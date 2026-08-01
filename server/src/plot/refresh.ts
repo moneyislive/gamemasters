@@ -600,11 +600,15 @@ function normalizarPistas(valor: unknown): PlotClue[] {
     const description = textoDe(dato.description);
     if (!description) return;
     const roomId = textoDe(dato.roomId);
+    // Las pistas que llegan de una ampliación completan salas nuevas: se
+    // reparten en rondas intermedias para no adelantar el desenlace.
+    const ronda = Number(dato.round);
     pistas.push({
       id: textoDe(dato.id) || `pista-nueva-${indice + 1}`,
       ...(roomId ? { roomId } : {}),
       description,
       pointsTo: textoDe(dato.pointsTo),
+      round: Number.isInteger(ronda) && ronda >= 1 && ronda <= 4 ? ronda : 2,
     });
   });
   return pistas;

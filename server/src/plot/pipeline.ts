@@ -143,6 +143,19 @@ function construirPrompt(game: GameSession): string {
       .map((w) => `- id: "${w.id}" · nombre: "${w.name}"${w.description?.trim() ? ` · descripción: ${w.description.trim()}` : ''}`)
       .join('\n') || '- (sin armas registradas)';
 
+  // El tablero ya está trazado cuando se pide la trama: si el modelo no conoce
+  // los pasadizos REALES, se los inventa y contradice al plano de los dosieres.
+  const pasadizos =
+    game.boardMode === 'generated' && game.board?.passages.length
+      ? game.board.passages
+          .map((pasadizo) => {
+            const desde = game.rooms.find((s) => s.id === pasadizo.fromRoomId)?.name ?? '';
+            const hasta = game.rooms.find((s) => s.id === pasadizo.toRoomId)?.name ?? '';
+            return `- "${desde}" ⇄ "${hasta}"`;
+          })
+          .join('\n')
+      : '- (esta partida no tiene pasadizos secretos: no menciones ninguno)';
+
   return `Diseña la trama completa de una partida de CLUEDO EN VIVO llamada "${game.name}".
 
 SOSPECHOSOS (personas reales que jugarán; usa sus ids EXACTOS):
@@ -154,15 +167,28 @@ ${salas}
 ARMAS (objetos reales aportados; usa sus ids EXACTOS):
 ${armas}
 
+PASADIZOS SECRETOS YA TRAZADOS EN EL PLANO (son estos y solo estos):
+${pasadizos}
+
 REQUISITOS:
 1. Trama elaborada ambientada en los años 20, adaptada al espacio REAL descrito por las salas: el escenario debe sentirse como esa casa concreta convertida en mansión.
 2. Un personaje por sospechoso, hecho A MEDIDA de la persona real: usa su nombre y su descripción psicológica; el campo personalHook debe explicar cómo el personaje aprovecha su forma de ser.
 3. Coherencia total: coartadas cruzadas entre personajes, secretos que se entrelazan con el motivo del crimen, sin contradicciones con la cronología.
 4. La solución (solution.murdererId, solution.weaponId, solution.roomId) DEBE usar ids EXISTENTES de las listas anteriores. Igual para characters[].suspectId (exactamente uno por sospechoso), clues[].roomId y timeline[].suspectIds.
 5. La sinopsis es pública: NO debe revelar asesino, arma ni sala del crimen.
-6. timeline: de 6 a 8 eventos con hora ("19:30"); incluye 1 o 2 eventos que impliquen SOLO al asesino (se ocultarán a los jugadores).
-7. clues: aproximadamente 2 pistas por sala, mezcla de pistas verdaderas y señuelos; pointsTo indica qué o a quién señala cada una.
-8. gmScript: al menos 6 pasos concretos para que el Game Master conduzca la velada de principio a fin.
+6. PASADIZOS: si mencionas alguno en secretos, coartadas o pistas, debe ser EXACTAMENTE uno de los listados arriba. No inventes conexiones entre salas que el plano no tiene.
+7. timeline: de 8 a 12 eventos con hora ("19:30"), mezclando públicos y secretos.
+   - isPublic true SOLO para los momentos que presenciaron TODOS a la vez (llegada, cena, anuncio, apagón, hallazgo del cuerpo). Serán los únicos que vean los jugadores.
+   - isPublic false para todo lo demás: quién se movió durante el apagón, quién manipuló qué, quién provocó el apagón, conversaciones privadas, alteraciones de la escena y el crimen.
+   - Un evento que implique a UNA sola persona nunca puede ser público.
+8. COHERENCIA HORARIA (crítico, se revisa): las horas de la cronología, las coartadas de los personajes y las pistas deben encajar sin contradecirse.
+   - Si dos personajes se dan coartada mutua, ambos dosieres deben indicar el MISMO intervalo.
+   - Nadie puede estar en dos sitios a la vez ni presenciar algo fuera de su intervalo.
+   - Si una pista fija una hora, ningún personaje puede contradecirla sin que eso sea una mentira deliberada y marcada como tal en su secreto.
+9. clues: aproximadamente 2 pistas por sala, mezcla de verdaderas y señuelos; pointsTo indica qué o a quién señala cada una.
+   - REPARTO POR RONDAS con el campo "round": 1 motivos, conflictos y señuelos; 2 objetos desplazados y coartadas incompletas; 3 horarios, trayectos y contradicciones; 4 evidencias decisivas.
+   - Ninguna pista que por sí sola identifique al culpable puede llevar round 1 o 2. Reparte de forma pareja entre las cuatro rondas.
+10. gmScript: al menos 6 pasos concretos para conducir la velada. Debe incluir abrir un sobre de pistas por ronda y una puesta en común al final de cada ronda.
 9. TODO en español, con elegancia de novela negra de los años 20.${buildStyleBlock(game)}`;
 }
 

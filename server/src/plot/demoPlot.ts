@@ -263,37 +263,44 @@ function construirCronologia(
       time: '19:00',
       description: `Los invitados van llegando; ${nombreVictima} recibe a cada uno con una copa y una indirecta.`,
       suspectIds: todos,
+      isPublic: true,
     },
     {
       time: '19:45',
       description: `Durante el aperitivo, ${nombreVictima} anuncia que a medianoche "pondrá los puntos sobre las íes". Varias copas se detienen a medio camino.`,
       suspectIds: todos,
+      isPublic: true,
     },
     {
       time: '20:30',
       description: 'Cena servida. Conversación brillante en la superficie, cuchillos afilados por debajo.',
       suspectIds: todos,
+      isPublic: true,
     },
     {
       time: '21:15',
       description: `${nombreVictima} se excusa y se retira "a atender un asunto privado". Nadie admite haberle seguido.`,
       suspectIds: [],
+      isPublic: true,
     },
     {
       time: '21:40',
       description: 'Un apagón deja la casa a oscuras durante varios minutos. Pasos, un roce de telas, una puerta que no debía abrirse.',
       suspectIds: todos,
+      isPublic: true,
     },
     {
-      // Evento delator: implica solo al asesino. Se oculta en la cronología pública.
+      // Delator: nadie lo vio, así que jamás debe salir del dosier del GM.
       time: '21:44',
       description: `Una silueta se desliza hacia ${salaCrimen.name} amparada por la oscuridad y vuelve al salón antes de que prendan las velas.`,
       suspectIds: [asesino.id],
+      isPublic: false,
     },
     {
       time: '21:47',
       description: `Vuelve la luz. Un grito: ${descubridor.name} encuentra el cuerpo de ${nombreVictima}. La velada se convierte en investigación.`,
-      suspectIds: [descubridor.id],
+      suspectIds: [descubridor.id, ...todos.filter((id) => id !== descubridor.id)],
+      isPublic: true,
     },
   ];
 }
@@ -318,12 +325,15 @@ function construirPistas(
         roomId: sala.id,
         description: `Una alfombra ligeramente torcida y una mancha reciente que alguien limpió con más prisa que acierto.`,
         pointsTo: 'Señala esta sala como la verdadera escena del crimen.',
+        // Decisiva: cierra la sala del crimen, así que va en la última ronda.
+        round: 4,
       });
       pistas.push({
         id: `pista-${i + 1}-b`,
         roomId: sala.id,
         description: `Una marca del tamaño y forma de ${armaCrimen.name.toLowerCase()} en el polvo de una repisa: algo estuvo ahí hasta esta misma noche.`,
         pointsTo: `Señala ${armaCrimen.name} como el arma del crimen.`,
+        round: 4,
       });
     } else {
       pistas.push({
@@ -339,6 +349,8 @@ function construirPistas(
           i,
         ),
         pointsTo: `Parece incriminar a ${senuelo.name}… quizá demasiado claramente. Pista falsa.`,
+        // Señuelo: es lo que se saca al principio para levantar sospechas.
+        round: 1,
       });
       pistas.push({
         id: `pista-${i + 1}-b`,
@@ -353,6 +365,8 @@ function construirPistas(
           i + 1,
         ),
         pointsTo: `Sitúa a alguien moviéndose por la casa durante el apagón. Encaja con la coartada rota de ${asesino.name}.`,
+        // Horarios y trayectos: material de la tercera ronda.
+        round: 3,
       });
     }
   });

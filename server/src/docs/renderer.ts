@@ -428,17 +428,29 @@ function seccionEscenario(game: GameSession): string {
   </section>`;
 }
 
+/*
+ * Reglas del CLUEDO EN VIVO.
+ *
+ * Ojo: NO son las del Cluedo de tablero. Allí cada jugador tiene cartas que
+ * permiten refutar formalmente una sugerencia; aquí cada uno tiene un dosier
+ * narrativo y no puede «desmentir» una combinación, así que esa mecánica se
+ * sustituye por preguntas dirigidas. Y como la información está repartida, hay
+ * una obligación mínima de compartir: sin ella, dos jugadores callados podrían
+ * dejar el caso sin resolver.
+ */
 const REGLAS_EN_VIVO = [
-  '<b>El objetivo.</b> Alguien de esta casa es un asesino. Debes descubrir <b>quién</b> lo hizo, <b>con qué objeto</b> y <b>en qué sala</b>. Gana quien acuse correctamente los tres elementos.',
-  '<b>Tu personaje.</b> Interpreta al personaje de este dosier durante toda la velada. Puedes mentir, insinuar y desviar la atención, pero <b>nunca puedes negar una pregunta directa sobre un hecho que tu dosier afirma como cierto</b>.',
-  '<b>Tu secreto.</b> Todos escondéis algo. Solo debes revelar tu secreto si alguien te acorrala con una prueba concreta, o si consideras que te conviene.',
-  '<b>Las rondas.</b> El Game Master abrirá y cerrará cada ronda. Durante una ronda puedes desplazarte a una sala y conversar en privado con quien esté allí.',
-  '<b>Sugerencias.</b> Estando en una sala puedes formular en voz alta una sugerencia: «Sospecho de <i>[persona]</i>, con <i>[objeto]</i>, en <i>[esta sala]</i>». Quien pueda desmentir alguno de los tres elementos debe hacerlo <b>en privado y mostrando una sola prueba</b>.',
-  '<b>Pistas.</b> Repartidas por las salas hay pistas físicas y testimonios. Puedes compartirlas, guardarlas o mentir sobre ellas.',
+  '<b>El objetivo.</b> Alguien de esta casa es un asesino. Debes descubrir <b>quién</b> lo hizo, <b>con qué objeto</b> y <b>en qué sala</b>. Gana quien acierte los tres elementos en la acusación final.',
+  '<b>Tu personaje.</b> Interpreta al personaje de este dosier durante toda la velada. Tu forma de ser, tus opiniones y tus intenciones son tuyas; los hechos que el dosier da por ciertos, no.',
+  '<b>Qué puedes ocultar y qué no.</b> Puedes callar, desviar la atención y mentir sobre tus <i>opiniones, intenciones y sospechas</i>. <b>No</b> puedes negar un hecho que tu dosier afirme expresamente, mentir sobre dónde estuviste realmente, inventarte pruebas ni cambiar lo que dice una pista. Sobre una prueba puedes discutir su <i>interpretación</i>, nunca su contenido.',
+  '<b>Tu secreto.</b> Todos escondéis algo, y casi ninguno es el crimen. Revélalo cuando te acorralen con algo concreto o cuando te convenga; nadie puede obligarte.',
+  '<b>Las rondas.</b> El Game Master abre y cierra cada ronda. Durante una ronda te desplazas a una sala y conversas con quien esté allí.',
+  '<b>Preguntas dirigidas.</b> En cada ronda puedes hacer <b>una pregunta directa</b> a alguien que esté en tu sala. Puede responder con la verdad, dar una respuesta parcial o negarse a contestar —negarse también dice cosas—. Lo que no puede es contradecir un hecho de su dosier.',
+  '<b>Hipótesis.</b> Puedes lanzar en voz alta la combinación que sospeches (persona, objeto y sala) para provocar reacciones, pero <b>nadie está obligado a refutarla</b>: aquí no hay cartas que enseñar. Solo cuenta la acusación final.',
+  '<b>Pistas.</b> El Game Master saca pruebas nuevas en cada ronda. Las que encuentres son tuyas para enseñarlas o guardarlas… pero al cerrar cada ronda, <b>cada sala pone en común un hecho verificable</b> y las pruebas físicas halladas pasan al tablón común. Los secretos personales siguen siendo privados.',
   '<b>Pasadizos.</b> Si el plano marca un pasadizo secreto entre dos salas, puedes usarlo para cruzar la casa sin pasar por el pasillo. Nadie te verá salir.',
-  '<b>La acusación final.</b> Cuando el Game Master anuncie la última ronda, cada jugador escribe su acusación (persona, objeto y sala). Solo se puede acusar <b>una vez</b>.',
-  '<b>El desenlace.</b> El Game Master lee la solución. Quien haya acertado los tres elementos resuelve el caso; si nadie acierta, el asesino se sale con la suya.',
-  '<b>La regla de oro.</b> Todo lo que ocurre esta noche es ficción. Interpreta con generosidad y deja brillar a los demás.',
+  '<b>La acusación final.</b> En la última ronda cada jugador escribe su acusación: persona, objeto y sala. Se acusa <b>una sola vez</b> y por escrito, a la vez que los demás.',
+  '<b>El desenlace.</b> Se lee la solución. Quien haya acertado los tres elementos resuelve el caso; si nadie acierta, el asesino se sale con la suya.',
+  '<b>La regla de oro.</b> Todo lo de esta noche es ficción. Interpreta con generosidad y deja brillar a los demás.',
 ];
 
 function seccionReglas(): string {
@@ -454,10 +466,14 @@ function seccionReglas(): string {
  * asesino, porque delatarían el crimen antes de tiempo.
  */
 function cronologiaPublica(plot: Plot): TimelineEvent[] {
-  return plot.timeline.filter(
-    (evento) =>
-      !(evento.suspectIds.length === 1 && evento.suspectIds[0] === plot.solution.murdererId),
-  );
+  return plot.timeline.filter((evento) => {
+    // Regla principal: solo lo que presenciaron todos.
+    if (evento.isPublic !== true) return false;
+    // Cinturón y tirantes: aunque el modelo marcara como público un momento que
+    // implica a una sola persona, eso no lo vio nadie más. Fuera.
+    if (evento.suspectIds.length === 1) return false;
+    return true;
+  });
 }
 
 function seccionCronologia(eventos: TimelineEvent[], titulo: string, nota: string): string {
@@ -653,23 +669,46 @@ function dosierGameMaster(game: GameSession, plot: Plot): PlayerDocument {
     <ol class="reglas">${plot.gmScript.map((paso) => `<li>${esc(paso)}</li>`).join('')}</ol>
   </section>`;
 
+  // Las pistas se entregan POR RONDAS: sacarlas todas de golpe permite cerrar
+  // el caso en la primera media hora y arruina los señuelos.
+  const ETIQUETA_RONDA: Record<number, string> = {
+    1: 'Ronda 1 · Motivos, conflictos y señuelos',
+    2: 'Ronda 2 · Objetos desplazados y coartadas incompletas',
+    3: 'Ronda 3 · Horarios, trayectos y contradicciones',
+    4: 'Ronda 4 · Evidencias decisivas',
+  };
+  const porRonda = new Map<number, typeof plot.clues>();
+  for (const pista of plot.clues) {
+    const ronda = Number.isInteger(pista.round) && pista.round >= 1 && pista.round <= 4 ? pista.round : 1;
+    porRonda.set(ronda, [...(porRonda.get(ronda) ?? []), pista]);
+  }
+
   const pistas =
     plot.clues.length > 0
       ? `<section>
-          <h2>Todas las pistas</h2>
-          <ol class="crono">
-            ${plot.clues
-              .map((pista) => {
-                const nombreSala = pista.roomId
-                  ? (game.rooms.find((sala) => sala.id === pista.roomId)?.name ?? '')
-                  : '';
-                return `<li>
-                  <span class="hora">${esc(nombreSala || '—')}</span>
-                  <span>${esc(pista.description)}<br /><em style="color:#6d1a2a">Señala a: ${esc(pista.pointsTo)}</em></span>
-                </li>`;
-              })
-              .join('')}
-          </ol>
+          <h2>Las pistas, ronda a ronda</h2>
+          <p><em>Prepara un sobre por ronda. No pongas todas las pruebas sobre la mesa desde el principio: las de la ronda 4 cierran el caso.</em></p>
+          ${[1, 2, 3, 4]
+            .filter((ronda) => (porRonda.get(ronda) ?? []).length > 0)
+            .map(
+              (ronda) => `<div class="caja caja--gm" style="margin-bottom:16px">
+                <h3>${esc(ETIQUETA_RONDA[ronda] ?? `Ronda ${ronda}`)}</h3>
+                <ol class="crono">
+                  ${(porRonda.get(ronda) ?? [])
+                    .map((pista) => {
+                      const nombreSala = pista.roomId
+                        ? (game.rooms.find((sala) => sala.id === pista.roomId)?.name ?? '')
+                        : '';
+                      return `<li>
+                        <span class="hora">${esc(nombreSala || '—')}</span>
+                        <span>${esc(pista.description)}<br /><em style="color:#6d1a2a">Señala a: ${esc(pista.pointsTo)}</em></span>
+                      </li>`;
+                    })
+                    .join('')}
+                </ol>
+              </div>`,
+            )
+            .join('')}
         </section>`
       : '';
 

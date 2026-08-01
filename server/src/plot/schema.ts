@@ -62,7 +62,7 @@ const PERSONAJE_SCHEMA: Record<string, unknown> = {
 const PISTA_SCHEMA: Record<string, unknown> = {
   type: 'object',
   additionalProperties: false,
-  required: ['id', 'roomId', 'description', 'pointsTo'],
+  required: ['id', 'roomId', 'description', 'pointsTo', 'round'],
   properties: {
     id: { type: 'string', description: 'Identificador único de la pista, p. ej. "pista-1"' },
     roomId: {
@@ -71,6 +71,15 @@ const PISTA_SCHEMA: Record<string, unknown> = {
     },
     description: { type: 'string', description: 'Qué es la pista y cómo se presenta' },
     pointsTo: { type: 'string', description: 'Qué o a quién señala esta pista' },
+    round: {
+      type: 'integer',
+      enum: [1, 2, 3, 4],
+      description:
+        'Ronda en la que el Game Master saca esta pista. 1: motivos, conflictos y señuelos. ' +
+        '2: objetos desplazados y coartadas incompletas. 3: horarios, trayectos y contradicciones. ' +
+        '4: evidencias decisivas que cierran el caso. NINGUNA pista que por sí sola señale al ' +
+        'culpable puede ir en las rondas 1 o 2.',
+    },
   },
 };
 
@@ -147,11 +156,13 @@ export const PLOT_SCHEMA: Record<string, unknown> = {
     },
     timeline: {
       type: 'array',
-      description: 'Cronología de la velada (6-8 eventos con hora)',
+      description:
+        'Cronología COMPLETA de la velada (8-12 eventos con hora), pública y secreta mezclada. ' +
+        'Las horas deben ser consistentes entre sí y con las coartadas de los personajes.',
       items: {
         type: 'object',
         additionalProperties: false,
-        required: ['time', 'description', 'suspectIds'],
+        required: ['time', 'description', 'suspectIds', 'isPublic'],
         properties: {
           time: { type: 'string', description: 'Hora del evento, p. ej. "21:40"' },
           description: { type: 'string', description: 'Qué ocurrió' },
@@ -159,6 +170,16 @@ export const PLOT_SCHEMA: Record<string, unknown> = {
             type: 'array',
             description: 'Ids EXACTOS de los sospechosos implicados en el evento',
             items: { type: 'string' },
+          },
+          isPublic: {
+            type: 'boolean',
+            description:
+              'true SOLO si lo presenciaron todos los invitados a la vez (llegada, cena, ' +
+              'anuncio, apagón, hallazgo del cuerpo). false para todo lo que alguien hizo ' +
+              'cuando nadie miraba: movimientos durante el apagón, manipulación de objetos, ' +
+              'conversaciones privadas, causas del apagón, alteraciones de la escena y el ' +
+              'crimen mismo. Ante la duda, false: los eventos públicos se imprimen en el ' +
+              'dosier de TODOS los jugadores y destriparían el misterio.',
           },
         },
       },

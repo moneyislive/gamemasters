@@ -100,6 +100,12 @@ export interface PlotClue {
   roomId?: string;
   description: string;
   pointsTo: string;
+  /**
+   * Ronda en la que el Game Master pone esta pista sobre la mesa (1 = primera).
+   * Evita que las pruebas decisivas estén disponibles desde el minuto uno:
+   * las rondas bajas traen motivos y señuelos, las altas cierran el caso.
+   */
+  round: number;
 }
 
 export interface TimelineEvent {
@@ -107,6 +113,15 @@ export interface TimelineEvent {
   description: string;
   /** Ids de sospechosos implicados */
   suspectIds: string[];
+  /**
+   * ¿Lo presenciaron todos los invitados?
+   *
+   * Solo los eventos públicos aparecen en los dosieres de los jugadores. Todo
+   * lo demás —lo que alguien hizo cuando nadie miraba— pertenece a los secretos
+   * y a las pistas, y su lugar es el dosier del Game Master. Sin esta marca, la
+   * cronología destripaba las confesiones, las coartadas falsas y el crimen.
+   */
+  isPublic: boolean;
 }
 
 export interface PlotSolution {
