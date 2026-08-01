@@ -95,14 +95,16 @@ export function computeStaleness(game: GameSession): StalenessReport {
     .filter((c) => !idsSospechosos.has(c.suspectId))
     .map((c) => c.suspectId);
 
-  // El dosier del Game Master ('gm') no corresponde a ningún sospechoso.
+  // Los dosieres del Game Master ('gm') y del sobre sellado ('solution') no
+  // corresponden a ningún sospechoso.
+  const NO_JUGADORES = new Set(['gm', 'solution']);
   const conDosier = new Set(documents.map((d) => d.suspectId));
   const suspectsWithoutDocument =
     documents.length === 0
       ? []
       : game.suspects.filter((s) => !conDosier.has(s.id)).map((s) => s.id);
   const orphanDocuments = documents
-    .filter((d) => d.suspectId !== 'gm' && !idsSospechosos.has(d.suspectId))
+    .filter((d) => !NO_JUGADORES.has(d.suspectId) && !idsSospechosos.has(d.suspectId))
     .map((d) => d.suspectId);
 
   const brokenSolution = {

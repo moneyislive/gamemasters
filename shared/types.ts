@@ -168,9 +168,100 @@ export interface PlayerDocument {
 export type GameStatus = 'draft' | 'generating' | 'ready';
 export type BoardMode = 'generated' | 'aerial';
 
+/** Bloques que componen el dosier de un jugador, en el orden en que se imprimen. */
+export type DocumentSectionId =
+  | 'cover'
+  | 'character'
+  | 'secret'
+  | 'knowledge'
+  | 'case'
+  | 'rules'
+  | 'suspects'
+  | 'weapons'
+  | 'board'
+  | 'timeline';
+
+export interface DocumentSectionInfo {
+  id: DocumentSectionId;
+  label: string;
+  description: string;
+  /** Sin estos bloques el dosier no tendría sentido: no se pueden quitar. */
+  required?: boolean;
+}
+
+/** Catálogo de secciones: lo usan el renderizador y la maqueta de la interfaz. */
+export const DOCUMENT_SECTIONS: DocumentSectionInfo[] = [
+  {
+    id: 'cover',
+    label: 'Portada',
+    description: 'Título del misterio, lema y a quién pertenece el dosier.',
+    required: true,
+  },
+  {
+    id: 'character',
+    label: 'Tu personaje',
+    description: 'Papel, cara pública, motivo y coartada. El corazón del dosier.',
+    required: true,
+  },
+  {
+    id: 'secret',
+    label: 'Tu secreto',
+    description: 'Lo que esconde tu personaje, en su caja sellada. Al asesino se le revela aquí.',
+  },
+  {
+    id: 'knowledge',
+    label: 'Lo que sabes de los demás',
+    description: 'Dos o tres datos sobre otros personajes con los que empezar a tirar del hilo.',
+  },
+  {
+    id: 'case',
+    label: 'El caso',
+    description: 'La víctima y la sinopsis pública de lo ocurrido.',
+  },
+  {
+    id: 'rules',
+    label: 'Cómo se juega',
+    description: 'Las reglas del Cluedo en vivo. Quítalas si tus invitados ya son veteranos.',
+  },
+  {
+    id: 'suspects',
+    label: 'Los sospechosos',
+    description: 'Galería con el resto de invitados y sus fotos.',
+  },
+  {
+    id: 'weapons',
+    label: 'Los objetos',
+    description: 'Las posibles armas del crimen, con sus fotos.',
+  },
+  {
+    id: 'board',
+    label: 'El escenario',
+    description: 'El plano del tablero o la foto aérea con las salas marcadas.',
+  },
+  {
+    id: 'timeline',
+    label: 'Cronología pública',
+    description: 'Los momentos de la velada que presenciaron todos los invitados.',
+  },
+];
+
 export interface GameSettings {
   model?: ModelId;
   language: 'es';
+  /**
+   * Secciones incluidas en los dosieres de los jugadores. Si se omite, van
+   * todas. Las marcadas como `required` se incluyen siempre.
+   */
+  documentSections?: DocumentSectionId[];
+  /**
+   * ¿El Game Master juega también como personaje?
+   *
+   * Con esto activo, su dosier se parte en dos: una «guía de la velada» SIN la
+   * solución (rondas, sobres de pistas y qué leer en voz alta) y un sobre
+   * sellado aparte que nadie abre hasta el final. Así puede investigar en
+   * igualdad de condiciones.
+   */
+  gmPlays?: boolean;
   /**
    * Meta-prompt de estilo del juego: una indicación libre del Game Master que
    * condiciona SOLO el tono, la ambientación y el vocabulario de la trama y de

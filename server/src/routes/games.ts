@@ -7,7 +7,8 @@
  *   DELETE /games/:id  → {ok:true}
  */
 import { Router } from 'express';
-import type { GameSettings } from '../../../shared/types';
+import { DOCUMENT_SECTIONS } from '../../../shared/types';
+import type { DocumentSectionId, GameSettings } from '../../../shared/types';
 import { isModelId } from '../config';
 import { getStore } from '../db/store';
 import { normalizeStylePrompt } from '../plot/style';
@@ -106,6 +107,29 @@ router.patch('/games/:id', async (req, res) => {
           return;
         }
       }
+      // Secciones de los dosieres: se filtran contra el catálogo conocido.
+      if ('documentSections' in incoming) {
+        const brutas = incoming.documentSections;
+        if (Array.isArray(brutas)) {
+          const validas = DOCUMENT_SECTIONS.map((s) => s.id);
+          nextSettings.documentSections = brutas.filter(
+            (id): id is DocumentSectionId =>
+              typeof id === 'string' && validas.includes(id as DocumentSectionId),
+          );
+        } else {
+          delete nextSettings.documentSections;
+        }
+      }
+
+      // ¿El Game Master juega también como personaje?
+      if ('gmPlays' in incoming) {
+        if (typeof incoming.gmPlays === 'boolean') {
+          nextSettings.gmPlays = incoming.gmPlays;
+        } else {
+          delete nextSettings.gmPlays;
+        }
+      }
+
       // Meta-prompt de estilo: texto libre normalizado; vacío o null lo retira.
       if ('stylePrompt' in incoming) {
         const estilo = normalizeStylePrompt(incoming.stylePrompt);

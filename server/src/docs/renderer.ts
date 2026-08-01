@@ -11,8 +11,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { env } from '../config';
 import { styleNoteForGm } from '../plot/style';
+import { DOCUMENT_SECTIONS } from '../../../shared/types';
 import type {
   BoardLayout,
+  DocumentSectionId,
   GameSession,
   PlayerDocument,
   Plot,
@@ -515,14 +517,33 @@ function envolver(titulo: string, contenido: string): string {
 // Dosier de jugador
 // ---------------------------------------------------------------------------
 
+/**
+ * ¿Va incluida esta sección en los dosieres de esta partida?
+ * Sin selección guardada van todas; las obligatorias van siempre.
+ */
+function incluye(game: GameSession, seccion: DocumentSectionId): boolean {
+  const info = DOCUMENT_SECTIONS.find((s) => s.id === seccion);
+  if (info?.required) return true;
+  const elegidas = game.settings?.documentSections;
+  if (!elegidas || elegidas.length === 0) return true;
+  return elegidas.includes(seccion);
+}
+
 /** Título del dosier de un jugador (compartido por el índice y el render). */
 function tituloJugador(plot: Plot, sospechoso: Suspect): string {
   return `${plot.title} — Dosier de ${sospechoso.name}`;
 }
 
-/** Título del dosier del Game Master. */
-function tituloGameMaster(plot: Plot): string {
-  return `${plot.title} — Dosier del Game Master`;
+/** Título del dosier del Game Master (distinto si juega a ciegas). */
+function tituloGameMaster(plot: Plot, aCiegas = false): string {
+  return aCiegas
+    ? `${plot.title} — Guía de la velada (a ciegas)`
+    : `${plot.title} — Dosier del Game Master`;
+}
+
+/** Título del sobre sellado con la solución. */
+function tituloSolucion(plot: Plot): string {
+  return `${plot.title} — El sobre del crimen`;
 }
 
 function dosierJugador(
@@ -557,13 +578,17 @@ function dosierJugador(
         </div>
       </div>
 
-      <div class="caja caja--secreto" style="margin-top:24px">
-        <div class="titulo-secreto">⚑ Tu secreto — no lo compartas a la ligera</div>
-        <p style="margin:0">${esc(personaje.secret)}</p>
-      </div>
+      ${
+        incluye(game, 'secret')
+          ? `<div class="caja caja--secreto" style="margin-top:24px">
+              <div class="titulo-secreto">⚑ Tu secreto — no lo compartas a la ligera</div>
+              <p style="margin:0">${esc(personaje.secret)}</p>
+            </div>`
+          : ''
+      }
 
       ${
-        personaje.knowledge.length > 0
+        incluye(game, 'knowledge') && personaje.knowledge.length > 0
           ? `<div class="caja" style="margin-top:18px">
               <h3>Lo que sabes de los demás</h3>
               <ul style="margin:0;padding-left:20px">
@@ -595,10 +620,12 @@ function dosierJugador(
     </section>`
     : '';
 
+  // Cada bloque se incluye solo si el Game Master lo dejó activo en la maqueta.
   const contenido = [
     portada,
     seccionPersonaje,
-    `<section>
+    incluye(game, 'case')
+      ? `<section>
       <h2>El caso</h2>
       <div class="caja">
         <h3>La víctima: ${esc(plot.victim.name)}</h3>
@@ -606,17 +633,22 @@ function dosierJugador(
       </div>
       <p style="margin-top:20px">${esc(plot.synopsis)}</p>
       ${bloqueDato('El lugar', plot.setting)}
-    </section>`,
-    seccionReglas(),
-    seccionSospechosos(game, plot),
-    seccionArmas(game),
-    seccionEscenario(game),
-    seccionCronologia(
-      cronologiaPublica(plot),
-      'Cronología de la velada',
-      'Lo que todo el mundo sabe que ocurrió. Nadie ha contado todavía lo que hizo cuando nadie miraba.',
-    ),
-  ].join('\n');
+    </section>`
+      : '',
+    incluye(game, 'rules') ? seccionReglas() : '',
+    incluye(game, 'suspects') ? seccionSospechosos(game, plot) : '',
+    incluye(game, 'weapons') ? seccionArmas(game) : '',
+    incluye(game, 'board') ? seccionEscenario(game) : '',
+    incluye(game, 'timeline')
+      ? seccionCronologia(
+          cronologiaPublica(plot),
+          'Cronología de la velada',
+          'Lo que todo el mundo sabe que ocurrió. Nadie ha contado todavía lo que hizo cuando nadie miraba.',
+        )
+      : '',
+  ]
+    .filter(Boolean)
+    .join('\n');
 
   return {
     suspectId: sospechoso.id,
@@ -629,6 +661,51 @@ function dosierJugador(
 // Dosier del Game Master
 // ---------------------------------------------------------------------------
 
+/**
+ * Sobre sellado: SOLO la solución. Se genera cuando el Game Master juega como
+ * personaje, para que nadie —él tampoco— sepa quién fue hasta el final.
+ */
+function dosierSolucion(game: GameSession, plot: Plot): PlayerDocument {
+  const asesino = game.suspects.find((s) => s.id === plot.solution.murdererId);
+  const arma = game.weapons.find((w) => w.id === plot.solution.weaponId);
+  const sala = game.rooms.find((r) => r.id === plot.solution.roomId);
+  const personaje = plot.characters.find((c) => c.suspectId === plot.solution.murdererId);
+
+  const contenido = `<div class="portada">
+      <span class="sello">No abrir hasta el final de la velada</span>
+      <h1>El sobre del crimen</h1>
+      <p class="lema">${esc(plot.tagline)}</p>
+      <p class="destinatario">Solución de<strong>${esc(plot.title)}</strong></p>
+    </div>
+
+    <section>
+      <div class="caja caja--asesino">
+        <div class="titulo-secreto">☠ La solución</div>
+        <p style="font-size:23px;font-family:'Cinzel',serif;color:#4a0f1c;margin:6px 0 18px">
+          ${esc(asesino?.name ?? '—')}${personaje ? ` — ${esc(personaje.characterName)}` : ''}<br />
+          con ${esc(arma?.name ?? '—')}, en ${esc(sala?.name ?? '—')}
+        </p>
+        ${bloqueDato('Motivo', plot.solution.motive)}
+        ${bloqueDato('Cómo ocurrió', plot.solution.howItHappened)}
+      </div>
+      <p style="margin-top:22px;font-style:italic;text-align:center">
+        Léelo en voz alta cuando todos hayan entregado su acusación por escrito.
+      </p>
+    </section>`;
+
+  return {
+    suspectId: 'solution',
+    title: tituloSolucion(plot),
+    html: envolver(`${plot.title} — Solución`, contenido),
+  };
+}
+
+/**
+ * Dosier del Game Master. Si `settings.gmPlays` está activo se genera en modo
+ * CIEGO: conserva el guion, las pistas por rondas y la cronología completa que
+ * necesita para conducir la velada, pero SIN la solución ni los secretos de los
+ * jugadores, que se van al sobre sellado.
+ */
 function dosierGameMaster(game: GameSession, plot: Plot): PlayerDocument {
   const nombreDe = (id: string): string =>
     game.suspects.find((sospechoso) => sospechoso.id === id)?.name ?? id;
@@ -683,11 +760,15 @@ function dosierGameMaster(game: GameSession, plot: Plot): PlayerDocument {
     porRonda.set(ronda, [...(porRonda.get(ronda) ?? []), pista]);
   }
 
+  // A ciegas se listan las pistas (hay que repartirlas) pero NO qué señalan:
+  // «Señala X como el arma del crimen» destriparía el caso al propio GM.
+  const ciego = game.settings?.gmPlays === true;
+
   const pistas =
     plot.clues.length > 0
       ? `<section>
           <h2>Las pistas, ronda a ronda</h2>
-          <p><em>Prepara un sobre por ronda. No pongas todas las pruebas sobre la mesa desde el principio: las de la ronda 4 cierran el caso.</em></p>
+          <p><em>Prepara un sobre por ronda. No pongas todas las pruebas sobre la mesa desde el principio: las de la ronda 4 cierran el caso.${ciego ? ' Como juegas a ciegas, no se indica qué señala cada una: repártelas sin leerlas más de lo necesario.' : ''}</em></p>
           ${[1, 2, 3, 4]
             .filter((ronda) => (porRonda.get(ronda) ?? []).length > 0)
             .map(
@@ -701,7 +782,11 @@ function dosierGameMaster(game: GameSession, plot: Plot): PlayerDocument {
                         : '';
                       return `<li>
                         <span class="hora">${esc(nombreSala || '—')}</span>
-                        <span>${esc(pista.description)}<br /><em style="color:#6d1a2a">Señala a: ${esc(pista.pointsTo)}</em></span>
+                        <span>${esc(pista.description)}${
+                          ciego
+                            ? ''
+                            : `<br /><em style="color:#6d1a2a">Señala a: ${esc(pista.pointsTo)}</em>`
+                        }</span>
                       </li>`;
                     })
                     .join('')}
@@ -732,9 +817,29 @@ function dosierGameMaster(game: GameSession, plot: Plot): PlayerDocument {
       .join('')}
   </section>`;
 
+  // Modo ciego: el Game Master también juega, así que su guía conserva lo que
+  // necesita para conducir la velada pero pierde la solución, los secretos
+  // ajenos y la cronología secreta. Todo eso se va al sobre sellado.
+  const aCiegas = game.settings?.gmPlays === true;
+
+  const avisoCiego = aCiegas
+    ? `<section>
+        <div class="caja caja--gm">
+          <h3>Guía a ciegas: tú también juegas</h3>
+          <p>Este documento NO contiene la solución ni los secretos de los demás: los tienes en tu
+          propio dosier de jugador, como cualquier invitado, y el crimen está en un sobre aparte
+          que nadie debe abrir hasta el final.</p>
+          <p style="margin-bottom:0">Aquí tienes lo justo para conducir la velada sin ventaja:
+          el guion, los sobres de pistas por ronda y qué leer en voz alta. Investiga en igualdad
+          de condiciones… y desconfía de ti mismo.</p>
+        </div>
+      </section>`
+    : '';
+
   const contenido = [
     portada,
-    solucion,
+    avisoCiego,
+    aCiegas ? '' : solucion,
     `<section>
       <h2>El caso</h2>
       <div class="caja">
@@ -745,20 +850,28 @@ function dosierGameMaster(game: GameSession, plot: Plot): PlayerDocument {
       ${bloqueDato('El lugar', plot.setting)}
     </section>`,
     guion,
-    seccionCronologia(
-      plot.timeline,
-      'Cronología completa',
-      'Incluye los movimientos que los jugadores no conocen: no la leas en voz alta.',
-    ),
+    aCiegas
+      ? seccionCronologia(
+          cronologiaPublica(plot),
+          'Cronología pública',
+          'Solo lo que presenciaron todos: el resto lo descubrirás jugando, como los demás.',
+        )
+      : seccionCronologia(
+          plot.timeline,
+          'Cronología completa',
+          'Incluye los movimientos que los jugadores no conocen: no la leas en voz alta.',
+        ),
     pistas,
-    secretos,
+    aCiegas ? '' : secretos,
     seccionEscenario(game),
     seccionReglas(),
-  ].join('\n');
+  ]
+    .filter(Boolean)
+    .join('\n');
 
   return {
     suspectId: 'gm',
-    title: tituloGameMaster(plot),
+    title: tituloGameMaster(plot, aCiegas),
     html: envolver(`${plot.title} — Game Master`, contenido),
   };
 }
@@ -779,11 +892,14 @@ function dosierGameMaster(game: GameSession, plot: Plot): PlayerDocument {
 export function renderDocumentIndex(game: GameSession): PlayerDocument[] {
   const plot = game.plot;
   if (!plot) return [];
+  const aCiegas = game.settings?.gmPlays === true;
   const indice: PlayerDocument[] = game.suspects.map((sospechoso) => ({
     suspectId: sospechoso.id,
     title: tituloJugador(plot, sospechoso),
   }));
-  indice.push({ suspectId: 'gm', title: tituloGameMaster(plot) });
+  indice.push({ suspectId: 'gm', title: tituloGameMaster(plot, aCiegas) });
+  // Con el Game Master jugando, la solución vive en su propio sobre sellado.
+  if (aCiegas) indice.push({ suspectId: 'solution', title: tituloSolucion(plot) });
   return indice;
 }
 
@@ -799,6 +915,7 @@ export function renderPlayerDocument(
   if (!plot) return null;
 
   if (suspectId === 'gm') return dosierGameMaster(game, plot);
+  if (suspectId === 'solution') return dosierSolucion(game, plot);
 
   const sospechoso = game.suspects.find((s) => s.id === suspectId);
   if (!sospechoso) return null;
@@ -819,5 +936,6 @@ export function renderPlayerDocuments(game: GameSession): PlayerDocument[] {
     dosierJugador(game, plot, sospechoso, personajePorId.get(sospechoso.id)),
   );
   documentos.push(dosierGameMaster(game, plot));
+  if (game.settings?.gmPlays === true) documentos.push(dosierSolucion(game, plot));
   return documentos;
 }

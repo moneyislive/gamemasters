@@ -12,6 +12,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { computeStaleness } from '../../../../shared/staleness';
 import { documentUrl } from '../../api/client';
 import { useAppStore } from '../../state/store';
+import SectionDesigner from './SectionDesigner';
 import { startRefresh } from '../generate/GenerateOverlay';
 import './documents.css';
 
@@ -95,6 +96,8 @@ export default function DocumentsPanel(): JSX.Element {
     return (
       <div className="docs-panel">
         {aviso}
+        {/* La maqueta se ve ANTES de generar: es cuando sirve para decidir. */}
+        <SectionDesigner />
         <div className="docs-empty">
           <span className="docs-empty-glyph" aria-hidden="true">
             ✒
@@ -140,7 +143,18 @@ export default function DocumentsPanel(): JSX.Element {
   if (idsConDocumento.has('gm')) {
     sobres.push({
       suspectId: 'gm',
-      personName: 'Game Master',
+      personName: game.settings.gmPlays ? 'Guía de la velada' : 'Game Master',
+      isGm: true,
+      sinDosier: false,
+      sobrante: false,
+    });
+  }
+
+  // Sobre sellado: solo existe cuando el Game Master juega a ciegas.
+  if (idsConDocumento.has('solution')) {
+    sobres.push({
+      suspectId: 'solution',
+      personName: 'El sobre del crimen',
       isGm: true,
       sinDosier: false,
       sobrante: false,
@@ -150,6 +164,8 @@ export default function DocumentsPanel(): JSX.Element {
   return (
     <div className="docs-panel">
       {aviso}
+
+      <SectionDesigner />
 
       <header className="docs-header">
         <div>
@@ -221,12 +237,16 @@ export default function DocumentsPanel(): JSX.Element {
             </div>
 
             <h3 className="docs-card-name">
-              {sobre.isGm ? 'Dosier del Game Master' : (sobre.characterName ?? sobre.personName)}
+              {sobre.isGm ? sobre.personName : (sobre.characterName ?? sobre.personName)}
             </h3>
             <p className="docs-card-sub">
-              {sobre.isGm
-                ? 'Solución, guion y todas las pistas'
-                : sobre.sinDosier
+              {sobre.suspectId === 'solution'
+                ? 'No lo abras hasta el final'
+                : sobre.isGm
+                  ? game.settings.gmPlays
+                    ? 'Rondas y pistas, sin la solución'
+                    : 'Solución, guion y todas las pistas'
+                  : sobre.sinDosier
                   ? 'Aún no tiene personaje ni documento'
                   : sobre.sobrante
                     ? 'Ya no figura entre los sospechosos'
@@ -281,9 +301,7 @@ export default function DocumentsPanel(): JSX.Element {
               onClick={(event) => event.stopPropagation()}
             >
               <header className="docs-viewer-head">
-                <h3>
-                  {abierto.isGm ? 'Dosier del Game Master' : `Dosier de ${abierto.personName}`}
-                </h3>
+                <h3>{abierto.isGm ? abierto.personName : `Dosier de ${abierto.personName}`}</h3>
                 <div className="docs-viewer-actions">
                   <a
                     className="btn btn--sm"
