@@ -99,8 +99,10 @@ router.post('/auth/login', (req, res) => {
   res.cookie(COOKIE, tokenDeSesion(password), {
     httpOnly: true,
     sameSite: 'lax',
-    // En producción la aplicación va por HTTPS; en local, no.
-    secure: process.env.NODE_ENV === 'production',
+    // Según la conexión REAL, no según NODE_ENV: una cookie «secure» servida
+    // por HTTP la descarta el navegador, y en una wifi doméstica (el portátil
+    // haciendo de servidor para los móviles) no hay HTTPS.
+    secure: req.secure,
     maxAge: DURACION_SEGUNDOS * 1000,
     path: '/',
   });
