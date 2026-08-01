@@ -1,0 +1,192 @@
+/* =====================================================================
+   TRANSICIÓN CLUEDO — puertas de caoba, luz cálida, lupa y humo
+   Todas las animaciones son transform/opacity (compositor, sin reflow).
+   ===================================================================== */
+
+.ct {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: #050505;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+}
+
+/* Luz cálida tras las puertas */
+.ct-light {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: radial-gradient(
+    46% 60% at 50% 46%,
+    rgba(247, 216, 140, 0.38),
+    rgba(201, 162, 39, 0.13) 45%,
+    transparent 72%
+  );
+  will-change: transform, opacity;
+}
+
+/* ---------- Escenario central: título + lupa ---------- */
+
+.ct-stage {
+  position: relative;
+  z-index: 2;
+  text-align: center;
+  padding: 40px 60px;
+}
+
+.ct-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(58px, 9vw, 122px);
+  line-height: 1;
+  margin: 0;
+  padding-left: 0.3em; /* compensa el tracking para centrar ópticamente */
+  background: linear-gradient(180deg, #f7e7b2 10%, var(--gold-400) 58%, var(--brass) 95%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 0 32px rgba(201, 162, 39, 0.35));
+  will-change: transform, opacity, letter-spacing;
+}
+
+.ct-sub {
+  margin: 18px 0 0;
+  color: var(--gold-300);
+  letter-spacing: 0.42em;
+  font-size: 13px;
+}
+
+.ct-lens {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 3;
+  width: 132px;
+  height: 132px;
+  margin: -88px 0 0 -66px;
+  filter: drop-shadow(0 8px 20px rgba(0, 0, 0, 0.55));
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+
+.ct-lens svg {
+  width: 100%;
+  height: 100%;
+}
+
+/* ---------- Puertas ---------- */
+
+.ct-doors {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: flex;
+  perspective: 1400px;
+  pointer-events: none;
+}
+
+.ct-door {
+  position: relative;
+  width: 50%;
+  height: 100%;
+  background:
+    linear-gradient(90deg, rgba(0, 0, 0, 0.35), transparent 20% 80%, rgba(0, 0, 0, 0.35)),
+    repeating-linear-gradient(
+      90deg,
+      rgba(0, 0, 0, 0.12) 0 3px,
+      transparent 3px 26px
+    ),
+    linear-gradient(90deg, #241209, #3c2012 45%, #2b1710);
+  box-shadow: inset 0 0 80px rgba(0, 0, 0, 0.65);
+  backface-visibility: hidden;
+  will-change: transform;
+}
+
+.ct-door--left {
+  transform-origin: left center;
+  border-right: 2px solid rgba(201, 162, 39, 0.5);
+}
+
+.ct-door--right {
+  transform-origin: right center;
+  border-left: 2px solid rgba(201, 162, 39, 0.5);
+}
+
+/* Cuarterones tallados */
+.ct-door-inner {
+  position: absolute;
+  inset: 6% 14%;
+  display: flex;
+  flex-direction: column;
+  gap: 5%;
+}
+
+.ct-panel {
+  flex: 1;
+  border: 2px solid rgba(0, 0, 0, 0.55);
+  border-radius: 4px;
+  background: linear-gradient(180deg, rgba(66, 40, 26, 0.9), rgba(43, 26, 18, 0.9));
+  box-shadow:
+    inset 0 0 0 2px rgba(201, 162, 39, 0.16),
+    inset 0 10px 26px rgba(0, 0, 0, 0.5);
+}
+
+.ct-panel--tall {
+  flex: 1.5;
+}
+
+/* Pomos dorados */
+.ct-knob {
+  position: absolute;
+  top: 50%;
+  width: 22px;
+  height: 22px;
+  margin-top: -11px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #f4e2a1, var(--gold-500) 55%, #6f5313);
+  box-shadow:
+    0 0 16px rgba(201, 162, 39, 0.6),
+    0 2px 5px rgba(0, 0, 0, 0.65);
+}
+
+.ct-door--left .ct-knob {
+  right: 26px;
+}
+
+.ct-door--right .ct-knob {
+  left: 26px;
+}
+
+/* ---------- Humo y viñeta ---------- */
+
+.ct-smoke {
+  position: absolute;
+  bottom: -18%;
+  z-index: 5;
+  width: 120%;
+  height: 55%;
+  pointer-events: none;
+  filter: blur(26px);
+  will-change: transform, opacity;
+}
+
+.ct-smoke--a {
+  left: -10%;
+  background: radial-gradient(50% 60% at 32% 60%, rgba(212, 206, 190, 0.16), transparent 70%);
+}
+
+.ct-smoke--b {
+  right: -10%;
+  background: radial-gradient(50% 60% at 68% 55%, rgba(212, 206, 190, 0.13), transparent 70%);
+}
+
+.ct-vignette {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  pointer-events: none;
+  background: radial-gradient(120% 120% at 50% 50%, transparent 55%, rgba(0, 0, 0, 0.78));
+}

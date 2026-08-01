@@ -1,0 +1,380 @@
+/* =====================================================================
+   DOCUMENTS PANEL — sobres lacrados con los dosieres de cada jugador
+   ===================================================================== */
+
+/* El relleno lo pone el contenedor .studio-tabpanel, común a todas las pestañas. */
+.docs-panel {
+  padding: 0;
+}
+
+.docs-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 20px;
+  flex-wrap: wrap;
+  margin-bottom: 22px;
+}
+.docs-title {
+  margin: 0 0 4px;
+  font-size: 25px;
+}
+.docs-subtitle {
+  margin: 0;
+  max-width: 62ch;
+  font-style: italic;
+  color: var(--parchment-dim);
+}
+.docs-count {
+  font-family: var(--font-heading);
+  font-size: 12.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--parchment-dim);
+  border: 1px solid rgba(201, 162, 39, 0.35);
+  border-radius: 999px;
+  padding: 6px 14px;
+  white-space: nowrap;
+}
+.docs-count strong {
+  color: var(--gold-300);
+}
+
+/* ---------- Aviso de partida desincronizada ----------
+   Tono de advertencia (burdeos + ámbar) dentro del marco decó de la casa:
+   debe leerse como una nota del mayordomo, no como una alerta del navegador. */
+
+.docs-stale {
+  display: flex;
+  align-items: flex-start;
+  gap: 18px;
+  flex-wrap: wrap;
+  padding: 20px 24px 20px 22px;
+  margin-bottom: 22px;
+  border-color: rgba(201, 162, 39, 0.5);
+  background:
+    linear-gradient(160deg, rgba(88, 24, 36, 0.55), rgba(31, 18, 12, 0.95) 62%),
+    var(--panel-bg);
+  box-shadow:
+    0 10px 34px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(232, 207, 127, 0.12);
+  animation: fade-up 0.4s ease both;
+}
+/* Filo ámbar a la izquierda: la marca de "atención" sin gritar. */
+.docs-stale::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 14px;
+  bottom: 14px;
+  width: 3px;
+  border-radius: 3px;
+  background: linear-gradient(180deg, var(--gold-300), var(--burgundy-600));
+}
+
+.docs-stale-glyph {
+  flex: none;
+  font-size: 27px;
+  line-height: 1;
+  margin-top: 4px;
+  color: var(--gold-300);
+  text-shadow: 0 0 18px rgba(201, 162, 39, 0.45);
+}
+
+.docs-stale-body {
+  flex: 1 1 300px;
+  min-width: 0;
+}
+.docs-stale-kicker {
+  margin: 0 0 4px;
+  color: rgba(241, 229, 201, 0.55);
+  letter-spacing: 0.24em;
+}
+.docs-stale-title {
+  margin: 0 0 10px;
+  font-size: 20px;
+  line-height: 1.25;
+  color: var(--gold-300);
+}
+.docs-stale-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-width: 74ch;
+}
+.docs-stale-list li {
+  position: relative;
+  padding-left: 20px;
+  margin-bottom: 5px;
+  font-size: 16.5px;
+  line-height: 1.45;
+  color: var(--parchment);
+}
+.docs-stale-list li::before {
+  content: '❧';
+  position: absolute;
+  left: 0;
+  top: -1px;
+  font-size: 13px;
+  color: var(--gold-500);
+}
+.docs-stale-note {
+  margin: 12px 0 0;
+  font-size: 16px;
+  color: var(--parchment-dim);
+}
+
+.docs-stale-action {
+  flex: none;
+  display: flex;
+  align-items: center;
+  align-self: center;
+  padding-left: 4px;
+}
+.docs-stale-action .btn {
+  white-space: nowrap;
+}
+
+/* ---------- Rejilla de sobres ---------- */
+
+.docs-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(232px, 1fr));
+  gap: 18px;
+}
+
+.docs-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 8px;
+  padding: 26px 18px 20px;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.25s ease;
+}
+.docs-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 16px 44px rgba(0, 0, 0, 0.55), 0 0 22px rgba(201, 162, 39, 0.16);
+}
+.docs-card--gm {
+  border-color: rgba(140, 35, 55, 0.65);
+  background: linear-gradient(160deg, rgba(58, 16, 26, 0.94), rgba(26, 10, 14, 0.96));
+}
+
+/* Jugador sin dosier: tarjeta atenuada, como un sobre que aún no se ha escrito. */
+.docs-card--pendiente {
+  border-style: dashed;
+  border-color: rgba(201, 162, 39, 0.32);
+  background: linear-gradient(160deg, rgba(31, 18, 12, 0.55), rgba(20, 12, 8, 0.6));
+  opacity: 0.72;
+}
+.docs-card--pendiente:hover {
+  opacity: 0.92;
+  transform: none;
+  box-shadow: var(--panel-shadow);
+}
+.docs-card--pendiente .docs-card-media img,
+.docs-card--pendiente .docs-monogram {
+  border-color: rgba(201, 162, 39, 0.35);
+  filter: grayscale(0.55);
+}
+.docs-card--pendiente .docs-card-name {
+  color: var(--parchment-dim);
+}
+.docs-card-pending {
+  margin: 10px 0 0;
+  font-size: 14.5px;
+  color: rgba(241, 229, 201, 0.55);
+}
+
+/* Dosier sobrante: alguien que ya no se sienta a la mesa. */
+.docs-card--sobrante {
+  border-color: rgba(140, 35, 55, 0.5);
+  background: linear-gradient(160deg, rgba(38, 14, 20, 0.8), rgba(20, 12, 8, 0.88));
+  opacity: 0.8;
+}
+.docs-card--sobrante:hover {
+  opacity: 1;
+}
+.docs-card--sobrante .docs-card-name {
+  color: var(--parchment-dim);
+  text-decoration: line-through;
+  text-decoration-color: rgba(140, 35, 55, 0.7);
+  text-decoration-thickness: 1px;
+}
+
+/* Sello de lacre en la esquina */
+.docs-wax {
+  position: absolute;
+  top: -9px;
+  right: 14px;
+  font-family: var(--font-heading);
+  font-size: 9.5px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--parchment);
+  background: linear-gradient(180deg, #a3283c, var(--burgundy-700));
+  border: 1px solid rgba(232, 207, 127, 0.5);
+  border-radius: 999px;
+  padding: 4px 12px;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.5);
+}
+/* Sello "Sin dosier": lacre sin estampar todavía. */
+.docs-wax--pendiente {
+  color: var(--felt-950);
+  background: linear-gradient(180deg, var(--parchment-dim), #b8a882);
+  border-color: rgba(201, 162, 39, 0.45);
+}
+/* Sello "Ya no juega": lacre apagado. */
+.docs-wax--sobrante {
+  color: rgba(241, 229, 201, 0.85);
+  background: linear-gradient(180deg, #4a2129, #2a1116);
+  border-color: rgba(232, 207, 127, 0.32);
+}
+
+.docs-card-media {
+  width: 84px;
+  height: 84px;
+  margin-bottom: 4px;
+}
+.docs-card-media img,
+.docs-monogram {
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  border: 2px solid var(--gold-500);
+  object-fit: cover;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.docs-monogram {
+  background: linear-gradient(160deg, var(--felt-700), var(--felt-900));
+  color: var(--gold-300);
+  font-family: var(--font-heading);
+  font-size: 26px;
+  letter-spacing: 0.06em;
+}
+
+.docs-card-name {
+  margin: 0;
+  font-size: 17.5px;
+  line-height: 1.25;
+  color: var(--gold-300);
+}
+.docs-card-sub {
+  margin: 0;
+  font-size: 15px;
+  font-style: italic;
+  color: var(--parchment-dim);
+}
+.docs-card-mail {
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--parchment-dim);
+  word-break: break-all;
+}
+
+.docs-card-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+.docs-card-actions .btn {
+  text-decoration: none;
+}
+
+/* ---------- Estado vacío ---------- */
+
+.docs-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 10px;
+  padding: 64px 32px 56px;
+}
+.docs-empty-glyph {
+  font-size: 52px;
+  color: rgba(201, 162, 39, 0.55);
+  line-height: 1;
+}
+.docs-empty h3 {
+  margin: 0;
+  font-size: 24px;
+}
+.docs-empty p {
+  max-width: 52ch;
+  margin: 0;
+}
+
+/* ---------- Visor modal ---------- */
+
+.docs-viewer {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 28px;
+  background: rgba(6, 12, 9, 0.82);
+  backdrop-filter: blur(4px);
+}
+.docs-viewer-box {
+  display: flex;
+  flex-direction: column;
+  width: min(1000px, 100%);
+  height: min(92vh, 100%);
+  padding: 16px 16px 14px;
+  overflow: hidden;
+}
+.docs-viewer-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 0 6px 12px;
+  border-bottom: 1px solid rgba(201, 162, 39, 0.28);
+}
+.docs-viewer-head h3 {
+  margin: 0;
+  font-size: 18px;
+}
+.docs-viewer-actions {
+  display: flex;
+  gap: 8px;
+}
+.docs-viewer-actions .btn {
+  text-decoration: none;
+}
+.docs-viewer-frame {
+  flex: 1;
+  width: 100%;
+  margin-top: 12px;
+  border: 1px solid rgba(201, 162, 39, 0.28);
+  border-radius: 6px;
+  background: #f1e5c9;
+}
+
+@media (max-width: 720px) {
+  .docs-viewer {
+    padding: 12px;
+  }
+  /* (el relleno en pantallas estrechas lo ajusta .studio-tabpanel) */
+  .docs-stale {
+    padding: 18px 16px;
+  }
+  .docs-stale-action {
+    align-self: flex-start;
+    width: 100%;
+    padding-left: 0;
+  }
+  .docs-stale-action .btn {
+    width: 100%;
+  }
+}

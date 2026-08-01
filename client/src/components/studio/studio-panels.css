@@ -1,0 +1,860 @@
+/* =====================================================================
+   PANELES DEL ESTUDIO — sospechosos, salas y armas
+   Fichas de expediente, formularios de alta y plano aéreo con chinchetas.
+   Prefijo de clases: sp- (studio panels). Depende de theme.css.
+   ===================================================================== */
+
+/* ---------- Estructura general del panel ---------- */
+.sp-panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  animation: fade-up 0.45s ease both;
+}
+
+/* ---------- Cabecera con contador ---------- */
+.sp-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.sp-title {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 0;
+  font-family: var(--font-heading);
+  font-size: 26px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--gold-300);
+}
+.sp-title::after {
+  content: '';
+  width: 80px;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(201, 162, 39, 0.65), transparent);
+}
+.sp-subtitle {
+  margin: 6px 0 0;
+  font-style: italic;
+  font-size: 15.5px;
+  color: var(--parchment-dim);
+  max-width: 62ch;
+}
+.sp-counter {
+  white-space: nowrap;
+  font-family: var(--font-heading);
+  font-size: 11.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--parchment-dim);
+  background: rgba(0, 0, 0, 0.32);
+  border: 1px solid rgba(201, 162, 39, 0.35);
+  border-radius: 999px;
+  padding: 7px 15px;
+}
+.sp-counter strong {
+  font-size: 14px;
+  color: var(--gold-300);
+  margin-right: 2px;
+}
+.sp-counter--ok {
+  color: var(--gold-300);
+  border-color: rgba(201, 162, 39, 0.65);
+  box-shadow: 0 0 14px rgba(201, 162, 39, 0.16);
+}
+
+/* ---------- Rejilla formulario + galería ---------- */
+.sp-layout {
+  display: grid;
+  grid-template-columns: minmax(300px, 360px) minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+/* ---------- Formulario de alta / edición ---------- */
+.sp-form {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  position: sticky;
+  top: 16px;
+}
+.sp-form-title {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-size: 14px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--gold-300);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.sp-form-title::before {
+  content: '◆';
+  font-size: 9px;
+  color: var(--gold-500);
+}
+.sp-field {
+  display: flex;
+  flex-direction: column;
+}
+.sp-hint {
+  margin: 6px 0 0;
+  font-size: 13.5px;
+  font-style: italic;
+  color: rgba(241, 229, 201, 0.5);
+}
+.sp-error {
+  margin: 0;
+  font-size: 14.5px;
+  font-style: italic;
+  color: #e2a595;
+}
+.sp-form-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 2px;
+}
+
+/* ---------- Subida de foto (retrato / objeto) ---------- */
+.sp-photo {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.sp-photo-preview,
+.sp-photo-add {
+  width: 74px;
+  height: 74px;
+  flex-shrink: 0;
+}
+.sp-photo-preview {
+  object-fit: cover;
+  border: 2px solid rgba(201, 162, 39, 0.55);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+  background: rgba(0, 0, 0, 0.3);
+}
+.sp-photo--circle .sp-photo-preview,
+.sp-photo--circle .sp-photo-add {
+  border-radius: 50%;
+}
+.sp-photo--square .sp-photo-preview,
+.sp-photo--square .sp-photo-add {
+  border-radius: 8px;
+}
+.sp-photo-add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.3);
+  border: 2px dashed rgba(201, 162, 39, 0.4);
+  color: rgba(201, 162, 39, 0.7);
+  cursor: pointer;
+  transition:
+    border-color 0.2s ease,
+    color 0.2s ease,
+    background 0.2s ease;
+}
+.sp-photo-add:hover:not(:disabled) {
+  border-color: var(--gold-400);
+  color: var(--gold-300);
+  background: rgba(201, 162, 39, 0.07);
+}
+.sp-photo-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-start;
+}
+.sp-photo-btn {
+  background: none;
+  border: none;
+  padding: 2px 0;
+  cursor: pointer;
+  font-family: var(--font-heading);
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--gold-400);
+}
+.sp-photo-btn:hover:not(:disabled) {
+  color: var(--gold-300);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.sp-photo-btn--danger {
+  color: #d98a7a;
+}
+.sp-photo-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.sp-photo-spinner {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid rgba(201, 162, 39, 0.25);
+  border-top-color: var(--gold-400);
+  animation: sp-spin 0.8s linear infinite;
+}
+@keyframes sp-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ---------- Sugerencias rápidas (armas clásicas) ---------- */
+.sp-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.sp-chip {
+  font-family: var(--font-heading);
+  font-size: 11.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--gold-300);
+  border: 1px solid rgba(201, 162, 39, 0.4);
+  background: rgba(201, 162, 39, 0.07);
+  border-radius: 999px;
+  padding: 6px 13px;
+  cursor: pointer;
+  transition:
+    background 0.18s ease,
+    transform 0.15s ease,
+    box-shadow 0.18s ease;
+}
+.sp-chip:hover:not(:disabled) {
+  background: rgba(201, 162, 39, 0.18);
+  transform: translateY(-1px);
+  box-shadow: 0 0 12px rgba(201, 162, 39, 0.2);
+}
+.sp-chip:disabled {
+  opacity: 0.35;
+  cursor: default;
+  text-decoration: line-through;
+}
+
+/* ---------- Galería de fichas de expediente ---------- */
+.sp-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+  gap: 14px;
+  align-content: start;
+}
+.sp-side-list {
+  grid-template-columns: 1fr;
+}
+.sp-card {
+  display: flex;
+  gap: 14px;
+  padding: 16px 16px 30px;
+  position: relative;
+}
+.sp-card--editing {
+  border-color: var(--gold-400);
+  box-shadow: 0 0 18px rgba(201, 162, 39, 0.25), var(--panel-shadow);
+}
+.sp-card-media {
+  position: relative;
+  flex-shrink: 0;
+}
+.sp-card-photo,
+.sp-monogram {
+  width: 62px;
+  height: 62px;
+  display: block;
+}
+.sp-card-photo {
+  object-fit: cover;
+  border: 1.5px solid rgba(201, 162, 39, 0.5);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.4);
+}
+.sp-monogram {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-heading);
+  font-size: 21px;
+  letter-spacing: 0.04em;
+  color: var(--gold-300);
+  background: radial-gradient(circle at 30% 25%, rgba(201, 162, 39, 0.28), rgba(0, 0, 0, 0.45));
+  border: 1.5px solid rgba(201, 162, 39, 0.45);
+}
+.sp-card--circle .sp-card-photo,
+.sp-card--circle .sp-monogram {
+  border-radius: 50%;
+}
+.sp-card--square .sp-card-photo,
+.sp-card--square .sp-monogram {
+  border-radius: 8px;
+}
+.sp-card-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  font-family: var(--font-heading);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink);
+  background: linear-gradient(180deg, var(--gold-300), var(--gold-500));
+  border: 1px solid rgba(31, 18, 12, 0.5);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
+}
+.sp-card-body {
+  min-width: 0;
+}
+.sp-card-name {
+  margin: 0 0 2px;
+  font-family: var(--font-heading);
+  font-size: 17px;
+  letter-spacing: 0.06em;
+  color: var(--gold-300);
+  padding-right: 58px;
+  overflow-wrap: anywhere;
+}
+.sp-card-meta {
+  margin: 0 0 2px;
+  font-family: var(--font-heading);
+  font-size: 12.5px;
+  letter-spacing: 0.08em;
+  color: var(--parchment-dim);
+  overflow-wrap: anywhere;
+}
+.sp-card-desc {
+  margin: 4px 0 0;
+  font-size: 15.5px;
+  line-height: 1.45;
+  color: var(--parchment-dim);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.sp-card-desc--empty {
+  font-style: italic;
+  opacity: 0.6;
+}
+.sp-card-actions {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: flex;
+  gap: 2px;
+  opacity: 0.55;
+  transition: opacity 0.2s ease;
+  z-index: 2;
+}
+.sp-card:hover .sp-card-actions,
+.sp-card:focus-within .sp-card-actions {
+  opacity: 1;
+}
+.sp-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  padding: 6px;
+  border-radius: 6px;
+  color: var(--gold-400);
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+}
+.sp-icon-btn:hover {
+  background: rgba(201, 162, 39, 0.16);
+  color: var(--gold-300);
+}
+.sp-icon-btn--danger {
+  color: #c98a7a;
+}
+.sp-icon-btn--danger:hover {
+  background: rgba(179, 64, 47, 0.22);
+  color: #eeb0a0;
+}
+.sp-confirm {
+  font-family: var(--font-heading);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.sp-card-stamp {
+  position: absolute;
+  right: 12px;
+  bottom: 8px;
+  font-family: var(--font-heading);
+  font-size: 8.5px;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: rgba(140, 35, 55, 0.6);
+  border: 1px solid rgba(140, 35, 55, 0.45);
+  border-radius: 3px;
+  padding: 2px 5px 2px 8px;
+  transform: rotate(-4deg);
+  pointer-events: none;
+}
+
+/* ---------- Estado vacío ---------- */
+.sp-empty {
+  padding: 48px 26px;
+  text-align: center;
+}
+.sp-empty-symbol {
+  display: block;
+  font-size: 42px;
+  color: rgba(201, 162, 39, 0.5);
+  font-family: var(--font-display);
+  margin-bottom: 10px;
+}
+.sp-empty-title {
+  margin: 0 0 8px;
+  font-family: var(--font-heading);
+  font-size: 15px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--parchment-dim);
+}
+.sp-empty-body {
+  margin: 0 auto;
+  max-width: 44ch;
+  font-style: italic;
+  font-size: 15.5px;
+  color: rgba(241, 229, 201, 0.55);
+}
+
+/* ---------- Selector de modo de tablero (salas) ---------- */
+.sp-modes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+.sp-mode {
+  position: relative;
+  text-align: left;
+  padding: 18px 20px;
+  cursor: pointer;
+  font-family: var(--font-body);
+  color: var(--parchment);
+  background: var(--panel-bg);
+  border: 1px solid rgba(201, 162, 39, 0.3);
+  border-radius: var(--radius);
+  box-shadow: var(--panel-shadow);
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.15s ease;
+}
+.sp-mode:hover:not(:disabled) {
+  border-color: rgba(201, 162, 39, 0.6);
+  transform: translateY(-1px);
+}
+.sp-mode:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+.sp-mode--active {
+  border-color: var(--gold-400);
+  box-shadow: 0 0 22px rgba(201, 162, 39, 0.22), var(--panel-shadow);
+}
+.sp-mode-glyph {
+  display: block;
+  font-size: 24px;
+  line-height: 1;
+  color: var(--gold-400);
+  margin-bottom: 10px;
+}
+.sp-mode-name {
+  display: block;
+  font-family: var(--font-heading);
+  font-size: 14.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--gold-300);
+  margin-bottom: 6px;
+}
+.sp-mode-desc {
+  display: block;
+  margin: 0;
+  font-size: 14.5px;
+  font-style: italic;
+  line-height: 1.45;
+  color: var(--parchment-dim);
+}
+.sp-mode-check {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  font-family: var(--font-heading);
+  font-size: 10.5px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ink);
+  background: linear-gradient(180deg, var(--gold-300), var(--gold-500));
+  border-radius: 999px;
+  padding: 3px 10px;
+}
+
+/* ---------- Modo foto aérea ---------- */
+.sp-aerial-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
+  gap: 18px;
+  align-items: start;
+}
+.sp-aerial-main {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+.sp-aerial-side {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.sp-side-card {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-start;
+}
+.sp-side-note {
+  margin: 0;
+  font-style: italic;
+  font-size: 14.5px;
+  color: var(--parchment-dim);
+}
+
+.sp-upload-zone {
+  border: 2px dashed rgba(201, 162, 39, 0.4);
+  border-radius: var(--radius);
+  padding: 70px 30px;
+  text-align: center;
+  cursor: pointer;
+  background: rgba(0, 0, 0, 0.25);
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease;
+}
+.sp-upload-zone:hover,
+.sp-upload-zone--over {
+  border-color: var(--gold-400);
+  background: rgba(201, 162, 39, 0.06);
+}
+.sp-upload-glyph {
+  display: block;
+  font-size: 40px;
+  color: rgba(201, 162, 39, 0.6);
+  font-family: var(--font-display);
+  margin-bottom: 8px;
+}
+.sp-upload-title {
+  margin: 0 0 6px;
+  font-family: var(--font-heading);
+  font-size: 15px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--gold-300);
+}
+.sp-upload-hint {
+  margin: 0 auto;
+  max-width: 46ch;
+  font-style: italic;
+  font-size: 15px;
+  color: var(--parchment-dim);
+}
+
+/* Escenario: la foto aérea con las chinchetas encima */
+.sp-stage {
+  position: relative;
+  line-height: 0;
+  border-radius: var(--radius);
+  overflow: hidden;
+  border: 1px solid rgba(201, 162, 39, 0.45);
+  box-shadow: var(--panel-shadow);
+  cursor: crosshair;
+  user-select: none;
+}
+.sp-stage > img {
+  width: 100%;
+  height: auto;
+  display: block;
+  -webkit-user-drag: none;
+}
+.sp-stage-hint {
+  position: absolute;
+  left: 50%;
+  bottom: 14px;
+  translate: -50% 0;
+  z-index: 2;
+  line-height: 1.4;
+  font-family: var(--font-heading);
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--gold-300);
+  background: rgba(15, 10, 6, 0.85);
+  border: 1px solid rgba(201, 162, 39, 0.4);
+  border-radius: 999px;
+  padding: 8px 18px;
+  pointer-events: none;
+  animation: sp-pulse 2.4s ease-in-out infinite;
+}
+@keyframes sp-pulse {
+  0%,
+  100% {
+    opacity: 0.75;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* Chincheta: numerada, arrastrable, con tooltip del nombre.
+   Usa la propiedad `translate` (no `transform`) para no chocar con
+   las animaciones de framer-motion. */
+.sp-pin {
+  position: absolute;
+  translate: -50% -100%;
+  transform-origin: 50% 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: grab;
+  touch-action: none;
+  z-index: 5;
+}
+.sp-pin--dragging {
+  cursor: grabbing;
+  z-index: 9;
+}
+.sp-pin-head {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--ink);
+  background: linear-gradient(180deg, var(--gold-300), var(--gold-500) 60%, var(--brass));
+  border: 1.5px solid rgba(31, 18, 12, 0.6);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  transition: box-shadow 0.2s ease;
+}
+.sp-pin:hover .sp-pin-head,
+.sp-pin:focus-visible .sp-pin-head {
+  box-shadow: 0 0 16px rgba(201, 162, 39, 0.6), 0 3px 10px rgba(0, 0, 0, 0.55);
+}
+.sp-pin-tail {
+  width: 2px;
+  height: 11px;
+  background: linear-gradient(180deg, var(--brass), rgba(176, 141, 46, 0));
+}
+.sp-pin-tip {
+  position: absolute;
+  bottom: calc(100% + 7px);
+  left: 50%;
+  translate: -50% 0;
+  white-space: nowrap;
+  font-family: var(--font-heading);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--gold-300);
+  background: rgba(15, 10, 6, 0.92);
+  border: 1px solid rgba(201, 162, 39, 0.4);
+  border-radius: 6px;
+  padding: 4px 10px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s ease;
+  line-height: 1.4;
+}
+.sp-pin:hover .sp-pin-tip,
+.sp-pin:focus-visible .sp-pin-tip {
+  opacity: 1;
+}
+.sp-pin--dragging .sp-pin-tip {
+  opacity: 0;
+}
+
+/* Menú contextual y mini-formulario anclados a la chincheta */
+.sp-pin-menu {
+  position: absolute;
+  z-index: 12;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  min-width: 175px;
+  line-height: 1.4;
+  cursor: default;
+  animation: sp-pop 0.2s ease both;
+}
+.sp-pin-menu .btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.sp-pin-menu-name {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-size: 13px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--gold-300);
+  text-align: center;
+}
+.sp-pin-form {
+  position: absolute;
+  z-index: 14;
+  width: 262px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  line-height: 1.4;
+  cursor: default;
+  animation: sp-pop 0.2s ease both;
+}
+.sp-pin-form .input,
+.sp-pin-form .textarea {
+  font-size: 15px;
+  padding: 8px 10px;
+}
+@keyframes sp-pop {
+  from {
+    opacity: 0;
+    scale: 0.92;
+  }
+  to {
+    opacity: 1;
+    scale: 1;
+  }
+}
+
+/* ---------- Panel de estilo (meta-prompt del juego) ---------- */
+
+.sp-style-presets {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+  gap: 10px;
+  margin-bottom: 18px;
+}
+.sp-style-preset {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  text-align: left;
+  padding: 12px 14px;
+  cursor: pointer;
+  font-family: var(--font-body);
+  color: var(--parchment);
+  background: rgba(0, 0, 0, 0.28);
+  border: 1px solid rgba(201, 162, 39, 0.28);
+  border-radius: var(--radius);
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease,
+    transform 0.15s ease;
+}
+.sp-style-preset:hover:not(:disabled) {
+  border-color: rgba(201, 162, 39, 0.6);
+  background: rgba(201, 162, 39, 0.07);
+  transform: translateY(-1px);
+}
+.sp-style-preset:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+.sp-style-preset--activo {
+  border-color: var(--gold-400);
+  background: rgba(201, 162, 39, 0.12);
+  box-shadow: 0 0 18px rgba(201, 162, 39, 0.18);
+}
+.sp-style-glyph {
+  flex: none;
+  font-size: 20px;
+  line-height: 1;
+  color: var(--gold-400);
+}
+.sp-style-name {
+  font-family: var(--font-heading);
+  font-size: 12.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--gold-300);
+  line-height: 1.3;
+}
+
+.sp-style-editor {
+  padding: 18px 20px;
+}
+.sp-style-textarea {
+  min-height: 108px;
+}
+.sp-style-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+.sp-style-footer .sp-form-actions {
+  margin: 0;
+}
+.sp-style-count {
+  font-family: var(--font-heading);
+  font-size: 11.5px;
+  letter-spacing: 0.12em;
+  color: rgba(241, 229, 201, 0.45);
+}
+.sp-style-nota {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(201, 162, 39, 0.18);
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 1100px) {
+  .sp-layout,
+  .sp-aerial-layout {
+    grid-template-columns: 1fr;
+  }
+  .sp-form {
+    position: static;
+  }
+}
+@media (max-width: 760px) {
+  .sp-modes {
+    grid-template-columns: 1fr;
+  }
+}

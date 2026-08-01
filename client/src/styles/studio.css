@@ -1,0 +1,447 @@
+/* =====================================================================
+   STUDIO — el estudio de creación de un caso de CLUEDO
+   Cabecera + chat del mayordomo a la izquierda + pestañas a la derecha.
+   ===================================================================== */
+
+.studio {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  height: 100vh;
+  padding: 14px 18px 18px;
+}
+
+/* ---------- Cabecera ---------- */
+
+.studio-header {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+  padding: 12px 18px;
+  flex: none;
+}
+
+.studio-back {
+  flex: none;
+  letter-spacing: 0.1em;
+  color: var(--parchment-dim);
+}
+.studio-back:hover {
+  color: var(--gold-300);
+}
+
+.studio-name-wrap {
+  /* Prioridad alta: el nombre del caso es el título de la pantalla. */
+  flex: 3 1 340px;
+  min-width: 0;
+}
+.studio-kicker {
+  display: block;
+  color: rgba(241, 229, 201, 0.45);
+  letter-spacing: 0.28em;
+  margin-bottom: 1px;
+}
+.studio-name {
+  width: 100%;
+  font-family: var(--font-display);
+  font-size: clamp(19px, 2.2vw, 26px);
+  line-height: 1.2;
+  color: var(--gold-300);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 2px 8px;
+  margin-left: -8px;
+  outline: none;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease;
+}
+.studio-name:hover {
+  border-color: rgba(201, 162, 39, 0.28);
+}
+.studio-name:focus {
+  background: rgba(0, 0, 0, 0.32);
+  border-color: var(--gold-400);
+}
+/* Si aun así no cabe, se abrevia con puntos suspensivos en lugar de cortarse. */
+.studio-name:not(:focus) {
+  text-overflow: ellipsis;
+}
+
+.studio-header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.studio-ready {
+  color: var(--felt-950);
+  background: linear-gradient(180deg, var(--gold-300), var(--gold-500));
+  border: 1px solid var(--gold-400);
+  border-radius: 999px;
+  padding: 7px 16px;
+  cursor: pointer;
+  white-space: nowrap;
+  box-shadow: 0 0 20px rgba(201, 162, 39, 0.25);
+  transition: transform 0.15s ease, box-shadow 0.2s ease;
+}
+.studio-ready:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 0 28px rgba(201, 162, 39, 0.45);
+}
+
+/* Insignia de misterio desactualizado: ámbar sobre burdeos, seria pero elegante.
+   Nunca convive con .studio-ready: son los dos estados de la misma insignia. */
+.studio-stale {
+  position: relative;
+  color: #f2cf92;
+  background: linear-gradient(180deg, var(--burgundy-600), var(--burgundy-700));
+  border: 1px solid rgba(232, 207, 127, 0.55);
+  border-radius: 999px;
+  padding: 7px 16px;
+  cursor: pointer;
+  white-space: nowrap;
+  box-shadow:
+    0 0 20px rgba(140, 35, 55, 0.35),
+    inset 0 1px 0 rgba(232, 207, 127, 0.18);
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.2s ease,
+    color 0.2s ease;
+}
+.studio-stale:hover {
+  transform: translateY(-1px);
+  color: var(--gold-300);
+  box-shadow:
+    0 0 28px rgba(140, 35, 55, 0.55),
+    inset 0 1px 0 rgba(232, 207, 127, 0.24);
+}
+/* Latido muy contenido: llama la atención sin parpadear como una alarma. */
+@keyframes studio-stale-breath {
+  0%,
+  100% {
+    box-shadow:
+      0 0 16px rgba(140, 35, 55, 0.3),
+      inset 0 1px 0 rgba(232, 207, 127, 0.18);
+  }
+  50% {
+    box-shadow:
+      0 0 26px rgba(201, 162, 39, 0.4),
+      inset 0 1px 0 rgba(232, 207, 127, 0.24);
+  }
+}
+.studio-stale:not(:hover) {
+  animation: studio-stale-breath 3.4s ease-in-out infinite;
+}
+
+.studio-demo {
+  color: #e8cf7f;
+  border: 1px dashed rgba(201, 162, 39, 0.5);
+  border-radius: 999px;
+  padding: 6px 13px;
+  cursor: help;
+  white-space: nowrap;
+}
+
+.studio-model {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.studio-model-label {
+  color: var(--parchment-dim);
+  white-space: nowrap;
+}
+.studio-model-select {
+  width: auto;
+  min-width: 168px;
+  max-width: 232px;
+  font-size: 14.5px;
+  padding: 7px 10px;
+}
+
+/* Tooltip discreto reutilizable */
+.has-tip {
+  position: relative;
+}
+.has-tip::after {
+  content: attr(data-tip);
+  position: absolute;
+  top: calc(100% + 9px);
+  right: 0;
+  z-index: 40;
+  width: max-content;
+  max-width: 300px;
+  white-space: normal;
+  font-family: var(--font-body);
+  font-style: italic;
+  font-size: 14.5px;
+  letter-spacing: 0;
+  text-transform: none;
+  line-height: 1.4;
+  color: var(--parchment);
+  background: rgba(15, 10, 6, 0.96);
+  border: 1px solid rgba(201, 162, 39, 0.45);
+  border-radius: 8px;
+  padding: 9px 13px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55);
+}
+.has-tip:hover::after {
+  opacity: 1;
+}
+
+/* ---------- Cuerpo ---------- */
+
+.studio-body {
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(320px, 380px) minmax(0, 1fr);
+  gap: 16px;
+  min-height: 0;
+}
+
+.studio-chat {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.studio-main {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+  min-width: 0;
+}
+
+/* ---------- Barra de pestañas ---------- */
+
+.studio-actionbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  flex: none;
+}
+
+.studio-tabs {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.studio-tab {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-heading);
+  font-size: 13px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--parchment-dim);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px 8px 0 0;
+  padding: 11px 16px 13px;
+  cursor: pointer;
+  transition:
+    color 0.2s ease,
+    background 0.2s ease;
+}
+.studio-tab:hover {
+  color: var(--gold-300);
+  background: rgba(201, 162, 39, 0.07);
+}
+.studio-tab.is-active {
+  color: var(--gold-300);
+  background: rgba(201, 162, 39, 0.1);
+}
+.studio-tab-symbol {
+  font-size: 15px;
+  color: var(--gold-500);
+}
+.studio-tab-count {
+  font-size: 11px;
+  line-height: 1;
+  color: var(--parchment-dim);
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(201, 162, 39, 0.3);
+  border-radius: 999px;
+  padding: 3px 7px;
+}
+.studio-tab-underline {
+  position: absolute;
+  left: 10%;
+  right: 10%;
+  bottom: 0;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, transparent, var(--gold-400), transparent);
+}
+
+.studio-generate-wrap {
+  flex: none;
+}
+.studio-generate {
+  white-space: nowrap;
+  font-size: 14px;
+  padding: 12px 24px;
+}
+
+/* --- Botón "ACTUALIZAR MISTERIO": es la acción que toca, late suavemente --- */
+@keyframes studio-generate-beat {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 0 rgba(201, 162, 39, 0),
+      0 6px 18px rgba(0, 0, 0, 0.35);
+  }
+  50% {
+    box-shadow:
+      0 0 0 6px rgba(201, 162, 39, 0.12),
+      0 0 28px rgba(201, 162, 39, 0.45);
+  }
+}
+.studio-generate--refresh:not(:disabled) {
+  animation: studio-generate-beat 2.6s ease-in-out infinite;
+}
+.studio-generate--refresh:hover {
+  animation: none;
+}
+
+/* --- Botón "Regenerar desde cero": secundario y con confirmación --- */
+.studio-generate--redo {
+  position: relative;
+  overflow: hidden;
+  font-size: 13px;
+  letter-spacing: 0.1em;
+  padding: 11px 20px;
+  color: var(--parchment-dim);
+}
+.studio-generate--redo:hover {
+  color: var(--gold-300);
+}
+.studio-generate--redo.is-confirming {
+  color: #f2c9a0;
+  border-color: rgba(140, 35, 55, 0.75);
+  background: linear-gradient(180deg, rgba(140, 35, 55, 0.32), rgba(140, 35, 55, 0.12));
+}
+/* Mecha que se consume: avisa de que la confirmación caduca sola. */
+.studio-generate--redo.is-confirming::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 2px;
+  width: 100%;
+  background: linear-gradient(90deg, var(--burgundy-600), var(--gold-400));
+  transform-origin: left center;
+  animation: studio-wick 4s linear forwards;
+}
+@keyframes studio-wick {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .studio-stale:not(:hover),
+  .studio-generate--refresh:not(:disabled) {
+    animation: none;
+  }
+  .studio-generate--redo.is-confirming::after {
+    animation: none;
+    transform: scaleX(0.02);
+  }
+}
+
+/* ---------- Panel de la pestaña activa ---------- */
+
+.studio-tabpanel {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  /* El relleno vive AQUÍ, no en cada panel: así todas las pestañas respiran
+     igual y el contenido nunca queda debajo del filete de .deco-frame (inset 6px). */
+  padding: 22px 24px 24px;
+}
+
+/* ---------- Aviso flotante ---------- */
+
+.studio-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 26px;
+  translate: -50% 0;
+  z-index: 100;
+  font-family: var(--font-body);
+  font-style: italic;
+  color: var(--parchment);
+  background: rgba(15, 10, 6, 0.95);
+  border: 1px solid rgba(201, 162, 39, 0.45);
+  border-radius: 999px;
+  padding: 11px 24px;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6);
+  animation: fade-up 0.35s ease both;
+}
+
+/* ---------- Estados de carga / error ---------- */
+
+.studio-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 32px;
+}
+.studio-fallback-card {
+  max-width: 460px;
+  text-align: center;
+  padding: 38px 34px 32px;
+}
+.studio-fallback-card p {
+  margin-bottom: 22px;
+}
+.studio-loading-text {
+  color: var(--parchment-dim);
+  font-size: 19px;
+  letter-spacing: 0.04em;
+}
+
+/* ---------- Responsive ---------- */
+
+@media (max-width: 1080px) {
+  .studio {
+    height: auto;
+    min-height: 100vh;
+  }
+  .studio-body {
+    grid-template-columns: 1fr;
+  }
+  .studio-chat {
+    height: 460px;
+  }
+  .studio-tabpanel {
+    overflow: visible;
+    padding: 18px 16px 20px;
+  }
+  .has-tip::after {
+    right: auto;
+    left: 0;
+  }
+}

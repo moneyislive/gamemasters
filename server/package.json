@@ -1,0 +1,33 @@
+{
+  "name": "server",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "esbuild src/index.ts --bundle --platform=node --format=esm --target=node20 --outfile=dist/index.js --packages=external",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit",
+    "verify:mongo": "tsx scripts/verify-mongo.ts",
+    "migrate:mongo": "tsx scripts/migrate-file-to-mongo.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.115.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "mongoose": "^8.9.5",
+    "multer": "^1.4.5-lts.1",
+    "nanoid": "^5.0.9"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/multer": "^1.4.12",
+    "@types/node": "^20.17.10",
+    "esbuild": "^0.28.1",
+    "mongodb-memory-server": "^10.4.3",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}

@@ -1,0 +1,426 @@
+/* =====================================================================
+   AGENTCHAT — Chat con "El Mayordomo" + avisos (popups) del agente.
+   Estética CLUEDO años 20: pergamino, fieltro verde, latón y lacre.
+   ===================================================================== */
+
+/* ---------------------------------------------------------------------
+   Panel de chat
+   --------------------------------------------------------------------- */
+
+.agentchat {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* ---------- Cabecera ---------- */
+
+.agentchat__header {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 18px;
+  border-bottom: 1px solid rgba(201, 162, 39, 0.28);
+  background: linear-gradient(180deg, rgba(201, 162, 39, 0.08), transparent);
+}
+
+.agentchat__avatar {
+  position: relative;
+  flex: none;
+  width: 54px;
+  height: 54px;
+  filter: drop-shadow(0 3px 8px rgba(0, 0, 0, 0.45));
+}
+
+.agentchat__avatar svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* Puntito verde: el Mayordomo está de servicio */
+.agentchat__status-dot {
+  position: absolute;
+  right: 1px;
+  bottom: 1px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #46c46e;
+  border: 2px solid var(--mahogany-900);
+  animation: agentchat-latido 2.4s ease-in-out infinite;
+}
+
+@keyframes agentchat-latido {
+  0%,
+  100% {
+    box-shadow: 0 0 4px rgba(70, 196, 110, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 11px rgba(70, 196, 110, 0.95);
+  }
+}
+
+.agentchat__identity {
+  min-width: 0;
+}
+
+.agentchat__name {
+  margin: 0;
+  font-size: 19px;
+  letter-spacing: 0.1em;
+  color: var(--gold-300);
+}
+
+.agentchat__subtitle {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: 14.5px;
+  font-style: italic;
+  color: var(--parchment-dim);
+}
+
+/* ---------- Zona de mensajes ---------- */
+
+.agentchat__messages {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 14px;
+  background: radial-gradient(120% 60% at 50% 0%, rgba(0, 0, 0, 0.18), transparent 70%);
+}
+
+.agentchat__fila {
+  display: flex;
+}
+
+.agentchat__fila--assistant {
+  justify-content: flex-start;
+}
+
+.agentchat__fila--user {
+  justify-content: flex-end;
+}
+
+.agentchat__burbuja {
+  max-width: 88%;
+  padding: 10px 14px;
+  font-family: var(--font-body);
+  font-size: 16.5px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  animation: fade-up 0.3s ease both;
+}
+
+/* Pergamino del Mayordomo */
+.agentchat__burbuja--assistant {
+  color: var(--ink);
+  background: linear-gradient(170deg, #f7edd4, var(--parchment) 60%, #e8d8b2);
+  border: 1px solid rgba(176, 141, 46, 0.5);
+  border-radius: 10px 10px 10px 3px;
+  box-shadow:
+    0 6px 16px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+/* Fieltro verde del anfitrión */
+.agentchat__burbuja--user {
+  color: var(--parchment);
+  background: linear-gradient(165deg, var(--felt-700), var(--felt-800));
+  border: 1px solid rgba(201, 162, 39, 0.35);
+  border-radius: 10px 10px 3px 10px;
+  box-shadow:
+    0 6px 16px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(232, 207, 127, 0.1);
+}
+
+/* Cursor parpadeante durante el streaming */
+.agentchat__cursor {
+  display: inline-block;
+  width: 0.55em;
+  height: 1em;
+  margin-left: 3px;
+  vertical-align: text-bottom;
+  background: var(--brass);
+  animation: agentchat-parpadeo 0.9s steps(2, start) infinite;
+}
+
+@keyframes agentchat-parpadeo {
+  to {
+    visibility: hidden;
+  }
+}
+
+/* Indicador "está pensando…" con tres puntos */
+.agentchat__pensando {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 7px;
+  font-style: italic;
+  color: rgba(28, 20, 16, 0.75);
+}
+
+.agentchat__puntos {
+  display: inline-flex;
+  gap: 3px;
+}
+
+.agentchat__puntos i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--brass);
+  animation: agentchat-punto 1.2s ease-in-out infinite;
+}
+
+.agentchat__puntos i:nth-child(2) {
+  animation-delay: 0.18s;
+}
+
+.agentchat__puntos i:nth-child(3) {
+  animation-delay: 0.36s;
+}
+
+@keyframes agentchat-punto {
+  0%,
+  60%,
+  100% {
+    opacity: 0.25;
+    transform: translateY(0);
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(-3px);
+  }
+}
+
+/* ---------- Redacción ---------- */
+
+.agentchat__composer {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-top: 1px solid rgba(201, 162, 39, 0.28);
+  background: linear-gradient(0deg, rgba(0, 0, 0, 0.25), transparent);
+}
+
+.agentchat__input {
+  flex: 1;
+  min-width: 0;
+}
+
+.agentchat__send {
+  flex: none;
+  padding: 10px 16px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+/* Botón de micrófono */
+.agentchat__mic {
+  flex: none;
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--gold-300);
+  background: linear-gradient(180deg, rgba(201, 162, 39, 0.16), rgba(201, 162, 39, 0.05));
+  border: 1px solid rgba(201, 162, 39, 0.5);
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    box-shadow 0.2s ease,
+    color 0.2s ease;
+}
+
+.agentchat__mic:hover {
+  background: linear-gradient(180deg, rgba(201, 162, 39, 0.28), rgba(201, 162, 39, 0.1));
+  box-shadow: 0 0 14px rgba(201, 162, 39, 0.3);
+}
+
+.agentchat__mic svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* Grabando: anillo dorado pulsante */
+.agentchat__mic--grabando {
+  color: var(--ink);
+  background: linear-gradient(180deg, var(--gold-300), var(--gold-500));
+  border-color: var(--gold-400);
+  animation: agentchat-anillo 1.3s ease-out infinite;
+}
+
+@keyframes agentchat-anillo {
+  0% {
+    box-shadow: 0 0 0 0 rgba(201, 162, 39, 0.55);
+  }
+  100% {
+    box-shadow: 0 0 0 14px rgba(201, 162, 39, 0);
+  }
+}
+
+/* ---------------------------------------------------------------------
+   Avisos del agente (popups): telegramas lacrados de la mansión
+   --------------------------------------------------------------------- */
+
+.agentpopups {
+  position: fixed;
+  top: 18px;
+  right: 18px;
+  z-index: 90;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: min(360px, calc(100vw - 36px));
+  pointer-events: none;
+}
+
+.agentpopup {
+  position: relative;
+  pointer-events: auto;
+  display: grid;
+  grid-template-columns: 44px 1fr;
+  gap: 12px;
+  align-items: start;
+  padding: 14px 16px 17px 14px;
+  color: var(--ink);
+  /* Papel de telegrama: pergamino con rayado sutil */
+  background:
+    repeating-linear-gradient(0deg, transparent 0 25px, rgba(62, 39, 35, 0.05) 25px 26px),
+    linear-gradient(165deg, #f6ebd1, var(--parchment) 55%, #e6d6ae);
+  border: 1px solid var(--gold-500);
+  border-radius: 8px;
+  box-shadow:
+    0 14px 34px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.45);
+  overflow: hidden;
+}
+
+/* Borde doble dorado (segundo filete interior) */
+.agentpopup::before {
+  content: '';
+  position: absolute;
+  inset: 4px;
+  border: 1px solid rgba(176, 141, 46, 0.55);
+  border-radius: 5px;
+  pointer-events: none;
+}
+
+.agentpopup__sello {
+  width: 44px;
+  height: 44px;
+  margin-top: 2px;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.35));
+}
+
+/* Color del lacre según el tono */
+.agentpopup--info .agentpopup__sello {
+  color: #2f7a4d;
+}
+
+.agentpopup--success .agentpopup__sello {
+  color: var(--gold-500);
+}
+
+.agentpopup--mystery .agentpopup__sello {
+  color: var(--burgundy-600);
+}
+
+/* Filete lateral con el tono del aviso */
+.agentpopup--info {
+  border-left: 3px solid #2f7a4d;
+}
+
+.agentpopup--success {
+  border-left: 3px solid var(--gold-500);
+}
+
+.agentpopup--mystery {
+  border-left: 3px solid var(--burgundy-600);
+}
+
+.agentpopup__contenido {
+  min-width: 0;
+  padding-right: 16px;
+}
+
+.agentpopup__titulo {
+  margin: 0 0 4px;
+  font-family: var(--font-heading);
+  font-size: 14.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--mahogany-800);
+}
+
+.agentpopup__cuerpo {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.4;
+  color: rgba(28, 20, 16, 0.85);
+  overflow-wrap: anywhere;
+}
+
+.agentpopup__cerrar {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  font-family: var(--font-heading);
+  font-size: 18px;
+  line-height: 1;
+  color: rgba(62, 39, 35, 0.65);
+  background: transparent;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  transition:
+    color 0.15s ease,
+    background 0.15s ease;
+}
+
+.agentpopup__cerrar:hover {
+  color: var(--mahogany-800);
+  background: rgba(176, 141, 46, 0.18);
+}
+
+/* Barra sutil de tiempo restante (7 s, sincronizada con AUTO_CIERRE_MS) */
+.agentpopup__tiempo {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--brass), var(--gold-400));
+  opacity: 0.55;
+  transform-origin: left;
+  animation: agentpopup-tiempo 7s linear forwards;
+}
+
+@keyframes agentpopup-tiempo {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}

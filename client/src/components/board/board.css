@@ -1,0 +1,252 @@
+/* =====================================================================
+   BOARD VIEW — El tablero del misterio
+   Modo 'generated': plano SVG estilo CLUEDO (tapete, parquet, latón).
+   Modo 'aerial': fotografía cenital con chinchetas numeradas.
+   ===================================================================== */
+
+/* El relleno lo pone el contenedor .studio-tabpanel, común a todas las pestañas. */
+.board-panel {
+  padding: 0;
+}
+
+/* ---------- SVG del tablero generado ---------- */
+
+.board-svg {
+  display: block;
+  width: min(100%, 82vh);
+  height: auto;
+  margin: 0 auto;
+  border-radius: 8px;
+}
+
+.board-plaque-text {
+  font-family: var(--font-display);
+  fill: var(--gold-300);
+  letter-spacing: 0.18em;
+}
+
+.board-room-name {
+  font-family: var(--font-heading);
+  fill: var(--parchment);
+  stroke: rgba(31, 18, 12, 0.78);
+  stroke-width: 3px;
+  paint-order: stroke;
+  letter-spacing: 0.08em;
+}
+
+.board-room-ornament line {
+  stroke: rgba(232, 207, 127, 0.55);
+  stroke-width: 1;
+}
+.board-room-ornament path {
+  fill: var(--gold-400);
+}
+
+.board-center-label {
+  font-family: var(--font-display);
+  fill: var(--gold-300);
+  letter-spacing: 0.3em;
+}
+
+/* Pasadizos secretos: trazo discontinuo dorado que fluye */
+@keyframes board-dash-flow {
+  to {
+    stroke-dashoffset: -42;
+  }
+}
+.board-passage {
+  cursor: help;
+}
+.board-passage-line {
+  stroke: var(--gold-400);
+  stroke-width: 2.5;
+  stroke-dasharray: 12 9;
+  stroke-linecap: round;
+  animation: board-dash-flow 2.6s linear infinite;
+}
+.board-passage-hit {
+  stroke: transparent;
+  stroke-width: 18;
+  fill: none;
+}
+.board-passage-spiral {
+  fill: none;
+  stroke: var(--gold-300);
+  stroke-width: 1.8;
+  opacity: 0.9;
+}
+.board-passage:hover .board-passage-line {
+  stroke: var(--gold-300);
+  filter: drop-shadow(0 0 6px rgba(232, 207, 127, 0.6));
+}
+
+/* ---------- Pie: leyenda + acciones ---------- */
+
+.board-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+}
+.board-legend {
+  margin: 0;
+  color: var(--parchment-dim);
+}
+.board-hint {
+  margin: 6px 0 0;
+  font-size: 15px;
+  font-style: italic;
+}
+.board-error {
+  margin: 10px 0 0;
+  color: #e8a294;
+  font-style: italic;
+}
+
+/* ---------- Estado vacío ---------- */
+
+.board-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 10px;
+  padding: 56px 32px 48px;
+}
+.board-empty-plan {
+  width: 150px;
+  opacity: 0.9;
+  filter: drop-shadow(0 0 18px rgba(201, 162, 39, 0.15));
+  margin-bottom: 8px;
+}
+.board-empty h3 {
+  margin: 0;
+  font-size: 24px;
+}
+.board-empty p {
+  max-width: 46ch;
+  margin: 0 0 10px;
+}
+
+/* ---------- Modo aéreo ---------- */
+
+.board-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+.board-head h3 {
+  margin: 0;
+}
+
+.board-aerial {
+  position: relative;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid rgba(201, 162, 39, 0.4);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+}
+.board-aerial img {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+}
+/* Viñeta sutil sobre la fotografía */
+.board-aerial::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  box-shadow: inset 0 0 80px rgba(0, 0, 0, 0.45);
+}
+
+.board-pin {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  padding-bottom: 9px;
+  z-index: 2;
+}
+.board-pin-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: linear-gradient(180deg, var(--gold-300), var(--brass));
+  color: var(--ink);
+  font-family: var(--font-heading);
+  font-size: 14px;
+  font-weight: 700;
+  border: 2px solid rgba(31, 18, 12, 0.7);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.5);
+  cursor: default;
+}
+/* Aguja de la chincheta */
+.board-pin::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 29px;
+  transform: translateX(-50%);
+  border: 6px solid transparent;
+  border-top: 9px solid var(--brass);
+}
+.board-pin-label {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 6px);
+  transform: translateX(-50%);
+  white-space: nowrap;
+  background: rgba(20, 12, 8, 0.92);
+  color: var(--gold-300);
+  font-family: var(--font-heading);
+  font-size: 12.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 5px 10px;
+  border: 1px solid rgba(201, 162, 39, 0.5);
+  border-radius: 6px;
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease;
+}
+.board-pin:hover .board-pin-label {
+  opacity: 1;
+  transform: translateX(-50%) translateY(-2px);
+}
+
+.board-aerial-legend {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 8px 20px;
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 0;
+}
+.board-aerial-legend li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 17px;
+}
+.board-aerial-num {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: linear-gradient(180deg, var(--gold-300), var(--brass));
+  color: var(--ink);
+  font-family: var(--font-heading);
+  font-size: 12px;
+  font-weight: 700;
+}

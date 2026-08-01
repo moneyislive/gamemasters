@@ -1,0 +1,41 @@
+# Despliegue en Render — un único servicio que sirve la web y la API.
+#
+# Render lee este fichero al conectar el repositorio ("Blueprint"). Las claves
+# marcadas con sync:false NO se guardan aquí: las introduces tú en el panel,
+# para que no acaben nunca en el repositorio.
+services:
+  - type: web
+    name: gamemasters
+    runtime: node
+    plan: free
+    region: frankfurt # el más cercano a España; cámbialo si prefieres otro
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/config
+
+    # Disco persistente: sin esto, las fotos subidas desaparecen en cada
+    # despliegue, porque el sistema de ficheros del contenedor es efímero.
+    disk:
+      name: gamemasters-uploads
+      mountPath: /var/data
+      sizeGB: 1
+
+    envVars:
+      - key: NODE_VERSION
+        value: '20'
+      - key: NODE_ENV
+        value: production
+      # Las fotos van al disco persistente montado arriba.
+      - key: UPLOADS_DIR
+        value: /var/data/uploads
+      # Secretos: se introducen en el panel de Render (Environment).
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: MONGODB_URI
+        sync: false
+      - key: APP_PASSWORD
+        sync: false
+      - key: ANTHROPIC_MODEL
+        value: claude-fable-5
+      - key: MONGODB_DB
+        value: gamemasters

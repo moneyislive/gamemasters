@@ -1,0 +1,314 @@
+/* =====================================================================
+   RECIBIDOR — lista de casos de CLUEDO como expedientes de detective
+   ===================================================================== */
+
+.lobby {
+  position: relative;
+  z-index: 1;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 56px 40px 72px;
+  min-height: 100vh;
+}
+
+/* Resplandor de apliques de pared a los lados (ambiente de recibidor) */
+.lobby-glow {
+  position: fixed;
+  top: 12%;
+  width: 320px;
+  height: 480px;
+  pointer-events: none;
+  z-index: 0;
+  background: radial-gradient(50% 50% at 50% 40%, rgba(247, 216, 140, 0.1), transparent 70%);
+}
+
+.lobby-glow--left {
+  left: -80px;
+}
+
+.lobby-glow--right {
+  right: -80px;
+}
+
+/* ---------- Cabecera ---------- */
+
+.lobby-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 28px;
+  flex-wrap: wrap;
+}
+
+.lobby-back {
+  display: inline-block;
+  margin-bottom: 22px;
+  color: var(--parchment-dim);
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.lobby-back:hover {
+  color: var(--gold-300);
+}
+
+.lobby-kicker {
+  margin: 0 0 6px;
+  color: var(--gold-500);
+  letter-spacing: 0.3em;
+}
+
+.lobby-title {
+  font-family: var(--font-display);
+  font-size: clamp(34px, 4.4vw, 52px);
+  margin: 0 0 8px;
+}
+
+.lobby-sub {
+  margin: 0;
+  font-size: 19px;
+  max-width: 520px;
+}
+
+.lobby-new {
+  flex: none;
+  margin-bottom: 6px;
+}
+
+/* ---------- Estados de carga y vacío ---------- */
+
+.lobby-loading {
+  margin-top: 60px;
+  text-align: center;
+  color: var(--parchment-dim);
+  font-size: 20px;
+}
+
+.lobby-empty {
+  margin: 56px auto 0;
+  max-width: 560px;
+  padding: 56px 44px;
+  text-align: center;
+}
+
+.lobby-empty-mark {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 92px;
+  line-height: 1;
+  color: rgba(201, 162, 39, 0.4);
+  margin-bottom: 12px;
+}
+
+.lobby-empty h2 {
+  margin-bottom: 8px;
+}
+
+.lobby-empty p {
+  margin: 0 0 22px;
+  font-size: 18px;
+}
+
+/* ---------- Rejilla de expedientes ---------- */
+
+.case-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 26px;
+  margin-top: 38px;
+}
+
+.case-card {
+  position: relative;
+  padding: 30px 22px 22px;
+  cursor: pointer;
+  outline: none;
+  transition:
+    box-shadow 0.3s ease,
+    border-color 0.3s ease,
+    transform 0.25s ease;
+}
+
+.case-card:hover,
+.case-card:focus-visible {
+  transform: translateY(-4px);
+  border-color: rgba(217, 182, 74, 0.7);
+  box-shadow:
+    0 20px 48px rgba(0, 0, 0, 0.6),
+    0 0 30px rgba(201, 162, 39, 0.22),
+    inset 0 1px 0 rgba(232, 207, 127, 0.16);
+}
+
+/* Pestaña de carpeta con el número de caso */
+.case-tab {
+  position: absolute;
+  top: -13px;
+  left: 20px;
+  padding: 4px 14px;
+  background: linear-gradient(180deg, var(--mahogany-700), var(--mahogany-800));
+  border: 1px solid rgba(201, 162, 39, 0.4);
+  border-bottom: none;
+  border-radius: 8px 8px 0 0;
+  color: var(--gold-400);
+  font-size: 11px;
+  letter-spacing: 0.18em;
+}
+
+.case-name {
+  font-size: 23px;
+  margin: 4px 0 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding-right: 26px;
+}
+
+.case-date {
+  margin: 0 0 14px;
+  font-size: 15.5px;
+}
+
+.case-counts {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  color: var(--parchment-dim);
+  font-size: 11.5px;
+  margin-bottom: 16px;
+}
+
+.case-counts b {
+  color: var(--gold-300);
+  font-size: 15px;
+  font-weight: 600;
+  margin-right: 3px;
+}
+
+.case-counts i {
+  color: rgba(201, 162, 39, 0.5);
+  font-style: normal;
+}
+
+/* Sello de estado */
+.case-status {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  letter-spacing: 0.16em;
+}
+
+.case-status.is-draft {
+  color: var(--parchment-dim);
+  border: 1px solid rgba(241, 229, 201, 0.35);
+}
+
+.case-status.is-generating {
+  color: var(--gold-300);
+  border: 1px solid rgba(201, 162, 39, 0.6);
+  animation: case-pulse 1.6s ease-in-out infinite;
+}
+
+.case-status.is-ready {
+  color: var(--ink);
+  background: linear-gradient(180deg, var(--gold-300), var(--gold-500));
+  border: 1px solid var(--gold-400);
+}
+
+@keyframes case-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(201, 162, 39, 0.35);
+  }
+  50% {
+    box-shadow: 0 0 14px 2px rgba(201, 162, 39, 0.45);
+  }
+}
+
+/* Borrado discreto */
+.case-delete {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: rgba(241, 229, 201, 0.45);
+  font-size: 15px;
+  cursor: pointer;
+  opacity: 0;
+  transition:
+    opacity 0.2s ease,
+    color 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.case-card:hover .case-delete,
+.case-card:focus-visible .case-delete,
+.case-delete:focus-visible {
+  opacity: 1;
+}
+
+.case-delete:hover {
+  color: #f4c8bd;
+  border-color: rgba(179, 64, 47, 0.6);
+}
+
+/* Confirmación in situ */
+.case-confirm {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 20px;
+  border-radius: var(--radius);
+  background: rgba(15, 9, 6, 0.9);
+  backdrop-filter: blur(3px);
+  cursor: default;
+  animation: fade-up 0.25s ease both;
+}
+
+.case-confirm-text {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-size: 17px;
+  color: var(--parchment);
+  text-align: center;
+}
+
+.case-confirm-actions {
+  display: flex;
+  gap: 10px;
+}
+
+/* ---------- Aviso de error ---------- */
+
+.lobby-toast {
+  position: fixed;
+  bottom: 28px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 50;
+  padding: 10px 22px;
+  border-radius: 10px;
+  background: rgba(31, 18, 12, 0.95);
+  border: 1px solid rgba(179, 64, 47, 0.6);
+  color: #f4c8bd;
+  font-size: 16px;
+  animation: fade-up 0.3s ease both;
+}
+
+@media (max-width: 640px) {
+  .lobby {
+    padding: 40px 22px 56px;
+  }
+}

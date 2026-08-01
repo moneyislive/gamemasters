@@ -1,0 +1,115 @@
+/**
+ * Acceso por contraseña única.
+ *
+ * Si `APP_PASSWORD` está definida, toda la aplicación (API, imágenes subidas y
+ * dosieres) queda tras una contraseña. Sin ella, la aplicación funciona abierta
+ * como hasta ahora: pensado para desarrollo en local.
+ *
+ * La sesión es una cookie firmada, SIN estado en el servidor: el valor es un
+ * HMAC-SHA256 de una constante usando la propia contraseña como clave. Así
+ * sobrevive a los reinicios y a varios contenedores a la vez, y cambiar la
+ * contraseña invalida automáticamente todas las sesiones. La comparación se
+ * hace en tiempo constante para no filtrar información por el tiempo de
+ * respuesta.
+ */
+import crypto from 'node:crypto';
+import type { NextFunction, Request, Response } from 'express';
+import { Router } from 'express';
+import { env } from './config';
+
+const COOKIE = 'gm_sesion';
+/** 30 días: es una herramienta para organizar veladas, no un banco. */
+const DURACION_SEGUNDOS = 60 * 60 * 24 * 30;
+
+/** ¿Hay contraseña configurada? Si no, no se protege nada. */
+export function passwordRequired(): boolean {
+  return Boolean(env.appPassword);
+}
+
+/** Testigo de sesión derivado de la contraseña actual. */
+function tokenDeSesion(password: string): string {
+  return crypto.createHmac('sha256', password).update('gamemasters:sesion:v1').digest('hex');
+}
+
+/** Comparación en tiempo constante, tolerante a longitudes distintas. */
+function igualSeguro(a: string, b: string): boolean {
+  const bufferA = Buffer.from(a);
+  const bufferB = Buffer.from(b);
+  if (bufferA.length !== bufferB.length) return false;
+  return crypto.timingSafeEqual(bufferA, bufferB);
+}
+
+/** Lee una cookie concreta de la cabecera, sin dependencias externas. */
+function leerCookie(req: Request, nombre: string): string | undefined {
+  const cabecera = req.headers.cookie;
+  if (!cabecera) return undefined;
+  for (const parte of cabecera.split(';')) {
+    const separador = parte.indexOf('=');
+    if (separador === -1) continue;
+    if (parte.slice(0, separador).trim() === nombre) {
+      return decodeURIComponent(parte.slice(separador + 1).trim());
+    }
+  }
+  return undefined;
+}
+
+/** ¿La petición trae una sesión válida? (cierto siempre si no hay contraseña) */
+export function isAuthenticated(req: Request): boolean {
+  const password = env.appPassword;
+  if (!password) return true;
+  const cookie = leerCookie(req, COOKIE);
+  return Boolean(cookie) && igualSeguro(cookie!, tokenDeSesion(password));
+}
+
+/**
+ * Middleware de protección. Deja pasar siempre las rutas de autenticación
+ * (si no, no habría forma de iniciar sesión) y responde 401 al resto.
+ */
+export function requireAuth(req: Request, res: Response, next: NextFunction): void {
+  if (!passwordRequired() || req.path.startsWith('/auth/') || isAuthenticated(req)) {
+    next();
+    return;
+  }
+  res.status(401).json({ error: 'Acceso restringido: introduce la contraseña de la casa.' });
+}
+
+const router = Router();
+
+/** Estado de la sesión: lo consulta el cliente al arrancar. */
+router.get('/auth/status', (req, res) => {
+  res.json({ required: passwordRequired(), authenticated: isAuthenticated(req) });
+});
+
+router.post('/auth/login', (req, res) => {
+  const password = env.appPassword;
+  if (!password) {
+    res.json({ authenticated: true });
+    return;
+  }
+
+  const enviada = typeof req.body?.password === 'string' ? req.body.password : '';
+  if (!igualSeguro(enviada, password)) {
+    // Retardo breve: encarece probar contraseñas a lo bruto.
+    setTimeout(() => {
+      res.status(401).json({ error: 'Contraseña incorrecta.' });
+    }, 600);
+    return;
+  }
+
+  res.cookie(COOKIE, tokenDeSesion(password), {
+    httpOnly: true,
+    sameSite: 'lax',
+    // En producción la aplicación va por HTTPS; en local, no.
+    secure: process.env.NODE_ENV === 'production',
+    maxAge: DURACION_SEGUNDOS * 1000,
+    path: '/',
+  });
+  res.json({ authenticated: true });
+});
+
+router.post('/auth/logout', (_req, res) => {
+  res.clearCookie(COOKIE, { path: '/' });
+  res.json({ authenticated: false });
+});
+
+export default router;
