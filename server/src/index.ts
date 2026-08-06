@@ -19,6 +19,8 @@ import documentsRouter from './routes/documents';
 import entitiesRouter from './routes/entities';
 import gamesRouter from './routes/games';
 import generateRouter from './routes/generate';
+import jugarRouter from './routes/jugar';
+import liveRouter from './routes/live';
 import materialRouter from './routes/material';
 import refreshRouter from './routes/refresh';
 import uploadsRouter from './routes/uploads';
@@ -50,6 +52,11 @@ app.use(
   }),
 );
 
+// La app del jugador va ANTES del guardián: quien juega no conoce la contraseña
+// de la casa. Su credencial es el testigo firmado que recibe al emparejar el
+// móvil, y cada ruta lo verifica por su cuenta.
+app.use('/api', jugarRouter);
+
 // Acceso: el router de autenticación va primero y el guardián protege el resto.
 app.use('/api', authRouter);
 app.use('/api', requireAuth);
@@ -64,6 +71,7 @@ app.use('/api', boardRouter);
 app.use('/api', generateRouter);
 app.use('/api', refreshRouter);
 app.use('/api', materialRouter);
+app.use('/api', liveRouter);
 app.use('/api', documentsRouter);
 
 // 404 en JSON para rutas de API desconocidas.

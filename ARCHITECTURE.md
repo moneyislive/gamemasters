@@ -8,6 +8,8 @@ jugadores, el espacio físico y los objetos aportados.
 
 ## Stack
 
+- `app/` — Expo (React Native) + expo-router. La app de los jugadores para la
+  partida en vivo: iOS, Android y web con un solo código. Ver `app/README.md`.
 - `client/` — React 18 + Vite + TypeScript. Zustand, react-router-dom v6, framer-motion.
 - `server/` — Node 20 + Express 4 + TypeScript (ESM, ejecutado con tsx). Mongoose
   (MongoDB Atlas) con fallback a fichero JSON. `@anthropic-ai/sdk`.
@@ -21,6 +23,12 @@ Puertos: cliente 5173 (proxy `/api` y `/uploads` → 5174), servidor 5174.
 
 - TypeScript estricto; sin `any` salvo imposibilidad razonable.
 - NO ejecutar `npm install`, builds ni servidores: solo escribir código.
+  (Excepción registrada: la creación de `app/` exigió instalar Expo y sus
+  dependencias. Fue una decisión explícita del propietario del repositorio.)
+- Al probar en local, NUNCA lanzar el servidor con variables de PowerShell
+  (`$env:VAR=""`): Windows descarta las vacías y el proceso acaba cargando el
+  `.env` real, con la clave de Anthropic y la base de Atlas de producción. Usar
+  `spawn` de Node pasando el entorno explícito (ver los bancos de prueba).
 - No crear ficheros fuera de tu lista de propiedad (ownership) — otros agentes poseen el resto.
 - Comentarios y textos de UI en español.
 - Estética: usar las clases y variables de `client/src/styles/theme.css`

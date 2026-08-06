@@ -16,6 +16,7 @@ import type {
   GameSummary,
   ModelId,
 } from '../../../shared/types';
+import type { Account, LiveSession } from '../../../shared/live';
 import { env, isModelId } from '../config';
 
 // ---------------------------------------------------------------------------
@@ -32,6 +33,18 @@ export interface Store {
   appendMessage(gameId: string, msg: ChatMessage): Promise<void>;
   getConfigModel(): Promise<ModelId>;
   setConfigModel(m: ModelId): Promise<void>;
+
+  // ---- Partida en vivo ----
+  getLive(gameId: string): Promise<LiveSession | null>;
+  /** Busca por el código corto que se dicta en la mesa. */
+  getLiveByCode(code: string): Promise<LiveSession | null>;
+  saveLive(session: LiveSession): Promise<LiveSession>;
+  deleteLive(gameId: string): Promise<void>;
+
+  // ---- Cuentas de jugador ----
+  getAccount(id: string): Promise<Account | null>;
+  getAccountByEmail(email: string): Promise<Account | null>;
+  saveAccount(account: Account): Promise<Account>;
 }
 
 // ---------------------------------------------------------------------------
@@ -98,6 +111,8 @@ interface FileData {
   games: GameSession[];
   messages: Record<string, ChatMessage[]>;
   config: { model: ModelId };
+  live: LiveSession[];
+  accounts: Account[];
 }
 
 class FileStore implements Store {
@@ -107,6 +122,8 @@ class FileStore implements Store {
     games: [],
     messages: {},
     config: { model: env.defaultModel },
+    live: [],
+    accounts: [],
   };
   /** Cadena de escrituras para serializar los renames y evitar colisiones. */
   private writeChain: Promise<void> = Promise.resolve();
@@ -126,6 +143,8 @@ class FileStore implements Store {
           parsed.config && isModelId(parsed.config.model)
             ? { model: parsed.config.model }
             : { model: env.defaultModel },
+        live: Array.isArray(parsed.live) ? parsed.live : [],
+        accounts: Array.isArray(parsed.accounts) ? parsed.accounts : [],
       };
     } catch {
       // El fichero aún no existe (o está corrupto): se parte de un almacén vacío.
@@ -203,6 +222,49 @@ class FileStore implements Store {
     this.data.config.model = m;
     await this.persist();
   }
+
+  async getLive(gameId: string): Promise<LiveSession | null> {
+    const s = this.data.live.find((l) => l.id === gameId);
+    return s ? structuredClone(s) : null;
+  }
+
+  async getLiveByCode(code: string): Promise<LiveSession | null> {
+    const s = this.data.live.find((l) => l.code === code.toUpperCase());
+    return s ? structuredClone(s) : null;
+  }
+
+  async saveLive(session: LiveSession): Promise<LiveSession> {
+    const updated = { ...structuredClone(session), updatedAt: new Date().toISOString() };
+    const i = this.data.live.findIndex((l) => l.id === session.id);
+    if (i >= 0) this.data.live[i] = updated;
+    else this.data.live.push(updated);
+    await this.persist();
+    return structuredClone(updated);
+  }
+
+  async deleteLive(gameId: string): Promise<void> {
+    this.data.live = this.data.live.filter((l) => l.id !== gameId);
+    await this.persist();
+  }
+
+  async getAccount(id: string): Promise<Account | null> {
+    const a = this.data.accounts.find((x) => x.id === id);
+    return a ? structuredClone(a) : null;
+  }
+
+  async getAccountByEmail(email: string): Promise<Account | null> {
+    const a = this.data.accounts.find((x) => x.email === email.trim().toLowerCase());
+    return a ? structuredClone(a) : null;
+  }
+
+  async saveAccount(account: Account): Promise<Account> {
+    const copia = structuredClone(account);
+    const i = this.data.accounts.findIndex((x) => x.id === account.id);
+    if (i >= 0) this.data.accounts[i] = copia;
+    else this.data.accounts.push(copia);
+    await this.persist();
+    return structuredClone(copia);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -254,6 +316,8 @@ class MongoStore implements Store {
   private readonly games = looseModel('CluedoGame', 'games', 'id');
   private readonly messages = looseModel('CluedoMessage', 'messages', 'gameId');
   private readonly config = looseModel('CluedoConfig', 'config', 'key');
+  private readonly live = looseModel('CluedoLive', 'live', 'id');
+  private readonly accounts = looseModel('CluedoAccount', 'accounts', 'email');
 
   async listGames(): Promise<GameSummary[]> {
     const docs = (await this.games
@@ -327,6 +391,49 @@ class MongoStore implements Store {
       { $set: { model: m } },
       { upsert: true },
     );
+  }
+
+  async getLive(gameId: string): Promise<LiveSession | null> {
+    const doc = (await this.live.findOne({ id: gameId }).lean()) as unknown as LooseDoc | null;
+    return doc ? stripMongo<LiveSession>(doc) : null;
+  }
+
+  async getLiveByCode(code: string): Promise<LiveSession | null> {
+    const doc = (await this.live
+      .findOne({ code: code.toUpperCase() })
+      .lean()) as unknown as LooseDoc | null;
+    return doc ? stripMongo<LiveSession>(doc) : null;
+  }
+
+  async saveLive(session: LiveSession): Promise<LiveSession> {
+    const updated: LiveSession = { ...session, updatedAt: new Date().toISOString() };
+    await this.live.replaceOne({ id: session.id }, updated as unknown as LooseDoc, {
+      upsert: true,
+    });
+    return updated;
+  }
+
+  async deleteLive(gameId: string): Promise<void> {
+    await this.live.deleteOne({ id: gameId });
+  }
+
+  async getAccount(id: string): Promise<Account | null> {
+    const doc = (await this.accounts.findOne({ id }).lean()) as unknown as LooseDoc | null;
+    return doc ? stripMongo<Account>(doc) : null;
+  }
+
+  async getAccountByEmail(email: string): Promise<Account | null> {
+    const doc = (await this.accounts
+      .findOne({ email: email.trim().toLowerCase() })
+      .lean()) as unknown as LooseDoc | null;
+    return doc ? stripMongo<Account>(doc) : null;
+  }
+
+  async saveAccount(account: Account): Promise<Account> {
+    await this.accounts.replaceOne({ id: account.id }, account as unknown as LooseDoc, {
+      upsert: true,
+    });
+    return account;
   }
 }
 

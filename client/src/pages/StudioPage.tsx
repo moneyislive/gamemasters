@@ -27,12 +27,13 @@ import WeaponsPanel from '../components/studio/WeaponsPanel';
 import StylePanel from '../components/studio/StylePanel';
 import BoardView from '../components/board/BoardView';
 import DocumentsPanel from '../components/documents/DocumentsPanel';
+import LivePanel from '../components/live/LivePanel';
 import GenerateOverlay, { startGeneration, startRefresh } from '../components/generate/GenerateOverlay';
 import '../styles/studio.css';
 
 type StudioTab = Extract<
   HighlightTarget,
-  'suspects' | 'rooms' | 'weapons' | 'style' | 'board' | 'documents'
+  'suspects' | 'rooms' | 'weapons' | 'style' | 'board' | 'documents' | 'live'
 >;
 
 /** Qué hace el botón principal según el estado de la partida. */
@@ -45,6 +46,7 @@ const TABS: ReadonlyArray<{ id: StudioTab; label: string; symbol: string }> = [
   { id: 'style', label: 'Estilo', symbol: '✒' },
   { id: 'board', label: 'Tablero', symbol: '▦' },
   { id: 'documents', label: 'Dosieres', symbol: '❧' },
+  { id: 'live', label: 'En vivo', symbol: '◉' },
 ];
 
 const DEMO_TIP =
@@ -297,6 +299,8 @@ export default function StudioPage() {
         return <BoardView />;
       case 'documents':
         return <DocumentsPanel />;
+      case 'live':
+        return <LivePanel />;
       case 'suspects':
       default:
         return <SuspectsPanel />;

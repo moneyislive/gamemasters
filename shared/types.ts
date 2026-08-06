@@ -478,6 +478,7 @@ export type HighlightTarget =
   | 'style'
   | 'board'
   | 'documents'
+  | 'live'
   | 'generate';
 
 export interface UiPopupCommand {

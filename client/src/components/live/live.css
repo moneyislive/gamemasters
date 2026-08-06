@@ -1,0 +1,146 @@
+/* Puesto de mando de la partida en vivo. */
+
+.live-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.live-vacio {
+  text-align: center;
+  padding: 40px 28px;
+}
+.live-glifo {
+  display: block;
+  font-size: 2.4rem;
+  color: var(--gold-400);
+  margin-bottom: 10px;
+}
+.live-vacio h3 {
+  font-family: var(--font-heading);
+  color: var(--parchment);
+  margin: 0 0 8px;
+}
+.live-vacio p {
+  max-width: 46ch;
+  margin: 0 auto 18px;
+}
+
+.live-cabecera {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 28px;
+  align-items: flex-start;
+  padding: 22px 24px;
+}
+.live-codigo,
+.live-estado {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.live-kicker {
+  font-size: 0.66rem;
+  letter-spacing: 0.22em;
+  color: var(--gold-500);
+}
+.live-codigo strong {
+  font-family: var(--font-heading);
+  font-size: 2.4rem;
+  letter-spacing: 0.22em;
+  color: var(--gold-300);
+  line-height: 1.1;
+}
+.live-estado strong {
+  font-family: var(--font-heading);
+  font-size: 1.05rem;
+  letter-spacing: 0.06em;
+  color: var(--parchment);
+}
+
+.live-titulo {
+  font-family: var(--font-heading);
+  font-size: 0.95rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--gold-300);
+  margin: 0 0 8px;
+}
+
+.live-botones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: flex-end;
+  margin: 12px 0;
+}
+
+.live-minutos {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.live-minutos .mono-caps {
+  font-size: 0.62rem;
+  letter-spacing: 0.2em;
+  color: var(--gold-500);
+}
+.live-minutos .input {
+  width: 82px;
+  text-align: center;
+}
+
+.live-tabla {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 12px;
+}
+.live-tabla th {
+  font-family: var(--font-heading);
+  font-size: 0.62rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--gold-500);
+  text-align: left;
+  padding: 6px 8px;
+  border-bottom: 1px solid rgba(201, 162, 39, 0.3);
+}
+.live-tabla td {
+  padding: 9px 8px;
+  border-bottom: 1px solid rgba(201, 162, 39, 0.12);
+  color: var(--parchment);
+  font-size: 0.95rem;
+}
+
+.live-code {
+  font-family: var(--font-heading);
+  letter-spacing: 0.2em;
+  color: var(--gold-300);
+  background: rgba(201, 162, 39, 0.1);
+  border: 1px solid rgba(201, 162, 39, 0.3);
+  border-radius: 5px;
+  padding: 3px 9px;
+}
+
+.live-punto {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  margin-right: 7px;
+  background: rgba(217, 201, 163, 0.3);
+}
+.live-punto.is-vivo {
+  background: var(--gold-400);
+  box-shadow: 0 0 8px rgba(201, 162, 39, 0.7);
+}
+
+@media (max-width: 720px) {
+  .live-cabecera {
+    gap: 16px;
+  }
+  .live-tabla th:nth-child(4),
+  .live-tabla td:nth-child(4) {
+    display: none;
+  }
+}
