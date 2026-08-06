@@ -15,6 +15,8 @@ import { getStore } from '../db/store';
 import { renderPlayerDocument } from '../docs/renderer';
 import { renderPrintableDocument } from '../docs/imprimibles';
 import { buscarNavegador, convertirAPdf, SinNavegador } from '../docs/pdf';
+import { armarPaquete } from '../docs/paquete';
+import { EscritorZip } from '../docs/zip';
 import { isPrintableDocId } from '../../../shared/documents';
 import type { DocumentCapabilities, DocumentVariant } from '../../../shared/types';
 
@@ -46,6 +48,72 @@ router.get('/documents/capabilities', (_req, res) => {
     ? { pdf: true, engine: navegador.nombre }
     : { pdf: false };
   res.json(respuesta);
+});
+
+/**
+ * Paquete completo de la partida en un ZIP.
+ *
+ * Se escribe en streaming: con once dosieres en PDF el archivo ronda los 70 MB
+ * y tardar medio minuto es normal, pero acumularlo en memoria antes de enviarlo
+ * no lo es.
+ */
+router.get('/games/:id/documents.zip', async (req, res) => {
+  const game = await getStore().getGame(req.params.id);
+  if (!game) {
+    res.status(404).json({ error: 'No existe esa partida.' });
+    return;
+  }
+  if (!game.plot) {
+    res.status(409).json({ error: 'Esta partida todavía no tiene misterio: genéralo primero.' });
+    return;
+  }
+
+  const variante: DocumentVariant = req.query.variant === 'blanco' ? 'blanco' : 'color';
+  const formato = req.query.format === 'pdf' ? 'pdf' : 'html';
+
+  // Se comprueba ANTES de escribir un solo byte: una vez empezado el ZIP ya no
+  // hay forma de responder con un error en condiciones.
+  if (formato === 'pdf' && !buscarNavegador()) {
+    res.status(503).json({
+      error:
+        'Esta máquina no tiene Chrome ni Edge para generar los PDF. Descarga el paquete en HTML y usa «Imprimir → Guardar como PDF».',
+    });
+    return;
+  }
+
+  const { leeme, entradas } = armarPaquete(game);
+  const nombreZip = nombreDeFichero('', game.plot.title, variante, 'zip').replace('.zip', `-${formato}.zip`);
+
+  res.setHeader('Content-Type', 'application/zip');
+  res.setHeader('Content-Disposition', `attachment; filename="${nombreZip}"`);
+  res.setHeader('Cache-Control', 'no-store');
+
+  const zip = new EscritorZip((trozo) => res.write(trozo));
+  zip.añadir('00_LEEME_PRIMERO.txt', leeme);
+
+  for (const entrada of entradas) {
+    try {
+      const html = entrada.componer({ variant: variante });
+      if (!html) continue;
+      if (formato === 'pdf') {
+        // Los PDF ya vienen comprimidos: volver a comprimirlos no baja nada.
+        zip.añadir(`${entrada.ruta}.pdf`, await convertirAPdf(html), false);
+      } else {
+        zip.añadir(`${entrada.ruta}.html`, html);
+      }
+    } catch (error) {
+      // Un documento que falla no puede tumbar el paquete entero: se deja
+      // constancia dentro del propio ZIP y se sigue.
+      console.error(`[documents] fallo al empaquetar ${entrada.ruta}:`, error);
+      zip.añadir(
+        `${entrada.ruta}.ERROR.txt`,
+        `No se pudo generar este documento.\n\n${error instanceof Error ? error.message : 'Error desconocido'}\n`,
+      );
+    }
+  }
+
+  zip.cerrar();
+  res.end();
 });
 
 router.get('/games/:id/documents/:suspectId', async (req, res) => {

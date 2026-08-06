@@ -9,7 +9,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { DOCUMENT_FORMATS } from '../../../../shared/types';
-import type { DocumentCapabilities } from '../../../../shared/types';
+import type {
+  DocumentCapabilities,
+  DocumentFormat,
+  DocumentVariant,
+} from '../../../../shared/types';
 import { documentUrl } from '../../api/client';
 
 interface Props {
@@ -19,6 +23,15 @@ interface Props {
   capacidades: DocumentCapabilities | null;
   /** Estilo del botón que abre el menú. */
   compacto?: boolean;
+  /** Texto del botón. Por defecto, «Descargar». */
+  etiqueta?: string;
+  /**
+   * Construye la URL de cada formato. Se inyecta para que el mismo menú sirva
+   * para un documento suelto y para el paquete completo en ZIP.
+   */
+  construirUrl?: (variant: DocumentVariant, format: DocumentFormat) => string;
+  /** El paquete completo no se puede «imprimir»: se descarga y ya. */
+  conImprimir?: boolean;
 }
 
 export default function DownloadMenu({
@@ -26,6 +39,9 @@ export default function DownloadMenu({
   suspectId,
   capacidades,
   compacto = true,
+  etiqueta = 'Descargar',
+  construirUrl,
+  conImprimir = true,
 }: Props): JSX.Element {
   const [abierto, setAbierto] = useState(false);
   const contenedor = useRef<HTMLDivElement>(null);
@@ -56,7 +72,7 @@ export default function DownloadMenu({
         aria-expanded={abierto}
         onClick={() => setAbierto((previo) => !previo)}
       >
-        Descargar ▾
+        {etiqueta} ▾
       </button>
 
       <AnimatePresence>
@@ -87,11 +103,15 @@ export default function DownloadMenu({
                   className="docs-descarga-item"
                   key={clave}
                   role="menuitem"
-                  href={documentUrl(gameId, suspectId, {
-                    variant: formato.variant,
-                    format: formato.format,
-                    download: true,
-                  })}
+                  href={
+                    construirUrl
+                      ? construirUrl(formato.variant, formato.format)
+                      : documentUrl(gameId, suspectId, {
+                          variant: formato.variant,
+                          format: formato.format,
+                          download: true,
+                        })
+                  }
                   download
                   onClick={() => setAbierto(false)}
                 >
@@ -101,19 +121,21 @@ export default function DownloadMenu({
               );
             })}
 
-            <a
-              className="docs-descarga-item docs-descarga-item--imprimir"
-              role="menuitem"
-              href={documentUrl(gameId, suspectId, { print: 'auto' })}
-              target="_blank"
-              rel="noreferrer"
-              onClick={() => setAbierto(false)}
-            >
-              <span className="docs-descarga-label">Imprimir…</span>
-              <span className="docs-descarga-hint">
-                Abre el documento y lanza el diálogo de impresión de tu navegador.
-              </span>
-            </a>
+            {conImprimir && (
+              <a
+                className="docs-descarga-item docs-descarga-item--imprimir"
+                role="menuitem"
+                href={documentUrl(gameId, suspectId, { print: 'auto' })}
+                target="_blank"
+                rel="noreferrer"
+                onClick={() => setAbierto(false)}
+              >
+                <span className="docs-descarga-label">Imprimir…</span>
+                <span className="docs-descarga-hint">
+                  Abre el documento y lanza el diálogo de impresión de tu navegador.
+                </span>
+              </a>
+            )}
           </motion.div>
         )}
       </AnimatePresence>

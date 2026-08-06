@@ -10,7 +10,7 @@
 import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { computeStaleness } from '../../../../shared/staleness';
-import { documentUrl, fetchDocumentCapabilities } from '../../api/client';
+import { documentUrl, fetchDocumentCapabilities, packageUrl } from '../../api/client';
 import type { DocumentCapabilities } from '../../../../shared/types';
 import { useAppStore } from '../../state/store';
 import DownloadMenu from './DownloadMenu';
@@ -265,19 +265,32 @@ export default function DocumentsPanel(): JSX.Element {
             secretos distintos.
           </p>
         </div>
-        <span className="docs-count">
-          {/* Con la partida desincronizada hay más tarjetas que documentos:
-              se dice de cuántas están escritas para que el número no confunda. */}
-          {sobres.length > documentos.length ? (
-            <>
-              <strong>{documentos.length}</strong> de {sobres.length} documentos
-            </>
-          ) : (
-            <>
-              <strong>{documentos.length}</strong> documentos
-            </>
+        <div className="docs-header-acciones">
+          <span className="docs-count">
+            {/* Con la partida desincronizada hay más tarjetas que documentos:
+                se dice de cuántas están escritas para que el número no confunda. */}
+            {sobres.length > documentos.length ? (
+              <>
+                <strong>{documentos.length}</strong> de {sobres.length} documentos
+              </>
+            ) : (
+              <>
+                <strong>{documentos.length}</strong> documentos
+              </>
+            )}
+          </span>
+          {game.plot && (
+            <DownloadMenu
+              gameId={game.id}
+              suspectId="paquete"
+              capacidades={capacidades}
+              compacto={false}
+              etiqueta="Descargar todo"
+              conImprimir={false}
+              construirUrl={(variant, format) => packageUrl(game.id, { variant, format })}
+            />
           )}
-        </span>
+        </div>
       </header>
 
       <div className="docs-grid">

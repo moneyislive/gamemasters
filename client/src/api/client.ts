@@ -214,6 +214,18 @@ export const documentUrl = (
   return `${BASE}/games/${gameId}/documents/${suspectId}${cola ? `?${cola}` : ''}`;
 };
 
+/** Paquete completo de la partida en un ZIP, con carpetas por destinatario. */
+export const packageUrl = (
+  gameId: string,
+  opciones: { variant?: DocumentVariant; format?: DocumentFormat } = {},
+): string => {
+  const params = new URLSearchParams();
+  if (opciones.variant === 'blanco') params.set('variant', 'blanco');
+  if (opciones.format === 'pdf') params.set('format', 'pdf');
+  const cola = params.toString();
+  return `${BASE}/games/${gameId}/documents.zip${cola ? `?${cola}` : ''}`;
+};
+
 /** ¿Puede el servidor convertir a PDF, o hay que imprimir desde el navegador? */
 export const fetchDocumentCapabilities = () =>
   request<DocumentCapabilities>('/documents/capabilities');

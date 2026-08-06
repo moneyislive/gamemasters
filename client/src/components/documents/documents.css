@@ -530,6 +530,21 @@
   background: #f1e5c9;
 }
 
+/* Cabecera: el recuento y la descarga del paquete completo, juntos. */
+.docs-header-acciones {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 720px) {
+  .docs-header-acciones {
+    width: 100%;
+    justify-content: space-between;
+  }
+}
+
 /* ---------------------------------------------------------------------------
    Material de la velada
    La única acción del panel que consume IA: se anuncia, no se esconde.
