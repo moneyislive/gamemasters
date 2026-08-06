@@ -13,10 +13,14 @@
 
 export type PrintableDocId =
   | 'indice-paquete'
+  | 'manual-gm'
   | 'hojas-investigacion'
   | 'carteles-sala'
   | 'linea-temporal'
   | 'etiquetas-sobres'
+  | 'tarjetas-ensobrar'
+  | 'guia-preparador'
+  | 'desenlace'
   | 'informe-validacion';
 
 /** Para quién es el documento. Determina en qué grupo se pinta en la interfaz. */
@@ -65,6 +69,17 @@ export const PRINTABLE_DOCS: PrintableDocInfo[] = [
     sides: 'doble',
   },
   {
+    id: 'manual-gm',
+    name: 'Manual del Game Master',
+    summary:
+      'El documento que tienes en la mano toda la noche: reglas que leer, estructura de cada ronda, salas activas, sobres y listas de control.',
+    audience: 'gm',
+    modes: ['host', 'blind'],
+    defaultOn: true,
+    copies: 'una',
+    sides: 'doble',
+  },
+  {
     id: 'hojas-investigacion',
     name: 'Hojas de investigación y acusación',
     summary:
@@ -107,6 +122,39 @@ export const PRINTABLE_DOCS: PrintableDocInfo[] = [
     defaultOn: true,
     copies: 'una',
     sides: 'una',
+  },
+  {
+    id: 'tarjetas-ensobrar',
+    name: 'Tarjetas para ensobrar',
+    summary:
+      'El contenido de cada sobre, recortable: pistas por sala y ronda, revelaciones de cronología, giros personales y ayudas.',
+    audience: 'preparer',
+    modes: ['host', 'blind'],
+    defaultOn: true,
+    copies: 'una',
+    sides: 'una',
+  },
+  {
+    id: 'guia-preparador',
+    name: 'Guía del preparador',
+    summary:
+      'Solo con el Game Master a ciegas: qué personaje darle, a quién va cada giro y en qué orden se abre todo. Contiene la solución.',
+    audience: 'preparer',
+    modes: ['blind'],
+    defaultOn: true,
+    copies: 'una',
+    sides: 'doble',
+  },
+  {
+    id: 'desenlace',
+    name: 'El desenlace',
+    summary:
+      'La combinación, la reconstrucción, la confesión y el epílogo. Va en sobre opaco y no se abre hasta recoger todas las acusaciones.',
+    audience: 'preparer',
+    modes: ['host', 'blind'],
+    defaultOn: true,
+    copies: 'una',
+    sides: 'doble',
   },
   {
     id: 'informe-validacion',

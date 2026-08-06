@@ -7,7 +7,7 @@
  * activas, códigos de sobre, el hueco de la cronología— se calcula aquí una vez
  * y lo consume quien lo necesite.
  */
-import type { GameSession, Plot, PlotClue, Room, TimelineEvent } from '../../../shared/types';
+import type { GameSession, Plot, PlotClue, Room, Suspect, TimelineEvent } from '../../../shared/types';
 
 // ---------------------------------------------------------------------------
 // Rondas y reparto de pistas
@@ -174,6 +174,25 @@ export function inventarioSobres(game: GameSession, plot: Plot): SobreDeLaPartid
   }
 
   return sobres;
+}
+
+// ---------------------------------------------------------------------------
+// Reparto
+// ---------------------------------------------------------------------------
+
+/**
+ * Personajes que puede interpretar un Game Master que juega a ciegas.
+ *
+ * Tiene que ser alguien inocente y sin giro asignado: si le tocara el culpable
+ * sabría la solución, y si le tocara un giro tendría que actuar una revelación
+ * que no ha podido preparar mientras dirige. Quien prepara elige de esta lista.
+ */
+export function candidatosParaGm(game: GameSession, plot: Plot): Suspect[] {
+  const conGiro = new Set((plot.material?.twists ?? []).map((giro) => giro.suspectId));
+  return game.suspects.filter(
+    (sospechoso) =>
+      sospechoso.id !== plot.solution.murdererId && !conGiro.has(sospechoso.id),
+  );
 }
 
 // ---------------------------------------------------------------------------

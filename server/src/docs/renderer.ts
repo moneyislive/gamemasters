@@ -11,6 +11,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { env } from '../config';
 import { styleNoteForGm } from '../plot/style';
+import { vistaGm } from './contexto';
 import { cronologiaPublica } from './datos';
 import { barraDeImpresion, hojaDeEstilos } from './estilos';
 import { esc } from './html';
@@ -614,7 +615,7 @@ function dosierGameMaster(opciones: DocumentRenderOptions, game: GameSession, pl
 
   // A ciegas se listan las pistas (hay que repartirlas) pero NO qué señalan:
   // «Señala X como el arma del crimen» destriparía el caso al propio GM.
-  const ciego = game.settings?.gmPlays === true;
+  const ciego = !vistaGm(game).revelaPistas;
 
   const pistas =
     plot.clues.length > 0
@@ -672,7 +673,7 @@ function dosierGameMaster(opciones: DocumentRenderOptions, game: GameSession, pl
   // Modo ciego: el Game Master también juega, así que su guía conserva lo que
   // necesita para conducir la velada pero pierde la solución, los secretos
   // ajenos y la cronología secreta. Todo eso se va al sobre sellado.
-  const aCiegas = game.settings?.gmPlays === true;
+  const aCiegas = !vistaGm(game).revelaSolucion;
 
   const avisoCiego = aCiegas
     ? `<section>
@@ -744,7 +745,7 @@ function dosierGameMaster(opciones: DocumentRenderOptions, game: GameSession, pl
 export function renderDocumentIndex(game: GameSession): PlayerDocument[] {
   const plot = game.plot;
   if (!plot) return [];
-  const aCiegas = game.settings?.gmPlays === true;
+  const aCiegas = vistaGm(game).gmJuega;
   const indice: PlayerDocument[] = game.suspects.map((sospechoso) => ({
     suspectId: sospechoso.id,
     title: tituloJugador(plot, sospechoso),
@@ -792,6 +793,6 @@ export function renderPlayerDocuments(
     dosierJugador(opciones, game, plot, sospechoso, personajePorId.get(sospechoso.id)),
   );
   documentos.push(dosierGameMaster(opciones, game, plot));
-  if (game.settings?.gmPlays === true) documentos.push(dosierSolucion(opciones, game, plot));
+  if (vistaGm(game).gmJuega) documentos.push(dosierSolucion(opciones, game, plot));
   return documentos;
 }
