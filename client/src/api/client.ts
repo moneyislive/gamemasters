@@ -1,6 +1,9 @@
 import type {
   AppConfig,
   ChatStreamEvent,
+  DocumentCapabilities,
+  DocumentFormat,
+  DocumentVariant,
   GameSession,
   GameSummary,
   GenerateStreamEvent,
@@ -175,5 +178,31 @@ export const refreshGame = (
 
 // ---------- Documentos ----------
 
-export const documentUrl = (gameId: string, suspectId: string, download = false) =>
-  `${BASE}/games/${gameId}/documents/${suspectId}${download ? '?download=1' : ''}`;
+export interface DocumentUrlOptions {
+  variant?: DocumentVariant;
+  format?: DocumentFormat;
+  download?: boolean;
+  /** Abre el documento con la barra de imprimir; `'auto'` lanza el diálogo. */
+  print?: boolean | 'auto';
+}
+
+export const documentUrl = (
+  gameId: string,
+  suspectId: string,
+  opciones: DocumentUrlOptions | boolean = {},
+): string => {
+  // Durante un tiempo la firma fue (gameId, suspectId, download): se mantiene
+  // para no romper llamadas antiguas.
+  const op: DocumentUrlOptions = typeof opciones === 'boolean' ? { download: opciones } : opciones;
+  const params = new URLSearchParams();
+  if (op.variant === 'blanco') params.set('variant', 'blanco');
+  if (op.format === 'pdf') params.set('format', 'pdf');
+  if (op.download) params.set('download', '1');
+  if (op.print) params.set('print', op.print === 'auto' ? 'auto' : '1');
+  const cola = params.toString();
+  return `${BASE}/games/${gameId}/documents/${suspectId}${cola ? `?${cola}` : ''}`;
+};
+
+/** ¿Puede el servidor convertir a PDF, o hay que imprimir desde el navegador? */
+export const fetchDocumentCapabilities = () =>
+  request<DocumentCapabilities>('/documents/capabilities');

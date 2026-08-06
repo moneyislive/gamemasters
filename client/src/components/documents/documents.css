@@ -530,7 +530,83 @@
   background: #f1e5c9;
 }
 
+/* ---------------------------------------------------------------------------
+   Menú de descarga
+   Cuatro formatos no caben como botones en una tarjeta: van desplegables.
+   --------------------------------------------------------------------------- */
+
+.docs-descarga {
+  position: relative;
+  display: inline-block;
+}
+
+.docs-descarga-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 30;
+  width: 288px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: var(--panel-bg);
+  border: var(--panel-border);
+  border-radius: var(--radius);
+  box-shadow: var(--panel-shadow);
+}
+
+.docs-descarga-item {
+  display: block;
+  padding: 9px 12px;
+  border-radius: 6px;
+  text-decoration: none;
+  color: var(--parchment);
+  transition: background 0.15s ease;
+}
+.docs-descarga-item:hover {
+  background: rgba(201, 162, 39, 0.14);
+}
+
+.docs-descarga-label {
+  display: block;
+  font-family: var(--font-heading);
+  font-size: 0.82rem;
+  letter-spacing: 0.08em;
+  color: var(--gold-300);
+}
+
+.docs-descarga-hint {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.86rem;
+  line-height: 1.35;
+  color: var(--parchment-dim);
+}
+
+/* Sin navegador para el PDF: la entrada se queda, pero apagada y explicada. */
+.docs-descarga-item.is-off {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+.docs-descarga-item.is-off:hover {
+  background: none;
+}
+.docs-descarga-item.is-off .docs-descarga-label {
+  color: var(--parchment-dim);
+}
+
+.docs-descarga-item--imprimir {
+  margin-top: 4px;
+  padding-top: 11px;
+  border-top: 1px solid rgba(201, 162, 39, 0.28);
+  border-radius: 0 0 6px 6px;
+}
+
 @media (max-width: 720px) {
+  .docs-descarga-menu {
+    width: min(288px, calc(100vw - 48px));
+  }
   .docs-viewer {
     padding: 12px;
   }

@@ -11,9 +11,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { env } from '../config';
 import { styleNoteForGm } from '../plot/style';
+import { barraDeImpresion, hojaDeEstilos } from './estilos';
 import { DOCUMENT_SECTIONS } from '../../../shared/types';
 import type {
   BoardLayout,
+  DocumentRenderOptions,
   DocumentSectionId,
   GameSession,
   PlayerDocument,
@@ -117,7 +119,7 @@ export function renderBoardSvg(board: BoardLayout, rooms: Room[]): string {
               fill="url(#parquet)" stroke="#c9a227" stroke-width="2.5" />
         <rect x="${x + 10}" y="${y + 10}" width="${w - 20}" height="${h - 20}" rx="3"
               fill="none" stroke="rgba(201,162,39,0.35)" stroke-width="1" />
-        <text x="${cx}" y="${cy + 4}" text-anchor="middle"
+        <text class="sala-nombre" x="${cx}" y="${cy + 4}" text-anchor="middle"
               font-family="Cinzel, Georgia, serif" font-size="${tamano.toFixed(1)}"
               letter-spacing="1.4" fill="#f1e5c9">${esc(nombre.toUpperCase())}</text>
         <line x1="${cx - 22}" y1="${cy + 16}" x2="${cx + 22}" y2="${cy + 16}"
@@ -138,8 +140,8 @@ export function renderBoardSvg(board: BoardLayout, rooms: Room[]): string {
         <title>Pasadizo secreto: ${esc(desde)} ⇄ ${esc(hasta)}</title>
         <line x1="${a.cx}" y1="${a.cy}" x2="${b.cx}" y2="${b.cy}"
               stroke="#c9a227" stroke-width="2.4" stroke-dasharray="11 9" opacity="0.75" />
-        <circle cx="${a.cx}" cy="${a.cy}" r="9" fill="#1f120c" stroke="#c9a227" stroke-width="2" />
-        <circle cx="${b.cx}" cy="${b.cy}" r="9" fill="#1f120c" stroke="#c9a227" stroke-width="2" />
+        <circle cx="${a.cx}" cy="${a.cy}" r="9" class="nodo" fill="#1f120c" stroke="#c9a227" stroke-width="2" />
+        <circle cx="${b.cx}" cy="${b.cy}" r="9" class="nodo" fill="#1f120c" stroke="#c9a227" stroke-width="2" />
       </g>`;
     })
     .join('');
@@ -173,11 +175,11 @@ export function renderBoardSvg(board: BoardLayout, rooms: Room[]): string {
         stroke="rgba(201,162,39,0.4)" stroke-width="1.2" />
 
   <g>
-    <rect x="${centro.x}" y="${centro.y}" width="${centro.w}" height="${centro.h}" rx="6"
+    <rect class="centro" x="${centro.x}" y="${centro.y}" width="${centro.w}" height="${centro.h}" rx="6"
           fill="#4a1622" stroke="#c9a227" stroke-width="2.5" />
     <rect x="${centro.x + 9}" y="${centro.y + 9}" width="${centro.w - 18}" height="${centro.h - 18}"
           rx="4" fill="none" stroke="rgba(232,207,127,0.45)" stroke-width="1" />
-    <text x="${centro.x + centro.w / 2}" y="${centro.y + centro.h / 2 + 6}" text-anchor="middle"
+    <text class="centro-nombre" x="${centro.x + centro.w / 2}" y="${centro.y + centro.h / 2 + 6}" text-anchor="middle"
           font-family="Cinzel, Georgia, serif" font-size="21" letter-spacing="5"
           fill="#e8cf7f">${esc(board.centerLabel)}</text>
     <circle cx="${centro.x + centro.w / 2}" cy="${centro.y + centro.h / 2 - 34}" r="13"
@@ -192,140 +194,6 @@ export function renderBoardSvg(board: BoardLayout, rooms: Room[]): string {
 </svg>`;
 }
 
-// ---------------------------------------------------------------------------
-// Hoja de estilos de los dosieres
-// ---------------------------------------------------------------------------
-
-const ESTILOS = `
-@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;900&family=Cinzel+Decorative:wght@700;900&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&display=swap');
-
-* { box-sizing: border-box; }
-body {
-  margin: 0;
-  padding: 0 0 60px;
-  background: #241a12;
-  font-family: 'Cormorant Garamond', Georgia, serif;
-  font-size: 17.5px;
-  line-height: 1.62;
-  color: #241a12;
-}
-.hoja {
-  max-width: 880px;
-  margin: 0 auto;
-  background: #f1e5c9;
-  background-image:
-    radial-gradient(circle at 12% 8%, rgba(109,26,42,0.05), transparent 45%),
-    radial-gradient(circle at 88% 92%, rgba(26,63,42,0.06), transparent 45%);
-  box-shadow: 0 18px 60px rgba(0,0,0,0.55);
-  border-top: 10px solid #6d1a2a;
-  border-bottom: 10px solid #6d1a2a;
-}
-.marco { padding: 46px 54px; border: 2px solid #c9a227; border-width: 0 2px; }
-
-h1, h2, h3 { font-family: 'Cinzel', Georgia, serif; margin: 0 0 .45em; letter-spacing: .06em; }
-
-/* ---------- Portada ---------- */
-.portada { text-align: center; padding: 40px 0 28px; border-bottom: 3px double #c9a227; }
-.portada .sello {
-  display: inline-block; font-family: 'Cinzel', serif; font-size: 11.5px; letter-spacing: .34em;
-  text-transform: uppercase; color: #6d1a2a; border: 1px solid #6d1a2a;
-  padding: 5px 16px; border-radius: 3px; margin-bottom: 22px;
-}
-.portada h1 {
-  font-family: 'Cinzel Decorative', serif; font-size: 42px; line-height: 1.12;
-  color: #1a3f2a; margin-bottom: .18em;
-}
-.portada .lema { font-style: italic; font-size: 20px; color: #6b5638; margin: 0 0 26px; }
-.portada .destinatario { font-family: 'Cinzel', serif; font-size: 15px; letter-spacing: .18em; text-transform: uppercase; color: #3e2723; }
-.portada .destinatario strong { display: block; font-size: 27px; letter-spacing: .06em; color: #6d1a2a; margin-top: 8px; }
-
-/* ---------- Secciones ---------- */
-section { margin: 40px 0; page-break-inside: avoid; }
-h2 {
-  font-size: 21px; color: #1a3f2a; text-transform: uppercase; letter-spacing: .18em;
-  display: flex; align-items: center; gap: 14px;
-}
-h2::after { content: ''; flex: 1; height: 2px; background: linear-gradient(90deg, #c9a227, rgba(201,162,39,0)); }
-h3 { font-size: 16.5px; color: #6d1a2a; letter-spacing: .1em; }
-
-.dato { margin: 0 0 14px; }
-.dato .etiqueta {
-  display: block; font-family: 'Cinzel', serif; font-size: 11px; letter-spacing: .2em;
-  text-transform: uppercase; color: #8a7145; margin-bottom: 2px;
-}
-
-.caja { border: 1px solid #c9a227; background: rgba(255,255,255,0.42); padding: 20px 24px; border-radius: 4px; }
-.caja--secreto { border: 2px solid #6d1a2a; background: rgba(109,26,42,0.06); position: relative; }
-.caja--secreto .titulo-secreto {
-  font-family: 'Cinzel', serif; font-size: 11.5px; letter-spacing: .26em; text-transform: uppercase;
-  color: #6d1a2a; margin-bottom: 10px;
-}
-.caja--asesino { border: 2px solid #6d1a2a; background: rgba(109,26,42,0.12); }
-.caja--asesino .titulo-secreto { color: #4a0f1c; }
-.caja--gm { border: 2px solid #1a3f2a; background: rgba(26,63,42,0.08); }
-
-.protagonista { display: flex; gap: 26px; align-items: flex-start; }
-.protagonista .retrato-grande {
-  width: 132px; height: 132px; flex: 0 0 132px; border-radius: 50%; object-fit: cover;
-  border: 3px solid #c9a227; box-shadow: 0 6px 18px rgba(0,0,0,0.25);
-}
-.monograma {
-  display: flex; align-items: center; justify-content: center;
-  background: #1a3f2a; color: #e8cf7f; font-family: 'Cinzel', serif; letter-spacing: .06em;
-}
-.retrato-grande.monograma { font-size: 42px; }
-
-.rejilla { display: grid; grid-template-columns: repeat(auto-fill, minmax(178px, 1fr)); gap: 18px; }
-.ficha { text-align: center; border: 1px solid rgba(201,162,39,.75); border-radius: 4px; padding: 14px 10px; background: rgba(255,255,255,.4); }
-.ficha .retrato { width: 78px; height: 78px; border-radius: 50%; object-fit: cover; border: 2px solid #c9a227; margin: 0 auto 10px; font-size: 25px; }
-.ficha--objeto .retrato { border-radius: 4px; width: 100%; height: 110px; }
-.ficha .nombre { font-family: 'Cinzel', serif; font-size: 14.5px; color: #3e2723; letter-spacing: .05em; }
-.ficha .papel { font-style: italic; font-size: 14px; color: #6b5638; }
-.ficha .nota { font-size: 13.5px; color: #6b5638; margin-top: 6px; }
-
-ol.reglas { padding-left: 22px; }
-ol.reglas li { margin-bottom: 11px; }
-ol.reglas b { color: #6d1a2a; }
-
-.crono { list-style: none; padding: 0; margin: 0; }
-.crono li { display: flex; gap: 18px; padding: 11px 0; border-bottom: 1px dashed rgba(62,39,35,.28); }
-.crono .hora { font-family: 'Cinzel', serif; color: #6d1a2a; min-width: 62px; letter-spacing: .06em; }
-
-.tablero-svg { width: 100%; height: auto; border: 2px solid #c9a227; border-radius: 4px; background: #0d2118; }
-.aerea { position: relative; display: inline-block; width: 100%; border: 2px solid #c9a227; border-radius: 4px; overflow: hidden; }
-.aerea img { display: block; width: 100%; }
-.chincheta {
-  position: absolute; transform: translate(-50%, -100%);
-  font-family: 'Cinzel', serif; font-size: 13px; color: #f1e5c9;
-  background: #6d1a2a; border: 2px solid #e8cf7f; border-radius: 50%;
-  width: 30px; height: 30px; display: flex; align-items: center; justify-content: center;
-  box-shadow: 0 3px 8px rgba(0,0,0,.45);
-}
-.leyenda { list-style: none; padding: 0; margin: 16px 0 0; columns: 2; column-gap: 30px; }
-.leyenda li { font-size: 15px; margin-bottom: 7px; break-inside: avoid; }
-.leyenda .num {
-  display: inline-block; width: 22px; height: 22px; line-height: 20px; text-align: center;
-  border: 1px solid #6d1a2a; border-radius: 50%; color: #6d1a2a; font-family: 'Cinzel', serif;
-  font-size: 12px; margin-right: 8px;
-}
-
-.pie {
-  margin-top: 52px; padding-top: 18px; border-top: 3px double #c9a227; text-align: center;
-  font-family: 'Cinzel', serif; font-size: 11px; letter-spacing: .3em; text-transform: uppercase; color: #8a7145;
-}
-
-@media print {
-  body { background: #fff; }
-  .hoja { box-shadow: none; max-width: none; }
-  .marco { padding: 24px 30px; }
-  section { page-break-inside: avoid; }
-}
-@media (max-width: 720px) {
-  .marco { padding: 26px 20px; }
-  .protagonista { flex-direction: column; align-items: center; text-align: center; }
-  .leyenda { columns: 1; }
-}
-`;
 
 // ---------------------------------------------------------------------------
 // Bloques reutilizables
@@ -493,16 +361,19 @@ function seccionCronologia(eventos: TimelineEvent[], titulo: string, nota: strin
   </section>`;
 }
 
-function envolver(titulo: string, contenido: string): string {
+function envolver(titulo: string, contenido: string, opciones: DocumentRenderOptions = {}): string {
+  const tema = opciones.variant === 'blanco' ? 'blanco' : 'color';
+  const conBarra = opciones.printBar === true || opciones.printBar === 'auto';
   return `<!doctype html>
-<html lang="es">
+<html lang="es" data-tema="${tema}">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>${esc(titulo)}</title>
-<style>${ESTILOS}</style>
+<style>${hojaDeEstilos({ conBarra })}</style>
 </head>
 <body>
+${conBarra ? barraDeImpresion(opciones.printBar === 'auto') : ''}
   <div class="hoja">
     <div class="marco">
       ${contenido}
@@ -547,6 +418,7 @@ function tituloSolucion(plot: Plot): string {
 }
 
 function dosierJugador(
+  opciones: DocumentRenderOptions,
   game: GameSession,
   plot: Plot,
   sospechoso: Suspect,
@@ -653,7 +525,7 @@ function dosierJugador(
   return {
     suspectId: sospechoso.id,
     title: tituloJugador(plot, sospechoso),
-    html: envolver(`${plot.title} — ${sospechoso.name}`, contenido),
+    html: envolver(`${plot.title} — ${sospechoso.name}`, contenido, opciones),
   };
 }
 
@@ -665,7 +537,7 @@ function dosierJugador(
  * Sobre sellado: SOLO la solución. Se genera cuando el Game Master juega como
  * personaje, para que nadie —él tampoco— sepa quién fue hasta el final.
  */
-function dosierSolucion(game: GameSession, plot: Plot): PlayerDocument {
+function dosierSolucion(opciones: DocumentRenderOptions, game: GameSession, plot: Plot): PlayerDocument {
   const asesino = game.suspects.find((s) => s.id === plot.solution.murdererId);
   const arma = game.weapons.find((w) => w.id === plot.solution.weaponId);
   const sala = game.rooms.find((r) => r.id === plot.solution.roomId);
@@ -696,7 +568,7 @@ function dosierSolucion(game: GameSession, plot: Plot): PlayerDocument {
   return {
     suspectId: 'solution',
     title: tituloSolucion(plot),
-    html: envolver(`${plot.title} — Solución`, contenido),
+    html: envolver(`${plot.title} — Solución`, contenido, opciones),
   };
 }
 
@@ -706,7 +578,7 @@ function dosierSolucion(game: GameSession, plot: Plot): PlayerDocument {
  * necesita para conducir la velada, pero SIN la solución ni los secretos de los
  * jugadores, que se van al sobre sellado.
  */
-function dosierGameMaster(game: GameSession, plot: Plot): PlayerDocument {
+function dosierGameMaster(opciones: DocumentRenderOptions, game: GameSession, plot: Plot): PlayerDocument {
   const nombreDe = (id: string): string =>
     game.suspects.find((sospechoso) => sospechoso.id === id)?.name ?? id;
   const asesino = game.suspects.find((s) => s.id === plot.solution.murdererId);
@@ -872,7 +744,7 @@ function dosierGameMaster(game: GameSession, plot: Plot): PlayerDocument {
   return {
     suspectId: 'gm',
     title: tituloGameMaster(plot, aCiegas),
-    html: envolver(`${plot.title} — Game Master`, contenido),
+    html: envolver(`${plot.title} — Game Master`, contenido, opciones),
   };
 }
 
@@ -910,17 +782,18 @@ export function renderDocumentIndex(game: GameSession): PlayerDocument[] {
 export function renderPlayerDocument(
   game: GameSession,
   suspectId: string,
+  opciones: DocumentRenderOptions = {},
 ): PlayerDocument | null {
   const plot = game.plot;
   if (!plot) return null;
 
-  if (suspectId === 'gm') return dosierGameMaster(game, plot);
-  if (suspectId === 'solution') return dosierSolucion(game, plot);
+  if (suspectId === 'gm') return dosierGameMaster(opciones, game, plot);
+  if (suspectId === 'solution') return dosierSolucion(opciones, game, plot);
 
   const sospechoso = game.suspects.find((s) => s.id === suspectId);
   if (!sospechoso) return null;
   const personaje = plot.characters.find((c) => c.suspectId === suspectId);
-  return dosierJugador(game, plot, sospechoso, personaje);
+  return dosierJugador(opciones, game, plot, sospechoso, personaje);
 }
 
 /**
@@ -928,14 +801,17 @@ export function renderPlayerDocument(
  * Pensado para exportaciones en bloque; no lo uses para guardar en la partida
  * —para eso está `renderDocumentIndex`—.
  */
-export function renderPlayerDocuments(game: GameSession): PlayerDocument[] {
+export function renderPlayerDocuments(
+  game: GameSession,
+  opciones: DocumentRenderOptions = {},
+): PlayerDocument[] {
   const plot = game.plot;
   if (!plot) return [];
   const personajePorId = new Map(plot.characters.map((personaje) => [personaje.suspectId, personaje]));
   const documentos = game.suspects.map((sospechoso) =>
-    dosierJugador(game, plot, sospechoso, personajePorId.get(sospechoso.id)),
+    dosierJugador(opciones, game, plot, sospechoso, personajePorId.get(sospechoso.id)),
   );
-  documentos.push(dosierGameMaster(game, plot));
-  if (game.settings?.gmPlays === true) documentos.push(dosierSolucion(game, plot));
+  documentos.push(dosierGameMaster(opciones, game, plot));
+  if (game.settings?.gmPlays === true) documentos.push(dosierSolucion(opciones, game, plot));
   return documentos;
 }

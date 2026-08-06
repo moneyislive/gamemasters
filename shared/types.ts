@@ -274,6 +274,74 @@ export interface GameSettings {
 /** Longitud máxima del meta-prompt de estilo (suficiente para un par de frases). */
 export const STYLE_PROMPT_MAX = 600;
 
+// ---------- Formatos de descarga de los documentos ----------
+
+/**
+ * Tema visual del documento.
+ *
+ * - `color`: la estética art-decó completa, papel crema y cajas entintadas.
+ * - `blanco`: fondo blanco y sin superficies macizas. Conserva tipografías y
+ *   líneas de color, pero gasta alrededor de un 78 % menos de tinta, que es la
+ *   diferencia entre imprimir doscientas páginas en casa o no poder.
+ */
+export type DocumentVariant = 'color' | 'blanco';
+
+/** Cómo se entrega el documento: la página en sí, o ya convertida a PDF. */
+export type DocumentFormat = 'html' | 'pdf';
+
+export interface DocumentRenderOptions {
+  variant?: DocumentVariant;
+  /**
+   * Añade la barra superior con el botón de imprimir y, si es `'auto'`, abre el
+   * diálogo de impresión al cargar. La barra nunca sale en el papel.
+   */
+  printBar?: boolean | 'auto';
+}
+
+export interface DocumentFormatInfo {
+  variant: DocumentVariant;
+  format: DocumentFormat;
+  /** Etiqueta corta para la interfaz. */
+  label: string;
+  /** Una frase explicando cuándo conviene. */
+  hint: string;
+}
+
+export const DOCUMENT_FORMATS: DocumentFormatInfo[] = [
+  {
+    variant: 'color',
+    format: 'html',
+    label: 'HTML con estilo',
+    hint: 'La página tal cual, para leerla en pantalla o enviarla por correo.',
+  },
+  {
+    variant: 'blanco',
+    format: 'html',
+    label: 'HTML fondo blanco',
+    hint: 'Lo mismo, sin superficies entintadas.',
+  },
+  {
+    variant: 'color',
+    format: 'pdf',
+    label: 'PDF con estilo',
+    hint: 'A4, listo para llevar a una imprenta.',
+  },
+  {
+    variant: 'blanco',
+    format: 'pdf',
+    label: 'PDF ahorro de tinta',
+    hint: 'A4 en fondo blanco. El más barato de imprimir en casa.',
+  },
+];
+
+/** Respuesta de `GET /api/documents/capabilities`. */
+export interface DocumentCapabilities {
+  /** ¿Hay un navegador en esta máquina capaz de convertir a PDF? */
+  pdf: boolean;
+  /** Nombre del motor encontrado, para poder explicarlo en la interfaz. */
+  engine?: string;
+}
+
 export interface GameSession {
   id: string;
   name: string;

@@ -10,8 +10,10 @@
 import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { computeStaleness } from '../../../../shared/staleness';
-import { documentUrl } from '../../api/client';
+import { documentUrl, fetchDocumentCapabilities } from '../../api/client';
+import type { DocumentCapabilities } from '../../../../shared/types';
 import { useAppStore } from '../../state/store';
+import DownloadMenu from './DownloadMenu';
 import SectionDesigner from './SectionDesigner';
 import { startRefresh } from '../generate/GenerateOverlay';
 import './documents.css';
@@ -31,6 +33,9 @@ interface Sobre {
   sobrante: boolean;
 }
 
+/** Ids del índice que no son jugadores: el Game Master y el sobre sellado. */
+const NO_JUGADORES = new Set(['gm', 'solution']);
+
 function iniciales(nombre: string): string {
   const partes = nombre.trim().split(/\s+/).filter(Boolean);
   if (partes.length === 0) return '?';
@@ -43,6 +48,25 @@ export default function DocumentsPanel(): JSX.Element {
   const game = useAppStore((s) => s.game);
   const generating = useAppStore((s) => s.generating);
   const [abierto, setAbierto] = useState<Sobre | null>(null);
+  // Se consulta una vez: saber si hay navegador para el PDF cambia el menú de
+  // descarga, y preguntarlo al abrirlo produciría un parpadeo.
+  const [capacidades, setCapacidades] = useState<DocumentCapabilities | null>(null);
+
+  useEffect(() => {
+    let vigente = true;
+    fetchDocumentCapabilities()
+      .then((datos) => {
+        if (vigente) setCapacidades(datos);
+      })
+      .catch(() => {
+        // Sin respuesta se asume que sí hay PDF: si falla, el propio intento de
+        // descarga explica el motivo con el mensaje del servidor.
+        if (vigente) setCapacidades({ pdf: true });
+      });
+    return () => {
+      vigente = false;
+    };
+  }, []);
 
   // Cerrar el visor con Escape
   useEffect(() => {
@@ -129,8 +153,10 @@ export default function DocumentsPanel(): JSX.Element {
   }));
 
   // Dosieres que sobran: se escribieron para alguien que ya no participa.
+  // 'gm' y 'solution' no corresponden a ningún sospechoso y nunca sobran; sin
+  // excluir el segundo, el sobre del crimen se pintaba dos veces.
   for (const documento of documentos) {
-    if (documento.suspectId === 'gm' || idsSospechosos.has(documento.suspectId)) continue;
+    if (NO_JUGADORES.has(documento.suspectId) || idsSospechosos.has(documento.suspectId)) continue;
     sobres.push({
       suspectId: documento.suspectId,
       personName: personajePorId.get(documento.suspectId)?.characterName ?? documento.title,
@@ -270,13 +296,11 @@ export default function DocumentsPanel(): JSX.Element {
                 <button className="btn btn--sm" onClick={() => setAbierto(sobre)}>
                   Leer
                 </button>
-                <a
-                  className="btn btn--sm btn--primary"
-                  href={documentUrl(game.id, sobre.suspectId, true)}
-                  download
-                >
-                  Descargar
-                </a>
+                <DownloadMenu
+                  gameId={game.id}
+                  suspectId={sobre.suspectId}
+                  capacidades={capacidades}
+                />
               </div>
             )}
           </motion.article>
@@ -303,13 +327,11 @@ export default function DocumentsPanel(): JSX.Element {
               <header className="docs-viewer-head">
                 <h3>{abierto.isGm ? abierto.personName : `Dosier de ${abierto.personName}`}</h3>
                 <div className="docs-viewer-actions">
-                  <a
-                    className="btn btn--sm"
-                    href={documentUrl(game.id, abierto.suspectId, true)}
-                    download
-                  >
-                    Descargar
-                  </a>
+                  <DownloadMenu
+                    gameId={game.id}
+                    suspectId={abierto.suspectId}
+                    capacidades={capacidades}
+                  />
                   <button className="btn btn--sm btn--ghost" onClick={() => setAbierto(null)}>
                     Cerrar ✕
                   </button>
