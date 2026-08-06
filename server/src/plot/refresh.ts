@@ -199,6 +199,16 @@ function podarTrama(plot: Plot, game: GameSession): void {
     cronologia.push({ ...evento, suspectIds: vivos });
   }
   plot.timeline = cronologia;
+
+  // Material impreso: un giro dirigido a alguien que ya no juega no se puede
+  // entregar, y uno dirigido al culpable lo delataría si la solución se ha
+  // reasignado al reparar la trama.
+  if (plot.material) {
+    plot.material.twists = plot.material.twists.filter(
+      (giro) =>
+        idsSospechosos.has(giro.suspectId) && giro.suspectId !== plot.solution.murdererId,
+    );
+  }
 }
 
 /** ¿La descripción menciona a alguno de los personajes eliminados? */

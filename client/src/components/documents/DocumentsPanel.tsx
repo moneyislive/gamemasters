@@ -19,7 +19,7 @@ import PrintablePicker from './PrintablePicker';
 import { copiasDe } from './copias';
 import { printableDocsFor } from '../../../../shared/documents';
 import type { DocumentAudience } from '../../../../shared/documents';
-import { startRefresh } from '../generate/GenerateOverlay';
+import { startMaterial, startRefresh } from '../generate/GenerateOverlay';
 import './documents.css';
 
 interface Sobre {
@@ -101,6 +101,50 @@ export default function DocumentsPanel(): JSX.Element {
     // startRefresh ya avisa con un popup si algo sale mal.
     void startRefresh().catch(() => undefined);
   };
+
+  const material = game.plot?.material;
+
+  /**
+   * Invitación a escribir el material de la velada. Es la única acción de este
+   * panel que consume IA, así que se dice claramente antes de pulsarla.
+   */
+  const bloqueMaterial = game.plot ? (
+    <section className="deco-frame docs-material">
+      <span className="docs-material-glyph" aria-hidden="true">
+        {material ? '✒' : '☾'}
+      </span>
+      <div className="docs-material-body">
+        <p className="docs-material-kicker mono-caps">Material de la velada</p>
+        <h3 className="docs-material-title">
+          {material ? 'La velada tiene guion' : 'Falta lo que se lee en voz alta'}
+        </h3>
+        <p className="docs-material-note text-dim">
+          {material ? (
+            <>
+              {material.narrations.length} narraciones, {material.twists.length} giros personales,{' '}
+              {material.timelineReveals.length} revelaciones de cronología y el desenlace. La
+              línea temporal ya sale con sus bloques escritos.
+            </>
+          ) : (
+            <>
+              Las narraciones que abren cada ronda, los giros que reactivan la partida a mitad de
+              velada, lo que se destapa al cerrar cada ronda y la confesión final. Se escribe{' '}
+              <b>sin tocar la trama</b>: si algo sale mal, el misterio queda intacto.
+            </>
+          )}
+        </p>
+      </div>
+      <div className="docs-material-action">
+        <button
+          className={`btn${material ? '' : ' btn--primary'}`}
+          disabled={generating}
+          onClick={() => void startMaterial().catch(() => undefined)}
+        >
+          {material ? 'Reescribir' : 'Escribir el material'}
+        </button>
+      </div>
+    </section>
+  ) : null;
 
   /** Aviso de desincronización, común al estado vacío y al normal. */
   const aviso = informe.isStale ? (
@@ -208,6 +252,7 @@ export default function DocumentsPanel(): JSX.Element {
   return (
     <div className="docs-panel">
       {aviso}
+      {bloqueMaterial}
 
       <SectionDesigner />
       <PrintablePicker />

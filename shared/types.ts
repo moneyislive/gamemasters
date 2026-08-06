@@ -141,6 +141,75 @@ export interface PlotSolution {
   howItHappened: string;
 }
 
+// ---------- Material impreso (segunda llamada, opcional) ----------
+
+/**
+ * Texto que el Game Master lee en voz alta para abrir un tramo de la velada.
+ * `round` 0 es la apertura; 1..N, el arranque de cada ronda.
+ */
+export interface PlotNarration {
+  round: number;
+  title: string;
+  /** Se lee literalmente: está escrito para sonar bien dicho en alto. */
+  text: string;
+  /** Indicación escénica breve: apagar una luz, mostrar un objeto, callar. */
+  stageDirection?: string;
+}
+
+/**
+ * Giro personal: una instrucción privada que recibe UN jugador a mitad de
+ * partida y que cambia lo que puede contar. Es lo que evita que la velada se
+ * estanque cuando ya se han dicho todas las coartadas.
+ */
+export interface PlotTwist {
+  id: string;
+  suspectId: string;
+  /** Se entrega al cerrar esta ronda. */
+  round: number;
+  /** Escrita en segunda persona, para que el jugador la lea y actúe. */
+  instruction: string;
+}
+
+/** Lo que el grupo puede dar por establecido al cerrar una ronda. */
+export interface TimelineReveal {
+  round: number;
+  time: string;
+  fact: string;
+}
+
+/** Ayuda graduada para cuando el grupo se atasca. */
+export interface PlotHint {
+  /** 1 empuja, 2 orienta, 3 casi lo dice. */
+  level: number;
+  text: string;
+}
+
+/** El cierre: lo que se lee al abrir el sobre del crimen. */
+export interface PlotFinale {
+  reconstruction: string;
+  /** En primera persona: la confesión del culpable. */
+  confession: string;
+  epilogue: string;
+}
+
+/**
+ * Material narrativo para el papel, escrito en una SEGUNDA llamada.
+ *
+ * Va aparte de `Plot` a propósito. Pedirlo en la misma generación dispararía el
+ * consumo de tokens de una llamada que ya roza su límite, y —más importante—
+ * impediría añadírselo a una partida ya escrita sin regenerar el misterio
+ * entero. Así, una trama que ya te gusta puede recibir su material sin tocarla.
+ */
+export interface PrintMaterial {
+  narrations: PlotNarration[];
+  twists: PlotTwist[];
+  timelineReveals: TimelineReveal[];
+  hints: PlotHint[];
+  finale: PlotFinale;
+  /** Cuándo se escribió, para saber si acompaña a la trama actual. */
+  generatedAt: string;
+}
+
 export interface Plot {
   title: string;
   tagline: string;
@@ -153,6 +222,11 @@ export interface Plot {
   clues: PlotClue[];
   /** Guion del Game Master: actos y momentos clave para conducir la partida */
   gmScript: string[];
+  /**
+   * Material narrativo para imprimir. Se escribe aparte y puede faltar: los
+   * documentos que lo usan se degradan a su versión en blanco cuando no está.
+   */
+  material?: PrintMaterial;
 }
 
 // ---------- Documentos por jugador ----------
@@ -445,7 +519,7 @@ export type ChatStreamEvent =
 
 /** Eventos del stream de generación: POST /api/games/:id/generate */
 export type GenerateStreamEvent =
-  | { type: 'stage'; stage: 'board' | 'plot' | 'documents'; label: string }
+  | { type: 'stage'; stage: 'board' | 'plot' | 'documents' | 'material'; label: string }
   | { type: 'text'; delta: string }
   | { type: 'done'; game: GameSession }
   | { type: 'error'; message: string };

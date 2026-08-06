@@ -57,18 +57,32 @@ ${filas.join('\n')}
     </div>`
     : '';
 
-  // Huecos para ir pegando lo que se destape al cerrar cada ronda.
-  const actualizaciones = Array.from(
-    { length: rondas },
-    (_, indice) => `      <div class="junto" style="margin-bottom:3mm;">
-        <span class="etiqueta" style="font-size:9.5pt;">Al cerrar la ronda ${indice + 1}</span>
-        <div class="caja" style="min-height:${rondas <= 4 ? 34 : 24}mm; border-width:2px; border-style:dashed; display:flex; align-items:center; justify-content:center; text-align:center; background:transparent;">
+  // Con material escrito, cada ronda trae su revelación ya redactada y solo hay
+  // que recortarla y pegarla. Sin él, el hueco queda en blanco para rellenarlo a
+  // mano con lo que el grupo haya conseguido establecer.
+  const revelaciones = plot.material?.timelineReveals ?? [];
+  const actualizaciones = Array.from({ length: rondas }, (_, indice) => {
+    const ronda = indice + 1;
+    const revelacion = revelaciones.find((r) => r.round === ronda);
+    const cuerpo = revelacion
+      ? `        <div class="caja junto" style="border-width:2px;">
+          <span class="etiqueta" style="font-size:9.5pt;">${esc(revelacion.time)}</span>
+          <p style="margin:0; font-size:13pt;">${esc(revelacion.fact)}</p>
+        </div>`
+      : `        <div class="caja" style="min-height:${rondas <= 4 ? 34 : 24}mm; border-width:2px; border-style:dashed; display:flex; align-items:center; justify-content:center; text-align:center; background:transparent;">
           <span style="font-family:'Cinzel',Georgia,serif; font-size:11pt; letter-spacing:0.14em; text-transform:uppercase; color:#8a7145;">
-            Lo que se haya destapado en la ronda ${indice + 1}
+            Lo que se haya destapado en la ronda ${ronda}
           </span>
-        </div>
-      </div>`,
-  ).join('\n');
+        </div>`;
+    return `      <div class="junto" style="margin-bottom:3mm;">
+        <span class="etiqueta" style="font-size:9.5pt;">Al cerrar la ronda ${ronda}</span>
+${cuerpo}
+      </div>`;
+  }).join('\n');
+
+  const explicacion = revelaciones.length
+    ? 'Recorta cada bloque y pégalo en su sitio al cerrar la ronda correspondiente. No lo pegues antes: el hueco es la partida.'
+    : 'Al cerrar cada ronda, anota en su hueco lo que el grupo haya conseguido establecer. Así todos comparten la misma reconstrucción y nadie discute sobre lo que ya está probado.';
 
   const contenido = `${portada(
     'Material público',
@@ -91,9 +105,7 @@ ${corazon}
     <section class="pagina">
       <h2 style="margin-top:0;">Lo que se vaya sabiendo</h2>
       <p style="font-size:12.5pt;">
-        Cuelga esta hoja justo debajo de la anterior. Al cerrar cada ronda, anota o pega en
-        su hueco lo que el grupo haya conseguido establecer. Así todos comparten la misma
-        reconstrucción y nadie discute sobre lo que ya está probado.
+        Cuelga esta hoja justo debajo de la anterior. ${esc(explicacion)}
       </p>
 ${actualizaciones}
     </section>`;

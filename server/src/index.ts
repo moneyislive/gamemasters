@@ -19,6 +19,7 @@ import documentsRouter from './routes/documents';
 import entitiesRouter from './routes/entities';
 import gamesRouter from './routes/games';
 import generateRouter from './routes/generate';
+import materialRouter from './routes/material';
 import refreshRouter from './routes/refresh';
 import uploadsRouter from './routes/uploads';
 
@@ -62,6 +63,7 @@ app.use('/api', chatRouter);
 app.use('/api', boardRouter);
 app.use('/api', generateRouter);
 app.use('/api', refreshRouter);
+app.use('/api', materialRouter);
 app.use('/api', documentsRouter);
 
 // 404 en JSON para rutas de API desconocidas.

@@ -123,6 +123,33 @@ export function informeValidacion(
     },
   ];
 
+  const material = plot.material;
+  comprobaciones.push({
+    titulo: 'El material de la velada está escrito',
+    bien: Boolean(material),
+    detalle: material
+      ? `${material.narrations.length} narraciones · ${material.twists.length} giros · ${material.timelineReveals.length} revelaciones · ${material.hints.length} ayudas`
+      : 'Sin él, la cronología se rellena a mano y no hay narraciones ni giros. Se escribe con «Escribir el material» y no toca la trama.',
+  });
+  if (material) {
+    const rondasConNarracion = new Set(material.narrations.map((n) => n.round));
+    const faltan = Array.from({ length: rondas }, (_, i) => i + 1).filter(
+      (r) => !rondasConNarracion.has(r),
+    );
+    comprobaciones.push({
+      titulo: 'Cada ronda tiene su narración de apertura',
+      bien: faltan.length === 0,
+      detalle: faltan.length
+        ? `Sin narración: ronda ${faltan.join(', ')}.`
+        : 'Apertura y todas las rondas cubiertas.',
+    });
+    comprobaciones.push({
+      titulo: 'Ningún giro le toca al culpable',
+      bien: !material.twists.some((g) => g.suspectId === plot.solution.murdererId),
+      detalle: 'Un giro dirigido al culpable lo señalaría delante de todos.',
+    });
+  }
+
   if (aCiegas) comprobaciones.push(...comprobarCeguera(game, plot));
 
   const recuento = `    <table>

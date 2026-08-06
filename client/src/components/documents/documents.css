@@ -531,6 +531,71 @@
 }
 
 /* ---------------------------------------------------------------------------
+   Material de la velada
+   La única acción del panel que consume IA: se anuncia, no se esconde.
+   --------------------------------------------------------------------------- */
+
+.docs-material {
+  display: flex;
+  align-items: flex-start;
+  gap: 18px;
+  padding: 22px 24px;
+  margin-bottom: 22px;
+}
+
+.docs-material-glyph {
+  font-size: 1.7rem;
+  line-height: 1;
+  color: var(--gold-300);
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+
+.docs-material-body {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.docs-material-kicker {
+  margin: 0 0 4px;
+  font-size: 0.68rem;
+  letter-spacing: 0.22em;
+  color: var(--gold-500);
+}
+
+.docs-material-title {
+  margin: 0 0 6px;
+  font-family: var(--font-heading);
+  font-size: 1.02rem;
+  letter-spacing: 0.04em;
+  color: var(--parchment);
+}
+
+.docs-material-note {
+  margin: 0;
+  font-size: 0.96rem;
+  line-height: 1.5;
+}
+
+.docs-material-action {
+  flex: 0 0 auto;
+  padding-left: 8px;
+}
+
+@media (max-width: 720px) {
+  .docs-material {
+    flex-wrap: wrap;
+  }
+  .docs-material-action {
+    width: 100%;
+    padding-left: 0;
+  }
+  .docs-material-action .btn {
+    width: 100%;
+  }
+}
+
+/* ---------------------------------------------------------------------------
    Material para la mesa
    Documentos que no son de nadie en concreto: carteles y hojas que se reparten.
    --------------------------------------------------------------------------- */

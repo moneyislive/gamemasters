@@ -12,7 +12,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { GenerateStreamEvent } from '../../../../shared/types';
-import { generateGame, refreshGame } from '../../api/client';
+import { generateGame, generateMaterial, refreshGame } from '../../api/client';
 import { useAppStore } from '../../state/store';
 import './generate.css';
 
@@ -22,7 +22,7 @@ import './generate.css';
    aquí con un observable mínimo: el overlay se suscribe y cambia sus textos.
    ===================================================================== */
 
-type ModoCeremonia = 'generar' | 'actualizar';
+type ModoCeremonia = 'generar' | 'actualizar' | 'material';
 
 let modoCeremonia: ModoCeremonia = 'generar';
 const oyentesModo = new Set<() => void>();
@@ -156,6 +156,27 @@ export async function startRefresh(): Promise<void> {
   });
 }
 
+/**
+ * Escribe el material de la velada sobre la trama ya existente.
+ *
+ * No toca el misterio: si falla, se pierde el material y nada más. Es también
+ * la forma de dárselo a una partida escrita antes de que este material
+ * existiera, sin regenerarla y sin perder la trama que ya te gusta.
+ */
+export async function startMaterial(): Promise<void> {
+  await ejecutarCeremonia({
+    modo: 'material',
+    abrirStream: (gameId, onEvent) => generateMaterial(gameId, onEvent),
+    etapaInicial: 'Levantando el telón…',
+    exito: {
+      title: 'El material está escrito',
+      body: 'Narraciones, giros, revelaciones y desenlace listos para imprimir.',
+    },
+    errorTitulo: 'El material se torció',
+    errorConexion: 'No se pudo escribir el material. La trama no se ha modificado.',
+  });
+}
+
 /* =====================================================================
    Overlay
    ===================================================================== */
@@ -179,6 +200,36 @@ const FRASES_ACTUALIZAR = [
   'Se reimprimen los dosieres afectados…',
 ];
 
+const FRASES_MATERIAL = [
+  'Se ensaya en voz alta la apertura de la velada…',
+  'Se escriben los sobres que nadie debe abrir antes de tiempo…',
+  'Alguien recibirá un recado a mitad de la noche…',
+  'Se ordena la cronología minuto a minuto…',
+  'Se lacra la confesión…',
+];
+
+/** Textos del overlay por ceremonia: evita encadenar ternarios por toda la vista. */
+const TEXTOS: Record<ModoCeremonia, { kicker: string; etapa: string; idle: string; frases: string[] }> = {
+  generar: {
+    kicker: 'Creando el misterio',
+    etapa: 'Preparando el escenario…',
+    idle: 'El agente ordena sus notas antes de escribir…',
+    frases: FRASES_GENERAR,
+  },
+  actualizar: {
+    kicker: 'Poniendo el misterio al día',
+    etapa: 'Revisando qué ha cambiado…',
+    idle: 'El agente compara la trama con la partida actual…',
+    frases: FRASES_ACTUALIZAR,
+  },
+  material: {
+    kicker: 'Escribiendo el material de la velada',
+    etapa: 'Levantando el telón…',
+    idle: 'El agente escribe lo que se leerá en voz alta…',
+    frases: FRASES_MATERIAL,
+  },
+};
+
 /** Últimas líneas del log, para el efecto máquina de escribir. */
 function ultimasLineas(log: string, cuantas: number): string[] {
   const lineas = log.split('\n').filter((linea) => linea.trim().length > 0);
@@ -193,17 +244,17 @@ export default function GenerateOverlay(): JSX.Element {
   const [frase, setFrase] = useState(0);
   const logRef = useRef<HTMLDivElement>(null);
 
-  const actualizando = modo === 'actualizar';
-  const frases = actualizando ? FRASES_ACTUALIZAR : FRASES_GENERAR;
+  const textos = TEXTOS[modo];
+  const frases = textos.frases;
 
   // Rotación de frases ambientales
   useEffect(() => {
     if (!generating) return;
     setFrase(0);
-    const total = actualizando ? FRASES_ACTUALIZAR.length : FRASES_GENERAR.length;
+    const total = TEXTOS[modo].frases.length;
     const id = window.setInterval(() => setFrase((n) => (n + 1) % total), 4200);
     return () => window.clearInterval(id);
-  }, [generating, actualizando]);
+  }, [generating, modo]);
 
   // Autoscroll del log
   useEffect(() => {
@@ -250,9 +301,7 @@ export default function GenerateOverlay(): JSX.Element {
               </svg>
             </div>
 
-            <p className="gen-kicker mono-caps">
-              {actualizando ? 'Poniendo el misterio al día' : 'Creando el misterio'}
-            </p>
+            <p className="gen-kicker mono-caps">{textos.kicker}</p>
             <AnimatePresence mode="wait">
               <motion.h2
                 key={stage ?? 'sin-etapa'}
@@ -262,7 +311,7 @@ export default function GenerateOverlay(): JSX.Element {
                 exit={{ opacity: 0, y: -10 }}
                 transition={{ duration: 0.32 }}
               >
-                {stage ?? (actualizando ? 'Revisando qué ha cambiado…' : 'Preparando el escenario…')}
+                {stage ?? textos.etapa}
               </motion.h2>
             </AnimatePresence>
 
@@ -272,11 +321,7 @@ export default function GenerateOverlay(): JSX.Element {
 
             <div className="gen-log deco-frame" ref={logRef}>
               {lineas.length === 0 ? (
-                <p className="gen-log-line gen-log-line--idle">
-                  {actualizando
-                    ? 'El agente compara la trama con la partida actual…'
-                    : 'El agente ordena sus notas antes de escribir…'}
-                </p>
+                <p className="gen-log-line gen-log-line--idle">{textos.idle}</p>
               ) : (
                 lineas.map((linea, indice) => (
                   <p

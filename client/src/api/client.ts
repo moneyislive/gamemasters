@@ -176,6 +176,17 @@ export const refreshGame = (
   signal?: AbortSignal,
 ) => postSSE<GenerateStreamEvent>(`/games/${gameId}/refresh`, {}, onEvent, signal);
 
+/**
+ * Escribe el material de la velada —narraciones, giros, revelaciones de
+ * cronología, ayudas y desenlace— sobre una trama ya existente, sin tocarla.
+ * Mismo protocolo que `generateGame`.
+ */
+export const generateMaterial = (
+  gameId: string,
+  onEvent: (event: GenerateStreamEvent) => void,
+  signal?: AbortSignal,
+) => postSSE<GenerateStreamEvent>(`/games/${gameId}/material`, {}, onEvent, signal);
+
 // ---------- Documentos ----------
 
 export interface DocumentUrlOptions {
