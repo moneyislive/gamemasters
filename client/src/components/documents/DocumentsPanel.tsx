@@ -18,6 +18,7 @@ import SectionDesigner from './SectionDesigner';
 import PrintablePicker from './PrintablePicker';
 import { copiasDe } from './copias';
 import { printableDocsFor } from '../../../../shared/documents';
+import type { DocumentAudience } from '../../../../shared/documents';
 import { startRefresh } from '../generate/GenerateOverlay';
 import './documents.css';
 
@@ -40,6 +41,14 @@ interface Sobre {
 
 /** Ids del índice que no son jugadores: el Game Master y el sobre sellado. */
 const NO_JUGADORES = new Set(['gm', 'solution']);
+
+/** Un símbolo por destinatario, para distinguir las tarjetas de un vistazo. */
+const GLIFO: Record<DocumentAudience, string> = {
+  players: '✎',
+  room: '⌂',
+  preparer: '✂',
+  gm: '★',
+};
 
 function iniciales(nombre: string): string {
   const partes = nombre.trim().split(/\s+/).filter(Boolean);
@@ -350,7 +359,7 @@ export default function DocumentsPanel(): JSX.Element {
 
                 <div className="docs-card-media">
                   <span className="docs-monogram" aria-hidden="true">
-                    {doc.audience === 'room' ? '⌂' : '✎'}
+                    {GLIFO[doc.audience]}
                   </span>
                 </div>
 

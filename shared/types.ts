@@ -46,6 +46,12 @@ export interface Room {
   name: string;
   description?: string;
   photoUrl?: string;
+  /**
+   * Código corto para rotular los sobres de esta sala («COCINA», «SALON-A»…).
+   * Si se omite se deduce del nombre. Se guarda para que un cambio posterior en
+   * la lista de salas no renombre códigos ya impresos en etiquetas.
+   */
+  shortCode?: string;
   /** Solo en modo 'aerial': posición de la chincheta sobre la foto aérea */
   pin?: RoomPin;
 }

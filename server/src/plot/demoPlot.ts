@@ -365,8 +365,10 @@ function construirPistas(
           i + 1,
         ),
         pointsTo: `Sitúa a alguien moviéndose por la casa durante el apagón. Encaja con la coartada rota de ${asesino.name}.`,
-        // Horarios y trayectos: material de la tercera ronda.
-        round: 3,
+        // Horarios y trayectos, repartidos entre la segunda y la tercera ronda.
+        // Si todas fueran a la tercera, la segunda se quedaba sin nada que sacar
+        // y la partida se paraba en seco a mitad de velada.
+        round: i % 2 === 0 ? 2 : 3,
       });
     }
   });

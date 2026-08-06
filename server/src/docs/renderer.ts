@@ -11,6 +11,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { env } from '../config';
 import { styleNoteForGm } from '../plot/style';
+import { cronologiaPublica } from './datos';
 import { barraDeImpresion, hojaDeEstilos } from './estilos';
 import { esc } from './html';
 import { DOCUMENT_SECTIONS } from '../../../shared/types';
@@ -325,17 +326,6 @@ function seccionReglas(): string {
  * Cronología pública: se ocultan los eventos que implican en exclusiva al
  * asesino, porque delatarían el crimen antes de tiempo.
  */
-function cronologiaPublica(plot: Plot): TimelineEvent[] {
-  return plot.timeline.filter((evento) => {
-    // Regla principal: solo lo que presenciaron todos.
-    if (evento.isPublic !== true) return false;
-    // Cinturón y tirantes: aunque el modelo marcara como público un momento que
-    // implica a una sola persona, eso no lo vio nadie más. Fuera.
-    if (evento.suspectIds.length === 1) return false;
-    return true;
-  });
-}
-
 function seccionCronologia(eventos: TimelineEvent[], titulo: string, nota: string): string {
   if (eventos.length === 0) return '';
   const filas = eventos

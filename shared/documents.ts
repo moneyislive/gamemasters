@@ -11,7 +11,13 @@
  * `resolveGmMode` recibe la forma que necesita y no `GameSettings` entero.
  */
 
-export type PrintableDocId = 'hojas-investigacion' | 'carteles-sala';
+export type PrintableDocId =
+  | 'indice-paquete'
+  | 'hojas-investigacion'
+  | 'carteles-sala'
+  | 'linea-temporal'
+  | 'etiquetas-sobres'
+  | 'informe-validacion';
 
 /** Para quién es el documento. Determina en qué grupo se pinta en la interfaz. */
 export type DocumentAudience = 'players' | 'gm' | 'preparer' | 'room';
@@ -48,6 +54,17 @@ export interface PrintableDocInfo {
 
 export const PRINTABLE_DOCS: PrintableDocInfo[] = [
   {
+    id: 'indice-paquete',
+    name: 'Empieza por aquí',
+    summary:
+      'La hoja por la que se abre el paquete: qué imprimir, cuántas copias y, si juegas a ciegas, qué no debes abrir tú.',
+    audience: 'preparer',
+    modes: ['host', 'blind'],
+    defaultOn: true,
+    copies: 'una',
+    sides: 'doble',
+  },
+  {
     id: 'hojas-investigacion',
     name: 'Hojas de investigación y acusación',
     summary:
@@ -68,6 +85,39 @@ export const PRINTABLE_DOCS: PrintableDocInfo[] = [
     defaultOn: true,
     copies: 'una-por-sala',
     sides: 'una',
+  },
+  {
+    id: 'linea-temporal',
+    name: 'Línea temporal pública',
+    summary:
+      'Cartel con los hechos que presenciaron todos y, en el centro, el tramo sin testigos que hay que reconstruir.',
+    audience: 'room',
+    modes: ['host', 'blind'],
+    defaultOn: true,
+    copies: 'una',
+    sides: 'una',
+  },
+  {
+    id: 'etiquetas-sobres',
+    name: 'Etiquetas de sobres',
+    summary:
+      'Recortables con el código de cada sobre. Solo dicen la sala y la ronda: no revelan nada del misterio.',
+    audience: 'preparer',
+    modes: ['host', 'blind'],
+    defaultOn: true,
+    copies: 'una',
+    sides: 'una',
+  },
+  {
+    id: 'informe-validacion',
+    name: 'Informe de validación',
+    summary:
+      'Comprobación previa: recuento de material, salas sin pistas, rondas vacías y —si juegas a ciegas— que tu guía no lleva la solución.',
+    audience: 'preparer',
+    modes: ['host', 'blind'],
+    defaultOn: true,
+    copies: 'una',
+    sides: 'doble',
   },
 ];
 
