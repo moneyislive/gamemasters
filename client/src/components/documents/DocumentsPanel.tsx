@@ -15,6 +15,9 @@ import type { DocumentCapabilities } from '../../../../shared/types';
 import { useAppStore } from '../../state/store';
 import DownloadMenu from './DownloadMenu';
 import SectionDesigner from './SectionDesigner';
+import PrintablePicker from './PrintablePicker';
+import { copiasDe } from './copias';
+import { printableDocsFor } from '../../../../shared/documents';
 import { startRefresh } from '../generate/GenerateOverlay';
 import './documents.css';
 
@@ -31,6 +34,8 @@ interface Sobre {
   sinDosier: boolean;
   /** Dosier de alguien que ya no participa. */
   sobrante: boolean;
+  /** Material para la mesa, no el documento de una persona. */
+  esImprimible?: boolean;
 }
 
 /** Ids del índice que no son jugadores: el Game Master y el sobre sellado. */
@@ -122,6 +127,7 @@ export default function DocumentsPanel(): JSX.Element {
         {aviso}
         {/* La maqueta se ve ANTES de generar: es cuando sirve para decidir. */}
         <SectionDesigner />
+        <PrintablePicker />
         <div className="docs-empty">
           <span className="docs-empty-glyph" aria-hidden="true">
             ✒
@@ -135,6 +141,9 @@ export default function DocumentsPanel(): JSX.Element {
       </div>
     );
   }
+
+  // El material imprimible no está en game.documents: sale del catálogo.
+  const imprimibles = game.plot ? printableDocsFor(game.settings) : [];
 
   const personajePorId = new Map((game.plot?.characters ?? []).map((c) => [c.suspectId, c]));
   const idsConDocumento = new Set(documentos.map((doc) => doc.suspectId));
@@ -192,6 +201,7 @@ export default function DocumentsPanel(): JSX.Element {
       {aviso}
 
       <SectionDesigner />
+      <PrintablePicker />
 
       <header className="docs-header">
         <div>
@@ -307,6 +317,71 @@ export default function DocumentsPanel(): JSX.Element {
         ))}
       </div>
 
+      {/* Material que no es de nadie en concreto: se cuelga o se reparte. No
+          vive en game.documents, se calcula del catálogo, así que aparece
+          también en partidas generadas antes de que existiera. */}
+      {imprimibles.length > 0 && (
+        <section className="docs-imprimibles">
+          <header className="docs-header">
+            <div>
+              <h2 className="docs-title">Material para la mesa</h2>
+              <p className="docs-subtitle">
+                Lo que se cuelga en las paredes y lo que se reparte durante la partida. No
+                contiene secretos de nadie.
+              </p>
+            </div>
+            <span className="docs-count">
+              <strong>{imprimibles.length}</strong> documentos
+            </span>
+          </header>
+
+          <div className="docs-grid">
+            {imprimibles.map((doc, indice) => (
+              <motion.article
+                key={doc.id}
+                className="deco-frame docs-card docs-card--imprimible"
+                initial={{ opacity: 0, y: 18 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, ease: 'easeOut', delay: Math.min(indice * 0.05, 0.2) }}
+              >
+                <span className="docs-wax docs-wax--imprimible" aria-hidden="true">
+                  Imprimible
+                </span>
+
+                <div className="docs-card-media">
+                  <span className="docs-monogram" aria-hidden="true">
+                    {doc.audience === 'room' ? '⌂' : '✎'}
+                  </span>
+                </div>
+
+                <h3 className="docs-card-name">{doc.name}</h3>
+                <p className="docs-card-sub">{copiasDe(doc, game)}</p>
+                <p className="docs-card-pending text-italic">{doc.summary}</p>
+
+                <div className="docs-card-actions">
+                  <button
+                    className="btn btn--sm"
+                    onClick={() =>
+                      setAbierto({
+                        suspectId: doc.id,
+                        personName: doc.name,
+                        isGm: false,
+                        sinDosier: false,
+                        sobrante: false,
+                        esImprimible: true,
+                      })
+                    }
+                  >
+                    Leer
+                  </button>
+                  <DownloadMenu gameId={game.id} suspectId={doc.id} capacidades={capacidades} />
+                </div>
+              </motion.article>
+            ))}
+          </div>
+        </section>
+      )}
+
       <AnimatePresence>
         {abierto && (
           <motion.div
@@ -325,7 +400,11 @@ export default function DocumentsPanel(): JSX.Element {
               onClick={(event) => event.stopPropagation()}
             >
               <header className="docs-viewer-head">
-                <h3>{abierto.isGm ? abierto.personName : `Dosier de ${abierto.personName}`}</h3>
+                <h3>
+                  {abierto.isGm || abierto.esImprimible
+                    ? abierto.personName
+                    : `Dosier de ${abierto.personName}`}
+                </h3>
                 <div className="docs-viewer-actions">
                   <DownloadMenu
                     gameId={game.id}

@@ -206,8 +206,11 @@ const TEMA_BLANCO = `
    y con el número en hueco no se leerían. */
 `;
 
-/** Barra superior con el botón de imprimir. Nunca sale en el papel. */
-const BARRA = `
+/**
+ * Barra superior con el botón de imprimir. Nunca sale en el papel.
+ * La comparten los dosieres y el material imprimible, que usan hojas distintas.
+ */
+export const CSS_BARRA = `
 .barra-impresion {
   position: sticky; top: 0; z-index: 20;
   display: flex; align-items: center; justify-content: space-between;
@@ -237,7 +240,7 @@ export interface OpcionesDeEstilo {
 
 /** Devuelve el CSS completo de un documento. */
 export function hojaDeEstilos(opciones: OpcionesDeEstilo = {}): string {
-  return [TEMA_COLOR, IMPRESION, TEMA_BLANCO, opciones.conBarra ? BARRA : ''].join('\n');
+  return [TEMA_COLOR, IMPRESION, TEMA_BLANCO, opciones.conBarra ? CSS_BARRA : ''].join('\n');
 }
 
 /**

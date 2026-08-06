@@ -13,13 +13,20 @@
 import express from 'express';
 import { getStore } from '../db/store';
 import { renderPlayerDocument } from '../docs/renderer';
+import { renderPrintableDocument } from '../docs/imprimibles';
 import { buscarNavegador, convertirAPdf, SinNavegador } from '../docs/pdf';
+import { isPrintableDocId } from '../../../shared/documents';
 import type { DocumentCapabilities, DocumentVariant } from '../../../shared/types';
 
 const router = express.Router();
 
 /** Nombre de fichero seguro para la descarga. */
-function nombreDeFichero(titulo: string, variante: DocumentVariant, extension: string): string {
+function nombreDeFichero(
+  prefijo: string,
+  titulo: string,
+  variante: DocumentVariant,
+  extension: string,
+): string {
   const limpio = titulo
     .normalize('NFD')
     .replace(/[̀-ͯ]/g, '')
@@ -29,7 +36,7 @@ function nombreDeFichero(titulo: string, variante: DocumentVariant, extension: s
   // El sufijo evita que la versión en blanco pise a la de color en la carpeta
   // de descargas, que es lo que pasaba al bajar las dos seguidas.
   const sufijo = variante === 'blanco' ? '-blanco' : '';
-  return `dosier-${limpio || 'gamemasters'}${sufijo}.${extension}`;
+  return `${prefijo}${limpio || 'gamemasters'}${sufijo}.${extension}`;
 }
 
 /** ¿Puede esta máquina convertir a PDF? La interfaz lo pregunta al arrancar. */
@@ -49,41 +56,53 @@ router.get('/games/:id/documents/:suspectId', async (req, res) => {
       return;
     }
 
-    // La partida guarda solo el índice; el HTML se compone aquí, al vuelo, con
-    // las fotos incrustadas para que el fichero descargado funcione sin conexión.
-    const enIndice = game.documents?.some((doc) => doc.suspectId === req.params.suspectId);
-    if (!enIndice) {
-      res.status(404).json({ error: 'Ese dosier todavía no se ha generado.' });
-      return;
+    const id = req.params.suspectId;
+    const esImprimible = isPrintableDocId(id);
+
+    // Los imprimibles NO están en el índice guardado: se calculan al vuelo desde
+    // el catálogo, para que aparezcan también en partidas generadas antes de
+    // que existieran, sin obligar a regenerarlas.
+    if (!esImprimible) {
+      const enIndice = game.documents?.some((doc) => doc.suspectId === id);
+      if (!enIndice) {
+        res.status(404).json({ error: 'Ese dosier todavía no se ha generado.' });
+        return;
+      }
     }
 
     const variante: DocumentVariant = req.query.variant === 'blanco' ? 'blanco' : 'color';
     const formato = req.query.format === 'pdf' ? 'pdf' : 'html';
     // La barra de impresión solo estorba dentro del PDF y del visor incrustado.
     const barra = formato === 'html' && req.query.print ? (req.query.print === 'auto' ? 'auto' : true) : false;
+    const opciones = { variant: variante, printBar: barra } as const;
 
-    const documento = renderPlayerDocument(game, req.params.suspectId, {
-      variant: variante,
-      printBar: barra,
-    });
+    const documento = esImprimible
+      ? renderPrintableDocument(game, id, opciones)
+      : renderPlayerDocument(game, id, opciones);
     if (!documento?.html) {
-      res.status(404).json({ error: 'Ese dosier ya no puede componerse: la partida ha cambiado.' });
+      res.status(404).json({
+        error: esImprimible
+          ? 'Ese documento aún no puede componerse: genera antes el misterio.'
+          : 'Ese dosier ya no puede componerse: la partida ha cambiado.',
+      });
       return;
     }
 
-    const etiqueta =
-      req.params.suspectId === 'gm'
+    const prefijo = esImprimible ? '' : 'dosier-';
+    const etiqueta = esImprimible
+      ? documento.title
+      : id === 'gm'
         ? 'game-master'
-        : req.params.suspectId === 'solution'
+        : id === 'solution'
           ? 'el-sobre-del-crimen'
-          : (game.suspects.find((s) => s.id === req.params.suspectId)?.name ?? documento.title);
+          : (game.suspects.find((s) => s.id === id)?.name ?? documento.title);
 
     if (formato === 'pdf') {
       const pdf = await convertirAPdf(documento.html);
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader(
         'Content-Disposition',
-        `${req.query.download ? 'attachment' : 'inline'}; filename="${nombreDeFichero(etiqueta, variante, 'pdf')}"`,
+        `${req.query.download ? 'attachment' : 'inline'}; filename="${nombreDeFichero(prefijo, etiqueta, variante, 'pdf')}"`,
       );
       res.send(pdf);
       return;
@@ -92,7 +111,7 @@ router.get('/games/:id/documents/:suspectId', async (req, res) => {
     if (req.query.download) {
       res.setHeader(
         'Content-Disposition',
-        `attachment; filename="${nombreDeFichero(etiqueta, variante, 'html')}"`,
+        `attachment; filename="${nombreDeFichero(prefijo, etiqueta, variante, 'html')}"`,
       );
     }
     res.setHeader('Content-Type', 'text/html; charset=utf-8');

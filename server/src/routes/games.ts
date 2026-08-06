@@ -9,6 +9,7 @@
 import { Router } from 'express';
 import { DOCUMENT_SECTIONS } from '../../../shared/types';
 import type { DocumentSectionId, GameSettings } from '../../../shared/types';
+import { isPrintableDocId } from '../../../shared/documents';
 import { isModelId } from '../config';
 import { getStore } from '../db/store';
 import { normalizeStylePrompt } from '../plot/style';
@@ -118,6 +119,18 @@ router.patch('/games/:id', async (req, res) => {
           );
         } else {
           delete nextSettings.documentSections;
+        }
+      }
+
+      // Material imprimible: se filtra contra el catálogo, igual que arriba.
+      // Ojo: una lista vacía es una elección legítima («ninguno») y hay que
+      // distinguirla de la ausencia del campo, que significa «los de por defecto».
+      if ('printableDocs' in incoming) {
+        const brutos = incoming.printableDocs;
+        if (Array.isArray(brutos)) {
+          nextSettings.printableDocs = brutos.filter(isPrintableDocId);
+        } else {
+          delete nextSettings.printableDocs;
         }
       }
 

@@ -531,6 +531,36 @@
 }
 
 /* ---------------------------------------------------------------------------
+   Material para la mesa
+   Documentos que no son de nadie en concreto: carteles y hojas que se reparten.
+   --------------------------------------------------------------------------- */
+
+.docs-imprimibles {
+  margin-top: 40px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(201, 162, 39, 0.22);
+}
+
+.docs-card--imprimible .docs-monogram {
+  font-size: 2rem;
+  color: var(--gold-300);
+}
+
+.docs-wax--imprimible {
+  background: linear-gradient(180deg, var(--gold-400), var(--brass));
+  color: var(--mahogany-900);
+}
+
+/* Recuento de copias dentro del selector */
+.docs-bloque-copias {
+  display: block;
+  margin-top: 6px;
+  font-size: 0.68rem;
+  letter-spacing: 0.14em;
+  color: var(--gold-500);
+}
+
+/* ---------------------------------------------------------------------------
    Menú de descarga
    Cuatro formatos no caben como botones en una tarjeta: van desplegables.
    --------------------------------------------------------------------------- */

@@ -12,6 +12,7 @@ import path from 'node:path';
 import { env } from '../config';
 import { styleNoteForGm } from '../plot/style';
 import { barraDeImpresion, hojaDeEstilos } from './estilos';
+import { esc } from './html';
 import { DOCUMENT_SECTIONS } from '../../../shared/types';
 import type {
   BoardLayout,
@@ -32,17 +33,6 @@ const CELDA = 40; // píxeles por celda de la rejilla del tablero
 // ---------------------------------------------------------------------------
 // Utilidades
 // ---------------------------------------------------------------------------
-
-/** Escapa texto para insertarlo con seguridad en el HTML. */
-function esc(value: string | undefined | null): string {
-  if (!value) return '';
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
 
 const MIME_POR_EXTENSION: Record<string, string> = {
   '.jpg': 'image/jpeg',

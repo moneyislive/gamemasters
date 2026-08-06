@@ -2,6 +2,9 @@
  * Tipos compartidos entre cliente y servidor.
  * ESTE FICHERO ES EL CONTRATO CENTRAL — no cambiar formas sin actualizar ARCHITECTURE.md.
  */
+import type { PrintableDocId } from './documents';
+
+export type { PrintableDocId };
 
 export type ModelId =
   | 'claude-fable-5'
@@ -262,6 +265,12 @@ export interface GameSettings {
    * igualdad de condiciones.
    */
   gmPlays?: boolean;
+  /**
+   * Material imprimible que se genera además de los dosieres (carteles de sala,
+   * hojas de investigación…). Si se omite valen los marcados por defecto en
+   * `PRINTABLE_DOCS`; una lista vacía significa «ninguno».
+   */
+  printableDocs?: PrintableDocId[];
   /**
    * Meta-prompt de estilo del juego: una indicación libre del Game Master que
    * condiciona SOLO el tono, la ambientación y el vocabulario de la trama y de
