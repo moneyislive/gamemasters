@@ -8,8 +8,11 @@
  */
 import { printableDocInfo, resolveGmMode } from '../../../../shared/documents';
 import { vistaGm } from '../contexto';
+import { cartaImprevistos } from './cartaImprevistos';
 import { cartelesSala } from './cartelesSala';
 import { desenlace } from './desenlace';
+import { hojaSolucion } from './hojaSolucion';
+import { matrizConocimiento } from './matrizConocimiento';
 import { etiquetasSobres } from './etiquetasSobres';
 import { guiaPreparador } from './guiaPreparador';
 import { hojasInvestigacion } from './hojasInvestigacion';
@@ -41,8 +44,11 @@ const PLANTILLAS: Record<PrintableDocId, Plantilla> = {
   'carteles-sala': (game, plot, _vista, opciones) => cartelesSala(game, plot, opciones),
   'linea-temporal': (_game, plot, _vista, opciones) => lineaTemporal(plot, opciones),
   'etiquetas-sobres': (game, plot, _vista, opciones) => etiquetasSobres(game, plot, opciones),
+  'carta-imprevistos': cartaImprevistos,
   'tarjetas-ensobrar': tarjetasEnsobrar,
   'guia-preparador': (game, plot, _vista, opciones) => guiaPreparador(game, plot, opciones),
+  'hoja-solucion': (game, plot, _vista, opciones) => hojaSolucion(game, plot, opciones),
+  'matriz-conocimiento': (game, plot, _vista, opciones) => matrizConocimiento(game, plot, opciones),
   desenlace: (game, plot, _vista, opciones) => desenlace(game, plot, opciones),
   'informe-validacion': (game, plot, _vista, opciones) => informeValidacion(game, plot, opciones),
 };

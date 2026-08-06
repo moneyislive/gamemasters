@@ -18,8 +18,11 @@ export type PrintableDocId =
   | 'carteles-sala'
   | 'linea-temporal'
   | 'etiquetas-sobres'
+  | 'carta-imprevistos'
   | 'tarjetas-ensobrar'
   | 'guia-preparador'
+  | 'hoja-solucion'
+  | 'matriz-conocimiento'
   | 'desenlace'
   | 'informe-validacion';
 
@@ -124,6 +127,17 @@ export const PRINTABLE_DOCS: PrintableDocInfo[] = [
     sides: 'una',
   },
   {
+    id: 'carta-imprevistos',
+    name: 'Imprevistos',
+    summary:
+      'Una hoja suelta para tener al lado: respuestas que sirven siempre y qué hacer cuando alguien llega tarde, se va o el grupo se atasca.',
+    audience: 'gm',
+    modes: ['host', 'blind'],
+    defaultOn: true,
+    copies: 'una',
+    sides: 'una',
+  },
+  {
     id: 'tarjetas-ensobrar',
     name: 'Tarjetas para ensobrar',
     summary:
@@ -142,6 +156,28 @@ export const PRINTABLE_DOCS: PrintableDocInfo[] = [
     audience: 'preparer',
     modes: ['blind'],
     defaultOn: true,
+    copies: 'una',
+    sides: 'doble',
+  },
+  {
+    id: 'hoja-solucion',
+    name: 'Hoja de solución',
+    summary:
+      'Tu chuleta en una hoja: la combinación, el mapa de pistas, quién guarda qué secreto y la cronología completa. Solo si diriges conociendo el caso.',
+    audience: 'gm',
+    modes: ['host'],
+    defaultOn: true,
+    copies: 'una',
+    sides: 'doble',
+  },
+  {
+    id: 'matriz-conocimiento',
+    name: 'Quién sabe qué',
+    summary:
+      'Lo que cada jugador puede contar de los demás, cruzado. Sirve para desatascar la partida empujando encuentros en vez de dar pistas.',
+    audience: 'gm',
+    modes: ['host'],
+    defaultOn: false,
     copies: 'una',
     sides: 'doble',
   },

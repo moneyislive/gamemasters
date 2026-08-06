@@ -83,7 +83,38 @@ ${
       Lee las acusaciones en voz alta una por una antes de dar la combinación por buena: la gracia
       está en oír quién estuvo cerca. Después, que cada cual cuente su secreto. Es la mejor parte
       de la noche y casi siempre se olvida.
-    </p>`;
+    </p>
+
+    <section class="pagina">
+      <h2 style="margin-top:0;">Recuento de acusaciones</h2>
+      <p style="font-size:12.5pt;">
+        Ve anotando lo que dice cada papeleta según la lees. Marca los aciertos y anuncia el
+        resultado al final: quien haya acertado los tres se lleva la noche.
+      </p>
+      <table>
+        <thead>
+          <tr>
+            <th style="width:34mm;">Quién acusa</th>
+            <th>Culpable</th><th>Objeto</th><th>Sala</th>
+            <th style="width:16mm;">Pleno</th>
+          </tr>
+        </thead>
+        <tbody>
+${game.suspects
+  .map(
+    (s) =>
+      `          <tr><td>${esc(s.name)}</td><td></td><td></td><td></td><td></td></tr>`,
+  )
+  .join('\n')}
+        </tbody>
+      </table>
+      <div class="caja caja--verde junto">
+        <span class="etiqueta">La combinación correcta, para ir marcando</span>
+        <p style="margin:0; font-family:'Cinzel',serif; font-size:12pt; letter-spacing:0.05em; color:#1a3f2a;">
+          ${esc(personaje?.characterName ?? asesino?.name ?? '')} · ${esc(arma?.name ?? '')} · ${esc(sala?.name ?? '')}
+        </p>
+      </div>
+    </section>`;
 
   return envolver(`${plot.title} — El desenlace`, contenido, opciones);
 }
