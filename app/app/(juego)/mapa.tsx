@@ -199,9 +199,23 @@ function PlanoDibujado({
     h: Math.round(plano.grid.rows * 0.34) * CELDA,
   };
 
+  // Las zonas pulsables van en Pressables por encima del dibujo, no en el
+  // propio SVG. `<G onPress>` funciona en el móvil pero en web react-native-svg
+  // le cuelga al nodo del DOM las props de gesto de React Native, que el
+  // navegador no entiende: el toque se pierde y la consola se llena de
+  // «Unknown event handler property». Con la escala del viewBox, colocar los
+  // rectángulos encima es trivial y funciona igual en las tres plataformas.
+  const escala = ancho / lado;
+
   return (
     <Animated.View entering={FadeIn.duration(600)} style={estilos.lienzo}>
-      <Svg width={ancho} height={(ancho * alto) / lado} viewBox={`0 0 ${lado} ${alto}`}>
+      <View style={{ width: ancho, height: (ancho * alto) / lado }}>
+      <Svg
+        width={ancho}
+        height={(ancho * alto) / lado}
+        viewBox={`0 0 ${lado} ${alto}`}
+        style={StyleSheet.absoluteFill}
+      >
         <Defs>
           <RadialGradient id="tapete" cx="50%" cy="44%" r="74%">
             <Stop offset="0%" stopColor="#1d4a32" />
@@ -334,7 +348,7 @@ function PlanoDibujado({
           const puertaX = haciaDerecha ? x + w - 4 : x + 4;
 
           return (
-            <G key={c.roomId} onPress={activo ? () => void alPulsar(c.roomId) : undefined}>
+            <G key={c.roomId}>
               {/* El parquet de la web no se porta: sus baldosas de 26 unidades
                   quedarían en 9 píxeles y solo aportarían ruido. Un caoba plano
                   con doble filete lee mucho mejor a este tamaño. */}
@@ -412,6 +426,29 @@ function PlanoDibujado({
           );
         })}
       </Svg>
+
+      {activo &&
+        plano.rooms.map((c) => (
+          <Pressable
+            key={`toque-${c.roomId}`}
+            accessibilityRole="button"
+            accessibilityLabel={`Entrar en ${nombrePorId.get(c.roomId) ?? 'la sala'}`}
+            disabled={miSala === c.roomId}
+            onPress={() => void alPulsar(c.roomId)}
+            style={({ pressed }) => [
+              {
+                position: 'absolute',
+                left: c.x * CELDA * escala,
+                top: c.y * CELDA * escala,
+                width: c.w * CELDA * escala,
+                height: c.h * CELDA * escala,
+                borderRadius: 6,
+              },
+              pressed && { backgroundColor: 'rgba(232,207,127,0.18)' },
+            ]}
+          />
+        ))}
+      </View>
     </Animated.View>
   );
 }

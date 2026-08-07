@@ -122,8 +122,12 @@ export function BarraDeJuego({ state, descriptors, navigation }: BottomTabBarPro
   const lado = { top: SALIENTE_BOTON, height: ALTO, paddingBottom: insets.bottom };
 
   return (
-    <View style={[estilos.raiz, { height: H }]} pointerEvents="box-none">
-      <Svg width={width} height={H} style={StyleSheet.absoluteFill} pointerEvents="none">
+    <View style={[estilos.raiz, { height: H, pointerEvents: 'box-none' }]}>
+      <Svg
+        width={width}
+        height={H}
+        style={[StyleSheet.absoluteFill, { pointerEvents: 'none' }]}
+      >
         <Defs>
           <LinearGradient id="filoBarra" x1="0" y1="0" x2="1" y2="0">
             <Stop offset="0" stopColor={color.laton} stopOpacity="0.25" />
