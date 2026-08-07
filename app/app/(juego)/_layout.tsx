@@ -5,9 +5,9 @@
  * lo que se usa tiene que verse desde cualquier pantalla.
  */
 import { Tabs } from 'expo-router';
-import { Text } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { BlurView } from 'expo-blur';
-import { StyleSheet } from 'react-native';
+import { BotonMayordomo } from '../../src/mayordomo';
 import { ALTO_BARRA, color, fuente } from '../../src/tema';
 
 function Glifo({ children, activo }: { children: string; activo: boolean }): JSX.Element {
@@ -19,6 +19,17 @@ function Glifo({ children, activo }: { children: string; activo: boolean }): JSX
 }
 
 export default function DisposicionJuego(): JSX.Element {
+  return (
+    <View style={{ flex: 1 }}>
+      <Pestanas />
+      {/* Flota sobre todas las pestañas: cuando alguien se pierde, no va a
+          buscarlo al final de un scroll. */}
+      <BotonMayordomo />
+    </View>
+  );
+}
+
+function Pestanas(): JSX.Element {
   return (
     <Tabs
       screenOptions={{

@@ -1,10 +1,12 @@
 /**
- * El consejero: un mayordomo al que preguntar cuando estás perdido.
+ * El Mayordomo: el asistente con IA al que preguntar cuando estás perdido.
  *
- * Solo sabe lo que tú sabes —recibe la misma proyección que tu móvil—, así que
- * puedes insistir todo lo que quieras: no puede contarte quién fue porque no lo
- * sabe. Está para las reglas, para tu propio personaje y para ordenar lo que ya
- * has visto.
+ * Sabe bastante MENOS que tú. El servidor le arma un contexto del que quedan
+ * fuera las pistas, el tablón, la cronología y los giros —los tuyos incluidos—,
+ * así que puedes insistir todo lo que quieras: no puede contarte quién fue
+ * porque nadie se lo ha contado. Está para las reglas y para tu papel.
+ *
+ * Lo comprueba `server/scripts/verificar-mayordomo.ts`.
  */
 import { useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, TextInput, View } from 'react-native';
@@ -35,8 +37,8 @@ interface Turno {
 const SUGERENCIAS = [
   '¿Cómo se juega exactamente?',
   '¿Quién soy y qué escondo?',
-  '¿Con quién me conviene hablar?',
-  'Repásame lo que sabemos',
+  '¿Cómo interpreto a mi personaje?',
+  '¿Qué puedo preguntar a los demás?',
 ];
 
 export default function Consejero(): JSX.Element {
@@ -44,7 +46,8 @@ export default function Consejero(): JSX.Element {
     {
       mio: false,
       texto:
-        'Usted dirá. Le advierto de antemano: sé lo mismo que usted y ni una palabra más, así que no me pregunte quién fue.',
+        'Usted dirá. Le aviso de entrada: no conozco la solución, ni las pistas, ni lo que esconden los demás. ' +
+        'Estoy para las reglas y para su papel. Lo otro tendrá que sacarlo de la mesa.',
     },
   ]);
   const [pregunta, setPregunta] = useState('');
@@ -77,7 +80,7 @@ export default function Consejero(): JSX.Element {
     >
       <Pantalla scroll={false} barra={false}>
         <View style={{ alignItems: 'center', marginBottom: espacio.md }}>
-          <Sello>El consejero</Sello>
+          <Sello>El Mayordomo · asistente con IA</Sello>
         </View>
 
         <ScrollView
@@ -89,7 +92,7 @@ export default function Consejero(): JSX.Element {
           {turnos.map((t, i) => (
             <Animated.View key={i} entering={FadeInUp.duration(320)}>
               <View style={[estilos.burbuja, t.mio ? estilos.mia : estilos.suya]}>
-                {!t.mio && <Etiqueta style={{ marginBottom: 4 }}>Mayordomo</Etiqueta>}
+                {!t.mio && <Etiqueta style={{ marginBottom: 4 }}>El Mayordomo</Etiqueta>}
                 <Cuerpo style={{ fontSize: 17 }}>{t.texto}</Cuerpo>
               </View>
             </Animated.View>

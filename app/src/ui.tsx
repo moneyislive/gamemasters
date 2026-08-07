@@ -21,7 +21,17 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ALTO_BARRA, color, espacio, fondoMesa, fuente, radio, sombra, texto } from './tema';
+import {
+  ALTO_BARRA,
+  ALTO_MAYORDOMO,
+  color,
+  espacio,
+  fondoMesa,
+  fuente,
+  radio,
+  sombra,
+  texto,
+} from './tema';
 
 // ---------------------------------------------------------------------------
 // Contenedores
@@ -47,7 +57,8 @@ export function Pantalla({
   // su alto MÁS el margen inferior del dispositivo. Sin esto, en pantallas
   // cortas lo último del scroll queda debajo de la barra y no hay forma de
   // llegar a ello.
-  const hueco = (barra ? ALTO_BARRA : 0) + insets.bottom + espacio.lg;
+  const hueco =
+    (barra ? ALTO_BARRA + ALTO_MAYORDOMO : 0) + insets.bottom + espacio.lg;
 
   const contenido = (
     <View style={[padding && { paddingHorizontal: espacio.lg }]}>

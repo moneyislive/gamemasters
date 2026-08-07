@@ -56,6 +56,14 @@ export const espacio = {
  */
 export const ALTO_BARRA = 74;
 
+/**
+ * Alto de la pastilla del Mayordomo, que flota por encima de la barra.
+ *
+ * Se suma al hueco inferior de cada pantalla: si no, taparía lo último del
+ * scroll igual que hacía la barra de pestañas antes de reservarle su sitio.
+ */
+export const ALTO_MAYORDOMO = 64;
+
 export const radio = {
   sm: 6,
   md: 10,

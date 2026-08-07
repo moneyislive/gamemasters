@@ -9,6 +9,7 @@
     "start": "node dist/index.js",
     "typecheck": "tsc --noEmit",
     "verify:mongo": "tsx scripts/verify-mongo.ts",
+    "verify:mayordomo": "tsx scripts/verificar-mayordomo.ts",
     "migrate:mongo": "tsx scripts/migrate-file-to-mongo.ts"
   },
   "dependencies": {

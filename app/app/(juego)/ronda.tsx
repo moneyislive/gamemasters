@@ -141,7 +141,6 @@ export default function Ronda(): JSX.Element {
 
         <AvisoError>{errorSala}</AvisoError>
 
-        <Boton onPress={() => router.push('/consejero')}>Preguntar al consejero</Boton>
       </Pantalla>
     );
   }
@@ -304,8 +303,6 @@ export default function Ronda(): JSX.Element {
         </Marco>
       )}
 
-      <Ornamento />
-      <Boton onPress={() => router.push('/consejero')}>Preguntar al consejero</Boton>
     </Pantalla>
   );
 }

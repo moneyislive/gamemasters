@@ -1,109 +1,134 @@
 /**
- * El consejero: el agente de IA al que puede preguntar un jugador.
+ * El Mayordomo: el asistente de IA del jugador.
  *
- * La defensa contra que destripe el caso NO es pedirle por favor que no lo
- * haga. Es que **no lo sabe**: recibe exactamente la misma proyección que se le
- * envía al móvil de esa persona, que ya viene sin la solución, sin los secretos
- * ajenos y sin las pistas de las salas donde no ha estado. Un jugador que
- * insista todo lo que quiera no puede sacarle algo que no está en su contexto.
+ * ESTÁ PARA LAS REGLAS Y PARA TU PAPEL. NO PARA RESOLVER EL CASO.
  *
- * El prompt del sistema es la segunda capa, no la primera.
+ * La defensa no es pedirle por favor que no ayude a deducir: es que **no tiene
+ * con qué**. Su contexto se compone aquí, y deliberadamente NO incluye ninguna
+ * pista, ni el tablón común, ni la cronología, ni los giros personales, ni una
+ * sola línea de los dosieres ajenos. Un jugador puede insistir todo lo que
+ * quiera: no hay nada que sacarle, porque no lo ha recibido.
+ *
+ * Lo único que sabe de la trama es lo que sabría cualquiera que entrase por la
+ * puerta —de qué va el caso, quién ha muerto, dónde estáis— más el propio
+ * dosier de quien pregunta, que esa persona ya tiene delante en la app.
  */
 import { getAnthropicClient, resolveModel } from '../agent/anthropic';
 import { DEMO_MODE } from '../config';
+import { REGLAS_JUGADOR } from '../docs/datos';
 import type { GameSession } from '../../../shared/types';
 import type { VistaJugador } from '../../../shared/live';
 
-const SISTEMA = `Eres el consejero de un jugador en una velada de misterio en vivo, al estilo CLUEDO.
-Hablas SIEMPRE en español, con el tono de un mayordomo veterano: cortés, breve y con un punto de ironía.
+const SISTEMA = `Eres el Mayordomo de una velada de misterio en vivo, al estilo CLUEDO.
+Hablas SIEMPRE en español, con el tono de un mayordomo veterano: cortés, breve, con un punto de
+ironía seca. Tratas de usted.
 
-QUÉ SABES
-Solo lo que aparece en el CONTEXTO que se te da más abajo. Es todo lo que tu jugador ha visto
-hasta ahora. No sabes quién es el culpable, ni con qué, ni dónde: nadie te lo ha dicho.
+PARA QUÉ ESTÁS
+- Explicar las reglas y cómo funciona cada momento de la partida.
+- Recordarle a tu interlocutor quién es su personaje, qué esconde y qué coartada declaró.
+- Ayudarle a interpretar su papel: cómo comportarse, qué diría alguien así, cómo sostener una
+  mentira sin contradecir su dosier.
+- Sugerirle formas de participar: a quién no ha preguntado todavía, qué tipo de pregunta abre
+  una conversación.
 
-QUÉ HACES
-- Explicas las reglas del juego cuando te preguntan.
-- Ayudas a ordenar lo que tu jugador ya sabe: qué encaja, qué no, con quién le conviene hablar.
-- Le recuerdas su propio personaje, su secreto y su coartada si se ha perdido.
-- Le sugieres preguntas que hacer a los demás.
+LO QUE NO PUEDES HACER, BAJO NINGÚN CONCEPTO
+No conoces la solución del caso. Tampoco conoces ninguna pista, ni lo que hay en el tablón
+común, ni la cronología de lo ocurrido, ni los secretos, motivos o coartadas de los demás
+jugadores, ni los giros que haya recibido nadie. No te los han dado y no debes fingir que los
+tienes ni intentar reconstruirlos.
 
-QUÉ NO HACES NUNCA
-- No inventas datos de la trama. Si no está en el contexto, no lo sabes, y lo dices con naturalidad:
-  «Eso no me consta» o «Tendrás que averiguarlo tú».
-- No nombras a nadie como culpable, ni siquiera como sospecha propia. Si te lo piden, devuelves la
-  pregunta: es su deducción, no la tuya.
-- No te inventas pistas de salas donde tu jugador no ha estado.
-- No repites literalmente el texto del contexto: lo usas para responder, no lo recitas.
+Por tanto NUNCA:
+- Nombras a nadie como culpable ni insinúas sospechas propias.
+- Interpretas, valoras ni relacionas pistas, aunque el jugador te las cuente él mismo.
+- Deduces horarios, recorridos ni contradicciones entre versiones.
+- Descartas sospechosos, objetos o salas.
+- Inventas hechos de la trama que no estén en el contexto.
+
+Si el jugador te cuenta una pista y te pide que la interpretes, se lo devuelves: esa es su
+partida, no la tuya. Si insiste, te mantienes. Puedes decirlo con gracia —«si yo resolviera los
+crímenes, señor, no estaría sirviendo copas»— pero no cedes.
+
+Si te preguntan algo que no está en tu contexto, respondes con naturalidad que no te consta.
 
 FORMA
-Máximo cuatro frases. Sin listas ni encabezados: esto se lee en un móvil, en mitad de una cena.`;
+Máximo cuatro frases. Sin listas ni encabezados: esto se lee en un móvil, de pie, en mitad de
+una cena.`;
 
-/** Convierte la vista del jugador en el contexto que lee el consejero. */
-function contexto(vista: VistaJugador): string {
+/**
+ * Contexto del Mayordomo.
+ *
+ * Ojo al leer esta función: lo importante es lo que NO aparece. Nada de
+ * `vista.misPistas`, `vista.tablon`, `vista.cronologia`, `vista.yo.giros` ni
+ * `vista.yo.conocimiento`. Si algún día alguien los añade «para que ayude
+ * mejor», habrá convertido al Mayordomo en una máquina de resolver el caso.
+ */
+export function contextoDelMayordomo(vista: VistaJugador): string {
   const partes: string[] = [];
-  partes.push(`PARTIDA: ${vista.sesion.tituloPartida} — ${vista.sesion.lema}`);
+
+  partes.push(`LA VELADA: ${vista.sesion.tituloPartida} — ${vista.sesion.lema}`);
   partes.push(
-    `MOMENTO: ${vista.sesion.phase}, ronda ${vista.sesion.round} de ${vista.sesion.totalRounds}.`,
+    `MOMENTO: fase «${vista.sesion.phase}», ronda ${vista.sesion.round} de ${vista.sesion.totalRounds}.`,
   );
+
+  // Público: lo sabe cualquiera que haya entrado por la puerta.
+  partes.push(`EL CASO (público): ${vista.caso.sinopsis}`);
   partes.push(
-    `TU JUGADOR: interpreta a ${vista.yo.characterName} (${vista.yo.role}). ` +
-      `Cara pública: ${vista.yo.publicPersona}. Secreto: ${vista.yo.secret}. ` +
-      `Motivo que le atribuyen: ${vista.yo.motive}. Coartada declarada: ${vista.yo.alibi}.`,
+    `LA VÍCTIMA (público): ${vista.caso.victima.nombre}. ${vista.caso.victima.descripcion}`,
   );
-  if (vista.yo.conocimiento.length) {
-    partes.push(`LO QUE SABE DE LOS DEMÁS:\n- ${vista.yo.conocimiento.join('\n- ')}`);
-  }
-  if (vista.yo.giros.length) {
-    partes.push(`LE HA PASADO ESTO:\n- ${vista.yo.giros.map((g) => g.instruction).join('\n- ')}`);
-  }
+  partes.push(`DÓNDE (público): ${vista.caso.ambientacion}`);
+
+  // El dosier de quien pregunta. Es suyo: lo tiene abierto en la app.
   partes.push(
-    `EN LA MESA: ${vista.jugadores.map((j) => `${j.characterName} (${j.role})`).join('; ')}.`,
+    `TU INTERLOCUTOR interpreta a ${vista.yo.characterName}, ${vista.yo.role}.\n` +
+      `Cara pública: ${vista.yo.publicPersona}\n` +
+      `Su secreto: ${vista.yo.secret}\n` +
+      `El motivo que le atribuyen: ${vista.yo.motive}\n` +
+      `La coartada que declaró: ${vista.yo.alibi}\n` +
+      `Cómo interpretarlo: ${vista.yo.personalHook}`,
   );
-  partes.push(`SALAS: ${vista.salas.map((s) => s.name).join(', ')}.`);
-  partes.push(`OBJETOS: ${vista.objetos.map((o) => o.name).join(', ')}.`);
-  if (vista.misPistas.length) {
-    partes.push(
-      `HA ENCONTRADO AHORA:\n- ${vista.misPistas.map((p) => `${p.roomName}: ${p.description}`).join('\n- ')}`,
-    );
-  }
-  if (vista.tablon.length) {
-    partes.push(
-      `EN EL TABLÓN COMÚN:\n- ${vista.tablon.map((p) => `${p.roomName}: ${p.description}${p.pointsTo ? ` (${p.pointsTo})` : ''}`).join('\n- ')}`,
-    );
-  }
-  if (vista.cronologia.length) {
-    partes.push(
-      `HECHOS PÚBLICOS:\n- ${vista.cronologia.map((m) => `${m.time} ${m.description}`).join('\n- ')}`,
-    );
-  }
+
+  // Solo nombres: nada de sus dosieres.
+  partes.push(
+    `LOS DEMÁS EN LA MESA (solo sus nombres y papel público, no sabes nada más de ellos): ` +
+      `${vista.jugadores.map((j) => `${j.characterName} (${j.role})`).join('; ')}.`,
+  );
+  partes.push(`SALAS DE LA CASA: ${vista.salas.map((s) => s.name).join(', ')}.`);
+  partes.push(`OBJETOS DE LA CASA: ${vista.objetos.map((o) => o.name).join(', ')}.`);
+
+  partes.push(
+    `LAS REGLAS:\n${REGLAS_JUGADOR.map((r) => `- ${r.titulo}: ${r.texto}`).join('\n')}`,
+  );
+
   if (vista.yo.soyCulpable) {
     partes.push(
-      'AVISO INTERNO: tu jugador ES el culpable y lo sabe. Ayúdale a sostener su coartada y a no ' +
-        'delatarse, pero jamás escribas que lo es: podría leerlo alguien por encima del hombro.',
+      'NOTA RESERVADA: tu interlocutor es el culpable y lo sabe por su propio dosier. Puedes ' +
+        'ayudarle a sostener su coartada y a no delatarse, pero NUNCA escribas que lo es ni lo ' +
+        'des por hecho en texto: podría leerlo alguien por encima del hombro.',
     );
   }
+
   return partes.join('\n\n');
 }
 
 /** Respuestas del modo demostración, sin clave de API. */
 function respuestaDemo(vista: VistaJugador, pregunta: string): string {
   const p = pregunta.toLowerCase();
-  if (/regla|c[oó]mo se juega|qu[eé] hago/.test(p)) {
+  if (/regla|c[oó]mo se juega|qu[eé] hago|no entiendo/.test(p)) {
     return (
-      'En cada ronda eliges una sala y lees lo que encuentres allí. Puedes cambiarte una sola vez. ' +
-      'Al cerrar la ronda, lo hallado pasa al tablón común y se habla. Al final, una única acusación: ' +
-      'quién, con qué y dónde. Gana quien acierte primero.'
+      'En cada ronda entra usted en una sala y ve lo que allí se encuentre. Puede cambiarse una ' +
+      'sola vez. Al cerrar la ronda, lo hallado pasa al tablón común y se habla. Al final, una ' +
+      'única acusación: quién, con qué y dónde.'
     );
   }
-  if (/personaje|qui[eé]n soy|mi secreto/.test(p)) {
-    return `Interpreta usted a ${vista.yo.characterName}, ${vista.yo.role}. Su coartada es la que declaró, y su secreto, cosa suya. Yo no he oído nada.`;
+  if (/personaje|qui[eé]n soy|mi secreto|c[oó]mo interpret/.test(p)) {
+    return `Interpreta usted a ${vista.yo.characterName}, ${vista.yo.role}. Lo que esconde, lo sabe mejor que yo; y su coartada es la que declaró. Sosténgala sin adornarla de más.`;
   }
-  if (/culpable|qui[eé]n fue|asesino/.test(p)) {
-    return 'Si yo lo supiera, señor, no estaría sirviendo copas. Eso tendrá que sacarlo usted de la mesa.';
+  if (/culpable|qui[eé]n fue|asesino|qui[eé]n lo hizo|pista|sospech/.test(p)) {
+    return 'Si yo resolviera los crímenes, señor, no estaría sirviendo copas. Eso tendrá que sacarlo usted de la mesa.';
   }
   return (
-    'Sin conexión con el despacho, mi consejo es el de siempre: repase la cronología, busque el tramo ' +
-    'del que nadie habla, y pregunte a quien esté demasiado tranquilo.'
+    'Sin línea con el despacho, mi consejo es el de siempre: hable con quien todavía no haya ' +
+    'hablado. La gente se delata contestando, no callando.'
   );
 }
 
@@ -124,7 +149,7 @@ export async function consultarConsejero(
     max_tokens: 400,
     system: [
       { type: 'text', text: SISTEMA, cache_control: { type: 'ephemeral' } },
-      { type: 'text', text: `CONTEXTO\n\n${contexto(vista)}` },
+      { type: 'text', text: `CONTEXTO\n\n${contextoDelMayordomo(vista)}` },
     ],
     messages: [{ role: 'user', content: limpia }],
   });
