@@ -36,6 +36,7 @@ export default function Ronda(): JSX.Element {
   const { vista, cargando, error, aplicarVista } = usePartida();
   const [eligiendo, setEligiendo] = useState<string | null>(null);
   const [errorSala, setErrorSala] = useState<string | null>(null);
+  const [avisando, setAvisando] = useState(false);
 
   if (cargando && !vista) return <Pantalla><Cargando texto="Buscando la partida…" /></Pantalla>;
   if (!vista) {
@@ -48,6 +49,19 @@ export default function Ronda(): JSX.Element {
   }
 
   const { sesion, yo, salas, misPistas, miSala, narracion } = vista;
+
+  const avisar = async (listo: boolean): Promise<void> => {
+    setErrorSala(null);
+    setAvisando(true);
+    try {
+      const r = await api.avisarListo(listo);
+      aplicarVista(r.vista);
+    } catch (e) {
+      setErrorSala(e instanceof Error ? e.message : 'No se pudo avisar.');
+    } finally {
+      setAvisando(false);
+    }
+  };
 
   const elegir = async (sala: SalaVista): Promise<void> => {
     setErrorSala(null);
@@ -91,14 +105,43 @@ export default function Ronda(): JSX.Element {
               Leer tu dosier
             </Boton>
           </Marco>
+        </Animated.View>
 
-          <Marco>
-            <Cuerpo tenue style={{ textAlign: 'center' }}>
-              La velada empezará en cuanto quien dirige abra la primera ronda.
-              Aprovecha para aprenderte tu papel: en cuanto empiece, no habrá tiempo.
+        <Animated.View entering={FadeInUp.delay(280).duration(500)}>
+          <Marco tono="papel">
+            <Etiqueta style={{ color: color.burdeos700 }}>Lo que ha pasado</Etiqueta>
+            <Cuerpo style={{ color: color.caoba700, marginTop: espacio.sm }}>
+              {vista.caso.sinopsis}
             </Cuerpo>
           </Marco>
         </Animated.View>
+
+        {/* Avisar de que estás listo. No abre la ronda —eso lo decide quien
+            dirige— pero le ahorra ir preguntando uno por uno. */}
+        <Animated.View entering={FadeInUp.delay(360).duration(500)}>
+          <Marco style={yo.pediEmpezar ? estilos.marcoListo : undefined}>
+            <Etiqueta style={{ textAlign: 'center' }}>
+              {sesion.listos} de {sesion.total} ya están listos
+            </Etiqueta>
+            <Cuerpo tenue style={{ textAlign: 'center', marginTop: 6, fontSize: 16 }}>
+              {yo.pediEmpezar
+                ? 'Has avisado. La partida arrancará en cuanto quien dirige la abra.'
+                : 'Avisa cuando te hayas leído el papel y estés en la mesa.'}
+            </Cuerpo>
+            <Boton
+              variante={yo.pediEmpezar ? 'secundario' : 'primario'}
+              cargando={avisando}
+              onPress={() => void avisar(!yo.pediEmpezar)}
+              style={{ marginTop: espacio.lg }}
+            >
+              {yo.pediEmpezar ? 'Todavía no, espera' : 'Estoy listo · que empiece'}
+            </Boton>
+          </Marco>
+        </Animated.View>
+
+        <AvisoError>{errorSala}</AvisoError>
+
+        <Boton onPress={() => router.push('/consejero')}>Preguntar al consejero</Boton>
       </Pantalla>
     );
   }
@@ -269,6 +312,10 @@ export default function Ronda(): JSX.Element {
 
 const estilos = StyleSheet.create({
   centro: { alignItems: 'center', paddingTop: espacio.xl },
+  marcoListo: {
+    borderColor: color.oro400,
+    backgroundColor: 'rgba(201,162,39,0.12)',
+  },
   cabeceraRonda: {
     flexDirection: 'row',
     alignItems: 'center',

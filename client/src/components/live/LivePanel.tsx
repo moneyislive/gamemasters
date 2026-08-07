@@ -205,6 +205,22 @@ export default function LivePanel(): JSX.Element {
             {vista.acusacionesRecibidas} de {sesion.players.length} acusaciones entregadas.
           </p>
         )}
+
+        {/* Quién ha avisado desde el móvil de que ya está en la mesa. Ahorra
+            preguntarlo en voz alta doce veces mientras la gente va llegando. */}
+        {sesion.phase === 'lobby' && (
+          <div className="live-listos">
+            <span className="live-kicker mono-caps">
+              {vista.listos.length} de {sesion.players.length} dicen estar listos
+            </span>
+            {vista.listos.length > 0 && (
+              <p className="text-dim">{vista.listos.map((l) => l.displayName).join(' · ')}</p>
+            )}
+            {vista.listos.length === sesion.players.length && sesion.players.length > 0 && (
+              <p className="live-todos">Está todo el mundo. Puedes abrir la primera ronda.</p>
+            )}
+          </div>
+        )}
       </section>
 
       {/* ---- Giros pendientes ---- */}

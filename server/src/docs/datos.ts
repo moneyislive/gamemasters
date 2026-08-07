@@ -177,6 +177,88 @@ export function inventarioSobres(game: GameSession, plot: Plot): SobreDeLaPartid
 }
 
 // ---------------------------------------------------------------------------
+// Reglas del jugador
+// ---------------------------------------------------------------------------
+
+/**
+ * Las reglas que recibe quien juega, en una sola lista.
+ *
+ * Viven aquí y sin marcas de HTML para que las consuman por igual el dosier
+ * impreso y la app del móvil. Cuando cada sitio tenía su copia, bastaba con
+ * corregir una para que el papel y la pantalla dijeran cosas distintas.
+ *
+ * No confundir con la lista corta del manual del Game Master: aquella es lo que
+ * él lee en voz alta al empezar; ésta es la referencia completa del jugador.
+ */
+export interface ReglaJugador {
+  titulo: string;
+  texto: string;
+}
+
+export const REGLAS_JUGADOR: ReglaJugador[] = [
+  {
+    titulo: 'El objetivo',
+    texto:
+      'Alguien de esta casa es un asesino. Debes descubrir quién lo hizo, con qué objeto y en qué sala. Gana quien acierte los tres elementos en la acusación final.',
+  },
+  {
+    titulo: 'Tu personaje',
+    texto:
+      'Interpreta al personaje de tu dosier durante toda la velada. Tu forma de ser, tus opiniones y tus intenciones son tuyas; los hechos que el dosier da por ciertos, no.',
+  },
+  {
+    titulo: 'Qué puedes ocultar y qué no',
+    texto:
+      'Puedes callar, desviar la atención y mentir sobre tus opiniones, intenciones y sospechas. No puedes negar un hecho que tu dosier afirme, mentir sobre dónde estuviste realmente, inventarte pruebas ni cambiar lo que dice una pista. Sobre una prueba puedes discutir su interpretación, nunca su contenido.',
+  },
+  {
+    titulo: 'Tu secreto',
+    texto:
+      'Todos escondéis algo, y casi ninguno es el crimen. Revélalo cuando te acorralen con algo concreto o cuando te convenga; nadie puede obligarte.',
+  },
+  {
+    titulo: 'Las rondas',
+    texto:
+      'Quien dirige abre y cierra cada ronda. Durante una ronda entras en una sala y conversas con quien esté allí.',
+  },
+  {
+    titulo: 'Preguntas dirigidas',
+    texto:
+      'En cada ronda puedes hacer una pregunta directa a alguien que esté en tu sala. Puede responder con la verdad, dar una respuesta parcial o negarse a contestar; negarse también dice cosas. Lo que no puede es contradecir un hecho de su dosier.',
+  },
+  {
+    titulo: 'Hipótesis',
+    texto:
+      'Puedes lanzar en voz alta la combinación que sospeches para provocar reacciones, pero nadie está obligado a refutarla: aquí no hay cartas que enseñar. Solo cuenta la acusación final.',
+  },
+  {
+    titulo: 'Pistas',
+    texto:
+      'Cada ronda aparecen pruebas nuevas. Las que encuentres son tuyas para enseñarlas o guardarlas, pero al cerrar la ronda las pruebas físicas pasan al tablón común. Los secretos personales siguen siendo privados.',
+  },
+  {
+    titulo: 'Pasadizos',
+    texto:
+      'Si el plano marca un pasadizo entre dos salas, puedes usarlo para cruzar la casa sin pasar por el pasillo. Nadie te verá salir.',
+  },
+  {
+    titulo: 'La acusación final',
+    texto:
+      'Al final cada jugador escribe su acusación: persona, objeto y sala. Se acusa una sola vez, por escrito y a la vez que los demás.',
+  },
+  {
+    titulo: 'El desenlace',
+    texto:
+      'Se lee la solución. Quien haya acertado los tres elementos resuelve el caso; si nadie acierta, el asesino se sale con la suya.',
+  },
+  {
+    titulo: 'La regla de oro',
+    texto:
+      'Todo lo de esta noche es ficción. Interpreta con generosidad y deja brillar a los demás.',
+  },
+];
+
+// ---------------------------------------------------------------------------
 // Reparto
 // ---------------------------------------------------------------------------
 

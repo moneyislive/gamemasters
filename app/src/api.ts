@@ -163,6 +163,10 @@ export function elegirSala(roomId: string): Promise<{ vista: VistaJugador }> {
   return peticion('/jugar/sala', { method: 'POST', body: JSON.stringify({ roomId }) });
 }
 
+export function avisarListo(listo: boolean): Promise<{ vista: VistaJugador }> {
+  return peticion('/jugar/listo', { method: 'POST', body: JSON.stringify({ listo }) });
+}
+
 export function guardarNotas(notas: string): Promise<{ ok: true }> {
   return peticion('/jugar/notas', { method: 'POST', body: JSON.stringify({ notas }) });
 }

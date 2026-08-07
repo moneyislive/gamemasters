@@ -122,7 +122,7 @@ export default function Acusar(): JSX.Element {
 
   if (confirmando) {
     return (
-      <Pantalla>
+      <Pantalla barra={false}>
         <Animated.View entering={FadeIn.duration(400)} style={{ alignItems: 'center', paddingTop: espacio.xl }}>
           <Sello>Última oportunidad</Sello>
           <Titulo style={{ textAlign: 'center', marginTop: espacio.lg }}>
@@ -159,7 +159,7 @@ export default function Acusar(): JSX.Element {
   }
 
   return (
-    <Pantalla>
+    <Pantalla barra={false}>
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={{ alignItems: 'center', paddingTop: espacio.md }}>
           <Sello>Acusación</Sello>

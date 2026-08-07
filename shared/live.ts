@@ -62,6 +62,14 @@ export interface LivePlayer {
   notas: string;
   /** Ids de los giros personales que ya se le han entregado. */
   girosRecibidos: string[];
+  /**
+   * Ha pulsado «estoy listo» en la sala de espera.
+   *
+   * No abre la partida —eso lo decide quien dirige— pero le dice cuánta gente
+   * está esperando ya, que es la pregunta que se hace doce veces mientras la
+   * mesa se llena.
+   */
+  pideEmpezar?: boolean;
 }
 
 export interface Acusacion {
@@ -235,6 +243,23 @@ export interface VistaJugador {
     ahora: string;
     tituloPartida: string;
     lema: string;
+    /** Cuántos han pulsado «estoy listo» y cuántos son en total. */
+    listos: number;
+    total: number;
+  };
+  /**
+   * El caso, tal como lo conoce todo el mundo.
+   *
+   * Es lo que en el dosier impreso ocupa la sección «El caso»: sin esto, quien
+   * juega desde el móvil sabe quién es su personaje pero no de qué va la
+   * velada, ni quién ha muerto, ni dónde está.
+   */
+  caso: {
+    sinopsis: string;
+    victima: { nombre: string; descripcion: string };
+    ambientacion: string;
+    /** Las reglas que se leen en voz alta al empezar. */
+    reglas: string[];
   };
   yo: {
     suspectId: string;
@@ -257,6 +282,8 @@ export interface VistaJugador {
     notas: string;
     /** Solo lo sabe quien lo es. Sirve para cambiarle el tono a la app. */
     soyCulpable: boolean;
+    /** ¿Ya ha avisado de que está listo para empezar? */
+    pediEmpezar: boolean;
   };
   /** Los demás, con lo que cualquiera sabría de ellos. */
   jugadores: Array<{
@@ -316,6 +343,8 @@ export interface VistaGameMaster {
   girosPendientes: Array<{ id: string; suspectId: string; displayName: string; round: number }>;
   /** Cuántas acusaciones se han recibido. */
   acusacionesRecibidas: number;
+  /** Quiénes han avisado de que están listos para empezar. */
+  listos: Array<{ suspectId: string; displayName: string }>;
   /** El Game Master a ciegas no ve si son correctas. */
   revelaSolucion: boolean;
 }

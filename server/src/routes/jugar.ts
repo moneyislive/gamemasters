@@ -178,6 +178,29 @@ router.post('/jugar/sala', async (req, res) => {
   }
 });
 
+/**
+ * «Estoy listo»: le dice a quien dirige que puede empezar cuando quiera.
+ *
+ * No abre la ronda —eso sigue siendo decisión suya— pero le ahorra preguntar
+ * doce veces si ya está todo el mundo. Se puede retirar.
+ */
+router.post('/jugar/listo', async (req, res) => {
+  const cred = credencial(req, res);
+  if (!cred) return;
+  const listo = req.body?.listo !== false;
+  try {
+    await mutar(cred.gameId, (s) => {
+      const jugador = s.players.find((p) => p.suspectId === cred.suspectId);
+      if (!jugador) throw new Error('No participas en esta partida.');
+      jugador.pideEmpezar = listo;
+    });
+    const vista = await vistaActual(cred.gameId, cred.suspectId, res);
+    if (vista) res.json({ vista });
+  } catch (error) {
+    res.status(409).json({ error: mensaje(error, 'No se pudo avisar.') });
+  }
+});
+
 router.post('/jugar/notas', async (req, res) => {
   const cred = credencial(req, res);
   if (!cred) return;

@@ -8,7 +8,7 @@ import { Tabs } from 'expo-router';
 import { Text } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { StyleSheet } from 'react-native';
-import { color, fuente } from '../../src/tema';
+import { ALTO_BARRA, color, fuente } from '../../src/tema';
 
 function Glifo({ children, activo }: { children: string; activo: boolean }): JSX.Element {
   return (
@@ -83,7 +83,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: 'rgba(201,162,39,0.28)',
     backgroundColor: 'rgba(11,23,16,0.82)',
-    height: 74,
+    height: ALTO_BARRA,
     paddingTop: 8,
     paddingBottom: 16,
   },

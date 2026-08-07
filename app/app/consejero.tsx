@@ -75,7 +75,7 @@ export default function Consejero(): JSX.Element {
       style={{ flex: 1 }}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <Pantalla scroll={false}>
+      <Pantalla scroll={false} barra={false}>
         <View style={{ alignItems: 'center', marginBottom: espacio.md }}>
           <Sello>El consejero</Sello>
         </View>

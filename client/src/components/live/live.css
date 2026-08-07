@@ -90,6 +90,21 @@
   text-align: center;
 }
 
+.live-listos {
+  border-top: 1px solid rgba(201, 162, 39, 0.2);
+  padding-top: 12px;
+  margin-top: 4px;
+}
+.live-listos p {
+  margin: 4px 0 0;
+}
+.live-todos {
+  color: var(--gold-300);
+  font-family: var(--font-heading);
+  font-size: 0.9rem;
+  letter-spacing: 0.06em;
+}
+
 .live-tabla {
   width: 100%;
   border-collapse: collapse;

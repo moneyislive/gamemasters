@@ -21,13 +21,31 @@ import {
   radio,
 } from '../../src/ui';
 
-function Dato({ etiqueta, valor }: { etiqueta: string; valor: string }): JSX.Element | null {
+/**
+ * Cada apartado del dosier va en su propia hoja.
+ *
+ * Todo seguido en un solo bloque, en una pantalla de móvil, se lee como un
+ * muro: no se distingue dónde acaba tu coartada y empieza tu secreto. Separado
+ * en hojas, cada cosa se lee como lo que es —una ficha aparte— y además se
+ * puede volver a una concreta de un vistazo.
+ */
+function Hoja({
+  etiqueta,
+  valor,
+  retardo = 0,
+}: {
+  etiqueta: string;
+  valor: string;
+  retardo?: number;
+}): JSX.Element | null {
   if (!valor) return null;
   return (
-    <View style={{ marginBottom: espacio.md }}>
-      <Etiqueta style={{ color: color.burdeos700 }}>{etiqueta}</Etiqueta>
-      <Cuerpo style={{ color: color.caoba700, marginTop: 2 }}>{valor}</Cuerpo>
-    </View>
+    <Animated.View entering={FadeInUp.delay(retardo).duration(460)}>
+      <Marco tono="papel" style={{ marginBottom: espacio.md }}>
+        <Etiqueta style={{ color: color.burdeos700 }}>{etiqueta}</Etiqueta>
+        <Cuerpo style={{ color: color.caoba700, marginTop: espacio.sm }}>{valor}</Cuerpo>
+      </Marco>
+    </Animated.View>
   );
 }
 
@@ -70,15 +88,11 @@ export default function Personaje(): JSX.Element {
 
       <Ornamento />
 
-      <Animated.View entering={FadeInUp.delay(180).duration(500)}>
-        <Marco tono="papel">
-          <Dato etiqueta="Quién crees ser ante los demás" valor={yo.publicPersona} />
-          <Dato etiqueta="Tu secreto" valor={yo.secret} />
-          <Dato etiqueta="Tu motivo" valor={yo.motive} />
-          <Dato etiqueta="Tu coartada" valor={yo.alibi} />
-          <Dato etiqueta="Cómo interpretarlo" valor={yo.personalHook} />
-        </Marco>
-      </Animated.View>
+      <Hoja etiqueta="Quién crees ser ante los demás" valor={yo.publicPersona} retardo={160} />
+      <Hoja etiqueta="Tu secreto" valor={yo.secret} retardo={220} />
+      <Hoja etiqueta="Tu motivo" valor={yo.motive} retardo={280} />
+      <Hoja etiqueta="Tu coartada" valor={yo.alibi} retardo={340} />
+      <Hoja etiqueta="Cómo interpretarlo" valor={yo.personalHook} retardo={400} />
 
       <Seccion>Lo que sabes de los demás</Seccion>
       {yo.conocimiento.length === 0 ? (
@@ -117,6 +131,40 @@ export default function Personaje(): JSX.Element {
           ))}
         </>
       )}
+
+      <Ornamento />
+      <Seccion>El caso</Seccion>
+      <Hoja etiqueta="Qué ha ocurrido" valor={vista.caso.sinopsis} />
+      <Hoja
+        etiqueta={`La víctima · ${vista.caso.victima.nombre}`}
+        valor={vista.caso.victima.descripcion}
+      />
+      <Hoja etiqueta="Dónde estáis" valor={vista.caso.ambientacion} />
+
+      <Ornamento />
+      <Seccion>Cómo se juega</Seccion>
+      <Cuerpo tenue style={{ fontSize: 15, marginBottom: espacio.md }}>
+        Aunque nunca hayas jugado, con esto te basta.
+      </Cuerpo>
+      {vista.caso.reglas.map((regla, i) => {
+        const punto = regla.indexOf('. ');
+        const titulo = punto > 0 ? regla.slice(0, punto) : `Regla ${i + 1}`;
+        const cuerpo = punto > 0 ? regla.slice(punto + 2) : regla;
+        return <Hoja key={i} etiqueta={titulo} valor={cuerpo} retardo={Math.min(i * 40, 320)} />;
+      })}
+
+      <Ornamento />
+      <Seccion>Los objetos</Seccion>
+      <Marco>
+        {vista.objetos.map((o) => (
+          <View key={o.id} style={estilos.fila}>
+            <Cuerpo style={{ flex: 1, fontSize: 16 }}>{o.name}</Cuerpo>
+            {o.description ? (
+              <Cuerpo tenue style={{ flex: 1, fontSize: 14 }}>{o.description}</Cuerpo>
+            ) : null}
+          </View>
+        ))}
+      </Marco>
 
       <Ornamento />
       <Seccion>En la mesa</Seccion>

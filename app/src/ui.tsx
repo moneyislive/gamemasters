@@ -20,8 +20,8 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { color, espacio, fondoMesa, fuente, radio, sombra, texto } from './tema';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ALTO_BARRA, color, espacio, fondoMesa, fuente, radio, sombra, texto } from './tema';
 
 // ---------------------------------------------------------------------------
 // Contenedores
@@ -31,32 +31,68 @@ export function Pantalla({
   children,
   scroll = true,
   padding = true,
+  pie = true,
+  barra = true,
 }: {
   children: React.ReactNode;
   scroll?: boolean;
   padding?: boolean;
+  /** El cierre ornamental del final. Se quita en pantallas de altura fija. */
+  pie?: boolean;
+  /** ¿Hay barra de pestañas flotando debajo? Los modales no la tienen. */
+  barra?: boolean;
 }): JSX.Element {
+  const insets = useSafeAreaInsets();
+  // La barra de pestañas flota sobre el contenido, así que hay que reservarle
+  // su alto MÁS el margen inferior del dispositivo. Sin esto, en pantallas
+  // cortas lo último del scroll queda debajo de la barra y no hay forma de
+  // llegar a ello.
+  const hueco = (barra ? ALTO_BARRA : 0) + insets.bottom + espacio.lg;
+
   const contenido = (
-    <View style={[padding && { paddingHorizontal: espacio.lg, paddingBottom: espacio.xxl }]}>
+    <View style={[padding && { paddingHorizontal: espacio.lg }]}>
       {children}
+      {scroll && pie && <PieDePagina />}
     </View>
   );
+
   return (
     <LinearGradient colors={fondoMesa} style={estilos.fondo}>
       <SafeAreaView style={estilos.seguro} edges={['top']}>
         {scroll ? (
           <ScrollView
             showsVerticalScrollIndicator={false}
-            contentContainerStyle={{ paddingTop: espacio.md }}
+            contentContainerStyle={{ paddingTop: espacio.md, paddingBottom: hueco }}
             keyboardShouldPersistTaps="handled"
           >
             {contenido}
           </ScrollView>
         ) : (
-          contenido
+          <View style={{ flex: 1, paddingBottom: hueco }}>{contenido}</View>
         )}
       </SafeAreaView>
     </LinearGradient>
+  );
+}
+
+/**
+ * Cierre de página.
+ *
+ * Cumple dos funciones: rematar la pantalla con la marca de la casa, y —más
+ * práctico— dejar claro que ahí se acaba el contenido. Sin un final visible,
+ * en una pantalla larga nunca sabes si te queda algo por leer.
+ */
+export function PieDePagina(): JSX.Element {
+  return (
+    <View style={estilos.pie}>
+      <View style={estilos.pieRegla} />
+      <View style={estilos.pieRosa}>
+        <Text style={{ color: color.oro500, fontSize: 11 }}>✦</Text>
+        <Text style={estilos.pieMarca}>GameMasters</Text>
+        <Text style={{ color: color.oro500, fontSize: 11 }}>✦</Text>
+      </View>
+      <Text style={estilos.pieLema}>Juegos reales, misterios de verdad</Text>
+    </View>
   );
 }
 
@@ -262,7 +298,9 @@ const estilos = StyleSheet.create({
     marginBottom: espacio.md,
   },
   sello: {
-    alignSelf: 'flex-start',
+    // Todas las cabeceras que lo usan están centradas; con `flex-start` el
+    // sello se quedaba pegado a la izquierda bajo un título centrado.
+    alignSelf: 'center',
     borderWidth: 1,
     borderColor: 'rgba(201,162,39,0.6)',
     borderRadius: radio.redondo,
@@ -296,6 +334,36 @@ const estilos = StyleSheet.create({
   botonPeligro: {
     backgroundColor: 'rgba(140,35,55,0.28)',
     borderColor: color.burdeos600,
+  },
+  pie: {
+    alignItems: 'center',
+    marginTop: espacio.xxl,
+    paddingTop: espacio.lg,
+  },
+  pieRegla: {
+    width: 92,
+    height: 1,
+    backgroundColor: 'rgba(201,162,39,0.4)',
+    marginBottom: espacio.md,
+  },
+  pieRosa: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: espacio.sm,
+  },
+  pieMarca: {
+    fontFamily: fuente.titulo,
+    fontSize: 12,
+    letterSpacing: 3,
+    color: 'rgba(201,162,39,0.75)',
+    textTransform: 'uppercase',
+  },
+  pieLema: {
+    fontFamily: fuente.cuerpo,
+    fontSize: 13,
+    fontStyle: 'italic',
+    color: 'rgba(217,201,163,0.45)',
+    marginTop: 6,
   },
   error: {
     borderWidth: 1,

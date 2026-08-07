@@ -37,19 +37,15 @@ export default function Entrada(): JSX.Element {
   const [entrando, setEntrando] = useState(false);
   const [listo, setListo] = useState(false);
 
-  // Si ya había sesión guardada, se entra directo: nadie quiere teclear su
-  // código cada vez que bloquea el móvil durante la cena.
+  // La credencial ya la carga el proveedor; aquí solo se lee la dirección del
+  // servidor para poder mostrarla y editarla.
   useEffect(() => {
     void (async () => {
-      const { token, servidor: guardado } = await api.cargarSesionGuardada();
+      const { servidor: guardado } = await api.cargarSesionGuardada();
       setServidor(guardado);
-      if (token) {
-        await refrescar();
-        router.replace('/(juego)/ronda');
-      }
       setListo(true);
     })();
-  }, [refrescar]);
+  }, []);
 
   useEffect(() => {
     if (vista) router.replace('/(juego)/ronda');
@@ -72,7 +68,7 @@ export default function Entrada(): JSX.Element {
   };
 
   return (
-    <Pantalla>
+    <Pantalla barra={false}>
       <Animated.View entering={FadeInDown.duration(600)} style={estilos.cabecera}>
         <Sello>Juegos reales</Sello>
         <Titulo style={{ textAlign: 'center', marginTop: espacio.lg }}>GameMasters</Titulo>

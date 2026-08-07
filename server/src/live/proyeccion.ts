@@ -16,7 +16,7 @@
  *  4. El conocimiento del personaje se desbloquea ronda a ronda.
  *  5. Los giros personales solo llegan a su destinatario.
  */
-import { cronologiaPublica } from '../docs/datos';
+import { cronologiaPublica, REGLAS_JUGADOR } from '../docs/datos';
 import { estaConectado, salaDe } from './sesion';
 import type {
   LiveSession,
@@ -148,6 +148,17 @@ export function vistaDeJugador(
       ahora: new Date().toISOString(),
       tituloPartida: plot.title,
       lema: plot.tagline,
+      listos: sesion.players.filter((p) => p.pideEmpezar).length,
+      total: sesion.players.length,
+    },
+    // El caso es público: la sinopsis se escribe expresamente sin revelar
+    // asesino, arma ni sala, y la víctima y la ambientación las conoce todo el
+    // mundo desde que cruza la puerta.
+    caso: {
+      sinopsis: plot.synopsis,
+      victima: { nombre: plot.victim.name, descripcion: plot.victim.description },
+      ambientacion: plot.setting,
+      reglas: REGLAS_JUGADOR.map((r) => `${r.titulo}. ${r.texto}`),
     },
     yo: {
       suspectId,
@@ -165,6 +176,7 @@ export function vistaDeJugador(
       giros,
       notas: jugador.notas,
       soyCulpable: plot.solution.murdererId === suspectId,
+      pediEmpezar: jugador.pideEmpezar === true,
     },
     jugadores: sesion.players
       .filter((p) => p.suspectId !== suspectId)
@@ -296,6 +308,9 @@ export function vistaDeGameMaster(game: GameSession, sesion: LiveSession): Vista
     ocupacion,
     girosPendientes,
     acusacionesRecibidas: sesion.acusaciones.length,
+    listos: sesion.players
+      .filter((p) => p.pideEmpezar)
+      .map((p) => ({ suspectId: p.suspectId, displayName: p.displayName })),
     revelaSolucion,
   };
 }

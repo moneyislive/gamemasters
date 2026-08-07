@@ -46,6 +46,16 @@ export const espacio = {
   xxl: 40,
 } as const;
 
+/**
+ * Alto de la barra de pestañas.
+ *
+ * Vive aquí porque lo necesitan dos sitios: la propia barra y el hueco que
+ * cada pantalla tiene que dejar debajo. Cuando el valor estaba solo en la
+ * barra, el contenido reservaba menos de lo que ella ocupa y en pantallas
+ * cortas lo último del scroll quedaba escondido detrás.
+ */
+export const ALTO_BARRA = 74;
+
 export const radio = {
   sm: 6,
   md: 10,

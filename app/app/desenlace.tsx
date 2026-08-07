@@ -40,7 +40,7 @@ export default function Desenlace(): JSX.Element {
   const fin = vista.desenlace;
   if (!fin) {
     return (
-      <Pantalla>
+      <Pantalla barra={false}>
         <Marco>
           <Cuerpo>Todavía no se ha abierto el sobre del crimen.</Cuerpo>
           <Boton onPress={() => router.back()} style={{ marginTop: espacio.lg }}>
@@ -55,7 +55,7 @@ export default function Desenlace(): JSX.Element {
   const eraYo = fin.murdererId === vista.yo.suspectId;
 
   return (
-    <Pantalla>
+    <Pantalla barra={false}>
       <Animated.View entering={FadeInDown.duration(700)} style={{ alignItems: 'center', paddingTop: espacio.lg }}>
         <Sello>El sobre del crimen</Sello>
       </Animated.View>
@@ -81,17 +81,22 @@ export default function Desenlace(): JSX.Element {
       </Animated.View>
 
       {paso >= 1 && (
-        <Animated.View entering={FadeInUp.duration(600)}>
-          <Marco tono="papel">
-            <Etiqueta style={{ color: color.burdeos700 }}>El motivo</Etiqueta>
-            <Cuerpo style={{ color: color.caoba700, marginTop: espacio.sm }}>{fin.motive}</Cuerpo>
-            <View style={estilos.separador} />
-            <Etiqueta style={{ color: color.burdeos700 }}>Cómo ocurrió</Etiqueta>
-            <Cuerpo style={{ color: color.caoba700, marginTop: espacio.sm }}>
-              {fin.reconstruccion}
-            </Cuerpo>
-          </Marco>
-        </Animated.View>
+        <>
+          <Animated.View entering={FadeInUp.duration(600)}>
+            <Marco tono="papel">
+              <Etiqueta style={{ color: color.burdeos700 }}>El motivo</Etiqueta>
+              <Cuerpo style={{ color: color.caoba700, marginTop: espacio.sm }}>{fin.motive}</Cuerpo>
+            </Marco>
+          </Animated.View>
+          <Animated.View entering={FadeInUp.delay(140).duration(600)}>
+            <Marco tono="papel">
+              <Etiqueta style={{ color: color.burdeos700 }}>Cómo ocurrió</Etiqueta>
+              <Cuerpo style={{ color: color.caoba700, marginTop: espacio.sm }}>
+                {fin.reconstruccion}
+              </Cuerpo>
+            </Marco>
+          </Animated.View>
+        </>
       )}
 
       {paso >= 2 && fin.confesion && (
@@ -172,11 +177,6 @@ export default function Desenlace(): JSX.Element {
 }
 
 const estilos = StyleSheet.create({
-  separador: {
-    height: 1,
-    backgroundColor: 'rgba(109,26,42,0.25)',
-    marginVertical: espacio.md,
-  },
   marcoGanador: {
     borderColor: color.oro300,
     backgroundColor: 'rgba(201,162,39,0.14)',

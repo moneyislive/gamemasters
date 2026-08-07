@@ -56,6 +56,18 @@ export function ProveedorPartida({ children }: { children: React.ReactNode }): J
   const activoRef = useRef(true);
   const abortRef = useRef<AbortController | null>(null);
   const contadorAviso = useRef(0);
+  /**
+   * La credencial guardada se lee AQUÍ, no en la pantalla de entrada.
+   *
+   * Si solo se leyera allí, abrir la app directamente en cualquier otra
+   * pantalla —al recargar, al volver de segundo plano o desde un enlace— dejaba
+   * el módulo sin testigo y la partida cargando para siempre.
+   */
+  const [sesionLeida, setSesionLeida] = useState(false);
+
+  useEffect(() => {
+    void api.cargarSesionGuardada().finally(() => setSesionLeida(true));
+  }, []);
 
   const aplicarVista = useCallback((v: VistaJugador) => {
     revRef.current = v.rev;
@@ -90,7 +102,18 @@ export function ProveedorPartida({ children }: { children: React.ReactNode }): J
 
     const bucle = async (): Promise<void> => {
       while (!cancelado) {
-        if (!activoRef.current || !api.haySesion()) {
+        if (!sesionLeida) {
+          await new Promise((r) => setTimeout(r, 120));
+          continue;
+        }
+        if (!api.haySesion()) {
+          // Sin credencial no hay nada que esperar: se deja de cargar para que
+          // la pantalla de entrada pueda pedir los códigos.
+          setCargando(false);
+          await new Promise((r) => setTimeout(r, 400));
+          continue;
+        }
+        if (!activoRef.current) {
           await new Promise((r) => setTimeout(r, 400));
           continue;
         }
@@ -127,7 +150,7 @@ export function ProveedorPartida({ children }: { children: React.ReactNode }): J
       cancelado = true;
       abortRef.current?.abort();
     };
-  }, [aplicarVista, encolarAvisos]);
+  }, [aplicarVista, encolarAvisos, sesionLeida]);
 
   // ---- Pausa en segundo plano ----
   useEffect(() => {

@@ -12,7 +12,7 @@ import path from 'node:path';
 import { env } from '../config';
 import { styleNoteForGm } from '../plot/style';
 import { vistaGm } from './contexto';
-import { cronologiaPublica } from './datos';
+import { cronologiaPublica, REGLAS_JUGADOR } from './datos';
 import { barraDeImpresion, hojaDeEstilos } from './estilos';
 import { esc } from './html';
 import { DOCUMENT_SECTIONS } from '../../../shared/types';
@@ -300,26 +300,13 @@ function seccionEscenario(game: GameSession): string {
  * una obligación mínima de compartir: sin ella, dos jugadores callados podrían
  * dejar el caso sin resolver.
  */
-const REGLAS_EN_VIVO = [
-  '<b>El objetivo.</b> Alguien de esta casa es un asesino. Debes descubrir <b>quién</b> lo hizo, <b>con qué objeto</b> y <b>en qué sala</b>. Gana quien acierte los tres elementos en la acusación final.',
-  '<b>Tu personaje.</b> Interpreta al personaje de este dosier durante toda la velada. Tu forma de ser, tus opiniones y tus intenciones son tuyas; los hechos que el dosier da por ciertos, no.',
-  '<b>Qué puedes ocultar y qué no.</b> Puedes callar, desviar la atención y mentir sobre tus <i>opiniones, intenciones y sospechas</i>. <b>No</b> puedes negar un hecho que tu dosier afirme expresamente, mentir sobre dónde estuviste realmente, inventarte pruebas ni cambiar lo que dice una pista. Sobre una prueba puedes discutir su <i>interpretación</i>, nunca su contenido.',
-  '<b>Tu secreto.</b> Todos escondéis algo, y casi ninguno es el crimen. Revélalo cuando te acorralen con algo concreto o cuando te convenga; nadie puede obligarte.',
-  '<b>Las rondas.</b> El Game Master abre y cierra cada ronda. Durante una ronda te desplazas a una sala y conversas con quien esté allí.',
-  '<b>Preguntas dirigidas.</b> En cada ronda puedes hacer <b>una pregunta directa</b> a alguien que esté en tu sala. Puede responder con la verdad, dar una respuesta parcial o negarse a contestar —negarse también dice cosas—. Lo que no puede es contradecir un hecho de su dosier.',
-  '<b>Hipótesis.</b> Puedes lanzar en voz alta la combinación que sospeches (persona, objeto y sala) para provocar reacciones, pero <b>nadie está obligado a refutarla</b>: aquí no hay cartas que enseñar. Solo cuenta la acusación final.',
-  '<b>Pistas.</b> El Game Master saca pruebas nuevas en cada ronda. Las que encuentres son tuyas para enseñarlas o guardarlas… pero al cerrar cada ronda, <b>cada sala pone en común un hecho verificable</b> y las pruebas físicas halladas pasan al tablón común. Los secretos personales siguen siendo privados.',
-  '<b>Pasadizos.</b> Si el plano marca un pasadizo secreto entre dos salas, puedes usarlo para cruzar la casa sin pasar por el pasillo. Nadie te verá salir.',
-  '<b>La acusación final.</b> En la última ronda cada jugador escribe su acusación: persona, objeto y sala. Se acusa <b>una sola vez</b> y por escrito, a la vez que los demás.',
-  '<b>El desenlace.</b> Se lee la solución. Quien haya acertado los tres elementos resuelve el caso; si nadie acierta, el asesino se sale con la suya.',
-  '<b>La regla de oro.</b> Todo lo de esta noche es ficción. Interpreta con generosidad y deja brillar a los demás.',
-];
+
 
 function seccionReglas(): string {
   return `<section>
     <h2>Cómo se juega</h2>
     <p><em>Aunque nunca hayas jugado al Cluedo, con estas diez reglas te bastará.</em></p>
-    <ol class="reglas">${REGLAS_EN_VIVO.map((regla) => `<li>${regla}</li>`).join('')}</ol>
+    <ol class="reglas">${REGLAS_JUGADOR.map((regla) => `<li><b>${esc(regla.titulo)}.</b> ${esc(regla.texto)}</li>`).join('')}</ol>
   </section>`;
 }
 
