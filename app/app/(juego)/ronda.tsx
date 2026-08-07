@@ -139,6 +139,23 @@ export default function Ronda(): JSX.Element {
           </Marco>
         </Animated.View>
 
+        {/* En la sala de espera es cuando más gente se pierde: acaban de
+            sentarse, no han jugado nunca y todavía no saben ni de qué va. El
+            Mayordomo está en la barra a todas horas, pero aquí conviene que se
+            vea escrito y con sitio de sobra. */}
+        <Animated.View entering={FadeInUp.delay(440).duration(500)}>
+          <Marco>
+            <Etiqueta>¿Primera vez?</Etiqueta>
+            <Cuerpo tenue style={{ marginTop: 6, fontSize: 16 }}>
+              El Mayordomo te explica las reglas y te ayuda a meterte en tu papel. No sabe quién
+              fue, así que ni lo intentes.
+            </Cuerpo>
+            <Boton onPress={() => router.push('/consejero')} style={{ marginTop: espacio.lg }}>
+              Preguntar al Mayordomo
+            </Boton>
+          </Marco>
+        </Animated.View>
+
         <AvisoError>{errorSala}</AvisoError>
 
       </Pantalla>

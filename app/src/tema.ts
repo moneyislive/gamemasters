@@ -57,12 +57,38 @@ export const espacio = {
 export const ALTO_BARRA = 74;
 
 /**
- * Alto de la pastilla del Mayordomo, que flota por encima de la barra.
+ * El botón del Mayordomo, encajado en la muesca central de la barra.
  *
- * Se suma al hueco inferior de cada pantalla: si no, taparía lo último del
- * scroll igual que hacía la barra de pestañas antes de reservarle su sitio.
+ * Estos cuatro valores son los mandos de la forma; `barra-geometria.ts` deduce
+ * de ellos todo lo demás. Salieron de montar la barra y fotografiarla a 320,
+ * 375 y 430 puntos:
+ *
+ *  · R = 30 da un botón de 60, por encima del mínimo de 44 que se puede pulsar
+ *    sin apuntar.
+ *  · SALIENTE = 26 deja fuera el 43% del botón: emerge de la barra sin llegar a
+ *    flotar sobre ella.
+ *  · HOLGURA = 7 es el aire entre el botón y el filo. Menos y se tocan; más y
+ *    deja de parecer que uno encaja en el otro.
+ *  · FILETE = 14 es lo que suaviza la entrada a la muesca. Sin él hay un
+ *    ángulo duro y la muesca parece un mordisco.
+ *
+ * Cuidado al tocarlos: la muesca se hunde hasta 2R + HOLGURA, que no depende
+ * del saliente. Con R por encima de 42 perfora la barra por abajo y el filo
+ * dorado se parte en dos trozos sueltos.
  */
-export const ALTO_MAYORDOMO = 64;
+export const R_BOTON = 30;
+export const SALIENTE_BOTON = 26;
+export const HOLGURA_BOTON = 7;
+export const FILETE_BARRA = 14;
+
+/**
+ * Lo que ocupa la barra contando el saliente del botón.
+ *
+ * Es lo que cada pantalla tiene que reservar por debajo de su contenido. Si se
+ * reserva solo `ALTO_BARRA`, la cúspide del botón tapa lo último del scroll,
+ * que es exactamente el fallo que costó arreglar cuando la barra creció.
+ */
+export const ALTO_BARRA_TOTAL = ALTO_BARRA + SALIENTE_BOTON;
 
 export const radio = {
   sm: 6,

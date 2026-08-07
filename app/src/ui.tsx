@@ -22,8 +22,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
-  ALTO_BARRA,
-  ALTO_MAYORDOMO,
+  ALTO_BARRA_TOTAL,
   color,
   espacio,
   fondoMesa,
@@ -56,9 +55,9 @@ export function Pantalla({
   // La barra de pestañas flota sobre el contenido, así que hay que reservarle
   // su alto MÁS el margen inferior del dispositivo. Sin esto, en pantallas
   // cortas lo último del scroll queda debajo de la barra y no hay forma de
-  // llegar a ello.
-  const hueco =
-    (barra ? ALTO_BARRA + ALTO_MAYORDOMO : 0) + insets.bottom + espacio.lg;
+  // llegar a ello. `ALTO_BARRA_TOTAL` incluye el saliente del botón central,
+  // que es la parte que más arriba llega.
+  const hueco = (barra ? ALTO_BARRA_TOTAL : 0) + insets.bottom + espacio.lg;
 
   const contenido = (
     <View style={[padding && { paddingHorizontal: espacio.lg }]}>

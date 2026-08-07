@@ -12,6 +12,7 @@
  * hostil —basta con abrir las herramientas del navegador— así que el servidor
  * envía lo que esa persona puede saber en esa ronda, y nada más.
  */
+import type { BoardLayout, BoardMode } from './types';
 
 // ---------------------------------------------------------------------------
 // Estado de la partida
@@ -209,6 +210,33 @@ export interface SalaVista {
   photoUrl?: string;
   /** ¿Alguien ya está ahí esta ronda? Se enseña para animar a repartirse. */
   ocupantes: number;
+  /**
+   * Dónde está clavada su chincheta sobre la foto aérea, en fracción del ancho
+   * y del alto (0–1). Solo tiene valor si la partida se juega sobre el plano
+   * del espacio real.
+   */
+  pin?: { x: number; y: number };
+}
+
+/**
+ * El plano de la casa.
+ *
+ * Este es el único bloque de la vista que se envía ENTERO, sin recortar, y
+ * conviene dejar dicho por qué: el tablero lo produce `generateBoardLayout()` a
+ * partir de la lista de salas y de nada más. No mira la trama, ni quién es el
+ * culpable, ni en qué sala está cada pista. Es la planta del edificio, y la
+ * planta la ve cualquiera que cruce la puerta.
+ *
+ * Lo que sí es información de juego —dónde estoy, dónde hay gente, en qué salas
+ * ya se encontró algo— no viaja aquí: se pinta encima con lo que el jugador ya
+ * tenía en su vista.
+ */
+export interface TableroVista {
+  modo: BoardMode;
+  /** Modo aéreo: foto cenital del sitio real, relativa al servidor. */
+  imagenUrl?: string;
+  /** Modo generado: el plano de rejilla con salas y pasadizos. */
+  plano?: BoardLayout;
 }
 
 /** Una pista, tal como se le entrega a quien ha entrado en esa sala. */
@@ -298,6 +326,8 @@ export interface VistaJugador {
     yaAcuso: boolean;
   }>;
   salas: SalaVista[];
+  /** El plano de la casa. Ausente si la partida todavía no tiene tablero. */
+  tablero?: TableroVista;
   objetos: Array<{ id: string; name: string; description?: string; photoUrl?: string }>;
   /** La sala que has elegido esta ronda, si ya lo has hecho. */
   miSala?: string;

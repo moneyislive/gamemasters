@@ -23,6 +23,7 @@ import type {
   MomentoVista,
   PistaVista,
   SalaVista,
+  TableroVista,
   VistaGameMaster,
   VistaJugador,
 } from '../../../shared/live';
@@ -109,7 +110,23 @@ export function vistaDeJugador(
     description: r.description,
     photoUrl: r.photoUrl,
     ocupantes: ocupacion.get(r.id) ?? 0,
+    pin: r.pin,
   }));
+
+  // ---- El plano de la casa ----
+  // Sale entero, y es la única parte de la vista de la que puede decirse eso.
+  // El tablero se calcula desde la lista de salas y nada más: no sabe quién es
+  // el culpable ni dónde está ninguna pista. Lo que sí es información de juego
+  // —dónde estás, dónde hay gente, qué salas ya dieron algo— lo pinta el móvil
+  // encima, con lo que ya tenía.
+  const tablero: TableroVista | undefined =
+    game.boardMode === 'aerial'
+      ? game.boardImageUrl
+        ? { modo: 'aerial', imagenUrl: game.boardImageUrl }
+        : undefined
+      : game.board
+        ? { modo: 'generated', plano: game.board }
+        : undefined;
 
   // ---- Mis pistas: solo las de MI sala en ESTA ronda, y sin su significado ----
   const miSala = enJuego ? salaDe(jugador, sesion.round) : undefined;
@@ -196,6 +213,7 @@ export function vistaDeJugador(
         };
       }),
     salas,
+    tablero,
     objetos: game.weapons.map((w) => ({
       id: w.id,
       name: w.name,

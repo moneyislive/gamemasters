@@ -1,101 +1,34 @@
 /**
- * Navegación del juego: cinco pestañas, siempre a un dedo de distancia.
+ * Navegación del juego: seis pestañas y el Mayordomo en medio.
  *
  * Nada de menús ocultos. Durante la partida hay ruido, poca luz y prisa: todo
  * lo que se usa tiene que verse desde cualquier pantalla.
+ *
+ * La barra es propia (`BarraDeJuego`) en vez de la de serie, porque la de serie
+ * no sabe abrirse en el centro para alojar el botón del asistente. El orden de
+ * las pestañas de aquí abajo es el orden en que salen: tres, la muesca, y tres.
  */
-import { Tabs } from 'expo-router';
-import { StyleSheet, Text, View } from 'react-native';
-import { BlurView } from 'expo-blur';
-import { BotonMayordomo } from '../../src/mayordomo';
-import { ALTO_BARRA, color, fuente } from '../../src/tema';
-
-function Glifo({ children, activo }: { children: string; activo: boolean }): JSX.Element {
-  return (
-    <Text style={{ fontSize: 19, opacity: activo ? 1 : 0.45, color: activo ? color.oro300 : color.pergaminoTenue }}>
-      {children}
-    </Text>
-  );
-}
+import { Tabs } from 'expo-router/js-tabs';
+import { BarraDeJuego } from '../../src/barra';
+import { color } from '../../src/tema';
 
 export default function DisposicionJuego(): JSX.Element {
   return (
-    <View style={{ flex: 1 }}>
-      <Pestanas />
-      {/* Flota sobre todas las pestañas: cuando alguien se pierde, no va a
-          buscarlo al final de un scroll. */}
-      <BotonMayordomo />
-    </View>
-  );
-}
-
-function Pestanas(): JSX.Element {
-  return (
     <Tabs
+      tabBar={(props) => <BarraDeJuego {...props} />}
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: color.oro300,
-        tabBarInactiveTintColor: 'rgba(217,201,163,0.5)',
-        tabBarStyle: styles.barra,
-        tabBarBackground: () => (
-          <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
-        ),
-        tabBarLabelStyle: {
-          fontFamily: fuente.titulo,
-          fontSize: 10,
-          letterSpacing: 1,
-          marginTop: 2,
-        },
         sceneStyle: { backgroundColor: color.feltoscuro },
       }}
     >
-      <Tabs.Screen
-        name="ronda"
-        options={{
-          title: 'Ronda',
-          tabBarIcon: ({ focused }) => <Glifo activo={focused}>⌛</Glifo>,
-        }}
-      />
-      <Tabs.Screen
-        name="personaje"
-        options={{
-          title: 'Tú',
-          tabBarIcon: ({ focused }) => <Glifo activo={focused}>🎭</Glifo>,
-        }}
-      />
-      <Tabs.Screen
-        name="tablon"
-        options={{
-          title: 'Tablón',
-          tabBarIcon: ({ focused }) => <Glifo activo={focused}>📌</Glifo>,
-        }}
-      />
-      <Tabs.Screen
-        name="cuaderno"
-        options={{
-          title: 'Cuaderno',
-          tabBarIcon: ({ focused }) => <Glifo activo={focused}>✒</Glifo>,
-        }}
-      />
-      <Tabs.Screen
-        name="perfil"
-        options={{
-          title: 'Perfil',
-          tabBarIcon: ({ focused }) => <Glifo activo={focused}>🏆</Glifo>,
-        }}
-      />
+      <Tabs.Screen name="ronda" options={{ title: 'Ronda' }} />
+      <Tabs.Screen name="personaje" options={{ title: 'Tú' }} />
+      <Tabs.Screen name="mapa" options={{ title: 'Mapa' }} />
+      <Tabs.Screen name="tablon" options={{ title: 'Tablón' }} />
+      {/* El rótulo dice «Notas» y no «Cuaderno» por sitio: con seis pestañas y
+          la muesca en medio, en un móvil estrecho «Cuaderno» no entra. */}
+      <Tabs.Screen name="cuaderno" options={{ title: 'Notas' }} />
+      <Tabs.Screen name="perfil" options={{ title: 'Perfil' }} />
     </Tabs>
   );
 }
-
-const styles = StyleSheet.create({
-  barra: {
-    position: 'absolute',
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(201,162,39,0.28)',
-    backgroundColor: 'rgba(11,23,16,0.82)',
-    height: ALTO_BARRA,
-    paddingTop: 8,
-    paddingBottom: 16,
-  },
-});
