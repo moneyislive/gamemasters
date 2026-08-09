@@ -74,6 +74,32 @@ export interface DefinicionCategoria {
   sonLugares?: boolean;
   admiteFoto?: boolean;
   admiteEmail?: boolean;
+
+  /**
+   * Cómo se presenta esta categoría en el taller.
+   *
+   * Todo esto es CONTENIDO, no comportamiento, y por eso vive aquí y no en el
+   * componente: son las palabras con las que un juego le habla a quien lo
+   * prepara. Un panel de «armas del crimen» y uno de «piezas de la colección»
+   * son la misma pantalla con distinto texto, y hasta ahora eran dos ficheros
+   * de doscientas líneas cada uno.
+   */
+  presentacion?: {
+    /** «Armas del crimen» */
+    titulo: string;
+    /** El párrafo que explica para qué sirve la lista. */
+    descripcion: string;
+    /** Redondas para las caras, cuadradas para las cosas. */
+    forma?: 'circle' | 'square';
+    /** Qué se enseña cuando la lista está vacía. */
+    vacio?: { glifo: string; titulo: string; texto: string };
+    /** Nombres de un clic, para no empezar en blanco. */
+    sugerencias?: string[];
+    ejemploNombre?: string;
+    ejemploDescripcion?: string;
+    /** La coletilla bajo la descripción. */
+    pista?: string;
+  };
 }
 
 /**

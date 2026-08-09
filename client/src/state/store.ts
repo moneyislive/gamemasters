@@ -43,6 +43,15 @@ interface AppState {
   setGame: (game: GameSession) => void;
   patchGame: (patch: Partial<GameSession>) => Promise<void>;
 
+  /**
+   * Alta o edición de una entidad, por categoría.
+   *
+   * Las tres funciones con nombre de abajo siguen ahí porque las usan pantallas
+   * que aún no se han generalizado, pero lo nuevo pasa por aquí: una categoría
+   * más no añade dos métodos más.
+   */
+  upsertEntidad: (categoria: string, datos: Record<string, unknown>) => Promise<void>;
+  removeEntidad: (categoria: string, id: string) => Promise<void>;
   upsertSuspect: (suspect: Partial<Suspect>) => Promise<void>;
   removeSuspect: (suspectId: string) => Promise<void>;
   upsertRoom: (room: Partial<Room>) => Promise<void>;
@@ -66,6 +75,19 @@ interface AppState {
 }
 
 let popupSeq = 0;
+
+/**
+ * Categoría del juego → segmento de la ruta del servidor.
+ *
+ * Es la última tabla del cliente que conoce a la vez un id de categoría y un
+ * nombre heredado de CLUEDO. Cuando el almacenamiento se generalice del todo,
+ * desaparece.
+ */
+const RUTA_DE_CATEGORIA: Record<string, string> = {
+  sospechosos: 'suspects',
+  salas: 'rooms',
+  objetos: 'weapons',
+};
 
 export const useAppStore = create<AppState>((set, get) => ({
   config: null,
@@ -116,6 +138,23 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ game: updated });
   },
 
+  upsertEntidad: async (categoria, datos) => {
+    const { game } = get();
+    if (!game) return;
+    // El servidor ya genera sus rutas de entidades recorriendo una tabla; esto
+    // es su reflejo en el cliente, y el único sitio que traduce una categoría
+    // del juego al nombre heredado de su ruta.
+    const ruta = RUTA_DE_CATEGORIA[categoria];
+    if (!ruta) throw new Error(`No sé dónde guardar «${categoria}».`);
+    set({ game: await api.upsertEntidad(game.id, ruta, datos) });
+  },
+  removeEntidad: async (categoria, id) => {
+    const { game } = get();
+    if (!game) return;
+    const ruta = RUTA_DE_CATEGORIA[categoria];
+    if (!ruta) throw new Error(`No sé de dónde quitar «${categoria}».`);
+    set({ game: await api.removeEntidad(game.id, ruta, id) });
+  },
   upsertSuspect: async (suspect) => {
     const { game } = get();
     if (!game) return;

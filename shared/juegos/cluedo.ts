@@ -35,6 +35,21 @@ export const CLUEDO: ManifiestoDeJuego = {
       sonJugadores: true,
       admiteFoto: true,
       admiteEmail: true,
+      presentacion: {
+        titulo: 'Los sospechosos',
+        descripcion:
+          'Las personas de carne y hueso que se sentarán a la mesa. Cuanto mejor las describas, más a medida será su personaje.',
+        forma: 'circle',
+        vacio: {
+          glifo: '♟',
+          titulo: 'Todavía no hay nadie',
+          texto: 'Añade al menos tres invitados. El agente escribirá un personaje a la medida de cada uno.',
+        },
+        ejemploNombre: 'Marta',
+        ejemploDescripcion:
+          'Le encanta el teatro y no sabe mentir sin reírse. Ideal para un papel con un secreto que le cueste guardar.',
+        pista: 'El agente usa esto para asignarle un papel que la haga disfrutar.',
+      },
     },
     {
       id: 'salas',
@@ -43,6 +58,20 @@ export const CLUEDO: ManifiestoDeJuego = {
       minimo: 3,
       sonLugares: true,
       admiteFoto: true,
+      presentacion: {
+        titulo: 'Las salas',
+        descripcion:
+          'Las estancias reales de tu casa por las que se moverán los invitados. Cada una esconderá sus pistas.',
+        forma: 'square',
+        vacio: {
+          glifo: '⌂',
+          titulo: 'La casa está vacía',
+          texto: 'Añade al menos tres estancias. Con nombres reconocibles, la velada se juega sola.',
+        },
+        ejemploNombre: 'La cocina',
+        ejemploDescripcion: 'La grande, con la mesa de mármol y la puerta que da al patio.',
+        pista: 'Los detalles reales hacen que la trama parezca escrita para tu casa.',
+      },
     },
     {
       id: 'objetos',
@@ -50,6 +79,22 @@ export const CLUEDO: ManifiestoDeJuego = {
       plural: 'objetos',
       minimo: 3,
       admiteFoto: true,
+      presentacion: {
+        titulo: 'Armas del crimen',
+        descripcion:
+          'Objetos que existan de verdad en tu casa: uno de ellos será el arma homicida, el resto, señuelos perfectos.',
+        forma: 'square',
+        vacio: {
+          glifo: '†',
+          titulo: 'El armero está vacío',
+          texto: 'Añade al menos tres objetos cotidianos. Cuanto más reconocibles sean para tus invitados, mejor.',
+        },
+        sugerencias: ['Candelabro', 'Cuerda', 'Tubería de plomo', 'Revólver', 'Puñal', 'Llave inglesa'],
+        ejemploNombre: 'Candelabro de plata',
+        ejemploDescripcion:
+          'El que heredó la abuela: pesado, con una muesca en la base. Suele estar en el aparador del salón.',
+        pista: 'Los detalles reales hacen que la trama parezca escrita para tu casa.',
+      },
     },
   ],
 

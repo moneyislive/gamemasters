@@ -72,6 +72,23 @@ export const deleteGame = (id: string) =>
 
 // ---------- Entidades (upsert: si lleva id existente actualiza, si no crea) ----------
 
+/**
+ * Alta o edición de una entidad, sea de la categoría que sea.
+ *
+ * El servidor ya registra sus seis rutas de entidades recorriendo una tabla;
+ * estas dos funciones son su reflejo aquí. Las tres parejas con nombre que
+ * siguen debajo se conservan porque las usan pantallas todavía sin
+ * generalizar.
+ */
+export const upsertEntidad = (gameId: string, ruta: string, datos: Record<string, unknown>) =>
+  request<GameSession>(`/games/${gameId}/${ruta}`, {
+    method: 'POST',
+    body: JSON.stringify(datos),
+  });
+
+export const removeEntidad = (gameId: string, ruta: string, id: string) =>
+  request<GameSession>(`/games/${gameId}/${ruta}/${id}`, { method: 'DELETE' });
+
 export const upsertSuspect = (gameId: string, suspect: Partial<Suspect>) =>
   request<GameSession>(`/games/${gameId}/suspects`, {
     method: 'POST',
