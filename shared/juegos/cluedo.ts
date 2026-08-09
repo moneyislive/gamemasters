@@ -135,6 +135,23 @@ export const CLUEDO: ManifiestoDeJuego = {
     },
   ],
 
+  // Las seis de siempre, con los rótulos de siempre. «Notas» y no «Cuaderno»
+  // porque con la muesca en medio, en un móvil estrecho no entra.
+  barra: [
+    { pantalla: 'ronda', rotulo: 'Ronda', icono: 'reloj' },
+    { pantalla: 'personaje', rotulo: 'Tú', icono: 'mascara' },
+    { pantalla: 'mapa', rotulo: 'Mapa', icono: 'plano' },
+    { pantalla: 'tablon', rotulo: 'Tablón', icono: 'tablon' },
+    { pantalla: 'cuaderno', rotulo: 'Notas', icono: 'cuaderno' },
+    { pantalla: 'perfil', rotulo: 'Perfil', icono: 'copa' },
+  ],
+
+  asistente: {
+    nombre: 'El Mayordomo',
+    descripcion: 'Tu asistente del juego con IA',
+    icono: 'mayordomo',
+  },
+
   ronda: {
     accionSobre: 'salas',
     cambiosPermitidos: 1,

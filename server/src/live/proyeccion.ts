@@ -207,6 +207,7 @@ export function vistaDeJugador(
       listos: sesion.players.filter((p) => p.pideEmpezar).length,
       total: sesion.players.length,
       encuentro: sesion.encuentro ?? 1,
+      juego: manifiesto.id,
     },
     // El caso es público: la sinopsis se escribe expresamente sin revelar
     // asesino, arma ni sala, y la víctima y la ambientación las conoce todo el

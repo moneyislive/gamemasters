@@ -46,6 +46,15 @@ const LA_TORRE: ManifiestoDeJuego = {
   // Sin ejes: no hay nada que adivinar, hay una historia que jugar.
   turnos: 'simultaneo',
   acciones: [{ id: 'entrenar', rotulo: 'Entrenar', fases: ['ronda-abierta'], vecesPorTurno: 1 }],
+  // Cuatro, y con los nombres de una campaña: la ficha se llama «Mi héroe».
+  barra: [
+    { pantalla: 'ronda', rotulo: 'La escena', icono: 'reloj' },
+    { pantalla: 'personaje', rotulo: 'Mi héroe', icono: 'mascara' },
+    { pantalla: 'cuaderno', rotulo: 'Diario', icono: 'cuaderno' },
+    { pantalla: 'perfil', rotulo: 'Perfil', icono: 'copa' },
+  ],
+  asistente: { nombre: 'El Farolero', descripcion: 'Alumbra cuando te pierdes', icono: 'farol' },
+
   ronda: { accionSobre: 'lugares', cambiosPermitidos: 0 },
   fases: {
     lobby: ['ronda-abierta'],

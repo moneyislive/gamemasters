@@ -156,6 +156,57 @@ export interface DefinicionAccion {
   vecesPorTurno?: number;
 }
 
+/**
+ * Los iconos que trae la app.
+ *
+ * Es una unión cerrada a propósito, y no una cadena libre: si un juego pidiera
+ * un icono que no existe, la pestaña saldría en blanco en el móvil y nadie se
+ * enteraría hasta la noche de la partida. Así lo dice el compilador.
+ */
+export type IconoId =
+  | 'reloj'
+  | 'mascara'
+  | 'plano'
+  | 'tablon'
+  | 'cuaderno'
+  | 'copa'
+  | 'mayordomo'
+  | 'farol';
+
+/**
+ * Las pantallas que trae la app.
+ *
+ * Aquí hay un acoplamiento honesto que conviene no disimular: la app es un
+ * binario compilado, así que un juego NO puede inventarse una pantalla. Lo que
+ * puede es elegir cuáles usa, en qué orden y cómo se llaman. Una pantalla nueva
+ * exige publicar una versión nueva de la app.
+ */
+export type PantallaDeApp = 'ronda' | 'personaje' | 'mapa' | 'tablon' | 'cuaderno' | 'perfil';
+
+/** Una pestaña de la barra de abajo. */
+export interface PestanaDeBarra {
+  pantalla: PantallaDeApp;
+  /** Cómo se llama en la barra. «Tú» en CLUEDO, «Mi héroe» en una campaña. */
+  rotulo: string;
+  icono: IconoId;
+}
+
+/**
+ * El asistente con IA.
+ *
+ * Todos los juegos tienen uno —para eso está la plataforma— y por eso su botón
+ * central no es opcional ni se puede quitar. Lo que cambia es a quién
+ * representa: un mayordomo en una casa de los años treinta, un farolero en una
+ * campaña de aventuras.
+ */
+export interface AsistenteDeJuego {
+  /** «El Mayordomo». Se usa en el sello y en las burbujas de la conversación. */
+  nombre: string;
+  /** Cómo se le llama a lo que hace. «Tu asistente del juego con IA». */
+  descripcion: string;
+  icono: IconoId;
+}
+
 /** Qué puede hacer un jugador cuando la ronda está abierta. */
 export interface DefinicionDeRonda {
   /**
@@ -203,6 +254,18 @@ export interface ManifiestoDeJuego {
 
   /** El repertorio de lo que se puede hacer. */
   acciones: DefinicionAccion[];
+
+  /**
+   * Las pestañas de la barra de abajo, en orden.
+   *
+   * La FORMA de la barra no cambia nunca —la muesca, el botón central, el filo
+   * dorado— porque es la identidad del producto. Lo que cambia es qué hay en
+   * ella: un misterio necesita tablón y cuaderno; una oca, ni lo uno ni lo otro.
+   */
+  barra: PestanaDeBarra[];
+
+  /** Quién ayuda desde el botón central. */
+  asistente: AsistenteDeJuego;
 
   ronda: DefinicionDeRonda;
 

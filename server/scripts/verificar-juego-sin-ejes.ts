@@ -69,6 +69,15 @@ const LA_OCA: ManifiestoDeJuego = {
       eligeDe: [{ campo: 'casilla', categoria: 'casillas', rotulo: '¿Dónde te plantas?' }],
     },
   ],
+  // TRES pestañas. Una oca no tiene tablón de pistas ni cuaderno de notas, y
+  // dejarlos ahí vacíos sería peor que no tenerlos.
+  barra: [
+    { pantalla: 'ronda', rotulo: 'El tablero', icono: 'reloj' },
+    { pantalla: 'mapa', rotulo: 'Casillas', icono: 'plano' },
+    { pantalla: 'perfil', rotulo: 'Perfil', icono: 'copa' },
+  ],
+  asistente: { nombre: 'La Abuela', descripcion: 'Te recuerda las reglas', icono: 'farol' },
+
   ronda: { accionSobre: 'casillas', cambiosPermitidos: 0 },
   fases: {
     lobby: ['ronda-abierta'],

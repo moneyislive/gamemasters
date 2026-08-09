@@ -340,6 +340,14 @@ export interface VistaJugador {
     total: number;
     /** En qué encuentro va la partida. 1 en una velada de una sola noche. */
     encuentro: number;
+    /**
+     * A qué se juega.
+     *
+     * Lo necesita el móvil para saber qué pestañas pintar en la barra y qué
+     * icono darle al asistente. Sin esto la app tendría que adivinarlo, o
+     * peor: dar por hecho que siempre es CLUEDO.
+     */
+    juego?: JuegoId;
   };
   /**
    * El caso, tal como lo conoce todo el mundo.

@@ -12,6 +12,7 @@
  * convierte en una mancha.
  */
 import Svg, { Circle, G, Path, Rect } from 'react-native-svg';
+import type { IconoId } from '../../shared/juegos';
 
 export interface PropsIcono {
   size?: number;
@@ -143,3 +144,53 @@ export function IconoMayordomo({ size = 31, color }: PropsIcono): JSX.Element {
     </Svg>
   );
 }
+
+/**
+ * El farol: el asistente de un juego que no transcurre en una casa señorial.
+ *
+ * Existe para demostrar que el icono del botón central es del juego y no de la
+ * plataforma. Un mayordomo no pinta nada en una campaña de aventuras; un farol
+ * —quien alumbra el camino— sí, y sirve igual para una oca o un juego de
+ * exploración.
+ */
+export function IconoFarol({ size = 31, color }: PropsIcono): JSX.Element {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 48 48">
+      {/* Asa y remate */}
+      <G fill="none" stroke={color} strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round">
+        <Path d="M17 8 a7 7 0 0 1 14 0" />
+        <Path d="M24 4.5 V8" />
+        <Path d="M14.5 12.5 h19" />
+        <Path d="M16.5 41.5 h15" />
+      </G>
+      {/* Caja de cristal */}
+      <Path
+        d="M17.5 12.5 h13 l2.5 24 a1.6 1.6 0 0 1-1.6 1.8 H16.6 a1.6 1.6 0 0 1-1.6-1.8 z"
+        fill="none"
+        stroke={color}
+        strokeWidth={2.4}
+        strokeLinejoin="round"
+      />
+      {/* La llama */}
+      <Path d="M24 20.5 c3.4 3.2 4.2 5.4 4.2 7.6 a4.2 4.2 0 0 1-8.4 0 c0-2.2 0.8-4.4 4.2-7.6 z" fill={color} />
+    </Svg>
+  );
+}
+
+/**
+ * Todos los iconos, por su nombre en el manifiesto.
+ *
+ * Es un `Record` sobre la unión cerrada a propósito: si alguien añade un icono
+ * al contrato y olvida dibujarlo, esto no compila. Sin eso, la pestaña saldría
+ * en blanco en el móvil y nadie se enteraría hasta la noche de la partida.
+ */
+export const ICONOS: Record<IconoId, (p: PropsIcono) => JSX.Element> = {
+  reloj: IconoRonda,
+  mascara: IconoPersonaje,
+  plano: IconoMapa,
+  tablon: IconoTablon,
+  cuaderno: IconoCuaderno,
+  copa: IconoPerfil,
+  mayordomo: IconoMayordomo,
+  farol: IconoFarol,
+};

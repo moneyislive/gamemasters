@@ -1,5 +1,11 @@
 /**
- * La barra de abajo: seis pestañas y, en el centro, el Mayordomo.
+ * La barra de abajo: las pestañas del juego y, en el centro, su asistente.
+ *
+ * La FORMA no cambia nunca —la muesca, el botón, el filo dorado— porque es la
+ * identidad del producto. Lo que cambia es qué hay dentro: cuántas pestañas,
+ * cómo se llaman, qué icono llevan, y a quién representa el botón central. Todo
+ * eso lo declara cada juego en su manifiesto; aquí no hay ni una pestaña
+ * escrita a mano.
  *
  * El botón del asistente era antes una pastilla flotante encima de la barra.
  * Funcionaba, pero se veía como lo que era: otra cosa puesta encima. Aquí la
@@ -26,16 +32,9 @@ import * as Haptics from 'expo-haptics';
 import Svg, { Defs, LinearGradient, Path, Stop } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { bordeSuperior, geometriaMuesca, siluetaBarra } from './barra-geometria';
-import {
-  IconoCuaderno,
-  IconoMapa,
-  IconoMayordomo,
-  IconoPerfil,
-  IconoPersonaje,
-  IconoRonda,
-  IconoTablon,
-  type PropsIcono,
-} from './iconos';
+import { ICONOS } from './iconos';
+import { manifiestoDe } from '../../shared/juegos';
+import { usePartida } from './estado';
 import {
   ALTO_BARRA,
   FILETE_BARRA,
@@ -45,16 +44,6 @@ import {
   color,
   fuente,
 } from './tema';
-
-/** Qué icono le toca a cada ruta. La clave es el nombre del fichero. */
-const ICONOS: Record<string, (p: PropsIcono) => JSX.Element> = {
-  ronda: IconoRonda,
-  personaje: IconoPersonaje,
-  mapa: IconoMapa,
-  tablon: IconoTablon,
-  cuaderno: IconoCuaderno,
-  perfil: IconoPerfil,
-};
 
 export function BarraDeJuego({ state, descriptors, navigation }: BottomTabBarProps): JSX.Element {
   const { width } = useWindowDimensions();
@@ -72,17 +61,34 @@ export function BarraDeJuego({ state, descriptors, navigation }: BottomTabBarPro
   };
   const g = geometriaMuesca(forma);
 
-  // Tres a cada lado de la muesca.
-  const mitad = Math.ceil(state.routes.length / 2);
+  // Qué pestañas hay y cómo se llaman lo dice el juego, no este fichero. Un
+  // misterio necesita tablón y cuaderno; una oca, ni lo uno ni lo otro.
+  const { vista } = usePartida();
+  const manifiesto = manifiestoDe(vista?.sesion.juego);
+
+  // Se recorre el orden del manifiesto y se busca su ruta. Una pestaña que el
+  // juego no declare no se pinta, aunque su pantalla exista en el paquete.
+  const pestanas = manifiesto.barra
+    .map((p) => ({ decl: p, ruta: state.routes.find((r) => r.name === p.pantalla) }))
+    .filter((x): x is { decl: (typeof manifiesto.barra)[number]; ruta: (typeof state.routes)[number] } =>
+      Boolean(x.ruta),
+    );
+
+  // Repartidas a los dos lados de la muesca. Con número impar, la de más va a
+  // la izquierda: es donde primero cae el pulgar.
+  const mitad = Math.ceil(pestanas.length / 2);
   const anchoLado = g.ax;
   // Con seis pestañas, en una pantalla de 320 puntos cada una se queda en 37 y
   // «Tablón» no entra. El rótulo se encoge antes que partirse en dos líneas.
-  const estrecho = anchoLado / mitad < 42;
+  // Con menos pestañas hay sitio de sobra y no hace falta encogerlo.
+  const estrecho = mitad > 0 && anchoLado / mitad < 42;
 
-  const pestana = (ruta: (typeof state.routes)[number], indice: number): JSX.Element => {
-    const { options } = descriptors[ruta.key]!;
-    const enfocada = indice === state.index;
-    const Icono = ICONOS[ruta.name];
+  const pestana = ({
+    decl,
+    ruta,
+  }: (typeof pestanas)[number]): JSX.Element => {
+    const enfocada = state.routes[state.index]?.key === ruta.key;
+    const Icono = ICONOS[decl.icono];
     const tinta = enfocada ? color.oro300 : 'rgba(217,201,163,0.42)';
 
     return (
@@ -90,7 +96,7 @@ export function BarraDeJuego({ state, descriptors, navigation }: BottomTabBarPro
         key={ruta.key}
         accessibilityRole="button"
         accessibilityState={enfocada ? { selected: true } : {}}
-        accessibilityLabel={options.title ?? ruta.name}
+        accessibilityLabel={decl.rotulo}
         onPress={() => {
           const evento = navigation.emit({
             type: 'tabPress',
@@ -113,13 +119,14 @@ export function BarraDeJuego({ state, descriptors, navigation }: BottomTabBarPro
             { color: tinta, fontSize: estrecho ? 7.8 : 9, letterSpacing: estrecho ? 0.15 : 0.6 },
           ]}
         >
-          {options.title ?? ruta.name}
+          {decl.rotulo}
         </Text>
       </Pressable>
     );
   };
 
   const lado = { top: SALIENTE_BOTON, height: ALTO, paddingBottom: insets.bottom };
+  const IconoAsistente = ICONOS[manifiesto.asistente.icono];
 
   return (
     <View style={[estilos.raiz, { height: H, pointerEvents: 'box-none' }]}>
@@ -148,15 +155,15 @@ export function BarraDeJuego({ state, descriptors, navigation }: BottomTabBarPro
       </Svg>
 
       <View style={[estilos.lado, lado, { left: 0, width: anchoLado }]}>
-        {state.routes.slice(0, mitad).map((r, i) => pestana(r, i))}
+        {pestanas.slice(0, mitad).map(pestana)}
       </View>
       <View style={[estilos.lado, lado, { right: 0, width: anchoLado }]}>
-        {state.routes.slice(mitad).map((r, i) => pestana(r, i + mitad))}
+        {pestanas.slice(mitad).map(pestana)}
       </View>
 
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Habla con el Mayordomo, tu asistente del juego con IA"
+        accessibilityLabel={`Habla con ${manifiesto.asistente.nombre}, ${manifiesto.asistente.descripcion.toLowerCase()}`}
         onPress={() => {
           void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
           router.push('/consejero');
@@ -172,7 +179,7 @@ export function BarraDeJuego({ state, descriptors, navigation }: BottomTabBarPro
           pressed && { transform: [{ scale: 0.94 }] },
         ]}
       >
-        <IconoMayordomo color={color.oro300} />
+        <IconoAsistente color={color.oro300} />
       </Pressable>
     </View>
   );

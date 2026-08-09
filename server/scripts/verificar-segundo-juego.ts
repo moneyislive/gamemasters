@@ -74,6 +74,16 @@ const EL_LEGADO: ManifiestoDeJuego = {
     { id: 'senalar', rotulo: 'Señalar', fases: ['acusaciones'], vecesPorTurno: 1 },
   ],
 
+  // Cinco pestañas, no seis: aquí no hay cuaderno.
+  barra: [
+    { pantalla: 'ronda', rotulo: 'La cena', icono: 'reloj' },
+    { pantalla: 'personaje', rotulo: 'Tú', icono: 'mascara' },
+    { pantalla: 'mapa', rotulo: 'La casa', icono: 'plano' },
+    { pantalla: 'tablon', rotulo: 'Lo visto', icono: 'tablon' },
+    { pantalla: 'perfil', rotulo: 'Perfil', icono: 'copa' },
+  ],
+  asistente: { nombre: 'El Notario', descripcion: 'Guarda el testamento y poco más', icono: 'mayordomo' },
+
   // Y se actúa sobre una categoría que no responde a ningún eje.
   ronda: { accionSobre: 'estancias', cambiosPermitidos: 2 },
 
