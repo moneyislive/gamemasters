@@ -189,6 +189,22 @@ export function acusar(
   });
 }
 
+/**
+ * Hacer algo: la acción genérica.
+ *
+ * Un solo camino para todo el repertorio del juego. Añadir una acción nueva no
+ * añade una función aquí ni un endpoint allí.
+ */
+export function hacerAccion(
+  accion: string,
+  datos: Record<string, string>,
+): Promise<{ resultado: unknown; vista: VistaJugador }> {
+  return peticion('/jugar/accion', {
+    method: 'POST',
+    body: JSON.stringify({ accion, datos }),
+  });
+}
+
 export function preguntarAlConsejero(pregunta: string): Promise<{ respuesta: string }> {
   return peticion('/jugar/preguntar', {
     method: 'POST',
