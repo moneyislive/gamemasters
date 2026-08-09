@@ -9,6 +9,7 @@ import { candidatosParaGm, inventarioSobres, numeroDeRondas } from '../datos';
 import { esc } from '../html';
 import { envolver, portada } from './comun';
 import type { DocumentRenderOptions, GameSession, Plot } from '../../../../shared/types';
+import { culpableDe, lugarDe, objetoDe } from '../../juegos/cluedo';
 
 export function guiaPreparador(
   game: GameSession,
@@ -81,9 +82,9 @@ ${material.twists
     <div class="caja caja--roja junto">
       <table>
         <tbody>
-          <tr><td style="width:30mm;"><strong>Culpable</strong></td><td>${esc(nombreDe(plot.solution.murdererId))} · ${esc(plot.characters.find((c) => c.suspectId === plot.solution.murdererId)?.characterName ?? '')}</td></tr>
-          <tr><td><strong>Objeto</strong></td><td>${esc(game.weapons.find((w) => w.id === plot.solution.weaponId)?.name ?? '')}</td></tr>
-          <tr><td><strong>Sala</strong></td><td>${esc(game.rooms.find((r) => r.id === plot.solution.roomId)?.name ?? '')}</td></tr>
+          <tr><td style="width:30mm;"><strong>Culpable</strong></td><td>${esc(nombreDe(culpableDe(plot.solution)))} · ${esc(plot.characters.find((c) => c.suspectId === culpableDe(plot.solution))?.characterName ?? '')}</td></tr>
+          <tr><td><strong>Objeto</strong></td><td>${esc(game.weapons.find((w) => w.id === objetoDe(plot.solution))?.name ?? '')}</td></tr>
+          <tr><td><strong>Sala</strong></td><td>${esc(game.rooms.find((r) => r.id === lugarDe(plot.solution))?.name ?? '')}</td></tr>
         </tbody>
       </table>
       <p style="margin:0;">

@@ -171,14 +171,21 @@ export function guardarNotas(notas: string): Promise<{ ok: true }> {
   return peticion('/jugar/notas', { method: 'POST', body: JSON.stringify({ notas }) });
 }
 
+/**
+ * Entrega la acusación: un valor por cada eje que pida el juego.
+ *
+ * Recibe un diccionario y no tres cadenas sueltas, y no es un detalle de
+ * estilo. Antes la firma era `acusar(murdererId, weaponId, roomId)`: tres
+ * parámetros posicionales del mismo tipo, de modo que intercambiar dos
+ * compilaba igual de bien y la partida puntuaba mal las acusaciones sin avisar
+ * ni una sola vez. Con claves, esa clase de error deja de existir.
+ */
 export function acusar(
-  murdererId: string,
-  weaponId: string,
-  roomId: string,
+  respuestas: Record<string, string>,
 ): Promise<{ registrada: true; at: string }> {
   return peticion('/jugar/acusar', {
     method: 'POST',
-    body: JSON.stringify({ murdererId, weaponId, roomId }),
+    body: JSON.stringify({ respuestas }),
   });
 }
 

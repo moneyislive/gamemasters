@@ -37,6 +37,8 @@ import { renderPrintableDocument } from '../src/docs/imprimibles';
 import { abrirRonda, acusar, cerrarRonda, elegirSala, guardarNotas } from '../src/live/sesion';
 import { vistaDeGameMaster, vistaDeJugador } from '../src/live/proyeccion';
 import { printableDocsFor } from '../../shared/documents';
+import { EJES, respuestasCluedo } from '../src/juegos/cluedo';
+import { alDia } from '../src/juegos/migracion';
 import type { DocumentVariant, GameSession } from '../../shared/types';
 import type { LiveSession } from '../../shared/live';
 
@@ -70,7 +72,10 @@ const OBJETOS = ['Candelabro', 'Abrecartas', 'Cuerda de cortina', 'Frasco de lá
  */
 function partidaDeReferencia(): GameSession {
   if (fs.existsSync(FIXTURE)) {
-    return JSON.parse(fs.readFileSync(FIXTURE, 'utf8')) as GameSession;
+    // Por la MISMA puerta que el almacén. La partida congelada se deja a
+    // propósito en el formato antiguo, así que cada ejecución vuelve a
+    // comprobar que la conversión de partidas viejas sigue funcionando.
+    return alDia(JSON.parse(fs.readFileSync(FIXTURE, 'utf8')) as GameSession);
   }
 
   const ahora = '2026-01-01T20:00:00.000Z';
@@ -257,27 +262,26 @@ function capturarPartida(game: GameSession): Instantanea['partida'] {
   sesion.phase = 'acusaciones';
   retratar('acusaciones-abiertas');
 
-  const solucion = game.plot!.solution;
+  const solucion = game.plot!.solution.respuestas;
   // Una acusación equivocada, una a medias y la correcta: los tres casos que
   // decide el recuento de aciertos.
   acusar(
     sesion,
     game.suspects[2]!.id,
-    { murdererId: game.suspects[7]!.id, weaponId: game.weapons[0]!.id, roomId: game.rooms[0]!.id },
+    respuestasCluedo({
+      murdererId: game.suspects[7]!.id,
+      weaponId: game.weapons[0]!.id,
+      roomId: game.rooms[0]!.id,
+    }),
     solucion,
   );
   acusar(
     sesion,
     game.suspects[3]!.id,
-    { murdererId: solucion.murdererId, weaponId: game.weapons[1]!.id, roomId: solucion.roomId },
+    { ...solucion, [EJES.objeto]: game.weapons[1]!.id },
     solucion,
   );
-  acusar(
-    sesion,
-    game.suspects[4]!.id,
-    { murdererId: solucion.murdererId, weaponId: solucion.weaponId, roomId: solucion.roomId },
-    solucion,
-  );
+  acusar(sesion, game.suspects[4]!.id, { ...solucion }, solucion);
   retratar('acusaciones-entregadas');
 
   sesion.phase = 'desenlace';
@@ -355,7 +359,29 @@ if (difs.length === 0) {
   process.exit(0);
 }
 
-console.log(`\n${difs.length} DIFERENCIAS:\n`);
-for (const d of difs.slice(0, 40)) console.log(`  ✗ ${d}`);
-if (difs.length > 40) console.log(`\n  … y ${difs.length - 40} más.`);
+/**
+ * Resumen por familias.
+ *
+ * Con ocho jugadores y dieciséis pasos, un solo campo cambiado produce
+ * decenas de renglones idénticos. Lo que hay que poder afirmar no es «hay 96
+ * diferencias» sino «las diferencias son estas cuatro cosas, y las cuatro son
+ * a propósito». Así que se colapsan los índices y el id del jugador.
+ */
+const familia = (d: string): string =>
+  d
+    .split('\n')[0]!
+    .replace(/^partida\[\d+\]\.jugadores\.[^.]+\./, 'vista del jugador · ')
+    .replace(/^partida\[\d+\]\.gm\./, 'vista del Game Master · ')
+    .replace(/\[\d+\]/g, '[]');
+
+const porFamilia = new Map<string, number>();
+for (const d of difs) porFamilia.set(familia(d), (porFamilia.get(familia(d)) ?? 0) + 1);
+
+console.log(`\n${difs.length} diferencias, en ${porFamilia.size} familias:\n`);
+for (const [f, n] of [...porFamilia.entries()].sort()) {
+  console.log(`  ✗ ${f}   (×${n})`);
+}
+
+console.log('\nDetalle de las primeras:\n');
+for (const d of difs.slice(0, 12)) console.log(`  · ${d}`);
 process.exit(1);

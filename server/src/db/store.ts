@@ -18,6 +18,7 @@ import type {
 } from '../../../shared/types';
 import type { Account, LiveSession } from '../../../shared/live';
 import { env, isModelId } from '../config';
+import { alDia, sesionAlDia } from '../juegos/migracion';
 
 // ---------------------------------------------------------------------------
 // Contrato
@@ -174,7 +175,7 @@ class FileStore implements Store {
 
   async getGame(id: string): Promise<GameSession | null> {
     const game = this.data.games.find((g) => g.id === id);
-    return game ? structuredClone(game) : null;
+    return game ? alDia(structuredClone(game)) : null;
   }
 
   async createGame(name?: string): Promise<GameSession> {
@@ -225,12 +226,12 @@ class FileStore implements Store {
 
   async getLive(gameId: string): Promise<LiveSession | null> {
     const s = this.data.live.find((l) => l.id === gameId);
-    return s ? structuredClone(s) : null;
+    return s ? sesionAlDia(structuredClone(s)) : null;
   }
 
   async getLiveByCode(code: string): Promise<LiveSession | null> {
     const s = this.data.live.find((l) => l.code === code.toUpperCase());
-    return s ? structuredClone(s) : null;
+    return s ? sesionAlDia(structuredClone(s)) : null;
   }
 
   async saveLive(session: LiveSession): Promise<LiveSession> {
@@ -329,7 +330,7 @@ class MongoStore implements Store {
 
   async getGame(id: string): Promise<GameSession | null> {
     const doc = (await this.games.findOne({ id }).lean()) as unknown as LooseDoc | null;
-    return doc ? stripMongo<GameSession>(doc) : null;
+    return doc ? alDia(stripMongo<GameSession>(doc)) : null;
   }
 
   async createGame(name?: string): Promise<GameSession> {
@@ -395,14 +396,14 @@ class MongoStore implements Store {
 
   async getLive(gameId: string): Promise<LiveSession | null> {
     const doc = (await this.live.findOne({ id: gameId }).lean()) as unknown as LooseDoc | null;
-    return doc ? stripMongo<LiveSession>(doc) : null;
+    return doc ? sesionAlDia(stripMongo<LiveSession>(doc)) : null;
   }
 
   async getLiveByCode(code: string): Promise<LiveSession | null> {
     const doc = (await this.live
       .findOne({ code: code.toUpperCase() })
       .lean()) as unknown as LooseDoc | null;
-    return doc ? stripMongo<LiveSession>(doc) : null;
+    return doc ? sesionAlDia(stripMongo<LiveSession>(doc)) : null;
   }
 
   async saveLive(session: LiveSession): Promise<LiveSession> {

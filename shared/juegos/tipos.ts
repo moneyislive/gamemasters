@@ -157,6 +157,29 @@ export function eje(m: ManifiestoDeJuego, id: EjeId): DefinicionEje | undefined 
 }
 
 /**
+ * El eje cuya respuesta es una persona de la mesa.
+ *
+ * En CLUEDO, «quién lo hizo». Se deduce de que su categoría sea la de los
+ * jugadores, así que ningún juego tiene que declararlo dos veces. Puede no
+ * existir: un juego donde haya que adivinar una combinación de objetos y
+ * lugares no señala a nadie.
+ */
+export function ejeDeJugadores(m: ManifiestoDeJuego): DefinicionEje | undefined {
+  const cat = categoriaDeJugadores(m);
+  return cat ? m.ejes.find((e) => e.categoria === cat.id) : undefined;
+}
+
+/** ¿Es esta persona la respuesta del eje que señala a alguien de la mesa? */
+export function esElSenalado(
+  m: ManifiestoDeJuego,
+  solucion: Record<EjeId, string>,
+  suspectId: string,
+): boolean {
+  const e = ejeDeJugadores(m);
+  return Boolean(e && solucion[e.id] === suspectId);
+}
+
+/**
  * ¿Está completa una respuesta?
  *
  * Reemplaza a comprobar tres campos a mano. Con los ejes en una lista, «acertar

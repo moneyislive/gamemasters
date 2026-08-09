@@ -3,7 +3,7 @@
  * ESTE FICHERO ES EL CONTRATO CENTRAL — no cambiar formas sin actualizar ARCHITECTURE.md.
  */
 import type { PrintableDocId } from './documents';
-import type { JuegoId } from './juegos/tipos';
+import type { EjeId, JuegoId } from './juegos/tipos';
 
 export type { PrintableDocId };
 
@@ -138,19 +138,15 @@ export interface TimelineEvent {
 /**
  * La respuesta del misterio.
  *
- * MEDIDO EN LA CATA: convertir estos tres campos en `respuestas:
- * Record<EjeId, string>` provoca 86 errores de compilación en 17 ficheros del
- * servidor, y CERO en el taller y en la app. De esos 86, 83 son la misma
- * sustitución mecánica y solo 3 obligan a pensar.
+ * Un valor por cada eje que declare el juego en su manifiesto, en vez de tres
+ * campos con nombre propio. En CLUEDO son `culpable`, `objeto` y `lugar`; un
+ * misterio sin arma tiene dos entradas y uno con cómplice, cuatro.
  *
- * El cero del taller y de la app no significa que estén desacoplados: es que
- * repiten la terna a mano en sitios donde el compilador no puede verla
- * (`VistaJugador.miAcusacion`, `api.acusar`). Ver `shared/juegos/tipos.ts`.
+ * Las claves son ids de eje y los valores, ids de entidad de la categoría que
+ * ese eje declara. Nada aquí obliga a que sean tres.
  */
 export interface PlotSolution {
-  murdererId: string;
-  weaponId: string;
-  roomId: string;
+  respuestas: Record<EjeId, string>;
   motive: string;
   howItHappened: string;
 }
@@ -462,6 +458,23 @@ export interface GameSession {
   suspects: Suspect[];
   rooms: Room[];
   weapons: Weapon[];
+  /**
+   * Las entidades por categoría, para juegos que no sean CLUEDO.
+   *
+   * CLUEDO sigue guardándolas en `suspects`, `rooms` y `weapons`, que es donde
+   * están las partidas ya creadas. Nadie debería leer ninguno de los cuatro
+   * campos directamente: se consultan con `entidadesDe(game, categoria)`, que
+   * mira primero aquí y cae a los heredados. Así el día que estos tres
+   * desaparezcan solo cambia esa función.
+   */
+  entidades?: Record<string, Array<{
+    id: string;
+    name: string;
+    description?: string;
+    photoUrl?: string;
+    email?: string;
+    pin?: RoomPin;
+  }>>;
   boardMode: BoardMode;
   /** Foto aérea del espacio físico (modo 'aerial') */
   boardImageUrl?: string;

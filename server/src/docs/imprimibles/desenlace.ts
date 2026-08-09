@@ -5,16 +5,17 @@
 import { esc } from '../html';
 import { envolver, portada } from './comun';
 import type { DocumentRenderOptions, GameSession, Plot } from '../../../../shared/types';
+import { culpableDe, lugarDe, objetoDe } from '../../juegos/cluedo';
 
 export function desenlace(
   game: GameSession,
   plot: Plot,
   opciones: DocumentRenderOptions,
 ): string {
-  const asesino = game.suspects.find((s) => s.id === plot.solution.murdererId);
-  const personaje = plot.characters.find((c) => c.suspectId === plot.solution.murdererId);
-  const arma = game.weapons.find((w) => w.id === plot.solution.weaponId);
-  const sala = game.rooms.find((r) => r.id === plot.solution.roomId);
+  const asesino = game.suspects.find((s) => s.id === culpableDe(plot.solution));
+  const personaje = plot.characters.find((c) => c.suspectId === culpableDe(plot.solution));
+  const arma = game.weapons.find((w) => w.id === objetoDe(plot.solution));
+  const sala = game.rooms.find((r) => r.id === lugarDe(plot.solution));
   const finale = plot.material?.finale;
 
   const reconstruccion = finale?.reconstruction?.trim() || plot.solution.howItHappened;

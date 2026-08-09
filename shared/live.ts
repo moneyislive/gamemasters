@@ -13,7 +13,7 @@
  * envía lo que esa persona puede saber en esa ronda, y nada más.
  */
 import type { BoardLayout, BoardMode } from './types';
-import type { JuegoId } from './juegos/tipos';
+import type { EjeId, JuegoId } from './juegos/tipos';
 
 // ---------------------------------------------------------------------------
 // Estado de la partida
@@ -77,9 +77,8 @@ export interface LivePlayer {
 export interface Acusacion {
   /** Quién acusa. */
   suspectId: string;
-  murdererId: string;
-  weaponId: string;
-  roomId: string;
+  /** Un valor por eje del juego. En CLUEDO: culpable, objeto y lugar. */
+  respuestas: Record<EjeId, string>;
   /**
    * Hora del SERVIDOR en el instante de recibirla. El ganador se decide por
    * este campo, así que jamás puede venir del cliente: un móvil con la hora
@@ -344,6 +343,25 @@ export interface VistaJugador {
   /** El plano de la casa. Ausente si la partida todavía no tiene tablero. */
   tablero?: TableroVista;
   objetos: Array<{ id: string; name: string; description?: string; photoUrl?: string }>;
+  /**
+   * Qué hay que responder para acusar, y con qué opciones.
+   *
+   * Lo compone el servidor a partir del manifiesto del juego. Antes la app
+   * pintaba tres selectores escritos a mano —culpable, objeto y sala— y por
+   * tanto solo servía para CLUEDO. Ahora recorre esta lista: si un juego tiene
+   * dos ejes o cinco, la pantalla de acusación sale bien sin tocarla.
+   *
+   * No abre ninguna brecha: las opciones son las mismas entidades que ya
+   * viajan en `jugadores`, `salas` y `objetos`.
+   */
+  ejes: Array<{
+    ejeId: EjeId;
+    /** «¿Quién lo hizo?» */
+    pregunta: string;
+    /** «Quién» */
+    rotulo: string;
+    opciones: Array<{ id: string; nombre: string }>;
+  }>;
   /** La sala que has elegido esta ronda, si ya lo has hecho. */
   miSala?: string;
   /** Pistas de TU sala en esta ronda. Vacío hasta que eliges. */
@@ -355,13 +373,20 @@ export interface VistaJugador {
   /** Narración de la ronda en curso, si el Game Master la ha lanzado. */
   narracion?: { title: string; text: string };
   /** Tu acusación, si ya la has hecho. */
-  miAcusacion?: { murdererId: string; weaponId: string; roomId: string; at: string };
+  miAcusacion?: { respuestas: Record<EjeId, string>; at: string };
   /** Solo cuando la partida ha terminado. */
   desenlace?: {
-    murdererId: string;
-    murdererName: string;
-    weaponName: string;
-    roomName: string;
+    /**
+     * La respuesta, ya resuelta a nombres para poder leerla sin más consultas.
+     * Un renglón por eje, en el orden que declara el juego.
+     */
+    respuestas: Array<{ ejeId: EjeId; rotulo: string; entidadId: string; nombre: string }>;
+    /**
+     * Quién resultó ser. Se conserva aparte de `respuestas` porque la app lo
+     * necesita para saber si el culpable eres tú, y eso no es un eje más: es
+     * la única respuesta que además identifica a una persona de la mesa.
+     */
+    culpableId?: string;
     motive: string;
     reconstruccion: string;
     confesion?: string;

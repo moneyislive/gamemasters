@@ -14,6 +14,8 @@ import { renderDocumentIndex } from '../docs/renderer';
 import { generateDemoPlot } from './demoPlot';
 import { PLOT_SCHEMA } from './schema';
 import { buildStyleBlock } from './style';
+import { repararRespuestas } from '../juegos/solucion';
+import { tramaAlDia } from '../juegos/migracion';
 
 type Emitir = (evento: GenerateStreamEvent) => void;
 
@@ -39,6 +41,12 @@ export async function runGeneration(game: GameSession, emit: Emitir): Promise<vo
     // ---------- Etapa 2: trama ----------
     emit({ type: 'stage', stage: 'plot', label: 'Tejiendo la trama del crimen…' });
     const plot = DEMO_MODE ? await generarTramaDemo(game, emit) : await generarTramaConApi(game, emit);
+    // El esquema con el que se le pide la trama al modelo sigue hablando de
+    // asesino, arma y sala, y se deja así a propósito: está afinado y
+    // probado, y cambiarlo cambiaría las tramas que salen. La conversión a
+    // ejes se hace aquí, en la frontera. Un segundo juego traerá su propio
+    // esquema y su propia frontera.
+    tramaAlDia(plot);
     corregirSolucion(plot, game);
     game.plot = plot;
 
@@ -218,19 +226,13 @@ function pausa(ms: number): Promise<void> {
 // Validación de la solución
 // ---------------------------------------------------------------------------
 
-/** Garantiza que la solución apunta a ids existentes; si no, sustituye por el primero válido. */
+/**
+ * Garantiza que la solución apunta a ids existentes; si no, sustituye por el
+ * primero válido de la categoría de ese eje.
+ *
+ * Antes eran tres comprobaciones escritas a mano, una por eje. Ahora recorre
+ * los ejes que declare el juego, sean los que sean.
+ */
 function corregirSolucion(plot: Plot, game: GameSession): void {
-  const { solution } = plot;
-  if (!game.suspects.some((s) => s.id === solution.murdererId)) {
-    const primero = game.suspects[0];
-    if (primero) solution.murdererId = primero.id;
-  }
-  if (!game.weapons.some((w) => w.id === solution.weaponId)) {
-    const primera = game.weapons[0];
-    if (primera) solution.weaponId = primera.id;
-  }
-  if (!game.rooms.some((r) => r.id === solution.roomId)) {
-    const primera = game.rooms[0];
-    if (primera) solution.roomId = primera.id;
-  }
+  repararRespuestas(plot, game);
 }

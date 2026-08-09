@@ -11,6 +11,8 @@
  * regenerar y el cliente para avisar en la interfaz. Una sola fuente de verdad.
  */
 import type { GameSession } from './types';
+import { manifiestoDe } from './juegos';
+import type { EjeId } from './juegos';
 
 export interface StalenessReport {
   /** ¿Hay algo desincronizado? Falso también si aún no se ha generado nada. */
@@ -27,8 +29,14 @@ export interface StalenessReport {
   /** Dosieres de personas que ya no juegan. */
   orphanDocuments: string[];
 
-  /** La solución del crimen apunta a entidades que ya no existen. */
-  brokenSolution: { murderer: boolean; weapon: boolean; room: boolean };
+  /**
+   * Ejes cuya respuesta apunta a algo que ya no existe.
+   *
+   * Antes eran tres booleanos con nombre —asesino, arma y sala—, que es la
+   * misma afirmación de siempre: que todo misterio tiene esos tres ejes.
+   * Vacío significa que la solución es coherente.
+   */
+  brokenSolution: EjeId[];
   /** Pistas que apuntan a salas inexistentes. */
   brokenClues: number;
   /** Eventos de la cronología que citan a sospechosos inexistentes. */
@@ -71,7 +79,7 @@ export function computeStaleness(game: GameSession): StalenessReport {
     orphanCharacters: [],
     suspectsWithoutDocument: [],
     orphanDocuments: [],
-    brokenSolution: { murderer: false, weapon: false, room: false },
+    brokenSolution: [],
     brokenClues: 0,
     brokenTimelineEvents: 0,
     boardOutdated: false,
@@ -107,11 +115,21 @@ export function computeStaleness(game: GameSession): StalenessReport {
     .filter((d) => !NO_JUGADORES.has(d.suspectId) && !idsSospechosos.has(d.suspectId))
     .map((d) => d.suspectId);
 
-  const brokenSolution = {
-    murderer: !idsSospechosos.has(plot.solution.murdererId),
-    weapon: !idsArmas.has(plot.solution.weaponId),
-    room: !idsSalas.has(plot.solution.roomId),
+  // Un eje está roto si su respuesta no señala a ninguna entidad viva de la
+  // categoría que ese eje declara.
+  const porCategoria: Record<string, Set<string>> = {
+    sospechosos: idsSospechosos,
+    objetos: idsArmas,
+    salas: idsSalas,
   };
+  const manifiesto = manifiestoDe(game.settings?.juego);
+  const brokenSolution = manifiesto.ejes
+    .filter((eje) => {
+      const id = plot.solution.respuestas[eje.id];
+      const vivas = porCategoria[eje.categoria];
+      return !id || (vivas ? !vivas.has(id) : false);
+    })
+    .map((eje) => eje.id);
 
   const brokenClues = plot.clues.filter(
     (pista) => pista.roomId !== undefined && !idsSalas.has(pista.roomId),
@@ -131,7 +149,7 @@ export function computeStaleness(game: GameSession): StalenessReport {
       [...idsSalas].some((id) => !enTablero.has(id));
   }
 
-  const solucionRota = brokenSolution.murderer || brokenSolution.weapon || brokenSolution.room;
+  const solucionRota = brokenSolution.length > 0;
   const needsAgent = suspectsWithoutCharacter.length > 0 || solucionRota;
 
   const summary: string[] = [];
@@ -150,14 +168,15 @@ export function computeStaleness(game: GameSession): StalenessReport {
         : `Hay ${orphanCharacters.length} personajes en la trama cuyos jugadores ya no participan.`,
     );
   }
-  if (brokenSolution.murderer) {
-    summary.push('El asesino de la trama ya no está entre los sospechosos: el caso no tiene solución.');
-  }
-  if (brokenSolution.weapon) {
-    summary.push('El arma del crimen ya no figura entre los objetos.');
-  }
-  if (brokenSolution.room) {
-    summary.push('La sala donde ocurrió el crimen ya no existe.');
+  // Un aviso por eje roto, con la pregunta que ese eje hace. Antes eran tres
+  // frases escritas a mano; ahora las escribe el juego en su manifiesto.
+  for (const ejeId of brokenSolution) {
+    const eje = manifiesto.ejes.find((e) => e.id === ejeId);
+    summary.push(
+      eje
+        ? `La respuesta a «${eje.pregunta}» ya no señala a nada que exista: el caso no tiene solución.`
+        : 'La solución del caso apunta a algo que ya no existe.',
+    );
   }
   if (brokenClues > 0) {
     summary.push(

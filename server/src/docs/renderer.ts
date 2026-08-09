@@ -29,6 +29,7 @@ import type {
   TimelineEvent,
   Weapon,
 } from '../../../shared/types';
+import { culpableDe, lugarDe, objetoDe } from '../juegos/cluedo';
 
 const CELDA = 40; // píxeles por celda de la rejilla del tablero
 
@@ -392,10 +393,10 @@ function dosierJugador(
   sospechoso: Suspect,
   personaje: PlotCharacter | undefined,
 ): PlayerDocument {
-  const esAsesino = plot.solution.murdererId === sospechoso.id;
+  const esAsesino = culpableDe(plot.solution) === sospechoso.id;
   const nombrePersonaje = personaje?.characterName ?? sospechoso.name;
-  const armaDelCrimen = game.weapons.find((arma) => arma.id === plot.solution.weaponId);
-  const salaDelCrimen = game.rooms.find((sala) => sala.id === plot.solution.roomId);
+  const armaDelCrimen = game.weapons.find((arma) => arma.id === objetoDe(plot.solution));
+  const salaDelCrimen = game.rooms.find((sala) => sala.id === lugarDe(plot.solution));
 
   const portada = `<div class="portada">
     <span class="sello">Confidencial · solo para sus ojos</span>
@@ -506,10 +507,10 @@ function dosierJugador(
  * personaje, para que nadie —él tampoco— sepa quién fue hasta el final.
  */
 function dosierSolucion(opciones: DocumentRenderOptions, game: GameSession, plot: Plot): PlayerDocument {
-  const asesino = game.suspects.find((s) => s.id === plot.solution.murdererId);
-  const arma = game.weapons.find((w) => w.id === plot.solution.weaponId);
-  const sala = game.rooms.find((r) => r.id === plot.solution.roomId);
-  const personaje = plot.characters.find((c) => c.suspectId === plot.solution.murdererId);
+  const asesino = game.suspects.find((s) => s.id === culpableDe(plot.solution));
+  const arma = game.weapons.find((w) => w.id === objetoDe(plot.solution));
+  const sala = game.rooms.find((r) => r.id === lugarDe(plot.solution));
+  const personaje = plot.characters.find((c) => c.suspectId === culpableDe(plot.solution));
 
   const contenido = `<div class="portada">
       <span class="sello">No abrir hasta el final de la velada</span>
@@ -549,9 +550,9 @@ function dosierSolucion(opciones: DocumentRenderOptions, game: GameSession, plot
 function dosierGameMaster(opciones: DocumentRenderOptions, game: GameSession, plot: Plot): PlayerDocument {
   const nombreDe = (id: string): string =>
     game.suspects.find((sospechoso) => sospechoso.id === id)?.name ?? id;
-  const asesino = game.suspects.find((s) => s.id === plot.solution.murdererId);
-  const arma = game.weapons.find((w) => w.id === plot.solution.weaponId);
-  const sala = game.rooms.find((r) => r.id === plot.solution.roomId);
+  const asesino = game.suspects.find((s) => s.id === culpableDe(plot.solution));
+  const arma = game.weapons.find((w) => w.id === objetoDe(plot.solution));
+  const sala = game.rooms.find((r) => r.id === lugarDe(plot.solution));
 
   const portada = `<div class="portada">
     <span class="sello">Confidencial · Game Master</span>

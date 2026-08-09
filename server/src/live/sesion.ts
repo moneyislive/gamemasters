@@ -11,8 +11,8 @@ import { getStore } from '../db/store';
 import { numeroDeRondas } from '../docs/datos';
 import { avisarCambio } from './hub';
 import { ALFABETO_CODIGO } from '../../../shared/live';
-import { manifiestoDe } from '../../../shared/juegos';
-import type { JuegoId } from '../../../shared/juegos';
+import { aciertos, esElSenalado, manifiestoDe, respuestaCompleta } from '../../../shared/juegos';
+import type { EjeId, JuegoId } from '../../../shared/juegos';
 import type { Acusacion, LivePhase, LivePlayer, LiveSession } from '../../../shared/live';
 import type { GameSession } from '../../../shared/types';
 
@@ -274,8 +274,8 @@ export interface ResultadoAcusacion {
 export function acusar(
   sesion: LiveSession,
   suspectId: string,
-  eleccion: { murdererId: string; weaponId: string; roomId: string },
-  solucion: { murdererId: string; weaponId: string; roomId: string },
+  eleccion: Record<EjeId, string>,
+  solucion: Record<EjeId, string>,
 ): ResultadoAcusacion {
   if (sesion.phase !== 'acusaciones' && sesion.phase !== 'ronda-cerrada') {
     throw new Error('Todavía no se puede acusar.');
@@ -284,20 +284,26 @@ export function acusar(
     throw new Error('Ya has entregado tu acusación. No se puede cambiar.');
   }
 
-  const correcta =
-    eleccion.murdererId === solucion.murdererId &&
-    eleccion.weaponId === solucion.weaponId &&
-    eleccion.roomId === solucion.roomId;
+  const manifiesto = manifiestoDe(sesion.juego);
+  if (!respuestaCompleta(manifiesto, eleccion)) {
+    throw new Error('Tienes que responder a todo antes de acusar.');
+  }
+
+  // Acertar es coincidir en TODOS los ejes que declare el juego, sean tres o
+  // sean otros tantos. Antes eran tres comparaciones escritas a mano.
+  const correcta = aciertos(manifiesto, eleccion, solucion) === manifiesto.ejes.length;
 
   const acusacion: Acusacion = {
     suspectId,
-    ...eleccion,
+    respuestas: { ...eleccion },
     at: new Date().toISOString(),
     correcta,
   };
   sesion.acusaciones.push(acusacion);
 
-  const esElCulpable = suspectId === solucion.murdererId;
+  // Quien es señalado por el eje que apunta a la mesa no puede ganar
+  // acusándose: su juego es no ser descubierto.
+  const esElCulpable = esElSenalado(manifiesto, solucion, suspectId);
   const ganador = correcta && !esElCulpable && !sesion.winnerId;
   if (ganador) sesion.winnerId = suspectId;
 

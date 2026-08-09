@@ -12,6 +12,7 @@
 import { esc } from '../html';
 import { envolver, portada } from './comun';
 import type { DocumentRenderOptions, GameSession, Plot } from '../../../../shared/types';
+import { culpableDe } from '../../juegos/cluedo';
 
 export function matrizConocimiento(
   game: GameSession,
@@ -43,7 +44,7 @@ export function matrizConocimiento(
             })
             .join('')
         : '<li><em>No sabe nada concreto de nadie: es de los que solo pueden contar lo suyo.</em></li>';
-      const esCulpable = personaje.suspectId === plot.solution.murdererId;
+      const esCulpable = personaje.suspectId === culpableDe(plot.solution);
       return `      <tr>
         <td style="width:40mm;">
           <strong>${esc(nombreDe(personaje.suspectId))}</strong><br />

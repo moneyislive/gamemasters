@@ -216,11 +216,13 @@ router.post('/jugar/notas', async (req, res) => {
 router.post('/jugar/acusar', async (req, res) => {
   const cred = credencial(req, res);
   if (!cred) return;
-  const eleccion = {
-    murdererId: String(req.body?.murdererId ?? ''),
-    weaponId: String(req.body?.weaponId ?? ''),
-    roomId: String(req.body?.roomId ?? ''),
-  };
+  // Un valor por eje. El móvil manda un diccionario, no tres campos fijos:
+  // así el mismo endpoint sirve para un juego con otros ejes.
+  const crudo = (req.body ?? {}) as { respuestas?: Record<string, unknown> };
+  const eleccion: Record<string, string> = {};
+  for (const [eje, valor] of Object.entries(crudo.respuestas ?? {})) {
+    eleccion[String(eje)] = String(valor ?? '');
+  }
 
   try {
     const store = getStore();
@@ -230,7 +232,7 @@ router.post('/jugar/acusar', async (req, res) => {
       return;
     }
     const { resultado } = await mutar(cred.gameId, (s) =>
-      acusar(s, cred.suspectId, eleccion, game.plot!.solution),
+      acusar(s, cred.suspectId, eleccion, game.plot!.solution.respuestas),
     );
     // Deliberadamente NO se dice si ha acertado: se sabrá en el desenlace, como
     // en la mesa. Devolverlo aquí permitiría probar combinaciones.

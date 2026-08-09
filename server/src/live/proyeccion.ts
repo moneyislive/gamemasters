@@ -28,6 +28,8 @@ import type {
   VistaJugador,
 } from '../../../shared/live';
 import type { GameSession, Plot } from '../../../shared/types';
+import { aciertos, ejeDeJugadores, esElSenalado, manifiestoDe } from '../../../shared/juegos';
+import { entidadesDe, nombreDeEntidad } from '../juegos/entidades';
 
 /**
  * Cuánto conocimiento del personaje está desbloqueado.
@@ -77,6 +79,7 @@ export function vistaDeJugador(
 ): VistaJugador | null {
   const plot = game.plot;
   if (!plot) return null;
+  const manifiesto = manifiestoDe(sesion.juego);
   const jugador = sesion.players.find((p) => p.suspectId === suspectId);
   if (!jugador) return null;
 
@@ -157,6 +160,25 @@ export function vistaDeJugador(
     (n) => n.round === (sesion.phase === 'lobby' ? 0 : sesion.round),
   );
 
+  // ---- Qué hay que responder para acusar ----
+  // Lo dice el juego, no la pantalla. Para el eje que señala a alguien de la
+  // mesa se usan los nombres de PERSONAJE, que es como se les conoce durante
+  // la velada, y el propio se marca para no acusarse por despiste.
+  const ejes = manifiesto.ejes.map((e) => {
+    const cat = manifiesto.categorias.find((c) => c.id === e.categoria);
+    return {
+      ejeId: e.id,
+      pregunta: e.pregunta,
+      rotulo: e.rotulo,
+      opciones: entidadesDe(game, e.categoria).map((ent) => {
+        if (!cat?.sonJugadores) return { id: ent.id, nombre: ent.name };
+        const suyo = plot.characters.find((c) => c.suspectId === ent.id);
+        const nombre = suyo?.characterName ?? ent.name;
+        return { id: ent.id, nombre: ent.id === suspectId ? `${nombre} (tú)` : nombre };
+      }),
+    };
+  });
+
   const miAcusacion = sesion.acusaciones.find((a) => a.suspectId === suspectId);
 
   const vista: VistaJugador = {
@@ -197,7 +219,7 @@ export function vistaDeJugador(
       conocimientoPendiente: Math.max(0, todoElConocimiento.length - desbloqueado),
       giros,
       notas: jugador.notas,
-      soyCulpable: plot.solution.murdererId === suspectId,
+      soyCulpable: esElSenalado(manifiesto, plot.solution.respuestas, suspectId),
       pediEmpezar: jugador.pideEmpezar === true,
     },
     jugadores: sesion.players
@@ -219,6 +241,7 @@ export function vistaDeJugador(
       }),
     salas,
     tablero,
+    ejes,
     objetos: game.weapons.map((w) => ({
       id: w.id,
       name: w.name,
@@ -233,35 +256,38 @@ export function vistaDeJugador(
       ? { title: narracionActual.title, text: narracionActual.text }
       : undefined,
     miAcusacion: miAcusacion
-      ? {
-          murdererId: miAcusacion.murdererId,
-          weaponId: miAcusacion.weaponId,
-          roomId: miAcusacion.roomId,
-          at: miAcusacion.at,
-        }
+      ? { respuestas: { ...miAcusacion.respuestas }, at: miAcusacion.at }
       : undefined,
   };
 
   // ---- El desenlace: la ÚNICA puerta por la que sale la solución ----
   if (terminada) {
-    const asesino = game.suspects.find((s) => s.id === plot.solution.murdererId);
-    const arma = game.weapons.find((w) => w.id === plot.solution.weaponId);
-    const salaCrimen = game.rooms.find((r) => r.id === plot.solution.roomId);
     const ganador = sesion.winnerId
       ? sesion.players.find((p) => p.suspectId === sesion.winnerId)
       : undefined;
     const acusacionGanadora = sesion.acusaciones.find((a) => a.suspectId === sesion.winnerId);
 
+    // Un renglón por eje, ya resuelto a nombres. Antes eran tres campos
+    // —asesino, arma y sala— y el móvil los pintaba uno a uno; ahora recorre
+    // lo que venga, que es lo que permite que otro juego tenga otros ejes.
+    const respuestas = manifiesto.ejes.map((e) => {
+      const entidadId = plot.solution.respuestas[e.id] ?? '';
+      return {
+        ejeId: e.id,
+        rotulo: e.rotulo,
+        entidadId,
+        nombre: nombreDeEntidad(game, e.categoria, entidadId),
+      };
+    });
+
     const aciertosDe = (a: (typeof sesion.acusaciones)[number]): number =>
-      (a.murdererId === plot.solution.murdererId ? 1 : 0) +
-      (a.weaponId === plot.solution.weaponId ? 1 : 0) +
-      (a.roomId === plot.solution.roomId ? 1 : 0);
+      aciertos(manifiesto, a.respuestas, plot.solution.respuestas);
 
     vista.desenlace = {
-      murdererId: plot.solution.murdererId,
-      murdererName: asesino?.name ?? '',
-      weaponName: arma?.name ?? '',
-      roomName: salaCrimen?.name ?? '',
+      respuestas,
+      culpableId: ejeDeJugadores(manifiesto)
+        ? plot.solution.respuestas[ejeDeJugadores(manifiesto)!.id]
+        : undefined,
       motive: plot.solution.motive,
       reconstruccion: plot.material?.finale?.reconstruction || plot.solution.howItHappened,
       confesion: plot.material?.finale?.confession,

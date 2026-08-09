@@ -2,9 +2,15 @@
  * La acusación.
  *
  * Es el momento con más peso de la noche, así que la pantalla lo trata como
- * tal: se elige en tres pasos, se enseña la combinación completa antes de
+ * tal: se elige eje por eje, se enseña la combinación completa antes de
  * entregarla, y se avisa dos veces de que no hay vuelta atrás. Gana quien
  * acierte primero, y el servidor pone la hora.
+ *
+ * No sabe a qué se está jugando. Antes pintaba tres selectores escritos a mano
+ * —culpable, objeto y sala—, que es tanto como decir que solo servía para
+ * CLUEDO. Ahora recorre `vista.ejes`, que compone el servidor desde el
+ * manifiesto del juego: con dos ejes o con cinco, esta pantalla sale bien sin
+ * tocar una línea.
  */
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
@@ -54,6 +60,8 @@ function Selector({
           return (
             <Pressable
               key={o.id}
+              accessibilityRole="button"
+              accessibilityState={activo ? { selected: true } : {}}
               onPress={() => {
                 void Haptics.selectionAsync();
                 alElegir(o.id);
@@ -83,32 +91,27 @@ function Selector({
 
 export default function Acusar(): JSX.Element {
   const { vista, refrescar } = usePartida();
-  const [culpable, setCulpable] = useState<string>();
-  const [objeto, setObjeto] = useState<string>();
-  const [sala, setSala] = useState<string>();
+  const [respuestas, setRespuestas] = useState<Record<string, string>>({});
   const [confirmando, setConfirmando] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   if (!vista) return <Pantalla><Cargando /></Pantalla>;
 
-  const sospechosos: Opcion[] = [
-    ...vista.jugadores.map((j) => ({ id: j.suspectId, nombre: j.characterName })),
-    { id: vista.yo.suspectId, nombre: `${vista.yo.characterName} (tú)` },
-  ];
-  const objetos: Opcion[] = vista.objetos.map((o) => ({ id: o.id, nombre: o.name }));
-  const salas: Opcion[] = vista.salas.map((s) => ({ id: s.id, nombre: s.name }));
+  const ejes = vista.ejes ?? [];
+  const completa = ejes.length > 0 && ejes.every((e) => respuestas[e.ejeId]);
 
-  const completa = Boolean(culpable && objeto && sala);
-  const nombreDe = (lista: Opcion[], id?: string): string =>
-    lista.find((x) => x.id === id)?.nombre ?? '—';
+  const nombreElegido = (ejeId: string): string => {
+    const eje = ejes.find((e) => e.ejeId === ejeId);
+    return eje?.opciones.find((o) => o.id === respuestas[ejeId])?.nombre ?? '—';
+  };
 
   const enviar = async (): Promise<void> => {
-    if (!culpable || !objeto || !sala) return;
+    if (!completa) return;
     setEnviando(true);
     setError(null);
     try {
-      await api.acusar(culpable, objeto, sala);
+      await api.acusar(respuestas);
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       await refrescar();
       router.back();
@@ -121,6 +124,8 @@ export default function Acusar(): JSX.Element {
   };
 
   if (confirmando) {
+    // El primer eje encabeza —«acusas a Fulano»— y el resto se lee debajo.
+    const [primero, ...resto] = ejes;
     return (
       <Pantalla barra={false}>
         <Animated.View entering={FadeIn.duration(400)} style={{ alignItems: 'center', paddingTop: espacio.xl }}>
@@ -134,12 +139,19 @@ export default function Acusar(): JSX.Element {
 
         <Marco tono="peligro">
           <Etiqueta style={{ color: '#f0c9c0' }}>Acusas a</Etiqueta>
-          <Titulo style={{ fontSize: 24, marginTop: 4 }}>{nombreDe(sospechosos, culpable)}</Titulo>
-          <Cuerpo style={{ marginTop: espacio.md }}>
-            con <Cuerpo style={{ color: color.oro300 }}>{nombreDe(objetos, objeto)}</Cuerpo>
-            {'\n'}
-            en <Cuerpo style={{ color: color.oro300 }}>{nombreDe(salas, sala)}</Cuerpo>
-          </Cuerpo>
+          <Titulo style={{ fontSize: 24, marginTop: 4 }}>
+            {primero ? nombreElegido(primero.ejeId) : '—'}
+          </Titulo>
+          {resto.length > 0 && (
+            <View style={{ marginTop: espacio.md }}>
+              {resto.map((e) => (
+                <Cuerpo key={e.ejeId}>
+                  {e.rotulo.toLowerCase()}{' '}
+                  <Cuerpo style={{ color: color.oro300 }}>{nombreElegido(e.ejeId)}</Cuerpo>
+                </Cuerpo>
+              ))}
+            </View>
+          )}
         </Marco>
 
         <AvisoError>{error}</AvisoError>
@@ -164,23 +176,25 @@ export default function Acusar(): JSX.Element {
         <View style={{ alignItems: 'center', paddingTop: espacio.md }}>
           <Sello>Acusación</Sello>
           <Titulo style={{ textAlign: 'center', marginTop: espacio.md, fontSize: 26 }}>
-            Quién, con qué y dónde
+            {ejes.map((e) => e.rotulo).join(', ')}
           </Titulo>
         </View>
 
         <Ornamento />
 
         <Animated.View entering={FadeInUp.duration(400)}>
-          <Selector titulo="El culpable" opciones={sospechosos} elegido={culpable} alElegir={setCulpable} />
-          <Selector titulo="El objeto" opciones={objetos} elegido={objeto} alElegir={setObjeto} />
-          <Selector titulo="La sala" opciones={salas} elegido={sala} alElegir={setSala} />
+          {ejes.map((e) => (
+            <Selector
+              key={e.ejeId}
+              titulo={e.pregunta}
+              opciones={e.opciones}
+              elegido={respuestas[e.ejeId]}
+              alElegir={(id) => setRespuestas((r) => ({ ...r, [e.ejeId]: id }))}
+            />
+          ))}
         </Animated.View>
 
-        <Boton
-          variante="peligro"
-          onPress={() => setConfirmando(true)}
-          disabled={!completa}
-        >
+        <Boton variante="peligro" onPress={() => setConfirmando(true)} disabled={!completa}>
           Revisar mi acusación
         </Boton>
         <Boton onPress={() => router.back()} style={{ marginTop: espacio.sm }}>
