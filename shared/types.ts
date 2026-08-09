@@ -3,6 +3,7 @@
  * ESTE FICHERO ES EL CONTRATO CENTRAL — no cambiar formas sin actualizar ARCHITECTURE.md.
  */
 import type { PrintableDocId } from './documents';
+import type { JuegoId } from './juegos/tipos';
 
 export type { PrintableDocId };
 
@@ -62,6 +63,7 @@ export interface Weapon {
   description?: string;
   photoUrl?: string;
 }
+
 
 // ---------- Tablero ----------
 
@@ -133,6 +135,18 @@ export interface TimelineEvent {
   isPublic: boolean;
 }
 
+/**
+ * La respuesta del misterio.
+ *
+ * MEDIDO EN LA CATA: convertir estos tres campos en `respuestas:
+ * Record<EjeId, string>` provoca 86 errores de compilación en 17 ficheros del
+ * servidor, y CERO en el taller y en la app. De esos 86, 83 son la misma
+ * sustitución mecánica y solo 3 obligan a pensar.
+ *
+ * El cero del taller y de la app no significa que estén desacoplados: es que
+ * repiten la terna a mano en sitios donde el compilador no puede verla
+ * (`VistaJugador.miAcusacion`, `api.acusar`). Ver `shared/juegos/tipos.ts`.
+ */
 export interface PlotSolution {
   murdererId: string;
   weaponId: string;
@@ -331,6 +345,14 @@ export const DOCUMENT_SECTIONS: DocumentSectionInfo[] = [
 export interface GameSettings {
   model?: ModelId;
   language: 'es';
+  /**
+   * A qué se juega. CATA: si falta, es CLUEDO.
+   *
+   * Opcional a propósito. Las partidas que ya existen no lo llevan, y el
+   * almacén de Mongo es de esquema laxo, así que añadirlo no obliga a migrar
+   * nada: lo resuelve `manifiestoDe(undefined)`.
+   */
+  juego?: JuegoId;
   /**
    * Secciones incluidas en los dosieres de los jugadores. Si se omite, van
    * todas. Las marcadas como `required` se incluyen siempre.

@@ -11,6 +11,8 @@ import { getStore } from '../db/store';
 import { numeroDeRondas } from '../docs/datos';
 import { avisarCambio } from './hub';
 import { ALFABETO_CODIGO } from '../../../shared/live';
+import { manifiestoDe } from '../../../shared/juegos';
+import type { JuegoId } from '../../../shared/juegos';
 import type { Acusacion, LivePhase, LivePlayer, LiveSession } from '../../../shared/live';
 import type { GameSession } from '../../../shared/types';
 
@@ -152,16 +154,20 @@ export async function refrescarSesion(game: GameSession): Promise<LiveSession | 
 // ---------------------------------------------------------------------------
 
 /** Transiciones permitidas. Cualquier otra se rechaza con un mensaje claro. */
-const TRANSICIONES: Record<LivePhase, LivePhase[]> = {
-  lobby: ['ronda-abierta'],
-  'ronda-abierta': ['ronda-cerrada'],
-  'ronda-cerrada': ['ronda-abierta', 'acusaciones'],
-  acusaciones: ['desenlace'],
-  desenlace: [],
-};
-
-export function puedePasarA(desde: LivePhase, hasta: LivePhase): boolean {
-  return TRANSICIONES[desde]?.includes(hasta) ?? false;
+/**
+ * CATA: la tabla de transiciones ya no vive aquí, la declara cada juego.
+ *
+ * Al hacerlo saltó lo primero que se rompe: esta función se llamaba con dos
+ * fases y ya está, pero para saber qué transiciones valen hay que saber a qué
+ * se juega. De ahí que `LiveSession` lleve ahora su propio `juego`: las cuatro
+ * funciones que gobiernan las fases reciben la sesión y nada más.
+ */
+export function puedePasarA(
+  juego: JuegoId | undefined,
+  desde: LivePhase,
+  hasta: LivePhase,
+): boolean {
+  return manifiestoDe(juego).fases[desde]?.includes(hasta) ?? false;
 }
 
 export class TransicionInvalida extends Error {
@@ -175,7 +181,7 @@ export class TransicionInvalida extends Error {
 export const MINUTOS_POR_RONDA = 15;
 
 export function abrirRonda(sesion: LiveSession, minutos = MINUTOS_POR_RONDA): void {
-  if (!puedePasarA(sesion.phase, 'ronda-abierta')) {
+  if (!puedePasarA(sesion.juego, sesion.phase,'ronda-abierta')) {
     throw new TransicionInvalida(sesion.phase, 'ronda-abierta');
   }
   const ahora = new Date();
@@ -187,7 +193,7 @@ export function abrirRonda(sesion: LiveSession, minutos = MINUTOS_POR_RONDA): vo
 }
 
 export function cerrarRonda(sesion: LiveSession): void {
-  if (!puedePasarA(sesion.phase, 'ronda-cerrada')) {
+  if (!puedePasarA(sesion.juego, sesion.phase,'ronda-cerrada')) {
     throw new TransicionInvalida(sesion.phase, 'ronda-cerrada');
   }
   sesion.phase = 'ronda-cerrada';
@@ -204,7 +210,7 @@ export function cerrarRonda(sesion: LiveSession): void {
 }
 
 export function abrirAcusaciones(sesion: LiveSession): void {
-  if (!puedePasarA(sesion.phase, 'acusaciones')) {
+  if (!puedePasarA(sesion.juego, sesion.phase,'acusaciones')) {
     throw new TransicionInvalida(sesion.phase, 'acusaciones');
   }
   sesion.phase = 'acusaciones';
@@ -212,7 +218,7 @@ export function abrirAcusaciones(sesion: LiveSession): void {
 }
 
 export function revelarDesenlace(sesion: LiveSession): void {
-  if (!puedePasarA(sesion.phase, 'desenlace')) {
+  if (!puedePasarA(sesion.juego, sesion.phase,'desenlace')) {
     throw new TransicionInvalida(sesion.phase, 'desenlace');
   }
   sesion.phase = 'desenlace';

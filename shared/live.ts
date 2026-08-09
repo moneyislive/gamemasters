@@ -13,6 +13,7 @@
  * envía lo que esa persona puede saber en esa ronda, y nada más.
  */
 import type { BoardLayout, BoardMode } from './types';
+import type { JuegoId } from './juegos/tipos';
 
 // ---------------------------------------------------------------------------
 // Estado de la partida
@@ -92,6 +93,16 @@ export interface Acusacion {
 export interface LiveSession {
   /** Coincide con el id de la partida. */
   id: string;
+  /**
+   * A qué se juega. CATA.
+   *
+   * Está aquí, y no solo en los ajustes de la partida, por una razón que salió
+   * al intentarlo: las funciones que gobiernan las fases —`abrirRonda`,
+   * `cerrarRonda`, `abrirAcusaciones`— reciben la sesión y nada más. Sin esta
+   * copia habría que pasarles la partida entera a todas, o buscarla en el
+   * almacén dentro de una función que hoy es síncrona y pura.
+   */
+  juego?: JuegoId;
   /** Código corto para entrar, del estilo «TEJADO». Se enseña en la mesa. */
   code: string;
   phase: LivePhase;
