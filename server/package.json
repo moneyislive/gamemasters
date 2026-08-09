@@ -14,7 +14,8 @@
     "oro:capturar": "tsx scripts/oro.ts capturar",
     "oro:verificar": "tsx scripts/oro.ts verificar",
     "verify:partida": "tsx scripts/verificar-partida.ts",
-    "verify:segundo-juego": "tsx scripts/verificar-segundo-juego.ts"
+    "verify:segundo-juego": "tsx scripts/verificar-segundo-juego.ts",
+    "verify:sin-ejes": "tsx scripts/verificar-juego-sin-ejes.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",

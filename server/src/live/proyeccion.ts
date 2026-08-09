@@ -292,14 +292,17 @@ export function vistaDeJugador(
       reconstruccion: plot.material?.finale?.reconstruction || plot.solution.howItHappened,
       confesion: plot.material?.finale?.confession,
       epilogo: plot.material?.finale?.epilogue,
-      ganador:
-        ganador && acusacionGanadora
-          ? {
-              suspectId: ganador.suspectId,
-              displayName: ganador.displayName,
-              at: acusacionGanadora.at,
-            }
-          : undefined,
+      // El ganador se anuncia haya acusado o no. Antes esto exigía que
+      // existiera una acusación suya, porque en CLUEDO gana quien acierta
+      // primero y siempre la hay. En una oca se gana llegando a la meta, y con
+      // aquella condición el desenlace se quedaba sin ganador que anunciar.
+      ganador: ganador
+        ? {
+            suspectId: ganador.suspectId,
+            displayName: ganador.displayName,
+            at: acusacionGanadora?.at ?? sesion.updatedAt,
+          }
+        : undefined,
       clasificacion: sesion.players
         .map((p) => {
           const suya = sesion.acusaciones.find((a) => a.suspectId === p.suspectId);

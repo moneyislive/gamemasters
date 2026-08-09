@@ -116,6 +116,26 @@ export interface LiveSession {
   acusaciones: Acusacion[];
   /** Sospechoso que ganó, decidido por la primera acusación correcta. */
   winnerId?: string;
+  /**
+   * Lo que cada juego necesita guardar y el motor no interpreta.
+   *
+   * Las posiciones de una oca, los puntos de vida de una campaña de rol, las
+   * cartas repartidas. El motor lo transporta, lo persiste y lo proyecta según
+   * las reglas del juego, pero no mira dentro: si mirase, volvería a saber de
+   * qué se juega.
+   */
+  estado?: Record<string, unknown>;
+  /**
+   * A quién le toca, en los juegos por turnos.
+   *
+   * Vacío en los simultáneos, donde los doce actúan a la vez.
+   */
+  turnoDe?: string;
+  /**
+   * Registro de lo que se ha hecho. Sirve para contar repeticiones por ronda y
+   * para que quien dirige vea el pulso de la mesa.
+   */
+  acciones?: Array<{ suspectId: string; accion: string; round: number; at: string }>;
   /** Salas visitadas por alguien en cada ronda; lo que pasa al tablón común. */
   tablon: Array<{ round: number; roomId: string }>;
   /**

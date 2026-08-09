@@ -29,12 +29,14 @@ export {
 } from './tipos';
 export type {
   CategoriaId,
+  DefinicionAccion,
   DefinicionCategoria,
   DefinicionDeRonda,
   DefinicionEje,
   EjeId,
   JuegoId,
   ManifiestoDeJuego,
+  ModoDeTurno,
 } from './tipos';
 export { CLUEDO };
 export { entidadesDe, entidadDe, nombreDeEntidad, entidadesDelEje } from './entidades';
