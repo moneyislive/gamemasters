@@ -28,6 +28,9 @@ import type {
   VistaJugador,
 } from '../../../shared/live';
 import type { GameSession, Plot } from '../../../shared/types';
+import { aciertos, ejeDeJugadores, ejes as ejesDe, esElSenalado, manifiestoDe } from '../../../shared/juegos';
+import { entidadesDe, nombreDeEntidad } from '../juegos/entidades';
+import { accionesDisponibles } from '../juegos/motor';
 
 /**
  * Cuánto conocimiento del personaje está desbloqueado.
@@ -77,6 +80,7 @@ export function vistaDeJugador(
 ): VistaJugador | null {
   const plot = game.plot;
   if (!plot) return null;
+  const manifiesto = manifiestoDe(sesion.juego);
   const jugador = sesion.players.find((p) => p.suspectId === suspectId);
   if (!jugador) return null;
 
@@ -157,6 +161,36 @@ export function vistaDeJugador(
     (n) => n.round === (sesion.phase === 'lobby' ? 0 : sesion.round),
   );
 
+  // ---- Qué hay que responder para acusar ----
+  // Lo dice el juego, no la pantalla. Para el eje que señala a alguien de la
+  // mesa se usan los nombres de PERSONAJE, que es como se les conoce durante
+  // la velada, y el propio se marca para no acusarse por despiste.
+  const ejes = ejesDe(manifiesto).map((e) => {
+    const cat = manifiesto.categorias.find((c) => c.id === e.categoria);
+    return {
+      ejeId: e.id,
+      pregunta: e.pregunta,
+      rotulo: e.rotulo,
+      opciones: entidadesDe(game, e.categoria).map((ent) => {
+        if (!cat?.sonJugadores) return { id: ent.id, nombre: ent.name };
+        const suyo = plot.characters.find((c) => c.suspectId === ent.id);
+        const nombre = suyo?.characterName ?? ent.name;
+        return { id: ent.id, nombre: ent.id === suspectId ? `${nombre} (tú)` : nombre };
+      }),
+    };
+  });
+
+  // ---- Qué se puede hacer ahora mismo ----
+  const acciones = accionesDisponibles(sesion, suspectId).map((a) => ({
+    id: a.id,
+    rotulo: a.rotulo,
+    campos: (a.eligeDe ?? []).map((c) => ({
+      campo: c.campo,
+      rotulo: c.rotulo,
+      opciones: entidadesDe(game, c.categoria).map((e) => ({ id: e.id, nombre: e.name })),
+    })),
+  }));
+
   const miAcusacion = sesion.acusaciones.find((a) => a.suspectId === suspectId);
 
   const vista: VistaJugador = {
@@ -172,6 +206,7 @@ export function vistaDeJugador(
       lema: plot.tagline,
       listos: sesion.players.filter((p) => p.pideEmpezar).length,
       total: sesion.players.length,
+      encuentro: sesion.encuentro ?? 1,
     },
     // El caso es público: la sinopsis se escribe expresamente sin revelar
     // asesino, arma ni sala, y la víctima y la ambientación las conoce todo el
@@ -197,7 +232,7 @@ export function vistaDeJugador(
       conocimientoPendiente: Math.max(0, todoElConocimiento.length - desbloqueado),
       giros,
       notas: jugador.notas,
-      soyCulpable: plot.solution.murdererId === suspectId,
+      soyCulpable: esElSenalado(manifiesto, plot.solution.respuestas, suspectId),
       pediEmpezar: jugador.pideEmpezar === true,
     },
     jugadores: sesion.players
@@ -219,6 +254,8 @@ export function vistaDeJugador(
       }),
     salas,
     tablero,
+    ejes,
+    acciones,
     objetos: game.weapons.map((w) => ({
       id: w.id,
       name: w.name,
@@ -228,52 +265,66 @@ export function vistaDeJugador(
     miSala,
     misPistas,
     tablon,
+    // La crónica de los encuentros ya cerrados: es lo que permite retomar una
+    // campaña una semana después sin que nadie recuerde dónde lo dejaron.
+    cronica: (sesion.cronica ?? []).map((e) => ({
+      encuentro: e.encuentro,
+      titulo: e.titulo,
+      resumen: e.resumen,
+      cerradoEl: e.cerradoEl,
+    })),
     cronologia: cronologia(plot),
     narracion: narracionActual
       ? { title: narracionActual.title, text: narracionActual.text }
       : undefined,
     miAcusacion: miAcusacion
-      ? {
-          murdererId: miAcusacion.murdererId,
-          weaponId: miAcusacion.weaponId,
-          roomId: miAcusacion.roomId,
-          at: miAcusacion.at,
-        }
+      ? { respuestas: { ...miAcusacion.respuestas }, at: miAcusacion.at }
       : undefined,
   };
 
   // ---- El desenlace: la ÚNICA puerta por la que sale la solución ----
   if (terminada) {
-    const asesino = game.suspects.find((s) => s.id === plot.solution.murdererId);
-    const arma = game.weapons.find((w) => w.id === plot.solution.weaponId);
-    const salaCrimen = game.rooms.find((r) => r.id === plot.solution.roomId);
     const ganador = sesion.winnerId
       ? sesion.players.find((p) => p.suspectId === sesion.winnerId)
       : undefined;
     const acusacionGanadora = sesion.acusaciones.find((a) => a.suspectId === sesion.winnerId);
 
+    // Un renglón por eje, ya resuelto a nombres. Antes eran tres campos
+    // —asesino, arma y sala— y el móvil los pintaba uno a uno; ahora recorre
+    // lo que venga, que es lo que permite que otro juego tenga otros ejes.
+    const respuestas = ejesDe(manifiesto).map((e) => {
+      const entidadId = plot.solution.respuestas[e.id] ?? '';
+      return {
+        ejeId: e.id,
+        rotulo: e.rotulo,
+        entidadId,
+        nombre: nombreDeEntidad(game, e.categoria, entidadId),
+      };
+    });
+
     const aciertosDe = (a: (typeof sesion.acusaciones)[number]): number =>
-      (a.murdererId === plot.solution.murdererId ? 1 : 0) +
-      (a.weaponId === plot.solution.weaponId ? 1 : 0) +
-      (a.roomId === plot.solution.roomId ? 1 : 0);
+      aciertos(manifiesto, a.respuestas, plot.solution.respuestas);
 
     vista.desenlace = {
-      murdererId: plot.solution.murdererId,
-      murdererName: asesino?.name ?? '',
-      weaponName: arma?.name ?? '',
-      roomName: salaCrimen?.name ?? '',
+      respuestas,
+      culpableId: ejeDeJugadores(manifiesto)
+        ? plot.solution.respuestas[ejeDeJugadores(manifiesto)!.id]
+        : undefined,
       motive: plot.solution.motive,
       reconstruccion: plot.material?.finale?.reconstruction || plot.solution.howItHappened,
       confesion: plot.material?.finale?.confession,
       epilogo: plot.material?.finale?.epilogue,
-      ganador:
-        ganador && acusacionGanadora
-          ? {
-              suspectId: ganador.suspectId,
-              displayName: ganador.displayName,
-              at: acusacionGanadora.at,
-            }
-          : undefined,
+      // El ganador se anuncia haya acusado o no. Antes esto exigía que
+      // existiera una acusación suya, porque en CLUEDO gana quien acierta
+      // primero y siempre la hay. En una oca se gana llegando a la meta, y con
+      // aquella condición el desenlace se quedaba sin ganador que anunciar.
+      ganador: ganador
+        ? {
+            suspectId: ganador.suspectId,
+            displayName: ganador.displayName,
+            at: acusacionGanadora?.at ?? sesion.updatedAt,
+          }
+        : undefined,
       clasificacion: sesion.players
         .map((p) => {
           const suya = sesion.acusaciones.find((a) => a.suspectId === p.suspectId);

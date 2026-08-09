@@ -15,6 +15,7 @@ import { getStore } from '../db/store';
 import { normalizarEmail } from '../../../shared/live';
 import type { Account, LiveSession, PartidaJugada, TrofeoId } from '../../../shared/live';
 import type { GameSession } from '../../../shared/types';
+import { culpableDe } from '../juegos/cluedo';
 
 /** Busca la cuenta del correo, o la crea si es la primera vez. */
 export async function cuentaDe(email: string, displayName: string): Promise<Account> {
@@ -56,7 +57,7 @@ export async function cerrarPartidaEnCuentas(
 
     const personaje = plot.characters.find((c) => c.suspectId === jugador.suspectId);
     const suya = sesion.acusaciones.find((a) => a.suspectId === jugador.suspectId);
-    const eraCulpable = plot.solution.murdererId === jugador.suspectId;
+    const eraCulpable = culpableDe(plot.solution) === jugador.suspectId;
     const gano = sesion.winnerId === jugador.suspectId;
 
     const partida: PartidaJugada = {

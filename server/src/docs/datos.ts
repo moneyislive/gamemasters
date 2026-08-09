@@ -8,6 +8,7 @@
  * y lo consume quien lo necesite.
  */
 import type { GameSession, Plot, PlotClue, Room, Suspect, TimelineEvent } from '../../../shared/types';
+import { culpableDe } from '../juegos/cluedo';
 
 // ---------------------------------------------------------------------------
 // Rondas y reparto de pistas
@@ -273,7 +274,7 @@ export function candidatosParaGm(game: GameSession, plot: Plot): Suspect[] {
   const conGiro = new Set((plot.material?.twists ?? []).map((giro) => giro.suspectId));
   return game.suspects.filter(
     (sospechoso) =>
-      sospechoso.id !== plot.solution.murdererId && !conGiro.has(sospechoso.id),
+      sospechoso.id !== culpableDe(plot.solution) && !conGiro.has(sospechoso.id),
   );
 }
 

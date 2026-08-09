@@ -36,6 +36,8 @@ import { renderDocumentIndex } from '../docs/renderer';
 import { generateDemoCharacters } from './demoPlot';
 import { PLOT_EXTENSION_SCHEMA } from './schema';
 import { buildStyleBlock } from './style';
+import { culpableDe, lugarDe, objetoDe } from '../juegos/cluedo';
+import { juegoDe, repararRespuestas } from '../juegos/solucion';
 
 type Emitir = (evento: GenerateStreamEvent) => void;
 
@@ -206,7 +208,7 @@ function podarTrama(plot: Plot, game: GameSession): void {
   if (plot.material) {
     plot.material.twists = plot.material.twists.filter(
       (giro) =>
-        idsSospechosos.has(giro.suspectId) && giro.suspectId !== plot.solution.murdererId,
+        idsSospechosos.has(giro.suspectId) && giro.suspectId !== culpableDe(plot.solution),
     );
   }
 }
@@ -232,10 +234,7 @@ async function ampliarTrama(
   informe: StalenessReport,
   emit: Emitir,
 ): Promise<void> {
-  const solucionRota =
-    informe.brokenSolution.murderer ||
-    informe.brokenSolution.weapon ||
-    informe.brokenSolution.room;
+  const solucionRota = informe.brokenSolution.length > 0;
 
   // (a) Primero los ids: el texto se reescribe después, ya sabiendo a quién señala.
   if (solucionRota) {
@@ -330,33 +329,23 @@ async function ampliarTrama(
  * apoyándose en una historia que existe.
  */
 function repararIdsSolucion(plot: Plot, game: GameSession): void {
-  const { solution } = plot;
-
-  if (!game.suspects.some((sospechoso) => sospechoso.id === solution.murdererId)) {
-    const conPersonaje = game.suspects.find((sospechoso) =>
-      plot.characters.some((personaje) => personaje.suspectId === sospechoso.id),
-    );
-    const elegido = conPersonaje ?? game.suspects[0];
-    if (elegido) solution.murdererId = elegido.id;
-  }
-
-  if (!game.weapons.some((arma) => arma.id === solution.weaponId)) {
-    const primera = game.weapons[0];
-    if (primera) solution.weaponId = primera.id;
-  }
-
-  if (!game.rooms.some((sala) => sala.id === solution.roomId)) {
-    const primera = game.rooms[0];
-    if (primera) solution.roomId = primera.id;
-  }
+  const manifiesto = juegoDe(game);
+  repararRespuestas(plot, game, (categoria, candidatas) => {
+    // Para el eje que señala a alguien de la mesa se prefiere quien YA tenga
+    // personaje escrito: así el crimen sigue apoyándose en una historia que
+    // existe, en vez de en el primero de la lista.
+    const cat = manifiesto.categorias.find((c) => c.id === categoria);
+    if (!cat?.sonJugadores) return undefined;
+    return candidatas.find((e) => plot.characters.some((p) => p.suspectId === e.id));
+  });
 }
 
 /** Reescritura local del motivo y del relato del crimen (modo demo y red de seguridad). */
 function reparacionLocal(game: GameSession, plot: Plot): ReparacionSolucion {
-  const asesino = game.suspects.find((s) => s.id === plot.solution.murdererId);
-  const personaje = plot.characters.find((c) => c.suspectId === plot.solution.murdererId);
-  const arma = game.weapons.find((w) => w.id === plot.solution.weaponId);
-  const sala = game.rooms.find((r) => r.id === plot.solution.roomId);
+  const asesino = game.suspects.find((s) => s.id === culpableDe(plot.solution));
+  const personaje = plot.characters.find((c) => c.suspectId === culpableDe(plot.solution));
+  const arma = game.weapons.find((w) => w.id === objetoDe(plot.solution));
+  const sala = game.rooms.find((r) => r.id === lugarDe(plot.solution));
 
   const nombre = personaje?.characterName ?? asesino?.name ?? 'el culpable';
   const motive = personaje?.motive?.trim() || plot.solution.motive;
@@ -444,12 +433,12 @@ function construirPromptAmpliacion(
   const nombreSospechoso = (id: string): string =>
     game.suspects.find((sospechoso) => sospechoso.id === id)?.name ?? '(jugador desconocido)';
 
-  const asesino = game.suspects.find((s) => s.id === plot.solution.murdererId);
+  const asesino = game.suspects.find((s) => s.id === culpableDe(plot.solution));
   const personajeAsesino = plot.characters.find(
-    (c) => c.suspectId === plot.solution.murdererId,
+    (c) => c.suspectId === culpableDe(plot.solution),
   );
-  const arma = game.weapons.find((w) => w.id === plot.solution.weaponId);
-  const sala = game.rooms.find((r) => r.id === plot.solution.roomId);
+  const arma = game.weapons.find((w) => w.id === objetoDe(plot.solution));
+  const sala = game.rooms.find((r) => r.id === lugarDe(plot.solution));
 
   const personajesExistentes =
     plot.characters
@@ -500,16 +489,16 @@ function construirPromptAmpliacion(
 
   const bloqueSolucion = solucionRota
     ? `LA SOLUCIÓN HA QUEDADO ROTA Y SE HA REASIGNADO. Ahora es, de forma definitiva:
-- Asesino: ${asesino?.name ?? '(sin asignar)'}${personajeAsesino ? ` — personaje "${personajeAsesino.characterName}"` : ' — todavía sin personaje escrito'} (id "${plot.solution.murdererId}")
-- Arma: ${arma?.name ?? '(sin asignar)'} (id "${plot.solution.weaponId}")
-- Sala del crimen: ${sala?.name ?? '(sin asignar)'} (id "${plot.solution.roomId}")
+- Asesino: ${asesino?.name ?? '(sin asignar)'}${personajeAsesino ? ` — personaje "${personajeAsesino.characterName}"` : ' — todavía sin personaje escrito'} (id "${culpableDe(plot.solution)}")
+- Arma: ${arma?.name ?? '(sin asignar)'} (id "${objetoDe(plot.solution)}")
+- Sala del crimen: ${sala?.name ?? '(sin asignar)'} (id "${lugarDe(plot.solution)}")
 El motivo y el relato antiguos ya no valen porque hablaban de otras personas u objetos:
 - motivo antiguo: ${plot.solution.motive}
 - relato antiguo: ${plot.solution.howItHappened}
 DEBES devolver "solutionRepair" con un motivo y un relato NUEVOS, coherentes con ese asesino,
 esa arma y esa sala, y con los secretos y coartadas de los personajes de la lista anterior.`
     : `LA SOLUCIÓN REAL SIGUE SIENDO VÁLIDA (es secreta, no la contradigas ni la reveles en los textos públicos):
-- Asesino: ${asesino?.name ?? '(desconocido)'}${personajeAsesino ? ` — personaje "${personajeAsesino.characterName}"` : ''} (id "${plot.solution.murdererId}")
+- Asesino: ${asesino?.name ?? '(desconocido)'}${personajeAsesino ? ` — personaje "${personajeAsesino.characterName}"` : ''} (id "${culpableDe(plot.solution)}")
 - Arma: ${arma?.name ?? '(desconocida)'} · Sala del crimen: ${sala?.name ?? '(desconocida)'}
 - Motivo: ${plot.solution.motive}
 - Cómo ocurrió: ${plot.solution.howItHappened}

@@ -1,0 +1,645 @@
+{
+  "id": "oro",
+  "name": "Partida de referencia",
+  "status": "ready",
+  "createdAt": "2026-01-01T20:00:00.000Z",
+  "updatedAt": "2026-01-01T20:00:00.000Z",
+  "suspects": [
+    {
+      "id": "s0",
+      "name": "Ana",
+      "description": "Invitado número 1.",
+      "email": "ana@ejemplo.es"
+    },
+    {
+      "id": "s1",
+      "name": "Bruno",
+      "description": "Invitado número 2.",
+      "email": "bruno@ejemplo.es"
+    },
+    {
+      "id": "s2",
+      "name": "Carla",
+      "description": "Invitado número 3.",
+      "email": "carla@ejemplo.es"
+    },
+    {
+      "id": "s3",
+      "name": "Dani",
+      "description": "Invitado número 4.",
+      "email": "dani@ejemplo.es"
+    },
+    {
+      "id": "s4",
+      "name": "Elena",
+      "description": "Invitado número 5.",
+      "email": "elena@ejemplo.es"
+    },
+    {
+      "id": "s5",
+      "name": "Fabio",
+      "description": "Invitado número 6.",
+      "email": "fabio@ejemplo.es"
+    },
+    {
+      "id": "s6",
+      "name": "Gema",
+      "description": "Invitado número 7.",
+      "email": "gema@ejemplo.es"
+    },
+    {
+      "id": "s7",
+      "name": "Hugo",
+      "description": "Invitado número 8.",
+      "email": "hugo@ejemplo.es"
+    }
+  ],
+  "rooms": [
+    {
+      "id": "r0",
+      "name": "Salón",
+      "description": "Descripción de salón."
+    },
+    {
+      "id": "r1",
+      "name": "Cocina",
+      "description": "Descripción de cocina."
+    },
+    {
+      "id": "r2",
+      "name": "Biblioteca",
+      "description": "Descripción de biblioteca."
+    },
+    {
+      "id": "r3",
+      "name": "Invernadero",
+      "description": "Descripción de invernadero."
+    },
+    {
+      "id": "r4",
+      "name": "Despacho",
+      "description": "Descripción de despacho."
+    },
+    {
+      "id": "r5",
+      "name": "Sala de billar",
+      "description": "Descripción de sala de billar."
+    },
+    {
+      "id": "r6",
+      "name": "Bodega",
+      "description": "Descripción de bodega."
+    },
+    {
+      "id": "r7",
+      "name": "Galería",
+      "description": "Descripción de galería."
+    }
+  ],
+  "weapons": [
+    {
+      "id": "w0",
+      "name": "Candelabro",
+      "description": "Un candelabro."
+    },
+    {
+      "id": "w1",
+      "name": "Abrecartas",
+      "description": "Un abrecartas."
+    },
+    {
+      "id": "w2",
+      "name": "Cuerda de cortina",
+      "description": "Un cuerda de cortina."
+    },
+    {
+      "id": "w3",
+      "name": "Frasco de láudano",
+      "description": "Un frasco de láudano."
+    },
+    {
+      "id": "w4",
+      "name": "Atizador",
+      "description": "Un atizador."
+    }
+  ],
+  "boardMode": "generated",
+  "settings": {
+    "language": "es"
+  },
+  "board": {
+    "grid": {
+      "cols": 24,
+      "rows": 24
+    },
+    "rooms": [
+      {
+        "roomId": "r0",
+        "x": 0,
+        "y": 0,
+        "w": 6,
+        "h": 6
+      },
+      {
+        "roomId": "r1",
+        "x": 18,
+        "y": 0,
+        "w": 6,
+        "h": 6
+      },
+      {
+        "roomId": "r2",
+        "x": 18,
+        "y": 18,
+        "w": 6,
+        "h": 6
+      },
+      {
+        "roomId": "r3",
+        "x": 0,
+        "y": 18,
+        "w": 6,
+        "h": 6
+      },
+      {
+        "roomId": "r4",
+        "x": 9,
+        "y": 0,
+        "w": 6,
+        "h": 5
+      },
+      {
+        "roomId": "r5",
+        "x": 19,
+        "y": 9,
+        "w": 5,
+        "h": 6
+      },
+      {
+        "roomId": "r6",
+        "x": 9,
+        "y": 19,
+        "w": 6,
+        "h": 5
+      },
+      {
+        "roomId": "r7",
+        "x": 0,
+        "y": 9,
+        "w": 5,
+        "h": 6
+      }
+    ],
+    "passages": [
+      {
+        "fromRoomId": "r0",
+        "toRoomId": "r2"
+      },
+      {
+        "fromRoomId": "r1",
+        "toRoomId": "r3"
+      }
+    ],
+    "centerLabel": "ESCALERAS"
+  },
+  "plot": {
+    "title": "El silencio de el Doctor Lenoir",
+    "tagline": "Nadie abandona la mansión hasta que la verdad salga a la luz.",
+    "synopsis": "La velada en Partida de referencia prometía champán, música y un gran anuncio. Pero cuando las luces volvieron tras el apagón, el Doctor Lenoir yacía sin vida y ninguno de los 8 invitados quiso ser el primero en hablar. El arma no aparece, la sala del crimen se disputa y cada coartada tiene una costura suelta. Uno de los presentes miente mejor que los demás.",
+    "victim": {
+      "name": "el Doctor Lenoir",
+      "description": "Médico de la alta sociedad, confidente de medio vecindario y guardián de demasiados secretos ajenos. Esta noche celebraba, decía, \"un anuncio que lo cambiaría todo\"."
+    },
+    "setting": "La acción transcurre en Partida de referencia, reconvertida por una noche en una mansión de los años 20. Cada espacio real se transforma: Salón, Cocina, Biblioteca, Invernadero, Despacho, Sala de billar, Bodega, Galería. Luz baja, jazz de fondo y copas largas: nadie debería fiarse de nadie.",
+    "solution": {
+      "murdererId": "s3",
+      "weaponId": "w1",
+      "roomId": "r2",
+      "motive": "un romance secreto que la víctima había descubierto",
+      "howItHappened": "Aprovechando el apagón de las 21:40, Dani se deslizó hasta Biblioteca, donde el Doctor Lenoir esperaba a solas una conversación \"privada\". Bastaron dos minutos y abrecartas para zanjar un romance secreto que la víctima había descubierto. Después, Dani volvió al grupo fingiendo buscar velas, con el pulso casi firme."
+    },
+    "characters": [
+      {
+        "suspectId": "s0",
+        "characterName": "Ana Escarlata",
+        "role": "mano derecha de la víctima en los negocios",
+        "publicPersona": "Ana Escarlata es mano derecha de la víctima en los negocios, y en sociedad se comenta ante todo su encanto imposible de resistir.",
+        "secret": "Debe una pequeña fortuna a prestamistas poco recomendables… y la víctima lo sabía.",
+        "motive": "un romance secreto que la víctima había descubierto — o eso murmuran en los pasillos.",
+        "alibi": "Asegura que durante el apagón estaba en Salón charlando con Bruno. Bruno solo puede confirmarlo a medias.",
+        "knowledge": [
+          "Viste a Carla discutir en voz baja con la víctima poco antes de la cena.",
+          "Sabes que Bruno entró en Biblioteca cuando todos le creían en otra parte.",
+          "Tras el apagón oíste un objeto metálico caer al suelo, aunque no sabrías decir dónde exactamente."
+        ],
+        "personalHook": "Este personaje está cosido a tu medida. Quien te conoce dice de ti: «Invitado número 1.». Úsalo esta noche: que esa forma de ser sea el disfraz perfecto… o la coartada perfecta."
+      },
+      {
+        "suspectId": "s1",
+        "characterName": "Bruno Mostaza",
+        "role": "amistad de la infancia que reapareció hace poco",
+        "publicPersona": "Bruno Mostaza es amistad de la infancia que reapareció hace poco, y en sociedad se comenta ante todo una memoria que no perdona ni una fecha.",
+        "secret": "Mantiene correspondencia secreta con el mayor rival de la familia.",
+        "motive": "una venganza incubada desde una ruina que nunca perdonó — o eso murmuran en los pasillos.",
+        "alibi": "Asegura que durante el apagón estaba en Cocina charlando con Carla. Carla solo puede confirmarlo a medias.",
+        "knowledge": [
+          "Viste a Dani discutir en voz baja con la víctima poco antes de la cena.",
+          "Sabes que Carla entró en Invernadero cuando todos le creían en otra parte.",
+          "Tras el apagón oíste un objeto metálico caer al suelo, aunque no sabrías decir dónde exactamente."
+        ],
+        "personalHook": "Este personaje está cosido a tu medida. Quien te conoce dice de ti: «Invitado número 2.». Úsalo esta noche: que esa forma de ser sea el disfraz perfecto… o la coartada perfecta."
+      },
+      {
+        "suspectId": "s2",
+        "characterName": "Carla Esmeralda",
+        "role": "estrella invitada de la velada",
+        "publicPersona": "Carla Esmeralda es estrella invitada de la velada, y en sociedad se comenta ante todo sus silencios más elocuentes que cualquier discurso.",
+        "secret": "No es quien dice ser: su título es comprado y su pasado, inventado.",
+        "motive": "unos documentos comprometedores guardados bajo llave — o eso murmuran en los pasillos.",
+        "alibi": "Asegura que durante el apagón estaba en Biblioteca charlando con Dani. Dani solo puede confirmarlo a medias.",
+        "knowledge": [
+          "Viste a Elena discutir en voz baja con la víctima poco antes de la cena.",
+          "Sabes que Dani entró en Despacho cuando todos le creían en otra parte.",
+          "Tras el apagón oíste un objeto metálico caer al suelo, aunque no sabrías decir dónde exactamente."
+        ],
+        "personalHook": "Este personaje está cosido a tu medida. Quien te conoce dice de ti: «Invitado número 3.». Úsalo esta noche: que esa forma de ser sea el disfraz perfecto… o la coartada perfecta."
+      },
+      {
+        "suspectId": "s3",
+        "characterName": "Dani Añil",
+        "role": "persona de confianza de la familia desde hace décadas",
+        "publicPersona": "Dani Añil es persona de confianza de la familia desde hace décadas, y en sociedad se comenta ante todo una risa que llena los salones.",
+        "secret": "La semana pasada fue quien forzó el escritorio privado de la víctima.",
+        "motive": "un romance secreto que la víctima había descubierto",
+        "alibi": "Afirma que durante el apagón estaba a solas en Despacho, \"tomando el aire\". Nadie puede confirmarlo.",
+        "knowledge": [
+          "Viste a Fabio discutir en voz baja con la víctima poco antes de la cena.",
+          "Sabes que Elena entró en Sala de billar cuando todos le creían en otra parte.",
+          "Tras el apagón oíste un objeto metálico caer al suelo, aunque no sabrías decir dónde exactamente."
+        ],
+        "personalHook": "Este personaje está cosido a tu medida. Quien te conoce dice de ti: «Invitado número 4.». Úsalo esta noche: que esa forma de ser sea el disfraz perfecto… o la coartada perfecta."
+      },
+      {
+        "suspectId": "s4",
+        "characterName": "Elena Ciruela",
+        "role": "cronista de sociedad con pluma temible",
+        "publicPersona": "Elena Ciruela es cronista de sociedad con pluma temible, y en sociedad se comenta ante todo un gusto exquisito y carísimo.",
+        "secret": "Guarda una copia de la llave de todas las salas de la casa.",
+        "motive": "una herencia disputada durante años — o eso murmuran en los pasillos.",
+        "alibi": "Asegura que durante el apagón estaba en Despacho charlando con Fabio. Fabio solo puede confirmarlo a medias.",
+        "knowledge": [
+          "Viste a Gema discutir en voz baja con la víctima poco antes de la cena.",
+          "Sabes que Fabio entró en Bodega cuando todos le creían en otra parte.",
+          "Tras el apagón oíste un objeto metálico caer al suelo, aunque no sabrías decir dónde exactamente."
+        ],
+        "personalHook": "Este personaje está cosido a tu medida. Quien te conoce dice de ti: «Invitado número 5.». Úsalo esta noche: que esa forma de ser sea el disfraz perfecto… o la coartada perfecta."
+      },
+      {
+        "suspectId": "s5",
+        "characterName": "Fabio Marfil",
+        "role": "quien gestionaba las cuentas y contratos de la casa",
+        "publicPersona": "Fabio Marfil es quien gestionaba las cuentas y contratos de la casa, y en sociedad se comenta ante todo una calma sospechosamente inalterable.",
+        "secret": "Lleva meses falsificando las cuentas que gestionaba para la víctima.",
+        "motive": "un chantaje que amenazaba con salir a la luz — o eso murmuran en los pasillos.",
+        "alibi": "Asegura que durante el apagón estaba en Sala de billar charlando con Gema. Gema solo puede confirmarlo a medias.",
+        "knowledge": [
+          "Viste a Hugo discutir en voz baja con la víctima poco antes de la cena.",
+          "Sabes que Gema entró en Galería cuando todos le creían en otra parte.",
+          "Tras el apagón oíste un objeto metálico caer al suelo, aunque no sabrías decir dónde exactamente."
+        ],
+        "personalHook": "Este personaje está cosido a tu medida. Quien te conoce dice de ti: «Invitado número 6.». Úsalo esta noche: que esa forma de ser sea el disfraz perfecto… o la coartada perfecta."
+      },
+      {
+        "suspectId": "s6",
+        "characterName": "Gema Azabache",
+        "role": "visita inesperada que nadie recuerda haber invitado",
+        "publicPersona": "Gema Azabache es visita inesperada que nadie recuerda haber invitado, y en sociedad se comenta ante todo saber siempre más de lo que dice.",
+        "secret": "La víctima le retiró de su testamento hace tres días. Aún no se lo ha contado a nadie.",
+        "motive": "unas deudas de juego imposibles de pagar — o eso murmuran en los pasillos.",
+        "alibi": "Asegura que durante el apagón estaba en Bodega charlando con Hugo. Hugo solo puede confirmarlo a medias.",
+        "knowledge": [
+          "Viste a Ana discutir en voz baja con la víctima poco antes de la cena.",
+          "Sabes que Hugo entró en Salón cuando todos le creían en otra parte.",
+          "Tras el apagón oíste un objeto metálico caer al suelo, aunque no sabrías decir dónde exactamente."
+        ],
+        "personalHook": "Este personaje está cosido a tu medida. Quien te conoce dice de ti: «Invitado número 7.». Úsalo esta noche: que esa forma de ser sea el disfraz perfecto… o la coartada perfecta."
+      },
+      {
+        "suspectId": "s7",
+        "characterName": "Hugo Carmesí",
+        "role": "promesa del mundo del arte apadrinada por la víctima",
+        "publicPersona": "Hugo Carmesí es promesa del mundo del arte apadrinada por la víctima, y en sociedad se comenta ante todo llegar tarde a todas partes menos a la mesa.",
+        "secret": "Debe una pequeña fortuna a prestamistas poco recomendables… y la víctima lo sabía.",
+        "motive": "un romance secreto que la víctima había descubierto — o eso murmuran en los pasillos.",
+        "alibi": "Asegura que durante el apagón estaba en Galería charlando con Ana. Ana solo puede confirmarlo a medias.",
+        "knowledge": [
+          "Viste a Bruno discutir en voz baja con la víctima poco antes de la cena.",
+          "Sabes que Ana entró en Cocina cuando todos le creían en otra parte.",
+          "Tras el apagón oíste un objeto metálico caer al suelo, aunque no sabrías decir dónde exactamente."
+        ],
+        "personalHook": "Este personaje está cosido a tu medida. Quien te conoce dice de ti: «Invitado número 8.». Úsalo esta noche: que esa forma de ser sea el disfraz perfecto… o la coartada perfecta."
+      }
+    ],
+    "timeline": [
+      {
+        "time": "19:00",
+        "description": "Los invitados van llegando; el Doctor Lenoir recibe a cada uno con una copa y una indirecta.",
+        "suspectIds": [
+          "s0",
+          "s1",
+          "s2",
+          "s3",
+          "s4",
+          "s5",
+          "s6",
+          "s7"
+        ],
+        "isPublic": true
+      },
+      {
+        "time": "19:45",
+        "description": "Durante el aperitivo, el Doctor Lenoir anuncia que a medianoche \"pondrá los puntos sobre las íes\". Varias copas se detienen a medio camino.",
+        "suspectIds": [
+          "s0",
+          "s1",
+          "s2",
+          "s3",
+          "s4",
+          "s5",
+          "s6",
+          "s7"
+        ],
+        "isPublic": true
+      },
+      {
+        "time": "20:30",
+        "description": "Cena servida. Conversación brillante en la superficie, cuchillos afilados por debajo.",
+        "suspectIds": [
+          "s0",
+          "s1",
+          "s2",
+          "s3",
+          "s4",
+          "s5",
+          "s6",
+          "s7"
+        ],
+        "isPublic": true
+      },
+      {
+        "time": "21:15",
+        "description": "el Doctor Lenoir se excusa y se retira \"a atender un asunto privado\". Nadie admite haberle seguido.",
+        "suspectIds": [],
+        "isPublic": true
+      },
+      {
+        "time": "21:40",
+        "description": "Un apagón deja la casa a oscuras durante varios minutos. Pasos, un roce de telas, una puerta que no debía abrirse.",
+        "suspectIds": [
+          "s0",
+          "s1",
+          "s2",
+          "s3",
+          "s4",
+          "s5",
+          "s6",
+          "s7"
+        ],
+        "isPublic": true
+      },
+      {
+        "time": "21:44",
+        "description": "Una silueta se desliza hacia Biblioteca amparada por la oscuridad y vuelve al salón antes de que prendan las velas.",
+        "suspectIds": [
+          "s3"
+        ],
+        "isPublic": false
+      },
+      {
+        "time": "21:47",
+        "description": "Vuelve la luz. Un grito: Ana encuentra el cuerpo de el Doctor Lenoir. La velada se convierte en investigación.",
+        "suspectIds": [
+          "s0",
+          "s1",
+          "s2",
+          "s3",
+          "s4",
+          "s5",
+          "s6",
+          "s7"
+        ],
+        "isPublic": true
+      }
+    ],
+    "clues": [
+      {
+        "id": "pista-1-a",
+        "roomId": "r0",
+        "description": "Un pañuelo bordado con una inicial, abandonado con demasiada intención como para ser un descuido.",
+        "pointsTo": "Parece incriminar a Ana… quizá demasiado claramente. Pista falsa.",
+        "round": 1
+      },
+      {
+        "id": "pista-1-b",
+        "roomId": "r0",
+        "description": "Un reloj de sobremesa parado a las 21:43. Nadie recuerda haberlo tocado.",
+        "pointsTo": "Sitúa a alguien moviéndose por la casa durante el apagón. Encaja con la coartada rota de Dani.",
+        "round": 2
+      },
+      {
+        "id": "pista-2-a",
+        "roomId": "r1",
+        "description": "Una copa a medio beber con una huella de carmín (o de dedos nerviosos) en el borde.",
+        "pointsTo": "Parece incriminar a Bruno… quizá demasiado claramente. Pista falsa.",
+        "round": 1
+      },
+      {
+        "id": "pista-2-b",
+        "roomId": "r1",
+        "description": "Una cerilla consumida hasta el final, de las que se usan para alumbrarse a oscuras.",
+        "pointsTo": "Sitúa a alguien moviéndose por la casa durante el apagón. Encaja con la coartada rota de Dani.",
+        "round": 3
+      },
+      {
+        "id": "pista-3-a",
+        "roomId": "r2",
+        "description": "Una alfombra ligeramente torcida y una mancha reciente que alguien limpió con más prisa que acierto.",
+        "pointsTo": "Señala esta sala como la verdadera escena del crimen.",
+        "round": 4
+      },
+      {
+        "id": "pista-3-b",
+        "roomId": "r2",
+        "description": "Una marca del tamaño y forma de abrecartas en el polvo de una repisa: algo estuvo ahí hasta esta misma noche.",
+        "pointsTo": "Señala Abrecartas como el arma del crimen.",
+        "round": 4
+      },
+      {
+        "id": "pista-4-a",
+        "roomId": "r3",
+        "description": "Una cortina descolgada de un tirón, como si alguien se hubiera escondido tras ella.",
+        "pointsTo": "Parece incriminar a Elena… quizá demasiado claramente. Pista falsa.",
+        "round": 1
+      },
+      {
+        "id": "pista-4-b",
+        "roomId": "r3",
+        "description": "Barro fresco junto a la ventana: alguien entró o salió por donde no debía.",
+        "pointsTo": "Sitúa a alguien moviéndose por la casa durante el apagón. Encaja con la coartada rota de Dani.",
+        "round": 3
+      },
+      {
+        "id": "pista-5-a",
+        "roomId": "r4",
+        "description": "Un pañuelo bordado con una inicial, abandonado con demasiada intención como para ser un descuido.",
+        "pointsTo": "Parece incriminar a Fabio… quizá demasiado claramente. Pista falsa.",
+        "round": 1
+      },
+      {
+        "id": "pista-5-b",
+        "roomId": "r4",
+        "description": "Un reloj de sobremesa parado a las 21:43. Nadie recuerda haberlo tocado.",
+        "pointsTo": "Sitúa a alguien moviéndose por la casa durante el apagón. Encaja con la coartada rota de Dani.",
+        "round": 2
+      },
+      {
+        "id": "pista-6-a",
+        "roomId": "r5",
+        "description": "Una copa a medio beber con una huella de carmín (o de dedos nerviosos) en el borde.",
+        "pointsTo": "Parece incriminar a Gema… quizá demasiado claramente. Pista falsa.",
+        "round": 1
+      },
+      {
+        "id": "pista-6-b",
+        "roomId": "r5",
+        "description": "Una cerilla consumida hasta el final, de las que se usan para alumbrarse a oscuras.",
+        "pointsTo": "Sitúa a alguien moviéndose por la casa durante el apagón. Encaja con la coartada rota de Dani.",
+        "round": 3
+      },
+      {
+        "id": "pista-7-a",
+        "roomId": "r6",
+        "description": "Un papel arrugado en la papelera: media frase tachada que habla de \"saldar esto esta noche\".",
+        "pointsTo": "Parece incriminar a Hugo… quizá demasiado claramente. Pista falsa.",
+        "round": 1
+      },
+      {
+        "id": "pista-7-b",
+        "roomId": "r6",
+        "description": "El cajón del escritorio forzado; dentro, solo el hueco de lo que alguien se llevó.",
+        "pointsTo": "Sitúa a alguien moviéndose por la casa durante el apagón. Encaja con la coartada rota de Dani.",
+        "round": 2
+      },
+      {
+        "id": "pista-8-a",
+        "roomId": "r7",
+        "description": "Una cortina descolgada de un tirón, como si alguien se hubiera escondido tras ella.",
+        "pointsTo": "Parece incriminar a Ana… quizá demasiado claramente. Pista falsa.",
+        "round": 1
+      },
+      {
+        "id": "pista-8-b",
+        "roomId": "r7",
+        "description": "Barro fresco junto a la ventana: alguien entró o salió por donde no debía.",
+        "pointsTo": "Sitúa a alguien moviéndose por la casa durante el apagón. Encaja con la coartada rota de Dani.",
+        "round": 3
+      }
+    ],
+    "gmScript": [
+      "Antes de que lleguen los invitados, reparte o memoriza las pistas de cada sala (las tienes listadas en tu dosier) y decide cuáles esconderás físicamente.",
+      "Recibe a cada invitado por separado, entrégale su dosier confidencial y dale unos minutos para leerlo a solas. Nadie debe enseñar su dosier a nadie.",
+      "Abre la velada leyendo la sinopsis en voz alta, presenta a el Doctor Lenoir con teatro… y despídele: a las 21:47 se descubre el cuerpo.",
+      "Anuncia el descubrimiento siguiendo la cronología. Desde ese momento los detectives pueden moverse por las salas, buscar pistas e interrogarse en personaje.",
+      "Modera las sugerencias sala a sala (personaje + arma + la sala en la que están) y recuerda el turno de refutación cuando haga falta.",
+      "Si la investigación se estanca, deja caer una pista de las reservas o improvisa a un mayordomo chismoso que \"recuerda algo de pronto\".",
+      "Cuando alguien formule su acusación final, reúne a todos en la sala principal y revela la solución paso a paso, saboreando cada pausa.",
+      "Cierra con el motivo y el relato de cómo ocurrió, y brinda por quien haya resuelto el caso… o por el asesino, si nadie lo logró."
+    ],
+    "material": {
+      "generatedAt": "2026-01-01T20:00:00.000Z",
+      "narrations": [
+        {
+          "round": 1,
+          "title": "Ronda 1",
+          "text": "Texto que se lee en alto al abrir la ronda 1.",
+          "stageDirection": ""
+        },
+        {
+          "round": 2,
+          "title": "Ronda 2",
+          "text": "Texto que se lee en alto al abrir la ronda 2.",
+          "stageDirection": "Apaga una lámpara."
+        },
+        {
+          "round": 3,
+          "title": "Ronda 3",
+          "text": "Texto que se lee en alto al abrir la ronda 3.",
+          "stageDirection": ""
+        },
+        {
+          "round": 4,
+          "title": "Ronda 4",
+          "text": "Texto que se lee en alto al abrir la ronda 4.",
+          "stageDirection": ""
+        }
+      ],
+      "twists": [
+        {
+          "id": "giro-0",
+          "suspectId": "s0",
+          "round": 2,
+          "instruction": "Giro personal 1: recuerdas algo que no habías contado."
+        },
+        {
+          "id": "giro-1",
+          "suspectId": "s1",
+          "round": 3,
+          "instruction": "Giro personal 2: recuerdas algo que no habías contado."
+        },
+        {
+          "id": "giro-2",
+          "suspectId": "s2",
+          "round": 2,
+          "instruction": "Giro personal 3: recuerdas algo que no habías contado."
+        },
+        {
+          "id": "giro-3",
+          "suspectId": "s3",
+          "round": 3,
+          "instruction": "Giro personal 4: recuerdas algo que no habías contado."
+        }
+      ],
+      "timelineReveals": [
+        {
+          "round": 1,
+          "time": "21:40",
+          "fact": "Se apagaron las luces del pasillo."
+        },
+        {
+          "round": 2,
+          "time": "22:05",
+          "fact": "Alguien cerró la puerta del invernadero."
+        }
+      ],
+      "hints": [
+        {
+          "level": 1,
+          "text": "Ayuda de nivel 1."
+        },
+        {
+          "level": 2,
+          "text": "Ayuda de nivel 2."
+        },
+        {
+          "level": 3,
+          "text": "Ayuda de nivel 3."
+        }
+      ],
+      "finale": {
+        "reconstruction": "Reconstrucción de lo ocurrido.",
+        "confession": "La confesión, en primera persona.",
+        "epilogue": "El epílogo de la velada."
+      }
+    }
+  }
+}

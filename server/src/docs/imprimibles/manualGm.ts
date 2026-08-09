@@ -12,6 +12,7 @@ import { esc } from '../html';
 import { envolver, portada } from './comun';
 import type { VistaGm } from '../contexto';
 import type { DocumentRenderOptions, GameSession, Plot } from '../../../../shared/types';
+import { culpableDe, lugarDe, objetoDe } from '../../juegos/cluedo';
 
 function lista(elementos: string[]): string {
   return `<ul>${elementos.map((e) => `<li>${e}</li>`).join('')}</ul>`;
@@ -139,9 +140,9 @@ ${bloqueNarracion}
     <h2>La solución</h2>
     <table>
       <tbody>
-        <tr><td style="width:34mm;"><strong>Culpable</strong></td><td>${esc(game.suspects.find((s) => s.id === plot.solution.murdererId)?.name ?? '')} · ${esc(plot.characters.find((c) => c.suspectId === plot.solution.murdererId)?.characterName ?? '')}</td></tr>
-        <tr><td><strong>Objeto</strong></td><td>${esc(game.weapons.find((w) => w.id === plot.solution.weaponId)?.name ?? '')}</td></tr>
-        <tr><td><strong>Sala</strong></td><td>${esc(game.rooms.find((r) => r.id === plot.solution.roomId)?.name ?? '')}</td></tr>
+        <tr><td style="width:34mm;"><strong>Culpable</strong></td><td>${esc(game.suspects.find((s) => s.id === culpableDe(plot.solution))?.name ?? '')} · ${esc(plot.characters.find((c) => c.suspectId === culpableDe(plot.solution))?.characterName ?? '')}</td></tr>
+        <tr><td><strong>Objeto</strong></td><td>${esc(game.weapons.find((w) => w.id === objetoDe(plot.solution))?.name ?? '')}</td></tr>
+        <tr><td><strong>Sala</strong></td><td>${esc(game.rooms.find((r) => r.id === lugarDe(plot.solution))?.name ?? '')}</td></tr>
         <tr><td><strong>Motivo</strong></td><td>${esc(plot.solution.motive)}</td></tr>
       </tbody>
     </table>

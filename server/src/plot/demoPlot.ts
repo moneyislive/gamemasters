@@ -21,6 +21,7 @@ import type {
   TimelineEvent,
   Weapon,
 } from '../../../shared/types';
+import { culpableDe, respuestasCluedo } from '../juegos/cluedo';
 
 // ------------------------------ plantillas ------------------------------
 
@@ -180,9 +181,11 @@ export function generateDemoPlot(game: GameSession): Plot {
       `Cada espacio real se transforma: ${salas.map((sala) => sala.name).join(', ')}. ` +
       `Luz baja, jazz de fondo y copas largas: nadie debería fiarse de nadie.`,
     solution: {
-      murdererId: asesino.id,
-      weaponId: armaCrimen.id,
-      roomId: salaCrimen.id,
+      respuestas: respuestasCluedo({
+        murdererId: asesino.id,
+        weaponId: armaCrimen.id,
+        roomId: salaCrimen.id,
+      }),
       motive: motivo,
       howItHappened:
         `Aprovechando el apagón de las 21:40, ${asesino.name} se deslizó hasta ${salaCrimen.name}, ` +
@@ -431,7 +434,7 @@ export function generateDemoCharacters(
     const desplazamiento = plot.characters.length + i;
     const characterName = `${sospechoso.name} ${cicla(repertorio, i)}`;
     const papel = cicla(ROLES, desplazamiento);
-    const esAsesino = plot.solution.murdererId === sospechoso.id;
+    const esAsesino = culpableDe(plot.solution) === sospechoso.id;
     const salaCoartada = cicla(salas, desplazamiento);
 
     const testigo = testigos.length > 0 ? cicla(testigos, i) : null;

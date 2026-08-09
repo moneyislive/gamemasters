@@ -12,8 +12,10 @@ import { cerrarPartidaEnCuentas } from '../live/cuentas';
 import { vistaDeGameMaster } from '../live/proyeccion';
 import {
   abrirAcusaciones,
+  abrirEncuentro,
   abrirRonda,
   abrirSesion,
+  cerrarEncuentro,
   cerrarRonda,
   MINUTOS_POR_RONDA,
   mutar,
@@ -151,6 +153,36 @@ router.post('/games/:id/live/ayuda', async (req, res) => {
   }
   anunciar(req.params.id, sesion.rev, 'ayuda', ayuda.text);
   await responderVista(req.params.id, res);
+});
+
+/**
+ * Cierra la sesión de hoy sin terminar la partida.
+ *
+ * Para campañas de varias jornadas. Se conserva todo; lo único que se pide es
+ * un título y un resumen de lo ocurrido, que es lo que se lee al retomarla.
+ */
+router.post('/games/:id/live/encuentro/cerrar', async (req, res) => {
+  try {
+    await mutar(req.params.id, (s) =>
+      cerrarEncuentro(s, {
+        titulo: String(req.body?.titulo ?? ''),
+        resumen: String(req.body?.resumen ?? ''),
+      }),
+    );
+    await responderVista(req.params.id, res);
+  } catch (error) {
+    fallo(error, res);
+  }
+});
+
+/** Retoma la partida en el encuentro siguiente. */
+router.post('/games/:id/live/encuentro/abrir', async (req, res) => {
+  try {
+    await mutar(req.params.id, (s) => abrirEncuentro(s));
+    await responderVista(req.params.id, res);
+  } catch (error) {
+    fallo(error, res);
+  }
 });
 
 router.post('/games/:id/live/acusaciones', async (req, res) => {

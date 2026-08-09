@@ -52,7 +52,11 @@ export default function Desenlace(): JSX.Element {
   }
 
   const gane = fin.ganador?.suspectId === vista.yo.suspectId;
-  const eraYo = fin.murdererId === vista.yo.suspectId;
+  const eraYo = fin.culpableId === vista.yo.suspectId;
+  // El primer eje del juego es el que abre el sobre; el resto se lee debajo.
+  // En CLUEDO eso es «fue Fulano, con el candelabro, en la cocina», pero la
+  // pantalla ya no sabe que son tres ni cómo se llaman.
+  const [principal, ...secundarias] = fin.respuestas;
 
   return (
     <Pantalla barra={false}>
@@ -66,12 +70,18 @@ export default function Desenlace(): JSX.Element {
         <Marco tono="peligro">
           <Etiqueta style={{ color: '#f0c9c0', textAlign: 'center' }}>Fue</Etiqueta>
           <Titulo style={{ textAlign: 'center', fontSize: 30, marginTop: espacio.sm }}>
-            {fin.murdererName}
+            {principal?.nombre ?? ''}
           </Titulo>
-          <Cuerpo style={{ textAlign: 'center', marginTop: espacio.md, fontSize: 19 }}>
-            con {fin.weaponName}
-            {'\n'}en {fin.roomName}
-          </Cuerpo>
+          {secundarias.length > 0 && (
+            <Cuerpo style={{ textAlign: 'center', marginTop: espacio.md, fontSize: 19 }}>
+              {secundarias.map((r, i) => (
+                <Cuerpo key={r.ejeId} style={{ fontSize: 19 }}>
+                  {i > 0 ? '\n' : ''}
+                  {r.rotulo.toLowerCase()}: {r.nombre}
+                </Cuerpo>
+              ))}
+            </Cuerpo>
+          )}
           {eraYo && (
             <Cuerpo style={{ textAlign: 'center', marginTop: espacio.md, color: color.oro300 }}>
               Eras tú. {fin.ganador ? 'Te pillaron.' : 'Y nadie te descubrió.'}

@@ -14,7 +14,10 @@ import { avisosDesde, esperarCambio } from '../live/hub';
 import { consultarConsejero } from '../live/consejero';
 import { perfilDe } from '../live/cuentas';
 import { vistaDeJugador } from '../live/proyeccion';
-import { acusar, elegirSala, guardarNotas, mutar, tocar } from '../live/sesion';
+import { guardarNotas, mutar, tocar } from '../live/sesion';
+import { AccionInvalida, ejecutarAccion } from '../juegos/motor';
+// Importar este módulo da de alta lo que hacen las acciones de CLUEDO.
+import '../juegos/cluedo-acciones';
 import { credencialDePeticion, emitirCredencial } from '../live/token';
 import type { Request, Response } from 'express';
 import type { VistaJugador } from '../../../shared/live';
@@ -159,31 +162,73 @@ async function mutarPresencia(gameId: string, suspectId: string): Promise<void> 
 // Acciones
 // ---------------------------------------------------------------------------
 
+/**
+ * Hacer algo.
+ *
+ * Una sola ruta para todo el repertorio del juego. Añadir «descifrar el
+ * criptograma» no abre un endpoint nuevo: se declara en el manifiesto y se
+ * escribe su reductor. La superficie de la API no crece nunca.
+ */
+router.post('/jugar/accion', async (req, res) => {
+  const cred = credencial(req, res);
+  if (!cred) return;
+
+  const cuerpo = (req.body ?? {}) as { accion?: unknown; datos?: Record<string, unknown> };
+  const accion = String(cuerpo.accion ?? '');
+  const datos: Record<string, string> = {};
+  for (const [campo, valor] of Object.entries(cuerpo.datos ?? {})) {
+    datos[String(campo)] = String(valor ?? '');
+  }
+
+  try {
+    const store = getStore();
+    const game = await store.getGame(cred.gameId);
+    if (!game) {
+      res.status(404).json({ error: 'Esta partida ya no está en juego.' });
+      return;
+    }
+    const { resultado } = await mutar(cred.gameId, (s) =>
+      ejecutarAccion(game, s, cred.suspectId, accion, datos),
+    );
+    const vista = await vistaActual(cred.gameId, cred.suspectId, res);
+    if (!vista) return;
+    res.json({ resultado, vista });
+  } catch (error) {
+    const estado = error instanceof AccionInvalida ? 409 : 409;
+    res.status(estado).json({ error: mensaje(error, 'No se pudo hacer eso.') });
+  }
+});
+
+/**
+ * Entrar en una sala.
+ *
+ * Se conserva porque la app la usa, pero por dentro ya es la acción genérica:
+ * un solo camino, una sola comprobación, y lo que valga para CLUEDO valdrá
+ * para cualquier otro juego.
+ */
 router.post('/jugar/sala', async (req, res) => {
   const cred = credencial(req, res);
   if (!cred) return;
   const roomId = String(req.body?.roomId ?? '');
+
   try {
     const store = getStore();
     const game = await store.getGame(cred.gameId);
-    if (!game?.rooms.some((r) => r.id === roomId)) {
-      res.status(400).json({ error: 'Esa sala no existe en esta partida.' });
+    if (!game) {
+      res.status(404).json({ error: 'Esta partida ya no está en juego.' });
       return;
     }
-    await mutar(cred.gameId, (s) => elegirSala(s, cred.suspectId, roomId));
+    await mutar(cred.gameId, (s) =>
+      ejecutarAccion(game, s, cred.suspectId, 'entrar-en-sala', { sala: roomId }),
+    );
     const vista = await vistaActual(cred.gameId, cred.suspectId, res);
-    if (vista) res.json({ vista });
+    if (!vista) return;
+    res.json({ vista });
   } catch (error) {
     res.status(409).json({ error: mensaje(error, 'No se pudo entrar en esa sala.') });
   }
 });
 
-/**
- * «Estoy listo»: le dice a quien dirige que puede empezar cuando quiera.
- *
- * No abre la ronda —eso sigue siendo decisión suya— pero le ahorra preguntar
- * doce veces si ya está todo el mundo. Se puede retirar.
- */
 router.post('/jugar/listo', async (req, res) => {
   const cred = credencial(req, res);
   if (!cred) return;
@@ -213,14 +258,22 @@ router.post('/jugar/notas', async (req, res) => {
   }
 });
 
+/**
+ * Acusar.
+ *
+ * Por dentro es la acción `acusar` del juego. Quién gana y cuándo lo decide el
+ * reductor de CLUEDO, no la plataforma: un juego donde se gane de otra manera
+ * escribe el suyo y esta ruta le sirve igual.
+ */
 router.post('/jugar/acusar', async (req, res) => {
   const cred = credencial(req, res);
   if (!cred) return;
-  const eleccion = {
-    murdererId: String(req.body?.murdererId ?? ''),
-    weaponId: String(req.body?.weaponId ?? ''),
-    roomId: String(req.body?.roomId ?? ''),
-  };
+
+  const crudo = (req.body ?? {}) as { respuestas?: Record<string, unknown> };
+  const datos: Record<string, string> = {};
+  for (const [eje, valor] of Object.entries(crudo.respuestas ?? {})) {
+    datos[String(eje)] = String(valor ?? '');
+  }
 
   try {
     const store = getStore();
@@ -230,20 +283,14 @@ router.post('/jugar/acusar', async (req, res) => {
       return;
     }
     const { resultado } = await mutar(cred.gameId, (s) =>
-      acusar(s, cred.suspectId, eleccion, game.plot!.solution),
+      ejecutarAccion(game, s, cred.suspectId, 'acusar', datos),
     );
-    // Deliberadamente NO se dice si ha acertado: se sabrá en el desenlace, como
-    // en la mesa. Devolverlo aquí permitiría probar combinaciones.
-    res.json({ registrada: true, at: resultado.acusacion.at });
+    res.json(resultado);
   } catch (error) {
     res.status(409).json({ error: mensaje(error, 'No se pudo registrar la acusación.') });
   }
 });
 
-/**
- * El consejero. Recibe EXACTAMENTE la misma proyección que el móvil, así que
- * no puede revelar lo que no sabe.
- */
 router.post('/jugar/preguntar', async (req, res) => {
   const cred = credencial(req, res);
   if (!cred) return;

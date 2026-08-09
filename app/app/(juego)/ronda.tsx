@@ -13,6 +13,7 @@ import Animated, { FadeIn, FadeInDown, FadeInUp, Layout } from 'react-native-rea
 import * as api from '../../src/api';
 import { usePartida } from '../../src/estado';
 import { Reloj } from '../../src/reloj';
+import { PanelDeAcciones } from '../../src/acciones';
 import {
   Boton,
   Cargando,
@@ -158,6 +159,48 @@ export default function Ronda(): JSX.Element {
 
         <AvisoError>{errorSala}</AvisoError>
 
+      </Pantalla>
+    );
+  }
+
+  // ---- Entre jornadas ----
+  // Una campaña se levanta de la mesa sin terminar. Sin esta rama, la pantalla
+  // caía en la de «ronda cerrada» y decía que fueran al tablón, cuando lo que
+  // toca es leer lo que pasó y esperar al sábado que viene.
+  if (sesion.phase === 'intermedio') {
+    return (
+      <Pantalla>
+        <Animated.View entering={FadeInDown.duration(500)} style={estilos.centro}>
+          <Sello>Hasta la próxima</Sello>
+          <Titulo style={{ textAlign: 'center', marginTop: espacio.lg }}>
+            Se levanta la mesa
+          </Titulo>
+          <Cuerpo tenue style={{ textAlign: 'center', marginTop: 4 }}>
+            La partida sigue viva. Quien dirige la retomará.
+          </Cuerpo>
+        </Animated.View>
+
+        <Ornamento />
+
+        {vista.cronica.length === 0 ? (
+          <Marco>
+            <Cuerpo tenue>Todavía no hay nada apuntado de esta jornada.</Cuerpo>
+          </Marco>
+        ) : (
+          [...vista.cronica].reverse().map((e, i) => (
+            <Animated.View key={e.encuentro} entering={FadeInUp.delay(80 * i).duration(460)}>
+              <Marco tono="papel">
+                <Etiqueta style={{ color: color.burdeos700 }}>Jornada {e.encuentro}</Etiqueta>
+                <Cuerpo style={{ color: color.caoba700, fontFamily: 'Cinzel_600SemiBold', marginTop: 4 }}>
+                  {e.titulo}
+                </Cuerpo>
+                <Cuerpo style={{ color: color.caoba700, marginTop: espacio.sm }}>
+                  {e.resumen || 'Sin resumen.'}
+                </Cuerpo>
+              </Marco>
+            </Animated.View>
+          ))
+        )}
       </Pantalla>
     );
   }
@@ -319,6 +362,14 @@ export default function Ronda(): JSX.Element {
           </Boton>
         </Marco>
       )}
+
+      {/* Lo que el juego permita hacer y no tenga pantalla propia. En CLUEDO
+          suele estar vacío —entrar en una sala ya tiene la suya, más rica— y
+          en un juego nuevo es lo que lo hace jugable el primer día. */}
+      <PanelDeAcciones
+        acciones={vista.acciones.filter((a) => a.id !== 'entrar-en-sala' && a.id !== 'acusar')}
+        alHacer={aplicarVista}
+      />
 
     </Pantalla>
   );

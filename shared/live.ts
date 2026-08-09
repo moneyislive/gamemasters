@@ -13,6 +13,7 @@
  * envía lo que esa persona puede saber en esa ronda, y nada más.
  */
 import type { BoardLayout, BoardMode } from './types';
+import type { EjeId, JuegoId } from './juegos/tipos';
 
 // ---------------------------------------------------------------------------
 // Estado de la partida
@@ -27,6 +28,14 @@ export type LivePhase =
   | 'ronda-cerrada'
   /** Ventana de acusación: todos escriben a la vez. */
   | 'acusaciones'
+  /**
+   * Se cierra la sesión de hoy, pero la partida NO ha terminado.
+   *
+   * Es lo que separa una velada de una campaña. Un CLUEDO no pasa nunca por
+   * aquí: empieza y acaba la misma noche. Una campaña de rol de varios días
+   * vive aquí entre encuentro y encuentro, conservándolo todo.
+   */
+  | 'intermedio'
   /** Desenlace revelado. */
   | 'desenlace';
 
@@ -76,9 +85,8 @@ export interface LivePlayer {
 export interface Acusacion {
   /** Quién acusa. */
   suspectId: string;
-  murdererId: string;
-  weaponId: string;
-  roomId: string;
+  /** Un valor por eje del juego. En CLUEDO: culpable, objeto y lugar. */
+  respuestas: Record<EjeId, string>;
   /**
    * Hora del SERVIDOR en el instante de recibirla. El ganador se decide por
    * este campo, así que jamás puede venir del cliente: un móvil con la hora
@@ -92,6 +100,16 @@ export interface Acusacion {
 export interface LiveSession {
   /** Coincide con el id de la partida. */
   id: string;
+  /**
+   * A qué se juega. CATA.
+   *
+   * Está aquí, y no solo en los ajustes de la partida, por una razón que salió
+   * al intentarlo: las funciones que gobiernan las fases —`abrirRonda`,
+   * `cerrarRonda`, `abrirAcusaciones`— reciben la sesión y nada más. Sin esta
+   * copia habría que pasarles la partida entera a todas, o buscarla en el
+   * almacén dentro de una función que hoy es síncrona y pura.
+   */
+  juego?: JuegoId;
   /** Código corto para entrar, del estilo «TEJADO». Se enseña en la mesa. */
   code: string;
   phase: LivePhase;
@@ -106,6 +124,48 @@ export interface LiveSession {
   acusaciones: Acusacion[];
   /** Sospechoso que ganó, decidido por la primera acusación correcta. */
   winnerId?: string;
+  /**
+   * Lo que cada juego necesita guardar y el motor no interpreta.
+   *
+   * Las posiciones de una oca, los puntos de vida de una campaña de rol, las
+   * cartas repartidas. El motor lo transporta, lo persiste y lo proyecta según
+   * las reglas del juego, pero no mira dentro: si mirase, volvería a saber de
+   * qué se juega.
+   */
+  estado?: Record<string, unknown>;
+  /**
+   * A quién le toca, en los juegos por turnos.
+   *
+   * Vacío en los simultáneos, donde los doce actúan a la vez.
+   */
+  turnoDe?: string;
+  /**
+   * Registro de lo que se ha hecho. Sirve para contar repeticiones por ronda y
+   * para que quien dirige vea el pulso de la mesa.
+   */
+  acciones?: Array<{ suspectId: string; accion: string; round: number; at: string }>;
+  /**
+   * En qué encuentro va la partida. 1 es el primero.
+   *
+   * Una velada de una noche se queda en 1 para siempre y nadie lo nota. Una
+   * campaña lo va subiendo cada vez que se retoma.
+   */
+  encuentro?: number;
+  /**
+   * Lo que pasó en cada encuentro ya cerrado.
+   *
+   * No es decoración: en una campaña que se retoma al cabo de una semana, esto
+   * es lo que permite a doce personas recordar dónde lo dejaron. Se le enseña
+   * a quien juega.
+   */
+  cronica?: Array<{
+    encuentro: number;
+    titulo: string;
+    resumen: string;
+    desdeRonda: number;
+    hastaRonda: number;
+    cerradoEl: string;
+  }>;
   /** Salas visitadas por alguien en cada ronda; lo que pasa al tablón común. */
   tablon: Array<{ round: number; roomId: string }>;
   /**
@@ -278,6 +338,8 @@ export interface VistaJugador {
     /** Cuántos han pulsado «estoy listo» y cuántos son en total. */
     listos: number;
     total: number;
+    /** En qué encuentro va la partida. 1 en una velada de una sola noche. */
+    encuentro: number;
   };
   /**
    * El caso, tal como lo conoce todo el mundo.
@@ -333,24 +395,77 @@ export interface VistaJugador {
   /** El plano de la casa. Ausente si la partida todavía no tiene tablero. */
   tablero?: TableroVista;
   objetos: Array<{ id: string; name: string; description?: string; photoUrl?: string }>;
+  /**
+   * Qué hay que responder para acusar, y con qué opciones.
+   *
+   * Lo compone el servidor a partir del manifiesto del juego. Antes la app
+   * pintaba tres selectores escritos a mano —culpable, objeto y sala— y por
+   * tanto solo servía para CLUEDO. Ahora recorre esta lista: si un juego tiene
+   * dos ejes o cinco, la pantalla de acusación sale bien sin tocarla.
+   *
+   * No abre ninguna brecha: las opciones son las mismas entidades que ya
+   * viajan en `jugadores`, `salas` y `objetos`.
+   */
+  ejes: Array<{
+    ejeId: EjeId;
+    /** «¿Quién lo hizo?» */
+    pregunta: string;
+    /** «Quién» */
+    rotulo: string;
+    opciones: Array<{ id: string; nombre: string }>;
+  }>;
+  /**
+   * Qué puedes hacer ahora mismo, con sus opciones ya resueltas.
+   *
+   * Lo compone el servidor desde el repertorio del juego, filtrando por la
+   * fase, por si te toca y por las veces que ya lo has hecho. La app lo pinta
+   * sin saber a qué se juega: una acción nueva no obliga a escribir una
+   * pantalla nueva.
+   *
+   * No abre ninguna brecha: las opciones son entidades que ya viajan en la
+   * vista.
+   */
+  acciones: Array<{
+    id: string;
+    rotulo: string;
+    campos: Array<{
+      campo: string;
+      rotulo: string;
+      opciones: Array<{ id: string; nombre: string }>;
+    }>;
+  }>;
   /** La sala que has elegido esta ronda, si ya lo has hecho. */
   miSala?: string;
   /** Pistas de TU sala en esta ronda. Vacío hasta que eliges. */
   misPistas: PistaVista[];
   /** Todo lo que ha pasado al tablón común en rondas ya cerradas. */
   tablon: PistaVista[];
+  /**
+   * Lo que pasó en los encuentros anteriores.
+   *
+   * Vacío en una velada de una noche. En una campaña es lo primero que se mira
+   * al retomarla.
+   */
+  cronica: Array<{ encuentro: number; titulo: string; resumen: string; cerradoEl: string }>;
   /** Hechos públicos de la cronología. */
   cronologia: MomentoVista[];
   /** Narración de la ronda en curso, si el Game Master la ha lanzado. */
   narracion?: { title: string; text: string };
   /** Tu acusación, si ya la has hecho. */
-  miAcusacion?: { murdererId: string; weaponId: string; roomId: string; at: string };
+  miAcusacion?: { respuestas: Record<EjeId, string>; at: string };
   /** Solo cuando la partida ha terminado. */
   desenlace?: {
-    murdererId: string;
-    murdererName: string;
-    weaponName: string;
-    roomName: string;
+    /**
+     * La respuesta, ya resuelta a nombres para poder leerla sin más consultas.
+     * Un renglón por eje, en el orden que declara el juego.
+     */
+    respuestas: Array<{ ejeId: EjeId; rotulo: string; entidadId: string; nombre: string }>;
+    /**
+     * Quién resultó ser. Se conserva aparte de `respuestas` porque la app lo
+     * necesita para saber si el culpable eres tú, y eso no es un eje más: es
+     * la única respuesta que además identifica a una persona de la mesa.
+     */
+    culpableId?: string;
     motive: string;
     reconstruccion: string;
     confesion?: string;

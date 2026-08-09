@@ -12,6 +12,7 @@ import { esc } from '../html';
 import { renderPlayerDocument } from '../renderer';
 import { envolver, portada } from './comun';
 import type { DocumentRenderOptions, GameSession, Plot } from '../../../../shared/types';
+import { culpableDe, lugarDe, objetoDe } from '../../juegos/cluedo';
 
 interface Comprobacion {
   titulo: string;
@@ -89,9 +90,9 @@ export function informeValidacion(
     {
       titulo: 'La solución apunta a gente y cosas que existen',
       bien:
-        idsSospechosos.has(plot.solution.murdererId) &&
-        game.weapons.some((w) => w.id === plot.solution.weaponId) &&
-        game.rooms.some((r) => r.id === plot.solution.roomId),
+        idsSospechosos.has(culpableDe(plot.solution)) &&
+        game.weapons.some((w) => w.id === objetoDe(plot.solution)) &&
+        game.rooms.some((r) => r.id === lugarDe(plot.solution)),
       detalle:
         'Culpable, objeto y sala siguen formando parte de la partida. Si falla, actualiza el misterio.',
     },
@@ -145,7 +146,7 @@ export function informeValidacion(
     });
     comprobaciones.push({
       titulo: 'Ningún giro le toca al culpable',
-      bien: !material.twists.some((g) => g.suspectId === plot.solution.murdererId),
+      bien: !material.twists.some((g) => g.suspectId === culpableDe(plot.solution)),
       detalle: 'Un giro dirigido al culpable lo señalaría delante de todos.',
     });
   }

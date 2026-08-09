@@ -11,6 +11,8 @@ import { getStore } from '../db/store';
 import { numeroDeRondas } from '../docs/datos';
 import { avisarCambio } from './hub';
 import { ALFABETO_CODIGO } from '../../../shared/live';
+import { aciertos, esElSenalado, ejes as ejesDe, manifiestoDe, respuestaCompleta } from '../../../shared/juegos';
+import type { EjeId, JuegoId } from '../../../shared/juegos';
 import type { Acusacion, LivePhase, LivePlayer, LiveSession } from '../../../shared/live';
 import type { GameSession } from '../../../shared/types';
 
@@ -152,16 +154,20 @@ export async function refrescarSesion(game: GameSession): Promise<LiveSession | 
 // ---------------------------------------------------------------------------
 
 /** Transiciones permitidas. Cualquier otra se rechaza con un mensaje claro. */
-const TRANSICIONES: Record<LivePhase, LivePhase[]> = {
-  lobby: ['ronda-abierta'],
-  'ronda-abierta': ['ronda-cerrada'],
-  'ronda-cerrada': ['ronda-abierta', 'acusaciones'],
-  acusaciones: ['desenlace'],
-  desenlace: [],
-};
-
-export function puedePasarA(desde: LivePhase, hasta: LivePhase): boolean {
-  return TRANSICIONES[desde]?.includes(hasta) ?? false;
+/**
+ * CATA: la tabla de transiciones ya no vive aquí, la declara cada juego.
+ *
+ * Al hacerlo saltó lo primero que se rompe: esta función se llamaba con dos
+ * fases y ya está, pero para saber qué transiciones valen hay que saber a qué
+ * se juega. De ahí que `LiveSession` lleve ahora su propio `juego`: las cuatro
+ * funciones que gobiernan las fases reciben la sesión y nada más.
+ */
+export function puedePasarA(
+  juego: JuegoId | undefined,
+  desde: LivePhase,
+  hasta: LivePhase,
+): boolean {
+  return manifiestoDe(juego).fases[desde]?.includes(hasta) ?? false;
 }
 
 export class TransicionInvalida extends Error {
@@ -175,7 +181,7 @@ export class TransicionInvalida extends Error {
 export const MINUTOS_POR_RONDA = 15;
 
 export function abrirRonda(sesion: LiveSession, minutos = MINUTOS_POR_RONDA): void {
-  if (!puedePasarA(sesion.phase, 'ronda-abierta')) {
+  if (!puedePasarA(sesion.juego, sesion.phase,'ronda-abierta')) {
     throw new TransicionInvalida(sesion.phase, 'ronda-abierta');
   }
   const ahora = new Date();
@@ -187,7 +193,7 @@ export function abrirRonda(sesion: LiveSession, minutos = MINUTOS_POR_RONDA): vo
 }
 
 export function cerrarRonda(sesion: LiveSession): void {
-  if (!puedePasarA(sesion.phase, 'ronda-cerrada')) {
+  if (!puedePasarA(sesion.juego, sesion.phase,'ronda-cerrada')) {
     throw new TransicionInvalida(sesion.phase, 'ronda-cerrada');
   }
   sesion.phase = 'ronda-cerrada';
@@ -203,8 +209,66 @@ export function cerrarRonda(sesion: LiveSession): void {
   }
 }
 
+/**
+ * Cierra la sesión de hoy sin terminar la partida.
+ *
+ * Es lo que separa una velada de una campaña. Al cerrar un encuentro NO se
+ * pierde nada: siguen los códigos con los que la gente emparejó su móvil, sus
+ * notas, el tablón común, los giros ya repartidos y el estado propio del juego
+ * —las fichas, el inventario, lo que sea—. Lo único que cambia es que hoy ya
+ * no se juega más.
+ *
+ * El resumen no es adorno. Una campaña se retoma al cabo de una semana, y sin
+ * él nadie recuerda dónde lo dejaron.
+ */
+export function cerrarEncuentro(
+  sesion: LiveSession,
+  cierre: { titulo: string; resumen: string },
+): void {
+  if (!puedePasarA(sesion.juego, sesion.phase, 'intermedio')) {
+    throw new TransicionInvalida(sesion.phase, 'intermedio');
+  }
+
+  const cronica = sesion.cronica ?? [];
+  const encuentro = sesion.encuentro ?? 1;
+  const desdeRonda = cronica.length > 0 ? (cronica[cronica.length - 1]!.hastaRonda + 1) : 1;
+
+  sesion.cronica = [
+    ...cronica,
+    {
+      encuentro,
+      titulo: cierre.titulo.trim() || `Encuentro ${encuentro}`,
+      resumen: cierre.resumen.trim(),
+      desdeRonda,
+      hastaRonda: sesion.round,
+      cerradoEl: new Date().toISOString(),
+    },
+  ];
+  sesion.phase = 'intermedio';
+  sesion.roundEndsAt = undefined;
+  // Nadie tiene el turno mientras la mesa está levantada.
+  sesion.turnoDe = undefined;
+  // El aviso de «estoy listo» se limpia: la próxima vez hay que volver a darlo.
+  for (const jugador of sesion.players) jugador.pideEmpezar = false;
+}
+
+/**
+ * Retoma la partida en el encuentro siguiente.
+ *
+ * Las rondas siguen contando hacia arriba en vez de reiniciarse: en una campaña
+ * «la ronda 7» es un momento de la historia, y volver a empezar por uno haría
+ * ambiguo todo lo ya escrito en el tablón y en la crónica.
+ */
+export function abrirEncuentro(sesion: LiveSession): void {
+  if (sesion.phase !== 'intermedio') {
+    throw new TransicionInvalida(sesion.phase, 'ronda-abierta');
+  }
+  sesion.encuentro = (sesion.encuentro ?? 1) + 1;
+  sesion.phase = 'lobby';
+}
+
 export function abrirAcusaciones(sesion: LiveSession): void {
-  if (!puedePasarA(sesion.phase, 'acusaciones')) {
+  if (!puedePasarA(sesion.juego, sesion.phase,'acusaciones')) {
     throw new TransicionInvalida(sesion.phase, 'acusaciones');
   }
   sesion.phase = 'acusaciones';
@@ -212,7 +276,7 @@ export function abrirAcusaciones(sesion: LiveSession): void {
 }
 
 export function revelarDesenlace(sesion: LiveSession): void {
-  if (!puedePasarA(sesion.phase, 'desenlace')) {
+  if (!puedePasarA(sesion.juego, sesion.phase,'desenlace')) {
     throw new TransicionInvalida(sesion.phase, 'desenlace');
   }
   sesion.phase = 'desenlace';
@@ -268,8 +332,8 @@ export interface ResultadoAcusacion {
 export function acusar(
   sesion: LiveSession,
   suspectId: string,
-  eleccion: { murdererId: string; weaponId: string; roomId: string },
-  solucion: { murdererId: string; weaponId: string; roomId: string },
+  eleccion: Record<EjeId, string>,
+  solucion: Record<EjeId, string>,
 ): ResultadoAcusacion {
   if (sesion.phase !== 'acusaciones' && sesion.phase !== 'ronda-cerrada') {
     throw new Error('Todavía no se puede acusar.');
@@ -278,20 +342,26 @@ export function acusar(
     throw new Error('Ya has entregado tu acusación. No se puede cambiar.');
   }
 
-  const correcta =
-    eleccion.murdererId === solucion.murdererId &&
-    eleccion.weaponId === solucion.weaponId &&
-    eleccion.roomId === solucion.roomId;
+  const manifiesto = manifiestoDe(sesion.juego);
+  if (!respuestaCompleta(manifiesto, eleccion)) {
+    throw new Error('Tienes que responder a todo antes de acusar.');
+  }
+
+  // Acertar es coincidir en TODOS los ejes que declare el juego, sean tres o
+  // sean otros tantos. Antes eran tres comparaciones escritas a mano.
+  const correcta = aciertos(manifiesto, eleccion, solucion) === ejesDe(manifiesto).length;
 
   const acusacion: Acusacion = {
     suspectId,
-    ...eleccion,
+    respuestas: { ...eleccion },
     at: new Date().toISOString(),
     correcta,
   };
   sesion.acusaciones.push(acusacion);
 
-  const esElCulpable = suspectId === solucion.murdererId;
+  // Quien es señalado por el eje que apunta a la mesa no puede ganar
+  // acusándose: su juego es no ser descubierto.
+  const esElCulpable = esElSenalado(manifiesto, solucion, suspectId);
   const ganador = correcta && !esElCulpable && !sesion.winnerId;
   if (ganador) sesion.winnerId = suspectId;
 

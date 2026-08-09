@@ -22,6 +22,7 @@ import { DEMO_MODE } from '../config';
 import { getAnthropicClient, resolveModel } from '../agent/anthropic';
 import { numeroDeRondas } from '../docs/datos';
 import { buildStyleBlock } from './style';
+import { culpableDe, lugarDe, objetoDe } from '../juegos/cluedo';
 
 type Emitir = (evento: GenerateStreamEvent) => void;
 
@@ -216,9 +217,9 @@ function construirPrompt(game: GameSession, plot: Plot): string {
     })
     .join('\n');
 
-  const asesino = plot.characters.find((c) => c.suspectId === plot.solution.murdererId);
-  const arma = game.weapons.find((w) => w.id === plot.solution.weaponId)?.name ?? '';
-  const sala = game.rooms.find((r) => r.id === plot.solution.roomId)?.name ?? '';
+  const asesino = plot.characters.find((c) => c.suspectId === culpableDe(plot.solution));
+  const arma = game.weapons.find((w) => w.id === objetoDe(plot.solution))?.name ?? '';
+  const sala = game.rooms.find((r) => r.id === lugarDe(plot.solution))?.name ?? '';
 
   return `Escribe el material impreso de esta partida de misterio en vivo, que YA tiene trama cerrada.
 
@@ -271,7 +272,7 @@ function sanear(material: PrintMaterial, game: GameSession, plot: Plot): PrintMa
     .filter((giro) => {
       if (!giro || typeof giro.suspectId !== 'string') return false;
       if (!idsValidos.has(giro.suspectId)) return false;
-      if (giro.suspectId === plot.solution.murdererId) return false;
+      if (giro.suspectId === culpableDe(plot.solution)) return false;
       if (vistos.has(giro.suspectId)) return false;
       vistos.add(giro.suspectId);
       return true;
@@ -323,10 +324,10 @@ async function materialDemo(game: GameSession, plot: Plot, emit: Emitir): Promis
   }
 
   const rondas = numeroDeRondas(plot);
-  const inocentes = game.suspects.filter((s) => s.id !== plot.solution.murdererId);
-  const arma = game.weapons.find((w) => w.id === plot.solution.weaponId)?.name ?? 'el arma';
-  const sala = game.rooms.find((r) => r.id === plot.solution.roomId)?.name ?? 'la sala';
-  const asesino = plot.characters.find((c) => c.suspectId === plot.solution.murdererId);
+  const inocentes = game.suspects.filter((s) => s.id !== culpableDe(plot.solution));
+  const arma = game.weapons.find((w) => w.id === objetoDe(plot.solution))?.name ?? 'el arma';
+  const sala = game.rooms.find((r) => r.id === lugarDe(plot.solution))?.name ?? 'la sala';
+  const asesino = plot.characters.find((c) => c.suspectId === culpableDe(plot.solution));
   const publicos = plot.timeline.filter((e) => e.isPublic);
 
   const narrations: PlotNarration[] = [

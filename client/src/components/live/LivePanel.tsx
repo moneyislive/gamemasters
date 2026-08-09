@@ -10,6 +10,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAppStore } from '../../state/store';
+import { manifiestoDe } from '../../../../shared/juegos';
 import type { VistaGameMaster } from '../../../../shared/live';
 import './live.css';
 
@@ -57,6 +58,12 @@ export default function LivePanel(): JSX.Element {
   }, [game, cargar]);
 
   if (!game) return <div />;
+
+  // ¿Puede este juego levantar la mesa sin terminar la partida? Lo dice su
+  // manifiesto, no una comprobación a mano contra CLUEDO.
+  const admiteIntermedio = manifiestoDe(game.settings?.juego).fases['ronda-cerrada']?.includes(
+    'intermedio',
+  );
 
   const accion = async (fn: () => Promise<unknown>): Promise<void> => {
     setOcupado(true);
@@ -173,6 +180,35 @@ export default function LivePanel(): JSX.Element {
               onClick={() => void accion(() => llamar(`/games/${game.id}/live/acusaciones`))}
             >
               Pasar a las acusaciones
+            </button>
+          )}
+
+          {/* Solo aparece si el juego admite levantar la mesa sin terminar la
+              partida. Un CLUEDO no lo admite y el botón ni se dibuja. */}
+          {rondaCerrada && admiteIntermedio && (
+            <button
+              className="btn"
+              disabled={ocupado}
+              onClick={() => {
+                const titulo = window.prompt('¿Cómo se llama esta jornada?', `Encuentro ${sesion.encuentro ?? 1}`);
+                if (titulo === null) return;
+                const resumen = window.prompt('¿Qué ha pasado hoy? Se lo leerán al retomar.') ?? '';
+                void accion(() =>
+                  llamar(`/games/${game.id}/live/encuentro/cerrar`, 'POST', { titulo, resumen }),
+                );
+              }}
+            >
+              Cerrar la jornada
+            </button>
+          )}
+
+          {sesion.phase === 'intermedio' && (
+            <button
+              className="btn btn--primary"
+              disabled={ocupado}
+              onClick={() => void accion(() => llamar(`/games/${game.id}/live/encuentro/abrir`))}
+            >
+              Retomar la partida
             </button>
           )}
 
@@ -319,6 +355,8 @@ function etiquetaFase(fase: string, ronda: number, total: number): string {
       return `Ronda ${ronda} cerrada`;
     case 'acusaciones':
       return 'Recogiendo acusaciones';
+    case 'intermedio':
+      return 'Jornada cerrada · la partida continúa';
     case 'desenlace':
       return 'Desenlace revelado';
     default:

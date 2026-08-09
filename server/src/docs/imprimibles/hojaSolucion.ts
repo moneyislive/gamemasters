@@ -12,6 +12,7 @@ import { cronologiaPublica, pistasPorRonda } from '../datos';
 import { esc } from '../html';
 import { envolver, portada } from './comun';
 import type { DocumentRenderOptions, GameSession, Plot } from '../../../../shared/types';
+import { culpableDe, lugarDe, objetoDe } from '../../juegos/cluedo';
 
 export function hojaSolucion(
   game: GameSession,
@@ -24,9 +25,9 @@ export function hojaSolucion(
   const personajeDe = (id: string): string =>
     plot.characters.find((c) => c.suspectId === id)?.characterName ?? nombreDe(id);
 
-  const asesino = nombreDe(plot.solution.murdererId);
-  const arma = game.weapons.find((w) => w.id === plot.solution.weaponId)?.name ?? '';
-  const sala = game.rooms.find((r) => r.id === plot.solution.roomId)?.name ?? '';
+  const asesino = nombreDe(culpableDe(plot.solution));
+  const arma = game.weapons.find((w) => w.id === objetoDe(plot.solution))?.name ?? '';
+  const sala = game.rooms.find((r) => r.id === lugarDe(plot.solution))?.name ?? '';
 
   const mapaPistas = [...porRonda.entries()]
     .flatMap(([ronda, pistas]) =>
