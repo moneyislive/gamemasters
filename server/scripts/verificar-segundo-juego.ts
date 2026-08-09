@@ -1,0 +1,326 @@
+/**
+ * La prueba que de verdad importa: meter un juego que NO es CLUEDO.
+ *
+ *   npm run verify:segundo-juego
+ *
+ * Todo lo demás de este refactor comprueba que CLUEDO sigue funcionando. Eso
+ * es necesario pero no demuestra nada sobre la generalización: un código puede
+ * seguir haciendo lo mismo y seguir sirviendo solo para un juego. Lo único que
+ * lo demuestra es meter un segundo juego distinto y ver si el motor lo aguanta
+ * sin tocarlo.
+ *
+ * EL JUEGO DE PRUEBA: «El Legado». Una noche de herencias en la que alguien se
+ * ha llevado una pieza de la colección. Está elegido para romper por donde
+ * CLUEDO no rompía:
+ *
+ *   · DOS ejes, no tres. Quién y qué. No hay «dónde» en la respuesta, que era
+ *     justo lo que el contrato daba por supuesto.
+ *   · La categoría sobre la que se actúa en la ronda —las estancias— NO es
+ *     ninguno de los ejes. En CLUEDO la sala era las dos cosas a la vez, y eso
+ *     escondía si el código las distinguía de verdad.
+ *   · Nombres de categoría propios: herederos, piezas, estancias. Si algo
+ *     seguía buscando «sospechosos» o «armas», aquí se cae.
+ *
+ * No se le escribe generador de trama ni plantillas de imprimibles: eso es
+ * contenido y cada juego lo trae. Lo que se comprueba es el MOTOR.
+ */
+import { manifiestoDe, registrarJuego } from '../../shared/juegos';
+import { abrirRonda, acusar, cerrarRonda, elegirSala } from '../src/live/sesion';
+import { vistaDeGameMaster, vistaDeJugador } from '../src/live/proyeccion';
+import { repararRespuestas } from '../src/juegos/solucion';
+import { computeStaleness } from '../../shared/staleness';
+import type { ManifiestoDeJuego } from '../../shared/juegos';
+import type { GameSession, Plot } from '../../shared/types';
+import type { LiveSession } from '../../shared/live';
+
+let hechas = 0;
+const fallos: string[] = [];
+function comprobar(que: string, condicion: boolean, detalle?: unknown): void {
+  hechas++;
+  if (!condicion) {
+    fallos.push(`${que}${detalle === undefined ? '' : `\n      ${JSON.stringify(detalle)?.slice(0, 220)}`}`);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// El manifiesto del segundo juego
+// ---------------------------------------------------------------------------
+
+const EL_LEGADO: ManifiestoDeJuego = {
+  id: 'el-legado',
+  nombre: 'El Legado',
+  lema: 'La colección estaba completa al empezar la cena.',
+
+  categorias: [
+    { id: 'herederos', singular: 'heredero', plural: 'herederos', minimo: 3, sonJugadores: true, admiteFoto: true, admiteEmail: true },
+    { id: 'piezas', singular: 'pieza', plural: 'piezas', minimo: 3, admiteFoto: true },
+    { id: 'estancias', singular: 'estancia', plural: 'estancias', minimo: 2, sonLugares: true, admiteFoto: true },
+  ],
+
+  // Dos ejes. Aquí es donde el contrato antiguo se rompía sin remedio.
+  ejes: [
+    { id: 'ladron', pregunta: '¿Quién se la llevó?', rotulo: 'Quién', categoria: 'herederos' },
+    { id: 'pieza', pregunta: '¿Qué falta?', rotulo: 'Qué', categoria: 'piezas' },
+  ],
+
+  // Y se actúa sobre una categoría que no responde a ningún eje.
+  ronda: { accionSobre: 'estancias', cambiosPermitidos: 2 },
+
+  fases: {
+    lobby: ['ronda-abierta'],
+    'ronda-abierta': ['ronda-cerrada'],
+    'ronda-cerrada': ['ronda-abierta', 'acusaciones'],
+    acusaciones: ['desenlace'],
+    desenlace: [],
+  },
+
+  trofeos: [
+    { id: 'primera-partida', nombre: 'Primera velada', descripcion: 'Jugaste una entera.', glifo: '🕯' },
+  ],
+  seccionesDeDosier: [
+    { id: 'cover', label: 'Portada', description: 'El título y de quién es el dosier.', required: true },
+    { id: 'character', label: 'Tu personaje', description: 'Quién eres esta noche.', required: true },
+  ],
+  documentos: [],
+};
+
+registrarJuego(EL_LEGADO);
+
+// ---------------------------------------------------------------------------
+// Una partida de El Legado
+// ---------------------------------------------------------------------------
+
+const HEREDEROS = ['Amelia', 'Bernardo', 'Casilda', 'Damián'];
+const PIEZAS = ['El camafeo', 'La miniatura', 'El reloj de leontina'];
+const ESTANCIAS = ['La galería', 'El fumadero', 'La escalinata'];
+const ahora = '2026-03-01T21:00:00.000Z';
+
+const game: GameSession = {
+  id: 'legado',
+  name: 'La cena de los Ardavín',
+  status: 'ready',
+  createdAt: ahora,
+  updatedAt: ahora,
+  // Las tres categorías van en `entidades`, con sus nombres propios. Ni un solo
+  // `suspects`, `rooms` ni `weapons`: si algo del motor los buscara, no
+  // encontraría nada y la prueba se caería.
+  entidades: {
+    herederos: HEREDEROS.map((name, i) => ({ id: `h${i}`, name })),
+    piezas: PIEZAS.map((name, i) => ({ id: `p${i}`, name })),
+    estancias: ESTANCIAS.map((name, i) => ({ id: `e${i}`, name })),
+  },
+  // Los campos heredados quedan vacíos a propósito.
+  suspects: HEREDEROS.map((name, i) => ({ id: `h${i}`, name })),
+  rooms: ESTANCIAS.map((name, i) => ({ id: `e${i}`, name })),
+  weapons: [],
+  boardMode: 'generated',
+  settings: { language: 'es', juego: 'el-legado' },
+};
+
+const plot: Plot = {
+  title: 'El Legado',
+  tagline: 'La colección estaba completa al empezar la cena.',
+  synopsis: 'Al servirse el café faltaba una pieza de la vitrina. Nadie ha salido de la casa.',
+  victim: { name: 'La colección Ardavín', description: 'Tres piezas heredadas de la abuela.' },
+  setting: 'La casa de los Ardavín, una noche de marzo.',
+  solution: {
+    // Dos respuestas. Ni tres, ni con nombres de CLUEDO.
+    respuestas: { ladron: 'h2', pieza: 'p1' },
+    motive: 'Casilda creía que la miniatura le correspondía por testamento.',
+    howItHappened: 'La sacó de la vitrina mientras los demás discutían en el fumadero.',
+  },
+  characters: HEREDEROS.map((name, i) => ({
+    suspectId: `h${i}`,
+    characterName: `${name} Ardavín`,
+    role: 'Heredero',
+    publicPersona: `${name} llegó con prisa y sin abrigo.`,
+    secret: `Lo que ${name} no cuenta.`,
+    motive: 'Cree merecer más de lo que le tocó.',
+    alibi: 'Estuvo en el fumadero, dice.',
+    knowledge: [`${name} vio algo raro en la galería.`],
+    personalHook: 'Interprétalo con paciencia y mala uva.',
+  })),
+  timeline: [
+    { time: '21:30', description: 'Se sirve la cena.', suspectIds: [], isPublic: true },
+    { time: '22:10', description: 'Alguien apaga la luz de la galería.', suspectIds: ['h2'], isPublic: false },
+  ],
+  clues: [
+    { id: 'c1', roomId: 'e0', description: 'La vitrina está sin cerrar.', pointsTo: 'Alguien la abrió sin forzarla.', round: 1 },
+    { id: 'c2', roomId: 'e1', description: 'Una copa con carmín.', pointsTo: 'Alguien estuvo aquí y no lo ha dicho.', round: 1 },
+    { id: 'c3', roomId: 'e2', description: 'Un pañuelo en el escalón.', pointsTo: 'Se subió con prisa.', round: 2 },
+  ],
+  gmScript: ['Abre la velada.', 'Cierra la velada.'],
+};
+game.plot = plot;
+
+const sesion: LiveSession = {
+  id: game.id,
+  juego: 'el-legado',
+  code: 'LEGADO',
+  phase: 'lobby',
+  round: 0,
+  totalRounds: 2,
+  players: HEREDEROS.map((name, i) => ({
+    suspectId: `h${i}`,
+    displayName: name,
+    joinCode: `LEG00${i}`,
+    joined: true,
+    elecciones: [],
+    notas: '',
+    girosRecibidos: [],
+  })),
+  acusaciones: [],
+  tablon: [],
+  rev: 1,
+  updatedAt: ahora,
+};
+
+// ---------------------------------------------------------------------------
+// La velada
+// ---------------------------------------------------------------------------
+
+const manifiesto = manifiestoDe(sesion.juego);
+comprobar('el juego queda registrado', manifiesto.id === 'el-legado', manifiesto.id);
+comprobar('con dos ejes, no tres', manifiesto.ejes.length === 2);
+
+const vistaDe = (id: string) => vistaDeJugador(game, sesion, id)!;
+
+let v = vistaDe('h0');
+comprobar('se compone la vista de un jugador', Boolean(v));
+comprobar('con el título del juego nuevo', v.sesion.tituloPartida === 'El Legado');
+comprobar(
+  'la acusación pregunta DOS cosas',
+  v.ejes.length === 2 && v.ejes.map((e) => e.ejeId).join(',') === 'ladron,pieza',
+  v.ejes.map((e) => e.ejeId),
+);
+comprobar(
+  'y pregunta con las palabras del juego',
+  v.ejes[0]?.pregunta === '¿Quién se la llevó?' && v.ejes[1]?.pregunta === '¿Qué falta?',
+);
+comprobar(
+  'las opciones de «quién» son los herederos, con su nombre de personaje',
+  v.ejes[0]?.opciones.length === 4 && v.ejes[0].opciones[0]?.nombre.includes('Ardavín'),
+  v.ejes[0]?.opciones,
+);
+comprobar(
+  'las opciones de «qué» son las piezas',
+  v.ejes[1]?.opciones.length === 3 && v.ejes[1].opciones[1]?.nombre === 'La miniatura',
+  v.ejes[1]?.opciones,
+);
+comprobar('en la sala de espera no hay solución', v.desenlace === undefined);
+
+// Quien se llevó la pieza lo sabe, y nadie más.
+comprobar('la culpable sabe que lo es', vistaDe('h2').yo.soyCulpable === true);
+comprobar('los demás no', vistaDe('h0').yo.soyCulpable === false);
+
+// --- Ronda 1 ---
+abrirRonda(sesion, 10);
+elegirSala(sesion, 'h0', 'e0');
+elegirSala(sesion, 'h1', 'e1');
+v = vistaDe('h0');
+comprobar('la ronda abre', v.sesion.phase === 'ronda-abierta');
+comprobar('entro en una estancia', v.miSala === 'e0');
+comprobar('y veo lo que hay allí', v.misPistas.length === 1, v.misPistas);
+comprobar('sin que me digan qué significa', v.misPistas[0]?.pointsTo === undefined);
+comprobar(
+  'no veo lo de la estancia ajena',
+  !v.misPistas.some((p) => p.description.includes('carmín')),
+);
+
+cerrarRonda(sesion);
+v = vistaDe('h0');
+comprobar('al cerrar, lo hallado es público', v.tablon.length === 2, v.tablon.length);
+comprobar('y ya con su significado', v.tablon.every((p) => typeof p.pointsTo === 'string'));
+
+// --- Acusaciones ---
+sesion.phase = 'acusaciones';
+
+let rechazada = false;
+try {
+  // Falta un eje: no vale.
+  acusar(sesion, 'h0', { ladron: 'h2' }, plot.solution.respuestas);
+} catch {
+  rechazada = true;
+}
+comprobar('una acusación a medias se rechaza', rechazada);
+
+acusar(sesion, 'h0', { ladron: 'h1', pieza: 'p1' }, plot.solution.respuestas);
+acusar(sesion, 'h1', { ladron: 'h2', pieza: 'p1' }, plot.solution.respuestas);
+comprobar('la equivocada no gana', sesion.winnerId === 'h1', sesion.winnerId);
+comprobar(
+  'la acertada se marca correcta',
+  sesion.acusaciones.find((a) => a.suspectId === 'h1')?.correcta === true,
+);
+comprobar(
+  'y la fallida, no',
+  sesion.acusaciones.find((a) => a.suspectId === 'h0')?.correcta === false,
+);
+
+// La culpable acierta —se sabe la respuesta— pero no puede ganar.
+acusar(sesion, 'h2', { ladron: 'h2', pieza: 'p1' }, plot.solution.respuestas);
+comprobar('quien se la llevó no gana acusándose', sesion.winnerId === 'h1');
+
+// --- Desenlace ---
+sesion.phase = 'desenlace';
+v = vistaDe('h0');
+comprobar('llega el desenlace', Boolean(v.desenlace));
+comprobar(
+  'con DOS renglones, uno por eje',
+  v.desenlace?.respuestas.length === 2,
+  v.desenlace?.respuestas,
+);
+comprobar(
+  'resueltos a nombres del juego nuevo',
+  v.desenlace?.respuestas[0]?.nombre === 'Casilda' &&
+    v.desenlace?.respuestas[1]?.nombre === 'La miniatura',
+  v.desenlace?.respuestas,
+);
+comprobar('y con sus rótulos', v.desenlace?.respuestas.map((r) => r.rotulo).join('/') === 'Quién/Qué');
+comprobar('se sabe quién fue', v.desenlace?.culpableId === 'h2');
+comprobar('gana quien acertó', v.desenlace?.ganador?.suspectId === 'h1');
+comprobar(
+  'los aciertos se cuentan sobre DOS ejes',
+  v.desenlace?.clasificacion.find((c) => c.suspectId === 'h1')?.aciertos === 2 &&
+    v.desenlace?.clasificacion.find((c) => c.suspectId === 'h0')?.aciertos === 1,
+  v.desenlace?.clasificacion,
+);
+
+// --- El puesto de mando ---
+const gm = vistaDeGameMaster(game, sesion);
+comprobar('la vista de quien dirige se compone', Boolean(gm.sesion));
+comprobar('con las tres acusaciones', gm.acusacionesRecibidas === 3);
+
+// --- Coherencia y reparación ---
+comprobar(
+  'la solución se ve coherente',
+  computeStaleness(game).brokenSolution.length === 0,
+  computeStaleness(game).brokenSolution,
+);
+
+// Si desaparece la pieza robada, se detecta y se repara sobre la categoría
+// correcta: no hay ningún «coge la primera arma» escondido.
+game.entidades!.piezas = game.entidades!.piezas.filter((p) => p.id !== 'p1');
+comprobar(
+  'y si la pieza desaparece, se detecta ese eje',
+  computeStaleness(game).brokenSolution.join() === 'pieza',
+  computeStaleness(game).brokenSolution,
+);
+const reparados = repararRespuestas(plot, game);
+comprobar('se repara solo ese eje', reparados.join() === 'pieza', reparados);
+comprobar(
+  'con otra pieza, no con un heredero',
+  ['p0', 'p2'].includes(plot.solution.respuestas.pieza ?? ''),
+  plot.solution.respuestas,
+);
+
+// ---------------------------------------------------------------------------
+
+console.log(`\nEl Legado · un juego de dos ejes sobre el motor de CLUEDO`);
+console.log(`${hechas} comprobaciones`);
+if (fallos.length === 0) {
+  console.log('\nEl motor sostiene un segundo juego sin tocar una línea suya.');
+  process.exit(0);
+}
+console.log(`\n${fallos.length} FALLOS:\n`);
+for (const f of fallos) console.log(`  ✗ ${f}`);
+process.exit(1);

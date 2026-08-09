@@ -36,13 +36,45 @@ export type {
   ManifiestoDeJuego,
 } from './tipos';
 export { CLUEDO };
+export { entidadesDe, entidadDe, nombreDeEntidad, entidadesDelEje } from './entidades';
+export type { Entidad } from './entidades';
 
 /** Con qué se juega si una partida no dice de qué juego es. */
 export const JUEGO_POR_DEFECTO: JuegoId = 'cluedo';
 
-const INSTALADOS: Record<JuegoId, ManifiestoDeJuego> = {
-  [CLUEDO.id]: CLUEDO,
-};
+/**
+ * El registro, anclado al ámbito global.
+ *
+ * Podría ser una simple constante de módulo, y lo era. Lo cambió la prueba del
+ * segundo juego: registraba «El Legado» y `computeStaleness` seguía viendo solo
+ * CLUEDO. La causa es que este fichero se puede cargar DOS VECES —una prueba lo
+ * importa como `../../shared/juegos` y `staleness.ts` como `./juegos`, y el
+ * cargador las trata como módulos distintos—, con lo que cada copia tenía su
+ * propio registro y las altas se perdían por el camino.
+ *
+ * Con el ámbito global hay uno solo, cargue quien lo cargue y por donde lo
+ * cargue. Es la misma cautela que toman las librerías que no admiten dos
+ * instancias, y aquí no es teórica: el fallo estaba ocurriendo.
+ */
+const LLAVE = Symbol.for('gamemasters.juegos.instalados');
+const global_ = globalThis as unknown as Record<symbol, Record<JuegoId, ManifiestoDeJuego>>;
+
+const INSTALADOS: Record<JuegoId, ManifiestoDeJuego> =
+  global_[LLAVE] ?? (global_[LLAVE] = { [CLUEDO.id]: CLUEDO });
+INSTALADOS[CLUEDO.id] = CLUEDO;
+
+/**
+ * Da de alta un juego.
+ *
+ * Esta función ES la respuesta a «¿podemos meter otro juego?». Un juego nuevo
+ * escribe su manifiesto, lo registra aquí, y el motor —fases, proyección,
+ * acusación, ganador, desenlace— funciona sin tocar una línea. Lo comprueba
+ * `npm run verify:segundo-juego`, que registra uno de dos ejes y juega con él
+ * una velada entera.
+ */
+export function registrarJuego(manifiesto: ManifiestoDeJuego): void {
+  INSTALADOS[manifiesto.id] = manifiesto;
+}
 
 /** Todos los juegos instalados, para el catálogo del taller. */
 export function juegosInstalados(): ManifiestoDeJuego[] {

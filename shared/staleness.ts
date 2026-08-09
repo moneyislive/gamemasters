@@ -11,7 +11,7 @@
  * regenerar y el cliente para avisar en la interfaz. Una sola fuente de verdad.
  */
 import type { GameSession } from './types';
-import { manifiestoDe } from './juegos';
+import { entidadesDe, manifiestoDe } from './juegos';
 import type { EjeId } from './juegos';
 
 export interface StalenessReport {
@@ -117,17 +117,15 @@ export function computeStaleness(game: GameSession): StalenessReport {
 
   // Un eje está roto si su respuesta no señala a ninguna entidad viva de la
   // categoría que ese eje declara.
-  const porCategoria: Record<string, Set<string>> = {
-    sospechosos: idsSospechosos,
-    objetos: idsArmas,
-    salas: idsSalas,
-  };
+  // Las entidades vivas se piden POR CATEGORÍA, no por los tres campos de
+  // CLUEDO. Tenerlos escritos a mano aquí hacía que cualquier otro juego
+  // saliese con la solución rota; lo encontró la prueba del segundo juego.
   const manifiesto = manifiestoDe(game.settings?.juego);
   const brokenSolution = manifiesto.ejes
     .filter((eje) => {
       const id = plot.solution.respuestas[eje.id];
-      const vivas = porCategoria[eje.categoria];
-      return !id || (vivas ? !vivas.has(id) : false);
+      if (!id) return true;
+      return !entidadesDe(game, eje.categoria).some((e) => e.id === id);
     })
     .map((eje) => eje.id);
 
