@@ -1,14 +1,32 @@
 /**
  * Enrutado principal de GameMasters.
  * '/'                → catálogo de juegos
- * '/cluedo'          → recibidor (lista de casos de CLUEDO)
- * '/cluedo/:gameId'  → estudio de creación de la partida
+ * '/:juego'          → recibidor (lista de partidas de ese juego)
+ * '/:juego/:gameId'  → estudio de creación de la partida
+ *
+ * Las rutas llevan el juego delante en vez de la palabra «cluedo» escrita a
+ * fuego. Los enlaces antiguos siguen valiendo —«cluedo» encaja en `:juego`— y
+ * un juego nuevo no toca este fichero.
  */
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes, useParams } from 'react-router-dom';
+import { juegosInstalados } from '../../shared/juegos';
 import LoginGate from './components/auth/LoginGate';
 import CatalogPage from './pages/CatalogPage';
 import CluedoLobbyPage from './pages/CluedoLobbyPage';
 import StudioPage from './pages/StudioPage';
+
+/**
+ * Deja pasar solo a los juegos que existen.
+ *
+ * Con `:juego` en la ruta, cualquier cosa encaja: una errata, un juego todavía
+ * sin escribir, o un enlace viejo. Sin esta guarda, `manifiestoDe` devolvería
+ * CLUEDO por defecto y se abriría el taller equivocado con la partida de otro.
+ */
+function SoloSiEstaInstalado({ children }: { children: JSX.Element }): JSX.Element {
+  const { juego } = useParams();
+  const instalado = juegosInstalados().some((j) => j.id === juego);
+  return instalado ? children : <Navigate to="/" replace />;
+}
 
 export default function App() {
   return (
@@ -16,8 +34,22 @@ export default function App() {
     <LoginGate>
       <Routes>
         <Route path="/" element={<CatalogPage />} />
-        <Route path="/cluedo" element={<CluedoLobbyPage />} />
-        <Route path="/cluedo/:gameId" element={<StudioPage />} />
+        <Route
+          path="/:juego"
+          element={
+            <SoloSiEstaInstalado>
+              <CluedoLobbyPage />
+            </SoloSiEstaInstalado>
+          }
+        />
+        <Route
+          path="/:juego/:gameId"
+          element={
+            <SoloSiEstaInstalado>
+              <StudioPage />
+            </SoloSiEstaInstalado>
+          }
+        />
         {/* Cualquier ruta desconocida vuelve al catálogo */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

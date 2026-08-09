@@ -6,7 +6,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { KeyboardEvent, MouseEvent } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import type { Variants } from 'framer-motion';
 import type { GameStatus } from '../../../shared/types';
@@ -45,6 +45,8 @@ const itemVariants: Variants = {
 };
 
 export default function CluedoLobbyPage() {
+  // De qué juego es este recibidor. Viene de la ruta, no de una constante.
+  const { juego } = useParams<{ juego: string }>();
   const navigate = useNavigate();
   const games = useAppStore((s) => s.games);
   const fetchGames = useAppStore((s) => s.fetchGames);
@@ -78,7 +80,7 @@ export default function CluedoLobbyPage() {
   const enterGame = useCallback(
     (gameId: string) => {
       if (transitionActive) return;
-      destination.current = `/cluedo/${gameId}`;
+      destination.current = `/${juego}/${gameId}`;
       setTransitionActive(true);
     },
     [transitionActive],

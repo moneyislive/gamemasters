@@ -5,6 +5,7 @@
  */
 import type { CSSProperties, KeyboardEvent, ReactElement } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { juegosInstalados } from '../../../shared/juegos';
 import { motion } from 'framer-motion';
 import type { Variants } from 'framer-motion';
 import '../styles/catalog.css';
@@ -233,12 +234,17 @@ const cardVariants: Variants = {
 export default function CatalogPage() {
   const navigate = useNavigate();
 
-  const openCluedo = () => navigate('/cluedo');
+  // Se abre el juego que se pulsa, no «el» juego. Y lo que decide si una
+  // tarjeta está bloqueada ya no es un booleano escrito a mano, sino si ese
+  // juego está instalado de verdad: el candado no puede mentir.
+  const instalados = new Set(juegosInstalados().map((j) => j.id));
+  const abrir = (id: string) => navigate(`/${id}`);
 
   const onCardKey = (event: KeyboardEvent<HTMLElement>) => {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
-      openCluedo();
+      const id = event.currentTarget.getAttribute('data-juego');
+      if (id) abrir(id);
     }
   };
 
@@ -288,14 +294,19 @@ export default function CatalogPage() {
         initial="hidden"
         animate="visible"
       >
-        {GAMES.map((game) => (
+        {GAMES.map((game) => {
+          // Bloqueado = no instalado. Antes era un booleano escrito a mano que
+          // podía desmentir a la realidad.
+          const cerrado = !instalados.has(game.id);
+          return (
           <motion.article
             key={game.id}
-            className={`catalog-card deco-frame deco-corners ${game.locked ? 'is-locked' : 'is-open'}`}
+            className={`catalog-card deco-frame deco-corners ${cerrado ? 'is-locked' : 'is-open'}`}
             style={game.palette}
             variants={cardVariants}
             whileHover={game.locked ? undefined : { y: -10 }}
-            onClick={game.locked ? undefined : openCluedo}
+            data-juego={game.id}
+            onClick={cerrado ? undefined : () => abrir(game.id)}
             onKeyDown={game.locked ? undefined : onCardKey}
             role={game.locked ? undefined : 'button'}
             tabIndex={game.locked ? undefined : 0}
@@ -316,7 +327,8 @@ export default function CatalogPage() {
             </div>
             {game.locked && <div className="card-veil" aria-hidden="true" />}
           </motion.article>
-        ))}
+          );
+        })}
       </motion.main>
 
       <footer className="catalog-footer">

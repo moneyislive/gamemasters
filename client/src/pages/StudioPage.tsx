@@ -57,7 +57,7 @@ const DEMO_TIP =
 const CONFIRMACION_MS = 4000;
 
 export default function StudioPage() {
-  const { gameId } = useParams<{ gameId: string }>();
+  const { gameId, juego } = useParams<{ gameId: string; juego: string }>();
   const navigate = useNavigate();
 
   const game = useAppStore((s) => s.game);
@@ -154,7 +154,7 @@ export default function StudioPage() {
     setNameDraft(game?.name ?? '');
   }, [game?.id, game?.name]);
 
-  if (!gameId) return <Navigate to="/cluedo" replace />;
+  if (!gameId) return <Navigate to={`/${juego ?? ''}`} replace />;
 
   const ready = game !== null && game.id === gameId;
 
@@ -317,7 +317,7 @@ export default function StudioPage() {
           <p className="text-dim text-italic">
             No se pudo abrir este caso. Quizá fue borrado o el servidor no responde.
           </p>
-          <button className="btn" onClick={() => navigate('/cluedo')}>
+          <button className="btn" onClick={() => navigate(`/${juego ?? ''}`)}>
             ← Volver al recibidor
           </button>
         </div>
@@ -338,7 +338,7 @@ export default function StudioPage() {
   return (
     <div className="studio">
       <header className="studio-header deco-frame">
-        <button className="btn btn--ghost btn--sm studio-back" onClick={() => navigate('/cluedo')}>
+        <button className="btn btn--ghost btn--sm studio-back" onClick={() => navigate(`/${juego ?? ''}`)}>
           ← Recibidor
         </button>
 
