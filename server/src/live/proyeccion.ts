@@ -28,7 +28,7 @@ import type {
   VistaJugador,
 } from '../../../shared/live';
 import type { GameSession, Plot } from '../../../shared/types';
-import { aciertos, ejeDeJugadores, esElSenalado, manifiestoDe } from '../../../shared/juegos';
+import { aciertos, ejeDeJugadores, ejes as ejesDe, esElSenalado, manifiestoDe } from '../../../shared/juegos';
 import { entidadesDe, nombreDeEntidad } from '../juegos/entidades';
 
 /**
@@ -164,7 +164,7 @@ export function vistaDeJugador(
   // Lo dice el juego, no la pantalla. Para el eje que señala a alguien de la
   // mesa se usan los nombres de PERSONAJE, que es como se les conoce durante
   // la velada, y el propio se marca para no acusarse por despiste.
-  const ejes = manifiesto.ejes.map((e) => {
+  const ejes = ejesDe(manifiesto).map((e) => {
     const cat = manifiesto.categorias.find((c) => c.id === e.categoria);
     return {
       ejeId: e.id,
@@ -270,7 +270,7 @@ export function vistaDeJugador(
     // Un renglón por eje, ya resuelto a nombres. Antes eran tres campos
     // —asesino, arma y sala— y el móvil los pintaba uno a uno; ahora recorre
     // lo que venga, que es lo que permite que otro juego tenga otros ejes.
-    const respuestas = manifiesto.ejes.map((e) => {
+    const respuestas = ejesDe(manifiesto).map((e) => {
       const entidadId = plot.solution.respuestas[e.id] ?? '';
       return {
         ejeId: e.id,

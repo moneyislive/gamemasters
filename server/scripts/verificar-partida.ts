@@ -28,7 +28,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { generateBoardLayout } from '../src/board/generator';
 import { generateDemoPlot } from '../src/plot/demoPlot';
-import { manifiestoDe } from '../../shared/juegos';
+import { manifiestoDe, ejes as ejesDe } from '../../shared/juegos';
 import type { GameSession } from '../../shared/types';
 import type { LiveSession, VistaJugador } from '../../shared/live';
 
@@ -199,7 +199,7 @@ async function jugar(): Promise<void> {
   comprobar('llega el caso', Boolean(v.caso.sinopsis));
   comprobar(
     'llegan los ejes del juego',
-    Array.isArray(v.ejes) && v.ejes.length === manifiesto.ejes.length,
+    Array.isArray(v.ejes) && v.ejes.length === ejesDe(manifiesto).length,
     v.ejes?.map((e) => e.ejeId),
   );
   comprobar(
@@ -259,7 +259,7 @@ async function jugar(): Promise<void> {
   // «murdererId»: se recorre lo que el manifiesto declare.
   const solucion = game.plot!.solution.respuestas;
   const mia: Record<string, string> = {};
-  for (const eje of manifiesto.ejes) mia[eje.id] = solucion[eje.id]!;
+  for (const eje of ejesDe(manifiesto)) mia[eje.id] = solucion[eje.id]!;
 
   const acusar = await pedir('/jugar/acusar', { metodo: 'POST', testigo, cuerpo: { respuestas: mia } });
   comprobar('la acusación se registra', acusar.estado === 200, acusar.datos);
@@ -277,7 +277,7 @@ async function jugar(): Promise<void> {
   comprobar('mi acusación vuelve como diccionario', Boolean(v.miAcusacion?.respuestas));
   comprobar(
     'con un valor por eje',
-    Object.keys(v.miAcusacion?.respuestas ?? {}).length === manifiesto.ejes.length,
+    Object.keys(v.miAcusacion?.respuestas ?? {}).length === ejesDe(manifiesto).length,
   );
   comprobar('sigue sin llegar la solución', v.desenlace === undefined);
 
@@ -288,7 +288,7 @@ async function jugar(): Promise<void> {
   comprobar('ahora sí llega el desenlace', Boolean(v.desenlace));
   comprobar(
     'con una respuesta por eje, ya con nombre',
-    v.desenlace?.respuestas.length === manifiesto.ejes.length &&
+    v.desenlace?.respuestas.length === ejesDe(manifiesto).length &&
       v.desenlace.respuestas.every((r) => r.nombre.length > 0),
     v.desenlace?.respuestas,
   );
@@ -301,7 +301,7 @@ async function jugar(): Promise<void> {
   comprobar(
     'la clasificación me da todos los aciertos',
     v.desenlace?.clasificacion.find((c) => c.suspectId === 's0')?.aciertos ===
-      manifiesto.ejes.length,
+      ejesDe(manifiesto).length,
     v.desenlace?.clasificacion,
   );
 

@@ -21,6 +21,7 @@
  * de CLUEDO escritas a mano y daba por rota la solución de cualquier otro
  * juego.
  */
+import { ejes as ejesDe } from './tipos';
 import type { CategoriaId, ManifiestoDeJuego } from './tipos';
 import type { GameSession } from '../types';
 
@@ -75,6 +76,6 @@ export function entidadesDelEje(
   manifiesto: ManifiestoDeJuego,
   ejeId: string,
 ): Entidad[] {
-  const e = manifiesto.ejes.find((x) => x.id === ejeId);
+  const e = ejesDe(manifiesto).find((x) => x.id === ejeId);
   return e ? entidadesDe(game, e.categoria) : [];
 }

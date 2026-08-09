@@ -12,7 +12,7 @@
  * partida queda con una solución que no señala a nada y no hay forma de
  * ganarla.
  */
-import { manifiestoDe } from '../../../shared/juegos';
+import { manifiestoDe, ejes as ejesDe } from '../../../shared/juegos';
 import { entidadesDe } from './entidades';
 import type { CategoriaId, EjeId, ManifiestoDeJuego } from '../../../shared/juegos';
 import type { GameSession, Plot } from '../../../shared/types';
@@ -26,7 +26,7 @@ export function juegoDe(game: GameSession): ManifiestoDeJuego {
 /** Los ejes cuya respuesta no señala a ninguna entidad existente. */
 export function ejesRotos(plot: Plot, game: GameSession): EjeId[] {
   const manifiesto = juegoDe(game);
-  return manifiesto.ejes
+  return ejesDe(manifiesto)
     .filter((e) => {
       const id = plot.solution.respuestas[e.id];
       return !id || !entidadesDe(game, e.categoria).some((x) => x.id === id);
@@ -49,7 +49,7 @@ export function repararRespuestas(
   const manifiesto = juegoDe(game);
   const reparados: EjeId[] = [];
 
-  for (const eje of manifiesto.ejes) {
+  for (const eje of ejesDe(manifiesto)) {
     const candidatas = entidadesDe(game, eje.categoria);
     const actual = plot.solution.respuestas[eje.id];
     if (actual && candidatas.some((c) => c.id === actual)) continue;

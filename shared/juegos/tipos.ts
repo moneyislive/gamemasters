@@ -92,6 +92,44 @@ export interface DefinicionEje {
   categoria: CategoriaId;
 }
 
+/**
+ * Cómo se reparte el turno.
+ *
+ * CLUEDO es simultáneo: los doce eligen sala a la vez y la ronda se cierra
+ * cuando quien dirige lo decide. Una oca o un parchís van por turnos: uno tira,
+ * y hasta que no termina no le toca al siguiente. Son dos juegos distintos con
+ * el mismo motor, y la diferencia cabe en este campo.
+ */
+export type ModoDeTurno = 'simultaneo' | 'por-turnos';
+
+/**
+ * Algo que un jugador puede hacer.
+ *
+ * Esta es la pieza que permite salir del misterio. Antes lo único que se podía
+ * hacer en una ronda era elegir sala, y estaba escrito en el tipo. Aquí cada
+ * juego declara su repertorio: entrar en una sala, tirar el dado, acusar,
+ * repartir botín, atacar. El motor valida y ejecuta; qué significa cada una lo
+ * pone el juego.
+ */
+export interface DefinicionAccion {
+  id: string;
+  /** Cómo se llama en la pantalla. «Entrar en una sala», «Tirar el dado». */
+  rotulo: string;
+  /** En qué fases se admite. Fuera de ellas, el motor la rechaza. */
+  fases: LivePhase[];
+  /**
+   * Qué hay que elegir para ejecutarla.
+   *
+   * Vacío significa que no necesita datos —tirar un dado no requiere elegir
+   * nada—. Con entradas, el móvil pinta un selector por cada una, sacando las
+   * opciones de la categoría indicada. Así una acción nueva no obliga a
+   * escribir una pantalla nueva.
+   */
+  eligeDe?: Array<{ campo: string; categoria: CategoriaId; rotulo: string }>;
+  /** Cuántas veces se admite por turno o ronda. Sin límite si se omite. */
+  vecesPorTurno?: number;
+}
+
 /** Qué puede hacer un jugador cuando la ronda está abierta. */
 export interface DefinicionDeRonda {
   /**
@@ -122,8 +160,24 @@ export interface ManifiestoDeJuego {
 
   /** Las familias de entidades que se dan de alta al preparar la partida. */
   categorias: DefinicionCategoria[];
-  /** Los ejes que hay que acertar. En orden de presentación. */
-  ejes: DefinicionEje[];
+
+  /**
+   * Los ejes que hay que acertar, si el juego consiste en adivinar algo.
+   *
+   * OPCIONAL, y esto importa: un parchís temático o una campaña de rol no
+   * tienen «respuesta». Mientras esto fue obligatorio, la plataforma solo sabía
+   * organizar juegos de deducción aunque nadie lo hubiera dicho en voz alta.
+   * Sin ejes no hay acusación ni sobre que abrir, y el motor no los echa de
+   * menos.
+   */
+  ejes?: DefinicionEje[];
+
+  /** Simultáneo o por turnos. */
+  turnos: ModoDeTurno;
+
+  /** El repertorio de lo que se puede hacer. */
+  acciones: DefinicionAccion[];
+
   ronda: DefinicionDeRonda;
 
   /** Qué fase puede seguir a cuál. Hoy ya es una tabla, solo que una sola. */
@@ -152,8 +206,12 @@ export function categoriasDeLugar(m: ManifiestoDeJuego): DefinicionCategoria[] {
   return m.categorias.filter((c) => c.sonLugares);
 }
 
+export function ejes(m: ManifiestoDeJuego): DefinicionEje[] {
+  return m.ejes ?? [];
+}
+
 export function eje(m: ManifiestoDeJuego, id: EjeId): DefinicionEje | undefined {
-  return m.ejes.find((e) => e.id === id);
+  return ejes(m).find((e) => e.id === id);
 }
 
 /**
@@ -166,7 +224,7 @@ export function eje(m: ManifiestoDeJuego, id: EjeId): DefinicionEje | undefined 
  */
 export function ejeDeJugadores(m: ManifiestoDeJuego): DefinicionEje | undefined {
   const cat = categoriaDeJugadores(m);
-  return cat ? m.ejes.find((e) => e.categoria === cat.id) : undefined;
+  return cat ? ejes(m).find((e) => e.categoria === cat.id) : undefined;
 }
 
 /** ¿Es esta persona la respuesta del eje que señala a alguien de la mesa? */
@@ -189,7 +247,8 @@ export function respuestaCompleta(
   m: ManifiestoDeJuego,
   respuestas: Record<EjeId, string>,
 ): boolean {
-  return m.ejes.every((e) => Boolean(respuestas[e.id]));
+  const lista = ejes(m);
+  return lista.length > 0 && lista.every((e) => Boolean(respuestas[e.id]));
 }
 
 /** Cuántos ejes coinciden. Sustituye al recuento de tres booleanos. */
@@ -198,5 +257,5 @@ export function aciertos(
   respuestas: Record<EjeId, string>,
   solucion: Record<EjeId, string>,
 ): number {
-  return m.ejes.filter((e) => respuestas[e.id] === solucion[e.id]).length;
+  return ejes(m).filter((e) => respuestas[e.id] === solucion[e.id]).length;
 }

@@ -22,6 +22,7 @@ export {
   categoriaDeJugadores,
   categoriasDeLugar,
   eje,
+  ejes,
   ejeDeJugadores,
   esElSenalado,
   respuestaCompleta,

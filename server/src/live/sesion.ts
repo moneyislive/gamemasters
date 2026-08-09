@@ -11,7 +11,7 @@ import { getStore } from '../db/store';
 import { numeroDeRondas } from '../docs/datos';
 import { avisarCambio } from './hub';
 import { ALFABETO_CODIGO } from '../../../shared/live';
-import { aciertos, esElSenalado, manifiestoDe, respuestaCompleta } from '../../../shared/juegos';
+import { aciertos, esElSenalado, ejes as ejesDe, manifiestoDe, respuestaCompleta } from '../../../shared/juegos';
 import type { EjeId, JuegoId } from '../../../shared/juegos';
 import type { Acusacion, LivePhase, LivePlayer, LiveSession } from '../../../shared/live';
 import type { GameSession } from '../../../shared/types';
@@ -291,7 +291,7 @@ export function acusar(
 
   // Acertar es coincidir en TODOS los ejes que declare el juego, sean tres o
   // sean otros tantos. Antes eran tres comparaciones escritas a mano.
-  const correcta = aciertos(manifiesto, eleccion, solucion) === manifiesto.ejes.length;
+  const correcta = aciertos(manifiesto, eleccion, solucion) === ejesDe(manifiesto).length;
 
   const acusacion: Acusacion = {
     suspectId,

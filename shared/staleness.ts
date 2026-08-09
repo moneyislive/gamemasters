@@ -11,7 +11,7 @@
  * regenerar y el cliente para avisar en la interfaz. Una sola fuente de verdad.
  */
 import type { GameSession } from './types';
-import { entidadesDe, manifiestoDe } from './juegos';
+import { entidadesDe, ejes as ejesDe, manifiestoDe } from './juegos';
 import type { EjeId } from './juegos';
 
 export interface StalenessReport {
@@ -121,7 +121,7 @@ export function computeStaleness(game: GameSession): StalenessReport {
   // CLUEDO. Tenerlos escritos a mano aquí hacía que cualquier otro juego
   // saliese con la solución rota; lo encontró la prueba del segundo juego.
   const manifiesto = manifiestoDe(game.settings?.juego);
-  const brokenSolution = manifiesto.ejes
+  const brokenSolution = ejesDe(manifiesto)
     .filter((eje) => {
       const id = plot.solution.respuestas[eje.id];
       if (!id) return true;
@@ -169,7 +169,7 @@ export function computeStaleness(game: GameSession): StalenessReport {
   // Un aviso por eje roto, con la pregunta que ese eje hace. Antes eran tres
   // frases escritas a mano; ahora las escribe el juego en su manifiesto.
   for (const ejeId of brokenSolution) {
-    const eje = manifiesto.ejes.find((e) => e.id === ejeId);
+    const eje = ejesDe(manifiesto).find((e) => e.id === ejeId);
     summary.push(
       eje
         ? `La respuesta a «${eje.pregunta}» ya no señala a nada que exista: el caso no tiene solución.`

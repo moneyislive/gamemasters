@@ -62,6 +62,25 @@ export const CLUEDO: ManifiestoDeJuego = {
     { id: 'lugar', pregunta: '¿Dónde?', rotulo: 'Dónde', categoria: 'salas' },
   ],
 
+  // Los doce eligen sala a la vez; la ronda la cierra quien dirige.
+  turnos: 'simultaneo',
+
+  acciones: [
+    {
+      id: 'entrar-en-sala',
+      rotulo: 'Entrar en una sala',
+      fases: ['ronda-abierta'],
+      eligeDe: [{ campo: 'sala', categoria: 'salas', rotulo: '¿Dónde entras?' }],
+      vecesPorTurno: 2,
+    },
+    {
+      id: 'acusar',
+      rotulo: 'Acusar',
+      fases: ['ronda-cerrada', 'acusaciones'],
+      vecesPorTurno: 1,
+    },
+  ],
+
   ronda: {
     accionSobre: 'salas',
     cambiosPermitidos: 1,

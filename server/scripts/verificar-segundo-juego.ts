@@ -24,7 +24,7 @@
  * No se le escribe generador de trama ni plantillas de imprimibles: eso es
  * contenido y cada juego lo trae. Lo que se comprueba es el MOTOR.
  */
-import { manifiestoDe, registrarJuego } from '../../shared/juegos';
+import { manifiestoDe, registrarJuego, ejes as ejesDe } from '../../shared/juegos';
 import { abrirRonda, acusar, cerrarRonda, elegirSala } from '../src/live/sesion';
 import { vistaDeGameMaster, vistaDeJugador } from '../src/live/proyeccion';
 import { repararRespuestas } from '../src/juegos/solucion';
@@ -61,6 +61,17 @@ const EL_LEGADO: ManifiestoDeJuego = {
   ejes: [
     { id: 'ladron', pregunta: '¿Quién se la llevó?', rotulo: 'Quién', categoria: 'herederos' },
     { id: 'pieza', pregunta: '¿Qué falta?', rotulo: 'Qué', categoria: 'piezas' },
+  ],
+
+  turnos: 'simultaneo',
+  acciones: [
+    {
+      id: 'entrar-en-estancia',
+      rotulo: 'Pasar a una estancia',
+      fases: ['ronda-abierta'],
+      eligeDe: [{ campo: 'estancia', categoria: 'estancias', rotulo: '¿A dónde pasas?' }],
+    },
+    { id: 'senalar', rotulo: 'Señalar', fases: ['acusaciones'], vecesPorTurno: 1 },
   ],
 
   // Y se actúa sobre una categoría que no responde a ningún eje.
@@ -181,7 +192,7 @@ const sesion: LiveSession = {
 
 const manifiesto = manifiestoDe(sesion.juego);
 comprobar('el juego queda registrado', manifiesto.id === 'el-legado', manifiesto.id);
-comprobar('con dos ejes, no tres', manifiesto.ejes.length === 2);
+comprobar('con dos ejes, no tres', ejesDe(manifiesto).length === 2);
 
 const vistaDe = (id: string) => vistaDeJugador(game, sesion, id)!;
 
