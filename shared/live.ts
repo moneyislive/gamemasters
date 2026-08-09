@@ -232,10 +232,14 @@ export interface SalaVista {
  * tenía en su vista.
  */
 export interface TableroVista {
+  /**
+   * Con cuál de los dos empezó quien preparó la partida. No excluye al otro:
+   * si vienen los dos, este solo decide cuál se enseña primero.
+   */
   modo: BoardMode;
-  /** Modo aéreo: foto cenital del sitio real, relativa al servidor. */
+  /** Foto cenital del sitio de verdad, relativa al servidor. Si la hay. */
   imagenUrl?: string;
-  /** Modo generado: el plano de rejilla con salas y pasadizos. */
+  /** El plano de rejilla con salas y pasadizos. Si está trazado. */
   plano?: BoardLayout;
 }
 

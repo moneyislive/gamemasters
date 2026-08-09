@@ -119,14 +119,19 @@ export function vistaDeJugador(
   // el culpable ni dónde está ninguna pista. Lo que sí es información de juego
   // —dónde estás, dónde hay gente, qué salas ya dieron algo— lo pinta el móvil
   // encima, con lo que ya tenía.
+  // Va TODO lo que exista, no solo lo del modo elegido. Una partida puede
+  // tener las dos cosas —el plano trazado y una foto cenital del sitio de
+  // verdad— y en la mesa las dos sirven: el plano para entender la casa, la
+  // foto para reconocerla. Cuál se enseña primero lo decide `modo`; poder ver
+  // la otra lo decide quien juega.
   const tablero: TableroVista | undefined =
-    game.boardMode === 'aerial'
-      ? game.boardImageUrl
-        ? { modo: 'aerial', imagenUrl: game.boardImageUrl }
-        : undefined
-      : game.board
-        ? { modo: 'generated', plano: game.board }
-        : undefined;
+    game.board || game.boardImageUrl
+      ? {
+          modo: game.boardMode,
+          ...(game.boardImageUrl ? { imagenUrl: game.boardImageUrl } : {}),
+          ...(game.board ? { plano: game.board } : {}),
+        }
+      : undefined;
 
   // ---- Mis pistas: solo las de MI sala en ESTA ronda, y sin su significado ----
   const miSala = enJuego ? salaDe(jugador, sesion.round) : undefined;

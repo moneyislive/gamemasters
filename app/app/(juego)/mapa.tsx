@@ -48,17 +48,36 @@ import type { SalaVista } from '../../../shared/live';
 /** Lado de celda en unidades del viewBox. El mismo que usa la web. */
 const CELDA = 40;
 
+/** Las dos caras del mismo sitio: la planta dibujada y la foto de verdad. */
+type Cara = 'plano' | 'foto';
+
+/** Medidas de la chincheta sobre la foto. Se usan para centrarla en su punto. */
+const ANCHO_CHINCHETA = 150;
+const ALTO_CABEZA = 34;
+
 export default function Mapa(): JSX.Element {
   const { vista, aplicarVista } = usePartida();
   const { width } = useWindowDimensions();
   const [eligiendo, setEligiendo] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Null mientras el jugador no elija: así manda lo que preparó quien dirige,
+  // pero en cuanto toca una pestaña, manda él.
+  const [elegida, setElegida] = useState<Cara | null>(null);
 
   if (!vista) return <Pantalla><Cargando texto="Desdoblando el plano…" /></Pantalla>;
 
   const { tablero, salas, miSala, sesion } = vista;
   const ancho = Math.max(240, width - espacio.lg * 2);
   const abierta = sesion.phase === 'ronda-abierta';
+
+  // Una partida puede tener las dos caras: el plano trazado y la foto cenital
+  // del sitio de verdad. Si están las dos, se puede pasar de una a otra.
+  const hayPlano = (tablero?.plano?.rooms.length ?? 0) > 0;
+  const hayFoto = Boolean(tablero?.imagenUrl);
+  const porDefecto: Cara | null =
+    tablero?.modo === 'aerial' && hayFoto ? 'foto' : hayPlano ? 'plano' : hayFoto ? 'foto' : null;
+  const cara = (elegida && (elegida === 'foto' ? hayFoto : hayPlano) ? elegida : porDefecto);
+  const conChincheta = salas.filter((s) => s.pin).length;
 
   // Salas de las que ya salió algo al tablón común. No es información nueva:
   // el jugador la tiene en la pestaña del tablón, aquí solo se ve de un vistazo.
@@ -81,26 +100,32 @@ export default function Mapa(): JSX.Element {
   return (
     <Pantalla>
       <View style={{ marginTop: espacio.md, marginBottom: espacio.lg }}>
-        <Titulo style={{ fontSize: 24 }}>El plano</Titulo>
+        <Titulo style={{ fontSize: 24 }}>{cara === 'foto' ? 'La casa' : 'El plano'}</Titulo>
         <Cuerpo tenue>
           {abierta
             ? 'Toca una estancia para entrar en ella.'
-            : 'La planta de la casa y por dónde se comunica.'}
+            : cara === 'foto'
+              ? 'El sitio de verdad, visto desde arriba.'
+              : 'La planta de la casa y por dónde se comunica.'}
         </Cuerpo>
       </View>
 
       <AvisoError>{error}</AvisoError>
 
-      {!tablero ? (
+      {hayPlano && hayFoto && (
+        <Alternador cara={cara} alCambiar={setElegida} />
+      )}
+
+      {!cara ? (
         <Marco>
           <Cuerpo tenue>
-            Esta partida todavía no tiene plano trazado. Quien la dirige puede construirlo desde el
-            taller.
+            Esta partida todavía no tiene plano. Quien la dirige puede trazarlo desde el taller, o
+            subir una foto aérea del sitio y clavar una chincheta en cada estancia.
           </Cuerpo>
         </Marco>
-      ) : tablero.modo === 'aerial' ? (
+      ) : cara === 'foto' ? (
         <PlanoAereo
-          imagenUrl={tablero.imagenUrl}
+          imagenUrl={tablero?.imagenUrl}
           salas={salas}
           miSala={miSala}
           conHallazgo={conHallazgo}
@@ -110,7 +135,7 @@ export default function Mapa(): JSX.Element {
         />
       ) : (
         <PlanoDibujado
-          plano={tablero.plano}
+          plano={tablero?.plano}
           salas={salas}
           miSala={miSala}
           conHallazgo={conHallazgo}
@@ -120,7 +145,20 @@ export default function Mapa(): JSX.Element {
         />
       )}
 
-      <Leyenda hayPasadizos={(tablero?.plano?.passages.length ?? 0) > 0} />
+      {cara === 'foto' && conChincheta < salas.length && (
+        <Cuerpo tenue style={{ fontStyle: 'italic', fontSize: 15, marginTop: espacio.sm }}>
+          {conChincheta === 0
+            ? 'Sobre esta foto todavía no hay ninguna estancia señalada.'
+            : `Sobre la foto hay ${conChincheta} de ${salas.length} estancias señaladas; las demás están en la lista de abajo.`}
+        </Cuerpo>
+      )}
+
+      {cara && (
+        <Leyenda
+          cara={cara}
+          hayPasadizos={(tablero?.plano?.passages.length ?? 0) > 0}
+        />
+      )}
 
       <Ornamento />
 
@@ -548,13 +586,50 @@ function PlanoAereo({
 // Leyenda y utilidades
 // ---------------------------------------------------------------------------
 
-function Leyenda({ hayPasadizos }: { hayPasadizos: boolean }): JSX.Element {
+/**
+ * El paso de una cara a otra.
+ *
+ * Solo aparece cuando la partida tiene las dos. Con una sola sobra el mando, y
+ * un botón que no lleva a ningún sitio es peor que no tenerlo.
+ */
+function Alternador({
+  cara,
+  alCambiar,
+}: {
+  cara: Cara | null;
+  alCambiar: (c: Cara) => void;
+}): JSX.Element {
+  const opcion = (valor: Cara, rotulo: string): JSX.Element => (
+    <Pressable
+      key={valor}
+      accessibilityRole="button"
+      accessibilityState={cara === valor ? { selected: true } : {}}
+      onPress={() => alCambiar(valor)}
+      style={[estilos.pestanaMapa, cara === valor && estilos.pestanaMapaActiva]}
+    >
+      <Etiqueta style={{ color: cara === valor ? color.oro300 : 'rgba(217,201,163,0.5)' }}>
+        {rotulo}
+      </Etiqueta>
+    </Pressable>
+  );
+  return (
+    <View style={estilos.alternador}>
+      {opcion('plano', 'El plano')}
+      {opcion('foto', 'La casa')}
+    </View>
+  );
+}
+
+function Leyenda({ cara, hayPasadizos }: { cara: Cara; hayPasadizos: boolean }): JSX.Element {
   return (
     <View style={estilos.leyenda}>
-      <Renglon glifo="▣" texto="La estancia iluminada es en la que estás." />
+      <Renglon
+        glifo={cara === 'foto' ? '◉' : '▣'}
+        texto="La estancia iluminada es en la que estás."
+      />
       <Renglon glifo="●" texto="Cada punto es alguien que ha entrado ahí esta ronda." />
       <Renglon glifo="✦" texto="El lacre marca las salas que ya dieron algo al tablón." />
-      {hayPasadizos && (
+      {cara === 'plano' && hayPasadizos && (
         <Renglon glifo="╌" texto="Los trazos discontinuos son pasadizos: cruzan la casa sin pasillo." />
       )}
     </View>
@@ -613,6 +688,24 @@ const estilos = StyleSheet.create({
     borderColor: 'rgba(201,162,39,0.35)',
   },
   leyenda: { marginTop: espacio.md },
+  alternador: {
+    flexDirection: 'row',
+    gap: espacio.sm,
+    marginBottom: espacio.md,
+  },
+  pestanaMapa: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 9,
+    borderWidth: 1,
+    borderColor: 'rgba(201,162,39,0.3)',
+    borderRadius: radio.md,
+    backgroundColor: 'rgba(31,18,12,0.5)',
+  },
+  pestanaMapaActiva: {
+    borderColor: color.oro400,
+    backgroundColor: 'rgba(201,162,39,0.14)',
+  },
   renglon: { flexDirection: 'row', alignItems: 'flex-start', gap: espacio.sm, marginBottom: 4 },
   fila: {
     flexDirection: 'row',
@@ -630,14 +723,21 @@ const estilos = StyleSheet.create({
     backgroundColor: 'rgba(201,162,39,0.13)',
   },
   chincheta: {
+    // La chincheta tiene que quedar centrada EXACTAMENTE sobre el punto que
+    // marcó quien preparó la partida. Por eso la caja lleva ancho fijo y se
+    // desplaza media caja: si se dejara que la anchura la fijase el rótulo,
+    // cada estancia se descolocaría en proporción a lo largo que sea su
+    // nombre, que es justo lo que pasaba antes.
     position: 'absolute',
+    width: ANCHO_CHINCHETA,
+    marginLeft: -ANCHO_CHINCHETA / 2,
+    marginTop: -ALTO_CABEZA / 2,
     alignItems: 'center',
-    transform: [{ translateX: -17 }, { translateY: -34 }],
   },
   chinchetaCabeza: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    width: ALTO_CABEZA,
+    height: ALTO_CABEZA,
+    borderRadius: ALTO_CABEZA / 2,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: color.oro300,
