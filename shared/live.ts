@@ -28,6 +28,14 @@ export type LivePhase =
   | 'ronda-cerrada'
   /** Ventana de acusación: todos escriben a la vez. */
   | 'acusaciones'
+  /**
+   * Se cierra la sesión de hoy, pero la partida NO ha terminado.
+   *
+   * Es lo que separa una velada de una campaña. Un CLUEDO no pasa nunca por
+   * aquí: empieza y acaba la misma noche. Una campaña de rol de varios días
+   * vive aquí entre encuentro y encuentro, conservándolo todo.
+   */
+  | 'intermedio'
   /** Desenlace revelado. */
   | 'desenlace';
 
@@ -136,6 +144,28 @@ export interface LiveSession {
    * para que quien dirige vea el pulso de la mesa.
    */
   acciones?: Array<{ suspectId: string; accion: string; round: number; at: string }>;
+  /**
+   * En qué encuentro va la partida. 1 es el primero.
+   *
+   * Una velada de una noche se queda en 1 para siempre y nadie lo nota. Una
+   * campaña lo va subiendo cada vez que se retoma.
+   */
+  encuentro?: number;
+  /**
+   * Lo que pasó en cada encuentro ya cerrado.
+   *
+   * No es decoración: en una campaña que se retoma al cabo de una semana, esto
+   * es lo que permite a doce personas recordar dónde lo dejaron. Se le enseña
+   * a quien juega.
+   */
+  cronica?: Array<{
+    encuentro: number;
+    titulo: string;
+    resumen: string;
+    desdeRonda: number;
+    hastaRonda: number;
+    cerradoEl: string;
+  }>;
   /** Salas visitadas por alguien en cada ronda; lo que pasa al tablón común. */
   tablon: Array<{ round: number; roomId: string }>;
   /**
@@ -308,6 +338,8 @@ export interface VistaJugador {
     /** Cuántos han pulsado «estoy listo» y cuántos son en total. */
     listos: number;
     total: number;
+    /** En qué encuentro va la partida. 1 en una velada de una sola noche. */
+    encuentro: number;
   };
   /**
    * El caso, tal como lo conoce todo el mundo.
@@ -408,6 +440,13 @@ export interface VistaJugador {
   misPistas: PistaVista[];
   /** Todo lo que ha pasado al tablón común en rondas ya cerradas. */
   tablon: PistaVista[];
+  /**
+   * Lo que pasó en los encuentros anteriores.
+   *
+   * Vacío en una velada de una noche. En una campaña es lo primero que se mira
+   * al retomarla.
+   */
+  cronica: Array<{ encuentro: number; titulo: string; resumen: string; cerradoEl: string }>;
   /** Hechos públicos de la cronología. */
   cronologia: MomentoVista[];
   /** Narración de la ronda en curso, si el Game Master la ha lanzado. */

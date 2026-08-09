@@ -209,6 +209,64 @@ export function cerrarRonda(sesion: LiveSession): void {
   }
 }
 
+/**
+ * Cierra la sesión de hoy sin terminar la partida.
+ *
+ * Es lo que separa una velada de una campaña. Al cerrar un encuentro NO se
+ * pierde nada: siguen los códigos con los que la gente emparejó su móvil, sus
+ * notas, el tablón común, los giros ya repartidos y el estado propio del juego
+ * —las fichas, el inventario, lo que sea—. Lo único que cambia es que hoy ya
+ * no se juega más.
+ *
+ * El resumen no es adorno. Una campaña se retoma al cabo de una semana, y sin
+ * él nadie recuerda dónde lo dejaron.
+ */
+export function cerrarEncuentro(
+  sesion: LiveSession,
+  cierre: { titulo: string; resumen: string },
+): void {
+  if (!puedePasarA(sesion.juego, sesion.phase, 'intermedio')) {
+    throw new TransicionInvalida(sesion.phase, 'intermedio');
+  }
+
+  const cronica = sesion.cronica ?? [];
+  const encuentro = sesion.encuentro ?? 1;
+  const desdeRonda = cronica.length > 0 ? (cronica[cronica.length - 1]!.hastaRonda + 1) : 1;
+
+  sesion.cronica = [
+    ...cronica,
+    {
+      encuentro,
+      titulo: cierre.titulo.trim() || `Encuentro ${encuentro}`,
+      resumen: cierre.resumen.trim(),
+      desdeRonda,
+      hastaRonda: sesion.round,
+      cerradoEl: new Date().toISOString(),
+    },
+  ];
+  sesion.phase = 'intermedio';
+  sesion.roundEndsAt = undefined;
+  // Nadie tiene el turno mientras la mesa está levantada.
+  sesion.turnoDe = undefined;
+  // El aviso de «estoy listo» se limpia: la próxima vez hay que volver a darlo.
+  for (const jugador of sesion.players) jugador.pideEmpezar = false;
+}
+
+/**
+ * Retoma la partida en el encuentro siguiente.
+ *
+ * Las rondas siguen contando hacia arriba en vez de reiniciarse: en una campaña
+ * «la ronda 7» es un momento de la historia, y volver a empezar por uno haría
+ * ambiguo todo lo ya escrito en el tablón y en la crónica.
+ */
+export function abrirEncuentro(sesion: LiveSession): void {
+  if (sesion.phase !== 'intermedio') {
+    throw new TransicionInvalida(sesion.phase, 'ronda-abierta');
+  }
+  sesion.encuentro = (sesion.encuentro ?? 1) + 1;
+  sesion.phase = 'lobby';
+}
+
 export function abrirAcusaciones(sesion: LiveSession): void {
   if (!puedePasarA(sesion.juego, sesion.phase,'acusaciones')) {
     throw new TransicionInvalida(sesion.phase, 'acusaciones');

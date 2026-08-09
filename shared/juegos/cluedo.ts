@@ -101,6 +101,8 @@ export const CLUEDO: ManifiestoDeJuego = {
     'ronda-abierta': ['ronda-cerrada'],
     'ronda-cerrada': ['ronda-abierta', 'acusaciones'],
     acusaciones: ['desenlace'],
+    // Una velada empieza y acaba la misma noche: nunca hay intermedio.
+    intermedio: [],
     desenlace: [],
   },
 

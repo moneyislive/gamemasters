@@ -206,6 +206,7 @@ export function vistaDeJugador(
       lema: plot.tagline,
       listos: sesion.players.filter((p) => p.pideEmpezar).length,
       total: sesion.players.length,
+      encuentro: sesion.encuentro ?? 1,
     },
     // El caso es público: la sinopsis se escribe expresamente sin revelar
     // asesino, arma ni sala, y la víctima y la ambientación las conoce todo el
@@ -264,6 +265,14 @@ export function vistaDeJugador(
     miSala,
     misPistas,
     tablon,
+    // La crónica de los encuentros ya cerrados: es lo que permite retomar una
+    // campaña una semana después sin que nadie recuerde dónde lo dejaron.
+    cronica: (sesion.cronica ?? []).map((e) => ({
+      encuentro: e.encuentro,
+      titulo: e.titulo,
+      resumen: e.resumen,
+      cerradoEl: e.cerradoEl,
+    })),
     cronologia: cronologia(plot),
     narracion: narracionActual
       ? { title: narracionActual.title, text: narracionActual.text }

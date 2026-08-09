@@ -15,7 +15,8 @@
     "oro:verificar": "tsx scripts/oro.ts verificar",
     "verify:partida": "tsx scripts/verificar-partida.ts",
     "verify:segundo-juego": "tsx scripts/verificar-segundo-juego.ts",
-    "verify:sin-ejes": "tsx scripts/verificar-juego-sin-ejes.ts"
+    "verify:sin-ejes": "tsx scripts/verificar-juego-sin-ejes.ts",
+    "verify:campana": "tsx scripts/verificar-campana.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",
