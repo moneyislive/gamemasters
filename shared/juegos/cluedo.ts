@@ -78,6 +78,15 @@ export const CLUEDO: ManifiestoDeJuego = {
       rotulo: 'Acusar',
       fases: ['ronda-cerrada', 'acusaciones'],
       vecesPorTurno: 1,
+      // Los campos de la acusación SON los ejes. Al declararlo así, el motor
+      // comprueba que cada respuesta es una entidad real de la categoría que
+      // le toca: que «con qué» sea un objeto y no una sala. Antes eso no lo
+      // comprobaba nadie y un móvil manipulado podía mandar cualquier id.
+      eligeDe: [
+        { campo: 'culpable', categoria: 'sospechosos', rotulo: '¿Quién lo hizo?' },
+        { campo: 'objeto', categoria: 'objetos', rotulo: '¿Con qué?' },
+        { campo: 'lugar', categoria: 'salas', rotulo: '¿Dónde?' },
+      ],
     },
   ],
 

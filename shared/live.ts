@@ -382,6 +382,26 @@ export interface VistaJugador {
     rotulo: string;
     opciones: Array<{ id: string; nombre: string }>;
   }>;
+  /**
+   * Qué puedes hacer ahora mismo, con sus opciones ya resueltas.
+   *
+   * Lo compone el servidor desde el repertorio del juego, filtrando por la
+   * fase, por si te toca y por las veces que ya lo has hecho. La app lo pinta
+   * sin saber a qué se juega: una acción nueva no obliga a escribir una
+   * pantalla nueva.
+   *
+   * No abre ninguna brecha: las opciones son entidades que ya viajan en la
+   * vista.
+   */
+  acciones: Array<{
+    id: string;
+    rotulo: string;
+    campos: Array<{
+      campo: string;
+      rotulo: string;
+      opciones: Array<{ id: string; nombre: string }>;
+    }>;
+  }>;
   /** La sala que has elegido esta ronda, si ya lo has hecho. */
   miSala?: string;
   /** Pistas de TU sala en esta ronda. Vacío hasta que eliges. */

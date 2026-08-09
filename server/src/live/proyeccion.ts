@@ -30,6 +30,7 @@ import type {
 import type { GameSession, Plot } from '../../../shared/types';
 import { aciertos, ejeDeJugadores, ejes as ejesDe, esElSenalado, manifiestoDe } from '../../../shared/juegos';
 import { entidadesDe, nombreDeEntidad } from '../juegos/entidades';
+import { accionesDisponibles } from '../juegos/motor';
 
 /**
  * Cuánto conocimiento del personaje está desbloqueado.
@@ -179,6 +180,17 @@ export function vistaDeJugador(
     };
   });
 
+  // ---- Qué se puede hacer ahora mismo ----
+  const acciones = accionesDisponibles(sesion, suspectId).map((a) => ({
+    id: a.id,
+    rotulo: a.rotulo,
+    campos: (a.eligeDe ?? []).map((c) => ({
+      campo: c.campo,
+      rotulo: c.rotulo,
+      opciones: entidadesDe(game, c.categoria).map((e) => ({ id: e.id, nombre: e.name })),
+    })),
+  }));
+
   const miAcusacion = sesion.acusaciones.find((a) => a.suspectId === suspectId);
 
   const vista: VistaJugador = {
@@ -242,6 +254,7 @@ export function vistaDeJugador(
     salas,
     tablero,
     ejes,
+    acciones,
     objetos: game.weapons.map((w) => ({
       id: w.id,
       name: w.name,
