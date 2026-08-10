@@ -14,6 +14,7 @@
  */
 import type { BoardLayout, BoardMode } from './types';
 import type { EjeId, JuegoId } from './juegos/tipos';
+import type { CorreoDeCuenta, IdentidadDeProveedor } from './identidad';
 
 // ---------------------------------------------------------------------------
 // Estado de la partida
@@ -331,14 +332,50 @@ export interface PartidaJugada {
   eraCulpable: boolean;
 }
 
+/**
+ * Una cuenta de la plataforma.
+ *
+ * Todo lo nuevo es OPCIONAL a propósito: hay comprobadores que construyen
+ * cuentas literales, y un campo obligatorio los rompería a todos sin aportar
+ * nada. Las cuentas antiguas se ven al día al leerlas (ver `juegos/migracion`).
+ */
 export interface Account {
   id: string;
-  /** Identidad de la cuenta. En minúsculas y sin espacios. */
+  /**
+   * Correo principal de la cuenta, en minúsculas y sin espacios.
+   *
+   * Sigue siendo el índice por el que se busca en el camino del consentimiento.
+   * Lo que NO puede hacer nunca es abrir una sesión desde un inicio con
+   * proveedor: ahí la identidad es el `sub`, no el correo. Un correo cambia de
+   * dueño; un `sub`, no.
+   */
   email: string;
   displayName: string;
   createdAt: string;
   partidas: PartidaJugada[];
   trofeos: TrofeoId[];
+
+  // ---- Identidad. Todo opcional: las cuentas de antes no lo tienen. ----
+  /** Proveedores vinculados. Ninguno = cuenta nacida del consentimiento. */
+  identidades?: IdentidadDeProveedor[];
+  /** Los correos que se le conocen, y hasta dónde llega la prueba de cada uno. */
+  correos?: CorreoDeCuenta[];
+  /**
+   * Puede abrir el taller y dirigir partidas.
+   *
+   * Se lee del almacén en CADA petición y nunca se sella dentro del pasaporte:
+   * si fuera al revés, retirarle el permiso a alguien no surtiría efecto hasta
+   * que caducara su sesión, y eso son noventa días.
+   */
+  taller?: boolean;
+  /**
+   * Corte de revocación: toda sesión emitida antes de esta fecha deja de valer.
+   *
+   * Es la única forma de echar a alguien de una sesión firmada sin estado. Sin
+   * esto, la única manera sería rotar el secreto del servidor, que echaría
+   * también a todos los jugadores de todas las campañas en curso.
+   */
+  sesionesValidasDesde?: string;
 }
 
 // ---------------------------------------------------------------------------

@@ -6,6 +6,7 @@
 import type { AppConfig } from '../../../shared/types';
 import { DEMO_MODE, MODEL_OPTIONS, isModelId } from '../config';
 import { getStorageKind, getStore } from '../db/store';
+import { identidadDeTaller } from '../auth';
 import { crearRouter } from '../rutas';
 
 const router = crearRouter();
@@ -30,6 +31,23 @@ router.get('/config', async (_req, res) => {
 
 router.put('/config', async (req, res) => {
   try {
+    /*
+     * El modelo es GLOBAL de la instancia y lo paga quien tiene la clave de
+     * API. Cuando cada Game Master entre con su cuenta, no puede ser que
+     * cualquiera de ellos cambie el modelo de todos los demás: eso se decide
+     * con la llave de la casa, o siendo alguien a quien se le ha dado el
+     * permiso expresamente.
+     */
+    const quien = identidadDeTaller(req);
+    if (quien?.tipo === 'cuenta') {
+      const cuenta = await getStore().getAccount(quien.cuentaId);
+      if (!cuenta?.taller) {
+        res.status(403).json({
+          error: 'El modelo lo decide quien administra esta instalación.',
+        });
+        return;
+      }
+    }
     const model = (req.body as { model?: unknown } | undefined)?.model;
     if (!isModelId(model)) {
       res.status(400).json({

@@ -476,12 +476,35 @@ export interface GameSession {
     pin?: RoomPin;
   }>>;
   boardMode: BoardMode;
+  /**
+   * Quién puede dirigirla. Vacío o ausente = HUÉRFANA: se creó cuando el taller
+   * era una sola casa con una sola contraseña, y no hay a quién atribuirla.
+   */
+  duenos?: DuenoDePartida[];
+  /** Traza de la adopción, para poder revisarla o deshacerla. */
+  adoptada?: { cuentaId: string; el: string; prueba: 'codigo-en-vivo' | 'nombre' };
   /** Foto aérea del espacio físico (modo 'aerial') */
   boardImageUrl?: string;
   board?: BoardLayout;
   plot?: Plot;
   documents?: PlayerDocument[];
   settings: GameSettings;
+}
+
+/**
+ * Quien puede dirigir una partida.
+ *
+ * Es un ARRAY y no un `ownerId` suelto porque una velada la puede preparar más
+ * de una persona, y porque si el único dueño borra su cuenta la partida no
+ * puede quedarse sin nadie que la abra.
+ */
+export interface DuenoDePartida {
+  cuentaId: string;
+  /** 'creo' la creó · 'adopto' la reclamó de las antiguas · 'invito' co-organiza. */
+  via: 'creo' | 'adopto' | 'invito';
+  desdeEl: string;
+  /** Quién le dio acceso, para poder deshacer una adopción equivocada. */
+  porCuentaId?: string;
 }
 
 export interface GameSummary {
@@ -493,6 +516,17 @@ export interface GameSummary {
   suspectCount: number;
   roomCount: number;
   weaponCount: number;
+  /** Nombres de quienes la dirigen. Es lo que se pinta, no los identificadores. */
+  duenosNombres?: string[];
+  /**
+   * Nadie la reclama todavía: se creó antes de que existieran las cuentas.
+   *
+   * Se MARCA, no se esconde. Ocultar lo que no tiene dueño es exactamente el
+   * fallo que ya está descrito en `db/store.ts` a propósito de MongoDB: quien
+   * dirige no ve sus partidas, las da por perdidas, las vuelve a crear, y
+   * acaban existiendo dos verdades sin forma de reconciliarlas.
+   */
+  huerfana?: boolean;
 }
 
 // ---------- Chat con el agente ----------

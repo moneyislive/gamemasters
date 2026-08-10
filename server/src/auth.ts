@@ -20,7 +20,8 @@ import type { NextFunction, Request, Response } from 'express';
 import { env } from './config';
 import { firmarConSecreto, igualSeguro } from './secreto';
 import { crearRouter } from './rutas';
-import { sesionDeCuentaDePeticion } from './identidad/sesion';
+import { COOKIE_CUENTA, emitirSesionDeCuenta, sesionDeCuentaDePeticion } from './identidad/sesion';
+import { cuentaDeCasa } from './taller/cuenta-de-casa';
 import type { ProveedorId } from '../../shared/identidad';
 
 const COOKIE = 'gm_sesion';
@@ -130,7 +131,7 @@ router.get('/auth/status', (req, res) => {
   res.json({ required: passwordRequired(), authenticated: isAuthenticated(req) });
 });
 
-router.post('/auth/login', (req, res) => {
+router.post('/auth/login', async (req, res) => {
   const password = env.appPassword;
   if (!password) {
     res.json({ authenticated: true });
@@ -156,6 +157,37 @@ router.post('/auth/login', (req, res) => {
     maxAge: DURACION_SEGUNDOS * 1000,
     path: '/',
   });
+
+  /*
+   * Si además se dice CON QUÉ NOMBRE se entra, se reparte también un pasaporte
+   * de cuenta, y a partir de ahí las partidas que se creen llevan su firma.
+   *
+   * Es organización, no seguridad —quien tiene la contraseña puede escribir
+   * cualquier nombre— y está dicho así en `taller/cuenta-de-casa.ts`. Existe
+   * para que «cada uno ve sus partidas» se pueda usar y probar hoy, sin esperar
+   * a las credenciales de los proveedores, y para que quien ya dirige veladas
+   * no se encuentre un taller vacío el día que vincule su Google.
+   */
+  const nombre = typeof req.body?.nombre === 'string' ? req.body.nombre.trim() : '';
+  if (nombre) {
+    const cuenta = await cuentaDeCasa(nombre);
+    if (!cuenta) {
+      res.status(409).json({
+        error: 'Ese nombre ya pertenece a una cuenta con proveedor. Entra con él.',
+      });
+      return;
+    }
+    res.cookie(COOKIE_CUENTA, emitirSesionDeCuenta(cuenta, 'google'), {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: req.secure,
+      maxAge: 60 * 60 * 24 * 90 * 1000,
+      path: '/',
+    });
+    res.json({ authenticated: true, cuenta: { id: cuenta.id, displayName: cuenta.displayName } });
+    return;
+  }
+
   res.json({ authenticated: true });
 });
 

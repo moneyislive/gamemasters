@@ -24,6 +24,7 @@ import liveRouter from './routes/live';
 import materialRouter from './routes/material';
 import refreshRouter from './routes/refresh';
 import uploadsRouter from './routes/uploads';
+import duenoRouter from './taller/dueno';
 import { paginaDePrivacidad } from './legal/privacidad';
 import { secretoDeFirma } from './secreto';
 
@@ -111,6 +112,13 @@ app.use('/api', jugarRouter);
 // Acceso: el router de autenticación va primero y el guardián protege el resto.
 app.use('/api', authRouter);
 app.use('/api', requireAuth);
+
+/*
+ * De quién es cada partida. Va JUSTO detrás del guardián de acceso y DELANTE de
+ * todos los routers que tocan una partida: si se moviera detrás, cada uno de
+ * ellos tendría que comprobarlo por su cuenta, y ahí es donde se olvida.
+ */
+app.use('/api', duenoRouter);
 
 // Routers de la API, todos bajo el prefijo /api.
 app.use('/api', configRouter);

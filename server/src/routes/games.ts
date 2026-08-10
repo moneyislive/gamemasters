@@ -11,6 +11,7 @@ import type { DocumentSectionId, GameSettings } from '../../../shared/types';
 import { isPrintableDocId } from '../../../shared/documents';
 import { isModelId } from '../config';
 import { getStore } from '../db/store';
+import { identidadDeTaller } from '../auth';
 import { olvidarFotos } from '../uploads/limpieza';
 import { normalizeStylePrompt } from '../plot/style';
 import { crearRouter } from '../rutas';
@@ -19,9 +20,33 @@ const router = crearRouter();
 
 const NOT_FOUND = { error: 'Partida no encontrada.' } as const;
 
-router.get('/games', async (_req, res) => {
+/**
+ * El listado.
+ *
+ * Se filtra AQUÍ y no en el almacén, porque aquí es donde se sabe de parte de
+ * quién viene la pregunta. Y devuelve las propias MÁS las huérfanas, marcadas:
+ * esconder lo que no tiene dueño es cómo alguien abre el taller, no ve ninguna
+ * de sus partidas, las da por perdidas y las vuelve a crear — el mismo modo de
+ * fallo que ya está descrito en `db/store.ts` a propósito de MongoDB.
+ */
+router.get('/games', async (req, res) => {
   try {
-    res.json(await getStore().listGames());
+    const todas = await getStore().listGames();
+    const quien = identidadDeTaller(req);
+    if (!quien || quien.tipo !== 'cuenta') {
+      res.json(todas);
+      return;
+    }
+    const mias = new Set<string>();
+    for (const resumen of todas) {
+      if (resumen.huerfana) continue;
+      const game = await getStore().getGame(resumen.id);
+      if (game && (game.duenos ?? []).some((d) => d.cuentaId === quien.cuentaId)) {
+        mias.add(resumen.id);
+      }
+    }
+    res.json(todas.filter((r) => r.huerfana || mias.has(r.id)));
+    return;
   } catch (err) {
     console.error('[partidas] Error al listar:', err);
     res.status(500).json({ error: 'No se pudieron listar las partidas.' });
@@ -33,6 +58,13 @@ router.post('/games', async (req, res) => {
     const rawName = (req.body as { name?: unknown } | undefined)?.name;
     const name = typeof rawName === 'string' ? rawName : undefined;
     const game = await getStore().createGame(name);
+    // Quien la crea la firma. Si entra con la contraseña de la casa no hay a
+    // quién atribuirla y nace huérfana, como todas las de antes.
+    const quien = identidadDeTaller(req);
+    if (quien?.tipo === 'cuenta') {
+      game.duenos = [{ cuentaId: quien.cuentaId, via: 'creo', desdeEl: new Date().toISOString() }];
+      await getStore().saveGame(game);
+    }
     res.status(201).json(game);
   } catch (err) {
     console.error('[partidas] Error al crear:', err);

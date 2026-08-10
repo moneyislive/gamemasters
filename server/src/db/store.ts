@@ -108,7 +108,16 @@ function toSummary(game: GameSession): GameSummary {
     suspectCount: game.suspects.length,
     roomCount: game.rooms.length,
     weaponCount: game.weapons.length,
+    // Los ids de los dueños NO salen del almacén: el listado se filtra en la
+    // ruta, que es quien sabe de parte de quién pregunta.
+    huerfana: (game.duenos?.length ?? 0) === 0,
   };
+}
+
+/** ¿Puede esta cuenta dirigir esta partida? Huérfana = sí, todavía no es de nadie. */
+export function esDuenoDe(game: Pick<GameSession, 'duenos'>, cuentaId: string): boolean {
+  const duenos = game.duenos ?? [];
+  return duenos.length === 0 || duenos.some((d) => d.cuentaId === cuentaId);
 }
 
 // ---------------------------------------------------------------------------
