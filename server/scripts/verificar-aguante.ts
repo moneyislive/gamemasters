@@ -44,6 +44,12 @@ const SERVIDOR = path.join(REPO, 'server', 'src', 'index.ts');
 const PUERTO = 5700 + Math.floor(Math.random() * 400);
 const BASE = `http://127.0.0.1:${PUERTO}`;
 const CONTRASENA = 'contrasena-de-prueba';
+const FOTO = 'retrato-de-prueba.png';
+/** El PNG válido más pequeño que existe: 1x1, transparente. */
+const PNG_MINIMO = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
+  'base64',
+);
 
 let hechas = 0;
 const fallos: string[] = [];
@@ -312,6 +318,16 @@ function sembrar(dir: string): void {
     'utf8',
   );
 
+  /*
+   * Una foto de verdad en la carpeta de subidas, y un sospechoso que la use.
+   * Es lo que permite comprobar que la app puede VERLA en producción, donde
+   * `/uploads` está detrás de la contraseña de la casa.
+   */
+  fs.mkdirSync(path.join(dir, 'uploads'), { recursive: true });
+  fs.writeFileSync(path.join(dir, 'uploads', FOTO), PNG_MINIMO);
+  game.suspects[0]!.photoUrl = `/uploads/${FOTO}`;
+  game.rooms[0]!.photoUrl = `/uploads/${FOTO}`;
+
   fs.mkdirSync(path.join(dir, 'data'), { recursive: true });
   fs.writeFileSync(
     path.join(dir, 'data', 'db.json'),
@@ -476,6 +492,73 @@ async function comprobarServidor(): Promise<void> {
     despues.datos?.vista?.yo?.notas,
   );
 
+  paso('Las fotos llegan al móvil aunque haya contraseña de la casa');
+
+  const conFoto = await pedir('/api/jugar/vista', { testigo });
+  const urlRetrato: string = conFoto.datos?.vista?.yo?.photoUrl ?? '';
+  comprobar('la vista trae el retrato', urlRetrato.length > 0, urlRetrato);
+  comprobar(
+    'y NO apunta a /uploads, que el jugador no puede abrir',
+    !urlRetrato.startsWith('/uploads/'),
+    urlRetrato,
+  );
+  comprobar('sino a la ruta firmada de la app', urlRetrato.startsWith('/api/jugar/foto/'), urlRetrato);
+
+  // Lo que de verdad importa: SIN la cookie del taller.
+  const imagen = await pedir(urlRetrato);
+  comprobar('la foto se sirve sin la cookie del Game Master', imagen.estado === 200, imagen.estado);
+  comprobar('y son bytes de imagen, no una página de error', imagen.texto.includes('PNG'), imagen.texto.slice(0, 20));
+
+  // CONTROL: por el camino viejo sigue sin poderse. Si esto dejara de ser
+  // cierto, la comprobación de arriba no probaría nada.
+  const porElCaminoViejo = await pedir(`/uploads/${FOTO}`);
+  comprobar(
+    'CONTROL: /uploads sigue cerrado sin la contraseña (por eso hacía falta la ruta nueva)',
+    porElCaminoViejo.estado === 401,
+    porElCaminoViejo.estado,
+  );
+
+  paso('Y el enlace firmado no vale para nada más');
+
+  const sinFirma = await pedir(urlRetrato.split('?')[0] ?? '');
+  comprobar('sin firma, no hay foto', sinFirma.estado === 404, sinFirma.estado);
+
+  const firmaTocada = `${urlRetrato.slice(0, -1)}${urlRetrato.slice(-1) === 'a' ? 'b' : 'a'}`;
+  comprobar('con la firma alterada, tampoco', (await pedir(firmaTocada)).estado === 404);
+
+  const firma = urlRetrato.split('?f=')[1] ?? '';
+  const deOtraPartida = await pedir(`/api/jugar/foto/otra-partida/${FOTO}?f=${firma}`);
+  comprobar(
+    'la firma de una partida no sirve en otra',
+    deOtraPartida.estado === 404,
+    deOtraPartida.estado,
+  );
+
+  /*
+   * Salir del directorio: aquí un fallo no es una foto de más, es leer
+   * ficheros del servidor.
+   *
+   * Se comprueba lo que IMPORTA —que no se sirva el fichero— y no un código
+   * concreto. Algunos intentos ni llegan a la ruta: `....//package.json` trae
+   * un segmento de más, así que no casa con `:gameId/:archivo`, se cuela hasta
+   * el guardián de la contraseña y se lleva un 401. También está bien; lo que
+   * no puede pasar es un 200 con contenido.
+   */
+  for (const intento of [
+    '..%2f..%2fpackage.json',
+    '..%5c..%5cpackage.json',
+    '....//package.json',
+    '%2e%2e%2fpackage.json',
+    'db.json',
+  ]) {
+    const fuga = await pedir(`/api/jugar/foto/aguante/${intento}?f=${firma}`);
+    comprobar(
+      `no se sirve nada con «${intento}»`,
+      fuga.estado !== 200 && !fuga.texto.includes('"name"'),
+      { estado: fuga.estado, principio: fuga.texto.slice(0, 60) },
+    );
+  }
+
   paso('El candado serializa y no deja basura detrás');
 
   // Esto no se ve por HTTP: es memoria del servidor. Va en un proceso aparte,
@@ -558,6 +641,7 @@ try {
       APP_PASSWORD: CONTRASENA,
       PLAYER_TOKEN_SECRET: 'secreto-de-prueba-de-aguante-0123456789abcdef',
       CLIENT_DIR: path.join(dir, 'cliente'),
+      UPLOADS_DIR: path.join(dir, 'uploads'),
     },
     stdio: 'ignore',
   });

@@ -31,6 +31,7 @@ import type { GameSession, Plot } from '../../../shared/types';
 import { aciertos, ejeDeJugadores, ejes as ejesDe, esElSenalado, manifiestoDe } from '../../../shared/juegos';
 import { entidadesDe, nombreDeEntidad } from '../juegos/entidades';
 import { accionesDisponibles } from '../juegos/motor';
+import { fotoParaJugador } from './fotos';
 
 /**
  * Cuánto conocimiento del personaje está desbloqueado.
@@ -112,7 +113,7 @@ export function vistaDeJugador(
     id: r.id,
     name: r.name,
     description: r.description,
-    photoUrl: r.photoUrl,
+    photoUrl: fotoParaJugador(r.photoUrl, game.id),
     ocupantes: ocupacion.get(r.id) ?? 0,
     pin: r.pin,
   }));
@@ -132,7 +133,9 @@ export function vistaDeJugador(
     game.board || game.boardImageUrl
       ? {
           modo: game.boardMode,
-          ...(game.boardImageUrl ? { imagenUrl: game.boardImageUrl } : {}),
+          ...(game.boardImageUrl
+            ? { imagenUrl: fotoParaJugador(game.boardImageUrl, game.id) }
+            : {}),
           ...(game.board ? { plano: game.board } : {}),
         }
       : undefined;
@@ -228,7 +231,7 @@ export function vistaDeJugador(
       motive: personaje?.motive ?? '',
       alibi: personaje?.alibi ?? '',
       personalHook: personaje?.personalHook ?? '',
-      photoUrl: sospechoso?.photoUrl,
+      photoUrl: fotoParaJugador(sospechoso?.photoUrl, game.id),
       conocimiento: todoElConocimiento.slice(0, desbloqueado),
       conocimientoPendiente: Math.max(0, todoElConocimiento.length - desbloqueado),
       giros,
@@ -247,7 +250,7 @@ export function vistaDeJugador(
           displayName: p.displayName,
           characterName: suPersonaje?.characterName ?? p.displayName,
           role: suPersonaje?.role ?? '',
-          photoUrl: suSospechoso?.photoUrl,
+          photoUrl: fotoParaJugador(suSospechoso?.photoUrl, game.id),
           conectado: estaConectado(p),
           salaActual: suSala ? game.rooms.find((r) => r.id === suSala)?.name : undefined,
           yaAcuso: sesion.acusaciones.some((a) => a.suspectId === p.suspectId),
@@ -261,7 +264,7 @@ export function vistaDeJugador(
       id: w.id,
       name: w.name,
       description: w.description,
-      photoUrl: w.photoUrl,
+      photoUrl: fotoParaJugador(w.photoUrl, game.id),
     })),
     miSala,
     misPistas,

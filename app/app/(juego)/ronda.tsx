@@ -7,7 +7,7 @@
  * delante durante dos horas, así que nunca muestra dos cosas a la vez.
  */
 import { useState } from 'react';
-import { Image, Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 import Animated, { FadeIn, FadeInDown, FadeInUp, Layout } from 'react-native-reanimated';
 import * as api from '../../src/api';
@@ -32,6 +32,7 @@ import {
   texto,
 } from '../../src/ui';
 import type { SalaVista } from '../../../shared/live';
+import { Foto } from '../../src/foto';
 
 export default function Ronda(): JSX.Element {
   const { vista, cargando, error, aplicarVista } = usePartida();
@@ -303,16 +304,15 @@ export default function Ronda(): JSX.Element {
                     pressed && { opacity: 0.85 },
                   ]}
                 >
-                  {sala.photoUrl ? (
-                    <Image
-                      source={{ uri: `${api.servidorActual()}${sala.photoUrl}` }}
-                      style={estilos.salaFoto}
-                    />
-                  ) : (
-                    <View style={[estilos.salaFoto, estilos.salaFotoVacia]}>
-                      <Cuerpo tenue style={{ fontSize: 22 }}>⌂</Cuerpo>
-                    </View>
-                  )}
+                  <Foto
+                    url={sala.photoUrl}
+                    style={estilos.salaFoto}
+                    respaldo={
+                      <View style={[estilos.salaFoto, estilos.salaFotoVacia]}>
+                        <Cuerpo tenue style={{ fontSize: 22 }}>⌂</Cuerpo>
+                      </View>
+                    }
+                  />
                   <View style={{ flex: 1 }}>
                     <Cuerpo style={{ fontFamily: 'Cinzel_600SemiBold', fontSize: 17 }}>
                       {sala.name}

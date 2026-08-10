@@ -8,10 +8,13 @@
  * Ninguna ruta de este fichero devuelve nada que no haya pasado por
  * `vistaDeJugador`. Es la regla que sostiene el juego entero.
  */
+import path from 'node:path';
+import { env } from '../config';
 import { getStore } from '../db/store';
 import { avisosDesde, esperarCambio } from '../live/hub';
 import { consultarConsejero } from '../live/consejero';
 import { borrarCuentaDe, perfilDe } from '../live/cuentas';
+import { firmaDeFotoValida } from '../live/fotos';
 import { vistaDeJugador } from '../live/proyeccion';
 import { guardarNotas, mutar, tocar } from '../live/sesion';
 import { AccionInvalida, ejecutarAccion } from '../juegos/motor';
@@ -349,6 +352,57 @@ router.post('/jugar/preguntar', async (req, res) => {
     res.status(503).json({ error: 'El consejero no está disponible ahora mismo.' });
   }
 });
+
+/**
+ * Sirve una foto de la partida a quien juega.
+ *
+ * Existe porque `/uploads` está detrás de la contraseña de la casa y la app no
+ * la tiene: en producción, donde `APP_PASSWORD` es obligatoria, TODAS las fotos
+ * devolvían 401 y el jugador veía huecos negros en tres pantallas sin una
+ * palabra de explicación.
+ *
+ * No pide credencial `Bearer` a propósito, y no es un descuido: `<Image>` no
+ * manda cabeceras cuando la app corre en el navegador. La autorización va en la
+ * firma del enlace, que emite la propia proyección y ata la foto a SU partida
+ * (ver `live/fotos.ts`). Sin firma válida no se sirve nada, y con una firma no
+ * se puede pedir otra cosa que ese fichero.
+ */
+router.get('/jugar/foto/:gameId/:archivo', (req, res) => {
+  const { gameId, archivo } = req.params;
+  const firma = String(req.query.f ?? '');
+
+  if (!firmaDeFotoValida(gameId, archivo, firma)) {
+    res.status(404).end();
+    return;
+  }
+
+  // Doble cinturón: la firma ya obliga a que el nombre sea de los que fabrica
+  // `uploads.ts`, pero además se comprueba que la ruta resuelta cae DENTRO de
+  // la carpeta. Un fallo aquí no es una foto de más: es leer ficheros del
+  // servidor.
+  const carpeta = path.resolve(env.uploadsDir);
+  const completa = path.resolve(carpeta, archivo);
+  if (completa !== path.join(carpeta, archivo)) {
+    res.status(404).end();
+    return;
+  }
+
+  res.sendFile(completa, { headers: cabecerasDeFoto(archivo) }, (error) => {
+    if (error && !res.headersSent) res.status(404).end();
+  });
+});
+
+/** La tabla mime de Express no conoce AVIF y el navegador no lo pinta. */
+function cabecerasDeFoto(archivo: string): Record<string, string> {
+  const cabeceras: Record<string, string> = {
+    // Las fotos no cambian: el nombre lo fabrica `nanoid` y subir otra crea
+    // otro fichero. Cachear de verdad es lo que evita que doce móviles
+    // vuelvan a descargarlas en cada vuelta del sondeo.
+    'Cache-Control': 'private, max-age=604800',
+  };
+  if (archivo.toLowerCase().endsWith('.avif')) cabeceras['Content-Type'] = 'image/avif';
+  return cabeceras;
+}
 
 router.get('/jugar/perfil', async (req, res) => {
   const cred = credencial(req, res);

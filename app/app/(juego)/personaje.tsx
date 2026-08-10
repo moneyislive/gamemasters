@@ -2,9 +2,8 @@
  * Tu dosier. Es el documento impreso, pero vivo: el conocimiento se va
  * desbloqueando ronda a ronda y los giros aparecen cuando te los entregan.
  */
-import { Image, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
-import * as api from '../../src/api';
 import { usePartida } from '../../src/estado';
 import {
   Cargando,
@@ -20,6 +19,7 @@ import {
   espacio,
   radio,
 } from '../../src/ui';
+import { Foto } from '../../src/foto';
 
 /**
  * Cada apartado del dosier va en su propia hoja.
@@ -58,18 +58,17 @@ export default function Personaje(): JSX.Element {
     <Pantalla>
       <Animated.View entering={FadeInDown.duration(500)} style={{ alignItems: 'center' }}>
         <Sello>Confidencial · solo para ti</Sello>
-        {yo.photoUrl ? (
-          <Image
-            source={{ uri: `${api.servidorActual()}${yo.photoUrl}` }}
-            style={estilos.retrato}
-          />
-        ) : (
-          <View style={[estilos.retrato, estilos.retratoVacio]}>
-            <Titulo style={{ fontSize: 32 }}>
-              {yo.characterName.slice(0, 1).toUpperCase()}
-            </Titulo>
-          </View>
-        )}
+        <Foto
+          url={yo.photoUrl}
+          style={estilos.retrato}
+          respaldo={
+            <View style={[estilos.retrato, estilos.retratoVacio]}>
+              <Titulo style={{ fontSize: 32 }}>
+                {yo.characterName.slice(0, 1).toUpperCase()}
+              </Titulo>
+            </View>
+          }
+        />
         <Titulo style={{ textAlign: 'center', fontSize: 26 }}>{yo.characterName}</Titulo>
         <Cuerpo tenue style={{ textAlign: 'center', fontStyle: 'italic' }}>{yo.role}</Cuerpo>
       </Animated.View>

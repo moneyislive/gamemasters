@@ -520,7 +520,10 @@ function PlanoAereo({
   activo,
 }: PropsPlano & { imagenUrl?: string }): JSX.Element {
   const [proporcion, setProporcion] = useState(4 / 3);
-  const uri = imagenUrl ? `${api.servidorActual()}${imagenUrl}` : undefined;
+  // Si la foto no llega, se dice. Antes quedaba un rectángulo negro con las
+  // chinchetas flotando encima de nada, que es peor que no enseñar el mapa.
+  const [fallo, setFallo] = useState(false);
+  const uri = imagenUrl && !fallo ? `${api.servidorActual()}${imagenUrl}` : undefined;
 
   // La foto la sube quien prepara la partida, así que su proporción es
   // imprevisible. Sin medirla, las chinchetas caen donde no es.
@@ -531,7 +534,10 @@ function PlanoAereo({
       (w, h) => {
         if (h > 0) setProporcion(w / h);
       },
-      () => undefined,
+      // Medir es lo primero que se hace con la foto, así que si falla aquí es
+      // que no va a cargar: se pasa al mensaje en vez de esperar al `onError`
+      // de una imagen que no llegará.
+      () => setFallo(true),
     );
   }, [uri]);
 
@@ -539,7 +545,9 @@ function PlanoAereo({
     return (
       <Marco>
         <Cuerpo tenue>
-          Esta partida se juega sobre el espacio real, pero todavía no hay foto del plano.
+          {fallo
+            ? 'No se ha podido cargar la foto del plano. Usa la lista de estancias de abajo.'
+            : 'Esta partida se juega sobre el espacio real, pero todavía no hay foto del plano.'}
         </Cuerpo>
       </Marco>
     );
@@ -550,14 +558,32 @@ function PlanoAereo({
   return (
     <Animated.View entering={FadeIn.duration(600)} style={estilos.lienzo}>
       <View style={{ width: ancho, height: ancho / proporcion }}>
-        <Image source={{ uri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+        <Image
+          source={{ uri }}
+          style={StyleSheet.absoluteFill}
+          resizeMode="cover"
+          onError={() => setFallo(true)}
+        />
         {conChincheta.map((sala) => {
           const dentro = sala.id === miSala;
           return (
-            <Pressable
+            /*
+              La caja que centra NO recibe toques, y esto importa mucho más de
+              lo que parece. Mide 150 px de ancho —los necesita para centrar la
+              chincheta sobre su punto pase lo que pase con el rótulo— y antes
+              era ella misma el `Pressable`: en un móvil normal eso es casi la
+              mitad del ancho del mapa, invisible, y la chincheta pintada
+              después se tragaba el toque de la anterior.
+
+              Con `box-none` la caja deja pasar los toques y solo responde la
+              cabeza. Y el rótulo, `none`, para que tampoco estorbe.
+
+              No era un fallo cosmético: solo se puede cambiar de sala UNA vez
+              por ronda, así que tocar la chincheta equivocada no se deshace.
+            */
+            <View
               key={sala.id}
-              onPress={() => void alPulsar(sala.id)}
-              disabled={!activo || dentro}
+              pointerEvents="box-none"
               style={[
                 estilos.chincheta,
                 {
@@ -566,15 +592,24 @@ function PlanoAereo({
                 },
               ]}
             >
-              <View style={[estilos.chinchetaCabeza, dentro && estilos.chinchetaDentro]}>
+              <Pressable
+                onPress={() => void alPulsar(sala.id)}
+                disabled={!activo || dentro}
+                // La cabeza mide 34: con esto la zona de toque llega a 50, por
+                // encima del mínimo que piden tanto Apple (44) como Android (48).
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel={`${sala.name}${dentro ? ', estás aquí' : ''}`}
+                style={[estilos.chinchetaCabeza, dentro && estilos.chinchetaDentro]}
+              >
                 <Cuerpo style={{ fontSize: 13, color: color.tinta }}>
                   {conHallazgo.has(sala.id) ? '✦' : sala.ocupantes > 0 ? String(sala.ocupantes) : '·'}
                 </Cuerpo>
-              </View>
-              <View style={estilos.chinchetaEtiqueta}>
+              </Pressable>
+              <View style={estilos.chinchetaEtiqueta} pointerEvents="none">
                 <Etiqueta style={{ fontSize: 10 }}>{sala.name}</Etiqueta>
               </View>
-            </Pressable>
+            </View>
           );
         })}
       </View>
