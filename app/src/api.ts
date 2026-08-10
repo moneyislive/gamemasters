@@ -12,6 +12,16 @@ import type { Account } from '../../shared/live';
 
 const CLAVE_TOKEN = 'gm_token';
 const CLAVE_SERVIDOR = 'gm_servidor';
+/**
+ * El pasaporte de cuenta. Es OTRO testigo, con otra vida y otra puerta.
+ *
+ * Que sean dos y no uno es lo que impide el peor fallo posible aquí: que
+ * caducar la sesión de tu cuenta te eche de la partida a mitad de cena. Son
+ * cosas distintas —una dura noventa días y va contigo, la otra dura lo que la
+ * velada y va atada a la apertura de esa partida— y se tratan por separado de
+ * arriba abajo: distinta clave guardada, distinta cabecera, distinta salida.
+ */
+const CLAVE_CUENTA = 'gm_cuenta';
 
 /** Valor por defecto, sobreescribible con EXPO_PUBLIC_API_URL al compilar. */
 const SERVIDOR_POR_DEFECTO =
@@ -54,12 +64,24 @@ const almacen = {
 };
 
 let token: string | null = null;
+let pasaporte: string | null = null;
 let servidor: string = SERVIDOR_POR_DEFECTO;
 
 export async function cargarSesionGuardada(): Promise<{ token: string | null; servidor: string }> {
   token = await almacen.get(CLAVE_TOKEN);
+  pasaporte = await almacen.get(CLAVE_CUENTA);
   servidor = (await almacen.get(CLAVE_SERVIDOR)) ?? SERVIDOR_POR_DEFECTO;
   return { token, servidor };
+}
+
+export function hayCuenta(): boolean {
+  return Boolean(pasaporte);
+}
+
+export async function fijarPasaporte(nuevo: string | null): Promise<void> {
+  pasaporte = nuevo;
+  if (nuevo) await almacen.set(CLAVE_CUENTA, nuevo);
+  else await almacen.del(CLAVE_CUENTA);
 }
 
 export function servidorActual(): string {
@@ -84,6 +106,19 @@ export async function fijarToken(nuevo: string | null): Promise<void> {
  * tenga configurado el móvil: en la wifi de casa apunta al portátil, y en el
  * servidor público, al de verdad.
  */
+/**
+ * El taller, para quien llega sin invitación.
+ *
+ * Es el mismo servidor con el que se juega: en la wifi de casa apunta al
+ * portátil de quien organiza, y en producción, al público. Se abre en el
+ * navegador porque el taller es una herramienta de escritorio —montar una
+ * velada es escribir, subir fotos y colocar chinchetas en un plano— y hacerlo
+ * en un móvil sería un castigo.
+ */
+export function urlDelTaller(): string {
+  return servidor;
+}
+
 export function urlDePrivacidad(): string {
   return `${servidor}/privacidad`;
 }
@@ -164,7 +199,11 @@ async function peticion<T>(
       signal: propio.signal,
       headers: {
         'Content-Type': 'application/json',
+        // Las dos cabeceras cuando se tienen las dos. `Authorization` es SOLO
+        // del jugador; la cuenta va por la suya. Mezclarlas haría que un 401 de
+        // una echase de la otra.
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(pasaporte ? { 'X-GM-Cuenta': pasaporte } : {}),
         ...(opciones.headers ?? {}),
       },
     });
@@ -346,6 +385,54 @@ export function borrarCuenta(): Promise<{ borrada: boolean; partidasLimpiadas: n
   return peticion('/jugar/cuenta', { method: 'DELETE' });
 }
 
-export async function salir(): Promise<void> {
+/**
+ * Salir de la PARTIDA. No toca la cuenta.
+ *
+ * Antes había una sola `salir()` y la llamaban los dos caminos: el 401 del
+ * bucle de la partida y el botón del perfil. En cuanto existen dos sesiones eso
+ * se vuelve peligroso —un 401 de la cuenta te echaría de la mesa— así que están
+ * partidas desde el principio.
+ */
+export async function salirDeLaPartida(): Promise<void> {
   await fijarToken(null);
+}
+
+/** Cerrar la sesión de la cuenta. No toca la partida en curso. */
+export async function cerrarSesionDeCuenta(): Promise<void> {
+  await fijarPasaporte(null);
+}
+
+/** @deprecated Di cuál de las dos. */
+export async function salir(): Promise<void> {
+  await salirDeLaPartida();
+}
+
+// ---------------------------------------------------------------------------
+// La cuenta
+// ---------------------------------------------------------------------------
+
+export interface InvitacionVista {
+  gameId: string;
+  titulo: string;
+  personaje: string;
+  suspectId: string;
+  fase: string;
+  paraEl: string;
+  directa: boolean;
+  yaDentro: boolean;
+}
+
+export interface Portada {
+  cuenta: {
+    id: string;
+    displayName: string;
+    email: string;
+    trofeos: string[];
+    partidas: Account['partidas'];
+  };
+  invitaciones: InvitacionVista[];
+}
+
+export function pedirPortada(): Promise<Portada> {
+  return peticion('/cuenta/portada');
 }

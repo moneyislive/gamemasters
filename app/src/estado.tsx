@@ -161,7 +161,7 @@ export function ProveedorPartida({ children }: { children: React.ReactNode }): J
              * entra de nuevo.
              */
             setError('Tu sesión ha caducado. Vuelve a entrar con tu código.');
-            await api.salir();
+            await api.salirDeLaPartida();
             revRef.current = -1;
             setVista(null);
             setCargando(false);
@@ -209,7 +209,7 @@ export function ProveedorPartida({ children }: { children: React.ReactNode }): J
   }, []);
 
   const desconectar = useCallback(async () => {
-    await api.salir();
+    await api.salirDeLaPartida();
     revRef.current = -1;
     setVista(null);
   }, []);

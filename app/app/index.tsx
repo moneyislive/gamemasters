@@ -1,190 +1,811 @@
 /**
- * Entrada: la puerta de la mansión.
+ * La portada: se abre la app y se entra en un mundo.
  *
- * Dos códigos y dentro. Ninguna contraseña, ningún correo de verificación,
- * ningún registro: con doce personas esperando a cenar, cada paso de más es
- * alguien que se rinde y se pone a mirar el móvil por su cuenta.
+ * LA ESCENA. Arriba no hay una cabecera: hay una noche. Una mansión con las
+ * ventanas encendidas, luna con halo, niebla cruzando, un relámpago cada tanto
+ * y polvo dorado subiendo. Al hacer scroll las capas se separan en parallax y
+ * el título se hunde en la escena. Todo corre en el hilo de la interfaz
+ * (Reanimated + SVG): espectacular no puede significar «a tirones».
+ *
+ * EL ORDEN DEL CONTENIDO es el de la urgencia de quien mira:
+ *
+ *   1. Tu partida EN MARCHA, con su latido. Nada compite con lo que está vivo.
+ *   2. Las invitaciones, como sobres lacrados. «Serás el mayordomo» mueve más
+ *      que «tienes 1 invitación».
+ *   3. LOS MUNDOS: el catálogo en un carrusel con perspectiva, cada juego con
+ *      su paleta, su vela y su destello. Cierra con «Forja la tuya».
+ *   4. La SALA DE ARCADE (minijuegos): otro color, otra forma, otro mundo.
+ *      Nadie puede confundir «una noche con cinco amigos» con «treinta
+ *      segundos en el metro».
+ *   5. TU LEYENDA: rango con barra de progreso, vitrina de trofeos que brillan.
+ *      Si aún no hay cuenta, se enseña la vitrina cerrada: el incentivo es ver
+ *      lo que te falta, no un muro de texto.
+ *   6. Las dos puertas: entrar con código (siempre, sin cuenta) y el taller.
+ *
+ * Y UNA REGLA INNEGOCIABLE: nada de lo que se enseña es mentira. Si no hay
+ * minijuegos todavía, la sala está «cableándose» y se ve así; no se rellena con
+ * cajas muertas. La confianza en el escaparate es el escaparate.
  */
-import { useEffect, useState } from 'react';
-import { Keyboard, Linking, Pressable, StyleSheet, TextInput, View } from 'react-native';
-import { router } from 'expo-router';
-import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
+import { useCallback, useEffect, useState } from 'react';
+import { Linking, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { router, useFocusEffect } from 'expo-router';
+import Animated, {
+  Easing,
+  FadeIn,
+  FadeInDown,
+  FadeInUp,
+  interpolate,
+  useAnimatedScrollHandler,
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withTiming,
+} from 'react-native-reanimated';
+import Svg, { Circle, Path } from 'react-native-svg';
 import * as api from '../src/api';
 import { usePartida } from '../src/estado';
-import {
-  Boton,
-  Cuerpo,
-  Error as AvisoError,
-  Etiqueta,
-  Marco,
-  Ornamento,
-  Pantalla,
-  Sello,
-  Titulo,
-  color,
-  espacio,
-  radio,
-  texto,
-} from '../src/ui';
+import { EscenaVestibulo } from '../src/escena';
+import { CarruselDeMundos } from '../src/carrusel3d';
+import { Latido, Polvo, Pulsable, useMenosMovimiento } from '../src/vivo';
+import { veladas } from '../src/vitrina';
+import { TROFEOS } from '../../shared/live';
+import { color, espacio, fuente, radio } from '../src/tema';
 
-export default function Entrada(): JSX.Element {
-  const { vista, refrescar } = usePartida();
-  const [codigo, setCodigo] = useState('');
-  const [personal, setPersonal] = useState('');
-  const [servidor, setServidor] = useState('');
-  const [verServidor, setVerServidor] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [entrando, setEntrando] = useState(false);
-  const [listo, setListo] = useState(false);
+/** La fase, dicha como en la mesa. */
+const COMO_VA: Record<string, string> = {
+  lobby: 'La mesa se está llenando',
+  'ronda-abierta': 'Ronda en curso',
+  'ronda-cerrada': 'Puesta en común',
+  acusaciones: 'Momento de acusar',
+  intermedio: 'Entre jornadas',
+  desenlace: 'Terminada',
+};
 
-  // La credencial ya la carga el proveedor; aquí solo se lee la dirección del
-  // servidor para poder mostrarla y editarla.
-  useEffect(() => {
-    void (async () => {
-      const { servidor: guardado } = await api.cargarSesionGuardada();
-      setServidor(guardado);
-      setListo(true);
-    })();
+/**
+ * Los rangos: el incentivo de volver.
+ *
+ * Salen de las veladas jugadas, que es lo único que de verdad cuesta ganarse:
+ * cada una es una noche real con gente real.
+ */
+const RANGOS: Array<{ desde: number; titulo: string }> = [
+  { desde: 0, titulo: 'Recién llegado' },
+  { desde: 1, titulo: 'Invitado habitual' },
+  { desde: 3, titulo: 'Sabueso de salón' },
+  { desde: 6, titulo: 'Maestro de ceremonias' },
+  { desde: 10, titulo: 'Leyenda de la mesa' },
+];
+
+function rangoDe(jugadas: number): {
+  titulo: string;
+  siguiente?: { titulo: string; faltan: number; progreso: number };
+} {
+  let actual = RANGOS[0]!;
+  let siguiente: (typeof RANGOS)[number] | undefined;
+  for (const r of RANGOS) {
+    if (jugadas >= r.desde) actual = r;
+    else if (!siguiente) siguiente = r;
+  }
+  if (!siguiente) return { titulo: actual.titulo };
+  const tramo = siguiente.desde - actual.desde;
+  return {
+    titulo: actual.titulo,
+    siguiente: {
+      titulo: siguiente.titulo,
+      faltan: siguiente.desde - jugadas,
+      progreso: tramo <= 0 ? 0 : (jugadas - actual.desde) / tramo,
+    },
+  };
+}
+
+export default function Portada(): JSX.Element {
+  const { vista, cargando } = usePartida();
+  const { width, height } = useWindowDimensions();
+  const [portada, setPortada] = useState<api.Portada | null>(null);
+
+  const scrollY = useSharedValue(0);
+  const alScroll = useAnimatedScrollHandler((e) => {
+    scrollY.value = e.contentOffset.y;
+  });
+
+  const cargarPortada = useCallback(() => {
+    if (!api.hayCuenta()) {
+      setPortada(null);
+      return;
+    }
+    api
+      .pedirPortada()
+      .then(setPortada)
+      .catch(() => setPortada(null));
   }, []);
 
-  useEffect(() => {
-    if (vista) router.replace('/(juego)/ronda');
-  }, [vista]);
+  useEffect(cargarPortada, [cargarPortada]);
+  useFocusEffect(cargarPortada);
 
-  const entrar = async (): Promise<void> => {
-    Keyboard.dismiss();
-    setError(null);
-    setEntrando(true);
-    try {
-      if (servidor.trim()) await api.fijarServidor(servidor);
-      await api.entrar(codigo, personal);
-      await refrescar();
-      router.replace('/(juego)/ronda');
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'No se pudo entrar.');
-    } finally {
-      setEntrando(false);
-    }
-  };
+  const invitaciones = portada?.invitaciones ?? [];
+  const jugadas = portada?.cuenta.partidas ?? [];
+  const trofeos = portada?.cuenta.trofeos ?? [];
+  const rango = rangoDe(jugadas.length);
+
+  const altoHero = Math.min(Math.max(height * 0.6, 420), 560);
+
+  // El título se hunde en la escena al hacer scroll: pertenece a la noche, no
+  // a la barra de estado.
+  const capaTitulo = useAnimatedStyle(() => ({
+    opacity: interpolate(scrollY.value, [0, altoHero * 0.55], [1, 0], 'clamp'),
+    transform: [
+      { translateY: interpolate(scrollY.value, [0, altoHero], [0, altoHero * 0.28], 'clamp') },
+    ],
+  }));
+
+  const abrirTaller = (): void => void Linking.openURL(api.urlDelTaller());
 
   return (
-    <Pantalla barra={false}>
-      <Animated.View entering={FadeInDown.duration(600)} style={estilos.cabecera}>
-        <Sello>Juegos reales</Sello>
-        <Titulo style={{ textAlign: 'center', marginTop: espacio.lg }}>GameMasters</Titulo>
-        <Cuerpo tenue style={{ textAlign: 'center', fontStyle: 'italic', marginTop: 6 }}>
-          Alguien de esta casa miente.
-        </Cuerpo>
-      </Animated.View>
-
-      <Ornamento />
-
-      <Animated.View entering={FadeInUp.delay(180).duration(600)}>
-        <Marco>
-          <Etiqueta>Código de la partida</Etiqueta>
-          <Cuerpo tenue style={{ fontSize: 15, marginTop: 2, marginBottom: espacio.sm }}>
-            Lo dicta en voz alta quien dirige la velada.
-          </Cuerpo>
-          <TextInput
-            value={codigo}
-            onChangeText={(t) => setCodigo(t.toUpperCase())}
-            autoCapitalize="characters"
-            autoCorrect={false}
-            maxLength={8}
-            placeholder="—————"
-            placeholderTextColor="rgba(217,201,163,0.3)"
-            style={[estilos.campo, estilos.campoCodigo]}
-          />
-
-          <View style={{ height: espacio.lg }} />
-
-          <Etiqueta>Tu código personal</Etiqueta>
-          <Cuerpo tenue style={{ fontSize: 15, marginTop: 2, marginBottom: espacio.sm }}>
-            Te lo entrega solo a ti. No se lo enseñes a nadie.
-          </Cuerpo>
-          <TextInput
-            value={personal}
-            onChangeText={(t) => setPersonal(t.toUpperCase())}
-            autoCapitalize="characters"
-            autoCorrect={false}
-            maxLength={8}
-            placeholder="——————"
-            placeholderTextColor="rgba(217,201,163,0.3)"
-            style={[estilos.campo, estilos.campoCodigo]}
-          />
-
-          <View style={{ height: espacio.lg }} />
-          <AvisoError>{error}</AvisoError>
-
-          <Boton
-            variante="primario"
-            onPress={() => void entrar()}
-            disabled={!listo || codigo.length < 4 || personal.length < 4}
-            cargando={entrando}
-          >
-            Entrar en la partida
-          </Boton>
-        </Marco>
-      </Animated.View>
-
-      <Animated.View entering={FadeInUp.delay(320).duration(600)}>
-        {verServidor ? (
-          <Marco>
-            <Etiqueta>Servidor</Etiqueta>
-            <Cuerpo tenue style={{ fontSize: 15, marginTop: 2, marginBottom: espacio.sm }}>
-              Solo si quien organiza te ha dado una dirección distinta.
-            </Cuerpo>
-            <TextInput
-              value={servidor}
-              onChangeText={setServidor}
-              autoCapitalize="none"
-              autoCorrect={false}
-              keyboardType="url"
-              placeholder="https://…"
-              placeholderTextColor="rgba(217,201,163,0.3)"
-              style={estilos.campo}
-            />
-          </Marco>
-        ) : (
-          <Boton onPress={() => setVerServidor(true)} style={{ marginTop: espacio.sm }}>
-            Cambiar de servidor
-          </Boton>
-        )}
-      </Animated.View>
-
-      {/*
-        También aquí, y no solo en el perfil: esta es la única pantalla que ve
-        quien todavía no ha entrado —y quien revisa la app en la tienda—, así
-        que es donde tiene que poder leerse antes de teclear nada.
-      */}
-      <Pressable
-        onPress={() => void Linking.openURL(api.urlDePrivacidad())}
-        hitSlop={10}
-        accessibilityRole="link"
-        style={{ alignSelf: 'center', marginTop: espacio.lg, paddingVertical: espacio.sm }}
+    <View style={estilos.raiz}>
+      <Animated.ScrollView
+        onScroll={alScroll}
+        scrollEventThrottle={16}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: espacio.xxl * 2 }}
       >
-        <Etiqueta style={{ color: 'rgba(217,201,163,0.55)' }}>Política de privacidad</Etiqueta>
-      </Pressable>
-    </Pantalla>
+        {/* ================= LA NOCHE ================= */}
+        <View style={{ height: altoHero }}>
+          <EscenaVestibulo ancho={width} alto={altoHero} scrollY={scrollY} />
+          <Polvo ancho={width} alto={altoHero} cantidad={14} tono="#ffd98a" />
+
+          <Animated.View style={[estilos.heroContenido, capaTitulo]}>
+            <Animated.View entering={FadeInDown.duration(1100)} style={{ alignItems: 'center' }}>
+              <View style={estilos.sello}>
+                <Text style={estilos.selloTexto}>JUEGOS REALES</Text>
+              </View>
+              <Text style={estilos.marca}>GameMasters</Text>
+              <Text style={estilos.lemaHero}>Cruza la puerta. La casa ya está jugando.</Text>
+            </Animated.View>
+
+            <Animated.View entering={FadeInUp.delay(500).duration(800)} style={estilos.filaPuertas}>
+              <Pulsable onPress={() => router.push('/entrar')}>
+                <LinearGradient
+                  colors={['#e0b83a', '#b8901e']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={estilos.puertaOro}
+                >
+                  <Text style={estilos.puertaOroTexto}>TENGO UN CÓDIGO</Text>
+                </LinearGradient>
+              </Pulsable>
+              <Pulsable onPress={abrirTaller}>
+                <View style={estilos.puertaHumo}>
+                  <Text style={estilos.puertaHumoTexto}>CREAR VELADA</Text>
+                </View>
+              </Pulsable>
+            </Animated.View>
+
+            <PistaDeScroll />
+          </Animated.View>
+        </View>
+
+        {/* ================= 1 · EN MARCHA ================= */}
+        {cargando && !vista ? (
+          <Animated.View entering={FadeIn.duration(400)} style={estilos.seccion}>
+            <View style={estilos.esqueleto} />
+          </Animated.View>
+        ) : vista ? (
+          <Animated.View entering={FadeInUp.duration(650)} style={estilos.seccion}>
+            <Pulsable onPress={() => router.push('/(juego)/ronda')}>
+              <LinearGradient
+                colors={['#2c2110', '#140f08']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={estilos.enCurso}
+              >
+                <View style={estilos.filaLatido}>
+                  <Latido tono={color.oro400} />
+                  <Text style={estilos.microOro}>EN MARCHA AHORA</Text>
+                </View>
+                <Text style={estilos.enCursoTitulo} numberOfLines={2}>
+                  {vista.sesion.tituloPartida}
+                </Text>
+                <Text style={estilos.enCursoPie}>
+                  {COMO_VA[vista.sesion.phase] ?? 'En juego'} · eres {vista.yo.characterName}
+                </Text>
+                <View style={estilos.botonFuerte}>
+                  <Text style={estilos.botonFuerteTexto}>VOLVER A LA MESA</Text>
+                </View>
+              </LinearGradient>
+            </Pulsable>
+          </Animated.View>
+        ) : null}
+
+        {/* ================= 2 · TE ESPERAN ================= */}
+        {invitaciones.length > 0 && (
+          <View style={estilos.seccion}>
+            <Titular
+              texto={invitaciones.length === 1 ? 'Te esperan' : 'Te esperan en varias mesas'}
+              nota="Alguien ha guardado una silla con tu nombre"
+            />
+            {invitaciones.map((inv, i) => (
+              <Sobre key={`${inv.gameId}-${inv.suspectId}`} invitacion={inv} indice={i} />
+            ))}
+          </View>
+        )}
+
+        {/* ================= 3 · LOS MUNDOS ================= */}
+        <View style={estilos.seccion}>
+          <Titular
+            texto="Los mundos"
+            nota="Veladas que se juegan en la vida real, alrededor de una mesa. Desliza."
+          />
+        </View>
+        <CarruselDeMundos veladas={veladas()} anchoPantalla={width} onMontar={abrirTaller} />
+
+        {/* ================= 4 · LA SALA DE ARCADE ================= */}
+        <View style={estilos.seccion}>
+          <Titular
+            texto="La sala de arcade"
+            nota="Minijuegos para ti solo, aquí mismo, en un rato muerto."
+            acento="#5fd4c8"
+          />
+          <View style={estilos.arcade}>
+            <View style={estilos.arcadeNeon} />
+            <Text style={estilos.arcadeTitulo}>Cableándose…</Text>
+            <Text style={estilos.arcadeCuerpo}>
+              Las máquinas están llegando. Partidas de un minuto para cuando no hay mesa que
+              montar: acertijos, memoria, pulso. Vuelve pronto.
+            </Text>
+          </View>
+        </View>
+
+        {/* ================= 5 · TU LEYENDA ================= */}
+        <View style={estilos.seccion}>
+          <Titular
+            texto="Tu leyenda"
+            nota={portada ? portada.cuenta.displayName : 'Toda mesa recuerda a los suyos'}
+          />
+          {portada ? (
+            <View style={estilos.vitrina}>
+              <View style={estilos.filaRango}>
+                <LaurelDeRango />
+                <View style={{ flex: 1 }}>
+                  <Text style={estilos.rango}>{rango.titulo}</Text>
+                  <Text style={estilos.menudo}>
+                    {jugadas.length} {jugadas.length === 1 ? 'velada jugada' : 'veladas jugadas'} ·{' '}
+                    {trofeos.length} {trofeos.length === 1 ? 'trofeo' : 'trofeos'}
+                  </Text>
+                </View>
+              </View>
+
+              {rango.siguiente && (
+                <View style={{ marginTop: espacio.md }}>
+                  <BarraDeProgreso progreso={rango.siguiente.progreso} />
+                  <Text style={[estilos.menudo, { marginTop: 6 }]}>
+                    {rango.siguiente.faltan === 1
+                      ? `Una velada más y serás ${rango.siguiente.titulo}`
+                      : `${rango.siguiente.faltan} veladas más y serás ${rango.siguiente.titulo}`}
+                  </Text>
+                </View>
+              )}
+
+              <View style={estilos.estante}>
+                {TROFEOS.map((t) => {
+                  const ganado = trofeos.includes(t.id);
+                  return (
+                    <View key={t.id} style={estilos.pedestal}>
+                      <View
+                        style={[estilos.trofeo, ganado ? estilos.trofeoGanado : estilos.trofeoVacio]}
+                      >
+                        {ganado && <ResplandorDeTrofeo />}
+                        <Text style={{ fontSize: 21, opacity: ganado ? 1 : 0.18 }}>{t.glifo}</Text>
+                      </View>
+                      <View style={estilos.pedestalBase} />
+                    </View>
+                  );
+                })}
+              </View>
+              {jugadas.length > 0 && (
+                <Text style={[estilos.menudo, { marginTop: espacio.sm }]}>
+                  La última: {jugadas[jugadas.length - 1]?.titulo}
+                </Text>
+              )}
+            </View>
+          ) : (
+            /* La vitrina cerrada: se ve lo que hay dentro, y por eso apetece. */
+            <View style={[estilos.vitrina, { opacity: 0.92 }]}>
+              <View style={estilos.estante}>
+                {TROFEOS.slice(0, 6).map((t) => (
+                  <View key={t.id} style={estilos.pedestal}>
+                    <View style={[estilos.trofeo, estilos.trofeoVacio]}>
+                      <Text style={{ fontSize: 21, opacity: 0.16 }}>{t.glifo}</Text>
+                    </View>
+                    <View style={estilos.pedestalBase} />
+                  </View>
+                ))}
+              </View>
+              <Text style={[estilos.rango, { marginTop: espacio.md, fontSize: 17 }]}>
+                Tu vitrina, todavía a oscuras
+              </Text>
+              <Text style={estilos.menudo}>
+                Juega tu primera velada y acepta guardar tus partidas desde tu perfil: los trofeos,
+                el rango y la crónica de cada noche se quedan aquí, esperándote.
+              </Text>
+            </View>
+          )}
+        </View>
+
+        {/* ================= 6 · LA OTRA PUERTA ================= */}
+        <View style={estilos.seccion}>
+          <Pulsable onPress={abrirTaller}>
+            <View style={estilos.taller}>
+              <Text style={estilos.tallerEyebrow}>¿NADIE TE HA INVITADO TODAVÍA?</Text>
+              <Text style={estilos.tallerTitulo}>Sé tú quien reparte los papeles</Text>
+              <Text style={estilos.tallerCuerpo}>
+                El taller se abre en un ordenador. El agente escribe la trama contigo, imprime los
+                dosieres, y tú repartes los códigos en la mesa.
+              </Text>
+              <Text style={estilos.tallerLlamada}>Abrir el taller →</Text>
+            </View>
+          </Pulsable>
+        </View>
+
+        <Pressable
+          onPress={() => void Linking.openURL(api.urlDePrivacidad())}
+          hitSlop={10}
+          accessibilityRole="link"
+          style={estilos.privacidad}
+        >
+          <Text style={estilos.privacidadTexto}>POLÍTICA DE PRIVACIDAD</Text>
+        </Pressable>
+      </Animated.ScrollView>
+    </View>
   );
 }
 
+// ---------------------------------------------------------------------------
+// Piezas
+// ---------------------------------------------------------------------------
+
+function Titular({
+  texto,
+  nota,
+  acento = color.oro300,
+}: {
+  texto: string;
+  nota?: string;
+  acento?: string;
+}): JSX.Element {
+  return (
+    <View style={{ marginBottom: espacio.sm }}>
+      <View style={estilos.filaTitular}>
+        <View style={[estilos.guion, { backgroundColor: acento }]} />
+        <Text style={[estilos.titular, { color: acento }]}>{texto.toUpperCase()}</Text>
+      </View>
+      {nota ? <Text style={estilos.notaTitular}>{nota}</Text> : null}
+    </View>
+  );
+}
+
+/** El chevron que invita a bajar, latiendo despacio. */
+function PistaDeScroll(): JSX.Element | null {
+  const menos = useMenosMovimiento();
+  const t = useSharedValue(0);
+  useEffect(() => {
+    if (menos) return;
+    t.value = withRepeat(withTiming(1, { duration: 1600, easing: Easing.inOut(Easing.sin) }), -1, true);
+  }, [t, menos]);
+  const estilo = useAnimatedStyle(() => ({
+    opacity: interpolate(t.value, [0, 1], [0.25, 0.7]),
+    transform: [{ translateY: interpolate(t.value, [0, 1], [0, 6]) }],
+  }));
+  if (menos) return null;
+  return (
+    <Animated.View style={[{ alignSelf: 'center', marginTop: espacio.lg }, estilo]}>
+      <Svg width={22} height={12} viewBox="0 0 22 12">
+        <Path
+          d="M2 2 L11 10 L20 2"
+          stroke={color.oro300}
+          strokeWidth={2}
+          fill="none"
+          strokeLinecap="round"
+        />
+      </Svg>
+    </Animated.View>
+  );
+}
+
+/** Una invitación como lo que es: un sobre con lacre. */
+function Sobre({
+  invitacion,
+  indice,
+}: {
+  invitacion: api.InvitacionVista;
+  indice: number;
+}): JSX.Element {
+  const menos = useMenosMovimiento();
+  const t = useSharedValue(0);
+  useEffect(() => {
+    if (menos) return;
+    t.value = withRepeat(withTiming(1, { duration: 2400, easing: Easing.inOut(Easing.sin) }), -1, true);
+  }, [t, menos]);
+  const lacre = useAnimatedStyle(() => ({
+    transform: [{ scale: menos ? 1 : interpolate(t.value, [0, 1], [1, 1.12]) }],
+  }));
+
+  return (
+    <Animated.View entering={FadeInUp.delay(90 * indice).duration(600)}>
+      <Pulsable
+        onPress={invitacion.yaDentro ? undefined : () => router.push('/entrar')}
+        accessibilityLabel={`Invitación a ${invitacion.titulo}: serás ${invitacion.personaje}`}
+      >
+        <View style={estilos.sobre}>
+          {/* La solapa del sobre, dibujada con dos diagonales. */}
+          <Svg width={72} height={96} viewBox="0 0 72 96" style={estilos.sobreSolapa}>
+            <Path
+              d="M0 0 L36 36 L72 0"
+              stroke="rgba(212,99,111,0.5)"
+              strokeWidth={1.5}
+              fill="rgba(58,18,32,0.85)"
+            />
+          </Svg>
+          <Animated.View style={[estilos.lacre, lacre]}>
+            <Svg width={34} height={34}>
+              <Circle cx={17} cy={17} r={16} fill="#8c2337" />
+              <Circle
+                cx={17}
+                cy={17}
+                r={11}
+                fill="none"
+                stroke="rgba(240,201,192,0.5)"
+                strokeWidth={1}
+              />
+            </Svg>
+            <Text style={estilos.lacreGlifo}>✦</Text>
+          </Animated.View>
+
+          <View style={{ flex: 1, paddingLeft: espacio.md }}>
+            <Text style={estilos.sobreTitulo} numberOfLines={1}>
+              {invitacion.titulo}
+            </Text>
+            <Text style={estilos.sobrePersonaje}>Serás {invitacion.personaje}</Text>
+            <Text style={estilos.menudo} numberOfLines={1}>
+              {COMO_VA[invitacion.fase] ?? invitacion.fase} · para {invitacion.paraEl}
+            </Text>
+            <Text
+              style={[estilos.sobreLlamada, invitacion.yaDentro && { color: color.pergaminoTenue }]}
+            >
+              {invitacion.yaDentro ? 'Ya hay un móvil en esa silla' : 'Abrir la invitación →'}
+            </Text>
+          </View>
+        </View>
+      </Pulsable>
+    </Animated.View>
+  );
+}
+
+function BarraDeProgreso({ progreso }: { progreso: number }): JSX.Element {
+  const t = useSharedValue(0);
+  useEffect(() => {
+    t.value = withTiming(Math.max(0.04, Math.min(progreso, 1)), {
+      duration: 1100,
+      easing: Easing.out(Easing.cubic),
+    });
+  }, [t, progreso]);
+  const relleno = useAnimatedStyle(() => ({ width: `${t.value * 100}%` }));
+  return (
+    <View style={estilos.barraFondo}>
+      <Animated.View style={[estilos.barraRelleno, relleno]}>
+        <LinearGradient
+          colors={['#b8901e', '#e8cf7f']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={{ flex: 1, borderRadius: radio.redondo }}
+        />
+      </Animated.View>
+    </View>
+  );
+}
+
+function ResplandorDeTrofeo(): JSX.Element {
+  const menos = useMenosMovimiento();
+  const t = useSharedValue(0);
+  useEffect(() => {
+    if (menos) return;
+    t.value = withRepeat(withTiming(1, { duration: 3200, easing: Easing.inOut(Easing.sin) }), -1, true);
+  }, [t, menos]);
+  const estilo = useAnimatedStyle(() => ({
+    opacity: menos ? 0.4 : interpolate(t.value, [0, 1], [0.2, 0.6]),
+  }));
+  return (
+    <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, estilo]}>
+      <LinearGradient
+        colors={['rgba(232,207,127,0.4)', 'transparent']}
+        style={{ flex: 1, borderRadius: radio.md }}
+      />
+    </Animated.View>
+  );
+}
+
+function LaurelDeRango(): JSX.Element {
+  return (
+    <View style={estilos.laurel}>
+      <Svg width={44} height={44} viewBox="0 0 44 44">
+        <Circle
+          cx={22}
+          cy={22}
+          r={20}
+          stroke="rgba(201,162,39,0.55)"
+          strokeWidth={1.5}
+          fill="rgba(201,162,39,0.08)"
+        />
+        <Path
+          d="M12 28 C15 24 15 18 13 14 M32 28 C29 24 29 18 31 14"
+          stroke="rgba(201,162,39,0.7)"
+          strokeWidth={1.5}
+          fill="none"
+          strokeLinecap="round"
+        />
+        <Circle cx={22} cy={20} r={4.5} fill="#c9a227" />
+      </Svg>
+    </View>
+  );
+}
+
+// ---------------------------------------------------------------------------
+
 const estilos = StyleSheet.create({
-  cabecera: { alignItems: 'center', paddingTop: espacio.xxl },
-  campo: {
+  raiz: { flex: 1, backgroundColor: '#050d09' },
+
+  heroContenido: { flex: 1, justifyContent: 'flex-end', paddingBottom: espacio.xl },
+  sello: {
     borderWidth: 1,
-    borderColor: 'rgba(201,162,39,0.4)',
-    borderRadius: radio.md,
-    backgroundColor: 'rgba(11,23,16,0.6)',
-    color: color.pergamino,
-    paddingVertical: 14,
+    borderColor: 'rgba(201,162,39,0.5)',
+    borderRadius: radio.redondo,
     paddingHorizontal: espacio.md,
-    ...texto.cuerpo,
+    paddingVertical: 5,
+    marginBottom: espacio.md,
+    backgroundColor: 'rgba(5,13,9,0.4)',
   },
-  campoCodigo: {
-    fontFamily: 'Cinzel_700Bold',
-    fontSize: 26,
-    letterSpacing: 8,
+  selloTexto: { fontFamily: fuente.titulo, fontSize: 10.5, letterSpacing: 3, color: color.oro300 },
+  marca: {
+    fontFamily: fuente.display,
+    fontSize: 44,
+    lineHeight: 52,
+    color: color.oro300,
+    letterSpacing: 1.5,
     textAlign: 'center',
+    textShadowColor: 'rgba(201,162,39,0.45)',
+    textShadowRadius: 24,
+    textShadowOffset: { width: 0, height: 0 },
+  },
+  lemaHero: {
+    fontFamily: fuente.cuerpoCursiva,
+    fontSize: 17.5,
+    lineHeight: 25,
+    color: color.pergaminoTenue,
+    textAlign: 'center',
+    marginTop: espacio.sm,
+  },
+  filaPuertas: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: espacio.md,
+    marginTop: espacio.xl,
+    paddingHorizontal: espacio.lg,
+  },
+  puertaOro: { borderRadius: radio.md, paddingHorizontal: espacio.xl, paddingVertical: 14 },
+  puertaOroTexto: {
+    fontFamily: fuente.titulo,
+    fontSize: 13,
+    letterSpacing: 1.8,
+    color: color.caoba900,
+  },
+  puertaHumo: {
+    borderRadius: radio.md,
+    paddingHorizontal: espacio.lg,
+    paddingVertical: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(232,207,127,0.5)',
+    backgroundColor: 'rgba(5,13,9,0.45)',
+  },
+  puertaHumoTexto: {
+    fontFamily: fuente.titulo,
+    fontSize: 13,
+    letterSpacing: 1.8,
+    color: color.oro300,
+  },
+
+  seccion: { paddingHorizontal: espacio.lg, marginTop: espacio.xl },
+  filaTitular: { flexDirection: 'row', alignItems: 'center', gap: espacio.sm },
+  guion: { width: 22, height: 1 },
+  titular: { fontFamily: fuente.titulo, fontSize: 15, letterSpacing: 2.6 },
+  notaTitular: {
+    fontFamily: fuente.cuerpo,
+    fontSize: 15.5,
+    lineHeight: 21,
+    color: color.pergaminoTenue,
+    opacity: 0.65,
+    marginTop: 4,
+  },
+
+  esqueleto: { height: 140, borderRadius: radio.lg, backgroundColor: 'rgba(217,201,163,0.05)' },
+
+  enCurso: {
+    borderRadius: radio.lg,
+    borderWidth: 1,
+    borderColor: 'rgba(201,162,39,0.55)',
+    padding: espacio.lg,
+  },
+  filaLatido: { flexDirection: 'row', alignItems: 'center', gap: espacio.sm },
+  microOro: { fontFamily: fuente.titulo, fontSize: 11, letterSpacing: 2.4, color: color.oro300 },
+  enCursoTitulo: {
+    fontFamily: fuente.display,
+    fontSize: 26,
+    lineHeight: 33,
+    color: color.pergamino,
+    marginTop: espacio.sm,
+  },
+  enCursoPie: {
+    fontFamily: fuente.cuerpo,
+    fontSize: 16.5,
+    color: color.pergaminoTenue,
+    marginTop: 2,
+  },
+  botonFuerte: {
+    marginTop: espacio.lg,
+    backgroundColor: color.oro500,
+    borderRadius: radio.md,
+    paddingVertical: 13,
+    alignItems: 'center',
+  },
+  botonFuerteTexto: {
+    fontFamily: fuente.titulo,
+    fontSize: 13,
+    letterSpacing: 1.8,
+    color: color.caoba900,
+  },
+
+  sobre: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(31,18,12,0.7)',
+    borderRadius: radio.lg,
+    borderWidth: 1,
+    borderColor: 'rgba(212,99,111,0.32)',
+    marginBottom: espacio.sm,
+    paddingRight: espacio.md,
+    overflow: 'hidden',
+    minHeight: 96,
+  },
+  sobreSolapa: { marginLeft: 2 },
+  lacre: { position: 'absolute', left: 20, top: 42, alignItems: 'center', justifyContent: 'center' },
+  lacreGlifo: { position: 'absolute', color: '#f0c9c0', fontSize: 13 },
+  sobreTitulo: {
+    fontFamily: fuente.titulo,
+    fontSize: 17.5,
+    color: color.pergamino,
+    paddingTop: espacio.md,
+  },
+  sobrePersonaje: {
+    fontFamily: fuente.cuerpoMedio,
+    fontSize: 16.5,
+    color: '#f0c9c0',
+    marginTop: 1,
+  },
+  sobreLlamada: {
+    fontFamily: fuente.titulo,
+    fontSize: 12,
+    letterSpacing: 1.3,
+    color: color.oro300,
+    marginTop: 6,
+    paddingBottom: espacio.md,
+  },
+
+  arcade: {
+    borderRadius: radio.lg,
+    borderWidth: 1,
+    borderColor: 'rgba(95,212,200,0.4)',
+    backgroundColor: 'rgba(10,32,30,0.55)',
+    padding: espacio.lg,
+    overflow: 'hidden',
+  },
+  arcadeNeon: {
+    position: 'absolute',
+    top: 0,
+    left: espacio.lg,
+    right: espacio.lg,
+    height: 2,
+    borderRadius: 2,
+    backgroundColor: 'rgba(95,212,200,0.65)',
+  },
+  arcadeTitulo: { fontFamily: fuente.titulo, fontSize: 17, color: '#5fd4c8', letterSpacing: 1 },
+  arcadeCuerpo: {
+    fontFamily: fuente.cuerpo,
+    fontSize: 15.5,
+    lineHeight: 22,
+    color: color.pergaminoTenue,
+    opacity: 0.8,
+    marginTop: 6,
+  },
+
+  vitrina: {
+    borderRadius: radio.lg,
+    borderWidth: 1,
+    borderColor: 'rgba(201,162,39,0.3)',
+    backgroundColor: 'rgba(31,18,12,0.6)',
+    padding: espacio.lg,
+  },
+  filaRango: { flexDirection: 'row', alignItems: 'center', gap: espacio.md },
+  laurel: { width: 44, height: 44 },
+  rango: { fontFamily: fuente.display, fontSize: 21, color: color.pergamino },
+  barraFondo: {
+    height: 8,
+    borderRadius: radio.redondo,
+    backgroundColor: 'rgba(201,162,39,0.14)',
+    overflow: 'hidden',
+  },
+  barraRelleno: { height: 8 },
+  estante: { flexDirection: 'row', flexWrap: 'wrap', gap: espacio.sm, marginTop: espacio.lg },
+  pedestal: { alignItems: 'center' },
+  trofeo: {
+    width: 44,
+    height: 44,
+    borderRadius: radio.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  trofeoGanado: { borderColor: 'rgba(232,207,127,0.6)', backgroundColor: 'rgba(201,162,39,0.14)' },
+  trofeoVacio: { borderColor: 'rgba(201,162,39,0.14)', backgroundColor: 'rgba(11,23,16,0.5)' },
+  pedestalBase: {
+    width: 30,
+    height: 3,
+    borderRadius: 2,
+    marginTop: 2,
+    backgroundColor: 'rgba(201,162,39,0.22)',
+  },
+
+  taller: {
+    borderRadius: radio.lg,
+    borderWidth: 1,
+    borderColor: 'rgba(201,162,39,0.3)',
+    padding: espacio.lg,
+    backgroundColor: 'rgba(217,201,163,0.04)',
+  },
+  tallerEyebrow: {
+    fontFamily: fuente.titulo,
+    fontSize: 10.5,
+    letterSpacing: 2.2,
+    color: color.pergaminoTenue,
+    opacity: 0.7,
+  },
+  tallerTitulo: {
+    fontFamily: fuente.display,
+    fontSize: 23,
+    lineHeight: 29,
+    color: color.pergamino,
+    marginTop: 6,
+  },
+  tallerCuerpo: {
+    fontFamily: fuente.cuerpo,
+    fontSize: 15.5,
+    lineHeight: 22,
+    color: color.pergaminoTenue,
+    opacity: 0.8,
+    marginTop: espacio.sm,
+  },
+  tallerLlamada: {
+    fontFamily: fuente.titulo,
+    fontSize: 12.5,
+    letterSpacing: 1.4,
+    color: color.oro300,
+    marginTop: espacio.md,
+  },
+
+  menudo: { fontFamily: fuente.cuerpo, fontSize: 14.5, color: color.pergaminoTenue, opacity: 0.65 },
+  privacidad: { alignSelf: 'center', marginTop: espacio.xl, paddingVertical: espacio.md },
+  privacidadTexto: {
+    fontFamily: fuente.titulo,
+    fontSize: 10.5,
+    letterSpacing: 2,
+    color: 'rgba(217,201,163,0.4)',
   },
 });

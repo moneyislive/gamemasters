@@ -72,7 +72,15 @@ export function Pantalla({
         {scroll ? (
           <ScrollView
             showsVerticalScrollIndicator={false}
-            contentContainerStyle={{ paddingTop: espacio.md, paddingBottom: hueco }}
+            // `flexGrow` para que una pantalla CORTA siga llenando el alto. Sin
+            // esto, el fondo de fieltro se corta donde acaba el contenido y
+            // debajo queda un rectángulo negro: se nota en cuanto una pantalla
+            // cabe entera sin desplazar, que es justo el caso de la portada.
+            contentContainerStyle={{
+              flexGrow: 1,
+              paddingTop: espacio.md,
+              paddingBottom: hueco,
+            }}
             keyboardShouldPersistTaps="handled"
           >
             {contenido}

@@ -147,6 +147,28 @@ export async function aceptarGuardar(
   via: VinculoDeCuenta['via'] = 'confirmacion',
 ): Promise<VinculoDeCuenta> {
   const cuenta = await cuentaDe(email, displayName);
+  const normalizado = normalizarEmail(email);
+
+  /*
+   * Se apunta el correo en la cuenta, con el nivel de prueba que tiene.
+   *
+   * `invitacion` y no `buzon`: lo tecleó quien organiza y nadie ha demostrado
+   * el buzón. Lo que SÍ demuestra quien acepta es que tenía el código personal
+   * de esa velada en la mano, y eso basta para que se le avise de otras
+   * invitaciones al mismo correo — pero no para entrar en ellas sin código.
+   */
+  const correos = cuenta.correos ?? [];
+  if (!correos.some((c) => c.correo === normalizado)) {
+    correos.push({
+      correo: normalizado,
+      nivel: via === 'confirmacion' ? 'invitacion' : 'buzon',
+      origen: via,
+      anadidoEl: new Date().toISOString(),
+    });
+    cuenta.correos = correos;
+    await getStore().saveAccount(cuenta);
+  }
+
   return { accountId: cuenta.id, aceptadoEl: new Date().toISOString(), via };
 }
 
