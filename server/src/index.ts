@@ -10,7 +10,7 @@ import cors from 'cors';
 import express from 'express';
 import type { NextFunction, Request, Response } from 'express';
 import { DEMO_MODE, env } from './config';
-import authRouter, { isAuthenticated, passwordRequired, requireAuth } from './auth';
+import authRouter, { identidadDeTaller, passwordRequired, requireAuth } from './auth';
 import { getStorageKind, getStore, initStore } from './db/store';
 import boardRouter from './routes/board';
 import chatRouter from './routes/chat';
@@ -49,7 +49,10 @@ app.use(
   '/uploads',
   (req, res, next) => {
     // Las fotos de los invitados son parte del misterio: no se sirven a extraños.
-    if (!passwordRequired() || isAuthenticated(req)) return next();
+    // Va por `identidadDeTaller` como el resto de la puerta: antes cortocircuitaba
+    // en «no hay contraseña configurada», que en producción es un descuido, no un
+    // permiso.
+    if (identidadDeTaller(req)) return next();
     res.status(401).end();
   },
   express.static(uploadsDir, {

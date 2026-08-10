@@ -1,9 +1,13 @@
 /**
- * Acceso por contraseña única.
+ * La puerta del taller.
  *
- * Si `APP_PASSWORD` está definida, toda la aplicación (API, imágenes subidas y
- * dosieres) queda tras una contraseña. Sin ella, la aplicación funciona abierta
- * como hasta ahora: pensado para desarrollo en local.
+ * Hoy se entra con la contraseña de la casa (`APP_PASSWORD`); mañana, también
+ * con una cuenta de proveedor. `identidadDeTaller` es el único sitio donde se
+ * decide, y devuelve CON QUÉ título entra cada cual, no un sí o un no: «cada
+ * Game Master ve sus partidas» necesita saber quién es.
+ *
+ * Sin contraseña configurada la aplicación queda abierta, pero solo fuera de
+ * producción. Ver `identidadDeTaller`.
  *
  * La sesión es una cookie firmada, SIN estado en el servidor: el valor es un
  * HMAC-SHA256 de una constante usando la propia contraseña como clave. Así
@@ -16,6 +20,8 @@ import type { NextFunction, Request, Response } from 'express';
 import { env } from './config';
 import { firmarConSecreto, igualSeguro } from './secreto';
 import { crearRouter } from './rutas';
+import { sesionDeCuentaDePeticion } from './identidad/sesion';
+import type { ProveedorId } from '../../shared/identidad';
 
 const COOKIE = 'gm_sesion';
 /** 30 días: es una herramienta para organizar veladas, no un banco. */
@@ -56,12 +62,53 @@ function leerCookie(req: Request, nombre: string): string | undefined {
   return undefined;
 }
 
-/** ¿La petición trae una sesión válida? (cierto siempre si no hay contraseña) */
-export function isAuthenticated(req: Request): boolean {
+/**
+ * Con qué título entra alguien al taller.
+ *
+ * POR QUÉ EXISTE ESTE TIPO EN VEZ DE UN BOOLEANO. Van a convivir dos maneras de
+ * entrar —la contraseña de la casa de toda la vida y una cuenta de proveedor—, y
+ * el taller necesita saber CUÁL de las dos, porque «cada uno ve sus partidas»
+ * solo tiene sentido si hay un «uno». Un booleano obliga a volver a preguntarlo
+ * en cada ruta, y ahí es donde se olvida.
+ */
+export type IdentidadDeTaller =
+  | { tipo: 'abierto' }
+  | { tipo: 'casa' }
+  | { tipo: 'cuenta'; cuentaId: string; via: ProveedorId };
+
+/**
+ * Quién es quien llama, o `null` si no lo sabemos.
+ *
+ * EL MODO ABIERTO ESTÁ ATADO A `NODE_ENV`, NO A QUE FALTE LA CONTRASEÑA. Esa es
+ * la diferencia entre «no hay puerta porque estás en tu portátil» y «no hay
+ * puerta porque alguien borró una variable del panel». Antes era lo segundo:
+ * `isAuthenticated` devolvía `true` en cuanto `APP_PASSWORD` estuviera vacía,
+ * de modo que retirarla en producción no cerraba nada — dejaba el taller
+ * ABIERTO, con la solución del caso servida en `/api/games/<id>` a cualquiera
+ * que diera con la dirección.
+ *
+ * Importa ahora más que nunca: en cuanto una cuenta pueda abrir el taller, hay
+ * un motivo legítimo para quitar `APP_PASSWORD`, y ese día el fallo dejaría de
+ * ser hipotético. Con esto, quitarla en producción devuelve 401 a todo el
+ * mundo: molesto y evidente, que es como tienen que fallar estas cosas.
+ */
+export function identidadDeTaller(req: Request): IdentidadDeTaller | null {
+  const pasaporte = sesionDeCuentaDePeticion(req);
+  if (pasaporte) return { tipo: 'cuenta', cuentaId: pasaporte.cuentaId, via: pasaporte.via };
+
   const password = env.appPassword;
-  if (!password) return true;
-  const cookie = leerCookie(req, COOKIE);
-  return Boolean(cookie) && igualSeguro(cookie!, tokenDeSesion(password));
+  if (password) {
+    const cookie = leerCookie(req, COOKIE);
+    if (cookie && igualSeguro(cookie, tokenDeSesion(password))) return { tipo: 'casa' };
+    return null;
+  }
+
+  return process.env.NODE_ENV === 'production' ? null : { tipo: 'abierto' };
+}
+
+/** ¿La petición viene de alguien a quien se deja pasar? */
+export function isAuthenticated(req: Request): boolean {
+  return identidadDeTaller(req) !== null;
 }
 
 /**
@@ -69,7 +116,7 @@ export function isAuthenticated(req: Request): boolean {
  * (si no, no habría forma de iniciar sesión) y responde 401 al resto.
  */
 export function requireAuth(req: Request, res: Response, next: NextFunction): void {
-  if (!passwordRequired() || req.path.startsWith('/auth/') || isAuthenticated(req)) {
+  if (req.path.startsWith('/auth/') || isAuthenticated(req)) {
     next();
     return;
   }

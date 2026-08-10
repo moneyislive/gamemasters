@@ -19,7 +19,8 @@
     "verify:campana": "tsx scripts/verificar-campana.ts",
     "verify:credenciales": "tsx scripts/verificar-credenciales.ts",
     "verify:aguante": "tsx scripts/verificar-aguante.ts",
-    "verify:borrado": "tsx scripts/verificar-borrado.ts"
+    "verify:borrado": "tsx scripts/verificar-borrado.ts",
+    "verify:cuentas": "tsx scripts/verificar-cuentas.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",
