@@ -28,7 +28,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { generateBoardLayout } from '../src/board/generator';
 import { generateDemoPlot } from '../src/plot/demoPlot';
-import { manifiestoDe, ejes as ejesDe } from '../../shared/juegos';
+import { esElSenalado, manifiestoDe, ejes as ejesDe } from '../../shared/juegos';
 import type { GameSession } from '../../shared/types';
 import type { LiveSession, VistaJugador } from '../../shared/live';
 
@@ -86,7 +86,24 @@ function sembrar(dir: string): { game: GameSession; sesion: LiveSession } {
     settings: { language: 'es' },
   };
   game.board = generateBoardLayout(game.rooms);
-  game.plot = generateDemoPlot(game);
+  /*
+   * La trama de demostración reparte la culpa AL AZAR, y esta prueba juega
+   * siempre con `s0`. Cuando le tocaba ser culpable —una de cada cuatro veces—
+   * acusar correctamente NO da la victoria, y hace bien: quien es señalado no
+   * gana delatándose, su juego es no ser descubierto. Pero la comprobación
+   * «gané, porque acerté los tres ejes» daba por hecho lo contrario y fallaba.
+   *
+   * Un comprobador que falla una de cada cuatro veces sin que nada esté roto se
+   * acaba ignorando, y entonces deja de servir para el día en que sí lo está.
+   * Se siembra hasta que el culpable sea otro, y así el caso que se prueba es
+   * siempre el mismo.
+   */
+  let trama = generateDemoPlot(game);
+  for (let intento = 0; intento < 40; intento++) {
+    if (!esElSenalado(manifiestoDe(game.settings.juego), trama.solution.respuestas, 's0')) break;
+    trama = generateDemoPlot(game);
+  }
+  game.plot = trama;
   game.plot.material = {
     generatedAt: ahora,
     narrations: [{ round: 1, title: 'Ronda 1', text: 'Se abre la ronda.', stageDirection: '' }],

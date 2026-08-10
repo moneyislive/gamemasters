@@ -12,6 +12,7 @@
  */
 import { nanoid } from 'nanoid';
 import { getStore } from '../db/store';
+import { mutar } from './sesion';
 import { normalizarEmail } from '../../../shared/live';
 import type { Account, LiveSession, PartidaJugada, TrofeoId } from '../../../shared/live';
 import type { GameSession } from '../../../shared/types';
@@ -97,4 +98,78 @@ export async function perfilDe(email: string | undefined): Promise<Account | nul
   if (!email) return null;
   const store = getStore();
   return store.getAccountByEmail(normalizarEmail(email));
+}
+
+/**
+ * Borra la cuenta de un correo Y desengancha ese correo de todas las partidas.
+ *
+ * LAS DOS COSAS, y este es el motivo de que no sea una línea. Borrar solo la
+ * fila de la cuenta no borra nada en la práctica:
+ *
+ *   1. El correo sigue escrito en `sesion.players[].email`, así que en cuanto
+ *      esa partida llegue al desenlace, `cerrarPartidaEnCuentas` vuelve a
+ *      crear la cuenta con el mismo correo. Borrada el martes, de vuelta el
+ *      sábado.
+ *   2. Y aunque se limpiara la sesión, `sincronizarJugadores` copia el correo
+ *      DESDE la partida cada vez que se sincroniza (`{ ...previo, email:
+ *      s.email }`). Hay que quitarlo también de `game.suspects`, o el primer
+ *      «sincronizar» del Game Master lo devuelve a su sitio.
+ *
+ * Se barren TODAS las partidas, no solo aquella desde la que se pidió el
+ * borrado: quien dice «borra mis datos» no está hablando de una velada.
+ *
+ * Lo que NO se toca: el historial de los demás y la partida en sí. Que alguien
+ * jugara y ganara es un hecho de la mesa, no un dato personal suyo en exclusiva;
+ * lo que desaparece es el correo que lo identifica y todo lo colgado de él.
+ *
+ * Devuelve cuántas partidas quedaron limpias, para poder contarlo.
+ */
+export async function borrarCuentaDe(email: string): Promise<{
+  cuentaBorrada: boolean;
+  partidasLimpiadas: number;
+}> {
+  const store = getStore();
+  const normalizado = normalizarEmail(email);
+
+  const cuenta = await store.getAccountByEmail(normalizado);
+  if (cuenta) await store.deleteAccount(cuenta.id);
+
+  let partidasLimpiadas = 0;
+  for (const resumen of await store.listGames()) {
+    const game = await store.getGame(resumen.id);
+    if (!game) continue;
+
+    let tocada = false;
+    for (const sospechoso of game.suspects) {
+      if (sospechoso.email && normalizarEmail(sospechoso.email) === normalizado) {
+        delete sospechoso.email;
+        tocada = true;
+      }
+    }
+    if (tocada) await store.saveGame(game);
+
+    // Por `mutar`, no a pelo: doce móviles pueden estar escribiendo notas y
+    // eligiendo sala en este mismo instante, y una lectura-modificación-
+    // escritura por libre se lleva por delante lo que se guardara entretanto.
+    // Que la revisión suba está bien: para quien pierde la cuenta, su pantalla
+    // de perfil ha cambiado de verdad.
+    if (await store.getLive(game.id)) {
+      const { resultado } = await mutar(game.id, (sesion) => {
+        let sesionTocada = false;
+        for (const jugador of sesion.players) {
+          if (jugador.email && normalizarEmail(jugador.email) === normalizado) {
+            delete jugador.email;
+            delete jugador.accountId;
+            sesionTocada = true;
+          }
+        }
+        return sesionTocada;
+      });
+      if (resultado) tocada = true;
+    }
+
+    if (tocada) partidasLimpiadas++;
+  }
+
+  return { cuentaBorrada: Boolean(cuenta), partidasLimpiadas };
 }

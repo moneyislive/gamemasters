@@ -99,6 +99,17 @@ export function ProveedorPartida({ children }: { children: React.ReactNode }): J
   // ---- Bucle de espera de cambios ----
   useEffect(() => {
     let cancelado = false;
+    /**
+     * Espera creciente entre reintentos, de 2,5 s a 20 s.
+     *
+     * Con una espera fija, un móvil sin cobertura se pasa la velada entera
+     * pidiendo cada 2,5 segundos: gasta batería, calienta el teléfono y no
+     * consigue nada. Creciendo, el que está de verdad desconectado deja de
+     * insistir, y el que solo tuvo un tropiezo se recupera igual de rápido
+     * porque la espera se reinicia en cuanto una petición sale bien.
+     */
+    let espera = 2500;
+    const MAX_ESPERA = 20000;
 
     const bucle = async (): Promise<void> => {
       while (!cancelado) {
@@ -129,18 +140,53 @@ export function ProveedorPartida({ children }: { children: React.ReactNode }): J
           }
           // 204 (sin novedad) o respuesta con datos: en ambos casos se repite.
           setCargando(false);
+          espera = 2500;
         } catch (e) {
           if (cancelado) return;
-          if (e instanceof api.ErrorApi && e.estado === 401) {
+          const estado = e instanceof api.ErrorApi ? e.estado : 0;
+
+          if (estado === 401) {
+            /*
+             * La credencial ya no vale: ha caducado (duran 30 días, y una
+             * campaña puede tener jornadas más separadas que eso) o quien
+             * dirige ha cerrado y reabierto la partida.
+             *
+             * Antes esto hacía `return`, y ahí estaba el fallo: el bucle vive
+             * en un efecto cuyas dependencias no cambian nunca, y el proveedor
+             * cuelga de la raíz y no se desmonta ni volviendo a la entrada. Al
+             * salirse, la app se quedaba MUDA el resto de la velada: el jugador
+             * volvía a entrar, veía su pantalla, y no se enteraba de una sola
+             * ronda más. Ahora se sigue dando vueltas: sin credencial el bucle
+             * cae en la espera de arriba y se reengancha solo en cuanto se
+             * entra de nuevo.
+             */
             setError('Tu sesión ha caducado. Vuelve a entrar con tu código.');
             await api.salir();
+            revRef.current = -1;
             setVista(null);
             setCargando(false);
-            return;
+            continue;
           }
-          // Wifi doméstico: se reintenta con calma en vez de gritar.
-          setError('Sin conexión con la partida. Reintentando…');
-          await new Promise((r) => setTimeout(r, 2500));
+
+          if (estado === 403 || estado === 404) {
+            // La partida se cerró, o ya no participo. Puede ser definitivo,
+            // pero también pasajero —el servidor responde 403 mientras se
+            // regenera la trama—, así que no se corta: se espera más y se
+            // vuelve a mirar.
+            setError(
+              estado === 404
+                ? 'La partida ya no está en juego. Si sigue la velada, pide un código nuevo.'
+                : 'Ya no participas en esta partida.',
+            );
+            setCargando(false);
+          } else {
+            // Wifi doméstico: se reintenta con calma en vez de gritar.
+            setError('Sin conexión con la partida. Reintentando…');
+            setCargando(false);
+          }
+
+          await new Promise((r) => setTimeout(r, espera));
+          espera = Math.min(espera * 2, MAX_ESPERA);
         }
       }
     };

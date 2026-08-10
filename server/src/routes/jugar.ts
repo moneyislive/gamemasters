@@ -11,7 +11,7 @@
 import { getStore } from '../db/store';
 import { avisosDesde, esperarCambio } from '../live/hub';
 import { consultarConsejero } from '../live/consejero';
-import { perfilDe } from '../live/cuentas';
+import { borrarCuentaDe, perfilDe } from '../live/cuentas';
 import { vistaDeJugador } from '../live/proyeccion';
 import { guardarNotas, mutar, tocar } from '../live/sesion';
 import { AccionInvalida, ejecutarAccion } from '../juegos/motor';
@@ -358,6 +358,46 @@ router.get('/jugar/perfil', async (req, res) => {
   const jugador = sesion?.players.find((p) => p.suspectId === cred.suspectId);
   const cuenta = await perfilDe(jugador?.email);
   res.json({ cuenta });
+});
+
+/**
+ * Borra la cuenta del jugador y todo lo que cuelga de su correo.
+ *
+ * Existe porque las dos tiendas lo exigen —Apple 5.1.1(v), Google Play desde
+ * abril de 2024— a toda app en la que se pueda acabar con una cuenta, y aquí
+ * se acaba: nadie se registra, pero el Game Master escribe tu correo al montar
+ * la partida y a partir de ahí tienes perfil, historial y trofeos. Que la
+ * cuenta la abriera otro no la hace menos tuya.
+ *
+ * También es el derecho de supresión del RGPD, que aquí no tenía ni una
+ * ventanilla: no había forma de pedirlo ni forma de concederlo.
+ *
+ * El borrado es AMPLIO a propósito: no se limita a la partida desde la que se
+ * pide. Ver `borrarCuentaDe`.
+ */
+router.delete('/jugar/cuenta', async (req, res) => {
+  const cred = credencial(req, res);
+  if (!cred) return;
+
+  const store = getStore();
+  const sesion = await store.getLive(cred.gameId);
+  const jugador = sesion?.players.find((p) => p.suspectId === cred.suspectId);
+  if (!jugador) {
+    res.status(403).json({ error: 'Ya no participas en esta partida.' });
+    return;
+  }
+  if (!jugador.email) {
+    // Sin correo no hay cuenta: no es un error, es que no había nada que
+    // borrar. Se responde en positivo para que la app diga lo mismo.
+    res.json({ borrada: false, partidasLimpiadas: 0 });
+    return;
+  }
+
+  const resultado = await borrarCuentaDe(jugador.email);
+  res.json({
+    borrada: resultado.cuentaBorrada,
+    partidasLimpiadas: resultado.partidasLimpiadas,
+  });
 });
 
 function mensaje(error: unknown, porDefecto: string): string {

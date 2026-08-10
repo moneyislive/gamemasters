@@ -81,9 +81,19 @@ export function haySesion(): boolean {
   return Boolean(token);
 }
 
+/**
+ * Completa lo que se teclea en «Cambiar de servidor».
+ *
+ * Sin esquema se asume `https://`, no `http://`. Quien escribe un dominio a
+ * secas —`misterios.example.com`— está pensando en el servidor público, y ahí
+ * el texto en claro lo bloquean tanto iOS (App Transport Security) como Android
+ * (tráfico sin cifrar desde targetSdk 28): la app se quedaba sin poder hablar
+ * con nadie y sin decir por qué. Quien de verdad quiera la wifi de casa escribe
+ * `http://192.168.1.40:5174`, que se respeta tal cual.
+ */
 function normalizarUrl(url: string): string {
   let limpia = url.trim().replace(/\/+$/, '');
-  if (!/^https?:\/\//i.test(limpia)) limpia = `http://${limpia}`;
+  if (!/^https?:\/\//i.test(limpia)) limpia = `https://${limpia}`;
   return limpia;
 }
 
@@ -96,22 +106,76 @@ export class ErrorApi extends Error {
   }
 }
 
+/**
+ * Plazos. Sin ellos, una petición puede quedarse esperando PARA SIEMPRE.
+ *
+ * No es teórico: el cliente HTTP de Android no trae plazo por defecto, así que
+ * una wifi asociada pero muerta —el portal cautivo del hotel, el repetidor que
+ * dejó de encaminar— deja el `await` colgado sin error y sin fin. La pantalla
+ * se queda con datos rancios y el reloj de la ronda bajando como si nada,
+ * mientras en la mesa ya se ha cerrado.
+ */
+const PLAZO_MS = 15000;
+/** La espera larga: el servidor retiene la petición hasta 25 s a propósito. */
+const PLAZO_ESPERA_LARGA_MS = 40000;
+/** El Mayordomo habla con un modelo de lenguaje y puede tardar. */
+const PLAZO_MAYORDOMO_MS = 60000;
+
+/** Reenvía al controlador propio la cancelación de quien llama. */
+function enlazarSenales(externa: AbortSignal | undefined, propio: AbortController): () => void {
+  if (!externa) return () => undefined;
+  if (externa.aborted) {
+    propio.abort();
+    return () => undefined;
+  }
+  const alAbortar = (): void => propio.abort();
+  externa.addEventListener('abort', alAbortar);
+  return () => externa.removeEventListener('abort', alAbortar);
+}
+
 async function peticion<T>(
   ruta: string,
   opciones: RequestInit = {},
   señal?: AbortSignal,
+  plazo: number = PLAZO_MS,
 ): Promise<T> {
-  const res = await fetch(`${servidor}/api${ruta}`, {
-    ...opciones,
-    signal: señal,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(opciones.headers ?? {}),
-    },
-  });
-  if (res.status === 204) return undefined as T;
-  const texto = await res.text();
+  // Se combinan a mano y no con `AbortSignal.any`, que no está garantizado en
+  // React Native.
+  const propio = new AbortController();
+  const temporizador = setTimeout(() => propio.abort(), plazo);
+  const desenlazar = enlazarSenales(señal, propio);
+
+  let res: Response;
+  let texto: string;
+  try {
+    res = await fetch(`${servidor}/api${ruta}`, {
+      ...opciones,
+      signal: propio.signal,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(opciones.headers ?? {}),
+      },
+    });
+    if (res.status === 204) return undefined as T;
+    // El plazo sigue corriendo mientras se lee el cuerpo: unas cabeceras que
+    // llegan y un cuerpo que no, cuelgan igual que no llegar nada.
+    texto = await res.text();
+  } catch (e) {
+    // Si canceló quien llama —la app se fue a segundo plano, la pantalla se
+    // desmontó— se deja pasar tal cual: no es un fallo que contar a nadie.
+    if (señal?.aborted) throw e;
+    if (propio.signal.aborted) {
+      throw new ErrorApi('El servidor tarda demasiado en contestar.', 0);
+    }
+    // En React Native esto llega como «Network request failed», en inglés y
+    // sin contexto. La app está entera en castellano; que no se rompa aquí.
+    throw new ErrorApi('No se pudo conectar con la partida. Revisa la conexión.', 0);
+  } finally {
+    clearTimeout(temporizador);
+    desenlazar();
+  }
+
   let cuerpo: unknown;
   try {
     cuerpo = texto ? JSON.parse(texto) : {};
@@ -156,7 +220,14 @@ export interface RespuestaVista {
 /** Pide la vista. Con `desde` espera a que algo cambie (long-polling). */
 export function pedirVista(desde?: number, señal?: AbortSignal): Promise<RespuestaVista | undefined> {
   const cola = desde === undefined ? '' : `?desde=${desde}`;
-  return peticion<RespuestaVista | undefined>(`/jugar/vista${cola}`, {}, señal);
+  return peticion<RespuestaVista | undefined>(
+    `/jugar/vista${cola}`,
+    {},
+    señal,
+    // Con `desde`, el servidor retiene la petición a propósito hasta 25 s. El
+    // plazo tiene que ir por encima o cortaríamos justo lo que buscamos.
+    desde === undefined ? PLAZO_MS : PLAZO_ESPERA_LARGA_MS,
+  );
 }
 
 export function elegirSala(roomId: string): Promise<{ vista: VistaJugador }> {
@@ -206,14 +277,27 @@ export function hacerAccion(
 }
 
 export function preguntarAlConsejero(pregunta: string): Promise<{ respuesta: string }> {
-  return peticion('/jugar/preguntar', {
-    method: 'POST',
-    body: JSON.stringify({ pregunta }),
-  });
+  return peticion(
+    '/jugar/preguntar',
+    { method: 'POST', body: JSON.stringify({ pregunta }) },
+    undefined,
+    PLAZO_MAYORDOMO_MS,
+  );
 }
 
 export function pedirPerfil(): Promise<{ cuenta: Account | null }> {
   return peticion('/jugar/perfil');
+}
+
+/**
+ * Borra la cuenta y desengancha el correo de todas las partidas.
+ *
+ * No es solo la exigencia de las tiendas: es que hasta ahora no había ninguna
+ * manera de deshacer una cuenta que, además, la abrió otra persona —quien
+ * organiza, al escribir tu correo—.
+ */
+export function borrarCuenta(): Promise<{ borrada: boolean; partidasLimpiadas: number }> {
+  return peticion('/jugar/cuenta', { method: 'DELETE' });
 }
 
 export async function salir(): Promise<void> {

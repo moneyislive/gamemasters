@@ -31,18 +31,47 @@ export default function Perfil(): JSX.Element {
   const { vista, desconectar } = usePartida();
   const [cuenta, setCuenta] = useState<Account | null>(null);
   const [cargando, setCargando] = useState(true);
+  /**
+   * Un fallo de red NO es «no tienes cuenta».
+   *
+   * Antes ambos casos caían en `setCuenta(null)` y la pantalla soltaba
+   * «pídele a quien organiza que añada tu correo» a alguien que sí lo tenía
+   * puesto: la app culpaba al organizador de que la wifi fuera mal.
+   */
+  const [fallo, setFallo] = useState(false);
+  const [confirmando, setConfirmando] = useState(false);
+  const [borrando, setBorrando] = useState(false);
+  const [borrada, setBorrada] = useState(false);
 
-  useEffect(() => {
+  const cargarPerfil = (): void => {
+    setCargando(true);
+    setFallo(false);
     api
       .pedirPerfil()
       .then((r) => setCuenta(r.cuenta))
-      .catch(() => setCuenta(null))
+      .catch(() => setFallo(true))
       .finally(() => setCargando(false));
-  }, [vista?.sesion.phase]);
+  };
+
+  useEffect(cargarPerfil, [vista?.sesion.phase]);
 
   const salir = async (): Promise<void> => {
     await desconectar();
     router.replace('/');
+  };
+
+  const borrar = async (): Promise<void> => {
+    setBorrando(true);
+    try {
+      await api.borrarCuenta();
+      setCuenta(null);
+      setBorrada(true);
+      setConfirmando(false);
+    } catch {
+      setFallo(true);
+    } finally {
+      setBorrando(false);
+    }
   };
 
   return (
@@ -56,6 +85,20 @@ export default function Perfil(): JSX.Element {
 
       {cargando ? (
         <Cargando texto="Buscando tus veladas…" />
+      ) : fallo ? (
+        <Marco>
+          <Cuerpo>No se ha podido consultar tu perfil. Puede ser cosa de la conexión.</Cuerpo>
+          <Boton onPress={cargarPerfil} style={{ marginTop: espacio.md }}>
+            Volver a intentarlo
+          </Boton>
+        </Marco>
+      ) : borrada ? (
+        <Marco>
+          <Cuerpo>
+            Cuenta borrada. Tu correo ya no está en ninguna partida, y con él se han ido tu
+            historial y tus trofeos. Puedes seguir jugando esta velada con normalidad.
+          </Cuerpo>
+        </Marco>
       ) : !cuenta ? (
         <Marco>
           <Cuerpo>
@@ -119,7 +162,43 @@ export default function Perfil(): JSX.Element {
       )}
 
       <Ornamento />
-      <Boton onPress={() => void salir()}>Salir de la partida</Boton>
+
+      {/*
+        Confirmación EN LA PANTALLA, no con `Alert`.
+        `Alert.alert` no hace nada en react-native-web, y esta app también se
+        juega desde el navegador: el botón de borrar habría quedado mudo justo
+        allí donde más fácil es pulsarlo sin querer.
+      */}
+      {cuenta && !borrada && (
+        confirmando ? (
+          <Marco>
+            <Cuerpo>
+              Se borrará tu cuenta ({cuenta.email}), tu historial y tus trofeos, y tu correo se
+              quitará de todas las partidas. No se puede deshacer. La velada de hoy sigue igual:
+              no te echa de la mesa.
+            </Cuerpo>
+            <Boton
+              variante="peligro"
+              cargando={borrando}
+              onPress={() => void borrar()}
+              style={{ marginTop: espacio.md }}
+            >
+              Sí, bórralo todo
+            </Boton>
+            <Boton onPress={() => setConfirmando(false)} style={{ marginTop: espacio.sm }}>
+              Mejor no
+            </Boton>
+          </Marco>
+        ) : (
+          <Boton variante="peligro" onPress={() => setConfirmando(true)}>
+            Borrar mi cuenta y mis datos
+          </Boton>
+        )
+      )}
+
+      <Boton onPress={() => void salir()} style={{ marginTop: espacio.sm }}>
+        Salir de la partida
+      </Boton>
     </Pantalla>
   );
 }

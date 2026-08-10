@@ -133,7 +133,12 @@ function construirPrompt(game: GameSession): string {
   const sospechosos =
     game.suspects
       .map((s) => {
-        const lineas = [`- id: "${s.id}" · nombre: "${s.name}"${s.email ? ` · email: ${s.email}` : ''}`];
+        // El correo NO va al modelo. Estos son invitados de verdad, y su
+        // dirección no aporta absolutamente nada a escribir un personaje: era
+        // un dato personal saliendo hacia un tercero a cambio de nada. El
+        // esquema de la trama tampoco emite correos, así que no se echa en
+        // falta en ninguna parte.
+        const lineas = [`- id: "${s.id}" · nombre: "${s.name}"`];
         if (s.description?.trim()) {
           lineas.push(`  descripción psicológica: ${s.description.trim()}`);
         }

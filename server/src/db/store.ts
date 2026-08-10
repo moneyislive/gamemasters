@@ -46,6 +46,13 @@ export interface Store {
   getAccount(id: string): Promise<Account | null>;
   getAccountByEmail(email: string): Promise<Account | null>;
   saveAccount(account: Account): Promise<Account>;
+  /**
+   * Borra una cuenta. Lo exigen las dos tiendas y el RGPD, y hasta ahora no
+   * existía: se podía crear una cuenta con historial y trofeos, y no había
+   * ninguna forma de deshacerlo. Ni siquiera desde la base de datos, sin saber
+   * dónde mirar.
+   */
+  deleteAccount(id: string): Promise<void>;
 }
 
 // ---------------------------------------------------------------------------
@@ -203,6 +210,11 @@ class FileStore implements Store {
   async deleteGame(id: string): Promise<void> {
     this.data.games = this.data.games.filter((g) => g.id !== id);
     delete this.data.messages[id];
+    // La sesión en vivo se va con la partida. Antes se quedaba huérfana, y ahí
+    // es justo donde viven los nombres, los correos y las notas privadas de los
+    // doce invitados: borrar la partida parecía borrarlo todo y no borraba nada
+    // de eso.
+    this.data.live = this.data.live.filter((l) => l.id !== id);
     await this.persist();
   }
 
@@ -265,6 +277,11 @@ class FileStore implements Store {
     else this.data.accounts.push(copia);
     await this.persist();
     return structuredClone(copia);
+  }
+
+  async deleteAccount(id: string): Promise<void> {
+    this.data.accounts = this.data.accounts.filter((x) => x.id !== id);
+    await this.persist();
   }
 }
 
@@ -363,6 +380,9 @@ class MongoStore implements Store {
   async deleteGame(id: string): Promise<void> {
     await this.games.deleteOne({ id });
     await this.messages.deleteMany({ gameId: id });
+    // Ídem que en el almacén de fichero: la sesión en vivo guarda los datos
+    // personales, y quedarse sin dueño no la hacía menos real.
+    await this.live.deleteOne({ id });
   }
 
   async getMessages(gameId: string): Promise<ChatMessage[]> {
@@ -435,6 +455,10 @@ class MongoStore implements Store {
       upsert: true,
     });
     return account;
+  }
+
+  async deleteAccount(id: string): Promise<void> {
+    await this.accounts.deleteOne({ id });
   }
 }
 

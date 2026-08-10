@@ -13,8 +13,6 @@
     "@expo-google-fonts/cinzel": "^0.4.2",
     "@expo-google-fonts/cormorant-garamond": "^0.4.1",
     "expo": "~57.0.11",
-    "expo-audio": "~57.0.3",
-    "expo-blur": "~57.0.2",
     "expo-constants": "~57.0.9",
     "expo-font": "~57.0.1",
     "expo-haptics": "~57.0.1",
