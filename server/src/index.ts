@@ -24,6 +24,7 @@ import liveRouter from './routes/live';
 import materialRouter from './routes/material';
 import refreshRouter from './routes/refresh';
 import uploadsRouter from './routes/uploads';
+import { secretoDeFirma } from './secreto';
 
 const app = express();
 
@@ -102,6 +103,31 @@ app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
   }
   res.status(500).json({ error: 'Error interno del servidor.' });
 });
+
+/**
+ * Comprobaciones que se hacen ANTES de escuchar.
+ *
+ * Un servidor que se niega a arrancar se arregla en cinco minutos. Uno que
+ * arranca inseguro no se arregla nunca, porque nadie se entera. Y aquí lo que
+ * está en juego no es abstracto: sin contraseña, `requireAuth` deja pasar a
+ * todo el mundo, de modo que cualquiera que alcance la dirección puede leer la
+ * solución del caso en `/api/games/<id>`, descargar los dosieres y forzar el
+ * desenlace para los doce invitados.
+ */
+function comprobarArranque(): void {
+  // Falla aquí si falta el secreto de firma en producción.
+  secretoDeFirma();
+
+  if (process.env.NODE_ENV === 'production' && !env.appPassword) {
+    throw new Error(
+      'Falta APP_PASSWORD y esto es producción. Sin ella el taller queda ABIERTO: cualquiera con ' +
+        'la dirección lee la solución del caso, descarga los dosieres y puede cerrar la partida.\n' +
+        'Defínela, o arranca sin NODE_ENV=production si de verdad quieres una instancia abierta.',
+    );
+  }
+}
+
+comprobarArranque();
 
 await initStore();
 const activeModel = await getStore().getConfigModel();

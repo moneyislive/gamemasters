@@ -35,7 +35,15 @@ import type { LiveSession, VistaJugador } from '../../shared/live';
 const REPO = path.resolve(import.meta.dirname ?? __dirname, '..', '..');
 const TSX = path.join(REPO, 'node_modules', 'tsx', 'dist', 'cli.mjs');
 const SERVIDOR = path.join(REPO, 'server', 'src', 'index.ts');
-const PUERTO = 5311;
+/**
+ * Puerto al azar, no fijo.
+ *
+ * Con uno fijo, encadenar los comprobadores fallaba de vez en cuando: Windows
+ * tarda en soltar el puerto del servidor recién matado y el siguiente arranque
+ * lo encontraba ocupado. Un comprobador que falla una de cada cinco veces sin
+ * que nada esté roto acaba ignorándose, que es peor que no tenerlo.
+ */
+const PUERTO = 5300 + Math.floor(Math.random() * 400);
 const BASE = `http://127.0.0.1:${PUERTO}/api`;
 
 // ---------------------------------------------------------------------------

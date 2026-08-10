@@ -12,10 +12,10 @@
  * hace en tiempo constante para no filtrar información por el tiempo de
  * respuesta.
  */
-import crypto from 'node:crypto';
 import type { NextFunction, Request, Response } from 'express';
 import { Router } from 'express';
 import { env } from './config';
+import { firmarConSecreto, igualSeguro } from './secreto';
 
 const COOKIE = 'gm_sesion';
 /** 30 días: es una herramienta para organizar veladas, no un banco. */
@@ -26,17 +26,20 @@ export function passwordRequired(): boolean {
   return Boolean(env.appPassword);
 }
 
-/** Testigo de sesión derivado de la contraseña actual. */
+/**
+ * Testigo de sesión.
+ *
+ * La contraseña va en el MENSAJE, no en la clave. Antes era al revés
+ * —`HMAC(contraseña, constante)`— y eso convertía la cookie en un oráculo para
+ * romper la contraseña sin conexión: texto conocido, clave elegida por una
+ * persona, SHA-256 sin endurecer. Ahora hace falta el secreto del servidor para
+ * poder probar siquiera una candidata.
+ *
+ * Y se conserva lo que se buscaba: cambiar la contraseña cambia el mensaje,
+ * cambia la firma, y todas las sesiones abiertas dejan de valer.
+ */
 function tokenDeSesion(password: string): string {
-  return crypto.createHmac('sha256', password).update('gamemasters:sesion:v1').digest('hex');
-}
-
-/** Comparación en tiempo constante, tolerante a longitudes distintas. */
-function igualSeguro(a: string, b: string): boolean {
-  const bufferA = Buffer.from(a);
-  const bufferB = Buffer.from(b);
-  if (bufferA.length !== bufferB.length) return false;
-  return crypto.timingSafeEqual(bufferA, bufferB);
+  return firmarConSecreto(`gamemasters:sesion:v2:${password}`);
 }
 
 /** Lee una cookie concreta de la cabecera, sin dependencias externas. */

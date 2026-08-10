@@ -100,6 +100,8 @@ export async function abrirSesion(game: GameSession): Promise<LiveSession> {
 
   const sesion: LiveSession = {
     id: game.id,
+    // Nuevo en cada apertura: es lo que invalida los móviles de la anterior.
+    sid: nanoid(16),
     code: await codigoLibre(),
     phase: 'lobby',
     round: 0,

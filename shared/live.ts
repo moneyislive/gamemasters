@@ -110,6 +110,19 @@ export interface LiveSession {
    * almacén dentro de una función que hoy es síncrona y pura.
    */
   juego?: JuegoId;
+  /**
+   * Identificador interno de ESTA apertura de la partida.
+   *
+   * No se enseña a nadie: sirve para atar las credenciales de los móviles a la
+   * sesión que hay ahora. Antes, cerrar la partida y volver a abrirla repartía
+   * códigos nuevos pero los `suspectId` seguían siendo los mismos, así que el
+   * testigo de un móvil viejo volvía a valer y rotar los códigos no servía de
+   * nada. Con esto, reabrir echa a todo el mundo de verdad.
+   *
+   * Opcional porque las sesiones creadas antes de existir este campo siguen
+   * jugándose sin él.
+   */
+  sid?: string;
   /** Código corto para entrar, del estilo «TEJADO». Se enseña en la mesa. */
   code: string;
   phase: LivePhase;

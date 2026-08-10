@@ -18,11 +18,48 @@ import { guardarNotas, mutar, tocar } from '../live/sesion';
 import { AccionInvalida, ejecutarAccion } from '../juegos/motor';
 // Importar este módulo da de alta lo que hacen las acciones de CLUEDO.
 import '../juegos/cluedo-acciones';
-import { credencialDePeticion, emitirCredencial } from '../live/token';
-import type { Request, Response } from 'express';
+import { credencialDePeticion, credencialValidaPara, emitirCredencial } from '../live/token';
+import type { NextFunction, Request, Response } from 'express';
 import type { VistaJugador } from '../../../shared/live';
 
 const router = express.Router();
+
+/**
+ * Guardián de la sesión: un testigo solo vale para la apertura en la que se
+ * emitió.
+ *
+ * Va aquí, en un único punto por delante de todas las rutas, y no repetido
+ * dentro de cada una. Una comprobación de seguridad que hay que acordarse de
+ * escribir en ocho sitios acaba faltando en el noveno, y ese noveno es el que
+ * se explota. Así, una ruta nueva nace protegida sin que su autor haga nada.
+ */
+router.use(async (req: Request, res: Response, next: NextFunction) => {
+  // Emparejar es justamente lo que reparte testigos: no puede exigir uno.
+  if (req.path === '/jugar/entrar') {
+    next();
+    return;
+  }
+  const cred = credencialDePeticion(req.headers.authorization);
+  // Sin credencial no se corta aquí: cada ruta responde su propio 401 con el
+  // mensaje que le corresponde.
+  if (!cred) {
+    next();
+    return;
+  }
+  try {
+    const sesion = await getStore().getLive(cred.gameId);
+    if (!credencialValidaPara(cred, sesion)) {
+      res.status(401).json({
+        error: 'La partida se ha vuelto a abrir. Pide tu código nuevo a quien la dirige.',
+      });
+      return;
+    }
+  } catch {
+    // Si el almacén falla, que responda la ruta: este guardián no está para
+    // convertir una caída de la base de datos en un «vuelve a entrar».
+  }
+  next();
+});
 
 /** Saca la credencial de la petición o corta con 401. */
 function credencial(req: Request, res: Response): { gameId: string; suspectId: string } | null {
@@ -92,7 +129,7 @@ router.post('/jugar/entrar', async (req, res) => {
   });
 
   res.json({
-    token: emitirCredencial(sesion.id, jugador.suspectId),
+    token: emitirCredencial(sesion.id, jugador.suspectId, sesion.sid),
     gameId: sesion.id,
     suspectId: jugador.suspectId,
     displayName: jugador.displayName,
