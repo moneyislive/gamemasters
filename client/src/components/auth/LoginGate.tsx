@@ -103,6 +103,16 @@ export default function LoginGate({ children }: { children: ReactNode }): JSX.El
         <button className="btn btn--primary gate-btn" type="submit" disabled={entrando}>
           {entrando ? 'Abriendo…' : 'Entrar'}
         </button>
+
+        {/*
+          Aquí, en la puerta, y no dentro: quien organiza introduce en esta
+          herramienta los nombres, los correos y las fotos de sus invitados, así
+          que tiene que poder leer qué se hace con ellos ANTES de teclear nada.
+          La ruta va por delante del guardián, de modo que se abre sin entrar.
+        */}
+        <a className="gate-privacidad text-dim" href="/privacidad" target="_blank" rel="noopener">
+          Política de privacidad
+        </a>
       </motion.form>
     </div>
   );

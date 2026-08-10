@@ -18,7 +18,16 @@ function listar(
   return items
     .map((item) => {
       const partes = [`  - ${item.name}`];
-      if (item.email) partes.push(`(correo: ${item.email})`);
+      /*
+       * SE DICE QUE HAY CORREO, NO CUÁL ES.
+       *
+       * El agente necesita saber si ya está puesto —para no volver a pedirlo— y
+       * puede escribir uno nuevo al dictado con `upsert_suspect`. Para ninguna
+       * de las dos cosas hace falta que la dirección viaje hasta el modelo, y
+       * mandarla era enviar el dato personal de un invitado a un tercero a
+       * cambio de nada.
+       */
+      if (item.email) partes.push('(ya tiene correo)');
       if (item.description) partes.push(`— ${item.description}`);
       return partes.join(' ');
     })

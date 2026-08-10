@@ -559,6 +559,27 @@ async function comprobarServidor(): Promise<void> {
     );
   }
 
+  paso('La política de privacidad se lee sin contraseña y sin instalar nada');
+
+  // Es la condición que ponen las dos tiendas, y la que se incumplía sin querer:
+  // cualquier cosa que se sirva detrás del guardián NO vale.
+  const politica = await pedir('/privacidad');
+  comprobar('responde 200 sin cookie ninguna', politica.estado === 200, politica.estado);
+  comprobar('y es HTML', /<!doctype html>/i.test(politica.texto), politica.texto.slice(0, 40));
+  comprobar(
+    'con el responsable y su correo, que es lo que exige el RGPD',
+    politica.texto.includes('miguelpeidroparedes@gmail.com'),
+  );
+  comprobar(
+    'y con la vía para ejercer la supresión',
+    politica.texto.includes('Borrar mi cuenta y mis datos'),
+  );
+  comprobar(
+    'no necesita nada de fuera: ni scripts ni recursos remotos',
+    !/<script/i.test(politica.texto) && !/https?:\/\/(?!www\.aepd\.es)/i.test(politica.texto),
+    politica.texto.match(/https?:\/\/[^"' ]+/g)?.slice(0, 4),
+  );
+
   paso('Se puede denunciar al Mayordomo sin salir de la app');
 
   const revAntesDeDenunciar: number =

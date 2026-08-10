@@ -1,12 +1,14 @@
 /**
- * Tu cuenta: las veladas que llevas y lo que has ganado en ellas.
+ * Tu cuenta: las veladas que llevas, lo que has ganado, y qué se guarda de ti.
  *
- * La cuenta es el correo que puso quien organiza. Si no puso ninguno, se juega
- * igual pero la partida no se guarda, y eso se dice claramente en vez de
- * mostrar una pantalla vacía sin explicación.
+ * Esta pantalla es la ventanilla de todo lo que la ley te reconoce, y por eso
+ * están aquí las tres cosas y separadas: aceptar que se guarde, dejar de
+ * guardar, y borrarlo todo. Antes no había ninguna de las tres — el «sí» lo
+ * daba quien organiza con solo teclear tu correo al montar la partida, y no
+ * existía forma de deshacerlo.
  */
 import { useEffect, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Linking, Pressable, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 import Animated, { FadeInUp } from 'react-native-reanimated';
 import * as api from '../../src/api';
@@ -42,15 +44,37 @@ export default function Perfil(): JSX.Element {
   const [confirmando, setConfirmando] = useState(false);
   const [borrando, setBorrando] = useState(false);
   const [borrada, setBorrada] = useState(false);
+  /** El correo que escribió quien organiza. Una invitación, no una cuenta. */
+  const [invitacion, setInvitacion] = useState<string | null>(null);
+  const [guardando, setGuardando] = useState(false);
+  const [cambiando, setCambiando] = useState(false);
 
   const cargarPerfil = (): void => {
     setCargando(true);
     setFallo(false);
     api
       .pedirPerfil()
-      .then((r) => setCuenta(r.cuenta))
+      .then((r) => {
+        setCuenta(r.cuenta);
+        setInvitacion(r.invitacion);
+        setGuardando(r.guardando);
+      })
       .catch(() => setFallo(true))
       .finally(() => setCargando(false));
+  };
+
+  /** Acepta o retira que las partidas se guarden. */
+  const cambiarGuardado = async (quiero: boolean): Promise<void> => {
+    setCambiando(true);
+    try {
+      const r = await api.guardarEnPerfil(quiero);
+      setGuardando(r.guardando);
+      cargarPerfil();
+    } catch {
+      setFallo(true);
+    } finally {
+      setCambiando(false);
+    }
   };
 
   useEffect(cargarPerfil, [vista?.sesion.phase]);
@@ -100,11 +124,39 @@ export default function Perfil(): JSX.Element {
           </Cuerpo>
         </Marco>
       ) : !cuenta ? (
+        /*
+          Ni cuenta ni nada guardado. Dos casos distintos, y decirlos como si
+          fueran uno era el fallo: si quien organiza puso tu correo, ANTES se te
+          creaba un perfil sin preguntarte. Ahora se te ofrece, que no es lo
+          mismo, y la pantalla lo explica en esos términos.
+        */
         <Marco>
-          <Cuerpo>
-            Esta partida no está asociada a ningún correo, así que no se guardará en un perfil.
-            Pídele a quien organiza que añada tu correo al montar la próxima.
-          </Cuerpo>
+          {invitacion ? (
+            <>
+              <Etiqueta>Guardar tus veladas</Etiqueta>
+              <Cuerpo style={{ marginTop: espacio.sm }}>
+                Quien organiza te ha apuntado como {invitacion}. Si quieres, guardamos ahí las
+                partidas que juegues, con su historial y sus trofeos, para que los tengas la
+                próxima vez.
+              </Cuerpo>
+              <Cuerpo tenue style={{ marginTop: espacio.sm, fontSize: 15 }}>
+                No hace falta para jugar, y puedes cambiar de idea cuando quieras.
+              </Cuerpo>
+              <Boton
+                variante="primario"
+                cargando={cambiando}
+                onPress={() => void cambiarGuardado(true)}
+                style={{ marginTop: espacio.lg }}
+              >
+                Guardar mis partidas
+              </Boton>
+            </>
+          ) : (
+            <Cuerpo>
+              Esta partida no está asociada a ningún correo, así que no se guardará en un perfil.
+              Pídele a quien organiza que añada tu correo al montar la próxima.
+            </Cuerpo>
+          )}
         </Marco>
       ) : (
         <>
@@ -169,6 +221,27 @@ export default function Perfil(): JSX.Element {
         juega desde el navegador: el botón de borrar habría quedado mudo justo
         allí donde más fácil es pulsarlo sin querer.
       */}
+      {/*
+        Dejar de guardar NO es borrar la cuenta, y por eso son dos botones
+        separados. Uno dice «a partir de ahora, no»; el otro, «y lo de antes,
+        tampoco». Meterlos en el mismo sitio haría que quien solo quiere lo
+        primero acabe haciendo lo segundo sin querer.
+      */}
+      {cuenta && !borrada && guardando && (
+        <Marco>
+          <Cuerpo tenue style={{ fontSize: 15 }}>
+            Tus partidas se están guardando en este perfil.
+          </Cuerpo>
+          <Boton
+            cargando={cambiando}
+            onPress={() => void cambiarGuardado(false)}
+            style={{ marginTop: espacio.md }}
+          >
+            Dejar de guardar mis partidas
+          </Boton>
+        </Marco>
+      )}
+
       {cuenta && !borrada && (
         confirmando ? (
           <Marco>
@@ -199,6 +272,21 @@ export default function Perfil(): JSX.Element {
       <Boton onPress={() => void salir()} style={{ marginTop: espacio.sm }}>
         Salir de la partida
       </Boton>
+
+      {/*
+        El enlace a la política no es un adorno legal: Apple exige (5.1.1(i))
+        que sea accesible DESDE DENTRO de la app, no solo en la ficha de la
+        tienda. Y este es su sitio natural: la pantalla donde se decide qué se
+        guarda y qué se borra.
+      */}
+      <Pressable
+        onPress={() => void Linking.openURL(api.urlDePrivacidad())}
+        hitSlop={10}
+        accessibilityRole="link"
+        style={{ alignSelf: 'center', marginTop: espacio.lg, paddingVertical: espacio.sm }}
+      >
+        <Etiqueta style={{ color: 'rgba(217,201,163,0.6)' }}>Política de privacidad</Etiqueta>
+      </Pressable>
     </Pantalla>
   );
 }

@@ -77,6 +77,17 @@ export async function fijarToken(nuevo: string | null): Promise<void> {
   else await almacen.del(CLAVE_TOKEN);
 }
 
+/**
+ * Dirección pública de la política de privacidad.
+ *
+ * Cuelga del mismo servidor con el que se está jugando, así que sigue al que
+ * tenga configurado el móvil: en la wifi de casa apunta al portátil, y en el
+ * servidor público, al de verdad.
+ */
+export function urlDePrivacidad(): string {
+  return `${servidor}/privacidad`;
+}
+
 export function haySesion(): boolean {
   return Boolean(token);
 }
@@ -299,8 +310,29 @@ export function denunciarRespuesta(pregunta: string, respuesta: string): Promise
   });
 }
 
-export function pedirPerfil(): Promise<{ cuenta: Account | null }> {
+export interface RespuestaPerfil {
+  cuenta: Account | null;
+  /** El correo que escribió quien organiza, si puso alguno. */
+  invitacion: string | null;
+  /** ¿Se están guardando las partidas en un perfil? */
+  guardando: boolean;
+}
+
+export function pedirPerfil(): Promise<RespuestaPerfil> {
   return peticion('/jugar/perfil');
+}
+
+/**
+ * Acepta —o retira— que las partidas se guarden en un perfil.
+ *
+ * Hasta ahora este «sí» lo daba quien organiza sin saberlo, con solo teclear un
+ * correo al montar la partida. Ahora lo da quien juega, desde su móvil.
+ */
+export function guardarEnPerfil(guardar: boolean): Promise<{ guardando: boolean }> {
+  return peticion('/jugar/perfil/guardar', {
+    method: 'POST',
+    body: JSON.stringify({ guardar }),
+  });
 }
 
 /**

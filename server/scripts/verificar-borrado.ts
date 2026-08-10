@@ -151,6 +151,7 @@ fs.writeFileSync(
 // ---------------------------------------------------------------------------
 
 type Medida = {
+  sinConsentimiento: { brunoPartidas: number; anaPartidas: number; carlaExiste: boolean };
   antes: { cuentas: number; anaEnSesion: boolean; anaEnPartida: boolean };
   resultado: { cuentaBorrada: boolean; partidasLimpiadas: number };
   despues: {
@@ -202,6 +203,23 @@ comprobar('la sonda responde', m !== null, salida.slice(0, 300));
 
 if (m) {
   comprobar('la sonda no reventó', !m.error, m.error);
+
+  console.log('\n· Sin haber dicho que sí, no se guarda nada');
+  comprobar(
+    'llegar al desenlace NO le apunta la partida a quien no la aceptó',
+    m.sinConsentimiento.brunoPartidas === 0,
+    m.sinConsentimiento,
+  );
+  comprobar(
+    'ni se la suma a quien ya tenía historial de antes',
+    m.sinConsentimiento.anaPartidas === 1,
+    m.sinConsentimiento,
+  );
+  comprobar(
+    'y a quien no tiene ni correo no se le inventa una cuenta',
+    !m.sinConsentimiento.carlaExiste,
+    m.sinConsentimiento,
+  );
 
   console.log('\n· Antes de borrar');
   comprobar('hay dos cuentas', m.antes.cuentas === 2, m.antes);

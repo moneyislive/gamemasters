@@ -24,6 +24,7 @@ import liveRouter from './routes/live';
 import materialRouter from './routes/material';
 import refreshRouter from './routes/refresh';
 import uploadsRouter from './routes/uploads';
+import { paginaDePrivacidad } from './legal/privacidad';
 import { secretoDeFirma } from './secreto';
 
 const app = express();
@@ -69,6 +70,18 @@ app.use(
     res.status(404).end();
   },
 );
+
+/*
+ * La política de privacidad, en abierto y por delante de todo.
+ *
+ * Detrás de la contraseña no serviría de nada: las dos tiendas exigen una
+ * dirección pública, accesible SIN instalar la app —para que pueda leerla quien
+ * se lo está pensando, y para que la revise quien revisa—, y Apple pide además
+ * un enlace desde dentro de la aplicación (directriz 5.1.1(i)).
+ */
+app.get(['/privacidad', '/privacidad.html'], (_req, res) => {
+  res.type('html').send(paginaDePrivacidad());
+});
 
 // La app del jugador va ANTES del guardián: quien juega no conoce la contraseña
 // de la casa. Su credencial es el testigo firmado que recibe al emparejar el

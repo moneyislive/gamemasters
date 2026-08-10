@@ -6,7 +6,7 @@
  * alguien que se rinde y se pone a mirar el móvil por su cuenta.
  */
 import { useEffect, useState } from 'react';
-import { Keyboard, StyleSheet, TextInput, View } from 'react-native';
+import { Keyboard, Linking, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { router } from 'expo-router';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import * as api from '../src/api';
@@ -151,6 +151,20 @@ export default function Entrada(): JSX.Element {
           </Boton>
         )}
       </Animated.View>
+
+      {/*
+        También aquí, y no solo en el perfil: esta es la única pantalla que ve
+        quien todavía no ha entrado —y quien revisa la app en la tienda—, así
+        que es donde tiene que poder leerse antes de teclear nada.
+      */}
+      <Pressable
+        onPress={() => void Linking.openURL(api.urlDePrivacidad())}
+        hitSlop={10}
+        accessibilityRole="link"
+        style={{ alignSelf: 'center', marginTop: espacio.lg, paddingVertical: espacio.sm }}
+      >
+        <Etiqueta style={{ color: 'rgba(217,201,163,0.55)' }}>Política de privacidad</Etiqueta>
+      </Pressable>
     </Pantalla>
   );
 }

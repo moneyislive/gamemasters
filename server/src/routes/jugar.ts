@@ -13,7 +13,7 @@ import { env } from '../config';
 import { getStore } from '../db/store';
 import { avisosDesde, esperarCambio } from '../live/hub';
 import { consultarConsejero } from '../live/consejero';
-import { borrarCuentaDe, perfilDe } from '../live/cuentas';
+import { aceptarGuardar, borrarCuentaDe, perfilDe } from '../live/cuentas';
 import { firmaDeFotoValida } from '../live/fotos';
 import { vistaDeJugador } from '../live/proyeccion';
 import { guardarNotas, mutar, tocar } from '../live/sesion';
@@ -462,14 +462,79 @@ function cabecerasDeFoto(archivo: string): Record<string, string> {
   return cabeceras;
 }
 
+/**
+ * El perfil: historial y trofeos, si es que se guardan.
+ *
+ * Devuelve además `invitacion` —el correo que escribió quien organiza— para que
+ * la app pueda ofrecer guardar. Es el correo de quien pregunta y solo se le
+ * enseña a él; ninguna otra ruta lo emite hacia ningún móvil.
+ */
 router.get('/jugar/perfil', async (req, res) => {
   const cred = credencial(req, res);
   if (!cred) return;
   const store = getStore();
   const sesion = await store.getLive(cred.gameId);
   const jugador = sesion?.players.find((p) => p.suspectId === cred.suspectId);
-  const cuenta = await perfilDe(jugador?.email);
-  res.json({ cuenta });
+  const cuenta = await perfilDe(jugador?.vinculo);
+  res.json({
+    cuenta,
+    invitacion: jugador?.email ?? null,
+    guardando: Boolean(jugador?.vinculo),
+  });
+});
+
+/**
+ * Acepta —o retira— que las partidas se guarden en un perfil.
+ *
+ * Es la ventanilla del consentimiento, y está aquí, en el móvil de quien juega,
+ * porque es el único sitio donde tiene sentido: hasta ahora el «sí» lo daba
+ * quien organiza sin saberlo, con solo teclear un correo al montar la partida.
+ *
+ * Retirarlo NO borra la cuenta —eso es `DELETE /jugar/cuenta`— sino que deja de
+ * alimentarla: esta partida ya no se apuntará. Son dos cosas distintas y la app
+ * las ofrece por separado.
+ */
+router.post('/jugar/perfil/guardar', async (req, res) => {
+  const cred = credencial(req, res);
+  if (!cred) return;
+  const guardar = req.body?.guardar !== false;
+
+  try {
+    const store = getStore();
+    const sesion = await store.getLive(cred.gameId);
+    const jugador = sesion?.players.find((p) => p.suspectId === cred.suspectId);
+    if (!jugador) {
+      res.status(403).json({ error: 'Ya no participas en esta partida.' });
+      return;
+    }
+
+    if (!guardar) {
+      await mutar(cred.gameId, (s) => {
+        const j = s.players.find((p) => p.suspectId === cred.suspectId);
+        if (j) delete j.vinculo;
+      });
+      res.json({ guardando: false });
+      return;
+    }
+
+    if (!jugador.email) {
+      res.status(409).json({
+        error: 'Quien organiza no ha puesto ningún correo para ti, así que no hay dónde guardar.',
+      });
+      return;
+    }
+
+    // La cuenta se crea o se recupera FUERA del candado —habla con el almacén—
+    // y solo el vínculo se escribe dentro.
+    const vinculo = await aceptarGuardar(jugador.email, jugador.displayName);
+    await mutar(cred.gameId, (s) => {
+      const j = s.players.find((p) => p.suspectId === cred.suspectId);
+      if (j) j.vinculo = vinculo;
+    });
+    res.json({ guardando: true });
+  } catch (error) {
+    res.status(409).json({ error: mensaje(error, 'No se pudo cambiar la preferencia.') });
+  }
 });
 
 /**

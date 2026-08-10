@@ -1,20 +1,29 @@
 /**
  * Cuentas de jugador, historial y trofeos.
  *
- * La cuenta es el correo que el Game Master escribió al montar la partida. No
- * hay contraseñas ni enlaces mágicos: montar un servidor de correo para que
- * doce personas entren en un juego de sobremesa es desproporcionado, y una
- * contraseña más es justo lo que nadie quiere teclear con la cena servida.
+ * El factor de acceso para JUGAR sigue siendo el código de invitación que
+ * reparte el Game Master: montar un servidor de correo para que doce personas
+ * entren en un juego de sobremesa es desproporcionado, y una contraseña más es
+ * justo lo que nadie quiere teclear con la cena servida.
  *
- * El factor de acceso es el código de invitación que reparte el Game Master, y
- * el vínculo con la cuenta lo establece él al escribir el correo. Quien no
- * tenga correo juega igual: simplemente esa partida no se le guarda.
+ * Pero la CUENTA es otra cosa, y ya no la abre quien organiza. El correo que él
+ * teclea es una dirección de invitación, no una identidad: nadie lo ha
+ * verificado y lo escribe un tercero. La cuenta nace cuando la persona, desde
+ * su móvil, acepta que sus partidas se guarden — y deja de alimentarse en
+ * cuanto lo retira. Quien no lo acepte juega exactamente igual; simplemente no
+ * queda rastro suyo fuera de la propia partida.
  */
 import { nanoid } from 'nanoid';
 import { getStore } from '../db/store';
 import { mutar } from './sesion';
 import { normalizarEmail } from '../../../shared/live';
-import type { Account, LiveSession, PartidaJugada, TrofeoId } from '../../../shared/live';
+import type {
+  Account,
+  LiveSession,
+  PartidaJugada,
+  TrofeoId,
+  VinculoDeCuenta,
+} from '../../../shared/live';
 import type { GameSession } from '../../../shared/types';
 import { culpableDe } from '../juegos/cluedo';
 
@@ -51,9 +60,22 @@ export async function cerrarPartidaEnCuentas(
   const store = getStore();
 
   for (const jugador of sesion.players) {
-    if (!jugador.email) continue;
+    /*
+     * SOLO quien ha dicho que sí.
+     *
+     * Antes la condición era «tiene correo», y el correo lo escribe quien
+     * organiza: bastaba con eso para fabricarle a alguien una cuenta con su
+     * historial y sus trofeos sin que hubiera pedido nada —ni abierto la app,
+     * en muchos casos—. Ahora hace falta un `vinculo`, que solo se crea cuando
+     * la persona lo acepta desde su móvil.
+     *
+     * Quien no lo acepte juega exactamente igual. Al terminar, sencillamente no
+     * queda rastro suyo fuera de la propia partida, que es lo que había pedido.
+     */
+    if (!jugador.vinculo) continue;
 
-    const cuenta = await cuentaDe(jugador.email, jugador.displayName);
+    const cuenta = await store.getAccount(jugador.vinculo.accountId);
+    if (!cuenta) continue;
     if (cuenta.partidas.some((p) => p.gameId === game.id)) continue;
 
     const personaje = plot.characters.find((c) => c.suspectId === jugador.suspectId);
@@ -89,15 +111,43 @@ export async function cerrarPartidaEnCuentas(
     cuenta.trofeos = [...ganados];
 
     await store.saveAccount(cuenta);
+    // Se conserva por compatibilidad con las sesiones de antes; la verdad está
+    // en `vinculo`.
     jugador.accountId = cuenta.id;
   }
 }
 
-/** Perfil que ve el jugador en la app: su historial y sus trofeos. */
-export async function perfilDe(email: string | undefined): Promise<Account | null> {
-  if (!email) return null;
-  const store = getStore();
-  return store.getAccountByEmail(normalizarEmail(email));
+/**
+ * Perfil que ve el jugador en la app: su historial y sus trofeos.
+ *
+ * Se busca por el VÍNCULO, no por el correo. Buscar por correo devolvía el
+ * perfil de una cuenta que la persona no había reclamado —y que a lo mejor era
+ * de otro, si quien organiza se equivocó al teclear o reutilizó la dirección de
+ * un conocido—. Sin vínculo no hay perfil que enseñar, y eso es correcto: no
+ * hay nada guardado todavía.
+ */
+export async function perfilDe(vinculo: VinculoDeCuenta | undefined): Promise<Account | null> {
+  if (!vinculo) return null;
+  return getStore().getAccount(vinculo.accountId);
+}
+
+/**
+ * Acepta guardar las partidas de esta persona en un perfil.
+ *
+ * Es el consentimiento, y por eso lo pide el jugador desde SU móvil y no lo
+ * concede quien organiza. Si ya existe una cuenta con ese correo se reutiliza
+ * —es la gracia de tener historial entre veladas—; si no, se crea aquí.
+ *
+ * Devuelve el vínculo para que quien llame lo escriba en la sesión, dentro del
+ * candado.
+ */
+export async function aceptarGuardar(
+  email: string,
+  displayName: string,
+  via: VinculoDeCuenta['via'] = 'confirmacion',
+): Promise<VinculoDeCuenta> {
+  const cuenta = await cuentaDe(email, displayName);
+  return { accountId: cuenta.id, aceptadoEl: new Date().toISOString(), via };
 }
 
 /**
@@ -160,6 +210,9 @@ export async function borrarCuentaDe(email: string): Promise<{
           if (jugador.email && normalizarEmail(jugador.email) === normalizado) {
             delete jugador.email;
             delete jugador.accountId;
+            // Y el consentimiento: si no, la partida seguiría alimentando una
+            // cuenta que ya no existe, y el desenlace la volvería a crear.
+            delete jugador.vinculo;
             sesionTocada = true;
           }
         }

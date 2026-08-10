@@ -9,8 +9,32 @@
  * Escribe una línea de JSON por la salida estándar y termina.
  */
 import { getStore, initStore } from '../src/db/store';
-import { borrarCuentaDe, cerrarPartidaEnCuentas } from '../src/live/cuentas';
+import { aceptarGuardar, borrarCuentaDe, cerrarPartidaEnCuentas } from '../src/live/cuentas';
 import { refrescarSesion } from '../src/live/sesion';
+
+/** Lo mínimo para que `cerrarPartidaEnCuentas` no se salga por falta de trama. */
+function tramaMinima(sesion: { players: Array<{ suspectId: string; displayName: string }> }): never {
+  return {
+    title: 'Prueba',
+    tagline: '',
+    synopsis: '',
+    setting: '',
+    victim: { name: 'Alguien', description: '' },
+    characters: sesion.players.map((p) => ({
+      suspectId: p.suspectId,
+      characterName: p.displayName,
+      role: '',
+      publicPersona: '',
+      secret: '',
+      motive: '',
+      alibi: '',
+      personalHook: '',
+    })),
+    solution: { respuestas: { culpable: 's1', objeto: 'w0', lugar: 'r0' } },
+    clues: [],
+    timeline: [],
+  } as never;
+}
 
 const ANA = 'ana@ejemplo.com';
 const BRUNO = 'bruno@ejemplo.com';
@@ -38,6 +62,43 @@ const cuantasCuentas = async (): Promise<number> => {
 const salida: Record<string, unknown> = {};
 
 try {
+  /*
+   * EL CONSENTIMIENTO, PRIMERO DE TODO.
+   *
+   * Antes bastaba con que quien organiza tecleara un correo para que el
+   * desenlace fabricara una cuenta a nombre de esa persona, con su historial y
+   * sus trofeos, sin que hubiera pedido nada. Aquí se comprueba lo contrario:
+   * se llega al desenlace SIN que nadie haya aceptado, y no debe aparecer ni
+   * una cuenta nueva.
+   */
+  const antesDeTodo = await store.getLive('velada');
+  const conTramaMinima = await store.getGame('velada');
+  if (antesDeTodo && conTramaMinima) {
+    conTramaMinima.plot = tramaMinima(antesDeTodo);
+    await store.saveGame(conTramaMinima);
+    await cerrarPartidaEnCuentas(conTramaMinima, antesDeTodo);
+  }
+  salida.sinConsentimiento = {
+    // Bruno no tenía ninguna partida apuntada. Si el desenlace le apunta esta
+    // sin haberla aceptado él, es que el agujero sigue abierto.
+    brunoPartidas: (await store.getAccountByEmail(BRUNO))?.partidas.length ?? -1,
+    // Y a Ana, que ya tenía una de antes, no puede sumarle una segunda.
+    anaPartidas: (await store.getAccountByEmail(ANA))?.partidas.length ?? -1,
+    // Carla no tiene correo siquiera: nunca puede aparecer.
+    carlaExiste: Boolean(await store.getAccountByEmail('carla@ejemplo.com')),
+  };
+
+  // Y ahora Ana y Bruno SÍ aceptan, que es lo que da de alta el vínculo.
+  for (const correo of [ANA, BRUNO]) {
+    const vinculo = await aceptarGuardar(correo, correo === ANA ? 'Ana' : 'Bruno');
+    const sesion = await store.getLive('velada');
+    if (sesion) {
+      const j = sesion.players.find((p) => (p.email ?? '').toLowerCase() === correo);
+      if (j) j.vinculo = vinculo;
+      await store.saveLive(sesion);
+    }
+  }
+
   salida.antes = {
     cuentas: await cuantasCuentas(),
     anaEnSesion: await tieneCorreoEnSesion('velada', ANA),
@@ -69,27 +130,7 @@ try {
   const conTrama = await store.getGame('velada');
   const sesion = await store.getLive('velada');
   if (conTrama && sesion) {
-    // Una trama mínima: `cerrarPartidaEnCuentas` se sale si no hay ninguna.
-    conTrama.plot = {
-      title: 'Prueba',
-      tagline: '',
-      synopsis: '',
-      setting: '',
-      victim: { name: 'Alguien', description: '' },
-      characters: sesion.players.map((p) => ({
-        suspectId: p.suspectId,
-        characterName: p.displayName,
-        role: '',
-        publicPersona: '',
-        secret: '',
-        motive: '',
-        alibi: '',
-        personalHook: '',
-      })),
-      solution: { respuestas: { culpable: 's1', objeto: 'w0', lugar: 'r0' } },
-      clues: [],
-      timeline: [],
-    } as never;
+    conTrama.plot = tramaMinima(sesion);
     await store.saveGame(conTrama);
     await cerrarPartidaEnCuentas(conTrama, sesion);
   }

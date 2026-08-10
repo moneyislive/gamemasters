@@ -49,14 +49,65 @@ export interface EleccionDeSala {
   at: string;
 }
 
+/**
+ * Consentimiento de una persona para que su partida se guarde en un perfil.
+ *
+ * POR QUÉ EXISTE ESTE TIPO. Hasta ahora la cuenta nacía sola: el Game Master
+ * escribía un correo al montar la partida y, al llegar el desenlace, el
+ * servidor creaba una cuenta con ese correo, le apuntaba la partida y le
+ * repartía trofeos. A alguien que a lo mejor ni había abierto la app.
+ *
+ * Eso es exactamente lo que el RGPD no permite: un tercero no puede dar tu
+ * consentimiento por ti, y un correo tecleado por otro no es una identidad
+ * verificada. Además tenía consecuencias prácticas feas — una errata creaba una
+ * cuenta fantasma, y reutilizar el correo de un conocido le volcaba encima un
+ * historial que no era suyo—.
+ *
+ * Ahora la cuenta nace de un acto de la persona: acepta guardar. Y puede dejar
+ * de hacerlo cuando quiera, sin salir de la partida.
+ */
+export interface VinculoDeCuenta {
+  /** Cuenta donde se guarda. */
+  accountId: string;
+  /** Cuándo lo aceptó. Hora del servidor. */
+  aceptadoEl: string;
+  /**
+   * Cómo se confirmó.
+   *
+   * `confirmacion` es el jugador pulsando «guardar mis partidas» con el correo
+   * que le pusieron. Cuando existan las cuentas con proveedor, `google` y
+   * `apple` valdrán más: ahí el correo viene verificado de origen.
+   */
+  via: 'confirmacion' | 'google' | 'apple';
+}
+
 export interface LivePlayer {
   /** Id del sospechoso de la partida: es la identidad dentro del juego. */
   suspectId: string;
   /** Nombre real, para la lista de conectados del Game Master. */
   displayName: string;
+  /**
+   * Correo que escribió quien organiza al montar la partida.
+   *
+   * OJO A LO QUE ES Y A LO QUE NO ES. Es una DIRECCIÓN DE INVITACIÓN, no una
+   * cuenta ni una identidad: lo teclea una tercera persona y nadie lo ha
+   * verificado. Sirve para dos cosas —mandar la invitación y ofrecerle a quien
+   * juega guardar la partida en un perfil— y para nada más.
+   *
+   * Antes bastaba para que el servidor CREARA una cuenta a su nombre al llegar
+   * el desenlace, con su historial y sus trofeos, sin que esa persona hubiera
+   * pedido nada ni abierto siquiera la app. Ahora no: hace falta `vinculo`.
+   */
   email?: string;
-  /** Cuenta a la que se ha vinculado, si la persona ya tenía uNa. */
+  /** Cuenta a la que se ha vinculado, si la persona ya tenía una. */
   accountId?: string;
+  /**
+   * El consentimiento para guardar esta partida en un perfil.
+   *
+   * Si no está, no se guarda nada en ninguna cuenta: se juega igual y al
+   * terminar no queda rastro de esa persona fuera de la propia partida.
+   */
+  vinculo?: VinculoDeCuenta;
   /**
    * Código de invitación de seis caracteres que reparte el Game Master.
    * Es el único factor de acceso: sin servidor de correo ni contraseñas que
