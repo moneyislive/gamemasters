@@ -9,7 +9,15 @@
  * Lo comprueba `server/scripts/verificar-mayordomo.ts`.
  */
 import { useRef, useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import {
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  View,
+} from 'react-native';
 import { router } from 'expo-router';
 import Animated, { FadeInUp } from 'react-native-reanimated';
 import * as api from '../src/api';
@@ -53,7 +61,33 @@ export default function Consejero(): JSX.Element {
   const [pregunta, setPregunta] = useState('');
   const [pensando, setPensando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** Turnos ya denunciados, por su posición: para no repetir ni confundir. */
+  const [denunciados, setDenunciados] = useState<Set<number>>(new Set());
   const scroll = useRef<ScrollView>(null);
+
+  /**
+   * Denunciar una respuesta.
+   *
+   * Google Play lo exige a toda app que genere contenido con IA, y con estas
+   * palabras: tiene que poder hacerse DENTRO de la app, sin salir de ella. Aquí
+   * encaja además con la realidad de la velada, porque la denuncia va a parar a
+   * la partida y la ve quien la dirige, que es quien está en la habitación.
+   */
+  const denunciar = async (indice: number): Promise<void> => {
+    const respuesta = turnos[indice];
+    if (!respuesta || denunciados.has(indice)) return;
+    // La pregunta que lo provocó es el turno anterior, si fue mío.
+    const anterior = turnos[indice - 1];
+    // Se marca antes de mandarla: si falla la red no se va a volver a intentar
+    // desde aquí, y dejar el botón vivo invita a pulsarlo diez veces.
+    setDenunciados((previos) => new Set(previos).add(indice));
+    try {
+      await api.denunciarRespuesta(anterior?.mio ? anterior.texto : '', respuesta.texto);
+    } catch {
+      // Silencio a propósito: quien denuncia ya ha hecho su parte, y un error
+      // técnico en este momento no le aporta nada.
+    }
+  };
 
   const enviar = async (texto_: string): Promise<void> => {
     const limpia = texto_.trim();
@@ -94,6 +128,20 @@ export default function Consejero(): JSX.Element {
               <View style={[estilos.burbuja, t.mio ? estilos.mia : estilos.suya]}>
                 {!t.mio && <Etiqueta style={{ marginBottom: 4 }}>El Mayordomo</Etiqueta>}
                 <Cuerpo style={{ fontSize: 17 }}>{t.texto}</Cuerpo>
+                {!t.mio && (
+                  <Pressable
+                    onPress={() => void denunciar(i)}
+                    disabled={denunciados.has(i)}
+                    hitSlop={10}
+                    accessibilityRole="button"
+                    accessibilityLabel="Denunciar esta respuesta del Mayordomo"
+                    style={estilos.denunciar}
+                  >
+                    <Etiqueta style={{ fontSize: 10, color: 'rgba(217,201,163,0.55)' }}>
+                      {denunciados.has(i) ? 'Denunciada · gracias' : 'Denunciar respuesta'}
+                    </Etiqueta>
+                  </Pressable>
+                )}
               </View>
             </Animated.View>
           ))}
@@ -145,6 +193,10 @@ export default function Consejero(): JSX.Element {
 }
 
 const estilos = StyleSheet.create({
+  // Discreto a propósito: tiene que estar SIEMPRE, pero el Mayordomo es para
+  // divertirse y una denuncia en rojo en cada burbuja pondría a la mesa a mirar
+  // el botón en vez de jugar.
+  denunciar: { alignSelf: 'flex-end', marginTop: 8, paddingVertical: 2 },
   burbuja: {
     borderWidth: 1,
     borderRadius: radio.lg,

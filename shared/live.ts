@@ -182,6 +182,25 @@ export interface LiveSession {
   /** Salas visitadas por alguien en cada ronda; lo que pasa al tablón común. */
   tablon: Array<{ round: number; roomId: string }>;
   /**
+   * Respuestas del Mayordomo que alguien ha denunciado.
+   *
+   * Google Play lo exige literalmente a toda app que genere contenido con IA:
+   * tiene que haber una forma de denunciar dentro de la propia app, sin salir
+   * de ella. Y aquí no es letra pequeña: el Mayordomo es el botón central de la
+   * barra, disponible a todas horas y en todas las pantallas.
+   *
+   * Van a parar a la partida, que es donde puede verlas quien la dirige: en un
+   * juego que se monta en casa de alguien, quien responde de lo que sale por
+   * pantalla es esa persona, no un buzón lejano.
+   */
+  denuncias?: Array<{
+    suspectId: string;
+    displayName: string;
+    pregunta: string;
+    respuesta: string;
+    at: string;
+  }>;
+  /**
    * Se incrementa en CADA cambio. Es lo que permite que el móvil pregunte
    * «¿ha pasado algo desde la revisión N?» y el servidor le deje esperando
    * hasta que pase, en vez de sondear cada segundo.

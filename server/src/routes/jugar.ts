@@ -353,6 +353,64 @@ router.post('/jugar/preguntar', async (req, res) => {
   }
 });
 
+/** Cuánto se guarda de una denuncia. Lo justo para poder juzgarla. */
+const MAX_TEXTO_DENUNCIA = 4000;
+/** Tope por partida: una denuncia es una señal, no un canal de escritura. */
+const MAX_DENUNCIAS = 100;
+
+/**
+ * Denunciar una respuesta del Mayordomo.
+ *
+ * Lo exige la política de contenido generado con IA de Google Play, y con
+ * palabras que no dejan margen: tiene que poder denunciarse DENTRO de la app,
+ * sin salir de ella. Aquí además tiene todo el sentido, porque el Mayordomo es
+ * el botón central de la barra y está a mano en cualquier momento de la velada.
+ *
+ * La denuncia va a la propia partida, que es donde la ve quien la dirige. En un
+ * juego que se monta en el salón de alguien, esa persona es quien responde de
+ * lo que sale por pantalla; un buzón remoto no serviría de nada esta noche.
+ *
+ * Silenciosa: no despierta a los doce móviles. Que alguien denuncie una
+ * respuesta no es un cambio de partida.
+ */
+router.post('/jugar/denunciar', async (req, res) => {
+  const cred = credencial(req, res);
+  if (!cred) return;
+
+  const recortar = (v: unknown): string => String(v ?? '').slice(0, MAX_TEXTO_DENUNCIA);
+  const pregunta = recortar(req.body?.pregunta);
+  const respuesta = recortar(req.body?.respuesta);
+  if (!respuesta.trim()) {
+    res.status(400).json({ error: 'No hay ninguna respuesta que denunciar.' });
+    return;
+  }
+
+  try {
+    await mutar(
+      cred.gameId,
+      (s) => {
+        const jugador = s.players.find((p) => p.suspectId === cred.suspectId);
+        if (!jugador) throw new Error('Ya no participas en esta partida.');
+        const lista = s.denuncias ?? [];
+        lista.push({
+          suspectId: cred.suspectId,
+          displayName: jugador.displayName,
+          pregunta,
+          respuesta,
+          at: new Date().toISOString(),
+        });
+        // Se conservan las últimas: sin tope, esta ruta seria una forma de
+        // engordar la partida sin límite desde un móvil cualquiera.
+        s.denuncias = lista.slice(-MAX_DENUNCIAS);
+      },
+      { silenciosa: true },
+    );
+    res.json({ ok: true });
+  } catch (error) {
+    res.status(409).json({ error: mensaje(error, 'No se pudo enviar la denuncia.') });
+  }
+});
+
 /**
  * Sirve una foto de la partida a quien juega.
  *

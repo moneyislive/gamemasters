@@ -283,6 +283,34 @@ export default function LivePanel(): JSX.Element {
         </section>
       )}
 
+      {/*
+        ---- Denuncias al Mayordomo ----
+        Existe el botón en la app porque Google Play lo exige a toda app que
+        genere contenido con IA. Pero un botón cuyo resultado no lee nadie es un
+        adorno: las denuncias tienen que llegar a quien está en la habitación,
+        que es quien puede hacer algo esta misma noche.
+      */}
+      {(sesion.denuncias?.length ?? 0) > 0 && (
+        <section className="deco-frame">
+          <h3 className="live-titulo">Respuestas denunciadas del Mayordomo</h3>
+          <p className="text-dim">
+            Alguien de la mesa ha marcado estas respuestas como impropias. Échales un ojo: el
+            Mayordomo escribe con un modelo de lenguaje y no siempre acierta el tono.
+          </p>
+          {[...(sesion.denuncias ?? [])].reverse().map((d, i) => (
+            <div key={`${d.at}-${i}`} className="deco-frame" style={{ marginTop: '0.75rem' }}>
+              <p className="text-dim" style={{ fontSize: '0.85em' }}>
+                {d.displayName} · {new Date(d.at).toLocaleString('es-ES')}
+              </p>
+              {d.pregunta && (
+                <p style={{ fontStyle: 'italic' }}>Preguntó: «{d.pregunta}»</p>
+              )}
+              <p>{d.respuesta}</p>
+            </div>
+          ))}
+        </section>
+      )}
+
       {/* ---- Jugadores ---- */}
       <section className="deco-frame">
         <h3 className="live-titulo">Jugadores y códigos</h3>

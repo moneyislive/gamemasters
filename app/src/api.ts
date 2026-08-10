@@ -285,6 +285,20 @@ export function preguntarAlConsejero(pregunta: string): Promise<{ respuesta: str
   );
 }
 
+/**
+ * Denuncia una respuesta del Mayordomo.
+ *
+ * Lo exige la política de contenido generado con IA de Google Play: hay que
+ * poder denunciar sin salir de la app. Va a la partida, donde lo ve quien la
+ * dirige.
+ */
+export function denunciarRespuesta(pregunta: string, respuesta: string): Promise<{ ok: true }> {
+  return peticion('/jugar/denunciar', {
+    method: 'POST',
+    body: JSON.stringify({ pregunta, respuesta }),
+  });
+}
+
 export function pedirPerfil(): Promise<{ cuenta: Account | null }> {
   return peticion('/jugar/perfil');
 }

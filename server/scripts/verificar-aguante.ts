@@ -559,6 +559,48 @@ async function comprobarServidor(): Promise<void> {
     );
   }
 
+  paso('Se puede denunciar al Mayordomo sin salir de la app');
+
+  const revAntesDeDenunciar: number =
+    (await pedir('/api/jugar/vista', { testigo })).datos?.vista?.rev ?? 0;
+
+  const denuncia = await pedir('/api/jugar/denunciar', {
+    metodo: 'POST',
+    testigo,
+    cuerpo: { pregunta: '¿quién fue?', respuesta: 'Una respuesta impropia del Mayordomo.' },
+  });
+  comprobar('la denuncia se acepta', denuncia.estado === 200, denuncia.datos);
+
+  const vistaGm = await pedir('/api/games/aguante/live', { cookie });
+  const denuncias: Array<{ respuesta: string; displayName: string }> =
+    vistaGm.datos?.sesion?.denuncias ?? [];
+  comprobar('y quien dirige la ve', denuncias.length === 1, denuncias);
+  comprobar(
+    'con el texto y quién la puso',
+    denuncias[0]?.respuesta.includes('impropia') && denuncias[0]?.displayName === 'Ana',
+    denuncias[0],
+  );
+
+  const revDespues: number = (await pedir('/api/jugar/vista', { testigo })).datos?.vista?.rev ?? 0;
+  comprobar(
+    'denunciar NO despierta a los doce móviles',
+    revDespues === revAntesDeDenunciar,
+    { antes: revAntesDeDenunciar, despues: revDespues },
+  );
+
+  const vacia = await pedir('/api/jugar/denunciar', {
+    metodo: 'POST',
+    testigo,
+    cuerpo: { pregunta: 'algo', respuesta: '   ' },
+  });
+  comprobar('una denuncia sin texto se rechaza', vacia.estado === 400, vacia.estado);
+
+  const sinCredencial = await pedir('/api/jugar/denunciar', {
+    metodo: 'POST',
+    cuerpo: { respuesta: 'hola' },
+  });
+  comprobar('y sin credencial no se puede denunciar', sinCredencial.estado === 401, sinCredencial.estado);
+
   paso('El candado serializa y no deja basura detrás');
 
   // Esto no se ve por HTTP: es memoria del servidor. Va en un proceso aparte,
