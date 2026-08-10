@@ -136,7 +136,7 @@ try {
   }
   salida.trasDesenlace = {
     anaExiste: Boolean(await store.getAccountByEmail(ANA)),
-    brunoExiste: Boolean(await store.getAccountByEmail(BRUNO)),
+    brunoPartidas: (await store.getAccountByEmail(BRUNO))?.partidas.length ?? -1,
   };
 
   // --- Borrar la partida tiene que llevarse su sesión en vivo ---

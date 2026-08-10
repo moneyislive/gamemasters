@@ -11,7 +11,7 @@ services:
     region: frankfurt # el más cercano a España; cámbialo si prefieres otro
     buildCommand: npm install && npm run build
     startCommand: npm start
-    healthCheckPath: /api/config
+    healthCheckPath: /api/salud
 
     # Disco persistente: sin esto, las fotos subidas desaparecen en cada
     # despliegue, porque el sistema de ficheros del contenedor es efímero.

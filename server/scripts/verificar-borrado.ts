@@ -166,7 +166,7 @@ type Medida = {
     jugadoresIntactos: number;
   };
   trasSincronizar: { anaEnSesion: boolean };
-  trasDesenlace: { anaExiste: boolean; brunoExiste: boolean };
+  trasDesenlace: { anaExiste: boolean; brunoPartidas: number };
   trasBorrarPartida: { sesionSigueViva: boolean };
   error?: string;
 };
@@ -258,9 +258,19 @@ if (m) {
     !m.trasDesenlace.anaExiste,
     m.trasDesenlace,
   );
+  /*
+    OJO A ESTA. Antes medía `brunoExiste`, y la cuenta de Bruno se siembra ya
+    creada unas líneas más arriba: la comprobación pasaba hiciera lo que hiciera
+    el código, incluso si el desenlace dejaba de guardar absolutamente nada. Una
+    comprobación que no puede fallar no es una comprobación; ocupa sitio y da
+    una confianza que no ha ganado.
+
+    Lo que sí cambia es cuántas partidas tiene apuntadas: Bruno empieza con
+    cero, aceptó guardar, y el desenlace tiene que sumarle esta.
+  */
   comprobar(
-    'y sí sigue creando la de quien no la borró',
-    m.trasDesenlace.brunoExiste,
+    'y a quien SÍ aceptó se le apunta la partida',
+    m.trasDesenlace.brunoPartidas === 1,
     m.trasDesenlace,
   );
 

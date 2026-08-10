@@ -156,10 +156,11 @@ export async function aceptarGuardar(
  * LAS DOS COSAS, y este es el motivo de que no sea una línea. Borrar solo la
  * fila de la cuenta no borra nada en la práctica:
  *
- *   1. El correo sigue escrito en `sesion.players[].email`, así que en cuanto
- *      esa partida llegue al desenlace, `cerrarPartidaEnCuentas` vuelve a
- *      crear la cuenta con el mismo correo. Borrada el martes, de vuelta el
- *      sábado.
+ *   1. El correo sigue escrito en `sesion.players[].email`, y con él el
+ *      `vinculo` que apunta a la cuenta recién borrada: la partida seguiría
+ *      alimentando un perfil fantasma. (Desde que el consentimiento es
+ *      explícito ya no basta con el correo para RECREARLA, pero el vínculo que
+ *      quedó vivo sí la resucitaría.)
  *   2. Y aunque se limpiara la sesión, `sincronizarJugadores` copia el correo
  *      DESDE la partida cada vez que se sincroniza (`{ ...previo, email:
  *      s.email }`). Hay que quitarlo también de `game.suspects`, o el primer

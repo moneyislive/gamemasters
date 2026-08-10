@@ -559,6 +559,19 @@ async function comprobarServidor(): Promise<void> {
     );
   }
 
+  paso('La señal de vida responde sin contraseña');
+
+  // `render.yaml` la usa para decidir si el despliegue está sano. Apuntaba a
+  // `/api/config`, que va detrás del guardián: en producción respondía 401 y el
+  // servicio se daba por caído aunque estuviera perfectamente.
+  const salud = await pedir('/api/salud');
+  comprobar('responde 200 sin cookie', salud.estado === 200, salud.estado);
+  comprobar('y dice que está bien', salud.datos?.ok === true, salud.datos);
+  comprobar(
+    'CONTROL: la ruta que se usaba antes SÍ está cerrada',
+    (await pedir('/api/config')).estado === 401,
+  );
+
   paso('La política de privacidad se lee sin contraseña y sin instalar nada');
 
   // Es la condición que ponen las dos tiendas, y la que se incumplía sin querer:

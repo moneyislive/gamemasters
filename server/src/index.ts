@@ -83,6 +83,23 @@ app.get(['/privacidad', '/privacidad.html'], (_req, res) => {
   res.type('html').send(paginaDePrivacidad());
 });
 
+/**
+ * Señal de vida, para quien vigila el servicio.
+ *
+ * Existe porque `render.yaml` apuntaba su comprobación de salud a
+ * `/api/config`, que está DETRÁS del guardián de la contraseña. En producción
+ * —donde `APP_PASSWORD` es obligatoria— eso responde 401, así que Render daba
+ * el servicio por caído y lo reiniciaba en bucle: el despliegue nunca llegaba a
+ * estar sano, y no porque el servidor fallara.
+ *
+ * Dice lo justo. Ni la versión, ni el modo de almacenamiento, ni si hay
+ * contraseña: una sonda pública no tiene por qué contarle a nadie de fuera cómo
+ * está montada la casa.
+ */
+app.get('/api/salud', (_req, res) => {
+  res.json({ ok: true });
+});
+
 // La app del jugador va ANTES del guardián: quien juega no conoce la contraseña
 // de la casa. Su credencial es el testigo firmado que recibe al emparejar el
 // móvil, y cada ruta lo verifica por su cuenta.
