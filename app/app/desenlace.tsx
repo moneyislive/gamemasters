@@ -149,7 +149,13 @@ export default function Desenlace(): JSX.Element {
                   fontSize: 15,
                 }}
               >
-                {c.at ? `${c.aciertos}/3` : 'sin acusar'}
+                {/*
+                  El total sale de cuántas respuestas trae el desenlace, no de
+                  un 3 escrito a mano. CLUEDO tiene tres ejes —culpable, objeto
+                  y lugar— pero el motor ya sostiene juegos con dos, y allí un
+                  «2/3» sería mentira. El servidor garantiza un renglón por eje.
+                */}
+                {c.at ? `${c.aciertos}/${fin.respuestas.length}` : 'sin acusar'}
               </Cuerpo>
             </View>
           ))}

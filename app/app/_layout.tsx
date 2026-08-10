@@ -5,7 +5,7 @@
  * Cormorant Garamond para el texto— porque es lo que hace que la app y los
  * dosieres impresos parezcan del mismo mundo.
  */
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
@@ -24,24 +24,48 @@ import {
 } from '@expo-google-fonts/cormorant-garamond';
 import { ProveedorPartida } from '../src/estado';
 import { TelonDeAvisos } from '../src/avisos';
+import { FranjaDeConexion } from '../src/conexion';
 import { color } from '../src/tema';
 
 void SplashScreen.preventAutoHideAsync();
 
 export default function Raiz(): JSX.Element | null {
-  const [cinzel] = useCinzel({ Cinzel_600SemiBold, Cinzel_700Bold });
-  const [cormorant] = useCormorant({
+  const [cinzel, errorCinzel] = useCinzel({ Cinzel_600SemiBold, Cinzel_700Bold });
+  const [cormorant, errorCormorant] = useCormorant({
     CormorantGaramond_400Regular,
     CormorantGaramond_400Regular_Italic,
     CormorantGaramond_600SemiBold,
   });
-  const listo = cinzel && cormorant;
+  /**
+   * Se entra aunque las tipografías fallen o tarden demasiado.
+   *
+   * Antes la condición era solo «las dos cargadas», sin mirar el error y sin
+   * plazo, y con `return null` mientras tanto: cualquier fallo al registrar una
+   * fuente dejaba la pantalla de arranque para siempre, con la app viva por
+   * debajo y nada que tocar. Ese es el peor fallo posible —no hay forma de
+   * salir, ni de saber qué pasa— y encima es de los que solo aparecen en un
+   * modelo de teléfono concreto, o sea, nunca en el nuestro.
+   *
+   * Sin sus tipografías la app se ve con la letra del sistema. Es peor de
+   * aspecto y perfectamente jugable, que es justo el orden correcto de
+   * prioridades a las nueve de la noche con doce invitados sentados.
+   */
+  const [seAcabaLaEspera, setSeAcabaLaEspera] = useState(false);
+  useEffect(() => {
+    const plazo = setTimeout(() => setSeAcabaLaEspera(true), 4000);
+    return () => clearTimeout(plazo);
+  }, []);
+
+  const listo =
+    (cinzel || Boolean(errorCinzel)) &&
+    (cormorant || Boolean(errorCormorant));
+  const entrar = listo || seAcabaLaEspera;
 
   useEffect(() => {
-    if (listo) void SplashScreen.hideAsync();
-  }, [listo]);
+    if (entrar) void SplashScreen.hideAsync();
+  }, [entrar]);
 
-  if (!listo) return null;
+  if (!entrar) return null;
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
@@ -67,6 +91,7 @@ export default function Raiz(): JSX.Element | null {
             />
             <Stack.Screen name="desenlace" options={{ animation: 'fade' }} />
           </Stack>
+          <FranjaDeConexion />
           <TelonDeAvisos />
         </ProveedorPartida>
       </SafeAreaProvider>

@@ -601,6 +601,33 @@ async function comprobarServidor(): Promise<void> {
   });
   comprobar('y sin credencial no se puede denunciar', sinCredencial.estado === 401, sinCredencial.estado);
 
+  paso('Las fotos que ya no usa nadie se retiran');
+
+  const carpetaFotos = path.join(dir, 'uploads');
+  const hay = (nombre: string): boolean => fs.existsSync(path.join(carpetaFotos, nombre));
+
+  // Una foto compartida por DOS entidades. Es el caso que haría destructiva una
+  // limpieza ingenua: quitar una no puede dejar sin foto a la otra.
+  comprobar('la foto sembrada está', hay(FOTO));
+  const quitarSala = await pedir('/api/games/aguante/rooms/r0', { metodo: 'DELETE', cookie });
+  comprobar('se puede quitar la sala', quitarSala.estado === 200, quitarSala.datos);
+  comprobar(
+    'y la foto SIGUE, porque el sospechoso la comparte',
+    hay(FOTO),
+    'se ha borrado una foto que todavía se usaba',
+  );
+
+  // Ahora al sospechoso se le cambia la foto por otra: la vieja queda sin dueño.
+  fs.writeFileSync(path.join(carpetaFotos, 'otra.png'), PNG_MINIMO);
+  const cambiar = await pedir('/api/games/aguante/suspects', {
+    metodo: 'POST',
+    cookie,
+    cuerpo: { id: 's0', name: 'Ana', photoUrl: '/uploads/otra.png' },
+  });
+  comprobar('se puede cambiar la foto', cambiar.estado === 200, cambiar.datos);
+  comprobar('la nueva está', hay('otra.png'));
+  comprobar('y la vieja, ya sin dueño, se ha retirado', !hay(FOTO));
+
   paso('El candado serializa y no deja basura detrás');
 
   // Esto no se ve por HTTP: es memoria del servidor. Va en un proceso aparte,

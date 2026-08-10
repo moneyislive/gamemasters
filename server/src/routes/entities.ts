@@ -15,6 +15,7 @@
 import type { Request, Response } from 'express';
 import { nanoid } from 'nanoid';
 import { getStore } from '../db/store';
+import { olvidarFotos } from '../uploads/limpieza';
 import { crearRouter } from '../rutas';
 
 const router = crearRouter();
@@ -114,11 +115,16 @@ async function upsertHandler(kind: EntityKind, req: Request, res: Response): Pro
 
     // Cast deliberado: BaseEntity es superconjunto de Suspect/Room/Weapon.
     const list = game[kind] as unknown as BaseEntity[];
+    const huerfanas: string[] = [];
     const bodyId = typeof body.id === 'string' ? body.id : undefined;
     const existing = bodyId ? list.find((e) => e.id === bodyId) : undefined;
 
     if (existing) {
+      // La foto anterior, si la cambian, deja de tener dueño. Se anota antes de
+      // pisarla: después ya no hay forma de saber cuál era.
+      const fotoVieja = existing.photoUrl;
       Object.assign(existing, patch, { id: existing.id });
+      if (fotoVieja && fotoVieja !== existing.photoUrl) huerfanas.push(fotoVieja);
     } else {
       if (!patch.name) {
         res.status(400).json({ error: `Falta el nombre para crear ${KIND_LABEL[kind]}.` });
@@ -127,7 +133,11 @@ async function upsertHandler(kind: EntityKind, req: Request, res: Response): Pro
       list.push({ ...patch, id: nanoid(10), name: patch.name });
     }
 
-    res.json(await store.saveGame(game));
+    const guardada = await store.saveGame(game);
+    // Después de guardar, nunca antes: si el guardado falla, la foto vieja
+    // sigue siendo la buena y borrarla habría dejado la partida sin ella.
+    await olvidarFotos(huerfanas);
+    res.json(guardada);
   } catch (err) {
     console.error(`[entidades] Error en upsert de ${kind}:`, err);
     res.status(500).json({ error: 'Error interno al guardar la entidad.' });
@@ -149,10 +159,13 @@ async function deleteHandler(
     }
 
     const list = game[kind] as unknown as BaseEntity[];
+    const fotoDeLaQueSeVa = list.find((e) => e.id === entityId)?.photoUrl;
     const remaining = list.filter((e) => e.id !== entityId);
     list.splice(0, list.length, ...remaining);
 
-    res.json(await store.saveGame(game));
+    const guardada = await store.saveGame(game);
+    await olvidarFotos([fotoDeLaQueSeVa]);
+    res.json(guardada);
   } catch (err) {
     console.error(`[entidades] Error al borrar en ${kind}:`, err);
     res.status(500).json({ error: 'Error interno al borrar la entidad.' });
