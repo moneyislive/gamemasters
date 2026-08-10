@@ -25,6 +25,7 @@ import materialRouter from './routes/material';
 import refreshRouter from './routes/refresh';
 import uploadsRouter from './routes/uploads';
 import duenoRouter from './taller/dueno';
+import { costurasDePruebaActivas } from './identidad/oidc';
 import { paginaDePrivacidad } from './legal/privacidad';
 import { secretoDeFirma } from './secreto';
 
@@ -175,6 +176,21 @@ app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
 function comprobarArranque(): void {
   // Falla aquí si falta el secreto de firma en producción.
   secretoDeFirma();
+
+  /*
+   * Las costuras de prueba de OIDC permiten apuntar la verificación de
+   * identidad a un emisor y a unas claves cualesquiera. Es justo lo que hace
+   * falta para probarlo sin cuentas de Google ni de Apple, y justo lo que
+   * jamás puede estar activo en producción: con ellas, cualquiera que pueda
+   * levantar un servidor de claves se fabrica la identidad de quien quiera.
+   */
+  if (process.env.NODE_ENV === 'production' && costurasDePruebaActivas()) {
+    throw new Error(
+      'Hay variables OIDC_ISS_* u OIDC_JWKS_* definidas y esto es producción. Sirven para PROBAR ' +
+        'la verificación de identidad contra claves propias: con ellas activas, cualquiera se ' +
+        'fabrica la identidad de quien quiera.\nQuítalas.',
+    );
+  }
 
   if (process.env.NODE_ENV === 'production' && !env.appPassword) {
     throw new Error(

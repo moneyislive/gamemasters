@@ -21,7 +21,8 @@
     "verify:aguante": "tsx scripts/verificar-aguante.ts",
     "verify:borrado": "tsx scripts/verificar-borrado.ts",
     "verify:cuentas": "tsx scripts/verificar-cuentas.ts",
-    "verify:duenas": "tsx scripts/verificar-duenas.ts"
+    "verify:duenas": "tsx scripts/verificar-duenas.ts",
+    "verify:tokens": "tsx scripts/verificar-tokens.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",
