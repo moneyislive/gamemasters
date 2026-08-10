@@ -89,7 +89,16 @@ export function BarraDeJuego({ state, descriptors, navigation }: BottomTabBarPro
   }: (typeof pestanas)[number]): JSX.Element => {
     const enfocada = state.routes[state.index]?.key === ruta.key;
     const Icono = ICONOS[decl.icono];
-    const tinta = enfocada ? color.oro300 : 'rgba(217,201,163,0.42)';
+    /*
+     * La pestaña inactiva estaba al 0,42 de opacidad, que sobre el fondo de la
+     * barra da un contraste de 2,9:1 — por debajo del 4,5:1 que se considera
+     * legible. A 0,68 se lee sin esfuerzo y la activa sigue destacando, que es
+     * de lo que iba la diferencia.
+     *
+     * Se toca el COLOR y nada más: ni el tamaño del rótulo ni la geometría, que
+     * están medidos para que «Tablón» quepa a 320 puntos.
+     */
+    const tinta = enfocada ? color.oro300 : 'rgba(217,201,163,0.68)';
 
     return (
       <Pressable
