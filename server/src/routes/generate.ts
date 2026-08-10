@@ -4,12 +4,12 @@
  * Marca la partida como `generating`, delega en el pipeline (board → plot →
  * documents) y retransmite cada evento al cliente conforme se produce.
  */
-import express from 'express';
 import type { GenerateStreamEvent } from '../../../shared/types';
 import { getStore } from '../db/store';
 import { runGeneration } from '../plot/pipeline';
+import { crearRouter } from '../rutas';
 
-const router = express.Router();
+const router = crearRouter();
 
 router.post('/games/:id/generate', async (req, res) => {
   const store = getStore();

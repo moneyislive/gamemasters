@@ -2,11 +2,11 @@
  * Ruta del tablero: recalcula el plano determinista de la mansión a partir
  * de las salas registradas en la partida.
  */
-import express from 'express';
 import { generateBoardLayout } from '../board/generator';
 import { getStore } from '../db/store';
+import { crearRouter } from '../rutas';
 
-const router = express.Router();
+const router = crearRouter();
 
 router.post('/games/:id/board', async (req, res) => {
   try {

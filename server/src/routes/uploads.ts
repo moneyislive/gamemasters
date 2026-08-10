@@ -10,12 +10,12 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { Router } from 'express';
 import multer from 'multer';
 import { nanoid } from 'nanoid';
 import { env } from '../config';
+import { crearRouter } from '../rutas';
 
-const router = Router();
+const router = crearRouter();
 
 // Configurable con UPLOADS_DIR: en producción apunta al disco persistente.
 const UPLOADS_DIR = env.uploadsDir;

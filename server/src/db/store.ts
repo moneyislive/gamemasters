@@ -483,9 +483,31 @@ export async function initStore(): Promise<void> {
       );
       return;
     } catch (err) {
+      const motivo = err instanceof Error ? err.message : String(err);
+      /*
+       * Se pidió Mongo y Mongo no está. Caer al fichero JSON local no es una
+       * degradación amable: es arrancar con la base de datos VACÍA. Quien
+       * dirige abre el taller, no ve ninguna de sus partidas, las da por
+       * perdidas y vuelve a crearlas; cuando Atlas responda otra vez habrá dos
+       * verdades y ninguna forma de reconciliarlas.
+       *
+       * En producción se prefiere no arrancar. En local se mantiene el apaño
+       * —es cómodo trabajar sin red— pero se dice a gritos, porque el fallo
+       * silencioso era justamente el problema.
+       */
+      if (process.env.NODE_ENV === 'production') {
+        throw new Error(
+          'MONGODB_URI está configurada pero no se pudo conectar. El servidor NO arranca: ' +
+            'hacerlo con el almacén de fichero mostraría la base de datos vacía y se acabaría ' +
+            'duplicando el trabajo.\n' +
+            `Motivo: ${motivo}`,
+        );
+      }
       console.warn(
-        '[almacén] No se pudo conectar a MongoDB; se usará el almacén de fichero JSON.\n' +
-          `          Motivo: ${err instanceof Error ? err.message : String(err)}`,
+        '\n[almacén] ⚠  ATENCIÓN: se pidió MongoDB y no responde.\n' +
+          '          Se arranca con el fichero JSON local, que está VACÍO o desfasado:\n' +
+          '          las partidas de Atlas NO se ven. No crees nada encima.\n' +
+          `          Motivo: ${motivo}\n`,
       );
     }
   }

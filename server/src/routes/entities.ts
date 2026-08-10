@@ -12,12 +12,12 @@
  * se crea una nueva con nanoid (name obligatorio). Todas las rutas devuelven
  * la GameSession completa ya guardada.
  */
-import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { nanoid } from 'nanoid';
 import { getStore } from '../db/store';
+import { crearRouter } from '../rutas';
 
-const router = Router();
+const router = crearRouter();
 
 type EntityKind = 'suspects' | 'rooms' | 'weapons';
 

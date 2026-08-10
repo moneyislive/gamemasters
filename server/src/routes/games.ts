@@ -6,15 +6,15 @@
  *   PATCH  /games/:id  → patch parcial {name?, boardMode?, boardImageUrl?, settings?}
  *   DELETE /games/:id  → {ok:true}
  */
-import { Router } from 'express';
 import { DOCUMENT_SECTIONS } from '../../../shared/types';
 import type { DocumentSectionId, GameSettings } from '../../../shared/types';
 import { isPrintableDocId } from '../../../shared/documents';
 import { isModelId } from '../config';
 import { getStore } from '../db/store';
 import { normalizeStylePrompt } from '../plot/style';
+import { crearRouter } from '../rutas';
 
-const router = Router();
+const router = crearRouter();
 
 const NOT_FOUND = { error: 'Partida no encontrada.' } as const;
 

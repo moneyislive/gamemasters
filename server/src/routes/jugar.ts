@@ -8,7 +8,6 @@
  * Ninguna ruta de este fichero devuelve nada que no haya pasado por
  * `vistaDeJugador`. Es la regla que sostiene el juego entero.
  */
-import express from 'express';
 import { getStore } from '../db/store';
 import { avisosDesde, esperarCambio } from '../live/hub';
 import { consultarConsejero } from '../live/consejero';
@@ -21,8 +20,9 @@ import '../juegos/cluedo-acciones';
 import { credencialDePeticion, credencialValidaPara, emitirCredencial } from '../live/token';
 import type { NextFunction, Request, Response } from 'express';
 import type { VistaJugador } from '../../../shared/live';
+import { crearRouter } from '../rutas';
 
-const router = express.Router();
+const router = crearRouter();
 
 /**
  * Guardián de la sesión: un testigo solo vale para la apertura en la que se
@@ -179,17 +179,18 @@ router.get('/jugar/vista', async (req, res) => {
 /**
  * Marca presencia sin disparar una revisión.
  *
- * Si `tocar` subiera la revisión, doce móviles renovando presencia se
- * despertarían unos a otros en bucle y la partida no pararía de refrescarse.
+ * Pasa por el candado como cualquier otra escritura. Antes leía, modificaba y
+ * guardaba por su cuenta, y eso abría una ventana real: doce móviles renuevan
+ * presencia cada pocos segundos, así que uno podía leer la sesión, tardar en
+ * volver, y guardar encima una acusación que se había registrado entretanto.
+ * La acusación desaparecía sin dejar rastro.
+ *
+ * Silenciosa porque la presencia NO es un cambio de partida: si subiera la
+ * revisión, doce teléfonos se despertarían unos a otros en bucle.
  */
 async function mutarPresencia(gameId: string, suspectId: string): Promise<void> {
   try {
-    const store = getStore();
-    const sesion = await store.getLive(gameId);
-    if (!sesion) return;
-    tocar(sesion, suspectId);
-    // Se guarda SIN tocar rev: la presencia no es un cambio de partida.
-    await store.saveLive(sesion);
+    await mutar(gameId, (sesion) => tocar(sesion, suspectId), { silenciosa: true });
   } catch {
     // La presencia es cosmética: nunca debe tumbar una petición.
   }

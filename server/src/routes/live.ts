@@ -5,7 +5,6 @@
  * Nada de lo que devuelve incluye la solución: con el Game Master a ciegas, su
  * propio panel no puede enseñarle lo que dirige.
  */
-import express from 'express';
 import { getStore } from '../db/store';
 import { anunciar, olvidar } from '../live/hub';
 import { cerrarPartidaEnCuentas } from '../live/cuentas';
@@ -23,8 +22,9 @@ import {
   revelarDesenlace,
 } from '../live/sesion';
 import type { Response } from 'express';
+import { crearRouter } from '../rutas';
 
-const router = express.Router();
+const router = crearRouter();
 
 async function responderVista(gameId: string, res: Response): Promise<void> {
   const store = getStore();
@@ -77,14 +77,18 @@ router.get('/games/:id/live', async (req, res) => {
 router.post('/games/:id/live/ronda/abrir', async (req, res) => {
   const minutos = Number(req.body?.minutos);
   try {
-    const { sesion } = await mutar(req.params.id, (s) =>
-      abrirRonda(s, Number.isFinite(minutos) && minutos > 0 ? minutos : MINUTOS_POR_RONDA),
-    );
-    anunciar(
+    await mutar(
       req.params.id,
-      sesion.rev,
-      'ronda-abierta',
-      `Ronda ${sesion.round} de ${sesion.totalRounds}. Elige sala.`,
+      (s) => abrirRonda(s, Number.isFinite(minutos) && minutos > 0 ? minutos : MINUTOS_POR_RONDA),
+      {
+        avisar: (s) =>
+          anunciar(
+            req.params.id,
+            s.rev,
+            'ronda-abierta',
+            `Ronda ${s.round} de ${s.totalRounds}. Elige sala.`,
+          ),
+      },
     );
     await responderVista(req.params.id, res);
   } catch (error) {
@@ -94,13 +98,15 @@ router.post('/games/:id/live/ronda/abrir', async (req, res) => {
 
 router.post('/games/:id/live/ronda/cerrar', async (req, res) => {
   try {
-    const { sesion } = await mutar(req.params.id, (s) => cerrarRonda(s));
-    anunciar(
-      req.params.id,
-      sesion.rev,
-      'ronda-cerrada',
-      'Ronda cerrada. Lo encontrado pasa al tablón común.',
-    );
+    await mutar(req.params.id, (s) => cerrarRonda(s), {
+      avisar: (s) =>
+        anunciar(
+          req.params.id,
+          s.rev,
+          'ronda-cerrada',
+          'Ronda cerrada. Lo encontrado pasa al tablón común.',
+        ),
+    });
     await responderVista(req.params.id, res);
   } catch (error) {
     fallo(error, res);
@@ -118,17 +124,23 @@ router.post('/games/:id/live/giro', async (req, res) => {
       res.status(404).json({ error: 'Ese giro no existe en esta partida.' });
       return;
     }
-    const { sesion } = await mutar(req.params.id, (s) => {
-      const jugador = s.players.find((p) => p.suspectId === giro.suspectId);
-      if (!jugador) throw new Error('Ese jugador ya no participa.');
-      if (!jugador.girosRecibidos.includes(twistId)) jugador.girosRecibidos.push(twistId);
-    });
-    anunciar(
+    await mutar(
       req.params.id,
-      sesion.rev,
-      'giro',
-      'Ha llegado algo para ti. Ábrelo sin que nadie te vea.',
-      giro.suspectId,
+      (s) => {
+        const jugador = s.players.find((p) => p.suspectId === giro.suspectId);
+        if (!jugador) throw new Error('Ese jugador ya no participa.');
+        if (!jugador.girosRecibidos.includes(twistId)) jugador.girosRecibidos.push(twistId);
+      },
+      {
+        avisar: (s) =>
+          anunciar(
+            req.params.id,
+            s.rev,
+            'giro',
+            'Ha llegado algo para ti. Ábrelo sin que nadie te vea.',
+            giro.suspectId,
+          ),
+      },
     );
     await responderVista(req.params.id, res);
   } catch (error) {
@@ -136,7 +148,15 @@ router.post('/games/:id/live/giro', async (req, res) => {
   }
 });
 
-/** Lanza una ayuda a toda la mesa. */
+/**
+ * Lanza una ayuda a toda la mesa.
+ *
+ * Pasa por `mutar` aunque no cambie nada de la sesión, y no es un capricho: un
+ * aviso solo se entrega si su revisión es MAYOR que la que trae el móvil
+ * (`avisosDesde`). Anunciando con la revisión actual —que es justo la que el
+ * teléfono ya tiene— la pista despertaba a los doce móviles y luego no le
+ * llegaba a ninguno. Subir la revisión es lo que la hace visible.
+ */
 router.post('/games/:id/live/ayuda', async (req, res) => {
   const nivel = Number(req.body?.nivel);
   const store = getStore();
@@ -146,12 +166,14 @@ router.post('/games/:id/live/ayuda', async (req, res) => {
     res.status(404).json({ error: 'No hay ninguna ayuda de ese nivel.' });
     return;
   }
-  const sesion = await store.getLive(req.params.id);
-  if (!sesion) {
-    res.status(404).json({ error: 'Esta partida no está en juego.' });
+  try {
+    await mutar(req.params.id, () => undefined, {
+      avisar: (s) => anunciar(req.params.id, s.rev, 'ayuda', ayuda.text),
+    });
+  } catch (error) {
+    fallo(error, res);
     return;
   }
-  anunciar(req.params.id, sesion.rev, 'ayuda', ayuda.text);
   await responderVista(req.params.id, res);
 });
 
@@ -187,13 +209,15 @@ router.post('/games/:id/live/encuentro/abrir', async (req, res) => {
 
 router.post('/games/:id/live/acusaciones', async (req, res) => {
   try {
-    const { sesion } = await mutar(req.params.id, (s) => abrirAcusaciones(s));
-    anunciar(
-      req.params.id,
-      sesion.rev,
-      'acusaciones',
-      'Momento de acusar. Una sola combinación, y no se puede cambiar.',
-    );
+    await mutar(req.params.id, (s) => abrirAcusaciones(s), {
+      avisar: (s) =>
+        anunciar(
+          req.params.id,
+          s.rev,
+          'acusaciones',
+          'Momento de acusar. Una sola combinación, y no se puede cambiar.',
+        ),
+    });
     await responderVista(req.params.id, res);
   } catch (error) {
     fallo(error, res);
@@ -202,8 +226,20 @@ router.post('/games/:id/live/acusaciones', async (req, res) => {
 
 router.post('/games/:id/live/desenlace', async (req, res) => {
   try {
-    const { sesion } = await mutar(req.params.id, (s) => revelarDesenlace(s));
-    anunciar(req.params.id, sesion.rev, 'desenlace', 'Se abre el sobre del crimen.');
+    await mutar(req.params.id, (s) => revelarDesenlace(s), {
+      avisar: (s) => {
+        anunciar(req.params.id, s.rev, 'desenlace', 'Se abre el sobre del crimen.');
+        if (s.winnerId) {
+          const ganador = s.players.find((p) => p.suspectId === s.winnerId);
+          anunciar(
+            req.params.id,
+            s.rev,
+            'ganador',
+            `${ganador?.displayName ?? 'Alguien'} lo resolvió primero.`,
+          );
+        }
+      },
+    });
 
     // El historial y los trofeos se apuntan al cerrar, no antes: hasta aquí la
     // partida podía quedarse a medias.
@@ -215,15 +251,6 @@ router.post('/games/:id/live/desenlace', async (req, res) => {
         await cerrarPartidaEnCuentas(game, actual);
         await store.saveLive(actual);
       }
-    }
-    if (sesion.winnerId) {
-      const ganador = sesion.players.find((p) => p.suspectId === sesion.winnerId);
-      anunciar(
-        req.params.id,
-        sesion.rev,
-        'ganador',
-        `${ganador?.displayName ?? 'Alguien'} lo resolvió primero.`,
-      );
     }
     await responderVista(req.params.id, res);
   } catch (error) {

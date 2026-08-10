@@ -13,9 +13,9 @@
  * respuesta.
  */
 import type { NextFunction, Request, Response } from 'express';
-import { Router } from 'express';
 import { env } from './config';
 import { firmarConSecreto, igualSeguro } from './secreto';
+import { crearRouter } from './rutas';
 
 const COOKIE = 'gm_sesion';
 /** 30 días: es una herramienta para organizar veladas, no un banco. */
@@ -76,7 +76,7 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
   res.status(401).json({ error: 'Acceso restringido: introduce la contraseña de la casa.' });
 }
 
-const router = Router();
+const router = crearRouter();
 
 /** Estado de la sesión: lo consulta el cliente al arrancar. */
 router.get('/auth/status', (req, res) => {

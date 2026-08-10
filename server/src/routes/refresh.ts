@@ -5,12 +5,12 @@
  * board | plot | documents—, pero aquí solo se regenera lo que la partida ha
  * dejado obsoleto al cambiar jugadores, salas u objetos.
  */
-import express from 'express';
 import type { GenerateStreamEvent } from '../../../shared/types';
 import { getStore } from '../db/store';
 import { runRefresh } from '../plot/refresh';
+import { crearRouter } from '../rutas';
 
-const router = express.Router();
+const router = crearRouter();
 
 router.post('/games/:id/refresh', async (req, res) => {
   const store = getStore();

@@ -17,7 +17,8 @@
     "verify:segundo-juego": "tsx scripts/verificar-segundo-juego.ts",
     "verify:sin-ejes": "tsx scripts/verificar-juego-sin-ejes.ts",
     "verify:campana": "tsx scripts/verificar-campana.ts",
-    "verify:credenciales": "tsx scripts/verificar-credenciales.ts"
+    "verify:credenciales": "tsx scripts/verificar-credenciales.ts",
+    "verify:aguante": "tsx scripts/verificar-aguante.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",

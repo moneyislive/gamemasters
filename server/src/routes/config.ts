@@ -3,12 +3,12 @@
  *   GET /config → AppConfig (modelo activo, catálogo, hasApiKey, storage)
  *   PUT /config → cambia el modelo activo y devuelve la AppConfig resultante
  */
-import { Router } from 'express';
 import type { AppConfig } from '../../../shared/types';
 import { DEMO_MODE, MODEL_OPTIONS, isModelId } from '../config';
 import { getStorageKind, getStore } from '../db/store';
+import { crearRouter } from '../rutas';
 
-const router = Router();
+const router = crearRouter();
 
 async function buildConfig(): Promise<AppConfig> {
   return {

@@ -6,12 +6,12 @@
  * vía para que una partida escrita antes de que este material existiera lo
  * reciba sin regenerar el misterio.
  */
-import express from 'express';
 import type { GenerateStreamEvent } from '../../../shared/types';
 import { getStore } from '../db/store';
 import { generarMaterialImpreso } from '../plot/material';
+import { crearRouter } from '../rutas';
 
-const router = express.Router();
+const router = crearRouter();
 
 router.post('/games/:id/material', async (req, res) => {
   const store = getStore();

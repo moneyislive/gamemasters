@@ -8,7 +8,6 @@
  *   guion demo si no hay clave de API.
  */
 
-import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { nanoid } from 'nanoid';
 import type Anthropic from '@anthropic-ai/sdk';
@@ -24,8 +23,9 @@ import { getAnthropicClient, resolveModel, usesFallbacks } from '../agent/anthro
 import { buildSystemPrompt } from '../agent/systemPrompt';
 import { agentTools, executeTool } from '../agent/tools';
 import { runDemoChat } from '../agent/demo';
+import { crearRouter } from '../rutas';
 
-const router = Router();
+const router = crearRouter();
 
 /** Máximo de mensajes del historial que se envían al modelo. */
 const MAX_HISTORIAL = 30;

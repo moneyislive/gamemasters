@@ -23,22 +23,32 @@ import type { GameSession } from '../../../shared/types';
 const candados = new Map<string, Promise<unknown>>();
 
 /**
+ * Cuántos candados quedan vivos. Solo para comprobaciones.
+ *
+ * Existe porque la fuga que hubo aquí era invisible desde fuera: el mapa crecía
+ * una entrada por partida jugada y nada en la API lo delataba. Sin una forma de
+ * mirar dentro, la prueba que lo impide no se puede escribir.
+ */
+export function candadosVivos(): number {
+  return candados.size;
+}
+
+/**
  * Ejecuta una mutación sobre la sesión en vivo con exclusión mutua.
  * El resultado se persiste antes de soltar el turno.
  */
 export async function mutar<T>(
   gameId: string,
   cambio: (sesion: LiveSession) => T | Promise<T>,
+  opciones: { silenciosa?: boolean; avisar?: (sesion: LiveSession) => void } = {},
 ): Promise<{ sesion: LiveSession; resultado: T }> {
   const anterior = candados.get(gameId) ?? Promise.resolve();
   let liberar!: () => void;
   const turno = new Promise<void>((r) => {
     liberar = r;
   });
-  candados.set(
-    gameId,
-    anterior.then(() => turno),
-  );
+  const miVez = anterior.then(() => turno);
+  candados.set(gameId, miVez);
   await anterior;
 
   try {
@@ -46,16 +56,38 @@ export async function mutar<T>(
     const sesion = await store.getLive(gameId);
     if (!sesion) throw new Error('Esta partida no está en juego.');
     const resultado = await cambio(sesion);
-    // La revisión sube en CADA mutación: es lo que despierta a los móviles que
-    // están esperando cambios.
-    sesion.rev = (sesion.rev ?? 0) + 1;
+
+    // Una mutación SILENCIOSA no sube la revisión ni despierta a nadie. Es para
+    // la presencia: si marcar «sigo aquí» contara como cambio de partida, doce
+    // móviles se despertarían unos a otros en bucle y la velada no pararía de
+    // refrescarse. Pero pasa por el candado igual que todo lo demás, porque el
+    // problema no era la revisión: era leer, modificar y escribir por libre,
+    // que puede pisar una acusación guardada un instante antes.
+    if (!opciones.silenciosa) {
+      sesion.rev = (sesion.rev ?? 0) + 1;
+    }
     const guardada = await store.saveLive(sesion);
-    avisarCambio(gameId);
+
+    /*
+     * El aviso se registra AQUÍ, antes de despertar a nadie, y no en quien
+     * llama tras el `await`. Parece lo mismo y no lo es: al despertar, el móvil
+     * que esperaba reanuda ANTES de que vuelva quien llamó a `mutar`, así que
+     * podía preguntar por los avisos un instante antes de que el aviso
+     * existiera. Se llevaba la revisión nueva sin la pista, y como pedirá los
+     * siguientes «desde» esa revisión, la pista no le llegaría nunca. Un fallo
+     * que aparece una vez de cada muchas y siempre delante de invitados.
+     */
+    opciones.avisar?.(guardada);
+
+    if (!opciones.silenciosa) avisarCambio(gameId);
     return { sesion: guardada, resultado };
   } finally {
     liberar();
     // Si nadie más espera, se retira el candado para no acumular memoria.
-    if (candados.get(gameId) === turno) candados.delete(gameId);
+    // Se compara contra la promesa que SE GUARDÓ, no contra `turno`: guardando
+    // una y comparando la otra, la condición era siempre falsa y el candado no
+    // se borraba jamás — una fuga silenciosa, una entrada por partida jugada.
+    if (candados.get(gameId) === miVez) candados.delete(gameId);
   }
 }
 

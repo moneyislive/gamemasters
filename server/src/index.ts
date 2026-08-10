@@ -28,6 +28,15 @@ import { secretoDeFirma } from './secreto';
 
 const app = express();
 
+/*
+ * Detrás de un proxy (Render, Fly, un Nginx doméstico) la conexión con el
+ * navegador es HTTPS pero el último salto hasta aquí es HTTP en claro. Sin
+ * esto, `req.secure` es falso, la cookie de sesión sale sin `secure`, y viaja
+ * expuesta a cualquiera que comparta la wifi. El 1 es «me fío de UN proxy
+ * delante», no de la cabecera que traiga cualquiera.
+ */
+app.set('trust proxy', 1);
+
 app.use(cors());
 app.use(express.json({ limit: '25mb' }));
 
@@ -51,6 +60,14 @@ app.use(
       }
     },
   }),
+  // Una foto que no está es un 404, y se acaba aquí. Sin esto la petición
+  // seguía hasta el comodín del cliente y devolvía index.html con un 200: el
+  // navegador se encontraba una página HTML donde esperaba un JPEG, la imagen
+  // salía rota sin decir por qué, y en el registro no quedaba ni rastro del
+  // fallo.
+  (_req, res) => {
+    res.status(404).end();
+  },
 );
 
 // La app del jugador va ANTES del guardián: quien juega no conoce la contraseña
@@ -126,6 +143,30 @@ function comprobarArranque(): void {
     );
   }
 }
+
+/**
+ * Red de última instancia.
+ *
+ * Los routers ya encaminan hacia el middleware de error todo lo que escape de
+ * un manejador (ver `rutas.ts`). Esto cubre lo que NO nace de una petición: un
+ * temporizador, una promesa suelta en el hub de avisos, una llamada a la API de
+ * Anthropic que rechaza después de haber respondido. Node 20 mata el proceso
+ * ante un rechazo sin gestionar, y aquí eso significa dejar a doce personas con
+ * el móvil colgado en mitad de la cena.
+ *
+ * Se registra el fallo y se sigue en pie. Es deliberado: un servidor de juego
+ * degradado sirve para terminar la partida; uno muerto, no. Las excepciones no
+ * capturadas sí se dejan pasar —ahí el proceso ya está en un estado del que no
+ * se puede razonar— pero se anotan antes de caer, que es lo que faltaba para
+ * poder averiguar qué pasó.
+ */
+process.on('unhandledRejection', (razon) => {
+  console.error('[servidor] Promesa rechazada sin gestionar:', razon);
+});
+process.on('uncaughtException', (error) => {
+  console.error('[servidor] Excepción no capturada — el proceso termina:', error);
+  process.exit(1);
+});
 
 comprobarArranque();
 

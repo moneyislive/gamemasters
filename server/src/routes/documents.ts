@@ -10,7 +10,6 @@
  * Si no hay ninguno se responde 503 con un mensaje que la interfaz convierte en
  * «imprime desde tu navegador», que siempre funciona.
  */
-import express from 'express';
 import { getStore } from '../db/store';
 import { renderPlayerDocument } from '../docs/renderer';
 import { renderPrintableDocument } from '../docs/imprimibles';
@@ -19,8 +18,9 @@ import { armarPaquete } from '../docs/paquete';
 import { EscritorZip } from '../docs/zip';
 import { isPrintableDocId } from '../../../shared/documents';
 import type { DocumentCapabilities, DocumentVariant } from '../../../shared/types';
+import { crearRouter } from '../rutas';
 
-const router = express.Router();
+const router = crearRouter();
 
 /** Nombre de fichero seguro para la descarga. */
 function nombreDeFichero(
