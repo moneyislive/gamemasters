@@ -26,16 +26,17 @@
  * minijuegos todavía, la sala está «cableándose» y se ve así; no se rellena con
  * cajas muertas. La confianza en el escaparate es el escaparate.
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Linking, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect } from 'expo-router';
 import Animated, {
   Easing,
   FadeIn,
-  FadeInDown,
   FadeInUp,
   interpolate,
+  runOnJS,
+  useAnimatedReaction,
   useAnimatedScrollHandler,
   useAnimatedStyle,
   useSharedValue,
@@ -45,9 +46,11 @@ import Animated, {
 import Svg, { Circle, Path } from 'react-native-svg';
 import * as api from '../src/api';
 import { usePartida } from '../src/estado';
-import { EscenaVestibulo } from '../src/escena';
-import { CarruselDeMundos } from '../src/carrusel3d';
-import { Latido, Polvo, Pulsable, useMenosMovimiento } from '../src/vivo';
+import { CarruselDeMundos, PASO } from '../src/carrusel3d';
+import { EscenaAvatar, type ProgresoCompartido } from '../src/escena-avatar';
+import { FondoDeSalas } from '../src/fondos-sala';
+import { AVATAR_POR_DEFECTO, cargarAvatar, type Avatar } from '../src/avatar';
+import { Latido, Pulsable, useMenosMovimiento } from '../src/vivo';
 import { veladas } from '../src/vitrina';
 import { TROFEOS } from '../../shared/live';
 import { color, espacio, fuente, radio } from '../src/tema';
@@ -108,6 +111,28 @@ export default function Portada(): JSX.Element {
     scrollY.value = e.contentOffset.y;
   });
 
+  // El hilo que ata el carrusel de abajo al mundo 3D de arriba. El 3D no
+  // quiere estado de React —re-render por fotograma sería la muerte— sino un
+  // objeto mutable que su bucle lee cuando pinta.
+  const scrollCarrusel = useSharedValue(0);
+  const progresoRef = useRef<ProgresoCompartido>({ valor: 0 });
+  const [indiceActivo, setIndiceActivo] = useState(0);
+  const alCambiarProgreso = useCallback((p: number) => {
+    progresoRef.current.valor = p;
+    const redondo = Math.round(Math.max(p, 0));
+    setIndiceActivo((previo) => (previo === redondo ? previo : redondo));
+  }, []);
+  useAnimatedReaction(
+    () => scrollCarrusel.value / PASO,
+    (p) => {
+      runOnJS(alCambiarProgreso)(p);
+    },
+  );
+
+  const [avatar, setAvatar] = useState<Avatar>(AVATAR_POR_DEFECTO);
+  /** sala → ilustración generada, si el servidor la tiene. */
+  const [fondos, setFondos] = useState<Record<string, string>>({});
+
   const cargarPortada = useCallback(() => {
     if (!api.hayCuenta()) {
       setPortada(null);
@@ -119,24 +144,31 @@ export default function Portada(): JSX.Element {
       .catch(() => setPortada(null));
   }, []);
 
+  const cargarFigura = useCallback(() => {
+    void cargarAvatar().then(setAvatar);
+    // Los fondos generados: si el servidor no tiene, los telones aguantan.
+    void api
+      .pedirFondos()
+      .then((r) => setFondos(r.fondos))
+      .catch(() => undefined);
+  }, []);
+
   useEffect(cargarPortada, [cargarPortada]);
+  useEffect(cargarFigura, [cargarFigura]);
+  // Al volver del editor, el avatar puede haber cambiado.
   useFocusEffect(cargarPortada);
+  useFocusEffect(cargarFigura);
 
   const invitaciones = portada?.invitaciones ?? [];
   const jugadas = portada?.cuenta.partidas ?? [];
   const trofeos = portada?.cuenta.trofeos ?? [];
   const rango = rangoDe(jugadas.length);
 
-  const altoHero = Math.min(Math.max(height * 0.6, 420), 560);
+  const catalogo = veladas();
+  // Las salas del mundo 3D: una por juego, y la forja como cierre.
+  const salas = [...catalogo.map((v) => v.id), 'forja'];
 
-  // El título se hunde en la escena al hacer scroll: pertenece a la noche, no
-  // a la barra de estado.
-  const capaTitulo = useAnimatedStyle(() => ({
-    opacity: interpolate(scrollY.value, [0, altoHero * 0.55], [1, 0], 'clamp'),
-    transform: [
-      { translateY: interpolate(scrollY.value, [0, altoHero], [0, altoHero * 0.28], 'clamp') },
-    ],
-  }));
+  const altoHero = Math.min(Math.max(height * 0.56, 400), 540);
 
   const abrirTaller = (): void => void Linking.openURL(api.urlDelTaller());
 
@@ -148,40 +180,97 @@ export default function Portada(): JSX.Element {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: espacio.xxl * 2 }}
       >
-        {/* ================= LA NOCHE ================= */}
+        {/* ================= LA SALA ================= */}
+        {/*
+          Arriba no hay una cabecera: hay una habitación en la que TU avatar
+          está de pie. Al arrastrar el carrusel de abajo, las salas se deslizan
+          a su alrededor mientras él se queda en el centro — la transición está
+          atada al dedo, no disparada después.
+        */}
         <View style={{ height: altoHero }}>
-          <EscenaVestibulo ancho={width} alto={altoHero} scrollY={scrollY} />
-          <Polvo ancho={width} alto={altoHero} cantidad={14} tono="#ffd98a" />
-
-          <Animated.View style={[estilos.heroContenido, capaTitulo]}>
-            <Animated.View entering={FadeInDown.duration(1100)} style={{ alignItems: 'center' }}>
-              <View style={estilos.sello}>
-                <Text style={estilos.selloTexto}>JUEGOS REALES</Text>
-              </View>
-              <Text style={estilos.marca}>GameMasters</Text>
-              <Text style={estilos.lemaHero}>Cruza la puerta. La casa ya está jugando.</Text>
-            </Animated.View>
-
-            <Animated.View entering={FadeInUp.delay(500).duration(800)} style={estilos.filaPuertas}>
-              <Pulsable onPress={() => router.push('/entrar')}>
+          <FondoDeSalas
+            salas={salas}
+            fondos={fondos}
+            scrollX={scrollCarrusel}
+            ancho={width}
+            alto={altoHero}
+          />
+          {avatar.modeloUrl ? (
+            <EscenaAvatar
+              ancho={width}
+              alto={altoHero}
+              modeloUrl={avatar.modeloUrl}
+              progreso={progresoRef.current}
+            />
+          ) : (
+            /*
+              Sin modelo todavía no se enseña ningún muñeco de relleno: se
+              enseña la INVITACIÓN. El hueco vacío bajo el foco es el reclamo.
+            */
+            <View style={[estilos.ctaAvatar, { top: altoHero * 0.42 }]} pointerEvents="box-none">
+              <Pulsable onPress={() => router.push('/avatar')}>
                 <LinearGradient
                   colors={['#e0b83a', '#b8901e']}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
-                  style={estilos.puertaOro}
+                  style={estilos.ctaAvatarBoton}
                 >
-                  <Text style={estilos.puertaOroTexto}>TENGO UN CÓDIGO</Text>
+                  <Text style={estilos.ctaAvatarTexto}>FORJA TU AVATAR</Text>
                 </LinearGradient>
               </Pulsable>
-              <Pulsable onPress={abrirTaller}>
-                <View style={estilos.puertaHumo}>
-                  <Text style={estilos.puertaHumoTexto}>CREAR VELADA</Text>
-                </View>
-              </Pulsable>
-            </Animated.View>
+              <Text style={estilos.ctaAvatarPie}>
+                Sube una foto y el estudio la esculpe en 3D
+              </Text>
+            </View>
+          )}
 
+          {/* La botonera fantasma: casi transparente, siempre a mano. */}
+          <View style={estilos.botonera} pointerEvents="box-none">
+            <Text style={estilos.marcaMini}>GAMEMASTERS</Text>
+            <View style={{ flexDirection: 'row', gap: espacio.sm }}>
+              <BotonFantasma
+                etiqueta="Código"
+                accesible="Tengo un código: entrar en una velada"
+                onPress={() => router.push('/entrar')}
+              >
+                <IconoLlave />
+              </BotonFantasma>
+              <BotonFantasma
+                etiqueta="Crear"
+                accesible="Crear una velada en el taller"
+                onPress={abrirTaller}
+              >
+                <IconoPluma />
+              </BotonFantasma>
+            </View>
+          </View>
+
+          {/* El rótulo de la sala en la que estás: cambia con el carrusel. */}
+          <View style={estilos.rotuloSala} pointerEvents="none">
+            <Animated.View key={indiceActivo} entering={FadeIn.duration(420)}>
+              <Text style={estilos.rotuloSalaEyebrow}>ESTÁS EN</Text>
+              <Text style={estilos.rotuloSalaTexto}>
+                {indiceActivo < catalogo.length
+                  ? (catalogo[indiceActivo]?.nombre ?? '')
+                  : 'La forja'}
+              </Text>
+            </Animated.View>
+          </View>
+
+          {/* Cambiar el avatar: el lápiz junto a la figura. */}
+          <Pressable
+            onPress={() => router.push('/avatar')}
+            hitSlop={10}
+            accessibilityRole="button"
+            accessibilityLabel="Cambiar tu avatar"
+            style={[estilos.editarAvatar, { top: altoHero * 0.36, left: width / 2 + 66 }]}
+          >
+            <Text style={{ fontSize: 14, color: color.oro300 }}>✎</Text>
+          </Pressable>
+
+          <View style={estilos.pistaAbajo} pointerEvents="none">
             <PistaDeScroll />
-          </Animated.View>
+          </View>
         </View>
 
         {/* ================= 1 · EN MARCHA ================= */}
@@ -236,7 +325,12 @@ export default function Portada(): JSX.Element {
             nota="Veladas que se juegan en la vida real, alrededor de una mesa. Desliza."
           />
         </View>
-        <CarruselDeMundos veladas={veladas()} anchoPantalla={width} onMontar={abrirTaller} />
+        <CarruselDeMundos
+          veladas={catalogo}
+          anchoPantalla={width}
+          onMontar={abrirTaller}
+          scrollX={scrollCarrusel}
+        />
 
         {/* ================= 4 · LA SALA DE ARCADE ================= */}
         <View style={estilos.seccion}>
@@ -380,6 +474,46 @@ function Titular({
       </View>
       {nota ? <Text style={estilos.notaTitular}>{nota}</Text> : null}
     </View>
+  );
+}
+
+/** Un botón que casi no está: cristal oscuro, filo dorado, icono. */
+function BotonFantasma({
+  children,
+  etiqueta,
+  accesible,
+  onPress,
+}: {
+  children: React.ReactNode;
+  etiqueta: string;
+  accesible: string;
+  onPress: () => void;
+}): JSX.Element {
+  return (
+    <View style={{ alignItems: 'center' }}>
+      <Pulsable onPress={onPress} accessibilityLabel={accesible}>
+        <View style={estilos.fantasma}>{children}</View>
+      </Pulsable>
+      <Text style={estilos.fantasmaEtiqueta}>{etiqueta.toUpperCase()}</Text>
+    </View>
+  );
+}
+
+function IconoLlave(): JSX.Element {
+  return (
+    <Svg width={20} height={20} viewBox="0 0 20 20">
+      <Circle cx={7} cy={7} r={4} stroke="#e8cf7f" strokeWidth={1.8} fill="none" />
+      <Path d="M10 10 L16 16 M13.5 13.5 L16 11.5 M15 15 L17 13.5" stroke="#e8cf7f" strokeWidth={1.8} strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+function IconoPluma(): JSX.Element {
+  return (
+    <Svg width={20} height={20} viewBox="0 0 20 20">
+      <Path d="M4 16 C6 10 11 5 16 3 C15 8 11 13 6 15 Z" stroke="#e8cf7f" strokeWidth={1.6} fill="none" strokeLinejoin="round" />
+      <Path d="M4 16 L9 11" stroke="#e8cf7f" strokeWidth={1.4} strokeLinecap="round" />
+    </Svg>
   );
 }
 
@@ -552,6 +686,90 @@ function LaurelDeRango(): JSX.Element {
 
 const estilos = StyleSheet.create({
   raiz: { flex: 1, backgroundColor: '#050d09' },
+
+  botonera: {
+    position: 'absolute',
+    top: 14,
+    left: espacio.lg,
+    right: espacio.lg,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  marcaMini: {
+    fontFamily: fuente.titulo,
+    fontSize: 12,
+    letterSpacing: 2.6,
+    color: 'rgba(232,207,127,0.75)',
+    paddingTop: 10,
+  },
+  fantasma: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    borderWidth: 1,
+    borderColor: 'rgba(232,207,127,0.35)',
+    backgroundColor: 'rgba(5,13,9,0.35)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  fantasmaEtiqueta: {
+    fontFamily: fuente.titulo,
+    fontSize: 9,
+    letterSpacing: 1.2,
+    color: 'rgba(232,207,127,0.7)',
+    textAlign: 'center',
+    marginTop: 3,
+  },
+  rotuloSala: { position: 'absolute', left: espacio.lg, bottom: espacio.lg + 14 },
+  rotuloSalaEyebrow: {
+    fontFamily: fuente.titulo,
+    fontSize: 9.5,
+    letterSpacing: 2.4,
+    color: 'rgba(217,201,163,0.55)',
+  },
+  rotuloSalaTexto: {
+    fontFamily: fuente.display,
+    fontSize: 24,
+    color: color.pergamino,
+    textShadowColor: 'rgba(0,0,0,0.6)',
+    textShadowRadius: 8,
+    textShadowOffset: { width: 0, height: 2 },
+  },
+  editarAvatar: {
+    position: 'absolute',
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    borderWidth: 1,
+    borderColor: 'rgba(232,207,127,0.4)',
+    backgroundColor: 'rgba(5,13,9,0.55)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pistaAbajo: { position: 'absolute', bottom: 4, left: 0, right: 0, alignItems: 'center' },
+  ctaAvatar: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
+  ctaAvatarBoton: {
+    borderRadius: radio.md,
+    paddingHorizontal: espacio.xl,
+    paddingVertical: 14,
+  },
+  ctaAvatarTexto: {
+    fontFamily: fuente.titulo,
+    fontSize: 13.5,
+    letterSpacing: 1.8,
+    color: color.caoba900,
+  },
+  ctaAvatarPie: {
+    fontFamily: fuente.cuerpo,
+    fontSize: 14.5,
+    color: color.pergaminoTenue,
+    opacity: 0.8,
+    marginTop: espacio.sm,
+    textShadowColor: 'rgba(0,0,0,0.7)',
+    textShadowRadius: 6,
+    textShadowOffset: { width: 0, height: 1 },
+  },
 
   heroContenido: { flex: 1, justifyContent: 'flex-end', paddingBottom: espacio.xl },
   sello: {

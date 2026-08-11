@@ -20,6 +20,7 @@ import entitiesRouter from './routes/entities';
 import gamesRouter from './routes/games';
 import generateRouter from './routes/generate';
 import cuentaRouter from './routes/cuenta';
+import generacionRouter from './routes/generacion';
 import jugarRouter from './routes/jugar';
 import liveRouter from './routes/live';
 import materialRouter from './routes/material';
@@ -112,6 +113,8 @@ app.get('/api/salud', (_req, res) => {
 app.use('/api', jugarRouter);
 // La cuenta va con ellos: quien juega no conoce la contraseña de la casa.
 app.use('/api', cuentaRouter);
+// El estudio de generación: su puerta la pone él (cualquier identidad + tope).
+app.use('/api', generacionRouter);
 
 // Acceso: el router de autenticación va primero y el guardián protege el resto.
 app.use('/api', authRouter);

@@ -35,7 +35,8 @@ import type { Velada } from './vitrina';
 export const ANCHO_MUNDO = 252;
 export const ALTO_MUNDO = 340;
 const HUECO = espacio.md;
-const PASO = ANCHO_MUNDO + HUECO;
+/** Exportado: el escenario de arriba deriva su transición de este paso. */
+export const PASO = ANCHO_MUNDO + HUECO;
 
 // ---------------------------------------------------------------------------
 // El destello de lámina de oro
@@ -276,12 +277,19 @@ export function CarruselDeMundos({
   veladas,
   anchoPantalla,
   onMontar,
+  scrollX: compartido,
 }: {
   veladas: Velada[];
   anchoPantalla: number;
   onMontar: () => void;
+  /**
+   * Si la portada lo pasa, el carrusel escribe aquí su posición y el escenario
+   * de arriba la lee: es el hilo que ata las salas al dedo.
+   */
+  scrollX?: SharedValue<number>;
 }): JSX.Element {
-  const scrollX = useSharedValue(0);
+  const propio = useSharedValue(0);
+  const scrollX = compartido ?? propio;
   const alScroll = useAnimatedScrollHandler((e) => {
     scrollX.value = e.contentOffset.x;
   });

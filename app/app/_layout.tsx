@@ -81,6 +81,10 @@ export default function Raiz(): JSX.Element | null {
           >
             <Stack.Screen name="index" />
             <Stack.Screen name="entrar" />
+            <Stack.Screen
+              name="avatar"
+              options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+            />
             <Stack.Screen name="(juego)" />
             <Stack.Screen
               name="acusar"

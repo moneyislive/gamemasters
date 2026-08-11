@@ -436,3 +436,53 @@ export interface Portada {
 export function pedirPortada(): Promise<Portada> {
   return peticion('/cuenta/portada');
 }
+
+// ---------------------------------------------------------------------------
+// El estudio de generación: avatares 3D y fondos
+// ---------------------------------------------------------------------------
+
+export interface EstadoDeGeneracion {
+  estado: 'en-cola' | 'esculpiendo' | 'listo' | 'fallo';
+  progreso: number;
+  modeloUrl?: string;
+  vistaPrevia?: string;
+  detalle?: string;
+}
+
+export function generacionDisponible(): Promise<{ avatares: boolean; fondos: boolean }> {
+  return peticion('/generacion/disponible');
+}
+
+/** Manda la imagen (base64) y devuelve el identificador de la tarea. */
+export function generarAvatar3D(imagenB64: string, tipo: string): Promise<{ tarea: string }> {
+  return peticion(
+    '/generacion/avatar',
+    { method: 'POST', body: JSON.stringify({ imagen: imagenB64, tipo }) },
+    undefined,
+    // Subir una foto grande por wifi doméstica tarda: plazo holgado.
+    60000,
+  );
+}
+
+export function estadoAvatar3D(tarea: string): Promise<EstadoDeGeneracion> {
+  return peticion(`/generacion/avatar/${encodeURIComponent(tarea)}`, {}, undefined, 30000);
+}
+
+export function pedirFondos(): Promise<{ disponible: boolean; fondos: Record<string, string> }> {
+  return peticion('/generacion/fondos');
+}
+
+export function generarFondo(sala: string): Promise<{ sala: string; url: string }> {
+  return peticion(
+    '/generacion/fondo',
+    { method: 'POST', body: JSON.stringify({ sala }) },
+    undefined,
+    // Pintar un fondo en 4K lleva su tiempo.
+    120000,
+  );
+}
+
+/** Convierte una ruta firmada del servidor en URL absoluta para <Image> o GLB. */
+export function urlAbsoluta(ruta: string): string {
+  return ruta.startsWith('http') ? ruta : `${servidor}${ruta}`;
+}

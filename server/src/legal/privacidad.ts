@@ -20,7 +20,7 @@
  */
 
 /** Última revisión del texto. Se enseña al final del documento. */
-export const REVISADA_EL = '2026-08-10';
+export const REVISADA_EL = '2026-08-11';
 
 const RESPONSABLE = 'Miguel Peidro Paredes';
 const CORREO = 'miguelpeidroparedes@gmail.com';
@@ -45,8 +45,9 @@ const SECCIONES: Array<{ titulo: string; cuerpo: string }> = [
     titulo: 'Qué datos hay y de dónde salen',
     cuerpo: `
       <p>La app <strong>no te pide que te registres</strong>. Para jugar solo hacen falta dos
-      códigos que reparte quien organiza; la app no tiene acceso a tu cámara, ni a tu micrófono, ni
-      a tus contactos, ni a tu ubicación.</p>
+      códigos que reparte quien organiza. La app no tiene acceso a tu cámara, ni a tu micrófono,
+      ni a tus contactos, ni a tu ubicación; de tu galería solo ve la imagen concreta que tú
+      eliges si decides generar tu avatar.</p>
 
       <p>Los datos que existen son estos:</p>
       <ul>
@@ -71,6 +72,11 @@ const SECCIONES: Array<{ titulo: string; cuerpo: string }> = [
         <li>
           <strong>Las respuestas del Mayordomo que denuncies</strong>, junto con la pregunta que
           las provocó. Se guardan para que quien organiza pueda revisarlas.
+        </li>
+        <li>
+          <strong>La imagen que subas para generar tu avatar 3D</strong>, si usas esa función. La
+          eliges tú, se usa solo para esculpir el modelo, y el modelo resultante se guarda en el
+          servidor de tu juego.
         </li>
       </ul>
 
@@ -121,6 +127,12 @@ const SECCIONES: Array<{ titulo: string; cuerpo: string }> = [
         <li>
           <strong>El proveedor de alojamiento y de base de datos</strong> donde corre el servidor,
           que almacena lo descrito arriba.
+        </li>
+        <li>
+          <strong>Los servicios de generación 3D y de imagen</strong> (Tripo para esculpir tu
+          avatar desde la imagen que subes; Google para pintar los fondos de sala), únicamente si
+          quien administra el servidor los ha conectado y solo cuando usas esas funciones. Reciben
+          la imagen que tú eliges, para generar y nada más.
         </li>
       </ul>
       <p>

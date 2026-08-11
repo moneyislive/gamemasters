@@ -34,6 +34,14 @@
       "output": "single"
     },
     "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Tu foto se usa solo para generar tu avatar 3D. No sale de tu servidor de juego salvo hacia el servicio de esculpido.",
+          "cameraPermission": false,
+          "microphonePermission": false
+        }
+      ],
       "expo-router",
       "expo-font",
       "expo-secure-store",
