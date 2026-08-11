@@ -10,7 +10,7 @@ import cors from 'cors';
 import express from 'express';
 import type { NextFunction, Request, Response } from 'express';
 import { DEMO_MODE, env } from './config';
-import authRouter, { identidadDeTaller, passwordRequired, requireAuth } from './auth';
+import authRouter, { passwordRequired, requireAuth, tallerAbiertoPara } from './auth';
 import { getStorageKind, getStore, initStore } from './db/store';
 import boardRouter from './routes/board';
 import chatRouter from './routes/chat';
@@ -52,12 +52,13 @@ fs.mkdirSync(uploadsDir, { recursive: true });
 app.use(
   '/uploads',
   (req, res, next) => {
-    // Las fotos de los invitados son parte del misterio: no se sirven a extraños.
-    // Va por `identidadDeTaller` como el resto de la puerta: antes cortocircuitaba
-    // en «no hay contraseña configurada», que en producción es un descuido, no un
-    // permiso.
-    if (identidadDeTaller(req)) return next();
-    res.status(401).end();
+    // Las fotos de los invitados son parte del misterio, y además son personas
+    // reales: no se sirven a extraños. Va por `tallerAbiertoPara` como el resto
+    // de la puerta —no por la firma del pasaporte a secas—, porque un pasaporte
+    // de cuenta lo tiene también quien juega desde la app.
+    void tallerAbiertoPara(req)
+      .then((abierto) => (abierto ? next() : res.status(401).end()))
+      .catch(() => res.status(503).end());
   },
   express.static(uploadsDir, {
     setHeaders: (res, filePath) => {

@@ -79,3 +79,65 @@
 .gate-privacidad:hover {
   border-bottom-color: currentColor;
 }
+
+/*
+  El nombre no es una contraseña: se lee, no se teclea a ciegas. El espaciado
+  ancho y el centrado que ayudan en un campo de puntos aquí solo estorban.
+*/
+.gate-input--nombre {
+  letter-spacing: 0.04em;
+  font-size: 16px;
+}
+
+/* El separador entre las dos maneras de entrar: una línea con la «o» encima. */
+.gate-o {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  margin: 1.15rem 0 0.9rem;
+  color: rgba(232, 207, 127, 0.45);
+  font-size: 0.78rem;
+  font-style: italic;
+  letter-spacing: 0.14em;
+}
+.gate-o::before,
+.gate-o::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(232, 207, 127, 0.28), transparent);
+}
+
+/*
+  El botón de Google va en secundario a propósito. La contraseña de la casa es
+  la puerta principal de esta herramienta; el proveedor es la comodidad de quien
+  ya está admitido, y darle más peso visual del que tiene confundiría a quien
+  llega por primera vez con la contraseña en la mano.
+*/
+.gate-google {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  width: 100%;
+  text-decoration: none;
+}
+.gate-google::before {
+  /* La «G» de Google, dibujada, para no traer un logotipo de fuera. */
+  content: 'G';
+  font-family: Arial, Helvetica, sans-serif;
+  font-weight: 700;
+  font-size: 1.05em;
+  line-height: 1;
+  background: conic-gradient(from -35deg, #ea4335, #fbbc05, #34a853, #4285f4, #ea4335);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.gate-nota {
+  margin: 0.7rem 0 0;
+  font-size: 0.76rem;
+  line-height: 1.45;
+  font-style: italic;
+}

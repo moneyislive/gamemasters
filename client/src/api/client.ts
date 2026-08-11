@@ -45,10 +45,15 @@ export interface AuthStatus {
 }
 
 export const getAuthStatus = () => request<AuthStatus>('/auth/status');
-export const login = (password: string) =>
-  request<{ authenticated: boolean }>('/auth/login', {
+/**
+ * El `nombre` es opcional y no es una credencial: sirve para que las partidas
+ * que crees lleven tu firma en vez de salir huérfanas. Quien tiene la contraseña
+ * puede escribir cualquiera, y el servidor lo dice así.
+ */
+export const login = (password: string, nombre?: string) =>
+  request<{ authenticated: boolean; cuenta?: { id: string; displayName: string } }>('/auth/login', {
     method: 'POST',
-    body: JSON.stringify({ password }),
+    body: JSON.stringify(nombre ? { password, nombre } : { password }),
   });
 export const logout = () =>
   request<{ authenticated: boolean }>('/auth/logout', { method: 'POST' });

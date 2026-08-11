@@ -449,6 +449,49 @@ export interface EstadoDeGeneracion {
   detalle?: string;
 }
 
+/** Qué formas de entrar ofrece el servidor con el que se habla. */
+export function proveedoresDisponibles(): Promise<{ google: boolean; apple: boolean }> {
+  return peticion('/cuenta/proveedores');
+}
+
+/**
+ * Entra con un proveedor y guarda el pasaporte.
+ *
+ * El testigo del proveedor se verifica en el SERVIDOR: aquí solo se recoge y se
+ * entrega. Cualquier comprobación hecha en el móvil se la salta quien quiera.
+ */
+export async function entrarConProveedor(
+  proveedor: 'google' | 'apple',
+  idToken: string,
+  nonce: string,
+): Promise<{ id: string; displayName: string; email: string; taller: boolean }> {
+  const r = await peticion<{
+    pasaporte: string;
+    cuenta: { id: string; displayName: string; email: string; taller: boolean };
+  }>('/cuenta/entrar', {
+    method: 'POST',
+    body: JSON.stringify({ proveedor, idToken, nonce }),
+  });
+  await fijarPasaporte(r.pasaporte);
+  return r.cuenta;
+}
+
+/** Vincula un segundo proveedor a la cuenta con la que ya se está dentro. */
+export async function vincularProveedor(
+  proveedor: 'google' | 'apple',
+  idToken: string,
+  nonce: string,
+): Promise<string[]> {
+  const r = await peticion<{ pasaporte: string; identidades: string[] }>('/cuenta/vincular', {
+    method: 'POST',
+    body: JSON.stringify({ proveedor, idToken, nonce }),
+  });
+  // Vincular corta las sesiones anteriores: sin guardar el nuevo pasaporte,
+  // quien acaba de vincular se quedaría fuera al instante.
+  await fijarPasaporte(r.pasaporte);
+  return r.identidades;
+}
+
 /**
  * Canjea una invitación por una credencial de partida.
  *

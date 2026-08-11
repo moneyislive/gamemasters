@@ -23,7 +23,9 @@
     "verify:cuentas": "tsx scripts/verificar-cuentas.ts",
     "verify:duenas": "tsx scripts/verificar-duenas.ts",
     "verify:tokens": "tsx scripts/verificar-tokens.ts",
-    "verify:invitaciones": "tsx scripts/verificar-invitaciones.ts"
+    "verify:invitaciones": "tsx scripts/verificar-invitaciones.ts",
+    "verify:proveedores": "tsx scripts/verificar-proveedores.ts",
+    "verify:puerta-google": "tsx scripts/verificar-puerta-google.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",

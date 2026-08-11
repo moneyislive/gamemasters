@@ -18,6 +18,25 @@ export default function LoginGate({ children }: { children: ReactNode }): JSX.El
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [entrando, setEntrando] = useState(false);
+  const [nombre, setNombre] = useState('');
+  const [conGoogle, setConGoogle] = useState(false);
+
+  /*
+   * ¿Ofrece este servidor entrar con Google? Se pregunta, no se adivina: un
+   * botón que no lleva a ningún sitio es peor que no tenerlo.
+   */
+  useEffect(() => {
+    let vigente = true;
+    fetch('/api/cuenta/proveedores')
+      .then((r) => r.json())
+      .then((p: { google?: boolean }) => {
+        if (vigente) setConGoogle(Boolean(p.google));
+      })
+      .catch(() => undefined);
+    return () => {
+      vigente = false;
+    };
+  }, []);
 
   useEffect(() => {
     let vigente = true;
@@ -42,7 +61,7 @@ export default function LoginGate({ children }: { children: ReactNode }): JSX.El
     setEntrando(true);
     setError(null);
     try {
-      await login(password);
+      await login(password, nombre.trim() || undefined);
       setEstado('dentro');
     } catch (fallo) {
       setError(
@@ -94,6 +113,23 @@ export default function LoginGate({ children }: { children: ReactNode }): JSX.El
           autoComplete="current-password"
         />
 
+        {/*
+          El nombre es OPCIONAL y sirve para que las partidas que crees lleven
+          tu firma y no salgan huérfanas. Es organización, no seguridad: quien
+          tiene la contraseña puede escribir cualquier nombre, y está dicho así
+          en el servidor. En cuanto tu cuenta vincule un proveedor de verdad,
+          este atajo deja de abrirla.
+        */}
+        <input
+          className="input gate-input gate-input--nombre"
+          type="text"
+          value={nombre}
+          onChange={(evento) => setNombre(evento.target.value)}
+          placeholder="Tu nombre (opcional)"
+          aria-label="Tu nombre, para firmar las partidas que crees"
+          autoComplete="nickname"
+        />
+
         {error && (
           <p className="gate-error" role="alert">
             {error}
@@ -103,6 +139,26 @@ export default function LoginGate({ children }: { children: ReactNode }): JSX.El
         <button className="btn btn--primary gate-btn" type="submit" disabled={entrando}>
           {entrando ? 'Abriendo…' : 'Entrar'}
         </button>
+
+        {/*
+          Es un enlace y no un botón porque NO es una llamada desde la página: es
+          una navegación de verdad, el navegador entero se va a Google y vuelve.
+          Un `fetch` no podría hacerlo —Google no deja que su pantalla se cargue
+          dentro de otra— y disfrazarlo de botón solo escondería lo que pasa.
+        */}
+        {conGoogle && (
+          <>
+            <div className="gate-o">
+              <span>o</span>
+            </div>
+            <a className="btn gate-google" href="/api/cuenta/entrar/google">
+              Entrar con Google
+            </a>
+            <p className="gate-nota text-dim">
+              Solo abren el taller las cuentas que quien administra haya autorizado.
+            </p>
+          </>
+        )}
 
         {/*
           Aquí, en la puerta, y no dentro: quien organiza introduce en esta

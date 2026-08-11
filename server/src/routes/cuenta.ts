@@ -12,9 +12,24 @@
  * la única revocación real que tiene el juego —cerrar y reabrir la mesa echa a
  * todo el mundo— y no se puede perder por una comodidad.
  */
+import { randomUUID } from 'node:crypto';
 import { getStore } from '../db/store';
 import { crearRouter } from '../rutas';
-import { sesionDeCuentaDePeticion } from '../identidad/sesion';
+import {
+  COOKIE_CUENTA,
+  emitirSesionDeCuenta,
+  leerCookie,
+  pasaporteVigente,
+  sesionDeCuentaDePeticion,
+} from '../identidad/sesion';
+import { abrirSobre, cerrarSobre } from '../identidad/sobre';
+import { TestigoInvalido, proveedorConfigurado, verificarIdToken } from '../identidad/oidc';
+import {
+  ConflictoDeIdentidad,
+  admitidoEnElTaller,
+  entrarConProveedor,
+  vincularIdentidad,
+} from '../identidad/cuentas-proveedor';
 import { invitacionesPara } from '../live/invitaciones';
 import { borrarCuentaDe } from '../live/cuentas';
 import { mutar } from '../live/sesion';
@@ -23,6 +38,9 @@ import type { Request, Response } from 'express';
 import type { Account } from '../../../shared/live';
 
 const router = crearRouter();
+
+/** Donde viaja el nonce del camino del navegador, entre la ida y la vuelta. */
+const COOKIE_NONCE = 'gm_nonce';
 
 /** La cuenta de quien llama, o corta con 401. */
 async function cuentaDe(req: Request, res: Response): Promise<Account | null> {
@@ -41,14 +59,254 @@ async function cuentaDe(req: Request, res: Response): Promise<Account | null> {
    * del pasaporte. Si fuera al revés, echar a alguien no surtiría efecto hasta
    * que caducara su sesión, y eso son noventa días.
    */
-  if (cuenta.sesionesValidasDesde) {
-    const corte = new Date(cuenta.sesionesValidasDesde).getTime() / 1000;
-    if (pasaporte.iat < corte) {
-      res.status(401).json({ error: 'Esta sesión ya no vale. Vuelve a entrar.' });
-      return null;
-    }
+  if (!pasaporteVigente(pasaporte, cuenta)) {
+    res.status(401).json({ error: 'Esta sesión ya no vale. Vuelve a entrar.' });
+    return null;
   }
   return cuenta;
+}
+
+/**
+ * Entrar con un proveedor de identidad.
+ *
+ * El móvil manda el `id_token` que le dio Google o Apple; aquí se verifica
+ * contra las claves públicas del proveedor (ver `identidad/oidc.ts`) y se
+ * reparte un pasaporte de cuenta.
+ *
+ * DOS COSAS QUE NO HACE, y las dos son deliberadas:
+ *
+ *   · NO adopta una cuenta existente porque el correo coincida. Si ya había un
+ *     perfil creado por el camino del consentimiento —con el correo que tecleó
+ *     quien organiza— se crea una cuenta nueva y limpia. Unirlas es cosa de la
+ *     persona, desde dentro, con `/cuenta/vincular`.
+ *   · NO da acceso a jugar. El pasaporte solo permite pedir una credencial por
+ *     la vía normal.
+ */
+router.post('/cuenta/entrar', async (req, res) => {
+  const proveedor = String(req.body?.proveedor ?? '');
+  const idToken = String(req.body?.idToken ?? '');
+  /*
+   * El nonce llega de dos sitios según quién llame:
+   *
+   *   · La app lo manda en el cuerpo: lo generó ella y lo recuerda.
+   *   · El navegador NO puede: la página del retorno se sirve recién hecha y no
+   *     recuerda nada. Su nonce está en la cookie firmada que dejó
+   *     `/cuenta/entrar/google`, y se lee de ahí.
+   *
+   * Que el del navegador venga de una cookie firmada por el servidor, y no del
+   * cuerpo, es justo lo que le da valor: si viniera en el cuerpo lo elegiría
+   * quien llama, y entonces no comprobaría nada.
+   */
+  const desdeNavegador = req.body?.desdeNavegador === true;
+  const nonce = desdeNavegador
+    ? abrirSobre<{ nonce: string }>('invitacion:v1', leerCookie(req, COOKIE_NONCE))?.nonce
+    : req.body?.nonce
+      ? String(req.body.nonce)
+      : undefined;
+
+  if (proveedor !== 'google' && proveedor !== 'apple') {
+    res.status(400).json({ error: 'Proveedor no admitido.' });
+    return;
+  }
+  if (desdeNavegador && !nonce) {
+    res.status(400).json({ error: 'La entrada ha caducado. Vuelve a empezar.' });
+    return;
+  }
+  if (!proveedorConfigurado(proveedor)) {
+    res.status(503).json({
+      error:
+        `Iniciar sesión con ${proveedor === 'google' ? 'Google' : 'Apple'} no está configurado ` +
+        'en este servidor. Entra con tu código mientras tanto.',
+    });
+    return;
+  }
+
+  try {
+    const identidad = await verificarIdToken(proveedor, idToken, nonce);
+    const cuenta = await entrarConProveedor(identidad);
+    const pasaporte = emitirSesionDeCuenta(cuenta, proveedor);
+
+    if (desdeNavegador) {
+      // El nonce es de un solo uso: gastado, se tira.
+      res.clearCookie(COOKIE_NONCE, { path: '/' });
+      res.cookie(COOKIE_CUENTA, pasaporte, {
+        httpOnly: true,
+        sameSite: 'lax',
+        secure: req.secure,
+        maxAge: 60 * 60 * 24 * 90 * 1000,
+        path: '/',
+      });
+    }
+
+    res.json({
+      // El navegador guarda la sesión en la cookie; el pasaporte en el cuerpo es
+      // para la app, que no tiene cookies. Mandarlo a un navegador sería dejarlo
+      // al alcance de cualquier script de la página, así que allí no va.
+      pasaporte: desdeNavegador ? undefined : pasaporte,
+      cuenta: {
+        id: cuenta.id,
+        displayName: cuenta.displayName,
+        email: cuenta.email,
+        taller: admitidoEnElTaller(cuenta),
+      },
+    });
+  } catch (error) {
+    if (error instanceof TestigoInvalido) {
+      res.status(401).json({ error: `No se pudo comprobar tu identidad: ${error.message}` });
+      return;
+    }
+    console.error('[cuenta] fallo al entrar con proveedor:', error);
+    res.status(502).json({ error: 'El proveedor de identidad no responde ahora mismo.' });
+  }
+});
+
+/**
+ * Vincular un SEGUNDO proveedor a la cuenta con la que ya estás dentro.
+ *
+ * Es el único puente entre identidades, y por eso exige sesión: quien lo pide
+ * ya demostró controlar la primera, y al presentar el testigo demuestra la
+ * segunda. Si esa identidad pertenece a otro perfil se responde 409 con un
+ * mensaje que se pueda leer en voz alta — jamás se fusionan dos cuentas.
+ */
+router.post('/cuenta/vincular', async (req, res) => {
+  const cuenta = await cuentaDe(req, res);
+  if (!cuenta) return;
+
+  const proveedor = String(req.body?.proveedor ?? '');
+  const idToken = String(req.body?.idToken ?? '');
+  const nonce = req.body?.nonce ? String(req.body.nonce) : undefined;
+
+  if (proveedor !== 'google' && proveedor !== 'apple') {
+    res.status(400).json({ error: 'Proveedor no admitido.' });
+    return;
+  }
+
+  try {
+    const identidad = await verificarIdToken(proveedor, idToken, nonce);
+    const actualizada = await vincularIdentidad(cuenta, identidad);
+    res.json({
+      // Vincular corta las sesiones anteriores, así que hay que repartir una
+      // nueva o quien acaba de vincular se quedaría fuera al instante.
+      pasaporte: emitirSesionDeCuenta(actualizada, proveedor),
+      identidades: (actualizada.identidades ?? []).map((i) => i.proveedor),
+    });
+  } catch (error) {
+    if (error instanceof ConflictoDeIdentidad) {
+      res.status(409).json({ error: error.message });
+      return;
+    }
+    if (error instanceof TestigoInvalido) {
+      res.status(401).json({ error: `No se pudo comprobar esa identidad: ${error.message}` });
+      return;
+    }
+    res.status(502).json({ error: 'El proveedor de identidad no responde ahora mismo.' });
+  }
+});
+
+/** Qué formas de entrar ofrece este servidor. La app lo pregunta al arrancar. */
+router.get('/cuenta/proveedores', (_req, res) => {
+  res.json({
+    google: proveedorConfigurado('google'),
+    apple: proveedorConfigurado('apple'),
+  });
+});
+
+// ---------------------------------------------------------------------------
+// El camino del NAVEGADOR (el taller). El móvil no pasa por aquí.
+// ---------------------------------------------------------------------------
+
+/**
+ * Manda al taller a la pantalla de Google.
+ *
+ * FLUJO IMPLÍCITO, y por qué: se pide directamente el `id_token`, que es lo
+ * único que necesita el servidor. La alternativa —código de autorización— exige
+ * guardar el secreto del cliente y montar un intercambio, y no aporta nada aquí
+ * porque no se quiere ningún permiso sobre la cuenta más allá de saber quién
+ * eres.
+ *
+ * El `nonce` se guarda en una cookie firmada de un minuto y se compara al
+ * volver. Es lo que impide que un testigo capturado en otro sitio sirva para
+ * entrar aquí.
+ */
+router.get('/cuenta/entrar/google', (req, res) => {
+  if (!proveedorConfigurado('google')) {
+    res.status(503).send('Entrar con Google no está configurado en este servidor.');
+    return;
+  }
+  const clienteWeb = (process.env.GOOGLE_CLIENT_IDS ?? '').split(',')[0]?.trim();
+  if (!clienteWeb) {
+    res.status(503).send('Falta el identificador de cliente de Google.');
+    return;
+  }
+
+  const nonce = randomUUID();
+  res.cookie(COOKIE_NONCE, cerrarSobre('invitacion:v1', { nonce }, 300), {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: req.secure,
+    maxAge: 300_000,
+    path: '/',
+  });
+
+  const destino = new URL('https://accounts.google.com/o/oauth2/v2/auth');
+  destino.searchParams.set('client_id', clienteWeb);
+  destino.searchParams.set('redirect_uri', `${origenDe(req)}/api/cuenta/retorno`);
+  destino.searchParams.set('response_type', 'id_token');
+  destino.searchParams.set('scope', 'openid email profile');
+  destino.searchParams.set('nonce', nonce);
+  res.redirect(destino.toString());
+});
+
+/**
+ * La vuelta de Google.
+ *
+ * EL DETALLE QUE SORPRENDE: con el flujo implícito, el testigo vuelve en el
+ * FRAGMENTO de la URL (`#id_token=…`), y el fragmento NUNCA llega al servidor —
+ * el navegador no lo envía. Por eso esta ruta no puede leerlo: sirve una página
+ * mínima que lo saca del fragmento en el navegador, lo manda por POST a
+ * `/cuenta/entrar` y luego lleva al taller.
+ *
+ * Es el patrón estándar de este flujo, y la única forma de evitarlo sería
+ * guardar el secreto del cliente para intercambiar un código.
+ */
+router.get('/cuenta/retorno', (_req, res) => {
+  res.type('html').send(`<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><title>Entrando…</title>
+<style>
+  body{background:#0b1710;color:#e8cf7f;font-family:Georgia,serif;display:grid;
+       place-items:center;height:100vh;margin:0;text-align:center}
+  p{opacity:.8}
+</style></head>
+<body>
+<h1>Entrando…</h1>
+<p id="estado">Comprobando tu identidad.</p>
+<script>
+(async () => {
+  const trozos = new URLSearchParams(location.hash.slice(1));
+  const idToken = trozos.get('id_token');
+  const estado = document.getElementById('estado');
+  if (!idToken) { estado.textContent = 'Google no devolvió ninguna identidad.'; return; }
+  try {
+    const r = await fetch('/api/cuenta/entrar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ proveedor: 'google', idToken, desdeNavegador: true }),
+    });
+    const cuerpo = await r.json();
+    if (!r.ok) { estado.textContent = cuerpo.error || 'No se pudo entrar.'; return; }
+    location.replace('/');
+  } catch (e) {
+    estado.textContent = 'No se pudo hablar con el servidor.';
+  }
+})();
+</script>
+</body></html>`);
+});
+
+/** El origen público de esta petición, respetando el proxy de delante. */
+function origenDe(req: Request): string {
+  const host = req.get('host') ?? 'localhost';
+  return `${req.protocol}://${host}`;
 }
 
 /**

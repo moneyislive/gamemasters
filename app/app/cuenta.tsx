@@ -12,7 +12,7 @@
  * todo—, que son cosas distintas y por eso están separadas.
  */
 import { useCallback, useEffect, useState } from 'react';
-import { Image, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect } from 'expo-router';
 import Animated, { FadeIn, FadeInUp } from 'react-native-reanimated';
@@ -21,6 +21,7 @@ import { Pulsable } from '../src/vivo';
 import { cargarAvatar, guardarAvatar, AVATAR_POR_DEFECTO } from '../src/avatar';
 import { TROFEOS } from '../../shared/live';
 import { color, espacio, fuente, radio } from '../src/tema';
+import { SinProveedor, disponibles, entrarConApple, entrarConGoogle } from '../src/entrar-con';
 
 /** Los mismos rangos que pinta la portada: una sola escalera para todo. */
 const RANGOS: Array<{ desde: number; titulo: string }> = [
@@ -44,6 +45,9 @@ export default function Cuenta(): JSX.Element {
   const [borrando, setBorrando] = useState(false);
   const [borrada, setBorrada] = useState(false);
   const [fallo, setFallo] = useState(false);
+  const [proveedores, setProveedores] = useState({ google: false, apple: false });
+  const [entrando, setEntrando] = useState<'google' | 'apple' | null>(null);
+  const [avisoProveedor, setAvisoProveedor] = useState<string | null>(null);
 
   const cargar = useCallback(() => {
     void cargarAvatar().then((a) => setVistaAvatar(a.vistaPrevia));
@@ -59,6 +63,35 @@ export default function Cuenta(): JSX.Element {
 
   useEffect(cargar, [cargar]);
   useFocusEffect(cargar);
+
+  useEffect(() => {
+    void disponibles().then(setProveedores);
+  }, []);
+
+  /** Entrar con un proveedor. Cancelar no es un error y no dice nada. */
+  const entrarCon = useCallback(
+    (cual: 'google' | 'apple') => {
+      void (async () => {
+        setEntrando(cual);
+        setAvisoProveedor(null);
+        try {
+          await (cual === 'google' ? entrarConGoogle() : entrarConApple());
+          cargar();
+        } catch (e) {
+          setAvisoProveedor(
+            e instanceof SinProveedor
+              ? e.message
+              : e instanceof Error
+                ? e.message
+                : 'No se pudo completar la entrada.',
+          );
+        } finally {
+          setEntrando(null);
+        }
+      })();
+    },
+    [cargar],
+  );
 
   const cerrarSesion = useCallback(async () => {
     await api.cerrarSesionDeCuenta();
@@ -123,13 +156,48 @@ export default function Cuenta(): JSX.Element {
               Con una cuenta se guardan tus veladas, tus trofeos y tu rango, y las invitaciones te
               aparecen en la portada sin tener que pedirle el código a nadie.
             </Text>
-            <View style={estilos.marco}>
-              <Text style={estilos.subtitulo}>Cómo se consigue hoy</Text>
-              <Text style={estilos.parrafo}>
-                Juega una velada y, en «Tu perfil», acepta guardar tus partidas. Muy pronto se
-                podrá entrar directamente con Google o con Apple.
-              </Text>
-            </View>
+            {proveedores.google || proveedores.apple ? (
+              <View style={{ marginTop: espacio.lg }}>
+                {proveedores.google && (
+                  <Pulsable onPress={() => entrarCon('google')}>
+                    <View style={estilos.botonProveedor}>
+                      <Text style={estilos.botonProveedorTexto}>
+                        {entrando === 'google' ? 'ABRIENDO…' : 'CONTINUAR CON GOOGLE'}
+                      </Text>
+                    </View>
+                  </Pulsable>
+                )}
+                {/*
+                  Apple se ofrece SOLO en iOS: el diálogo nativo no existe en
+                  Android ni en la web, y ofrecer un botón que no lleva a
+                  ninguna parte es peor que no ofrecerlo.
+                */}
+                {proveedores.apple && Platform.OS === 'ios' && (
+                  <Pulsable onPress={() => entrarCon('apple')}>
+                    <View style={[estilos.botonProveedor, estilos.botonApple]}>
+                      <Text style={[estilos.botonProveedorTexto, { color: '#0c0508' }]}>
+                        {entrando === 'apple' ? 'ABRIENDO…' : ' CONTINUAR CON APPLE'}
+                      </Text>
+                    </View>
+                  </Pulsable>
+                )}
+                {avisoProveedor && (
+                  <Text style={[estilos.menudo, { color: '#e8a0a0' }]}>{avisoProveedor}</Text>
+                )}
+                <Text style={estilos.menudo}>
+                  Entrar con una cuenta no hace falta para jugar: los códigos siguen funcionando
+                  igual.
+                </Text>
+              </View>
+            ) : (
+              <View style={estilos.marco}>
+                <Text style={estilos.subtitulo}>Cómo se consigue hoy</Text>
+                <Text style={estilos.parrafo}>
+                  Juega una velada y, en «Tu perfil», acepta guardar tus partidas. Entrar con
+                  Google o con Apple llegará en cuanto quien administra el servidor lo configure.
+                </Text>
+              </View>
+            )}
           </Animated.View>
         ) : (
           <>
@@ -369,6 +437,22 @@ const estilos = StyleSheet.create({
     backgroundColor: 'rgba(201,162,39,0.22)',
     marginTop: espacio.xl,
     marginBottom: espacio.lg,
+  },
+  botonProveedor: {
+    borderRadius: radio.md,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginBottom: espacio.sm,
+    borderWidth: 1,
+    borderColor: 'rgba(232,207,127,0.55)',
+    backgroundColor: 'rgba(232,207,127,0.08)',
+  },
+  botonApple: { backgroundColor: '#f1e5c9', borderColor: '#f1e5c9' },
+  botonProveedorTexto: {
+    fontFamily: fuente.titulo,
+    fontSize: 13,
+    letterSpacing: 1.4,
+    color: color.oro300,
   },
   botonHumo: {
     borderRadius: radio.md,

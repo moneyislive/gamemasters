@@ -53,6 +53,13 @@ export interface Store {
    * dónde mirar.
    */
   deleteAccount(id: string): Promise<void>;
+  /**
+   * LA búsqueda del inicio de sesión con proveedor.
+   *
+   * Por `sub`, jamás por correo: un correo cambia de dueño y un `sub` no. Es la
+   * diferencia entre reconocer a alguien y reconocer una cadena de texto.
+   */
+  getAccountPorIdentidad(proveedor: string, sub: string): Promise<Account | null>;
 }
 
 // ---------------------------------------------------------------------------
@@ -292,6 +299,13 @@ class FileStore implements Store {
     this.data.accounts = this.data.accounts.filter((x) => x.id !== id);
     await this.persist();
   }
+
+  async getAccountPorIdentidad(proveedor: string, sub: string): Promise<Account | null> {
+    const a = this.data.accounts.find((x) =>
+      (x.identidades ?? []).some((i) => i.proveedor === proveedor && i.sub === sub),
+    );
+    return a ? structuredClone(a) : null;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -468,6 +482,13 @@ class MongoStore implements Store {
 
   async deleteAccount(id: string): Promise<void> {
     await this.accounts.deleteOne({ id });
+  }
+
+  async getAccountPorIdentidad(proveedor: string, sub: string): Promise<Account | null> {
+    const doc = (await this.accounts
+      .findOne({ identidades: { $elemMatch: { proveedor, sub } } })
+      .lean()) as unknown as LooseDoc | null;
+    return doc ? stripMongo<Account>(doc) : null;
   }
 }
 

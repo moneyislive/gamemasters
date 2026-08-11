@@ -37,6 +37,36 @@ Puertos: cliente 5173 (proxy `/api` y `/uploads` → 5174), servidor 5174.
   `var(--font-heading)` / `var(--font-body)` / `var(--font-display)`).
   Cada módulo puede añadir su propio CSS en ficheros nuevos dentro de su ownership.
 
+## La puerta del taller (server/src/auth.ts)
+
+Se entra de dos maneras y hay que distinguirlas, porque no dan lo mismo:
+
+- **La contraseña de la casa** (`APP_PASSWORD`) → cookie `gm_sesion`. Abre el
+  taller entero. Es la puerta principal.
+- **Una cuenta de proveedor** (Google/Apple) → pasaporte firmado, en la cookie
+  `gm_cuenta` o en la cabecera `X-GM-Cuenta`. Abre el taller **solo si el correo
+  verificado de esa cuenta está en `GM_ADMITIDOS`**.
+
+**La regla que cuesta un incidente aprender:** el pasaporte de cuenta lo tiene
+también **todo el que juega**. Se lo reparte `/cuenta/entrar` a cualquiera que
+inicie sesión con su Google en la app del jugador. Un guardián que se conforme
+con que la firma del pasaporte sea válida deja que un invitado pida
+`/api/games/<id>` y lea el culpable, la solución y todas las pistas.
+
+Por eso:
+
+- `tallerAbiertoPara(req)` es **asíncrona** y comprueba la admisión contra el
+  almacén en cada petición. Es el único sitio que decide si se abre. Falla
+  cerrada: si no puede comprobarlo, responde 503.
+- `identidadDeTaller(req)` es síncrona y dice **con qué título** entra alguien,
+  para «cada uno ve sus partidas». **No sirve como guardián** — no mira la lista.
+- Una cuenta no admitida **no corta**: se sigue por la puerta de la casa. Quien
+  entra con la contraseña y un nombre lleva las dos cosas, y su cuenta no está
+  en `GM_ADMITIDOS` ni tiene por qué.
+- Comprobar `admitidoEnElTaller` (la regla) **no es** comprobar la puerta. La
+  regla estuvo bien escrita desde el primer día y el taller siguió abierto.
+  `verify:proveedores` y `verify:puerta-google` prueban la puerta por HTTP.
+
 ## Modelo de datos
 
 Ver `shared/types.ts` (GameSession, Suspect, Room, Weapon, BoardLayout, Plot,

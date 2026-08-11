@@ -32,8 +32,25 @@ export function emitirSesionDeCuenta(cuenta: Account, via: ProveedorId): string 
   return cerrarSobre('cuenta:v1', { cuentaId: cuenta.id, via }, DURACION_SEGUNDOS);
 }
 
+/**
+ * ¿Sigue valiendo este pasaporte, o lo cortó una revocación posterior?
+ *
+ * VIVE AQUÍ, EN UN SOLO SITIO, POR EL ERROR QUE ESTABA REPETIDO EN DOS: el
+ * `iat` del sobre son SEGUNDOS truncados (`Math.floor`), y `sesionesValidasDesde`
+ * son milisegundos. Comparar el uno contra el otro sin truncar los dos rechaza
+ * el pasaporte que se acaba de emitir siempre que ambos caigan en el mismo
+ * segundo — que es justo lo que pasa al vincular un proveedor, porque vincular
+ * corta las sesiones y reparte una nueva en la misma respuesta. El resultado
+ * era echar a la persona en el instante de terminar de vincular, y de forma
+ * intermitente, que es la peor manera de fallar.
+ */
+export function pasaporteVigente(pasaporte: SesionDeCuenta, cuenta: Account): boolean {
+  if (!cuenta.sesionesValidasDesde) return true;
+  return pasaporte.iat >= Math.floor(new Date(cuenta.sesionesValidasDesde).getTime() / 1000);
+}
+
 /** Lee una cookie concreta de la cabecera, sin dependencias externas. */
-function leerCookie(req: Request, nombre: string): string | undefined {
+export function leerCookie(req: Request, nombre: string): string | undefined {
   const cabecera = req.headers.cookie;
   if (!cabecera) return undefined;
   for (const parte of cabecera.split(';')) {

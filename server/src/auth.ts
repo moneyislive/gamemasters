@@ -20,7 +20,14 @@ import type { NextFunction, Request, Response } from 'express';
 import { env } from './config';
 import { firmarConSecreto, igualSeguro } from './secreto';
 import { crearRouter } from './rutas';
-import { COOKIE_CUENTA, emitirSesionDeCuenta, sesionDeCuentaDePeticion } from './identidad/sesion';
+import {
+  COOKIE_CUENTA,
+  emitirSesionDeCuenta,
+  pasaporteVigente,
+  sesionDeCuentaDePeticion,
+} from './identidad/sesion';
+import { admitidoEnElTaller } from './identidad/cuentas-proveedor';
+import { getStore } from './db/store';
 import { cuentaDeCasa } from './taller/cuenta-de-casa';
 import type { ProveedorId } from '../../shared/identidad';
 
@@ -97,6 +104,7 @@ export function identidadDeTaller(req: Request): IdentidadDeTaller | null {
   const pasaporte = sesionDeCuentaDePeticion(req);
   if (pasaporte) return { tipo: 'cuenta', cuentaId: pasaporte.cuentaId, via: pasaporte.via };
 
+
   const password = env.appPassword;
   if (password) {
     const cookie = leerCookie(req, COOKIE);
@@ -107,9 +115,45 @@ export function identidadDeTaller(req: Request): IdentidadDeTaller | null {
   return process.env.NODE_ENV === 'production' ? null : { tipo: 'abierto' };
 }
 
-/** ¿La petición viene de alguien a quien se deja pasar? */
-export function isAuthenticated(req: Request): boolean {
-  return identidadDeTaller(req) !== null;
+/**
+ * ¿Se le abre el taller a quien llama?
+ *
+ * ES ASÍNCRONA Y TIENE QUE SERLO, y aquí está el motivo, que es el fallo más
+ * serio que ha tenido esta puerta:
+ *
+ * `identidadDeTaller` acepta cualquier pasaporte de cuenta con la firma buena.
+ * Pero el pasaporte de cuenta lo tiene TAMBIÉN todo el que inicia sesión con
+ * Google desde la app del jugador — se lo reparte `/cuenta/entrar`, y viaja en
+ * la cabecera `X-GM-Cuenta`. Con la puerta mirando solo la firma, cualquier
+ * invitado que hubiera entrado con su Google podía pedir `/api/games/<id>` y
+ * leer la solución del caso, el culpable y todas las pistas. La app no ofrece
+ * ese botón, claro; pero la puerta no la defiende la app, la defiende la puerta.
+ *
+ * Así que la admisión se comprueba contra el almacén, en cada petición y en
+ * tiempo real. Cuesta una lectura, y solo en el tráfico del taller: las rutas
+ * de quien juega van montadas ANTES de este guardián y no pasan por aquí.
+ *
+ * Y NO CORTA CUANDO LA CUENTA NO ESTÁ ADMITIDA: se sigue por la puerta de la
+ * casa. Quien entra con la contraseña y un nombre lleva las dos cosas —cookie
+ * de casa y pasaporte— y su cuenta no está en `GM_ADMITIDOS` ni tiene por qué;
+ * si un pasaporte no admitido cortara aquí, ese camino se cerraría solo.
+ */
+export async function tallerAbiertoPara(req: Request): Promise<boolean> {
+  const pasaporte = sesionDeCuentaDePeticion(req);
+  if (pasaporte) {
+    const cuenta = await getStore().getAccount(pasaporte.cuentaId);
+    // Revocación de verdad: quitar el correo de `GM_ADMITIDOS` cierra en la
+    // petición siguiente, sin esperar a que caduquen noventa días de sesión.
+    if (cuenta && admitidoEnElTaller(cuenta) && pasaporteVigente(pasaporte, cuenta)) return true;
+  }
+
+  const password = env.appPassword;
+  if (password) {
+    const cookie = leerCookie(req, COOKIE);
+    return Boolean(cookie && igualSeguro(cookie, tokenDeSesion(password)));
+  }
+
+  return process.env.NODE_ENV !== 'production';
 }
 
 /**
@@ -117,18 +161,30 @@ export function isAuthenticated(req: Request): boolean {
  * (si no, no habría forma de iniciar sesión) y responde 401 al resto.
  */
 export function requireAuth(req: Request, res: Response, next: NextFunction): void {
-  if (req.path.startsWith('/auth/') || isAuthenticated(req)) {
+  if (req.path.startsWith('/auth/')) {
     next();
     return;
   }
-  res.status(401).json({ error: 'Acceso restringido: introduce la contraseña de la casa.' });
+  void tallerAbiertoPara(req)
+    .then((abierto) => {
+      if (abierto) {
+        next();
+        return;
+      }
+      res.status(401).json({ error: 'Acceso restringido: introduce la contraseña de la casa.' });
+    })
+    .catch((fallo) => {
+      // Falla CERRADA: si no se puede comprobar la admisión, no se abre.
+      console.error('[auth] no se pudo comprobar la admisión al taller:', fallo);
+      res.status(503).json({ error: 'No se puede comprobar el acceso ahora mismo.' });
+    });
 }
 
 const router = crearRouter();
 
 /** Estado de la sesión: lo consulta el cliente al arrancar. */
-router.get('/auth/status', (req, res) => {
-  res.json({ required: passwordRequired(), authenticated: isAuthenticated(req) });
+router.get('/auth/status', async (req, res) => {
+  res.json({ required: passwordRequired(), authenticated: await tallerAbiertoPara(req) });
 });
 
 router.post('/auth/login', async (req, res) => {

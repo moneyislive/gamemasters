@@ -72,8 +72,15 @@ export async function cuentaDeCasa(nombre: string): Promise<Account | null> {
     trofeos: [],
     identidades: [],
     correos: [],
-    // Quien tiene la llave de la casa administra la casa: puede cambiar el
-    // modelo de la instancia, que es lo que cuesta dinero.
+    /*
+     * Quien tiene la llave de la casa administra la casa. Es coherente con lo
+     * que ya podía hacer: la contraseña compartida siempre lo abrió todo.
+     *
+     * Las cuentas de PROVEEDOR no reciben esto: para ellas manda `GM_ADMITIDOS`
+     * (ver `identidad/cuentas-proveedor.ts`), porque quién administra la
+     * instalación es una decisión de quien la administra, no algo que se gane
+     * iniciando sesión con Google.
+     */
     taller: true,
   };
   return store.saveAccount(nueva);
