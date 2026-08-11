@@ -159,3 +159,11 @@
     display: none;
   }
 }
+
+/* La marca de quien entró por invitación, sin teclear código. */
+.live-reclamada {
+  display: block;
+  font-size: 0.78em;
+  letter-spacing: 0.02em;
+  margin-top: 2px;
+}

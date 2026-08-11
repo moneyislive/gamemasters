@@ -449,6 +449,34 @@ export interface EstadoDeGeneracion {
   detalle?: string;
 }
 
+/**
+ * Canjea una invitación por una credencial de partida.
+ *
+ * Puede responder `requiereCodigo`: no es un error, es el camino normal cuando
+ * el correo no está verificado por un proveedor, la partida ya empezó, o la
+ * silla está ocupada. La app manda entonces a teclear el código de siempre.
+ */
+export function entrarDesdeInvitacion(
+  gameId: string,
+  suspectId: string,
+): Promise<
+  | { requiereCodigo: true; motivo: string }
+  | { requiereCodigo: false; token: string; gameId: string; suspectId: string; displayName: string }
+> {
+  return peticion('/cuenta/entrar-en-partida', {
+    method: 'POST',
+    body: JSON.stringify({ gameId, suspectId }),
+  });
+}
+
+/** Borra la cuenta desde fuera de una partida. */
+export function borrarCuentaDeLaPlataforma(): Promise<{
+  borrada: boolean;
+  partidasLimpiadas: number;
+}> {
+  return peticion('/cuenta', { method: 'DELETE' });
+}
+
 export function generacionDisponible(): Promise<{ avatares: boolean; fondos: boolean }> {
   return peticion('/generacion/disponible');
 }

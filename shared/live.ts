@@ -132,6 +132,17 @@ export interface LivePlayer {
    * mesa se llena.
    */
   pideEmpezar?: boolean;
+  /**
+   * Quién ocupó esta silla entrando desde una invitación, sin teclear código.
+   *
+   * NO ES DECORACIÓN: es la contrapartida de dejar entrar sin código. Verificar
+   * el buzón demuestra que ese correo es tuyo, pero NO arregla que quien
+   * organiza se equivocara al teclearlo — si puso el correo de otra Ana, esa
+   * Ana entraría de buena fe en la velada de unos desconocidos. Así que la
+   * silla queda marcada y quien dirige lo ve en su panel junto al código, con
+   * la opción de rotarlo. La puerta se abre, pero deja huella.
+   */
+  reclamadaPor?: { cuentaId: string; correo: string; el: string };
 }
 
 export interface Acusacion {

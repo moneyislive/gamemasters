@@ -126,6 +126,8 @@ type Medida = {
   conBuzon: Array<{ gameId: string; directa: boolean }>;
   conRelay: number;
   relayDirecta: boolean;
+  empezadaDirecta: boolean | null;
+  ocupadaDirecta: boolean | null;
   error?: string;
 };
 
@@ -202,6 +204,18 @@ if (m) {
     'pero NUNCA entra directo, ni con el buzón verificado',
     m.relayDirecta === false,
     m.relayDirecta,
+  );
+
+  paso('Verificar el buzón NO basta: hacen falta las tres condiciones');
+  comprobar(
+    'con la partida ya empezada, NO se entra sin código',
+    m.empezadaDirecta === false,
+    m.empezadaDirecta,
+  );
+  comprobar(
+    'con la silla ya ocupada, tampoco',
+    m.ocupadaDirecta === false,
+    m.ocupadaDirecta,
   );
 
   paso('Y lo que jamás puede salir');

@@ -340,6 +340,22 @@ export default function LivePanel(): JSX.Element {
                   <td>
                     <span className={`live-punto${vivo ? ' is-vivo' : ''}`} />
                     {p.joined ? (vivo ? 'conectado' : 'ausente') : 'sin entrar'}
+                    {/*
+                      Quien entró SIN teclear código deja huella, y aquí es
+                      donde se ve. Es la contrapartida de abrir esa puerta: el
+                      correo verificado demuestra que la dirección es suya, pero
+                      no que no te equivocaras al escribirla. Si este nombre no
+                      te cuadra, cierra la partida en vivo y vuelve a abrirla —
+                      eso rota todos los códigos y echa a todo el mundo.
+                    */}
+                    {p.reclamadaPor && (
+                      <span
+                        className="live-reclamada text-dim"
+                        title={`Entró desde una invitación a ${p.reclamadaPor.correo}`}
+                      >
+                        · por invitación ({p.reclamadaPor.correo})
+                      </span>
+                    )}
                   </td>
                   <td className="text-dim">{donde?.roomName ?? '—'}</td>
                 </tr>

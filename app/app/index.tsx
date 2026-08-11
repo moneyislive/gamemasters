@@ -102,7 +102,7 @@ function rangoDe(jugadas: number): {
 }
 
 export default function Portada(): JSX.Element {
-  const { vista, cargando } = usePartida();
+  const { vista, cargando, refrescar } = usePartida();
   const { width, height } = useWindowDimensions();
   const [portada, setPortada] = useState<api.Portada | null>(null);
 
@@ -171,6 +171,35 @@ export default function Portada(): JSX.Element {
   const altoHero = Math.min(Math.max(height * 0.56, 400), 540);
 
   const abrirTaller = (): void => void Linking.openURL(api.urlDelTaller());
+
+  /**
+   * Canjear una invitación.
+   *
+   * Si el correo está verificado y la silla libre, se entra sin teclear nada.
+   * Si no, el servidor responde `requiereCodigo` —que NO es un error: es el
+   * camino de siempre— y se manda a la pantalla de códigos con el sitio ya
+   * identificado.
+   */
+  const entrarDesdeInvitacion = useCallback(
+    (inv: api.InvitacionVista) => {
+      void (async () => {
+        try {
+          const r = await api.entrarDesdeInvitacion(inv.gameId, inv.suspectId);
+          if (r.requiereCodigo) {
+            router.push('/entrar');
+            return;
+          }
+          await api.fijarToken(r.token);
+          await refrescar();
+          router.push('/(juego)/ronda');
+        } catch {
+          // Si algo falla, queda el camino que nunca falla.
+          router.push('/entrar');
+        }
+      })();
+    },
+    [refrescar],
+  );
 
   return (
     <View style={estilos.raiz}>
@@ -313,7 +342,12 @@ export default function Portada(): JSX.Element {
               nota="Alguien ha guardado una silla con tu nombre"
             />
             {invitaciones.map((inv, i) => (
-              <Sobre key={`${inv.gameId}-${inv.suspectId}`} invitacion={inv} indice={i} />
+              <Sobre
+                key={`${inv.gameId}-${inv.suspectId}`}
+                invitacion={inv}
+                indice={i}
+                alEntrar={entrarDesdeInvitacion}
+              />
             ))}
           </View>
         )}
@@ -356,6 +390,7 @@ export default function Portada(): JSX.Element {
             nota={portada ? portada.cuenta.displayName : 'Toda mesa recuerda a los suyos'}
           />
           {portada ? (
+            <Pulsable onPress={() => router.push('/cuenta')} accessibilityLabel="Abrir tu cuenta">
             <View style={estilos.vitrina}>
               <View style={estilos.filaRango}>
                 <LaurelDeRango />
@@ -400,7 +435,9 @@ export default function Portada(): JSX.Element {
                   La última: {jugadas[jugadas.length - 1]?.titulo}
                 </Text>
               )}
+              <Text style={estilos.verCuenta}>Ver tu cuenta →</Text>
             </View>
+            </Pulsable>
           ) : (
             /* La vitrina cerrada: se ve lo que hay dentro, y por eso apetece. */
             <View style={[estilos.vitrina, { opacity: 0.92 }]}>
@@ -421,6 +458,9 @@ export default function Portada(): JSX.Element {
                 Juega tu primera velada y acepta guardar tus partidas desde tu perfil: los trofeos,
                 el rango y la crónica de cada noche se quedan aquí, esperándote.
               </Text>
+              <Pressable onPress={() => router.push('/cuenta')} style={{ paddingVertical: 10 }}>
+                <Text style={estilos.verCuenta}>Saber más →</Text>
+              </Pressable>
             </View>
           )}
         </View>
@@ -549,9 +589,11 @@ function PistaDeScroll(): JSX.Element | null {
 function Sobre({
   invitacion,
   indice,
+  alEntrar,
 }: {
   invitacion: api.InvitacionVista;
   indice: number;
+  alEntrar: (inv: api.InvitacionVista) => void;
 }): JSX.Element {
   const menos = useMenosMovimiento();
   const t = useSharedValue(0);
@@ -566,7 +608,7 @@ function Sobre({
   return (
     <Animated.View entering={FadeInUp.delay(90 * indice).duration(600)}>
       <Pulsable
-        onPress={invitacion.yaDentro ? undefined : () => router.push('/entrar')}
+        onPress={invitacion.yaDentro ? undefined : () => alEntrar(invitacion)}
         accessibilityLabel={`Invitación a ${invitacion.titulo}: serás ${invitacion.personaje}`}
       >
         <View style={estilos.sobre}>
@@ -605,7 +647,11 @@ function Sobre({
             <Text
               style={[estilos.sobreLlamada, invitacion.yaDentro && { color: color.pergaminoTenue }]}
             >
-              {invitacion.yaDentro ? 'Ya hay un móvil en esa silla' : 'Abrir la invitación →'}
+              {invitacion.yaDentro
+                ? 'Ya hay un móvil en esa silla'
+                : invitacion.directa
+                  ? 'Entrar sin código →'
+                  : 'Abrir la invitación →'}
             </Text>
           </View>
         </View>
@@ -748,6 +794,13 @@ const estilos = StyleSheet.create({
     justifyContent: 'center',
   },
   pistaAbajo: { position: 'absolute', bottom: 4, left: 0, right: 0, alignItems: 'center' },
+  verCuenta: {
+    fontFamily: fuente.titulo,
+    fontSize: 12,
+    letterSpacing: 1.3,
+    color: color.oro300,
+    marginTop: espacio.md,
+  },
   ctaAvatar: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
   ctaAvatarBoton: {
     borderRadius: radio.md,

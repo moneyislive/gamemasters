@@ -56,6 +56,39 @@ try {
   const suyas = await invitacionesPara(conRelay);
   salida.conRelay = suyas.length;
   salida.relayDirecta = suyas.some((i) => i.directa);
+
+  /*
+   * Las condiciones de «entrar sin teclear código», una a una. Verificar el
+   * buzón NO basta: hace falta además que la mesa se esté formando y que la
+   * silla esté libre. Cada una se mide por separado porque cada una tapa un
+   * agujero distinto, y una prueba que las mezclara no diría cuál se rompió.
+   */
+  const conBuzonBase: Account = {
+    ...cuenta,
+    correos: [
+      { correo: 'ana@ejemplo.com', nivel: 'buzon', origen: 'google', anadidoEl: cuenta.createdAt },
+    ],
+  };
+
+  // (a) La partida ya ha empezado.
+  const enJuego = await store.getLive('con-ana');
+  if (enJuego) {
+    enJuego.phase = 'ronda-abierta';
+    await store.saveLive(enJuego);
+  }
+  salida.empezadaDirecta =
+    (await invitacionesPara(conBuzonBase)).find((i) => i.gameId === 'con-ana')?.directa ?? null;
+
+  // (b) De vuelta a la sala de espera, pero con la silla ya ocupada.
+  const enLobby = await store.getLive('con-ana');
+  if (enLobby) {
+    enLobby.phase = 'lobby';
+    const j = enLobby.players.find((x) => x.suspectId === 's0');
+    if (j) j.joined = true;
+    await store.saveLive(enLobby);
+  }
+  salida.ocupadaDirecta =
+    (await invitacionesPara(conBuzonBase)).find((i) => i.gameId === 'con-ana')?.directa ?? null;
 } catch (e) {
   salida.error = e instanceof Error ? e.message : String(e);
 }
