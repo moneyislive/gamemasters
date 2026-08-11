@@ -24,6 +24,7 @@ import { View } from 'react-native';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { MeshoptDecoder } from 'meshoptimizer';
 import { Canvas } from './tres/Lienzo';
 import * as api from './api';
 
@@ -114,7 +115,28 @@ export function EscenaAvatar({
         const r = await fetch(api.urlAbsoluta(modeloUrl));
         if (!r.ok) return;
         const bytes = await r.arrayBuffer();
-        new GLTFLoader().parse(
+        /*
+         * EL DESCODIFICADOR DE GEOMETRÍA COMPRIMIDA, y ojo con cuál.
+         *
+         * El servidor pide los modelos comprimidos —el primero sin comprimir
+         * pesaba 12,3 MB y el mismo comprimido pesa 0,47— y sin descodificador
+         * el GLB llega entero pero no se abre: la escena sale vacía y sin una
+         * palabra de por qué. Fue la primera versión de este fichero.
+         *
+         * Y la trampa: Tripo comprime con MESHOPT, no con Draco. Poner el
+         * descodificador equivocado falla exactamente igual que no poner
+         * ninguno. El propio three lo dice —«setMeshoptDecoder must be called
+         * before loading compressed files»— pero solo si alguien escucha el
+         * error, que es la razón de que el manejador de abajo registre en vez
+         * de callar.
+         *
+         * Va empaquetado con la app (no de un CDN): funciona igual en el móvil
+         * y en una casa sin buena conexión, que es donde se juega.
+         */
+        await MeshoptDecoder.ready;
+        const cargador = new GLTFLoader();
+        cargador.setMeshoptDecoder(MeshoptDecoder);
+        cargador.parse(
           bytes,
           '',
           (gltf) => {
@@ -136,12 +158,18 @@ export function EscenaAvatar({
             escena.position.y -= caja.min.y;
             setObjeto(escena);
           },
-          () => {
-            /* Un GLB que no carga deja el hueco vacío; la portada ya tiene CTA. */
+          (error) => {
+            /*
+             * Se REGISTRA, no se traga. Un modelo que no carga deja la escena
+             * sin personaje, y sin este aviso el síntoma es «no se ve nada» sin
+             * una sola pista de por qué. Costó una tarde averiguar que era el
+             * descodificador de geometría comprimida.
+             */
+            console.warn('[avatar] el modelo no se pudo abrir:', error);
           },
         );
-      } catch {
-        /* Sin red no hay modelo: el fondo aguanta la escena solo. */
+      } catch (error) {
+        console.warn('[avatar] no se pudo traer el modelo:', error);
       }
     })();
     return () => {

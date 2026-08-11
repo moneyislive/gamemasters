@@ -95,6 +95,20 @@ export async function crearTareaDeAvatar(
       file: { type: tipo, file_token: testigo },
       texture: true,
       pbr: true,
+      /*
+       * TOPE DE POLÍGONOS Y COMPRESIÓN, y no son un capricho.
+       *
+       * La primera generación de prueba salió de 12,3 MB. Eso en un móvil con
+       * datos es medio minuto de descarga y un mordisco de memoria por cada
+       * avatar en pantalla — y la idea es que algún día estén los de toda la
+       * mesa. Con 30.000 caras el personaje sigue viéndose fino a tamaño de
+       * teléfono, y Draco comprime la geometría a una fracción.
+       *
+       * Lo que NO se toca es la textura: el detalle que se ve de verdad en un
+       * personaje estilizado está pintado, no esculpido.
+       */
+      face_limit: 30000,
+      compress: 'geometry',
     }),
   });
   if (!r.ok) {
