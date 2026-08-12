@@ -18,6 +18,7 @@
  * cabeceras separadas, un 401 de una no puede echarte de la otra.
  */
 import { abrirSobre, cerrarSobre } from './sobre';
+import { env } from '../config';
 import type { Request } from 'express';
 import type { Account } from '../../../shared/live';
 import type { ProveedorId, SesionDeCuenta } from '../../../shared/identidad';
@@ -30,6 +31,30 @@ export const CABECERA_CUENTA = 'x-gm-cuenta';
 
 export function emitirSesionDeCuenta(cuenta: Account, via: ProveedorId): string {
   return cerrarSobre('cuenta:v1', { cuentaId: cuenta.id, via }, DURACION_SEGUNDOS);
+}
+
+/**
+ * Las opciones de TODAS las cookies de esta casa, en un solo sitio.
+ *
+ * ESTABAN COPIADAS EN CUATRO LUGARES y es exactamente la clase de cosa que
+ * diverge sin que nadie lo note, porque una cookie mal puesta no da error: se
+ * comporta un poco distinto y ya está.
+ *
+ * `secure` sale del ORIGEN PÚBLICO configurado, no de `req.secure`. Si dependiera
+ * de la petición, bastaría con que nginx olvidara `X-Forwarded-Proto` para que
+ * las cookies salieran sin `Secure` en un sitio HTTPS —sin ningún síntoma— y la
+ * sesión de noventa días viajara en claro. Cuando no hay origen configurado se
+ * cae a `req.secure`, que es lo correcto en la wifi de casa: allí no hay HTTPS,
+ * y una cookie `Secure` la descarta el navegador y no deja entrar a nadie.
+ */
+export function opcionesDeCookie(req: Request, maxAgeMs: number) {
+  return {
+    httpOnly: true,
+    sameSite: 'lax' as const,
+    secure: env.publicOrigin ? env.publicOrigin.startsWith('https://') : req.secure,
+    maxAge: maxAgeMs,
+    path: '/',
+  };
 }
 
 /**

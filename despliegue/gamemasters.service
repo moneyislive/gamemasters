@@ -1,0 +1,54 @@
+# Unidad de systemd. Se copia a /etc/systemd/system/gamemasters.service
+#
+# Comprueba la ruta real de node antes de instalarla:  command -v node
+# Si no es /usr/bin/node, corrige ExecStart. Con la ruta equivocada el servicio
+# falla al arrancar con un «203/EXEC» que no dice qué falta.
+
+[Unit]
+Description=GameMasters — juegos de misterio en la vida real
+Documentation=https://harkania.com
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=gamemasters
+Group=gamemasters
+WorkingDirectory=/opt/gamemasters
+
+# NODE_ENV va AQUÍ y no solo en el fichero de entorno, a propósito: de esta
+# variable cuelgan seis comportamientos —entre ellos que el puerto no quede
+# expuesto y que el servidor se niegue a caer al fichero JSON local si Atlas
+# parpadea—, y un fichero de entorno se edita a mano y se puede quedar sin ella
+# sin que nada avise.
+Environment=NODE_ENV=production
+
+# Los secretos NO van en esta unidad: la leen todos los usuarios de la máquina
+# (`systemctl cat`). Van en un fichero aparte, propiedad de root y en modo 600.
+EnvironmentFile=/etc/gamemasters/entorno
+
+ExecStart=/usr/bin/node dist/index.js
+
+Restart=always
+RestartSec=5
+# Si se cae cinco veces en un minuto, se para de intentarlo: reiniciar en bucle
+# contra un Atlas caído solo llena el registro y calienta la máquina.
+StartLimitBurst=5
+StartLimitIntervalSec=60
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=gamemasters
+
+# Endurecimiento. El proceso solo necesita leer su código y escribir las fotos.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/gamemasters
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+
+[Install]
+WantedBy=multi-user.target

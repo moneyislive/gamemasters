@@ -11,6 +11,7 @@ import express from 'express';
 import type { NextFunction, Request, Response } from 'express';
 import { DEMO_MODE, env } from './config';
 import authRouter, { passwordRequired, requireAuth, tallerAbiertoPara } from './auth';
+import wellKnownRouter from './enlaces/well-known';
 import { getStorageKind, getStore, initStore } from './db/store';
 import boardRouter from './routes/board';
 import chatRouter from './routes/chat';
@@ -91,6 +92,14 @@ app.get(['/privacidad', '/privacidad.html'], (_req, res) => {
   res.type('html').send(paginaDePrivacidad());
 });
 
+/*
+ * Los ficheros de asociación de dominio de Apple y Google. Van AQUI, delante
+ * del guardian de la contrasena y delante del comodin, porque las dos
+ * plataformas los piden sin credenciales ninguna y porque el comodin les
+ * devolveria el index.html del taller con un 200 alegre. Ver enlaces/well-known.
+ */
+app.use(wellKnownRouter);
+
 /**
  * Señal de vida, para quien vigila el servicio.
  *
@@ -155,7 +164,19 @@ app.use('/api', (_req, res) => {
 if (env.clientDir) {
   const clientDir = env.clientDir;
   app.use(express.static(clientDir, { index: false }));
-  app.get('*', (_req, res) => {
+  app.get('*', (req, res) => {
+    /*
+     * El comodin NO puede contestar por la API ni por los ficheros de
+     * asociacion. Sin esto, una ruta mal escrita de /api/ o un fichero de
+     * .well-known que falte devuelven el index.html del taller con estado 200:
+     * quien llama cree que le han respondido y lo que recibe es una pagina web.
+     * Apple y Google, en concreto, dan la verificacion por buena y luego no
+     * funciona nada.
+     */
+    if (req.path.startsWith('/api/') || req.path.startsWith('/.well-known/')) {
+      res.status(404).json({ error: 'No existe.' });
+      return;
+    }
     res.sendFile(path.join(clientDir, 'index.html'));
   });
 }
@@ -206,6 +227,18 @@ function comprobarArranque(): void {
         'Defínela, o arranca sin NODE_ENV=production si de verdad quieres una instancia abierta.',
     );
   }
+
+  if (process.env.NODE_ENV === 'production' && !env.publicOrigin) {
+    throw new Error(
+      'Falta PUBLIC_ORIGIN y esto es producción. Sin ella el servidor se cree lo que diga la ' +
+        'cabecera Host, así que la dirección de vuelta que se le manda a Google la elige quien ' +
+        'llama: si nginx no la reenvía llega «localhost:5174» y fallan TODOS los inicios de ' +
+        'sesión a la vez, con un «redirect_uri_mismatch» que no dice de dónde viene.\n' +
+        'Y de ella cuelga el flag «secure» de las cookies: sin origen, una sesión de noventa ' +
+        'días puede acabar viajando en claro sin que nada falle a la vista.\n' +
+        'Defínela con el dominio público, sin barra final. Ejemplo: https://harkania.com',
+    );
+  }
 }
 
 /**
@@ -237,7 +270,18 @@ comprobarArranque();
 await initStore();
 const activeModel = await getStore().getConfigModel();
 
-app.listen(env.port, () => {
+/*
+ * En producción se escucha SOLO en el bucle local, y la razón es la línea
+ * `app.set('trust proxy', 1)` de arriba: eso significa «me fío del primer
+ * salto». Si el puerto fuera alcanzable desde fuera, quien llegara directo
+ * SERÍA el primer salto, y podría dictar `X-Forwarded-Proto` y
+ * `X-Forwarded-For` a voluntad — saltándose nginx entero y, con él, todo lo que
+ * dependa del protocolo o de la IP de quien llama.
+ *
+ * Fuera de producción se abre, porque el portátil hace de servidor de los
+ * móviles de la casa. Ver `readHost` en config.ts.
+ */
+app.listen(env.port, env.host, () => {
   const storageLabel =
     getStorageKind() === 'mongo'
       ? 'MongoDB Atlas (mongoose)'

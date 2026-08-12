@@ -17,7 +17,6 @@
  * `id_token` legítimo de otra sesión valdría igual.
  */
 import { Platform } from 'react-native';
-import * as AuthSession from 'expo-auth-session';
 import * as Crypto from 'expo-crypto';
 import * as WebBrowser from 'expo-web-browser';
 import * as api from './api';
@@ -56,44 +55,46 @@ async function nonceYHuella(): Promise<{ nonce: string; huella: string }> {
 }
 
 /**
- * Google.
+ * Google, a través del servidor.
  *
- * Se pide directamente el `id_token` (flujo implícito de OpenID Connect), que
- * es lo único que necesita el servidor: no se guarda ningún `access_token` ni
- * se pide ningún permiso sobre la cuenta más allá de saber quién eres.
+ * LA APP NO HABLA CON GOOGLE, y este es el motivo, que costó descubrir: Google
+ * no admite un esquema propio como `gamemasters://` en la dirección de vuelta
+ * de ningún tipo de cliente. El cliente **web** solo acepta `http` y `https`;
+ * el de **iOS** obliga a que el esquema sea su propio identificador invertido
+ * (`com.googleusercontent.apps.…`); y el de **Android** ni siquiera tiene campo
+ * para una dirección de vuelta.
+ *
+ * La primera versión de este fichero pedía el testigo directamente con
+ * `AuthSession.makeRedirectUri({ scheme: 'gamemasters' })`, y eso NO PODÍA
+ * funcionar contra Google de verdad: devuelve `redirect_uri_mismatch`. Compilaba,
+ * se veía bien, y solo lo habría descubierto una persona pulsando el botón en su
+ * móvil — porque el comprobador solo recorría el camino del navegador.
+ *
+ * Ahora se abre una página DEL SERVIDOR en el navegador de sesión. El servidor
+ * hace el viaje a Google con la única dirección de vuelta que hay dada de alta
+ * —la del dominio— y devuelve a `gamemasters://entrar?codigo=…` un código de un
+ * solo uso y dos minutos, que se cambia aquí por la sesión.
+ *
+ * Ese rodeo compra tres cosas: un solo identificador de cliente que mantener,
+ * ninguna credencial dentro del binario de la app, y la misma puerta servirá
+ * mañana para Apple en Android, que tiene exactamente el mismo problema.
  */
 export async function entrarConGoogle(): Promise<void> {
-  const clienteId = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID;
-  if (!clienteId) {
-    throw new SinProveedor(
-      'Entrar con Google no está configurado en esta versión de la app. Usa tu código.',
-    );
-  }
-
-  const { nonce } = await nonceYHuella();
-  const redirectUri = AuthSession.makeRedirectUri({ scheme: 'gamemasters' });
-
-  const peticion = new AuthSession.AuthRequest({
-    clientId: clienteId,
-    redirectUri,
-    responseType: AuthSession.ResponseType.IdToken,
-    scopes: ['openid', 'email', 'profile'],
-    extraParams: { nonce },
-  });
-
-  const resultado = await peticion.promptAsync({
-    authorizationEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
-  });
+  const servidor = api.urlDelServidor();
+  const resultado = await WebBrowser.openAuthSessionAsync(
+    `${servidor}/api/cuenta/entrar/google?destino=app`,
+    'gamemasters://entrar',
+  );
 
   if (resultado.type !== 'success') {
     // Cancelar no es un error: la persona cambió de idea.
-    if (resultado.type === 'cancel' || resultado.type === 'dismiss') return;
-    throw new Error('Google no completó la entrada.');
+    return;
   }
-  const idToken = resultado.params.id_token;
-  if (!idToken) throw new Error('Google no devolvió testigo de identidad.');
 
-  await api.entrarConProveedor('google', idToken, nonce);
+  const codigo = new URL(resultado.url).searchParams.get('codigo');
+  if (!codigo) throw new Error('La entrada no se completó. Inténtalo otra vez.');
+
+  await api.canjearEntrada(codigo);
 }
 
 /**

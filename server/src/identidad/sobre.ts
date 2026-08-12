@@ -24,7 +24,7 @@
 import { firmarConSecreto, igualSeguro } from '../secreto';
 
 /** Los dominios que existen. Añadir uno es añadirlo aquí, y en ningún otro sitio. */
-export type Dominio = 'cuenta:v1' | 'invitacion:v1';
+export type Dominio = 'cuenta:v1' | 'invitacion:v1' | 'nonce:v1' | 'canje:v1';
 
 const b64url = (d: Buffer | string): string =>
   Buffer.from(d).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');

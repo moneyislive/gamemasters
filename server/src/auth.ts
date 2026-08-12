@@ -23,6 +23,7 @@ import { crearRouter } from './rutas';
 import {
   COOKIE_CUENTA,
   emitirSesionDeCuenta,
+  opcionesDeCookie,
   pasaporteVigente,
   sesionDeCuentaDePeticion,
 } from './identidad/sesion';
@@ -32,6 +33,8 @@ import { cuentaDeCasa } from './taller/cuenta-de-casa';
 import type { ProveedorId } from '../../shared/identidad';
 
 const COOKIE = 'gm_sesion';
+/** La sesión de cuenta dura noventa días: es una plataforma, no una velada. */
+const noventaDias = (req: Request) => opcionesDeCookie(req, 60 * 60 * 24 * 90 * 1000);
 /** 30 días: es una herramienta para organizar veladas, no un banco. */
 const DURACION_SEGUNDOS = 60 * 60 * 24 * 30;
 
@@ -203,16 +206,7 @@ router.post('/auth/login', async (req, res) => {
     return;
   }
 
-  res.cookie(COOKIE, tokenDeSesion(password), {
-    httpOnly: true,
-    sameSite: 'lax',
-    // Según la conexión REAL, no según NODE_ENV: una cookie «secure» servida
-    // por HTTP la descarta el navegador, y en una wifi doméstica (el portátil
-    // haciendo de servidor para los móviles) no hay HTTPS.
-    secure: req.secure,
-    maxAge: DURACION_SEGUNDOS * 1000,
-    path: '/',
-  });
+  res.cookie(COOKIE, tokenDeSesion(password), opcionesDeCookie(req, DURACION_SEGUNDOS * 1000));
 
   /*
    * Si además se dice CON QUÉ NOMBRE se entra, se reparte también un pasaporte
@@ -233,13 +227,7 @@ router.post('/auth/login', async (req, res) => {
       });
       return;
     }
-    res.cookie(COOKIE_CUENTA, emitirSesionDeCuenta(cuenta, 'google'), {
-      httpOnly: true,
-      sameSite: 'lax',
-      secure: req.secure,
-      maxAge: 60 * 60 * 24 * 90 * 1000,
-      path: '/',
-    });
+    res.cookie(COOKIE_CUENTA, emitirSesionDeCuenta(cuenta, 'google'), noventaDias(req));
     res.json({ authenticated: true, cuenta: { id: cuenta.id, displayName: cuenta.displayName } });
     return;
   }
@@ -249,6 +237,12 @@ router.post('/auth/login', async (req, res) => {
 
 router.post('/auth/logout', (_req, res) => {
   res.clearCookie(COOKIE, { path: '/' });
+  /*
+   * Y TAMBIÉN el pasaporte de cuenta. Si solo se borrara la cookie de la casa,
+   * «salir» no sacaría a quien entró con un nombre: el guardián mira el
+   * pasaporte ANTES que la contraseña, así que seguiría dentro noventa días.
+   */
+  res.clearCookie(COOKIE_CUENTA, { path: '/' });
   res.json({ authenticated: false });
 });
 

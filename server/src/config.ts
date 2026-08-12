@@ -90,11 +90,62 @@ function readClientDir(): string | undefined {
   return candidatos.find((ruta) => fs.existsSync(path.join(ruta, 'index.html')));
 }
 
+/**
+ * El origen público: cómo se llega a este servidor desde fuera.
+ *
+ * POR QUÉ ES CONFIGURACIÓN Y NO LA CABECERA `Host`. El servidor construye con
+ * él la `redirect_uri` que se le manda a Google, y Google exige que coincida
+ * carácter por carácter con la que está dada de alta. Sacarla de `Host` la deja
+ * en manos de quien llama: si nginx no reenvía la cabecera llega
+ * `localhost:5174` y **todos** los inicios de sesión del taller fallan con
+ * `redirect_uri_mismatch`; y si alguien la falsifica, el enlace de vuelta apunta
+ * a donde él diga.
+ *
+ * De aquí cuelga además el flag `secure` de las cookies. Atarlo a `req.secure`
+ * a secas significa que, el día que nginx se despiste con `X-Forwarded-Proto`,
+ * las tres cookies salen SIN `Secure` en un sitio HTTPS y **nada falla a la
+ * vista**: se entra, se juega, y la sesión de noventa días viaja en claro. Con
+ * el origen configurado, ese fallo silencioso no puede ocurrir.
+ */
+function readPublicOrigin(): string | undefined {
+  const raw = process.env.PUBLIC_ORIGIN?.trim();
+  if (!raw) return undefined;
+  try {
+    const url = new URL(raw);
+    // Sin barra final y sin ruta: se concatena con rutas absolutas.
+    return `${url.protocol}//${url.host}`;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * En qué interfaz escucha el proceso.
+ *
+ * EN PRODUCCIÓN, SOLO EL BUCLE LOCAL, y la razón es `app.set('trust proxy', 1)`:
+ * eso significa «me fío del primer salto, sea quien sea». Si el puerto es
+ * alcanzable desde fuera, quien llegue directo ES el primer salto, y puede
+ * dictar `X-Forwarded-Proto` y `X-Forwarded-For` a voluntad — saltándose nginx
+ * entero y, con él, todo lo que dependa del protocolo o de la IP.
+ *
+ * Fuera de producción se abre, porque el portátil hace de servidor de los
+ * móviles de la casa y en esa wifi hay que ser alcanzable.
+ */
+function readHost(): string {
+  const raw = process.env.HOST?.trim();
+  if (raw) return raw;
+  return process.env.NODE_ENV === 'production' ? '127.0.0.1' : '0.0.0.0';
+}
+
 /** Variables de entorno ya normalizadas. */
 export const env: {
   apiKey?: string;
   defaultModel: ModelId;
   port: number;
+  /** Dónde vive este servidor de cara al mundo, p. ej. `https://harkania.com`. */
+  publicOrigin?: string;
+  /** Interfaz de escucha. Ver `readHost`. */
+  host: string;
   mongoUri?: string;
   /** Base de datos a usar; si se omite, se deduce de la URI (ver db/store.ts). */
   mongoDbName?: string;
@@ -106,6 +157,8 @@ export const env: {
   apiKey: process.env.ANTHROPIC_API_KEY?.trim() || undefined,
   defaultModel: readDefaultModel(),
   port: readPort(),
+  publicOrigin: readPublicOrigin(),
+  host: readHost(),
   mongoUri: process.env.MONGODB_URI?.trim() || undefined,
   mongoDbName: process.env.MONGODB_DB?.trim() || undefined,
   appPassword: process.env.APP_PASSWORD?.trim() || undefined,

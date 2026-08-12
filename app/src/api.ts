@@ -116,7 +116,37 @@ export async function fijarToken(nuevo: string | null): Promise<void> {
  * en un móvil sería un castigo.
  */
 export function urlDelTaller(): string {
+  return urlDelServidor();
+}
+
+/**
+ * La dirección del servidor con el que habla esta app.
+ *
+ * La necesita el inicio de sesión con Google, que ya no habla con Google
+ * directamente: abre una página DE ESTE SERVIDOR y deja que él haga el viaje.
+ */
+export function urlDelServidor(): string {
   return servidor;
+}
+
+/**
+ * Cambia el código de un solo uso que trajo el enlace de vuelta por la sesión.
+ *
+ * Ver el porqué del código intermedio en `entrar-con.ts`: el enlace atraviesa el
+ * sistema operativo y no puede llevar un pasaporte de noventa días dentro.
+ */
+export async function canjearEntrada(
+  codigo: string,
+): Promise<{ id: string; displayName: string; email: string; taller: boolean }> {
+  const r = await peticion<{
+    pasaporte: string;
+    cuenta: { id: string; displayName: string; email: string; taller: boolean };
+  }>('/cuenta/entrar/canjear', {
+    method: 'POST',
+    body: JSON.stringify({ codigo }),
+  });
+  await fijarPasaporte(r.pasaporte);
+  return r.cuenta;
 }
 
 export function urlDePrivacidad(): string {

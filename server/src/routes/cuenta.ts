@@ -13,12 +13,14 @@
  * todo el mundo— y no se puede perder por una comodidad.
  */
 import { randomUUID } from 'node:crypto';
+import { env } from '../config';
 import { getStore } from '../db/store';
 import { crearRouter } from '../rutas';
 import {
   COOKIE_CUENTA,
   emitirSesionDeCuenta,
   leerCookie,
+  opcionesDeCookie,
   pasaporteVigente,
   sesionDeCuentaDePeticion,
 } from '../identidad/sesion';
@@ -41,6 +43,25 @@ const router = crearRouter();
 
 /** Donde viaja el nonce del camino del navegador, entre la ida y la vuelta. */
 const COOKIE_NONCE = 'gm_nonce';
+
+/** Quién empezó el viaje a Google: el taller en un navegador, o la app. */
+type Destino = 'taller' | 'app';
+
+/**
+ * Los códigos de canje ya gastados.
+ *
+ * EN MEMORIA Y A PROPÓSITO. El código vive dos minutos, así que la ventana que
+ * abre un reinicio del servidor es de dos minutos; guardarlo en la base de
+ * datos costaría una escritura y una lectura en el camino más sensible que hay
+ * a cambio de cerrar eso. Si algún día hay más de un proceso sirviendo, esto
+ * hay que mover al almacén — y entonces será una decisión, no un descuido.
+ */
+const canjesGastados = new Set<string>();
+
+/** Un código de un solo uso que la app cambia por su pasaporte. */
+function emitirCanje(cuentaId: string): string {
+  return cerrarSobre('canje:v1', { cuentaId, jti: randomUUID() }, 120);
+}
 
 /** La cuenta de quien llama, o corta con 401. */
 async function cuentaDe(req: Request, res: Response): Promise<Account | null> {
@@ -98,8 +119,11 @@ router.post('/cuenta/entrar', async (req, res) => {
    * quien llama, y entonces no comprobaría nada.
    */
   const desdeNavegador = req.body?.desdeNavegador === true;
+  const sobreNonce = desdeNavegador
+    ? abrirSobre<{ nonce: string; destino: Destino }>('nonce:v1', leerCookie(req, COOKIE_NONCE))
+    : null;
   const nonce = desdeNavegador
-    ? abrirSobre<{ nonce: string }>('invitacion:v1', leerCookie(req, COOKIE_NONCE))?.nonce
+    ? sobreNonce?.nonce
     : req.body?.nonce
       ? String(req.body.nonce)
       : undefined;
@@ -126,30 +150,43 @@ router.post('/cuenta/entrar', async (req, res) => {
     const cuenta = await entrarConProveedor(identidad);
     const pasaporte = emitirSesionDeCuenta(cuenta, proveedor);
 
-    if (desdeNavegador) {
-      // El nonce es de un solo uso: gastado, se tira.
-      res.clearCookie(COOKIE_NONCE, { path: '/' });
-      res.cookie(COOKIE_CUENTA, pasaporte, {
-        httpOnly: true,
-        sameSite: 'lax',
-        secure: req.secure,
-        maxAge: 60 * 60 * 24 * 90 * 1000,
-        path: '/',
-      });
+    const resumen = {
+      id: cuenta.id,
+      displayName: cuenta.displayName,
+      email: cuenta.email,
+      taller: admitidoEnElTaller(cuenta),
+    };
+
+    if (!desdeNavegador) {
+      // La app nativa que ya tiene el testigo: se le da el pasaporte y ya está.
+      res.json({ pasaporte, cuenta: resumen });
+      return;
     }
 
-    res.json({
-      // El navegador guarda la sesión en la cookie; el pasaporte en el cuerpo es
-      // para la app, que no tiene cookies. Mandarlo a un navegador sería dejarlo
-      // al alcance de cualquier script de la página, así que allí no va.
-      pasaporte: desdeNavegador ? undefined : pasaporte,
-      cuenta: {
-        id: cuenta.id,
-        displayName: cuenta.displayName,
-        email: cuenta.email,
-        taller: admitidoEnElTaller(cuenta),
-      },
-    });
+    // El nonce es de un solo uso: gastado, se tira.
+    res.clearCookie(COOKIE_NONCE, { path: '/' });
+
+    if (sobreNonce?.destino === 'app') {
+      /*
+       * El viaje lo empezó la APP dentro de su navegador de sesión. Aquí NO se
+       * pone cookie: la app no las tiene. Se devuelve un código de un solo uso
+       * y de dos minutos que la página del retorno pondrá en un enlace
+       * `gamemasters://`.
+       *
+       * POR QUÉ UN CÓDIGO Y NO EL PASAPORTE DIRECTAMENTE. Ese enlace sale del
+       * navegador y entra en el sistema operativo: en Android puede verlo otra
+       * aplicación que declare el mismo esquema. Un pasaporte de noventa días
+       * ahí sería un regalo; un código que caduca en dos minutos y muere al
+       * primer uso, casi nada.
+       */
+      res.json({ codigo: emitirCanje(cuenta.id), cuenta: resumen });
+      return;
+    }
+
+    res.cookie(COOKIE_CUENTA, pasaporte, opcionesDeCookie(req, 60 * 60 * 24 * 90 * 1000));
+    // Al navegador NO se le manda el pasaporte en el cuerpo: lo guarda la
+    // cookie, y en el cuerpo quedaría al alcance de cualquier script.
+    res.json({ cuenta: resumen });
   } catch (error) {
     if (error instanceof TestigoInvalido) {
       res.status(401).json({ error: `No se pudo comprobar tu identidad: ${error.message}` });
@@ -158,6 +195,51 @@ router.post('/cuenta/entrar', async (req, res) => {
     console.error('[cuenta] fallo al entrar con proveedor:', error);
     res.status(502).json({ error: 'El proveedor de identidad no responde ahora mismo.' });
   }
+});
+
+/**
+ * La app cambia su código de un solo uso por el pasaporte.
+ *
+ * ES EL ÚLTIMO TRAMO del camino de Google en la app: el navegador de sesión
+ * volvió a `gamemasters://entrar?codigo=…`, y ese código —firmado, de dos
+ * minutos— se cambia aquí por la sesión de verdad.
+ *
+ * DE UN SOLO USO, y hace falta que lo sea: el enlace de vuelta atraviesa el
+ * sistema operativo, y en Android otra aplicación puede declarar el mismo
+ * esquema y llegar a verlo. Que el segundo intento falle convierte una copia
+ * robada en papel mojado casi siempre, y en las contadas veces que llegue antes
+ * quien lo robó, la persona ve que su propia entrada falla — que es la única
+ * forma de que se entere.
+ */
+router.post('/cuenta/entrar/canjear', async (req, res) => {
+  const codigo = String(req.body?.codigo ?? '');
+  const sobre = abrirSobre<{ cuentaId: string; jti: string }>('canje:v1', codigo);
+  if (!sobre) {
+    res.status(401).json({ error: 'Este acceso ha caducado. Vuelve a entrar.' });
+    return;
+  }
+  if (canjesGastados.has(sobre.jti)) {
+    res.status(409).json({ error: 'Este acceso ya se ha usado. Vuelve a entrar.' });
+    return;
+  }
+  canjesGastados.add(sobre.jti);
+  // Se olvida al caducar: si no, el conjunto crecería sin fin.
+  setTimeout(() => canjesGastados.delete(sobre.jti), 120_000).unref?.();
+
+  const cuenta = await getStore().getAccount(sobre.cuentaId);
+  if (!cuenta) {
+    res.status(401).json({ error: 'Esa cuenta ya no existe.' });
+    return;
+  }
+  res.json({
+    pasaporte: emitirSesionDeCuenta(cuenta, 'google'),
+    cuenta: {
+      id: cuenta.id,
+      displayName: cuenta.displayName,
+      email: cuenta.email,
+      taller: admitidoEnElTaller(cuenta),
+    },
+  });
 });
 
 /**
@@ -239,22 +321,25 @@ router.get('/cuenta/entrar/google', (req, res) => {
     return;
   }
 
-  const nonce = randomUUID();
-  res.cookie(COOKIE_NONCE, cerrarSobre('invitacion:v1', { nonce }, 300), {
-    httpOnly: true,
-    sameSite: 'lax',
-    secure: req.secure,
-    maxAge: 300_000,
-    path: '/',
-  });
+  // Quién ha empezado el viaje. Se guarda FIRMADO junto al nonce, no en la URL
+  // de vuelta: si viniera de la URL lo elegiría quien llama, y entonces
+  // cualquiera podría pedir que el pasaporte saliera hacia la app.
+  const destino: Destino = req.query.destino === 'app' ? 'app' : 'taller';
 
-  const destino = new URL('https://accounts.google.com/o/oauth2/v2/auth');
-  destino.searchParams.set('client_id', clienteWeb);
-  destino.searchParams.set('redirect_uri', `${origenDe(req)}/api/cuenta/retorno`);
-  destino.searchParams.set('response_type', 'id_token');
-  destino.searchParams.set('scope', 'openid email profile');
-  destino.searchParams.set('nonce', nonce);
-  res.redirect(destino.toString());
+  const nonce = randomUUID();
+  res.cookie(
+    COOKIE_NONCE,
+    cerrarSobre('nonce:v1', { nonce, destino }, 300),
+    opcionesDeCookie(req, 300_000),
+  );
+
+  const aGoogle = new URL('https://accounts.google.com/o/oauth2/v2/auth');
+  aGoogle.searchParams.set('client_id', clienteWeb);
+  aGoogle.searchParams.set('redirect_uri', `${origenDe(req)}/api/cuenta/retorno`);
+  aGoogle.searchParams.set('response_type', 'id_token');
+  aGoogle.searchParams.set('scope', 'openid email profile');
+  aGoogle.searchParams.set('nonce', nonce);
+  res.redirect(aGoogle.toString());
 });
 
 /**
@@ -294,6 +379,13 @@ router.get('/cuenta/retorno', (_req, res) => {
     });
     const cuerpo = await r.json();
     if (!r.ok) { estado.textContent = cuerpo.error || 'No se pudo entrar.'; return; }
+    // Si el viaje lo empezó la app, el servidor devuelve un código en vez de
+    // poner cookie: se le entrega por su esquema propio y esta pestaña muere.
+    if (cuerpo.codigo) {
+      estado.textContent = 'Listo. Volviendo a la aplicación…';
+      location.replace('gamemasters://entrar?codigo=' + encodeURIComponent(cuerpo.codigo));
+      return;
+    }
     location.replace('/');
   } catch (e) {
     estado.textContent = 'No se pudo hablar con el servidor.';
@@ -303,10 +395,23 @@ router.get('/cuenta/retorno', (_req, res) => {
 </body></html>`);
 });
 
-/** El origen público de esta petición, respetando el proxy de delante. */
+/**
+ * El origen público de este servidor.
+ *
+ * SALE DE LA CONFIGURACIÓN, NO DE LA CABECERA `Host`. Con él se fabrica la
+ * `redirect_uri` que se le manda a Google, y Google exige que coincida carácter
+ * por carácter con la registrada: si viniera del `Host` bastaría con que nginx
+ * no la reenviara para que llegase `localhost:5174` y fallaran TODOS los inicios
+ * de sesión del taller a la vez. Y quien falsificara la cabecera decidiría a
+ * dónde vuelve la persona.
+ *
+ * Solo se cae a la petición fuera de producción, que es donde la dirección
+ * cambia de verdad —el portátil haciendo de servidor en la wifi de casa— y
+ * donde no hay nada que proteger.
+ */
 function origenDe(req: Request): string {
-  const host = req.get('host') ?? 'localhost';
-  return `${req.protocol}://${host}`;
+  if (env.publicOrigin) return env.publicOrigin;
+  return `${req.protocol}://${req.get('host') ?? 'localhost'}`;
 }
 
 /**

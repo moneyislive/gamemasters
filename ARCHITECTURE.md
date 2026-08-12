@@ -336,3 +336,32 @@ descargado funcione offline). El SVG del tablero se genera con una función
 - Responsive razonable (≥1024px prioritario; usable en tablet).
 - Manejar estados vacíos con elegancia (ilustraciones tipográficas, invitaciones).
 - Errores de API → mensajes discretos en español (toast simple o texto en panel).
+
+## Despliegue y dominio (despliegue/, harkania.com)
+
+Un solo origen sirve todo: taller, API, documentos legales y páginas de
+aterrizaje. **No hay `api.harkania.com`** y es deliberado — las cookies se emiten
+sin atributo `Domain`, así que son host-only y no cruzarían al subdominio.
+
+Reglas que cuestan un incidente aprender:
+
+- **`PUBLIC_ORIGIN` es obligatoria en producción** y el servidor se niega a
+  arrancar sin ella. Con ella se fabrica la `redirect_uri` de Google (que exige
+  coincidencia carácter por carácter) y de ella cuelga el flag `secure` de las
+  cookies. Sacarla de la cabecera `Host` la pone en manos de quien llama.
+- **`NODE_ENV=production` va en la unidad de systemd**, no solo en el fichero de
+  entorno. De ella cuelgan seis comportamientos, entre ellos que el puerto no
+  quede expuesto y que el servidor no caiga al JSON local si Atlas parpadea.
+- **En producción se escucha solo en `127.0.0.1`.** Con `trust proxy` a 1, quien
+  alcance el puerto directamente es el primer salto y dicta `X-Forwarded-*`.
+- **Dos ficheros de nginx, no uno.** El definitivo apunta a un certificado que
+  aún no existe; certbot necesita un nginx en pie. Ver `despliegue/LEEME.md`.
+- **`/.well-known/*` son rutas de Express, no ficheros estáticos.** El comodín
+  del taller devolvía `index.html` con estado 200 para cualquier ruta
+  desconocida: Apple y Google daban la verificación por buena y luego no
+  funcionaba nada. El comodín ahora responde 404 para `/api/` y `/.well-known/`.
+- **El fichero de Apple se escribe por INCLUSIÓN.** Por exclusión, iOS reclama
+  el dominio entero para la app, incluido el taller.
+- **La app no habla con Google.** Google no admite esquemas propios
+  (`gamemasters://`) en la dirección de vuelta de ningún tipo de cliente. La app
+  abre `/api/cuenta/entrar/google?destino=app` y recibe un código de un solo uso.
