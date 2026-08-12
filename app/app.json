@@ -2,7 +2,7 @@
   "expo": {
     "name": "GameMasters",
     "slug": "gamemasters",
-    "scheme": "gamemasters",
+    "scheme": "harkania",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",

@@ -206,7 +206,7 @@ try {
   /*
    * ESTA ES LA COMPROBACIÓN QUE NO EXISTÍA, y por eso el botón de Google de la
    * app se escribió entero sin poder funcionar nunca: pedía el testigo a Google
-   * con una dirección de vuelta `gamemasters://`, y Google no admite un esquema
+   * con una dirección de vuelta `harkania://`, y Google no admite un esquema
    * propio en NINGÚN tipo de cliente. Compilaba, se veía bien, y solo lo habría
    * descubierto alguien pulsando el botón en su móvil.
    *
@@ -223,12 +223,12 @@ try {
   );
   comprobar(
     'nunca un esquema propio, que Google rechaza',
-    !(idaApp.cabeceras.get('location') ?? '').includes('gamemasters://'),
+    !(idaApp.cabeceras.get('location') ?? '').includes('harkania://'),
     idaApp.cabeceras.get('location')?.slice(0, 120),
   );
   comprobar(
     'la página de retorno sabe volver a la app',
-    retorno.cuerpo.includes('gamemasters://entrar?codigo='),
+    retorno.cuerpo.includes('harkania://entrar?codigo='),
     retorno.cuerpo.slice(0, 200),
   );
   comprobar(
@@ -274,7 +274,33 @@ try {
    * exactamente lo que no puede funcionar y lo que nadie ve hasta que alguien
    * pulsa el botón en un móvil de verdad.
    */
+  /*
+   * EL ESQUEMA, EN LOS TRES SITIOS A LA VEZ.
+   *
+   * Es el modo de fallo propio de un renombrado: se cambia en el servidor y no
+   * en la app, o al revés, y las dos mitades siguen compilando tan contentas.
+   * El resultado es que el navegador de sesión devuelve a un esquema que la app
+   * no declara, no vuelve nadie, y la pantalla se queda colgada sin ningún
+   * error — ni en el móvil ni en el registro del servidor.
+   *
+   * `app.json` manda: es lo único que el sistema operativo lee de verdad. Todo
+   * lo demás se compara contra él en vez de contra una constante escrita aquí,
+   * que solo sería un cuarto sitio donde equivocarse.
+   */
+  const appJson = JSON.parse(fs.readFileSync(path.join(REPO, 'app', 'app.json'), 'utf8'));
+  const esquema = String(appJson.expo?.scheme ?? '');
+  comprobar('la app declara un esquema propio', esquema.length > 2, esquema);
+  comprobar(
+    'y el servidor devuelve a ESE esquema, no a otro',
+    retorno.cuerpo.includes(`${esquema}://entrar?codigo=`),
+    { esquema, retorno: retorno.cuerpo.slice(0, 160) },
+  );
   const appEntrar = fs.readFileSync(path.join(REPO, 'app', 'src', 'entrar-con.ts'), 'utf8');
+  comprobar(
+    'y la app espera la vuelta en ESE esquema',
+    appEntrar.includes(`'${esquema}://entrar'`),
+    esquema,
+  );
   /*
    * Sin los comentarios, y no por elegancia: la primera versión de esto buscaba
    * `makeRedirectUri` en el fichero entero y saltaba siempre, porque el propio
@@ -401,8 +427,13 @@ try {
   const conCodigo = await pedir(5892, '/e/ABC123');
   comprobar('un enlace con código lleva a una página de verdad', conCodigo.estado === 200, conCodigo.estado);
   comprobar(
+    'con el MISMO esquema que declara la app, no otro',
+    conCodigo.cuerpo.includes(`${esquema}://e/`),
+    { esquema, pagina: conCodigo.cuerpo.slice(0, 160) },
+  );
+  comprobar(
     'que ofrece abrir la app con el código ya puesto',
-    conCodigo.cuerpo.includes('gamemasters://e/ABC123'),
+    conCodigo.cuerpo.includes('harkania://e/ABC123'),
     conCodigo.cuerpo.slice(0, 200),
   );
   comprobar(

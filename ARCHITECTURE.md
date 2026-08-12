@@ -363,5 +363,5 @@ Reglas que cuestan un incidente aprender:
 - **El fichero de Apple se escribe por INCLUSIÓN.** Por exclusión, iOS reclama
   el dominio entero para la app, incluido el taller.
 - **La app no habla con Google.** Google no admite esquemas propios
-  (`gamemasters://`) en la dirección de vuelta de ningún tipo de cliente. La app
+  (`harkania://`) en la dirección de vuelta de ningún tipo de cliente. La app
   abre `/api/cuenta/entrar/google?destino=app` y recibe un código de un solo uso.

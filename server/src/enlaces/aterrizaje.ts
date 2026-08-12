@@ -34,7 +34,7 @@ import { abrirSobre, cerrarSobre } from '../identidad/sobre';
 const router = crearRouter();
 
 /** El esquema propio de la app, para el botón de «ya la tengo». */
-const ESQUEMA = 'gamemasters';
+const ESQUEMA = 'harkania';
 
 /**
  * El enlace que se le manda a una persona invitada.

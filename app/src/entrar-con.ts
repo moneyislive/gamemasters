@@ -58,21 +58,21 @@ async function nonceYHuella(): Promise<{ nonce: string; huella: string }> {
  * Google, a través del servidor.
  *
  * LA APP NO HABLA CON GOOGLE, y este es el motivo, que costó descubrir: Google
- * no admite un esquema propio como `gamemasters://` en la dirección de vuelta
+ * no admite un esquema propio como `harkania://` en la dirección de vuelta
  * de ningún tipo de cliente. El cliente **web** solo acepta `http` y `https`;
  * el de **iOS** obliga a que el esquema sea su propio identificador invertido
  * (`com.googleusercontent.apps.…`); y el de **Android** ni siquiera tiene campo
  * para una dirección de vuelta.
  *
  * La primera versión de este fichero pedía el testigo directamente con
- * `AuthSession.makeRedirectUri({ scheme: 'gamemasters' })`, y eso NO PODÍA
+ * `AuthSession.makeRedirectUri({ scheme: 'harkania' })`, y eso NO PODÍA
  * funcionar contra Google de verdad: devuelve `redirect_uri_mismatch`. Compilaba,
  * se veía bien, y solo lo habría descubierto una persona pulsando el botón en su
  * móvil — porque el comprobador solo recorría el camino del navegador.
  *
  * Ahora se abre una página DEL SERVIDOR en el navegador de sesión. El servidor
  * hace el viaje a Google con la única dirección de vuelta que hay dada de alta
- * —la del dominio— y devuelve a `gamemasters://entrar?codigo=…` un código de un
+ * —la del dominio— y devuelve a `harkania://entrar?codigo=…` un código de un
  * solo uso y dos minutos, que se cambia aquí por la sesión.
  *
  * Ese rodeo compra tres cosas: un solo identificador de cliente que mantener,
@@ -83,7 +83,7 @@ export async function entrarConGoogle(): Promise<void> {
   const servidor = api.urlDelServidor();
   const resultado = await WebBrowser.openAuthSessionAsync(
     `${servidor}/api/cuenta/entrar/google?destino=app`,
-    'gamemasters://entrar',
+    'harkania://entrar',
   );
 
   if (resultado.type !== 'success') {

@@ -171,7 +171,7 @@ router.post('/cuenta/entrar', async (req, res) => {
        * El viaje lo empezó la APP dentro de su navegador de sesión. Aquí NO se
        * pone cookie: la app no las tiene. Se devuelve un código de un solo uso
        * y de dos minutos que la página del retorno pondrá en un enlace
-       * `gamemasters://`.
+       * `harkania://`.
        *
        * POR QUÉ UN CÓDIGO Y NO EL PASAPORTE DIRECTAMENTE. Ese enlace sale del
        * navegador y entra en el sistema operativo: en Android puede verlo otra
@@ -201,7 +201,7 @@ router.post('/cuenta/entrar', async (req, res) => {
  * La app cambia su código de un solo uso por el pasaporte.
  *
  * ES EL ÚLTIMO TRAMO del camino de Google en la app: el navegador de sesión
- * volvió a `gamemasters://entrar?codigo=…`, y ese código —firmado, de dos
+ * volvió a `harkania://entrar?codigo=…`, y ese código —firmado, de dos
  * minutos— se cambia aquí por la sesión de verdad.
  *
  * DE UN SOLO USO, y hace falta que lo sea: el enlace de vuelta atraviesa el
@@ -383,7 +383,7 @@ router.get('/cuenta/retorno', (_req, res) => {
     // poner cookie: se le entrega por su esquema propio y esta pestaña muere.
     if (cuerpo.codigo) {
       estado.textContent = 'Listo. Volviendo a la aplicación…';
-      location.replace('gamemasters://entrar?codigo=' + encodeURIComponent(cuerpo.codigo));
+      location.replace('harkania://entrar?codigo=' + encodeURIComponent(cuerpo.codigo));
       return;
     }
     location.replace('/');
