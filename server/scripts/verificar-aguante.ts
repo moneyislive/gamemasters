@@ -22,6 +22,21 @@
  * es un 404 y no una página HTML disfrazada, y que tras todo el maltrato el
  * proceso sigue en pie y respondiendo.
  *
+ * DOS COSAS MÁS QUE SOLO SE ROMPEN DETRÁS DE NGINX, y que por eso no las caza
+ * ninguna prueba que se conforme con lo que se ve en el portátil:
+ *
+ *   3. QUE LO QUE VA EN FLUJO SALGA EN FLUJO. Nginx almacena en su búfer lo que
+ *      le da quien tiene detrás; con un `text/event-stream` eso convierte al
+ *      mayordomo, que escribe palabra a palabra, en un silencio largo y una
+ *      parrafada final. Se comprueba por HTTP en el chat y sobre el código
+ *      fuente en todas las rutas en flujo a la vez — porque la número cinco se
+ *      escribirá otro día.
+ *   4. EL LIMITADOR DE INTENTOS, y sobre todo el caso que lo vuelve peligroso:
+ *      si la cadena del proxy no está bien montada, TODO EL MUNDO llega con la
+ *      misma dirección y un limitador por IP deja fuera a la casa entera. Aquí
+ *      se levantan las dos situaciones —la buena y la rota— y se mira que en la
+ *      rota no se bloquee a nadie.
+ *
  * AISLAMIENTO. Igual que el resto de comprobadores: proceso aparte, cwd en una
  * carpeta temporal sin `.env` al lado y un entorno explícito. Ni la clave de
  * Anthropic ni el Atlas de producción entran aquí.
@@ -34,6 +49,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { generateBoardLayout } from '../src/board/generator';
 import { generateDemoPlot } from '../src/plot/demoPlot';
+import { limitarIntentos } from '../src/puerta/limitador';
 import { crearRouter } from '../src/rutas';
 import type { GameSession } from '../../shared/types';
 import type { LiveSession } from '../../shared/live';
@@ -83,7 +99,21 @@ async function levantar(
   const puerto = typeof dir === 'object' && dir ? dir.port : 0;
   return {
     puerto,
-    cerrar: () => new Promise<void>((r) => servidor.close(() => r())),
+    cerrar: () =>
+      new Promise<void>((r) => {
+        servidor.close(() => r());
+        /*
+         * Y las conexiones abiertas se cortan a mano, o esto tarda cinco
+         * minutos. `close` deja de aceptar conexiones nuevas pero espera a que
+         * terminen las que hay, y aquí hay una colgada a propósito: la del
+         * control del router pelado, a la que nadie responde nunca. `fetch`
+         * mantiene su socket vivo, así que el cierre no volvía hasta que Node
+         * la tumbaba por `requestTimeout` — trescientos segundos, uno por uno.
+         * Un comprobador que tarda cinco minutos se acaba ejecutando la mitad
+         * de las veces, y entonces protege la mitad.
+         */
+        servidor.closeAllConnections();
+      }),
   };
 }
 
@@ -171,6 +201,255 @@ async function comprobarMecanismo(): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
+// 1 bis. El limitador de intentos, con y sin proxy bien montado
+// ---------------------------------------------------------------------------
+
+/*
+ * POR QUÉ ESTO VA EN MEMORIA Y NO CONTRA EL SERVIDOR DE VERDAD. El limitador
+ * todavía no está montado en `index.ts` —lo monta otra persona— así que por
+ * HTTP no habría nada que medir. Pero además, lo que hay que reproducir aquí es
+ * la CADENA DEL PROXY, y eso se hace montando dos aplicaciones distintas: una
+ * que se fía del primer salto, como la de producción, y otra que no. Levantar
+ * dos servidores completos para eso sería mucho ruido para lo mismo.
+ *
+ * Se reutiliza `levantar`, que es el mismo andamio que usa la comprobación de
+ * la fábrica de routers unas líneas más arriba.
+ */
+
+/** Una puerta de mentira: se entra con `joinCode: 'BUENO'` y con nada más. */
+async function puertaDePrueba(
+  confiarEnElProxy: boolean,
+  opciones: { porCredencial: number; porIp: number },
+): Promise<{ puerto: number; cerrar: () => Promise<void> }> {
+  const limite = limitarIntentos({
+    nombre: 'prueba',
+    credencial: (req) => String((req.body as { code?: string } | undefined)?.code ?? 'sin'),
+    ventanaMs: 60_000,
+    ...opciones,
+  });
+  return levantar((app) => {
+    // El 1 es exactamente lo que hay en `index.ts`: «me fío de UN salto».
+    if (confiarEnElProxy) app.set('trust proxy', 1);
+    app.use(express.json());
+    app.post('/entrar', limite, (req: express.Request, res: express.Response) => {
+      const cuerpo = req.body as { joinCode?: string } | undefined;
+      if (cuerpo?.joinCode === 'BUENO') {
+        res.json({ ok: true });
+        return;
+      }
+      res.status(401).json({ error: 'El código no es válido.' });
+    });
+  });
+}
+
+/** Un intento contra la puerta de mentira, viniendo de la IP que se diga. */
+async function intentar(
+  puerto: number,
+  cuerpo: { code: string; joinCode: string },
+  ipPublica?: string,
+): Promise<number> {
+  const r = await fetch(`http://127.0.0.1:${puerto}/entrar`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(ipPublica ? { 'X-Forwarded-For': ipPublica } : {}),
+    },
+    body: JSON.stringify(cuerpo),
+  });
+  await r.text();
+  // El recuento se apunta cuando la respuesta termina de salir, no cuando el
+  // manejador acaba. Sin esta pausa, dos intentos seguidos pueden adelantarse
+  // al apunte del anterior y la prueba contaría de menos un día de cada veinte.
+  await new Promise((r2) => setTimeout(r2, 15));
+  return r.status;
+}
+
+const CASA = '81.44.12.9';
+
+async function comprobarLimitador(): Promise<void> {
+  paso('El limitador cierra la puerta a quien prueba códigos');
+
+  {
+    const { puerto, cerrar } = await puertaDePrueba(true, { porCredencial: 4, porIp: 100 });
+    const estados: number[] = [];
+    for (let i = 0; i < 6; i++) {
+      estados.push(await intentar(puerto, { code: 'PARTIDA', joinCode: `MALO0${i}` }, CASA));
+    }
+
+    // Los cuatro primeros fallan como siempre; a partir del quinto ya no se
+    // llega a mirar el código.
+    comprobar('los intentos permitidos responden 401', estados.slice(0, 4).every((e) => e === 401), estados);
+    /*
+     * Y LA CABECERA NO VALE DESDE FUERA. Esta es la comprobación que faltaba y
+     * la que cazó el fallo: `app.set('trust proxy', 1)` hace que Express se crea
+     * la cabecera del primer salto sea quien sea, así que quien se conecta
+     * directo —el caso de una velada en casa, con el servidor en 0.0.0.0—
+     * elegía su propia procedencia. Rotándola no acumulaba fallos nunca; y
+     * fijándola en la de otra persona le gastaba el presupuesto y la dejaba
+     * fuera, que es convertir la defensa en un arma.
+     *
+     * Aquí la conexión llega del bucle local, así que la cabecera SÍ se
+     * respeta: es el caso de nginx en la misma máquina. Lo que se comprueba es
+     * que el limitador distingue por ella, y `procedenciaDe` documenta por qué
+     * eso solo vale desde el bucle local.
+     */
+    const otraProcedencia = await intentar(puerto, { code: 'PARTIDA', joinCode: 'MALO99' }, '81.44.12.10');
+    comprobar(
+      'CONTROL: otra procedencia tiene su propio presupuesto',
+      otraProcedencia === 401,
+      otraProcedencia,
+    );
+    comprobar('y al pasarse, la puerta responde 429', estados[4] === 429, estados);
+    comprobar('y sigue cerrada', estados[5] === 429, estados);
+
+    // `Retry-After` no es decoración: es lo que hace que la app pueda decir
+    // «vuelve a intentarlo en tres minutos» en vez de dejar a alguien pulsando.
+    const r = await fetch(`http://127.0.0.1:${puerto}/entrar`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': CASA },
+      body: JSON.stringify({ code: 'PARTIDA', joinCode: 'MALO' }),
+    });
+    await r.text();
+    comprobar('diciendo cuánto hay que esperar', Number(r.headers.get('retry-after')) > 0, r.headers.get('retry-after'));
+
+    // CONTROL: es POR IP. Si el contador fuera global, la casa de al lado
+    // —cualquier otra velada, esa misma noche— se habría quedado fuera también.
+    const otraCasa = await intentar(puerto, { code: 'PARTIDA', joinCode: 'MALO' }, '90.170.4.4');
+    comprobar('CONTROL: desde otra conexión se sigue pudiendo entrar', otraCasa === 401, otraCasa);
+
+    await cerrar();
+  }
+
+  paso('Acertar perdona los intentos anteriores');
+
+  {
+    // Quien teclea mal su código dos veces y acierta a la tercera no puede
+    // arrastrar nada: la noche es larga y va a volver a entrar.
+    const { puerto, cerrar } = await puertaDePrueba(true, { porCredencial: 4, porIp: 100 });
+    for (let i = 0; i < 3; i++) await intentar(puerto, { code: 'PARTIDA', joinCode: 'MALO' }, CASA);
+    const acierto = await intentar(puerto, { code: 'PARTIDA', joinCode: 'BUENO' }, CASA);
+    comprobar('el código bueno entra', acierto === 200, acierto);
+
+    const despues: number[] = [];
+    for (let i = 0; i < 3; i++) {
+      despues.push(await intentar(puerto, { code: 'PARTIDA', joinCode: 'MALO' }, CASA));
+    }
+    comprobar(
+      'y el contador quedó a cero: tres fallos más no cierran nada',
+      despues.every((e) => e === 401),
+      despues,
+    );
+    await cerrar();
+  }
+
+  paso('La velada real: doce móviles en la misma wifi');
+
+  {
+    /*
+     * ES LA COMPROBACIÓN POR LA QUE EXISTE ESTA TANDA. Las doce personas de la
+     * mesa salen a internet por la misma IP pública y teclean su código a la
+     * vez. Un limitador que contara PETICIONES en vez de fallos las echaría a
+     * todas de la cena en el momento exacto en que se sientan.
+     */
+    const { puerto, cerrar } = await puertaDePrueba(true, { porCredencial: 4, porIp: 8 });
+
+    /*
+     * Y VAN UNA DETRÁS DE OTRA A PROPÓSITO, que es lo que le da filo a la
+     * comprobación: doce peticiones a la vez pasarían igual con un limitador
+     * roto, porque ninguna habría terminado cuando la siguiente entra. En fila
+     * india, un contador que sumara peticiones habría cerrado en la novena.
+     */
+    const doce: number[] = [];
+    for (let i = 0; i < 12; i++) {
+      doce.push(await intentar(puerto, { code: 'PARTIDA', joinCode: 'BUENO' }, CASA));
+    }
+    comprobar('las doce entradas correctas pasan', doce.every((e) => e === 200), doce);
+    await cerrar();
+  }
+
+  {
+    // Y media mesa equivocándose una vez tampoco puede cerrar la puerta a la
+    // otra media: con los números de `montaje.ts` esto cabe de sobra.
+    const { puerto, cerrar } = await puertaDePrueba(true, { porCredencial: 30, porIp: 60 });
+    const erratas = await Promise.all(
+      Array.from({ length: 12 }, (_, i) =>
+        intentar(puerto, { code: 'PARTIDA', joinCode: `ERRAT${i}` }, CASA),
+      ),
+    );
+    comprobar('doce erratas simultáneas siguen siendo 401, no 429', erratas.every((e) => e === 401), erratas);
+    const tarde = await intentar(puerto, { code: 'PARTIDA', joinCode: 'BUENO' }, CASA);
+    comprobar('y quien acierta después entra igual', tarde === 200, tarde);
+    await cerrar();
+  }
+
+  paso('Y si el proxy no dice quién llama, NO se bloquea a nadie');
+
+  {
+    /*
+     * EL CASO QUE CONVIERTE UN LIMITADOR EN UN ARMA CONTRA LA PROPIA CASA.
+     *
+     * Esta aplicación es idéntica a la de arriba salvo en una línea: no se fía
+     * del proxy. Es lo que pasa el día que se despliega sin
+     * `app.set('trust proxy', 1)`, o el día que nginx deja de mandar
+     * `X-Forwarded-For` — dos descuidos de una línea que no dan ningún error.
+     * A partir de ahí todo el mundo es `127.0.0.1`, y un limitador que bloquee
+     * por IP deja fuera a los doce invitados en cuanto uno cualquiera falle
+     * cuatro veces. Sin credenciales que distinguir, la única respuesta honrada
+     * es encarecer y no cerrar.
+     */
+    const { puerto, cerrar } = await puertaDePrueba(false, { porCredencial: 4, porIp: 8 });
+    const estados: number[] = [];
+    for (let i = 0; i < 10; i++) {
+      estados.push(await intentar(puerto, { code: 'PARTIDA', joinCode: 'MALO' }, CASA));
+    }
+    comprobar(
+      'con la cadena del proxy rota, diez fallos NO cierran la puerta',
+      estados.every((e) => e === 401),
+      estados,
+    );
+    const invitada = await intentar(puerto, { code: 'PARTIDA', joinCode: 'BUENO' }, CASA);
+    comprobar('y la invitada número doce entra en su velada', invitada === 200, invitada);
+    await cerrar();
+  }
+
+  {
+    // Ni siquiera hace falta que llegue `X-Forwarded-For`: quien llama desde el
+    // bucle local sin cabecera ninguna tampoco identifica a nadie.
+    const { puerto, cerrar } = await puertaDePrueba(true, { porCredencial: 4, porIp: 8 });
+    const estados: number[] = [];
+    for (let i = 0; i < 10; i++) {
+      estados.push(await intentar(puerto, { code: 'PARTIDA', joinCode: 'MALO' }));
+    }
+    comprobar(
+      'sin X-Forwarded-For, tampoco se bloquea a la casa entera',
+      estados.every((e) => e === 401),
+      estados,
+    );
+    await cerrar();
+  }
+
+  paso('Pero probar a lo bruto sale caro aunque el proxy esté mal');
+
+  {
+    /*
+     * Que no se cierre la puerta no puede significar que salga gratis. Pasada la
+     * holgura —treinta fallos, que es una mesa entera equivocándose dos veces—
+     * cada intento arrastra un retardo creciente: quien prueba códigos baja de
+     * miles por minuto a unas pocas, y quien se equivoca de verdad no llega
+     * nunca hasta aquí.
+     */
+    const { puerto, cerrar } = await puertaDePrueba(false, { porCredencial: 4, porIp: 8 });
+    for (let i = 0; i < 33; i++) await intentar(puerto, { code: 'PARTIDA', joinCode: 'MALO' }, CASA);
+    const empezo = Date.now();
+    const estado = await intentar(puerto, { code: 'PARTIDA', joinCode: 'MALO' }, CASA);
+    const tardo = Date.now() - empezo;
+    comprobar('el intento treinta y cuatro sigue sin bloquearse', estado === 401, estado);
+    comprobar('pero ya cuesta un retardo apreciable', tardo >= 200, tardo);
+    await cerrar();
+  }
+}
+
+// ---------------------------------------------------------------------------
 // 2. La cobertura: no queda ningún router fuera de la red
 // ---------------------------------------------------------------------------
 
@@ -202,6 +481,35 @@ function comprobarCobertura(): void {
 
   comprobar('no queda ni un express.Router() suelto', sueltos.length === 0, sueltos);
   comprobar('y hay routers de verdad usando la fábrica', conFabrica >= 12, conFabrica);
+
+  paso('Ninguna respuesta en flujo se queda en el búfer de nginx');
+
+  /*
+   * ESTA VA SOBRE EL CÓDIGO FUENTE, y por el mismo motivo que la de los routers:
+   * lo que se prueba por HTTP más abajo es UNA ruta, y en flujo hay cuatro. El
+   * chat fue precisamente la que se quedó atrás —salía con `no-cache` a secas y
+   * sin `X-Accel-Buffering`— y nadie lo notó en meses, porque en el portátil no
+   * hay ningún nginx delante que almacene nada. La número cinco se escribirá
+   * otro día y tiene que nacer protegida.
+   */
+  const enFlujo: string[] = [];
+  const conBufer: string[] = [];
+  for (const fichero of ficherosTs(src)) {
+    const texto = fs.readFileSync(fichero, 'utf8');
+    if (!/setHeader\(\s*'Content-Type',\s*'text\/event-stream/.test(texto)) continue;
+    const relativo = path.relative(src, fichero).replace(/\\/g, '/');
+    enFlujo.push(relativo);
+    if (!texto.includes("'X-Accel-Buffering', 'no'") || !texto.includes('no-cache, no-transform')) {
+      conBufer.push(relativo);
+    }
+  }
+
+  comprobar('se encuentran las rutas en flujo', enFlujo.length >= 4, enFlujo);
+  comprobar(
+    'y TODAS le dicen a nginx que no almacene ni transforme la respuesta',
+    conBufer.length === 0,
+    conBufer,
+  );
 
   paso('Toda escritura sobre la partida pasa por el candado');
 
@@ -468,6 +776,48 @@ async function comprobarServidor(): Promise<void> {
     avisos,
   );
 
+  paso('Lo que dice el mayordomo sale conforme lo dice');
+
+  /*
+   * Aquí no se lee el cuerpo: se leen las CABECERAS, que es donde estaba el
+   * fallo. El servidor las manda con `flushHeaders()` antes de ponerse a
+   * escribir, así que llegan al instante; la conexión se corta en cuanto se han
+   * mirado, sin esperar a que el mayordomo termine su parrafada.
+   *
+   * Lo que se comprueba es lo que nginx necesita oír para no almacenar la
+   * respuesta. Sin ello el chat del taller se queda quieto todo el turno y
+   * suelta el texto de golpe al final —o no lo suelta, si el proxy corta antes
+   * por inactividad— y en local no se reproduce jamás.
+   */
+  const corte = new AbortController();
+  let flujo: Response | null = null;
+  try {
+    flujo = await fetch(`${BASE}/api/games/aguante/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: cookie },
+      body: JSON.stringify({ message: 'Buenas noches, Edmund.' }),
+      signal: corte.signal,
+    });
+    comprobar('el chat responde', flujo.status === 200, flujo.status);
+    comprobar(
+      'y lo hace en flujo, no como un JSON de una pieza',
+      (flujo.headers.get('content-type') ?? '').startsWith('text/event-stream'),
+      flujo.headers.get('content-type'),
+    );
+    comprobar(
+      'diciéndole a nginx que no la almacene en su búfer',
+      flujo.headers.get('x-accel-buffering') === 'no',
+      flujo.headers.get('x-accel-buffering'),
+    );
+    comprobar(
+      'ni la recomprima por el camino, que es la otra forma de acumularla',
+      (flujo.headers.get('cache-control') ?? '').includes('no-transform'),
+      flujo.headers.get('cache-control'),
+    );
+  } finally {
+    corte.abort();
+  }
+
   paso('Doce móviles a la vez no pierden lo que se escribe');
 
   // La presencia se guardaba fuera del candado: leía la sesión, tardaba, y
@@ -729,6 +1079,7 @@ let servidor: ChildProcess | undefined;
 
 try {
   await comprobarMecanismo();
+  await comprobarLimitador();
   comprobarCobertura();
 
   sembrar(dir);
@@ -741,6 +1092,17 @@ try {
       TMP: process.env.TMP,
       PORT: String(PUERTO),
       NODE_ENV: 'test',
+      /*
+       * Se arranca COMO EN PRODUCCION —escuchando solo en el bucle local—
+       * porque es la unica disposicion en la que el limitador se cree la
+       * cabecera X-Forwarded-For, y sin creersela no se pueden simular varias
+       * procedencias desde una sola prueba.
+       *
+       * Y esa condicion no es un capricho del banco de pruebas: fuera de esa
+       * disposicion el servidor escucha en 0.0.0.0, cualquiera se conecta
+       * directo y elegiria su propia IP. Ver `procedenciaDe`.
+       */
+      HOST: '127.0.0.1',
       APP_PASSWORD: CONTRASENA,
       PLAYER_TOKEN_SECRET: 'secreto-de-prueba-de-aguante-0123456789abcdef',
       CLIENT_DIR: path.join(dir, 'cliente'),

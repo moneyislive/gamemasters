@@ -17,33 +17,53 @@
  * conversaciones con el Mayordomo— hay que cambiar este texto EN EL MISMO
  * COMMIT. Una política que va por detrás del código es peor que no tenerla,
  * porque afirma cosas falsas con apariencia de compromiso.
+ *
+ * Y ESO YA PASÓ UNA VEZ, que es de dónde sale `verify:legal`. Este texto estuvo
+ * meses diciendo «solo dos proveedores» debajo de una lista de tres, sin
+ * nombrar a Google ni a Apple aunque el servidor ya les mandaba testigos de
+ * identidad, y sin mencionar una sola de las tres cookies que reparte. Ninguna
+ * de las cosas que fallaban era difícil de ver: lo difícil era acordarse de
+ * mirar. Ahora hay una comprobación que enumera los terceros y las cookies
+ * leyendo el código y exige que este documento los nombre uno por uno, de modo
+ * que el próximo proveedor que se conecte rompe la comprobación antes de llegar
+ * a producción.
  */
+import { crearRouter } from '../rutas';
+import { documentoLegal } from './plantilla';
+import type { SeccionLegal } from './plantilla';
+import {
+  avisoDeDatosPendientes,
+  correoDelResponsable,
+  fichaDelResponsable,
+  pieDelResponsable,
+} from './responsable';
 
 /** Última revisión del texto. Se enseña al final del documento. */
-export const REVISADA_EL = '2026-08-11';
+export const REVISADA_EL = '2026-08-12';
 
-const RESPONSABLE = 'Miguel Peidro Paredes';
-const CORREO = 'miguelpeidroparedes@gmail.com';
+function secciones(): SeccionLegal[] {
+  const correo = correoDelResponsable();
 
-const SECCIONES: Array<{ titulo: string; cuerpo: string }> = [
-  {
-    titulo: 'Quién trata tus datos',
-    cuerpo: `
+  return [
+    {
+      titulo: 'Quién trata tus datos',
+      cuerpo: `
       <p>
-        El responsable del tratamiento es <strong>${RESPONSABLE}</strong>, y puedes escribirle a
-        <a href="mailto:${CORREO}">${CORREO}</a> para cualquier cosa relacionada con tus datos,
-        incluidas las peticiones de acceso y de borrado.
+        El responsable del tratamiento es quien figura aquí abajo, y puedes escribirle para
+        cualquier cosa relacionada con tus datos, incluidas las peticiones de acceso y de borrado.
+        Sus datos completos están también en el <a href="/aviso-legal">aviso legal</a>.
       </p>
+      ${fichaDelResponsable('contacto')}
       <p>
         GameMasters es una herramienta para organizar juegos de misterio en la vida real. Hay dos
         piezas y conviene distinguirlas, porque tratan datos distintos: el <em>taller</em>, que usa
         quien organiza la partida desde un ordenador, y la <em>app</em>, que usan quienes juegan
         desde su móvil.
       </p>`,
-  },
-  {
-    titulo: 'Qué datos hay y de dónde salen',
-    cuerpo: `
+    },
+    {
+      titulo: 'Qué datos hay y de dónde salen',
+      cuerpo: `
       <p>La app <strong>no te pide que te registres</strong>. Para jugar solo hacen falta dos
       códigos que reparte quien organiza. La app no tiene acceso a tu cámara, ni a tu micrófono,
       ni a tus contactos, ni a tu ubicación; de tu galería solo ve la imagen concreta que tú
@@ -78,16 +98,22 @@ const SECCIONES: Array<{ titulo: string; cuerpo: string }> = [
           eliges tú, se usa solo para esculpir el modelo, y el modelo resultante se guarda en el
           servidor de tu juego.
         </li>
+        <li>
+          <strong>Si entras con tu cuenta de Google o de Apple:</strong> el correo que ese
+          proveedor nos confirma, tu nombre si lo comparte y un identificador estable que solo
+          sirve para reconocerte la próxima vez. Nada más: no se piden permisos sobre tu cuenta, ni
+          acceso a tu agenda, ni a tu correo, ni a tus fotos.
+        </li>
       </ul>
 
       <p>
         En el taller, quien organiza escribe además el material del juego: nombres de estancias, de
         objetos y las descripciones que quiera dar a cada personaje.
       </p>`,
-  },
-  {
-    titulo: 'Para qué se usan, y con qué amparo',
-    cuerpo: `
+    },
+    {
+      titulo: 'Para qué se usan, y con qué amparo',
+      cuerpo: `
       <p>
         Para que el juego funcione y para nada más. No hay publicidad, no hay perfilado, no hay
         analítica de terceros y no se venden ni se ceden datos a nadie.
@@ -105,16 +131,25 @@ const SECCIONES: Array<{ titulo: string; cuerpo: string }> = [
           partida.
         </li>
         <li>
+          <strong>Entrar con tu cuenta de Google o de Apple</strong>: ejecución de la relación, y
+          solo si eliges esa puerta. Es opcional — se puede jugar una velada entera sin cuenta
+          ninguna, con el código que reparte quien organiza.
+        </li>
+        <li>
           <strong>Revisar una respuesta denunciada</strong>: cumplimiento de la obligación que
           imponen las tiendas de aplicaciones a los productos que generan contenido con
           inteligencia artificial.
         </li>
       </ul>`,
-  },
-  {
-    titulo: 'Quién más los ve',
-    cuerpo: `
-      <p>Solo dos proveedores, y cada uno para una cosa concreta:</p>
+    },
+    {
+      titulo: 'Quién más los ve',
+      cuerpo: `
+      <p>
+        Esta es la lista completa de terceros que reciben algo, y cada uno recibe una cosa
+        concreta. Varios son <strong>opcionales</strong>: solo entran en juego si quien administra
+        el servidor ha conectado esa función y solo cuando la usas.
+      </p>
       <ul>
         <li>
           <strong>Anthropic</strong> (el modelo de lenguaje que escribe la trama y que da vida al
@@ -125,25 +160,81 @@ const SECCIONES: Array<{ titulo: string; cuerpo: string }> = [
           guardan en ningún sitio: se usan para contestarte y se descartan.
         </li>
         <li>
-          <strong>El proveedor de alojamiento y de base de datos</strong> donde corre el servidor,
-          que almacena lo descrito arriba.
+          <strong>Tripo</strong> (tripo3d.ai), si generas tu avatar 3D. Recibe la imagen que tú
+          eliges, y devuelve el modelo esculpido. Nada más viaja con ella: ni tu nombre, ni tu
+          correo, ni de qué partida sales.
         </li>
         <li>
-          <strong>Los servicios de generación 3D y de imagen</strong> (Tripo para esculpir tu
-          avatar desde la imagen que subes; Google para pintar los fondos de sala), únicamente si
-          quien administra el servidor los ha conectado y solo cuando usas esas funciones. Reciben
-          la imagen que tú eliges, para generar y nada más.
+          <strong>Google</strong>, en tres papeles distintos que conviene no confundir:
+          <em>(a)</em> como generador de imágenes —la familia Gemini pinta los fondos de las salas
+          a partir de una descripción escrita, sin ningún dato personal dentro—; <em>(b)</em> como
+          proveedor de identidad, si eliges «entrar con Google», en cuyo caso Google sabe que has
+          entrado aquí y nos confirma tu correo; y <em>(c)</em> como servidor de las tipografías con
+          las que se maquetan los dosieres: al abrir uno, tu navegador se las pide a Google y en ese
+          momento Google ve tu dirección IP.
+        </li>
+        <li>
+          <strong>Apple</strong>, si eliges «entrar con Apple». Lo mismo que Google en su papel de
+          proveedor de identidad. Si usas «Ocultar mi correo», lo que llega aquí es una dirección
+          de reenvío de Apple y no la tuya de verdad: funciona igual.
+        </li>
+        <li>
+          <strong>MongoDB Atlas</strong>, la base de datos donde se guarda todo lo descrito arriba.
+          El clúster se crea en una región europea.
+        </li>
+        <li>
+          <strong>Amazon Web Services</strong>, donde corre el servidor y donde está el disco en el
+          que se guardan las fotografías, los dosieres y los avatares.
         </li>
       </ul>
       <p>
-        Ambos pueden tratar datos fuera del Espacio Económico Europeo. Cuando ocurre, se ampara en
-        las cláusulas contractuales tipo aprobadas por la Comisión Europea, que es el mecanismo que
-        esos proveedores ofrecen para estas transferencias.
+        Ninguno de ellos usa estos datos para lo suyo: son encargados del tratamiento, tratan lo que
+        se les manda para prestar su servicio y no para otra cosa. Algunos pueden tratar datos fuera
+        del Espacio Económico Europeo; cuando ocurre, se ampara en las cláusulas contractuales tipo
+        aprobadas por la Comisión Europea, que es el mecanismo que esos proveedores ofrecen para
+        estas transferencias.
       </p>`,
-  },
-  {
-    titulo: 'Cuánto tiempo se conservan',
-    cuerpo: `
+    },
+    {
+      titulo: 'Cookies',
+      cuerpo: `
+      <p>
+        Hay tres, y las tres son estrictamente necesarias para que la sesión funcione. No hay
+        cookies de analítica, ni de publicidad, ni de terceros, ni nada que te siga por otras
+        páginas — por eso tampoco verás un cartel pidiéndote permiso: el artículo 22.2 de la LSSI
+        exime del consentimiento a las cookies imprescindibles para prestar el servicio, y todas
+        estas lo son.
+      </p>
+      <table>
+        <tr><th>Nombre</th><th>Para qué</th><th>Cuánto dura</th></tr>
+        <tr>
+          <td><code>gm_sesion</code></td>
+          <td>Recuerda que has entrado en el taller con la contraseña de la casa.</td>
+          <td>30 días</td>
+        </tr>
+        <tr>
+          <td><code>gm_cuenta</code></td>
+          <td>Tu sesión de cuenta, si has entrado con Google o con Apple.</td>
+          <td>90 días</td>
+        </tr>
+        <tr>
+          <td><code>gm_nonce</code></td>
+          <td>
+            Un número de un solo uso que viaja contigo a la pantalla de Google y se comprueba al
+            volver. Es lo que impide que sirva para entrar aquí un testigo capturado en otro sitio.
+          </td>
+          <td>5 minutos</td>
+        </tr>
+      </table>
+      <p>
+        Las tres son <em>httpOnly</em> —ningún script de la página puede leerlas— y viajan cifradas
+        cuando el sitio se sirve por HTTPS. <strong>La app del móvil no usa cookies</strong>: guarda
+        su credencial en el almacén seguro del teléfono y desaparece al desinstalarla.
+      </p>`,
+    },
+    {
+      titulo: 'Cuánto tiempo se conservan',
+      cuerpo: `
       <p>
         Mientras la partida exista. Quien organiza puede borrarla, y al hacerlo desaparece con ella
         todo lo de esa velada: nombres, correos, notas y fotografías.
@@ -154,10 +245,10 @@ const SECCIONES: Array<{ titulo: string; cuerpo: string }> = [
         datos». Se borra el perfil entero y, además, tu correo se retira de todas las partidas en
         las que estuviera apuntado, para que no vuelva a aparecer.
       </p>`,
-  },
-  {
-    titulo: 'Tus derechos',
-    cuerpo: `
+    },
+    {
+      titulo: 'Tus derechos',
+      cuerpo: `
       <p>
         Puedes pedir acceso a tus datos, su rectificación, su supresión, la limitación del
         tratamiento, oponerte a él y solicitar su portabilidad. Dos de ellos los puedes ejercer
@@ -171,30 +262,36 @@ const SECCIONES: Array<{ titulo: string; cuerpo: string }> = [
         </li>
       </ul>
       <p>
-        Para el resto, escribe a <a href="mailto:${CORREO}">${CORREO}</a>. Si crees que tus datos
+        Para el resto, escribe a <a href="mailto:${correo}">${correo}</a>. Si crees que tus datos
         no se han tratado como debían, puedes reclamar ante la Agencia Española de Protección de
         Datos (<a href="https://www.aepd.es" rel="noopener">aepd.es</a>).
       </p>`,
-  },
-  {
-    titulo: 'Menores',
-    cuerpo: `
+    },
+    {
+      titulo: 'Menores',
+      cuerpo: `
       <p>
         GameMasters está pensado para personas adultas. Quien organiza la partida es quien decide a
         quién invita y quien introduce sus datos, y por tanto quien debe asegurarse de contar con
         el consentimiento de quien corresponda si en la mesa hay menores de catorce años.
       </p>`,
-  },
-  {
-    titulo: 'Cambios',
-    cuerpo: `
+    },
+    {
+      titulo: 'Cambios',
+      cuerpo: `
       <p>
         Si cambia lo que se trata o cómo, cambia este texto, y con él la fecha de abajo. Los
         cambios que afecten a algo que hayas consentido se te pedirán de nuevo; no se dan por
         supuestos.
+      </p>
+      <p>
+        Las condiciones con las que se usa la plataforma están en los
+        <a href="/terminos">términos de uso</a>, y la identificación completa de quien la presta,
+        en el <a href="/aviso-legal">aviso legal</a>.
       </p>`,
-  },
-];
+    },
+  ];
+}
 
 /**
  * El documento, en HTML autocontenido.
@@ -202,82 +299,24 @@ const SECCIONES: Array<{ titulo: string; cuerpo: string }> = [
  * Sin hojas de estilo externas, sin tipografías de fuera y sin una sola línea de
  * JavaScript: tiene que abrirse igual desde el navegador de un móvil sin
  * cobertura decente y desde el revisor de una tienda. Y se lee en claro y oscuro
- * porque hay quien la abrirá de noche desde la cama.
+ * porque hay quien la abrirá de noche desde la cama. El armazón está en
+ * `plantilla.ts`, compartido con los otros dos documentos.
  */
 export function paginaDePrivacidad(): string {
-  const cuerpo = SECCIONES.map(
-    (s) => `<section><h2>${s.titulo}</h2>${s.cuerpo}</section>`,
-  ).join('\n');
-
-  return `<!doctype html>
-<html lang="es">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Privacidad · GameMasters</title>
-<style>
-  :root {
-    color-scheme: light dark;
-    --tinta: #1f120c;
-    --papel: #f4efe2;
-    --oro: #8a6a17;
-    --tenue: #5d5145;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root { --tinta: #ece3cf; --papel: #0b1710; --oro: #c9a227; --tenue: #a09781; }
-  }
-  * { box-sizing: border-box; }
-  body {
-    margin: 0;
-    padding: 2.5rem 1.25rem 4rem;
-    background: var(--papel);
-    color: var(--tinta);
-    font-family: Georgia, 'Times New Roman', serif;
-    font-size: 1.05rem;
-    line-height: 1.65;
-  }
-  main { max-width: 40rem; margin: 0 auto; }
-  h1 {
-    font-size: 1.9rem;
-    line-height: 1.2;
-    margin: 0 0 .25rem;
-    letter-spacing: .01em;
-  }
-  .sello {
-    text-transform: uppercase;
-    letter-spacing: .18em;
-    font-size: .72rem;
-    color: var(--oro);
-    margin: 0 0 2.5rem;
-  }
-  h2 {
-    font-size: 1.15rem;
-    margin: 2.5rem 0 .5rem;
-    padding-top: 1.5rem;
-    border-top: 1px solid color-mix(in srgb, var(--oro) 35%, transparent);
-  }
-  section:first-of-type h2 { border-top: 0; padding-top: 0; margin-top: 1.5rem; }
-  p, li { margin: .7rem 0; }
-  ul { padding-left: 1.15rem; }
-  a { color: var(--oro); }
-  footer {
-    margin-top: 3rem;
-    padding-top: 1.5rem;
-    border-top: 1px solid color-mix(in srgb, var(--oro) 35%, transparent);
-    color: var(--tenue);
-    font-size: .9rem;
-  }
-</style>
-</head>
-<body>
-<main>
-  <h1>Política de privacidad</h1>
-  <p class="sello">GameMasters</p>
-  ${cuerpo}
-  <footer>
-    <p>Última revisión: ${REVISADA_EL}. Responsable: ${RESPONSABLE} · <a href="mailto:${CORREO}">${CORREO}</a></p>
-  </footer>
-</main>
-</body>
-</html>`;
+  return documentoLegal({
+    titulo: 'Política de privacidad',
+    ruta: '/privacidad',
+    entradilla: avisoDeDatosPendientes('contacto'),
+    secciones: secciones(),
+    revisadaEl: REVISADA_EL,
+    pie: pieDelResponsable(),
+  });
 }
+
+const router = crearRouter();
+
+router.get(['/privacidad', '/privacidad.html'], (_req, res) => {
+  res.type('html').send(paginaDePrivacidad());
+});
+
+export default router;

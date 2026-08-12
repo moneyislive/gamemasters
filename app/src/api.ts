@@ -7,11 +7,19 @@
  */
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
+import { decidirServidor } from './servidor-elegido';
 import type { VistaJugador } from '../../shared/live';
 import type { Account } from '../../shared/live';
 
 const CLAVE_TOKEN = 'gm_token';
 const CLAVE_SERVIDOR = 'gm_servidor';
+/**
+ * El testigo de la elección de servidor: qué dirección traía la app compilada
+ * en el momento de guardarla. Sin él, una elección guardada no se distingue de
+ * otra hecha hace un año contra un portátil que ya no existe. El porqué entero
+ * está en `servidor-elegido.ts`.
+ */
+const CLAVE_SERVIDOR_COMPILADO = 'gm_servidor_compilado';
 /**
  * El pasaporte de cuenta. Es OTRO testigo, con otra vida y otra puerta.
  *
@@ -70,7 +78,26 @@ let servidor: string = SERVIDOR_POR_DEFECTO;
 export async function cargarSesionGuardada(): Promise<{ token: string | null; servidor: string }> {
   token = await almacen.get(CLAVE_TOKEN);
   pasaporte = await almacen.get(CLAVE_CUENTA);
-  servidor = (await almacen.get(CLAVE_SERVIDOR)) ?? SERVIDOR_POR_DEFECTO;
+
+  const veredicto = decidirServidor(
+    {
+      elegido: await almacen.get(CLAVE_SERVIDOR),
+      compiladoDeEntonces: await almacen.get(CLAVE_SERVIDOR_COMPILADO),
+    },
+    SERVIDOR_POR_DEFECTO,
+  );
+  servidor = veredicto.servidor;
+  /*
+   * La elección caducada se BORRA, no se deja ahí ignorada. Si se dejara,
+   * seguiría examinándose en cada arranque para nada y —esto es lo que de
+   * verdad muerde— resucitaría entera el día que una versión futura volviera a
+   * compilar por casualidad la dirección de entonces: un móvil que llevaba un
+   * año funcionando bien se desviaría solo al portátil de una velada vieja.
+   */
+  if (veredicto.olvidar) {
+    await almacen.del(CLAVE_SERVIDOR);
+    await almacen.del(CLAVE_SERVIDOR_COMPILADO);
+  }
   return { token, servidor };
 }
 
@@ -91,6 +118,13 @@ export function servidorActual(): string {
 export async function fijarServidor(url: string): Promise<void> {
   servidor = normalizarUrl(url);
   await almacen.set(CLAVE_SERVIDOR, servidor);
+  /*
+   * El testigo se escribe SIEMPRE, y en el mismo acto que la elección. Una
+   * elección guardada sin su testigo es indistinguible de las fósiles y el
+   * siguiente arranque la tira: quien acaba de escribir la dirección del
+   * portátil vería cómo la app vuelve sola a harkania.com al reabrirla.
+   */
+  await almacen.set(CLAVE_SERVIDOR_COMPILADO, SERVIDOR_POR_DEFECTO);
 }
 
 export async function fijarToken(nuevo: string | null): Promise<void> {

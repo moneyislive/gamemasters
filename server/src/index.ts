@@ -12,6 +12,9 @@ import type { NextFunction, Request, Response } from 'express';
 import { DEMO_MODE, env } from './config';
 import authRouter, { passwordRequired, requireAuth, tallerAbiertoPara } from './auth';
 import aterrizajeRouter from './enlaces/aterrizaje';
+import correoRouter from './correo/router';
+import legalRouter from './legal/documentos';
+import limitadorDeIntentos from './puerta/montaje';
 import wellKnownRouter from './enlaces/well-known';
 import { getStorageKind, getStore, initStore } from './db/store';
 import boardRouter from './routes/board';
@@ -30,7 +33,6 @@ import refreshRouter from './routes/refresh';
 import uploadsRouter from './routes/uploads';
 import duenoRouter from './taller/dueno';
 import { costurasDePruebaActivas } from './identidad/oidc';
-import { paginaDePrivacidad } from './legal/privacidad';
 import { secretoDeFirma } from './secreto';
 
 const app = express();
@@ -45,7 +47,23 @@ const app = express();
 app.set('trust proxy', 1);
 
 app.use(cors());
-app.use(express.json({ limit: '25mb' }));
+
+/*
+ * EL LIMITE DE CUERPO, y por qué son dos y no uno.
+ *
+ * Estaba en 25 MB para TODAS las rutas, y eso convierte cualquier ruta del
+ * servidor en un sitio donde tirar veinticinco megas: quien quiera dejar la
+ * máquina sin memoria solo tiene que mandar unos cuantos a la vez contra
+ * `/api/auth/login`, que ni siquiera lee el cuerpo entero. Ninguna ruta salvo
+ * una necesita más de unos kilobytes.
+ *
+ * La excepción es el estudio de avatares, que recibe la foto en base64 dentro
+ * del JSON. Tolera hasta 15 MB de imagen (ver `routes/generacion.ts`), y en
+ * base64 eso son unos veinte de texto. Así que ahí, y solo ahí, se levanta el
+ * límite — montado ANTES del analizador general para que gane.
+ */
+app.use('/api/generacion/avatar', express.json({ limit: '25mb' }));
+app.use(express.json({ limit: '256kb' }));
 
 // Directorio de subidas (disco persistente en producción): se crea al arrancar
 // y se sirve estático en /uploads, tras la contraseña si la hay.
@@ -89,9 +107,7 @@ app.use(
  * se lo está pensando, y para que la revise quien revisa—, y Apple pide además
  * un enlace desde dentro de la aplicación (directriz 5.1.1(i)).
  */
-app.get(['/privacidad', '/privacidad.html'], (_req, res) => {
-  res.type('html').send(paginaDePrivacidad());
-});
+app.use(legalRouter);
 
 /*
  * Los ficheros de asociación de dominio de Apple y Google. Van AQUI, delante
@@ -125,6 +141,15 @@ app.get('/api/salud', (_req, res) => {
   res.json({ ok: true });
 });
 
+/*
+ * El limitador de intentos, DELANTE de las tres puertas que hay.
+ *
+ * Tiene que ir por delante de `jugarRouter`, `cuentaRouter` y `authRouter`, que
+ * son las tres que aceptan una credencial: un limitador montado detrás de una
+ * de ellas no la protege, y montado detrás de todas no protege ninguna.
+ */
+app.use('/api', limitadorDeIntentos);
+
 // La app del jugador va ANTES del guardián: quien juega no conoce la contraseña
 // de la casa. Su credencial es el testigo firmado que recibe al emparejar el
 // móvil, y cada ruta lo verifica por su cuenta.
@@ -155,6 +180,7 @@ app.use('/api', boardRouter);
 app.use('/api', generateRouter);
 app.use('/api', refreshRouter);
 app.use('/api', materialRouter);
+app.use('/api', correoRouter);
 app.use('/api', liveRouter);
 app.use('/api', documentsRouter);
 

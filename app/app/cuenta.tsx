@@ -14,7 +14,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Image, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { router, useFocusEffect } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import Animated, { FadeIn, FadeInUp } from 'react-native-reanimated';
 import * as api from '../src/api';
 import { Pulsable } from '../src/vivo';
@@ -39,6 +39,18 @@ function rangoDe(jugadas: number): string {
 }
 
 export default function Cuenta(): JSX.Element {
+  /**
+   * El sobre de una invitación, cuando se ha llegado por
+   * `harkania.com/i/<sobre>` y todavía no hay cuenta con la que verla.
+   *
+   * NO SE ABRE NI SE CANJEA AQUÍ: viaja firmado y solo el servidor sabe leerlo,
+   * y un enlace que llega por correo lo reenvía cualquiera. Se usa únicamente
+   * como señal de POR QUÉ has llegado, para que esta pantalla no parezca una
+   * cuenta cualquiera cuando en realidad vienes de un sobre con tu nombre. Sin
+   * esto, el desvío entregaba el parámetro a una pantalla que lo tiraba, y
+   * quien pulsaba la invitación aterrizaba en un sitio que no la mencionaba.
+   */
+  const { invitacion } = useLocalSearchParams<{ invitacion?: string }>();
   const [portada, setPortada] = useState<api.Portada | null>(null);
   const [vistaAvatar, setVistaAvatar] = useState<string | undefined>();
   const [confirmando, setConfirmando] = useState(false);
@@ -93,6 +105,19 @@ export default function Cuenta(): JSX.Element {
     [cargar],
   );
 
+  /*
+   * Cerrar esta pantalla, incluso cuando debajo no hay nada.
+   *
+   * Aquí se llega también desde `harkania.com/i/<sobre>`, y ese desvío entra
+   * con `replace`: la pila queda con una sola pantalla y `router.back()` no
+   * hace nada. Al ser además una pantalla modal, quien llega por el enlace de
+   * una invitación se quedaba encerrado en ella sin más salida que matar la app.
+   */
+  const cerrar = useCallback(() => {
+    if (router.canGoBack()) router.back();
+    else router.replace('/');
+  }, []);
+
   const cerrarSesion = useCallback(async () => {
     await api.cerrarSesionDeCuenta();
     router.replace('/');
@@ -124,7 +149,7 @@ export default function Cuenta(): JSX.Element {
         <View style={estilos.cabecera}>
           <Text style={estilos.rotulo}>TU CUENTA</Text>
           <Pressable
-            onPress={() => router.back()}
+            onPress={cerrar}
             hitSlop={10}
             accessibilityRole="button"
             accessibilityLabel="Volver"
@@ -151,10 +176,13 @@ export default function Cuenta(): JSX.Element {
         ) : !portada ? (
           /* Sin cuenta: se explica qué es y para qué sirve, sin muro de texto. */
           <Animated.View entering={FadeInUp.duration(500)}>
-            <Text style={estilos.titulo}>Todavía no tienes cuenta</Text>
+            <Text style={estilos.titulo}>
+              {invitacion ? 'Te han invitado a una velada' : 'Todavía no tienes cuenta'}
+            </Text>
             <Text style={estilos.parrafo}>
-              Con una cuenta se guardan tus veladas, tus trofeos y tu rango, y las invitaciones te
-              aparecen en la portada sin tener que pedirle el código a nadie.
+              {invitacion
+                ? 'Tu invitación está guardada a nombre de un correo. Entra con ese mismo correo y te aparecerá en la portada, sin tener que pedirle el código a nadie.'
+                : 'Con una cuenta se guardan tus veladas, tus trofeos y tu rango, y las invitaciones te aparecen en la portada sin tener que pedirle el código a nadie.'}
             </Text>
             {proveedores.google || proveedores.apple ? (
               <View style={{ marginTop: espacio.lg }}>

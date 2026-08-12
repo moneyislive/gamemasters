@@ -263,10 +263,28 @@ router.post('/games/:id/chat', async (req: Request, res: Response) => {
       return;
     }
 
-    // Cabeceras SSE.
-    res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache');
+    /*
+     * Cabeceras del stream. Son las mismas que las de `/generate`, `/refresh` y
+     * `/material`, y tienen que serlo: esta era la única de las cuatro que salía
+     * sin `no-transform` ni `X-Accel-Buffering`, y detrás de nginx eso no es un
+     * detalle.
+     *
+     * Nginx almacena en su búfer la respuesta de quien tiene detrás, y con un
+     * `text/event-stream` eso significa que el mayordomo escribe palabra a
+     * palabra y no sale ni una hasta que se llena el búfer o se cierra la
+     * conexión: en el taller la respuesta llegaba de golpe al final, con el
+     * chat quieto durante todo el rato, o no llegaba nunca si el turno era
+     * largo y el proxy cortaba antes por inactividad. `X-Accel-Buffering: no`
+     * es la manera de decirle a nginx que en ESTA respuesta no lo haga, y
+     * `no-transform` le prohíbe además recomprimirla por el camino, que es la
+     * otra forma de acabar acumulando lo que debía ir saliendo.
+     *
+     * El fallo no se veía en local, porque en local no hay nginx delante.
+     */
+    res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
     res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
     res.flushHeaders();
 
     let cerrado = false;

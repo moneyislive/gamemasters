@@ -62,12 +62,34 @@ export default function Entrar(): JSX.Element {
     if (vista) router.replace('/(juego)/ronda');
   }, [vista]);
 
+  /*
+   * Volver, también cuando no hay a dónde volver.
+   *
+   * A esta pantalla se llega también desde `harkania.com/e/<código>`, y ese
+   * desvío entra con `replace`: la pila se queda con una sola pantalla y
+   * `router.back()` no hace absolutamente nada. Quien llega por el enlace de un
+   * amigo, se arrepiente y pulsa «Volver» se encuentra con un botón que no
+   * responde, que es como se ve una app colgada.
+   */
+  const volver = (): void => {
+    if (router.canGoBack()) router.back();
+    else router.replace('/');
+  };
+
   const entrar = async (): Promise<void> => {
     Keyboard.dismiss();
     setError(null);
     setEntrando(true);
     try {
-      if (servidor.trim()) await api.fijarServidor(servidor);
+      /*
+       * Solo se guarda la dirección si de verdad se ha CAMBIADO. El campo llega
+       * relleno con la que ya está en uso, así que guardarlo siempre le dejaba
+       * a todo el que entra una vez una «elección de servidor» que nunca hizo.
+       * Eso es lo que hacía invisible el clavado: la dirección se quedaba fija
+       * en el aparato sin que nadie recordara haber elegido nada.
+       */
+      const escrito = servidor.trim();
+      if (escrito && escrito !== api.servidorActual()) await api.fijarServidor(escrito);
       await api.entrar(codigo, personal);
       await refrescar();
       router.replace('/(juego)/ronda');
@@ -165,7 +187,7 @@ export default function Entrar(): JSX.Element {
         )}
       </Animated.View>
 
-      <Boton onPress={() => router.back()} style={{ marginTop: espacio.md }}>
+      <Boton onPress={volver} style={{ marginTop: espacio.md }}>
         Volver
       </Boton>
     </Pantalla>
