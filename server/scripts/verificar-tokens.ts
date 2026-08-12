@@ -68,8 +68,8 @@ const EMISOR_GOOGLE = 'https://accounts.google.com';
 const EMISOR_GOOGLE_CORTO = 'accounts.google.com';
 const EMISOR_APPLE = 'https://appleid.apple.com';
 const CLIENTE_WEB = '111-web.apps.googleusercontent.com';
-const BUNDLE = 'com.gamemasters.jugar';
-const SERVICES_ID = 'com.gamemasters.jugar.web';
+const BUNDLE = 'com.harkania.jugar';
+const SERVICES_ID = 'com.harkania.jugar.web';
 
 /*
  * Las costuras. Solo se leen fuera de producción, y el arranque del servidor se

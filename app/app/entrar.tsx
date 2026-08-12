@@ -11,7 +11,7 @@
  */
 import { useEffect, useState } from 'react';
 import { Keyboard, Linking, Pressable, StyleSheet, TextInput, View } from 'react-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import * as api from '../src/api';
 import { usePartida } from '../src/estado';
@@ -33,7 +33,14 @@ import {
 
 export default function Entrar(): JSX.Element {
   const { vista, refrescar } = usePartida();
-  const [codigo, setCodigo] = useState('');
+  /*
+   * El código puede venir ya puesto desde un enlace `harkania.com/e/<código>`.
+   * Se usa como valor INICIAL y no se vuelve a imponer: si se forzara en cada
+   * render, corregir a mano un código mal copiado sería imposible — el campo
+   * volvería solo al valor del enlace en cuanto se tocara.
+   */
+  const { codigo: codigoDelEnlace } = useLocalSearchParams<{ codigo?: string }>();
+  const [codigo, setCodigo] = useState(codigoDelEnlace ? String(codigoDelEnlace) : '');
   const [personal, setPersonal] = useState('');
   const [servidor, setServidor] = useState('');
   const [verServidor, setVerServidor] = useState(false);

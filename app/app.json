@@ -11,15 +11,19 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.gamemasters.jugar",
+      "bundleIdentifier": "com.harkania.jugar",
       "buildNumber": "1",
       "config": {
         "usesNonExemptEncryption": false
       },
-      "usesAppleSignIn": true
+      "usesAppleSignIn": true,
+      "associatedDomains": [
+        "applinks:harkania.com",
+        "webcredentials:harkania.com"
+      ]
     },
     "android": {
-      "package": "com.gamemasters.jugar",
+      "package": "com.harkania.jugar",
       "adaptiveIcon": {
         "backgroundColor": "#0b1710",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -27,7 +31,29 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "versionCode": 1
+      "versionCode": 1,
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "harkania.com",
+              "pathPrefix": "/i"
+            },
+            {
+              "scheme": "https",
+              "host": "harkania.com",
+              "pathPrefix": "/e"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png",

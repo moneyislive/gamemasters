@@ -32,7 +32,7 @@ import { crearRouter } from '../rutas';
 const router = crearRouter();
 
 /** El identificador de la aplicación, el mismo en las dos tiendas. */
-const BUNDLE = 'com.gamemasters.jugar';
+const BUNDLE = 'com.harkania.jugar';
 
 /** Las rutas que abren la aplicación. Todo lo demás se queda en la web. */
 export const RUTAS_DE_APP = ['/i/*', '/e/*'];

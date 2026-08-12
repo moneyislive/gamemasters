@@ -19,7 +19,7 @@
  *   1. `aud` ES UN CONJUNTO, NO UNA CONSTANTE. Es el error número uno. Google,
  *      en móvil nativo, firma con el identificador de cliente WEB (el de la
  *      plataforma va en `azp`). Apple, en iOS nativo, firma con el BUNDLE ID de
- *      la app —`com.gamemasters.jugar`— y no con el Services ID, que es el que
+ *      la app —`com.harkania.jugar`— y no con el Services ID, que es el que
  *      usa en web y en Android. Comparar contra un solo valor deja fuera a la
  *      mitad de tus usuarios, y el mensaje de error no dice por qué.
  *   2. `iss` DE GOOGLE TIENE DOS FORMAS: `accounts.google.com` y

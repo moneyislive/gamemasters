@@ -358,7 +358,7 @@ try {
   const detalle = JSON.parse(aasa.cuerpo).applinks.details[0];
   comprobar(
     'con el identificador completo: equipo y paquete',
-    detalle.appIDs[0] === 'AB12CD34EF.com.gamemasters.jugar',
+    detalle.appIDs[0] === 'AB12CD34EF.com.harkania.jugar',
     detalle.appIDs,
   );
   /*
@@ -386,6 +386,65 @@ try {
     'con la huella en mayúsculas, como espera Google',
     JSON.parse(links.cuerpo)[0].target.sha256_cert_fingerprints[0] === 'AA:BB:CC',
     links.cuerpo.slice(0, 160),
+  );
+
+  // -------------------------------------------------------------------------
+  paso('Donde cae quien pulsa la invitación sin tener la app');
+  // -------------------------------------------------------------------------
+  /*
+   * ES EL CAMINO QUE MÁS GENTE VA A RECORRER: con la app instalada estas
+   * páginas no se ven nunca —el sistema abre la app—, así que esto es
+   * exactamente lo que ve toda persona invitada la PRIMERA vez. Sin ellas, el
+   * enlace cae en el comodín y aparece la portada del taller, que es una
+   * herramienta que no es para ella.
+   */
+  const conCodigo = await pedir(5892, '/e/ABC123');
+  comprobar('un enlace con código lleva a una página de verdad', conCodigo.estado === 200, conCodigo.estado);
+  comprobar(
+    'que ofrece abrir la app con el código ya puesto',
+    conCodigo.cuerpo.includes('gamemasters://e/ABC123'),
+    conCodigo.cuerpo.slice(0, 200),
+  );
+  comprobar(
+    'y NO es la portada del taller',
+    !conCodigo.cuerpo.includes('<div id="root"'),
+    'el enlace acabó en el comodín del cliente',
+  );
+
+  /*
+   * El sobre caducado responde 410 y no 404: «esto existió y ya no vale» es otra
+   * cosa que «esto nunca existió», y para quien está delante es la diferencia
+   * entre creer que se equivocó de enlace y saber que llega tarde.
+   */
+  const caducada = await pedir(5892, '/i/esto-no-es-un-sobre');
+  comprobar('una invitación inválida se explica', caducada.estado === 410, caducada.estado);
+  comprobar(
+    'sin decir nada de la velada',
+    !caducada.cuerpo.includes('gameId') && !caducada.cuerpo.includes('suspect'),
+    caducada.cuerpo.slice(0, 160),
+  );
+
+  /*
+   * Y la comprobación que de verdad importa de esta sección: un código de
+   * partida NO se confirma aquí. Si esta página distinguiera entre un código
+   * válido y uno inventado, probando en la barra de direcciones se averiguarían
+   * los códigos existentes sin pasar por ningún contador de intentos.
+   */
+  /*
+   * Los dos códigos tienen que medir LO MISMO, y esto costó una comprobación mal
+   * escrita: la página muestra el código, así que uno de seis letras y otro de
+   * ocho dan respuestas de distinta longitud por ese motivo y no por existir o
+   * no. La primera versión comparaba longitudes con códigos desiguales y fallaba
+   * siempre, señalando un agujero que no había. Y `replaceAll` y no `replace`,
+   * porque el código sale DOS veces en la página —el texto y el enlace— y
+   * sustituir solo la primera dejaba la segunda descuadrada.
+   */
+  const inventado = await pedir(5892, '/e/ZZZ999');
+  comprobar(
+    'un código inventado se ve IGUAL que uno bueno: no es un oráculo',
+    inventado.estado === conCodigo.estado &&
+      inventado.cuerpo.replaceAll('ZZZ999', '§') === conCodigo.cuerpo.replaceAll('ABC123', '§'),
+    { bueno: conCodigo.estado, inventado: inventado.estado },
   );
 
   // -------------------------------------------------------------------------

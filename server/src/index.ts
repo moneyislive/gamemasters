@@ -11,6 +11,7 @@ import express from 'express';
 import type { NextFunction, Request, Response } from 'express';
 import { DEMO_MODE, env } from './config';
 import authRouter, { passwordRequired, requireAuth, tallerAbiertoPara } from './auth';
+import aterrizajeRouter from './enlaces/aterrizaje';
 import wellKnownRouter from './enlaces/well-known';
 import { getStorageKind, getStore, initStore } from './db/store';
 import boardRouter from './routes/board';
@@ -99,6 +100,13 @@ app.get(['/privacidad', '/privacidad.html'], (_req, res) => {
  * devolveria el index.html del taller con un 200 alegre. Ver enlaces/well-known.
  */
 app.use(wellKnownRouter);
+
+/*
+ * Donde cae quien pulsa un enlace de invitacion SIN la app instalada. Tambien
+ * delante del guardian: quien recibe la invitacion no conoce la contrasena de
+ * la casa, y sin esto el enlace acaba en la portada del taller.
+ */
+app.use(aterrizajeRouter);
 
 /**
  * Señal de vida, para quien vigila el servicio.
