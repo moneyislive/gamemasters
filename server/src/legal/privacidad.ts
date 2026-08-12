@@ -155,9 +155,11 @@ function secciones(): SeccionLegal[] {
           <strong>Anthropic</strong> (el modelo de lenguaje que escribe la trama y que da vida al
           Mayordomo). Recibe el material del juego —incluido el nombre con el que quien organiza
           te haya apuntado— y, cuando le preguntas algo al Mayordomo, tu pregunta junto con la
-          ficha de tu propio personaje. <strong>No recibe correos electrónicos</strong>, ni las
-          notas de tu cuaderno, ni las de nadie más. Tus conversaciones con el Mayordomo no se
-          guardan en ningún sitio: se usan para contestarte y se descartan.
+          ficha de tu propio personaje. <strong>También recibe tu dirección de correo</strong>, si
+          quien organiza la apuntó al montar la velada: forma parte de la ficha del personaje que
+          el modelo consulta para trabajar. No recibe las notas de tu cuaderno, ni las de nadie
+          más. Tus conversaciones con el Mayordomo no se guardan en ningún sitio: se usan para
+          contestarte y se descartan.
         </li>
         <li>
           <strong>Tripo</strong> (tripo3d.ai), si generas tu avatar 3D. Recibe la imagen que tú
