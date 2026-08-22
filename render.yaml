@@ -17,21 +17,28 @@ services:
   - type: web
     name: harkania
     runtime: node
-    plan: starter # el gratuito no admite disco y se duerme; ver más abajo
+    plan: free # ver el aviso de abajo: sin disco y con siesta
     region: frankfurt # el más cercano a España
     buildCommand: npm install && npm run build
     startCommand: npm start
     healthCheckPath: /api/salud
 
-    # Disco persistente. SIN ESTO LAS FOTOS DE LOS INVITADOS DESAPARECEN en cada
-    # despliegue, porque el sistema de ficheros del contenedor es efímero. Y son
-    # datos personales de otras personas, así que perderlas no es una molestia:
-    # es un incidente. Los discos exigen plan de pago — ese es el motivo real de
-    # que aquí no ponga `free`.
-    disk:
-      name: harkania-uploads
-      mountPath: /var/data
-      sizeGB: 1
+    # SIN DISCO PERSISTENTE, Y ESO TIENE CONSECUENCIAS QUE HAY QUE SABER.
+    #
+    # El plan gratuito no admite discos, así que el sistema de ficheros del
+    # contenedor es efímero: LAS FOTOS QUE SE SUBAN DESAPARECEN en cada
+    # despliegue y cada vez que el servicio despierte de su siesta. No dan
+    # error — las partidas siguen ahí y los retratos salen rotos.
+    #
+    # Mientras esto sea `free`, NO SUBAS FOTOS DE PERSONAS REALES a una velada
+    # que quieras conservar. Para eso hace falta el plan de pago y devolver
+    # aquí el bloque `disk:` con `mountPath: /var/data`, además de la variable
+    # UPLOADS_DIR apuntando dentro.
+    #
+    # Y el servicio SE DUERME tras un rato sin peticiones: la primera visita
+    # después de la siesta tarda cerca de un minuto en responder. Molesto si el
+    # primer invitado llega antes que tú; irrelevante una vez la mesa está en
+    # marcha, porque la partida consulta sin parar.
 
     envVars:
       - key: NODE_VERSION
@@ -55,10 +62,6 @@ services:
       # el enrutador no llegaría.
       - key: HOST
         value: 0.0.0.0
-
-      # Las fotos van al disco persistente montado arriba.
-      - key: UPLOADS_DIR
-        value: /var/data/uploads
 
       - key: ANTHROPIC_MODEL
         value: claude-fable-5
