@@ -216,10 +216,13 @@ Entra en `https://tu-servidor/descargar` y comprueba que sale el botón. Si dice
 
 ## Cuando quieras sacar una versión nueva
 
-1. Abre `app/app.json` y **sube dos números**:
-   - `"version": "1.0.1"` — el que ve la gente.
-   - `"versionCode": 2` — el que mira Android. **Este es obligatorio**: si no lo
-     subes, el teléfono se niega a instalar encima y no explica por qué.
+1. Abre `app/app.json` y sube `"version"` — el número que ve la gente.
+
+   No busques `versionCode`: ya no está, y es a propósito. Android usa ese
+   segundo número para decidir si una instalación es más nueva que la anterior,
+   y si no sube **el teléfono se niega a instalar encima sin explicar por qué**.
+   Como es fácil olvidarlo, lo lleva EAS: `eas.json` tiene `autoIncrement` en el
+   perfil `apk`, así que cada compilación recibe el suyo automáticamente.
 2. Repite los pasos 5, 6 y 7 (con la etiqueta `v1.0.1`).
 3. Actualiza `APK_URL` y `APK_VERSION` en Render.
 

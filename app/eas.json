@@ -18,7 +18,8 @@
       },
       "env": {
         "EXPO_PUBLIC_API_URL": "https://harkania.onrender.com"
-      }
+      },
+      "autoIncrement": true
     },
     "production": {
       "autoIncrement": true,

@@ -31,7 +31,6 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "versionCode": 1,
       "intentFilters": [
         {
           "action": "VIEW",
@@ -86,11 +85,12 @@
     "experiments": {
       "typedRoutes": true
     },
+    "owner": "miek98gs-team",
     "extra": {
+      "router": {},
       "eas": {
-        "projectId": "4080bdc1-ce9e-4a03-ba90-b6a3fb2d14f3"
+        "projectId": "75d313be-14be-479f-99fa-3f2803c7d9a2"
       }
-    },
-    "owner": "miek98gs-team"
+    }
   }
 }
