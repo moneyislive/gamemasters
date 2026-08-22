@@ -19,7 +19,16 @@ services:
     runtime: node
     plan: free # ver el aviso de abajo: sin disco y con siesta
     region: frankfurt # el más cercano a España
-    buildCommand: npm install && npm run build
+    # `--include=dev` NO ES OPCIONAL, y su ausencia da un error que no se
+    # explica solo: «esbuild: not found».
+    #
+    # Aquí abajo se define NODE_ENV=production, y npm respeta esa variable
+    # OMITIENDO las dependencias de desarrollo al instalar. Pero esbuild (que
+    # compila el servidor) y vite (que compila el cliente) son justamente
+    # dependencias de desarrollo: solo hacen falta para construir, no para
+    # ejecutar. Sin esta bandera, la instalación termina bien, el build arranca,
+    # y muere buscando una herramienta que nadie instaló.
+    buildCommand: npm install --include=dev && npm run build
     startCommand: npm start
     healthCheckPath: /api/salud
 
