@@ -1,0 +1,108 @@
+# Despliegue en Render — un único servicio sirve la web y la API.
+#
+# POR QUÉ RENDER Y NO VERCEL. Esto no es una web estática: el agente genera la
+# trama en flujo durante minutos, las partidas en vivo se sincronizan con espera
+# larga, y hay estado en memoria que asume UN SOLO proceso —el candado por
+# partida de `live/sesion.ts`, los códigos de un solo uso de `routes/cuenta.ts`
+# y el contador del limitador—. En un entorno sin servidor, cada invocación es
+# un proceso distinto: el candado deja de serializar nada y doce móviles
+# escribiendo a la vez pierden cambios, un código de un solo uso vale dos veces,
+# y el límite de intentos se multiplica por el número de instancias. Ninguna de
+# las tres cosas da error: siguen «funcionando» y fallan en silencio.
+#
+# Render lee este fichero al conectar el repositorio (Blueprint). Las claves
+# marcadas con sync:false NO se guardan aquí: las introduces tú en el panel,
+# para que no acaben nunca en el repositorio.
+services:
+  - type: web
+    name: harkania
+    runtime: node
+    plan: starter # el gratuito no admite disco y se duerme; ver más abajo
+    region: frankfurt # el más cercano a España
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/salud
+
+    # Disco persistente. SIN ESTO LAS FOTOS DE LOS INVITADOS DESAPARECEN en cada
+    # despliegue, porque el sistema de ficheros del contenedor es efímero. Y son
+    # datos personales de otras personas, así que perderlas no es una molestia:
+    # es un incidente. Los discos exigen plan de pago — ese es el motivo real de
+    # que aquí no ponga `free`.
+    disk:
+      name: harkania-uploads
+      mountPath: /var/data
+      sizeGB: 1
+
+    envVars:
+      - key: NODE_VERSION
+        value: '20'
+      # De esta variable cuelgan seis comportamientos, entre ellos que el taller
+      # se cierre si falta la contraseña y que el servidor NO caiga al fichero
+      # JSON local si Atlas parpadea (lo cual mostraría un taller vacío y haría
+      # rehacer partidas que existen).
+      - key: NODE_ENV
+        value: production
+
+      # El origen público. El servidor se niega a arrancar sin él en producción:
+      # con él se fabrica la dirección de vuelta que se le da a Google —que exige
+      # coincidencia carácter por carácter— y de él cuelga el flag `secure` de
+      # las cookies. Cámbialo al dominio propio cuando lo apuntes aquí.
+      - key: PUBLIC_ORIGIN
+        value: https://harkania.onrender.com
+
+      # Render enruta al puerto que le digas y el proceso vive en su propia red:
+      # aquí NO se ata al bucle local como en una máquina con nginx delante, o
+      # el enrutador no llegaría.
+      - key: HOST
+        value: 0.0.0.0
+
+      # Las fotos van al disco persistente montado arriba.
+      - key: UPLOADS_DIR
+        value: /var/data/uploads
+
+      - key: ANTHROPIC_MODEL
+        value: claude-fable-5
+      - key: MONGODB_DB
+        value: harkania
+
+      # --- Secretos: se introducen en el panel (Environment) ------------------
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: MONGODB_URI
+        sync: false
+      - key: APP_PASSWORD
+        sync: false
+      # Firma las cookies, los pasaportes y las credenciales de jugador.
+      # Cambiarlo invalida TODAS las sesiones a la vez: se elige una vez.
+      - key: PLAYER_TOKEN_SECRET
+        sync: false
+
+      # --- Identidad, cuando la tengas ---------------------------------------
+      - key: GOOGLE_CLIENT_IDS
+        sync: false
+      - key: APPLE_CLIENT_IDS
+        sync: false
+      # Sin tu correo aquí, tu propia cuenta de Google no abre el taller.
+      - key: GM_ADMITIDOS
+        sync: false
+
+      # --- La descarga del APK, mientras no haya tienda -----------------------
+      # La dirección del fichero en GitHub Releases y la versión que anuncia la
+      # página. Sin la primera, /descargar lo dice en vez de enseñar un botón
+      # muerto. Ver `enlaces/descarga.ts`.
+      - key: APK_URL
+        sync: false
+      - key: APK_VERSION
+        sync: false
+
+      # --- Generación de imagen y 3D (opcionales) ----------------------------
+      - key: TRIPO_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+
+      # --- Datos del responsable, para el aviso legal -------------------------
+      - key: LEGAL_NIF
+        sync: false
+      - key: LEGAL_DIRECCION
+        sync: false

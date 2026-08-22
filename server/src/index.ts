@@ -12,6 +12,7 @@ import type { NextFunction, Request, Response } from 'express';
 import { DEMO_MODE, env } from './config';
 import authRouter, { passwordRequired, requireAuth, tallerAbiertoPara } from './auth';
 import aterrizajeRouter from './enlaces/aterrizaje';
+import descargaRouter from './enlaces/descarga';
 import correoRouter from './correo/router';
 import legalRouter from './legal/documentos';
 import limitadorDeIntentos from './puerta/montaje';
@@ -123,6 +124,13 @@ app.use(wellKnownRouter);
  * la casa, y sin esto el enlace acaba en la portada del taller.
  */
 app.use(aterrizajeRouter);
+
+/*
+ * La descarga del APK, mientras no haya tienda. Tambien delante del guardian:
+ * quien va a instalar la app es quien juega, y no conoce la contrasena de la
+ * casa ni tiene por que.
+ */
+app.use(descargaRouter);
 
 /**
  * Señal de vida, para quien vigila el servicio.

@@ -367,6 +367,8 @@ try {
       UPLOADS_DIR: path.join(dirC, 'uploads'),
       APPLE_TEAM_ID: 'AB12CD34EF',
       ANDROID_CERT_SHA256: 'aa:bb:cc',
+      APK_URL: 'https://github.com/ejemplo/harkania/releases/download/v3/harkania.apk',
+      APK_VERSION: '3.0.1',
     },
     stdio: 'ignore',
   });
@@ -476,6 +478,48 @@ try {
     inventado.estado === conCodigo.estado &&
       inventado.cuerpo.replaceAll('ZZZ999', '§') === conCodigo.cuerpo.replaceAll('ABC123', '§'),
     { bueno: conCodigo.estado, inventado: inventado.estado },
+  );
+
+  // -------------------------------------------------------------------------
+  paso('La descarga del APK, mientras no haya tienda');
+  // -------------------------------------------------------------------------
+  /*
+   * SIN CONFIGURAR, NO HAY BOTON. Es la misma regla que el resto de la casa: un
+   * enlace que no lleva a ningun sitio es peor que no tenerlo, porque quien lo
+   * pulsa cree que el problema es suyo. Aqui ademas seria peor de lo normal:
+   * quien lo pulsa esta de camino a una cena, con prisa, y si no consigue
+   * instalar la app se queda fuera de la partida.
+   */
+  const sinApk = await pedir(5892, '/descargar');
+  comprobar('sin APK_URL, la pagina lo dice', sinApk.estado === 503, sinApk.estado);
+  comprobar(
+    'y no ensena ningun boton de descarga',
+    !sinApk.cuerpo.includes('class="btn"'),
+    sinApk.cuerpo.slice(0, 160),
+  );
+
+  const conApk = await pedir(5893, '/descargar');
+  comprobar('con APK_URL, se sirve la pagina', conApk.estado === 200, conApk.estado);
+  comprobar(
+    'con el enlace configurado, sin inventarse ninguno',
+    conApk.cuerpo.includes('releases/download/v3/harkania.apk'),
+    conApk.cuerpo.slice(0, 200),
+  );
+  comprobar('y diciendo que version es', conApk.cuerpo.includes('3.0.1'), 'no aparece la version');
+  /*
+   * QUE DIGA LA VERDAD SOBRE EL IPHONE. Apple no permite instalar fuera de su
+   * tienda, asi que ofrecer ahi una descarga —o callarse— manda a esa persona a
+   * pelearse con su telefono para nada.
+   */
+  comprobar(
+    'y advirtiendo de que en iPhone no se puede',
+    /iPhone/i.test(conApk.cuerpo),
+    'la pagina no dice nada del iPhone',
+  );
+  comprobar(
+    'sin pedir la contrasena de la casa: quien instala es quien juega',
+    !conApk.cuerpo.includes('Contrase'),
+    'la pagina de descarga pide credenciales',
   );
 
   // -------------------------------------------------------------------------
