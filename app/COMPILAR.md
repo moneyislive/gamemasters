@@ -1,65 +1,260 @@
-# Compilar la app con EAS
+# Cómo sacar la app instalable, paso a paso
 
-`eas.json` no admite comentarios, así que lo que hay que saber está aquí.
+Escrito para quien no ha hecho esto nunca. Si algo ya lo sabes, sáltatelo.
 
-## Las dos trampas del perfil
+---
 
-**1. El perfil por defecto NO sirve para instalar a mano.** El perfil
-`production` produce un *app bundle* (`.aab`), que es lo que pide Google Play y
-lo que **no se puede instalar** en un teléfono: al descargarlo no pasa nada. Por
-eso existe el perfil `apk`, que es el que hay que usar mientras se reparta desde
-`harkania.com/descargar`.
+## Antes de nada: qué es cada cosa
 
-**2. `EXPO_PUBLIC_API_URL` se congela al compilar.** La app decide con qué
-servidor habla a partir de esa variable, y se resuelve **en el momento de la
-compilación**, no al arrancar. Un APK compilado sin ella apunta a
-`http://localhost:5174` — que en un móvil es el propio móvil — y no funciona en
-ningún teléfono que no sea el de quien programa. No da un error claro: dice que
-no puede hablar con el servidor, exactamente igual que si no hubiera cobertura,
-y todo el mundo culpa al wifi de la casa.
+**Tu app está escrita en JavaScript**, pero un móvil no ejecuta JavaScript: necesita
+un programa ya compilado. Compilar para Android exige normalmente instalar el SDK
+de Android, Java y Gradle — varios gigas de herramientas y un buen rato de
+configuración.
 
-Por eso cada perfil de `eas.json` lleva la suya escrita. **Comprueba que la del
-perfil `apk` es la dirección real de tu servidor antes de compilar**, o
-repartirás una app que no habla con nadie.
+**Expo** es la caja de herramientas con la que está construida la app. **EAS**
+(*Expo Application Services*) es su servicio en la nube: hace la compilación **en
+los servidores de Expo**, así que tú no instalas nada de eso. Le mandas el
+código, esperas entre diez y veinte minutos, y te devuelve un fichero.
 
-## El comando
+Ese fichero es el **APK**: el instalable de Android, el equivalente a un `.exe`
+de Windows. Se puede instalar directamente en un teléfono, sin pasar por Google
+Play.
+
+**El recorrido completo es este:**
+
+```
+tu código  →  EAS compila en la nube  →  te da un .apk  →  lo publicas en
+GitHub  →  tus invitados lo descargan desde harkania.com/descargar
+```
+
+Nada de esto toca la App Store ni Google Play. Es más rápido y no hay revisión
+de nadie. La contrapartida: **solo funciona en Android**. Apple no permite
+instalar aplicaciones fuera de su tienda, punto.
+
+---
+
+## Lo que necesitas tener
+
+- **Node.js** — ya lo tienes, es lo que usas para el resto del proyecto.
+- **Una cuenta de Expo** — gratuita. Se crea en el paso 1.
+- **Una cuenta de GitHub** — ya la tienes (`moneyislive`).
+
+No hace falta instalar Android Studio, ni Java, ni nada parecido.
+
+---
+
+## Paso 1 · Crear la cuenta de Expo
+
+Ve a **https://expo.dev/signup** y regístrate. Apunta el usuario y la contraseña:
+te los va a pedir la terminal dentro de un momento.
+
+> **Por qué importa esta cuenta.** La primera compilación genera la **clave de
+> firma** de tu app, que se queda guardada ahí. Android usa esa clave para saber
+> que una actualización viene de ti y no de un impostor. **No se puede cambiar
+> nunca**: si algún día publicas en Google Play y pierdes esa cuenta, no podrás
+> volver a actualizar la app jamás — habría que publicar otra distinta y pedirle
+> a todo el mundo que la reinstale. Guarda las credenciales donde guardas las
+> cosas importantes.
+
+---
+
+## Paso 2 · Abrir la terminal en la carpeta correcta
+
+Abre **PowerShell** y ve a la carpeta de la app. **Tiene que ser `app`, no la
+raíz del proyecto** — EAS busca ahí la configuración:
+
+```bash
+cd C:\Users\QWERTY\Documents\GameMasters\app
+```
+
+Comprueba que estás donde toca. Esto tiene que listar `eas.json`:
+
+```bash
+ls eas.json
+```
+
+Si dice que no existe, estás en la carpeta equivocada.
+
+---
+
+## Paso 3 · Iniciar sesión
+
+```bash
+npx eas-cli@latest login
+```
+
+`npx` descarga la herramienta y la ejecuta sin instalarla permanentemente. La
+primera vez tarda un minuto y puede preguntar si quieres instalar el paquete:
+di que sí.
+
+Te pedirá el usuario y la contraseña de Expo del paso 1. **La contraseña no se
+verá mientras la escribes** — ni asteriscos ni nada. Es normal: escríbela a
+ciegas y pulsa Enter.
+
+Para confirmar que ha funcionado:
+
+```bash
+npx eas-cli@latest whoami
+```
+
+Tiene que responder con tu nombre de usuario.
+
+---
+
+## Paso 4 · Apuntar la app a tu servidor
+
+**Este paso es el que más gente se salta y el que más caro sale.**
+
+La app necesita saber a qué servidor hablar, y esa dirección **se graba dentro
+del APK en el momento de compilar**. No se puede cambiar después sin volver a
+compilar.
+
+Abre `app/eas.json` y busca el bloque `"apk"`:
+
+```json
+"apk": {
+  "distribution": "internal",
+  "android": { "buildType": "apk" },
+  "env": {
+    "EXPO_PUBLIC_API_URL": "https://harkania.onrender.com"
+  }
+}
+```
+
+Cambia esa dirección por la de tu servidor de verdad, la que te dé Render cuando
+lo despliegues.
+
+> **Qué pasa si te lo saltas.** El APK sale apuntando a `localhost`, que dentro
+> de un móvil significa «este mismo teléfono». La app se instala, se abre, y al
+> intentar entrar dice que no puede hablar con el servidor — exactamente el
+> mismo mensaje que si no hubiera cobertura. Nadie sospecha de la compilación:
+> todo el mundo culpa al wifi de la casa. Y hay que repetir el proceso entero.
+
+---
+
+## Paso 5 · Compilar
 
 ```bash
 npx eas-cli@latest build --platform android --profile apk
 ```
 
-La primera vez pedirá iniciar sesión, creará el proyecto y generará el almacén
-de claves de Android. **Ese almacén se queda en tu cuenta de Expo y no se puede
-cambiar una vez publicada la app en Google Play**: si se pierde, la aplicación
-publicada no se puede volver a actualizar nunca y hay que subir otra distinta.
-Guarda una copia con `eas credentials`.
+La primera vez te hará tres preguntas:
 
-Al terminar da una URL de descarga alojada por Expo. Sirve para probar, pero
-**caduca**, así que no es la que se pone en `APK_URL`: descarga el fichero,
-publícalo como archivo adjunto de una *release* en GitHub y usa esa dirección,
-que no caduca y sirve el fichero con las cabeceras que Android necesita.
+1. **«Would you like to create a project?»** → **Sí**. Crea el proyecto
+   `harkania` en tu cuenta.
+2. **«Generate a new Android Keystore?»** → **Sí**. Es la clave de firma del
+   paso 1. Que la genere Expo es lo correcto; la guarda él.
+3. Puede preguntar por el `package name` → ya está puesto
+   (`com.harkania.jugar`), acéptalo.
 
-## La huella para los enlaces profundos
+Y a esperar. La compilación ocurre en los servidores de Expo, así que **puedes
+cerrar la terminal**: el trabajo sigue. Entre diez y veinte minutos, más lo que
+tarde en llegarle el turno — el plan gratuito tiene cola y un número limitado de
+compilaciones al mes.
 
-Cuando quieras que `https://harkania.com/i/…` abra la app en vez del navegador:
+Puedes seguirlo en **https://expo.dev** → tu proyecto → *Builds*.
+
+> **`--profile apk` no es opcional.** Sin esa parte, EAS usa el perfil de tienda
+> y produce un fichero `.aab` (*app bundle*), que es lo que pide Google Play y lo
+> que **no se puede instalar** en un teléfono: lo descargas, lo tocas, y no pasa
+> absolutamente nada.
+
+---
+
+## Paso 6 · Descargar el fichero
+
+Cuando termine, la terminal (y la página de Expo) te dan un enlace. Ábrelo y
+descarga el `.apk`.
+
+**Esa dirección no te sirve para publicarla**, aunque funcione hoy: los enlaces
+de Expo caducan. Por eso el fichero hay que ponerlo en un sitio permanente, que
+es el paso siguiente.
+
+Si quieres probarlo ya en tu propio móvil, mándate el fichero por Telegram o por
+correo y ábrelo desde el teléfono.
+
+---
+
+## Paso 7 · Publicarlo en GitHub
+
+GitHub sirve archivos grandes gratis, con las cabeceras correctas y con una
+dirección que no caduca. Es el sitio.
+
+1. Ve a **https://github.com/moneyislive/gamemasters/releases/new**
+2. En *Choose a tag*, escribe `v1.0.0` y pulsa **Create new tag**.
+3. En *Release title*, pon `v1.0.0`.
+4. **Arrastra el fichero `.apk`** a la caja de abajo («Attach binaries…») y
+   espera a que suba del todo.
+5. Pulsa **Publish release**.
+
+Ahora, en la página de la release, **haz clic derecho sobre el nombre del `.apk`
+→ Copiar dirección del enlace**. Eso es lo que necesitas. Tiene esta pinta:
+
+```
+https://github.com/moneyislive/gamemasters/releases/download/v1.0.0/harkania.apk
+```
+
+---
+
+## Paso 8 · Decírselo al servidor
+
+En el panel de Render, en *Environment*, añade dos variables:
+
+| Variable | Valor |
+| --- | --- |
+| `APK_URL` | la dirección que acabas de copiar |
+| `APK_VERSION` | `1.0.0` |
+
+Guarda. Render reinicia el servicio solo.
+
+Entra en `https://tu-servidor/descargar` y comprueba que sale el botón. Si dice
+«Todavía no hay descarga», es que `APK_URL` no se guardó bien.
+
+**Y ya está.** Esa dirección es la que le pasas a tus invitados.
+
+---
+
+## Cuando quieras sacar una versión nueva
+
+1. Abre `app/app.json` y **sube dos números**:
+   - `"version": "1.0.1"` — el que ve la gente.
+   - `"versionCode": 2` — el que mira Android. **Este es obligatorio**: si no lo
+     subes, el teléfono se niega a instalar encima y no explica por qué.
+2. Repite los pasos 5, 6 y 7 (con la etiqueta `v1.0.1`).
+3. Actualiza `APK_URL` y `APK_VERSION` en Render.
+
+Ten en cuenta que **quien ya tenga la app instalada no se entera**: fuera de la
+tienda no hay actualización automática. Por eso la página de descarga muestra el
+número de versión — para que puedan comparar y volver a descargarla.
+
+---
+
+## Más adelante: los enlaces que abren la app
+
+Cuando quieras que pulsar `https://harkania.com/i/…` abra la app en vez del
+navegador, hace falta darle al servidor la huella de tu clave de firma:
 
 ```bash
 npx eas-cli@latest credentials --platform android
 ```
 
-Copia la huella **SHA-256** del certificado de *producción* —no el de
-desarrollo— a la variable `ANDROID_CERT_SHA256` del servidor. Con la de
-desarrollo los enlaces funcionan en tu móvil y en ningún otro, que es de las
-cosas más difíciles de diagnosticar que hay.
+Elige el perfil de producción y copia la huella **SHA-256** (una tira larga de
+pares separados por dos puntos) a la variable `ANDROID_CERT_SHA256` del
+servidor.
 
-## Subir una versión nueva
+Cuidado con cuál copias: si pones la del certificado de *desarrollo*, los
+enlaces funcionan en tu móvil y en ningún otro. Es de las cosas más difíciles de
+diagnosticar que hay, porque para ti todo va bien.
 
-1. Sube `versionCode` en `app.json` (Android no instala encima una versión igual
-   o menor, y falla sin decir por qué).
-2. Compila con el perfil `apk`.
-3. Publica el fichero en una *release* nueva de GitHub.
-4. Cambia `APK_URL` y `APK_VERSION` en el panel del servidor.
+---
 
-Quien ya tenga la app instalada **no se entera**: fuera de la tienda no hay
-actualización automática. Por eso la página de descarga muestra el número de
-versión.
+## Si algo falla
+
+| Lo que ves | Qué pasa |
+| --- | --- |
+| `eas: command not found` | Te falta el `npx eas-cli@latest` delante del comando. |
+| `Not logged in` | Repite el paso 3. |
+| No encuentra `eas.json` | Estás en la carpeta equivocada: tienes que estar en `app`. |
+| El APK se descarga pero al tocarlo no pasa nada | Es un `.aab`, no un `.apk`. Te faltó `--profile apk`. |
+| La app se instala pero no conecta | Te saltaste el paso 4. Hay que recompilar. |
+| Android dice que bloqueó la instalación | Normal fuera de la tienda. La página `/descargar` explica los dos toques necesarios. |
