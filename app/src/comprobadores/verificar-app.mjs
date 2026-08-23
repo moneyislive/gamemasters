@@ -377,6 +377,44 @@ comprobar(
   conRelleno.map((f) => path.relative(RUTAS, f)),
 );
 
+// ---------------------------------------------------------------------------
+// «No hay proveedores» y «no llego al servidor» NO pueden verse igual
+// ---------------------------------------------------------------------------
+/*
+ * ESTE FALLO OCURRIO DE VERDAD, y por eso hay una comprobacion. `disponibles()`
+ * atrapaba el error de red y devolvia `{google:false, apple:false}` — o sea,
+ * exactamente lo mismo que responde un servidor sano sin proveedores
+ * configurados. Un servidor dormido, un wifi caido o una direccion mal grabada
+ * en el APK se disfrazaban de «esto no esta configurado», y se buscaba el fallo
+ * donde no estaba.
+ *
+ * Se mira el CODIGO, sin comentarios: el porque de esto se explica largo y
+ * tendido justo encima de la funcion, y buscar las palabras en el fichero
+ * entero daria verde por la propia explicacion.
+ */
+{
+  const entrarCon = fs.readFileSync(path.join(SRC, 'entrar-con.ts'), 'utf8');
+  const codigo = entrarCon.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+
+  comprobar(
+    'disponibles() distingue no-configurado de no-alcanzable',
+    codigo.includes("'sin-servidor'"),
+    'entrar-con.ts vuelve a colapsar el fallo de red en «no hay proveedores»',
+  );
+  comprobar(
+    'y no devuelve dos booleanos a secas desde el catch',
+    !/catch\s*\{[^}]*google:\s*false[^}]*\}/.test(codigo),
+    'el catch de disponibles() vuelve a inventarse una respuesta',
+  );
+
+  const cuenta = fs.readFileSync(path.join(RUTAS, 'cuenta.tsx'), 'utf8');
+  comprobar(
+    'y la pantalla de cuenta cuenta ese caso en vez de callarlo',
+    cuenta.includes("'sin-servidor'") && /REINTENTAR/i.test(cuenta),
+    'cuenta.tsx no ofrece reintentar cuando no se llega al servidor',
+  );
+}
+
 console.log('');
 if (fallos.length === 0) {
   console.log(

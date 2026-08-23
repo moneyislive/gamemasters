@@ -22,6 +22,7 @@ import { cargarAvatar, guardarAvatar, AVATAR_POR_DEFECTO } from '../src/avatar';
 import { TROFEOS } from '../../shared/live';
 import { color, espacio, fuente, radio } from '../src/tema';
 import { SinProveedor, disponibles, entrarConApple, entrarConGoogle } from '../src/entrar-con';
+import type { Proveedores } from '../src/entrar-con';
 
 /** Los mismos rangos que pinta la portada: una sola escalera para todo. */
 const RANGOS: Array<{ desde: number; titulo: string }> = [
@@ -57,7 +58,13 @@ export default function Cuenta(): JSX.Element {
   const [borrando, setBorrando] = useState(false);
   const [borrada, setBorrada] = useState(false);
   const [fallo, setFallo] = useState(false);
-  const [proveedores, setProveedores] = useState({ google: false, apple: false });
+  /*
+   * `null` mientras se pregunta. Los tres casos —preguntando, servidor
+   * inalcanzable, y respuesta buena— se cuentan distinto: dar por hecho «no hay
+   * proveedores» mientras aún no ha contestado nadie enseña durante un segundo
+   * un mensaje que puede ser falso.
+   */
+  const [proveedores, setProveedores] = useState<Proveedores | null>(null);
   const [entrando, setEntrando] = useState<'google' | 'apple' | null>(null);
   const [avisoProveedor, setAvisoProveedor] = useState<string | null>(null);
 
@@ -76,9 +83,11 @@ export default function Cuenta(): JSX.Element {
   useEffect(cargar, [cargar]);
   useFocusEffect(cargar);
 
-  useEffect(() => {
+  const preguntarProveedores = useCallback(() => {
+    setProveedores(null);
     void disponibles().then(setProveedores);
   }, []);
+  useEffect(preguntarProveedores, [preguntarProveedores]);
 
   /** Entrar con un proveedor. Cancelar no es un error y no dice nada. */
   const entrarCon = useCallback(
@@ -184,9 +193,9 @@ export default function Cuenta(): JSX.Element {
                 ? 'Tu invitación está guardada a nombre de un correo. Entra con ese mismo correo y te aparecerá en la portada, sin tener que pedirle el código a nadie.'
                 : 'Con una cuenta se guardan tus veladas, tus trofeos y tu rango, y las invitaciones te aparecen en la portada sin tener que pedirle el código a nadie.'}
             </Text>
-            {proveedores.google || proveedores.apple ? (
+            {proveedores?.estado === 'listo' && (proveedores.google || proveedores.apple) ? (
               <View style={{ marginTop: espacio.lg }}>
-                {proveedores.google && (
+                {proveedores.estado === 'listo' && proveedores.google && (
                   <Pulsable onPress={() => entrarCon('google')}>
                     <View style={estilos.botonProveedor}>
                       <Text style={estilos.botonProveedorTexto}>
@@ -200,7 +209,7 @@ export default function Cuenta(): JSX.Element {
                   Android ni en la web, y ofrecer un botón que no lleva a
                   ninguna parte es peor que no ofrecerlo.
                 */}
-                {proveedores.apple && Platform.OS === 'ios' && (
+                {proveedores.estado === 'listo' && proveedores.apple && Platform.OS === 'ios' && (
                   <Pulsable onPress={() => entrarCon('apple')}>
                     <View style={[estilos.botonProveedor, estilos.botonApple]}>
                       <Text style={[estilos.botonProveedorTexto, { color: '#0c0508' }]}>
@@ -216,6 +225,30 @@ export default function Cuenta(): JSX.Element {
                   Entrar con una cuenta no hace falta para jugar: los códigos siguen funcionando
                   igual.
                 </Text>
+              </View>
+            ) : proveedores === null ? (
+              <View style={estilos.marco}>
+                <Text style={estilos.parrafo}>Comprobando cómo se puede entrar…</Text>
+              </View>
+            ) : proveedores.estado === 'sin-servidor' ? (
+              /*
+               * NO SE DICE «no hay proveedores», porque no se sabe. Antes sí se
+               * decía: el fallo de red se atrapaba y se devolvía «ninguno», así
+               * que un servidor dormido o una dirección mal compilada se
+               * disfrazaban de «esto no está configurado» y se buscaba el fallo
+               * donde no estaba.
+               */
+              <View style={estilos.marco}>
+                <Text style={estilos.subtitulo}>No se llega al servidor</Text>
+                <Text style={estilos.parrafo}>
+                  No se ha podido comprobar cómo entrar. Puede ser la conexión, o que el servidor
+                  esté despertando — los primeros segundos tarda. Vuelve a intentarlo.
+                </Text>
+                <Pulsable onPress={preguntarProveedores}>
+                  <View style={estilos.botonProveedor}>
+                    <Text style={estilos.botonProveedorTexto}>REINTENTAR</Text>
+                  </View>
+                </Pulsable>
               </View>
             ) : (
               <View style={estilos.marco}>

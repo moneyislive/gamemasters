@@ -33,12 +33,34 @@ export class SinProveedor extends Error {
   }
 }
 
-/** Qué formas de entrar ofrece el servidor con el que se está hablando. */
-export async function disponibles(): Promise<{ google: boolean; apple: boolean }> {
+/**
+ * Qué formas de entrar ofrece el servidor con el que se está hablando.
+ *
+ * DEVUELVE TRES CASOS Y NO DOS, y la razón es un defecto que tuvo este fichero:
+ * antes atrapaba el error de red y devolvía `{google:false, apple:false}`, o
+ * sea EXACTAMENTE lo mismo que cuando el servidor está bien y no tiene ningún
+ * proveedor configurado. Dos problemas muy distintos con la misma cara:
+ *
+ *   · «este servidor no ofrece entrar con Google» — no hay nada que hacer, y la
+ *     app debe explicar cómo se consigue una cuenta hoy.
+ *   · «no llego al servidor» — puede ser el wifi, puede ser que el servidor
+ *     esté dormido, o puede que la app se compilara apuntando a una dirección
+ *     equivocada. Callarlo hace que se busque el fallo donde no está.
+ *
+ * Y el tercer caso lo pide el sitio donde vive esto: un servidor gratuito que
+ * se duerme tarda cerca de un minuto en despertar, así que «no llego» es un
+ * estado NORMAL y pasajero que hay que saber contar.
+ */
+export type Proveedores =
+  | { estado: 'listo'; google: boolean; apple: boolean }
+  | { estado: 'sin-servidor' };
+
+export async function disponibles(): Promise<Proveedores> {
   try {
-    return await api.proveedoresDisponibles();
+    const { google, apple } = await api.proveedoresDisponibles();
+    return { estado: 'listo', google, apple };
   } catch {
-    return { google: false, apple: false };
+    return { estado: 'sin-servidor' };
   }
 }
 
