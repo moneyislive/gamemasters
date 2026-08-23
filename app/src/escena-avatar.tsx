@@ -37,6 +37,15 @@ export interface ProgresoCompartido {
 /** Altura a la que se normaliza cualquier modelo: 1,7 unidades, pies en 0. */
 const ALTURA_PERSONAJE = 1.7;
 
+/**
+ * Radianes por segundo del giro de reposo: una vuelta completa cada 18 s.
+ *
+ * La cifra importa. Más rápido marea en una pantalla que se mira mucho rato y
+ * emborrona la cara justo cuando pasa de frente; más lento y hay que esperar de
+ * pie a que enseñe la espalda, que es lo que se venía a arreglar.
+ */
+const GIRO_POR_SEGUNDO = (2 * Math.PI) / 18;
+
 function Personaje({
   objeto,
   progreso,
@@ -53,8 +62,19 @@ function Personaje({
     // La fracción del arrastre: 0 quieto en una sala, 0,5 en pleno tránsito.
     const fraccion = Math.abs(progreso.valor - Math.round(progreso.valor));
     const transito = Math.min(fraccion * 2, 1);
-    // De guardia gira despacio, enseñándose; en tránsito se revuelve más vivo.
-    g.rotation.y = 0.35 * Math.sin(t * 0.35) + transito * 1.4 * Math.sin(t * 3);
+    /*
+     * LA VUELTA ENTERA, no un vaivén.
+     *
+     * Esto era `0.35 * Math.sin(t * 0.35)`: un balanceo de ±20° que volvía
+     * siempre sobre sus pasos. Enseñaba la misma cara una y otra vez y dejaba
+     * sin ver la espalda —el peinado, la ropa, todo lo que se esculpió y no se
+     * miraba nunca—. Acumular el ángulo en vez de oscilarlo da el giro de
+     * plataforma de escaparate: se ve el personaje entero sin tocar nada.
+     *
+     * En tránsito se le suma el revuelo de antes, que sigue siendo lo que hace
+     * que parezca volverse hacia la sala nueva.
+     */
+    g.rotation.y = t * GIRO_POR_SEGUNDO + transito * 1.4 * Math.sin(t * 3);
     g.position.y = 0.015 * Math.sin(t * 1.8) + transito * 0.05 * Math.abs(Math.sin(t * 8));
   });
 
