@@ -488,6 +488,63 @@ for (const pantalla of ['index.tsx', 'avatar.tsx', 'cuenta.tsx']) {
   );
 }
 
+// ---------------------------------------------------------------------------
+// Iniciar sesion no esta escondido
+// ---------------------------------------------------------------------------
+/*
+ * VIVIA AL FINAL DE LA PORTADA, dentro de «Tu leyenda», detras de un enlace que
+ * decia «Saber mas». Para encontrarlo habia que bajar por todo el catalogo de
+ * juegos sin ningun motivo para sospechar que estaba alli. Y lo que hay detras
+ * no es un extra: es lo que hace que las veladas, los trofeos y las
+ * invitaciones sobrevivan al telefono.
+ */
+{
+  const portada = fs
+    .readFileSync(path.join(RUTAS, 'index.tsx'), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/\/\/.*$/gm, '');
+
+  /*
+   * Con el nombre delimitado, no `includes` a secas: `<SelloDeCuentaLoQueSea`
+   * contiene la cadena `<SelloDeCuenta`, asi que la primera version daba verde
+   * con el componente renombrado. Una comprobacion que pasa con el codigo roto
+   * es peor que ninguna, porque da confianza.
+   */
+  comprobar(
+    'el sello de cuenta esta en la botonera de arriba',
+    /<SelloDeCuenta[\s/>]/.test(portada),
+    'la portada no monta el sello: iniciar sesion vuelve a estar al final',
+  );
+  comprobar(
+    'y se rehacen portada Y figura al entrar o salir',
+    /onCambio=\{\(\) => \{[\s\S]*?cargarPortada\(\);[\s\S]*?cargarFigura\(\);/.test(portada),
+    'onCambio no rehace las dos: la pantalla contaria dos versiones de quien eres',
+  );
+
+  const sello = fs
+    .readFileSync(path.join(SRC, 'sello-cuenta.tsx'), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/\/\/.*$/gm, '');
+  /*
+   * Que el sello INFORME y no solo abra: sin el punto de estado, estar dentro y
+   * estar fuera se ven igual y hay que abrir la hoja para saberlo.
+   */
+  comprobar(
+    'el sello dice si hay sesion sin tener que abrirlo',
+    sello.includes('puntoDentro') && sello.includes('discoDentro'),
+    'el sello no distingue visualmente dentro de fuera',
+  );
+  /*
+   * Y que no ofrezca Apple donde no funciona: fuera de iOS haria falta el flujo
+   * web, que no existe. Un boton ahi seria un callejon.
+   */
+  comprobar(
+    'Apple solo se ofrece donde el dialogo nativo existe',
+    /Platform\.OS === 'ios'/.test(sello),
+    'el sello ofreceria Apple fuera de iOS, donde no hay flujo',
+  );
+}
+
 console.log('');
 if (fallos.length === 0) {
   console.log(

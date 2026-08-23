@@ -52,13 +52,13 @@ export class SinProveedor extends Error {
  * estado NORMAL y pasajero que hay que saber contar.
  */
 export type Proveedores =
-  | { estado: 'listo'; google: boolean; apple: boolean }
+  | { estado: 'listo'; google: boolean; apple: boolean; navegador: string[] }
   | { estado: 'sin-servidor' };
 
 export async function disponibles(): Promise<Proveedores> {
   try {
-    const { google, apple } = await api.proveedoresDisponibles();
-    return { estado: 'listo', google, apple };
+    const { google, apple, navegador } = await api.proveedoresDisponibles();
+    return { estado: 'listo', google, apple, navegador: navegador ?? [] };
   } catch {
     return { estado: 'sin-servidor' };
   }

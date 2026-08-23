@@ -514,7 +514,20 @@ export interface EstadoDeGeneracion {
 }
 
 /** Qué formas de entrar ofrece el servidor con el que se habla. */
-export function proveedoresDisponibles(): Promise<{ google: boolean; apple: boolean }> {
+export function proveedoresDisponibles(): Promise<{
+  google: boolean;
+  apple: boolean;
+  /**
+   * Los que tienen puerta de entrada POR NAVEGADOR.
+   *
+   * Importa aquí y no solo en el taller: el inicio de sesión con Google de la
+   * app también pasa por el navegador —abre una página del servidor porque
+   * Google no admite esquemas propios— así que necesita esa ruta. Apple en
+   * iPhone no: usa el diálogo nativo del sistema y le basta con estar
+   * configurado.
+   */
+  navegador?: string[];
+}> {
   return peticion('/cuenta/proveedores');
 }
 

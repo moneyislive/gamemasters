@@ -50,6 +50,7 @@ import { usarMarco } from '../src/marco';
 import { CarruselDeMundos, PASO } from '../src/carrusel3d';
 import { EscenaAvatar, type ProgresoCompartido } from '../src/escena-avatar';
 import { Figura } from '../src/figura';
+import { SelloDeCuenta } from '../src/sello-cuenta';
 import { FondoDeSalas } from '../src/fondos-sala';
 import { AVATAR_POR_DEFECTO, cargarAvatar, type Avatar } from '../src/avatar';
 import { Latido, Pulsable, useMenosMovimiento } from '../src/vivo';
@@ -276,6 +277,30 @@ export default function Portada(): JSX.Element {
               >
                 <IconoPluma />
               </BotonFantasma>
+              {/*
+                EL SELLO VA EL ULTIMO Y CON OTRA FORMA. Iniciar sesion vivia al
+                final de la portada, dentro de «Tu leyenda», detras de un enlace
+                que decia «Saber mas»: habia que bajar por todo el catalogo sin
+                ningun motivo para sospechar que estaba alli. Aqui esta donde la
+                gente ya busca, y es un disco con tu figura —no un tercer boton
+                fantasma— porque los otros dos son verbos y esto es una persona.
+              */}
+              <SelloDeCuenta
+                avatar={avatar}
+                nombre={portada?.cuenta.displayName ?? null}
+                correo={portada?.cuenta.email ?? null}
+                /*
+                  Al entrar o salir se rehacen las DOS cosas: la portada (que
+                  trae nombre, trofeos e invitaciones) y la figura (que puede
+                  cambiar si la cuenta traía un avatar esculpido). Rehacer solo
+                  una deja la pantalla contando dos versiones distintas de quién
+                  eres.
+                */
+                onCambio={() => {
+                  cargarPortada();
+                  cargarFigura();
+                }}
+              />
             </View>
           </View>
 
