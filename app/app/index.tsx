@@ -244,7 +244,13 @@ export default function Portada(): JSX.Element {
             ancho={width}
             alto={altoHero}
           />
-          {avatar.modeloUrl && !modeloRoto ? (
+          {/*
+            LA CONDICION MIRA `usa3D`, NO SOLO QUE HAYA MODELO. Antes bastaba
+            con que existiera `modeloUrl` para que ganara siempre: elegir un
+            personaje del elenco se guardaba y la portada seguia enseñando el
+            3D, asi que la eleccion parecia no servir para nada.
+          */}
+          {avatar.modeloUrl && avatar.usa3D && !modeloRoto ? (
             <EscenaAvatar
               ancho={width}
               alto={altoHero}

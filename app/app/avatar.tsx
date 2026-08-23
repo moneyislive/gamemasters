@@ -72,8 +72,11 @@ export default function EstudioDeAvatar(): JSX.Element {
      */
     const conModelo: Avatar = {
       ...nuevos,
+      // El modelo esculpido se CONSERVA —cambiar de personaje no es tirarlo—
+      // pero deja de ser el activo: eso es lo que significa elegir aqui.
       modeloUrl: rasgos?.modeloUrl,
       vistaPrevia: rasgos?.vistaPrevia,
+      usa3D: false,
     };
     setRasgos(conModelo);
     await guardarAvatar(conModelo);
@@ -153,7 +156,7 @@ export default function EstudioDeAvatar(): JSX.Element {
 
   const usarModelo = useCallback(async (modeloUrl: string, vistaPrevia?: string) => {
     const avatar = await cargarAvatar();
-    await guardarAvatar({ ...avatar, modeloUrl, vistaPrevia });
+    await guardarAvatar({ ...avatar, modeloUrl, vistaPrevia, usa3D: true });
     router.back();
   }, []);
 
@@ -191,8 +194,41 @@ export default function EstudioDeAvatar(): JSX.Element {
           <View style={estilos.elenco}>
             <Text style={estilos.subtitulo}>Elige quién eres</Text>
             <View style={estilos.rejilla}>
+              {/*
+                TU FIGURA ESCULPIDA VA EN LA MISMA REJILLA, y es el arreglo de
+                fondo: antes vivia en otra parte de la pantalla, asi que no
+                habia forma de ver cual de las dos estaba puesta ni de cambiar
+                de una a otra. Ahora son once opciones y una sola seleccion.
+              */}
+              {rasgos.modeloUrl && (
+                <Pulsable
+                  onPress={() =>
+                    void guardarAvatar({ ...rasgos, usa3D: true }).then(() =>
+                      setRasgos({ ...rasgos, usa3D: true }),
+                    )
+                  }
+                >
+                  <View style={[estilos.ficha, rasgos.usa3D && estilos.fichaPuesta]}>
+                    {rasgos.vistaPrevia ? (
+                      <Image
+                        source={{ uri: rasgos.vistaPrevia }}
+                        style={estilos.fichaEsculpida}
+                        resizeMode="cover"
+                      />
+                    ) : (
+                      <View style={[estilos.fichaEsculpida, estilos.fichaSinImagen]}>
+                        <Text style={{ fontSize: 24, color: '#e8cf7f' }}>✦</Text>
+                      </View>
+                    )}
+                    <Text style={estilos.fichaNombre} numberOfLines={1}>
+                      La tuya
+                    </Text>
+                  </View>
+                </Pulsable>
+              )}
               {ELENCO.map((p) => {
                 const puesto =
+                  !rasgos.usa3D &&
                   rasgos.piel === p.rasgos.piel &&
                   rasgos.peinado === p.rasgos.peinado &&
                   rasgos.atuendo === p.rasgos.atuendo &&
@@ -355,6 +391,12 @@ const estilos = StyleSheet.create({
     textTransform: 'uppercase',
   },
   elenco: { marginBottom: espacio.lg },
+  fichaEsculpida: { width: 78, height: 78, borderRadius: 8 },
+  fichaSinImagen: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(232,207,127,0.08)',
+  },
   rejilla: {
     flexDirection: 'row',
     flexWrap: 'wrap',

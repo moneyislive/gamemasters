@@ -37,6 +37,19 @@ export interface Avatar {
   modeloUrl?: string;
   /** La imagen de vista previa que renderiza el generador. */
   vistaPrevia?: string;
+  /**
+   * CUÁL DE LOS DOS SE USA, y sin esto no habia forma de decirlo.
+   *
+   * Antes mandaba la simple presencia de `modeloUrl`: si habia modelo, ganaba
+   * siempre. Eso dejaba una interfaz sin salida — elegias un personaje del
+   * elenco, se guardaba, y la portada seguia enseñando el 3D como si no
+   * hubieras tocado nada; y si el 3D no cargaba, no se veia ninguno de los dos
+   * y parecia que la eleccion no servia para nada.
+   *
+   * Con un campo explicito hay UNA seleccion: o tu figura esculpida o un
+   * personaje, y se puede cambiar de idea sin perder la otra.
+   */
+  usa3D?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -229,6 +242,18 @@ function acotar(a: Avatar): Avatar {
       ? { modeloUrl: a.modeloUrl }
       : {}),
     ...(typeof a.vistaPrevia === 'string' ? { vistaPrevia: a.vistaPrevia } : {}),
+    /*
+     * MIGRACION DE LO YA GUARDADO. Quien esculpio un avatar antes de que
+     * existiera este campo lo tiene sin el, y sin esta linea su 3D dejaria de
+     * mostrarse el dia de la actualizacion —sin haber tocado nada y sin
+     * explicacion—. Antes mandaba la simple presencia del modelo, asi que eso
+     * es lo que significa un `usa3D` ausente.
+     */
+    ...(typeof a.usa3D === 'boolean'
+      ? { usa3D: a.usa3D }
+      : a.modeloUrl
+        ? { usa3D: true }
+        : {}),
   };
 }
 
@@ -266,8 +291,14 @@ export async function cargarAvatar(): Promise<Avatar> {
  */
 export async function olvidarModelo3D(): Promise<void> {
   const avatar = await cargarAvatar();
-  const { modeloUrl: _m, vistaPrevia: _v, ...rasgos } = avatar;
-  await guardarAvatar(rasgos);
+  /*
+   * SE DESACTIVA, NO SE BORRA. La primera version tiraba la direccion y la
+   * vista previa, y eso deja a la persona sin saber que llego a tener una
+   * figura esculpida: desaparece del estudio como si nunca hubiera existido, y
+   * no hay nada que explique por que. Conservandola, el estudio puede decir
+   * «esta ya no esta en el servidor» y ofrecer rehacerla.
+   */
+  await guardarAvatar({ ...avatar, usa3D: false });
 }
 
 export async function guardarAvatar(avatar: Avatar): Promise<void> {

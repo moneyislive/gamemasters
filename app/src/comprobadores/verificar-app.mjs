@@ -675,6 +675,60 @@ for (const pantalla of ['index.tsx', 'avatar.tsx', 'cuenta.tsx']) {
   );
 }
 
+// ---------------------------------------------------------------------------
+// Una sola seleccion de avatar, y la que ya estaba no se pierde
+// ---------------------------------------------------------------------------
+/*
+ * LO QUE NO SE PODIA HACER: elegir. Mandaba la simple presencia de `modeloUrl`,
+ * asi que el 3D ganaba siempre; se elegia un personaje del elenco, se guardaba,
+ * y la portada seguia enseñando el 3D como si no hubieras tocado nada. Y si el
+ * 3D no cargaba, no se veia ninguno de los dos y la eleccion parecia inutil.
+ */
+{
+  const av = fs
+    .readFileSync(path.join(SRC, 'avatar.ts'), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/\/\/.*$/gm, '');
+
+  comprobar(
+    'hay un campo explicito que dice cual esta activo',
+    /usa3D\?: boolean/.test(av),
+    'sin ese campo, el 3D vuelve a ganar siempre',
+  );
+  /*
+   * Y LA MIGRACION, que es lo que evita romperle el avatar a quien ya tenia uno:
+   * su dato guardado no lleva el campo, y sin esta regla su 3D desapareceria el
+   * dia de la actualizacion sin que hiciera nada.
+   */
+  comprobar(
+    'y quien ya tenia un 3D lo conserva activo al actualizar',
+    /a\.modeloUrl[\s\S]{0,40}usa3D: true/.test(av),
+    'un avatar esculpido antes de este campo dejaria de verse',
+  );
+  comprobar(
+    'olvidar el modelo lo DESACTIVA en vez de borrarlo',
+    /guardarAvatar\(\{ \.\.\.avatar, usa3D: false \}\)/.test(av),
+    'se borraria la figura esculpida y nadie sabria que llego a tenerla',
+  );
+
+  const portada = fs
+    .readFileSync(path.join(RUTAS, 'index.tsx'), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/\/\/.*$/gm, '');
+  comprobar(
+    'la portada respeta esa seleccion',
+    /avatar\.usa3D/.test(portada),
+    'la portada vuelve a enseñar el 3D aunque se haya elegido un personaje',
+  );
+
+  const estudio = fs.readFileSync(path.join(RUTAS, 'avatar.tsx'), 'utf8');
+  comprobar(
+    'y la figura esculpida se elige en la misma rejilla que el elenco',
+    /rasgos\.modeloUrl &&/.test(estudio) && /rasgos\.usa3D &&/.test(estudio),
+    'la esculpida vuelve a vivir aparte: no hay forma de ver cual esta puesta',
+  );
+}
+
 console.log('');
 if (fallos.length === 0) {
   console.log(
