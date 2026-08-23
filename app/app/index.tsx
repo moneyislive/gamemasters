@@ -52,7 +52,7 @@ import { EscenaAvatar, type ProgresoCompartido } from '../src/escena-avatar';
 import { Figura } from '../src/figura';
 import { SelloDeCuenta } from '../src/sello-cuenta';
 import { FondoDeSalas } from '../src/fondos-sala';
-import { AVATAR_POR_DEFECTO, cargarAvatar, type Avatar } from '../src/avatar';
+import { AVATAR_POR_DEFECTO, cargarAvatar, olvidarModelo3D, type Avatar } from '../src/avatar';
 import { Latido, Pulsable, useMenosMovimiento } from '../src/vivo';
 import { veladas } from '../src/vitrina';
 import { TROFEOS } from '../../shared/live';
@@ -133,6 +133,8 @@ export default function Portada(): JSX.Element {
   );
 
   const [avatar, setAvatar] = useState<Avatar>(AVATAR_POR_DEFECTO);
+  /** El modelo 3D no se ha podido enseñar en esta sesión. */
+  const [modeloRoto, setModeloRoto] = useState(false);
   /** sala → ilustración generada, si el servidor la tiene. */
   const [fondos, setFondos] = useState<Record<string, string>>({});
 
@@ -242,12 +244,25 @@ export default function Portada(): JSX.Element {
             ancho={width}
             alto={altoHero}
           />
-          {avatar.modeloUrl ? (
+          {avatar.modeloUrl && !modeloRoto ? (
             <EscenaAvatar
               ancho={width}
               alto={altoHero}
               modeloUrl={avatar.modeloUrl}
               progreso={progresoRef.current}
+              /*
+                SI EL MODELO NO SE PUEDE ENSEÑAR, SE ENSEÑA LA FIGURA. Antes la
+                escena se quedaba vacía sin decir nada: el fichero desaparecía
+                del servidor —los modelos viven en el disco de las subidas, que
+                sin disco persistente se borra en cada despliegue— y la portada
+                se quedaba sin nadie, sin ninguna pista de por qué.
+              */
+              alFallar={(definitivo) => {
+                setModeloRoto(true);
+                // Solo se borra si el fichero ya no existe. Mala cobertura no
+                // es motivo para quitarle a nadie el avatar que esculpió.
+                if (definitivo) void olvidarModelo3D().then(cargarFigura);
+              }}
             />
           ) : (
             /*

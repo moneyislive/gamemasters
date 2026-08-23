@@ -630,6 +630,51 @@ for (const pantalla of ['index.tsx', 'avatar.tsx', 'cuenta.tsx']) {
   );
 }
 
+// ---------------------------------------------------------------------------
+// Un avatar 3D que no se puede enseñar NO desaparece en silencio
+// ---------------------------------------------------------------------------
+/*
+ * LO QUE PASO. Se genera un avatar con Tripo, se ve bien, y al dia siguiente la
+ * portada aparece sin nadie. El fichero del modelo vive en el disco de las
+ * subidas del servidor, que en un plan sin disco persistente se borra en cada
+ * despliegue; la app pedia un 404 y salia por un `if (!r.ok) return;` MUDO: sin
+ * aviso, sin respaldo y sin una sola pista. «No se ve nada» y a adivinar.
+ */
+{
+  const escena = fs.readFileSync(path.join(SRC, 'escena-avatar.tsx'), 'utf8');
+  const codigo = escena.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+
+  comprobar(
+    'una respuesta que no es 200 deja de salir en silencio',
+    !/if \(!r\.ok\) return;/.test(codigo),
+    'el modelo vuelve a fallar sin decir nada',
+  );
+  comprobar(
+    'y se avisa a quien manda para que ponga otra cosa',
+    /alFallar\?\.\(/.test(codigo),
+    'la escena no avisa: la portada se quedara vacia',
+  );
+  /*
+   * Y la distincion que evita el dano: borrar el avatar de alguien porque el
+   * salon tenia mala cobertura seria peor que no enseñarlo un rato.
+   */
+  comprobar(
+    'solo se olvida el modelo cuando de verdad ya no existe',
+    /r\.status === 404 \|\| r\.status === 410/.test(codigo),
+    'se borraria el avatar ante cualquier fallo, incluida la mala cobertura',
+  );
+
+  const portada = fs
+    .readFileSync(path.join(RUTAS, 'index.tsx'), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/\/\/.*$/gm, '');
+  comprobar(
+    'la portada cae a la figura dibujada si el modelo falla',
+    /modeloRoto/.test(portada) && /alFallar=/.test(portada),
+    'la portada se quedara sin nadie cuando el modelo no cargue',
+  );
+}
+
 console.log('');
 if (fallos.length === 0) {
   console.log(

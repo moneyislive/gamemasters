@@ -99,11 +99,19 @@ export function EscenaAvatar({
   alto,
   modeloUrl,
   progreso,
+  alFallar,
 }: {
   ancho: number;
   alto: number;
   modeloUrl: string;
   progreso: ProgresoCompartido;
+  /**
+   * Se llama cuando el modelo no se puede enseñar, para que quien manda decida
+   * qué poner en su lugar. `definitivo` distingue «ese fichero ya no existe»
+   * —hay que olvidarlo— de «ahora mismo no se ha podido traer», que puede ser
+   * la cobertura del salón y no debe borrarle a nadie su avatar.
+   */
+  alFallar?: (definitivo: boolean) => void;
 }): JSX.Element {
   const [objeto, setObjeto] = useState<THREE.Group | null>(null);
 
@@ -113,7 +121,20 @@ export function EscenaAvatar({
     void (async () => {
       try {
         const r = await fetch(api.urlAbsoluta(modeloUrl));
-        if (!r.ok) return;
+        if (!r.ok) {
+          /*
+           * ESTE `return` ERA MUDO, y es la razón de que un avatar generado se
+           * evaporara sin dejar rastro: el fichero desaparecía del servidor
+           * —los modelos viven en el disco de las subidas, que en un plan sin
+           * disco persistente se borra en cada despliegue— la app pedía un 404,
+           * salía por aquí en silencio, y la escena se quedaba sin personaje.
+           * Ni un aviso en la consola. «No se ve nada» y a adivinar.
+           */
+          console.warn(`[avatar] el modelo respondió ${r.status}: ${modeloUrl}`);
+          // 404 y 410 son definitivos: ese fichero no va a volver.
+          if (vivo) alFallar?.(r.status === 404 || r.status === 410);
+          return;
+        }
         const bytes = await r.arrayBuffer();
         /*
          * EL DESCODIFICADOR DE GEOMETRÍA COMPRIMIDA, y ojo con cuál.
@@ -166,16 +187,20 @@ export function EscenaAvatar({
              * descodificador de geometría comprimida.
              */
             console.warn('[avatar] el modelo no se pudo abrir:', error);
+            // Llegó entero y no se deja abrir: está roto, no ausente.
+            if (vivo) alFallar?.(true);
           },
         );
       } catch (error) {
         console.warn('[avatar] no se pudo traer el modelo:', error);
+        // Sin respuesta: puede ser la cobertura. No se borra nada.
+        if (vivo) alFallar?.(false);
       }
     })();
     return () => {
       vivo = false;
     };
-  }, [modeloUrl]);
+  }, [modeloUrl, alFallar]);
 
   return (
     <View pointerEvents="none" style={{ position: 'absolute', width: ancho, height: alto }}>

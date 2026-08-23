@@ -252,6 +252,24 @@ export async function cargarAvatar(): Promise<Avatar> {
   }
 }
 
+/**
+ * Olvida el modelo 3D, conservando los rasgos dibujados.
+ *
+ * SE LLAMA CUANDO EL FICHERO YA NO EXISTE, y solo entonces. Los modelos viven
+ * en el disco de las subidas del servidor, que en un plan sin disco persistente
+ * se borra en cada despliegue: la app se queda con una dirección que apunta a
+ * nada y, si no se olvida, lo intenta en cada arranque para siempre y la
+ * portada se queda sin figura.
+ *
+ * NO se llama cuando simplemente no hay respuesta. Un salón con mala cobertura
+ * no es motivo para borrarle a nadie el avatar que esculpió.
+ */
+export async function olvidarModelo3D(): Promise<void> {
+  const avatar = await cargarAvatar();
+  const { modeloUrl: _m, vistaPrevia: _v, ...rasgos } = avatar;
+  await guardarAvatar(rasgos);
+}
+
 export async function guardarAvatar(avatar: Avatar): Promise<void> {
   await almacen.set(JSON.stringify(acotar(avatar)));
 }
