@@ -102,13 +102,31 @@ export async function crearTareaDeAvatar(
        * datos es medio minuto de descarga y un mordisco de memoria por cada
        * avatar en pantalla — y la idea es que algún día estén los de toda la
        * mesa. Con 30.000 caras el personaje sigue viéndose fino a tamaño de
-       * teléfono, y Draco comprime la geometría a una fracción.
+       * teléfono.
        *
        * Lo que NO se toca es la textura: el detalle que se ve de verdad en un
        * personaje estilizado está pintado, no esculpido.
+       *
+       * Y NO SE PIDE LA GEOMETRÍA COMPRIMIDA, aunque el fichero pese más.
+       *
+       * Se pedía —`compress: 'geometry'`— y bajaba de 12,3 MB a 0,47. El
+       * problema es que un GLB así solo se abre con un descodificador de
+       * geometría comprimida, y TODOS los que existen (meshopt, Draco) están
+       * compilados a WebAssembly. Hermes, el motor de JavaScript de React
+       * Native, no ejecuta WebAssembly: el fichero llega entero al teléfono y
+       * no hay manera de abrirlo.
+       *
+       * Costó descubrirlo porque el síntoma es idéntico al de un fichero que
+       * falta, y porque en un navegador —donde WebAssembly sí existe— funciona
+       * perfectamente. Se probó ahí, se dio por bueno, y en el móvil no
+       * funcionó nunca.
+       *
+       * Así que el peso se controla con `face_limit` y nada más. Si algún día
+       * pesa demasiado, la salida es bajar caras o reducir la textura, no
+       * volver a comprimir: comprimir en un sitio que no puede descomprimir es
+       * no tener modelo.
        */
       face_limit: 30000,
-      compress: 'geometry',
     }),
   });
   if (!r.ok) {

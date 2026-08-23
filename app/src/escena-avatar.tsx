@@ -154,9 +154,34 @@ export function EscenaAvatar({
          * Va empaquetado con la app (no de un CDN): funciona igual en el móvil
          * y en una casa sin buena conexión, que es donde se juega.
          */
-        await MeshoptDecoder.ready;
         const cargador = new GLTFLoader();
-        cargador.setMeshoptDecoder(MeshoptDecoder);
+        /*
+         * EL DESCODIFICADOR SE INTENTA, PERO NO SE ESPERA QUE FUNCIONE AQUÍ.
+         *
+         * `meshoptimizer` está compilado a WebAssembly, y Hermes —el motor de
+         * JavaScript de React Native— no lo ejecuta. Así que en el teléfono
+         * esto no puede descomprimir nada, por bien escrito que esté.
+         *
+         * Por eso el servidor ya NO pide la geometría comprimida (ver
+         * `ia/tripo.ts`): los modelos nuevos llegan sin comprimir y se abren
+         * sin descodificador. Esto se queda por los modelos VIEJOS, que sí
+         * están comprimidos: en un navegador —donde WebAssembly existe— aún se
+         * abren, y en el móvil fallan con un mensaje que lo dice.
+         *
+         * Y va envuelto: si preparar el descodificador revienta, no puede
+         * llevarse por delante la carga de un modelo que no lo necesita.
+         */
+        try {
+          await MeshoptDecoder.ready;
+          cargador.setMeshoptDecoder(MeshoptDecoder);
+        } catch (fallo) {
+          console.warn(
+            '[avatar] no hay descodificador de geometría comprimida en este ' +
+              'aparato (Hermes no ejecuta WebAssembly). Los modelos SIN comprimir ' +
+              'se abrirán igual; los comprimidos, no. Motivo:',
+            fallo,
+          );
+        }
         cargador.parse(
           bytes,
           '',

@@ -749,6 +749,54 @@ for (const pantalla of ['index.tsx', 'avatar.tsx', 'cuenta.tsx']) {
   );
 }
 
+// ---------------------------------------------------------------------------
+// La geometria comprimida no se puede abrir en el telefono
+// ---------------------------------------------------------------------------
+/*
+ * LO QUE COSTO DESCUBRIR. El servidor pedia a Tripo la geometria comprimida
+ * —bajaba de 12,3 MB a 0,47— y un GLB asi solo se abre con un descodificador,
+ * y TODOS (meshopt, Draco) estan compilados a WebAssembly. Hermes, el motor de
+ * JavaScript de React Native, no ejecuta WebAssembly: el fichero llega entero
+ * al telefono y no hay manera de abrirlo.
+ *
+ * El sintoma es identico al de un fichero que falta, asi que se estuvo mirando
+ * el disco del servidor. Y en un navegador —donde WebAssembly si existe—
+ * funciona perfectamente: se probo ahi, se dio por bueno, y en el movil no
+ * funciono nunca.
+ */
+{
+  const tripo = fs.readFileSync(
+    path.join(SRC, '..', '..', 'server', 'src', 'ia', 'tripo.ts'),
+    'utf8',
+  );
+  const codigoTripo = tripo.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+  comprobar(
+    'el servidor NO pide a Tripo la geometria comprimida',
+    !/compress:/.test(codigoTripo),
+    'un GLB comprimido no se puede abrir en el telefono: no hay WebAssembly',
+  );
+  comprobar(
+    'y controla el peso por numero de caras, que si funciona en todas partes',
+    /face_limit:/.test(codigoTripo),
+    'sin face_limit el modelo llega enorme',
+  );
+
+  const escena = fs
+    .readFileSync(path.join(SRC, 'escena-avatar.tsx'), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/\/\/.*$/gm, '');
+  /*
+   * Y preparar el descodificador NO puede tumbar la carga de un modelo que no
+   * lo necesita: si `MeshoptDecoder.ready` revienta sin proteccion, se lleva
+   * por delante tambien los modelos sin comprimir, que se abririan solos.
+   */
+  comprobar(
+    'preparar el descodificador no puede tumbar la carga',
+    /try \{[\s\S]{0,200}MeshoptDecoder\.ready/.test(escena),
+    'un fallo al preparar el descodificador impediria abrir hasta lo no comprimido',
+  );
+}
+
 console.log('');
 if (fallos.length === 0) {
   console.log(
