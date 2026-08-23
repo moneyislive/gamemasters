@@ -1,0 +1,113 @@
+/*
+  El control de cuenta, arriba a la derecha y por encima de todo.
+
+  FIJO Y NO DENTRO DE UNA PÁGINA, a propósito: el taller tiene tres pantallas
+  con cabeceras distintas —catálogo, recibidor y estudio— y meterlo en cada una
+  significaría tres sitios donde puede quedarse desactualizado. Aquí es uno.
+
+  El z-index tiene que ganar a los paneles del estudio, que se superponen.
+*/
+.cuentabarra {
+  position: fixed;
+  top: 0.9rem;
+  right: 1rem;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.85rem;
+}
+
+.cuentabarra-anon {
+  color: rgba(240, 230, 205, 0.5);
+  font-style: italic;
+  letter-spacing: 0.04em;
+}
+
+.cuentabarra-btn {
+  padding: 0.35rem 0.8rem;
+  font-size: 0.82rem;
+  letter-spacing: 0.04em;
+}
+
+.cuentabarra-quien {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.3rem 0.7rem 0.3rem 0.3rem;
+  border: 1px solid rgba(232, 207, 127, 0.28);
+  border-radius: 999px;
+  background: rgba(11, 23, 16, 0.75);
+  color: #f0e6cd;
+  font: inherit;
+  cursor: pointer;
+  /* El fondo del taller cambia por página; sin esto el control se pierde. */
+  backdrop-filter: blur(6px);
+}
+.cuentabarra-quien:hover {
+  border-color: rgba(232, 207, 127, 0.55);
+}
+
+.cuentabarra-inicial {
+  display: grid;
+  place-items: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 50%;
+  background: rgba(232, 207, 127, 0.16);
+  color: #e8cf7f;
+  font-weight: 700;
+  font-size: 0.8rem;
+  line-height: 1;
+}
+
+.cuentabarra-nombre {
+  max-width: 11rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cuentabarra-menu {
+  position: absolute;
+  top: 2.6rem;
+  right: 0;
+  min-width: 15rem;
+  padding: 0.9rem 1rem;
+  background: #0b1710;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.cuentabarra-correo {
+  margin: 0;
+  font-size: 0.8rem;
+  overflow-wrap: anywhere;
+}
+
+.cuentabarra-aviso {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  font-style: italic;
+  color: #e8cf7f;
+  opacity: 0.85;
+}
+
+.cuentabarra-salir {
+  width: 100%;
+  padding: 0.4rem;
+  font-size: 0.82rem;
+}
+
+/*
+  En un móvil el taller ya va justo de espacio, y este control no debe taparle
+  el título a nadie: se queda, pero sin el nombre.
+*/
+@media (max-width: 560px) {
+  .cuentabarra-nombre,
+  .cuentabarra-anon {
+    display: none;
+  }
+}

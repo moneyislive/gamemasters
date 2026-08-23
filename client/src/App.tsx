@@ -10,6 +10,7 @@
  */
 import { Navigate, Route, Routes, useParams } from 'react-router-dom';
 import { juegosInstalados } from '../../shared/juegos';
+import BarraDeCuenta from './components/auth/BarraDeCuenta';
 import LoginGate from './components/auth/LoginGate';
 import CatalogPage from './pages/CatalogPage';
 import CluedoLobbyPage from './pages/CluedoLobbyPage';
@@ -32,6 +33,13 @@ export default function App() {
   return (
     // Si el servidor tiene APP_PASSWORD, nada se muestra sin la contraseña.
     <LoginGate>
+      {/*
+        DENTRO de la puerta y FUERA de las rutas. Dentro, porque a quien todavía
+        no ha entrado ya le ofrece Google la propia puerta y aquí sobraría.
+        Fuera de las rutas, porque si viviera en una página habría que repetirlo
+        en las tres —catálogo, recibidor y estudio— y la tercera se olvidaría.
+      */}
+      <BarraDeCuenta />
       <Routes>
         <Route path="/" element={<CatalogPage />} />
         <Route

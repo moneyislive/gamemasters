@@ -481,6 +481,61 @@ try {
   );
 
   // -------------------------------------------------------------------------
+  paso('El taller solo ofrece proveedores que tengan ruta de verdad');
+  // -------------------------------------------------------------------------
+  /*
+   * ESTA COMPROBACION NACE DE UN BOTON MUERTO QUE ESTUVE A PUNTO DE PUBLICAR.
+   * El control de cuenta del taller pintaba «Entrar con Apple» mirando si Apple
+   * estaba configurado — pero estar configurado solo significa que el servidor
+   * sabe VERIFICAR un testigo que llegue de la app del iPhone. Entrar desde un
+   * navegador es otra cosa: exige un Services ID y el dominio verificado ante
+   * Apple, y su ruta de ida no existe. Quien pulsara ese boton recibiria un 404
+   * y creeria que la culpa es suya.
+   *
+   * Por eso el servidor publica `navegador`, calculado de las rutas que existen
+   * de verdad, y no de una lista escrita a mano que se queda vieja.
+   */
+  const anunciados: { google: boolean; apple: boolean; navegador: string[] } = JSON.parse(
+    (await pedir(5892, '/api/cuenta/proveedores')).cuerpo,
+  );
+  comprobar(
+    'con Google configurado, se anuncia su entrada por navegador',
+    anunciados.navegador.includes('google'),
+    anunciados,
+  );
+  comprobar(
+    'y NUNCA se anuncia una que no tenga ruta',
+    anunciados.navegador.every((p) => p === 'google'),
+    anunciados.navegador,
+  );
+
+  // Y cada una de las anunciadas tiene que responder de verdad, no 404.
+  for (const p of anunciados.navegador) {
+    const puerta = await pedir(5892, `/api/cuenta/entrar/${p}`);
+    comprobar(`y /cuenta/entrar/${p} lleva a algun sitio`, puerta.estado === 302, puerta.estado);
+  }
+
+  /*
+   * Y AL REVES: que la lista y las rutas no se separen. La lista se escribe a
+   * mano —la introspeccion de Express resulto fragil y tumbaba la ruta entera—
+   * asi que lo que impide que diverja es esto: se leen las rutas
+   * `/cuenta/entrar/*` que existen de verdad en el fichero y se comparan con la
+   * constante. Anadir una ruta y olvidarse de la lista deja un boton que no
+   * aparece; anadirla a la lista y olvidarse de la ruta deja un boton muerto.
+   */
+  const fuente = fs.readFileSync(path.join(REPO, 'server', 'src', 'routes', 'cuenta.ts'), 'utf8');
+  const rutasReales = [...fuente.matchAll(/router\.get\('\/cuenta\/entrar\/(\w+)'/g)]
+    .map((m) => m[1])
+    .sort();
+  const enLaLista = /const ENTRADAS_DE_NAVEGADOR[^=]*=\s*\[([^\]]*)\]/.exec(fuente)?.[1] ?? '';
+  const declaradas = [...enLaLista.matchAll(/'(\w+)'/g)].map((m) => m[1]).sort();
+  comprobar(
+    'la lista de entradas coincide EXACTAMENTE con las rutas que existen',
+    JSON.stringify(rutasReales) === JSON.stringify(declaradas),
+    { rutasReales, declaradas },
+  );
+
+  // -------------------------------------------------------------------------
   paso('La descarga del APK, mientras no haya tienda');
   // -------------------------------------------------------------------------
   /*

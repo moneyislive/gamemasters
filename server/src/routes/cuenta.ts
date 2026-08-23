@@ -44,6 +44,25 @@ const router = crearRouter();
 /** Donde viaja el nonce del camino del navegador, entre la ida y la vuelta. */
 const COOKIE_NONCE = 'gm_nonce';
 
+/**
+ * Proveedores con PUERTA DE ENTRADA POR NAVEGADOR, que no es lo mismo que estar
+ * configurados.
+ *
+ * Tener credenciales de Apple permite VERIFICAR un testigo que llega de la app
+ * del iPhone, y eso le basta a la app. Pero entrar con Apple desde un navegador
+ * es otra cosa: exige un Services ID y el dominio verificado ante Apple, y su
+ * ruta de ida todavía no existe.
+ *
+ * El taller solo puede entrar por navegador, así que si mirara `apple` a secas
+ * pintaría un botón hacia una ruta que no está, y quien lo pulsara se llevaría
+ * un 404 creyendo que la culpa es suya. Estuvo a punto de pasar.
+ *
+ * AÑADIR UNA ENTRADA ES AÑADIRLA AQUÍ Y ESCRIBIR SU RUTA. Que las dos cosas no
+ * se separen lo vigila `verify:puerta-google`, que compara esta lista con las
+ * rutas `/cuenta/entrar/*` que existen de verdad en este fichero.
+ */
+const ENTRADAS_DE_NAVEGADOR: Array<'google' | 'apple'> = ['google'];
+
 /** Quién empezó el viaje a Google: el taller en un navegador, o la app. */
 type Destino = 'taller' | 'app';
 
@@ -290,6 +309,7 @@ router.get('/cuenta/proveedores', (_req, res) => {
   res.json({
     google: proveedorConfigurado('google'),
     apple: proveedorConfigurado('apple'),
+    navegador: ENTRADAS_DE_NAVEGADOR.filter((p) => proveedorConfigurado(p)),
   });
 });
 
@@ -421,6 +441,46 @@ function origenDe(req: Request): string {
  * respondiera «¿tiene invitaciones fulano@ejemplo.com?» sería un oráculo para
  * averiguar quién juega en esta plataforma. Los correos salen de la sesión.
  */
+/**
+ * Quién es quien llama, o `null`. NUNCA corta.
+ *
+ * EXISTE PORQUE PREGUNTAR NO ES ENTRAR. Todas las demás rutas de cuenta
+ * responden 401 cuando no hay pasaporte, y eso está bien para ellas — pero el
+ * taller necesita algo distinto: saber si quien mira tiene cuenta para decidir
+ * si le ofrece iniciar sesión o le saluda por su nombre. Con un 401, esa
+ * pregunta se convierte en un error en la consola cada vez que la hace alguien
+ * que todavía no tiene cuenta, que es el caso normal.
+ *
+ * Y HACE FALTA PORQUE HABÍA UN CALLEJÓN SIN SALIDA: quien entra al taller con
+ * la contraseña de la casa nunca volvía a ver la puerta —`LoginGate` solo se
+ * dibuja cuando NO estás dentro— así que no tenía forma de vincular su Google
+ * después. Su progreso se quedaba atado a una contraseña compartida en vez de a
+ * una persona.
+ *
+ * No dice nada que no sepa ya quien pregunta: o eres tú, o no hay nadie.
+ */
+router.get('/cuenta/yo', async (req, res) => {
+  const pasaporte = sesionDeCuentaDePeticion(req);
+  if (!pasaporte) {
+    res.json({ cuenta: null });
+    return;
+  }
+  const cuenta = await getStore().getAccount(pasaporte.cuentaId);
+  if (!cuenta || !pasaporteVigente(pasaporte, cuenta)) {
+    res.json({ cuenta: null });
+    return;
+  }
+  res.json({
+    cuenta: {
+      id: cuenta.id,
+      displayName: cuenta.displayName,
+      email: cuenta.email,
+      taller: admitidoEnElTaller(cuenta),
+      via: (cuenta.identidades ?? []).map((i) => i.proveedor),
+    },
+  });
+});
+
 router.get('/cuenta/portada', async (req, res) => {
   const cuenta = await cuentaDe(req, res);
   if (!cuenta) return;
