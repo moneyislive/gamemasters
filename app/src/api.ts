@@ -31,9 +31,24 @@ const CLAVE_SERVIDOR_COMPILADO = 'gm_servidor_compilado';
  */
 const CLAVE_CUENTA = 'gm_cuenta';
 
-/** Valor por defecto, sobreescribible con EXPO_PUBLIC_API_URL al compilar. */
+/**
+ * A qué servidor habla la app por defecto.
+ *
+ * EN EL NAVEGADOR SE DEDUCE, y esa es la diferencia importante. La versión web
+ * se sirve DESDE el propio servidor de juego, en `/jugar`, así que su origen ya
+ * es la respuesta: preguntarle a la página dónde está acierta siempre y no hay
+ * nada que configurar al compilar. Si se grabara una dirección fija, el mismo
+ * empaquetado dejaría de servir en cualquier otro sitio —una prueba local, un
+ * dominio nuevo— y fallaría con «no se puede hablar con el servidor», que suena
+ * a problema de red y no a una dirección mal puesta.
+ *
+ * En el móvil no hay página de la que deducir nada, así que ahí sí se graba al
+ * compilar con `EXPO_PUBLIC_API_URL`. Ver `app/COMPILAR.md`.
+ */
 const SERVIDOR_POR_DEFECTO =
-  process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:5174';
+  Platform.OS === 'web' && typeof globalThis.location !== 'undefined'
+    ? globalThis.location.origin
+    : (process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:5174');
 
 // SecureStore no existe en web: allí se cae a localStorage, que es lo que hay.
 const almacen = {

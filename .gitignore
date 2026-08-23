@@ -8,3 +8,6 @@ server/data/
 cluedo_casa_sabron_corregido/
 # Diagnostico local: adb y scripts. Desechable, no entra en el proyecto.
 herramientas/
+
+# El empaquetado web de la app: lo genera el despliegue.
+app/dist/

@@ -13,6 +13,7 @@ import { DEMO_MODE, env } from './config';
 import authRouter, { passwordRequired, requireAuth, tallerAbiertoPara } from './auth';
 import aterrizajeRouter from './enlaces/aterrizaje';
 import descargaRouter, { comprobarLaDescarga } from './enlaces/descarga';
+import jugarWebRouter from './enlaces/jugar-web';
 import correoRouter from './correo/router';
 import legalRouter from './legal/documentos';
 import limitadorDeIntentos from './puerta/montaje';
@@ -159,6 +160,14 @@ app.use(aterrizajeRouter);
  * casa ni tiene por que.
  */
 app.use(descargaRouter);
+
+/*
+ * La app jugable desde el navegador, para quien no puede instalar el APK —todo
+ * iPhone, porque Apple no permite instalar fuera de su tienda. Mismo origen que
+ * la API, asi que no hay CORS ni direcciones que configurar. Delante del
+ * guardian: quien juega no conoce la contrasena de la casa.
+ */
+app.use(jugarWebRouter);
 
 /**
  * Señal de vida, para quien vigila el servicio.
