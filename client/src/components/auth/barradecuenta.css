@@ -1,12 +1,22 @@
 /*
-  El control de cuenta, arriba a la derecha y por encima de todo.
+  El sello de cuenta del taller.
 
   FIJO Y NO DENTRO DE UNA PÁGINA, a propósito: el taller tiene tres pantallas
   con cabeceras distintas —catálogo, recibidor y estudio— y meterlo en cada una
   significaría tres sitios donde puede quedarse desactualizado. Aquí es uno.
 
-  El z-index tiene que ganar a los paneles del estudio, que se superponen.
+  LA IDEA VISUAL. La primera versión era una caja con un botón de oro macizo
+  dentro, y se veía improvisada por dos motivos concretos: la acción pesaba más
+  que la información —un bloque dorado gritando en un menú que solo se abre para
+  mirar— y el panel flotaba sin relación con el sello que lo abre.
+
+  Aquí el peso está invertido. Manda el monograma, que es lo que identifica; la
+  acción es una fila discreta que solo se enciende al pasar por encima; y el
+  panel cuelga del sello con una púa, como un lacre del que tira un cordón. Los
+  materiales son los de la casa: latón sobre caoba, filete de oro y el mismo
+  ornamento de rombo que separa las secciones del taller.
 */
+
 .cuentabarra {
   position: fixed;
   top: 0.9rem;
@@ -14,51 +24,76 @@
   z-index: 60;
   display: flex;
   align-items: center;
-  gap: 0.6rem;
-  font-size: 0.85rem;
+  gap: 0.55rem;
+  font-family: var(--font-body);
 }
 
+/* ---------- Sin cuenta: la invitación a entrar ---------- */
+
 .cuentabarra-anon {
-  color: rgba(240, 230, 205, 0.5);
+  color: var(--parchment-dim);
+  opacity: 0.6;
+  font-size: 0.9rem;
   font-style: italic;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.03em;
 }
 
 .cuentabarra-btn {
-  padding: 0.35rem 0.8rem;
-  font-size: 0.82rem;
-  letter-spacing: 0.04em;
+  padding: 0.34rem 0.85rem;
+  font-size: 0.8rem;
+  letter-spacing: 0.06em;
 }
+
+/* ---------- El sello ---------- */
 
 .cuentabarra-quien {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.3rem 0.7rem 0.3rem 0.3rem;
-  border: 1px solid rgba(232, 207, 127, 0.28);
+  gap: 0.55rem;
+  padding: 0.28rem 0.85rem 0.28rem 0.3rem;
+  border: 1px solid rgba(201, 162, 39, 0.3);
   border-radius: 999px;
-  background: rgba(11, 23, 16, 0.75);
-  color: #f0e6cd;
+  background: linear-gradient(160deg, rgba(31, 18, 12, 0.88), rgba(11, 23, 16, 0.92));
+  color: var(--parchment);
   font: inherit;
+  font-size: 0.9rem;
   cursor: pointer;
-  /* El fondo del taller cambia por página; sin esto el control se pierde. */
-  backdrop-filter: blur(6px);
+  /* El fondo del taller cambia por página; sin esto el sello se pierde. */
+  backdrop-filter: blur(8px);
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease;
 }
-.cuentabarra-quien:hover {
-  border-color: rgba(232, 207, 127, 0.55);
+.cuentabarra-quien:hover,
+.cuentabarra-quien[aria-expanded='true'] {
+  border-color: rgba(232, 207, 127, 0.6);
+  box-shadow: 0 0 18px rgba(201, 162, 39, 0.18);
+}
+.cuentabarra-quien:focus-visible {
+  outline: 2px solid var(--gold-300);
+  outline-offset: 2px;
 }
 
+/*
+  El monograma: latón repujado, no un círculo plano. El borde interior claro y
+  la sombra de abajo son lo que le dan relieve; sin ellos parece una pegatina.
+*/
 .cuentabarra-inicial {
   display: grid;
   place-items: center;
-  width: 1.6rem;
-  height: 1.6rem;
+  width: 1.75rem;
+  height: 1.75rem;
   border-radius: 50%;
-  background: rgba(232, 207, 127, 0.16);
-  color: #e8cf7f;
+  background: radial-gradient(circle at 32% 28%, #e8cf7f, #a8801f 70%, #7a5c14);
+  color: var(--mahogany-900);
+  font-family: var(--font-heading);
   font-weight: 700;
-  font-size: 0.8rem;
+  font-size: 0.82rem;
   line-height: 1;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 245, 214, 0.6),
+    inset 0 -1px 2px rgba(0, 0, 0, 0.35),
+    0 1px 3px rgba(0, 0, 0, 0.5);
 }
 
 .cuentabarra-nombre {
@@ -66,48 +101,165 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  letter-spacing: 0.02em;
 }
+
+/* ---------- El panel que cuelga ---------- */
 
 .cuentabarra-menu {
   position: absolute;
-  top: 2.6rem;
+  top: 2.9rem;
   right: 0;
-  min-width: 15rem;
-  padding: 0.9rem 1rem;
-  background: #0b1710;
-  display: flex;
-  flex-direction: column;
-  gap: 0.7rem;
-}
-
-.cuentabarra-correo {
-  margin: 0;
-  font-size: 0.8rem;
-  overflow-wrap: anywhere;
-}
-
-.cuentabarra-aviso {
-  margin: 0;
-  font-size: 0.78rem;
-  line-height: 1.45;
-  font-style: italic;
-  color: #e8cf7f;
-  opacity: 0.85;
-}
-
-.cuentabarra-salir {
-  width: 100%;
-  padding: 0.4rem;
-  font-size: 0.82rem;
+  min-width: 16.5rem;
+  padding: 1.1rem 1.15rem 0.9rem;
+  border-radius: var(--radius);
+  background: var(--panel-bg);
+  border: var(--panel-border);
+  box-shadow: var(--panel-shadow);
+  transform-origin: top right;
 }
 
 /*
-  En un móvil el taller ya va justo de espacio, y este control no debe taparle
-  el título a nadie: se queda, pero sin el nombre.
+  La púa que lo ata al sello. Es un cuadrado girado con solo dos lados de borde,
+  de modo que se ve el filete continuo del panel y no una punta pegada encima.
+*/
+.cuentabarra-menu::before {
+  content: '';
+  position: absolute;
+  top: -6px;
+  right: 1.1rem;
+  width: 10px;
+  height: 10px;
+  transform: rotate(45deg);
+  background: var(--mahogany-900);
+  border-top: 1px solid rgba(201, 162, 39, 0.35);
+  border-left: 1px solid rgba(201, 162, 39, 0.35);
+}
+
+.cuentabarra-ficha {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+
+.cuentabarra-inicial--grande {
+  width: 2.4rem;
+  height: 2.4rem;
+  font-size: 1.1rem;
+}
+
+.cuentabarra-datos {
+  min-width: 0;
+}
+
+.cuentabarra-nombre-grande {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-size: 1rem;
+  letter-spacing: 0.03em;
+  color: var(--gold-300);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cuentabarra-correo {
+  margin: 0.1rem 0 0;
+  font-size: 0.82rem;
+  color: var(--parchment-dim);
+  opacity: 0.72;
+  overflow-wrap: anywhere;
+}
+
+/* El mismo rombo que separa las secciones del taller. */
+.cuentabarra-filete {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  margin: 0.95rem 0 0.7rem;
+  color: rgba(201, 162, 39, 0.6);
+  font-size: 0.55rem;
+}
+.cuentabarra-filete::before,
+.cuentabarra-filete::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(201, 162, 39, 0.45), transparent);
+}
+
+/*
+  El aviso de que esta cuenta aún no dirige veladas. Va con barra lateral y no
+  con color de alarma: no es un error, es un estado — y pintarlo de rojo haría
+  pensar que algo se ha roto.
+*/
+.cuentabarra-aviso {
+  margin: 0 0 0.6rem;
+  padding-left: 0.7rem;
+  border-left: 2px solid rgba(201, 162, 39, 0.45);
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--parchment-dim);
+  opacity: 0.85;
+}
+
+/*
+  LA ACCIÓN ES UNA FILA, NO UN BLOQUE DE ORO. En un menú que se abre para mirar,
+  la única acción no debe pesar más que la identidad que lo encabeza: se queda
+  en reposo y solo se enciende al pasar por encima.
+*/
+.cuentabarra-salir {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  width: 100%;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--parchment-dim);
+  font-family: var(--font-heading);
+  font-size: 0.78rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition:
+    background 150ms ease,
+    color 150ms ease,
+    border-color 150ms ease;
+}
+.cuentabarra-salir:hover {
+  background: rgba(109, 26, 42, 0.28);
+  border-color: rgba(140, 35, 55, 0.6);
+  color: var(--parchment);
+}
+.cuentabarra-salir:focus-visible {
+  outline: 2px solid var(--gold-300);
+  outline-offset: 1px;
+}
+
+.cuentabarra-salir svg {
+  flex: none;
+  opacity: 0.75;
+}
+
+/*
+  En un móvil el taller ya va justo de espacio, y el sello no debe taparle el
+  título a nadie: se queda, pero sin el nombre.
 */
 @media (max-width: 560px) {
   .cuentabarra-nombre,
   .cuentabarra-anon {
     display: none;
+  }
+  .cuentabarra-menu {
+    min-width: 14rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cuentabarra-quien,
+  .cuentabarra-salir {
+    transition: none;
   }
 }

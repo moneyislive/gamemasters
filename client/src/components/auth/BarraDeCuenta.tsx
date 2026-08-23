@@ -19,7 +19,8 @@
  * cuenta, este control sería un adorno que ocupa una esquina para decir que no
  * puedes hacer nada.
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import './barradecuenta.css';
 
 interface Cuenta {
@@ -70,6 +71,29 @@ export default function BarraDeCuenta(): JSX.Element | null {
 
   useEffect(preguntar, [preguntar]);
 
+  /*
+   * CERRAR AL PULSAR FUERA Y CON ESCAPE. Sin esto el panel solo se cierra
+   * volviendo a pulsar el sello, que es justo donde nadie mira: se toca en
+   * cualquier otro sitio, el panel se queda abierto tapando el taller, y parece
+   * que se ha colgado. Es lo que separa un menú de una caja que aparece.
+   */
+  const caja = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!abierto) return undefined;
+    const fuera = (e: MouseEvent): void => {
+      if (caja.current && !caja.current.contains(e.target as Node)) setAbierto(false);
+    };
+    const tecla = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') setAbierto(false);
+    };
+    document.addEventListener('mousedown', fuera);
+    document.addEventListener('keydown', tecla);
+    return () => {
+      document.removeEventListener('mousedown', fuera);
+      document.removeEventListener('keydown', tecla);
+    };
+  }, [abierto]);
+
   const salir = async (): Promise<void> => {
     await fetch('/api/auth/logout', { method: 'POST' }).catch(() => undefined);
     // Recarga entera y no un `setCuenta(null)`: al salir cambia también lo que
@@ -97,39 +121,86 @@ export default function BarraDeCuenta(): JSX.Element | null {
     );
   }
 
+  const inicial = (cuenta.displayName || '?').slice(0, 1).toUpperCase();
+
   return (
-    <div className="cuentabarra">
+    <div className="cuentabarra" ref={caja}>
       <button
         type="button"
         className="cuentabarra-quien"
         onClick={() => setAbierto((v) => !v)}
         aria-expanded={abierto}
+        aria-haspopup="menu"
       >
         <span className="cuentabarra-inicial" aria-hidden="true">
-          {(cuenta.displayName || '?').slice(0, 1).toUpperCase()}
+          {inicial}
         </span>
         <span className="cuentabarra-nombre">{cuenta.displayName}</span>
       </button>
 
-      {abierto && (
-        <div className="cuentabarra-menu deco-frame">
-          <p className="cuentabarra-correo text-dim">{cuenta.email}</p>
-          {/*
-            Se dice si esta cuenta abre el taller o no. Sin esto, quien inicia
-            sesión y no está en la lista ve el taller igual —porque conserva la
-            contraseña de la casa— y se lleva la sorpresa el día que la quiten.
-          */}
-          {!cuenta.taller && (
-            <p className="cuentabarra-aviso">
-              Esta cuenta todavía no tiene permiso para dirigir veladas. Estás dentro por la
-              contraseña de la casa.
-            </p>
-          )}
-          <button type="button" className="btn cuentabarra-salir" onClick={() => void salir()}>
-            Cerrar sesión
-          </button>
-        </div>
-      )}
+      <AnimatePresence>
+        {abierto && (
+          /*
+           * Baja un poco al aparecer y escala desde la esquina de arriba a la
+           * derecha, que es de donde cuelga: así el panel parece salir DEL
+           * sello y no materializarse encima del taller.
+           */
+          <motion.div
+            className="cuentabarra-menu"
+            role="menu"
+            initial={{ opacity: 0, y: -8, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -6, scale: 0.97 }}
+            transition={{ duration: 0.18, ease: 'easeOut' }}
+          >
+            <div className="cuentabarra-ficha">
+              <span
+                className="cuentabarra-inicial cuentabarra-inicial--grande"
+                aria-hidden="true"
+              >
+                {inicial}
+              </span>
+              <div className="cuentabarra-datos">
+                <p className="cuentabarra-nombre-grande">{cuenta.displayName}</p>
+                <p className="cuentabarra-correo">{cuenta.email}</p>
+              </div>
+            </div>
+
+            <div className="cuentabarra-filete" aria-hidden="true">
+              ◆
+            </div>
+
+            {/*
+              Se dice si esta cuenta abre el taller o no. Sin esto, quien inicia
+              sesión y no está en la lista ve el taller igual —porque conserva la
+              contraseña de la casa— y se lleva la sorpresa el día que la quiten.
+            */}
+            {!cuenta.taller && (
+              <p className="cuentabarra-aviso">
+                Esta cuenta todavía no dirige veladas. Estás dentro por la contraseña de la casa.
+              </p>
+            )}
+
+            <button
+              type="button"
+              className="cuentabarra-salir"
+              onClick={() => void salir()}
+              role="menuitem"
+            >
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <path
+                  d="M6 2H3.5A1.5 1.5 0 0 0 2 3.5v9A1.5 1.5 0 0 0 3.5 14H6M10.5 11 14 8l-3.5-3M14 8H6"
+                  stroke="currentColor"
+                  strokeWidth="1.4"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              Cerrar sesión
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
