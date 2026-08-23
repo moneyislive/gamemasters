@@ -103,6 +103,106 @@ const almacen = {
   },
 };
 
+/**
+ * EL ELENCO: diez identidades listas, para que nadie empiece sin cara.
+ *
+ * EL PROBLEMA QUE RESUELVE. La única forma de tener retrato era esculpir uno
+ * con Tripo: subir una foto, esperar un par de minutos y confiar. Quien abría la
+ * app por primera vez —a diez minutos de una cena, con prisa— no tenía identidad
+ * ninguna, y la pantalla le ofrecía un botón en medio de la nada.
+ *
+ * Con esto, al primer arranque ya eres alguien. Cambiar de personaje es un
+ * toque, y esculpir el tuyo sigue estando para quien quiera.
+ *
+ * SON COMBINACIONES DE LOS CATÁLOGOS, no dibujos aparte. Así el elenco entero
+ * pesa unos cientos de bytes, se recolorea con el tema y añadir el undécimo es
+ * escribir una línea. Los nombres son de la casa —arquetipos de misterio— y no
+ * de personas: quien juega ya tendrá su personaje dentro de la velada, y este
+ * retrato es quien es en la plataforma, no en la partida.
+ */
+export interface Personaje {
+  id: string;
+  nombre: string;
+  /** Una línea que se lee bajo el nombre al elegir. */
+  nota: string;
+  rasgos: Avatar;
+}
+
+export const ELENCO: ReadonlyArray<Personaje> = [
+  {
+    id: 'anfitriona',
+    nombre: 'La Anfitriona',
+    nota: 'Sonríe mientras cuenta los cubiertos.',
+    rasgos: { piel: 0, peinado: 1, colorPelo: 4, atuendo: 1, colorAtuendo: 1, accesorio: 0 },
+  },
+  {
+    id: 'inspector',
+    nombre: 'El Inspector',
+    nota: 'Ya sabe la respuesta; quiere ver si tú también.',
+    rasgos: { piel: 2, peinado: 0, colorPelo: 0, atuendo: 1, colorAtuendo: 4, accesorio: 2 },
+  },
+  {
+    id: 'heredero',
+    nombre: 'El Heredero',
+    nota: 'Nunca ha pagado una cuenta en su vida.',
+    rasgos: { piel: 1, peinado: 0, colorPelo: 3, atuendo: 0, colorAtuendo: 0, accesorio: 1 },
+  },
+  {
+    id: 'viuda',
+    nombre: 'La Viuda',
+    nota: 'De luto desde antes del entierro.',
+    rasgos: { piel: 0, peinado: 3, colorPelo: 0, atuendo: 2, colorAtuendo: 0, accesorio: 3 },
+  },
+  {
+    id: 'doctora',
+    nombre: 'La Doctora',
+    nota: 'Sabe exactamente cuánto tarda cada cosa.',
+    rasgos: { piel: 3, peinado: 3, colorPelo: 1, atuendo: 3, colorAtuendo: 2, accesorio: 2 },
+  },
+  {
+    id: 'crupier',
+    nombre: 'El Crupier',
+    nota: 'Reparte las cartas y también los rumores.',
+    rasgos: { piel: 4, peinado: 4, colorPelo: 0, atuendo: 0, colorAtuendo: 3, accesorio: 0 },
+  },
+  {
+    id: 'cantante',
+    nombre: 'La Cantante',
+    nota: 'Llegó tarde y con una coartada preciosa.',
+    rasgos: { piel: 1, peinado: 2, colorPelo: 6, atuendo: 2, colorAtuendo: 1, accesorio: 0 },
+  },
+  {
+    id: 'jardinero',
+    nombre: 'El Jardinero',
+    nota: 'Conoce los rincones de la casa mejor que nadie.',
+    rasgos: { piel: 5, peinado: 2, colorPelo: 0, atuendo: 3, colorAtuendo: 4, accesorio: 0 },
+  },
+  {
+    id: 'profesor',
+    nombre: 'El Profesor',
+    nota: 'Corrige a todo el mundo, incluso cuando acierta.',
+    rasgos: { piel: 2, peinado: 0, colorPelo: 6, atuendo: 0, colorAtuendo: 2, accesorio: 2 },
+  },
+  {
+    id: 'forastera',
+    nombre: 'La Forastera',
+    nota: 'Nadie recuerda quién la invitó.',
+    rasgos: { piel: 4, peinado: 1, colorPelo: 5, atuendo: 2, colorAtuendo: 3, accesorio: 3 },
+  },
+];
+
+/**
+ * Un personaje del elenco al azar, para el primer arranque.
+ *
+ * AL AZAR Y NO SIEMPRE EL PRIMERO: si todo el mundo empezara siendo La
+ * Anfitriona, en una mesa de doce habría doce anfitrionas idénticas y el
+ * retrato dejaría de distinguir a nadie, que es justo para lo que está.
+ */
+export function personajeDeEstreno(): Avatar {
+  const elegido = ELENCO[Math.floor(Math.random() * ELENCO.length)];
+  return { ...(elegido ?? ELENCO[0])!.rasgos };
+}
+
 export const AVATAR_POR_DEFECTO: Avatar = {
   piel: 1,
   peinado: 0,
@@ -132,11 +232,21 @@ function acotar(a: Avatar): Avatar {
   };
 }
 
+/**
+ * El avatar guardado o, la primera vez, uno del elenco.
+ *
+ * SE GUARDA EN EL PRIMER ARRANQUE, y no basta con devolverlo: si solo se
+ * devolviera, cada pantalla que preguntara sacaría un personaje distinto al
+ * azar y la identidad cambiaría sola al navegar. Al escribirlo, quien abre la
+ * app ya es alguien concreto y lo sigue siendo mañana.
+ */
 export async function cargarAvatar(): Promise<Avatar> {
   try {
     const bruto = await almacen.get();
-    if (!bruto) return AVATAR_POR_DEFECTO;
-    return acotar(JSON.parse(bruto) as Avatar);
+    if (bruto) return acotar(JSON.parse(bruto) as Avatar);
+    const estreno = personajeDeEstreno();
+    await almacen.set(JSON.stringify(estreno));
+    return estreno;
   } catch {
     return AVATAR_POR_DEFECTO;
   }

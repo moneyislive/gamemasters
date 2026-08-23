@@ -46,8 +46,10 @@ import Animated, {
 import Svg, { Circle, Path } from 'react-native-svg';
 import * as api from '../src/api';
 import { usePartida } from '../src/estado';
+import { usarMarco } from '../src/marco';
 import { CarruselDeMundos, PASO } from '../src/carrusel3d';
 import { EscenaAvatar, type ProgresoCompartido } from '../src/escena-avatar';
+import { Figura } from '../src/figura';
 import { FondoDeSalas } from '../src/fondos-sala';
 import { AVATAR_POR_DEFECTO, cargarAvatar, type Avatar } from '../src/avatar';
 import { Latido, Pulsable, useMenosMovimiento } from '../src/vivo';
@@ -165,6 +167,13 @@ export default function Portada(): JSX.Element {
   const rango = rangoDe(jugadas.length);
 
   const catalogo = veladas();
+  /*
+   * El mundo 3D llega al borde a propósito —meterle margen dejaría una franja
+   * negra que rompe la profundidad— pero la botonera de encima SÍ tiene que
+   * apartarse de la hora, la batería y la muesca.
+   */
+  const marco = usarMarco();
+
   // Las salas del mundo 3D: una por juego, y la forja como cierre.
   const salas = [...catalogo.map((v) => v.id), 'forja'];
 
@@ -233,28 +242,24 @@ export default function Portada(): JSX.Element {
             />
           ) : (
             /*
-              Sin modelo todavía no se enseña ningún muñeco de relleno: se
-              enseña la INVITACIÓN. El hueco vacío bajo el foco es el reclamo.
+              SIN MODELO 3D SE ENSEÑA LA FIGURA DIBUJADA, no un reclamo.
+
+              Antes aquí había un botón de «FORJA TU AVATAR» flotando en el
+              hueco: la única forma de tener cara era subir una foto y esperar
+              dos minutos a que Tripo esculpiera. Quien abría la app por primera
+              vez —normalmente con prisa, camino de una cena— no era nadie.
+
+              Ahora el primer arranque ya asigna un personaje del elenco, así
+              que aquí siempre hay alguien. El lápiz de al lado sigue llevando
+              al estudio, donde se cambia de personaje o se esculpe el propio.
             */
-            <View style={[estilos.ctaAvatar, { top: altoHero * 0.42 }]} pointerEvents="box-none">
-              <Pulsable onPress={() => router.push('/avatar')}>
-                <LinearGradient
-                  colors={['#e0b83a', '#b8901e']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={estilos.ctaAvatarBoton}
-                >
-                  <Text style={estilos.ctaAvatarTexto}>FORJA TU AVATAR</Text>
-                </LinearGradient>
-              </Pulsable>
-              <Text style={estilos.ctaAvatarPie}>
-                Sube una foto y el estudio la esculpe en 3D
-              </Text>
+            <View style={[estilos.ctaAvatar, { top: altoHero * 0.30 }]} pointerEvents="none">
+              <Figura avatar={avatar} tamano={168} conFondo={false} />
             </View>
           )}
 
           {/* La botonera fantasma: casi transparente, siempre a mano. */}
-          <View style={estilos.botonera} pointerEvents="box-none">
+          <View style={[estilos.botonera, { top: marco.arriba }]} pointerEvents="box-none">
             <Text style={estilos.marcaMini}>GAMEMASTERS</Text>
             <View style={{ flexDirection: 'row', gap: espacio.sm }}>
               <BotonFantasma
@@ -735,7 +740,6 @@ const estilos = StyleSheet.create({
 
   botonera: {
     position: 'absolute',
-    top: 14,
     left: espacio.lg,
     right: espacio.lg,
     flexDirection: 'row',
@@ -802,27 +806,6 @@ const estilos = StyleSheet.create({
     marginTop: espacio.md,
   },
   ctaAvatar: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
-  ctaAvatarBoton: {
-    borderRadius: radio.md,
-    paddingHorizontal: espacio.xl,
-    paddingVertical: 14,
-  },
-  ctaAvatarTexto: {
-    fontFamily: fuente.titulo,
-    fontSize: 13.5,
-    letterSpacing: 1.8,
-    color: color.caoba900,
-  },
-  ctaAvatarPie: {
-    fontFamily: fuente.cuerpo,
-    fontSize: 14.5,
-    color: color.pergaminoTenue,
-    opacity: 0.8,
-    marginTop: espacio.sm,
-    textShadowColor: 'rgba(0,0,0,0.7)',
-    textShadowRadius: 6,
-    textShadowOffset: { width: 0, height: 1 },
-  },
 
   heroContenido: { flex: 1, justifyContent: 'flex-end', paddingBottom: espacio.xl },
   sello: {

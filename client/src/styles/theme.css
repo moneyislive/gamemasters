@@ -235,7 +235,6 @@ h4 {
   align-items: center;
   gap: 12px;
   color: var(--gold-500);
-  margin: 14px 0;
 }
 .ornament-divider::before,
 .ornament-divider::after {

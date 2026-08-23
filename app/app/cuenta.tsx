@@ -17,6 +17,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import Animated, { FadeIn, FadeInUp } from 'react-native-reanimated';
 import * as api from '../src/api';
+import { usarMarco } from '../src/marco';
 import { Pulsable } from '../src/vivo';
 import { cargarAvatar, guardarAvatar, AVATAR_POR_DEFECTO } from '../src/avatar';
 import { TROFEOS } from '../../shared/live';
@@ -64,6 +65,7 @@ export default function Cuenta(): JSX.Element {
    * proveedores» mientras aún no ha contestado nadie enseña durante un segundo
    * un mensaje que puede ser falso.
    */
+  const marco = usarMarco();
   const [proveedores, setProveedores] = useState<Proveedores | null>(null);
   const [entrando, setEntrando] = useState<'google' | 'apple' | null>(null);
   const [avisoProveedor, setAvisoProveedor] = useState<string | null>(null);
@@ -155,7 +157,7 @@ export default function Cuenta(): JSX.Element {
     <View style={estilos.raiz}>
       <LinearGradient colors={['#1a0b12', '#0c0508']} style={StyleSheet.absoluteFill} />
       <ScrollView contentContainerStyle={estilos.contenido} showsVerticalScrollIndicator={false}>
-        <View style={estilos.cabecera}>
+        <View style={[estilos.cabecera, { marginTop: marco.arriba }]}>
           <Text style={estilos.rotulo}>TU CUENTA</Text>
           <Pressable
             onPress={cerrar}

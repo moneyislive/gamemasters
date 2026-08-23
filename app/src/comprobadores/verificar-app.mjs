@@ -415,6 +415,79 @@ comprobar(
   );
 }
 
+// ---------------------------------------------------------------------------
+// Nadie abre la app sin cara
+// ---------------------------------------------------------------------------
+/*
+ * LA SITUACION QUE ESTO EVITA: los catalogos de rasgos —pieles, peinados,
+ * atuendos— llevaban en avatar.ts desde el principio SIN QUE NADIE LOS
+ * DIBUJARA. El unico retrato posible era el modelo 3D de Tripo, que exige subir
+ * una foto y esperar un par de minutos, asi que quien abria la app por primera
+ * vez —con prisa, camino de una cena— no era nadie y solo veia un boton.
+ */
+{
+  const avatarTs = fs.readFileSync(path.join(SRC, 'avatar.ts'), 'utf8');
+  const personajes = (avatarTs.match(/^ {4}id: '/gm) || []).length;
+  comprobar(
+    'el elenco trae diez personajes o mas',
+    personajes >= 10,
+    `solo hay ${personajes} en ELENCO`,
+  );
+
+  /*
+   * Y SE GUARDA, no solo se devuelve. Si `cargarAvatar` se limitara a devolver
+   * uno al azar sin escribirlo, cada pantalla que preguntara sacaria un
+   * personaje distinto y la identidad cambiaria sola al navegar.
+   */
+  const codigo = avatarTs.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+  comprobar(
+    'el primer arranque asigna identidad Y la guarda',
+    /personajeDeEstreno\(\)/.test(codigo) && /almacen\.set\(JSON\.stringify\(estreno\)\)/.test(codigo),
+    'cargarAvatar no persiste el personaje de estreno',
+  );
+
+  // La figura tiene que existir de verdad, o el elenco no se ve.
+  comprobar(
+    'hay una figura dibujada que interpreta los rasgos',
+    fs.existsSync(path.join(SRC, 'figura.tsx')),
+    'falta src/figura.tsx',
+  );
+
+  /*
+   * SIN COMENTARIOS, y es la tercera vez que hace falta en este proyecto. El
+   * comentario que explica el boton retirado LO NOMBRA, asi que buscarlo en el
+   * fichero entero daba rojo con el codigo correcto. Una comprobacion que falla
+   * cuando todo esta bien se acaba desactivando, y entonces ya no protege nada.
+   */
+  const portada = fs
+    .readFileSync(path.join(RUTAS, 'index.tsx'), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/\/\/.*$/gm, '');
+  comprobar(
+    'la portada pinta la figura y ya no un reclamo para forjar',
+    portada.includes('<Figura avatar={avatar}') && !portada.includes('FORJA TU AVATAR'),
+    'la portada sigue enseñando el boton en vez de la figura',
+  );
+}
+
+// ---------------------------------------------------------------------------
+// El marco del telefono se respeta
+// ---------------------------------------------------------------------------
+/*
+ * `SafeAreaProvider` estaba montado desde el principio y NINGUNA pantalla
+ * preguntaba por los margenes, asi que el contenido se dibujaba debajo de la
+ * hora y la bateria de Android. Tener el proveedor puesto y no usarlo es la
+ * forma mas silenciosa de que esto pase: no falla nada, se pinta encima.
+ */
+for (const pantalla of ['index.tsx', 'avatar.tsx', 'cuenta.tsx']) {
+  const fuente = fs.readFileSync(path.join(RUTAS, pantalla), 'utf8');
+  comprobar(
+    `${pantalla} se aparta de la barra de estado`,
+    fuente.includes('usarMarco()') && fuente.includes('marco.arriba'),
+    `${pantalla} no usa el marco: se dibujara bajo la hora y la bateria`,
+  );
+}
+
 console.log('');
 if (fallos.length === 0) {
   console.log(

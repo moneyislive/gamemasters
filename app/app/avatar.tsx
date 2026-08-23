@@ -26,6 +26,10 @@ import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import Animated, { FadeIn, FadeInUp } from 'react-native-reanimated';
 import * as api from '../src/api';
+import { ELENCO } from '../src/avatar';
+import type { Avatar } from '../src/avatar';
+import { Figura } from '../src/figura';
+import { usarMarco } from '../src/marco';
 import { Pulsable } from '../src/vivo';
 import { cargarAvatar, guardarAvatar } from '../src/avatar';
 import { color, espacio, fuente, radio } from '../src/tema';
@@ -48,6 +52,32 @@ function rotuloDeProgreso(progreso: number): string {
 }
 
 export default function EstudioDeAvatar(): JSX.Element {
+  const marco = usarMarco();
+  /*
+   * Los rasgos de ahora, para saber qué personaje del elenco sale marcado. Se
+   * leen del almacén y no del servidor: el retrato es de este teléfono y tiene
+   * que estar en pantalla al instante, sin esperar a una respuesta ni depender
+   * de que haya cobertura.
+   */
+  const [rasgos, setRasgos] = useState<Avatar | null>(null);
+  useEffect(() => {
+    void cargarAvatar().then(setRasgos);
+  }, []);
+
+  const elegirDelElenco = useCallback(async (nuevos: Avatar): Promise<void> => {
+    /*
+     * Se conserva el modelo 3D si lo hay: elegir un personaje del elenco NO es
+     * tirar el que se esculpió con una foto. Quien vuelve a su figura de Tripo
+     * la encuentra donde la dejó.
+     */
+    const conModelo: Avatar = {
+      ...nuevos,
+      modeloUrl: rasgos?.modeloUrl,
+      vistaPrevia: rasgos?.vistaPrevia,
+    };
+    setRasgos(conModelo);
+    await guardarAvatar(conModelo);
+  }, [rasgos]);
   const [acto, setActo] = useState<Acto>({ paso: 'cargando' });
   const [actual, setActual] = useState<string | undefined>(undefined);
   const sondeo = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -131,7 +161,7 @@ export default function EstudioDeAvatar(): JSX.Element {
     <View style={estilos.raiz}>
       <LinearGradient colors={['#1a0b12', '#0c0508']} style={StyleSheet.absoluteFill} />
       <ScrollView contentContainerStyle={estilos.contenido} showsVerticalScrollIndicator={false}>
-        <View style={estilos.cabecera}>
+        <View style={[estilos.cabecera, { marginTop: marco.arriba }]}>
           <Text style={estilos.rotulo}>EL ESTUDIO</Text>
           <Pressable
             onPress={() => router.back()}
@@ -149,6 +179,50 @@ export default function EstudioDeAvatar(): JSX.Element {
           Elige una imagen —un retrato tuyo, un dibujo, el personaje que quieras ser— y el estudio
           la convierte en tu figura 3D con texturas, la que te representa en cada sala.
         </Text>
+
+        {/*
+          EL ELENCO VA PRIMERO, y es el cambio importante de esta pantalla.
+          Antes solo había un botón para esculpir con Tripo: quien abría esto a
+          diez minutos de una cena tenía que subir una foto y esperar dos
+          minutos para tener cara. Ahora la identidad es un toque, y esculpir la
+          propia sigue estando justo debajo para quien quiera.
+        */}
+        {rasgos && (
+          <View style={estilos.elenco}>
+            <Text style={estilos.subtitulo}>Elige quién eres</Text>
+            <View style={estilos.rejilla}>
+              {ELENCO.map((p) => {
+                const puesto =
+                  rasgos.piel === p.rasgos.piel &&
+                  rasgos.peinado === p.rasgos.peinado &&
+                  rasgos.atuendo === p.rasgos.atuendo &&
+                  rasgos.colorAtuendo === p.rasgos.colorAtuendo &&
+                  rasgos.accesorio === p.rasgos.accesorio;
+                return (
+                  <Pulsable key={p.id} onPress={() => void elegirDelElenco(p.rasgos)}>
+                    <View style={[estilos.ficha, puesto && estilos.fichaPuesta]}>
+                      <Figura avatar={p.rasgos} tamano={78} />
+                      <Text style={estilos.fichaNombre} numberOfLines={1}>
+                        {p.nombre}
+                      </Text>
+                    </View>
+                  </Pulsable>
+                );
+              })}
+            </View>
+            <Text style={estilos.menudo}>
+              {ELENCO.find(
+                (p) =>
+                  rasgos.piel === p.rasgos.piel &&
+                  rasgos.peinado === p.rasgos.peinado &&
+                  rasgos.atuendo === p.rasgos.atuendo,
+              )?.nota ?? 'Tu figura esculpida.'}
+            </Text>
+          </View>
+        )}
+
+        <View style={estilos.separador} />
+        <Text style={estilos.subtitulo}>O esculpe la tuya</Text>
 
         {actual && acto.paso !== 'listo' && (
           <View style={estilos.actual}>
@@ -274,6 +348,48 @@ function BarraViva({ progreso }: { progreso: number }): JSX.Element {
 const estilos = StyleSheet.create({
   raiz: { flex: 1, backgroundColor: '#0c0508' },
   contenido: { padding: espacio.lg, paddingBottom: espacio.xxl },
+  subtitulo: {
+    fontSize: 15,
+    letterSpacing: 1,
+    color: '#e8cf7f',
+    textTransform: 'uppercase',
+  },
+  elenco: { marginBottom: espacio.lg },
+  rejilla: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    gap: 10,
+    marginTop: 10,
+  },
+  ficha: {
+    width: 96,
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(232,207,127,0.16)',
+    backgroundColor: 'rgba(255,255,255,0.02)',
+  },
+  /* El elegido se marca con el borde y no con una palomita: a este tamaño un
+     icono encima taparía media cara. */
+  fichaPuesta: {
+    borderColor: '#e8cf7f',
+    backgroundColor: 'rgba(232,207,127,0.10)',
+  },
+  fichaNombre: {
+    marginTop: 6,
+    fontSize: 11,
+    letterSpacing: 0.3,
+    color: '#e8cf7f',
+    maxWidth: 88,
+    textAlign: 'center',
+  },
+  separador: {
+    height: 1,
+    marginVertical: espacio.lg,
+    backgroundColor: 'rgba(232,207,127,0.18)',
+  },
   cabecera: {
     flexDirection: 'row',
     justifyContent: 'space-between',
