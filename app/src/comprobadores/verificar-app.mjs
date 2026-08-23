@@ -797,6 +797,54 @@ for (const pantalla of ['index.tsx', 'avatar.tsx', 'cuenta.tsx']) {
   );
 }
 
+// ---------------------------------------------------------------------------
+// Las texturas empotradas no pueden tumbar la geometria
+// ---------------------------------------------------------------------------
+/*
+ * COMPROBADO EN EL CODIGO DE THREE, no supuesto: cuando un GLB trae las
+ * imagenes dentro del binario —lo que devuelve Tripo con texture:true—
+ * GLTFLoader construye un Blob, llama a URL.createObjectURL y se lo pasa a un
+ * cargador que por dentro crea un <img>. Nada de eso existe en React Native.
+ *
+ * Y lo grave no es perder la textura: es que al reventar la carga NO SE VE NI
+ * LA GEOMETRIA, que se abriria sola. El sintoma es un hueco, identico al de un
+ * fichero que falta — por eso se busco en el disco del servidor durante dias.
+ */
+{
+  const escena = fs
+    .readFileSync(path.join(SRC, 'escena-avatar.tsx'), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/\/\/.*$/gm, '');
+
+  comprobar(
+    'la escena contempla que el motor no decodifique imagenes',
+    /decodificaImagenes\(\)/.test(escena) && /cargador\.register\(/.test(escena),
+    'una textura empotrada volveria a impedir que se vea la geometria',
+  );
+
+  const puente = fs.readFileSync(path.join(SRC, 'tres', 'texturas-nativas.ts'), 'utf8');
+  /*
+   * BLANCA Y NO GRIS: en un material la textura MULTIPLICA al color base, asi
+   * que el blanco lo deja intacto y el modelo sale con los colores que Tripo
+   * escribio. Cualquier otro tono los ensuciaria todos por igual.
+   */
+  comprobar(
+    'y la textura de relevo es blanca, que no ensucia el color base',
+    /255, 255, 255, 255/.test(puente),
+    'una textura de relevo que no sea blanca tiñe el modelo entero',
+  );
+  /*
+   * Y SOLO DONDE HACE FALTA: en un navegador las texturas de verdad si cargan,
+   * y registrar el relevo alli las sustituiria por nada — cambiar un fallo en
+   * el movil por una perdida de calidad en todas partes.
+   */
+  comprobar(
+    'el relevo no se registra donde las texturas si funcionan',
+    /if \(!decodificaImagenes\(\)\)/.test(escena),
+    'el relevo se registraria siempre y quitaria las texturas tambien en la web',
+  );
+}
+
 console.log('');
 if (fallos.length === 0) {
   console.log(

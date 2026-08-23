@@ -6,3 +6,5 @@ server/data/
 *.log
 .DS_Store
 cluedo_casa_sabron_corregido/
+# Diagnostico local: adb y scripts. Desechable, no entra en el proyecto.
+herramientas/

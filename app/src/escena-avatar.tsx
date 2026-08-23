@@ -26,6 +26,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'meshoptimizer';
 import { Canvas } from './tres/Lienzo';
+import { decodificaImagenes, texturasLisas } from './tres/texturas-nativas';
 import * as api from './api';
 
 /** El puente con el carrusel: objeto mutable, sin re-render por fotograma. */
@@ -155,6 +156,16 @@ export function EscenaAvatar({
          * y en una casa sin buena conexión, que es donde se juega.
          */
         const cargador = new GLTFLoader();
+        /*
+         * SIN NAVEGADOR, LAS TEXTURAS EMPOTRADAS NO SE PUEDEN DECODIFICAR, y lo
+         * grave es que su fallo se lleva por delante la carga ENTERA: no se ve
+         * ni la geometria, que si se abriria. Ver `tres/texturas-nativas.ts`
+         * para el mecanismo exacto.
+         *
+         * El complemento solo se registra donde hace falta: en un navegador las
+         * texturas de verdad si cargan, y ponerlo alli las sustituiria por nada.
+         */
+        if (!decodificaImagenes()) cargador.register(texturasLisas);
         /*
          * EL DESCODIFICADOR SE INTENTA, PERO NO SE ESPERA QUE FUNCIONE AQUÍ.
          *
