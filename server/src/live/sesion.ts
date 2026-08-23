@@ -10,7 +10,7 @@ import { nanoid } from 'nanoid';
 import { getStore } from '../db/store';
 import { numeroDeRondas } from '../docs/datos';
 import { avisarCambio } from './hub';
-import { ALFABETO_CODIGO } from '../../../shared/live';
+import { ALFABETO_CODIGO, FASES_EN_JUEGO } from '../../../shared/live';
 import { aciertos, esElSenalado, ejes as ejesDe, manifiestoDe, respuestaCompleta } from '../../../shared/juegos';
 import type { EjeId, JuegoId } from '../../../shared/juegos';
 import type { Acusacion, LivePhase, LivePlayer, LiveSession } from '../../../shared/live';
@@ -369,7 +369,20 @@ export function acusar(
   eleccion: Record<EjeId, string>,
   solucion: Record<EjeId, string>,
 ): ResultadoAcusacion {
-  if (sesion.phase !== 'acusaciones' && sesion.phase !== 'ronda-cerrada') {
+  /*
+   * SE PUEDE ACUSAR EN CUALQUIER MOMENTO DE JUEGO, y eso es lo que hace que
+   * acusar sea una decisión y no un trámite: gana quien acierta ANTES, así que
+   * esperar tiene un coste y arriesgarse pronto tiene premio. Antes solo se
+   * admitía con la ronda cerrada o en una fase de acusaciones que tenía que
+   * abrir quien dirige — y eso convertía la carrera en una cola.
+   *
+   * Lo que NO cambia: una acusación por persona y para toda la partida, no por
+   * ronda. Lo comprueba la línea de abajo contra `sesion.acusaciones` entera.
+   *
+   * `FASES_EN_JUEGO` incluye la fase `acusaciones`, así que las partidas que ya
+   * estén ahí siguen funcionando igual.
+   */
+  if (!FASES_EN_JUEGO.includes(sesion.phase)) {
     throw new Error('Todavía no se puede acusar.');
   }
   if (sesion.acusaciones.some((a) => a.suspectId === suspectId)) {

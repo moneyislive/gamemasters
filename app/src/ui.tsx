@@ -42,6 +42,7 @@ export function Pantalla({
   padding = true,
   pie = true,
   barra = true,
+  reserva = 0,
 }: {
   children: React.ReactNode;
   scroll?: boolean;
@@ -50,6 +51,15 @@ export function Pantalla({
   pie?: boolean;
   /** ¿Hay barra de pestañas flotando debajo? Los modales no la tienen. */
   barra?: boolean;
+  /**
+   * Alto de lo que la pantalla ancle POR ENCIMA de la barra de pestañas.
+   *
+   * Existe por la barra de acusar de la ronda. Lo anclado no participa del
+   * scroll, así que no lo empuja: se queda quieto tapando lo último de la
+   * lista. Y el síntoma es de los que no se investigan solos —la última sala
+   * simplemente no se puede pulsar, y parece un fallo del botón, no del hueco.
+   */
+  reserva?: number;
 }): JSX.Element {
   const insets = useSafeAreaInsets();
   // La barra de pestañas flota sobre el contenido, así que hay que reservarle
@@ -57,7 +67,7 @@ export function Pantalla({
   // cortas lo último del scroll queda debajo de la barra y no hay forma de
   // llegar a ello. `ALTO_BARRA_TOTAL` incluye el saliente del botón central,
   // que es la parte que más arriba llega.
-  const hueco = (barra ? ALTO_BARRA_TOTAL : 0) + insets.bottom + espacio.lg;
+  const hueco = (barra ? ALTO_BARRA_TOTAL : 0) + insets.bottom + espacio.lg + reserva;
 
   const contenido = (
     <View style={[padding && { paddingHorizontal: espacio.lg }]}>

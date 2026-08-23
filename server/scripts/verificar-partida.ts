@@ -250,6 +250,53 @@ async function jugar(): Promise<void> {
   comprobar('es la ronda 1', v.sesion.round === 1);
   comprobar('hay reloj', Boolean(v.sesion.roundEndsAt));
 
+  paso('Acusar en mitad de la ronda, sin permiso de nadie');
+  /*
+   * ESTO ES LO NUEVO. Antes acusar exigía que quien dirige abriera una fase de
+   * acusaciones, y hasta entonces el servidor devolvía 409. Eso convertía en
+   * cola lo que es una carrera —gana quien acierta ANTES—, así que ahora se
+   * puede acusar en cualquier fase de juego.
+   *
+   * Acusa Bruno y lo hace MAL a propósito: así se prueba que la puerta está
+   * abierta sin robarle la victoria a quien acierta más abajo, que es lo que
+   * comprueban las líneas del desenlace.
+   */
+  const bruno = await pedir('/jugar/entrar', {
+    metodo: 'POST',
+    cuerpo: { code: 'PRUEBA', joinCode: 'CODIG1' },
+  });
+  const testigoBruno: string = bruno.datos?.token ?? '';
+  comprobar('entra un segundo jugador', testigoBruno.length > 20, bruno.datos);
+
+  const suVista = await pedir('/jugar/vista', { testigo: testigoBruno });
+  const respuestasBuenas = game.plot!.solution.respuestas;
+  const equivocada: Record<string, string> = {};
+  for (const eje of (suVista.datos as { vista: VistaJugador }).vista.ejes) {
+    const otra = eje.opciones.find((o) => o.id !== respuestasBuenas[eje.ejeId]);
+    equivocada[eje.ejeId] = otra!.id;
+  }
+  comprobar(
+    'su acusación es completa y distinta de la solución',
+    Object.keys(equivocada).length === ejesDe(manifiesto).length &&
+      ejesDe(manifiesto).some((e) => equivocada[e.id] !== respuestasBuenas[e.id]),
+    equivocada,
+  );
+
+  const enRonda = await pedir('/jugar/acusar', {
+    metodo: 'POST',
+    testigo: testigoBruno,
+    cuerpo: { respuestas: equivocada },
+  });
+  comprobar(
+    'se puede acusar con la ronda ABIERTA, sin habilitación del GM',
+    enRonda.estado === 200,
+    enRonda.datos,
+  );
+  comprobar('tampoco a él se le dice si acertó', !('correcta' in (enRonda.datos ?? {})), enRonda.datos);
+
+  v = await vista();
+  comprobar('y acusar no altera la ronda en curso', v.sesion.phase === 'ronda-abierta', v.sesion.phase);
+
   paso('Elegir sala y leer lo que hay');
   const conPista = game.plot!.clues.find((c) => c.round === 1 && c.roomId)?.roomId ?? 'r0';
   const elegir = await pedir('/jugar/sala', { metodo: 'POST', testigo, cuerpo: { roomId: conPista } });
@@ -273,10 +320,38 @@ async function jugar(): Promise<void> {
     v.tablon.every((p) => typeof p.pointsTo === 'string'),
   );
 
-  paso('Acusar');
-  const acusaciones = await pedir(`/games/${game.id}/live/acusaciones`, { metodo: 'POST' });
-  comprobar('abrir acusaciones responde 200', acusaciones.estado === 200, acusaciones.datos);
+  paso('Una segunda ronda, para probar que la acusación no se renueva');
+  /*
+   * HACE FALTA LA RONDA 2, y no vale reintentar en la misma. El motor limita
+   * `acusar` a `vecesPorTurno: 1`, y eso cuenta POR RONDA: reintentando en la
+   * ronda 1 el 409 lo devolvería ese contador y no la regla que se quiere
+   * probar. De hecho así estaba escrito primero, y pasaba igual de verde con la
+   * regla rota. En la ronda 2 el contador vuelve a cero, así que lo único que
+   * puede rechazar la segunda acusación es que sea una por partida.
+   */
+  const ronda2 = await pedir(`/games/${game.id}/live/ronda/abrir`, {
+    metodo: 'POST',
+    cuerpo: { minutos: 10 },
+  });
+  comprobar('abrir la ronda 2 responde 200', ronda2.estado === 200, ronda2.datos);
+  v = await vista();
+  comprobar('estamos en la ronda 2', v.sesion.round === 2, v.sesion.round);
 
+  const otraRonda = await pedir('/jugar/acusar', {
+    metodo: 'POST',
+    testigo: testigoBruno,
+    cuerpo: { respuestas: equivocada },
+  });
+  comprobar(
+    'una acusación por PARTIDA, no por ronda: en la ronda 2 sigue sin poder',
+    otraRonda.estado === 409,
+    otraRonda.datos,
+  );
+
+  const cerrar2 = await pedir(`/games/${game.id}/live/ronda/cerrar`, { metodo: 'POST' });
+  comprobar('cerrar la ronda 2 responde 200', cerrar2.estado === 200, cerrar2.datos);
+
+  paso('Acusar con la ronda cerrada, sin pasar por ninguna fase de acusaciones');
   const vacia = await pedir('/jugar/acusar', { metodo: 'POST', testigo, cuerpo: { respuestas: {} } });
   comprobar('una acusación incompleta se rechaza', vacia.estado === 409, vacia.datos);
 
@@ -306,9 +381,41 @@ async function jugar(): Promise<void> {
   );
   comprobar('sigue sin llegar la solución', v.desenlace === undefined);
 
+  paso('La fase vieja sigue viva, y la partida sabe salir sin ella');
+  /*
+   * DOS COSAS QUE PROBAR AQUÍ, y las dos por el mismo cambio.
+   *
+   * La primera: la fase `acusaciones` y su ruta siguen funcionando. El taller ya
+   * no tiene botón para abrirla, pero las partidas que estuvieran en ella cuando
+   * se desplegó esto tienen que poder seguir.
+   *
+   * La segunda, y es la que costó: al quitar ese botón, el sobre del crimen se
+   * quedó sin puerta. Solo se podía abrir desde `acusaciones`, y a `acusaciones`
+   * ya no llegaba nadie: la partida entera se volvía interminable. Por eso ahora
+   * se sale al desenlace desde `ronda-cerrada`, y por eso se comprueba.
+   */
+  const acusaciones = await pedir(`/games/${game.id}/live/acusaciones`, { metodo: 'POST' });
+  comprobar('la ruta vieja de acusaciones sigue respondiendo 200', acusaciones.estado === 200, acusaciones.datos);
+  v = await vista();
+  comprobar('y deja la partida en esa fase', v.sesion.phase === 'acusaciones', v.sesion.phase);
+
+  const volver = await pedir(`/games/${game.id}/live/ronda/abrir`, {
+    metodo: 'POST',
+    cuerpo: { minutos: 10 },
+  });
+  comprobar('desde ahí se puede volver a jugar', volver.estado === 200, volver.datos);
+  const cerrar3 = await pedir(`/games/${game.id}/live/ronda/cerrar`, { metodo: 'POST' });
+  comprobar('y cerrar esa ronda', cerrar3.estado === 200, cerrar3.datos);
+  v = await vista();
+  comprobar('quedando la ronda cerrada', v.sesion.phase === 'ronda-cerrada', v.sesion.phase);
+
   paso('El desenlace');
   const desenlace = await pedir(`/games/${game.id}/live/desenlace`, { metodo: 'POST' });
-  comprobar('revelar responde 200', desenlace.estado === 200, desenlace.datos);
+  comprobar(
+    'se abre el sobre DIRECTAMENTE desde la ronda cerrada',
+    desenlace.estado === 200,
+    desenlace.datos,
+  );
   v = await vista();
   comprobar('ahora sí llega el desenlace', Boolean(v.desenlace));
   comprobar(

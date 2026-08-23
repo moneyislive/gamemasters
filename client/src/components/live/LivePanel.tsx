@@ -11,6 +11,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAppStore } from '../../state/store';
 import { manifiestoDe } from '../../../../shared/juegos';
+import { FASES_EN_JUEGO } from '../../../../shared/live';
 import type { VistaGameMaster } from '../../../../shared/live';
 import './live.css';
 
@@ -173,15 +174,17 @@ export default function LivePanel(): JSX.Element {
             </button>
           )}
 
-          {rondaCerrada && (
-            <button
-              className="btn"
-              disabled={ocupado}
-              onClick={() => void accion(() => llamar(`/games/${game.id}/live/acusaciones`))}
-            >
-              Pasar a las acusaciones
-            </button>
-          )}
+          {/*
+            YA NO HAY BOTÓN DE «PASAR A LAS ACUSACIONES», y es deliberado.
+            Acusar es una carrera —gana quien acierta antes— así que tener que
+            esperar a que alguien abra la puerta la convertía en una cola.
+            Ahora quien juega acusa cuando quiere desde su móvil, una sola vez y
+            para toda la partida, y las rondas siguen su curso.
+
+            La fase `acusaciones` sigue existiendo en el servidor para las
+            partidas que ya estén en ella: lo que se retira es la obligación de
+            pasar por ahí, no la fase.
+          */}
 
           {/* Solo aparece si el juego admite levantar la mesa sin terminar la
               partida. Un CLUEDO no lo admite y el botón ni se dibuja. */}
@@ -212,7 +215,14 @@ export default function LivePanel(): JSX.Element {
             </button>
           )}
 
-          {sesion.phase === 'acusaciones' && (
+          {/*
+            Con la ronda cerrada, y tambien en `acusaciones` para las partidas
+            que estuvieran en esa fase cuando se desplego el cambio. Mientras la
+            ronda esta ABIERTA no aparece a proposito: quien juega sigue
+            moviendose, y revelar en mitad de un movimiento se lee como un
+            fallo, no como un final.
+          */}
+          {(rondaCerrada || sesion.phase === 'acusaciones') && (
             <button
               className="btn btn--primary"
               disabled={ocupado}
@@ -236,7 +246,12 @@ export default function LivePanel(): JSX.Element {
           ))}
         </div>
 
-        {sesion.phase === 'acusaciones' && (
+        {/* Durante TODO el juego, no solo en la fase que ya no se abre. Ahora se
+            acusa en mitad de las rondas, asi que este contador es lo unico que
+            dice cuanta gente queda por acusar —y es de lo que depende decidir
+            cuando abrir el sobre. Atado a `acusaciones` se habria quedado a
+            cero para siempre. */}
+        {FASES_EN_JUEGO.includes(sesion.phase) && (
           <p className="text-dim text-italic">
             {vista.acusacionesRecibidas} de {sesion.players.length} acusaciones entregadas.
           </p>

@@ -121,7 +121,12 @@ export const CLUEDO: ManifiestoDeJuego = {
     {
       id: 'acusar',
       rotulo: 'Acusar',
-      fases: ['ronda-cerrada', 'acusaciones'],
+      /*
+       * LAS TRES FASES DE JUEGO. Acusar es una carrera —gana quien acierta
+       * antes— asi que esperar a que alguien la habilite la convertiria en una
+       * cola. Una por persona y para toda la partida; eso lo vigila el motor.
+       */
+      fases: ['ronda-abierta', 'ronda-cerrada', 'acusaciones'],
       vecesPorTurno: 1,
       // Los campos de la acusación SON los ejes. Al declararlo así, el motor
       // comprueba que cada respuesta es una entidad real de la categoría que
@@ -161,8 +166,21 @@ export const CLUEDO: ManifiestoDeJuego = {
   fases: {
     lobby: ['ronda-abierta'],
     'ronda-abierta': ['ronda-cerrada'],
-    'ronda-cerrada': ['ronda-abierta', 'acusaciones'],
-    acusaciones: ['desenlace'],
+    /*
+     * De `ronda-cerrada` se sale al desenlace DIRECTAMENTE. Antes habia que
+     * pasar por `acusaciones`, porque era ahi donde se acusaba; ahora se acusa
+     * durante el juego, asi que esa parada dejo de tener contenido. Y al quitar
+     * el boton que la abria se quedaba sin puerta: el sobre del crimen solo se
+     * podia abrir desde una fase a la que ya no se llegaba.
+     */
+    'ronda-cerrada': ['ronda-abierta', 'acusaciones', 'desenlace'],
+    /*
+     * De `acusaciones` se puede VOLVER a jugar. Antes solo llevaba al desenlace,
+     * asi que una partida que pasara por ahi se quedaba sin rondas aunque
+     * faltara gente por acusar. Se conserva la fase para no romper las partidas
+     * que ya esten en ella.
+     */
+    acusaciones: ['ronda-abierta', 'desenlace'],
     // Una velada empieza y acaba la misma noche: nunca hay intermedio.
     intermedio: [],
     desenlace: [],

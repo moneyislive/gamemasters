@@ -10,6 +10,7 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 import Animated, { FadeIn, FadeInDown, FadeInUp, Layout } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as api from '../../src/api';
 import { usePartida } from '../../src/estado';
 import { Reloj } from '../../src/reloj';
@@ -31,6 +32,7 @@ import {
   radio,
   texto,
 } from '../../src/ui';
+import { ALTO_BARRA_TOTAL } from '../../src/tema';
 import type { SalaVista } from '../../../shared/live';
 import { Foto } from '../../src/foto';
 
@@ -258,7 +260,8 @@ export default function Ronda(): JSX.Element {
   const abierta = sesion.phase === 'ronda-abierta';
 
   return (
-    <Pantalla>
+    <>
+    <Pantalla reserva={ALTO_ACUSAR}>
       <View style={estilos.cabeceraRonda}>
         <View style={{ flex: 1 }}>
           <Etiqueta>
@@ -372,11 +375,77 @@ export default function Ronda(): JSX.Element {
       />
 
     </Pantalla>
+    <BarraDeAcusar yaAcuso={Boolean(vista.miAcusacion)} />
+    </>
+  );
+}
+
+/**
+ * ACUSAR, SIEMPRE A LA VISTA.
+ *
+ * Antes había que esperar a que quien dirige abriera una «ronda de
+ * acusaciones», y eso convertía en cola lo que es una carrera: gana quien
+ * acierta ANTES. Si hay que pedir vez, arriesgarse pronto no premia y esperar
+ * no cuesta, así que todo el mundo acusa a la vez al final y la decisión —el
+ * único momento en que se apuesta algo— deja de existir.
+ *
+ * ANCLADA, NO AL FINAL DEL SCROLL. La pantalla de ronda se desplaza, y la lista
+ * de salas es larga: puesta al final, «siempre disponible» sería «disponible
+ * para quien se acuerde de bajar». Aquí no se puede no verla.
+ *
+ * ENCIMA DE LAS PESTAÑAS, sin invadirlas: `ALTO_BARRA_TOTAL` incluye el saliente
+ * del botón del asistente, que es la parte que más arriba llega. Restándole solo
+ * `ALTO_BARRA` se solaparía justo con ese botón —el único redondo y el más
+ * pulsado de la app.
+ *
+ * Y ENTREGADA NO ES INVISIBLE: cuando ya se ha acusado, la barra se queda
+ * diciéndolo en vez de desaparecer. Un control que se esfuma deja la duda de si
+ * llegó a enviarse, y esa duda en mitad de una velada se resuelve preguntando en
+ * voz alta —que es exactamente lo que arruina el secreto.
+ */
+const ALTO_ACUSAR = 78;
+
+function BarraDeAcusar({ yaAcuso }: { yaAcuso: boolean }): JSX.Element {
+  const insets = useSafeAreaInsets();
+  return (
+    <Animated.View
+      entering={FadeInUp.duration(400)}
+      style={[estilos.barraAcusar, { bottom: ALTO_BARRA_TOTAL + insets.bottom }]}
+    >
+      <View style={{ flex: 1 }}>
+        <Etiqueta style={{ color: yaAcuso ? color.laton : '#f0c9c0' }}>
+          {yaAcuso ? 'Tu acusación' : 'Cuando lo tengas claro'}
+        </Etiqueta>
+        <Cuerpo tenue style={{ fontSize: 13, marginTop: 2 }}>
+          {yaAcuso ? 'Entregada. Ya no se puede cambiar.' : 'Una sola vez. Gana quien acierte antes.'}
+        </Cuerpo>
+      </View>
+      {!yaAcuso && (
+        <Boton variante="peligro" onPress={() => router.push('/acusar')}>
+          Acusar
+        </Boton>
+      )}
+    </Animated.View>
   );
 }
 
 const estilos = StyleSheet.create({
   centro: { alignItems: 'center', paddingTop: espacio.xl },
+  barraAcusar: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    height: ALTO_ACUSAR,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: espacio.md,
+    paddingHorizontal: espacio.lg,
+    borderTopWidth: 1,
+    borderTopColor: color.burdeos600,
+    // Opaca a propósito: debajo pasa el scroll, y con fondo translúcido el
+    // texto de las salas se leería a través de la barra.
+    backgroundColor: '#2a0f16',
+  },
   marcoListo: {
     borderColor: color.oro400,
     backgroundColor: 'rgba(201,162,39,0.12)',
