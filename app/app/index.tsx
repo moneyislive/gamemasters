@@ -373,11 +373,21 @@ export default function Portada(): JSX.Element {
         ) : null}
 
         {/* ================= 2 · TE ESPERAN ================= */}
-        {invitaciones.length > 0 && (
+        {portada && (
           <View style={estilos.seccion}>
             <Titular
-              texto={invitaciones.length === 1 ? 'Te esperan' : 'Te esperan en varias mesas'}
-              nota="Alguien ha guardado una silla con tu nombre"
+              texto={
+                invitaciones.length === 0
+                  ? 'Tus partidas'
+                  : invitaciones.length === 1
+                    ? 'Te esperan'
+                    : 'Te esperan en varias mesas'
+              }
+              nota={
+                invitaciones.length === 0
+                  ? 'Todo lo que has jugado y lo que está por venir'
+                  : 'Alguien ha guardado una silla con tu nombre'
+              }
             />
             {invitaciones.map((inv, i) => (
               <Sobre
@@ -387,6 +397,29 @@ export default function Portada(): JSX.Element {
                 alEntrar={entrarDesdeInvitacion}
               />
             ))}
+
+            {/*
+              LA ENTRADA AL PANEL, EN LA PORTADA Y NO SOLO EN EL SELLO.
+              La primera version lo dejo colgando del menu de cuenta, que es
+              exactamente donde estaba el inicio de sesion cuando dijimos que
+              parecia escondido — y por el mismo motivo: hay que saber que esta
+              ahi para ir a buscarlo. Aqui aparece SIEMPRE que hay cuenta,
+              tambien cuando no hay ninguna invitacion, porque es entonces
+              cuando la historia es lo unico que queda por ver.
+            */}
+            <Pulsable
+              onPress={() => router.push('/partidas')}
+              accessibilityLabel="Ver todas tus partidas"
+            >
+              <View style={estilos.verPanel}>
+                <Text style={estilos.verPanelTexto}>
+                  {invitaciones.length === 0
+                    ? 'VER TUS PARTIDAS'
+                    : 'VER TODAS TUS PARTIDAS'}
+                </Text>
+                <Text style={estilos.verPanelFlecha}>›</Text>
+              </View>
+            </Pulsable>
           </View>
         )}
 
@@ -839,6 +872,25 @@ const estilos = StyleSheet.create({
     marginTop: espacio.md,
   },
   ctaAvatar: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
+  verPanel: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: espacio.md,
+    paddingVertical: 14,
+    paddingHorizontal: espacio.md,
+    borderWidth: 1,
+    borderColor: 'rgba(232,207,127,0.24)',
+    borderRadius: radio.md,
+    backgroundColor: 'rgba(232,207,127,0.05)',
+  },
+  verPanelTexto: {
+    fontFamily: fuente.titulo,
+    fontSize: 12,
+    letterSpacing: 1.4,
+    color: color.oro300,
+  },
+  verPanelFlecha: { fontSize: 20, color: 'rgba(232,207,127,0.6)' },
 
   heroContenido: { flex: 1, justifyContent: 'flex-end', paddingBottom: espacio.xl },
   sello: {

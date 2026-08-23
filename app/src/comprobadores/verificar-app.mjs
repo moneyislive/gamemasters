@@ -598,6 +598,17 @@ for (const pantalla of ['index.tsx', 'avatar.tsx', 'cuenta.tsx']) {
     fs.existsSync(path.join(RUTAS, 'partidas.tsx')),
     'falta app/partidas.tsx',
   );
+  /*
+   * Y SE LLEGA DESDE LA PORTADA, no solo desde el menu de cuenta. La primera
+   * version lo dejo colgando del sello — exactamente donde estaba el inicio de
+   * sesion cuando dijimos que parecia escondido, y por el mismo motivo: hay que
+   * saber que esta ahi para ir a buscarlo.
+   */
+  comprobar(
+    'y se llega a el desde la portada, no solo desde el menu de cuenta',
+    /accessibilityLabel="Ver todas tus partidas"/.test(portada),
+    'el panel volvio a quedar escondido detras del sello de cuenta',
+  );
 
   const panel = fs.readFileSync(path.join(RUTAS, 'partidas.tsx'), 'utf8');
   /*
