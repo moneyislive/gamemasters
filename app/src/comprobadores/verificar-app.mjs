@@ -663,6 +663,26 @@ for (const pantalla of ['index.tsx', 'avatar.tsx', 'cuenta.tsx']) {
     /r\.status === 404 \|\| r\.status === 410/.test(codigo),
     'se borraria el avatar ante cualquier fallo, incluida la mala cobertura',
   );
+  /*
+   * Y UN MODELO QUE LLEGA PERO NO SE ABRE TAMPOCO ES DEFINITIVO. El fichero
+   * esta ahi: lo que falla es abrirlo —descodificador, descarga a medias— y eso
+   * puede ir bien al siguiente intento o en otro telefono. Tratarlo como
+   * definitivo apagaba la seleccion de la persona: volvia a la figura dibujada
+   * y en el estudio su avatar esculpido ya no salia elegido, asi que tenia que
+   * volver a marcarlo cada vez sin que la causa apareciera por ningun sitio.
+   */
+  /*
+   * Se mira el PRIMER aviso tras la marca, no una ventana de caracteres: la
+   * primera version cogia 400 y ahi dentro cabia tambien el `alFallar(false)`
+   * del `catch` de mas abajo, asi que daba verde con el codigo roto.
+   */
+  const trasAbrir = codigo.split('no se pudo abrir')[1] ?? '';
+  const primerAviso = /alFallar\?\.\((true|false)\)/.exec(trasAbrir);
+  comprobar(
+    'un modelo que llega y no se abre NO borra la seleccion',
+    primerAviso?.[1] === 'false',
+    `el primer aviso tras fallar al abrir es alFallar(${primerAviso?.[1]})`,
+  );
 
   const portada = fs
     .readFileSync(path.join(RUTAS, 'index.tsx'), 'utf8')

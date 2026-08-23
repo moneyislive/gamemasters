@@ -187,8 +187,19 @@ export function EscenaAvatar({
              * descodificador de geometría comprimida.
              */
             console.warn('[avatar] el modelo no se pudo abrir:', error);
-            // Llegó entero y no se deja abrir: está roto, no ausente.
-            if (vivo) alFallar?.(true);
+            /*
+             * NO ES DEFINITIVO, aunque lo parezca. El fichero LLEGÓ: lo que
+             * falla es abrirlo, y eso apunta al descodificador de geometría
+             * comprimida o a una descarga a medias — cosas que se arreglan y
+             * que pueden funcionar en el siguiente intento o en otro teléfono.
+             *
+             * Marcarlo como definitivo —que es lo que hacía— apagaba la
+             * selección de la persona: volvía a la figura dibujada, y al entrar
+             * al estudio su avatar esculpido ya no salía elegido. Tenía que
+             * volver a marcarlo cada vez, y la causa real no aparecía por
+             * ninguna parte. Se pierde la sesión, no la elección.
+             */
+            if (vivo) alFallar?.(false);
           },
         );
       } catch (error) {
