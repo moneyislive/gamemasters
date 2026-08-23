@@ -21,6 +21,7 @@ import { getStorageKind, getStore, initStore } from './db/store';
 import boardRouter from './routes/board';
 import chatRouter from './routes/chat';
 import configRouter from './routes/config';
+import diagnosticoRouter from './routes/diagnostico';
 import documentsRouter from './routes/documents';
 import entitiesRouter from './routes/entities';
 import gamesRouter from './routes/games';
@@ -206,6 +207,12 @@ app.use('/api', requireAuth);
 app.use('/api', duenoRouter);
 
 // Routers de la API, todos bajo el prefijo /api.
+/*
+ * El diagnostico del disco, DETRAS del guardian del taller. Dice si los modelos
+ * generados siguen ahi y si llegan comprimidos — las dos causas que producen el
+ * mismo sintoma: un hueco donde deberia haber un avatar.
+ */
+app.use('/api', diagnosticoRouter);
 app.use('/api', configRouter);
 app.use('/api', gamesRouter);
 app.use('/api', entitiesRouter);
