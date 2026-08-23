@@ -102,11 +102,28 @@ export async function invitacionesPara(cuenta: Account): Promise<InvitacionVista
         suspectId: jugador.suspectId,
         fase: sesion.phase,
         paraEl: correo,
-        // Las tres condiciones, y las tres importan. Ver §seguridad del diseño:
-        // un correo verificado no arregla una errata de quien organiza, así que
-        // entrar sin código se limita a la sala de espera —con quien dirige
-        // mirando la pantalla— y a una silla que nadie ha ocupado.
-        directa: Boolean(verificado) && sesion.phase === 'lobby' && !jugador.joined,
+        /*
+         * DOS CAMINOS DISTINTOS, y confundirlos era el fallo.
+         *
+         * a) RECLAMAR una silla que nadie ha ocupado. Aquí sí hacen falta las
+         *    tres condiciones: un correo verificado no arregla una errata de
+         *    quien organiza, así que se limita a la sala de espera —con quien
+         *    dirige mirando la pantalla— y a un asiento libre.
+         *
+         * b) VOLVER a la tuya. Si esta misma cuenta ya reclamó ese asiento, no
+         *    hay nada que decidir: el servidor lo tiene apuntado en
+         *    `reclamadaPor`. Exigirle el código aquí era mandar a quien ya se
+         *    identificó a teclear dos claves que se reparten precisamente para
+         *    quien NO tiene cuenta — y encima con la partida ya empezada, que
+         *    es cuando peor viene.
+         *
+         * Y volver es MÁS seguro que el código, no menos: el código lo puede
+         * usar cualquiera que lo tenga, y esto exige ser la cuenta que ocupó
+         * ese asiento.
+         */
+        directa:
+          jugador.reclamadaPor?.cuentaId === cuenta.id ||
+          (Boolean(verificado) && sesion.phase === 'lobby' && !jugador.joined),
         yaDentro: jugador.joined,
       });
     }

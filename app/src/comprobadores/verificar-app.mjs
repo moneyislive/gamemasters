@@ -566,6 +566,59 @@ for (const pantalla of ['index.tsx', 'avatar.tsx', 'cuenta.tsx']) {
   );
 }
 
+// ---------------------------------------------------------------------------
+// Quien tiene cuenta no vuelve a la pantalla de codigos
+// ---------------------------------------------------------------------------
+/*
+ * LO QUE PASABA: al pulsar una invitacion, si el servidor pedia codigo, la app
+ * desviaba a /entrar — con el de la partida ya relleno y el personal vacio. Los
+ * dos codigos son el camino de quien juega SIN cuenta; mandar ahi a quien acaba
+ * de identificarse con Google es pedirle que demuestre otra vez lo que ya
+ * demostro, y encima sin decirle por que.
+ */
+{
+  const portada = fs
+    .readFileSync(path.join(RUTAS, 'index.tsx'), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/\/\/.*$/gm, '');
+
+  comprobar(
+    'una invitacion que pide codigo NO desvia a la pantalla de codigos',
+    !/requiereCodigo[\s\S]{0,200}?router\.push\('\/entrar'\)/.test(portada),
+    'la portada vuelve a mandar a /entrar a quien ya tiene cuenta',
+  );
+  comprobar(
+    'sino al panel, donde cada mesa explica su estado',
+    /router\.push\('\/partidas'\)/.test(portada),
+    'no hay salida al panel de partidas',
+  );
+
+  comprobar(
+    'existe el panel de partidas',
+    fs.existsSync(path.join(RUTAS, 'partidas.tsx')),
+    'falta app/partidas.tsx',
+  );
+
+  const panel = fs.readFileSync(path.join(RUTAS, 'partidas.tsx'), 'utf8');
+  /*
+   * EL ESTADO SE DICE CON PALABRA Y NO SOLO CON COLOR: en una mesa de doce hay
+   * siempre alguien que no distingue el verde del ambar, y un estado contado
+   * solo con un tono es un estado que esa persona no puede leer.
+   */
+  for (const estado of ['espera', 'en-curso', 'pausada', 'terminada', 'retirada']) {
+    comprobar(
+      `el panel sabe pintar el estado «${estado}»`,
+      panel.includes(`${estado}:`) || panel.includes(`'${estado}'`),
+      `el panel no contempla ${estado}`,
+    );
+  }
+  comprobar(
+    'y cuando no se puede entrar, se dice por que',
+    /p\.motivo/.test(panel),
+    'un boton que desaparece sin explicacion se lee como que la app se equivoco',
+  );
+}
+
 console.log('');
 if (fallos.length === 0) {
   console.log(

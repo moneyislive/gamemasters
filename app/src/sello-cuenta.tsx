@@ -212,6 +212,13 @@ export function SelloDeCuenta({
           {dentro ? (
             <>
               <Fila
+                texto="Tus partidas"
+                onPress={() => {
+                  setAbierto(false);
+                  router.push('/partidas');
+                }}
+              />
+              <Fila
                 texto="Tu leyenda, trofeos y crónica"
                 onPress={() => {
                   setAbierto(false);

@@ -196,15 +196,23 @@ export default function Portada(): JSX.Element {
         try {
           const r = await api.entrarDesdeInvitacion(inv.gameId, inv.suspectId);
           if (r.requiereCodigo) {
-            router.push('/entrar');
+            /*
+             * NO SE DESVÍA A LA PANTALLA DE CÓDIGOS. Los dos códigos son el
+             * camino de quien juega SIN cuenta, y mandar ahí a quien acaba de
+             * identificarse con Google —con el de la partida ya relleno y el
+             * personal vacío— es pedirle que vuelva a demostrar lo que ya
+             * demostró, sin decirle por qué. Se le lleva a su panel, donde cada
+             * mesa explica su estado y qué falta.
+             */
+            router.push('/partidas');
             return;
           }
           await api.fijarToken(r.token);
           await refrescar();
           router.push('/(juego)/ronda');
         } catch {
-          // Si algo falla, queda el camino que nunca falla.
-          router.push('/entrar');
+          // Si algo falla, al panel: allí se ve el estado de cada mesa.
+          router.push('/partidas');
         }
       })();
     },

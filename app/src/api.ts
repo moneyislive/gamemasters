@@ -576,6 +576,34 @@ export async function vincularProveedor(
  * el correo no está verificado por un proveedor, la partida ya empezó, o la
  * silla está ocupada. La app manda entonces a teclear el código de siempre.
  */
+/** Una partida tal y como la enseña el panel. Ver `server/src/live/panel.ts`. */
+export interface PartidaDelPanel {
+  gameId: string;
+  titulo: string;
+  personaje: string;
+  suspectId: string;
+  estado: 'espera' | 'en-curso' | 'pausada' | 'terminada' | 'retirada';
+  cuando?: string;
+  puedeEntrar: boolean;
+  motivo?: string;
+  resultado?: { ganador?: string; gane: boolean; acerte: boolean };
+}
+
+/**
+ * Todo lo que esta cuenta ha jugado o tiene por jugar.
+ *
+ * SEPARADO DE LA PORTADA a propósito: la portada solo trae los sobres de las
+ * mesas a las que puedes sentarte ahora, y cargarle además el historial entero
+ * en cada arranque sería pagarlo siempre para enseñarlo casi nunca.
+ */
+export async function pedirPartidas(): Promise<PartidaDelPanel[]> {
+  const r = await peticion<{ partidas: PartidaDelPanel[] }>('/cuenta/partidas');
+  return r.partidas;
+}
+
+/** Entra en una mesa desde el panel. Es la misma puerta que la invitación. */
+export const entrarEnPartida = entrarDesdeInvitacion;
+
 export function entrarDesdeInvitacion(
   gameId: string,
   suspectId: string,

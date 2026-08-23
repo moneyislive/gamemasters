@@ -33,6 +33,7 @@ import {
   vincularIdentidad,
 } from '../identidad/cuentas-proveedor';
 import { invitacionesPara } from '../live/invitaciones';
+import { panelDe } from '../live/panel';
 import { borrarCuentaDe } from '../live/cuentas';
 import { mutar } from '../live/sesion';
 import { emitirCredencial } from '../live/token';
@@ -479,6 +480,21 @@ router.get('/cuenta/yo', async (req, res) => {
       via: (cuenta.identidades ?? []).map((i) => i.proveedor),
     },
   });
+});
+
+/**
+ * El panel de partidas: todo lo jugado y todo lo que espera, con su estado.
+ *
+ * SEPARADO DE `/cuenta/portada` a propósito. La portada responde «¿a qué mesa
+ * puedo sentarme AHORA?» y por eso descarta lo terminado; esto responde «¿qué
+ * he jugado y cómo acabó?». Meterlas en la misma respuesta obligaría a la
+ * portada a cargar el historial entero en cada arranque para enseñar dos
+ * sobres.
+ */
+router.get('/cuenta/partidas', async (req, res) => {
+  const cuenta = await cuentaDe(req, res);
+  if (!cuenta) return;
+  res.json({ partidas: await panelDe(cuenta) });
 });
 
 router.get('/cuenta/portada', async (req, res) => {
