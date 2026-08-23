@@ -198,6 +198,14 @@ router.post('/cuenta/entrar', async (req, res) => {
        * aplicación que declare el mismo esquema. Un pasaporte de noventa días
        * ahí sería un regalo; un código que caduca en dos minutos y muere al
        * primer uso, casi nada.
+       *
+       * Y VUELVE A `retorno-google`, NO A `entrar`. La primera versión usaba
+       * `harkania://entrar?codigo=…` y chocaba dos veces con lo que ya existía:
+       * `entrar` ES la pantalla de los códigos de partida, y encima lee un
+       * parámetro llamado `codigo` para rellenar el de la mesa. Resultado: al
+       * volver de Google se abría el formulario de códigos con el código de
+       * canje metido en la casilla de la partida. Una ruta de vuelta tiene que
+       * ser suya y no compartir nombre con una pantalla de verdad.
        */
       res.json({ codigo: emitirCanje(cuenta.id), cuenta: resumen });
       return;
@@ -404,7 +412,7 @@ router.get('/cuenta/retorno', (_req, res) => {
     // poner cookie: se le entrega por su esquema propio y esta pestaña muere.
     if (cuerpo.codigo) {
       estado.textContent = 'Listo. Volviendo a la aplicación…';
-      location.replace('harkania://entrar?codigo=' + encodeURIComponent(cuerpo.codigo));
+      location.replace('harkania://retorno-google?canje=' + encodeURIComponent(cuerpo.codigo));
       return;
     }
     location.replace('/');

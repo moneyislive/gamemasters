@@ -94,7 +94,7 @@ async function nonceYHuella(): Promise<{ nonce: string; huella: string }> {
  *
  * Ahora se abre una página DEL SERVIDOR en el navegador de sesión. El servidor
  * hace el viaje a Google con la única dirección de vuelta que hay dada de alta
- * —la del dominio— y devuelve a `harkania://entrar?codigo=…` un código de un
+ * —la del dominio— y devuelve a `harkania://retorno-google?canje=…` un código de un
  * solo uso y dos minutos, que se cambia aquí por la sesión.
  *
  * Ese rodeo compra tres cosas: un solo identificador de cliente que mantener,
@@ -105,7 +105,7 @@ export async function entrarConGoogle(): Promise<void> {
   const servidor = api.urlDelServidor();
   const resultado = await WebBrowser.openAuthSessionAsync(
     `${servidor}/api/cuenta/entrar/google?destino=app`,
-    'harkania://entrar',
+    'harkania://retorno-google',
   );
 
   if (resultado.type !== 'success') {
@@ -113,7 +113,7 @@ export async function entrarConGoogle(): Promise<void> {
     return;
   }
 
-  const codigo = new URL(resultado.url).searchParams.get('codigo');
+  const codigo = new URL(resultado.url).searchParams.get('canje');
   if (!codigo) throw new Error('La entrada no se completó. Inténtalo otra vez.');
 
   await api.canjearEntrada(codigo);

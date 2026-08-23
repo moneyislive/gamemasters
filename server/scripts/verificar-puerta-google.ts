@@ -229,8 +229,22 @@ try {
   );
   comprobar(
     'la página de retorno sabe volver a la app',
-    retorno.cuerpo.includes('harkania://entrar?codigo='),
+    retorno.cuerpo.includes('harkania://retorno-google?canje='),
     retorno.cuerpo.slice(0, 200),
+  );
+  /*
+   * Y NO VUELVE A `entrar`, QUE ES LA PANTALLA DE LOS CÓDIGOS. La primera
+   * versión usaba `harkania://entrar?codigo=…` y chocaba dos veces con lo que ya
+   * existía: esa ruta ES el formulario de códigos de partida, y encima lee un
+   * parámetro llamado `codigo` para rellenar el de la mesa. Al volver de Google
+   * se abría ese formulario con el código de canje en la casilla equivocada —
+   * mandando a teclear códigos justo a quien acababa de identificarse, que es
+   * exactamente para quien los códigos NO son.
+   */
+  comprobar(
+    'y NO a la pantalla de códigos, que es de quien no tiene cuenta',
+    !retorno.cuerpo.includes('://entrar?'),
+    'el retorno vuelve a caer en el formulario de códigos',
   );
   comprobar(
     'y NUNCA pone el pasaporte en ese enlace: solo un código',
@@ -293,13 +307,13 @@ try {
   comprobar('la app declara un esquema propio', esquema.length > 2, esquema);
   comprobar(
     'y el servidor devuelve a ESE esquema, no a otro',
-    retorno.cuerpo.includes(`${esquema}://entrar?codigo=`),
+    retorno.cuerpo.includes(`${esquema}://retorno-google?canje=`),
     { esquema, retorno: retorno.cuerpo.slice(0, 160) },
   );
   const appEntrar = fs.readFileSync(path.join(REPO, 'app', 'src', 'entrar-con.ts'), 'utf8');
   comprobar(
     'y la app espera la vuelta en ESE esquema',
-    appEntrar.includes(`'${esquema}://entrar'`),
+    appEntrar.includes(`'${esquema}://retorno-google'`),
     esquema,
   );
   /*
