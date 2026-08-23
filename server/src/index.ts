@@ -66,10 +66,37 @@ app.use(cors());
 app.use('/api/generacion/avatar', express.json({ limit: '25mb' }));
 app.use(express.json({ limit: '256kb' }));
 
-// Directorio de subidas (disco persistente en producción): se crea al arrancar
-// y se sirve estático en /uploads, tras la contraseña si la hay.
+/*
+ * Directorio de subidas (disco persistente en producción): se crea al arrancar
+ * y se sirve estático en /uploads, tras la contraseña si la hay.
+ *
+ * EL ERROR SE TRADUCE, y no es cosmética. Si `UPLOADS_DIR` apunta a un sitio
+ * donde el proceso no puede escribir, `mkdirSync` lanza un `EACCES` pelado y el
+ * servidor muere con un volcado de Node que no menciona ni la variable ni el
+ * disco. Pasó exactamente eso: se configuró `UPLOADS_DIR=/var/data/uploads`
+ * antes de que el disco existiera, así que `/var/data` era un directorio del
+ * contenedor propiedad de root — y el arranque quedó en un `EACCES` sin pistas.
+ *
+ * Y se muere igual, a propósito: arrancar escribiendo en un sitio que no es el
+ * que se pidió significa perder las fotos de los invitados en el siguiente
+ * despliegue, y eso es peor que no arrancar.
+ */
 const uploadsDir = env.uploadsDir;
-fs.mkdirSync(uploadsDir, { recursive: true });
+try {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+  fs.accessSync(uploadsDir, fs.constants.W_OK);
+} catch (fallo) {
+  const causa = (fallo as NodeJS.ErrnoException).code ?? 'desconocida';
+  throw new Error(
+    `No se puede escribir en UPLOADS_DIR («${uploadsDir}»): ${causa}.\n` +
+      '  · Si esperabas un disco persistente, comprueba que existe y está montado ' +
+      'en la ruta que contiene a esa carpeta. Tener la variable puesta sin el disco ' +
+      'creado deja este error exacto.\n' +
+      '  · Si no quieres persistencia todavía, QUITA la variable: el servidor ' +
+      'usará una carpeta local y arrancará (pero las fotos y los avatares 3D ' +
+      'desaparecerán en cada despliegue).',
+  );
+}
 app.use(
   '/uploads',
   (req, res, next) => {
