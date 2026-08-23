@@ -98,6 +98,7 @@ const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'gm-puerta-'));
 let sinGoogle: ChildProcess | undefined;
 let conGoogle: ChildProcess | undefined;
 let terceros: ChildProcess | undefined;
+let cuarto: ChildProcess | undefined;
 
 try {
   // -------------------------------------------------------------------------
@@ -553,12 +554,67 @@ try {
     sinApk.cuerpo.slice(0, 160),
   );
 
+  /*
+   * LA VERSION Y LA DIRECCION NO PUEDEN DISCREPAR, y esta comprobacion nace de
+   * que discreparon: se publico la 1.0.2 y en el panel quedo la etiqueta vieja
+   * con el fichero nuevo —`v1.0.1/harkania-1.0.2.apk`— que da 404. La pagina se
+   * veia perfecta, anunciaba «Versión 1.0.2», y el boton no bajaba nada. Ahora
+   * la direccion se deduce de la version, asi que basta con vigilar que la
+   * deduccion sea la que se espera.
+   */
   const conApk = await pedir(5893, '/descargar');
   comprobar('con APK_URL, se sirve la pagina', conApk.estado === 200, conApk.estado);
   comprobar(
     'con el enlace configurado, sin inventarse ninguno',
     conApk.cuerpo.includes('releases/download/v3/harkania.apk'),
     conApk.cuerpo.slice(0, 200),
+  );
+
+  /*
+   * Y SIN APK_URL, la direccion sale de la version — que es el camino normal.
+   * La etiqueta y el nombre del fichero llevan la MISMA version, que es
+   * justamente lo que a mano se desincronizo.
+   */
+  const dirD = path.join(dir, 'd');
+  fs.mkdirSync(path.join(dirD, 'data'), { recursive: true });
+  cuarto = spawn(process.execPath, [TSX, SERVIDOR], {
+    cwd: dirD,
+    env: {
+      PATH: process.env.PATH,
+      SystemRoot: process.env.SystemRoot,
+      TEMP: process.env.TEMP,
+      TMP: process.env.TMP,
+      PORT: '5894',
+      NODE_ENV: 'test',
+      APP_PASSWORD: CONTRASENA,
+      PLAYER_TOKEN_SECRET: SECRETO,
+      CLIENT_DIR: path.join(dirD, 'cliente'),
+      UPLOADS_DIR: path.join(dirD, 'uploads'),
+      APK_VERSION: '9.9.9',
+      APK_REPO: 'ejemplo/harkania',
+    },
+    stdio: 'ignore',
+  });
+  await esperar(5894);
+  const deducida = await pedir(5894, '/descargar');
+  comprobar(
+    'sin APK_URL, la direccion se deduce de la version',
+    deducida.cuerpo.includes(
+      'https://github.com/ejemplo/harkania/releases/download/v9.9.9/harkania-9.9.9.apk',
+    ),
+    deducida.cuerpo.slice(deducida.cuerpo.indexOf('href="https'), 220),
+  );
+  /*
+   * Se extraen las dos versiones y se comparan a mano. La primera version usaba
+   * una retrorreferencia dentro de un lookahead —`harkania-(?!)`— y no hacia
+   * lo que parecia: fallaba con el codigo correcto. Una comprobacion que no se
+   * puede leer de un vistazo es una comprobacion en la que no se puede confiar.
+   */
+  const enlace = /download\/v([\d.]+)\/harkania-([\d.]+)\.apk/.exec(deducida.cuerpo);
+  comprobar(
+    'y la etiqueta y el fichero llevan la MISMA version',
+    Boolean(enlace) && enlace?.[1] === enlace?.[2],
+    { etiqueta: enlace?.[1], fichero: enlace?.[2] },
   );
   comprobar('y diciendo que version es', conApk.cuerpo.includes('3.0.1'), 'no aparece la version');
   /*
@@ -606,6 +662,7 @@ try {
   sinGoogle?.kill();
   conGoogle?.kill();
   terceros?.kill();
+  cuarto?.kill();
   try {
     fs.rmSync(dir, { recursive: true, force: true });
   } catch {

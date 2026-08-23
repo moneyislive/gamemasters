@@ -31,11 +31,63 @@ import { escaparHtml } from './aterrizaje';
 const router = crearRouter();
 
 /** Dónde vive el fichero, y qué versión es. */
-function apk(): { url?: string; version: string } {
+/** Dónde vive el fichero, y qué versión es. */
+function apk(): { url?: string; version?: string } {
+  const version = process.env.APK_VERSION?.trim() || undefined;
+  const repo = process.env.APK_REPO?.trim() || 'moneyislive/gamemasters';
+  const puesta = process.env.APK_URL?.trim() || undefined;
+
+  /*
+   * LA DIRECCIÓN SE DEDUCE DE LA VERSIÓN, y esto no es comodidad: es que
+   * escribirlas por separado ya salió mal. Se publicó la 1.0.2 y en el panel
+   * quedó la etiqueta vieja con el fichero nuevo —`v1.0.1/harkania-1.0.2.apk`—
+   * que da 404. La página se veía perfecta, anunciaba «Versión 1.0.2», y el
+   * botón no descargaba nada. Dos campos que tienen que concordar y que nadie
+   * compara acaban discrepando siempre.
+   *
+   * Con una sola variable no hay nada que sincronizar: se pone la versión y la
+   * dirección sale sola. `APK_URL` sigue existiendo para el caso en que el
+   * fichero no esté en GitHub o no siga el patrón, y entonces manda ella — pero
+   * es la excepción, no el camino.
+   */
+  if (puesta) return { url: puesta, version };
+  if (!version) return { url: undefined, version };
   return {
-    url: process.env.APK_URL?.trim() || undefined,
-    version: process.env.APK_VERSION?.trim() || 'sin numerar',
+    url: `https://github.com/${repo}/releases/download/v${version}/harkania-${version}.apk`,
+    version,
   };
+}
+
+/**
+ * Comprueba UNA VEZ, al arrancar, que la descarga anunciada existe de verdad.
+ *
+ * NO BLOQUEA NI TUMBA NADA: si GitHub no contesta, no es motivo para no
+ * arrancar. Lo que hace es gritar en el registro, que es donde alguien mira
+ * cuando algo va mal — y es exactamente el fallo que no se ve de otra forma,
+ * porque la página se sirve igual de bien con un enlace muerto dentro.
+ */
+export function comprobarLaDescarga(): void {
+  const { url, version } = apk();
+  if (!url) return;
+  void fetch(url, { method: 'HEAD', redirect: 'follow', signal: AbortSignal.timeout(8000) })
+    .then((r) => {
+      if (r.ok) {
+        console.log(`[descarga] la versión ${version} está publicada y se puede descargar.`);
+        return;
+      }
+      console.error(
+        `[descarga] ATENCIÓN: /descargar anuncia la versión ${version} pero su enlace responde ` +
+          `${r.status}. Nadie podrá instalar la app.
+  ${url}
+` +
+          '  Revisa APK_VERSION —y que la release exista en GitHub con ese nombre de fichero.',
+      );
+    })
+    .catch((e) => {
+      console.warn(
+        `[descarga] no se ha podido comprobar el enlace de la versión ${version}: ${String(e)}`,
+      );
+    });
 }
 
 function pagina(cuerpo: string): string {
@@ -111,7 +163,7 @@ router.get(['/descargar', '/descargar.html'], (_req, res) => {
     pagina(
       `<div class="sello">🕯</div>
        <h1>Instalar Harkania</h1>
-       <p class="version">Versión ${escaparHtml(version)} · Android</p>
+       <p class="version">Versión ${escaparHtml(version ?? 'sin numerar')} · Android</p>
 
        <a class="btn" href="${escaparHtml(url)}">Descargar la aplicación</a>
 

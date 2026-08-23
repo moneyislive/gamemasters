@@ -102,9 +102,14 @@ services:
       # La dirección del fichero en GitHub Releases y la versión que anuncia la
       # página. Sin la primera, /descargar lo dice en vez de enseñar un botón
       # muerto. Ver `enlaces/descarga.ts`.
-      - key: APK_URL
-        sync: false
+      # Basta con la version: la direccion se deduce de ella. Ver
+      # `enlaces/descarga.ts` y el bloque de .env.example.
       - key: APK_VERSION
+        sync: false
+      - key: APK_REPO
+        sync: false
+      # Solo para saltarse el patron. Normalmente vacia.
+      - key: APK_URL
         sync: false
 
       # --- Generación de imagen y 3D (opcionales) ----------------------------

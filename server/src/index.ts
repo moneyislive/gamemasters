@@ -12,7 +12,7 @@ import type { NextFunction, Request, Response } from 'express';
 import { DEMO_MODE, env } from './config';
 import authRouter, { passwordRequired, requireAuth, tallerAbiertoPara } from './auth';
 import aterrizajeRouter from './enlaces/aterrizaje';
-import descargaRouter from './enlaces/descarga';
+import descargaRouter, { comprobarLaDescarga } from './enlaces/descarga';
 import correoRouter from './correo/router';
 import legalRouter from './legal/documentos';
 import limitadorDeIntentos from './puerta/montaje';
@@ -323,6 +323,13 @@ const activeModel = await getStore().getConfigModel();
  * Fuera de producción se abre, porque el portátil hace de servidor de los
  * móviles de la casa. Ver `readHost` en config.ts.
  */
+/*
+ * Se comprueba al arrancar que la descarga anunciada existe. No bloquea: solo
+ * grita en el registro si el enlace esta muerto, que es un fallo invisible de
+ * otra forma — la pagina se sirve igual de bien con un enlace roto dentro.
+ */
+comprobarLaDescarga();
+
 app.listen(env.port, env.host, () => {
   const storageLabel =
     getStorageKind() === 'mongo'
