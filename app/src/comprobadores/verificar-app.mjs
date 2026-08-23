@@ -543,6 +543,27 @@ for (const pantalla of ['index.tsx', 'avatar.tsx', 'cuenta.tsx']) {
     /Platform\.OS === 'ios'/.test(sello),
     'el sello ofreceria Apple fuera de iOS, donde no hay flujo',
   );
+  /*
+   * LA HOJA SE APARTA DE LA BARRA DE GESTOS. Se pega al borde inferior, que es
+   * donde Android pinta la suya: sin apartarse, la ultima fila —justo «Cerrar
+   * sesion»— queda medio tapada y parece cortada. Un boton a medias no se
+   * lee como un fallo de margen, se lee como que la app esta rota.
+   */
+  comprobar(
+    'la hoja de cuenta respeta la barra de gestos de abajo',
+    /marco\.abajo/.test(sello),
+    'la hoja se pega al borde: la ultima fila quedara medio tapada',
+  );
+  /*
+   * Y el icono del sello es del TRAZO de los otros dos, no la figura del avatar:
+   * la portada ya la enseña en grande justo debajo y repetirla en miniatura
+   * resta, porque el ojo la lee como escena y no como control.
+   */
+  comprobar(
+    'el icono del sello es de la familia de los otros botones',
+    /function IconoUsuario/.test(sello),
+    'el sello volvio a repetir la figura del avatar en miniatura',
+  );
 }
 
 console.log('');

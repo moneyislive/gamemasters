@@ -20,6 +20,7 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import { Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import Svg, { Circle, Path } from 'react-native-svg';
 import Animated, { FadeIn, FadeInUp } from 'react-native-reanimated';
 import { router } from 'expo-router';
 import * as api from './api';
@@ -27,6 +28,7 @@ import { Figura } from './figura';
 import { SinProveedor, disponibles, entrarConApple, entrarConGoogle } from './entrar-con';
 import type { Proveedores } from './entrar-con';
 import type { Avatar } from './avatar';
+import { usarMarco } from './marco';
 import { Pulsable } from './vivo';
 
 const ORO = '#e8cf7f';
@@ -34,6 +36,34 @@ const ORO_TENUE = 'rgba(232,207,127,0.35)';
 
 /** Cómo se llama cada proveedor cuando hay que escribirlo en un botón. */
 const NOMBRES: Record<string, string> = { google: 'Google', apple: 'Apple' };
+
+/**
+ * El icono de usuario, de la misma familia que la llave y la pluma.
+ *
+ * NO SE PONE AQUÍ LA FIGURA DEL AVATAR, aunque parezca lo obvio: la portada ya
+ * la enseña en grande justo debajo, y repetirla en miniatura a treinta píxeles
+ * no añade información — resta, porque el ojo la lee como un elemento más de la
+ * escena y no como un control. Los tres botones de la botonera tienen que
+ * leerse como un conjunto, y eso pide el mismo trazo.
+ *
+ * El estado de la sesión lo cuenta el anillo y el punto, que es donde debe
+ * estar: en el marco, no en el contenido.
+ */
+function IconoUsuario({ dentro }: { dentro: boolean }): JSX.Element {
+  const tinte = dentro ? '#e8cf7f' : 'rgba(232,207,127,0.62)';
+  return (
+    <Svg width={20} height={20} viewBox="0 0 20 20">
+      <Circle cx={10} cy={6.6} r={3.6} stroke={tinte} strokeWidth={1.8} fill="none" />
+      <Path
+        d="M3.6 17c0-3.4 2.9-5.6 6.4-5.6s6.4 2.2 6.4 5.6"
+        stroke={tinte}
+        strokeWidth={1.8}
+        strokeLinecap="round"
+        fill="none"
+      />
+    </Svg>
+  );
+}
 
 export function SelloDeCuenta({
   avatar,
@@ -48,6 +78,12 @@ export function SelloDeCuenta({
   /** Se llama al entrar o al salir, para que la portada se rehaga. */
   onCambio: () => void;
 }): JSX.Element {
+  /*
+   * EL MARCO DE ABAJO. La hoja se pega al borde inferior, y ahí es donde Android
+   * pinta su barra de gestos: sin apartarse, la última fila —justo «Cerrar
+   * sesión»— queda medio tapada y parece cortada.
+   */
+  const marco = usarMarco();
   const [abierto, setAbierto] = useState(false);
   const [proveedores, setProveedores] = useState<Proveedores | null>(null);
   const [entrando, setEntrando] = useState<string | null>(null);
@@ -126,7 +162,7 @@ export function SelloDeCuenta({
           accessibilityLabel={dentro ? `Tu cuenta: ${nombre}` : 'Iniciar sesión'}
         >
           <View style={[estilos.disco, dentro && estilos.discoDentro]}>
-            <Figura avatar={avatar} tamano={38} conFondo={false} />
+            <IconoUsuario dentro={dentro} />
             {/*
               El punto de estado. Es lo que hace que el sello INFORME y no solo
               abra: sin él, estar dentro y estar fuera se ven exactamente igual,
@@ -151,7 +187,10 @@ export function SelloDeCuenta({
           <Animated.View entering={FadeIn.duration(200)} style={{ flex: 1 }} />
         </Pressable>
 
-        <Animated.View entering={FadeInUp.duration(260)} style={estilos.hoja}>
+        <Animated.View
+          entering={FadeInUp.duration(260)}
+          style={[estilos.hoja, { paddingBottom: marco.abajo + 22 }]}
+        >
           <View style={estilos.asa} />
 
           <View style={estilos.ficha}>
@@ -291,7 +330,6 @@ const estilos = StyleSheet.create({
     bottom: 0,
     paddingHorizontal: 20,
     paddingTop: 10,
-    paddingBottom: 34,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     backgroundColor: '#0c1a12',
