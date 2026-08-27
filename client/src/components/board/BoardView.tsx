@@ -10,6 +10,50 @@ import './board.css';
 /** Lado de cada celda de la rejilla, en unidades del viewBox. */
 const CELDA = 40;
 
+/**
+ * El sello que va en el bloque central del plano.
+ *
+ * En la mansión es una lupa, y estaba dibujada a mano en mitad del plano. Un
+ * plano de una tumba con una lupa en el centro es de las cosas que rompen la
+ * ilusión sin que nadie sepa decir por qué, así que cada juego pone la suya:
+ * un anj para la Momia, que es el signo que se graba en las puertas.
+ *
+ * Tabla y no manifiesto, como los retratos y las cortinillas: son trazos.
+ */
+const EMBLEMAS: Record<string, (cx: number, cy: number) => JSX.Element> = {
+  cluedo: (cx, cy) => (
+    <>
+      <circle cx={cx} cy={cy} r="15" fill="none" stroke="var(--gold-300)" strokeWidth="2.4" />
+      <line
+        x1={cx + 11}
+        y1={cy + 11}
+        x2={cx + 24}
+        y2={cy + 24}
+        stroke="var(--gold-300)"
+        strokeWidth="3.4"
+        strokeLinecap="round"
+      />
+    </>
+  ),
+  momia: (cx, cy) => (
+    <g
+      fill="none"
+      stroke="var(--gold-300)"
+      strokeWidth="3"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <ellipse cx={cx} cy={cy - 10} rx="10" ry="11" />
+      <path d={`M${cx} ${cy + 1} v25`} />
+      <path d={`M${cx - 15} ${cy + 9} h30`} />
+    </g>
+  ),
+};
+
+function emblema(juego: string | undefined, cx: number, cy: number): JSX.Element {
+  return (EMBLEMAS[juego ?? 'cluedo'] ?? EMBLEMAS.cluedo!)(cx, cy);
+}
+
 export default function BoardView(): JSX.Element {
   const game = useAppStore((s) => s.game);
   const [recalculando, setRecalculando] = useState(false);
@@ -98,6 +142,7 @@ export default function BoardView(): JSX.Element {
   /* ------------------------------------------------------------------ */
 
   const board = game.board;
+  const juego = game.settings?.juego;
 
   if (!board || board.rooms.length === 0) {
     return (
@@ -148,17 +193,17 @@ export default function BoardView(): JSX.Element {
       <svg className="board-svg" viewBox={`0 0 ${ancho} ${alto}`} role="img" aria-label="Plano del tablero">
         <defs>
           <pattern id="bv-parquet" width="26" height="26" patternUnits="userSpaceOnUse">
-            <rect width="26" height="26" fill="#2b1a12" />
-            <rect width="26" height="13" fill="#34211a" />
+            <rect width="26" height="26" fill="var(--tablero-parquet)" />
+            <rect width="26" height="13" fill="var(--tablero-parquet-alt)" />
             <line x1="0" y1="13" x2="26" y2="13" stroke="rgba(0,0,0,0.38)" strokeWidth="1" />
             <line x1="13" y1="0" x2="13" y2="13" stroke="rgba(0,0,0,0.3)" strokeWidth="1" />
             <line x1="0" y1="26" x2="26" y2="26" stroke="rgba(0,0,0,0.3)" strokeWidth="1" />
           </pattern>
 
           <radialGradient id="bv-tapete" cx="50%" cy="44%" r="74%">
-            <stop offset="0%" stopColor="#1d4a32" />
-            <stop offset="70%" stopColor="#123122" />
-            <stop offset="100%" stopColor="#0a1c13" />
+            <stop offset="0%" stopColor="var(--tablero-suelo-1)" />
+            <stop offset="70%" stopColor="var(--tablero-suelo-2)" />
+            <stop offset="100%" stopColor="var(--tablero-suelo-3)" />
           </radialGradient>
         </defs>
 
@@ -170,7 +215,7 @@ export default function BoardView(): JSX.Element {
           width={ancho - 18}
           height={alto - 18}
           fill="none"
-          stroke="var(--gold-500, #c9a227)"
+          stroke="var(--gold-500)"
           strokeWidth="3"
         />
         <rect
@@ -179,7 +224,7 @@ export default function BoardView(): JSX.Element {
           width={ancho - 40}
           height={alto - 40}
           fill="none"
-          stroke="rgba(201,162,39,0.35)"
+          stroke="rgba(var(--acento-rgb), 0.35)"
           strokeWidth="1.2"
         />
 
@@ -192,7 +237,7 @@ export default function BoardView(): JSX.Element {
               y1={20}
               x2={(i + 1) * CELDA}
               y2={alto - 20}
-              stroke="#e8cf7f"
+              stroke="var(--gold-300)"
               strokeWidth="0.5"
             />
           ))}
@@ -203,7 +248,7 @@ export default function BoardView(): JSX.Element {
               y1={(i + 1) * CELDA}
               x2={ancho - 20}
               y2={(i + 1) * CELDA}
-              stroke="#e8cf7f"
+              stroke="var(--gold-300)"
               strokeWidth="0.5"
             />
           ))}
@@ -217,8 +262,8 @@ export default function BoardView(): JSX.Element {
             width={centro.w}
             height={centro.h}
             rx="7"
-            fill="#4a1622"
-            stroke="#c9a227"
+            fill="var(--tablero-centro)"
+            stroke="var(--gold-500)"
             strokeWidth="2.5"
           />
           <rect
@@ -228,26 +273,10 @@ export default function BoardView(): JSX.Element {
             height={centro.h - 20}
             rx="4"
             fill="none"
-            stroke="rgba(232,207,127,0.4)"
+            stroke="rgba(var(--acento-claro-rgb), 0.4)"
             strokeWidth="1"
           />
-          <circle
-            cx={centro.x + centro.w / 2}
-            cy={centro.y + centro.h / 2 - 36}
-            r="15"
-            fill="none"
-            stroke="#e8cf7f"
-            strokeWidth="2.4"
-          />
-          <line
-            x1={centro.x + centro.w / 2 + 11}
-            y1={centro.y + centro.h / 2 - 25}
-            x2={centro.x + centro.w / 2 + 24}
-            y2={centro.y + centro.h / 2 - 12}
-            stroke="#e8cf7f"
-            strokeWidth="3.4"
-            strokeLinecap="round"
-          />
+          {emblema(juego, centro.x + centro.w / 2, centro.y + centro.h / 2 - 36)}
           <text
             className="board-center-label"
             x={centro.x + centro.w / 2}
@@ -300,7 +329,7 @@ export default function BoardView(): JSX.Element {
                 height={h - 10}
                 rx="6"
                 fill="url(#bv-parquet)"
-                stroke="#c9a227"
+                stroke="var(--gold-500)"
                 strokeWidth="2.5"
               />
               <rect
@@ -310,11 +339,11 @@ export default function BoardView(): JSX.Element {
                 height={h - 24}
                 rx="3"
                 fill="none"
-                stroke="rgba(201,162,39,0.3)"
+                stroke="rgba(var(--acento-rgb), 0.3)"
                 strokeWidth="1"
               />
               {/* Hueco de la puerta */}
-              <rect x={puertaX - 3} y={cy - 16} width="8" height="32" fill="#123122" />
+              <rect x={puertaX - 3} y={cy - 16} width="8" height="32" fill="var(--tablero-suelo-2)" />
 
               <text
                 className="board-room-name"
@@ -365,7 +394,7 @@ export default function BoardView(): JSX.Element {
 function Espiral({ cx, cy }: { cx: number; cy: number }): JSX.Element {
   return (
     <>
-      <circle cx={cx} cy={cy} r="10" fill="#1f120c" stroke="#c9a227" strokeWidth="2" />
+      <circle cx={cx} cy={cy} r="10" fill="var(--mahogany-900)" stroke="var(--gold-500)" strokeWidth="2" />
       <path
         className="board-passage-spiral"
         d={`M ${cx} ${cy - 5.5} A 5.5 5.5 0 1 1 ${cx - 5.5} ${cy} A 3.4 3.4 0 1 0 ${cx} ${cy + 3.4}`}
@@ -378,15 +407,15 @@ function Espiral({ cx, cy }: { cx: number; cy: number }): JSX.Element {
 function PlanoDecorativo(): JSX.Element {
   return (
     <svg className="board-empty-plan" viewBox="0 0 120 120" role="img" aria-label="Plano en blanco">
-      <rect x="6" y="6" width="108" height="108" rx="6" fill="none" stroke="#c9a227" strokeWidth="2" />
+      <rect x="6" y="6" width="108" height="108" rx="6" fill="none" stroke="var(--gold-500)" strokeWidth="2" />
       <rect x="16" y="16" width="34" height="30" fill="none" stroke="rgba(201,162,39,0.55)" strokeWidth="1.5" />
       <rect x="70" y="16" width="34" height="30" fill="none" stroke="rgba(201,162,39,0.55)" strokeWidth="1.5" />
       <rect x="16" y="74" width="34" height="30" fill="none" stroke="rgba(201,162,39,0.55)" strokeWidth="1.5" />
       <rect x="70" y="74" width="34" height="30" fill="none" stroke="rgba(201,162,39,0.55)" strokeWidth="1.5" />
-      <line x1="33" y1="46" x2="33" y2="74" stroke="rgba(201,162,39,0.3)" strokeWidth="1" strokeDasharray="4 4" />
-      <line x1="87" y1="46" x2="87" y2="74" stroke="rgba(201,162,39,0.3)" strokeWidth="1" strokeDasharray="4 4" />
-      <circle cx="60" cy="60" r="13" fill="none" stroke="#e8cf7f" strokeWidth="2" />
-      <line x1="69" y1="69" x2="80" y2="80" stroke="#e8cf7f" strokeWidth="3" strokeLinecap="round" />
+      <line x1="33" y1="46" x2="33" y2="74" stroke="rgba(var(--acento-rgb), 0.3)" strokeWidth="1" strokeDasharray="4 4" />
+      <line x1="87" y1="46" x2="87" y2="74" stroke="rgba(var(--acento-rgb), 0.3)" strokeWidth="1" strokeDasharray="4 4" />
+      <circle cx="60" cy="60" r="13" fill="none" stroke="var(--gold-300)" strokeWidth="2" />
+      <line x1="69" y1="69" x2="80" y2="80" stroke="var(--gold-300)" strokeWidth="3" strokeLinecap="round" />
     </svg>
   );
 }

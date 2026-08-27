@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import type { ChatMessage } from '../../../../shared/types';
+import { manifiestoDe } from '../../../../shared/juegos';
+import { palabrasDe } from '../../juegos/palabras';
 import { chatWithAgent } from '../../api/client';
 import { emitUiCommand } from '../../lib/uiBus';
 import { useAppStore } from '../../state/store';
@@ -12,16 +14,19 @@ interface AgentChatPanelProps {
   gameId: string;
 }
 
-/** Mensaje de bienvenida local del Mayordomo cuando la partida aún no tiene historial. */
-function mensajeBienvenida(): ChatMessage {
+/**
+ * El saludo con el que abre una partida sin conversación todavía.
+ *
+ * Lo escribe cada juego, y no es un adorno: es lo primero que se lee al entrar
+ * en el taller y lo que dice de qué va la noche. El mayordomo trata de usted y
+ * ofrece anotarlo todo con discreción; el escriba tutea y avisa de que falta
+ * poco para el amanecer.
+ */
+function mensajeBienvenida(juego: string | undefined): ChatMessage {
   return {
-    id: 'bienvenida-mayordomo',
+    id: `bienvenida-${juego ?? 'cluedo'}`,
     role: 'assistant',
-    content:
-      'Bienvenido a la mansión. Soy Edmund, su maestro de ceremonias. ' +
-      'Cuénteme quiénes asistirán a la velada, qué estancias tiene la casa y qué objetos ' +
-      'podrían servir de… arma. Puede escribirme o dictármelo con el micrófono; ' +
-      'yo lo anotaré todo con la debida discreción.',
+    content: palabrasDe(juego).asistente.bienvenida,
     createdAt: new Date().toISOString(),
   };
 }
@@ -86,6 +91,74 @@ function AvatarMayordomo() {
   );
 }
 
+/**
+ * Retrato de El Escriba: medallón con la cabeza de perfil, como en un muro.
+ *
+ * NO ES UN MAYORDOMO PINTADO DE OTRO COLOR, y ahí está la diferencia que se
+ * nota sin saber decir por qué: el mayordomo mira de frente porque está a su
+ * servicio, y el escriba va de perfil porque así se pintaba a la gente en
+ * Egipto —hombros de frente, cara de lado— y porque está mirando su papiro, no
+ * a ti. Es de la expedición, no del servicio.
+ */
+function AvatarEscriba() {
+  return (
+    <svg viewBox="0 0 64 64" role="img" aria-label="Retrato de El Escriba">
+      <defs>
+        <clipPath id="agentchat-medallon-escriba">
+          <circle cx="32" cy="32" r="29" />
+        </clipPath>
+      </defs>
+      <circle cx="32" cy="32" r="30" fill="var(--felt-800)" stroke="var(--gold-500)" strokeWidth="2" />
+      <circle cx="32" cy="32" r="26.5" fill="none" stroke="rgba(var(--acento-rgb), 0.35)" strokeWidth="1" />
+      <g clipPath="url(#agentchat-medallon-escriba)">
+        {/* Hombros y túnica de lino */}
+        <path d="M13 62 Q32 43 51 62 L51 64 L13 64 Z" fill="var(--mahogany-800)" />
+        <path d="M22 60 q10 -7 20 0" fill="none" stroke="var(--parchment)" strokeWidth="1.2" opacity="0.55" />
+        {/* Cabeza de perfil, mirando a su izquierda */}
+        <path
+          d="M38.5 22.5 q-3.5 -7.5 -11 -6.5 q-8 1 -9.5 9 q-1 5.5 1.5 9.5 q1.5 2.4 1.2 4.6 l-0.4 3 q-0.2 1.6 1.4 1.8 l2.4 0.3 l0.2 4.4 q0.1 2.2 2.3 2.2 l7.4 0 q2 0 2 -2 l0 -7.6 q4 -3 4.2 -8.4 q0.2 -5.4 -1.7 -10.3 z"
+          fill="var(--parchment)"
+        />
+        {/* Peluca corta, la que se lleva bajo el sol */}
+        <path
+          d="M17.6 26 q0.4 -11 11.4 -11.6 q7.6 -0.4 10 6.6 q-4.6 -3.4 -10.4 -3 q-7.4 0.5 -9.2 8 z"
+          fill="var(--mahogany-700)"
+        />
+        <path
+          d="M17.4 24.5 q-1.6 6.5 0.4 12.4 l-3.6 0.6 q-2.2 -7.6 0.6 -13.6 z"
+          fill="var(--mahogany-700)"
+        />
+        {/* Ojo perfilado en kohl, el signo que hace egipcia una cara */}
+        <path d="M22.4 27.6 q3.2 -2.4 6.4 -0.2" stroke="var(--ink)" strokeWidth="1.3" fill="none" strokeLinecap="round" />
+        <circle cx="25.4" cy="29.4" r="1.6" fill="var(--ink)" />
+        <path d="M21 29.6 q3.4 3 7.6 1.2" stroke="var(--ink)" strokeWidth="1.1" fill="none" strokeLinecap="round" />
+        <path d="M29.2 30.6 l3.4 1.6" stroke="var(--ink)" strokeWidth="1.1" strokeLinecap="round" />
+        {/* Ceja */}
+        <path d="M21.8 24.6 q3.6 -2 7 0" stroke="var(--mahogany-700)" strokeWidth="1.3" fill="none" strokeLinecap="round" />
+        {/* Boca */}
+        <path d="M19.6 37.4 q2.6 1 4.6 -0.4" stroke="rgba(var(--tinta-rgb), 0.55)" strokeWidth="1" fill="none" strokeLinecap="round" />
+        {/* Collar de cuentas de fayenza */}
+        <path d="M23 49 q9 6 17 1" fill="none" stroke="var(--gold-400)" strokeWidth="2.4" strokeLinecap="round" />
+        <path d="M23.5 52.5 q9 6 16 1" fill="none" stroke="rgba(var(--contra-rgb), 0.85)" strokeWidth="2" strokeLinecap="round" />
+        {/* El cálamo, detrás de la oreja: es lo que le hace escriba */}
+        <path d="M31.5 21 l9 -7" stroke="var(--gold-300)" strokeWidth="1.8" strokeLinecap="round" />
+      </g>
+    </svg>
+  );
+}
+
+/**
+ * Qué cara pone el asistente de cada juego.
+ *
+ * Tabla y no campo del manifiesto por la misma razón que las cortinillas de
+ * entrada: un retrato son cuarenta trazos de SVG, y eso es código. Lo que sí
+ * dice el manifiesto es CÓMO SE LLAMA, y de ahí sale el nombre que se lee.
+ */
+const RETRATOS: Record<string, () => JSX.Element> = {
+  cluedo: AvatarMayordomo,
+  momia: AvatarEscriba,
+};
+
 /** Icono de micrófono para la entrada por voz. */
 function IconoMicrofono() {
   return (
@@ -99,10 +172,21 @@ function IconoMicrofono() {
 }
 
 /**
- * Panel de chat con el agente de CLUEDO ("El Mayordomo").
+ * Panel de chat con el asistente del juego que se esté preparando.
+ *
  * Streaming SSE, entrada por voz y comandos de UI reenviados al bus.
+ *
+ * QUIÉN CONTESTA lo dice la partida: El Mayordomo en la mansión, El Escriba en
+ * la expedición. El nombre sale del manifiesto (`asistente.nombre`) y no de una
+ * constante, que era lo que había: un panel que llamaba «Mayordomo» a quien
+ * contestara, aunque quien contestara ya no lo fuese.
  */
 export default function AgentChatPanel({ gameId }: AgentChatPanelProps) {
+  const game = useAppStore((s) => s.game);
+  const juego = game?.settings?.juego;
+  const asistente = manifiestoDe(juego).asistente;
+  const palabras = palabrasDe(juego).asistente;
+  const Retrato = RETRATOS[juego ?? 'cluedo'] ?? AvatarMayordomo;
   const chatMessages = useAppStore((s) => s.chatMessages);
   const addChatMessage = useAppStore((s) => s.addChatMessage);
   const appendToLastAssistant = useAppStore((s) => s.appendToLastAssistant);
@@ -134,18 +218,18 @@ export default function AgentChatPanel({ gameId }: AgentChatPanelProps) {
         const historial = (await res.json()) as ChatMessage[];
         if (cancelado) return;
         useAppStore.setState({
-          chatMessages: historial.length > 0 ? historial : [mensajeBienvenida()],
+          chatMessages: historial.length > 0 ? historial : [mensajeBienvenida(juego)],
         });
       } catch {
-        // Sin historial disponible: el Mayordomo saluda igualmente.
-        if (!cancelado) useAppStore.setState({ chatMessages: [mensajeBienvenida()] });
+        // Sin historial disponible: el asistente saluda igualmente.
+        if (!cancelado) useAppStore.setState({ chatMessages: [mensajeBienvenida(juego)] });
       }
     };
     void cargarHistorial();
     return () => {
       cancelado = true;
     };
-  }, [gameId]);
+  }, [gameId, juego]);
 
   // ---- Auto-scroll inteligente: solo si el usuario estaba abajo ----
   const manejarScroll = () => {
@@ -271,16 +355,19 @@ export default function AgentChatPanel({ gameId }: AgentChatPanelProps) {
   };
 
   return (
-    <section className="agentchat deco-frame deco-corners" aria-label="Chat con El Mayordomo">
+    <section
+      className="agentchat deco-frame deco-corners"
+      aria-label={`Chat con ${asistente.nombre}`}
+    >
       {/* Cabecera con el retrato del agente */}
       <header className="agentchat__header">
         <div className="agentchat__avatar">
-          <AvatarMayordomo />
-          <span className="agentchat__status-dot" title="El Mayordomo está de servicio" />
+          <Retrato />
+          <span className="agentchat__status-dot" title={palabras.servicio} />
         </div>
         <div className="agentchat__identity">
-          <h3 className="agentchat__name">El Mayordomo</h3>
-          <p className="agentchat__subtitle">Agente experto en CLUEDO</p>
+          <h3 className="agentchat__name">{asistente.nombre}</h3>
+          <p className="agentchat__subtitle">{palabras.subtitulo}</p>
         </div>
       </header>
 
@@ -295,7 +382,7 @@ export default function AgentChatPanel({ gameId }: AgentChatPanelProps) {
               <div className={`agentchat__burbuja agentchat__burbuja--${mensaje.role}`}>
                 {mostrarPensando ? (
                   <span className="agentchat__pensando">
-                    El Mayordomo está pensando…
+                    {palabras.pensando}
                     <span className="agentchat__puntos" aria-hidden="true">
                       <i />
                       <i />
@@ -331,8 +418,8 @@ export default function AgentChatPanel({ gameId }: AgentChatPanelProps) {
           className="input agentchat__input"
           value={texto}
           onChange={(evento) => setTexto(evento.target.value)}
-          placeholder={grabando ? 'Escuchando…' : 'Hable con El Mayordomo…'}
-          aria-label="Mensaje para El Mayordomo"
+          placeholder={grabando ? 'Escuchando…' : palabras.marcador}
+          aria-label={`Mensaje para ${asistente.nombre}`}
           autoComplete="off"
         />
         <button

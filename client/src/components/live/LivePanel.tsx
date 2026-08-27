@@ -9,25 +9,29 @@
  * propio panel tampoco puede decirle lo que dirige.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
+import type { ComponentType } from 'react';
 import { useAppStore } from '../../state/store';
 import { manifiestoDe } from '../../../../shared/juegos';
 import { FASES_EN_JUEGO } from '../../../../shared/live';
-import type { VistaGameMaster } from '../../../../shared/live';
+import type { LivePhase, VistaGameMaster } from '../../../../shared/live';
+import { palabrasDe } from '../../juegos/palabras';
+import type { PalabrasDeJuego } from '../../juegos/palabras';
+import PanelDeLaMomia from './PanelDeLaMomia';
+import type { PropsDeMandosPropios } from './PanelDeLaMomia';
+import { llamar } from './llamar';
 import './live.css';
 
-const BASE = '/api';
-
-async function llamar<T>(ruta: string, metodo = 'POST', cuerpo?: unknown): Promise<T> {
-  const res = await fetch(`${BASE}${ruta}`, {
-    method: metodo,
-    headers: { 'Content-Type': 'application/json' },
-    body: cuerpo === undefined ? undefined : JSON.stringify(cuerpo),
-  });
-  const texto = await res.text();
-  const datos = texto ? JSON.parse(texto) : {};
-  if (!res.ok) throw new Error(datos.error ?? `Error ${res.status}`);
-  return datos as T;
-}
+/**
+ * Los mandos que cada juego añade a los de la casa.
+ *
+ * Tabla, y no un campo del manifiesto, por la misma razón que las cortinillas
+ * de entrada y los retratos del asistente: esto es una pantalla, y una pantalla
+ * es código. Lo que el manifiesto declara son las FASES, y de ellas salen los
+ * botones que abren y cierran cada una.
+ */
+const MANDOS_PROPIOS: Record<string, ComponentType<PropsDeMandosPropios>> = {
+  momia: PanelDeLaMomia,
+};
 
 export default function LivePanel(): JSX.Element {
   const game = useAppStore((s) => s.game);
@@ -60,11 +64,24 @@ export default function LivePanel(): JSX.Element {
 
   if (!game) return <div />;
 
-  // ¿Puede este juego levantar la mesa sin terminar la partida? Lo dice su
-  // manifiesto, no una comprobación a mano contra CLUEDO.
-  const admiteIntermedio = manifiestoDe(game.settings?.juego).fases['ronda-cerrada']?.includes(
-    'intermedio',
-  );
+  const manifiesto = manifiestoDe(game.settings?.juego);
+  const palabras = palabrasDe(game.settings?.juego).vivo;
+
+  /*
+   * ¿A dónde se puede ir desde donde estamos? Lo dice el grafo de fases del
+   * manifiesto, no una comprobación a mano contra CLUEDO.
+   *
+   * De aquí salen los botones de fase, y por eso importa: es la lección que
+   * costó cara en CLUEDO. Al retirar un botón intermedio, el desenlace se quedó
+   * SIN PUERTA y una partida no se podía terminar. Preguntando al grafo, un
+   * botón existe exactamente cuando existe la transición, y las dos cosas ya no
+   * se pueden separar.
+   */
+  const puedeIrA = (fase: LivePhase): boolean =>
+    Boolean(vista && manifiesto.fases[vista.sesion.phase]?.includes(fase));
+
+  // ¿Puede este juego levantar la mesa sin terminar la partida?
+  const admiteIntermedio = manifiesto.fases['ronda-cerrada']?.includes('intermedio');
 
   const accion = async (fn: () => Promise<unknown>): Promise<void> => {
     setOcupado(true);
@@ -92,16 +109,14 @@ export default function LivePanel(): JSX.Element {
             Al abrirla se genera un código para la mesa y uno personal para cada jugador. Con esos
             dos códigos entran en la app del móvil: no hace falta instalar nada ni registrarse.
           </p>
-          {!game.plot && (
-            <p className="sp-error">Genera antes el misterio: sin trama no hay nada que jugar.</p>
-          )}
+          {!game.plot && <p className="sp-error">{palabras.sinTrama}</p>}
           {error && <p className="sp-error">{error}</p>}
           <button
             className="btn btn--primary"
             disabled={ocupado || !game.plot}
             onClick={() => void accion(() => llamar(`/games/${game.id}/live/abrir`))}
           >
-            Abrir la sala de espera
+            {palabras.abrirSala}
           </button>
         </section>
       </div>
@@ -126,7 +141,9 @@ export default function LivePanel(): JSX.Element {
         </div>
         <div className="live-estado">
           <span className="live-kicker mono-caps">Estado</span>
-          <strong>{etiquetaFase(sesion.phase, sesion.round, sesion.totalRounds)}</strong>
+          <strong>
+            {etiquetaFase(palabras, sesion.phase, sesion.round, sesion.totalRounds)}
+          </strong>
           <span className="text-dim">
             {vista.conectados} de {sesion.players.length} con el móvil conectado
           </span>
@@ -137,7 +154,18 @@ export default function LivePanel(): JSX.Element {
       <section className="deco-frame live-mandos">
         <h3 className="live-titulo">Mandos</h3>
         <div className="live-botones">
-          {(sesion.phase === 'lobby' || rondaCerrada) && !ultimaRonda && (
+          {/*
+            De la sala de espera y de la vigilia cerrada, como siempre; y
+            también del sellado, porque el manifiesto de la Momia lo permite a
+            propósito: si la mesa se atasca discutiendo el orden, quien dirige
+            puede darles otra vigilia en vez de obligarles a ejecutar un ritual
+            a medio cocinar. No se pregunta solo al grafo porque en CLUEDO
+            también se puede volver a jugar desde `acusaciones` y ahí este botón
+            no ha estado nunca; eso se queda exactamente como estaba.
+          */}
+          {(sesion.phase === 'lobby' || rondaCerrada || sesion.phase === 'sellado') &&
+            puedeIrA('ronda-abierta') &&
+            !ultimaRonda && (
             <>
               <label className="live-minutos">
                 <span className="mono-caps">Minutos</span>
@@ -159,7 +187,7 @@ export default function LivePanel(): JSX.Element {
                   )
                 }
               >
-                Abrir ronda {sesion.round + 1}
+                {palabras.abrirRonda(sesion.round + 1)}
               </button>
             </>
           )}
@@ -170,7 +198,7 @@ export default function LivePanel(): JSX.Element {
               disabled={ocupado}
               onClick={() => void accion(() => llamar(`/games/${game.id}/live/ronda/cerrar`))}
             >
-              Cerrar la ronda
+              {palabras.cerrarRonda}
             </button>
           )}
 
@@ -222,13 +250,34 @@ export default function LivePanel(): JSX.Element {
             moviendose, y revelar en mitad de un movimiento se lee como un
             fallo, no como un final.
           */}
-          {(rondaCerrada || sesion.phase === 'acusaciones') && (
+          {/*
+            EL SELLADO. Solo existe si el juego declara la transición, así que
+            en CLUEDO este botón no se dibuja jamás: su grafo tiene `sellado: []`.
+          */}
+          {puedeIrA('sellado') && (
+            <button
+              className="btn btn--primary"
+              disabled={ocupado}
+              title="Se cierra la exploración: a partir de aquí solo se propone el orden y se señala."
+              onClick={() => void accion(() => llamar(`/games/${game.id}/live/sellado`))}
+            >
+              Abrir El Sellado
+            </button>
+          )}
+
+          {/*
+            El desenlace, preguntando al grafo en vez de enumerar fases a mano.
+            En CLUEDO sale exactamente donde salía —de la ronda cerrada y de
+            `acusaciones`, que son sus dos fases con salida al desenlace— y en la
+            Momia sale además desde el sellado, que es donde termina su noche.
+          */}
+          {puedeIrA('desenlace') && (
             <button
               className="btn btn--primary"
               disabled={ocupado}
               onClick={() => void accion(() => llamar(`/games/${game.id}/live/desenlace`))}
             >
-              Abrir el sobre del crimen
+              {palabras.desenlace}
             </button>
           )}
 
@@ -274,6 +323,19 @@ export default function LivePanel(): JSX.Element {
         )}
       </section>
 
+      {/*
+        ---- Los mandos propios del juego ----
+        Se buscan en una tabla y no con un `if`: el día del tercer juego, quien
+        lo añada pone su panel aquí y no toca nada de esta pantalla. CLUEDO no
+        tiene ninguno y no se pinta nada, que es lo que tiene que pasar.
+      */}
+      {(() => {
+        const Propio = MANDOS_PROPIOS[game.settings?.juego ?? ''];
+        return Propio ? (
+          <Propio game={game} vista={vista} ocupado={ocupado} ejecutar={(fn) => void accion(fn)} />
+        ) : null;
+      })()}
+
       {/* ---- Giros pendientes ---- */}
       {vista.girosPendientes.length > 0 && (
         <section className="deco-frame live-giros">
@@ -307,10 +369,11 @@ export default function LivePanel(): JSX.Element {
       */}
       {(sesion.denuncias?.length ?? 0) > 0 && (
         <section className="deco-frame">
-          <h3 className="live-titulo">Respuestas denunciadas del Mayordomo</h3>
+          <h3 className="live-titulo">Respuestas denunciadas de {manifiesto.asistente.nombre}</h3>
           <p className="text-dim">
-            Alguien de la mesa ha marcado estas respuestas como impropias. Échales un ojo: el
-            Mayordomo escribe con un modelo de lenguaje y no siempre acierta el tono.
+            Alguien de la mesa ha marcado estas respuestas como impropias. Échales un ojo:{' '}
+            {manifiesto.asistente.nombre} escribe con un modelo de lenguaje y no siempre acierta el
+            tono.
           </p>
           {[...(sesion.denuncias ?? [])].reverse().map((d, i) => (
             <div key={`${d.at}-${i}`} className="deco-frame" style={{ marginTop: '0.75rem' }}>
@@ -404,14 +467,28 @@ export default function LivePanel(): JSX.Element {
   );
 }
 
-function etiquetaFase(fase: string, ronda: number, total: number): string {
+/**
+ * En qué punto de la noche está la partida, con las palabras del juego.
+ *
+ * Una «ronda» de CLUEDO es una «vigilia» de la Momia, y no es un sinónimo por
+ * capricho: son las horas que quedan hasta el amanecer, y quien dirige lo va a
+ * decir en voz alta doce veces esta noche.
+ */
+function etiquetaFase(
+  palabras: PalabrasDeJuego['vivo'],
+  fase: string,
+  ronda: number,
+  total: number,
+): string {
   switch (fase) {
     case 'lobby':
       return 'Sala de espera';
     case 'ronda-abierta':
-      return `Ronda ${ronda} de ${total} · en curso`;
+      return palabras.rondaEnCurso(ronda, total);
     case 'ronda-cerrada':
-      return `Ronda ${ronda} cerrada`;
+      return palabras.rondaCerrada(ronda);
+    case 'sellado':
+      return 'El Sellado · la mesa vota el orden';
     case 'acusaciones':
       return 'Recogiendo acusaciones';
     case 'intermedio':
