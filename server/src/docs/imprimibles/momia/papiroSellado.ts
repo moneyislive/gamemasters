@@ -17,16 +17,27 @@
  */
 import { esc } from '../../html';
 import { envolverPapiro, portadaPapiro, sinTrama } from './comun';
-import { DONES, vistaDeLaMomia } from './datos';
+import { vistaDeLaMomia } from './datos';
+import type { VistaGm } from '../../contexto';
 import type { DocumentRenderOptions, GameSession, Plot } from '../../../../../shared/types';
 
 export function papiroSellado(
   game: GameSession,
   plot: Plot,
+  vistaDelGm: VistaGm,
   opciones: DocumentRenderOptions,
 ): string {
   const vista = vistaDeLaMomia(game, plot);
   if (!vista.hay || !vista.trama) return sinTrama('El papiro del sellado', opciones);
+
+  /*
+   * QUIÉN SOSTIENE ESTA HOJA CAMBIA CON EL MODO, y no es un matiz de redacción.
+   * Con el Game Master a ciegas, quien dirige juega como uno más y no puede leer
+   * esto: la guarda quien preparó el material, y es esa persona la que saca el
+   * papiro al final y comprueba el orden votado. Una hoja que dijera «para quien
+   * dirige» acabaría en las manos exactamente equivocadas.
+   */
+  const aCiegas = vistaDelGm.hayPreparador;
 
   const ritos = vista.ordenVerdadero
     .map((rito, i) => {
@@ -47,15 +58,33 @@ export function papiroSellado(
   const reliquia = vista.reliquias.find((r) => r.id === vista.trama!.reliquiaCodiciada);
 
   const contenido = `${portadaPapiro(
-    'No la dejes sobre la mesa',
+    aCiegas ? 'Solo quien prepara' : 'No la dejes sobre la mesa',
     'El papiro del sellado',
     'Lo que estaba escrito antes de que la puerta se abriera',
   )}
 
     <div class="aviso">
       Esta hoja tiene la solución entera<br />
-      Boca abajo hasta el final de la noche
+      ${
+        aCiegas
+          ? 'Quien dirige juega esta noche: NO se la des'
+          : 'Boca abajo hasta el final de la noche'
+      }
     </div>
+
+    ${
+      aCiegas
+        ? `<div class="caja caja--almagre junto">
+      <span class="etiqueta">En esta partida diriges tú el sellado</span>
+      <p style="margin:0;">
+        Quien conduce la velada juega como un expedicionario más y no conoce la solución. Cuando
+        la mesa haya votado su orden, sales tú con esta hoja, ejecutas los ritos en el orden
+        votado y dices si la tumba se sella. Hasta entonces no la enseñes a nadie, ni a quien
+        dirige.
+      </p>
+    </div>`
+        : ''
+    }
 
     <h2>El orden verdadero</h2>
     <table>

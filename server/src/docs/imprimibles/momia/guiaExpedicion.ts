@@ -20,17 +20,27 @@
  */
 import { esc } from '../../html';
 import { manifiestoDe } from '../../../../../shared/juegos';
+import type { VistaGm } from '../../contexto';
 import { envolverPapiro, portadaPapiro, sinTrama, ORNAMENTO } from './comun';
-import { DONES, vistaDeLaMomia } from './datos';
+import { vistaDeLaMomia } from './datos';
 import type { DocumentRenderOptions, GameSession, Plot } from '../../../../../shared/types';
 
 export function guiaExpedicion(
   game: GameSession,
   plot: Plot,
+  vistaDelGm: VistaGm,
   opciones: DocumentRenderOptions,
 ): string {
   const vista = vistaDeLaMomia(game, plot);
   if (!vista.hay || !vista.trama) return sinTrama('Guía de la expedición', opciones);
+
+  /*
+   * Con el Game Master a ciegas, quien lee esta guía TAMBIÉN JUEGA y no tiene el
+   * papiro del sellado: lo guarda quien preparó el material. Decirle «saca ahora
+   * el papiro» sería mandarle a por una hoja que no existe en sus manos, en el
+   * peor momento de la noche.
+   */
+  const aCiegas = vistaDelGm.hayPreparador;
 
   const reglas = manifiestoDe(game.settings?.juego).reglas ?? [];
   const material = plot.material;
@@ -126,9 +136,11 @@ export function guiaExpedicion(
       <span class="etiqueta">Lo primero</span>
       <p style="margin:0;">
         Esta guía <strong>no lleva la solución</strong>: ni el orden de los ritos ni quién rompió el
-        sello. Eso está en «El papiro del sellado», una hoja aparte que tienes boca abajo y no
-        vuelves a mirar hasta el final. Así puedes llevar esta encima toda la noche sin miedo a
-        que alguien la lea por encima de tu hombro.
+        sello. ${
+          aCiegas
+            ? 'En esta partida tú también juegas, así que no la conoces y no vas a conocerla: la guarda quien preparó el material, y es esa persona la que sale al final con «El papiro del sellado». Puedes dirigir la noche entera con esta hoja e investigar en igualdad de condiciones.'
+            : 'Eso está en «El papiro del sellado», una hoja aparte que tienes boca abajo y no vuelves a mirar hasta el final. Así puedes llevar esta encima toda la noche sin miedo a que alguien la lea por encima de tu hombro.'
+        }
       </p>
     </div>
 
@@ -196,9 +208,13 @@ ${vigilias}
         <li>Reparte la hoja del sellado. Cada persona escribe <strong>su orden de los cinco ritos</strong> y <strong>a quién señala</strong>. En silencio.</li>
         <li>Recoge las hojas. Lee en voz alta los órdenes propuestos, sin nombres. <strong>Las de quien esté tocado no cuentan</strong> para el orden, pero su señalamiento sí.</li>
         <li>El orden <strong>más votado</strong> es el que se ejecuta. Si hay empate, que la mesa lo discuta y vuelva a votar a mano alzada.</li>
-        <li>Saca ahora el papiro del sellado y compáralo. Ejecuta los ritos uno a uno, en el orden que salió, leyendo su invocación y haciendo su gesto.</li>
+        <li>${
+          aCiegas
+            ? 'Llama ahora a quien preparó el material: sale con el papiro del sellado y ejecuta los ritos, uno a uno, en el orden que salió votado. Tú te sientas: en esta partida también juegas.'
+            : 'Saca ahora el papiro del sellado y compáralo. Ejecuta los ritos uno a uno, en el orden que salió, leyendo su invocación y haciendo su gesto.'
+        }</li>
         <li>Si el orden era el correcto, la tumba se sella y <strong>gana la expedición entera menos el saqueador</strong>. Si no, gana el saqueador.</li>
-        <li>Revela quién rompió el sello, deja que confiese —la confesión está escrita para que la lea esa persona— y cierra con el epílogo.</li>
+        <li>Se revela quién rompió el sello, esa persona lee su confesión —está escrita para que la lea ella— y se cierra con el epílogo.</li>
       </ol>
     </div>
 

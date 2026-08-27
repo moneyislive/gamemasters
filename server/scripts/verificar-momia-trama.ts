@@ -703,6 +703,37 @@ for (const id of IMPRIMIBLES) {
 }
 
 /*
+ * ─────────────────────────────────────────────────────────────────────────────
+ * Y LA MISMA PARTIDA CON QUIEN DIRIGE A CIEGAS
+ * ─────────────────────────────────────────────────────────────────────────────
+ *
+ * Con `gmPlays`, quien conduce la velada juega como un expedicionario más y no
+ * conoce la solución: el papiro del sellado lo guarda quien preparó el material,
+ * y es esa persona la que sale al final. Una guía que le dijera «saca ahora el
+ * papiro del sellado» le mandaría a por una hoja que no tiene, en el peor
+ * momento de la noche — y en la Momia el peor momento es cuando ya se ha votado.
+ */
+const aCiegas: GameSession = {
+  ...partidaConTrama,
+  settings: { ...partidaConTrama.settings, gmPlays: true },
+};
+
+const guiaCiega = renderPrintableDocument(aCiegas, 'guia-expedicion')?.html ?? '';
+const papiroCiego = renderPrintableDocument(aCiegas, 'papiro-sellado')?.html ?? '';
+
+comprobar('a ciegas, el papiro del sellado SÍ se imprime', papiroCiego.length > 1500,
+  papiroCiego ? `${papiroCiego.length} caracteres` : 'no se generó: la partida a ciegas no se podría arbitrar');
+comprobar('y avisa de que no se le dé a quien dirige',
+  papiroCiego.includes('Quien dirige juega esta noche'));
+comprobar('a ciegas, la guía no manda a quien dirige a por el papiro',
+  !guiaCiega.includes('Saca ahora el papiro del sellado'),
+  'le mandaría a por una hoja que no tiene');
+comprobar('y le dice quién sale con él', guiaCiega.includes('quien preparó el material'));
+comprobar('la guía a ciegas sigue sin delatar el orden', !delataElOrden(guiaCiega));
+comprobar('y sigue sin llevar el motivo del saqueador',
+  !guiaCiega.includes(sana.plot.solution.motive.slice(0, 40)));
+
+/*
  * Y para mirarlos con los ojos, que es lo que ninguna comprobación sustituye:
  *
  *   npm run verify:momia-trama -w server -- --volcar C:\\ruta\\donde\\sea

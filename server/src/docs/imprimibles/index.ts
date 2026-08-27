@@ -66,13 +66,13 @@ const PLANTILLAS: Record<PrintableDocId, Plantilla> = {
    * otra carpeta: ver `momia/estilo.ts` para por qué está al lado de la de
    * CLUEDO en vez de generalizada.
    */
-  'guia-expedicion': (game, plot, _vista, opciones) => guiaExpedicion(game, plot, opciones),
+  'guia-expedicion': guiaExpedicion,
   'dosier-expedicionario': (game, plot, _vista, opciones) => dosierExpedicionario(game, plot, opciones),
   'fragmentos-papiro': (game, plot, _vista, opciones) => fragmentosPapiro(game, plot, opciones),
   'carteles-camara': (game, plot, _vista, opciones) => cartelesCamara(game, plot, opciones),
   'hoja-sellado': (game, plot, _vista, opciones) => hojaSellado(game, plot, opciones),
   'tabla-marcas': (game, plot, _vista, opciones) => tablaMarcas(game, plot, opciones),
-  'papiro-sellado': (game, plot, _vista, opciones) => papiroSellado(game, plot, opciones),
+  'papiro-sellado': papiroSellado,
   'informe-papiro': (game, plot, _vista, opciones) => informePapiro(game, plot, opciones),
 };
 
@@ -82,16 +82,14 @@ const NECESITAN_SALAS = new Set<PrintableDocId>(['carteles-sala', 'carteles-cama
 /**
  * La ficha de un documento, buscada en el catálogo DEL JUEGO que se juega.
  *
- * `printableDocInfo` mira `PRINTABLE_DOCS`, que son los trece de CLUEDO: con
- * ella, los diez de la Momia no existían y `renderPrintableDocument` devolvía
- * null para todos ellos —el paquete salía sin un solo documento del juego—.
- * El manifiesto de CLUEDO declara `documentos: PRINTABLE_DOCS`, así que para
- * CLUEDO esto devuelve exactamente lo mismo que antes, byte por byte.
+ * Sin el catálogo, `printableDocInfo` mira `PRINTABLE_DOCS`, que son los trece de
+ * CLUEDO: los diez de la Momia no existían y `renderPrintableDocument` devolvía
+ * null para todos ellos, con lo que el paquete salía sin un solo documento del
+ * juego. El manifiesto de CLUEDO declara `documentos: PRINTABLE_DOCS`, así que
+ * para CLUEDO esto devuelve exactamente lo mismo que antes.
  */
 function fichaDelDocumento(game: GameSession, id: PrintableDocId): PrintableDocInfo | undefined {
-  return (
-    manifiestoDe(game.settings?.juego).documentos.find((d) => d.id === id) ?? printableDocInfo(id)
-  );
+  return printableDocInfo(id, manifiestoDe(game.settings?.juego).documentos);
 }
 
 /**
