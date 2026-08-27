@@ -112,6 +112,7 @@ function toSummary(game: GameSession): GameSummary {
     status: game.status,
     createdAt: game.createdAt,
     updatedAt: game.updatedAt,
+    juego: game.settings?.juego,
     suspectCount: game.suspects.length,
     roomCount: game.rooms.length,
     weaponCount: game.weapons.length,

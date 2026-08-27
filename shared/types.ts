@@ -533,6 +533,17 @@ export interface DuenoDePartida {
 export interface GameSummary {
   id: string;
   name: string;
+  /**
+   * De qué juego es.
+   *
+   * LA COSTURA MÁS VISIBLE QUE DESTAPÓ EL SEGUNDO JUEGO: sin este campo, el
+   * recibidor de una expedición listaba también los casos de CLUEDO, con los
+   * rótulos de la expedición encima. No daba error; enseñaba mal.
+   *
+   * Ausente significa CLUEDO, igual que en `GameSettings.juego`, para que las
+   * partidas de antes del manifiesto no desaparezcan del listado.
+   */
+  juego?: JuegoId;
   status: GameStatus;
   createdAt: string;
   updatedAt: string;

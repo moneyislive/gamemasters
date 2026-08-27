@@ -235,8 +235,17 @@ export function isPrintableDocId(
   return IDS.has(valor);
 }
 
-export function printableDocInfo(id: PrintableDocId): PrintableDocInfo | undefined {
-  return PRINTABLE_DOCS.find((d) => d.id === id);
+export function printableDocInfo(
+  id: PrintableDocId,
+  /*
+   * La tercera de la misma familia, y por la misma razon que las otras dos:
+   * `PRINTABLE_DOCS` son los trece de CLUEDO, asi que la ficha de un documento
+   * de otro juego no se encontraba y el paquete salia sin su nombre ni su
+   * numero de copias. Sin catalogo se comporta como antes.
+   */
+  catalogo?: PrintableDocInfo[],
+): PrintableDocInfo | undefined {
+  return (catalogo ?? PRINTABLE_DOCS).find((d) => d.id === id);
 }
 
 /** Modo de dirección de la partida a partir de sus ajustes. */

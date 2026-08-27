@@ -21,7 +21,7 @@ import { getStore } from '../db/store';
 import { DEMO_MODE } from '../config';
 import { getAnthropicClient, resolveModel, usesFallbacks } from '../agent/anthropic';
 import { buildSystemPrompt } from '../agent/systemPrompt';
-import { agentTools, executeTool } from '../agent/tools';
+import { executeTool, herramientasDe } from '../agent/tools';
 import { runDemoChat } from '../agent/demo';
 import { crearRouter } from '../rutas';
 
@@ -76,6 +76,11 @@ function abrirStream(
   model: ModelId,
   systemText: string,
   turnos: Turno[],
+  /*
+   * La partida, para saber a que juego se juega. Entra hasta aqui solo por las
+   * herramientas: son lo unico de la llamada que depende del juego.
+   */
+  game: GameSession,
 ): StreamAgente {
   const parametrosBase = {
     model,
@@ -88,7 +93,21 @@ function abrirStream(
       },
     ],
     messages: turnos,
-    tools: agentTools,
+    /*
+     * LAS HERRAMIENTAS DE SU JUEGO, no las de CLUEDO.
+     *
+     * Aqui iba `agentTools`, la lista fija, asi que El Escriba de la expedicion
+     * hablaba como El Escriba —el prompt si se ramificaba— y recibia las
+     * herramientas de un mayordomo: podia dar de alta sospechosos, salas y
+     * armas, y NO podia dar de alta ritos, que son cinco piezas obligatorias sin
+     * las cuales no hay puzle. El asistente no habria dado ningun error: habria
+     * dicho que no sabe hacer eso.
+     *
+     * `herramientasDe` devuelve `agentTools` tal cual para CLUEDO, asi que su
+     * conversacion no cambia ni un token —y eso importa, porque el prompt va con
+     * cache y una lista distinta la invalidaria.
+     */
+    tools: herramientasDe(game),
   };
 
   if (usesFallbacks(model)) {
@@ -139,7 +158,7 @@ async function chatConAgente(
   let partidaActual = game;
 
   for (let vuelta = 0; vuelta < MAX_ITERACIONES; vuelta++) {
-    const stream = abrirStream(client, model, systemText, turnos);
+    const stream = abrirStream(client, model, systemText, turnos, game);
 
     for await (const evento of stream) {
       if (evento.type === 'content_block_delta' && evento.delta?.type === 'text_delta') {

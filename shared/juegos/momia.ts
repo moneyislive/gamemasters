@@ -37,6 +37,18 @@ import type { ManifiestoDeJuego, ReglaDeJuego } from './tipos';
  * El último premia ganar siendo el traidor: sin él, ser el saqueador sería un
  * castigo y nadie querría serlo.
  */
+/*
+ * LOS GLIFOS SON DEL PLANO BASICO, y no es un capricho estetico.
+ *
+ * Estos trofeos llevaban jeroglificos de verdad (𓂀, 𓋹, U+13000 y alrededores).
+ * En Windows se pintan porque el sistema trae Segoe UI Historic; en iOS y en
+ * Android NO HAY NINGUNA FUENTE que cubra ese bloque, asi que la vitrina de
+ * trofeos —que se mira en el movil, no en un escritorio— habria salido con
+ * cuadraditos vacios. El sitio donde se veria mal es justo el unico sitio donde
+ * se ve.
+ *
+ * El anj (U+2625) si esta en el plano basico y se pinta en todas partes.
+ */
 export const TROFEOS_MOMIA: TrofeoInfo[] = [
   {
     id: 'sellador',
@@ -48,25 +60,25 @@ export const TROFEOS_MOMIA: TrofeoInfo[] = [
     id: 'ojo-de-horus',
     nombre: 'Ojo de Horus',
     descripcion: 'Señalaste al saqueador y acertaste.',
-    glifo: '𓂀',
+    glifo: '◉',
   },
   {
     id: 'incorrupto',
     nombre: 'Incorrupto',
     descripcion: 'Amaneciste sin una sola marca de la maldición.',
-    glifo: '𓋹',
+    glifo: '☥',
   },
   {
     id: 'mano-abierta',
     nombre: 'Mano Abierta',
     descripcion: 'Diste tus dos amuletos. Ninguno fue para ti.',
-    glifo: '𓂉',
+    glifo: '❖',
   },
   {
     id: 'sombra',
     nombre: 'La Sombra',
     descripcion: 'Eras el saqueador, y amaneció con la tumba abierta.',
-    glifo: '𓆙',
+    glifo: '☾',
   },
 ];
 
@@ -165,8 +177,9 @@ export const IMPRIMIBLES_MOMIA: PrintableDocInfo[] = [
     id: 'tabla-marcas',
     name: 'Tabla de marcas y amuletos',
     summary: 'La cuenta de la maldición, para llevarla a mano sin discusiones.',
+    // No lleva la solución, así que puede llevarla quien dirige a ciegas.
     audience: 'gm',
-    modes: ['host'],
+    modes: ['host', 'blind'],
     defaultOn: true,
     copies: 'una',
     sides: 'una',
@@ -175,8 +188,20 @@ export const IMPRIMIBLES_MOMIA: PrintableDocInfo[] = [
     id: 'papiro-sellado',
     name: 'El papiro del sellado',
     summary: 'El orden verdadero de los cinco ritos y quién rompió el sello. NO la dejes sobre la mesa.',
-    audience: 'gm',
-    modes: ['host'],
+    /*
+     * PARA QUIEN PREPARA, y en los DOS modos.
+     *
+     * Estaba como `audience: 'gm'` y `modes: ['host']`, y eso dejaba la partida
+     * a ciegas sin arbitro: con `gmPlays`, quien dirige juega como uno mas y no
+     * conoce la solucion, asi que estas dos hojas no se imprimian... y son
+     * justamente las que hacen falta para resolver el sellado y llevar la cuenta
+     * de las marcas. Nadie las tenia.
+     *
+     * `preparer` es la audiencia correcta: quien monta el sobre puede no ser
+     * quien dirige, y en la partida a ciegas es exactamente asi.
+     */
+    audience: 'preparer',
+    modes: ['host', 'blind'],
     defaultOn: true,
     copies: 'una',
     sides: 'una',
@@ -304,7 +329,7 @@ export const MOMIA: ManifiestoDeJuego = {
           'Las personas de carne y hueso que se sentarán a la mesa. A cada una le tocará un papel y un don: cuanto mejor las describas, mejor le encajará el suyo.',
         forma: 'circle',
         vacio: {
-          glifo: '𓀀',
+          glifo: '☥',
           titulo: 'Todavía no hay expedición',
           texto: 'Añade al menos cuatro personas. El agente le escribirá a cada una un papel y le repartirá un don.',
         },
@@ -329,7 +354,7 @@ export const MOMIA: ManifiestoDeJuego = {
           'Las estancias reales de tu casa, convertidas en cámaras. Cada vigilia una de ellas está profanada: entrar da un fragmento, pero también una marca.',
         forma: 'square',
         vacio: {
-          glifo: '𓉔',
+          glifo: '⌂',
           titulo: 'La tumba está sin excavar',
           texto: 'Añade al menos cinco estancias. Con nombres de tu casa de verdad, la tumba se monta sola.',
         },
@@ -359,7 +384,7 @@ export const MOMIA: ManifiestoDeJuego = {
           'Lo que ha salido de la tumba. Una de ellas es la que el saqueador tiene vendida de antemano.',
         forma: 'square',
         vacio: {
-          glifo: '𓆲',
+          glifo: '◈',
           titulo: 'No se ha sacado nada todavía',
           texto: 'Añade al menos tres piezas. Objetos de tu casa valen: una jarra, un espejo, un abrecartas.',
         },
