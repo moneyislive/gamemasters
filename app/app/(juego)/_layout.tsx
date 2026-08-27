@@ -16,7 +16,7 @@
  */
 import { Tabs } from 'expo-router/js-tabs';
 import { BarraDeJuego } from '../../src/barra';
-import { color } from '../../src/tema';
+import { useTema } from '../../src/tema-juego';
 import type { PantallaDeApp } from '../../../shared/juegos';
 
 /**
@@ -41,12 +41,20 @@ const PANTALLAS: Record<PantallaDeApp, true> = {
 };
 
 export default function DisposicionJuego(): JSX.Element {
+  /*
+   * El fondo del navegador también es del juego. Se ve poco —cada pantalla pone
+   * encima su propio degradado— pero se ve justo donde peor sienta: en el
+   * instante de la transición entre dos pestañas. Con el verde de CLUEDO fijo,
+   * cambiar de pestaña en la Momia daba un fogonazo verde entre dos pantallas
+   * color arena.
+   */
+  const t = useTema();
   return (
     <Tabs
       tabBar={(props) => <BarraDeJuego {...props} />}
       screenOptions={{
         headerShown: false,
-        sceneStyle: { backgroundColor: color.feltoscuro },
+        sceneStyle: { backgroundColor: t.feltoscuro },
       }}
     >
       {(Object.keys(PANTALLAS) as PantallaDeApp[]).map((nombre) => (

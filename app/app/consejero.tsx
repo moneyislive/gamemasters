@@ -220,10 +220,7 @@ const estilos = StyleSheet.create({
   campo: {
     flex: 1,
     borderWidth: 1,
-    borderColor: 'rgba(201,162,39,0.4)',
     borderRadius: radio.md,
-    backgroundColor: 'rgba(11,23,16,0.6)',
-    color: color.pergamino,
     paddingVertical: 12,
     paddingHorizontal: espacio.md,
     maxHeight: 120,

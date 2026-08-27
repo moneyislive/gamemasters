@@ -14,7 +14,8 @@ import Animated, {
   withSequence,
   withTiming,
 } from 'react-native-reanimated';
-import { color, espacio, fuente, texto } from './tema';
+import { espacio, fuente, texto } from './tema';
+import { conAlfa, useTema } from './tema-juego';
 
 export function Reloj({
   terminaEn,
@@ -23,6 +24,7 @@ export function Reloj({
   terminaEn?: string;
   ahoraServidor: string;
 }): JSX.Element | null {
+  const t = useTema();
   // Diferencia entre el reloj del móvil y el del servidor, medida una vez.
   const desfase = useRef(0);
   useEffect(() => {
@@ -66,14 +68,34 @@ export function Reloj({
   const agotado = restante <= 0;
 
   return (
-    <Animated.View style={[estilos.caja, apurado && estilos.cajaApurada, estilo]}>
-      <Text style={[texto.microCaps, { color: apurado ? '#f0c9c0' : color.laton }]}>
+    <Animated.View
+      style={[
+        estilos.caja,
+        /*
+         * El reloj es del juego. Su caja llevaba el verde fieltro cosido en el
+         * `StyleSheet` —`rgba(11,23,16,0.55)` es `feltoscuro`— y en una partida
+         * de la Momia salía un recuadro verde de casino en mitad de una pantalla
+         * de arena y lapislázuli. Se veía a un metro, y es de esas cosas que no
+         * se encuentran leyendo: hay que abrir la pantalla y mirarla.
+         *
+         * Para CLUEDO no cambia un píxel: `conAlfa` reconstruye las mismas
+         * cadenas que había escritas a mano, carácter a carácter.
+         */
+        { borderColor: conAlfa(t.oro500, 0.35), backgroundColor: conAlfa(t.feltoscuro, 0.55) },
+        apurado && {
+          borderColor: conAlfa(t.peligro, 0.7),
+          backgroundColor: conAlfa(t.burdeos700, 0.22),
+        },
+        estilo,
+      ]}
+    >
+      <Text style={[texto.microCaps, { color: apurado ? '#f0c9c0' : t.laton }]}>
         {agotado ? 'Tiempo cumplido' : 'Queda'}
       </Text>
       <Text
         style={[
           estilos.digitos,
-          { color: agotado ? '#e8a0a0' : apurado ? '#f0c9c0' : color.oro300 },
+          { color: agotado ? '#e8a0a0' : apurado ? '#f0c9c0' : t.oro300 },
         ]}
       >
         {agotado ? '00:00' : `${String(min).padStart(2, '0')}:${String(seg).padStart(2, '0')}`}
@@ -89,12 +111,6 @@ const estilos = StyleSheet.create({
     paddingHorizontal: espacio.lg,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: 'rgba(201,162,39,0.35)',
-    backgroundColor: 'rgba(11,23,16,0.55)',
-  },
-  cajaApurada: {
-    borderColor: 'rgba(179,64,47,0.7)',
-    backgroundColor: 'rgba(109,26,42,0.22)',
   },
   digitos: {
     fontFamily: fuente.tituloFuerte,
@@ -105,24 +121,20 @@ const estilos = StyleSheet.create({
 });
 
 export function BarraDeProgreso({ valor }: { valor: number }): JSX.Element {
+  const t = useTema();
   const ancho = useSharedValue(0);
   useEffect(() => {
     ancho.value = withTiming(Math.max(0, Math.min(1, valor)), { duration: 500 });
   }, [valor, ancho]);
   const estilo = useAnimatedStyle(() => ({ width: `${ancho.value * 100}%` }));
   return (
-    <View style={barra.pista}>
-      <Animated.View style={[barra.relleno, estilo]} />
+    <View style={[barra.pista, { backgroundColor: conAlfa(t.oro500, 0.18) }]}>
+      <Animated.View style={[barra.relleno, { backgroundColor: t.oro400 }, estilo]} />
     </View>
   );
 }
 
 const barra = StyleSheet.create({
-  pista: {
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: 'rgba(201,162,39,0.18)',
-    overflow: 'hidden',
-  },
-  relleno: { height: 4, backgroundColor: color.oro400 },
+  pista: { height: 4, borderRadius: 2, overflow: 'hidden' },
+  relleno: { height: 4 },
 });

@@ -35,19 +35,26 @@ import { bordeSuperior, geometriaMuesca, siluetaBarra } from './barra-geometria'
 import { ICONOS } from './iconos';
 import { manifiestoDe } from '../../shared/juegos';
 import { usePartida } from './estado';
+import { conAlfa, useTema } from './tema-juego';
 import {
   ALTO_BARRA,
   FILETE_BARRA,
   HOLGURA_BOTON,
   R_BOTON,
   SALIENTE_BOTON,
-  color,
   fuente,
 } from './tema';
 
 export function BarraDeJuego({ state, descriptors, navigation }: BottomTabBarProps): JSX.Element {
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
+  /*
+   * La barra es lo ÚNICO que se ve en las seis pantallas, así que es donde más
+   * rinde que el color sea del juego: se cambia de pestaña y la tumba sigue
+   * siendo la tumba. La forma —la muesca, el saliente, el filete— no cambia,
+   * que es la identidad del producto; cambia de qué está hecha.
+   */
+  const t = useTema();
 
   const ALTO = ALTO_BARRA + insets.bottom;
   const H = SALIENTE_BOTON + ALTO;
@@ -81,7 +88,31 @@ export function BarraDeJuego({ state, descriptors, navigation }: BottomTabBarPro
   // Con seis pestañas, en una pantalla de 320 puntos cada una se queda en 37 y
   // «Tablón» no entra. El rótulo se encoge antes que partirse en dos líneas.
   // Con menos pestañas hay sitio de sobra y no hace falta encogerlo.
-  const estrecho = mitad > 0 && anchoLado / mitad < 42;
+  const hueco = mitad > 0 ? anchoLado / mitad : 0;
+  /*
+   * SEGUNDO MOTIVO PARA ENCOGER: que el rótulo sea largo, no que la pantalla sea
+   * pequeña.
+   *
+   * Lo de arriba se midió con los rótulos de CLUEDO, cuyo más largo es «Tablón»
+   * —seis— y con esa medida la regla del ancho basta. La Momia trae «Sellado»,
+   * que son siete, y a 390 puntos entra en el hueco por los pelos: la app se
+   * veía perfecta y la pestaña ponía «SELLAD…». Un rótulo cortado en la barra es
+   * de los fallos que no se notan revisando código y se notan enseguida en la
+   * mano de alguien.
+   *
+   * LA CONDICIÓN ESTÁ PUESTA PARA QUE CLUEDO NO PUEDA ENTRAR EN ELLA, y no por
+   * cortesía: si la fórmula se aplicara a rótulos de seis, habría anchos
+   * intermedios —alrededor de 360 puntos— en los que CLUEDO pasaría de 9 a 7,8 y
+   * su barra cambiaría de aspecto. Con el corte en siete, ningún rótulo suyo la
+   * alcanza y su barra queda intacta por construcción. El día que un juego traiga
+   * «Cuaderno», entrará solo.
+   *
+   * El 7,2 es lo que ocupa un carácter de Cinzel en mayúsculas a tamaño 9 con su
+   * espaciado, medido sobre la propia barra y no deducido de la métrica de la
+   * fuente, que en web y en el móvil no dan lo mismo.
+   */
+  const masLargo = pestanas.reduce((n, p) => Math.max(n, p.decl.rotulo.length), 0);
+  const estrecho = (mitad > 0 && hueco < 42) || (masLargo >= 7 && hueco < masLargo * 7.2);
 
   const pestana = ({
     decl,
@@ -98,7 +129,7 @@ export function BarraDeJuego({ state, descriptors, navigation }: BottomTabBarPro
      * Se toca el COLOR y nada más: ni el tamaño del rótulo ni la geometría, que
      * están medidos para que «Tablón» quepa a 320 puntos.
      */
-    const tinta = enfocada ? color.oro300 : 'rgba(217,201,163,0.68)';
+    const tinta = enfocada ? t.oro300 : conAlfa(t.pergaminoTenue, 0.68);
 
     return (
       <Pressable
@@ -146,17 +177,17 @@ export function BarraDeJuego({ state, descriptors, navigation }: BottomTabBarPro
       >
         <Defs>
           <LinearGradient id="filoBarra" x1="0" y1="0" x2="1" y2="0">
-            <Stop offset="0" stopColor={color.laton} stopOpacity="0.25" />
-            <Stop offset="0.5" stopColor={color.oro300} stopOpacity="1" />
-            <Stop offset="1" stopColor={color.laton} stopOpacity="0.25" />
+            <Stop offset="0" stopColor={t.laton} stopOpacity="0.25" />
+            <Stop offset="0.5" stopColor={t.oro300} stopOpacity="1" />
+            <Stop offset="1" stopColor={t.laton} stopOpacity="0.25" />
           </LinearGradient>
         </Defs>
-        <Path d={siluetaBarra(forma)} fill="rgba(11,23,16,0.94)" />
+        <Path d={siluetaBarra(forma)} fill={conAlfa(t.feltoscuro, 0.94)} />
         {/* El doble filete de la casa, el mismo que remata el pie de página. */}
         <Path
           d={bordeSuperior({ ...forma, offset: 4 })}
           fill="none"
-          stroke={color.laton}
+          stroke={t.laton}
           strokeWidth={0.75}
           strokeOpacity={0.35}
         />
@@ -180,6 +211,8 @@ export function BarraDeJuego({ state, descriptors, navigation }: BottomTabBarPro
         style={({ pressed }) => [
           estilos.boton,
           {
+            backgroundColor: t.caoba900,
+            borderColor: t.oro400,
             left: g.cx - R_BOTON,
             width: R_BOTON * 2,
             height: R_BOTON * 2,
@@ -188,7 +221,7 @@ export function BarraDeJuego({ state, descriptors, navigation }: BottomTabBarPro
           pressed && { transform: [{ scale: 0.94 }] },
         ]}
       >
-        <IconoAsistente color={color.oro300} />
+        <IconoAsistente color={t.oro300} />
       </Pressable>
     </View>
   );
@@ -223,10 +256,9 @@ const estilos = StyleSheet.create({
     top: 0,
     alignItems: 'center',
     justifyContent: 'center',
-    // Opaco a propósito: ver la cabecera del fichero.
-    backgroundColor: color.caoba900,
+    // El fondo y el borde van en línea (son del juego); opaco a propósito, ver
+    // la cabecera del fichero.
     borderWidth: 1.5,
-    borderColor: color.oro400,
     shadowColor: '#000',
     shadowOpacity: 0.6,
     shadowRadius: 12,

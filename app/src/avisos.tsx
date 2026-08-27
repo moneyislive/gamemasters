@@ -20,6 +20,7 @@ import Animated, {
 import { LinearGradient } from 'expo-linear-gradient';
 import { usePartida } from './estado';
 import { color, espacio, texto } from './tema';
+import { conAlfa, useTema } from './tema-juego';
 import type { AvisoClave } from '../../shared/live';
 
 const { width } = Dimensions.get('window');
@@ -37,6 +38,13 @@ const ROTULO: Record<AvisoClave, { titulo: string; tono: string }> = {
 
 export function TelonDeAvisos(): JSX.Element | null {
   const { aviso, descartarAviso } = usePartida();
+  /*
+   * El tema, ANTES del `return null` de más abajo. Este componente existe para
+   * aparecer y desaparecer, así que si el hook fuese detrás del `return` el
+   * número de hooks cambiaría en cuanto saltase el primer aviso de la noche y
+   * React tiraría la pantalla entera. Es el mismo cuidado que en `ui.tsx`.
+   */
+  const t = useTema();
   const opacidad = useSharedValue(0);
   const escala = useSharedValue(0.92);
   const deslizar = useSharedValue(18);
@@ -80,7 +88,12 @@ export function TelonDeAvisos(): JSX.Element | null {
       <Pressable style={StyleSheet.absoluteFill} onPress={descartarAviso} />
       <Animated.View style={[estilos.tarjeta, estiloTarjeta]}>
         <LinearGradient
-          colors={['rgba(31,18,12,0.98)', 'rgba(11,23,16,0.98)']}
+          /*
+           * El aviso salta en TODAS las rondas de las dos partidas, asi que su
+           * degradado tenia que dejar de ser el caoba-sobre-fieltro de CLUEDO.
+           * `conAlfa` devuelve para CLUEDO las mismas dos cadenas que habia.
+           */
+          colors={[conAlfa(t.caoba900, 0.98), conAlfa(t.feltoscuro, 0.98)]}
           style={estilos.degradado}
         >
           <View style={estilos.filaOrnamento}>

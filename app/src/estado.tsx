@@ -237,3 +237,17 @@ export function usePartida(): Estado {
   if (!ctx) throw new Error('usePartida fuera del proveedor');
   return ctx;
 }
+
+/**
+ * Lo mismo, pero sin reventar si no hay proveedor encima.
+ *
+ * Existe por el tema: `useTema()` lo usan piezas de `ui.tsx` que se pintan
+ * TAMBIEN fuera de la partida —la portada, la pantalla de entrar, un aviso de
+ * error de red— donde el proveedor no esta montado. La version que lanza es la
+ * correcta para una pantalla de juego, que sin partida no tiene nada que
+ * ensenar; para decidir un color, no: ahi la respuesta buena es «no se a que se
+ * juega, usa el tema de siempre».
+ */
+export function usePartidaSiLaHay(): Estado | null {
+  return useContext(Contexto);
+}
