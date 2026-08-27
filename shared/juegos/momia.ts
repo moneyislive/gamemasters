@@ -471,6 +471,17 @@ export const MOMIA: ManifiestoDeJuego = {
       rotulo: 'Usar tu don',
       fases: ['ronda-abierta'],
       /*
+       * DOS CATEGORIAS, y opcionales las dos: el capataz excava una CAMARA y el
+       * medico sana a una PERSONA. Cual de las dos hace falta depende del don, y
+       * el don es secreto, asi que el motor no puede saberlo de antemano: valida
+       * lo que venga contra su categoria y deja que el reductor —que si sabe el
+       * don— decida cual mira y si era obligatoria.
+       */
+      eligeOpcional: [
+        { campo: 'objetivo', categoria: 'expedicionarios', rotulo: '¿Sobre quién?' },
+        { campo: 'camara', categoria: 'camaras', rotulo: '¿En qué cámara excavas?' },
+      ],
+      /*
        * Sin `eligeDe`: lo que hay que elegir depende del don, y el don es
        * secreto hasta que lo usas. El selector lo pinta la pantalla del juego a
        * partir del estado, no el panel genérico de acciones.
@@ -482,12 +493,14 @@ export const MOMIA: ManifiestoDeJuego = {
       rotulo: 'Proponer el sellado',
       fases: ['ronda-abierta', 'ronda-cerrada', 'sellado'],
       /*
-       * Tampoco cabe en `eligeDe`, que sabe pintar «elige uno de esta
-       * categoría» y no «ordena estos cinco». Es la limitación que el propio
-       * comentario de `DefinicionDeRonda` ya avisaba, y aquí se toca de frente:
-       * lo resuelve una pantalla propia, y el informe de arquitectura propone
-       * el modelo general.
+       * LOS CINCO RITOS, EN ORDEN. `ordenada` es lo que separa esto de «elige
+       * cinco»: aqui la posicion ES la respuesta. Y `cuantas: 5` no es
+       * decorativo — una propuesta incompleta no se puede ejecutar, y es mejor
+       * rechazarla en el motor que descubrirlo al resolver el sellado.
        */
+      eligeVarias: [
+        { campo: 'orden', categoria: 'ritos', rotulo: 'El orden del sellado', cuantas: 5, ordenada: true },
+      ],
       vecesPorTurno: 1,
     },
     {
