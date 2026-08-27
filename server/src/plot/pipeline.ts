@@ -16,6 +16,8 @@ import { PLOT_SCHEMA } from './schema';
 import { buildStyleBlock } from './style';
 import { repararRespuestas } from '../juegos/solucion';
 import { tramaAlDia } from '../juegos/migracion';
+import { MOMIA } from '../../../shared/juegos/momia';
+import { generarTramaMomia } from './momia-generacion';
 
 type Emitir = (evento: GenerateStreamEvent) => void;
 
@@ -39,13 +41,34 @@ export async function runGeneration(game: GameSession, emit: Emitir): Promise<vo
     // En modo 'aerial' no se genera rejilla: manda la foto aérea con chinchetas.
 
     // ---------- Etapa 2: trama ----------
-    emit({ type: 'stage', stage: 'plot', label: 'Tejiendo la trama del crimen…' });
-    const plot = DEMO_MODE ? await generarTramaDemo(game, emit) : await generarTramaConApi(game, emit);
+    /*
+     * LA RAMA POR JUEGO. Se bifurca aquí y en ninguna otra parte: cada juego
+     * trae su propio esquema, su propio prompt y su propia validación, y lo que
+     * comparten es el resto de la tubería —tablero, reparación de la solución,
+     * documentos, guardado y eventos—. La rama de CLUEDO queda EXACTAMENTE como
+     * estaba; añadir un juego no puede cambiar lo que sale del otro.
+     *
+     * El segundo juego que anunciaba el comentario de abajo ya está aquí, y ha
+     * traído consigo la frontera que se predijo: la Momia no reutiliza
+     * `PLOT_SCHEMA` porque no tiene asesino, arma ni sala, y sobre todo porque
+     * su puzle lo genera código y al modelo solo se le pide el sabor.
+     */
+    const esMomia = game.settings?.juego === MOMIA.id;
+    emit({
+      type: 'stage',
+      stage: 'plot',
+      label: esMomia ? 'Recomponiendo el papiro del sellado…' : 'Tejiendo la trama del crimen…',
+    });
+    const plot = esMomia
+      ? await generarTramaMomia(game, emit)
+      : DEMO_MODE
+        ? await generarTramaDemo(game, emit)
+        : await generarTramaConApi(game, emit);
     // El esquema con el que se le pide la trama al modelo sigue hablando de
     // asesino, arma y sala, y se deja así a propósito: está afinado y
     // probado, y cambiarlo cambiaría las tramas que salen. La conversión a
-    // ejes se hace aquí, en la frontera. Un segundo juego traerá su propio
-    // esquema y su propia frontera.
+    // ejes se hace aquí, en la frontera. (En la Momia no hace nada: su solución
+    // ya nace con `respuestas`, y `tramaAlDia` no toca lo que ya está al día.)
     tramaAlDia(plot);
     corregirSolucion(plot, game);
     game.plot = plot;

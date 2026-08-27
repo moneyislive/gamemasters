@@ -17,6 +17,7 @@
     "verify:segundo-juego": "tsx scripts/verificar-segundo-juego.ts",
     "verify:sin-ejes": "tsx scripts/verificar-juego-sin-ejes.ts",
     "verify:campana": "tsx scripts/verificar-campana.ts",
+    "verify:momia-trama": "tsx scripts/verificar-momia-trama.ts",
     "verify:credenciales": "tsx scripts/verificar-credenciales.ts",
     "verify:aguante": "tsx scripts/verificar-aguante.ts",
     "verify:borrado": "tsx scripts/verificar-borrado.ts",
