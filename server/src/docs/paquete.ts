@@ -9,6 +9,7 @@
  * El prefijo numérico también es parte del producto: marca por dónde se empieza.
  */
 import { printableDocsFor } from '../../../shared/documents';
+import { manifiestoDe } from '../../../shared/juegos';
 import { vistaGm } from './contexto';
 import { renderPrintableDocument } from './imprimibles';
 import { renderPlayerDocument } from './renderer';
@@ -49,7 +50,7 @@ export function armarPaquete(game: GameSession): Paquete {
   const carpetaJugadores = aCiegas ? '02_JUGADORES_NO_ABRIR_GM' : '02_JUGADORES';
   const carpetaPreparador = '03_SOLO_PREPARADOR_NO_ABRIR_GM';
 
-  const docs = printableDocsFor(game.settings);
+  const docs = printableDocsFor(game.settings, manifiestoDe(game.settings?.juego).documentos);
 
   // El índice va suelto en la raíz: es lo primero que se abre y, a ciegas, lo
   // que explica qué carpeta no se puede tocar.

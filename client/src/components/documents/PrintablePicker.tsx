@@ -8,6 +8,7 @@
  */
 import { useState } from 'react';
 import { PRINTABLE_DOCS, printableDocsFor } from '../../../../shared/documents';
+import { manifiestoDe } from '../../../../shared/juegos';
 import type { PrintableDocId } from '../../../../shared/documents';
 import { useAppStore } from '../../state/store';
 import { copiasDe } from './copias';
@@ -22,7 +23,8 @@ export default function PrintablePicker(): JSX.Element {
 
   const modo = game.settings.gmPlays === true ? 'blind' : 'host';
   const disponibles = PRINTABLE_DOCS.filter((doc) => doc.modes.includes(modo));
-  const activos = new Set(printableDocsFor(game.settings).map((d) => d.id));
+  const catalogo = manifiestoDe(game.settings?.juego).documentos;
+  const activos = new Set(printableDocsFor(game.settings, catalogo).map((d) => d.id));
 
   const guardar = async (ids: PrintableDocId[]): Promise<void> => {
     setGuardando(true);

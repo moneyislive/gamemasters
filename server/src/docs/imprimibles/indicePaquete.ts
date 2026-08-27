@@ -6,6 +6,7 @@
  * él, el reparto vive solo en la cabeza de quien montó la partida.
  */
 import { printableDocsFor, resolveGmMode } from '../../../../shared/documents';
+import { manifiestoDe } from '../../../../shared/juegos';
 import { esc } from '../html';
 import { envolver, portada } from './comun';
 import type { PrintableDocInfo } from '../../../../shared/documents';
@@ -31,7 +32,7 @@ export function indicePaquete(
   opciones: DocumentRenderOptions,
 ): string {
   const aCiegas = resolveGmMode(game.settings) === 'blind';
-  const docs = printableDocsFor(game.settings);
+  const docs = printableDocsFor(game.settings, manifiestoDe(game.settings?.juego).documentos);
 
   const parteImprimibles = docs
     .map((doc) => ficha(doc.name, doc.summary, copias(doc, game)))

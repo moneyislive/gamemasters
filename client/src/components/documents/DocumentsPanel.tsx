@@ -18,6 +18,7 @@ import SectionDesigner from './SectionDesigner';
 import PrintablePicker from './PrintablePicker';
 import { copiasDe } from './copias';
 import { printableDocsFor } from '../../../../shared/documents';
+import { manifiestoDe } from '../../../../shared/juegos';
 import type { DocumentAudience } from '../../../../shared/documents';
 import { startMaterial, startRefresh } from '../generate/GenerateOverlay';
 import './documents.css';
@@ -196,7 +197,9 @@ export default function DocumentsPanel(): JSX.Element {
   }
 
   // El material imprimible no está en game.documents: sale del catálogo.
-  const imprimibles = game.plot ? printableDocsFor(game.settings) : [];
+  const imprimibles = game.plot
+    ? printableDocsFor(game.settings, manifiestoDe(game.settings?.juego).documentos)
+    : [];
 
   const personajePorId = new Map((game.plot?.characters ?? []).map((c) => [c.suspectId, c]));
   const idsConDocumento = new Set(documentos.map((doc) => doc.suspectId));

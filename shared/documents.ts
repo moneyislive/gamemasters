@@ -236,10 +236,28 @@ export function resolveGmMode(settings: { gmPlays?: boolean } | undefined): GmMo
  */
 export function printableDocsFor(
   settings: { gmPlays?: boolean; printableDocs?: PrintableDocId[] } | undefined,
+  /*
+   * EL CATALOGO DEL JUEGO, y por parametro en vez de por import.
+   *
+   * Esta funcion filtraba `PRINTABLE_DOCS`, que es el catalogo de CLUEDO. Con
+   * un segundo juego eso significa que sus diez documentos no aparecen y que
+   * los trece de CLUEDO si, aunque no existan para el: el paquete imprimible
+   * de una partida de la Momia saldria con la hoja de solucion de un asesinato.
+   *
+   * Lo natural seria leer aqui `manifiestoDe(juego).documentos`, y no se puede:
+   * el manifiesto de CLUEDO importa `PrintableDocId` de este fichero, asi que
+   * importar el registro de juegos desde aqui cierra un ciclo —lo avisa la
+   * cabecera del fichero—. Con el catalogo por parametro no hay ciclo: lo pasa
+   * quien ya tiene el manifiesto delante.
+   *
+   * El valor por defecto es el de CLUEDO, asi que las llamadas que no lo pasen
+   * se comportan exactamente igual que antes.
+   */
+  catalogo: PrintableDocInfo[] = PRINTABLE_DOCS,
 ): PrintableDocInfo[] {
   const modo = resolveGmMode(settings);
   const elegidos = settings?.printableDocs;
-  return PRINTABLE_DOCS.filter((doc) => {
+  return catalogo.filter((doc) => {
     if (!doc.modes.includes(modo)) return false;
     if (!elegidos) return doc.defaultOn;
     return elegidos.includes(doc.id);
