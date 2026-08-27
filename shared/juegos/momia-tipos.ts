@@ -185,3 +185,52 @@ export function permutaciones<T>(items: T[]): T[][] {
 export function solucionesDe(ritos: RitoId[], restricciones: Restriccion[]): RitoId[][] {
   return permutaciones(ritos).filter((orden) => restricciones.every((r) => cumple(orden, r)));
 }
+
+// ---------------------------------------------------------------------------
+// La trama
+// ---------------------------------------------------------------------------
+
+/** Una restricción ya redactada, tal y como se lee en un fragmento. */
+export interface RestriccionEscrita {
+  id: string;
+  restriccion: Restriccion;
+  /** La frase de papiro. La escribe el modelo; la lógica no depende de ella. */
+  texto: string;
+}
+
+/**
+ * Lo que se decide al GENERAR una partida de la Momia y ya no cambia.
+ *
+ * Viaja en `Plot.delJuego`. La frontera con `EstadoMomia` es la del tiempo: aquí
+ * está lo que la casa decidió antes de que llegara nadie —el orden verdadero,
+ * quién tiene qué don, qué cámara se profana cada noche— y allí lo que va
+ * pasando durante la velada.
+ *
+ * SE GENERA CON CÓDIGO, NO CON EL MODELO. El modelo escribe el sabor: los
+ * nombres, las descripciones, la frase de cada fragmento. La LÓGICA —que el
+ * puzle tenga una sola solución y que nadie pueda resolverlo en solitario— la
+ * garantiza el código, porque un modelo que se equivoque en una restricción deja
+ * la partida irresoluble y nadie se entera hasta la noche.
+ */
+export interface TramaMomia {
+  /** La permutación correcta de los cinco ritos. */
+  ordenVerdadero: RitoId[];
+  /** Las restricciones ciertas. Su conjunto determina `ordenVerdadero`. */
+  restricciones: RestriccionEscrita[];
+  /**
+   * Restricciones falsas, listas para que el saqueador las publique.
+   *
+   * No se reparten a nadie: se le ofrecen cuando invoca `falsificar`. Están
+   * escritas de antemano porque fabricarlas en caliente daría frases de otro
+   * tono, y una pista que suena distinta a las demás se delata sola.
+   */
+  falsasCandidatas: RestriccionEscrita[];
+  /** Qué cámara se profana en cada vigilia. Índice = ronda - 1. */
+  profanadas: string[];
+  /** Dónde y cuándo aparece cada fragmento cierto. */
+  hallazgos: Array<{ fragmentoId: string; camaraId: string; ronda: number }>;
+  /** El don de cada expedicionario, por su `suspectId`. */
+  dones: Record<string, DonId>;
+  /** La reliquia que el saqueador tiene vendida de antemano. */
+  reliquiaCodiciada: string;
+}

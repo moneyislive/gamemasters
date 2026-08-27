@@ -237,6 +237,24 @@ export interface Plot {
    * documentos que lo usan se degradan a su versión en blanco cuando no está.
    */
   material?: PrintMaterial;
+  /**
+   * Lo que este juego necesita de su trama y los demás no.
+   *
+   * Es el hermano de `LiveSession.estado`, y existe por la misma razón. Aquella
+   * guarda lo que pasa DURANTE la partida —las marcas, los amuletos—; esta
+   * guarda lo que se decidió AL GENERARLA y no cambia: en El Misterio de la
+   * Momia, el orden verdadero de los cinco ritos, las restricciones que lo
+   * describen y el don que le tocó a cada cual.
+   *
+   * La alternativa era añadir aquí un campo `momia?: TramaMomia`, y con ella el
+   * contrato general habría empezado a saber de qué se juega. Cada juego que
+   * entrase añadiría el suyo, y en cinco juegos esto sería una lista de campos
+   * opcionales que casi nunca están.
+   *
+   * Quien lo escribe y quien lo lee es el mismo juego, así que el motor no
+   * necesita entenderlo: lo transporta y lo persiste, nada más.
+   */
+  delJuego?: unknown;
 }
 
 // ---------- Documentos por jugador ----------
