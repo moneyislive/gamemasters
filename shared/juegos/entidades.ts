@@ -42,11 +42,30 @@ export interface Entidad {
  * nombre de campo del almacén. Cuando desaparezca, la generalización estará
  * completa.
  */
-const CAMPO_HEREDADO: Record<CategoriaId, 'suspects' | 'rooms' | 'weapons'> = {
+type CampoHeredado = 'suspects' | 'rooms' | 'weapons';
+
+const CAMPO_HEREDADO: Record<CategoriaId, CampoHeredado> = {
   sospechosos: 'suspects',
   salas: 'rooms',
   objetos: 'weapons',
 };
+
+/**
+ * Da de alta dónde vive una categoría.
+ *
+ * Lo llama `registrarJuego` por cada categoría que declare `almacen`. Antes
+ * esta tabla estaba escrita a mano aquí arriba y solo conocía las tres de
+ * CLUEDO: cualquier otro juego caía fuera y sus entidades no se encontraban.
+ *
+ * NO SE PUEDE RESOLVER LEYENDO EL MANIFIESTO EN EL MOMENTO porque estas
+ * funciones no lo reciben —las llaman treinta sitios que solo tienen la partida
+ * delante— y hacer que lo recibieran habría cambiado treinta firmas para ganar
+ * lo mismo. Se rellena al registrar el juego, que ocurre al importar el módulo,
+ * mucho antes de que nadie pregunte.
+ */
+export function declararAlmacen(categoria: CategoriaId, campo: CampoHeredado): void {
+  CAMPO_HEREDADO[categoria] = campo;
+}
 
 /** Las entidades de una categoría, vengan de donde vengan. */
 export function entidadesDe(game: GameSession, categoria: CategoriaId): Entidad[] {
@@ -54,6 +73,30 @@ export function entidadesDe(game: GameSession, categoria: CategoriaId): Entidad[
   if (propias) return propias;
   const campo = CAMPO_HEREDADO[categoria];
   return campo ? ((game[campo] ?? []) as Entidad[]) : [];
+}
+
+/**
+ * La lista REAL de una categoría, la que se puede modificar.
+ *
+ * `entidadesDe` sirve para leer y devuelve lo que encuentre; esta devuelve el
+ * array que de verdad está dentro de la partida, creándolo si hace falta, para
+ * que quien da de alta o borra escriba donde toca.
+ *
+ * Son dos funciones y no una a propósito: leer lo hace todo el mundo y escribir
+ * casi nadie. Si `entidadesDe` creara la lista al vuelo, una simple lectura
+ * dejaría `entidades: {}` escrito en partidas de CLUEDO que no lo tenían, y el
+ * maestro de oro —que compara la partida byte a byte— empezaría a fallar sin
+ * que nadie hubiera cambiado nada.
+ */
+export function listaDeCategoria(game: GameSession, categoria: CategoriaId): Entidad[] {
+  const campo = CAMPO_HEREDADO[categoria];
+  if (campo) {
+    if (!game[campo]) (game as unknown as Record<string, unknown>)[campo] = [];
+    return game[campo] as unknown as Entidad[];
+  }
+  if (!game.entidades) game.entidades = {};
+  if (!game.entidades[categoria]) game.entidades[categoria] = [];
+  return game.entidades[categoria]!;
 }
 
 /** Una entidad por su id, dentro de su categoría. */

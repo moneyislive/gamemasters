@@ -35,6 +35,8 @@ export const CLUEDO: ManifiestoDeJuego = {
       sonJugadores: true,
       admiteFoto: true,
       admiteEmail: true,
+      // Donde han vivido siempre. Se declara para que deje de estar escondido.
+      almacen: 'suspects',
       presentacion: {
         titulo: 'Los sospechosos',
         descripcion:
@@ -58,6 +60,7 @@ export const CLUEDO: ManifiestoDeJuego = {
       minimo: 3,
       sonLugares: true,
       admiteFoto: true,
+      almacen: 'rooms',
       presentacion: {
         titulo: 'Las salas',
         descripcion:
@@ -79,6 +82,7 @@ export const CLUEDO: ManifiestoDeJuego = {
       plural: 'objetos',
       minimo: 3,
       admiteFoto: true,
+      almacen: 'weapons',
       presentacion: {
         titulo: 'Armas del crimen',
         descripcion:

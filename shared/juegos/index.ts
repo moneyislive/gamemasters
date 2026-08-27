@@ -4,6 +4,7 @@
  * CATA. Un registro por nombre, que es lo mínimo que hace falta para que
  * «¿de qué juego es esta partida?» tenga respuesta.
  */
+import { declararAlmacen } from './entidades';
 import { CLUEDO } from './cluedo';
 import { MOMIA } from './momia';
 import type { JuegoId, ManifiestoDeJuego } from './tipos';
@@ -61,7 +62,14 @@ export type {
   Restriccion,
   RitoId,
 } from './momia-tipos';
-export { entidadesDe, entidadDe, nombreDeEntidad, entidadesDelEje } from './entidades';
+export {
+  entidadesDe,
+  entidadDe,
+  nombreDeEntidad,
+  entidadesDelEje,
+  listaDeCategoria,
+  declararAlmacen,
+} from './entidades';
 export type { Entidad } from './entidades';
 
 /** Con qué se juega si una partida no dice de qué juego es. */
@@ -88,6 +96,8 @@ const INSTALADOS: Record<JuegoId, ManifiestoDeJuego> =
   global_[LLAVE] ?? (global_[LLAVE] = { [CLUEDO.id]: CLUEDO });
 INSTALADOS[CLUEDO.id] = CLUEDO;
 INSTALADOS[MOMIA.id] = MOMIA;
+anotarAlmacenes(CLUEDO);
+anotarAlmacenes(MOMIA);
 
 /**
  * Da de alta un juego.
@@ -100,6 +110,21 @@ INSTALADOS[MOMIA.id] = MOMIA;
  */
 export function registrarJuego(manifiesto: ManifiestoDeJuego): void {
   INSTALADOS[manifiesto.id] = manifiesto;
+  anotarAlmacenes(manifiesto);
+}
+
+/**
+ * Apunta dónde vive cada categoría de un juego.
+ *
+ * Va aquí y no en el manifiesto porque el manifiesto es un DATO —una tabla que
+ * algún día se leerá de una base de datos— y esto es el efecto de darlo de
+ * alta. Registrar un juego es exactamente eso: que la plataforma sepa
+ * encontrar sus cosas.
+ */
+function anotarAlmacenes(manifiesto: ManifiestoDeJuego): void {
+  for (const categoria of manifiesto.categorias) {
+    if (categoria.almacen) declararAlmacen(categoria.id, categoria.almacen);
+  }
 }
 
 /** Todos los juegos instalados, para el catálogo del taller. */

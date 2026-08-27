@@ -217,6 +217,12 @@ export const MOMIA: ManifiestoDeJuego = {
       sonJugadores: true,
       admiteFoto: true,
       admiteEmail: true,
+      /*
+       * En `suspects`, y no por comodidad: de ese campo cuelga el emparejamiento
+       * de los móviles, el reparto de dosieres y los correos. Una categoría de
+       * personas que viviera en otro sitio se quedaría sin nada de eso.
+       */
+      almacen: 'suspects',
       presentacion: {
         titulo: 'La expedición',
         descripcion:
@@ -240,6 +246,8 @@ export const MOMIA: ManifiestoDeJuego = {
       minimo: 5,
       sonLugares: true,
       admiteFoto: true,
+      // En `rooms` porque de ahí cuelgan el plano y las chinchetas.
+      almacen: 'rooms',
       presentacion: {
         titulo: 'Las cámaras de la tumba',
         descripcion:
@@ -268,6 +276,8 @@ export const MOMIA: ManifiestoDeJuego = {
       plural: 'reliquias',
       minimo: 3,
       admiteFoto: true,
+      // El tercer campo heredado. No le pega el nombre, pero es donde cabe.
+      almacen: 'weapons',
       presentacion: {
         titulo: 'Las reliquias',
         descripcion:
@@ -301,6 +311,15 @@ export const MOMIA: ManifiestoDeJuego = {
        * poner en común, poco para que se pueda razonar en voz alta.
        */
       minimo: 5,
+      /*
+       * SIN `almacen`, y es la primera categoría de la plataforma que no lo
+       * tiene. Los ritos no son personas ni lugares ni objetos: no hay campo
+       * heredado donde quepan, así que viven en `game.entidades.ritos`, que es
+       * el destino al que tiene que llegar todo lo demás.
+       *
+       * Que exista una categoría así es lo que hacía falta para comprobar que
+       * el almacén genérico funciona de verdad y no solo sobre el papel.
+       */
       presentacion: {
         titulo: 'Los cinco ritos',
         descripcion:

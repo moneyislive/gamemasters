@@ -28,6 +28,7 @@
     "verify:puerta-google": "tsx scripts/verificar-puerta-google.ts",
     "verify:entorno": "tsx scripts/verificar-entorno.ts",
     "verify:enlaces": "tsx scripts/verificar-enlaces.ts",
+    "verify:entidades": "tsx scripts/verificar-entidades.ts",
     "verify:legal": "tsx scripts/verificar-legal.ts"
   },
   "dependencies": {
