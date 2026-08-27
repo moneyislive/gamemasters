@@ -11,6 +11,7 @@
  * «imprime desde tu navegador», que siempre funciona.
  */
 import { getStore } from '../db/store';
+import { manifiestoDe } from '../../../shared/juegos';
 import { renderPlayerDocument } from '../docs/renderer';
 import { renderPrintableDocument } from '../docs/imprimibles';
 import { buscarNavegador, convertirAPdf, SinNavegador } from '../docs/pdf';
@@ -125,7 +126,7 @@ router.get('/games/:id/documents/:suspectId', async (req, res) => {
     }
 
     const id = req.params.suspectId;
-    const esImprimible = isPrintableDocId(id);
+    const esImprimible = isPrintableDocId(id, manifiestoDe(game.settings?.juego).documentos);
 
     // Los imprimibles NO están en el índice guardado: se calculan al vuelo desde
     // el catálogo, para que aparezcan también en partidas generadas antes de

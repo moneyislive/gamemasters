@@ -26,6 +26,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { entidadesDe, manifiestoDe } from '../../shared/juegos';
+import { isPrintableDocId } from '../../shared/documents';
 // A PROPOSITO por el otro camino: ver la comprobacion de la doble carga.
 import { entidadesDe as entidadesPorElOtroCamino } from '../../shared/juegos/entidades';
 import type { GameSession } from '../../shared/types';
@@ -243,6 +244,28 @@ async function jugar(): Promise<void> {
   comprobar(
     'y se lee igual por categoría',
     entidadesDe(conCamara, 'camaras')[0]?.name === 'Cámara del Barquero',
+  );
+
+  paso('Los imprimibles de un juego se reconocen como suyos');
+  /*
+   * `isPrintableDocId` validaba contra `PRINTABLE_DOCS`, que son los trece ids
+   * de CLUEDO. Un documento de otro juego no pasaba por ahi, y la ruta contestaba
+   * «ese dosier todavia no se ha generado» — un mensaje que manda a mirar la
+   * generacion cuando el problema era que el id ni se reconocia. Los ocho
+   * imprimibles de la Momia devolvian 404 con las plantillas ya escritas.
+   */
+  const catalogoMomia = manifiesto.documentos;
+  comprobar(
+    'un imprimible de la Momia se reconoce con SU catalogo',
+    isPrintableDocId('guia-expedicion', catalogoMomia),
+  );
+  comprobar(
+    'y NO se reconoce con el de CLUEDO, que es lo que fallaba',
+    !isPrintableDocId('guia-expedicion'),
+  );
+  comprobar(
+    'y uno de CLUEDO sigue reconociendose sin catalogo',
+    isPrintableDocId('manual-gm'),
   );
 
   paso('El almacen se ve igual desde los dos caminos de importacion');

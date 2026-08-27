@@ -7,7 +7,7 @@
  *   DELETE /games/:id  → {ok:true}
  */
 import { DOCUMENT_SECTIONS } from '../../../shared/types';
-import { juegosInstalados } from '../../../shared/juegos';
+import { juegosInstalados, manifiestoDe } from '../../../shared/juegos';
 import type { DocumentSectionId, GameSettings } from '../../../shared/types';
 import { isPrintableDocId } from '../../../shared/documents';
 import { isModelId } from '../config';
@@ -187,7 +187,10 @@ router.patch('/games/:id', async (req, res) => {
       if ('printableDocs' in incoming) {
         const brutos = incoming.printableDocs;
         if (Array.isArray(brutos)) {
-          nextSettings.printableDocs = brutos.filter(isPrintableDocId);
+          // Contra el catalogo de SU juego: si no, elegir un imprimible de la
+          // Momia desde el taller se descartaba en silencio al guardar.
+          const catalogo = manifiestoDe(game.settings?.juego).documentos;
+          nextSettings.printableDocs = brutos.filter((d) => isPrintableDocId(d, catalogo));
         } else {
           delete nextSettings.printableDocs;
         }

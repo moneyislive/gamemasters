@@ -216,8 +216,23 @@ export const PRINTABLE_DOCS: PrintableDocInfo[] = [
 
 const IDS = new Set<string>(PRINTABLE_DOCS.map((d) => d.id));
 
-export function isPrintableDocId(valor: unknown): valor is PrintableDocId {
-  return typeof valor === 'string' && IDS.has(valor);
+export function isPrintableDocId(
+  valor: unknown,
+  /*
+   * EL CATALOGO DEL JUEGO, por la misma razon y con la misma forma que en
+   * `printableDocsFor`: `IDS` son los trece ids de CLUEDO, asi que un documento
+   * de otro juego no pasaba por aqui y la ruta contestaba «ese dosier todavia no
+   * se ha generado» — un mensaje que manda a mirar la generacion cuando el
+   * problema era que el id ni siquiera se reconocia.
+   *
+   * No se puede leer el manifiesto desde este fichero sin cerrar un ciclo de
+   * imports; quien llama ya lo tiene delante.
+   */
+  catalogo?: PrintableDocInfo[],
+): valor is PrintableDocId {
+  if (typeof valor !== 'string') return false;
+  if (catalogo) return catalogo.some((d) => d.id === valor);
+  return IDS.has(valor);
 }
 
 export function printableDocInfo(id: PrintableDocId): PrintableDocInfo | undefined {
