@@ -10,8 +10,8 @@
  * en una guía sin solución y un sobre sellado, para que pueda jugar como uno más.
  */
 import { useState } from 'react';
-import { DOCUMENT_SECTIONS } from '../../../../shared/types';
 import type { DocumentSectionId } from '../../../../shared/types';
+import { manifiestoDe } from '../../../../shared/juegos';
 import { useAppStore } from '../../state/store';
 import './documents.css';
 
@@ -21,6 +21,28 @@ export default function SectionDesigner(): JSX.Element {
   const [error, setError] = useState<string | null>(null);
 
   if (!game) return <div />;
+
+  /*
+   * LOS BLOQUES LOS DECLARA EL JUEGO, no el contrato comun.
+   *
+   * Antes salian de `DOCUMENT_SECTIONS`, que es la lista de CLUEDO, y en una
+   * expedicion a una tumba la maqueta ofrecia «los sospechosos», «las armas del
+   * crimen» y «las reglas del Cluedo en vivo». La Momia declara los suyos —el
+   * DON de cada expedicionario, las reliquias, los cinco ritos— y son once, no
+   * diez.
+   *
+   * CLUEDO no cambia ni un bloque: su manifiesto referencia esa misma lista, no
+   * una copia de ella.
+   */
+  const manifiesto = manifiestoDe(game.settings?.juego);
+  const secciones = manifiesto.seccionesDeDosier;
+  /*
+   * «un sospechoso más» solo vale en CLUEDO. Sale de la categoría que el juego
+   * declara como la de las personas de la mesa, que es la única que puede tener
+   * un personaje: en la Momia, «un expedicionario más».
+   */
+  const jugadores = manifiesto.categorias.find((c) => c.sonJugadores);
+  const unoMas = `un ${jugadores?.singular ?? 'sospechoso'} más`;
 
   const elegidas = game.settings.documentSections;
   // Sin selección guardada van todas: es el comportamiento por defecto.
@@ -41,16 +63,16 @@ export default function SectionDesigner(): JSX.Element {
   };
 
   const alternar = (id: DocumentSectionId): void => {
-    const info = DOCUMENT_SECTIONS.find((s) => s.id === id);
+    const info = secciones.find((s) => s.id === id);
     if (info?.required) return;
-    const base = DOCUMENT_SECTIONS.filter((s) => activa(s.id)).map((s) => s.id);
+    const base = secciones.filter((s) => activa(s.id)).map((s) => s.id);
     const siguiente = activa(id) ? base.filter((x) => x !== id) : [...base, id];
     // Se guarda en el orden canónico del catálogo, no en el de los clics.
-    const ordenadas = DOCUMENT_SECTIONS.filter((s) => siguiente.includes(s.id)).map((s) => s.id);
+    const ordenadas = secciones.filter((s) => siguiente.includes(s.id)).map((s) => s.id);
     void guardar({ documentSections: ordenadas });
   };
 
-  const incluidas = DOCUMENT_SECTIONS.filter((s) => activa(s.id)).length;
+  const incluidas = secciones.filter((s) => activa(s.id)).length;
 
   return (
     <section className="deco-frame docs-designer">
@@ -62,12 +84,12 @@ export default function SectionDesigner(): JSX.Element {
           </p>
         </div>
         <span className="docs-designer-count mono-caps">
-          {incluidas} de {DOCUMENT_SECTIONS.length} bloques
+          {incluidas} de {secciones.length} bloques
         </span>
       </header>
 
       <div className="docs-maqueta">
-        {DOCUMENT_SECTIONS.map((seccion) => {
+        {secciones.map((seccion) => {
           const dentro = activa(seccion.id);
           return (
             <button
@@ -116,7 +138,7 @@ export default function SectionDesigner(): JSX.Element {
           <em>
             Su dosier se parte en dos: una guía de la velada <b>sin la solución</b> —rondas, sobres
             de pistas y qué leer en voz alta— y un sobre sellado aparte que nadie abre hasta el
-            final. Añádete además como un sospechoso más para tener tu propio personaje.
+            final. Añádete además como {unoMas} para tener tu propio personaje.
           </em>
         </span>
       </label>
