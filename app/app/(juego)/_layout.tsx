@@ -34,6 +34,10 @@ const PANTALLAS: Record<PantallaDeApp, true> = {
   tablon: true,
   cuaderno: true,
   perfil: true,
+  // Las dos de El Misterio de la Momia. CLUEDO no las declara en su barra, asi
+  // que existen en el binario pero no se pintan en una partida de CLUEDO.
+  papiro: true,
+  sellado: true,
 };
 
 export default function DisposicionJuego(): JSX.Element {

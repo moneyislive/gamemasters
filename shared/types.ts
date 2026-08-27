@@ -272,7 +272,12 @@ export type DocumentSectionId =
   | 'suspects'
   | 'weapons'
   | 'board'
-  | 'timeline';
+  | 'timeline'
+  /* Las que trae El Misterio de la Momia. Ver shared/juegos/momia.ts. */
+  | 'don'
+  | 'expedicion'
+  | 'reliquias'
+  | 'ritos';
 
 export interface DocumentSectionInfo {
   id: DocumentSectionId;

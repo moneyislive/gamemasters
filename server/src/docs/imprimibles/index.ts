@@ -20,6 +20,7 @@ import { indicePaquete } from './indicePaquete';
 import { informeValidacion } from './informeValidacion';
 import { lineaTemporal } from './lineaTemporal';
 import { manualGm } from './manualGm';
+import { pendiente } from './momia/pendiente';
 import { tarjetasEnsobrar } from './tarjetasEnsobrar';
 import type { PrintableDocId } from '../../../../shared/documents';
 import type { VistaGm } from '../contexto';
@@ -51,6 +52,19 @@ const PLANTILLAS: Record<PrintableDocId, Plantilla> = {
   'matriz-conocimiento': (game, plot, _vista, opciones) => matrizConocimiento(game, plot, opciones),
   desenlace: (game, plot, _vista, opciones) => desenlace(game, plot, opciones),
   'informe-validacion': (game, plot, _vista, opciones) => informeValidacion(game, plot, opciones),
+
+  /*
+   * EL MISTERIO DE LA MOMIA. Declarados en el catalogo y todavia sin plantilla:
+   * ver `momia/pendiente.ts` para por que esto es un andamio y no un olvido.
+   */
+  'guia-expedicion': () => pendiente('guia-expedicion'),
+  'dosier-expedicionario': () => pendiente('dosier-expedicionario'),
+  'fragmentos-papiro': () => pendiente('fragmentos-papiro'),
+  'carteles-camara': () => pendiente('carteles-camara'),
+  'hoja-sellado': () => pendiente('hoja-sellado'),
+  'tabla-marcas': () => pendiente('tabla-marcas'),
+  'papiro-sellado': () => pendiente('papiro-sellado'),
+  'informe-papiro': () => pendiente('informe-papiro'),
 };
 
 /** Documentos que necesitan al menos una sala para tener sentido. */

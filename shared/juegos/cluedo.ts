@@ -181,6 +181,12 @@ export const CLUEDO: ManifiestoDeJuego = {
      * que ya esten en ella.
      */
     acusaciones: ['ronda-abierta', 'desenlace'],
+    /*
+     * El sellado es de El Misterio de la Momia. Aqui se declara vacio, que es
+     * la forma de decir «este juego no pasa por ahi»: si alguien intentase
+     * llevar una partida de CLUEDO a esa fase, `sePuedeIr` lo rechaza.
+     */
+    sellado: [],
     // Una velada empieza y acaba la misma noche: nunca hay intermedio.
     intermedio: [],
     desenlace: [],

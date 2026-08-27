@@ -93,6 +93,8 @@ const EL_LEGADO: ManifiestoDeJuego = {
     'ronda-cerrada': ['ronda-abierta', 'acusaciones'],
     acusaciones: ['desenlace'],
     // Una velada empieza y acaba la misma noche: nunca hay intermedio.
+    // Este juego no pasa por el sellado de la Momia.
+    sellado: [],
     intermedio: [],
     desenlace: [],
   },

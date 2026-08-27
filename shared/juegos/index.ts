@@ -5,6 +5,7 @@
  * «¿de qué juego es esta partida?» tenga respuesta.
  */
 import { CLUEDO } from './cluedo';
+import { MOMIA } from './momia';
 import type { JuegoId, ManifiestoDeJuego } from './tipos';
 
 /**
@@ -43,6 +44,23 @@ export type {
   ModoDeTurno,
 } from './tipos';
 export { CLUEDO };
+export { MOMIA };
+export {
+  cumple,
+  permutaciones,
+  solucionesDe,
+  RITOS_DEL_SELLADO,
+  MARCAS_PARA_TOCADO,
+  AMULETOS_INICIALES,
+} from './momia-tipos';
+export type {
+  DonId,
+  EstadoDePersona,
+  EstadoMomia,
+  Fragmento,
+  Restriccion,
+  RitoId,
+} from './momia-tipos';
 export { entidadesDe, entidadDe, nombreDeEntidad, entidadesDelEje } from './entidades';
 export type { Entidad } from './entidades';
 
@@ -69,6 +87,7 @@ const global_ = globalThis as unknown as Record<symbol, Record<JuegoId, Manifies
 const INSTALADOS: Record<JuegoId, ManifiestoDeJuego> =
   global_[LLAVE] ?? (global_[LLAVE] = { [CLUEDO.id]: CLUEDO });
 INSTALADOS[CLUEDO.id] = CLUEDO;
+INSTALADOS[MOMIA.id] = MOMIA;
 
 /**
  * Da de alta un juego.

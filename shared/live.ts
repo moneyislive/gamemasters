@@ -30,6 +30,15 @@ export type LivePhase =
   /** Ventana de acusación: todos escriben a la vez. */
   | 'acusaciones'
   /**
+   * El Sellado: la mesa ejecuta el ritual y se decide en bloque.
+   *
+   * La trae El Misterio de la Momia y CLUEDO no pasa nunca por aquí. No es una
+   * fase de acusación con otro nombre: en una acusación cada cual responde por
+   * su cuenta y gana quien acierta; en el sellado se ejecuta UNA propuesta, la
+   * más votada, y de ella depende que gane un bando o el otro.
+   */
+  | 'sellado'
+  /**
    * Se cierra la sesión de hoy, pero la partida NO ha terminado.
    *
    * Es lo que separa una velada de una campaña. Un CLUEDO no pasa nunca por
@@ -40,7 +49,12 @@ export type LivePhase =
   /** Desenlace revelado. */
   | 'desenlace';
 
-export const FASES_EN_JUEGO: LivePhase[] = ['ronda-abierta', 'ronda-cerrada', 'acusaciones'];
+export const FASES_EN_JUEGO: LivePhase[] = [
+  'ronda-abierta',
+  'ronda-cerrada',
+  'acusaciones',
+  'sellado',
+];
 
 /** Elección de sala de un jugador en una ronda concreta. */
 export interface EleccionDeSala {
@@ -282,7 +296,20 @@ export type TrofeoId =
   | 'sabueso'
   | 'culpable-impune'
   | 'superviviente'
-  | 'escribano';
+  | 'escribano'
+  /*
+   * Los de El Misterio de la Momia. Que esta union sea CERRADA y haya que
+   * ampliarla con cada juego es una costura conocida: obliga a tocar el
+   * contrato comun para anadir contenido de uno solo. Se deja asi a proposito
+   * en esta entrega —el compilador avisa de los sitios que hay que repasar— y
+   * el informe de arquitectura propone que pasen a ser cadenas con el juego por
+   * delante (`momia:sellador`), que es lo que escala.
+   */
+  | 'sellador'
+  | 'ojo-de-horus'
+  | 'incorrupto'
+  | 'mano-abierta'
+  | 'sombra';
 
 export interface TrofeoInfo {
   id: TrofeoId;
@@ -573,6 +600,23 @@ export interface VistaJugador {
       opciones: Array<{ id: string; nombre: string }>;
     }>;
   }>;
+  /**
+   * Lo que este juego concreto necesita ensenarle a quien juega.
+   *
+   * POR QUE HACIA FALTA. `LiveSession.estado` ya existia para que un juego
+   * guardase lo suyo —las marcas de la maldicion, los amuletos, los fragmentos—
+   * pero no habia por donde sacarlo al movil: la vista del jugador solo tenia
+   * huecos con forma de misterio (salas, pistas, tablon, acusacion). Un juego
+   * podia recordar lo suyo y no podia contarlo.
+   *
+   * Lo rellena la funcion que cada juego registra con `registrarProyeccion`, y
+   * es ESA funcion la que decide que ve cada persona. El motor no mira dentro:
+   * si mirase, volveria a saber de que se juega.
+   *
+   * CLUEDO no registra ninguna y su vista no cambia ni un byte. Lo comprueba el
+   * maestro de oro.
+   */
+  estadoDelJuego?: unknown;
   /** La sala que has elegido esta ronda, si ya lo has hecho. */
   miSala?: string;
   /** Pistas de TU sala en esta ronda. Vacío hasta que eliges. */

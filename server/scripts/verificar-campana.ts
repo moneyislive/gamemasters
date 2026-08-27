@@ -62,6 +62,8 @@ const LA_TORRE: ManifiestoDeJuego = {
     // Aquí está la diferencia con una velada: al cerrar una ronda se puede
     // levantar la mesa sin terminar la partida.
     'ronda-cerrada': ['ronda-abierta', 'intermedio', 'acusaciones'],
+    // Este juego no pasa por el sellado de la Momia.
+    sellado: [],
     intermedio: ['lobby'],
     acusaciones: ['desenlace'],
     desenlace: [],

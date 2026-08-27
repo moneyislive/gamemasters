@@ -171,7 +171,11 @@ export type IconoId =
   | 'cuaderno'
   | 'copa'
   | 'mayordomo'
-  | 'farol';
+  | 'farol'
+  /* Los de El Misterio de la Momia. */
+  | 'papiro'
+  | 'anj'
+  | 'escarabajo';
 
 /**
  * Las pantallas que trae la app.
@@ -181,7 +185,25 @@ export type IconoId =
  * puede es elegir cuáles usa, en qué orden y cómo se llaman. Una pantalla nueva
  * exige publicar una versión nueva de la app.
  */
-export type PantallaDeApp = 'ronda' | 'personaje' | 'mapa' | 'tablon' | 'cuaderno' | 'perfil';
+export type PantallaDeApp =
+  | 'ronda'
+  | 'personaje'
+  | 'mapa'
+  | 'tablon'
+  | 'cuaderno'
+  | 'perfil'
+  /*
+   * Las dos que trae El Misterio de la Momia.
+   *
+   * Y aqui se ve el acoplamiento honesto del que habla el comentario de arriba:
+   * anadir un juego con mecanicas propias obliga a tocar ESTE fichero, que es
+   * comun, y a publicar una version nueva de la app. No hay forma de evitarlo
+   * mientras la app sea un binario compilado; lo que si se puede es que el
+   * compilador lo cante, y lo canta: `PANTALLAS` en `app/app/(juego)/_layout.tsx`
+   * es un Record sobre esta union y no compila hasta que se declaran.
+   */
+  | 'papiro'
+  | 'sellado';
 
 /** Una pestaña de la barra de abajo. */
 export interface PestanaDeBarra {

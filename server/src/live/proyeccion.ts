@@ -29,6 +29,7 @@ import type {
 } from '../../../shared/live';
 import type { GameSession, Plot } from '../../../shared/types';
 import { aciertos, ejeDeJugadores, ejes as ejesDe, esElSenalado, manifiestoDe } from '../../../shared/juegos';
+import { proyectarEstado } from '../juegos/proyecciones';
 import { entidadesDe, nombreDeEntidad } from '../juegos/entidades';
 import { accionesDisponibles } from '../juegos/motor';
 import { fotoParaJugador } from './fotos';
@@ -260,6 +261,14 @@ export function vistaDeJugador(
     tablero,
     ejes,
     acciones,
+    /*
+     * Lo que este juego concreto quiera ensenar, si lo declara.
+     *
+     * Vale `undefined` para CLUEDO, que no registra ninguna proyeccion, y una
+     * clave con valor `undefined` desaparece al serializar a JSON: la vista de
+     * CLUEDO sale byte a byte como salia. Lo comprueba el maestro de oro.
+     */
+    estadoDelJuego: proyectarEstado(game, sesion, suspectId),
     objetos: game.weapons.map((w) => ({
       id: w.id,
       name: w.name,

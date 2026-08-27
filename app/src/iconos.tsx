@@ -184,7 +184,63 @@ export function IconoFarol({ size = 31, color }: PropsIcono): JSX.Element {
  * al contrato y olvida dibujarlo, esto no compila. Sin eso, la pestaña saldría
  * en blanco en el móvil y nadie se enteraría hasta la noche de la partida.
  */
+/**
+ * ANDAMIO: los tres iconos de El Misterio de la Momia.
+ *
+ * Estan dibujados a lo justo para que la barra no salga en blanco. Se
+ * sustituyen por los buenos cuando se tematice el juego; lo que no se puede es
+ * dejarlos sin declarar, porque `ICONOS` es un Record sobre `IconoId` y sin
+ * ellos no compila el paquete entero.
+ */
+function IconoPapiro({ size = 24, color = 'currentColor' }: PropsIcono): JSX.Element {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3V4Z"
+        stroke={color}
+        strokeWidth={1.6}
+        strokeLinejoin="round"
+      />
+      <Path d="M8 8h8M8 12h8M8 16h5" stroke={color} strokeWidth={1.4} strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+function IconoAnj({ size = 24, color = 'currentColor' }: PropsIcono): JSX.Element {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M12 3a3.2 3.2 0 0 1 0 6.4A3.2 3.2 0 0 1 12 3Z"
+        stroke={color}
+        strokeWidth={1.6}
+      />
+      <Path d="M12 9.4V21M7 13h10" stroke={color} strokeWidth={1.6} strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+function IconoEscarabajo({ size = 24, color = 'currentColor' }: PropsIcono): JSX.Element {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M12 5c2.4 0 4.2 2 4.2 4.8S14.4 19 12 19s-4.2-6.4-4.2-9.2S9.6 5 12 5Z"
+        stroke={color}
+        strokeWidth={1.6}
+      />
+      <Path
+        d="M4.5 8.5 8 10M19.5 8.5 16 10M4.5 15.5 8 14M19.5 15.5 16 14M12 5V2.8"
+        stroke={color}
+        strokeWidth={1.4}
+        strokeLinecap="round"
+      />
+    </Svg>
+  );
+}
+
 export const ICONOS: Record<IconoId, (p: PropsIcono) => JSX.Element> = {
+  papiro: IconoPapiro,
+  anj: IconoAnj,
+  escarabajo: IconoEscarabajo,
   reloj: IconoRonda,
   mascara: IconoPersonaje,
   plano: IconoMapa,

@@ -24,7 +24,16 @@ export type PrintableDocId =
   | 'hoja-solucion'
   | 'matriz-conocimiento'
   | 'desenlace'
-  | 'informe-validacion';
+  | 'informe-validacion'
+  /* Los de El Misterio de la Momia. Ver shared/juegos/momia.ts. */
+  | 'guia-expedicion'
+  | 'dosier-expedicionario'
+  | 'fragmentos-papiro'
+  | 'carteles-camara'
+  | 'hoja-sellado'
+  | 'tabla-marcas'
+  | 'papiro-sellado'
+  | 'informe-papiro';
 
 /** Para quién es el documento. Determina en qué grupo se pinta en la interfaz. */
 export type DocumentAudience = 'players' | 'gm' | 'preparer' | 'room';
