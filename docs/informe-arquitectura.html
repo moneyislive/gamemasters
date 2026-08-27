@@ -757,7 +757,7 @@
   </section>
 
   <section>
-    <h2><span class="num">08</span>Cinco lecciones sobre cómo se comprueba</h2>
+    <h2><span class="num">08</span>Seis lecciones sobre cómo se comprueba</h2>
     <p>
       Salieron de construir el segundo juego con cuatro personas a la vez, y
       valen para cualquier cosa que se compruebe en este repositorio.
@@ -812,6 +812,29 @@
         Levantar la partida y jugarla veinte minutos encontró dos averías que 145
         comprobaciones no vieron. <strong>Jugar es una técnica de verificación,
         no un lujo.</strong>
+      </p>
+    </div>
+
+    <div class="bloqueo">
+      <h3>Una comprobación en verde solo dice algo del árbol que había cuando corrió</h3>
+      <p>
+        Un commit shipeó una línea rota. La suite había dado verde <em>minutos
+        antes</em> y quien la commiteó nunca la escribió: entre una cosa y otra,
+        <strong>otra sesión rompió ese fichero a propósito para probar su propia
+        aserción</strong> y lo restauró después. Cuatro sesiones compartían un
+        único árbol de trabajo.
+      </p>
+      <p>
+        Dos consecuencias que conviene tener escritas. Una:
+        <code>verificar &amp;&amp; git add &amp;&amp; git commit</code> en la
+        <em>misma</em> orden, para que verde y commit no estén separados por una
+        ventana. Otra: en un árbol compartido, <strong>una rotura deliberada es un
+        peligro para todos</strong>, no solo para quien la hace.
+      </p>
+      <p>
+        La forma hermana del mismo problema: <code>git commit</code> sin rutas
+        publica lo que otra sesión haya dejado en el índice. Pasó también, y se
+        llevó seis ficheros ajenos dentro de un commit que no los menciona.
       </p>
     </div>
 
