@@ -409,6 +409,26 @@ async function jugar(): Promise<void> {
   v = await vista();
   comprobar('quedando la ronda cerrada', v.sesion.phase === 'ronda-cerrada', v.sesion.phase);
 
+  paso('La fase de otro juego no le abre a CLUEDO ninguna puerta');
+  /*
+   * `sellado` la trae El Misterio de la Momia y se anadio a `LivePhase`, que es
+   * el contrato COMUN. Ampliar una union cerrada para meter contenido de un solo
+   * juego es justo el tipo de cambio que puede colarle a los demas una fase que
+   * no deberian tener, y aqui se comprueba que no: el grafo de CLUEDO declara
+   * `sellado: []`, asi que la transicion se rechaza.
+   *
+   * Sin esta linea, el dia que alguien escriba `sellado: ['desenlace']` por
+   * descuido en el manifiesto de CLUEDO, no lo notaria nadie.
+   */
+  const selladoEnCluedo = await pedir(`/games/${game.id}/live/sellado`, { metodo: 'POST' });
+  comprobar(
+    'CLUEDO rechaza pasar al sellado',
+    selladoEnCluedo.estado === 409,
+    selladoEnCluedo.datos,
+  );
+  v = await vista();
+  comprobar('y se queda donde estaba', v.sesion.phase === 'ronda-cerrada', v.sesion.phase);
+
   paso('El desenlace');
   const desenlace = await pedir(`/games/${game.id}/live/desenlace`, { metodo: 'POST' });
   comprobar(

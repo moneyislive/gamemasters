@@ -699,6 +699,8 @@ export type AvisoClave =
   | 'giro'
   | 'ayuda'
   | 'acusaciones'
+  /* El Sellado, de El Misterio de la Momia. */
+  | 'sellado'
   | 'desenlace'
   | 'ganador';
 

@@ -321,6 +321,23 @@ export function abrirAcusaciones(sesion: LiveSession): void {
   sesion.roundEndsAt = undefined;
 }
 
+/**
+ * Abre El Sellado.
+ *
+ * Es la hermana de `abrirAcusaciones` y hace lo mismo: comprobar que el juego
+ * admite la transicion y cambiar de fase. La comprobacion sale del manifiesto,
+ * asi que en CLUEDO —cuyo grafo declara `sellado: []`— esta llamada se rechaza
+ * siempre, y ese rechazo es la garantia de que anadir la fase no le abre a
+ * CLUEDO una puerta que no deberia tener.
+ */
+export function abrirSellado(sesion: LiveSession): void {
+  if (!puedePasarA(sesion.juego, sesion.phase, 'sellado')) {
+    throw new TransicionInvalida(sesion.phase, 'sellado');
+  }
+  sesion.phase = 'sellado';
+  sesion.roundEndsAt = undefined;
+}
+
 export function revelarDesenlace(sesion: LiveSession): void {
   if (!puedePasarA(sesion.juego, sesion.phase,'desenlace')) {
     throw new TransicionInvalida(sesion.phase, 'desenlace');

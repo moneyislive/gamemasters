@@ -32,6 +32,7 @@ const ROTULO: Record<AvisoClave, { titulo: string; tono: string }> = {
   giro: { titulo: 'Algo ha cambiado', tono: '#e8a0a0' },
   ayuda: { titulo: 'Una ayuda', tono: color.oro300 },
   acusaciones: { titulo: 'Hora de acusar', tono: '#f0c9c0' },
+  sellado: { titulo: 'Se abre El Sellado', tono: '#f0c9c0' },
   desenlace: { titulo: 'El sobre del crimen', tono: '#f0c9c0' },
   ganador: { titulo: 'Alguien lo ha resuelto', tono: color.oro300 },
 };

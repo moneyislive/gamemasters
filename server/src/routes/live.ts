@@ -11,6 +11,7 @@ import { cerrarPartidaEnCuentas } from '../live/cuentas';
 import { vistaDeGameMaster } from '../live/proyeccion';
 import {
   abrirAcusaciones,
+  abrirSellado,
   abrirEncuentro,
   abrirRonda,
   abrirSesion,
@@ -216,6 +217,35 @@ router.post('/games/:id/live/acusaciones', async (req, res) => {
           s.rev,
           'acusaciones',
           'Momento de acusar. Una sola combinación, y no se puede cambiar.',
+        ),
+    });
+    await responderVista(req.params.id, res);
+  } catch (error) {
+    fallo(error, res);
+  }
+});
+
+/**
+ * El Sellado de El Misterio de la Momia.
+ *
+ * EL BOTON EXISTIA Y LA RUTA NO. El taller pinta «Abrir El Sellado» cuando el
+ * manifiesto declara la transicion, y llamaba aqui contra una ruta que no se
+ * habia escrito: el hueco clasico de integrar dos trabajos hechos en paralelo,
+ * y de los que no aparecen hasta que alguien pulsa el boton.
+ *
+ * Es generica, no de la Momia: cambia a una fase si el juego la admite. Para
+ * CLUEDO, cuyo grafo declara `sellado: []`, se rechaza siempre — y ese rechazo
+ * es la garantia de que anadir la fase no le abre a CLUEDO una puerta nueva.
+ */
+router.post('/games/:id/live/sellado', async (req, res) => {
+  try {
+    await mutar(req.params.id, (s) => abrirSellado(s), {
+      avisar: (s) =>
+        anunciar(
+          req.params.id,
+          s.rev,
+          'sellado',
+          'Se abre El Sellado. Cinco ritos, un solo orden bueno.',
         ),
     });
     await responderVista(req.params.id, res);
