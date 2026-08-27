@@ -232,7 +232,14 @@ export function generarTramaMomia(game: GameSession, opciones: OpcionesTrama = {
    */
   const profanadas: string[] = [];
   for (let ronda = 0; ronda < vigilias; ronda++) {
-    const posibles = camaras.filter((c) => c.id !== profanadas[ronda - 1]);
+    const posibles = camaras.filter(
+      (c) =>
+        c.id !== profanadas[ronda - 1] &&
+        // Y la ultima tampoco puede repetir la primera: la lista se recorre en
+        // circulo si la noche se alarga (ver `camaraProfanada`), y si coincidieran
+        // los extremos habria dos vigilias seguidas con la misma camara.
+        !(ronda === vigilias - 1 && vigilias > 1 && c.id === profanadas[0]),
+    );
     profanadas.push(posibles[Math.floor(rnd() * posibles.length)]!.id);
   }
 
@@ -421,6 +428,30 @@ function construirCronologia(): TimelineEvent[] {
 // ---------------------------------------------------------------------------
 // Del papel a la mesa
 // ---------------------------------------------------------------------------
+
+/**
+ * Que camara esta profanada en una vigilia.
+ *
+ * SE CONSULTA EN CIRCULO, Y ESO TAPA UNA AVERIA QUE ESTABA ESPERANDO. La trama
+ * escribe tantas camaras profanadas como vigilias se pidieron, pero quien dirige
+ * puede abrir vigilias indefinidamente —`ronda-cerrada` vuelve a
+ * `ronda-abierta`— y en la primera que se pasara de la cuenta el indice se salia
+ * de la lista: ninguna camara profanada, ninguna marca, la maldicion apagada de
+ * golpe y sin que nada diera error.
+ *
+ * Hasta hoy no ocurria, y por una casualidad que conviene no heredar:
+ * `numeroDeRondas` deduce las vigilias de `plot.clues`, este juego las deja
+ * vacias y la funcion devuelve su valor por defecto, cuatro, que es justo lo que
+ * la trama genera. Dos numeros que coinciden sin que nadie los haya atado. En
+ * cuanto alguien genere una velada de tres o de cinco, dejan de coincidir.
+ *
+ * Dando la vuelta al principio, una quinta vigilia repite la camara de la
+ * primera. La maldicion no se para nunca y el juego sigue teniendo sentido.
+ */
+export function camaraProfanada(profanadas: string[], ronda: number): string | undefined {
+  if (profanadas.length === 0 || ronda < 1) return undefined;
+  return profanadas[(ronda - 1) % profanadas.length];
+}
 
 /**
  * La trama de la Momia de una partida, si la tiene.

@@ -34,7 +34,7 @@ import { AccionInvalida, registrarAcciones } from './motor';
 // Por la puerta principal: es el índice quien declara dónde vive cada
 // categoría. Ver el comentario largo en `momia-trama.ts`.
 import { entidadesDe } from '../../../shared/juegos';
-import { estadoInicial, tramaDe, EJE_SAQUEADOR } from './momia-trama';
+import { camaraProfanada, estadoInicial, tramaDe, EJE_SAQUEADOR } from './momia-trama';
 import { MARCAS_PARA_TOCADO } from '../../../shared/juegos/momia-tipos';
 import type { DonId, EstadoMomia, TramaMomia } from '../../../shared/juegos/momia-tipos';
 import type { GameSession } from '../../../shared/types';
@@ -200,7 +200,7 @@ export function entrarEnCamara(
     .filter((id) => estado.fragmentos[id] && !persona.fragmentos.includes(id));
   persona.fragmentos.push(...encontrados);
 
-  const profanada = estado.profanadas[sesion.round - 1] === camaraId;
+  const profanada = camaraProfanada(estado.profanadas, sesion.round) === camaraId;
   const vigilia = vigiliaDe(sesion);
   const protegido = vigilia.protegidos.includes(suspectId);
 
@@ -382,8 +382,7 @@ export function invocarDon(
     }
 
     case 'sobornar': {
-      // Índice = ronda - 1, así que la SIGUIENTE vigilia es `sesion.round`.
-      const manana = estado.profanadas[sesion.round];
+      const manana = camaraProfanada(estado.profanadas, sesion.round + 1);
       if (!manana) throw new AccionInvalida('No hay otra vigilia después de esta.');
       vigilia.sobornos[suspectId] = manana;
       resultado = {

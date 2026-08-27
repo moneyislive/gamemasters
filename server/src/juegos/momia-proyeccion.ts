@@ -29,7 +29,7 @@
  * recibe el móvil y falla si aparece.
  */
 import { donesDe, esElSaqueador, estadoDe } from './momia-acciones';
-import { DONES_REPARTIBLES, tramaDe } from './momia-trama';
+import { camaraProfanada, DONES_REPARTIBLES, tramaDe } from './momia-trama';
 import { registrarProyeccion } from './proyecciones';
 import { selladoDe, trofeosDe } from './momia-sellado';
 // Por la puerta principal, igual que en `momia-trama.ts` y por lo mismo.
@@ -153,7 +153,7 @@ export function vistaMomiaDe(
     .map((f) => contar(f.id))
     .filter((f): f is FragmentoVisto => Boolean(f));
 
-  const profanada = estado.profanadas[sesion.round - 1];
+  const profanada = camaraProfanada(estado.profanadas, sesion.round);
   const soborno = (sesion.estado?.['momia-vigilia'] as { sobornos?: Record<string, string> } | undefined)
     ?.sobornos?.[suspectId];
 

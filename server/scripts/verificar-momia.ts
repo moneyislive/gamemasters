@@ -51,7 +51,7 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { generarTramaMomia, estadoInicial, tramaDe } from '../src/juegos/momia-trama';
+import { camaraProfanada, generarTramaMomia, estadoInicial, tramaDe } from '../src/juegos/momia-trama';
 import { entrarEnCamara, invocarDon, ofrendarAmuleto, proponerOrden } from '../src/juegos/momia-acciones';
 import { ejecutarSellado, resolverSellado, selladoDe, trofeosDe } from '../src/juegos/momia-sellado';
 import { vistaMomiaDe } from '../src/juegos/momia-proyeccion';
@@ -648,14 +648,13 @@ async function jugarPorElCable(): Promise<void> {
     });
     comprobar('y una con un rito repetido, también', repes.estado === 409, repes.datos);
 
-    for (const id of ['e0', 'e1', 'e2']) {
-      const r = await accion(id, 'proponer-orden', { orden: trama.ordenVerdadero });
-      comprobar(`${id} entrega su propuesta`, r.estado === 200, r.datos);
-    }
-    const delSaqueadorProp = await accion(SAQUEADOR, 'proponer-orden', {
-      orden: [...trama.ordenVerdadero].reverse(),
-    });
-    comprobar('y el saqueador la suya, torcida', delSaqueadorProp.estado === 200, delSaqueadorProp.datos);
+    /*
+     * SE PUEDE PROPONER DURANTE LA VIGILIA, sin esperar al Sellado, y el
+     * manifiesto lo declara así a propósito: quien lo tiene claro se moja
+     * pronto. El resto de la mesa entrega en El Sellado, más abajo.
+     */
+    const madrugadora = await accion('e0', 'proponer-orden', { orden: trama.ordenVerdadero });
+    comprobar('se puede entregar la propuesta sin esperar al Sellado', madrugadora.estado === 200, madrugadora.datos);
 
     v = await vista('e0');
     comprobar(
@@ -664,9 +663,8 @@ async function jugarPorElCable(): Promise<void> {
       estadoDe(v).yo.miPropuesta,
     );
     comprobar(
-      'y de los demás solo sabe QUE han propuesto, no QUÉ',
-      estadoDe(v).mesa.every((m: any) => m.haPropuesto === true) &&
-        !JSON.stringify(estadoDe(v).mesa).includes(trama.ordenVerdadero[0]!),
+      'y de los demás no se sabe ni que han propuesto, porque todavía no lo han hecho',
+      estadoDe(v).mesa.every((m: any) => m.haPropuesto === false),
       estadoDe(v).mesa,
     );
     // Y con propuestas sobre la mesa, el orden verdadero sigue sin viajar.
@@ -735,6 +733,15 @@ async function jugarPorElCable(): Promise<void> {
     senalaOtraVez.datos,
   );
 
+  if (porElCable) {
+    const brunoEnVigilia2 = await accion('e1', 'proponer-orden', { orden: trama.ordenVerdadero });
+    comprobar(
+      'Bruno entrega su orden en la vigilia 2',
+      brunoEnVigilia2.estado === 200,
+      brunoEnVigilia2.datos,
+    );
+  }
+
   const exploraOtraVigilia = await accion('e0', 'explorar', { camara: limpia });
   comprobar(
     'pero explorar sí se renueva cada vigilia',
@@ -742,8 +749,72 @@ async function jugarPorElCable(): Promise<void> {
     exploraOtraVigilia.datos,
   );
 
-  paso('El desenlace: ahora sí se abre el papiro');
+  paso('El Sellado: la mesa ejecuta un solo orden');
   await pedir(`/games/${game.id}/live/ronda/cerrar`, { metodo: 'POST' });
+
+  if (porElCable) {
+    const abrirSellado = await pedir(`/games/${game.id}/live/sellado`, { metodo: 'POST' });
+    comprobar('quien dirige abre El Sellado', abrirSellado.estado === 200, abrirSellado.datos);
+    v = await vista('e0');
+    comprobar('y la partida entra en esa fase', v.sesion.phase === 'sellado', v.sesion.phase);
+
+    // Explorar no cabe aquí: la tumba ya no se recorre, se sella.
+    const exploraEnSellado = await accion('e1', 'explorar', { camara: limpia });
+    comprobar(
+      'en El Sellado ya no se explora',
+      exploraEnSellado.estado === 409,
+      exploraEnSellado.datos,
+    );
+
+    const enSellado = await accion('e2', 'proponer-orden', { orden: trama.ordenVerdadero });
+    comprobar('e2 entrega su orden en El Sellado', enSellado.estado === 200, enSellado.datos);
+
+    /*
+     * ANA SÍ RECTIFICA Y BRUNO NO, y la diferencia no es una regla de este juego:
+     * es que `vecesPorTurno` cuenta por RONDA y abrir El Sellado no abre una
+     * vigilia nueva. Ana propuso en la vigilia 1, así que su contador está a cero
+     * en la 2 y puede reescribir; Bruno propuso en la 2, la misma en la que se
+     * abre El Sellado, y se queda con lo que escribió.
+     *
+     * Es defendible —mojarse pronto tiene premio y tiene coste— pero es una
+     * consecuencia del motor y no una decisión del diseño, y quien lo juegue lo
+     * va a notar. Queda escrito aquí y en el informe.
+     */
+    const anaRectifica = await accion('e0', 'proponer-orden', { orden: trama.ordenVerdadero });
+    comprobar(
+      'quien propuso en una vigilia ANTERIOR sí puede reescribir en El Sellado',
+      anaRectifica.estado === 200,
+      anaRectifica.datos,
+    );
+    const delSaqueadorProp = await accion(SAQUEADOR, 'proponer-orden', {
+      orden: [...trama.ordenVerdadero].reverse(),
+    });
+    comprobar('y el saqueador el suyo, torcido', delSaqueadorProp.estado === 200, delSaqueadorProp.datos);
+
+    const brunoOtraVez = await accion('e1', 'proponer-orden', { orden: trama.ordenVerdadero });
+    comprobar(
+      'y quien propuso en ESTA misma vigilia, no',
+      brunoOtraVez.estado === 409,
+      brunoOtraVez.datos,
+    );
+
+    // Señalar sí sigue abierto: se puede acusar hasta el final.
+    const senalaTarde = await accion('e1', 'senalar', { saqueador: SAQUEADOR });
+    comprobar('pero señalar sigue abierto en El Sellado', senalaTarde.estado === 200, senalaTarde.datos);
+
+    v = await vista('e1');
+    comprobar(
+      'y ahora sí consta que los demás han propuesto',
+      estadoDe(v).mesa.filter((m: any) => m.haPropuesto).length === 3,
+      estadoDe(v).mesa,
+    );
+    for (const id of Object.keys(testigos)) {
+      const fugas = fugasEn(await vista(id), trama.ordenVerdadero);
+      comprobar(`ni en El Sellado se le filtra nada a ${id}`, fugas.length === 0, fugas);
+    }
+  }
+
+  paso('El desenlace: ahora sí se abre el papiro');
   const desenlace = await pedir(`/games/${game.id}/live/desenlace`, { metodo: 'POST' });
   comprobar(
     'se llega al desenlace directamente desde la vigilia cerrada',
@@ -973,6 +1044,68 @@ function jugarElSellado(): void {
   comprobar(
     'y una propuesta posterior ya no lo cambia: la tumba se selló',
     selladoDe(d.game, d.sesion).correcto === true,
+  );
+
+  // --- La noche que se alarga ---
+  paso('Una velada mas larga de lo previsto');
+  /*
+   * QUIEN DIRIGE PUEDE ABRIR VIGILIAS SIN LIMITE: `ronda-cerrada` vuelve a
+   * `ronda-abierta` y nadie cuenta. La trama escribe tantas camaras profanadas
+   * como vigilias se pidieron, asi que en la primera que se pasara de la cuenta
+   * el indice se salia de la lista y la maldicion se apagaba de golpe, sin error
+   * y sin que nadie lo notara hasta preguntarse por que ya no marca nada.
+   *
+   * No saltaba porque `numeroDeRondas` devuelve cuatro para este juego —deduce
+   * las vigilias de `plot.clues`, que aqui van vacias— y la trama genera cuatro.
+   * Dos numeros que coincidian sin que nadie los hubiera atado.
+   */
+  const larga = armar();
+  const tramaLarga = tramaDe(larga.game.plot)!;
+  const estadoLargo = larga.sesion.estado!.momia as any;
+  comprobar(
+    'la trama planea cuatro vigilias',
+    tramaLarga.profanadas.length === VIGILIAS,
+    tramaLarga.profanadas.length,
+  );
+  /*
+   * SOBRE CUARENTA TRAMAS Y NO SOBRE UNA. Con una sola semilla, que la ultima
+   * camara no coincida con la primera es cuestion de suerte: se probo quitando
+   * la regla y la comprobacion seguia en verde, porque esa velada concreta no
+   * repetia de todos modos. Cinco camaras y cuatro vigilias: una de cada cinco
+   * tramas repetiria.
+   */
+  let seguidas = 0;
+  let extremos = 0;
+  for (let i = 0; i < 40; i++) {
+    const otra = tramaDe(
+      generarTramaMomia(nuevaPartida().game, { semilla: `noches-${i}`, vigilias: VIGILIAS }),
+    )!;
+    if (otra.profanadas.some((c, n) => n > 0 && c === otra.profanadas[n - 1])) seguidas++;
+    if (otra.profanadas[0] === otra.profanadas[otra.profanadas.length - 1]) extremos++;
+  }
+  comprobar('en cuarenta tramas, ninguna profana la misma camara dos noches seguidas', seguidas === 0, seguidas);
+  comprobar(
+    'ni deja la ultima igual que la primera, que al dar la vuelta serian dos seguidas',
+    extremos === 0,
+    extremos,
+  );
+
+  larga.sesion.round = VIGILIAS + 1;
+  const deLaQuinta = camaraProfanada(estadoLargo.profanadas, larga.sesion.round);
+  comprobar(
+    'en la quinta vigilia sigue habiendo camara profanada, dando la vuelta',
+    deLaQuinta === tramaLarga.profanadas[0],
+    { quinta: deLaQuinta, primera: tramaLarga.profanadas[0] },
+  );
+  const marcaTardia = entrarEnCamara(larga.game, larga.sesion, 'e0', deLaQuinta!);
+  comprobar(
+    'y entrar en ella sigue marcando: la maldicion no se apaga sola',
+    marcaTardia.profanada === true && estadoLargo.gente.e0.marcas === 1,
+    marcaTardia,
+  );
+  comprobar(
+    'la proyeccion tambien la anuncia',
+    vistaMomiaDe(larga.game, larga.sesion, 'e1')!.vigilia.profanada === deLaQuinta,
   );
 
   // --- Los amuletos ---
