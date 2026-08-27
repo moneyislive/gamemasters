@@ -66,7 +66,19 @@ export const TROFEOS_MOMIA: TrofeoInfo[] = [
     id: 'incorrupto',
     nombre: 'Incorrupto',
     descripcion: 'Amaneciste sin una sola marca de la maldición.',
-    glifo: '☥',
+    /*
+     * Hueco a proposito, y es el unico de los cinco que lo es. En la vitrina
+     * estos glifos se miran de tres en tres a 30 px, con el rotulo en
+     * versalitas de 11 px que a veces parte en dos lineas: la forma es lo unico
+     * que los distingue. Aqui llevaba tambien el anj, el mismo que «El
+     * Sellador», y los dos son la primera y la tercera casilla de la misma
+     * fila — se leian como el mismo trofeo repetido.
+     *
+     * El anj se queda en «El Sellador» porque sellar la tumba es devolver la
+     * vida, y porque ya es el icono de la pestana del Sellado en la barra.
+     * «Incorrupto» es una AUSENCIA —ni una marca—, y una estrella hueca lo dice.
+     */
+    glifo: '✧',
   },
   {
     id: 'mano-abierta',
@@ -329,7 +341,9 @@ export const MOMIA: ManifiestoDeJuego = {
           'Las personas de carne y hueso que se sentarán a la mesa. A cada una le tocará un papel y un don: cuanto mejor las describas, mejor le encajará el suyo.',
         forma: 'circle',
         vacio: {
-          glifo: '☥',
+          // Una bandera: lo que planta una expedicion al llegar. El anj se
+          // reserva para los ritos, que es donde significa algo.
+          glifo: '⚑',
           titulo: 'Todavía no hay expedición',
           texto: 'Añade al menos cuatro personas. El agente le escribirá a cada una un papel y le repartirá un don.',
         },

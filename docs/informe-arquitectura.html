@@ -757,7 +757,80 @@
   </section>
 
   <section>
-    <h2><span class="num">08</span>La regla que ha gobernado la noche</h2>
+    <h2><span class="num">08</span>Cinco lecciones sobre cómo se comprueba</h2>
+    <p>
+      Salieron de construir el segundo juego con cuatro personas a la vez, y
+      valen para cualquier cosa que se compruebe en este repositorio.
+    </p>
+
+    <div class="bloqueo">
+      <h3>Una comprobación que no encuentra nada pasa igual que una que comprueba</h3>
+      <p>
+        Ocurrió <strong>ocho veces</strong> esta noche. Una prueba de fugas llamaba
+        mal a la función que interrogaba y recibía «herramienta desconocida»: la
+        búsqueda de secretos no encontraba nada y salía verde. Otras cuatro
+        rechazaban la acción por una regla <em>distinta</em> de la que se creía
+        estar probando.
+      </p>
+      <p>
+        De ahí salió una técnica: <strong>no basta con comprobar que algo falló,
+        hay que comprobar POR QUÉ falló.</strong>
+      </p>
+    </div>
+
+    <div class="bloqueo">
+      <h3>El maestro de oro solo mira el juego viejo</h3>
+      <p>
+        Una tabla mal declarada tenía <em>todas</em> las acciones del juego nuevo
+        rechazadas, y los ocho verificadores en verde — porque las categorías del
+        juego viejo no dependían de ella.
+      </p>
+      <p>
+        <strong>Cada juego necesita su propia velada de punta a punta.</strong> La
+        del juego nuevo es la única capaz de ver esa clase de fallo.
+      </p>
+    </div>
+
+    <div class="bloqueo">
+      <h3>Una comprobación sobre una muestra no prueba una regla probabilística</h3>
+      <p>
+        «La última vigilia no repite la cámara de la primera» pasaba en verde con
+        la regla quitada, porque esa semilla concreta no repetía. Con cinco
+        cámaras y cuatro vigilias, habría fallado una de cada cinco veces. Ahora
+        se comprueba sobre cuarenta tramas generadas.
+      </p>
+    </div>
+
+    <div class="bloqueo">
+      <h3>Hay averías que ninguna aserción va a cazar</h3>
+      <p>
+        La cronología pública anunciaba qué cámara se profanaría <em>las cuatro
+        noches</em>. Era correcta por todos los contratos —público es público— y
+        arruinaba la decisión central del juego y dejaba un poder sin sentido.
+      </p>
+      <p>
+        Levantar la partida y jugarla veinte minutos encontró dos averías que 145
+        comprobaciones no vieron. <strong>Jugar es una técnica de verificación,
+        no un lujo.</strong>
+      </p>
+    </div>
+
+    <div class="bloqueo">
+      <h3>Un campo del contrato que nadie lee es un bug</h3>
+      <p>
+        Cinco campos del manifiesto estaban declarados, rellenados y sin leer por
+        nadie. No fallan al compilar ni al arrancar: fallan la noche de la
+        partida, en silencio, haciendo lo del juego viejo.
+      </p>
+      <p>
+        <strong>Debería existir una comprobación que demuestre leído cada campo
+        del contrato.</strong>
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="num">09</span>La regla que ha gobernado la noche</h2>
     <p>
       <strong>CLUEDO no puede cambiar de comportamiento.</strong> Ni una fase, ni un
       byte de su vista, ni una coma de sus impresos.
