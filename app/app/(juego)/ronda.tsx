@@ -5,6 +5,22 @@
  * personaje; con la ronda abierta manda elegir sala y enseña lo que encuentras;
  * al cerrarse, calla y te empuja al tablón. Es la pantalla que la gente tendrá
  * delante durante dos horas, así que nunca muestra dos cosas a la vez.
+ *
+ * ═══ Y CUANDO NO ES CLUEDO ═══
+ *
+ * Todo lo de abajo es de CLUEDO: salas, pistas, tablón, acusar. La Momia usa
+ * esta misma pestaña —es «la pantalla donde se juega», y eso lo tienen los dos—
+ * pero dentro no se parece en nada: cámaras profanadas, marcas, amuletos y
+ * dones. Así que se bifurca ARRIBA, en una línea, y lo de la Momia vive entero
+ * en `src/momia/vigilia.tsx`.
+ *
+ * POR QUÉ ASÍ Y NO CON `if` REPARTIDOS. Porque la regla que manda es que CLUEDO
+ * no cambie de comportamiento, y un fichero con dos juegos entrelazados la
+ * incumple tarde o temprano sin que nadie lo note: se toca un marco para la
+ * Momia y se mueve un píxel de CLUEDO tres fases más abajo. Con la bifurcación
+ * en la primera línea, todo lo que sigue es CLUEDO y solo CLUEDO, y se puede
+ * leer sin tener el otro juego en la cabeza. El precio es un fichero más; la
+ * alternativa era uno de mil líneas donde cada arreglo es un riesgo.
  */
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
@@ -33,6 +49,7 @@ import {
   texto,
 } from '../../src/ui';
 import { ALTO_BARRA_TOTAL } from '../../src/tema';
+import { Vigilia } from '../../src/momia/vigilia';
 import type { SalaVista } from '../../../shared/live';
 import { Foto } from '../../src/foto';
 
@@ -41,6 +58,16 @@ export default function Ronda(): JSX.Element {
   const [eligiendo, setEligiendo] = useState<string | null>(null);
   const [errorSala, setErrorSala] = useState<string | null>(null);
   const [avisando, setAvisando] = useState(false);
+
+  /*
+   * La bifurcación por juego, y va AQUÍ y no antes: los tres `useState` de
+   * arriba tienen que ejecutarse siempre. React identifica los hooks por su
+   * orden de llamada, así que un `return` por encima de ellos haría que el
+   * número de hooks cambiara entre una partida de CLUEDO y una de la Momia y
+   * React tiraría la pantalla entera. Son tres líneas de coste y ninguna
+   * consecuencia: la Momia no las usa y CLUEDO las usa igual que siempre.
+   */
+  if (vista?.sesion.juego === 'momia') return <Vigilia />;
 
   if (cargando && !vista) return <Pantalla><Cargando texto="Buscando la partida…" /></Pantalla>;
   if (!vista) {

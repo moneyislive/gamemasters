@@ -185,54 +185,107 @@ export function IconoFarol({ size = 31, color }: PropsIcono): JSX.Element {
  * en blanco en el móvil y nadie se enteraría hasta la noche de la partida.
  */
 /**
- * ANDAMIO: los tres iconos de El Misterio de la Momia.
+ * Los tres iconos de El Misterio de la Momia.
  *
- * Estan dibujados a lo justo para que la barra no salga en blanco. Se
- * sustituyen por los buenos cuando se tematice el juego; lo que no se puede es
- * dejarlos sin declarar, porque `ICONOS` es un Record sobre `IconoId` y sin
- * ellos no compila el paquete entero.
+ * LO QUE ESTABA MAL EN LOS ANDAMIOS QUE SUSTITUYEN. No era el dibujo: era que
+ * hablaban otro idioma. Venían en una caja de 24 con trazo 1,6, mientras que los
+ * seis de CLUEDO viven en una de 48 con trazo 3. Puestos en la misma barra, los
+ * de la Momia salían un 40% más finos que sus vecinos —el navegador escala la
+ * caja pero no compensa el grosor— y se veía como lo que era: iconos de otro
+ * juego de iconos pegados al lado. Estos comparten lienzo, grosor y remates con
+ * los demás, así que la barra se lee como UNA barra aunque cambie de juego.
+ *
+ * Se dibujan pensando en 23 píxeles, igual que el resto: nada por debajo de dos
+ * unidades sobrevive a ese tamaño.
  */
-function IconoPapiro({ size = 24, color = 'currentColor' }: PropsIcono): JSX.Element {
+
+/**
+ * El papiro: un rollo abierto, sujeto por sus dos varillas.
+ *
+ * Tenía que distinguirse a 23 píxeles de otros dos iconos de PAPEL que ya
+ * existen —el tablón, que es una cuartilla con chincheta, y el cuaderno, que es
+ * hoja y pluma—. Lo que los separa a ese tamaño no es el detalle sino la
+ * silueta: el tablón es un rectángulo con un punto arriba, el cuaderno tiene una
+ * diagonal cruzada, y este tiene dos barras horizontales gruesas arriba y abajo.
+ * Se reconoce por el contorno, que es lo único que queda cuando el icono se
+ * hace pequeño.
+ */
+export function IconoPapiro(p: PropsIcono): JSX.Element {
   return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <Path
-        d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3V4Z"
-        stroke={color}
-        strokeWidth={1.6}
-        strokeLinejoin="round"
-      />
-      <Path d="M8 8h8M8 12h8M8 16h5" stroke={color} strokeWidth={1.4} strokeLinecap="round" />
-    </Svg>
+    <Lienzo {...p}>
+      {/* Las varillas del rollo. */}
+      <Rect x={7.5} y={6.5} width={33} height={7} rx={3.5} />
+      <Rect x={7.5} y={34.5} width={33} height={7} rx={3.5} />
+      {/* La hoja tendida entre las dos. */}
+      <Path d="M11 13.5 V34.5" />
+      <Path d="M37 13.5 V34.5" />
+      {/* Dos renglones, no tres: con tres el hueco entre ellos baja de dos
+          unidades y a 23 píxeles la hoja se ve como una mancha rayada. */}
+      <Path d="M16 21 h16" />
+      <Path d="M16 27.5 h11" />
+    </Lienzo>
   );
 }
 
-function IconoAnj({ size = 24, color = 'currentColor' }: PropsIcono): JSX.Element {
+/**
+ * El anj: la llave de la vida, que es de lo que va el sellado.
+ *
+ * El lazo es una elipse y no un círculo a propósito. Con círculo, para que el
+ * hueco de dentro siga viéndose a 23 píxeles hay que agrandar el radio, y
+ * entonces la cabeza se come el travesaño y el conjunto deja de leerse como un
+ * anj y pasa a leerse como una llave inglesa. Alargándolo se gana hueco interior
+ * sin robar anchura.
+ */
+export function IconoAnj(p: PropsIcono): JSX.Element {
   return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <Path
-        d="M12 3a3.2 3.2 0 0 1 0 6.4A3.2 3.2 0 0 1 12 3Z"
-        stroke={color}
-        strokeWidth={1.6}
-      />
-      <Path d="M12 9.4V21M7 13h10" stroke={color} strokeWidth={1.6} strokeLinecap="round" />
-    </Svg>
+    <Lienzo {...p}>
+      <Path d="M24 6 a7 8.5 0 0 1 0 17 a7 8.5 0 0 1 0-17 z" />
+      <Path d="M24 22.5 V42" />
+      <Path d="M11.5 27.5 H36.5" />
+    </Lienzo>
   );
 }
 
-function IconoEscarabajo({ size = 24, color = 'currentColor' }: PropsIcono): JSX.Element {
+/**
+ * El escarabajo: El Escriba, el asistente de la Momia.
+ *
+ * Va en el botón central, que es el único que se ve a 31 píxeles, así que aquí
+ * —igual que el Mayordomo— se puede mezclar masa y trazo. Y hace falta: un
+ * escarabajo de solo línea a ese tamaño es una mancha ovalada con patas, y no
+ * se distingue de una araña ni de una tortuga.
+ *
+ * Lo que lo hace inconfundible es el DISCO SOLAR, que va relleno y encima. No es
+ * adorno: Jepri es el escarabajo que empuja el sol, y esa forma —un círculo
+ * macizo sobre una cúpula— no se parece a ningún otro bicho. Es exactamente la
+ * misma lección que la copa del Mayordomo: lo que sobrevive al tamaño pequeño es
+ * la masa, no el detalle.
+ */
+export function IconoEscarabajo({ size = 31, color }: PropsIcono): JSX.Element {
   return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <Path
-        d="M12 5c2.4 0 4.2 2 4.2 4.8S14.4 19 12 19s-4.2-6.4-4.2-9.2S9.6 5 12 5Z"
+    <Svg width={size} height={size} viewBox="0 0 48 48">
+      {/* El sol que empuja. Relleno: es lo que aguanta a 31 píxeles. */}
+      <Circle cx={24} cy={7.5} r={5} fill={color} />
+      <G
+        fill="none"
         stroke={color}
-        strokeWidth={1.6}
-      />
-      <Path
-        d="M4.5 8.5 8 10M19.5 8.5 16 10M4.5 15.5 8 14M19.5 15.5 16 14M12 5V2.8"
-        stroke={color}
-        strokeWidth={1.4}
+        strokeWidth={2.4}
         strokeLinecap="round"
-      />
+        strokeLinejoin="round"
+      >
+        {/* El escudo del tórax, apoyado justo debajo del disco. */}
+        <Path d="M14.5 20.5 a10 8.5 0 0 1 19 0 z" />
+        {/* Los élitros. */}
+        <Path d="M15 20.5 h18 v7.5 a9 12.5 0 0 1-18 0 z" />
+        {/* La juntura de las alas: lo que lo vuelve escarabajo y no escudo. */}
+        <Path d="M24 21.5 V40" />
+        {/* Tres pares de patas, abriéndose hacia fuera. */}
+        <Path d="M15.5 19 L7 13.5" />
+        <Path d="M32.5 19 L41 13.5" />
+        <Path d="M15 26.5 H6" />
+        <Path d="M33 26.5 H42" />
+        <Path d="M17 33.5 L9.5 39.5" />
+        <Path d="M31 33.5 L38.5 39.5" />
+      </G>
     </Svg>
   );
 }

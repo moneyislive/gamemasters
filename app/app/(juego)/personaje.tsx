@@ -20,6 +20,9 @@ import {
   radio,
 } from '../../src/ui';
 import { Foto } from '../../src/foto';
+import { conAlfa, useTema } from '../../src/tema-juego';
+import { TarjetaDon } from '../../src/momia/vigilia';
+import { leerEstadoMomia } from '../../src/momia/vista';
 
 /**
  * Cada apartado del dosier va en su propia hoja.
@@ -51,8 +54,29 @@ function Hoja({
 
 export default function Personaje(): JSX.Element {
   const { vista } = usePartida();
+  /*
+   * El tema va ANTES del `return` de abajo. Es un hook, y React los identifica
+   * por su orden de llamada: dejarlo detrás haría que en el primer renderizado
+   * —sin vista todavía— se llamara uno y en el siguiente dos, y React tira la
+   * pantalla con «rendered more hooks than during the previous render». Y no es
+   * un caso raro: ese primer renderizado sin vista es el que ve TODO el mundo al
+   * abrir el dosier, porque la vista llega del servidor.
+   */
+  const t = useTema();
   if (!vista) return <Pantalla><Cargando /></Pantalla>;
   const { yo, sesion } = vista;
+  /*
+   * EL DON VA EN EL DOSIER, y va aquí y no en una pantalla propia porque es lo
+   * que es: una sección más de tu papel, la que dice qué puedes hacer tú y nadie
+   * más. El manifiesto de la Momia lo declara así —`SECCIONES_MOMIA` tiene una
+   * sección `don` marcada como obligatoria— y es también la que más se consulta
+   * durante la noche, de ahí que vaya arriba del todo y no al final.
+   *
+   * Para CLUEDO esto es `null` y la pantalla queda exactamente como estaba: no
+   * hay `estadoDelJuego`, así que `leerEstadoMomia` devuelve `null` y no se
+   * pinta nada. Ni un elemento de más en el árbol.
+   */
+  const momia = leerEstadoMomia(vista.estadoDelJuego);
 
   return (
     <Pantalla>
@@ -62,7 +86,16 @@ export default function Personaje(): JSX.Element {
           url={yo.photoUrl}
           style={estilos.retrato}
           respaldo={
-            <View style={[estilos.retrato, estilos.retratoVacio]}>
+            <View
+              style={[
+                estilos.retrato,
+                estilos.retratoVacio,
+                // El verde fieltro estaba cosido aquí abajo, y era lo PRIMERO
+                // que se veía del dosier: un disco verde de casino coronando una
+                // pantalla de arena y lapislázuli.
+                { backgroundColor: conAlfa(t.felt700, 0.6) },
+              ]}
+            >
               <Titulo style={{ fontSize: 32 }}>
                 {yo.characterName.slice(0, 1).toUpperCase()}
               </Titulo>
@@ -72,6 +105,12 @@ export default function Personaje(): JSX.Element {
         <Titulo style={{ textAlign: 'center', fontSize: 26 }}>{yo.characterName}</Titulo>
         <Cuerpo tenue style={{ textAlign: 'center', fontStyle: 'italic' }}>{yo.role}</Cuerpo>
       </Animated.View>
+
+      {momia && (
+        <Animated.View entering={FadeInUp.delay(90).duration(500)}>
+          <TarjetaDon estado={momia} ronda={sesion.round} compacta />
+        </Animated.View>
+      )}
 
       {yo.soyCulpable && (
         <Animated.View entering={FadeInUp.delay(120).duration(500)}>
@@ -202,7 +241,6 @@ const estilos = StyleSheet.create({
   retratoVacio: {
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(26,63,42,0.6)',
   },
   fila: {
     flexDirection: 'row',

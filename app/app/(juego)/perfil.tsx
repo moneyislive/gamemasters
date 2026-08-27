@@ -14,6 +14,9 @@ import Animated, { FadeInUp } from 'react-native-reanimated';
 import * as api from '../../src/api';
 import { usePartida } from '../../src/estado';
 import { TROFEOS } from '../../../shared/live';
+import { manifiestoDe } from '../../../shared/juegos';
+import { conAlfa, useTema } from '../../src/tema-juego';
+import type { TrofeoInfo } from '../../../shared/live';
 import {
   Boton,
   Cargando,
@@ -29,8 +32,23 @@ import {
 } from '../../src/ui';
 import type { Account } from '../../../shared/live';
 
+/**
+ * Los trofeos que este juego trae y la plataforma no conocía.
+ *
+ * SE CALCULA POR DIFERENCIA, en vez de escribir «si es la Momia, estos cinco».
+ * Para CLUEDO da la lista vacía —su manifiesto declara exactamente `TROFEOS`—
+ * así que la sección no se pinta y su pantalla queda idéntica: la regla que
+ * manda se cumple sin depender de acordarse de nada. Y el día que entre un
+ * tercer juego, sus trofeos aparecen solos.
+ */
+function trofeosPropiosDe(juego: string | undefined): TrofeoInfo[] {
+  const comunes = new Set(TROFEOS.map((t) => t.id));
+  return manifiestoDe(juego as never).trofeos.filter((t) => !comunes.has(t.id));
+}
+
 export default function Perfil(): JSX.Element {
   const { vista, desconectar } = usePartida();
+  const propios = trofeosPropiosDe(vista?.sesion.juego);
   const [cuenta, setCuenta] = useState<Account | null>(null);
   const [cargando, setCargando] = useState(true);
   /**
@@ -160,29 +178,34 @@ export default function Perfil(): JSX.Element {
         </Marco>
       ) : (
         <>
+          {/*
+            * Los del juego de esta noche van PRIMERO y con su propio rótulo.
+            * Mezclarlos con los comunes en una sola rejilla los habría dejado
+            * indistinguibles, y son los únicos que se pueden ganar hoy: verlos
+            * juntos es lo que le dice a alguien qué merece la pena intentar.
+            */}
+          {propios.length > 0 && (
+            <>
+              <Seccion>{manifiestoDe(vista?.sesion.juego).nombre}</Seccion>
+              <View style={estilos.rejilla}>
+                {propios.map((t, i) => (
+                  <Vitrina key={t.id} trofeo={t} ganado={cuenta.trofeos.includes(t.id)} orden={i} />
+                ))}
+              </View>
+              <Ornamento />
+            </>
+          )}
+
           <Seccion>Trofeos</Seccion>
           <View style={estilos.rejilla}>
-            {TROFEOS.map((t, i) => {
-              const ganado = cuenta.trofeos.includes(t.id);
-              return (
-                <Animated.View
-                  key={t.id}
-                  entering={FadeInUp.delay(50 * i).duration(400)}
-                  style={[estilos.trofeo, ganado ? estilos.trofeoGanado : estilos.trofeoVacio]}
-                >
-                  <Cuerpo style={{ fontSize: 26, opacity: ganado ? 1 : 0.25 }}>{t.glifo}</Cuerpo>
-                  <Etiqueta style={{ color: ganado ? color.oro300 : 'rgba(217,201,163,0.35)', textAlign: 'center', marginTop: 4 }}>
-                    {t.nombre}
-                  </Etiqueta>
-                  <Cuerpo
-                    tenue
-                    style={{ fontSize: 13, textAlign: 'center', marginTop: 2, opacity: ganado ? 1 : 0.5 }}
-                  >
-                    {t.descripcion}
-                  </Cuerpo>
-                </Animated.View>
-              );
-            })}
+            {TROFEOS.map((trofeo, i) => (
+              <Vitrina
+                key={trofeo.id}
+                trofeo={trofeo}
+                ganado={cuenta.trofeos.includes(trofeo.id)}
+                orden={i}
+              />
+            ))}
           </View>
 
           <Ornamento />
@@ -299,6 +322,52 @@ function Insignia({ texto, tono }: { texto: string; tono: string }): JSX.Element
   );
 }
 
+/** Una casilla de la vitrina. Misma forma que las de siempre, con su juego. */
+function Vitrina({
+  trofeo,
+  ganado,
+  orden,
+}: {
+  trofeo: TrofeoInfo;
+  ganado: boolean;
+  orden: number;
+}): JSX.Element {
+  const t = useTema();
+  return (
+    <Animated.View
+      entering={FadeInUp.delay(50 * orden).duration(400)}
+      style={[
+        estilos.trofeo,
+        /*
+         * El fondo de la casilla apagada era `rgba(11,23,16,0.4)`: el fieltro
+         * verde de CLUEDO, cosido en el `StyleSheet` de modulo. En la vitrina de
+         * la Momia salian once recuadros verdosos sobre arena.
+         */
+        ganado
+          ? { borderColor: conAlfa(t.oro500, 0.55), backgroundColor: conAlfa(t.oro500, 0.1) }
+          : { borderColor: conAlfa(t.oro500, 0.16), backgroundColor: conAlfa(t.feltoscuro, 0.4) },
+      ]}
+    >
+      <Cuerpo style={{ fontSize: 26, opacity: ganado ? 1 : 0.25 }}>{trofeo.glifo}</Cuerpo>
+      <Etiqueta
+        style={{
+          color: ganado ? t.oro300 : conAlfa(t.pergaminoTenue, 0.35),
+          textAlign: 'center',
+          marginTop: 4,
+        }}
+      >
+        {trofeo.nombre}
+      </Etiqueta>
+      <Cuerpo
+        tenue
+        style={{ fontSize: 13, textAlign: 'center', marginTop: 2, opacity: ganado ? 1 : 0.5 }}
+      >
+        {trofeo.descripcion}
+      </Cuerpo>
+    </Animated.View>
+  );
+}
+
 const estilos = StyleSheet.create({
   rejilla: { flexDirection: 'row', flexWrap: 'wrap', gap: espacio.sm },
   trofeo: {
@@ -308,14 +377,6 @@ const estilos = StyleSheet.create({
     borderRadius: 12,
     paddingVertical: espacio.md,
     paddingHorizontal: 6,
-  },
-  trofeoGanado: {
-    borderColor: 'rgba(201,162,39,0.55)',
-    backgroundColor: 'rgba(201,162,39,0.1)',
-  },
-  trofeoVacio: {
-    borderColor: 'rgba(201,162,39,0.16)',
-    backgroundColor: 'rgba(11,23,16,0.4)',
   },
   medallas: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: espacio.sm },
   insignia: {
