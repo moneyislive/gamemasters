@@ -1,11 +1,22 @@
 /**
  * CatalogPage — portada de GameMasters.
- * Catálogo de juegos: CLUEDO disponible y otros títulos bloqueados "próximamente".
+ *
+ * Catálogo de juegos. Lo que decide si una tarjeta se puede abrir no es un
+ * booleano escrito a mano: es si ese juego está INSTALADO de verdad. El candado
+ * no puede mentir, y esa es la única forma de que no vuelva a pasar lo que
+ * pasaba —«El Misterio de la Momia» anunciándose como próximamente cuando ya se
+ * podía jugar—.
+ *
+ * De cada tarjeta, lo que es del juego sale de su manifiesto (el nombre y el
+ * lema) y lo que es de la portada se queda aquí (el dibujo, la paleta de la
+ * ficha y la invitación a entrar), porque son ilustración y no datos.
+ *
  * Todo el arte es tipográfico / SVG inline: sin imágenes externas.
  */
 import type { CSSProperties, KeyboardEvent, ReactElement } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { juegosInstalados } from '../../../shared/juegos';
+import { juegosInstalados, manifiestoDe } from '../../../shared/juegos';
+import { useTemaDeJuego } from '../lib/tema';
 import { motion } from 'framer-motion';
 import type { Variants } from 'framer-motion';
 import '../styles/catalog.css';
@@ -140,10 +151,12 @@ function LockIcon(): ReactElement {
 
 interface CatalogGame {
   id: string;
+  /** Solo para los que aún no existen: los instalados dicen su nombre solos. */
   title: string;
   tagline: string;
   players: string;
-  locked: boolean;
+  /** La invitación a entrar. Cada casa recibe a su manera. */
+  cta: string;
   /** Paleta propia de la tarjeta vía variables CSS */
   palette: CSSProperties;
   art: ReactElement;
@@ -155,7 +168,7 @@ const GAMES: readonly CatalogGame[] = [
     title: 'CLUEDO',
     tagline: 'Un asesinato en la mansión. Los invitados son los sospechosos.',
     players: '3 – 8 jugadores · En vivo',
-    locked: false,
+    cta: 'Entrar en la mansión →',
     palette: {
       '--card-bg1': 'var(--felt-900)',
       '--card-bg2': 'var(--felt-700)',
@@ -169,7 +182,7 @@ const GAMES: readonly CatalogGame[] = [
     title: 'Dungeons & Dragons',
     tagline: 'Mazmorras, dragones y una campaña tejida a medida del grupo.',
     players: '3 – 6 jugadores',
-    locked: true,
+    cta: 'Bajar a la mazmorra →',
     palette: {
       '--card-bg1': '#230b09',
       '--card-bg2': '#5a1e12',
@@ -181,14 +194,27 @@ const GAMES: readonly CatalogGame[] = [
   {
     id: 'momia',
     title: 'El Misterio de la Momia',
-    tagline: 'Una expedición, un sarcófago abierto y una maldición que despierta.',
-    players: '4 – 10 jugadores',
-    locked: true,
+    tagline: 'El sello está roto. Alguien de la expedición lo quiso así.',
+    players: '4 – 10 jugadores · En vivo',
+    cta: 'Bajar a la tumba →',
+    /*
+     * La ficha lleva la paleta del juego, no una paleta cualquiera: la noche de
+     * lapislázuli detrás y el oro viejo delante son los mismos valores con los
+     * que se pinta su taller (`styles/temas.css`). Que la tarjeta prometa lo que
+     * hay al otro lado es media promesa cumplida antes de pulsarla.
+     */
     palette: {
-      '--card-bg1': '#241b0c',
-      '--card-bg2': '#5c4720',
-      '--card-accent': '#57cfc2',
-      '--card-glow': 'rgba(87, 207, 194, 0.32)',
+      /*
+       * Noche fuera, lámpara dentro: el degradado sale caliente del centro
+       * —la arenisca iluminada— y se apaga en el azul de la noche del
+       * desierto. Se probó con el lapislázuli también fuera y la ficha se
+       * confundía con la de Harry Potter, que es azul marino y oro: dos
+       * tarjetas iguales en la misma estantería no las distingue nadie.
+       */
+      '--card-bg1': '#080d1e',
+      '--card-bg2': '#5b4622',
+      '--card-accent': '#e8cf9a',
+      '--card-glow': 'rgba(216, 180, 106, 0.42)',
     } as CSSProperties,
     art: <ArtMummy />,
   },
@@ -197,7 +223,7 @@ const GAMES: readonly CatalogGame[] = [
     title: 'Harry Potter',
     tagline: 'Hechizos, casas rivales y secretos en los pasillos del castillo.',
     players: '4 – 12 jugadores',
-    locked: true,
+    cta: 'Cruzar el andén →',
     palette: {
       '--card-bg1': '#0b1130',
       '--card-bg2': '#1c2c60',
@@ -233,6 +259,11 @@ const cardVariants: Variants = {
 
 export default function CatalogPage() {
   const navigate = useNavigate();
+
+  // La portada es de la casa, no de ningún juego: si se llega aquí desde una
+  // partida de la Momia, hay que devolver el tema de GameMasters. Sin esto, el
+  // catálogo se quedaría pintado del último juego que se abrió.
+  useTemaDeJuego(undefined);
 
   // Se abre el juego que se pulsa, no «el» juego. Y lo que decide si una
   // tarjeta está bloqueada ya no es un booleano escrito a mano, sino si ese
@@ -283,8 +314,13 @@ export default function CatalogPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.55, duration: 0.8 }}
         >
-          Un mayordomo de inteligencia artificial prepara la trama, reparte los papeles y
-          dirige la velada. Usted solo tiene que reunir a los invitados.
+          {/*
+            «Un agente» y ya no «un mayordomo»: el mayordomo es de CLUEDO, y en
+            la estantería hay ahora una expedición cuyo asistente es un escriba.
+            Es la portada de la casa y tiene que valer para los dos.
+          */}
+          Un agente de inteligencia artificial prepara la trama, reparte los papeles y dirige la
+          velada. Usted solo tiene que reunir a los invitados.
         </motion.p>
       </header>
 
@@ -298,34 +334,45 @@ export default function CatalogPage() {
           // Bloqueado = no instalado. Antes era un booleano escrito a mano que
           // podía desmentir a la realidad.
           const cerrado = !instalados.has(game.id);
+          /*
+           * El NOMBRE lo dice el juego: es su identidad y no puede haber dos.
+           * La FRASE de la ficha, en cambio, se queda aquí, y no por descuido.
+           * Son dos textos distintos con dos trabajos distintos: el lema del
+           * manifiesto es un gancho que se lee dentro del juego («Alguien de
+           * esta casa miente»), y esta frase tiene que explicar en una línea a
+           * qué se juega, que es lo que hace falta en una estantería con cuatro
+           * cajas. En la Momia coinciden porque su lema ya explicaba mejor el
+           * juego que cualquier frase que se pudiera escribir aparte.
+           */
+          const titulo = cerrado ? game.title : manifiestoDe(game.id).nombre;
           return (
           <motion.article
             key={game.id}
             className={`catalog-card deco-frame deco-corners ${cerrado ? 'is-locked' : 'is-open'}`}
             style={game.palette}
             variants={cardVariants}
-            whileHover={game.locked ? undefined : { y: -10 }}
+            whileHover={cerrado ? undefined : { y: -10 }}
             data-juego={game.id}
             onClick={cerrado ? undefined : () => abrir(game.id)}
-            onKeyDown={game.locked ? undefined : onCardKey}
-            role={game.locked ? undefined : 'button'}
-            tabIndex={game.locked ? undefined : 0}
-            aria-label={game.locked ? `${game.title} (próximamente)` : `Jugar a ${game.title}`}
+            onKeyDown={cerrado ? undefined : onCardKey}
+            role={cerrado ? undefined : 'button'}
+            tabIndex={cerrado ? undefined : 0}
+            aria-label={cerrado ? `${titulo} (próximamente)` : `Jugar a ${titulo}`}
           >
             <div className="card-art">{game.art}</div>
             <div className="card-body">
-              <h2 className="card-title">{game.title}</h2>
+              <h2 className="card-title">{titulo}</h2>
               <p className="card-tagline">{game.tagline}</p>
               <p className="card-players mono-caps">{game.players}</p>
-              {game.locked ? (
+              {cerrado ? (
                 <span className="card-coming mono-caps">
                   <LockIcon /> Próximamente
                 </span>
               ) : (
-                <span className="card-cta mono-caps">Entrar en la mansión →</span>
+                <span className="card-cta mono-caps">{game.cta}</span>
               )}
             </div>
-            {game.locked && <div className="card-veil" aria-hidden="true" />}
+            {cerrado && <div className="card-veil" aria-hidden="true" />}
           </motion.article>
           );
         })}

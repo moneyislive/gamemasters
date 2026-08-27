@@ -4,7 +4,6 @@ import type {
   ChatMessage,
   GameSession,
   GameSummary,
-  HighlightTarget,
   Room,
   Suspect,
   UiPopupCommand,
@@ -16,6 +15,23 @@ export interface AgentPopup extends UiPopupCommand {
   id: string;
 }
 
+/**
+ * Qué pestaña del taller está abierta, o cuál resalta el agente.
+ *
+ * Es `string` y no `HighlightTarget`, y el motivo es concreto: las pestañas de
+ * categoría se identifican por el ID DE SU CATEGORÍA —`sospechosos`, `salas`,
+ * `expedicionarios`, `ritos`—, y esa unión solo conoce las tres de CLUEDO.
+ * Ampliarla habría obligado a escribir en `shared/types.ts`, que es contrato
+ * común, los nombres de las categorías de un juego concreto; y el juego
+ * siguiente añadiría los suyos. Lo que se pierde es la exhaustividad del
+ * compilador; se pierde en el mismo sitio y por la misma razón por la que
+ * `JuegoId` es `string` y no una unión, y allí ya está razonado.
+ *
+ * Lo que llega del agente sigue siendo `HighlightTarget`: es un subconjunto,
+ * así que entra sin conversión.
+ */
+export type PestanaDelTaller = string;
+
 interface AppState {
   // Datos
   config: AppConfig | null;
@@ -25,10 +41,10 @@ interface AppState {
   chatMessages: ChatMessage[];
 
   // Estado de UI gobernado por el agente
-  highlight: HighlightTarget | null;
+  highlight: PestanaDelTaller | null;
   popups: AgentPopup[];
   /** Pestaña activa del estudio */
-  activeTab: HighlightTarget;
+  activeTab: PestanaDelTaller;
 
   // Generación
   generating: boolean;
@@ -38,7 +54,7 @@ interface AppState {
   // Acciones
   fetchConfig: () => Promise<void>;
   fetchGames: () => Promise<void>;
-  createGame: (name?: string) => Promise<GameSession>;
+  createGame: (name?: string, juego?: string) => Promise<GameSession>;
   loadGame: (id: string) => Promise<void>;
   setGame: (game: GameSession) => void;
   patchGame: (patch: Partial<GameSession>) => Promise<void>;
@@ -63,8 +79,8 @@ interface AppState {
   addChatMessage: (message: ChatMessage) => void;
   appendToLastAssistant: (delta: string) => void;
 
-  setHighlight: (target: HighlightTarget | null) => void;
-  setActiveTab: (tab: HighlightTarget) => void;
+  setHighlight: (target: PestanaDelTaller | null) => void;
+  setActiveTab: (tab: PestanaDelTaller) => void;
   pushPopup: (popup: UiPopupCommand) => void;
   dismissPopup: (id: string) => void;
 
@@ -77,17 +93,31 @@ interface AppState {
 let popupSeq = 0;
 
 /**
- * Categoría del juego → segmento de la ruta del servidor.
+ * A qué ruta del servidor va cada categoría.
  *
- * Es la última tabla del cliente que conoce a la vez un id de categoría y un
- * nombre heredado de CLUEDO. Cuando el almacenamiento se generalice del todo,
- * desaparece.
+ * El servidor tiene DOS puertas y aquí se usan las dos:
+ *
+ *   · Las tres de siempre —`/suspects`, `/rooms`, `/weapons`— por las que
+ *     CLUEDO guarda desde el primer día.
+ *   · Una genérica, `/entidades/:categoria`, que sirve a cualquier juego y por
+ *     la que entra todo lo demás. Es la que hace posible `ritos`, que no tiene
+ *     campo heredado donde vivir.
+ *
+ * QUE SIGAN SIENDO DOS NO ES INDECISIÓN. Mover el alta de un sospechoso a la
+ * ruta nueva no le aporta nada a nadie y sí puede romper algo que hoy funciona;
+ * y el taller de CLUEDO es justamente lo que no se puede tocar. Cuando el
+ * almacén heredado desaparezca, se borra esta tabla y la función de abajo se
+ * queda en una línea.
  */
-const RUTA_DE_CATEGORIA: Record<string, string> = {
+const RUTA_HEREDADA: Record<string, string> = {
   sospechosos: 'suspects',
   salas: 'rooms',
   objetos: 'weapons',
 };
+
+function rutaDeCategoria(categoria: string): string {
+  return RUTA_HEREDADA[categoria] ?? `entidades/${categoria}`;
+}
 
 export const useAppStore = create<AppState>((set, get) => ({
   config: null,
@@ -112,8 +142,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ games });
   },
 
-  createGame: async (name?: string) => {
-    const game = await api.createGame(name);
+  createGame: async (name?: string, juego?: string) => {
+    const game = await api.createGame(name, juego);
     set({ game, chatMessages: [] });
     return game;
   },
@@ -141,19 +171,12 @@ export const useAppStore = create<AppState>((set, get) => ({
   upsertEntidad: async (categoria, datos) => {
     const { game } = get();
     if (!game) return;
-    // El servidor ya genera sus rutas de entidades recorriendo una tabla; esto
-    // es su reflejo en el cliente, y el único sitio que traduce una categoría
-    // del juego al nombre heredado de su ruta.
-    const ruta = RUTA_DE_CATEGORIA[categoria];
-    if (!ruta) throw new Error(`No sé dónde guardar «${categoria}».`);
-    set({ game: await api.upsertEntidad(game.id, ruta, datos) });
+    set({ game: await api.upsertEntidad(game.id, rutaDeCategoria(categoria), datos) });
   },
   removeEntidad: async (categoria, id) => {
     const { game } = get();
     if (!game) return;
-    const ruta = RUTA_DE_CATEGORIA[categoria];
-    if (!ruta) throw new Error(`No sé de dónde quitar «${categoria}».`);
-    set({ game: await api.removeEntidad(game.id, ruta, id) });
+    set({ game: await api.removeEntidad(game.id, rutaDeCategoria(categoria), id) });
   },
   upsertSuspect: async (suspect) => {
     const { game } = get();

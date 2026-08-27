@@ -67,8 +67,23 @@ export const setConfigModel = (model: ModelId) =>
 // ---------- Partidas ----------
 
 export const listGames = () => request<GameSummary[]>('/games');
-export const createGame = (name?: string) =>
-  request<GameSession>('/games', { method: 'POST', body: JSON.stringify({ name }) });
+/**
+ * Abre una partida nueva DE UN JUEGO CONCRETO.
+ *
+ * El `juego` no estaba y su ausencia era un agujero silencioso: sin él, el
+ * servidor guardaba la partida sin declarar a qué se juega, `manifiestoDe`
+ * caía en CLUEDO —que es lo correcto para las partidas antiguas— y una
+ * expedición de la Momia se habría preparado y jugado como un CLUEDO sin que
+ * saltara un solo error. Se habría descubierto la noche de la velada.
+ *
+ * Se manda solo si viene: omitiéndolo, el servidor crea la partida como
+ * siempre, que es lo que necesitan las llamadas que no saben de juegos.
+ */
+export const createGame = (name?: string, juego?: string) =>
+  request<GameSession>('/games', {
+    method: 'POST',
+    body: JSON.stringify(juego ? { name, juego } : { name }),
+  });
 export const getGame = (id: string) => request<GameSession>(`/games/${id}`);
 export const updateGame = (id: string, patch: Partial<GameSession>) =>
   request<GameSession>(`/games/${id}`, { method: 'PATCH', body: JSON.stringify(patch) });

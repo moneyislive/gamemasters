@@ -1,24 +1,41 @@
 /**
- * CluedoLobbyPage — el recibidor de la mansión.
- * Lista los casos (partidas) de CLUEDO como expedientes, permite crear un
- * caso nuevo y borrar con confirmación discreta. Al entrar en un caso se
- * reproduce la transición de puertas y después se navega al estudio.
+ * El recibidor de un juego: la lista de sus partidas.
+ *
+ * SE LLAMA `CluedoLobbyPage` Y YA NO ES SOLO DE CLUEDO. El nombre se conserva a
+ * propósito en esta entrega: renombrar el fichero mientras hay otras sesiones
+ * trabajando en el mismo directorio es la clase de cambio que se lleva por
+ * delante el trabajo de otro sin aportar nada esta noche. Anotado para después.
+ *
+ * Lo que pinta sale de tres sitios y conviene saber de cuál:
+ *   · La RUTA dice de qué juego es este recibidor (`/:juego`).
+ *   · El manifiesto pone lo que es del juego y saben los tres paquetes.
+ *   · `juegos/palabras.ts` pone los rótulos, que solo son del taller.
+ *
+ * Al abrir una partida se reproduce la cortinilla de SU juego —puertas de caoba
+ * en la mansión, una losa de piedra en la tumba— y después se navega al taller.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { KeyboardEvent, MouseEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import type { Variants } from 'framer-motion';
-import type { GameStatus } from '../../../shared/types';
+import type { GameStatus, GameSummary } from '../../../shared/types';
+import { JUEGO_POR_DEFECTO } from '../../../shared/juegos';
 import * as api from '../api/client';
 import { useAppStore } from '../state/store';
-import CluedoTransition from '../components/transition/CluedoTransition';
+import TransicionDeEntrada from '../components/transition/TransicionDeEntrada';
+import { useTemaDeJuego } from '../lib/tema';
+import { palabrasDe } from '../juegos/palabras';
 import '../styles/lobby.css';
 
-const STATUS_META: Record<GameStatus, { label: string; className: string }> = {
-  draft: { label: 'Borrador', className: 'is-draft' },
-  generating: { label: 'Generando…', className: 'is-generating' },
-  ready: { label: 'Misterio listo', className: 'is-ready' },
+/**
+ * La clase CSS de cada estado. El RÓTULO no está aquí: lo pone cada juego, que
+ * a lo que llama «misterio listo» la expedición lo llama «papiro escrito».
+ */
+const CLASE_DE_ESTADO: Record<GameStatus, string> = {
+  draft: 'is-draft',
+  generating: 'is-generating',
+  ready: 'is-ready',
 };
 
 /** Fecha legible en español, p. ej. "12 de julio de 2026". */
@@ -32,6 +49,38 @@ function formatDate(iso: string): string {
   } catch {
     return iso;
   }
+}
+
+/**
+ * Un resumen de partida que quizá diga de qué juego es.
+ *
+ * HOY NO LO DICE, y es la costura más visible que ha destapado el segundo
+ * juego: `GameSummary` —lo que devuelve `GET /api/games`— no lleva el juego,
+ * así que el recibidor de la Momia lista también los casos de CLUEDO, con los
+ * rótulos de la Momia encima. Se ve mal y engaña.
+ *
+ * Hace falta un campo en `shared/types.ts` y rellenarlo en el listado del
+ * servidor; ninguno de los dos ficheros es de esta sesión, así que va anotado
+ * en el informe. Mientras tanto, el filtro de abajo está escrito para que
+ * FUNCIONE SOLO en cuanto el campo exista, sin tocar nada más.
+ */
+type ResumenDePartida = GameSummary & { juego?: string };
+
+/**
+ * Las partidas de este juego.
+ *
+ * Lo que no lo dice SE ENSEÑA, y esa es la parte importante: si se escondiera
+ * lo desconocido, el día que se añada el campo desaparecerían de la vista todas
+ * las partidas antiguas —que no lo tienen— y quien las buscara las daría por
+ * borradas. Es el mismo modo de fallo que ya está descrito en `db/store.ts` a
+ * propósito de las partidas huérfanas.
+ */
+function partidasDe(games: GameSummary[], juego: string | undefined): GameSummary[] {
+  const cual = juego ?? JUEGO_POR_DEFECTO;
+  return games.filter((g) => {
+    const suyo = (g as ResumenDePartida).juego;
+    return suyo === undefined || suyo === cual;
+  });
 }
 
 const listVariants: Variants = {
@@ -48,9 +97,16 @@ export default function CluedoLobbyPage() {
   // De qué juego es este recibidor. Viene de la ruta, no de una constante.
   const { juego } = useParams<{ juego: string }>();
   const navigate = useNavigate();
-  const games = useAppStore((s) => s.games);
+  const todas = useAppStore((s) => s.games);
   const fetchGames = useAppStore((s) => s.fetchGames);
   const createGame = useAppStore((s) => s.createGame);
+
+  // El recibidor ya viste el tema del juego: quien entra en la Momia no debe
+  // ver un solo pantallazo de burdeos antes de llegar al taller.
+  useTemaDeJuego(juego);
+  const palabras = palabrasDe(juego).recibidor;
+
+  const games = partidasDe(todas, juego);
 
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
@@ -65,10 +121,10 @@ export default function CluedoLobbyPage() {
 
   useEffect(() => {
     fetchGames()
-      .catch(() => setError('No se pudieron cargar los casos. ¿Está el servidor en marcha?'))
+      .catch(() => setError(palabras.errorCargar))
       .finally(() => setLoading(false));
     return () => window.clearTimeout(errorTimer.current);
-  }, [fetchGames]);
+  }, [fetchGames, palabras.errorCargar]);
 
   const showError = useCallback((message: string) => {
     setError(message);
@@ -83,7 +139,7 @@ export default function CluedoLobbyPage() {
       destination.current = `/${juego}/${gameId}`;
       setTransitionActive(true);
     },
-    [transitionActive],
+    [transitionActive, juego],
   );
 
   const handleTransitionComplete = useCallback(() => {
@@ -94,10 +150,16 @@ export default function CluedoLobbyPage() {
     if (creating || transitionActive) return;
     setCreating(true);
     try {
-      const game = await createGame();
+      /*
+       * SE MANDA EL JUEGO, y sin esto no había segundo juego posible: el
+       * servidor guardaba la partida sin declarar a qué se juega, así que una
+       * expedición de la Momia se preparaba y se jugaba como un CLUEDO, sin un
+       * solo error por el camino. Se habría descubierto la noche de la velada.
+       */
+      const game = await createGame(undefined, juego);
       enterGame(game.id);
     } catch {
-      showError('No se pudo abrir un caso nuevo.');
+      showError(palabras.errorCrear);
     } finally {
       setCreating(false);
     }
@@ -109,7 +171,7 @@ export default function CluedoLobbyPage() {
       await api.deleteGame(gameId);
       await fetchGames();
     } catch {
-      showError('No se pudo borrar el caso.');
+      showError(palabras.errorBorrar);
     } finally {
       setDeletingId(null);
       setConfirmingId(null);
@@ -135,42 +197,38 @@ export default function CluedoLobbyPage() {
           <Link to="/" className="lobby-back mono-caps">
             ← Catálogo
           </Link>
-          <p className="lobby-kicker mono-caps">El recibidor de la mansión</p>
-          <h1 className="lobby-title">Casos de CLUEDO</h1>
-          <p className="lobby-sub text-dim text-italic">
-            Cada expediente es una velada: sospechosos, salas, armas y una trama a medida.
-          </p>
+          <p className="lobby-kicker mono-caps">{palabras.kicker}</p>
+          <h1 className="lobby-title">{palabras.titulo}</h1>
+          <p className="lobby-sub text-dim text-italic">{palabras.sub}</p>
         </div>
         <button
           className="btn btn--primary lobby-new"
           onClick={() => void handleCreate()}
           disabled={creating || transitionActive}
         >
-          {creating ? 'Abriendo expediente…' : '✦ Nuevo caso'}
+          {creating ? palabras.creando : palabras.nueva}
         </button>
       </header>
 
       <div className="ornament-divider">
-        <span aria-hidden="true">❖</span>
+        <span aria-hidden="true">{palabrasDe(juego).ornamento}</span>
       </div>
 
       {loading ? (
-        <p className="lobby-loading text-italic">Encendiendo los candelabros…</p>
+        <p className="lobby-loading text-italic">{palabras.cargando}</p>
       ) : games.length === 0 ? (
         <div className="lobby-empty deco-frame deco-corners fade-up">
           <span className="lobby-empty-mark" aria-hidden="true">
-            ?
+            {palabras.vacioMarca}
           </span>
-          <h2>Aún no hay casos abiertos</h2>
-          <p className="text-dim text-italic">
-            Pulse «Nuevo caso» y el mayordomo convocará a los sospechosos.
-          </p>
+          <h2>{palabras.vacioTitulo}</h2>
+          <p className="text-dim text-italic">{palabras.vacioTexto}</p>
           <button
             className="btn lobby-empty-btn"
             onClick={() => void handleCreate()}
             disabled={creating || transitionActive}
           >
-            Abrir el primer expediente
+            {palabras.vacioBoton}
           </button>
         </div>
       ) : (
@@ -187,14 +245,16 @@ export default function CluedoLobbyPage() {
               className="case-card deco-frame"
               role="button"
               tabIndex={0}
-              aria-label={`Abrir el caso ${game.name}`}
+              aria-label={palabras.abrirAria(game.name)}
               onClick={() => enterGame(game.id)}
               onKeyDown={(event) => onCardKey(event, game.id)}
             >
-              <span className="case-tab mono-caps">Caso nº {String(index + 1).padStart(3, '0')}</span>
+              <span className="case-tab mono-caps">
+                {palabras.ficha} {String(index + 1).padStart(3, '0')}
+              </span>
               <button
                 className="case-delete"
-                aria-label={`Borrar el caso ${game.name}`}
+                aria-label={palabras.borrarAria(game.name)}
                 onClick={(event) => {
                   event.stopPropagation();
                   setConfirmingId(game.id);
@@ -209,24 +269,24 @@ export default function CluedoLobbyPage() {
               </p>
               <div className="case-counts mono-caps">
                 <span>
-                  <b>{game.suspectCount}</b> sospechosos
+                  <b>{game.suspectCount}</b> {palabras.contadores[0]}
                 </span>
                 <i aria-hidden="true">·</i>
                 <span>
-                  <b>{game.roomCount}</b> salas
+                  <b>{game.roomCount}</b> {palabras.contadores[1]}
                 </span>
                 <i aria-hidden="true">·</i>
                 <span>
-                  <b>{game.weaponCount}</b> armas
+                  <b>{game.weaponCount}</b> {palabras.contadores[2]}
                 </span>
               </div>
-              <span className={`case-status mono-caps ${STATUS_META[game.status].className}`}>
-                {STATUS_META[game.status].label}
+              <span className={`case-status mono-caps ${CLASE_DE_ESTADO[game.status]}`}>
+                {palabras.estados[game.status]}
               </span>
 
               {confirmingId === game.id && (
                 <div className="case-confirm" onClick={stopPropagation}>
-                  <p className="case-confirm-text">¿Cerrar este caso para siempre?</p>
+                  <p className="case-confirm-text">{palabras.confirmarCierre}</p>
                   <div className="case-confirm-actions">
                     <button
                       className="btn btn--danger btn--sm"
@@ -251,7 +311,11 @@ export default function CluedoLobbyPage() {
 
       {error && <div className="lobby-toast">{error}</div>}
 
-      <CluedoTransition active={transitionActive} onComplete={handleTransitionComplete} />
+      <TransicionDeEntrada
+        juego={juego}
+        active={transitionActive}
+        onComplete={handleTransitionComplete}
+      />
     </div>
   );
 }

@@ -1,0 +1,228 @@
+/* =====================================================================
+   TRANSICIÓN DE LA MOMIA — el sello se rompe y la losa se abre
+   =====================================================================
+   La de CLUEDO son dos puertas de caoba que GIRAN sobre sus bisagras. Esta
+   no puede girar: una losa de piedra de dos toneladas no se abre hacia
+   dentro, se DESPLAZA. Es la diferencia entre una casa y una tumba, y se
+   nota aunque nadie sepa decir por qué.
+
+   Todo lo animado es transform/opacity, igual que en la otra: nada que
+   provoque recálculo de disposición mientras corre.
+   ===================================================================== */
+
+.mt {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: #04060d;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+}
+
+/* La lámpara de aceite que espera dentro, cálida contra el azul de fuera. */
+.mt-luz {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: radial-gradient(
+    44% 58% at 50% 48%,
+    rgba(247, 224, 168, 0.36),
+    rgba(var(--acento-rgb), 0.14) 44%,
+    transparent 72%
+  );
+  will-change: transform, opacity;
+}
+
+/* ---------- Escenario central ---------- */
+
+.mt-stage {
+  position: relative;
+  z-index: 2;
+  text-align: center;
+  padding: 40px 48px;
+}
+
+.mt-title {
+  font-family: var(--font-display);
+  font-size: clamp(30px, 5.6vw, 74px);
+  line-height: 1.06;
+  margin: 0;
+  padding-left: 0.24em; /* compensa el tracking para centrar ópticamente */
+  background: linear-gradient(180deg, #fbeec6 8%, var(--gold-400) 56%, var(--brass) 96%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 0 30px rgba(var(--acento-rgb), 0.32));
+  will-change: transform, opacity, letter-spacing;
+}
+
+.mt-sub {
+  margin: 18px 0 0;
+  color: var(--gold-300);
+  letter-spacing: 0.4em;
+  font-size: 13px;
+}
+
+/* El barrido de la lámpara al pasarla por delante de la inscripción. */
+.mt-lampara {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 3;
+  width: 190px;
+  height: 230px;
+  margin: -150px 0 0 -95px;
+  pointer-events: none;
+  background: radial-gradient(
+    50% 42% at 50% 34%,
+    rgba(255, 236, 186, 0.5),
+    rgba(var(--acento-rgb), 0.18) 46%,
+    transparent 72%
+  );
+  filter: blur(2px);
+  will-change: transform, opacity;
+}
+
+/* ---------- El sello intacto, y su rotura ---------- */
+
+.mt-sello {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 6;
+  width: 128px;
+  height: 128px;
+  margin: -64px 0 0 -64px;
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+
+.mt-sello svg {
+  width: 100%;
+  height: 100%;
+  filter: drop-shadow(0 0 16px rgba(var(--acento-rgb), 0.55));
+}
+
+/* ---------- Las dos losas ---------- */
+
+.mt-losas {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: flex;
+  pointer-events: none;
+}
+
+.mt-losa {
+  position: relative;
+  width: 50.4%; /* se solapan un pelo: sin esto se ve una raya de fondo */
+  height: 100%;
+  background:
+    /* Sombra en el canto que da al corte: la piedra tiene grosor. */
+    linear-gradient(90deg, rgba(0, 0, 0, 0.42), transparent 22% 78%, rgba(0, 0, 0, 0.42)),
+    /* Vetas y desconchones. */
+    repeating-linear-gradient(
+      92deg,
+      rgba(0, 0, 0, 0.07) 0 2px,
+      transparent 2px 34px
+    ),
+    repeating-linear-gradient(
+      2deg,
+      rgba(255, 255, 255, 0.022) 0 1px,
+      transparent 1px 58px
+    ),
+    linear-gradient(100deg, #2c2418, #4a3c28 42%, #332a1c);
+  box-shadow: inset 0 0 90px rgba(0, 0, 0, 0.6);
+  backface-visibility: hidden;
+  will-change: transform;
+}
+
+.mt-losa--izq {
+  border-right: 2px solid rgba(var(--acento-rgb), 0.35);
+}
+
+.mt-losa--der {
+  border-left: 2px solid rgba(var(--acento-rgb), 0.35);
+  margin-left: -0.8%;
+}
+
+/* Las columnas de jeroglíficos talladas en cada losa. */
+.mt-jeros {
+  position: absolute;
+  top: 8%;
+  bottom: 8%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-around;
+  width: 62px;
+  font-size: 30px;
+  line-height: 1;
+  color: rgba(var(--acento-claro-rgb), 0.16);
+  /* Grabado: una luz arriba y una sombra abajo, como un bajorrelieve. */
+  text-shadow:
+    0 -1px 0 rgba(0, 0, 0, 0.55),
+    0 1px 0 rgba(255, 230, 170, 0.09);
+  user-select: none;
+}
+
+.mt-losa--izq .mt-jeros {
+  right: 8%;
+}
+.mt-losa--der .mt-jeros {
+  left: 8%;
+}
+
+/* ---------- Arena que cae por la grieta ---------- */
+
+.mt-arena {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  z-index: 5;
+  width: 210px;
+  translate: -50% 0;
+  pointer-events: none;
+  filter: blur(7px);
+  background: linear-gradient(
+    180deg,
+    transparent,
+    rgba(228, 205, 154, 0.24) 18%,
+    rgba(228, 205, 154, 0.13) 62%,
+    transparent
+  );
+  will-change: transform, opacity;
+}
+
+/* Polvo en suspensión, atravesado por la luz. */
+.mt-polvo {
+  position: absolute;
+  z-index: 5;
+  bottom: -14%;
+  width: 120%;
+  height: 60%;
+  pointer-events: none;
+  filter: blur(30px);
+  will-change: transform, opacity;
+}
+
+.mt-polvo--a {
+  left: -10%;
+  background: radial-gradient(52% 60% at 34% 58%, rgba(226, 208, 166, 0.17), transparent 70%);
+}
+
+.mt-polvo--b {
+  right: -10%;
+  background: radial-gradient(52% 60% at 66% 54%, rgba(180, 200, 240, 0.11), transparent 70%);
+}
+
+.mt-vineta {
+  position: absolute;
+  inset: 0;
+  z-index: 7;
+  pointer-events: none;
+  background: radial-gradient(120% 120% at 50% 50%, transparent 52%, rgba(0, 0, 0, 0.82));
+}
