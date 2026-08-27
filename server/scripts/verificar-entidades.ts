@@ -26,6 +26,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { entidadesDe, manifiestoDe } from '../../shared/juegos';
+// A PROPOSITO por el otro camino: ver la comprobacion de la doble carga.
+import { entidadesDe as entidadesPorElOtroCamino } from '../../shared/juegos/entidades';
 import type { GameSession } from '../../shared/types';
 
 const REPO = path.resolve(import.meta.dirname ?? __dirname, '..', '..');
@@ -241,6 +243,32 @@ async function jugar(): Promise<void> {
   comprobar(
     'y se lee igual por categoría',
     entidadesDe(conCamara, 'camaras')[0]?.name === 'Cámara del Barquero',
+  );
+
+  paso('El almacen se ve igual desde los dos caminos de importacion');
+  /*
+   * ESTA COMPROBACION EXISTE POR UN FALLO QUE OCURRIO.
+   *
+   * `shared/juegos/entidades.ts` se carga DOS VECES —un modulo lo importa como
+   * `../../shared/juegos` y otro como `./entidades`, y el cargador las trata
+   * como modulos distintos—. La tabla de almacenes era una constante de modulo,
+   * asi que habia dos, y `declararAlmacen` escribia solo en una.
+   *
+   * Lo peor no fue el fallo: fue que NINGUN verificador de CLUEDO se enteraba.
+   * Sus tres categorias van en el literal inicial y no dependen de que nadie las
+   * declare, asi que CLUEDO funcionaba perfectamente mientras el juego nuevo
+   * tenia rechazadas TODAS sus acciones —el motor no encontraba ni una de sus
+   * entidades— y todo seguia en verde.
+   *
+   * Por eso se comprueba importando por LOS DOS caminos: es la unica forma de
+   * ver dos instancias desde dentro de un solo proceso.
+   */
+  const porUnCamino = entidadesDe(conCamara, 'camaras').map((e) => e.name);
+  const porElOtro = entidadesPorElOtroCamino(conCamara, 'camaras').map((e) => e.name);
+  comprobar(
+    'una categoria declarada por el manifiesto se resuelve igual desde los dos',
+    porUnCamino.length > 0 && JSON.stringify(porUnCamino) === JSON.stringify(porElOtro),
+    { porUnCamino, porElOtro },
   );
 
   paso('Una categoría que este juego no tiene se rechaza');

@@ -44,11 +44,38 @@ export interface Entidad {
  */
 type CampoHeredado = 'suspects' | 'rooms' | 'weapons';
 
-const CAMPO_HEREDADO: Record<CategoriaId, CampoHeredado> = {
-  sospechosos: 'suspects',
-  salas: 'rooms',
-  objetos: 'weapons',
-};
+/**
+ * Anclado al ambito global, y esta vez con motivo demostrado.
+ *
+ * Este fichero se carga DOS VECES: una prueba lo importa como
+ * `../../shared/juegos` y otro modulo como `./entidades`, y el cargador las
+ * trata como modulos distintos. Con una constante de modulo hay dos tablas, y
+ * `declararAlmacen` escribe solo en una.
+ *
+ * Es el mismo fallo del que avisan `INSTALADOS`, `REDUCTORES`, `PROYECCIONES` y
+ * `REPARTOS` —los cuatro anclados con `Symbol.for` por esta razon— y esta tabla
+ * se quedo sin anclar al escribirla.
+ *
+ * Y ES DE LOS QUE NO SE VEN: las tres categorias de CLUEDO estan en el literal
+ * inicial, asi que no dependen de `declararAlmacen` y CLUEDO funciona igual con
+ * esto roto. Los verificadores de CLUEDO seguian TODOS en verde mientras el
+ * juego nuevo tenia rechazadas todas sus acciones, porque `motor.ts` importa
+ * `entidadesDe` por el camino que veia la tabla sin declarar y no encontraba
+ * ninguna de sus entidades.
+ */
+const LLAVE_ALMACENES = Symbol.for('gamemasters.juegos.almacenes');
+const globalAlmacenes = globalThis as unknown as Record<
+  symbol,
+  Record<CategoriaId, CampoHeredado>
+>;
+
+const CAMPO_HEREDADO: Record<CategoriaId, CampoHeredado> =
+  globalAlmacenes[LLAVE_ALMACENES] ??
+  (globalAlmacenes[LLAVE_ALMACENES] = {
+    sospechosos: 'suspects',
+    salas: 'rooms',
+    objetos: 'weapons',
+  });
 
 /**
  * Da de alta dónde vive una categoría.
