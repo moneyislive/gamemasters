@@ -29,6 +29,9 @@
     "verify:entorno": "tsx scripts/verificar-entorno.ts",
     "verify:enlaces": "tsx scripts/verificar-enlaces.ts",
     "verify:entidades": "tsx scripts/verificar-entidades.ts",
+    "verify:secretos-agente": "tsx scripts/verificar-secretos-del-agente.ts",
+    "verify:momia": "tsx scripts/verificar-momia.ts",
+    "verify:puzle-momia": "tsx scripts/verificar-puzle-momia.ts",
     "verify:legal": "tsx scripts/verificar-legal.ts"
   },
   "dependencies": {
