@@ -25,7 +25,8 @@ import type {
   VinculoDeCuenta,
 } from '../../../shared/live';
 import type { GameSession } from '../../../shared/types';
-import { culpableDe } from '../juegos/cluedo';
+import { esElSenalado, manifiestoDe } from '../../../shared/juegos';
+import { trofeosDelJuego } from '../juegos/trofeos';
 
 /** Busca la cuenta del correo, o la crea si es la primera vez. */
 export async function cuentaDe(email: string, displayName: string): Promise<Account> {
@@ -80,7 +81,20 @@ export async function cerrarPartidaEnCuentas(
 
     const personaje = plot.characters.find((c) => c.suspectId === jugador.suspectId);
     const suya = sesion.acusaciones.find((a) => a.suspectId === jugador.suspectId);
-    const eraCulpable = culpableDe(plot.solution) === jugador.suspectId;
+    /*
+     * QUIEN ERA EL SENALADO, preguntado al manifiesto y no a CLUEDO.
+     *
+     * Antes: `culpableDe(plot.solution) === jugador.suspectId`, y `culpableDe`
+     * lee la clave `culpable` de la solucion. En un juego cuyo eje se llame
+     * `saqueador` esa clave no existe, asi que `eraCulpable` era SIEMPRE falso
+     * y el trofeo de quien se sale con la suya no se concedia nunca — sin dar
+     * ningun error.
+     *
+     * `esElSenalado` ya existia y ya la usaba la proyeccion; aqui no se habia
+     * girado. Para CLUEDO devuelve exactamente lo mismo.
+     */
+    const manifiesto = manifiestoDe(sesion.juego ?? game.settings?.juego);
+    const eraCulpable = esElSenalado(manifiesto, plot.solution.respuestas, jugador.suspectId);
     const gano = sesion.winnerId === jugador.suspectId;
 
     const partida: PartidaJugada = {
@@ -107,6 +121,23 @@ export async function cerrarPartidaEnCuentas(
     if (jugador.joined && jugador.lastSeenAt) {
       const margen = Date.now() - new Date(jugador.lastSeenAt).getTime();
       if (margen < 5 * 60_000) ganados.add('superviviente');
+    }
+    /*
+     * Y los que reparta el juego por su cuenta. CLUEDO no registra ninguno, asi
+     * que su lista de trofeos sale identica; la Momia reparte los suyos, que no
+     * son variantes de estos —«La Sombra» se gana PERDIENDO la partida como
+     * saqueador— sino condiciones que dependen de su propio estado.
+     */
+    for (const t of trofeosDelJuego(manifiesto.id, {
+      game,
+      sesion,
+      plot,
+      jugador,
+      eraSenalado: eraCulpable,
+      gano,
+      acerto: suya?.correcta ?? false,
+    })) {
+      ganados.add(t);
     }
     cuenta.trofeos = [...ganados];
 
