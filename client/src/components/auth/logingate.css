@@ -32,7 +32,7 @@
   font-size: 44px;
   line-height: 1;
   color: var(--gold-400);
-  text-shadow: 0 0 26px rgba(201, 162, 39, 0.35);
+  text-shadow: 0 0 26px rgba(var(--acento-rgb), 0.35);
 }
 
 .gate-title {
@@ -95,7 +95,7 @@
   align-items: center;
   gap: 0.9rem;
   margin: 1.15rem 0 0.9rem;
-  color: rgba(232, 207, 127, 0.45);
+  color: rgba(var(--acento-claro-rgb), 0.45);
   font-size: 0.78rem;
   font-style: italic;
   letter-spacing: 0.14em;
@@ -105,7 +105,7 @@
   content: '';
   flex: 1;
   height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(232, 207, 127, 0.28), transparent);
+  background: linear-gradient(90deg, transparent, rgba(var(--acento-claro-rgb), 0.28), transparent);
 }
 
 /*

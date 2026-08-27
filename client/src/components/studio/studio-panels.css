@@ -36,7 +36,7 @@
   content: '';
   width: 80px;
   height: 1px;
-  background: linear-gradient(90deg, rgba(201, 162, 39, 0.65), transparent);
+  background: linear-gradient(90deg, rgba(var(--acento-rgb), 0.65), transparent);
 }
 .sp-subtitle {
   margin: 6px 0 0;
@@ -53,7 +53,7 @@
   text-transform: uppercase;
   color: var(--parchment-dim);
   background: rgba(0, 0, 0, 0.32);
-  border: 1px solid rgba(201, 162, 39, 0.35);
+  border: 1px solid rgba(var(--acento-rgb), 0.35);
   border-radius: 999px;
   padding: 7px 15px;
 }
@@ -64,8 +64,50 @@
 }
 .sp-counter--ok {
   color: var(--gold-300);
-  border-color: rgba(201, 162, 39, 0.65);
-  box-shadow: 0 0 14px rgba(201, 162, 39, 0.16);
+  border-color: rgba(var(--acento-rgb), 0.65);
+  box-shadow: 0 0 14px rgba(var(--acento-rgb), 0.16);
+}
+/*
+ * Sobran. Solo aparece en las categorías de cuenta exacta —hoy, los cinco
+ * ritos— y se pinta en rojo y no en dorado apagado a propósito: que falten es
+ * un trabajo a medias, que sobren es un error, y un error tiene que verse.
+ */
+.sp-counter--sobra {
+  color: #f0c3b6;
+  border-color: rgba(var(--peligro-rgb), 0.7);
+  box-shadow: 0 0 14px rgba(var(--peligro-rgb), 0.2);
+}
+.sp-counter--sobra strong {
+  color: #f6d8cf;
+}
+
+/*
+ * El aviso de la regla de cuenta exacta, bajo el formulario.
+ *
+ * No es un error mientras no sobren: es la regla del juego dicha antes de que
+ * se incumpla, que es cuando sirve de algo.
+ */
+.sp-regla {
+  margin: 0 0 12px;
+  padding: 9px 12px;
+  font-size: 15px;
+  line-height: 1.35;
+  color: var(--parchment-dim);
+  background: rgba(var(--acento-rgb), 0.07);
+  border: 1px solid rgba(var(--acento-rgb), 0.28);
+  border-left-width: 3px;
+  border-radius: 6px;
+}
+.sp-regla--rota {
+  color: #f0c3b6;
+  background: rgba(var(--peligro-rgb), 0.1);
+  border-color: rgba(var(--peligro-rgb), 0.45);
+}
+.sp-regla strong {
+  color: var(--gold-300);
+}
+.sp-regla--rota strong {
+  color: #f6d8cf;
 }
 
 /* ---------- Rejilla formulario + galería ---------- */
@@ -109,7 +151,7 @@
   margin: 6px 0 0;
   font-size: 13.5px;
   font-style: italic;
-  color: rgba(241, 229, 201, 0.5);
+  color: rgba(var(--papel-rgb), 0.5);
 }
 .sp-error {
   margin: 0;
@@ -139,7 +181,7 @@
 }
 .sp-photo-preview {
   object-fit: cover;
-  border: 2px solid rgba(201, 162, 39, 0.55);
+  border: 2px solid rgba(var(--acento-rgb), 0.55);
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
   background: rgba(0, 0, 0, 0.3);
 }
@@ -156,8 +198,8 @@
   align-items: center;
   justify-content: center;
   background: rgba(0, 0, 0, 0.3);
-  border: 2px dashed rgba(201, 162, 39, 0.4);
-  color: rgba(201, 162, 39, 0.7);
+  border: 2px dashed rgba(var(--acento-rgb), 0.4);
+  color: rgba(var(--acento-rgb), 0.7);
   cursor: pointer;
   transition:
     border-color 0.2s ease,
@@ -167,7 +209,7 @@
 .sp-photo-add:hover:not(:disabled) {
   border-color: var(--gold-400);
   color: var(--gold-300);
-  background: rgba(201, 162, 39, 0.07);
+  background: rgba(var(--acento-rgb), 0.07);
 }
 .sp-photo-actions {
   display: flex;
@@ -202,7 +244,7 @@
   width: 22px;
   height: 22px;
   border-radius: 50%;
-  border: 2px solid rgba(201, 162, 39, 0.25);
+  border: 2px solid rgba(var(--acento-rgb), 0.25);
   border-top-color: var(--gold-400);
   animation: sp-spin 0.8s linear infinite;
 }
@@ -224,8 +266,8 @@
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--gold-300);
-  border: 1px solid rgba(201, 162, 39, 0.4);
-  background: rgba(201, 162, 39, 0.07);
+  border: 1px solid rgba(var(--acento-rgb), 0.4);
+  background: rgba(var(--acento-rgb), 0.07);
   border-radius: 999px;
   padding: 6px 13px;
   cursor: pointer;
@@ -235,9 +277,9 @@
     box-shadow 0.18s ease;
 }
 .sp-chip:hover:not(:disabled) {
-  background: rgba(201, 162, 39, 0.18);
+  background: rgba(var(--acento-rgb), 0.18);
   transform: translateY(-1px);
-  box-shadow: 0 0 12px rgba(201, 162, 39, 0.2);
+  box-shadow: 0 0 12px rgba(var(--acento-rgb), 0.2);
 }
 .sp-chip:disabled {
   opacity: 0.35;
@@ -263,7 +305,7 @@
 }
 .sp-card--editing {
   border-color: var(--gold-400);
-  box-shadow: 0 0 18px rgba(201, 162, 39, 0.25), var(--panel-shadow);
+  box-shadow: 0 0 18px rgba(var(--acento-rgb), 0.25), var(--panel-shadow);
 }
 .sp-card-media {
   position: relative;
@@ -277,7 +319,7 @@
 }
 .sp-card-photo {
   object-fit: cover;
-  border: 1.5px solid rgba(201, 162, 39, 0.5);
+  border: 1.5px solid rgba(var(--acento-rgb), 0.5);
   box-shadow: 0 3px 10px rgba(0, 0, 0, 0.4);
 }
 .sp-monogram {
@@ -288,8 +330,8 @@
   font-size: 21px;
   letter-spacing: 0.04em;
   color: var(--gold-300);
-  background: radial-gradient(circle at 30% 25%, rgba(201, 162, 39, 0.28), rgba(0, 0, 0, 0.45));
-  border: 1.5px solid rgba(201, 162, 39, 0.45);
+  background: radial-gradient(circle at 30% 25%, rgba(var(--acento-rgb), 0.28), rgba(0, 0, 0, 0.45));
+  border: 1.5px solid rgba(var(--acento-rgb), 0.45);
 }
 .sp-card--circle .sp-card-photo,
 .sp-card--circle .sp-monogram {
@@ -315,7 +357,7 @@
   font-weight: 700;
   color: var(--ink);
   background: linear-gradient(180deg, var(--gold-300), var(--gold-500));
-  border: 1px solid rgba(31, 18, 12, 0.5);
+  border: 1px solid rgba(var(--madera-rgb), 0.5);
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
 }
 .sp-card-body {
@@ -381,14 +423,14 @@
     color 0.15s ease;
 }
 .sp-icon-btn:hover {
-  background: rgba(201, 162, 39, 0.16);
+  background: rgba(var(--acento-rgb), 0.16);
   color: var(--gold-300);
 }
 .sp-icon-btn--danger {
   color: #c98a7a;
 }
 .sp-icon-btn--danger:hover {
-  background: rgba(179, 64, 47, 0.22);
+  background: rgba(var(--peligro-rgb), 0.22);
   color: #eeb0a0;
 }
 .sp-confirm {
@@ -405,8 +447,8 @@
   font-size: 8.5px;
   letter-spacing: 0.32em;
   text-transform: uppercase;
-  color: rgba(140, 35, 55, 0.6);
-  border: 1px solid rgba(140, 35, 55, 0.45);
+  color: rgba(var(--contra-rgb), 0.6);
+  border: 1px solid rgba(var(--contra-rgb), 0.45);
   border-radius: 3px;
   padding: 2px 5px 2px 8px;
   transform: rotate(-4deg);
@@ -421,7 +463,7 @@
 .sp-empty-symbol {
   display: block;
   font-size: 42px;
-  color: rgba(201, 162, 39, 0.5);
+  color: rgba(var(--acento-rgb), 0.5);
   font-family: var(--font-display);
   margin-bottom: 10px;
 }
@@ -438,7 +480,7 @@
   max-width: 44ch;
   font-style: italic;
   font-size: 15.5px;
-  color: rgba(241, 229, 201, 0.55);
+  color: rgba(var(--papel-rgb), 0.55);
 }
 
 /* ---------- Selector de modo de tablero (salas) ---------- */
@@ -455,7 +497,7 @@
   font-family: var(--font-body);
   color: var(--parchment);
   background: var(--panel-bg);
-  border: 1px solid rgba(201, 162, 39, 0.3);
+  border: 1px solid rgba(var(--acento-rgb), 0.3);
   border-radius: var(--radius);
   box-shadow: var(--panel-shadow);
   transition:
@@ -464,7 +506,7 @@
     transform 0.15s ease;
 }
 .sp-mode:hover:not(:disabled) {
-  border-color: rgba(201, 162, 39, 0.6);
+  border-color: rgba(var(--acento-rgb), 0.6);
   transform: translateY(-1px);
 }
 .sp-mode:disabled {
@@ -473,7 +515,7 @@
 }
 .sp-mode--active {
   border-color: var(--gold-400);
-  box-shadow: 0 0 22px rgba(201, 162, 39, 0.22), var(--panel-shadow);
+  box-shadow: 0 0 22px rgba(var(--acento-rgb), 0.22), var(--panel-shadow);
 }
 .sp-mode-glyph {
   display: block;
@@ -546,7 +588,7 @@
 }
 
 .sp-upload-zone {
-  border: 2px dashed rgba(201, 162, 39, 0.4);
+  border: 2px dashed rgba(var(--acento-rgb), 0.4);
   border-radius: var(--radius);
   padding: 70px 30px;
   text-align: center;
@@ -559,12 +601,12 @@
 .sp-upload-zone:hover,
 .sp-upload-zone--over {
   border-color: var(--gold-400);
-  background: rgba(201, 162, 39, 0.06);
+  background: rgba(var(--acento-rgb), 0.06);
 }
 .sp-upload-glyph {
   display: block;
   font-size: 40px;
-  color: rgba(201, 162, 39, 0.6);
+  color: rgba(var(--acento-rgb), 0.6);
   font-family: var(--font-display);
   margin-bottom: 8px;
 }
@@ -590,7 +632,7 @@
   line-height: 0;
   border-radius: var(--radius);
   overflow: hidden;
-  border: 1px solid rgba(201, 162, 39, 0.45);
+  border: 1px solid rgba(var(--acento-rgb), 0.45);
   box-shadow: var(--panel-shadow);
   cursor: crosshair;
   user-select: none;
@@ -614,7 +656,7 @@
   text-transform: uppercase;
   color: var(--gold-300);
   background: rgba(15, 10, 6, 0.85);
-  border: 1px solid rgba(201, 162, 39, 0.4);
+  border: 1px solid rgba(var(--acento-rgb), 0.4);
   border-radius: 999px;
   padding: 8px 18px;
   pointer-events: none;
@@ -663,18 +705,18 @@
   font-size: 14px;
   color: var(--ink);
   background: linear-gradient(180deg, var(--gold-300), var(--gold-500) 60%, var(--brass));
-  border: 1.5px solid rgba(31, 18, 12, 0.6);
+  border: 1.5px solid rgba(var(--madera-rgb), 0.6);
   box-shadow: 0 3px 10px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.35);
   transition: box-shadow 0.2s ease;
 }
 .sp-pin:hover .sp-pin-head,
 .sp-pin:focus-visible .sp-pin-head {
-  box-shadow: 0 0 16px rgba(201, 162, 39, 0.6), 0 3px 10px rgba(0, 0, 0, 0.55);
+  box-shadow: 0 0 16px rgba(var(--acento-rgb), 0.6), 0 3px 10px rgba(0, 0, 0, 0.55);
 }
 .sp-pin-tail {
   width: 2px;
   height: 11px;
-  background: linear-gradient(180deg, var(--brass), rgba(176, 141, 46, 0));
+  background: linear-gradient(180deg, var(--brass), rgba(var(--acento-hondo-rgb), 0));
 }
 .sp-pin-tip {
   position: absolute;
@@ -688,7 +730,7 @@
   text-transform: uppercase;
   color: var(--gold-300);
   background: rgba(15, 10, 6, 0.92);
-  border: 1px solid rgba(201, 162, 39, 0.4);
+  border: 1px solid rgba(var(--acento-rgb), 0.4);
   border-radius: 6px;
   padding: 4px 10px;
   opacity: 0;
@@ -778,7 +820,7 @@
   font-family: var(--font-body);
   color: var(--parchment);
   background: rgba(0, 0, 0, 0.28);
-  border: 1px solid rgba(201, 162, 39, 0.28);
+  border: 1px solid rgba(var(--acento-rgb), 0.28);
   border-radius: var(--radius);
   transition:
     border-color 0.2s ease,
@@ -786,8 +828,8 @@
     transform 0.15s ease;
 }
 .sp-style-preset:hover:not(:disabled) {
-  border-color: rgba(201, 162, 39, 0.6);
-  background: rgba(201, 162, 39, 0.07);
+  border-color: rgba(var(--acento-rgb), 0.6);
+  background: rgba(var(--acento-rgb), 0.07);
   transform: translateY(-1px);
 }
 .sp-style-preset:disabled {
@@ -796,8 +838,8 @@
 }
 .sp-style-preset--activo {
   border-color: var(--gold-400);
-  background: rgba(201, 162, 39, 0.12);
-  box-shadow: 0 0 18px rgba(201, 162, 39, 0.18);
+  background: rgba(var(--acento-rgb), 0.12);
+  box-shadow: 0 0 18px rgba(var(--acento-rgb), 0.18);
 }
 .sp-style-glyph {
   flex: none;
@@ -835,12 +877,12 @@
   font-family: var(--font-heading);
   font-size: 11.5px;
   letter-spacing: 0.12em;
-  color: rgba(241, 229, 201, 0.45);
+  color: rgba(var(--papel-rgb), 0.45);
 }
 .sp-style-nota {
   margin-top: 14px;
   padding-top: 12px;
-  border-top: 1px solid rgba(201, 162, 39, 0.18);
+  border-top: 1px solid rgba(var(--acento-rgb), 0.18);
 }
 
 /* ---------- Responsive ---------- */

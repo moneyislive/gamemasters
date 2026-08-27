@@ -51,9 +51,9 @@
   align-items: center;
   gap: 0.55rem;
   padding: 0.28rem 0.85rem 0.28rem 0.3rem;
-  border: 1px solid rgba(201, 162, 39, 0.3);
+  border: 1px solid rgba(var(--acento-rgb), 0.3);
   border-radius: 999px;
-  background: linear-gradient(160deg, rgba(31, 18, 12, 0.88), rgba(11, 23, 16, 0.92));
+  background: linear-gradient(160deg, rgba(var(--madera-rgb), 0.88), rgba(var(--suelo-hondo-rgb), 0.92));
   color: var(--parchment);
   font: inherit;
   font-size: 0.9rem;
@@ -66,8 +66,8 @@
 }
 .cuentabarra-quien:hover,
 .cuentabarra-quien[aria-expanded='true'] {
-  border-color: rgba(232, 207, 127, 0.6);
-  box-shadow: 0 0 18px rgba(201, 162, 39, 0.18);
+  border-color: rgba(var(--acento-claro-rgb), 0.6);
+  box-shadow: 0 0 18px rgba(var(--acento-rgb), 0.18);
 }
 .cuentabarra-quien:focus-visible {
   outline: 2px solid var(--gold-300);
@@ -132,8 +132,8 @@
   height: 10px;
   transform: rotate(45deg);
   background: var(--mahogany-900);
-  border-top: 1px solid rgba(201, 162, 39, 0.35);
-  border-left: 1px solid rgba(201, 162, 39, 0.35);
+  border-top: 1px solid rgba(var(--acento-rgb), 0.35);
+  border-left: 1px solid rgba(var(--acento-rgb), 0.35);
 }
 
 .cuentabarra-ficha {
@@ -177,7 +177,7 @@
   align-items: center;
   gap: 0.7rem;
   margin: 0.95rem 0 0.7rem;
-  color: rgba(201, 162, 39, 0.6);
+  color: rgba(var(--acento-rgb), 0.6);
   font-size: 0.55rem;
 }
 .cuentabarra-filete::before,
@@ -185,7 +185,7 @@
   content: '';
   flex: 1;
   height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(201, 162, 39, 0.45), transparent);
+  background: linear-gradient(90deg, transparent, rgba(var(--acento-rgb), 0.45), transparent);
 }
 
 /*
@@ -196,7 +196,7 @@
 .cuentabarra-aviso {
   margin: 0 0 0.6rem;
   padding-left: 0.7rem;
-  border-left: 2px solid rgba(201, 162, 39, 0.45);
+  border-left: 2px solid rgba(var(--acento-rgb), 0.45);
   font-size: 0.82rem;
   line-height: 1.5;
   color: var(--parchment-dim);
@@ -229,8 +229,8 @@
     border-color 150ms ease;
 }
 .cuentabarra-salir:hover {
-  background: rgba(109, 26, 42, 0.28);
-  border-color: rgba(140, 35, 55, 0.6);
+  background: rgba(var(--contra-hondo-rgb), 0.28);
+  border-color: rgba(var(--contra-rgb), 0.6);
   color: var(--parchment);
 }
 .cuentabarra-salir:focus-visible {

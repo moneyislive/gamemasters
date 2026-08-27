@@ -1,37 +1,116 @@
 /* =====================================================================
-   GAMEMASTERS — Sistema de diseño "Miniverso CLUEDO"
-   Estética: mansión años 20, art-decó, fieltro verde, caoba, latón.
+   GAMEMASTERS — el sistema de diseño, y cómo cambia de juego
+   =====================================================================
+
+   Aquí abajo hay DOS capas y conviene no confundirlas.
+
+   1. EL TEMA. Doce números y tres tipografías. Es lo único que un juego
+      repinta, y lo hace en `temas.css` bajo `:root[data-juego='<id>']`.
+   2. LOS NOMBRES DE SIEMPRE (`--gold-500`, `--felt-900`, `--parchment`…).
+      Ya no son colores: son ALIAS del tema. Los usan trece hojas de estilo y
+      seiscientas líneas de CSS que no hay ninguna razón para tocar.
+
+   POR QUÉ ESTA GENERALIZACIÓN Y NO OTRA
+   -------------------------------------
+   Se barajaron tres. Se eligió la tercera:
+
+   · Duplicar el CSS por juego (`studio.css` + `studio-momia.css`). Es lo que
+     primero se le ocurre a cualquiera y es lo peor: cada arreglo de estilo
+     habría que hacerlo dos veces, y a la tercera vez alguien se olvida de una.
+
+   · Envolver el taller en una clase (`.tema-momia .studio-tab { … }`). No sirve
+     por un detalle muy concreto: el color dorado NO estaba en variables. Estaba
+     escrito a mano 137 veces como `rgba(201, 162, 39, α)`, porque una variable
+     de color no admite que le cambies la transparencia. Con una clase envolvente
+     habría que reescribir esas 137 reglas enteras, una por una.
+
+   · Sacar el canal de color a un token (`--acento-rgb: 201, 162, 39`) y escribir
+     `rgba(var(--acento-rgb), α)`. Es lo que se ha hecho. La transparencia sigue
+     donde estaba, el color sale del tema, y el cambio fue mecánico: un `sed` por
+     cada uno de los diez colores de la casa. El resultado para CLUEDO es el
+     mismo píxel —`rgb(201, 162, 39)` y `#c9a227` son el mismo color—, y eso es
+     comprobable mirando la pantalla, que es como se ha comprobado.
+
+   DÓNDE SE ENCHUFA. En `<html>`, no en un `<div>`. Es importante y es sutil:
+   los alias de abajo (`--gold-500: rgb(var(--acento-rgb))`) se resuelven en el
+   elemento DONDE SE DECLARAN. Si el tema se pusiera en un div de dentro, los
+   alias ya vendrían resueltos en dorado desde `:root` y no cambiaría nada. Lo
+   pone `client/src/lib/tema.ts`.
+
+   LO QUE FALTA. `rgba(0, 0, 0, α)` y `rgba(255, 255, 255, α)` —las sombras y los
+   brillos— siguen escritos a mano, y está bien: son sombra y luz, no color de
+   casa, y valen igual en una mansión que en una tumba.
    ===================================================================== */
 
 :root {
-  /* Paleta */
-  --felt-950: #0b1710;
-  --felt-900: #10241a;
-  --felt-800: #14301f;
-  --felt-700: #1a3f2a;
-  --mahogany-900: #1f120c;
-  --mahogany-800: #2b1a12;
-  --mahogany-700: #3e2723;
-  --gold-500: #c9a227;
-  --gold-400: #d9b64a;
-  --gold-300: #e8cf7f;
-  --brass: #b08d2e;
-  --burgundy-700: #6d1a2a;
-  --burgundy-600: #8c2337;
-  --parchment: #f1e5c9;
-  --parchment-dim: #d9c9a3;
-  --ink: #1c1410;
-  --danger: #b3402f;
+  /* ------------------------------------------------------------------
+     EL TEMA — los valores de CLUEDO, que son también los de por defecto.
+     Un juego sin tema propio se ve así, y eso es deliberado: la mansión
+     es la casa, y lo que se hereda al no decir nada es la casa.
+     ------------------------------------------------------------------ */
+
+  /* El metal de la casa: dorado latón. */
+  --acento-rgb: 201, 162, 39;
+  --acento-medio-rgb: 217, 182, 74;
+  --acento-claro-rgb: 232, 207, 127;
+  --acento-hondo-rgb: 176, 141, 46;
+  /* El segundo color, el que hace de contrapunto: burdeos. */
+  --contra-rgb: 140, 35, 55;
+  --contra-hondo-rgb: 109, 26, 42;
+  /* El papel sobre el que se escribe: pergamino. */
+  --papel-rgb: 241, 229, 201;
+  --papel-tenue-rgb: 217, 201, 163;
+  /* La madera de los paneles: caoba. */
+  --madera-honda-rgb: 20, 12, 8;
+  --madera-rgb: 31, 18, 12;
+  --madera-media-rgb: 43, 26, 18;
+  --madera-clara-rgb: 62, 39, 35;
+  /* El suelo de todo: el fieltro verde de la mesa de juego. */
+  --suelo-hondo-rgb: 11, 23, 16;
+  --suelo-rgb: 16, 36, 26;
+  --suelo-alto-rgb: 20, 48, 31;
+  --suelo-vivo-rgb: 26, 63, 42;
+  --suelo-hondo: rgb(var(--suelo-hondo-rgb));
+  --suelo: rgb(var(--suelo-rgb));
+  --suelo-alto: rgb(var(--suelo-alto-rgb));
+  --suelo-vivo: rgb(var(--suelo-vivo-rgb));
+  /* La tinta y el aviso. */
+  --tinta-rgb: 28, 20, 16;
+  --peligro-rgb: 179, 64, 47;
 
   /* Tipografía */
   --font-display: 'Cinzel Decorative', 'Cinzel', serif;
   --font-heading: 'Cinzel', serif;
   --font-body: 'Cormorant Garamond', Georgia, serif;
 
+  /* ------------------------------------------------------------------
+     LOS NOMBRES DE SIEMPRE — alias, no colores.
+     Se conservan porque los usa todo el CSS que ya estaba escrito, y
+     renombrarlos habría sido un cambio de dos mil líneas para no ganar
+     nada. Un juego nuevo no los repinta: repinta el tema de arriba.
+     ------------------------------------------------------------------ */
+  --felt-950: var(--suelo-hondo);
+  --felt-900: var(--suelo);
+  --felt-800: var(--suelo-alto);
+  --felt-700: var(--suelo-vivo);
+  --mahogany-900: rgb(var(--madera-rgb));
+  --mahogany-800: rgb(var(--madera-media-rgb));
+  --mahogany-700: rgb(var(--madera-clara-rgb));
+  --gold-500: rgb(var(--acento-rgb));
+  --gold-400: rgb(var(--acento-medio-rgb));
+  --gold-300: rgb(var(--acento-claro-rgb));
+  --brass: rgb(var(--acento-hondo-rgb));
+  --burgundy-700: rgb(var(--contra-hondo-rgb));
+  --burgundy-600: rgb(var(--contra-rgb));
+  --parchment: rgb(var(--papel-rgb));
+  --parchment-dim: rgb(var(--papel-tenue-rgb));
+  --ink: rgb(var(--tinta-rgb));
+  --danger: rgb(var(--peligro-rgb));
+
   /* Superficies */
-  --panel-bg: linear-gradient(160deg, rgba(31, 18, 12, 0.92), rgba(20, 12, 8, 0.96));
-  --panel-border: 1px solid rgba(201, 162, 39, 0.35);
-  --panel-shadow: 0 10px 40px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(232, 207, 127, 0.12);
+  --panel-bg: linear-gradient(160deg, rgba(var(--madera-rgb), 0.92), rgba(var(--madera-honda-rgb), 0.96));
+  --panel-border: 1px solid rgba(var(--acento-rgb), 0.35);
+  --panel-shadow: 0 10px 40px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(var(--acento-claro-rgb), 0.12);
 
   --radius: 10px;
 }
@@ -50,8 +129,8 @@ body,
 
 body {
   background:
-    radial-gradient(1200px 700px at 20% -10%, rgba(201, 162, 39, 0.08), transparent 60%),
-    radial-gradient(900px 600px at 110% 110%, rgba(109, 26, 42, 0.18), transparent 55%),
+    radial-gradient(1200px 700px at 20% -10%, rgba(var(--acento-rgb), 0.08), transparent 60%),
+    radial-gradient(900px 600px at 110% 110%, rgba(var(--contra-hondo-rgb), 0.18), transparent 55%),
     linear-gradient(180deg, var(--felt-950), var(--felt-900) 45%, var(--felt-950));
   color: var(--parchment);
   font-family: var(--font-body);
@@ -82,13 +161,13 @@ h4 {
 }
 
 ::selection {
-  background: rgba(201, 162, 39, 0.35);
+  background: rgba(var(--acento-rgb), 0.35);
 }
 
 /* ---------- Scrollbars ---------- */
 * {
   scrollbar-width: thin;
-  scrollbar-color: rgba(201, 162, 39, 0.4) rgba(0, 0, 0, 0.2);
+  scrollbar-color: rgba(var(--acento-rgb), 0.4) rgba(0, 0, 0, 0.2);
 }
 *::-webkit-scrollbar {
   width: 10px;
@@ -114,7 +193,7 @@ h4 {
   content: '';
   position: absolute;
   inset: 6px;
-  border: 1px solid rgba(201, 162, 39, 0.22);
+  border: 1px solid rgba(var(--acento-rgb), 0.22);
   border-radius: calc(var(--radius) - 4px);
   pointer-events: none;
 }
@@ -138,8 +217,8 @@ h4 {
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--gold-300);
-  background: linear-gradient(180deg, rgba(201, 162, 39, 0.16), rgba(201, 162, 39, 0.05));
-  border: 1px solid rgba(201, 162, 39, 0.5);
+  background: linear-gradient(180deg, rgba(var(--acento-rgb), 0.16), rgba(var(--acento-rgb), 0.05));
+  border: 1px solid rgba(var(--acento-rgb), 0.5);
   border-radius: 8px;
   padding: 10px 20px;
   cursor: pointer;
@@ -150,8 +229,8 @@ h4 {
   user-select: none;
 }
 .btn:hover {
-  background: linear-gradient(180deg, rgba(201, 162, 39, 0.28), rgba(201, 162, 39, 0.1));
-  box-shadow: 0 0 18px rgba(201, 162, 39, 0.25);
+  background: linear-gradient(180deg, rgba(var(--acento-rgb), 0.28), rgba(var(--acento-rgb), 0.1));
+  box-shadow: 0 0 18px rgba(var(--acento-rgb), 0.25);
   transform: translateY(-1px);
 }
 .btn:active {
@@ -171,12 +250,12 @@ h4 {
 }
 .btn--primary:hover {
   background: linear-gradient(180deg, #f2dfa0, var(--gold-400) 55%, var(--gold-500));
-  box-shadow: 0 0 26px rgba(201, 162, 39, 0.45);
+  box-shadow: 0 0 26px rgba(var(--acento-rgb), 0.45);
 }
 .btn--danger {
   color: #f4c8bd;
-  border-color: rgba(179, 64, 47, 0.6);
-  background: linear-gradient(180deg, rgba(179, 64, 47, 0.2), rgba(179, 64, 47, 0.06));
+  border-color: rgba(var(--peligro-rgb), 0.6);
+  background: linear-gradient(180deg, rgba(var(--peligro-rgb), 0.2), rgba(var(--peligro-rgb), 0.06));
 }
 .btn--ghost {
   border-color: transparent;
@@ -196,7 +275,7 @@ h4 {
   font-size: 17px;
   color: var(--parchment);
   background: rgba(0, 0, 0, 0.35);
-  border: 1px solid rgba(201, 162, 39, 0.3);
+  border: 1px solid rgba(var(--acento-rgb), 0.3);
   border-radius: 8px;
   padding: 10px 12px;
   outline: none;
@@ -208,11 +287,11 @@ h4 {
 .textarea:focus,
 .select:focus {
   border-color: var(--gold-400);
-  box-shadow: 0 0 0 3px rgba(201, 162, 39, 0.18);
+  box-shadow: 0 0 0 3px rgba(var(--acento-rgb), 0.18);
 }
 .input::placeholder,
 .textarea::placeholder {
-  color: rgba(241, 229, 201, 0.4);
+  color: rgba(var(--papel-rgb), 0.4);
   font-style: italic;
 }
 .textarea {
@@ -241,17 +320,17 @@ h4 {
   content: '';
   flex: 1;
   height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(201, 162, 39, 0.5), transparent);
+  background: linear-gradient(90deg, transparent, rgba(var(--acento-rgb), 0.5), transparent);
 }
 
 /* ---------- Resaltado dirigido por el agente ---------- */
 @keyframes agent-glow {
   0%,
   100% {
-    box-shadow: 0 0 0 2px rgba(201, 162, 39, 0.35), 0 0 24px rgba(201, 162, 39, 0.25);
+    box-shadow: 0 0 0 2px rgba(var(--acento-rgb), 0.35), 0 0 24px rgba(var(--acento-rgb), 0.25);
   }
   50% {
-    box-shadow: 0 0 0 4px rgba(201, 162, 39, 0.75), 0 0 46px rgba(201, 162, 39, 0.55);
+    box-shadow: 0 0 0 4px rgba(var(--acento-rgb), 0.75), 0 0 46px rgba(var(--acento-rgb), 0.55);
   }
 }
 .agent-highlight {

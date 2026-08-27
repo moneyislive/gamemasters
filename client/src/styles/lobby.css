@@ -96,7 +96,7 @@
   font-family: var(--font-display);
   font-size: 92px;
   line-height: 1;
-  color: rgba(201, 162, 39, 0.4);
+  color: rgba(var(--acento-rgb), 0.4);
   margin-bottom: 12px;
 }
 
@@ -132,11 +132,11 @@
 .case-card:hover,
 .case-card:focus-visible {
   transform: translateY(-4px);
-  border-color: rgba(217, 182, 74, 0.7);
+  border-color: rgba(var(--acento-medio-rgb), 0.7);
   box-shadow:
     0 20px 48px rgba(0, 0, 0, 0.6),
-    0 0 30px rgba(201, 162, 39, 0.22),
-    inset 0 1px 0 rgba(232, 207, 127, 0.16);
+    0 0 30px rgba(var(--acento-rgb), 0.22),
+    inset 0 1px 0 rgba(var(--acento-claro-rgb), 0.16);
 }
 
 /* Pestaña de carpeta con el número de caso */
@@ -146,7 +146,7 @@
   left: 20px;
   padding: 4px 14px;
   background: linear-gradient(180deg, var(--mahogany-700), var(--mahogany-800));
-  border: 1px solid rgba(201, 162, 39, 0.4);
+  border: 1px solid rgba(var(--acento-rgb), 0.4);
   border-bottom: none;
   border-radius: 8px 8px 0 0;
   color: var(--gold-400);
@@ -186,7 +186,7 @@
 }
 
 .case-counts i {
-  color: rgba(201, 162, 39, 0.5);
+  color: rgba(var(--acento-rgb), 0.5);
   font-style: normal;
 }
 
@@ -201,12 +201,12 @@
 
 .case-status.is-draft {
   color: var(--parchment-dim);
-  border: 1px solid rgba(241, 229, 201, 0.35);
+  border: 1px solid rgba(var(--papel-rgb), 0.35);
 }
 
 .case-status.is-generating {
   color: var(--gold-300);
-  border: 1px solid rgba(201, 162, 39, 0.6);
+  border: 1px solid rgba(var(--acento-rgb), 0.6);
   animation: case-pulse 1.6s ease-in-out infinite;
 }
 
@@ -219,10 +219,10 @@
 @keyframes case-pulse {
   0%,
   100% {
-    box-shadow: 0 0 0 0 rgba(201, 162, 39, 0.35);
+    box-shadow: 0 0 0 0 rgba(var(--acento-rgb), 0.35);
   }
   50% {
-    box-shadow: 0 0 14px 2px rgba(201, 162, 39, 0.45);
+    box-shadow: 0 0 14px 2px rgba(var(--acento-rgb), 0.45);
   }
 }
 
@@ -238,7 +238,7 @@
   background: transparent;
   border: 1px solid transparent;
   border-radius: 8px;
-  color: rgba(241, 229, 201, 0.45);
+  color: rgba(var(--papel-rgb), 0.45);
   font-size: 15px;
   cursor: pointer;
   opacity: 0;
@@ -256,7 +256,7 @@
 
 .case-delete:hover {
   color: #f4c8bd;
-  border-color: rgba(179, 64, 47, 0.6);
+  border-color: rgba(var(--peligro-rgb), 0.6);
 }
 
 /* Confirmación in situ */
@@ -300,8 +300,8 @@
   z-index: 50;
   padding: 10px 22px;
   border-radius: 10px;
-  background: rgba(31, 18, 12, 0.95);
-  border: 1px solid rgba(179, 64, 47, 0.6);
+  background: rgba(var(--madera-rgb), 0.95);
+  border: 1px solid rgba(var(--peligro-rgb), 0.6);
   color: #f4c8bd;
   font-size: 16px;
   animation: fade-up 0.3s ease both;

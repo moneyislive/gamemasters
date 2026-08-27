@@ -1,0 +1,180 @@
+/* =====================================================================
+   LOS TEMAS DE CADA JUEGO
+   =====================================================================
+
+   Un juego repinta el tema declarado en `theme.css` y nada más. Ni una regla
+   de disposición, ni un tamaño, ni un margen: si un juego necesitara mover
+   una caja de sitio, eso ya no sería un tema, sería otra pantalla, y tendría
+   que decirlo en su manifiesto.
+
+   El selector es `:root[data-juego='<id>']` —el atributo va en `<html>`, lo
+   pone `client/src/lib/tema.ts`— y gana a `:root` por especificidad sin
+   necesidad de `!important`.
+
+   CLUEDO NO APARECE AQUÍ, y es a propósito: sus valores son los de `:root`.
+   Así, si alguien se lleva por delante este fichero entero, CLUEDO se sigue
+   viendo exactamente igual. Es la forma más barata que hay de garantizar que
+   añadir un juego no puede estropear el que ya funcionaba.
+   ===================================================================== */
+
+/* ---------------------------------------------------------------------
+   EL MISTERIO DE LA MOMIA — 1923, una tumba abierta y una lámpara dentro
+   ---------------------------------------------------------------------
+   La paleta sale de cuatro cosas que están de verdad en esa habitación:
+   la NOCHE del desierto (azul de lapislázuli, casi negro), la ARENISCA de
+   las paredes iluminada por una lámpara de aceite, el ORO VIEJO de lo que
+   se saca de la tumba —más pálido y más sucio que el latón de la mansión,
+   porque lleva tres mil años ahí— y el PAPIRO sobre el que se escribe.
+
+   El burdeos de CLUEDO era el contrapunto cálido de una casa; aquí el
+   contrapunto es FRÍO, el lapislázuli, porque lo que se cuenta es que fuera
+   hace frío y dentro hay una sola lámpara.
+   --------------------------------------------------------------------- */
+
+:root[data-juego='momia'] {
+  /* Oro viejo: más pálido, más terroso y menos brillante que el latón. */
+  --acento-rgb: 216, 180, 106;
+  --acento-medio-rgb: 230, 201, 141;
+  --acento-claro-rgb: 243, 226, 182;
+  --acento-hondo-rgb: 168, 129, 60;
+
+  /* Lapislázuli: el azul que se molía para pintar a los dioses. */
+  --contra-rgb: 44, 90, 168;
+  --contra-hondo-rgb: 27, 58, 117;
+
+  /* Papiro. Algo más cálido y menos blanco que el pergamino de la mansión. */
+  --papel-rgb: 240, 227, 196;
+  --papel-tenue-rgb: 203, 183, 143;
+
+  /*
+   * Arenisca a la luz de la lámpara: de esto están hechos los paneles.
+   *
+   * Se subieron dos veces respecto al primer intento. Con la caoba de CLUEDO
+   * cambiada por un marrón casi negro, el taller se veía apagado y genérico —
+   * «oscuro», que no es lo mismo que «una tumba»—. Una tumba con una lámpara
+   * dentro tiene la piedra CLARA donde da la luz; lo negro es lo de fuera.
+   */
+  --madera-honda-rgb: 22, 18, 13;
+  --madera-rgb: 46, 36, 25;
+  --madera-media-rgb: 64, 51, 35;
+  --madera-clara-rgb: 90, 72, 49;
+
+  /* La noche del desierto, que es el suelo sobre el que se apoya todo. */
+  --suelo-hondo-rgb: 8, 12, 27;
+  --suelo-rgb: 14, 21, 45;
+  --suelo-alto-rgb: 20, 30, 61;
+  --suelo-vivo-rgb: 32, 54, 108;
+
+  --tinta-rgb: 26, 18, 10;
+  /* Rojo de óxido: el de las vendas viejas, no el de la sangre. */
+  --peligro-rgb: 173, 76, 48;
+
+  /*
+   * TIPOGRAFÍA. Tres caras y cada una hace un trabajo distinto:
+   *
+   * · Limelight es art déco de 1920 y no es un capricho de época: el año en
+   *   que se abrió la tumba de Tutankamón es 1922, y la egiptomanía que vino
+   *   después SE ESCRIBIÓ con letras así. Es la que más lejos queda del
+   *   Cinzel Decorative de la mansión, que es exactamente lo que se busca.
+   * · Marcellus SC son versales inscripcionales: se leen como grabadas.
+   * · Spectral para el cuerpo, más ancha y más legible en párrafo largo que
+   *   la Cormorant de CLUEDO, que iba buscando otra cosa.
+   *
+   * Las alternativas van detrás por si el navegador no llega a cargarlas: se
+   * cargan bajo demanda al entrar en un juego de la Momia, así que hay un
+   * instante en que todavía no están.
+   */
+  --font-display: 'Limelight', 'Cinzel Decorative', 'Cinzel', serif;
+  --font-heading: 'Marcellus SC', 'Cinzel', serif;
+  --font-body: 'Spectral', 'Cormorant Garamond', Georgia, serif;
+
+  /*
+   * LA SUPERFICIE DE LOS PANELES: papiro, no caoba.
+   *
+   * Es el cambio que más se nota de todos, y es el más barato: los paneles
+   * ocupan casi toda la pantalla, así que su textura es la textura del sitio.
+   * Dos tramas cruzadas —una vertical muy fina y otra casi horizontal, como las
+   * fibras de una hoja de papiro— sobre la arenisca. A esta opacidad no se ve
+   * como un dibujo: se ve como que la superficie no es lisa, que es de lo que
+   * se trata.
+   */
+  --panel-bg:
+    repeating-linear-gradient(93deg, rgba(var(--papel-rgb), 0.018) 0 1px, transparent 1px 9px),
+    repeating-linear-gradient(2deg, rgba(0, 0, 0, 0.035) 0 1px, transparent 1px 15px),
+    linear-gradient(160deg, rgba(var(--madera-rgb), 0.9), rgba(var(--madera-honda-rgb), 0.95));
+}
+
+/*
+ * EL PLANO DE LA TUMBA. Los tokens los define `components/board/board.css`
+ * con los valores de CLUEDO; aquí se repintan.
+ *
+ * El tapete verde de una mesa de juego pasa a ser roca a la luz de una lámpara
+ * —azul en la sombra, ocre donde da la luz— y el parqué de caoba, arenisca. El
+ * bloque central deja de ser burdeos y se vuelve el pozo: casi negro, que es lo
+ * que se ve cuando uno se asoma.
+ */
+:root[data-juego='momia'] {
+  --tablero-suelo-1: #1b3355;
+  --tablero-suelo-2: #101f3a;
+  --tablero-suelo-3: #070d1c;
+  --tablero-parquet: #3a2e1e;
+  --tablero-parquet-alt: #46392a;
+  --tablero-centro: #0c1730;
+}
+
+/*
+ * La textura del fondo. En CLUEDO es el grano del fieltro de una mesa de
+ * juego; aquí es arena en suspensión, así que se sube un punto la opacidad y
+ * se le añade el rasante de una lámpara que entra por la izquierda, que es lo
+ * que convierte un fondo plano en una habitación.
+ */
+:root[data-juego='momia'] body::before {
+  opacity: 0.075;
+}
+
+:root[data-juego='momia'] body {
+  background:
+    /* La lámpara. */
+    radial-gradient(820px 560px at 10% 4%, rgba(var(--acento-rgb), 0.2), transparent 64%),
+    /* El azul que entra por la grieta del techo. */
+    radial-gradient(980px 660px at 106% 102%, rgba(var(--contra-rgb), 0.3), transparent 60%),
+    /* Estratos de arenisca, muy sutiles: dan sensación de pared excavada. */
+    repeating-linear-gradient(
+      177deg,
+      rgba(var(--papel-rgb), 0.016) 0 2px,
+      transparent 2px 90px
+    ),
+    linear-gradient(180deg, var(--suelo-hondo), var(--suelo) 45%, var(--suelo-hondo));
+}
+
+/*
+ * Las esquinas del marco. En la mansión son cuatro remaches de latón; en la
+ * tumba son cuatro clavos de cobre más pequeños y menos redondos, que es la
+ * diferencia entre un mueble de ebanista y una caja que alguien claveteó.
+ */
+:root[data-juego='momia'] .deco-corners::after {
+  background:
+    radial-gradient(circle at 0 0, var(--gold-500) 1.5px, transparent 2.5px),
+    radial-gradient(circle at 100% 0, var(--gold-500) 1.5px, transparent 2.5px),
+    radial-gradient(circle at 0 100%, var(--gold-500) 1.5px, transparent 2.5px),
+    radial-gradient(circle at 100% 100%, var(--gold-500) 1.5px, transparent 2.5px);
+  background-origin: border-box;
+}
+
+/*
+ * Los negros casi puros que quedaron escritos a mano —toasts, menús flotantes,
+ * el velo de la generación—. En la mansión son un negro cálido de madera; aquí
+ * tienen que ser el azul de la noche o cantan como un agujero.
+ *
+ * Se enumeran en vez de tokenizarlos porque cada uno tiene su propio valor y
+ * unificarlos habría cambiado píxeles de CLUEDO, que es lo único que no se
+ * puede hacer.
+ */
+:root[data-juego='momia'] .has-tip::after,
+:root[data-juego='momia'] .studio-toast,
+:root[data-juego='momia'] .case-confirm,
+:root[data-juego='momia'] .sp-stage-hint,
+:root[data-juego='momia'] .sp-pin-tip,
+:root[data-juego='momia'] .docs-viewer {
+  background: rgba(7, 10, 22, 0.94);
+}

@@ -91,7 +91,7 @@
 }
 
 .live-listos {
-  border-top: 1px solid rgba(201, 162, 39, 0.2);
+  border-top: 1px solid rgba(var(--acento-rgb), 0.2);
   padding-top: 12px;
   margin-top: 4px;
 }
@@ -118,11 +118,11 @@
   color: var(--gold-500);
   text-align: left;
   padding: 6px 8px;
-  border-bottom: 1px solid rgba(201, 162, 39, 0.3);
+  border-bottom: 1px solid rgba(var(--acento-rgb), 0.3);
 }
 .live-tabla td {
   padding: 9px 8px;
-  border-bottom: 1px solid rgba(201, 162, 39, 0.12);
+  border-bottom: 1px solid rgba(var(--acento-rgb), 0.12);
   color: var(--parchment);
   font-size: 0.95rem;
 }
@@ -131,8 +131,8 @@
   font-family: var(--font-heading);
   letter-spacing: 0.2em;
   color: var(--gold-300);
-  background: rgba(201, 162, 39, 0.1);
-  border: 1px solid rgba(201, 162, 39, 0.3);
+  background: rgba(var(--acento-rgb), 0.1);
+  border: 1px solid rgba(var(--acento-rgb), 0.3);
   border-radius: 5px;
   padding: 3px 9px;
 }
@@ -143,11 +143,11 @@
   height: 7px;
   border-radius: 50%;
   margin-right: 7px;
-  background: rgba(217, 201, 163, 0.3);
+  background: rgba(var(--papel-tenue-rgb), 0.3);
 }
 .live-punto.is-vivo {
   background: var(--gold-400);
-  box-shadow: 0 0 8px rgba(201, 162, 39, 0.7);
+  box-shadow: 0 0 8px rgba(var(--acento-rgb), 0.7);
 }
 
 @media (max-width: 720px) {
@@ -166,4 +166,116 @@
   font-size: 0.78em;
   letter-spacing: 0.02em;
   margin-top: 2px;
+}
+
+/* =====================================================================
+   LOS MANDOS DE EL MISTERIO DE LA MOMIA
+   =====================================================================
+   Se pinta con los mismos tokens que todo lo demás —el tema ya está puesto
+   en `<html>`— así que aquí no hay un solo color de la Momia escrito a mano.
+   Lo único propio es la FORMA: una tabla de maldición que hay que leer de un
+   vistazo, y un veredicto que tiene que verse desde el otro lado de la mesa.
+   ===================================================================== */
+
+.live-momia {
+  padding: 20px 22px;
+}
+
+/* La cámara profanada: es lo primero que se anuncia en voz alta. */
+.live-profanada {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin: 0;
+}
+.live-profanada strong {
+  font-family: var(--font-heading);
+  font-size: 1.35rem;
+  letter-spacing: 0.06em;
+  color: var(--gold-300);
+}
+
+/* --- La cuenta de la maldición --- */
+
+.live-marcas,
+.live-amuletos {
+  font-size: 1.05rem;
+  letter-spacing: 0.24em;
+  white-space: nowrap;
+}
+.live-marcas {
+  color: var(--danger);
+}
+.live-amuletos {
+  color: var(--gold-400);
+}
+
+/*
+ * A una marca de quedarse sin voz. Se resalta la FILA entera y no el número:
+ * quien dirige está mirando doce nombres a la vez y buscando cuál necesita un
+ * amuleto, no leyendo una columna.
+ */
+.live-maldicion tr.is-al-borde td {
+  background: rgba(var(--peligro-rgb), 0.09);
+}
+.live-maldicion tr.is-tocado td {
+  opacity: 0.55;
+}
+.live-maldicion tr.is-tocado td:first-child {
+  text-decoration: line-through;
+  text-decoration-color: rgba(var(--peligro-rgb), 0.8);
+}
+
+/* --- El sellado --- */
+
+.live-propuestas {
+  margin: 0 0 4px;
+}
+.live-propuestas strong {
+  font-family: var(--font-heading);
+  font-size: 1.3rem;
+  color: var(--gold-300);
+  margin-right: 4px;
+}
+
+.live-desenlace {
+  border-left: 3px solid rgba(var(--acento-rgb), 0.5);
+  padding-left: 14px;
+}
+.live-desenlace.is-perdida {
+  border-left-color: rgba(var(--peligro-rgb), 0.75);
+}
+.live-veredicto {
+  font-family: var(--font-heading);
+  font-size: 1.15rem;
+  letter-spacing: 0.04em;
+  color: var(--gold-300);
+  margin: 0 0 10px;
+}
+.live-desenlace.is-perdida .live-veredicto {
+  color: #f0c3b6;
+}
+
+/* El orden ejecutado, en fila y numerado: se lee como un ritual. */
+.live-orden {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 8px;
+}
+.live-rito {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 7px;
+  padding: 5px 11px;
+  border: 1px solid rgba(var(--acento-rgb), 0.35);
+  border-radius: 999px;
+  background: rgba(var(--acento-rgb), 0.07);
+  font-size: 0.95rem;
+}
+.live-rito b {
+  font-family: var(--font-heading);
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  color: var(--gold-500);
 }

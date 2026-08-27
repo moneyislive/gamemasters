@@ -31,7 +31,7 @@
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--parchment-dim);
-  border: 1px solid rgba(201, 162, 39, 0.35);
+  border: 1px solid rgba(var(--acento-rgb), 0.35);
   border-radius: 999px;
   padding: 6px 14px;
   white-space: nowrap;
@@ -51,13 +51,13 @@
   flex-wrap: wrap;
   padding: 20px 24px 20px 22px;
   margin-bottom: 22px;
-  border-color: rgba(201, 162, 39, 0.5);
+  border-color: rgba(var(--acento-rgb), 0.5);
   background:
-    linear-gradient(160deg, rgba(88, 24, 36, 0.55), rgba(31, 18, 12, 0.95) 62%),
+    linear-gradient(160deg, rgba(88, 24, 36, 0.55), rgba(var(--madera-rgb), 0.95) 62%),
     var(--panel-bg);
   box-shadow:
     0 10px 34px rgba(0, 0, 0, 0.5),
-    inset 0 1px 0 rgba(232, 207, 127, 0.12);
+    inset 0 1px 0 rgba(var(--acento-claro-rgb), 0.12);
   animation: fade-up 0.4s ease both;
 }
 /* Filo ámbar a la izquierda: la marca de "atención" sin gritar. */
@@ -78,7 +78,7 @@
   line-height: 1;
   margin-top: 4px;
   color: var(--gold-300);
-  text-shadow: 0 0 18px rgba(201, 162, 39, 0.45);
+  text-shadow: 0 0 18px rgba(var(--acento-rgb), 0.45);
 }
 
 .docs-stale-body {
@@ -87,7 +87,7 @@
 }
 .docs-stale-kicker {
   margin: 0 0 4px;
-  color: rgba(241, 229, 201, 0.55);
+  color: rgba(var(--papel-rgb), 0.55);
   letter-spacing: 0.24em;
 }
 .docs-stale-title {
@@ -161,7 +161,7 @@
 }
 .docs-designer-count {
   color: var(--parchment-dim);
-  border: 1px solid rgba(201, 162, 39, 0.3);
+  border: 1px solid rgba(var(--acento-rgb), 0.3);
   border-radius: 999px;
   padding: 5px 12px;
   white-space: nowrap;
@@ -182,8 +182,8 @@
   cursor: pointer;
   font-family: var(--font-body);
   color: var(--parchment);
-  background: rgba(241, 229, 201, 0.05);
-  border: 1px solid rgba(201, 162, 39, 0.34);
+  background: rgba(var(--papel-rgb), 0.05);
+  border: 1px solid rgba(var(--acento-rgb), 0.34);
   border-radius: 8px;
   transition:
     opacity 0.2s ease,
@@ -203,8 +203,8 @@
 }
 .docs-bloque--fijo {
   cursor: default;
-  border-color: rgba(201, 162, 39, 0.55);
-  background: rgba(201, 162, 39, 0.08);
+  border-color: rgba(var(--acento-rgb), 0.55);
+  background: rgba(var(--acento-rgb), 0.08);
 }
 
 /* Miniatura: unas barras que insinúan el texto del bloque */
@@ -222,10 +222,10 @@
 .docs-bloque-maqueta i {
   height: 2.5px;
   border-radius: 2px;
-  background: rgba(62, 39, 35, 0.5);
+  background: rgba(var(--madera-clara-rgb), 0.5);
 }
 .docs-bloque--fuera .docs-bloque-maqueta {
-  background: rgba(241, 229, 201, 0.25);
+  background: rgba(var(--papel-rgb), 0.25);
 }
 
 .docs-bloque-texto {
@@ -265,7 +265,7 @@
   margin-top: 16px;
   padding: 14px 16px;
   cursor: pointer;
-  border: 1px solid rgba(201, 162, 39, 0.28);
+  border: 1px solid rgba(var(--acento-rgb), 0.28);
   border-radius: 8px;
   background: rgba(0, 0, 0, 0.22);
   transition:
@@ -273,11 +273,11 @@
     background 0.2s ease;
 }
 .docs-gm-juega:hover {
-  border-color: rgba(201, 162, 39, 0.55);
+  border-color: rgba(var(--acento-rgb), 0.55);
 }
 .docs-gm-juega.is-on {
   border-color: var(--burgundy-600);
-  background: rgba(140, 35, 55, 0.14);
+  background: rgba(var(--contra-rgb), 0.14);
 }
 .docs-gm-juega input {
   margin-top: 4px;
@@ -326,18 +326,18 @@
 }
 .docs-card:hover {
   transform: translateY(-3px);
-  box-shadow: 0 16px 44px rgba(0, 0, 0, 0.55), 0 0 22px rgba(201, 162, 39, 0.16);
+  box-shadow: 0 16px 44px rgba(0, 0, 0, 0.55), 0 0 22px rgba(var(--acento-rgb), 0.16);
 }
 .docs-card--gm {
-  border-color: rgba(140, 35, 55, 0.65);
+  border-color: rgba(var(--contra-rgb), 0.65);
   background: linear-gradient(160deg, rgba(58, 16, 26, 0.94), rgba(26, 10, 14, 0.96));
 }
 
 /* Jugador sin dosier: tarjeta atenuada, como un sobre que aún no se ha escrito. */
 .docs-card--pendiente {
   border-style: dashed;
-  border-color: rgba(201, 162, 39, 0.32);
-  background: linear-gradient(160deg, rgba(31, 18, 12, 0.55), rgba(20, 12, 8, 0.6));
+  border-color: rgba(var(--acento-rgb), 0.32);
+  background: linear-gradient(160deg, rgba(var(--madera-rgb), 0.55), rgba(var(--madera-honda-rgb), 0.6));
   opacity: 0.72;
 }
 .docs-card--pendiente:hover {
@@ -347,7 +347,7 @@
 }
 .docs-card--pendiente .docs-card-media img,
 .docs-card--pendiente .docs-monogram {
-  border-color: rgba(201, 162, 39, 0.35);
+  border-color: rgba(var(--acento-rgb), 0.35);
   filter: grayscale(0.55);
 }
 .docs-card--pendiente .docs-card-name {
@@ -356,13 +356,13 @@
 .docs-card-pending {
   margin: 10px 0 0;
   font-size: 14.5px;
-  color: rgba(241, 229, 201, 0.55);
+  color: rgba(var(--papel-rgb), 0.55);
 }
 
 /* Dosier sobrante: alguien que ya no se sienta a la mesa. */
 .docs-card--sobrante {
-  border-color: rgba(140, 35, 55, 0.5);
-  background: linear-gradient(160deg, rgba(38, 14, 20, 0.8), rgba(20, 12, 8, 0.88));
+  border-color: rgba(var(--contra-rgb), 0.5);
+  background: linear-gradient(160deg, rgba(38, 14, 20, 0.8), rgba(var(--madera-honda-rgb), 0.88));
   opacity: 0.8;
 }
 .docs-card--sobrante:hover {
@@ -371,7 +371,7 @@
 .docs-card--sobrante .docs-card-name {
   color: var(--parchment-dim);
   text-decoration: line-through;
-  text-decoration-color: rgba(140, 35, 55, 0.7);
+  text-decoration-color: rgba(var(--contra-rgb), 0.7);
   text-decoration-thickness: 1px;
 }
 
@@ -386,7 +386,7 @@
   text-transform: uppercase;
   color: var(--parchment);
   background: linear-gradient(180deg, #a3283c, var(--burgundy-700));
-  border: 1px solid rgba(232, 207, 127, 0.5);
+  border: 1px solid rgba(var(--acento-claro-rgb), 0.5);
   border-radius: 999px;
   padding: 4px 12px;
   box-shadow: 0 3px 10px rgba(0, 0, 0, 0.5);
@@ -395,13 +395,13 @@
 .docs-wax--pendiente {
   color: var(--felt-950);
   background: linear-gradient(180deg, var(--parchment-dim), #b8a882);
-  border-color: rgba(201, 162, 39, 0.45);
+  border-color: rgba(var(--acento-rgb), 0.45);
 }
 /* Sello "Ya no juega": lacre apagado. */
 .docs-wax--sobrante {
-  color: rgba(241, 229, 201, 0.85);
+  color: rgba(var(--papel-rgb), 0.85);
   background: linear-gradient(180deg, #4a2129, #2a1116);
-  border-color: rgba(232, 207, 127, 0.32);
+  border-color: rgba(var(--acento-claro-rgb), 0.32);
 }
 
 .docs-card-media {
@@ -468,7 +468,7 @@
 }
 .docs-empty-glyph {
   font-size: 52px;
-  color: rgba(201, 162, 39, 0.55);
+  color: rgba(var(--acento-rgb), 0.55);
   line-height: 1;
 }
 .docs-empty h3 {
@@ -508,7 +508,7 @@
   gap: 16px;
   flex-wrap: wrap;
   padding: 0 6px 12px;
-  border-bottom: 1px solid rgba(201, 162, 39, 0.28);
+  border-bottom: 1px solid rgba(var(--acento-rgb), 0.28);
 }
 .docs-viewer-head h3 {
   margin: 0;
@@ -525,7 +525,7 @@
   flex: 1;
   width: 100%;
   margin-top: 12px;
-  border: 1px solid rgba(201, 162, 39, 0.28);
+  border: 1px solid rgba(var(--acento-rgb), 0.28);
   border-radius: 6px;
   background: #f1e5c9;
 }
@@ -618,7 +618,7 @@
 .docs-imprimibles {
   margin-top: 40px;
   padding-top: 8px;
-  border-top: 1px solid rgba(201, 162, 39, 0.22);
+  border-top: 1px solid rgba(var(--acento-rgb), 0.22);
 }
 
 .docs-card--imprimible .docs-monogram {
@@ -675,7 +675,7 @@
   transition: background 0.15s ease;
 }
 .docs-descarga-item:hover {
-  background: rgba(201, 162, 39, 0.14);
+  background: rgba(var(--acento-rgb), 0.14);
 }
 
 .docs-descarga-label {
@@ -709,7 +709,7 @@
 .docs-descarga-item--imprimir {
   margin-top: 4px;
   padding-top: 11px;
-  border-top: 1px solid rgba(201, 162, 39, 0.28);
+  border-top: 1px solid rgba(var(--acento-rgb), 0.28);
   border-radius: 0 0 6px 6px;
 }
 

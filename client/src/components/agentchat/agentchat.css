@@ -24,8 +24,8 @@
   align-items: center;
   gap: 14px;
   padding: 14px 18px;
-  border-bottom: 1px solid rgba(201, 162, 39, 0.28);
-  background: linear-gradient(180deg, rgba(201, 162, 39, 0.08), transparent);
+  border-bottom: 1px solid rgba(var(--acento-rgb), 0.28);
+  background: linear-gradient(180deg, rgba(var(--acento-rgb), 0.08), transparent);
 }
 
 .agentchat__avatar {
@@ -126,7 +126,7 @@
 .agentchat__burbuja--assistant {
   color: var(--ink);
   background: linear-gradient(170deg, #f7edd4, var(--parchment) 60%, #e8d8b2);
-  border: 1px solid rgba(176, 141, 46, 0.5);
+  border: 1px solid rgba(var(--acento-hondo-rgb), 0.5);
   border-radius: 10px 10px 10px 3px;
   box-shadow:
     0 6px 16px rgba(0, 0, 0, 0.35),
@@ -137,11 +137,11 @@
 .agentchat__burbuja--user {
   color: var(--parchment);
   background: linear-gradient(165deg, var(--felt-700), var(--felt-800));
-  border: 1px solid rgba(201, 162, 39, 0.35);
+  border: 1px solid rgba(var(--acento-rgb), 0.35);
   border-radius: 10px 10px 3px 10px;
   box-shadow:
     0 6px 16px rgba(0, 0, 0, 0.35),
-    inset 0 1px 0 rgba(232, 207, 127, 0.1);
+    inset 0 1px 0 rgba(var(--acento-claro-rgb), 0.1);
 }
 
 /* Cursor parpadeante durante el streaming */
@@ -167,7 +167,7 @@
   align-items: baseline;
   gap: 7px;
   font-style: italic;
-  color: rgba(28, 20, 16, 0.75);
+  color: rgba(var(--tinta-rgb), 0.75);
 }
 
 .agentchat__puntos {
@@ -213,7 +213,7 @@
   align-items: center;
   gap: 10px;
   padding: 12px 14px;
-  border-top: 1px solid rgba(201, 162, 39, 0.28);
+  border-top: 1px solid rgba(var(--acento-rgb), 0.28);
   background: linear-gradient(0deg, rgba(0, 0, 0, 0.25), transparent);
 }
 
@@ -238,8 +238,8 @@
   place-items: center;
   border-radius: 50%;
   color: var(--gold-300);
-  background: linear-gradient(180deg, rgba(201, 162, 39, 0.16), rgba(201, 162, 39, 0.05));
-  border: 1px solid rgba(201, 162, 39, 0.5);
+  background: linear-gradient(180deg, rgba(var(--acento-rgb), 0.16), rgba(var(--acento-rgb), 0.05));
+  border: 1px solid rgba(var(--acento-rgb), 0.5);
   cursor: pointer;
   transition:
     background 0.2s ease,
@@ -248,8 +248,8 @@
 }
 
 .agentchat__mic:hover {
-  background: linear-gradient(180deg, rgba(201, 162, 39, 0.28), rgba(201, 162, 39, 0.1));
-  box-shadow: 0 0 14px rgba(201, 162, 39, 0.3);
+  background: linear-gradient(180deg, rgba(var(--acento-rgb), 0.28), rgba(var(--acento-rgb), 0.1));
+  box-shadow: 0 0 14px rgba(var(--acento-rgb), 0.3);
 }
 
 .agentchat__mic svg {
@@ -267,10 +267,10 @@
 
 @keyframes agentchat-anillo {
   0% {
-    box-shadow: 0 0 0 0 rgba(201, 162, 39, 0.55);
+    box-shadow: 0 0 0 0 rgba(var(--acento-rgb), 0.55);
   }
   100% {
-    box-shadow: 0 0 0 14px rgba(201, 162, 39, 0);
+    box-shadow: 0 0 0 14px rgba(var(--acento-rgb), 0);
   }
 }
 
@@ -301,7 +301,7 @@
   color: var(--ink);
   /* Papel de telegrama: pergamino con rayado sutil */
   background:
-    repeating-linear-gradient(0deg, transparent 0 25px, rgba(62, 39, 35, 0.05) 25px 26px),
+    repeating-linear-gradient(0deg, transparent 0 25px, rgba(var(--madera-clara-rgb), 0.05) 25px 26px),
     linear-gradient(165deg, #f6ebd1, var(--parchment) 55%, #e6d6ae);
   border: 1px solid var(--gold-500);
   border-radius: 8px;
@@ -316,7 +316,7 @@
   content: '';
   position: absolute;
   inset: 4px;
-  border: 1px solid rgba(176, 141, 46, 0.55);
+  border: 1px solid rgba(var(--acento-hondo-rgb), 0.55);
   border-radius: 5px;
   pointer-events: none;
 }
@@ -373,7 +373,7 @@
   font-family: var(--font-body);
   font-size: 16px;
   line-height: 1.4;
-  color: rgba(28, 20, 16, 0.85);
+  color: rgba(var(--tinta-rgb), 0.85);
   overflow-wrap: anywhere;
 }
 
@@ -388,7 +388,7 @@
   font-family: var(--font-heading);
   font-size: 18px;
   line-height: 1;
-  color: rgba(62, 39, 35, 0.65);
+  color: rgba(var(--madera-clara-rgb), 0.65);
   background: transparent;
   border: none;
   border-radius: 50%;
@@ -400,7 +400,7 @@
 
 .agentpopup__cerrar:hover {
   color: var(--mahogany-800);
-  background: rgba(176, 141, 46, 0.18);
+  background: rgba(var(--acento-hondo-rgb), 0.18);
 }
 
 /* Barra sutil de tiempo restante (7 s, sincronizada con AUTO_CIERRE_MS) */

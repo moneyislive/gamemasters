@@ -1,4 +1,28 @@
 /* =====================================================================
+   LOS COLORES DEL TABLERO
+   =====================================================================
+   El plano se dibuja en SVG y sus colores estaban escritos a mano dentro
+   del componente: tapete verde, parqué de caoba, bloque central burdeos.
+   Eran los de CLUEDO y no había forma de que fueran otros.
+
+   Aquí quedan como tokens con SUS MISMOS VALORES —el plano de CLUEDO no
+   cambia ni un píxel— y `styles/temas.css` los repinta por juego. Están en
+   este fichero y no en `theme.css` porque solo los usa el tablero: quien
+   cambie el plano los tiene delante.
+   ===================================================================== */
+:root {
+  /* El tapete, de dentro afuera. */
+  --tablero-suelo-1: #1d4a32;
+  --tablero-suelo-2: #123122;
+  --tablero-suelo-3: #0a1c13;
+  /* El parqué de las salas, en dos tonos alternos. */
+  --tablero-parquet: #2b1a12;
+  --tablero-parquet-alt: #34211a;
+  /* El bloque del centro, donde va el sello de la casa. */
+  --tablero-centro: #4a1622;
+}
+
+/* =====================================================================
    BOARD VIEW — El tablero del misterio
    Modo 'generated': plano SVG estilo CLUEDO (tapete, parquet, latón).
    Modo 'aerial': fotografía cenital con chinchetas numeradas.
@@ -28,14 +52,14 @@
 .board-room-name {
   font-family: var(--font-heading);
   fill: var(--parchment);
-  stroke: rgba(31, 18, 12, 0.78);
+  stroke: rgba(var(--madera-rgb), 0.78);
   stroke-width: 3px;
   paint-order: stroke;
   letter-spacing: 0.08em;
 }
 
 .board-room-ornament line {
-  stroke: rgba(232, 207, 127, 0.55);
+  stroke: rgba(var(--acento-claro-rgb), 0.55);
   stroke-width: 1;
 }
 .board-room-ornament path {
@@ -77,7 +101,7 @@
 }
 .board-passage:hover .board-passage-line {
   stroke: var(--gold-300);
-  filter: drop-shadow(0 0 6px rgba(232, 207, 127, 0.6));
+  filter: drop-shadow(0 0 6px rgba(var(--acento-claro-rgb), 0.6));
 }
 
 /* ---------- Pie: leyenda + acciones ---------- */
@@ -118,7 +142,7 @@
 .board-empty-plan {
   width: 150px;
   opacity: 0.9;
-  filter: drop-shadow(0 0 18px rgba(201, 162, 39, 0.15));
+  filter: drop-shadow(0 0 18px rgba(var(--acento-rgb), 0.15));
   margin-bottom: 8px;
 }
 .board-empty h3 {
@@ -147,7 +171,7 @@
   position: relative;
   border-radius: 8px;
   overflow: hidden;
-  border: 1px solid rgba(201, 162, 39, 0.4);
+  border: 1px solid rgba(var(--acento-rgb), 0.4);
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
 }
 .board-aerial img {
@@ -182,7 +206,7 @@
   font-family: var(--font-heading);
   font-size: 14px;
   font-weight: 700;
-  border: 2px solid rgba(31, 18, 12, 0.7);
+  border: 2px solid rgba(var(--madera-rgb), 0.7);
   box-shadow: 0 3px 10px rgba(0, 0, 0, 0.5);
   cursor: default;
 }
@@ -202,14 +226,14 @@
   bottom: calc(100% + 6px);
   transform: translateX(-50%);
   white-space: nowrap;
-  background: rgba(20, 12, 8, 0.92);
+  background: rgba(var(--madera-honda-rgb), 0.92);
   color: var(--gold-300);
   font-family: var(--font-heading);
   font-size: 12.5px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   padding: 5px 10px;
-  border: 1px solid rgba(201, 162, 39, 0.5);
+  border: 1px solid rgba(var(--acento-rgb), 0.5);
   border-radius: 6px;
   opacity: 0;
   pointer-events: none;
