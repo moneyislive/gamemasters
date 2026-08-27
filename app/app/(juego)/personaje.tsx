@@ -108,7 +108,7 @@ export default function Personaje(): JSX.Element {
 
       {momia && (
         <Animated.View entering={FadeInUp.delay(90).duration(500)}>
-          <TarjetaDon estado={momia} ronda={sesion.round} compacta />
+          <TarjetaDon estado={momia} compacta />
         </Animated.View>
       )}
 

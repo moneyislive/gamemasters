@@ -58,7 +58,7 @@ import { COLOR_MOMIA as C, MOMIA } from '../tema-momia';
 import { Cartucho, Maldicion } from './piezas';
 import { GlifoDeDon, Grieta, Puerta } from './glifos';
 import { DONES } from './dones';
-import { CAMPO_OBJETIVO, leerEstadoMomia, type EstadoMomiaVisible } from './vista';
+import { codificarObjetivo, leerEstadoMomia, type EstadoMomiaVisible } from './vista';
 import type { SalaVista, VistaJugador } from '../../../shared/live';
 
 /** Lo que la barra de señalar ocupa por encima de las pestañas. */
@@ -144,7 +144,7 @@ export function Vigilia(): JSX.Element {
             <Etiqueta>Vas como</Etiqueta>
             <Titulo style={{ fontSize: 24, marginTop: 4 }}>{yo.characterName}</Titulo>
             <Cuerpo tenue style={{ marginTop: 4 }}>{yo.role}</Cuerpo>
-            {estado && <TarjetaDon estado={estado} ronda={sesion.round} compacta />}
+            {estado && <TarjetaDon estado={estado} compacta />}
             <Boton
               variante="primario"
               onPress={() => router.push('/(juego)/personaje')}
@@ -233,7 +233,10 @@ export function Vigilia(): JSX.Element {
   // ---- La vigilia ----
   const abierta = sesion.phase === 'ronda-abierta';
   const profanada = estado?.profanada;
-  const nombreProfanada = salas.find((s) => s.id === profanada)?.name;
+  // El nombre lo resuelve el servidor; la lista de salas es el respaldo por si
+  // una version vieja del servidor todavia no lo mandara.
+  const nombreProfanada =
+    estado?.profanadaNombre ?? salas.find((s) => s.id === profanada)?.name;
 
   return (
     <>
@@ -251,7 +254,7 @@ export function Vigilia(): JSX.Element {
         </View>
 
         {/* 1. La cámara profanada, lo primero y en grande. */}
-        <Profanacion nombre={nombreProfanada} siguiente={estado?.profanadaSiguiente} salas={salas} />
+        <Profanacion nombre={nombreProfanada} siguiente={estado?.profanadaSiguienteNombre} />
 
         {/* 2. Cómo estás. */}
         {estado && (
@@ -369,14 +372,13 @@ export function Vigilia(): JSX.Element {
 function Profanacion({
   nombre,
   siguiente,
-  salas,
 }: {
   nombre?: string;
+  /** Ya viene como NOMBRE, no como id: lo resuelve la proyeccion. */
   siguiente?: string;
-  salas: SalaVista[];
 }): JSX.Element | null {
   if (!nombre) return null;
-  const nombreSiguiente = siguiente ? salas.find((s) => s.id === siguiente)?.name : undefined;
+  const nombreSiguiente = siguiente;
   return (
     <Animated.View entering={FadeInDown.duration(520)}>
       <View style={estilos.profanada}>
@@ -472,21 +474,28 @@ function FilaDeCamara({
 /** Tu don, sin selector: para el vestíbulo y para el dosier. */
 export function TarjetaDon({
   estado,
-  ronda,
   compacta = false,
 }: {
   estado: EstadoMomiaVisible;
-  ronda: number;
   compacta?: boolean;
 }): JSX.Element {
+  /*
+   * El rotulo y la frase salen del SERVIDOR cuando los manda, y de la tabla de
+   * `dones.ts` cuando no. No es duplicar por duplicar: el servidor tiene la
+   * redaccion canonica —la misma que va al dosier impreso— y la tabla de aqui
+   * tiene ademas QUE HAY QUE ELEGIR, que el servidor no manda porque anunciarlo
+   * seria anunciar quien tiene que don.
+   */
   const don = DONES[estado.yo.don];
-  const usado = estado.yo.donUsadoEnRonda === ronda;
+  const usado = estado.yo.donUsado;
   return (
     <View style={[estilos.don, compacta && { marginTop: espacio.md }]}>
       <View style={estilos.donFila}>
         <GlifoDeDon don={estado.yo.don} size={28} color={C.oro300} />
         <View style={{ flex: 1 }}>
-          <Etiqueta style={{ color: MOMIA.amuleto }}>Tu don · {don.rol}</Etiqueta>
+          <Etiqueta style={{ color: MOMIA.amuleto }}>
+            Tu don · {estado.yo.donRol || don.rol}
+          </Etiqueta>
           <Cuerpo style={[texto.titulo, { color: C.oro300, fontSize: 19, marginTop: 2 }]}>
             {don.nombre}
           </Cuerpo>
@@ -494,7 +503,7 @@ export function TarjetaDon({
         {usado && <Cartucho tono="apagado">Usado</Cartucho>}
       </View>
       <Cuerpo tenue style={{ marginTop: espacio.sm, fontSize: 16 }}>
-        {don.que}
+        {estado.yo.donQueHace || don.que}
       </Cuerpo>
       <Cuerpo tenue style={{ marginTop: 4, fontSize: 14, fontStyle: 'italic' }}>
         Una vez por vigilia. Nadie sabe cuál te ha tocado.
@@ -526,7 +535,7 @@ function PanelDelDon({
 
   const puede = vista.acciones.some((a) => a.id === 'invocar');
   const don = DONES[estado.yo.don];
-  const usado = estado.yo.donUsadoEnRonda === vista.sesion.round;
+  const usado = estado.yo.donUsado;
 
   const opciones: Array<{ id: string; nombre: string }> =
     don.elige === 'persona'
@@ -551,7 +560,7 @@ function PanelDelDon({
     setError(null);
     setEnviando(true);
     try {
-      const r = await api.hacerAccion('invocar', elegido ? { [CAMPO_OBJETIVO]: elegido } : {});
+      const r = await api.hacerAccion('invocar', codificarObjetivo(don.elige, elegido));
       alHacer(r.vista);
       setElegido(null);
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -567,7 +576,7 @@ function PanelDelDon({
       <Ornamento />
       <Seccion>Tu don</Seccion>
       <Marco style={estado.yo.don === 'falsificar' ? estilos.marcoSaqueador : undefined}>
-        <TarjetaDon estado={estado} ronda={vista.sesion.round} />
+        <TarjetaDon estado={estado} />
         <AvisoError>{error}</AvisoError>
 
         {usado ? (

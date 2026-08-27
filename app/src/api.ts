@@ -397,7 +397,15 @@ export function acusar(
  */
 export function hacerAccion(
   accion: string,
-  datos: Record<string, string>,
+  /*
+   * UNA LISTA TAMBIEN ES UN VALOR. Era `Record<string, string>` porque toda
+   * accion elegia UNA entidad; el sellado de la Momia elige cinco ritos EN
+   * ORDEN, y el motor lo declara con `eligeVarias`, que exige un array de
+   * verdad. Aplanarlo a «a,b,c» aqui habria dejado el sellado sin entregar la
+   * noche de la partida, con el reductor escrito y funcionando. La ruta del
+   * servidor conserva los arrays justo para esto.
+   */
+  datos: Record<string, string | string[]>,
 ): Promise<{ resultado: unknown; vista: VistaJugador }> {
   return peticion('/jugar/accion', {
     method: 'POST',

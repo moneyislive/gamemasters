@@ -200,7 +200,7 @@ export function TarjetaFragmento({
           <Etiqueta style={{ color: conAlfa(MOMIA.amuleto, 0.9) }}>Solo tú lo has leído</Etiqueta>
         </View>
         <Text style={[texto.cuerpo, { color: C.pergamino, marginTop: espacio.sm }]}>
-          {fragmento.texto || descripcionDe(fragmento.restriccion)}
+          {textoDe(fragmento)}
         </Text>
       </View>
     );
@@ -223,7 +223,7 @@ export function TarjetaFragmento({
           dudado && { textDecorationLine: 'line-through', opacity: 0.55 },
         ]}
       >
-        {fragmento.texto || descripcionDe(fragmento.restriccion)}
+        {textoDe(fragmento)}
       </Text>
 
       {alDudar && (
@@ -257,7 +257,20 @@ export function TarjetaFragmento({
   );
 }
 
-/** Por si un fragmento llega sin frase: se lee la restricción en crudo. */
+/**
+ * Lo que se lee en la tarjeta.
+ *
+ * Manda la FRASE, que es la que se lee en voz alta en la mesa y la que el modelo
+ * escribió para esta partida. La restricción en crudo es solo el respaldo de un
+ * fragmento que llegara sin redactar: fea de leer, pero jugable, que es mejor que
+ * una tarjeta en blanco a mitad de vigilia.
+ */
+export function textoDe(f: FragmentoVisible): string {
+  if (f.texto) return f.texto;
+  return f.restriccion ? descripcionDe(f.restriccion) : 'Fragmento ilegible.';
+}
+
+/** La restricción dicha en castellano, sin la redacción de la partida. */
 export function descripcionDe(r: Restriccion): string {
   switch (r.tipo) {
     case 'antes':

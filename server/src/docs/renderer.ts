@@ -16,7 +16,6 @@ import { cronologiaPublica, REGLAS_JUGADOR } from './datos';
 import { manifiestoDe } from '../../../shared/juegos';
 import { barraDeImpresion, hojaDeEstilos } from './estilos';
 import { esc } from './html';
-import { DOCUMENT_SECTIONS } from '../../../shared/types';
 import type {
   BoardLayout,
   DocumentRenderOptions,
@@ -374,7 +373,18 @@ ${conBarra ? barraDeImpresion(opciones.printBar === 'auto') : ''}
  * Sin selección guardada van todas; las obligatorias van siempre.
  */
 function incluye(game: GameSession, seccion: DocumentSectionId): boolean {
-  const info = DOCUMENT_SECTIONS.find((s) => s.id === seccion);
+  /*
+   * LAS SECCIONES SON LAS DEL JUEGO QUE SE JUEGA, no las de CLUEDO.
+   *
+   * `DOCUMENT_SECTIONS` son las once de CLUEDO, y el manifiesto de CLUEDO las
+   * declara tal cual, así que para él esto devuelve exactamente lo mismo que
+   * antes. Para la Momia no: sus secciones propias —`don`, `expedicion`,
+   * `reliquias`, `ritos`— no están en esa constante, así que ninguna se
+   * encontraba y las OBLIGATORIAS dejaban de serlo. Con una selección guardada
+   * por el Game Master, el dosier de un expedicionario podía salir sin su don,
+   * que es la sección que más se consulta durante la noche.
+   */
+  const info = manifiestoDe(game.settings?.juego).seccionesDeDosier.find((s) => s.id === seccion);
   if (info?.required) return true;
   const elegidas = game.settings?.documentSections;
   if (!elegidas || elegidas.length === 0) return true;

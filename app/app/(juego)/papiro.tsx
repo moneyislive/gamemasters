@@ -67,7 +67,16 @@ export default function Papiro(): JSX.Element {
   const deduccion = useMemo(() => {
     if (!estado) return null;
     const publicosEnPie = estado.publicos.filter((f) => !apartados.has(f.id));
-    const enUso = [...estado.yo.fragmentos, ...publicosEnPie].map((f) => f.restriccion);
+    /*
+     * Solo los fragmentos que traen su restriccion EN DATOS. Los que llegan con
+     * la frase pero sin la restriccion se siguen leyendo en su tarjeta —para eso
+     * esta la frase— pero no pueden tachar casillas ni entrar en la comprobacion
+     * de contradiccion, porque deducir de la prosa exigiria volver a parsearla, y
+     * el diseno lo prohibe: la logica no depende de la redaccion.
+     */
+    const enUso = [...estado.yo.fragmentos, ...publicosEnPie]
+      .map((f) => f.restriccion)
+      .filter((r): r is NonNullable<typeof r> => Boolean(r));
     return {
       exclusiones: exclusionesDe(enUso, estado.ritos),
       contradiccion: hayContradiccion(enUso, estado.ritos),
@@ -177,7 +186,14 @@ export default function Papiro(): JSX.Element {
       )}
 
       {/* ---- El tablero ---- */}
-      {estado.ritos.length > 0 && (
+      {/*
+        * El tablero SOLO si los fragmentos traen su restriccion en datos. Hoy el
+        * servidor manda unicamente `texto`, y un tablero sin una casilla tachada
+        * no se lee como «esto todavia no funciona»: se lee como «no hay nada
+        * descartado», que es una mentira y de las que hacen perder la partida.
+        * Antes de ensenar algo falso, no se ensena. Pedido en el informe.
+        */}
+      {estado.ritos.length > 0 && estado.hayRestricciones && (
         <>
           <Ornamento />
           <Seccion>Lo que ya no puede ser</Seccion>
