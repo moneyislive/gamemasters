@@ -28,11 +28,12 @@
  */
 import {
   generarPuzle,
+  maximoQueJuntaUnaPersona,
   redactar,
   repartirHallazgos,
   verificarPuzle,
 } from '../juegos/momia-puzle';
-import type { InformeDelPuzle, PuzleMomia } from '../juegos/momia-puzle';
+import type { Hallazgo, InformeDelPuzle, PuzleMomia } from '../juegos/momia-puzle';
 import type { Entidad } from '../../../shared/juegos/entidades';
 import type { DonId, RestriccionEscrita, RitoId, TramaMomia } from '../../../shared/juegos/momia-tipos';
 
@@ -166,6 +167,45 @@ function repartirDones(gente: Entidad[], rnd: () => number): Record<string, DonI
 }
 
 // ---------------------------------------------------------------------------
+// El remiendo del reparto
+// ---------------------------------------------------------------------------
+
+/**
+ * Que ningún fragmento cierto se quede sin aparecer en ninguna cámara.
+ *
+ * NO ES UNA PRECAUCIÓN TEÓRICA: se descubrió generando. `repartirHallazgos`
+ * recorría los fragmentos con un desplazamiento fijo por vigilia, y cuando ese
+ * paso resultaba múltiplo del número de fragmentos —seis fragmentos y cinco
+ * cámaras, que es una partida de lo más normal— el desplazamiento efectivo era
+ * cero: todas las vigilias repartían los mismos cinco y el sexto no estaba en
+ * ninguna cámara ninguna noche.
+ *
+ * Y ese fragmento hace falta. El conjunto es MÍNIMO, así que sin él el papiro
+ * que la mesa puede reunir admite más de un orden y la tumba no se sella por
+ * mucho que hablen. Nadie lo notaría hasta las dos de la mañana.
+ *
+ * El reparto ya lo arregla en su sitio (`juegos/momia-puzle.ts`). Esto no lo
+ * vuelve a arreglar: lo COMPRUEBA, que es distinto. Un remiendo silencioso aquí
+ * dejaría pasar una regresión de allí sin que nadie se enterase; reventar al
+ * preparar, con el taller delante, se arregla en un minuto. Fallar pronto y
+ * ruidosamente es lo correcto cuando la alternativa es fallar tarde y en
+ * silencio.
+ *
+ * @throws si algún fragmento cierto no aparece en ninguna cámara.
+ */
+function exigirQueTodosSePuedanEncontrar(hallazgos: Hallazgo[], fragmentos: string[]): Hallazgo[] {
+  const encontrables = new Set(hallazgos.map((h) => h.fragmentoId));
+  const faltan = fragmentos.filter((id) => !encontrables.has(id));
+  if (faltan.length > 0) {
+    throw new Error(
+      `El reparto deja ${faltan.length} fragmento(s) sin aparecer en ninguna cámara (${faltan.join(', ')}): ` +
+        'la mesa nunca podría reunir el papiro entero y la tumba no se podría sellar.',
+    );
+  }
+  return hallazgos;
+}
+
+// ---------------------------------------------------------------------------
 // Los cimientos
 // ---------------------------------------------------------------------------
 
@@ -264,12 +304,27 @@ export function cimientosDeMomia(
   const restricciones = mezclados.filter((m) => !m.falso).map(escribir);
   const falsasCandidatas = mezclados.filter((m) => m.falso).map(escribir);
 
-  const hallazgos = repartirHallazgos({
-    fragmentos: restricciones.map((r) => r.id),
-    camaras: camaras.map((c) => c.id),
-    rondas: vigilias,
-    semilla: `${semilla}·hallazgos`,
-  });
+  const hallazgos = exigirQueTodosSePuedanEncontrar(
+    repartirHallazgos({
+      fragmentos: restricciones.map((r) => r.id),
+      camaras: camaras.map((c) => c.id),
+      rondas: vigilias,
+      semilla: `${semilla}·hallazgos`,
+    }),
+    restricciones.map((r) => r.id),
+  );
+
+  /*
+   * Después de tocar el reparto hay que volver a mirar lo único que no se puede
+   * perder: que nadie junte el puzle entero por su cuenta. Si el remiendo de
+   * arriba hubiera puesto un fragmento donde no debía, esto lo caza AQUÍ, con el
+   * taller delante, y no de noche.
+   */
+  if (maximoQueJuntaUnaPersona(hallazgos) >= restricciones.length) {
+    throw new Error(
+      'El reparto de fragmentos deja que una sola persona los junte todos: podría sellar la tumba sin hablar con nadie.',
+    );
+  }
 
   /*
    * Qué cámara se profana cada noche. Nunca dos noches seguidas la misma: con

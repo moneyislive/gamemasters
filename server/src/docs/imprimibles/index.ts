@@ -20,9 +20,17 @@ import { indicePaquete } from './indicePaquete';
 import { informeValidacion } from './informeValidacion';
 import { lineaTemporal } from './lineaTemporal';
 import { manualGm } from './manualGm';
-import { pendiente } from './momia/pendiente';
+import { cartelesCamara } from './momia/cartelesCamara';
+import { dosierExpedicionario } from './momia/dosierExpedicionario';
+import { fragmentosPapiro } from './momia/fragmentosPapiro';
+import { guiaExpedicion } from './momia/guiaExpedicion';
+import { hojaSellado } from './momia/hojaSellado';
+import { informePapiro } from './momia/informePapiro';
+import { papiroSellado } from './momia/papiroSellado';
+import { tablaMarcas } from './momia/tablaMarcas';
 import { tarjetasEnsobrar } from './tarjetasEnsobrar';
-import type { PrintableDocId } from '../../../../shared/documents';
+import { manifiestoDe } from '../../../../shared/juegos';
+import type { PrintableDocId, PrintableDocInfo } from '../../../../shared/documents';
 import type { VistaGm } from '../contexto';
 import type {
   DocumentRenderOptions,
@@ -54,21 +62,37 @@ const PLANTILLAS: Record<PrintableDocId, Plantilla> = {
   'informe-validacion': (game, plot, _vista, opciones) => informeValidacion(game, plot, opciones),
 
   /*
-   * EL MISTERIO DE LA MOMIA. Declarados en el catalogo y todavia sin plantilla:
-   * ver `momia/pendiente.ts` para por que esto es un andamio y no un olvido.
+   * EL MISTERIO DE LA MOMIA. Otra imprenta —papiro, tinta sepia y almagre— y
+   * otra carpeta: ver `momia/estilo.ts` para por qué está al lado de la de
+   * CLUEDO en vez de generalizada.
    */
-  'guia-expedicion': () => pendiente('guia-expedicion'),
-  'dosier-expedicionario': () => pendiente('dosier-expedicionario'),
-  'fragmentos-papiro': () => pendiente('fragmentos-papiro'),
-  'carteles-camara': () => pendiente('carteles-camara'),
-  'hoja-sellado': () => pendiente('hoja-sellado'),
-  'tabla-marcas': () => pendiente('tabla-marcas'),
-  'papiro-sellado': () => pendiente('papiro-sellado'),
-  'informe-papiro': () => pendiente('informe-papiro'),
+  'guia-expedicion': (game, plot, _vista, opciones) => guiaExpedicion(game, plot, opciones),
+  'dosier-expedicionario': (game, plot, _vista, opciones) => dosierExpedicionario(game, plot, opciones),
+  'fragmentos-papiro': (game, plot, _vista, opciones) => fragmentosPapiro(game, plot, opciones),
+  'carteles-camara': (game, plot, _vista, opciones) => cartelesCamara(game, plot, opciones),
+  'hoja-sellado': (game, plot, _vista, opciones) => hojaSellado(game, plot, opciones),
+  'tabla-marcas': (game, plot, _vista, opciones) => tablaMarcas(game, plot, opciones),
+  'papiro-sellado': (game, plot, _vista, opciones) => papiroSellado(game, plot, opciones),
+  'informe-papiro': (game, plot, _vista, opciones) => informePapiro(game, plot, opciones),
 };
 
 /** Documentos que necesitan al menos una sala para tener sentido. */
-const NECESITAN_SALAS = new Set<PrintableDocId>(['carteles-sala']);
+const NECESITAN_SALAS = new Set<PrintableDocId>(['carteles-sala', 'carteles-camara']);
+
+/**
+ * La ficha de un documento, buscada en el catálogo DEL JUEGO que se juega.
+ *
+ * `printableDocInfo` mira `PRINTABLE_DOCS`, que son los trece de CLUEDO: con
+ * ella, los diez de la Momia no existían y `renderPrintableDocument` devolvía
+ * null para todos ellos —el paquete salía sin un solo documento del juego—.
+ * El manifiesto de CLUEDO declara `documentos: PRINTABLE_DOCS`, así que para
+ * CLUEDO esto devuelve exactamente lo mismo que antes, byte por byte.
+ */
+function fichaDelDocumento(game: GameSession, id: PrintableDocId): PrintableDocInfo | undefined {
+  return (
+    manifiestoDe(game.settings?.juego).documentos.find((d) => d.id === id) ?? printableDocInfo(id)
+  );
+}
 
 /**
  * Compone uno de los documentos imprimibles. Devuelve null si la partida no
@@ -83,7 +107,7 @@ export function renderPrintableDocument(
 ): PlayerDocument | null {
   const plot = game.plot;
   if (!plot) return null;
-  const info = printableDocInfo(id);
+  const info = fichaDelDocumento(game, id);
   if (!info) return null;
   if (!info.modes.includes(resolveGmMode(game.settings))) return null;
   if (NECESITAN_SALAS.has(id) && game.rooms.length === 0) return null;

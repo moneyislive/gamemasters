@@ -35,6 +35,8 @@ import { solucionesDe } from '../../shared/juegos/momia-tipos';
 import { MOMIA } from '../../shared/juegos';
 import type { RespuestaMomia } from '../src/plot/momia-esquema';
 import type { RitoId } from '../../shared/juegos/momia-tipos';
+import { renderPrintableDocument } from '../src/docs/imprimibles';
+import type { PrintableDocId } from '../../shared/documents';
 import type { GameSession } from '../../shared/types';
 
 // ---------------------------------------------------------------------------
@@ -159,8 +161,23 @@ for (let n = 0; n < 100; n++) {
     fallos.push(`cimientos ${n}: ${trama.profanadas.length} vigilias en vez de ${VIGILIAS_POR_DEFECTO}`);
     break;
   }
-  if (trama.hallazgos.length !== trama.restricciones.length) {
-    fallos.push(`cimientos ${n}: ${trama.hallazgos.length} hallazgos para ${trama.restricciones.length} fragmentos`);
+  /*
+   * TODO FRAGMENTO CIERTO TIENE QUE PODER ENCONTRARSE. El conjunto es mínimo:
+   * si uno no aparece en ninguna cámara ninguna noche, el papiro que la mesa
+   * puede reunir admite más de un orden y la tumba no se sella por mucho que
+   * hablen. Ocurría de verdad —seis fragmentos y cinco cámaras dejaban uno
+   * fuera— y por eso esto se comprueba en cada una de las cien siembras.
+   */
+  const encontrables = new Set(trama.hallazgos.map((h) => h.fragmentoId));
+  const inencontrables = trama.restricciones.filter((r) => !encontrables.has(r.id));
+  if (inencontrables.length > 0) {
+    fallos.push(
+      `cimientos ${n}: ${inencontrables.map((r) => r.id).join(', ')} no aparecen en ninguna cámara`,
+    );
+    break;
+  }
+  if (trama.hallazgos.some((h) => !trama.restricciones.some((r) => r.id === h.fragmentoId))) {
+    fallos.push(`cimientos ${n}: hay hallazgos que apuntan a un fragmento inexistente`);
     break;
   }
   if (maximoQueJuntaUnaPersona(trama.hallazgos) >= trama.restricciones.length) {
@@ -186,6 +203,40 @@ for (let n = 0; n < 100; n++) {
   if (posicionesFalsas.every((p) => p > total - trama.falsasCandidatas.length)) sinFalsaUtil++;
 }
 comprobar('cien puzles seguidos cumplen las cuatro garantías', fallos.length === 0, fallos[0] ?? '');
+
+/*
+ * LA TRAMPA ARITMÉTICA DEL REPARTO, buscada a propósito.
+ *
+ * `repartirHallazgos` recorre los fragmentos con un desplazamiento de
+ * `cámaras + 1` por vigilia. Cuando ese paso es múltiplo del número de
+ * fragmentos —seis fragmentos y cinco cámaras— el desplazamiento efectivo es
+ * CERO: todas las vigilias reparten los mismos cinco y el sexto no está en
+ * ninguna cámara ninguna noche. Como el conjunto es mínimo, sin él el papiro
+ * admite más de un orden y la tumba no se puede sellar.
+ *
+ * No se puede dejar que este caso aparezca por suerte entre las cien siembras de
+ * arriba: se busca hasta encontrarlo y se exige que esté cubierto. Y si no
+ * apareciera ninguno, también es un fallo — significaría que esta comprobación
+ * dejó de probar lo que dice probar.
+ */
+const conLaTrampa: number[] = [];
+for (let n = 0; n < 200 && conLaTrampa.length < 3; n++) {
+  const { trama } = cimientosDeMomia(entidades, { semilla: `trampa-${n}` });
+  if (trama.restricciones.length !== CAMARAS.length + 1) continue;
+  conLaTrampa.push(n);
+  const encontrables = new Set(trama.hallazgos.map((h) => h.fragmentoId));
+  const fuera = trama.restricciones.filter((r) => !encontrables.has(r.id));
+  comprobar(
+    `con ${trama.restricciones.length} fragmentos y ${CAMARAS.length} cámaras, todos se pueden encontrar`,
+    fuera.length === 0,
+    `no aparecen: ${fuera.map((r) => r.id).join(', ')}`,
+  );
+}
+comprobar(
+  'y el caso de la trampa se ha llegado a probar',
+  conLaTrampa.length > 0,
+  'ninguna de 200 siembras dio un puzle con cámaras+1 fragmentos',
+);
 comprobar(
   'los ids de fragmento no delatan cuáles son falsos',
   sinFalsaUtil < 100,
@@ -506,6 +557,170 @@ const lexGemelos = lexicoDeRitos(entGemelos.ritos.map((r) => ({ id: r.id, name: 
 comprobar('la partida sigue siendo jugable',
   todasLasFrasesSonSanas(resGemelos, lexGemelos) === null,
   todasLasFrasesSonSanas(resGemelos, lexGemelos) ?? '');
+
+// ---------------------------------------------------------------------------
+// 7. Los imprimibles: la partida en papel
+// ---------------------------------------------------------------------------
+
+seccion('Los ocho imprimibles, compuestos de verdad');
+
+const partidaConTrama: GameSession = { ...partidaDeMomia(), plot: sana.plot };
+
+const IMPRIMIBLES: PrintableDocId[] = [
+  'guia-expedicion',
+  'dosier-expedicionario',
+  'fragmentos-papiro',
+  'carteles-camara',
+  'hoja-sellado',
+  'tabla-marcas',
+  'papiro-sellado',
+  'informe-papiro',
+];
+
+const compuestos = new Map<PrintableDocId, string>();
+for (const id of IMPRIMIBLES) {
+  const doc = renderPrintableDocument(partidaConTrama, id);
+  comprobar(`se compone «${id}»`, Boolean(doc?.html && doc.html.length > 1500),
+    doc ? `${doc.html?.length ?? 0} caracteres` : 'devolvió null');
+  if (doc?.html) compuestos.set(id, doc.html);
+  comprobar(`«${id}» no sale con el andamio de «pendiente»`,
+    !(doc?.html ?? '').includes('todavía no está escrito'));
+}
+
+/** ¿Aparecen los cinco ritos en el orden verdadero dentro de este HTML? */
+function delataElOrden(html: string): boolean {
+  const m = ritosMencionados(html, lexico);
+  return m.length >= orden.length && m.join('>') === orden.join('>');
+}
+
+/*
+ * LA GUÍA SE MANEJA TODA LA NOCHE DELANTE DE LA MESA. Por eso no lleva ni el
+ * orden verdadero ni el nombre de quien rompió el sello: eso vive en el papiro
+ * del sellado, que es una hoja aparte y boca abajo. Si alguien mete el orden en
+ * la guía «para tenerlo a mano», esta comprobación se pone roja.
+ */
+const nombreSaqueador = EXPEDICION.find(
+  (e) => e.id === sana.plot.solution.respuestas.saqueador,
+)!.name;
+
+for (const id of ['guia-expedicion', 'hoja-sellado', 'carteles-camara', 'informe-papiro'] as PrintableDocId[]) {
+  const html = compuestos.get(id) ?? '';
+  comprobar(`«${id}» no delata el orden verdadero`, !delataElOrden(html));
+}
+/*
+ * «No nombra al saqueador» no se puede comprobar por el nombre: la guía lista a
+ * la expedición entera en la tabla de dones, y ahí está esa persona junto a las
+ * demás, que es justo lo que tiene que pasar. Lo que no puede llevar es lo que
+ * SOLO sabe quien rompió el sello: su motivo, el relato de cómo lo hizo y la
+ * frase con la que su dosier se lo dice.
+ */
+const guia = compuestos.get('guia-expedicion') ?? '';
+comprobar('la guía no lleva el motivo del saqueador',
+  !guia.includes(sana.plot.solution.motive.slice(0, 40)));
+comprobar('ni el relato de cómo rompió el sello',
+  !guia.includes(sana.plot.solution.howItHappened.slice(0, 40)));
+comprobar('ni la frase que se lo dice a esa persona', !guia.includes('Fuiste tú'));
+comprobar('la hoja del sellado tampoco',
+  !(compuestos.get('hoja-sellado') ?? '').includes('Fuiste tú'));
+
+// Y el papiro del sellado SÍ, que para eso existe. Sin esto, un documento vacío
+// pasaría las cuatro comprobaciones de arriba con matrícula.
+comprobar('el papiro del sellado SÍ lleva el orden verdadero',
+  delataElOrden(compuestos.get('papiro-sellado') ?? ''));
+comprobar('y SÍ nombra a quien rompió el sello',
+  (compuestos.get('papiro-sellado') ?? '').includes(nombreSaqueador));
+
+/*
+ * Los dosieres van todos en un mismo documento y se separan al ensobrar. Solo
+ * UNO puede decir «fuiste tú»: si lo dijeran dos, habría dos saqueadores; si
+ * ninguno, la persona que lo es no lo sabría y jugaría de inocente.
+ */
+const dosieres = compuestos.get('dosier-expedicionario') ?? '';
+comprobar('exactamente un dosier revela que su dueño rompió el sello',
+  (dosieres.match(/Fuiste tú/g) ?? []).length === 1,
+  `${(dosieres.match(/Fuiste tú/g) ?? []).length} veces`);
+comprobar('y hay un dosier por persona',
+  EXPEDICION.every((e) => dosieres.includes(e.name)));
+
+/*
+ * Las tiras de fragmento son las que se recortan y reparten. Tienen que estar
+ * todas —las ciertas y las falsas, que se guarda quien dirige— y tiene que
+ * quedar dicho que se imprime a una sola cara: a doble cara se leen al trasluz.
+ */
+const tiras = compuestos.get('fragmentos-papiro') ?? '';
+const tramaSana = sana.plot.delJuego as typeof cimientos.trama;
+comprobar('las tiras traen los textos de TODOS los fragmentos ciertos',
+  tramaSana.restricciones.every((f) => tiras.includes(f.texto.replace(/&/g, '&amp;'))),
+  tramaSana.restricciones.filter((f) => !tiras.includes(f.texto.replace(/&/g, '&amp;'))).map((f) => f.id).join(', '));
+comprobar('y también las falsificaciones, en su página aparte',
+  tramaSana.falsasCandidatas.every((f) => tiras.includes(f.texto.replace(/&/g, '&amp;'))));
+comprobar('y avisan de imprimir a una sola cara',
+  tiras.includes('UNA SOLA CARA') || tiras.includes('una sola cara'));
+comprobar('y traen la línea de doblez que impide leerlas por detrás',
+  tiras.includes('dobla por aquí'));
+
+/*
+ * El informe del papiro es el que le da confianza a quien monta la velada. Con
+ * una trama sana tiene que decir que todo cuadra; si dijera eso siempre, no
+ * valdría nada, así que también se comprueba al revés más abajo.
+ */
+const informe = compuestos.get('informe-papiro') ?? '';
+comprobar('el informe da el puzle por bueno cuando lo es',
+  informe.includes('El papiro está bien roto'));
+
+/*
+ * Y ahora con una trama ESTROPEADA: se le quita un fragmento cierto, con lo que
+ * el puzle deja de tener una sola solución. El informe tiene que enterarse. Es
+ * la comprobación que impide que este documento sea un sello de goma.
+ */
+const tramaCoja = {
+  ...tramaSana,
+  restricciones: tramaSana.restricciones.slice(1),
+  hallazgos: tramaSana.hallazgos.filter((h) => h.fragmentoId !== tramaSana.restricciones[0]!.id),
+};
+const partidaCoja: GameSession = {
+  ...partidaConTrama,
+  plot: { ...sana.plot, delJuego: tramaCoja },
+};
+const informeCojo = renderPrintableDocument(partidaCoja, 'informe-papiro')?.html ?? '';
+comprobar('y lo desmiente cuando el puzle se queda sin solución única',
+  !informeCojo.includes('El papiro está bien roto') && informeCojo.includes('antes de imprimir nada'),
+  informeCojo.includes('El papiro está bien roto') ? 'lo dio por bueno igual' : 'no avisó');
+
+/*
+ * Y sin trama de la Momia —una partida vieja, o una a la que le cambiaron el
+ * juego— cada documento tiene que decir qué pasa, no salir en blanco.
+ */
+const sinDelJuego: GameSession = {
+  ...partidaConTrama,
+  plot: { ...sana.plot, delJuego: undefined },
+};
+for (const id of IMPRIMIBLES) {
+  const html = renderPrintableDocument(sinDelJuego, id)?.html ?? '';
+  comprobar(`«${id}» explica qué falta si no hay trama del juego`,
+    html.includes('no tiene trama de El Misterio de la Momia'),
+    `${html.length} caracteres`);
+}
+
+/*
+ * Y para mirarlos con los ojos, que es lo que ninguna comprobación sustituye:
+ *
+ *   npm run verify:momia-trama -w server -- --volcar C:\\ruta\\donde\\sea
+ *
+ * Los PDF son de lo que más fácil se da por bueno leyendo el código y peor sale
+ * en papel: márgenes, cortes de página, tiras que no se recortan bien. Esto
+ * escribe los ocho a disco para abrirlos e imprimir uno de verdad.
+ */
+const donde = process.argv[process.argv.indexOf('--volcar') + 1];
+if (process.argv.includes('--volcar') && donde) {
+  const fs = await import('node:fs');
+  const path = await import('node:path');
+  fs.mkdirSync(donde, { recursive: true });
+  for (const [id, html] of compuestos) {
+    fs.writeFileSync(path.join(donde, `${id}.html`), html, 'utf8');
+  }
+  console.log(`\nVolcados ${compuestos.size} documentos en ${donde}`);
+}
 
 // ---------------------------------------------------------------------------
 // Cierre
