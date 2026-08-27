@@ -58,6 +58,7 @@ import { vistaMomiaDe } from '../src/juegos/momia-proyeccion';
 import { MARCAS_PARA_TOCADO } from '../../shared/juegos/momia-tipos';
 import type { TramaMomia } from '../../shared/juegos/momia-tipos';
 import type { GameSession } from '../../shared/types';
+import { manifiestoDe } from '../../shared/juegos';
 import type { LiveSession, VistaJugador } from '../../shared/live';
 
 const REPO = path.resolve(import.meta.dirname ?? __dirname, '..', '..');
@@ -537,25 +538,76 @@ async function jugarPorElCable(): Promise<void> {
     senala.datos?.resultado,
   );
 
-  paso('Proponer el orden: hoy no llega, y esta comprobación existe para que se note');
+  paso('Proponer el orden del sellado');
   /*
-   * ESTO NO ES UN FALLO DE LA MOMIA, ES UNA COSTURA DE LA PLATAFORMA. El motor
-   * descarta todo campo que la acción no declare en `eligeDe`, y una lista
-   * ordenada de cinco entidades no cabe ahí (§8.5). Se comprueba el
-   * comportamiento de HOY a propósito: el día que el motor deje pasar los campos
-   * libres, esta línea se pondrá en rojo y quien la arregle verá aquí escrito
-   * qué hay que cambiar.
+   * SE COMPRUEBA LO QUE EL CONTRATO DECLARE, NO LO QUE HOY PASE.
+   *
+   * `proponer-orden` necesita una lista ordenada de cinco entidades, y `eligeDe`
+   * solo sabía pedir una. Durante unas horas la propuesta no llegaba y aquí
+   * había escrito «se rechaza», congelando la costura como si fuera la regla.
+   * Eso es exactamente lo que una prueba no debe hacer: el día que el hueco se
+   * tapara, se habría puesto roja sin que nada estuviera mal.
+   *
+   * Así que se mira el manifiesto y se exige la conducta que corresponda. Si
+   * declara `eligeVarias`, la propuesta TIENE que llegar; si no, tiene que
+   * rechazarse con su motivo y queda anotado como pendiente. Las dos ramas son
+   * comprobaciones de verdad, y ninguna se cae sola cuando la otra llega.
    */
-  const propone = await accion('e0', 'proponer-orden', { orden: trama.ordenVerdadero.join(',') });
-  comprobar(
-    'hoy la propuesta se rechaza porque el motor descarta el campo',
-    propone.estado === 409 && String(propone.datos?.error ?? '').includes('no ha llegado'),
-    propone.datos,
-  );
-  pendientes.push(
-    'motor.ts descarta los campos que la acción no declara en `eligeDe`: ' +
-      '`proponer-orden` no puede recibir su lista y `invocar` no puede recibir su objetivo.',
-  );
+  const definicionPropuesta = manifiestoDe('momia').acciones.find((a) => a.id === 'proponer-orden');
+  const porElCable = Boolean(definicionPropuesta?.eligeVarias?.length);
+
+  if (porElCable) {
+    const mal = await accion('e0', 'proponer-orden', { orden: trama.ordenVerdadero.slice(0, 4) });
+    comprobar('una propuesta de cuatro ritos la para el motor', mal.estado === 409, mal.datos);
+    const repes = await accion('e0', 'proponer-orden', {
+      orden: [trama.ordenVerdadero[0], trama.ordenVerdadero[0], ...trama.ordenVerdadero.slice(1, 4)],
+    });
+    comprobar('y una con un rito repetido, también', repes.estado === 409, repes.datos);
+
+    for (const id of ['e0', 'e1', 'e2']) {
+      const r = await accion(id, 'proponer-orden', { orden: trama.ordenVerdadero });
+      comprobar(`${id} entrega su propuesta`, r.estado === 200, r.datos);
+    }
+    const delSaqueadorProp = await accion(SAQUEADOR, 'proponer-orden', {
+      orden: [...trama.ordenVerdadero].reverse(),
+    });
+    comprobar('y el saqueador la suya, torcida', delSaqueadorProp.estado === 200, delSaqueadorProp.datos);
+
+    v = await vista('e0');
+    comprobar(
+      'cada cual ve la suya',
+      estadoDe(v).yo.miPropuesta?.join('|') === trama.ordenVerdadero.join('|'),
+      estadoDe(v).yo.miPropuesta,
+    );
+    comprobar(
+      'y de los demás solo sabe QUE han propuesto, no QUÉ',
+      estadoDe(v).mesa.every((m: any) => m.haPropuesto === true) &&
+        !JSON.stringify(estadoDe(v).mesa).includes(trama.ordenVerdadero[0]!),
+      estadoDe(v).mesa,
+    );
+    // Y con propuestas sobre la mesa, el orden verdadero sigue sin viajar.
+    for (const id of Object.keys(testigos)) {
+      const fugas = fugasEn(await vista(id), trama.ordenVerdadero, PROHIBIDAS).filter(
+        // La propuesta PROPIA sí puede coincidir con el orden verdadero: quien
+        // acierta tiene derecho a ver lo que escribió. Lo que no puede es
+        // llegarle por ningún otro camino.
+        (f) => !f.startsWith('vista.estadoDelJuego.yo.miPropuesta'),
+      );
+      comprobar(`ni con las propuestas entregadas se le filtra nada a ${id}`, fugas.length === 0, fugas);
+    }
+  } else {
+    const propone = await accion('e0', 'proponer-orden', { orden: trama.ordenVerdadero });
+    comprobar(
+      'sin `eligeVarias` en el manifiesto, la propuesta no puede llegar',
+      propone.estado === 409 && String(propone.datos?.error ?? '').includes('no ha llegado'),
+      propone.datos,
+    );
+    pendientes.push(
+      'el manifiesto de la Momia no declara `eligeVarias` para `proponer-orden`: ' +
+        'el motor ya lo admite, pero mientras no se declare, el sellado no se puede ' +
+        'entregar por el cable.',
+    );
+  }
 
   paso('Se cierra la vigilia y se abre la segunda');
   const cerrar = await pedir(`/games/${game.id}/live/ronda/cerrar`, { metodo: 'POST' });
@@ -620,19 +672,39 @@ async function jugarPorElCable(): Promise<void> {
     final?.ordenVerdadero?.map((r: any) => r.id).join('|') === trama.ordenVerdadero.join('|'),
   );
   comprobar('se dice quién rompió el sello', final?.saqueadorId === SAQUEADOR, final?.saqueadorId);
-  comprobar(
-    'nadie propuso nada, así que la tumba amanece abierta y gana el saqueador',
-    final?.gana === 'saqueador' && final?.ganadores.join() === SAQUEADOR,
-    { gana: final?.gana, ganadores: final?.ganadores },
-  );
+  if (porElCable) {
+    comprobar(
+      'tres votaron el orden bueno contra uno: la tumba se sella',
+      final?.correcto === true && final?.gana === 'expedicion',
+      { correcto: final?.correcto, gana: final?.gana },
+    );
+    comprobar(
+      'y gana la expedición entera menos el saqueador',
+      final?.ganadores.slice().sort().join() === ['e0', 'e1', 'e2'].join(),
+      final?.ganadores,
+    );
+    comprobar(
+      'quienes propusieron el orden ejecutado se llevan El Sellador',
+      (final?.trofeos?.e0 ?? []).includes('sellador'),
+      final?.trofeos,
+    );
+  } else {
+    comprobar(
+      'nadie propuso nada, así que la tumba amanece abierta y gana el saqueador',
+      final?.gana === 'saqueador' && final?.ganadores.join() === SAQUEADOR,
+      { gana: final?.gana, ganadores: final?.ganadores },
+    );
+  }
   comprobar(
     'y quien señaló bien se lleva el Ojo de Horus',
     (final?.trofeos?.e0 ?? []).includes('ojo-de-horus'),
     final?.trofeos,
   );
   comprobar(
-    'el saqueador se lleva La Sombra',
-    (final?.trofeos?.[SAQUEADOR] ?? []).includes('sombra'),
+    porElCable
+      ? 'y el saqueador NO se lleva La Sombra, porque la tumba se selló'
+      : 'el saqueador se lleva La Sombra',
+    (final?.trofeos?.[SAQUEADOR] ?? []).includes('sombra') !== porElCable,
     final?.trofeos,
   );
 }
@@ -884,12 +956,12 @@ function jugarElSellado(): void {
 
   estadoE.gente.e1.don = 'sanar';
   estadoE.gente.e2.marcas = 2;
-  const sanado = invocarDon(e.game, e.sesion, 'e1', { objetivo: 'e2' });
+  const sanado = invocarDon(e.game, e.sesion, 'e1', { persona: 'e2' });
   comprobar('sanar quita una marca sin gastar amuleto', estadoE.gente.e2.marcas === 1);
   comprobar('y no toca los amuletos', estadoE.gente.e1.amuletos === 2, sanado);
 
   estadoE.gente.e2.don = 'proteger';
-  invocarDon(e.game, e.sesion, 'e2', { objetivo: 'e2' });
+  invocarDon(e.game, e.sesion, 'e2', { persona: 'e2' });
   const conProteccion = entrarEnCamara(e.game, e.sesion, 'e2', tramaE.profanadas[0]!);
   comprobar(
     'a quien está protegido no le marca la cámara profanada',

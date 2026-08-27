@@ -6,32 +6,28 @@
  * importaciones y el módulo se quedaría a medio cargar.
  *
  * ────────────────────────────────────────────────────────────────────────────
- * UNA LIMITACIÓN DE LA PLATAFORMA QUE HAY QUE CONOCER ANTES DE LEER ESTO
+ * CÓMO LLEGAN AQUÍ LOS DATOS, QUE TIENE HISTORIA
  * ────────────────────────────────────────────────────────────────────────────
  *
- * El motor solo le pasa al reductor los campos que la acción declara en
- * `eligeDe` (`motor.ts`, el bucle que compone `limpios`). Todo lo demás que
- * mande el móvil se descarta, y hace bien: es lo que impide que un cliente
- * manipulado cuele el id de una sala donde va un sospechoso.
+ * El motor solo le pasa al reductor los campos que la acción declara, y hace
+ * bien: es lo que impide que un móvil manipulado cuele el id de una sala donde
+ * va un sospechoso. El problema era que solo sabía declarar «una entidad de esta
+ * categoría», y dos acciones de este juego no caben ahí: `proponer-orden`
+ * necesita una LISTA ORDENADA de cinco y `invocar` necesita un objetivo que
+ * depende del don, que es secreto hasta que se usa (§8.5 del diseño).
  *
- * Pero dos acciones de este juego NO CABEN en `eligeDe`, y el propio manifiesto
- * lo dice: `proponer-orden` necesita una lista ordenada de cinco entidades e
- * `invocar` necesita algo distinto según el don, que es secreto hasta que se
- * usa. `eligeDe` sabe pintar «elige uno de esta categoría» y nada más (§8.5 del
- * diseño). Resultado: hoy esas dos acciones llegan aquí SIN DATOS.
+ * Durante unas horas eso dejó las dos acciones sin datos, y este fichero tenía
+ * escrito el apaño. Ya no: el motor admite `eligeVarias` —que valida cada
+ * elemento igual, exige el número exacto y rechaza repetidos— y `eligeOpcional`
+ * —un campo que unas veces hace falta y otras no—. Las listas llegan en
+ * `ctx.listas` y no en `ctx.datos`, separadas a propósito para que un juego que
+ * no use listas no tenga que comprobar el tipo de cada campo.
  *
- * Cómo se resuelve mientras tanto, y es a propósito que se resuelva así:
- *
- *   · La lógica de verdad vive en funciones exportadas —`proponerOrden`,
- *     `invocarDon`, `ofrendarAmuleto`, `entrarEnCamara`— que reciben lo que
- *     necesitan por parámetro. Se pueden llamar, probar y usar desde una
- *     pantalla propia sin pasar por el motor.
- *   · Los reductores leen `ctx.datos` por si algún día llega. El día que el
- *     motor deje pasar los campos libres, esto funciona sin tocar una línea.
- *   · Donde no llega nada, hay un valor por defecto DETERMINISTA y documentado,
- *     nunca uno al azar: una partida tiene que poder repetirse.
- *
- * El cambio que falta está anotado en el informe: una línea en `motor.ts`.
+ * LO QUE SIGUE SIN CABER, y está en el informe: elegir CUÁL de sus dos dones usa
+ * el saqueador. Un don no es una entidad de ninguna categoría, así que no hay
+ * forma de declararlo. Mientras tanto se lee de `datos.don` —por si algún día
+ * llega— y sin él se usa el don aparente, que es el que tiene en el dosier.
+ *  * El cambio que falta está anotado en el informe: una línea en `motor.ts`.
  */
 import { acusar as registrarSenalamiento, elegirSala } from '../live/sesion';
 import { AccionInvalida, registrarAcciones } from './motor';
@@ -291,15 +287,21 @@ function leFaltaSoloUno(estado: EstadoMomia, suspectId: string): boolean {
 /**
  * Usa el don. Una vez por vigilia.
  *
- * @param don cuál usar, para el saqueador, que tiene dos. Por defecto el suyo.
- * @param objetivo a quién o a qué, según el don. Los valores por defecto están
- * documentados uno a uno: hoy no llega nada del móvil (ver la cabecera).
+ * LOS DESTINOS VAN EN CAMPOS DISTINTOS SEGÚN LO QUE SEAN, y no en un `objetivo`
+ * para todo. La razón es del motor: valida cada campo contra la categoría que la
+ * acción declara, así que una persona y una cámara no pueden compartir campo. Y
+ * lo que no es una entidad —un fragmento, una mentira— no puede declararse
+ * siquiera, así que esos dos solo llegan cuando se llama a esta función
+ * directamente y por el cable se usa el valor por defecto.
+ *
+ * Los valores por defecto son DETERMINISTAS, nunca al azar: una partida tiene
+ * que poder repetirse con la misma semilla.
  */
 export function invocarDon(
   game: GameSession,
   sesion: LiveSession,
   suspectId: string,
-  opciones: { don?: string; objetivo?: string } = {},
+  opciones: { don?: string; persona?: string; camara?: string; fragmento?: string } = {},
 ): ResultadoInvocacion {
   const trama = tramaObligatoria(game);
   const estado = estadoDe(game, sesion);
@@ -355,7 +357,7 @@ export function invocarDon(
     }
 
     case 'sanar': {
-      const aQuien = opciones.objetivo ?? masTocado;
+      const aQuien = opciones.persona ?? masTocado;
       if (!aQuien || aQuien === suspectId) {
         throw new AccionInvalida('Sanar es para otra persona, no para ti.');
       }
@@ -372,7 +374,7 @@ export function invocarDon(
       // Aquí sí se admite protegerse a uno mismo: el guardián carga la lámpara y
       // decide a quién alumbra. Es lo contrario del amuleto, y a propósito: uno
       // obliga a hablar, el otro es la decisión privada de quien vigila.
-      const aQuien = opciones.objetivo ?? masTocado ?? suspectId;
+      const aQuien = opciones.persona ?? masTocado ?? suspectId;
       if (!estado.gente[aQuien]) throw new AccionInvalida('Esa persona no está en la expedición.');
       if (!vigilia.protegidos.includes(aQuien)) vigilia.protegidos.push(aQuien);
       resultado = { don, efecto: 'La maldición no le alcanzará esta vigilia.', objetivo: aQuien };
@@ -394,7 +396,7 @@ export function invocarDon(
 
     case 'documentar': {
       const cual =
-        opciones.objetivo ??
+        opciones.fragmento ??
         persona.fragmentos.find((id) => estado.fragmentos[id] && !estado.fragmentos[id]!.publico);
       const fragmento = cual ? estado.fragmentos[cual] : undefined;
       if (!fragmento) throw new AccionInvalida('No tienes ningún fragmento sin publicar.');
@@ -414,7 +416,7 @@ export function invocarDon(
         .filter((e) => e.round === sesion.round)
         .map((e) => e.roomId);
       const aDonde =
-        opciones.objetivo ?? camaras.find((c) => !yaVisitadas.includes(c.id))?.id;
+        opciones.camara ?? camaras.find((c) => !yaVisitadas.includes(c.id))?.id;
       if (!aDonde) throw new AccionInvalida('No queda cámara nueva en la que entrar.');
       const exploracion = entrarEnCamara(game, sesion, suspectId, aDonde, { marcaExtra: true });
       resultado = {
@@ -437,7 +439,7 @@ export function invocarDon(
         Object.values(estado.fragmentos).filter((f) => f.falso).map((f) => f.id),
       );
       const candidata =
-        trama.falsasCandidatas.find((f) => f.id === opciones.objetivo) ??
+        trama.falsasCandidatas.find((f) => f.id === opciones.fragmento) ??
         trama.falsasCandidatas.find((f) => !yaPublicadas.has(f.id));
       if (!candidata) throw new AccionInvalida('Ya has gastado todas tus mentiras.');
       if (yaPublicadas.has(candidata.id)) throw new AccionInvalida('Esa ya está sobre la mesa.');
@@ -532,26 +534,32 @@ registrarAcciones('momia', {
     ofrendarAmuleto(game, sesion, suspectId, datos.aQuien!),
 
   /*
-   * `datos` llega vacío hoy —`invocar` no declara `eligeDe`— así que esto es, de
-   * momento, «usa tu don con lo que haya». Se lee de `datos` igualmente para que
-   * el día que el motor deje pasar campos libres no haya que tocar nada.
+   * Los campos llegan por `eligeOpcional`, que es lo que permite que una misma
+   * acción pida una persona, una cámara o nada según el don. Cuál mirar lo
+   * decide el reductor, porque el motor no puede: el don es secreto.
    */
   invocar: ({ game, sesion, suspectId, datos }) =>
-    invocarDon(game, sesion, suspectId, { don: datos.don, objetivo: datos.objetivo }),
+    invocarDon(game, sesion, suspectId, {
+      don: datos.don,
+      persona: datos.objetivo,
+      camara: datos.camara,
+    }),
 
-  'proponer-orden': ({ game, sesion, suspectId, datos }) => {
-    /*
-     * La lista viaja separada por comas porque `datos` es `Record<string,string>`
-     * y una acción no puede declarar un campo compuesto. Es un apaño, y se nota
-     * que lo es: lo correcto está en §8.5 del diseño y anotado en el informe.
-     */
-    const crudo = datos.orden ?? '';
-    if (!crudo) {
+  /*
+   * La lista llega en `listas`, ya validada por el motor: cinco ritos, todos
+   * reales, sin repetidos y en el orden en que se mandaron. Las comprobaciones
+   * de `proponerOrden` siguen ahí de todos modos, porque esa función también se
+   * llama desde una pantalla propia y desde las pruebas, y una regla que solo se
+   * cumple cuando se entra por una puerta no es una regla.
+   */
+  'proponer-orden': ({ game, sesion, suspectId, listas }) => {
+    const orden = listas.orden ?? [];
+    if (orden.length === 0) {
       throw new AccionInvalida(
         'Tu propuesta no ha llegado. El sellado se entrega desde la pantalla del sellado.',
       );
     }
-    return proponerOrden(game, sesion, suspectId, crudo.split(',').filter(Boolean));
+    return proponerOrden(game, sesion, suspectId, orden);
   },
 
   /**
