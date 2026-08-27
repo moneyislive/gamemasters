@@ -177,6 +177,43 @@ export interface DefinicionAccion {
    * escribir una pantalla nueva.
    */
   eligeDe?: Array<{ campo: string; categoria: CategoriaId; rotulo: string }>;
+  /**
+   * Lo que se elige EN LISTA, no de uno en uno.
+   *
+   * `eligeDe` sabe pedir «una entidad de esta categoría» y nada más. Hay
+   * acciones cuya respuesta es un CONJUNTO o una SECUENCIA —ordenar los cinco
+   * ritos del sellado, repartir tres cartas, señalar a dos personas— y no cabían:
+   * el motor descartaba cualquier campo no declarado, así que la lista no
+   * llegaba al reductor y la acción no se podía hacer por HTTP.
+   *
+   * Cada elemento se comprueba igual que en `eligeDe`: tiene que ser una entidad
+   * REAL de su categoría. Eso es lo que impide que un móvil manipulado mande el
+   * id de una sala donde va un sospechoso, y no se afloja por admitir listas.
+   *
+   * `cuantas` exige un número exacto de elementos; `ordenada` dice que el orden
+   * significa algo, que es lo que separa «elige tres» de «ponlos en orden».
+   */
+  eligeVarias?: Array<{
+    campo: string;
+    categoria: CategoriaId;
+    rotulo: string;
+    cuantas?: number;
+    ordenada?: boolean;
+  }>;
+
+  /**
+   * Lo que se elige solo A VECES.
+   *
+   * Existe por los dones de El Misterio de la Momia: `invocar` necesita un
+   * objetivo cuando el don es curar a alguien y ninguno cuando es leer un
+   * jeroglífico. Cuál de los dos es depende del don, que es SECRETO, así que el
+   * motor no puede saber de antemano si el campo hace falta.
+   *
+   * Se comprueba igual de estricto que `eligeDe` cuando viene; lo que no hace es
+   * exigirlo. Quien decide si era obligatorio es el reductor, que sí sabe el don.
+   */
+  eligeOpcional?: Array<{ campo: string; categoria: CategoriaId; rotulo: string }>;
+
   /** Cuántas veces se admite por turno o ronda. Sin límite si se omite. */
   vecesPorTurno?: number;
 }

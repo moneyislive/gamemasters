@@ -35,6 +35,16 @@ export interface ContextoAccion {
   suspectId: string;
   /** Lo que ha elegido, campo a campo, con ids ya verificados. */
   datos: Record<string, string>;
+  /**
+   * Lo elegido EN LISTA, con cada id ya verificado contra su categoría.
+   *
+   * Va en un campo aparte y no dentro de `datos` a propósito: mezclarlos
+   * obligaría a que `datos` fuese `Record<string, string | string[]>`, y
+   * entonces todos los reductores que ya existen tendrían que comprobar de qué
+   * tipo es cada campo antes de usarlo. Separados, un juego que no use listas no
+   * se entera de que existen.
+   */
+  listas: Record<string, string[]>;
   /** La definición, por si el reductor quiere consultar sus límites. */
   definicion: DefinicionAccion;
 }
@@ -83,7 +93,12 @@ export function ejecutarAccion(
   sesion: LiveSession,
   suspectId: string,
   accion: string,
-  datos: Record<string, string>,
+  /*
+   * Puede traer listas ademas de valores sueltos: hay acciones cuya respuesta es
+   * una secuencia —ordenar los cinco ritos del sellado— y no cabia en un mapa de
+   * cadenas. Todo se valida igual mas abajo, elemento a elemento.
+   */
+  datos: Record<string, string | string[]>,
 ): unknown {
   const manifiesto = manifiestoDe(sesion.juego);
   const definicion = manifiesto.acciones.find((a) => a.id === accion);
@@ -126,12 +141,48 @@ export function ejecutarAccion(
     limpios[campo.campo] = valor;
   }
 
+  /*
+   * Lo mismo, para lo que se elige en lista y para lo opcional. Cada elemento
+   * pasa por la misma comprobacion: tiene que ser una entidad REAL de su
+   * categoria. Admitir listas no afloja la garantia, solo cambia la forma.
+   */
+  const listas: Record<string, string[]> = {};
+  for (const campo of definicion.eligeVarias ?? []) {
+    const crudo = (datos as Record<string, unknown>)[campo.campo];
+    if (!Array.isArray(crudo)) throw new AccionInvalida(`Falta elegir: ${campo.rotulo}`);
+    const valores = crudo.map((v) => String(v ?? ''));
+    if (campo.cuantas !== undefined && valores.length !== campo.cuantas) {
+      throw new AccionInvalida(
+        `${campo.rotulo}: hacen falta ${campo.cuantas}, y han llegado ${valores.length}.`,
+      );
+    }
+    if (new Set(valores).size !== valores.length) {
+      throw new AccionInvalida(`${campo.rotulo}: no se puede repetir.`);
+    }
+    const existentes = entidadesDe(game, campo.categoria);
+    for (const valor of valores) {
+      if (!existentes.some((e) => e.id === valor)) {
+        throw new AccionInvalida(`Esa no es una opción válida para «${campo.rotulo}».`);
+      }
+    }
+    listas[campo.campo] = valores;
+  }
+
+  for (const campo of definicion.eligeOpcional ?? []) {
+    const valor = String(datos[campo.campo] ?? '');
+    if (!valor) continue;
+    if (!entidadesDe(game, campo.categoria).some((e) => e.id === valor)) {
+      throw new AccionInvalida(`Esa no es una opción válida para «${campo.rotulo}».`);
+    }
+    limpios[campo.campo] = valor;
+  }
+
   const reductor = REDUCTORES[manifiesto.id]?.[accion];
   if (!reductor) {
     throw new AccionInvalida('Esta partida todavía no sabe hacer eso.');
   }
 
-  const resultado = reductor({ game, sesion, suspectId, datos: limpios, definicion });
+  const resultado = reductor({ game, sesion, suspectId, datos: limpios, listas, definicion });
 
   // Queda registrado para poder contar repeticiones y para que quien dirige vea
   // lo que va pasando.

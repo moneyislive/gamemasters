@@ -222,9 +222,20 @@ router.post('/jugar/accion', async (req, res) => {
 
   const cuerpo = (req.body ?? {}) as { accion?: unknown; datos?: Record<string, unknown> };
   const accion = String(cuerpo.accion ?? '');
-  const datos: Record<string, string> = {};
+  /*
+   * Las LISTAS se conservan como listas. Antes todo pasaba por `String(valor)`,
+   * asi que un array llegaba al motor convertido en «a,b,c» y la accion se
+   * quedaba sin sus datos: el sellado de la Momia —ordenar cinco ritos— no se
+   * podia hacer por HTTP aunque el reductor estuviera escrito.
+   *
+   * Se sanean igual: cada elemento a cadena, y el motor comprueba despues que
+   * cada uno sea una entidad real de su categoria.
+   */
+  const datos: Record<string, string | string[]> = {};
   for (const [campo, valor] of Object.entries(cuerpo.datos ?? {})) {
-    datos[String(campo)] = String(valor ?? '');
+    datos[String(campo)] = Array.isArray(valor)
+      ? valor.map((v) => String(v ?? ''))
+      : String(valor ?? '');
   }
 
   try {
