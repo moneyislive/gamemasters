@@ -1,17 +1,49 @@
 /**
- * Panel de salas. Dos modos de tablero:
- *  - "generated": listado clásico de salas; el tablero se dibuja solo.
- *  - "aerial": se sube una foto aérea del espacio real y se colocan chinchetas
- *    sobre ella; cada chincheta es una sala (arrastrable y editable).
+ * El panel de una categoria de LUGARES. Dos modos de tablero:
+ *  - "generated": listado clasico; el tablero se dibuja solo.
+ *  - "aerial": se sube una foto aerea del espacio real y se colocan chinchetas
+ *    sobre ella; cada chincheta es un lugar (arrastrable y editable).
+ *
+ * ERA EL PANEL DE LAS SALAS DE CLUEDO y ahora sirve a cualquier categoria que
+ * declare `sonLugares`. Las camaras de la Momia entran por aqui, y tiene que
+ * ser asi: lo que distingue a esta pantalla del panel generico no es que las
+ * cosas se llamen salas, es que OCUPAN UN SITIO del espacio real, y por eso
+ * hay una foto de la casa y unas chinchetas encima.
+ *
+ * Lee y escribe SIEMPRE por categoria (`entidadesDe`, `upsertEntidad`), nunca
+ * contra `game.rooms`. Para CLUEDO acaba en el mismo sitio de siempre —sus
+ * salas viven en `rooms` y su ruta es la de siempre—, pero el componente ya no
+ * lo sabe ni tiene por que saberlo.
  */
 import { useEffect, useRef, useState } from 'react';
 import type { DragEvent, FormEvent, PointerEvent as ReactPointerEvent } from 'react';
-import type { BoardMode, Room } from '../../../../shared/types';
+import type { BoardMode } from '../../../../shared/types';
+import { entidadesDe } from '../../../../shared/juegos';
+import type { CategoriaId, DefinicionCategoria, Entidad } from '../../../../shared/juegos';
 import { uploadFile } from '../../api/client';
 import { useAppStore } from '../../state/store';
+import { minimoDe } from '../../juegos/reglas';
+import { laCategoria, nuevaCategoria, rotuloDeCategoria } from '../../juegos/palabras';
 import EntityGallery, { PanelHeader } from './EntityList';
 import PhotoUpload from './PhotoUpload';
 import './studio-panels.css';
+
+/**
+ * La descripcion que CLUEDO lleva ensenando desde el primer dia.
+ *
+ * Su manifiesto tiene OTRA («Las estancias reales de tu casa por las que se
+ * moveran los invitados…»), escrita despues y nunca usada aqui. Son dos
+ * verdades sobre lo mismo, y de las dos manda esta mientras la regla de la
+ * entrega sea que CLUEDO no cambie ni un pixel.
+ *
+ * Sobra una. Que decida quien sea el dueno del texto de CLUEDO; el dia que se
+ * decida, se borra esta tabla y la descripcion sale del manifiesto como en
+ * todas las demas categorias. Va anotado en el informe.
+ */
+const DESCRIPCION_CONGELADA: Record<CategoriaId, string> = {
+  salas:
+    'Los espacios donde transcurrirá la velada. Descríbelos: la trama se ambientará en tu casa concreta.',
+};
 
 interface Borrador {
   id: string | null;
@@ -30,7 +62,11 @@ function posicionRelativa(elemento: HTMLElement, clientX: number, clientY: numbe
   return { x, y };
 }
 
-export default function RoomsPanel(): JSX.Element {
+export default function RoomsPanel({
+  categoria,
+}: {
+  categoria: DefinicionCategoria;
+}): JSX.Element {
   const game = useAppStore((s) => s.game);
 
   // Formulario clásico
@@ -61,7 +97,16 @@ export default function RoomsPanel(): JSX.Element {
 
   const modo: BoardMode = game.boardMode;
   const editando = borrador.id !== null;
-  const conChincheta = game.rooms.filter((sala) => sala.pin);
+  const lugares = entidadesDe(game, categoria.id);
+  const conChincheta = lugares.filter((sala) => sala.pin);
+  const { singular, plural } = categoria;
+  const juego = game.settings?.juego;
+  /** «la sala», «la cámara»: el artículo lo declara el juego, no se adivina. */
+  const laCosa = laCategoria(juego, categoria);
+
+  /** Alta o edicion, por categoria: el componente no sabe donde acaba. */
+  const guardar = (datos: Record<string, unknown>) =>
+    useAppStore.getState().upsertEntidad(categoria.id, datos);
 
   /* ---------- Acciones comunes ---------- */
 
@@ -81,8 +126,8 @@ export default function RoomsPanel(): JSX.Element {
   const eliminar = (id: string): void => {
     void useAppStore
       .getState()
-      .removeRoom(id)
-      .catch(() => setError('No se pudo eliminar la sala.'));
+      .removeEntidad(categoria.id, id)
+      .catch(() => setError(`No se pudo eliminar ${laCosa}.`));
     if (borrador.id === id) setBorrador(VACIO);
     if (menuId === id) setMenuId(null);
     if (editandoPin === id) setEditandoPin(null);
@@ -91,7 +136,7 @@ export default function RoomsPanel(): JSX.Element {
   /* ---------- Formulario clásico ---------- */
 
   const editar = (id: string): void => {
-    const sala = game.rooms.find((r) => r.id === id);
+    const sala = lugares.find((r) => r.id === id);
     if (!sala) return;
     if (modo === 'aerial' && sala.pin) {
       setEditandoPin(id);
@@ -113,19 +158,19 @@ export default function RoomsPanel(): JSX.Element {
     event.preventDefault();
     const name = borrador.name.trim();
     if (!name) {
-      setError('Escribe el nombre de la sala.');
+      setError(`Escribe el nombre: falta ${laCosa}.`);
       return;
     }
     setGuardando(true);
     setError(null);
     try {
-      const datos: Partial<Room> = {
+      const datos: Record<string, unknown> = {
         name,
         description: borrador.description.trim() || undefined,
         photoUrl: borrador.photoUrl,
       };
       if (borrador.id) datos.id = borrador.id;
-      await useAppStore.getState().upsertRoom(datos);
+      await guardar(datos);
       setBorrador(VACIO);
     } catch {
       setError('No se pudo guardar. Revisa la conexión con el servidor.');
@@ -194,7 +239,7 @@ export default function RoomsPanel(): JSX.Element {
     const name = nombreChincheta.trim();
     if (!name) return;
     try {
-      await useAppStore.getState().upsertRoom({
+      await guardar({
         name,
         description: descChincheta.trim() || undefined,
         pin: nuevaChincheta,
@@ -203,18 +248,18 @@ export default function RoomsPanel(): JSX.Element {
       setNombreChincheta('');
       setDescChincheta('');
     } catch {
-      setError('No se pudo crear la sala.');
+      setError(`No se pudo crear ${laCosa}.`);
     }
   };
 
   const guardarEdicionPin = async (event: FormEvent): Promise<void> => {
     event.preventDefault();
     if (!editandoPin) return;
-    const sala = game.rooms.find((r) => r.id === editandoPin);
+    const sala = lugares.find((r) => r.id === editandoPin);
     const name = nombreChincheta.trim();
     if (!sala || !name) return;
     try {
-      await useAppStore.getState().upsertRoom({
+      await guardar({
         id: sala.id,
         name,
         description: descChincheta.trim() || undefined,
@@ -222,13 +267,13 @@ export default function RoomsPanel(): JSX.Element {
       });
       setEditandoPin(null);
     } catch {
-      setError('No se pudo guardar la sala.');
+      setError(`No se pudo guardar ${laCosa}.`);
     }
   };
 
   /* ---------- Arrastre de chinchetas ---------- */
 
-  const iniciarArrastre = (event: ReactPointerEvent<HTMLButtonElement>, sala: Room): void => {
+  const iniciarArrastre = (event: ReactPointerEvent<HTMLButtonElement>, sala: Entidad): void => {
     event.stopPropagation();
     if (!sala.pin) return;
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -242,7 +287,7 @@ export default function RoomsPanel(): JSX.Element {
     setArrastre({ id: arrastre.id, ...posicion });
   };
 
-  const soltarArrastre = (event: ReactPointerEvent<HTMLButtonElement>, sala: Room): void => {
+  const soltarArrastre = (event: ReactPointerEvent<HTMLButtonElement>, sala: Entidad): void => {
     event.stopPropagation();
     if (!arrastre || arrastre.id !== sala.id) return;
     const movido =
@@ -252,10 +297,9 @@ export default function RoomsPanel(): JSX.Element {
     setArrastre(null);
 
     if (movido) {
-      void useAppStore
-        .getState()
-        .upsertRoom({ id: sala.id, name: sala.name, pin: destino })
-        .catch(() => setError('No se pudo mover la chincheta.'));
+      void guardar({ id: sala.id, name: sala.name, pin: destino }).catch(() =>
+        setError('No se pudo mover la chincheta.'),
+      );
       return;
     }
     // Clic limpio: abre el menú de la chincheta.
@@ -312,11 +356,11 @@ export default function RoomsPanel(): JSX.Element {
   return (
     <div className="sp-panel">
       <PanelHeader
-        title="Salas"
-        subtitle="Los espacios donde transcurrirá la velada. Descríbelos: la trama se ambientará en tu casa concreta."
-        count={game.rooms.length}
-        min={4}
-        noun="salas"
+        title={rotuloDeCategoria(juego, categoria)}
+        subtitle={DESCRIPCION_CONGELADA[categoria.id] ?? categoria.presentacion?.descripcion ?? ''}
+        count={lugares.length}
+        min={minimoDe(categoria)}
+        noun={plural}
       />
 
       {selectorDeModo}
@@ -330,7 +374,9 @@ export default function RoomsPanel(): JSX.Element {
       {modo === 'generated' ? (
         <div className="sp-layout">
           <form className="deco-frame sp-form" onSubmit={(event) => void enviar(event)}>
-            <h3 className="sp-form-title">{editando ? 'Editar sala' : 'Nueva sala'}</h3>
+            <h3 className="sp-form-title">
+              {editando ? `Editar ${singular}` : nuevaCategoria(juego, categoria)}
+            </h3>
 
             <div className="sp-field">
               <label className="label" htmlFor="sala-nombre">
@@ -370,7 +416,7 @@ export default function RoomsPanel(): JSX.Element {
 
             <div className="sp-form-actions">
               <button className="btn btn--primary" type="submit" disabled={guardando}>
-                {guardando ? 'Guardando…' : editando ? 'Guardar cambios' : 'Añadir sala'}
+                {guardando ? 'Guardando…' : editando ? 'Guardar cambios' : `Añadir ${singular}`}
               </button>
               {editando && (
                 <button
@@ -388,7 +434,7 @@ export default function RoomsPanel(): JSX.Element {
           </form>
 
           <EntityGallery
-            items={game.rooms.map((sala) => ({
+            items={lugares.map((sala) => ({
               id: sala.id,
               name: sala.name,
               description: sala.description,
@@ -469,7 +515,7 @@ export default function RoomsPanel(): JSX.Element {
               {/* Menú de una chincheta existente */}
               {menuId &&
                 (() => {
-                  const sala = game.rooms.find((r) => r.id === menuId);
+                  const sala = lugares.find((r) => r.id === menuId);
                   if (!sala?.pin) return null;
                   return (
                     <div
@@ -509,7 +555,7 @@ export default function RoomsPanel(): JSX.Element {
                   onPointerDown={(event) => event.stopPropagation()}
                   onSubmit={(event) => void crearChincheta(event)}
                 >
-                  <p className="sp-pin-menu-name">Nueva sala aquí</p>
+                  <p className="sp-pin-menu-name">{`${nuevaCategoria(juego, categoria)} aquí`}</p>
                   <input
                     className="input"
                     value={nombreChincheta}
@@ -542,7 +588,7 @@ export default function RoomsPanel(): JSX.Element {
               {/* Formulario de edición de una chincheta */}
               {editandoPin &&
                 (() => {
-                  const sala = game.rooms.find((r) => r.id === editandoPin);
+                  const sala = lugares.find((r) => r.id === editandoPin);
                   if (!sala?.pin) return null;
                   return (
                     <form
@@ -551,7 +597,7 @@ export default function RoomsPanel(): JSX.Element {
                       onPointerDown={(event) => event.stopPropagation()}
                       onSubmit={(event) => void guardarEdicionPin(event)}
                     >
-                      <p className="sp-pin-menu-name">Editar sala</p>
+                      <p className="sp-pin-menu-name">{`Editar ${singular}`}</p>
                       <input
                         className="input"
                         value={nombreChincheta}
@@ -592,7 +638,8 @@ export default function RoomsPanel(): JSX.Element {
           <aside className="sp-aerial-side">
             <div className="deco-frame sp-side-card">
               <p className="sp-side-note">
-                {conChincheta.length} {conChincheta.length === 1 ? 'sala clavada' : 'salas clavadas'} sobre
+                {conChincheta.length}{' '}
+                {conChincheta.length === 1 ? `${singular} clavada` : `${plural} clavadas`} sobre
                 el plano.
               </p>
               <button type="button" className="btn btn--sm" onClick={abrirSelector} disabled={subiendo}>

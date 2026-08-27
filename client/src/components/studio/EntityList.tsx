@@ -89,10 +89,34 @@ export interface PanelHeaderProps {
   min: number;
   /** Sustantivo en plural, p. ej. "sospechosos" */
   noun: string;
+  /**
+   * Cuántas admite EXACTAMENTE, si no vale «al menos».
+   *
+   * Los cinco ritos del sellado son cinco: con cuatro el puzle es trivial y con
+   * seis la sobremesa se hace larga. Es la primera categoría de la plataforma
+   * que no se conforma con un mínimo, y el contador tiene que decirlo con estas
+   * palabras y no con «mínimo 5», que invita a poner seis.
+   */
+  exacto?: number;
 }
 
-export function PanelHeader({ title, subtitle, count, min, noun }: PanelHeaderProps): JSX.Element {
-  const enough = count >= min;
+export function PanelHeader({
+  title,
+  subtitle,
+  count,
+  min,
+  noun,
+  exacto,
+}: PanelHeaderProps): JSX.Element {
+  const enough = exacto === undefined ? count >= min : count === exacto;
+  const sobran = exacto !== undefined && count > exacto;
+  const titulo = enough
+    ? 'Cantidad suficiente para generar la trama'
+    : exacto === undefined
+      ? `Añade al menos ${min}`
+      : sobran
+        ? `Sobran: tienen que ser ${exacto} justos`
+        : `Tienen que ser ${exacto} justos`;
   return (
     <header className="sp-header">
       <div>
@@ -100,10 +124,18 @@ export function PanelHeader({ title, subtitle, count, min, noun }: PanelHeaderPr
         <p className="sp-subtitle">{subtitle}</p>
       </div>
       <span
-        className={`sp-counter${enough ? ' sp-counter--ok' : ''}`}
-        title={enough ? 'Cantidad suficiente para generar la trama' : `Añade al menos ${min}`}
+        className={`sp-counter${enough ? ' sp-counter--ok' : ''}${sobran ? ' sp-counter--sobra' : ''}`}
+        title={titulo}
       >
-        <strong>{count}</strong> de mínimo {min} {noun}
+        {exacto === undefined ? (
+          <>
+            <strong>{count}</strong> de mínimo {min} {noun}
+          </>
+        ) : (
+          <>
+            <strong>{count}</strong> de {exacto} {noun} exactos
+          </>
+        )}
       </span>
     </header>
   );

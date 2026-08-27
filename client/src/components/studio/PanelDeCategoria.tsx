@@ -19,6 +19,8 @@ import EntityGallery, { PanelHeader } from './EntityList';
 import PhotoUpload from './PhotoUpload';
 import { entidadesDe } from '../../../../shared/juegos';
 import type { CategoriaId, DefinicionCategoria } from '../../../../shared/juegos';
+import { cuentaExactaDe, minimoDe } from '../../juegos/reglas';
+import { estaCategoria, laCategoria, nuevaCategoria } from '../../juegos/palabras';
 import './studio-panels.css';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -32,6 +34,19 @@ interface Borrador {
 }
 
 const VACIO: Borrador = { id: null, name: '', email: '', description: '', photoUrl: undefined };
+
+/**
+ * «los cinco» y no «los 5».
+ *
+ * Una cifra en mitad de una frase se lee como un dato de formulario; escrita se
+ * lee como una regla del juego, que es lo que es. Solo hacen falta las que
+ * puede tener una categoría de cuenta exacta, y si algún día hay una de nueve,
+ * la cifra sirve igual.
+ */
+function enLetra(n: number): string {
+  const letras = ['cero', 'uno', 'dos', 'tres', 'cuatro', 'cinco', 'seis', 'siete', 'ocho'];
+  return letras[n] ? `los ${letras[n]}` : `los ${n}`;
+}
 
 export default function PanelDeCategoria({
   categoria,
@@ -55,6 +70,25 @@ export default function PanelDeCategoria({
   const editando = borrador.id !== null;
   const nombresUsados = new Set(entidades.map((e) => e.name.toLowerCase()));
   const idFormulario = `cat-${categoria.id}`;
+  const juego = game.settings?.juego;
+
+  /*
+   * LAS CATEGORÍAS DE CUENTA EXACTA. Hoy solo hay una —los cinco ritos del
+   * sellado— y su regla no cabe en «mínimo N»: con cuatro, la mesa resuelve el
+   * puzle por fuerza bruta en diez minutos; con seis, la sobremesa se hace
+   * larga. Ver `shared/juegos/momia.ts`.
+   *
+   * El taller hace tres cosas con esto, y las tres hacen falta: lo DICE antes
+   * de que se incumpla, IMPIDE pasarse —el formulario se cierra al llegar a
+   * cinco— y no deja generar mientras no cuadre (eso lo comprueba `StudioPage`
+   * con la misma regla). Avisar sin impedir habría dejado montar una partida
+   * imposible; impedir sin avisar, un botón que no responde y nadie sabe por
+   * qué.
+   */
+  const exacto = cuentaExactaDe(juego ?? 'cluedo', categoria.id);
+  const completa = exacto !== undefined && entidades.length >= exacto;
+  const sobran = exacto !== undefined && entidades.length > exacto;
+  const bloqueado = completa && !editando;
 
   const editar = (id: string): void => {
     const e = entidades.find((x) => x.id === id);
@@ -73,7 +107,7 @@ export default function PanelDeCategoria({
     void useAppStore
       .getState()
       .removeEntidad(categoria.id, id)
-      .catch(() => setError(`No se pudo eliminar este ${categoria.singular}.`));
+      .catch(() => setError(`No se pudo eliminar ${estaCategoria(juego, categoria)}.`));
     if (borrador.id === id) setBorrador(VACIO);
   };
 
@@ -81,7 +115,7 @@ export default function PanelDeCategoria({
     event.preventDefault();
     const name = borrador.name.trim();
     if (!name) {
-      setError(`Escribe el nombre: falta el ${categoria.singular}.`);
+      setError(`Escribe el nombre: falta ${laCategoria(juego, categoria)}.`);
       return;
     }
     const email = borrador.email.trim();
@@ -114,15 +148,41 @@ export default function PanelDeCategoria({
         title={p?.titulo ?? categoria.plural}
         subtitle={p?.descripcion ?? ''}
         count={entidades.length}
-        min={categoria.minimo}
+        min={minimoDe(categoria)}
         noun={categoria.plural}
+        exacto={exacto}
       />
 
       <div className="sp-layout">
         <form className="deco-frame sp-form" onSubmit={(event) => void enviar(event)}>
           <h3 className="sp-form-title">
-            {editando ? `Editar ${categoria.singular}` : `Nuevo ${categoria.singular}`}
+            {editando ? `Editar ${categoria.singular}` : nuevaCategoria(juego, categoria)}
           </h3>
+
+          {exacto !== undefined && (
+            <p className={`sp-regla${sobran ? ' sp-regla--rota' : ''}`} role="note">
+              {sobran ? (
+                <>
+                  {entidades.length - exacto === 1 ? 'Sobra uno' : `Sobran ${entidades.length - exacto}`}
+                  . Tienen que ser <strong>exactamente {exacto}</strong>: borra{' '}
+                  {entidades.length - exacto === 1 ? 'el que menos te guste' : 'los que sobren'} para
+                  poder generar.
+                </>
+              ) : completa ? (
+                <>
+                  Ya están {enLetra(exacto)}. Para cambiar alguno, edítalo o bórralo: no caben
+                  más.
+                </>
+              ) : (
+                <>
+                  Tienen que ser <strong>exactamente {exacto}</strong>, ni uno más ni uno menos.
+                  {exacto - entidades.length === 1
+                    ? ' Falta uno.'
+                    : ` Faltan ${exacto - entidades.length}.`}
+                </>
+              )}
+            </p>
+          )}
 
           <div className="sp-field">
             <label className="label" htmlFor={`${idFormulario}-nombre`}>
@@ -207,7 +267,7 @@ export default function PanelDeCategoria({
           )}
 
           <div className="sp-form-actions">
-            <button className="btn btn--primary" type="submit" disabled={guardando}>
+            <button className="btn btn--primary" type="submit" disabled={guardando || bloqueado}>
               {guardando
                 ? 'Guardando…'
                 : editando
