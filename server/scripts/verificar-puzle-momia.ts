@@ -218,30 +218,83 @@ paso('El reparto por cámaras y vigilias');
 
 const CAMARAS = ['c1', 'c2', 'c3', 'c4', 'c5'];
 let alguienLosJuntaTodos = 0;
-let repetidos = 0;
-let perdidos = 0;
+let camarasVacias = 0;
+let fragmentosSinColocar = 0;
+let mapaFijo = 0;
+
 for (let i = 0; i < 120; i++) {
-  const puzle = generarPuzle({ ritos: RITOS, jugadores: 4, semilla: `hallazgo-${i}` });
-  const ids = puzle.restricciones.map((_, n) => `f${n}`);
-  // Se prueban veladas de dos, tres y cuatro vigilias: con una sola vigilia por
-  // fragmento es cuando el reparto ingenuo dejaría que alguien los juntase todos.
   const rondas = 2 + (i % 3);
+  // Igual que en una partida: más restricciones que vigilias, o una sola
+  // persona podría juntarlas todas explorando.
+  const puzle = generarPuzle({
+    ritos: RITOS,
+    jugadores: 4,
+    semilla: `hallazgo-${i}`,
+    minimoRestricciones: rondas + 1,
+  });
+  const ids = puzle.restricciones.map((_, n) => `f${n}`);
   const hallazgos = repartirHallazgos({
     fragmentos: ids,
     camaras: CAMARAS,
     rondas,
     semilla: `h-${i}`,
   });
-  if (hallazgos.length !== ids.length) perdidos++;
-  if (new Set(hallazgos.map((h) => h.fragmentoId)).size !== ids.length) repetidos++;
+
+  // TODA cámara, TODA vigilia: es lo que promete el diseño y lo que promete la
+  // app. Salir de una cámara con las manos vacías se lee como que algo falló.
+  for (let ronda = 1; ronda <= rondas; ronda++) {
+    for (const camara of CAMARAS) {
+      if (!hallazgos.some((h) => h.ronda === ronda && h.camaraId === camara)) camarasVacias++;
+    }
+  }
+  if (!ids.every((id) => hallazgos.some((h) => h.fragmentoId === id))) fragmentosSinColocar++;
   if (maximoQueJuntaUnaPersona(hallazgos) >= ids.length) alguienLosJuntaTodos++;
+
+  // Y que el reparto CAMBIE de una vigilia a otra: si la misma cámara diera
+  // siempre el mismo fragmento, la mesa aprendería el mapa en dos noches y
+  // elegir cámara dejaría de decidir nada.
+  if (rondas >= 2) {
+    const dePrimera = CAMARAS.map(
+      (c) => hallazgos.find((h) => h.ronda === 1 && h.camaraId === c)?.fragmentoId,
+    ).join('|');
+    const deSegunda = CAMARAS.map(
+      (c) => hallazgos.find((h) => h.ronda === 2 && h.camaraId === c)?.fragmentoId,
+    ).join('|');
+    if (dePrimera === deSegunda) mapaFijo++;
+  }
 }
-comprobar('no se pierde ningún fragmento por el camino', perdidos === 0, perdidos);
-comprobar('ni se coloca ninguno dos veces', repetidos === 0, repetidos);
+comprobar('toda cámara da papiro en toda vigilia', camarasVacias === 0, camarasVacias);
+comprobar('y ningún fragmento se queda sin colocar', fragmentosSinColocar === 0, fragmentosSinColocar);
 comprobar(
-  'y en ninguna de las 120 veladas puede una sola persona juntarlos todos',
+  'en ninguna de las 120 veladas puede una sola persona juntarlos todos',
   alguienLosJuntaTodos === 0,
   alguienLosJuntaTodos,
+);
+comprobar(
+  'y la cámara que da cada fragmento cambia de una vigilia a otra',
+  mapaFijo === 0,
+  mapaFijo,
+);
+
+/*
+ * Y LA CONDICIÓN DE LA QUE TODO ESTO DEPENDE, dicha en voz alta: con tantas
+ * restricciones como vigilias, o menos, una sola persona SÍ puede juntarlas
+ * todas. No es un fallo del reparto, es aritmética —una cámara por vigilia—, y
+ * por eso `generarTramaMomia` pide siempre `vigilias + 1`. Se comprueba que el
+ * reparto lo delata en vez de disimularlo.
+ */
+const justas = generarPuzle({ ritos: RITOS, jugadores: 4, semilla: 'justas', minimoRestricciones: 4 });
+const idsJustas = justas.restricciones.slice(0, 3).map((_, n) => `g${n}`);
+const apretado = repartirHallazgos({
+  fragmentos: idsJustas,
+  camaras: CAMARAS,
+  rondas: 4,
+  semilla: 'apretado',
+});
+comprobar(
+  'con menos fragmentos que vigilias, el reparto avisa de que alguien los junta todos',
+  maximoQueJuntaUnaPersona(apretado) === idsJustas.length,
+  maximoQueJuntaUnaPersona(apretado),
 );
 
 // ---------------------------------------------------------------------------

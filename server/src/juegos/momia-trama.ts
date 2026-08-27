@@ -172,6 +172,15 @@ export function generarTramaMomia(game: GameSession, opciones: OpcionesTrama = {
     ritos: ritos.map((r) => r.id),
     jugadores: expedicionarios.length,
     semilla: `${semilla}|puzle`,
+    /*
+     * MÁS RESTRICCIONES QUE VIGILIAS, y esto es una regla del juego disfrazada de
+     * parámetro. Toda cámara da papiro todas las noches, y se entra en una por
+     * vigilia: quien explore las cuatro se lleva cuatro fragmentos distintos como
+     * mucho. Si el puzle tuviera cuatro, una sola persona podría resolverlo en
+     * solitario y la razón de ser del juego —que haya que poner en común— se
+     * caería sin que ninguna de las cuatro garantías del §4.2 se enterase.
+     */
+    minimoRestricciones: vigilias + 1,
   });
   /*
    * SE VERIFICA AQUÍ TAMBIÉN, aunque `generarPuzle` ya no devuelve puzles malos.
@@ -289,7 +298,7 @@ export function generarTramaMomia(game: GameSession, opciones: OpcionesTrama = {
         `equivocado para que amanezca con la tumba abierta.`,
     },
     characters,
-    timeline: construirCronologia(camaras, profanadas),
+    timeline: construirCronologia(),
     /*
      * Vacío, y el porqué está en la cabecera: los hallazgos de este juego no son
      * pistas de sala, son fragmentos de papiro que viven en el estado.
@@ -366,12 +375,27 @@ function construirExpedicion(
   });
 }
 
-function construirCronologia(
-  camaras: Array<{ id: string; name: string }>,
-  profanadas: string[],
-): TimelineEvent[] {
-  const nombre = (id: string): string => camaras.find((c) => c.id === id)?.name ?? 'la tumba';
-  const eventos: TimelineEvent[] = [
+/**
+ * La cronología pública: lo que pasó ANTES de que empezara a jugarse.
+ *
+ * NO LLEVA NI UNA VIGILIA, y eso es lo que se arregló al jugar una velada de
+ * verdad. Antes ponía un renglón por noche —«Vigilia 3: la maldición se asienta
+ * en el Pozo de las Ofrendas»— y `VistaJugador.cronologia` es PÚBLICA por
+ * contrato: cualquiera veía, desde el primer minuto, qué cámara estaría profanada
+ * las cuatro noches.
+ *
+ * Rompía dos cosas de golpe. La decisión central del juego, porque explorar
+ * dejaba de ser «información a cambio de salud» y pasaba a ser «entra donde no
+ * hay maldición», que no es una decisión. Y el don del Mecenas, que consiste
+ * exactamente en saber de antemano qué cámara se profanará mañana: quien lo
+ * recibiera pasaría la noche preguntándose por qué le tocó el papel inútil.
+ *
+ * La vigilia EN CURSO sí se anuncia —lo pide el diseño (§2)— pero por donde debe:
+ * `estadoDelJuego.vigilia.profanada`, que se compone vigilia a vigilia y no
+ * adelanta ninguna.
+ */
+function construirCronologia(): TimelineEvent[] {
+  return [
     {
       time: '04:10',
       description: 'El lacre de la cámara sellada aparece partido. Nadie dice haber oído nada.',
@@ -386,20 +410,12 @@ function construirCronologia(
     },
     {
       time: '21:00',
-      description: 'Cae la noche y las lámparas empiezan a apagarse solas. Se organiza la primera vigilia.',
+      description:
+        'Cae la noche y las lámparas empiezan a apagarse solas. Se organiza la primera vigilia.',
       suspectIds: [],
       isPublic: true,
     },
   ];
-  profanadas.forEach((camaraId, i) => {
-    eventos.push({
-      time: `${String(22 + i).padStart(2, '0')}:00`,
-      description: `Vigilia ${i + 1}: la maldición se asienta en ${nombre(camaraId)}.`,
-      suspectIds: [],
-      isPublic: true,
-    });
-  });
-  return eventos;
 }
 
 // ---------------------------------------------------------------------------

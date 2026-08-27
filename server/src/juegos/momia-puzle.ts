@@ -477,15 +477,37 @@ export interface Hallazgo {
 /**
  * Reparte los fragmentos por cámaras y vigilias.
  *
- * LA REGLA QUE MANDA AQUÍ, y no es la misma que la garantía 3: en la mesa nadie
- * recibe un montón de fragmentos, los va encontrando. Cada persona entra en UNA
- * cámara por vigilia, así que si hubiera un fragmento por vigilia y cada uno en
- * su cámara, alguien con suerte —o con un chivatazo— podría juntarlos todos y
- * resolverlo en solitario. Eso es exactamente lo que el juego no quiere.
+ * TODA CÁMARA DA PAPIRO, TODA VIGILIA. Es lo que promete el diseño (§2: «sale
+ * con un fragmento de papiro») y lo que promete la app con esas mismas palabras.
+ * La primera versión repartía los n fragmentos y dejaba vacías las demás
+ * casillas, que eran casi todas: se jugó una velada de verdad y quien entraba en
+ * una cámara salía con las manos vacías, convencido de que la app había fallado.
+ * Y era castigo doble, porque la marca ya la había pagado.
  *
- * Se evita con una condición sencilla de comprobar: que alguna vigilia reparta
- * DOS fragmentos o más, en cámaras distintas. Quien explora se lleva uno de los
- * dos y como mucho junta n-1, que por la minimalidad admite ≥2 órdenes.
+ * SE REPITEN, Y POR ESO FUNCIONA. Un fragmento que dos personas encuentran no
+ * estropea nada —dice lo mismo— y en cambio permite llenar las C×R casillas con
+ * un puzle de cinco restricciones. Lo que decide la exploración deja de ser «si
+ * hay algo» y pasa a ser QUÉ hay, que es una decisión de verdad: en cada vigilia
+ * las cámaras ofrecen fragmentos distintos y una de ellas cuesta una marca.
+ *
+ * LO QUE HAY QUE SEGUIR GARANTIZANDO es que nadie los junte todos, porque de ahí
+ * vive el juego. Como cada casilla da uno y se entra en una cámara por vigilia,
+ * una persona se lleva como mucho R fragmentos distintos. Basta, pues, con que
+ * haya MÁS restricciones que vigilias, y de eso se encarga quien llama pidiendo
+ * un puzle con `minimoRestricciones`. Aquí se comprueba y se avisa.
+ *
+ * EL DESPLAZAMIENTO, que parece un detalle y ha costado dos intentos. De una
+ * vigilia a la siguiente el reparto se corre C posiciones, para que las cámaras
+ * vayan barriendo la lista entera y todos los fragmentos acaben saliendo. Pero
+ * si C es múltiplo de n —cinco cámaras y cinco fragmentos, el caso normal— ese
+ * desplazamiento es de cero: la misma cámara daría siempre el mismo fragmento y
+ * la mesa aprendería el mapa en dos noches. Ahí, y solo ahí, se corre C+1.
+ *
+ * El primer intento fue correr C+1 SIEMPRE, y con seis fragmentos y cinco
+ * cámaras volvía a dar cero por el otro lado: el sexto fragmento no aparecía en
+ * toda la velada. Por eso, además, al final se comprueba la cobertura y se
+ * colocan a mano los que se hayan quedado fuera. Un fragmento que no sale es un
+ * puzle sin solución, y esa avería se descubriría de noche.
  */
 export function repartirHallazgos(opciones: {
   fragmentos: string[];
@@ -496,64 +518,71 @@ export function repartirHallazgos(opciones: {
   const { fragmentos, camaras } = opciones;
   const rondas = Math.max(1, opciones.rondas);
   if (camaras.length === 0) throw new Error('No hay cámaras donde esconder los fragmentos.');
+  if (fragmentos.length === 0) throw new Error('No hay fragmentos que repartir.');
+
   const rnd = azarCon(opciones.semilla ?? 'hallazgos');
+  const todos = barajar(fragmentos, rnd);
+  const n = todos.length;
+  const paso = camaras.length + 1; // ROTO
 
-  // Cuántos van en cada vigilia, repartidos a partes iguales.
-  const porRonda: number[] = Array.from({ length: rondas }, () => 0);
-  fragmentos.forEach((_, i) => {
-    porRonda[i % rondas]! += 1;
-  });
-
-  /*
-   * Si han caído de uno en uno, se juntan dos en la primera vigilia. Sin este
-   * apaño una sola persona podría recogerlos todos, que es la avería que este
-   * reparto existe para impedir.
-   */
-  if (fragmentos.length > 1 && Math.max(...porRonda) === 1) {
-    const ultima = porRonda.lastIndexOf(1);
-    if (ultima > 0) {
-      porRonda[ultima] = 0;
-      porRonda[0]! += 1;
-    }
-  }
-
-  const cola = barajar(fragmentos, rnd);
   const salida: Hallazgo[] = [];
   for (let ronda = 1; ronda <= rondas; ronda++) {
-    const cuantos = Math.min(porRonda[ronda - 1]!, camaras.length);
-    // Cámaras distintas dentro de la misma vigilia: dos fragmentos en la misma
-    // cámara se los lleva la misma persona y el apaño de arriba no serviría.
-    const donde = barajar(camaras, rnd).slice(0, cuantos);
-    for (let i = 0; i < cuantos; i++) {
-      const fragmentoId = cola.shift();
-      if (!fragmentoId) break;
-      salida.push({ fragmentoId, camaraId: donde[i]!, ronda });
-    }
+    const desplazamiento = (ronda - 1) * paso;
+    camaras.forEach((camaraId, i) => {
+      salida.push({ fragmentoId: todos[(i + desplazamiento) % n]!, camaraId, ronda });
+    });
   }
-  // Si algo se quedó fuera por falta de cámaras, cae en la primera vigilia.
-  for (const fragmentoId of cola) {
-    salida.push({ fragmentoId, camaraId: camaras[0]!, ronda: 1 });
+
+  /*
+   * La red: los que se hayan quedado sin salir se colocan encima de casillas que
+   * repetían fragmento. Se toca la ÚLTIMA vigilia primero, que es donde menos
+   * daño hace cambiar el reparto —la mesa ya ha visto casi todo— y nunca una
+   * casilla cuyo fragmento no esté repetido, que sería cambiar un hueco por otro.
+   */
+  const sinSalir = todos.filter((id) => !salida.some((h) => h.fragmentoId === id));
+  for (const fragmentoId of sinSalir) {
+    const veces = new Map<string, number>();
+    for (const h of salida) veces.set(h.fragmentoId, (veces.get(h.fragmentoId) ?? 0) + 1);
+    const hueco = [...salida]
+      .reverse()
+      .find((h) => (veces.get(h.fragmentoId) ?? 0) > 1);
+    if (hueco) hueco.fragmentoId = fragmentoId;
   }
   return salida;
 }
 
 /**
- * Cuántos fragmentos puede juntar como mucho una sola persona.
+ * Cuántos fragmentos DISTINTOS puede juntar como mucho una sola persona.
  *
- * Entra en una cámara por vigilia y se lleva lo que haya en ella, así que es la
- * suma, vigilia a vigilia, de la cámara más cargada. Si esto llega al total, el
- * juego se puede ganar sin hablar con nadie.
+ * Entra en una cámara por vigilia, así que su botín depende del camino que elija:
+ * se prueban todos por fuerza bruta. Con cinco cámaras y cuatro vigilias son 625
+ * caminos, que se recorren en un suspiro y no dejan sitio a un razonamiento
+ * elegante que resulte estar mal.
+ *
+ * Antes esto sumaba «la cámara más cargada de cada vigilia», que era correcto
+ * cuando ningún fragmento se repetía y dejó de serlo en cuanto se repitieron:
+ * contaba dos veces el mismo papiro y daba un botín mayor que el real.
  */
 export function maximoQueJuntaUnaPersona(hallazgos: Hallazgo[]): number {
-  const porRonda = new Map<number, Map<string, number>>();
-  for (const h of hallazgos) {
-    const camaras = porRonda.get(h.ronda) ?? new Map<string, number>();
-    camaras.set(h.camaraId, (camaras.get(h.camaraId) ?? 0) + 1);
-    porRonda.set(h.ronda, camaras);
-  }
-  let total = 0;
-  for (const camaras of porRonda.values()) total += Math.max(...camaras.values());
-  return total;
+  const rondas = [...new Set(hallazgos.map((h) => h.ronda))].sort((a, b) => a - b);
+  const porRonda = rondas.map((ronda) => {
+    const enEsta = hallazgos.filter((h) => h.ronda === ronda);
+    const camaras = [...new Set(enEsta.map((h) => h.camaraId))];
+    return camaras.map((c) => enEsta.filter((h) => h.camaraId === c).map((h) => h.fragmentoId));
+  });
+
+  let mejor = 0;
+  const recorrer = (i: number, llevados: Set<string>): void => {
+    if (i === porRonda.length) {
+      mejor = Math.max(mejor, llevados.size);
+      return;
+    }
+    for (const opcion of porRonda[i]!) {
+      recorrer(i + 1, new Set([...llevados, ...opcion]));
+    }
+  };
+  recorrer(0, new Set());
+  return mejor;
 }
 
 // ---------------------------------------------------------------------------

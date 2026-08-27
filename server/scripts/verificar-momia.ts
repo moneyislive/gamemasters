@@ -232,8 +232,48 @@ const PROHIBIDAS = ['ordenVerdadero', 'falso', 'falsasCandidatas', 'restriccion'
  *   · Que la SECUENCIA del orden verdadero no aparezca serializada. Cazaría a
  *     quien la mandase con otro nombre, o dentro de un texto.
  */
-function fugasEn(vista: unknown, ordenVerdadero: string[], prohibidas = PROHIBIDAS): string[] {
+/**
+ * Poda del árbol las ramas donde un dato SÍ puede estar legítimamente.
+ *
+ * Se excluye por RUTA y no por coincidencia, y la diferencia importa. La
+ * propuesta que has entregado tú aparece en tu propia vista, y tiene que
+ * aparecer: no se puede cambiar, así que hay que poder consultarla. Si esa
+ * propuesta acierta el orden verdadero —que es justo lo que pasa cuando alguien
+ * lo deduce bien— el barrido la denunciaba como fuga.
+ *
+ * El primer arreglo fue descartar los hallazgos cuyo camino empezara por
+ * `yo.miPropuesta`, y no valía: la comprobación de la secuencia serializada mira
+ * el JSON entero y no tiene camino que descartar. Así que se poda ANTES de
+ * mirar, y a partir de ahí el barrido puede ser estricto sin excepciones: si la
+ * secuencia aparece en el árbol podado, es una fuga, haya acertado quien haya
+ * acertado.
+ */
+function podar(vista: unknown, rutas: string[]): unknown {
+  const copia = JSON.parse(JSON.stringify(vista ?? null));
+  for (const ruta of rutas) {
+    const partes = ruta.split('.');
+    let nodo: any = copia;
+    for (let i = 0; i < partes.length - 1 && nodo; i++) nodo = nodo[partes[i]!];
+    if (nodo && typeof nodo === 'object') delete nodo[partes[partes.length - 1]!];
+  }
+  return copia;
+}
+
+/**
+ * Lo que una persona puede ver de lo suyo sin que sea una fuga.
+ *
+ * Una lista corta y cerrada a propósito: cada entrada es un permiso, y un
+ * permiso de más aquí abre un agujero en todo lo demás.
+ */
+const LEGITIMAS = ['estadoDelJuego.yo.miPropuesta'];
+
+function fugasEn(
+  vistaCruda: unknown,
+  ordenVerdadero: string[],
+  prohibidas = PROHIBIDAS,
+): string[] {
   const encontradas: string[] = [];
+  const vista = podar(vistaCruda, LEGITIMAS);
 
   const recorrer = (nodo: unknown, camino: string): void => {
     if (Array.isArray(nodo)) {
@@ -381,6 +421,14 @@ async function jugarPorElCable(): Promise<void> {
   );
 
   paso('Exploran: papiro para todos, marca para quien entra en la profanada');
+  /*
+   * ENTRAR SIEMPRE DA PAPIRO. Lo promete el diseño (§2) y lo promete la app con
+   * esas palabras, y durante unas horas no era verdad: el reparto colocaba los
+   * fragmentos en unas pocas casillas y quien entraba en cualquier otra cámara
+   * salía con las manos vacías. Se descubrió jugando una velada de verdad, no
+   * aquí, porque ninguna comprobación miraba lo que la app promete. Ahora sí.
+   */
+  const papiroDe = (r: { datos: any }): number => (r.datos?.resultado?.fragmentos ?? []).length;
   const profanada = trama.profanadas[0]!;
   /*
    * LA CÁMARA LIMPIA SE ELIGE ENTRE LAS QUE TIENEN PAPIRO ESTA VIGILIA. Los
@@ -405,11 +453,13 @@ async function jugarPorElCable(): Promise<void> {
     comprobar(`${id} entra en la cámara profanada`, r.estado === 200, r.datos);
     comprobar('y se le avisa de que lo estaba', r.datos?.resultado?.profanada === true);
     comprobar('con una marca encima', r.datos?.resultado?.marcas === 1, r.datos?.resultado);
+    comprobar('y con papiro, que es lo que se prometió', papiroDe(r) >= 1, r.datos?.resultado);
   }
   for (const id of ['e2', 'e3']) {
     const r = await accion(id, 'explorar', { camara: limpia });
     comprobar(`${id} explora una cámara limpia`, r.estado === 200, r.datos);
     comprobar('y sale sin marca', r.datos?.resultado?.marcas === 0, r.datos?.resultado);
+    comprobar('pero con papiro igualmente', papiroDe(r) >= 1, r.datos?.resultado);
   }
 
   paso('LA REGLA DE ORO, otra vez · ahora que hay papiro en las manos');
@@ -440,6 +490,39 @@ async function jugarPorElCable(): Promise<void> {
     'la mesa ve las marcas de los demás: es información pública',
     (await vista('e1')).estadoDelJuego !== undefined &&
       estadoDe(await vista('e1')).mesa.find((m: any) => m.suspectId === 'e0')?.marcas === 1,
+  );
+
+  paso('La cronología pública no adelanta la maldición');
+  /*
+   * LA FUGA QUE NINGUNA COMPROBACIÓN MIRABA, y que se encontró jugando. La
+   * cronología viaja entera a todo el mundo por contrato, y la trama metía en
+   * ella un renglón por vigilia diciendo qué cámara se profanaría cada noche. O
+   * sea: la maldición entera, pública, desde el primer minuto.
+   *
+   * Se cargaba la decisión central —explorar dejaba de ser «información a cambio
+   * de salud»— y dejaba al Mecenas con un don que consiste exactamente en saber
+   * eso, y que ya sabía todo el mundo gratis.
+   *
+   * No es una fuga de la solución, así que el barrido de la regla de oro no la
+   * veía. Necesita su propia comprobación, y esta es.
+   */
+  const cronologiaEntera = JSON.stringify((await vista('e0')).cronologia ?? []);
+  for (let f = 1; f < trama.profanadas.length; f++) {
+    const nombre = CAMARAS[Number(trama.profanadas[f]!.slice(1))]!;
+    comprobar(
+      `la cronología no dice que la vigilia ${f + 1} se profanará ${nombre}`,
+      !cronologiaEntera.includes(nombre),
+      cronologiaEntera.slice(0, 200),
+    );
+  }
+  comprobar(
+    'de hecho, la cronología no nombra ninguna cámara: cuál se profana se dice vigilia a vigilia',
+    CAMARAS.every((nombre) => !cronologiaEntera.includes(nombre)),
+    cronologiaEntera.slice(0, 200),
+  );
+  comprobar(
+    'y la de HOY sí se anuncia, que eso lo pide el diseño',
+    estadoDe(await vista('e0')).vigilia.profanada === trama.profanadas[0],
   );
 
   paso('No se puede cambiar de cámara: la decisión no se rectifica');
@@ -587,14 +670,22 @@ async function jugarPorElCable(): Promise<void> {
     );
     // Y con propuestas sobre la mesa, el orden verdadero sigue sin viajar.
     for (const id of Object.keys(testigos)) {
-      const fugas = fugasEn(await vista(id), trama.ordenVerdadero, PROHIBIDAS).filter(
-        // La propuesta PROPIA sí puede coincidir con el orden verdadero: quien
-        // acierta tiene derecho a ver lo que escribió. Lo que no puede es
-        // llegarle por ningún otro camino.
-        (f) => !f.startsWith('vista.estadoDelJuego.yo.miPropuesta'),
-      );
+      const fugas = fugasEn(await vista(id), trama.ordenVerdadero);
       comprobar(`ni con las propuestas entregadas se le filtra nada a ${id}`, fugas.length === 0, fugas);
     }
+    /*
+     * Y QUE LA PODA NO SE HAYA COMIDO EL BARRIDO. Excluir una rama es abrir un
+     * agujero: si mañana alguien mete el orden verdadero justo ahí, esto no lo
+     * vería. Así que se comprueba que la rama podada es pequeña y es la que se
+     * cree —la propuesta propia y nada más—, y que la de otra persona no viaja.
+     */
+    const deAna = await vista('e0');
+    comprobar(
+      'la rama que el barrido perdona es solo la propuesta propia',
+      estadoDe(deAna).yo.miPropuesta?.join('|') === trama.ordenVerdadero.join('|') &&
+        !JSON.stringify(estadoDe(deAna).mesa).includes(trama.ordenVerdadero[1]!),
+      estadoDe(deAna).mesa,
+    );
   } else {
     const propone = await accion('e0', 'proponer-orden', { orden: trama.ordenVerdadero });
     comprobar(
