@@ -1,0 +1,787 @@
+<title>De un juego a muchos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,300;0,400;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
+
+<style>
+  :root {
+    /* Neutro con sesgo frío: no es el de ninguno de los dos juegos. */
+    --fondo: #eceff1;
+    --papel: #f8f9fa;
+    --papel-hondo: #e3e7ea;
+    --tinta: #14181c;
+    --tinta-media: #4a555e;
+    --tinta-tenue: #6e7b85;
+    --filo: #cdd4d9;
+    --filo-suave: #dde2e6;
+
+    /* Los dos mundos, usados SOLO como codigo semantico. */
+    --cluedo: #9b2c3f;
+    --cluedo-velo: rgba(155, 44, 63, 0.09);
+    --momia: #1f6fa8;
+    --momia-velo: rgba(31, 111, 168, 0.09);
+
+    /* El acento de la pagina. Uno solo. */
+    --oro: #a8761f;
+    --oro-velo: rgba(168, 118, 31, 0.12);
+
+    --bien: #2f6b46;
+    --bien-velo: rgba(47, 107, 70, 0.11);
+
+    --medida: 68ch;
+    --paso: clamp(1.5rem, 3vw, 2.5rem);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --fondo: #0e1216;
+      --papel: #161c22;
+      --papel-hondo: #1d242b;
+      --tinta: #e6ebef;
+      --tinta-media: #a4b1bb;
+      --tinta-tenue: #7d8b96;
+      --filo: #2b343c;
+      --filo-suave: #222a31;
+      --cluedo: #e0899a;
+      --cluedo-velo: rgba(224, 137, 154, 0.13);
+      --momia: #77b6e2;
+      --momia-velo: rgba(119, 182, 226, 0.13);
+      --oro: #e0b055;
+      --oro-velo: rgba(224, 176, 85, 0.15);
+      --bien: #7cc79a;
+      --bien-velo: rgba(124, 199, 154, 0.14);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --fondo: #0e1216;
+    --papel: #161c22;
+    --papel-hondo: #1d242b;
+    --tinta: #e6ebef;
+    --tinta-media: #a4b1bb;
+    --tinta-tenue: #7d8b96;
+    --filo: #2b343c;
+    --filo-suave: #222a31;
+    --cluedo: #e0899a;
+    --cluedo-velo: rgba(224, 137, 154, 0.13);
+    --momia: #77b6e2;
+    --momia-velo: rgba(119, 182, 226, 0.13);
+    --oro: #e0b055;
+    --oro-velo: rgba(224, 176, 85, 0.15);
+    --bien: #7cc79a;
+    --bien-velo: rgba(124, 199, 154, 0.14);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--fondo);
+    color: var(--tinta);
+    font-family: Spectral, Georgia, "Times New Roman", serif;
+    font-size: 17px;
+    line-height: 1.62;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .envoltorio {
+    max-width: 78rem;
+    margin: 0 auto;
+    padding: clamp(2rem, 5vw, 4.5rem) clamp(1.1rem, 4vw, 3rem) 6rem;
+  }
+
+  /* ---- Cabecera ---- */
+
+  header { margin-bottom: clamp(2.5rem, 6vw, 4rem); }
+
+  .eyebrow {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--tinta-tenue);
+    margin: 0 0 1.1rem;
+  }
+
+  h1 {
+    font-size: clamp(2.4rem, 7vw, 4.1rem);
+    font-weight: 700;
+    line-height: 1.02;
+    letter-spacing: -0.022em;
+    margin: 0;
+    text-wrap: balance;
+  }
+
+  /* La costura: los dos mundos, y el punto donde se tocan. */
+  .costura {
+    height: 3px;
+    margin: 1.6rem 0 1.5rem;
+    max-width: 26rem;
+    background: linear-gradient(to right, var(--cluedo), var(--oro) 50%, var(--momia));
+    border-radius: 2px;
+  }
+
+  .entradilla {
+    font-size: clamp(1.05rem, 2.2vw, 1.25rem);
+    color: var(--tinta-media);
+    max-width: var(--medida);
+    margin: 0;
+    font-style: italic;
+  }
+
+  /* ---- Secciones ---- */
+
+  section { margin-top: clamp(3rem, 7vw, 4.5rem); }
+
+  h2 {
+    font-size: clamp(1.5rem, 3.4vw, 2.05rem);
+    font-weight: 600;
+    letter-spacing: -0.015em;
+    line-height: 1.15;
+    margin: 0 0 1.4rem;
+    text-wrap: balance;
+    padding-top: 1.3rem;
+    border-top: 1px solid var(--filo);
+  }
+
+  h2 .num {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--oro);
+    letter-spacing: 0.1em;
+    display: block;
+    margin-bottom: 0.55rem;
+  }
+
+  h3 {
+    font-size: 1.12rem;
+    font-weight: 600;
+    margin: 2.1rem 0 0.7rem;
+    letter-spacing: -0.005em;
+  }
+
+  p, li { max-width: var(--medida); }
+  p { margin: 0 0 1.05rem; }
+
+  ul, ol { padding-left: 1.15rem; margin: 0 0 1.15rem; }
+  li { margin-bottom: 0.45rem; }
+
+  strong { font-weight: 600; }
+  em { font-style: italic; }
+
+  code, .mono {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 0.845em;
+    background: var(--papel-hondo);
+    padding: 0.12em 0.38em;
+    border-radius: 3px;
+    word-break: break-word;
+  }
+
+  /* ---- La cita destacada ---- */
+
+  .nota {
+    border-left: 3px solid var(--oro);
+    background: var(--oro-velo);
+    padding: 1.05rem 1.3rem;
+    margin: 1.6rem 0;
+    max-width: var(--medida);
+    border-radius: 0 5px 5px 0;
+  }
+  .nota p:last-child { margin-bottom: 0; }
+
+  /* ---- Tarjetas de bloqueo ---- */
+
+  .bloqueo {
+    background: var(--papel);
+    border: 1px solid var(--filo-suave);
+    border-radius: 7px;
+    padding: 1.3rem 1.45rem;
+    margin-bottom: 1.1rem;
+  }
+  .bloqueo h3 { margin-top: 0; }
+  .bloqueo p:last-child { margin-bottom: 0; }
+
+  .coste {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1.4rem;
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 0.72rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--tinta-tenue);
+    margin-top: 0.9rem;
+    padding-top: 0.85rem;
+    border-top: 1px solid var(--filo-suave);
+  }
+  .coste b { color: var(--tinta-media); font-weight: 600; }
+
+  /* ---- Tablas ---- */
+
+  .tabla-marco {
+    overflow-x: auto;
+    margin: 1.4rem 0 1.8rem;
+    border: 1px solid var(--filo-suave);
+    border-radius: 7px;
+    background: var(--papel);
+  }
+
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 0.9rem;
+    line-height: 1.5;
+  }
+
+  th {
+    text-align: left;
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 0.66rem;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+    color: var(--tinta-tenue);
+    font-weight: 600;
+    padding: 0.85rem 1rem;
+    border-bottom: 1px solid var(--filo);
+    white-space: nowrap;
+  }
+
+  td {
+    padding: 0.8rem 1rem;
+    border-bottom: 1px solid var(--filo-suave);
+    vertical-align: top;
+  }
+  tr:last-child td { border-bottom: none; }
+  td:first-child { white-space: nowrap; }
+  td.libre { white-space: normal; min-width: 17rem; }
+
+  /* ---- Chips de estado ---- */
+
+  .chip {
+    display: inline-block;
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 0.64rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-weight: 600;
+    padding: 0.22em 0.6em;
+    border-radius: 3px;
+    white-space: nowrap;
+  }
+  .chip.hecho { background: var(--bien-velo); color: var(--bien); }
+  .chip.queda { background: var(--cluedo-velo); color: var(--cluedo); }
+  .chip.momia { background: var(--momia-velo); color: var(--momia); }
+
+  /* ---- Rejilla de capas ---- */
+
+  .rejilla {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+    gap: 0.9rem;
+    margin: 1.4rem 0 1.8rem;
+  }
+  .capa {
+    background: var(--papel);
+    border: 1px solid var(--filo-suave);
+    border-radius: 7px;
+    padding: 1.05rem 1.15rem;
+  }
+  .capa h4 {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 0.68rem;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+    color: var(--oro);
+    margin: 0 0 0.6rem;
+    font-weight: 600;
+  }
+  .capa p { font-size: 0.9rem; margin: 0; color: var(--tinta-media); max-width: none; }
+
+  /* ---- Las cuatro puertas ---- */
+
+  .puertas { counter-reset: puerta; list-style: none; padding: 0; margin: 1.5rem 0; }
+  .puertas li {
+    counter-increment: puerta;
+    position: relative;
+    padding-left: 3rem;
+    margin-bottom: 1.05rem;
+    max-width: var(--medida);
+  }
+  .puertas li::before {
+    content: counter(puerta);
+    position: absolute;
+    left: 0;
+    top: -0.1em;
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--cluedo);
+    background: var(--cluedo-velo);
+    width: 2rem;
+    height: 2rem;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+  }
+
+  footer {
+    margin-top: clamp(3.5rem, 8vw, 5rem);
+    padding-top: 1.6rem;
+    border-top: 1px solid var(--filo);
+    color: var(--tinta-tenue);
+    font-size: 0.88rem;
+  }
+  footer p { max-width: var(--medida); }
+
+  a { color: var(--momia); text-underline-offset: 0.18em; }
+  a:focus-visible, :focus-visible {
+    outline: 2px solid var(--oro);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+</style>
+
+<div class="envoltorio">
+
+  <header>
+    <p class="eyebrow">Harkania · Informe de arquitectura</p>
+    <h1>De un juego a muchos</h1>
+    <div class="costura"></div>
+    <p class="entradilla">
+      Lo que costó meter el segundo juego en una plataforma diseñada para
+      albergar muchos, y lo que falta para que el tercero sea una carpeta.
+    </p>
+  </header>
+
+  <section>
+    <h2><span class="num">01</span>El veredicto</h2>
+    <p>
+      La plataforma estaba <strong>mejor diseñada de lo que estaba conectada</strong>.
+    </p>
+    <p>
+      El contrato de juego (<code>ManifiestoDeJuego</code>) es la mejor pieza del
+      repositorio: un juego declarado como dato, con sus categorías, ejes,
+      acciones, fases y barra. El motor que ejecuta acciones es genuinamente
+      agnóstico. El registro de juegos existía desde hacía meses.
+    </p>
+    <p>
+      Y sin embargo, al empezar la noche <strong>no se podía jugar a otra cosa que
+      CLUEDO</strong>. No por una razón: por cuatro puertas cerradas en fila.
+    </p>
+
+    <ol class="puertas">
+      <li>Ninguna ruta aceptaba declarar de qué juego era una partida.</li>
+      <li>Aunque se declarase, la sesión en vivo no copiaba el dato, así que el juego se resolvía a CLUEDO <strong>en silencio</strong>.</li>
+      <li>Aunque se copiase, una categoría nueva no tenía dónde guardarse: las rutas de alta llevaban <code>suspects</code>, <code>rooms</code> y <code>weapons</code> en la URL.</li>
+      <li>Y aunque se guardase, cinco campos del manifiesto estaban declarados <strong>y no los leía nadie</strong>.</li>
+    </ol>
+
+    <p>
+      El diagnóstico en una frase: <strong>la generalización se hizo de dentro
+      afuera y se paró antes de llegar a los bordes.</strong> El núcleo aprendió a
+      no saber de qué se juega; los consumidores no llegaron a preguntárselo.
+    </p>
+
+    <div class="nota">
+      <p>
+        Ninguno de esos cuatro fallos daba error. Todos se habrían descubierto la
+        noche de una velada, con doce personas alrededor de una mesa. Es la peor
+        clase de fallo que hay: <strong>el que no falla</strong>.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="num">02</span>Lo que se ha arreglado esta noche</h2>
+    <p>
+      Todo aditivo. Todo demostrado con el maestro de oro —76 piezas contrastadas
+      byte a byte— y los verificadores de CLUEDO en verde antes de cada commit.
+    </p>
+
+    <div class="tabla-marco">
+      <table>
+        <thead>
+          <tr><th>Commit</th><th>Qué cerraba</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><span class="mono">2c7e727</span></td><td class="libre">Los contratos del segundo juego: manifiesto, tipos, <code>registrarProyeccion</code>, la fase <code>sellado</code></td></tr>
+          <tr><td><span class="mono">dea3f11</span></td><td class="libre"><code>Plot.delJuego</code>: dónde guarda un juego lo que decidió al generar la partida</td></tr>
+          <tr><td><span class="mono">536e119</span></td><td class="libre"><strong>Las entidades ya no tienen que ser sospechosos, salas o armas</strong></td></tr>
+          <tr><td><span class="mono">1176330</span></td><td class="libre">El paquete imprimible sale del catálogo del juego, no del de CLUEDO</td></tr>
+          <tr><td><span class="mono">30df805</span></td><td class="libre"><strong>Ya se puede crear una partida que no sea de CLUEDO</strong></td></tr>
+          <tr><td><span class="mono">eb0f19e</span></td><td class="libre">Que el asistente no reciba la solución deja de cumplirse por casualidad</td></tr>
+          <tr><td><span class="mono">1b3e20d</span></td><td class="libre">Las reglas que lee quien juega dejan de ser siempre las de CLUEDO</td></tr>
+          <tr><td><span class="mono">b5fabce</span></td><td class="libre">Los trofeos dejan de calcularse con la lógica de CLUEDO para todos</td></tr>
+          <tr><td><span class="mono">5d452f5</span></td><td class="libre">El plano deja de tener escaleras de mansión; las fotos dejan de fugarse al borrar</td></tr>
+          <tr><td><span class="mono">b78f085</span></td><td class="libre">Los juegos se dan de alta al arrancar, y en un solo sitio</td></tr>
+          <tr><td><span class="mono">2b878ae</span></td><td class="libre"><strong>La tabla de almacenes no estaba anclada</strong>, y por eso el juego nuevo no podia jugar</td></tr>
+          <tr><td><span class="mono">54021e0</span></td><td class="libre">Una accion ya puede recibir una lista ordenada, y un objetivo opcional</td></tr>
+          <tr><td><span class="mono">b93bc0b</span></td><td class="libre">Los ocho imprimibles del juego nuevo devolvian 404 con las plantillas escritas</td></tr>
+          <tr><td><span class="mono">d20f025</span></td><td class="libre">El boton del Sellado existia y su ruta no</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Tres de estos merecen leerse despacio</h3>
+
+    <p>
+      <strong>Las entidades.</strong> El lector genérico <code>entidadesDe()</code>
+      ya sabía mirar en <code>game.entidades</code> antes de caer a los campos
+      heredados. Pero <strong>nadie escribía ahí</strong>. El destino estaba puesto
+      y no salía ningún tren. Ahora cada juego declara dónde vive cada categoría, y
+      lo que se gana no es solo que funcione: el acoplamiento con los tres campos
+      viejos pasa a estar <em>a la vista, en el manifiesto</em>, en vez de escondido
+      en una constante. El día que se generalice del todo, lo que hay que borrar
+      está enumerado.
+    </p>
+
+    <p>
+      <strong>Las reglas.</strong> <code>REGLAS_JUGADOR</code> vivía en el servidor
+      con nombre de verdad universal y empezaba así: <em>«Alguien de esta casa es un
+      asesino»</em>. Esa lista viajaba a cualquier juego y no a un sitio, sino a
+      tres: la app, el dosier impreso y el prompt del asistente de la partida. Una
+      expedición arqueológica habría leído las reglas de un asesinato en los tres.
+    </p>
+
+    <p>
+      <strong>El asistente.</strong> «El asistente nunca revela la solución» es la
+      regla más importante del producto —si puede chivar quién fue, no hay velada—
+      y <strong>no estaba escrita en ningún sitio</strong>. Se cumplía por omisión.
+      Cualquier herramienta nueva que devolviera la trama entera la rompía en
+      silencio.
+    </p>
+
+    <div class="nota">
+      <p>
+        Esa prueba se pilló a sí misma pasando en falso: llamaba mal a
+        <code>executeTool</code> y recibía «herramienta desconocida», así que la
+        búsqueda de secretos no encontraba nada <strong>y pasaba en verde</strong>.
+        Se detectó rompiendo el código a propósito y viendo que <em>no</em> fallaba.
+        Es la trampa más común de este repositorio: una comprobación que no
+        encuentra nada pasa igual que una que comprueba de verdad.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="num">03</span>La superficie común</h2>
+    <p>Lo que un juego nuevo hereda gratis.</p>
+
+    <div class="rejilla">
+      <div class="capa">
+        <h4>Contratos</h4>
+        <p>El manifiesto, el registro global, el puente de entidades por categoría, y los dos sacos donde un juego guarda lo suyo sin que el motor mire dentro.</p>
+      </div>
+      <div class="capa">
+        <h4>Motor</h4>
+        <p><code>ejecutarAccion</code> valida fase, turno, repeticiones y que lo elegido exista de verdad en su categoría. No sabe de qué se juega.</p>
+      </div>
+      <div class="capa">
+        <h4>Registros por juego</h4>
+        <p>Acciones, proyección del estado y trofeos. Cada uno es una llamada; el tercero se añadió esta noche.</p>
+      </div>
+      <div class="capa">
+        <h4>Plataforma</h4>
+        <p>Cuentas, invitaciones, correo, enlaces profundos, subidas, la puerta del taller, el motor de PDF, el bus en vivo. Ninguno sabe de juegos y no ha habido que tocarlos.</p>
+      </div>
+    </div>
+
+    <p>
+      Esa última caja es aproximadamente la mitad del código, y es la mejor noticia
+      del informe: el trabajo caro —identidad, correo, despliegue, impresión— ya
+      está pagado y no se vuelve a pagar por juego.
+    </p>
+  </section>
+
+  <section>
+    <h2><span class="num">04</span>La superficie propia de cada juego</h2>
+    <p>
+      Esto es, literalmente, la lista de tareas para el juego número tres, en orden
+      de trabajo.
+    </p>
+
+    <div class="tabla-marco">
+      <table>
+        <thead>
+          <tr><th>#</th><th>Qué se escribe</th><th>Dónde</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>1</td><td class="libre">El manifiesto: categorías, ejes, acciones, fases, barra, asistente, trofeos, reglas, documentos</td><td class="libre"><code>shared/juegos/&lt;juego&gt;.ts</code></td></tr>
+          <tr><td>2</td><td class="libre">Los tipos propios: su estado en partida y su trama</td><td class="libre"><code>shared/juegos/&lt;juego&gt;-tipos.ts</code></td></tr>
+          <tr><td>3</td><td class="libre">Darlo de alta <span class="chip queda">toca común</span></td><td class="libre"><code>shared/juegos/index.ts</code> y <code>juegos/instalados.ts</code></td></tr>
+          <tr><td>4</td><td class="libre">Los reductores de sus acciones</td><td class="libre"><code>&lt;juego&gt;-acciones.ts</code></td></tr>
+          <tr><td>5</td><td class="libre">Qué ve cada persona de su estado</td><td class="libre"><code>&lt;juego&gt;-proyeccion.ts</code></td></tr>
+          <tr><td>6</td><td class="libre">Sus trofeos</td><td class="libre"><code>registrarTrofeos(...)</code></td></tr>
+          <tr><td>7</td><td class="libre">El esquema y el prompt de generación</td><td class="libre"><code>server/src/plot/</code></td></tr>
+          <tr><td>8</td><td class="libre">Una trama de demostración sin IA, para probar sin gastar tokens</td><td class="libre"><code>&lt;juego&gt;-demo.ts</code></td></tr>
+          <tr><td>9</td><td class="libre">Sus imprimibles</td><td class="libre"><code>docs/imprimibles/&lt;juego&gt;/</code></td></tr>
+          <tr><td>10</td><td class="libre">Su tema, en el taller y en la app</td><td class="libre"><code>styles/</code> y <code>app/src/tema-&lt;juego&gt;.ts</code></td></tr>
+          <tr><td>11</td><td class="libre">Sus pantallas propias, si las necesita <span class="chip queda">toca común</span></td><td class="libre"><code>app/app/(juego)/</code> + <code>PantallaDeApp</code></td></tr>
+          <tr><td>12</td><td class="libre">Un verificador que juegue una velada entera</td><td class="libre"><code>verificar-&lt;juego&gt;.ts</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p>
+      Solo dos de los doce obligan a tocar código común. Los otros diez son
+      ficheros nuevos al lado de los que ya hay.
+    </p>
+  </section>
+
+  <section>
+    <h2><span class="num">05</span>Lo que sigue cableado</h2>
+    <p>
+      Ordenado por lo que impide, no por cuánto código toca. Lo pendiente es
+      trabajo real, no cosmética.
+    </p>
+
+    <div class="tabla-marco">
+      <table>
+        <thead>
+          <tr><th>Estado</th><th>Dónde</th><th>Qué</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="chip queda">queda</span></td>
+            <td><code>shared/live.ts:23</code></td>
+            <td class="libre"><strong><code>LivePhase</code> es una unión cerrada</strong> con los nombres del ritmo de CLUEDO. Cada juego declara las seis fases aunque no las use. Esta noche se amplió con <code>sellado</code> — que es exactamente el síntoma: ampliar el contrato común para añadir contenido de un solo juego.</td>
+          </tr>
+          <tr>
+            <td><span class="chip queda">queda</span></td>
+            <td><code>shared/live.ts:46</code></td>
+            <td class="libre"><strong><code>EleccionDeSala</code> es el único registro de lo que alguien hace en una ronda</strong>: un <code>roomId</code> y nada más. Un juego con dos acciones distintas por ronda pisa la primera con la segunda.</td>
+          </tr>
+          <tr>
+            <td><span class="chip queda">queda</span></td>
+            <td>169 accesos</td>
+            <td class="libre"><strong>Los tres campos heredados leídos a mano</strong> por todo el sistema. Hoy no muerde porque los dos juegos mapean sus categorías a ellos; el tercero que no lo haga genera documentos vacíos sin dar error.</td>
+          </tr>
+          <tr>
+            <td><span class="chip queda">queda</span></td>
+            <td><code>live/sesion.ts:366</code></td>
+            <td class="libre"><strong>La victoria se decide en la plataforma</strong>: «una acusación por persona, gana quien acierta antes». La victoria por bandos de la Momia no cabe en <code>winnerId: string</code>.</td>
+          </tr>
+          <tr>
+            <td><span class="chip queda">queda</span></td>
+            <td><code>plot/schema.ts</code></td>
+            <td class="libre"><strong>Un solo esquema de generación</strong>, con culpable, arma y sala obligatorios. Falta <code>registrarGenerador</code>.</td>
+          </tr>
+          <tr>
+            <td><span class="chip queda">queda</span></td>
+            <td><code>agent/tools.ts:35</code></td>
+            <td class="libre">Los mínimos escritos a mano pese a que el manifiesto los declara por categoría, y seis herramientas que son la misma operación repetida tres veces.</td>
+          </tr>
+          <tr>
+            <td><span class="chip queda">queda</span></td>
+            <td><code>StudioPage.tsx</code></td>
+            <td class="libre">Las pestañas del taller son una constante y un <code>switch</code> cerrado. No importa <code>manifiestoDe</code> en ningún sitio.</td>
+          </tr>
+          <tr>
+            <td><span class="chip queda">queda</span></td>
+            <td><code>informeValidacion.ts:36</code></td>
+            <td class="libre">Comprueba la ceguera del Game Master <strong>buscando literales en castellano</strong> en el HTML. Con otro juego pasaría siempre en verde sin comprobar nada: una garantía falsa es peor que ninguna.</td>
+          </tr>
+          <tr>
+            <td><span class="chip hecho">hecho</span></td>
+            <td><code>routes/games.ts:56</code></td>
+            <td class="libre">No se podía declarar el juego de una partida.</td>
+          </tr>
+          <tr>
+            <td><span class="chip hecho">hecho</span></td>
+            <td><code>live/sesion.ts:133</code></td>
+            <td class="libre">La sesión en vivo no heredaba el juego — y por tanto lo resolvía a CLUEDO en silencio.</td>
+          </tr>
+          <tr>
+            <td><span class="chip hecho">hecho</span></td>
+            <td><code>routes/entities.ts</code></td>
+            <td class="libre">Una categoría nueva no tenía dónde guardarse.</td>
+          </tr>
+          <tr>
+            <td><span class="chip hecho">hecho</span></td>
+            <td><code>shared/documents.ts</code></td>
+            <td class="libre">El paquete imprimible salía del catálogo de CLUEDO.</td>
+          </tr>
+          <tr>
+            <td><span class="chip hecho">hecho</span></td>
+            <td><code>docs/datos.ts:199</code></td>
+            <td class="libre">Las reglas del jugador eran las de CLUEDO en tres sitios a la vez.</td>
+          </tr>
+          <tr>
+            <td><span class="chip hecho">hecho</span></td>
+            <td><code>live/cuentas.ts:83</code></td>
+            <td class="libre"><code>eraCulpable</code> era siempre falso fuera de CLUEDO, así que su trofeo no se concedía nunca.</td>
+          </tr>
+          <tr>
+            <td><span class="chip hecho">hecho</span></td>
+            <td><code>live/consejero.ts:95</code></td>
+            <td class="libre">El asistente anunciaba «SALAS DE LA CASA» en cualquier juego.</td>
+          </tr>
+          <tr>
+            <td><span class="chip hecho">hecho</span></td>
+            <td><code>routes/games.ts:233</code></td>
+            <td class="libre">Al borrar una partida se fugaban ficheros de las categorías nuevas.</td>
+          </tr>
+          <tr>
+            <td><span class="chip hecho">hecho</span></td>
+            <td>—</td>
+            <td class="libre">El asistente podía filtrar la solución sin que nada lo detectara.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="num">06</span>Los cinco bloqueos de fondo</h2>
+    <p>Lo anterior son síntomas. Esto es la enfermedad.</p>
+
+    <div class="bloqueo">
+      <h3>El ritmo de la partida es el de CLUEDO</h3>
+      <p>
+        <code>LivePhase</code> enumera seis fases con nombres de un misterio de
+        salón. Un juego con otro ritmo —turnos de exploración, fases de mercado,
+        encuentros por capítulos— no puede declararlo.
+      </p>
+      <p>
+        <strong>Propuesta:</strong> abrir <code>LivePhase</code> a cadena,
+        reservando <code>lobby</code> y <code>desenlace</code>. Las fases pasan a
+        llevar rótulo y banderas, y la lista de «fases en juego» se calcula del
+        manifiesto. <code>puedePasarA</code> ya devuelve falso por defecto, así que
+        una tabla no exhaustiva no rompe nada.
+      </p>
+      <div class="coste"><span><b>Coste</b> 1–2 días</span><span><b>Riesgo</b> bajo</span></div>
+    </div>
+
+    <div class="bloqueo">
+      <h3>Una ronda admite una acción, y con forma de sala</h3>
+      <p>
+        De <code>elecciones</code> salen la sala actual, la ocupación que ve quien
+        dirige y el tablón común. Toda la mecánica de reparto de información de la
+        plataforma pasa por ahí.
+      </p>
+      <p>
+        <strong>Propuesta:</strong> ampliar el registro de acciones que ya existe a
+        <code>{suspectId, accion, datos, round, at}</code> y añadir un estado por
+        jugador, hermano del estado de sesión. <code>elecciones</code> se queda como
+        campo heredado y la sala actual pasa a derivarse.
+      </p>
+      <div class="coste"><span><b>Coste</b> 2–3 días</span><span><b>Riesgo</b> medio</span></div>
+    </div>
+
+    <div class="bloqueo">
+      <h3>La victoria vive en la plataforma</h3>
+      <p>
+        <code>acusar()</code> decide quién gana dentro de <code>live/</code>, con
+        las reglas de CLUEDO, aunque el comentario del juego afirme que «el motor no
+        sabe que existe un ganador».
+      </p>
+      <p>
+        <strong>Propuesta:</strong> mover la mecánica de CLUEDO a
+        <code>juegos/cluedo-mecanica.ts</code> y dejar en <code>live/</code> la
+        máquina de estados, la presencia y el guardado. Añadir ganchos por juego
+        para el cierre de ronda y el final.
+      </p>
+      <div class="coste"><span><b>Coste</b> 2 días</span><span><b>Riesgo</b> medio-alto</span><span><b>Red</b> el maestro de oro</span></div>
+    </div>
+
+    <div class="bloqueo">
+      <h3>Las acciones solo saben «elige uno de esta categoría» <span class="chip hecho">medio hecho</span></h3>
+      <p>
+        No sabían ordenar, ni elegir varios, ni admitir un campo que a veces hace
+        falta. El sellado de la Momia —ordenar cinco ritos— <em>no se podía hacer
+        por HTTP</em> aunque su reductor estuviera escrito: el motor descartaba
+        cualquier campo no declarado.
+      </p>
+      <p>
+        <strong>Hecho esta noche:</strong> <code>eligeVarias</code> (con
+        <code>cuantas</code> y <code>ordenada</code>) y <code>eligeOpcional</code>,
+        para campos que dependen de algo secreto — el don de cada persona decide
+        si <code>invocar</code> necesita objetivo, y el motor no puede saberlo.
+        Ninguna afloja la garantía: cada id se sigue validando contra una entidad
+        real de su categoría.
+      </p>
+      <p>
+        <strong>Lo que falta:</strong> <code>eligeEntre</code>, con opciones
+        <em>literales</em> en vez de entidades. Tres elecciones del juego nuevo no
+        son entidades del catálogo —cuál de sus dos dones usa el saqueador, qué
+        fragmento publica el fotógrafo, qué mentira fabrica— y hoy funcionan con
+        valores por defecto deterministas.
+      </p>
+      <div class="coste"><span><b>Coste</b> medio día</span><span><b>Riesgo</b> bajo</span></div>
+    </div>
+
+    <div class="bloqueo">
+      <h3>La app es un binario con pantallas y tema cerrados</h3>
+      <p>
+        Que las pantallas sean una unión cerrada es <em>correcto</em>: la app se
+        compila, y lo que hay que asegurar es que el compilador lo cante —y ya lo
+        canta—. El tema es otra cosa: hay un único objeto de color importado por 27
+        ficheros, más unos 46 literales de oro escritos a mano.
+      </p>
+      <p>
+        <strong>Propuesta:</strong> barrer los literales a tokens (mecánico, no
+        cambia ni un valor), un proveedor de tema en la raíz, y el tema declarado en
+        el manifiesto.
+      </p>
+      <div class="coste"><span><b>Coste</b> 2–3 días</span><span><b>Riesgo</b> bajo</span></div>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="num">07</span>Plan por fases</h2>
+
+    <h3>Fase 1 — hecha esta noche</h3>
+    <p>
+      Las cuatro puertas cerradas y las tres fugas hacia el jugador. Es lo que
+      convierte «la plataforma podría albergar más juegos» en «hay dos juegos».
+    </p>
+
+    <h3>Fase 2 — antes del tercer juego</h3>
+    <ol>
+      <li>Girar los 169 accesos a <code>entidadesDe</code>. Es mecánico y el maestro de oro lo verifica.</li>
+      <li><code>registrarGenerador</code> para la trama.</li>
+      <li>Las herramientas del agente por categoría, en vez de seis con el nombre dentro.</li>
+      <li>El taller construyendo sus pestañas desde el manifiesto.</li>
+      <li>El informe de validación comprobando sobre secciones emitidas, no sobre literales en castellano.</li>
+    </ol>
+
+    <h3>Fase 3 — la visión</h3>
+    <p>
+      Abrir las fases, sacar la mecánica de CLUEDO de <code>live/</code>, tipar las
+      entradas de las acciones y el tema por juego. Al final de esto,
+      <strong>un juego nuevo es una carpeta y una línea en el registro</strong>, y
+      ninguna de las dos toca el núcleo.
+    </p>
+  </section>
+
+  <section>
+    <h2><span class="num">08</span>La regla que ha gobernado la noche</h2>
+    <p>
+      <strong>CLUEDO no puede cambiar de comportamiento.</strong> Ni una fase, ni un
+      byte de su vista, ni una coma de sus impresos.
+    </p>
+    <p>
+      Se ha comprobado antes de cada commit con el maestro de oro y los
+      verificadores. Y cada regla nueva se ha probado <strong>rompiéndola a
+      propósito</strong> y viendo fallar su comprobación.
+    </p>
+    <div class="nota">
+      <p>
+        Una comprobación que nunca se ha visto fallar no demuestra nada. Esta noche
+        ha habido <strong>dos</strong> que pasaban en verde sin mirar nada hasta que
+        se rompió el código a propósito para comprobarlo.
+      </p>
+    </div>
+  </section>
+
+  <footer>
+    <p>
+      Escrito la noche del 27 al 28 de agosto de 2026, mientras cuatro sesiones en
+      paralelo implementaban El Misterio de la Momia. Las citas de fichero y línea
+      corresponden al estado del repositorio en esa fecha.
+    </p>
+  </footer>
+
+</div>
