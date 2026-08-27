@@ -55,6 +55,7 @@ import { generarTramaMomia, estadoInicial, tramaDe } from '../src/juegos/momia-t
 import { entrarEnCamara, invocarDon, ofrendarAmuleto, proponerOrden } from '../src/juegos/momia-acciones';
 import { ejecutarSellado, resolverSellado, selladoDe, trofeosDe } from '../src/juegos/momia-sellado';
 import { vistaMomiaDe } from '../src/juegos/momia-proyeccion';
+import { trofeosDelJuego } from '../src/juegos/trofeos';
 import { MARCAS_PARA_TOCADO } from '../../shared/juegos/momia-tipos';
 import type { TramaMomia } from '../../shared/juegos/momia-tipos';
 import type { GameSession } from '../../shared/types';
@@ -1013,6 +1014,40 @@ function jugarElSellado(): void {
   comprobar('quien propuso el orden ejecutado se lleva El Sellador', trofeos.e0!.includes('sellador'));
   comprobar('quien no lo propuso, no', !trofeos.e1!.includes('sellador'), trofeos.e1);
   comprobar('quien no se marcó se lleva Incorrupto', trofeos.e1!.includes('incorrupto'));
+
+  /*
+   * EL GANCHO DE TROFEOS, POR DONDE LO LLAMA LA PLATAFORMA. `trofeosDe` ya está
+   * comprobado arriba, pero eso no demuestra que el juego esté DADO DE ALTA en el
+   * registro: `trofeosDelJuego` se traga los errores a propósito —un fallo
+   * repartiendo medallas no puede impedir que se guarde la partida— así que un
+   * alta que faltara no daría error, daría una lista vacía y nadie se enteraría.
+   */
+  const porElGancho = trofeosDelJuego('momia', {
+    game: d.game,
+    sesion: d.sesion,
+    plot: d.game.plot!,
+    jugador: d.sesion.players.find((p) => p.suspectId === 'e0')!,
+    eraSenalado: false,
+    gano: false,
+    acerto: false,
+  });
+  comprobar(
+    'la plataforma pide los trofeos de la Momia y los recibe',
+    porElGancho.includes('sellador'),
+    porElGancho,
+  );
+  comprobar(
+    'y a un juego que no registra ninguno no le inventa medallas',
+    trofeosDelJuego('cluedo', {
+      game: d.game,
+      sesion: d.sesion,
+      plot: d.game.plot!,
+      jugador: d.sesion.players[0]!,
+      eraSenalado: false,
+      gano: false,
+      acerto: false,
+    }).length === 0,
+  );
 
   // --- La regla de oro, también aquí ---
   const fugasFinales = fugasEn(vistaMomiaDe(d.game, d.sesion, 'e1'), tramaD.ordenVerdadero);
