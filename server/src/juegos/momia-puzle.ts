@@ -523,7 +523,7 @@ export function repartirHallazgos(opciones: {
   const rnd = azarCon(opciones.semilla ?? 'hallazgos');
   const todos = barajar(fragmentos, rnd);
   const n = todos.length;
-  const paso = camaras.length + 1; // ROTO
+  const paso = camaras.length % n === 0 ? camaras.length + 1 : camaras.length;
 
   const salida: Hallazgo[] = [];
   for (let ronda = 1; ronda <= rondas; ronda++) {
