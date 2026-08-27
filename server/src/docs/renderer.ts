@@ -13,6 +13,7 @@ import { env } from '../config';
 import { styleNoteForGm } from '../plot/style';
 import { vistaGm } from './contexto';
 import { cronologiaPublica, REGLAS_JUGADOR } from './datos';
+import { manifiestoDe } from '../../../shared/juegos';
 import { barraDeImpresion, hojaDeEstilos } from './estilos';
 import { esc } from './html';
 import { DOCUMENT_SECTIONS } from '../../../shared/types';
@@ -303,11 +304,22 @@ function seccionEscenario(game: GameSession): string {
  */
 
 
-function seccionReglas(): string {
+function seccionReglas(game?: GameSession): string {
+  /*
+   * Las reglas del juego que se juega. Sin partida delante, las de CLUEDO: es
+   * lo que hacia antes para todos, y conservarlo como valor por defecto es lo
+   * que deja el dosier de CLUEDO byte a byte como estaba.
+   */
+  const manifiesto = manifiestoDe(game?.settings?.juego);
+  const reglas = manifiesto.reglas ?? REGLAS_JUGADOR;
   return `<section>
     <h2>Cómo se juega</h2>
-    <p><em>Aunque nunca hayas jugado al Cluedo, con estas diez reglas te bastará.</em></p>
-    <ol class="reglas">${REGLAS_JUGADOR.map((regla) => `<li><b>${esc(regla.titulo)}.</b> ${esc(regla.texto)}</li>`).join('')}</ol>
+    <p><em>${esc(
+      manifiesto.id === 'cluedo'
+        ? 'Aunque nunca hayas jugado al Cluedo, con estas diez reglas te bastará.'
+        : `Aunque nunca hayas jugado a ${manifiesto.nombre}, con estas reglas te bastará.`,
+    )}</em></p>
+    <ol class="reglas">${reglas.map((regla) => `<li><b>${esc(regla.titulo)}.</b> ${esc(regla.texto)}</li>`).join('')}</ol>
   </section>`;
 }
 
@@ -476,7 +488,7 @@ function dosierJugador(
       ${bloqueDato('El lugar', plot.setting)}
     </section>`
       : '',
-    incluye(game, 'rules') ? seccionReglas() : '',
+    incluye(game, 'rules') ? seccionReglas(game) : '',
     incluye(game, 'suspects') ? seccionSospechosos(game, plot) : '',
     incluye(game, 'weapons') ? seccionArmas(game) : '',
     incluye(game, 'board') ? seccionEscenario(game) : '',
@@ -705,7 +717,7 @@ function dosierGameMaster(opciones: DocumentRenderOptions, game: GameSession, pl
     pistas,
     aCiegas ? '' : secretos,
     seccionEscenario(game),
-    seccionReglas(),
+    seccionReglas(game),
   ]
     .filter(Boolean)
     .join('\n');

@@ -220,7 +220,12 @@ export function vistaDeJugador(
       sinopsis: plot.synopsis,
       victima: { nombre: plot.victim.name, descripcion: plot.victim.description },
       ambientacion: plot.setting,
-      reglas: REGLAS_JUGADOR.map((r) => `${r.titulo}. ${r.texto}`),
+      /*
+       * LAS REGLAS DEL JUEGO QUE SE JUEGA, no las de CLUEDO. Aqui viajaba
+       * `REGLAS_JUGADOR`, que empieza por «Alguien de esta casa es un asesino»:
+       * una expedicion arqueologica las habria leido tal cual en su movil.
+       */
+      reglas: (manifiesto.reglas ?? REGLAS_JUGADOR).map((r) => `${r.titulo}. ${r.texto}`),
     },
     yo: {
       suspectId,

@@ -230,6 +230,20 @@ export type PantallaDeApp =
   | 'papiro'
   | 'sellado';
 
+/**
+ * Una regla de las que lee quien juega.
+ *
+ * Vive en el manifiesto y no en el servidor porque es CONTENIDO del juego, no
+ * comportamiento de la plataforma, y porque la leen tres sitios que tienen que
+ * decir exactamente lo mismo: la app, el dosier impreso y el asistente de la
+ * partida. Cuando cada uno tenía su copia, bastaba con corregir una para que el
+ * papel y la pantalla dijeran cosas distintas.
+ */
+export interface ReglaDeJuego {
+  titulo: string;
+  texto: string;
+}
+
 /** Una pestaña de la barra de abajo. */
 export interface PestanaDeBarra {
   pantalla: PantallaDeApp;
@@ -315,6 +329,22 @@ export interface ManifiestoDeJuego {
   asistente: AsistenteDeJuego;
 
   ronda: DefinicionDeRonda;
+
+  /**
+   * Las reglas que se le enseñan a quien juega.
+   *
+   * ANTES ERAN UNA CONSTANTE DEL SERVIDOR, y una constante escrita para CLUEDO:
+   * «Alguien de esta casa es un asesino. Debes descubrir quién lo hizo, con qué
+   * objeto y en qué sala». Esa lista viajaba tal cual a CUALQUIER juego —a la
+   * app, al dosier impreso y al prompt del asistente de la partida—, así que una
+   * expedición arqueológica habría leído las reglas de un asesinato en tres
+   * sitios distintos y ninguno habría dado error.
+   *
+   * Es opcional para que un juego pueda no traerlas, pero la Momia y CLUEDO las
+   * declaran las dos: un juego sin reglas propias heredando las de otro es
+   * exactamente el fallo que esto viene a cerrar.
+   */
+  reglas?: ReglaDeJuego[];
 
   /** Qué fase puede seguir a cuál. Hoy ya es una tabla, solo que una sola. */
   fases: Record<LivePhase, LivePhase[]>;

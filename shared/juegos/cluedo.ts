@@ -19,7 +19,78 @@
 import { TROFEOS } from '../live';
 import { DOCUMENT_SECTIONS } from '../types';
 import { PRINTABLE_DOCS } from '../documents';
-import type { ManifiestoDeJuego } from './tipos';
+import type { ManifiestoDeJuego, ReglaDeJuego } from './tipos';
+
+/**
+ * Las reglas de CLUEDO, tal y como las lee quien juega.
+ *
+ * Estaban en `server/src/docs/datos.ts` como `REGLAS_JUGADOR`, con nombre de
+ * verdad universal, y de ahí salían hacia los tres sitios que las enseñan. El
+ * texto no ha cambiado ni una coma al mudarse: lo comprueba el maestro de oro,
+ * que compara el dosier impreso byte a byte.
+ */
+export const REGLAS_CLUEDO: ReglaDeJuego[] = [
+  {
+    titulo: 'El objetivo',
+    texto:
+      'Alguien de esta casa es un asesino. Debes descubrir quién lo hizo, con qué objeto y en qué sala. Gana quien acierte los tres elementos en la acusación final.',
+  },
+  {
+    titulo: 'Tu personaje',
+    texto:
+      'Interpreta al personaje de tu dosier durante toda la velada. Tu forma de ser, tus opiniones y tus intenciones son tuyas; los hechos que el dosier da por ciertos, no.',
+  },
+  {
+    titulo: 'Qué puedes ocultar y qué no',
+    texto:
+      'Puedes callar, desviar la atención y mentir sobre tus opiniones, intenciones y sospechas. No puedes negar un hecho que tu dosier afirme, mentir sobre dónde estuviste realmente, inventarte pruebas ni cambiar lo que dice una pista. Sobre una prueba puedes discutir su interpretación, nunca su contenido.',
+  },
+  {
+    titulo: 'Tu secreto',
+    texto:
+      'Todos escondéis algo, y casi ninguno es el crimen. Revélalo cuando te acorralen con algo concreto o cuando te convenga; nadie puede obligarte.',
+  },
+  {
+    titulo: 'Las rondas',
+    texto:
+      'Quien dirige abre y cierra cada ronda. Durante una ronda entras en una sala y conversas con quien esté allí.',
+  },
+  {
+    titulo: 'Preguntas dirigidas',
+    texto:
+      'En cada ronda puedes hacer una pregunta directa a alguien que esté en tu sala. Puede responder con la verdad, dar una respuesta parcial o negarse a contestar; negarse también dice cosas. Lo que no puede es contradecir un hecho de su dosier.',
+  },
+  {
+    titulo: 'Hipótesis',
+    texto:
+      'Puedes lanzar en voz alta la combinación que sospeches para provocar reacciones, pero nadie está obligado a refutarla: aquí no hay cartas que enseñar. Solo cuenta la acusación final.',
+  },
+  {
+    titulo: 'Pistas',
+    texto:
+      'Cada ronda aparecen pruebas nuevas. Las que encuentres son tuyas para enseñarlas o guardarlas, pero al cerrar la ronda las pruebas físicas pasan al tablón común. Los secretos personales siguen siendo privados.',
+  },
+  {
+    titulo: 'Pasadizos',
+    texto:
+      'Si el plano marca un pasadizo entre dos salas, puedes usarlo para cruzar la casa sin pasar por el pasillo. Nadie te verá salir.',
+  },
+  {
+    titulo: 'La acusación final',
+    texto:
+      'Al final cada jugador escribe su acusación: persona, objeto y sala. Se acusa una sola vez, por escrito y a la vez que los demás.',
+  },
+  {
+    titulo: 'El desenlace',
+    texto:
+      'Se lee la solución. Quien haya acertado los tres elementos resuelve el caso; si nadie acierta, el asesino se sale con la suya.',
+  },
+  {
+    titulo: 'La regla de oro',
+    texto:
+      'Todo lo de esta noche es ficción. Interpreta con generosidad y deja brillar a los demás.',
+  },
+];
 
 export const CLUEDO: ManifiestoDeJuego = {
   id: 'cluedo',
@@ -160,6 +231,8 @@ export const CLUEDO: ManifiestoDeJuego = {
     descripcion: 'Tu asistente del juego con IA',
     icono: 'mayordomo',
   },
+
+  reglas: REGLAS_CLUEDO,
 
   ronda: {
     accionSobre: 'salas',

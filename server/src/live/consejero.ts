@@ -16,6 +16,7 @@
 import { getAnthropicClient, resolveModel } from '../agent/anthropic';
 import { DEMO_MODE } from '../config';
 import { REGLAS_JUGADOR } from '../docs/datos';
+import { manifiestoDe } from '../../../shared/juegos';
 import type { GameSession } from '../../../shared/types';
 import type { VistaJugador } from '../../../shared/live';
 
@@ -62,6 +63,17 @@ una cena.`;
  * `vista.yo.conocimiento`. Si algún día alguien los añade «para que ayude
  * mejor», habrá convertido al Mayordomo en una máquina de resolver el caso.
  */
+/**
+ * El manifiesto del juego que se esta jugando, sacado de la propia vista.
+ *
+ * La vista lleva `sesion.juego` desde que se generalizo el contrato, asi que no
+ * hace falta arrastrar la partida hasta aqui. Si faltara —una partida anterior
+ * al manifiesto— `manifiestoDe` cae en CLUEDO, que es lo correcto.
+ */
+function juegoDe(vista: VistaJugador) {
+  return manifiestoDe(vista.sesion.juego);
+}
+
 export function contextoDelMayordomo(vista: VistaJugador): string {
   const partes: string[] = [];
 
@@ -92,11 +104,23 @@ export function contextoDelMayordomo(vista: VistaJugador): string {
     `LOS DEMÁS EN LA MESA (solo sus nombres y papel público, no sabes nada más de ellos): ` +
       `${vista.jugadores.map((j) => `${j.characterName} (${j.role})`).join('; ')}.`,
   );
-  partes.push(`SALAS DE LA CASA: ${vista.salas.map((s) => s.name).join(', ')}.`);
-  partes.push(`OBJETOS DE LA CASA: ${vista.objetos.map((o) => o.name).join(', ')}.`);
+  /*
+   * Los rotulos salen de las categorias del juego. Antes decia «SALAS DE LA
+   * CASA» y «OBJETOS DE LA CASA» para cualquier juego, de modo que el asistente
+   * de una expedicion arqueologica hablaba de las salas de una mansion.
+   */
+  const cats = juegoDe(vista).categorias;
+  const catLugar = cats.find((c) => c.sonLugares);
+  const catCosas = cats.find((c) => !c.sonLugares && !c.sonJugadores);
+  partes.push(
+    `${(catLugar?.plural ?? 'salas').toUpperCase()}: ${vista.salas.map((s) => s.name).join(', ')}.`,
+  );
+  partes.push(
+    `${(catCosas?.plural ?? 'objetos').toUpperCase()}: ${vista.objetos.map((o) => o.name).join(', ')}.`,
+  );
 
   partes.push(
-    `LAS REGLAS:\n${REGLAS_JUGADOR.map((r) => `- ${r.titulo}: ${r.texto}`).join('\n')}`,
+    `LAS REGLAS:\n${(juegoDe(vista).reglas ?? REGLAS_JUGADOR).map((r) => `- ${r.titulo}: ${r.texto}`).join('\n')}`,
   );
 
   if (vista.yo.soyCulpable) {

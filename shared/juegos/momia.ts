@@ -27,7 +27,7 @@
 import type { TrofeoInfo } from '../live';
 import type { DocumentSectionInfo } from '../types';
 import type { PrintableDocInfo } from '../documents';
-import type { ManifiestoDeJuego } from './tipos';
+import type { ManifiestoDeJuego, ReglaDeJuego } from './tipos';
 
 /**
  * Los trofeos de la Momia.
@@ -200,6 +200,81 @@ export const IMPRIMIBLES_MOMIA: PrintableDocInfo[] = [
     defaultOn: false,
     copies: 'una',
     sides: 'una',
+  },
+];
+
+
+/**
+ * Las reglas que lee quien juega.
+ *
+ * Estan escritas para leerse UNA VEZ, de pie, con el movil en la mano y con
+ * ruido alrededor. Por eso van en el orden en que hacen falta —primero que se
+ * gana, luego que se hace cada vigilia, y el sellado al final— y no en el orden
+ * en que se programaron.
+ *
+ * Las tres que mas se releen durante la noche son la de los amuletos, la del
+ * saqueador y la del sellado: son las que la gente pregunta en voz alta.
+ */
+export const REGLAS_MOMIA: ReglaDeJuego[] = [
+  {
+    titulo: 'El objetivo',
+    texto:
+      'La tumba esta abierta y la maldicion avanza. Antes del amanecer hay que volver a sellarla ejecutando cinco ritos EN EL ORDEN correcto. Si se sella, gana la expedicion entera. Si no, gana quien rompio el sello.',
+  },
+  {
+    titulo: 'Hay un saqueador entre vosotros',
+    texto:
+      'Una de las personas de la mesa abrio el sello a proposito, por encargo de un comprador. No quiere que la tumba se selle. Nadie sabe quien es, y esa persona juega con vosotros toda la noche como si fuera una mas.',
+  },
+  {
+    titulo: 'Nadie puede resolverlo solo',
+    texto:
+      'El orden de los ritos estaba escrito en un papiro que se rompio. Cada fragmento dice UNA cosa sobre el orden. Los fragmentos estan repartidos, y con los tuyos no basta: la unica forma de sellar la tumba es poner en comun lo que cada cual ha encontrado.',
+  },
+  {
+    titulo: 'No todo lo que se dice es verdad',
+    texto:
+      'El saqueador puede fabricar fragmentos falsos y ponerlos sobre la mesa como si los hubiera encontrado. Parecen autenticos. Si dos fragmentos publicos se contradicen, uno de los dos es mentira: esa contradiccion es la mejor pista que vas a tener.',
+  },
+  {
+    titulo: 'Las vigilias',
+    texto:
+      'La noche se divide en vigilias. Quien dirige abre y cierra cada una. Al empezar se anuncia que camara esta PROFANADA esa noche.',
+  },
+  {
+    titulo: 'Entrar en una camara',
+    texto:
+      'En cada vigilia entras en una camara y sales con un fragmento de papiro. Si la camara estaba profanada, sales tambien con una MARCA de la maldicion. No se puede rectificar: se entra una vez y se acepta lo que haya.',
+  },
+  {
+    titulo: 'Las marcas',
+    texto:
+      'A las tres marcas quedas TOCADO. No te elimina: sigues jugando, sigues hablando y sigues pudiendo senalar. Lo que pierdes es voz en el sellado, porque tu propuesta ya no cuenta en la votacion.',
+  },
+  {
+    titulo: 'Los amuletos',
+    texto:
+      'Empiezas con dos amuletos. Un amuleto quita una marca, y solo puedes gastarlo EN OTRA PERSONA, nunca en ti. Es la unica forma de curarse que hay, asi que sobrevivir depende de que alguien quiera ayudarte.',
+  },
+  {
+    titulo: 'Tu don',
+    texto:
+      'Tu papel trae un don que las demas personas no tienen, y puedes usarlo una vez por vigilia. Lo que hagas con el es cosa tuya: contarlo, callartelo o mentir sobre lo que has visto.',
+  },
+  {
+    titulo: 'El sellado',
+    texto:
+      'Cuando quien dirige lo decide, cada cual propone su orden de los cinco ritos y senala a quien cree que es el saqueador. Se ejecuta el orden MAS VOTADO, no el tuyo: convencer a la mesa importa tanto como acertar.',
+  },
+  {
+    titulo: 'Senalar al saqueador',
+    texto:
+      'Se senala una sola vez y para toda la partida, y no se puede cambiar. No se te dira si has acertado hasta el desenlace.',
+  },
+  {
+    titulo: 'La regla de oro',
+    texto:
+      'Todo lo de esta noche es ficcion. Interpreta con generosidad y deja brillar a los demas. Y si eres el saqueador: pierde con elegancia o gana sin restregarlo.',
   },
 ];
 
@@ -444,6 +519,8 @@ export const MOMIA: ManifiestoDeJuego = {
     descripcion: 'Tu asistente de la expedición con IA',
     icono: 'escarabajo',
   },
+
+  reglas: REGLAS_MOMIA,
 
   ronda: {
     accionSobre: 'camaras',

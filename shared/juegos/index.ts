@@ -40,6 +40,7 @@ export type {
   IconoId,
   PantallaDeApp,
   PestanaDeBarra,
+  ReglaDeJuego,
   JuegoId,
   ManifiestoDeJuego,
   ModoDeTurno,

@@ -166,6 +166,25 @@ async function jugar(): Promise<void> {
     ritos?.almacen,
   );
 
+  paso('Cada juego trae sus propias reglas');
+  /*
+   * Las reglas que lee quien juega viajaban como una constante del servidor
+   * escrita para CLUEDO —«Alguien de esta casa es un asesino»— y llegaban tal
+   * cual a CUALQUIER juego: a la app, al dosier impreso y al prompt del
+   * asistente de la partida. Tres sitios, ningun error.
+   */
+  const reglasMomia = manifiesto.reglas ?? [];
+  comprobar('la Momia declara las suyas', reglasMomia.length > 0, reglasMomia.length);
+  comprobar(
+    'y no hablan de un asesinato en una mansion',
+    !reglasMomia.some((r) => /asesino|sala de la casa|acusación final/i.test(r.texto)),
+    reglasMomia.filter((r) => /asesino/i.test(r.texto)).map((r) => r.titulo),
+  );
+  comprobar(
+    'y CLUEDO sigue declarando las suyas',
+    (manifiestoDe('cluedo').reglas ?? []).length > 0,
+  );
+
   paso('Dar de alta un rito, que no cabe en ningún campo de CLUEDO');
   const alta = await pedir('/games/tumba/entidades/ritos', {
     metodo: 'POST',
