@@ -64,10 +64,41 @@ const game: GameSession = {
   settings: { language: 'es', juego: 'momia' },
 } as unknown as GameSession;
 
+/**
+ * Una partida aparte, ya con trama, para poder abrir su sesion en vivo.
+ *
+ * Va separada de la de arriba a proposito: aquella empieza VACIA porque lo que
+ * se prueba con ella es dar de alta entidades desde cero, y sembrarla con gente
+ * dentro haria que la primera comprobacion pasara sin haber creado nada.
+ */
+const conTrama: GameSession = {
+  ...structuredClone(game),
+  id: 'tumba-lista',
+  status: 'ready',
+  suspects: [
+    { id: 's0', name: 'Ana' },
+    { id: 's1', name: 'Bruno' },
+    { id: 's2', name: 'Carla' },
+    { id: 's3', name: 'Dani' },
+  ],
+  plot: {
+    title: 'La tumba',
+    tagline: 'El sello esta roto.',
+    synopsis: 'Alguien abrio lo que no debia.',
+    victim: { name: 'El sello', description: 'Roto desde dentro.' },
+    setting: 'El campamento',
+    solution: { respuestas: { saqueador: 's1' }, motive: 'Una deuda.', howItHappened: 'De noche.' },
+    characters: [],
+    timeline: [],
+    clues: [],
+    gmScript: [],
+  },
+} as unknown as GameSession;
+
 fs.mkdirSync(path.join(dir, 'data'), { recursive: true });
 fs.writeFileSync(
   path.join(dir, 'data', 'db.json'),
-  JSON.stringify({ games: [game], messages: {}, config: { model: 'claude-fable-5' }, live: [], accounts: [] }),
+  JSON.stringify({ games: [game, conTrama], messages: {}, config: { model: 'claude-fable-5' }, live: [], accounts: [] }),
   'utf8',
 );
 
@@ -199,6 +230,49 @@ async function jugar(): Promise<void> {
     cuerpo: { name: 'Smaug' },
   });
   comprobar('responde 404 y no la crea', inventada.estado === 404, inventada.datos);
+
+  paso('Crear una partida de OTRO juego, y que se entere la partida en vivo');
+  /*
+   * ESTA ES LA PUERTA QUE NO EXISTIA. `POST /games` solo leia el nombre, asi
+   * que no habia forma de crear una partida que no fuera de CLUEDO: el
+   * manifiesto estaba, el registro estaba, y no habia por donde entrar.
+   */
+  const nueva = await pedir('/games', { metodo: 'POST', cuerpo: { name: 'La tumba', juego: 'momia' } });
+  comprobar('crear una partida de la Momia responde 201', nueva.estado === 201, nueva.datos);
+  comprobar(
+    'y queda declarada como tal',
+    (nueva.datos as GameSession)?.settings?.juego === 'momia',
+    (nueva.datos as GameSession)?.settings,
+  );
+
+  const inventado = await pedir('/games', { metodo: 'POST', cuerpo: { name: 'X', juego: 'parchis' } });
+  comprobar(
+    'un juego que no existe se rechaza en vez de caer a CLUEDO en silencio',
+    inventado.estado === 400,
+    inventado.datos,
+  );
+
+  const sinJuego = await pedir('/games', { metodo: 'POST', cuerpo: { name: 'De siempre' } });
+  comprobar('crear sin decir el juego sigue funcionando', sinJuego.estado === 201, sinJuego.datos);
+  comprobar(
+    'y no se le inventa ninguno',
+    (sinJuego.datos as GameSession)?.settings?.juego === undefined,
+    (sinJuego.datos as GameSession)?.settings,
+  );
+
+  /*
+   * Y LO QUE DE VERDAD IMPORTA: que la sesion en vivo lo herede. Sin esto,
+   * `manifiestoDe(undefined)` cae en CLUEDO —por diseno, para no romper las
+   * partidas viejas— y la Momia se jugaria como CLUEDO sin dar ningun error.
+   */
+  const abierta = await pedir('/games/tumba-lista/live/abrir', { metodo: 'POST' });
+  comprobar('abrir la sesion responde 200', abierta.estado === 200, abierta.datos);
+  const sesion = (abierta.datos?.sesion ?? abierta.datos) as { juego?: string };
+  comprobar(
+    'y la sesion en vivo sabe que se juega a la Momia',
+    sesion?.juego === 'momia',
+    sesion,
+  );
 
   paso('Borrarlo');
   const borrado = await pedir(`/games/tumba/entidades/ritos/${rito?.id}`, { metodo: 'DELETE' });

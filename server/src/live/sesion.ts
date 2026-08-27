@@ -132,6 +132,18 @@ export async function abrirSesion(game: GameSession): Promise<LiveSession> {
 
   const sesion: LiveSession = {
     id: game.id,
+    /*
+     * A QUE SE JUEGA, copiado de la partida.
+     *
+     * Sin esta linea, `sesion.juego` se quedaba vacio y `manifiestoDe(undefined)`
+     * cae en CLUEDO por diseno —para que las partidas de antes del manifiesto
+     * sigan funcionando—. El efecto era que una partida declarada de otro juego
+     * se jugaba como CLUEDO EN SILENCIO: sin error, sin aviso, con las fases y
+     * las acciones equivocadas, y descubriendolo la noche de la velada.
+     *
+     * Es de los fallos peores que hay: el que no falla.
+     */
+    juego: game.settings?.juego,
     // Nuevo en cada apertura: es lo que invalida los móviles de la anterior.
     sid: nanoid(16),
     code: await codigoLibre(),

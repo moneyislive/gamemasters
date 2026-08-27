@@ -7,6 +7,7 @@
  *   DELETE /games/:id  → {ok:true}
  */
 import { DOCUMENT_SECTIONS } from '../../../shared/types';
+import { juegosInstalados } from '../../../shared/juegos';
 import type { DocumentSectionId, GameSettings } from '../../../shared/types';
 import { isPrintableDocId } from '../../../shared/documents';
 import { isModelId } from '../config';
@@ -55,16 +56,41 @@ router.get('/games', async (req, res) => {
 
 router.post('/games', async (req, res) => {
   try {
-    const rawName = (req.body as { name?: unknown } | undefined)?.name;
+    const cuerpo = (req.body ?? {}) as { name?: unknown; juego?: unknown };
+    const rawName = cuerpo.name;
     const name = typeof rawName === 'string' ? rawName : undefined;
     const game = await getStore().createGame(name);
+    let hayQueGuardar = false;
+
+    /*
+     * A QUE SE JUEGA. Hasta ahora esta ruta solo leia el nombre, asi que NO
+     * HABIA FORMA de crear una partida que no fuera de CLUEDO: el manifiesto
+     * existia, el registro existia, y no habia puerta por donde entrar. La
+     * plataforma podia albergar muchos juegos y solo se podia jugar a uno.
+     *
+     * Se comprueba contra los juegos instalados y no se acepta cualquier cadena:
+     * un id inventado dejaria la partida apuntando a un manifiesto que no
+     * existe, y `manifiestoDe` caeria en CLUEDO en silencio —que es exactamente
+     * el fallo que esto viene a evitar—.
+     */
+    const pedido = typeof cuerpo.juego === 'string' ? cuerpo.juego : undefined;
+    if (pedido) {
+      if (!juegosInstalados().some((j) => j.id === pedido)) {
+        res.status(400).json({ error: `«${pedido}» no es un juego instalado.` });
+        return;
+      }
+      game.settings = { ...game.settings, juego: pedido };
+      hayQueGuardar = true;
+    }
+
     // Quien la crea la firma. Si entra con la contraseña de la casa no hay a
     // quién atribuirla y nace huérfana, como todas las de antes.
     const quien = identidadDeTaller(req);
     if (quien?.tipo === 'cuenta') {
       game.duenos = [{ cuentaId: quien.cuentaId, via: 'creo', desdeEl: new Date().toISOString() }];
-      await getStore().saveGame(game);
+      hayQueGuardar = true;
     }
+    if (hayQueGuardar) await getStore().saveGame(game);
     res.status(201).json(game);
   } catch (err) {
     console.error('[partidas] Error al crear:', err);
