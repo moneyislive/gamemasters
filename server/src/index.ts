@@ -5,6 +5,14 @@
  * express con sus routers bajo /api, inicializar el almacén y escuchar.
  */
 import fs from 'node:fs';
+/*
+ * DA DE ALTA LOS JUEGOS ANTES QUE NADA. Cada juego registra al importarse lo
+ * que hacen sus acciones, que ve cada persona de su estado y que trofeos
+ * reparte. Si esto no se importa, el registro esta vacio y la primera partida
+ * de ese juego falla con «eso no se puede hacer en esta partida» — un mensaje
+ * que no lleva a ningun sitio, en produccion, con la mesa puesta.
+ */
+import './juegos/instalados';
 import path from 'node:path';
 import cors from 'cors';
 import express from 'express';

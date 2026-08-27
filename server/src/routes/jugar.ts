@@ -18,8 +18,14 @@ import { firmaDeFotoValida } from '../live/fotos';
 import { vistaDeJugador } from '../live/proyeccion';
 import { guardarNotas, mutar, tocar } from '../live/sesion';
 import { AccionInvalida, ejecutarAccion } from '../juegos/motor';
-// Importar este módulo da de alta lo que hacen las acciones de CLUEDO.
-import '../juegos/cluedo-acciones';
+/*
+ * El alta de los juegos ya no vive aqui: la hace `juegos/instalados.ts` desde
+ * el arranque. Colgarla de esta ruta funcionaba con un solo juego —toda
+ * partida pasa por aqui tarde o temprano— y con dos era una trampa: habia que
+ * acordarse de anadir una linea en un fichero que no tiene nada que ver con el
+ * juego que se esta escribiendo, y olvidarla no fallaba al arrancar sino en la
+ * primera partida.
+ */
 import { credencialDePeticion, credencialValidaPara, emitirCredencial } from '../live/token';
 import type { NextFunction, Request, Response } from 'express';
 import type { VistaJugador } from '../../../shared/live';
