@@ -13,7 +13,7 @@ import { isPrintableDocId } from '../../../shared/documents';
 import { isModelId } from '../config';
 import { getStore } from '../db/store';
 import { identidadDeTaller } from '../auth';
-import { olvidarFotos } from '../uploads/limpieza';
+import { fotosDe, olvidarFotos } from '../uploads/limpieza';
 import { normalizeStylePrompt } from '../plot/style';
 import { crearRouter } from '../rutas';
 
@@ -229,13 +229,15 @@ router.delete('/games/:id', async (req, res) => {
       res.status(404).json(NOT_FOUND);
       return;
     }
-    // Las fotos ANTES de borrar, que después ya no hay dónde mirarlas.
-    const fotos = [
-      game.boardImageUrl,
-      ...game.suspects.map((s) => s.photoUrl),
-      ...game.rooms.map((r) => r.photoUrl),
-      ...game.weapons.map((w) => w.photoUrl),
-    ];
+    /*
+     * Las fotos ANTES de borrar, que despues ya no hay donde mirarlas.
+     *
+     * Se pide la lista a `fotosDe` en vez de rehacerla aqui: la copia que habia
+     * en este fichero se habia quedado sin `game.entidades`, asi que las fotos
+     * de cualquier categoria que no fuera sospechosos, salas o armas se
+     * quedaban en disco para siempre.
+     */
+    const fotos = fotosDe(game);
     await store.deleteGame(req.params.id);
     // Y se retiran DESPUÉS, cuando ya no las reclama esta partida: `olvidarFotos`
     // vuelve a mirar todas las demás por si alguna las comparte.

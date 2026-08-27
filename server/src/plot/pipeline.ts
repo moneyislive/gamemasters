@@ -6,6 +6,7 @@
  * route handler, que cierra el SSE.
  */
 import type { GameSession, GenerateStreamEvent, Plot } from '../../../shared/types';
+import { manifiestoDe } from '../../../shared/juegos';
 import { DEMO_MODE } from '../config';
 import { getStore } from '../db/store';
 import { getAnthropicClient, resolveModel } from '../agent/anthropic';
@@ -36,7 +37,7 @@ export async function runGeneration(game: GameSession, emit: Emitir): Promise<vo
     emit({ type: 'stage', stage: 'board', label: 'Trazando el plano de la mansión…' });
     if (game.boardMode === 'generated') {
       // Determinista: regenerar siempre refleja los últimos cambios de salas.
-      game.board = generateBoardLayout(game.rooms);
+      game.board = generateBoardLayout(game.rooms, manifiestoDe(game.settings?.juego).rotuloCentralDelPlano);
     }
     // En modo 'aerial' no se genera rejilla: manda la foto aérea con chinchetas.
 

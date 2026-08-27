@@ -24,8 +24,18 @@ import { env } from '../config';
 import { getStore } from '../db/store';
 import type { GameSession } from '../../../shared/types';
 
-/** Todas las URL de foto que aparecen en una partida, incluida la del tablero. */
-function fotosDe(game: GameSession): string[] {
+/**
+ * Todas las URL de foto que aparecen en una partida, incluida la del tablero.
+ *
+ * SE EXPORTA porque la ruta de borrado tenia su propia copia de esta lista, y
+ * la copia se quedo sin `game.entidades`: al borrar una partida, las fotos de
+ * las categorias que no son sospechosos, salas ni armas se quedaban en disco
+ * para siempre. Una fuga pequena y silenciosa que crece con cada juego nuevo.
+ *
+ * Dos listas de lo mismo en dos ficheros solo pueden divergir; esta es la que
+ * ya estaba bien.
+ */
+export function fotosDe(game: GameSession): string[] {
   const urls = [
     game.boardImageUrl,
     ...game.suspects.map((s) => s.photoUrl),

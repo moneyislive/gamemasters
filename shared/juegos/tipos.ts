@@ -331,6 +331,20 @@ export interface ManifiestoDeJuego {
   ronda: DefinicionDeRonda;
 
   /**
+   * Cómo se llama el bloque del centro del plano.
+   *
+   * Parece un detalle y es el tipo de detalle que delata que un juego está
+   * pintado encima de otro: el generador de plano plantaba «ESCALERAS» en el
+   * centro de cualquier tablero, así que una tumba egipcia tenía las escaleras
+   * de la mansión de CLUEDO en medio. Nadie habría dado un error; simplemente
+   * habría quedado raro en la mesa.
+   *
+   * Sin declarar, «ESCALERAS»: es lo que hacía antes para todos y es lo que
+   * deja el plano de CLUEDO idéntico.
+   */
+  rotuloCentralDelPlano?: string;
+
+  /**
    * Las reglas que se le enseñan a quien juega.
    *
    * ANTES ERAN UNA CONSTANTE DEL SERVIDOR, y una constante escrita para CLUEDO:

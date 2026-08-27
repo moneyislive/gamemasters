@@ -65,7 +65,16 @@ const HUECOS_COMPACTOS: Hueco[] = [
 ];
 
 /** Genera el BoardLayout determinista para las salas dadas. */
-export function generateBoardLayout(rooms: Room[]): BoardLayout {
+export function generateBoardLayout(
+  rooms: Room[],
+  /*
+   * El rotulo del centro entra por parametro y no se lee aqui del manifiesto
+   * para que este fichero siga siendo geometria pura: recibe lugares, devuelve
+   * un plano, y no sabe de que juego es. Quien llama ya tiene la partida
+   * delante y sabe preguntarselo.
+   */
+  rotuloCentral = 'ESCALERAS',
+): BoardLayout {
   // Orden estable por id: mismo conjunto de salas → mismo tablero.
   const ordenadas = [...rooms].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   const huecos = ordenadas.length <= HUECOS_AMPLIOS.length ? HUECOS_AMPLIOS : HUECOS_COMPACTOS;
@@ -79,7 +88,7 @@ export function generateBoardLayout(rooms: Room[]): BoardLayout {
     grid: { cols: COLS, rows: ROWS },
     rooms: colocaciones,
     passages: calcularPasadizos(colocaciones),
-    centerLabel: 'ESCALERAS',
+    centerLabel: rotuloCentral,
   };
 }
 

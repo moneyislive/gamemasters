@@ -520,6 +520,9 @@ export const MOMIA: ManifiestoDeJuego = {
     icono: 'escarabajo',
   },
 
+  // En medio de una tumba no hay escaleras: hay un pozo funerario.
+  rotuloCentralDelPlano: 'EL POZO',
+
   reglas: REGLAS_MOMIA,
 
   ronda: {

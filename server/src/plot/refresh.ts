@@ -26,6 +26,7 @@ import type {
   PlotClue,
   TimelineEvent,
 } from '../../../shared/types';
+import { manifiestoDe } from '../../../shared/juegos';
 import type { StalenessReport } from '../../../shared/staleness';
 import { computeStaleness } from '../../../shared/staleness';
 import { DEMO_MODE } from '../config';
@@ -98,7 +99,7 @@ export async function runRefresh(game: GameSession, emit: Emitir): Promise<void>
       // Determinista: se reconstruye con las salas actuales.
       // En modo 'aerial' no hay rejilla que rehacer (manda la foto con chinchetas),
       // y por eso `boardOutdated` nunca es cierto en ese modo.
-      game.board = generateBoardLayout(game.rooms);
+      game.board = generateBoardLayout(game.rooms, manifiestoDe(game.settings?.juego).rotuloCentralDelPlano);
     }
 
     // ---------- Etapa 2: poda local (gratis, sin IA) ----------
