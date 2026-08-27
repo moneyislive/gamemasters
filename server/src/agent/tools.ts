@@ -1,11 +1,21 @@
 /**
- * Herramientas del agente de CLUEDO.
+ * Herramientas del asistente del taller.
  *
- * - `agentTools`: definiciones (formato Tool de Anthropic) que se pasan al
- *   modelo en cada petición de chat.
+ * - `agentTools`: las de CLUEDO, tal cual estaban. Se sigue exportando con este
+ *   nombre porque lo importa el taller y lo congela el maestro de oro.
+ * - `herramientasDe(game)`: las que le tocan a ESTA partida. CLUEDO recibe las
+ *   suyas; cualquier otro juego, las de sus categorías generadas desde su
+ *   manifiesto (`momia-herramientas.ts`) más las comunes.
  * - `executeTool`: ejecuta una herramienta sobre la partida. Las de mutación
  *   guardan con el store y devuelven la partida actualizada; las `ui_*`
  *   devuelven un comando de interfaz; `get_game_state` devuelve un resumen JSON.
+ *
+ * LO QUE NO SALE DE AQUÍ, PASE LO QUE PASE: nada de `game.plot` salvo el
+ * título. Ni la solución, ni los secretos, ni el orden verdadero de los ritos,
+ * ni qué fragmentos son falsos. `get_game_state` es la única herramienta que
+ * LEE, así que es la que hay que vigilar, y la vigila
+ * `npm run verify:secretos-agente`. Si algún día se añade otra de lectura, hay
+ * que ampliar esa prueba — y ese es justo el momento en el que se olvidaría.
  */
 
 import type Anthropic from '@anthropic-ai/sdk';
@@ -20,6 +30,12 @@ import type {
 } from '../../../shared/types';
 import { getStore } from '../db/store';
 import { normalizeStylePrompt } from '../plot/style';
+import { CLUEDO, entidadesDe, manifiestoDe } from '../../../shared/juegos';
+import {
+  ejecutarHerramientaDeCategoria,
+  faltanMinimos,
+  herramientasDeCategorias,
+} from './momia-herramientas';
 
 /** Objetivos válidos para realce/navegación en la interfaz. */
 const OBJETIVOS_UI: HighlightTarget[] = [
@@ -34,7 +50,15 @@ const OBJETIVOS_UI: HighlightTarget[] = [
 /** Mínimos exigidos antes de poder generar la trama. */
 export const MINIMOS = { sospechosos: 3, salas: 4, armas: 3 } as const;
 
-export const agentTools: Anthropic.Messages.Tool[] = [
+/**
+ * Las de dar de alta y de baja entidades, en CLUEDO.
+ *
+ * Se separan de las comunes para poder cambiarlas por las de otro juego sin
+ * tocar ni una línea de estas. `agentTools` sigue siendo la concatenación
+ * EXACTA de las dos listas, en el mismo orden que tenía: quien la importe no
+ * nota nada, y el maestro de oro tampoco.
+ */
+const HERRAMIENTAS_DE_CLUEDO: Anthropic.Messages.Tool[] = [
   {
     name: 'upsert_suspect',
     description:
@@ -133,6 +157,18 @@ export const agentTools: Anthropic.Messages.Tool[] = [
       required: ['id'],
     },
   },
+];
+
+/**
+ * Las que valen para cualquier juego.
+ *
+ * Renombrar la partida, fijar el estilo, mirar el estado, mover la interfaz y
+ * lanzar la generación no dependen de si se juega a un asesinato o a un
+ * sellado: solo cambian las palabras del juego, y esas las pone el system
+ * prompt. Tener una sola copia evita que dentro de tres juegos haya cinco
+ * variantes de `ui_popup` que se hayan ido separando.
+ */
+const HERRAMIENTAS_COMUNES: Anthropic.Messages.Tool[] = [
   {
     name: 'set_game_name',
     description: 'Cambia el nombre de la partida. Úsala cuando el usuario bautice o renombre la velada.',
@@ -228,6 +264,29 @@ export const agentTools: Anthropic.Messages.Tool[] = [
   },
 ];
 
+/**
+ * Las herramientas de CLUEDO. Se deja el nombre y el contenido intactos porque
+ * lo importa el taller y lo congela el maestro de oro.
+ */
+export const agentTools: Anthropic.Messages.Tool[] = [
+  ...HERRAMIENTAS_DE_CLUEDO,
+  ...HERRAMIENTAS_COMUNES,
+];
+
+/**
+ * Las herramientas que se le pasan al asistente de ESTA partida.
+ *
+ * CLUEDO recibe las suyas de siempre; cualquier otro juego recibe las de sus
+ * categorías, generadas desde su manifiesto, más las comunes. Un juego con
+ * «ritos» puede así darlos de alta, cosa que con `upsert_weapon` no tenía
+ * manera de hacer.
+ */
+export function herramientasDe(game: GameSession): Anthropic.Messages.Tool[] {
+  const manifiesto = manifiestoDe(game.settings?.juego);
+  if (manifiesto.id === CLUEDO.id) return agentTools;
+  return [...herramientasDeCategorias(manifiesto), ...HERRAMIENTAS_COMUNES];
+}
+
 /** Lee una propiedad string del input de la herramienta, ya parseado por el SDK. */
 function texto(input: Record<string, unknown>, clave: string): string | undefined {
   const valor = input[clave];
@@ -249,6 +308,19 @@ export async function executeTool(
   const store = getStore();
   const datos: Record<string, unknown> =
     input && typeof input === 'object' ? (input as Record<string, unknown>) : {};
+
+  /*
+   * Las altas y bajas por categoría, primero y solo si no es CLUEDO.
+   *
+   * Devuelve `null` cuando el nombre no es de una categoría de este juego, y
+   * entonces se sigue al `switch` de siempre. En CLUEDO ni se pregunta: sus
+   * herramientas se llaman `upsert_suspect` y las atiende su propio caso, byte
+   * por byte como antes.
+   */
+  if (manifiestoDe(game.settings?.juego).id !== CLUEDO.id) {
+    const atendida = await ejecutarHerramientaDeCategoria(game, name, datos);
+    if (atendida) return atendida;
+  }
 
   switch (name) {
     case 'upsert_suspect': {
@@ -425,6 +497,46 @@ export async function executeTool(
     }
 
     case 'get_game_state': {
+      /*
+       * Para un juego que no sea CLUEDO, el resumen va POR CATEGORÍA: llamar
+       * «armas» a las reliquias de una tumba y «sospechosos» a una expedición
+       * confunde al asistente en cada consulta, y además dejaba fuera cualquier
+       * categoría que no fuese una de las tres.
+       *
+       * LO QUE NO SALE, NI AQUÍ NI EN LA RAMA DE CLUEDO: nada de `game.plot`
+       * salvo el título. Ni la solución, ni los secretos, ni el orden verdadero
+       * de los ritos, ni qué fragmentos son falsos. Es la única defensa que
+       * funciona —no dárselo— y la vigila `npm run verify:secretos-agente`.
+       */
+      const manifiesto = manifiestoDe(game.settings?.juego);
+      if (manifiesto.id !== CLUEDO.id) {
+        return {
+          result: JSON.stringify({
+            id: game.id,
+            nombre: game.name,
+            juego: manifiesto.id,
+            estado: game.status,
+            modoTablero: game.boardMode,
+            categorias: Object.fromEntries(
+              manifiesto.categorias.map((cat) => [
+                cat.id,
+                entidadesDe(game, cat.id).map((e) => ({
+                  id: e.id,
+                  nombre: e.name,
+                  descripcion: e.description ?? null,
+                  tieneFoto: Boolean(e.photoUrl),
+                  ...(cat.admiteEmail ? { tieneCorreo: Boolean(e.email) } : {}),
+                })),
+              ]),
+            ),
+            tramaGenerada: Boolean(game.plot),
+            tituloTrama: game.plot?.title ?? null,
+            dosieres: game.documents?.length ?? 0,
+            faltan: faltanMinimos(game),
+          }),
+        };
+      }
+
       const resumen = {
         id: game.id,
         nombre: game.name,
@@ -499,6 +611,25 @@ export async function executeTool(
     }
 
     case 'start_generation': {
+      /*
+       * Los mínimos de un juego que no sea CLUEDO salen de su manifiesto, que es
+       * donde los declara. Escritos aquí a mano, un juego nuevo habría podido
+       * generar sin sus cinco ritos y la partida habría salido sin puzle.
+       */
+      if (manifiestoDe(game.settings?.juego).id !== CLUEDO.id) {
+        const faltan = faltanMinimos(game);
+        if (faltan.length > 0) {
+          return {
+            result: `No se puede generar todavía. Faltan mínimos (${faltan.join('; ')}). Pide al usuario los datos que faltan.`,
+          };
+        }
+        return {
+          result:
+            'Orden de generación enviada a la interfaz: el cliente lanzará ahora el proceso de tablero, trama y dosieres.',
+          ui: { kind: 'start_generation' },
+        };
+      }
+
       const faltantes: string[] = [];
       if (game.suspects.length < MINIMOS.sospechosos) {
         faltantes.push(`sospechosos: hay ${game.suspects.length}, mínimo ${MINIMOS.sospechosos}`);

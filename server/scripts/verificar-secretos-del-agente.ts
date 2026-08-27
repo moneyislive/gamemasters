@@ -99,6 +99,16 @@ const CENTINELAS = {
   aQueApunta: 'CENTINELA-A-QUE-APUNTA-6e10',
   confesion: 'CENTINELA-CONFESION-3a77',
   reconstruccion: 'CENTINELA-RECONSTRUCCION-8b02',
+  /*
+   * Los dos de El Misterio de la Momia, y no son un extra del mismo problema:
+   * son PEORES. En CLUEDO chivar la solución arruina el final; aquí el orden
+   * verdadero de los cinco ritos sella la tumba en la primera vigilia, y saber
+   * qué fragmentos son falsos desarma al saqueador, que es el motor adversarial
+   * del juego entero. Los dos viven en `plot.delJuego`, que es un campo nuevo:
+   * exactamente el sitio por el que se filtraría algo sin que nadie lo notara.
+   */
+  ordenVerdadero: 'CENTINELA-ORDEN-DEL-SELLADO-5c19',
+  fragmentoFalso: 'CENTINELA-FRAGMENTO-FALSO-2d63',
 } as const;
 
 const ahora = new Date().toISOString();
@@ -172,6 +182,104 @@ const game: GameSession = {
   },
 } as unknown as GameSession;
 
+/**
+ * La misma partida, pero de El Misterio de la Momia.
+ *
+ * Lleva los centinelas donde de verdad duelen en ese juego: el orden verdadero
+ * del sellado y el texto de un fragmento falso, los dos dentro de
+ * `plot.delJuego`. Y las entidades van por las cuatro categorías de la Momia
+ * —incluidos los `ritos`, que no caben en `suspects`, `rooms` ni `weapons`—
+ * para que el prompt del Escriba y `get_game_state` se compongan de verdad y no
+ * sobre una partida vacía que no probaría nada.
+ */
+const gameMomia = {
+  id: 'secretos-momia',
+  name: 'Expedición con centinelas',
+  status: 'ready',
+  createdAt: ahora,
+  updatedAt: ahora,
+  suspects: [
+    { id: 'e0', name: 'Marta', description: 'Discute por deporte.' },
+    { id: 'e1', name: 'Bruno' },
+    { id: 'e2', name: 'Carla' },
+    { id: 'e3', name: 'Dani' },
+  ],
+  rooms: [
+    { id: 'c0', name: 'Antesala de los Sellos' },
+    { id: 'c1', name: 'Pozo de las Ofrendas' },
+    { id: 'c2', name: 'Corredor de las Estrellas' },
+    { id: 'c3', name: 'Cámara del Barquero' },
+    { id: 'c4', name: 'Sala de la Balanza' },
+  ],
+  weapons: [
+    { id: 'q0', name: 'Escarabeo' },
+    { id: 'q1', name: 'Máscara' },
+    { id: 'q2', name: 'Vaso canopo' },
+  ],
+  entidades: {
+    ritos: [
+      { id: 't0', name: 'Rito del Agua' },
+      { id: 't1', name: 'Rito del Aliento' },
+      { id: 't2', name: 'Rito del Nombre' },
+      { id: 't3', name: 'Rito de la Balanza' },
+      { id: 't4', name: 'Rito del Silencio' },
+    ],
+  },
+  boardMode: 'generated',
+  settings: { language: 'es', juego: 'momia' },
+  plot: {
+    title: 'La tumba abierta',
+    tagline: 'Alguien rompió el sello.',
+    synopsis: 'Una expedición que acaba mal.',
+    victim: { name: 'Neferhotep', description: 'Lo enterraron deprisa.' },
+    setting: 'Una casa grande',
+    solution: {
+      respuestas: { saqueador: CENTINELAS.culpable },
+      motive: CENTINELAS.motivo,
+      howItHappened: CENTINELAS.comoPaso,
+    },
+    characters: [
+      {
+        suspectId: 'e0',
+        characterName: 'Marta Vance',
+        role: 'Epigrafista',
+        publicPersona: 'Traduce lo que nadie sabe leer.',
+        secret: CENTINELAS.secreto,
+        motive: 'Una concesión.',
+        alibi: 'Estaba en el corredor.',
+        knowledge: [],
+        personalHook: 'Discute por deporte.',
+      },
+    ],
+    timeline: [],
+    clues: [],
+    gmScript: [],
+    delJuego: {
+      ordenVerdadero: [CENTINELAS.ordenVerdadero, 't1', 't2', 't3', 't4'],
+      restricciones: [{ id: 'p-01', restriccion: { tipo: 'extremos', a: 't0' }, texto: 'El Agua abre o cierra.' }],
+      falsasCandidatas: [
+        { id: 'p-02', restriccion: { tipo: 'extremos', a: 't1' }, texto: CENTINELAS.fragmentoFalso },
+      ],
+      profanadas: ['c0'],
+      hallazgos: [],
+      dones: { e0: 'descifrar' },
+      reliquiaCodiciada: 'q0',
+    },
+    material: {
+      generatedAt: ahora,
+      narrations: [],
+      twists: [],
+      timelineReveals: [],
+      hints: [],
+      finale: {
+        reconstruction: CENTINELAS.reconstruccion,
+        confession: CENTINELAS.confesion,
+        epilogue: 'Amaneció.',
+      },
+    },
+  },
+} as unknown as GameSession;
+
 /** Busca centinelas dentro de un texto y devuelve los nombres de los que salen. */
 function filtrados(texto: string): string[] {
   return Object.entries(CENTINELAS)
@@ -204,6 +312,30 @@ async function comprobarTodo(): Promise<void> {
   comprobar('get_game_state devuelve algo', comoTexto.length > 2);
   const enEstado = filtrados(comoTexto);
   comprobar('y NO lleva ni un secreto dentro', enEstado.length === 0, enEstado);
+
+  console.log('\n· El Escriba, en El Misterio de la Momia');
+  /*
+   * El mismo par de comprobaciones sobre el otro juego. No sobra por ser «lo
+   * mismo con otro manifiesto»: son OTRA rama de `buildSystemPrompt` y OTRA de
+   * `get_game_state`, escritas aparte, y lo que garantiza una no garantiza nada
+   * sobre la otra. La primera vez que alguien meta aquí «un resumen de la trama
+   * para que el Escriba ayude mejor», es esta línea la que se pone roja.
+   */
+  const promptMomia = buildSystemPrompt(gameMomia);
+  comprobar('el prompt del Escriba se compone', promptMomia.length > 100);
+  comprobar('y habla de la Momia, no de CLUEDO', promptMomia.includes('Escriba'), promptMomia.slice(0, 60));
+  const enPromptMomia = filtrados(promptMomia);
+  comprobar('y NO lleva ni un secreto dentro', enPromptMomia.length === 0, enPromptMomia);
+
+  const estadoMomia = await executeTool(gameMomia, 'get_game_state', {});
+  const momiaTexto = JSON.stringify(estadoMomia);
+  comprobar(
+    'get_game_state responde de verdad en la Momia',
+    !momiaTexto.includes('desconocida') && momiaTexto.includes('ritos'),
+    estadoMomia,
+  );
+  const enEstadoMomia = filtrados(momiaTexto);
+  comprobar('y NO lleva ni un secreto dentro', enEstadoMomia.length === 0, enEstadoMomia);
 
   console.log('\n· El centinela funciona de verdad');
   /*

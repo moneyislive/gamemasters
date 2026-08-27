@@ -9,6 +9,8 @@
  */
 
 import type { GameSession } from '../../../shared/types';
+import { MOMIA } from '../../../shared/juegos';
+import { buildSystemPromptMomia } from './momia-escriba';
 
 /** Formatea una lista de entidades con nombre y descripción opcional. */
 function listar(
@@ -35,6 +37,20 @@ function listar(
 }
 
 export function buildSystemPrompt(game: GameSession): string {
+  /*
+   * LA RAMA POR JUEGO, y está arriba del todo a propósito.
+   *
+   * Todo lo que hay debajo —las reglas oficiales de Cluedo, los seis
+   * sospechosos clásicos, los pasadizos secretos, «Edmund»— es CLUEDO y solo
+   * CLUEDO. Reutilizarlo para otro juego no daba un asistente mediocre: daba un
+   * mayordomo británico explicando refutaciones en una expedición egipcia.
+   *
+   * Cada juego trae el suyo entero, no un parche sobre este. Lo comparten es la
+   * política de herramientas y la regla de oro, que se repiten en los dos porque
+   * son prompt y el prompt no se factoriza sin perder tono.
+   */
+  if (game.settings?.juego === MOMIA.id) return buildSystemPromptMomia(game);
+
   const numSospechosos = game.suspects.length;
   const numSalas = game.rooms.length;
   const numArmas = game.weapons.length;
