@@ -825,11 +825,25 @@
         único árbol de trabajo.
       </p>
       <p>
-        Dos consecuencias que conviene tener escritas. Una:
+        Y el fichero no se pilló roto: se pilló <strong>a medio restaurar</strong>.
+        De las dos defensas que se habían anulado para la prueba, una ya estaba
+        devuelta y la otra no. Eso es peor que pillarlo roto entero, porque el
+        resultado se parece muchísimo al código bueno: una línea dentro de una
+        función por lo demás intacta y bien comentada.
+      </p>
+      <p>
+        La ventana peligrosa, entonces, no es «mientras está roto»: es
+        <strong>mientras se está restaurando</strong>. Romper y restaurar no son
+        dos instantes, son un intervalo, y en un árbol compartido cualquiera puede
+        hacer <code>git add</code> dentro de él.
+      </p>
+      <p>
+        Dos consecuencias. Una:
         <code>verificar &amp;&amp; git add &amp;&amp; git commit</code> en la
-        <em>misma</em> orden, para que verde y commit no estén separados por una
-        ventana. Otra: en un árbol compartido, <strong>una rotura deliberada es un
-        peligro para todos</strong>, no solo para quien la hace.
+        <em>misma</em> orden, que cierra también este caso — la comprobación cae
+        igual con la línea a medias que con el fichero roto entero. Otra: en un
+        árbol compartido, <strong>una rotura deliberada es un peligro para
+        todos</strong>, no solo para quien la hace.
       </p>
       <p>
         La forma hermana del mismo problema: <code>git commit</code> sin rutas
