@@ -25,7 +25,7 @@
  */
 import { cimientosDeMomia, VIGILIAS_POR_DEFECTO } from '../src/plot/momia-cimientos';
 import type { EntidadesDeMomia } from '../src/plot/momia-cimientos';
-import { ensamblarTramaMomia, entidadesDeLaMomia } from '../src/plot/momia-generacion';
+import { ensamblarTramaMomia, entidadesDeLaMomia, loQueFalta } from '../src/plot/momia-generacion';
 import { respuestaDeDemostracion } from '../src/plot/momia-demo';
 import { comprobarRedaccion, lexicoDeRitos, ritosMencionados } from '../src/plot/momia-validacion';
 import { redactar, verificarPuzle, maximoQueJuntaUnaPersona } from '../src/juegos/momia-puzle';
@@ -751,6 +751,71 @@ if (process.argv.includes('--volcar') && donde) {
     fs.writeFileSync(path.join(donde, `${id}.html`), html, 'utf8');
   }
   console.log(`\nVolcados ${compuestos.size} documentos en ${donde}`);
+}
+
+// ---------------------------------------------------------------------------
+// 8. Cuándo merece la pena volver a preguntar
+// ---------------------------------------------------------------------------
+
+seccion('La segunda tirada: cuándo se pide y cuándo no');
+
+/*
+ * `loQueFalta` decide si se paga una segunda llamada al modelo. No es la
+ * validación —esa la hace `ensamblarTramaMomia`, que tiene recambio para cada
+ * hueco—: es la pregunta de si lo que ha llegado da para una velada.
+ *
+ * El listón está en la mitad a propósito, y las dos direcciones importan igual.
+ * Si salta de más, cada generación cuesta el doble y tarda otros cinco minutos
+ * por unas frases que el ensamblado ya sabía arreglar. Si salta de menos, se
+ * imprime una expedición con los dosieres en blanco y eso solo se ve en la
+ * mesa. Los dos casos rotos de aquí abajo son los que se midieron contra la API
+ * de verdad, no inventados.
+ */
+{
+  comprobar('una respuesta entera no pide nada', loQueFalta(buena, entidades, cimientos).length === 0,
+    loQueFalta(buena, entidades, cimientos).join(', '));
+
+  const sinNadie = copiar(buena);
+  sinNadie.expedicionarios = [];
+  comprobar('sin la expedición, se pide otra',
+    loQueFalta(sinNadie, entidades, cimientos).some((f) => f.includes('dosieres')));
+
+  // EL CASO REAL: el modelo escribe los seis dosieres pero se inventa los ids,
+  // así que no casa ninguno y salen seis dosieres mínimos sin un solo error.
+  const idsInventados = copiar(buena);
+  for (const [i, p] of idsInventados.expedicionarios.entries()) p.suspectId = `persona-${i + 1}`;
+  comprobar('con los ids inventados, se pide otra',
+    loQueFalta(idsInventados, entidades, cimientos).some((f) => f.includes('dosieres')));
+
+  // Y el contrario: que se deje a UNA persona lo arregla el dosier mínimo.
+  const faltaUno = copiar(buena);
+  faltaUno.expedicionarios = faltaUno.expedicionarios.slice(1);
+  comprobar('si solo falta una persona, NO se pide otra',
+    loQueFalta(faltaUno, entidades, cimientos).length === 0,
+    loQueFalta(faltaUno, entidades, cimientos).join(', '));
+
+  const sinFragmentos = copiar(buena);
+  sinFragmentos.fragmentos = [];
+  comprobar('sin fragmentos redactados, se pide otra',
+    loQueFalta(sinFragmentos, entidades, cimientos).some((f) => f.includes('fragmentos')));
+
+  // El otro caso real: el JSON cierra con los arrays grandes vacíos.
+  const cascaraVacia = copiar(buena);
+  cascaraVacia.vigilias = [];
+  cascaraVacia.cronologia = [];
+  cascaraVacia.ayudas = [];
+  cascaraVacia.guion = [];
+  const huecos = loQueFalta(cascaraVacia, entidades, cimientos);
+  comprobar('con los arrays grandes vacíos, se pide otra', huecos.length === 4, huecos.join(', '));
+
+  // Y lo que NO puede pasar: que una respuesta buena con una frase menos
+  // dispare la segunda llamada.
+  const casiEntera = copiar(buena);
+  casiEntera.expedicionarios[0].secret = '';
+  casiEntera.ayudas = casiEntera.ayudas.slice(0, 1);
+  comprobar('una respuesta con algún hueco suelto NO pide otra',
+    loQueFalta(casiEntera, entidades, cimientos).length === 0,
+    loQueFalta(casiEntera, entidades, cimientos).join(', '));
 }
 
 // ---------------------------------------------------------------------------

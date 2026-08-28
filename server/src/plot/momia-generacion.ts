@@ -580,16 +580,62 @@ export async function generarTramaMomia(game: GameSession, emit: Emitir): Promis
   return ensamblada.plot;
 }
 
-async function respuestaConApi(
+/**
+ * Las piezas GRANDES que tienen que venir escritas, y cuáles no han venido.
+ *
+ * Esto no es la validación: de eso se encarga `ensamblarTramaMomia`, que sabe
+ * arreglar lo que llega mal y tiene un recambio para cada hueco. La pregunta
+ * aquí es otra —¿merece la pena pagar una segunda llamada?— y por eso solo mira
+ * lo gordo. A una respuesta le pueden faltar tres frases y ensamblarse
+ * perfectamente; lo que no se puede dar por bueno es que falte la expedición
+ * entera.
+ *
+ * Y pasa. Midiéndolo contra la API de verdad, de cuatro generaciones dos
+ * salieron impecables, una devolvió los seis dosieres con `suspectId` que no
+ * casaban con ninguna persona real —o sea, seis dosieres mínimos y una velada
+ * sin papeles— y otra cerró el JSON con casi todos los arrays vacíos. Las dos
+ * veces la partida se guardaba como lista y el fallo solo se veía al imprimir.
+ */
+export function loQueFalta(
+  respuesta: RespuestaMomia,
+  entidades: EntidadesDeMomia,
+  cimientos: Cimientos,
+): string[] {
+  const faltan: string[] = [];
+
+  const ids = new Set(entidades.expedicionarios.map((e) => e.id));
+  const dosieres = (respuesta.expedicionarios ?? []).filter(
+    (p) => p && typeof p.suspectId === 'string' && ids.has(p.suspectId),
+  ).length;
+  // La mitad, y no «alguno»: que se deje a una persona lo arregla el dosier
+  // mínimo sin que se note; que se deje a la mesa entera, no.
+  if (dosieres * 2 < ids.size) faltan.push(`los dosieres (${dosieres} de ${ids.size})`);
+
+  const pedidos = new Set(
+    [...cimientos.trama.restricciones, ...cimientos.trama.falsasCandidatas].map((f) => f.id),
+  );
+  const redactados = (respuesta.fragmentos ?? []).filter(
+    (f) => f && typeof f.id === 'string' && pedidos.has(f.id) && (f.texto ?? '').trim(),
+  ).length;
+  if (redactados * 2 < pedidos.size) faltan.push(`los fragmentos (${redactados} de ${pedidos.size})`);
+
+  if ((respuesta.vigilias ?? []).length === 0) faltan.push('las vigilias');
+  if ((respuesta.cronologia ?? []).length === 0) faltan.push('la cronología');
+  if ((respuesta.ayudas ?? []).length === 0) faltan.push('las ayudas');
+  if ((respuesta.guion ?? []).length === 0) faltan.push('el guion');
+
+  return faltan;
+}
+
+/** Una tirada: se le pide la trama al modelo y se devuelve tal cual la escribió. */
+async function unaTirada(
+  client: NonNullable<ReturnType<typeof getAnthropicClient>>,
+  model: Awaited<ReturnType<typeof resolveModel>>,
   game: GameSession,
   entidades: EntidadesDeMomia,
   cimientos: Cimientos,
   emit: Emitir,
 ): Promise<RespuestaMomia> {
-  const client = getAnthropicClient();
-  if (!client) return respuestaDemo(game, entidades, cimientos, emit);
-
-  const model = await resolveModel(game);
   const stream = client.messages.stream({
     model,
     max_tokens: 64000,
@@ -621,6 +667,63 @@ async function respuestaConApi(
   } catch {
     throw new Error('La respuesta del modelo no es un JSON válido. Vuelve a intentar la generación.');
   }
+}
+
+/**
+ * Le pide la trama al modelo, y se la vuelve a pedir UNA vez si viene coja.
+ *
+ * Una sola repetición, y solo cuando falta algo grande: la segunda llamada
+ * cuesta lo mismo que la primera y tarda otros cuatro o cinco minutos, así que
+ * no se paga por unas frases sueltas. Si las dos vienen cojas se ensambla la
+ * que menos cojea —dos tramas a medias no se pueden coser en una, y quedarse
+ * con la segunda por ser la última sería tirar la mejor.
+ */
+async function respuestaConApi(
+  game: GameSession,
+  entidades: EntidadesDeMomia,
+  cimientos: Cimientos,
+  emit: Emitir,
+): Promise<RespuestaMomia> {
+  const client = getAnthropicClient();
+  if (!client) return respuestaDemo(game, entidades, cimientos, emit);
+
+  const model = await resolveModel(game);
+
+  const primera = await unaTirada(client, model, game, entidades, cimientos, emit);
+  const faltan = loQueFalta(primera, entidades, cimientos);
+  if (faltan.length === 0) return primera;
+
+  console.warn(`[momia] la primera escritura vino sin ${faltan.join(', ')}; se pide otra`);
+  emit({
+    type: 'text',
+    delta: `
+
+[La primera escritura vino sin ${faltan.join(', ')}. Pidiendo otra…]
+
+`,
+  });
+
+  /*
+   * Y SI LA SEGUNDA REVIENTA, NOS QUEDAMOS CON LA PRIMERA.
+   *
+   * Una trama coja se ensambla —para eso están los recambios— y una excepción
+   * deja la partida en `draft` sin nada. Sería absurdo tirar lo que ya tenemos
+   * porque el intento de mejorarlo se topó con un rechazo o con un corte de
+   * red: el reintento está para ganar, no para poder perder.
+   */
+  let segunda: RespuestaMomia;
+  try {
+    segunda = await unaTirada(client, model, game, entidades, cimientos, emit);
+  } catch (error) {
+    console.warn('[momia] la segunda escritura falló; se ensambla la primera:', error);
+    return primera;
+  }
+
+  const faltanTambien = loQueFalta(segunda, entidades, cimientos);
+  if (faltanTambien.length === 0) return segunda;
+
+  console.warn(`[momia] la segunda escritura vino sin ${faltanTambien.join(', ')}`);
+  return faltanTambien.length < faltan.length ? segunda : primera;
 }
 
 async function respuestaDemo(
