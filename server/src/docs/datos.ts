@@ -11,6 +11,7 @@ import { REGLAS_CLUEDO } from '../../../shared/juegos/cluedo';
 import type { ReglaDeJuego } from '../../../shared/juegos';
 import type { GameSession, Plot, PlotClue, Room, Suspect, TimelineEvent } from '../../../shared/types';
 import { culpableDe } from '../juegos/cluedo';
+import { manifiestoDe } from '../../../shared/juegos';
 
 // ---------------------------------------------------------------------------
 // Rondas y reparto de pistas
@@ -155,12 +156,38 @@ export function inventarioSobres(game: GameSession, plot: Plot): SobreDeLaPartid
     soloPreparador: false,
   });
 
+  /*
+   * LOS SOBRES DE LO QUE SE REPARTE DURANTE LA VELADA.
+   *
+   * En CLUEDO son las pistas de cada sala y ronda, que viven en `plot.clues`.
+   * Un juego que no genere pistas —El Misterio de la Momia hace `clues: []` a
+   * propósito, porque lo suyo son tiras de papiro— se quedaba con la hoja de
+   * etiquetas VACÍA: un documento en el paquete sin una sola etiqueta dentro,
+   * cuando sus sobres son por vigilia y sí hay que rotularlos.
+   *
+   * Así que si no hay pistas se rotula por RONDA, que es lo único que la
+   * plataforma sabe con certeza de cualquier juego: cuántas hay y en qué orden
+   * se abren.
+   */
   const porRonda = pistasPorRonda(plot);
-  for (const [ronda] of porRonda) {
-    for (const sala of salasActivas(game, plot, ronda)) {
+  if (porRonda.size > 0) {
+    for (const [ronda] of porRonda) {
+      for (const sala of salasActivas(game, plot, ronda)) {
+        sobres.push({
+          codigo: `R${ronda}-${codigos.get(sala.id) ?? 'SALA'}`,
+          contenido: `Pistas de ${sala.name} en la ronda ${ronda}`,
+          grupo: 'Pistas',
+          soloPreparador: aCiegas,
+        });
+      }
+    }
+  } else {
+    const manifiesto = manifiestoDe(game.settings?.juego);
+    const turno = manifiesto.barra.find((p) => p.pantalla === 'ronda')?.rotulo ?? 'Ronda';
+    for (let ronda = 1; ronda <= numeroDeRondas(plot); ronda += 1) {
       sobres.push({
-        codigo: `R${ronda}-${codigos.get(sala.id) ?? 'SALA'}`,
-        contenido: `Pistas de ${sala.name} en la ronda ${ronda}`,
+        codigo: `${turno.toUpperCase()} ${ronda}`,
+        contenido: `Lo que se reparte en ${turno.toLowerCase()} ${ronda}. No se abre antes.`,
         grupo: 'Pistas',
         soloPreparador: aCiegas,
       });

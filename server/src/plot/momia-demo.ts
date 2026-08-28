@@ -57,9 +57,26 @@ export function respuestaDeDemostracion(
   const nombreDe = (lista: Entidad[], id: string): string =>
     lista.find((e) => e.id === id)?.name ?? id;
 
-  // El saqueador de la demo: el último de la lista. Fijo a propósito, para que
-  // la partida congelada no cambie de culpable entre dos ejecuciones.
-  const saqueador = expedicionarios[expedicionarios.length - 1]!;
+  /*
+   * QUIÉN ROMPIÓ EL SELLO EN MODO DEMOSTRACIÓN.
+   *
+   * DETERMINISTA, PERO NO FIJO, y la diferencia es toda la gracia. Era
+   * `expedicionarios[length - 1]`: el último de la lista, siempre. Se puso así
+   * para que una partida repetida con la misma semilla no cambiara de culpable
+   * —eso hay que conservarlo— pero tenía un efecto que nadie quería: sin clave
+   * de API, DOS VELADAS SEGUIDAS tienen el mismo culpable, y encima es siempre
+   * la última persona que se dio de alta. Basta jugar una vez para saber dónde
+   * mirar la siguiente.
+   *
+   * Ahora sale del PUZLE, que ya es determinista por semilla: el orden
+   * verdadero y las restricciones cambian con cada partida y no cambian nunca
+   * dentro de la misma. Así se conservan las dos propiedades a la vez —repetir
+   * una semilla da el mismo culpable, y dos partidas distintas dan culpables
+   * distintos— sin tocar el reloj ni el azar.
+   */
+  const huella = [...trama.ordenVerdadero.join('|'), ...trama.restricciones.map((r) => r.id).join('|')]
+    .reduce((acumulado, letra) => (acumulado * 31 + letra.charCodeAt(0)) >>> 0, 7);
+  const saqueador = expedicionarios[huella % expedicionarios.length]!;
 
   return {
     title: `${nombrePartida}: la tumba abierta`,

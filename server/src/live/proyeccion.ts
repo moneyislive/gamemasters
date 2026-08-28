@@ -29,7 +29,7 @@ import type {
 } from '../../../shared/live';
 import type { GameSession, Plot } from '../../../shared/types';
 import { aciertos, ejeDeJugadores, ejes as ejesDe, esElSenalado, manifiestoDe } from '../../../shared/juegos';
-import { proyectarEstado } from '../juegos/proyecciones';
+import { estadoParaGm, proyectarEstado } from '../juegos/proyecciones';
 import { entidadesDe, nombreDeEntidad } from '../juegos/entidades';
 import { accionesDisponibles } from '../juegos/motor';
 import { fotoParaJugador } from './fotos';
@@ -394,8 +394,26 @@ export function vistaDeGameMaster(game: GameSession, sesion: LiveSession): Vista
       round: t.round,
     }));
 
+  /*
+   * A CIEGAS, EL ESTADO DEL JUEGO SE FILTRA ANTES DE SALIR.
+   *
+   * `sesion` va entera al navegador, y dentro va `estado`, que es donde cada
+   * juego guarda lo suyo: en El Misterio de la Momia, el orden verdadero de los
+   * cinco ritos y qué fragmentos son falsos. El panel no lo pintaba —cumplía su
+   * promesa— pero el dato estaba ahí, y con el Game Master JUGANDO eso es la
+   * partida entera a un clic en las herramientas del navegador.
+   *
+   * Dirigiendo de la forma normal no se toca nada: quien dirige conoce la
+   * solución, la lleva en su dosier, y esconderle su propio estado sería
+   * quitarle medio puesto de mando por nada.
+   */
+  const aCiegas = game.settings?.gmPlays === true;
+  const sesionQueSale: LiveSession = aCiegas
+    ? { ...sesion, estado: estadoParaGm(game, sesion) as LiveSession['estado'] }
+    : sesion;
+
   return {
-    sesion,
+    sesion: sesionQueSale,
     conectados: sesion.players.filter(estaConectado).length,
     ocupacion,
     girosPendientes,

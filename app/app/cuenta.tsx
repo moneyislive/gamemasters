@@ -20,10 +20,19 @@ import * as api from '../src/api';
 import { usarMarco } from '../src/marco';
 import { Pulsable } from '../src/vivo';
 import { cargarAvatar, guardarAvatar, AVATAR_POR_DEFECTO } from '../src/avatar';
-import { TROFEOS } from '../../shared/live';
+import { todosLosTrofeos } from '../../shared/juegos';
 import { color, espacio, fuente, radio } from '../src/tema';
 import { SinProveedor, disponibles, entrarConApple, entrarConGoogle } from '../src/entrar-con';
 import type { Proveedores } from '../src/entrar-con';
+
+/*
+ * TODOS los trofeos que puede haber, no solo los seis de la plataforma. La
+ * vitrina se mira al día siguiente, sin ninguna partida abierta: con la lista
+ * corta, quien selló una tumba no encontraba aquí ni «El Sellador» ni «Ojo de
+ * Horus» —los tenía concedidos y guardados— y un trofeo que no se puede enseñar
+ * no es un trofeo.
+ */
+const VITRINA = todosLosTrofeos();
 
 /** Los mismos rangos que pinta la portada: una sola escalera para todo. */
 const RANGOS: Array<{ desde: number; titulo: string }> = [
@@ -296,7 +305,7 @@ export default function Cuenta(): JSX.Element {
             {/* ---- Trofeos ---- */}
             <Text style={estilos.subtitulo}>Trofeos</Text>
             <View style={estilos.estante}>
-              {TROFEOS.map((t) => {
+              {VITRINA.map((t) => {
                 const ganado = trofeos.includes(t.id);
                 return (
                   <View

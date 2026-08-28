@@ -8,6 +8,8 @@ import { declararAlmacen } from './entidades';
 import { CLUEDO } from './cluedo';
 import { MOMIA } from './momia';
 import type { JuegoId, ManifiestoDeJuego } from './tipos';
+import { TROFEOS } from '../live';
+import type { TrofeoInfo } from '../live';
 
 /**
  * Reexportado uno a uno, no con `export *`.
@@ -131,6 +133,53 @@ function anotarAlmacenes(manifiesto: ManifiestoDeJuego): void {
 }
 
 /** Todos los juegos instalados, para el catálogo del taller. */
+/**
+ * Todos los trofeos que puede haber en una vitrina: los de la plataforma más
+ * los de cada juego instalado.
+ *
+ * POR QUÉ HACE FALTA. Los trofeos se guardan en la CUENTA, no en la partida, y
+ * la vitrina se mira al día siguiente, sin ninguna partida abierta. Con la
+ * lista de la plataforma a secas —los seis de CLUEDO— quien selló una tumba
+ * abría su vitrina y no encontraba ni «El Sellador» ni «Ojo de Horus»: los tenía
+ * concedidos y guardados, y no se veían en ninguna parte. Un trofeo que no se
+ * puede enseñar no es un trofeo.
+ *
+ * El orden importa para la vitrina: primero los comunes, que los tiene todo el
+ * mundo, y detrás los de cada juego.
+ */
+export function todosLosTrofeos(): TrofeoInfo[] {
+  const vistos = new Set<string>();
+  const salida: TrofeoInfo[] = [];
+  for (const trofeo of [...TROFEOS, ...juegosInstalados().flatMap((m) => m.trofeos)]) {
+    if (vistos.has(trofeo.id)) continue;
+    vistos.add(trofeo.id);
+    salida.push(trofeo);
+  }
+  return salida;
+}
+
+/**
+ * Ids de trofeo que dos sitios declaran con contenido DISTINTO. Vacío es lo
+ * correcto, y no es una precaución de manual: los ids no llevan prefijo de
+ * juego, así que dos juegos pueden usar el mismo sin que nada avise y entonces
+ * el trofeo de uno aparecería en la vitrina con el nombre y el glifo del otro.
+ *
+ * REPETIR EL MISMO NO ES CHOCAR. CLUEDO declara en su manifiesto los seis de la
+ * plataforma —los mismos objetos— porque son los suyos. Eso no es una colisión:
+ * es la misma cosa nombrada dos veces. Lo que sí lo es: el mismo id con otro
+ * nombre detrás.
+ */
+export function trofeosQueChocan(): string[] {
+  const porId = new Map<string, string>();
+  const chocan = new Set<string>();
+  for (const t of [...TROFEOS, ...juegosInstalados().flatMap((m) => m.trofeos)]) {
+    const visto = porId.get(t.id);
+    if (visto === undefined) porId.set(t.id, t.nombre);
+    else if (visto !== t.nombre) chocan.add(t.id);
+  }
+  return [...chocan];
+}
+
 export function juegosInstalados(): ManifiestoDeJuego[] {
   return Object.values(INSTALADOS);
 }

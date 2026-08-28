@@ -21,6 +21,8 @@ import {
 import { router } from 'expo-router';
 import Animated, { FadeInUp } from 'react-native-reanimated';
 import * as api from '../src/api';
+import { usePartidaSiLaHay } from '../src/estado';
+import { manifiestoDe } from '../../shared/juegos';
 import {
   Boton,
   Cuerpo,
@@ -50,14 +52,18 @@ const SUGERENCIAS = [
 ];
 
 export default function Consejero(): JSX.Element {
-  const [turnos, setTurnos] = useState<Turno[]>([
-    {
-      mio: false,
-      texto:
-        'Usted dirá. Le aviso de entrada: no conozco la solución, ni las pistas, ni lo que esconden los demás. ' +
-        'Estoy para las reglas y para su papel. Lo otro tendrá que sacarlo de la mesa.',
-    },
-  ]);
+  /*
+   * QUIÉN CONTESTA LO DICE EL MANIFIESTO. El nombre estaba escrito a mano —«El
+   * Mayordomo»— en el sello, en cada burbuja y en la etiqueta de accesibilidad,
+   * mientras el botón de la barra que trae aquí ya decía «El Escriba». Dos
+   * nombres para la misma persona en dos pantallas seguidas.
+   *
+   * `SiLaHay` porque a esta pantalla se puede llegar sin partida abierta, y sin
+   * partida el manifiesto cae en el de la casa, que es lo correcto.
+   */
+  const asistente = manifiestoDe(usePartidaSiLaHay()?.vista?.sesion.juego).asistente;
+
+  const [turnos, setTurnos] = useState<Turno[]>([{ mio: false, texto: asistente.saludo }]);
   const [pregunta, setPregunta] = useState('');
   const [pensando, setPensando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -114,7 +120,7 @@ export default function Consejero(): JSX.Element {
     >
       <Pantalla scroll={false} barra={false}>
         <View style={{ alignItems: 'center', marginBottom: espacio.md }}>
-          <Sello>El Mayordomo · asistente con IA</Sello>
+          <Sello>{`${asistente.nombre} · asistente con IA`}</Sello>
         </View>
 
         <ScrollView
@@ -126,7 +132,7 @@ export default function Consejero(): JSX.Element {
           {turnos.map((t, i) => (
             <Animated.View key={i} entering={FadeInUp.duration(320)}>
               <View style={[estilos.burbuja, t.mio ? estilos.mia : estilos.suya]}>
-                {!t.mio && <Etiqueta style={{ marginBottom: 4 }}>El Mayordomo</Etiqueta>}
+                {!t.mio && <Etiqueta style={{ marginBottom: 4 }}>{asistente.nombre}</Etiqueta>}
                 <Cuerpo style={{ fontSize: 17 }}>{t.texto}</Cuerpo>
                 {!t.mio && (
                   <Pressable
@@ -134,7 +140,7 @@ export default function Consejero(): JSX.Element {
                     disabled={denunciados.has(i)}
                     hitSlop={10}
                     accessibilityRole="button"
-                    accessibilityLabel="Denunciar esta respuesta del Mayordomo"
+                    accessibilityLabel={`Denunciar esta respuesta de ${asistente.nombre}`}
                     style={estilos.denunciar}
                   >
                     <Etiqueta style={{ fontSize: 10, color: 'rgba(217,201,163,0.55)' }}>

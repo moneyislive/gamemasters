@@ -25,6 +25,7 @@
  * CLUEDO NO REGISTRA NINGUNA, y por eso su vista no cambia ni un byte. Lo
  * comprueba el maestro de oro.
  */
+import { manifiestoDe } from '../../../shared/juegos';
 import type { JuegoId } from '../../../shared/juegos';
 import type { GameSession } from '../../../shared/types';
 import type { LiveSession } from '../../../shared/live';
@@ -80,4 +81,60 @@ export function proyectarEstado(
     );
     return undefined;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Lo que puede ver QUIEN DIRIGE del estado del juego
+// ---------------------------------------------------------------------------
+
+/**
+ * Qué parte del estado del juego puede ver quien dirige.
+ *
+ * POR QUÉ HACE FALTA UNA SEGUNDA. La vista del Game Master manda la `sesion`
+ * entera, y dentro va `estado`, que es donde cada juego guarda lo suyo. En El
+ * Misterio de la Momia ahí está el ORDEN VERDADERO de los cinco ritos y qué
+ * fragmentos son falsos. El panel no lo pinta —cumple su promesa— pero el dato
+ * viaja al navegador, y con el Game Master jugando eso es la partida entera en
+ * las herramientas de desarrollo. Además las cabeceras de `routes/live.ts` y de
+ * `live/proyeccion.ts` AFIRMAN que la solución nunca se incluye, así que o era
+ * verdad o había que hacerla verdad.
+ *
+ * SOLO SE FILTRA A CIEGAS. Dirigiendo de la forma normal, quien dirige conoce
+ * la solución —la lleva en su dosier— y esconderle su propio estado sería
+ * quitarle la mitad del puesto de mando por nada.
+ *
+ * CLUEDO no registra ninguna y su vista no cambia ni un byte.
+ */
+export type ProyeccionParaGm = (game: GameSession, sesion: LiveSession) => unknown;
+
+const LLAVE_GM = Symbol.for('gamemasters.juegos.proyeccionesGm');
+const globalGm = globalThis as unknown as Record<symbol, Record<string, ProyeccionParaGm>>;
+const PARA_GM: Record<JuegoId, ProyeccionParaGm> = globalGm[LLAVE_GM] ?? (globalGm[LLAVE_GM] = {});
+
+/** Da de alta qué ve quien dirige a ciegas del estado de un juego. */
+export function registrarProyeccionParaGm(juego: JuegoId, fn: ProyeccionParaGm): void {
+  PARA_GM[juego] = fn;
+}
+
+/**
+ * El estado del juego tal y como puede verlo quien dirige a ciegas.
+ *
+ * Un juego que no registre nada recibe `undefined`, o sea que a ciegas su
+ * estado NO viaja. Falla cerrado a propósito: es mejor un panel con menos que
+ * una solución en el navegador de quien está jugando.
+ */
+export function estadoParaGm(game: GameSession, sesion: LiveSession): unknown {
+  const fn = PARA_GM[manifiestoDe(sesion.juego).id];
+  if (!fn) return undefined;
+  try {
+    return fn(game, sesion);
+  } catch (error) {
+    console.error(`[proyeccionGm] el juego «${sesion.juego}» no pudo proyectar para quien dirige:`, error);
+    return undefined;
+  }
+}
+
+/** Los juegos con proyección para quien dirige. Lo usa la comprobación. */
+export function juegosConProyeccionGm(): string[] {
+  return Object.keys(PARA_GM);
 }

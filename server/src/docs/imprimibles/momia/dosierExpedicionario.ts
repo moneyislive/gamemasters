@@ -95,6 +95,14 @@ ${portadaPapiro(
         </p>
       </div>
 
+      <div class="caja junto">
+        <span class="etiqueta">Los cinco ritos del sellado</span>
+        <p style="margin:0 0 1.5mm; font-size:10.5pt; color:#7a5c34;">
+          Los sabe toda la expedición desde el principio. Lo que nadie sabe es en qué orden van.
+        </p>
+        <p style="margin:0;">${vista.ritos.map((r) => esc(r.name)).join(' · ')}</p>
+      </div>
+
       <div class="caja caja--almagre junto">
         <span class="etiqueta">Tu secreto — nadie más lo lee</span>
         <p style="margin:0;">${esc(personaje?.secret ?? '')}</p>

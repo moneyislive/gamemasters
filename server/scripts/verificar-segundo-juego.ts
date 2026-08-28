@@ -82,7 +82,18 @@ const EL_LEGADO: ManifiestoDeJuego = {
     { pantalla: 'tablon', rotulo: 'Lo visto', icono: 'tablon' },
     { pantalla: 'perfil', rotulo: 'Perfil', icono: 'copa' },
   ],
-  asistente: { nombre: 'El Notario', descripcion: 'Guarda el testamento y poco más', icono: 'mayordomo' },
+  asistente: {
+    nombre: 'El Notario', descripcion: 'Guarda el testamento y poco más', icono: 'mayordomo',
+    voz: 'Eres el asistente de esta velada. Hablas en espanol, breve y claro.',
+    saludo: 'Tu diras. No se la solucion ni las pistas.',
+    seNiega: 'yo no resuelvo nada, solo acompano',
+    sinIa: {
+      reglas: 'Se juega por rondas: se actua, se cierra y se habla.',
+      personaje: 'Tu papel lo sabes tu mejor que yo.',
+      solucion: 'Eso no me toca a mi decirlo.',
+      general: 'Habla con quien todavia no hayas hablado.',
+    },
+  },
 
   // Y se actúa sobre una categoría que no responde a ningún eje.
   ronda: { accionSobre: 'estancias', cambiosPermitidos: 2 },

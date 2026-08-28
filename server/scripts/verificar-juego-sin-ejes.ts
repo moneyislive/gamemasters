@@ -76,7 +76,18 @@ const LA_OCA: ManifiestoDeJuego = {
     { pantalla: 'mapa', rotulo: 'Casillas', icono: 'plano' },
     { pantalla: 'perfil', rotulo: 'Perfil', icono: 'copa' },
   ],
-  asistente: { nombre: 'La Abuela', descripcion: 'Te recuerda las reglas', icono: 'farol' },
+  asistente: {
+    nombre: 'La Abuela', descripcion: 'Te recuerda las reglas', icono: 'farol',
+    voz: 'Eres el asistente de esta velada. Hablas en espanol, breve y claro.',
+    saludo: 'Tu diras. No se la solucion ni las pistas.',
+    seNiega: 'yo no resuelvo nada, solo acompano',
+    sinIa: {
+      reglas: 'Se juega por rondas: se actua, se cierra y se habla.',
+      personaje: 'Tu papel lo sabes tu mejor que yo.',
+      solucion: 'Eso no me toca a mi decirlo.',
+      general: 'Habla con quien todavia no hayas hablado.',
+    },
+  },
 
   ronda: { accionSobre: 'casillas', cambiosPermitidos: 0 },
   fases: {

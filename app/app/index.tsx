@@ -55,8 +55,17 @@ import { FondoDeSalas } from '../src/fondos-sala';
 import { AVATAR_POR_DEFECTO, cargarAvatar, olvidarModelo3D, type Avatar } from '../src/avatar';
 import { Latido, Pulsable, useMenosMovimiento } from '../src/vivo';
 import { veladas } from '../src/vitrina';
-import { TROFEOS } from '../../shared/live';
+import { todosLosTrofeos } from '../../shared/juegos';
 import { color, espacio, fuente, radio } from '../src/tema';
+
+/*
+ * TODOS los trofeos que puede haber, no solo los seis de la plataforma. La
+ * vitrina se mira al día siguiente, sin ninguna partida abierta: con la lista
+ * corta, quien selló una tumba no encontraba aquí ni «El Sellador» ni «Ojo de
+ * Horus» —los tenía concedidos y guardados— y un trofeo que no se puede enseñar
+ * no es un trofeo.
+ */
+const VITRINA = todosLosTrofeos();
 
 /** La fase, dicha como en la mesa. */
 const COMO_VA: Record<string, string> = {
@@ -513,7 +522,7 @@ export default function Portada(): JSX.Element {
               )}
 
               <View style={estilos.estante}>
-                {TROFEOS.map((t) => {
+                {VITRINA.map((t) => {
                   const ganado = trofeos.includes(t.id);
                   return (
                     <View key={t.id} style={estilos.pedestal}>
@@ -540,7 +549,7 @@ export default function Portada(): JSX.Element {
             /* La vitrina cerrada: se ve lo que hay dentro, y por eso apetece. */
             <View style={[estilos.vitrina, { opacity: 0.92 }]}>
               <View style={estilos.estante}>
-                {TROFEOS.slice(0, 6).map((t) => (
+                {VITRINA.slice(0, 6).map((t) => (
                   <View key={t.id} style={estilos.pedestal}>
                     <View style={[estilos.trofeo, estilos.trofeoVacio]}>
                       <Text style={{ fontSize: 21, opacity: 0.16 }}>{t.glifo}</Text>

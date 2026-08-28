@@ -104,6 +104,16 @@ export default function RoomsPanel({
   /** «la sala», «la cámara»: el artículo lo declara el juego, no se adivina. */
   const laCosa = laCategoria(juego, categoria);
 
+  /*
+   * TODO LO QUE SE LEE AQUÍ SALE DE LA CATEGORÍA, y estaba escrito a mano en
+   * CLUEDO: «un tablero de Cluedo con pasadizos secretos», «Nombre de la sala»
+   * con marcador «Biblioteca», «tu casa en la mansión del crimen», y un estado
+   * vacío que pedía cuatro estancias debajo de un contador que exige cinco.
+   * El manifiesto ya declaraba las cinco cosas —ejemplo, pista, texto del vacío
+   * y hasta cinco sugerencias de un clic— y este panel no leía ninguna.
+   */
+  const p = categoria.presentacion;
+
   /** Alta o edicion, por categoria: el componente no sabe donde acaba. */
   const guardar = (datos: Record<string, unknown>) =>
     useAppStore.getState().upsertEntidad(categoria.id, datos);
@@ -324,7 +334,7 @@ export default function RoomsPanel({
         </span>
         <span className="sp-mode-name">Tablero clásico generado</span>
         <span className="sp-mode-desc">
-          Escribe las salas y la plataforma dibuja un tablero de Cluedo con pasadizos secretos.
+          {`Escribe las ${plural} y la plataforma dibuja el plano, con sus pasadizos.`}
         </span>
       </button>
 
@@ -380,16 +390,42 @@ export default function RoomsPanel({
 
             <div className="sp-field">
               <label className="label" htmlFor="sala-nombre">
-                Nombre de la sala
+                {`Nombre de ${laCosa}`}
               </label>
               <input
                 id="sala-nombre"
                 className="input"
                 value={borrador.name}
                 onChange={(event) => setBorrador({ ...borrador, name: event.target.value })}
-                placeholder="Biblioteca"
+                placeholder={p?.ejemploNombre ?? 'Biblioteca'}
                 autoComplete="off"
               />
+              {(p?.sugerencias?.length ?? 0) > 0 && (
+                /*
+                 * Las sugerencias de un clic. La Momia declara cinco y no se
+                 * pintaban en ninguna parte: montar una tumba desde cero con la
+                 * página en blanco delante es justo donde se abandona.
+                 */
+                <div className="sp-chips">
+                  {p!.sugerencias!.map((sugerencia) => {
+                    const usada = lugares.some(
+                      (l) => l.name.toLowerCase() === sugerencia.toLowerCase(),
+                    );
+                    return (
+                      <button
+                        key={sugerencia}
+                        type="button"
+                        className="sp-chip"
+                        disabled={usada}
+                        onClick={() => setBorrador({ ...borrador, name: sugerencia })}
+                        title={usada ? 'Ya está en la lista' : `Usar «${sugerencia}»`}
+                      >
+                        {sugerencia}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
             <div className="sp-field">
@@ -402,9 +438,14 @@ export default function RoomsPanel({
                 rows={4}
                 value={borrador.description}
                 onChange={(event) => setBorrador({ ...borrador, description: event.target.value })}
-                placeholder="El salón con la chimenea que nunca tira bien y el sofá donde siempre acaba durmiendo el gato."
+                placeholder={
+                  p?.ejemploDescripcion ??
+                  'El salón con la chimenea que nunca tira bien y el sofá donde siempre acaba durmiendo el gato.'
+                }
               />
-              <p className="sp-hint">Los detalles reales convierten tu casa en la mansión del crimen.</p>
+              <p className="sp-hint">
+                {p?.pista ?? 'Los detalles reales hacen que la trama parezca escrita para tu casa.'}
+              </p>
             </div>
 
             <PhotoUpload
@@ -441,9 +482,9 @@ export default function RoomsPanel({
               photoUrl: sala.photoUrl,
             }))}
             shape="square"
-            emptySymbol="⌂"
-            emptyTitle="La mansión está vacía"
-            emptyBody="Añade al menos cuatro estancias. Con seis o nueve, el tablero recuerda al Cluedo original."
+            emptySymbol={p?.vacio?.glifo ?? '⌂'}
+            emptyTitle={p?.vacio?.titulo ?? 'La mansión está vacía'}
+            emptyBody={p?.vacio?.texto ?? `Añade al menos ${categoria.minimo} ${plural}.`}
             editingId={borrador.id}
             onEdit={editar}
             onDelete={eliminar}

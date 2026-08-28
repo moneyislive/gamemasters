@@ -17,12 +17,32 @@ import { getAnthropicClient, resolveModel } from '../agent/anthropic';
 import { DEMO_MODE } from '../config';
 import { REGLAS_JUGADOR } from '../docs/datos';
 import { manifiestoDe } from '../../../shared/juegos';
+import type { ManifiestoDeJuego } from '../../../shared/juegos';
 import type { GameSession } from '../../../shared/types';
 import type { VistaJugador } from '../../../shared/live';
 
-const SISTEMA = `Eres el Mayordomo de una velada de misterio en vivo, al estilo CLUEDO.
-Hablas SIEMPRE en español, con el tono de un mayordomo veterano: cortés, breve, con un punto de
-ironía seca. Tratas de usted.
+/**
+ * El encargo del asistente, compuesto para el juego que se esté jugando.
+ *
+ * QUÉ ES DE QUIÉN. La VOZ —quién es, cómo habla, cómo se niega— la declara el
+ * manifiesto, porque es del juego: en El Misterio de la Momia el Escriba de una
+ * expedición estaba hablando como un mayordomo inglés de un asesinato que no ha
+ * ocurrido. Todo lo demás —lo que no puede hacer, y cómo tiene que contestar—
+ * lo pone la plataforma, porque es la barrera que protege la partida y no puede
+ * depender de que un juego se acuerde de escribirla.
+ *
+ * Los sustantivos de «no descartas X, Y ni Z» también salen del manifiesto: en
+ * un juego sin salas, pedirle que no descarte salas es enseñarle un juego que
+ * no está jugando.
+ */
+function encargo(manifiesto: ManifiestoDeJuego): string {
+  const categorias = manifiesto.categorias.map((c) => c.plural);
+  const cosas =
+    categorias.length > 1
+      ? `${categorias.slice(0, -1).join(', ')} ni ${categorias[categorias.length - 1]}`
+      : (categorias[0] ?? 'nada');
+
+  return `${manifiesto.asistente.voz}
 
 PARA QUÉ ESTÁS
 - Explicar las reglas y cómo funciona cada momento de la partida.
@@ -42,18 +62,18 @@ Por tanto NUNCA:
 - Nombras a nadie como culpable ni insinúas sospechas propias.
 - Interpretas, valoras ni relacionas pistas, aunque el jugador te las cuente él mismo.
 - Deduces horarios, recorridos ni contradicciones entre versiones.
-- Descartas sospechosos, objetos o salas.
+- Descartas ${cosas}.
 - Inventas hechos de la trama que no estén en el contexto.
 
 Si el jugador te cuenta una pista y te pide que la interpretes, se lo devuelves: esa es su
-partida, no la tuya. Si insiste, te mantienes. Puedes decirlo con gracia —«si yo resolviera los
-crímenes, señor, no estaría sirviendo copas»— pero no cedes.
+partida, no la tuya. Si insiste, te mantienes. Puedes decirlo con gracia —«${manifiesto.asistente.seNiega}»— pero no cedes.
 
 Si te preguntan algo que no está en tu contexto, respondes con naturalidad que no te consta.
 
 FORMA
 Máximo cuatro frases. Sin listas ni encabezados: esto se lee en un móvil, de pie, en mitad de
 una cena.`;
+}
 
 /**
  * Contexto del Mayordomo.
@@ -135,25 +155,29 @@ export function contextoDelMayordomo(vista: VistaJugador): string {
 }
 
 /** Respuestas del modo demostración, sin clave de API. */
+/**
+ * Qué contesta sin clave de API.
+ *
+ * LAS CUATRO FRASES SON DEL JUEGO, y estaban escritas aquí en CLUEDO: a un
+ * expedicionario perdido en una tumba se le explicaba «una única acusación:
+ * quién, con qué y dónde», que son las reglas de otro juego. Y quien pregunta
+ * esto está perdido, que es justo cuando peor sienta que te cuenten otra cosa.
+ *
+ * Lo único que sigue siendo de la plataforma es CUÁNDO se dice cada una: los
+ * cuatro casos —las reglas, tu papel, quién fue, y lo demás— valen igual para
+ * cualquier juego de misterio.
+ */
 function respuestaDemo(vista: VistaJugador, pregunta: string): string {
+  const { sinIa } = juegoDe(vista).asistente;
   const p = pregunta.toLowerCase();
-  if (/regla|c[oó]mo se juega|qu[eé] hago|no entiendo/.test(p)) {
-    return (
-      'En cada ronda entra usted en una sala y ve lo que allí se encuentre. Puede cambiarse una ' +
-      'sola vez. Al cerrar la ronda, lo hallado pasa al tablón común y se habla. Al final, una ' +
-      'única acusación: quién, con qué y dónde.'
-    );
-  }
+  if (/regla|c[oó]mo se juega|qu[eé] hago|no entiendo/.test(p)) return sinIa.reglas;
   if (/personaje|qui[eé]n soy|mi secreto|c[oó]mo interpret/.test(p)) {
-    return `Interpreta usted a ${vista.yo.characterName}, ${vista.yo.role}. Lo que esconde, lo sabe mejor que yo; y su coartada es la que declaró. Sosténgala sin adornarla de más.`;
+    return `Interpretas a ${vista.yo.characterName}, ${vista.yo.role}. ${sinIa.personaje}`;
   }
-  if (/culpable|qui[eé]n fue|asesino|qui[eé]n lo hizo|pista|sospech/.test(p)) {
-    return 'Si yo resolviera los crímenes, señor, no estaría sirviendo copas. Eso tendrá que sacarlo usted de la mesa.';
+  if (/culpable|qui[eé]n fue|asesino|qui[eé]n lo hizo|pista|sospech|saqueador|sello/.test(p)) {
+    return sinIa.solucion;
   }
-  return (
-    'Sin línea con el despacho, mi consejo es el de siempre: hable con quien todavía no haya ' +
-    'hablado. La gente se delata contestando, no callando.'
-  );
+  return sinIa.general;
 }
 
 export async function consultarConsejero(
@@ -172,7 +196,7 @@ export async function consultarConsejero(
     model,
     max_tokens: 400,
     system: [
-      { type: 'text', text: SISTEMA, cache_control: { type: 'ephemeral' } },
+      { type: 'text', text: encargo(juegoDe(vista)), cache_control: { type: 'ephemeral' } },
       { type: 'text', text: `CONTEXTO\n\n${contextoDelMayordomo(vista)}` },
     ],
     messages: [{ role: 'user', content: limpia }],

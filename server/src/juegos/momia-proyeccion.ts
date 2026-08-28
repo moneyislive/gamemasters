@@ -30,12 +30,13 @@
  */
 import { donesDe, esElSaqueador, estadoDe } from './momia-acciones';
 import { camaraProfanada, DONES_REPARTIBLES, tramaDe } from './momia-trama';
-import { registrarProyeccion } from './proyecciones';
+import { registrarProyeccion, registrarProyeccionParaGm } from './proyecciones';
 import { selladoDe, trofeosDe } from './momia-sellado';
 // Por la puerta principal, igual que en `momia-trama.ts` y por lo mismo.
 import { entidadesDe, nombreDeEntidad } from '../../../shared/juegos';
 import { MARCAS_PARA_TOCADO } from '../../../shared/juegos/momia-tipos';
-import type { Restriccion } from '../../../shared/juegos/momia-tipos';
+import type {
+  EstadoMomia, Restriccion } from '../../../shared/juegos/momia-tipos';
 import type { GameSession } from '../../../shared/types';
 import type { LiveSession } from '../../../shared/live';
 
@@ -269,3 +270,56 @@ export function vistaMomiaDe(
 }
 
 registrarProyeccion('momia', (game, sesion, suspectId) => vistaMomiaDe(game, sesion, suspectId));
+
+/**
+ * Lo que puede ver quien dirige A CIEGAS del estado de la expedición.
+ *
+ * LO QUE NO SALE: `ordenVerdadero`, `restricciones`, cuáles son falsas y las
+ * propuestas que haya entregado cada cual. Los tres primeros son la solución;
+ * el cuarto convierte el sellado en seguir al que va primero.
+ *
+ * LO QUE SÍ SALE, porque lo necesita para dirigir y porque en la mesa se ve:
+ * qué cámara está profanada, las marcas y los amuletos de cada cual, y qué
+ * fragmentos están ya sobre la mesa —que son públicos por definición—.
+ *
+ * Sin esto registrado, a ciegas el panel se quedaría sin nada que enseñar: el
+ * filtro falla cerrado a propósito, y esta función es lo que lo abre justo lo
+ * necesario.
+ */
+registrarProyeccionParaGm('momia', (game, sesion) => {
+  const estado = (sesion.estado as { momia?: EstadoMomia } | undefined)?.momia;
+  if (!estado) return undefined;
+
+  const publicos = Object.values(estado.fragmentos).filter((f) => f.publico);
+  return {
+    momia: {
+      profanadas: estado.profanadas,
+      gente: Object.fromEntries(
+        Object.entries(estado.gente).map(([id, p]) => [
+          id,
+          {
+            marcas: p.marcas,
+            amuletos: p.amuletos,
+            tocado: p.tocado,
+            fragmentos: p.fragmentos,
+            donUsadoEnRonda: p.donUsadoEnRonda,
+          },
+        ]),
+      ),
+      /*
+       * Los fragmentos, SOLO los que ya están sobre la mesa, y sin decir si son
+       * falsos. Que uno sea falso es lo que la mesa tiene que descubrir hablando.
+       */
+      fragmentos: Object.fromEntries(
+        publicos.map((f) => [f.id, { id: f.id, texto: f.texto, publico: true }]),
+      ),
+      /*
+       * Cuántas propuestas hay, no cuáles. Con el Game Master jugando, ver el
+       * orden que ha entregado cada cual sería jugar con las cartas vistas.
+       */
+      propuestas: {},
+      propuestasEntregadas: Object.keys(estado.propuestas).length,
+      sellado: estado.sellado,
+    },
+  };
+});

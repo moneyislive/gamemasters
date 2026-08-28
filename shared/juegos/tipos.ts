@@ -327,6 +327,48 @@ export interface AsistenteDeJuego {
   /** Cómo se le llama a lo que hace. «Tu asistente del juego con IA». */
   descripcion: string;
   icono: IconoId;
+
+  /**
+   * Quién es y cómo habla. Es lo primero que lee el modelo.
+   *
+   * POR QUÉ ES UN DATO Y NO CÓDIGO. El encargo del asistente estaba escrito a
+   * mano en `live/consejero.ts` y empezaba «Eres el Mayordomo de una velada al
+   * estilo CLUEDO»: en El Misterio de la Momia, el Escriba de una expedición
+   * hablaba como un mayordomo inglés de un asesinato que no ha ocurrido. El
+   * resto del encargo —lo que no puede hacer, la forma de contestar— sí es de
+   * la plataforma y lo pone ella.
+   */
+  voz: string;
+  /**
+   * Con qué te recibe al abrir la pantalla, antes de que preguntes nada.
+   *
+   * Va aquí y no en la pantalla porque es lo primero que se lee de él y es
+   * DONDE MÁS SE NOTA la voz: el Mayordomo trata de usted y el Escriba de tú.
+   * Estaba escrito a mano en la app, así que el Escriba recibía a la mesa
+   * hablando como un mayordomo inglés.
+   */
+  saludo: string;
+  /**
+   * Cómo se niega, en su propio idioma, cuando le piden que resuelva el caso.
+   *
+   * Va aparte de la voz porque el encargo lo cita como ejemplo dentro de la
+   * regla que más importa —«no cedes»— y esa regla es de la plataforma.
+   */
+  seNiega: string;
+  /**
+   * Qué contesta cuando no hay clave de API.
+   *
+   * Sin esto, el asistente de cualquier juego explicaba «una única acusación:
+   * quién, con qué y dónde», que son las reglas de CLUEDO. Y quien lo lee está
+   * perdido, que es justo cuando peor sienta que te cuenten otro juego.
+   */
+  sinIa: {
+    reglas: string;
+    personaje: string;
+    /** Cuando le piden que señale a alguien. */
+    solucion: string;
+    general: string;
+  };
 }
 
 /** Qué puede hacer un jugador cuando la ronda está abierta. */
@@ -446,6 +488,21 @@ export interface ManifiestoDeJuego {
    * —una la ve el taller, la otra la ejecuta el servidor— y `verify:puertas`
    * comprueba que no se separen.
    */
+  /**
+   * Cómo se prepara físicamente el paquete de esta partida.
+   *
+   * La hoja por la que se abre el ZIP dice qué hacer antes de que llegue la
+   * gente. Estaba escrita en CLUEDO —«mete las pistas de cada sala y ronda en
+   * su sobre rotulado», «cuelga los carteles de sala y la línea temporal»,
+   * «reparte una hoja de investigación por persona»— y esos tres documentos no
+   * existen en El Misterio de la Momia, mientras que recortar las tiras de
+   * papiro y agruparlas por vigilia, que sí hay que hacerlo, no lo decía nadie.
+   *
+   * Va aquí y no en la plantilla porque depende de QUÉ HAY en el paquete, y eso
+   * lo declara el juego. Si falta, se usa la de CLUEDO, que es lo que había.
+   */
+  preparacion?: { anfitrion: string[]; aCiegas: string[] };
+
   materialDeVelada?: boolean;
 
   /**

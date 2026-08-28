@@ -586,6 +586,34 @@ export const MOMIA: ManifiestoDeJuego = {
     nombre: 'El Escriba',
     descripcion: 'Tu asistente de la expedición con IA',
     icono: 'escarabajo',
+    /*
+     * NO ES UN MAYORDOMO. Lleva el acta de la excavación: sabe de ritos, de
+     * cámaras y de lo que se ha dicho en voz alta, y no ha visto un asesinato
+     * en su vida. Trata de tú porque en una expedición se trabaja codo con codo.
+     */
+    voz:
+      'Eres el Escriba de una expedición que abrió una tumba y rompió su sello.\n' +
+      'Hablas SIEMPRE en español, con el tono de quien lleva el acta de una excavación: preciso,\n' +
+      'breve, algo supersticioso. Tratas de tú, porque en una expedición se trabaja codo con codo.',
+    saludo:
+      'Tú dirás. Te aviso de entrada: no sé quién rompió el sello, ni qué dicen los fragmentos que ' +
+      'no has visto, ni cuál es el orden bueno. Estoy para las reglas y para tu papel.',
+    seNiega: 'yo tomo nota de lo que se dice, no de lo que es verdad',
+    sinIa: {
+      reglas:
+        'Cada vigilia entras en una cámara y sales con un fragmento de papiro. Si entras en la que ' +
+        'está profanada, sales además con una marca. Al final se propone el orden de los cinco ritos ' +
+        'y se ejecuta el más apoyado: si es el bueno, la tumba se sella.',
+      personaje:
+        'Lo que callas, lo sabes tú mejor que yo. Y tu don se usa una vez por vigilia: dilo en voz ' +
+        'alta cuando lo invoques, aunque no digas qué has visto.',
+      solucion:
+        'Yo tomo nota de lo que se dice, no de lo que es verdad. Quién rompió el sello lo tendrá que ' +
+        'sacar la mesa, y se sabrá al amanecer.',
+      general:
+        'Sin línea con el campamento, mi consejo es el de siempre: pon un fragmento sobre la mesa y ' +
+        'mira quién se apresura a explicarlo.',
+    },
   },
 
   // En medio de una tumba no hay escaleras: hay un pozo funerario.
@@ -623,6 +651,25 @@ export const MOMIA: ManifiestoDeJuego = {
 
   trofeos: TROFEOS_MOMIA,
   seccionesDeDosier: SECCIONES_MOMIA,
+  preparacion: {
+    anfitrion: [
+      'Imprime el paquete. Los fragmentos de papiro, a UNA CARA: a doble cara se leen al trasluz y se acaba el juego.',
+      'Recorta las tiras de papiro y dóblalas por su línea. Agrúpalas por vigilia y mete cada grupo en un sobre.',
+      'Cuelga un cartel en cada cámara: es lo que convierte tu casa en la tumba.',
+      'Reparte los dosieres cerrados. Cada uno lleva su don y su secreto; nadie abre el de otro.',
+      'Ten a mano la tabla de marcas y dos amuletos por persona. La hoja del sellado, sin repartir todavía.',
+      'Guarda el papiro del sellado donde nadie lo vea: lleva el orden verdadero y el nombre de quien rompió el sello.',
+    ],
+    aCiegas: [
+      'Busca a alguien que no vaya a jugar, o que acepte jugar sabiéndolo todo. Esa persona prepara el material.',
+      'Quien prepara imprime todo —los fragmentos a UNA CARA—, recorta las tiras y las agrupa por vigilia.',
+      'Quien dirige recibe solo su guía, los carteles de las cámaras y la tabla de marcas. Nada más.',
+      'Quien prepara reparte los dosieres cerrados y va dejando las tiras de cada vigilia antes de que empiece.',
+      'Quien prepara le dice a quien dirige, al abrir cada vigilia, qué cámara está profanada.',
+      'El papiro del sellado se queda con quien prepara hasta el amanecer.',
+    ],
+  },
+
   documentos: IMPRIMIBLES_MOMIA,
   dosieresPropios: true,
 };

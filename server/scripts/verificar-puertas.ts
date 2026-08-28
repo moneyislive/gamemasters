@@ -36,7 +36,10 @@ import { generarTramaMomia, estadoInicial, tramaDe } from '../src/juegos/momia-t
 import { generateBoardLayout } from '../src/board/generator';
 import { generateDemoPlot } from '../src/plot/demoPlot';
 import { armarPaquete } from '../src/docs/paquete';
-import { renderDocumentIndex } from '../src/docs/renderer';
+import { renderDocumentIndex, renderPlayerDocument } from '../src/docs/renderer';
+import { renderPrintableDocument } from '../src/docs/imprimibles';
+import { todosLosTrofeos, trofeosQueChocan } from '../../shared/juegos';
+import { TROFEOS } from '../../shared/live';
 import '../src/juegos/instalados';
 import { juegosConMaterial } from '../src/juegos/materiales';
 import { ampliacionDe, juegosConAmpliacion } from '../src/juegos/ampliaciones';
@@ -265,8 +268,14 @@ const enJuego = partidaDeMomia('ronda-abierta', 'excavacion', 'ABIERT', 'ABIE');
  * prueba, que es el único modo de mirar lo que hay en el instante de abrir.
  */
 const porAbrir = partidaDeMomia('ronda-abierta', 'excavacion2', 'NOABRE', 'NOAB');
+/*
+ * Y una cuarta con el Game Master jugando: es el unico modo en el que la
+ * solucion no puede viajar a su navegador.
+ */
+const aCiegas = partidaDeMomia('ronda-abierta', 'aciegas', 'CIEGAS', 'CIEG');
+aCiegas.game.settings = { ...aCiegas.game.settings, gmPlays: true } as never;
 const cluedo = partidaDeCluedo();
-sembrar(dir, [momia, enJuego, cluedo], [porAbrir.game]);
+sembrar(dir, [momia, enJuego, cluedo, aCiegas], [porAbrir.game]);
 
 let servidor: ChildProcess | undefined;
 
@@ -377,6 +386,56 @@ async function probar(): Promise<void> {
       JSON.stringify(final?.estado?.momia?.sellado?.ordenEjecutado) ===
         JSON.stringify(sellado?.ordenEjecutado),
       final?.estado?.momia?.sellado,
+    );
+  }
+
+  // -------------------------------------------------------------------------
+  paso('A ciegas, la solución no llega al navegador de quien dirige');
+  // -------------------------------------------------------------------------
+  {
+    /*
+     * LA VISTA DEL PUESTO DE MANDO, POR HTTP, que es como la recibe el
+     * navegador. Mandaba la sesión entera, y dentro va el estado del juego: en
+     * la Momia, el orden verdadero de los cinco ritos y qué fragmentos son
+     * falsos. El panel no lo pintaba —cumplía su promesa— pero el dato estaba
+     * ahí, y con el Game Master JUGANDO eso es la partida a un clic en las
+     * herramientas del navegador.
+     */
+    const r = await pedir('/games/aciegas/live');
+    comprobar('el puesto de mando responde', r.estado === 200, r.estado);
+    const crudo = JSON.stringify(r.datos);
+
+    const trama = aCiegas.game.plot!.delJuego as {
+      ordenVerdadero: string[];
+      falsasCandidatas: Array<{ id: string }>;
+    };
+    comprobar(
+      'el orden verdadero NO viaja',
+      !trama.ordenVerdadero.every((id) => crudo.includes(`"${id}"`)) ||
+        !crudo.includes(JSON.stringify(trama.ordenVerdadero)),
+      trama.ordenVerdadero,
+    );
+    for (const falsa of trama.falsasCandidatas.slice(0, 2)) {
+      comprobar(`ni la falsificación ${falsa.id}`, !crudo.includes(`"${falsa.id}"`));
+    }
+    comprobar('ni se dice de ningún fragmento que sea falso', !crudo.includes('"falso":true'));
+
+    /*
+     * PERO SIGUE HABIENDO PUESTO DE MANDO. Filtrar de más deja a quien dirige
+     * sin nada que leer, que es el fallo contrario y también rompe la velada.
+     */
+    comprobar('y quien dirige sigue viendo las marcas', crudo.includes('"marcas"'), crudo.slice(0, 200));
+    comprobar('y qué cámara está profanada', crudo.includes('"profanadas"'));
+
+    /*
+     * DIRIGIENDO DE LA FORMA NORMAL NO SE TOCA NADA: quien dirige conoce la
+     * solución —la lleva en su dosier— y esconderle su propio estado sería
+     * quitarle medio puesto de mando por nada.
+     */
+    const normal = await pedir('/games/expedicion/live');
+    comprobar(
+      'en modo anfitrión el estado sigue llegando entero',
+      JSON.stringify(normal.datos).includes('"ordenVerdadero"'),
     );
   }
 
@@ -953,6 +1012,104 @@ function probarAmpliacion(): void {
   );
 }
 
+/**
+ * La vitrina, el asistente, el papel y el taller: que cada juego hable el suyo.
+ */
+/**
+ * El codigo de un fichero, sin sus comentarios.
+ *
+ * SE MIRA EL USO, NO LA MENCION. Los comentarios de este repositorio explican
+ * el fallo que arreglaron, asi que citan las frases equivocadas: «tablero de
+ * Cluedo», «mansion del crimen». Una comprobacion que buscara esas frases en el
+ * texto entero se rompería por su propia explicación, que es la forma más tonta
+ * de tener una comprobación inútil.
+ */
+function sinComentarios(texto: string): string {
+  return texto
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/\/\/[^\n]*/g, '');
+}
+
+function probarCadaJuegoHablaElSuyo(): void {
+  paso('Cada juego habla su idioma, y sus trofeos existen');
+
+  /*
+   * LOS TROFEOS SE MIRAN SIN PARTIDA ABIERTA. Con la lista de la plataforma a
+   * secas, quien selló una tumba abría su vitrina y no encontraba ni «El
+   * Sellador» ni «Ojo de Horus»: los tenía concedidos y guardados y no se veían.
+   */
+  const vitrina = todosLosTrofeos().map((t) => t.id);
+  for (const suyo of manifiestoDe('momia').trofeos) {
+    comprobar(`«${suyo.nombre}» cabe en la vitrina`, vitrina.includes(suyo.id), vitrina);
+  }
+  for (const comun of TROFEOS) {
+    comprobar(`y «${comun.nombre}» sigue estando`, vitrina.includes(comun.id));
+  }
+  comprobar(
+    'ningún id de trofeo lo declaran dos sitios',
+    trofeosQueChocan().length === 0,
+    trofeosQueChocan(),
+  );
+
+  /*
+   * EL ASISTENTE. Su voz, su saludo y lo que contesta sin clave de API son del
+   * juego: a un expedicionario perdido se le explicaba «una única acusación:
+   * quién, con qué y dónde», que son las reglas de otro juego.
+   */
+  const escriba = manifiestoDe('momia').asistente;
+  const mayordomo = manifiestoDe('cluedo').asistente;
+  comprobar('el Escriba no se presenta como mayordomo', !escriba.voz.toLowerCase().includes('mayordomo'), escriba.voz);
+  comprobar('ni menciona CLUEDO', !escriba.voz.includes('CLUEDO'));
+  comprobar('y el Mayordomo sigue siendo el de siempre', mayordomo.voz.includes('CLUEDO'));
+  comprobar('el Escriba trata de tú', escriba.saludo.startsWith('Tú'), escriba.saludo);
+  comprobar('y el Mayordomo de usted', mayordomo.saludo.startsWith('Usted'), mayordomo.saludo);
+  comprobar(
+    'sin IA, la Momia no explica las reglas de CLUEDO',
+    !escriba.sinIa.reglas.includes('quién, con qué y dónde'),
+    escriba.sinIa.reglas,
+  );
+
+  /*
+   * EL PAPEL. Los ritos son públicos en la app desde el principio; en papel no
+   * los veía nadie hasta el final, así que se discutía un orden de cinco cosas
+   * cuyos nombres media mesa no conocía.
+   */
+  const conRitos = partidaDeMomia('ronda-abierta').game;
+  const dosier = renderPlayerDocument(conRitos, 'e0')?.html ?? '';
+  comprobar('el dosier impreso lista los cinco ritos', dosier.includes('Los cinco ritos del sellado'));
+  for (const rito of conRitos.entidades!.ritos!) {
+    comprobar(`y nombra «${rito.name}»`, dosier.includes(rito.name));
+  }
+
+  /*
+   * Y LA HOJA POR LA QUE SE ABRE EL PAQUETE, que mandaba meter pistas en sobres
+   * y repartir hojas de investigación: tres documentos que aquí no existen.
+   */
+  const indice = renderPrintableDocument(conRitos, 'indice-paquete', {})?.html ?? '';
+  comprobar('el índice no manda repartir hojas de investigación', !indice.includes('hoja de investigación'));
+  comprobar('ni colgar carteles de sala', !indice.includes('carteles de sala'));
+  comprobar('y sí manda recortar las tiras de papiro', indice.includes('tiras de papiro'), indice.slice(0, 200));
+
+  // El de CLUEDO no se ha movido.
+  const indiceCluedo = renderPrintableDocument(partidaDeCluedo().game, 'indice-paquete', {})?.html ?? '';
+  comprobar('el de CLUEDO sigue diciendo lo suyo', indiceCluedo.includes('hoja de investigación'));
+
+  /*
+   * EL TALLER. La pestaña de cámaras estaba escrita en CLUEDO y no leía nada de
+   * lo que el manifiesto ya declaraba.
+   */
+  const panel = sinComentarios(
+    fs.readFileSync(
+      path.join(REPO, 'client', 'src', 'components', 'studio', 'RoomsPanel.tsx'),
+      'utf8',
+    ),
+  );
+  for (const deCluedo of ['tablero de Cluedo', 'Nombre de la sala', '"Biblioteca"', 'mansión del crimen']) {
+    comprobar(`el panel de lugares ya no dice «${deCluedo}»`, !panel.includes(deCluedo));
+  }
+  comprobar('y sí pinta las sugerencias del manifiesto', panel.includes('sugerencias'));
+}
+
 function probarPanel(): void {
   paso('El panel del Game Master');
 
@@ -979,6 +1136,7 @@ function probarPanel(): void {
 
 try {
   probarPaquete();
+  probarCadaJuegoHablaElSuyo();
   probarDosieres();
   probarDepuracion();
   probarAmpliacion();

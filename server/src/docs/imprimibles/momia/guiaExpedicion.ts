@@ -186,7 +186,7 @@ export function guiaExpedicion(
         <li>Pega un cartel en la puerta de cada habitación que hace de cámara. Es lo que convierte el pasillo en una tumba.</li>
         <li>Recorta y dobla los fragmentos de papiro. Guárdalos por vigilias, en sobres.</li>
         <li>Mete cada dosier en un sobre con el nombre de su persona. Nadie abre el ajeno.</li>
-        <li>Ten a mano la tabla de marcas, dos amuletos por persona (monedas, fichas, garbanzos) y la hoja del sellado sin repartir todavía.</li>
+        <li>Ten a mano la tabla de marcas, dos amuletos por persona (monedas, fichas, garbanzos) y la hoja del sellado sin repartir todavía. Los <strong>nombres</strong> de los cinco ritos ya los llevan todos en su dosier: la hoja es solo para escribir el orden.</li>
         <li>Guárdate el papiro del sellado donde no se vea.</li>
       </ol>
     </div>

@@ -59,17 +59,38 @@ ${ficha(
       : ''
   }`;
 
-  const pasos = aCiegas
-    ? `      <li>Busca a alguien de confianza que <strong>no vaya a jugar</strong>, o que acepte jugar conociendo la solución. Esa persona prepara el material.</li>
-      <li>Quien prepara imprime todo, recorta las etiquetas y mete cada cosa en su sobre.</li>
-      <li>El Game Master recibe solo su guía y los carteles. Nada más.</li>
-      <li>Cada jugador recibe su dosier cerrado y una hoja de investigación.</li>
-      <li>Durante la velada se abren los sobres <strong>en el orden de las rondas</strong>. Nunca antes.</li>`
-    : `      <li>Imprime el paquete y recorta las etiquetas.</li>
-      <li>Mete las pistas de cada sala y ronda en su sobre rotulado.</li>
-      <li>Cuelga los carteles de sala y la línea temporal donde vayáis a jugar.</li>
-      <li>Reparte los dosieres cerrados y una hoja de investigación por persona.</li>
-      <li>Guarda tu dosier donde nadie pueda leerlo: llevas la solución encima.</li>`;
+  /*
+   * QUÉ HAY QUE HACER ANTES DE QUE LLEGUE LA GENTE, y lo dice el juego.
+   *
+   * Estaba escrito aquí en CLUEDO: meter las pistas de cada sala en su sobre,
+   * colgar los carteles de sala y la línea temporal, repartir una hoja de
+   * investigación por persona. En El Misterio de la Momia esos tres documentos
+   * NO EXISTEN, y en cambio nada decía que hay que recortar las tiras de papiro
+   * y agruparlas por vigilia, que es lo único que de verdad hay que hacer.
+   *
+   * El respaldo es la lista de CLUEDO, que es la que había: un juego que no
+   * declare su preparación se prepara como se preparaba antes.
+   */
+  const CLUEDO_ANFITRION = [
+    'Imprime el paquete y recorta las etiquetas.',
+    'Mete las pistas de cada sala y ronda en su sobre rotulado.',
+    'Cuelga los carteles de sala y la línea temporal donde vayáis a jugar.',
+    'Reparte los dosieres cerrados y una hoja de investigación por persona.',
+    'Guarda tu dosier donde nadie pueda leerlo: llevas la solución encima.',
+  ];
+  const CLUEDO_A_CIEGAS = [
+    'Busca a alguien de confianza que <strong>no vaya a jugar</strong>, o que acepte jugar conociendo la solución. Esa persona prepara el material.',
+    'Quien prepara imprime todo, recorta las etiquetas y mete cada cosa en su sobre.',
+    'El Game Master recibe solo su guía y los carteles. Nada más.',
+    'Cada jugador recibe su dosier cerrado y una hoja de investigación.',
+    'Durante la velada se abren los sobres <strong>en el orden de las rondas</strong>. Nunca antes.',
+  ];
+
+  const suya = manifiestoDe(game.settings?.juego).preparacion;
+  const lista = aCiegas
+    ? (suya?.aCiegas ?? CLUEDO_A_CIEGAS)
+    : (suya?.anfitrion ?? CLUEDO_ANFITRION);
+  const pasos = lista.map((paso) => `      <li>${paso}</li>`).join(String.fromCharCode(10));
 
   const aviso = aCiegas
     ? `    <div class="aviso">
