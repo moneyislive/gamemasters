@@ -118,7 +118,27 @@ let avisoGuardado: { gameId: string | null; texto: string } | null = null;
 let pasaporte: string | null = null;
 let servidor: string = SERVIDOR_POR_DEFECTO;
 
-export async function cargarSesionGuardada(): Promise<{ token: string | null; servidor: string }> {
+/**
+ * La lectura del disco, una sola vez y compartida por todo el que la pida.
+ *
+ * NO ES UNA OPTIMIZACIÓN, ES LA CORRECCIÓN DE UNA CARRERA. Antes cada pantalla
+ * que quería saber si hay cuenta lo preguntaba a pelo con `hayCuenta()`, y en el
+ * arranque —o abriendo la app directamente en una pantalla por un enlace— esa
+ * pregunta llegaba ANTES de que el disco hubiera contestado. La respuesta era
+ * «no hay cuenta», que es falso, y la pantalla se quedaba diciendo que no te han
+ * sentado en ninguna mesa teniendo mesa. Al ser en el arranque, no se reintenta:
+ * hay que salir y volver a entrar para verlo bien.
+ *
+ * Ahora se espera a esto y ya está. Guardar la promesa —y no un booleano— es lo
+ * que hace que quien llegue a mitad de la lectura espere en vez de lanzar otra.
+ */
+let lectura: Promise<{ token: string | null; servidor: string }> | null = null;
+
+export function cargarSesionGuardada(): Promise<{ token: string | null; servidor: string }> {
+  return (lectura ??= leerSesionDelDisco());
+}
+
+async function leerSesionDelDisco(): Promise<{ token: string | null; servidor: string }> {
   token = await almacen.get(CLAVE_TOKEN);
   partida = await almacen.get(CLAVE_PARTIDA);
   avisoGuardado = leerAviso(await almacen.get(CLAVE_AVISO));

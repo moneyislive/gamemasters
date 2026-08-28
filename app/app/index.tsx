@@ -139,14 +139,20 @@ export default function Portada(): JSX.Element {
   const [fondos, setFondos] = useState<Record<string, string>>({});
 
   const cargarPortada = useCallback(() => {
-    if (!api.hayCuenta()) {
-      setPortada(null);
-      return;
-    }
-    api
-      .pedirPortada()
-      .then(setPortada)
-      .catch(() => setPortada(null));
+    void (async () => {
+      // El disco antes que la pregunta: si no, en el arranque «no hay cuenta» y
+      // la portada se queda sin tus sobres de invitación.
+      await api.cargarSesionGuardada();
+      if (!api.hayCuenta()) {
+        setPortada(null);
+        return;
+      }
+      try {
+        setPortada(await api.pedirPortada());
+      } catch {
+        setPortada(null);
+      }
+    })();
   }, []);
 
   const cargarFigura = useCallback(() => {

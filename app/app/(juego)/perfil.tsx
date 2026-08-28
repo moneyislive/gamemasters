@@ -70,8 +70,12 @@ export default function Perfil(): JSX.Element {
   const cargarPerfil = (): void => {
     setCargando(true);
     setFallo(false);
+    // Igual que en las demás: sin esperar al disco, la credencial todavía no
+    // está en memoria y el perfil se pide sin ella. Sale «no se ha podido
+    // consultar tu perfil» con la sesión perfectamente guardada.
     api
-      .pedirPerfil()
+      .cargarSesionGuardada()
+      .then(() => api.pedirPerfil())
       .then((r) => {
         setCuenta(r.cuenta);
         setInvitacion(r.invitacion);

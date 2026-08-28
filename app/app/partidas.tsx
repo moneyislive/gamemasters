@@ -67,17 +67,22 @@ export default function Partidas(): JSX.Element {
   const [refrescando, setRefrescando] = useState(false);
 
   const cargar = useCallback(() => {
-    if (!api.hayCuenta()) {
-      setPartidas([]);
-      return;
-    }
-    api
-      .pedirPartidas()
-      .then((p) => {
-        setPartidas(p);
+    void (async () => {
+      // Primero el disco. Preguntar por la cuenta antes de haberla leído
+      // contesta que no hay, y esta pantalla se queda diciendo que no te han
+      // sentado en ninguna mesa cuando sí. Es gratis a partir de la primera vez.
+      await api.cargarSesionGuardada();
+      if (!api.hayCuenta()) {
+        setPartidas([]);
+        return;
+      }
+      try {
+        setPartidas(await api.pedirPartidas());
         setFallo(false);
-      })
-      .catch(() => setFallo(true));
+      } catch {
+        setFallo(true);
+      }
+    })();
   }, []);
 
   /*

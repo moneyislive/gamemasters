@@ -72,14 +72,19 @@ export default function Cuenta(): JSX.Element {
 
   const cargar = useCallback(() => {
     void cargarAvatar().then((a) => setVistaAvatar(a.vistaPrevia));
-    if (!api.hayCuenta()) {
-      setPortada(null);
-      return;
-    }
-    api
-      .pedirPortada()
-      .then(setPortada)
-      .catch(() => setFallo(true));
+    void (async () => {
+      // El disco antes que la pregunta: si no, en el arranque «no hay cuenta».
+      await api.cargarSesionGuardada();
+      if (!api.hayCuenta()) {
+        setPortada(null);
+        return;
+      }
+      try {
+        setPortada(await api.pedirPortada());
+      } catch {
+        setFallo(true);
+      }
+    })();
   }, []);
 
   useEffect(cargar, [cargar]);
