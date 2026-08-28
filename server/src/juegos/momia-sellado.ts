@@ -26,6 +26,7 @@
  */
 import { estadoDe, esElSaqueador } from './momia-acciones';
 import { registrarTrofeos } from './trofeos';
+import { registrarCierre } from './cierres';
 import { AMULETOS_INICIALES } from '../../../shared/juegos/momia-tipos';
 import { EJE_SAQUEADOR } from './momia-trama';
 import type { EstadoMomia, RitoId } from '../../../shared/juegos/momia-tipos';
@@ -225,4 +226,26 @@ export function trofeosDe(
 registrarTrofeos('momia', (cierre) => {
   const resultado = selladoDe(cierre.game, cierre.sesion);
   return trofeosDe(cierre.game, cierre.sesion, resultado)[cierre.jugador.suspectId] ?? [];
+});
+
+/**
+ * El gancho por el que quien dirige ejecuta el ritual.
+ *
+ * QUE ESTO EXISTA ES LA DIFERENCIA ENTRE UN VEREDICTO Y UNA OPINIÓN. Hasta que
+ * se ejecuta, `selladoDe` recalcula el resultado en cada lectura sobre las
+ * propuestas que haya en ese momento, así que una entregada tarde —o un
+ * `ofrendar` que deja tocado a quien iba ganando— podía volcar un final ya
+ * anunciado en voz alta. `ejecutarSellado` lo escribe, y a partir de ahí la
+ * misma función devuelve lo escrito y deja de recalcular.
+ *
+ * El anuncio no dice quién gana. Lo que la mesa oye es que el ritual se ha
+ * ejecutado; quién ganó se sabe al amanecer, en el desenlace.
+ */
+registrarCierre('momia', (game, sesion) => {
+  const resultado = ejecutarSellado(game, sesion);
+  return {
+    anuncio: resultado.correcto
+      ? 'El ritual se ha ejecutado. La tumba responde.'
+      : 'El ritual se ha ejecutado. Algo ha salido mal.',
+  };
 });

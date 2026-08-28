@@ -20,6 +20,7 @@ import type { JuegoId, ManifiestoDeJuego } from './tipos';
  */
 export {
   aciertos,
+  accionDeAcusacion,
   categoria,
   categoriaDeJugadores,
   categoriasDeLugar,

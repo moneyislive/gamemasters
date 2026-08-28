@@ -20,12 +20,25 @@ import Animated, {
 import { LinearGradient } from 'expo-linear-gradient';
 import { usePartida } from './estado';
 import { color, espacio, texto } from './tema';
-import { conAlfa, useTema } from './tema-juego';
+import { conAlfa, useEsMomia, useTema } from './tema-juego';
 import type { AvisoClave } from '../../shared/live';
 
 const { width } = Dimensions.get('window');
 
-/** Cada momento tiene su rótulo y su color. */
+/**
+ * Cada momento tiene su rótulo y su color.
+ *
+ * DOS DE ELLOS DEPENDEN DEL JUEGO, y estaban escritos en vocabulario de CLUEDO
+ * para los dos. En El Misterio de la Momia no hay ningún sobre del crimen y
+ * nadie «lo resuelve»: amanece, y gana un bando. Un telón a pantalla completa
+ * es lo último que se lee de la noche, así que decir ahí la palabra del otro
+ * juego se nota más que en ningún otro sitio.
+ */
+const ROTULO_MOMIA: Partial<Record<AvisoClave, string>> = {
+  desenlace: 'Ha amanecido',
+  ganador: 'Alguien ha señalado',
+};
+
 const ROTULO: Record<AvisoClave, { titulo: string; tono: string }> = {
   'ronda-abierta': { titulo: 'Comienza la ronda', tono: color.oro300 },
   'ronda-cerrada': { titulo: 'Se cierra la ronda', tono: color.oro400 },
@@ -46,6 +59,7 @@ export function TelonDeAvisos(): JSX.Element | null {
    * React tiraría la pantalla entera. Es el mismo cuidado que en `ui.tsx`.
    */
   const t = useTema();
+  const esMomia = useEsMomia();
   const opacidad = useSharedValue(0);
   const escala = useSharedValue(0.92);
   const deslizar = useSharedValue(18);
@@ -82,7 +96,10 @@ export function TelonDeAvisos(): JSX.Element | null {
   }));
 
   if (!aviso) return null;
-  const rotulo = ROTULO[aviso.clave] ?? { titulo: 'Atención', tono: color.oro300 };
+  const base = ROTULO[aviso.clave] ?? { titulo: 'Atención', tono: color.oro300 };
+  const rotulo = esMomia
+    ? { ...base, titulo: ROTULO_MOMIA[aviso.clave] ?? base.titulo }
+    : base;
 
   return (
     <Animated.View style={[StyleSheet.absoluteFill, estilos.telon, estiloTelon]} pointerEvents="box-none">

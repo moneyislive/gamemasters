@@ -64,13 +64,31 @@ export function armarPaquete(game: GameSession): Paquete {
 
   let nGm = 0;
   let nPreparador = 0;
+  let nJugadores = 0;
   for (const doc of docs) {
     if (doc.id === 'indice-paquete') continue;
-    // A ciegas, lo del preparador va a su propia carpeta con el aviso en el
-    // nombre. En modo anfitrión no hay dos personas: todo es del mismo.
+    /*
+     * A CIEGAS HAY TRES DESTINOS, NO DOS, Y ESE ERA EL AGUJERO.
+     *
+     * Lo del preparador iba a su carpeta y TODO LO DEMÁS a la de quien dirige,
+     * incluidos los documentos declarados para QUIEN JUEGA. En El Misterio de
+     * la Momia eso es un solo fichero con los dosieres de todos, y el del
+     * saqueador empieza «Fuiste tú»: el paquete le entregaba la solución a la
+     * única persona que no puede verla, en una carpeta cuyo LÉEME dice que nada
+     * de ahí revela el caso. CLUEDO no lo sufría porque sus documentos con
+     * secreto se declaran `modes: ['host']` y a ciegas ni se generan.
+     *
+     * En modo anfitrión no se toca nada: ahí no hay dos personas, todo es del
+     * mismo, y mover documentos de sitio cambiaría un paquete que funciona.
+     */
     const alPreparador = aCiegas && doc.audience === 'preparer';
-    const carpeta = alPreparador ? carpetaPreparador : carpetaGm;
-    const indiceCarpeta = alPreparador ? ++nPreparador : ++nGm;
+    const aJugadores = aCiegas && doc.audience === 'players';
+    const carpeta = alPreparador ? carpetaPreparador : aJugadores ? carpetaJugadores : carpetaGm;
+    const indiceCarpeta = alPreparador
+      ? ++nPreparador
+      : aJugadores
+        ? ++nJugadores
+        : ++nGm;
     entradas.push({
       ruta: `${carpeta}/${dos(indiceCarpeta)}_${limpiar(doc.name)}`,
       componer: (op) => renderPrintableDocument(game, doc.id, op)?.html ?? null,

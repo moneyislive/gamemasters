@@ -12,6 +12,7 @@ import { router } from 'expo-router';
 import Animated, { FadeIn, FadeInDown, FadeInUp } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { usePartida } from '../src/estado';
+import { Amanecer } from '../src/momia/amanecer';
 import {
   Boton,
   Cargando,
@@ -32,9 +33,25 @@ export default function Desenlace(): JSX.Element {
   const { vista } = usePartida();
   const [paso, setPaso] = useState(0);
 
+  /*
+   * LA MOMIA TIENE SU PROPIA PANTALLA, y se desvía aquí por el mismo sitio y
+   * por el mismo motivo que la vigilia se desvía en `ronda.tsx`: lo de abajo
+   * está construido sobre lo único que la plataforma sabe de un final —alguien
+   * acertó quién, con qué y dónde, y ganó por llegar antes— y este juego no
+   * acaba así. Enseñárselo decía «El sobre del crimen» y cerraba con «el crimen
+   * queda impune» en una velada que puede haber ganado la expedición entera.
+   *
+   * VA DESPUÉS DE TODOS LOS HOOKS Y ANTES DE CUALQUIER OTRA COSA, y el orden no
+   * es un detalle de estilo: un `return` colado ENTRE dos hooks cambia cuántos
+   * se ejecutan según el juego, y React tira la pantalla entera con el error
+   * 300 en el momento más caro de la noche. Costó verlo porque el fallo no es
+   * de la rama nueva: es de la vieja, que deja de contar igual.
+   */
   useEffect(() => {
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   }, []);
+
+  if (vista?.sesion.juego === 'momia') return <Amanecer />;
 
   if (!vista) return <Pantalla><Cargando /></Pantalla>;
   const fin = vista.desenlace;

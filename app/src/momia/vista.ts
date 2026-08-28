@@ -127,6 +127,30 @@ export interface EstadoMomiaVisible {
   hayRestricciones: boolean;
   /** El resultado, cuando la tumba ya se ha sellado (o no). */
   sellado?: { ordenEjecutado: RitoId[]; correcto: boolean };
+  /**
+   * Cómo acabó la noche, entero. Solo llega al amanecer.
+   *
+   * SE LEÍA A MEDIAS Y ESE ERA EL FALLO. El servidor manda desde el principio
+   * quién gana, quiénes son los ganadores, el orden verdadero, los votos y los
+   * trofeos, y aquí solo se recogían el orden ejecutado y si era correcto. La
+   * pantalla del final se quedaba entonces con el desenlace genérico, que es el
+   * de CLUEDO: «el sobre del crimen», clasificación por aciertos y —como nadie
+   * podía señalar— el cierre «el crimen queda impune». En un juego que se gana
+   * por bandos, eso no es un adorno mal puesto: es contar otra partida.
+   *
+   * `ordenVerdadero` no viaja NUNCA antes de esto. Es la única puerta.
+   */
+  desenlace?: {
+    ordenVerdadero: RitoVisible[];
+    ordenEjecutado: RitoVisible[];
+    correcto: boolean;
+    gana: 'expedicion' | 'saqueador';
+    saqueadorId: string;
+    ganadores: string[];
+    votos: Array<{ orden: RitoId[]; apoyos: string[] }>;
+    silenciadas: string[];
+    trofeos: Record<string, string[]>;
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -245,6 +269,15 @@ export function leerEstadoMomia(v: unknown): EstadoMomiaVisible | null {
    * porque allí ya no hay que cruzarlos con nada: se leen. Se acepta cualquiera
    * de las dos formas para no depender de ese detalle.
    */
+  /** Los ritos del desenlace, con su nombre, tal y como llegan. */
+  const ritosDe = (v2: unknown): RitoVisible[] =>
+    leerLista(v2, (x) => {
+      if (typeof x === 'string') return { id: x, nombre: x };
+      if (!esObjeto(x)) return null;
+      const id = cadena(x.id);
+      return id ? { id, nombre: cadena(x.nombre) ?? id } : null;
+    });
+
   const idsDe = (v2: unknown): string[] =>
     Array.isArray(v2)
       ? v2
@@ -290,6 +323,25 @@ export function leerEstadoMomia(v: unknown): EstadoMomiaVisible | null {
       ? {
           ordenEjecutado: idsDe(desenlace.ordenEjecutado),
           correcto: desenlace.correcto === true,
+        }
+      : undefined,
+    desenlace: desenlace
+      ? {
+          ordenVerdadero: ritosDe(desenlace.ordenVerdadero),
+          ordenEjecutado: ritosDe(desenlace.ordenEjecutado),
+          correcto: desenlace.correcto === true,
+          gana: desenlace.gana === 'saqueador' ? 'saqueador' : 'expedicion',
+          saqueadorId: cadena(desenlace.saqueadorId) ?? '',
+          ganadores: listaDeIds(desenlace.ganadores),
+          votos: leerLista(desenlace.votos, (x) =>
+            esObjeto(x) ? { orden: idsDe(x.orden), apoyos: listaDeIds(x.apoyos) } : null,
+          ),
+          silenciadas: listaDeIds(desenlace.silenciadas),
+          trofeos: esObjeto(desenlace.trofeos)
+            ? Object.fromEntries(
+                Object.entries(desenlace.trofeos).map(([id, lista]) => [id, listaDeIds(lista)]),
+              )
+            : {},
         }
       : undefined,
   };

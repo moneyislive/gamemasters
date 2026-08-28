@@ -8,7 +8,8 @@
  */
 import type { GenerateStreamEvent } from '../../../shared/types';
 import { getStore } from '../db/store';
-import { generarMaterialImpreso } from '../plot/material';
+import { generadorDeMaterial } from '../juegos/materiales';
+import '../plot/material';
 import { crearRouter } from '../rutas';
 
 const router = crearRouter();
@@ -34,6 +35,22 @@ router.post('/games/:id/material', async (req, res) => {
     return;
   }
 
+  /*
+   * QUIÉN ESCRIBE EL MATERIAL DEPENDE DEL JUEGO, y hasta aquí no dependía de
+   * nada: esta ruta corría el pipeline de CLUEDO para cualquier partida. En El
+   * Misterio de la Momia eso pedía culpable, arma y sala a una trama que no
+   * tiene ninguna de las tres —devuelven cadena vacía— y el modelo escribía
+   * sobre un asesinato que no ha ocurrido, ENCIMA de las narraciones de vigilia
+   * ya depuradas. Sin aviso y sin deshacer.
+   */
+  const generador = generadorDeMaterial(game.settings?.juego);
+  if (!generador) {
+    res
+      .status(409)
+      .json({ error: 'Este juego no escribe material de velada: su trama ya lo trae dentro.' });
+    return;
+  }
+
   res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
   res.setHeader('Cache-Control', 'no-cache, no-transform');
   res.setHeader('Connection', 'keep-alive');
@@ -47,7 +64,7 @@ router.post('/games/:id/material', async (req, res) => {
 
   try {
     emit({ type: 'stage', stage: 'material', label: 'Escribiendo el material de la velada…' });
-    const material = await generarMaterialImpreso(game, game.plot, emit);
+    const material = await generador(game, game.plot, emit);
     game.plot.material = material;
     const guardada = await store.saveGame(game);
     emit({ type: 'done', game: guardada });

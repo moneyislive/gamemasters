@@ -275,4 +275,5 @@ export const CLUEDO: ManifiestoDeJuego = {
   trofeos: TROFEOS,
   seccionesDeDosier: DOCUMENT_SECTIONS,
   documentos: PRINTABLE_DOCS,
+  materialDeVelada: true,
 };

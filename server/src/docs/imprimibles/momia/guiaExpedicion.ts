@@ -59,7 +59,19 @@ export function guiaExpedicion(
       return `    <section class="${ronda === 1 ? '' : 'pagina'}">
       <h2>Vigilia ${ronda}</h2>
 
-      <div class="caja caja--almagre junto">
+      ${
+        aCiegas
+          ? `<div class="caja caja--almagre junto">
+        <span class="etiqueta">Pregúntalo antes de abrir</span>
+        <p style="margin:0; font-size:14pt;">
+          Quien prepara te dirá <strong>qué cámara está profanada esta noche</strong>. También
+          sale en tu panel en cuanto abras la vigilia.
+        </p>
+        <p style="margin:2mm 0 0; font-size:11pt;">
+          Anúncialo en voz alta: quien entre ahí sale con un fragmento <em>y con una marca</em>.
+        </p>
+      </div>`
+          : `<div class="caja caja--almagre junto">
         <span class="etiqueta">Anúncialo en voz alta al abrir</span>
         <p style="margin:0; font-size:14pt;">
           Esta noche está profanada <strong>${esc(camara?.name ?? 'una cámara sin nombre')}</strong>.
@@ -67,7 +79,8 @@ export function guiaExpedicion(
         <p style="margin:2mm 0 0; font-size:11pt;">
           Quien entre ahí sale con un fragmento <em>y con una marca</em>. Dilo antes de que nadie elija.
         </p>
-      </div>
+      </div>`
+      }
 
       ${
         narracion
@@ -82,10 +95,17 @@ export function guiaExpedicion(
       </div>`
       }
 
-      <div class="caja junto">
+      ${
+        aCiegas
+          ? `<div class="caja junto">
+        <span class="etiqueta">De esto se encarga quien prepara</span>
+        <p style="margin:0;">Las tiras de esta vigilia ya estarán puestas cuando entres. Ni las colocas tú ni sabes cuáles son.</p>
+      </div>`
+          : `<div class="caja junto">
         <span class="etiqueta">Deja estas tiras antes de empezar</span>
         ${dondeVan ? `<ul style="margin:0;">\n${dondeVan}\n        </ul>` : '<p style="margin:0;"><em>Esta vigilia no reparte fragmentos.</em></p>'}
-      </div>
+      </div>`
+      }
 
       <div class="caja junto">
         <span class="etiqueta">Y entonces, por este orden</span>

@@ -23,6 +23,7 @@ import { getAnthropicClient, resolveModel } from '../agent/anthropic';
 import { numeroDeRondas } from '../docs/datos';
 import { buildStyleBlock } from './style';
 import { culpableDe, lugarDe, objetoDe } from '../juegos/cluedo';
+import { registrarMaterial } from '../juegos/materiales';
 
 type Emitir = (evento: GenerateStreamEvent) => void;
 
@@ -150,6 +151,11 @@ export const MATERIAL_SCHEMA: Record<string, unknown> = {
 // ---------------------------------------------------------------------------
 
 /** Escribe el material impreso de una trama ya validada. */
+/**
+ * ESTE MATERIAL ES DE CLUEDO, y por eso se da de alta a nombre de CLUEDO al
+ * final del fichero. Se lee en el propio pipeline: pide culpable, arma y sala.
+ * Un juego que no tenga esas tres cosas no puede pasar por aquí.
+ */
 export async function generarMaterialImpreso(
   game: GameSession,
   plot: Plot,
@@ -375,3 +381,9 @@ async function materialDemo(game: GameSession, plot: Plot, emit: Emitir): Promis
     generatedAt: new Date().toISOString(),
   };
 }
+
+/*
+ * El alta. Va al final del fichero y no en `instalados.ts` porque lo que se da
+ * de alta es esta función, y así no hay forma de moverla sin ver el registro.
+ */
+registrarMaterial('cluedo', generarMaterialImpreso);

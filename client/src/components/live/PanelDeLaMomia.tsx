@@ -246,7 +246,7 @@ export default function PanelDeLaMomia({
                       )
                     )
                       return;
-                    ejecutar(() => llamar(`/games/${game.id}/live/sellado/ejecutar`));
+                    ejecutar(() => llamar(`/games/${game.id}/live/cierre`));
                   }}
                 >
                   Ejecutar el ritual

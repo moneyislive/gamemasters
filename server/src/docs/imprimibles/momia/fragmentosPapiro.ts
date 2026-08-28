@@ -90,7 +90,16 @@ export function fragmentosPapiro(
           ),
         )
         .join('\n');
+      /*
+       * LA CÁMARA PROFANADA VA AQUÍ, y este es su único sitio cuando se dirige a
+       * ciegas. Antes solo salía en la Guía de la expedición, que es de quien
+       * dirige: eso le daba de antemano la lista entera de cámaras marcadas de
+       * toda la noche, o sea qué habitaciones evitar para amanecer sin una sola
+       * marca. Con el Game Master jugando, es el trofeo «Incorrupto» de regalo.
+       */
+      const profanada = vista.profanadas[ronda - 1];
       return `    <h2>Vigilia ${ronda} <span style="font-family:'EB Garamond',serif; text-transform:none; letter-spacing:0; font-size:11pt; color:#7a5c34;">· ${hallazgos.length} ${hallazgos.length === 1 ? 'tira' : 'tiras'}</span></h2>
+      <p class="maquina" style="margin:0 0 3mm; color:#7a5c34;">Cámara profanada esta vigilia: <strong>${esc(profanada?.name ?? 'ninguna')}</strong> — díselo a quien dirige antes de abrirla.</p>
     <div class="rejilla">
 ${tiras}
     </div>`;

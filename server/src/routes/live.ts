@@ -7,6 +7,7 @@
  */
 import { getStore } from '../db/store';
 import { anunciar, olvidar } from '../live/hub';
+import { ejecutarCierre } from '../juegos/cierres';
 import { cerrarPartidaEnCuentas } from '../live/cuentas';
 import { vistaDeGameMaster } from '../live/proyeccion';
 import {
@@ -248,6 +249,45 @@ router.post('/games/:id/live/sellado', async (req, res) => {
           'Se abre El Sellado. Cinco ritos, un solo orden bueno.',
         ),
     });
+    await responderVista(req.params.id, res);
+  } catch (error) {
+    fallo(error, res);
+  }
+});
+
+/**
+ * Ejecutar el cierre propio del juego. Irreversible a propósito.
+ *
+ * GENÉRICA, aunque hoy solo la use un juego: pregunta al registro de cierres si
+ * este juego tiene uno y lo ejecuta. CLUEDO no declara ninguno y recibe un 409
+ * honesto, que es la garantía de que abrir esta puerta no le da a CLUEDO una
+ * forma nueva de terminar.
+ *
+ * VA DENTRO DE `mutar` Y NO ALREDEDOR: el cierre lee el estado y escribe encima
+ * en el mismo acto. Si se leyera fuera del candado, dos clics seguidos —o un
+ * `ofrendar` colándose en medio— podrían escribir dos veredictos distintos.
+ */
+router.post('/games/:id/live/cierre', async (req, res) => {
+  try {
+    const store = getStore();
+    const game = await store.getGame(req.params.id);
+    if (!game) {
+      res.status(404).json({ error: 'Esta partida no existe.' });
+      return;
+    }
+    /*
+     * El anuncio se guarda al ejecutar y se usa al avisar. `avisar` corre
+     * DESPUÉS del cambio y antes de que `mutar` devuelva, así que no se puede
+     * leer de su valor de retorno: hay que apuntarlo por el camino.
+     */
+    let anuncio = '';
+    await mutar(
+      req.params.id,
+      (s) => {
+        anuncio = ejecutarCierre(game, s).anuncio;
+      },
+      { avisar: (s) => anunciar(req.params.id, s.rev, 'sellado', anuncio) },
+    );
     await responderVista(req.params.id, res);
   } catch (error) {
     fallo(error, res);

@@ -7,7 +7,7 @@
  * distintos, aunque la forma de interactuar sea la misma.
  */
 import { useState } from 'react';
-import { PRINTABLE_DOCS, printableDocsFor } from '../../../../shared/documents';
+import { printableDocsFor } from '../../../../shared/documents';
 import { manifiestoDe } from '../../../../shared/juegos';
 import type { PrintableDocId } from '../../../../shared/documents';
 import { useAppStore } from '../../state/store';
@@ -22,8 +22,21 @@ export default function PrintablePicker(): JSX.Element {
   if (!game) return <div />;
 
   const modo = game.settings.gmPlays === true ? 'blind' : 'host';
-  const disponibles = PRINTABLE_DOCS.filter((doc) => doc.modes.includes(modo));
+  /*
+   * EL CATÁLOGO DEL JUEGO, NO EL DE CLUEDO, Y EN LOS TRES SITIOS.
+   *
+   * Estaba a medias: el catálogo se leía para saber cuáles están ACTIVOS, pero
+   * las fichas que se pintan y el orden en el que se guardan salían de
+   * `PRINTABLE_DOCS`, que son los trece de CLUEDO. En una partida de la Momia el
+   * panel enseñaba «Hojas de investigación» y «Carteles de sala», y al pulsar
+   * cualquiera se guardaba una lista de ids de CLUEDO: el filtro del orden
+   * canónico descartaba entonces TODOS los documentos de la Momia y el ZIP salía
+   * con una hoja. Sin guía, sin tiras de papiro, sin hojas de sellado. Y sin
+   * vuelta atrás desde la interfaz, porque todas las fichas pulsables eran del
+   * catálogo equivocado.
+   */
   const catalogo = manifiestoDe(game.settings?.juego).documentos;
+  const disponibles = catalogo.filter((doc) => doc.modes.includes(modo));
   const activos = new Set(printableDocsFor(game.settings, catalogo).map((d) => d.id));
 
   const guardar = async (ids: PrintableDocId[]): Promise<void> => {
@@ -44,8 +57,8 @@ export default function PrintablePicker(): JSX.Element {
     const siguiente = activos.has(id)
       ? [...activos].filter((x) => x !== id)
       : [...activos, id];
-    // Se guarda en el orden canónico del catálogo, no en el de los clics.
-    const ordenados = PRINTABLE_DOCS.filter((d) => siguiente.includes(d.id)).map((d) => d.id);
+    // Se guarda en el orden canónico del catálogo DEL JUEGO, no en el de los clics.
+    const ordenados = catalogo.filter((d) => siguiente.includes(d.id)).map((d) => d.id);
     void guardar(ordenados);
   };
 

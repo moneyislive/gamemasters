@@ -109,7 +109,7 @@ export default function DocumentsPanel(): JSX.Element {
    * Invitación a escribir el material de la velada. Es la única acción de este
    * panel que consume IA, así que se dice claramente antes de pulsarla.
    */
-  const bloqueMaterial = game.plot ? (
+  const bloqueMaterial = game.plot && manifiestoDe(game.settings?.juego).materialDeVelada ? (
     <section className="deco-frame docs-material">
       <span className="docs-material-glyph" aria-hidden="true">
         {material ? '✒' : '☾'}

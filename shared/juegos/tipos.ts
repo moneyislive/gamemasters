@@ -403,6 +403,26 @@ export interface ManifiestoDeJuego {
   trofeos: TrofeoInfo[];
   seccionesDeDosier: DocumentSectionInfo[];
   documentos: PrintableDocInfo[];
+
+  /**
+   * ¿Este juego tiene «material de velada» que el taller pueda reescribir?
+   *
+   * El material son las narraciones de cada ronda, los giros, las revelaciones
+   * de cronología y el desenlace: texto que se escribe ENCIMA de una trama ya
+   * generada. CLUEDO lo tiene y lo ofrece con un botón; El Misterio de la Momia
+   * lo lleva dentro de su propia trama y no tiene nada que reescribir aparte.
+   *
+   * SIN ESTO, ESE BOTÓN SE PINTABA SIEMPRE. Y pulsarlo en la Momia corría el
+   * pipeline de CLUEDO —que pide culpable, arma y sala— sobre una trama que no
+   * los tiene, sustituyendo las narraciones de vigilia por un asesinato que no
+   * ha ocurrido. Sin aviso y sin deshacer.
+   *
+   * Este campo dice si el botón se pinta; quién escribe de verdad lo dice el
+   * registro de `server/src/juegos/materiales.ts`. Son dos cosas distintas
+   * —una la ve el taller, la otra la ejecuta el servidor— y `verify:puertas`
+   * comprueba que no se separen.
+   */
+  materialDeVelada?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -421,6 +441,36 @@ export function categoriaDeJugadores(m: ManifiestoDeJuego): DefinicionCategoria 
 /** Las categorías que ocupan un sitio del espacio real. */
 export function categoriasDeLugar(m: ManifiestoDeJuego): DefinicionCategoria[] {
   return m.categorias.filter((c) => c.sonLugares);
+}
+
+/**
+ * Con qué acción se acusa en este juego.
+ *
+ * NO ES UN CAMPO NUEVO DEL MANIFIESTO, ES UNA PROPIEDAD QUE YA ERA CIERTA: los
+ * campos que pide la acusación SON los ejes. CLUEDO declara `acusar` con
+ * `culpable`, `objeto` y `lugar`, que son sus tres ejes; la Momia declara
+ * `senalar` con `saqueador`, que es el suyo. Deducirlo en vez de declararlo
+ * evita el fallo que trae siempre declarar dos veces la misma cosa: que una de
+ * las dos se quede vieja.
+ *
+ * LO QUE ARREGLA. La ruta de acusar despachaba el id `'acusar'` escrito a mano.
+ * En la Momia eso no existe, así que los dos botones de «Señalar al saqueador»
+ * —la barra de la vigilia y el panel del Sellado— contestaban «eso no se puede
+ * hacer en esta partida» a todo el mundo y toda la noche. Y arrastraba el
+ * resto: sin acusaciones no hay `winnerId`, no hay trofeo de desenmascarar, y
+ * la plataforma le regalaba «culpable impune» al saqueador siempre.
+ *
+ * Devuelve `undefined` si el juego no tiene ejes —no hay nada que acusar— o si
+ * ninguna acción los cubre, que es un manifiesto mal escrito y lo caza
+ * `verify:manifiestos`.
+ */
+export function accionDeAcusacion(m: ManifiestoDeJuego): DefinicionAccion | undefined {
+  const lista = ejes(m);
+  if (lista.length === 0) return undefined;
+  return m.acciones.find((a) => {
+    const campos = new Set((a.eligeDe ?? []).map((c) => c.campo));
+    return lista.every((e) => campos.has(e.id));
+  });
 }
 
 export function ejes(m: ManifiestoDeJuego): DefinicionEje[] {

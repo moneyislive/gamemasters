@@ -18,6 +18,7 @@ import { firmaDeFotoValida } from '../live/fotos';
 import { vistaDeJugador } from '../live/proyeccion';
 import { guardarNotas, mutar, tocar } from '../live/sesion';
 import { AccionInvalida, ejecutarAccion } from '../juegos/motor';
+import { accionDeAcusacion, manifiestoDe } from '../../../shared/juegos';
 /*
  * El alta de los juegos ya no vive aqui: la hace `juegos/instalados.ts` desde
  * el arranque. Colgarla de esta ruta funcionaba con un solo juego —toda
@@ -340,8 +341,20 @@ router.post('/jugar/acusar', async (req, res) => {
       res.status(404).json({ error: 'Esta partida ya no está en juego.' });
       return;
     }
+    /*
+     * EL ID DE LA ACCIÓN SALE DEL MANIFIESTO, no de una constante escrita aquí.
+     * Estaba cableado a `'acusar'`, que es el nombre que le puso CLUEDO, así
+     * que en El Misterio de la Momia —donde la acción se llama `senalar`— esta
+     * ruta contestaba «eso no se puede hacer en esta partida» a los dos botones
+     * que llevan aquí, para todo el mundo y toda la noche.
+     */
+    const accion = accionDeAcusacion(manifiestoDe(game.settings?.juego));
+    if (!accion) {
+      res.status(409).json({ error: 'En esta partida no se acusa a nadie.' });
+      return;
+    }
     const { resultado } = await mutar(cred.gameId, (s) =>
-      ejecutarAccion(game, s, cred.suspectId, 'acusar', datos),
+      ejecutarAccion(game, s, cred.suspectId, accion.id, datos),
     );
     res.json(resultado);
   } catch (error) {

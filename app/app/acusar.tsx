@@ -19,6 +19,8 @@ import Animated, { FadeIn, FadeInUp } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import * as api from '../src/api';
 import { usePartida } from '../src/estado';
+import { useEsMomia } from '../src/tema-juego';
+import { accionDeAcusacion, manifiestoDe } from '../../shared/juegos';
 import {
   Boton,
   Cargando,
@@ -91,6 +93,7 @@ function Selector({
 
 export default function Acusar(): JSX.Element {
   const { vista, refrescar } = usePartida();
+  const esMomia = useEsMomia();
   const [respuestas, setRespuestas] = useState<Record<string, string>>({});
   const [confirmando, setConfirmando] = useState(false);
   const [enviando, setEnviando] = useState(false);
@@ -123,6 +126,27 @@ export default function Acusar(): JSX.Element {
     }
   };
 
+  /*
+   * LAS PALABRAS SALEN DEL JUEGO, no de CLUEDO.
+   *
+   * Esta pantalla es genérica —recorre los ejes que declare el manifiesto— pero
+   * sus rótulos estaban escritos en el vocabulario de la casa: «Acusación»,
+   * «Acusas a», «Gana quien acierte primero». En El Misterio de la Momia nadie
+   * acusa a nadie de un asesinato: se señala a quien rompió el sello, y acertar
+   * antes no gana nada porque se gana por bandos. Es la pantalla que toca la
+   * mesa entera, así que hablar ahí el idioma del otro juego se nota más que en
+   * ningún otro sitio.
+   *
+   * El rótulo de la acción y el del eje ya vienen del manifiesto; lo único que
+   * hacía falta era dejar de escribir alrededor lo que solo vale para CLUEDO.
+   */
+  const accion = accionDeAcusacion(manifiestoDe(vista?.sesion.juego));
+  const titulo = accion?.rotulo ?? 'Acusación';
+  const verbo = esMomia ? 'Señalas a' : 'Acusas a';
+  const consecuencia = esMomia
+    ? 'No podrás cambiarlo. Se sabrá al amanecer si acertaste.'
+    : 'No podrás cambiarla. Gana quien acierte primero.';
+
   if (confirmando) {
     // El primer eje encabeza —«acusas a Fulano»— y el resto se lee debajo.
     const [primero, ...resto] = ejes;
@@ -138,7 +162,7 @@ export default function Acusar(): JSX.Element {
         <Ornamento />
 
         <Marco tono="peligro">
-          <Etiqueta style={{ color: '#f0c9c0' }}>Acusas a</Etiqueta>
+          <Etiqueta style={{ color: '#f0c9c0' }}>{verbo}</Etiqueta>
           <Titulo style={{ fontSize: 24, marginTop: 4 }}>
             {primero ? nombreElegido(primero.ejeId) : '—'}
           </Titulo>
@@ -157,11 +181,11 @@ export default function Acusar(): JSX.Element {
         <AvisoError>{error}</AvisoError>
 
         <Cuerpo tenue style={{ textAlign: 'center', marginBottom: espacio.md }}>
-          No podrás cambiarla. Gana quien acierte primero.
+          {consecuencia}
         </Cuerpo>
 
         <Boton variante="peligro" onPress={() => void enviar()} cargando={enviando}>
-          Entregar mi acusación
+          {esMomia ? 'Entregarlo' : 'Entregar mi acusación'}
         </Boton>
         <Boton onPress={() => setConfirmando(false)} style={{ marginTop: espacio.sm }}>
           Volver a pensarlo
@@ -174,7 +198,7 @@ export default function Acusar(): JSX.Element {
     <Pantalla barra={false}>
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={{ alignItems: 'center', paddingTop: espacio.md }}>
-          <Sello>Acusación</Sello>
+          <Sello>{titulo}</Sello>
           <Titulo style={{ textAlign: 'center', marginTop: espacio.md, fontSize: 26 }}>
             {ejes.map((e) => e.rotulo).join(', ')}
           </Titulo>
@@ -195,7 +219,7 @@ export default function Acusar(): JSX.Element {
         </Animated.View>
 
         <Boton variante="peligro" onPress={() => setConfirmando(true)} disabled={!completa}>
-          Revisar mi acusación
+          {esMomia ? 'Revisarlo' : 'Revisar mi acusación'}
         </Boton>
         <Boton onPress={() => router.back()} style={{ marginTop: espacio.sm }}>
           Todavía no
