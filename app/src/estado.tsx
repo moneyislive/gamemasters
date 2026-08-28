@@ -138,7 +138,21 @@ export function ProveedorPartida({ children }: { children: React.ReactNode }): J
             aplicarVista(r.vista);
             encolarAvisos(r.avisos);
           }
-          // 204 (sin novedad) o respuesta con datos: en ambos casos se repite.
+          /*
+           * 204 (sin novedad) o respuesta con datos: en ambos casos se repite.
+           *
+           * Y EN AMBOS SE RETIRA EL AVISO DE «SIN CONEXIÓN», que es el arreglo.
+           * Antes solo lo quitaba `aplicarVista`, y esa solo se llama cuando
+           * llega una vista NUEVA. En una partida tranquila —quien dirige aún no
+           * ha abierto la vigilia, nadie ha hecho nada— el sondeo largo contesta
+           * 204 una y otra vez, así que después de un corte de wifi el aviso se
+           * quedaba puesto PARA SIEMPRE: el móvil estaba perfectamente conectado
+           * y seguía diciendo que no.
+           *
+           * Un 204 no es «no ha pasado nada, no sé si hay red»: es el servidor
+           * contestando. Es exactamente la prueba de que hay conexión.
+           */
+          setError(null);
           setCargando(false);
           espera = 2500;
         } catch (e) {
