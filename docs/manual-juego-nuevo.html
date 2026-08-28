@@ -1,0 +1,773 @@
+<title>Cómo se añade un juego</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,300;0,400;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
+
+<style>
+  :root {
+    --fondo: #eceff1;
+    --papel: #f8f9fa;
+    --papel-hondo: #e3e7ea;
+    --tinta: #14181c;
+    --tinta-media: #4a555e;
+    --tinta-tenue: #6e7b85;
+    --filo: #cdd4d9;
+    --filo-suave: #dde2e6;
+
+    /* El acento de ESTE documento es el lapislázuli: se va hacia delante. */
+    --acento: #1f6fa8;
+    --acento-velo: rgba(31, 111, 168, 0.10);
+    /* Y el burdeos queda reservado para lo que muerde. */
+    --aviso: #9b2c3f;
+    --aviso-velo: rgba(155, 44, 63, 0.09);
+    --bien: #2f6b46;
+    --bien-velo: rgba(47, 107, 70, 0.11);
+    --oro: #a8761f;
+
+    --medida: 68ch;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --fondo: #0e1216;
+      --papel: #161c22;
+      --papel-hondo: #1d242b;
+      --tinta: #e6ebef;
+      --tinta-media: #a4b1bb;
+      --tinta-tenue: #7d8b96;
+      --filo: #2b343c;
+      --filo-suave: #222a31;
+      --acento: #77b6e2;
+      --acento-velo: rgba(119, 182, 226, 0.13);
+      --aviso: #e0899a;
+      --aviso-velo: rgba(224, 137, 154, 0.13);
+      --bien: #7cc79a;
+      --bien-velo: rgba(124, 199, 154, 0.14);
+      --oro: #e0b055;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --fondo: #0e1216;
+    --papel: #161c22;
+    --papel-hondo: #1d242b;
+    --tinta: #e6ebef;
+    --tinta-media: #a4b1bb;
+    --tinta-tenue: #7d8b96;
+    --filo: #2b343c;
+    --filo-suave: #222a31;
+    --acento: #77b6e2;
+    --acento-velo: rgba(119, 182, 226, 0.13);
+    --aviso: #e0899a;
+    --aviso-velo: rgba(224, 137, 154, 0.13);
+    --bien: #7cc79a;
+    --bien-velo: rgba(124, 199, 154, 0.14);
+    --oro: #e0b055;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--fondo);
+    color: var(--tinta);
+    font-family: Spectral, Georgia, "Times New Roman", serif;
+    font-size: 17px;
+    line-height: 1.62;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .envoltorio {
+    max-width: 76rem;
+    margin: 0 auto;
+    padding: clamp(2rem, 5vw, 4.5rem) clamp(1.1rem, 4vw, 3rem) 6rem;
+  }
+
+  header { margin-bottom: clamp(2.5rem, 6vw, 3.5rem); }
+
+  .eyebrow {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--tinta-tenue);
+    margin: 0 0 1.1rem;
+  }
+
+  h1 {
+    font-size: clamp(2.3rem, 6.5vw, 3.8rem);
+    font-weight: 700;
+    line-height: 1.04;
+    letter-spacing: -0.022em;
+    margin: 0;
+    text-wrap: balance;
+  }
+
+  .regla {
+    height: 3px;
+    margin: 1.5rem 0 1.4rem;
+    max-width: 22rem;
+    background: var(--acento);
+    border-radius: 2px;
+  }
+
+  .entradilla {
+    font-size: clamp(1.05rem, 2.2vw, 1.22rem);
+    color: var(--tinta-media);
+    max-width: var(--medida);
+    margin: 0;
+    font-style: italic;
+  }
+
+  section { margin-top: clamp(2.8rem, 6vw, 4rem); }
+
+  h2 {
+    font-size: clamp(1.45rem, 3.2vw, 1.95rem);
+    font-weight: 600;
+    letter-spacing: -0.015em;
+    line-height: 1.15;
+    margin: 0 0 1.3rem;
+    text-wrap: balance;
+    padding-top: 1.2rem;
+    border-top: 1px solid var(--filo);
+  }
+
+  h3 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin: 2rem 0 0.7rem;
+    letter-spacing: -0.005em;
+  }
+
+  p, li { max-width: var(--medida); }
+  p { margin: 0 0 1rem; }
+  ul, ol { padding-left: 1.15rem; margin: 0 0 1.1rem; }
+  li { margin-bottom: 0.4rem; }
+  strong { font-weight: 600; }
+
+  code, .mono {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 0.84em;
+    background: var(--papel-hondo);
+    padding: 0.12em 0.38em;
+    border-radius: 3px;
+    word-break: break-word;
+  }
+
+  /* ---- Las etapas del camino ---- */
+
+  .etapa {
+    background: var(--papel);
+    border: 1px solid var(--filo-suave);
+    border-left: 3px solid var(--acento);
+    border-radius: 0 8px 8px 0;
+    padding: 1.4rem 1.5rem;
+    margin-bottom: 1.3rem;
+  }
+  .etapa > h3 { margin-top: 0; display: flex; align-items: baseline; gap: 0.7rem; }
+  .etapa > h3 .n {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 0.78rem;
+    color: var(--acento);
+    font-weight: 600;
+  }
+
+  /* El punto en que ya puedes ver algo funcionando. */
+  .hito {
+    background: var(--bien-velo);
+    border-radius: 6px;
+    padding: 0.75rem 1rem;
+    margin-top: 1.1rem;
+    font-size: 0.92rem;
+    color: var(--tinta-media);
+    max-width: none;
+  }
+  .hito b {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 0.68rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--bien);
+    display: block;
+    margin-bottom: 0.3rem;
+  }
+
+  /* ---- Trampas ---- */
+
+  .trampa {
+    background: var(--aviso-velo);
+    border-left: 3px solid var(--aviso);
+    border-radius: 0 6px 6px 0;
+    padding: 1rem 1.2rem;
+    margin: 1.2rem 0;
+    max-width: var(--medida);
+  }
+  .trampa p:last-child { margin-bottom: 0; }
+  .trampa .rot {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 0.66rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--aviso);
+    display: block;
+    margin-bottom: 0.35rem;
+  }
+
+  /* ---- Tablas ---- */
+
+  .tabla-marco {
+    overflow-x: auto;
+    margin: 1.1rem 0 1.5rem;
+    border: 1px solid var(--filo-suave);
+    border-radius: 7px;
+    background: var(--papel);
+  }
+  table { border-collapse: collapse; width: 100%; font-size: 0.88rem; line-height: 1.5; }
+  th {
+    text-align: left;
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 0.64rem;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+    /* Tinta media y no tenue: a 0.64rem en versalitas, la tenue se quedaba en
+       4.12 sobre el papel claro y AA pide 4.5 para texto pequeno. Medido. */
+    color: var(--tinta-media);
+    font-weight: 600;
+    padding: 0.8rem 0.95rem;
+    border-bottom: 1px solid var(--filo);
+    white-space: nowrap;
+  }
+  td { padding: 0.75rem 0.95rem; border-bottom: 1px solid var(--filo-suave); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  td.libre { min-width: 15rem; }
+  td.ruta { white-space: nowrap; }
+
+  .chip {
+    display: inline-block;
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 0.63rem;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    font-weight: 600;
+    padding: 0.2em 0.55em;
+    border-radius: 3px;
+    white-space: nowrap;
+  }
+  /* Solo hay una: la que marca lo que obliga a tocar codigo comun. Habia otras
+     dos declaradas y sin usar en ninguna parte del documento. */
+  .chip.comun { background: var(--aviso-velo); color: var(--aviso); }
+
+  /* ---- El modelo mental ---- */
+
+  .modelo {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+    gap: 0.9rem;
+    margin: 1.4rem 0 1.6rem;
+  }
+  .pieza {
+    background: var(--papel);
+    border: 1px solid var(--filo-suave);
+    border-radius: 7px;
+    padding: 1.05rem 1.15rem;
+  }
+  .pieza h4 {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 0.67rem;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+    color: var(--acento);
+    margin: 0 0 0.55rem;
+    font-weight: 600;
+  }
+  .pieza p { font-size: 0.9rem; margin: 0; color: var(--tinta-media); max-width: none; }
+
+  pre {
+    background: var(--papel-hondo);
+    border-radius: 6px;
+    padding: 0.9rem 1.1rem;
+    overflow-x: auto;
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 0.8rem;
+    line-height: 1.55;
+    margin: 1rem 0;
+  }
+  pre code { background: none; padding: 0; font-size: 1em; }
+
+  footer {
+    margin-top: clamp(3rem, 7vw, 4.5rem);
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--filo);
+    color: var(--tinta-tenue);
+    font-size: 0.88rem;
+  }
+  footer p { max-width: var(--medida); }
+
+  a { color: var(--acento); text-underline-offset: 0.18em; }
+  :focus-visible { outline: 2px solid var(--oro); outline-offset: 2px; border-radius: 2px; }
+</style>
+
+<div class="envoltorio">
+
+  <header>
+    <p class="eyebrow">Harkania · manual de la plataforma</p>
+    <h1>Cómo se añade un juego</h1>
+    <div class="regla"></div>
+    <p class="entradilla">
+      La organización real del codebase con dos juegos dentro, y el camino
+      completo para escribir el tercero.
+    </p>
+  </header>
+
+  <section>
+    <h2>El modelo mental</h2>
+    <p>
+      Un juego de esta plataforma son <strong>cuatro cosas</strong>, y conviene
+      tenerlas separadas en la cabeza antes de tocar nada, porque el codebase
+      está organizado exactamente así.
+    </p>
+
+    <div class="modelo">
+      <div class="pieza">
+        <h4>1 · El dato</h4>
+        <p>El manifiesto: qué categorías tiene, qué se puede hacer, qué fases hay, qué pestañas salen en el móvil. Es una tabla, no código.</p>
+      </div>
+      <div class="pieza">
+        <h4>2 · Las reglas</h4>
+        <p>Qué pasa cuando alguien hace algo. Funciones que mutan el estado de la partida y que el motor llama sin saber qué hacen.</p>
+      </div>
+      <div class="pieza">
+        <h4>3 · El secreto</h4>
+        <p>Qué ve cada persona de ese estado. Lo decide el juego, no la plataforma: el motor no puede saber qué es secreto en un juego que no conoce.</p>
+      </div>
+      <div class="pieza">
+        <h4>4 · La piel</h4>
+        <p>El tema del taller y de la app, y los documentos que se imprimen. Es lo que hace que se note que estás en otro sitio.</p>
+      </div>
+    </div>
+
+    <p>
+      La regla que gobierna todo el diseño: <strong>la plataforma nunca aprende a
+      qué se juega.</strong> Transporta, persiste y proyecta; las decisiones las
+      toma el juego. Cuando esa regla se rompe —y se rompió muchas veces— el
+      síntoma es siempre el mismo: el juego nuevo se comporta como el viejo, en
+      silencio.
+    </p>
+  </section>
+
+  <section>
+    <h2>El camino</h2>
+    <p>
+      Seis etapas, en orden. Cada una termina en un punto donde
+      <strong>puedes ver algo funcionando</strong>, que es lo que permite parar,
+      comprobar y seguir en vez de escribir treinta ficheros a ciegas.
+    </p>
+    <p>
+      Como referencia viva, El Misterio de la Momia son unos 35 ficheros propios
+      repartidos exactamente por estas seis etapas. Se puede leer entero como
+      ejemplo.
+    </p>
+
+    <div class="etapa">
+      <h3><span class="n">ETAPA 1</span> El juego como dato</h3>
+      <p>
+        Escribes el manifiesto y lo das de alta. Nada de lógica todavía.
+      </p>
+      <div class="tabla-marco">
+        <table>
+          <thead><tr><th>Qué</th><th>Dónde</th><th>Si se olvida</th></tr></thead>
+          <tbody>
+            <tr>
+              <td class="libre">El manifiesto: 13 campos obligatorios y 3 opcionales (<code>ejes</code>, <code>reglas</code>, <code>rotuloCentralDelPlano</code>)</td>
+              <td class="ruta"><code>shared/juegos/&lt;juego&gt;.ts</code></td>
+              <td class="libre">—</td>
+            </tr>
+            <tr>
+              <td class="libre">Tus tipos: el estado en partida y lo que decide la generación</td>
+              <td class="ruta"><code>shared/juegos/&lt;juego&gt;-tipos.ts</code></td>
+              <td class="libre">—</td>
+            </tr>
+            <tr>
+              <td class="libre">El alta: importar, <code>INSTALADOS[X.id] = X</code> y <code>anotarAlmacenes(X)</code> <span class="chip comun">común</span></td>
+              <td class="ruta"><code>shared/juegos/index.ts</code></td>
+              <td class="libre">El catálogo no lo enseña y <code>manifiestoDe</code> cae en CLUEDO</td>
+            </tr>
+            <tr>
+              <td class="libre"><code>almacen</code> en cada categoría que sean personas o lugares</td>
+              <td class="ruta">el manifiesto</td>
+              <td class="libre"><strong>Silencioso:</strong> las entidades se guardan donde nadie las lee. Sin <code>almacen: 'suspects'</code> en la categoría de personas, no hay emparejamiento de móviles, ni dosieres, ni correos</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="hito">
+        <b>Ya se puede ver</b>
+        El juego aparece en el catálogo del taller y se puede crear una partida
+        suya: <code>POST /api/games {name, juego}</code>. Los paneles de sus
+        categorías se pintan solos desde <code>presentacion</code>.
+      </div>
+    </div>
+
+    <div class="etapa">
+      <h3><span class="n">ETAPA 2</span> Las reglas</h3>
+      <p>
+        Qué hace cada acción, qué ve cada persona y qué trofeos se ganan. Tres
+        registros, tres funciones.
+      </p>
+      <pre><code>registrarAcciones('&lt;juego&gt;', { … })   // server/src/juegos/motor.ts
+registrarProyeccion('&lt;juego&gt;', fn)    // server/src/juegos/proyecciones.ts
+registrarTrofeos('&lt;juego&gt;', fn)       // server/src/juegos/trofeos.ts</code></pre>
+      <div class="tabla-marco">
+        <table>
+          <thead><tr><th>Qué</th><th>Dónde</th><th>Si se olvida</th></tr></thead>
+          <tbody>
+            <tr>
+              <td class="libre">Los reductores de tus acciones</td>
+              <td class="ruta"><code>&lt;juego&gt;-acciones.ts</code></td>
+              <td class="libre">«Esta partida todavía no sabe hacer eso»</td>
+            </tr>
+            <tr>
+              <td class="libre">La proyección: qué ve cada persona de tu estado</td>
+              <td class="ruta"><code>&lt;juego&gt;-proyeccion.ts</code></td>
+              <td class="libre">El móvil no recibe nada de tu juego. <strong>Y si proyectas de más, filtras la solución</strong></td>
+            </tr>
+            <tr>
+              <td class="libre">Tus trofeos</td>
+              <td class="ruta">donde quieras, con <code>registrarTrofeos</code></td>
+              <td class="libre"><strong>Silencioso:</strong> declararlos en el manifiesto no basta. Sin el gancho no se concede ninguno</td>
+            </tr>
+            <tr>
+              <td class="libre">Una línea de import por módulo <span class="chip comun">común</span></td>
+              <td class="ruta"><code>server/src/juegos/instalados.ts</code></td>
+              <td class="libre"><strong>El peor:</strong> no falla al arrancar. Falla en la primera partida, en producción, y el verificador del juego pasa en verde porque importa los módulos a mano</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="hito">
+        <b>Ya se puede ver</b>
+        Una partida se juega entera por HTTP: entrar con código, hacer acciones,
+        recibir la vista. Es el momento de escribir el verificador de la velada.
+      </div>
+    </div>
+
+    <div class="etapa">
+      <h3><span class="n">ETAPA 3</span> La trama</h3>
+      <p>
+        Lo que convierte una lista de nombres en una partida. Y aquí está la
+        decisión de diseño más importante que tomarás.
+      </p>
+      <p>
+        <strong>El código compone una partida jugable; el modelo escribe el
+        sabor.</strong> En la Momia, el orden verdadero de los ritos, las
+        restricciones que lo determinan y su reparto los genera código con
+        garantías comprobadas. Al modelo se le pide la redacción, y se
+        <em>valida</em> antes de aceptarla. Si la llamada falla, si el JSON viene
+        truncado o si el modelo redacta mal, la partida sigue siendo jugable.
+      </p>
+      <div class="tabla-marco">
+        <table>
+          <thead><tr><th>Qué</th><th>Dónde</th><th>Obligatorio</th></tr></thead>
+          <tbody>
+            <tr><td class="libre">Los cimientos: lo que decide el código</td><td class="ruta"><code>plot/&lt;juego&gt;-cimientos.ts</code></td><td>sí</td></tr>
+            <tr><td class="libre">El esquema y el prompt para el modelo</td><td class="ruta"><code>plot/&lt;juego&gt;-esquema.ts</code>, <code>-prompt.ts</code></td><td>sí</td></tr>
+            <tr><td class="libre">La validación de lo que devuelve</td><td class="ruta"><code>plot/&lt;juego&gt;-validacion.ts</code></td><td>sí</td></tr>
+            <tr><td class="libre">Una trama de demostración sin IA</td><td class="ruta"><code>plot/&lt;juego&gt;-demo.ts</code></td><td>sí, para poder probar sin gastar tokens</td></tr>
+            <tr><td class="libre">El prompt de tu asistente y sus herramientas</td><td class="ruta"><code>agent/&lt;juego&gt;-*.ts</code></td><td>sí</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="hito">
+        <b>Ya se puede ver</b>
+        El agente del taller ayuda a montar la partida hablando el vocabulario de
+        tu juego, y se puede generar una trama completa.
+      </div>
+    </div>
+
+    <div class="etapa">
+      <h3><span class="n">ETAPA 4</span> La app</h3>
+      <p>
+        La barra de pestañas, los rótulos y el asistente salen del manifiesto sin
+        escribir una línea. Lo que se escribe es el tema y las pantallas propias,
+        si las necesitas.
+      </p>
+      <div class="tabla-marco">
+        <table>
+          <thead><tr><th>Qué</th><th>Dónde</th><th>Nota</th></tr></thead>
+          <tbody>
+            <tr>
+              <td class="libre">Tu paleta</td>
+              <td class="ruta"><code>app/src/tema-&lt;juego&gt;.ts</code></td>
+              <td class="libre">Y una línea en <code>paletaDe()</code> <span class="chip comun">común</span></td>
+            </tr>
+            <tr>
+              <td class="libre">Pantallas propias, si tu mecánica no cabe en las que hay</td>
+              <td class="ruta"><code>app/app/(juego)/&lt;nombre&gt;.tsx</code></td>
+              <td class="libre">Obliga a ampliar <code>PantallaDeApp</code> <span class="chip comun">común</span> y a publicar versión nueva de la app</td>
+            </tr>
+            <tr>
+              <td class="libre">Tus iconos de barra</td>
+              <td class="ruta"><code>app/src/iconos.tsx</code></td>
+              <td class="libre">Ampliar <code>IconoId</code> <span class="chip comun">común</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="hito">
+        <b>Ya se puede ver</b>
+        <code>npx expo export --platform web</code> y la app entera se abre en un
+        navegador, con su tema y sus pantallas. Es la forma más rápida de mirarla
+        sin compilar un APK.
+      </div>
+    </div>
+
+    <div class="etapa">
+      <h3><span class="n">ETAPA 5</span> El taller</h3>
+      <p>
+        Las pestañas de categorías, sus textos, sus glifos y el nombre del
+        asistente salen del manifiesto. Se escribe el tema y los mandos propios
+        para dirigir.
+      </p>
+      <div class="tabla-marco">
+        <table>
+          <thead><tr><th>Qué</th><th>Dónde</th><th>Nota</th></tr></thead>
+          <tbody>
+            <tr>
+              <td class="libre">Tu paleta y tus tipografías</td>
+              <td class="ruta"><code>client/src/styles/temas.css</code></td>
+              <td class="libre">Un bloque <code>:root[data-juego='x']</code>. Las fuentes se cargan bajo demanda desde <code>lib/tema.ts</code></td>
+            </tr>
+            <tr>
+              <td class="libre">El panel para dirigir tu juego en vivo</td>
+              <td class="ruta"><code>client/src/components/live/</code></td>
+              <td class="libre">Lo que quien dirige necesita ver y pulsar</td>
+            </tr>
+            <tr>
+              <td class="libre">La ficha del catálogo</td>
+              <td class="ruta"><code>client/src/pages/CatalogPage.tsx</code></td>
+              <td class="libre">El arte y la paleta de la tarjeta <span class="chip comun">común</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="hito">
+        <b>Ya se puede ver</b>
+        Una partida se prepara y se dirige de principio a fin desde el navegador.
+        <strong>Compruébalo entero</strong>: la lección más cara del proyecto fue
+        retirar un botón de fase y dejar el desenlace sin puerta.
+      </div>
+    </div>
+
+    <div class="etapa">
+      <h3><span class="n">ETAPA 6</span> El papel</h3>
+      <p>
+        Tu juego se tiene que poder jugar sin móviles. No es un extra: es la
+        mitad del producto.
+      </p>
+      <div class="tabla-marco">
+        <table>
+          <thead><tr><th>Qué</th><th>Dónde</th><th>Nota</th></tr></thead>
+          <tbody>
+            <tr>
+              <td class="libre">Tu imprenta: paleta y tipografía de papel</td>
+              <td class="ruta"><code>docs/imprimibles/&lt;juego&gt;/estilo.ts</code></td>
+              <td class="libre">Al lado, no generalizando la de CLUEDO: el maestro de oro compara sus documentos byte a byte</td>
+            </tr>
+            <tr>
+              <td class="libre">Tus documentos</td>
+              <td class="ruta"><code>docs/imprimibles/&lt;juego&gt;/*.ts</code></td>
+              <td class="libre">Declararlos en el manifiesto y ampliar <code>PrintableDocId</code> <span class="chip comun">común</span></td>
+            </tr>
+            <tr>
+              <td class="libre">Enchufar cada plantilla</td>
+              <td class="ruta"><code>docs/imprimibles/index.ts</code></td>
+              <td class="libre">El registro es exhaustivo: si declaras un documento y no lo enchufas, no compila <span class="chip comun">común</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="hito">
+        <b>Ya se puede ver</b>
+        <strong>Imprime uno de verdad.</strong> Los PDF son de lo que más fácil
+        se da por bueno leyendo el código y peor sale en papel: márgenes, cortes
+        de página, cartas que no se recortan bien.
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Lo que heredas gratis</h2>
+    <p>
+      Nada de esto hay que escribirlo, y es aproximadamente la mitad del trabajo
+      de montar un producto como este.
+    </p>
+    <div class="tabla-marco">
+      <table>
+        <thead><tr><th>Qué</th><th>Qué te da</th></tr></thead>
+        <tbody>
+          <tr><td class="libre">El motor de acciones</td><td class="libre">Valida fase, turno, repeticiones y que lo elegido exista de verdad en su categoría. Un móvil manipulado no cuela un id de otra cosa</td></tr>
+          <tr><td class="libre">La maquinaria de acusación</td><td class="libre">Si declaras <code>ejes</code>: una por persona, para toda la partida, no se puede cambiar, y no se dice si acertaste</td></tr>
+          <tr><td class="libre">La barra del móvil</td><td class="libre">Pestañas, rótulos e iconos desde el manifiesto</td></tr>
+          <tr><td class="libre">Los paneles del taller</td><td class="libre">Uno por categoría, con sus textos, ejemplos y sugerencias desde <code>presentacion</code></td></tr>
+          <tr><td class="libre">Toda la plataforma</td><td class="libre">Cuentas, invitaciones, correo, enlaces profundos, subidas, la puerta del taller, el motor de PDF, el bus de eventos en vivo, el despliegue</td></tr>
+          <tr><td class="libre">El plano</td><td class="libre">Si tienes una categoría con <code>sonLugares</code>, hay tablero y chinchetas</td></tr>
+          <tr><td class="libre">La regla de oro</td><td class="libre">El asistente del taller no recibe la solución, y hay una prueba con centinelas que lo vigila</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>Lo que obliga a tocar código común</h2>
+    <p>
+      Esta es la deuda, y conviene verla de un vistazo: son
+      <strong>siete uniones cerradas</strong> y <strong>cuatro puntos de
+      alta</strong>. Ninguna es difícil; lo que cuesta es que un juego no se
+      pueda añadir sin editar ficheros de todos.
+    </p>
+    <div class="tabla-marco">
+      <table>
+        <thead><tr><th>Qué se amplía</th><th>Dónde</th><th>Solo si…</th></tr></thead>
+        <tbody>
+          <tr><td class="ruta"><code>TrofeoId</code></td><td class="ruta"><code>shared/live.ts:293</code></td><td class="libre">siempre</td></tr>
+          <tr><td class="ruta"><code>PrintableDocId</code></td><td class="ruta"><code>shared/documents.ts:14</code></td><td class="libre">siempre</td></tr>
+          <tr><td class="ruta"><code>DocumentSectionId</code></td><td class="ruta"><code>shared/types.ts:283</code></td><td class="libre">siempre</td></tr>
+          <tr><td class="ruta"><code>IconoId</code></td><td class="ruta"><code>shared/juegos/tipos.ts:228</code></td><td class="libre">quieres iconos propios</td></tr>
+          <tr><td class="ruta"><code>PantallaDeApp</code></td><td class="ruta"><code>shared/juegos/tipos.ts:250</code></td><td class="libre">necesitas pantallas propias</td></tr>
+          <tr><td class="ruta"><code>LivePhase</code></td><td class="ruta"><code>shared/live.ts:23</code></td><td class="libre">tu ritmo no cabe en las fases que hay</td></tr>
+          <tr><td class="ruta"><code>AvisoClave</code></td><td class="ruta"><code>shared/live.ts:696</code></td><td class="libre">añadiste una fase</td></tr>
+          <tr><td class="ruta">El registro de juegos</td><td class="ruta"><code>shared/juegos/index.ts</code></td><td class="libre">siempre</td></tr>
+          <tr><td class="ruta">El alta al arrancar</td><td class="ruta"><code>server/src/juegos/instalados.ts</code></td><td class="libre">siempre</td></tr>
+          <tr><td class="ruta">El registro de plantillas</td><td class="ruta"><code>docs/imprimibles/index.ts</code></td><td class="libre">siempre</td></tr>
+          <tr><td class="ruta">La paleta de la app</td><td class="ruta"><code>app/src/tema-juego.ts</code></td><td class="libre">siempre</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>
+      <strong>Un detalle que salva:</strong> las tres primeras y las tres del alta
+      son uniones o registros <em>exhaustivos</em>. Si te olvidas de una,
+      <strong>no compila</strong>. Eso es deuda benigna: molesta, pero te lo dice.
+      Las que hay que vigilar son las otras.
+    </p>
+  </section>
+
+  <section>
+    <h2>Las trampas</h2>
+    <p>
+      Ordenadas por lo caro que sale caer en ellas. Las primeras no fallan al
+      compilar ni al arrancar: fallan la noche de la partida.
+    </p>
+
+    <div class="trampa">
+      <span class="rot">Silencioso · el peor de todos</span>
+      <p>
+        <strong>Olvidar la línea en <code>instalados.ts</code>.</strong> El
+        servidor arranca perfectamente. La primera partida de tu juego contesta
+        «esta partida todavía no sabe hacer eso», que no lleva a ningún sitio. Y
+        tu propio verificador pasa en verde, porque importa los módulos a mano.
+      </p>
+    </div>
+
+    <div class="trampa">
+      <span class="rot">Silencioso</span>
+      <p>
+        <strong>Rellenar el manifiesto y creer que basta.</strong> Cinco campos
+        estuvieron declarados y sin leer por nadie durante meses. Hoy quedan dos:
+        <code>ronda.accionSobre</code> y <code>ronda.cambiosPermitidos</code>
+        <em>siguen sin leerlos nadie</em>. Si tu juego los declara, haz cumplir la
+        regla tú en el reductor.
+      </p>
+    </div>
+
+    <div class="trampa">
+      <span class="rot">Silencioso</span>
+      <p>
+        <strong>Los verificadores de CLUEDO en verde no dicen nada de tu
+        juego.</strong> Una tabla mal declarada tuvo <em>todas</em> las acciones
+        del juego nuevo rechazadas mientras los ocho verificadores del viejo
+        seguían verdes. El maestro de oro solo mira CLUEDO: la velada de punta a
+        punta de tu juego es la única que puede ver esa clase de fallo.
+      </p>
+    </div>
+
+    <div class="trampa">
+      <span class="rot">Se ve tarde</span>
+      <p>
+        <strong>Los jeroglíficos no existen en un móvil.</strong> Cualquier
+        carácter fuera del plano básico Unicode se pinta en Windows y sale como
+        cuadradito en iOS y Android. La vitrina de trofeos se mira en el móvil.
+      </p>
+    </div>
+
+    <div class="trampa">
+      <span class="rot">Se ve tarde</span>
+      <p>
+        <strong>Un <code>StyleSheet.create</code> de módulo congela el color.</strong>
+        Se evalúa al importar, antes de que exista partida, así que cualquier color
+        puesto ahí queda fijado al del juego por defecto para siempre — y no se ve
+        revisando código, porque suele estar escrito como cadena <code>rgba</code>
+        y no como token.
+      </p>
+    </div>
+
+    <div class="trampa">
+      <span class="rot">Cuesta una pantalla</span>
+      <p>
+        <strong>Retirar un mando de fase deja la partida sin salida.</strong> Pasó:
+        se quitó el botón que llevaba a una fase intermedia y el desenlace, que
+        solo se alcanzaba desde ella, se quedó sin puerta. La partida no se podía
+        terminar. Antes de dar por bueno un panel, llévalo de principio a fin.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Cómo se comprueba</h2>
+    <p>
+      La plataforma tiene 23 verificadores. Los que te importan a ti son estos
+      cuatro, y el orden en que se escriben no es indiferente.
+    </p>
+    <div class="tabla-marco">
+      <table>
+        <thead><tr><th>Cuándo</th><th>Qué prueba</th></tr></thead>
+        <tbody>
+          <tr><td class="libre">Al terminar la etapa 2</td><td class="libre">Una velada entera por HTTP, contra el servidor de verdad. Incluye <strong>la regla de oro</strong>: que la solución no viaje al móvil</td></tr>
+          <tr><td class="libre">Al terminar la etapa 3</td><td class="libre">Que la generación produzca partidas jugables, y que lo que devuelve el modelo se valide antes de aceptarlo</td></tr>
+          <tr><td class="libre">Si tu juego tiene un puzle</td><td class="libre">Sus garantías, sobre muchas partidas generadas. No sobre una: una regla probabilística no se prueba con una muestra</td></tr>
+          <tr><td class="libre">Antes de cada commit</td><td class="libre">Que CLUEDO no se ha movido: <code>oro:verificar</code> compara 76 piezas byte a byte</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Dos disciplinas que no son opcionales</h3>
+    <p>
+      <strong>Rompe cada comprobación a propósito antes de fiarte de ella.</strong>
+      En este proyecto han aparecido <em>ocho</em> comprobaciones que pasaban en
+      verde con su regla rota. Una prueba que nunca has visto fallar no demuestra
+      nada.
+    </p>
+    <p>
+      <strong>Verifica y commitea en la misma orden.</strong>
+      <code>verificar &amp;&amp; git add &amp;&amp; git commit</code>. Una
+      comprobación en verde solo dice algo del árbol que había cuando corrió.
+    </p>
+
+    <h3>Y una que no se puede automatizar</h3>
+    <p>
+      <strong>Juega.</strong> Levanta la partida y juégala veinte minutos. Hay
+      averías que ninguna aserción va a cazar porque son de diseño y no de
+      corrección: una cronología pública que revelaba de más era correcta por
+      todos los contratos, arruinaba la decisión central del juego y dejaba un
+      poder sin sentido. La encontró jugar, no comprobar.
+    </p>
+  </section>
+
+  <footer>
+    <p>
+      Estado del repositorio con CLUEDO y El Misterio de la Momia instalados. El
+      informe de arquitectura «De un juego a muchos» cuenta la otra mitad: qué
+      costó llegar hasta aquí y qué queda por generalizar.
+    </p>
+  </footer>
+
+</div>
