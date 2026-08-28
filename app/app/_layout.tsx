@@ -25,7 +25,6 @@ import {
 import { ProveedorPartida } from '../src/estado';
 import { TelonDeAvisos } from '../src/avisos';
 import { FranjaDeConexion } from '../src/conexion';
-import { color } from '../src/tema';
 import { useTema } from '../src/tema-juego';
 
 void SplashScreen.preventAutoHideAsync();
@@ -101,26 +100,26 @@ function PilaDePantallas(): JSX.Element {
         animation: 'fade',
       }}
     >
-            <Stack.Screen name="index" />
-            <Stack.Screen name="entrar" />
-            <Stack.Screen
-              name="avatar"
-              options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
-            />
-            <Stack.Screen
-              name="cuenta"
-              options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
-            />
-            <Stack.Screen name="(juego)" />
-            <Stack.Screen
-              name="acusar"
-              options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
-            />
-            <Stack.Screen
-              name="consejero"
-              options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
-            />
-            <Stack.Screen name="desenlace" options={{ animation: 'fade' }} />
+      <Stack.Screen name="index" />
+      <Stack.Screen name="entrar" />
+      <Stack.Screen
+        name="avatar"
+        options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+      />
+      <Stack.Screen
+        name="cuenta"
+        options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+      />
+      <Stack.Screen name="(juego)" />
+      <Stack.Screen
+        name="acusar"
+        options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+      />
+      <Stack.Screen
+        name="consejero"
+        options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+      />
+      <Stack.Screen name="desenlace" options={{ animation: 'fade' }} />
     </Stack>
   );
 }

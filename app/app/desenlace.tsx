@@ -28,7 +28,7 @@ import {
   espacio,
   radio,
 } from '../src/ui';
-import { useTema } from '../src/tema-juego';
+import { conAlfa, useTema } from '../src/tema-juego';
 
 export default function Desenlace(): JSX.Element {
   const { vista } = usePartida();
@@ -139,8 +139,20 @@ export default function Desenlace(): JSX.Element {
 
       {paso >= 3 && (
         <Animated.View entering={FadeInUp.duration(600)}>
+          {/*
+            El resalte de quien gana va EN LÍNEA y no en la hoja de estilos: la
+            hoja se construye al importar el módulo, que es antes de que exista
+            ninguna partida, así que ahí no se puede saber a qué se juega. Era el
+            oro de CLUEDO enmarcando al ganador de cualquier juego.
+          */}
           {fin.ganador ? (
-            <Marco style={gane ? estilos.marcoGanador : undefined}>
+            <Marco
+              style={
+                gane
+                  ? { borderColor: t.oro300, backgroundColor: conAlfa(t.oro500, 0.14) }
+                  : undefined
+              }
+            >
               <Etiqueta style={{ textAlign: 'center' }}>
                 {gane ? 'Lo resolviste tú' : 'Lo resolvió'}
               </Etiqueta>
@@ -212,10 +224,6 @@ export default function Desenlace(): JSX.Element {
 }
 
 const estilos = StyleSheet.create({
-  marcoGanador: {
-    borderColor: color.oro300,
-    backgroundColor: 'rgba(201,162,39,0.14)',
-  },
   fila: {
     flexDirection: 'row',
     alignItems: 'center',

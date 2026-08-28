@@ -73,7 +73,14 @@ function Selector({
               }}
               style={({ pressed }) => [
                 estilos.opcion,
-                activo && estilos.opcionActiva,
+                /*
+                 * El resalte de lo elegido va EN LÍNEA y no en la hoja de
+                 * estilos: una hoja se construye al importar el módulo, que es
+                 * antes de que exista ninguna partida, así que ahí no se puede
+                 * saber a qué se juega. Era el oro de CLUEDO sobre la opción
+                 * marcada, en la pantalla en la que la mesa entera señala.
+                 */
+                activo && { backgroundColor: t.oro400, borderColor: t.oro300 },
                 pressed && { opacity: 0.8 },
               ]}
             >
@@ -242,9 +249,5 @@ const estilos = StyleSheet.create({
     borderRadius: radio.md,
     paddingVertical: 10,
     paddingHorizontal: espacio.md,
-  },
-  opcionActiva: {
-    backgroundColor: color.oro400,
-    borderColor: color.oro300,
   },
 });
