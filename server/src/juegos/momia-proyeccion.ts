@@ -35,6 +35,7 @@ import { selladoDe, trofeosDe } from './momia-sellado';
 // Por la puerta principal, igual que en `momia-trama.ts` y por lo mismo.
 import { entidadesDe, nombreDeEntidad } from '../../../shared/juegos';
 import { MARCAS_PARA_TOCADO } from '../../../shared/juegos/momia-tipos';
+import type { Restriccion } from '../../../shared/juegos/momia-tipos';
 import type { GameSession } from '../../../shared/types';
 import type { LiveSession } from '../../../shared/live';
 
@@ -46,6 +47,26 @@ export interface FragmentoVisto {
   publico: boolean;
   /** Quién lo puso sobre la mesa, si alguien lo hizo. */
   publicadoPor?: string;
+  /**
+   * La restricción, en datos.
+   *
+   * POR QUÉ NO ES UNA FUGA, que es la pregunta que hay que hacerse antes de
+   * añadir cualquier cosa a esta vista: `texto` YA dice exactamente esto, solo
+   * que en prosa de papiro —«el Rito del Agua precede al del Aliento»— y la
+   * generación valida que la frase y la restricción digan lo mismo. Mandar la
+   * forma estructurada no añade ni un dato que no estuviera ya viajando.
+   *
+   * Lo secreto de un fragmento es `falso`, no lo que afirma. Y `falso` sigue
+   * saliendo solo en el desenlace.
+   *
+   * POR QUÉ HACE FALTA: sin ella, la app tendría que volver a parsear la prosa
+   * para saber qué casilla tachar, que es justo lo que el diseño prohíbe —la
+   * lógica la garantiza el código, no la interpretación de un texto—. Mientras
+   * no llegaba, la pantalla del papiro ocultaba su tablero entero: un tablero en
+   * blanco no se lee como «todavía no» sino como «no hay nada descartado», que
+   * es mentira y de las que hacen perder una partida.
+   */
+  restriccion: Restriccion;
   /** Solo en el desenlace: si era mentira. Antes, nunca. */
   falso?: boolean;
 }
@@ -141,6 +162,7 @@ export function vistaMomiaDe(
     return {
       id: f.id,
       texto: f.texto,
+      restriccion: f.restriccion,
       publico: f.publico,
       ...(f.publicadoPor ? { publicadoPor: f.publicadoPor } : {}),
       ...(terminada ? { falso: f.falso } : {}),

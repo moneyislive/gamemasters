@@ -55,6 +55,8 @@ import { camaraProfanada, generarTramaMomia, estadoInicial, tramaDe } from '../s
 import { entrarEnCamara, invocarDon, ofrendarAmuleto, proponerOrden } from '../src/juegos/momia-acciones';
 import { ejecutarSellado, resolverSellado, selladoDe, trofeosDe } from '../src/juegos/momia-sellado';
 import { vistaMomiaDe } from '../src/juegos/momia-proyeccion';
+import { solucionesDe } from '../../shared/juegos/momia-tipos';
+import type { Restriccion } from '../../shared/juegos/momia-tipos';
 import { trofeosDelJuego } from '../src/juegos/trofeos';
 import { MARCAS_PARA_TOCADO } from '../../shared/juegos/momia-tipos';
 import type { TramaMomia } from '../../shared/juegos/momia-tipos';
@@ -220,8 +222,24 @@ async function esperarServidor(): Promise<void> {
 // La regla de oro
 // ---------------------------------------------------------------------------
 
-/** Las claves que no pueden aparecer NUNCA en el JSON que recibe el móvil. */
-const PROHIBIDAS = ['ordenVerdadero', 'falso', 'falsasCandidatas', 'restriccion', 'restricciones'];
+/**
+ * Las claves que no pueden aparecer NUNCA en el JSON que recibe el móvil.
+ *
+ * `restriccion` ESTUVO EN ESTA LISTA Y SE HA SACADO, con motivo. Prohibirla era
+ * vigilar la FORMA de los datos, y la forma nunca fue el peligro: `texto` dice
+ * exactamente lo mismo en prosa —la generación valida que coincidan— así que
+ * esconder la estructura no escondía nada, y a cambio dejaba oculto el tablero
+ * del papiro en la app, que es una pantalla entera.
+ *
+ * Lo que sí importa se comprueba ahora abajo y de verdad: se corre el resolutor
+ * sobre TODO lo que cada persona ve y se exige que le queden varios órdenes
+ * posibles. Esa comprobación seguiría cazando la fuga aunque los fragmentos
+ * viajaran en prosa; esta lista, no.
+ *
+ * Las cuatro que quedan sí son secreto puro: no hay ninguna forma de deducirlas
+ * de lo que ya viaja.
+ */
+const PROHIBIDAS = ['ordenVerdadero', 'falso', 'falsasCandidatas', 'restricciones'];
 
 /**
  * Busca fugas en lo que se le manda a una persona.
@@ -557,11 +575,61 @@ async function jugarPorElCable(): Promise<void> {
     misFragmentos.every((f) => typeof f.texto === 'string' && f.texto.length > 15),
     misFragmentos,
   );
+  /*
+   * AQUI HABIA UNA COMPROBACION QUE VIGILABA UN PROXY, y se ha cambiado por la
+   * que vigila la propiedad de verdad. Merece la pena contarlo entero.
+   *
+   * Decia: «y sin la restriccion en crudo, que se resolveria con un resolutor»,
+   * y comprobaba que la palabra `tipo` no apareciera en los fragmentos. El
+   * miedo era razonable —con las restricciones en datos, `solucionesDe` esta a
+   * un import y son 120 permutaciones— pero el proxy no era el peligro.
+   *
+   * Dos razones para cambiarlo:
+   *
+   * 1. NO ESCONDIA NADA. `texto` ya dice exactamente lo que dice la
+   *    restriccion, solo que en prosa, y la generacion valida que las dos digan
+   *    lo mismo. Quien quisiera alimentar un resolutor podia transcribir diez
+   *    frases a mano en dos minutos — que es, literalmente, lo que hace
+   *    cualquiera con la hoja impresa y un boli.
+   *
+   * 2. COSTABA UNA PANTALLA ENTERA. Sin la restriccion en datos, la app tendria
+   *    que volver a parsear la prosa para saber que casilla tachar —justo lo que
+   *    el diseno prohibe— asi que el tablero del papiro se quedaba oculto. Y un
+   *    tablero en blanco no se lee como «todavia no»: se lee como «no hay nada
+   *    descartado», que es mentira y de las que hacen perder una partida.
+   *
+   * LA PROPIEDAD QUE DE VERDAD IMPORTA no es «que forma tienen los datos» sino
+   * «¿puede alguien resolver el sellado con lo que ve?». Eso es la garantia 3
+   * del diseno, y ahora se comprueba sobre lo PROYECTADO en vez de suponerse:
+   * se corre el resolutor de verdad sobre todo lo que cada persona tiene
+   * delante, y tiene que quedarle mas de un orden posible.
+   *
+   * Es mas fuerte que el proxy: seguiria fallando aunque los fragmentos
+   * viajaran en prosa, si alguien acumulara bastantes.
+   */
   comprobar(
-    'y sin la restricción en crudo, que se resolvería con un resolutor',
-    !JSON.stringify(misFragmentos).includes('tipo'),
+    'los fragmentos llegan con su restricción en datos, para poder tachar',
+    misFragmentos.every((f) => Boolean((f as { restriccion?: unknown }).restriccion)),
     misFragmentos,
   );
+
+  for (const id of Object.keys(testigos)) {
+    const suya = await vista(id);
+    const est = estadoDe(suya);
+    const visibles: Restriccion[] = [
+      ...(est.yo.fragmentos as Array<{ restriccion: Restriccion }>),
+      ...(est.papiro as Array<{ restriccion: Restriccion }>),
+    ].map((f) => f.restriccion);
+    const posibles = solucionesDe(
+      trama.ordenVerdadero,
+      visibles,
+    );
+    comprobar(
+      `a ${id} le quedan varios órdenes posibles con lo que ve`,
+      posibles.length > 1,
+      { fragmentos: visibles.length, ordenes: posibles.length },
+    );
+  }
 
   paso('Invocar el don');
   /*
