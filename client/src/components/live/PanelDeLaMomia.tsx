@@ -68,7 +68,13 @@ export default function PanelDeLaMomia({
 }: PropsDeMandosPropios): JSX.Element {
   const { sesion } = vista;
   const estado = estadoDe(vista);
+  /*
+   * «La vigilia» es de cuando se explora. En el sellado ya no se entra en
+   * ninguna cámara, así que la tarjeta que dice «anúnciala en voz alta al abrir
+   * la vigilia» seguía ahí mandando hacer algo que ya no toca.
+   */
   const enJuego = sesion.phase !== 'lobby' && sesion.phase !== 'desenlace';
+  const enVigilia = enJuego && sesion.phase !== 'sellado';
 
   /** El nombre de un rito o de una cámara, por su id. */
   const nombreDe = (categoria: string, id: string): string =>
@@ -109,8 +115,16 @@ export default function PanelDeLaMomia({
    * depende la decisión de quien dirige —abrir el sellado o dar otra vigilia—,
    * y porque después de ejecutarlo ya no sirve de nada saberlo.
    */
+  /*
+   * A CIEGAS EL RECUENTO NO SE PINTA, porque saber qué orden ha entregado cada
+   * cual —y cuál va ganando— es la mitad de la partida. Se reconoce porque las
+   * propuestas llegan marcadas como reservadas: llegan sus CLAVES, para saber
+   * cuántas hay y poder ejecutar el ritual, pero sin el orden dentro.
+   */
+  const reservadas = propuestas.some(([, p]) => (p as { reservada?: boolean }).reservada);
+
   const recuento = new Map<string, { orden: string[]; apoyos: string[] }>();
-  for (const [suspectId, propuesta] of propuestas) {
+  for (const [suspectId, propuesta] of reservadas ? [] : propuestas) {
     if (gente[suspectId]?.tocado) continue;
     const clave = propuesta.orden.join('>');
     const previo = recuento.get(clave);
@@ -128,7 +142,7 @@ export default function PanelDeLaMomia({
   return (
     <>
       {/* ---- La vigilia: qué cámara está profanada ---- */}
-      {enJuego && (
+      {enVigilia && (
         <section className="deco-frame live-momia">
           <h3 className="live-titulo">La vigilia {sesion.round}</h3>
           {profanada ? (

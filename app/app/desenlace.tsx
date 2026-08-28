@@ -28,10 +28,12 @@ import {
   espacio,
   radio,
 } from '../src/ui';
+import { useTema } from '../src/tema-juego';
 
 export default function Desenlace(): JSX.Element {
   const { vista } = usePartida();
   const [paso, setPaso] = useState(0);
+  const t = useTema();
 
   /*
    * LA MOMIA TIENE SU PROPIA PANTALLA, y se desvía aquí por el mismo sitio y
@@ -100,7 +102,7 @@ export default function Desenlace(): JSX.Element {
             </Cuerpo>
           )}
           {eraYo && (
-            <Cuerpo style={{ textAlign: 'center', marginTop: espacio.md, color: color.oro300 }}>
+            <Cuerpo style={{ textAlign: 'center', marginTop: espacio.md, color: t.oro300 }}>
               Eras tú. {fin.ganador ? 'Te pillaron.' : 'Y nadie te descubrió.'}
             </Cuerpo>
           )}
@@ -111,14 +113,14 @@ export default function Desenlace(): JSX.Element {
         <>
           <Animated.View entering={FadeInUp.duration(600)}>
             <Marco tono="papel">
-              <Etiqueta style={{ color: color.burdeos700 }}>El motivo</Etiqueta>
-              <Cuerpo style={{ color: color.caoba700, marginTop: espacio.sm }}>{fin.motive}</Cuerpo>
+              <Etiqueta style={{ color: t.burdeos700 }}>El motivo</Etiqueta>
+              <Cuerpo style={{ color: t.caoba700, marginTop: espacio.sm }}>{fin.motive}</Cuerpo>
             </Marco>
           </Animated.View>
           <Animated.View entering={FadeInUp.delay(140).duration(600)}>
             <Marco tono="papel">
-              <Etiqueta style={{ color: color.burdeos700 }}>Cómo ocurrió</Etiqueta>
-              <Cuerpo style={{ color: color.caoba700, marginTop: espacio.sm }}>
+              <Etiqueta style={{ color: t.burdeos700 }}>Cómo ocurrió</Etiqueta>
+              <Cuerpo style={{ color: t.caoba700, marginTop: espacio.sm }}>
                 {fin.reconstruccion}
               </Cuerpo>
             </Marco>
@@ -161,7 +163,7 @@ export default function Desenlace(): JSX.Element {
               <Cuerpo style={{ flex: 1, fontSize: 17 }}>{c.displayName}</Cuerpo>
               <Cuerpo
                 style={{
-                  color: c.acerto ? color.oro300 : color.pergaminoTenue,
+                  color: c.acerto ? t.oro300 : t.pergaminoTenue,
                   fontFamily: 'Cinzel_600SemiBold',
                   fontSize: 15,
                 }}
@@ -181,8 +183,8 @@ export default function Desenlace(): JSX.Element {
             <>
               <Ornamento />
               <Marco tono="papel">
-                <Etiqueta style={{ color: color.burdeos700 }}>Epílogo</Etiqueta>
-                <Cuerpo style={{ color: color.caoba700, marginTop: espacio.sm }}>
+                <Etiqueta style={{ color: t.burdeos700 }}>Epílogo</Etiqueta>
+                <Cuerpo style={{ color: t.caoba700, marginTop: espacio.sm }}>
                   {fin.epilogo}
                 </Cuerpo>
               </Marco>

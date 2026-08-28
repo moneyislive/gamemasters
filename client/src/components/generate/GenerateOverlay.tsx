@@ -14,6 +14,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import type { GenerateStreamEvent } from '../../../../shared/types';
 import { generateGame, generateMaterial, refreshGame } from '../../api/client';
 import { useAppStore } from '../../state/store';
+import { manifiestoDe } from '../../../../shared/juegos';
 import './generate.css';
 
 /* =====================================================================
@@ -240,18 +241,35 @@ export default function GenerateOverlay(): JSX.Element {
   const generating = useAppStore((s) => s.generating);
   const stage = useAppStore((s) => s.generationStage);
   const log = useAppStore((s) => s.generationLog);
+  const juego = useAppStore((s) => s.game?.settings?.juego);
   const modo = useSyncExternalStore(suscribirModo, leerModo, leerModo);
   const [frase, setFrase] = useState(0);
   const logRef = useRef<HTMLDivElement>(null);
 
-  const textos = TEXTOS[modo];
+  /*
+   * LAS FRASES SON DEL JUEGO. Son sesenta segundos a pantalla completa y es la
+   * primera vez que quien organiza ve de qué va su partida: «el mayordomo
+   * repasa las coartadas» salía igual montando una expedición a una tumba.
+   * Lo demás del texto —el rótulo, la etapa— es de la plataforma y no cambia.
+   */
+  const suyas = manifiestoDe(juego).ceremonia;
+  const base = TEXTOS[modo];
+  const textos = {
+    ...base,
+    frases:
+      modo === 'generar'
+        ? (suyas?.generar ?? base.frases)
+        : modo === 'actualizar'
+          ? (suyas?.actualizar ?? base.frases)
+          : base.frases,
+  };
   const frases = textos.frases;
 
   // Rotación de frases ambientales
   useEffect(() => {
     if (!generating) return;
     setFrase(0);
-    const total = TEXTOS[modo].frases.length;
+    const total = textos.frases.length;
     const id = window.setInterval(() => setFrase((n) => (n + 1) % total), 4200);
     return () => window.clearInterval(id);
   }, [generating, modo]);

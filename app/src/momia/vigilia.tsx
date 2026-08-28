@@ -66,9 +66,33 @@ import type { SalaVista, VistaJugador } from '../../../shared/live';
 /** Lo que la barra de señalar ocupa por encima de las pestañas. */
 const ALTO_SENALAR = 78;
 
+
+/**
+ * Lo que se cuenta después de entrar en una cámara.
+ *
+ * El servidor devuelve cuántos fragmentos había y si la cámara estaba
+ * profanada, y la pantalla lo tiraba: entrar era la decisión más cara de la
+ * vigilia y no daba ninguna respuesta. Se lee con cuidado porque viene de la
+ * red: cualquier forma rara se traduce a «no ha pasado nada que contar».
+ */
+function leerLoEncontrado(crudo: unknown): string | null {
+  if (typeof crudo !== 'object' || crudo === null) return null;
+  const r = crudo as { fragmentos?: unknown; profanada?: unknown };
+  const cuantos = Array.isArray(r.fragmentos) ? r.fragmentos.length : 0;
+  const marcado = r.profanada === true;
+  if (cuantos === 0 && !marcado) return 'Esa cámara estaba vacía.';
+  const trozos: string[] = [];
+  if (cuantos === 1) trozos.push('Sales con un fragmento');
+  else if (cuantos > 1) trozos.push(`Sales con ${cuantos} fragmentos`);
+  if (marcado) trozos.push(trozos.length > 0 ? 'y con una marca' : 'Sales con una marca');
+  return `${trozos.join(' ')}.`;
+}
+
 export function Vigilia(): JSX.Element {
   const { vista, cargando, error, aplicarVista } = usePartida();
   const [entrando, setEntrando] = useState<string | null>(null);
+  /** Lo que has sacado de la cámara, para decirlo donde acabas de pulsar. */
+  const [loQueSaqué, setLoQueSaqué] = useState<string | null>(null);
   const [errorCamara, setErrorCamara] = useState<string | null>(null);
   const [avisando, setAvisando] = useState(false);
 
@@ -117,6 +141,15 @@ export function Vigilia(): JSX.Element {
         ? await api.hacerAccion('explorar', { camara: camara.id })
         : await api.elegirSala(camara.id);
       aplicarVista(r.vista);
+      /*
+       * CON QUÉ HAS SALIDO, dicho aquí mismo. El servidor lo devuelve —cuántos
+       * fragmentos y si la cámara estaba profanada— y se tiraba a la basura, así
+       * que entrar en una cámara no daba ninguna respuesta: había que irse a la
+       * pestaña del Papiro a ver si había algo nuevo. Es el momento de la
+       * vigilia en el que más se juega uno algo, y era el más callado.
+       */
+      const salida = 'resultado' in r ? (r as { resultado?: unknown }).resultado : undefined;
+      setLoQueSaqué(leerLoEncontrado(salida));
       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     } catch (e) {
       setErrorCamara(e instanceof Error ? e.message : 'No se pudo entrar en esa cámara.');
@@ -292,6 +325,18 @@ export function Vigilia(): JSX.Element {
         )}
 
         <AvisoError>{errorCamara}</AvisoError>
+
+        {/* Con qué has salido, dicho donde acabas de pulsar y no en otra pestaña. */}
+        {loQueSaqué && miSala && (
+          <Animated.View entering={FadeInDown.duration(400)}>
+            <Marco style={estilos.loQueSaque}>
+              <Cuerpo style={{ fontSize: 16 }}>{loQueSaqué}</Cuerpo>
+              <Cuerpo tenue style={{ fontSize: 13.5, marginTop: 2 }}>
+                Lo tienes en el Papiro. Nadie sabe qué te ha tocado.
+              </Cuerpo>
+            </Marco>
+          </Animated.View>
+        )}
 
         {abierta ? (
           <>
@@ -869,6 +914,12 @@ const estilos = StyleSheet.create({
     borderColor: MOMIA.profanada,
     backgroundColor: conAlfa(MOMIA.profanada, 0.14),
   },
+  /* Lo que sacas de la cámara: discreto, es un dato, no una alarma. */
+  loQueSaque: {
+    borderColor: conAlfa(MOMIA.fayenza, 0.55),
+    backgroundColor: conAlfa(MOMIA.fayenza, 0.1),
+  },
+
   /* Los dos dones del saqueador, uno al lado del otro. */
   dones: { flexDirection: 'row', flexWrap: 'wrap', gap: espacio.sm, marginTop: espacio.sm },
   donOpcion: {

@@ -437,6 +437,59 @@ async function probar(): Promise<void> {
       'en modo anfitrión el estado sigue llegando entero',
       JSON.stringify(normal.datos).includes('"ordenVerdadero"'),
     );
+
+    /*
+     * NI LAS ACUSACIONES, que son la otra mitad de la solución: una sola con
+     * `correcta: true` y su `respuestas.saqueador` es quien rompió el sello,
+     * entregado al navegador de quien está jugando.
+     */
+    const testigoCiego = await entrar('CIEGAS', 'CIEG0A');
+    const senalado = await pedir('/jugar/acusar', {
+      metodo: 'POST',
+      testigo: testigoCiego,
+      cuerpo: { respuestas: { saqueador: 'e3' } },
+    });
+    comprobar('se puede señalar en la partida a ciegas', senalado.estado === 200, senalado.datos);
+
+    const tras = await pedir('/games/aciegas/live');
+    const conAcusacion = JSON.stringify(tras.datos);
+    comprobar('quien dirige ve QUE se ha señalado', conAcusacion.includes('"acusaciones"'));
+    comprobar('pero no A QUIÉN', !conAcusacion.includes('"saqueador":"e3"'), conAcusacion.slice(0, 300));
+    comprobar('ni si acertó', !conAcusacion.includes('"correcta":true'));
+
+    /*
+     * Y EL PUESTO DE MANDO TIENE QUE SEGUIR SIENDO USABLE. Filtrar de más lo
+     * dejó sin poder terminar la partida: el botón de ejecutar el ritual se
+     * desactiva cuando no llega ninguna propuesta, y era la única forma de
+     * cerrar la noche. Un filtro que impide acabar la velada es peor que el
+     * dato que escondía.
+     */
+    const conPropuesta = await pedir('/jugar/accion', {
+      metodo: 'POST',
+      testigo: testigoCiego,
+      cuerpo: { accion: 'proponer-orden', datos: { orden: ['t0', 't1', 't2', 't3', 't4'] } },
+    });
+    comprobar('se puede proponer orden a ciegas', conPropuesta.estado === 200, conPropuesta.datos);
+
+    const conMando = await pedir('/games/aciegas/live');
+    const estadoCiego = (conMando.datos?.sesion?.estado as { momia?: Record<string, never> })?.momia as
+      | { propuestas?: Record<string, { orden: string[] }>; fragmentos?: Record<string, unknown> }
+      | undefined;
+    comprobar(
+      'quien dirige sabe CUÁNTAS propuestas hay',
+      Object.keys(estadoCiego?.propuestas ?? {}).length === 1,
+      estadoCiego?.propuestas,
+    );
+    comprobar(
+      'pero no QUÉ orden lleva ninguna',
+      Object.values(estadoCiego?.propuestas ?? {}).every((p) => p.orden.length === 0),
+      estadoCiego?.propuestas,
+    );
+    comprobar(
+      'y el recuento de fragmentos no miente',
+      Object.keys(estadoCiego?.fragmentos ?? {}).length > 1,
+      Object.keys(estadoCiego?.fragmentos ?? {}).length,
+    );
   }
 
   // -------------------------------------------------------------------------

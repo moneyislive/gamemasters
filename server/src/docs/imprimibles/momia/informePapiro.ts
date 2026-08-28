@@ -52,6 +52,12 @@ export function informePapiro(
   if (!vista.hay || !vista.trama || !vista.informe) return sinTrama('Informe del papiro', opciones);
 
   const { trama, informe } = vista;
+  /*
+   * Lo que hubo que corregirle al modelo. Se guarda con la trama desde que dejó
+   * de morir en la consola del servidor; una partida generada antes no lo trae,
+   * y entonces esta sección simplemente no sale.
+   */
+  const revision = (trama as { revision?: { incidencias: Array<{ donde: string; motivo: string }>; aceptadas: number; total: number } }).revision;
   const permutaciones = factorial(vista.ritos.length);
 
   const comprobaciones: Comprobacion[] = [
@@ -167,6 +173,29 @@ ${veredicto}
 ${comprobaciones.map(fila).join('\n')}
       </tbody>
     </table>
+
+    ${
+      revision
+        ? `<h2>Lo que hubo que corregirle a quien escribió</h2>
+    <p>
+      El modelo escribió ${revision.total} fragmentos y se aceptaron ${revision.aceptadas} tal cual.
+      ${
+        revision.incidencias.length === 0
+          ? 'No hubo que sustituir nada más.'
+          : `Se sustituyeron ${revision.incidencias.length} textos porque decían algo que no puede leerse en la mesa:`
+      }
+    </p>
+    ${
+      revision.incidencias.length > 0
+        ? `<table>
+      <tbody>
+${revision.incidencias.map((i) => `        <tr><td style="width:52mm;">${esc(i.donde)}</td><td>${esc(i.motivo)}</td></tr>`).join(String.fromCharCode(10))}
+      </tbody>
+    </table>`
+        : ''
+    }`
+        : ''
+    }
 
     <h2>Cómo queda repartida la noche</h2>
     <table>

@@ -301,5 +301,25 @@ export const CLUEDO: ManifiestoDeJuego = {
   trofeos: TROFEOS,
   seccionesDeDosier: DOCUMENT_SECTIONS,
   documentos: PRINTABLE_DOCS,
+  ceremonia: {
+    generar: [
+      'El mayordomo repasa las coartadas…',
+      'Se afilan los motivos…',
+      'Alguien miente, y lo hace muy bien…',
+      'Se apagan las luces del pasillo…',
+      'Una copa cae en la sala contigua…',
+      'Los relojes de la casa se sincronizan…',
+      'Se lacra el sobre del crimen…',
+    ],
+    actualizar: [
+      'El mayordomo coteja la lista de invitados…',
+      'Se corrigen las coartadas que ya no encajan…',
+      'Se retiran de la mesa los nombres que ya no juegan…',
+      'Los recién llegados reciben su papel…',
+      'Se redibuja el plano de la mansión…',
+      'Se reimprimen los dosieres afectados…',
+    ],
+  },
+
   materialDeVelada: true,
 };

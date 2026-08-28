@@ -36,6 +36,7 @@ import {
   espacio,
   radio,
 } from '../src/ui';
+import { useTema } from '../src/tema-juego';
 
 interface Opcion {
   id: string;
@@ -53,6 +54,8 @@ function Selector({
   elegido?: string;
   alElegir: (id: string) => void;
 }): JSX.Element {
+  // El selector también se pinta con el tema del juego, no con el de la casa.
+  const t = useTema();
   return (
     <View style={{ marginBottom: espacio.lg }}>
       <Etiqueta>{titulo}</Etiqueta>
@@ -77,7 +80,7 @@ function Selector({
               <Cuerpo
                 style={{
                   fontSize: 16,
-                  color: activo ? color.caoba900 : color.pergamino,
+                  color: activo ? t.caoba900 : t.pergamino,
                   fontFamily: activo ? 'Cinzel_600SemiBold' : undefined,
                 }}
               >
@@ -94,6 +97,7 @@ function Selector({
 export default function Acusar(): JSX.Element {
   const { vista, refrescar } = usePartida();
   const esMomia = useEsMomia();
+  const t = useTema();
   const [respuestas, setRespuestas] = useState<Record<string, string>>({});
   const [confirmando, setConfirmando] = useState(false);
   const [enviando, setEnviando] = useState(false);
@@ -171,7 +175,7 @@ export default function Acusar(): JSX.Element {
               {resto.map((e) => (
                 <Cuerpo key={e.ejeId}>
                   {e.rotulo.toLowerCase()}{' '}
-                  <Cuerpo style={{ color: color.oro300 }}>{nombreElegido(e.ejeId)}</Cuerpo>
+                  <Cuerpo style={{ color: t.oro300 }}>{nombreElegido(e.ejeId)}</Cuerpo>
                 </Cuerpo>
               ))}
             </View>

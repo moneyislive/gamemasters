@@ -408,8 +408,30 @@ export function vistaDeGameMaster(game: GameSession, sesion: LiveSession): Vista
    * quitarle medio puesto de mando por nada.
    */
   const aCiegas = game.settings?.gmPlays === true;
+  /*
+   * Y LAS ACUSACIONES, QUE SON LA OTRA MITAD. Salían enteras: `respuestas` con
+   * a quién señaló cada cual, y `correcta` con si acertó. Una sola acusación
+   * con `correcta: true` ES la solución, entregada al navegador de quien está
+   * jugando. Lo que quien dirige necesita para dirigir es CUÁNTAS hay y de
+   * quién —para saber cuándo abrir el sobre—, y eso se conserva.
+   */
   const sesionQueSale: LiveSession = aCiegas
-    ? { ...sesion, estado: estadoParaGm(game, sesion) as LiveSession['estado'] }
+    ? {
+        ...sesion,
+        estado: estadoParaGm(game, sesion) as LiveSession['estado'],
+        /*
+         * `correcta: false` para todas, y no es una mentira que engañe a nadie:
+         * a ciegas el panel no lo pinta —`revelaSolucion` es false— y quien
+         * dirige no puede saberlo, que es justo lo que se busca. Decir la
+         * verdad ahí sería decirle quién rompió el sello.
+         */
+        acusaciones: sesion.acusaciones.map((a) => ({
+          suspectId: a.suspectId,
+          respuestas: {},
+          correcta: false,
+          at: a.at,
+        })),
+      }
     : sesion;
 
   return {

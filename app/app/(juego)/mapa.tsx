@@ -28,7 +28,7 @@ import Svg, {
 } from 'react-native-svg';
 import * as api from '../../src/api';
 import { usePartida } from '../../src/estado';
-import { conAlfa } from '../../src/tema-juego';
+import { conAlfa, useTema } from '../../src/tema-juego';
 import { MOMIA } from '../../src/tema-momia';
 import { leerEstadoMomia } from '../../src/momia/vista';
 import { accionDeEntrarEnLugar, categoriasDeLugar, manifiestoDe } from '../../../shared/juegos';
@@ -93,6 +93,7 @@ export default function Mapa(): JSX.Element {
    * cámaras, y lo que hay es una tumba. El plano es de los sitios donde más se
    * nota, porque se mira mucho y se lee entero.
    */
+  const t = useTema();
   const manifiesto = manifiestoDe(sesion.juego);
   const lugar = categoriasDeLugar(manifiesto)[0];
   const unLugar = lugar?.singular ?? 'estancia';
@@ -226,7 +227,7 @@ export default function Mapa(): JSX.Element {
                   .join(' · ') || 'Sin novedades'}
               </Cuerpo>
             </View>
-            {sala.id === miSala && <Cuerpo style={{ color: color.oro300, fontSize: 19 }}>✓</Cuerpo>}
+            {sala.id === miSala && <Cuerpo style={{ color: t.oro300, fontSize: 19 }}>✓</Cuerpo>}
           </Pressable>
         </Animated.View>
       ))}
@@ -260,6 +261,7 @@ function PlanoDibujado({
   plano,
   ...resto
 }: PropsPlano & { plano?: BoardLayout }): JSX.Element | null {
+  const t = useTema();
   const { salas, miSala, conHallazgo, profanada, ancho, alPulsar, activo } = resto;
   if (!plano || plano.rooms.length === 0) return null;
 
@@ -313,7 +315,7 @@ function PlanoDibujado({
           width={lado - 18}
           height={alto - 18}
           fill="none"
-          stroke={color.oro500}
+          stroke={t.oro500}
           strokeWidth={3}
         />
         <Rect
@@ -336,7 +338,7 @@ function PlanoDibujado({
               y1={20}
               x2={(i + 1) * CELDA}
               y2={alto - 20}
-              stroke={color.oro300}
+              stroke={t.oro300}
               strokeWidth={1}
             />
           ))}
@@ -347,7 +349,7 @@ function PlanoDibujado({
               y1={(i + 1) * CELDA}
               x2={lado - 20}
               y2={(i + 1) * CELDA}
-              stroke={color.oro300}
+              stroke={t.oro300}
               strokeWidth={1}
             />
           ))}
@@ -362,7 +364,7 @@ function PlanoDibujado({
             height={centro.h}
             rx={7}
             fill="#4a1622"
-            stroke={color.oro500}
+            stroke={t.oro500}
             strokeWidth={2.5}
           />
           <Rect
@@ -381,7 +383,7 @@ function PlanoDibujado({
             textAnchor="middle"
             fontSize={34}
             fontFamily="Cinzel_700Bold"
-            fill={color.oro300}
+            fill={t.oro300}
           >
             {plano.centerLabel}
           </SvgText>
@@ -399,7 +401,7 @@ function PlanoDibujado({
                 y1={a.cy}
                 x2={b.cx}
                 y2={b.cy}
-                stroke={color.oro400}
+                stroke={t.oro400}
                 strokeWidth={3}
                 strokeDasharray="14 11"
                 strokeLinecap="round"
@@ -447,7 +449,7 @@ function PlanoDibujado({
                       ? conAlfa(MOMIA.profanada, 0.22)
                       : '#2b1a12'
                 }
-                stroke={dentro ? color.oro300 : marcada ? MOMIA.profanada : color.oro500}
+                stroke={dentro ? t.oro300 : marcada ? MOMIA.profanada : t.oro500}
                 strokeWidth={dentro ? 4 : marcada ? 3.5 : 2.5}
               />
               <Rect
@@ -469,7 +471,7 @@ function PlanoDibujado({
                 textAnchor="middle"
                 fontSize={tam}
                 fontFamily="Cinzel_600SemiBold"
-                fill={dentro ? color.oro300 : color.pergamino}
+                fill={dentro ? t.oro300 : t.pergamino}
               >
                 {lineas.map((linea, i) => (
                   <TSpan key={i} x={cx} dy={i === 0 ? 0 : tam * 1.06}>
@@ -487,7 +489,7 @@ function PlanoDibujado({
                       cx={cx - (Math.min(4, sala!.ocupantes) - 1) * 9 + i * 18}
                       cy={y + h - 26}
                       r={5}
-                      fill={color.oro300}
+                      fill={t.oro300}
                     />
                   ))}
                 </G>
@@ -500,13 +502,13 @@ function PlanoDibujado({
                     cx={x + w - 26}
                     cy={y + 26}
                     r={11}
-                    fill={color.burdeos700}
-                    stroke={color.oro400}
+                    fill={t.burdeos700}
+                    stroke={t.oro400}
                     strokeWidth={1.6}
                   />
                   <Path
                     d={`M ${x + w - 26} ${y + 20.5} l 2.6 5.2 -2.6 5.2 -2.6 -5.2 z`}
-                    fill={color.oro300}
+                    fill={t.oro300}
                   />
                 </G>
               )}
@@ -543,13 +545,14 @@ function PlanoDibujado({
 
 /** Espiral en cada boca de pasadizo, como en el tablero de la web. */
 function BocaDePasadizo({ cx, cy }: { cx: number; cy: number }): JSX.Element {
+  const t = useTema();
   return (
     <G>
-      <Circle cx={cx} cy={cy} r={11} fill={color.caoba900} stroke={color.oro500} strokeWidth={2} />
+      <Circle cx={cx} cy={cy} r={11} fill={t.caoba900} stroke={t.oro500} strokeWidth={2} />
       <Path
         d={`M ${cx} ${cy - 6} A 6 6 0 1 1 ${cx - 6} ${cy} A 3.6 3.6 0 1 0 ${cx} ${cy + 3.6}`}
         fill="none"
-        stroke={color.oro300}
+        stroke={t.oro300}
         strokeWidth={2}
       />
     </G>
@@ -569,6 +572,7 @@ function PlanoAereo({
   alPulsar,
   activo,
 }: PropsPlano & { imagenUrl?: string }): JSX.Element {
+  const t = useTema();
   const [proporcion, setProporcion] = useState(4 / 3);
   // Si la foto no llega, se dice. Antes quedaba un rectángulo negro con las
   // chinchetas flotando encima de nada, que es peor que no enseñar el mapa.
@@ -652,7 +656,7 @@ function PlanoAereo({
                 accessibilityLabel={`${sala.name}${dentro ? ', estás aquí' : ''}`}
                 style={[estilos.chinchetaCabeza, dentro && estilos.chinchetaDentro]}
               >
-                <Cuerpo style={{ fontSize: 13, color: color.tinta }}>
+                <Cuerpo style={{ fontSize: 13, color: t.tinta }}>
                   {conHallazgo.has(sala.id) ? '✦' : sala.ocupantes > 0 ? String(sala.ocupantes) : '·'}
                 </Cuerpo>
               </Pressable>
@@ -684,6 +688,7 @@ function Alternador({
   cara: Cara | null;
   alCambiar: (c: Cara) => void;
 }): JSX.Element {
+  const t = useTema();
   const opcion = (valor: Cara, rotulo: string): JSX.Element => (
     <Pressable
       key={valor}
@@ -692,7 +697,7 @@ function Alternador({
       onPress={() => alCambiar(valor)}
       style={[estilos.pestanaMapa, cara === valor && estilos.pestanaMapaActiva]}
     >
-      <Etiqueta style={{ color: cara === valor ? color.oro300 : 'rgba(217,201,163,0.5)' }}>
+      <Etiqueta style={{ color: cara === valor ? t.oro300 : 'rgba(217,201,163,0.5)' }}>
         {rotulo}
       </Etiqueta>
     </Pressable>
@@ -738,9 +743,10 @@ function Leyenda({
 }
 
 function Renglon({ glifo, texto }: { glifo: string; texto: string }): JSX.Element {
+  const t = useTema();
   return (
     <View style={estilos.renglon}>
-      <Cuerpo style={{ color: color.oro400, width: 20, fontSize: 15 }}>{glifo}</Cuerpo>
+      <Cuerpo style={{ color: t.oro400, width: 20, fontSize: 15 }}>{glifo}</Cuerpo>
       <Cuerpo tenue style={{ flex: 1, fontSize: 15 }}>
         {texto}
       </Cuerpo>

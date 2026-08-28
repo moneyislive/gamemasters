@@ -503,6 +503,19 @@ export interface ManifiestoDeJuego {
    */
   preparacion?: { anfitrion: string[]; aCiegas: string[] };
 
+  /**
+   * Lo que se lee mientras el agente escribe la partida.
+   *
+   * Son sesenta segundos a pantalla completa, y es la primera vez que quien
+   * organiza ve de qué va su juego. Estaban escritas en CLUEDO —«el mayordomo
+   * repasa las coartadas», «se lacra el sobre del crimen»— y salían igual
+   * montando una expedición a una tumba, dentro de la misma caja en la que se
+   * escribían las líneas propias de la Momia.
+   *
+   * Si un juego no las declara se usan las de CLUEDO, que es lo que había.
+   */
+  ceremonia?: { generar: string[]; actualizar: string[] };
+
   materialDeVelada?: boolean;
 
   /**

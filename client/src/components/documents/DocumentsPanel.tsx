@@ -200,6 +200,8 @@ export default function DocumentsPanel(): JSX.Element {
   const imprimibles = game.plot
     ? printableDocsFor(game.settings, manifiestoDe(game.settings?.juego).documentos)
     : [];
+  /** ¿Alguno de estos NO se puede abrir delante de la mesa? */
+  const hayReservados = imprimibles.some((d) => d.audience === 'preparer' || d.audience === 'gm');
 
   const personajePorId = new Map((game.plot?.characters ?? []).map((c) => [c.suspectId, c]));
   const idsConDocumento = new Set(documentos.map((doc) => doc.suspectId));
@@ -395,9 +397,19 @@ export default function DocumentsPanel(): JSX.Element {
           <header className="docs-header">
             <div>
               <h2 className="docs-title">Material para la mesa</h2>
+              {/*
+                NO SE PROMETE QUE NO HAYA SECRETOS, porque los hay. En este
+                grupo están el papiro del sellado —con el orden verdadero y el
+                nombre de quien rompió el sello— y las tiras falsas, cada uno con
+                un botón «Leer» que los abre en la pantalla que hay encima de la
+                mesa. Prometer lo contrario es peor que no decir nada: invita a
+                abrirlos delante de todo el mundo.
+              */}
               <p className="docs-subtitle">
-                Lo que se cuelga en las paredes y lo que se reparte durante la partida. No
-                contiene secretos de nadie.
+                Lo que se cuelga en las paredes y lo que se reparte durante la partida.{' '}
+                {hayReservados
+                  ? 'Alguno lleva la solución: mira el aviso antes de abrirlo delante de nadie.'
+                  : 'Ninguno lleva la solución.'}
               </p>
             </div>
             <span className="docs-count">

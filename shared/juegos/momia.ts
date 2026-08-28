@@ -670,6 +670,24 @@ export const MOMIA: ManifiestoDeJuego = {
     ],
   },
 
+  ceremonia: {
+    generar: [
+      'El escriba moja el cálamo…',
+      'Se reparten los dones sin que nadie mire…',
+      'Cinco ritos buscan su orden…',
+      'Se rompe una tira de papiro en pedazos…',
+      'Alguien esconde una mentira entre las verdaderas…',
+      'La maldición elige a quién marcar cada noche…',
+      'Se sella el papiro que nadie debe leer…',
+    ],
+    actualizar: [
+      'El escriba repasa la lista de la expedición…',
+      'A los recién llegados se les busca un don…',
+      'Se corrigen los papeles que ya no encajan…',
+      'Se reimprimen los dosieres afectados…',
+    ],
+  },
+
   documentos: IMPRIMIBLES_MOMIA,
   dosieresPropios: true,
 };

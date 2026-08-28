@@ -90,7 +90,19 @@ export interface SaborMomia {
 }
 
 /** `TramaMomia` más lo que escribe el modelo. Es lo que va en `Plot.delJuego`. */
-export type TramaMomiaConSabor = TramaMomia & { sabor: SaborMomia };
+export type TramaMomiaConSabor = TramaMomia & {
+  sabor: SaborMomia;
+  /**
+   * Qué hubo que corregirle a lo que escribió el modelo.
+   *
+   * SE GUARDA, NO SE IMPRIME EN LA CONSOLA. Estaba solo en un `console.warn` del
+   * servidor: quien monta la partida nunca lo veía, aunque el comentario del
+   * propio fichero prometía que se pintaba en el informe del papiro. Y es
+   * justamente lo que quien dirige querría saber antes de sentar a ocho
+   * personas: qué frases hubo que sustituir y por qué.
+   */
+  revision?: { incidencias: Incidencia[]; aceptadas: number; total: number };
+};
 
 /** El sabor de una trama ya generada, o undefined si esta partida no es la Momia. */
 export function saborDe(plot: Plot | undefined): SaborMomia | undefined {
@@ -550,6 +562,22 @@ export async function generarTramaMomia(game: GameSession, emit: Emitir): Promis
   console.log(
     `[momia] redacción del modelo aceptada en ${ensamblada.redaccion.aceptadas} de ${ensamblada.redaccion.total} fragmentos`,
   );
+
+  /*
+   * Y SE GUARDA CON LA TRAMA, que es lo que el comentario de arriba llevaba
+   * prometiendo desde el principio: «se pintan en el informe del papiro». No se
+   * pintaban en ninguna parte — morían en la consola del servidor, donde no
+   * mira nadie. Quien monta la partida querría saber, antes de sentar a ocho
+   * personas, qué frases hubo que sustituirle al modelo y por qué.
+   */
+  const conRevision = ensamblada.plot.delJuego as TramaMomiaConSabor | undefined;
+  if (conRevision) {
+    conRevision.revision = {
+      incidencias: ensamblada.incidencias,
+      aceptadas: ensamblada.redaccion.aceptadas,
+      total: ensamblada.redaccion.total,
+    };
+  }
 
   return ensamblada.plot;
 }

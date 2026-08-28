@@ -48,6 +48,7 @@ export interface FragmentoVisto {
   publico: boolean;
   /** Quién lo puso sobre la mesa, si alguien lo hizo. */
   publicadoPor?: string;
+  publicadoPorNombre?: string;
   /**
    * La restricción, en datos.
    *
@@ -109,7 +110,7 @@ export interface VistaMomia {
   /** Los fragmentos que están sobre la mesa, los tenga quien los tenga. */
   papiro: FragmentoVisto[];
   mesa: CompaneroVisto[];
-  ritos: Array<{ id: string; nombre: string }>;
+  ritos: Array<{ id: string; nombre: string; descripcion?: string }>;
   /** Solo para quien rompió el sello. Al resto no le llega ni la clave. */
   saqueo?: {
     mentiras: Array<{ id: string; texto: string }>;
@@ -167,7 +168,19 @@ export function vistaMomiaDe(
       texto: f.texto,
       restriccion: f.restriccion,
       publico: f.publico,
-      ...(f.publicadoPor ? { publicadoPor: f.publicadoPor } : {}),
+      /*
+       * CON NOMBRE, no solo con el id. La tarjeta del papiro tiene una línea
+       * «Lo puso Fulano» que no se pintaba nunca porque el nombre no llegaba, y
+       * el id no le dice nada a nadie. Quién puso un fragmento sobre la mesa es
+       * público —se ve al hacerlo— y es la mitad de la conversación.
+       */
+      ...(f.publicadoPor
+        ? {
+            publicadoPor: f.publicadoPor,
+            publicadoPorNombre:
+              sesion.players.find((p) => p.suspectId === f.publicadoPor)?.displayName ?? '',
+          }
+        : {}),
       ...(terminada ? { falso: f.falso } : {}),
     };
   };
@@ -229,7 +242,18 @@ export function vistaMomiaDe(
           haPropuesto: Boolean(estado.propuestas[p.suspectId]),
         };
       }),
-    ritos: entidadesDe(game, 'ritos').map((r) => ({ id: r.id, nombre: r.name })),
+    /*
+     * CON SU DESCRIPCIÓN. La pantalla del sellado tiene una rama para pintarla
+     * —«Balanza: quien entre saldrá con un fragmento y con una marca»— y no se
+     * evaluaba a cierto jamás, porque aquí solo se mandaban el id y el nombre.
+     * Es texto que quien dirige escribió al montar la partida y que ayuda a
+     * decidir el orden: no tiene ningún motivo para quedarse en el servidor.
+     */
+    ritos: entidadesDe(game, 'ritos').map((r) => ({
+      id: r.id,
+      nombre: r.name,
+      ...(r.description?.trim() ? { descripcion: r.description.trim() } : {}),
+    })),
   };
 
   /*
@@ -307,17 +331,32 @@ registrarProyeccionParaGm('momia', (game, sesion) => {
         ]),
       ),
       /*
-       * Los fragmentos, SOLO los que ya están sobre la mesa, y sin decir si son
-       * falsos. Que uno sea falso es lo que la mesa tiene que descubrir hablando.
+       * TODOS los fragmentos, pero con TEXTO solo los que ya están sobre la
+       * mesa, y sin decir de ninguno si es falso.
+       *
+       * Mandar solo los públicos parecía más seguro y era peor: el panel cuenta
+       * «X de Y publicados» y con esa lista decía siempre «Y de Y», o sea que
+       * mentía sobre lo único que enseña. Esconder el TEXTO es lo que hace
+       * falta; esconder que existen no protege nada y rompe el recuento.
        */
       fragmentos: Object.fromEntries(
-        publicos.map((f) => [f.id, { id: f.id, texto: f.texto, publico: true }]),
+        Object.values(estado.fragmentos).map((f) => [
+          f.id,
+          f.publico ? { id: f.id, texto: f.texto, publico: true } : { id: f.id, publico: false },
+        ]),
       ),
       /*
-       * Cuántas propuestas hay, no cuáles. Con el Game Master jugando, ver el
-       * orden que ha entregado cada cual sería jugar con las cartas vistas.
+       * QUIÉN ha entregado su orden, pero no CUÁL. Con el Game Master jugando,
+       * ver el orden de cada cual sería jugar con las cartas vistas.
+       *
+       * Y las claves TIENEN que estar: mandar `{}` dejaba el puesto de mando
+       * inutilizable, porque el botón de ejecutar el ritual se desactiva cuando
+       * no hay ninguna y esa es la única forma de terminar la noche. Un filtro
+       * que impide acabar la partida es peor que el dato que escondía.
        */
-      propuestas: {},
+      propuestas: Object.fromEntries(
+        Object.keys(estado.propuestas).map((id) => [id, { orden: [] as string[], reservada: true }]),
+      ),
       propuestasEntregadas: Object.keys(estado.propuestas).length,
       sellado: estado.sellado,
     },

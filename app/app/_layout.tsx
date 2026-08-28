@@ -26,6 +26,7 @@ import { ProveedorPartida } from '../src/estado';
 import { TelonDeAvisos } from '../src/avisos';
 import { FranjaDeConexion } from '../src/conexion';
 import { color } from '../src/tema';
+import { useTema } from '../src/tema-juego';
 
 void SplashScreen.preventAutoHideAsync();
 
@@ -72,13 +73,34 @@ export default function Raiz(): JSX.Element | null {
       <SafeAreaProvider>
         <ProveedorPartida>
           <StatusBar style="light" />
-          <Stack
-            screenOptions={{
-              headerShown: false,
-              contentStyle: { backgroundColor: color.feltoscuro },
-              animation: 'fade',
-            }}
-          >
+          <PilaDePantallas />
+          <FranjaDeConexion />
+          <TelonDeAvisos />
+        </ProveedorPartida>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
+  );
+}
+
+/**
+ * La pila de pantallas, con el fondo del juego que se esté jugando.
+ *
+ * VA EN SU PROPIO COMPONENTE porque el fondo tiene que salir de `useTema()`, y
+ * ese hook lee el contexto de la partida — que envuelve a esto pero no al
+ * componente de arriba. Estaba puesto a `color.feltoscuro`: el verde de fieltro
+ * de CLUEDO, detrás de TODAS las pantallas, incluidas las de la tumba. Es el
+ * color que más superficie ocupa de la app y era el único que no cambiaba.
+ */
+function PilaDePantallas(): JSX.Element {
+  const t = useTema();
+  return (
+    <Stack
+      screenOptions={{
+        headerShown: false,
+        contentStyle: { backgroundColor: t.feltoscuro },
+        animation: 'fade',
+      }}
+    >
             <Stack.Screen name="index" />
             <Stack.Screen name="entrar" />
             <Stack.Screen
@@ -99,11 +121,6 @@ export default function Raiz(): JSX.Element | null {
               options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
             />
             <Stack.Screen name="desenlace" options={{ animation: 'fade' }} />
-          </Stack>
-          <FranjaDeConexion />
-          <TelonDeAvisos />
-        </ProveedorPartida>
-      </SafeAreaProvider>
-    </GestureHandlerRootView>
+    </Stack>
   );
 }
