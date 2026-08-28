@@ -82,6 +82,13 @@ export interface MiEstadoMomia {
   amuletos: number;
   tocado: boolean;
   don: DonId;
+  /**
+   * Todos los dones que puedes usar esta vigilia.
+   *
+   * Uno para casi todo el mundo, y ese uno es `don`. DOS PARA EL SAQUEADOR: el
+   * suyo aparente y `falsificar`. Ausente si el servidor no lo manda.
+   */
+  donesDisponibles?: DonId[];
   /** El oficio y la frase del don, redactados por el servidor. */
   donRol?: string;
   donQueHace?: string;
@@ -291,6 +298,17 @@ export function leerEstadoMomia(v: unknown): EstadoMomiaVisible | null {
       amuletos: entero(yo.amuletos),
       tocado: yo.tocado === true,
       don: DONES_VALIDOS.includes(yo.don as DonId) ? (yo.don as DonId) : 'descifrar',
+      /*
+       * Todos los que puedes usar. Casi siempre uno; dos si eres el saqueador.
+       * Se cae al don aparente si el servidor no lo manda —una versión vieja—
+       * para que la pantalla siga funcionando exactamente como antes.
+       */
+      donesDisponibles: (() => {
+        const lista = listaDeIds(yo.donesDisponibles).filter((d): d is DonId =>
+          DONES_VALIDOS.includes(d as DonId),
+        );
+        return lista.length > 0 ? lista : undefined;
+      })(),
       donRol: cadena(yo.donRol),
       donQueHace: cadena(yo.donQueHace),
       donUsado: yo.donUsadoEstaVigilia === true,

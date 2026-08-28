@@ -113,12 +113,17 @@ async function esperarServidor(): Promise<void> {
 const NOMBRES = ['Ana', 'Bruno', 'Carla', 'Dani'];
 const ahora = new Date().toISOString();
 
-function partidaDeMomia(fase: 'ronda-abierta' | 'sellado'): {
+function partidaDeMomia(
+  fase: 'ronda-abierta' | 'sellado',
+  id = 'expedicion',
+  code = 'PUERTA',
+  clave = 'PUER',
+): {
   game: GameSession;
   sesion: LiveSession;
 } {
   const game = {
-    id: 'expedicion',
+    id,
     name: 'La tumba de Nebkaura',
     status: 'ready',
     createdAt: ahora,
@@ -149,7 +154,7 @@ function partidaDeMomia(fase: 'ronda-abierta' | 'sellado'): {
   const sesion = {
     id: game.id,
     juego: 'momia',
-    code: 'PUERTA',
+    code,
     phase: fase,
     round: 1,
     totalRounds: 3,
@@ -157,7 +162,7 @@ function partidaDeMomia(fase: 'ronda-abierta' | 'sellado'): {
     players: game.suspects.map((s, i) => ({
       suspectId: s.id,
       displayName: s.name,
-      joinCode: `PUER${i}A`,
+      joinCode: `${clave}${i}A`,
       joined: true,
       elecciones: [],
       notas: '',
@@ -239,8 +244,9 @@ function sembrar(dir: string, partidas: Array<{ game: GameSession; sesion: LiveS
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'gm-puertas-'));
 const momia = partidaDeMomia('sellado');
+const enJuego = partidaDeMomia('ronda-abierta', 'excavacion', 'ABIERT', 'ABIE');
 const cluedo = partidaDeCluedo();
-sembrar(dir, [momia, cluedo]);
+sembrar(dir, [momia, enJuego, cluedo]);
 
 let servidor: ChildProcess | undefined;
 
@@ -355,6 +361,54 @@ async function probar(): Promise<void> {
   }
 
   // -------------------------------------------------------------------------
+  paso('Lo que se elige y NO es una entidad llega al reductor');
+  // -------------------------------------------------------------------------
+  {
+    /*
+     * LA PRUEBA MÁS FINA DE LAS DOS, y la que de verdad demuestra que el campo
+     * VIAJA: se manda un don que no es tuyo. Si el motor lo pasa, el reductor
+     * lo mira y lo rechaza —«Ese don no es tuyo»—. Si el motor lo descartase
+     * por no estar declarado, el reductor caería en el don por defecto y esto
+     * respondería 200: el mismo silencio que dejaba al saqueador sin su jugada.
+     */
+    const impostor = await entrar('ABIERT', 'ABIE0A');
+    const ajeno = await pedir('/jugar/accion', {
+      metodo: 'POST',
+      testigo: impostor,
+      cuerpo: { accion: 'invocar', datos: { don: 'falsificar' } },
+    });
+    /*
+     * SE MIRA EL MOTIVO, NO SOLO EL CÓDIGO, y la diferencia lo era todo: con el
+     * motor descartando el campo, este jugador usaba su don de siempre y podía
+     * fallar igualmente por otra razón —al suyo le falta un objetivo—, así que
+     * un simple «responde 400» pasaba en verde con el fallo puesto. Solo el
+     * mensaje «ese don no es tuyo» demuestra que el campo llegó y se miró.
+     */
+    comprobar(
+      'un don que no es tuyo se rechaza POR NO SER TUYO',
+      String(ajeno.datos?.error ?? '').toLowerCase().includes('no es tuyo'),
+      ajeno,
+    );
+
+    // Y el saqueador —el único con dos— sí puede elegir el suyo.
+    const saqueador = await entrar('ABIERT', 'ABIE3A');
+    const miente = await pedir('/jugar/accion', {
+      metodo: 'POST',
+      testigo: saqueador,
+      cuerpo: { accion: 'invocar', datos: { don: 'falsificar' } },
+    });
+    comprobar('el saqueador sí puede falsificar', miente.estado === 200, miente.datos);
+
+    const declarado = manifiestoDe('momia').acciones.find((a) => a.id === 'invocar');
+    const libres = (declarado?.eligeLibre ?? []).map((c) => c.campo).sort();
+    comprobar(
+      'el manifiesto declara los dos campos que no son entidades',
+      JSON.stringify(libres) === JSON.stringify(['don', 'fragmento']),
+      libres,
+    );
+  }
+
+  // -------------------------------------------------------------------------
   paso('CLUEDO no gana una puerta nueva');
   // -------------------------------------------------------------------------
   {
@@ -443,6 +497,24 @@ function probarPaquete(): void {
       suya,
     );
   }
+
+  /*
+   * LA CARA DE LA TIRA FALSA. Es la mitad que queda a la vista al doblarla, así
+   * que cualquier palabra que la delate ahí acaba con la mecánica del traidor
+   * en el momento de usarla.
+   */
+  const papiro = paquete.entradas.find((e) => e.ruta.toLowerCase().includes('fragmentos'));
+  const html = papiro?.componer({} as never) ?? '';
+  const caras = html.split('class="cara"').slice(1).map((t) => t.split('class="doblez"')[0] ?? '');
+  comprobar('el documento de fragmentos se compone', caras.length > 0);
+  comprobar(
+    'ninguna cara de tira dice que es una falsificación',
+    !caras.some((c) => c.toLowerCase().includes('falsific')),
+  );
+  comprobar(
+    'ni que no se reparte',
+    !caras.some((c) => c.toLowerCase().includes('no se reparte')),
+  );
 
   const dosieres = rutas.find((r) => r.toLowerCase().includes('dosieres'));
   comprobar('los dosieres van a la carpeta que no puede abrir quien dirige', Boolean(dosieres) && dosieres!.startsWith('02_'), dosieres);

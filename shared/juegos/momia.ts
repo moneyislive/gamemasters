@@ -525,6 +525,21 @@ export const MOMIA: ManifiestoDeJuego = {
        * secreto hasta que lo usas. El selector lo pinta la pantalla del juego a
        * partir del estado, no el panel genérico de acciones.
        */
+      /*
+       * LOS DOS QUE NO SON ENTIDADES DE NADIE, y sin ellos este juego pierde su
+       * mecánica central. `don` es CUÁL de los tuyos usas: solo el saqueador
+       * tiene dos —el suyo aparente y `falsificar`— y elegir es exactamente la
+       * jugada del traidor. `fragmento` es CUÁL de los tuyos publica el
+       * Fotógrafo. Ninguno está en una categoría, porque los dos dependen de lo
+       * que tú sabes y nadie más.
+       *
+       * El motor los pasa sin validar; los valida el reductor, que compara el
+       * don contra los tuyos y el fragmento contra los que tienes en la mano.
+       */
+      eligeLibre: [
+        { campo: 'don', rotulo: '¿Cuál de tus dones?' },
+        { campo: 'fragmento', rotulo: '¿Cuál publicas?' },
+      ],
       vecesPorTurno: 1,
     },
     {

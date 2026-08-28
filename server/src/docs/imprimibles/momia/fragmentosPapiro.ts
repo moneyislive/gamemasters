@@ -106,16 +106,38 @@ ${tiras}
     })
     .join('\n\n');
 
+  /*
+   * LA CARA DE UNA FALSA TIENE QUE SER LA DE UNA VERDADERA, y no es un detalle
+   * de maquetacion: es la mecanica entera del traidor.
+   *
+   * Estaba compuesta con la misma funcion que las ciertas pero pasandole «No se
+   * reparte», «Falsificacion N» y «se la das al saqueador cuando la pida». Los
+   * tres textos van en la CARA, que es la mitad que queda a la vista al doblar
+   * —lo dice la cabecera de este fichero—, asi que en cuanto el saqueador
+   * dejaba la tira en el centro de la mesa cualquiera leia que era falsa. La
+   * unica jugada del traidor se delataba sola al hacerla.
+   *
+   * Ahora la cara lleva el mismo diseno que las demas con la procedencia en
+   * blanco, para escribirla a lapiz al ponerla, y todo lo que la identifica se
+   * va al DORSO: el lado que queda dentro al doblar, que solo lee quien la
+   * tiene en la mano — justamente quien ya sabe que es mentira.
+   */
   const falsas = vista.trama.falsasCandidatas
-    .map((f, i) =>
-      tira(
-        'No se reparte',
-        `Falsificación ${i + 1}`,
-        `${f.id} — se la das al saqueador cuando la pida`,
-        f.texto,
-      ),
+    .map(
+      (f, i) => `      <div class="tira">
+        <div class="cara">
+          <span class="etiqueta" style="margin:0; border-bottom:0.3mm dotted #8a6b3a; display:block; min-width:34mm;">&nbsp;</span>
+          <p style="margin:0.5mm 0 0; font-family:'Marcellus SC',Georgia,serif; font-size:10pt; color:#1f3f6b; border-bottom:0.3mm dotted #8a6b3a; min-height:5mm;">&nbsp;</p>
+          <div class="ornamento" style="margin:1.5mm 0 0; font-size:10pt; letter-spacing:0.35em;"><span class="glifo">𓂀</span></div>
+        </div>
+        <div class="doblez">— — — dobla por aqui — — —</div>
+        <div class="dorso">
+          <p class="maquina" style="margin:0 0 1.5mm; font-size:7.5pt; color:#8a6b3a;">Falsificacion ${i + 1} · ${esc(f.id)} — escribe arriba una camara y una vigilia antes de dejarla en la mesa</p>
+          <p>${esc(f.texto)}</p>
+        </div>
+      </div>`,
     )
-    .join('\n');
+    .join(String.fromCharCode(10));
 
   const total = vista.hallazgos.length;
 

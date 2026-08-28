@@ -59,6 +59,7 @@ import { COLOR_MOMIA as C, MOMIA } from '../tema-momia';
 import { Cartucho, Maldicion } from './piezas';
 import { GlifoDeDon, Grieta, Puerta } from './glifos';
 import { DONES } from './dones';
+import type { DonId } from '../../../shared/juegos/momia-tipos';
 import { codificarObjetivo, leerEstadoMomia, type EstadoMomiaVisible } from './vista';
 import type { SalaVista, VistaJugador } from '../../../shared/live';
 
@@ -536,8 +537,20 @@ function PanelDelDon({
   const [error, setError] = useState<string | null>(null);
 
   const puede = vista.acciones.some((a) => a.id === 'invocar');
-  const don = DONES[estado.yo.don];
   const usado = estado.yo.donUsado;
+
+  /*
+   * CUÁL DE TUS DONES USAS, y para casi todo el mundo esto no existe: tienen
+   * uno y este selector no se pinta. Para el saqueador son dos, y elegir es
+   * exactamente la jugada del traidor —falsificar un fragmento y ponerlo sobre
+   * la mesa como si lo hubiera encontrado—. Antes no había forma de decirlo: la
+   * app mandaba siempre el don aparente y la mecánica central del juego no se
+   * podía usar en ninguna parte.
+   */
+  const disponibles = estado.yo.donesDisponibles ?? [estado.yo.don];
+  const [conCual, setConCual] = useState<DonId>(estado.yo.don);
+  const activo: DonId = disponibles.includes(conCual) ? conCual : estado.yo.don;
+  const don = DONES[activo];
 
   const opciones: Array<{ id: string; nombre: string }> =
     don.elige === 'persona'
@@ -562,7 +575,14 @@ function PanelDelDon({
     setError(null);
     setEnviando(true);
     try {
-      const r = await api.hacerAccion('invocar', codificarObjetivo(don.elige, elegido));
+      /*
+       * `don` va SIEMPRE, aunque solo haya uno: mandarlo solo cuando hay
+       * elección haría que el caso raro fuese el único probado en la mesa.
+       */
+      const r = await api.hacerAccion('invocar', {
+        ...codificarObjetivo(don.elige, elegido),
+        don: activo,
+      });
       alHacer(r.vista);
       setElegido(null);
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -580,6 +600,27 @@ function PanelDelDon({
       <Marco style={estado.yo.don === 'falsificar' ? estilos.marcoSaqueador : undefined}>
         <TarjetaDon estado={estado} />
         <AvisoError>{error}</AvisoError>
+
+        {!usado && puede && disponibles.length > 1 && (
+          <View style={{ marginTop: espacio.lg }}>
+            <Cuerpo tenue style={{ fontSize: 15 }}>¿Con cuál invocas esta vigilia?</Cuerpo>
+            <View style={estilos.dones}>
+              {disponibles.map((d) => (
+                <Pressable
+                  key={d}
+                  onPress={() => {
+                    setConCual(d);
+                    setElegido(null);
+                    setError(null);
+                  }}
+                  style={[estilos.donOpcion, d === activo && estilos.donElegido]}
+                >
+                  <Cuerpo style={{ fontSize: 15 }}>{DONES[d].nombre}</Cuerpo>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+        )}
 
         {usado ? (
           <Cuerpo tenue style={{ marginTop: espacio.md, fontStyle: 'italic' }}>
@@ -828,6 +869,20 @@ const estilos = StyleSheet.create({
     borderColor: MOMIA.profanada,
     backgroundColor: conAlfa(MOMIA.profanada, 0.14),
   },
+  /* Los dos dones del saqueador, uno al lado del otro. */
+  dones: { flexDirection: 'row', flexWrap: 'wrap', gap: espacio.sm, marginTop: espacio.sm },
+  donOpcion: {
+    borderWidth: 1,
+    borderColor: conAlfa(MOMIA.lapis, 0.9),
+    borderRadius: radio.sm,
+    paddingHorizontal: espacio.md,
+    paddingVertical: 8,
+  },
+  donElegido: {
+    borderColor: MOMIA.profanada,
+    backgroundColor: conAlfa(MOMIA.profanada, 0.14),
+  },
+
   /* Al saqueador se le tiñe el panel de su don: es el único que ve este borde. */
   marcoSaqueador: {
     borderColor: conAlfa(MOMIA.profanada, 0.7),

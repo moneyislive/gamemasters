@@ -94,6 +94,8 @@ export interface VistaMomia {
     amuletos: number;
     tocado: boolean;
     don: string;
+    /** Todos los que puedes usar. Dos solo para el saqueador. */
+    donesDisponibles: string[];
     donRol: string;
     donQueHace: string;
     donUsadoEstaVigilia: boolean;
@@ -192,6 +194,16 @@ export function vistaMomiaDe(
       amuletos: yo.amuletos,
       tocado: yo.tocado,
       don: yo.don,
+      /*
+       * TODOS LOS DONES QUE PUEDES USAR, no solo el que aparentas.
+       *
+       * Casi siempre es uno y esta lista sobra. Para el saqueador son dos —el
+       * suyo y `falsificar`— y ahí está el juego: sin poder elegir, la app le
+       * mandaba siempre el primero y el traidor se quedaba sin su única
+       * mecánica. No delata a nadie: quien no es saqueador recibe una lista de
+       * un elemento, que es exactamente lo que ya sabía.
+       */
+      donesDisponibles: donesDe(game, estado, suspectId),
       donRol: ficha?.rol ?? '',
       donQueHace: ficha?.que ?? '',
       donUsadoEstaVigilia: yo.donUsadoEnRonda === sesion.round,

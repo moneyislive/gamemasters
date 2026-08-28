@@ -214,6 +214,30 @@ export interface DefinicionAccion {
    */
   eligeOpcional?: Array<{ campo: string; categoria: CategoriaId; rotulo: string }>;
 
+  /**
+   * Campos cuyo valor NO es una entidad del manifiesto.
+   *
+   * POR QUÉ HACÍA FALTA. Las otras tres formas de pedir datos comprueban que lo
+   * que llega es una entidad real de su categoría, y esa comprobación es lo que
+   * impide que un móvil manipulado mande el id de una sala donde va una
+   * persona. Pero hay cosas que se eligen y no son entidades de nadie: CUÁL DE
+   * TUS DONES usas, o CUÁL DE TUS FRAGMENTOS publicas. No están en ninguna
+   * categoría porque dependen de tu estado secreto, que es justo lo que el
+   * motor no puede mirar sin volver a saber a qué se juega.
+   *
+   * Sin esto, el motor descartaba esos campos por no estar declarados y el
+   * reductor recibía siempre el valor por defecto. En El Misterio de la Momia
+   * eso apagaba dos cosas: el saqueador no podía elegir falsificar —o sea, se
+   * quedaba sin la única mecánica del traidor— y el Fotógrafo publicaba un
+   * fragmento distinto del que había elegido. Sin error y sin aviso.
+   *
+   * EL TRATO ES EXPLÍCITO: el motor los pasa TAL CUAL y NO los valida. Hacerlo
+   * es obligación del reductor, que sí conoce el estado secreto de quien juega.
+   * Un reductor que se los crea sin mirar abre exactamente el agujero que las
+   * otras tres formas cierran.
+   */
+  eligeLibre?: Array<{ campo: string; rotulo: string }>;
+
   /** Cuántas veces se admite por turno o ronda. Sin límite si se omite. */
   vecesPorTurno?: number;
 }

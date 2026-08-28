@@ -177,6 +177,20 @@ export function ejecutarAccion(
     limpios[campo.campo] = valor;
   }
 
+  /*
+   * Y lo que NO es una entidad, tal cual y sin validar.
+   *
+   * Aquí no hay nada que comprobar contra el manifiesto: cuál de tus dones o
+   * cuál de tus fragmentos depende de tu estado secreto, que este motor no mira
+   * a propósito. Lo valida el reductor, que sí lo conoce. Se copia solo lo
+   * DECLARADO —igual que arriba—, así que un móvil no puede colar un campo que
+   * la acción no pide.
+   */
+  for (const campo of definicion.eligeLibre ?? []) {
+    const valor = String(datos[campo.campo] ?? '');
+    if (valor) limpios[campo.campo] = valor;
+  }
+
   const reductor = REDUCTORES[manifiesto.id]?.[accion];
   if (!reductor) {
     throw new AccionInvalida('Esta partida todavía no sabe hacer eso.');
