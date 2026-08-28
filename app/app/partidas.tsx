@@ -20,6 +20,7 @@ import Animated, { FadeInUp } from 'react-native-reanimated';
 import { router, useFocusEffect } from 'expo-router';
 import * as api from '../src/api';
 import { usarMarco } from '../src/marco';
+import { usePartidaSiLaHay } from '../src/estado';
 import { Pulsable } from '../src/vivo';
 
 const ORO = '#e8cf7f';
@@ -56,6 +57,12 @@ function cuando(iso?: string): string {
 export default function Partidas(): JSX.Element {
   const marco = usarMarco();
   const [partidas, setPartidas] = useState<api.PartidaDelPanel[] | null>(null);
+  /*
+   * `SiLaHay` y no `usePartida()`: este panel se abre tambien desde la portada,
+   * sin ninguna partida abierta, y la version que lanza dejaria la pantalla en
+   * blanco. Sin partida no hay aviso que dar, que es exactamente lo correcto.
+   */
+  const avisoDePartida = usePartidaSiLaHay()?.avisoDePartida ?? null;
   const [fallo, setFallo] = useState(false);
   const [refrescando, setRefrescando] = useState(false);
 
@@ -102,7 +109,7 @@ export default function Partidas(): JSX.Element {
             );
             return;
           }
-          await api.fijarToken(r.token);
+          await api.fijarToken(r.token, p.gameId);
           router.push('/(juego)/ronda');
         } catch {
           setFallo(true);
@@ -168,6 +175,22 @@ export default function Partidas(): JSX.Element {
                   <Text style={[estilos.selloTexto, { color: sello.color }]}>{sello.texto}</Text>
                 </View>
 
+                {avisoDePartida?.gameId === p.gameId && (
+                  /*
+                   * EL AVISO DE ESTA PARTIDA, y solo de esta.
+                   *
+                   * Antes esto era una franja a lo ancho de la app. Estaba mal:
+                   * que tu sesión de una velada haya caducado no dice nada de
+                   * las demás, y anunciarlo a pantalla completa hace creer que
+                   * lo que falla es la app. Aquí va donde se puede hacer algo al
+                   * respecto —la fila de su partida, con su botón de entrar al
+                   * lado— y solo mientras dura.
+                   */
+                  <View style={estilos.avisoDeLaPartida}>
+                    <Text style={estilos.avisoDeLaPartidaTexto}>{avisoDePartida.texto}</Text>
+                  </View>
+                )}
+
                 <Text style={estilos.velada}>{p.titulo}</Text>
                 <Text style={estilos.personaje}>Tu papel: {p.personaje}</Text>
                 {p.cuando ? <Text style={estilos.fecha}>{cuando(p.cuando)}</Text> : null}
@@ -212,6 +235,25 @@ export default function Partidas(): JSX.Element {
 }
 
 const estilos = StyleSheet.create({
+  /*
+   * Discreto a proposito. No es una alarma: es un dato sobre una velada
+   * concreta, y la fila entera ya dice de cual. Ambar y no rojo porque casi
+   * siempre se arregla volviendo a entrar.
+   */
+  avisoDeLaPartida: {
+    backgroundColor: 'rgba(232,207,127,0.12)',
+    borderLeftWidth: 2,
+    borderLeftColor: ORO,
+    borderRadius: 4,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    marginBottom: 10,
+  },
+  avisoDeLaPartidaTexto: {
+    fontSize: 13,
+    lineHeight: 18,
+    color: ORO,
+  },
   raiz: { flex: 1, backgroundColor: '#050d09' },
   contenido: { paddingHorizontal: 20 },
   cabecera: {

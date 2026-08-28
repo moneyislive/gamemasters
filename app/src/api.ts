@@ -12,6 +12,32 @@ import type { VistaJugador } from '../../shared/live';
 import type { Account } from '../../shared/live';
 
 const CLAVE_TOKEN = 'gm_token';
+/**
+ * En qué partida está este móvil.
+ *
+ * Va aparte del testigo aunque el testigo la lleve dentro, porque leerla de ahí
+ * obligaría a descodificar un sobre firmado para sacar un dato que ya nos
+ * devuelve el servidor al entrar. Se guarda al fijar el testigo y se borra con
+ * él: son la misma sesión.
+ *
+ * Existe para poder decir QUÉ partida da problemas. Sin esto, el aviso de una
+ * partida caída no se puede colgar de su fila en el panel y hay que enseñarlo
+ * como una franja arriba de todo, que es justo lo que se quería evitar.
+ */
+const CLAVE_PARTIDA = 'gm_partida';
+/**
+ * El aviso de la partida, guardado en disco mientras dura.
+ *
+ * NO ES CACHÉ, ES DÓNDE VIVE. Estaba solo en memoria de React y se perdía en
+ * cuanto el árbol se remontaba —basta con abrir el panel de partidas desde una
+ * app recién arrancada—, así que el aviso desaparecía justo al llegar a la
+ * pantalla donde había que enseñarlo. Y con la app cerrada y vuelta a abrir,
+ * igual: el problema seguía ahí y el aviso no.
+ *
+ * Se borra en cuanto deja de ser verdad: cualquier respuesta buena del
+ * servidor, o volver a entrar en la partida.
+ */
+const CLAVE_AVISO = 'gm_aviso';
 const CLAVE_SERVIDOR = 'gm_servidor';
 /**
  * El testigo de la elección de servidor: qué dirección traía la app compilada
@@ -87,11 +113,15 @@ const almacen = {
 };
 
 let token: string | null = null;
+let partida: string | null = null;
+let avisoGuardado: { gameId: string | null; texto: string } | null = null;
 let pasaporte: string | null = null;
 let servidor: string = SERVIDOR_POR_DEFECTO;
 
 export async function cargarSesionGuardada(): Promise<{ token: string | null; servidor: string }> {
   token = await almacen.get(CLAVE_TOKEN);
+  partida = await almacen.get(CLAVE_PARTIDA);
+  avisoGuardado = leerAviso(await almacen.get(CLAVE_AVISO));
   pasaporte = await almacen.get(CLAVE_CUENTA);
 
   const veredicto = decidirServidor(
@@ -142,10 +172,58 @@ export async function fijarServidor(url: string): Promise<void> {
   await almacen.set(CLAVE_SERVIDOR_COMPILADO, SERVIDOR_POR_DEFECTO);
 }
 
-export async function fijarToken(nuevo: string | null): Promise<void> {
+export async function fijarToken(nuevo: string | null, gameId?: string): Promise<void> {
   token = nuevo;
   if (nuevo) await almacen.set(CLAVE_TOKEN, nuevo);
   else await almacen.del(CLAVE_TOKEN);
+
+  /*
+    * La partida SOLO se olvida al fijar un testigo nuevo sin decir cuál, no al
+    * quitarlo. Un 401 quita el testigo, y ahí es justo cuando hace falta saber
+    * de qué partida hablamos para colgar el aviso de su fila.
+    */
+  if (nuevo) {
+    partida = gameId ?? null;
+    if (partida) await almacen.set(CLAVE_PARTIDA, partida);
+    else await almacen.del(CLAVE_PARTIDA);
+    // Entrar de nuevo es la cura del aviso, así que el aviso se va con ella.
+    await fijarAvisoDePartida(null);
+  }
+}
+
+/**
+ * Lee el aviso guardado sin fiarse de lo que haya en el disco.
+ *
+ * Lo escribimos nosotros, pero de una versión anterior puede quedar cualquier
+ * cosa, y un JSON roto aquí dejaría la app sin arrancar por un aviso.
+ */
+function leerAviso(crudo: string | null): { gameId: string | null; texto: string } | null {
+  if (!crudo) return null;
+  try {
+    const v = JSON.parse(crudo) as { gameId?: unknown; texto?: unknown };
+    if (typeof v?.texto !== 'string' || !v.texto) return null;
+    return { gameId: typeof v.gameId === 'string' ? v.gameId : null, texto: v.texto };
+  } catch {
+    return null;
+  }
+}
+
+/** El aviso de la partida que siga en pie, si hay alguno. */
+export function avisoDePartidaGuardado(): { gameId: string | null; texto: string } | null {
+  return avisoGuardado;
+}
+
+export async function fijarAvisoDePartida(
+  nuevo: { gameId: string | null; texto: string } | null,
+): Promise<void> {
+  avisoGuardado = nuevo;
+  if (nuevo) await almacen.set(CLAVE_AVISO, JSON.stringify(nuevo));
+  else await almacen.del(CLAVE_AVISO);
+}
+
+/** En qué partida está este móvil, si está en alguna. */
+export function partidaActiva(): string | null {
+  return partida;
 }
 
 /**
@@ -337,7 +415,7 @@ export async function entrar(code: string, joinCode: string): Promise<RespuestaE
     method: 'POST',
     body: JSON.stringify({ code, joinCode }),
   });
-  await fijarToken(r.token);
+  await fijarToken(r.token, r.gameId);
   return r;
 }
 
@@ -482,6 +560,20 @@ export function borrarCuenta(): Promise<{ borrada: boolean; partidasLimpiadas: n
  */
 export async function salirDeLaPartida(): Promise<void> {
   await fijarToken(null);
+}
+
+/**
+ * Salir a propósito, que no es lo mismo que quedarse sin credencial.
+ *
+ * Un 401 tira el testigo pero deja en pie de qué partida hablábamos, porque
+ * hace falta para colgar el aviso de su fila. Cuando alguien pulsa «salir de la
+ * partida» no queda nada de que avisar: se olvida todo.
+ */
+export async function olvidarPartida(): Promise<void> {
+  await salirDeLaPartida();
+  partida = null;
+  await almacen.del(CLAVE_PARTIDA);
+  await fijarAvisoDePartida(null);
 }
 
 /** Cerrar la sesión de la cuenta. No toca la partida en curso. */

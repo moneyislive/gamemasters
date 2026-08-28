@@ -12,6 +12,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState } f
 import { AppState } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import * as api from './api';
+import { repartirFallo } from './conexion-reglas';
 import type { AvisoClave, VistaJugador } from '../../shared/live';
 
 export interface Aviso {
@@ -24,6 +25,32 @@ export interface Aviso {
 interface Estado {
   vista: VistaJugador | null;
   cargando: boolean;
+  /**
+   * NO LLEGAMOS AL SERVIDOR. Es de la plataforma, no de una partida.
+   *
+   * Se pone al fallar la petición sin llegar a haber respuesta —wifi caída,
+   * servidor apagado— y se quita en cuanto el servidor vuelve a contestar
+   * cualquier cosa, incluido un 204 de «no hay novedad». Un 204 no es «no sé si
+   * hay red»: es el servidor hablando.
+   */
+  sinRed: boolean;
+  /**
+   * Algo pasa con ESTA partida, y no es la red.
+   *
+   * La sesión caducó, te sacaron, la partida se cerró. Son cosas de UNA partida
+   * y por eso llevan su `gameId`: se pueden perder los hilos de una velada y
+   * seguir teniendo los de las demás, así que decirlo con una franja a lo ancho
+   * de la app sería mentir sobre el alcance del problema. Se cuelga de su fila
+   * en el panel de partidas.
+   */
+  avisoDePartida: { gameId: string | null; texto: string } | null;
+  /**
+   * Lo que le pasa a la partida abierta, sea lo que sea.
+   *
+   * Derivado de los dos de arriba, y solo para las pantallas que necesitan
+   * decir algo cuando NO HAY VISTA que enseñar. No lo use nadie para pintar
+   * franjas: para eso están los dos campos de arriba, que distinguen.
+   */
   error: string | null;
   /** Aviso pendiente de celebrar en pantalla. */
   aviso: Aviso | null;
@@ -49,7 +76,10 @@ const VIBRACION: Partial<Record<AvisoClave, () => void>> = {
 export function ProveedorPartida({ children }: { children: React.ReactNode }): JSX.Element {
   const [vista, setVista] = useState<VistaJugador | null>(null);
   const [cargando, setCargando] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [sinRed, setSinRed] = useState(false);
+  const [avisoDePartida, setAvisoDePartida] = useState<
+    { gameId: string | null; texto: string } | null
+  >(null);
   const [aviso, setAviso] = useState<Aviso | null>(null);
 
   const revRef = useRef<number>(-1);
@@ -66,14 +96,34 @@ export function ProveedorPartida({ children }: { children: React.ReactNode }): J
   const [sesionLeida, setSesionLeida] = useState(false);
 
   useEffect(() => {
-    void api.cargarSesionGuardada().finally(() => setSesionLeida(true));
+    void api
+      .cargarSesionGuardada()
+      /*
+       * El aviso guardado se recupera aquí. Sin esto, abrir el panel de
+       * partidas con la app recién arrancada no enseña nada: el problema sigue
+       * ahí, pero el aviso se quedó en el árbol de React de antes.
+       */
+      .then(() => setAvisoDePartida(api.avisoDePartidaGuardado()))
+      .finally(() => setSesionLeida(true));
+  }, []);
+
+  /*
+   * El aviso se escribe SIEMPRE por aquí, nunca con `setAvisoDePartida` a pelo.
+   * Memoria y disco tienen que decir lo mismo: si divergen, la pantalla enseña
+   * una cosa y el panel otra, y no hay forma de saber cuál miente.
+   */
+  const anotarAviso = useCallback((nuevo: { gameId: string | null; texto: string } | null) => {
+    setAvisoDePartida(nuevo);
+    void api.fijarAvisoDePartida(nuevo);
   }, []);
 
   const aplicarVista = useCallback((v: VistaJugador) => {
     revRef.current = v.rev;
     setVista(v);
-    setError(null);
-  }, []);
+    // Una vista nueva demuestra las dos cosas a la vez.
+    setSinRed(false);
+    anotarAviso(null);
+  }, [anotarAviso]);
 
   const encolarAvisos = useCallback((lista: Array<{ clave: string; texto: string }>) => {
     if (lista.length === 0) return;
@@ -90,11 +140,21 @@ export function ProveedorPartida({ children }: { children: React.ReactNode }): J
         aplicarVista(r.vista);
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'No se pudo hablar con el servidor.');
+      // Mismo reparto que en el bucle, y por el mismo sitio.
+      const { sinRed: esDeLaRed, deLaPartida } = repartirFallo(
+        e instanceof api.ErrorApi ? e.estado : 0,
+      );
+      setSinRed(esDeLaRed);
+      if (deLaPartida) {
+        anotarAviso({
+          gameId: api.partidaActiva(),
+          texto: e instanceof Error ? e.message : 'No se pudo hablar con el servidor.',
+        });
+      }
     } finally {
       setCargando(false);
     }
-  }, [aplicarVista]);
+  }, [aplicarVista, anotarAviso]);
 
   // ---- Bucle de espera de cambios ----
   useEffect(() => {
@@ -139,25 +199,47 @@ export function ProveedorPartida({ children }: { children: React.ReactNode }): J
             encolarAvisos(r.avisos);
           }
           /*
-           * 204 (sin novedad) o respuesta con datos: en ambos casos se repite.
+           * 204 (sin novedad) o respuesta con datos: en ambos casos se repite, y
+           * EN AMBOS SE RETIRAN LOS DOS AVISOS. Un 204 no es «no ha pasado nada,
+           * no sé si hay red»: es el servidor contestando, o sea la prueba misma
+           * de que hay conexión y de que esta partida sigue en pie.
            *
-           * Y EN AMBOS SE RETIRA EL AVISO DE «SIN CONEXIÓN», que es el arreglo.
-           * Antes solo lo quitaba `aplicarVista`, y esa solo se llama cuando
-           * llega una vista NUEVA. En una partida tranquila —quien dirige aún no
-           * ha abierto la vigilia, nadie ha hecho nada— el sondeo largo contesta
-           * 204 una y otra vez, así que después de un corte de wifi el aviso se
-           * quedaba puesto PARA SIEMPRE: el móvil estaba perfectamente conectado
-           * y seguía diciendo que no.
-           *
-           * Un 204 no es «no ha pasado nada, no sé si hay red»: es el servidor
-           * contestando. Es exactamente la prueba de que hay conexión.
+           * Antes solo lo hacía `aplicarVista`, y esa solo corre cuando llega
+           * una vista NUEVA. En una partida tranquila —quien dirige aún no ha
+           * abierto la ronda, nadie ha hecho nada— el sondeo contesta 204 una y
+           * otra vez, así que después de un corte el aviso se quedaba puesto
+           * PARA SIEMPRE con el móvil perfectamente conectado.
            */
-          setError(null);
+          setSinRed(false);
+          anotarAviso(null);
           setCargando(false);
           espera = 2500;
         } catch (e) {
           if (cancelado) return;
+
+          /*
+           * UNA CANCELACIÓN NUESTRA NO ES UN FALLO, y confundirla con uno era
+           * medio problema de la franja pegada.
+           *
+           * El sondeo largo se aborta a propósito en dos sitios: al irse la app
+           * a segundo plano y al desmontarse el proveedor. Los dos llegan aquí
+           * como un aborto sin código HTTP, indistinguible de «no hay red» si no
+           * se mira la señal. Resultado: bastaba con mirar el móvil, salir a
+           * otra app y volver para que apareciera «Sin conexión» estando
+           * perfectamente conectado.
+           */
+          if (control.signal.aborted) {
+            // Con espera, no `continue` a secas: si algún día se abortara sin
+            // que ninguna de las dos guardas de arriba lo pare, esto sería un
+            // bucle cerrado quemando la batería.
+            await new Promise((r) => setTimeout(r, 200));
+            continue;
+          }
+
           const estado = e instanceof api.ErrorApi ? e.estado : 0;
+
+          // De quién es el problema lo decide `repartirFallo`, en un solo sitio.
+          setSinRed(repartirFallo(estado).sinRed);
 
           if (estado === 401) {
             /*
@@ -174,7 +256,10 @@ export function ProveedorPartida({ children }: { children: React.ReactNode }): J
              * cae en la espera de arriba y se reengancha solo en cuanto se
              * entra de nuevo.
              */
-            setError('Tu sesión ha caducado. Vuelve a entrar con tu código.');
+            anotarAviso({
+              gameId: api.partidaActiva(),
+              texto: 'Tu sesión ha caducado. Vuelve a entrar con tu código.',
+            });
             await api.salirDeLaPartida();
             revRef.current = -1;
             setVista(null);
@@ -187,15 +272,17 @@ export function ProveedorPartida({ children }: { children: React.ReactNode }): J
             // pero también pasajero —el servidor responde 403 mientras se
             // regenera la trama—, así que no se corta: se espera más y se
             // vuelve a mirar.
-            setError(
-              estado === 404
-                ? 'La partida ya no está en juego. Si sigue la velada, pide un código nuevo.'
-                : 'Ya no participas en esta partida.',
-            );
+            anotarAviso({
+              gameId: api.partidaActiva(),
+              texto:
+                estado === 404
+                  ? 'La partida ya no está en juego. Si sigue la velada, pide un código nuevo.'
+                  : 'Ya no participas en esta partida.',
+            });
             setCargando(false);
           } else {
-            // Wifi doméstico: se reintenta con calma en vez de gritar.
-            setError('Sin conexión con la partida. Reintentando…');
+            // Lo de la plataforma no lleva aviso propio: la franja de arriba lo
+            // dice todo, y ya la ha puesto `repartirFallo`.
             setCargando(false);
           }
 
@@ -210,7 +297,7 @@ export function ProveedorPartida({ children }: { children: React.ReactNode }): J
       cancelado = true;
       abortRef.current?.abort();
     };
-  }, [aplicarVista, encolarAvisos, sesionLeida]);
+  }, [anotarAviso, aplicarVista, encolarAvisos, sesionLeida]);
 
   // ---- Pausa en segundo plano ----
   useEffect(() => {
@@ -223,9 +310,11 @@ export function ProveedorPartida({ children }: { children: React.ReactNode }): J
   }, []);
 
   const desconectar = useCallback(async () => {
-    await api.salirDeLaPartida();
+    await api.olvidarPartida();
     revRef.current = -1;
     setVista(null);
+    setSinRed(false);
+    setAvisoDePartida(null);
   }, []);
 
   return (
@@ -233,7 +322,14 @@ export function ProveedorPartida({ children }: { children: React.ReactNode }): J
       value={{
         vista,
         cargando,
-        error,
+        sinRed,
+        avisoDePartida,
+        /*
+         * Derivado, y solo para pantallas que tienen que decir algo cuando no
+         * hay vista. Manda el aviso de la partida: si la partida se cerro, eso
+         * es mas concreto que decir que no hay red.
+         */
+        error: avisoDePartida?.texto ?? (sinRed ? 'Sin conexión. Reintentando…' : null),
         aviso,
         descartarAviso: () => setAviso(null),
         refrescar,

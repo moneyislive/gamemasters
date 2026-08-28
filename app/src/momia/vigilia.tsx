@@ -34,6 +34,7 @@ import * as Haptics from 'expo-haptics';
 import * as api from '../api';
 import { usePartida } from '../estado';
 import { Reloj } from '../reloj';
+import { AvisoDeLaPartida } from '../conexion';
 import { Foto } from '../foto';
 import { PanelDeAcciones } from '../acciones';
 import {
@@ -241,6 +242,7 @@ export function Vigilia(): JSX.Element {
   return (
     <>
       <Pantalla reserva={ALTO_SENALAR}>
+        <AvisoDeLaPartida />
         <View style={estilos.cabecera}>
           <View style={{ flex: 1 }}>
             <Etiqueta>

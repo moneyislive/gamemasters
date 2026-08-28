@@ -209,7 +209,7 @@ export default function Portada(): JSX.Element {
             router.push('/partidas');
             return;
           }
-          await api.fijarToken(r.token);
+          await api.fijarToken(r.token, inv.gameId);
           await refrescar();
           router.push('/(juego)/ronda');
         } catch {

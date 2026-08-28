@@ -30,6 +30,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as api from '../../src/api';
 import { usePartida } from '../../src/estado';
 import { Reloj } from '../../src/reloj';
+import { AvisoDeLaPartida } from '../../src/conexion';
 import { PanelDeAcciones } from '../../src/acciones';
 import {
   Boton,
@@ -289,6 +290,7 @@ export default function Ronda(): JSX.Element {
   return (
     <>
     <Pantalla reserva={ALTO_ACUSAR}>
+      <AvisoDeLaPartida />
       <View style={estilos.cabeceraRonda}>
         <View style={{ flex: 1 }}>
           <Etiqueta>

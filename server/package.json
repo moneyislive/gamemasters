@@ -33,6 +33,7 @@
     "verify:secretos-agente": "tsx scripts/verificar-secretos-del-agente.ts",
     "verify:momia": "tsx scripts/verificar-momia.ts",
     "verify:puzle-momia": "tsx scripts/verificar-puzle-momia.ts",
+    "verify:conexion": "tsx scripts/verificar-conexion.ts",
     "verify:legal": "tsx scripts/verificar-legal.ts"
   },
   "dependencies": {
