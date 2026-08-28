@@ -78,15 +78,12 @@ type Emitir = (evento: GenerateStreamEvent) => void;
  */
 export interface SaborMomia {
   faraon: { nombre: string; descripcion: string };
-  tumba: { porQueEstabaSellada: string; queSeAbrio: string; laNocheDelSello: string };
   /** Por `suspectId`: por qué en la ficción le tocó su don. */
   elDon: Record<string, string>;
   /** Por id de rito. */
   ritos: Record<string, { invocacion: string; gesto: string }>;
   /** Por id de cámara. */
   inscripciones: Record<string, string>;
-  /** Por id de reliquia. */
-  reliquias: Record<string, string>;
 }
 
 /** `TramaMomia` más lo que escribe el modelo. Es lo que va en `Plot.delJuego`. */
@@ -411,11 +408,6 @@ export function ensamblarTramaMomia(
       nombre: respuesta.faraon?.nombre?.trim() || 'el difunto',
       descripcion: depurar(respuesta.faraon?.descripcion ?? '', 'el faraón', false),
     },
-    tumba: {
-      porQueEstabaSellada: respuesta.tumba?.porQueEstabaSellada ?? '',
-      queSeAbrio: respuesta.tumba?.queSeAbrio ?? '',
-      laNocheDelSello: respuesta.tumba?.laNocheDelSello ?? '',
-    },
     elDon: Object.fromEntries(
       entidades.expedicionarios.map((p) => [p.id, escritos.get(p.id)?.elDon?.trim() ?? '']),
     ),
@@ -429,12 +421,6 @@ export function ensamblarTramaMomia(
       entidades.camaras.map((camara) => {
         const escrito = (respuesta.camaras ?? []).find((c) => c?.camaraId === camara.id);
         return [camara.id, depurar(escrito?.inscripcion ?? '', `inscripción de ${camara.name}`, false)];
-      }),
-    ),
-    reliquias: Object.fromEntries(
-      entidades.reliquias.map((reliquia) => {
-        const escrito = (respuesta.reliquias ?? []).find((r) => r?.reliquiaId === reliquia.id);
-        return [reliquia.id, escrito?.relato ?? ''];
       }),
     ),
   };
@@ -505,7 +491,19 @@ export function ensamblarTramaMomia(
      * `delJuego`, que es de quien sabe leerlas.
      */
     clues: [],
-    gmScript: (respuesta.guion ?? []).filter((p) => typeof p === 'string' && p.trim()),
+    /*
+     * EL GUION TAMBIÉN PASA POR EL FILTRO, y era el único texto de la trama que
+     * no lo hacía.
+     *
+     * Se imprime entero en la Guía de la expedición, que es la hoja que se
+     * maneja toda la noche delante de la mesa y que, con el Game Master
+     * jugando, lee alguien que también juega. Un paso del guion que dijera «a la
+     * tercera vigilia recuérdales que el agua va antes que el nombre», o que
+     * nombrara a quien rompió el sello, salía impreso sin que nadie lo mirara.
+     */
+    gmScript: (respuesta.guion ?? [])
+      .filter((p) => typeof p === 'string' && p.trim())
+      .map((paso) => depurar(paso, 'guion', true)),
     material,
     delJuego,
   };

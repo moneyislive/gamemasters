@@ -44,17 +44,35 @@ import { envolverPapiro, portadaPapiro, sinTrama } from './comun';
 import { vistaDeLaMomia } from './datos';
 import type { DocumentRenderOptions, GameSession, Plot } from '../../../../../shared/types';
 
-/** Una tira: cara arriba, doblez, texto abajo. */
+/**
+ * Una tira: cara arriba, doblez, texto abajo.
+ *
+ * EL APUNTE VA EN EL DORSO, Y ESO ES LO QUE IGUALA LAS DOS CARAS.
+ *
+ * Estaba impreso en la cara, que es la mitad que queda a la vista al doblar, y
+ * era una cuarta línea —el id del fragmento y «déjalo en esa habitación»— que
+ * las falsificaciones no llevan. O sea que las dos clases de tira se
+ * distinguían de un vistazo desde el otro lado de la mesa, sin leer nada: la
+ * que tenía cuatro líneas era verdadera. La única jugada del traidor se caía
+ * con solo mirarla, que es justo lo que la cabecera de este fichero promete
+ * que no pasa.
+ *
+ * Ahora la cara lleva las mismas tres piezas en las dos —procedencia, vigilia
+ * y ornamento— y la instrucción de reparto viaja al dorso, que solo lee quien
+ * ya tiene la tira en la mano.
+ */
 function tira(donde: string, cuando: string, apunte: string, texto: string): string {
   return `      <div class="tira">
         <div class="cara">
           <span class="etiqueta" style="margin:0;">${esc(donde)}</span>
           <p style="margin:0.5mm 0 0; font-family:'Marcellus SC',Georgia,serif; font-size:10pt; color:#1f3f6b;">${esc(cuando)}</p>
           <div class="ornamento" style="margin:1.5mm 0 0; font-size:10pt; letter-spacing:0.35em;"><span class="glifo">𓂀</span></div>
-          <p class="maquina" style="margin:1.5mm 0 0; font-size:7.5pt; color:#8a6b3a;">${esc(apunte)}</p>
         </div>
         <div class="doblez">— — — dobla por aquí — — —</div>
-        <div class="dorso"><p>${esc(texto)}</p></div>
+        <div class="dorso">
+          <p class="maquina" style="margin:0 0 1.5mm; font-size:7.5pt; color:#8a6b3a;">${esc(apunte)}</p>
+          <p>${esc(texto)}</p>
+        </div>
       </div>`;
 }
 

@@ -407,7 +407,7 @@ async function probar(): Promise<void> {
 
     const trama = aCiegas.game.plot!.delJuego as {
       ordenVerdadero: string[];
-      falsasCandidatas: Array<{ id: string }>;
+      falsasCandidatas: Array<{ id: string; texto: string }>;
     };
     comprobar(
       'el orden verdadero NO viaja',
@@ -415,9 +415,28 @@ async function probar(): Promise<void> {
         !crudo.includes(JSON.stringify(trama.ordenVerdadero)),
       trama.ordenVerdadero,
     );
+    /*
+     * NI EL TEXTO DE UNA FALSIFICACIÓN QUE NADIE HA PUBLICADO.
+     *
+     * Los ids SÍ viajan, los nueve, y es deliberado: el universo de fragmentos
+     * se siembra con las candidatas para que el recuento del panel no se mueva
+     * cuando el saqueador miente. Antes no se sembraba, y el denominador
+     * saltaba de «0 de 5» a «1 de 6» en el instante exacto de la falsificación
+     * —con el texto del recién llegado al lado—, que es señalar al saqueador
+     * con el dedo sin necesidad de abrir las herramientas del navegador.
+     *
+     * El id no dice nada: se numeran DESPUÉS de barajar ciertas y falsas
+     * juntas (`momia-cimientos.ts`, «el id no dice nada»). Lo que no puede
+     * salir de aquí es el TEXTO, y eso es lo que se comprueba.
+     */
     for (const falsa of trama.falsasCandidatas.slice(0, 2)) {
-      comprobar(`ni la falsificación ${falsa.id}`, !crudo.includes(`"${falsa.id}"`));
+      comprobar(`ni el texto de la falsificación ${falsa.id}`, !crudo.includes(falsa.texto), falsa.texto);
     }
+    comprobar(
+      'y el universo de fragmentos ya viene sembrado con las falsificaciones',
+      trama.falsasCandidatas.every((f) => crudo.includes(`"${f.id}"`)),
+      trama.falsasCandidatas.map((f) => f.id).join(', '),
+    );
     comprobar('ni se dice de ningún fragmento que sea falso', !crudo.includes('"falso":true'));
 
     /*

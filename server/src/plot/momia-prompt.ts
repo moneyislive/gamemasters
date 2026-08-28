@@ -208,10 +208,11 @@ ${REGLAS_DE_REDACCION}
 LO QUE TIENES QUE ESCRIBIR
 ═══════════════════════════════════════════════════════════════════════════
 
-1. EL FARAÓN Y SU TUMBA. Quién fue, por qué su tumba se selló como se selló, qué
-   advertía el sello, qué se abrió y qué pasó la noche en que se rompió. La
-   ambientación tiene que reconocerse como la CASA REAL descrita en las cámaras:
-   si una cámara es «el pasillo largo con la lámpara que parpadea», eso aparece.
+1. EL FARAÓN Y LA NOCHE DEL SELLO. Quién fue el difunto y qué pasó la noche en
+   que se rompió el sello, contado como lo contaría la expedición: con lagunas.
+   La ambientación tiene que reconocerse como la CASA REAL descrita en las
+   cámaras: si una cámara es «el pasillo largo con la lámpara que parpadea», eso
+   aparece.
 
 2. UN DOSIER POR PERSONA, exactamente uno por cada id de la expedición, hecho a
    la medida de esa persona real. Esto es lo que vende la velada:
@@ -241,9 +242,10 @@ LO QUE TIENES QUE ESCRIBIR
    la maldición avanza, el aire se enrarece, quedan menos horas. Ninguna dice el
    orden de los ritos ni insinúa quién rompió el sello.
 
-5. LOS RITOS, LAS CÁMARAS Y LAS RELIQUIAS. Una invocación y un gesto físico por
-   rito —algo que se pueda hacer de verdad en un salón—, una inscripción de
-   dintel por cámara, y un relato por reliquia.
+5. LOS RITOS Y LAS CÁMARAS. Una invocación y un gesto físico por rito —algo que
+   se pueda hacer de verdad en un salón— y una inscripción de dintel por cámara.
+   De las reliquias no se escribe nada: están en la lista para que el motivo del
+   saqueo se apoye en una que existe.
 
 6. LA CRONOLOGÍA de la noche en que se rompió el sello, de 6 a 10 momentos.
    "publico" en true SOLO para lo que vio la expedición entera a la vez; un
@@ -265,7 +267,7 @@ ${trama.ordenVerdadero.map((id, i) => `  ${i + 1}. ${nombreRito(id)}`).join('\n'
 
 Este orden aparece ÚNICAMENTE en "desenlace.reconstruccion". No lo enumeres en la
 sinopsis, ni en las vigilias, ni en las inscripciones de las cámaras, ni en los
-dosieres, ni en las ayudas. Si aparece fuera de ahí, la velada se acaba en la
+dosieres, ni en las ayudas, ni en el guion de quien dirige. Si aparece fuera de ahí, la velada se acaba en la
 primera media hora.
 
 Los expedicionarios, por si necesitas nombrarlos en el desenlace: ${entidades.expedicionarios.map((e) => `${e.name} (${e.id})`).join(', ')}.

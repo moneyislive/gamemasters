@@ -120,6 +120,16 @@ export interface PalabrasDeJuego {
     cerrarRonda: string;
     rondaEnCurso: (numero: number, total: number) => string;
     rondaCerrada: (numero: number) => string;
+    /**
+     * Cuántas personas han entregado ya lo que se entrega al final.
+     *
+     * FRASE ENTERA Y NO UNA PALABRA METIDA EN UN HUECO, por lo mismo que dice
+     * la cabecera: se intentó componerla con el rótulo de la acción y salía «5
+     * de 5 acusar: entregadas» en CLUEDO y «5 de 5 señalar al saqueador:
+     * entregadas» en la Momia. Un infinitivo no es un sustantivo, y en español
+     * no se puede fingir que lo sea.
+     */
+    acusacionesRecibidas: (cuantas: number, total: number) => string;
   };
   /** El asistente. El NOMBRE sale del manifiesto; esto es lo que le rodea. */
   asistente: {
@@ -191,6 +201,8 @@ const CLUEDO: PalabrasDeJuego = {
     cerrarRonda: 'Cerrar la ronda',
     rondaEnCurso: (n, total) => `Ronda ${n} de ${total} · en curso`,
     rondaCerrada: (n) => `Ronda ${n} cerrada`,
+    // Palabra por palabra la que ya había: CLUEDO no cambia ni un píxel.
+    acusacionesRecibidas: (cuantas, total) => `${cuantas} de ${total} acusaciones entregadas.`,
   },
   asistente: {
     subtitulo: 'Agente experto en CLUEDO',
@@ -278,6 +290,13 @@ const MOMIA: PalabrasDeJuego = {
     cerrarRonda: 'Cerrar la vigilia',
     rondaEnCurso: (n, total) => `Vigilia ${n} de ${total} · en curso`,
     rondaCerrada: (n) => `Vigilia ${n} cerrada`,
+    /*
+     * «Señalamientos» y no «acusaciones»: aquí nadie acusa de un asesinato, se
+     * señala a quien rompió el sello. Y va justo encima del contador de
+     * propuestas de orden, así que con la misma palabra los dos se leían como
+     * el mismo dato.
+     */
+    acusacionesRecibidas: (cuantas, total) => `${cuantas} de ${total} señalamientos entregados.`,
   },
   asistente: {
     subtitulo: 'Escriba de la expedición',

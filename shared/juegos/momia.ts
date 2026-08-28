@@ -223,7 +223,18 @@ export const IMPRIMIBLES_MOMIA: PrintableDocInfo[] = [
     id: 'informe-papiro',
     name: 'Informe del papiro',
     summary: 'La comprobación de que el puzle tiene una sola solución y de que nadie puede resolverlo en solitario.',
-    audience: 'gm',
+    /*
+     * `preparer` Y NO `gm`, como su gemelo `informe-validacion` de CLUEDO.
+     *
+     * Dentro va el texto entero de los fragmentos ciertos, y esos fragmentos
+     * determinan un solo orden: quien los lee tiene la solución, aunque no
+     * venga enumerada. Con `gm`, el paquete a ciegas lo metía en la carpeta
+     * `01_GAME_MASTER`, cuyo propio léeme promete que nada de ahí revela el
+     * caso, y quien dirige jugando se destripaba la partida creyendo que hacía
+     * la comprobación previa. Es material de quien MONTA la velada, que es lo
+     * que dice la cabecera de `docs/imprimibles/momia/informePapiro.ts`.
+     */
+    audience: 'preparer',
     modes: ['host', 'blind'],
     defaultOn: false,
     copies: 'una',

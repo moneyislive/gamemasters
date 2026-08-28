@@ -6,7 +6,6 @@
  *   PATCH  /games/:id  → patch parcial {name?, boardMode?, boardImageUrl?, settings?}
  *   DELETE /games/:id  → {ok:true}
  */
-import { DOCUMENT_SECTIONS } from '../../../shared/types';
 import { juegosInstalados, manifiestoDe } from '../../../shared/juegos';
 import type { DocumentSectionId, GameSettings } from '../../../shared/types';
 import { isPrintableDocId } from '../../../shared/documents';
@@ -171,7 +170,17 @@ router.patch('/games/:id', async (req, res) => {
       if ('documentSections' in incoming) {
         const brutas = incoming.documentSections;
         if (Array.isArray(brutas)) {
-          const validas = DOCUMENT_SECTIONS.map((s) => s.id);
+          /*
+           * Contra el catálogo de SU juego, por lo mismo que el bloque de
+           * `printableDocs` de aquí abajo, que ya se arregló por esta razón.
+           *
+           * `DOCUMENT_SECTIONS` son las diez de CLUEDO, y las cuatro propias de
+           * la Momia —el don, la expedición, las reliquias, los ritos— no están
+           * ahí: quien montaba la maqueta del dosier de una expedición las
+           * marcaba, le decía que guardaba, y al recargar habían desaparecido
+           * sin un solo aviso.
+           */
+          const validas = manifiestoDe(game.settings?.juego).seccionesDeDosier.map((s) => s.id);
           nextSettings.documentSections = brutas.filter(
             (id): id is DocumentSectionId =>
               typeof id === 'string' && validas.includes(id as DocumentSectionId),

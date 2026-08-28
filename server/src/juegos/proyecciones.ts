@@ -70,7 +70,9 @@ export function proyectarEstado(
   sesion: LiveSession,
   suspectId: string,
 ): unknown | undefined {
-  const fn = PROYECCIONES[sesion.juego ?? ''];
+  // Por el manifiesto y no por el campo crudo, igual que `estadoParaGm` aquí
+  // abajo: las partidas de CLUEDO de siempre no declaran `settings.juego`.
+  const fn = PROYECCIONES[manifiestoDe(sesion.juego).id];
   if (!fn) return undefined;
   try {
     return fn(game, sesion, suspectId);

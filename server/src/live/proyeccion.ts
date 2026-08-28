@@ -431,6 +431,23 @@ export function vistaDeGameMaster(game: GameSession, sesion: LiveSession): Vista
           correcta: false,
           at: a.at,
         })),
+        /*
+         * Y LAS DOS RENDIJAS QUE QUEDABAN ABIERTAS AL LADO DE LA PUERTA.
+         *
+         * `winnerId` solo se escribe cuando alguien señala CORRECTAMENTE, así
+         * que su mera presencia dice que esa acusación era la buena — y si el
+         * id es el de quien dirige, acaba de enterarse de que acertó. Es
+         * exactamente el dato que las líneas de arriba se molestan en borrar de
+         * `acusaciones`, saliendo por la puerta de al lado.
+         *
+         * `acciones` es el registro de quién ha hecho qué en cada vigilia. No
+         * nombra al saqueador por sí solo —todos los dones se ejercen con
+         * `invocar`—, pero es material de juego en la pantalla de alguien que
+         * está jugando, y no lo lee nadie: ni el puesto de mando ni la app lo
+         * consultan.
+         */
+        winnerId: undefined,
+        acciones: [],
       }
     : sesion;
 

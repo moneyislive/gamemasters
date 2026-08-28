@@ -18,6 +18,7 @@
  * habría cambiado el comportamiento del único juego que hay en producción a
  * cambio de nada esta noche. El informe de arquitectura propone cuándo hacerlo.
  */
+import { manifiestoDe } from '../../../shared/juegos';
 import type { JuegoId } from '../../../shared/juegos';
 import type { LivePlayer, LiveSession, TrofeoId } from '../../../shared/live';
 import type { GameSession, Plot } from '../../../shared/types';
@@ -61,7 +62,9 @@ export function registrarTrofeos(juego: JuegoId, reparto: RepartoDeTrofeos): voi
  * lo primero es que quede constancia de que jugó.
  */
 export function trofeosDelJuego(juego: JuegoId | undefined, cierre: CierreDeJugador): TrofeoId[] {
-  const reparto = REPARTOS[juego ?? ''];
+  // Por el manifiesto y no por el campo crudo: una partida de CLUEDO de las de
+  // siempre llega aquí sin `juego` declarado.
+  const reparto = REPARTOS[manifiestoDe(juego).id];
   if (!reparto) return [];
   try {
     return reparto(cierre);

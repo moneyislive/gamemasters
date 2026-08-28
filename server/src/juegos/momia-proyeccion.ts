@@ -310,6 +310,28 @@ registrarProyeccion('momia', (game, sesion, suspectId) => vistaMomiaDe(game, ses
  * filtro falla cerrado a propósito, y esta función es lo que lo abre justo lo
  * necesario.
  */
+/** Un fragmento tal y como lo ve quien dirige: con texto solo si está sobre la mesa. */
+type FragmentoParaGm = { id: string; texto?: string; publico: boolean };
+
+/**
+ * El universo de fragmentos que ve quien dirige, sembrado con las candidatas.
+ *
+ * Se ordena por id, y eso no es cosmética: si las candidatas se quedaran al
+ * final de la lista, el orden de las claves diría cuáles son igual de bien que
+ * el recuento.
+ */
+function universoDeFragmentos(game: GameSession, estado: EstadoMomia): Array<[string, FragmentoParaGm]> {
+  const universo = new Map<string, FragmentoParaGm>();
+  for (const f of tramaDe(game.plot)?.falsasCandidatas ?? []) {
+    universo.set(f.id, { id: f.id, publico: false });
+  }
+  // El estado manda: una candidata que ya está en juego pisa su semilla.
+  for (const f of Object.values(estado.fragmentos)) {
+    universo.set(f.id, f.publico ? { id: f.id, texto: f.texto, publico: true } : { id: f.id, publico: false });
+  }
+  return [...universo.entries()].sort(([a], [b]) => a.localeCompare(b));
+}
+
 registrarProyeccionParaGm('momia', (game, sesion) => {
   const estado = (sesion.estado as { momia?: EstadoMomia } | undefined)?.momia;
   if (!estado) return undefined;
@@ -338,13 +360,24 @@ registrarProyeccionParaGm('momia', (game, sesion) => {
        * «X de Y publicados» y con esa lista decía siempre «Y de Y», o sea que
        * mentía sobre lo único que enseña. Esconder el TEXTO es lo que hace
        * falta; esconder que existen no protege nada y rompe el recuento.
+       *
+       * Y EL UNIVERSO SE SIEMBRA CON LAS FALSAS CANDIDATAS, que es lo que
+       * impide que el denominador delate la mentira.
+       *
+       * `estado.fragmentos` arranca con los fragmentos ciertos y solo crece
+       * cuando el saqueador falsifica: publicar de verdad nunca añade una
+       * clave, se limita a poner `publico` en una que ya estaba. Así que quien
+       * dirige veía el recuento saltar de «0 de 5» a «1 de 6», con el texto del
+       * recién llegado al lado, y ese salto señalaba la falsificación —y de
+       * paso a quien tiene el don— sin necesidad de mirar el JSON. Con las
+       * candidatas sembradas desde la primera vigilia el denominador ya no se
+       * mueve en toda la noche, y una falsa publicada entra por la misma puerta
+       * que una cierta.
+       *
+       * Ordenado por id para que el orden de las claves tampoco cuente nada:
+       * las candidatas no pueden ir siempre al final de la lista.
        */
-      fragmentos: Object.fromEntries(
-        Object.values(estado.fragmentos).map((f) => [
-          f.id,
-          f.publico ? { id: f.id, texto: f.texto, publico: true } : { id: f.id, publico: false },
-        ]),
-      ),
+      fragmentos: Object.fromEntries(universoDeFragmentos(game, estado)),
       /*
        * QUIÉN ha entregado su orden, pero no CUÁL. Con el Game Master jugando,
        * ver el orden de cada cual sería jugar con las cartas vistas.

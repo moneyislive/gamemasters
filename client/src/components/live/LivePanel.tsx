@@ -11,7 +11,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ComponentType } from 'react';
 import { useAppStore } from '../../state/store';
-import { manifiestoDe, accionDeAcusacion } from '../../../../shared/juegos';
+import { manifiestoDe } from '../../../../shared/juegos';
 import { FASES_EN_JUEGO } from '../../../../shared/live';
 import type { LivePhase, VistaGameMaster } from '../../../../shared/live';
 import { palabrasDe } from '../../juegos/palabras';
@@ -303,14 +303,14 @@ export default function LivePanel(): JSX.Element {
         {FASES_EN_JUEGO.includes(sesion.phase) && (
           <p className="text-dim text-italic">
             {/*
-              CON LA PALABRA DEL JUEGO. En El Misterio de la Momia esto salía
-              como «5 de 5 acusaciones entregadas» justo encima de «5 de 5
-              propuestas de orden entregadas», y ahí nadie acusa a nadie: se
-              señala a quien rompió el sello. Dos contadores casi iguales con
-              una palabra que no es la del juego se leen como el mismo dato.
+              CON LA PALABRA DEL JUEGO, y sale de `palabras.ts` como el resto de
+              los rótulos del taller. En El Misterio de la Momia esto decía «5 de
+              5 acusaciones entregadas» justo encima de «5 de 5 propuestas de
+              orden entregadas», y ahí nadie acusa a nadie: se señala a quien
+              rompió el sello. Dos contadores casi iguales con una palabra que no
+              es la del juego se leen como el mismo dato.
             */}
-            {vista.acusacionesRecibidas} de {sesion.players.length}{' '}
-            {`${(accionDeAcusacion(manifiesto)?.rotulo ?? 'Acusar').toLowerCase()}: entregadas.`}
+            {palabras.acusacionesRecibidas(vista.acusacionesRecibidas, sesion.players.length)}
           </p>
         )}
 

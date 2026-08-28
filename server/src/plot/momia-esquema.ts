@@ -85,7 +85,7 @@ export interface RespuestaMomia {
   synopsis: string;
   faraon: { nombre: string; descripcion: string };
   ambientacion: string;
-  tumba: { porQueEstabaSellada: string; queSeAbrio: string; laNocheDelSello: string };
+  tumba: { laNocheDelSello: string };
   /** Id EXACTO de un expedicionario. Es la respuesta del único eje del juego. */
   saqueadorId: string;
   motivoDelSaqueo: string;
@@ -93,7 +93,6 @@ export interface RespuestaMomia {
   expedicionarios: ExpedicionarioEscrito[];
   ritos: Array<{ ritoId: string; invocacion: string; gesto: string }>;
   camaras: Array<{ camaraId: string; inscripcion: string }>;
-  reliquias: Array<{ reliquiaId: string; relato: string }>;
   fragmentos: FragmentoEscrito[];
   vigilias: VigiliaEscrita[];
   cronologia: Array<{
@@ -116,6 +115,27 @@ export interface RespuestaMomia {
  * estructuradas exigen `additionalProperties: false`, `required` completo en
  * cada nivel y nada de `minLength`/`minimum`. Las longitudes se piden en las
  * descripciones, que el modelo sí lee.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * Y HAY UN TECHO: ESTE ESQUEMA CABE JUSTO
+ * ─────────────────────────────────────────────────────────────────────────────
+ *
+ * Con `output_config.format` la API compila el esquema a una gramática, y si
+ * sale demasiado grande RECHAZA la petición entera con un 400 —«The compiled
+ * grammar is too large»— antes de escribir una palabra. Este esquema llegó a
+ * pasarse de ese techo: la generación del papiro estaba rota contra la API de
+ * verdad, y no se vio porque sin clave se cae al modo demo y porque
+ * `verificar-momia-trama.ts` es puro y no sale a la red.
+ *
+ * Se arregló quitando tres textos que se pedían y no leía nadie —los dos
+ * campos de `tumba` que no son `laNocheDelSello`, y el relato de cada
+ * reliquia—. Lo que quedó compila con sitio para unos seis campos de texto más.
+ *
+ * Así que ANTES DE AÑADIR CAMPOS AQUÍ, comprueba que la gramática sigue
+ * compilando: basta una llamada con `max_tokens` mínimo y este esquema; el 400
+ * llega en la validación y no cuesta tokens. Lo que NO sirve es fiarse de la
+ * suite: ninguna de sus comprobaciones llama a la API. El techo es del
+ * servicio, no del modelo — cambiar de modelo no lo levanta.
  */
 
 const EXPEDICIONARIO_SCHEMA: Record<string, unknown> = {
@@ -199,7 +219,6 @@ export const MOMIA_TRAMA_SCHEMA: Record<string, unknown> = {
     'expedicionarios',
     'ritos',
     'camaras',
-    'reliquias',
     'fragmentos',
     'vigilias',
     'cronologia',
@@ -235,13 +254,8 @@ export const MOMIA_TRAMA_SCHEMA: Record<string, unknown> = {
     tumba: {
       type: 'object',
       additionalProperties: false,
-      required: ['porQueEstabaSellada', 'queSeAbrio', 'laNocheDelSello'],
+      required: ['laNocheDelSello'],
       properties: {
-        porQueEstabaSellada: {
-          type: 'string',
-          description: 'Por qué se selló la tumba hace tres mil años y qué advertía el sello.',
-        },
-        queSeAbrio: { type: 'string', description: 'Qué se abrió exactamente y en qué orden avanzó la excavación.' },
         laNocheDelSello: {
           type: 'string',
           description:
@@ -303,22 +317,6 @@ export const MOMIA_TRAMA_SCHEMA: Record<string, unknown> = {
             type: 'string',
             description:
               'Lo que hay escrito en su dintel, para el cartel que se pega en la puerta de esa habitación real. 1-2 frases, sin decir nada del orden de los ritos.',
-          },
-        },
-      },
-    },
-    reliquias: {
-      type: 'array',
-      description: 'Una entrada por cada reliquia de la lista, con su id EXACTO',
-      items: {
-        type: 'object',
-        additionalProperties: false,
-        required: ['reliquiaId', 'relato'],
-        properties: {
-          reliquiaId: { type: 'string', description: 'Id EXACTO de la reliquia' },
-          relato: {
-            type: 'string',
-            description: 'Qué es, dónde apareció y por qué alguien pagaría por ella. 2-3 frases.',
           },
         },
       },

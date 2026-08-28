@@ -256,6 +256,24 @@ export function cimientosDeMomia(
     ritos: idsDeRito,
     jugadores: expedicionarios.length,
     semilla: `${semilla}·puzle`,
+    /*
+     * UNA RESTRICCIÓN MÁS QUE VIGILIAS, y no es una preferencia de diseño: sin
+     * esto la mesa mínima no se puede generar.
+     *
+     * Se entra en una cámara por vigilia y cada cámara da un fragmento, así que
+     * quien explore las cuatro noches se lleva cuatro fragmentos. Si el puzle se
+     * resuelve con cuatro, una sola persona lo saca en solitario y el reparto
+     * —que es de lo que va el juego— deja de tener sentido; y el chequeo de más
+     * abajo, que exige justamente que nadie pueda juntarlos todos, revienta la
+     * generación. Con cuatro expedicionarios, que es el mínimo que declara el
+     * manifiesto, `generarPuzle` elegía por su cuenta un mínimo de cuatro y
+     * cerca de la mitad de las semillas moría ahí. Y como la semilla es el id de
+     * la partida, reintentar daba exactamente el mismo error para siempre.
+     *
+     * `momia-trama.ts` lo pasa desde el principio; aquí faltaba, y este es el
+     * camino por el que se genera de verdad.
+     */
+    minimoRestricciones: vigilias + 1,
   });
 
   const informe = verificarPuzle(idsDeRito, puzle);

@@ -53,7 +53,7 @@ export function respuestaDeDemostracion(
   entidades: EntidadesDeMomia,
   trama: TramaMomia,
 ): RespuestaMomia {
-  const { expedicionarios, camaras, reliquias, ritos } = entidades;
+  const { expedicionarios, camaras, ritos } = entidades;
   const nombreDe = (lista: Entidad[], id: string): string =>
     lista.find((e) => e.id === id)?.name ?? id;
 
@@ -99,12 +99,6 @@ export function respuestaDeDemostracion(
         .map((c) => c.name)
         .join(', ')} y lo que las une son ahora corredores excavados en la roca.`,
     tumba: {
-      porQueEstabaSellada:
-        'El sello triple advertía que el difunto no había pagado su deuda con la balanza y que abrir ' +
-        'la puerta era aceptarla en su lugar.',
-      queSeAbrio:
-        'Primero el corredor, después la antesala, y la última noche la cámara del sarcófago, contra ' +
-        'el criterio del guardián de la concesión.',
       laNocheDelSello:
         'Se cenó tarde. Hubo una discusión por quién firmaría el hallazgo. A la una alguien bajó con ' +
         'una lámpara y a las dos el sello estaba en el suelo, en tres pedazos, y nadie vio nada.',
@@ -151,12 +145,6 @@ export function respuestaDeDemostracion(
     camaras: camaras.map((camara) => ({
       camaraId: camara.id,
       inscripcion: `Aquí se guarda lo que no se pesa. Entra si has de entrar, y no te entretengas.`,
-    })),
-    reliquias: reliquias.map((reliquia) => ({
-      reliquiaId: reliquia.id,
-      relato:
-        'Salió del nicho lateral, envuelta en lino podrido. Vale menos de lo que se dice y más de lo ' +
-        'que se paga por ella.',
     })),
     // La redacción del código, tal cual: es la que la validación acepta.
     fragmentos: [...trama.restricciones, ...trama.falsasCandidatas].map((r) => ({
