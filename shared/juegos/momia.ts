@@ -152,6 +152,7 @@ export const IMPRIMIBLES_MOMIA: PrintableDocInfo[] = [
     audience: 'players',
     modes: ['host', 'blind'],
     defaultOn: true,
+    porPersona: true,
     copies: 'una-por-jugador',
     sides: 'doble',
   },

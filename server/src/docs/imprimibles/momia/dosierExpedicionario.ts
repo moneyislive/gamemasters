@@ -29,6 +29,7 @@ import { manifiestoDe } from '../../../../../shared/juegos';
 import { envolverPapiro, portadaPapiro, sinTrama } from './comun';
 import { vistaDeLaMomia } from './datos';
 import type { DocumentRenderOptions, GameSession, Plot } from '../../../../../shared/types';
+import { registrarDosierDeUno } from '../../dosieres';
 
 export function dosierExpedicionario(
   game: GameSession,
@@ -41,7 +42,17 @@ export function dosierExpedicionario(
   const reglas = manifiestoDe(game.settings?.juego).reglas ?? [];
   const saqueadorId = plot.solution?.respuestas?.saqueador;
 
-  const dosieres = vista.expedicionarios
+  /*
+   * UNO SOLO CUANDO LO PIDE EL TALLER. El documento lleva dentro el de toda la
+   * mesa —se imprime de una vez y se recorta— pero el taller los reparte de uno
+   * en uno: abre el de Ana, lo manda por correo, lo descarga. Mandarle a una
+   * persona el fichero entero sería repartirle la partida.
+   */
+  const gente = opciones.soloPara
+    ? vista.expedicionarios.filter((e) => e.id === opciones.soloPara)
+    : vista.expedicionarios;
+
+  const dosieres = gente
     .map((persona, indice) => {
       const personaje = plot.characters.find((c) => c.suspectId === persona.id);
       const don = vista.donDe(persona.id);
@@ -158,3 +169,13 @@ ${dosieres}`;
 
   return envolverPapiro(`${plot.title} — Dosieres de la expedición`, contenido, opciones);
 }
+
+/*
+ * El alta para el taller, que reparte los dosieres de uno en uno.
+ *
+ * Es el MISMO documento, compuesto solo con el bloque de esa persona. Va al
+ * final de su fichero para que no se pueda mover sin ver el registro.
+ */
+registrarDosierDeUno('momia', (game, plot, suspectId, opciones) =>
+  dosierExpedicionario(game, plot, { ...opciones, soloPara: suspectId }),
+);

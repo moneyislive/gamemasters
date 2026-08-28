@@ -28,6 +28,7 @@
  * `registrarGenerador` que pide el informe de arquitectura. Cuando se junten,
  * este comentario sobra.
  */
+import { manifiestoDe } from '../../../shared/juegos';
 import type { JuegoId } from '../../../shared/juegos';
 import type { GenerateStreamEvent, GameSession, Plot } from '../../../shared/types';
 import type { StalenessReport } from '../../../shared/staleness';
@@ -56,8 +57,19 @@ export function registrarAmpliacion(juego: JuegoId, ampliacion: Ampliacion): voi
  * Un juego sin ampliación registrada NO recibe la de otro: se salta esa etapa.
  * Es lo correcto y además es lo seguro — recibir la de otro juego era el fallo.
  */
+/*
+ * EL ID SE RESUELVE CON EL MANIFIESTO, NO CON EL CAMPO CRUDO.
+ *
+ * Una partida de CLUEDO de las de siempre NO tiene `settings.juego` escrito: el
+ * campo nacio con el segundo juego y `manifiestoDe(undefined)` cae en CLUEDO a
+ * proposito, para que las partidas de antes sigan funcionando. Buscar aqui por
+ * `juego ?? ''` significaba no encontrar NADA para esas partidas, o sea saltarse
+ * en silencio lo que CLUEDO si tiene dado de alta. Estuvo roto exactamente asi,
+ * con la suite entera en verde, porque ninguna comprobacion entraba por esa
+ * puerta con una partida sin el campo.
+ */
 export function ampliacionDe(juego: JuegoId | undefined): Ampliacion | undefined {
-  return AMPLIACIONES[juego ?? ''];
+  return AMPLIACIONES[manifiestoDe(juego).id];
 }
 
 /** Los juegos con ampliación dada de alta. Lo usa la comprobación. */

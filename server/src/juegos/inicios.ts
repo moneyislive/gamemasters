@@ -21,6 +21,7 @@
  * no tiene que saberlo, tiene que PREGUNTARLO. Un juego que no registra nada
  * abre exactamente igual que antes — y CLUEDO no registra nada.
  */
+import { manifiestoDe } from '../../../shared/juegos';
 import type { JuegoId } from '../../../shared/juegos';
 import type { LiveSession } from '../../../shared/live';
 import type { GameSession } from '../../../shared/types';
@@ -50,7 +51,7 @@ export function registrarInicio(juego: JuegoId, inicio: Inicio): void {
  * fallo en algo que se puede reconstruir sería peor que el fallo.
  */
 export function iniciarJuego(game: GameSession, sesion: LiveSession): void {
-  const inicio = INICIOS[sesion.juego ?? ''];
+  const inicio = INICIOS[manifiestoDe(sesion.juego).id];
   if (!inicio) return;
   try {
     inicio(game, sesion);

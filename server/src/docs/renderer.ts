@@ -14,6 +14,7 @@ import { styleNoteForGm } from '../plot/style';
 import { vistaGm } from './contexto';
 import { cronologiaPublica, REGLAS_JUGADOR } from './datos';
 import { manifiestoDe } from '../../../shared/juegos';
+import { dosierPropioDe } from './dosieres';
 import { barraDeImpresion, hojaDeEstilos } from './estilos';
 import { esc } from './html';
 import type {
@@ -783,6 +784,24 @@ export function renderPlayerDocument(
 
   const sospechoso = game.suspects.find((s) => s.id === suspectId);
   if (!sospechoso) return null;
+
+  /*
+   * EL DOSIER PROPIO DEL JUEGO, SI LO HAY, y esta es la otra puerta del mismo
+   * agujero. El paquete ya dejó de meter el genérico de CLUEDO en el ZIP, pero
+   * el taller sirve los dosieres de UNO EN UNO por su propia ruta: abrir el de
+   * Ana, mandárselo por correo, descargarlo en PDF. Por ahí seguía saliendo el
+   * de CLUEDO —la víctima, los sospechosos, los pasadizos secretos— sobre datos
+   * de una expedición, y sin el don, que este juego declara obligatorio.
+   *
+   * `soloPara` es lo que hace que se le mande SU bloque y no el de la mesa
+   * entera, que sería repartirle la partida.
+   */
+  const propio = dosierPropioDe(game.settings?.juego);
+  if (propio) {
+    const html = propio(game, plot, suspectId, opciones);
+    if (html) return { suspectId, title: tituloJugador(plot, sospechoso), html };
+  }
+
   const personaje = plot.characters.find((c) => c.suspectId === suspectId);
   return dosierJugador(opciones, game, plot, sospechoso, personaje);
 }

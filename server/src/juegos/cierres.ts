@@ -21,6 +21,7 @@
  * 409 honesto —«este juego no se cierra así»— y CLUEDO no gana ninguna puerta
  * nueva por el hecho de que la Momia la necesite.
  */
+import { manifiestoDe } from '../../../shared/juegos';
 import type { JuegoId } from '../../../shared/juegos';
 import type { LiveSession } from '../../../shared/live';
 import type { GameSession } from '../../../shared/types';
@@ -50,7 +51,7 @@ export function registrarCierre(juego: JuegoId, cierre: Cierre): void {
 
 /** ¿Este juego se cierra con un acto de quien dirige? */
 export function tieneCierre(juego: JuegoId | undefined): boolean {
-  return Boolean(CIERRES[juego ?? '']);
+  return Boolean(CIERRES[manifiestoDe(juego).id]);
 }
 
 /**
@@ -62,7 +63,7 @@ export function tieneCierre(juego: JuegoId | undefined): boolean {
  * un ritual que no se ha escrito.
  */
 export function ejecutarCierre(game: GameSession, sesion: LiveSession): { anuncio: string } {
-  const cierre = CIERRES[sesion.juego ?? ''];
+  const cierre = CIERRES[manifiestoDe(sesion.juego).id];
   if (!cierre) {
     throw new Error('Este juego no se cierra así.');
   }

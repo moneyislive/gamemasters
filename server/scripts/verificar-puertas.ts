@@ -36,8 +36,10 @@ import { generarTramaMomia, estadoInicial, tramaDe } from '../src/juegos/momia-t
 import { generateBoardLayout } from '../src/board/generator';
 import { generateDemoPlot } from '../src/plot/demoPlot';
 import { armarPaquete } from '../src/docs/paquete';
+import { renderDocumentIndex } from '../src/docs/renderer';
+import '../src/juegos/instalados';
 import { juegosConMaterial } from '../src/juegos/materiales';
-import { juegosConAmpliacion } from '../src/juegos/ampliaciones';
+import { ampliacionDe, juegosConAmpliacion } from '../src/juegos/ampliaciones';
 import { entidadesDeLaMomia, ensamblarTramaMomia } from '../src/plot/momia-generacion';
 import { cimientosDeMomia } from '../src/plot/momia-cimientos';
 import { respuestaDeDemostracion } from '../src/plot/momia-demo';
@@ -152,6 +154,9 @@ function partidaDeMomia(
 
   game.board = generateBoardLayout(game.rooms, manifiestoDe('momia').rotuloCentralDelPlano);
   game.plot = generarTramaMomia(game, { semilla: 'puertas', vigilias: 3, saqueador: 'e3' });
+  // El índice de documentos, como lo deja la generación de verdad: sin él, la
+  // ruta que sirve un dosier suelto contesta «todavía no se ha generado».
+  game.documents = renderDocumentIndex(game);
   const estado: EstadoMomia = estadoInicial(
     tramaDe(game.plot)!,
     game.suspects.map((s) => s.id),
@@ -376,6 +381,52 @@ async function probar(): Promise<void> {
   }
 
   // -------------------------------------------------------------------------
+  paso('El dosier que sirve el taller es el del juego, y solo el de esa persona');
+  // -------------------------------------------------------------------------
+  {
+    /*
+     * ESTA ES LA PUERTA DEL TALLER, y era la otra mitad del agujero de los
+     * dosieres. El paquete ya dejó de meter el genérico de CLUEDO en el ZIP,
+     * pero el taller sirve los dosieres de UNO EN UNO por esta ruta: abrir el de
+     * alguien, mandárselo por correo, descargarlo en PDF. Por aquí seguía
+     * saliendo el de CLUEDO sobre datos de una expedición.
+     */
+    const r = await pedir('/games/expedicion/documents/e0');
+    const html = typeof r.datos === 'string' ? r.datos : JSON.stringify(r.datos);
+    const sirve = r.estado === 200;
+    comprobar('el taller sirve el dosier de una persona', sirve, r.estado);
+
+    /*
+     * TODO LO DE ABAJO EXIGE QUE HAYA SERVIDO. Sin esta guarda, un 404
+     * dejaba las tres comprobaciones de contenido en verde —no encontraban las
+     * palabras de CLUEDO porque no había documento— y el fallo pasaba entero.
+     * Es la trampa de siempre: verde por vacío.
+     */
+    for (const deCluedo of ['Los objetos del crimen', 'Pasadizos secretos', 'Los sospechosos']) {
+      comprobar(`no habla de «${deCluedo}»`, sirve && !html.includes(deCluedo));
+    }
+    comprobar(
+      'y sí trae el don, que este juego declara obligatorio',
+      sirve && html.includes('Tu don ·'),
+      html.slice(0, 200),
+    );
+
+    /*
+     * Y SOLO EL SUYO. El documento lleva dentro el de toda la mesa para poder
+     * imprimirlo de una vez y recortarlo; mandarle a una persona el fichero
+     * entero sería repartirle la partida.
+     */
+    /*
+     * UN SOLO BLOQUE, y se cuenta por la caja del don y no por los nombres: en
+     * el dosier de cada cual SÍ salen los demás —la tabla «quiénes van» los
+     * lista a todos— y eso es el juego, no una filtración. Lo que no puede
+     * haber son cuatro dosieres en el fichero que se le manda a una persona.
+     */
+    const bloques = html.split('Tu don ·').length - 1;
+    comprobar('y un solo dosier dentro, no el de la mesa entera', sirve && bloques === 1, { bloques });
+  }
+
+  // -------------------------------------------------------------------------
   paso('Quien dirige tiene algo que leer DESDE QUE ABRE, sin que nadie actúe');
   // -------------------------------------------------------------------------
   {
@@ -508,6 +559,25 @@ async function probar(): Promise<void> {
     const antes = await pedir('/games/expedicion');
     const r = await pedir('/games/expedicion/material', { metodo: 'POST' });
     comprobar('la Momia rechaza el material de velada', r.estado === 409, r.estado);
+
+    /*
+     * Y CLUEDO NO. Esta comprobación existe porque su ausencia dejó pasar una
+     * regresión con las 70 en verde: los registros buscaban por `settings.juego`
+     * y las partidas de CLUEDO de siempre NO tienen ese campo —nació con el
+     * segundo juego—, así que no encontraban nada y CLUEDO se quedaba sin su
+     * material y sin su ampliación, en silencio. La partida `mansion` de esta
+     * prueba está sembrada igual que las de verdad: `settings` sin `juego`.
+     */
+    comprobar(
+      'la partida de CLUEDO de la prueba no declara juego, como las de verdad',
+      (cluedo.game.settings as { juego?: string }).juego === undefined,
+    );
+    const suyo = await pedir('/games/mansion/material', { metodo: 'POST' });
+    comprobar(
+      'y aun así CLUEDO encuentra su material de velada',
+      suyo.estado !== 409,
+      suyo.estado,
+    );
     const despues = await pedir('/games/expedicion');
     comprobar(
       'y la trama sigue exactamente igual',
@@ -759,6 +829,69 @@ function probarDepuracion(): void {
     'los secretos de cada cual siguen enteros',
     plot.characters.every((c) => Boolean(c.secret)),
   );
+
+  /*
+   * EL LEMA, que es la línea más difundida del juego: va a la portada de cinco
+   * imprimibles —incluidos los carteles que se pegan en las puertas— y al móvil
+   * de todo el mundo. No pasaba por ningún filtro. Es un canal peor que el
+   * dosier: aquel hay que abrirlo y este está en la pared.
+   */
+  const saqueadorId = respuesta.saqueadorId;
+  const nombreSaqueador =
+    entidades.expedicionarios.find((e) => e.id === saqueadorId)?.name ?? '';
+
+  const conLemaEnvenenado = respuestaDeDemostracion(game.name, entidades, cimientos.trama);
+  conLemaEnvenenado.tagline = `${nombres.join(' · ')}. Ese es el orden.`;
+  const { plot: p2 } = ensamblarTramaMomia(game, entidades, cimientos, conLemaEnvenenado);
+  comprobar('un lema con el orden verdadero NO sobrevive', !p2.tagline.includes(nombres[0]!), p2.tagline);
+
+  const conLemaQueSenala = respuestaDeDemostracion(game.name, entidades, cimientos.trama);
+  conLemaQueSenala.tagline = `Todo el mundo sabe que ${nombreSaqueador} rompió el sello.`;
+  const { plot: p3 } = ensamblarTramaMomia(game, entidades, cimientos, conLemaQueSenala);
+  comprobar(
+    'ni un lema que señala a quien lo rompió',
+    !p3.tagline.includes(nombreSaqueador),
+    p3.tagline,
+  );
+
+  /*
+   * SEÑALAR NO ES NOMBRAR, y esta pareja es la que lo fija. La presentación de
+   * alguien puede hablar del saqueador —la expedición habla de todos— pero no
+   * puede acusarle en la misma frase.
+   */
+  const acusa = respuestaDeDemostracion(game.name, entidades, cimientos.trama);
+  acusa.expedicionarios[0]!.publicPersona = `Todo el mundo comenta que ${nombreSaqueador} rompió el sello aquella noche.`;
+  const { plot: p4 } = ensamblarTramaMomia(game, entidades, cimientos, acusa);
+  const acusador = p4.characters.find((c) => c.suspectId === entidades.expedicionarios[0]!.id);
+  comprobar(
+    'una presentación pública que ACUSA no sobrevive',
+    !acusador!.publicPersona.includes('rompió el sello'),
+    acusador?.publicPersona,
+  );
+
+  const menciona = respuestaDeDemostracion(game.name, entidades, cimientos.trama);
+  const inocente = `Llegó de El Cairo con ${nombreSaqueador} y desde entonces no se separan.`;
+  menciona.expedicionarios[0]!.publicPersona = inocente;
+  const { plot: p5 } = ensamblarTramaMomia(game, entidades, cimientos, menciona);
+  const mencionador = p5.characters.find((c) => c.suspectId === entidades.expedicionarios[0]!.id);
+  comprobar(
+    'pero MENCIONARLE sin acusarle sí sobrevive',
+    mencionador?.publicPersona === inocente,
+    mencionador?.publicPersona,
+  );
+
+  /*
+   * Y SUSTITUIR NO PUEDE DELATAR. Poner el recambio narrativo en la casilla del
+   * oficio dejaba a cinco personas con una frase de novela ahí y al saqueador
+   * con un oficio de verdad: el único con pinta normal. Un filtro que señala a
+   * quien no filtró es peor que no filtrar.
+   */
+  const oficios = respuestaDeDemostracion(game.name, entidades, cimientos.trama);
+  oficios.expedicionarios[0]!.role = veneno;
+  const { plot: p6 } = ensamblarTramaMomia(game, entidades, cimientos, oficios);
+  const sustituido = p6.characters.find((c) => c.suspectId === entidades.expedicionarios[0]!.id)!;
+  comprobar('el oficio sustituido sigue pareciendo un oficio', sustituido.role.length < 40, sustituido.role);
+  comprobar('y no es la frase de recambio larga', !sustituido.role.includes('no se ponen de acuerdo'), sustituido.role);
 }
 
 /**
@@ -802,6 +935,22 @@ function probarAmpliacion(): void {
   const registrados = new Set(juegosConAmpliacion());
   comprobar('CLUEDO tiene la suya', registrados.has('cluedo'), [...registrados]);
   comprobar('y la Momia la suya', registrados.has('momia'), [...registrados]);
+
+  /*
+   * Y SE ENCUENTRAN DESDE UNA PARTIDA REAL, que es otra cosa. Las de CLUEDO no
+   * llevan `settings.juego` —el campo nació con el segundo juego— y buscar por
+   * el campo crudo no encontraba nada: CLUEDO se saltaba la etapa de trama
+   * entera, o sea que quien llegaba tarde se quedaba sin personaje y una
+   * solución rota no se reparaba nunca. Con las 70 comprobaciones en verde.
+   */
+  comprobar(
+    'y una partida de CLUEDO SIN el campo encuentra la suya',
+    Boolean(ampliacionDe(undefined)),
+  );
+  comprobar(
+    'igual que una que sí lo trae',
+    Boolean(ampliacionDe('cluedo')) && Boolean(ampliacionDe('momia')),
+  );
 }
 
 function probarPanel(): void {

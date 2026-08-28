@@ -37,6 +37,16 @@ import './momia-acciones';
 import './momia-proyeccion';
 import './momia-sellado';
 
+/*
+ * Y su dosier por persona, que lo sirve el taller.
+ *
+ * Se importa AQUÍ y no solo desde el catálogo de imprimibles porque el taller
+ * puede pedir el dosier de alguien antes de haber compuesto ningún imprimible.
+ * Si el alta no ha corrido, `renderPlayerDocument` cae en el genérico de CLUEDO
+ * en silencio, que es exactamente el fallo que esto viene a cerrar.
+ */
+import '../docs/imprimibles/momia/dosierExpedicionario';
+
 /**
  * No exporta nada, y es a propósito.
  *

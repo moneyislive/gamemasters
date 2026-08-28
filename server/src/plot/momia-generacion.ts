@@ -51,6 +51,7 @@ import { respuestaDeDemostracion } from './momia-demo';
 import {
   lexicoDeRitos,
   nombraAlSaqueador,
+  senalaAlSaqueador,
   revelaElOrden,
   revisarRedaccion,
 } from './momia-validacion';
@@ -128,6 +129,17 @@ export interface TramaEnsamblada {
   /** Cuántas frases del modelo se aceptaron, de cuántas se le pidieron. */
   redaccion: { aceptadas: number; total: number };
 }
+
+/**
+ * Recambio para una casilla que es un OFICIO, no un párrafo.
+ *
+ * Poner ahí el recambio narrativo largo convertía la sustitución en un
+ * marcador: en la tabla «quiénes van», cinco personas aparecían con una frase
+ * de novela en la casilla del oficio y el saqueador con «guardián de la
+ * concesión» — el único con pinta normal. Un filtro que señala a quien no filtró
+ * es peor que no filtrar.
+ */
+const RECAMBIO_OFICIO = 'miembro de la expedición';
 
 /** Un texto de recambio cuando el modelo escribe algo que no puede salir a la mesa. */
 const RECAMBIO_PUBLICO =
@@ -224,15 +236,38 @@ export function ensamblarTramaMomia(
    */
   const nombresDelSaqueador = [saqueador?.name ?? '', characters.find((c) => c.suspectId === saqueadorId)?.characterName ?? ''].filter(Boolean);
 
-  const depurar = (texto: string, donde: string, tambienElNombre: boolean): string => {
-    let salida = texto ?? '';
+  const depurar = (
+    texto: string,
+    donde: string,
+    tambienElNombre: boolean,
+    recambio: string = RECAMBIO_PUBLICO,
+  ): string => {
+    const salida = texto ?? '';
     if (revelaElOrden(salida, lexico, trama.ordenVerdadero)) {
       incidencias.push({ donde, arreglo: 'sustituida', motivo: 'enumeraba los cinco ritos en el orden verdadero' });
-      return RECAMBIO_PUBLICO;
+      return recambio;
     }
     if (tambienElNombre && nombresDelSaqueador.length && nombraAlSaqueador(salida, nombresDelSaqueador)) {
       incidencias.push({ donde, arreglo: 'sustituida', motivo: 'nombraba a quien rompió el sello' });
-      return RECAMBIO_PUBLICO;
+      return recambio;
+    }
+    /*
+     * Y EL SEÑALAMIENTO, SIEMPRE, aunque no toque el chequeo del nombre.
+     *
+     * Los dos no son lo mismo. `nombraAlSaqueador` prohíbe que aparezca el
+     * nombre, y eso solo vale donde el saqueador no debe salir en absoluto —la
+     * sinopsis, el lema, una narración—. En la presentación de alguien o en un
+     * momento público los nombres salen con toda naturalidad, el suyo incluido,
+     * y prohibirlos dejaría los dosieres llenos de agujeros.
+     *
+     * Lo que no puede salir NUNCA, ni ahí, es «todo el mundo comenta que Fabio
+     * rompió el sello aquella noche»: nombre y acusación en la misma frase. Eso
+     * es lo que mira `senalaAlSaqueador`, y es lo que estaba imprimiéndose en la
+     * hoja de las otras cinco personas.
+     */
+    if (nombresDelSaqueador.length && senalaAlSaqueador(salida, nombresDelSaqueador)) {
+      incidencias.push({ donde, arreglo: 'sustituida', motivo: 'señalaba a quien rompió el sello' });
+      return recambio;
     }
     return salida;
   };
@@ -259,7 +294,12 @@ export function ensamblarTramaMomia(
    * dosier del saqueador tiene que poder decirle que fue él.
    */
   for (const personaje of characters) {
-    personaje.role = depurar(personaje.role, `papel de ${personaje.characterName}`, false);
+    personaje.role = depurar(
+      personaje.role,
+      `papel de ${personaje.characterName}`,
+      false,
+      RECAMBIO_OFICIO,
+    );
     personaje.publicPersona = depurar(
       personaje.publicPersona,
       `presentación pública de ${personaje.characterName}`,
@@ -416,7 +456,21 @@ export function ensamblarTramaMomia(
 
   const plot: Plot = {
     title: respuesta.title?.trim() || game.name,
-    tagline: respuesta.tagline?.trim() || 'El sello está roto. Alguien de la expedición lo quiso así.',
+    /*
+     * EL LEMA ES LA LÍNEA QUE MÁS SE DIFUNDE DE TODO EL JUEGO, y no pasaba por
+     * ningún filtro. Va a la portada de cinco imprimibles —incluidos los
+     * carteles que se pegan en las puertas, que ve la casa entera— y al móvil de
+     * todo el mundo como `sesion.lema`. Es un canal peor que el dosier: aquel
+     * hay que abrirlo, y este está en la pared.
+     *
+     * Con el chequeo del nombre puesto, como la sinopsis: aquí el saqueador no
+     * pinta nada, ni nombrado ni señalado.
+     */
+    tagline: depurar(
+      respuesta.tagline?.trim() || 'El sello está roto. Alguien de la expedición lo quiso así.',
+      'lema',
+      true,
+    ),
     synopsis,
     // El «muerto» de esta velada es el faraón: es de quien va el caso, es quien
     // aparece en la portada de los dosieres y es a quien se le debe el sellado.

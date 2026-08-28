@@ -379,6 +379,60 @@ export function revelaElOrden(
  * —«Aurelia» identifica a Aurelia Vance—; con uno corto se exige entero, para
  * no dar por delatada a media expedición.
  */
+/**
+ * Palabras que convierten mencionar a alguien en SEÑALARLE.
+ *
+ * Normalizadas —sin tildes y en minúscula— porque así llega el texto a la
+ * comparación. No pretende ser exhaustivo: pretende cubrir cómo se dice esto en
+ * castellano cuando se dice de verdad.
+ */
+const SENALAMIENTOS = [
+  'rompio el sello',
+  'rompio el lacre',
+  'abrio el sello',
+  'abrio la camara sellada',
+  'profano',
+  'fue quien',
+  'fue el',
+  'fue ella',
+  'el saqueador',
+  'la saqueadora',
+  'por encargo',
+  'vendio',
+  'traiciono',
+];
+
+/**
+ * ¿Este texto SEÑALA a quien rompió el sello?
+ *
+ * NO ES LO MISMO QUE NOMBRARLE, y la diferencia es todo el juego. Los momentos
+ * públicos son de dos o más personas y llevan sus nombres; la presentación de
+ * alguien lleva el suyo; la expedición habla del saqueador sin saber que lo es.
+ * Nada de eso revela nada, y un filtro que lo borrase dejaría los dosieres
+ * llenos de agujeros.
+ *
+ * Lo que sí revela es «todo el mundo comenta que Fabio rompió el sello aquella
+ * noche», que es una frase que el modelo escribe de vez en cuando y que estaba
+ * saliendo impresa en la hoja de las otras cinco personas. Así que se exige que
+ * el nombre y la acusación estén EN LA MISMA FRASE: es lo que separa hablar de
+ * alguien de acusarle.
+ */
+export function senalaAlSaqueador(texto: string, nombres: string[]): boolean {
+  const limpios = nombres.map((n) => normalizar(n)).filter(Boolean);
+  if (limpios.length === 0) return false;
+
+  for (const frase of normalizar(texto).split(/[.;:!?\n]+/)) {
+    const conBordes = ` ${frase} `;
+    const nombra = limpios.some((n) => {
+      const tokens = n.split(' ').filter((t) => t.length >= 4);
+      if (tokens.length === 0) return conBordes.includes(` ${n} `);
+      return tokens.some((t) => conBordes.includes(` ${t} `) || conBordes.includes(` ${t}s `));
+    });
+    if (nombra && SENALAMIENTOS.some((m) => conBordes.includes(m))) return true;
+  }
+  return false;
+}
+
 export function nombraAlSaqueador(texto: string, nombres: string[]): boolean {
   const plano = ` ${normalizar(texto)} `;
   return nombres.some((n) => {

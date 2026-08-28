@@ -66,6 +66,21 @@ export interface PrintableDocInfo {
    * distintos tienen que ir a una sola cara, y eso cambia el resultado físico.
    */
   sides: 'una' | 'doble';
+  /**
+   * ¿Este documento es UN BLOQUE POR PERSONA?
+   *
+   * Los dosieres de un juego propio se componen en un solo fichero —se imprime
+   * una vez y se recorta— pero el taller los reparte de uno en uno: abre el de
+   * Ana, lo manda por correo, lo descarga en PDF. Con esto declarado, quien
+   * sirve un dosier suelto sabe qué documento tiene que componer y a nombre de
+   * quién, en vez de caer en el genérico de CLUEDO.
+   *
+   * SIN ESTO SE MANDABA EL DOCUMENTO EQUIVOCADO. El taller entregaba un dosier
+   * que hablaba de la víctima, de los sospechosos y de los pasadizos secretos,
+   * sobre datos de una expedición, y sin el don — que este juego declara como
+   * sección obligatoria.
+   */
+  porPersona?: boolean;
 }
 
 export const PRINTABLE_DOCS: PrintableDocInfo[] = [

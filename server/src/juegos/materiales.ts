@@ -19,6 +19,7 @@
  * separen: declarar sin generador deja un botón que da 409, y generador sin
  * declarar deja código al que no llega nadie.
  */
+import { manifiestoDe } from '../../../shared/juegos';
 import type { JuegoId } from '../../../shared/juegos';
 import type { GenerateStreamEvent, GameSession, Plot, PrintMaterial } from '../../../shared/types';
 
@@ -41,8 +42,19 @@ export function registrarMaterial(juego: JuegoId, generador: GeneradorDeMaterial
 }
 
 /** ¿Sabe alguien escribir el material de este juego? */
+/*
+ * EL ID SE RESUELVE CON EL MANIFIESTO, NO CON EL CAMPO CRUDO.
+ *
+ * Una partida de CLUEDO de las de siempre NO tiene `settings.juego` escrito: el
+ * campo nacio con el segundo juego y `manifiestoDe(undefined)` cae en CLUEDO a
+ * proposito, para que las partidas de antes sigan funcionando. Buscar aqui por
+ * `juego ?? ''` significaba no encontrar NADA para esas partidas, o sea saltarse
+ * en silencio lo que CLUEDO si tiene dado de alta. Estuvo roto exactamente asi,
+ * con la suite entera en verde, porque ninguna comprobacion entraba por esa
+ * puerta con una partida sin el campo.
+ */
 export function generadorDeMaterial(juego: JuegoId | undefined): GeneradorDeMaterial | undefined {
-  return GENERADORES[juego ?? ''];
+  return GENERADORES[manifiestoDe(juego).id];
 }
 
 /** Los juegos que tienen generador dado de alta. Lo usa la comprobación. */

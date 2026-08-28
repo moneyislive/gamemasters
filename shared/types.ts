@@ -426,6 +426,15 @@ export interface DocumentRenderOptions {
    * diálogo de impresión al cargar. La barra nunca sale en el papel.
    */
   printBar?: boolean | 'auto';
+  /**
+   * Compón solo el bloque de esta persona.
+   *
+   * Un documento `porPersona` lleva dentro el de toda la mesa: así se imprime de
+   * una vez y se recorta. Cuando el taller sirve el de alguien —para abrirlo,
+   * mandarlo por correo o descargarlo— tiene que llevar SOLO el suyo: mandarle
+   * a una persona el fichero entero es repartir la partida.
+   */
+  soloPara?: string;
 }
 
 export interface DocumentFormatInfo {
