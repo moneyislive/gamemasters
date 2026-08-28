@@ -95,26 +95,41 @@ export function armarPaquete(game: GameSession): Paquete {
     });
   }
 
-  // Dosier del Game Master: siempre suyo.
-  entradas.push({
-    ruta: `${carpetaGm}/${dos(++nGm)}_${aCiegas ? 'Guia_de_la_velada' : 'Dosier_del_Game_Master'}`,
-    componer: (op) => renderPlayerDocument(game, 'gm', op)?.html ?? null,
-  });
-
-  // Sobre sellado: solo existe a ciegas, y es del preparador.
-  if (aCiegas) {
+  /*
+   * LOS TRES DOSIERES GENÉRICOS, SOLO SI EL JUEGO NO TRAE LOS SUYOS.
+   *
+   * La plataforma sabe componer un dosier por persona, uno para quien dirige y
+   * el sobre de la solución, y los tres están escritos en CLUEDO: la víctima,
+   * los sospechosos, «los objetos del crimen — cualquiera de ellos pudo ser el
+   * arma», los pasadizos secretos.
+   *
+   * Se metían SIEMPRE. En un juego con dosieres propios eso deja dos por
+   * persona: el bueno en su carpeta y el de CLUEDO en `02_JUGADORES`, que es
+   * justo donde mira quien prepare para saber qué repartir. No es un documento
+   * de más: es un documento EQUIVOCADO en el sitio donde se coge.
+   */
+  if (!manifiestoDe(game.settings?.juego).dosieresPropios) {
+    // Dosier del Game Master: siempre suyo.
     entradas.push({
-      ruta: `${carpetaPreparador}/${dos(++nPreparador)}_El_sobre_del_crimen`,
-      componer: (op) => renderPlayerDocument(game, 'solution', op)?.html ?? null,
+      ruta: `${carpetaGm}/${dos(++nGm)}_${aCiegas ? 'Guia_de_la_velada' : 'Dosier_del_Game_Master'}`,
+      componer: (op) => renderPlayerDocument(game, 'gm', op)?.html ?? null,
     });
-  }
 
-  // Un dosier por jugador.
-  for (const sospechoso of game.suspects) {
-    entradas.push({
-      ruta: `${carpetaJugadores}/dosier_${limpiar(sospechoso.name)}`,
-      componer: (op) => renderPlayerDocument(game, sospechoso.id, op)?.html ?? null,
-    });
+    // Sobre sellado: solo existe a ciegas, y es del preparador.
+    if (aCiegas) {
+      entradas.push({
+        ruta: `${carpetaPreparador}/${dos(++nPreparador)}_El_sobre_del_crimen`,
+        componer: (op) => renderPlayerDocument(game, 'solution', op)?.html ?? null,
+      });
+    }
+
+    // Un dosier por jugador.
+    for (const sospechoso of game.suspects) {
+      entradas.push({
+        ruta: `${carpetaJugadores}/dosier_${limpiar(sospechoso.name)}`,
+        componer: (op) => renderPlayerDocument(game, sospechoso.id, op)?.html ?? null,
+      });
+    }
   }
 
   const leeme = aCiegas

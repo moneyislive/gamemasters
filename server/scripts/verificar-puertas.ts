@@ -37,6 +37,12 @@ import { generateBoardLayout } from '../src/board/generator';
 import { generateDemoPlot } from '../src/plot/demoPlot';
 import { armarPaquete } from '../src/docs/paquete';
 import { juegosConMaterial } from '../src/juegos/materiales';
+import { juegosConAmpliacion } from '../src/juegos/ampliaciones';
+import { entidadesDeLaMomia, ensamblarTramaMomia } from '../src/plot/momia-generacion';
+import { cimientosDeMomia } from '../src/plot/momia-cimientos';
+import { respuestaDeDemostracion } from '../src/plot/momia-demo';
+import { ampliarExpedicion } from '../src/juegos/momia-trama';
+import '../src/plot/refresh';
 import '../src/plot/material';
 import { manifiestoDe, accionDeAcusacion, accionDeEntrarEnLugar } from '../../shared/juegos';
 import type { GameSession } from '../../shared/types';
@@ -642,6 +648,162 @@ function probarSelector(): void {
 // El panel de quien dirige: ni aconseja el desastre, ni le esconde la partida.
 // ---------------------------------------------------------------------------
 
+/**
+ * El paquete no mete DOS dosieres por persona, uno de ellos equivocado.
+ *
+ * La plataforma sabe componer dosieres genéricos y están escritos en CLUEDO:
+ * hablan de la víctima, de los sospechosos y de pasadizos secretos. Se metían
+ * siempre, así que en la Momia quedaban dos por cabeza — el bueno en una
+ * carpeta y el de CLUEDO en `02_JUGADORES`, que es donde va a mirar quien
+ * prepare para saber qué repartir.
+ */
+function probarDosieres(): void {
+  paso('Un solo dosier por persona, y el bueno');
+
+  const conSuyos = partidaDeMomia('ronda-abierta').game;
+  const rutas = armarPaquete(conSuyos).entradas.map((e) => e.ruta);
+
+  comprobar(
+    'la Momia declara que trae los suyos',
+    manifiestoDe('momia').dosieresPropios === true,
+  );
+  /*
+   * `dosier_<nombre>` en minúscula y dentro de la carpeta de jugadores: es la
+   * forma exacta del genérico. Buscar «dosier_» a secas contaba también
+   * «Dosier_del_Game_Master», y una comprobación que cuenta de más miente igual
+   * que una que cuenta de menos.
+   */
+  const genericos = (lista: string[]): string[] =>
+    lista.filter((r) => r.split('/').pop()?.startsWith('dosier_'));
+
+  comprobar(
+    'no se cuela el dosier genérico de cada jugador',
+    genericos(rutas).length === 0,
+    genericos(rutas),
+  );
+  comprobar(
+    'ni el dosier genérico de quien dirige',
+    !rutas.some((r) => r.includes('Dosier_del_Game_Master')),
+    rutas,
+  );
+  comprobar(
+    'y sí están los suyos',
+    rutas.some((r) => r.toLowerCase().includes('dosieres')),
+    rutas,
+  );
+
+  // Y CLUEDO sigue teniendo los suyos, que son estos: uno por persona.
+  const cluedoGame = partidaDeCluedo().game;
+  const deCluedo = armarPaquete(cluedoGame).entradas.map((e) => e.ruta);
+  comprobar(
+    'CLUEDO conserva un dosier por jugador',
+    genericos(deCluedo).length === cluedoGame.suspects.length,
+    genericos(deCluedo),
+  );
+  comprobar(
+    'y el suyo de quien dirige',
+    deCluedo.some((r) => r.includes('Dosier_del_Game_Master')),
+    deCluedo,
+  );
+  comprobar('CLUEDO no declara dosieres propios', !manifiestoDe('cluedo').dosieresPropios);
+}
+
+/**
+ * Lo que se imprime en la hoja de TODO EL MUNDO pasa por el depurador.
+ *
+ * Se ejecuta el ensamblador con una respuesta ENVENENADA a mano: los cinco
+ * ritos en el orden verdadero, metidos en la presentación pública de alguien y
+ * en un momento público de la cronología. Los dos sitios se imprimen para todos
+ * y ninguno de los dos pasaba por el filtro.
+ */
+function probarDepuracion(): void {
+  paso('Nada público enumera el orden verdadero');
+
+  const game = partidaDeMomia('ronda-abierta').game;
+  const entidades = entidadesDeLaMomia(game);
+  const cimientos = cimientosDeMomia(entidades, { semilla: 'depurar', vigilias: 3 });
+  const respuesta = respuestaDeDemostracion(game.name, entidades, cimientos.trama);
+
+  // El orden verdadero, escrito de corrido.
+  const nombres = cimientos.trama.ordenVerdadero.map(
+    (id) => entidades.ritos.find((r) => r.id === id)?.name ?? id,
+  );
+  const veneno = `Lo sabe de memoria: ${nombres.join(', ')}. Ese es el orden.`;
+
+  respuesta.expedicionarios[0]!.publicPersona = veneno;
+  respuesta.expedicionarios[0]!.role = veneno;
+  respuesta.cronologia = [
+    {
+      hora: '23:00',
+      descripcion: veneno,
+      expedicionarioIds: entidades.expedicionarios.slice(0, 2).map((e) => e.id),
+      publico: true,
+    },
+  ];
+
+  const { plot } = ensamblarTramaMomia(game, entidades, cimientos, respuesta);
+
+  const publica = plot.characters.find((c) => c.suspectId === entidades.expedicionarios[0]!.id);
+  comprobar('la presentación pública envenenada NO sobrevive', publica?.publicPersona !== veneno, publica?.publicPersona);
+  comprobar('ni el papel', publica?.role !== veneno, publica?.role);
+
+  const momento = plot.timeline.find((e) => e.isPublic);
+  comprobar('hay un momento público que mirar', Boolean(momento));
+  comprobar('y su texto envenenado tampoco sobrevive', momento?.description !== veneno, momento?.description);
+
+  /*
+   * Y LO PRIVADO NO SE TOCA. El dosier del saqueador tiene que poder decirle
+   * que fue él; un filtro demasiado celoso ahí romperia el juego en silencio.
+   */
+  comprobar(
+    'los secretos de cada cual siguen enteros',
+    plot.characters.every((c) => Boolean(c.secret)),
+  );
+}
+
+/**
+ * Quien se apunta con el misterio ya escrito recibe su don.
+ *
+ * Se quedaba fuera del reparto, y entonces la partida daba DOS RESPUESTAS
+ * DISTINTAS a la misma pregunta: el móvil le ponía `descifrar` en silencio —por
+ * el valor por defecto de `estadoInicial`— y su dosier impreso le decía que
+ * esta partida no le había asignado ninguno.
+ */
+function probarAmpliacion(): void {
+  paso('Quien llega tarde entra en la expedición entera');
+
+  const { game } = partidaDeMomia('ronda-abierta');
+  const trama = game.plot!.delJuego as { dones: Record<string, string> };
+  const antes = Object.keys(trama.dones).length;
+
+  // Se sienta alguien más, como cuando confirman tarde.
+  game.suspects.push({ id: 'e9', name: 'Nueva' } as never);
+
+  comprobar('antes de ampliar no tiene don', trama.dones.e9 === undefined);
+  comprobar('ni papel escrito', !game.plot!.characters.some((c) => c.suspectId === 'e9'));
+
+  const { anadidos } = ampliarExpedicion(game, game.plot!);
+
+  comprobar('la ampliación la ve', anadidos.includes('e9'), anadidos);
+  comprobar('ahora tiene don', Boolean(trama.dones.e9), trama.dones.e9);
+  comprobar('y papel escrito', game.plot!.characters.some((c) => c.suspectId === 'e9'));
+  comprobar(
+    'y no le ha quitado el suyo a nadie',
+    Object.keys(trama.dones).length === antes + 1,
+    Object.keys(trama.dones),
+  );
+
+  /*
+   * Y CADA JUEGO AMPLÍA CON EL SUYO. Que los dos estén dados de alta es lo que
+   * impide que la Momia reciba el pipeline de CLUEDO, que le pasa al modelo el
+   * motivo —el que NOMBRA a quien rompió el sello— para escribir textos que se
+   * imprimen en la hoja de todo el mundo.
+   */
+  const registrados = new Set(juegosConAmpliacion());
+  comprobar('CLUEDO tiene la suya', registrados.has('cluedo'), [...registrados]);
+  comprobar('y la Momia la suya', registrados.has('momia'), [...registrados]);
+}
+
 function probarPanel(): void {
   paso('El panel del Game Master');
 
@@ -668,6 +830,9 @@ function probarPanel(): void {
 
 try {
   probarPaquete();
+  probarDosieres();
+  probarDepuracion();
+  probarAmpliacion();
   probarSelector();
   probarPanel();
 

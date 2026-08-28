@@ -237,6 +237,36 @@ export function ensamblarTramaMomia(
     return salida;
   };
 
+  /*
+   * LOS DOS CAMPOS DEL DOSIER QUE LEE TODO EL MUNDO.
+   *
+   * `role` y `publicPersona` de cada persona se imprimen en la hoja de TODAS
+   * las demás, y no pasaban por aquí: el modelo podía escribir en la
+   * presentación pública de alguien los cinco ritos enumerados en el orden
+   * bueno, y la partida se acababa en la portada del dosier. Lo pedía el prompt
+   * y no lo comprobaba nadie, que es lo contrario de lo que hace este fichero
+   * con todo lo demás.
+   *
+   * SOLO CONTRA EL ORDEN, y esto es lo delicado: el chequeo del nombre es una
+   * coincidencia de palabras, y en la presentación de alguien su propio nombre
+   * —o el de un compañero, aunque sea el saqueador— aparece con toda
+   * naturalidad. Aplicarlo aquí borraría textos legítimos a puñados. Que la
+   * expedición hable del saqueador no revela nada: lo que lo revelaría es que
+   * un texto público enumere el orden verdadero, y eso no tiene ni un uso
+   * legítimo.
+   *
+   * Lo privado —`secret`, `motive`, `alibi`, `personalHook`— NO se toca: el
+   * dosier del saqueador tiene que poder decirle que fue él.
+   */
+  for (const personaje of characters) {
+    personaje.role = depurar(personaje.role, `papel de ${personaje.characterName}`, false);
+    personaje.publicPersona = depurar(
+      personaje.publicPersona,
+      `presentación pública de ${personaje.characterName}`,
+      false,
+    );
+  }
+
   const synopsis = depurar(respuesta.synopsis ?? '', 'sinopsis', true);
   const ambientacion = depurar(respuesta.ambientacion ?? '', 'ambientación', true);
 
@@ -301,9 +331,23 @@ export function ensamblarTramaMomia(
           motivo: 'venía marcado como público con una sola persona implicada; pasa a secreto',
         });
       }
+      /*
+       * Lo público de la cronología viaja al MÓVIL DE TODOS —`live/proyeccion.ts`
+       * la manda entera— y se imprime. No pasaba por el depurador, así que un
+       * momento público que enumerase los cinco ritos en orden resolvía la
+       * partida sin que nadie explorara nada.
+       *
+       * Otra vez solo contra el orden: los momentos públicos son de DOS O MÁS
+       * personas por construcción, así que sus nombres salen ahí, y el del
+       * saqueador entre ellos. Eso es el juego, no una filtración.
+       */
+      const descripcion = publico
+        ? depurar(e.descripcion.trim(), `cronología ${e.hora ?? ''}`, false)
+        : e.descripcion.trim();
+
       return {
         time: e.hora?.trim() || '00:00',
-        description: e.descripcion.trim(),
+        description: descripcion,
         suspectIds,
         isPublic: publico,
       };

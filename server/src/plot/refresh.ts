@@ -34,6 +34,7 @@ import { getStore } from '../db/store';
 import { getAnthropicClient, resolveModel } from '../agent/anthropic';
 import { generateBoardLayout } from '../board/generator';
 import { renderDocumentIndex } from '../docs/renderer';
+import { ampliacionDe, registrarAmpliacion } from '../juegos/ampliaciones';
 import { generateDemoCharacters } from './demoPlot';
 import { PLOT_EXTENSION_SCHEMA } from './schema';
 import { buildStyleBlock } from './style';
@@ -107,10 +108,22 @@ export async function runRefresh(game: GameSession, emit: Emitir): Promise<void>
       podarTrama(game.plot, game);
     }
 
-    // ---------- Etapa 3: ampliación de la trama (solo si hace falta la IA) ----------
-    if (informe.needsAgent && game.plot) {
+    /*
+     * ---------- Etapa 3: poner al día la trama ----------
+     *
+     * QUIÉN LA PONE AL DÍA DEPENDE DEL JUEGO, y no dependía de nada: esto
+     * llamaba a `ampliarTrama`, que es de CLUEDO, para cualquier partida. Sobre
+     * una de El Misterio de la Momia le pasaba al modelo la solución del caso
+     * —el motivo NOMBRA a quien rompió el sello— para que escribiera coartadas
+     * que acaban impresas en la hoja de todo el mundo.
+     *
+     * Un juego sin ampliación registrada se salta esta etapa entera. Es lo
+     * correcto: mejor que le falte color a que le sobre el de otro juego.
+     */
+    const ampliar = ampliacionDe(game.settings?.juego);
+    if (informe.needsAgent && game.plot && ampliar) {
       emit({ type: 'stage', stage: 'plot', label: 'Escribiendo los personajes que faltan…' });
-      await ampliarTrama(game, game.plot, informe, emit);
+      await ampliar(game, game.plot, informe, emit);
     }
 
     // ---------- Etapa 4: dosieres ----------
@@ -613,3 +626,13 @@ function normalizarPistas(valor: unknown): PlotClue[] {
   });
   return pistas;
 }
+
+/*
+ * El alta de la ampliación de CLUEDO.
+ *
+ * Va al final de su propio fichero y no en `instalados.ts` porque lo que se da
+ * de alta es la función de aquí arriba: así no hay forma de moverla o
+ * renombrarla sin ver el registro. Y como `runRefresh` vive en este mismo
+ * módulo, cuando alguien pone al día una partida esta línea ya ha corrido.
+ */
+registrarAmpliacion('cluedo', ampliarTrama);

@@ -33,6 +33,7 @@
  * sin nadie —sin dar ningún error—. Costó un rato de perplejidad.
  */
 import { entidadesDe } from '../../../shared/juegos';
+import { registrarAmpliacion } from './ampliaciones';
 import { generarPuzle, redactar, repartirHallazgos, verificarPuzle } from './momia-puzle';
 import { AMULETOS_INICIALES } from '../../../shared/juegos/momia-tipos';
 import type {
@@ -514,3 +515,91 @@ export function estadoInicial(trama: TramaMomia, suspectIds: string[]): EstadoMo
     propuestas: {},
   };
 }
+
+// ---------------------------------------------------------------------------
+// Poner al día una expedición a la que se ha sentado alguien más
+// ---------------------------------------------------------------------------
+
+/**
+ * Qué pasa cuando alguien se apunta con el misterio ya escrito.
+ *
+ * LO QUE HACÍA FALTA ARREGLAR. Esa persona se quedaba fuera del reparto de
+ * dones, y entonces la partida daba DOS RESPUESTAS DISTINTAS a la misma
+ * pregunta: el móvil le ponía `descifrar` en silencio —por el valor por defecto
+ * de `estadoInicial`— y su dosier impreso le decía que esta partida no le había
+ * asignado ninguno. Quien lo leyera se plantaría en la mesa creyendo que no
+ * tiene don, con un don en el bolsillo.
+ *
+ * SIN LLAMAR AL MODELO, y es una decisión, no una limitación. La ampliación de
+ * CLUEDO sí llama, y para hacerlo le pasa la solución del caso: en la Momia eso
+ * significa pasarle el motivo, que NOMBRA a quien rompió el sello, para que
+ * escriba textos que se imprimen en la hoja de todo el mundo. No merece la pena
+ * arriesgar eso por un párrafo de color. Aquí se reparte lo que falta —de forma
+ * determinista, para que una partida se pueda repetir con su semilla— y se
+ * escribe un papel mínimo que dice claramente que hay que improvisarlo.
+ *
+ * NO TOCA NADA DE LO YA ESCRITO: ni el puzle, ni el orden verdadero, ni quién es
+ * el saqueador, ni los dones de quienes ya lo tenían. Solo rellena huecos.
+ */
+export function ampliarExpedicion(game: GameSession, plot: Plot): { anadidos: string[] } {
+  const trama = tramaDe(plot);
+  if (!trama) return { anadidos: [] };
+
+  const expedicionarios = entidadesDe(game, 'expedicionarios');
+  const yaEscritos = new Set(plot.characters.map((c) => c.suspectId));
+  const anadidos: string[] = [];
+
+  /*
+   * La rueda sigue donde se quedó. Los dones se repartieron en rueda sobre una
+   * lista barajada; para quien llega tarde se continúa por el mismo sitio, así
+   * que el reparto sigue siendo par y no depende del azar del momento.
+   */
+  let vuelta = Object.keys(trama.dones).length;
+
+  for (const persona of expedicionarios) {
+    if (trama.dones[persona.id] === undefined) {
+      trama.dones[persona.id] = DONES_REPARTIBLES[vuelta % DONES_REPARTIBLES.length]!.don;
+      vuelta += 1;
+    }
+    if (yaEscritos.has(persona.id)) continue;
+
+    /*
+     * Con respaldo, aunque el don se acabe de repartir tres líneas arriba: si
+     * algún día deja de hacerse, esto tiene que dar un dosier pobre y no tirar
+     * la puesta al día entera con doce personas esperando.
+     */
+    const don = trama.dones[persona.id];
+    const ficha = DONES_REPARTIBLES.find((d) => d.don === don) ?? DONES_REPARTIBLES[0]!;
+    plot.characters.push({
+      suspectId: persona.id,
+      characterName: persona.name,
+      role: ficha.rol,
+      publicPersona: 'Se incorporó a la expedición con el trabajo ya empezado.',
+      secret: 'Callas algo de aquella noche que todavía no has sabido cómo contar.',
+      motive: 'Si la tumba no vuelve a sellarse, la concesión sigue viva otra temporada.',
+      alibi: 'Dices que estabas en el corredor cuando se apagó la lámpara.',
+      knowledge: [],
+      personalHook:
+        'Su papel se ha quedado sin escribir: improvísalo con lo que sepas de la persona, ' +
+        'o vuelve a generar el misterio entero para que se lo escriban.',
+    });
+    anadidos.push(persona.id);
+  }
+
+  return { anadidos };
+}
+
+/*
+ * El alta. La Momia no llama al modelo para esto, así que su ampliación es
+ * síncrona por dentro y se envuelve aquí para encajar en el contrato.
+ */
+registrarAmpliacion('momia', async (game, plot, _informe, emit) => {
+  const { anadidos } = ampliarExpedicion(game, plot);
+  emit({
+    type: 'text',
+    delta:
+      anadidos.length === 0
+        ? 'La expedición ya estaba completa.\n'
+        : `Repartido el don que faltaba a ${anadidos.length} ${anadidos.length === 1 ? 'persona' : 'personas'}.\n`,
+  });
+});

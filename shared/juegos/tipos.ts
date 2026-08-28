@@ -447,6 +447,26 @@ export interface ManifiestoDeJuego {
    * comprueba que no se separen.
    */
   materialDeVelada?: boolean;
+
+  /**
+   * ¿Este juego trae sus propios dosieres en `documentos`?
+   *
+   * La plataforma sabe componer un dosier por persona, uno para quien dirige y
+   * un sobre con la solución. Son de CLUEDO: hablan de la víctima, de los
+   * sospechosos, de «los objetos del crimen — cualquiera de ellos pudo ser el
+   * arma» y de pasadizos secretos.
+   *
+   * LO QUE PASABA. El paquete los metía SIEMPRE, incluso en un juego que trae
+   * los suyos. En El Misterio de la Momia eso dejaba DOS dosieres por persona:
+   * el bueno —con su don, su secreto y sus reliquias— en una carpeta, y el de
+   * CLUEDO en `02_JUGADORES`, que es justo donde va a mirar quien prepare para
+   * saber qué repartir. Y el genérico de quien dirige imprimía «La solución del
+   * caso: — · — · —» y duplicaba la Guía de la expedición.
+   *
+   * Con esto en `true`, el paquete emite SOLO los documentos del manifiesto.
+   * CLUEDO no lo declara y su ZIP no cambia ni un byte.
+   */
+  dosieresPropios?: boolean;
 }
 
 // ---------------------------------------------------------------------------

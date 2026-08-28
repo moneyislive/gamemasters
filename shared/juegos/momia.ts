@@ -623,4 +623,5 @@ export const MOMIA: ManifiestoDeJuego = {
   trofeos: TROFEOS_MOMIA,
   seccionesDeDosier: SECCIONES_MOMIA,
   documentos: IMPRIMIBLES_MOMIA,
+  dosieresPropios: true,
 };
