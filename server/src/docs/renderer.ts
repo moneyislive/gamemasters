@@ -761,9 +761,21 @@ export function renderDocumentIndex(game: GameSession): PlayerDocument[] {
     suspectId: sospechoso.id,
     title: tituloJugador(plot, sospechoso),
   }));
-  indice.push({ suspectId: 'gm', title: tituloGameMaster(plot, aCiegas) });
-  // Con el Game Master jugando, la solución vive en su propio sobre sellado.
-  if (aCiegas) indice.push({ suspectId: 'solution', title: tituloSolucion(plot) });
+  /*
+   * LOS DOS GENÉRICOS SOLO PARA QUIEN NO TRAE LOS SUYOS.
+   *
+   * El dosier de quien dirige y el sobre de la solución son de CLUEDO: hablan
+   * de la víctima, de los sospechosos y del arma. Un juego con `dosieresPropios`
+   * ya trae los que le tocan —en la Momia, la Guía de la expedición y el papiro
+   * del sellado—, y el ZIP dejó de meter los genéricos por esta misma razón.
+   * El taller, en cambio, los seguía listando y sirviendo: dos tarjetas de más
+   * que duplican lo que el juego ya tiene y lo cuentan con las palabras de otro.
+   */
+  if (!manifiestoDe(game.settings?.juego).dosieresPropios) {
+    indice.push({ suspectId: 'gm', title: tituloGameMaster(plot, aCiegas) });
+    // Con el Game Master jugando, la solución vive en su propio sobre sellado.
+    if (aCiegas) indice.push({ suspectId: 'solution', title: tituloSolucion(plot) });
+  }
   return indice;
 }
 

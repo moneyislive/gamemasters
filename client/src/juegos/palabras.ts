@@ -130,6 +130,32 @@ export interface PalabrasDeJuego {
      * no se puede fingir que lo sea.
      */
     acusacionesRecibidas: (cuantas: number, total: number) => string;
+    /**
+     * Quien se ha añadido a la partida DESPUÉS de abrir la sala y no tiene silla.
+     *
+     * La sala se abre con la gente que hubiera en ese momento, y a quien llega
+     * más tarde no le nace ni silla ni código: no puede entrar y no había forma
+     * de arreglarlo sin cerrar la sala y echar a todos los demás.
+     */
+    sinSilla: (cuantos: number) => string;
+    sentarAQuienFalte: string;
+  };
+  /**
+   * El plano del espacio donde se juega.
+   *
+   * `BoardView` tenía el vocabulario de CLUEDO escrito a fuego —salas, mansión,
+   * arquitecto, pasadizos secretos— y lo pintaba igual en la pestaña «La
+   * tumba» de una expedición egipcia, incluido un «vuelve a la pestaña de
+   * salas» que en la Momia no existe: ahí la pestaña se llama «Las cámaras».
+   */
+  plano: {
+    aereoSinPlano: string;
+    conChincheta: (cuantas: number) => string;
+    sinChinchetas: string;
+    sinLugares: string;
+    invitacion: string;
+    leyenda: (lugares: number, pasos: number) => string;
+    pistaPasos: string;
   };
   /** El asistente. El NOMBRE sale del manifiesto; esto es lo que le rodea. */
   asistente: {
@@ -203,6 +229,24 @@ const CLUEDO: PalabrasDeJuego = {
     rondaCerrada: (n) => `Ronda ${n} cerrada`,
     // Palabra por palabra la que ya había: CLUEDO no cambia ni un píxel.
     acusacionesRecibidas: (cuantas, total) => `${cuantas} de ${total} acusaciones entregadas.`,
+    sinSilla: (cuantos) =>
+      cuantos === 1
+        ? 'Hay una persona en la partida que aún no tiene silla en la mesa.'
+        : `Hay ${cuantos} personas en la partida que aún no tienen silla en la mesa.`,
+    sentarAQuienFalte: 'Sentar a quien falte',
+  },
+  plano: {
+    aereoSinPlano:
+      'Has elegido jugar sobre el espacio real. Sube la fotografía aérea desde la pestaña de ' +
+      'salas y clava una chincheta en cada estancia.',
+    conChincheta: (n) => `${n} ${n === 1 ? 'sala' : 'salas'} sobre el plano real`,
+    sinChinchetas:
+      'Aún no has clavado ninguna chincheta. Vuelve a la pestaña de salas y haz clic sobre la fotografía.',
+    sinLugares: 'Añade primero algunas salas: el arquitecto necesita saber qué estancias tiene la mansión.',
+    invitacion: 'Traza el plano de la mansión y descubre por dónde discurren los pasadizos secretos.',
+    leyenda: (lugares, pasos) =>
+      `${lugares} salas · ${pasos} ${pasos === 1 ? 'pasadizo secreto' : 'pasadizos secretos'}`,
+    pistaPasos: 'Los trazos dorados discontinuos son pasadizos: cruzan la casa sin pasar por el pasillo.',
   },
   asistente: {
     subtitulo: 'Agente experto en CLUEDO',
@@ -297,6 +341,25 @@ const MOMIA: PalabrasDeJuego = {
      * el mismo dato.
      */
     acusacionesRecibidas: (cuantas, total) => `${cuantas} de ${total} señalamientos entregados.`,
+    sinSilla: (cuantos) =>
+      cuantos === 1
+        ? 'Hay una persona apuntada a la expedición que todavía no tiene sitio.'
+        : `Hay ${cuantos} personas apuntadas a la expedición que todavía no tienen sitio.`,
+    sentarAQuienFalte: 'Dar sitio a quien falte',
+  },
+  plano: {
+    aereoSinPlano:
+      'Has elegido jugar sobre el espacio real. Sube la fotografía cenital desde la pestaña de ' +
+      'cámaras y clava una chincheta en cada una.',
+    conChincheta: (n) => `${n} ${n === 1 ? 'cámara' : 'cámaras'} sobre el plano real`,
+    sinChinchetas:
+      'Aún no has clavado ninguna chincheta. Vuelve a la pestaña de cámaras y haz clic sobre la fotografía.',
+    sinLugares: 'Añade primero algunas cámaras: sin saber qué salas tiene la tumba no hay nada que trazar.',
+    invitacion: 'Traza el plano de la tumba y descubre por dónde discurren los corredores excavados.',
+    leyenda: (lugares, pasos) =>
+      `${lugares} cámaras · ${pasos} ${pasos === 1 ? 'corredor excavado' : 'corredores excavados'}`,
+    pistaPasos:
+      'Los trazos dorados discontinuos son corredores: cruzan la tumba sin pasar por la galería.',
   },
   asistente: {
     subtitulo: 'Escriba de la expedición',

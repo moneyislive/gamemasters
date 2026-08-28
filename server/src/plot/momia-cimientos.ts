@@ -155,9 +155,21 @@ function repartirDones(gente: Entidad[], rnd: () => number): Record<string, DonI
     usados.add(c.don);
   }
 
-  // Los que quedan, con los dones que quedan; y si se acaban, se vuelve a
-  // empezar la vuelta. `libres` se recalcula para no repetir hasta agotar.
-  let libres: DonRepartible[] = DONES_REPARTIBLES.filter((d) => !usados.has(d));
+  /*
+   * Los que quedan, con los dones que quedan; y si se acaban, se vuelve a
+   * empezar la vuelta. `libres` se recalcula para no repetir hasta agotar.
+   *
+   * BARAJADOS TAMBIÉN EN LA PRIMERA VUELTA, que es lo que faltaba. Se servían
+   * en el orden en que están declarados, así que en una mesa donde nadie tiene
+   * una descripción que dispare una preferencia —cuatro personas y ninguna
+   * palabra clave— salían siempre los cuatro primeros dones de la lista y los
+   * dos últimos no se repartían nunca. Dos de los seis papeles del juego no
+   * existían para esa mesa, y ninguna semilla lo cambiaba.
+   */
+  let libres: DonRepartible[] = barajar(
+    DONES_REPARTIBLES.filter((d) => !usados.has(d)),
+    rnd,
+  );
   for (const persona of orden) {
     if (dones[persona.id]) continue;
     if (libres.length === 0) libres = barajar([...DONES_REPARTIBLES], rnd);

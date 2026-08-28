@@ -129,7 +129,16 @@ async function codigoLibre(): Promise<string> {
 export async function abrirSesion(game: GameSession): Promise<LiveSession> {
   const store = getStore();
   const existente = await store.getLive(game.id);
-  if (existente) return sincronizarJugadores(existente, game);
+  /*
+   * Y SE GUARDA, que es lo que faltaba.
+   *
+   * `sincronizarJugadores` alinea la lista con la partida —da silla a quien se
+   * ha añadido después— pero devolvía la sesión sin escribirla, así que quien
+   * llegaba tarde aparecía en la respuesta de esa llamada y se esfumaba en la
+   * siguiente lectura: sin silla, sin código y sin forma de entrar. Su hermano
+   * `refrescarSesion` sí guardaba; este no, y es el que se llama al reabrir.
+   */
+  if (existente) return store.saveLive(sincronizarJugadores(existente, game));
 
   const sesion: LiveSession = {
     id: game.id,

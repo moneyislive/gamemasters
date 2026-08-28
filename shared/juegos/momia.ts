@@ -681,6 +681,14 @@ export const MOMIA: ManifiestoDeJuego = {
     ],
   },
 
+  avisos: {
+    rondaAbierta: 'Vigilia {ronda} de {total}. Elige cámara.',
+    // Al cerrar no se publica nada: lo único que llega a la mesa es lo que
+    // alguien decide enseñar con su don.
+    rondaCerrada: 'Vigilia cerrada. Lo que nadie ha enseñado, sigue sin saberse.',
+    acusaciones: 'Momento de señalar. Un solo nombre, y no se puede cambiar.',
+    desenlace: 'Se abre el papiro del sellado.',
+  },
   ceremonia: {
     generar: [
       'El escriba moja el cálamo…',

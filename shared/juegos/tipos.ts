@@ -516,6 +516,25 @@ export interface ManifiestoDeJuego {
    */
   ceremonia?: { generar: string[]; actualizar: string[] };
 
+  /**
+   * Lo que se anuncia a pantalla completa en el móvil al cambiar la partida.
+   *
+   * Estaban escritos a mano en `routes/live.ts`, en vocabulario de CLUEDO, y el
+   * telón de la app imprime el cuerpo tal cual llega: quien jugaba a la Momia
+   * leía «Elige sala», «pasa al tablón común» y «Se abre el sobre del crimen»
+   * en mitad de una expedición egipcia. Y el de la vigilia cerrada además
+   * mentía, porque al cerrar no pasa nada a ningún tablón.
+   *
+   * Texto plano y no funciones: el manifiesto se serializa, así que `{ronda}` y
+   * `{total}` se sustituyen al anunciar.
+   */
+  avisos?: {
+    rondaAbierta: string;
+    rondaCerrada: string;
+    acusaciones: string;
+    desenlace: string;
+  };
+
   materialDeVelada?: boolean;
 
   /**

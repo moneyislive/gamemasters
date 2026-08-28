@@ -28,7 +28,9 @@ import type { GameSession } from '../../../shared/types';
  * los dos números, y debería sobrar el del servidor.
  */
 const MINIMO_HEREDADO: Record<CategoriaId, number> = {
-  salas: 4,
+  // Vacía: CLUEDO ya declara sus cuatro salas en el manifiesto. Se conserva la
+  // tabla porque el mecanismo sigue valiendo si vuelve a aparecer un mínimo que
+  // el servidor exige y un manifiesto no declara.
 };
 
 /**

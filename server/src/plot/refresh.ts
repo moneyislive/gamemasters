@@ -120,6 +120,30 @@ export async function runRefresh(game: GameSession, emit: Emitir): Promise<void>
      * Un juego sin ampliación registrada se salta esta etapa entera. Es lo
      * correcto: mejor que le falte color a que le sobre el de otro juego.
      */
+    /*
+     * ---------- Etapa 3a: la solución rota, para CUALQUIER juego ----------
+     *
+     * Estaba dentro de la ampliación de CLUEDO, así que solo CLUEDO se
+     * reparaba. Una partida de la Momia a la que se le quita de la lista a
+     * quien rompió el sello se quedaba con un `saqueador` que ya no existe:
+     * `runRefresh` emitía `done`, la marcaba `ready` y dejaba
+     * `brokenSolution: ['saqueador']` intacto. Nadie puede ganar una partida
+     * cuya respuesta no está en la mesa, y no había ni un aviso.
+     *
+     * `repararRespuestas` ya era genérica —recorre los ejes del manifiesto—,
+     * así que solo le faltaba que alguien la llamara. Va ANTES del reparto por
+     * juego para que cada ampliación escriba su texto sabiendo ya a quién
+     * señala la solución.
+     *
+     * Lo que esto NO arregla, y conviene saberlo: en un juego cuya ampliación
+     * no reescriba el motivo, el texto seguirá describiendo a la persona
+     * anterior. Es una partida jugable con una frase desalineada, que es
+     * bastante mejor que una partida sin solución.
+     */
+    if (informe.brokenSolution.length > 0 && game.plot) {
+      repararIdsSolucion(game.plot, game);
+    }
+
     const ampliar = ampliacionDe(game.settings?.juego);
     if (informe.needsAgent && game.plot && ampliar) {
       emit({ type: 'stage', stage: 'plot', label: 'Escribiendo los personajes que faltan…' });
@@ -250,10 +274,8 @@ async function ampliarTrama(
 ): Promise<void> {
   const solucionRota = informe.brokenSolution.length > 0;
 
-  // (a) Primero los ids: el texto se reescribe después, ya sabiendo a quién señala.
-  if (solucionRota) {
-    repararIdsSolucion(plot, game);
-  }
+  // (a) Los ids ya vienen reparados de `runRefresh`, que lo hace para todos los
+  // juegos; aquí solo queda reescribir el texto sabiendo a quién señala.
 
   // (b) Personas incorporadas después que aún no tienen personaje.
   const faltantes = informe.suspectsWithoutCharacter.filter((id) =>

@@ -339,7 +339,20 @@ registrarProyeccionParaGm('momia', (game, sesion) => {
   const publicos = Object.values(estado.fragmentos).filter((f) => f.publico);
   return {
     momia: {
-      profanadas: estado.profanadas,
+      /*
+       * SOLO HASTA LA VIGILIA DE ESTA NOCHE, nunca el calendario entero.
+       *
+       * Iba completo, así que quien dirige jugando veía de antemano qué cámara
+       * se profana cada una de las noches que quedan — o sea, qué habitaciones
+       * evitar para amanecer sin una sola marca. Es el trofeo «Incorrupto» de
+       * regalo, y por esa misma razón la lista completa se sacó de la Guía de
+       * la expedición a las tiras de papiro, que son de quien prepara.
+       *
+       * Recortado y no sustituido: el panel indexa por `sesion.round - 1`, así
+       * que las noches ya vividas tienen que seguir en su sitio. Esas ya las ha
+       * visto; las que no han pasado no son suyas todavía.
+       */
+      profanadas: estado.profanadas.slice(0, Math.max(0, sesion.round)),
       gente: Object.fromEntries(
         Object.entries(estado.gente).map(([id, p]) => [
           id,

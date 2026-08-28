@@ -169,19 +169,32 @@ export function inventarioSobres(game: GameSession, plot: Plot): SobreDeLaPartid
    * plataforma sabe con certeza de cualquier juego: cuántas hay y en qué orden
    * se abren.
    */
+  /*
+   * SE PREGUNTA POR LOS SOBRES QUE HAN SALIDO, no por el tamaño del mapa.
+   *
+   * La condición era `porRonda.size > 0`, y `pistasPorRonda` presiembra una
+   * entrada por ronda aunque no haya ni una pista, así que era verdadera
+   * SIEMPRE y la rama de abajo no se ejecutaba nunca. En la Momia el bucle
+   * daba cero vueltas útiles —`salasActivas` no encuentra nada sin `clues`— y
+   * la hoja de etiquetas salía impresa sin una sola etiqueta de vigilia, que
+   * es justo lo que este bloque dice que no puede pasar.
+   *
+   * Contar lo empujado cubre además el caso de que haya pistas pero ninguna
+   * sala activa, que dejaba la hoja igual de vacía por otro camino.
+   */
+  const sobresAntes = sobres.length;
   const porRonda = pistasPorRonda(plot);
-  if (porRonda.size > 0) {
-    for (const [ronda] of porRonda) {
-      for (const sala of salasActivas(game, plot, ronda)) {
-        sobres.push({
-          codigo: `R${ronda}-${codigos.get(sala.id) ?? 'SALA'}`,
-          contenido: `Pistas de ${sala.name} en la ronda ${ronda}`,
-          grupo: 'Pistas',
-          soloPreparador: aCiegas,
-        });
-      }
+  for (const [ronda] of porRonda) {
+    for (const sala of salasActivas(game, plot, ronda)) {
+      sobres.push({
+        codigo: `R${ronda}-${codigos.get(sala.id) ?? 'SALA'}`,
+        contenido: `Pistas de ${sala.name} en la ronda ${ronda}`,
+        grupo: 'Pistas',
+        soloPreparador: aCiegas,
+      });
     }
-  } else {
+  }
+  if (sobres.length === sobresAntes) {
     const manifiesto = manifiestoDe(game.settings?.juego);
     const turno = manifiesto.barra.find((p) => p.pantalla === 'ronda')?.rotulo ?? 'Ronda';
     for (let ronda = 1; ronda <= numeroDeRondas(plot); ronda += 1) {

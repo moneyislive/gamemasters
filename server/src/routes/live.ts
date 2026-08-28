@@ -23,7 +23,25 @@ import {
   refrescarSesion,
   revelarDesenlace,
 } from '../live/sesion';
+import { manifiestoDe } from '../../../shared/juegos';
+import type { LiveSession } from '../../../shared/live';
 import type { Response } from 'express';
+
+/**
+ * El aviso que le toca a ESTE juego, con la ronda puesta.
+ *
+ * Los textos estaban escritos a mano aquí, en vocabulario de CLUEDO, y el telón
+ * de la app imprime el cuerpo tal cual llega: en una expedición egipcia se leía
+ * «Elige sala» y «Se abre el sobre del crimen». Ahora los declara cada juego en
+ * su manifiesto, al lado de la ceremonia y las reglas.
+ */
+function avisoDe(sesion: LiveSession, cual: 'rondaAbierta' | 'rondaCerrada' | 'acusaciones' | 'desenlace'): string {
+  const avisos = manifiestoDe(sesion.juego).avisos;
+  const plantilla = avisos?.[cual] ?? '';
+  return plantilla
+    .replace('{ronda}', String(sesion.round))
+    .replace('{total}', String(sesion.totalRounds));
+}
 import { crearRouter } from '../rutas';
 
 const router = crearRouter();
@@ -88,7 +106,7 @@ router.post('/games/:id/live/ronda/abrir', async (req, res) => {
             req.params.id,
             s.rev,
             'ronda-abierta',
-            `Ronda ${s.round} de ${s.totalRounds}. Elige sala.`,
+            avisoDe(s, 'rondaAbierta'),
           ),
       },
     );
@@ -106,7 +124,7 @@ router.post('/games/:id/live/ronda/cerrar', async (req, res) => {
           req.params.id,
           s.rev,
           'ronda-cerrada',
-          'Ronda cerrada. Lo encontrado pasa al tablón común.',
+          avisoDe(s, 'rondaCerrada'),
         ),
     });
     await responderVista(req.params.id, res);
@@ -217,7 +235,7 @@ router.post('/games/:id/live/acusaciones', async (req, res) => {
           req.params.id,
           s.rev,
           'acusaciones',
-          'Momento de acusar. Una sola combinación, y no se puede cambiar.',
+          avisoDe(s, 'acusaciones'),
         ),
     });
     await responderVista(req.params.id, res);
@@ -298,7 +316,7 @@ router.post('/games/:id/live/desenlace', async (req, res) => {
   try {
     await mutar(req.params.id, (s) => revelarDesenlace(s), {
       avisar: (s) => {
-        anunciar(req.params.id, s.rev, 'desenlace', 'Se abre el sobre del crimen.');
+        anunciar(req.params.id, s.rev, 'desenlace', avisoDe(s, 'desenlace'));
         if (s.winnerId) {
           const ganador = s.players.find((p) => p.suspectId === s.winnerId);
           anunciar(

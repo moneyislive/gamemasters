@@ -74,7 +74,9 @@ export default function Papiro(): JSX.Element {
      * de contradiccion, porque deducir de la prosa exigiria volver a parsearla, y
      * el diseno lo prohibe: la logica no depende de la redaccion.
      */
-    const enUso = [...estado.yo.fragmentos, ...publicosEnPie]
+    // Los tuyos que YA has publicado llegan por `publicosEnPie`: contarlos otra
+    // vez aqui inflaba el «con N fragmentos en la mano» de la deduccion.
+    const enUso = [...estado.yo.fragmentos.filter((f) => !f.publico), ...publicosEnPie]
       .map((f) => f.restriccion)
       .filter((r): r is NonNullable<typeof r> => Boolean(r));
     return {
@@ -100,7 +102,17 @@ export default function Papiro(): JSX.Element {
     );
   }
 
-  const mios = estado.yo.fragmentos;
+  /*
+   * LO TUYO ES LO QUE TODAVIA NO HAS ENSENADO.
+   *
+   * `estado.yo.fragmentos` los trae todos, tambien los que tu mismo has puesto
+   * sobre la mesa. Sin filtrar, un fragmento publicado por ti salia dos veces:
+   * en «En tu mano» con la etiqueta «Solo tu lo has leido» —que a esas alturas
+   * es mentira, lo ha leido la mesa entera— y otra vez en «Sobre la mesa». Y el
+   * titular los contaba a los dos, asi que decia doce fragmentos donde habia
+   * nueve.
+   */
+  const mios = estado.yo.fragmentos.filter((f) => !f.publico);
   const publicos = estado.publicos;
 
   const alternar = (id: string): void =>
@@ -168,8 +180,9 @@ export default function Papiro(): JSX.Element {
       {publicos.length === 0 ? (
         <Marco>
           <Cuerpo tenue>
-            Nadie ha puesto nada en común. Al cerrarse la vigilia se hace público parte de lo
-            encontrado, y quien tenga el don de documentar puede adelantar algo suyo.
+            Nadie ha puesto nada en común todavía. Aquí solo llega lo que alguien decide
+            enseñar: quien tiene el don de documentar puede publicar un fragmento suyo. Lo que
+            cada cual se guarde, se queda en su papiro.
           </Cuerpo>
         </Marco>
       ) : (

@@ -5,6 +5,7 @@
  */
 import { useState } from 'react';
 import { useAppStore } from '../../state/store';
+import { palabrasDe } from '../../juegos/palabras';
 import './board.css';
 
 /** Lado de cada celda de la rejilla, en unidades del viewBox. */
@@ -61,6 +62,10 @@ export default function BoardView(): JSX.Element {
 
   if (!game) return <div className="board-panel" />;
 
+  // El plano lo dibuja la misma pantalla para los dos juegos; lo que cambia son
+  // las palabras, y salen del juego como el resto de los rotulos del taller.
+  const palabras = palabrasDe(game.settings?.juego).plano;
+
   const recalcular = async (): Promise<void> => {
     setRecalculando(true);
     setError(null);
@@ -87,8 +92,7 @@ export default function BoardView(): JSX.Element {
             <PlanoDecorativo />
             <h3>Todavía no hay plano</h3>
             <p className="text-dim text-italic">
-              Has elegido jugar sobre el espacio real. Sube la fotografía aérea desde la pestaña de
-              salas y clava una chincheta en cada estancia.
+              {palabras.aereoSinPlano}
             </p>
           </div>
         </div>
@@ -100,7 +104,7 @@ export default function BoardView(): JSX.Element {
         <div className="board-head">
           <h3>{game.name}</h3>
           <span className="mono-caps text-dim">
-            {conChincheta.length} {conChincheta.length === 1 ? 'sala' : 'salas'} sobre el plano real
+            {palabras.conChincheta(conChincheta.length)}
           </span>
         </div>
 
@@ -129,8 +133,7 @@ export default function BoardView(): JSX.Element {
           </ol>
         ) : (
           <p className="board-hint text-dim">
-            Aún no has clavado ninguna chincheta. Vuelve a la pestaña de salas y haz clic sobre la
-            fotografía.
+            {palabras.sinChinchetas}
           </p>
         )}
       </div>
@@ -151,9 +154,7 @@ export default function BoardView(): JSX.Element {
           <PlanoDecorativo />
           <h3>El plano está por trazar</h3>
           <p className="text-dim text-italic">
-            {game.rooms.length === 0
-              ? 'Añade primero algunas salas: el arquitecto necesita saber qué estancias tiene la mansión.'
-              : 'Traza el plano de la mansión y descubre por dónde discurren los pasadizos secretos.'}
+            {game.rooms.length === 0 ? palabras.sinLugares : palabras.invitacion}
           </p>
           <button
             className="btn btn--primary"
@@ -372,12 +373,10 @@ export default function BoardView(): JSX.Element {
       <div className="board-footer">
         <div>
           <p className="board-legend">
-            <strong className="text-gold">{board.rooms.length}</strong> salas ·{' '}
-            <strong className="text-gold">{board.passages.length}</strong>{' '}
-            {board.passages.length === 1 ? 'pasadizo secreto' : 'pasadizos secretos'}
+            {palabras.leyenda(board.rooms.length, board.passages.length)}
           </p>
           <p className="board-hint text-dim">
-            Los trazos dorados discontinuos son pasadizos: cruzan la casa sin pasar por el pasillo.
+            {palabras.pistaPasos}
           </p>
         </div>
         <button className="btn" onClick={() => void recalcular()} disabled={recalculando}>

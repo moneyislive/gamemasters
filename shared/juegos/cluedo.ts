@@ -128,7 +128,16 @@ export const CLUEDO: ManifiestoDeJuego = {
       id: 'salas',
       singular: 'sala',
       plural: 'salas',
-      minimo: 3,
+      /*
+       * CUATRO, que es lo que exige el servidor desde siempre.
+       *
+       * Aquí decía tres y `agent/tools.ts` pedía cuatro, así que el taller
+       * enseñaba «Añade al menos tres estancias» y luego se negaba a generar
+       * con tres. El cliente lo tapaba con una tabla de excepciones
+       * —`MINIMO_HEREDADO`— cuyo propio comentario pedía que alguien viniera a
+       * quitar uno de los dos números. Este es el que sobraba.
+       */
+      minimo: 4,
       sonLugares: true,
       admiteFoto: true,
       almacen: 'rooms',
@@ -140,7 +149,7 @@ export const CLUEDO: ManifiestoDeJuego = {
         vacio: {
           glifo: '⌂',
           titulo: 'La casa está vacía',
-          texto: 'Añade al menos tres estancias. Con nombres reconocibles, la velada se juega sola.',
+          texto: 'Añade al menos cuatro estancias. Con nombres reconocibles, la velada se juega sola.',
         },
         ejemploNombre: 'La cocina',
         ejemploDescripcion: 'La grande, con la mesa de mármol y la puerta que da al patio.',
@@ -301,6 +310,16 @@ export const CLUEDO: ManifiestoDeJuego = {
   trofeos: TROFEOS,
   seccionesDeDosier: DOCUMENT_SECTIONS,
   documentos: PRINTABLE_DOCS,
+  /*
+    * PALABRA POR PALABRA LOS QUE YA HABÍA. CLUEDO no cambia ni una coma: esto
+    * es una mudanza de sitio, no una reescritura.
+    */
+  avisos: {
+    rondaAbierta: 'Ronda {ronda} de {total}. Elige sala.',
+    rondaCerrada: 'Ronda cerrada. Lo encontrado pasa al tablón común.',
+    acusaciones: 'Momento de acusar. Una sola combinación, y no se puede cambiar.',
+    desenlace: 'Se abre el sobre del crimen.',
+  },
   ceremonia: {
     generar: [
       'El mayordomo repasa las coartadas…',

@@ -529,6 +529,36 @@ comprobar('quien habla de dinero acaba sobornando', dones.e4 === 'sobornar', `le
 comprobar('quien hace fotos acaba documentando', dones.e5 === 'documentar', `le tocó ${dones.e5}`);
 comprobar('nadie se queda sin don', Object.keys(dones).length === EXPEDICION.length);
 
+/*
+ * Y EN UNA MESA MUDA, LOS SEIS DONES TIENEN QUE PODER SALIR.
+ *
+ * Cuando ninguna descripción dispara una preferencia —cuatro personas y ni una
+ * palabra clave— el reparto se queda con lo que sobra, y eso se servía en el
+ * orden en que están declarados los dones: salían siempre los cuatro primeros
+ * y los dos últimos no se repartían nunca. Dos de los seis papeles del juego no
+ * existían para esa mesa, y ninguna semilla lo cambiaba.
+ */
+{
+  const mudos = [
+    { id: 'm1', name: 'Uno', description: '' },
+    { id: 'm2', name: 'Dos', description: '' },
+    { id: 'm3', name: 'Tres', description: '' },
+    { id: 'm4', name: 'Cuatro', description: '' },
+  ];
+  const vistos = new Set<string>();
+  for (let i = 0; i < 40; i++) {
+    const muda = partidaDeMomia(`momia-muda-${i}`);
+    muda.suspects = mudos.map((m) => ({ ...m }));
+    const cim = cimientosDeMomia(entidadesDeLaMomia(muda), { semilla: muda.id });
+    for (const don of Object.values(cim.trama.dones)) vistos.add(don);
+  }
+  comprobar(
+    'con cuatro personas y sin descripciones, los seis dones acaban saliendo',
+    vistos.size === 6,
+    `salieron ${[...vistos].sort().join(', ')}`,
+  );
+}
+
 // ---------------------------------------------------------------------------
 // 6. Ritos que no se pueden distinguir
 // ---------------------------------------------------------------------------

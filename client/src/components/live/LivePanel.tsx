@@ -124,6 +124,8 @@ export default function LivePanel(): JSX.Element {
   }
 
   const { sesion } = vista;
+  // Gente de la partida que no tiene silla en la sesion abierta.
+  const sinSilla = game.suspects.filter((s) => !sesion.players.some((p) => p.suspectId === s.id));
   const enRonda = sesion.phase === 'ronda-abierta';
   const rondaCerrada = sesion.phase === 'ronda-cerrada';
   const ultimaRonda = sesion.round >= sesion.totalRounds;
@@ -149,6 +151,32 @@ export default function LivePanel(): JSX.Element {
           </span>
         </div>
       </section>
+
+      {/*
+        QUIEN LLEGO TARDE, Y COMO SENTARLO SIN ECHAR A NADIE.
+
+        La sala se abre con la gente que hubiera en ese momento. A quien se
+        anade despues no le nace silla, asi que no puede entrar por mucho que
+        figure en la partida, y hasta ahora la unica salida era cerrar la sala
+        y volver a abrirla — lo que cambia el codigo y echa a todos los moviles
+        ya emparejados. Este boton llama a `/live/sincronizar`, que alinea la
+        lista conservando a quien ya estaba dentro.
+      */}
+      {sinSilla.length > 0 && (
+        <section className="deco-frame live-cabecera">
+          <div className="live-codigo">
+            <span className="live-kicker mono-caps">Falta gente por sentar</span>
+            <span className="text-dim">{palabras.sinSilla(sinSilla.length)}</span>
+          </div>
+          <button
+            className="btn"
+            disabled={ocupado}
+            onClick={() => void accion(() => llamar(`/games/${game.id}/live/sincronizar`))}
+          >
+            {palabras.sentarAQuienFalte}
+          </button>
+        </section>
+      )}
 
       {/* ---- Mandos ---- */}
       <section className="deco-frame live-mandos">

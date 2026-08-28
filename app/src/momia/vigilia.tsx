@@ -371,9 +371,9 @@ export function Vigilia(): JSX.Element {
             <Marco>
               <Etiqueta>Se cierra la vigilia</Etiqueta>
               <Cuerpo style={{ marginTop: 6 }}>
-                Parte de lo encontrado está ya sobre la mesa. Es el momento de hablar: nadie tiene
-                fragmentos suficientes para sellar en solitario, y alguno de los que hay puede ser
-                falso.
+                Es el momento de hablar: nadie tiene fragmentos suficientes para sellar en
+                solitario, así que lo que no se cuente no lo sabrá nadie. Y alguno de los que ya
+                estén sobre la mesa puede ser falso.
               </Cuerpo>
               <Boton
                 variante="primario"

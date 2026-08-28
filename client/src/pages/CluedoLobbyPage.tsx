@@ -20,7 +20,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import type { Variants } from 'framer-motion';
 import type { GameStatus, GameSummary } from '../../../shared/types';
-import { JUEGO_POR_DEFECTO } from '../../../shared/juegos';
+import { JUEGO_POR_DEFECTO, manifiestoDe } from '../../../shared/juegos';
 import * as api from '../api/client';
 import { useAppStore } from '../state/store';
 import TransicionDeEntrada from '../components/transition/TransicionDeEntrada';
@@ -76,11 +76,22 @@ type ResumenDePartida = GameSummary & { juego?: string };
  * propósito de las partidas huérfanas.
  */
 function partidasDe(games: GameSummary[], juego: string | undefined): GameSummary[] {
-  const cual = juego ?? JUEGO_POR_DEFECTO;
-  return games.filter((g) => {
-    const suyo = (g as ResumenDePartida).juego;
-    return suyo === undefined || suyo === cual;
-  });
+  /*
+   * POR EL MANIFIESTO, que es lo que resuelve el hueco sin abrirlo de más.
+   *
+   * El filtro dejaba pasar toda partida sin `juego` declarado a CUALQUIER
+   * recibidor, para no perder de vista las antiguas. El efecto era que las
+   * partidas de CLUEDO de siempre salían también en el recibidor de la Momia,
+   * vestidas de expedición: con sus rótulos, su ceremonia y un «¿Cerrar esta
+   * expedición para siempre?» al borrarlas.
+   *
+   * `manifiestoDe(undefined)` cae en CLUEDO a propósito —es lo que mantiene
+   * viva a la partida antigua—, así que resolver los dos lados por el
+   * manifiesto las deja donde siempre debieron estar: en el recibidor de
+   * CLUEDO, y solo en ese.
+   */
+  const cual = manifiestoDe(juego ?? JUEGO_POR_DEFECTO).id;
+  return games.filter((g) => manifiestoDe((g as ResumenDePartida).juego).id === cual);
 }
 
 const listVariants: Variants = {

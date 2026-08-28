@@ -67,6 +67,14 @@ export default function Sellado(): JSX.Element {
   const estado = useMemo(() => leerEstadoMomia(vista?.estadoDelJuego), [vista?.estadoDelJuego]);
 
   const [orden, setOrden] = useState<RitoVisible[]>([]);
+  /*
+   * Si has vuelto a abrir tu propuesta para cambiarla.
+   *
+   * Vive solo en el movil: el servidor no distingue «entregada» de «entregada y
+   * la estoy repensando», y no tiene por que. Lo que el servidor dice es si
+   * admite otra, y eso llega en `vista.acciones`.
+   */
+  const [reabierto, setReabierto] = useState(false);
   const [confirmando, setConfirmando] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -123,21 +131,42 @@ export default function Sellado(): JSX.Element {
     );
   }
 
-  // ---- Ya entregada: no se puede cambiar ----
-  if (estado.miPropuesta) {
+  /*
+   * Que el servidor siga admitiendo propuestas. Se calcula ANTES de la rama de
+   * abajo: estaba despues, y como la rama devolvia siempre, esta linea era
+   * inalcanzable en cuanto entregabas una vez.
+   */
+  const puedeProponer = vista?.acciones.some((a) => a.id === 'proponer-orden') ?? false;
+
+  /*
+   * ---- Ya entregada ----
+   *
+   * ENTREGAR NO ES CERRAR, y la pantalla lo daba por cerrado para siempre. El
+   * servidor admite una propuesta nueva en cada vigilia —la ultima que entregas
+   * es la que cuenta— pero aqui se devolvia una vista de solo lectura que decia
+   * «Ya no se puede cambiar» desde la primera vez. Quien se lo creia jugaba las
+   * vigilias restantes con un orden que ya no defendia, y la unica salida era
+   * no entregar hasta el final, que es lo contrario de lo que pide el juego.
+   */
+  if (estado.miPropuesta && !reabierto) {
+    // Capturada aqui: dentro del callback del boton, TypeScript ya no puede dar
+    // por hecho que sigue definida.
+    const entregada = estado.miPropuesta;
     return (
       <Pantalla>
         <Animated.View entering={FadeInDown.duration(480)} style={estilos.centro}>
           <Sello>Entregado</Sello>
           <Titulo style={{ textAlign: 'center', marginTop: espacio.md }}>Tu sellado</Titulo>
           <Cuerpo tenue style={{ textAlign: 'center', marginTop: 4, fontStyle: 'italic' }}>
-            Ya no se puede cambiar. Se ejecutará el orden que más apoyos reúna.
+            {puedeProponer
+              ? 'Se ejecutará el orden que más apoyos reúna. Puedes cambiarlo mientras la vigilia siga abierta.'
+              : 'Ya no se puede cambiar. Se ejecutará el orden que más apoyos reúna.'}
           </Cuerpo>
         </Animated.View>
 
         <Ornamento />
 
-        {estado.miPropuesta.orden.map((id, i) => (
+        {entregada.orden.map((id, i) => (
           <Animated.View key={id} entering={FadeInUp.delay(60 * i).duration(420)}>
             <View style={[estilos.fila, estilos.filaEntregada]}>
               <Numero n={i + 1} />
@@ -156,6 +185,23 @@ export default function Sellado(): JSX.Element {
           </Marco>
         )}
 
+        {puedeProponer && (
+          <Boton
+            onPress={() => {
+              // Se siembra con lo que entregaste, no con el orden de partida:
+              // vuelves a donde lo dejaste y mueves desde ahi.
+              const entregado = entregada.orden
+                .map((id) => estado.ritos.find((r) => r.id === id))
+                .filter((r): r is RitoVisible => Boolean(r));
+              setOrden(entregado.length === estado.ritos.length ? entregado : estado.ritos);
+              setReabierto(true);
+            }}
+            style={{ marginTop: espacio.lg }}
+          >
+            Cambiar mi orden
+          </Boton>
+        )}
+
         <PanelSenalar />
         <Recuento entregadas={estado.propuestasEntregadas} />
       </Pantalla>
@@ -163,7 +209,6 @@ export default function Sellado(): JSX.Element {
   }
 
   // ---- Ordenar y entregar ----
-  const puedeProponer = vista?.acciones.some((a) => a.id === 'proponer-orden') ?? false;
 
   const mover = (desde: number, hacia: number): void => {
     if (hacia < 0 || hacia >= orden.length) return;
