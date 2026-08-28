@@ -28,6 +28,10 @@ import Svg, {
 } from 'react-native-svg';
 import * as api from '../../src/api';
 import { usePartida } from '../../src/estado';
+import { conAlfa } from '../../src/tema-juego';
+import { MOMIA } from '../../src/tema-momia';
+import { leerEstadoMomia } from '../../src/momia/vista';
+import { accionDeEntrarEnLugar, categoriasDeLugar, manifiestoDe } from '../../../shared/juegos';
 import {
   Cargando,
   Cuerpo,
@@ -83,8 +87,31 @@ export default function Mapa(): JSX.Element {
   // el jugador la tiene en la pestaña del tablón, aquí solo se ve de un vistazo.
   const conHallazgo = new Set(vista.tablon.map((p) => p.roomId));
 
+  /*
+   * LAS PALABRAS DEL SITIO SALEN DEL MANIFIESTO. Esta pantalla decía «la casa»
+   * y «las estancias», que en El Misterio de la Momia no existen: allí son
+   * cámaras, y lo que hay es una tumba. El plano es de los sitios donde más se
+   * nota, porque se mira mucho y se lee entero.
+   */
+  const manifiesto = manifiestoDe(sesion.juego);
+  const lugar = categoriasDeLugar(manifiesto)[0];
+  const unLugar = lugar?.singular ?? 'estancia';
+  const losLugares = lugar?.plural ?? 'estancias';
+  // Si el juego no tiene acción de entrar, el plano se mira pero no se toca.
+  const seEntra = Boolean(accionDeEntrarEnLugar(manifiesto));
+
+  /*
+   * La cámara profanada de esta vigilia, marcada también aquí.
+   *
+   * Es pública —quien dirige la anuncia en voz alta al abrir— y es LO QUE MÁS
+   * pesa al decidir dónde entrar: quien pise ahí sale con una marca. Tenerla en
+   * el plano, y no solo en la primera pestaña, es la diferencia entre un plano
+   * que sirve para decidir y un plano decorativo.
+   */
+  const profanada = leerEstadoMomia(vista.estadoDelJuego)?.profanada;
+
   const elegir = async (salaId: string): Promise<void> => {
-    if (!abierta || salaId === miSala || eligiendo) return;
+    if (!abierta || !seEntra || salaId === miSala || eligiendo) return;
     setError(null);
     setEligiendo(salaId);
     try {
@@ -100,13 +127,15 @@ export default function Mapa(): JSX.Element {
   return (
     <Pantalla>
       <View style={{ marginTop: espacio.md, marginBottom: espacio.lg }}>
-        <Titulo style={{ fontSize: 24 }}>{cara === 'foto' ? 'La casa' : 'El plano'}</Titulo>
+        <Titulo style={{ fontSize: 24 }}>{cara === 'foto' ? 'El sitio' : 'El plano'}</Titulo>
         <Cuerpo tenue>
           {abierta
-            ? 'Toca una estancia para entrar en ella.'
+            ? seEntra
+              ? `Toca una ${unLugar} para entrar en ella.`
+              : `Las ${losLugares} de esta partida.`
             : cara === 'foto'
               ? 'El sitio de verdad, visto desde arriba.'
-              : 'La planta de la casa y por dónde se comunica.'}
+              : `La planta y por dónde se comunican las ${losLugares}.`}
         </Cuerpo>
       </View>
 
@@ -120,7 +149,7 @@ export default function Mapa(): JSX.Element {
         <Marco>
           <Cuerpo tenue>
             Esta partida todavía no tiene plano. Quien la dirige puede trazarlo desde el taller, o
-            subir una foto aérea del sitio y clavar una chincheta en cada estancia.
+            subir una foto aérea del sitio y clavar una chincheta en cada {unLugar}.
           </Cuerpo>
         </Marco>
       ) : cara === 'foto' ? (
@@ -139,6 +168,7 @@ export default function Mapa(): JSX.Element {
           salas={salas}
           miSala={miSala}
           conHallazgo={conHallazgo}
+          profanada={profanada}
           ancho={ancho}
           alPulsar={elegir}
           activo={abierta}
@@ -148,21 +178,22 @@ export default function Mapa(): JSX.Element {
       {cara === 'foto' && conChincheta < salas.length && (
         <Cuerpo tenue style={{ fontStyle: 'italic', fontSize: 15, marginTop: espacio.sm }}>
           {conChincheta === 0
-            ? 'Sobre esta foto todavía no hay ninguna estancia señalada.'
-            : `Sobre la foto hay ${conChincheta} de ${salas.length} estancias señaladas; las demás están en la lista de abajo.`}
+            ? `Sobre esta foto todavía no hay ninguna ${unLugar} señalada.`
+            : `Sobre la foto hay ${conChincheta} de ${salas.length} ${losLugares} señaladas; las demás están en la lista de abajo.`}
         </Cuerpo>
       )}
 
       {cara && (
         <Leyenda
           cara={cara}
+          nombreProfanada={salas.find((s) => s.id === profanada)?.name}
           hayPasadizos={(tablero?.plano?.passages.length ?? 0) > 0}
         />
       )}
 
       <Ornamento />
 
-      <Seccion>Las estancias</Seccion>
+      <Seccion>{`Las ${losLugares}`}</Seccion>
       {salas.map((sala, i) => (
         <Animated.View key={sala.id} entering={FadeInUp.delay(40 * i).duration(360)}>
           <Pressable
@@ -171,6 +202,7 @@ export default function Mapa(): JSX.Element {
             style={({ pressed }) => [
               estilos.fila,
               sala.id === miSala && estilos.filaDentro,
+              sala.id === profanada && estilos.filaProfanada,
               pressed && { opacity: 0.85 },
             ]}
           >
@@ -187,6 +219,8 @@ export default function Mapa(): JSX.Element {
                       : `${sala.ocupantes} personas`
                     : null,
                   conHallazgo.has(sala.id) ? 'Ya dio algo' : null,
+                  // Lo primero de la lista si toca: entrar ahí cuesta una marca.
+                  sala.id === profanada ? 'Profanada esta noche' : null,
                 ]
                   .filter(Boolean)
                   .join(' · ') || 'Sin novedades'}
@@ -208,6 +242,15 @@ interface PropsPlano {
   salas: SalaVista[];
   miSala?: string;
   conHallazgo: Set<string>;
+  /**
+   * La que cuesta una marca esta noche, si el juego tiene una.
+   *
+   * Se dibuja EN EL PLANO y no solo en la lista de abajo: el plano es lo que se
+   * mira para decidir dónde entrar, y esto es lo que más pesa en esa decisión.
+   * Tenerlo solo en la lista obligaba a bajar, recordar cuál era y volver a
+   * subir a buscarla.
+   */
+  profanada?: string;
   ancho: number;
   alPulsar: (salaId: string) => void | Promise<void>;
   activo: boolean;
@@ -217,7 +260,7 @@ function PlanoDibujado({
   plano,
   ...resto
 }: PropsPlano & { plano?: BoardLayout }): JSX.Element | null {
-  const { salas, miSala, conHallazgo, ancho, alPulsar, activo } = resto;
+  const { salas, miSala, conHallazgo, profanada, ancho, alPulsar, activo } = resto;
   if (!plano || plano.rooms.length === 0) return null;
 
   const lado = plano.grid.cols * CELDA;
@@ -380,6 +423,7 @@ function PlanoDibujado({
           const nombre = (nombrePorId.get(c.roomId) ?? 'Sala').toUpperCase();
           const dentro = miSala === c.roomId;
           const dioAlgo = conHallazgo.has(c.roomId);
+          const marcada = c.roomId === profanada;
           const lineas = partirNombre(nombre);
           const tam = tamanoDeLetra(lineas, w - 30);
           const haciaDerecha = cx < lado / 2;
@@ -396,9 +440,15 @@ function PlanoDibujado({
                 width={w - 10}
                 height={h - 10}
                 rx={6}
-                fill={dentro ? 'rgba(201,162,39,0.20)' : '#2b1a12'}
-                stroke={dentro ? color.oro300 : color.oro500}
-                strokeWidth={dentro ? 4 : 2.5}
+                fill={
+                  dentro
+                    ? 'rgba(201,162,39,0.20)'
+                    : marcada
+                      ? conAlfa(MOMIA.profanada, 0.22)
+                      : '#2b1a12'
+                }
+                stroke={dentro ? color.oro300 : marcada ? MOMIA.profanada : color.oro500}
+                strokeWidth={dentro ? 4 : marcada ? 3.5 : 2.5}
               />
               <Rect
                 x={x + 12}
@@ -546,7 +596,7 @@ function PlanoAereo({
       <Marco>
         <Cuerpo tenue>
           {fallo
-            ? 'No se ha podido cargar la foto del plano. Usa la lista de estancias de abajo.'
+            ? 'No se ha podido cargar la foto del plano. Usa la lista de abajo.'
             : 'Esta partida se juega sobre el espacio real, pero todavía no hay foto del plano.'}
         </Cuerpo>
       </Marco>
@@ -650,22 +700,38 @@ function Alternador({
   return (
     <View style={estilos.alternador}>
       {opcion('plano', 'El plano')}
-      {opcion('foto', 'La casa')}
+      {opcion('foto', 'El sitio')}
     </View>
   );
 }
 
-function Leyenda({ cara, hayPasadizos }: { cara: Cara; hayPasadizos: boolean }): JSX.Element {
+function Leyenda({
+  cara,
+  hayPasadizos,
+  nombreProfanada,
+}: {
+  cara: Cara;
+  hayPasadizos: boolean;
+  nombreProfanada?: string;
+}): JSX.Element {
   return (
     <View style={estilos.leyenda}>
       <Renglon
         glifo={cara === 'foto' ? '◉' : '▣'}
-        texto="La estancia iluminada es en la que estás."
+        texto="La iluminada es donde estás."
       />
       <Renglon glifo="●" texto="Cada punto es alguien que ha entrado ahí esta ronda." />
-      <Renglon glifo="✦" texto="El lacre marca las salas que ya dieron algo al tablón." />
+      <Renglon glifo="✦" texto="El lacre marca las que ya dieron algo." />
+      {/* Solo si la hay. Con palabra y no solo con color: en una mesa de ocho
+          hay siempre alguien que no distingue el rojo, y esto cuesta una marca. */}
+      {nombreProfanada && (
+        <Renglon
+          glifo="▨"
+          texto={`${nombreProfanada} está profanada esta noche: quien entre sale con una marca.`}
+        />
+      )}
       {cara === 'plano' && hayPasadizos && (
-        <Renglon glifo="╌" texto="Los trazos discontinuos son pasadizos: cruzan la casa sin pasillo." />
+        <Renglon glifo="╌" texto="Los trazos discontinuos son pasadizos: cruzan de un lado a otro sin pasillo." />
       )}
     </View>
   );
@@ -756,6 +822,16 @@ const estilos = StyleSheet.create({
   filaDentro: {
     borderColor: color.oro400,
     backgroundColor: 'rgba(201,162,39,0.13)',
+  },
+  /*
+   * La profanada. Con borde y con PALABRA —«Profanada esta noche» va en la
+   * línea de abajo—, no solo con color: en una mesa de ocho hay siempre alguien
+   * que no distingue el rojo, y un dato que solo se dice con un tono es un dato
+   * que esa persona no puede leer. Y este cuesta una marca.
+   */
+  filaProfanada: {
+    borderColor: MOMIA.profanada,
+    backgroundColor: conAlfa(MOMIA.profanada, 0.12),
   },
   chincheta: {
     // La chincheta tiene que quedar centrada EXACTAMENTE sobre el punto que

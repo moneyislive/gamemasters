@@ -78,16 +78,28 @@ export default function PanelDeLaMomia({
     return (
       <section className="deco-frame live-momia">
         <h3 className="live-titulo">La vigilia</h3>
+        {/*
+          NO SE ACONSEJA CERRAR Y REABRIR, y este texto costó una auditoría.
+          Decía exactamente eso, y cerrar la partida BORRA la sesión en vivo y
+          echa a las ocho personas de la mesa: el consejo que parecía la
+          solución era el desastre. Ya casi no se llega aquí —el estado se monta
+          al abrir— pero una sesión de antes de ese cambio sí, y entonces lo
+          honesto es decir que se arregla solo.
+        */}
         <p className="text-dim text-italic">
-          El papiro todavía no se ha repartido en esta partida: no hay marcas, ni fragmentos, ni
-          cámara profanada que anunciar. Ciérrala y vuelve a abrirla después de generar la
-          expedición.
+          Esta partida se abrió antes de que la expedición tuviera estado, así que todavía no hay
+          marcas ni cámara profanada que enseñar aquí. Aparecerán en cuanto alguien haga su primera
+          acción de la vigilia. <b>No cierres la partida</b>: eso echaría a todo el mundo de la
+          mesa y no hace falta.
         </p>
       </section>
     );
   }
 
   const profanada = sesion.round > 0 ? estado.profanadas[sesion.round - 1] : undefined;
+  const todos = Object.values(estado.fragmentos ?? {});
+  const publicos = todos.filter((f) => f.publico);
+  const totalFragmentos = todos.length;
   const propuestas = Object.entries(estado.propuestas ?? {});
   const gente = estado.gente ?? {};
 
@@ -179,6 +191,60 @@ export default function PanelDeLaMomia({
           </tbody>
         </table>
       </section>
+
+      {/* ---- El papiro: qué hay sobre la mesa y quién ha gastado su don ---- */}
+      {enJuego && (
+        <section className="deco-frame live-momia">
+          <h3 className="live-titulo">El papiro</h3>
+          <p className="text-dim">
+            Lo que está sobre la mesa a la vista de todos, y quién ha usado ya su don esta
+            vigilia. Ninguna de las dos cosas es secreta —se ven en la mesa— pero hasta ahora
+            había que preguntarlas en voz alta para saberlas.
+          </p>
+          <p className="live-propuestas">
+            <strong>{publicos.length}</strong> de {totalFragmentos} fragmentos publicados
+            {publicos.length > 0 && ' · el resto sigue en manos de alguien'}
+          </p>
+          {publicos.length > 0 && (
+            <ul className="live-publicos">
+              {publicos.map((f) => (
+                <li key={f.id}>
+                  <span className="mono-caps text-dim">{f.id}</span> {f.texto}
+                </li>
+              ))}
+            </ul>
+          )}
+          <table className="live-tabla">
+            <thead>
+              <tr>
+                <th>Expedicionario</th>
+                <th>Fragmentos</th>
+                <th>Su don</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sesion.players.map((p) => {
+                const suyo = gente[p.suspectId];
+                const usado = suyo?.donUsadoEnRonda === sesion.round;
+                return (
+                  <tr key={p.suspectId}>
+                    <td>{p.displayName}</td>
+                    <td>{suyo?.fragmentos.length ?? 0}</td>
+                    <td className="text-dim">
+                      {usado ? 'usado esta vigilia' : 'sin usar'}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          {/*
+            QUÉ don tiene cada cual NO se enseña, y es a propósito: es secreto
+            de quien lo tiene, y el saqueador tiene dos. Que se haya usado sí,
+            porque en la mesa se dice en voz alta al invocarlo.
+          */}
+        </section>
+      )}
 
       {/* ---- El sellado ---- */}
       <section className="deco-frame live-momia">

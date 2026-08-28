@@ -488,6 +488,34 @@ export function categoriasDeLugar(m: ManifiestoDeJuego): DefinicionCategoria[] {
  * ninguna acción los cubre, que es un manifiesto mal escrito y lo caza
  * `verify:manifiestos`.
  */
+/**
+ * Con qué acción se entra en un sitio, y en qué campo va.
+ *
+ * OTRA PROPIEDAD QUE YA ERA CIERTA, como la de la acusación: en los dos juegos
+ * existe una acción que pide UNA entidad y esa entidad es un lugar. CLUEDO la
+ * llama `entrar-en-sala` con el campo `sala`; la Momia, `explorar` con el campo
+ * `camara`.
+ *
+ * LO QUE ARREGLA. La ruta del plano despachaba `'entrar-en-sala'` escrito a
+ * mano, así que en la Momia tocar una cámara en la pestaña «Tumba» contestaba
+ * 409 — y la pantalla invitaba a hacerlo, «toca una estancia para entrar en
+ * ella», y pintaba el error justo debajo. Se salía cambiando de pestaña, que
+ * es la clase de cosa que nadie descubre solo.
+ */
+export function accionDeEntrarEnLugar(
+  m: ManifiestoDeJuego,
+): { accion: DefinicionAccion; campo: string } | undefined {
+  const lugares = new Set(categoriasDeLugar(m).map((c) => c.id));
+  if (lugares.size === 0) return undefined;
+  for (const accion of m.acciones) {
+    const campos = accion.eligeDe ?? [];
+    if (campos.length !== 1) continue;
+    const unico = campos[0]!;
+    if (lugares.has(unico.categoria)) return { accion, campo: unico.campo };
+  }
+  return undefined;
+}
+
 export function accionDeAcusacion(m: ManifiestoDeJuego): DefinicionAccion | undefined {
   const lista = ejes(m);
   if (lista.length === 0) return undefined;

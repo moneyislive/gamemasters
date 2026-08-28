@@ -18,7 +18,7 @@ import { firmaDeFotoValida } from '../live/fotos';
 import { vistaDeJugador } from '../live/proyeccion';
 import { guardarNotas, mutar, tocar } from '../live/sesion';
 import { AccionInvalida, ejecutarAccion } from '../juegos/motor';
-import { accionDeAcusacion, manifiestoDe } from '../../../shared/juegos';
+import { accionDeAcusacion, accionDeEntrarEnLugar, manifiestoDe } from '../../../shared/juegos';
 /*
  * El alta de los juegos ya no vive aqui: la hace `juegos/instalados.ts` desde
  * el arranque. Colgarla de esta ruta funcionaba con un solo juego —toda
@@ -277,8 +277,20 @@ router.post('/jugar/sala', async (req, res) => {
       res.status(404).json({ error: 'Esta partida ya no está en juego.' });
       return;
     }
+    /*
+     * LA ACCIÓN Y EL NOMBRE DEL CAMPO SALEN DEL MANIFIESTO, no de aquí.
+     *
+     * Estaban cableados a `'entrar-en-sala'` y `sala`, que son los de CLUEDO,
+     * así que en El Misterio de la Momia tocar una cámara en el plano
+     * contestaba 409 mientras la propia pantalla invitaba a tocarla.
+     */
+    const entrar = accionDeEntrarEnLugar(manifiestoDe(game.settings?.juego));
+    if (!entrar) {
+      res.status(409).json({ error: 'En esta partida no se entra en ningún sitio.' });
+      return;
+    }
     await mutar(cred.gameId, (s) =>
-      ejecutarAccion(game, s, cred.suspectId, 'entrar-en-sala', { sala: roomId }),
+      ejecutarAccion(game, s, cred.suspectId, entrar.accion.id, { [entrar.campo]: roomId }),
     );
     const vista = await vistaActual(cred.gameId, cred.suspectId, res);
     if (!vista) return;

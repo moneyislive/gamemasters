@@ -10,6 +10,7 @@ import { nanoid } from 'nanoid';
 import { getStore } from '../db/store';
 import { numeroDeRondas } from '../docs/datos';
 import { avisarCambio } from './hub';
+import { iniciarJuego } from '../juegos/inicios';
 import { ALFABETO_CODIGO, FASES_EN_JUEGO } from '../../../shared/live';
 import { aciertos, esElSenalado, ejes as ejesDe, manifiestoDe, respuestaCompleta } from '../../../shared/juegos';
 import type { EjeId, JuegoId } from '../../../shared/juegos';
@@ -156,6 +157,16 @@ export async function abrirSesion(game: GameSession): Promise<LiveSession> {
     rev: 1,
     updatedAt: new Date().toISOString(),
   };
+
+  /*
+   * Y lo que el juego necesite montado ANTES de guardar por primera vez.
+   *
+   * La plataforma no sabe qué es —ni tiene que saberlo—: pregunta. Un juego que
+   * no registra nada abre exactamente igual que siempre, y CLUEDO no registra
+   * nada, así que su apertura no cambia ni un byte.
+   */
+  iniciarJuego(game, sesion);
+
   return store.saveLive(sesion);
 }
 

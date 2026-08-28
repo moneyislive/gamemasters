@@ -31,6 +31,7 @@
  */
 import { acusar as registrarSenalamiento, elegirSala } from '../live/sesion';
 import { AccionInvalida, registrarAcciones } from './motor';
+import { registrarInicio } from './inicios';
 // Por la puerta principal: es el índice quien declara dónde vive cada
 // categoría. Ver el comentario largo en `momia-trama.ts`.
 import { entidadesDe } from '../../../shared/juegos';
@@ -100,6 +101,22 @@ export function estadoDe(game: GameSession, sesion: LiveSession): EstadoMomia {
   }
   return estado;
 }
+
+/**
+ * El alta: la Momia monta su estado al abrir la mesa.
+ *
+ * Es la misma `estadoDe` de arriba, que ya sabe crearlo y es idempotente. Lo
+ * que cambia es CUÁNDO: antes nacía con la primera acción de alguien, y hasta
+ * entonces el panel de quien dirige no encontraba nada que leer —ni cámara
+ * profanada, ni marcas— justo en el momento en que hay que anunciarla en voz
+ * alta. Se traga su propio error porque una partida sin trama todavía no puede
+ * montar nada, y eso no es motivo para no abrir la mesa: el primer reductor lo
+ * intentará otra vez.
+ */
+registrarInicio('momia', (game, sesion) => {
+  if (!tramaDe(game.plot)) return;
+  estadoDe(game, sesion);
+});
 
 /** La trama, ya comprobada. Los reductores no pueden trabajar sin ella. */
 function tramaObligatoria(game: GameSession): TramaMomia {

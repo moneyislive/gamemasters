@@ -38,7 +38,7 @@ import { generateDemoPlot } from '../src/plot/demoPlot';
 import { armarPaquete } from '../src/docs/paquete';
 import { juegosConMaterial } from '../src/juegos/materiales';
 import '../src/plot/material';
-import { manifiestoDe, accionDeAcusacion } from '../../shared/juegos';
+import { manifiestoDe, accionDeAcusacion, accionDeEntrarEnLugar } from '../../shared/juegos';
 import type { GameSession } from '../../shared/types';
 import type { LiveSession } from '../../shared/live';
 import type { EstadoMomia } from '../../shared/juegos/momia-tipos';
@@ -221,13 +221,17 @@ function partidaDeCluedo(): { game: GameSession; sesion: LiveSession } {
   return { game, sesion };
 }
 
-function sembrar(dir: string, partidas: Array<{ game: GameSession; sesion: LiveSession }>): void {
+function sembrar(
+  dir: string,
+  partidas: Array<{ game: GameSession; sesion: LiveSession }>,
+  sinSesion: GameSession[] = [],
+): void {
   fs.mkdirSync(path.join(dir, 'data'), { recursive: true });
   fs.writeFileSync(
     path.join(dir, 'data', 'db.json'),
     JSON.stringify(
       {
-        games: partidas.map((p) => p.game),
+        games: [...partidas.map((p) => p.game), ...sinSesion],
         messages: {},
         config: { model: 'claude-fable-5' },
         live: partidas.map((p) => p.sesion),
@@ -245,8 +249,13 @@ function sembrar(dir: string, partidas: Array<{ game: GameSession; sesion: LiveS
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'gm-puertas-'));
 const momia = partidaDeMomia('sellado');
 const enJuego = partidaDeMomia('ronda-abierta', 'excavacion', 'ABIERT', 'ABIE');
+/*
+ * Una tercera partida SIN sesión en vivo: se abre desde el taller durante la
+ * prueba, que es el único modo de mirar lo que hay en el instante de abrir.
+ */
+const porAbrir = partidaDeMomia('ronda-abierta', 'excavacion2', 'NOABRE', 'NOAB');
 const cluedo = partidaDeCluedo();
-sembrar(dir, [momia, enJuego, cluedo]);
+sembrar(dir, [momia, enJuego, cluedo], [porAbrir.game]);
 
 let servidor: ChildProcess | undefined;
 
@@ -358,6 +367,76 @@ async function probar(): Promise<void> {
         JSON.stringify(sellado?.ordenEjecutado),
       final?.estado?.momia?.sellado,
     );
+  }
+
+  // -------------------------------------------------------------------------
+  paso('Quien dirige tiene algo que leer DESDE QUE ABRE, sin que nadie actúe');
+  // -------------------------------------------------------------------------
+  {
+    /*
+     * ABRE UNA MESA NUEVA Y NO TOCA NADA MÁS. Es el momento exacto del fallo:
+     * el estado nacía con la primera acción de alguien, así que hasta entonces
+     * el panel de quien dirige no encontraba cámara profanada que anunciar
+     * —que es literalmente lo primero que hay que decir en voz alta— y en su
+     * lugar aconsejaba cerrar la partida y volver a abrirla, que borra la
+     * sesión y echa a las ocho personas de la mesa.
+     */
+    const abierta = await pedir('/games/excavacion2/live/abrir', {
+      metodo: 'POST',
+      cuerpo: {},
+    });
+    comprobar('la mesa se abre', abierta.estado === 200, abierta.datos);
+
+    const recien = await estadoDeLaSesion('excavacion2');
+    const suyo = recien?.estado?.momia;
+    comprobar('el estado del juego existe ANTES de que nadie actúe', Boolean(suyo), recien?.estado);
+    comprobar(
+      'y trae las cámaras profanadas, que es lo que hay que anunciar',
+      Array.isArray(suyo?.profanadas) && suyo.profanadas.length > 0,
+      suyo?.profanadas,
+    );
+    comprobar(
+      'y a toda la expedición, con sus marcas y sus amuletos',
+      Object.keys(suyo?.gente ?? {}).length === 4,
+      Object.keys(suyo?.gente ?? {}),
+    );
+    comprobar(
+      'y los fragmentos, para saber qué hay sobre la mesa',
+      Object.keys(suyo?.fragmentos ?? {}).length > 0,
+    );
+
+    // Y CLUEDO abre exactamente igual que siempre: sin estado, porque no registra ninguno.
+    const cluedoAbierto = await estadoDeLaSesion('mansion');
+    comprobar(
+      'CLUEDO sigue abriendo sin estado propio',
+      cluedoAbierto?.estado === undefined || cluedoAbierto?.estado === null,
+      cluedoAbierto?.estado,
+    );
+  }
+
+  // -------------------------------------------------------------------------
+  paso('Tocar un sitio en el plano funciona en los dos juegos');
+  // -------------------------------------------------------------------------
+  {
+    const entrada = accionDeEntrarEnLugar(manifiestoDe('momia'));
+    comprobar('la Momia dice con qué acción se entra', entrada?.accion.id === 'explorar', entrada?.accion.id);
+    comprobar('y en qué campo va', entrada?.campo === 'camara', entrada?.campo);
+    const enCluedo = accionDeEntrarEnLugar(manifiestoDe('cluedo'));
+    comprobar('CLUEDO sigue con la suya', enCluedo?.accion.id === 'entrar-en-sala', enCluedo?.accion.id);
+
+    /*
+     * LA LLAMADA QUE HACE EL PLANO. Despachaba `'entrar-en-sala'` a pelo, así
+     * que en la Momia contestaba 409 mientras la propia pantalla invitaba a
+     * tocar la cámara y pintaba el error justo debajo.
+     */
+    const testigo = await entrar('ABIERT', 'ABIE1A');
+    const r = await pedir('/jugar/sala', {
+      metodo: 'POST',
+      testigo,
+      cuerpo: { roomId: 'c1' },
+    });
+    comprobar('tocar una cámara en el plano entra de verdad', r.estado === 200, r.datos);
+    comprobar('y la vista dice que estás dentro', r.datos?.vista?.miSala === 'c1', r.datos?.vista?.miSala);
   }
 
   // -------------------------------------------------------------------------
@@ -560,10 +639,37 @@ function probarSelector(): void {
 }
 
 // ---------------------------------------------------------------------------
+// El panel de quien dirige: ni aconseja el desastre, ni le esconde la partida.
+// ---------------------------------------------------------------------------
+
+function probarPanel(): void {
+  paso('El panel del Game Master');
+
+  const fichero = path.join(REPO, 'client', 'src', 'components', 'live', 'PanelDeLaMomia.tsx');
+  const texto = fs.readFileSync(fichero, 'utf8');
+
+  /*
+   * NO PUEDE ACONSEJAR CERRAR LA PARTIDA. Lo hacía —«ciérrala y vuelve a
+   * abrirla»— justo cuando no encontraba estado, que era justo al abrir la
+   * mesa; y cerrar BORRA la sesión en vivo y echa a las ocho personas. El
+   * consejo que parecía la solución era el desastre.
+   */
+  comprobar(
+    'no aconseja cerrar y reabrir la partida',
+    !texto.toLowerCase().includes('vuelve a abrirla'),
+  );
+
+  // Y lo que quien dirige no veía nunca: qué hay publicado y quién gastó su don.
+  comprobar('enseña los fragmentos publicados', texto.includes('publicados'));
+  comprobar('y si cada cual ha usado su don', texto.includes('donUsadoEnRonda'));
+}
+
+// ---------------------------------------------------------------------------
 
 try {
   probarPaquete();
   probarSelector();
+  probarPanel();
 
   servidor = spawn(process.execPath, [TSX, SERVIDOR], {
     cwd: dir,
