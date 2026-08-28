@@ -380,7 +380,7 @@
             <tr>
               <td class="libre">El manifiesto: 13 campos obligatorios y 3 opcionales (<code>ejes</code>, <code>reglas</code>, <code>rotuloCentralDelPlano</code>)</td>
               <td class="ruta"><code>shared/juegos/&lt;juego&gt;.ts</code></td>
-              <td class="libre">—</td>
+              <td class="libre"><strong>Silencioso:</strong> si el <code>id</code> del manifiesto no coincide exactamente con el que se guarda en la partida, <code>manifiestoDe()</code> cae en CLUEDO. La partida se juega con las categorías, fases, reglas y trofeos de CLUEDO sin dar un solo error</td>
             </tr>
             <tr>
               <td class="libre">Tus tipos: el estado en partida y lo que decide la generación</td>
@@ -417,6 +417,23 @@
       <pre><code>registrarAcciones('&lt;juego&gt;', { … })   // server/src/juegos/motor.ts
 registrarProyeccion('&lt;juego&gt;', fn)    // server/src/juegos/proyecciones.ts
 registrarTrofeos('&lt;juego&gt;', fn)       // server/src/juegos/trofeos.ts</code></pre>
+      <div class="trampa">
+        <span class="rot">Decide esto antes de escribir la acción</span>
+        <p>
+          Una acción puede pedir sus datos de tres formas: <code>eligeDe</code>
+          (una entidad por campo, obligatoria), <code>eligeVarias</code> (una
+          lista, con <code>cuantas</code> y <code>ordenada</code>) y
+          <code>eligeOpcional</code> (puede no venir). Las tres validan igual de
+          estricto que el id sea una entidad real de su categoría.
+        </p>
+        <p>
+          <strong>Pero el panel genérico de la app solo sabe pintar
+          <code>eligeDe</code>.</strong> Una acción declarada con las otras dos
+          se valida perfectamente por HTTP y quien juega no tiene con qué
+          mandarla: necesita pantalla propia. Tenlo decidido antes, porque
+          cambia si tu juego cae en la etapa 4 o no.
+        </p>
+      </div>
       <div class="tabla-marco">
         <table>
           <thead><tr><th>Qué</th><th>Dónde</th><th>Si se olvida</th></tr></thead>
@@ -476,6 +493,16 @@ registrarTrofeos('&lt;juego&gt;', fn)       // server/src/juegos/trofeos.ts</cod
             <tr><td class="libre">El prompt de tu asistente y sus herramientas</td><td class="ruta"><code>agent/&lt;juego&gt;-*.ts</code></td><td>sí</td></tr>
           </tbody>
         </table>
+      </div>
+      <div class="trampa">
+        <span class="rot">Silencioso</span>
+        <p>
+          <strong>El enganche de la trama no es un registro: es un
+          <code>if</code> cableado.</strong> Puedes tener reductores, proyección
+          y trofeos dados de alta y aun así recibir la trama de CLUEDO, porque
+          esa rama se escribe a mano en el pipeline. Es la única de las cuatro
+          capas del juego que no se da de alta con una llamada.
+        </p>
       </div>
       <div class="hito">
         <b>Ya se puede ver</b>
@@ -634,7 +661,7 @@ registrarTrofeos('&lt;juego&gt;', fn)       // server/src/juegos/trofeos.ts</cod
           <tr><td class="ruta"><code>DocumentSectionId</code></td><td class="ruta"><code>shared/types.ts:283</code></td><td class="libre">siempre</td></tr>
           <tr><td class="ruta"><code>IconoId</code></td><td class="ruta"><code>shared/juegos/tipos.ts:228</code></td><td class="libre">quieres iconos propios</td></tr>
           <tr><td class="ruta"><code>PantallaDeApp</code></td><td class="ruta"><code>shared/juegos/tipos.ts:250</code></td><td class="libre">necesitas pantallas propias</td></tr>
-          <tr><td class="ruta"><code>LivePhase</code></td><td class="ruta"><code>shared/live.ts:23</code></td><td class="libre">tu ritmo no cabe en las fases que hay</td></tr>
+          <tr><td class="ruta"><code>LivePhase</code></td><td class="ruta"><code>shared/live.ts:23</code></td><td class="libre">tu ritmo no cabe en las fases que hay. <strong>La más cara con diferencia:</strong> <code>fases</code> es un <code>Record</code> exhaustivo, así que añadir una obliga a tocar los <em>cinco</em> manifiestos que existen —los dos juegos y los tres de las pruebas— aunque no la usen</td></tr>
           <tr><td class="ruta"><code>AvisoClave</code></td><td class="ruta"><code>shared/live.ts:696</code></td><td class="libre">añadiste una fase</td></tr>
           <tr><td class="ruta">El registro de juegos</td><td class="ruta"><code>shared/juegos/index.ts</code></td><td class="libre">siempre</td></tr>
           <tr><td class="ruta">El alta al arrancar</td><td class="ruta"><code>server/src/juegos/instalados.ts</code></td><td class="libre">siempre</td></tr>
@@ -687,6 +714,50 @@ registrarTrofeos('&lt;juego&gt;', fn)       // server/src/juegos/trofeos.ts</cod
         del juego nuevo rechazadas mientras los ocho verificadores del viejo
         seguían verdes. El maestro de oro solo mira CLUEDO: la velada de punta a
         punta de tu juego es la única que puede ver esa clase de fallo.
+      </p>
+    </div>
+
+    <div class="trampa">
+      <span class="rot">Silencioso</span>
+      <p>
+        <strong>Quien dirige lo ve TODO lo que guardes.</strong> La vista del
+        Game Master manda la sesión entera, <code>estado</code> incluido, y no
+        hay proyección por juego para ella. Si guardas ahí la solución —y hay que
+        guardarla en algún sitio— quien dirige la tiene delante. En CLUEDO eso es
+        correcto; si tu juego admite dirigir a ciegas, tenlo en cuenta.
+      </p>
+    </div>
+
+    <div class="trampa">
+      <span class="rot">Silencioso</span>
+      <p>
+        <strong>Las secciones de dosier propias no las pinta nadie.</strong>
+        Puedes declararlas, aparecen en el diseñador del taller y se pueden
+        encender y apagar — y el dosier del jugador las ignora. Lo mismo con
+        <code>ronda</code> entero (<code>accionSobre</code> y
+        <code>cambiosPermitidos</code>): es obligatorio en el manifiesto y no lo
+        lee nadie.
+      </p>
+    </div>
+
+    <div class="trampa">
+      <span class="rot">Silencioso · colisión entre juegos</span>
+      <p>
+        <strong>Los ids de trofeo no llevan prefijo de juego.</strong> Dos juegos
+        pueden usar el mismo id sin que nada avise, y entonces el trofeo de uno
+        aparece en la vitrina del otro. Ponles nombres que no pueda repetir nadie.
+      </p>
+    </div>
+
+    <div class="trampa">
+      <span class="rot">Se ve tarde</span>
+      <p>
+        <strong>El tema de la app no llega a todas las pantallas.</strong> Unas
+        diez importan la constante <code>color</code> directamente desde
+        <code>ui.tsx</code> en vez de pedir el tema, así que se quedan en verde
+        CLUEDO. Y <code>paletaDe()</code> no es una tabla: es un ternario contra
+        <code>'momia'</code>, de modo que escribir tu paleta y olvidar esa rama
+        deja la app entera con el tema de la casa sin un solo error.
       </p>
     </div>
 
