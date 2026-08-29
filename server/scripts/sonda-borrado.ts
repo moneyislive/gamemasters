@@ -9,7 +9,7 @@
  * Escribe una línea de JSON por la salida estándar y termina.
  */
 import { getStore, initStore } from '../src/db/store';
-import { aceptarGuardar, borrarCuentaDe, cerrarPartidaEnCuentas } from '../src/live/cuentas';
+import { aceptarGuardar, borrarCuenta, cerrarPartidaEnCuentas } from '../src/live/cuentas';
 import { refrescarSesion } from '../src/live/sesion';
 
 /** Lo mínimo para que `cerrarPartidaEnCuentas` no se salga por falta de trama. */
@@ -105,9 +105,17 @@ try {
     anaEnPartida: await tieneCorreoEnPartida('velada', ANA),
   };
 
-  // Se pide el borrado con el correo TAL COMO lo escribió quien organiza, en
-  // mayúsculas: si no se normaliza, no encuentra nada y «borra» sin borrar.
-  salida.resultado = await borrarCuentaDe('Ana@Ejemplo.COM');
+  /*
+   * Se BUSCA la cuenta con el correo tal como lo escribió quien organiza, en
+   * mayúsculas: si no se normaliza, no encuentra nada y «borra» sin borrar.
+   * Y se borra pasando la cuenta entera, que es lo que ahora exige
+   * `borrarCuenta` para no llevarse por delante la de otra persona que
+   * compartiera dirección.
+   */
+  const suya = await store.getAccountByEmail('Ana@Ejemplo.COM');
+  salida.resultado = suya
+    ? await borrarCuenta(suya)
+    : { cuentaBorrada: false, partidasLimpiadas: 0 };
 
   salida.despues = {
     cuentas: await cuantasCuentas(),
@@ -142,6 +150,85 @@ try {
   // --- Borrar la partida tiene que llevarse su sesión en vivo ---
   await store.deleteGame('otra-velada');
   salida.trasBorrarPartida = { sesionSigueViva: Boolean(await store.getLive('otra-velada')) };
+
+  /*
+   * --- Dos cuentas con el MISMO correo: borrar una no puede llevarse la otra.
+   *
+   * Ninguna colección tiene índice único, así que esto pasa de verdad: una
+   * cuenta nacida de una invitación y otra creada al entrar con un proveedor
+   * pueden compartir dirección. El borrado buscaba «la primera con ese correo».
+   */
+  const gemela1 = await store.saveAccount({
+    id: 'gem-1', email: 'gemelas@ejemplo.com', displayName: 'La de la invitación',
+    createdAt: new Date().toISOString(), partidas: [], trofeos: [],
+  });
+  const gemela2 = await store.saveAccount({
+    id: 'gem-2', email: 'gemelas@ejemplo.com', displayName: 'La de Google',
+    createdAt: new Date().toISOString(), partidas: [], trofeos: [],
+    identidades: [{ proveedor: 'google', sub: 'sub-google-1', correoVerificado: true, esRelay: false, vinculadaEl: new Date().toISOString(), vistaEl: new Date().toISOString() }],
+  } as Parameters<typeof store.saveAccount>[0]);
+  await borrarCuenta(gemela1);
+  salida.gemelas = {
+    borradaLaSuya: !(await store.getAccount('gem-1')),
+    sobreviveLaOtra: Boolean(await store.getAccount('gem-2')),
+    idDeLaOtra: gemela2.id,
+  };
+
+  /*
+   * --- Una invitación no puede adoptar una cuenta ya demostrada ---
+   *
+   * Escribir el correo de alguien con cuenta en una silla y aceptar «guardar mi
+   * partida» la vinculaba a SU cuenta, con su historial y sus trofeos.
+   */
+  let adopcion = 'no lanzó';
+  try {
+    await aceptarGuardar('gemelas@ejemplo.com', 'Quien ocupa la silla');
+  } catch (e) {
+    adopcion = e instanceof Error ? e.message : String(e);
+  }
+  salida.adopcion = {
+    rechazada: adopcion !== 'no lanzó',
+    mensaje: adopcion,
+    // Y la cuenta demostrada sigue intacta y sin vínculos nuevos.
+    laDemostradaSigue: Boolean(await store.getAccount('gem-2')),
+  };
+
+  /*
+   * --- El barrido limpia TODOS los correos de la cuenta y la marca de silla ---
+   */
+  const varios = await store.saveAccount({
+    id: 'varios-1', email: 'principal@ejemplo.com', displayName: 'Con dos correos',
+    createdAt: new Date().toISOString(), partidas: [], trofeos: [],
+    correos: [
+      { correo: 'principal@ejemplo.com', nivel: 'buzon', origen: 'google', anadidoEl: new Date().toISOString() },
+      { correo: 'segundo@ejemplo.com', nivel: 'buzon', origen: 'google', anadidoEl: new Date().toISOString() },
+    ],
+  } as Parameters<typeof store.saveAccount>[0]);
+  const conVarios = await store.getGame('velada');
+  if (conVarios) {
+    conVarios.suspects = [...conVarios.suspects, { id: 'v1', name: 'Con dos', email: 'segundo@ejemplo.com' }];
+    await store.saveGame(conVarios);
+    await store.saveLive({
+      ...(await store.getLive('velada'))!,
+      players: [
+        ...((await store.getLive('velada'))?.players ?? []),
+        {
+          suspectId: 'v1', displayName: 'Con dos', email: 'segundo@ejemplo.com',
+          accountId: 'varios-1', joinCode: 'ZZZZZZ', joined: true, elecciones: [], notas: '',
+          girosRecibidos: [],
+          reclamadaPor: { cuentaId: 'varios-1', correo: 'principal@ejemplo.com', el: new Date().toISOString() },
+        },
+      ],
+    } as Parameters<typeof store.saveLive>[0]);
+  }
+  await borrarCuenta(varios);
+  const trasVarios = await store.getLive('velada');
+  const silla = trasVarios?.players.find((j) => j.suspectId === 'v1');
+  salida.variosCorreos = {
+    segundoBarridoEnSesion: !silla?.email,
+    segundoBarridoEnPartida: !(await store.getGame('velada'))?.suspects.some((x) => x.email === 'segundo@ejemplo.com'),
+    reclamadaPorBorrada: !silla?.reclamadaPor,
+  };
 } catch (e) {
   salida.error = e instanceof Error ? e.message : String(e);
 }

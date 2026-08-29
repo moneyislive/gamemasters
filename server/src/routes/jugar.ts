@@ -13,7 +13,7 @@ import { env } from '../config';
 import { getStore } from '../db/store';
 import { avisosDesde, esperarCambio } from '../live/hub';
 import { consultarConsejero } from '../live/consejero';
-import { aceptarGuardar, borrarCuentaDe, perfilDe } from '../live/cuentas';
+import { aceptarGuardar, borrarCuenta, perfilDe } from '../live/cuentas';
 import { firmaDeFotoValida } from '../live/fotos';
 import { vistaDeJugador } from '../live/proyeccion';
 import { guardarNotas, mutar, tocar } from '../live/sesion';
@@ -605,14 +605,31 @@ router.delete('/jugar/cuenta', async (req, res) => {
     res.status(403).json({ error: 'Ya no participas en esta partida.' });
     return;
   }
-  if (!jugador.email) {
-    // Sin correo no hay cuenta: no es un error, es que no había nada que
-    // borrar. Se responde en positivo para que la app diga lo mismo.
+  /*
+   * SE BORRA LA CUENTA A LA QUE ESTA SILLA ESTÁ VINCULADA, y solo esa.
+   *
+   * Antes se borraba `borrarCuentaDe(jugador.email)`, y ese correo lo teclea
+   * QUIEN MONTA LA PARTIDA al crear la silla: no es una identidad, es una
+   * dirección de invitación que nadie ha verificado. Si el organizador escribía
+   * ahí el correo de un conocido que sí tiene cuenta, quien se sentara en esa
+   * silla podía borrársela sin haber aceptado nada ni haber demostrado nada.
+   *
+   * `accountId` solo se escribe cuando esa persona ACEPTÓ vincular su silla a
+   * su cuenta, que es la única señal de que la cuenta es suya. Sin vínculo no
+   * hay nada que borrar, y eso no es un error: es que no había cuenta.
+   */
+  if (!jugador.accountId) {
     res.json({ borrada: false, partidasLimpiadas: 0 });
     return;
   }
 
-  const resultado = await borrarCuentaDe(jugador.email);
+  const suya = await store.getAccount(jugador.accountId);
+  if (!suya) {
+    res.json({ borrada: false, partidasLimpiadas: 0 });
+    return;
+  }
+
+  const resultado = await borrarCuenta(suya);
   res.json({
     borrada: resultado.cuentaBorrada,
     partidasLimpiadas: resultado.partidasLimpiadas,

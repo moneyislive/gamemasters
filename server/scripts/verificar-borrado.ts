@@ -168,6 +168,16 @@ type Medida = {
   trasSincronizar: { anaEnSesion: boolean };
   trasDesenlace: { anaExiste: boolean; brunoPartidas: number };
   trasBorrarPartida: { sesionSigueViva: boolean };
+  /** Dos cuentas con el mismo correo: se borra la de quien lo pide, no la otra. */
+  gemelas: { borradaLaSuya: boolean; sobreviveLaOtra: boolean; idDeLaOtra: string };
+  /** Una invitación no puede adoptar una cuenta ya demostrada. */
+  adopcion: { rechazada: boolean; mensaje: string; laDemostradaSigue: boolean };
+  /** El barrido llega a todos los correos de la cuenta y a la marca de la silla. */
+  variosCorreos: {
+    segundoBarridoEnSesion: boolean;
+    segundoBarridoEnPartida: boolean;
+    reclamadaPorBorrada: boolean;
+  };
   error?: string;
 };
 
@@ -279,6 +289,44 @@ if (m) {
     'no queda una sesión huérfana con nombres, correos y notas',
     !m.trasBorrarPartida.sesionSigueViva,
     m.trasBorrarPartida,
+  );
+
+  /*
+    A QUIEN SE BORRA, Y A QUIEN NO.
+
+    El borrado buscaba «la primera cuenta con este correo» aunque quien pedia
+    ya estuviera identificado. Como ninguna coleccion tiene indice unico, dos
+    cuentas pueden compartir direccion —una nacida de una invitacion y otra de
+    entrar con Google— y se podia borrar la ajena respondiendo `borrada: true`.
+  */
+  console.log('\n· Se borra la cuenta de quien lo pide, no la que comparte correo');
+  comprobar('la cuenta de quien pidio el borrado desaparece', m.gemelas.borradaLaSuya, m.gemelas);
+  comprobar(
+    'la OTRA cuenta con el mismo correo sigue intacta',
+    m.gemelas.sobreviveLaOtra,
+    m.gemelas,
+  );
+
+  /*
+    Y LA PUERTA QUE ABRIA EL CONSENTIMIENTO. El correo de una silla lo teclea
+    quien monta la partida: es una invitacion, no una prueba. Bastaba con
+    escribir ahi la direccion de alguien con cuenta para que quien se sentara
+    quedara vinculado a la suya, con su historial y sus trofeos.
+  */
+  console.log('\n· Una invitacion no adopta la cuenta de nadie');
+  comprobar('aceptar guardar se niega si esa cuenta ya esta demostrada', m.adopcion.rechazada, m.adopcion);
+  comprobar('y la cuenta demostrada queda como estaba', m.adopcion.laDemostradaSigue, m.adopcion);
+
+  console.log('\n· El barrido no se deja nada');
+  comprobar(
+    'se limpia tambien el SEGUNDO correo demostrado de la cuenta',
+    m.variosCorreos.segundoBarridoEnSesion && m.variosCorreos.segundoBarridoEnPartida,
+    m.variosCorreos,
+  );
+  comprobar(
+    'y la marca de quien reclamo la silla, que dejaba el correo a la vista',
+    m.variosCorreos.reclamadaPorBorrada,
+    m.variosCorreos,
   );
 }
 

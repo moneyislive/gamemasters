@@ -47,6 +47,18 @@ export async function cuentaDe(email: string, displayName: string): Promise<Acco
 }
 
 /**
+ * ¿Esta cuenta ha demostrado que ese correo es suyo?
+ *
+ * Dos formas de demostrarlo: tener un proveedor vinculado —se entró con Google
+ * o con Apple— o llevar el correo en `correos[]` con nivel `buzon`. Cualquiera
+ * de las dos convierte la cuenta en algo que una invitación no puede tocar.
+ */
+function estaDemostrada(cuenta: Account, correo: string): boolean {
+  if ((cuenta.identidades ?? []).length > 0) return true;
+  return (cuenta.correos ?? []).some((c) => c.correo === correo && c.nivel === 'buzon');
+}
+
+/**
  * Cierra la partida en las cuentas: apunta lo jugado y reparte trofeos.
  *
  * Se llama al revelar el desenlace. Es idempotente: si se llama dos veces, la
@@ -177,8 +189,34 @@ export async function aceptarGuardar(
   displayName: string,
   via: VinculoDeCuenta['via'] = 'confirmacion',
 ): Promise<VinculoDeCuenta> {
-  const cuenta = await cuentaDe(email, displayName);
   const normalizado = normalizarEmail(email);
+
+  /*
+   * UNA INVITACIÓN NO PUEDE ADOPTAR UNA CUENTA DEMOSTRADA.
+   *
+   * `cuentaDe` devuelve la cuenta que ya exista con ese correo, y el correo de
+   * una silla lo teclea QUIEN MONTA LA PARTIDA: es una invitación, y la
+   * cabecera de `shared/identidad.ts` lo dice con todas las letras —«puede ser
+   * una errata, o el correo de un conocido... solo lo segundo puede abrir una
+   * puerta»—. Esta era una puerta abierta: bastaba con escribir en una silla la
+   * dirección de alguien con cuenta para que quien se sentara en ella quedara
+   * vinculado a SU cuenta, con su historial y sus trofeos, y `GET /jugar/perfil`
+   * se la sirviera entera.
+   *
+   * Si la cuenta tiene un proveedor vinculado o ese correo demostrado a nivel
+   * `buzon`, el consentimiento no basta: hay que entrar con ella. Una cuenta
+   * nacida de otra invitación al mismo correo sí se reutiliza, que es el flujo
+   * legítimo de siempre — ahí nadie ha demostrado nada todavía, ni antes ni
+   * ahora.
+   */
+  const yaExiste = await getStore().getAccountByEmail(normalizado);
+  if (yaExiste && via === 'confirmacion' && estaDemostrada(yaExiste, normalizado)) {
+    throw new Error(
+      'Esa dirección ya tiene una cuenta con su propio inicio de sesión. Entra con ella para guardar la partida.',
+    );
+  }
+
+  const cuenta = await cuentaDe(email, displayName);
 
   /*
    * Se apunta el correo en la cuenta, con el nivel de prueba que tiene.
@@ -228,15 +266,36 @@ export async function aceptarGuardar(
  *
  * Devuelve cuántas partidas quedaron limpias, para poder contarlo.
  */
-export async function borrarCuentaDe(email: string): Promise<{
+export async function borrarCuenta(cuenta: Account): Promise<{
   cuentaBorrada: boolean;
   partidasLimpiadas: number;
 }> {
   const store = getStore();
-  const normalizado = normalizarEmail(email);
 
-  const cuenta = await store.getAccountByEmail(normalizado);
-  if (cuenta) await store.deleteAccount(cuenta.id);
+  /*
+   * POR ID, Y NO POR CORREO. La versión anterior recibía un correo y borraba
+   * `getAccountByEmail(correo)`, que devuelve la PRIMERA cuenta que lo lleve.
+   * Ninguna colección tiene índice único, así que dos cuentas pueden compartir
+   * dirección —una nacida del consentimiento y otra verificada con Google, por
+   * ejemplo— y quien pedía borrar la suya podía llevarse la ajena por delante,
+   * con un `borrada: true` de respuesta. Quien llama ya sabe exactamente qué
+   * cuenta es: se la pasa entera y aquí no se vuelve a adivinar.
+   */
+  await store.deleteAccount(cuenta.id);
+
+  /*
+   * Y SE BARREN TODOS SUS CORREOS, no solo el principal. Una cuenta puede tener
+   * varias direcciones demostradas en `correos[]`; barriendo solo `email`,
+   * todo lo que esa persona hubiera escrito bajo la segunda sobrevivía al
+   * borrado. El derecho de supresión no se ejerce a medias.
+   */
+  const suyos = new Set(
+    [cuenta.email, ...(cuenta.correos ?? []).map((c) => c.correo)]
+      .filter(Boolean)
+      .map((c) => normalizarEmail(c)),
+  );
+  const esSuyo = (correo: string | undefined): boolean =>
+    Boolean(correo) && suyos.has(normalizarEmail(correo!));
 
   let partidasLimpiadas = 0;
   for (const resumen of await store.listGames()) {
@@ -245,7 +304,7 @@ export async function borrarCuentaDe(email: string): Promise<{
 
     let tocada = false;
     for (const sospechoso of game.suspects) {
-      if (sospechoso.email && normalizarEmail(sospechoso.email) === normalizado) {
+      if (esSuyo(sospechoso.email)) {
         delete sospechoso.email;
         tocada = true;
       }
@@ -261,12 +320,22 @@ export async function borrarCuentaDe(email: string): Promise<{
       const { resultado } = await mutar(game.id, (sesion) => {
         let sesionTocada = false;
         for (const jugador of sesion.players) {
-          if (jugador.email && normalizarEmail(jugador.email) === normalizado) {
+          // Por correo O por cuenta: si la silla estaba vinculada a esta cuenta,
+          // se limpia aunque el correo escrito en ella fuera otro.
+          if (esSuyo(jugador.email) || jugador.accountId === cuenta.id || esSuyo(jugador.reclamadaPor?.correo)) {
             delete jugador.email;
             delete jugador.accountId;
             // Y el consentimiento: si no, la partida seguiría alimentando una
             // cuenta que ya no existe, y el desenlace la volvería a crear.
             delete jugador.vinculo;
+            /*
+             * Y LA MARCA DE QUIÉN RECLAMÓ LA SILLA, que se quedaba puesta.
+             * `reclamadaPor.correo` guarda la dirección en claro y el puesto de
+             * mando la pinta, así que tras borrar la cuenta el correo seguía a
+             * la vista de quien dirige — justo lo que la política publicada
+             * promete que desaparece.
+             */
+            delete jugador.reclamadaPor;
             sesionTocada = true;
           }
         }
@@ -278,5 +347,5 @@ export async function borrarCuentaDe(email: string): Promise<{
     if (tocada) partidasLimpiadas++;
   }
 
-  return { cuentaBorrada: Boolean(cuenta), partidasLimpiadas };
+  return { cuentaBorrada: true, partidasLimpiadas };
 }

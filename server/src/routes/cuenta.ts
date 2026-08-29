@@ -34,7 +34,7 @@ import {
 } from '../identidad/cuentas-proveedor';
 import { invitacionesPara } from '../live/invitaciones';
 import { panelDe } from '../live/panel';
-import { borrarCuentaDe } from '../live/cuentas';
+import { borrarCuenta } from '../live/cuentas';
 import { mutar } from '../live/sesion';
 import { emitirCredencial } from '../live/token';
 import type { Request, Response } from 'express';
@@ -621,7 +621,9 @@ function motivoDeCodigo(invitacion: { fase: string; yaDentro: boolean }): string
 router.delete('/cuenta', async (req, res) => {
   const cuenta = await cuentaDe(req, res);
   if (!cuenta) return;
-  const resultado = await borrarCuentaDe(cuenta.email);
+  // La cuenta entera, no su correo: `cuentaDe` ya la resolvió por la sesión y
+  // volver a buscarla por texto era lo que permitía borrar la de otra persona.
+  const resultado = await borrarCuenta(cuenta);
   res.json({ borrada: resultado.cuentaBorrada, partidasLimpiadas: resultado.partidasLimpiadas });
 });
 
