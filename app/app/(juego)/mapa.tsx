@@ -67,6 +67,21 @@ export default function Mapa(): JSX.Element {
   // Null mientras el jugador no elija: así manda lo que preparó quien dirige,
   // pero en cuanto toca una pestaña, manda él.
   const [elegida, setElegida] = useState<Cara | null>(null);
+  /*
+   * ARRIBA DEL TODO, ANTES DEL PRIMER `return`.
+   *
+   * Estaba cien lineas mas abajo, detras de la salida temprana de «no hay
+   * vista todavia»: en la primera pintada no se llamaba y en la siguiente si.
+   * Hoy no rompe nada —`useTema` es un `useContext` y esos no ocupan sitio en
+   * la lista de hooks— pero es una trampa puesta y armada: el dia que a
+   * `useTema` se le añada un `useMemo` dentro, esta pantalla revienta con el
+   * error 300 de React en el movil de alguien, a mitad de partida, y el fichero
+   * que se toco no sera este.
+   *
+   * Todas las llamadas a hooks van antes de cualquier `return`. Sin excepciones
+   * y sin razonar cual es inofensiva.
+   */
+  const t = useTema();
 
   if (!vista) return <Pantalla><Cargando texto="Desdoblando el plano…" /></Pantalla>;
 
@@ -93,7 +108,6 @@ export default function Mapa(): JSX.Element {
    * cámaras, y lo que hay es una tumba. El plano es de los sitios donde más se
    * nota, porque se mira mucho y se lee entero.
    */
-  const t = useTema();
   const manifiesto = manifiestoDe(sesion.juego);
   const lugar = categoriasDeLugar(manifiesto)[0];
   const unLugar = lugar?.singular ?? 'estancia';

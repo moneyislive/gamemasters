@@ -865,6 +865,139 @@ for (const pantalla of ['index.tsx', 'avatar.tsx', 'cuenta.tsx']) {
   );
 }
 
+// ---------------------------------------------------------------------------
+// Ningun hook detras de una salida temprana
+// ---------------------------------------------------------------------------
+
+/*
+ * LA TRAMPA QUE SE ARMA SOLA.
+ *
+ * `mapa.tsx` llamaba a `useTema()` cien lineas por debajo de su
+ * `if (!vista) return ...`: en la primera pintada no se llamaba y en la
+ * siguiente si. No reventaba de milagro —`useTema` es un `useContext`, y esos
+ * no ocupan sitio en la lista de hooks— pero el dia que a `useTema` se le
+ * añada un `useMemo` dentro, la pantalla revienta con el error 300 de React en
+ * el movil de alguien, a mitad de partida, y el fichero que se toco no sera
+ * ese.
+ *
+ * Por eso no se comprueba «que no rompa»: se comprueba la regla entera, que no
+ * haya NINGUN hook detras de un `return`. Razonar cual es inofensivo es
+ * exactamente como se llega aqui.
+ *
+ * Se lee con el arbol de TypeScript y no con expresiones regulares porque la
+ * pregunta —¿esta esta llamada despues de aquel return, en el mismo cuerpo?—
+ * es de estructura, y un `grep` la contesta mal en las dos direcciones. Solo se
+ * miran las sentencias del cuerpo: lo que ocurra dentro de una funcion anidada
+ * es de esa funcion.
+ */
+{
+  const pantallas = [];
+  const recorrer = (dir) => {
+    for (const entrada of fs.readdirSync(dir, { withFileTypes: true })) {
+      const completo = path.join(dir, entrada.name);
+      if (entrada.isDirectory()) {
+        if (entrada.name === 'node_modules') continue;
+        recorrer(completo);
+      } else if (entrada.name.endsWith('.tsx')) {
+        pantallas.push(completo);
+      }
+    }
+  };
+  recorrer(RUTAS);
+  recorrer(SRC);
+
+  const esHook = (nombre) => /^use[A-Z]/.test(nombre);
+  const tarde = [];
+
+  for (const fichero of pantallas) {
+    const fuente = ts.createSourceFile(
+      fichero,
+      fs.readFileSync(fichero, 'utf8'),
+      ts.ScriptTarget.Latest,
+      true,
+      ts.ScriptKind.TSX,
+    );
+    const relativo = path.relative(path.resolve(SRC, '..'), fichero).replace(/\\/g, '/');
+
+    // Los hooks de un cuerpo, sin entrar en funciones de dentro.
+    const hooksDe = (nodo, salida) => {
+      if (
+        ts.isFunctionDeclaration(nodo) ||
+        ts.isFunctionExpression(nodo) ||
+        ts.isArrowFunction(nodo) ||
+        ts.isMethodDeclaration(nodo)
+      ) {
+        return;
+      }
+      if (ts.isCallExpression(nodo) && ts.isIdentifier(nodo.expression) && esHook(nodo.expression.text)) {
+        salida.push(nodo.expression.text);
+      }
+      ts.forEachChild(nodo, (h) => hooksDe(h, salida));
+    };
+
+    const contieneReturn = (nodo) => {
+      let hay = false;
+      const mirar = (n) => {
+        if (hay) return;
+        if (
+          ts.isFunctionDeclaration(n) ||
+          ts.isFunctionExpression(n) ||
+          ts.isArrowFunction(n) ||
+          ts.isMethodDeclaration(n)
+        ) {
+          return;
+        }
+        if (ts.isReturnStatement(n)) {
+          hay = true;
+          return;
+        }
+        ts.forEachChild(n, mirar);
+      };
+      ts.forEachChild(nodo, mirar);
+      return hay;
+    };
+
+    const revisarCuerpo = (cuerpo, nombre) => {
+      if (!cuerpo || !ts.isBlock(cuerpo)) return;
+      let huboSalida = false;
+      for (const sentencia of cuerpo.statements) {
+        if (huboSalida) {
+          const encontrados = [];
+          hooksDe(sentencia, encontrados);
+          for (const h of encontrados) {
+            const { line } = fuente.getLineAndCharacterOfPosition(sentencia.getStart(fuente));
+            tarde.push(`${relativo}:${line + 1} · ${nombre} llama a ${h}() tras un return`);
+          }
+        }
+        if (ts.isReturnStatement(sentencia)) huboSalida = true;
+        else if (ts.isIfStatement(sentencia) && contieneReturn(sentencia)) huboSalida = true;
+      }
+    };
+
+    const visitar = (nodo) => {
+      if (ts.isFunctionDeclaration(nodo) && nodo.name) {
+        revisarCuerpo(nodo.body, nodo.name.text);
+      } else if (
+        ts.isVariableDeclaration(nodo) &&
+        nodo.name &&
+        ts.isIdentifier(nodo.name) &&
+        nodo.initializer &&
+        (ts.isArrowFunction(nodo.initializer) || ts.isFunctionExpression(nodo.initializer))
+      ) {
+        revisarCuerpo(nodo.initializer.body, nodo.name.text);
+      }
+      ts.forEachChild(nodo, visitar);
+    };
+    visitar(fuente);
+  }
+
+  comprobar(
+    'ningun hook se llama detras de una salida temprana',
+    tarde.length === 0,
+    tarde.join(' | ') || 'un hook que unas veces se llama y otras no revienta React con el error 300',
+  );
+}
+
 console.log('');
 if (fallos.length === 0) {
   console.log(
