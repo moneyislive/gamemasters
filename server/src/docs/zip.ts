@@ -11,6 +11,16 @@
  * ficheros y 4 GB, y aquí hablamos de decenas de ficheros y megabytes.
  */
 import zlib from 'node:zlib';
+import { promisify } from 'node:util';
+
+/*
+ * ASÍNCRONO, y no `deflateRawSync`. Comprimir es trabajo de CPU, y hacerlo en
+ * la síncrona detiene el bucle de eventos del proceso entero: mientras se
+ * arma un paquete de decenas de megas, los doce móviles de esa velada y los de
+ * todas las demás se quedan esperando. `deflateRaw` lo hace en el pool de
+ * hilos y devuelve el turno.
+ */
+const comprimirAsync = promisify(zlib.deflateRaw);
 
 const TABLA_CRC = (() => {
   const tabla = new Int32Array(256);
@@ -50,17 +60,26 @@ interface EntradaCentral {
 }
 
 export class EscritorZip {
-  private readonly escribir: (trozo: Buffer) => void;
+  private readonly escribir: (trozo: Buffer) => Promise<void>;
   private readonly entradas: EntradaCentral[] = [];
   private posicion = 0;
   private readonly fecha = new Date();
 
-  constructor(escribir: (trozo: Buffer) => void) {
+  /**
+   * @param escribir Escribe un trozo y RESUELVE cuando se puede seguir.
+   *
+   * Antes recibía una función que devolvía `void`, así que el `false` de
+   * `res.write()` —«el buffer está lleno, espera al drain»— se tiraba a la
+   * basura: el ZIP se seguía generando a toda velocidad y se acumulaba en
+   * memoria del proceso hasta que el cliente terminase de descargar. Un par de
+   * descargas lentas de un paquete grande bastaban para hincharlo.
+   */
+  constructor(escribir: (trozo: Buffer) => Promise<void>) {
     this.escribir = escribir;
   }
 
-  private emitir(trozo: Buffer): void {
-    this.escribir(trozo);
+  private async emitir(trozo: Buffer): Promise<void> {
+    await this.escribir(trozo);
     this.posicion += trozo.length;
   }
 
@@ -70,11 +89,11 @@ export class EscritorZip {
    * Los PDF y las imágenes ya vienen comprimidos: volver a comprimirlos gasta
    * tiempo y no baja el tamaño, así que se guardan tal cual.
    */
-  añadir(nombre: string, contenido: Buffer | string, comprimir = true): void {
+  async añadir(nombre: string, contenido: Buffer | string, comprimir = true): Promise<void> {
     const datos = Buffer.isBuffer(contenido) ? contenido : Buffer.from(contenido, 'utf8');
     const nombreBuf = Buffer.from(nombre, 'utf8');
     const crc = crc32(datos);
-    const cuerpo = comprimir ? zlib.deflateRawSync(datos, { level: 6 }) : datos;
+    const cuerpo = comprimir ? await comprimirAsync(datos, { level: 6 }) : datos;
     const metodo = comprimir ? 8 : 0;
     const { hora, dia } = fechaDos(this.fecha);
 
@@ -102,13 +121,13 @@ export class EscritorZip {
     cabecera.writeUInt16LE(nombreBuf.length, 26);
     cabecera.writeUInt16LE(0, 28);
 
-    this.emitir(cabecera);
-    this.emitir(nombreBuf);
-    this.emitir(cuerpo);
+    await this.emitir(cabecera);
+    await this.emitir(nombreBuf);
+    await this.emitir(cuerpo);
   }
 
   /** Cierra el archivo escribiendo el directorio central. Hay que llamarlo. */
-  cerrar(): void {
+  async cerrar(): Promise<void> {
     const inicioDirectorio = this.posicion;
 
     for (const e of this.entradas) {
@@ -130,8 +149,8 @@ export class EscritorZip {
       registro.writeUInt16LE(0, 36); // atributos internos
       registro.writeUInt32LE(0, 38); // atributos externos
       registro.writeUInt32LE(e.desplazamiento, 42);
-      this.emitir(registro);
-      this.emitir(e.nombre);
+      await this.emitir(registro);
+      await this.emitir(e.nombre);
     }
 
     const tamanoDirectorio = this.posicion - inicioDirectorio;
@@ -144,6 +163,6 @@ export class EscritorZip {
     fin.writeUInt32LE(tamanoDirectorio, 12);
     fin.writeUInt32LE(inicioDirectorio, 16);
     fin.writeUInt16LE(0, 20);
-    this.emitir(fin);
+    await this.emitir(fin);
   }
 }

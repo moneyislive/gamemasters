@@ -126,24 +126,49 @@ export function procedenciaDe(req: Request): Procedencia {
    * montado el despliegue — ver `despliegue/LEEME.md`. Con un balanceador
    * externo delante habría que enumerar sus direcciones aquí.)
    */
-  const peer = req.socket.remoteAddress ?? '';
-  if (!esBucleLocal(peer)) {
-    /*
-     * Y NO se cae al camino de «no fiable» de más abajo, aunque llegue la
-     * cabecera. Ese camino desactiva el bloqueo y deja solo retardos, así que a
-     * quien quisiera probar contraseñas a lo bruto le bastaría con añadir un
-     * encabezado para desarmar la puerta. Una defensa que se apaga sola con una
-     * cabecera no es una defensa.
-     */
-    if (peer) return { ip: peer, fiable: true };
-  }
-
+  /*
+   * PRIMERO LA CADENA DEL PROXY, Y ESTE ORDEN ES EL ARREGLO.
+   *
+   * Esto miraba antes `req.socket.remoteAddress` y, si no era el bucle local,
+   * lo daba por bueno como IP de quien llama. Eso vale con nginx en la misma
+   * máquina —el montaje que describe `despliegue/LEEME.md`— y es exactamente lo
+   * que el comentario de abajo advertía que había que revisar con un
+   * balanceador externo delante.
+   *
+   * En Render lo hay. El otro extremo del TCP es SIEMPRE su balanceador, así
+   * que todas las peticiones de la plataforma entraban con la misma dirección:
+   * el limitador las contaba como si fueran una sola persona y ocho contraseñas
+   * mal tecleadas por cualquiera dejaban a TODOS los Game Masters fuera de su
+   * taller. Un cerrojo pensado contra la fuerza bruta convertido en el botón de
+   * apagado, y al alcance de cualquiera.
+   *
+   * `req.ips` solo trae algo cuando Express confía en un salto —`trust proxy: 1`
+   * en `index.ts`— y esa es justamente la señal de que hay un proxy delante.
+   *
+   * EL PRECIO, DICHO CLARO: detrás de un balanceador, quien llama puede añadir
+   * su propia `X-Forwarded-For` y aparecer con otra dirección, o sea saltarse SU
+   * límite. Es peor de lo ideal y mucho mejor que lo que había: quien abusa se
+   * escapa de su cerrojo, pero ya no puede cerrarle la puerta a los demás.
+   */
   const porProxy = req.ips;
   if (porProxy.length > 0) {
     // El último de la lista es el que añadió el salto en el que sí se confía;
     // los de más a la izquierda los puede haber escrito quien llama.
     return { ip: porProxy[porProxy.length - 1] ?? '', fiable: true };
   }
+
+  /*
+   * Sin proxy de confianza delante, el otro extremo del TCP es lo único de toda
+   * la petición que quien llama no puede elegir.
+   *
+   * Y NO se cae al camino de «no fiable» de más abajo, aunque llegue la
+   * cabecera. Ese camino desactiva el bloqueo y deja solo retardos, así que a
+   * quien quisiera probar contraseñas a lo bruto le bastaría con añadir un
+   * encabezado para desarmar la puerta. Una defensa que se apaga sola con una
+   * cabecera no es una defensa.
+   */
+  const peer = req.socket.remoteAddress ?? '';
+  if (!esBucleLocal(peer) && peer) return { ip: peer, fiable: true };
 
   const directa = req.ip ?? req.socket.remoteAddress ?? '';
 

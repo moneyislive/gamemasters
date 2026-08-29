@@ -10,6 +10,7 @@
  * Si no hay ninguno se responde 503 con un mensaje que la interfaz convierte en
  * «imprime desde tu navegador», que siempre funciona.
  */
+import { once } from 'node:events';
 import { getStore } from '../db/store';
 import { manifiestoDe } from '../../../shared/juegos';
 import { renderPlayerDocument } from '../docs/renderer';
@@ -89,8 +90,18 @@ router.get('/games/:id/documents.zip', async (req, res) => {
   res.setHeader('Content-Disposition', `attachment; filename="${nombreZip}"`);
   res.setHeader('Cache-Control', 'no-store');
 
-  const zip = new EscritorZip((trozo) => res.write(trozo));
-  zip.añadir('00_LEEME_PRIMERO.txt', leeme);
+  /*
+   * SE ESPERA AL `drain`. `res.write()` devuelve `false` cuando su buffer está
+   * lleno, y ese aviso se estaba ignorando: el ZIP se generaba entero a toda
+   * velocidad y se amontonaba en memoria del proceso al ritmo de la descarga
+   * más lenta.
+   */
+  const escribir = async (trozo: Buffer): Promise<void> => {
+    if (!res.write(trozo)) await once(res, 'drain');
+  };
+
+  const zip = new EscritorZip(escribir);
+  await zip.añadir('00_LEEME_PRIMERO.txt', leeme);
 
   for (const entrada of entradas) {
     try {
@@ -98,22 +109,22 @@ router.get('/games/:id/documents.zip', async (req, res) => {
       if (!html) continue;
       if (formato === 'pdf') {
         // Los PDF ya vienen comprimidos: volver a comprimirlos no baja nada.
-        zip.añadir(`${entrada.ruta}.pdf`, await convertirAPdf(html), false);
+        await zip.añadir(`${entrada.ruta}.pdf`, await convertirAPdf(html), false);
       } else {
-        zip.añadir(`${entrada.ruta}.html`, html);
+        await zip.añadir(`${entrada.ruta}.html`, html);
       }
     } catch (error) {
       // Un documento que falla no puede tumbar el paquete entero: se deja
       // constancia dentro del propio ZIP y se sigue.
       console.error(`[documents] fallo al empaquetar ${entrada.ruta}:`, error);
-      zip.añadir(
+      await zip.añadir(
         `${entrada.ruta}.ERROR.txt`,
         `No se pudo generar este documento.\n\n${error instanceof Error ? error.message : 'Error desconocido'}\n`,
       );
     }
   }
 
-  zip.cerrar();
+  await zip.cerrar();
   res.end();
 });
 

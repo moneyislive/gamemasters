@@ -74,6 +74,21 @@ function dentroDelTope(quien: string): boolean {
   return true;
 }
 
+/**
+ * La misma puerta, pero como middleware y ANTES de leer el cuerpo.
+ *
+ * El analizador de 25 MB del estudio de avatares se monta a nivel de app, así
+ * que el cuerpo se leía entero y se convertía en cadena antes de que nadie
+ * mirara quién llamaba: cualquiera sin credencial podía mandar veinticinco
+ * megas y hacer trabajar al proceso —lectura, `toString`, `JSON.parse`— para
+ * acabar recibiendo un 401. Con esto delante, quien no se identifica recibe el
+ * 401 sin que se lea un solo byte del cuerpo.
+ */
+export function exigeIdentidad(req: Request, res: Response, next: () => void): void {
+  if (!conPuerta(req, res)) return;
+  next();
+}
+
 function conPuerta(req: Request, res: Response): string | null {
   const quien = identidadDe(req);
   if (!quien) {

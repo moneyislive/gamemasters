@@ -45,6 +45,7 @@ import uploadsRouter from './routes/uploads';
 import duenoRouter from './taller/dueno';
 import { costurasDePruebaActivas } from './identidad/oidc';
 import { secretoDeFirma } from './secreto';
+import { exigeIdentidad } from './routes/generacion';
 
 const app = express();
 
@@ -73,7 +74,14 @@ app.use(cors());
  * base64 eso son unos veinte de texto. Así que ahí, y solo ahí, se levanta el
  * límite — montado ANTES del analizador general para que gane.
  */
-app.use('/api/generacion/avatar', express.json({ limit: '25mb' }));
+/*
+ * CON LA PUERTA DELANTE, que es lo que faltaba. El analizador se monta a nivel
+ * de app y corría antes que cualquier comprobación: quien no tuviera credencial
+ * podía mandar veinticinco megas igual, y el proceso los leía, los convertía en
+ * cadena y los parseaba para terminar respondiendo un 401. Ahora quien no se
+ * identifica no llega ni a que se lea el cuerpo.
+ */
+app.use('/api/generacion/avatar', exigeIdentidad, express.json({ limit: '25mb' }));
 app.use(express.json({ limit: '256kb' }));
 
 /*
