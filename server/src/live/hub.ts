@@ -15,6 +15,7 @@
  * Además, cada aviso se guarda con su revisión, de modo que un móvil que estaba
  * en segundo plano recupera al volver los avisos que se perdió.
  */
+import { olvidarPresencia } from './presencia';
 import type { AvisoClave } from '../../../shared/live';
 
 interface EsperaPendiente {
@@ -104,4 +105,5 @@ export function avisosDesde(
 export function olvidar(gameId: string): void {
   avisarCambio(gameId);
   avisos.delete(gameId);
+  olvidarPresencia(gameId);
 }

@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "verify:mongo": "tsx scripts/verify-mongo.ts",
     "verify:almacen": "tsx scripts/verificar-almacen.ts",
+    "verify:presencia": "tsx scripts/verificar-presencia.ts",
     "verify:mayordomo": "tsx scripts/verificar-mayordomo.ts",
     "migrate:mongo": "tsx scripts/migrate-file-to-mongo.ts",
     "oro:capturar": "tsx scripts/oro.ts capturar",

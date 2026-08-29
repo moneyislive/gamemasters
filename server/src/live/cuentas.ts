@@ -15,7 +15,7 @@
  */
 import { nanoid } from 'nanoid';
 import { getStore } from '../db/store';
-import { mutar } from './sesion';
+import { mutar, ultimaSenal } from './sesion';
 import { normalizarEmail } from '../../../shared/live';
 import type {
   Account,
@@ -130,9 +130,12 @@ export async function cerrarPartidaEnCuentas(
     if (eraCulpable && !sesion.winnerId) ganados.add('culpable-impune');
     if (jugador.notas.length > 1000) ganados.add('escribano');
     // Superviviente: emparejó y seguía vivo al cerrar.
-    if (jugador.joined && jugador.lastSeenAt) {
-      const margen = Date.now() - new Date(jugador.lastSeenAt).getTime();
-      if (margen < 5 * 60_000) ganados.add('superviviente');
+    // Por `ultimaSenal` y no por el documento: la señal del rato vive en
+    // memoria, y leer solo el documento le quitaría el trofeo a quien estaba
+    // delante del móvil pero no había pasado nada que escribir en cinco minutos.
+    if (jugador.joined) {
+      const cuando = ultimaSenal(jugador, sesion.id);
+      if (cuando > 0 && Date.now() - cuando < 5 * 60_000) ganados.add('superviviente');
     }
     /*
      * Y los que reparta el juego por su cuenta. CLUEDO no registra ninguno, asi

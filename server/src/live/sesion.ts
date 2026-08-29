@@ -10,6 +10,7 @@ import { nanoid } from 'nanoid';
 import { getStore } from '../db/store';
 import { numeroDeRondas } from '../docs/datos';
 import { avisarCambio } from './hub';
+import { senalEnMemoria, volcarPresencia } from './presencia';
 import { iniciarJuego } from '../juegos/inicios';
 import { ALFABETO_CODIGO, FASES_EN_JUEGO } from '../../../shared/live';
 import { aciertos, esElSenalado, ejes as ejesDe, manifiestoDe, respuestaCompleta } from '../../../shared/juegos';
@@ -67,6 +68,13 @@ export async function mutar<T>(
     if (!opciones.silenciosa) {
       sesion.rev = (sesion.rev ?? 0) + 1;
     }
+    /*
+     * La presencia que se haya acumulado en memoria se va con esta escritura.
+     * Es gratis —la escritura ocurria igual— y deja el documento al dia para
+     * quien lo lea sin pasar por el registro de memoria. Si no hay nada
+     * anotado no toca nada, que es lo que mantiene identico el maestro de oro.
+     */
+    volcarPresencia(sesion);
     const guardada = await store.saveLive(sesion);
 
     /*
@@ -483,16 +491,27 @@ export function acusar(
   return { acusacion, ganador };
 }
 
-/** Marca a un jugador como visto ahora mismo. */
-export function tocar(sesion: LiveSession, suspectId: string): void {
-  const jugador = sesion.players.find((p) => p.suspectId === suspectId);
-  if (jugador) jugador.lastSeenAt = new Date().toISOString();
+/**
+ * La última señal de vida, en epoch ms. 0 si no consta ninguna.
+ *
+ * SIEMPRE LA MÁS RECIENTE DE LAS DOS. La presencia del rato vive en memoria
+ * —ver `presencia.ts`, y por qué— y el documento guarda lo que arrastró la
+ * última escritura de verdad. Cuál de las dos va por delante depende de si ha
+ * pasado algo en la partida hace poco, así que preguntar solo a una se
+ * equivoca la mitad de las veces. `gameId` es opcional porque hay sitios que
+ * solo tienen el jugador delante: allí se lee el documento, como siempre.
+ */
+export function ultimaSenal(jugador: LivePlayer, gameId?: string): number {
+  const enDocumento = jugador.lastSeenAt ? Date.parse(jugador.lastSeenAt) : NaN;
+  const enMemoria = gameId ? senalEnMemoria(gameId, jugador.suspectId) : 0;
+  return Math.max(Number.isFinite(enDocumento) ? enDocumento : 0, enMemoria);
 }
 
 /** Se considera conectado si dio señales de vida hace menos de un minuto. */
-export function estaConectado(jugador: LivePlayer): boolean {
-  if (!jugador.lastSeenAt) return false;
-  return Date.now() - new Date(jugador.lastSeenAt).getTime() < 60_000;
+export function estaConectado(jugador: LivePlayer, gameId?: string): boolean {
+  const cuando = ultimaSenal(jugador, gameId);
+  if (cuando === 0) return false;
+  return Date.now() - cuando < 60_000;
 }
 
 export { nanoid };

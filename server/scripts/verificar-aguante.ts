@@ -546,16 +546,35 @@ function comprobarCobertura(): void {
     escrituraSuelta.every((sitio) => sitio.startsWith('routes/live.ts')),
     escrituraSuelta,
   );
-  // El cuerpo de `mutarPresencia`, hasta la llave que lo cierra en su columna.
+  /*
+   * Y LA PRESENCIA NO ESCRIBE, PUNTO.
+   *
+   * Aquí se exigía que marcar «sigo aquí» pasara por `mutar`, porque antes leía
+   * y guardaba por libre y podía pisar una acusación registrada entretanto. Lo
+   * que se pide ahora es más fuerte: que no escriba nada. No puede pisar una
+   * acusación quien no toca el documento, y de paso deja de ocupar el candado
+   * que la acusación necesita — era la escritura más frecuente de la velada.
+   *
+   * Se comprueba sobre la ruta del long-poll, que es donde vive: doce móviles
+   * cada veinticinco segundos.
+   */
   const jugarTs = fs.readFileSync(path.join(src, 'routes', 'jugar.ts'), 'utf8');
-  const tras = jugarTs.split('async function mutarPresencia')[1] ?? '';
-  const cuerpo = tras.split('\n}')[0] ?? '';
-  comprobar('se encuentra el cuerpo de mutarPresencia', cuerpo.length > 20, cuerpo.length);
-  comprobar('la presencia va por `mutar`', cuerpo.includes('await mutar('), cuerpo.trim().slice(0, 160));
+  const rutaVista =
+    jugarTs.split("router.get('/jugar/vista'")[1]?.split('\n});')[0] ?? '';
+  comprobar('se encuentra la ruta de la vista', rutaVista.length > 100, rutaVista.length);
   comprobar(
-    'y no guarda la sesión por su cuenta',
-    !cuerpo.includes('saveLive'),
-    cuerpo.trim().slice(0, 160),
+    'la presencia se marca en memoria',
+    rutaVista.includes('marcarPresencia('),
+    rutaVista.trim().slice(0, 160),
+  );
+  comprobar(
+    'y no muta la sesión para eso',
+    !rutaVista.includes('mutar(') && !rutaVista.includes('saveLive'),
+    rutaVista.trim().slice(0, 160),
+  );
+  comprobar(
+    'el registro de presencia no toca el almacén',
+    !fs.readFileSync(path.join(src, 'live', 'presencia.ts'), 'utf8').includes('getStore'),
   );
 }
 

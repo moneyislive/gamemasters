@@ -12,11 +12,12 @@ import path from 'node:path';
 import { env } from '../config';
 import { getStore } from '../db/store';
 import { avisosDesde, esperarCambio } from '../live/hub';
+import { marcarPresencia } from '../live/presencia';
 import { consultarConsejero } from '../live/consejero';
 import { aceptarGuardar, borrarCuenta, perfilDe } from '../live/cuentas';
 import { firmaDeFotoValida } from '../live/fotos';
 import { vistaDeJugador } from '../live/proyeccion';
-import { guardarNotas, mutar, tocar } from '../live/sesion';
+import { guardarNotas, mutar } from '../live/sesion';
 import { AccionInvalida, ejecutarAccion } from '../juegos/motor';
 import { accionDeAcusacion, accionDeEntrarEnLugar, manifiestoDe } from '../../../shared/juegos';
 /*
@@ -170,14 +171,14 @@ router.get('/jugar/vista', async (req, res) => {
       if (!huboCambio) {
         // Sin novedad: el cliente vuelve a preguntar. Se aprovecha para marcar
         // que sigue vivo, que es como se pinta «conectado» en el panel.
-        await mutarPresencia(cred.gameId, cred.suspectId);
+        marcarPresencia(cred.gameId, cred.suspectId);
         res.status(204).end();
         return;
       }
     }
   }
 
-  await mutarPresencia(cred.gameId, cred.suspectId);
+  marcarPresencia(cred.gameId, cred.suspectId);
   const vista = await vistaActual(cred.gameId, cred.suspectId, res);
   if (!vista) return;
   res.json({
@@ -186,25 +187,21 @@ router.get('/jugar/vista', async (req, res) => {
   });
 });
 
-/**
- * Marca presencia sin disparar una revisión.
+/*
+ * AQUÍ HABÍA UNA ESCRITURA, Y ERA LA MÁS CARA DE LA VELADA.
  *
- * Pasa por el candado como cualquier otra escritura. Antes leía, modificaba y
- * guardaba por su cuenta, y eso abría una ventana real: doce móviles renuevan
- * presencia cada pocos segundos, así que uno podía leer la sesión, tardar en
- * volver, y guardar encima una acusación que se había registrado entretanto.
- * La acusación desaparecía sin dejar rastro.
+ * Marcar «sigo aquí» pedía el candado de la partida, releía la sesión entera y
+ * la volvía a guardar completa. Doce móviles, cada veinticinco segundos, más
+ * una vuelta por cada cambio que se les entrega. Y lo caro no eran los bytes:
+ * mientras esa ida y vuelta ocupaba el candado, la acusación de otro esperaba
+ * detrás. La velada se estrechaba por el cuello del dato más insignificante que
+ * tiene.
  *
- * Silenciosa porque la presencia NO es un cambio de partida: si subiera la
- * revisión, doce teléfonos se despertarían unos a otros en bucle.
+ * Ahora es un número en un mapa: `marcarPresencia`. En `live/presencia.ts` está
+ * por qué se puede —la presencia es cosmética y solo mira sesenta segundos
+ * atrás— y cómo el documento se sigue poniendo al día de balde, subido a las
+ * escrituras que ya iban a ocurrir.
  */
-async function mutarPresencia(gameId: string, suspectId: string): Promise<void> {
-  try {
-    await mutar(gameId, (sesion) => tocar(sesion, suspectId), { silenciosa: true });
-  } catch {
-    // La presencia es cosmética: nunca debe tumbar una petición.
-  }
-}
 
 // ---------------------------------------------------------------------------
 // Acciones

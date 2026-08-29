@@ -257,7 +257,7 @@ export function vistaDeJugador(
           characterName: suPersonaje?.characterName ?? p.displayName,
           role: suPersonaje?.role ?? '',
           photoUrl: fotoParaJugador(suSospechoso?.photoUrl, game.id),
-          conectado: estaConectado(p),
+          conectado: estaConectado(p, sesion.id),
           salaActual: suSala ? game.rooms.find((r) => r.id === suSala)?.name : undefined,
           yaAcuso: sesion.acusaciones.some((a) => a.suspectId === p.suspectId),
         };
@@ -464,7 +464,7 @@ export function vistaDeGameMaster(game: GameSession, sesion: LiveSession): Vista
 
   return {
     sesion: sesionQueSale,
-    conectados: sesion.players.filter(estaConectado).length,
+    conectados: sesion.players.filter((p) => estaConectado(p, sesion.id)).length,
     ocupacion,
     girosPendientes,
     acusacionesRecibidas: sesion.acusaciones.length,
