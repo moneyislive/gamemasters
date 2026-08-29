@@ -176,8 +176,19 @@ const plot: Plot = {
     knowledge: [`${name} vio algo raro en la galería.`],
     personalHook: 'Interprétalo con paciencia y mala uva.',
   })),
+  /*
+   * La cronología, escrita para poder probar la guardia del dosier.
+   *
+   * Los cuatro momentos son los cuatro casos que se dan: el público sin nadie,
+   * el secreto de dos inocentes, el secreto del ladrón a solas y —el que
+   * importa— el secreto en el que están un inocente y el ladrón, redactado
+   * desde fuera como los escribe un modelo. Ese último es el que jamás puede
+   * llegarle al inocente.
+   */
   timeline: [
     { time: '21:30', description: 'Se sirve la cena.', suspectIds: [], isPublic: true },
+    { time: '21:50', description: 'Amelia y Bernardo discuten en la escalinata.', suspectIds: ['h0', 'h1'], isPublic: false },
+    { time: '22:05', description: 'Casilda se acerca a la vitrina mientras Amelia mira.', suspectIds: ['h0', 'h2'], isPublic: false },
     { time: '22:10', description: 'Alguien apaga la luz de la galería.', suspectIds: ['h2'], isPublic: false },
   ],
   clues: [
@@ -265,8 +276,57 @@ comprobar(
 
 cerrarRonda(sesion);
 v = vistaDe('h0');
-comprobar('al cerrar, lo hallado es público', v.tablon.length === 2, v.tablon.length);
-comprobar('y ya con su significado', v.tablon.every((p) => typeof p.pointsTo === 'string'));
+comprobar('al cerrar sigo teniendo solo lo mío', v.misHallazgos.length === 1, v.misHallazgos.length);
+comprobar('y ya con su significado', v.misHallazgos.every((p) => typeof p.pointsTo === 'string'));
+/*
+ * Y LA DE LA ESTANCIA AJENA SIGUE SIN LLEGAR. Aquí decía que al cerrar «lo
+ * hallado es público» y esperaba las DOS pistas, la mía y la de la estancia en
+ * la que estuvo el otro. Esa regla se retiró: lo que se encuentra es de quien lo
+ * encuentra, en este juego y en CLUEDO.
+ */
+comprobar(
+  'lo de la estancia ajena tampoco llega con la ronda cerrada',
+  !v.misHallazgos.some((p) => p.description.includes('carmín')),
+);
+
+/*
+ * ---- LA CRONOLOGÍA DE TU PERSONAJE, y lo que NO entra en ella ----
+ *
+ * El dosier enseña qué hacía tu personaje esa noche. Sale de la cronología de
+ * la trama recortada a los momentos donde figuras, y hasta ahí es información
+ * que tu personaje vivió. El peligro está en los momentos SECRETOS donde
+ * estabais el señalado y tú: esa frase la escribe un modelo, muchas veces desde
+ * fuera —«Casilda se acerca a la vitrina»— y sirve el nombre del culpable en la
+ * primera pantalla que abre alguien.
+ *
+ * Se prueba aquí, sobre un juego cuyo eje de personas se llama `ladron` y no
+ * `culpable`, porque la guardia resuelve el eje desde el manifiesto: si algún
+ * día se cableara a CLUEDO, los otros juegos se quedarían sin ella y CLUEDO
+ * seguiría en verde.
+ */
+const cronoDe = (id: string): string[] =>
+  vistaDe(id).yo.cronologiaPropia.map((m) => m.description);
+
+const ladron = plot.solution.respuestas.ladron!;
+comprobar('el eje de personas de este juego es el ladrón', ladron === 'h2', ladron);
+
+const deAmelia = cronoDe('h0');
+comprobar('a un inocente le llega su momento con otro inocente', deAmelia.some((t) => t.includes('discuten en la escalinata')));
+comprobar(
+  'pero NO el secreto en el que estaba el ladrón, aunque él figure en él',
+  !deAmelia.some((t) => t.includes('se acerca a la vitrina')),
+  deAmelia,
+);
+comprobar('y tampoco el del ladrón a solas', !deAmelia.some((t) => t.includes('apaga la luz')));
+
+const delLadron = cronoDe('h2');
+comprobar('al ladrón le llegan los suyos, que ya se los sabe', delLadron.some((t) => t.includes('se acerca a la vitrina')));
+comprobar('incluido el que hizo a solas', delLadron.some((t) => t.includes('apaga la luz')));
+comprobar(
+  'a quien no figura en un momento no le llega ese momento',
+  cronoDe('h3').length === 0,
+  cronoDe('h3'),
+);
 
 // --- Acusaciones ---
 sesion.phase = 'acusaciones';

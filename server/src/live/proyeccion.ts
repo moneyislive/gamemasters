@@ -11,10 +11,13 @@
  *  2. De los demás jugadores solo salen su cara pública: nombre, papel y foto.
  *     Ni secretos, ni motivos, ni coartadas.
  *  3. Las pistas de una sala solo las recibe quien ha entrado en esa sala, y
- *     `pointsTo` —lo que la pista significa— no sale hasta que la ronda cierra
- *     y la pista pasa al tablón común.
+ *     `pointsTo` —lo que la pista significa— no sale hasta que esa ronda cierra.
+ *     No hay ninguna puerta por la que la pista de una sala llegue a quien no
+ *     estuvo dentro: lo que se encuentra es de quien lo encuentra.
  *  4. El conocimiento del personaje se desbloquea ronda a ronda.
  *  5. Los giros personales solo llegan a su destinatario.
+ *  6. La cronología propia solo lleva momentos que ese personaje vivió, y nunca
+ *     un momento a puerta cerrada donde estuviera el culpable.
  */
 import { cronologiaPublica, REGLAS_JUGADOR } from '../docs/datos';
 import { estaConectado, salaDe } from './sesion';
@@ -89,7 +92,15 @@ export function vistaDeJugador(
   const personaje = plot.characters.find((c) => c.suspectId === suspectId);
   const sospechoso = game.suspects.find((s) => s.id === suspectId);
   const enJuego = sesion.phase !== 'lobby';
+  const abierta = sesion.phase === 'ronda-abierta';
   const terminada = sesion.phase === 'desenlace';
+  /*
+   * Si el papel que me ha tocado es el que el juego señala —el asesino en
+   * CLUEDO— hace falta saberlo AQUÍ y no solo al final, porque de ello depende
+   * qué momentos de la cronología es seguro mandarme. Ya se calculaba para
+   * `yo.soyCulpable`; lo único que cambia es que ahora se calcula antes.
+   */
+  const soyCulpable = esElSenalado(manifiesto, plot.solution.respuestas, suspectId);
 
   // ---- Conocimiento, desbloqueado por rondas ----
   const todoElConocimiento = personaje?.knowledge ?? [];
@@ -101,6 +112,31 @@ export function vistaDeJugador(
   const giros = (plot.material?.twists ?? [])
     .filter((t) => t.suspectId === suspectId && jugador.girosRecibidos.includes(t.id))
     .map((t) => ({ id: t.id, round: t.round, instruction: t.instruction }));
+
+  /*
+   * ---- MI CRONOLOGÍA: qué hacía yo mientras pasaba todo ----
+   *
+   * La cronología de la trama, recortada a los momentos en los que figuro. Lo
+   * que sale de aquí no le cuenta a nadie nada que su personaje no viviera: si
+   * mi id está en `suspectIds`, yo estaba allí.
+   *
+   * Y AUN ASÍ SE FILTRA UNA COSA MÁS. Un momento a puerta cerrada donde
+   * estuvimos el culpable y yo puede estar redactado desde fuera —«X se desliza
+   * hacia la biblioteca»— y entregarme el nombre del asesino en la primera
+   * pantalla que abro. Esa frase la escribe un modelo, no una persona que esté
+   * pensando en la defensa antitrampas, así que no se le concede el beneficio de
+   * la duda: si el momento es secreto y el culpable estaba, no sale. Salvo que
+   * el culpable sea yo, claro, porque entonces no hay nada que protegerme.
+   *
+   * El precio es perder algún momento jugoso de un inocente que sí presenció
+   * algo. Se paga a gusto: lo otro es reventar la velada entera.
+   */
+  const ejeSenalado = ejeDeJugadores(manifiesto);
+  const senalado = ejeSenalado ? plot.solution.respuestas[ejeSenalado.id] : undefined;
+  const cronologiaPropia: MomentoVista[] = plot.timeline
+    .filter((e) => e.suspectIds.includes(suspectId))
+    .filter((e) => e.isPublic || soyCulpable || !senalado || !e.suspectIds.includes(senalado))
+    .map((e) => ({ time: e.time, description: e.description }));
 
   // ---- Salas, con cuánta gente hay en cada una esta ronda ----
   const ocupacion = new Map<string, number>();
@@ -150,15 +186,49 @@ export function vistaDeJugador(
           .map((c) => pistaVista(game, c, false))
       : [];
 
-  // ---- Tablón común: lo que se destapó en rondas ya cerradas ----
-  const tablon: PistaVista[] = [];
-  for (const entrada of sesion.tablon) {
-    for (const clue of plot.clues) {
-      if (clue.roomId === entrada.roomId && clue.round === entrada.round) {
-        tablon.push(pistaVista(game, clue, true));
+  /*
+   * ---- LO QUE HE ENCONTRADO YO, ronda a ronda ----
+   *
+   * Aquí se componía el TABLÓN COMÚN: se recorría `sesion.tablon` —las salas
+   * que había pisado cualquiera— y se enviaban sus pistas a TODOS. Con eso,
+   * elegir bien la sala no servía de nada: al cerrar la ronda todo el mundo
+   * tenía lo mismo, y contar lo que habías visto no le aportaba nada a nadie.
+   *
+   * Ahora se recorren MIS elecciones y nada más. La lista que sale de aquí no
+   * puede contener una pista de una sala en la que no estuve, porque el bucle no
+   * tiene por dónde llegar a ella.
+   *
+   * El significado (`pointsTo`) sigue apareciendo solo con la ronda cerrada: la
+   * regla de que durante la ronda interpretar es cosa tuya no ha cambiado, solo
+   * ha cambiado quién llega a leerla.
+   */
+  const misHallazgos: PistaVista[] = [];
+  if (enJuego) {
+    for (let ronda = 1; ronda <= sesion.round; ronda++) {
+      const sala = salaDe(jugador, ronda);
+      if (!sala) continue;
+      const cerrada = ronda < sesion.round || !abierta;
+      for (const clue of plot.clues) {
+        if (clue.roomId === sala && clue.round === ronda) {
+          misHallazgos.push(pistaVista(game, clue, cerrada));
+        }
       }
     }
   }
+
+  /*
+   * ---- LOS HECHOS QUE LA MESA DA POR ESTABLECIDOS ----
+   *
+   * Son las revelaciones de la línea temporal, que ya se generaban para el
+   * cartel imprimible y que quien dirige va pegando al cerrar cada ronda. Es
+   * material declaradamente PÚBLICO, así que va entero a todo el mundo; lo único
+   * que se filtra es el calendario, para que no se lea la revelación de una
+   * ronda antes de que esa ronda haya cerrado.
+   */
+  const hechos = (plot.material?.timelineReveals ?? [])
+    .filter((r) => r.round < sesion.round || (r.round === sesion.round && !abierta))
+    .sort((a, b) => a.round - b.round)
+    .map((r) => ({ round: r.round, time: r.time, fact: r.fact }));
 
   // ---- Narración de la ronda en curso ----
   const narracionActual = plot.material?.narrations.find(
@@ -241,8 +311,9 @@ export function vistaDeJugador(
       conocimiento: todoElConocimiento.slice(0, desbloqueado),
       conocimientoPendiente: Math.max(0, todoElConocimiento.length - desbloqueado),
       giros,
+      cronologiaPropia,
       notas: jugador.notas,
-      soyCulpable: esElSenalado(manifiesto, plot.solution.respuestas, suspectId),
+      soyCulpable,
       pediEmpezar: jugador.pideEmpezar === true,
     },
     jugadores: sesion.players
@@ -282,7 +353,8 @@ export function vistaDeJugador(
     })),
     miSala,
     misPistas,
-    tablon,
+    misHallazgos,
+    hechos,
     // La crónica de los encuentros ya cerrados: es lo que permite retomar una
     // campaña una semana después sin que nadie recuerde dónde lo dejaron.
     cronica: (sesion.cronica ?? []).map((e) => ({

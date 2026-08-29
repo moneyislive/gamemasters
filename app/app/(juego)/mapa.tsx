@@ -98,9 +98,15 @@ export default function Mapa(): JSX.Element {
   const cara = (elegida && (elegida === 'foto' ? hayFoto : hayPlano) ? elegida : porDefecto);
   const conChincheta = salas.filter((s) => s.pin).length;
 
-  // Salas de las que ya salió algo al tablón común. No es información nueva:
-  // el jugador la tiene en la pestaña del tablón, aquí solo se ve de un vistazo.
-  const conHallazgo = new Set(vista.tablon.map((p) => p.roomId));
+  /*
+   * Salas en las que YO he encontrado algo. Antes eran las salas de las que
+   * había salido algo al tablón común —o sea, las de cualquiera—, y con eso el
+   * plano acababa marcado entero para todo el mundo por igual. Ahora las pistas
+   * son de quien las encuentra, así que esto marca tu propio recorrido: dónde
+   * has estado y qué te dio algo. No es información nueva, la tienes en Pistas;
+   * aquí solo se ve de un vistazo y sobre el plano.
+   */
+  const conHallazgo = new Set(vista.misHallazgos.map((p) => p.roomId));
 
   /*
    * LAS PALABRAS DEL SITIO SALEN DEL MANIFIESTO. Esta pantalla decía «la casa»
@@ -254,7 +260,7 @@ export default function Mapa(): JSX.Element {
                       ? 'Hay alguien'
                       : `${sala.ocupantes} personas`
                     : null,
-                  conHallazgo.has(sala.id) ? 'Ya dio algo' : null,
+                  conHallazgo.has(sala.id) ? 'Aquí encontraste algo' : null,
                   // Lo primero de la lista si toca: entrar ahí cuesta una marca.
                   sala.id === profanada ? 'Profanada esta noche' : null,
                 ]
@@ -530,7 +536,7 @@ function PlanoDibujado({
                 </G>
               )}
 
-              {/* Sello de lacre: de aquí ya salió algo al tablón común. */}
+              {/* Sello de lacre: aquí encontraste algo tú. */}
               {dioAlgo && (
                 <G>
                   <Circle

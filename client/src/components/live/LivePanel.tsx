@@ -185,7 +185,20 @@ export default function LivePanel(): JSX.Element {
   const sinSilla = game.suspects.filter((s) => !sesion.players.some((p) => p.suspectId === s.id));
   const enRonda = sesion.phase === 'ronda-abierta';
   const rondaCerrada = sesion.phase === 'ronda-cerrada';
-  const ultimaRonda = sesion.round >= sesion.totalRounds;
+  /*
+   * ¿Se ha agotado lo que la trama tenía escrito? Es un AVISO, no un tope.
+   *
+   * Con esto mismo se escondía el botón de abrir ronda —`!ultimaRonda &&`— y esa
+   * era la única forma de acabar una partida: al llegar a la última ronda
+   * prevista no quedaba más salida que empujar a la mesa a acusar, supieran o no
+   * quién fue. `totalRounds` sale del reparto de pistas de la trama: dice cuántas
+   * rondas tenía PREVISTAS quien la escribió, no cuántas hacen falta.
+   *
+   * Ahora se puede seguir abriendo rondas, y lo que dice esto es que a partir de
+   * aquí ya no hay pistas nuevas que repartir: se juega para hablar y para que
+   * alguien se rompa, que muchas veces es lo que faltaba.
+   */
+  const sinPistasNuevas = sesion.round >= sesion.totalRounds;
 
   return (
     <div className="live-panel">
@@ -250,8 +263,7 @@ export default function LivePanel(): JSX.Element {
             no ha estado nunca; eso se queda exactamente como estaba.
           */}
           {(sesion.phase === 'lobby' || rondaCerrada || sesion.phase === 'sellado') &&
-            puedeIrA('ronda-abierta') &&
-            !ultimaRonda && (
+            puedeIrA('ronda-abierta') && (
             <>
               <label className="live-minutos">
                 <span className="mono-caps">Minutos</span>
@@ -275,6 +287,13 @@ export default function LivePanel(): JSX.Element {
               >
                 {palabras.abrirRonda(sesion.round + 1)}
               </button>
+              {sinPistasNuevas && sesion.round > 0 && (
+                <p className="text-dim text-italic live-prorroga">
+                  La trama ya ha repartido todas sus pistas. Puedes abrir otra ronda igualmente si
+                  la mesa aún no lo tiene claro: no habrá material nuevo, pero sí más tiempo para
+                  hablar.
+                </p>
+              )}
             </>
           )}
 

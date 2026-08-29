@@ -25,7 +25,7 @@
  * mundo. Los estilos de aquí abajo llevan a propósito solo lo que no es color
  * —medidas, bordes, disposición— y el color se pone en línea.
  */
-import { forwardRef } from 'react';
+import { forwardRef, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -293,6 +293,68 @@ export function Ornamento({ style }: { style?: StyleProp<ViewStyle> }): JSX.Elem
   );
 }
 
+/**
+ * Un bloque que se abre y se cierra.
+ *
+ * Existe por un problema muy concreto de esta app: hay textos que hay que tener
+ * A MANO toda la velada y que solo se leen enteros una vez. Las doce reglas del
+ * juego son el caso de manual —se leen al empezar, y a partir de ahí lo que se
+ * busca es una sola—, y la trama igual. Ponerlos desplegados empuja al fondo del
+ * scroll lo que de verdad se usa cada ronda; esconderlos en otra pestaña los
+ * convierte en algo que nadie vuelve a encontrar.
+ *
+ * Plegado y con su rótulo a la vista, ocupan un renglón y siguen estando.
+ */
+export function Plegable({
+  etiqueta,
+  resumen,
+  abierto: abiertoAlEmpezar = false,
+  children,
+}: {
+  etiqueta: string;
+  resumen?: string;
+  abierto?: boolean;
+  children: React.ReactNode;
+}): JSX.Element {
+  const t = useTema();
+  const [abierto, setAbierto] = useState(abiertoAlEmpezar);
+  return (
+    <View style={{ marginBottom: espacio.sm }}>
+      <Pressable
+        onPress={() => setAbierto((v) => !v)}
+        accessibilityRole="button"
+        accessibilityState={{ expanded: abierto }}
+        style={({ pressed }) => [
+          estilos.plegable,
+          {
+            borderColor: conAlfa(t.oro500, 0.35),
+            backgroundColor: conAlfa(t.caoba900, 0.72),
+          },
+          pressed && { opacity: 0.85 },
+        ]}
+      >
+        <View style={{ flex: 1 }}>
+          <Text style={[texto.microCaps, { color: t.laton, textTransform: 'uppercase' }]}>
+            {etiqueta}
+          </Text>
+          {resumen ? (
+            <Text
+              numberOfLines={abierto ? undefined : 1}
+              style={[texto.cuerpo, { color: t.pergaminoTenue, fontSize: 15, marginTop: 2 }]}
+            >
+              {resumen}
+            </Text>
+          ) : null}
+        </View>
+        <Text style={{ color: t.oro300, fontSize: 20, marginLeft: espacio.md }}>
+          {abierto ? '−' : '+'}
+        </Text>
+      </Pressable>
+      {abierto ? <View style={{ marginTop: espacio.sm }}>{children}</View> : null}
+    </View>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Interacción
 // ---------------------------------------------------------------------------
@@ -406,6 +468,14 @@ const estilos = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginVertical: espacio.lg,
+  },
+  plegable: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: radio.md,
+    paddingVertical: espacio.md,
+    paddingHorizontal: espacio.lg,
   },
   ornamentoLinea: {
     flex: 1,

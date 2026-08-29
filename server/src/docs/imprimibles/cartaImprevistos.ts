@@ -38,7 +38,7 @@ const INCIDENCIAS: Array<[string, string]> = [
   ],
   [
     'Alguien no participa',
-    'Dale algo concreto que hacer: pídele que lea en voz alta lo que hay en el tablón común, o que resuma la cronología. Funciona mejor que animarle.',
+    'Dale algo concreto que hacer: pídele que cuente en voz alta lo que encontró en su sala, o que resuma la cronología. Funciona mejor que animarle.',
   ],
   [
     'Se alarga demasiado',

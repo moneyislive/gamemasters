@@ -90,6 +90,20 @@
   text-align: center;
 }
 
+/*
+ * El aviso de que la trama ya no tiene más pistas que repartir.
+ *
+ * Va dentro de `.live-botones`, que es un flex con `wrap`, así que sin la base
+ * del 100% se colocaría como un botón más al lado del de abrir ronda y saldría
+ * un párrafo de tres líneas espachurrado en una columna de 80 px.
+ */
+.live-prorroga {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: 0.9rem;
+  max-width: 52ch;
+}
+
 .live-listos {
   border-top: 1px solid rgba(var(--acento-rgb), 0.2);
   padding-top: 12px;

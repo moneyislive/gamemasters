@@ -314,10 +314,28 @@ async function jugar(): Promise<void> {
   comprobar('cerrar responde 200', cerrar.estado === 200, cerrar.datos);
   v = await vista();
   comprobar('la ronda está cerrada', v.sesion.phase === 'ronda-cerrada');
-  comprobar('lo hallado pasa al tablón', v.tablon.length > 0);
+  comprobar('lo que encontré sigue estando', v.misHallazgos.length > 0, v.misHallazgos.length);
   comprobar(
     'y AHORA sí se dice qué significa',
-    v.tablon.every((p) => typeof p.pointsTo === 'string'),
+    v.misHallazgos.every((p) => typeof p.pointsTo === 'string'),
+  );
+
+  /*
+   * LA PRUEBA DE QUE LO HALLADO NO SE PONE EN COMÚN.
+   *
+   * Bruno está en la partida y no ha entrado en ninguna sala. Antes, al cerrar
+   * la ronda, recibía en su tablón exactamente las mismas pistas que quien sí
+   * había entrado: elegir sala no servía de nada y contar lo que habías visto,
+   * tampoco. Que su lista esté VACÍA es la regla nueva, y es la clase de fallo
+   * que no se ve jugando —todo el mundo tiene la información, así que todo
+   * parece funcionar— hasta que alguien se pregunta para qué se mueve nadie.
+   */
+  const vistaDeBruno = await pedir('/jugar/vista', { testigo: testigoBruno });
+  const hallazgosDeBruno = vistaDeBruno.datos?.vista?.misHallazgos ?? [];
+  comprobar(
+    'quien no entró en ninguna sala NO recibe lo que encontró otro',
+    Array.isArray(hallazgosDeBruno) && hallazgosDeBruno.length === 0,
+    hallazgosDeBruno,
   );
 
   paso('Una segunda ronda, para probar que la acusación no se renueva');
@@ -350,6 +368,43 @@ async function jugar(): Promise<void> {
 
   const cerrar2 = await pedir(`/games/${game.id}/live/ronda/cerrar`, { metodo: 'POST' });
   comprobar('cerrar la ronda 2 responde 200', cerrar2.estado === 200, cerrar2.datos);
+
+  paso('Seguir abriendo rondas después de la última que tenía prevista la trama');
+  /*
+   * LA PARTIDA NO SE ACABA PORQUE SE ACABE EL GUION.
+   *
+   * `totalRounds` sale del reparto de pistas: es cuántas rondas tenía escritas
+   * quien montó la trama. Se usaba además como tope —el panel escondía el botón
+   * de abrir ronda al llegar a la última—, así que una mesa que a la cuarta
+   * seguía sin tenerlo claro no tenía más salida que acusar a ciegas.
+   *
+   * Aquí se juega hasta pasarse: se abren y cierran rondas hasta una por encima
+   * de las previstas y se comprueba que el servidor las acepta y que el «de N»
+   * que lee todo el mundo crece con ellas, en vez de quedarse diciendo «ronda 5
+   * de 4».
+   */
+  const previstas = v.sesion.totalRounds;
+  comprobar('la trama traía varias rondas previstas', previstas >= 2, previstas);
+  for (let n = 3; n <= previstas + 1; n++) {
+    const abrir = await pedir(`/games/${game.id}/live/ronda/abrir`, {
+      metodo: 'POST',
+      cuerpo: { minutos: 10 },
+    });
+    comprobar(`abrir la ronda ${n} responde 200`, abrir.estado === 200, abrir.datos);
+    const cerrar = await pedir(`/games/${game.id}/live/ronda/cerrar`, { metodo: 'POST' });
+    comprobar(`cerrar la ronda ${n} responde 200`, cerrar.estado === 200, cerrar.datos);
+  }
+  v = await vista();
+  comprobar(
+    'se ha jugado una ronda MÁS de las previstas',
+    v.sesion.round === previstas + 1,
+    v.sesion.round,
+  );
+  comprobar(
+    'y el total crece con ella, para que nadie lea «ronda 5 de 4»',
+    v.sesion.totalRounds === previstas + 1,
+    v.sesion.totalRounds,
+  );
 
   paso('Acusar con la ronda cerrada, sin pasar por ninguna fase de acusaciones');
   const vacia = await pedir('/jugar/acusar', { metodo: 'POST', testigo, cuerpo: { respuestas: {} } });

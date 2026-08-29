@@ -256,7 +256,20 @@ export interface LiveSession {
     hastaRonda: number;
     cerradoEl: string;
   }>;
-  /** Salas visitadas por alguien en cada ronda; lo que pasa al tablón común. */
+  /**
+   * Salas en las que estuvo alguien en cada ronda ya cerrada.
+   *
+   * ES UN REGISTRO, NO UN TABLÓN. Se llamó así cuando lo hallado en una sala se
+   * ponía en común al cerrar la ronda: esta lista era la que decidía qué pistas
+   * se destapaban para TODA la mesa. Esa regla ya no existe —las pistas son de
+   * quien las encuentra y no salen de su móvil— así que nada de esto se proyecta
+   * ya hacia ningún jugador.
+   *
+   * Se conserva porque es historia de la partida y las sesiones guardadas la
+   * llevan dentro: borrar el campo obligaría a migrar documentos que se están
+   * jugando ahora mismo, y a cambio no se gana nada. Quien venga detrás debe
+   * saber que escribir aquí NO publica nada.
+   */
   tablon: Array<{ round: number; roomId: string }>;
   /**
    * Respuestas del Mayordomo que alguien ha denunciado.
@@ -483,8 +496,9 @@ export interface PistaVista {
   round: number;
   description: string;
   /**
-   * A qué señala. Solo se envía cuando la ronda ya ha cerrado y la pista pasó
-   * al tablón común: durante la ronda, interpretarla es trabajo del jugador.
+   * A qué señala. Solo se envía a QUIEN LA ENCONTRÓ y solo cuando la ronda en
+   * la que la encontró ya ha cerrado: mientras la ronda está abierta,
+   * interpretarla es trabajo del jugador.
    */
   pointsTo?: string;
 }
@@ -553,6 +567,19 @@ export interface VistaJugador {
     conocimientoPendiente: number;
     /** Giros personales ya entregados, en orden. */
     giros: Array<{ id: string; round: number; instruction: string }>;
+    /**
+     * QUÉ HIZO TU PERSONAJE ESA NOCHE, hora a hora.
+     *
+     * Es la cronología de la trama recortada a los momentos en los que TÚ
+     * estuviste. Sirve para que quien abre el dosier entienda de un vistazo qué
+     * hacía su personaje mientras ocurría el crimen, en vez de tener que
+     * deducirlo de la coartada.
+     *
+     * No es la cronología pública: ahí solo va lo que presenciaron todos, y esto
+     * incluye también lo que hiciste sin testigos. Lo compone `proyeccion.ts`,
+     * que es quien decide qué momentos son seguros de enviar.
+     */
+    cronologiaPropia: MomentoVista[];
     notas: string;
     /** Solo lo sabe quien lo es. Sirve para cambiarle el tono a la app. */
     soyCulpable: boolean;
@@ -635,8 +662,34 @@ export interface VistaJugador {
   miSala?: string;
   /** Pistas de TU sala en esta ronda. Vacío hasta que eliges. */
   misPistas: PistaVista[];
-  /** Todo lo que ha pasado al tablón común en rondas ya cerradas. */
-  tablon: PistaVista[];
+  /**
+   * TODO lo que has encontrado tú, ronda a ronda, desde que empezó la partida.
+   *
+   * Aquí estaba `tablon`, y el cambio de nombre no es cosmético: era la lista de
+   * lo que se ponía EN COMÚN al cerrar cada ronda, y por tanto todo el mundo
+   * recibía lo mismo aunque no hubiera pisado esa sala. Entrar en una sala u
+   * otra daba igual, porque al cabo de un minuto lo tenías todo; y la mitad de
+   * la conversación de la mesa —«yo estuve en la cocina y vi esto»— se quedaba
+   * sin objeto porque ya estaba en la pantalla de los demás.
+   *
+   * Ahora lo que se encuentra es de quien lo encuentra. Esta lista es la tuya y
+   * solo la tuya: el servidor la compone con las salas que TÚ elegiste en cada
+   * ronda. Enseñarla o callársela vuelve a ser una decisión.
+   */
+  misHallazgos: PistaVista[];
+  /**
+   * Los hechos que la mesa puede dar por establecidos, ronda a ronda.
+   *
+   * Es la mitad pública de la investigación, y la única que queda: existía ya
+   * como cartel imprimible —«Línea temporal», material público— donde quien
+   * dirige va pegando un bloque al cerrar cada ronda. En el móvil no estaba, así
+   * que una partida sin imprimir nada se quedaba sin ella.
+   *
+   * No revela la solución: el material se escribe con el encargo explícito de
+   * que la última revelación pueda dejar la pieza final sin encajar y de que
+   * ninguna nombre al culpable.
+   */
+  hechos: Array<{ round: number; time: string; fact: string }>;
   /**
    * Lo que pasó en los encuentros anteriores.
    *

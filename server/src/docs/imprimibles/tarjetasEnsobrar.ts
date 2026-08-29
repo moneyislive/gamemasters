@@ -55,7 +55,7 @@ export function tarjetasEnsobrar(
             codigo,
             sala?.name ?? 'Sin sala asignada',
             cuerpo,
-            'Al terminar la ronda, lleva esta tarjeta al tablón común.',
+            'Esta tarjeta es de quien la encuentra. No se pone en común: se cuenta o se calla.',
           );
         })
         .join('\n');

@@ -28,7 +28,7 @@ const REGLAS_EN_VIVO = [
   'Cada cual elige libremente en qué sala está y con quién habla.',
   'En cada ronda hay salas con evidencia nueva. Las demás siguen abiertas para conversar.',
   'A mitad de ronda podéis cambiar de sala una sola vez. Usar un pasadizo consume ese cambio.',
-  'Lo que se encuentra en una sala se lleva al tablón común al cerrar la ronda. Los secretos personales, no.',
+  'Lo que encuentras en una sala es tuyo. No hay tablón común: si quieres que se sepa, cuéntalo tú.',
   'Podéis mentir sobre vuestros secretos. No podéis inventar una versión distinta de la que pone vuestro dosier.',
   'Nadie puede enseñar su dosier a nadie. Contarlo, sí. Enseñarlo, no.',
   'La acusación final es simultánea, escrita y única. No se cambia.',
@@ -120,7 +120,7 @@ ${bloqueNarracion}
         'He anunciado las salas con evidencia nueva.',
         'He leído la narración y he puesto el reloj en marcha.',
         'He avisado a mitad de ronda del único cambio de sala.',
-        'Al cerrar, las pistas encontradas han pasado al tablón común.',
+        'Al cerrar, he recordado que cada cual guarda lo suyo y que hablar es cosa de ellos.',
         ...(material?.timelineReveals.some((r) => r.round === ronda)
           ? [`He ${vista.hayPreparador ? 'abierto' : 'colocado'} la revelación de cronología de esta ronda.`]
           : []),
@@ -196,7 +196,7 @@ ${encabezado}
       'He colgado un cartel en cada sala.',
       'He colgado la línea temporal donde todos la vean.',
       'He señalado los pasadizos, si los hay.',
-      'He elegido una mesa como tablón común de pruebas.',
+      'He elegido un rincón tranquilo donde puedan hablar sin que les oiga toda la casa.',
       'Cada jugador tiene su dosier cerrado y su hoja de investigación.',
       ...(vista.hayPreparador
         ? ['He recibido los sobres ya preparados y NO he abierto ninguno.']
@@ -210,7 +210,7 @@ ${encabezado}
         <tr><td class="hora">Al abrir</td><td>Lees la narración y anuncias las salas con evidencia nueva.</td></tr>
         <tr><td class="hora">Investigación</td><td>Cada cual va a una sala. Tú vigilas el reloj y no opinas.</td></tr>
         <tr><td class="hora">Mitad</td><td>Avisas: se puede cambiar de sala una vez.</td></tr>
-        <tr><td class="hora">Al cerrar</td><td>Todos al tablón común. Lo encontrado se pone a la vista.</td></tr>
+        <tr><td class="hora">Al cerrar</td><td>Todos a hablar. Lo encontrado no se pone a la vista: se cuenta, o no.</td></tr>
       </tbody>
     </table>
 

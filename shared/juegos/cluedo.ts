@@ -25,9 +25,15 @@ import type { ManifiestoDeJuego, ReglaDeJuego } from './tipos';
  * Las reglas de CLUEDO, tal y como las lee quien juega.
  *
  * Estaban en `server/src/docs/datos.ts` como `REGLAS_JUGADOR`, con nombre de
- * verdad universal, y de ahí salían hacia los tres sitios que las enseñan. El
- * texto no ha cambiado ni una coma al mudarse: lo comprueba el maestro de oro,
- * que compara el dosier impreso byte a byte.
+ * verdad universal, y de ahí salían hacia los tres sitios que las enseñan: el
+ * dosier impreso, el móvil y el Mayordomo. Tocar una coma aquí mueve los tres a
+ * la vez, y eso es lo que se quiere: que nadie pueda leer dos reglas distintas
+ * según por dónde entre. El maestro de oro lo canta comparando byte a byte, así
+ * que un cambio en este texto SIEMPRE hay que volver a capturarlo a mano.
+ *
+ * Dos reglas —«Las rondas» y «Pistas»— dicen hoy algo distinto de lo que decían
+ * al mudarse, y a propósito: la partida ya no tiene un número fijo de rondas y
+ * lo que se encuentra en una sala no pasa a un tablón común.
  */
 export const REGLAS_CLUEDO: ReglaDeJuego[] = [
   {
@@ -53,7 +59,7 @@ export const REGLAS_CLUEDO: ReglaDeJuego[] = [
   {
     titulo: 'Las rondas',
     texto:
-      'Quien dirige abre y cierra cada ronda. Durante una ronda entras en una sala y conversas con quien esté allí.',
+      'Quien dirige abre y cierra cada ronda. Durante una ronda entras en una sala y conversas con quien esté allí. No hay un número fijo: si al final de la última la mesa sigue a oscuras, quien dirige puede abrir otra.',
   },
   {
     titulo: 'Preguntas dirigidas',
@@ -68,7 +74,7 @@ export const REGLAS_CLUEDO: ReglaDeJuego[] = [
   {
     titulo: 'Pistas',
     texto:
-      'Cada ronda aparecen pruebas nuevas. Las que encuentres son tuyas para enseñarlas o guardarlas, pero al cerrar la ronda las pruebas físicas pasan al tablón común. Los secretos personales siguen siendo privados.',
+      'Cada ronda aparecen pruebas nuevas en las salas. Lo que encuentres es tuyo y de nadie más: no hay tablón común y nada se comparte solo. Enseñarlo, contarlo a medias o callártelo es decisión tuya, y hablar es la única forma de que llegue a los demás.',
   },
   {
     titulo: 'Pasadizos',
@@ -230,8 +236,8 @@ export const CLUEDO: ManifiestoDeJuego = {
     { pantalla: 'ronda', rotulo: 'Ronda', icono: 'reloj' },
     { pantalla: 'personaje', rotulo: 'Tú', icono: 'mascara' },
     { pantalla: 'mapa', rotulo: 'Mapa', icono: 'plano' },
-    { pantalla: 'tablon', rotulo: 'Tablón', icono: 'tablon' },
-    { pantalla: 'cuaderno', rotulo: 'Notas', icono: 'cuaderno' },
+    { pantalla: 'tablon', rotulo: 'Hechos', icono: 'tablon' },
+    { pantalla: 'cuaderno', rotulo: 'Pistas', icono: 'farol' },
     { pantalla: 'perfil', rotulo: 'Perfil', icono: 'copa' },
   ],
 
@@ -255,8 +261,8 @@ export const CLUEDO: ManifiestoDeJuego = {
     sinIa: {
       reglas:
         'En cada ronda entra usted en una sala y ve lo que allí se encuentre. Puede cambiarse una ' +
-        'sola vez. Al cerrar la ronda, lo hallado pasa al tablón común y se habla. Al final, una ' +
-        'única acusación: quién, con qué y dónde.',
+        'sola vez. Lo que halle es suyo y de nadie más: nadie lo verá si usted no lo cuenta. Al ' +
+        'final, una única acusación: quién, con qué y dónde.',
       personaje:
         'Lo que esconde, lo sabe mejor que yo; y su coartada es la que declaró. Sosténgala sin adornarla de más.',
       solucion:
@@ -316,7 +322,7 @@ export const CLUEDO: ManifiestoDeJuego = {
     */
   avisos: {
     rondaAbierta: 'Ronda {ronda} de {total}. Elige sala.',
-    rondaCerrada: 'Ronda cerrada. Lo encontrado pasa al tablón común.',
+    rondaCerrada: 'Ronda cerrada. Lo que encontraste es tuyo: cuéntalo o guárdatelo.',
     acusaciones: 'Momento de acusar. Una sola combinación, y no se puede cambiar.',
     desenlace: 'Se abre el sobre del crimen.',
   },

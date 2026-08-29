@@ -5,8 +5,8 @@
  *
  * La defensa no es pedirle por favor que no ayude a deducir: es que **no tiene
  * con qué**. Su contexto se compone aquí, y deliberadamente NO incluye ninguna
- * pista, ni el tablón común, ni la cronología, ni los giros personales, ni una
- * sola línea de los dosieres ajenos. Un jugador puede insistir todo lo que
+ * pista —ni las que encontró quien pregunta—, ni la cronología, ni los giros
+ * personales, ni una sola línea de los dosieres ajenos. Un jugador puede insistir todo lo que
  * quiera: no hay nada que sacarle, porque no lo ha recibido.
  *
  * Lo único que sabe de la trama es lo que sabría cualquiera que entrase por la
@@ -80,9 +80,10 @@ una cena.`;
  * Contexto del Mayordomo.
  *
  * Ojo al leer esta función: lo importante es lo que NO aparece. Nada de
- * `vista.misPistas`, `vista.tablon`, `vista.cronologia`, `vista.yo.giros` ni
- * `vista.yo.conocimiento`. Si algún día alguien los añade «para que ayude
- * mejor», habrá convertido al Mayordomo en una máquina de resolver el caso.
+ * `vista.misPistas`, `vista.misHallazgos`, `vista.hechos`, `vista.cronologia`,
+ * `vista.yo.giros`, `vista.yo.cronologiaPropia` ni `vista.yo.conocimiento`. Si
+ * algún día alguien los añade «para que ayude mejor», habrá convertido al
+ * Mayordomo en una máquina de resolver el caso.
  */
 /**
  * El manifiesto del juego que se esta jugando, sacado de la propia vista.

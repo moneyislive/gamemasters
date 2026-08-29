@@ -1,10 +1,16 @@
 /**
  * La pantalla de la ronda: donde se juega.
  *
- * Cambia de piel según la fase. En la sala de espera invita a mirar tu
- * personaje; con la ronda abierta manda elegir sala y enseña lo que encuentras;
- * al cerrarse, calla y te empuja al tablón. Es la pantalla que la gente tendrá
- * delante durante dos horas, así que nunca muestra dos cosas a la vez.
+ * Cambia de piel según la fase. En la sala de espera cuenta de qué va la velada,
+ * cómo se juega y te abre el dosier; con la ronda abierta manda elegir sala y
+ * enseña lo que encuentras; al cerrarse, calla y te manda a hablar. Es la
+ * pantalla que la gente tendrá delante durante dos horas, así que nunca muestra
+ * dos cosas a la vez.
+ *
+ * ES TAMBIÉN LA PUERTA DE ENTRADA, y eso es nuevo. La trama y las reglas vivían
+ * dentro del dosier, detrás del secreto y de la coartada de cada cual; ahora
+ * están aquí, en el orden en que se necesitan: de qué va esto, cómo se juega y
+ * quién eres tú. El dosier se quedó con lo único que no puede leer nadie más.
  *
  * ═══ Y CUANDO NO ES CLUEDO ═══
  *
@@ -41,6 +47,7 @@ import {
   Marco,
   Ornamento,
   Pantalla,
+  Plegable,
   Sello,
   Seccion,
   Titulo,
@@ -52,8 +59,104 @@ import {
 import { ALTO_BARRA_TOTAL } from '../../src/tema';
 import { Vigilia } from '../../src/momia/vigilia';
 import { Hora } from '../../src/sombras/hora';
-import type { SalaVista } from '../../../shared/live';
+import type { SalaVista, VistaJugador } from '../../../shared/live';
 import { Foto } from '../../src/foto';
+
+/**
+ * LA TRAMA, LAS REGLAS Y EL DOSIER: los tres bloques de entrada a la partida.
+ *
+ * Los tres vivían en el dosier, uno detrás de otro y detrás de tu papel, y ese
+ * era el orden equivocado. La trama y las reglas son de la VELADA, no tuyas: las
+ * lee todo el mundo, dicen lo mismo para todos y se leen una vez, al principio.
+ * Tenerlas dentro del documento confidencial obligaba a atravesar tu secreto y
+ * tu coartada para llegar a «¿de qué va esto?», que es la primera pregunta que
+ * se hace quien acaba de sentarse.
+ *
+ * Así que están aquí, que es la pestaña por la que se entra: primero de qué va,
+ * luego cómo se juega, y al final la puerta a lo único que es tuyo.
+ */
+function LaTrama({ vista }: { vista: VistaJugador }): JSX.Element {
+  return (
+    <Marco tono="papel">
+      <Etiqueta style={{ color: color.burdeos700 }}>Lo que ha pasado</Etiqueta>
+      <Cuerpo style={{ color: color.caoba700, marginTop: espacio.sm }}>
+        {vista.caso.sinopsis}
+      </Cuerpo>
+
+      <View style={estilos.apartadoPapel}>
+        <Etiqueta style={{ color: color.burdeos700 }}>
+          La víctima · {vista.caso.victima.nombre}
+        </Etiqueta>
+        <Cuerpo style={{ color: color.caoba700, marginTop: espacio.sm }}>
+          {vista.caso.victima.descripcion}
+        </Cuerpo>
+      </View>
+
+      <View style={estilos.apartadoPapel}>
+        <Etiqueta style={{ color: color.burdeos700 }}>Dónde estáis</Etiqueta>
+        <Cuerpo style={{ color: color.caoba700, marginTop: espacio.sm }}>
+          {vista.caso.ambientacion}
+        </Cuerpo>
+      </View>
+    </Marco>
+  );
+}
+
+/**
+ * Las reglas, en un solo bloque plegado.
+ *
+ * En el dosier iban en doce marcos separados, uno por regla, y ocupaban más
+ * pantalla que todo lo demás junto. Se leen enteras una vez y después se
+ * consulta una: apiladas dentro de una hoja de papel, con su título en versales,
+ * se recorren de un vistazo sin sepultar nada.
+ */
+function ComoSeJuega({ reglas, abierto }: { reglas: string[]; abierto?: boolean }): JSX.Element {
+  return (
+    <Plegable
+      etiqueta="Cómo se juega"
+      resumen="Aunque nunca hayas jugado, con esto te basta."
+      abierto={abierto}
+    >
+      <Marco tono="papel">
+        {reglas.map((regla, i) => {
+          const punto = regla.indexOf('. ');
+          const titulo = punto > 0 ? regla.slice(0, punto) : `Regla ${i + 1}`;
+          const cuerpo = punto > 0 ? regla.slice(punto + 2) : regla;
+          return (
+            <View key={i} style={i === 0 ? undefined : estilos.apartadoPapel}>
+              <Etiqueta style={{ color: color.burdeos700 }}>{titulo}</Etiqueta>
+              <Cuerpo style={{ color: color.caoba700, marginTop: espacio.sm }}>{cuerpo}</Cuerpo>
+            </View>
+          );
+        })}
+      </Marco>
+    </Plegable>
+  );
+}
+
+/** La puerta al dosier. Va SIEMPRE al final: es lo último que se lee de aquí. */
+function EnlaceAlDosier({
+  nombre,
+  papel,
+}: {
+  nombre: string;
+  papel: string;
+}): JSX.Element {
+  return (
+    <Marco>
+      <Etiqueta>Y tú, en todo esto</Etiqueta>
+      <Titulo style={{ fontSize: 24, marginTop: 4 }}>{nombre}</Titulo>
+      <Cuerpo tenue style={{ marginTop: 4 }}>{papel}</Cuerpo>
+      <Boton
+        variante="primario"
+        onPress={() => router.push('/(juego)/personaje')}
+        style={{ marginTop: espacio.lg }}
+      >
+        Abrir tu dosier
+      </Boton>
+    </Marco>
+  );
+}
 
 export default function Ronda(): JSX.Element {
   const { vista, cargando, error, aplicarVista } = usePartida();
@@ -131,29 +234,27 @@ export default function Ronda(): JSX.Element {
 
         <Ornamento />
 
+        {/*
+          EL ORDEN DE LECTURA DE UNA VELADA QUE EMPIEZA: de qué va, cómo se
+          juega, quién eres. Estaba al revés —primero el botón del dosier, y la
+          sinopsis debajo en un recuadro pequeño— y con doce personas leyendo a
+          la vez el resultado era que nadie sabía de qué iba la partida hasta que
+          alguien lo preguntaba en voz alta.
+        */}
         <Animated.View entering={FadeInUp.delay(200).duration(500)}>
-          <Marco>
-            <Etiqueta>Eres</Etiqueta>
-            <Titulo style={{ fontSize: 24, marginTop: 4 }}>{yo.characterName}</Titulo>
-            <Cuerpo tenue style={{ marginTop: 4 }}>{yo.role}</Cuerpo>
-            <Boton
-              variante="primario"
-              onPress={() => router.push('/(juego)/personaje')}
-              style={{ marginTop: espacio.lg }}
-            >
-              Leer tu dosier
-            </Boton>
-          </Marco>
+          <Seccion>La trama</Seccion>
+          <LaTrama vista={vista} />
         </Animated.View>
 
-        <Animated.View entering={FadeInUp.delay(280).duration(500)}>
-          <Marco tono="papel">
-            <Etiqueta style={{ color: color.burdeos700 }}>Lo que ha pasado</Etiqueta>
-            <Cuerpo style={{ color: color.caoba700, marginTop: espacio.sm }}>
-              {vista.caso.sinopsis}
-            </Cuerpo>
-          </Marco>
+        <Animated.View entering={FadeInUp.delay(260).duration(500)}>
+          <ComoSeJuega reglas={vista.caso.reglas} abierto />
         </Animated.View>
+
+        <Animated.View entering={FadeInUp.delay(320).duration(500)}>
+          <EnlaceAlDosier nombre={yo.characterName} papel={yo.role} />
+        </Animated.View>
+
+        <Ornamento />
 
         {/* Avisar de que estás listo. No abre la ronda —eso lo decide quien
             dirige— pero le ahorra ir preguntando uno por uno. */}
@@ -385,7 +486,8 @@ export default function Ronda(): JSX.Element {
                 </Animated.View>
               ))}
               <Cuerpo tenue style={{ fontStyle: 'italic', fontSize: 15 }}>
-                Qué significa es cosa tuya. Al cerrar la ronda pasará al tablón común.
+                Esto lo has visto tú y nadie más. Qué significa es cosa tuya, y contarlo o no
+                también. Al cerrar la ronda se queda guardado en tus pistas.
               </Cuerpo>
             </>
           )}
@@ -393,11 +495,11 @@ export default function Ronda(): JSX.Element {
       ) : (
         <Marco>
           <Cuerpo>
-            Todo lo que se ha encontrado esta ronda está ya en el tablón común. Es el momento de
-            hablar: contrasta lo tuyo con lo de los demás antes de que empiece la siguiente.
+            Lo que encontraste en tu sala es tuyo: nadie más lo ha visto, y nadie lo verá si no lo
+            cuentas. Es el momento de hablar y de decidir qué enseñas, qué insinúas y qué te callas.
           </Cuerpo>
-          <Boton onPress={() => router.push('/(juego)/tablon')} style={{ marginTop: espacio.lg }}>
-            Ir al tablón
+          <Boton onPress={() => router.push('/(juego)/cuaderno')} style={{ marginTop: espacio.lg }}>
+            Ver tus pistas
           </Boton>
         </Marco>
       )}
@@ -409,6 +511,24 @@ export default function Ronda(): JSX.Element {
         acciones={vista.acciones.filter((a) => a.id !== 'entrar-en-sala' && a.id !== 'acusar')}
         alHacer={aplicarVista}
       />
+
+      {/*
+        LO QUE SE LEYÓ AL EMPEZAR, SIN IRSE DE LA PESTAÑA.
+
+        Plegados y al final: durante una ronda con el reloj corriendo lo que
+        manda es la lista de salas, y estos dos bloques desplegados la habrían
+        empujado fuera de la primera pantalla. Pero tienen que seguir estando —a
+        media velada alguien pregunta siempre «¿cuántas veces puedo cambiarme?»—
+        y mandar a buscarlos a otra pestaña es mandar a que nadie los encuentre.
+      */}
+      <Ornamento />
+      <Plegable etiqueta="La trama" resumen={vista.caso.sinopsis}>
+        <LaTrama vista={vista} />
+      </Plegable>
+      <ComoSeJuega reglas={vista.caso.reglas} />
+      <Boton onPress={() => router.push('/(juego)/personaje')} style={{ marginTop: espacio.sm }}>
+        Abrir tu dosier
+      </Boton>
 
     </Pantalla>
     <BarraDeAcusar yaAcuso={Boolean(vista.miAcusacion)} />
@@ -467,6 +587,13 @@ function BarraDeAcusar({ yaAcuso }: { yaAcuso: boolean }): JSX.Element {
 
 const estilos = StyleSheet.create({
   centro: { alignItems: 'center', paddingTop: espacio.xl },
+  /* Separador entre dos apartados de una misma hoja de papel. */
+  apartadoPapel: {
+    marginTop: espacio.md,
+    paddingTop: espacio.md,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(109,26,42,0.22)',
+  },
   barraAcusar: {
     position: 'absolute',
     left: 0,

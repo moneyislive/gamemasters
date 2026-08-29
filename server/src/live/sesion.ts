@@ -279,6 +279,27 @@ export function abrirRonda(sesion: LiveSession, minutos = MINUTOS_POR_RONDA): vo
   }
   const ahora = new Date();
   sesion.round += 1;
+  /*
+   * LA PARTIDA NO SE ACABA PORQUE SE ACABE EL GUION.
+   *
+   * `totalRounds` sale del reparto de pistas de la trama: es cuántas rondas
+   * tenía PREVISTAS quien la escribió. Se estaba usando además como tope duro
+   * —el panel de quien dirige escondía el botón de abrir ronda al llegar a la
+   * última—, y eso convertía una previsión en una regla: si a la cuarta ronda la
+   * mesa seguía sin tenerlo claro, no había forma de darles una quinta salvo
+   * empujarles a acusar a ciegas.
+   *
+   * Así que la previsión cede ante lo que de verdad ha pasado. Al abrir una
+   * ronda de más, el total pasa a ser esa ronda, y todo lo que se cuenta «de N»
+   * —el rótulo del móvil, el contexto del Mayordomo— sigue diciendo la verdad en
+   * vez de «ronda 5 de 4».
+   *
+   * No desordena el reparto de conocimiento: `conocimientoDesbloqueado` reparte
+   * `ceil(total/rondas)` piezas por ronda, y al llegar a la última ya está todo
+   * fuera. Subir el total baja el ritmo de las rondas futuras, nunca retira algo
+   * que ya se había entregado.
+   */
+  if (sesion.round > sesion.totalRounds) sesion.totalRounds = sesion.round;
   sesion.phase = 'ronda-abierta';
   sesion.roundStartedAt = ahora.toISOString();
   sesion.roundEndsAt = new Date(ahora.getTime() + minutos * 60_000).toISOString();
@@ -291,7 +312,12 @@ export function cerrarRonda(sesion: LiveSession): void {
   }
   sesion.phase = 'ronda-cerrada';
   sesion.roundEndsAt = undefined;
-  // Lo que alguien encontró pasa al tablón común: es la regla de la mesa.
+  /*
+   * Se anota en qué salas estuvo alguien. NO ES UN TABLÓN: esta lista publicaba
+   * las pistas de esas salas a toda la mesa, y esa regla se retiró —lo que se
+   * encuentra es de quien lo encuentra—. Se sigue anotando porque es historia de
+   * la partida, pero ya no la lee ninguna proyección hacia un jugador.
+   */
   for (const jugador of sesion.players) {
     const eleccion = jugador.elecciones.find((e) => e.round === sesion.round);
     if (!eleccion) continue;
