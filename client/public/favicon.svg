@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="GameMasters">
+  <!--
+    EL DADO DEL IMPOSTOR.
+
+    Cinco pips en cara de dado. Cuatro son de oro. El del centro tiene la misma
+    forma y el mismo tamaño que los otros cuatro —eso es lo importante— pero no
+    es de los suyos.
+
+    POR QUÉ ESTO Y NO UNA LUPA, UNA LLAVE O UNA MÁSCARA. Todas ésas dicen
+    «misterio» y ya está: las lleva medio internet y no distinguen a este
+    producto de una novela de Agatha Christie. Lo que de verdad comparten los
+    tres juegos de la casa no es la ambientación, que es distinta en cada uno
+    —una mansión, una tumba, un monte de Iga—, sino la MECÁNICA: se juega en
+    grupo, y dentro del grupo hay exactamente una persona que no es lo que dice.
+    El culpable de CLUEDO, el saqueador de la Momia, el kanchō de El Paso de las
+    Sombras. Esa idea es la marca, y no tiene dibujo hecho: hay que inventarlo.
+
+    De ahí las dos lecturas en una sola figura: de lejos es un DADO —se juega—,
+    y de cerca es un INTRUSO —alguien miente—.
+
+    DIBUJADA PARA 16 PX:
+      · Cinco discos gordos y nada más. No hay silueta que reconocer, ni trazo
+        fino que se evapore, ni detalle que se empaste. A 16 px se siguen viendo
+        cinco puntos, que es todo lo que tiene que pasar.
+      · El impostor se distingue por COLOR, no por forma ni por tamaño. El color
+        es lo último que se pierde al reducir; la forma es lo primero.
+      · El aro de oro alrededor del pip burdeos existe para que no se hunda en
+        el fondo oscuro cuando el icono se ve pequeño y sin antialias.
+  -->
+  <defs>
+    <linearGradient id="oro" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#F6E39C"/>
+      <stop offset="1" stop-color="#B98E22"/>
+    </linearGradient>
+    <linearGradient id="madera" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2E1C10"/>
+      <stop offset="1" stop-color="#0C0705"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="url(#madera)"/>
+  <circle cx="19" cy="19" r="7.4" fill="url(#oro)"/>
+  <circle cx="45" cy="19" r="7.4" fill="url(#oro)"/>
+  <circle cx="19" cy="45" r="7.4" fill="url(#oro)"/>
+  <circle cx="45" cy="45" r="7.4" fill="url(#oro)"/>
+  <circle cx="32" cy="32" r="7.4" fill="#B8354F"/>
+  <circle cx="32" cy="32" r="7.4" fill="none" stroke="#D9B84E" stroke-width="3"/>
+</svg>
