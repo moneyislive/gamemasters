@@ -46,7 +46,25 @@ export default function LivePanel(): JSX.Element {
       const v = await llamar<VistaGameMaster>(`/games/${id}/live`, 'GET');
       setVista(v);
       setError(null);
-    } catch {
+    } catch (e) {
+      /*
+       * UN PARPADEO DE RED NO ES «LA PARTIDA NO ESTÁ EN JUEGO».
+       *
+       * Cualquier fallo borraba la vista, y el sondeo corre cada tres segundos.
+       * Con el wifi de una casa ajena, el panel caía en mitad de la velada al
+       * estado inicial —«La partida no está en juego»— con el botón de abrir la
+       * sala encendido, porque para encenderlo basta que la partida tenga
+       * trama. Quien dirige lo pulsaba para recuperar su puesto de mando, que
+       * es exactamente lo que parece que hay que hacer.
+       *
+       * `llamar` deja escapar el `TypeError` de `fetch` cuando no hay red, y
+       * envuelve en un `Error` normal lo que el servidor sí contesta. Solo esto
+       * segundo significa de verdad que ya no hay sesión.
+       */
+      if (e instanceof TypeError || e instanceof SyntaxError) {
+        setError('Sin conexión con el servidor. Se sigue intentando…');
+        return;
+      }
       setVista(null);
     }
   }, []);
