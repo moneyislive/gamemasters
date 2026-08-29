@@ -54,6 +54,33 @@ function Hoja({
   );
 }
 
+/**
+ * Lo que se le dice a quien lleva el papel que gana perdiendo.
+ *
+ * El texto era el de CLUEDO y lo leian los tres juegos, porque `soyCulpable` sale
+ * de resolver el eje de jugadores de CUALQUIER manifiesto. Al saqueador de la
+ * Momia se le explicaba que su partida es «que no te acierten» y que no señale a
+ * nadie el primero: las dos cosas son falsas ahi —gana si la tumba no se sella
+ * bien, y que le señalen no se lo quita—, asi que el consejo no solo no ayuda,
+ * dirige mal. En El Paso de las Sombras, igual.
+ *
+ * CLUEDO se queda en el respaldo y sin entrada propia, para que su texto no pueda
+ * moverse por descuido al tocar los otros.
+ */
+const CONSEJO_DE_CLUEDO =
+  'Nadie más lo sabe. Tu partida no es acertar: es que no te acierten. Miente con ' +
+  'cuidado, ofrece coartadas verificables y no seas el primero en señalar a nadie.';
+
+const CONSEJO_DE_CULPABLE: Record<string, string> = {
+  momia:
+    'Nadie más lo sabe. Rompiste el sello, y ganas si la tumba NO se cierra en el orden ' +
+    'bueno: que te señalen no te lo quita. Tienes una mentira por vigilia y nadie sabe que ' +
+    'la tienes.',
+  sombras:
+    'Nadie más lo sabe. Ganas si la senda no se recorre como debe, no si nadie te señala. ' +
+    'Siembra dudas donde más se decida y no defiendas demasiado pronto.',
+};
+
 export default function Personaje(): JSX.Element {
   const { vista } = usePartida();
   /*
@@ -84,6 +111,7 @@ export default function Personaje(): JSX.Element {
    * Para CLUEDO sigue siendo `null` y la pantalla queda exactamente como estaba:
    * ni un elemento de más en el árbol. Para la Momia se lee igual que siempre.
    */
+  const consejoDeCulpable = CONSEJO_DE_CULPABLE[sesion.juego ?? ''] ?? CONSEJO_DE_CLUEDO;
   const momia = sesion.juego === 'momia' ? leerEstadoMomia(vista.estadoDelJuego) : null;
   /*
    * Lo mismo para El Paso de las Sombras: el DISFRAZ es una sección obligatoria
@@ -155,10 +183,7 @@ export default function Personaje(): JSX.Element {
         <Animated.View entering={FadeInUp.delay(120).duration(500)}>
           <Marco tono="peligro">
             <Etiqueta style={{ color: '#f0c9c0' }}>Tú lo hiciste</Etiqueta>
-            <Cuerpo style={{ marginTop: espacio.sm }}>
-              Nadie más lo sabe. Tu partida no es acertar: es que no te acierten. Miente con
-              cuidado, ofrece coartadas verificables y no seas el primero en señalar a nadie.
-            </Cuerpo>
+            <Cuerpo style={{ marginTop: espacio.sm }}>{consejoDeCulpable}</Cuerpo>
           </Marco>
         </Animated.View>
       )}

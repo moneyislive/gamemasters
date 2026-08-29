@@ -19,6 +19,18 @@ export async function llamar<T>(ruta: string, metodo = 'POST', cuerpo?: unknown)
   });
   const texto = await res.text();
   const datos = texto ? JSON.parse(texto) : {};
-  if (!res.ok) throw new Error(datos.error ?? `Error ${res.status}`);
+  if (!res.ok) {
+    /*
+     * EL ESTADO VIAJA CON EL ERROR. Sin el, quien llama no puede distinguir «esta
+     * partida ya no esta en juego» (404, legitimo) de «el servidor tuvo un mal
+     * momento» (500, 503), y el puesto de mando trataba los dos igual: se
+     * vaciaba y ofrecia abrir la sala en mitad de una velada. Y 503 no es
+     * hipotetico — es lo que responde el guardian de acceso cuando no puede
+     * comprobar la admision, que falla cerrado a proposito.
+     */
+    const fallo = new Error(datos.error ?? `Error ${res.status}`) as Error & { estado?: number };
+    fallo.estado = res.status;
+    throw fallo;
+  }
   return datos as T;
 }

@@ -89,6 +89,18 @@ export default function LivePanel(): JSX.Element {
         setAvisoDeSondeo('Sin conexión con el servidor. Se sigue intentando…');
         return;
       }
+      /*
+       * Y SOLO UN 404 SIGNIFICA QUE YA NO HAY SESIÓN. Un 500 o un 503 son un mal
+       * momento del servidor —el guardián de acceso responde 503 cuando no puede
+       * comprobar la admisión, que falla cerrado a propósito— y tratarlos como
+       * «la partida no está en juego» vaciaba el puesto de mando en mitad de la
+       * velada, con el botón de abrir la sala encendido.
+       */
+      const estado = (e as { estado?: number })?.estado;
+      if (estado !== undefined && estado !== 404) {
+        setAvisoDeSondeo('El servidor no responde bien ahora mismo. Se sigue intentando…');
+        return;
+      }
       setVista(null);
     }
   }, []);
