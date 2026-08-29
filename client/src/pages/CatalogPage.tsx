@@ -253,7 +253,7 @@ const GAMES: readonly CatalogGame[] = [
        * confundía con la de Harry Potter, que es azul marino y oro: dos
        * tarjetas iguales en la misma estantería no las distingue nadie.
        */
-      '--card-bg1': '#e5d94cc4',
+      '--card-bg1': '#e4d7386e',
       '--card-bg2': '#5b4622',
       '--card-accent': '#e8cf9a',
       '--card-glow': 'rgba(216, 180, 106, 0.42)',
