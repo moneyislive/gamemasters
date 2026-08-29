@@ -86,11 +86,11 @@
       "typedRoutes": true,
       "baseUrl": "/jugar"
     },
-    "owner": "miek98gs-team",
+    "owner": "mike98tts-team",
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "75d313be-14be-479f-99fa-3f2803c7d9a2"
+        "projectId": "710be942-4204-43ab-b29f-18059e37a643"
       }
     }
   }
