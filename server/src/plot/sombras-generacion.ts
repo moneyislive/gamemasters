@@ -71,6 +71,7 @@ import {
 } from './sombras-validacion';
 import type { Incidencia } from './sombras-validacion';
 import { emisorDeProgreso } from '../live/proyeccion';
+import { apuntarUso, volcarGasto } from '../gasto/contador';
 
 type Emitir = (evento: GenerateStreamEvent) => void;
 
@@ -674,6 +675,8 @@ async function unaTirada(
   // la senda verdadera dentro y el taller lo pinta a pantalla completa.
   stream.on('text', emisorDeProgreso(game, emit));
   const mensaje = await stream.finalMessage();
+  // Lo que ha costado esta llamada. No puede tumbar la generacion.
+  apuntarUso({ concepto: 'trama', model, usage: mensaje.usage, gameId: game.id });
 
   if (mensaje.stop_reason === 'refusal') {
     throw new Error(

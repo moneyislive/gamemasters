@@ -49,6 +49,21 @@ export async function resolveModel(game: GameSession): Promise<ModelId> {
  * (`betas: ['server-side-fallback-2026-07-01']` + `fallbacks: 'default'`).
  * Solo aplica a claude-fable-5 y claude-opus-5; sonnet/haiku usan la ruta normal.
  */
+/**
+ * ¿Este modelo admite `output_config.effort`?
+ *
+ * El esfuerzo gobierna cuánto piensa el modelo antes de responder, y lo pensado
+ * se factura como salida — que es la parte cara. Ninguna de las siete llamadas
+ * lo pedía, así que todas corrían al defecto `high`: pagando el pensamiento más
+ * profundo también para escribir cuatro frases de reglas.
+ *
+ * Los Haiku no lo aceptan y responden con un error, así que se pregunta antes en
+ * vez de repetir la condición en cada punto de llamada.
+ */
+export function aceptaEffort(model: ModelId): boolean {
+  return !model.startsWith('claude-haiku');
+}
+
 export function usesFallbacks(model: ModelId): boolean {
   return model === 'claude-fable-5' || model === 'claude-opus-5';
 }

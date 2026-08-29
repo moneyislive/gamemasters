@@ -25,6 +25,7 @@ import { executeTool, herramientasDe } from '../agent/tools';
 import { runDemoChat } from '../agent/demo';
 import { crearRouter } from '../rutas';
 import { partidaParaElTaller } from '../live/proyeccion';
+import { apuntarUso, volcarGasto } from '../gasto/contador';
 
 const router = crearRouter();
 
@@ -55,6 +56,12 @@ interface BloqueFinal {
 interface MensajeFinal {
   stop_reason: string | null;
   content: BloqueFinal[];
+  /**
+   * Lo que ha costado la vuelta. Es `unknown` a proposito: aqui solo se pasa al
+   * contador, que ya sabe leer las formas que trae la API sin obligar a este
+   * fichero a conocerlas.
+   */
+  usage?: unknown;
 }
 
 interface StreamAgente extends AsyncIterable<EventoStream> {
@@ -172,6 +179,13 @@ async function chatConAgente(
     }
 
     const mensaje = await stream.finalMessage();
+    /*
+     * POR VUELTA, no solo la ultima. El bucle del taller puede dar hasta doce, y
+     * cada una reenvia la conversacion entera: contar solo la que termina seria
+     * perderse justo lo que se quiere medir. Es ademas el gasto menos acotado de
+     * la casa, porque crece con lo que se hable.
+     */
+    apuntarUso({ concepto: 'asistente', model, usage: mensaje.usage, gameId: game.id });
 
     if (mensaje.stop_reason === 'refusal') {
       emit({
@@ -244,6 +258,10 @@ async function chatConAgente(
   };
   await store.appendMessage(game.id, mensajeAsistente);
   emit({ type: 'done', messageId: mensajeAsistente.id });
+
+  // Lo apuntado en TODAS las vueltas del bucle, de una vez y con la partida ya
+  // guardada: volcarlo antes seria contar en una hoja que el turno va a tirar.
+  await volcarGasto(game.id);
 }
 
 // ---------------------------------------------------------------------------

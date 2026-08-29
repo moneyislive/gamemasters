@@ -22,6 +22,7 @@ import { generarTramaMomia } from './momia-generacion';
 import { SOMBRAS } from '../../../shared/juegos/sombras';
 import { escribirTramaSombras } from './sombras-generacion';
 import { emisorDeProgreso, partidaParaElTaller } from '../live/proyeccion';
+import { apuntarUso, volcarGasto } from '../gasto/contador';
 
 type Emitir = (evento: GenerateStreamEvent) => void;
 
@@ -121,6 +122,9 @@ export async function runGeneration(game: GameSession, emit: Emitir): Promise<vo
     const guardada = await store.saveGame(game);
     // Con el Game Master jugando, este `done` bajaba la trama entera.
     emit({ type: 'done', game: partidaParaElTaller(guardada) });
+    // Y se vuelca lo apuntado, ya con todo guardado: si se hiciera antes, el
+    // guardado de aqui arriba se lo llevaria por delante.
+    await volcarGasto(game.id);
   } catch (error) {
     console.error('[pipeline] fallo en la generación:', error);
     /*
@@ -179,6 +183,8 @@ async function generarTramaConApi(game: GameSession, emit: Emitir): Promise<Plot
   stream.on('text', emisorDeProgreso(game, emit));
 
   const mensaje = await stream.finalMessage();
+  // Lo que ha costado esta llamada. No puede tumbar la generacion.
+  apuntarUso({ concepto: 'trama', model, usage: mensaje.usage, gameId: game.id });
 
   if (mensaje.stop_reason === 'refusal') {
     throw new Error(

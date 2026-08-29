@@ -13,13 +13,14 @@
  * puerta —de qué va el caso, quién ha muerto, dónde estáis— más el propio
  * dosier de quien pregunta, que esa persona ya tiene delante en la app.
  */
-import { getAnthropicClient, resolveModel } from '../agent/anthropic';
+import { aceptaEffort, getAnthropicClient, resolveModel } from '../agent/anthropic';
 import { DEMO_MODE } from '../config';
 import { REGLAS_JUGADOR } from '../docs/datos';
 import { manifiestoDe } from '../../../shared/juegos';
 import type { ManifiestoDeJuego } from '../../../shared/juegos';
 import type { GameSession } from '../../../shared/types';
 import type { VistaJugador } from '../../../shared/live';
+import { apuntarUso, volcarGasto } from '../gasto/contador';
 
 /**
  * El encargo del asistente, compuesto para el juego que se esté jugando.
@@ -194,7 +195,16 @@ export async function consultarConsejero(
   const model = await resolveModel(game);
   const mensaje = await client.messages.create({
     model,
-    max_tokens: 400,
+    /*
+     * MARGEN DE SOBRA, Y NO CUESTA NADA: solo se factura lo generado. Con 400 y
+     * un modelo cuyo pensamiento no se puede apagar, el corte llegaba a mitad de
+     * frase y salia disfrazado de «no sabria que decirle» —ver la rama de abajo—,
+     * asi que parecia que el Mayordomo no sabia cuando lo que pasaba es que le
+     * habian tapado la boca.
+     */
+    max_tokens: 4000,
+    // Cuatro frases de reglas: pensar mas no las mejora y se factura como salida.
+    ...(aceptaEffort(model) ? { output_config: { effort: 'low' as const } } : {}),
     system: [
       { type: 'text', text: encargo(juegoDe(vista)), cache_control: { type: 'ephemeral' } },
       { type: 'text', text: `CONTEXTO\n\n${contextoDelMayordomo(vista)}` },
@@ -202,8 +212,19 @@ export async function consultarConsejero(
     messages: [{ role: 'user', content: limpia }],
   });
 
+  apuntarUso({ concepto: 'consejero', model, usage: mensaje.usage, gameId: game.id });
+
   if (mensaje.stop_reason === 'refusal') {
     return 'Prefiero no responder a eso, si me disculpa.';
+  }
+  /*
+   * Y SI SE CORTA, QUE SE NOTE. Sin esta rama, un corte por longitud caia en el
+   * «no sabria que decirle» del final —la misma respuesta que da cuando no hay
+   * nada que responder— y quien pregunta no tenia forma de saber que le habian
+   * cortado a medias ni que valia la pena repetir.
+   */
+  if (mensaje.stop_reason === 'max_tokens') {
+    return 'Me he ido por las ramas y he perdido el hilo. Pregúntemelo otra vez, más corto.';
   }
   let texto = '';
   for (const bloque of mensaje.content) {

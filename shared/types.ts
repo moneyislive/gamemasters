@@ -487,12 +487,43 @@ export interface DocumentCapabilities {
   engine?: string;
 }
 
+/**
+ * Lo que ha costado esta partida, en tokens.
+ *
+ * NO HABIA NINGUNA CONTABILIDAD: los siete puntos que llaman al modelo recogian
+ * el mensaje final y tiraban `usage` a la basura, asi que no habia forma de
+ * saber que gasta una velada — ni para poner precio, ni para detectar un abuso,
+ * ni para responderle a quien reclame. Medido a mano, una trama de CLUEDO son
+ * unos 0,82 $ y una de la Momia 0,49 $, pero eso es una medicion de laboratorio
+ * y no la factura de nadie.
+ *
+ * Se guarda en la partida y no en un registro aparte porque es donde se puede
+ * mirar sin montar nada, y porque la unidad que se va a cobrar es justamente la
+ * velada. Los totales son acumulados: regenerar suma, no reemplaza.
+ */
+export interface GastoDeLaPartida {
+  /** Cuantas veces se ha llamado al modelo por esta partida. */
+  llamadas: number;
+  entrada: number;
+  salida: number;
+  /** Tokens escritos en la cache (se pagan mas caros) y leidos de ella (mas baratos). */
+  cacheEscrita: number;
+  cacheLeida: number;
+  /** Por concepto: `trama`, `material`, `refresco`, `asistente`, `consejero`. */
+  porConcepto: Record<string, { llamadas: number; entrada: number; salida: number }>;
+  /** Que modelos han intervenido, para poder poner precio despues. */
+  modelos: string[];
+  actualizadoEl: string;
+}
+
 export interface GameSession {
   id: string;
   name: string;
   status: GameStatus;
   createdAt: string;
   updatedAt: string;
+  /** Lo que ha costado, en tokens. Ausente en las partidas anteriores a esto. */
+  gasto?: GastoDeLaPartida;
   suspects: Suspect[];
   rooms: Room[];
   weapons: Weapon[];

@@ -25,6 +25,7 @@ import { buildStyleBlock } from './style';
 import { culpableDe, lugarDe, objetoDe } from '../juegos/cluedo';
 import { registrarMaterial } from '../juegos/materiales';
 import { emisorDeProgreso } from '../live/proyeccion';
+import { apuntarUso, volcarGasto } from '../gasto/contador';
 
 type Emitir = (evento: GenerateStreamEvent) => void;
 
@@ -183,6 +184,8 @@ async function materialConApi(game: GameSession, plot: Plot, emit: Emitir): Prom
 
   stream.on('text', emisorDeProgreso(game, emit));
   const mensaje = await stream.finalMessage();
+  // Lo que ha costado esta llamada. No puede tumbar la generacion.
+  apuntarUso({ concepto: 'material', model, usage: mensaje.usage, gameId: game.id });
 
   if (mensaje.stop_reason === 'refusal') {
     throw new Error('El modelo declinó escribir el material. Revisa los textos de la partida.');

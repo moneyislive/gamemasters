@@ -41,6 +41,7 @@ import { buildStyleBlock } from './style';
 import { culpableDe, lugarDe, objetoDe } from '../juegos/cluedo';
 import { juegoDe, repararRespuestas } from '../juegos/solucion';
 import { emisorDeProgreso, partidaParaElTaller } from '../live/proyeccion';
+import { apuntarUso, volcarGasto } from '../gasto/contador';
 
 type Emitir = (evento: GenerateStreamEvent) => void;
 
@@ -160,6 +161,9 @@ export async function runRefresh(game: GameSession, emit: Emitir): Promise<void>
     game.status = 'ready';
     const guardada = await store.saveGame(game);
     emit({ type: 'done', game: partidaParaElTaller(guardada) });
+    // Y se vuelca lo apuntado, ya con todo guardado: si se hiciera antes, el
+    // guardado de aqui arriba se lo llevaria por delante.
+    await volcarGasto(game.id);
   } catch (error) {
     console.error('[refresh] fallo al poner al día la partida:', error);
     await restaurarEstado(game.id);
@@ -433,6 +437,8 @@ async function pedirAmpliacion(
   stream.on('text', emisorDeProgreso(game, emit));
 
   const mensaje = await stream.finalMessage();
+  // Lo que ha costado esta llamada. No puede tumbar la generacion.
+  apuntarUso({ concepto: 'refresco', model, usage: mensaje.usage, gameId: game.id });
 
   if (mensaje.stop_reason === 'refusal') {
     throw new Error(
