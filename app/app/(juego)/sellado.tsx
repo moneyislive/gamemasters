@@ -227,6 +227,18 @@ export default function Sellado(): JSX.Element {
     try {
       const r = await api.hacerAccion('proponer-orden', codificarOrden(orden.map((x) => x.id)));
       aplicarVista(r.vista);
+      /*
+       * Y SE VUELVE A LA VISTA DE ENTREGADO.
+       *
+       * Antes de que se pudiera reabrir la propuesta esto no hacia falta: en
+       * cuanto `miPropuesta` existia, el componente salia por la rama de solo
+       * lectura y daba igual como quedaran las banderas. Con `reabierto` puesto
+       * esa rama ya no se toma, asi que al volver a entregar la pantalla se
+       * quedaba en modo edicion —con la lista arrastrable y el dialogo de
+       * confirmar colgado— como si no hubieras entregado nada.
+       */
+      setReabierto(false);
+      setConfirmando(false);
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'No se pudo entregar el sellado.');
