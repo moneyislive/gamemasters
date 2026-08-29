@@ -405,7 +405,15 @@ function stripMessage(doc: LooseDoc): ChatMessage {
   return rest as unknown as ChatMessage;
 }
 
-class MongoStore implements Store {
+/**
+ * Exportada SOLO para poder comprobarla.
+ *
+ * `initStore` elige tienda por entorno, asi que sin esto la de Mongo —la que usa
+ * produccion— no se puede instanciar desde una prueba, y era justamente por eso
+ * por lo que no la ejercitaba ninguna. Ver `scripts/verificar-almacen.ts`. La
+ * aplicacion sigue pidiendo su tienda por `getStore()`, nunca por aqui.
+ */
+export class MongoStore implements Store {
   // Cada campo por el que se consulta de verdad. Ver `looseModel`.
   private readonly games = looseModel('CluedoGame', 'games', ['id', 'updatedAt', 'duenos.cuentaId']);
   private readonly messages = looseModel('CluedoMessage', 'messages', 'gameId');
