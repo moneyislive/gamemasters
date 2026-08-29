@@ -458,6 +458,35 @@ async function probar(): Promise<void> {
     );
 
     /*
+     * LA PUERTA DE AL LADO, que estaba abierta de par en par.
+     *
+     * Toda esta sección comprobaba `/live`, y `GET /games/:id` —la ruta con la
+     * que el taller carga la partida— respondía la `GameSession` ENTERA sin
+     * mirar nada: el navegador de quien dirige jugando se descargaba
+     * `plot.solution` con el nombre del culpable, `plot.delJuego` con el orden
+     * verdadero y el `secret` de cada persona. Es el patrón de siempre: la
+     * comprobación tejida alrededor de una ruta y la hermana sin mirar.
+     */
+    const taller = await pedir('/games/aciegas');
+    const crudoTaller = JSON.stringify(taller.datos);
+    comprobar('el taller responde la partida', taller.estado === 200, taller.estado);
+    comprobar('y NO trae el orden verdadero', !crudoTaller.includes('"ordenVerdadero"'));
+    comprobar('ni a quién señala la solución', !crudoTaller.includes('"saqueador"'));
+    comprobar('ni el secreto de nadie', !/"secret":"[^"]{4,}"/.test(crudoTaller));
+    /*
+     * Y NO SE FILTRA DE MÁS: el taller necesita saber que hay trama y cómo se
+     * llama cada personaje para pintar sus fichas. Un filtro que deja a quien
+     * dirige sin nada que leer es el fallo contrario.
+     */
+    comprobar('pero sigue habiendo trama y personajes', crudoTaller.includes('"characterName"'));
+
+    const tallerNormal = await pedir('/games/expedicion');
+    comprobar(
+      'y en modo anfitrión la partida sigue llegando entera',
+      JSON.stringify(tallerNormal.datos).includes('"ordenVerdadero"'),
+    );
+
+    /*
      * NI LAS ACUSACIONES, que son la otra mitad de la solución: una sola con
      * `correcta: true` y su `respuestas.saqueador` es quien rompió el sello,
      * entregado al navegador de quien está jugando.

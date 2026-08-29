@@ -40,6 +40,7 @@ import { PLOT_EXTENSION_SCHEMA } from './schema';
 import { buildStyleBlock } from './style';
 import { culpableDe, lugarDe, objetoDe } from '../juegos/cluedo';
 import { juegoDe, repararRespuestas } from '../juegos/solucion';
+import { emisorDeProgreso, partidaParaElTaller } from '../live/proyeccion';
 
 type Emitir = (evento: GenerateStreamEvent) => void;
 
@@ -84,7 +85,7 @@ export async function runRefresh(game: GameSession, emit: Emitir): Promise<void>
       // Solo se deshace el estado 'generating' que marcó la ruta al empezar.
       game.status = informe.hasPlot ? 'ready' : 'draft';
       const intacta = await store.saveGame(game);
-      emit({ type: 'done', game: intacta });
+      emit({ type: 'done', game: partidaParaElTaller(intacta) });
       return;
     }
 
@@ -158,7 +159,7 @@ export async function runRefresh(game: GameSession, emit: Emitir): Promise<void>
 
     game.status = 'ready';
     const guardada = await store.saveGame(game);
-    emit({ type: 'done', game: guardada });
+    emit({ type: 'done', game: partidaParaElTaller(guardada) });
   } catch (error) {
     console.error('[refresh] fallo al poner al día la partida:', error);
     await restaurarEstado(game.id);
@@ -427,10 +428,9 @@ async function pedirAmpliacion(
     ],
   });
 
-  // Los deltas sirven de indicador de progreso en el overlay del cliente.
-  stream.on('text', (delta) => {
-    emit({ type: 'text', delta });
-  });
+  // Los deltas sirven de indicador de progreso en el overlay del cliente. A
+  // ciegas van como puntos: el crudo del modelo lleva la solucion dentro.
+  stream.on('text', emisorDeProgreso(game, emit));
 
   const mensaje = await stream.finalMessage();
 

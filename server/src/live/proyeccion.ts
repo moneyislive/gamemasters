@@ -463,3 +463,95 @@ export function vistaDeGameMaster(game: GameSession, sesion: LiveSession): Vista
     revelaSolucion,
   };
 }
+
+// ---------------------------------------------------------------------------
+// La partida tal y como puede bajar al navegador del taller
+// ---------------------------------------------------------------------------
+
+/**
+ * Lo que sale por las rutas del TALLER cuando quien dirige también juega.
+ *
+ * `vistaDeGameMaster` tapa la vista en vivo, y se hizo con cuidado. Pero la
+ * partida entera sale además por otras nueve puertas —leerla, renombrarla,
+ * tocar sus entidades, regenerar el plano y los tres avisos de «ya está lista»,
+ * que terminan mandando `game` dentro— y ninguna la miraba. Con el Game Master
+ * jugando, `GET /api/games/:id` bajaba al navegador `plot.solution` con el
+ * nombre del culpable, `plot.delJuego` con el orden verdadero de los ritos y el
+ * `secret` de cada persona. La guía que este mismo producto imprime promete por
+ * escrito que no lleva la solución; el navegador la llevaba.
+ *
+ * EN MODO ANFITRIÓN NO SE TOCA NADA, y esa es la primera línea: quien dirige
+ * sin jugar conoce la solución, la lleva en su dosier, y recortársela sería
+ * quitarle medio puesto de mando por nada. CLUEDO de siempre sale byte a byte
+ * igual.
+ *
+ * Y SE FILTRA JUSTO LO QUE SOBRA. El taller necesita saber que hay trama, qué
+ * material existe y cómo se llama cada personaje; nada de eso se va. Filtrar de
+ * más deja a quien dirige sin nada que leer, que es el fallo contrario y también
+ * rompe la velada.
+ */
+export function partidaParaElTaller(game: GameSession): GameSession {
+  if (game.settings?.gmPlays !== true) return game;
+  const plot = game.plot;
+  if (!plot) return game;
+
+  return {
+    ...game,
+    plot: {
+      ...plot,
+      // El eje del caso: a quién señala, por qué y cómo ocurrió.
+      solution: { respuestas: {}, motive: '', howItHappened: '' },
+      // Los nombres se quedan —el taller los pinta—; lo privado, no.
+      characters: plot.characters.map((c) => ({
+        ...c,
+        secret: '',
+        motive: '',
+        alibi: '',
+      })),
+      /*
+       * Solo los momentos que presenció la mesa entera, con la misma regla que
+       * `cronologiaPublica`: un momento con una sola persona no lo vio nadie
+       * más, por mucho que venga marcado como público.
+       */
+      timeline: plot.timeline.filter((e) => e.isPublic === true && e.suspectIds.length > 1),
+      // La pista se lee; a quién apunta, no.
+      clues: plot.clues.map((c) => ({ ...c, pointsTo: '' })),
+      material: plot.material
+        ? {
+            ...plot.material,
+            twists: [],
+            timelineReveals: [],
+            // Las ayudas las pide el panel y las pinta; a ciegas cada una es un
+            // empujón hacia la solución que quien juega no debería tener.
+            hints: [],
+            finale: { reconstruction: '', confession: '', epilogue: '' },
+          }
+        : undefined,
+      // Y lo que cada juego guarda de su trama: en la Momia, el orden verdadero.
+      delJuego: undefined,
+    },
+  };
+}
+
+/**
+ * Los deltas de progreso de una generación, sin el contenido cuando no toca.
+ *
+ * El flujo de generación retransmitía al navegador el TEXTO CRUDO que va
+ * escribiendo el modelo, y ese texto es el JSON de la trama: lleva dentro el
+ * nombre del culpable, el orden verdadero de los ritos y el secreto de cada
+ * persona. El taller lo pinta a pantalla completa mientras se genera, así que
+ * con el Game Master jugando la solución le pasaba por delante de los ojos
+ * durante los siete minutos que tarda, sin que hiciera falta abrir nada.
+ *
+ * Dirigiendo de la forma normal se sigue viendo tal cual: es su partida y su
+ * trama, y ver cómo se escribe es parte de la ceremonia. A ciegas se manda un
+ * punto por delta, que conserva lo único que el overlay necesitaba —la sensación
+ * de que aquello avanza— y no dice nada.
+ */
+export function emisorDeProgreso(
+  game: GameSession,
+  emit: (evento: { type: 'text'; delta: string }) => void,
+): (delta: string) => void {
+  const aCiegas = game.settings?.gmPlays === true;
+  return (delta: string) => emit({ type: 'text', delta: aCiegas ? '·' : delta });
+}

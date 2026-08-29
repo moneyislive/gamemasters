@@ -24,6 +24,7 @@ import { buildSystemPrompt } from '../agent/systemPrompt';
 import { executeTool, herramientasDe } from '../agent/tools';
 import { runDemoChat } from '../agent/demo';
 import { crearRouter } from '../rutas';
+import { partidaParaElTaller } from '../live/proyeccion';
 
 const router = crearRouter();
 
@@ -222,7 +223,9 @@ async function chatConAgente(
       }
 
       if (entidadesCambiadas) {
-        emit({ type: 'entities', game: partidaActual });
+        // La misma puerta por el chat del taller: cada alta de entidad
+        // devolvia la partida completa.
+        emit({ type: 'entities', game: partidaParaElTaller(partidaActual) });
       }
 
       turnos.push({ role: 'user', content: resultados });

@@ -24,6 +24,7 @@ import { numeroDeRondas } from '../docs/datos';
 import { buildStyleBlock } from './style';
 import { culpableDe, lugarDe, objetoDe } from '../juegos/cluedo';
 import { registrarMaterial } from '../juegos/materiales';
+import { emisorDeProgreso } from '../live/proyeccion';
 
 type Emitir = (evento: GenerateStreamEvent) => void;
 
@@ -180,7 +181,7 @@ async function materialConApi(game: GameSession, plot: Plot, emit: Emitir): Prom
     messages: [{ role: 'user', content: construirPrompt(game, plot) }],
   });
 
-  stream.on('text', (delta) => emit({ type: 'text', delta }));
+  stream.on('text', emisorDeProgreso(game, emit));
   const mensaje = await stream.finalMessage();
 
   if (mensaje.stop_reason === 'refusal') {

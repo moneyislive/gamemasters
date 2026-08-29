@@ -19,6 +19,7 @@ import { olvidarFotos } from '../uploads/limpieza';
 import { crearRouter } from '../rutas';
 import { categoria as categoriaDe, listaDeCategoria, manifiestoDe } from '../../../shared/juegos';
 import type { Entidad } from '../../../shared/juegos';
+import { partidaParaElTaller } from '../live/proyeccion';
 
 const router = crearRouter();
 
@@ -139,7 +140,7 @@ async function upsertHandler(kind: EntityKind, req: Request, res: Response): Pro
     // Después de guardar, nunca antes: si el guardado falla, la foto vieja
     // sigue siendo la buena y borrarla habría dejado la partida sin ella.
     await olvidarFotos(huerfanas);
-    res.json(guardada);
+    res.json(partidaParaElTaller(guardada));
   } catch (err) {
     console.error(`[entidades] Error en upsert de ${kind}:`, err);
     res.status(500).json({ error: 'Error interno al guardar la entidad.' });
@@ -167,7 +168,7 @@ async function deleteHandler(
 
     const guardada = await store.saveGame(game);
     await olvidarFotos([fotoDeLaQueSeVa]);
-    res.json(guardada);
+    res.json(partidaParaElTaller(guardada));
   } catch (err) {
     console.error(`[entidades] Error al borrar en ${kind}:`, err);
     res.status(500).json({ error: 'Error interno al borrar la entidad.' });
@@ -249,7 +250,7 @@ async function conLaPartida(
     // Despues de guardar, nunca antes: si el guardado falla, la foto vieja
     // sigue siendo la buena y borrarla habria dejado la partida sin ella.
     await olvidarFotos(huerfanas);
-    res.json(guardada);
+    res.json(partidaParaElTaller(guardada));
   } catch (err) {
     console.error('[entidades] error por categoria:', err);
     res.status(500).json({ error: 'Error interno al guardar la entidad.' });

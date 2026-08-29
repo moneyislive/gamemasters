@@ -15,6 +15,7 @@ import { identidadDeTaller } from '../auth';
 import { fotosDe, olvidarFotos } from '../uploads/limpieza';
 import { normalizeStylePrompt } from '../plot/style';
 import { crearRouter } from '../rutas';
+import { partidaParaElTaller } from '../live/proyeccion';
 
 const router = crearRouter();
 
@@ -104,7 +105,9 @@ router.get('/games/:id', async (req, res) => {
       res.status(404).json(NOT_FOUND);
       return;
     }
-    res.json(game);
+    // A ciegas, sin la solucion ni la trama interna: el navegador de quien
+    // dirige es de alguien que ademas juega.
+    res.json(partidaParaElTaller(game));
   } catch (err) {
     console.error('[partidas] Error al obtener:', err);
     res.status(500).json({ error: 'No se pudo cargar la partida.' });
@@ -226,7 +229,7 @@ router.patch('/games/:id', async (req, res) => {
       game.settings = nextSettings;
     }
 
-    res.json(await store.saveGame(game));
+    res.json(partidaParaElTaller(await store.saveGame(game)));
   } catch (err) {
     console.error('[partidas] Error al actualizar:', err);
     res.status(500).json({ error: 'No se pudo actualizar la partida.' });

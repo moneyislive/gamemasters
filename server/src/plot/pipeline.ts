@@ -19,6 +19,9 @@ import { repararRespuestas } from '../juegos/solucion';
 import { tramaAlDia } from '../juegos/migracion';
 import { MOMIA } from '../../../shared/juegos/momia';
 import { generarTramaMomia } from './momia-generacion';
+import { SOMBRAS } from '../../../shared/juegos/sombras';
+import { escribirTramaSombras } from './sombras-generacion';
+import { emisorDeProgreso, partidaParaElTaller } from '../live/proyeccion';
 
 type Emitir = (evento: GenerateStreamEvent) => void;
 
@@ -55,16 +58,23 @@ export async function runGeneration(game: GameSession, emit: Emitir): Promise<vo
      * su puzle lo genera código y al modelo solo se le pide el sabor.
      */
     const esMomia = game.settings?.juego === MOMIA.id;
+    const esSombras = game.settings?.juego === SOMBRAS.id;
     emit({
       type: 'stage',
       stage: 'plot',
-      label: esMomia ? 'Recomponiendo el papiro del sellado…' : 'Tejiendo la trama del crimen…',
+      label: esMomia
+        ? 'Recomponiendo el papiro del sellado…'
+        : esSombras
+          ? 'Trazando la senda hasta la playa…'
+          : 'Tejiendo la trama del crimen…',
     });
     const plot = esMomia
       ? await generarTramaMomia(game, emit)
-      : DEMO_MODE
-        ? await generarTramaDemo(game, emit)
-        : await generarTramaConApi(game, emit);
+      : esSombras
+        ? await escribirTramaSombras(game, emit)
+        : DEMO_MODE
+          ? await generarTramaDemo(game, emit)
+          : await generarTramaConApi(game, emit);
     // El esquema con el que se le pide la trama al modelo sigue hablando de
     // asesino, arma y sala, y se deja así a propósito: está afinado y
     // probado, y cambiarlo cambiaría las tramas que salen. La conversión a
@@ -81,7 +91,8 @@ export async function runGeneration(game: GameSession, emit: Emitir): Promise<vo
 
     game.status = 'ready';
     const guardada = await store.saveGame(game);
-    emit({ type: 'done', game: guardada });
+    // Con el Game Master jugando, este `done` bajaba la trama entera.
+    emit({ type: 'done', game: partidaParaElTaller(guardada) });
   } catch (error) {
     console.error('[pipeline] fallo en la generación:', error);
     // La partida vuelve a borrador para poder reintentar.
@@ -123,10 +134,9 @@ async function generarTramaConApi(game: GameSession, emit: Emitir): Promise<Plot
     messages: [{ role: 'user', content: construirPrompt(game) }],
   });
 
-  // Los deltas de texto sirven como indicador de progreso en el overlay.
-  stream.on('text', (delta) => {
-    emit({ type: 'text', delta });
-  });
+  // Los deltas de texto sirven como indicador de progreso en el overlay. A
+  // ciegas van como puntos: el crudo del modelo lleva la solucion dentro.
+  stream.on('text', emisorDeProgreso(game, emit));
 
   const mensaje = await stream.finalMessage();
 

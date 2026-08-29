@@ -56,6 +56,7 @@ import {
   revisarRedaccion,
 } from './momia-validacion';
 import type { Incidencia } from './momia-validacion';
+import { emisorDeProgreso } from '../live/proyeccion';
 
 type Emitir = (evento: GenerateStreamEvent) => void;
 
@@ -644,7 +645,7 @@ async function unaTirada(
     messages: [{ role: 'user', content: construirPromptMomia(game, cimientos.trama, entidades) }],
   });
 
-  stream.on('text', (delta) => emit({ type: 'text', delta }));
+  stream.on('text', emisorDeProgreso(game, emit));
   const mensaje = await stream.finalMessage();
 
   if (mensaje.stop_reason === 'refusal') {

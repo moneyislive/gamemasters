@@ -6,6 +6,7 @@ import { generateBoardLayout } from '../board/generator';
 import { manifiestoDe } from '../../../shared/juegos';
 import { getStore } from '../db/store';
 import { crearRouter } from '../rutas';
+import { partidaParaElTaller } from '../live/proyeccion';
 
 const router = crearRouter();
 
@@ -19,7 +20,7 @@ router.post('/games/:id/board', async (req, res) => {
     }
     game.board = generateBoardLayout(game.rooms, manifiestoDe(game.settings?.juego).rotuloCentralDelPlano);
     const guardada = await store.saveGame(game);
-    res.json(guardada);
+    res.json(partidaParaElTaller(guardada));
   } catch (error) {
     console.error('[board] error al generar el tablero:', error);
     res.status(500).json({ error: 'No se pudo generar el tablero.' });

@@ -11,6 +11,7 @@ import { getStore } from '../db/store';
 import { generadorDeMaterial } from '../juegos/materiales';
 import '../plot/material';
 import { crearRouter } from '../rutas';
+import { partidaParaElTaller } from '../live/proyeccion';
 
 const router = crearRouter();
 
@@ -67,7 +68,7 @@ router.post('/games/:id/material', async (req, res) => {
     const material = await generador(game, game.plot, emit);
     game.plot.material = material;
     const guardada = await store.saveGame(game);
-    emit({ type: 'done', game: guardada });
+    emit({ type: 'done', game: partidaParaElTaller(guardada) });
   } catch (error) {
     console.error('[material] fallo al escribir el material:', error);
     // La trama no se ha tocado: solo se ha perdido el material.
