@@ -147,6 +147,32 @@ ${ritos}
       <p style="margin:0;">${esc(plot.material.finale.epilogue)}</p>
     </div>`
         : ''
+    }
+
+    ${
+      /*
+        LAS AYUDAS VIENEN AQUÍ CUANDO QUIEN DIRIGE JUEGA.
+
+        En modo anfitrión salen en la Guía de la expedición, que es su sitio: la
+        hoja que se maneja toda la noche delante de la mesa. Pero si quien la lee
+        también juega, ahí son media solución —la de nivel 3 puede fijar un
+        extremo del orden—, así que se mudan a esta hoja: la de quien PREPARA,
+        que es la única persona que puede leerlas sin estropearse la partida.
+      */
+      aCiegas && (plot.material?.hints ?? []).length > 0
+        ? `<h2>Si la mesa se atasca</h2>
+    <p class="maquina" style="margin:0 0 3mm; color:#7a5c34;">
+      De menos a más, y solo si hace falta. Quien dirige no las tiene: está jugando.
+    </p>
+${(plot.material?.hints ?? [])
+  .map(
+    (h) => `    <div class="caja junto">
+      <span class="etiqueta">Ayuda de nivel ${h.level}${h.level === 3 ? ' — solo si van muy perdidos' : ''}</span>
+      <p style="margin:0;">${esc(h.text)}</p>
+    </div>`,
+  )
+  .join('\n')}`
+        : ''
     }`;
 
   return envolverPapiro(`${plot.title} — El papiro del sellado`, contenido, opciones);

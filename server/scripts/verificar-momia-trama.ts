@@ -36,6 +36,7 @@ import { MOMIA } from '../../shared/juegos';
 import type { RespuestaMomia } from '../src/plot/momia-esquema';
 import type { RitoId } from '../../shared/juegos/momia-tipos';
 import { renderPrintableDocument } from '../src/docs/imprimibles';
+import { DONES } from '../src/docs/imprimibles/momia/datos';
 import type { PrintableDocId } from '../../shared/documents';
 import type { GameSession } from '../../shared/types';
 
@@ -762,6 +763,53 @@ comprobar('y le dice quién sale con él', guiaCiega.includes('quien preparó el
 comprobar('la guía a ciegas sigue sin delatar el orden', !delataElOrden(guiaCiega));
 comprobar('y sigue sin llevar el motivo del saqueador',
   !guiaCiega.includes(sana.plot.solution.motive.slice(0, 40)));
+
+/*
+ * LAS DOS COSAS QUE LA GUIA A CIEGAS SEGUIA CONTANDO.
+ *
+ * Esta hoja se maneja toda la noche delante de la mesa y, con quien dirige
+ * jugando, cae en `01_GAME_MASTER`, cuyo leeme promete que nada de ahi revela el
+ * caso. Llevaba dos cosas que si lo revelan: la tabla NOMINAL de dones —saber
+ * que Marta descifra y Bruno sana es saber media mesa antes de empezar, cuando
+ * el juego consiste en averiguarlo hablando— y las tres ayudas graduadas, que
+ * son empujones hacia el orden verdadero y la de nivel 3 puede fijar un extremo.
+ * CLUEDO ya habia tomado la decision contraria en `cartaImprevistos.ts`.
+ */
+for (const persona of EXPEDICION) {
+  const suDon = cimientos.trama.dones[persona.id];
+  const escrito = suDon ? DONES[suDon] : undefined;
+  if (!escrito) continue;
+  comprobar(
+    `la guia a ciegas no dice que ${persona.name} tiene «${escrito.nombre}»`,
+    !new RegExp(`${persona.name}[^]{0,400}${escrito.nombre}`).test(guiaCiega),
+  );
+}
+comprobar(
+  'ni imprime las ayudas graduadas',
+  (sana.plot.material?.hints ?? []).every((h) => !guiaCiega.includes(h.text.slice(0, 40))),
+  'cada ayuda es un empujon hacia el orden, y quien lee esta hoja juega',
+);
+/*
+ * PERO NO SE FILTRA DE MAS, que es el fallo contrario y tambien rompe la
+ * velada: quien dirige sigue teniendo que arbitrar una invocacion en el momento,
+ * juegue o no, y las ayudas tienen que existir en alguna parte.
+ */
+comprobar('pero sigue explicando como se arbitra cada don',
+  guiaCiega.includes('Qué haces cuando alguien lo invoca'));
+comprobar('y las ayudas salen en el papiro, que es de quien prepara',
+  (sana.plot.material?.hints ?? []).every((h) => papiroCiego.includes(h.text.slice(0, 40))),
+  'a ciegas la mesa se quedaria sin red al atascarse');
+
+/*
+ * Y EN MODO ANFITRION NO CAMBIA NADA: quien dirige sin jugar conoce la solucion,
+ * la lleva en su dosier, y recortarle la tabla seria quitarle el arbitraje por
+ * nada.
+ */
+const guiaNormal = renderPrintableDocument(partidaConTrama, 'guia-expedicion')?.html ?? '';
+comprobar('dirigiendo de la forma normal, la tabla nominal sigue entera',
+  EXPEDICION.every((p) => guiaNormal.includes(p.name)));
+comprobar('y las ayudas siguen en la guia',
+  (sana.plot.material?.hints ?? []).every((h) => guiaNormal.includes(h.text.slice(0, 40))));
 
 /*
  * Y para mirarlos con los ojos, que es lo que ninguna comprobación sustituye:

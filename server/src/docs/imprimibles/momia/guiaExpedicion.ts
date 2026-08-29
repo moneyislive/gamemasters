@@ -22,7 +22,7 @@ import { esc } from '../../html';
 import { manifiestoDe } from '../../../../../shared/juegos';
 import type { VistaGm } from '../../contexto';
 import { envolverPapiro, portadaPapiro, sinTrama, ORNAMENTO } from './comun';
-import { vistaDeLaMomia } from './datos';
+import { DONES, vistaDeLaMomia } from './datos';
 import type { DocumentRenderOptions, GameSession, Plot } from '../../../../../shared/types';
 
 export function guiaExpedicion(
@@ -121,8 +121,24 @@ export function guiaExpedicion(
     })
     .join('\n\n');
 
-  // ---- Dones y arbitraje ----
-  const tablaDones = vista.expedicionarios
+  /*
+   * ---- Dones y arbitraje ----
+   *
+   * DOS TABLAS, Y LA DIFERENCIA ES QUIEN LEE LA HOJA.
+   *
+   * La nominal —quien tiene cual— es material de quien dirige sin jugar: la
+   * necesita para arbitrar sin preguntar en voz alta. Pero esta hoja, con el
+   * Game Master jugando, cae en `01_GAME_MASTER`, cuyo propio leeme promete que
+   * nada de ahi revela el caso, y ahi saber que Marta descifra y Bruno sana es
+   * saber media mesa antes de empezar: el juego consiste justamente en que eso
+   * se descubra hablando.
+   *
+   * Lo que NO se puede quitar es el arbitraje. Quien dirige sigue teniendo que
+   * resolver una invocacion en el momento, juegue o no. Asi que a ciegas se
+   * imprime el catalogo entero de dones explicado, sin la columna de nombres:
+   * sirve igual para arbitrar y no dice de quien es cada uno.
+   */
+  const tablaDonesNominal = vista.expedicionarios
     .map((persona) => {
       const don = vista.donDe(persona.id);
       const personaje = plot.characters.find((c) => c.suspectId === persona.id);
@@ -132,6 +148,15 @@ export function guiaExpedicion(
           <td style="font-size:10.5pt;">${esc(don?.arbitraje ?? 'Sin don asignado.')}</td>
         </tr>`;
     })
+    .join('\n');
+
+  const tablaDonesAnonima = Object.values(DONES)
+    .map(
+      (don) => `        <tr>
+          <td><strong>${esc(don.rol)}</strong><br /><span style="font-size:10pt; color:#7a5c34;">${esc(don.nombre)}</span></td>
+          <td style="font-size:10.5pt;">${esc(don.arbitraje)}</td>
+        </tr>`,
+    )
     .join('\n');
 
   const ayudas = (material?.hints ?? [])
@@ -202,12 +227,25 @@ ${ORNAMENTO}
 
     <div class="pagina"></div>
     <h2>Los dones, y qué haces tú con cada uno</h2>
-    <table>
+    ${
+      vistaDelGm.revelaSolucion
+        ? `<table>
       <thead><tr><th style="width:38mm;">Quién</th><th style="width:38mm;">Su papel</th><th>Qué haces cuando lo invoca</th></tr></thead>
       <tbody>
-${tablaDones}
+${tablaDonesNominal}
       </tbody>
-    </table>
+    </table>`
+        : `<p class="maquina" style="margin:0 0 3mm; color:#7a5c34;">
+      Quién tiene cada don no se dice aquí: estás jugando, y averiguarlo es parte de la noche.
+      Lo tiene quien preparó el material, en «El papiro del sellado».
+    </p>
+    <table>
+      <thead><tr><th style="width:44mm;">El don</th><th>Qué haces cuando alguien lo invoca</th></tr></thead>
+      <tbody>
+${tablaDonesAnonima}
+      </tbody>
+    </table>`
+    }
     <div class="caja caja--almagre junto">
       <span class="etiqueta">Uno de ellos tiene un don de más</span>
       <p style="margin:0;">
@@ -238,7 +276,22 @@ ${vigilias}
       </ol>
     </div>
 
-${ayudas ? `    <h2>Si se atascan</h2>\n${ayudas}` : ''}
+${
+  /*
+    LAS AYUDAS SOLO SI QUIEN LEE ESTA HOJA NO JUEGA, que es la decision que
+    CLUEDO ya habia tomado en `cartaImprevistos.ts` y aqui no se replico.
+
+    Cada ayuda es un empujon hacia el orden verdadero —la de nivel 3 puede fijar
+    un extremo— y esta hoja se maneja toda la noche delante de la mesa. Con el
+    Game Master jugando, leerlas es leerse media solucion. El filtro `depurar` no
+    las tumba, y hace bien: una ayuda que oriente sin dar el orden entero es
+    exactamente lo que se le pidio al modelo.
+
+    A ciegas no se pierden: salen en «El papiro del sellado», que es de quien
+    PREPARA y es la unica persona que puede leerlas sin arruinarse la partida.
+  */
+  ayudas && vistaDelGm.revelaSolucion ? `    <h2>Si se atascan</h2>\n${ayudas}` : ''
+}
 
 ${
   guion
