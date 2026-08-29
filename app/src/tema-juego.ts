@@ -154,21 +154,11 @@ export function useFondo(): readonly [string, string, string] {
 }
 
 /**
- * Un color de la paleta con transparencia.
+ * `conAlfa` se REEXPORTA desde `tema.ts`, donde vive ahora.
  *
- * ESTO ES LO QUE HACE QUE EL TEMA SEA POSIBLE SIN TOCAR CLUEDO. `ui.tsx` estaba
- * lleno de `rgba(201,162,39,0.35)` escritos a mano, y resulta que TODOS eran un
- * token de `tema.ts` con alfa: 201,162,39 es `oro500`, 31,18,12 es `caoba900`,
- * 179,64,47 es `peligro`. Sustituirlos por `conAlfa(p.oro500, 0.35)` devuelve
- * para CLUEDO exactamente la misma cadena, carácter a carácter, así que el
- * cambio no puede alterar un píxel suyo aunque se quiera; y para la Momia sale
- * gratis el tinte equivalente de su oro.
- *
- * Se pasa el hexadecimal y no un objeto de color porque los estilos de React
- * Native se comparan por valor: devolver siempre una cadena mantiene el
- * `StyleSheet` comparable y no obliga a memorizar nada.
+ * Se mudó para que se pueda comprobar: este fichero importa el contexto de la
+ * partida —React— y `tema.ts` no importa nada, así que allí el comprobador puede
+ * cargar la función de verdad en vez de escribirse una copia. Se reexporta desde
+ * aquí para que ninguno de los diez ficheros que la importan tenga que cambiar.
  */
-export function conAlfa(hex: string, alfa: number): string {
-  const n = parseInt(hex.slice(1), 16);
-  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${alfa})`;
-}
+export { conAlfa } from './tema';

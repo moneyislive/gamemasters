@@ -120,3 +120,38 @@ export const sombra = {
   shadowOffset: { width: 0, height: 10 },
   elevation: 10,
 } as const;
+
+/**
+ * Un color con transparencia.
+ *
+ * ═══ POR QUÉ VIVE AQUÍ Y NO EN `tema-juego.ts` ═══
+ *
+ * Estaba allí, que es donde se usa, y allí NO SE PODÍA COMPROBAR: `tema-juego`
+ * importa el contexto de la partida, o sea React, así que un comprobador que
+ * quisiera ejecutarlo tendría que arrastrar media app. El resultado fue que
+ * `verificar-tema.mjs` se escribió una COPIA de esta función y comparaba su copia
+ * contra una lista escrita a mano: aritmética entre dos constantes, verde
+ * garantizado, imposible de romper.
+ *
+ * Este fichero no importa nada. Con la función aquí, el comprobador carga la de
+ * verdad y la aplica a los colores de verdad, que es la diferencia entre
+ * comprobar y aparentar. `tema-juego` la reexporta, así que ni un solo `import`
+ * de los diez que la usan ha tenido que cambiar.
+ *
+ * ═══ QUÉ HACE, Y POR QUÉ IMPORTA TANTO ═══
+ *
+ * `ui.tsx` estaba lleno de `rgba(201,162,39,0.35)` escritos a mano, y resulta que
+ * TODOS eran un token de aquí arriba con alfa: 201,162,39 es `oro500`, 31,18,12
+ * es `caoba900`, 179,64,47 es `peligro`. Sustituirlos por `conAlfa(p.oro500,
+ * 0.35)` devuelve para CLUEDO exactamente la misma cadena, carácter a carácter,
+ * así que el cambio no puede alterar un píxel suyo aunque se quiera; y para los
+ * otros juegos sale gratis el tinte equivalente de su oro.
+ *
+ * Se pasa el hexadecimal y no un objeto de color porque los estilos de React
+ * Native se comparan por valor: devolver siempre una cadena mantiene el
+ * `StyleSheet` comparable y no obliga a memorizar nada.
+ */
+export function conAlfa(hex: string, alfa: number): string {
+  const n = parseInt(hex.slice(1), 16);
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${alfa})`;
+}

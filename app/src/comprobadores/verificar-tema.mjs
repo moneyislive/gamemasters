@@ -28,13 +28,52 @@
  * sobre la Momia, solo sobre que CLUEDO siga donde estaba.
  *
  *   node app/src/comprobadores/verificar-tema.mjs
+ *
+ * ═══ Y AQUÍ ESTUVO DANDO UN VERDE FALSO ═══
+ *
+ * Durante un tiempo este fichero NO LEÍA NI UN FICHERO DEL PROYECTO. Tenía los
+ * colores copiados a mano, la función `conAlfa` copiada a mano y la lista de
+ * cadenas esperadas escrita a mano, así que lo único que comprobaba era que una
+ * copia aplicada a unas constantes diera unas cadenas: aritmética entre valores
+ * fijos. Se podía cambiar cualquier color de la app y esto seguía anunciando
+ * «30 colores de CLUEDO intactos, carácter a carácter».
+ *
+ * El razonamiento de arriba —copiar lo ESPERADO para que no se mueva con lo
+ * observado— era correcto y sigue intacto. Lo que faltaba era la otra mitad: que
+ * lo OBSERVADO viniera del proyecto. Ahora `tema.ts` se carga y se ejecuta de
+ * verdad, y `conAlfa` es la suya. Los valores esperados siguen escritos a mano.
+ *
+ * La otra mitad del fallo se veía peor: la comprobación de que la paleta de
+ * CLUEDO llega por identidad se hacía sobre un TERNARIO escrito aquí mismo,
+ * cuando la implementación real hace tiempo que es una tabla y ya conoce un
+ * tercer juego. Comprobaba su propio juguete. Ahora se lee el fichero real y se
+ * exige que las tres tablas por juego cubran exactamente los mismos juegos.
  */
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import ts from 'typescript';
 
-/** La misma cuenta que hace `conAlfa` en `tema-juego.ts`. */
-function conAlfa(hex, alfa) {
-  const n = parseInt(hex.slice(1), 16);
-  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${alfa})`;
+const AQUI = path.dirname(fileURLToPath(import.meta.url));
+const SRC = path.resolve(AQUI, '..');
+
+/** Carga un módulo TypeScript sin dependencias y lo devuelve ejecutable. */
+async function cargar(fichero) {
+  const js = ts.transpileModule(fs.readFileSync(fichero, 'utf8'), {
+    compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2020 },
+  }).outputText;
+  return import(`data:text/javascript;base64,${Buffer.from(js, 'utf8').toString('base64')}`);
 }
+
+/*
+ * EL TEMA DE VERDAD, ejecutado. `tema.ts` no importa nada —ni React, ni React
+ * Native— y esa propiedad no es casual: es lo que permite cargarlo aquí. Si
+ * algún día alguien le mete un import, esto dejará de cargar; lo que hay que
+ * hacer entonces es quitarle el import, no volver a copiar la tabla aquí.
+ */
+const tema = await cargar(path.join(SRC, 'tema.ts'));
+const conAlfa = tema.conAlfa;
+const COLOR_REAL = tema.color;
 
 /**
  * Los colores de CLUEDO, copiados de `tema.ts`.
@@ -104,10 +143,38 @@ const ESPERADO = [
 ];
 
 let fallos = 0;
+
+/*
+ * PRIMERO: que los colores del proyecto sigan siendo los que se jugaron.
+ *
+ * Este es el eslabón que faltaba y el que convierte el fichero en una
+ * comprobación. `CLUEDO` de arriba es lo ESPERADO, escrito a mano; `COLOR_REAL`
+ * sale de EJECUTAR `tema.ts`. Cambiar un dígito allí pone esto rojo.
+ */
+if (!COLOR_REAL || typeof COLOR_REAL !== 'object') {
+  console.error('✗ no se ha podido cargar `color` de tema.ts: sin eso aquí no se comprueba nada');
+  fallos++;
+}
+if (typeof conAlfa !== 'function') {
+  console.error('✗ no se ha podido cargar `conAlfa` de tema.ts');
+  fallos++;
+}
+for (const [token, esperado] of Object.entries(CLUEDO)) {
+  const real = COLOR_REAL?.[token];
+  if (real === undefined) {
+    console.error(`✗ tema.ts ya no tiene el color «${token}»`);
+    fallos++;
+  } else if (real !== esperado) {
+    console.error(`✗ tema.ts · ${token}\n    se jugó con ${esperado}\n    y ahora es  ${real}`);
+    fallos++;
+  }
+}
+
+/* Y después, que cada cadena que estaba escrita a mano siga saliendo igual. */
 for (const [donde, token, alfa, literal] of ESPERADO) {
-  const hex = CLUEDO[token];
+  const hex = COLOR_REAL?.[token];
   if (!hex) {
-    console.error(`✗ ${donde}: el token «${token}» no existe`);
+    console.error(`✗ ${donde}: el token «${token}» no existe en tema.ts`);
     fallos++;
     continue;
   }
@@ -119,28 +186,86 @@ for (const [donde, token, alfa, literal] of ESPERADO) {
 }
 
 /*
- * Y lo otro que hay que garantizar: que para CLUEDO la paleta es EL MISMO OBJETO
- * de siempre, no una copia con los mismos valores. Con una copia, un componente
- * que compare paletas por identidad —o un `useMemo` que dependa de ella— se
- * comportaría distinto sin que ningún color cambiara.
+ * ═══ LAS TRES TABLAS POR JUEGO CUBREN LOS MISMOS JUEGOS ═══
+ *
+ * `tema-juego.ts` reparte lo propio de cada juego en tres tablas: `PALETAS` (los
+ * colores), `FONDOS` (el degradado de pantalla) y `ORNAMENTOS` (el signo del
+ * divisor). Son tres porque son tres cosas distintas, y por eso mismo se pueden
+ * quedar a medias — que es un fallo peor que no tematizar nada: con la paleta
+ * puesta y el fondo olvidado, los marcos y los botones salen del color nuevo
+ * sobre el fieltro verde de CLUEDO, y la app parece a medio pintar en vez de mal
+ * configurada.
+ *
+ * Se lee el fichero de verdad, y también se exige que CLUEDO NO esté en ninguna
+ * de las tres: le tiene que llegar por el respaldo, que es lo que garantiza que
+ * reciba el MISMO objeto de siempre y no una copia con los mismos valores.
  */
-const paletaDe = (juego, cluedo, momia) => (juego === 'momia' ? momia : cluedo);
-const objCluedo = {};
-const objMomia = {};
-for (const juego of [undefined, 'cluedo']) {
-  if (paletaDe(juego, objCluedo, objMomia) !== objCluedo) {
-    console.error(`✗ paletaDe(${String(juego)}) no devuelve la paleta de CLUEDO por identidad`);
-    fallos++;
+{
+  const rutaTemaJuego = path.join(SRC, 'tema-juego.ts');
+  const texto = fs.readFileSync(rutaTemaJuego, 'utf8');
+  const fuente = ts.createSourceFile('tema-juego.ts', texto, ts.ScriptTarget.Latest, true);
+
+  /** Las claves de un `const X = { … }` de nivel de módulo, o null si no está. */
+  const clavesDe = (nombre) => {
+    let claves = null;
+    for (const sent of fuente.statements) {
+      if (!ts.isVariableStatement(sent)) continue;
+      for (const d of sent.declarationList.declarations) {
+        if (!ts.isIdentifier(d.name) || d.name.text !== nombre) continue;
+        if (d.initializer && ts.isObjectLiteralExpression(d.initializer)) {
+          claves = d.initializer.properties
+            .filter((pr) => ts.isPropertyAssignment(pr) && pr.name)
+            .map((pr) => pr.name.getText().replace(/['"]/g, ''));
+        }
+      }
+    }
+    return claves;
+  };
+
+  const tablas = [['PALETAS', clavesDe('PALETAS')], ['FONDOS', clavesDe('FONDOS')], ['ORNAMENTOS', clavesDe('ORNAMENTOS')]];
+  for (const [nombre, claves] of tablas) {
+    if (claves === null) {
+      console.error(`✗ tema-juego.ts ya no tiene la tabla «${nombre}»: el reparto por juego ha cambiado de forma`);
+      fallos++;
+    }
   }
-}
-if (paletaDe('momia', objCluedo, objMomia) !== objMomia) {
-  console.error('✗ paletaDe("momia") no devuelve la paleta de la Momia');
-  fallos++;
+  const conClaves = tablas.filter((t) => t[1] !== null);
+  if (conClaves.length === tablas.length) {
+    const referencia = conClaves[0][1];
+    for (const [nombre, claves] of conClaves.slice(1)) {
+      const faltan = referencia.filter((j) => !claves.includes(j));
+      const sobran = claves.filter((j) => !referencia.includes(j));
+      if (faltan.length || sobran.length) {
+        console.error(
+          `✗ «${nombre}» no cubre los mismos juegos que «${conClaves[0][0]}»` +
+            (faltan.length ? `\n    le faltan: ${faltan.join(', ')}` : '') +
+            (sobran.length ? `\n    le sobran: ${sobran.join(', ')}` : '') +
+            '\n    un juego con paleta y sin fondo sale a medio pintar, que engaña más que no tematizarlo',
+        );
+        fallos++;
+      }
+    }
+    if (referencia.includes('cluedo')) {
+      console.error('✗ una tabla por juego incluye «cluedo»: tiene que llegarle por el respaldo, para que sea el MISMO objeto');
+      fallos++;
+    }
+    console.log(`✓ Las tres tablas por juego cubren los mismos: ${referencia.join(', ')}.`);
+  }
+
+  /* Y que el respaldo siga siendo el de CLUEDO en los tres sitios. */
+  const RESPALDOS = [['la paleta', '?? color'], ['el fondo', '?? fondoMesa'], ['el ornamento', '?? ']];
+  for (const [que, marca] of RESPALDOS) {
+    if (!texto.includes(marca)) {
+      console.error(`✗ ${que} ya no cae en el respaldo de CLUEDO: su tema dejaría de ser el de siempre`);
+      fallos++;
+    }
+  }
 }
 
 if (fallos > 0) {
-  console.error(`\n${fallos} color(es) de CLUEDO han cambiado. Eso rompe la regla que manda.`);
+  console.error(`\n${fallos} comprobacion(es) del tema han fallado. Eso rompe la regla que manda.`);
   process.exit(1);
 }
-console.log(`✓ ${ESPERADO.length} colores de CLUEDO intactos, carácter a carácter.`);
-console.log('✓ Para CLUEDO la paleta sigue siendo el mismo objeto de siempre.');
+console.log(
+  `✓ ${Object.keys(CLUEDO).length} colores leídos de tema.ts y ${ESPERADO.length} cadenas, carácter a carácter.`,
+);
