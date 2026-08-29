@@ -16,7 +16,9 @@ import type {
   HighlightTarget,
 } from '../../../shared/types';
 import { getStore } from '../db/store';
-import { executeTool, MINIMOS } from './tools';
+import { executeTool } from './tools';
+import { ejecutarHerramientaDeCategoria, faltanMinimos, sufijoDeCategoria } from './momia-herramientas';
+import { manifiestoDe } from '../../../shared/juegos';
 
 const pausa = (ms: number) => new Promise<void>((resolver) => setTimeout(resolver, ms));
 
@@ -282,37 +284,63 @@ async function anadirArmas(partida: GameSession, captura: string): Promise<Resul
   return { partida: actual, hechos, panel: 'weapons' };
 }
 
-/** Resume qué falta para llegar a los mínimos de generación. */
+/**
+ * Resume qué falta para llegar a los mínimos de generación.
+ *
+ * ═══ LA MISMA CUENTA QUE DESPUÉS SE VA A HACER VALER ═══
+ *
+ * Esto comparaba `suspects`/`rooms`/`weapons` contra `MINIMOS`, que son los tres
+ * números de CLUEDO: 3 sospechosos, 4 salas, 3 armas. En El Misterio de la Momia
+ * hacen falta 4 expedicionarios, 5 cámaras, 3 reliquias y EXACTAMENTE 5 ritos,
+ * así que con 3 personas, 4 salas y 3 objetos esta función contestaba «La casa
+ * está lista: cumplimos los mínimos» y, en el mismo turno, `start_generation`
+ * respondía «No se puede generar todavía. Faltan mínimos (expedicionarios: hay 3,
+ * mínimo 4; cámaras: hay 4, mínimo 5; ritos: hay 0 y hacen falta exactamente 5)».
+ *
+ * Dos respuestas contradictorias a la misma pregunta, seguidas, y la segunda
+ * imposible de satisfacer desde este chat porque no sabía dar de alta un rito.
+ *
+ * `faltanMinimos` es la función que usa la generación de verdad, y lee el
+ * manifiesto. Preguntándole a ella no puede haber contradicción: es literalmente
+ * la misma cuenta.
+ */
 function resumenProgreso(partida: GameSession): string {
-  const faltas: string[] = [];
-  let totalQueFalta = 0;
-  const anotarFalta = (cantidad: number, singular: string, plural: string): void => {
-    totalQueFalta += cantidad;
-    faltas.push(`${cantidad} ${cantidad === 1 ? singular : plural}`);
-  };
-
-  if (partida.suspects.length < MINIMOS.sospechosos) {
-    anotarFalta(MINIMOS.sospechosos - partida.suspects.length, 'sospechoso', 'sospechosos');
+  const faltan = faltanMinimos(partida);
+  if (faltan.length === 0) {
+    return 'Todo listo: cumplimos los mínimos. Cuando usted lo ordene, digo «genera la trama» y preparo la velada.';
   }
-  if (partida.rooms.length < MINIMOS.salas) {
-    anotarFalta(MINIMOS.salas - partida.rooms.length, 'sala', 'salas');
-  }
-  if (partida.weapons.length < MINIMOS.armas) {
-    anotarFalta(MINIMOS.armas - partida.weapons.length, 'arma', 'armas');
-  }
-  if (faltas.length === 0) {
-    return 'La casa está lista: cumplimos los mínimos. Cuando usted lo ordene, digo «genera la trama» y preparo la velada.';
-  }
-  // El verbo concuerda con lo que falta en total, no con el número de categorías.
-  return `Para poder generar la trama aún ${totalQueFalta === 1 ? 'falta' : 'faltan'} ${listar(faltas)}.`;
+  return `Para poder generar la trama aún falta material. ${listar(faltan)}.`;
 }
 
-/** Saludo completo: solo cuando el usuario aún no ha dictado nada aprovechable. */
-const BIENVENIDA = `Bienvenido a la mansión, si me permite la reverencia. Soy Edmund, su mayordomo y maestro de ceremonias, y le ayudaré a preparar una velada de CLUEDO en vivo.
+/**
+ * Saludo completo: solo cuando el usuario aún no ha dictado nada aprovechable.
+ *
+ * ═══ SE ESCRIBE CON LAS PALABRAS DEL JUEGO QUE SE PREPARA ═══
+ *
+ * Era una constante, y una constante escrita en CLUEDO: «Bienvenido a la
+ * mansión… Soy Edmund, su mayordomo… una velada de CLUEDO en vivo… 3
+ * sospechosos, 4 salas y 3 armas». Quien montaba una expedición a una tumba
+ * egipcia leía eso como primera frase del taller, con el nombre y la cara de su
+ * propio asistente al lado, porque esos SÍ salen del manifiesto.
+ *
+ * Ahora se compone: el nombre del asistente, el del juego y las categorías de
+ * verdad con sus mínimos. Para CLUEDO dice lo mismo que decía.
+ */
+function bienvenida(game: GameSession): string {
+  const m = manifiestoDe(game.settings?.juego);
+  const listaCategorias = m.categorias
+    .map((c) => `${c.minimo} ${c.minimo === 1 ? c.singular : c.plural}`)
+    .join(', ');
+  const ejemplos = m.categorias
+    .map((c) => `«${c.plural}: ${(c.presentacion?.ejemploNombre ?? `un ${c.singular}`)}, …»`)
+    .join('; ');
 
-El plan es sencillo: primero presénteme a los invitados («añade a Marta, tímida pero mordaz»), después las estancias de la casa («apunta la cocina y la biblioteca») y por último los objetos sospechosos («arma: el candelabro de plata»). En cuanto tengamos ${MINIMOS.sospechosos} sospechosos, ${MINIMOS.salas} salas y ${MINIMOS.armas} armas, generaré la trama y los dosieres. ¿Por quién empezamos?
+  return `A su servicio. Soy ${m.asistente.nombre} y le ayudaré a preparar una velada de ${m.nombre}.
+
+El plan es sencillo: dicte cada lista con su nombre delante y yo la anoto. ${ejemplos}. En cuanto tengamos ${listaCategorias}, generaré la trama y los dosieres. ¿Por dónde empezamos?
 
 Una advertencia honesta: el servidor no tiene clave de API, así que ahora mismo hablo con un guion de demostración y solo entiendo órdenes sencillas como las de arriba. Con una ANTHROPIC_API_KEY configurada me convierto en el agente completo y podrá pedirme lo que quiera con sus propias palabras.`;
+}
 
 /**
  * Apertura breve cuando la primera intervención ya trae datos que anotar.
@@ -412,6 +440,57 @@ export async function runDemoChat(
     partida = resultado.partida;
     frases.push(...resultado.hechos);
     panel = resultado.panel;
+  } else {
+    /*
+     * ═══ EL ALTA DE CUALQUIER CATEGORÍA, DICTADA POR SU NOMBRE ═══
+     *
+     * Todo lo de arriba está escrito para las tres categorías de CLUEDO:
+     * «añade a Marta», «apunta la cocina», «arma: el candelabro». Una categoría
+     * que no sea ninguna de esas tres NO TENÍA POR DÓNDE ENTRAR, y no es un caso
+     * hipotético: los cinco ritos de El Misterio de la Momia y los cuatro
+     * estandartes de El Paso de las Sombras no tienen `almacen`, así que ni
+     * siquiera caían de rebote en una de las tres herramientas heredadas. Por
+     * este chat era imposible dar de alta un rito, y sin los cinco ritos la
+     * partida no se puede generar: un callejón sin salida completo.
+     *
+     * Esto lo abre con la forma más simple que existe y la que la gente usa sola
+     * al dictar una lista: el nombre de la categoría delante y los elementos
+     * detrás. «ritos: Agua, Aliento, Nombre, Balanza, Silencio».
+     *
+     * VA EL ÚLTIMO a propósito. Las ramas de arriba son las de CLUEDO y siguen
+     * ganando, así que su comportamiento no cambia ni una coma; esta solo
+     * atiende lo que ninguna de ellas ha querido.
+     */
+    const manifiesto = manifiestoDe(partida.settings?.juego);
+    for (const cat of manifiesto.categorias) {
+      const nombres = [cat.plural, cat.singular]
+        .map((n) => n.normalize('NFD').replace(/[\u0300-\u036f]/g, ''))
+        .join('|');
+      const dictada = texto
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .match(new RegExp(`^\\s*(?:${nombres})\\b\\s*[:,]\\s*(.+)$`, 'i'));
+      if (!dictada?.[1]) continue;
+
+      const piezas = dictada[1]
+        .split(/\s*(?:,|;| y )\s*/)
+        .map((t) => limpiarNombre(t))
+        .filter(Boolean);
+      const anotados: string[] = [];
+      for (const nombre of piezas) {
+        const salida = await ejecutarHerramientaDeCategoria(partida, `upsert_${sufijoDeCategoria(cat)}`, {
+          name: capitalizar(nombre),
+        });
+        if (salida?.game) partida = salida.game;
+        if (salida && !salida.result.startsWith('Error')) anotados.push(capitalizar(nombre));
+      }
+      if (anotados.length > 0) {
+        frases.push(
+          `anotado en ${cat.plural}: ${listar(anotados)}`,
+        );
+      }
+      break;
+    }
   }
 
   // --- Notificar entidades y guiar visualmente ---
@@ -438,9 +517,13 @@ export async function runDemoChat(
 
   let respuesta: string;
   if (esPrimeraVez && frases.length === 0) {
-    respuesta = BIENVENIDA;
+    respuesta = bienvenida(partida);
   } else if (frases.length === 0) {
-    respuesta = `Disculpe, en modo demo mis oídos son algo limitados. Pruebe con «añade a <nombre>» para un sospechoso, «apunta la cocina» para una sala o «arma: el candelabro» para un objeto. ${resumenProgreso(partida)}`;
+    respuesta = `Disculpe, en modo demo mis oídos son algo limitados. Pruebe dictando una lista con su nombre delante: ${manifiestoDe(
+      partida.settings?.juego,
+    )
+      .categorias.map((c) => `«${c.plural}: …»`)
+      .join(', ')}. ${resumenProgreso(partida)}`;
   } else {
     const cuerpo = frases
       .map((f) => f.charAt(0).toUpperCase() + f.slice(1))
