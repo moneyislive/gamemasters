@@ -20,7 +20,7 @@ import type {
 import { getStore } from '../db/store';
 import { DEMO_MODE } from '../config';
 import { getAnthropicClient, resolveModel, usesFallbacks } from '../agent/anthropic';
-import { buildSystemPrompt } from '../agent/systemPrompt';
+import { bloquesDeSistema } from '../agent/systemPrompt';
 import { executeTool, herramientasDe } from '../agent/tools';
 import { runDemoChat } from '../agent/demo';
 import { crearRouter } from '../rutas';
@@ -82,7 +82,7 @@ interface Turno {
 function abrirStream(
   client: Anthropic,
   model: ModelId,
-  systemText: string,
+  sistema: { estable: string; volatil: string },
   turnos: Turno[],
   /*
    * La partida, para saber a que juego se juega. Entra hasta aqui solo por las
@@ -102,12 +102,24 @@ function abrirStream(
   const parametrosBase = {
     model,
     max_tokens: 16000,
+    /*
+     * DOS BLOQUES, Y LA MARCA DE LA CACHE ENTRE MEDIAS.
+     *
+     * El modelo recibe exactamente los mismos caracteres en el mismo orden --la
+     * API concatena los bloques del sistema--, pero ahora el prefijo cacheado
+     * termina justo antes del inventario de la partida, que es lo unico que
+     * cambia de un turno a otro. Antes la marca estaba al final de todo, asi que
+     * dar de alta un sospechoso invalidaba los tres mil y pico tokens enteros; y
+     * dar de alta cosas es lo que se hace en el taller. En `bloquesDeSistema`
+     * esta el porque con los numeros.
+     */
     system: [
       {
         type: 'text' as const,
-        text: systemText,
+        text: sistema.estable,
         cache_control: { type: 'ephemeral' as const },
       },
+      ...(sistema.volatil === '' ? [] : [{ type: 'text' as const, text: sistema.volatil }]),
     ],
     messages: turnos,
     /*
@@ -159,7 +171,7 @@ async function chatConAgente(
   }
 
   const model = await resolveModel(game);
-  const systemText = buildSystemPrompt(game);
+  const sistema = bloquesDeSistema(game);
 
   // Historial reciente (incluye el mensaje de usuario recién guardado).
   const historial = await store.getMessages(game.id);
@@ -198,7 +210,7 @@ async function chatConAgente(
       break;
     }
 
-    const stream = abrirStream(client, model, systemText, turnos, game, senal);
+    const stream = abrirStream(client, model, sistema, turnos, game, senal);
 
     try {
       for await (const evento of stream) {

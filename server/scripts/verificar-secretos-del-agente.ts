@@ -74,7 +74,7 @@ if (process.env.GM_AISLADA !== '1') {
   process.exit(r.status ?? 1);
 }
 
-const { buildSystemPrompt } = await import('../src/agent/systemPrompt');
+const { bloquesDeSistema, buildSystemPrompt } = await import('../src/agent/systemPrompt');
 const { executeTool } = await import('../src/agent/tools');
 const { initStore } = await import('../src/db/store');
 import type { GameSession } from '../../shared/types';
@@ -294,6 +294,46 @@ async function comprobarTodo(): Promise<void> {
   comprobar('se compone', prompt.length > 100);
   const enPrompt = filtrados(prompt);
   comprobar('y NO lleva ni un secreto dentro', enPrompt.length === 0, enPrompt);
+
+  /*
+   * EL CORTE PARA LA CACHE NO PUEDE CAMBIAR NI UN CARÁCTER.
+   *
+   * El prompt sale en dos bloques para que la marca de la cache quede antes del
+   * inventario, que es lo único que cambia de un turno a otro. Todo el
+   * argumento depende de que el modelo reciba exactamente lo mismo que recibía:
+   * si los dos trozos dejan de recomponer el original —un corte que se lleva un
+   * salto de línea, un titular renombrado a medias— el mayordomo cambia de
+   * comportamiento sin que nadie lo haya pedido, y en un juego que ya está en
+   * producción.
+   *
+   * Se comprueba en los tres, porque los tres traen su prompt entero.
+   */
+  console.log('\n· El prompt partido para la cache');
+  // La misma partida con el manifiesto de las Sombras: aquí no se mira el
+  // contenido, se mira que el corte caiga en su sitio en las tres ramas.
+  const gameSombras = {
+    ...gameMomia,
+    id: 'secretos-sombras',
+    settings: { ...gameMomia.settings, juego: 'sombras' },
+  } as unknown as typeof gameMomia;
+
+  for (const [nombre, partida] of [
+    ['CLUEDO', game],
+    ['la Momia', gameMomia],
+    ['las Sombras', gameSombras],
+  ] as const) {
+    const entero = buildSystemPrompt(partida);
+    const { estable, volatil } = bloquesDeSistema(partida);
+    comprobar(`en ${nombre} los dos trozos recomponen el prompt`, estable + volatil === entero);
+    comprobar(`en ${nombre} el corte cae donde empieza el inventario`, volatil.startsWith('# ESTADO ACTUAL DE LA PARTIDA'));
+    /*
+     * Y el trozo cacheado tiene que ser GRANDE: por debajo del mínimo que pide
+     * la API la marca no hace nada, y la mejora sería imaginaria. Mil tokens es
+     * el mínimo; se pide holgura sobre él en caracteres.
+     */
+    comprobar(`en ${nombre} el trozo cacheado supera el mínimo de la API`, estable.length > 5000, estable.length);
+    comprobar(`en ${nombre} el corte deja fuera de la cache lo que cambia`, !estable.includes('# ESTADO ACTUAL'));
+  }
 
   console.log('\n· Lo que devuelven las herramientas del agente');
   /*
