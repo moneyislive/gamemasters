@@ -33,6 +33,34 @@ const SYSTEM_TRAMA =
   'Devuelves exclusivamente el JSON pedido, respetando los ids proporcionados.';
 
 /** Ejecuta la generación completa sobre la partida dada. */
+/**
+ * Cuanto se espera antes de dar por muerta una generacion que dejo la partida en
+ * `generating`. La mas larga medida —CLUEDO, dos llamadas— tarda siete minutos,
+ * y la Momia puede pedir una segunda tirada; veinte deja margen de sobra sin que
+ * una partida colgada por un proceso muerto quede bloqueada para siempre.
+ */
+const PLAZO_DE_GENERACION = 20 * 60 * 1000;
+
+/**
+ * ¿Esta partida se esta generando AHORA MISMO?
+ *
+ * Las tres rutas que gastan dinero de verdad —generar, actualizar y el material—
+ * no miraban nada, y la unica defensa era un booleano en memoria del navegador:
+ * se pierde al recargar y no existe en una segunda pestaña. Dos clics arrancaban
+ * dos tuberias completas, pagaban dos veces al modelo y guardaban las dos.
+ *
+ * El sello es `updatedAt`, que `saveGame` escribe en cada guardado: al pasar a
+ * `generating` queda con la hora de arranque. Sin plazo, un proceso que muera a
+ * mitad dejaria la partida bloqueada para siempre, porque quien la libera es el
+ * `catch` del propio proceso.
+ */
+export function generacionEnCurso(game: GameSession): boolean {
+  if (game.status !== 'generating') return false;
+  const desde = Date.parse(game.updatedAt);
+  if (Number.isNaN(desde)) return false;
+  return Date.now() - desde < PLAZO_DE_GENERACION;
+}
+
 export async function runGeneration(game: GameSession, emit: Emitir): Promise<void> {
   const store = getStore();
   try {
@@ -95,10 +123,22 @@ export async function runGeneration(game: GameSession, emit: Emitir): Promise<vo
     emit({ type: 'done', game: partidaParaElTaller(guardada) });
   } catch (error) {
     console.error('[pipeline] fallo en la generación:', error);
-    // La partida vuelve a borrador para poder reintentar.
+    /*
+     * SE RELEE ANTES DE TOCAR NADA, y no es un detalle.
+     *
+     * Esto hacia `game.status = 'draft'; saveGame(game)` con el objeto leido al
+     * principio, o sea que guardaba su instantanea VIEJA encima de lo que
+     * hubiera. Si entretanto otra peticion habia terminado de generar bien, un
+     * fallo tardio de esta borraba la trama buena y devolvia la partida a
+     * borrador. Ahora solo se corrige el estado, y solo si sigue en
+     * `generating`: si ya la libero alguien, no hay nada que hacer.
+     */
     try {
-      game.status = 'draft';
-      await store.saveGame(game);
+      const almacenada = await store.getGame(game.id);
+      if (almacenada && almacenada.status === 'generating') {
+        almacenada.status = almacenada.plot ? 'ready' : 'draft';
+        await store.saveGame(almacenada);
+      }
     } catch {
       // Si tampoco se puede guardar, el error original ya es suficiente.
     }

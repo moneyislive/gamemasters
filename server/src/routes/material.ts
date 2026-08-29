@@ -12,6 +12,7 @@ import { generadorDeMaterial } from '../juegos/materiales';
 import '../plot/material';
 import { crearRouter } from '../rutas';
 import { partidaParaElTaller } from '../live/proyeccion';
+import { generacionEnCurso } from '../plot/pipeline';
 
 const router = crearRouter();
 
@@ -31,6 +32,17 @@ router.post('/games/:id/material', async (req, res) => {
     res.status(404).json({ error: 'No existe esa partida.' });
     return;
   }
+  /*
+   * NI DOS A LA VEZ SOBRE LA MISMA PARTIDA. Cada una de estas llamadas cuesta
+   * dinero de verdad, y la unica defensa era un booleano del navegador: se
+   * pierde al recargar y no existe en otra pestaña. Se responde ANTES de abrir
+   * el stream para que el cliente reciba un 409 legible y no un SSE que muere.
+   */
+  if (generacionEnCurso(game)) {
+    res.status(409).json({ error: 'Esta partida ya se está generando. Espera a que termine.' });
+    return;
+  }
+
   if (!game.plot) {
     res.status(409).json({ error: 'Esta partida todavía no tiene misterio: genéralo primero.' });
     return;

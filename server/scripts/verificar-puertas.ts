@@ -53,6 +53,7 @@ import { manifiestoDe, accionDeAcusacion, accionDeEntrarEnLugar } from '../../sh
 import type { GameSession } from '../../shared/types';
 import type { LiveSession } from '../../shared/live';
 import type { EstadoMomia } from '../../shared/juegos/momia-tipos';
+import { generacionEnCurso } from '../src/plot/pipeline';
 
 const REPO = path.resolve(import.meta.dirname ?? __dirname, '..', '..');
 const TSX = path.join(REPO, 'node_modules', 'tsx', 'dist', 'cli.mjs');
@@ -1269,6 +1270,42 @@ try {
   } catch {
     console.log(`  (queda por limpiar ${dir})`);
   }
+}
+
+/*
+ * ---------------------------------------------------------------------------
+ * NI DOS GENERACIONES A LA VEZ SOBRE LA MISMA PARTIDA
+ * ---------------------------------------------------------------------------
+ *
+ * Las tres rutas que gastan dinero de verdad no miraban si esa partida ya se
+ * estaba generando, y la unica defensa era un booleano en memoria del
+ * navegador: se pierde al recargar y no existe en una segunda pestaña. Dos
+ * clics arrancaban dos tuberias, pagaban dos veces al modelo y guardaban las dos.
+ *
+ * Se prueba el guardia y no la ruta a proposito: es una funcion pura sobre la
+ * partida, y asi se puede afirmar tambien el caso que importa y no se ve —el
+ * plazo—, que por HTTP obligaria a esperar veinte minutos.
+ */
+paso('Dos generaciones a la vez sobre la misma partida');
+{
+  const base = { id: 'concurrencia', name: 'x', createdAt: new Date().toISOString() };
+  const con = (status: string, updatedAt: string) =>
+    ({ ...base, status, updatedAt }) as unknown as Parameters<typeof generacionEnCurso>[0];
+
+  const ahora = new Date().toISOString();
+  const haceMedia = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+
+  comprobar('una partida lista no esta generando', !generacionEnCurso(con('ready', ahora)));
+  comprobar('una recien puesta a generar, si', generacionEnCurso(con('generating', ahora)));
+  /*
+   * Y CADUCA. Quien libera la partida es el `catch` del propio proceso, asi que
+   * si ese proceso muere a mitad nadie la suelta: sin plazo quedaria bloqueada
+   * para siempre y no habria forma de volver a generarla.
+   */
+  comprobar('pero una colgada hace media hora ya no bloquea',
+    !generacionEnCurso(con('generating', haceMedia)));
+  comprobar('y una fecha ilegible no bloquea tampoco',
+    !generacionEnCurso(con('generating', 'no es una fecha')));
 }
 
 console.log(`\n${hechas} comprobaciones`);
