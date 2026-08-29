@@ -314,6 +314,32 @@ for (const m of juegosInstalados()) {
     }
     comprobar(`${m.id}/${doc.id}: no revienta al renderizar`, reventó === null, reventó);
     if (reventó === null) revisar(doc.id, html);
+
+    /*
+     * LA HOJA POR LA QUE SE ABRE EL PAQUETE NO PUEDE PROMETER LO QUE NO HAY.
+     *
+     * `indice-paquete` la comparten los tres juegos y lista qué imprimir y
+     * cuántas copias. Tenía escritos a mano los tres dosieres genéricos de
+     * CLUEDO —el de cada persona, el de quien dirige y el sobre del crimen— y los
+     * emitía siempre; pero el ZIP solo los mete cuando el juego NO trae los
+     * suyos. A la Momia y a las Sombras se les prometían dos documentos que no
+     * están dentro, y quien prepara la velada los busca y se pregunta qué ha
+     * hecho mal.
+     *
+     * `verificar-puertas` ya comprobaba la lista de RUTAS del ZIP y confirmaba
+     * que los genéricos no estaban; lo que no miraba nadie era el HTML de esta
+     * hoja. El agujero cabía justo en ese hueco.
+     */
+    if (doc.id === 'indice-paquete' && (m as { dosieresPropios?: boolean }).dosieresPropios === true) {
+      const promete = ['Dosier del Game Master', 'El sobre del crimen', 'Guía de la velada'].filter(
+        (t) => (html ?? '').includes(t),
+      );
+      comprobar(
+        `${m.id}/indice-paquete: no promete dosieres genéricos que su ZIP no lleva`,
+        promete.length === 0,
+        { promete, porque: 'este juego declara dosieresPropios y paquete.ts no mete los genericos' },
+      );
+    }
   }
 }
 

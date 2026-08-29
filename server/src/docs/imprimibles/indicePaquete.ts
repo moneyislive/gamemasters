@@ -38,26 +38,58 @@ export function indicePaquete(
     .map((doc) => ficha(doc.name, doc.summary, copias(doc, game)))
     .join('\n');
 
-  const parteDosieres = `${ficha(
-    'Dosieres de los jugadores',
-    `Uno por persona, cada uno con sus secretos. ${game.suspects.map((s) => s.name).join(', ')}.`,
-    `${game.suspects.length} copias · a doble cara`,
-  )}
+  /*
+   * ═══ LOS TRES DOSIERES GENÉRICOS, SOLO SI EL ZIP LOS LLEVA ═══
+   *
+   * Esta tabla estaba escrita a mano en CLUEDO y se emitía SIEMPRE: el dosier de
+   * cada persona, el de quien dirige y —a ciegas— el sobre del crimen. Pero al
+   * otro extremo, `paquete.ts` solo mete esos tres cuando el juego NO trae los
+   * suyos (`if (!manifiestoDe(...).dosieresPropios)`), y la Momia y El Paso de las
+   * Sombras los declaran propios.
+   *
+   * O sea que en la PRIMERA HOJA QUE SE ABRE DEL PAQUETE —la que dice qué
+   * imprimir y cuántas copias— se les prometían dos documentos que no existen
+   * dentro, «Dosier del Game Master · La solución, el guion completo y todas las
+   * pistas» incluido, y encima los dosieres de jugador salían dos veces: aquí como
+   * «Dosieres de los jugadores» y otra vez abajo con su nombre de verdad
+   * —«Dosieres de la expedición», «Dosieres de la columna»— porque esos sí están
+   * en el catálogo del juego.
+   *
+   * Quien prepara la velada busca lo prometido, no lo encuentra, y se pregunta
+   * qué ha hecho mal. La comprobación de las puertas verifica la lista de rutas
+   * del ZIP y confirma que los genéricos no están; lo que no miraba nadie es el
+   * HTML de esta hoja, así que el agujero cabía justo en ese hueco.
+   */
+  const traeLosSuyos = manifiestoDe(game.settings?.juego).dosieresPropios === true;
+
+  const parteDosieres = traeLosSuyos
+    ? ficha(
+        'Los dosieres',
+        `Uno por persona, cada uno con sus secretos. Están abajo, con su nombre. ${game.suspects
+          .map((s) => s.name)
+          .join(', ')}.`,
+        `${game.suspects.length} copias · a doble cara`,
+      )
+    : `${ficha(
+        'Dosieres de los jugadores',
+        `Uno por persona, cada uno con sus secretos. ${game.suspects.map((s) => s.name).join(', ')}.`,
+        `${game.suspects.length} copias · a doble cara`,
+      )}
 ${ficha(
-    aCiegas ? 'Guía de la velada' : 'Dosier del Game Master',
-    aCiegas
-      ? 'Rondas, sobres y qué leer en voz alta. Sin la solución: puedes leerla entera.'
-      : 'La solución, el guion completo y todas las pistas.',
-    '1 copia · grapada',
-  )}${
-    aCiegas
-      ? `\n${ficha(
-          'El sobre del crimen',
-          'La solución, en sobre opaco. No se abre hasta recoger todas las acusaciones.',
-          '1 copia · sobre cerrado',
-        )}`
-      : ''
-  }`;
+        aCiegas ? 'Guía de la velada' : 'Dosier del Game Master',
+        aCiegas
+          ? 'Rondas, sobres y qué leer en voz alta. Sin la solución: puedes leerla entera.'
+          : 'La solución, el guion completo y todas las pistas.',
+        '1 copia · grapada',
+      )}${
+        aCiegas
+          ? `\n${ficha(
+              'El sobre del crimen',
+              'La solución, en sobre opaco. No se abre hasta recoger todas las acusaciones.',
+              '1 copia · sobre cerrado',
+            )}`
+          : ''
+      }`;
 
   /*
    * QUÉ HAY QUE HACER ANTES DE QUE LLEGUE LA GENTE, y lo dice el juego.

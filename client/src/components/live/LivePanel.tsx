@@ -254,16 +254,34 @@ export default function LivePanel(): JSX.Element {
         <h3 className="live-titulo">Mandos</h3>
         <div className="live-botones">
           {/*
-            De la sala de espera y de la vigilia cerrada, como siempre; y
-            también del sellado, porque el manifiesto de la Momia lo permite a
-            propósito: si la mesa se atasca discutiendo el orden, quien dirige
-            puede darles otra vigilia en vez de obligarles a ejecutar un ritual
-            a medio cocinar. No se pregunta solo al grafo porque en CLUEDO
-            también se puede volver a jugar desde `acusaciones` y ahí este botón
-            no ha estado nunca; eso se queda exactamente como estaba.
+            SE LE PREGUNTA AL GRAFO DEL JUEGO, Y A NADA MÁS.
+
+            Aquí había además una lista de fases escrita a mano —«de la sala de
+            espera, de la ronda cerrada y del sellado»— y esa lista dejó fuera a
+            El Paso de las Sombras. Su fase de deliberación final se llama
+            `acusaciones`, que es el Consejo del alba, y su manifiesto declara
+            `acusaciones: ['ronda-abierta', 'desenlace']` con el comentario
+            explícito de que «del consejo se puede volver a andar: si la mesa se
+            atasca, otra hora». El grafo decía que sí y la lista decía que no, así
+            que el botón no se dibujaba JAMÁS: a quien dirigía solo le quedaban
+            «Echar a andar» —que es irreversible y resuelve la noche— y el
+            desenlace. La Momia se salvó por casualidad, porque a su fase
+            equivalente la llamó `sellado` y ese nombre sí estaba en la lista.
+
+            La lista existía para que CLUEDO no cambiara: él también declara la
+            vuelta desde `acusaciones` y el botón nunca estuvo ahí. Ahora sí
+            aparece, y es lo correcto por dos motivos. Uno, su manifiesto lo
+            declara legal desde hace tiempo y con un comentario que dice por qué
+            —«una partida que pasara por ahí se quedaba sin rondas aunque faltara
+            gente por acusar»—. Y dos, es lo mismo que se acaba de arreglar al
+            quitar el tope de cuatro rondas: si la mesa no lo tiene claro, quien
+            dirige tiene que poder darles otra.
+
+            Una lista blanca de nombres de fase es, además, la forma equivocada:
+            el juego siguiente que llame a su fase de otra manera se vuelve a
+            quedar tapiado sin que nadie vea un error.
           */}
-          {(sesion.phase === 'lobby' || rondaCerrada || sesion.phase === 'sellado') &&
-            puedeIrA('ronda-abierta') && (
+          {puedeIrA('ronda-abierta') && (
             <>
               <label className="live-minutos">
                 <span className="mono-caps">Minutos</span>
