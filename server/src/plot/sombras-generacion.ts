@@ -70,6 +70,7 @@ import {
   senalaAlKancho,
 } from './sombras-validacion';
 import type { Incidencia } from './sombras-validacion';
+import { emisorDeProgreso } from '../live/proyeccion';
 
 type Emitir = (evento: GenerateStreamEvent) => void;
 
@@ -669,7 +670,9 @@ async function unaTirada(
     messages: [{ role: 'user', content: construirPromptSombras(game, cimientos.trama, entidades) }],
   });
 
-  stream.on('text', (delta) => emit({ type: 'text', delta }));
+  // A ciegas van puntos y no el crudo del modelo, que es el JSON de la trama con
+  // la senda verdadera dentro y el taller lo pinta a pantalla completa.
+  stream.on('text', emisorDeProgreso(game, emit));
   const mensaje = await stream.finalMessage();
 
   if (mensaje.stop_reason === 'refusal') {
