@@ -11,13 +11,25 @@ import fsp from 'node:fs/promises';
 import path from 'node:path';
 import mongoose from 'mongoose';
 import type { ChatMessage, GameSession, ModelId } from '../../shared/types';
+import type { Account, LiveSession } from '../../shared/live';
 import { env } from '../src/config';
 import { getStorageKind, getStore, initStore } from '../src/db/store';
 
+/**
+ * Lo que hay en el fichero, ENTERO.
+ *
+ * Declaraba solo `games`, `messages` y `config`, asi que la migracion se dejaba
+ * atras TODAS las cuentas y TODAS las sesiones en vivo —el historial de cada
+ * persona, sus trofeos, los codigos de las partidas abiertas— y terminaba
+ * anunciando exito. Quien migrara a Mongo con una velada en marcha se quedaba
+ * sin ella, y sin saberlo hasta que alguien intentara entrar.
+ */
 interface DatosFichero {
   games?: GameSession[];
   messages?: Record<string, ChatMessage[]>;
   config?: { model?: ModelId };
+  live?: LiveSession[];
+  accounts?: Account[];
 }
 
 const forzar = process.argv.includes('--force');
@@ -96,12 +108,54 @@ async function main(): Promise<void> {
     console.log(`  ✓ Modelo preferido conservado: «${datos.config.model}»`);
   }
 
+  /*
+   * LAS CUENTAS Y LAS SESIONES, que se quedaban atras sin que nadie lo dijera.
+   *
+   * No son un extra: en las cuentas viven el historial de cada persona y sus
+   * trofeos, y en las sesiones los codigos con los que doce moviles estan dentro
+   * de una partida ahora mismo. Van despues de las partidas porque una sesion
+   * sin su partida no sirve de nada.
+   */
+  let cuentasMigradas = 0;
+  for (const cuenta of datos.accounts ?? []) {
+    if ((await store.getAccount(cuenta.id)) && !forzar) continue;
+    await store.saveAccount(cuenta);
+    cuentasMigradas++;
+  }
+  if (cuentasMigradas > 0) {
+    console.log(`  ✓ ${cuentasMigradas} cuenta(s) con su historial y sus trofeos`);
+  }
+
+  let sesionesMigradas = 0;
+  for (const sesion of datos.live ?? []) {
+    if ((await store.getLive(sesion.id)) && !forzar) continue;
+    await store.saveLive(sesion);
+    sesionesMigradas++;
+  }
+  if (sesionesMigradas > 0) {
+    console.log(`  ✓ ${sesionesMigradas} sesion(es) en vivo, con sus codigos`);
+  }
+
+  /*
+   * Y SE DICE LO QUE NO SE HA MOVIDO: un contador que solo cuenta lo que sale
+   * bien deja creer que lo demas no existia.
+   */
+  const cuentasEnFichero = (datos.accounts ?? []).length;
+  const sesionesEnFichero = (datos.live ?? []).length;
+  if (cuentasEnFichero > cuentasMigradas || sesionesEnFichero > sesionesMigradas) {
+    console.log(
+      `  – Ya estaban en Mongo: ${cuentasEnFichero - cuentasMigradas} cuenta(s) y ` +
+        `${sesionesEnFichero - sesionesMigradas} sesion(es). Usa --force para sobrescribirlas.`,
+    );
+  }
+
   // Comprobación final: releer desde Mongo lo que acabamos de escribir.
   const listado = await store.listGames();
   const sinDuplicados = new Set(listado.map((g) => g.id)).size === listado.length;
 
   console.log(
-    `\n  Resultado: ${migradas} migrada(s), ${omitidas} omitida(s), ${mensajesMigrados} mensaje(s).`,
+    `\n  Resultado: ${migradas} partida(s), ${omitidas} omitida(s), ${mensajesMigrados} mensaje(s), ` +
+      `${cuentasMigradas} cuenta(s), ${sesionesMigradas} sesion(es) en vivo.`,
   );
   console.log(`  En Mongo hay ahora ${listado.length} partida(s)${sinDuplicados ? '' : ' ¡CON DUPLICADOS!'}.`);
   console.log(`  El fichero ${ruta} queda intacto como copia de seguridad.\n`);
