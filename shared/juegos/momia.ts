@@ -27,7 +27,8 @@
 import type { TrofeoInfo } from '../live';
 import type { DocumentSectionInfo } from '../types';
 import type { PrintableDocInfo } from '../documents';
-import type { ManifiestoDeJuego, ReglaDeJuego } from './tipos';
+import type { ManifiestoDeJuego, ReferenciaDeTrama, ReglaDeJuego } from './tipos';
+import type { TramaMomia } from './momia-tipos';
 
 /**
  * Los trofeos de la Momia.
@@ -326,6 +327,42 @@ export const REGLAS_MOMIA: ReglaDeJuego[] = [
       'Todo lo de esta noche es ficcion. Interpreta con generosidad y deja brillar a los demas. Y si eres el saqueador: pierde con elegancia o gana sin restregarlo.',
   },
 ];
+
+/**
+ * Lo que la trama de la Momia cita de la partida.
+ *
+ * Sirve para que `computeStaleness` avise cuando quien dirige toca las entidades
+ * DESPUÉS de generar. Sin esto, borrar una cámara dejaba `profanadas` y
+ * `hallazgos` apuntando al vacío sin que nadie dijera nada, y tocar los ritos no
+ * lo veía absolutamente NADIE —no tienen equivalente genérico— aunque el orden
+ * del sellado sea el juego entero.
+ *
+ * Las restricciones no se enumeran a propósito: solo citan ritos, y los cinco
+ * ritos ya entran por `ordenVerdadero`. Repetirlas daría el mismo aviso dos
+ * veces.
+ */
+function citasDeLaMomia(delJuego: unknown): ReferenciaDeTrama[] {
+  const t = delJuego as Partial<TramaMomia> | undefined;
+  if (!t) return [];
+  const citas: ReferenciaDeTrama[] = [];
+
+  for (const [i, id] of (t.ordenVerdadero ?? []).entries()) {
+    citas.push({ categoria: 'ritos', id, donde: `el rito ${i + 1} del sellado` });
+  }
+  for (const [i, id] of (t.profanadas ?? []).entries()) {
+    citas.push({ categoria: 'camaras', id, donde: `la cámara profanada en la vigilia ${i + 1}` });
+  }
+  for (const h of t.hallazgos ?? []) {
+    citas.push({ categoria: 'camaras', id: h.camaraId, donde: 'la cámara donde aparece un fragmento' });
+  }
+  for (const id of Object.keys(t.dones ?? {})) {
+    citas.push({ categoria: 'expedicionarios', id, donde: 'quien recibió un don' });
+  }
+  if (t.reliquiaCodiciada) {
+    citas.push({ categoria: 'reliquias', id: t.reliquiaCodiciada, donde: 'la reliquia que el saqueador tiene vendida' });
+  }
+  return citas;
+}
 
 export const MOMIA: ManifiestoDeJuego = {
   id: 'momia',
@@ -631,6 +668,7 @@ export const MOMIA: ManifiestoDeJuego = {
   rotuloCentralDelPlano: 'EL POZO',
 
   reglas: REGLAS_MOMIA,
+  referenciasDeLaTrama: citasDeLaMomia,
 
   ronda: {
     accionSobre: 'camaras',

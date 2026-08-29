@@ -38,7 +38,8 @@ import { construirPromptSombras } from '../src/plot/sombras-prompt';
 import { tramaDe } from '../src/juegos/sombras-trama';
 import { renderPrintableDocument } from '../src/docs/imprimibles/index';
 import { sendasDe } from '../../shared/juegos/sombras-tipos';
-import { manifiestoDe } from '../../shared/juegos';
+import { listaDeCategoria, manifiestoDe } from '../../shared/juegos';
+import { computeStaleness } from '../../shared/staleness';
 import '../src/juegos/instalados';
 import type { GameSession } from '../../shared/types';
 
@@ -177,6 +178,73 @@ comprobar(
   buena.redaccion,
 );
 comprobar('sin incidencias', buena.incidencias.length === 0, buena.incidencias);
+
+/*
+ * ─────────────────────────────────────────────────────────────────────────────
+ * QUE LA REVISIÓN DE DESCUADRE VEA LA TRAMA PROPIA
+ * ─────────────────────────────────────────────────────────────────────────────
+ *
+ * `computeStaleness` solo miraba la parte genérica de la trama —personajes,
+ * pistas, cronología, tablero— y todo lo de este juego vive en `plot.delJuego`.
+ * Se podía borrar un paso después de generar y la plataforma decía que estaba
+ * todo en orden mientras la senda verdadera apuntaba al vacío.
+ *
+ * Lo PRIMERO que hay que exigir no es que avise: es que NO avise cuando no
+ * toca. Una comprobación que ladra sobre partidas sanas enseña a ignorarla, y
+ * aquí el riesgo es real: basta con equivocarse de categoría al declarar qué
+ * cita la trama, o con confundir la clave con el valor en un `Record`.
+ */
+{
+  const partidaGenerada = { ...game, plot: buena.plot, documents: [] } as GameSession;
+  const informeSano = computeStaleness(partidaGenerada);
+  comprobar(
+    'una partida recién generada no tiene ni una referencia rota',
+    informeSano.brokenGameRefs.length === 0,
+    informeSano.brokenGameRefs.map((r) => `${r.categoria}:${r.id} (${r.donde})`).join(' | '),
+  );
+
+  // Se borra POR DONDE BORRA LA APLICACIÓN: los pasos viven en `rooms` y los
+  // enseres en `weapons` por herencia de CLUEDO, tocar `entidades` a mano no
+  // borra uno, los esconde todos.
+  const sinLaEntidad = (categoria: string, id: string): GameSession => {
+    const copia = JSON.parse(JSON.stringify(partidaGenerada)) as GameSession;
+    const lista = listaDeCategoria(copia, categoria as never);
+    const donde = lista.findIndex((e) => e.id === id);
+    if (donde >= 0) lista.splice(donde, 1);
+    return copia;
+  };
+
+  const trama = tramaDe(buena.plot)!;
+  const informePaso = computeStaleness(sinLaEntidad('pasos', trama.sendaVerdadera[0]!));
+  comprobar(
+    'borrar un paso de la senda SÍ se ve',
+    informePaso.brokenGameRefs.some((r) => r.categoria === 'pasos'),
+    informePaso.brokenGameRefs.map((r) => `${r.categoria}:${r.id}`).join(','),
+  );
+  comprobar('y pide al agente, porque en local no se arregla', informePaso.needsAgent);
+  comprobar(
+    'y se avisa una sola vez del mismo paso',
+    informePaso.brokenGameRefs.filter((r) => r.categoria === 'pasos').length === 1,
+    informePaso.brokenGameRefs.length,
+  );
+
+  comprobar(
+    'borrar el enser prometido al kanchō SÍ se ve',
+    computeStaleness(sinLaEntidad('enseres', trama.enserComprometido)).brokenGameRefs.some(
+      (r) => r.categoria === 'enseres',
+    ),
+  );
+
+  const unEstandarte = Object.values(trama.estandartes)[0];
+  if (unEstandarte) {
+    comprobar(
+      'borrar un estandarte repartido SÍ se ve',
+      computeStaleness(sinLaEntidad('estandartes', unEstandarte)).brokenGameRefs.some(
+        (r) => r.categoria === 'estandartes',
+      ),
+    );
+  }
+}
 comprobar(
   'sin pistas de CLUEDO: los hitos no viajan por ahí',
   buena.plot.clues.length === 0,

@@ -417,6 +417,18 @@ export interface DefinicionDeRonda {
  * sino porque el día que se quiera editar un juego sin desplegar, mudarlo a la
  * base de datos sea mover datos y no rediseñar.
  */
+/**
+ * Una entidad citada por la trama propia de un juego.
+ *
+ * `donde` es para poder decir en qué se rompió: «la vigilia 3 profana una cámara
+ * que ya no existe» se entiende; «falta una entidad», no.
+ */
+export interface ReferenciaDeTrama {
+  categoria: string;
+  id: string;
+  donde: string;
+}
+
 export interface ManifiestoDeJuego {
   id: JuegoId;
   nombre: string;
@@ -469,6 +481,40 @@ export interface ManifiestoDeJuego {
    * deja el plano de CLUEDO idéntico.
    */
   rotuloCentralDelPlano?: string;
+
+  /**
+   * Qué entidades de la partida cita la trama PROPIA del juego.
+   *
+   * ─────────────────────────────────────────────────────────────────────────
+   * EL AGUJERO QUE TAPA
+   * ─────────────────────────────────────────────────────────────────────────
+   *
+   * `computeStaleness` avisa de que la partida se ha quedado descuadrada:
+   * alguien nuevo sin personaje, una pista que apunta a una sala borrada, la
+   * solución señalando a nadie. Pero solo miraba la parte GENÉRICA de la trama,
+   * y todo lo que es propio de cada juego vive en `plot.delJuego`, que para el
+   * contrato general es `unknown`.
+   *
+   * Así que en El Misterio de la Momia se podía borrar una cámara después de
+   * generar y la plataforma decía que todo estaba en orden, mientras
+   * `profanadas` y `hallazgos` seguían apuntando a una cámara que ya no existe.
+   * Peor: los cinco ritos NO tienen equivalente genérico, así que tocarlos no
+   * lo veía absolutamente nadie — y el orden del sellado es el juego entero.
+   * Quien dirige se enteraba en la mesa, con los invitados delante.
+   *
+   * ─────────────────────────────────────────────────────────────────────────
+   * POR QUÉ SE DECLARA Y NO SE COMPRUEBA
+   * ─────────────────────────────────────────────────────────────────────────
+   *
+   * `staleness.ts` es compartida y genérica a propósito: si supiera de ritos y
+   * de cámaras, cada juego nuevo tendría que ir a modificarla, que es
+   * exactamente la forma de que el tercero se olvide. El juego dice QUÉ cita su
+   * trama; la comprobación genérica se encarga de mirar si sigue existiendo.
+   *
+   * Sin declarar no se comprueba nada, que es lo que había: CLUEDO no tiene
+   * trama propia y su informe sale idéntico.
+   */
+  referenciasDeLaTrama?: (delJuego: unknown) => ReferenciaDeTrama[];
 
   /**
    * Las reglas que se le enseñan a quien juega.

@@ -33,6 +33,8 @@ import { solucionesDe } from '../../shared/juegos/momia-tipos';
 // Del índice: al cargarlo se registran los manifiestos y se anota dónde vive
 // cada categoría. Importando el manifiesto suelto, 'camaras' no resolvería.
 import { MOMIA } from '../../shared/juegos';
+import { computeStaleness } from '../../shared/staleness';
+import { listaDeCategoria } from '../../shared/juegos';
 import type { RespuestaMomia } from '../src/plot/momia-esquema';
 import type { RitoId } from '../../shared/juegos/momia-tipos';
 import { renderPrintableDocument } from '../src/docs/imprimibles';
@@ -285,6 +287,82 @@ comprobar('la trama del juego viaja en delJuego', Boolean(sana.plot.delJuego));
 comprobar('no se emiten pistas de CLUEDO', sana.plot.clues.length === 0);
 comprobar('hay una narración por vigilia, más la apertura',
   sana.plot.material?.narrations.length === VIGILIAS_POR_DEFECTO + 1);
+
+/*
+ * ─────────────────────────────────────────────────────────────────────────────
+ * QUE LA REVISIÓN DE DESCUADRE VEA LA TRAMA PROPIA
+ * ─────────────────────────────────────────────────────────────────────────────
+ *
+ * `computeStaleness` solo miraba la parte genérica de la trama, y todo lo de la
+ * Momia vive en `plot.delJuego`. Se podía borrar una cámara después de generar
+ * y la plataforma decía que todo estaba en orden mientras las vigilias
+ * apuntaban al vacío. Y los cinco ritos, que son el juego entero, no los miraba
+ * nadie porque no tienen equivalente genérico.
+ *
+ * Lo primero que hay que exigir NO es que avise: es que NO avise cuando no toca.
+ * Una comprobación nueva que ladre sobre partidas sanas es peor que no tenerla
+ * —enseña a ignorar el aviso—, y aquí el riesgo es real, porque basta con
+ * equivocarse de categoría al declarar qué cita la trama.
+ */
+{
+  const partidaGenerada = { ...game, plot: sana.plot, documents: [] } as typeof game;
+  const informeSano = computeStaleness(partidaGenerada);
+  comprobar('una partida recién generada no tiene ni una referencia rota',
+    informeSano.brokenGameRefs.length === 0,
+    informeSano.brokenGameRefs.map((r) => `${r.categoria}:${r.id} (${r.donde})`).join(' | '));
+
+  /*
+   * Y ahora se rompe a mano, una cosa cada vez.
+   *
+   * Se borra POR DONDE BORRA LA APLICACIÓN —`listaDeCategoria`— y no tocando
+   * `entidades` a mano. No es remilgo: las cámaras viven en `rooms` y las
+   * reliquias en `weapons` por herencia de CLUEDO, así que escribir
+   * `entidades.camaras = []` no borra una cámara, las esconde todas, y la
+   * prueba pasaba a medir otra cosa. La primera versión de esto se equivocó
+   * justo ahí.
+   */
+  const sinLaEntidad = (categoria: string, id: string): typeof game => {
+    const copia = JSON.parse(JSON.stringify(partidaGenerada)) as typeof game;
+    const lista = listaDeCategoria(copia, categoria as never);
+    const donde = lista.findIndex((e) => e.id === id);
+    if (donde >= 0) lista.splice(donde, 1);
+    return copia;
+  };
+
+  const trama = sana.plot.delJuego as {
+    profanadas: string[];
+    reliquiaCodiciada: string;
+    ordenVerdadero: string[];
+  };
+
+  const informeRito = computeStaleness(sinLaEntidad('ritos', trama.ordenVerdadero[0]!));
+  comprobar('borrar un rito después de generar SÍ se ve',
+    informeRito.brokenGameRefs.some((r) => r.categoria === 'ritos'),
+    informeRito.brokenGameRefs.map((r) => r.categoria).join(','));
+  comprobar('y pide al agente, porque en local no se arregla', informeRito.needsAgent);
+  comprobar('y lo dice con palabras que se entienden',
+    informeRito.summary.some((f) => f.toLowerCase().includes('rito')), informeRito.summary.join(' | '));
+
+  const informeCamara = computeStaleness(sinLaEntidad('camaras', trama.profanadas[0]!));
+  comprobar('borrar la cámara de una vigilia SÍ se ve',
+    informeCamara.brokenGameRefs.some((r) => r.categoria === 'camaras'),
+    informeCamara.brokenGameRefs.map((r) => `${r.categoria}:${r.id}`).join(','));
+  // Una cámara sale en varias vigilias y en varios hallazgos: un aviso, no nueve.
+  comprobar('y se avisa una sola vez de la misma cámara',
+    informeCamara.brokenGameRefs.filter((r) => r.categoria === 'camaras').length === 1,
+    String(informeCamara.brokenGameRefs.length));
+
+  comprobar('borrar la reliquia codiciada SÍ se ve',
+    computeStaleness(sinLaEntidad('reliquias', trama.reliquiaCodiciada)).brokenGameRefs
+      .some((r) => r.categoria === 'reliquias'));
+
+  // Y borrar algo que la trama NO cita no puede inventarse un aviso.
+  const otraReliquia = (partidaGenerada.weapons ?? []).find((w) => w.id !== trama.reliquiaCodiciada);
+  if (otraReliquia) {
+    comprobar('borrar una reliquia que la trama no cita no dice nada',
+      computeStaleness(sinLaEntidad('reliquias', otraReliquia.id)).brokenGameRefs.length === 0);
+  }
+}
 
 /*
  * La invariante que de verdad importa: pase lo que pase, TODA frase que quede en

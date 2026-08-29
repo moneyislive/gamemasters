@@ -45,6 +45,21 @@ export interface StalenessReport {
   boardOutdated: boolean;
 
   /**
+   * Lo que la trama PROPIA del juego cita y ya no existe.
+   *
+   * Faltaba entero. Esta comprobación solo miraba la parte genérica de la trama
+   * —personajes, pistas, cronología, tablero— y todo lo que es de cada juego
+   * vive en `plot.delJuego`, que para el contrato general es `unknown`. Así que
+   * en El Misterio de la Momia se podía borrar una cámara después de generar y
+   * la plataforma decía que todo estaba en orden mientras las vigilias
+   * apuntaban al vacío. Y los cinco ritos, que son el juego entero, no los
+   * miraba nadie porque no tienen equivalente genérico.
+   *
+   * Vacío en CLUEDO siempre: no tiene trama propia que declarar.
+   */
+  brokenGameRefs: Array<{ categoria: string; id: string; donde: string }>;
+
+  /**
    * ¿Hace falta el agente de IA para arreglarlo? Cierto cuando faltan
    * personajes o la solución del crimen ha quedado rota. El resto (podar
    * sobras, rehacer el tablero, reimprimir dosieres) es trabajo local y
@@ -83,6 +98,7 @@ export function computeStaleness(game: GameSession): StalenessReport {
     brokenClues: 0,
     brokenTimelineEvents: 0,
     boardOutdated: false,
+    brokenGameRefs: [],
     needsAgent: false,
     summary: [],
   };
@@ -147,8 +163,35 @@ export function computeStaleness(game: GameSession): StalenessReport {
       [...idsSalas].some((id) => !enTablero.has(id));
   }
 
+  /*
+   * Y lo que cita la trama propia del juego, si la hay.
+   *
+   * El juego DECLARA qué entidades cita —ver `referenciasDeLaTrama` en el
+   * manifiesto— y aquí se mira si siguen existiendo. Al revés, con esta función
+   * sabiendo de ritos y de cámaras, cada juego nuevo tendría que venir a
+   * modificarla: es la forma segura de que al tercero se le olvide.
+   *
+   * Se quitan los repetidos porque una misma cámara borrada aparece en varias
+   * vigilias y en varios hallazgos, y no hacen falta nueve avisos de lo mismo.
+   */
+  const vistas = new Set<string>();
+  const brokenGameRefs = (manifiesto.referenciasDeLaTrama?.(plot.delJuego) ?? [])
+    .filter((cita) => !entidadesDe(game, cita.categoria).some((e) => e.id === cita.id))
+    .filter((cita) => {
+      const clave = `${cita.categoria}|${cita.id}`;
+      if (vistas.has(clave)) return false;
+      vistas.add(clave);
+      return true;
+    });
+
   const solucionRota = brokenSolution.length > 0;
-  const needsAgent = suspectsWithoutCharacter.length > 0 || solucionRota;
+  /*
+   * Una referencia rota de la trama propia PIDE AL AGENTE. No se puede arreglar
+   * en local: si falta la cámara de la tercera vigilia, hay que decidir cuál se
+   * profana en su lugar, y eso es rehacer una parte de la trama.
+   */
+  const needsAgent =
+    suspectsWithoutCharacter.length > 0 || solucionRota || brokenGameRefs.length > 0;
 
   const summary: string[] = [];
   if (suspectsWithoutCharacter.length > 0) {
@@ -193,6 +236,11 @@ export function computeStaleness(game: GameSession): StalenessReport {
   if (boardOutdated) {
     summary.push('El plano del tablero no refleja las salas actuales.');
   }
+  // Con el «dónde» de cada una: «falta una entidad» no le dice nada a nadie,
+  // «la cámara profanada en la vigilia 3 ya no existe» se entiende y se arregla.
+  for (const cita of brokenGameRefs) {
+    summary.push(`${cita.donde.charAt(0).toUpperCase()}${cita.donde.slice(1)} ya no existe.`);
+  }
   if (
     suspectsWithoutDocument.length > 0 &&
     suspectsWithoutCharacter.length === 0 // ya avisado arriba
@@ -224,6 +272,7 @@ export function computeStaleness(game: GameSession): StalenessReport {
     brokenClues,
     brokenTimelineEvents,
     boardOutdated,
+    brokenGameRefs,
     needsAgent,
     summary,
   };

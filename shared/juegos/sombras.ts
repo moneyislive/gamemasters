@@ -40,7 +40,8 @@
 import type { TrofeoInfo } from '../live';
 import type { DocumentSectionInfo } from '../types';
 import type { PrintableDocInfo } from '../documents';
-import type { ManifiestoDeJuego, ReglaDeJuego } from './tipos';
+import type { ManifiestoDeJuego, ReferenciaDeTrama, ReglaDeJuego } from './tipos';
+import type { TramaSombras } from './sombras-tipos';
 
 /**
  * Los trofeos de El Paso de las Sombras.
@@ -333,6 +334,52 @@ export const REGLAS_SOMBRAS: ReglaDeJuego[] = [
       'Todo lo de esta noche es ficción. Interpreta con generosidad y deja brillar a los demás. Y si te toca ser el kanchō: pierde con elegancia o gana sin restregarlo.',
   },
 ];
+
+/**
+ * Lo que la trama de las Sombras cita de la partida.
+ *
+ * Mismo motivo que en la Momia: sin esto, borrar un paso o un estandarte
+ * después de generar no lo veía nadie, y la senda verdadera es el juego entero.
+ *
+ * Las condiciones no se enumeran: solo citan pasos, y todos entran ya por
+ * `sendaVerdadera`.
+ */
+function citasDeLasSombras(delJuego: unknown): ReferenciaDeTrama[] {
+  const t = delJuego as Partial<TramaSombras> | undefined;
+  if (!t) return [];
+  const citas: ReferenciaDeTrama[] = [];
+
+  for (const [i, id] of (t.sendaVerdadera ?? []).entries()) {
+    citas.push({ categoria: 'pasos', id, donde: `el tramo ${i + 1} de la senda` });
+  }
+  for (const [i, id] of (t.batidos ?? []).entries()) {
+    citas.push({ categoria: 'pasos', id, donde: `el paso batido en la hora ${i + 1}` });
+  }
+  for (const h of t.hallazgos ?? []) {
+    citas.push({ categoria: 'pasos', id: h.pasoId, donde: 'el paso donde aparece un hito' });
+  }
+  for (const id of Object.keys(t.contrasenas ?? {})) {
+    citas.push({ categoria: 'pasos', id, donde: 'el paso que tiene contraseña en su puerta' });
+  }
+  for (const id of Object.keys(t.papeles ?? {})) {
+    citas.push({ categoria: 'escoltas', id, donde: 'quien tiene papel en la columna' });
+  }
+  for (const [escolta, estandarte] of Object.entries(t.estandartes ?? {})) {
+    citas.push({ categoria: 'escoltas', id: escolta, donde: 'quien lleva estandarte' });
+    citas.push({ categoria: 'estandartes', id: estandarte, donde: 'el estandarte que lleva alguien' });
+  }
+  for (const id of Object.keys(t.portes ?? {})) {
+    citas.push({ categoria: 'enseres', id, donde: 'el enser que tiene porte' });
+  }
+  for (const [enser, quien] of Object.entries(t.cargaInicial ?? {})) {
+    citas.push({ categoria: 'enseres', id: enser, donde: 'el enser que alguien carga al empezar' });
+    citas.push({ categoria: 'escoltas', id: quien, donde: 'quien carga un enser al empezar' });
+  }
+  if (t.enserComprometido) {
+    citas.push({ categoria: 'enseres', id: t.enserComprometido, donde: 'el enser prometido al kanchō' });
+  }
+  return citas;
+}
 
 export const SOMBRAS: ManifiestoDeJuego = {
   id: 'sombras',
@@ -660,6 +707,7 @@ export const SOMBRAS: ManifiestoDeJuego = {
   rotuloCentralDelPlano: 'EL MONTE',
 
   reglas: REGLAS_SOMBRAS,
+  referenciasDeLaTrama: citasDeLasSombras,
 
   ronda: {
     accionSobre: 'pasos',
