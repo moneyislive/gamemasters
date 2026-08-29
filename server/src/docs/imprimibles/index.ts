@@ -28,6 +28,14 @@ import { hojaSellado } from './momia/hojaSellado';
 import { informePapiro } from './momia/informePapiro';
 import { papiroSellado } from './momia/papiroSellado';
 import { tablaMarcas } from './momia/tablaMarcas';
+import { cartelesPaso } from './sombras/cartelesPaso';
+import { dosierEscolta } from './sombras/dosierEscolta';
+import { guiaDelPaso } from './sombras/guiaDelPaso';
+import { hitosCamino } from './sombras/hitosCamino';
+import { hojaConsejo } from './sombras/hojaConsejo';
+import { informeSenda } from './sombras/informeSenda';
+import { sendaVerdadera } from './sombras/sendaVerdadera';
+import { tablaRastro } from './sombras/tablaRastro';
 import { tarjetasEnsobrar } from './tarjetasEnsobrar';
 import { manifiestoDe } from '../../../../shared/juegos';
 import type { PrintableDocId, PrintableDocInfo } from '../../../../shared/documents';
@@ -74,10 +82,36 @@ const PLANTILLAS: Record<PrintableDocId, Plantilla> = {
   'tabla-marcas': (game, plot, _vista, opciones) => tablaMarcas(game, plot, opciones),
   'papiro-sellado': papiroSellado,
   'informe-papiro': (game, plot, _vista, opciones) => informePapiro(game, plot, opciones),
+
+  /*
+   * EL PASO DE LAS SOMBRAS. Una tercera imprenta —washi, tinta sumi y sello
+   * bermellón— y una tercera carpeta: ver `sombras/estilo.ts` para por qué sigue
+   * al lado de las otras dos en vez de generalizarse.
+   *
+   * `guia-del-paso` es la única que recibe la `vista`: es el único documento de
+   * este juego que cambia según quien dirija conozca o no la solución.
+   */
+  'guia-del-paso': guiaDelPaso,
+  'dosier-escolta': (game, plot, _vista, opciones) => dosierEscolta(game, plot, opciones),
+  'hitos-camino': (game, plot, _vista, opciones) => hitosCamino(game, plot, opciones),
+  'carteles-paso': (game, plot, _vista, opciones) => cartelesPaso(game, plot, opciones),
+  'hoja-consejo': (game, plot, _vista, opciones) => hojaConsejo(game, plot, opciones),
+  'tabla-rastro': (game, plot, _vista, opciones) => tablaRastro(game, plot, opciones),
+  'senda-verdadera': (game, plot, _vista, opciones) => sendaVerdadera(game, plot, opciones),
+  'informe-senda': (game, plot, _vista, opciones) => informeSenda(game, plot, opciones),
 };
 
 /** Documentos que necesitan al menos una sala para tener sentido. */
-const NECESITAN_SALAS = new Set<PrintableDocId>(['carteles-sala', 'carteles-camara']);
+const NECESITAN_SALAS = new Set<PrintableDocId>([
+  'carteles-sala',
+  'carteles-camara',
+  /*
+   * Y aquí no es solo que quede feo: sin pasos no hay carteles, y sin carteles no
+   * hay contraseñas que leer, así que El Paso de las Sombras no se puede jugar.
+   * Que el documento no salga es mejor que un folio con una portada y nada más.
+   */
+  'carteles-paso',
+]);
 
 /**
  * La ficha de un documento, buscada en el catálogo DEL JUEGO que se juega.

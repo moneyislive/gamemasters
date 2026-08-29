@@ -51,6 +51,7 @@ import {
 } from '../../src/ui';
 import { ALTO_BARRA_TOTAL } from '../../src/tema';
 import { Vigilia } from '../../src/momia/vigilia';
+import { Hora } from '../../src/sombras/hora';
 import type { SalaVista } from '../../../shared/live';
 import { Foto } from '../../src/foto';
 
@@ -69,6 +70,12 @@ export default function Ronda(): JSX.Element {
    * consecuencia: la Momia no las usa y CLUEDO las usa igual que siempre.
    */
   if (vista?.sesion.juego === 'momia') return <Vigilia />;
+  /*
+   * Y la de El Paso de las Sombras, por lo mismo. La bifurcación se queda en una
+   * línea por juego: en cuanto haya que escribir un `if` dentro del cuerpo,
+   * empezará a moverse un píxel de CLUEDO cada vez que se toque otro juego.
+   */
+  if (vista?.sesion.juego === 'sombras') return <Hora />;
 
   if (cargando && !vista) return <Pantalla><Cargando texto="Buscando la partida…" /></Pantalla>;
   if (!vista) {

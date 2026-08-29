@@ -7,6 +7,7 @@
 import { declararAlmacen } from './entidades';
 import { CLUEDO } from './cluedo';
 import { MOMIA } from './momia';
+import { SOMBRAS } from './sombras';
 import type { JuegoId, ManifiestoDeJuego } from './tipos';
 import { TROFEOS } from '../live';
 import type { TrofeoInfo } from '../live';
@@ -67,6 +68,36 @@ export type {
   Restriccion,
   RitoId,
 } from './momia-tipos';
+export { SOMBRAS };
+/*
+ * NINGÚN NOMBRE DE AQUÍ CHOCA CON LOS DE LA MOMIA, y no es suerte: este índice
+ * es plano, así que el nombre ES el espacio de nombres. `cumple`,
+ * `permutaciones` y `solucionesDe` ya estaban cogidos, y un tercer juego que los
+ * reutilizara no daría un error evidente — resolvería su rompecabezas con las
+ * reglas del ajeno. Por eso los de aquí se llaman `cumpleCondicion`,
+ * `variaciones` y `sendasDe`. Está razonado en la cabecera de `sombras-tipos`.
+ */
+export {
+  cumpleCondicion,
+  variaciones,
+  sendasDe,
+  normalizarContrasena,
+  rastroMaximoPara,
+  TRAMOS_DE_LA_SENDA,
+  PRENDAS_INICIALES,
+  PRENDAS_RECIBIDAS_MAXIMO,
+} from './sombras-tipos';
+export type {
+  Condicion,
+  CondicionEscrita,
+  EstadoDeEscolta,
+  EstadoSombras,
+  Hito,
+  PapelId,
+  PasoId,
+  PorteId,
+  TramaSombras,
+} from './sombras-tipos';
 export {
   entidadesDe,
   entidadDe,
@@ -101,8 +132,10 @@ const INSTALADOS: Record<JuegoId, ManifiestoDeJuego> =
   global_[LLAVE] ?? (global_[LLAVE] = { [CLUEDO.id]: CLUEDO });
 INSTALADOS[CLUEDO.id] = CLUEDO;
 INSTALADOS[MOMIA.id] = MOMIA;
+INSTALADOS[SOMBRAS.id] = SOMBRAS;
 anotarAlmacenes(CLUEDO);
 anotarAlmacenes(MOMIA);
+anotarAlmacenes(SOMBRAS);
 
 /**
  * Da de alta un juego.

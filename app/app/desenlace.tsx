@@ -13,6 +13,7 @@ import Animated, { FadeIn, FadeInDown, FadeInUp } from 'react-native-reanimated'
 import * as Haptics from 'expo-haptics';
 import { usePartida } from '../src/estado';
 import { Amanecer } from '../src/momia/amanecer';
+import { Alba } from '../src/sombras/alba';
 import {
   Boton,
   Cargando,
@@ -54,6 +55,13 @@ export default function Desenlace(): JSX.Element {
   }, []);
 
   if (vista?.sesion.juego === 'momia') return <Amanecer />;
+  /*
+   * Y El Paso de las Sombras, por lo mismo y con un motivo propio: allí se puede
+   * PERDER habiendo acertado la senda —si el rastro llegó al tope— y no gana una
+   * persona, gana un bando. La clasificación por aciertos de abajo contaría otra
+   * partida.
+   */
+  if (vista?.sesion.juego === 'sombras') return <Alba />;
 
   if (!vista) return <Pantalla><Cargando /></Pantalla>;
   const fin = vista.desenlace;

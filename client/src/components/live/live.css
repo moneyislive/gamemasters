@@ -307,3 +307,71 @@
 .live-publicos .mono-caps {
   margin-right: 6px;
 }
+
+/* ---------------------------------------------------------------------
+   EL PASO DE LAS SOMBRAS
+   ---------------------------------------------------------------------
+   Reutiliza `.live-momia` para el relleno y las tablas —son medidas, no
+   colores, y los colores ya los repinta el tema— y añade solo lo que este
+   juego tiene y los otros dos no: la barra del rastro y el aviso de lo que
+   NO se anuncia.
+   --------------------------------------------------------------------- */
+
+.live-sombras .live-titulo {
+  /* Un punto más de aire: aquí hay cuatro bloques y se leen en vertical. */
+  margin-bottom: 8px;
+}
+
+/*
+ * El rastro. Va en una barra de caracteres y no en un número a secas por lo
+ * mismo que en el papel: un número que sube no se ve desde el otro lado de la
+ * mesa; una fila que se llena, sí.
+ */
+.live-rastro {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin: 0 0 6px;
+}
+.live-rastro-barra {
+  font-family: var(--font-heading);
+  font-size: 1.15rem;
+  letter-spacing: 0.16em;
+  color: rgba(var(--acento-rgb), 0.75);
+}
+.live-rastro strong {
+  font-family: var(--font-heading);
+  font-size: 1.3rem;
+  color: var(--gold-300);
+}
+.live-rastro.is-apremia .live-rastro-barra,
+.live-rastro.is-apremia strong {
+  color: rgb(var(--peligro-rgb));
+}
+.live-rastro.is-interceptada {
+  /* Cuando ya no hay margen, la barra deja de ser un contador y es un veredicto. */
+  animation: none;
+}
+.live-rastro.is-interceptada .live-rastro-barra,
+.live-rastro.is-interceptada strong {
+  color: rgb(var(--contra-rgb));
+}
+
+/*
+ * El aviso de lo que NO se anuncia.
+ *
+ * Es la única caja de este panel que grita, y se lo ha ganado: quien venga de
+ * dirigir la Momia tiene el reflejo de cantar la cámara profanada al abrir la
+ * vigilia, y hacerlo aquí apaga el juego entero.
+ */
+.live-aviso-sombras {
+  margin: 0 0 10px;
+  padding: 8px 12px;
+  border-left: 3px solid rgb(var(--contra-rgb));
+  background: rgba(var(--contra-rgb), 0.12);
+  font-family: var(--font-heading);
+  font-size: 0.78rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgb(var(--contra-rgb));
+}

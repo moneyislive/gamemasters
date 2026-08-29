@@ -41,6 +41,15 @@ import { useEffect } from 'react';
 const FUENTES_DE_JUEGO: Record<string, string> = {
   momia:
     'https://fonts.googleapis.com/css2?family=Limelight&family=Marcellus+SC&family=Spectral:ital,wght@0,300;0,400;0,600;1,400&display=swap',
+  /*
+   * Shippori Mincho es la MISMA que usa la imprenta de este juego
+   * (`docs/imprimibles/sombras/estilo.ts`), y eso no es ahorro: es que la
+   * pantalla del taller y la hoja que sale de la impresora se lean como la misma
+   * cosa. Trae alfabeto latino completo, así que no hace falta una segunda cara
+   * para los títulos.
+   */
+  sombras:
+    'https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;600;800&family=Spectral:ital,wght@0,300;0,400;0,600;1,400&display=swap',
 };
 
 /** Marca en el `<link>` para no pedir dos veces la misma hoja. */

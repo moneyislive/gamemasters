@@ -178,3 +178,167 @@
 :root[data-juego='momia'] .docs-viewer {
   background: rgba(7, 10, 22, 0.94);
 }
+
+/* ---------------------------------------------------------------------
+   EL PASO DE LAS SOMBRAS — 1582, un monte de noche y una columna en fila
+   ---------------------------------------------------------------------
+   La paleta sale de cuatro cosas que están de verdad en ese camino: la
+   NOCHE de junio en el monte (añil casi negro, que es de lo que está hecho
+   el cielo cuando no hay luna), el ACERO de la luna sobre un filo —lo único
+   que brilla ahí arriba—, el BERMELLÓN del sello de tinta, que es lo único
+   caliente de toda la pantalla, y el WASHI sobre el que se escribe.
+
+   POR QUÉ EL ACENTO NO ES DORADO, que es la decisión que más se ve. Los
+   otros dos juegos son dorados, y con razón: uno es un salón y el otro una
+   tumba llena de oro. Aquí no hay oro en ninguna parte —hay hierro, papel y
+   frío— y un acento dorado habría hecho que este juego pareciera el mismo
+   producto con otras palabras. El acero es más frío, se lee igual de bien
+   sobre el añil, y hace que el bermellón del sello sea de verdad lo único
+   cálido que hay.
+   --------------------------------------------------------------------- */
+
+:root[data-juego='sombras'] {
+  /* Acero lunar: el filo, el metal, el texto que destaca. */
+  --acento-rgb: 147, 167, 192;
+  --acento-medio-rgb: 188, 203, 221;
+  --acento-claro-rgb: 227, 235, 245;
+  --acento-hondo-rgb: 117, 135, 158;
+
+  /* Bermellón (朱): el color del sello de tinta y de lo que hay que obedecer. */
+  --contra-rgb: 184, 64, 47;
+  --contra-hondo-rgb: 122, 42, 32;
+
+  /* Washi. Más blanco y más frío que el pergamino de la mansión. */
+  --papel-rgb: 238, 241, 236;
+  --papel-tenue-rgb: 180, 188, 196;
+
+  /*
+   * Pizarra mojada: de esto están hechos los paneles.
+   *
+   * Ni marrón ni negro. Un monte de noche después de llover tiene ese azul
+   * gris que no es color de nada, y es lo que separa esta pantalla de las
+   * otras dos sin necesidad de un solo adorno.
+   */
+  --madera-honda-rgb: 12, 15, 22;
+  --madera-rgb: 26, 32, 44;
+  --madera-media-rgb: 38, 46, 62;
+  --madera-clara-rgb: 56, 68, 88;
+
+  /* La noche de junio en el monte, que es el suelo sobre el que se apoya todo. */
+  --suelo-hondo-rgb: 6, 8, 14;
+  --suelo-rgb: 10, 14, 24;
+  --suelo-alto-rgb: 16, 22, 36;
+  --suelo-vivo-rgb: 30, 44, 72;
+
+  --tinta-rgb: 17, 20, 26;
+  /* Rojo de laca vieja, no de sangre. */
+  --peligro-rgb: 200, 80, 59;
+
+  /*
+   * TIPOGRAFÍA. Dos caras y cada una hace un trabajo distinto:
+   *
+   * · Shippori Mincho es una mincho japonesa con alfabeto latino completo:
+   *   el remate fino y el contraste alto de un pincel cortado. Es lo que más
+   *   lejos queda del Cinzel Decorative de la mansión y del Limelight de la
+   *   tumba, y —esto importa— es la MISMA que usa la imprenta de este juego,
+   *   así que la pantalla y el papel se leen como la misma cosa.
+   * · Spectral para el cuerpo, ancha y legible en párrafo largo.
+   *
+   * Las alternativas van detrás por si el navegador no llega a cargarlas: se
+   * cargan bajo demanda al entrar en el juego, así que hay un instante en que
+   * todavía no están.
+   */
+  --font-display: 'Shippori Mincho', 'Marcellus SC', 'Cinzel', serif;
+  --font-heading: 'Shippori Mincho', 'Marcellus SC', 'Cinzel', serif;
+  --font-body: 'Spectral', 'Cormorant Garamond', Georgia, serif;
+
+  /*
+   * LA SUPERFICIE DE LOS PANELES: papel de fibra, no madera.
+   *
+   * El washi de morera tiene fibras largas y sueltas que se ven al trasluz,
+   * y no van rectas. Dos tramas casi verticales en ángulos distintos —una
+   * fina y otra muy espaciada— dan esa sensación sin dibujar nada: a esta
+   * opacidad no se ve como una textura, se ve como que la superficie no es
+   * lisa, que es de lo que se trata.
+   */
+  --panel-bg:
+    repeating-linear-gradient(97deg, rgba(var(--papel-rgb), 0.022) 0 1px, transparent 1px 7px),
+    repeating-linear-gradient(84deg, rgba(0, 0, 0, 0.05) 0 1px, transparent 1px 19px),
+    linear-gradient(165deg, rgba(var(--madera-rgb), 0.92), rgba(var(--madera-honda-rgb), 0.96));
+}
+
+/*
+ * EL PLANO DEL CAMINO. Los tokens los define `components/board/board.css`
+ * con los valores de CLUEDO; aquí se repintan.
+ *
+ * El tapete verde de una mesa de juego pasa a ser el monte visto desde muy
+ * arriba —añil en la sombra, verde muy oscuro donde da la luna— y el parqué
+ * de caoba, la pizarra de los caminos. El bloque central deja de ser burdeos
+ * y se vuelve el monte que hay que rodear: casi negro.
+ */
+:root[data-juego='sombras'] {
+  --tablero-suelo-1: #16223a;
+  --tablero-suelo-2: #0d1526;
+  --tablero-suelo-3: #070a12;
+  --tablero-parquet: #232c3c;
+  --tablero-parquet-alt: #2b3547;
+  --tablero-centro: #0a1410;
+}
+
+/*
+ * La textura del fondo. En CLUEDO es el grano del fieltro de una mesa de
+ * juego y en la Momia arena en suspensión; aquí es niebla de monte, así que
+ * se baja la opacidad —la niebla no tiene grano— y se le añade la luna
+ * entrando por arriba a la derecha, que es lo que convierte un fondo plano
+ * en una intemperie.
+ */
+:root[data-juego='sombras'] body::before {
+  opacity: 0.045;
+}
+
+:root[data-juego='sombras'] body {
+  background:
+    /* La luna, alta y detrás. */
+    radial-gradient(760px 520px at 88% 2%, rgba(var(--acento-rgb), 0.16), transparent 62%),
+    /* El valle, abajo a la izquierda: el sitio al que hay que llegar. */
+    radial-gradient(900px 620px at -6% 104%, rgba(var(--suelo-vivo-rgb), 0.55), transparent 62%),
+    /* Bandas de niebla, muy sutiles: dan sensación de aire con humedad. */
+    repeating-linear-gradient(
+      184deg,
+      rgba(var(--papel-rgb), 0.012) 0 3px,
+      transparent 3px 120px
+    ),
+    linear-gradient(180deg, var(--suelo-hondo), var(--suelo) 48%, var(--suelo-hondo));
+}
+
+/*
+ * Las esquinas del marco. En la mansión son cuatro remaches de latón y en la
+ * tumba cuatro clavos de cobre; aquí son las cuatro grapas de hierro de una
+ * caja de campaña: cuadradas y pequeñas, no redondas.
+ */
+:root[data-juego='sombras'] .deco-corners::after {
+  background:
+    linear-gradient(var(--gold-500), var(--gold-500)) 0 0 / 3px 3px no-repeat,
+    linear-gradient(var(--gold-500), var(--gold-500)) 100% 0 / 3px 3px no-repeat,
+    linear-gradient(var(--gold-500), var(--gold-500)) 0 100% / 3px 3px no-repeat,
+    linear-gradient(var(--gold-500), var(--gold-500)) 100% 100% / 3px 3px no-repeat;
+  background-origin: border-box;
+}
+
+/*
+ * Los negros casi puros que quedaron escritos a mano —toasts, menús
+ * flotantes, el velo de la generación—. En la mansión son un negro cálido de
+ * madera y en la tumba el azul de la noche del desierto; aquí, la pizarra.
+ *
+ * Se enumeran en vez de tokenizarlos porque cada uno tiene su propio valor y
+ * unificarlos habría cambiado píxeles de CLUEDO, que es lo único que no se
+ * puede hacer.
+ */
+:root[data-juego='sombras'] .has-tip::after,
+:root[data-juego='sombras'] .studio-toast,
+:root[data-juego='sombras'] .case-confirm,
+:root[data-juego='sombras'] .sp-stage-hint,
+:root[data-juego='sombras'] .sp-pin-tip,
+:root[data-juego='sombras'] .docs-viewer {
+  background: rgba(9, 12, 20, 0.95);
+}

@@ -290,10 +290,72 @@ export function IconoEscarabajo({ size = 31, color }: PropsIcono): JSX.Element {
   );
 }
 
+/* ------------------------------------------------------------------------- */
+/* Los dos de El Paso de las Sombras                                          */
+/* ------------------------------------------------------------------------- */
+
+/**
+ * El torii: la puerta que marca el camino.
+ *
+ * Es el icono de la senda, y la elección tiene su razón: en un monte japonés, lo
+ * que hay clavado en un cruce de caminos es un torii o una piedra con algo
+ * escrito. El torii se reconoce a 23 píxeles por su SILUETA —dos verticales y
+ * dos horizontales que sobresalen— y ningún otro icono de la barra tiene esa
+ * forma. Una piedra habría sido un rectángulo más, indistinguible del tablón.
+ *
+ * El dintel de arriba sobresale por los dos lados y el travesaño de abajo no: es
+ * lo único que separa un torii de una letra H girada, y a este tamaño es lo
+ * único que se ve.
+ */
+export function IconoTorii(p: PropsIcono): JSX.Element {
+  return (
+    <Lienzo {...p}>
+      {/* El dintel (kasagi), que sobresale. */}
+      <Path d="M6 12.5 H42" />
+      {/* El travesaño (nuki), que no. */}
+      <Path d="M12 20 H36" />
+      {/* Los dos pilares, ligeramente inclinados hacia dentro como los de verdad. */}
+      <Path d="M14 12.5 L15.5 41.5" />
+      <Path d="M34 12.5 L32.5 41.5" />
+      {/* El montante central. Corto: con él largo, el hueco de dentro se cierra. */}
+      <Path d="M24 12.5 V20" />
+    </Lienzo>
+  );
+}
+
+/**
+ * El abanico de guerra (軍配, gunbai): con lo que un comandante decide.
+ *
+ * Es el icono del consejo del alba, y es exactamente lo que significa: el gunbai
+ * no es un abanico de abanicarse, es la paleta con la que se señala una orden y
+ * se zanja una discusión. En un juego donde el final es una votación, no hay
+ * objeto mejor.
+ *
+ * LA PALA VA CERRADA Y CON UNA MARCA DENTRO. A 23 píxeles, una pala vacía se
+ * lee como una cuchara o como una lupa sin mango; la cruz de dentro —que en los
+ * de verdad es el sello del clan— es lo que lo vuelve inconfundible.
+ */
+export function IconoAbanico(p: PropsIcono): JSX.Element {
+  return (
+    <Lienzo {...p}>
+      {/* La pala, con la forma de calabaza achatada que tienen los gunbai. */}
+      <Path d="M24 6 C33 6 37 12 37 18 C37 24 33 29.5 24 29.5 C15 29.5 11 24 11 18 C11 12 15 6 24 6 Z" />
+      {/* La marca de dentro. */}
+      <Path d="M24 11.5 V24" />
+      <Path d="M17.5 17.5 H30.5" />
+      {/* El mango, con su tope. */}
+      <Path d="M24 29.5 V41.5" />
+      <Path d="M19.5 41.5 H28.5" />
+    </Lienzo>
+  );
+}
+
 export const ICONOS: Record<IconoId, (p: PropsIcono) => JSX.Element> = {
   papiro: IconoPapiro,
   anj: IconoAnj,
   escarabajo: IconoEscarabajo,
+  torii: IconoTorii,
+  abanico: IconoAbanico,
   reloj: IconoRonda,
   mascara: IconoPersonaje,
   plano: IconoMapa,

@@ -1,0 +1,165 @@
+/* =====================================================================
+   LA CORTINILLA DE EL PASO DE LAS SOMBRAS
+   =====================================================================
+
+   Va aparte de `transition.css` (CLUEDO) y de `transicion-momia.css` por lo
+   mismo que las otras dos: son animaciones distintas, no la misma con otros
+   colores, y compartir hoja habría acabado en una maraña de selectores con
+   `[data-juego]` delante.
+
+   TODOS LOS COLORES SON LITERALES Y NO TOKENS, y es a propósito. Esta
+   cortinilla se pinta ANTES de que el documento tenga `data-juego` puesto —es
+   lo primero que se ve al pulsar la ficha del catálogo, y el tema se aplica al
+   entrar en el recibidor— así que un `var(--acento)` aquí traería el dorado de
+   la casa y el farol saldría del color equivocado justo en el único fotograma
+   que la gente mira con atención.
+   ===================================================================== */
+
+.ts-velo {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  /* Negro azulado, no negro puro: el negro puro se lee como «se ha roto». */
+  background: #05070d;
+  overflow: hidden;
+}
+
+/* ---------------------------------------------------------------------
+   El farol
+   --------------------------------------------------------------------- */
+
+/* El halo va DEBAJO del dibujo y es lo que de verdad ilumina la escena. */
+.ts-halo {
+  position: absolute;
+  width: min(70vw, 520px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgba(232, 190, 118, 0.42) 0%,
+    rgba(200, 150, 80, 0.18) 38%,
+    rgba(0, 0, 0, 0) 70%
+  );
+  filter: blur(2px);
+  pointer-events: none;
+}
+
+.ts-farol {
+  position: relative;
+  width: min(34vw, 150px);
+  /* El papel del chōchin, encendido por dentro. */
+  color: #e6c88e;
+  filter: drop-shadow(0 0 18px rgba(226, 178, 96, 0.55));
+}
+
+.ts-llama {
+  fill: #ffd98a;
+  filter: drop-shadow(0 0 10px rgba(255, 200, 110, 0.9));
+}
+
+.ts-humo {
+  color: #9aa4b2;
+}
+
+/* ---------------------------------------------------------------------
+   El monte
+   --------------------------------------------------------------------- */
+
+.ts-monte {
+  position: absolute;
+  inset: auto 0 0 0;
+  width: 100%;
+  height: min(62vh, 420px);
+  pointer-events: none;
+}
+
+.ts-luna {
+  fill: #dfe8f3;
+  filter: drop-shadow(0 0 26px rgba(190, 212, 240, 0.55));
+}
+
+/* El halo de la luna: casi invisible, y sin él la luna parece pegada. */
+.ts-luna-halo {
+  fill: rgba(160, 190, 226, 0.09);
+}
+
+/*
+ * Las crestas van RELLENAS y sin borde: son siluetas a contraluz, y un trazo
+ * las convertiría en un dibujo de montaña en vez de en la falta de luz que hay
+ * detrás de una montaña.
+ */
+.ts-cresta {
+  fill: #0a0f1a;
+}
+
+.ts-cresta--lejos {
+  fill: #111a2b;
+}
+
+/*
+ * El torii, todavía más oscuro que la cresta de delante. Está más cerca, así
+ * que le llega menos luna: si fuera del mismo tono, la escena se aplanaría y
+ * parecería un decorado de cartón.
+ */
+.ts-torii {
+  fill: #05070d;
+}
+
+/* ---------------------------------------------------------------------
+   La frase
+   --------------------------------------------------------------------- */
+
+.ts-lema {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: clamp(2.5rem, 9vh, 5.5rem);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.55rem;
+  text-align: center;
+  pointer-events: none;
+  padding: 0 1.5rem;
+}
+
+.ts-lema-kanji {
+  font-family: 'Shippori Mincho', 'Noto Serif JP', serif;
+  font-size: clamp(1.6rem, 5vw, 2.4rem);
+  letter-spacing: 0.4em;
+  /* El bermellón del sello: el único punto cálido que queda al final. */
+  color: #c9705f;
+  text-shadow: 0 0 22px rgba(184, 64, 47, 0.35);
+  /* El interletrado deja un hueco a la derecha; se compensa para centrarlo. */
+  text-indent: 0.4em;
+}
+
+.ts-lema-texto {
+  font-family: 'Shippori Mincho', Georgia, serif;
+  font-size: clamp(0.86rem, 2.4vw, 1.05rem);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: rgba(214, 226, 240, 0.72);
+}
+
+/*
+ * Sin movimiento para quien lo ha pedido.
+ *
+ * La cortinilla es decoración pura: quitarla entera no impide entrar en la
+ * partida, y para alguien con sensibilidad vestibular una pantalla que se
+ * enciende y se apaga en dos segundos es exactamente lo que hay que evitar. Se
+ * queda la escena final, quieta, y el temporizador sigue corriendo igual.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .ts-halo,
+  .ts-farol {
+    display: none;
+  }
+  .ts-monte,
+  .ts-lema {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}

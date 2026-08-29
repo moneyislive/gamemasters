@@ -309,7 +309,21 @@ export type TrofeoId =
   | 'ojo-de-horus'
   | 'incorrupto'
   | 'mano-abierta'
-  | 'sombra';
+  | 'sombra'
+  /*
+   * Los de El Paso de las Sombras.
+   *
+   * NÓTESE QUE NINGUNO ES UNA PALABRA SUELTA, y no es casualidad: `sombra` ya
+   * es de la Momia, y el trofeo del traidor de este juego se habría llamado
+   * igual con toda naturalidad. Como los ids no llevan prefijo de juego —la
+   * costura que el informe propone cerrar—, la única defensa que hay hoy es
+   * ponerles nombres que nadie pueda repetir por accidente.
+   */
+  | 'paso-abierto'
+  | 'ojo-de-hanzo'
+  | 'sin-rastro'
+  | 'palabra-dada'
+  | 'sombra-de-akechi';
 
 export interface TrofeoInfo {
   id: TrofeoId;

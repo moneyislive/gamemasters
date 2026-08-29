@@ -50,7 +50,7 @@ import {
   sombra,
   texto,
 } from './tema';
-import { conAlfa, useEsMomia, useFondo, useTema } from './tema-juego';
+import { conAlfa, useFondo, useOrnamento, useTema } from './tema-juego';
 
 // ---------------------------------------------------------------------------
 // Contenedores
@@ -275,14 +275,19 @@ export function Sello({ children }: { children: React.ReactNode }): JSX.Element 
  */
 export function Ornamento({ style }: { style?: StyleProp<ViewStyle> }): JSX.Element {
   const t = useTema();
-  const momia = useEsMomia();
+  /*
+   * EL SIGNO SALE DE UNA TABLA Y YA NO DE UN TERNARIO. Con dos juegos, `momia ?
+   * '☥' : '❦'` funcionaba; con el tercero habría hecho falta anidar otro, y ese
+   * es exactamente el sitio donde un juego nuevo se olvida y hereda el signo de
+   * la mansión sin que nada dé error. CLUEDO sigue recibiendo '❦' porque es el
+   * respaldo de la tabla.
+   */
+  const signo = useOrnamento();
   const linea = { backgroundColor: conAlfa(t.oro500, 0.35) };
   return (
     <View style={[estilos.ornamento, style]}>
       <View style={[estilos.ornamentoLinea, linea]} />
-      <Text style={{ color: t.oro500, fontSize: 13, marginHorizontal: espacio.sm }}>
-        {momia ? '☥' : '❦'}
-      </Text>
+      <Text style={{ color: t.oro500, fontSize: 13, marginHorizontal: espacio.sm }}>{signo}</Text>
       <View style={[estilos.ornamentoLinea, linea]} />
     </View>
   );

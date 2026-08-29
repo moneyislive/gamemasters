@@ -375,9 +375,132 @@ const MOMIA: PalabrasDeJuego = {
   },
 };
 
+/**
+ * El Paso de las Sombras.
+ *
+ * El registro es un tercero, y tampoco es un adorno: en la mansión se trata de
+ * usted porque el mayordomo es un empleado; en la expedición se tutea porque el
+ * escriba es uno más. Aquí se tutea y ADEMÁS se habla corto: quien acompaña es
+ * un guía de monte que habla bajo para que no le oigan, y las frases largas le
+ * quedarían mal en la boca. Que el tono cambie con el juego es la mitad de lo
+ * que hace que sea otro sitio.
+ */
+const SOMBRAS: PalabrasDeJuego = {
+  ornamento: '◇',
+  recibidor: {
+    kicker: 'Sakai, la tarde antes',
+    titulo: 'Noches de Iga',
+    sub: 'Cada noche es un cruce: los pasos de tu casa, cuatro que llevan a la playa y alguien que cobra de Akechi.',
+    nueva: '✦ Nueva noche',
+    creando: 'Reuniendo la columna…',
+    cargando: 'Apagando los faroles…',
+    ficha: 'Noche nº',
+    vacioTitulo: 'Todavía no ha salido ninguna columna',
+    vacioTexto: 'Pulsa «Nueva noche» y el Guía empezará a trazar el camino.',
+    vacioBoton: 'Trazar el primer camino',
+    vacioMarca: '◇',
+    estados: { draft: 'Sin trazar', generating: 'Trazando…', ready: 'Camino trazado' },
+    contadores: ['en la columna', 'pasos', 'enseres'],
+    confirmarCierre: '¿Cerrar esta noche para siempre?',
+    errorCargar: 'No se pudieron cargar las noches. ¿Está el servidor en marcha?',
+    errorCrear: 'No se pudo abrir una noche nueva.',
+    errorBorrar: 'No se pudo borrar la noche.',
+    abrirAria: (nombre) => `Abrir la noche ${nombre}`,
+    borrarAria: (nombre) => `Borrar la noche ${nombre}`,
+  },
+  /*
+   * Una pestaña necesita UNA palabra, y «escoltas» no es la que usa nadie en la
+   * mesa: se dice «la columna». Es la única excepción que hace falta; las otras
+   * tres categorías se llaman igual en el manifiesto y en la pantalla.
+   */
+  rotulos: { escoltas: 'Columna' },
+  articulos: { escoltas: 'el', pasos: 'el', enseres: 'el', estandartes: 'el' },
+  taller: {
+    volver: '← Sakai',
+    pestanaEstilo: 'Estilo',
+    pestanaTablero: 'El camino',
+    pestanaDosieres: 'Dosieres',
+    pestanaVivo: 'En vivo',
+    kicker: 'Noche',
+    nombreAria: 'Nombre de la noche',
+    listo: '✦ Camino trazado · Ver dosieres',
+    desactualizado: '⚠ La columna ha cambiado',
+    generar: '✦ TRAZAR EL CAMINO',
+    actualizar: '✦ ACTUALIZAR EL CAMINO',
+    regenerar: '↻ Trazar otro camino',
+    confirmarRegenerar: '¿Seguro? Pulsa otra vez',
+    tipGenerar:
+      'Traza la senda, reparte los disfraces y escribe lo que dice cada mojón del camino.',
+    tipTrabajando: 'El Guía ya está trabajando…',
+    tipRegenerar:
+      'Descarta el camino actual —la senda, los disfraces y los dosieres— y traza otro distinto.',
+    tipConfirmar: 'Pulsa otra vez para descartar este camino y trazar uno nuevo.',
+    tipConAyuda: ', con ayuda del Guía para lo que falte',
+    extraviadoTitulo: 'Esta noche se ha perdido en el monte',
+    extraviadoTexto: 'No se pudo abrir. Quizá se borró, o el servidor no responde.',
+    extraviadoVolver: '← Volver a Sakai',
+    abriendo: 'Desdoblando el mapa…',
+    buscando: 'Buscando la noche…',
+  },
+  /*
+   * Una «ronda» es aquí una HORA de las del reloj japonés —del Jabalí, de la
+   * Rata, del Buey, del Tigre— y quien dirige lo va a decir doce veces esta
+   * noche. Decir «ronda tres» en mitad de un monte rompe la ficción tan bien
+   * como una alarma de móvil.
+   */
+  vivo: {
+    abrirSala: 'Reunir a la columna',
+    sinTrama: 'Traza antes el camino: sin senda no hay nada que cruzar.',
+    desenlace: 'Abrir el pliego de Hanzō',
+    abrirRonda: (n) => `Abrir la hora ${n}`,
+    cerrarRonda: 'Cerrar la hora',
+    rondaEnCurso: (n, total) => `Hora ${n} de ${total} · en curso`,
+    rondaCerrada: (n) => `Hora ${n} cerrada`,
+    /*
+     * «Señalamientos» y no «acusaciones»: aquí nadie acusa de un asesinato, se
+     * señala a quien cobra de Akechi. Y va justo encima del contador de sendas
+     * propuestas, así que con la misma palabra los dos se leían como el mismo
+     * dato.
+     */
+    acusacionesRecibidas: (cuantas, total) => `${cuantas} de ${total} señalamientos entregados.`,
+    sinSilla: (cuantos) =>
+      cuantos === 1
+        ? 'Hay una persona apuntada a esta noche que todavía no tiene sitio en la columna.'
+        : `Hay ${cuantos} personas apuntadas a esta noche que todavía no tienen sitio en la columna.`,
+    sentarAQuienFalte: 'Dar sitio a quien falte',
+  },
+  plano: {
+    aereoSinPlano:
+      'Has elegido jugar sobre el espacio real. Sube la fotografía cenital desde la pestaña de ' +
+      'pasos y clava una chincheta en cada uno.',
+    conChincheta: (n) => `${n} ${n === 1 ? 'paso' : 'pasos'} sobre el plano real`,
+    sinChinchetas:
+      'Aún no has clavado ninguna chincheta. Vuelve a la pestaña de pasos y haz clic sobre la fotografía.',
+    sinLugares:
+      'Añade primero algunos pasos: sin saber por dónde se cruza no hay camino que trazar.',
+    invitacion: 'Traza el camino de Iga y mira por dónde se puede cortar de un paso a otro.',
+    leyenda: (lugares, pasos) =>
+      `${lugares} pasos · ${pasos} ${pasos === 1 ? 'atajo' : 'atajos'}`,
+    pistaPasos:
+      'Los trazos discontinuos son atajos: se cruza de un paso a otro sin bajar al camino grande.',
+  },
+  asistente: {
+    subtitulo: 'Guía del camino de Iga',
+    bienvenida:
+      'Baja la voz. Kioto arde y los caminos grandes ya no son nuestros; hay que cruzar Iga esta ' +
+      'noche y llegar a la playa antes del alba. Soy el guía: conozco estos montes y sé las ' +
+      'reglas del camino. Cuéntame quién cruza, qué habitaciones de tu casa van a ser los ' +
+      'pasos y qué lleva la columna encima. De los blasones me ocupo yo, si no se te ocurren.',
+    servicio: 'El Guía está despierto',
+    pensando: 'El Guía está mirando el monte…',
+    marcador: 'Habla con El Guía…',
+  },
+};
+
 const PALABRAS: Record<JuegoId, PalabrasDeJuego> = {
   cluedo: CLUEDO,
   momia: MOMIA,
+  sombras: SOMBRAS,
 };
 
 /**

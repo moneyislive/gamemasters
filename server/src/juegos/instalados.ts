@@ -47,6 +47,21 @@ import './momia-sellado';
  */
 import '../docs/imprimibles/momia/dosierExpedicionario';
 
+// El Paso de las Sombras: reductores, proyección del estado, consejo y trofeos.
+import './sombras-acciones';
+import './sombras-proyeccion';
+import './sombras-consejo';
+/*
+ * Y su ampliación, que vive con la trama sin IA. La importan los reductores por
+ * `estadoInicial`, así que ya estaría cargada; se pone explícita porque
+ * depender de un import indirecto para que un registro corra es exactamente la
+ * clase de cosa que se rompe al reordenar imports y no falla hasta la noche.
+ */
+import './sombras-trama';
+
+// Y su dosier por persona, que lo sirve el taller. Ver el porqué arriba.
+import '../docs/imprimibles/sombras/dosierEscolta';
+
 /**
  * No exporta nada, y es a propósito.
  *

@@ -74,6 +74,13 @@ export const PALETAS = {
   arcano: { acento: '#9b7fd4', fondo: ['#241a3d', '#0b0714'] },
   bosque: { acento: '#5fbf95', fondo: ['#0f2e24', '#050f0c'] },
   brasa: { acento: '#e8a04a', fondo: ['#3a2410', '#120b04'] },
+  /*
+   * La única FRÍA de la estantería, y por eso existe. Las cinco de arriba son
+   * cálidas o moradas: una velada de acero y añil metida en cualquiera de ellas
+   * se habría confundido con la de al lado en la portada, que es exactamente
+   * donde no puede pasar.
+   */
+  acero: { acento: '#a8bcd6', fondo: ['#16223a', '#05070d'] },
 } as const satisfies Record<string, Paleta>;
 
 /**
@@ -97,6 +104,20 @@ const RETRATOS: Record<string, { genero: string; gente: string; duracion: string
     duracion: 'Una hora',
     icono: 'plano',
     paleta: PALETAS.bosque,
+  },
+  /*
+   * El Misterio de la Momia NO está en esta tabla y se queda como estaba: cae en
+   * el retrato por defecto, y ese es el estado en el que se probó y se publicó.
+   * Añadirle una entrada aquí le cambiaría la portada, y la regla de esta
+   * entrega es no mover los dos juegos que ya funcionan. Queda anotado en los
+   * pendientes.
+   */
+  sombras: {
+    genero: 'Sigilo y traición',
+    gente: '4 a 10',
+    duracion: 'Una noche',
+    icono: 'torii',
+    paleta: PALETAS.acero,
   },
 };
 

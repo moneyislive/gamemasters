@@ -19,7 +19,7 @@ import Animated, { FadeIn, FadeInUp } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import * as api from '../src/api';
 import { usePartida } from '../src/estado';
-import { useEsMomia } from '../src/tema-juego';
+import { useJuego } from '../src/tema-juego';
 import { accionDeAcusacion, manifiestoDe } from '../../shared/juegos';
 import {
   Boton,
@@ -101,9 +101,51 @@ function Selector({
   );
 }
 
+/**
+ * Lo que se dice al acusar, por juego.
+ *
+ * ERA UN TERNARIO CONTRA `esMomia`, y con un tercer juego se convirtió en el
+ * fallo que esta entrega ha ido persiguiendo por toda la app: El Paso de las
+ * Sombras no es la Momia, luego caía en la rama de CLUEDO y el consejo del alba
+ * —al que se llega desde `consejo.tsx`— prometía «Gana quien acierte primero».
+ * Allí no gana quien acierta primero: se señala una sola vez, no se sabe hasta
+ * el amanecer, y se puede perder habiendo acertado.
+ *
+ * CLUEDO ES EL RESPALDO, con las mismas palabras de siempre, y la Momia tiene
+ * aquí las suyas sin cambiar una letra.
+ */
+interface PalabrasDeAcusar {
+  verbo: string;
+  consecuencia: string;
+  entregar: string;
+  revisar: string;
+}
+
+const PALABRAS_DE_CLUEDO: PalabrasDeAcusar = {
+  verbo: 'Acusas a',
+  consecuencia: 'No podrás cambiarla. Gana quien acierte primero.',
+  entregar: 'Entregar mi acusación',
+  revisar: 'Revisar mi acusación',
+};
+
+const PALABRAS_DE_ACUSAR: Record<string, PalabrasDeAcusar> = {
+  momia: {
+    verbo: 'Señalas a',
+    consecuencia: 'No podrás cambiarlo. Se sabrá al amanecer si acertaste.',
+    entregar: 'Entregarlo',
+    revisar: 'Revisarlo',
+  },
+  sombras: {
+    verbo: 'Señalas a',
+    consecuencia: 'No podrás cambiarlo. Se señala una vez y para toda la partida.',
+    entregar: 'Entregarlo',
+    revisar: 'Revisarlo',
+  },
+};
+
 export default function Acusar(): JSX.Element {
   const { vista, refrescar } = usePartida();
-  const esMomia = useEsMomia();
+  const palabras = PALABRAS_DE_ACUSAR[useJuego() ?? ''] ?? PALABRAS_DE_CLUEDO;
   const t = useTema();
   const [respuestas, setRespuestas] = useState<Record<string, string>>({});
   const [confirmando, setConfirmando] = useState(false);
@@ -153,10 +195,8 @@ export default function Acusar(): JSX.Element {
    */
   const accion = accionDeAcusacion(manifiestoDe(vista?.sesion.juego));
   const titulo = accion?.rotulo ?? 'Acusación';
-  const verbo = esMomia ? 'Señalas a' : 'Acusas a';
-  const consecuencia = esMomia
-    ? 'No podrás cambiarlo. Se sabrá al amanecer si acertaste.'
-    : 'No podrás cambiarla. Gana quien acierte primero.';
+  const verbo = palabras.verbo;
+  const consecuencia = palabras.consecuencia;
 
   if (confirmando) {
     // El primer eje encabeza —«acusas a Fulano»— y el resto se lee debajo.
@@ -196,7 +236,7 @@ export default function Acusar(): JSX.Element {
         </Cuerpo>
 
         <Boton variante="peligro" onPress={() => void enviar()} cargando={enviando}>
-          {esMomia ? 'Entregarlo' : 'Entregar mi acusación'}
+          {palabras.entregar}
         </Boton>
         <Boton onPress={() => setConfirmando(false)} style={{ marginTop: espacio.sm }}>
           Volver a pensarlo
@@ -230,7 +270,7 @@ export default function Acusar(): JSX.Element {
         </Animated.View>
 
         <Boton variante="peligro" onPress={() => setConfirmando(true)} disabled={!completa}>
-          {esMomia ? 'Revisarlo' : 'Revisar mi acusación'}
+          {palabras.revisar}
         </Boton>
         <Boton onPress={() => router.back()} style={{ marginTop: espacio.sm }}>
           Todavía no

@@ -23,6 +23,8 @@ import { Foto } from '../../src/foto';
 import { conAlfa, useTema } from '../../src/tema-juego';
 import { TarjetaDon } from '../../src/momia/vigilia';
 import { leerEstadoMomia } from '../../src/momia/vista';
+import { leerEstadoSombras } from '../../src/sombras/vista';
+import { Mon, TarjetaDisfraz } from '../../src/sombras/piezas';
 
 /**
  * Cada apartado del dosier va en su propia hoja.
@@ -72,11 +74,25 @@ export default function Personaje(): JSX.Element {
    * sección `don` marcada como obligatoria— y es también la que más se consulta
    * durante la noche, de ahí que vaya arriba del todo y no al final.
    *
-   * Para CLUEDO esto es `null` y la pantalla queda exactamente como estaba: no
-   * hay `estadoDelJuego`, así que `leerEstadoMomia` devuelve `null` y no se
-   * pinta nada. Ni un elemento de más en el árbol.
+   * SE PREGUNTA PRIMERO A QUÉ SE JUEGA, y no basta con mirar el estado. Era
+   * `leerEstadoMomia(vista.estadoDelJuego)` a secas, y esa función solo exige que
+   * el estado sea un objeto con un `yo` dentro —no mira ni una clave propia de la
+   * Momia—. El Paso de las Sombras manda exactamente eso, así que devolvía un
+   * estado bueno con el don caído al de respaldo y la pantalla pintaba «Tu don ·
+   * Epigrafista», con la vigilia y los colores de la tumba, encima del disfraz.
+   *
+   * Para CLUEDO sigue siendo `null` y la pantalla queda exactamente como estaba:
+   * ni un elemento de más en el árbol. Para la Momia se lee igual que siempre.
    */
-  const momia = leerEstadoMomia(vista.estadoDelJuego);
+  const momia = sesion.juego === 'momia' ? leerEstadoMomia(vista.estadoDelJuego) : null;
+  /*
+   * Lo mismo para El Paso de las Sombras: el DISFRAZ es una sección obligatoria
+   * de su dosier —`SECCIONES_SOMBRAS` la declara así— y es lo que más se
+   * consulta durante la noche. Y va aquí también el ESTANDARTE, que en aquel
+   * juego no existe: es público, sirve para que la gente se llame a gritos por
+   * un pasillo a oscuras, y si no se lee en el dosier no se lee en ninguna parte.
+   */
+  const sombras = sesion.juego === 'sombras' ? leerEstadoSombras(vista.estadoDelJuego) : null;
 
   return (
     <Pantalla>
@@ -109,6 +125,29 @@ export default function Personaje(): JSX.Element {
       {momia && (
         <Animated.View entering={FadeInUp.delay(90).duration(500)}>
           <TarjetaDon estado={momia} compacta />
+        </Animated.View>
+      )}
+
+      {sombras && (
+        <Animated.View entering={FadeInUp.delay(90).duration(500)}>
+          <Marco>
+            <TarjetaDisfraz
+              rol={sombras.yo.papelRol}
+              kanji={sombras.yo.papelKanji}
+              queHace={sombras.yo.papelQueHace}
+              usado={sombras.yo.papelUsado}
+            />
+            {sombras.yo.estandarteNombre ? (
+              <View style={{ marginTop: espacio.md }}>
+                <Etiqueta>Cruzas bajo el blasón de</Etiqueta>
+                <View style={{ height: espacio.xs }} />
+                <Mon>{sombras.yo.estandarteNombre}</Mon>
+                <Cuerpo tenue style={{ fontSize: 13, marginTop: espacio.xs }}>
+                  Es público: los demás lo saben y te llamarán por él.
+                </Cuerpo>
+              </View>
+            ) : null}
+          </Marco>
         </Animated.View>
       )}
 

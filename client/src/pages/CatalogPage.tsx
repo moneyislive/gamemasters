@@ -106,6 +106,48 @@ function ArtMummy(): ReactElement {
   );
 }
 
+/**
+ * El Paso de las Sombras — un torii, la luna y el camino que sube.
+ *
+ * Tenía que distinguirse de la ficha de la Momia a un metro, y ahí estaba el
+ * riesgo: aquella son dos triángulos —pirámides— y unas montañas de trazo se le
+ * habrían parecido demasiado en la estantería. Lo que separa las dos siluetas es
+ * el TORII, que no se parece a nada más de la portada, y que la luna esté ALTA y
+ * hueca en vez de un sol con rayos.
+ */
+function ArtSombras(): ReactElement {
+  return (
+    <svg viewBox="0 0 220 220" role="img" aria-label="Un torii, la luna y un camino de monte">
+      <g fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+        {/* La luna, alta y detrás de todo. */}
+        <circle cx="164" cy="48" r="26" />
+        <path d="M150 30a26 26 0 0 0 24 40" opacity="0.35" />
+
+        {/* Las crestas del monte, muy bajas: es un puerto, no una cordillera. */}
+        <path d="M8 150l30-26 22 18 26-30 24 26 30-22 34 30" opacity="0.55" />
+
+        {/* Dos pinos, la silueta que dice «Japón» sin decir nada. */}
+        <path d="M46 150v-26M34 128l12-14 12 14M38 138l8-9 8 9" opacity="0.75" />
+        <path d="M190 156v-22M180 138l10-12 10 12" opacity="0.6" />
+
+        {/* El camino, que se estrecha al fondo. */}
+        <path d="M62 210l30-58M158 210l-34-58" opacity="0.5" />
+        <path d="M92 152h32" opacity="0.5" />
+
+        {/* El torii, en primer plano y a la izquierda. */}
+        <path d="M62 122h74" strokeWidth="5" />
+        <path d="M70 136h58" />
+        <path d="M76 122l4 68" />
+        <path d="M122 122l-4 68" />
+        <path d="M99 122v14" />
+      </g>
+      {/* Un mon lacado: el sello bermellón, lo único macizo del dibujo. */}
+      <circle cx="99" cy="176" r="9" fill="currentColor" stroke="none" opacity="0.85" />
+      <circle cx="99" cy="176" r="4" fill="none" stroke="var(--card-bg1)" strokeWidth="2.5" />
+    </svg>
+  );
+}
+
 /** Harry Potter — varita, chispas y rayo. */
 function ArtWizard(): ReactElement {
   return (
@@ -217,6 +259,32 @@ const GAMES: readonly CatalogGame[] = [
       '--card-glow': 'rgba(216, 180, 106, 0.42)',
     } as CSSProperties,
     art: <ArtMummy />,
+  },
+  {
+    id: 'sombras',
+    title: 'El Paso de las Sombras',
+    tagline: 'Honnō-ji arde. Antes del alba hay que cruzar Iga, y uno de los que guían cobra de Akechi.',
+    players: '4 – 10 jugadores · En vivo',
+    cta: 'Salir de Sakai →',
+    /*
+     * La ficha lleva la paleta del juego, no una paleta cualquiera: la noche del
+     * monte detrás y el acero de la luna delante son los mismos valores con los
+     * que se pinta su taller (`styles/temas.css`). Que la tarjeta prometa lo que
+     * hay al otro lado es media promesa cumplida antes de pulsarla.
+     *
+     * Y ES LA ÚNICA FICHA FRÍA DE LA ESTANTERÍA, a propósito. Las otras tres
+     * abiertas son doradas —candelabro, oro de tumba, oro de castillo— y una
+     * cuarta dorada se habría perdido entre ellas. Aquí el acento es acero y el
+     * único calor es el punto de bermellón del sello, que es exactamente lo que
+     * pasa dentro del juego.
+     */
+    palette: {
+      '--card-bg1': '#070a12',
+      '--card-bg2': '#22304a',
+      '--card-accent': '#c3d0e0',
+      '--card-glow': 'rgba(147, 167, 192, 0.38)',
+    } as CSSProperties,
+    art: <ArtSombras />,
   },
   {
     id: 'potter',

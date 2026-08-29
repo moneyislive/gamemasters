@@ -9,8 +9,9 @@
  */
 
 import type { GameSession } from '../../../shared/types';
-import { MOMIA } from '../../../shared/juegos';
+import { MOMIA, SOMBRAS } from '../../../shared/juegos';
 import { buildSystemPromptMomia } from './momia-escriba';
+import { buildSystemPromptSombras } from './sombras-guia';
 
 /** Formatea una lista de entidades con nombre y descripción opcional. */
 function listar(
@@ -50,6 +51,7 @@ export function buildSystemPrompt(game: GameSession): string {
    * son prompt y el prompt no se factoriza sin perder tono.
    */
   if (game.settings?.juego === MOMIA.id) return buildSystemPromptMomia(game);
+  if (game.settings?.juego === SOMBRAS.id) return buildSystemPromptSombras(game);
 
   const numSospechosos = game.suspects.length;
   const numSalas = game.rooms.length;

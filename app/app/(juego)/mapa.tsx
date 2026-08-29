@@ -98,8 +98,29 @@ export default function Mapa(): JSX.Element {
   const lugar = categoriasDeLugar(manifiesto)[0];
   const unLugar = lugar?.singular ?? 'estancia';
   const losLugares = lugar?.plural ?? 'estancias';
-  // Si el juego no tiene acción de entrar, el plano se mira pero no se toca.
-  const seEntra = Boolean(accionDeEntrarEnLugar(manifiesto));
+  /*
+   * Si el juego no tiene acción de entrar, el plano se mira pero no se toca.
+   *
+   * Y TAMPOCO SE TOCA SI ESA ACCIÓN PIDE ALGO QUE ESTE PLANO NO PUEDE DAR. En
+   * El Paso de las Sombras, reconocer un paso exige además la palabra escrita en
+   * la puerta —un campo `eligeLibre`— y este plano solo sabe mandar el id del
+   * sitio: la petición saldría, el reductor la rechazaría con razón, y la
+   * pantalla habría invitado a hacer algo imposible. Se deduce de la acción en
+   * vez de escribir el nombre del juego aquí: cualquier juego futuro cuya acción
+   * de entrar necesite datos propios se comporta igual sin tocar esta pantalla.
+   */
+  const entrada = accionDeEntrarEnLugar(manifiesto);
+  const seEntra = Boolean(entrada) && (entrada?.accion.eligeLibre ?? []).length === 0;
+
+  /*
+   * «Las salas», «las cámaras»… y «los pasos». El manifiesto no declara el
+   * género de una categoría —está anotado como pendiente en el informe— así que
+   * se deduce de la terminación del singular, que es la misma heurística que ya
+   * usa `agent/momia-herramientas.ts` para «un/una». Con las tres categorías de
+   * lugar que existen acierta; el día que alguien registre «los mapas», habrá
+   * que declararlo de verdad.
+   */
+  const losLas = /a$/i.test(unLugar) ? 'Las' : 'Los';
 
   /*
    * La cámara profanada de esta vigilia, marcada también aquí.
@@ -133,10 +154,10 @@ export default function Mapa(): JSX.Element {
           {abierta
             ? seEntra
               ? `Toca una ${unLugar} para entrar en ella.`
-              : `Las ${losLugares} de esta partida.`
+              : `${losLas} ${losLugares} de esta partida.`
             : cara === 'foto'
               ? 'El sitio de verdad, visto desde arriba.'
-              : `La planta y por dónde se comunican las ${losLugares}.`}
+              : `La planta y por dónde se comunican ${losLas.toLowerCase()} ${losLugares}.`}
         </Cuerpo>
       </View>
 

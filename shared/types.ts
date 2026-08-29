@@ -295,7 +295,13 @@ export type DocumentSectionId =
   | 'don'
   | 'expedicion'
   | 'reliquias'
-  | 'ritos';
+  | 'ritos'
+  /* Las que trae El Paso de las Sombras. Ver shared/juegos/sombras.ts. */
+  | 'papel'
+  | 'estandarte'
+  | 'columna'
+  | 'enseres'
+  | 'senda';
 
 export interface DocumentSectionInfo {
   id: DocumentSectionId;

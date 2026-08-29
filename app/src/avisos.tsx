@@ -20,7 +20,7 @@ import Animated, {
 import { LinearGradient } from 'expo-linear-gradient';
 import { usePartida } from './estado';
 import { color, espacio, texto } from './tema';
-import { conAlfa, useEsMomia, useTema } from './tema-juego';
+import { conAlfa, useJuego, useTema } from './tema-juego';
 import type { AvisoClave } from '../../shared/live';
 
 const { width } = Dimensions.get('window');
@@ -37,6 +37,29 @@ const { width } = Dimensions.get('window');
 const ROTULO_MOMIA: Partial<Record<AvisoClave, string>> = {
   desenlace: 'Ha amanecido',
   ganador: 'Alguien ha señalado',
+};
+
+/*
+ * Y El Paso de las Sombras, por lo mismo y con más motivo: allí la noche se
+ * cuenta por HORAS y no por rondas, no hay sobre del crimen y nadie «lo
+ * resuelve» —decide el consejo del alba—. Sin esta tabla el telón de la última
+ * pantalla de la noche decía «El sobre del crimen» en un juego que no tiene
+ * ninguno.
+ *
+ * Se pasa a tabla por juego en vez de encadenar otro ternario: es exactamente
+ * lo que se hizo con las paletas y con el ornamento, y por el mismo motivo.
+ */
+const ROTULO_SOMBRAS: Partial<Record<AvisoClave, string>> = {
+  'ronda-abierta': 'Comienza la hora',
+  'ronda-cerrada': 'Se cierra la hora',
+  acusaciones: 'El consejo del alba',
+  desenlace: 'Amanece',
+  ganador: 'El consejo ha hablado',
+};
+
+const ROTULOS_POR_JUEGO: Record<string, Partial<Record<AvisoClave, string>>> = {
+  momia: ROTULO_MOMIA,
+  sombras: ROTULO_SOMBRAS,
 };
 
 const ROTULO: Record<AvisoClave, { titulo: string; tono: string }> = {
@@ -59,7 +82,7 @@ export function TelonDeAvisos(): JSX.Element | null {
    * React tiraría la pantalla entera. Es el mismo cuidado que en `ui.tsx`.
    */
   const t = useTema();
-  const esMomia = useEsMomia();
+  const juego = useJuego();
   const opacidad = useSharedValue(0);
   const escala = useSharedValue(0.92);
   const deslizar = useSharedValue(18);
@@ -97,9 +120,8 @@ export function TelonDeAvisos(): JSX.Element | null {
 
   if (!aviso) return null;
   const base = ROTULO[aviso.clave] ?? { titulo: 'Atención', tono: color.oro300 };
-  const rotulo = esMomia
-    ? { ...base, titulo: ROTULO_MOMIA[aviso.clave] ?? base.titulo }
-    : base;
+  const propios = ROTULOS_POR_JUEGO[juego ?? ''];
+  const rotulo = propios ? { ...base, titulo: propios[aviso.clave] ?? base.titulo } : base;
 
   return (
     <Animated.View style={[StyleSheet.absoluteFill, estilos.telon, estiloTelon]} pointerEvents="box-none">

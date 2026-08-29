@@ -33,7 +33,22 @@ export type PrintableDocId =
   | 'hoja-sellado'
   | 'tabla-marcas'
   | 'papiro-sellado'
-  | 'informe-papiro';
+  | 'informe-papiro'
+  /*
+   * Los de El Paso de las Sombras. Ver shared/juegos/sombras.ts.
+   *
+   * Son OCHO y no nueve: el índice del paquete se reutiliza —`indice-paquete`,
+   * el de la casa— porque esa hoja se compone entera desde el catálogo del juego
+   * y desde `manifiesto.preparacion`. Es lo mismo que hace la Momia.
+   */
+  | 'guia-del-paso'
+  | 'dosier-escolta'
+  | 'hitos-camino'
+  | 'carteles-paso'
+  | 'hoja-consejo'
+  | 'tabla-rastro'
+  | 'senda-verdadera'
+  | 'informe-senda';
 
 /** Para quién es el documento. Determina en qué grupo se pinta en la interfaz. */
 export type DocumentAudience = 'players' | 'gm' | 'preparer' | 'room';

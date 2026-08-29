@@ -261,7 +261,17 @@ export type IconoId =
   /* Los de El Misterio de la Momia. */
   | 'papiro'
   | 'anj'
-  | 'escarabajo';
+  | 'escarabajo'
+  /*
+   * Los de El Paso de las Sombras. Solo DOS, y merece la pena decir por qué tan
+   * pocos: su asistente reutiliza `farol` —que existía sin dueño desde la Momia
+   * y resulta ser justo lo que lleva quien guía de noche— y sus otras cuatro
+   * pestañas usan `reloj`, `mascara`, `plano` y `copa`. Un juego nuevo no tiene
+   * por qué traer seis iconos: tiene que traer los que de verdad dicen algo
+   * distinto.
+   */
+  | 'torii'
+  | 'abanico';
 
 /**
  * Las pantallas que trae la app.
@@ -289,7 +299,20 @@ export type PantallaDeApp =
    * es un Record sobre esta union y no compila hasta que se declaran.
    */
   | 'papiro'
-  | 'sellado';
+  | 'sellado'
+  /*
+   * Las dos de El Paso de las Sombras. `camino` es el tablero de deducción de la
+   * senda —cuáles de los pasos entran y en qué orden— y `consejo` es donde se
+   * propone y se señala al amanecer.
+   *
+   * Y aquí se vuelve a ver el acoplamiento honesto del que habla el comentario
+   * de arriba: no hay forma de evitarlo mientras la app sea un binario
+   * compilado. Lo que sí se puede es que el compilador lo cante, y lo canta:
+   * `PANTALLAS` en `app/app/(juego)/_layout.tsx` es un Record sobre esta unión y
+   * no compila hasta que se declaran.
+   */
+  | 'camino'
+  | 'consejo';
 
 /**
  * Una regla de las que lee quien juega.

@@ -38,6 +38,10 @@ const PANTALLAS: Record<PantallaDeApp, true> = {
   // que existen en el binario pero no se pintan en una partida de CLUEDO.
   papiro: true,
   sellado: true,
+  // Y las dos de El Paso de las Sombras, con la misma regla: existen en el
+  // binario y solo se pintan donde el manifiesto las pide.
+  camino: true,
+  consejo: true,
 };
 
 export default function DisposicionJuego(): JSX.Element {
