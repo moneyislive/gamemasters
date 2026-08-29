@@ -659,7 +659,33 @@ export function tramaDe(plot: Plot | undefined): TramaSombras | undefined {
  * antes de que llegara nadie, el estado es lo que va pasando. Esta función es el
  * momento exacto en que lo primero se convierte en lo segundo.
  */
-export function estadoInicial(trama: TramaSombras, suspectIds: string[]): EstadoSombras {
+export function estadoInicial(
+  trama: TramaSombras,
+  suspectIds: string[],
+  /*
+   * EL REPARTO YA RESUELTO, incluida la gente que llegó tarde.
+   *
+   * Aquí ponía `trama.papeles[id] ?? 'rastrear'`, y ese respaldo silencioso
+   * hacía que la partida diera DOS RESPUESTAS DISTINTAS a la misma pregunta: a
+   * quien se apuntó después de generar, el móvil le ponía `rastrear` sin
+   * decírselo a nadie mientras su dosier impreso decía que esta noche no le
+   * había asignado ninguno.
+   *
+   * `ampliarColumna` lo arreglaba, pero solo si el Game Master actualizaba la
+   * partida ANTES de que nadie emparejara el móvil. Sentar primero a quien llega
+   * tarde —que es el orden natural cuando hay prisa— dejaba ganar al respaldo.
+   *
+   * Con `papelesAlDia` la respuesta es la misma se actualice o no, y antes o
+   * después: es la MISMA rueda.
+   */
+  papeles: Record<string, PapelId> = trama.papeles,
+  /*
+   * Y los estandartes al día, por lo mismo. Iban por `trama.estandartes`, así
+   * que quien llegaba tarde se sentaba SIN NINGUNO —no con uno equivocado, con
+   * ninguno— hasta que alguien se acordara de actualizar la partida.
+   */
+  banderas: Record<string, string> = trama.estandartes,
+): EstadoSombras {
   const gente: EstadoSombras['gente'] = {};
   for (const id of suspectIds) {
     gente[id] = {
@@ -667,7 +693,10 @@ export function estadoInicial(trama: TramaSombras, suspectIds: string[]): Estado
       prendasRecibidas: 0,
       hitos: [],
       donde: {},
-      papel: trama.papeles[id] ?? 'rastrear',
+      // El respaldo ya no debería alcanzarse por el camino de producción:
+      // `estadoDe` resuelve la rueda antes de llamar. Queda porque el tipo pide
+      // un papel y quedarse sin ninguno impediría jugar, que es peor.
+      papel: papeles[id] ?? trama.papeles[id] ?? 'rastrear',
       enseres: Object.entries(trama.cargaInicial)
         .filter(([, quien]) => quien === id)
         .map(([enser]) => enser),
@@ -699,7 +728,7 @@ export function estadoInicial(trama: TramaSombras, suspectIds: string[]): Estado
     rastroMaximo: rastroMaximoPara(suspectIds.length),
     gente,
     hitos,
-    estandartes: { ...trama.estandartes },
+    estandartes: { ...banderas },
     portes: { ...trama.portes },
     propuestas: {},
   };
@@ -728,6 +757,38 @@ export function estadoInicial(trama: TramaSombras, suspectIds: string[]): Estado
  * NO TOCA NADA DE LO YA ESCRITO: ni la senda, ni los hitos, ni quién es el
  * kanchō, ni los disfraces de quienes ya lo tenían. Solo rellena huecos.
  */
+/**
+ * El reparto de papeles y estandartes al día, contando a quien llegó tarde.
+ * No muta nada.
+ *
+ * LA RUEDA SIGUE DONDE SE QUEDÓ, igual que en el reparto original: para quien
+ * llega tarde se continúa por el mismo sitio, así que sigue siendo par y no
+ * depende del azar del momento.
+ *
+ * ES PURA Y ES UNA SOLA. Antes esta cuenta vivía dentro de `ampliarColumna`
+ * —que solo corre si el Game Master actualiza la partida— mientras el móvil, al
+ * sentar a alguien, se inventaba un `rastrear` por su cuenta. Dos sitios
+ * decidiendo lo mismo son dos respuestas distintas en cuanto una no se ejecuta.
+ */
+export function papelesAlDia(
+  trama: TramaSombras,
+  escoltas: Array<{ id: string }>,
+  estandartes: Array<{ id: string }>,
+): { papeles: Record<string, PapelId>; estandartes: Record<string, string> } {
+  const papeles: Record<string, PapelId> = { ...trama.papeles };
+  const banderas: Record<string, string> = { ...trama.estandartes };
+  let vuelta = Object.keys(trama.papeles).length;
+  for (const persona of escoltas) {
+    if (papeles[persona.id] !== undefined) continue;
+    papeles[persona.id] = PAPELES_REPARTIBLES[vuelta % PAPELES_REPARTIBLES.length]!.papel;
+    if (estandartes.length > 0) {
+      banderas[persona.id] = estandartes[vuelta % estandartes.length]!.id;
+    }
+    vuelta += 1;
+  }
+  return { papeles, estandartes: banderas };
+}
+
 export function ampliarColumna(game: GameSession, plot: Plot): { anadidos: string[] } {
   const trama = tramaDe(plot);
   if (!trama) return { anadidos: [] };
@@ -737,21 +798,14 @@ export function ampliarColumna(game: GameSession, plot: Plot): { anadidos: strin
   const yaEscritos = new Set(plot.characters.map((c) => c.suspectId));
   const anadidos: string[] = [];
 
-  /*
-   * La rueda sigue donde se quedó. Los disfraces se repartieron en rueda sobre
-   * una lista barajada; para quien llega tarde se continúa por el mismo sitio,
-   * así que el reparto sigue siendo par y no depende del azar del momento.
-   */
-  let vuelta = Object.keys(trama.papeles).length;
+  // El reparto lo decide `papelesAlDia`, que es la MISMA función que consulta
+  // el móvil al sentar a alguien. Que sea una sola es lo que garantiza que las
+  // dos respuestas coincidan, se actualice la partida antes o después.
+  const alDia = papelesAlDia(trama, escoltas, estandartes);
+  Object.assign(trama.papeles, alDia.papeles);
+  Object.assign(trama.estandartes, alDia.estandartes);
 
   for (const persona of escoltas) {
-    if (trama.papeles[persona.id] === undefined) {
-      trama.papeles[persona.id] = PAPELES_REPARTIBLES[vuelta % PAPELES_REPARTIBLES.length]!.papel;
-      if (estandartes.length > 0) {
-        trama.estandartes[persona.id] = estandartes[vuelta % estandartes.length]!.id;
-      }
-      vuelta += 1;
-    }
     if (yaEscritos.has(persona.id)) continue;
 
     /*

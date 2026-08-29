@@ -478,7 +478,30 @@ export function tramaDe(plot: Plot | undefined): TramaMomia | undefined {
  * antes de que llegara nadie, el estado es lo que va pasando. Esta función es el
  * momento exacto en que lo primero se convierte en lo segundo.
  */
-export function estadoInicial(trama: TramaMomia, suspectIds: string[]): EstadoMomia {
+export function estadoInicial(
+  trama: TramaMomia,
+  suspectIds: string[],
+  /*
+   * EL REPARTO YA RESUELTO, incluida la gente que llegó tarde.
+   *
+   * Aquí ponía `trama.dones[id] ?? 'descifrar'`, y ese respaldo silencioso hacía
+   * que la partida diera DOS RESPUESTAS DISTINTAS a la misma pregunta: a quien
+   * se apuntó después de generar, el móvil le ponía `descifrar` sin decírselo a
+   * nadie mientras su dosier impreso decía que esta partida no le había asignado
+   * ninguno. Se plantaba en la mesa creyendo que no tiene don, con un don en el
+   * bolsillo.
+   *
+   * `ampliarExpedicion` arreglaba eso, pero solo si el Game Master se acordaba
+   * de actualizar la partida ANTES de que nadie emparejara el móvil. Si sentaba
+   * a alguien primero —que es el orden natural cuando llega tarde y hay prisa—
+   * el respaldo se le adelantaba.
+   *
+   * Con `donesAlDia` la respuesta es la misma se actualice o no, y se actualice
+   * antes o después: es la MISMA rueda, así que el don que enseña el móvil hoy
+   * es el que escribirá el dosier mañana.
+   */
+  dones: Record<string, DonId> = trama.dones,
+): EstadoMomia {
   const gente: EstadoMomia['gente'] = {};
   for (const id of suspectIds) {
     gente[id] = {
@@ -486,7 +509,10 @@ export function estadoInicial(trama: TramaMomia, suspectIds: string[]): EstadoMo
       amuletos: AMULETOS_INICIALES,
       tocado: false,
       fragmentos: [],
-      don: trama.dones[id] ?? 'descifrar',
+      // El respaldo ya no debería alcanzarse nunca por el camino de producción:
+      // `estadoDe` resuelve la rueda antes de llamar. Queda porque el tipo pide
+      // un don y quedarse sin ninguno impediría jugar, que es peor.
+      don: dones[id] ?? trama.dones[id] ?? 'descifrar',
     };
   }
 
@@ -541,6 +567,33 @@ export function estadoInicial(trama: TramaMomia, suspectIds: string[]): EstadoMo
  * NO TOCA NADA DE LO YA ESCRITO: ni el puzle, ni el orden verdadero, ni quién es
  * el saqueador, ni los dones de quienes ya lo tenían. Solo rellena huecos.
  */
+/**
+ * El reparto de dones al día, contando a quien llegó tarde. No muta nada.
+ *
+ * LA RUEDA SIGUE DONDE SE QUEDÓ. Los dones se repartieron en rueda sobre una
+ * lista barajada; para quien llega tarde se continúa por el mismo sitio, así que
+ * el reparto sigue siendo par y no depende del azar del momento.
+ *
+ * ES PURA Y ES UNA SOLA, y ahí está el arreglo. Antes esta cuenta vivía dentro
+ * de `ampliarExpedicion` —que solo corre si el Game Master actualiza la
+ * partida— mientras el móvil, al sentar a alguien, se inventaba un `descifrar`
+ * por su cuenta. Dos sitios decidiendo lo mismo son dos respuestas distintas en
+ * cuanto una de las dos no se ejecuta.
+ */
+export function donesAlDia(
+  trama: TramaMomia,
+  expedicionarios: Array<{ id: string }>,
+): Record<string, DonId> {
+  const dones: Record<string, DonId> = { ...trama.dones };
+  let vuelta = Object.keys(trama.dones).length;
+  for (const persona of expedicionarios) {
+    if (dones[persona.id] !== undefined) continue;
+    dones[persona.id] = DONES_REPARTIBLES[vuelta % DONES_REPARTIBLES.length]!.don;
+    vuelta += 1;
+  }
+  return dones;
+}
+
 export function ampliarExpedicion(game: GameSession, plot: Plot): { anadidos: string[] } {
   const trama = tramaDe(plot);
   if (!trama) return { anadidos: [] };
@@ -549,18 +602,12 @@ export function ampliarExpedicion(game: GameSession, plot: Plot): { anadidos: st
   const yaEscritos = new Set(plot.characters.map((c) => c.suspectId));
   const anadidos: string[] = [];
 
-  /*
-   * La rueda sigue donde se quedó. Los dones se repartieron en rueda sobre una
-   * lista barajada; para quien llega tarde se continúa por el mismo sitio, así
-   * que el reparto sigue siendo par y no depende del azar del momento.
-   */
-  let vuelta = Object.keys(trama.dones).length;
+  // El reparto lo decide `donesAlDia`, que es la MISMA función que consulta el
+  // móvil al sentar a alguien. Que sea una sola es lo que garantiza que las dos
+  // respuestas coincidan, se actualice la partida antes o después.
+  Object.assign(trama.dones, donesAlDia(trama, expedicionarios));
 
   for (const persona of expedicionarios) {
-    if (trama.dones[persona.id] === undefined) {
-      trama.dones[persona.id] = DONES_REPARTIBLES[vuelta % DONES_REPARTIBLES.length]!.don;
-      vuelta += 1;
-    }
     if (yaEscritos.has(persona.id)) continue;
 
     /*

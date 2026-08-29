@@ -40,6 +40,10 @@ import { renderPrintableDocument } from '../src/docs/imprimibles/index';
 import { sendasDe } from '../../shared/juegos/sombras-tipos';
 import { listaDeCategoria, manifiestoDe } from '../../shared/juegos';
 import { computeStaleness } from '../../shared/staleness';
+import { ampliarColumna } from '../src/juegos/sombras-trama';
+import { estadoDe } from '../src/juegos/sombras-acciones';
+import { entidadesDe } from '../../shared/juegos';
+import type { TramaSombras } from '../../shared/juegos/sombras-tipos';
 import '../src/juegos/instalados';
 import type { GameSession } from '../../shared/types';
 
@@ -178,6 +182,77 @@ comprobar(
   buena.redaccion,
 );
 comprobar('sin incidencias', buena.incidencias.length === 0, buena.incidencias);
+
+/*
+ * ─────────────────────────────────────────────────────────────────────────────
+ * QUIEN LLEGA TARDE: UNA SOLA RESPUESTA, NO DOS
+ * ─────────────────────────────────────────────────────────────────────────────
+ *
+ * A quien se apunta con la noche ya escrita hay que darle papel y estandarte. Lo
+ * hacía `ampliarColumna` al actualizar la partida... y también, por su cuenta y
+ * en silencio, `estadoInicial`, que le ponía `rastrear` de respaldo y ningún
+ * estandarte. Dos sitios decidiendo lo mismo son dos respuestas distintas en
+ * cuanto una no se ejecuta: emparejarle el móvil ANTES de actualizar le enseñaba
+ * un papel que su dosier impreso contradecía.
+ *
+ * Se pregunta por `estadoDe`, que es el camino de producción: es donde estaba el
+ * respaldo silencioso, y medir el ayudante nuevo no demostraría nada.
+ */
+{
+  const conMasGente = JSON.parse(JSON.stringify(game)) as GameSession;
+  const lista = listaDeCategoria(conMasGente, 'escoltas' as never);
+  lista.push({ id: 'tarde-1', name: 'Quien llegó tarde' });
+  lista.push({ id: 'tarde-2', name: 'Y quien llegó más tarde' });
+
+  const tramaOriginal = JSON.parse(JSON.stringify(tramaDe(buena.plot))) as TramaSombras;
+  comprobar(
+    'los que llegan tarde no tenían papel en la trama',
+    tramaOriginal.papeles['tarde-1'] === undefined && tramaOriginal.papeles['tarde-2'] === undefined,
+  );
+
+  // Lo que escribe el dosier cuando el Game Master actualiza.
+  const paraElDosier = { ...conMasGente, plot: JSON.parse(JSON.stringify(buena.plot)) } as GameSession;
+  ampliarColumna(paraElDosier, paraElDosier.plot!);
+  const enElPapel = tramaDe(paraElDosier.plot!)!;
+
+  // Lo que se le monta en la mesa al emparejar el móvil, sin actualizar nada.
+  const partidaEnJuego = { ...conMasGente, plot: JSON.parse(JSON.stringify(buena.plot)) } as GameSession;
+  const sesionFalsa = {
+    id: 'tarde',
+    players: entidadesDe(partidaEnJuego, 'escoltas').map((e) => ({
+      suspectId: e.id,
+      displayName: e.name,
+      joinCode: 'AAAAAA',
+      joined: true,
+      elecciones: [],
+      notas: '',
+      girosRecibidos: [],
+    })),
+  } as unknown as Parameters<typeof estadoDe>[1];
+  const enLaMesa = estadoDe(partidaEnJuego, sesionFalsa);
+
+  comprobar(
+    'quien llega tarde se sienta con su papel, no con el de respaldo',
+    enLaMesa.gente['tarde-1']?.papel === enElPapel.papeles['tarde-1'] &&
+      enLaMesa.gente['tarde-2']?.papel === enElPapel.papeles['tarde-2'],
+    `mesa ${enLaMesa.gente['tarde-1']?.papel}/${enLaMesa.gente['tarde-2']?.papel} · papel ${enElPapel.papeles['tarde-1']}/${enElPapel.papeles['tarde-2']}`,
+  );
+  comprobar(
+    'y con su estandarte, que antes no recibía ninguno',
+    Boolean(enLaMesa.estandartes['tarde-1']) &&
+      enLaMesa.estandartes['tarde-1'] === enElPapel.estandartes['tarde-1'],
+    `mesa ${enLaMesa.estandartes['tarde-1']} · papel ${enElPapel.estandartes['tarde-1']}`,
+  );
+  comprobar(
+    'la rueda sigue repartiendo par',
+    enLaMesa.gente['tarde-1']?.papel !== enLaMesa.gente['tarde-2']?.papel,
+    `${enLaMesa.gente['tarde-1']?.papel} y ${enLaMesa.gente['tarde-2']?.papel}`,
+  );
+  comprobar(
+    'a los de siempre no se les mueve el suyo',
+    Object.entries(tramaOriginal.papeles).every(([id, p]) => enLaMesa.gente[id]?.papel === p),
+  );
+}
 
 /*
  * ─────────────────────────────────────────────────────────────────────────────

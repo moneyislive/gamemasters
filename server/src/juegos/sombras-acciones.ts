@@ -42,6 +42,7 @@ import { entidadesDe } from '../../../shared/juegos';
 import {
   EJE_KANCHO,
   estadoInicial,
+  papelesAlDia,
   pasoBatido,
   tramaDe,
 } from './sombras-trama';
@@ -105,10 +106,26 @@ export function estadoDe(game: GameSession, sesion: LiveSession): EstadoSombras 
   const trama = tramaDe(game.plot);
   if (!trama) throw new AccionInvalida('Esta partida todavía no tiene camino que cruzar.');
 
+  /*
+   * EL REPARTO SE RESUELVE ANTES DE SENTAR A NADIE.
+   *
+   * Es la misma rueda que usa `ampliarColumna` al actualizar la partida, así que
+   * el papel y el estandarte que se le enseñan a quien se apuntó tarde son
+   * EXACTAMENTE los que su dosier va a decir cuando el Game Master actualice — o
+   * los que diría si ya lo hubiera hecho. Antes no: sentarle el móvil primero le
+   * escribía un `rastrear` de respaldo y ningún estandarte, y el papel impreso
+   * decía otra cosa.
+   */
+  const { papeles, estandartes: banderas } = papelesAlDia(
+    trama,
+    entidadesDe(game, 'escoltas'),
+    entidadesDe(game, 'estandartes'),
+  );
+
   sesion.estado = sesion.estado ?? {};
   let estado = sesion.estado[CLAVE_ESTADO] as EstadoSombras | undefined;
   if (!estado) {
-    estado = estadoInicial(trama, sesion.players.map((p) => p.suspectId));
+    estado = estadoInicial(trama, sesion.players.map((p) => p.suspectId), papeles, banderas);
     sesion.estado[CLAVE_ESTADO] = estado;
   }
 
@@ -119,10 +136,13 @@ export function estadoDe(game: GameSession, sesion: LiveSession): EstadoSombras 
    */
   for (const jugador of sesion.players) {
     if (estado.gente[jugador.suspectId]) continue;
-    const recien = estadoInicial(trama, [jugador.suspectId]);
+    const recien = estadoInicial(trama, [jugador.suspectId], papeles, banderas);
     estado.gente[jugador.suspectId] = recien.gente[jugador.suspectId]!;
-    if (trama.estandartes[jugador.suspectId]) {
-      estado.estandartes[jugador.suspectId] = trama.estandartes[jugador.suspectId]!;
+    // Por `banderas` y no por `trama.estandartes`: quien llegó tarde todavía no
+    // está escrito en la trama y se quedaba sin estandarte hasta que alguien se
+    // acordara de actualizar la partida.
+    if (banderas[jugador.suspectId]) {
+      estado.estandartes[jugador.suspectId] = banderas[jugador.suspectId]!;
     }
   }
   return estado;

@@ -35,7 +35,7 @@ import { registrarInicio } from './inicios';
 // Por la puerta principal: es el índice quien declara dónde vive cada
 // categoría. Ver el comentario largo en `momia-trama.ts`.
 import { entidadesDe } from '../../../shared/juegos';
-import { camaraProfanada, estadoInicial, tramaDe, EJE_SAQUEADOR } from './momia-trama';
+import { camaraProfanada, donesAlDia, estadoInicial, tramaDe, EJE_SAQUEADOR } from './momia-trama';
 import { MARCAS_PARA_TOCADO } from '../../../shared/juegos/momia-tipos';
 import type { DonId, EstadoMomia, TramaMomia } from '../../../shared/juegos/momia-tipos';
 import type { GameSession } from '../../../shared/types';
@@ -84,10 +84,21 @@ export function estadoDe(game: GameSession, sesion: LiveSession): EstadoMomia {
   const trama = tramaDe(game.plot);
   if (!trama) throw new AccionInvalida('Esta partida todavía no tiene tumba que sellar.');
 
+  /*
+   * EL REPARTO SE RESUELVE ANTES DE SENTAR A NADIE.
+   *
+   * Es la misma rueda que usa `ampliarExpedicion` al actualizar la partida, así
+   * que el don que se le enseña a alguien que se apuntó tarde es EXACTAMENTE el
+   * que su dosier va a decir cuando el Game Master actualice — o el que diría si
+   * lo hubiera hecho ya. Antes no: sentarle el móvil antes de actualizar le
+   * escribía un `descifrar` de respaldo, y el papel impreso decía otra cosa.
+   */
+  const dones = donesAlDia(trama, entidadesDe(game, 'expedicionarios'));
+
   sesion.estado = sesion.estado ?? {};
   let estado = sesion.estado[CLAVE_ESTADO] as EstadoMomia | undefined;
   if (!estado) {
-    estado = estadoInicial(trama, sesion.players.map((p) => p.suspectId));
+    estado = estadoInicial(trama, sesion.players.map((p) => p.suspectId), dones);
     sesion.estado[CLAVE_ESTADO] = estado;
   }
 
@@ -96,7 +107,7 @@ export function estadoDe(game: GameSession, sesion: LiveSession): EstadoMomia {
   // amuletos y sin don, y no hay forma de que juegue.
   for (const jugador of sesion.players) {
     if (estado.gente[jugador.suspectId]) continue;
-    const recien = estadoInicial(trama, [jugador.suspectId]);
+    const recien = estadoInicial(trama, [jugador.suspectId], dones);
     estado.gente[jugador.suspectId] = recien.gente[jugador.suspectId]!;
   }
   return estado;

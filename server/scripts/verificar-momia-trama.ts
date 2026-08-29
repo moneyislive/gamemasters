@@ -34,7 +34,9 @@ import { solucionesDe } from '../../shared/juegos/momia-tipos';
 // cada categoría. Importando el manifiesto suelto, 'camaras' no resolvería.
 import { MOMIA } from '../../shared/juegos';
 import { computeStaleness } from '../../shared/staleness';
-import { listaDeCategoria } from '../../shared/juegos';
+import { ampliarExpedicion, donesAlDia } from '../src/juegos/momia-trama';
+import { estadoDe } from '../src/juegos/momia-acciones';
+import { entidadesDe, listaDeCategoria } from '../../shared/juegos';
 import type { RespuestaMomia } from '../src/plot/momia-esquema';
 import type { RitoId } from '../../shared/juegos/momia-tipos';
 import { renderPrintableDocument } from '../src/docs/imprimibles';
@@ -287,6 +289,99 @@ comprobar('la trama del juego viaja en delJuego', Boolean(sana.plot.delJuego));
 comprobar('no se emiten pistas de CLUEDO', sana.plot.clues.length === 0);
 comprobar('hay una narración por vigilia, más la apertura',
   sana.plot.material?.narrations.length === VIGILIAS_POR_DEFECTO + 1);
+
+
+/*
+ * ──────────────────────────────────────────────────────────────────────────────
+ * QUIEN LLEGA TARDE: UNA SOLA RESPUESTA, NO DOS
+ * ──────────────────────────────────────────────────────────────────────────────
+ *
+ * A quien se apunta con el misterio ya escrito hay que darle un don. Lo hacía
+ * `ampliarExpedicion` al actualizar la partida... y también, por su cuenta y en
+ * silencio, `estadoInicial`, que le ponía `descifrar` de respaldo. Dos sitios
+ * decidiendo lo mismo son dos respuestas distintas en cuanto una de las dos no
+ * se ejecuta: sentar a alguien el móvil ANTES de actualizar —el orden natural
+ * cuando llega tarde y hay prisa— le enseñaba un don que su dosier impreso
+ * contradecía. Se plantaba en la mesa creyendo que no tiene don, con uno en el
+ * bolsillo.
+ *
+ * Lo que se exige aquí es que la respuesta sea LA MISMA en los dos órdenes.
+ */
+{
+  const conMasGente = JSON.parse(JSON.stringify(game)) as typeof game;
+  const listaExp = listaDeCategoria(conMasGente, 'expedicionarios' as never);
+  listaExp.push({ id: 'tarde-1', name: 'Quien llegó tarde' });
+  listaExp.push({ id: 'tarde-2', name: 'Y quien llegó más tarde' });
+
+  const expedicionarios = entidadesDe(conMasGente, 'expedicionarios');
+  const tramaOriginal = JSON.parse(JSON.stringify(sana.plot.delJuego)) as typeof cimientos.trama;
+
+  comprobar('los que llegan tarde no tenían don en la trama',
+    tramaOriginal.dones['tarde-1'] === undefined && tramaOriginal.dones['tarde-2'] === undefined);
+
+  // (a) Lo que le enseña el móvil al sentarle, sin haber actualizado nada.
+  const enElMovil = donesAlDia(tramaOriginal, expedicionarios);
+  comprobar('el móvil ya le da un don de verdad', Boolean(enElMovil['tarde-1']));
+
+  // (b) Lo que escribe el dosier cuando el Game Master actualiza.
+  const paraElDosier = { ...conMasGente, plot: JSON.parse(JSON.stringify(sana.plot)) } as typeof game;
+  ampliarExpedicion(paraElDosier, paraElDosier.plot!);
+  const enElPapel = (paraElDosier.plot!.delJuego as { dones: Record<string, string> }).dones;
+
+  comprobar('y es EL MISMO que acabará imprimiendo el dosier',
+    enElMovil['tarde-1'] === enElPapel['tarde-1'] && enElMovil['tarde-2'] === enElPapel['tarde-2'],
+    `móvil ${enElMovil['tarde-1']}/${enElMovil['tarde-2']} · papel ${enElPapel['tarde-1']}/${enElPapel['tarde-2']}`);
+
+  comprobar('a nadie que ya lo tenía se le cambia el don',
+    Object.entries(tramaOriginal.dones).every(([id, don]) => enElMovil[id] === don && enElPapel[id] === don));
+
+  // La rueda sigue: dos que llegan tarde no reciben el mismo don por defecto.
+  comprobar('la rueda sigue repartiendo par, no da el mismo a todos',
+    enElMovil['tarde-1'] !== enElMovil['tarde-2'],
+    `${enElMovil['tarde-1']} y ${enElMovil['tarde-2']}`);
+
+  // Y da igual el orden: actualizar primero y sentar después da lo mismo.
+  const alReves = donesAlDia(
+    paraElDosier.plot!.delJuego as typeof cimientos.trama,
+    entidadesDe(paraElDosier, 'expedicionarios'),
+  );
+  comprobar('actualizar antes o después da exactamente lo mismo',
+    JSON.stringify(alReves) === JSON.stringify(enElMovil),
+    `${JSON.stringify(alReves)} vs ${JSON.stringify(enElMovil)}`);
+
+  /*
+   * Y POR EL CAMINO DE PRODUCCIÓN, que es lo único que demuestra algo.
+   *
+   * Todo lo de arriba mide `donesAlDia`, que es código nuevo: contra el fallo
+   * anterior no habría fallado, porque no existía. Lo que de verdad le pasa a
+   * alguien que llega tarde es que empareja el móvil y `estadoDe` le monta su
+   * sitio en la mesa — ese es el sitio donde estaba el `descifrar` silencioso, y
+   * ese es el que hay que preguntar.
+   */
+  const partidaEnJuego = { ...conMasGente, plot: JSON.parse(JSON.stringify(sana.plot)) } as typeof game;
+  const sesionFalsa = {
+    id: 'tarde',
+    players: entidadesDe(partidaEnJuego, 'expedicionarios').map((e) => ({
+      suspectId: e.id,
+      displayName: e.name,
+      joinCode: 'AAAAAA',
+      joined: true,
+      elecciones: [],
+      notas: '',
+      girosRecibidos: [],
+    })),
+  } as unknown as Parameters<typeof estadoDe>[1];
+
+  const enLaMesa = estadoDe(partidaEnJuego, sesionFalsa);
+  comprobar('quien llega tarde se sienta con un don, no con el de respaldo',
+    enLaMesa.gente['tarde-1']?.don === enElPapel['tarde-1'],
+    `mesa ${enLaMesa.gente['tarde-1']?.don} · papel ${enElPapel['tarde-1']}`);
+  comprobar('y el segundo también',
+    enLaMesa.gente['tarde-2']?.don === enElPapel['tarde-2'],
+    `mesa ${enLaMesa.gente['tarde-2']?.don} · papel ${enElPapel['tarde-2']}`);
+  comprobar('a los de siempre no se les mueve el suyo',
+    Object.entries(tramaOriginal.dones).every(([id, don]) => enLaMesa.gente[id]?.don === don));
+}
 
 /*
  * ─────────────────────────────────────────────────────────────────────────────
