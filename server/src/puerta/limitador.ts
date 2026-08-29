@@ -45,6 +45,7 @@
  * decisión y no un descuido.
  */
 import type { NextFunction, Request, RequestHandler, Response } from 'express';
+import { env } from '../config';
 
 /** Ventana por defecto: diez minutos, que es lo que dura sentarse a la mesa. */
 const VENTANA_MS = 10 * 60 * 1000;
@@ -105,70 +106,53 @@ function esBucleLocal(ip: string): boolean {
  */
 export function procedenciaDe(req: Request): Procedencia {
   /*
-   * LA CABECERA SOLO SE MIRA SI EL OTRO EXTREMO DE LA CONEXIÓN ES ESTE MISMO
-   * EQUIPO, que es donde vive nginx. Es la regla entera, y sustituye a fiarse
-   * de `req.ips` a secas.
+   * DE QUIÉN ES LA CABECERA: LO DICE `PROXY_DE_CONFIANZA`, NO SE ADIVINA.
    *
-   * Con `app.set('trust proxy', 1)`, Express se cree la cabecera del primer
-   * salto sea quien sea. Detrás de nginx eso está bien. Pero fuera de
-   * producción se escucha en 0.0.0.0 —que es exactamente el montaje de una
-   * velada real, el portátil sirviendo a los móviles de la casa— y ahí
-   * cualquiera se conecta directo y elige la IP que quiere: rotándola nunca
-   * acumula fallos, y fijándola en la de otra persona le gasta el presupuesto y
-   * la deja fuera. Eso último es lo grave: convierte una defensa en un arma.
+   * Hay dos despliegues y quieren cosas opuestas, así que adivinar falla en uno
+   * de los dos — y este fichero ya ha fallado en los dos, uno detrás de otro:
    *
-   * `req.socket.remoteAddress` es el otro extremo del TCP: lo único de toda la
-   * petición que quien llama no puede elegir. Si es el bucle local, delante hay
-   * un proxy de esta misma máquina y su cabecera vale; si no, quien llama ES el
-   * cliente y su cabecera no vale nada.
+   *   · EN CASA (el portátil sirviendo a los móviles de la velada, escuchando
+   *     en 0.0.0.0) cualquier móvil se conecta directo y elige la cabecera que
+   *     quiere: rotándola no acumula fallos nunca, y fijándola en la de otra
+   *     persona le gasta el presupuesto y la deja fuera. Eso último es lo grave:
+   *     convierte una defensa en un arma. Aquí solo vale el otro extremo del
+   *     TCP, que es lo único de toda la petición que quien llama no elige.
    *
-   * (Esto da por hecho que nginx corre en la misma máquina, que es como está
-   * montado el despliegue — ver `despliegue/LEEME.md`. Con un balanceador
-   * externo delante habría que enumerar sus direcciones aquí.)
+   *   · EN RENDER hay un balanceador externo, así que el otro extremo del TCP
+   *     es SIEMPRE suyo: mirarlo mete a toda la plataforma en el mismo cubo y
+   *     ocho contraseñas mal tecleadas por cualquiera dejan a TODOS los Game
+   *     Masters fuera del taller. Aquí la única dirección útil es la cabecera
+   *     que el balanceador reescribe en cada petición.
+   *
+   * Mirar el peer primero rompía Render; mirar `req.ips` primero rompía la
+   * velada en casa. Por eso se declara: `plataforma` en Render (ver
+   * `render.yaml`), y el valor por defecto —`loopback`— es el seguro, que es
+   * como tiene que fallar una variable que se olvida.
    */
-  /*
-   * PRIMERO LA CADENA DEL PROXY, Y ESTE ORDEN ES EL ARREGLO.
-   *
-   * Esto miraba antes `req.socket.remoteAddress` y, si no era el bucle local,
-   * lo daba por bueno como IP de quien llama. Eso vale con nginx en la misma
-   * máquina —el montaje que describe `despliegue/LEEME.md`— y es exactamente lo
-   * que el comentario de abajo advertía que había que revisar con un
-   * balanceador externo delante.
-   *
-   * En Render lo hay. El otro extremo del TCP es SIEMPRE su balanceador, así
-   * que todas las peticiones de la plataforma entraban con la misma dirección:
-   * el limitador las contaba como si fueran una sola persona y ocho contraseñas
-   * mal tecleadas por cualquiera dejaban a TODOS los Game Masters fuera de su
-   * taller. Un cerrojo pensado contra la fuerza bruta convertido en el botón de
-   * apagado, y al alcance de cualquiera.
-   *
-   * `req.ips` solo trae algo cuando Express confía en un salto —`trust proxy: 1`
-   * en `index.ts`— y esa es justamente la señal de que hay un proxy delante.
-   *
-   * EL PRECIO, DICHO CLARO: detrás de un balanceador, quien llama puede añadir
-   * su propia `X-Forwarded-For` y aparecer con otra dirección, o sea saltarse SU
-   * límite. Es peor de lo ideal y mucho mejor que lo que había: quien abusa se
-   * escapa de su cerrojo, pero ya no puede cerrarle la puerta a los demás.
-   */
-  const porProxy = req.ips;
-  if (porProxy.length > 0) {
-    // El último de la lista es el que añadió el salto en el que sí se confía;
-    // los de más a la izquierda los puede haber escrito quien llama.
-    return { ip: porProxy[porProxy.length - 1] ?? '', fiable: true };
-  }
+  if (env.proxyDeConfianza === 'plataforma') {
+    const deLaPlataforma = req.ips;
+    if (deLaPlataforma.length > 0) {
+      // El último de la lista es el que añadió el salto en el que sí se confía;
+      // los de más a la izquierda los puede haber escrito quien llama.
+      return { ip: deLaPlataforma[deLaPlataforma.length - 1] ?? '', fiable: true };
+    }
+  } else {
+    /*
+     * El peer manda: si es el bucle local, delante hay un proxy de esta misma
+     * máquina y su cabecera vale; si no, quien llama ES el cliente y no vale
+     * nada. Y NO se cae al camino de «no fiable» de más abajo aunque llegue la
+     * cabecera: ese camino desactiva el bloqueo y deja solo retardos, así que a
+     * quien probara contraseñas a lo bruto le bastaría con añadir un encabezado
+     * para desarmar la puerta.
+     */
+    const peer = req.socket.remoteAddress ?? '';
+    if (!esBucleLocal(peer) && peer) return { ip: peer, fiable: true };
 
-  /*
-   * Sin proxy de confianza delante, el otro extremo del TCP es lo único de toda
-   * la petición que quien llama no puede elegir.
-   *
-   * Y NO se cae al camino de «no fiable» de más abajo, aunque llegue la
-   * cabecera. Ese camino desactiva el bloqueo y deja solo retardos, así que a
-   * quien quisiera probar contraseñas a lo bruto le bastaría con añadir un
-   * encabezado para desarmar la puerta. Una defensa que se apaga sola con una
-   * cabecera no es una defensa.
-   */
-  const peer = req.socket.remoteAddress ?? '';
-  if (!esBucleLocal(peer) && peer) return { ip: peer, fiable: true };
+    const porProxy = req.ips;
+    if (porProxy.length > 0) {
+      return { ip: porProxy[porProxy.length - 1] ?? '', fiable: true };
+    }
+  }
 
   const directa = req.ip ?? req.socket.remoteAddress ?? '';
 

@@ -89,6 +89,16 @@ services:
         sync: false
       - key: APP_PASSWORD
         sync: false
+      # QUIEN HAY DELANTE, para que el limitador sepa de quien es la
+      # `X-Forwarded-For`. Aqui hay un balanceador externo, asi que el otro
+      # extremo del TCP es SIEMPRE suyo: sin esto, todas las peticiones de la
+      # plataforma entran con la misma direccion y ocho contrasenas mal
+      # tecleadas por cualquiera dejan a TODOS los Game Masters fuera del
+      # taller. El valor por defecto (`loopback`) es el seguro para el
+      # despliegue de casa, donde el portatil escucha en 0.0.0.0 y la cabecera
+      # la escribe quien quiere. Ver `server/src/puerta/limitador.ts`.
+      - key: PROXY_DE_CONFIANZA
+        value: plataforma
       # Firma las cookies, los pasaportes y las credenciales de jugador.
       # Cambiarlo invalida TODAS las sesiones a la vez: se elige una vez.
       - key: PLAYER_TOKEN_SECRET

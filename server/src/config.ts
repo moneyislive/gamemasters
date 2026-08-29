@@ -151,6 +151,24 @@ export const env: {
   mongoDbName?: string;
   /** Contraseña única de acceso. Sin ella, la aplicación queda abierta. */
   appPassword?: string;
+  /**
+   * Quién hay delante del servidor, y por tanto de quién es la `X-Forwarded-For`.
+   *
+   * `loopback` (por defecto): solo se cree la cabecera si la conexión viene de
+   * esta misma máquina, que es donde vive nginx en el despliegue de casa. Es el
+   * valor seguro: en una velada real el portátil escucha en 0.0.0.0 y cualquier
+   * móvil de la casa se conecta directo, así que su cabecera no vale nada.
+   *
+   * `plataforma`: hay un balanceador externo —Render— que reescribe la cabecera
+   * en cada petición. Ahí el otro extremo del TCP es SIEMPRE el balanceador, así
+   * que sin esto todo el mundo comparte dirección y el limitador se convierte en
+   * un cerrojo global: ocho contraseñas mal tecleadas por cualquiera dejan fuera
+   * a todos.
+   *
+   * Se declara a mano y no se adivina: las dos formas de equivocarse son malas y
+   * en direcciones opuestas, y ninguna avisa.
+   */
+  proxyDeConfianza: 'loopback' | 'plataforma';
   uploadsDir: string;
   clientDir?: string;
 } = {
@@ -162,6 +180,8 @@ export const env: {
   mongoUri: process.env.MONGODB_URI?.trim() || undefined,
   mongoDbName: process.env.MONGODB_DB?.trim() || undefined,
   appPassword: process.env.APP_PASSWORD?.trim() || undefined,
+  // Cualquier valor que no sea exactamente 'plataforma' cae en el seguro.
+  proxyDeConfianza: process.env.PROXY_DE_CONFIANZA?.trim() === 'plataforma' ? 'plataforma' : 'loopback',
   uploadsDir: readUploadsDir(),
   clientDir: readClientDir(),
 };
