@@ -227,6 +227,60 @@ try {
   if (StoreDeMongo) {
     const conMongo = await guion(new StoreDeMongo());
 
+    /*
+     * Y LO QUE NO PUEDE REPETIRSE, NO SE REPITE.
+     *
+     * Los indices estaban todos para ir rapido y ninguno para impedir nada. Se
+     * comprueba contra Mongo de verdad y no contra el fichero porque la
+     * restriccion la pone Mongo: es exactamente la clase de garantia que el
+     * `FileStore` no tiene y que nadie estaba mirando.
+     */
+    seccion('Lo que no puede repetirse');
+    const crudo = mongoose.connection.db!;
+    // Los indices los declara el esquema al crear el modelo; se espera a que
+    // esten construidos antes de intentar violarlos.
+    await mongoose.connection.syncIndexes().catch(() => undefined);
+
+    /** Mete un documento y dice si Mongo lo rechazo por repetido. */
+    const rechaza = async (col: string, doc: Record<string, unknown>): Promise<boolean> => {
+      try {
+        await crudo.collection(col).insertOne(doc);
+        return false;
+      } catch (e) {
+        return (e as { code?: number }).code === 11000;
+      }
+    };
+
+    /*
+     * Cada caso se siembra aqui mismo en vez de apoyarse en lo que dejo el
+     * guion. La primera version daba por hecho que la cuenta de mas arriba
+     * seguia ahi --y el guion la borra al final--, asi que el choque no ocurria
+     * y la comprobacion decia que el indice no restringe. Una prueba que
+     * depende del estado que deja otra mide el estado, no la garantia.
+     */
+    await crudo.collection('games').insertOne({ id: 'unico-1' });
+    comprobar('dos partidas con el mismo id, no', await rechaza('games', { id: 'unico-1' }));
+
+    await crudo.collection('accounts').insertOne({ id: 'unico-2', email: 'choque@ejemplo.com' });
+    comprobar('dos cuentas con el mismo correo, no',
+      await rechaza('accounts', { id: 'unico-3', email: 'choque@ejemplo.com' }));
+    comprobar('ni dos cuentas con el mismo id, no',
+      await rechaza('accounts', { id: 'unico-2', email: 'otro@ejemplo.com' }));
+
+    await crudo.collection('live').insertOne({ id: 'unico-4', code: 'ZZZZZ' });
+    comprobar('dos sesiones con el mismo codigo, no',
+      await rechaza('live', { id: 'unico-5', code: 'ZZZZZ' }));
+
+    /*
+     * Y `sparse`: dos documentos SIN el campo no chocan entre si. La afirmacion
+     * que interesa es «no hay dos con el mismo valor», no «todos tienen el
+     * campo» — esa segunda haria fallar la creacion del indice al arrancar por
+     * un solo documento antiguo, cambiando un fallo silencioso por un servidor
+     * que no levanta.
+     */
+    comprobar('pero dos sin codigo si caben',
+      !(await rechaza('live', { id: 'sin-1' })) && !(await rechaza('live', { id: 'sin-2' })));
+
     seccion('Y dicen exactamente lo mismo');
     const claves = Object.keys(conFichero);
     for (const clave of claves) {

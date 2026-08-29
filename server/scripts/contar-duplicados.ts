@@ -1,7 +1,12 @@
 /**
  * ¿Hay duplicados en la base de datos de verdad?
  *
- *   MONGODB_URI="…" npx tsx server/scripts/contar-duplicados.ts
+ *   npm run duplicados -w server
+ *
+ * La cadena sale del `.env` de la raíz, igual que la lee el servidor, así que
+ * no hay nada que pegar a mano —y no acaba en el historial de la consola, que
+ * es donde peor está una contraseña de base de datos—. Si en el entorno ya hay
+ * una `MONGODB_URI`, manda esa.
  *
  * ─────────────────────────────────────────────────────────────────────────────
  * PARA QUÉ
@@ -31,16 +36,46 @@
  * valores repetidos y calla. Con el resultado delante se decide si el arreglo es
  * poner los índices y ya, o si hay que limpiar antes.
  */
+import dotenv from 'dotenv';
+import fs from 'node:fs';
+import path from 'node:path';
 import mongoose from 'mongoose';
+import { resolveDbName } from '../src/db/store';
+
+// El mismo orden que `server/src/config.ts`: primero el `.env` de la raiz,
+// luego el de `server/`. dotenv nunca pisa lo que ya esta en el entorno, asi
+// que pasar la variable a mano sigue mandando.
+const raiz = path.resolve(process.cwd(), '../.env');
+if (fs.existsSync(raiz)) dotenv.config({ path: raiz });
+dotenv.config();
 
 const uri = process.env.MONGODB_URI;
 if (!uri) {
   console.error(
-    '\nHace falta MONGODB_URI.\n\n' +
-      '  MONGODB_URI="mongodb+srv://…" npx tsx server/scripts/contar-duplicados.ts\n\n' +
-      'Es la misma cadena que tiene el servicio en Render, en Environment.\n',
+    '\nNo hay MONGODB_URI ni en el entorno ni en el .env de la raíz.\n\n' +
+      'Cópiala del servicio en Render (Environment) al .env de la raíz, o' +
+      ' defínela en la consola antes de llamar.\n\n' +
+      '  $env:MONGODB_URI = "mongodb+srv://...."\n',
   );
   process.exit(2);
+}
+
+/**
+ * A qué base se está mirando, con la contraseña tapada.
+ *
+ * Se enseña SIEMPRE y lo primero: un recuento de duplicados solo sirve si se
+ * sabe de dónde sale, y aquí la respuesta decide si se ponen índices únicos en
+ * la base donde están las partidas de la gente. Equivocarse de base y creerse
+ * el número es peor que no mirar.
+ */
+function aQueBase(cadena: string): string {
+  try {
+    const u = new URL(cadena);
+    const bd = u.pathname.replace(/^\//, '') || '(la de por defecto)';
+    return `${u.protocol}//${u.hostname}/${bd}`;
+  } catch {
+    return '(no se pudo leer la cadena)';
+  }
 }
 
 /** Lo que debería ser único, y qué significa que no lo sea. */
@@ -81,14 +116,68 @@ const CANDIDATOS: Array<{
 
 async function main(): Promise<void> {
   console.log('\nDuplicados en la base de datos\n');
+  console.log(`Mirando: ${aQueBase(uri!)}`);
   console.log('(solo lectura: este guion no escribe nada)\n');
 
-  await mongoose.connect(uri!);
+  /*
+   * LA MISMA BASE QUE ABRE EL SERVIDOR, resuelta con SU función.
+   *
+   * La primera versión llamaba a `mongoose.connect(uri)` a secas y caía en la
+   * base por defecto del clúster. Como la URI no lleva nombre de base en la
+   * ruta —el nombre va aparte, en `MONGODB_DB`— no encontró ni una colección... y
+   * dijo «sin duplicados, se pueden poner los índices». Un verde de haber mirado
+   * en el cajón equivocado, que es la peor respuesta posible: la que habría
+   * llevado a poner índices únicos a ciegas sobre las partidas de la gente.
+   */
+  const base = resolveDbName(uri!, process.env.MONGODB_DB);
+  await mongoose.connect(uri!, {
+    serverSelectionTimeoutMS: 8000,
+    ...(base ? { dbName: base } : {}),
+  });
   const db = mongoose.connection.db;
   if (!db) throw new Error('sin conexión');
+  console.log(`Base abierta: «${mongoose.connection.name}»` + "\n");
 
   const existentes = new Set((await db.listCollections().toArray()).map((c) => c.name));
   let hayAlguno = false;
+
+  /*
+   * Y SI NO HAY NADA QUE MIRAR, SE DICE. No se contesta «sin duplicados».
+   *
+   * Es la diferencia entre «he mirado y está limpio» y «no he mirado», y aquí
+   * las dos se parecían demasiado. Se enseña qué bases hay en el clúster para
+   * que se vea de un vistazo cuál era la buena.
+   */
+  const esperadas = [...new Set(CANDIDATOS.map((c) => c.coleccion))];
+  if (!esperadas.some((c) => existentes.has(c))) {
+    console.log('NO HAY NADA QUE MIRAR en esta base: no existe ninguna de las');
+    console.log(`colecciones que usa la aplicación (${esperadas.join(', ')}).`);
+    console.log('');
+    console.log('Esto NO significa que no haya duplicados: significa que se ha');
+    console.log('mirado donde no es. Bases con datos en este clúster:');
+    try {
+      const admin = mongoose.connection.getClient().db().admin();
+      const { databases } = await admin.listDatabases();
+      for (const d of databases) {
+        const suyas = await mongoose.connection
+          .getClient()
+          .db(d.name)
+          .listCollections()
+          .toArray();
+        const nombres = suyas.map((c) => c.name);
+        const pinta = esperadas.some((c) => nombres.includes(c)) ? '   <-- esta tiene pinta' : '';
+        console.log(`  · ${d.name}: ${nombres.join(', ') || '(vacía)'}${pinta}`);
+      }
+    } catch (e) {
+      console.log(`  (no se pudieron listar: ${e instanceof Error ? e.message : String(e)})`);
+    }
+    console.log('');
+    console.log('Ponle el nombre bueno y vuelve a llamar. En PowerShell:');
+    console.log('  $env:MONGODB_DB = "harkania"; npm run duplicados -w server');
+    console.log('');
+    await mongoose.disconnect();
+    process.exit(3);
+  }
 
   for (const { coleccion, campo, porQue, minusculas } of CANDIDATOS) {
     if (!existentes.has(coleccion)) {

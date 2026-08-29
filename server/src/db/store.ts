@@ -368,6 +368,36 @@ const LIMITE_DOCUMENTO_BYTES = 15 * 1024 * 1024;
  * tumbar nada — te quedas creyendo que esta puesto. Eso hay que hacerlo contra
  * produccion, contando antes.
  */
+/**
+ * La lista de campos que NO PUEDEN REPETIRSE.
+ *
+ * Los índices de aquí abajo estaban todos para ir rápido y ninguno para impedir
+ * nada. Nada evitaba dos documentos con el mismo valor, y cuando eso pasa
+ * `findOne` devuelve uno de los dos sin decir cuál: dos cuentas con el mismo
+ * correo son alguien que entra unas veces en una y otras en otra, con partidas
+ * distintas, sin entender por qué.
+ *
+ * Se defendía por convención —`codigoLibre()` mira si el código está cogido
+ * antes de usarlo— y una convención no es una restricción: entre mirar y
+ * escribir hay una ventana.
+ *
+ * SPARSE, y a propósito. La afirmación que interesa es «no hay dos documentos
+ * con el mismo valor», no «todos los documentos tienen este campo». Sin
+ * `sparse`, un documento antiguo sin `code` contaría como uno con valor nulo y
+ * el segundo haría fallar la creación del índice al arrancar — cambiar un fallo
+ * silencioso por un servidor que no levanta.
+ *
+ * OJO AL DESPLEGAR SOBRE UNA BASE QUE YA EXISTE: MongoDB no cambia las opciones
+ * de un índice que ya está creado, así que declarar esto no convierte en únicos
+ * los que ya hay. Hay que pasar `npm run indices -w server` una vez. Lo dice el
+ * propio guion, y `npm run duplicados -w server` enseña cuáles están puestos.
+ */
+export const CAMPOS_UNICOS: Record<string, string[]> = {
+  games: ['id'],
+  live: ['id', 'code'],
+  accounts: ['id', 'email'],
+};
+
 function looseModel(
   name: string,
   collection: string,
@@ -389,8 +419,9 @@ function looseModel(
       id: false,
     },
   );
+  const unicos = new Set(CAMPOS_UNICOS[collection] ?? []);
   for (const campo of typeof indices === 'string' ? [indices] : (indices ?? [])) {
-    schema.index({ [campo]: 1 });
+    schema.index({ [campo]: 1 }, unicos.has(campo) ? { unique: true, sparse: true } : {});
   }
   return mongoose.model<LooseDoc>(name, schema);
 }
