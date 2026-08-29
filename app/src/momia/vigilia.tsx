@@ -77,14 +77,27 @@ const ALTO_SENALAR = 78;
  */
 function leerLoEncontrado(crudo: unknown): string | null {
   if (typeof crudo !== 'object' || crudo === null) return null;
-  const r = crudo as { fragmentos?: unknown; profanada?: unknown };
+  const r = crudo as { fragmentos?: unknown; profanada?: unknown; protegido?: unknown };
   const cuantos = Array.isArray(r.fragmentos) ? r.fragmentos.length : 0;
-  const marcado = r.profanada === true;
+  /*
+   * PROFANADA NO ES LO MISMO QUE MARCADO. El servidor manda `protegido` en el
+   * mismo objeto y ya viene calculado como «te ahorro una marca de verdad»
+   * (momia-acciones.ts), pero aqui se tiraba: a quien el Guardian acababa de
+   * proteger se le decia que salia con una marca mientras el contador de la
+   * maldicion de esa misma pantalla seguia donde estaba. La pantalla se
+   * contradecia sola, y de paso la unica jugada del Guardian era invisible.
+   */
+  const protegido = r.protegido === true;
+  const marcado = r.profanada === true && !protegido;
   if (cuantos === 0 && !marcado) return 'Esa cámara estaba vacía.';
   const trozos: string[] = [];
   if (cuantos === 1) trozos.push('Sales con un fragmento');
   else if (cuantos > 1) trozos.push(`Sales con ${cuantos} fragmentos`);
   if (marcado) trozos.push(trozos.length > 0 ? 'y con una marca' : 'Sales con una marca');
+  if (protegido) {
+    // Que se vea que alguien te cubrio: es la unica prueba que llega a la mesa.
+    trozos.push(trozos.length > 0 ? '· la maldición no te ha alcanzado' : 'La maldición no te ha alcanzado');
+  }
   return `${trozos.join(' ')}.`;
 }
 

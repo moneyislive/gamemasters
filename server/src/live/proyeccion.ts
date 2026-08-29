@@ -448,6 +448,17 @@ export function vistaDeGameMaster(game: GameSession, sesion: LiveSession): Vista
          */
         winnerId: undefined,
         acciones: [],
+        /*
+         * Y EL CUADERNO DE CADA CUAL. `players` iba entero, y ahi dentro va
+         * `notas`: lo que cada invitado escribe en su movil durante la velada,
+         * que es privado por definicion y no lo pinta ningun panel. Con quien
+         * dirige jugando, eso es leerle las notas a la mesa entera.
+         *
+         * `elecciones` se queda: el panel de El Paso de las Sombras las lee
+         * para pintar el recorrido, y quitarlas romperia su puesto de mando.
+         * Filtrar de mas es el fallo contrario.
+         */
+        players: sesion.players.map((p) => ({ ...p, notas: '' })),
       }
     : sesion;
 

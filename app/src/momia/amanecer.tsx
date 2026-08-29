@@ -71,6 +71,14 @@ export function Amanecer(): JSX.Element {
   const gane = fin.ganadores.includes(yo);
   const eraYo = fin.saqueadorId === yo;
   const nombreDe = (id: string): string => {
+    /*
+     * TU MISMO NO ERES «ALGUIEN». `vista.jugadores` viene del servidor SIN quien
+     * la recibe (live/proyeccion.ts la filtra a proposito), pero esto se aplica
+     * sobre `votos[].apoyos` y `silenciadas`, que si llevan tu id. Asi que en el
+     * recuento de la votacion tu propio nombre salia como «alguien», y en una
+     * pantalla que existe justo para repasar quien apoyo a quien.
+     */
+    if (id === vista.yo.suspectId) return 'Tú';
     const j = vista.jugadores.find((x) => x.suspectId === id);
     return j ? j.characterName || j.displayName : 'alguien';
   };

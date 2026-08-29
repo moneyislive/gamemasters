@@ -108,6 +108,9 @@ export default function PanelDeLaMomia({
   const totalFragmentos = todos.length;
   const propuestas = Object.entries(estado.propuestas ?? {});
   const gente = estado.gente ?? {};
+  // Quien lleva tres marcas propone, pero su propuesta ya no cuenta en la
+  // votacion: el boton del ritual tiene que mirar estas, no las que han llegado.
+  const propuestasQueCuentan = propuestas.filter(([id]) => !gente[id]?.tocado).length;
 
   /*
    * El recuento, tal y como se resolverá: las propuestas iguales se agrupan y
@@ -313,10 +316,18 @@ export default function PanelDeLaMomia({
                 </p>
                 <button
                   className="btn btn--primary"
-                  disabled={ocupado || propuestas.length === 0}
+                  /*
+                    LAS QUE CUENTAN, no las que han llegado. Quien lleva tres
+                    marcas sigue proponiendo, pero su propuesta ya no vota. Con
+                    el boton mirando el crudo se podia lanzar el ritual con cero
+                    votos validos: el servidor lo resuelve con lo que hay —nada—
+                    y la tumba se sella mal. Sin vuelta atras y con la mesa
+                    delante.
+                  */
+                  disabled={ocupado || propuestasQueCuentan === 0}
                   title={
-                    propuestas.length === 0
-                      ? 'Nadie ha propuesto todavía un orden'
+                    propuestasQueCuentan === 0
+                      ? 'Nadie con voz ha propuesto todavía: da otra vigilia o reparte amuletos'
                       : 'Ejecuta el orden más votado. No tiene vuelta atrás.'
                   }
                   onClick={() => {
