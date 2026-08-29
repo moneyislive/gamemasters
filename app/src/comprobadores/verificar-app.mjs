@@ -239,29 +239,49 @@ comprobar('elegir la misma dirección compilada no se confunde con no elegir', (
 paso('El cableado en api.ts');
 
 const api = leer(path.join(SRC, 'api.ts'));
-const cargar = cuerpoDe(api, 'export async function cargarSesionGuardada');
+/*
+ * EL CUERPO VIVE EN `leerSesionDelDisco`, NO EN `cargarSesionGuardada`.
+ *
+ * Esto buscaba `export async function cargarSesionGuardada` y esa firma ya no
+ * existe: la funcion se partio en dos para memoizar la lectura, y hoy es
+ * `export function` delegando en `leerSesionDelDisco`. `cuerpoDe` devolvia
+ * `null` y las cuatro comprobaciones de aqui abajo llevaban en rojo desde
+ * entonces, con lo cual la vigilancia entera sobre a que servidor se conecta la
+ * app estaba apagada — y un comprobador que siempre falla deja de mirarse, que
+ * es la peor forma de no tener pruebas.
+ */
+const cargar = cuerpoDe(api, 'async function leerSesionDelDisco');
 const fijar = cuerpoDe(api, 'export async function fijarServidor');
 
 comprobar('api.ts importa la decisión de servidor-elegido', /from '\.\/servidor-elegido'/.test(api));
-comprobar('se encontró el cuerpo de cargarSesionGuardada', cargar !== null);
+comprobar('se encontró el cuerpo de la lectura de sesión', cargar !== null);
 comprobar('se encontró el cuerpo de fijarServidor', fijar !== null);
 
 comprobar(
-  'cargarSesionGuardada decide con decidirServidor',
+  'la lectura de sesión decide con decidirServidor',
   Boolean(cargar && cargar.includes('decidirServidor(')),
 );
 comprobar(
-  'cargarSesionGuardada NO vuelve a coger la guardada a pelo',
+  'la lectura de sesión NO vuelve a coger la guardada a pelo',
   Boolean(cargar && !/almacen\.get\(CLAVE_SERVIDOR\)\s*\)?\s*\?\?/.test(cargar)),
   cargar?.slice(0, 200),
 );
 comprobar(
-  'cargarSesionGuardada borra la elección caducada Y su testigo',
+  'la lectura de sesión borra la elección caducada Y su testigo',
   Boolean(
     cargar &&
       cargar.includes('almacen.del(CLAVE_SERVIDOR)') &&
       cargar.includes('almacen.del(CLAVE_SERVIDOR_COMPILADO)'),
   ),
+);
+/*
+ * Y LO QUE LA PARTICION EXISTE PARA GARANTIZAR, que hoy no vigilaba nadie: que
+ * `cargarSesionGuardada` MEMOIZA. Sin eso, dos pantallas que arranquen a la vez
+ * leen el disco en paralelo y pueden decidir servidores distintos.
+ */
+comprobar(
+  'cargarSesionGuardada memoiza la lectura y no la repite',
+  /lectura\s*\?\?=/.test(api),
 );
 comprobar(
   'fijarServidor guarda el testigo junto a la elección',

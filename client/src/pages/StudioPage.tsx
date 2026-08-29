@@ -340,9 +340,14 @@ export default function StudioPage() {
     accionTip =
       missing.length > 0 ? `Faltan ingredientes: ${missing.join(', ')}.` : palabras.taller.tipGenerar;
   } else if (accion === 'actualizar') {
-    accionTip = `${primeraCausa} Se rehará solo lo necesario y se conservará la trama${
-      informe?.needsAgent ? palabras.taller.tipConAyuda : ', sin consumir IA'
-    }.`;
+    // Si faltan ingredientes, eso es lo primero que hay que decir: es lo que
+    // impide pulsar, y sin decirlo el boton apagado no se explica solo.
+    accionTip =
+      missing.length > 0
+        ? `Faltan ingredientes: ${missing.join(', ')}.`
+        : `${primeraCausa} Se rehará solo lo necesario y se conservará la trama${
+            informe?.needsAgent ? palabras.taller.tipConAyuda : ', sin consumir IA'
+          }.`;
   } else if (confirmandoRegenerar) {
     accionTip = palabras.taller.tipConfirmar;
   } else {
@@ -556,7 +561,14 @@ export default function StudioPage() {
                   className={`btn btn--primary studio-generate studio-generate--refresh ${
                     highlight === 'generate' ? 'agent-highlight' : ''
                   }`}
-                  disabled={generating}
+                  /*
+                    LA MISMA GUARDA QUE EL DE GENERAR. Miraba solo `generating`,
+                    asi que con ingredientes de menos se dejaba pulsar: la
+                    peticion sale, el servidor la rechaza y quien dirige se queda
+                    con un fallo sin explicacion, cuando el taller sabia desde el
+                    principio que faltaban salas o personas.
+                  */
+                  disabled={generateDisabled}
                   onClick={handleRefresh}
                 >
                   {palabras.taller.actualizar}

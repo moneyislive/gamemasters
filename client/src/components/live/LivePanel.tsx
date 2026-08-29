@@ -38,16 +38,38 @@ const MANDOS_PROPIOS: Record<string, ComponentType<PropsDeMandosPropios>> = {
 export default function LivePanel(): JSX.Element {
   const game = useAppStore((s) => s.game);
   const [vista, setVista] = useState<VistaGameMaster | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  /*
+   * DOS AVISOS DISTINTOS, Y POR ESO SON DOS ESTADOS.
+   *
+   * Compartian uno solo, y el sondeo corre cada tres segundos: pulsabas un mando,
+   * salia en rojo por que habia fallado, y a la siguiente vuelta `cargar` lo
+   * borraba con su `setError(null)`. En la practica el mensaje aparecia y se iba
+   * antes de que diera tiempo a leerlo — y quien dirige se quedaba sin saber por
+   * que no habia pasado nada, en mitad de la velada.
+   *
+   * `errorDeMando` lo pone la accion y el sondeo NO lo toca nunca; caduca solo a
+   * los nueve segundos, que da de sobra para leerlo. `avisoDeSondeo` es el otro:
+   * la conexion, que si tiene que limpiarse en cuanto vuelva a haberla.
+   */
+  const [errorDeMando, setErrorDeMando] = useState<string | null>(null);
+  const [avisoDeSondeo, setAvisoDeSondeo] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
   const [minutos, setMinutos] = useState(15);
   const intervalo = useRef<number | null>(null);
+  const borrarMando = useRef<number | null>(null);
+
+  /** Enseña un fallo de mando y lo retira solo, sin que el sondeo lo pise. */
+  const avisarDelMando = useCallback((mensaje: string) => {
+    setErrorDeMando(mensaje);
+    if (borrarMando.current) window.clearTimeout(borrarMando.current);
+    borrarMando.current = window.setTimeout(() => setErrorDeMando(null), 9000);
+  }, []);
 
   const cargar = useCallback(async (id: string) => {
     try {
       const v = await llamar<VistaGameMaster>(`/games/${id}/live`, 'GET');
       setVista(v);
-      setError(null);
+      setAvisoDeSondeo(null);
     } catch (e) {
       /*
        * UN PARPADEO DE RED NO ES «LA PARTIDA NO ESTÁ EN JUEGO».
@@ -64,7 +86,7 @@ export default function LivePanel(): JSX.Element {
        * segundo significa de verdad que ya no hay sesión.
        */
       if (e instanceof TypeError || e instanceof SyntaxError) {
-        setError('Sin conexión con el servidor. Se sigue intentando…');
+        setAvisoDeSondeo('Sin conexión con el servidor. Se sigue intentando…');
         return;
       }
       setVista(null);
@@ -79,6 +101,8 @@ export default function LivePanel(): JSX.Element {
     intervalo.current = window.setInterval(() => void cargar(game.id), 3000);
     return () => {
       if (intervalo.current) window.clearInterval(intervalo.current);
+      // Y el temporizador del aviso de mando, que si no queda vivo tras salir.
+      if (borrarMando.current) window.clearTimeout(borrarMando.current);
     };
   }, [game, cargar]);
 
@@ -105,12 +129,12 @@ export default function LivePanel(): JSX.Element {
 
   const accion = async (fn: () => Promise<unknown>): Promise<void> => {
     setOcupado(true);
-    setError(null);
+    setErrorDeMando(null);
     try {
       await fn();
       await cargar(game.id);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'No se pudo completar la acción.');
+      avisarDelMando(e instanceof Error ? e.message : 'No se pudo completar la acción.');
     } finally {
       setOcupado(false);
     }
@@ -130,7 +154,8 @@ export default function LivePanel(): JSX.Element {
             dos códigos entran en la app del móvil: no hace falta instalar nada ni registrarse.
           </p>
           {!game.plot && <p className="sp-error">{palabras.sinTrama}</p>}
-          {error && <p className="sp-error">{error}</p>}
+          {errorDeMando && <p className="sp-error">{errorDeMando}</p>}
+          {avisoDeSondeo && <p className="text-dim text-italic">{avisoDeSondeo}</p>}
           <button
             className="btn btn--primary"
             disabled={ocupado || !game.plot}
@@ -152,7 +177,8 @@ export default function LivePanel(): JSX.Element {
 
   return (
     <div className="live-panel">
-      {error && <p className="sp-error">{error}</p>}
+      {errorDeMando && <p className="sp-error">{errorDeMando}</p>}
+      {avisoDeSondeo && <p className="text-dim text-italic">{avisoDeSondeo}</p>}
 
       {/* ---- Estado y código ---- */}
       <section className="deco-frame live-cabecera">
