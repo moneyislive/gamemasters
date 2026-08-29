@@ -89,6 +89,15 @@ function abrirStream(
    * herramientas: son lo unico de la llamada que depende del juego.
    */
   game: GameSession,
+  /*
+   * La señal con la que se corta si quien preguntó ya no está.
+   *
+   * Va hasta la llamada HTTP misma, no solo hasta el bucle: abortarla cierra la
+   * conexion con la API y el modelo deja de generar. Cortar solo el bucle
+   * dejaria la generacion corriendo al otro lado, que es exactamente lo que se
+   * paga.
+   */
+  senal: AbortSignal,
 ): StreamAgente {
   const parametrosBase = {
     model,
@@ -123,11 +132,13 @@ function abrirStream(
       ...parametrosBase,
       betas: ['server-side-fallback-2026-07-01'],
       fallbacks: 'default',
-    } as unknown as Parameters<typeof client.beta.messages.stream>[0]) as unknown as StreamAgente;
+    } as unknown as Parameters<typeof client.beta.messages.stream>[0],
+    { signal: senal }) as unknown as StreamAgente;
   }
 
   return client.messages.stream(
     parametrosBase as unknown as Parameters<typeof client.messages.stream>[0],
+    { signal: senal },
   ) as unknown as StreamAgente;
 }
 
@@ -138,6 +149,7 @@ function abrirStream(
 async function chatConAgente(
   game: GameSession,
   emit: (e: ChatStreamEvent) => void,
+  senal: AbortSignal,
 ): Promise<void> {
   const store = getStore();
   const client = getAnthropicClient();
@@ -165,17 +177,45 @@ async function chatConAgente(
   let textoAsistente = '';
   let partidaActual = game;
 
-  for (let vuelta = 0; vuelta < MAX_ITERACIONES; vuelta++) {
-    const stream = abrirStream(client, model, systemText, turnos, game);
+  /*
+   * SI SE FUE, SE CORTA. Antes no: el mayordomo seguia hablando solo.
+   *
+   * Cerrar la pestaña solo hacia que `emit` dejara de escribir. El bucle seguia
+   * hasta doce vueltas, reenviando la conversacion entera en cada una, llamando
+   * herramientas y guardando la partida — todo para nadie. Es el gasto menos
+   * acotado de la casa y el mas facil de disparar: basta con recargar el taller
+   * un par de veces para dejar tres agentes escribiendo contra la misma partida
+   * a la vez, que ademas de caro es una forma de pisarse los cambios.
+   *
+   * Se corta con la señal, no con una bandera, porque la bandera no cruza a la
+   * API: el modelo seguiria generando al otro lado y esos tokens ya se pagan.
+   */
+  let cortado = false;
 
-    for await (const evento of stream) {
-      if (evento.type === 'content_block_delta' && evento.delta?.type === 'text_delta') {
-        const delta = evento.delta.text ?? '';
-        if (delta !== '') {
-          textoAsistente += delta;
-          emit({ type: 'text', delta });
+  for (let vuelta = 0; vuelta < MAX_ITERACIONES; vuelta++) {
+    if (senal.aborted) {
+      cortado = true;
+      break;
+    }
+
+    const stream = abrirStream(client, model, systemText, turnos, game, senal);
+
+    try {
+      for await (const evento of stream) {
+        if (evento.type === 'content_block_delta' && evento.delta?.type === 'text_delta') {
+          const delta = evento.delta.text ?? '';
+          if (delta !== '') {
+            textoAsistente += delta;
+            emit({ type: 'text', delta });
+          }
         }
       }
+    } catch (error) {
+      // Abortar hace saltar el stream. Si fue porque se fue quien preguntaba,
+      // no es un fallo: es lo que se pidio. Cualquier otro error sube.
+      if (!senal.aborted) throw error;
+      cortado = true;
+      break;
     }
 
     const mensaje = await stream.finalMessage();
@@ -250,14 +290,31 @@ async function chatConAgente(
     break;
   }
 
-  const mensajeAsistente: ChatMessage = {
-    id: nanoid(),
-    role: 'assistant',
-    content: textoAsistente,
-    createdAt: new Date().toISOString(),
-  };
-  await store.appendMessage(game.id, mensajeAsistente);
-  emit({ type: 'done', messageId: mensajeAsistente.id });
+  /*
+   * LO YA DICHO SE GUARDA AUNQUE SE HAYA CORTADO.
+   *
+   * Cortar no puede convertirse en perder: quien cerro la pestaña a mitad
+   * vuelve al taller y encuentra lo que el mayordomo llevaba escrito, igual que
+   * si se hubiera quedado mirando. Lo unico que se pierde son las vueltas que
+   * ya no se van a dar, que es justo lo que se queria dejar de pagar.
+   *
+   * Vacio no se guarda nada: un turno del asistente en blanco solo ensucia el
+   * historial que se reenvia en la siguiente pregunta.
+   */
+  if (textoAsistente !== '') {
+    const mensajeAsistente: ChatMessage = {
+      id: nanoid(),
+      role: 'assistant',
+      content: textoAsistente,
+      createdAt: new Date().toISOString(),
+    };
+    await store.appendMessage(game.id, mensajeAsistente);
+    if (!cortado) emit({ type: 'done', messageId: mensajeAsistente.id });
+  }
+
+  if (cortado) {
+    console.log(`[chat] turno cortado: quien preguntaba se fue (partida ${game.id})`);
+  }
 
   // Lo apuntado en TODAS las vueltas del bucle, de una vez y con la partida ya
   // guardada: volcarlo antes seria contar en una hoja que el turno va a tirar.
@@ -328,8 +385,17 @@ router.post('/games/:id/chat', async (req: Request, res: Response) => {
     res.flushHeaders();
 
     let cerrado = false;
+    /*
+     * El mando de apagado del turno. `res.on('close')` salta tanto si se cierra
+     * la pestaña como al terminar de responder, asi que se aborta solo mientras
+     * el turno sigue vivo; abortar despues seria inofensivo pero engañoso de
+     * leer.
+     */
+    const mando = new AbortController();
+    let enCurso = true;
     res.on('close', () => {
       cerrado = true;
+      if (enCurso) mando.abort();
     });
     const emit = (evento: ChatStreamEvent): void => {
       if (!cerrado) res.write(`data: ${JSON.stringify(evento)}\n\n`);
@@ -356,7 +422,7 @@ router.post('/games/:id/chat', async (req: Request, res: Response) => {
         await store.appendMessage(game.id, mensajeAsistente);
         emit({ type: 'done', messageId: mensajeAsistente.id });
       } else {
-        await chatConAgente(game, emit);
+        await chatConAgente(game, emit, mando.signal);
       }
     } catch (error) {
       emit({
@@ -367,6 +433,7 @@ router.post('/games/:id/chat', async (req: Request, res: Response) => {
             : 'El agente ha tropezado con un imprevisto desconocido.',
       });
     } finally {
+      enCurso = false;
       res.end();
     }
   } catch (error) {

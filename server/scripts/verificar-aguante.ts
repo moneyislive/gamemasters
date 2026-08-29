@@ -576,6 +576,41 @@ function comprobarCobertura(): void {
     'el registro de presencia no toca el almacén',
     !fs.readFileSync(path.join(src, 'live', 'presencia.ts'), 'utf8').includes('getStore'),
   );
+
+  /*
+   * Y SI SE VA QUIEN PREGUNTABA, EL MAYORDOMO SE CALLA.
+   *
+   * Cerrar la pestaña solo hacia que `emit` dejara de escribir: el bucle del
+   * taller seguia hasta doce vueltas, reenviando la conversacion entera y
+   * llamando herramientas, para nadie. Recargar el taller tres veces dejaba
+   * tres agentes escribiendo contra la misma partida.
+   *
+   * Esto se comprueba sobre el fuente y no sobre el comportamiento: probarlo
+   * de verdad exige una llamada real al modelo, y el modo de demostracion no
+   * pasa por este bucle. Lo que se fija aqui es que el cableado siga puesto,
+   * que es lo que se rompe sin querer al tocar el fichero.
+   */
+  const chatTs = fs.readFileSync(path.join(src, 'routes', 'chat.ts'), 'utf8');
+  comprobar(
+    'la señal llega hasta la llamada HTTP, no solo al bucle',
+    /signal:\s*senal/.test(chatTs),
+  );
+  comprobar(
+    'el que responde aborta cuando se cierra la conexión',
+    /res\.on\('close'[\s\S]{0,200}\.abort\(\)/.test(chatTs),
+  );
+  comprobar(
+    'el bucle mira la señal antes de pedir otra vuelta',
+    chatTs.includes('senal.aborted'),
+  );
+  comprobar(
+    'y lo ya dicho se guarda aunque se corte',
+    /if \(textoAsistente !== ''\)[\s\S]{0,400}appendMessage/.test(chatTs),
+  );
+  comprobar(
+    'la generación NO se aborta: su resultado se guarda igual',
+    !fs.readFileSync(path.join(src, 'routes', 'generate.ts'), 'utf8').includes('AbortController'),
+  );
 }
 
 // ---------------------------------------------------------------------------
