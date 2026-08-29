@@ -311,12 +311,26 @@ export async function borrarCuenta(cuenta: Account): Promise<{
     }
     if (tocada) await store.saveGame(game);
 
-    // Por `mutar`, no a pelo: doce móviles pueden estar escribiendo notas y
-    // eligiendo sala en este mismo instante, y una lectura-modificación-
-    // escritura por libre se lleva por delante lo que se guardara entretanto.
-    // Que la revisión suba está bien: para quien pierde la cuenta, su pantalla
-    // de perfil ha cambiado de verdad.
-    if (await store.getLive(game.id)) {
+    /*
+     * Por `mutar`, no a pelo: doce móviles pueden estar escribiendo notas y
+     * eligiendo sala en este mismo instante, y una lectura-modificación-
+     * escritura por libre se lleva por delante lo que se guardara entretanto.
+     * Que la revisión suba está bien: para quien pierde la cuenta, su pantalla
+     * de perfil ha cambiado de verdad.
+     *
+     * PERO SOLO SI ESA PARTIDA TIENE ALGO SUYO. Antes se entraba en `mutar` para
+     * TODAS las sesiones vivas de la plataforma, y `mutar` sube la revisión y
+     * despierta a los móviles aunque el cambio no toque nada: una persona
+     * borrando su cuenta sacudía las veladas de doce desconocidos que estaban
+     * jugando en ese momento, cada uno con su refresco y su viaje al servidor.
+     * Se mira antes, y a las que no le deben nada no se las molesta.
+     */
+    const enVivo = await store.getLive(game.id);
+    const leDebeAlgo =
+      enVivo?.players.some(
+        (j) => esSuyo(j.email) || j.accountId === cuenta.id || esSuyo(j.reclamadaPor?.correo),
+      ) ?? false;
+    if (leDebeAlgo) {
       const { resultado } = await mutar(game.id, (sesion) => {
         let sesionTocada = false;
         for (const jugador of sesion.players) {

@@ -329,16 +329,30 @@ router.post('/games/:id/live/desenlace', async (req, res) => {
       },
     });
 
-    // El historial y los trofeos se apuntan al cerrar, no antes: hasta aquí la
-    // partida podía quedarse a medias.
+    /*
+     * El historial y los trofeos se apuntan al cerrar, no antes: hasta aquí la
+     * partida podía quedarse a medias.
+     *
+     * Y POR `mutar`, que es la tercera pata del mismo fallo. Esto hacía
+     * `getLive` → `cerrarPartidaEnCuentas` → `saveLive` por libre, y
+     * `cerrarPartidaEnCuentas` SÍ muta la sesión: escribe el `accountId` de cada
+     * jugador. La ventana no era estrecha, era ancha — hace un `getAccount` y un
+     * `saveAccount` POR PERSONA, o sea doce idas y vueltas a la base de datos
+     * con la sesión leída en la mano— y `saveLive` reemplaza el documento
+     * entero sin comparar `rev`. Lo que se escribiera durante esos doce viajes
+     * —una nota, una presencia, una acusación rezagada— se perdía, y `rev`
+     * retrocedía: el móvil que ya había visto la revisión 4 pedía «desde la 4» y
+     * se quedaba sin lo que volviera a numerarse 4.
+     *
+     * Mete las doce cuentas dentro del candado de la partida, sí. Es el
+     * desenlace y la velada ya ha terminado: ahí no hay nadie esperando turno.
+     */
     const store = getStore();
     const game = await store.getGame(req.params.id);
     if (game) {
-      const actual = await store.getLive(req.params.id);
-      if (actual) {
-        await cerrarPartidaEnCuentas(game, actual);
-        await store.saveLive(actual);
-      }
+      await mutar(req.params.id, async (sesion) => {
+        await cerrarPartidaEnCuentas(game, sesion);
+      });
     }
     await responderVista(req.params.id, res);
   } catch (error) {
