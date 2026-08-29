@@ -104,6 +104,26 @@ services:
       - key: PLAYER_TOKEN_SECRET
         sync: false
 
+      # --- El freno de lo que cuesta dinero ----------------------------------
+      # Tope diario por identidad. Habia uno, y estaba puesto en la ruta BARATA
+      # (avatares y fondos); las caras no llevaban ninguno, y generar una trama
+      # cuesta entre 0,48 y 0,82 euros MEDIDOS cada vez.
+      #
+      # Estan holgados a proposito: su trabajo es cortar un bucle, no racionar
+      # el producto. Quien dirige de verdad genera una vez, actualiza dos o tres
+      # y quiza regenera; ocho al dia le sobran y son unos seis euros de techo.
+      #
+      # Un 0 QUITA el tope de esa familia, y es una salida de emergencia de
+      # verdad: si resulta estar mal calibrado un sabado por la noche, se pone a
+      # 0 y se recalibra el lunes, en vez de dejar a doce personas sentadas a la
+      # mesa. Ver `server/src/gasto/tope.ts`.
+      - key: TOPE_DIARIO_TRAMAS
+        value: "8"
+      - key: TOPE_DIARIO_CHARLA
+        value: "250"
+      - key: TOPE_DIARIO_ESTUDIO
+        value: "8"
+
       # --- Identidad, cuando la tengas ---------------------------------------
       - key: GOOGLE_CLIENT_IDS
         sync: false

@@ -11,6 +11,8 @@ import { getStore } from '../db/store';
 import { generadorDeMaterial } from '../juegos/materiales';
 import '../plot/material';
 import { crearRouter } from '../rutas';
+import { quienPide } from '../gasto/quien';
+import { cabeHoy, mensajeDeTope } from '../gasto/tope';
 import { partidaParaElTaller } from '../live/proyeccion';
 import { generacionEnCurso } from '../plot/pipeline';
 import { volcarGasto } from '../gasto/contador';
@@ -18,6 +20,25 @@ import { volcarGasto } from '../gasto/contador';
 const router = crearRouter();
 
 router.post('/games/:id/material', async (req, res) => {
+  /*
+   * EL TOPE, ANTES DE GASTAR NADA.
+   *
+   * Esta ruta no tenia ninguno. `generacionEnCurso` impide dos a la vez sobre la
+   * MISMA partida, que es otra cosa: crear veinte partidas y generarlas seguidas
+   * no lo paraba nada, y cada una cuesta entre 0,48 y 0,82 euros medidos. El
+   * unico tope de la casa estaba en la ruta de avatares, la barata.
+   *
+   * Se cuenta ANTES de empezar, no despues: cobrar el apunte cuando ya se ha
+   * pagado al proveedor no frena nada. Y a quien no se identifica no se le
+   * cuenta aqui --de eso se encarga la puerta-- pero tampoco se le deja pasar
+   * sin cubo, asi que se le da el de invitado.
+   */
+  const quien = quienPide(req) ?? 'sin-identificar';
+  if (!cabeHoy(quien, 'tramas')) {
+    res.status(429).json({ error: mensajeDeTope('tramas') });
+    return;
+  }
+
   const store = getStore();
 
   let game;

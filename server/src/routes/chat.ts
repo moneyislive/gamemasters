@@ -21,6 +21,8 @@ import { getStore } from '../db/store';
 import { DEMO_MODE } from '../config';
 import { getAnthropicClient, resolveModel, usesFallbacks } from '../agent/anthropic';
 import { bloquesDeSistema } from '../agent/systemPrompt';
+import { quienPide } from '../gasto/quien';
+import { cabeHoy, mensajeDeTope } from '../gasto/tope';
 import { executeTool, herramientasDe } from '../agent/tools';
 import { runDemoChat } from '../agent/demo';
 import { crearRouter } from '../rutas';
@@ -369,6 +371,24 @@ router.post('/games/:id/chat', async (req: Request, res: Response) => {
     const texto = String(cuerpo.message ?? cuerpo.text ?? '').trim();
     if (texto === '') {
       res.status(400).json({ error: 'El mensaje no puede estar vacío' });
+      return;
+    }
+
+    /*
+     * EL TOPE, Y AQUÍ HACE MÁS FALTA QUE EN NINGÚN SITIO.
+     *
+     * Este es el gasto SIN FONDO de la casa: cada turno da hasta doce vueltas
+     * reenviando la conversación entera, así que lo que cuesta crece con lo que
+     * se hable y no tiene techo natural. No llevaba ninguno; el único de la casa
+     * estaba en la ruta de avatares, la barata.
+     *
+     * Se cuenta antes de responder y en 429 con texto legible, porque esto lo va
+     * a leer alguien preparando su velada. El tope está puesto alto a propósito
+     * —doscientos cincuenta turnos al día— para que solo lo toque un bucle.
+     */
+    const quien = quienPide(req) ?? 'sin-identificar';
+    if (!cabeHoy(quien, 'charla')) {
+      res.status(429).json({ error: mensajeDeTope('charla') });
       return;
     }
 

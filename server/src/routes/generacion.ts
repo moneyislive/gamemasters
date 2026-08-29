@@ -15,9 +15,8 @@
  */
 import path from 'node:path';
 import { env } from '../config';
-import { identidadDeTaller } from '../auth';
-import { credencialDePeticion } from '../live/token';
-import { sesionDeCuentaDePeticion } from '../identidad/sesion';
+import { quienPide } from '../gasto/quien';
+import { cabeHoy } from '../gasto/tope';
 import { firmarConSecreto, igualSeguro } from '../secreto';
 import { crearRouter } from '../rutas';
 import {
@@ -42,36 +41,18 @@ const router = crearRouter();
 // La puerta y el tope
 // ---------------------------------------------------------------------------
 
-/** Quién pide, o null. Cualquier identidad de la plataforma vale. */
+/*
+ * QUIÉN PIDE Y CUÁNTO LE CABE: los dos vivían aquí, y por eso el tope solo
+ * existía en esta ruta, que es la BARATA. Generar una trama cuesta entre 0,48 €
+ * y 0,82 € medidos y no llevaba ninguno. Ahora los dos son de la casa entera
+ * (`gasto/quien.ts` y `gasto/tope.ts`) y esta ruta es una clienta más.
+ */
 function identidadDe(req: Request): string | null {
-  const jugador = credencialDePeticion(req.headers.authorization);
-  if (jugador) return `jugador:${jugador.gameId}:${jugador.suspectId}`;
-  const cuenta = sesionDeCuentaDePeticion(req);
-  if (cuenta) return `cuenta:${cuenta.cuentaId}`;
-  const taller = identidadDeTaller(req);
-  if (taller?.tipo === 'casa') return 'casa';
-  if (taller?.tipo === 'abierto') return 'abierto';
-  if (taller?.tipo === 'cuenta') return `cuenta:${taller.cuentaId}`;
-  return null;
+  return quienPide(req);
 }
 
-/**
- * Tope diario en memoria. Se pierde al reiniciar, y no importa: su trabajo es
- * parar un bucle descontrolado, no llevar contabilidad.
- */
-const GASTO_DIARIO_MAX = 8;
-const gasto = new Map<string, { dia: string; usos: number }>();
-
 function dentroDelTope(quien: string): boolean {
-  const hoy = new Date().toISOString().slice(0, 10);
-  const registro = gasto.get(quien);
-  if (!registro || registro.dia !== hoy) {
-    gasto.set(quien, { dia: hoy, usos: 1 });
-    return true;
-  }
-  if (registro.usos >= GASTO_DIARIO_MAX) return false;
-  registro.usos++;
-  return true;
+  return cabeHoy(quien, 'estudio');
 }
 
 /**
