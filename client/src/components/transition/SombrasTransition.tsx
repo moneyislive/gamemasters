@@ -1,9 +1,10 @@
 /**
  * SombrasTransition — entrar en una partida de El Paso de las Sombras.
  *
- * QUÉ CUENTA, en 2,9 s: hay un farol de papel encendido → alguien lo APAGA de
- * un soplo → queda todo negro un instante → y de la negrura salen la luna, la
- * cresta del monte y un torii. «A partir de aquí se anda a oscuras.»
+ * QUÉ CUENTA, en 3,4 s: hay un farol de papel encendido → alguien lo APAGA de
+ * un soplo → y mientras el papel se apaga y el ojo se acostumbra, DETRÁS del
+ * farol van saliendo la luna, la cresta del monte y un torii. El farol se va y
+ * la escena se queda. «A partir de aquí se anda a oscuras.»
  *
  * POR QUÉ EXISTE, TENIENDO YA LAS OTRAS DOS. Porque cuentan cosas distintas.
  * Dos puertas de caoba que se abren hacia dentro son una casa que te recibe; dos
@@ -33,42 +34,58 @@ interface SombrasTransitionProps {
 /**
  * LOS TIEMPOS, EN UN SOLO SITIO Y EN SEGUNDOS.
  *
- * Estaban repartidos por el JSX como números sueltos y se habían desajustado sin
- * que se notara leyendo: el farol se comía el 60 % de la cortinilla y la escena
- * —luna, crestas, torii y frase— entraba tan tarde que la cresta cercana, el
- * torii y el lema seguían ANIMÁNDOSE cuando el velo ya se estaba yendo. Es decir:
- * la escena completa no llegaba a verse quieta ni un instante.
+ * NO ES UNA SECUENCIA, ES UN RELEVO, y esa es toda la diferencia. Antes el farol
+ * se apagaba del todo y SOLO ENTONCES empezaba el monte: se leía como dos
+ * animaciones pegadas, «primero una cosa y luego otra». Ahora el monte empieza a
+ * salir mientras el farol todavía está encendido y visible, que además es lo que
+ * pasa de verdad: se apaga la luz que llevas y el ojo se acostumbra, así que lo
+ * que aparece no es una escena nueva, es la que estaba ahí todo el rato.
  *
- * La regla de esta tabla: `ESCENA.lema + su duración` tiene que caber holgado
- * dentro de `TOTAL_MS`, y lo que sobra es el REPOSO, que es lo que se disfruta.
- * Si se toca un número, hay que rehacer esa cuenta.
+ * Las tres reglas que sostienen eso, y que hay que rehacer si se toca un número:
+ *
+ *   1. Nada de la escena empieza antes de `ESCENA.monte.en`: ese primer segundo
+ *      es el farol SOLO en la oscuridad, y es lo que hay que conservar.
+ *   2. `FAROL.cuerpo` tiene que acabar DESPUÉS de `ESCENA.monte.en` con margen
+ *      de sobra. Ahí está el solape: si el farol se va antes de que el monte
+ *      entre, vuelve la sensación de dos animaciones pegadas.
+ *   3. El último en entrar es el lema: `ESCENA.lema.en + ESCENA.lema.dura` tiene
+ *      que caber holgado dentro de `TOTAL_MS`. Lo que sobra es el REPOSO, que es
+ *      lo único que de verdad se disfruta.
  */
 const FAROL = {
-  /** El halo cálido y el propio farol. */
-  halo: 1.15,
-  cuerpo: 1.25,
-  /** La llama se apaga al 78 % de su duración: 1.1 × 0.78 ≈ 0.86 s. */
+  /** El halo cálido: se muere con la llama, antes que el papel. */
+  halo: 1.5,
+  /**
+   * El cuerpo del farol aguanta hasta 2,05 s —a plena opacidad hasta 1,35— para
+   * que siga colgado en el aire mientras el monte sale detrás. Es la regla 2.
+   */
+  cuerpo: 2.05,
+  /** La llama se apaga al 78 % de su duración: 1.1 × 0.78 ≈ 0,86 s. */
   llama: 1.1,
+  /** El humo ya se ve entero: antes el padre se desvanecía antes que él. */
   humo: 0.88,
 } as const;
 
+/** Cuándo entra cada pieza de la escena y cuánto tarda en entrar. */
 const ESCENA = {
-  monte: 1.05,
-  luna: 1.15,
-  crestaLejos: 1.2,
-  cresta: 1.28,
-  torii: 1.38,
-  lema: 1.5,
+  monte: { en: 1.05, dura: 1.1 },
+  luna: { en: 1.18, dura: 1.15 },
+  crestaLejos: { en: 1.28, dura: 1.15 },
+  cresta: { en: 1.42, dura: 1.15 },
+  torii: { en: 1.6, dura: 1.05 },
+  lema: { en: 1.85, dura: 0.9 },
 } as const;
 
 /**
  * Duración total de la secuencia en milisegundos.
  *
- * El lema acaba de entrar en 1,5 + 0,8 = 2,3 s, así que quedan 0,6 s de escena
- * quieta antes de que empiece el velo a irse (y otro medio segundo mientras se
- * va). Antes eran 2400 y la escena no se quedaba quieta nunca.
+ * El lema acaba de entrar en 1,85 + 0,9 = 2,75 s y el farol se fue en 2,05, así
+ * que la escena se queda sola 0,65 s quieta antes de que el velo empiece a irse
+ * (y otro medio segundo mientras se va). Es más larga que la Momia (2400) y que
+ * CLUEDO (2250) a propósito: esta cortinilla tiene un relevo que las otras dos
+ * no tienen, y sin reposo al final no se ve.
  */
-const TOTAL_MS = 2900;
+const TOTAL_MS = 3400;
 
 export default function SombrasTransition({
   active,
@@ -94,7 +111,7 @@ export default function SombrasTransition({
             className="ts-halo"
             initial={{ opacity: 0, scale: 0.7 }}
             animate={{ opacity: [0, 1, 1, 0], scale: [0.7, 1, 1.05, 0.2] }}
-            transition={{ duration: FAROL.halo, times: [0, 0.25, 0.7, 1], ease: 'easeOut' }}
+            transition={{ duration: FAROL.halo, times: [0, 0.17, 0.5, 1], ease: 'easeOut' }}
           />
 
           {/* ---- El farol ---- */}
@@ -103,7 +120,7 @@ export default function SombrasTransition({
             viewBox="0 0 120 190"
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: [0, 1, 1, 0], y: [10, 0, 0, -6] }}
-            transition={{ duration: FAROL.cuerpo, times: [0, 0.2, 0.7, 1] }}
+            transition={{ duration: FAROL.cuerpo, times: [0, 0.11, 0.66, 1] }}
           >
             <g
               fill="none"
@@ -139,7 +156,7 @@ export default function SombrasTransition({
               className="ts-humo"
               initial={{ opacity: 0, y: 0 }}
               animate={{ opacity: [0, 0.5, 0], y: [0, -22, -40] }}
-              transition={{ duration: 0.9, delay: FAROL.humo }}
+              transition={{ duration: 0.95, delay: FAROL.humo }}
             />
           </motion.svg>
 
@@ -150,13 +167,13 @@ export default function SombrasTransition({
             preserveAspectRatio="xMidYMax slice"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ duration: 0.9, delay: ESCENA.monte }}
+            transition={{ duration: ESCENA.monte.dura, delay: ESCENA.monte.en }}
           >
             {/* La luna: fría, alta y hueca. Es lo contrario del farol. */}
             <motion.g
               initial={{ opacity: 0, y: 24 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 1, delay: ESCENA.luna, ease: 'easeOut' }}
+              transition={{ duration: ESCENA.luna.dura, delay: ESCENA.luna.en, ease: 'easeOut' }}
             >
               <circle className="ts-luna" cx="930" cy="96" r="46" />
               <circle className="ts-luna-halo" cx="930" cy="96" r="76" />
@@ -168,14 +185,14 @@ export default function SombrasTransition({
               d="M0 300 L120 246 L210 282 L330 200 L430 268 L540 214 L660 286 L780 232 L900 288 L1020 240 L1120 292 L1200 258 L1200 420 L0 420 Z"
               initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 1, delay: ESCENA.crestaLejos }}
+              transition={{ duration: ESCENA.crestaLejos.dura, delay: ESCENA.crestaLejos.en }}
             />
             <motion.path
               className="ts-cresta"
               d="M0 348 L160 296 L280 336 L400 268 L520 330 L640 288 L760 340 L880 300 L1000 344 L1120 306 L1200 340 L1200 420 L0 420 Z"
               initial={{ opacity: 0, y: 40 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 1, delay: ESCENA.cresta }}
+              transition={{ duration: ESCENA.cresta.dura, delay: ESCENA.cresta.en }}
             />
 
             {/* El torii, en primer plano y a contraluz. */}
@@ -183,7 +200,7 @@ export default function SombrasTransition({
               className="ts-torii"
               initial={{ opacity: 0, y: 40 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.9, delay: ESCENA.torii, ease: 'easeOut' }}
+              transition={{ duration: ESCENA.torii.dura, delay: ESCENA.torii.en, ease: 'easeOut' }}
             >
               <rect x="248" y="188" width="230" height="16" rx="6" />
               <rect x="272" y="226" width="182" height="11" />
@@ -198,7 +215,7 @@ export default function SombrasTransition({
             className="ts-lema"
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: ESCENA.lema }}
+            transition={{ duration: ESCENA.lema.dura, delay: ESCENA.lema.en }}
           >
             <span className="ts-lema-kanji">影の道</span>
             <span className="ts-lema-texto">A partir de aquí se anda a oscuras</span>

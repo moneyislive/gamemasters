@@ -30,9 +30,26 @@
    El farol
    --------------------------------------------------------------------- */
 
+/* ---------------------------------------------------------------------
+   EL ORDEN DE LAS CAPAS, DICHO Y NO HEREDADO DEL DOM
+
+   Antes no había un solo `z-index` aquí y no hacía falta: el farol se apagaba
+   del todo ANTES de que saliera el monte, así que nunca coincidían. Ahora se
+   solapan a propósito durante un segundo largo, y sin declarar el orden el
+   monte —que va después en el DOM y ocupa el 62 % de abajo— se pintaba ENCIMA
+   del farol y se lo comía por la mitad.
+
+   El orden es el de la escena de verdad: el monte está lejos, el farol lo
+   llevas tú en la mano, y el halo va entre los dos porque lo que ilumina es lo
+   que hay delante. Que el halo cálido quede por encima del monte no es un
+   efecto secundario: es lo que lava de naranja la montaña mientras el farol
+   sigue encendido, y lo que la deja azul cuando se apaga.
+   --------------------------------------------------------------------- */
+
 /* El halo va DEBAJO del dibujo y es lo que de verdad ilumina la escena. */
 .ts-halo {
   position: absolute;
+  z-index: 2;
   width: min(70vw, 520px);
   aspect-ratio: 1;
   border-radius: 50%;
@@ -48,6 +65,7 @@
 
 .ts-farol {
   position: relative;
+  z-index: 3;
   width: min(34vw, 150px);
   /* El papel del chōchin, encendido por dentro. */
   color: #e6c88e;
@@ -69,6 +87,7 @@
 
 .ts-monte {
   position: absolute;
+  z-index: 1;
   inset: auto 0 0 0;
   width: 100%;
   height: min(62vh, 420px);
@@ -113,6 +132,7 @@
 
 .ts-lema {
   position: absolute;
+  z-index: 4;
   left: 0;
   right: 0;
   bottom: clamp(2.5rem, 9vh, 5.5rem);
