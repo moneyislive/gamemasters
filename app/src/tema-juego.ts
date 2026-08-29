@@ -72,15 +72,20 @@ export function useJuego(): JuegoId | undefined {
   return partida?.vista?.sesion.juego;
 }
 
-/** `true` si lo que hay abierto es una partida de la Momia. */
-export function useEsMomia(): boolean {
-  return useJuego() === 'momia';
-}
-
-/** `true` si lo que hay abierto es una partida de El Paso de las Sombras. */
-export function useEsSombras(): boolean {
-  return useJuego() === 'sombras';
-}
+/*
+ * AQUÍ HABÍA `useEsMomia()` Y `useEsSombras()`, y se han retirado por dos
+ * motivos que conviene dejar escritos.
+ *
+ * El primero es que no los llamaba nadie: quedaron muertos al pasar el fondo y
+ * el ornamento a tablas. El segundo importa más: son la FORMA equivocada. Un
+ * predicado por juego invita a escribir `if (esMomia) …` en una pantalla común,
+ * que es exactamente el reparto que este fichero existe para evitar. Lo que un
+ * juego tiene de propio se declara en una tabla —`PALETAS`, `ORNAMENTOS`,
+ * `FONDOS`— y se pregunta por clave; así, añadir un juego es añadir una fila y
+ * no encontrar todos los sitios donde alguien preguntó por el suyo.
+ *
+ * Si algún día hace falta saber a qué se juega, ahí está `useJuego()`.
+ */
 
 /**
  * El signo que va en medio del divisor ornamental.
@@ -103,14 +108,15 @@ export function useOrnamento(): string {
   return ORNAMENTOS[useJuego() ?? ''] ?? '❦';
 }
 
-/** El degradado de fondo del juego que se esté jugando. */
-export function useFondo(): readonly [string, string, string] {
-  const juego = useJuego();
-  if (juego === 'momia') return FONDO_MOMIA;
-  if (juego === 'sombras') return FONDO_SOMBRAS;
-  return fondoMesa;
-}
-
+/**
+ * El degradado de fondo del juego que se esté jugando.
+ *
+ * TABLA, como la paleta y el ornamento. Era una cadena de `if` por juego y era
+ * la última que quedaba en este fichero: la trampa que describe el manual de
+ * montaje —«se olvida la rama del fondo y la app sale con marcos y botones del
+ * color nuevo sobre el fieltro verde de CLUEDO, que engaña más que no
+ * tematizarla»— vivía justo aquí.
+ */
 /**
  * El fondo de la Momia: la piedra caliza tostada arriba, la noche del desierto
  * abajo. El tercer tono tira a azul a propósito —es la única frialdad de toda
@@ -129,6 +135,23 @@ const FONDO_MOMIA = ['#0b0805', '#150e07', '#0a0c16'] as const;
  * un degradado de aplicación en vez de como un sitio.
  */
 const FONDO_SOMBRAS = ['#080a11', '#0f1526', '#0a1211'] as const;
+
+/*
+ * LA TABLA VA DEBAJO DE LOS DOS DEGRADADOS, y no es cuestión de gusto: un
+ * `const` de módulo se evalúa al importar, en orden, así que una tabla escrita
+ * ARRIBA que los nombre revienta con «Cannot access 'FONDO_MOMIA' before
+ * initialization» al cargar el fichero — y este lo carga `ui.tsx`, o sea la app
+ * entera, en blanco y antes de la primera pantalla. Se escribió así primero y se
+ * cazó al ejecutarlo, no al compilarlo.
+ */
+const FONDOS: Record<string, readonly [string, string, string]> = {
+  momia: FONDO_MOMIA,
+  sombras: FONDO_SOMBRAS,
+};
+
+export function useFondo(): readonly [string, string, string] {
+  return FONDOS[useJuego() ?? ''] ?? fondoMesa;
+}
 
 /**
  * Un color de la paleta con transparencia.

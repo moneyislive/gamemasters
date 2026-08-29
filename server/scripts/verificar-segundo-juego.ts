@@ -82,6 +82,9 @@ const EL_LEGADO: ManifiestoDeJuego = {
     { pantalla: 'tablon', rotulo: 'Lo visto', icono: 'tablon' },
     { pantalla: 'perfil', rotulo: 'Perfil', icono: 'copa' },
   ],
+  // Un dosier corto: este juego tiene pestana de `tablon` donde mirar lo visto.
+  dosier: ['identidad', 'senalado', 'persona-publica', 'secreto', 'conocimiento'],
+
   asistente: {
     nombre: 'El Notario', descripcion: 'Guarda el testamento y poco más', icono: 'mayordomo',
     voz: 'Eres el asistente de esta velada. Hablas en espanol, breve y claro.',

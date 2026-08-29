@@ -657,6 +657,35 @@ export const SOMBRAS: ManifiestoDeJuego = {
     { pantalla: 'perfil', rotulo: 'Perfil', icono: 'copa' },
   ],
 
+  /**
+   * EL DOSIER DE LA COLUMNA.
+   *
+   * Como el de la Momia y por lo mismo: la barra de este juego es `camino` y
+   * `consejo`, no `tablon` ni `cuaderno`, así que lo que en CLUEDO se mudó a
+   * otras pestañas aquí no tiene adónde ir.
+   *
+   * El DISFRAZ va arriba —es lo que puedes hacer tú y nadie más— y lleva dentro
+   * el estandarte, que es público y sirve para llamarse a gritos por un sendero
+   * a oscuras.
+   */
+  dosier: [
+    'identidad',
+    'senalado',
+    'disfraz',
+    'persona-publica',
+    'secreto',
+    'motivo',
+    'coartada',
+    'cronologia-propia',
+    'gancho',
+    'conocimiento',
+    'giros',
+    'caso',
+    'reglas',
+    'cosas',
+    'mesa',
+  ],
+
   asistente: {
     nombre: 'El Guía',
     descripcion: 'Tu guía del camino con IA',

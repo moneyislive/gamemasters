@@ -315,6 +315,73 @@ export type PantallaDeApp =
   | 'consejo';
 
 /**
+ * Un bloque del dosier que se lee en el MÓVIL.
+ *
+ * ═══ POR QUÉ ESTO EXISTE ═══
+ *
+ * `app/app/(juego)/personaje.tsx` es UNA pantalla que comparten todos los
+ * juegos, y durante un tiempo lo pintó todo para todos: el papel, el secreto,
+ * la coartada, lo que sabes de los demás, los giros, el caso, las doce reglas,
+ * los objetos y la lista de gente en la mesa. Cuando a CLUEDO se le reorganizó
+ * el dosier —trama y reglas a la pestaña de Ronda, pistas a la suya— resultó que
+ * la Momia y El Paso de las Sombras NO tienen esas pestañas, así que quitarles
+ * lo mismo les borraba esa información de la app entera. Se tapó con un booleano
+ * que preguntaba si el juego declaraba la pestaña `cuaderno`, y eso era un
+ * parche: dos juegos y dos ramas, con el tercero heredando la que le tocara.
+ *
+ * Ahora cada juego DECLARA su dosier, bloque a bloque y en su orden. Cambiar el
+ * de CLUEDO no puede tocar el de la Momia, porque son dos listas distintas en
+ * dos ficheros distintos. Eso es lo que se quería decir con «sin solapes».
+ *
+ * ═══ POR QUÉ UNA UNIÓN CERRADA Y NO UNA CADENA LIBRE ═══
+ *
+ * Por lo mismo que `PantallaDeApp` e `IconoId`: la app es un binario, así que
+ * los bloques que sabe pintar están compilados dentro. Con una cadena libre, un
+ * juego podría declarar `'mi-bloque'` y en el móvil no saldría NADA —sin error,
+ * sin aviso— y nadie se enteraría hasta la noche de la partida. Con la unión, el
+ * `Record` de `app/src/dosier/bloques.tsx` no compila hasta que ese bloque
+ * existe. Es el acoplamiento honesto de siempre: se paga una línea aquí y a
+ * cambio el compilador no deja estrenarse a medias.
+ *
+ * Un juego que necesite un bloque que no está en esta lista lo añade aquí y lo
+ * escribe en su propia carpeta (`app/src/momia/`, `app/src/sombras/`…). No tiene
+ * que tocar los bloques de los demás ni que pedirle permiso a CLUEDO.
+ */
+export type BloqueDeDosier =
+  /* ---- Los que sirven a cualquier juego con personajes ---- */
+  /** Quién eres y si el juego te señala a ti. Lo primero que se lee. */
+  | 'identidad'
+  /** El consejo para quien lleva el papel que gana perdiendo. */
+  | 'senalado'
+  /** Tu cara pública: quién crees ser ante los demás. */
+  | 'persona-publica'
+  | 'secreto'
+  | 'motivo'
+  | 'coartada'
+  /** Cómo interpretar el papel. Consejo de actuación, no información. */
+  | 'gancho'
+  /** Qué hizo tu personaje esa noche, hora a hora. */
+  | 'cronologia-propia'
+  /** Lo que sabes de los demás, que se desbloquea ronda a ronda. */
+  | 'conocimiento'
+  /** Los giros que te han entregado a mitad de partida. */
+  | 'giros'
+  /** De qué va la velada: sinopsis, víctima y dónde. */
+  | 'caso'
+  /** Las reglas del juego. */
+  | 'reglas'
+  /** Las cosas de la partida: objetos, reliquias, enseres. */
+  | 'cosas'
+  /** Quién está sentado a la mesa. */
+  | 'mesa'
+  /* ---- Los propios de El Misterio de la Momia ---- */
+  /** Tu don: lo que puedes hacer tú y nadie más, una vez por vigilia. */
+  | 'don'
+  /* ---- Los propios de El Paso de las Sombras ---- */
+  /** Tu disfraz y el blasón bajo el que cruzas. */
+  | 'disfraz';
+
+/**
  * Una regla de las que lee quien juega.
  *
  * Vive en el manifiesto y no en el servidor porque es CONTENIDO del juego, no
@@ -462,6 +529,21 @@ export interface ManifiestoDeJuego {
    * ella: un misterio necesita tablón y cuaderno; una oca, ni lo uno ni lo otro.
    */
   barra: PestanaDeBarra[];
+
+  /**
+   * Qué lleva dentro el dosier del móvil, en orden.
+   *
+   * Es la hermana de `barra`: aquélla dice QUÉ PESTAÑAS hay, ésta dice qué hay
+   * dentro de la de tu personaje. Y es OBLIGATORIA a propósito, sin respaldo:
+   * el respaldo silencioso a CLUEDO es justo lo que hace que un juego nuevo se
+   * estrene enseñando el dosier de otro sin que nadie lo note. Aquí el
+   * compilador obliga a decidir.
+   *
+   * Lista vacía es una respuesta legítima: significa «este juego no tiene dosier
+   * de personaje». Un juego así tampoco declarará la pestaña `personaje` en su
+   * barra, y las dos cosas se leen juntas.
+   */
+  dosier: BloqueDeDosier[];
 
   /** Quién ayuda desde el botón central. */
   asistente: AsistenteDeJuego;

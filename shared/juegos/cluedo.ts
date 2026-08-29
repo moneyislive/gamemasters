@@ -241,6 +241,29 @@ export const CLUEDO: ManifiestoDeJuego = {
     { pantalla: 'perfil', rotulo: 'Perfil', icono: 'copa' },
   ],
 
+  /**
+   * EL DOSIER DE CLUEDO, y solo el de CLUEDO.
+   *
+   * Corto a propósito. La trama y las reglas se leen en la pestaña de Ronda, que
+   * es por donde se entra a la partida; lo que sabes de los demás, lo que
+   * encuentras, los objetos y quién está en la mesa viven en la de Pistas. Aquí
+   * queda lo único que no cambia en toda la noche y que no puede leer nadie más:
+   * quién eres, qué escondes y qué hiciste de verdad.
+   *
+   * Que esta lista sea corta ya NO le quita nada a los otros juegos: la Momia y
+   * las Sombras declaran la suya, y las suyas son largas porque ellos no tienen
+   * esas otras dos pestañas donde mudar el material.
+   */
+  dosier: [
+    'identidad',
+    'senalado',
+    'persona-publica',
+    'secreto',
+    'motivo',
+    'coartada',
+    'cronologia-propia',
+  ],
+
   asistente: {
     nombre: 'El Mayordomo',
     descripcion: 'Tu asistente del juego con IA',

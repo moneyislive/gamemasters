@@ -12,8 +12,7 @@ import { router } from 'expo-router';
 import Animated, { FadeIn, FadeInDown, FadeInUp } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { usePartida } from '../src/estado';
-import { Amanecer } from '../src/momia/amanecer';
-import { Alba } from '../src/sombras/alba';
+import { pantallaDe } from '../src/pantallas';
 import {
   Boton,
   Cargando,
@@ -54,14 +53,16 @@ export default function Desenlace(): JSX.Element {
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   }, []);
 
-  if (vista?.sesion.juego === 'momia') return <Amanecer />;
   /*
-   * Y El Paso de las Sombras, por lo mismo y con un motivo propio: allí se puede
-   * PERDER habiendo acertado la senda —si el rastro llegó al tope— y no gana una
-   * persona, gana un bando. La clasificación por aciertos de abajo contaría otra
-   * partida.
+   * Se pregunta a la tabla de `src/pantallas.ts`, no con un `if` por juego. Aquí
+   * había uno por cada uno, y con el de la ronda hacían cuatro sitios repartidos
+   * donde un juego nuevo tiene que acordarse de entrar. El Paso de las Sombras
+   * tiene el suyo por un motivo propio, además: allí se puede PERDER habiendo
+   * acertado la senda —si el rastro llegó al tope— y no gana una persona, gana un
+   * bando. La clasificación por aciertos de abajo contaría otra partida.
    */
-  if (vista?.sesion.juego === 'sombras') return <Alba />;
+  const Propio = pantallaDe(vista?.sesion.juego, 'desenlace');
+  if (Propio) return <Propio />;
 
   if (!vista) return <Pantalla><Cargando /></Pantalla>;
   const fin = vista.desenlace;

@@ -35,6 +35,7 @@ export {
   respuestaCompleta,
 } from './tipos';
 export type {
+  BloqueDeDosier,
   CategoriaId,
   DefinicionAccion,
   DefinicionCategoria,

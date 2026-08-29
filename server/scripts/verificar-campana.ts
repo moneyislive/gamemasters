@@ -53,6 +53,9 @@ const LA_TORRE: ManifiestoDeJuego = {
     { pantalla: 'cuaderno', rotulo: 'Diario', icono: 'cuaderno' },
     { pantalla: 'perfil', rotulo: 'Perfil', icono: 'copa' },
   ],
+  // Una campana de rol: importa el papel y lo que se va sabiendo, no la coartada.
+  dosier: ['identidad', 'persona-publica', 'secreto', 'gancho', 'conocimiento', 'giros'],
+
   asistente: {
     nombre: 'El Farolero', descripcion: 'Alumbra cuando te pierdes', icono: 'farol',
     voz: 'Eres el asistente de esta velada. Hablas en espanol, breve y claro.',

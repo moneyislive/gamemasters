@@ -76,6 +76,13 @@ const LA_OCA: ManifiestoDeJuego = {
     { pantalla: 'mapa', rotulo: 'Casillas', icono: 'plano' },
     { pantalla: 'perfil', rotulo: 'Perfil', icono: 'copa' },
   ],
+  /*
+   * SIN DOSIER, y la lista vacía es la respuesta correcta: una oca no tiene
+   * personaje que interpretar. Su barra tampoco declara la pestaña `personaje`,
+   * y las dos cosas se leen juntas.
+   */
+  dosier: [],
+
   asistente: {
     nombre: 'La Abuela', descripcion: 'Te recuerda las reglas', icono: 'farol',
     voz: 'Eres el asistente de esta velada. Hablas en espanol, breve y claro.',

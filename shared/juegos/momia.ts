@@ -630,6 +630,36 @@ export const MOMIA: ManifiestoDeJuego = {
     { pantalla: 'perfil', rotulo: 'Perfil', icono: 'copa' },
   ],
 
+  /**
+   * EL DOSIER DE LA EXPEDICIÓN.
+   *
+   * Largo, y no por inercia: la barra de este juego no tiene ni `tablon` ni
+   * `cuaderno` —son `papiro` y `sellado`— así que el caso, las reglas, las
+   * reliquias y quién va en la expedición no tienen otra pantalla donde vivir.
+   * Si se quitaran de aquí desaparecerían de la app entera.
+   *
+   * El DON va arriba del todo, justo después de saber quién eres: es la sección
+   * que más se consulta durante la noche y la única que dice qué puedes hacer tú
+   * y nadie más.
+   */
+  dosier: [
+    'identidad',
+    'senalado',
+    'don',
+    'persona-publica',
+    'secreto',
+    'motivo',
+    'coartada',
+    'cronologia-propia',
+    'gancho',
+    'conocimiento',
+    'giros',
+    'caso',
+    'reglas',
+    'cosas',
+    'mesa',
+  ],
+
   asistente: {
     nombre: 'El Escriba',
     descripcion: 'Tu asistente de la expedición con IA',

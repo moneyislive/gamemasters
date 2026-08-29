@@ -57,8 +57,7 @@ import {
   texto,
 } from '../../src/ui';
 import { ALTO_BARRA_TOTAL } from '../../src/tema';
-import { Vigilia } from '../../src/momia/vigilia';
-import { Hora } from '../../src/sombras/hora';
+import { pantallaDe } from '../../src/pantallas';
 import type { SalaVista, VistaJugador } from '../../../shared/live';
 import { Foto } from '../../src/foto';
 
@@ -165,20 +164,20 @@ export default function Ronda(): JSX.Element {
   const [avisando, setAvisando] = useState(false);
 
   /*
-   * La bifurcación por juego, y va AQUÍ y no antes: los tres `useState` de
-   * arriba tienen que ejecutarse siempre. React identifica los hooks por su
-   * orden de llamada, así que un `return` por encima de ellos haría que el
-   * número de hooks cambiara entre una partida de CLUEDO y una de la Momia y
-   * React tiraría la pantalla entera. Son tres líneas de coste y ninguna
-   * consecuencia: la Momia no las usa y CLUEDO las usa igual que siempre.
+   * ¿ESTE JUEGO TRAE SU PROPIA PANTALLA DE RONDA? Se pregunta a la tabla, no con
+   * un `if` por juego. Aquí había uno por cada uno —«si es la momia, la vigilia;
+   * si son las sombras, la hora»— y ese era el sitio donde un juego nuevo se
+   * olvida: sin su línea, la pestaña «donde se juega» pinta la ronda de CLUEDO
+   * —elegir sala, ver pistas, acusar— y la partida se juega como CLUEDO desde el
+   * móvil aunque todo lo demás sea suyo. Nadie ve un error.
+   *
+   * VA AQUÍ Y NO ANTES: los tres `useState` de arriba tienen que ejecutarse
+   * siempre. React identifica los hooks por su orden de llamada, así que un
+   * `return` por encima de ellos haría que el número de hooks cambiara entre una
+   * partida de CLUEDO y una de la Momia, y React tiraría la pantalla entera.
    */
-  if (vista?.sesion.juego === 'momia') return <Vigilia />;
-  /*
-   * Y la de El Paso de las Sombras, por lo mismo. La bifurcación se queda en una
-   * línea por juego: en cuanto haya que escribir un `if` dentro del cuerpo,
-   * empezará a moverse un píxel de CLUEDO cada vez que se toque otro juego.
-   */
-  if (vista?.sesion.juego === 'sombras') return <Hora />;
+  const Propia = pantallaDe(vista?.sesion.juego, 'ronda');
+  if (Propia) return <Propia />;
 
   if (cargando && !vista) return <Pantalla><Cargando texto="Buscando la partida…" /></Pantalla>;
   if (!vista) {

@@ -998,6 +998,94 @@ for (const pantalla of ['index.tsx', 'avatar.tsx', 'cuenta.tsx']) {
   );
 }
 
+
+// ---------------------------------------------------------------------------
+// Ninguna tabla de modulo nombra algo que todavia no existe
+// ---------------------------------------------------------------------------
+
+/**
+ * Un `const` de módulo se evalúa AL IMPORTAR, y en orden.
+ *
+ * La app reparte lo propio de cada juego en tablas de módulo —`PALETAS`,
+ * `ORNAMENTOS`, `FONDOS`, `PANTALLAS_DE_JUEGO`, `BLOQUES`— y esa es la forma
+ * buena: añadir un juego es añadir una fila. Pero tiene un filo. Si la tabla se
+ * escribe ARRIBA y las constantes que nombra están más abajo, el fichero
+ * revienta al cargarse con «Cannot access 'X' before initialization», y no en
+ * una pantalla concreta: en el import, o sea la app entera en blanco antes de
+ * la primera pantalla.
+ *
+ * No lo caza el compilador en todos los casos y no lo caza el empaquetador
+ * nunca, porque ninguno de los dos EJECUTA el módulo. Se coló una vez —la tabla
+ * de fondos escrita encima de los degradados— y se descubrió leyendo, que es
+ * suerte y no red.
+ *
+ * Solo se miran los inicializadores de nivel de módulo: una referencia dentro
+ * del cuerpo de una función es perfectamente legal, porque para cuando se llama
+ * ya está todo montado.
+ */
+paso('Ninguna tabla de módulo nombra algo que todavía no existe');
+{
+  const ficheros = [
+    path.join(SRC, 'tema-juego.ts'),
+    path.join(SRC, 'pantallas.ts'),
+    path.join(SRC, 'dosier', 'bloques.tsx'),
+    path.join(SRC, 'iconos.tsx'),
+    path.join(SRC, 'ui.tsx'),
+    path.join(SRC, 'barra.tsx'),
+  ].filter((f) => fs.existsSync(f));
+
+  comprobar('hay ficheros de tablas que revisar', ficheros.length >= 4, ficheros.length);
+
+  const prematuras = [];
+  for (const fichero of ficheros) {
+    const fuente = ts.createSourceFile(fichero, leer(fichero), ts.ScriptTarget.Latest, true);
+
+    // Nombre -> en que sentencia de nivel de modulo se declara.
+    const declaradoEn = new Map();
+    fuente.statements.forEach((sent, i) => {
+      if (!ts.isVariableStatement(sent)) return;
+      for (const d of sent.declarationList.declarations) {
+        if (ts.isIdentifier(d.name)) declaradoEn.set(d.name.text, i);
+      }
+    });
+
+    fuente.statements.forEach((sent, i) => {
+      if (!ts.isVariableStatement(sent)) return;
+      for (const d of sent.declarationList.declarations) {
+        if (!d.initializer) continue;
+        const visitar = (nodo) => {
+          // Dentro de una funcion la referencia es tardia y por tanto legal.
+          if (
+            ts.isFunctionDeclaration(nodo) ||
+            ts.isFunctionExpression(nodo) ||
+            ts.isArrowFunction(nodo) ||
+            ts.isMethodDeclaration(nodo)
+          ) {
+            return;
+          }
+          if (ts.isIdentifier(nodo)) {
+            const donde = declaradoEn.get(nodo.text);
+            if (donde !== undefined && donde > i) {
+              prematuras.push(
+                `${path.basename(fichero)}: «${ts.isIdentifier(d.name) ? d.name.text : '?'}» nombra a «${nodo.text}», que se declara más abajo`,
+              );
+            }
+          }
+          ts.forEachChild(nodo, visitar);
+        };
+        visitar(d.initializer);
+      }
+    });
+  }
+
+  comprobar(
+    'ninguna tabla de módulo nombra una constante declarada más abajo',
+    prematuras.length === 0,
+    prematuras.join(' | ') ||
+      'al importar el fichero eso lanza «Cannot access X before initialization» y deja la app en blanco',
+  );
+}
+
 console.log('');
 if (fallos.length === 0) {
   console.log(
