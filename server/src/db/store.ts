@@ -26,6 +26,25 @@ import { alDia, sesionAlDia } from '../juegos/migracion';
 
 export interface Store {
   listGames(): Promise<GameSummary[]>;
+  /**
+   * Los ids de las partidas de las que esta cuenta es dueña.
+   *
+   * Existe para no traerse la colección entera. El listado del taller filtraba
+   * pidiendo el documento COMPLETO de cada partida —una consulta por partida, en
+   * serie, cada una con su trama, sus dosieres y su material— solo para mirar un
+   * campo. Con cien partidas guardadas son cien viajes y decenas de megas cada
+   * vez que alguien abre el recibidor.
+   */
+  listGameIdsDeCuenta(cuentaId: string): Promise<Set<string>>;
+  /**
+   * Las sesiones en vivo que todavía no han terminado.
+   *
+   * La portada de la app buscaba las invitaciones de una persona recorriendo
+   * TODAS las partidas y pidiendo la sesión de cada una: una consulta por
+   * partida jugada en la historia de la casa, cada vez que alguien abre la app.
+   * Con esto es una, y solo trae las que pueden ser una invitación.
+   */
+  listLiveActivas(): Promise<LiveSession[]>;
   getGame(id: string): Promise<GameSession | null>;
   createGame(name?: string): Promise<GameSession>;
   saveGame(game: GameSession): Promise<GameSession>;
@@ -197,6 +216,15 @@ class FileStore implements Store {
       .map(toSummary);
   }
 
+  async listGameIdsDeCuenta(cuentaId: string): Promise<Set<string>> {
+    // Aquí no hay viaje que ahorrar —todo está en memoria—, solo el contrato.
+    return new Set(
+      this.data.games
+        .filter((g) => (g.duenos ?? []).some((d) => d.cuentaId === cuentaId))
+        .map((g) => g.id),
+    );
+  }
+
   async getGame(id: string): Promise<GameSession | null> {
     const game = this.data.games.find((g) => g.id === id);
     return game ? alDia(structuredClone(game)) : null;
@@ -251,6 +279,12 @@ class FileStore implements Store {
   async setConfigModel(m: ModelId): Promise<void> {
     this.data.config.model = m;
     await this.persist();
+  }
+
+  async listLiveActivas(): Promise<LiveSession[]> {
+    return this.data.live
+      .filter((l) => l.phase !== 'desenlace')
+      .map((l) => sesionAlDia(structuredClone(l)));
   }
 
   async getLive(gameId: string): Promise<LiveSession | null> {
@@ -318,11 +352,26 @@ type LooseDoc = Record<string, unknown>;
 /** Margen sobre los 16 MB de MongoDB para avisar antes de que reviente el BSON. */
 const LIMITE_DOCUMENTO_BYTES = 15 * 1024 * 1024;
 
-/** Registra (o recupera) un modelo laxo; sobrevive a los reinicios de tsx watch. */
+/**
+ * Registra (o recupera) un modelo laxo; sobrevive a los reinicios de tsx watch.
+ *
+ * `indices` acepta VARIOS campos porque casi todas las colecciones se consultan
+ * por mas de uno, y solo se declaraba el primero: `accounts` estaba indexada por
+ * `email` mientras el codigo busca por `id` y por identidad de proveedor, y
+ * `live` por `id` mientras `getLiveByCode` —la consulta de CADA persona que
+ * entra a una partida— busca por `code`. Sin indice, Mongo recorre la coleccion
+ * entera cada vez; con doce moviles entrando a la vez y las partidas de meses
+ * acumuladas, eso se nota en la puerta.
+ *
+ * Son indices normales, no unicos: los unicos exigen que la coleccion no tenga
+ * duplicados YA, y crear uno sobre una que los tiene falla en segundo plano sin
+ * tumbar nada — te quedas creyendo que esta puesto. Eso hay que hacerlo contra
+ * produccion, contando antes.
+ */
 function looseModel(
   name: string,
   collection: string,
-  indexField?: string,
+  indices?: string | string[],
 ): mongoose.Model<LooseDoc> {
   const existing = mongoose.models[name] as mongoose.Model<LooseDoc> | undefined;
   if (existing) return existing;
@@ -340,7 +389,9 @@ function looseModel(
       id: false,
     },
   );
-  if (indexField) schema.index({ [indexField]: 1 });
+  for (const campo of typeof indices === 'string' ? [indices] : (indices ?? [])) {
+    schema.index({ [campo]: 1 });
+  }
   return mongoose.model<LooseDoc>(name, schema);
 }
 
@@ -355,11 +406,18 @@ function stripMessage(doc: LooseDoc): ChatMessage {
 }
 
 class MongoStore implements Store {
-  private readonly games = looseModel('CluedoGame', 'games', 'id');
+  // Cada campo por el que se consulta de verdad. Ver `looseModel`.
+  private readonly games = looseModel('CluedoGame', 'games', ['id', 'updatedAt', 'duenos.cuentaId']);
   private readonly messages = looseModel('CluedoMessage', 'messages', 'gameId');
   private readonly config = looseModel('CluedoConfig', 'config', 'key');
-  private readonly live = looseModel('CluedoLive', 'live', 'id');
-  private readonly accounts = looseModel('CluedoAccount', 'accounts', 'email');
+  // `code` es por donde entra CADA persona a una partida.
+  private readonly live = looseModel('CluedoLive', 'live', ['id', 'code']);
+  // `id` para el borrado y el perfil; `identidades.sub` para entrar con proveedor.
+  private readonly accounts = looseModel('CluedoAccount', 'accounts', [
+    'email',
+    'id',
+    'identidades.sub',
+  ]);
 
   async listGames(): Promise<GameSummary[]> {
     const docs = (await this.games
@@ -367,6 +425,15 @@ class MongoStore implements Store {
       .sort({ updatedAt: -1 })
       .lean()) as unknown as LooseDoc[];
     return docs.map((d) => toSummary(stripMongo<GameSession>(d)));
+  }
+
+  async listGameIdsDeCuenta(cuentaId: string): Promise<Set<string>> {
+    // Una consulta, y trayendo solo el `id`: el filtro lo hace Mongo con su
+    // índice, en vez de este proceso descargando cada partida entera.
+    const docs = (await this.games
+      .find({ 'duenos.cuentaId': cuentaId }, { id: 1 })
+      .lean()) as unknown as LooseDoc[];
+    return new Set(docs.map((d) => String(d.id)));
   }
 
   async getGame(id: string): Promise<GameSession | null> {
@@ -436,6 +503,15 @@ class MongoStore implements Store {
       { $set: { model: m } },
       { upsert: true },
     );
+  }
+
+  async listLiveActivas(): Promise<LiveSession[]> {
+    // Una consulta, y el filtro de fase lo hace Mongo: una partida terminada no
+    // es una invitación, es historia.
+    const docs = (await this.live
+      .find({ phase: { $ne: 'desenlace' } })
+      .lean()) as unknown as LooseDoc[];
+    return docs.map((d) => sesionAlDia(stripMongo<LiveSession>(d)));
   }
 
   async getLive(gameId: string): Promise<LiveSession | null> {

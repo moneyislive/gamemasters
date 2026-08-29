@@ -195,7 +195,17 @@ router.get('/games/:id/documents/:suspectId', async (req, res) => {
       );
     }
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    res.send(documento.html);
+    /*
+     * `end` Y NO `send`, y la diferencia se nota en un dosier grande.
+     *
+     * `res.send` de una cadena calcula ademas su ETag, y eso es recorrerla
+     * entera para hacerle un hash antes de escribir un solo byte: trabajo de CPU
+     * sincrono que detiene el bucle de eventos del proceso, o sea la partida de
+     * todo el mundo. Un dosier con las fotos incrustadas en base64 son decenas
+     * de megas, y aqui no hay nada que cachear: cada peticion se compone en el
+     * momento.
+     */
+    res.end(documento.html);
   } catch (error) {
     if (error instanceof SinNavegador) {
       res.status(503).json({

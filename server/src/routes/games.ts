@@ -38,14 +38,13 @@ router.get('/games', async (req, res) => {
       res.json(todas);
       return;
     }
-    const mias = new Set<string>();
-    for (const resumen of todas) {
-      if (resumen.huerfana) continue;
-      const game = await getStore().getGame(resumen.id);
-      if (game && (game.duenos ?? []).some((d) => d.cuentaId === quien.cuentaId)) {
-        mias.add(resumen.id);
-      }
-    }
+    /*
+     * UNA CONSULTA, NO UNA POR PARTIDA. Esto pedia el documento COMPLETO de cada
+     * una —con su trama, sus dosieres y su material— en serie, solo para mirar
+     * un campo. Con cien partidas guardadas eran cien viajes y decenas de megas
+     * cada vez que alguien abria el recibidor, y crece con el uso.
+     */
+    const mias = await getStore().listGameIdsDeCuenta(quien.cuentaId);
     res.json(todas.filter((r) => r.huerfana || mias.has(r.id)));
     return;
   } catch (err) {

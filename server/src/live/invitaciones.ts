@@ -83,11 +83,18 @@ export async function invitacionesPara(cuenta: Account): Promise<InvitacionVista
   const store = getStore();
   const invitaciones: InvitacionVista[] = [];
 
-  for (const resumen of await store.listGames()) {
-    const sesion = await store.getLive(resumen.id);
-    if (!sesion) continue;
-    // Una partida terminada no es una invitación: es historia.
-    if (sesion.phase === 'desenlace') continue;
+  /*
+   * DOS CONSULTAS, NO UNA POR PARTIDA JUGADA EN LA HISTORIA DE LA CASA.
+   *
+   * Esto recorria TODAS las partidas y pedia la sesion de cada una, y corre cada
+   * vez que alguien abre la app. Ahora se piden de golpe las sesiones que
+   * todavia no han terminado —una partida acabada no es una invitacion, es
+   * historia— y los nombres salen del listado de resumenes, que ya se traia.
+   */
+  const nombres = new Map((await store.listGames()).map((r) => [r.id, r.name]));
+
+  for (const sesion of await store.listLiveActivas()) {
+    const resumen = { id: sesion.id, name: nombres.get(sesion.id) ?? '' };
 
     for (const jugador of sesion.players) {
       if (!jugador.email) continue;
