@@ -20,3 +20,7 @@ app/dist/
 #
 # Se descubrio mirando el fichero antes de empujar: tres correos de gmail.
 server/scripts/copias/
+
+# El destino del despliegue: la IP de la instancia y la ruta de la clave .pem.
+# De cada maquina, no del proyecto.
+despliegue/destino.local.json

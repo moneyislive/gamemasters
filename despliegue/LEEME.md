@@ -250,9 +250,38 @@ aplicación desvinculada del dominio.
 
 ## Actualizar, a partir de aquí
 
+**Desde Windows**, que es de donde se trabaja:
+
+```powershell
+.\despliegue\desplegar.ps1 -Servidor ubuntu@LA.IP.ELASTICA -Llave C:uta	u-clave.pem
+```
+
+Los datos se recuerdan en `destino.local.json` —que está en `.gitignore`, porque
+una dirección de servidor y una ruta de clave no son cosa del repositorio— así
+que a partir de la segunda vez basta con `.\despliegue\desplegar.ps1`.
+
+**Desde la propia instancia**, si ya estás dentro por SSH:
+
 ```bash
 sudo /opt/gamemasters/despliegue/desplegar.sh
 ```
+
+Los dos hacen el mismo trabajo: el de Windows entra por SSH y lanza el de bash.
+Lo que añade es lo que aquel **no puede hacer**: comprobar el sitio DESDE FUERA
+al terminar. Un despliegue que dice «en pie» porque el servicio contesta en
+`localhost` puede haber dejado nginx sirviendo la versión vieja, el certificado
+caducado, o `/jugar` sin la app —que se sirve desde otra carpeta y se ha quedado
+sin desplegar más de una vez sin que el taller se enterara.
+
+Para mirar el sitio sin desplegar nada:
+
+```powershell
+.\despliegue\desplegar.ps1 -SoloComprobar
+```
+
+Si no contesta, dice **por qué**: distingue un servicio caído de un dominio que
+todavía apunta al aparcamiento del registrador, que son dos arreglos distintos y
+en el paso 3 es fácil dejarlo a medias.
 
 ## Copias de seguridad
 
