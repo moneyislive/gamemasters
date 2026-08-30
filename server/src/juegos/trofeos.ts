@@ -12,11 +12,17 @@
  * haber regalado los dos amuletos. Ninguna de las dos condiciones es expresable
  * como una variante de las de CLUEDO: dependen del estado propio del juego.
  *
- * QUÉ NO SE HA HECHO Y POR QUÉ. No se han movido los seis de CLUEDO aquí. Se
- * quedan donde estaban, concediéndose igual que siempre, y este registro añade
- * ENCIMA lo que cada juego quiera. Mover los de CLUEDO habría sido más limpio y
- * habría cambiado el comportamiento del único juego que hay en producción a
- * cambio de nada esta noche. El informe de arquitectura propone cuándo hacerlo.
+ * YA SE HAN MOVIDO LOS DE CLUEDO. Esta cabecera decía que no, y que dejarlos
+ * donde estaban «habría cambiado el comportamiento del único juego que hay en
+ * producción a cambio de nada esta noche». Con tres juegos dejó de ser a cambio
+ * de nada: dos repartían medallas que no eran suyas, y una de ellas —«Crimen
+ * perfecto»— se le daba al saqueador de la Momia justo en las noches en que
+ * PERDÍA. Sus tres viven ahora en `cluedo-trofeos.ts`.
+ *
+ * En `live/cuentas.ts` se quedan solo los que de verdad son de la plataforma
+ * porque significan lo mismo en cualquier juego: `primera-partida`, `escribano` y
+ * `superviviente`. Todo lo que dependa de las REGLAS de un juego se reparte
+ * desde aquí.
  */
 import { manifiestoDe } from '../../../shared/juegos';
 import type { JuegoId } from '../../../shared/juegos';

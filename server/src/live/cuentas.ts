@@ -121,13 +121,27 @@ export async function cerrarPartidaEnCuentas(
     cuenta.partidas.push(partida);
 
     // ---- Trofeos ----
+    /*
+     * ═══ SOLO LOS TRES QUE SON DE LA PLATAFORMA ═══
+     *
+     * Aquí se concedían SEIS con sus ids escritos a mano, y tres de los seis son
+     * reglas de CLUEDO que se repartían a cualquier partida. El caso que lo
+     * retrata es «Crimen perfecto» —«fuiste el culpable y nadie te descubrió»—,
+     * que se concedía con `eraCulpable && !sesion.winnerId`: en El Misterio de la
+     * Momia `winnerId` solo se escribe si alguien SEÑALA al saqueador, así que
+     * una noche en la que la expedición sella la tumba —o sea, en la que el
+     * saqueador PIERDE— le daba la medalla de haberse salido con la suya si
+     * además nadie llegó a señalarlo. Premiar al que perdió, con la frase de otro
+     * juego.
+     *
+     * Los tres que quedan sí significan lo mismo en cualquier juego: haber jugado
+     * la primera partida, haber llenado el cuaderno y seguir con el móvil
+     * encendido al cerrar. `ganador`, `sabueso` y `culpable-impune` se han mudado
+     * a `juegos/cluedo-trofeos.ts` y llegan por el gancho de abajo, igual que los
+     * de la Momia y los de las Sombras.
+     */
     const ganados = new Set<TrofeoId>(cuenta.trofeos);
     if (cuenta.partidas.length === 1) ganados.add('primera-partida');
-    if (gano) ganados.add('ganador');
-    // Sabueso: acertó y fue la primera acusación que entregó (siempre lo es,
-    // porque solo se admite una) Y acertó los tres campos a la vez.
-    if (suya?.correcta) ganados.add('sabueso');
-    if (eraCulpable && !sesion.winnerId) ganados.add('culpable-impune');
     if (jugador.notas.length > 1000) ganados.add('escribano');
     // Superviviente: emparejó y seguía vivo al cerrar.
     // Por `ultimaSenal` y no por el documento: la señal del rato vive en
@@ -138,10 +152,11 @@ export async function cerrarPartidaEnCuentas(
       if (cuando > 0 && Date.now() - cuando < 5 * 60_000) ganados.add('superviviente');
     }
     /*
-     * Y los que reparta el juego por su cuenta. CLUEDO no registra ninguno, asi
-     * que su lista de trofeos sale identica; la Momia reparte los suyos, que no
-     * son variantes de estos —«La Sombra» se gana PERDIENDO la partida como
-     * saqueador— sino condiciones que dependen de su propio estado.
+     * Y los que reparta el juego por su cuenta, que ahora son TODOS los que
+     * dependen de sus reglas: CLUEDO tambien registra los suyos desde que se
+     * mudaron los tres de arriba. La Momia y las Sombras reparten condiciones
+     * que no son variantes de las de nadie —«La Sombra» se gana PERDIENDO la
+     * partida como saqueador— sino cosas de su propio estado.
      */
     for (const t of trofeosDelJuego(manifiesto.id, {
       game,

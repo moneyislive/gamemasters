@@ -31,6 +31,7 @@
 
 // CLUEDO.
 import './cluedo-acciones';
+import './cluedo-trofeos';
 
 // El Misterio de la Momia: reductores, proyección del estado y trofeos.
 import './momia-acciones';

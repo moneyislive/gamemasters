@@ -32,6 +32,7 @@ import { generarTramaSombras } from '../src/juegos/sombras-trama';
 import { generateDemoPlot } from '../src/plot/demoPlot';
 import { generateBoardLayout } from '../src/board/generator';
 import { iniciarJuego } from '../src/juegos/inicios';
+import { trofeosDelJuego } from '../src/juegos/trofeos';
 import { abrirRonda } from '../src/live/sesion';
 import { renderPlayerDocument } from '../src/docs/renderer';
 import { renderPrintableDocument } from '../src/docs/imprimibles';
@@ -340,6 +341,128 @@ for (const m of juegosInstalados()) {
         { promete, porque: 'este juego declara dosieresPropios y paquete.ts no mete los genericos' },
       );
     }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Las medallas de un juego no se reparten en otro
+// ---------------------------------------------------------------------------
+
+/*
+ * ═══ POR QUÉ ESTO TIENE COMPROBACIÓN PROPIA ═══
+ *
+ * `live/cuentas.ts` concedía seis trofeos con los ids escritos a mano, en código
+ * de plataforma que corre para CUALQUIER partida, y tres de los seis son reglas
+ * de CLUEDO. El que lo retrata es «Crimen perfecto», cuyo texto dice «fuiste el
+ * culpable y nadie te descubrió»: se concedía con `eraSenalado && !winnerId`, y
+ * en El Misterio de la Momia `winnerId` solo se escribe si alguien SEÑALA al
+ * saqueador. O sea que una noche en la que la expedición sellaba la tumba en el
+ * orden bueno —en la que el saqueador PERDÍA— le daba igualmente la medalla de
+ * haberse salido con la suya, si además nadie llegó a señalarlo.
+ *
+ * Ahora los tres viven en `juegos/cluedo-trofeos.ts` y se piden por el mismo
+ * gancho que los de los demás. Esto comprueba las dos mitades: que CLUEDO los
+ * sigue dando exactamente igual, y que ningún otro juego los da.
+ */
+paso('Las medallas de un juego no se reparten en otro');
+{
+  const DE_CLUEDO: string[] = ['ganador', 'sabueso', 'culpable-impune'];
+
+  /*
+   * SE LLAMA AL REPARTO DIRECTAMENTE, SIN LA RED.
+   *
+   * `trofeosDelJuego` se traga las excepciones a propósito —un fallo repartiendo
+   * medallas no puede impedir que se guarde la partida de alguien— y devuelve
+   * lista vacía. Eso es correcto en producción y ARRUINA una comprobación: la
+   * primera versión de esto pasaba en verde para la Momia porque su reparto
+   * reventaba por dentro («Esta partida todavía no tiene tumba que sellar», por
+   * pasarle una sesión de mentira) y una lista vacía no contiene ningún trofeo de
+   * CLUEDO. Verde por no haber mirado.
+   *
+   * Así que se coge el reparto del registro y se llama a pelo: si lanza, esto
+   * falla, que es lo que tiene que pasar.
+   */
+  const repartos = registro('gamemasters.juegos.trofeos') as Record<
+    string,
+    ((c: unknown) => string[]) | undefined
+  >;
+
+  for (const m of juegosInstalados()) {
+    const game = partidaDe(m);
+    if (!game) continue;
+    const sesion = sesionDe(game, m);
+    sesion.phase = 'desenlace';
+    const jugador = sesion.players[0]!;
+
+    /** Un cierre real de este juego, con el caso que se quiera probar encima. */
+    const cierre = (extra: { gano?: boolean; acerto?: boolean; eraSenalado?: boolean; winnerId?: string }) => ({
+      game,
+      sesion: { ...sesion, winnerId: extra.winnerId },
+      plot: game.plot!,
+      jugador,
+      eraSenalado: extra.eraSenalado === true,
+      gano: extra.gano === true,
+      acerto: extra.acerto === true,
+    });
+
+    const reparto = repartos[m.id];
+    const CASOS = [
+      { gano: true, winnerId: jugador.suspectId },
+      { acerto: true },
+      { eraSenalado: true },
+    ];
+
+    let reventó: string | null = null;
+    const repartidos = new Set<string>();
+    if (reparto) {
+      for (const caso of CASOS) {
+        try {
+          for (const t of reparto(cierre(caso))) repartidos.add(t);
+        } catch (e) {
+          reventó = e instanceof Error ? e.message : String(e);
+        }
+      }
+    }
+
+    comprobar(
+      `${m.id}: su reparto de trofeos no revienta`,
+      reventó === null,
+      { reventó, porque: 'trofeosDelJuego se traga el error y devuelve lista vacia: el fallo seria mudo' },
+    );
+
+    if (m.id === 'cluedo') {
+      // Las tres condiciones de CLUEDO, una por una, tal como estaban.
+      comprobar('cluedo: quien gana se lleva «ganador»', repartidos.has('ganador'));
+      comprobar('cluedo: quien acierta se lleva «sabueso»', repartidos.has('sabueso'));
+      comprobar(
+        'cluedo: el culpable a quien nadie descubre se lleva «culpable-impune»',
+        repartidos.has('culpable-impune'),
+      );
+      comprobar(
+        'cluedo: si alguien resolvió el caso, el culpable NO se lo lleva',
+        !(reparto?.(cierre({ eraSenalado: true, winnerId: 'otro' })) ?? []).includes('culpable-impune'),
+      );
+    } else {
+      const colados = [...repartidos].filter((t) => DE_CLUEDO.includes(t));
+      comprobar(
+        `${m.id}: no reparte ninguna medalla de CLUEDO`,
+        colados.length === 0,
+        { colados, porque: '«Crimen perfecto» premiaba al saqueador de la Momia justo cuando perdia' },
+      );
+    }
+
+    /*
+     * Y que solo reparta trofeos que él mismo declara: un id que no esté en su
+     * manifiesto no se pinta en la vitrina del perfil, así que se ganaría en
+     * silencio y no lo vería nadie.
+     */
+    const suyos = new Set(m.trofeos.map((t) => t.id as string));
+    const sinDeclarar = [...repartidos].filter((t) => !suyos.has(t));
+    comprobar(
+      `${m.id}: todo trofeo que reparte está declarado en su manifiesto`,
+      sinDeclarar.length === 0,
+      { sinDeclarar, porque: 'un trofeo no declarado se gana en silencio y no se pinta en la vitrina' },
+    );
   }
 }
 
