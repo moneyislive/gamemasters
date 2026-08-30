@@ -661,6 +661,27 @@ export interface VistaJugador {
       rotulo: string;
       opciones: Array<{ id: string; nombre: string }>;
     }>;
+    /**
+     * Las CANTIDADES que pide la acción, si pide alguna.
+     *
+     * Sin esto, una acción que necesitara un número llegaba al móvil como un
+     * botón SIN CAMPOS: el panel genérico solo sabía pintar `campos`, así que un
+     * juego con dinero, con dados o con puntos de vida tenía que escribir
+     * pantalla propia —o sea, publicar una versión nueva del binario— nada más
+     * que para poder teclear una cifra.
+     *
+     * No hay riesgo en enviarlo: son los límites que el juego declara en su
+     * manifiesto, que es público. Quien los hace valer es el motor, en el
+     * servidor, y volvería a hacerlo aunque el móvil mandara cualquier cosa.
+     */
+    numeros?: Array<{
+      campo: string;
+      rotulo: string;
+      minimo?: number;
+      maximo?: number;
+      porDefecto?: number;
+      entero?: boolean;
+    }>;
   }>;
   /**
    * Lo que este juego concreto necesita ensenarle a quien juega.

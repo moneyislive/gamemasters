@@ -45,6 +45,15 @@ export interface ContextoAccion {
    * se entera de que existen.
    */
   listas: Record<string, string[]>;
+  /**
+   * Las CANTIDADES, ya validadas: número de verdad y dentro de sus límites.
+   *
+   * En un campo aparte por lo mismo que `listas`: mezclarlas en `datos` obligaría
+   * a que fuese `Record<string, string | number>` y todos los reductores que ya
+   * existen tendrían que mirar de qué tipo es cada campo antes de usarlo. Un
+   * juego sin números no se entera de que esto existe.
+   */
+  numeros: Record<string, number>;
   /** La definición, por si el reductor quiere consultar sus límites. */
   definicion: DefinicionAccion;
 }
@@ -191,12 +200,44 @@ export function ejecutarAccion(
     if (valor) limpios[campo.campo] = valor;
   }
 
+  /*
+   * Y las CANTIDADES, que sí se validan.
+   *
+   * Al revés que `eligeLibre`, aquí el motor puede y debe comprobar: un número no
+   * depende de ningún estado secreto —es aritmética, no reglas— y es justo la
+   * clase de campo que un móvil manipulado mandaría en negativo, enorme, o como
+   * `NaN`. Sin esto, un juego con dinero no podía ni preguntar la cantidad: el
+   * motor descartaba el campo por no estar declarado y el reductor recibía
+   * siempre el valor por defecto, sin dar ningún error.
+   */
+  const numeros: Record<string, number> = {};
+  for (const campo of definicion.pideNumero ?? []) {
+    const crudo = (datos as Record<string, unknown>)[campo.campo] ?? campo.porDefecto;
+    if (crudo === undefined || crudo === null || crudo === '') {
+      throw new AccionInvalida(`Falta un número: ${campo.rotulo}`);
+    }
+    const valor = Number(crudo);
+    if (!Number.isFinite(valor)) {
+      throw new AccionInvalida(`«${campo.rotulo}» tiene que ser un número.`);
+    }
+    if (campo.entero && !Number.isInteger(valor)) {
+      throw new AccionInvalida(`«${campo.rotulo}» tiene que ser un número entero.`);
+    }
+    if (campo.minimo !== undefined && valor < campo.minimo) {
+      throw new AccionInvalida(`«${campo.rotulo}» no puede bajar de ${campo.minimo}.`);
+    }
+    if (campo.maximo !== undefined && valor > campo.maximo) {
+      throw new AccionInvalida(`«${campo.rotulo}» no puede pasar de ${campo.maximo}.`);
+    }
+    numeros[campo.campo] = valor;
+  }
+
   const reductor = REDUCTORES[manifiesto.id]?.[accion];
   if (!reductor) {
     throw new AccionInvalida('Esta partida todavía no sabe hacer eso.');
   }
 
-  const resultado = reductor({ game, sesion, suspectId, datos: limpios, listas, definicion });
+  const resultado = reductor({ game, sesion, suspectId, datos: limpios, listas, numeros, definicion });
 
   // Queda registrado para poder contar repeticiones y para que quien dirige vea
   // lo que va pasando.

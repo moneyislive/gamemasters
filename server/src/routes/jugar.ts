@@ -228,6 +228,13 @@ router.post('/jugar/accion', async (req, res) => {
    *
    * Se sanean igual: cada elemento a cadena, y el motor comprueba despues que
    * cada uno sea una entidad real de su categoria.
+   *
+   * UN NUMERO TAMBIEN PASA POR AQUI Y SALE COMO CADENA, y esta bien asi: el
+   * motor hace `Number(crudo)` sobre lo declarado como `pideNumero` y comprueba
+   * que sea finito y que quepa entre sus limites. Convertirlo aqui no ganaria
+   * nada y perderia la unica garantia que importa --que lo valide quien conoce
+   * la definicion de la accion-- ademas de abrir la puerta a `NaN` viajando como
+   * numero de verdad.
    */
   const datos: Record<string, string | string[]> = {};
   for (const [campo, valor] of Object.entries(cuerpo.datos ?? {})) {

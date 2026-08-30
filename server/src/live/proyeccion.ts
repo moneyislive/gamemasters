@@ -263,6 +263,26 @@ export function vistaDeJugador(
       rotulo: c.rotulo,
       opciones: entidadesDe(game, c.categoria).map((e) => ({ id: e.id, nombre: e.name })),
     })),
+    /*
+     * Y las cantidades que pida, con sus límites tal como los declara el juego.
+     *
+     * La clave se OMITE cuando no pide ninguna, en vez de mandar un array vacío:
+     * una clave con `undefined` desaparece al serializar a JSON, así que la vista
+     * de los juegos que no usan números sale byte a byte como salía. Lo comprueba
+     * el maestro de oro.
+     */
+    ...((a.pideNumero ?? []).length > 0
+      ? {
+          numeros: (a.pideNumero ?? []).map((n) => ({
+            campo: n.campo,
+            rotulo: n.rotulo,
+            ...(n.minimo !== undefined ? { minimo: n.minimo } : {}),
+            ...(n.maximo !== undefined ? { maximo: n.maximo } : {}),
+            ...(n.porDefecto !== undefined ? { porDefecto: n.porDefecto } : {}),
+            ...(n.entero !== undefined ? { entero: n.entero } : {}),
+          })),
+        }
+      : {}),
   }));
 
   const miAcusacion = sesion.acusaciones.find((a) => a.suspectId === suspectId);

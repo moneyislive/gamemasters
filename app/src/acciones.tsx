@@ -13,7 +13,7 @@
  * si le merece la pena.
  */
 import { useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import * as api from './api';
 import {
@@ -40,16 +40,35 @@ export function PanelDeAcciones({
   alHacer: (vista: VistaJugador) => void;
 }): JSX.Element | null {
   const [elegido, setElegido] = useState<Record<string, Record<string, string>>>({});
+  /*
+   * Las cantidades se guardan como TEXTO mientras se teclean, no como número.
+   *
+   * Quien escribe «12» pasa por «1», y quien borra para corregir pasa por la
+   * cadena vacía; con un `number` en el estado, ese instante intermedio se
+   * convierte en `0` o en `NaN` y el campo da un salto debajo del dedo. Se
+   * convierte a número al enviar, que es cuando hay que hacerlo, y quien decide
+   * si vale es el motor en el servidor.
+   */
+  const [cifras, setCifras] = useState<Record<string, Record<string, string>>>({});
   const [enviando, setEnviando] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   if (acciones.length === 0) return null;
 
   const hacer = async (accion: Accion): Promise<void> => {
-    const datos = elegido[accion.id] ?? {};
-    if (accion.campos.some((c) => !datos[c.campo])) {
+    const elegidos = elegido[accion.id] ?? {};
+    if (accion.campos.some((c) => !elegidos[c.campo])) {
       setError('Te falta elegir algo.');
       return;
+    }
+    const datos: Record<string, string | number> = { ...elegidos };
+    for (const n of accion.numeros ?? []) {
+      const crudo = cifras[accion.id]?.[n.campo] ?? String(n.porDefecto ?? '');
+      if (crudo.trim() === '') {
+        setError(`Te falta un número: ${n.rotulo}.`);
+        return;
+      }
+      datos[n.campo] = Number(crudo.replace(',', '.'));
     }
     setError(null);
     setEnviando(accion.id);
@@ -57,6 +76,7 @@ export function PanelDeAcciones({
       const r = await api.hacerAccion(accion.id, datos);
       alHacer(r.vista);
       setElegido((e) => ({ ...e, [accion.id]: {} }));
+      setCifras((c) => ({ ...c, [accion.id]: {} }));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'No se pudo hacer eso.');
     } finally {
@@ -114,6 +134,45 @@ export function PanelDeAcciones({
             </View>
           ))}
 
+          {/*
+            LAS CANTIDADES.
+
+            Sin esto, una acción que pidiera un número llegaba al móvil como un
+            botón SIN CAMPOS: el panel solo sabía pintar las que eligen una
+            entidad, así que un juego con dinero, con dados o con puntos de vida
+            tenía que escribir pantalla propia —o sea, publicar una versión nueva
+            del binario— nada más que para poder teclear una cifra.
+
+            Los límites se enseñan pero no se hacen valer aquí: quien los aplica
+            es el motor, en el servidor, y volvería a aplicarlos aunque este
+            teclado mandara cualquier cosa. Aquí solo sirven para que se vea qué
+            se está pidiendo.
+          */}
+          {(accion.numeros ?? []).map((n) => (
+            <View key={n.campo} style={{ marginTop: espacio.md }}>
+              <Cuerpo tenue style={{ fontSize: 15 }}>
+                {n.rotulo}
+                {n.minimo !== undefined || n.maximo !== undefined
+                  ? `  (${n.minimo ?? '—'} a ${n.maximo ?? '—'})`
+                  : ''}
+              </Cuerpo>
+              <TextInput
+                value={cifras[accion.id]?.[n.campo] ?? (n.porDefecto !== undefined ? String(n.porDefecto) : '')}
+                onChangeText={(t) =>
+                  setCifras((c) => ({
+                    ...c,
+                    [accion.id]: { ...(c[accion.id] ?? {}), [n.campo]: t },
+                  }))
+                }
+                keyboardType={n.entero ? 'number-pad' : 'decimal-pad'}
+                inputMode={n.entero ? 'numeric' : 'decimal'}
+                placeholder={n.porDefecto !== undefined ? String(n.porDefecto) : '0'}
+                placeholderTextColor="rgba(217,201,163,0.4)"
+                style={estilos.cifra}
+              />
+            </View>
+          ))}
+
           <Boton
             variante="primario"
             cargando={enviando === accion.id}
@@ -130,6 +189,19 @@ export function PanelDeAcciones({
 
 const estilos = StyleSheet.create({
   opciones: { flexDirection: 'row', flexWrap: 'wrap', gap: espacio.sm, marginTop: espacio.sm },
+  cifra: {
+    marginTop: espacio.sm,
+    borderWidth: 1,
+    borderColor: 'rgba(201,162,39,0.32)',
+    backgroundColor: 'rgba(31,18,12,0.5)',
+    borderRadius: radio.md,
+    paddingVertical: 10,
+    paddingHorizontal: espacio.md,
+    color: color.pergamino,
+    fontFamily: 'Cinzel_600SemiBold',
+    fontSize: 18,
+    letterSpacing: 1,
+  },
   opcion: {
     borderWidth: 1,
     borderColor: 'rgba(201,162,39,0.32)',

@@ -238,6 +238,50 @@ export interface DefinicionAccion {
    */
   eligeLibre?: Array<{ campo: string; rotulo: string }>;
 
+  /**
+   * Una CANTIDAD. Un número, no una entidad ni una cadena.
+   *
+   * ═══ POR QUÉ FALTABA Y QUÉ IMPEDÍA ═══
+   *
+   * Las cuatro formas de arriba saben pedir entidades y cadenas, y con eso se
+   * escriben todas las acciones de un misterio: entrar en una sala, señalar a
+   * alguien, ordenar cinco ritos, elegir un don. Pero en cuanto un juego tiene
+   * NÚMEROS —una puja, una apuesta, un daño, cuántos dados tiras, cuánto pagas—
+   * no había forma de preguntarlos: el motor construye los datos SOLO con lo
+   * declarado y descarta en silencio cualquier campo que no lo esté, así que la
+   * cantidad no llegaba al reductor y no daba ningún error.
+   *
+   * La consecuencia no era «queda feo»: era que un juego con dinero no se podía
+   * jugar por la pantalla genérica. Tenía que escribir pantalla propia en la app
+   * —o sea, publicar una versión nueva del binario— solo para poder teclear un
+   * número. Lo destapó `verify:ajeno`, donde una subasta tenía que calcularse la
+   * puja dentro del reductor porque no había forma de preguntarla.
+   *
+   * ═══ EL TRATO ═══
+   *
+   * El motor SÍ lo valida, al revés que `eligeLibre`: comprueba que es un número
+   * de verdad y que cabe entre `minimo` y `maximo` si se declaran. Puede hacerlo
+   * porque un número no depende de ningún estado secreto —es aritmética, no
+   * reglas— y es justo la clase de cosa que un móvil manipulado mandaría
+   * negativa o enorme.
+   *
+   * Llega al reductor en `numeros`, en un campo aparte de `datos` por lo mismo
+   * que `listas`: si se mezclaran, todos los reductores que ya existen tendrían
+   * que mirar de qué tipo es cada campo antes de usarlo.
+   */
+  pideNumero?: Array<{
+    campo: string;
+    rotulo: string;
+    /** Si falta, no hay suelo. Una puja no puede ser negativa; un ajuste sí. */
+    minimo?: number;
+    /** Si falta, no hay techo. */
+    maximo?: number;
+    /** Lo que trae puesto el campo al abrirse. */
+    porDefecto?: number;
+    /** ¿Tiene que ser entero? Las monedas sí; una nota de cata, no. */
+    entero?: boolean;
+  }>;
+
   /** Cuántas veces se admite por turno o ronda. Sin límite si se omite. */
   vecesPorTurno?: number;
 }

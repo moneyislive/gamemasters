@@ -136,17 +136,22 @@ const LA_ALMONEDA: ManifiestoDeJuego = {
       id: 'pujar',
       rotulo: 'Pujar',
       fases: ['ronda-abierta'],
-      /*
-       * PEAJE: una puja es un NÚMERO y no cabe.
-       *
-       * `eligeDe` solo sabe pedir «una entidad de esta categoría». No hay forma
-       * de declarar una cantidad, ni un texto libre, ni un booleano. Así que la
-       * cantidad se manda por fuera del contrato: el reductor la lee de `datos`
-       * aunque el motor no la haya declarado ni validado, y la app genérica no
-       * puede pintar el campo. Un juego con dinero, con dados o con puntos de
-       * vida se queda hoy sin pantalla genérica.
-       */
       eligeDe: [{ campo: 'lote', categoria: 'lotes', rotulo: '¿Por cuál pujas?' }],
+      /*
+       * LA PUJA ES UN NÚMERO, y ahora se puede pedir.
+       *
+       * Antes no cabía: las cuatro formas de pedir datos sabían pedir entidades y
+       * cadenas, así que la cantidad había que calcularla dentro del reductor
+       * —«sube diez sobre la anterior»— porque no había forma de preguntarla. Y
+       * en el móvil la acción salía como un botón SIN CAMPOS.
+       *
+       * El motor comprueba que sea un número de verdad y que quepa entre el
+       * mínimo y el máximo. Puede hacerlo porque un número no depende de ningún
+       * estado secreto: es aritmética, no reglas.
+       */
+      pideNumero: [
+        { campo: 'cuanto', rotulo: '¿Cuánto ofreces?', minimo: 1, maximo: 100, entero: true },
+      ],
       vecesPorTurno: 1,
     },
     { id: 'pasar', rotulo: 'Pasar', fases: ['ronda-abierta'], vecesPorTurno: 1 },
@@ -243,20 +248,20 @@ function estadoDe(sesion: LiveSession): EstadoAlmoneda {
 }
 
 registrarAcciones('la-almoneda', {
-  pujar: ({ sesion, suspectId, datos }) => {
+  pujar: ({ sesion, suspectId, datos, numeros }) => {
     const estado = estadoDe(sesion);
     const lote = datos.lote ?? '';
     /*
-     * PEAJE: la cantidad llega por `datos` sin estar declarada.
-     *
-     * El motor construye `datos` SOLO con los campos de `eligeDe`, así que un
-     * `cuanto` que venga del móvil se descarta en silencio. Aquí se calcula para
-     * poder seguir jugando, y eso es exactamente lo que no debería tener que
-     * hacer un juego: inventarse el dato que no le dejan pedir.
+     * La cantidad llega YA VALIDADA por el motor: es un número entero entre 1 y
+     * 100, porque así lo declara la acción. Lo que el motor no puede saber son
+     * las REGLAS —que hay que superar la puja anterior y que no se puede ofrecer
+     * más de lo que queda en el fondo— y eso lo comprueba el juego, que es quien
+     * las conoce.
      */
+    const cuanto = numeros.cuanto ?? 0;
     const anterior = estado.pujas[lote]?.cuanto ?? 0;
-    const cuanto = Math.min(estado.fondo[suspectId] ?? 0, anterior + 10);
-    if (cuanto <= anterior) return { pujado: false };
+    if (cuanto <= anterior) return { pujado: false, porque: 'hay que superar la puja anterior' };
+    if (cuanto > (estado.fondo[suspectId] ?? 0)) return { pujado: false, porque: 'no te llega el fondo' };
     estado.pujas[lote] = { de: suspectId, cuanto };
     sesion.estado = { ...(sesion.estado ?? {}), almoneda: estado };
     return { pujado: true, cuanto };
@@ -394,12 +399,33 @@ comprobar(
   accionesDisponibles(sesion, 'p1'),
 );
 
-ejecutarAccion(game, sesion, 'p0', 'pujar', { lote: 'l0' });
+ejecutarAccion(game, sesion, 'p0', 'pujar', { lote: 'l0', cuanto: '15' });
 sesion.turnoDe = 'p1';
-ejecutarAccion(game, sesion, 'p1', 'pujar', { lote: 'l0' });
+ejecutarAccion(game, sesion, 'p1', 'pujar', { lote: 'l0', cuanto: '20' });
 const trasPujar = (sesion.estado?.almoneda ?? {}) as EstadoAlmoneda;
-comprobar('la segunda puja sube sobre la primera', trasPujar.pujas.l0?.cuanto === 20, trasPujar.pujas);
+comprobar('la puja que se teclea es la que se registra', trasPujar.pujas.l0?.cuanto === 20, trasPujar.pujas);
 comprobar('y es de quien pujó último', trasPujar.pujas.l0?.de === 'p1');
+
+/*
+ * Y EL MOTOR HACE VALER LOS LÍMITES, que es lo que separa pedir un número de
+ * dejar que llegue cualquier cosa. Se prueban los cuatro rechazos.
+ */
+sesion.turnoDe = 'p2';
+const rechaza = (que: string, datos: Record<string, string>): void => {
+  let salto = false;
+  try {
+    ejecutarAccion(game, sesion, 'p2', 'pujar', datos);
+  } catch {
+    salto = true;
+  }
+  comprobar(que, salto, datos);
+};
+rechaza('el motor rechaza una puja que no es un número', { lote: 'l1', cuanto: 'muchísimo' });
+rechaza('rechaza una puja por debajo del mínimo', { lote: 'l1', cuanto: '0' });
+rechaza('rechaza una puja por encima del máximo', { lote: 'l1', cuanto: '500' });
+rechaza('rechaza una puja con decimales si se pidió entera', { lote: 'l1', cuanto: '12.5' });
+rechaza('y rechaza que falte el número', { lote: 'l1' });
+sesion.turnoDe = 'p1';
 
 cerrarRonda(sesion);
 adjudicar(sesion);
@@ -429,6 +455,30 @@ comprobar(
 );
 
 /*
+ * Y LA CANTIDAD LLEGA AL MÓVIL COMO CAMPO. Sin esto la acción aparecía como un
+ * botón sin nada que rellenar, y un juego con dinero tenía que escribir pantalla
+ * propia —o sea, publicar una versión nueva del binario— solo para poder teclear
+ * una cifra.
+ */
+sesion.phase = 'ronda-abierta';
+/*
+ * Se le pregunta a p2 y no a p1: `vecesPorTurno: 1` cuenta POR RONDA, y p1 ya
+ * pujó en esta. Preguntarle a él devolvería la lista vacía por el motivo
+ * correcto y esta comprobación diría que el campo no llega, que es otra cosa.
+ */
+sesion.turnoDe = 'p2';
+const conAcciones = vistaDeJugador(game, sesion, 'p2')!;
+const pujarEnLaApp = conAcciones.acciones.find((a) => a.id === 'pujar');
+comprobar('la acción de pujar llega al móvil', pujarEnLaApp !== undefined);
+comprobar(
+  'y llega con su campo numérico y sus límites',
+  pujarEnLaApp?.numeros?.[0]?.campo === 'cuanto' &&
+    pujarEnLaApp.numeros[0].minimo === 1 &&
+    pujarEnLaApp.numeros[0].maximo === 100,
+  pujarEnLaApp?.numeros,
+);
+
+/*
  * PEAJE, y este se ve en la propia vista: hay que mandar una víctima que no
  * existe. La app pintará «La víctima · —» si alguien declara el bloque del caso.
  */
@@ -437,7 +487,6 @@ peaje('`Plot` exige victim, synopsis, setting y solution: un juego sin crimen se
 peaje('`PlotCharacter` exige secret, motive, alibi y personalHook por persona, aunque nadie interprete a nadie');
 peaje('los NOMBRES de las fases siguen siendo los de CLUEDO: una subasta llama «ronda-abierta» a «se canta un lote»');
 peaje('la categoría de personas tiene que ir a `suspects` o no hay emparejamiento, dosieres ni correos');
-peaje('una acción no puede pedir un número: `eligeDe` solo sabe pedir una entidad de una categoría');
 peaje('`VistaJugador` obliga a mandar salas, objetos, pistas y cronología vacías aunque el juego no tenga nada de eso');
 
 // ---------------------------------------------------------------------------

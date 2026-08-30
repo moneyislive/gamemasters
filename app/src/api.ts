@@ -503,7 +503,13 @@ export function hacerAccion(
    * noche de la partida, con el reductor escrito y funcionando. La ruta del
    * servidor conserva los arrays justo para esto.
    */
-  datos: Record<string, string | string[]>,
+  /*
+   * Y UN NUMERO TAMBIEN. Una accion puede pedir una cantidad --una puja, un
+   * dano, cuantos dados tiras-- y mandarla como cadena la dejaria fuera: el
+   * motor comprueba que sea un numero de verdad y que quepa entre sus limites, y
+   * lo hace sobre lo que llega. Se manda tal cual y se valida alli.
+   */
+  datos: Record<string, string | string[] | number>,
 ): Promise<{ resultado: unknown; vista: VistaJugador }> {
   return peticion('/jugar/accion', {
     method: 'POST',
