@@ -828,6 +828,15 @@ function Leyenda({
         texto="La iluminada es donde estás."
       />
       <Renglon glifo="●" texto="Cada punto es alguien que ha entrado ahí esta ronda." />
+      {/*
+        LAS DOS MARCAS DE TU RECORRIDO, y son distintas a propósito. El anillo
+        dice dónde estuviste —lo sabe la plataforma, así que sale en cualquier
+        juego con sitios donde entrar—; el lacre dice cuáles te dieron algo, que
+        solo lo distingue un juego que tenga algo que encontrar. Antes solo
+        existía el lacre, así que el plano de un juego sin pistas salía sin una
+        sola marca y nadie lo notaba: un plano limpio parece un plano al empezar.
+      */}
+      <Renglon glifo="○" texto="El anillo marca por dónde ya has pasado." />
       <Renglon glifo="✦" texto="El lacre marca las que ya dieron algo." />
       {/* Solo si la hay. Con palabra y no solo con color: en una mesa de ocho
           hay siempre alguien que no distingue el rojo, y esto cuesta una marca. */}
