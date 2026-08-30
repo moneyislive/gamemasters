@@ -158,7 +158,7 @@ function nuevaPartida(): { game: GameSession; sesion: LiveSession } {
       notas: '',
       girosRecibidos: [],
     })),
-    acusaciones: [],
+    respuestasEntregadas: [],
     tablon: [],
     rev: 1,
     updatedAt: ahora,

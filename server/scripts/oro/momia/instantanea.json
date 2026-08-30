@@ -1200,7 +1200,7 @@
               "girosRecibidos": []
             }
           ],
-          "acusaciones": [],
+          "respuestasEntregadas": [],
           "tablon": [],
           "rev": 1,
           "updatedAt": "«instante»",
@@ -1350,7 +1350,7 @@
           }
         ],
         "girosPendientes": [],
-        "acusacionesRecibidas": 0,
+        "respuestasRecibidas": 0,
         "listos": [],
         "revelaSolucion": true
       }
@@ -2391,7 +2391,7 @@
               "girosRecibidos": []
             }
           ],
-          "acusaciones": [],
+          "respuestasEntregadas": [],
           "tablon": [],
           "rev": 1,
           "updatedAt": "«instante»",
@@ -2541,7 +2541,7 @@
           }
         ],
         "girosPendientes": [],
-        "acusacionesRecibidas": 0,
+        "respuestasRecibidas": 0,
         "listos": [],
         "revelaSolucion": true
       },
@@ -4012,7 +4012,7 @@
               "girosRecibidos": []
             }
           ],
-          "acusaciones": [],
+          "respuestasEntregadas": [],
           "tablon": [],
           "rev": 1,
           "updatedAt": "«instante»",
@@ -4165,7 +4165,7 @@
           }
         ],
         "girosPendientes": [],
-        "acusacionesRecibidas": 0,
+        "respuestasRecibidas": 0,
         "listos": [],
         "revelaSolucion": true
       },
@@ -5597,7 +5597,7 @@
               "girosRecibidos": []
             }
           ],
-          "acusaciones": [],
+          "respuestasEntregadas": [],
           "tablon": [],
           "rev": 1,
           "updatedAt": "«instante»",
@@ -5835,7 +5835,7 @@
           }
         ],
         "girosPendientes": [],
-        "acusacionesRecibidas": 0,
+        "respuestasRecibidas": 0,
         "listos": [],
         "revelaSolucion": true
       },
@@ -7388,7 +7388,7 @@
               "girosRecibidos": []
             }
           ],
-          "acusaciones": [],
+          "respuestasEntregadas": [],
           "tablon": [
             {
               "round": 1,
@@ -7642,7 +7642,7 @@
           }
         ],
         "girosPendientes": [],
-        "acusacionesRecibidas": 0,
+        "respuestasRecibidas": 0,
         "listos": [],
         "revelaSolucion": true
       },
@@ -9230,7 +9230,7 @@
               "girosRecibidos": []
             }
           ],
-          "acusaciones": [],
+          "respuestasEntregadas": [],
           "tablon": [
             {
               "round": 1,
@@ -9477,7 +9477,7 @@
           }
         ],
         "girosPendientes": [],
-        "acusacionesRecibidas": 0,
+        "respuestasRecibidas": 0,
         "listos": [],
         "revelaSolucion": true
       },
@@ -10972,7 +10972,7 @@
               "girosRecibidos": []
             }
           ],
-          "acusaciones": [],
+          "respuestasEntregadas": [],
           "tablon": [
             {
               "round": 1,
@@ -11277,7 +11277,7 @@
           }
         ],
         "girosPendientes": [],
-        "acusacionesRecibidas": 0,
+        "respuestasRecibidas": 0,
         "listos": [],
         "revelaSolucion": true
       },
@@ -12884,7 +12884,7 @@
               "girosRecibidos": []
             }
           ],
-          "acusaciones": [],
+          "respuestasEntregadas": [],
           "tablon": [
             {
               "round": 1,
@@ -13204,7 +13204,7 @@
           }
         ],
         "girosPendientes": [],
-        "acusacionesRecibidas": 0,
+        "respuestasRecibidas": 0,
         "listos": [],
         "revelaSolucion": true
       },
@@ -14851,7 +14851,7 @@
               "girosRecibidos": []
             }
           ],
-          "acusaciones": [],
+          "respuestasEntregadas": [],
           "tablon": [
             {
               "round": 1,
@@ -15165,7 +15165,7 @@
           }
         ],
         "girosPendientes": [],
-        "acusacionesRecibidas": 0,
+        "respuestasRecibidas": 0,
         "listos": [],
         "revelaSolucion": true
       },
@@ -16719,7 +16719,7 @@
               "girosRecibidos": []
             }
           ],
-          "acusaciones": [],
+          "respuestasEntregadas": [],
           "tablon": [
             {
               "round": 1,
@@ -17091,7 +17091,7 @@
           }
         ],
         "girosPendientes": [],
-        "acusacionesRecibidas": 0,
+        "respuestasRecibidas": 0,
         "listos": [],
         "revelaSolucion": true
       },
@@ -18757,7 +18757,7 @@
               "girosRecibidos": []
             }
           ],
-          "acusaciones": [],
+          "respuestasEntregadas": [],
           "tablon": [
             {
               "round": 1,
@@ -19144,7 +19144,7 @@
           }
         ],
         "girosPendientes": [],
-        "acusacionesRecibidas": 0,
+        "respuestasRecibidas": 0,
         "listos": [],
         "revelaSolucion": true
       },
@@ -20846,7 +20846,7 @@
               "girosRecibidos": []
             }
           ],
-          "acusaciones": [],
+          "respuestasEntregadas": [],
           "tablon": [
             {
               "round": 1,
@@ -21227,7 +21227,7 @@
           }
         ],
         "girosPendientes": [],
-        "acusacionesRecibidas": 0,
+        "respuestasRecibidas": 0,
         "listos": [],
         "revelaSolucion": true
       },
@@ -22826,7 +22826,7 @@
               "girosRecibidos": []
             }
           ],
-          "acusaciones": [],
+          "respuestasEntregadas": [],
           "tablon": [
             {
               "round": 1,
@@ -23270,7 +23270,7 @@
           }
         ],
         "girosPendientes": [],
-        "acusacionesRecibidas": 0,
+        "respuestasRecibidas": 0,
         "listos": [],
         "revelaSolucion": true
       },
@@ -24982,7 +24982,7 @@
               "girosRecibidos": []
             }
           ],
-          "acusaciones": [],
+          "respuestasEntregadas": [],
           "tablon": [
             {
               "round": 1,
@@ -25441,7 +25441,7 @@
           }
         ],
         "girosPendientes": [],
-        "acusacionesRecibidas": 0,
+        "respuestasRecibidas": 0,
         "listos": [],
         "revelaSolucion": true
       },
@@ -27046,7 +27046,7 @@
               "girosRecibidos": []
             }
           ],
-          "acusaciones": [],
+          "respuestasEntregadas": [],
           "tablon": [
             {
               "round": 1,
@@ -27554,7 +27554,7 @@
           }
         ],
         "girosPendientes": [],
-        "acusacionesRecibidas": 0,
+        "respuestasRecibidas": 0,
         "listos": [],
         "revelaSolucion": true
       },
@@ -29151,7 +29151,7 @@
               "girosRecibidos": []
             }
           ],
-          "acusaciones": [
+          "respuestasEntregadas": [
             {
               "participanteId": "e0",
               "respuestas": {
@@ -29651,7 +29651,7 @@
               "at": "«instante»"
             }
           ],
-          "winnerId": "e0"
+          "primeroEnAcertar": "e0"
         },
         "conectados": 0,
         "ocupacion": [
@@ -29689,7 +29689,7 @@
           }
         ],
         "girosPendientes": [],
-        "acusacionesRecibidas": 2,
+        "respuestasRecibidas": 2,
         "listos": [],
         "revelaSolucion": true
       },
@@ -31143,7 +31143,7 @@
               "girosRecibidos": []
             }
           ],
-          "acusaciones": [
+          "respuestasEntregadas": [
             {
               "participanteId": "e0",
               "respuestas": {
@@ -31643,7 +31643,7 @@
               "at": "«instante»"
             }
           ],
-          "winnerId": "e0"
+          "primeroEnAcertar": "e0"
         },
         "conectados": 0,
         "ocupacion": [
@@ -31681,7 +31681,7 @@
           }
         ],
         "girosPendientes": [],
-        "acusacionesRecibidas": 2,
+        "respuestasRecibidas": 2,
         "listos": [],
         "revelaSolucion": true
       },
@@ -33112,7 +33112,7 @@
               "girosRecibidos": []
             }
           ],
-          "acusaciones": [
+          "respuestasEntregadas": [
             {
               "participanteId": "e0",
               "respuestas": {
@@ -33650,7 +33650,7 @@
               "at": "«instante»"
             }
           ],
-          "winnerId": "e0"
+          "primeroEnAcertar": "e0"
         },
         "conectados": 0,
         "ocupacion": [
@@ -33688,7 +33688,7 @@
           }
         ],
         "girosPendientes": [],
-        "acusacionesRecibidas": 2,
+        "respuestasRecibidas": 2,
         "listos": [],
         "revelaSolucion": true
       },
@@ -35650,7 +35650,7 @@
               "girosRecibidos": []
             }
           ],
-          "acusaciones": [
+          "respuestasEntregadas": [
             {
               "participanteId": "e0",
               "respuestas": {
@@ -36188,7 +36188,7 @@
               "at": "«instante»"
             }
           ],
-          "winnerId": "e0",
+          "primeroEnAcertar": "e0",
           "ganadores": [
             "e0",
             "e1",
@@ -36231,7 +36231,7 @@
           }
         ],
         "girosPendientes": [],
-        "acusacionesRecibidas": 2,
+        "respuestasRecibidas": 2,
         "listos": [],
         "revelaSolucion": true
       },

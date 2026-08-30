@@ -93,7 +93,7 @@ export async function cerrarPartidaEnCuentas(
     if (cuenta.partidas.some((p) => p.gameId === game.id)) continue;
 
     const personaje = plot.characters.find((c) => c.participanteId === jugador.participanteId);
-    const suya = sesion.acusaciones.find((a) => a.participanteId === jugador.participanteId);
+    const suya = sesion.respuestasEntregadas.find((a) => a.participanteId === jugador.participanteId);
     /*
      * QUIEN ERA EL SENALADO, preguntado al manifiesto y no a CLUEDO.
      *
@@ -111,7 +111,7 @@ export async function cerrarPartidaEnCuentas(
     /*
      * ¿GANÓ? SE LE PREGUNTA AL JUEGO.
      *
-     * `sesion.winnerId` significa «el primero que acertó la acusación», que es
+     * `sesion.primeroEnAcertar` significa «el primero que acertó la acusación», que es
      * exactamente ganar en CLUEDO y no lo es en ningún juego de bandos. En El
      * Misterio de la Momia solo se escribe si alguien SEÑALA al saqueador, así
      * que una noche en la que la expedición sellaba bien la tumba pero nadie
@@ -126,7 +126,7 @@ export async function cerrarPartidaEnCuentas(
      * registra ninguno, así que su historial sale idéntico.
      */
     const ganadores = ganadoresDe(game, sesion);
-    const gano = ganadores ? ganadores.includes(jugador.participanteId) : sesion.winnerId === jugador.participanteId;
+    const gano = ganadores ? ganadores.includes(jugador.participanteId) : sesion.primeroEnAcertar === jugador.participanteId;
 
     const partida: PartidaJugada = {
       gameId: game.id,
@@ -146,7 +146,7 @@ export async function cerrarPartidaEnCuentas(
      * Aquí se concedían SEIS con sus ids escritos a mano, y tres de los seis son
      * reglas de CLUEDO que se repartían a cualquier partida. El caso que lo
      * retrata es «Crimen perfecto» —«fuiste el culpable y nadie te descubrió»—,
-     * que se concedía con `eraCulpable && !sesion.winnerId`: en El Misterio de la
+     * que se concedía con `eraCulpable && !sesion.primeroEnAcertar`: en El Misterio de la
      * Momia `winnerId` solo se escribe si alguien SEÑALA al saqueador, así que
      * una noche en la que la expedición sella la tumba —o sea, en la que el
      * saqueador PIERDE— le daba la medalla de haberse salido con la suya si

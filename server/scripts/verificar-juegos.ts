@@ -158,7 +158,7 @@ function sesionDe(game: GameSession, m: ManifiestoDeJuego): LiveSession {
       notas: '',
       girosRecibidos: [],
     })),
-    acusaciones: [],
+    respuestasEntregadas: [],
     tablon: [],
     rev: 1,
     updatedAt: game.createdAt,
@@ -331,7 +331,7 @@ for (const m of juegosInstalados()) {
   /*
    * ---- 2 quater. QUIEN DECIDE SU VICTORIA ----
    *
-   * `sesion.winnerId` significa «el primero que acerto la acusacion», que es
+   * `sesion.primeroEnAcertar` significa «el primero que acerto la acusacion», que es
    * ganar en CLUEDO y no lo es en un juego de bandos. Un juego cuyo desenlace no
    * quepa ahi tiene que dar de alta su veredicto, o la plataforma anotara en el
    * historial de cada cuenta un ganador que no lo es --y eso no se arregla
@@ -339,7 +339,7 @@ for (const m of juegosInstalados()) {
    *
    * Se pregunta por el EJE: un juego cuyo eje de personas senala a alguien --el
    * culpable, el saqueador, el kancho-- y que ademas resuelve por bandos, tiene
-   * que traerlo. CLUEDO no, porque para el `winnerId` ES la respuesta correcta.
+   * que traerlo. CLUEDO no, porque para el `primeroEnAcertar` ES la respuesta correcta.
    */
   if (m.id !== 'cluedo' && (m.ejes ?? []).length > 0) {
     comprobar(
@@ -562,8 +562,8 @@ for (const m of juegosInstalados()) {
  * `live/cuentas.ts` concedía seis trofeos con los ids escritos a mano, en código
  * de plataforma que corre para CUALQUIER partida, y tres de los seis son reglas
  * de CLUEDO. El que lo retrata es «Crimen perfecto», cuyo texto dice «fuiste el
- * culpable y nadie te descubrió»: se concedía con `eraSenalado && !winnerId`, y
- * en El Misterio de la Momia `winnerId` solo se escribe si alguien SEÑALA al
+ * culpable y nadie te descubrió»: se concedía con `eraSenalado && !primeroEnAcertar`, y
+ * en El Misterio de la Momia `primeroEnAcertar` solo se escribe si alguien SEÑALA al
  * saqueador. O sea que una noche en la que la expedición sellaba la tumba en el
  * orden bueno —en la que el saqueador PERDÍA— le daba igualmente la medalla de
  * haberse salido con la suya, si además nadie llegó a señalarlo.
@@ -603,9 +603,9 @@ paso('Las medallas de un juego no se reparten en otro');
     const jugador = sesion.players[0]!;
 
     /** Un cierre real de este juego, con el caso que se quiera probar encima. */
-    const cierre = (extra: { gano?: boolean; acerto?: boolean; eraSenalado?: boolean; winnerId?: string }) => ({
+    const cierre = (extra: { gano?: boolean; acerto?: boolean; eraSenalado?: boolean; primeroEnAcertar?: string }) => ({
       game,
-      sesion: { ...sesion, winnerId: extra.winnerId },
+      sesion: { ...sesion, primeroEnAcertar: extra.primeroEnAcertar },
       plot: game.plot!,
       jugador,
       eraSenalado: extra.eraSenalado === true,
@@ -615,7 +615,7 @@ paso('Las medallas de un juego no se reparten en otro');
 
     const reparto = repartos[m.id];
     const CASOS = [
-      { gano: true, winnerId: jugador.participanteId },
+      { gano: true, primeroEnAcertar: jugador.participanteId },
       { acerto: true },
       { eraSenalado: true },
     ];
@@ -648,7 +648,7 @@ paso('Las medallas de un juego no se reparten en otro');
       );
       comprobar(
         'cluedo: si alguien resolvió el caso, el culpable NO se lo lleva',
-        !(reparto?.(cierre({ eraSenalado: true, winnerId: 'otro' })) ?? []).includes('culpable-impune'),
+        !(reparto?.(cierre({ eraSenalado: true, primeroEnAcertar: 'otro' })) ?? []).includes('culpable-impune'),
       );
     } else {
       const colados = [...repartidos].filter((t) => DE_CLUEDO.includes(t));
@@ -794,8 +794,8 @@ paso('Lo guardado con los nombres viejos se pone al dia al leerlo');
   );
   comprobar(
     'las acusaciones ya entregadas siguen sabiendo quien las entrego',
-    sesionPuesta.acusaciones[0]?.participanteId === 's0',
-    sesionPuesta.acusaciones[0],
+    sesionPuesta.respuestasEntregadas[0]?.participanteId === 's0',
+    sesionPuesta.respuestasEntregadas[0],
   );
   comprobar(
     'el registro de acciones no pierde de quien es cada una',

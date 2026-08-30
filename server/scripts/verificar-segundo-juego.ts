@@ -228,7 +228,7 @@ const sesion: LiveSession = {
     notas: '',
     girosRecibidos: [],
   })),
-  acusaciones: [],
+  respuestasEntregadas: [],
   tablon: [],
   rev: 1,
   updatedAt: ahora,
@@ -354,19 +354,19 @@ comprobar('una acusación a medias se rechaza', rechazada);
 
 acusar(sesion, 'h0', { ladron: 'h1', pieza: 'p1' }, plot.solution.respuestas);
 acusar(sesion, 'h1', { ladron: 'h2', pieza: 'p1' }, plot.solution.respuestas);
-comprobar('la equivocada no gana', sesion.winnerId === 'h1', sesion.winnerId);
+comprobar('la equivocada no gana', sesion.primeroEnAcertar === 'h1', sesion.primeroEnAcertar);
 comprobar(
   'la acertada se marca correcta',
-  sesion.acusaciones.find((a) => a.participanteId === 'h1')?.correcta === true,
+  sesion.respuestasEntregadas.find((a) => a.participanteId === 'h1')?.correcta === true,
 );
 comprobar(
   'y la fallida, no',
-  sesion.acusaciones.find((a) => a.participanteId === 'h0')?.correcta === false,
+  sesion.respuestasEntregadas.find((a) => a.participanteId === 'h0')?.correcta === false,
 );
 
 // La culpable acierta —se sabe la respuesta— pero no puede ganar.
 acusar(sesion, 'h2', { ladron: 'h2', pieza: 'p1' }, plot.solution.respuestas);
-comprobar('quien se la llevó no gana acusándose', sesion.winnerId === 'h1');
+comprobar('quien se la llevó no gana acusándose', sesion.primeroEnAcertar === 'h1');
 
 // --- Desenlace ---
 sesion.phase = 'desenlace';
@@ -396,7 +396,7 @@ comprobar(
 // --- El puesto de mando ---
 const gm = vistaDeGameMaster(game, sesion);
 comprobar('la vista de quien dirige se compone', Boolean(gm.sesion));
-comprobar('con las tres acusaciones', gm.acusacionesRecibidas === 3);
+comprobar('con las tres acusaciones', gm.respuestasRecibidas === 3);
 
 // --- Coherencia y reparación ---
 comprobar(

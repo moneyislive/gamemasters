@@ -438,7 +438,7 @@ export default function LivePanel(): JSX.Element {
               rompió el sello. Dos contadores casi iguales con una palabra que no
               es la del juego se leen como el mismo dato.
             */}
-            {palabras.acusacionesRecibidas(vista.acusacionesRecibidas, sesion.players.length)}
+            {palabras.respuestasRecibidas(vista.respuestasRecibidas, sesion.players.length)}
           </p>
         )}
 

@@ -9,7 +9,7 @@
  *
  * El caso que lo retrata es «Crimen perfecto», cuyo texto dice literalmente
  * «Fuiste el culpable y nadie te descubrió». Se concedía con
- * `eraCulpable && !sesion.winnerId`, y en El Misterio de la Momia `winnerId` solo
+ * `eraCulpable && !sesion.primeroEnAcertar`, y en El Misterio de la Momia `winnerId` solo
  * se escribe si alguien SEÑALA al saqueador. Así que en una noche en la que la
  * expedición sella la tumba en el orden bueno —o sea, en la que el saqueador
  * PIERDE— si además nadie llegó a señalarlo, el saqueador se llevaba la medalla
@@ -56,11 +56,11 @@ registrarTrofeos('cluedo', ({ sesion, gano, acerto, eraSenalado }) => {
   /*
    * Crimen perfecto: fuiste el culpable y NADIE te descubrió.
    *
-   * Se mira `sesion.winnerId` y no `gano`: la pregunta no es si ganó esta
+   * Se mira `sesion.primeroEnAcertar` y no `gano`: la pregunta no es si ganó esta
    * persona, es si ganó ALGUIEN. Mientras el sobre siga sin abrirse por nadie,
    * el culpable se sale con la suya.
    */
-  if (eraSenalado && !sesion.winnerId) suyos.push('culpable-impune');
+  if (eraSenalado && !sesion.primeroEnAcertar) suyos.push('culpable-impune');
 
   return suyos;
 });

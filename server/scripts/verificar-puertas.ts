@@ -183,7 +183,7 @@ function partidaDeMomia(
       notas: '',
       girosRecibidos: [],
     })),
-    acusaciones: [],
+    respuestasEntregadas: [],
     tablon: [],
     estado: { momia: estado },
     rev: 3,
@@ -227,7 +227,7 @@ function partidaDeCluedo(): { game: GameSession; sesion: LiveSession } {
       notas: '',
       girosRecibidos: [],
     })),
-    acusaciones: [],
+    respuestasEntregadas: [],
     tablon: [],
     rev: 3,
     updatedAt: ahora,
@@ -316,8 +316,8 @@ async function probar(): Promise<void> {
     comprobar('la app puede señalar y el servidor lo acepta', r.estado === 200, r.datos);
 
     const sesion = await estadoDeLaSesion('expedicion');
-    const suya = (sesion?.acusaciones ?? []).find((a: any) => a.participanteId === 'e0');
-    comprobar('el señalamiento queda guardado en la partida', Boolean(suya), sesion?.acusaciones);
+    const suya = (sesion?.respuestasEntregadas ?? []).find((a: any) => a.participanteId === 'e0');
+    comprobar('el señalamiento queda guardado en la partida', Boolean(suya), sesion?.respuestasEntregadas);
     comprobar('y se apunta que acertó', suya?.correcta === true, suya);
   }
 
@@ -502,7 +502,7 @@ async function probar(): Promise<void> {
 
     const tras = await pedir('/games/aciegas/live');
     const conAcusacion = JSON.stringify(tras.datos);
-    comprobar('quien dirige ve QUE se ha señalado', conAcusacion.includes('"acusaciones"'));
+    comprobar('quien dirige ve QUE se ha señalado', conAcusacion.includes('"respuestasEntregadas"'));
     comprobar('pero no A QUIÉN', !conAcusacion.includes('"saqueador":"e3"'), conAcusacion.slice(0, 300));
     comprobar('ni si acertó', !conAcusacion.includes('"correcta":true'));
 

@@ -150,7 +150,7 @@ async function guion(store: Store): Promise<Record<string, unknown>> {
     players: [
       { participanteId: 'e1', displayName: 'Marta', joinCode: 'AAAAAA', joined: false, elecciones: [], notas: 'mis notas', girosRecibidos: [] },
     ],
-    acusaciones: [],
+    respuestasEntregadas: [],
     acciones: [],
     createdAt: ahora,
     updatedAt: ahora,

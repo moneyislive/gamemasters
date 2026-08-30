@@ -89,7 +89,7 @@ function sesionInicial(game: GameSession): LiveSession {
       notas: '',
       girosRecibidos: [],
     })),
-    acusaciones: [],
+    respuestasEntregadas: [],
     tablon: [],
     rev: 1,
     updatedAt: AHORA,

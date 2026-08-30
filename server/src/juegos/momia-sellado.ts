@@ -193,7 +193,7 @@ export function trofeosDe(
 
     // Ojo de Horus: señalaste al saqueador y acertaste. Se lee de la acusación
     // que ya guarda la plataforma, que es donde `senalar` la deja.
-    const suSenalamiento = sesion.acusaciones.find((a) => a.participanteId === id);
+    const suSenalamiento = sesion.respuestasEntregadas.find((a) => a.participanteId === id);
     if (suSenalamiento?.correcta && !esElSaqueador(game, id)) suyos.push('ojo-de-horus');
 
     // Incorrupto: amaneciste sin una sola marca.

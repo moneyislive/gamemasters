@@ -328,8 +328,8 @@ router.post('/games/:id/live/desenlace', async (req, res) => {
     await mutar(req.params.id, (s) => revelarDesenlace(partida, s), {
       avisar: (s) => {
         anunciar(req.params.id, s.rev, 'desenlace', avisoDe(s, 'desenlace'));
-        if (s.winnerId) {
-          const ganador = s.players.find((p) => p.participanteId === s.winnerId);
+        if (s.primeroEnAcertar) {
+          const ganador = s.players.find((p) => p.participanteId === s.primeroEnAcertar);
           anunciar(
             req.params.id,
             s.rev,

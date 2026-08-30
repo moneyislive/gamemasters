@@ -16,7 +16,7 @@ import { ALFABETO_CODIGO, PAPELES_EN_JUEGO } from '../../../shared/live';
 import type { PapelDeFase } from '../../../shared/live';
 import { aciertos, ejes as ejesDe, esElSenalado, fasesConPapel, manifiestoDe, papelDe, personasDe, respuestaCompleta } from '../../../shared/juegos';
 import type { EjeId, JuegoId } from '../../../shared/juegos';
-import type { Acusacion, LivePhase, LivePlayer, LiveSession } from '../../../shared/live';
+import type { RespuestaEntregada, LivePhase, LivePlayer, LiveSession } from '../../../shared/live';
 import type { GameSession } from '../../../shared/types';
 import { ganadoresDe } from '../juegos/veredictos';
 
@@ -194,7 +194,7 @@ export async function abrirSesion(game: GameSession): Promise<LiveSession> {
     round: 0,
     totalRounds: game.plot ? numeroDeRondas(game.plot) : 4,
     players: personasDe(game).map((s) => nuevoJugador(s.id, s.name, s.email)),
-    acusaciones: [],
+    respuestasEntregadas: [],
     tablon: [],
     rev: 1,
     updatedAt: new Date().toISOString(),
@@ -515,7 +515,7 @@ export function guardarNotas(sesion: LiveSession, participanteId: string, notas:
 }
 
 export interface ResultadoAcusacion {
-  acusacion: Acusacion;
+  acusacion: RespuestaEntregada;
   /** ¿Ha ganado con ella? */
   ganador: boolean;
 }
@@ -541,7 +541,7 @@ export function acusar(
    * abrir quien dirige — y eso convertía la carrera en una cola.
    *
    * Lo que NO cambia: una acusación por persona y para toda la partida, no por
-   * ronda. Lo comprueba la línea de abajo contra `sesion.acusaciones` entera.
+   * ronda. Lo comprueba la línea de abajo contra `sesion.respuestasEntregadas` entera.
    *
    * POR EL PAPEL, NO POR EL NOMBRE. Era `FASES_EN_JUEGO.includes(sesion.phase)`
    * contra una lista de cuatro nombres escrita en el contrato comun —los de
@@ -552,7 +552,7 @@ export function acusar(
   if (!PAPELES_EN_JUEGO.includes(papelDe(manifiestoDe(sesion.juego), sesion.phase))) {
     throw new Error('Todavía no se puede acusar.');
   }
-  if (sesion.acusaciones.some((a) => a.participanteId === participanteId)) {
+  if (sesion.respuestasEntregadas.some((a) => a.participanteId === participanteId)) {
     throw new Error('Ya has entregado tu acusación. No se puede cambiar.');
   }
 
@@ -565,19 +565,19 @@ export function acusar(
   // sean otros tantos. Antes eran tres comparaciones escritas a mano.
   const correcta = aciertos(manifiesto, eleccion, solucion) === ejesDe(manifiesto).length;
 
-  const acusacion: Acusacion = {
+  const acusacion: RespuestaEntregada = {
     participanteId,
     respuestas: { ...eleccion },
     at: new Date().toISOString(),
     correcta,
   };
-  sesion.acusaciones.push(acusacion);
+  sesion.respuestasEntregadas.push(acusacion);
 
   // Quien es señalado por el eje que apunta a la mesa no puede ganar
   // acusándose: su juego es no ser descubierto.
   const esElCulpable = esElSenalado(manifiesto, solucion, participanteId);
-  const ganador = correcta && !esElCulpable && !sesion.winnerId;
-  if (ganador) sesion.winnerId = participanteId;
+  const ganador = correcta && !esElCulpable && !sesion.primeroEnAcertar;
+  if (ganador) sesion.primeroEnAcertar = participanteId;
 
   return { acusacion, ganador };
 }

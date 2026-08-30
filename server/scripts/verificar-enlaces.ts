@@ -176,7 +176,7 @@ const datos = {
           girosRecibidos: [],
         },
       ],
-      acusaciones: [],
+      respuestasEntregadas: [],
       tablon: [],
       rev: 1,
       updatedAt: ahora,

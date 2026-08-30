@@ -181,7 +181,7 @@ function participantesDeLaTramaAlDia(game: GameSession): void {
 /** Lo guardado en la SESION que llevaba el nombre viejo. */
 function participantesDeLaSesionAlDia(sesion: LiveSession): void {
   for (const jugador of sesion.players ?? []) renombrarParticipante(jugador);
-  for (const a of sesion.acusaciones ?? []) renombrarParticipante(a);
+  for (const a of sesion.respuestasEntregadas ?? []) renombrarParticipante(a);
   for (const accion of sesion.acciones ?? []) renombrarParticipante(accion);
   for (const denuncia of sesion.denuncias ?? []) renombrarParticipante(denuncia);
 }
@@ -198,6 +198,41 @@ export function alDia<T extends GameSession | null | undefined>(game: T): T {
 }
 
 /**
+ * La acusacion deja de llamarse acusacion en el contrato comun.
+ *
+ * `acusaciones` -> `respuestasEntregadas` y `winnerId` -> `primeroEnAcertar`.
+ *
+ * Un juego donde se acusa a alguien de un crimen tiene acusaciones; una
+ * expedicion tiene un señalamiento del saqueador y un cruce de montaña un
+ * consejo del alba. Los tres son lo mismo: una respuesta por eje, entregada una
+ * vez y que no se puede cambiar. El concepto SI es de la plataforma —los ejes
+ * estan en el manifiesto— asi que lo que sobraba era el nombre.
+ *
+ * Y `winnerId` mentia en dos juegos de tres: significaba «quien acerto primero»
+ * y se leia como «quien gano». Tanto es asi que hubo que añadir `ganadores` al
+ * lado para poder decirlo bien.
+ *
+ * SIN ESTO, una partida a medio jugar pierde las respuestas ya entregadas:
+ * quien ya acuso podria volver a hacerlo y el recuento del panel diria cero.
+ */
+function respuestasDeLaSesionAlDia(sesion: LiveSession): void {
+  const vieja = sesion as unknown as {
+    acusaciones?: unknown[];
+    respuestasEntregadas?: unknown[];
+    winnerId?: string;
+    primeroEnAcertar?: string;
+  };
+  if (!vieja.respuestasEntregadas && Array.isArray(vieja.acusaciones)) {
+    vieja.respuestasEntregadas = vieja.acusaciones;
+  }
+  delete vieja.acusaciones;
+  if (vieja.primeroEnAcertar === undefined && typeof vieja.winnerId === 'string') {
+    vieja.primeroEnAcertar = vieja.winnerId;
+  }
+  delete vieja.winnerId;
+}
+
+/**
  * Pone al día una sesión en vivo recién leída.
  *
  * Las acusaciones ya entregadas llevaban la terna. Si se perdieran, una partida
@@ -205,8 +240,9 @@ export function alDia<T extends GameSession | null | undefined>(game: T): T {
  */
 export function sesionAlDia<T extends LiveSession | null | undefined>(sesion: T): T {
   if (!sesion) return sesion;
+  respuestasDeLaSesionAlDia(sesion);
   participantesDeLaSesionAlDia(sesion);
-  for (const a of sesion.acusaciones ?? []) {
+  for (const a of sesion.respuestasEntregadas ?? []) {
     const vieja = a as unknown as TernaHeredada & { respuestas?: Record<string, string> };
     if (vieja.respuestas || !tieneTerna(vieja)) continue;
     a.respuestas = respuestasCluedo({

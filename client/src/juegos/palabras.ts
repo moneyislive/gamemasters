@@ -129,7 +129,7 @@ export interface PalabrasDeJuego {
      * entregadas» en la Momia. Un infinitivo no es un sustantivo, y en español
      * no se puede fingir que lo sea.
      */
-    acusacionesRecibidas: (cuantas: number, total: number) => string;
+    respuestasRecibidas: (cuantas: number, total: number) => string;
     /**
      * Quien se ha añadido a la partida DESPUÉS de abrir la sala y no tiene silla.
      *
@@ -228,7 +228,7 @@ const CLUEDO: PalabrasDeJuego = {
     rondaEnCurso: (n, total) => `Ronda ${n} de ${total} · en curso`,
     rondaCerrada: (n) => `Ronda ${n} cerrada`,
     // Palabra por palabra la que ya había: CLUEDO no cambia ni un píxel.
-    acusacionesRecibidas: (cuantas, total) => `${cuantas} de ${total} acusaciones entregadas.`,
+    respuestasRecibidas: (cuantas, total) => `${cuantas} de ${total} acusaciones entregadas.`,
     sinSilla: (cuantos) =>
       cuantos === 1
         ? 'Hay una persona en la partida que aún no tiene silla en la mesa.'
@@ -340,7 +340,7 @@ const MOMIA: PalabrasDeJuego = {
      * propuestas de orden, así que con la misma palabra los dos se leían como
      * el mismo dato.
      */
-    acusacionesRecibidas: (cuantas, total) => `${cuantas} de ${total} señalamientos entregados.`,
+    respuestasRecibidas: (cuantas, total) => `${cuantas} de ${total} señalamientos entregados.`,
     sinSilla: (cuantos) =>
       cuantos === 1
         ? 'Hay una persona apuntada a la expedición que todavía no tiene sitio.'
@@ -462,7 +462,7 @@ const SOMBRAS: PalabrasDeJuego = {
      * propuestas, así que con la misma palabra los dos se leían como el mismo
      * dato.
      */
-    acusacionesRecibidas: (cuantas, total) => `${cuantas} de ${total} señalamientos entregados.`,
+    respuestasRecibidas: (cuantas, total) => `${cuantas} de ${total} señalamientos entregados.`,
     sinSilla: (cuantos) =>
       cuantos === 1
         ? 'Hay una persona apuntada a esta noche que todavía no tiene sitio en la columna.'

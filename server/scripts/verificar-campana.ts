@@ -168,7 +168,7 @@ const sesion: LiveSession = {
     { participanteId: 'a', displayName: 'Íñigo', joinCode: 'TOR001', joined: true, elecciones: [], notas: '', girosRecibidos: [] },
     { participanteId: 'b', displayName: 'Berta', joinCode: 'TOR002', joined: true, elecciones: [], notas: '', girosRecibidos: [] },
   ],
-  acusaciones: [],
+  respuestasEntregadas: [],
   tablon: [],
   rev: 1,
   updatedAt: ahora,

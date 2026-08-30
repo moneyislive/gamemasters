@@ -165,7 +165,7 @@ function nuevaPartida(): { game: GameSession; sesion: LiveSession } {
       notas: '',
       girosRecibidos: [],
     })),
-    acusaciones: [],
+    respuestasEntregadas: [],
     tablon: [],
     rev: 1,
     updatedAt: ahora,
@@ -780,7 +780,7 @@ function jugarElConsejo(): void {
   proponerSenda(g4, s4, 'e0', t4.sendaVerdadera);
   darPrenda(g4, s4, 'e1', 'e0');
   darPrenda(g4, s4, 'e1', 'e2');
-  s4.acusaciones = [
+  s4.respuestasEntregadas = [
     { participanteId: 'e0', respuestas: { kancho: KANCHO }, at: 'z', correcta: true },
   ];
   const res4 = ejecutarConsejo(g4, s4);

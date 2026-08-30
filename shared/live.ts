@@ -204,7 +204,7 @@ export interface LivePlayer {
   reclamadaPor?: { cuentaId: string; correo: string; el: string };
 }
 
-export interface Acusacion {
+export interface RespuestaEntregada {
   /** Quién acusa. */
   participanteId: string;
   /** Un valor por eje del juego. En CLUEDO: culpable, objeto y lugar. */
@@ -256,9 +256,34 @@ export interface LiveSession {
   /** Fin previsto de la ronda; el reloj del móvil se sincroniza con esto. */
   roundEndsAt?: string;
   players: LivePlayer[];
-  acusaciones: Acusacion[];
+  /**
+   * LAS RESPUESTAS QUE HA ENTREGADO LA GENTE.
+   *
+   * Se llamaba `acusaciones`, y el tipo `RespuestaEntregada`. Un juego donde se acusa a
+   * alguien de un crimen tiene acusaciones; una expedición tiene un
+   * señalamiento del saqueador y un cruce de montaña un consejo del alba. Los
+   * tres son lo mismo: una respuesta por eje, entregada una vez y que no se
+   * puede cambiar.
+   *
+   * El CONCEPTO sí es de la plataforma —los ejes están en el manifiesto y
+   * `accionDeAcusacion` deduce con qué acción se responde—, así que lo que
+   * sobraba era el nombre, no la idea.
+   */
+  respuestasEntregadas: RespuestaEntregada[];
   /** Sospechoso que ganó, decidido por la primera acusación correcta. */
-  winnerId?: string;
+  /**
+   * QUIEN ACERTÓ PRIMERO. No necesariamente quien gana.
+   *
+   * Se llamaba `winnerId`, y mentía en dos juegos de tres. En El Misterio de la
+   * Momia significa «quien primero desenmascaró al saqueador», y ahí gana un
+   * BANDO que se decide en el sellado; en El Paso de las Sombras se puede
+   * PERDER habiendo acertado la senda, si el rastro llegó al tope.
+   *
+   * Tanto mentía que hubo que añadir `ganadores` al lado para poder decir la
+   * verdad. Ahora los dos campos dicen lo que son y conviven sin confundirse:
+   * este es una carrera, y el otro es el resultado.
+   */
+  primeroEnAcertar?: string;
   /**
    * Quiénes ganaron de verdad, según las reglas del juego.
    *
@@ -863,7 +888,7 @@ export interface VistaGameMaster {
   /** Giros pendientes de entregar en la ronda en curso. */
   girosPendientes: Array<{ id: string; participanteId: string; displayName: string; round: number }>;
   /** Cuántas acusaciones se han recibido. */
-  acusacionesRecibidas: number;
+  respuestasRecibidas: number;
   /** Quiénes han avisado de que están listos para empezar. */
   listos: Array<{ participanteId: string; displayName: string }>;
   /** El Game Master a ciegas no ve si son correctas. */

@@ -126,7 +126,7 @@ function resultadoDe(
   participanteId: string,
 ): PartidaDelPanel['resultado'] | undefined {
   if (sesion.phase !== 'desenlace') return undefined;
-  const mia = sesion.acusaciones.find((a) => a.participanteId === participanteId);
+  const mia = sesion.respuestasEntregadas.find((a) => a.participanteId === participanteId);
 
   /*
    * SI EL JUEGO DEJÓ ESCRITO QUIÉN GANÓ, manda eso.
@@ -152,10 +152,10 @@ function resultadoDe(
     };
   }
 
-  const ganador = sesion.players.find((p) => p.participanteId === sesion.winnerId);
+  const ganador = sesion.players.find((p) => p.participanteId === sesion.primeroEnAcertar);
   return {
     ganador: ganador?.displayName,
-    gane: Boolean(sesion.winnerId) && sesion.winnerId === participanteId,
+    gane: Boolean(sesion.primeroEnAcertar) && sesion.primeroEnAcertar === participanteId,
     acerte: Boolean(mia?.correcta),
   };
 }

@@ -92,7 +92,7 @@ function partidaEnElPeorCaso(n: number): { game: GameSession; sesion: LiveSessio
       notas: '',
       girosRecibidos: game.suspects.map((_, i) => `giro-${i}`),
     })),
-    acusaciones: [],
+    respuestasEntregadas: [],
     tablon: [],
     rev: 1,
     updatedAt: ahora,

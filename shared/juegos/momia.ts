@@ -724,7 +724,7 @@ export const MOMIA: ManifiestoDeJuego = {
     /* Del sellado se puede volver a jugar: si la mesa se atasca, otra vigilia. */
     sellado: ['ronda-abierta', 'desenlace'],
     /* La Momia no la usa: se juega y se acaba la misma noche. */
-    acusaciones: [],
+    respuestasEntregadas: [],
     intermedio: [],
     desenlace: [],
   },

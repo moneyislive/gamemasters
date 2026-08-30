@@ -95,7 +95,7 @@ const sesionDe = (id: string, sospechosos: Array<{ id: string; name: string; ema
     notas: '',
     girosRecibidos: [],
   })),
-  acusaciones: [],
+  respuestasEntregadas: [],
   tablon: [],
   rev: 1,
   updatedAt: ahora,

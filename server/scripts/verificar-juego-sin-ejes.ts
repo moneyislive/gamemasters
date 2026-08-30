@@ -135,7 +135,7 @@ registrarAcciones('la-oca', {
     const posiciones = (sesion.estado?.posiciones ?? {}) as Record<string, number>;
     const nueva = Math.min(CASILLAS.length - 1, (posiciones[participanteId] ?? 0) + 2);
     sesion.estado = { ...(sesion.estado ?? {}), posiciones: { ...posiciones, [participanteId]: nueva } };
-    if (nueva === CASILLAS.length - 1) sesion.winnerId = participanteId;
+    if (nueva === CASILLAS.length - 1) sesion.primeroEnAcertar = participanteId;
     return { casilla: nueva };
   },
   plantarse: ({ sesion, participanteId, datos }) => {
@@ -227,7 +227,7 @@ const sesion: LiveSession = {
     { participanteId: 'j0', displayName: 'Marta', joinCode: 'OCA001', joined: true, elecciones: [], notas: '', girosRecibidos: [] },
     { participanteId: 'j1', displayName: 'Nico', joinCode: 'OCA002', joined: true, elecciones: [], notas: '', girosRecibidos: [] },
   ],
-  acusaciones: [],
+  respuestasEntregadas: [],
   tablon: [],
   rev: 1,
   updatedAt: ahora,
@@ -324,7 +324,7 @@ sesion.round = 3;
 ejecutarAccion(game, sesion, 'j1', 'tirar', {});
 sesion.round = 4;
 ejecutarAccion(game, sesion, 'j1', 'tirar', {});
-comprobar('se gana llegando, no acertando', sesion.winnerId === 'j1', sesion.winnerId);
+comprobar('se gana llegando, no acertando', sesion.primeroEnAcertar === 'j1', sesion.primeroEnAcertar);
 
 // --- Y no se puede acusar, porque no hay nada que acusar ---
 let noSePuedeAcusar = false;

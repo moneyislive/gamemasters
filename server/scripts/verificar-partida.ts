@@ -128,7 +128,7 @@ function sembrar(dir: string): { game: GameSession; sesion: LiveSession } {
       notas: '',
       girosRecibidos: [],
     })),
-    acusaciones: [],
+    respuestasEntregadas: [],
     tablon: [],
     rev: 1,
     updatedAt: ahora,

@@ -308,7 +308,7 @@ export function vistaDeJugador(
       : {}),
   }));
 
-  const miAcusacion = sesion.acusaciones.find((a) => a.participanteId === participanteId);
+  const miAcusacion = sesion.respuestasEntregadas.find((a) => a.participanteId === participanteId);
 
   const vista: VistaJugador = {
     rev: sesion.rev ?? 0,
@@ -376,7 +376,7 @@ export function vistaDeJugador(
           photoUrl: fotoParaJugador(suSospechoso?.photoUrl, game.id),
           conectado: estaConectado(p, sesion.id),
           salaActual: suSala ? lugaresDe(game).find((r) => r.id === suSala)?.name : undefined,
-          yaAcuso: sesion.acusaciones.some((a) => a.participanteId === p.participanteId),
+          yaAcuso: sesion.respuestasEntregadas.some((a) => a.participanteId === p.participanteId),
         };
       }),
     salas,
@@ -431,10 +431,10 @@ export function vistaDeJugador(
 
   // ---- El desenlace: la ÚNICA puerta por la que sale la solución ----
   if (terminada) {
-    const ganador = sesion.winnerId
-      ? sesion.players.find((p) => p.participanteId === sesion.winnerId)
+    const ganador = sesion.primeroEnAcertar
+      ? sesion.players.find((p) => p.participanteId === sesion.primeroEnAcertar)
       : undefined;
-    const acusacionGanadora = sesion.acusaciones.find((a) => a.participanteId === sesion.winnerId);
+    const acusacionGanadora = sesion.respuestasEntregadas.find((a) => a.participanteId === sesion.primeroEnAcertar);
 
     // Un renglón por eje, ya resuelto a nombres. Antes eran tres campos
     // —asesino, arma y sala— y el móvil los pintaba uno a uno; ahora recorre
@@ -449,7 +449,7 @@ export function vistaDeJugador(
       };
     });
 
-    const aciertosDe = (a: (typeof sesion.acusaciones)[number]): number =>
+    const aciertosDe = (a: (typeof sesion.respuestasEntregadas)[number]): number =>
       aciertos(manifiesto, a.respuestas, plot.solution.respuestas);
 
     vista.desenlace = {
@@ -474,7 +474,7 @@ export function vistaDeJugador(
         : undefined,
       clasificacion: sesion.players
         .map((p) => {
-          const suya = sesion.acusaciones.find((a) => a.participanteId === p.participanteId);
+          const suya = sesion.respuestasEntregadas.find((a) => a.participanteId === p.participanteId);
           return {
             participanteId: p.participanteId,
             displayName: p.displayName,
@@ -554,7 +554,7 @@ export function vistaDeGameMaster(game: GameSession, sesion: LiveSession): Vista
          * dirige no puede saberlo, que es justo lo que se busca. Decir la
          * verdad ahí sería decirle quién rompió el sello.
          */
-        acusaciones: sesion.acusaciones.map((a) => ({
+        respuestasEntregadas: sesion.respuestasEntregadas.map((a) => ({
           participanteId: a.participanteId,
           respuestas: {},
           correcta: false,
@@ -575,7 +575,7 @@ export function vistaDeGameMaster(game: GameSession, sesion: LiveSession): Vista
          * está jugando, y no lo lee nadie: ni el puesto de mando ni la app lo
          * consultan.
          */
-        winnerId: undefined,
+        primeroEnAcertar: undefined,
         acciones: [],
         /*
          * Y EL CUADERNO DE CADA CUAL. `players` iba entero, y ahi dentro va
@@ -596,7 +596,7 @@ export function vistaDeGameMaster(game: GameSession, sesion: LiveSession): Vista
     conectados: sesion.players.filter((p) => estaConectado(p, sesion.id)).length,
     ocupacion,
     girosPendientes,
-    acusacionesRecibidas: sesion.acusaciones.length,
+    respuestasRecibidas: sesion.respuestasEntregadas.length,
     listos: sesion.players
       .filter((p) => p.pideEmpezar)
       .map((p) => ({ participanteId: p.participanteId, displayName: p.displayName })),

@@ -173,7 +173,7 @@ function contarSenalamientos(
   sesion: LiveSession,
   kanchoId: string,
 ): { aciertos: number; total: number } {
-  const entregados = sesion.acusaciones.filter((a) => a.respuestas[EJE_KANCHO]);
+  const entregados = sesion.respuestasEntregadas.filter((a) => a.respuestas[EJE_KANCHO]);
   return {
     aciertos: entregados.filter((a) => a.respuestas[EJE_KANCHO] === kanchoId).length,
     total: entregados.length,
@@ -274,7 +274,7 @@ export function trofeosDe(
 
     // El ojo de Hanzō: señalaste al kanchō y acertaste. Se lee de la acusación
     // que ya guarda la plataforma, que es donde `senalar` la deja.
-    const suSenalamiento = sesion.acusaciones.find((a) => a.participanteId === id);
+    const suSenalamiento = sesion.respuestasEntregadas.find((a) => a.participanteId === id);
     if (suSenalamiento?.correcta && !esElKancho(game, id)) suyos.push('ojo-de-hanzo');
 
     // Sin rastro: cruzaste sin pisar una sola vez donde estaban los cazadores.

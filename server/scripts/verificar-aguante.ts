@@ -657,7 +657,7 @@ function sembrar(dir: string): void {
       notas: '',
       girosRecibidos: [],
     })),
-    acusaciones: [],
+    respuestasEntregadas: [],
     tablon: [],
     rev: 1,
     updatedAt: ahora,
