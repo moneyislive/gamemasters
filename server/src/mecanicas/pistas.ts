@@ -30,6 +30,7 @@ import { lugaresDe, manifiestoDe, faseEs } from '../../../shared/juegos';
 import type { GameSession } from '../../../shared/types';
 import type { LiveSession } from '../../../shared/live';
 import type { BloqueDePistas, PistaVista } from '../../../shared/mecanicas/pistas';
+import { pistasDeLaTrama } from '../../../shared/mecanicas/pistas';
 
 export type { BloqueDePistas, PistaVista };
 
@@ -84,7 +85,7 @@ export function bloqueDePistas(
   const miLugar = enEspera ? undefined : salaDe(jugador, sesion.round);
   const misPistas =
     abierta && miLugar
-      ? plot.clues
+      ? pistasDeLaTrama(plot)
           .filter((c) => c.lugarId === miLugar && c.round === sesion.round)
           .map((c) => pistaVista(game, c, false))
       : [];
@@ -95,7 +96,7 @@ export function bloqueDePistas(
       const lugar = salaDe(jugador, ronda);
       if (!lugar) continue;
       const cerrada = ronda < sesion.round || !abierta;
-      for (const clue of plot.clues) {
+      for (const clue of pistasDeLaTrama(plot)) {
         if (clue.lugarId === lugar && clue.round === ronda) {
           misHallazgos.push(pistaVista(game, clue, cerrada));
         }

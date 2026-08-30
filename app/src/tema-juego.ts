@@ -30,6 +30,7 @@
 import { color, fondoMesa } from './tema';
 import { COLOR_MOMIA, type Paleta } from './tema-momia';
 import { COLOR_SOMBRAS } from './tema-sombras';
+import { COLOR_NUDO, FONDO_NUDO } from './tema-nudo';
 import { usePartidaSiLaHay } from './estado';
 import type { JuegoId } from '../../shared/juegos';
 
@@ -54,6 +55,7 @@ import type { JuegoId } from '../../shared/juegos';
 const PALETAS: Record<string, Paleta> = {
   momia: COLOR_MOMIA,
   sombras: COLOR_SOMBRAS,
+  nudo: COLOR_NUDO,
 };
 
 export function paletaDe(juego: JuegoId | undefined): Paleta {
@@ -100,6 +102,8 @@ export function useJuego(): JuegoId | undefined {
  */
 const ORNAMENTOS: Record<string, string> = {
   momia: '☥',
+  /* Un aspa de paso a nivel: la única señal que hay en una vía sin barreras. */
+  nudo: '✕',
   /* Un rombo hueco: la marca de camino, y lo más parecido a un mon sin serlo. */
   sombras: '◇',
 };
@@ -147,6 +151,7 @@ const FONDO_SOMBRAS = ['#080a11', '#0f1526', '#0a1211'] as const;
 const FONDOS: Record<string, readonly [string, string, string]> = {
   momia: FONDO_MOMIA,
   sombras: FONDO_SOMBRAS,
+  nudo: FONDO_NUDO,
 };
 
 export function useFondo(): readonly [string, string, string] {
@@ -198,6 +203,12 @@ const TABLERO_CLUEDO: Tablero = {
 const TABLEROS: Record<string, Tablero> = {
   momia: { tapete: ['#33240f', '#1f1508', '#0d0904'], centro: '#42200f' },
   sombras: { tapete: ['#1a2740', '#111a2b', '#080c14'], centro: '#3a1a14' },
+  /*
+   * El Nudo: la planta de la estación sobre el balasto, oscureciendo hacia los
+   * bordes. El bloque del centro —el haz de vías donde se cruzan las cinco
+   * líneas— tira al rojo de señal, que es el acento de alarma de este juego.
+   */
+  nudo: { tapete: ['#232a33', '#161c24', '#0a0d12'], centro: '#5a231c' },
 };
 
 export function tableroDe(juego: JuegoId | undefined): Tablero {

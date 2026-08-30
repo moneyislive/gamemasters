@@ -478,11 +478,6 @@ export function generarTramaSombras(game: GameSession, opciones: OpcionesTrama =
     },
     characters,
     timeline: construirCronologia(),
-    /*
-     * Vacío, y el porqué está en la cabecera: los hallazgos de este juego no son
-     * pistas de sala, son hitos que viven en el estado.
-     */
-    clues: [],
     gmScript: [
       'Antes de que llegue nadie: cuelga un cartel en cada paso —lleva la CONTRASEÑA, y es lo que hay que ir a leer—, deja en cada habitación las tiras de sus hitos y reparte los dosieres cerrados.',
       'Abre la noche leyendo la sinopsis. Cuenta lo de Honnō-ji. Deja claro que hay barca en Shirako y que solo hay cuatro pasos buenos.',

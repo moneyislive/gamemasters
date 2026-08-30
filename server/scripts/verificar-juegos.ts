@@ -29,6 +29,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { generarTramaMomia } from '../src/juegos/momia-trama';
 import { generarTramaSombras } from '../src/juegos/sombras-trama';
+import { generarTramaNudo } from '../src/juegos/nudo-trama';
 import { generateDemoPlot } from '../src/plot/cluedo-demo';
 import { generateBoardLayout } from '../src/board/generator';
 import { iniciarJuego } from '../src/juegos/inicios';
@@ -56,6 +57,7 @@ import { PAPELES_EN_JUEGO } from '../../shared/live';
 import type { BloqueDeDosier, ManifiestoDeJuego } from '../../shared/juegos';
 import type { LivePhase, LiveSession } from '../../shared/live';
 import type { GameSession } from '../../shared/types';
+import { pistasDeLaTrama } from '../../shared/mecanicas/pistas';
 
 const RAIZ = path.resolve(import.meta.dirname ?? __dirname, '..', '..');
 
@@ -125,6 +127,8 @@ function partidaDe(m: ManifiestoDeJuego): GameSession | null {
       game.plot = generarTramaMomia(game, { semilla: 'verificar-juegos', vigilias: 4 });
     } else if (m.id === 'sombras') {
       game.plot = generarTramaSombras(game, { semilla: 'verificar-juegos', horas: 4 });
+    } else if (m.id === 'nudo') {
+      game.plot = generarTramaNudo(game, { semilla: 'verificar-juegos' });
     } else {
       game.plot = generateDemoPlot(game);
     }
@@ -186,6 +190,12 @@ const VOCABULARIO: Record<string, RegExp[]> = {
   cluedo: [/\basesin[oa]\b/i, /\bmayordomo\b/i, /\bmansi[oó]n\b/i, /sospechos[oa]s?\b/i],
   momia: [/\bvigilia/i, /\bpapiro/i, /\bsaqueador/i, /\bfara[oó]n/i, /\bmomia\b/i],
   sombras: [/\bkanch[oō]/i, /\bescolta/i, /\bIga\b/, /\bninja/i, /\bHonn[oō]/i],
+  /*
+   * Las de El Nudo de Valdehierro. Ninguna puede salir ni negada en los otros
+   * tres: un dosier de CLUEDO que hable de convoyes o de enclavamientos es un
+   * dosier compuesto con la plantilla equivocada.
+   */
+  nudo: [/\bconvoy/i, /\benclavamiento/i, /\bValdehierro\b/i, /\bguardaguja/i, /\bcuadro de marchas/i],
 };
 
 // ---------------------------------------------------------------------------
@@ -212,7 +222,11 @@ const RUTA_DE_FASE: Record<string, RegExp> = {
 };
 
 /** Bloques del dosier que solo pertenecen a un juego. */
-const BLOQUES_PROPIOS: Record<string, BloqueDeDosier> = { momia: 'don', sombras: 'disfraz' };
+const BLOQUES_PROPIOS: Record<string, BloqueDeDosier> = {
+  momia: 'don',
+  sombras: 'disfraz',
+  nudo: 'telegramas',
+};
 
 for (const m of juegosInstalados()) {
   paso(`${m.nombre} · lo declarado está implementado`);
@@ -764,7 +778,16 @@ paso('La mudanza al modelo nuevo no pierde nada por el camino');
   comprobar('el plano dibuja lugares y pasadizos', p.board.lugares?.[0]?.lugarId === 'r0' && p.board.pasadizos?.[0]?.desdeLugarId === 'r0');
   comprobar('cada personaje sabe a quien interpreta', p.plot.characters[0].participanteId === 's0');
   comprobar('la cronologia sabe quienes estaban', p.plot.timeline[0].participanteIds?.[0] === 's0');
-  comprobar('las pistas saben de que lugar son', p.plot.clues[0].lugarId === 'r0');
+  /*
+   * LAS PISTAS CAMBIAN DE SITIO Y DE NOMBRE A LA VEZ: de `plot.clues[].roomId`
+   * a `plot.mecanicas.pistas[].lugarId`. Se comprueban las dos cosas, y que el
+   * campo viejo no se quede detras haciendo sombra.
+   */
+  comprobar(
+    'las pistas se mudan a su mecánica y saben de qué lugar son',
+    pistasDeLaTrama(p.plot)[0]?.lugarId === 'r0' && !('clues' in p.plot),
+    { pistas: p.plot.mecanicas?.pistas, quedaClues: 'clues' in p.plot },
+  );
   comprobar('los giros saben a quien van', p.plot.material.twists[0].participanteId === 's1');
   comprobar('el dosier sabe de quien es', p.documents[0].id === 's0');
   /*
@@ -979,7 +1002,7 @@ paso('Un juego que no esta instalado no se juega como otro');
 console.log('');
 if (fallos.length === 0) {
   console.log(`${hechas} comprobaciones`);
-  console.log('\nLos tres juegos tienen implementado lo que declaran, y su material es suyo.');
+  console.log('\nCada juego instalado tiene implementado lo que declara, y su material es suyo.');
   process.exit(0);
 }
 console.log(`${fallos.length} de ${hechas} comprobaciones han fallado:\n`);

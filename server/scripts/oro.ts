@@ -59,13 +59,14 @@ import { manifiestoDe, personasDe } from '../../shared/juegos';
 import { GUION as CLUEDO } from './oro-guiones/cluedo';
 import { GUION as MOMIA } from './oro-guiones/momia';
 import { GUION as SOMBRAS } from './oro-guiones/sombras';
+import { GUION as NUDO } from './oro-guiones/nudo';
 import type { DocumentVariant, GameSession } from '../../shared/types';
 import type { LiveSession } from '../../shared/live';
 import type { GuionDeOro, Mesa } from './oro-guiones/tipos';
 
 const AQUI = path.resolve(import.meta.dirname ?? __dirname, 'oro');
 
-const GUIONES: GuionDeOro[] = [CLUEDO, MOMIA, SOMBRAS];
+const GUIONES: GuionDeOro[] = [CLUEDO, MOMIA, SOMBRAS, NUDO];
 
 // ---------------------------------------------------------------------------
 // Normalización

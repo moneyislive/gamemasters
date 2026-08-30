@@ -58,6 +58,7 @@ import {
 } from '../../src/ui';
 import { ALTO_BARRA_TOTAL } from '../../src/tema';
 import { bloqueDe, pantallaDe } from '../../src/pantallas';
+import { accionDeAcusacion, categoriasDeLugar, manifiestoSiExiste } from '../../../shared/juegos';
 import type { LugarVista, VistaJugador } from '../../../shared/live';
 import { Foto } from '../../src/foto';
 
@@ -160,6 +161,11 @@ function EnlaceAlDosier({
   );
 }
 
+/** «puestos» -> «Puestos». Para encabezar con la palabra del juego. */
+function capitalizar(t: string): string {
+  return t.charAt(0).toUpperCase() + t.slice(1);
+}
+
 export default function Ronda(): JSX.Element {
   const { vista, cargando, error, aplicarVista } = usePartida();
   const [eligiendo, setEligiendo] = useState<string | null>(null);
@@ -194,6 +200,21 @@ export default function Ronda(): JSX.Element {
   }
 
   const { sesion, yo, lugares: salas, miLugar, narracion } = vista;
+
+  /*
+   * LAS PALABRAS DE ESTA PANTALLA SALEN DEL MANIFIESTO.
+   *
+   * Esta es la ronda que se lleva CUALQUIER juego que no declare la suya, y
+   * decía «Salas» y ofrecía «Acusar» a todo el mundo. El cuarto juego lo dejó
+   * a la vista: un nudo ferroviario leyendo «Salas» encima de sus puestos de
+   * servicio, con un botón de acusar en un juego donde no se acusa a nadie.
+   *
+   * `acusa` es false cuando el juego no declara ejes —no hay nada que
+   * adivinar— y entonces ni se pinta la barra ni se le reserva alto.
+   */
+  const manifiesto = manifiestoSiExiste(sesion.juego);
+  const losLugares = manifiesto ? (categoriasDeLugar(manifiesto)[0]?.plural ?? 'lugares') : 'lugares';
+  const acusa = manifiesto ? Boolean(accionDeAcusacion(manifiesto)) : false;
 
   const avisar = async (listo: boolean): Promise<void> => {
     setErrorSala(null);
@@ -400,7 +421,7 @@ export default function Ronda(): JSX.Element {
 
   return (
     <>
-    <Pantalla reserva={ALTO_ACUSAR}>
+    <Pantalla reserva={acusa ? ALTO_ACUSAR : 0}>
       <AvisoDeLaPartida />
       <View style={estilos.cabeceraRonda}>
         <View style={{ flex: 1 }}>
@@ -429,7 +450,13 @@ export default function Ronda(): JSX.Element {
 
       {abierta ? (
         <>
-          <Seccion>{miLugar ? 'Puedes cambiarte una vez' : 'Salas'}</Seccion>
+          {/*
+            «Salas» estaba escrito a mano, y esta pantalla la hereda cualquier
+            juego que no declare la suya: un nudo ferroviario leía «Salas»
+            encima de una lista de puestos de servicio. El plural lo dice el
+            manifiesto, que es quien sabe cómo llama cada juego a sus sitios.
+          */}
+          <Seccion>{miLugar ? 'Puedes cambiarte una vez' : capitalizar(losLugares)}</Seccion>
           {salas.map((sala, i) => {
             const dentro = miLugar === sala.id;
             return (
@@ -522,7 +549,7 @@ export default function Ronda(): JSX.Element {
       </Boton>
 
     </Pantalla>
-    <BarraDeAcusar yaRespondio={Boolean(vista.miRespuesta)} />
+    {acusa && <BarraDeAcusar yaRespondio={Boolean(vista.miRespuesta)} />}
     </>
   );
 }

@@ -148,6 +148,109 @@ function ArtSombras(): ReactElement {
   );
 }
 
+/**
+ * El Nudo de Valdehierro — la vía que se abre en dos, el farol y la nieve.
+ *
+ * De las cinco siluetas de la estantería, esta es la única que no tiene una
+ * sola figura en el centro: tiene una LÍNEA que entra por abajo y se parte. Eso
+ * era el requisito de verdad, porque el juego entero es decidir por dónde va
+ * cada uno de los seis convoyes, y una bifurcación es esa frase dibujada.
+ *
+ * LA PERSPECTIVA HACE EL TRABAJO QUE AQUÍ NO PUEDE HACER EL COLOR. La ficha se
+ * pinta con un solo color de acento, así que la profundidad no se puede contar
+ * con tonos: se cuenta con la geometría. Los dos carriles se juntan según suben
+ * y las traviesas se estrechan con ellos, que es lo que convierte cuatro rectas
+ * en una vía que se va.
+ *
+ * Y HAY UN SEGUNDO CARRIL QUE CRUZA AL PRIMERO, que parece un error de trazo y
+ * no lo es: es el corazón de la aguja, el punto donde el carril de la desviada
+ * atraviesa al de la directa. Sin él son dos vías paralelas que se separan; con
+ * él son una vía que se bifurca, que es lo que dice el título.
+ */
+function ArtNudo(): ReactElement {
+  return (
+    <svg viewBox="0 0 220 220" role="img" aria-label="Una vía que se bifurca en una aguja, con un farol y nieve">
+      <g fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
+        {/*
+         * Las traviesas de delante: gordas, y SOBRESALIENDO de los dos carriles.
+         * Lo segundo es lo que importa. Cortadas a ras de carril esto se
+         * convertía en una escalera de mano —así estaba, y así se veía—; lo que
+         * hace que una traviesa parezca una traviesa es el trozo que le sobra.
+         */}
+        <path d="M-2 194L78 222M34 172L100 196M64 154L118 173" strokeWidth="3.4" opacity="0.42" />
+        {/* Y las de más allá, más finas, más cortas y cada vez más juntas. */}
+        <path
+          d="M90 139L133 155M111 126L146 139M129 115L157 125M144 106L166 114M157 98L174 105"
+          strokeWidth="2.2"
+          opacity="0.3"
+        />
+
+        {/* La vía directa, hacia el punto de fuga de la esquina de arriba. */}
+        <path d="M4 196L179 86M72 220L185 89" strokeWidth="3.2" />
+        {/*
+         * La desviada, más pálida: se va hacia donde ya no llega la bombilla.
+         *
+         * SALE TANGENTE Y LUEGO SE ABRE, que es la única parte de esta silueta
+         * que hubo que rehacer. Con las dos ramas saliendo ya torcidas desde el
+         * primer píxel —así estaban— no se veía una vía que se bifurca: se veían
+         * dos vías distintas que se cruzan por casualidad. Un desvío de verdad
+         * arranca paralelo a la vía de la que sale y se separa poco a poco, y
+         * por eso el primer punto de control de las dos curvas está sobre la
+         * dirección de la vía directa. Es lo que convierte una equis en una uve.
+         */}
+        <path d="M62 160C86 143 96 112 98 84M110 176C138 158 132 116 120 90" strokeWidth="3" opacity="0.62" />
+        {/*
+         * Y sus tres traviesas, que son baratas y hacen todo el trabajo: dos
+         * líneas finas y curvas se leen como dos cables, y con tres travesaños
+         * cruzados encima se leen como una vía. Van más pálidas que las de la
+         * directa porque están más lejos y porque ahí ya no llega la bombilla.
+         */}
+        <path d="M74 144L129 160M87 121L133 132M93 100L129 108" strokeWidth="2" opacity="0.26" />
+
+        {/* El farol del andén: el poste, el sombrerete y la caja de la luz. */}
+        <path d="M26 172V74M14 172h24M14 74l12-13 12 13M17 74h18l-3 24H20z" strokeWidth="3" />
+        {/* Lo que alumbra. Seis rayas cortas bastan: más son un sol, y esto es una bombilla. */}
+        <path d="M9 86H2M43 86h7M11 72l-5-5M41 72l5-5M11 100l-5 5M41 100l5 5" strokeWidth="2" opacity="0.45" />
+        {/* La nieve cuajada encima del sombrerete: lleva ahí toda la noche. */}
+        <path d="M16 70q4.5-6.5 10-10q5.5 3.5 10 10" strokeWidth="3.2" opacity="0.5" />
+
+        {/* La caja del farol de la aguja, plantada por fuera del desvío. */}
+        <path d="M140 198v-20M134 164h12v14h-12z" strokeWidth="2.4" opacity="0.8" />
+
+        {/* El ventisquero, delante de todo: la nieve ya está tapando la vía. */}
+        <path d="M0 209q22-10 44-2t44-3t44 4t44-3t44 2" strokeWidth="4" opacity="0.28" />
+      </g>
+
+      {/* La bombilla. Lo único macizo del dibujo, como el sello de las Sombras. */}
+      <circle cx="26" cy="86" r="6" fill="currentColor" stroke="none" />
+      {/*
+       * La lente del farol de la aguja, y lo ÚNICO que no está pintado con el
+       * acento de la ficha. Un farol de aguja enseña ámbar por la vía directa y
+       * rojo por la desviada: es literalmente el aparato que dice hacia dónde
+       * está puesto el desvío. Va pequeño a propósito —el rojo de señal es
+       * oscuro y a este tamaño compite con la bombilla si crece.
+       */}
+      <circle cx="140" cy="171" r="3.4" fill="#9a2f22" stroke="none" />
+
+      {/* Los copos. Sin simetría y de tres tamaños, que es como cae la nieve. */}
+      <g fill="currentColor" stroke="none" opacity="0.5">
+        <circle cx="30" cy="34" r="2.2" />
+        <circle cx="62" cy="18" r="1.7" />
+        <circle cx="86" cy="52" r="1.5" />
+        <circle cx="114" cy="36" r="2" />
+        <circle cx="152" cy="26" r="1.8" />
+        <circle cx="188" cy="44" r="2.2" />
+        <circle cx="206" cy="76" r="1.6" />
+        <circle cx="160" cy="72" r="1.4" />
+        <circle cx="196" cy="118" r="1.9" />
+        <circle cx="8" cy="110" r="1.8" />
+        <circle cx="204" cy="156" r="2.1" />
+        <circle cx="168" cy="194" r="1.7" />
+      </g>
+    </svg>
+  );
+}
+
 /** Harry Potter — varita, chispas y rayo. */
 function ArtWizard(): ReactElement {
   return (
@@ -285,6 +388,47 @@ const GAMES: readonly CatalogGame[] = [
       '--card-glow': 'rgba(147, 167, 192, 0.38)',
     } as CSSProperties,
     art: <ArtSombras />,
+  },
+  {
+    id: 'nudo',
+    title: 'El Nudo de Valdehierro',
+    /*
+     * AQUÍ EL LEMA Y LA FRASE DE LA FICHA SON EL MISMO TEXTO, como en la Momia
+     * y por la misma razón: la frase de la estantería tiene que explicar a qué
+     * se juega, y el lema del manifiesto ya lo explica mejor de lo que lo haría
+     * cualquier segunda frase escrita aparte. Dice el desastre, dice el reloj y
+     * dice cuánto queda; no sobra nada y no falta nada.
+     */
+    tagline: 'Ardió el cuadro de marchas y seis convoyes vienen rodando. Quedan seis franjas para rehacerlo.',
+    /*
+     * DOCE Y NO DIEZ, que es el tope de los otros dos juegos en vivo. Los cuatro
+     * oficios se reparten con repetición y los puestos son habitaciones de la
+     * casa: una mesa grande aquí no rompe nada, solo hace que en la garita haya
+     * dos personas discutiendo la misma maniobra, que es lo que pasa de verdad
+     * en un turno de noche.
+     */
+    players: '4 – 12 jugadores · En vivo',
+    cta: 'Entrar de turno →',
+    /*
+     * La ficha lleva la paleta del juego, no una paleta cualquiera: el azul de
+     * hulla detrás y el ámbar de bombilla delante son los mismos valores con
+     * los que se pinta su taller (`styles/temas.css`). Que la tarjeta prometa
+     * lo que hay al otro lado es media promesa cumplida antes de pulsarla.
+     *
+     * EL ACENTO VUELVE A SER CÁLIDO Y NO CONTRADICE LO QUE DICE LA FICHA DE LAS
+     * SOMBRAS AHÍ ARRIBA. Aquello era sobre el oro: tres tarjetas doradas
+     * seguidas se leen como el mismo producto tres veces. Esto no es oro, es
+     * LUZ —un filamento de veinticinco vatios— y se nota en el fondo, que es lo
+     * que de verdad separa dos fichas en una estantería: la de Harry Potter es
+     * azul marino y esta es negra con una idea de azul. Al lado se distinguen.
+     */
+    palette: {
+      '--card-bg1': '#0d1219',
+      '--card-bg2': '#1b212a',
+      '--card-accent': '#d9a648',
+      '--card-glow': 'rgba(217, 166, 72, 0.38)',
+    } as CSSProperties,
+    art: <ArtNudo />,
   },
   {
     id: 'potter',

@@ -89,8 +89,47 @@ const RAICES = ['shared', 'server/src', 'client/src', 'app/src', 'app/app'];
  * El que queda por decidir es `docs/renderer.ts`, que compone los dosieres y es
  * el fichero más acoplado que hay. No es una mudanza: tiene dentro el dosier
  * genérico de CLUEDO Y el mecanismo por el que cada juego registra el suyo.
+ *
+ * ═══ Y LOS NOMBRES SALEN SOLOS, QUE ES EL PUNTO ═══
+ *
+ * Aquí había una lista escrita a mano: `(cluedo|momia|sombras)`. O sea que el
+ * verificador de que el núcleo no sabe a qué se juega llevaba dentro los
+ * nombres de los tres juegos, y añadir un cuarto exigía editarlo.
+ *
+ * Se vio en cuanto apareció el cuarto: su manifiesto contó como núcleo y salió
+ * en rojo por existir. Que meter un juego obligue a tocar el núcleo es
+ * exactamente lo que esta medida existe para cazar, y lo tenía dentro.
+ *
+ * Ahora se deducen: un manifiesto es un fichero de `shared/juegos/` que declara
+ * `: ManifiestoDeJuego =`, y el juego se llama como el fichero. Es la
+ * convención que ya sigue el repositorio entero —`momia.ts`, `momia-tipos.ts`,
+ * `momia-acciones.ts`, `imprimibles/momia/`— y un juego nuevo entra sin que
+ * nadie se acuerde de tocar esto.
  */
-const ES_DE_UN_JUEGO = /(^|[\/\\-])(cluedo|momia|sombras)([\/\\.-]|$)/i;
+function juegosDelRepositorio(): string[] {
+  const carpeta = path.join(RAIZ, 'shared', 'juegos');
+  return fs
+    .readdirSync(carpeta)
+    .filter((n) => n.endsWith('.ts'))
+    .filter((n) => fs.readFileSync(path.join(carpeta, n), 'utf8').includes(': ManifiestoDeJuego = {'))
+    .map((n) => n.slice(0, -3).toLowerCase());
+}
+
+const NOMBRES_DE_JUEGO = juegosDelRepositorio();
+
+/** ¿Este fichero es DE un juego? Por la convención de nombres del repositorio. */
+function esDeUnJuego(rel: string): boolean {
+  const ruta = rel.split('\\').join('/').toLowerCase();
+  return NOMBRES_DE_JUEGO.some(
+    (n) =>
+      ruta.includes('/' + n + '/') ||
+      ruta.endsWith('/' + n + '.ts') ||
+      ruta.endsWith('/' + n + '.tsx') ||
+      ruta.includes('/' + n + '-') ||
+      ruta.includes('-' + n + '.') ||
+      ruta.includes('-' + n + '-'),
+  );
+}
 
 /**
  * NI ESTO ES NUCLEO: las MECANICAS son la tercera capa.
@@ -300,7 +339,7 @@ function ficherosDelNucleo(): string[] {
       if (!/\.(ts|tsx)$/.test(e.name)) continue;
       if (e.name.endsWith('.d.ts')) continue;
       const rel = path.relative(RAIZ, completa).replace(/\\/g, '/');
-      if (ES_DE_UN_JUEGO.test(rel) || esUnaMecanica(rel)) continue;
+      if (esDeUnJuego(rel) || esUnaMecanica(rel)) continue;
       salida.push(rel);
     }
   };

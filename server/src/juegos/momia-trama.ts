@@ -43,6 +43,7 @@ import type {
   TramaMomia,
 } from '../../../shared/juegos/momia-tipos';
 import type { GameSession, Plot, PlotCharacter, TimelineEvent } from '../../../shared/types';
+import { pistasDeLaTrama } from '../../../shared/mecanicas/pistas';
 
 /** El eje único de la Momia: quién rompió el sello. */
 export const EJE_SAQUEADOR = 'saqueador';
@@ -307,11 +308,6 @@ export function generarTramaMomia(game: GameSession, opciones: OpcionesTrama = {
     },
     characters,
     timeline: construirCronologia(),
-    /*
-     * Vacío, y el porqué está en la cabecera: los hallazgos de este juego no son
-     * pistas de sala, son fragmentos de papiro que viven en el estado.
-     */
-    clues: [],
     gmScript: [
       'Antes de que llegue nadie: pega los carteles en las puertas, reparte los dosieres en sobres cerrados y quédate el papiro del sellado. No lo dejes sobre la mesa.',
       'Abre la velada leyendo la sinopsis. Presenta la tumba, presenta al faraón sin nombre, y deja claro que antes del amanecer hay que sellarla.',
@@ -441,7 +437,7 @@ function construirCronologia(): TimelineEvent[] {
  * golpe y sin que nada diera error.
  *
  * Hasta hoy no ocurria, y por una casualidad que conviene no heredar:
- * `numeroDeRondas` deduce las vigilias de `plot.clues`, este juego las deja
+ * `numeroDeRondas` deduce las vigilias de `pistasDeLaTrama(plot)`, este juego las deja
  * vacias y la funcion devuelve su valor por defecto, cuatro, que es justo lo que
  * la trama genera. Dos numeros que coinciden sin que nadie los haya atado. En
  * cuanto alguien genere una velada de tres o de cinco, dejan de coincidir.

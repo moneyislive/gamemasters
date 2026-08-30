@@ -9,9 +9,10 @@
  */
 import { REGLAS_CLUEDO } from '../../../shared/juegos/cluedo';
 import type { ReglaDeJuego } from '../../../shared/juegos';
-import type { GameSession, Plot, PlotClue, Room, Suspect, TimelineEvent } from '../../../shared/types';
+import type { GameSession, Plot, Room, Suspect, TimelineEvent } from '../../../shared/types';
 import { culpableDe } from '../juegos/cluedo';
 import { lugaresDe, manifiestoSiExiste, personasDe } from '../../../shared/juegos';
+import { PlotClue, pistasDeLaTrama } from '../../../shared/mecanicas/pistas';
 
 // ---------------------------------------------------------------------------
 // Rondas y reparto de pistas
@@ -25,7 +26,7 @@ import { lugaresDe, manifiestoSiExiste, personasDe } from '../../../shared/juego
  * número disparatado genere cuarenta bloques.
  */
 export function numeroDeRondas(plot: Plot): number {
-  const rondas = plot.clues
+  const rondas = pistasDeLaTrama(plot)
     .map((pista) => pista.round)
     .filter((n) => Number.isInteger(n) && n >= 1 && n <= 12);
   if (rondas.length === 0) return 4;
@@ -37,7 +38,7 @@ export function pistasPorRonda(plot: Plot): Map<number, PlotClue[]> {
   const total = numeroDeRondas(plot);
   const mapa = new Map<number, PlotClue[]>();
   for (let ronda = 1; ronda <= total; ronda++) mapa.set(ronda, []);
-  for (const pista of plot.clues) {
+  for (const pista of pistasDeLaTrama(plot)) {
     const ronda = Number.isInteger(pista.round) ? pista.round : 1;
     // Una pista con una ronda fuera de rango se recoge en la primera antes que
     // desaparecer del material sin que nadie se entere.
@@ -159,7 +160,7 @@ export function inventarioSobres(game: GameSession, plot: Plot): SobreDeLaPartid
   /*
    * LOS SOBRES DE LO QUE SE REPARTE DURANTE LA VELADA.
    *
-   * En CLUEDO son las pistas de cada sala y ronda, que viven en `plot.clues`.
+   * En CLUEDO son las pistas de cada sala y ronda, que viven en `pistasDeLaTrama(plot)`.
    * Un juego que no genere pistas —El Misterio de la Momia hace `clues: []` a
    * propósito, porque lo suyo son tiras de papiro— se quedaba con la hoja de
    * etiquetas VACÍA: un documento en el paquete sin una sola etiqueta dentro,

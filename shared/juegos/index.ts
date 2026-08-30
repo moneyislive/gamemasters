@@ -10,6 +10,7 @@ import { categoriaDeJugadores, categoriasDeLugar } from './tipos';
 import { CLUEDO } from './cluedo';
 import { MOMIA } from './momia';
 import { SOMBRAS } from './sombras';
+import { NUDO } from './nudo';
 import type { CategoriaId, JuegoId, ManifiestoDeJuego } from './tipos';
 import { TROFEOS } from '../live';
 import type { GameSession } from '../types';
@@ -105,6 +106,66 @@ export type {
   PorteId,
   TramaSombras,
 } from './sombras-tipos';
+export { NUDO };
+/*
+ * NINGÚN NOMBRE DE AQUÍ CHOCA CON LOS DE LOS OTROS TRES, y como en el caso de
+ * las Sombras no es suerte: `cumple`/`permutaciones`/`solucionesDe` son de la
+ * Momia y `cumpleCondicion`/`variaciones`/`sendasDe` de las Sombras, así que el
+ * cuarto juego usa `cumpleTelegrama`/`ordenaciones`/`cuadrosDe`. Reutilizar uno
+ * no daría un error evidente: este juego resolvería su cuadro con las reglas
+ * del ajeno. Está razonado en la cabecera de `nudo-tipos`.
+ */
+export {
+  cumpleTelegrama,
+  claveDeTelegrama,
+  ordenaciones,
+  cuadrosDe,
+  franjasDe,
+  horaDeFranja,
+  normalizarParte,
+  aMorse,
+  retrasoMaximoPara,
+  CONVOYES_DE_LA_NOCHE,
+  FRANJAS_DE_LA_NOCHE,
+  CONVOYES_MAXIMOS,
+  HORAS_DE_FRANJA,
+  MORSE,
+  OFICIOS,
+  NOMBRE_DE_OFICIO,
+  OFICIO_DE_PERSONA,
+  MANA_DE_OFICIO,
+  RETRASO_POR_ORDEN_RECHAZADA,
+  RETRASO_POR_FRANJA_PERDIDA,
+  RETRASO_POR_CONVOY_VARADO,
+  CONFORMIDADES_DE_OFICIO,
+  MARGEN_POR_INSTRUMENTO,
+  MARGEN_EXTRA_EN_TU_OFICIO,
+  MARGEN_POR_CONSULTA,
+  MARGEN_POR_RECUPERAR,
+  RETRASO_QUE_RECUPERA,
+} from './nudo-tipos';
+export type {
+  ConvoyId,
+  PuestoId,
+  MercanciaId,
+  Cuadro,
+  FranjaDe,
+  Telegrama,
+  TipoDeTelegrama,
+  TelegramaEscrito,
+  TramaNudo,
+  EstadoNudo,
+  EstadoDeFerroviario,
+  OrdenCursada,
+  OficioId,
+  InstrumentoId,
+  Instrumento,
+  ManiobraPlanteada,
+  MovimientoDeManiobra,
+  PartePlanteado,
+  EnclavamientoPlanteado,
+  CarguePlanteado,
+} from './nudo-tipos';
 export {
   entidadesDe,
   entidadDe,
@@ -174,6 +235,7 @@ function alta(manifiesto: ManifiestoDeJuego): void {
 alta(CLUEDO);
 alta(MOMIA);
 alta(SOMBRAS);
+alta(NUDO);
 
 /**
  * Da de alta un juego.

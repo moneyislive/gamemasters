@@ -237,11 +237,11 @@ const plot: Plot = {
     { time: '22:05', description: 'Casilda se acerca a la vitrina mientras Amelia mira.', participanteIds: ['h0', 'h2'], isPublic: false },
     { time: '22:10', description: 'Alguien apaga la luz de la galería.', participanteIds: ['h2'], isPublic: false },
   ],
-  clues: [
+  mecanicas: { pistas: [
     { id: 'c1', lugarId: 'e0', description: 'La vitrina está sin cerrar.', pointsTo: 'Alguien la abrió sin forzarla.', round: 1 },
     { id: 'c2', lugarId: 'e1', description: 'Una copa con carmín.', pointsTo: 'Alguien estuvo aquí y no lo ha dicho.', round: 1 },
     { id: 'c3', lugarId: 'e2', description: 'Un pañuelo en el escalón.', pointsTo: 'Se subió con prisa.', round: 2 },
-  ],
+  ] },
   gmScript: ['Abre la velada.', 'Cierra la velada.'],
 };
 game.plot = plot;

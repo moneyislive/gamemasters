@@ -524,15 +524,6 @@ export function ensamblarTramaSombras(
     characters,
     timeline,
     /*
-     * SIN PISTAS, Y ES DELIBERADO. Un hito se parece a una pista —aparece en un
-     * paso, en una hora— pero no lo es: es una pieza de un rompecabezas lógico,
-     * algunas son MENTIRA, y quién se lleva cuál lo decide el reductor del juego.
-     * Metidas en `clues` viajarían por la proyección genérica de CLUEDO, que
-     * reparte por sala y no sabe de hitos falsos: el móvil recibiría las mentiras
-     * marcadas como pistas del caso.
-     */
-    clues: [],
-    /*
      * EL GUION TAMBIÉN PASA POR EL FILTRO. Se imprime entero en la Guía del paso,
      * que es la hoja que se maneja toda la noche delante de la mesa y que, con
      * quien dirige jugando, lee alguien que también juega.

@@ -32,6 +32,7 @@ import { REGLAS_JUGADOR } from '../src/docs/datos';
 import type { GameSession } from '../../shared/types';
 import type { LiveSession } from '../../shared/live';
 import { personasDe, lugaresDe, entidadesDe } from '../../shared/juegos';
+import { pistasDeLaTrama } from '../../shared/mecanicas/pistas';
 
 const RONDAS = 25;
 const MARCA_GIRO = 'GIRO PERSONAL QUE NADIE MAS DEBE VER';
@@ -105,7 +106,7 @@ function partidaEnElPeorCaso(n: number): { game: GameSession; sesion: LiveSessio
   // tablón tiene contenido y los `pointsTo` ya se han desvelado.
   abrirRonda(sesion, 15);
   for (const j of sesion.players) {
-    const sala = game.plot.clues.find((c) => c.round === 1 && c.lugarId)?.lugarId;
+    const sala = pistasDeLaTrama(game.plot).find((c) => c.round === 1 && c.lugarId)?.lugarId;
     if (sala) j.elecciones.push({ round: 1, lugarId: sala, at: ahora });
   }
   cerrarRonda(sesion);
@@ -169,8 +170,8 @@ for (let n = 0; n < RONDAS; n++) {
     ['la revelación de la cronología', MARCA_CRONOLOGIA],
     ['la ayuda de nivel 3', MARCA_AYUDA],
     ['la confesión final', MARCA_CONFESION],
-    ...plot.clues.map((c, i): [string, string] => [`la pista ${i + 1}`, c.description]),
-    ...plot.clues.map((c, i): [string, string] => [`a qué señala la pista ${i + 1}`, c.pointsTo]),
+    ...pistasDeLaTrama(plot).map((c, i): [string, string] => [`la pista ${i + 1}`, c.description]),
+    ...pistasDeLaTrama(plot).map((c, i): [string, string] => [`a qué señala la pista ${i + 1}`, c.pointsTo]),
     ...plot.timeline.map((e, i): [string, string] => [`el momento ${i + 1} de la cronología`, e.description]),
     ...ajenos.map((c): [string, string] => [`el secreto de ${c.characterName}`, c.secret ?? '']),
     ...ajenos.map((c): [string, string] => [`la coartada de ${c.characterName}`, c.alibi ?? '']),

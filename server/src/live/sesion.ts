@@ -192,7 +192,7 @@ export async function abrirSesion(game: GameSession): Promise<LiveSession> {
      */
     phase: fasesConPapel(manifiestoDe(game.settings?.juego), 'espera')[0] ?? 'lobby',
     round: 0,
-    totalRounds: game.plot ? numeroDeRondas(game.plot) : 4,
+    totalRounds: rondasDe(game),
     players: personasDe(game).map((s) => nuevoJugador(s.id, s.name, s.email)),
     respuestasEntregadas: [],
     porDondePasaron: [],
@@ -236,8 +236,28 @@ function sincronizarJugadores(sesion: LiveSession, game: GameSession): LiveSessi
     if (!previo) return nuevoJugador(s.id, s.name, s.email);
     return { ...previo, displayName: s.name, email: s.email };
   });
-  if (game.plot) sesion.totalRounds = numeroDeRondas(game.plot);
+  sesion.totalRounds = rondasDe(game);
   return sesion;
+}
+
+/**
+ * Cuántas rondas tiene una velada de esta partida.
+ *
+ * ═══ SE LE PREGUNTA AL JUEGO ANTES QUE A LA TRAMA ═══
+ *
+ * `numeroDeRondas` deduce la duración de la ronda más alta de las PISTAS, y eso
+ * es una propiedad de CLUEDO disfrazada de regla general: un juego que no use
+ * la mecánica de pistas se queda con cuatro rondas aunque su velada tenga seis.
+ * No da ningún error — el móvil enseña «5 de 4» y ya está.
+ *
+ * Así que primero se pregunta al manifiesto, que es quien lo sabe, y solo si no
+ * lo declara se deduce como se hacía. Los tres primeros juegos no lo declaran,
+ * así que su cuenta no cambia ni un byte.
+ */
+function rondasDe(game: GameSession): number {
+  const declaradas = manifiestoDe(game.settings?.juego).ronda?.cuantas;
+  if (declaradas !== undefined && declaradas > 0) return declaradas;
+  return game.plot ? numeroDeRondas(game.plot) : 4;
 }
 
 /**

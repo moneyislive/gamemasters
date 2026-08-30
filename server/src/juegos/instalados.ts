@@ -157,6 +157,25 @@ import '../docs/imprimibles/sombras/dosierEscolta';
 import '../docs/imprimibles/sombras/registro';
 
 /*
+ * ═══ EL NUDO DE VALDEHIERRO ═══
+ *
+ * Ocho lineas, y ninguna es opcional. Este juego no tiene NINGUNA importacion
+ * accidental que lo salve: no comparte fichero con nadie y su generacion no la
+ * importa ningun imprimible de otro. Si falta cualquiera de las ocho, el
+ * servidor arranca perfectamente, el taller pinta el juego entero y falla en la
+ * primera partida de verdad — con «esta partida todavia no sabe hacer eso», con
+ * el boton de generar muerto, o con el ZIP sin un solo documento.
+ */
+import '../plot/nudo-generacion';
+import '../agent/nudo-jefe';
+import './nudo-acciones';
+import './nudo-proyeccion';
+import './nudo-amanecer';
+import './nudo-trama';
+import '../docs/imprimibles/nudo/dosierFerroviario';
+import '../docs/imprimibles/nudo/registro';
+
+/*
  * ═══ Y AHORA SE ELIGE CUALES QUEDAN INSTALADOS ═══
  *
  * Todo lo de arriba da de alta lo que este binario SABE hacer. Lo que este

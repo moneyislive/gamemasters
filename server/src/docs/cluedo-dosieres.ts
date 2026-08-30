@@ -38,6 +38,8 @@ import type {
   TimelineEvent,
   Weapon,
 } from '../../../shared/types';
+import type { PlotClue } from '../../../shared/mecanicas/pistas';
+import { pistasDeLaTrama } from '../../../shared/mecanicas/pistas';
 
 // ---------------------------------------------------------------------------
 // Bloques reutilizables
@@ -446,8 +448,8 @@ function dosierGameMaster(opciones: DocumentRenderOptions, game: GameSession, pl
     3: 'Ronda 3 · Horarios, trayectos y contradicciones',
     4: 'Ronda 4 · Evidencias decisivas',
   };
-  const porRonda = new Map<number, typeof plot.clues>();
-  for (const pista of plot.clues) {
+  const porRonda = new Map<number, PlotClue[]>();
+  for (const pista of pistasDeLaTrama(plot)) {
     const ronda = Number.isInteger(pista.round) && pista.round >= 1 && pista.round <= 4 ? pista.round : 1;
     porRonda.set(ronda, [...(porRonda.get(ronda) ?? []), pista]);
   }
@@ -457,7 +459,7 @@ function dosierGameMaster(opciones: DocumentRenderOptions, game: GameSession, pl
   const ciego = !vistaGm(game).revelaPistas;
 
   const pistas =
-    plot.clues.length > 0
+    pistasDeLaTrama(plot).length > 0
       ? `<section>
           <h2>Las pistas, ronda a ronda</h2>
           <p><em>Prepara un sobre por ronda. No pongas todas las pruebas sobre la mesa desde el principio: las de la ronda 4 cierran el caso.${ciego ? ' Como juegas a ciegas, no se indica qué señala cada una: repártelas sin leerlas más de lo necesario.' : ''}</em></p>

@@ -13,6 +13,7 @@
 import type { GameSession } from './types';
 import { CLUEDO, ejes as ejesDe, entidadesDe, lugaresDe, manifiestoSiExiste, personasDe } from './juegos';
 import type { EjeId } from './juegos';
+import { pistasDeLaTrama } from './mecanicas/pistas';
 
 export interface StalenessReport {
   /** ¿Hay algo desincronizado? Falso también si aún no se ha generado nada. */
@@ -160,7 +161,7 @@ export function computeStaleness(game: GameSession): StalenessReport {
     })
     .map((eje) => eje.id);
 
-  const brokenClues = plot.clues.filter(
+  const brokenClues = pistasDeLaTrama(plot).filter(
     (pista) => pista.lugarId !== undefined && !idsSalas.has(pista.lugarId),
   ).length;
 

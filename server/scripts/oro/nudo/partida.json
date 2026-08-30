@@ -1,0 +1,340 @@
+{
+  "id": "oro-nudo",
+  "name": "Nudo de referencia",
+  "status": "ready",
+  "createdAt": "2027-01-14T22:00:00.000Z",
+  "updatedAt": "2027-01-14T22:00:00.000Z",
+  "entidades": {
+    "ferroviarios": [
+      {
+        "id": "f0",
+        "name": "Ana",
+        "description": "Del turno de noche, 1.º de la lista.",
+        "email": "ana@ejemplo.es"
+      },
+      {
+        "id": "f1",
+        "name": "Bruno",
+        "description": "Del turno de noche, 2.º de la lista.",
+        "email": "bruno@ejemplo.es"
+      },
+      {
+        "id": "f2",
+        "name": "Carla",
+        "description": "Del turno de noche, 3.º de la lista.",
+        "email": "carla@ejemplo.es"
+      },
+      {
+        "id": "f3",
+        "name": "Dani",
+        "description": "Del turno de noche, 4.º de la lista.",
+        "email": "dani@ejemplo.es"
+      }
+    ],
+    "convoyes": [
+      {
+        "id": "c0",
+        "name": "El Correo de Medianoche",
+        "description": "Descripcion de El Correo de Medianoche."
+      },
+      {
+        "id": "c1",
+        "name": "El mixto de Penarroya",
+        "description": "Descripcion de El mixto de Penarroya."
+      },
+      {
+        "id": "c2",
+        "name": "El carbonero de la Cuenca",
+        "description": "Descripcion de El carbonero de la Cuenca."
+      },
+      {
+        "id": "c3",
+        "name": "El expreso de la frontera",
+        "description": "Descripcion de El expreso de la frontera."
+      },
+      {
+        "id": "c4",
+        "name": "El tren de obras del 84",
+        "description": "Descripcion de El tren de obras del 84."
+      },
+      {
+        "id": "c5",
+        "name": "El ganadero de Villaseca",
+        "description": "Descripcion de El ganadero de Villaseca."
+      }
+    ],
+    "puestos": [
+      {
+        "id": "p0",
+        "name": "La garita del kilometro 83",
+        "description": "Descripcion de La garita del kilometro 83."
+      },
+      {
+        "id": "p1",
+        "name": "El cuarto del telegrafo",
+        "description": "Descripcion de El cuarto del telegrafo."
+      },
+      {
+        "id": "p2",
+        "name": "El muelle cubierto",
+        "description": "Descripcion de El muelle cubierto."
+      },
+      {
+        "id": "p3",
+        "name": "La sala de aparatos",
+        "description": "Descripcion de La sala de aparatos."
+      }
+    ],
+    "mercancias": [
+      {
+        "id": "m0",
+        "name": "El suero antidifterico"
+      },
+      {
+        "id": "m1",
+        "name": "Hulla de la Cuenca"
+      },
+      {
+        "id": "m2",
+        "name": "Reses para el matadero"
+      }
+    ]
+  },
+  "boardMode": "generated",
+  "settings": {
+    "language": "es",
+    "juego": "nudo"
+  },
+  "plot": {
+    "title": "El Nudo de Valdehierro",
+    "tagline": "Seis convoyes, seis franjas y una sola noche para rehacer el cuadro.",
+    "synopsis": "Madrugada del 14 de enero de 1927. Ardió la oficina del telégrafo de Valdehierro y con ella el cuadro de marchas de esta noche. Seis convoyes vienen rodando hacia el nudo y no hay forma de avisarles. Uno de ellos, El Correo de Medianoche, lleva el suero para el valle. El turno de noche tiene que rehacer el cuadro con las tiras que cada cual salvó del fuego y sacar los seis antes de que el puerto se cierre.",
+    "setting": "La estación de Valdehierro, donde se cruzan cinco líneas, en una noche de nieve. Cada habitación de la casa es un puesto con su instrumento, y hay que ir hasta allí de verdad.",
+    "solution": {
+      "respuestas": {
+        "franja-1": "c3",
+        "franja-2": "c0",
+        "franja-3": "c4",
+        "franja-4": "c1",
+        "franja-5": "c2",
+        "franja-6": "c5"
+      }
+    },
+    "characters": [
+      {
+        "participanteId": "f0",
+        "characterName": "Ana Aramburu",
+        "role": "telegrafista",
+        "publicPersona": "Lleva el turno de noche en cuarto del telégrafo, que esta noche está en La sala de aparatos. No ha vuelto a subirse a una máquina desde lo del kilómetro 84.",
+        "secret": "Guardas una copia del cuadro de la semana pasada. No sirve de nada esta noche, y lo sabes.",
+        "personalHook": "Tu maña es «Línea directa»: Una vez en toda la noche: tu siguiente consulta al archivo sale gratis. Salvaste 2 tiras del telégrafo.",
+        "knowledge": [
+          "EL MIXTO DE PENARROYA NO PUEDE OCUPAR LA FRANJA DE LAS 03:20 STOP VIA TOMADA POR MANIOBRAS",
+          "EL CORREO DE MEDIANOCHE HA DE HABER SALIDO ANTES QUE EL CARBONERO DE LA CUENCA STOP"
+        ]
+      },
+      {
+        "participanteId": "f1",
+        "characterName": "Bruno Ferrer",
+        "role": "guardagujas",
+        "publicPersona": "Lleva el turno de noche en garita de agujas, que esta noche está en El muelle cubierto. Está convencida de que la estufa del cuarto de aparatos es una desgracia esperando.",
+        "secret": "Falsificaste una firma en un parte hace seis años y aún sueñas con ello.",
+        "personalHook": "Tu maña es «Cambio de aguja»: Una vez en toda la noche: la siguiente orden que te rechacen a TI no cuenta retraso. Dilo en voz alta antes de cursarla. Salvaste 2 tiras del telégrafo.",
+        "knowledge": [
+          "EL CORREO DE MEDIANOCHE HA DE HABER SALIDO ANTES QUE EL TREN DE OBRAS DEL 84 STOP",
+          "EL MIXTO DE PENARROYA Y EL GANADERO DE VILLASECA NO PUEDEN SALIR EN FRANJAS SEGUIDAS STOP SE CRUZARIAN EN EL APARTADERO"
+        ]
+      },
+      {
+        "participanteId": "f2",
+        "characterName": "Carla Escobedo",
+        "role": "factor de circulación",
+        "publicPersona": "Lleva el turno de noche en cuadro de enclavamiento, que esta noche está en El cuarto del telegrafo. Le debe dinero a alguien de este turno y no lo ha dicho.",
+        "secret": "La noche que ardió el telégrafo estabas fuera fumando y no lo has dicho.",
+        "personalHook": "Tu maña es «Llave maestra»: Una vez en toda la noche: cursas una orden sin gastar conformidad. Sirve cuando la estación se ha quedado sin ninguna. Salvaste 2 tiras del telégrafo.",
+        "knowledge": [
+          "ENTRE EL MIXTO DE PENARROYA Y EL EXPRESO DE LA FRONTERA HAN DE MEDIAR AL MENOS 2 FRANJAS STOP ORDEN DE LA JEFATURA",
+          "EL CARBONERO DE LA CUENCA Y EL GANADERO DE VILLASECA SALEN LOS DOS ANTES DEL RELEVO O LOS DOS DESPUES STOP EL RELEVO ES ENTRE LA TERCERA FRANJA Y LA CUARTA"
+        ]
+      },
+      {
+        "participanteId": "f3",
+        "characterName": "Dani Cifuentes",
+        "role": "jefe de carga",
+        "publicPersona": "Lleva el turno de noche en muelle de carga, que esta noche está en La garita del kilometro 83. Aprendió el oficio en la línea del norte y aquí todavía la miran como a una forastera.",
+        "secret": "Le prometiste al jefe de la línea que este mes no habría un solo parte de retraso.",
+        "personalHook": "Tu maña es «Doble turno»: Una vez en toda la noche: ganas tres de margen de golpe. Salvaste una tira del telégrafo.",
+        "knowledge": [
+          "EL CORREO DE MEDIANOCHE Y EL EXPRESO DE LA FRONTERA SALEN EN FRANJAS SEGUIDAS EN EL ORDEN QUE SEA STOP MISMA MAQUINA DE MANIOBRAS PARA LOS DOS"
+        ]
+      }
+    ],
+    "timeline": [
+      {
+        "time": "21:40",
+        "description": "Se declara el incendio en la oficina del telégrafo. Arde el cuadro de marchas de la noche.",
+        "participanteIds": [],
+        "isPublic": true
+      },
+      {
+        "time": "22:15",
+        "description": "Se apaga el fuego. Del cuadro no queda nada; de las tiras del telégrafo, lo que cada cual llevaba encima.",
+        "participanteIds": [
+          "f0",
+          "f1",
+          "f2",
+          "f3"
+        ],
+        "isPublic": true
+      },
+      {
+        "time": "23:20",
+        "description": "Entra el turno de noche. Son 4 y la estación tiene 4 puestos abiertos.",
+        "participanteIds": [
+          "f0",
+          "f1",
+          "f2",
+          "f3"
+        ],
+        "isPublic": true
+      },
+      {
+        "time": "23:50",
+        "description": "Los seis convoyes están rodando y no se les puede avisar. El primero pide vía a las 00:00.",
+        "participanteIds": [],
+        "isPublic": true
+      }
+    ],
+    "gmScript": [
+      "ACTO 1 · Se lee el parte de la primera franja y se abre. La mesa todavía no ha juntado las tiras: espera a que alguien lo proponga, no lo propongas tú.",
+      "ACTO 2 · A partir de la segunda franja, empuja a que cada cual lea SU tira en voz alta. Es donde se resuelve el cuadro.",
+      "ACTO 3 · Cuando lleven tres convoyes fuera, recuérdales el retraso que llevan y lo que cuesta el tope. Ahí es donde se decide si consultan el archivo.",
+      "ACTO 4 · Última franja: si falta más de un convoy, avisa de que se van a quedar en la vía. Que la decisión sea suya.",
+      "CIERRE · Abre el cuadro final, deja que cada cual entregue el suyo y luego da el parte del amanecer."
+    ],
+    "delJuego": {
+      "cuadro": [
+        "c3",
+        "c0",
+        "c4",
+        "c1",
+        "c2",
+        "c5"
+      ],
+      "telegramas": [
+        {
+          "id": "t1",
+          "telegrama": {
+            "tipo": "antes",
+            "antes": "c0",
+            "despues": "c4"
+          },
+          "texto": "EL CORREO DE MEDIANOCHE HA DE HABER SALIDO ANTES QUE EL TREN DE OBRAS DEL 84 STOP"
+        },
+        {
+          "id": "t2",
+          "telegrama": {
+            "tipo": "separados",
+            "a": "c1",
+            "b": "c3",
+            "franjas": 3
+          },
+          "texto": "ENTRE EL MIXTO DE PENARROYA Y EL EXPRESO DE LA FRONTERA HAN DE MEDIAR AL MENOS 2 FRANJAS STOP ORDEN DE LA JEFATURA"
+        },
+        {
+          "id": "t3",
+          "telegrama": {
+            "tipo": "bloque",
+            "a": "c2",
+            "b": "c5"
+          },
+          "texto": "EL CARBONERO DE LA CUENCA Y EL GANADERO DE VILLASECA SALEN LOS DOS ANTES DEL RELEVO O LOS DOS DESPUES STOP EL RELEVO ES ENTRE LA TERCERA FRANJA Y LA CUARTA"
+        },
+        {
+          "id": "t4",
+          "telegrama": {
+            "tipo": "no-franja",
+            "convoy": "c1",
+            "franja": 6
+          },
+          "texto": "EL MIXTO DE PENARROYA NO PUEDE OCUPAR LA FRANJA DE LAS 03:20 STOP VIA TOMADA POR MANIOBRAS"
+        },
+        {
+          "id": "t5",
+          "telegrama": {
+            "tipo": "seguidos",
+            "a": "c0",
+            "b": "c3"
+          },
+          "texto": "EL CORREO DE MEDIANOCHE Y EL EXPRESO DE LA FRONTERA SALEN EN FRANJAS SEGUIDAS EN EL ORDEN QUE SEA STOP MISMA MAQUINA DE MANIOBRAS PARA LOS DOS"
+        },
+        {
+          "id": "t6",
+          "telegrama": {
+            "tipo": "antes",
+            "antes": "c0",
+            "despues": "c2"
+          },
+          "texto": "EL CORREO DE MEDIANOCHE HA DE HABER SALIDO ANTES QUE EL CARBONERO DE LA CUENCA STOP"
+        },
+        {
+          "id": "t7",
+          "telegrama": {
+            "tipo": "no-seguidos",
+            "a": "c1",
+            "b": "c5"
+          },
+          "texto": "EL MIXTO DE PENARROYA Y EL GANADERO DE VILLASECA NO PUEDEN SALIR EN FRANJAS SEGUIDAS STOP SE CRUZARIAN EN EL APARTADERO"
+        }
+      ],
+      "reparto": {
+        "f0": [
+          "t4",
+          "t6"
+        ],
+        "f1": [
+          "t1",
+          "t7"
+        ],
+        "f2": [
+          "t2",
+          "t3"
+        ],
+        "f3": [
+          "t5"
+        ]
+      },
+      "correo": "c0",
+      "oficioDePuesto": {
+        "p2": "agujas",
+        "p3": "telegrafo",
+        "p1": "enclavamiento",
+        "p0": "muelle"
+      },
+      "oficioDePersona": {
+        "f1": "agujas",
+        "f0": "telegrafo",
+        "f2": "enclavamiento",
+        "f3": "muelle"
+      },
+      "cargaDeConvoy": {
+        "c0": "m0",
+        "c1": "m1",
+        "c2": "m2",
+        "c3": "m1",
+        "c4": "m2",
+        "c5": "m1"
+      },
+      "partes": [
+        "La nieve ha llegado a la altura del andén y el hilo con la capital va y viene. Entra el turno.",
+        "Sin novedad en la línea. La estufa del cuarto de aparatos sigue sin tirar. Quedan 5 franjas.",
+        "Sin novedad en la línea. La estufa del cuarto de aparatos sigue sin tirar. Quedan 4 franjas.",
+        "Sin novedad en la línea. La estufa del cuarto de aparatos sigue sin tirar. Quedan 3 franjas.",
+        "Sin novedad en la línea. La estufa del cuarto de aparatos sigue sin tirar. Quedan 2 franjas.",
+        "Empieza a clarear por el lado de la sierra. Es la última franja de la noche."
+      ],
+      "franjas": 6,
+      "retrasoMaximo": 10
+    }
+  }
+}

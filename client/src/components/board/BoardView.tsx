@@ -50,6 +50,28 @@ const EMBLEMAS: Record<string, (cx: number, cy: number) => JSX.Element> = {
       <path d={`M${cx - 15} ${cy + 9} h30`} />
     </g>
   ),
+  /*
+   * El aspa de San Andrés sobre la vía: la chapa que hay clavada en todo paso a
+   * nivel de España desde antes de 1927.
+   *
+   * NO ES UNA LOCOMOTORA, y no por falta de ganas: a este tamaño una máquina son
+   * catorce trazos que se leen como una mancha, y el bloque central del plano
+   * lleva debajo el rótulo «EL NUDO» a veinte píxeles. El aspa se reconoce de
+   * lejos, se distingue de la lupa y del anj de un vistazo —una cruz, un círculo
+   * y una llave son tres siluetas distintas— y es el mismo signo que usa el
+   * trofeo «El Correo pasó», así que las dos cosas se apoyan.
+   *
+   * Los dos carriles van DETRÁS y en fino: sin ellos el aspa es una equis
+   * cualquiera; con ellos es un cruce, que es literalmente de lo que va el juego.
+   */
+  nudo: (cx, cy) => (
+    <g fill="none" stroke="var(--gold-300)" strokeLinecap="round">
+      <path d={`M${cx - 26} ${cy - 5} h52`} strokeWidth="1.4" opacity="0.55" />
+      <path d={`M${cx - 26} ${cy + 5} h52`} strokeWidth="1.4" opacity="0.55" />
+      <path d={`M${cx - 17} ${cy - 17} L${cx + 17} ${cy + 17}`} strokeWidth="3.6" />
+      <path d={`M${cx + 17} ${cy - 17} L${cx - 17} ${cy + 17}`} strokeWidth="3.6" />
+    </g>
+  ),
 };
 
 function emblema(juego: string | undefined, cx: number, cy: number): JSX.Element {

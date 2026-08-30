@@ -42,6 +42,10 @@ const PANTALLAS: Record<PantallaDeApp, true> = {
   // binario y solo se pintan donde el manifiesto las pide.
   camino: true,
   consejo: true,
+  // Y las dos de El Nudo de Valdehierro, con la misma regla. `puesto` es la
+  // primera pantalla de la app que lleva dentro un minijuego.
+  cuadro: true,
+  puesto: true,
 };
 
 export default function DisposicionJuego(): JSX.Element {

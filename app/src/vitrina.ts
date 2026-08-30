@@ -81,6 +81,23 @@ export const PALETAS = {
    * donde no puede pasar.
    */
   acero: { acento: '#a8bcd6', fondo: ['#16223a', '#05070d'] },
+  /*
+   * La de El Nudo de Valdehierro, y hace falta una nueva por el mismo motivo por
+   * el que hizo falta `acero`: ninguna de las seis de arriba deja la tarjeta como
+   * es el juego.
+   *
+   * `acero` era la tentación —también es una noche fría— y es justo la que no
+   * puede ser: es la de El Paso de las Sombras, y ponerla aquí volvería a
+   * confundir dos veladas en la portada, que es lo que aquel comentario existe
+   * para impedir. `brasa` acierta el acento y falla el fondo: su degradado es
+   * marrón cálido, o sea una taberna, y esto es una estación nevada.
+   *
+   * Lo propio de este juego es precisamente la MEZCLA que ninguna otra tiene:
+   * ámbar de bombilla sobre azul de hulla. El acento es `oro400` de
+   * `tema-nudo.ts` y el fondo son dos paradas de `FONDO_NUDO`, así que la
+   * tarjeta de la portada y la app que se abre desde ella son del mismo color.
+   */
+  hulla: { acento: '#d9a648', fondo: ['#131a24', '#05070b'] },
 } as const satisfies Record<string, Paleta>;
 
 /**
@@ -118,6 +135,23 @@ const RETRATOS: Record<string, { genero: string; gente: string; duracion: string
     duracion: 'Una noche',
     icono: 'torii',
     paleta: PALETAS.acero,
+  },
+  /*
+   * El Nudo de Valdehierro. El mínimo de cuatro sale de su manifiesto —cuatro
+   * oficios, uno por persona, y con menos hay un instrumento de la estación que
+   * no maneja nadie— y el tope de doce, de su diseño, que es donde se cuenta el
+   * reparto de telegramas.
+   *
+   * `locomotora` y no `aguja` porque la aguja ya trabaja de icono de pestaña en
+   * la barra del juego, y aquí se pide el emblema de la velada entera. Es la
+   * misma elección que hizo El Paso de las Sombras con `torii`.
+   */
+  nudo: {
+    genero: 'Lógica y cooperación',
+    gente: '4 a 12',
+    duracion: 'Una noche',
+    icono: 'locomotora',
+    paleta: PALETAS.hulla,
   },
 };
 

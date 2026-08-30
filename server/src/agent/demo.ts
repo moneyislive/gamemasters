@@ -128,6 +128,32 @@ function quitarColaDeRol(captura: string): string {
   return captura.replace(COLA_ROL, '').trim();
 }
 
+/**
+ * El panel del taller que corresponde a una categoria de ESTE juego.
+ *
+ * ═══ AQUI HABIA TRES CADENAS ESCRITAS A MANO ═══
+ *
+ *     panel: 'suspects'   panel: 'rooms'   panel: 'weapons'
+ *
+ * Eran los ids de las pestañas de CLUEDO, y funcionaban porque el taller los
+ * TRADUCIA: buscaba que categoria de este juego vivia en ese almacen heredado y
+ * abria la suya. Esa traduccion se quito cuando el `enum` de las herramientas
+ * paso a salir del manifiesto, y con ella estas tres cadenas dejaron de señalar
+ * a ninguna parte —sin error: la pantalla se queda quieta, que es el sintoma
+ * mas inutil que hay.
+ *
+ * Ahora el panel ES el id de la categoria, que es lo que el taller usa de
+ * pestaña. Devuelve `undefined` si el juego no tiene esa clase de categoria, y
+ * entonces no se realza nada, que es lo correcto.
+ */
+function panelDe(game: GameSession, clase: 'gente' | 'lugares' | 'cosas'): HighlightTarget | undefined {
+  const cats = manifiestoDe(game.settings?.juego).categorias;
+  if (clase === 'gente') return cats.find((c) => c.sonJugadores)?.id;
+  if (clase === 'lugares') return cats.find((c) => c.sonLugares)?.id;
+  return cats.find((c) => !c.sonJugadores && !c.sonLugares)?.id;
+}
+
+
 interface ResultadoDemo {
   partida: GameSession;
   hechos: string[];
@@ -192,7 +218,7 @@ async function anadirSospechosos(
     );
   }
 
-  return { partida: actual, hechos, panel: 'suspects' };
+  return { partida: actual, hechos, panel: panelDe(actual, 'gente') };
 }
 
 /** Añade las salas detectadas por palabra clave en el texto. */
@@ -241,7 +267,7 @@ async function anadirSalas(partida: GameSession, texto: string): Promise<Resulta
     );
   }
 
-  return { partida: actual, hechos, panel: 'rooms' };
+  return { partida: actual, hechos, panel: panelDe(actual, 'lugares') };
 }
 
 /** Añade las armas dictadas tras la palabra «arma(s)». */
@@ -291,7 +317,7 @@ async function anadirArmas(partida: GameSession, captura: string): Promise<Resul
     );
   }
 
-  return { partida: actual, hechos, panel: 'weapons' };
+  return { partida: actual, hechos, panel: panelDe(actual, 'cosas') };
 }
 
 /**
@@ -426,7 +452,7 @@ export async function runDemoChat(
       );
     } else {
       frases.push(`Todavía no puedo, mi señor. ${result.replace(/^No se puede generar todavía\.\s*/, '')}`);
-      panel = 'suspects';
+      panel = panelDe(partida, 'gente');
     }
   } else if (arma?.[1]) {
     const resultado = await anadirArmas(partida, arma[1]);

@@ -16,14 +16,7 @@
  * Se ha ido a `cluedo-ampliacion.ts`. Aqui queda el procedimiento: mirar que
  * esta desincronizado, rehacer el plano, podar, preguntarle al juego, guardar.
  */
-import type {
-  GameSession,
-  GenerateStreamEvent,
-  Plot,
-  PlotCharacter,
-  PlotClue,
-  TimelineEvent,
-} from '../../../shared/types';
+import type { GameSession, GenerateStreamEvent, Plot, PlotCharacter, TimelineEvent } from '../../../shared/types';
 import { esElSenalado, lugaresDe, manifiestoDe, manifiestoSiExiste, personasDe } from '../../../shared/juegos';
 import type { StalenessReport } from '../../../shared/staleness';
 import { computeStaleness } from '../../../shared/staleness';
@@ -42,6 +35,7 @@ import { renderDocumentIndex } from '../docs/renderer';
  * contrato que comparten los tres generadores y los tres ampliadores.
  */
 import type { Emitir } from './pipeline';
+import { pistasParaEscribir } from '../../../shared/mecanicas/pistas';
 
 // ---------------------------------------------------------------------------
 // Entrada principal
@@ -221,10 +215,14 @@ function podarTrama(plot: Plot, game: GameSession): void {
     idsSospechosos.has(personaje.participanteId),
   );
 
-  // Pistas escondidas en salas que ya no existen (las que no citan sala se conservan).
-  plot.clues = plot.clues.filter(
-    (pista) => pista.lugarId === undefined || idsSalas.has(pista.lugarId),
-  );
+  /*
+   * Pistas escondidas en lugares que ya no existen. Las que no citan lugar se
+   * conservan. Un juego que no use la mecánica no tiene ninguna y esto no hace
+   * nada, que es la diferencia con leer `plot.clues` a pelo.
+   */
+  const pistas = pistasParaEscribir(plot);
+  const quedan = pistas.filter((pista) => pista.lugarId === undefined || idsSalas.has(pista.lugarId));
+  pistas.splice(0, pistas.length, ...quedan);
 
   // Cronología: se quitan los ids inexistentes; el evento solo se elimina si se
   // queda sin nadie Y además su descripción hablaba de alguien que ya no juega.

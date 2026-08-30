@@ -13,6 +13,7 @@ import { renderPlayerDocument } from '../../renderer';
 import { envolver, portada } from '../comun';
 import type { DocumentRenderOptions, GameSession, Plot } from '../../../../../shared/types';
 import { culpableDe, lugarDe, objetoDe, objetosDe, salasDe, sospechososDe } from '../../../juegos/cluedo';
+import { pistasDeLaTrama } from '../../../../../shared/mecanicas/pistas';
 
 interface Comprobacion {
   titulo: string;
@@ -71,7 +72,7 @@ export function informeValidacion(
   const idsSospechosos = new Set(sospechososDe(game).map((s) => s.id));
 
   const salasSinPista = salasDe(game).filter(
-    (sala) => !plot.clues.some((pista) => pista.lugarId === sala.id),
+    (sala) => !pistasDeLaTrama(plot).some((pista) => pista.lugarId === sala.id),
   );
   const sinPersonaje = sospechososDe(game).filter(
     (s) => !plot.characters.some((c) => c.participanteId === s.id),
@@ -160,7 +161,7 @@ export function informeValidacion(
         <tr><td>Salas</td><td>${salasDe(game).length}</td></tr>
         <tr><td>Objetos</td><td>${objetosDe(game).length}</td></tr>
         <tr><td>Rondas</td><td>${rondas}</td></tr>
-        <tr><td>Pistas</td><td>${plot.clues.length}</td></tr>
+        <tr><td>Pistas</td><td>${pistasDeLaTrama(plot).length}</td></tr>
         <tr><td>Sobres que hay que rotular</td><td>${sobres.length}</td></tr>
       </tbody>
     </table>`;

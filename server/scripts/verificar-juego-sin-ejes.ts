@@ -202,7 +202,6 @@ const plot: Plot = {
     },
   ],
   timeline: [],
-  clues: [],
   gmScript: [],
 };
 game.plot = plot;

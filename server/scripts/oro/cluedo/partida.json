@@ -314,120 +314,6 @@
         ]
       }
     ],
-    "clues": [
-      {
-        "id": "pista-1-a",
-        "description": "Un pañuelo bordado con una inicial, abandonado con demasiada intención como para ser un descuido.",
-        "pointsTo": "Parece incriminar a Ana… quizá demasiado claramente. Pista falsa.",
-        "round": 1,
-        "lugarId": "r0"
-      },
-      {
-        "id": "pista-1-b",
-        "description": "Un reloj de sobremesa parado a las 21:43. Nadie recuerda haberlo tocado.",
-        "pointsTo": "Sitúa a alguien moviéndose por la casa durante el apagón. Encaja con la coartada rota de Dani.",
-        "round": 2,
-        "lugarId": "r0"
-      },
-      {
-        "id": "pista-2-a",
-        "description": "Una copa a medio beber con una huella de carmín (o de dedos nerviosos) en el borde.",
-        "pointsTo": "Parece incriminar a Bruno… quizá demasiado claramente. Pista falsa.",
-        "round": 1,
-        "lugarId": "r1"
-      },
-      {
-        "id": "pista-2-b",
-        "description": "Una cerilla consumida hasta el final, de las que se usan para alumbrarse a oscuras.",
-        "pointsTo": "Sitúa a alguien moviéndose por la casa durante el apagón. Encaja con la coartada rota de Dani.",
-        "round": 3,
-        "lugarId": "r1"
-      },
-      {
-        "id": "pista-3-a",
-        "description": "Una alfombra ligeramente torcida y una mancha reciente que alguien limpió con más prisa que acierto.",
-        "pointsTo": "Señala esta sala como la verdadera escena del crimen.",
-        "round": 4,
-        "lugarId": "r2"
-      },
-      {
-        "id": "pista-3-b",
-        "description": "Una marca del tamaño y forma de abrecartas en el polvo de una repisa: algo estuvo ahí hasta esta misma noche.",
-        "pointsTo": "Señala Abrecartas como el arma del crimen.",
-        "round": 4,
-        "lugarId": "r2"
-      },
-      {
-        "id": "pista-4-a",
-        "description": "Una cortina descolgada de un tirón, como si alguien se hubiera escondido tras ella.",
-        "pointsTo": "Parece incriminar a Elena… quizá demasiado claramente. Pista falsa.",
-        "round": 1,
-        "lugarId": "r3"
-      },
-      {
-        "id": "pista-4-b",
-        "description": "Barro fresco junto a la ventana: alguien entró o salió por donde no debía.",
-        "pointsTo": "Sitúa a alguien moviéndose por la casa durante el apagón. Encaja con la coartada rota de Dani.",
-        "round": 3,
-        "lugarId": "r3"
-      },
-      {
-        "id": "pista-5-a",
-        "description": "Un pañuelo bordado con una inicial, abandonado con demasiada intención como para ser un descuido.",
-        "pointsTo": "Parece incriminar a Fabio… quizá demasiado claramente. Pista falsa.",
-        "round": 1,
-        "lugarId": "r4"
-      },
-      {
-        "id": "pista-5-b",
-        "description": "Un reloj de sobremesa parado a las 21:43. Nadie recuerda haberlo tocado.",
-        "pointsTo": "Sitúa a alguien moviéndose por la casa durante el apagón. Encaja con la coartada rota de Dani.",
-        "round": 2,
-        "lugarId": "r4"
-      },
-      {
-        "id": "pista-6-a",
-        "description": "Una copa a medio beber con una huella de carmín (o de dedos nerviosos) en el borde.",
-        "pointsTo": "Parece incriminar a Gema… quizá demasiado claramente. Pista falsa.",
-        "round": 1,
-        "lugarId": "r5"
-      },
-      {
-        "id": "pista-6-b",
-        "description": "Una cerilla consumida hasta el final, de las que se usan para alumbrarse a oscuras.",
-        "pointsTo": "Sitúa a alguien moviéndose por la casa durante el apagón. Encaja con la coartada rota de Dani.",
-        "round": 3,
-        "lugarId": "r5"
-      },
-      {
-        "id": "pista-7-a",
-        "description": "Un papel arrugado en la papelera: media frase tachada que habla de \"saldar esto esta noche\".",
-        "pointsTo": "Parece incriminar a Hugo… quizá demasiado claramente. Pista falsa.",
-        "round": 1,
-        "lugarId": "r6"
-      },
-      {
-        "id": "pista-7-b",
-        "description": "El cajón del escritorio forzado; dentro, solo el hueco de lo que alguien se llevó.",
-        "pointsTo": "Sitúa a alguien moviéndose por la casa durante el apagón. Encaja con la coartada rota de Dani.",
-        "round": 2,
-        "lugarId": "r6"
-      },
-      {
-        "id": "pista-8-a",
-        "description": "Una cortina descolgada de un tirón, como si alguien se hubiera escondido tras ella.",
-        "pointsTo": "Parece incriminar a Ana… quizá demasiado claramente. Pista falsa.",
-        "round": 1,
-        "lugarId": "r7"
-      },
-      {
-        "id": "pista-8-b",
-        "description": "Barro fresco junto a la ventana: alguien entró o salió por donde no debía.",
-        "pointsTo": "Sitúa a alguien moviéndose por la casa durante el apagón. Encaja con la coartada rota de Dani.",
-        "round": 3,
-        "lugarId": "r7"
-      }
-    ],
     "gmScript": [
       "Antes de que lleguen los invitados, reparte o memoriza las pistas de cada sala (las tienes listadas en tu dosier) y decide cuáles esconderás físicamente.",
       "Recibe a cada invitado por separado, entrégale su dosier confidencial y dale unos minutos para leerlo a solas. Nadie debe enseñar su dosier a nadie.",
@@ -523,6 +409,122 @@
         "confession": "La confesión, en primera persona.",
         "epilogue": "El epílogo de la velada."
       }
+    },
+    "mecanicas": {
+      "pistas": [
+        {
+          "id": "pista-1-a",
+          "description": "Un pañuelo bordado con una inicial, abandonado con demasiada intención como para ser un descuido.",
+          "pointsTo": "Parece incriminar a Ana… quizá demasiado claramente. Pista falsa.",
+          "round": 1,
+          "lugarId": "r0"
+        },
+        {
+          "id": "pista-1-b",
+          "description": "Un reloj de sobremesa parado a las 21:43. Nadie recuerda haberlo tocado.",
+          "pointsTo": "Sitúa a alguien moviéndose por la casa durante el apagón. Encaja con la coartada rota de Dani.",
+          "round": 2,
+          "lugarId": "r0"
+        },
+        {
+          "id": "pista-2-a",
+          "description": "Una copa a medio beber con una huella de carmín (o de dedos nerviosos) en el borde.",
+          "pointsTo": "Parece incriminar a Bruno… quizá demasiado claramente. Pista falsa.",
+          "round": 1,
+          "lugarId": "r1"
+        },
+        {
+          "id": "pista-2-b",
+          "description": "Una cerilla consumida hasta el final, de las que se usan para alumbrarse a oscuras.",
+          "pointsTo": "Sitúa a alguien moviéndose por la casa durante el apagón. Encaja con la coartada rota de Dani.",
+          "round": 3,
+          "lugarId": "r1"
+        },
+        {
+          "id": "pista-3-a",
+          "description": "Una alfombra ligeramente torcida y una mancha reciente que alguien limpió con más prisa que acierto.",
+          "pointsTo": "Señala esta sala como la verdadera escena del crimen.",
+          "round": 4,
+          "lugarId": "r2"
+        },
+        {
+          "id": "pista-3-b",
+          "description": "Una marca del tamaño y forma de abrecartas en el polvo de una repisa: algo estuvo ahí hasta esta misma noche.",
+          "pointsTo": "Señala Abrecartas como el arma del crimen.",
+          "round": 4,
+          "lugarId": "r2"
+        },
+        {
+          "id": "pista-4-a",
+          "description": "Una cortina descolgada de un tirón, como si alguien se hubiera escondido tras ella.",
+          "pointsTo": "Parece incriminar a Elena… quizá demasiado claramente. Pista falsa.",
+          "round": 1,
+          "lugarId": "r3"
+        },
+        {
+          "id": "pista-4-b",
+          "description": "Barro fresco junto a la ventana: alguien entró o salió por donde no debía.",
+          "pointsTo": "Sitúa a alguien moviéndose por la casa durante el apagón. Encaja con la coartada rota de Dani.",
+          "round": 3,
+          "lugarId": "r3"
+        },
+        {
+          "id": "pista-5-a",
+          "description": "Un pañuelo bordado con una inicial, abandonado con demasiada intención como para ser un descuido.",
+          "pointsTo": "Parece incriminar a Fabio… quizá demasiado claramente. Pista falsa.",
+          "round": 1,
+          "lugarId": "r4"
+        },
+        {
+          "id": "pista-5-b",
+          "description": "Un reloj de sobremesa parado a las 21:43. Nadie recuerda haberlo tocado.",
+          "pointsTo": "Sitúa a alguien moviéndose por la casa durante el apagón. Encaja con la coartada rota de Dani.",
+          "round": 2,
+          "lugarId": "r4"
+        },
+        {
+          "id": "pista-6-a",
+          "description": "Una copa a medio beber con una huella de carmín (o de dedos nerviosos) en el borde.",
+          "pointsTo": "Parece incriminar a Gema… quizá demasiado claramente. Pista falsa.",
+          "round": 1,
+          "lugarId": "r5"
+        },
+        {
+          "id": "pista-6-b",
+          "description": "Una cerilla consumida hasta el final, de las que se usan para alumbrarse a oscuras.",
+          "pointsTo": "Sitúa a alguien moviéndose por la casa durante el apagón. Encaja con la coartada rota de Dani.",
+          "round": 3,
+          "lugarId": "r5"
+        },
+        {
+          "id": "pista-7-a",
+          "description": "Un papel arrugado en la papelera: media frase tachada que habla de \"saldar esto esta noche\".",
+          "pointsTo": "Parece incriminar a Hugo… quizá demasiado claramente. Pista falsa.",
+          "round": 1,
+          "lugarId": "r6"
+        },
+        {
+          "id": "pista-7-b",
+          "description": "El cajón del escritorio forzado; dentro, solo el hueco de lo que alguien se llevó.",
+          "pointsTo": "Sitúa a alguien moviéndose por la casa durante el apagón. Encaja con la coartada rota de Dani.",
+          "round": 2,
+          "lugarId": "r6"
+        },
+        {
+          "id": "pista-8-a",
+          "description": "Una cortina descolgada de un tirón, como si alguien se hubiera escondido tras ella.",
+          "pointsTo": "Parece incriminar a Ana… quizá demasiado claramente. Pista falsa.",
+          "round": 1,
+          "lugarId": "r7"
+        },
+        {
+          "id": "pista-8-b",
+          "description": "Barro fresco junto a la ventana: alguien entró o salió por donde no debía.",
+          "pointsTo": "Sitúa a alguien moviéndose por la casa durante el apagón. Encaja con la coartada rota de Dani.",
+          "round": 3,
+          "lugarId": "r7"
+        }
+      ]
     }
   },
   "entidades": {

@@ -10,7 +10,7 @@
  * `registrarAmpliacion`, igual que los otros dos juegos, y no cambia una linea
  * de lo que hace.
  */
-import type { GameSession, Plot, PlotCharacter, PlotClue } from '../../../shared/types';
+import type { GameSession, Plot, PlotCharacter } from '../../../shared/types';
 import type { StalenessReport } from '../../../shared/staleness';
 import { DEMO_MODE } from '../config';
 import { getAnthropicClient, resolveModel } from '../agent/anthropic';
@@ -23,6 +23,7 @@ import { juegoDe, repararRespuestas } from '../juegos/solucion';
 import { emisorDeProgreso } from '../live/proyeccion';
 import { apuntarUso } from '../gasto/contador';
 import type { Emitir } from './pipeline';
+import { PlotClue, pistasDeLaTrama, pistasParaEscribir } from '../../../shared/mecanicas/pistas';
 
 type ClienteAnthropic = NonNullable<ReturnType<typeof getAnthropicClient>>;
 
@@ -138,12 +139,12 @@ async function ampliarTrama(
   // Pistas extra para salas que se hubieran quedado a oscuras.
   if (pistasExtra.length > 0) {
     const idsSalas = new Set(salasDe(game).map((sala) => sala.id));
-    const idsPistas = new Set(plot.clues.map((pista) => pista.id));
+    const idsPistas = new Set(pistasDeLaTrama(plot).map((pista) => pista.id));
     pistasExtra.forEach((pista, indice) => {
       if (!pista.lugarId || !idsSalas.has(pista.lugarId)) return;
       const id = idsPistas.has(pista.id) ? `${pista.id}-nueva-${indice + 1}` : pista.id;
       idsPistas.add(id);
-      plot.clues.push({ ...pista, id });
+      pistasParaEscribir(plot).push({ ...pista, id });
     });
   }
 }
@@ -292,7 +293,7 @@ function construirPromptAmpliacion(
       .join('\n') || '- (ninguna persona nueva)';
 
   const salasSinPista = salasDe(game)
-    .filter((sala2) => !plot.clues.some((pista) => pista.lugarId === sala2.id))
+    .filter((sala2) => !pistasDeLaTrama(plot).some((pista) => pista.lugarId === sala2.id))
     .map((sala2) => `"${sala2.name}" (id "${sala2.id}")`)
     .join(', ');
 

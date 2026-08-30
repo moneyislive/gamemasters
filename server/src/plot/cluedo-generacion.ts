@@ -183,7 +183,8 @@ function pausa(ms: number): Promise<void> {
 }
 
 /**
- * La terna de CLUEDO, convertida a ejes.
+ * Lo que el generador de CLUEDO devuelve, traducido a lo que la plataforma
+ * espera: la terna a ejes y las pistas a su mecanica.
  *
  * ═══ ESTO ESTABA EN `pipeline.ts`, Y ERA LO ULTIMO DE `migracion.ts` ═══
  *
@@ -199,7 +200,26 @@ function pausa(ms: number): Promise<void> {
  * un generador. Ahora es lo segundo y vive donde vive ese generador, asi que la
  * tuberia no sabe lo que es un asesino.
  */
-function conEjes(plot: Plot): Plot {
+function comoLoEsperaLaPlataforma(plot: Plot): Plot {
+  /*
+   * ═══ Y LAS PISTAS, QUE EL MODELO DEVUELVE EN LA RAIZ ═══
+   *
+   * El esquema le pide `clues` al nivel de la trama, igual que le pide asesino
+   * y arma: esta afinado y cambiarlo cambiaria las tramas que salen. Pero las
+   * pistas son de la MECANICA de las pistas, no del contrato de la trama —la
+   * Momia y las Sombras no tienen ninguna y escribian `clues: []` para
+   * cumplir—, asi que viven en `plot.mecanicas.pistas`.
+   *
+   * Se traduce aqui, en la frontera, que es donde se traducen las cosas de un
+   * generador concreto.
+   */
+  const conRaiz = plot as unknown as { clues?: unknown[] };
+  if (Array.isArray(conRaiz.clues)) {
+    if (!plot.mecanicas) plot.mecanicas = {};
+    if (plot.mecanicas.pistas === undefined) plot.mecanicas.pistas = conRaiz.clues;
+    delete conRaiz.clues;
+  }
+
   const s = plot.solution as unknown as {
     murdererId?: string;
     weaponId?: string;
@@ -221,5 +241,7 @@ function conEjes(plot: Plot): Plot {
 registrarGenerador('cluedo', {
   rotulo: 'Tejiendo la trama del crimen…',
   generar: async (game: GameSession, emit: Emitir) =>
-    conEjes(await (DEMO_MODE ? generarTramaDemo(game, emit) : generarTramaConApi(game, emit))),
+    comoLoEsperaLaPlataforma(
+      await (DEMO_MODE ? generarTramaDemo(game, emit) : generarTramaConApi(game, emit)),
+    ),
 });

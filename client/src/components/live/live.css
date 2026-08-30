@@ -389,3 +389,68 @@
   text-transform: uppercase;
   color: rgb(var(--contra-rgb));
 }
+
+/* ---------------------------------------------------------------------
+   EL NUDO DE VALDEHIERRO
+   ---------------------------------------------------------------------
+   Reutiliza `.live-momia` para el relleno y las tablas —son medidas, no
+   colores— y añade solo lo que esta noche tiene y las otras tres no: un
+   número que hay que leer desde el otro lado de la mesa y una crónica en la
+   que lo importante son los renglones en rojo.
+   --------------------------------------------------------------------- */
+
+.live-nudo .live-titulo {
+  /* Como en las Sombras: aquí hay cinco bloques y se leen en vertical. */
+  margin-bottom: 8px;
+}
+
+/*
+ * EL RETRASO, EN GRANDE Y SIN BARRA.
+ *
+ * Las Sombras pintan su rastro con una fila de caracteres que se llena, y aquí
+ * no se puede: esa barra necesita el tope para saber cuántas casillas dibujar y
+ * el tope sale de la trama, que no llega a esta pantalla. Un número grande sí se
+ * lee desde el otro lado de la mesa, que es para lo que estaba la barra.
+ */
+.live-retraso {
+  align-items: baseline;
+  gap: 10px;
+}
+.live-retraso strong {
+  font-size: 2.2rem;
+  line-height: 1;
+}
+.live-retraso .live-unidad {
+  font-family: var(--font-heading);
+  font-size: 0.78rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--gold-500);
+}
+
+/* El margen de cada cual: la misma alineación que las marcas de la Momia. */
+.live-margen {
+  font-family: var(--font-heading);
+  font-size: 1.05rem;
+  color: var(--gold-400);
+}
+
+/*
+ * LA ORDEN QUE EL ENCLAVAMIENTO RECHAZÓ.
+ *
+ * Se tiñe la FILA entera y no solo la casilla del resultado, por lo mismo que
+ * las Sombras resaltan la fila de quien está al borde: quien dirige está
+ * buscando en la lista cuál fue la última que se rechazó, no leyendo una
+ * columna. Y el nombre del convoy en rojo, que es la palabra que se canta.
+ */
+.live-cronica tr.is-rechazada td {
+  background: rgba(var(--peligro-rgb), 0.09);
+}
+.live-cronica tr.is-rechazada td strong {
+  color: rgb(var(--peligro-rgb));
+}
+
+/* Un puesto ya rendido esta franja: ya dio lo suyo, se aparta de la vista. */
+.live-tabla tr.is-rendido td {
+  opacity: 0.6;
+}

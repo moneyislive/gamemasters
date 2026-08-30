@@ -25,6 +25,55 @@
  * que tiene la trama delante.
  */
 
+/**
+ * UNA PISTA, tal como la escribe el generador y la guarda la partida.
+ *
+ * ═══ ESTABA EN `shared/types.ts`, DENTRO DE `Plot` ═══
+ *
+ *     clues: PlotClue[];   // obligatorio
+ *
+ * Obligatorio, asi que El Misterio de la Momia y El Paso de las Sombras
+ * escribian `clues: []` en sus generadores. Fingian el campo: es literalmente
+ * el defecto que toda esta arquitectura existe para quitar, escrito en el
+ * contrato mas central que hay.
+ *
+ * Ahora vive en `plot.mecanicas.pistas`, y quien no use la mecanica no tiene
+ * nada que escribir.
+ */
+export interface PlotClue {
+  id: string;
+  lugarId?: string;
+  description: string;
+  pointsTo: string;
+  /**
+   * Ronda en la que quien dirige pone esta pista sobre la mesa (1 = primera).
+   * Evita que las pruebas decisivas esten disponibles desde el minuto uno: las
+   * rondas bajas traen motivos y señuelos, las altas cierran el caso.
+   */
+  round: number;
+}
+
+/** El nombre de esta mecanica dentro de `plot.mecanicas`. */
+const LLAVE = 'pistas';
+
+/**
+ * Las pistas de una trama. Vacio si este juego no usa la mecanica.
+ *
+ * Se lee SIEMPRE por aqui y nunca por el campo: es lo unico que hace que
+ * añadir, quitar o mover el almacen sea un cambio de una funcion.
+ */
+export function pistasDeLaTrama(plot: { mecanicas?: Record<string, unknown> } | undefined): PlotClue[] {
+  const suyas = plot?.mecanicas?.[LLAVE];
+  return Array.isArray(suyas) ? (suyas as PlotClue[]) : [];
+}
+
+/** La lista REAL, para quien escribe. La crea si hace falta. */
+export function pistasParaEscribir(plot: { mecanicas?: Record<string, unknown> }): PlotClue[] {
+  if (!plot.mecanicas) plot.mecanicas = {};
+  if (!Array.isArray(plot.mecanicas[LLAVE])) plot.mecanicas[LLAVE] = [];
+  return plot.mecanicas[LLAVE] as PlotClue[];
+}
+
 /** Una pista, tal como la ve quien juega. */
 export interface PistaVista {
   id: string;

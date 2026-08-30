@@ -306,7 +306,17 @@ export type IconoId =
    * distinto.
    */
   | 'torii'
-  | 'abanico';
+  | 'abanico'
+  /*
+   * Los dos de El Nudo de Valdehierro, y aquí la cuenta baja otra vez: sus
+   * cinco pestañas usan `reloj` para el cuadro de marchas —que es un horario y
+   * nada más—, `plano` para la estación, `mascara` para la ficha y `copa` para
+   * el perfil. Solo hacen falta dos que digan algo que ninguno decía: la AGUJA,
+   * que es la palanca del cambio de vía, y la LOCOMOTORA para el jefe de
+   * estación.
+   */
+  | 'aguja'
+  | 'locomotora';
 
 /**
  * Las pantallas que trae la app.
@@ -347,7 +357,21 @@ export type PantallaDeApp =
    * no compila hasta que se declaran.
    */
   | 'camino'
-  | 'consejo';
+  | 'consejo'
+  /*
+   * Las dos de El Nudo de Valdehierro. `cuadro` es la cuadrícula compartida
+   * donde se reconstruye el cuadro de marchas —y donde se cursan las órdenes— y
+   * `puesto` es donde vive el INSTRUMENTO del sitio en el que estás plantado.
+   *
+   * `puesto` no es una pestaña más: es la primera pantalla de la plataforma que
+   * lleva dentro un minijuego, y tiene que ser propia por una razón concreta y
+   * no por gusto. La vista del jugador solo aplana `eligeDe` y `pideNumero` en
+   * `acciones[].campos`; `eligeLibre` —que es por donde viaja la solución de un
+   * instrumento— no llega al móvil, así que el panel genérico pintaría un botón
+   * sin campos. Está anotado en el §11 del diseño del juego.
+   */
+  | 'cuadro'
+  | 'puesto';
 
 /**
  * Un bloque del dosier que se lee en el MÓVIL.
@@ -414,7 +438,18 @@ export type BloqueDeDosier =
   | 'don'
   /* ---- Los propios de El Paso de las Sombras ---- */
   /** Tu disfraz y el blasón bajo el que cruzas. */
-  | 'disfraz';
+  | 'disfraz'
+  /* ---- Los propios de El Nudo de Valdehierro ---- */
+  /** Tu oficio, el instrumento que manejas y la maña que gastas una vez. */
+  | 'oficio'
+  /**
+   * Las tiras de telegrama que salvaste del fuego.
+   *
+   * Van en el DOSIER y no en una pestaña porque son papel: se leen en voz alta
+   * encima de la mesa. Lo que hace la app es tenerlas a mano para quien haya
+   * perdido su sobre, que a las dos de la mañana pasa.
+   */
+  | 'telegramas';
 
 /**
  * Una regla de las que lee quien juega.
@@ -509,6 +544,26 @@ export interface DefinicionDeRonda {
   accionSobre: CategoriaId;
   /** Cuántas veces se puede rectificar dentro de la misma ronda. */
   cambiosPermitidos: number;
+  /**
+   * CUÁNTAS RONDAS TIENE UNA VELADA DE ESTE JUEGO.
+   *
+   * ═══ POR QUÉ HACÍA FALTA, Y LO ENCONTRÓ EL CUARTO JUEGO ═══
+   *
+   * El único sitio que decidía cuántas rondas tiene una partida era
+   * `numeroDeRondas`, que mira la ronda más alta de las PISTAS de la trama y,
+   * si no hay ninguna, contesta cuatro.
+   *
+   * Eso funcionaba porque los tres primeros juegos usan la mecánica de pistas o
+   * se conforman con cuatro. En cuanto un juego no la usa —El Nudo de
+   * Valdehierro no entra en ningún sitio a encontrar nada— se queda con cuatro
+   * rondas aunque su noche tenga seis franjas, y el móvil de doce personas
+   * enseña «Franja 5 de 4» sin que nada dé un error.
+   *
+   * Derivar la duración de una velada del reparto de pistas era una propiedad
+   * de CLUEDO disfrazada de regla general. Un juego que la sepa la declara; el
+   * que no, sigue exactamente como estaba.
+   */
+  cuantas?: number;
 }
 
 /**

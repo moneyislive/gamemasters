@@ -1,0 +1,338 @@
+/* =====================================================================
+   LA CORTINILLA DE EL NUDO DE VALDEHIERRO
+   =====================================================================
+
+   Va aparte de `transition.css` (CLUEDO), de `transicion-momia.css` y de
+   `transicion-sombras.css` por lo mismo que aquellas: son animaciones
+   distintas, no la misma con otros colores, y compartir hoja habría acabado
+   en una maraña de selectores con `[data-juego]` delante.
+
+   TODOS LOS COLORES SON LITERALES Y NO TOKENS, y es a propósito. Esta
+   cortinilla se pinta ANTES de que el documento tenga `data-juego` puesto —es
+   lo primero que se ve al pulsar la ficha del catálogo, y el tema se aplica al
+   entrar en el recibidor— así que un `var(--acento)` aquí traería el dorado de
+   la casa y las ventanas del tren saldrían del color equivocado justo en el
+   único fotograma que la gente mira con atención. Es la misma lección que ya
+   está escrita en la cabecera de la hoja de las Sombras.
+
+   TODO LO QUE SE MUEVE SE MUEVE CON `transform`. El tren mide casi dos
+   pantallas de largo: animarlo con `left` sería repintar dos pantallas de
+   degradados sesenta veces por segundo en un móvil de hace cuatro años.
+   ===================================================================== */
+
+.tn-velo {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  overflow: hidden;
+  /* Azul de hulla, no negro puro: el negro puro se lee como «se ha roto». */
+  background: #080b11;
+}
+
+/* ---------------------------------------------------------------------
+   El andén
+   --------------------------------------------------------------------- */
+
+/*
+ * La franja de abajo. Hace dos cosas a la vez: da suelo al tren —sin ella
+ * flota— y pone la nieve pisada que devuelve algo de la luz de las ventanas.
+ * El filo de arriba es de ámbar muy bajo, que es el canto del andén cogiendo
+ * la luz de la bombilla.
+ */
+.tn-anden {
+  position: absolute;
+  inset: auto 0 0 0;
+  z-index: 1;
+  height: 32%;
+  border-top: 1px solid rgba(217, 166, 72, 0.16);
+  background:
+    linear-gradient(180deg, rgba(222, 210, 187, 0.06), rgba(222, 210, 187, 0.015) 38%, transparent 78%),
+    linear-gradient(180deg, #0b0f15, #080b11);
+}
+
+/* ---------------------------------------------------------------------
+   El rótulo de la estación
+   --------------------------------------------------------------------- */
+
+/*
+ * Chapa esmaltada: ámbar de fondo y letra de hierro. Es al revés que todo lo
+ * demás de la app —ahí el ámbar es la letra y el hierro el fondo— y es la
+ * única forma honesta de rotular una estación: lo que se lee de noche desde la
+ * ventanilla de un tren en marcha es oscuro sobre amarillo, nunca al revés.
+ *
+ * El centrado va con `translate` y NO con `transform`, y eso importa: framer
+ * anima `y` por `transform`, así que si el centrado viviera ahí, la entrada del
+ * cartel se lo llevaría por delante. Son dos propiedades distintas y se aplican
+ * las dos. De paso, es lo que permite que el bloque de movimiento reducido de
+ * ahí abajo anule el `transform` sin descentrar nada.
+ */
+.tn-rotulo {
+  position: absolute;
+  z-index: 2;
+  top: 34%;
+  left: 50%;
+  translate: -50% 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: clamp(12px, 2.4vw, 22px) clamp(22px, 5vw, 56px);
+  border: 3px solid #12161c;
+  border-radius: 5px;
+  background: linear-gradient(180deg, #eccb8b, #d9a648 46%, #c08a2e);
+  box-shadow:
+    0 0 52px rgba(217, 166, 72, 0.34),
+    inset 0 0 0 3px rgba(18, 22, 28, 0.16);
+  will-change: transform, opacity;
+}
+
+.tn-rotulo-nombre {
+  font-family: 'Franklin Gothic Medium', 'Arial Narrow', 'Helvetica Neue', Arial, sans-serif;
+  font-size: clamp(1.5rem, 6.4vw, 3.4rem);
+  line-height: 1;
+  letter-spacing: 0.24em;
+  /* El interletrado deja un hueco a la derecha; se compensa para centrarlo. */
+  text-indent: 0.24em;
+  color: #12161c;
+  white-space: nowrap;
+}
+
+/* El filete de la chapa, que es lo que hace que parezca esmalte y no un botón. */
+.tn-rotulo-linea {
+  width: 62%;
+  height: 2px;
+  background: rgba(18, 22, 28, 0.5);
+}
+
+.tn-rotulo-pie {
+  font-family: 'Franklin Gothic Medium', 'Arial Narrow', 'Helvetica Neue', Arial, sans-serif;
+  font-size: clamp(0.55rem, 1.8vw, 0.76rem);
+  letter-spacing: 0.2em;
+  text-indent: 0.2em;
+  color: rgba(18, 22, 28, 0.72);
+  white-space: nowrap;
+}
+
+/* ---------------------------------------------------------------------
+   El tren
+   --------------------------------------------------------------------- */
+
+/*
+ * El coche, en capas horizontales: el filo del techo, la moldura donde pega la
+ * luz del andén, la caja, la faja de debajo de las ventanas, los bajos y la
+ * sombra de los bogies. Se pinta con un solo degradado de paradas duras porque
+ * a esta velocidad nadie va a mirar dos veces, y porque cada elemento de más
+ * son dos pantallas más que componer sesenta veces por segundo.
+ */
+.tn-tren {
+  position: absolute;
+  z-index: 3;
+  left: 0;
+  top: 22%;
+  width: 180vw;
+  height: 46%;
+  will-change: transform;
+  background: linear-gradient(
+    180deg,
+    #05070b 0 5%,
+    #131a24 5% 10%,
+    #0f151d 10% 13%,
+    #1b222d 13% 60%,
+    #10161e 60% 64%,
+    #080c12 64% 84%,
+    #04060a 84% 100%
+  );
+  box-shadow: 0 0 70px rgba(0, 0, 0, 0.85);
+}
+
+/*
+ * El faro de la máquina, colgado por DELANTE del morro: entra en cuadro unos
+ * dos décimas antes que el hierro, que es lo que hace que el tren se anuncie en
+ * vez de aparecer. En una noche con nieve un faro no ilumina, deslumbra: de ahí
+ * el desenfoque grande y que el centro llegue casi a blanco.
+ */
+.tn-faro {
+  position: absolute;
+  top: -45%;
+  right: -26vw;
+  width: 42vw;
+  height: 190%;
+  pointer-events: none;
+  filter: blur(26px);
+  background: radial-gradient(
+    46% 40% at 62% 50%,
+    rgba(255, 244, 214, 0.55),
+    rgba(217, 166, 72, 0.22) 44%,
+    transparent 72%
+  );
+}
+
+/*
+ * La fila de ventanas. Un patrón que se repite cada 62 px: 18 de montante, 32
+ * de cristal encendido y 12 de entrepaño.
+ *
+ * LOS NÚMEROS SON EL DIBUJO ENTERO, y la primera versión los tenía al doble:
+ * con ventanas de 52 px de ancho y un tercio de la altura del coche salían
+ * siete puertas amarillas cruzando la pantalla, que es un autobús. Un coche de
+ * viajeros tiene la ventana MÁS ALTA QUE ANCHA y caben veinte en un encuadre;
+ * eso es lo que se reconoce como un tren de noche, y no hay que dibujar nada
+ * más para conseguirlo.
+ *
+ * El desenfoque de medio píxel tampoco es un adorno: es lo que le quita el filo
+ * de gráfico vectorial y lo que hace que a esta velocidad se lea como luz y no
+ * como una valla amarilla.
+ */
+.tn-ventanas {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 17%;
+  height: 21%;
+  filter: blur(0.5px);
+  background: repeating-linear-gradient(
+    90deg,
+    transparent 0 18px,
+    rgba(236, 203, 139, 0.92) 18px 50px,
+    transparent 50px 62px
+  );
+}
+
+/*
+ * Lo que las ventanas echan sobre la nieve del andén al pasar por delante.
+ *
+ * ARRANCA DEBAJO DE LA CAJA Y NO DENTRO. Empezaba a media altura del coche y el
+ * desenfoque le lavaba los bajos: el tren perdía su masa y quedaba una mancha
+ * parda del tamaño de media pantalla. La luz de una ventana no ilumina la
+ * chapa que tiene debajo —sale hacia fuera—, así que esto empieza donde acaba
+ * el coche y se muere a media nieve.
+ */
+.tn-derrame {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 88%;
+  height: 70%;
+  pointer-events: none;
+  filter: blur(26px);
+  background: linear-gradient(
+    180deg,
+    rgba(217, 166, 72, 0.22),
+    rgba(217, 166, 72, 0.07) 40%,
+    transparent 76%
+  );
+}
+
+/*
+ * Los testeros: el corte negro entre coche y coche, cada 800 px. Son la única
+ * pista de que esto son SEIS unidades enganchadas y no una cinta infinita, y
+ * sin ellos el tren parecía un friso de ventanas.
+ */
+.tn-testeros {
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(90deg, transparent 0 744px, #05070b 744px 800px);
+}
+
+/* ---------------------------------------------------------------------
+   La nieve
+   --------------------------------------------------------------------- */
+
+/*
+ * Dos capas, y las dos MÁS GRANDES QUE LA PANTALLA por sus cuatro costados: se
+ * desplazan mientras corre la cortinilla, y con `inset: 0` se vería entrar el
+ * borde del mosaico por arriba.
+ *
+ * SEIS MOSAICOS Y NO DOS, Y DE LADO GRANDE. Es lo que costó que esto pareciera
+ * nieve. Un `radial-gradient` repetido es una RETÍCULA, y con mosaicos chicos
+ * —había dos, de 137 y 91 px— la retícula se ve: son puntos en formación, no
+ * copos. Se arregla por dos sitios a la vez: lados grandes (de 233 a 113 px, o
+ * sea tres o cuatro repeticiones por pantalla en vez de doce) y primos entre sí
+ * (233, 181, 139, 197, 157, 113), que es lo que impide que dos capas cuadren
+ * sus columnas dentro del ancho de una pantalla. Seis retículas mal alineadas
+ * no se leen como ninguna retícula.
+ */
+.tn-nieve {
+  position: absolute;
+  inset: -22% -12%;
+  z-index: 5;
+  pointer-events: none;
+  will-change: transform;
+}
+
+.tn-nieve--cerca {
+  opacity: 0.55;
+  background-image:
+    radial-gradient(circle at 18% 24%, rgba(240, 233, 218, 0.95) 1.7px, transparent 2.2px),
+    radial-gradient(circle at 71% 63%, rgba(240, 233, 218, 0.8) 1.4px, transparent 1.9px),
+    radial-gradient(circle at 39% 81%, rgba(240, 233, 218, 0.7) 1.2px, transparent 1.7px);
+  background-size:
+    233px 233px,
+    181px 181px,
+    139px 139px;
+}
+
+.tn-nieve--lejos {
+  opacity: 0.34;
+  background-image:
+    radial-gradient(circle at 44% 12%, rgba(222, 210, 187, 0.8) 1.1px, transparent 1.6px),
+    radial-gradient(circle at 8% 58%, rgba(222, 210, 187, 0.65) 1px, transparent 1.5px),
+    radial-gradient(circle at 76% 87%, rgba(222, 210, 187, 0.55) 0.9px, transparent 1.4px);
+  background-size:
+    197px 197px,
+    157px 157px,
+    113px 113px;
+}
+
+/* ---------------------------------------------------------------------
+   El pie y la viñeta
+   --------------------------------------------------------------------- */
+
+.tn-lema {
+  position: absolute;
+  z-index: 4;
+  left: 0;
+  right: 0;
+  bottom: clamp(2.2rem, 8vh, 5rem);
+  margin: 0;
+  padding: 0 1.5rem;
+  text-align: center;
+  pointer-events: none;
+  font-family: 'Franklin Gothic Medium', 'Arial Narrow', 'Helvetica Neue', Arial, sans-serif;
+  font-size: clamp(0.78rem, 2.2vw, 0.98rem);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: rgba(222, 210, 187, 0.66);
+  will-change: transform, opacity;
+}
+
+.tn-vineta {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  pointer-events: none;
+  background: radial-gradient(120% 120% at 50% 50%, transparent 48%, rgba(0, 0, 0, 0.85));
+}
+
+/*
+ * Sin movimiento para quien lo ha pedido.
+ *
+ * La cortinilla es decoración pura: quitarla entera no impide entrar en la
+ * partida, y para alguien con sensibilidad vestibular una masa del tamaño de
+ * dos pantallas cruzando el campo de visión en segundo y medio es exactamente
+ * lo que hay que evitar. Se queda la estación —el rótulo y el pie, quietos— y
+ * el temporizador sigue corriendo igual.
+ *
+ * `transform: none` anula lo que framer escribe en línea; el `translate` que
+ * centra el rótulo es otra propiedad y sobrevive, que es justo lo que se quiere.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .tn-tren,
+  .tn-nieve {
+    display: none;
+  }
+  .tn-rotulo,
+  .tn-lema {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}

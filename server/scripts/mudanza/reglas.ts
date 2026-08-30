@@ -95,7 +95,27 @@ export function mudarPartida(game: Obj): string[] {
       if (renombrar(p, 'suspectId', 'participanteId')) hecho.push('plot.characters');
     }
     for (const m of lista(plot.timeline)) renombrar(m, 'suspectIds', 'participanteIds');
-    for (const c of lista(plot.clues)) renombrar(c, 'roomId', 'lugarId');
+    /*
+     * LAS PISTAS SE MUDAN DE SITIO, no solo de nombre.
+     *
+     * `plot.clues` era un campo OBLIGATORIO del contrato de la trama, asi que
+     * la Momia y las Sombras escribian `clues: []` para cumplir: fingian un
+     * campo que no significa nada en su juego. Ahora las pistas son de la
+     * mecanica que las usa y viven en `plot.mecanicas.pistas`.
+     *
+     * Una trama sin pistas no escribe nada, que es la diferencia.
+     */
+    if (Array.isArray(plot.clues)) {
+      const pistas = lista(plot.clues);
+      for (const c of pistas) renombrar(c, 'roomId', 'lugarId');
+      if (pistas.length > 0) {
+        const mecanicas = esObjeto(plot.mecanicas) ? plot.mecanicas : {};
+        if (mecanicas.pistas === undefined) mecanicas.pistas = pistas;
+        plot.mecanicas = mecanicas;
+        hecho.push(`clues→mecanicas.pistas (${pistas.length})`);
+      }
+      delete plot.clues;
+    }
     const material = esObjeto(plot.material) ? plot.material : null;
     if (material) for (const t of lista(material.twists)) renombrar(t, 'suspectId', 'participanteId');
     /*

@@ -21,6 +21,7 @@ import type { ComponentType } from 'react';
 import CluedoTransition from './CluedoTransition';
 import MomiaTransition from './MomiaTransition';
 import SombrasTransition from './SombrasTransition';
+import NudoTransition from './NudoTransition';
 
 export interface PropsDeTransicion {
   active: boolean;
@@ -31,6 +32,7 @@ const TRANSICIONES: Record<string, ComponentType<PropsDeTransicion>> = {
   cluedo: CluedoTransition,
   momia: MomiaTransition,
   sombras: SombrasTransition,
+  nudo: NudoTransition,
 };
 
 export default function TransicionDeEntrada({

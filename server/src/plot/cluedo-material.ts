@@ -26,6 +26,7 @@ import { culpableDe, lugarDe, objetoDe, objetosDe, salasDe, sospechososDe, victi
 import { registrarMaterial } from '../juegos/materiales';
 import { emisorDeProgreso } from '../live/proyeccion';
 import { apuntarUso, volcarGasto } from '../gasto/contador';
+import { pistasDeLaTrama } from '../../../shared/mecanicas/pistas';
 
 type Emitir = (evento: GenerateStreamEvent) => void;
 
@@ -220,7 +221,7 @@ function construirPrompt(game: GameSession, plot: Plot): string {
     .map((e) => `- ${e.time} ${e.isPublic ? '[público]' : '[secreto]'} ${e.description}`)
     .join('\n');
 
-  const pistas = plot.clues
+  const pistas = pistasDeLaTrama(plot)
     .map((c) => {
       const sala = salasDe(game).find((r) => r.id === c.lugarId)?.name ?? 'sin sala';
       return `- ronda ${c.round} · ${sala}: ${c.description}`;

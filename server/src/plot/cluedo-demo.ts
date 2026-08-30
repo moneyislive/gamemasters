@@ -11,17 +11,9 @@
  * /refresh tanto en modo demo como de red de seguridad cuando la IA no
  * devuelve todos los personajes pedidos.
  */
-import type {
-  GameSession,
-  Plot,
-  PlotCharacter,
-  PlotClue,
-  Room,
-  Suspect,
-  TimelineEvent,
-  Weapon,
-} from '../../../shared/types';
+import type { GameSession, Plot, PlotCharacter, Room, Suspect, TimelineEvent, Weapon } from '../../../shared/types';
 import { culpableDe, objetosDe, respuestasCluedo, salasDe, sospechososDe, victimaDe } from '../juegos/cluedo';
+import type { PlotClue } from '../../../shared/mecanicas/pistas';
 
 // ------------------------------ plantillas ------------------------------
 
@@ -195,7 +187,8 @@ export function generateDemoPlot(game: GameSession): Plot {
     },
     characters,
     timeline,
-    clues,
+    /* Las pistas son de la mecánica, no del contrato de la trama. */
+    mecanicas: { pistas: clues },
     gmScript: [
       `Antes de que lleguen los invitados, reparte o memoriza las pistas de cada sala (las tienes listadas en tu dosier) y decide cuáles esconderás físicamente.`,
       `Recibe a cada invitado por separado, entrégale su dosier confidencial y dale unos minutos para leerlo a solas. Nadie debe enseñar su dosier a nadie.`,

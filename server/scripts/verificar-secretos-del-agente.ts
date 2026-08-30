@@ -74,6 +74,22 @@ if (process.env.GM_AISLADA !== '1') {
   process.exit(r.status ?? 1);
 }
 
+/*
+ * ═══ ESTO SE IMPORTA PRIMERO, Y SIN ELLO EL VERIFICADOR MENTIA ═══
+ *
+ * `instalados.ts` es lo que da de alta las voces de los tres juegos. Sin este
+ * import, `vozDelTaller` no encontraba ninguna y los tres caian al prompt
+ * generico: el de la Momia «hablaba de la plataforma, no de la Momia» y el
+ * trozo cacheable se quedaba en 2.757 caracteres en vez de los mas de 5.000
+ * que hacen falta para que la marca de cache sirva de algo.
+ *
+ * O sea: cuatro comprobaciones en rojo por un import que faltaba, en el guion
+ * cuya cabecera dice que un fallo aqui es el producto. Es la trampa que
+ * `instalados.ts` documenta en su propia cabecera —«el verificador importa los
+ * modulos a mano»— y que ya cazo una vez a los reductores de CLUEDO.
+ */
+await import('../src/juegos/instalados');
+
 const { bloquesDeSistema, buildSystemPrompt } = await import('../src/agent/systemPrompt');
 const { executeTool } = await import('../src/agent/tools');
 const { initStore } = await import('../src/db/store');
@@ -165,9 +181,9 @@ const game: GameSession = {
       },
     ],
     timeline: [],
-    clues: [
+    mecanicas: { pistas: [
       { id: 'c0', lugarId: 'r0', description: 'Una copa rota.', pointsTo: CENTINELAS.aQueApunta, round: 1 },
-    ],
+    ] },
     gmScript: [],
     material: {
       generatedAt: ahora,
@@ -254,7 +270,6 @@ const gameMomia = {
       },
     ],
     timeline: [],
-    clues: [],
     gmScript: [],
     delJuego: {
       ordenVerdadero: [CENTINELAS.ordenVerdadero, 't1', 't2', 't3', 't4'],
@@ -318,11 +333,23 @@ async function comprobarTodo(): Promise<void> {
     id: 'secretos-sombras',
     settings: { ...gameMomia.settings, juego: 'sombras' },
   } as unknown as typeof gameMomia;
+  /*
+   * Y el cuarto. La lista estaba escrita a mano con tres, asi que un juego nuevo
+   * podia partir mal su prompt --o no llevar el titular por el que se corta-- sin
+   * que nada avisara: el corte se hace por una cadena literal y quien no la
+   * escriba se queda con el trozo estable vacio y sin cache.
+   */
+  const gameNudo = {
+    ...gameMomia,
+    id: 'secretos-nudo',
+    settings: { ...gameMomia.settings, juego: 'nudo' },
+  } as unknown as typeof gameMomia;
 
   for (const [nombre, partida] of [
     ['CLUEDO', game],
     ['la Momia', gameMomia],
     ['las Sombras', gameSombras],
+    ['el Nudo', gameNudo],
   ] as const) {
     const entero = buildSystemPrompt(partida);
     const { estable, volatil } = bloquesDeSistema(partida);

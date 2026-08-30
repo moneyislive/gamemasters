@@ -342,3 +342,206 @@
 :root[data-juego='sombras'] .docs-viewer {
   background: rgba(9, 12, 20, 0.95);
 }
+
+/* ---------------------------------------------------------------------
+   EL NUDO DE VALDEHIERRO — 1927, una estación de noche y nevando
+   ---------------------------------------------------------------------
+   La paleta sale de cuatro cosas que están de verdad en esa estación: la
+   HULLA, que es el azul negro del carbón y de lo que está hecho todo lo que
+   se ve por la ventana; el HIERRO de los aparatos, que no es gris sino gris
+   con azul dentro; el ÁMBAR de la única bombilla encendida en toda la casa,
+   y el PAPEL ESTRAZA de los impresos del servicio, que es pardo y es barato
+   porque se gasta a espuertas.
+
+   POR QUÉ EL ACENTO VUELVE A SER CÁLIDO, DESPUÉS DE QUE LAS SOMBRAS
+   ARGUMENTARAN LO CONTRARIO. El argumento de allí sigue siendo bueno: un
+   tercer juego DORADO parecería el mismo producto con otras palabras. Pero
+   esto no es oro. El oro es materia —latón de la mansión, oro viejo de la
+   tumba— y se pone en los marcos, en los remates y en los filos. El ámbar de
+   aquí es LUZ, un filamento de veinticinco vatios, y se pone en lo que está
+   encendido. Todo lo que lo rodea es hierro frío, que en la mansión no hay en
+   ninguna parte.
+
+   EL ROJO NO DECORA. En la mansión el burdeos es el terciopelo y en la tumba
+   el lapislázuli es el cielo: son colores del sitio, y están porque el sitio
+   los tiene. El rojo de señal está porque SIGNIFICA algo —una señal cerrada,
+   una vía que no da paso— y por eso es un rojo apagado y con hollín encima,
+   no un rojo de peligro de cartel. El vivo se reserva para los avisos.
+   --------------------------------------------------------------------- */
+
+:root[data-juego='nudo'] {
+  /* Ámbar de bombilla: la luz de un filamento, no el brillo de un metal. */
+  --acento-rgb: 217, 166, 72;
+  --acento-medio-rgb: 228, 186, 107;
+  --acento-claro-rgb: 236, 203, 139;
+  --acento-hondo-rgb: 192, 138, 46;
+
+  /* Rojo de señal cerrada: el del disco que no deja pasar. */
+  --contra-rgb: 154, 47, 34;
+  --contra-hondo-rgb: 110, 32, 23;
+
+  /* Papel estraza. Más pardo y más sucio que el pergamino de la mansión. */
+  --papel-rgb: 222, 210, 187;
+  --papel-tenue-rgb: 176, 165, 145;
+
+  /*
+   * Masa de hierro: de esto están hechos los paneles.
+   *
+   * Ni marrón, ni negro, ni la pizarra mojada de las Sombras. El hierro de un
+   * aparato de estación tiene un azul dentro que solo se ve cuando le da una
+   * luz amarilla —es lo que hace que la bombilla parezca amarilla y no
+   * blanca—, y sube muy poco de un escalón al siguiente: una máquina no tiene
+   * brillos, y un degradado con contraste la habría vuelto plástico.
+   */
+  --madera-honda-rgb: 18, 22, 28;
+  --madera-rgb: 27, 33, 42;
+  --madera-media-rgb: 38, 46, 58;
+  --madera-clara-rgb: 55, 65, 80;
+
+  /* Azul de hulla: la noche de enero, que es el suelo sobre el que va todo. */
+  --suelo-hondo-rgb: 8, 11, 17;
+  --suelo-rgb: 13, 18, 25;
+  --suelo-alto-rgb: 20, 27, 37;
+  --suelo-vivo-rgb: 32, 44, 60;
+
+  /*
+   * LA TINTA ES EL HIERRO, y este token hace bastante más de lo que parece.
+   *
+   * `.btn--primary` pinta su texto con `var(--ink)` sobre un degradado del
+   * acento, o sea que la tinta es el color del texto QUE VA ENCIMA DEL ÁMBAR.
+   * Con una tinta clara el botón principal del taller sería casi blanco sobre
+   * amarillo —2:1, que no se lee— y con el hierro se queda en 8,4:1, que es de
+   * sobra. Y además es lo que hace un rótulo esmaltado de verdad: oscuro sobre
+   * amarillo, porque es lo que se lee de noche y con nieve.
+   */
+  --tinta-rgb: 18, 22, 28;
+  /*
+   * Rojo de señal ENCENDIDA, un punto más vivo que el disco de arriba: los
+   * avisos hay que leerlos, y `--contra-rgb` a secas sobre el azul de hulla se
+   * hunde en el fondo en vez de saltar.
+   */
+  --peligro-rgb: 181, 58, 42;
+
+  /*
+   * TIPOGRAFÍA. Y aquí hay que decir una cosa incómoda: SON CARAS DEL SISTEMA
+   * Y NO UNA FAMILIA DESCARGADA, al revés que la Momia y las Sombras.
+   *
+   * No es pereza, es dónde vive el interruptor: las tipografías de un juego se
+   * piden bajo demanda desde `lib/tema.ts` (`FUENTES_DE_JUEGO`), y este juego
+   * no tiene entrada ahí. Declarar aquí una familia que nadie descarga no da un
+   * error: da una pantalla que se ve con la alternativa y nadie se entera de
+   * por qué está fea. Así que se declara lo que de verdad va a haber. El día
+   * que se le añada una hoja de Google Fonts a `tema.ts`, ESTAS TRES LÍNEAS son
+   * las que hay que tocar, y el nombre nuevo va el primero de cada pila.
+   *
+   * Y la elección tampoco es un apaño. Los otros tres juegos son de PLOMO DE
+   * IMPRENTA —tres serifas distintas, tres siglos distintos—; un rótulo de
+   * estación de 1927 es chapa esmaltada y palo seco, condensado para que quepa
+   * el nombre del pueblo. Es lo más lejos que se puede estar de la mansión sin
+   * salir de las caras que tiene cualquier ordenador.
+   */
+  --font-display: 'Franklin Gothic Medium', 'Arial Narrow', 'Helvetica Neue', Arial, sans-serif;
+  --font-heading: 'Franklin Gothic Medium', 'Arial Narrow', 'Helvetica Neue', Arial, sans-serif;
+  --font-body: Georgia, 'Cormorant Garamond', 'Times New Roman', serif;
+
+  /*
+   * LA SUPERFICIE DE LOS PANELES: chapa, no madera ni papel.
+   *
+   * El papiro de la Momia y el washi de las Sombras cuentan que ahí se ESCRIBE.
+   * Aquí no: aquí se manejan aparatos, y la superficie que se toca toda la
+   * noche es chapa laminada con hollín encima. Una veta horizontal larguísima y
+   * muy tenue —el laminado— cruzada por un grano casi vertical y más sucio —la
+   * carbonilla, que cae de arriba—. A esta opacidad no se ve como un dibujo: se
+   * ve como que la superficie no está limpia, que es de lo que se trata.
+   */
+  --panel-bg:
+    repeating-linear-gradient(178deg, rgba(var(--papel-rgb), 0.016) 0 1px, transparent 1px 11px),
+    repeating-linear-gradient(6deg, rgba(0, 0, 0, 0.055) 0 1px, transparent 1px 23px),
+    linear-gradient(168deg, rgba(var(--madera-rgb), 0.94), rgba(var(--madera-honda-rgb), 0.97));
+}
+
+/*
+ * EL PLANO DE LA ESTACIÓN. Los tokens los define `components/board/board.css`
+ * con los valores de CLUEDO; aquí se repintan.
+ *
+ * El tapete verde de una mesa de juego pasa a ser la playa de vías vista desde
+ * arriba —nieve pisada sobre balasto, que de noche es azul y no blanca— y el
+ * parqué de caoba, los tablones del andén. El bloque central deja de ser
+ * burdeos y se vuelve EL NUDO: el haz donde se cruzan las cinco líneas, que es
+ * carbonilla apelmazada y por eso es lo único pardo del plano.
+ */
+:root[data-juego='nudo'] {
+  --tablero-suelo-1: #18212c;
+  --tablero-suelo-2: #111823;
+  --tablero-suelo-3: #0a0f16;
+  --tablero-parquet: #232a34;
+  --tablero-parquet-alt: #2b323d;
+  --tablero-centro: #17120e;
+}
+
+/*
+ * La textura del fondo. En CLUEDO es el grano del fieltro de una mesa, en la
+ * Momia arena en suspensión y en las Sombras niebla de monte; aquí es
+ * CARBONILLA, que tiene más grano que la arena porque son partículas duras y
+ * no polvo. Sube un poco respecto a la mansión y se queda por debajo de la
+ * tumba: lo justo para que la pantalla parezca sucia y no rota.
+ */
+:root[data-juego='nudo'] body::before {
+  opacity: 0.06;
+}
+
+:root[data-juego='nudo'] body {
+  background:
+    /* La bombilla de la oficina, arriba a la izquierda y colgando de un cable. */
+    radial-gradient(760px 520px at 8% 0%, rgba(var(--acento-rgb), 0.17), transparent 60%),
+    /* La señal cerrada del otro extremo del andén: lo único que hay ahí fuera. */
+    radial-gradient(880px 600px at 104% 100%, rgba(var(--contra-rgb), 0.2), transparent 58%),
+    /*
+     * Nieve. Rayas finas y MUY tumbadas, que es la diferencia entre nevar y
+     * ventiscar: cerca de la vertical parecerían lluvia de fondo de pantalla, y
+     * a 255° se lee que fuera hace viento.
+     */
+    repeating-linear-gradient(
+      255deg,
+      rgba(var(--papel-rgb), 0.014) 0 2px,
+      transparent 2px 26px
+    ),
+    linear-gradient(180deg, var(--suelo-hondo), var(--suelo) 46%, var(--suelo-hondo));
+}
+
+/*
+ * Las esquinas del marco. En la mansión son cuatro remaches de latón, en la
+ * tumba cuatro clavos de cobre y en el monte cuatro grapas de hierro; aquí son
+ * cuatro ROBLONES de viga de celosía: más gordos que ninguno de los otros y con
+ * un punto de luz en la cabeza, porque un roblón es media esfera y lo que se ve
+ * de él es dónde le da la bombilla. Es el mismo truco que el bajorrelieve de
+ * los jeroglíficos, hecho con una parada más del degradado.
+ */
+:root[data-juego='nudo'] .deco-corners::after {
+  background:
+    radial-gradient(circle at 0 0, var(--gold-300) 0.8px, var(--gold-500) 1px 2.6px, transparent 3.6px),
+    radial-gradient(circle at 100% 0, var(--gold-300) 0.8px, var(--gold-500) 1px 2.6px, transparent 3.6px),
+    radial-gradient(circle at 0 100%, var(--gold-300) 0.8px, var(--gold-500) 1px 2.6px, transparent 3.6px),
+    radial-gradient(circle at 100% 100%, var(--gold-300) 0.8px, var(--gold-500) 1px 2.6px, transparent 3.6px);
+  background-origin: border-box;
+}
+
+/*
+ * Los negros casi puros que quedaron escritos a mano —toasts, menús flotantes,
+ * el velo de la generación—. En la mansión son un negro cálido de madera, en la
+ * tumba el azul de la noche del desierto y en el monte la pizarra; aquí, la
+ * hulla, que es el más oscuro de los cuatro y tiene que serlo: es lo que hay al
+ * otro lado de la ventana de una estación a las dos de la mañana.
+ *
+ * Se enumeran en vez de tokenizarlos porque cada uno tiene su propio valor y
+ * unificarlos habría cambiado píxeles de CLUEDO, que es lo único que no se
+ * puede hacer.
+ */
+:root[data-juego='nudo'] .has-tip::after,
+:root[data-juego='nudo'] .studio-toast,
+:root[data-juego='nudo'] .case-confirm,
+:root[data-juego='nudo'] .sp-stage-hint,
+:root[data-juego='nudo'] .sp-pin-tip,
+:root[data-juego='nudo'] .docs-viewer {
+  background: rgba(8, 11, 17, 0.95);
+}

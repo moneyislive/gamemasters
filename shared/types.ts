@@ -126,19 +126,6 @@ export interface PlotCharacter {
   knowledge: string[];
 }
 
-export interface PlotClue {
-  id: string;
-  lugarId?: string;
-  description: string;
-  pointsTo: string;
-  /**
-   * Ronda en la que el Game Master pone esta pista sobre la mesa (1 = primera).
-   * Evita que las pruebas decisivas estén disponibles desde el minuto uno:
-   * las rondas bajas traen motivos y señuelos, las altas cierran el caso.
-   */
-  round: number;
-}
-
 export interface TimelineEvent {
   time: string;
   description: string;
@@ -271,7 +258,6 @@ export interface Plot {
   solution: PlotSolution;
   characters: PlotCharacter[];
   timeline: TimelineEvent[];
-  clues: PlotClue[];
   /** Guion del Game Master: actos y momentos clave para conducir la partida */
   gmScript: string[];
   /**
@@ -297,6 +283,29 @@ export interface Plot {
    * necesita entenderlo: lo transporta y lo persiste, nada más.
    */
   delJuego?: unknown;
+  /**
+   * Lo que las MECANICAS que este juego usa necesitan de su trama.
+   *
+   * ═══ HERMANO DE `delJuego`, Y DISTINTO POR QUIEN LO LLENA ═══
+   *
+   * `delJuego` es del juego: lo escribe y lo lee el mismo, y nadie mas lo
+   * entiende. Esto es de una MECANICA —codigo que sirve a varios juegos y que
+   * ninguno tiene que conocer—, asi que va por su nombre y no por el del juego.
+   *
+   * Hacia falta porque un juego puede usar una mecanica Y tener lo suyo. Con
+   * las pistas dentro de `delJuego`, un juego de misterio con trama propia
+   * tendria que compartir ese hueco con la mecanica y ponerse de acuerdo con
+   * ella sobre como repartirselo.
+   *
+   * ═══ AQUI ARRIBA HABIA UN `clues: PlotClue[]` ═══
+   *
+   * Obligatorio. La Momia y las Sombras escribian `clues: []` en sus
+   * generadores: fingian el campo, que es el defecto que toda esta arquitectura
+   * existe para quitar, escrito en el contrato mas central que hay. Las pistas
+   * son de la mecanica de las pistas y viven en `mecanicas.pistas`; se leen con
+   * `pistasDeLaTrama` y se escriben con `pistasParaEscribir`.
+   */
+  mecanicas?: Record<string, unknown>;
 }
 
 // ---------- Documentos por jugador ----------
@@ -351,7 +360,20 @@ export type DocumentSectionId =
   | 'estandarte'
   | 'columna'
   | 'enseres'
-  | 'senda';
+  | 'senda'
+  /*
+   * Las que trae El Nudo de Valdehierro. Ver shared/juegos/nudo.ts.
+   *
+   * Son CINCO y ninguna se parece a las de los otros tres, que es lo que se
+   * esperaba de un juego sin crimen: aquí no hay coartadas que enseñar ni
+   * sospechosos que enumerar. Lo que se reparte es TRABAJO —un oficio y unas
+   * tiras de telegrama— y una cuadrícula en blanco para tacharla a lápiz.
+   */
+  | 'oficio'
+  | 'telegramas'
+  | 'convoyes'
+  | 'cuadro'
+  | 'turno';
 
 export interface DocumentSectionInfo {
   id: DocumentSectionId;

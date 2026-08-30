@@ -63,6 +63,7 @@ import type { TramaMomia } from '../../shared/juegos/momia-tipos';
 import type { GameSession } from '../../shared/types';
 import { manifiestoDe } from '../../shared/juegos';
 import type { LiveSession, VistaJugador } from '../../shared/live';
+import { pistasDeLaTrama } from '../../shared/mecanicas/pistas';
 
 const REPO = path.resolve(import.meta.dirname ?? __dirname, '..', '..');
 const TSX = path.join(REPO, 'node_modules', 'tsx', 'dist', 'cli.mjs');
@@ -1126,7 +1127,7 @@ function jugarElSellado(): void {
    * y sin que nadie lo notara hasta preguntarse por que ya no marca nada.
    *
    * No saltaba porque `numeroDeRondas` devuelve cuatro para este juego —deduce
-   * las vigilias de `plot.clues`, que aqui van vacias— y la trama genera cuatro.
+   * las vigilias de `pistasDeLaTrama(plot)`, que aqui van vacias— y la trama genera cuatro.
    * Dos numeros que coincidian sin que nadie los hubiera atado.
    */
   const larga = armar();

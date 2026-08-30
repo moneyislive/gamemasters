@@ -13,6 +13,7 @@ import { esc } from '../../html';
 import { envolver, portada } from '../comun';
 import type { DocumentRenderOptions, GameSession, Plot } from '../../../../../shared/types';
 import { culpableDe, sospechososDe } from '../../../juegos/cluedo';
+import { pistasDeLaTrama } from '../../../../../shared/mecanicas/pistas';
 
 export function matrizConocimiento(
   game: GameSession,
@@ -58,7 +59,7 @@ export function matrizConocimiento(
 
   // A quién puede señalar cada pista: el otro sentido de la misma pregunta.
   const senalados = new Map<string, string[]>();
-  for (const pista of plot.clues) {
+  for (const pista of pistasDeLaTrama(plot)) {
     for (const personaje of plot.characters) {
       const nombre = nombreDe(personaje.participanteId);
       if (pista.pointsTo.toLowerCase().includes(nombre.toLowerCase())) {

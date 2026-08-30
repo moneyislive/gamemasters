@@ -44,6 +44,15 @@ import { Vigilia } from './momia/vigilia';
 import { Amanecer } from './momia/amanecer';
 import { Hora } from './sombras/hora';
 import { Alba } from './sombras/alba';
+/*
+ * El desenlace de El Nudo de Valdehierro se llama `Amanecer` en su fichero, igual
+ * que el de la Momia. Los dos nombres son buenos en su juego y ninguno debe
+ * cambiar allí, así que la colisión se resuelve AQUÍ, que es el único sitio donde
+ * los dos coinciden. Sin el alias esto no compila, que es exactamente lo que se
+ * quiere: la alternativa —que uno de los dos ganara en silencio— pintaría el
+ * final de la Momia a quien acaba de jugar al Nudo.
+ */
+import { Amanecer as AmanecerDelNudo } from './nudo/amanecer';
 import type { JuegoId } from '../../shared/juegos';
 
 /**
@@ -75,6 +84,24 @@ export const PANTALLAS_DE_JUEGO: Record<
   cluedo: { cuaderno: Cuaderno, hechos: Hechos },
   momia: { ronda: Vigilia, desenlace: Amanecer },
   sombras: { ronda: Hora, desenlace: Alba },
+  /*
+   * El Nudo de Valdehierro declara `desenlace` Y NO `ronda`, y la ausencia es
+   * deliberada, no un olvido.
+   *
+   * Su barra —la del manifiesto— no nombra la pestaña `ronda` en ningún sitio:
+   * enseña `cuadro` y `puesto`, que son suyas. Y una pestaña que la barra no
+   * nombra no se pinta jamás, así que la ronda genérica de CLUEDO —elegir sala,
+   * ver pistas, acusar— no llega a verse ni con este juego ni sin esta fila.
+   * Poner aquí `ronda` sería declarar una sustitución que nadie pide: un
+   * componente montado en el binario, cargado en cada arranque, imposible de
+   * alcanzar, y —lo peor— una pista falsa para quien lea esta tabla buscando
+   * dónde se juega el Nudo. Se juega en `cuadro` y en `puesto`.
+   *
+   * El `desenlace` sí hace falta: esa pantalla es de la plataforma y se pinta
+   * al acabar cualquier partida, así que sin esta fila el Nudo terminaría con
+   * el final de CLUEDO —quién, con qué y dónde— encima de una noche de trenes.
+   */
+  nudo: { desenlace: AmanecerDelNudo },
 };
 
 /**

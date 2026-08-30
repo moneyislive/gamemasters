@@ -38,7 +38,7 @@ import { generateDemoPlot } from '../src/plot/cluedo-demo';
 import { armarPaquete } from '../src/docs/paquete';
 import { renderDocumentIndex, renderPlayerDocument } from '../src/docs/renderer';
 import { renderPrintableDocument } from '../src/docs/imprimibles';
-import { lugaresDe, personasDe, todosLosTrofeos, trofeosQueChocan } from '../../shared/juegos';
+import { juegosInstalados, lugaresDe, personasDe, todosLosTrofeos, trofeosQueChocan } from '../../shared/juegos';
 import { TROFEOS } from '../../shared/live';
 import '../src/juegos/instalados';
 import { juegosConMaterial } from '../src/juegos/materiales';
@@ -785,7 +785,15 @@ async function probar(): Promise<void> {
      * deja código al que no llega nadie.
      */
     const conGenerador = new Set(juegosConMaterial());
-    for (const juego of ['cluedo', 'momia'] as const) {
+    /*
+     * LA LISTA ESTABA ESCRITA A MANO Y SE QUEDO CORTA. Eran `cluedo` y `momia`,
+     * asi que El Paso de las Sombras y El Nudo de Valdehierro no pasaban por
+     * aqui: podian declarar `materialDeVelada` sin generador —un boton que da
+     * 409— o al reves —codigo al que no llega nadie— sin que nada avisara.
+     * Ahora se recorren los juegos INSTALADOS, que es lo que la comprobacion
+     * queria decir desde el principio, y un juego nuevo entra solo.
+     */
+    for (const juego of juegosInstalados().map((m) => m.id)) {
       comprobar(
         `«${juego}»: lo que declara el manifiesto y lo que hay registrado coinciden`,
         (manifiestoDe(juego).materialDeVelada === true) === conGenerador.has(juego),

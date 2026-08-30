@@ -141,9 +141,9 @@ const plot: Plot = {
     { participanteId: 'b', characterName: 'Berta', role: 'Cantera', publicPersona: '', secret: '', motive: '', alibi: '', knowledge: [], personalHook: '' },
   ],
   timeline: [],
-  clues: [
+  mecanicas: { pistas: [
     { id: 'k1', lugarId: 'l0', description: 'Una cuerda cortada.', pointsTo: 'Alguien bajó por aquí.', round: 1 },
-  ],
+  ] },
   gmScript: [],
 };
 game.plot = plot;

@@ -497,10 +497,213 @@ const SOMBRAS: PalabrasDeJuego = {
   },
 };
 
+/**
+ * El Nudo de Valdehierro.
+ *
+ * ═══ EL REGISTRO ES DE USTED, Y NO POR LO MISMO QUE EN LA MANSIÓN ═══
+ *
+ * Allí se trata de usted porque el mayordomo es un empleado y quien organiza es
+ * su señor. Aquí se trata de usted porque en el servicio ferroviario se trataba
+ * de usted hasta entre compañeros de veinte años: es el registro del Reglamento
+ * de Circulación, no el de la servidumbre. Y va con frases cortas, que es lo
+ * segundo que distingue a este de aquel: el Jefe de Estación no adorna nada.
+ *
+ * DE USTED EN TODOS LOS BLOQUES, incluido el del plano. CLUEDO mezcla —su
+ * recibidor dice «Pulse» y su plano dice «Has elegido»— porque esas frases se
+ * escribieron en sitios distintos y en años distintos. Aquí no se hereda la
+ * mezcla: si el juego habla de usted, el taller habla de usted en las setenta.
+ *
+ * LA PARTIDA ES UN TURNO Y LA FICCIÓN ES UNA NOCHE, y los dos nombres conviven
+ * a propósito. Lo que se abre, se borra y se lista es un TURNO —«¿Cerrar este
+ * turno?»—, porque es lo que se cubre y lo que tiene gente dentro. Lo que se
+ * numera en la pestaña de la ficha es una NOCHE, porque «Noche n.º 003» es lo
+ * que uno escribiría a mano en la tapa del libro de servicio. Usar «noche» para
+ * todo habría dejado media docena de frases idénticas a las de El Paso de las
+ * Sombras, que también cuenta noches y no tiene nada que ver con esta.
+ */
+const NUDO: PalabrasDeJuego = {
+  /*
+   * Un aspa de paso a nivel, y del PLANO BÁSICO, que es la lección que pagó la
+   * Momia con sus glifos: fuera de él se ve en Windows y sale como un cuadradito
+   * en el móvil. Los otros tres tienen cogidos ❖, ☥ y ◇, así que la silueta
+   * tampoco se repite —el separador no lleva rótulo y el signo es todo lo que
+   * hay para saber en qué juego está uno—.
+   */
+  ornamento: '✕',
+  recibidor: {
+    kicker: 'Valdehierro, antes del relevo',
+    titulo: 'Turnos de noche',
+    sub: 'Cada turno es una madrugada: seis convoyes rodando, seis franjas para colocarlos y un cuadro de marchas que ardió con la oficina.',
+    nueva: '✦ Nuevo turno',
+    creando: 'Dando de alta el turno…',
+    cargando: 'Encendiendo las señales…',
+    ficha: 'Noche n.º',
+    vacioTitulo: 'Todavía no se ha cubierto ningún turno',
+    vacioTexto: 'Pulse «Nuevo turno» y el Jefe de Estación pasará lista al personal.',
+    vacioBoton: 'Cubrir el primer turno',
+    vacioMarca: '✕',
+    estados: { draft: 'Sin cuadro', generating: 'Rehaciendo…', ready: 'Cuadro rehecho' },
+    /*
+     * TRES DE LAS CUATRO CATEGORÍAS, y los cargamentos son los que se quedan
+     * fuera: no entran en el rompecabezas —lo dice su propia declaración en el
+     * manifiesto— y de un vistazo a la ficha lo que se quiere saber es si hay
+     * gente, si están los seis y si la casa tiene puestos suficientes.
+     *
+     * HOY ESTA TUPLA NO LA PINTA NADIE. La ficha del recibidor recorre las
+     * categorías del manifiesto desde que un juego con cuatro tenía la cuarta
+     * invisible, y el contrato conservó el campo. Se rellena igual porque
+     * mientras esté declarado no rellenarlo es una omisión, no una postura.
+     */
+    contadores: ['de turno', 'convoyes', 'puestos'],
+    confirmarCierre: '¿Cerrar este turno para siempre?',
+    errorCargar: 'No se pudieron cargar los turnos. ¿Está el servidor en marcha?',
+    errorCrear: 'No se pudo abrir un turno nuevo.',
+    errorBorrar: 'No se pudo borrar el turno.',
+    abrirAria: (nombre) => `Abrir el turno ${nombre}`,
+    borrarAria: (nombre) => `Borrar el turno ${nombre}`,
+  },
+  /*
+   * UNA SOLA EXCEPCIÓN, Y ES ORTOGRÁFICA. El plural del manifiesto capitalizado
+   * sirve tal cual para «Ferroviarios», «Convoyes» y «Puestos». Para la cuarta
+   * daría «Mercancias», sin tilde: el id de una categoría es un identificador y
+   * por eso se escribe sin acentos, pero una pestaña no es un identificador.
+   * Y ya que hay que escribirla, se escribe la palabra que se dice en la mesa:
+   * lo que va en los vagones son cargamentos.
+   */
+  rotulos: { mercancias: 'Cargamentos' },
+  /*
+   * LAS CUATRO EN MASCULINO, Y `mercancias` ES EXACTAMENTE POR LO QUE ESTE
+   * CAMPO EXISTE. El artículo se pega al SINGULAR de la categoría, y el singular
+   * de esta es «cargamento». La regla cómoda —termina en -a, es femenino— mira
+   * el id de la categoría, que es el plural, y lo daría por femenino: «Nueva
+   * cargamento», «No se pudo eliminar la cargamento». Declarado no falla, y
+   * declararlo cuesta una palabra.
+   */
+  articulos: { ferroviarios: 'el', convoyes: 'el', puestos: 'el', mercancias: 'el' },
+  taller: {
+    volver: '← Valdehierro',
+    pestanaEstilo: 'Estilo',
+    pestanaTablero: 'La estación',
+    pestanaDosieres: 'Dosieres',
+    pestanaVivo: 'En vivo',
+    kicker: 'Turno',
+    nombreAria: 'Nombre del turno',
+    listo: '✦ Cuadro rehecho · Ver dosieres',
+    desactualizado: '⚠ El turno ha cambiado',
+    generar: '✦ REHACER EL CUADRO',
+    actualizar: '✦ ACTUALIZAR EL CUADRO',
+    regenerar: '↻ Rehacer otro cuadro',
+    confirmarRegenerar: '¿Seguro? Pulse otra vez',
+    tipTrabajando: 'El Jefe de Estación ya está trabajando…',
+    tipGenerar:
+      'Rehace el cuadro de marchas, reparte los cuatro oficios y redacta las tiras que se salvaron del fuego.',
+    tipRegenerar:
+      'Descarta el cuadro actual —el orden de los seis convoyes, los oficios y los dosieres— y rehace otro distinto.',
+    tipConfirmar: 'Pulse otra vez para descartar este cuadro y rehacer otro.',
+    /*
+     * SE CONTRAE, y por eso va la coletilla entera y no el nombre suelto. El
+     * asistente se llama «El Jefe de Estación» y la frase pide un «de»: a trozos
+     * saldría «de El Jefe de Estación». Es el mismo motivo por el que la Momia
+     * escribe «del Escriba» aquí en vez de componerlo.
+     */
+    tipConAyuda: ', con ayuda del Jefe de Estación para lo que falte',
+    extraviadoTitulo: 'Este turno no consta en el libro',
+    extraviadoTexto: 'No se pudo abrir. Quizá se borró, o el servidor no responde.',
+    extraviadoVolver: '← Volver a Valdehierro',
+    abriendo: 'Abriendo el libro de servicio…',
+    buscando: 'Buscando el turno en el libro…',
+  },
+  /*
+   * Una «ronda» es aquí una FRANJA: los cuarenta minutos de reloj en los que
+   * tiene que salir un convoy y solo uno. Quien dirige va a decirlo seis veces
+   * en voz alta esta noche, y «abrir la ronda tres» en una estación de 1927
+   * rompe la ficción tan bien como una alarma de móvil.
+   */
+  vivo: {
+    abrirSala: 'Pasar lista al turno',
+    sinTrama: 'Rehaga antes el cuadro de marchas: sin él no hay noche que sacar.',
+    /*
+     * ESTE BOTÓN DESTAPA EL FINAL, NO TERMINA LA NOCHE. Llama a
+     * `/live/desenlace` con la mesa delante y enseña en qué orden iban los seis;
+     * el que levanta la mesa y anula los códigos está más abajo en `LivePanel`,
+     * escrito a fuego y fuera de este fichero. Por eso aquí NO dice «dar el
+     * parte del amanecer»: ese rótulo se lee como «ya hemos terminado» y quien
+     * dirige lo pulsaría para cerrar, que es justo el momento en el que esto
+     * abre el cuadro verdadero delante de todo el mundo.
+     *
+     * Y dice «abrir» como sus tres hermanos —el sobre, el pliego, el papiro—
+     * porque lo que hace es exactamente eso: hay un papel lacrado y se rompe.
+     */
+    desenlace: 'Abrir el cuadro verdadero',
+    abrirRonda: (n) => `Abrir la franja ${n}`,
+    cerrarRonda: 'Cerrar la franja',
+    rondaEnCurso: (n, total) => `Franja ${n} de ${total} · en curso`,
+    rondaCerrada: (n) => `Franja ${n} cerrada`,
+    /*
+     * «CUADROS» Y NO «SEÑALAMIENTOS» NI «ACUSACIONES», y aquí la diferencia no
+     * es de tono: en esta noche no se señala a nadie. Lo que cada cual entrega
+     * es su cuadro de marchas —los seis convoyes en las seis franjas, de
+     * memoria—, y llamarlo de cualquiera de las otras dos maneras prometería un
+     * culpable que no existe en toda la partida.
+     */
+    respuestasRecibidas: (cuantas, total) => `${cuantas} de ${total} cuadros entregados.`,
+    /*
+     * «No figura en el turno» y no «no tiene puesto»: los puestos son la
+     * categoría de lugares de este juego, y quien lee esto entendería que a esa
+     * persona le falta una habitación, no una silla.
+     */
+    sinSilla: (cuantos) =>
+      cuantos === 1
+        ? 'Hay una persona apuntada a esta noche que todavía no figura en el turno.'
+        : `Hay ${cuantos} personas apuntadas a esta noche que todavía no figuran en el turno.`,
+    sentarAQuienFalte: 'Dar de alta a quien falte',
+  },
+  /*
+   * El plano de este juego es la PLANTA DE LA ESTACIÓN, y sus lugares son los
+   * PUESTOS: la pestaña que los edita se llama así y estas frases mandan a ella
+   * por su nombre. Los pasadizos son ATAJOS DE SERVICIO —el paso de servicio que
+   * une dos dependencias sin salir al andén ni cruzar la vía—, que es lo que un
+   * ferroviario llamaría a un camino que no está en el plano del público.
+   */
+  plano: {
+    aereoSinPlano:
+      'Ha elegido jugar sobre el espacio real. Suba la fotografía cenital desde la pestaña de ' +
+      'puestos y clave una chincheta en cada uno.',
+    conChincheta: (n) => `${n} ${n === 1 ? 'puesto' : 'puestos'} sobre el plano real`,
+    sinChinchetas:
+      'Aún no ha clavado ninguna chincheta. Vuelva a la pestaña de puestos y haga clic sobre la fotografía.',
+    sinLugares:
+      'Añada primero algunos puestos: sin saber qué dependencias tiene la estación no hay planta que levantar.',
+    invitacion: 'Levante la planta de Valdehierro y mire por dónde se corta de un puesto a otro.',
+    leyenda: (lugares, pasos) =>
+      `${lugares} puestos · ${pasos} ${pasos === 1 ? 'atajo de servicio' : 'atajos de servicio'}`,
+    pistaPasos:
+      'Los trazos discontinuos son atajos de servicio: se pasa de un puesto a otro sin cruzar la vía.',
+  },
+  asistente: {
+    subtitulo: 'Jefe de estación de Valdehierro',
+    /*
+     * PIDE LAS CUATRO COSAS QUE NECESITA Y AVISA DE LA ÚNICA QUE TIENE NÚMERO
+     * FIJO. Los convoyes son EXACTAMENTE seis —su categoría lo declara con
+     * `exacto`—, así que si no se dice aquí, se dice más tarde en forma de error
+     * al generar, que es el peor sitio para enterarse.
+     */
+    bienvenida:
+      'A sus órdenes. Ha ardido la oficina del telégrafo y con ella el cuadro de marchas: hay que ' +
+      'rehacerlo antes de que amanezca. Dígame quién está de turno esta noche, qué seis convoyes ' +
+      'tienen que cruzar —seis, ni uno más ni uno menos—, qué habitaciones de su casa van a ser ' +
+      'los puestos y qué va en los vagones. De repartir las tiras del telégrafo me encargo yo.',
+    servicio: 'El Jefe de Estación está de servicio',
+    pensando: 'El Jefe de Estación consulta el Reglamento…',
+    marcador: 'Hable con El Jefe de Estación…',
+  },
+};
+
 const PALABRAS: Record<JuegoId, PalabrasDeJuego> = {
   cluedo: CLUEDO,
   momia: MOMIA,
   sombras: SOMBRAS,
+  nudo: NUDO,
 };
 
 /**

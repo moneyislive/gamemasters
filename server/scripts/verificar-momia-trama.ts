@@ -23,6 +23,13 @@
  * resultado queda SANO. Una comprobación que solo mirara lo primero pasaría en
  * verde aunque el arreglo no se aplicase.
  */
+/*
+ * PRIMERO EL REGISTRO. Sin esto no hay ninguna plantilla de imprimible dada de
+ * alta y los trece documentos de la Momia devuelven `null`: treinta y tres
+ * comprobaciones en rojo por un import que falta, no por la trama. Es la
+ * trampa que documenta `instalados.ts` en su cabecera.
+ */
+import '../src/juegos/instalados';
 import { cimientosDeMomia, VIGILIAS_POR_DEFECTO } from '../src/plot/momia-cimientos';
 import type { EntidadesDeMomia } from '../src/plot/momia-cimientos';
 import { ensamblarTramaMomia, entidadesDeLaMomia, loQueFalta } from '../src/plot/momia-generacion';
@@ -42,6 +49,7 @@ import { renderPrintableDocument } from '../src/docs/imprimibles';
 import { DONES } from '../src/docs/imprimibles/momia/datos';
 import type { PrintableDocId } from '../../shared/documents';
 import type { GameSession } from '../../shared/types';
+import { pistasDeLaTrama } from '../../shared/mecanicas/pistas';
 
 // ---------------------------------------------------------------------------
 // Marcador
@@ -287,7 +295,7 @@ comprobar('hay un dosier por expedicionario', sana.plot.characters.length === EX
 comprobar('la solución señala a un expedicionario de verdad',
   EXPEDICION.some((e) => e.id === sana.plot.solution.respuestas.saqueador));
 comprobar('la trama del juego viaja en delJuego', Boolean(sana.plot.delJuego));
-comprobar('no se emiten pistas de CLUEDO', sana.plot.clues.length === 0);
+comprobar('no se emiten pistas de CLUEDO', pistasDeLaTrama(sana.plot).length === 0);
 comprobar('hay una narración por vigilia, más la apertura',
   sana.plot.material?.narrations.length === VIGILIAS_POR_DEFECTO + 1);
 
@@ -741,7 +749,14 @@ comprobar('nadie se queda sin don', Object.keys(dones).length === EXPEDICION.len
 seccion('Ritos con nombres calcados: se admite en vez de disimular');
 
 const gemelos = partidaDeMomia('momia-gemelos');
+/*
+ * SE FUNDE, no se sustituye. Antes las otras tres categorias vivian en
+ * `suspects`, `rooms` y `weapons`, asi que pisar `entidades` entero solo
+ * cambiaba los ritos. Ahora estan todas aqui: sustituirlo dejaba la tumba sin
+ * camaras donde esconder los fragmentos.
+ */
 gemelos.entidades = {
+  ...gemelos.entidades,
   ritos: [
     { id: 't1', name: 'Rito del Agua' },
     { id: 't2', name: 'Rito del Agua' },

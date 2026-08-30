@@ -32,7 +32,6 @@ function tramaMinima(sesion: { players: Array<{ participanteId: string; displayN
       personalHook: '',
     })),
     solution: { respuestas: { culpable: 's1', objeto: 'w0', lugar: 'r0' } },
-    clues: [],
     timeline: [],
   } as never;
 }

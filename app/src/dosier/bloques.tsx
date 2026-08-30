@@ -50,7 +50,9 @@ import {
 import { TarjetaDon } from '../momia/vigilia';
 import { leerEstadoMomia } from '../momia/vista';
 import { leerEstadoSombras } from '../sombras/vista';
+import { leerEstadoNudo } from '../nudo/vista';
 import { Mon, TarjetaDisfraz } from '../sombras/piezas';
+import { ejeDeJugadores } from '../../../shared/juegos';
 import type { BloqueDeDosier, ManifiestoDeJuego } from '../../../shared/juegos';
 import type { VistaJugador } from '../../../shared/live';
 
@@ -171,23 +173,42 @@ function capitalizar(texto: string): string {
 const Identidad: Bloque = ({ vista, manifiesto }) => {
   const { yo } = vista;
   const veredicto = VEREDICTO[manifiesto.id] ?? VEREDICTO_DE_CLUEDO;
+  /*
+   * EL VEREDICTO SOLO SE PINTA SI HAY A QUIEN SENALAR.
+   *
+   * `soyElSenalado` significa «hay un eje de la respuesta que apunta a alguien
+   * de la mesa, y eres tu». En un juego SIN ese eje --El Nudo de Valdehierro no
+   * tiene culpable, ni traidor, ni nadie a quien acusar-- es falso para todo el
+   * mundo y toda la noche, asi que este bloque pintaba «No eres el asesino» en
+   * la primera linea del dosier de doce ferroviarios.
+   *
+   * Se pregunta al MANIFIESTO y no al id del juego: `ejeDeJugadores` devuelve
+   * `undefined` exactamente cuando ningun eje senala a una persona. Asi el
+   * siguiente juego sin culpable no tiene que acordarse de nada.
+   */
+  const hayAQuienSenalar = ejeDeJugadores(manifiesto) !== undefined;
   return (
     <Animated.View entering={FadeInUp.delay(80).duration(500)}>
       <Marco style={estilos.identidad}>
         <Etiqueta style={{ textAlign: 'center' }}>Eres</Etiqueta>
         <Titulo style={estilos.papel}>{yo.role}</Titulo>
-        <View
-          style={[
-            estilos.veredicto,
-            yo.soyElSenalado ? estilos.veredictoCulpable : estilos.veredictoInocente,
-          ]}
-        >
-          <Cuerpo
-            style={[estilos.veredictoTexto, { color: yo.soyElSenalado ? '#f0c9c0' : color.oro300 }]}
+        {hayAQuienSenalar ? (
+          <View
+            style={[
+              estilos.veredicto,
+              yo.soyElSenalado ? estilos.veredictoCulpable : estilos.veredictoInocente,
+            ]}
           >
-            {yo.soyElSenalado ? veredicto.si : veredicto.no}
-          </Cuerpo>
-        </View>
+            <Cuerpo
+              style={[
+                estilos.veredictoTexto,
+                { color: yo.soyElSenalado ? '#f0c9c0' : color.oro300 },
+              ]}
+            >
+              {yo.soyElSenalado ? veredicto.si : veredicto.no}
+            </Cuerpo>
+          </View>
+        ) : null}
       </Marco>
     </Animated.View>
   );
@@ -473,6 +494,92 @@ const Mesa: Bloque = ({ vista, manifiesto }) => (
  * La tabla. Un `Record` cerrado sobre la unión: añadir un bloque a
  * `BloqueDeDosier` y no escribirlo aquí NO COMPILA.
  */
+/**
+ * EL OFICIO DEL NUDO. Es una seccion obligatoria de su dosier y la que mas se
+ * consulta durante la noche: dice que instrumento manejas y que puedes hacer tu
+ * una sola vez en toda la velada.
+ *
+ * La MANA va destacada porque es lo que la gente busca a las dos de la manana, y
+ * lleva encima si esta gastada o armada: los tres efectos que se arman --el
+ * indulto, la consulta gratis y la llave maestra-- se gastan en la accion
+ * siguiente, asi que hay que poder ver de un vistazo si te queda uno puesto.
+ */
+const Oficio: Bloque = ({ vista, manifiesto }) => {
+  if (manifiesto.id !== 'nudo') return null;
+  const nudo = leerEstadoNudo(vista.estadoDelJuego);
+  if (!nudo) return null;
+  const armado = nudo.yo.indulto || nudo.yo.consultaGratis || nudo.yo.sinConformidad;
+  return (
+    <Animated.View entering={FadeInUp.delay(150).duration(500)}>
+      <Marco>
+        <Etiqueta>Tu oficio</Etiqueta>
+        <Titulo style={{ fontSize: 20, marginTop: 2 }}>{nudo.yo.oficioNombre}</Titulo>
+        <Cuerpo tenue style={{ fontSize: 13, marginTop: espacio.xs }}>
+          Tu instrumento es {nudo.yo.instrumentoNombre}. Ahi rindes el doble: cada vez que lo
+          resuelvas te llevas un punto mas de margen.
+        </Cuerpo>
+
+        <View style={{ marginTop: espacio.md }}>
+          <Etiqueta>{nudo.yo.manaUsada ? 'Tu mana (gastada)' : 'Tu mana'}</Etiqueta>
+          <View style={{ height: espacio.xs }} />
+          <Cuerpo style={{ opacity: nudo.yo.manaUsada ? 0.45 : 1 }}>{nudo.yo.mana.nombre}</Cuerpo>
+          <Cuerpo tenue style={{ fontSize: 13, opacity: nudo.yo.manaUsada ? 0.45 : 1 }}>
+            {nudo.yo.mana.texto}
+          </Cuerpo>
+          {armado ? (
+            <Cuerpo style={{ fontSize: 13, marginTop: espacio.xs, color: color.oro300 }}>
+              La tienes puesta: se gasta con la siguiente accion que valga.
+            </Cuerpo>
+          ) : null}
+        </View>
+
+        <View style={{ marginTop: espacio.md }}>
+          <Etiqueta>Tu margen</Etiqueta>
+          <Cuerpo>{nudo.yo.margen}</Cuerpo>
+        </View>
+      </Marco>
+    </Animated.View>
+  );
+};
+
+/**
+ * TUS TELEGRAMAS. Las tiras que salvaste del fuego.
+ *
+ * ESTAN EN PAPEL Y AQUI TAMBIEN, Y NO ES REDUNDANCIA. El juego se juega
+ * leyendolas en voz alta encima de la mesa: el sobre de papel es el material de
+ * verdad. Esto es la copia de servicio para quien haya perdido su sobre, para
+ * quien juegue sin haber impreso nada y --sobre todo-- para no tener que dejar
+ * la tira encima de la mesa cuando te levantas a ocupar un puesto. Que esten en
+ * el movil no quita ninguna razon para decirlas en voz alta: nadie mas las ve.
+ *
+ * SOLO LAS TUYAS. La proyeccion del servidor manda unicamente las de esta
+ * persona; aqui no hay nada que filtrar porque no ha llegado nada mas.
+ */
+const Telegramas: Bloque = ({ vista, manifiesto }) => {
+  if (manifiesto.id !== 'nudo') return null;
+  const nudo = leerEstadoNudo(vista.estadoDelJuego);
+  if (!nudo || nudo.yo.telegramas.length === 0) return null;
+  return (
+    <Animated.View entering={FadeInUp.delay(190).duration(500)}>
+      <Marco>
+        <Etiqueta>
+          {nudo.yo.telegramas.length === 1
+            ? 'La tira que salvaste'
+            : `Las ${nudo.yo.telegramas.length} tiras que salvaste`}
+        </Etiqueta>
+        <Cuerpo tenue style={{ fontSize: 13, marginTop: espacio.xs, marginBottom: espacio.sm }}>
+          Nadie mas las ve. El cuadro no sale sin ellas: leelas en voz alta.
+        </Cuerpo>
+        {nudo.yo.telegramas.map((t) => (
+          <View key={t.id} style={estilos.telegrama}>
+            <Cuerpo style={estilos.telegramaTexto}>{t.texto}</Cuerpo>
+          </View>
+        ))}
+      </Marco>
+    </Animated.View>
+  );
+};
+
 export const BLOQUES: Record<BloqueDeDosier, Bloque> = {
   identidad: Identidad,
   senalado: Senalado,
@@ -490,9 +597,30 @@ export const BLOQUES: Record<BloqueDeDosier, Bloque> = {
   mesa: Mesa,
   don: Don,
   disfraz: Disfraz,
+  oficio: Oficio,
+  telegramas: Telegramas,
 };
 
 const estilos = StyleSheet.create({
+  /*
+   * La tira de telegrama. Monoespaciada de espiritu y con el borde discontinuo
+   * del papel recortado: en la mesa hay una tira de verdad al lado que se ve
+   * exactamente asi, y que las dos se parezcan es lo que hace que la app no
+   * parezca otra cosa distinta del juego.
+   */
+  telegrama: {
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: 'rgba(201,162,39,0.4)',
+    paddingVertical: espacio.sm,
+    paddingHorizontal: espacio.md,
+    marginBottom: espacio.sm,
+  },
+  telegramaTexto: {
+    fontSize: 13,
+    letterSpacing: 0.6,
+    lineHeight: 20,
+  },
   identidad: {
     alignItems: 'stretch',
     borderColor: color.oro400,

@@ -1025,16 +1025,37 @@ for (const pantalla of ['index.tsx', 'avatar.tsx', 'cuenta.tsx']) {
  */
 paso('Ninguna tabla de módulo nombra algo que todavía no existe');
 {
-  const ficheros = [
-    path.join(SRC, 'tema-juego.ts'),
-    path.join(SRC, 'pantallas.ts'),
-    path.join(SRC, 'dosier', 'bloques.tsx'),
-    path.join(SRC, 'iconos.tsx'),
-    path.join(SRC, 'ui.tsx'),
-    path.join(SRC, 'barra.tsx'),
-  ].filter((f) => fs.existsSync(f));
+  /*
+   * ═══ SE RECORREN TODOS, Y ANTES ERAN SEIS ESCRITOS A MANO ═══
+   *
+   * La lista era `tema-juego.ts`, `pantallas.ts`, `dosier/bloques.tsx`,
+   * `iconos.tsx`, `ui.tsx` y `barra.tsx` — los seis que tenían tabla el día que
+   * se escribió esto. El fallo que caza no es de esos seis ficheros: es de
+   * CUALQUIER módulo que declare un `const` que nombre otro `const` de más
+   * abajo, y el cuarto juego trajo cinco ficheros nuevos con tablas y paletas
+   * que la lista no miraba.
+   *
+   * Una lista escrita a mano en un comprobador se queda vieja con cada juego, y
+   * se queda vieja EN SILENCIO: sigue en verde mirando seis ficheros de los
+   * cuarenta que hay. Recorrer `src/` y `app/` enteros cuesta unos milisegundos
+   * y no hay que acordarse de nada.
+   */
+  const recorrer = (dir) =>
+    fs.existsSync(dir)
+      ? fs
+          .readdirSync(dir, { withFileTypes: true })
+          .flatMap((e) =>
+            e.isDirectory()
+              ? recorrer(path.join(dir, e.name))
+              : /\.tsx?$/.test(e.name)
+                ? [path.join(dir, e.name)]
+                : [],
+          )
+      : [];
 
-  comprobar('hay ficheros de tablas que revisar', ficheros.length >= 4, ficheros.length);
+  const ficheros = [...recorrer(SRC), ...recorrer(RUTAS)];
+
+  comprobar('hay ficheros de tablas que revisar', ficheros.length >= 20, ficheros.length);
 
   const prematuras = [];
   for (const fichero of ficheros) {

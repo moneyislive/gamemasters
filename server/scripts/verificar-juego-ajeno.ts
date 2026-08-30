@@ -18,7 +18,7 @@
  *   · SIN LUGARES. Ninguna categoría es `sonLugares`, así que no hay mapa, ni
  *     plano, ni chinchetas, ni salas donde entrar. La mecánica entera ocurre
  *     sobre una mesa.
- *   · SIN PISTAS. `plot.clues` va vacío: aquí no se encuentra nada, se puja.
+ *   · SIN PISTAS. `pistasDeLaTrama(plot)` va vacío: aquí no se encuentra nada, se puja.
  *   · SIN PERSONAJE QUE INTERPRETAR. Nadie tiene secreto, ni coartada, ni
  *     motivo. El dosier declara CERO bloques.
  *   · SIN VÍCTIMA. No ha muerto nadie.
@@ -48,7 +48,7 @@ import { ejes as ejesDe } from '../../shared/juegos';
 import type { ManifiestoDeJuego } from '../../shared/juegos';
 import type { GameSession, Plot } from '../../shared/types';
 import type { LiveSession } from '../../shared/live';
-import { leerBloqueDePistas } from '../../shared/mecanicas/pistas';
+import { pistasDeLaTrama, leerBloqueDePistas } from '../../shared/mecanicas/pistas';
 
 let hechas = 0;
 const fallos: string[] = [];
@@ -378,7 +378,6 @@ const plot: Plot = {
     knowledge: [],
   })),
   timeline: [],
-  clues: [],
   gmScript: [],
 };
 game.plot = plot;

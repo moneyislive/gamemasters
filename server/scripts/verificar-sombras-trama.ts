@@ -46,6 +46,7 @@ import { entidadesDe } from '../../shared/juegos';
 import type { TramaSombras } from '../../shared/juegos/sombras-tipos';
 import '../src/juegos/instalados';
 import type { GameSession } from '../../shared/types';
+import { pistasDeLaTrama } from '../../shared/mecanicas/pistas';
 
 let hechas = 0;
 const fallos: string[] = [];
@@ -324,7 +325,7 @@ comprobar('sin incidencias', buena.incidencias.length === 0, buena.incidencias);
 }
 comprobar(
   'sin pistas de CLUEDO: los hitos no viajan por ahí',
-  buena.plot.clues.length === 0,
+  pistasDeLaTrama(buena.plot).length === 0,
 );
 comprobar(
   'con material: una narración por hora más la de antes de empezar',

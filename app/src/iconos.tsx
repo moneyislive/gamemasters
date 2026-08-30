@@ -350,6 +350,44 @@ export function IconoAbanico(p: PropsIcono): JSX.Element {
   );
 }
 
+/**
+ * La aguja: el cambio de vía visto desde arriba.
+ *
+ * Dos raíles que se separan y la palanca que los mueve. Es el gesto del juego
+ * entero —decidir por dónde va cada convoy— y a 23 px no se confunde con nada
+ * de los otros tres: ningun icono de la app tiene una bifurcacion.
+ */
+export function IconoAguja(p: PropsIcono): JSX.Element {
+  return (
+    <Lienzo {...p}>
+      <Path d="M8 38 H40" />
+      <Path d="M8 30 H24 L40 14" />
+      <Circle cx={11} cy={22} r={3.5} />
+      <Path d="M11 25.5 V30" />
+    </Lienzo>
+  );
+}
+
+/**
+ * La locomotora: la caldera, la chimenea y dos ruedas.
+ *
+ * Es el icono del asistente. A este tamano una locomotora detallada se
+ * emborrona, asi que se dibuja lo unico que la hace reconocible de un vistazo:
+ * el cilindro, la chimenea alta y las dos ruedas de distinto tamano.
+ */
+export function IconoLocomotora(p: PropsIcono): JSX.Element {
+  return (
+    <Lienzo {...p}>
+      <Path d="M9 32 V20 h20 v12 z" />
+      <Path d="M29 32 V26 h8 l3 6 z" />
+      <Path d="M13 20 V13 h6 v7" />
+      <Circle cx={16} cy={37} r={4.5} />
+      <Circle cx={33} cy={38} r={3.2} />
+      <Path d="M7 42 H41" />
+    </Lienzo>
+  );
+}
+
 export const ICONOS: Record<IconoId, (p: PropsIcono) => JSX.Element> = {
   papiro: IconoPapiro,
   anj: IconoAnj,
@@ -364,4 +402,7 @@ export const ICONOS: Record<IconoId, (p: PropsIcono) => JSX.Element> = {
   copa: IconoPerfil,
   mayordomo: IconoMayordomo,
   farol: IconoFarol,
+  /* Los dos de El Nudo de Valdehierro. */
+  aguja: IconoAguja,
+  locomotora: IconoLocomotora,
 };

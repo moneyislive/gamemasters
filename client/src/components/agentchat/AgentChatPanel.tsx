@@ -148,6 +148,86 @@ function AvatarEscriba() {
 }
 
 /**
+ * Retrato de El Jefe de Estación: de frente, con la gorra de plato puesta.
+ *
+ * NI SIRVIENTE NI COMPAÑERO DE VIAJE, y la diferencia se ve antes de leer una
+ * palabra suya. El mayordomo mira de frente porque está a su servicio y el
+ * escriba va de perfil porque está mirando su papiro; este mira de frente
+ * porque es la AUTORIDAD de la estación —el Reglamento de Circulación lo dice
+ * así— y lo que lleva encima no es un uniforme de casa grande: es la gorra del
+ * servicio, con su plato, su visera y su chapa. Tratará de usted toda la noche,
+ * y la gorra ya lo estaba diciendo.
+ *
+ * La chapa de la gorra es el aspa del paso a nivel, el mismo signo que va en el
+ * centro del plano y en el trofeo «El Correo pasó». A este tamaño no se lee como
+ * un aspa —son cinco píxeles— pero se lee como que ahí hay una chapa, que es
+ * exactamente lo que se ve en una fotografía de 1927.
+ */
+function AvatarNudo() {
+  return (
+    <svg viewBox="0 0 64 64" role="img" aria-label="Retrato de El Jefe de Estación">
+      <defs>
+        <clipPath id="agentchat-medallon-jefe">
+          <circle cx="32" cy="32" r="29" />
+        </clipPath>
+      </defs>
+      <circle cx="32" cy="32" r="30" fill="var(--felt-800)" stroke="var(--gold-500)" strokeWidth="2" />
+      <circle cx="32" cy="32" r="26.5" fill="none" stroke="rgba(var(--acento-rgb), 0.35)" strokeWidth="1" />
+      <g clipPath="url(#agentchat-medallon-jefe)">
+        {/*
+          EL ORDEN DE ESTOS TRAZOS ES LA MITAD DEL DIBUJO, y se aprendió mirando
+          el del mayordomo: entre la barbilla y el hombro hay ocho unidades de
+          fondo, y cualquier cosa que se pinte ahí suelta —un pico de cuello, una
+          corbata— se queda flotando en el fieltro como un recorte. Así que
+          primero el cuello, que TAPA ese hueco, encima la guerrera, y solo
+          después lo que va cosido a ella.
+        */}
+        <path d="M28.2 41 h7.6 v13 h-7.6 z" fill="var(--parchment)" />
+        {/* La guerrera del servicio, abotonada hasta arriba porque hace ocho bajo cero */}
+        <path d="M11 62 Q32 44 53 62 L53 64 L11 64 Z" fill="var(--mahogany-800)" />
+        {/* Cuello duro, corbata negra de reglamento y los dos botones dorados */}
+        <path
+          d="M28.4 54.4 L32 58.8 L35.6 54.4"
+          fill="none"
+          stroke="var(--parchment)"
+          strokeWidth="2.2"
+          strokeLinejoin="round"
+        />
+        <path d="M32 58 l-2.2 2 l2.2 6 l2.2 -6 z" fill="var(--ink)" />
+        <circle cx="24.6" cy="56.4" r="1.3" fill="var(--gold-400)" />
+        <circle cx="39.4" cy="56.4" r="1.3" fill="var(--gold-400)" />
+        {/* Cara */}
+        <circle cx="32" cy="32.5" r="13.5" fill="var(--parchment)" />
+        {/* El plato de la gorra, más ancho que la cabeza: es lo que la hace de plato */}
+        <path d="M18 23.6 L17.2 17.4 Q17 14.6 21 14.3 L43 14.3 Q47 14.6 46.8 17.4 L46 23.6 Z" fill="var(--mahogany-700)" />
+        {/* La cinta, la chapa del aspa y la visera charolada */}
+        <path d="M18 23.4 h28 v3.4 h-28 z" fill="var(--ink)" />
+        <path d="M29.8 22.9 l4.4 2.4 M34.2 22.9 l-4.4 2.4" stroke="var(--gold-300)" strokeWidth="1.2" strokeLinecap="round" />
+        <path d="M15.4 26.6 Q32 33.2 48.6 26.6 Q32 29.6 15.4 26.6 Z" fill="var(--ink)" />
+        {/* Cejas y ojos: treinta años de turnos de noche, y ninguno de sorpresa */}
+        <path d="M24.4 31.4 q2.8 -1 5.6 0" stroke="rgba(var(--tinta-rgb), 0.5)" strokeWidth="1.1" fill="none" strokeLinecap="round" />
+        <path d="M34 31.4 q2.8 -1 5.6 0" stroke="rgba(var(--tinta-rgb), 0.5)" strokeWidth="1.1" fill="none" strokeLinecap="round" />
+        <circle cx="27.2" cy="33.8" r="1.5" fill="var(--ink)" />
+        <circle cx="36.8" cy="33.8" r="1.5" fill="var(--ink)" />
+        {/* Nariz */}
+        <path d="M32 34.2 q1.2 3.2 0 4.8" stroke="rgba(var(--tinta-rgb), 0.55)" strokeWidth="1" fill="none" strokeLinecap="round" />
+        {/*
+          BIGOTE DE CEPILLO, recto y recortado, y no el de manillar del
+          mayordomo: el de manillar es de salón y este hombre se afeita a las
+          cinco de la mañana en un cuarto sin espejo bueno.
+        */}
+        <path
+          d="M27.6 39.4 q4.4 -1.3 8.8 0 q0.5 2.5 -0.6 3 q-3.8 0.8 -7.6 0 q-1.1 -0.5 -0.6 -3 z"
+          fill="var(--mahogany-700)"
+        />
+        {/* Boca: una línea recta. Aquí no se sonríe hasta que cruza el sexto */}
+        <path d="M29.6 44 h4.8" stroke="rgba(var(--tinta-rgb), 0.5)" strokeWidth="1" fill="none" strokeLinecap="round" />
+      </g>
+    </svg>
+  );
+}
+
+/**
  * Qué cara pone el asistente de cada juego.
  *
  * Tabla y no campo del manifiesto por la misma razón que las cortinillas de
@@ -157,6 +237,7 @@ function AvatarEscriba() {
 const RETRATOS: Record<string, () => JSX.Element> = {
   cluedo: AvatarMayordomo,
   momia: AvatarEscriba,
+  nudo: AvatarNudo,
 };
 
 /** Icono de micrófono para la entrada por voz. */

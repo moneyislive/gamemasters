@@ -31,7 +31,7 @@ import { generateDemoPlot } from '../src/plot/cluedo-demo';
 import { CLUEDO, ejes as ejesDe, esElSenalado, fasesConPapel, lugaresDe, manifiestoDe, personasDe } from '../../shared/juegos';
 import type { GameSession } from '../../shared/types';
 import type { LiveSession, VistaJugador } from '../../shared/live';
-import { leerBloqueDePistas } from '../../shared/mecanicas/pistas';
+import { pistasDeLaTrama, leerBloqueDePistas } from '../../shared/mecanicas/pistas';
 import type { BloqueDePistas } from '../../shared/mecanicas/pistas';
 
 /**
@@ -317,7 +317,7 @@ async function jugar(): Promise<void> {
   comprobar('y acusar no altera la ronda en curso', v.sesion.phase === 'ronda-abierta', v.sesion.phase);
 
   paso('Elegir sala y leer lo que hay');
-  const conPista = game.plot!.clues.find((c) => c.round === 1 && c.lugarId)?.lugarId ?? 'r0';
+  const conPista = pistasDeLaTrama(game.plot!).find((c) => c.round === 1 && c.lugarId)?.lugarId ?? 'r0';
   const elegir = await pedir('/jugar/sala', { metodo: 'POST', testigo, cuerpo: { lugarId: conPista } });
   comprobar('elegir sala responde 200', elegir.estado === 200, elegir.datos);
   v = await vista();

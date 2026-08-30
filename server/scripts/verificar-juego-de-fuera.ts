@@ -286,7 +286,6 @@ const sembrada = {
       { participanteId: 't2', characterName: 'Carla', role: 'Trasnochadora', publicPersona: '', knowledge: [] },
     ],
     timeline: [],
-    clues: [],
     gmScript: [],
   },
 };

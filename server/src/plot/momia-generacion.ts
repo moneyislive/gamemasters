@@ -485,16 +485,6 @@ export function ensamblarTramaMomia(
     characters,
     timeline,
     /*
-     * SIN PISTAS, Y ES DELIBERADO. Un fragmento de papiro se parece a una pista
-     * —aparece en una cámara, en una vigilia— pero no lo es: es una pieza de un
-     * puzle lógico, algunas son MENTIRA, y quién se lleva cuál lo decide el
-     * reductor del juego. Metidas en `clues` viajarían por la proyección
-     * genérica de CLUEDO, que reparte por sala y no sabe de fragmentos falsos:
-     * el móvil recibiría las mentiras marcadas como pistas del caso. Viven en
-     * `delJuego`, que es de quien sabe leerlas.
-     */
-    clues: [],
-    /*
      * EL GUION TAMBIÉN PASA POR EL FILTRO, y era el único texto de la trama que
      * no lo hacía.
      *

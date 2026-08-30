@@ -95,7 +95,6 @@ const conTrama: GameSession = {
     solution: { respuestas: { saqueador: 's1' }, motive: 'Una deuda.', howItHappened: 'De noche.' },
     characters: [],
     timeline: [],
-    clues: [],
     gmScript: [],
   },
 } as unknown as GameSession;

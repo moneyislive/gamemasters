@@ -11,18 +11,15 @@
     "client/src/components/live/PanelDeLasSombras.tsx": 2,
     "client/src/juegos/palabras.ts": 1,
     "client/src/state/store.ts": 1,
-    "server/src/agent/demo.ts": 4,
     "server/src/board/generator.ts": 2,
-    "server/src/docs/datos.ts": 7,
+    "server/src/docs/datos.ts": 5,
     "server/src/docs/imprimibles/indicePaquete.ts": 1,
     "server/src/docs/renderer.ts": 2,
     "server/src/live/consejero.ts": 3,
-    "server/src/live/proyeccion.ts": 5,
+    "server/src/live/proyeccion.ts": 3,
     "server/src/live/sesion.ts": 2,
-    "server/src/plot/refresh.ts": 2,
     "shared/documents.ts": 1,
     "shared/live.ts": 3,
-    "shared/staleness.ts": 1,
-    "shared/types.ts": 6
+    "shared/types.ts": 5
   }
 }

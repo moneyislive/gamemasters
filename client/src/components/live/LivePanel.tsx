@@ -18,6 +18,7 @@ import { palabrasDe } from '../../juegos/palabras';
 import type { PalabrasDeJuego } from '../../juegos/palabras';
 import PanelDeLaMomia from './PanelDeLaMomia';
 import PanelDeLasSombras from './PanelDeLasSombras';
+import PanelDelNudo from './PanelDelNudo';
 import type { PropsDeMandosPropios } from './PanelDeLaMomia';
 import { llamar } from './llamar';
 import './live.css';
@@ -33,6 +34,7 @@ import './live.css';
 const MANDOS_PROPIOS: Record<string, ComponentType<PropsDeMandosPropios>> = {
   momia: PanelDeLaMomia,
   sombras: PanelDeLasSombras,
+  nudo: PanelDelNudo,
 };
 
 export default function LivePanel(): JSX.Element {

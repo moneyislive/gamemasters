@@ -114,6 +114,31 @@ deja entrar a nadie por error ni destapa nada.
 Puedes tener **dos fases con el mismo papel** —exploración y combate son las dos
 `turno`— y la plataforma prefiere la que sea alcanzable desde donde estés.
 
+> ### ⚠ Antes de inventarte los nombres, lee esto
+>
+> El contrato dice que son libres y **a día de hoy lo son a medias**. Lo midió
+> El Nudo de Valdehierro, que renunció a estrenarlos por esto (§11 de
+> `docs/nudo/DISENO.md`):
+>
+> - **`live/proyeccion.ts` todavía compara por nombre en seis sitios.** Uno de
+>   ellos decide si se compone `vista.desenlace`, así que con fases propias **la
+>   mesa no ve nunca la solución**: la partida termina, se reparten los trofeos,
+>   y en doce móviles no aparece nada. Sin error y sin aviso.
+> - **`live/panel.ts`, `live/invitaciones.ts` y `routes/cuenta.ts`** hacen lo
+>   mismo: la partida sale siempre «en curso» en el historial y nadie puede
+>   aceptar una invitación desde la sala de espera.
+> - **Cada fase se abre con una ruta POST escrita a mano** en `routes/live.ts`, y
+>   solo existen las de los nombres de CLUEDO. `verify:juegos` comprueba que toda
+>   fase alcanzable tenga la suya, pero **un nombre desconocido pasa sin
+>   comprobarse**: el taller pinta el botón y da un 404 delante de la mesa.
+>
+> Mientras eso siga así, lo seguro es usar los cinco nombres de siempre
+> —`lobby`, `ronda-abierta`, `ronda-cerrada`, `acusaciones`, `desenlace`— y
+> **cambiarles las palabras**, que es lo que sí está resuelto: `avisos` y
+> `rotulosDeAviso` mandan sobre los telones, y `client/src/juegos/palabras.ts`
+> sobre los botones del taller. La Momia llama «vigilia» a su `ronda-abierta`,
+> las Sombras «hora» y el Nudo «franja», y en la mesa nadie ve un nombre interno.
+
 ### Tus ejes, si hay algo que adivinar
 
 ```js
@@ -218,7 +243,9 @@ misterio, **quedan dos**. Esto es lo que ha dejado de hacer falta:
   entero en vez de pintar «La víctima · —».
 - **Un secreto, un motivo y una coartada por persona.** Los cuatro campos de
   `PlotCharacter` son opcionales.
-- **Los nombres de fase de CLUEDO.** Ya los pones tú.
+- **Los nombres de fase de CLUEDO.** Ya los pones tú *en el manifiesto* — pero
+  lee el aviso del §2 antes de estrenarlos: la plataforma todavía compara por
+  nombre en ocho sitios.
 - **Que tu gente viva en `suspects`.** Ya vive donde digas.
 - **Un motivo y un relato del crimen** en la solución.
 
@@ -232,6 +259,18 @@ Lo que **sí** queda, dicho sin adornos:
   `objetos`, `misPistas`, `cronologia`. Los mandas vacíos y ya está. El arreglo
   de verdad es que esos bloques bajen al juego, como bajaron los dosieres y los
   imprimibles, y toca las pantallas del móvil.
+- **`eligeVarias`, `eligeOpcional` y `eligeLibre` no llegan al móvil.**
+  `live/proyeccion.ts` solo aplana `eligeDe` y `pideNumero` en
+  `VistaJugador.acciones`, así que una acción declarada con cualquiera de las
+  tres se pinta como un botón sin campos. **Si tu juego las usa, necesitas
+  pantalla propia** — y con ella, una entrada en `PantallaDeApp` y publicar una
+  versión nueva de la app. Lo pagaron las Sombras con sus contraseñas y el Nudo
+  con sus minijuegos.
+- **`turnos: 'por-turnos'` no lo escribe nadie.** El motor lo comprueba, pero el
+  guardia es `sesion.turnoDe && …` y en todo el repositorio la única escritura de
+  ese campo es ponerlo a `undefined`. Un juego por turnos se comporta como uno
+  simultáneo **hasta que él mismo lo escriba y lo rote** desde su
+  `registrarInicio` y sus reductores. Ningún juego lo hace todavía.
 
 ---
 
@@ -241,13 +280,13 @@ Lo que **sí** queda, dicho sin adornos:
 npm run verificar
 ```
 
-Dieciséis comprobadores, veintiséis segundos. Los que más te importan:
+Veinte comprobadores. Los que más te importan:
 
 - **`verify:juegos`** recorre `juegosInstalados()`, así que **tu juego entra solo**
   y comprueba que lo que declaras existe: acciones con reductor, fases con ruta,
   documentos con plantilla, medallas que no se cruzan con las de otro, y que tu
   material no use el vocabulario de otro juego.
-- **`oro:verificar`** congela la salida completa de los tres juegos de casa. Si
+- **`oro:verificar`** congela la salida completa de los juegos de casa. Si
   tocas algo común, aquí sale.
 - **`verify:nucleo`** cuenta el vocabulario de CLUEDO en el tronco y falla si
   sube. Si tu juego necesita que el núcleo aprenda una palabra suya, algo va mal

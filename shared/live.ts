@@ -433,7 +433,22 @@ export type TrofeoId =
   | 'ojo-de-hanzo'
   | 'sin-rastro'
   | 'palabra-dada'
-  | 'sombra-de-akechi';
+  | 'sombra-de-akechi'
+  /*
+   * Los de El Nudo de Valdehierro.
+   *
+   * Ninguno es una palabra suelta, por la misma cautela que los de arriba: los
+   * ids no llevan prefijo de juego, así que el trofeo de la noche limpia se
+   * habría llamado `limpio` con toda naturalidad y habría chocado con el
+   * siguiente juego que quisiera esa palabra. `todosLosTrofeos` deduplica por
+   * id, así que el choque no da error: enseña el trofeo de uno con el nombre y
+   * el glifo del otro.
+   */
+  | 'paso-a-nivel'
+  | 'noche-sin-retraso'
+  | 'cuadro-de-memoria'
+  | 'mano-en-la-palanca'
+  | 'sin-consultar-archivo';
 
 export interface TrofeoInfo {
   id: TrofeoId;

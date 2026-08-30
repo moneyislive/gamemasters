@@ -12,6 +12,8 @@
 import { useEffect, useState } from 'react';
 import { Keyboard, Linking, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
+import type { Href } from 'expo-router';
+import { manifiestoSiExiste } from '../../shared/juegos';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import * as api from '../src/api';
 import { usePartida } from '../src/estado';
@@ -31,6 +33,31 @@ import {
   texto,
 } from '../src/ui';
 
+
+
+/**
+ * POR DONDE SE ENTRA A LA PARTIDA: la primera pestaña que el juego declara.
+ *
+ * ═══ AQUI HABIA `/(juego)/ronda` ESCRITO A MANO ═══
+ *
+ * Y funcionaba mientras todos los juegos tuvieran esa pestaña. El cuarto no la
+ * tiene: la barra de El Nudo de Valdehierro es `cuadro · puesto · planta · tú ·
+ * perfil`, y no hay ninguna «ronda». Al entrar, la app aterrizaba en una
+ * pantalla que ese juego NO enseña en su barra —la ronda genérica, con sus
+ * «Salas» y su botón de acusar— y quien jugaba veia el vocabulario de un
+ * asesinato antes de ver el suyo.
+ *
+ * No daba error. Es el fallo de siempre: la pantalla existe en el binario,
+ * expo-router navega a ella tan contento, y lo unico raro es que la barra de
+ * abajo no marca ninguna pestaña.
+ *
+ * Ahora sale del manifiesto. Un juego que declare `ronda` la primera entra
+ * exactamente donde entraba.
+ */
+function porDondeSeEntra(juego: string | undefined): Href {
+  const primera = manifiestoSiExiste(juego)?.barra?.[0]?.pantalla;
+  return (primera ? `/(juego)/${primera}` : '/(juego)/ronda') as Href;
+}
 export default function Entrar(): JSX.Element {
   const { vista, refrescar } = usePartida();
   /*
@@ -59,7 +86,7 @@ export default function Entrar(): JSX.Element {
   }, []);
 
   useEffect(() => {
-    if (vista) router.replace('/(juego)/ronda');
+    if (vista) router.replace(porDondeSeEntra(vista.sesion.juego));
   }, [vista]);
 
   /*
@@ -91,8 +118,14 @@ export default function Entrar(): JSX.Element {
       const escrito = servidor.trim();
       if (escrito && escrito !== api.servidorActual()) await api.fijarServidor(escrito);
       await api.entrar(codigo, personal);
+      /*
+       * Y no se navega aquí. `refrescar()` deja la vista en el contexto, y el
+       * efecto de arriba lleva a la primera pestaña que declare el juego. Aquí
+       * había un `router.replace('/(juego)/ronda')` que corría con ese efecto y
+       * que además no sabía a qué se juega —era el segundo sitio con la misma
+       * pantalla escrita a mano.
+       */
       await refrescar();
-      router.replace('/(juego)/ronda');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'No se pudo entrar.');
     } finally {

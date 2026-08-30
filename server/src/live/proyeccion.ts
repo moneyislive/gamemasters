@@ -45,6 +45,7 @@ import { estadoParaGm, proyectarEstado } from '../juegos/proyecciones';
 import { entidadesDe, nombreDeEntidad } from '../juegos/entidades';
 import { accionesDisponibles } from '../juegos/motor';
 import { fotoParaJugador } from './fotos';
+import { pistasDeLaTrama } from '../../../shared/mecanicas/pistas';
 
 /**
  * Cuánto conocimiento del personaje está desbloqueado.
@@ -618,8 +619,22 @@ export function partidaParaElTaller(game: GameSession): GameSession {
        * más, por mucho que venga marcado como público.
        */
       timeline: plot.timeline.filter((e) => e.isPublic === true && e.participanteIds.length > 1),
-      // La pista se lee; a quién apunta, no.
-      clues: plot.clues.map((c) => ({ ...c, pointsTo: '' })),
+      /*
+       * Lo de cada MECANICA, recortado. Aquí iba `clues` a pelo, que era la
+       * mecánica de las pistas nombrada en el núcleo; ahora se recorta lo que
+       * haya sin saber qué es —salvo las pistas, que sí hay que recortar: la
+       * pista se lee, a quién apunta no.
+       */
+      ...(plot.mecanicas
+        ? {
+            mecanicas: {
+              ...plot.mecanicas,
+              ...(pistasDeLaTrama(plot).length > 0
+                ? { pistas: pistasDeLaTrama(plot).map((c) => ({ ...c, pointsTo: '' })) }
+                : {}),
+            },
+          }
+        : {}),
       material: plot.material
         ? {
             ...plot.material,
