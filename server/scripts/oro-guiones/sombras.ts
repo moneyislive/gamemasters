@@ -45,19 +45,22 @@ function partidaDeReferencia(): GameSession {
     createdAt: AHORA,
     updatedAt: AHORA,
     /*
-     * Las tres categorías con almacén heredado van donde el manifiesto dice, y
-     * los estandartes —sin campo heredado— en `entidades`. Si algo de esto
-     * estuviera mal no se encontrarían los estandartes, y nadie daría un error.
+     * LAS CUATRO CATEGORIAS, todas en el mismo sitio. Aquí las tres primeras
+     * iban a `suspects`, `rooms` y `weapons` porque el manifiesto declaraba un
+     * almacén heredado, y los estandartes aparte en `entidades`. Eran dos
+     * sitios para lo mismo; ya no hay más que uno.
      */
-    suspects: GENTE.map((name, i) => ({
-      id: `e${i}`,
-      name,
-      description: `Escolta número ${i + 1}.`,
-      email: `${name.toLowerCase()}@ejemplo.es`,
-    })),
-    rooms: PASOS.map((name, i) => ({ id: `p${i}`, name, description: `Descripción de ${name}.` })),
-    weapons: ENSERES.map((name, i) => ({ id: `n${i}`, name, description: `${name}.` })),
-    entidades: { estandartes: ESTANDARTES.map((name, i) => ({ id: `b${i}`, name })) },
+    entidades: {
+      escoltas: GENTE.map((name, i) => ({
+        id: `e${i}`,
+        name,
+        description: `Escolta número ${i + 1}.`,
+        email: `${name.toLowerCase()}@ejemplo.es`,
+      })),
+      pasos: PASOS.map((name, i) => ({ id: `p${i}`, name, description: `Descripción de ${name}.` })),
+      enseres: ENSERES.map((name, i) => ({ id: `n${i}`, name, description: `${name}.` })),
+      estandartes: ESTANDARTES.map((name, i) => ({ id: `b${i}`, name })),
+    },
     boardMode: 'generated',
     settings: { language: 'es', juego: 'sombras' },
   };

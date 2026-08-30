@@ -128,10 +128,12 @@ function nuevaPartida(): { game: GameSession; sesion: LiveSession } {
      * los estandartes —sin campo heredado— en `entidades`. Si algo de esto
      * estuviera mal, no se encontrarían los estandartes y nadie daría un error.
      */
-    suspects: GENTE.map((name, i) => ({ id: `e${i}`, name })),
-    rooms: PASOS.map((name, i) => ({ id: `p${i}`, name })),
-    weapons: ENSERES.map((name, i) => ({ id: `n${i}`, name })),
-    entidades: { estandartes: ESTANDARTES.map((name, i) => ({ id: `b${i}`, name })) },
+    entidades: {
+      escoltas: GENTE.map((name, i) => ({ id: `e${i}`, name })),
+      pasos: PASOS.map((name, i) => ({ id: `p${i}`, name })),
+      enseres: ENSERES.map((name, i) => ({ id: `n${i}`, name })),
+      estandartes: ESTANDARTES.map((name, i) => ({ id: `b${i}`, name })),
+    },
     boardMode: 'generated',
     settings: { language: 'es', juego: 'sombras' },
   };

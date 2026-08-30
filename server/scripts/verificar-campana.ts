@@ -125,15 +125,6 @@ const game: GameSession = {
       { id: 'l1', name: 'La atalaya' },
     ],
   },
-  suspects: [
-    { id: 'a', name: 'Íñigo' },
-    { id: 'b', name: 'Berta' },
-  ],
-  rooms: [
-    { id: 'l0', name: 'El foso' },
-    { id: 'l1', name: 'La atalaya' },
-  ],
-  weapons: [],
   boardMode: 'generated',
   settings: { language: 'es', juego: 'la-torre' },
 };

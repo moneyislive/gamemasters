@@ -102,13 +102,15 @@ const datos = {
       status: 'ready',
       createdAt: ahora,
       updatedAt: ahora,
-      suspects: [
+      entidades: {
+        sospechosos: [
         { id: 's0', name: 'Ana', email: 'ana@ejemplo.com' },
         { id: 's1', name: 'Bruno', email: 'bruno@ejemplo.com' },
         { id: 's2', name: 'Quien no dejó correo' },
       ],
-      rooms: [{ id: 'r0', name: 'Salón' }],
-      weapons: [{ id: 'w0', name: 'Candelabro' }],
+        salas: [{ id: 'r0', name: 'Salón' }],
+        objetos: [{ id: 'w0', name: 'Candelabro' }],
+      },
       boardMode: 'generated',
       settings: { language: 'es' },
       plot: {

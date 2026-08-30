@@ -11,6 +11,7 @@
 import { getStore, initStore } from '../src/db/store';
 import { aceptarGuardar, borrarCuenta, cerrarPartidaEnCuentas } from '../src/live/cuentas';
 import { refrescarSesion } from '../src/live/sesion';
+import { listaDeCategoria, personasDe } from '../../shared/juegos';
 
 /** Lo mínimo para que `cerrarPartidaEnCuentas` no se salga por falta de trama. */
 function tramaMinima(sesion: { players: Array<{ participanteId: string; displayName: string }> }): never {
@@ -48,7 +49,7 @@ const tieneCorreoEnSesion = async (gameId: string, correo: string): Promise<bool
 };
 const tieneCorreoEnPartida = async (gameId: string, correo: string): Promise<boolean> => {
   const g = await store.getGame(gameId);
-  return (g?.suspects ?? []).some((x) => (x.email ?? '').toLowerCase() === correo);
+  return (g ? personasDe(g) : []).some((x) => (x.email ?? '').toLowerCase() === correo);
 };
 const cuantasCuentas = async (): Promise<number> => {
   // No hay `listAccounts` en el contrato: se cuenta por los correos que se
@@ -206,7 +207,7 @@ try {
   } as Parameters<typeof store.saveAccount>[0]);
   const conVarios = await store.getGame('velada');
   if (conVarios) {
-    conVarios.suspects = [...conVarios.suspects, { id: 'v1', name: 'Con dos', email: 'segundo@ejemplo.com' }];
+    listaDeCategoria(conVarios, 'sospechosos').push({ id: 'v1', name: 'Con dos', email: 'segundo@ejemplo.com' });
     await store.saveGame(conVarios);
     await store.saveLive({
       ...(await store.getLive('velada'))!,
@@ -226,7 +227,7 @@ try {
   const silla = trasVarios?.players.find((j) => j.participanteId === 'v1');
   salida.variosCorreos = {
     segundoBarridoEnSesion: !silla?.email,
-    segundoBarridoEnPartida: !(await store.getGame('velada'))?.suspects.some((x) => x.email === 'segundo@ejemplo.com'),
+    segundoBarridoEnPartida: !personasDe((await store.getGame('velada'))!).some((x) => x.email === 'segundo@ejemplo.com'),
     reclamadaPorBorrada: !silla?.reclamadaPor,
   };
 } catch (e) {

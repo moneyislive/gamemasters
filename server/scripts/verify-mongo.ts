@@ -11,6 +11,7 @@
 import mongoose from 'mongoose';
 import { env } from '../src/config';
 import { getStorageKind, getStore, initStore, resolveDbName } from '../src/db/store';
+import { personasDe, lugaresDe } from '../../shared/juegos';
 
 const ok = (texto: string) => console.log(`  ✓ ${texto}`);
 const info = (texto: string) => console.log(`    ${texto}`);
@@ -75,13 +76,13 @@ async function main(): Promise<void> {
     idPrueba = partida.id;
     ok(`Escritura: partida creada (${partida.id})`);
 
-    partida.suspects.push({ id: 'tmp', name: 'Invitado de prueba' });
-    partida.rooms.push({ id: 'tmp', name: 'Sala de prueba' });
+    personasDe(partida).push({ id: 'tmp', name: 'Invitado de prueba' });
+    lugaresDe(partida).push({ id: 'tmp', name: 'Sala de prueba' });
     const guardada = await store.saveGame(partida);
-    ok(`Actualización: ${guardada.suspects.length} sospechoso y ${guardada.rooms.length} sala guardados`);
+    ok(`Actualización: ${personasDe(guardada).length} sospechoso y ${lugaresDe(guardada).length} sala guardados`);
 
     const leida = await store.getGame(partida.id);
-    if (!leida || leida.suspects.length !== 1 || leida.name !== 'Comprobación de conexión') {
+    if (!leida || personasDe(leida).length !== 1 || leida.name !== 'Comprobación de conexión') {
       throw new Error('La partida releída no coincide con lo guardado.');
     }
     ok('Lectura: la partida se recupera íntegra');

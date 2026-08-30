@@ -165,14 +165,6 @@ const game: GameSession = {
     ],
     casillas: CASILLAS.map((name, i) => ({ id: `c${i}`, name })),
   },
-  // Los campos heredados de CLUEDO van vacíos: si algo del motor los buscara,
-  // esta prueba se caería, que es justo lo que se quiere comprobar.
-  suspects: [
-    { id: 'j0', name: 'Marta' },
-    { id: 'j1', name: 'Nico' },
-  ],
-  rooms: [],
-  weapons: [],
   boardMode: 'generated',
   settings: { language: 'es', juego: 'la-oca' },
 };

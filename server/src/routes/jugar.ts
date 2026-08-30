@@ -273,15 +273,15 @@ router.post('/jugar/sala', async (req, res) => {
   const cred = credencial(req, res);
   if (!cred) return;
   /*
-   * SE ACEPTAN LOS DOS NOMBRES, y no es por gusto.
+   * AQUI SE ACEPTABA TAMBIEN `roomId`, el nombre viejo del campo.
    *
-   * El campo se llamaba `roomId` y ahora `lugarId`. El movil se compila aparte y
-   * no tiene actualizaciones sobre el aire: durante los dias que van entre
-   * desplegar el servidor y que la gente actualice, hay telefonos ahi fuera
-   * mandando el nombre viejo. Rechazarlos seria que no se pueda entrar en ningun
-   * sitio, de noche y sin explicacion.
+   * Estaba por los moviles ya instalados —la app se compila aparte y no tiene
+   * actualizaciones sobre el aire— y se ha quitado por lo mismo que el alias de
+   * `/jugar/acusar`: un binario que manda `roomId` tampoco sabe leer nada de lo
+   * que se le contesta. Aceptarlo no le dejaba jugar; le dejaba llegar un paso
+   * mas lejos antes de romperse.
    */
-  const lugarId = String(req.body?.lugarId ?? req.body?.roomId ?? '');
+  const lugarId = String(req.body?.lugarId ?? '');
 
   try {
     const store = getStore();
@@ -350,19 +350,22 @@ router.post('/jugar/notas', async (req, res) => {
  * escribe el suyo y esta ruta le sirve igual.
  */
 /*
- * ═══ DOS CAMINOS AL MISMO SITIO, Y HACE FALTA ═══
+ * ═══ AQUI SE ATENDIA TAMBIEN `/jugar/acusar`, Y SE HA QUITADO ═══
  *
- * La ruta se llamaba `/jugar/acusar` y ahora se llama `/jugar/responder`,
- * porque en dos de los tres juegos no se acusa a nadie: se señala quién rompió
- * el sello o quién traiciona.
+ * El alias estaba por los moviles ya instalados: la app se compila aparte y no
+ * tiene actualizaciones sobre el aire, asi que entre desplegar el servidor y
+ * que la gente actualice hay dias con telefonos llamando al nombre viejo.
  *
- * El nombre viejo se sigue atendiendo porque el móvil se compila aparte y no
- * tiene actualizaciones sobre el aire: durante los días que van entre desplegar
- * el servidor y que la gente actualice hay teléfonos llamando al de antes.
- * Quitarlo seria que no se pueda entregar la respuesta —o sea, terminar la
- * partida— de noche y sin explicacion.
+ * Y no protegia nada, que es la razon de quitarlo. Un binario de aquella epoca
+ * manda `suspectId` y `roomId`, espera `objetos`, `misPistas` y `tablon`, y
+ * pinta una pestaña que ya no existe: esta roto en veinte campos mas. Atender
+ * su ruta de acusar no le deja terminar la partida —le deja llegar mas lejos
+ * antes de romperse, y romperse mas callado.
+ *
+ * Lo honesto es que falle al entrar, que es lo que hace ahora: se actualiza la
+ * app y ya.
  */
-router.post(['/jugar/responder', '/jugar/acusar'], async (req, res) => {
+router.post('/jugar/responder', async (req, res) => {
   const cred = credencial(req, res);
   if (!cred) return;
 

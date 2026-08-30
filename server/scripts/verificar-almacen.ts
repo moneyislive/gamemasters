@@ -36,6 +36,7 @@ import { MongoMemoryServer } from 'mongodb-memory-server';
 import type { Store } from '../src/db/store';
 import type { GameSession } from '../../shared/types';
 import type { Account, LiveSession } from '../../shared/live';
+import { personasDe } from '../../shared/juegos';
 
 let hechas = 0;
 const fallos: string[] = [];
@@ -64,9 +65,11 @@ function partida(id: string, nombre: string): GameSession {
     status: 'draft',
     createdAt: ahora,
     updatedAt: ahora,
-    suspects: [{ id: 'e1', name: 'Marta' }, { id: 'e2', name: 'Bruno' }],
-    rooms: [{ id: 'c1', name: 'La cocina' }],
-    weapons: [{ id: 'q1', name: 'El abrecartas' }],
+    entidades: {
+      sospechosos: [{ id: 'e1', name: 'Marta' }, { id: 'e2', name: 'Bruno' }],
+      salas: [{ id: 'c1', name: 'La cocina' }],
+      objetos: [{ id: 'q1', name: 'El abrecartas' }],
+    },
     boardMode: 'generated',
     settings: { language: 'es' },
   } as unknown as GameSession;
@@ -89,7 +92,7 @@ async function guion(store: Store): Promise<Record<string, unknown>> {
   const leida = await store.getGame('p1');
   visto.idSobrevive = leida?.id;
   visto.nombre = leida?.name;
-  visto.sospechosos = leida?.suspects.length;
+  visto.sospechosos = leida ? personasDe(leida).length : undefined;
   visto.listadas = (await store.listGames()).length;
 
   // Guardar dos veces la misma partida no puede crear dos.

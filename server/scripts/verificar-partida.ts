@@ -28,7 +28,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { generateBoardLayout } from '../src/board/generator';
 import { generateDemoPlot } from '../src/plot/cluedo-demo';
-import { CLUEDO, ejes as ejesDe, esElSenalado, fasesConPapel, manifiestoDe } from '../../shared/juegos';
+import { CLUEDO, ejes as ejesDe, esElSenalado, fasesConPapel, lugaresDe, manifiestoDe, personasDe } from '../../shared/juegos';
 import type { GameSession } from '../../shared/types';
 import type { LiveSession, VistaJugador } from '../../shared/live';
 import { leerBloqueDePistas } from '../../shared/mecanicas/pistas';
@@ -96,13 +96,15 @@ function sembrar(dir: string): { game: GameSession; sesion: LiveSession } {
     status: 'ready',
     createdAt: ahora,
     updatedAt: ahora,
-    suspects: GENTE.map((name, i) => ({ id: `s${i}`, name })),
-    rooms: SALAS.map((name, i) => ({ id: `r${i}`, name })),
-    weapons: OBJETOS.map((name, i) => ({ id: `w${i}`, name })),
+    entidades: {
+      sospechosos: GENTE.map((name, i) => ({ id: `s${i}`, name })),
+      salas: SALAS.map((name, i) => ({ id: `r${i}`, name })),
+      objetos: OBJETOS.map((name, i) => ({ id: `w${i}`, name })),
+    },
     boardMode: 'generated',
     settings: { language: 'es' },
   };
-  game.board = generateBoardLayout(game.rooms);
+  game.board = generateBoardLayout(lugaresDe(game));
   /*
    * La trama de demostración reparte la culpa AL AZAR, y esta prueba juega
    * siempre con `s0`. Cuando le tocaba ser culpable —una de cada cuatro veces—
@@ -136,7 +138,7 @@ function sembrar(dir: string): { game: GameSession; sesion: LiveSession } {
     phase: 'lobby',
     round: 0,
     totalRounds: 3,
-    players: game.suspects.map((s, i) => ({
+    players: personasDe(game).map((s, i) => ({
       participanteId: s.id,
       displayName: s.name,
       joinCode: `CODIG${i}`,

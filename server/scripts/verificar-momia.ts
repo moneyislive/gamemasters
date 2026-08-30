@@ -125,10 +125,12 @@ function nuevaPartida(): { game: GameSession; sesion: LiveSession } {
     // Las tres categorías con almacén heredado van donde el manifiesto dice, y
     // los ritos —la primera categoría de la plataforma sin campo heredado— en
     // `entidades`. Si algo de esto estuviera mal, no se encontrarían los ritos.
-    suspects: GENTE.map((name, i) => ({ id: `e${i}`, name })),
-    rooms: CAMARAS.map((name, i) => ({ id: `c${i}`, name })),
-    weapons: RELIQUIAS.map((name, i) => ({ id: `q${i}`, name })),
-    entidades: { ritos: RITOS.map((name, i) => ({ id: `t${i}`, name })) },
+    entidades: {
+      expedicionarios: GENTE.map((name, i) => ({ id: `e${i}`, name })),
+      camaras: CAMARAS.map((name, i) => ({ id: `c${i}`, name })),
+      reliquias: RELIQUIAS.map((name, i) => ({ id: `q${i}`, name })),
+      ritos: RITOS.map((name, i) => ({ id: `t${i}`, name })),
+    },
     boardMode: 'generated',
     settings: { language: 'es', juego: 'momia' },
   };

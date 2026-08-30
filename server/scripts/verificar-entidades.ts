@@ -25,7 +25,7 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { entidadesDe, manifiestoDe } from '../../shared/juegos';
+import { entidadesDe, lugaresDe, manifiestoDe, personasDe } from '../../shared/juegos';
 import { isPrintableDocId } from '../../shared/documents';
 // A PROPOSITO por el otro camino: ver la comprobacion de la doble carga.
 import { entidadesDe as entidadesPorElOtroCamino } from '../../shared/juegos/entidades';
@@ -60,9 +60,11 @@ const game: GameSession = {
   status: 'draft',
   createdAt: ahora,
   updatedAt: ahora,
-  suspects: [],
-  rooms: [],
-  weapons: [],
+  entidades: {
+    expedicionarios: [],
+    camaras: [],
+    reliquias: [],
+  },
   boardMode: 'generated',
   settings: { language: 'es', juego: 'momia' },
 } as unknown as GameSession;
@@ -163,11 +165,17 @@ async function jugar(): Promise<void> {
   const manifiesto = manifiestoDe('momia');
   const ritos = manifiesto.categorias.find((c) => c.id === 'ritos');
   comprobar('la Momia declara la categoría «ritos»', Boolean(ritos));
-  comprobar(
-    'y NO tiene campo heredado, que es lo que la hace la prueba buena',
-    ritos?.almacenHeredado === undefined,
-    ritos?.almacenHeredado,
-  );
+  /*
+   * AQUI SE COMPROBABA que los ritos NO declaraban campo heredado —que era lo
+   * que hacia buena la prueba: una categoria que no cabia en `suspects`,
+   * `rooms` ni `weapons`—. Ya no hay campos heredados que declarar, ni forma de
+   * declararlos, asi que aquello es hoy un hecho del compilador y no algo que
+   * comprobar en ejecucion.
+   *
+   * Lo que si sigue habiendo que comprobar —que un rito dado de alta acaba
+   * donde toca y se lee por su categoria— esta mas abajo, contra el servidor de
+   * verdad, que es donde vale.
+   */
 
   paso('Cada juego trae sus propias reglas');
   /*
@@ -200,10 +208,16 @@ async function jugar(): Promise<void> {
   const rito = entidadesDe(guardada, 'ritos')[0];
   comprobar('con su nombre', rito?.name === 'Rito del Agua', rito);
   comprobar('y con un id de verdad', (rito?.id ?? '').length > 5, rito?.id);
+  /*
+   * Aqui se comprobaba que el rito no se hubiera colado en ninguno de los tres
+   * campos heredados. Ya no hay tres campos; lo que se comprueba es que no se
+   * haya colado en ninguna categoria que no sea la suya, que es lo mismo dicho
+   * con el vocabulario de ahora y ademas vale para el cuarto juego.
+   */
   comprobar(
-    'y NO se ha colado en ninguno de los tres campos heredados',
-    guardada.suspects.length === 0 && guardada.rooms.length === 0 && guardada.weapons.length === 0,
-    { s: guardada.suspects.length, r: guardada.rooms.length, w: guardada.weapons.length },
+    'y NO se ha colado en ninguna otra categoría',
+    Object.entries(guardada.entidades ?? {}).every(([cat, lista]) => cat === 'ritos' || lista.length === 0),
+    Object.fromEntries(Object.entries(guardada.entidades ?? {}).map(([c, l]) => [c, l.length])),
   );
 
   paso('Que sobreviva a releer la partida del almacén');
@@ -237,26 +251,25 @@ async function jugar(): Promise<void> {
   comprobar('el alta de una cámara responde 200', camara.estado === 200, camara.datos);
   const conCamara = camara.datos as GameSession;
   /*
-   * ═══ ESTA COMPROBACION SE DIO LA VUELTA, Y ES EL PUNTO DEL FRENTE ═══
+   * ═══ ESTA COMPROBACION SE DIO LA VUELTA DOS VECES ═══
    *
-   * Decia: «y la camara va a `rooms`, no a `entidades`». Afirmaba —y daba por
-   * bueno— que la categoria de lugares de la Momia acabara en un campo heredado
-   * de CLUEDO, porque `listaDeCategoria` mandaba ahi a toda categoria que
-   * declarase `almacen`.
+   * Primero decia: «y la camara va a `rooms`, no a `entidades`». Afirmaba —y
+   * daba por bueno— que la categoria de lugares de la Momia acabara en un campo
+   * heredado de CLUEDO, porque `listaDeCategoria` mandaba ahi a toda categoria
+   * que declarase almacen.
    *
-   * Ahora TODAS las categorias de TODOS los juegos se guardan igual. Los tres
-   * campos viejos solo los conserva la migracion, que trae las partidas
-   * antiguas a su sitio la primera vez que alguien las abre.
+   * Luego, al generalizar la escritura, paso a exigir lo contrario: que fuese a
+   * `entidades` Y que el campo heredado quedase vacio, porque dos copias de la
+   * misma lista divergen en cuanto alguien edita.
+   *
+   * Ahora los campos heredados no existen. Lo que queda es la mitad que
+   * significa algo para siempre: que una categoria de un juego que no es CLUEDO
+   * se guarda y se lee como cualquier otra.
    */
   comprobar(
     'la cámara va a `entidades`, como todo lo demás',
     (conCamara.entidades?.camaras ?? []).length === 1,
-    { rooms: conCamara.rooms.length, entidades: Object.keys(conCamara.entidades ?? {}) },
-  );
-  comprobar(
-    'y el campo heredado se queda vacío',
-    conCamara.rooms.length === 0,
-    { porque: 'dos copias de la misma lista divergen en cuanto alguien edita' },
+    { entidades: Object.keys(conCamara.entidades ?? {}) },
   );
   comprobar(
     'y se lee igual por categoría',

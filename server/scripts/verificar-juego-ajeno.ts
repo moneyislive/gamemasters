@@ -99,13 +99,13 @@ const LA_ALMONEDA: ManifiestoDeJuego = {
        * Lo habia, y con una nota que decia: «se llaman postores y no
        * sospechosos, pero media plataforma cuelga de ese campo con ese nombre —
        * el emparejamiento de los moviles, los dosieres y los correos leen
-       * `game.suspects` a pelo—. Sin esto no se puede jugar, y no porque el
+       * `personasDe(game)` a pelo—. Sin esto no se puede jugar, y no porque el
        * motor lo exija sino porque nadie mas se ha girado.»
        *
        * Ya se han girado. El nucleo pregunta `personasDe(game)`, que resuelve
        * por el manifiesto cual es la categoria de personas y devuelve SUS
        * entidades, vivan donde vivan. Los postores de esta subasta viven en
-       * `game.entidades.postores` y `game.suspects` esta vacio.
+       * `game.entidades.postores` y `personasDe(game)` esta vacio.
        */
       presentacion: {
         titulo: 'Los postores',
@@ -333,9 +333,6 @@ const game: GameSession = {
   status: 'ready',
   createdAt: ahora,
   updatedAt: ahora,
-  suspects: [],
-  rooms: [],
-  weapons: [],
   entidades: {
     postores: POSTORES.map((name, i) => ({ id: `p${i}`, name })),
     lotes: LOTES.map((name, i) => ({ id: `l${i}`, name })),
@@ -418,9 +415,16 @@ comprobar('el juego queda instalado con su id', m.id === 'la-almoneda', m.id);
 comprobar('sin ejes: no hay nada que adivinar', ejesDe(m).length === 0);
 comprobar('sin lugares: ninguna categoría los declara', !m.categorias.some((c) => c.sonLugares));
 comprobar('sin dosier: nadie interpreta a nadie', m.dosier.length === 0);
+/*
+ * Aqui se comprobaba que alguna categoria vivia «fuera de los tres campos
+ * heredados». Ya no hay tres campos: todas viven en `entidades`, que es lo que
+ * aquella comprobacion perseguia. Lo que se mira ahora es que las de este juego
+ * —que no se parecen a ninguna de CLUEDO— se lean sin mas.
+ */
 comprobar(
-  'una categoría vive fuera de los tres campos heredados',
-  m.categorias.some((c) => !c.almacenHeredado),
+  'sus categorías se leen por su id, sin sitio privilegiado',
+  m.categorias.every((c) => Array.isArray(game.entidades?.[c.id])),
+  m.categorias.map((c) => c.id),
 );
 
 paso('Se juega una subasta entera');
@@ -604,15 +608,20 @@ comprobar(
  * ═══ Y EL TERCERO QUE YA NO SE COBRA ═══
  *
  * Este era de los peores porque no lo exigia ningun tipo: la partida compilaba
- * igual con los postores en `game.entidades`. Lo que pasaba es que el nucleo
- * leia `game.suspects` en treinta y seis sitios —moviles, dosieres, correos,
- * limpieza de fotos, proyeccion— y ninguno se enteraba de que ese juego guarda
- * su gente en otro lado. Se jugaba una partida sin nadie sentado a la mesa.
+ * igual con los postores en `game.entidades` y no en `game.suspects`. Lo que
+ * pasaba es que el nucleo leia la gente en treinta y seis sitios —moviles,
+ * dosieres, correos, limpieza de fotos, proyeccion— y ninguno se enteraba de
+ * que ese juego la guarda en otro lado. Se jugaba una partida sin nadie
+ * sentado a la mesa.
+ *
+ * Ya no hay dos sitios donde guardarla. Lo que se comprueba es lo que aquello
+ * perseguia: que la plataforma encuentre a la gente de un juego cuya categoria
+ * de personas se llama `postores` y no se parece a ninguna de CLUEDO.
  */
 comprobar(
-  'sus personas viven fuera de `suspects` y la plataforma las encuentra igual',
-  game.suspects.length === 0 && personasDe(game).length === POSTORES.length,
-  { suspects: game.suspects.length, personas: personasDe(game).length },
+  'la plataforma encuentra a sus postores como gente de la mesa',
+  personasDe(game).length === POSTORES.length,
+  { personas: personasDe(game).length, esperados: POSTORES.length },
 );
 comprobar(
   'y la sesion reparte un sitio por persona, no por sospechoso',

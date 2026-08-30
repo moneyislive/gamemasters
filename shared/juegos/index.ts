@@ -4,7 +4,7 @@
  * CATA. Un registro por nombre, que es lo mínimo que hace falta para que
  * «¿de qué juego es esta partida?» tenga respuesta.
  */
-import { declararAlmacen, entidadesDe } from './entidades';
+import { entidadesDe } from './entidades';
 import type { Entidad } from './entidades';
 import { categoriaDeJugadores, categoriasDeLugar } from './tipos';
 import { CLUEDO } from './cluedo';
@@ -111,7 +111,6 @@ export {
   nombreDeEntidad,
   entidadesDelEje,
   listaDeCategoria,
-  declararAlmacen,
 } from './entidades';
 export type { Entidad } from './entidades';
 
@@ -170,7 +169,6 @@ function admitido(id: JuegoId): boolean {
 function alta(manifiesto: ManifiestoDeJuego): void {
   if (!admitido(manifiesto.id)) return;
   INSTALADOS[manifiesto.id] = manifiesto;
-  anotarAlmacenes(manifiesto);
 }
 
 alta(CLUEDO);
@@ -188,20 +186,6 @@ alta(SOMBRAS);
  */
 export function registrarJuego(manifiesto: ManifiestoDeJuego): void {
   alta(manifiesto);
-}
-
-/**
- * Apunta dónde vive cada categoría de un juego.
- *
- * Va aquí y no en el manifiesto porque el manifiesto es un DATO —una tabla que
- * algún día se leerá de una base de datos— y esto es el efecto de darlo de
- * alta. Registrar un juego es exactamente eso: que la plataforma sepa
- * encontrar sus cosas.
- */
-function anotarAlmacenes(manifiesto: ManifiestoDeJuego): void {
-  for (const categoria of manifiesto.categorias) {
-    if (categoria.almacenHeredado) declararAlmacen(categoria.id, categoria.almacenHeredado);
-  }
 }
 
 /**

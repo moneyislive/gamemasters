@@ -56,7 +56,6 @@ import { ejecutarAccion } from '../src/juegos/motor';
 import { iniciarJuego } from '../src/juegos/inicios';
 import { printableDocsFor } from '../../shared/documents';
 import { manifiestoDe, personasDe } from '../../shared/juegos';
-import { alDia } from '../src/juegos/migracion';
 import { GUION as CLUEDO } from './oro-guiones/cluedo';
 import { GUION as MOMIA } from './oro-guiones/momia';
 import { GUION as SOMBRAS } from './oro-guiones/sombras';
@@ -229,7 +228,7 @@ function partidaCongelada(guion: GuionDeOro): GameSession {
     // Por la MISMA puerta que el almacén. La partida congelada se deja a
     // propósito en el formato antiguo, así que cada ejecución vuelve a
     // comprobar que la conversión de partidas viejas sigue funcionando.
-    return alDia(JSON.parse(fs.readFileSync(fixture, 'utf8')) as GameSession);
+    return JSON.parse(fs.readFileSync(fixture, 'utf8')) as GameSession;
   }
   const game = guion.partidaDeReferencia();
   fs.mkdirSync(path.dirname(fixture), { recursive: true });

@@ -18,6 +18,7 @@ import { generateDemoPlot } from './cluedo-demo';
 import { PLOT_SCHEMA } from './cluedo-esquema';
 import { buildStyleBlock } from './style';
 import { registrarGenerador } from '../juegos/generadores';
+import { respuestasCluedo } from '../juegos/cluedo';
 import { emisorDeProgreso } from '../live/proyeccion';
 import { apuntarUso } from '../gasto/contador';
 import type { Emitir } from './pipeline';
@@ -181,8 +182,44 @@ function pausa(ms: number): Promise<void> {
   return new Promise((resolver) => setTimeout(resolver, ms));
 }
 
+/**
+ * La terna de CLUEDO, convertida a ejes.
+ *
+ * ═══ ESTO ESTABA EN `pipeline.ts`, Y ERA LO ULTIMO DE `migracion.ts` ═══
+ *
+ * El esquema con el que se le pide la trama al modelo sigue hablando de
+ * asesino, arma y sala —`murdererId`, `weaponId`, `roomId`— y se deja asi a
+ * proposito: esta afinado y probado, y cambiarlo cambiaria las tramas que
+ * salen. Pero la solucion que viaja por la plataforma es un valor por eje,
+ * porque un juego con dos ejes o con cinco no cabe en una terna.
+ *
+ * La conversion se hacia en la tuberia comun, llamando a `tramaAlDia` —una
+ * funcion de la migracion de datos guardados— sobre una trama recien nacida.
+ * Mezclaba dos cosas distintas: poner al dia lo viejo y traducir la frontera de
+ * un generador. Ahora es lo segundo y vive donde vive ese generador, asi que la
+ * tuberia no sabe lo que es un asesino.
+ */
+function conEjes(plot: Plot): Plot {
+  const s = plot.solution as unknown as {
+    murdererId?: string;
+    weaponId?: string;
+    roomId?: string;
+    respuestas?: Record<string, string>;
+  };
+  if (s.respuestas) return plot;
+  plot.solution.respuestas = respuestasCluedo({
+    murdererId: s.murdererId ?? '',
+    weaponId: s.weaponId ?? '',
+    lugarId: s.roomId ?? '',
+  });
+  delete s.murdererId;
+  delete s.weaponId;
+  delete s.roomId;
+  return plot;
+}
+
 registrarGenerador('cluedo', {
   rotulo: 'Tejiendo la trama del crimen…',
-  generar: (game: GameSession, emit: Emitir) =>
-    DEMO_MODE ? generarTramaDemo(game, emit) : generarTramaConApi(game, emit),
+  generar: async (game: GameSession, emit: Emitir) =>
+    conEjes(await (DEMO_MODE ? generarTramaDemo(game, emit) : generarTramaConApi(game, emit))),
 });

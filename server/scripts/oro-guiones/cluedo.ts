@@ -59,18 +59,20 @@ function partidaDeReferencia(): GameSession {
     status: 'ready',
     createdAt: AHORA,
     updatedAt: AHORA,
-    suspects: NOMBRES.map((name, i) => ({
+    entidades: {
+      sospechosos: NOMBRES.map((name, i) => ({
       id: `s${i}`,
       name,
       description: `Invitado número ${i + 1}.`,
       email: `${name.toLowerCase()}@ejemplo.es`,
     })),
-    rooms: SALAS.map((name, i) => ({
+      salas: SALAS.map((name, i) => ({
       id: `r${i}`,
       name,
       description: `Descripción de ${name.toLowerCase()}.`,
     })),
-    weapons: OBJETOS.map((name, i) => ({ id: `w${i}`, name, description: `Un ${name.toLowerCase()}.` })),
+      objetos: OBJETOS.map((name, i) => ({ id: `w${i}`, name, description: `Un ${name.toLowerCase()}.` })),
+    },
     boardMode: 'generated',
     settings: { language: 'es' },
   };

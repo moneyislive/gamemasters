@@ -119,22 +119,24 @@ const game: GameSession = {
   status: 'ready',
   createdAt: ahora,
   updatedAt: ahora,
-  suspects: [
-    { id: 's0', name: 'Ana' },
-    { id: 's1', name: 'Bruno' },
-    { id: 's2', name: 'Carla' },
-  ],
-  rooms: [
-    { id: 'r0', name: 'Salón' },
-    { id: 'r1', name: 'Cocina' },
-    { id: 'r2', name: 'Biblioteca' },
-    { id: 'r3', name: 'Invernadero' },
-  ],
-  weapons: [
-    { id: 'w0', name: 'Candelabro' },
-    { id: 'w1', name: 'Cuerda' },
-    { id: 'w2', name: 'Abrecartas' },
-  ],
+  entidades: {
+    sospechosos: [
+      { id: 's0', name: 'Ana' },
+      { id: 's1', name: 'Bruno' },
+      { id: 's2', name: 'Carla' },
+    ],
+    salas: [
+      { id: 'r0', name: 'Salón' },
+      { id: 'r1', name: 'Cocina' },
+      { id: 'r2', name: 'Biblioteca' },
+      { id: 'r3', name: 'Invernadero' },
+    ],
+    objetos: [
+      { id: 'w0', name: 'Candelabro' },
+      { id: 'w1', name: 'Cuerda' },
+      { id: 'w2', name: 'Abrecartas' },
+    ],
+  },
   boardMode: 'generated',
   settings: { language: 'es' },
   plot: {
@@ -198,25 +200,25 @@ const gameMomia = {
   status: 'ready',
   createdAt: ahora,
   updatedAt: ahora,
-  suspects: [
-    { id: 'e0', name: 'Marta', description: 'Discute por deporte.' },
-    { id: 'e1', name: 'Bruno' },
-    { id: 'e2', name: 'Carla' },
-    { id: 'e3', name: 'Dani' },
-  ],
-  rooms: [
-    { id: 'c0', name: 'Antesala de los Sellos' },
-    { id: 'c1', name: 'Pozo de las Ofrendas' },
-    { id: 'c2', name: 'Corredor de las Estrellas' },
-    { id: 'c3', name: 'Cámara del Barquero' },
-    { id: 'c4', name: 'Sala de la Balanza' },
-  ],
-  weapons: [
-    { id: 'q0', name: 'Escarabeo' },
-    { id: 'q1', name: 'Máscara' },
-    { id: 'q2', name: 'Vaso canopo' },
-  ],
   entidades: {
+    expedicionarios: [
+      { id: 'e0', name: 'Marta', description: 'Discute por deporte.' },
+      { id: 'e1', name: 'Bruno' },
+      { id: 'e2', name: 'Carla' },
+      { id: 'e3', name: 'Dani' },
+    ],
+    camaras: [
+      { id: 'c0', name: 'Antesala de los Sellos' },
+      { id: 'c1', name: 'Pozo de las Ofrendas' },
+      { id: 'c2', name: 'Corredor de las Estrellas' },
+      { id: 'c3', name: 'Cámara del Barquero' },
+      { id: 'c4', name: 'Sala de la Balanza' },
+    ],
+    reliquias: [
+      { id: 'q0', name: 'Escarabeo' },
+      { id: 'q1', name: 'Máscara' },
+      { id: 'q2', name: 'Vaso canopo' },
+    ],
     ritos: [
       { id: 't0', name: 'Rito del Agua' },
       { id: 't1', name: 'Rito del Aliento' },

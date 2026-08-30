@@ -4,81 +4,6 @@
   "status": "ready",
   "createdAt": "2026-06-21T21:00:00.000Z",
   "updatedAt": "2026-06-21T21:00:00.000Z",
-  "suspects": [
-    {
-      "id": "e0",
-      "name": "Ana",
-      "description": "Escolta número 1.",
-      "email": "ana@ejemplo.es"
-    },
-    {
-      "id": "e1",
-      "name": "Bruno",
-      "description": "Escolta número 2.",
-      "email": "bruno@ejemplo.es"
-    },
-    {
-      "id": "e2",
-      "name": "Carla",
-      "description": "Escolta número 3.",
-      "email": "carla@ejemplo.es"
-    },
-    {
-      "id": "e3",
-      "name": "Dani",
-      "description": "Escolta número 4.",
-      "email": "dani@ejemplo.es"
-    }
-  ],
-  "rooms": [
-    {
-      "id": "p0",
-      "name": "El Vado del Kizu",
-      "description": "Descripción de El Vado del Kizu."
-    },
-    {
-      "id": "p1",
-      "name": "El Collado de Kabuto",
-      "description": "Descripción de El Collado de Kabuto."
-    },
-    {
-      "id": "p2",
-      "name": "El Bosque de Tsuge",
-      "description": "Descripción de El Bosque de Tsuge."
-    },
-    {
-      "id": "p3",
-      "name": "El Puerto de Otogi",
-      "description": "Descripción de El Puerto de Otogi."
-    },
-    {
-      "id": "p4",
-      "name": "La Cuesta de Kashiwabara",
-      "description": "Descripción de La Cuesta de Kashiwabara."
-    },
-    {
-      "id": "p5",
-      "name": "La Playa de Shirako",
-      "description": "Descripción de La Playa de Shirako."
-    }
-  ],
-  "weapons": [
-    {
-      "id": "n0",
-      "name": "El farol de papel",
-      "description": "El farol de papel."
-    },
-    {
-      "id": "n1",
-      "name": "La plata de Chaya",
-      "description": "La plata de Chaya."
-    },
-    {
-      "id": "n2",
-      "name": "La lanza de Hanzo",
-      "description": "La lanza de Hanzo."
-    }
-  ],
   "entidades": {
     "estandartes": [
       {
@@ -96,6 +21,81 @@
       {
         "id": "b3",
         "name": "El pino de los Tarao"
+      }
+    ],
+    "escoltas": [
+      {
+        "id": "e0",
+        "name": "Ana",
+        "description": "Escolta número 1.",
+        "email": "ana@ejemplo.es"
+      },
+      {
+        "id": "e1",
+        "name": "Bruno",
+        "description": "Escolta número 2.",
+        "email": "bruno@ejemplo.es"
+      },
+      {
+        "id": "e2",
+        "name": "Carla",
+        "description": "Escolta número 3.",
+        "email": "carla@ejemplo.es"
+      },
+      {
+        "id": "e3",
+        "name": "Dani",
+        "description": "Escolta número 4.",
+        "email": "dani@ejemplo.es"
+      }
+    ],
+    "pasos": [
+      {
+        "id": "p0",
+        "name": "El Vado del Kizu",
+        "description": "Descripción de El Vado del Kizu."
+      },
+      {
+        "id": "p1",
+        "name": "El Collado de Kabuto",
+        "description": "Descripción de El Collado de Kabuto."
+      },
+      {
+        "id": "p2",
+        "name": "El Bosque de Tsuge",
+        "description": "Descripción de El Bosque de Tsuge."
+      },
+      {
+        "id": "p3",
+        "name": "El Puerto de Otogi",
+        "description": "Descripción de El Puerto de Otogi."
+      },
+      {
+        "id": "p4",
+        "name": "La Cuesta de Kashiwabara",
+        "description": "Descripción de La Cuesta de Kashiwabara."
+      },
+      {
+        "id": "p5",
+        "name": "La Playa de Shirako",
+        "description": "Descripción de La Playa de Shirako."
+      }
+    ],
+    "enseres": [
+      {
+        "id": "n0",
+        "name": "El farol de papel",
+        "description": "El farol de papel."
+      },
+      {
+        "id": "n1",
+        "name": "La plata de Chaya",
+        "description": "La plata de Chaya."
+      },
+      {
+        "id": "n2",
+        "name": "La lanza de Hanzo",
+        "description": "La lanza de Hanzo."
       }
     ]
   },
@@ -122,7 +122,6 @@
     },
     "characters": [
       {
-        "suspectId": "e0",
         "characterName": "Ana",
         "role": "Hōkashi, juglar de camino",
         "publicPersona": "Ana, hōkashi, juglar de camino, bajo el blasón de Las tres malvarrosas.",
@@ -137,10 +136,10 @@
           "Una prenda solo se da a otra persona, y quien la recibe debe una respuesta sincera a una pregunta directa.",
           "No todo lo que lleva escrito un mojón es cierto. Alguien de esta columna puede escribirlos."
         ],
-        "personalHook": "El papel se te ha escrito a medida. Quien te conoce dice de ti: «Escolta número 1.». Úsalo: esta noche lo que convence no son los datos, es quién los cuenta."
+        "personalHook": "El papel se te ha escrito a medida. Quien te conoce dice de ti: «Escolta número 1.». Úsalo: esta noche lo que convence no son los datos, es quién los cuenta.",
+        "participanteId": "e0"
       },
       {
-        "suspectId": "e1",
         "characterName": "Bruno",
         "role": "Tsune no kata, persona corriente",
         "publicPersona": "Bruno, tsune no kata, persona corriente, bajo el blasón de El pino de los Tarao.",
@@ -155,10 +154,10 @@
           "Una prenda solo se da a otra persona, y quien la recibe debe una respuesta sincera a una pregunta directa.",
           "No todo lo que lleva escrito un mojón es cierto. Alguien de esta columna puede escribirlos."
         ],
-        "personalHook": "El papel se te ha escrito a medida. Quien te conoce dice de ti: «Escolta número 2.». Úsalo: esta noche lo que convence no son los datos, es quién los cuenta."
+        "personalHook": "El papel se te ha escrito a medida. Quien te conoce dice de ti: «Escolta número 2.». Úsalo: esta noche lo que convence no son los datos, es quién los cuenta.",
+        "participanteId": "e1"
       },
       {
-        "suspectId": "e2",
         "characterName": "Carla",
         "role": "Komusō, monje de la cesta",
         "publicPersona": "Carla, komusō, monje de la cesta, bajo el blasón de El carro de los Hattori.",
@@ -173,10 +172,10 @@
           "Una prenda solo se da a otra persona, y quien la recibe debe una respuesta sincera a una pregunta directa.",
           "No todo lo que lleva escrito un mojón es cierto. Alguien de esta columna puede escribirlos."
         ],
-        "personalHook": "El papel se te ha escrito a medida. Quien te conoce dice de ti: «Escolta número 3.». Úsalo: esta noche lo que convence no son los datos, es quién los cuenta."
+        "personalHook": "El papel se te ha escrito a medida. Quien te conoce dice de ti: «Escolta número 3.». Úsalo: esta noche lo que convence no son los datos, es quién los cuenta.",
+        "participanteId": "e2"
       },
       {
-        "suspectId": "e3",
         "characterName": "Dani",
         "role": "Yamabushi, asceta de los montes",
         "publicPersona": "Dani, yamabushi, asceta de los montes, bajo el blasón de La tela de Chaya.",
@@ -191,33 +190,34 @@
           "Una prenda solo se da a otra persona, y quien la recibe debe una respuesta sincera a una pregunta directa.",
           "No todo lo que lleva escrito un mojón es cierto. Alguien de esta columna puede escribirlos."
         ],
-        "personalHook": "El papel se te ha escrito a medida. Quien te conoce dice de ti: «Escolta número 4.». Úsalo: esta noche lo que convence no son los datos, es quién los cuenta."
+        "personalHook": "El papel se te ha escrito a medida. Quien te conoce dice de ti: «Escolta número 4.». Úsalo: esta noche lo que convence no son los datos, es quién los cuenta.",
+        "participanteId": "e3"
       }
     ],
     "timeline": [
       {
         "time": "04:00",
         "description": "En Kioto, las tropas de Akechi Mitsuhide rodean el templo de Honnō-ji. Antes del amanecer, Oda Nobunaga ha muerto en el incendio.",
-        "suspectIds": [],
-        "isPublic": true
+        "isPublic": true,
+        "participanteIds": []
       },
       {
         "time": "10:00",
         "description": "La noticia llega a Sakai. El señor está de visita, sin tropas, con un puñado de acompañantes y a cuatro días de sus tierras.",
-        "suspectIds": [],
-        "isPublic": true
+        "isPublic": true,
+        "participanteIds": []
       },
       {
         "time": "15:00",
         "description": "Se descarta ir por la costa: los caminos grandes son de Akechi. Se decide cruzar Iga de noche, y se manda aviso a los guías.",
-        "suspectIds": [],
-        "isPublic": true
+        "isPublic": true,
+        "participanteIds": []
       },
       {
         "time": "20:00",
         "description": "Chaya se adelanta con plata para comprar el paso donde se pueda comprar. Por los montes ya corre que hay samuráis en fuga y precio por ellos.",
-        "suspectIds": [],
-        "isPublic": true
+        "isPublic": true,
+        "participanteIds": []
       }
     ],
     "clues": [],

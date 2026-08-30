@@ -15,7 +15,7 @@
  *   - Si solo se borra la cuenta, el correo sigue escrito en la sesión en vivo,
  *     y el desenlace de esa misma partida la crea otra vez.
  *   - Y si se limpia la sesión pero no la partida, `sincronizarJugadores` copia
- *     el correo DE VUELTA desde `game.suspects` en el primer «sincronizar» que
+ *     el correo DE VUELTA desde `personasDe(game)` en el primer «sincronizar» que
  *     pulse quien dirige.
  *
  * Las dos vueltas atrás se prueban aquí, ejecutándolas de verdad.
@@ -28,6 +28,8 @@ import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { personasDe } from '../../shared/juegos';
+import type { GameSession } from '../../shared/types';
 
 const REPO = path.resolve(import.meta.dirname ?? __dirname, '..', '..');
 const TSX = path.join(REPO, 'node_modules', 'tsx', 'dist', 'cli.mjs');
@@ -50,33 +52,38 @@ function comprobar(que: string, condicion: boolean, detalle?: unknown): void {
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'gm-borrado-'));
 const ahora = new Date().toISOString();
 
-const game = {
+const game: GameSession = {
   id: 'velada',
   name: 'Velada de comprobación',
   status: 'ready',
   createdAt: ahora,
   updatedAt: ahora,
-  suspects: [
+  entidades: {
+    sospechosos: [
     { id: 's0', name: 'Ana', email: 'Ana@Ejemplo.COM' },
     { id: 's1', name: 'Bruno', email: 'bruno@ejemplo.com' },
     { id: 's2', name: 'Carla' },
   ],
-  rooms: [{ id: 'r0', name: 'Salón' }, { id: 'r1', name: 'Cocina' }],
-  weapons: [{ id: 'w0', name: 'Candelabro' }],
+    salas: [{ id: 'r0', name: 'Salón' }, { id: 'r1', name: 'Cocina' }],
+    objetos: [{ id: 'w0', name: 'Candelabro' }],
+  },
   boardMode: 'generated',
   settings: { language: 'es' },
 };
 
 // Una SEGUNDA partida, con el mismo correo. Borrar tiene que alcanzar también
 // aquí: quien dice «borra mis datos» no está hablando de una sola velada.
-const otra = {
+const otra: GameSession = {
   ...game,
   id: 'otra-velada',
   name: 'Otra velada',
-  suspects: [
-    { id: 's0', name: 'Ana', email: 'ana@ejemplo.com' },
-    { id: 's1', name: 'Diego', email: 'diego@ejemplo.com' },
-  ],
+  entidades: {
+    ...game.entidades,
+    sospechosos: [
+      { id: 's0', name: 'Ana', email: 'ana@ejemplo.com' },
+      { id: 's1', name: 'Diego', email: 'diego@ejemplo.com' },
+    ],
+  },
 };
 
 const sesionDe = (id: string, sospechosos: Array<{ id: string; name: string; email?: string }>) => ({
@@ -137,7 +144,7 @@ fs.writeFileSync(
       games: [game, otra],
       messages: {},
       config: { model: 'claude-fable-5' },
-      live: [sesionDe(game.id, game.suspects), sesionDe(otra.id, otra.suspects)],
+      live: [sesionDe(game.id, personasDe(game)), sesionDe(otra.id, personasDe(otra))],
       accounts: [cuentaDeAna, cuentaDeBruno],
     },
     null,

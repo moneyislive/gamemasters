@@ -34,6 +34,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { GameSession } from '../../shared/types';
+import { personasDe, entidadesDe } from '../../shared/juegos';
 
 const REPO = path.resolve(import.meta.dirname ?? __dirname, '..', '..');
 const TSX = path.join(REPO, 'node_modules', 'tsx', 'dist', 'cli.mjs');
@@ -184,15 +185,26 @@ async function jugarElDeFuera(): Promise<void> {
   comprobar('y nace declarando su juego', game?.settings?.juego === 'la-farola', game?.settings);
   if (!game?.id) return;
 
-  paso('Su partida sembrada tiene la gente donde ÉL dice, no en `suspects`');
+  paso('Su partida sembrada tiene la gente en la categoría que ÉL declara');
 
   const conGente = await pedir(`/games/${SEMBRADA}`);
   const partida = conGente.datos as GameSession & { entidades?: Record<string, unknown[]> };
   comprobar('la partida sembrada se lee', conGente.estado === 200, conGente.estado);
+  /*
+   * SE MIRA EL DATO, NO EL ACCESOR, y aqui es obligatorio: este verificador
+   * corre FUERA del servidor, que es el unico proceso que ha cargado el juego
+   * de fuera. `personasDe` necesita su manifiesto para saber que categoria hace
+   * de gente, y aqui no lo hay —devolveria cero y la comprobacion pasaria por
+   * el motivo equivocado.
+   *
+   * Que el servidor SI las encuentre se comprueba mas abajo, donde la mesa se
+   * abre con un sitio por persona: eso solo puede salir bien si el nucleo ha
+   * sabido leer la gente de una categoria que se llama `trasnochadores`.
+   */
   comprobar(
-    'sus personas viven en `entidades`, no en `suspects`',
-    (partida.entidades?.trasnochadores ?? []).length === 3 && partida.suspects.length === 0,
-    { entidades: Object.keys(partida.entidades ?? {}), suspects: partida.suspects.length },
+    'sus personas viven en la categoría que ÉL declara',
+    (partida.entidades?.trasnochadores ?? []).length === 3,
+    { entidades: Object.keys(partida.entidades ?? {}) },
   );
 
   paso('Y la mesa se abre en la fase que ÉL declara');
@@ -203,6 +215,22 @@ async function jugarElDeFuera(): Promise<void> {
     'y empieza en «antes-de-salir», que es una fase que solo existe en su manifiesto',
     abrir.datos?.sesion?.phase === 'antes-de-salir',
     abrir.datos?.sesion?.phase,
+  );
+  /*
+   * ═══ LA COMPROBACION QUE DE VERDAD LO DICE ═══
+   *
+   * Un sitio por persona. Esto lo reparte el SERVIDOR, que es el unico proceso
+   * que ha cargado este juego, leyendo su gente con `personasDe`. Solo puede
+   * salir bien si el nucleo ha sabido encontrar a tres personas en una
+   * categoria que se llama `trasnochadores` y no se parece a ninguna de CLUEDO.
+   *
+   * Si la platforma volviera a dar por hecho donde vive la gente, aqui saldria
+   * una mesa vacia: cero codigos, nadie a quien mandar nada, y ni un error.
+   */
+  comprobar(
+    'y reparte un sitio por persona, leyendo la categoría que él declara',
+    abrir.datos?.sesion?.players?.length === 3,
+    abrir.datos?.sesion?.players?.map((p: { displayName?: string }) => p.displayName),
   );
 
   const ronda = await pedir(`/games/${SEMBRADA}/live/ronda/abrir`, {
@@ -237,9 +265,6 @@ const sembrada = {
   status: 'ready',
   createdAt: AHORA,
   updatedAt: AHORA,
-  suspects: [],
-  rooms: [],
-  weapons: [],
   entidades: {
     trasnochadores: [
       { id: 't0', name: 'Ana' },

@@ -195,10 +195,6 @@ const game: GameSession = {
     piezas: PIEZAS.map((name, i) => ({ id: `p${i}`, name })),
     estancias: ESTANCIAS.map((name, i) => ({ id: `e${i}`, name })),
   },
-  // Los campos heredados quedan vacíos a propósito.
-  suspects: HEREDEROS.map((name, i) => ({ id: `h${i}`, name })),
-  rooms: ESTANCIAS.map((name, i) => ({ id: `e${i}`, name })),
-  weapons: [],
   boardMode: 'generated',
   settings: { language: 'es', juego: 'el-legado' },
 };

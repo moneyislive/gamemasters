@@ -14,6 +14,7 @@ import type { ChatMessage, GameSession, ModelId } from '../../shared/types';
 import type { Account, LiveSession } from '../../shared/live';
 import { env } from '../src/config';
 import { getStorageKind, getStore, initStore } from '../src/db/store';
+import { personasDe, lugaresDe, entidadesDe } from '../../shared/juegos';
 
 /**
  * Lo que hay en el fichero, ENTERO.
@@ -96,8 +97,8 @@ async function main(): Promise<void> {
     }
 
     console.log(
-      `  ✓ «${partida.name}» — ${partida.suspects.length} sospechosos, ${partida.rooms.length} salas, ` +
-        `${partida.weapons.length} armas, ${partida.documents?.length ?? 0} dosieres, ` +
+      `  ✓ «${partida.name}» — ${personasDe(partida).length} sospechosos, ${lugaresDe(partida).length} salas, ` +
+        `${entidadesDe(partida, 'objetos').length} armas, ${partida.documents?.length ?? 0} dosieres, ` +
         `${(mensajes[partida.id] ?? []).length} mensajes`,
     );
     migradas++;

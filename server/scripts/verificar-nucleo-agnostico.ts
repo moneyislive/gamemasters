@@ -334,26 +334,23 @@ function medir(): Medida {
   return medida;
 }
 
-/**
- * EL FICHERO DE LA MEMORIA, contado aparte.
+/*
+ * ═══ AQUI HABIA UNA EXCEPCION, Y HA DEJADO DE HACER FALTA ═══
  *
- * `juegos/migracion.ts` nombra `suspects`, `roomId`, `winnerId`, `acusaciones` y
- * todos los demás a propósito: su trabajo literal es convertir los documentos
- * que se guardaron con esos nombres. Cada renombrado que se hace le AÑADE
- * menciones, y si contaran como deuda el marcador subiría justo cuando se está
- * mejorando — que es la peor propiedad que puede tener una medida.
+ * `juegos/migracion.ts` convertia al leer los documentos guardados con los
+ * nombres viejos, asi que nombraba `suspects`, `roomId`, `winnerId` y todos los
+ * demas a proposito. Se contaba aparte —«memoria y no deuda»— porque cada
+ * renombrado le AÑADIA menciones, y contarlas como deuda habria hecho subir el
+ * marcador justo cuando se estaba mejorando: la peor propiedad que puede tener
+ * una medida.
  *
- * Se sigue vigilando —está en el presupuesto y no puede crecer sin que se vea—
- * pero se enseña en su propia línea y no en el total.
+ * Ese fichero ya no existe. Lo guardado se movio de una vez con
+ * `scripts/mudanza-al-modelo-nuevo.ts`, que es de un solo uso, no se compila
+ * para nadie y por tanto no es nucleo. Con el se fueron las 58 menciones que
+ * llevaba dentro y, con ellas, la unica excepcion que tenia esta medida.
  */
-const LA_MEMORIA = 'server/src/juegos/migracion.ts';
 
-const total = (c: Cuentas): number =>
-  Object.entries(c)
-    .filter(([f]) => f !== LA_MEMORIA)
-    .reduce((a, [, n]) => a + n, 0);
-
-const enLaMemoria = (c: Cuentas): number => c[LA_MEMORIA] ?? 0;
+const total = (c: Cuentas): number => Object.values(c).reduce((a, n) => a + n, 0);
 
 // ---------------------------------------------------------------------------
 
@@ -410,10 +407,6 @@ for (const v of VOCABULARIOS) {
   const flecha = t === previo ? '=' : t < previo ? '↓' : '↑';
   console.log(`  ${String(t).padStart(5)} ${flecha}  ${v.titulo}`);
   console.log(`         arreglo: ${v.arreglo}`);
-  const memoria = enLaMemoria(actual[v.clave]);
-  if (memoria > 0) {
-    console.log(`         (+${memoria} en migracion.ts, que es memoria y no deuda)`);
-  }
 }
 
 if (bajadas.length > 0) {

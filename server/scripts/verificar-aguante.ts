@@ -53,6 +53,7 @@ import { limitarIntentos } from '../src/puerta/limitador';
 import { crearRouter } from '../src/rutas';
 import type { GameSession } from '../../shared/types';
 import type { LiveSession } from '../../shared/live';
+import { personasDe, lugaresDe } from '../../shared/juegos';
 
 const REPO = path.resolve(import.meta.dirname ?? __dirname, '..', '..');
 const TSX = path.join(REPO, 'node_modules', 'tsx', 'dist', 'cli.mjs');
@@ -625,13 +626,15 @@ function sembrar(dir: string): void {
     status: 'ready',
     createdAt: ahora,
     updatedAt: ahora,
-    suspects: ['Ana', 'Bruno', 'Carla'].map((name, i) => ({ id: `s${i}`, name })),
-    rooms: ['Salón', 'Cocina', 'Biblioteca'].map((name, i) => ({ id: `r${i}`, name })),
-    weapons: ['Candelabro', 'Cuerda'].map((name, i) => ({ id: `w${i}`, name })),
+    entidades: {
+      sospechosos: ['Ana', 'Bruno', 'Carla'].map((name, i) => ({ id: `s${i}`, name })),
+      salas: ['Salón', 'Cocina', 'Biblioteca'].map((name, i) => ({ id: `r${i}`, name })),
+      objetos: ['Candelabro', 'Cuerda'].map((name, i) => ({ id: `w${i}`, name })),
+    },
     boardMode: 'generated',
     settings: { language: 'es' },
   };
-  game.board = generateBoardLayout(game.rooms);
+  game.board = generateBoardLayout(lugaresDe(game));
   game.plot = generateDemoPlot(game);
   game.plot.material = {
     generatedAt: ahora,
@@ -648,7 +651,7 @@ function sembrar(dir: string): void {
     phase: 'lobby',
     round: 0,
     totalRounds: 3,
-    players: game.suspects.map((s, i) => ({
+    players: personasDe(game).map((s, i) => ({
       participanteId: s.id,
       displayName: s.name,
       joinCode: `CODIG${i}`,
@@ -687,8 +690,8 @@ function sembrar(dir: string): void {
    */
   fs.mkdirSync(path.join(dir, 'uploads'), { recursive: true });
   fs.writeFileSync(path.join(dir, 'uploads', FOTO), PNG_MINIMO);
-  game.suspects[0]!.photoUrl = `/uploads/${FOTO}`;
-  game.rooms[0]!.photoUrl = `/uploads/${FOTO}`;
+  personasDe(game)[0]!.photoUrl = `/uploads/${FOTO}`;
+  lugaresDe(game)[0]!.photoUrl = `/uploads/${FOTO}`;
 
   fs.mkdirSync(path.join(dir, 'data'), { recursive: true });
   fs.writeFileSync(

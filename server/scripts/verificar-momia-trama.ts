@@ -32,11 +32,10 @@ import { redactar, verificarPuzle, maximoQueJuntaUnaPersona } from '../src/juego
 import { solucionesDe } from '../../shared/juegos/momia-tipos';
 // Del índice: al cargarlo se registran los manifiestos y se anota dónde vive
 // cada categoría. Importando el manifiesto suelto, 'camaras' no resolvería.
-import { MOMIA } from '../../shared/juegos';
 import { computeStaleness } from '../../shared/staleness';
 import { ampliarExpedicion, donesAlDia } from '../src/juegos/momia-trama';
 import { estadoDe } from '../src/juegos/momia-acciones';
-import { entidadesDe, listaDeCategoria } from '../../shared/juegos';
+import { MOMIA, entidadesDe, listaDeCategoria, personasDe } from '../../shared/juegos';
 import type { RespuestaMomia } from '../src/plot/momia-esquema';
 import type { RitoId } from '../../shared/juegos/momia-tipos';
 import { renderPrintableDocument } from '../src/docs/imprimibles';
@@ -111,10 +110,12 @@ function partidaDeMomia(id = 'momia-verificacion'): GameSession {
     updatedAt: ahora,
     // Los `almacen` del manifiesto: expedicionarios→suspects, camaras→rooms,
     // reliquias→weapons. `ritos` no tiene campo heredado y vive en `entidades`.
-    suspects: EXPEDICION.map((e) => ({ ...e })),
-    rooms: CAMARAS.map((c) => ({ ...c })),
-    weapons: RELIQUIAS.map((r) => ({ ...r })),
-    entidades: { ritos: RITOS.map((r) => ({ ...r })) },
+    entidades: {
+      expedicionarios: EXPEDICION.map((e) => ({ ...e })),
+      camaras: CAMARAS.map((c) => ({ ...c })),
+      reliquias: RELIQUIAS.map((r) => ({ ...r })),
+      ritos: RITOS.map((r) => ({ ...r })),
+    },
     boardMode: 'generated',
     settings: { language: 'es', juego: MOMIA.id },
   };
@@ -452,7 +453,7 @@ comprobar('hay una narración por vigilia, más la apertura',
       .some((r) => r.categoria === 'reliquias'));
 
   // Y borrar algo que la trama NO cita no puede inventarse un aviso.
-  const otraReliquia = (partidaGenerada.weapons ?? []).find((w) => w.id !== trama.reliquiaCodiciada);
+  const otraReliquia = (entidadesDe(partidaGenerada, 'reliquias') ?? []).find((w) => w.id !== trama.reliquiaCodiciada);
   if (otraReliquia) {
     comprobar('borrar una reliquia que la trama no cita no dice nada',
       computeStaleness(sinLaEntidad('reliquias', otraReliquia.id)).brokenGameRefs.length === 0);
@@ -722,7 +723,7 @@ comprobar('nadie se queda sin don', Object.keys(dones).length === EXPEDICION.len
   const vistos = new Set<string>();
   for (let i = 0; i < 40; i++) {
     const muda = partidaDeMomia(`momia-muda-${i}`);
-    muda.suspects = mudos.map((m) => ({ ...m }));
+    listaDeCategoria(muda, 'expedicionarios').splice(0, Infinity, ...mudos.map((m) => ({ ...m })));
     const cim = cimientosDeMomia(entidadesDeLaMomia(muda), { semilla: muda.id });
     for (const don of Object.values(cim.trama.dones)) vistos.add(don);
   }

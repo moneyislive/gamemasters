@@ -575,38 +575,28 @@ export interface GameSession {
   /** Lo que ha costado, en tokens. Ausente en las partidas anteriores a esto. */
   gasto?: GastoDeLaPartida;
   /**
-   * ═══ LOS TRES CAMPOS HEREDADOS. YA NO SE ESCRIBE EN ELLOS ═══
+   * DONDE ESTAN LAS COSAS de una partida: una lista por categoría del juego.
    *
-   * Aquí vivían las entidades de una partida desde antes de que existieran las
-   * categorías, y por eso todo juego tenía que declarar `almacenHeredado` para
-   * que las suyas acabaran en uno de los tres. El núcleo los leía por su nombre
-   * en treinta y cinco ficheros.
+   * ═══ AQUI HABIA TRES CAMPOS MAS ═══
    *
-   * Ya no. Toda categoría de todo juego se guarda en `entidades[categoria]`, y
-   * `alDia` trae aquí lo que hubiera —dejándolos vacíos— la primera vez que una
-   * partida antigua sale del almacén.
+   *     suspects: Suspect[];
+   *     rooms: Room[];
+   *     weapons: Weapon[];
    *
-   * SIGUEN SIENDO OBLIGATORIOS, y a propósito: son cientos de documentos
-   * guardados en Mongo que los llevan dentro, y quitar el campo del tipo no los
-   * quita de la base. Cuando no queden partidas anteriores a la migración se
-   * pueden borrar de aquí, de `almacenHeredado` en los tres manifiestos y del
-   * respaldo de `entidadesDe`. Hasta entonces son memoria, no almacén.
+   * Ahí vivían las entidades desde antes de que existieran las categorías, y
+   * por eso todo juego tenía que declarar `almacenHeredado` para que las suyas
+   * acabaran en uno de los tres. Los ritos de la Momia no cabían en ninguno.
    *
-   * @deprecated Lee con `entidadesDe`, `personasDe` o `lugaresDe`.
-   */
-  suspects: Suspect[];
-  /** @deprecated Ver `suspects`. */
-  rooms: Room[];
-  /** @deprecated Ver `suspects`. */
-  weapons: Weapon[];
-  /**
-   * Las entidades por categoría, para juegos que no sean CLUEDO.
+   * Se quedaron después de generalizar el código porque había partidas
+   * guardadas que los llevaban dentro, y borrar el campo del tipo no lo borra
+   * de la base de datos. Eso se resolvió como se resuelve: moviendo lo que
+   * había, una vez, con `server/scripts/mudanza-al-modelo-nuevo.ts`. Mientras
+   * existieron, había DOS sitios donde podían estar las entidades de un juego,
+   * y solo uno de los dos servía para el cuarto.
    *
-   * CLUEDO sigue guardándolas en `suspects`, `rooms` y `weapons`, que es donde
-   * están las partidas ya creadas. Nadie debería leer ninguno de los cuatro
-   * campos directamente: se consultan con `entidadesDe(game, categoria)`, que
-   * mira primero aquí y cae a los heredados. Así el día que estos tres
-   * desaparezcan solo cambia esa función.
+   * NO SE LEE DIRECTAMENTE. Se consulta con `entidadesDe(game, categoria)`,
+   * `personasDe(game)` o `lugaresDe(game)`, que saben qué categoría hace de
+   * qué en cada juego.
    */
   entidades?: Record<string, Array<{
     id: string;

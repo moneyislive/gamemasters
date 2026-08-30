@@ -32,8 +32,8 @@ import { generarTramaSombras } from '../src/juegos/sombras-trama';
 import { generateDemoPlot } from '../src/plot/cluedo-demo';
 import { generateBoardLayout } from '../src/board/generator';
 import { iniciarJuego } from '../src/juegos/inicios';
-import { alDia, sesionAlDia } from '../src/juegos/migracion';
-import { entidadesDe } from '../../shared/juegos';
+import { mudarPartida, mudarSesion } from './mudanza/reglas';
+import { entidadesDe, lugaresDe, personasDe } from '../../shared/juegos';
 import { trofeosDelJuego } from '../src/juegos/trofeos';
 import { generadorDeTrama } from '../src/juegos/generadores';
 import { ampliacionDe } from '../src/juegos/ampliaciones';
@@ -102,9 +102,6 @@ function partidaDe(m: ManifiestoDeJuego): GameSession | null {
     status: 'ready',
     createdAt: ahora,
     updatedAt: ahora,
-    suspects: [],
-    rooms: [],
-    weapons: [],
     entidades: {},
     boardMode: 'generated',
     settings: { language: 'es', juego: m.id },
@@ -116,8 +113,9 @@ function partidaDe(m: ManifiestoDeJuego): GameSession | null {
       id: `${cat.id[0]}${i}`,
       name: cat.sonJugadores ? (GENTE[i] ?? `Persona ${i + 1}`) : `${capitalizar(cat.singular)} ${i + 1}`,
     }));
-    if (cat.almacenHeredado) (game as unknown as Record<string, unknown>)[cat.almacenHeredado] = lista;
-    else (game.entidades as Record<string, unknown>)[cat.id] = lista;
+    // Todas en `entidades`. Aquí había un desvío al campo heredado para las
+    // categorías que declarasen uno; ya no hay campos heredados.
+    (game.entidades as Record<string, unknown>)[cat.id] = lista;
   }
 
   // La trama la escribe cada juego. Sin generador propio se usa la de
@@ -133,7 +131,7 @@ function partidaDe(m: ManifiestoDeJuego): GameSession | null {
   } catch {
     return null;
   }
-  game.board = generateBoardLayout(game.rooms, m.rotuloCentralDelPlano);
+  game.board = generateBoardLayout(lugaresDe(game), m.rotuloCentralDelPlano);
   return game;
 }
 
@@ -149,7 +147,7 @@ function sesionDe(game: GameSession, m: ManifiestoDeJuego): LiveSession {
     phase: 'lobby',
     round: 0,
     totalRounds: 4,
-    players: game.suspects.map((s, i) => ({
+    players: personasDe(game).map((s, i) => ({
       participanteId: s.id,
       displayName: s.name,
       joinCode: `P${i}`,
@@ -502,7 +500,7 @@ for (const m of juegosInstalados()) {
   // (`dosieresPropios`) no lo mete en su paquete y lo que salga de ahí da igual.
   const propios = (m as { dosieresPropios?: boolean }).dosieresPropios === true;
   if (!propios) {
-    revisar('dosier-generico', renderPlayerDocument(game, game.suspects[0]!.id, { variant: 'color' })?.html);
+    revisar('dosier-generico', renderPlayerDocument(game, personasDe(game)[0]!.id, { variant: 'color' })?.html);
   }
 
   const docs = printableDocsFor(game.settings, m.documentos);
@@ -705,142 +703,122 @@ paso('Las medallas de un juego no se reparten en otro');
 }
 
 // ---------------------------------------------------------------------------
-// Una partida guardada con los nombres VIEJOS, ¿se sigue pudiendo abrir?
+// La mudanza: lo guardado con los nombres viejos, ¿llega entero al modelo nuevo?
 // ---------------------------------------------------------------------------
 
-paso('Lo guardado con los nombres viejos se pone al dia al leerlo');
+paso('La mudanza al modelo nuevo no pierde nada por el camino');
 
 /*
- * ═══ POR QUE ESTO ES LO MAS DELICADO DE TODO EL REFACTOR ═══
+ * ═══ ESTE BLOQUE PROBABA OTRA COSA, Y ES IMPORTANTE POR QUE CAMBIO ═══
  *
- * Renombrar un campo del codigo es mecanico y el compilador lo vigila. Renombrar
- * un campo GUARDADO no: los documentos que ya estan en Mongo siguen llevando el
- * nombre viejo, y el codigo nuevo no los encuentra.
+ * Antes probaba `alDia` y `sesionAlDia`: la conversion AL LEER. Cada vez que
+ * una partida salia del almacen se le renombraban los campos viejos, para
+ * siempre, en el nucleo. Eso se ha quitado —eran 58 menciones de CLUEDO cuyo
+ * unico trabajo era recordar como se llamaban antes las cosas— y lo guardado se
+ * mueve UNA VEZ con `scripts/mudanza-al-modelo-nuevo.ts`.
  *
- * El fallo no se ve al desplegar. Se ve cuando alguien abre una partida que
- * preparo la semana pasada y la mesa aparece vacia —ningun jugador, ninguna
- * acusacion, ningun personaje— porque los campos que los llevaban se llamaban de
- * otra forma. De noche, con doce personas delante.
+ * La conversion, por tanto, no ha desaparecido: se ha mudado. Y es la parte que
+ * puede salir mal en silencio —una regla equivocada guarda la partida sin un
+ * solo error, con la solucion cambiada o con la mesa vacia—, asi que la prueba
+ * se muda con ella.
  *
- * Asi que aqui se monta una partida y una sesion CON LOS NOMBRES VIEJOS, tal
- * como estarian en la base, se pasan por las dos puertas del almacen —`alDia` y
- * `sesionAlDia`— y se comprueba que salen enteras.
+ * Se le da un documento con TODOS los nombres viejos a la vez, que es peor caso
+ * que cualquiera real, y se comprueba campo a campo.
  */
 {
-  const vieja = {
+  const partidaVieja = {
     id: 'partida-vieja',
-    name: 'Guardada antes del renombrado',
+    name: 'Una de antes',
     status: 'ready',
-    createdAt: '2026-01-01T20:00:00.000Z',
-    updatedAt: '2026-01-01T20:00:00.000Z',
-    // Las entidades, en los tres campos heredados.
-    suspects: [{ id: 's0', name: 'Ana' }, { id: 's1', name: 'Bruno' }],
-    rooms: [{ id: 'r0', name: 'Salón' }],
-    weapons: [{ id: 'w0', name: 'Candelabro' }],
-    boardMode: 'generated',
     settings: { language: 'es', juego: 'cluedo' },
-    documents: [{ suspectId: 's0', title: 'Dosier de Ana' }],
-    plot: {
-      title: 'Un caso viejo',
-      tagline: 'De antes.',
-      synopsis: 'Algo pasó.',
-      setting: 'La casa.',
-      solution: { respuestas: {} },
-      characters: [{ suspectId: 's0', characterName: 'Ana', role: 'Invitada', publicPersona: '', knowledge: [] }],
-      timeline: [{ time: '21:00', description: 'Llegaron', suspectIds: ['s0', 's1'], isPublic: true }],
-      clues: [],
-      gmScript: [],
-      material: {
-        generatedAt: '2026-01-01T20:00:00.000Z',
-        narrations: [],
-        twists: [{ id: 'g0', suspectId: 's1', round: 2, instruction: 'Recuerdas algo.' }],
-        timelineReveals: [],
-        hints: [],
-        finale: { reconstruction: '', confession: '', epilogue: '' },
-      },
+    entidades: {
+      sospechosos: [
+      { id: 's0', name: 'Ana' },
+      { id: 's1', name: 'Bruno' },
+    ],
+      salas: [{ id: 'r0', name: 'Biblioteca' }],
+      objetos: [{ id: 'w0', name: 'Candelabro' }],
     },
-  } as unknown as GameSession;
+    board: {
+      grid: 9,
+      rooms: [{ roomId: 'r0', x: 1, y: 1, w: 2, h: 2 }],
+      passages: [{ fromRoomId: 'r0', toRoomId: 'r1' }],
+    },
+    documents: [{ suspectId: 's0', variant: 'player', content: '…' }],
+    plot: {
+      title: 'El caso',
+      characters: [{ suspectId: 's0', role: 'anfitriona' }],
+      timeline: [{ time: '21:00', suspectIds: ['s0', 's1'] }],
+      clues: [{ id: 'c0', roomId: 'r0', round: 1, description: 'Un pañuelo' }],
+      material: { twists: [{ id: 't0', suspectId: 's1', round: 2 }] },
+      solution: { murdererId: 's1', weaponId: 'w0', roomId: 'r0', motive: 'una deuda' },
+    },
+  } as unknown as Record<string, unknown>;
 
-  const puesta = alDia(vieja)!;
+  mudarPartida(partidaVieja);
+  const p = partidaVieja as any;
 
+  comprobar('la mesa entera llega a su categoria', p.entidades?.sospechosos?.length === 2, p.entidades);
+  comprobar('y los lugares y las cosas tambien', p.entidades?.salas?.length === 1 && p.entidades?.objetos?.length === 1);
+  comprobar('los campos viejos ya no estan', !('suspects' in p) && !('rooms' in p) && !('weapons' in p));
+  comprobar('el plano dibuja lugares y pasadizos', p.board.lugares?.[0]?.lugarId === 'r0' && p.board.pasadizos?.[0]?.desdeLugarId === 'r0');
+  comprobar('cada personaje sabe a quien interpreta', p.plot.characters[0].participanteId === 's0');
+  comprobar('la cronologia sabe quienes estaban', p.plot.timeline[0].participanteIds?.[0] === 's0');
+  comprobar('las pistas saben de que lugar son', p.plot.clues[0].lugarId === 'r0');
+  comprobar('los giros saben a quien van', p.plot.material.twists[0].participanteId === 's1');
+  comprobar('el dosier sabe de quien es', p.documents[0].id === 's0');
+  /*
+   * LA SOLUCION ES EL CAMPO QUE MAS CUESTA SI SE EQUIVOCA: no revienta, cambia
+   * quien fue. Se comprueban los tres ejes por su valor, no solo que existan.
+   */
   comprobar(
-    'las entidades se mudan de los campos heredados a `entidades`',
-    entidadesDe(puesta, 'sospechosos').length === 2 &&
-      entidadesDe(puesta, 'salas').length === 1 &&
-      entidadesDe(puesta, 'objetos').length === 1,
-    { entidades: Object.keys(puesta.entidades ?? {}) },
+    'la solucion pasa de terna a ejes, con los mismos ids',
+    p.plot.solution.respuestas?.culpable === 's1' &&
+      p.plot.solution.respuestas?.objeto === 'w0' &&
+      p.plot.solution.respuestas?.lugar === 'r0',
+    p.plot.solution,
   );
-  comprobar(
-    'y los campos heredados se quedan vacios',
-    puesta.suspects.length === 0 && puesta.rooms.length === 0 && puesta.weapons.length === 0,
-  );
-  comprobar(
-    'el indice de dosieres estrena `id`',
-    puesta.documents?.[0]?.id === 's0' &&
-      (puesta.documents?.[0] as unknown as { suspectId?: string }).suspectId === undefined,
-    puesta.documents,
-  );
-  comprobar(
-    'los personajes de la trama saben a quien interpretan',
-    puesta.plot?.characters[0]?.participanteId === 's0',
-    puesta.plot?.characters[0],
-  );
-  comprobar(
-    'la cronologia sabe quien estaba',
-    puesta.plot?.timeline[0]?.participanteIds.join(',') === 's0,s1',
-    puesta.plot?.timeline[0],
-  );
-  comprobar(
-    'y los giros saben a quien van',
-    puesta.plot?.material?.twists[0]?.participanteId === 's1',
-    puesta.plot?.material?.twists[0],
-  );
+  comprobar('y el motivo no se toca', p.plot.solution.motive === 'una deuda');
 
   const sesionVieja = {
     id: 'partida-vieja',
     juego: 'cluedo',
-    code: 'VIEJA1',
     phase: 'ronda-cerrada',
     round: 2,
-    totalRounds: 4,
     players: [
-      { suspectId: 's0', displayName: 'Ana', joinCode: 'AAA111', joined: true, elecciones: [], notas: '', girosRecibidos: [] },
-      { suspectId: 's1', displayName: 'Bruno', joinCode: 'BBB222', joined: true, elecciones: [], notas: '', girosRecibidos: [] },
+      { suspectId: 's0', displayName: 'Ana', elecciones: [{ round: 1, roomId: 'r0' }] },
+      { suspectId: 's1', displayName: 'Bruno', elecciones: [] },
     ],
-    acusaciones: [{ suspectId: 's0', respuestas: {}, at: '2026-01-01T21:00:00.000Z', correcta: false, aciertos: 0 }],
-    acciones: [{ suspectId: 's1', accion: 'entrar-en-sala', round: 1, at: '2026-01-01T20:30:00.000Z' }],
-    denuncias: [{ suspectId: 's0', displayName: 'Ana', pregunta: '¿?', respuesta: '…', at: '2026-01-01T20:40:00.000Z' }],
-    porDondePasaron: [],
-    rev: 3,
-    updatedAt: '2026-01-01T21:00:00.000Z',
-  } as unknown as LiveSession;
+    acusaciones: [{ suspectId: 's0', respuestas: {}, correcta: false }],
+    acciones: [{ suspectId: 's1', accion: 'entrar-en-sala', round: 1 }],
+    denuncias: [{ suspectId: 's0', pregunta: '¿?' }],
+    tablon: [{ round: 1, roomId: 'r0' }],
+    winnerId: 's0',
+  } as unknown as Record<string, unknown>;
 
-  const sesionPuesta = sesionAlDia(sesionVieja)!;
+  mudarSesion(sesionVieja);
+  const v = sesionVieja as any;
 
+  comprobar('cada silla sabe quien la ocupa', v.players.every((j: any) => typeof j.participanteId === 'string'));
+  comprobar('y por donde paso cada cual', v.players[0].elecciones[0].lugarId === 'r0');
+  comprobar('las respuestas entregadas siguen sabiendo quien las entrego', v.respuestasEntregadas?.[0]?.participanteId === 's0');
+  comprobar('el registro de acciones no pierde de quien es cada una', v.acciones[0].participanteId === 's1');
+  comprobar('y las denuncias tampoco', v.denuncias[0].participanteId === 's0');
+  comprobar('el recorrido de la mesa se conserva', v.porDondePasaron?.[0]?.lugarId === 'r0');
+  comprobar('y quien acerto primero sigue siendo quien fue', v.primeroEnAcertar === 's0');
+
+  /*
+   * LA COMPROBACION QUE LO CIERRA TODO. Las de arriba miran campo a campo y por
+   * tanto solo cazan lo que se le ocurrio a quien las escribio. Esta caza
+   * cualquier nombre viejo que quede en cualquier rincon, incluido uno que
+   * nadie haya pensado en mirar.
+   */
+  const restos = ['suspectId', 'suspectIds', 'roomId', 'weaponId', 'murdererId', 'acusaciones', 'winnerId', 'tablon', 'passages', 'fromRoomId'];
+  const encontrados = restos.filter((n) => JSON.stringify([partidaVieja, sesionVieja]).includes(`"${n}"`));
   comprobar(
-    'la mesa no se queda vacia: cada silla sabe quien la ocupa',
-    sesionPuesta.players.every((j) => typeof j.participanteId === 'string' && j.participanteId !== ''),
-    sesionPuesta.players.map((j) => j.participanteId),
-  );
-  comprobar(
-    'las acusaciones ya entregadas siguen sabiendo quien las entrego',
-    sesionPuesta.respuestasEntregadas[0]?.participanteId === 's0',
-    sesionPuesta.respuestasEntregadas[0],
-  );
-  comprobar(
-    'el registro de acciones no pierde de quien es cada una',
-    sesionPuesta.acciones?.[0]?.participanteId === 's1',
-    sesionPuesta.acciones?.[0],
-  );
-  comprobar(
-    'y las denuncias tampoco',
-    sesionPuesta.denuncias?.[0]?.participanteId === 's0',
-    sesionPuesta.denuncias?.[0],
-  );
-  comprobar(
-    'y no queda ni un `suspectId` suelto por ningun lado',
-    !JSON.stringify([puesta, sesionPuesta]).includes('suspectId'),
-    { porque: 'dos copias del mismo dato divergen en cuanto alguien edita' },
+    'y no queda ni un nombre viejo suelto por ningun rincon',
+    encontrados.length === 0,
+    { encontrados, porque: 'lo que la mudanza no convierta se queda invisible para siempre' },
   );
 }
 

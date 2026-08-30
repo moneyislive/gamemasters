@@ -105,9 +105,11 @@ const huerfana = {
   status: 'draft',
   createdAt: ahora,
   updatedAt: ahora,
-  suspects: [],
-  rooms: [],
-  weapons: [],
+  entidades: {
+    sospechosos: [],
+    salas: [],
+    objetos: [],
+  },
   boardMode: 'generated',
   settings: { language: 'es' },
 };

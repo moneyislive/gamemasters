@@ -31,6 +31,7 @@ import { abrirRonda, cerrarRonda } from '../src/live/sesion';
 import { REGLAS_JUGADOR } from '../src/docs/datos';
 import type { GameSession } from '../../shared/types';
 import type { LiveSession } from '../../shared/live';
+import { personasDe, lugaresDe, entidadesDe } from '../../shared/juegos';
 
 const RONDAS = 25;
 const MARCA_GIRO = 'GIRO PERSONAL QUE NADIE MAS DEBE VER';
@@ -47,13 +48,15 @@ function partidaEnElPeorCaso(n: number): { game: GameSession; sesion: LiveSessio
     status: 'ready',
     createdAt: ahora,
     updatedAt: ahora,
-    suspects: ['Ana', 'Bruno', 'Carla', 'Dani', 'Elena'].map((name, i) => ({ id: `s${i}`, name })),
-    rooms: ['Salón', 'Cocina', 'Biblioteca', 'Invernadero'].map((name, i) => ({ id: `r${i}`, name })),
-    weapons: ['Candelabro', 'Cuerda', 'Abrecartas'].map((name, i) => ({ id: `w${i}`, name })),
+    entidades: {
+      sospechosos: ['Ana', 'Bruno', 'Carla', 'Dani', 'Elena'].map((name, i) => ({ id: `s${i}`, name })),
+      salas: ['Salón', 'Cocina', 'Biblioteca', 'Invernadero'].map((name, i) => ({ id: `r${i}`, name })),
+      objetos: ['Candelabro', 'Cuerda', 'Abrecartas'].map((name, i) => ({ id: `w${i}`, name })),
+    },
     boardMode: 'generated',
     settings: { language: 'es' },
   };
-  game.board = generateBoardLayout(game.rooms);
+  game.board = generateBoardLayout(lugaresDe(game));
   game.plot = generateDemoPlot(game);
 
   // Material impreso, con marcas reconocibles: si alguna aparece en el
@@ -61,7 +64,7 @@ function partidaEnElPeorCaso(n: number): { game: GameSession; sesion: LiveSessio
   game.plot.material = {
     generatedAt: ahora,
     narrations: [{ round: 1, title: 'Ronda 1', text: 'Se abre la ronda.', stageDirection: '' }],
-    twists: game.suspects.map((s, i) => ({
+    twists: personasDe(game).map((s, i) => ({
       id: `giro-${i}`,
       participanteId: s.id,
       round: 2,
@@ -76,21 +79,21 @@ function partidaEnElPeorCaso(n: number): { game: GameSession; sesion: LiveSessio
     },
   };
 
-  const yo = game.suspects[n % game.suspects.length]!.id;
+  const yo = personasDe(game)[n % personasDe(game).length]!.id;
   const sesion: LiveSession = {
     id: game.id,
     code: 'PRUEBA',
     phase: 'lobby',
     round: 0,
     totalRounds: 4,
-    players: game.suspects.map((s) => ({
+    players: personasDe(game).map((s) => ({
       participanteId: s.id,
       displayName: s.name,
       joinCode: 'AAAAAA',
       joined: true,
       elecciones: [],
       notas: '',
-      girosRecibidos: game.suspects.map((_, i) => `giro-${i}`),
+      girosRecibidos: personasDe(game).map((_, i) => `giro-${i}`),
     })),
     respuestasEntregadas: [],
     porDondePasaron: [],
@@ -128,8 +131,8 @@ function corpusPermitido(game: GameSession, yo: string): string {
     mio.alibi,
     mio.personalHook,
     ...plot.characters.map((c) => `${c.characterName} ${c.role}`),
-    ...game.rooms.map((r) => r.name),
-    ...game.weapons.map((w) => w.name),
+    ...lugaresDe(game).map((r) => r.name),
+    ...entidadesDe(game, 'objetos').map((w) => w.name),
     ...REGLAS_JUGADOR.map((r) => `${r.titulo} ${r.texto}`),
   ].join('\n');
 }

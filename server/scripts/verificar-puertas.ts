@@ -38,7 +38,7 @@ import { generateDemoPlot } from '../src/plot/cluedo-demo';
 import { armarPaquete } from '../src/docs/paquete';
 import { renderDocumentIndex, renderPlayerDocument } from '../src/docs/renderer';
 import { renderPrintableDocument } from '../src/docs/imprimibles';
-import { todosLosTrofeos, trofeosQueChocan } from '../../shared/juegos';
+import { lugaresDe, personasDe, todosLosTrofeos, trofeosQueChocan } from '../../shared/juegos';
 import { TROFEOS } from '../../shared/live';
 import '../src/juegos/instalados';
 import { juegosConMaterial } from '../src/juegos/materiales';
@@ -140,13 +140,13 @@ function partidaDeMomia(
     status: 'ready',
     createdAt: ahora,
     updatedAt: ahora,
-    suspects: NOMBRES.map((name, i) => ({ id: `e${i}`, name })),
-    rooms: ['Antesala', 'Camara del Barquero', 'Pozo', 'Corredor', 'Balanza'].map((name, i) => ({
+    entidades: {
+      expedicionarios: NOMBRES.map((name, i) => ({ id: `e${i}`, name })),
+      camaras: ['Antesala', 'Camara del Barquero', 'Pozo', 'Corredor', 'Balanza'].map((name, i) => ({
       id: `c${i}`,
       name,
     })),
-    weapons: ['Escarabeo', 'Mascara', 'Daga'].map((name, i) => ({ id: `r${i}`, name })),
-    entidades: {
+      reliquias: ['Escarabeo', 'Mascara', 'Daga'].map((name, i) => ({ id: `r${i}`, name })),
       ritos: ['Agua', 'Aliento', 'Nombre', 'Balanza', 'Silencio'].map((name, i) => ({
         id: `t${i}`,
         name: `Rito del ${name}`,
@@ -156,14 +156,14 @@ function partidaDeMomia(
     settings: { language: 'es', juego: 'momia' },
   } as unknown as GameSession;
 
-  game.board = generateBoardLayout(game.rooms, manifiestoDe('momia').rotuloCentralDelPlano);
+  game.board = generateBoardLayout(lugaresDe(game), manifiestoDe('momia').rotuloCentralDelPlano);
   game.plot = generarTramaMomia(game, { semilla: 'puertas', vigilias: 3, saqueador: 'e3' });
   // El índice de documentos, como lo deja la generación de verdad: sin él, la
   // ruta que sirve un dosier suelto contesta «todavía no se ha generado».
   game.documents = renderDocumentIndex(game);
   const estado: EstadoMomia = estadoInicial(
     tramaDe(game.plot)!,
-    game.suspects.map((s) => s.id),
+    personasDe(game).map((s) => s.id),
   );
 
   const sesion = {
@@ -174,7 +174,7 @@ function partidaDeMomia(
     round: 1,
     totalRounds: 3,
     roundEndsAt: new Date(Date.now() + 3600_000).toISOString(),
-    players: game.suspects.map((s, i) => ({
+    players: personasDe(game).map((s, i) => ({
       participanteId: s.id,
       displayName: s.name,
       joinCode: `${clave}${i}A`,
@@ -200,14 +200,16 @@ function partidaDeCluedo(): { game: GameSession; sesion: LiveSession } {
     status: 'ready',
     createdAt: ahora,
     updatedAt: ahora,
-    suspects: NOMBRES.map((name, i) => ({ id: `s${i}`, name })),
-    rooms: ['Biblioteca', 'Cocina', 'Salon', 'Jardin'].map((name, i) => ({ id: `h${i}`, name })),
-    weapons: ['Candelabro', 'Cuerda', 'Llave'].map((name, i) => ({ id: `w${i}`, name })),
+    entidades: {
+      sospechosos: NOMBRES.map((name, i) => ({ id: `s${i}`, name })),
+      salas: ['Biblioteca', 'Cocina', 'Salon', 'Jardin'].map((name, i) => ({ id: `h${i}`, name })),
+      objetos: ['Candelabro', 'Cuerda', 'Llave'].map((name, i) => ({ id: `w${i}`, name })),
+    },
     boardMode: 'generated',
     settings: { language: 'es' },
   } as unknown as GameSession;
 
-  game.board = generateBoardLayout(game.rooms, manifiestoDe(undefined).rotuloCentralDelPlano);
+  game.board = generateBoardLayout(lugaresDe(game), manifiestoDe(undefined).rotuloCentralDelPlano);
   game.plot = generateDemoPlot(game);
 
   const sesion = {
@@ -218,7 +220,7 @@ function partidaDeCluedo(): { game: GameSession; sesion: LiveSession } {
     round: 1,
     totalRounds: 3,
     roundEndsAt: new Date(Date.now() + 3600_000).toISOString(),
-    players: game.suspects.map((s, i) => ({
+    players: personasDe(game).map((s, i) => ({
       participanteId: s.id,
       displayName: s.name,
       joinCode: `MANS${i}A`,
@@ -338,15 +340,18 @@ async function probar(): Promise<void> {
     comprobar('acusar en CLUEDO responde 200', r.estado === 200, r.datos);
 
     /*
-     * ═══ Y EL NOMBRE VIEJO DE LA RUTA SIGUE ATENDIENDO ═══
+     * ═══ Y EL NOMBRE VIEJO DE LA RUTA YA NO ATIENDE ═══
      *
-     * `/jugar/acusar` paso a llamarse `/jugar/responder`, porque en dos de los
-     * tres juegos no se acusa a nadie. El movil se compila aparte y no tiene
-     * actualizaciones sobre el aire: durante los dias que van entre desplegar
-     * el servidor y que la gente actualice hay telefonos llamando al de antes.
+     * `/jugar/acusar` paso a llamarse `/jugar/responder`, y durante un tiempo
+     * se atendieron los dos por los moviles ya instalados: la app se compila
+     * aparte y no tiene actualizaciones sobre el aire.
      *
-     * Si esto se cae, lo que se cae en la mesa es poder TERMINAR la partida, y
-     * se cae de noche, con doce personas delante y sin explicacion.
+     * Se quito, y esta comprobacion existe para que no vuelva por inercia. Un
+     * binario de aquella epoca manda `suspectId` y `roomId`, espera `objetos`,
+     * `misPistas` y `tablon`, y pinta una pestaña que ya no existe: esta roto
+     * en veinte campos mas. Atenderle esta ruta no le dejaba terminar la
+     * partida, le dejaba llegar un paso mas lejos antes de romperse —y romperse
+     * mas callado, que es peor.
      */
     const otro = await entrar('MANSIO', 'MANS1A');
     const viejo = await pedir('/jugar/acusar', {
@@ -354,7 +359,7 @@ async function probar(): Promise<void> {
       testigo: otro,
       cuerpo: { respuestas: sol },
     });
-    comprobar('y el nombre viejo de la ruta sigue valiendo', viejo.estado === 200, viejo.datos);
+    comprobar('y el nombre viejo de la ruta ya no atiende', viejo.estado === 404, viejo.estado);
   }
 
   // -------------------------------------------------------------------------
@@ -947,7 +952,7 @@ function probarDosieres(): void {
   const deCluedo = armarPaquete(cluedoGame).entradas.map((e) => e.ruta);
   comprobar(
     'CLUEDO conserva un dosier por jugador',
-    genericos(deCluedo).length === cluedoGame.suspects.length,
+    genericos(deCluedo).length === personasDe(cluedoGame).length,
     genericos(deCluedo),
   );
   comprobar(
@@ -1090,7 +1095,7 @@ function probarAmpliacion(): void {
   const antes = Object.keys(trama.dones).length;
 
   // Se sienta alguien más, como cuando confirman tarde.
-  game.suspects.push({ id: 'e9', name: 'Nueva' } as never);
+  personasDe(game).push({ id: 'e9', name: 'Nueva' } as never);
 
   comprobar('antes de ampliar no tiene don', trama.dones.e9 === undefined);
   comprobar('ni papel escrito', !game.plot!.characters.some((c) => c.participanteId === 'e9'));

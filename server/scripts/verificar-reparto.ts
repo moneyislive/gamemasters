@@ -114,9 +114,11 @@ function sembrar(dir: string): void {
     status: 'ready',
     createdAt: ahora,
     updatedAt: ahora,
-    suspects: [],
-    rooms: [],
-    weapons: [],
+    entidades: {
+      escoltas: [],
+      pasos: [],
+      enseres: [],
+    },
     boardMode: 'generated',
     settings: { language: 'es', juego: 'cluedo' },
   };

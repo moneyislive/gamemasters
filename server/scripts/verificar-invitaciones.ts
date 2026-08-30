@@ -52,9 +52,11 @@ const partida = (id: string, nombre: string, correos: Array<string | undefined>)
   status: 'ready',
   createdAt: ahora,
   updatedAt: ahora,
-  suspects: correos.map((email, i) => ({ id: `s${i}`, name: `Persona ${i}`, email })),
-  rooms: [{ id: 'r0', name: 'Salón' }],
-  weapons: [{ id: 'w0', name: 'Candelabro' }],
+  entidades: {
+    sospechosos: correos.map((email, i) => ({ id: `s${i}`, name: `Persona ${i}`, email })),
+    salas: [{ id: 'r0', name: 'Salón' }],
+    objetos: [{ id: 'w0', name: 'Candelabro' }],
+  },
   boardMode: 'generated',
   settings: { language: 'es' },
 });

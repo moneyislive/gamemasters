@@ -26,7 +26,6 @@ import { partidaParaElTaller } from '../live/proyeccion';
 import { getStore } from '../db/store';
 import { generateBoardLayout } from '../board/generator';
 import { renderDocumentIndex } from '../docs/renderer';
-import { tramaAlDia } from '../juegos/migracion';
 
 /**
  * Como avisa un generador de por donde va.
@@ -122,13 +121,14 @@ export async function runGeneration(game: GameSession, emit: Emitir): Promise<vo
           'Se declara con `registrarGenerador` y se carga desde `juegos/instalados.ts`.',
       );
     }
+    /*
+     * La trama llega YA con sus respuestas por eje. Aquí se llamaba a
+     * `tramaAlDia`, que convertía la terna de CLUEDO —asesino, arma, sala— a
+     * ejes: una función de la migración de datos guardados, corriendo sobre una
+     * trama recién nacida. Esa conversión es la frontera del generador de
+     * CLUEDO y se ha ido con él.
+     */
     const plot = await alta.generar(game, emit);
-    // El esquema con el que se le pide la trama al modelo sigue hablando de
-    // asesino, arma y sala, y se deja así a propósito: está afinado y
-    // probado, y cambiarlo cambiaría las tramas que salen. La conversión a
-    // ejes se hace aquí, en la frontera. (En la Momia no hace nada: su solución
-    // ya nace con `respuestas`, y `tramaAlDia` no toca lo que ya está al día.)
-    tramaAlDia(plot);
     /*
      * Y se reparan las respuestas que apunten a algo que ya no existe. Esto era
      * `corregirSolucion`, una funcion de una linea que vivia en la mitad de

@@ -92,41 +92,6 @@ export interface DefinicionCategoria {
   admiteEmail?: boolean;
 
   /**
-   * DÓNDE VIVÍAN estas entidades antes. Solo lo lee la migración.
-   *
-   * POR QUÉ EXISTE ESTE CAMPO TAN FEO. Una partida guarda sus cosas en
-   * `suspects`, `rooms` y `weapons`, con esos nombres, desde antes de que
-   * existieran las categorías. Y no es solo inercia: media plataforma se cuelga
-   * de ellos —el emparejamiento de los móviles y los dosieres van por
-   * `suspects`, el plano y las chinchetas por `rooms`—, así que una categoría
-   * cuyas entidades sean personas TIENE que acabar en `suspects` o nada de eso
-   * funciona.
-   *
-   * Antes esto era una tabla escondida en `entidades.ts` que solo conocía las
-   * tres categorías de CLUEDO. Al llegar el segundo juego se vio el problema:
-   * sus categorías tienen otros nombres, así que caían fuera de la tabla, y una
-   * de ellas —los ritos— no tiene sitio heredado ninguno.
-   *
-   * Ahora lo declara cada juego, que es quien lo sabe. Y lo que se gana no es
-   * solo que funcione: se gana que el acoplamiento esté A LA VISTA, en el
-   * manifiesto, en vez de escondido en una constante. El día que el almacén se
-   * generalice del todo, lo que hay que borrar está enumerado aquí.
-   *
-   * ═══ YA NO ES DÓNDE SE GUARDAN, ES DÓNDE ESTUVIERON ═══
-   *
-   * Hasta hoy este campo decidía dónde escribía `listaDeCategoria`: una
-   * categoría con `almacen: 'suspects'` guardaba en `game.suspects`, que es un
-   * campo heredado de CLUEDO. Ahora TODAS las categorías de TODOS los juegos
-   * guardan en `game.entidades[id]`, y este campo solo sirve para que la
-   * migración sepa de dónde traerse los datos de una partida antigua.
-   *
-   * Una categoría nueva no lo declara. Los tres juegos de casa lo declaran
-   * porque tienen partidas guardadas desde antes, y el día que no queden se
-   * puede borrar de los tres manifiestos sin tocar nada más.
-   */
-  almacenHeredado?: 'suspects' | 'rooms' | 'weapons';
-
-  /**
    * Cómo se presenta esta categoría en el taller.
    *
    * Todo esto es CONTENIDO, no comportamiento, y por eso vive aquí y no en el

@@ -19,7 +19,6 @@ import type {
 } from '../../../shared/types';
 import type { Account, LiveSession } from '../../../shared/live';
 import { env, isModelId } from '../config';
-import { alDia, sesionAlDia } from '../juegos/migracion';
 
 // ---------------------------------------------------------------------------
 // Contrato
@@ -117,9 +116,6 @@ function newGameSession(name?: string): GameSession {
     status: 'draft',
     createdAt: now,
     updatedAt: now,
-    suspects: [],
-    rooms: [],
-    weapons: [],
     boardMode: 'generated',
     settings: { language: 'es' },
   };
@@ -226,7 +222,7 @@ class FileStore implements Store {
 
   async getGame(id: string): Promise<GameSession | null> {
     const game = this.data.games.find((g) => g.id === id);
-    return game ? alDia(structuredClone(game)) : null;
+    return game ? structuredClone(game) : null;
   }
 
   async createGame(name?: string): Promise<GameSession> {
@@ -283,17 +279,17 @@ class FileStore implements Store {
   async listLiveActivas(): Promise<LiveSession[]> {
     return this.data.live
       .filter((l) => l.phase !== 'desenlace')
-      .map((l) => sesionAlDia(structuredClone(l)));
+      .map((l) => structuredClone(l));
   }
 
   async getLive(gameId: string): Promise<LiveSession | null> {
     const s = this.data.live.find((l) => l.id === gameId);
-    return s ? sesionAlDia(structuredClone(s)) : null;
+    return s ? structuredClone(s) : null;
   }
 
   async getLiveByCode(code: string): Promise<LiveSession | null> {
     const s = this.data.live.find((l) => l.code === code.toUpperCase());
-    return s ? sesionAlDia(structuredClone(s)) : null;
+    return s ? structuredClone(s) : null;
   }
 
   async saveLive(session: LiveSession): Promise<LiveSession> {
@@ -476,7 +472,7 @@ export class MongoStore implements Store {
 
   async getGame(id: string): Promise<GameSession | null> {
     const doc = (await this.games.findOne({ id }).lean()) as unknown as LooseDoc | null;
-    return doc ? alDia(stripMongo<GameSession>(doc)) : null;
+    return doc ? stripMongo<GameSession>(doc) : null;
   }
 
   async createGame(name?: string): Promise<GameSession> {
@@ -549,19 +545,19 @@ export class MongoStore implements Store {
     const docs = (await this.live
       .find({ phase: { $ne: 'desenlace' } })
       .lean()) as unknown as LooseDoc[];
-    return docs.map((d) => sesionAlDia(stripMongo<LiveSession>(d)));
+    return docs.map((d) => stripMongo<LiveSession>(d));
   }
 
   async getLive(gameId: string): Promise<LiveSession | null> {
     const doc = (await this.live.findOne({ id: gameId }).lean()) as unknown as LooseDoc | null;
-    return doc ? sesionAlDia(stripMongo<LiveSession>(doc)) : null;
+    return doc ? stripMongo<LiveSession>(doc) : null;
   }
 
   async getLiveByCode(code: string): Promise<LiveSession | null> {
     const doc = (await this.live
       .findOne({ code: code.toUpperCase() })
       .lean()) as unknown as LooseDoc | null;
-    return doc ? sesionAlDia(stripMongo<LiveSession>(doc)) : null;
+    return doc ? stripMongo<LiveSession>(doc) : null;
   }
 
   async saveLive(session: LiveSession): Promise<LiveSession> {

@@ -1,25 +1,28 @@
 /**
- * El puente entre «categoría del juego» y «dónde están guardadas esas cosas».
+ * Las entidades de una partida, por categoría.
  *
- * Hoy una partida guarda sus entidades en tres campos con nombre propio:
- * `suspects`, `rooms` y `weapons`. Eso funciona para CLUEDO y no para nada más.
- * El destino es `entidades: Record<CategoriaId, Entidad[]>`, pero cambiar el
- * almacenamiento de golpe obligaría a migrar las partidas que ya existen y a
- * tocar de una sentada las trece plantillas de imprimibles.
+ * ═══ AQUI HABIA UN PUENTE, Y YA NO HACE FALTA ═══
  *
- * Así que la generalización entra por aquí: todo el código que quiera ser
- * agnóstico pide entidades POR CATEGORÍA y no toca los tres campos. El día que
- * el almacenamiento cambie, cambia esta función y nada más.
+ * Una partida guardaba sus cosas en tres campos con nombre propio —`suspects`,
+ * `rooms` y `weapons`— que funcionaban para CLUEDO y para nada mas. Este
+ * fichero era el puente: todo el codigo agnostico pedia POR CATEGORIA y aqui
+ * dentro se traducia a uno de los tres, con una tabla que era «la unica del
+ * sistema que conoce a la vez un id de categoria y un nombre de campo».
  *
- * Mientras tanto, un juego nuevo ya puede declarar sus propias categorías y
- * guardarlas en `entidades`, que se consulta primero.
+ * El puente cumplio: permitio generalizar treinta ficheros sin migrar ni una
+ * partida. Y tenia fecha de caducidad, porque mientras existiera habia DOS
+ * sitios donde podian estar las entidades de un juego, y solo uno de los dos
+ * servia para el cuarto.
  *
- * VIVE EN shared/ Y NO EN server/ POR UNA RAZÓN CONCRETA: lo descubrió la
- * prueba del segundo juego. `computeStaleness` también tiene que resolver
- * entidades por categoría, y está aquí porque lo usa el taller. Con el puente
- * del lado del servidor, aquella función se quedaba con las tres categorías
- * de CLUEDO escritas a mano y daba por rota la solución de cualquier otro
- * juego.
+ * Ahora estan en `entidades` y solo ahi. Lo que habia guardado se movio de una
+ * vez con `scripts/mudanza-al-modelo-nuevo.ts`, que es de un solo uso y lo
+ * dice en su cabecera.
+ *
+ * VIVE EN shared/ Y NO EN server/ POR UNA RAZON CONCRETA: lo descubrio la
+ * prueba del segundo juego. `computeStaleness` tambien resuelve entidades por
+ * categoria y esta aqui porque lo usa el taller. Con esto del lado del
+ * servidor, aquella funcion se quedaba con las tres categorias de CLUEDO
+ * escritas a mano y daba por rota la solucion de cualquier otro juego.
  */
 import { ejes as ejesDe } from './tipos';
 import type { CategoriaId, ManifiestoDeJuego } from './tipos';
@@ -36,78 +39,15 @@ export interface Entidad {
 }
 
 /**
- * Los campos heredados de CLUEDO, por categoría.
+ * Las entidades de una categoría. Para LEER.
  *
- * Es la única tabla del sistema que conoce a la vez un id de categoría y un
- * nombre de campo del almacén. Cuando desaparezca, la generalización estará
- * completa.
- */
-type CampoHeredado = 'suspects' | 'rooms' | 'weapons';
-
-/**
- * Anclado al ambito global, y esta vez con motivo demostrado.
- *
- * Este fichero se carga DOS VECES: una prueba lo importa como
- * `../../shared/juegos` y otro modulo como `./entidades`, y el cargador las
- * trata como modulos distintos. Con una constante de modulo hay dos tablas, y
- * `declararAlmacen` escribe solo en una.
- *
- * Es el mismo fallo del que avisan `INSTALADOS`, `REDUCTORES`, `PROYECCIONES` y
- * `REPARTOS` —los cuatro anclados con `Symbol.for` por esta razon— y esta tabla
- * se quedo sin anclar al escribirla.
- *
- * Y ES DE LOS QUE NO SE VEN: las tres categorias de CLUEDO estan en el literal
- * inicial, asi que no dependen de `declararAlmacen` y CLUEDO funciona igual con
- * esto roto. Los verificadores de CLUEDO seguian TODOS en verde mientras el
- * juego nuevo tenia rechazadas todas sus acciones, porque `motor.ts` importa
- * `entidadesDe` por el camino que veia la tabla sin declarar y no encontraba
- * ninguna de sus entidades.
- */
-const LLAVE_ALMACENES = Symbol.for('gamemasters.juegos.almacenes');
-const globalAlmacenes = globalThis as unknown as Record<
-  symbol,
-  Record<CategoriaId, CampoHeredado>
->;
-
-const CAMPO_HEREDADO: Record<CategoriaId, CampoHeredado> =
-  globalAlmacenes[LLAVE_ALMACENES] ??
-  (globalAlmacenes[LLAVE_ALMACENES] = {
-    sospechosos: 'suspects',
-    salas: 'rooms',
-    objetos: 'weapons',
-  });
-
-/**
- * Da de alta dónde vive una categoría.
- *
- * Lo llama `registrarJuego` por cada categoría que declare `almacen`. Antes
- * esta tabla estaba escrita a mano aquí arriba y solo conocía las tres de
- * CLUEDO: cualquier otro juego caía fuera y sus entidades no se encontraban.
- *
- * NO SE PUEDE RESOLVER LEYENDO EL MANIFIESTO EN EL MOMENTO porque estas
- * funciones no lo reciben —las llaman treinta sitios que solo tienen la partida
- * delante— y hacer que lo recibieran habría cambiado treinta firmas para ganar
- * lo mismo. Se rellena al registrar el juego, que ocurre al importar el módulo,
- * mucho antes de que nadie pregunte.
- */
-export function declararAlmacen(categoria: CategoriaId, campo: CampoHeredado): void {
-  CAMPO_HEREDADO[categoria] = campo;
-}
-
-/**
- * Las entidades de una categoría, vengan de donde vengan.
- *
- * EL RESPALDO AL CAMPO HEREDADO SIGUE AQUÍ y es a propósito: es lo que hace que
- * una partida que todavía no ha pasado por `alDia` —una montada a mano en una
- * prueba, o una leída de un fichero suelto— se siga leyendo bien. Es el único
- * sitio del núcleo, junto con la migración, donde nombrar los tres campos de
- * CLUEDO no es deuda sino memoria.
+ * Devolvía lo que encontrase en `entidades` y, si no había nada, se iba a
+ * mirar al campo heredado. Ese respaldo era lo que dejaba pasar una partida sin
+ * convertir; ya no hay partidas sin convertir, así que preguntar por una
+ * categoría que este juego no tiene devuelve la lista vacía, que es la verdad.
  */
 export function entidadesDe(game: GameSession, categoria: CategoriaId): Entidad[] {
-  const propias = game.entidades?.[categoria];
-  if (propias) return propias;
-  const campo = CAMPO_HEREDADO[categoria];
-  return campo ? ((game[campo] ?? []) as Entidad[]) : [];
+  return game.entidades?.[categoria] ?? [];
 }
 
 /**

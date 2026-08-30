@@ -4,76 +4,6 @@
   "status": "ready",
   "createdAt": "2026-03-01T21:00:00.000Z",
   "updatedAt": "2026-03-01T21:00:00.000Z",
-  "suspects": [
-    {
-      "id": "e0",
-      "name": "Ana",
-      "description": "Miembro de la expedición número 1.",
-      "email": "ana@ejemplo.es"
-    },
-    {
-      "id": "e1",
-      "name": "Bruno",
-      "description": "Miembro de la expedición número 2.",
-      "email": "bruno@ejemplo.es"
-    },
-    {
-      "id": "e2",
-      "name": "Carla",
-      "description": "Miembro de la expedición número 3.",
-      "email": "carla@ejemplo.es"
-    },
-    {
-      "id": "e3",
-      "name": "Dani",
-      "description": "Miembro de la expedición número 4.",
-      "email": "dani@ejemplo.es"
-    }
-  ],
-  "rooms": [
-    {
-      "id": "c0",
-      "name": "Cámara del Barquero",
-      "description": "Descripción de Cámara del Barquero."
-    },
-    {
-      "id": "c1",
-      "name": "Pozo de las Ofrendas",
-      "description": "Descripción de Pozo de las Ofrendas."
-    },
-    {
-      "id": "c2",
-      "name": "Antesala de los Sellos",
-      "description": "Descripción de Antesala de los Sellos."
-    },
-    {
-      "id": "c3",
-      "name": "Corredor de las Estrellas",
-      "description": "Descripción de Corredor de las Estrellas."
-    },
-    {
-      "id": "c4",
-      "name": "Sala de la Balanza",
-      "description": "Descripción de Sala de la Balanza."
-    }
-  ],
-  "weapons": [
-    {
-      "id": "q0",
-      "name": "Escarabeo de lapislázuli",
-      "description": "Una Escarabeo de lapislázuli."
-    },
-    {
-      "id": "q1",
-      "name": "Máscara funeraria",
-      "description": "Una Máscara funeraria."
-    },
-    {
-      "id": "q2",
-      "name": "Vaso canopo",
-      "description": "Una Vaso canopo."
-    }
-  ],
   "entidades": {
     "ritos": [
       {
@@ -95,6 +25,76 @@
       {
         "id": "t4",
         "name": "Rito del Silencio"
+      }
+    ],
+    "expedicionarios": [
+      {
+        "id": "e0",
+        "name": "Ana",
+        "description": "Miembro de la expedición número 1.",
+        "email": "ana@ejemplo.es"
+      },
+      {
+        "id": "e1",
+        "name": "Bruno",
+        "description": "Miembro de la expedición número 2.",
+        "email": "bruno@ejemplo.es"
+      },
+      {
+        "id": "e2",
+        "name": "Carla",
+        "description": "Miembro de la expedición número 3.",
+        "email": "carla@ejemplo.es"
+      },
+      {
+        "id": "e3",
+        "name": "Dani",
+        "description": "Miembro de la expedición número 4.",
+        "email": "dani@ejemplo.es"
+      }
+    ],
+    "camaras": [
+      {
+        "id": "c0",
+        "name": "Cámara del Barquero",
+        "description": "Descripción de Cámara del Barquero."
+      },
+      {
+        "id": "c1",
+        "name": "Pozo de las Ofrendas",
+        "description": "Descripción de Pozo de las Ofrendas."
+      },
+      {
+        "id": "c2",
+        "name": "Antesala de los Sellos",
+        "description": "Descripción de Antesala de los Sellos."
+      },
+      {
+        "id": "c3",
+        "name": "Corredor de las Estrellas",
+        "description": "Descripción de Corredor de las Estrellas."
+      },
+      {
+        "id": "c4",
+        "name": "Sala de la Balanza",
+        "description": "Descripción de Sala de la Balanza."
+      }
+    ],
+    "reliquias": [
+      {
+        "id": "q0",
+        "name": "Escarabeo de lapislázuli",
+        "description": "Una Escarabeo de lapislázuli."
+      },
+      {
+        "id": "q1",
+        "name": "Máscara funeraria",
+        "description": "Una Máscara funeraria."
+      },
+      {
+        "id": "q2",
+        "name": "Vaso canopo",
+        "description": "Una Vaso canopo."
       }
     ]
   },
@@ -121,7 +121,6 @@
     },
     "characters": [
       {
-        "suspectId": "e0",
         "characterName": "Ana",
         "role": "Capataz",
         "publicPersona": "Ana, capataz de la expedición.",
@@ -135,10 +134,10 @@
           "A las tres marcas quedas tocado: sigues jugando y sigues pudiendo señalar, pero tu propuesta de orden ya no cuenta en la votación.",
           "No todo lo que se lee en un fragmento es cierto. Alguien de esta mesa puede fabricarlos."
         ],
-        "personalHook": "El papel se te ha escrito a medida. Quien te conoce dice de ti: «Miembro de la expedición número 1.». Úsalo: en esta mesa lo que convence no son los datos, es quién los cuenta."
+        "personalHook": "El papel se te ha escrito a medida. Quien te conoce dice de ti: «Miembro de la expedición número 1.». Úsalo: en esta mesa lo que convence no son los datos, es quién los cuenta.",
+        "participanteId": "e0"
       },
       {
-        "suspectId": "e1",
         "characterName": "Bruno",
         "role": "Epigrafista",
         "publicPersona": "Bruno, epigrafista de la expedición.",
@@ -152,10 +151,10 @@
           "A las tres marcas quedas tocado: sigues jugando y sigues pudiendo señalar, pero tu propuesta de orden ya no cuenta en la votación.",
           "No todo lo que se lee en un fragmento es cierto. Alguien de esta mesa puede fabricarlos."
         ],
-        "personalHook": "El papel se te ha escrito a medida. Quien te conoce dice de ti: «Miembro de la expedición número 2.». Úsalo: en esta mesa lo que convence no son los datos, es quién los cuenta."
+        "personalHook": "El papel se te ha escrito a medida. Quien te conoce dice de ti: «Miembro de la expedición número 2.». Úsalo: en esta mesa lo que convence no son los datos, es quién los cuenta.",
+        "participanteId": "e1"
       },
       {
-        "suspectId": "e2",
         "characterName": "Carla",
         "role": "Médico de la expedición",
         "publicPersona": "Carla, médico de la expedición de la expedición.",
@@ -169,10 +168,10 @@
           "A las tres marcas quedas tocado: sigues jugando y sigues pudiendo señalar, pero tu propuesta de orden ya no cuenta en la votación.",
           "No todo lo que se lee en un fragmento es cierto. Alguien de esta mesa puede fabricarlos."
         ],
-        "personalHook": "El papel se te ha escrito a medida. Quien te conoce dice de ti: «Miembro de la expedición número 3.». Úsalo: en esta mesa lo que convence no son los datos, es quién los cuenta."
+        "personalHook": "El papel se te ha escrito a medida. Quien te conoce dice de ti: «Miembro de la expedición número 3.». Úsalo: en esta mesa lo que convence no son los datos, es quién los cuenta.",
+        "participanteId": "e2"
       },
       {
-        "suspectId": "e3",
         "characterName": "Dani",
         "role": "Mecenas",
         "publicPersona": "Dani, mecenas de la expedición.",
@@ -186,27 +185,28 @@
           "A las tres marcas quedas tocado: sigues jugando y sigues pudiendo señalar, pero tu propuesta de orden ya no cuenta en la votación.",
           "No todo lo que se lee en un fragmento es cierto. Alguien de esta mesa puede fabricarlos."
         ],
-        "personalHook": "El papel se te ha escrito a medida. Quien te conoce dice de ti: «Miembro de la expedición número 4.». Úsalo: en esta mesa lo que convence no son los datos, es quién los cuenta."
+        "personalHook": "El papel se te ha escrito a medida. Quien te conoce dice de ti: «Miembro de la expedición número 4.». Úsalo: en esta mesa lo que convence no son los datos, es quién los cuenta.",
+        "participanteId": "e3"
       }
     ],
     "timeline": [
       {
         "time": "04:10",
         "description": "El lacre de la cámara sellada aparece partido. Nadie dice haber oído nada.",
-        "suspectIds": [],
-        "isPublic": true
+        "isPublic": true,
+        "participanteIds": []
       },
       {
         "time": "06:00",
         "description": "Se saca la primera reliquia. El aire dentro de la tumba ya está enrarecido.",
-        "suspectIds": [],
-        "isPublic": true
+        "isPublic": true,
+        "participanteIds": []
       },
       {
         "time": "21:00",
         "description": "Cae la noche y las lámparas empiezan a apagarse solas. Se organiza la primera vigilia.",
-        "suspectIds": [],
-        "isPublic": true
+        "isPublic": true,
+        "participanteIds": []
       }
     ],
     "clues": [],

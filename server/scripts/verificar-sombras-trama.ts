@@ -84,14 +84,16 @@ function nuevaPartida(id = 'sombras-prueba'): GameSession {
     status: 'ready',
     createdAt: ahora,
     updatedAt: ahora,
-    suspects: GENTE.map((name, i) => ({
+    entidades: {
+      escoltas: GENTE.map((name, i) => ({
       id: `e${i}`,
       name,
       description: i === 0 ? 'Discute por deporte y no se calla nunca.' : undefined,
     })),
-    rooms: PASOS.map((name, i) => ({ id: `p${i}`, name })),
-    weapons: ENSERES.map((name, i) => ({ id: `n${i}`, name })),
-    entidades: { estandartes: ESTANDARTES.map((name, i) => ({ id: `b${i}`, name })) },
+      pasos: PASOS.map((name, i) => ({ id: `p${i}`, name })),
+      enseres: ENSERES.map((name, i) => ({ id: `n${i}`, name })),
+      estandartes: ESTANDARTES.map((name, i) => ({ id: `b${i}`, name })),
+    },
     boardMode: 'generated',
     settings: { language: 'es', juego: 'sombras' },
   };

@@ -18,7 +18,7 @@ import type {
 import { getStore } from '../db/store';
 import { executeTool } from './tools';
 import { ejecutarHerramientaDeCategoria, faltanMinimos, sufijoDeCategoria } from './momia-herramientas';
-import { lugaresDe, manifiestoDe } from '../../../shared/juegos';
+import { entidadesDe, lugaresDe, manifiestoDe, personasDe } from '../../../shared/juegos';
 
 const pausa = (ms: number) => new Promise<void>((resolver) => setTimeout(resolver, ms));
 
@@ -166,7 +166,7 @@ async function anadirSospechosos(
   const repetidos: string[] = [];
 
   for (const entrada of entradas) {
-    const yaExiste = actual.suspects.some(
+    const yaExiste = personasDe(actual).some(
       (s) => s.name.toLowerCase() === entrada.name.toLowerCase(),
     );
     if (yaExiste) {
@@ -258,7 +258,17 @@ async function anadirArmas(partida: GameSession, captura: string): Promise<Resul
   const repetidas: string[] = [];
 
   for (const nombre of nombres) {
-    const yaExiste = actual.weapons.some((w) => w.name.toLowerCase() === nombre.toLowerCase());
+    /*
+     * Por la categoría, no por `actual.weapons`: el guion de demostración da de
+     * alta objetos con `upsert_objeto`, que escribe en `entidades`, así que
+     * mirar el campo heredado decía siempre «no existe» y los repetía.
+     */
+    const cat = manifiestoDe(actual.settings?.juego).categorias.find(
+      (c) => !c.sonJugadores && !c.sonLugares,
+    );
+    const yaExiste = (cat ? entidadesDe(actual, cat.id) : []).some(
+      (w) => w.name.toLowerCase() === nombre.toLowerCase(),
+    );
     if (yaExiste) {
       repetidas.push(nombre);
       continue;

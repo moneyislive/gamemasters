@@ -58,19 +58,22 @@ function partidaDeReferencia(): GameSession {
     createdAt: AHORA,
     updatedAt: AHORA,
     /*
-     * Las tres categorías con almacén heredado van donde el manifiesto dice, y
-     * los ritos —sin campo heredado— en `entidades`. Si algo de esto estuviera
-     * mal no se encontrarían los ritos, y no daría ningún error.
+     * LAS CUATRO CATEGORIAS, todas en el mismo sitio. Aquí las tres primeras
+     * iban a `suspects`, `rooms` y `weapons` porque el manifiesto declaraba un
+     * almacén heredado para ellas, y los ritos —que no tenían dónde— aparte, en
+     * `entidades`. Eran dos sitios para lo mismo; ya no hay más que uno.
      */
-    suspects: GENTE.map((name, i) => ({
-      id: `e${i}`,
-      name,
-      description: `Miembro de la expedición número ${i + 1}.`,
-      email: `${name.toLowerCase()}@ejemplo.es`,
-    })),
-    rooms: CAMARAS.map((name, i) => ({ id: `c${i}`, name, description: `Descripción de ${name}.` })),
-    weapons: RELIQUIAS.map((name, i) => ({ id: `q${i}`, name, description: `Una ${name}.` })),
-    entidades: { ritos: RITOS.map((name, i) => ({ id: `t${i}`, name })) },
+    entidades: {
+      expedicionarios: GENTE.map((name, i) => ({
+        id: `e${i}`,
+        name,
+        description: `Miembro de la expedición número ${i + 1}.`,
+        email: `${name.toLowerCase()}@ejemplo.es`,
+      })),
+      camaras: CAMARAS.map((name, i) => ({ id: `c${i}`, name, description: `Descripción de ${name}.` })),
+      reliquias: RELIQUIAS.map((name, i) => ({ id: `q${i}`, name, description: `Una ${name}.` })),
+      ritos: RITOS.map((name, i) => ({ id: `t${i}`, name })),
+    },
     boardMode: 'generated',
     settings: { language: 'es', juego: 'momia' },
   };
