@@ -58,6 +58,7 @@ import {
 import type { Incidencia } from './momia-validacion';
 import { emisorDeProgreso } from '../live/proyeccion';
 import { apuntarUso, volcarGasto } from '../gasto/contador';
+import { registrarGenerador } from '../juegos/generadores';
 
 type Emitir = (evento: GenerateStreamEvent) => void;
 
@@ -747,3 +748,20 @@ async function respuestaDemo(
   }
   return respuestaDeDemostracion(game.name, entidades, cimientos.trama);
 }
+
+/*
+ * EL ALTA. Antes, quien elegía el generador era un ternario dentro de
+ * `pipeline.ts` que comparaba ids de juego; ahora se declara aquí, al lado de lo
+ * que se declara. El rótulo va junto al generador porque son la misma decisión:
+ * estaban en dos ternarios distintos y se podían separar, y entonces la Momia
+ * recomponía su papiro mientras la pantalla decía «Tejiendo la trama del crimen».
+ *
+ * OJO: esto solo corre si alguien IMPORTA este módulo. Lo hace
+ * `juegos/instalados.ts`, que es el único sitio donde se dan de alta los juegos y
+ * que carga el arranque del servidor. Antes lo importaba `pipeline.ts` de rebote,
+ * que es la clase de dependencia que se rompe sin que nadie la eche de menos.
+ */
+registrarGenerador('momia', {
+  rotulo: 'Recomponiendo el papiro del sellado…',
+  generar: generarTramaMomia,
+});

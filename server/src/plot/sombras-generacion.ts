@@ -72,6 +72,7 @@ import {
 import type { Incidencia } from './sombras-validacion';
 import { emisorDeProgreso } from '../live/proyeccion';
 import { apuntarUso, volcarGasto } from '../gasto/contador';
+import { registrarGenerador } from '../juegos/generadores';
 
 type Emitir = (evento: GenerateStreamEvent) => void;
 
@@ -771,3 +772,9 @@ async function respuestaDemo(
   }
   return respuestaDeDemostracion(game.name, entidades, cimientos.trama);
 }
+
+/* El alta, por lo mismo que en la Momia. Ver `juegos/generadores.ts`. */
+registrarGenerador('sombras', {
+  rotulo: 'Trazando la senda hasta la playa…',
+  generar: escribirTramaSombras,
+});

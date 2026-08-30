@@ -17,10 +17,7 @@ import { PLOT_SCHEMA } from './schema';
 import { buildStyleBlock } from './style';
 import { repararRespuestas } from '../juegos/solucion';
 import { tramaAlDia } from '../juegos/migracion';
-import { MOMIA } from '../../../shared/juegos/momia';
-import { generarTramaMomia } from './momia-generacion';
-import { SOMBRAS } from '../../../shared/juegos/sombras';
-import { escribirTramaSombras } from './sombras-generacion';
+import { generadorDeTrama, registrarGenerador } from '../juegos/generadores';
 import { emisorDeProgreso, partidaParaElTaller } from '../live/proyeccion';
 import { apuntarUso, volcarGasto } from '../gasto/contador';
 
@@ -86,24 +83,39 @@ export async function runGeneration(game: GameSession, emit: Emitir): Promise<vo
      * `PLOT_SCHEMA` porque no tiene asesino, arma ni sala, y sobre todo porque
      * su puzle lo genera código y al modelo solo se le pide el sabor.
      */
-    const esMomia = game.settings?.juego === MOMIA.id;
-    const esSombras = game.settings?.juego === SOMBRAS.id;
+    /*
+     * SE LE PREGUNTA AL REGISTRO, no a un ternario encadenado por id de juego.
+     *
+     * Aquí había dos ternarios en fila —uno para el rótulo que se lee mientras
+     * escribe y otro para el generador— con CLUEDO como rama por defecto EN
+     * SILENCIO. Un juego nuevo que se olvidara de entrar en ellos no daba ningún
+     * error: le generaban un asesinato, con culpable, arma y sala sobre sus
+     * entidades, y con el modelo respondiendo a un esquema que empieza por «Eres
+     * un novelista de misterio experto en CLUEDO». Y el sitio donde había que
+     * acordarse de entrar no tiene nada que ver con el juego que se escribe:
+     * está en la tubería común, entre el tablero y el guardado.
+     *
+     * De paso, este fichero deja de importar los tres juegos por su nombre.
+     */
+    const alta = generadorDeTrama(game.settings?.juego);
     emit({
       type: 'stage',
       stage: 'plot',
-      label: esMomia
-        ? 'Recomponiendo el papiro del sellado…'
-        : esSombras
-          ? 'Trazando la senda hasta la playa…'
-          : 'Tejiendo la trama del crimen…',
+      label: alta?.rotulo ?? 'Tejiendo la trama del crimen…',
     });
-    const plot = esMomia
-      ? await generarTramaMomia(game, emit)
-      : esSombras
-        ? await escribirTramaSombras(game, emit)
-        : DEMO_MODE
-          ? await generarTramaDemo(game, emit)
-          : await generarTramaConApi(game, emit);
+    /*
+     * FALLA CERRADO. Un juego sin generador dado de alta recibe un error que dice
+     * exactamente lo que le falta, en vez de recibir el de CLUEDO. La diferencia
+     * es entre enterarse ahora y enterarse la noche de la partida, con una velada
+     * entera preparada sobre la trama equivocada.
+     */
+    if (!alta) {
+      throw new Error(
+        `El juego «${manifiestoDe(game.settings?.juego).id}» no tiene generador de trama dado de alta. ` +
+          'Se declara con `registrarGenerador` y se carga desde `juegos/instalados.ts`.',
+      );
+    }
+    const plot = await alta.generar(game, emit);
     // El esquema con el que se le pide la trama al modelo sigue hablando de
     // asesino, arma y sala, y se deja así a propósito: está afinado y
     // probado, y cambiarlo cambiaría las tramas que salen. La conversión a
@@ -321,3 +333,20 @@ function pausa(ms: number): Promise<void> {
 function corregirSolucion(plot: Plot, game: GameSession): void {
   repararRespuestas(plot, game);
 }
+
+/*
+ * EL ALTA DE CLUEDO, y va aquí porque aquí viven sus dos generadores: el de
+ * demostración —sin clave de API— y el que habla con el modelo. Cuál de los dos
+ * se usa es una decisión de la tubería, no del juego, y por eso la envuelve el
+ * alta en vez de estar suelta en el camino de todos.
+ *
+ * Con esto, CLUEDO deja de ser «lo que pasa si no eres ninguno de los otros» y
+ * pasa a ser un juego más que se da de alta. Es el mismo movimiento que con sus
+ * trofeos: mientras fue la rama por defecto, un juego nuevo que se olvidara de
+ * entrar en el ternario recibia un asesinato sin que nada diera error.
+ */
+registrarGenerador('cluedo', {
+  rotulo: 'Tejiendo la trama del crimen…',
+  generar: (game: GameSession, emit: Emitir) =>
+    DEMO_MODE ? generarTramaDemo(game, emit) : generarTramaConApi(game, emit),
+});

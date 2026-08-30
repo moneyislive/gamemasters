@@ -32,8 +32,25 @@
 // CLUEDO.
 import './cluedo-acciones';
 import './cluedo-trofeos';
+/*
+ * El generador de trama de CLUEDO vive en la tuberia, porque alli viven sus dos
+ * variantes --con clave de API y sin ella--. Se importa igual: desde que se
+ * eligen por registro y no por un ternario, no cargar este modulo significa que
+ * NADIE puede generar una trama de CLUEDO, y el fallo saldria al pulsar el boton.
+ */
+import '../plot/pipeline';
 
 // El Misterio de la Momia: reductores, proyección del estado y trofeos.
+/*
+ * OJO: hoy la Momia y las Sombras se registrarian IGUAL sin esta linea, porque
+ * sus datos de imprimible (`docs/imprimibles/momia/datos.ts`) importan su modulo
+ * de generacion para leerle el sabor, y ese si se carga desde aqui. Es una
+ * dependencia accidental y no se puede confiar en ella: el dia que alguien
+ * reordene esos imports, el alta desaparece sin que nada falle al arrancar. La
+ * linea explicita es lo que hace que el alta dependa de una decision y no de una
+ * casualidad.
+ */
+import '../plot/momia-generacion';
 import './momia-acciones';
 import './momia-proyeccion';
 import './momia-sellado';
@@ -49,6 +66,7 @@ import './momia-sellado';
 import '../docs/imprimibles/momia/dosierExpedicionario';
 
 // El Paso de las Sombras: reductores, proyección del estado, consejo y trofeos.
+import '../plot/sombras-generacion';
 import './sombras-acciones';
 import './sombras-proyeccion';
 import './sombras-consejo';

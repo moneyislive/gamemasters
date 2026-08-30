@@ -33,6 +33,7 @@ import { generateDemoPlot } from '../src/plot/demoPlot';
 import { generateBoardLayout } from '../src/board/generator';
 import { iniciarJuego } from '../src/juegos/inicios';
 import { trofeosDelJuego } from '../src/juegos/trofeos';
+import { generadorDeTrama } from '../src/juegos/generadores';
 import { abrirRonda } from '../src/live/sesion';
 import { renderPlayerDocument } from '../src/docs/renderer';
 import { renderPrintableDocument } from '../src/docs/imprimibles';
@@ -219,6 +220,33 @@ for (const m of juegosInstalados()) {
     `${m.id}: toda fase alcanzable tiene ruta POST`,
     sinRuta.length === 0,
     { sinRuta, consecuencia: 'el taller pinta el boton y da 404 delante de la mesa' },
+  );
+
+  /*
+   * ---- 2 bis. QUIEN ESCRIBE SU TRAMA ----
+   *
+   * El generador se elegía con un ternario encadenado por id de juego dentro de
+   * la tubería común, con CLUEDO como rama por defecto EN SILENCIO: un juego que
+   * se olvidara de entrar en él no daba error, le generaban un asesinato con
+   * culpable, arma y sala sobre sus entidades. Ahora se da de alta por registro y
+   * falla cerrado.
+   *
+   * Pero un registro tiene su propia trampa, y es la que este repositorio ya se
+   * comió una vez: el alta solo ocurre si ALGUIEN IMPORTA el módulo. Si nadie lo
+   * hace, el registro queda vacío, el servidor arranca perfectamente, los
+   * comprobadores de cada juego siguen en verde --porque importan sus módulos a
+   * mano-- y el fallo sale al pulsar «generar». Esto entra por la misma puerta
+   * que la producción: `instalados.ts`, que es lo que carga el arranque.
+   */
+  comprobar(
+    `${m.id}: tiene generador de trama dado de alta`,
+    generadorDeTrama(m.id) !== undefined,
+    'sin el, `runGeneration` lanza; y si el alta existe pero nadie importa el modulo, el registro queda vacio',
+  );
+  comprobar(
+    `${m.id}: y su generador trae el rótulo que se lee mientras escribe`,
+    (generadorDeTrama(m.id)?.rotulo ?? '').length > 0,
+    'estaban en dos ternarios distintos y se podian separar: la Momia recomponia su papiro mientras la pantalla decia «Tejiendo la trama del crimen»',
   );
 
   // ---- 3. Se puede terminar la partida ----
