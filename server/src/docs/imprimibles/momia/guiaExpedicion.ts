@@ -141,7 +141,7 @@ export function guiaExpedicion(
   const tablaDonesNominal = vista.expedicionarios
     .map((persona) => {
       const don = vista.donDe(persona.id);
-      const personaje = plot.characters.find((c) => c.suspectId === persona.id);
+      const personaje = plot.characters.find((c) => c.participanteId === persona.id);
       return `        <tr>
           <td><strong>${esc(persona.name)}</strong><br /><span style="font-size:10pt; color:#7a5c34;">${esc(personaje?.characterName ?? '')}</span></td>
           <td>${esc(don?.rol ?? '—')}<br /><span style="font-size:10pt; color:#7a5c34;">${esc(don?.nombre ?? '')}</span></td>

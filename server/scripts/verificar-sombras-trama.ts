@@ -220,7 +220,7 @@ comprobar('sin incidencias', buena.incidencias.length === 0, buena.incidencias);
   const sesionFalsa = {
     id: 'tarde',
     players: entidadesDe(partidaEnJuego, 'escoltas').map((e) => ({
-      suspectId: e.id,
+      participanteId: e.id,
       displayName: e.name,
       joinCode: 'AAAAAA',
       joined: true,
@@ -466,13 +466,13 @@ paso('LO QUE IMPORTA · estropear la respuesta de nueve maneras');
    * —que es lo normal en la presentación de alguien— sobrevive.
    */
   const soloNombra = conCambio((r) => {
-    const p = r.escoltas.find((x) => x.suspectId === r.kanchoId)!;
+    const p = r.escoltas.find((x) => x.participanteId === r.kanchoId)!;
     p.publicPersona = `${kanchoNombre} lleva el paso de quien ha andado de noche otras veces.`;
   });
   const rn = ensamblar(soloNombra);
   comprobar(
     'nombrar a alguien en su propia presentación NO se borra: eso es el juego',
-    (rn.plot.characters.find((c) => c.suspectId === rn.plot.solution.respuestas.kancho)?.publicPersona ?? '').includes(
+    (rn.plot.characters.find((c) => c.participanteId === rn.plot.solution.respuestas.kancho)?.publicPersona ?? '').includes(
       kanchoNombre,
     ),
   );
@@ -618,7 +618,7 @@ paso('Los ocho imprimibles, compuestos de verdad');
    * fallando. Una prueba de fuga que no encuentra lo que busca no esta en verde:
    * esta rota.
    */
-  const secretoAjeno = buena.plot.characters.find((c) => c.suspectId === 'e2')?.secret ?? '';
+  const secretoAjeno = buena.plot.characters.find((c) => c.participanteId === 'e2')?.secret ?? '';
   comprobar(
     'y no lleva el secreto de nadie más',
     Boolean(uno?.html) && secretoAjeno.length > 0 && !uno!.html!.includes(secretoAjeno),

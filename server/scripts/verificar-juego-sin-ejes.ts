@@ -131,17 +131,17 @@ registrarJuego(LA_OCA);
  * pueda afirmar dónde acaba cada ficha.
  */
 registrarAcciones('la-oca', {
-  tirar: ({ sesion, suspectId }) => {
+  tirar: ({ sesion, participanteId }) => {
     const posiciones = (sesion.estado?.posiciones ?? {}) as Record<string, number>;
-    const nueva = Math.min(CASILLAS.length - 1, (posiciones[suspectId] ?? 0) + 2);
-    sesion.estado = { ...(sesion.estado ?? {}), posiciones: { ...posiciones, [suspectId]: nueva } };
-    if (nueva === CASILLAS.length - 1) sesion.winnerId = suspectId;
+    const nueva = Math.min(CASILLAS.length - 1, (posiciones[participanteId] ?? 0) + 2);
+    sesion.estado = { ...(sesion.estado ?? {}), posiciones: { ...posiciones, [participanteId]: nueva } };
+    if (nueva === CASILLAS.length - 1) sesion.winnerId = participanteId;
     return { casilla: nueva };
   },
-  plantarse: ({ sesion, suspectId, datos }) => {
+  plantarse: ({ sesion, participanteId, datos }) => {
     const indice = CASILLAS.findIndex((_, i) => `c${i}` === datos.casilla);
     const posiciones = (sesion.estado?.posiciones ?? {}) as Record<string, number>;
-    sesion.estado = { ...(sesion.estado ?? {}), posiciones: { ...posiciones, [suspectId]: indice } };
+    sesion.estado = { ...(sesion.estado ?? {}), posiciones: { ...posiciones, [participanteId]: indice } };
     return { casilla: indice };
   },
 });
@@ -187,7 +187,7 @@ const plot: Plot = {
   solution: { respuestas: {}, motive: '', howItHappened: '' },
   characters: [
     {
-      suspectId: 'j0',
+      participanteId: 'j0',
       characterName: 'Marta',
       role: 'Jugadora',
       publicPersona: 'Tira con ganas.',
@@ -198,7 +198,7 @@ const plot: Plot = {
       personalHook: '',
     },
     {
-      suspectId: 'j1',
+      participanteId: 'j1',
       characterName: 'Nico',
       role: 'Jugador',
       publicPersona: 'Se queja del dado.',
@@ -224,8 +224,8 @@ const sesion: LiveSession = {
   totalRounds: 3,
   turnoDe: 'j0',
   players: [
-    { suspectId: 'j0', displayName: 'Marta', joinCode: 'OCA001', joined: true, elecciones: [], notas: '', girosRecibidos: [] },
-    { suspectId: 'j1', displayName: 'Nico', joinCode: 'OCA002', joined: true, elecciones: [], notas: '', girosRecibidos: [] },
+    { participanteId: 'j0', displayName: 'Marta', joinCode: 'OCA001', joined: true, elecciones: [], notas: '', girosRecibidos: [] },
+    { participanteId: 'j1', displayName: 'Nico', joinCode: 'OCA002', joined: true, elecciones: [], notas: '', girosRecibidos: [] },
   ],
   acusaciones: [],
   tablon: [],
@@ -342,7 +342,7 @@ v = vistaDeJugador(game, sesion, 'j0')!;
 comprobar('el desenlace se compone igual', Boolean(v.desenlace));
 comprobar('con cero renglones de respuesta', v.desenlace?.respuestas.length === 0, v.desenlace?.respuestas);
 comprobar('sin señalar a nadie', v.desenlace?.culpableId === undefined);
-comprobar('pero con su ganador', v.desenlace?.ganador?.suspectId === 'j1', v.desenlace?.ganador);
+comprobar('pero con su ganador', v.desenlace?.ganador?.participanteId === 'j1', v.desenlace?.ganador);
 
 // ---------------------------------------------------------------------------
 

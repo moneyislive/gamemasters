@@ -266,13 +266,13 @@ function estadoDe(sesion: LiveSession): EstadoAlmoneda {
   const guardado = (sesion.estado?.almoneda ?? null) as EstadoAlmoneda | null;
   if (guardado) return guardado;
   const nuevo: EstadoAlmoneda = { fondo: {}, pujas: {}, adjudicado: {} };
-  for (const p of sesion.players) nuevo.fondo[p.suspectId] = FONDO_INICIAL;
+  for (const p of sesion.players) nuevo.fondo[p.participanteId] = FONDO_INICIAL;
   sesion.estado = { ...(sesion.estado ?? {}), almoneda: nuevo };
   return nuevo;
 }
 
 registrarAcciones('la-almoneda', {
-  pujar: ({ sesion, suspectId, datos, numeros }) => {
+  pujar: ({ sesion, participanteId, datos, numeros }) => {
     const estado = estadoDe(sesion);
     const lote = datos.lote ?? '';
     /*
@@ -285,8 +285,8 @@ registrarAcciones('la-almoneda', {
     const cuanto = numeros.cuanto ?? 0;
     const anterior = estado.pujas[lote]?.cuanto ?? 0;
     if (cuanto <= anterior) return { pujado: false, porque: 'hay que superar la puja anterior' };
-    if (cuanto > (estado.fondo[suspectId] ?? 0)) return { pujado: false, porque: 'no te llega el fondo' };
-    estado.pujas[lote] = { de: suspectId, cuanto };
+    if (cuanto > (estado.fondo[participanteId] ?? 0)) return { pujado: false, porque: 'no te llega el fondo' };
+    estado.pujas[lote] = { de: participanteId, cuanto };
     sesion.estado = { ...(sesion.estado ?? {}), almoneda: estado };
     return { pujado: true, cuanto };
   },
@@ -308,10 +308,10 @@ function adjudicar(sesion: LiveSession): void {
   sesion.estado = { ...(sesion.estado ?? {}), almoneda: estado };
 }
 
-registrarProyeccion('la-almoneda', (_game, sesion, suspectId) => {
+registrarProyeccion('la-almoneda', (_game, sesion, participanteId) => {
   const estado = estadoDe(sesion);
   return {
-    fondo: estado.fondo[suspectId] ?? 0,
+    fondo: estado.fondo[participanteId] ?? 0,
     /* Lo que se ha llevado cada cual es público: se canta en voz alta. */
     adjudicado: estado.adjudicado,
     /* Y la puja más alta de cada lote, sin decir de quién. */
@@ -368,7 +368,7 @@ const plot: Plot = {
    */
   solution: { respuestas: {} },
   characters: POSTORES.map((name, i) => ({
-    suspectId: `p${i}`,
+    participanteId: `p${i}`,
     characterName: name,
     role: 'Postor',
     publicPersona: '',
@@ -393,7 +393,7 @@ const sesion: LiveSession = {
   round: 0,
   totalRounds: 5,
   players: POSTORES.map((name, i) => ({
-    suspectId: `p${i}`,
+    participanteId: `p${i}`,
     displayName: name,
     joinCode: `A${i}`,
     joined: true,

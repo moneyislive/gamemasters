@@ -25,7 +25,7 @@ import type { Request } from 'express';
  */
 export function quienPide(req: Request): string | null {
   const jugador = credencialDePeticion(req.headers.authorization);
-  if (jugador) return `jugador:${jugador.gameId}:${jugador.suspectId}`;
+  if (jugador) return `jugador:${jugador.gameId}:${jugador.participanteId}`;
   const cuenta = sesionDeCuentaDePeticion(req);
   if (cuenta) return `cuenta:${cuenta.cuentaId}`;
   const taller = identidadDeTaller(req);

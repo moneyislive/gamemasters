@@ -45,7 +45,7 @@ export function hojaConsejo(
       (persona) => `            <tr>
               <td style="width:9mm; text-align:center;"><span class="casilla"></span></td>
               <td>${esc(persona.name)} <span style="font-size:10pt; color:#7c7159;">· ${esc(
-                plot.characters.find((c) => c.suspectId === persona.id)?.characterName ?? '',
+                plot.characters.find((c) => c.participanteId === persona.id)?.characterName ?? '',
               )}</span></td>
             </tr>`,
     )

@@ -67,7 +67,7 @@ export function Amanecer(): JSX.Element {
     );
   }
 
-  const yo = vista.yo.suspectId;
+  const yo = vista.yo.participanteId;
   const gane = fin.ganadores.includes(yo);
   const eraYo = fin.saqueadorId === yo;
   const nombreDe = (id: string): string => {
@@ -78,8 +78,8 @@ export function Amanecer(): JSX.Element {
      * recuento de la votacion tu propio nombre salia como «alguien», y en una
      * pantalla que existe justo para repasar quien apoyo a quien.
      */
-    if (id === vista.yo.suspectId) return 'Tú';
-    const j = vista.jugadores.find((x) => x.suspectId === id);
+    if (id === vista.yo.participanteId) return 'Tú';
+    const j = vista.jugadores.find((x) => x.participanteId === id);
     return j ? j.characterName || j.displayName : 'alguien';
   };
 

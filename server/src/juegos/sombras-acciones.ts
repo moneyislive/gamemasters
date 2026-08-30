@@ -125,7 +125,7 @@ export function estadoDe(game: GameSession, sesion: LiveSession): EstadoSombras 
   sesion.estado = sesion.estado ?? {};
   let estado = sesion.estado[CLAVE_ESTADO] as EstadoSombras | undefined;
   if (!estado) {
-    estado = estadoInicial(trama, sesion.players.map((p) => p.suspectId), papeles, banderas);
+    estado = estadoInicial(trama, sesion.players.map((p) => p.participanteId), papeles, banderas);
     sesion.estado[CLAVE_ESTADO] = estado;
   }
 
@@ -135,14 +135,14 @@ export function estadoDe(game: GameSession, sesion: LiveSession): EstadoSombras 
    * disfraz y sin estandarte, y no hay forma de que juegue.
    */
   for (const jugador of sesion.players) {
-    if (estado.gente[jugador.suspectId]) continue;
-    const recien = estadoInicial(trama, [jugador.suspectId], papeles, banderas);
-    estado.gente[jugador.suspectId] = recien.gente[jugador.suspectId]!;
+    if (estado.gente[jugador.participanteId]) continue;
+    const recien = estadoInicial(trama, [jugador.participanteId], papeles, banderas);
+    estado.gente[jugador.participanteId] = recien.gente[jugador.participanteId]!;
     // Por `banderas` y no por `trama.estandartes`: quien llegó tarde todavía no
     // está escrito en la trama y se quedaba sin estandarte hasta que alguien se
     // acordara de actualizar la partida.
-    if (banderas[jugador.suspectId]) {
-      estado.estandartes[jugador.suspectId] = banderas[jugador.suspectId]!;
+    if (banderas[jugador.participanteId]) {
+      estado.estandartes[jugador.participanteId] = banderas[jugador.participanteId]!;
     }
   }
   return estado;
@@ -193,8 +193,8 @@ export function horaSiLaHay(sesion: LiveSession): HoraSombras | undefined {
 }
 
 /** ¿Es esta persona quien cobra de Akechi? Nunca se le pregunta al estado. */
-export function esElKancho(game: GameSession, suspectId: string): boolean {
-  return game.plot?.solution.respuestas[EJE_KANCHO] === suspectId;
+export function esElKancho(game: GameSession, participanteId: string): boolean {
+  return game.plot?.solution.respuestas[EJE_KANCHO] === participanteId;
 }
 
 /**
@@ -204,10 +204,10 @@ export function esElKancho(game: GameSession, suspectId: string): boolean {
  * `falsear`, que no está escrito en ninguna parte porque se deduce de ser la
  * respuesta del eje. Un dato que no se guarda no se puede filtrar por descuido.
  */
-export function papelesDe(game: GameSession, estado: EstadoSombras, suspectId: string): PapelId[] {
-  const propio = estado.gente[suspectId]?.papel;
+export function papelesDe(game: GameSession, estado: EstadoSombras, participanteId: string): PapelId[] {
+  const propio = estado.gente[participanteId]?.papel;
   const papeles: PapelId[] = propio ? [propio] : [];
-  if (esElKancho(game, suspectId)) papeles.push('falsear');
+  if (esElKancho(game, participanteId)) papeles.push('falsear');
   return papeles;
 }
 
@@ -219,8 +219,8 @@ export function quienLleva(estado: EstadoSombras, porte: PorteId): string | unde
 }
 
 /** ¿Lleva esta persona el enser con este porte? */
-export function llevaElPorte(estado: EstadoSombras, suspectId: string, porte: PorteId): boolean {
-  return quienLleva(estado, porte) === suspectId;
+export function llevaElPorte(estado: EstadoSombras, participanteId: string, porte: PorteId): boolean {
+  return quienLleva(estado, porte) === participanteId;
 }
 
 /** Sube el rastro sin pasarse del tope, y deja constancia de cuánto subió. */
@@ -258,13 +258,13 @@ export interface ResultadoDeAvance {
 export function reconocerPaso(
   game: GameSession,
   sesion: LiveSession,
-  suspectId: string,
+  participanteId: string,
   pasoId: string,
   contrasena: string,
 ): ResultadoDeAvance {
   const trama = tramaObligatoria(game);
   const estado = estadoDe(game, sesion);
-  const persona = estado.gente[suspectId];
+  const persona = estado.gente[participanteId];
   if (!persona) throw new AccionInvalida('No cruzas con esta columna.');
 
   /*
@@ -293,7 +293,7 @@ export function reconocerPaso(
    * juego. Y aquí es MÁS importante que en la Momia: que se vea públicamente
    * quién estuvo dónde es lo que permite desmentir a quien miente.
    */
-  elegirSala(sesion, suspectId, pasoId);
+  elegirSala(sesion, participanteId, pasoId);
 
   // Los hitos que el camino tiene puestos aquí esta hora.
   const encontrados = trama.hallazgos
@@ -308,8 +308,8 @@ export function reconocerPaso(
 
   const batido = pasoBatido(estado.batidos, sesion.round) === pasoId;
   const hora = horaDe(sesion);
-  const amparado = hora.amparados.includes(suspectId);
-  const conLanza = llevaElPorte(estado, suspectId, 'lanza');
+  const amparado = hora.amparados.includes(participanteId);
+  const conLanza = llevaElPorte(estado, participanteId, 'lanza');
 
   let subio = 0;
   let teLibraste = false;
@@ -328,7 +328,7 @@ export function reconocerPaso(
       teLibraste = true;
     } else {
       subio = subirRastro(estado, 1);
-      if (subio > 0) hora.pagaronPorBatido.push(suspectId);
+      if (subio > 0) hora.pagaronPorBatido.push(participanteId);
     }
   }
 
@@ -362,14 +362,14 @@ export function reconocerPaso(
 export function darPrenda(
   game: GameSession,
   sesion: LiveSession,
-  suspectId: string,
+  participanteId: string,
   aQuien: string,
 ): { prendas: number; recibidasPor: number } {
   const estado = estadoDe(game, sesion);
-  if (aQuien === suspectId) {
+  if (aQuien === participanteId) {
     throw new AccionInvalida('Una prenda no se puede dar a uno mismo.');
   }
-  const mio = estado.gente[suspectId];
+  const mio = estado.gente[participanteId];
   const suyo = estado.gente[aQuien];
   if (!mio) throw new AccionInvalida('No cruzas con esta columna.');
   if (!suyo) throw new AccionInvalida('Esa persona no cruza con la columna.');
@@ -405,13 +405,13 @@ export function darPrenda(
 export function pasarEnser(
   game: GameSession,
   sesion: LiveSession,
-  suspectId: string,
+  participanteId: string,
   enserId: string,
   aQuien: string,
 ): { enser: string; aQuien: string } {
   const estado = estadoDe(game, sesion);
-  if (aQuien === suspectId) throw new AccionInvalida('Ya lo llevas tú.');
-  const mio = estado.gente[suspectId];
+  if (aQuien === participanteId) throw new AccionInvalida('Ya lo llevas tú.');
+  const mio = estado.gente[participanteId];
   const suyo = estado.gente[aQuien];
   if (!mio) throw new AccionInvalida('No cruzas con esta columna.');
   if (!suyo) throw new AccionInvalida('Esa persona no cruza con la columna.');
@@ -437,8 +437,8 @@ export interface ResultadoDeInvocacion {
 }
 
 /** ¿Le falta a esta persona un solo hito para tenerlos TODOS? */
-function leFaltaSoloUno(estado: EstadoSombras, suspectId: string): boolean {
-  const persona = estado.gente[suspectId];
+function leFaltaSoloUno(estado: EstadoSombras, participanteId: string): boolean {
+  const persona = estado.gente[participanteId];
   if (!persona) return false;
   const ciertos = Object.values(estado.hitos).filter((h) => !h.falso);
   return ciertos.filter((h) => !persona.hitos.includes(h.id)).length <= 1;
@@ -459,15 +459,15 @@ function leFaltaSoloUno(estado: EstadoSombras, suspectId: string): boolean {
 export function invocarPapel(
   game: GameSession,
   sesion: LiveSession,
-  suspectId: string,
+  participanteId: string,
   opciones: { papel?: string; aQuien?: string; paso?: string; hito?: string } = {},
 ): ResultadoDeInvocacion {
   const trama = tramaObligatoria(game);
   const estado = estadoDe(game, sesion);
-  const persona = estado.gente[suspectId];
+  const persona = estado.gente[participanteId];
   if (!persona) throw new AccionInvalida('No cruzas con esta columna.');
 
-  const disponibles = papelesDe(game, estado, suspectId);
+  const disponibles = papelesDe(game, estado, participanteId);
   const papel = (opciones.papel as PapelId | undefined) ?? disponibles[0];
   if (!papel || !disponibles.includes(papel)) {
     throw new AccionInvalida('Ese disfraz no es el tuyo.');
@@ -476,7 +476,7 @@ export function invocarPapel(
     throw new AccionInvalida('Tu disfraz ya se ha usado esta hora.');
   }
 
-  const otros = Object.keys(estado.gente).filter((id) => id !== suspectId);
+  const otros = Object.keys(estado.gente).filter((id) => id !== participanteId);
   /*
    * A falta de elección, quien más ha pisado donde no debía; a igualdad, el
    * primero por id. DETERMINISTA Y NO AL AZAR: una partida tiene que poder
@@ -494,7 +494,7 @@ export function invocarPapel(
    * un sitio comprobable, y ninguno más — pero se calcula una vez porque los
    * tres lo sacarían del mismo sitio.
    */
-  const jugador = sesion.players.find((p) => p.suspectId === suspectId);
+  const jugador = sesion.players.find((p) => p.participanteId === participanteId);
   const dondeEstoy = (jugador?.elecciones ?? [])
     .filter((e) => e.round === sesion.round)
     .map((e) => e.roomId)
@@ -512,7 +512,7 @@ export function invocarPapel(
        * razón de ser del juego— se cae por la puerta de atrás. Que el monte se
        * resista es mejor regla que un tope contado.
        */
-      if (leFaltaSoloUno(estado, suspectId)) {
+      if (leFaltaSoloUno(estado, participanteId)) {
         throw new AccionInvalida('El monte se cierra: nadie lee el camino entero por su cuenta.');
       }
       const candidato = Object.values(estado.hitos)
@@ -542,7 +542,7 @@ export function invocarPapel(
        * propósito: una obliga a hablar, el otro es la decisión privada de quien
        * puede taparse la cara.
        */
-      const aQuien = opciones.aQuien ?? masExpuesto ?? suspectId;
+      const aQuien = opciones.aQuien ?? masExpuesto ?? participanteId;
       if (!estado.gente[aQuien]) throw new AccionInvalida('Esa persona no cruza con la columna.');
       if (!hora.amparados.includes(aQuien)) hora.amparados.push(aQuien);
 
@@ -583,7 +583,7 @@ export function invocarPapel(
     case 'adelantarse': {
       const manana = pasoBatido(estado.batidos, sesion.round + 1);
       if (!manana) throw new AccionInvalida('No hay otra hora después de esta.');
-      hora.adelantos[suspectId] = manana;
+      hora.adelantos[participanteId] = manana;
       resultado = {
         papel,
         efecto: 'Sabes dónde esperarán la hora que viene. Decide qué haces con eso.',
@@ -602,7 +602,7 @@ export function invocarPapel(
         throw new AccionInvalida('Solo puedes contar lo que has leído tú.');
       }
       hito.publico = true;
-      hito.publicadoPor = suspectId;
+      hito.publicadoPor = participanteId;
       /*
        * Y CON LA PROCEDENCIA QUE TÚ TIENES APUNTADA, no con una inventada. Esto
        * es lo que hace que la marca de sitio y hora no delate a los falsos: la
@@ -620,7 +620,7 @@ export function invocarPapel(
 
     case 'trocar': {
       const aQuien = opciones.aQuien ?? masExpuesto;
-      if (!aQuien || aQuien === suspectId) {
+      if (!aQuien || aQuien === participanteId) {
         throw new AccionInvalida('Un trueque es con otra persona, no contigo.');
       }
       const suyo = estado.gente[aQuien];
@@ -688,7 +688,7 @@ export function invocarPapel(
         falso: true,
         // Nace público: escribir un mojón y guardárselo no serviría de nada.
         publico: true,
-        publicadoPor: suspectId,
+        publicadoPor: participanteId,
         halladoEn: { pasoId: dondeEstoy, ronda: sesion.round },
       };
       // Y va a tu mano, con su procedencia, para que parezca un hallazgo tuyo
@@ -731,7 +731,7 @@ export function invocarPapel(
 export function proponerSenda(
   game: GameSession,
   sesion: LiveSession,
-  suspectId: string,
+  participanteId: string,
   senda: string[],
 ): { senda: string[]; at: string } {
   const estado = estadoDe(game, sesion);
@@ -748,7 +748,7 @@ export function proponerSenda(
   }
 
   const propuesta = { senda: [...senda], at: new Date().toISOString() };
-  estado.propuestas[suspectId] = propuesta;
+  estado.propuestas[participanteId] = propuesta;
   return propuesta;
 }
 
@@ -766,14 +766,14 @@ registrarAcciones('sombras', {
    * porque una regla que se cree escrita en dos sitios y solo está en uno es de
    * las que se rompen al mover cualquier otra cosa.
    */
-  avanzar: ({ game, sesion, suspectId, datos }) =>
-    reconocerPaso(game, sesion, suspectId, datos.paso!, datos.contrasena ?? ''),
+  avanzar: ({ game, sesion, participanteId, datos }) =>
+    reconocerPaso(game, sesion, participanteId, datos.paso!, datos.contrasena ?? ''),
 
-  avalar: ({ game, sesion, suspectId, datos }) =>
-    darPrenda(game, sesion, suspectId, datos.aQuien!),
+  avalar: ({ game, sesion, participanteId, datos }) =>
+    darPrenda(game, sesion, participanteId, datos.aQuien!),
 
-  entregar: ({ game, sesion, suspectId, datos }) =>
-    pasarEnser(game, sesion, suspectId, datos.enser!, datos.aQuien!),
+  entregar: ({ game, sesion, participanteId, datos }) =>
+    pasarEnser(game, sesion, participanteId, datos.enser!, datos.aQuien!),
 
   /*
    * Los campos llegan por `eligeOpcional` y `eligeLibre`, que es lo que permite
@@ -781,8 +781,8 @@ registrarAcciones('sombras', {
    * disfraz. Cuál mirar lo decide el reductor, porque el motor no puede: el
    * disfraz es secreto.
    */
-  invocar: ({ game, sesion, suspectId, datos }) =>
-    invocarPapel(game, sesion, suspectId, {
+  invocar: ({ game, sesion, participanteId, datos }) =>
+    invocarPapel(game, sesion, participanteId, {
       papel: datos.papel,
       aQuien: datos.aQuien,
       paso: datos.paso,
@@ -796,14 +796,14 @@ registrarAcciones('sombras', {
    * llama desde las pruebas, y una regla que solo se cumple cuando se entra por
    * una puerta no es una regla.
    */
-  'proponer-senda': ({ game, sesion, suspectId, listas }) => {
+  'proponer-senda': ({ game, sesion, participanteId, listas }) => {
     const senda = listas.senda ?? [];
     if (senda.length === 0) {
       throw new AccionInvalida(
         'Tu propuesta no ha llegado. La senda se entrega desde la pantalla del consejo.',
       );
     }
-    return proponerSenda(game, sesion, suspectId, senda);
+    return proponerSenda(game, sesion, participanteId, senda);
   },
 
   /**
@@ -821,12 +821,12 @@ registrarAcciones('sombras', {
    * El ojo de Hanzō— y la victoria de verdad viaja aparte, en el resultado del
    * consejo. Es la misma limitación que ya tenía la Momia y está en el informe.
    */
-  senalar: ({ game, sesion, suspectId, datos }) => {
+  senalar: ({ game, sesion, participanteId, datos }) => {
     const solucion = game.plot?.solution.respuestas;
     if (!solucion) throw new AccionInvalida('Esta partida todavía no tiene kanchō.');
     const { acusacion } = registrarSenalamiento(
       sesion,
-      suspectId,
+      participanteId,
       { [EJE_KANCHO]: datos[EJE_KANCHO] ?? '' },
       solucion,
     );

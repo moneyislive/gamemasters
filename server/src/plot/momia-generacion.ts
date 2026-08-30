@@ -81,7 +81,7 @@ type Emitir = (evento: GenerateStreamEvent) => void;
  */
 export interface SaborMomia {
   faraon: { nombre: string; descripcion: string };
-  /** Por `suspectId`: por qué en la ficción le tocó su don. */
+  /** Por `participanteId`: por qué en la ficción le tocó su don. */
   elDon: Record<string, string>;
   /** Por id de rito. */
   ritos: Record<string, { invocacion: string; gesto: string }>;
@@ -212,8 +212,8 @@ export function ensamblarTramaMomia(
   // ---- 3. Un dosier por persona, ni más ni menos ---------------------------
   const escritos = new Map<string, RespuestaMomia['expedicionarios'][number]>();
   for (const p of respuesta.expedicionarios ?? []) {
-    if (p && typeof p.suspectId === 'string' && idsExpedicion.has(p.suspectId) && !escritos.has(p.suspectId)) {
-      escritos.set(p.suspectId, p);
+    if (p && typeof p.participanteId === 'string' && idsExpedicion.has(p.participanteId) && !escritos.has(p.participanteId)) {
+      escritos.set(p.participanteId, p);
     }
   }
   const characters: PlotCharacter[] = entidades.expedicionarios.map((persona) => {
@@ -227,7 +227,7 @@ export function ensamblarTramaMomia(
       return dosierMinimo(persona);
     }
     return {
-      suspectId: persona.id,
+      participanteId: persona.id,
       characterName: escrito.characterName?.trim() || persona.name,
       role: escrito.role?.trim() || 'miembro de la expedición',
       publicPersona: escrito.publicPersona ?? '',
@@ -246,7 +246,7 @@ export function ensamblarTramaMomia(
    * primera vigilia; la segunda, antes de empezar. Se comprueban sobre CADA
    * texto que va a leerse en voz alta o a imprimirse en el dosier de todos.
    */
-  const nombresDelSaqueador = [saqueador?.name ?? '', characters.find((c) => c.suspectId === saqueadorId)?.characterName ?? ''].filter(Boolean);
+  const nombresDelSaqueador = [saqueador?.name ?? '', characters.find((c) => c.participanteId === saqueadorId)?.characterName ?? ''].filter(Boolean);
 
   const depurar = (
     texto: string,
@@ -367,7 +367,7 @@ export function ensamblarTramaMomia(
   const timeline: TimelineEvent[] = (respuesta.cronologia ?? [])
     .filter((e) => e && typeof e.descripcion === 'string' && e.descripcion.trim())
     .map((e) => {
-      const suspectIds = (e.expedicionarioIds ?? []).filter((id) => idsExpedicion.has(id));
+      const participanteIds = (e.expedicionarioIds ?? []).filter((id) => idsExpedicion.has(id));
       /*
        * Un momento con una sola persona NUNCA es público. Los públicos se
        * imprimen en el dosier de todo el mundo, así que «a la una bajó Fulano
@@ -375,7 +375,7 @@ export function ensamblarTramaMomia(
        * portada. Es la misma regla que en CLUEDO, y aquí se aplica con código en
        * vez de confiar en que el modelo la respete.
        */
-      const publico = e.publico === true && suspectIds.length > 1;
+      const publico = e.publico === true && participanteIds.length > 1;
       if (e.publico === true && !publico) {
         incidencias.push({
           donde: `cronología ${e.hora ?? ''}`,
@@ -400,7 +400,7 @@ export function ensamblarTramaMomia(
       return {
         time: e.hora?.trim() || '00:00',
         description: descripcion,
-        suspectIds,
+        participanteIds,
         isPublic: publico,
       };
     });
@@ -522,7 +522,7 @@ export function ensamblarTramaMomia(
 /** El dosier que se escribe cuando el modelo se deja a alguien. Feo, pero jugable. */
 function dosierMinimo(persona: Entidad): PlotCharacter {
   return {
-    suspectId: persona.id,
+    participanteId: persona.id,
     characterName: persona.name,
     role: 'miembro de la expedición',
     publicPersona: 'Llegó con la misión y ha estado en todas las cámaras que se han abierto.',
@@ -594,7 +594,7 @@ export async function generarTramaMomia(game: GameSession, emit: Emitir): Promis
  * entera.
  *
  * Y pasa. Midiéndolo contra la API de verdad, de cuatro generaciones dos
- * salieron impecables, una devolvió los seis dosieres con `suspectId` que no
+ * salieron impecables, una devolvió los seis dosieres con `participanteId` que no
  * casaban con ninguna persona real —o sea, seis dosieres mínimos y una velada
  * sin papeles— y otra cerró el JSON con casi todos los arrays vacíos. Las dos
  * veces la partida se guardaba como lista y el fallo solo se veía al imprimir.
@@ -608,7 +608,7 @@ export function loQueFalta(
 
   const ids = new Set(entidades.expedicionarios.map((e) => e.id));
   const dosieres = (respuesta.expedicionarios ?? []).filter(
-    (p) => p && typeof p.suspectId === 'string' && ids.has(p.suspectId),
+    (p) => p && typeof p.participanteId === 'string' && ids.has(p.participanteId),
   ).length;
   // La mitad, y no «alguno»: que se deje a una persona lo arregla el dosier
   // mínimo sin que se note; que se deje a la mesa entera, no.

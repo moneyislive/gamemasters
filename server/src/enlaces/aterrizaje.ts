@@ -57,8 +57,8 @@ const ESQUEMA = 'harkania';
  * así que dar por secreto lo que hay dentro sería un error: cualquiera con el
  * enlace puede leer los dos identificadores.
  */
-export function enlaceDeInvitacion(gameId: string, suspectId: string): string {
-  const sobre = cerrarSobre('enlace:v1', { gameId, suspectId }, 60 * 60 * 24 * 30);
+export function enlaceDeInvitacion(gameId: string, participanteId: string): string {
+  const sobre = cerrarSobre('enlace:v1', { gameId, participanteId }, 60 * 60 * 24 * 30);
   return `${env.publicOrigin ?? ''}/i/${encodeURIComponent(sobre)}`;
 }
 
@@ -146,7 +146,7 @@ function tiendas(): string {
  * que se sirve aquí es para el móvil que todavía no la tiene.
  */
 router.get('/i/:sobre', async (req, res) => {
-  const sobre = abrirSobre<{ gameId: string; suspectId: string }>('enlace:v1', req.params.sobre);
+  const sobre = abrirSobre<{ gameId: string; participanteId: string }>('enlace:v1', req.params.sobre);
   if (!sobre) {
     /*
      * 410 y no 404: «esto existió y ya no vale» es una información distinta de
@@ -274,7 +274,7 @@ router.get('/e/:codigo', (req, res) => {
  */
 router.post('/api/invitacion/abrir', async (req, res) => {
   const bruto = typeof req.body?.sobre === 'string' ? req.body.sobre : '';
-  const sobre = abrirSobre<{ gameId: string; suspectId: string }>('enlace:v1', bruto);
+  const sobre = abrirSobre<{ gameId: string; participanteId: string }>('enlace:v1', bruto);
   if (!sobre) {
     /*
      * 410 y el mismo texto que la página: quien llega aquí es alguien que ha
@@ -338,7 +338,7 @@ router.post('/api/invitacion/abrir', async (req, res) => {
    * esa cuenta ya tenía; para todo lo demás, no existe.
    */
   const invitacion = (await invitacionesPara(cuenta)).find(
-    (i) => i.gameId === sobre.gameId && i.suspectId === sobre.suspectId,
+    (i) => i.gameId === sobre.gameId && i.participanteId === sobre.participanteId,
   );
 
   if (!invitacion) {
@@ -363,7 +363,7 @@ router.post('/api/invitacion/abrir', async (req, res) => {
     requiereCuenta: false,
     invitacion: {
       gameId: invitacion.gameId,
-      suspectId: invitacion.suspectId,
+      participanteId: invitacion.participanteId,
       personaje: invitacion.personaje,
       paraEl: invitacion.paraEl,
       fase: invitacion.fase,

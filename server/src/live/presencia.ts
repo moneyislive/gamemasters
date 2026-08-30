@@ -40,7 +40,7 @@
  */
 import type { LiveSession } from '../../../shared/live';
 
-/** gameId → suspectId → cuándo se le vio (epoch ms). */
+/** gameId → participanteId → cuándo se le vio (epoch ms). */
 const vistos = new Map<string, Map<string, number>>();
 
 /**
@@ -69,17 +69,17 @@ function barrer(ahora: number): void {
 }
 
 /** Anota que alguien sigue ahí. Sin candado, sin almacén, sin esperar. */
-export function marcarPresencia(gameId: string, suspectId: string): void {
+export function marcarPresencia(gameId: string, participanteId: string): void {
   const ahora = Date.now();
   barrer(ahora);
   const jugadores = vistos.get(gameId) ?? new Map<string, number>();
-  jugadores.set(suspectId, ahora);
+  jugadores.set(participanteId, ahora);
   vistos.set(gameId, jugadores);
 }
 
 /** Última señal en memoria, o 0 si aquí no consta. */
-export function senalEnMemoria(gameId: string, suspectId: string): number {
-  return vistos.get(gameId)?.get(suspectId) ?? 0;
+export function senalEnMemoria(gameId: string, participanteId: string): number {
+  return vistos.get(gameId)?.get(participanteId) ?? 0;
 }
 
 /**
@@ -94,7 +94,7 @@ export function volcarPresencia(sesion: LiveSession): void {
   const jugadores = vistos.get(sesion.id);
   if (!jugadores || jugadores.size === 0) return;
   for (const jugador of sesion.players) {
-    const enMemoria = jugadores.get(jugador.suspectId);
+    const enMemoria = jugadores.get(jugador.participanteId);
     if (enMemoria === undefined) continue;
     const enDocumento = jugador.lastSeenAt ? Date.parse(jugador.lastSeenAt) : NaN;
     // Solo hacia delante: el documento nunca retrocede por culpa de la memoria.

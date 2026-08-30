@@ -36,7 +36,7 @@ export interface InvitacionVista {
   titulo: string;
   /** El personaje que le han asignado. */
   personaje: string;
-  suspectId: string;
+  participanteId: string;
   fase: LivePhase;
   /** Con cuál de TUS correos te ha localizado, para poder decir «yo no soy». */
   paraEl: string;
@@ -106,7 +106,7 @@ export async function invitacionesPara(cuenta: Account): Promise<InvitacionVista
         gameId: sesion.id,
         titulo: resumen.name,
         personaje: jugador.displayName,
-        suspectId: jugador.suspectId,
+        participanteId: jugador.participanteId,
         fase: sesion.phase,
         paraEl: correo,
         /*

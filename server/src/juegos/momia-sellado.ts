@@ -63,21 +63,21 @@ function contarVotos(estado: EstadoMomia): { votos: Voto[]; silenciadas: string[
   const silenciadas: string[] = [];
   const porOrden = new Map<string, Voto>();
 
-  for (const [suspectId, propuesta] of Object.entries(estado.propuestas)) {
-    if (estado.gente[suspectId]?.tocado) {
-      silenciadas.push(suspectId);
+  for (const [participanteId, propuesta] of Object.entries(estado.propuestas)) {
+    if (estado.gente[participanteId]?.tocado) {
+      silenciadas.push(participanteId);
       continue;
     }
     const clave = propuesta.orden.join('|');
     const ya = porOrden.get(clave);
     if (ya) {
-      ya.apoyos.push(suspectId);
+      ya.apoyos.push(participanteId);
       // La hora del voto es la de la PRIMERA entrega de ese orden: si empata en
       // apoyos con otro, gana el que se propuso antes, no el que sumó su último
       // apoyo antes.
       if (propuesta.at < ya.at) ya.at = propuesta.at;
     } else {
-      porOrden.set(clave, { orden: [...propuesta.orden], apoyos: [suspectId], at: propuesta.at });
+      porOrden.set(clave, { orden: [...propuesta.orden], apoyos: [participanteId], at: propuesta.at });
     }
   }
 
@@ -118,7 +118,7 @@ export function resolverSellado(
 export function selladoDe(game: GameSession, sesion: LiveSession): ResultadoSellado {
   const estado = estadoDe(game, sesion);
   const saqueadorId = game.plot?.solution.respuestas[EJE_SAQUEADOR] ?? '';
-  const todos = sesion.players.map((p) => p.suspectId);
+  const todos = sesion.players.map((p) => p.participanteId);
 
   const guardado = estado.sellado;
   if (guardado) {
@@ -184,7 +184,7 @@ export function trofeosDe(
   const salida: Record<string, TrofeoId[]> = {};
 
   for (const jugador of sesion.players) {
-    const id = jugador.suspectId;
+    const id = jugador.participanteId;
     const persona = estado.gente[id];
     const suyos: TrofeoId[] = [];
 
@@ -193,7 +193,7 @@ export function trofeosDe(
 
     // Ojo de Horus: señalaste al saqueador y acertaste. Se lee de la acusación
     // que ya guarda la plataforma, que es donde `senalar` la deja.
-    const suSenalamiento = sesion.acusaciones.find((a) => a.suspectId === id);
+    const suSenalamiento = sesion.acusaciones.find((a) => a.participanteId === id);
     if (suSenalamiento?.correcta && !esElSaqueador(game, id)) suyos.push('ojo-de-horus');
 
     // Incorrupto: amaneciste sin una sola marca.
@@ -226,7 +226,7 @@ export function trofeosDe(
  */
 registrarTrofeos('momia', (cierre) => {
   const resultado = selladoDe(cierre.game, cierre.sesion);
-  return trofeosDe(cierre.game, cierre.sesion, resultado)[cierre.jugador.suspectId] ?? [];
+  return trofeosDe(cierre.game, cierre.sesion, resultado)[cierre.jugador.participanteId] ?? [];
 });
 
 /**

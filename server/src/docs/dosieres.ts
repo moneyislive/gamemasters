@@ -46,7 +46,7 @@ import type { JuegoId } from '../../../shared/juegos';
 export type DosierDeUno = (
   game: GameSession,
   plot: Plot,
-  suspectId: string,
+  participanteId: string,
   opciones: DocumentRenderOptions,
 ) => string | null;
 
@@ -69,7 +69,7 @@ export interface DosierDeLaMesa {
 
 export interface DosieresDeJuego {
   /** Cómo se llama en el índice el dosier de una persona. */
-  tituloDeUno: (game: GameSession, plot: Plot, suspectId: string) => string;
+  tituloDeUno: (game: GameSession, plot: Plot, participanteId: string) => string;
   /** El dosier de una persona. */
   deUno: DosierDeUno;
   /** Los que no son de nadie. Vacío o ausente si el juego no tiene. */

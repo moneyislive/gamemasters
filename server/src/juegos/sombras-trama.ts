@@ -537,7 +537,7 @@ function construirColumna(
         `va a costar caro esta noche.`;
 
     return {
-      suspectId: persona.id,
+      participanteId: persona.id,
       characterName: persona.name,
       role: ficha.rol,
       publicPersona: `${persona.name}, ${ficha.rol.toLowerCase()}, bajo el blasón de ${nombreDeEstandarte(
@@ -581,28 +581,28 @@ function construirCronologia(): TimelineEvent[] {
       time: '04:00',
       description:
         'En Kioto, las tropas de Akechi Mitsuhide rodean el templo de Honnō-ji. Antes del amanecer, Oda Nobunaga ha muerto en el incendio.',
-      suspectIds: [],
+      participanteIds: [],
       isPublic: true,
     },
     {
       time: '10:00',
       description:
         'La noticia llega a Sakai. El señor está de visita, sin tropas, con un puñado de acompañantes y a cuatro días de sus tierras.',
-      suspectIds: [],
+      participanteIds: [],
       isPublic: true,
     },
     {
       time: '15:00',
       description:
         'Se descarta ir por la costa: los caminos grandes son de Akechi. Se decide cruzar Iga de noche, y se manda aviso a los guías.',
-      suspectIds: [],
+      participanteIds: [],
       isPublic: true,
     },
     {
       time: '20:00',
       description:
         'Chaya se adelanta con plata para comprar el paso donde se pueda comprar. Por los montes ya corre que hay samuráis en fuga y precio por ellos.',
-      suspectIds: [],
+      participanteIds: [],
       isPublic: true,
     },
   ];
@@ -661,7 +661,7 @@ export function tramaDe(plot: Plot | undefined): TramaSombras | undefined {
  */
 export function estadoInicial(
   trama: TramaSombras,
-  suspectIds: string[],
+  participanteIds: string[],
   /*
    * EL REPARTO YA RESUELTO, incluida la gente que llegó tarde.
    *
@@ -687,7 +687,7 @@ export function estadoInicial(
   banderas: Record<string, string> = trama.estandartes,
 ): EstadoSombras {
   const gente: EstadoSombras['gente'] = {};
-  for (const id of suspectIds) {
+  for (const id of participanteIds) {
     gente[id] = {
       prendas: PRENDAS_INICIALES,
       prendasRecibidas: 0,
@@ -725,7 +725,7 @@ export function estadoInicial(
     sendaVerdadera: [...trama.sendaVerdadera],
     batidos: [...trama.batidos],
     rastro: 0,
-    rastroMaximo: rastroMaximoPara(suspectIds.length),
+    rastroMaximo: rastroMaximoPara(participanteIds.length),
     gente,
     hitos,
     estandartes: { ...banderas },
@@ -795,7 +795,7 @@ export function ampliarColumna(game: GameSession, plot: Plot): { anadidos: strin
 
   const escoltas = entidadesDe(game, 'escoltas');
   const estandartes = entidadesDe(game, 'estandartes');
-  const yaEscritos = new Set(plot.characters.map((c) => c.suspectId));
+  const yaEscritos = new Set(plot.characters.map((c) => c.participanteId));
   const anadidos: string[] = [];
 
   // El reparto lo decide `papelesAlDia`, que es la MISMA función que consulta
@@ -815,7 +815,7 @@ export function ampliarColumna(game: GameSession, plot: Plot): { anadidos: strin
      */
     const ficha = fichaDePapel(trama.papeles[persona.id] ?? 'rastrear');
     plot.characters.push({
-      suspectId: persona.id,
+      participanteId: persona.id,
       characterName: persona.name,
       role: ficha.rol,
       publicPersona: 'Se unió a la columna con el camino ya empezado.',

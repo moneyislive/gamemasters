@@ -182,7 +182,7 @@ export default function LivePanel(): JSX.Element {
 
   const { sesion } = vista;
   // Gente de la partida que no tiene silla en la sesion abierta.
-  const sinSilla = personasDe(game).filter((s) => !sesion.players.some((p) => p.suspectId === s.id));
+  const sinSilla = personasDe(game).filter((s) => !sesion.players.some((p) => p.participanteId === s.id));
   /*
    * POR EL PAPEL, NO POR EL NOMBRE. Eran `sesion.phase === 'ronda-abierta'` y
    * `=== 'ronda-cerrada'`, o sea el taller reconociendo las fases de CLUEDO. Un
@@ -542,11 +542,11 @@ export default function LivePanel(): JSX.Element {
           </thead>
           <tbody>
             {sesion.players.map((p) => {
-              const donde = vista.ocupacion.find((o) => o.suspectIds.includes(p.suspectId));
+              const donde = vista.ocupacion.find((o) => o.participanteIds.includes(p.participanteId));
               const vivo =
                 p.lastSeenAt && Date.now() - new Date(p.lastSeenAt).getTime() < 60_000;
               return (
-                <tr key={p.suspectId}>
+                <tr key={p.participanteId}>
                   <td>{p.displayName}</td>
                   <td>
                     <code className="live-code">{p.joinCode}</code>

@@ -69,7 +69,7 @@ interface AppState {
   upsertEntidad: (categoria: string, datos: Record<string, unknown>) => Promise<void>;
   removeEntidad: (categoria: string, id: string) => Promise<void>;
   upsertSuspect: (suspect: Partial<Suspect>) => Promise<void>;
-  removeSuspect: (suspectId: string) => Promise<void>;
+  removeSuspect: (participanteId: string) => Promise<void>;
   upsertRoom: (room: Partial<Room>) => Promise<void>;
   removeRoom: (roomId: string) => Promise<void>;
   upsertWeapon: (weapon: Partial<Weapon>) => Promise<void>;
@@ -183,10 +183,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (!game) return;
     set({ game: await api.upsertSuspect(game.id, suspect) });
   },
-  removeSuspect: async (suspectId) => {
+  removeSuspect: async (participanteId) => {
     const { game } = get();
     if (!game) return;
-    set({ game: await api.removeSuspect(game.id, suspectId) });
+    set({ game: await api.removeSuspect(game.id, participanteId) });
   },
   upsertRoom: async (room) => {
     const { game } = get();

@@ -31,7 +31,7 @@
  *
  * ═══ DOS VOCABULARIOS, PORQUE TIENEN ARREGLOS DISTINTOS ═══
  *
- * · UNIVERSAL CON NOMBRE PRESTADO (`suspectId`). El concepto —«cuál de los que
+ * · UNIVERSAL CON NOMBRE PRESTADO (`participanteId`). El concepto —«cuál de los que
  *   están en la mesa»— es de todos los juegos: lo usan la presencia, el correo,
  *   los trofeos y el motor de acciones, que por lo demás no sabe a qué se juega.
  *   Lo que sobra es el NOMBRE. Se arregla renombrando, y es mecánico.
@@ -102,8 +102,20 @@ interface Vocabulario {
 const VOCABULARIOS: Vocabulario[] = [
   {
     clave: 'prestado',
-    titulo: 'Concepto universal con nombre prestado de CLUEDO',
-    arreglo: 'renombrar a un término que valga para cualquier juego',
+    titulo: 'Nombre prestado de CLUEDO que ya no debería aparecer',
+    arreglo: 'ya está hecho: esto solo vigila que no vuelva',
+    /*
+     * ═══ ESTO YA ESTÁ EN CERO, Y ESA ES LA GRACIA ═══
+     *
+     * Eran 324 menciones de `suspectId`: un concepto universal —cuál de los que
+     * están sentados a la mesa— con el nombre del primer juego. Se renombró a
+     * `participanteId` en 112 ficheros, con migración al leer para los siete
+     * sitios donde estaba guardado.
+     *
+     * La lista se queda aquí en vez de borrarse porque un renombrado se
+     * deshace solo: basta con que alguien copie una línea vieja de un commit
+     * antiguo. Con esto, la primera que vuelva sale en rojo.
+     */
     palabras: ['suspectId', 'suspectIds'],
   },
   {

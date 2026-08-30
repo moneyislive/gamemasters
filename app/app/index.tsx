@@ -211,7 +211,7 @@ export default function Portada(): JSX.Element {
     (inv: api.InvitacionVista) => {
       void (async () => {
         try {
-          const r = await api.entrarDesdeInvitacion(inv.gameId, inv.suspectId);
+          const r = await api.entrarDesdeInvitacion(inv.gameId, inv.participanteId);
           if (r.requiereCodigo) {
             /*
              * NO SE DESVÍA A LA PANTALLA DE CÓDIGOS. Los dos códigos son el
@@ -427,7 +427,7 @@ export default function Portada(): JSX.Element {
             />
             {invitaciones.map((inv, i) => (
               <Sobre
-                key={`${inv.gameId}-${inv.suspectId}`}
+                key={`${inv.gameId}-${inv.participanteId}`}
                 invitacion={inv}
                 indice={i}
                 alEntrar={entrarDesdeInvitacion}

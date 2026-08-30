@@ -92,7 +92,7 @@ export interface BoardLayout {
 // ---------- Trama ----------
 
 export interface PlotCharacter {
-  suspectId: string;
+  participanteId: string;
   /** Nombre del personaje dentro de la ficción (puede fusionar el nombre real) */
   characterName: string;
   role: string;
@@ -135,7 +135,7 @@ export interface TimelineEvent {
   time: string;
   description: string;
   /** Ids de sospechosos implicados */
-  suspectIds: string[];
+  participanteIds: string[];
   /**
    * ¿Lo presenciaron todos los invitados?
    *
@@ -193,7 +193,7 @@ export interface PlotNarration {
  */
 export interface PlotTwist {
   id: string;
-  suspectId: string;
+  participanteId: string;
   /** Se entrega al cerrar esta ronda. */
   round: number;
   /** Escrita en segunda persona, para que el jugador la lea y actúe. */
@@ -297,9 +297,9 @@ export interface PlayerDocument {
   /**
    * QUE ES ESTE DOCUMENTO. No siempre es una persona.
    *
-   * Se llamaba `suspectId` y guardaba tres cosas distintas: el id de alguien de
+   * Se llamaba `participanteId` y guardaba tres cosas distintas: el id de alguien de
    * la mesa (su dosier), las cadenas `gm` y `solution` (los dosieres que no son
-   * de nadie) y el id de un imprimible entero. Llamar `suspectId` a
+   * de nadie) y el id de un imprimible entero. Llamar `participanteId` a
    * «informe-validacion» era una mentira que costaba un rato entender.
    */
   id: string;
@@ -311,7 +311,7 @@ export interface PlayerDocument {
    * jugador incrusta las fotos de todos los demás en base64, así que almacenar
    * el HTML hacía crecer la partida al cuadrado y reventaba el límite de 16 MB
    * por documento de MongoDB. El HTML se genera bajo demanda al pedir el dosier
-   * por su ruta (`GET /api/games/:id/documents/:suspectId`).
+   * por su ruta (`GET /api/games/:id/documents/:participanteId`).
    */
   html?: string;
 }

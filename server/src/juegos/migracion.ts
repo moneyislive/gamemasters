@@ -130,12 +130,69 @@ function documentosAlDia(game: GameSession): void {
   }
 }
 
+
+/**
+ * `suspectId` pasa a llamarse `participanteId` en todo lo guardado.
+ *
+ * ═══ QUE SE ESTA CONVIRTIENDO, Y POR QUE IMPORTA TANTO ═══
+ *
+ * El concepto —«cual de los que estan sentados a la mesa»— es de todos los
+ * juegos: lo usan el emparejamiento de moviles, la presencia, los trofeos, los
+ * correos y el motor de acciones, que por lo demas no sabe a que se juega. Lo
+ * que sobraba era el NOMBRE, heredado del primer juego.
+ *
+ * Y estaba en SIETE sitios guardados. Si alguno se queda sin convertir no se
+ * rompe nada visible: se rompe una partida a medias, de noche, con doce
+ * personas delante. Los siete son:
+ *
+ *   · `players[].participanteId`   quien ocupa cada silla
+ *   · `acusaciones[].participanteId`  quien la entrego
+ *   · `acciones[].participanteId`  el registro de lo que se ha hecho
+ *   · `denuncias[].participanteId` quien denuncio una respuesta del asistente
+ *   · `plot.characters[].participanteId`  a quien interpreta cada personaje
+ *   · `plot.timeline[].participanteIds`   quienes estaban en cada momento
+ *   · `plot.material.twists[].participanteId`  a quien va cada giro
+ *
+ * Los cuatro primeros viven en la sesion y los tres ultimos en la partida, asi
+ * que se convierten en las dos puertas: `alDia` y `sesionAlDia`.
+ */
+function renombrarParticipante(objeto: unknown): void {
+  if (!objeto || typeof objeto !== 'object') return;
+  const o = objeto as Record<string, unknown>;
+  if (o.participanteId === undefined && typeof o.suspectId === 'string') {
+    o.participanteId = o.suspectId;
+  }
+  delete o.suspectId;
+  if (o.participanteIds === undefined && Array.isArray(o.suspectIds)) {
+    o.participanteIds = o.suspectIds;
+  }
+  delete o.suspectIds;
+}
+
+/** Lo guardado en la PARTIDA que llevaba el nombre viejo. */
+function participantesDeLaTramaAlDia(game: GameSession): void {
+  const plot = game.plot;
+  if (!plot) return;
+  for (const personaje of plot.characters ?? []) renombrarParticipante(personaje);
+  for (const momento of plot.timeline ?? []) renombrarParticipante(momento);
+  for (const giro of plot.material?.twists ?? []) renombrarParticipante(giro);
+}
+
+/** Lo guardado en la SESION que llevaba el nombre viejo. */
+function participantesDeLaSesionAlDia(sesion: LiveSession): void {
+  for (const jugador of sesion.players ?? []) renombrarParticipante(jugador);
+  for (const a of sesion.acusaciones ?? []) renombrarParticipante(a);
+  for (const accion of sesion.acciones ?? []) renombrarParticipante(accion);
+  for (const denuncia of sesion.denuncias ?? []) renombrarParticipante(denuncia);
+}
+
 /** Pone al día una partida recién leída del almacén. Devuelve la misma. */
 export function alDia<T extends GameSession | null | undefined>(game: T): T {
   if (game) {
     tramaAlDia(game.plot);
     entidadesAlDia(game);
     documentosAlDia(game);
+    participantesDeLaTramaAlDia(game);
   }
   return game;
 }
@@ -148,6 +205,7 @@ export function alDia<T extends GameSession | null | undefined>(game: T): T {
  */
 export function sesionAlDia<T extends LiveSession | null | undefined>(sesion: T): T {
   if (!sesion) return sesion;
+  participantesDeLaSesionAlDia(sesion);
   for (const a of sesion.acusaciones ?? []) {
     const vieja = a as unknown as TernaHeredada & { respuestas?: Record<string, string> };
     if (vieja.respuestas || !tieneTerna(vieja)) continue;

@@ -273,13 +273,13 @@ export default function Consejo(): JSX.Element {
           <Seccion>La mesa</Seccion>
           <Marco>
             {s.mesa.map((m) => (
-              <View key={m.suspectId} style={estilos.persona}>
+              <View key={m.participanteId} style={estilos.persona}>
                 <View style={{ flex: 1 }}>
                   <Mon
                     glifo={m.haPropuesto ? '決' : '·'}
                     tono={m.haPropuesto ? 'acero' : 'apagado'}
                   >
-                    {vista.jugadores.find((j) => j.suspectId === m.suspectId)?.displayName ??
+                    {vista.jugadores.find((j) => j.participanteId === m.participanteId)?.displayName ??
                       'alguien'}
                   </Mon>
                   {m.estandarteNombre ? (

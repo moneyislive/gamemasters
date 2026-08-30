@@ -44,7 +44,7 @@
 
 /** El dosier de una persona real, escrito a su medida. */
 export interface ExpedicionarioEscrito {
-  suspectId: string;
+  participanteId: string;
   characterName: string;
   role: string;
   publicPersona: string;
@@ -142,7 +142,7 @@ const EXPEDICIONARIO_SCHEMA: Record<string, unknown> = {
   type: 'object',
   additionalProperties: false,
   required: [
-    'suspectId',
+    'participanteId',
     'characterName',
     'role',
     'publicPersona',
@@ -154,7 +154,7 @@ const EXPEDICIONARIO_SCHEMA: Record<string, unknown> = {
     'elDon',
   ],
   properties: {
-    suspectId: { type: 'string', description: 'Id EXACTO del expedicionario real al que corresponde este dosier' },
+    participanteId: { type: 'string', description: 'Id EXACTO del expedicionario real al que corresponde este dosier' },
     characterName: {
       type: 'string',
       description:

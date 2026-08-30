@@ -527,7 +527,7 @@ router.get('/cuenta/portada', async (req, res) => {
  *
  * LA REGLA QUE NO SE ROMPE: el pasaporte de cuenta NO autoriza a jugar. Lo
  * único que hace esta ruta es COMPRAR una credencial de jugador por la vía
- * normal —`emitirCredencial(id, suspectId, sid)`, exactamente el mismo objeto
+ * normal —`emitirCredencial(id, participanteId, sid)`, exactamente el mismo objeto
  * que reparte el canje de códigos—. Así, dentro de `/api/jugar/*` sigue
  * habiendo un solo tipo de autorización, y el `sid` sigue siendo lo que hace
  * que cerrar y reabrir la partida eche a todo el mundo. Si una sesión de cuenta
@@ -557,12 +557,12 @@ router.post('/cuenta/entrar-en-partida', async (req, res) => {
   if (!cuenta) return;
 
   const gameId = String(req.body?.gameId ?? '');
-  const suspectId = String(req.body?.suspectId ?? '');
+  const participanteId = String(req.body?.participanteId ?? '');
 
   // Se comprueba contra las invitaciones DERIVADAS, no contra lo que mande el
   // móvil: pedir una partida cualquiera no sirve de nada si no sale en tu lista.
   const invitaciones = await invitacionesPara(cuenta);
-  const invitacion = invitaciones.find((i) => i.gameId === gameId && i.suspectId === suspectId);
+  const invitacion = invitaciones.find((i) => i.gameId === gameId && i.participanteId === participanteId);
   if (!invitacion) {
     // 404 y no 403: confirmar que la partida existe ya es contar algo.
     res.status(404).json({ error: 'No tienes ninguna invitación a esa partida.' });
@@ -582,7 +582,7 @@ router.post('/cuenta/entrar-en-partida', async (req, res) => {
   }
 
   await mutar(gameId, (s) => {
-    const jugador = s.players.find((p) => p.suspectId === suspectId);
+    const jugador = s.players.find((p) => p.participanteId === participanteId);
     if (!jugador) throw new Error('Ya no participas en esta partida.');
     jugador.joined = true;
     jugador.lastSeenAt = new Date().toISOString();
@@ -596,9 +596,9 @@ router.post('/cuenta/entrar-en-partida', async (req, res) => {
   res.json({
     requiereCodigo: false,
     // El MISMO objeto que reparte el canje de códigos, con su `sid`.
-    token: emitirCredencial(sesion.id, suspectId, sesion.sid),
+    token: emitirCredencial(sesion.id, participanteId, sesion.sid),
     gameId: sesion.id,
-    suspectId,
+    participanteId,
     displayName: invitacion.personaje,
   });
 });

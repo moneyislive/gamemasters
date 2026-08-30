@@ -23,7 +23,7 @@
  *     móvil daba acceso perpetuo.
  *
  *   · `sid` ATA el testigo a ESTA sesión en vivo. Antes, cerrar la partida y
- *     reabrirla repartía códigos nuevos pero los `suspectId` eran los mismos,
+ *     reabrirla repartía códigos nuevos pero los `participanteId` eran los mismos,
  *     así que el testigo viejo volvía a valer al instante: rotar los códigos no
  *     servía absolutamente de nada.
  */
@@ -31,7 +31,7 @@ import { firmarConSecreto, igualSeguro } from '../secreto';
 
 export interface CredencialJugador {
   gameId: string;
-  suspectId: string;
+  participanteId: string;
   /** Identificador de la sesión en vivo para la que se emitió. */
   sid?: string;
   /** Emitido en (segundos epoch). */
@@ -58,11 +58,11 @@ function base64url(dato: Buffer | string): string {
     .replace(/=+$/, '');
 }
 
-export function emitirCredencial(gameId: string, suspectId: string, sid?: string): string {
+export function emitirCredencial(gameId: string, participanteId: string, sid?: string): string {
   const ahora = Math.floor(Date.now() / 1000);
   const cuerpo: CredencialJugador = {
     gameId,
-    suspectId,
+    participanteId,
     ...(sid ? { sid } : {}),
     iat: ahora,
     exp: ahora + DURACION_SEGUNDOS,
@@ -84,7 +84,7 @@ export function verificarCredencial(testigo: string | undefined): CredencialJuga
     const datos = JSON.parse(
       Buffer.from(carga.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8'),
     ) as CredencialJugador;
-    if (typeof datos.gameId !== 'string' || typeof datos.suspectId !== 'string') return null;
+    if (typeof datos.gameId !== 'string' || typeof datos.participanteId !== 'string') return null;
 
     // Sin `exp` es un testigo anterior a que existiera la caducidad. No se
     // acepta: emitirlos ya no ocurre, y darle validez indefinida sería

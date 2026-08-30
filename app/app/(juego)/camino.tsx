@@ -117,9 +117,9 @@ export default function Camino(): JSX.Element {
 
   const nombreDePaso = (id: string) => s.pasos.find((p) => p.id === id)?.nombre ?? id;
   const nombreDe = (id: string) =>
-    id === vista.yo.suspectId
+    id === vista.yo.participanteId
       ? vista.yo.displayName
-      : (vista.jugadores.find((j) => j.suspectId === id)?.displayName ?? 'alguien');
+      : (vista.jugadores.find((j) => j.participanteId === id)?.displayName ?? 'alguien');
   const mios = s.yo.hitos.filter((h) => !h.publico);
 
   return (

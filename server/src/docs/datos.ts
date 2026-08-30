@@ -249,7 +249,7 @@ export const REGLAS_JUGADOR: ReglaJugador[] = REGLAS_CLUEDO;
  * que no ha podido preparar mientras dirige. Quien prepara elige de esta lista.
  */
 export function candidatosParaGm(game: GameSession, plot: Plot): Suspect[] {
-  const conGiro = new Set((plot.material?.twists ?? []).map((giro) => giro.suspectId));
+  const conGiro = new Set((plot.material?.twists ?? []).map((giro) => giro.participanteId));
   return personasDe(game).filter(
     (sospechoso) =>
       sospechoso.id !== culpableDe(plot.solution) && !conGiro.has(sospechoso.id),
@@ -273,7 +273,7 @@ export function cronologiaPublica(plot: Plot): TimelineEvent[] {
     if (evento.isPublic !== true) return false;
     // Cinturón y tirantes: aunque el modelo marcara como público un momento que
     // implica a una sola persona, eso no lo vio nadie más. Fuera.
-    if (evento.suspectIds.length === 1) return false;
+    if (evento.participanteIds.length === 1) return false;
     return true;
   });
 }

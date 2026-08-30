@@ -49,7 +49,7 @@ function bloqueDato(etiqueta: string, valor: string | undefined): string {
 }
 
 function seccionSospechosos(game: GameSession, plot: Plot): string {
-  const personajePorId = new Map(plot.characters.map((c) => [c.suspectId, c]));
+  const personajePorId = new Map(plot.characters.map((c) => [c.participanteId, c]));
   const fichas = sospechososDe(game)
     .map((sospechoso) => {
       const personaje = personajePorId.get(sospechoso.id);
@@ -361,7 +361,7 @@ function dosierSolucion(opciones: DocumentRenderOptions, game: GameSession, plot
   const asesino = sospechososDe(game).find((s) => s.id === culpableDe(plot.solution));
   const arma = objetosDe(game).find((w) => w.id === objetoDe(plot.solution));
   const sala = salasDe(game).find((r) => r.id === lugarDe(plot.solution));
-  const personaje = plot.characters.find((c) => c.suspectId === culpableDe(plot.solution));
+  const personaje = plot.characters.find((c) => c.participanteId === culpableDe(plot.solution));
 
   const contenido = `<div class="portada">
       <span class="sello">No abrir hasta el final de la velada</span>
@@ -494,7 +494,7 @@ function dosierGameMaster(opciones: DocumentRenderOptions, game: GameSession, pl
     ${plot.characters
       .map(
         (personaje) => `<div class="caja caja--gm" style="margin-bottom:16px">
-          <h3>${esc(personaje.characterName)} — ${esc(nombreDe(personaje.suspectId))}</h3>
+          <h3>${esc(personaje.characterName)} — ${esc(nombreDe(personaje.participanteId))}</h3>
           ${bloqueDato('Papel', personaje.role)}
           ${bloqueDato('Secreto', personaje.secret)}
           ${bloqueDato('Motivo', personaje.motive)}
@@ -576,14 +576,14 @@ function dosierGameMaster(opciones: DocumentRenderOptions, game: GameSession, pl
  * propio dosier y un sobre aparte sobraría.
  */
 registrarDosieres('cluedo', {
-  tituloDeUno: (game, plot, suspectId) => {
-    const sospechoso = sospechososDe(game).find((s) => s.id === suspectId);
+  tituloDeUno: (game, plot, participanteId) => {
+    const sospechoso = sospechososDe(game).find((s) => s.id === participanteId);
     return sospechoso ? tituloJugador(plot, sospechoso) : 'Dosier';
   },
-  deUno: (game, plot, suspectId, opciones) => {
-    const sospechoso = sospechososDe(game).find((s) => s.id === suspectId);
+  deUno: (game, plot, participanteId, opciones) => {
+    const sospechoso = sospechososDe(game).find((s) => s.id === participanteId);
     if (!sospechoso) return null;
-    const personaje = plot.characters.find((c) => c.suspectId === suspectId);
+    const personaje = plot.characters.find((c) => c.participanteId === participanteId);
     return dosierJugador(opciones, game, plot, sospechoso, personaje).html ?? null;
   },
   deLaMesa: (game, plot) => {

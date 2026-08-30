@@ -78,21 +78,21 @@ export interface ResultadoDelConsejo {
 }
 
 /** Lo que pesa el voto de una persona. */
-function pesoDe(estado: EstadoSombras, suspectId: string, anulado: boolean): number {
+function pesoDe(estado: EstadoSombras, participanteId: string, anulado: boolean): number {
   if (anulado) return 0;
-  return 1 + (estado.gente[suspectId]?.prendasRecibidas ?? 0);
+  return 1 + (estado.gente[participanteId]?.prendasRecibidas ?? 0);
 }
 
 /** Las propuestas agrupadas por senda, ya pesadas. */
 function contarVotos(estado: EstadoSombras, anulado: string | undefined): Voto[] {
   const porSenda = new Map<string, Voto>();
 
-  for (const [suspectId, propuesta] of Object.entries(estado.propuestas)) {
-    const peso = pesoDe(estado, suspectId, suspectId === anulado);
+  for (const [participanteId, propuesta] of Object.entries(estado.propuestas)) {
+    const peso = pesoDe(estado, participanteId, participanteId === anulado);
     const clave = propuesta.senda.join('|');
     const ya = porSenda.get(clave);
     if (ya) {
-      ya.apoyos.push(suspectId);
+      ya.apoyos.push(participanteId);
       ya.peso += peso;
       /*
        * La hora del voto es la de la PRIMERA entrega de esa senda: si empata en
@@ -103,7 +103,7 @@ function contarVotos(estado: EstadoSombras, anulado: string | undefined): Voto[]
     } else {
       porSenda.set(clave, {
         senda: [...propuesta.senda],
-        apoyos: [suspectId],
+        apoyos: [participanteId],
         peso,
         at: propuesta.at,
       });
@@ -184,7 +184,7 @@ function contarSenalamientos(
 export function consejoDe(game: GameSession, sesion: LiveSession): ResultadoDelConsejo {
   const estado = estadoDe(game, sesion);
   const kanchoId = game.plot?.solution.respuestas[EJE_KANCHO] ?? '';
-  const todos = sesion.players.map((p) => p.suspectId);
+  const todos = sesion.players.map((p) => p.participanteId);
   const senalamientos = contarSenalamientos(sesion, kanchoId);
 
   const guardado = estado.consejo;
@@ -258,7 +258,7 @@ export function trofeosDe(
   const salida: Record<string, TrofeoId[]> = {};
 
   for (const jugador of sesion.players) {
-    const id = jugador.suspectId;
+    const id = jugador.participanteId;
     const persona = estado.gente[id];
     const suyos: TrofeoId[] = [];
 
@@ -274,7 +274,7 @@ export function trofeosDe(
 
     // El ojo de Hanzō: señalaste al kanchō y acertaste. Se lee de la acusación
     // que ya guarda la plataforma, que es donde `senalar` la deja.
-    const suSenalamiento = sesion.acusaciones.find((a) => a.suspectId === id);
+    const suSenalamiento = sesion.acusaciones.find((a) => a.participanteId === id);
     if (suSenalamiento?.correcta && !esElKancho(game, id)) suyos.push('ojo-de-hanzo');
 
     // Sin rastro: cruzaste sin pisar una sola vez donde estaban los cazadores.
@@ -301,7 +301,7 @@ export function trofeosDe(
  */
 registrarTrofeos('sombras', (cierre) => {
   const resultado = consejoDe(cierre.game, cierre.sesion);
-  return trofeosDe(cierre.game, cierre.sesion, resultado)[cierre.jugador.suspectId] ?? [];
+  return trofeosDe(cierre.game, cierre.sesion, resultado)[cierre.jugador.participanteId] ?? [];
 });
 
 /**

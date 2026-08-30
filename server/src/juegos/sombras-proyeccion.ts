@@ -94,7 +94,7 @@ export interface HitoVisto {
 
 /** Lo que se sabe de otra persona con solo mirarla. */
 export interface CompaneroVisto {
-  suspectId: string;
+  participanteId: string;
   prendas: number;
   prendasRecibidas: number;
   /** ¿Ha entregado ya su propuesta de senda? Cuál, no se dice. */
@@ -214,13 +214,13 @@ function revelarHasta(sesion: LiveSession): number {
 export function vistaSombrasDe(
   game: GameSession,
   sesion: LiveSession,
-  suspectId: string,
+  participanteId: string,
 ): VistaSombras | undefined {
   const trama = tramaDe(game.plot);
   if (!trama) return undefined;
 
   const estado = estadoDe(game, sesion);
-  const yo = estado.gente[suspectId];
+  const yo = estado.gente[participanteId];
   if (!yo) return undefined;
 
   const terminada = sesion.phase === 'desenlace';
@@ -246,7 +246,7 @@ export function vistaSombrasDe(
         ? {
             publicadoPor: h.publicadoPor,
             publicadoPorNombre:
-              sesion.players.find((p) => p.suspectId === h.publicadoPor)?.displayName ?? '',
+              sesion.players.find((p) => p.participanteId === h.publicadoPor)?.displayName ?? '',
           }
         : {}),
       ...(h.halladoEn
@@ -276,10 +276,10 @@ export function vistaSombrasDe(
     if (pasoId) batidosRevelados.push({ ronda, pasoId, nombre: nombreDePaso(pasoId) });
   }
 
-  const conFarol = llevaElPorte(estado, suspectId, 'farol');
+  const conFarol = llevaElPorte(estado, participanteId, 'farol');
   const batidoDeAhora = pasoBatido(estado.batidos, sesion.round);
   const hora = horaSiLaHay(sesion);
-  const adelanto = hora?.adelantos?.[suspectId];
+  const adelanto = hora?.adelantos?.[participanteId];
 
   // ---- Los encuentros: quién estuvo dónde, hora a hora ----
   const encuentros: VistaSombras['encuentros'] = [];
@@ -289,7 +289,7 @@ export function vistaSombrasDe(
       for (const eleccion of jugador.elecciones) {
         if (eleccion.round !== ronda) continue;
         const lista = porPaso.get(eleccion.roomId) ?? [];
-        if (!lista.includes(jugador.suspectId)) lista.push(jugador.suspectId);
+        if (!lista.includes(jugador.participanteId)) lista.push(jugador.participanteId);
         porPaso.set(eleccion.roomId, lista);
       }
     }
@@ -306,7 +306,7 @@ export function vistaSombrasDe(
 
   /** Cuántas veces PISÓ el batido, contando solo horas ya reveladas. */
   const pisadasVistas = (id: string): number => {
-    const jugador = sesion.players.find((p) => p.suspectId === id);
+    const jugador = sesion.players.find((p) => p.participanteId === id);
     if (!jugador) return 0;
     let cuenta = 0;
     for (let ronda = 1; ronda <= hasta; ronda++) {
@@ -318,7 +318,7 @@ export function vistaSombrasDe(
   };
 
   const miPaso = sesion.players
-    .find((p) => p.suspectId === suspectId)
+    .find((p) => p.participanteId === participanteId)
     ?.elecciones.filter((e) => e.round === sesion.round)
     .map((e) => e.roomId)
     .pop();
@@ -362,7 +362,7 @@ export function vistaSombrasDe(
        * delata a nadie: quien no es kanchō recibe una lista de un elemento, que
        * es exactamente lo que ya sabía.
        */
-      papelesDisponibles: papelesDe(game, estado, suspectId),
+      papelesDisponibles: papelesDe(game, estado, participanteId),
       papelRol: ficha.rol,
       papelKanji: ficha.kanji,
       papelQueHace: ficha.que,
@@ -378,11 +378,11 @@ export function vistaSombrasDe(
           ...(fp ? { porteNombre: fp.nombre, porteQue: fp.que } : {}),
         };
       }),
-      ...(estado.estandartes[suspectId]
-        ? { estandarteNombre: nombreDeEntidad(game, 'estandartes', estado.estandartes[suspectId]!) }
+      ...(estado.estandartes[participanteId]
+        ? { estandarteNombre: nombreDeEntidad(game, 'estandartes', estado.estandartes[participanteId]!) }
         : {}),
       ...(miPaso ? { miPaso } : {}),
-      ...(estado.propuestas[suspectId] ? { miPropuesta: estado.propuestas[suspectId]!.senda } : {}),
+      ...(estado.propuestas[participanteId] ? { miPropuesta: estado.propuestas[participanteId]!.senda } : {}),
       ...(adelanto
         ? { sabeQueBatiran: { pasoId: adelanto, nombre: nombreDePaso(adelanto) } }
         : {}),
@@ -400,24 +400,24 @@ export function vistaSombrasDe(
       ...(p.description?.trim() ? { descripcion: p.description.trim() } : {}),
     })),
     mesa: sesion.players
-      .filter((p) => p.suspectId !== suspectId)
+      .filter((p) => p.participanteId !== participanteId)
       .map((p) => {
-        const suyo = estado.gente[p.suspectId];
+        const suyo = estado.gente[p.participanteId];
         return {
-          suspectId: p.suspectId,
+          participanteId: p.participanteId,
           // Las prendas son públicas: en la mesa se ven, y la tabla del rastro
           // de la partida en papel las lleva a la vista de todo el mundo.
           prendas: suyo?.prendas ?? 0,
           prendasRecibidas: suyo?.prendasRecibidas ?? 0,
           // Que alguien ha propuesto es público; QUÉ ha propuesto, no. Saberlo
           // antes de tiempo convertiría el consejo en seguir al que va primero.
-          haPropuesto: Boolean(estado.propuestas[p.suspectId]),
-          ...(estado.estandartes[p.suspectId]
+          haPropuesto: Boolean(estado.propuestas[p.participanteId]),
+          ...(estado.estandartes[p.participanteId]
             ? {
                 estandarteNombre: nombreDeEntidad(
                   game,
                   'estandartes',
-                  estado.estandartes[p.suspectId]!,
+                  estado.estandartes[p.participanteId]!,
                 ),
               }
             : {}),
@@ -426,7 +426,7 @@ export function vistaSombrasDe(
             nombre: nombreDeEnser(id),
             ...(estado.portes[id] ? { porte: estado.portes[id]! } : {}),
           })),
-          pisadasVistas: pisadasVistas(p.suspectId),
+          pisadasVistas: pisadasVistas(p.participanteId),
         };
       }),
     encuentros,
@@ -437,7 +437,7 @@ export function vistaSombrasDe(
    * `undefined` para el resto: se omite. Es la diferencia entre «no tienes
    * mentiras» y «aquí no hay mentiras que tener», y la primera ya sería un dato.
    */
-  if (esElKancho(game, suspectId) && papelesDe(game, estado, suspectId).includes('falsear')) {
+  if (esElKancho(game, participanteId) && papelesDe(game, estado, participanteId).includes('falsear')) {
     const yaPublicadas = new Set(
       Object.values(estado.hitos).filter((h) => h.falso).map((h) => h.id),
     );
@@ -472,7 +472,7 @@ export function vistaSombrasDe(
   return vista;
 }
 
-registrarProyeccion('sombras', (game, sesion, suspectId) => vistaSombrasDe(game, sesion, suspectId));
+registrarProyeccion('sombras', (game, sesion, participanteId) => vistaSombrasDe(game, sesion, participanteId));
 
 // ---------------------------------------------------------------------------
 // Lo que puede ver quien dirige A CIEGAS

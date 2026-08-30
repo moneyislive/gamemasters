@@ -63,7 +63,7 @@ function partidaEnElPeorCaso(n: number): { game: GameSession; sesion: LiveSessio
     narrations: [{ round: 1, title: 'Ronda 1', text: 'Se abre la ronda.', stageDirection: '' }],
     twists: game.suspects.map((s, i) => ({
       id: `giro-${i}`,
-      suspectId: s.id,
+      participanteId: s.id,
       round: 2,
       instruction: `${MARCA_GIRO}: viste algo junto al invernadero.`,
     })),
@@ -84,7 +84,7 @@ function partidaEnElPeorCaso(n: number): { game: GameSession; sesion: LiveSessio
     round: 0,
     totalRounds: 4,
     players: game.suspects.map((s) => ({
-      suspectId: s.id,
+      participanteId: s.id,
       displayName: s.name,
       joinCode: 'AAAAAA',
       joined: true,
@@ -113,7 +113,7 @@ function partidaEnElPeorCaso(n: number): { game: GameSession; sesion: LiveSessio
 /** Todo lo que el Mayordomo SÍ puede saber. Nada más puede salir de aquí. */
 function corpusPermitido(game: GameSession, yo: string): string {
   const plot = game.plot!;
-  const mio = plot.characters.find((c) => c.suspectId === yo)!;
+  const mio = plot.characters.find((c) => c.participanteId === yo)!;
   return [
     plot.title ?? '',
     plot.synopsis,
@@ -157,7 +157,7 @@ for (let n = 0; n < RONDAS; n++) {
   if (vista.yo.soyCulpable) culpablesPreguntando++;
 
   const permitido = corpusPermitido(game, yo);
-  const ajenos = plot.characters.filter((c) => c.suspectId !== yo);
+  const ajenos = plot.characters.filter((c) => c.participanteId !== yo);
 
   const prohibido: Array<[string, string]> = [
     ['el relato de cómo ocurrió', plot.solution.howItHappened ?? ''],

@@ -26,12 +26,12 @@ export function matrizConocimiento(
     const plano = texto.toLowerCase();
     return plot.characters
       .filter((otro) => {
-        if (otro.suspectId === exceptoId) return false;
-        const nombre = nombreDe(otro.suspectId).toLowerCase();
+        if (otro.participanteId === exceptoId) return false;
+        const nombre = nombreDe(otro.participanteId).toLowerCase();
         const personaje = otro.characterName.toLowerCase().split(/\s+/)[0] ?? '';
         return plano.includes(nombre) || (personaje.length >= 4 && plano.includes(personaje));
       })
-      .map((otro) => nombreDe(otro.suspectId));
+      .map((otro) => nombreDe(otro.participanteId));
   };
 
   const filas = plot.characters
@@ -39,15 +39,15 @@ export function matrizConocimiento(
       const saberes = personaje.knowledge?.length
         ? personaje.knowledge
             .map((s) => {
-              const cruces = mencionados(s, personaje.suspectId);
+              const cruces = mencionados(s, personaje.participanteId);
               return `<li>${esc(s)}${cruces.length ? ` <span style="font-family:'Cinzel',serif; font-size:8.5pt; letter-spacing:0.1em; color:#6d1a2a;">→ ${esc(cruces.join(' · '))}</span>` : ''}</li>`;
             })
             .join('')
         : '<li><em>No sabe nada concreto de nadie: es de los que solo pueden contar lo suyo.</em></li>';
-      const esCulpable = personaje.suspectId === culpableDe(plot.solution);
+      const esCulpable = personaje.participanteId === culpableDe(plot.solution);
       return `      <tr>
         <td style="width:40mm;">
-          <strong>${esc(nombreDe(personaje.suspectId))}</strong><br />
+          <strong>${esc(nombreDe(personaje.participanteId))}</strong><br />
           <span style="font-size:10.5pt; color:#6b5638;">${esc(personaje.characterName)}</span>
           ${esCulpable ? '<br /><span style="font-family:\'Cinzel\',serif; font-size:8.5pt; letter-spacing:0.12em; color:#6d1a2a;">☠ CULPABLE</span>' : ''}
         </td>
@@ -60,7 +60,7 @@ export function matrizConocimiento(
   const senalados = new Map<string, string[]>();
   for (const pista of plot.clues) {
     for (const personaje of plot.characters) {
-      const nombre = nombreDe(personaje.suspectId);
+      const nombre = nombreDe(personaje.participanteId);
       if (pista.pointsTo.toLowerCase().includes(nombre.toLowerCase())) {
         if (!senalados.has(nombre)) senalados.set(nombre, []);
         senalados.get(nombre)?.push(`ronda ${pista.round}`);
@@ -76,7 +76,7 @@ export function matrizConocimiento(
       <span class="etiqueta">Cómo se usa</span>
       <p style="margin:0;">
         Cuando la partida se pare, mira esta tabla y busca a dos personas que puedan hablar de lo
-        mismo. En vez de dar una pista, di algo como «${esc(nombreDe(plot.characters[0]?.suspectId ?? ''))},
+        mismo. En vez de dar una pista, di algo como «${esc(nombreDe(plot.characters[0]?.participanteId ?? ''))},
         ¿has hablado ya con todo el mundo?». Empuja el encuentro, no la conclusión.
       </p>
       <p style="margin:3mm 0 0; font-size:11pt;">

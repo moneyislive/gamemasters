@@ -175,7 +175,7 @@ function partidaDeMomia(
     totalRounds: 3,
     roundEndsAt: new Date(Date.now() + 3600_000).toISOString(),
     players: game.suspects.map((s, i) => ({
-      suspectId: s.id,
+      participanteId: s.id,
       displayName: s.name,
       joinCode: `${clave}${i}A`,
       joined: true,
@@ -219,7 +219,7 @@ function partidaDeCluedo(): { game: GameSession; sesion: LiveSession } {
     totalRounds: 3,
     roundEndsAt: new Date(Date.now() + 3600_000).toISOString(),
     players: game.suspects.map((s, i) => ({
-      suspectId: s.id,
+      participanteId: s.id,
       displayName: s.name,
       joinCode: `MANS${i}A`,
       joined: true,
@@ -316,7 +316,7 @@ async function probar(): Promise<void> {
     comprobar('la app puede señalar y el servidor lo acepta', r.estado === 200, r.datos);
 
     const sesion = await estadoDeLaSesion('expedicion');
-    const suya = (sesion?.acusaciones ?? []).find((a: any) => a.suspectId === 'e0');
+    const suya = (sesion?.acusaciones ?? []).find((a: any) => a.participanteId === 'e0');
     comprobar('el señalamiento queda guardado en la partida', Boolean(suya), sesion?.acusaciones);
     comprobar('y se apunta que acertó', suya?.correcta === true, suya);
   }
@@ -974,7 +974,7 @@ function probarDepuracion(): void {
 
   const { plot } = ensamblarTramaMomia(game, entidades, cimientos, respuesta);
 
-  const publica = plot.characters.find((c) => c.suspectId === entidades.expedicionarios[0]!.id);
+  const publica = plot.characters.find((c) => c.participanteId === entidades.expedicionarios[0]!.id);
   comprobar('la presentación pública envenenada NO sobrevive', publica?.publicPersona !== veneno, publica?.publicPersona);
   comprobar('ni el papel', publica?.role !== veneno, publica?.role);
 
@@ -1023,7 +1023,7 @@ function probarDepuracion(): void {
   const acusa = respuestaDeDemostracion(game.name, entidades, cimientos.trama);
   acusa.expedicionarios[0]!.publicPersona = `Todo el mundo comenta que ${nombreSaqueador} rompió el sello aquella noche.`;
   const { plot: p4 } = ensamblarTramaMomia(game, entidades, cimientos, acusa);
-  const acusador = p4.characters.find((c) => c.suspectId === entidades.expedicionarios[0]!.id);
+  const acusador = p4.characters.find((c) => c.participanteId === entidades.expedicionarios[0]!.id);
   comprobar(
     'una presentación pública que ACUSA no sobrevive',
     !acusador!.publicPersona.includes('rompió el sello'),
@@ -1034,7 +1034,7 @@ function probarDepuracion(): void {
   const inocente = `Llegó de El Cairo con ${nombreSaqueador} y desde entonces no se separan.`;
   menciona.expedicionarios[0]!.publicPersona = inocente;
   const { plot: p5 } = ensamblarTramaMomia(game, entidades, cimientos, menciona);
-  const mencionador = p5.characters.find((c) => c.suspectId === entidades.expedicionarios[0]!.id);
+  const mencionador = p5.characters.find((c) => c.participanteId === entidades.expedicionarios[0]!.id);
   comprobar(
     'pero MENCIONARLE sin acusarle sí sobrevive',
     mencionador?.publicPersona === inocente,
@@ -1050,7 +1050,7 @@ function probarDepuracion(): void {
   const oficios = respuestaDeDemostracion(game.name, entidades, cimientos.trama);
   oficios.expedicionarios[0]!.role = veneno;
   const { plot: p6 } = ensamblarTramaMomia(game, entidades, cimientos, oficios);
-  const sustituido = p6.characters.find((c) => c.suspectId === entidades.expedicionarios[0]!.id)!;
+  const sustituido = p6.characters.find((c) => c.participanteId === entidades.expedicionarios[0]!.id)!;
   comprobar('el oficio sustituido sigue pareciendo un oficio', sustituido.role.length < 40, sustituido.role);
   comprobar('y no es la frase de recambio larga', !sustituido.role.includes('no se ponen de acuerdo'), sustituido.role);
 }
@@ -1074,13 +1074,13 @@ function probarAmpliacion(): void {
   game.suspects.push({ id: 'e9', name: 'Nueva' } as never);
 
   comprobar('antes de ampliar no tiene don', trama.dones.e9 === undefined);
-  comprobar('ni papel escrito', !game.plot!.characters.some((c) => c.suspectId === 'e9'));
+  comprobar('ni papel escrito', !game.plot!.characters.some((c) => c.participanteId === 'e9'));
 
   const { anadidos } = ampliarExpedicion(game, game.plot!);
 
   comprobar('la ampliación la ve', anadidos.includes('e9'), anadidos);
   comprobar('ahora tiene don', Boolean(trama.dones.e9), trama.dones.e9);
-  comprobar('y papel escrito', game.plot!.characters.some((c) => c.suspectId === 'e9'));
+  comprobar('y papel escrito', game.plot!.characters.some((c) => c.participanteId === 'e9'));
   comprobar(
     'y no le ha quitado el suyo a nadie',
     Object.keys(trama.dones).length === antes + 1,

@@ -75,7 +75,7 @@ export interface FragmentoVisto {
 
 /** Lo que se sabe de otra persona con solo mirarla. */
 export interface CompaneroVisto {
-  suspectId: string;
+  participanteId: string;
   marcas: number;
   amuletos: number;
   tocado: boolean;
@@ -142,13 +142,13 @@ export interface VistaMomia {
 export function vistaMomiaDe(
   game: GameSession,
   sesion: LiveSession,
-  suspectId: string,
+  participanteId: string,
 ): VistaMomia | undefined {
   const trama = tramaDe(game.plot);
   if (!trama) return undefined;
 
   const estado = estadoDe(game, sesion);
-  const yo = estado.gente[suspectId];
+  const yo = estado.gente[participanteId];
   if (!yo) return undefined;
 
   const terminada = sesion.phase === 'desenlace';
@@ -178,7 +178,7 @@ export function vistaMomiaDe(
         ? {
             publicadoPor: f.publicadoPor,
             publicadoPorNombre:
-              sesion.players.find((p) => p.suspectId === f.publicadoPor)?.displayName ?? '',
+              sesion.players.find((p) => p.participanteId === f.publicadoPor)?.displayName ?? '',
           }
         : {}),
       ...(terminada ? { falso: f.falso } : {}),
@@ -193,7 +193,7 @@ export function vistaMomiaDe(
 
   const profanada = camaraProfanada(estado.profanadas, sesion.round);
   const soborno = (sesion.estado?.['momia-vigilia'] as { sobornos?: Record<string, string> } | undefined)
-    ?.sobornos?.[suspectId];
+    ?.sobornos?.[participanteId];
 
   const vista: VistaMomia = {
     vigilia: {
@@ -217,29 +217,29 @@ export function vistaMomiaDe(
        * mecánica. No delata a nadie: quien no es saqueador recibe una lista de
        * un elemento, que es exactamente lo que ya sabía.
        */
-      donesDisponibles: donesDe(game, estado, suspectId),
+      donesDisponibles: donesDe(game, estado, participanteId),
       donRol: ficha?.rol ?? '',
       donQueHace: ficha?.que ?? '',
       donUsadoEstaVigilia: yo.donUsadoEnRonda === sesion.round,
       fragmentos: mios,
-      ...(estado.propuestas[suspectId] ? { miPropuesta: estado.propuestas[suspectId]!.orden } : {}),
+      ...(estado.propuestas[participanteId] ? { miPropuesta: estado.propuestas[participanteId]!.orden } : {}),
       ...(soborno ? { sabeQueSeProfanara: nombreDeEntidad(game, 'camaras', soborno) } : {}),
     },
     papiro: publicos,
     // Las marcas y los amuletos son públicos: en la mesa se ven, y la hoja de
     // marcas de la partida en papel los lleva a la vista de todo el mundo.
     mesa: sesion.players
-      .filter((p) => p.suspectId !== suspectId)
+      .filter((p) => p.participanteId !== participanteId)
       .map((p) => {
-        const suyo = estado.gente[p.suspectId];
+        const suyo = estado.gente[p.participanteId];
         return {
-          suspectId: p.suspectId,
+          participanteId: p.participanteId,
           marcas: suyo?.marcas ?? 0,
           amuletos: suyo?.amuletos ?? 0,
           tocado: suyo?.tocado ?? false,
           // Que alguien ha propuesto es público; QUÉ ha propuesto, no. Saberlo
           // antes de tiempo convertiría el sellado en seguir al que va primero.
-          haPropuesto: Boolean(estado.propuestas[p.suspectId]),
+          haPropuesto: Boolean(estado.propuestas[p.participanteId]),
         };
       }),
     /*
@@ -261,7 +261,7 @@ export function vistaMomiaDe(
    * `undefined` para el resto: se omite. Es la diferencia entre «no tienes
    * mentiras» y «aquí no hay mentiras que tener», y la primera ya sería un dato.
    */
-  if (esElSaqueador(game, suspectId) && donesDe(game, estado, suspectId).includes('falsificar')) {
+  if (esElSaqueador(game, participanteId) && donesDe(game, estado, participanteId).includes('falsificar')) {
     const yaPublicadas = new Set(
       Object.values(estado.fragmentos).filter((f) => f.falso).map((f) => f.id),
     );
@@ -293,7 +293,7 @@ export function vistaMomiaDe(
   return vista;
 }
 
-registrarProyeccion('momia', (game, sesion, suspectId) => vistaMomiaDe(game, sesion, suspectId));
+registrarProyeccion('momia', (game, sesion, participanteId) => vistaMomiaDe(game, sesion, participanteId));
 
 /**
  * Lo que puede ver quien dirige A CIEGAS del estado de la expedición.

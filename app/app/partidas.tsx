@@ -96,7 +96,7 @@ export default function Partidas(): JSX.Element {
     (p: api.PartidaDelPanel) => {
       void (async () => {
         try {
-          const r = await api.entrarEnPartida(p.gameId, p.suspectId);
+          const r = await api.entrarEnPartida(p.gameId, p.participanteId);
           if (r.requiereCodigo) {
             /*
              * NO SE MANDA A LA PANTALLA DE CÓDIGOS SIN MÁS. Los dos códigos son
@@ -174,7 +174,7 @@ export default function Partidas(): JSX.Element {
         {partidas?.map((p, i) => {
           const sello = SELLOS[p.estado] ?? SELLOS.terminada!;
           return (
-            <Animated.View key={`${p.gameId}-${p.suspectId}`} entering={FadeInUp.delay(i * 60)}>
+            <Animated.View key={`${p.gameId}-${p.participanteId}`} entering={FadeInUp.delay(i * 60)}>
               <View style={estilos.ficha}>
                 <View style={[estilos.sello, { backgroundColor: sello.fondo }]}>
                   <Text style={[estilos.selloTexto, { color: sello.color }]}>{sello.texto}</Text>

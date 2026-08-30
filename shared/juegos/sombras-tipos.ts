@@ -389,9 +389,9 @@ export interface TramaSombras {
   hallazgos: Array<{ hitoId: string; pasoId: PasoId; ronda: number }>;
   /** La contraseña escrita en la puerta de cada paso, por id de paso. */
   contrasenas: Record<string, string>;
-  /** El papel de cada escolta, por su `suspectId`. */
+  /** El papel de cada escolta, por su `participanteId`. */
   papeles: Record<string, PapelId>;
-  /** El estandarte de cada escolta, por su `suspectId`. */
+  /** El estandarte de cada escolta, por su `participanteId`. */
   estandartes: Record<string, string>;
   /** Qué porte lleva cada enser. Solo tres enseres lo tienen. */
   portes: Record<string, PorteId>;

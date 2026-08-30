@@ -212,9 +212,9 @@ export async function abrirSesion(game: GameSession): Promise<LiveSession> {
   return store.saveLive(sesion);
 }
 
-function nuevoJugador(suspectId: string, displayName: string, email?: string): LivePlayer {
+function nuevoJugador(participanteId: string, displayName: string, email?: string): LivePlayer {
   return {
-    suspectId,
+    participanteId,
     displayName,
     email,
     joinCode: codigoAleatorio(6),
@@ -230,7 +230,7 @@ function nuevoJugador(suspectId: string, displayName: string, email?: string): L
  * Quien ya emparejó conserva su código y sus notas; los nuevos reciben el suyo.
  */
 function sincronizarJugadores(sesion: LiveSession, game: GameSession): LiveSession {
-  const porId = new Map(sesion.players.map((p) => [p.suspectId, p]));
+  const porId = new Map(sesion.players.map((p) => [p.participanteId, p]));
   sesion.players = personasDe(game).map((s) => {
     const previo = porId.get(s.id);
     if (!previo) return nuevoJugador(s.id, s.name, s.email);
@@ -484,11 +484,11 @@ export function revelarDesenlace(game: GameSession, sesion: LiveSession): void {
 // Acciones de jugador
 // ---------------------------------------------------------------------------
 
-export function elegirSala(sesion: LiveSession, suspectId: string, roomId: string): void {
+export function elegirSala(sesion: LiveSession, participanteId: string, roomId: string): void {
   if (sesion.phase !== 'ronda-abierta') {
     throw new Error('Solo puedes elegir sala con la ronda abierta.');
   }
-  const jugador = sesion.players.find((p) => p.suspectId === suspectId);
+  const jugador = sesion.players.find((p) => p.participanteId === participanteId);
   if (!jugador) throw new Error('No participas en esta partida.');
   const previa = jugador.elecciones.find((e) => e.round === sesion.round);
   if (previa) {
@@ -507,8 +507,8 @@ export function salaDe(jugador: LivePlayer, round: number): string | undefined {
   return deLaRonda[deLaRonda.length - 1]?.roomId;
 }
 
-export function guardarNotas(sesion: LiveSession, suspectId: string, notas: string): void {
-  const jugador = sesion.players.find((p) => p.suspectId === suspectId);
+export function guardarNotas(sesion: LiveSession, participanteId: string, notas: string): void {
+  const jugador = sesion.players.find((p) => p.participanteId === participanteId);
   if (!jugador) throw new Error('No participas en esta partida.');
   // Tope generoso pero acotado: el cuaderno no puede tumbar el documento.
   jugador.notas = notas.slice(0, 20_000);
@@ -529,7 +529,7 @@ export interface ResultadoAcusacion {
  */
 export function acusar(
   sesion: LiveSession,
-  suspectId: string,
+  participanteId: string,
   eleccion: Record<EjeId, string>,
   solucion: Record<EjeId, string>,
 ): ResultadoAcusacion {
@@ -552,7 +552,7 @@ export function acusar(
   if (!PAPELES_EN_JUEGO.includes(papelDe(manifiestoDe(sesion.juego), sesion.phase))) {
     throw new Error('Todavía no se puede acusar.');
   }
-  if (sesion.acusaciones.some((a) => a.suspectId === suspectId)) {
+  if (sesion.acusaciones.some((a) => a.participanteId === participanteId)) {
     throw new Error('Ya has entregado tu acusación. No se puede cambiar.');
   }
 
@@ -566,7 +566,7 @@ export function acusar(
   const correcta = aciertos(manifiesto, eleccion, solucion) === ejesDe(manifiesto).length;
 
   const acusacion: Acusacion = {
-    suspectId,
+    participanteId,
     respuestas: { ...eleccion },
     at: new Date().toISOString(),
     correcta,
@@ -575,9 +575,9 @@ export function acusar(
 
   // Quien es señalado por el eje que apunta a la mesa no puede ganar
   // acusándose: su juego es no ser descubierto.
-  const esElCulpable = esElSenalado(manifiesto, solucion, suspectId);
+  const esElCulpable = esElSenalado(manifiesto, solucion, participanteId);
   const ganador = correcta && !esElCulpable && !sesion.winnerId;
-  if (ganador) sesion.winnerId = suspectId;
+  if (ganador) sesion.winnerId = participanteId;
 
   return { acusacion, ganador };
 }
@@ -594,7 +594,7 @@ export function acusar(
  */
 export function ultimaSenal(jugador: LivePlayer, gameId?: string): number {
   const enDocumento = jugador.lastSeenAt ? Date.parse(jugador.lastSeenAt) : NaN;
-  const enMemoria = gameId ? senalEnMemoria(gameId, jugador.suspectId) : 0;
+  const enMemoria = gameId ? senalEnMemoria(gameId, jugador.participanteId) : 0;
   return Math.max(Number.isFinite(enDocumento) ? enDocumento : 0, enMemoria);
 }
 

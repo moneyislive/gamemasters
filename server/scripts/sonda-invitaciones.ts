@@ -83,7 +83,7 @@ try {
   const enLobby = await store.getLive('con-ana');
   if (enLobby) {
     enLobby.phase = 'lobby';
-    const j = enLobby.players.find((x) => x.suspectId === 's0');
+    const j = enLobby.players.find((x) => x.participanteId === 's0');
     if (j) j.joined = true;
     await store.saveLive(enLobby);
   }

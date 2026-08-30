@@ -77,10 +77,10 @@ export const MATERIAL_SCHEMA: Record<string, unknown> = {
       items: {
         type: 'object',
         additionalProperties: false,
-        required: ['id', 'suspectId', 'round', 'instruction'],
+        required: ['id', 'participanteId', 'round', 'instruction'],
         properties: {
           id: { type: 'string', description: 'Identificador único, p. ej. "giro-1"' },
-          suspectId: { type: 'string', description: 'Id EXACTO del sospechoso que lo recibe' },
+          participanteId: { type: 'string', description: 'Id EXACTO del sospechoso que lo recibe' },
           round: { type: 'integer', description: 'Ronda al cerrar la cual se entrega' },
           instruction: {
             type: 'string',
@@ -213,7 +213,7 @@ function construirPrompt(game: GameSession, plot: Plot): string {
     sospechososDe(game).find((s) => s.id === id)?.name ?? id;
 
   const personajes = plot.characters
-    .map((p) => `- id: "${p.suspectId}" · ${p.characterName} (${nombre(p.suspectId)}) · ${p.role}`)
+    .map((p) => `- id: "${p.participanteId}" · ${p.characterName} (${nombre(p.participanteId)}) · ${p.role}`)
     .join('\n');
 
   const cronologia = plot.timeline
@@ -227,7 +227,7 @@ function construirPrompt(game: GameSession, plot: Plot): string {
     })
     .join('\n');
 
-  const asesino = plot.characters.find((c) => c.suspectId === culpableDe(plot.solution));
+  const asesino = plot.characters.find((c) => c.participanteId === culpableDe(plot.solution));
   const arma = objetosDe(game).find((w) => w.id === objetoDe(plot.solution))?.name ?? '';
   const sala = salasDe(game).find((r) => r.id === lugarDe(plot.solution))?.name ?? '';
 
@@ -238,7 +238,7 @@ LEMA: ${plot.tagline}
 VÍCTIMA: ${victimaDe(plot).name} — ${victimaDe(plot).description}
 AMBIENTACIÓN: ${plot.setting}
 
-PERSONAJES (usa sus ids EXACTOS en twists[].suspectId):
+PERSONAJES (usa sus ids EXACTOS en twists[].participanteId):
 ${personajes}
 
 CRONOLOGÍA COMPLETA:
@@ -280,11 +280,11 @@ function sanear(material: PrintMaterial, game: GameSession, plot: Plot): PrintMa
 
   const twists: PlotTwist[] = (material.twists ?? [])
     .filter((giro) => {
-      if (!giro || typeof giro.suspectId !== 'string') return false;
-      if (!idsValidos.has(giro.suspectId)) return false;
-      if (giro.suspectId === culpableDe(plot.solution)) return false;
-      if (vistos.has(giro.suspectId)) return false;
-      vistos.add(giro.suspectId);
+      if (!giro || typeof giro.participanteId !== 'string') return false;
+      if (!idsValidos.has(giro.participanteId)) return false;
+      if (giro.participanteId === culpableDe(plot.solution)) return false;
+      if (vistos.has(giro.participanteId)) return false;
+      vistos.add(giro.participanteId);
       return true;
     })
     .map((giro, indice) => ({
@@ -337,7 +337,7 @@ async function materialDemo(game: GameSession, plot: Plot, emit: Emitir): Promis
   const inocentes = sospechososDe(game).filter((s) => s.id !== culpableDe(plot.solution));
   const arma = objetosDe(game).find((w) => w.id === objetoDe(plot.solution))?.name ?? 'el arma';
   const sala = salasDe(game).find((r) => r.id === lugarDe(plot.solution))?.name ?? 'la sala';
-  const asesino = plot.characters.find((c) => c.suspectId === culpableDe(plot.solution));
+  const asesino = plot.characters.find((c) => c.participanteId === culpableDe(plot.solution));
   const publicos = plot.timeline.filter((e) => e.isPublic);
 
   const narrations: PlotNarration[] = [
@@ -357,7 +357,7 @@ async function materialDemo(game: GameSession, plot: Plot, emit: Emitir): Promis
 
   const twists: PlotTwist[] = inocentes.slice(0, Math.min(4, inocentes.length)).map((s, i) => ({
     id: `giro-${i + 1}`,
-    suspectId: s.id,
+    participanteId: s.id,
     round: Math.min(2 + (i % Math.max(1, rondas - 1)), rondas),
     instruction: `Acabas de recordar algo que callaste al principio: aquella noche viste moverse a alguien cerca de ${sala}. No sabes quién era. Cuéntalo cuando te pregunten, pero admite que llevas toda la velada ocultándolo.`,
   }));

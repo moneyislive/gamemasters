@@ -148,7 +148,7 @@ async function guion(store: Store): Promise<Record<string, unknown>> {
     totalRounds: 4,
     rev: 1,
     players: [
-      { suspectId: 'e1', displayName: 'Marta', joinCode: 'AAAAAA', joined: false, elecciones: [], notas: 'mis notas', girosRecibidos: [] },
+      { participanteId: 'e1', displayName: 'Marta', joinCode: 'AAAAAA', joined: false, elecciones: [], notas: 'mis notas', girosRecibidos: [] },
     ],
     acusaciones: [],
     acciones: [],

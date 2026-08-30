@@ -104,16 +104,16 @@ function cosasDeLaMesa(game: GameSession): Entidad[] {
 export function vistaDeJugador(
   game: GameSession,
   sesion: LiveSession,
-  suspectId: string,
+  participanteId: string,
 ): VistaJugador | null {
   const plot = game.plot;
   if (!plot) return null;
   const manifiesto = manifiestoDe(sesion.juego);
-  const jugador = sesion.players.find((p) => p.suspectId === suspectId);
+  const jugador = sesion.players.find((p) => p.participanteId === participanteId);
   if (!jugador) return null;
 
-  const personaje = plot.characters.find((c) => c.suspectId === suspectId);
-  const sospechoso = personasDe(game).find((s) => s.id === suspectId);
+  const personaje = plot.characters.find((c) => c.participanteId === participanteId);
+  const sospechoso = personasDe(game).find((s) => s.id === participanteId);
   const enJuego = sesion.phase !== 'lobby';
   const abierta = sesion.phase === 'ronda-abierta';
   const terminada = sesion.phase === 'desenlace';
@@ -123,7 +123,7 @@ export function vistaDeJugador(
    * qué momentos de la cronología es seguro mandarme. Ya se calculaba para
    * `yo.soyCulpable`; lo único que cambia es que ahora se calcula antes.
    */
-  const soyCulpable = esElSenalado(manifiesto, plot.solution.respuestas, suspectId);
+  const soyCulpable = esElSenalado(manifiesto, plot.solution.respuestas, participanteId);
 
   // ---- Conocimiento, desbloqueado por rondas ----
   const todoElConocimiento = personaje?.knowledge ?? [];
@@ -133,7 +133,7 @@ export function vistaDeJugador(
 
   // ---- Mis giros: solo los que ya se han entregado ----
   const giros = (plot.material?.twists ?? [])
-    .filter((t) => t.suspectId === suspectId && jugador.girosRecibidos.includes(t.id))
+    .filter((t) => t.participanteId === participanteId && jugador.girosRecibidos.includes(t.id))
     .map((t) => ({ id: t.id, round: t.round, instruction: t.instruction }));
 
   /*
@@ -141,7 +141,7 @@ export function vistaDeJugador(
    *
    * La cronología de la trama, recortada a los momentos en los que figuro. Lo
    * que sale de aquí no le cuenta a nadie nada que su personaje no viviera: si
-   * mi id está en `suspectIds`, yo estaba allí.
+   * mi id está en `participanteIds`, yo estaba allí.
    *
    * Y AUN ASÍ SE FILTRA UNA COSA MÁS. Un momento a puerta cerrada donde
    * estuvimos el culpable y yo puede estar redactado desde fuera —«X se desliza
@@ -157,8 +157,8 @@ export function vistaDeJugador(
   const ejeSenalado = ejeDeJugadores(manifiesto);
   const senalado = ejeSenalado ? plot.solution.respuestas[ejeSenalado.id] : undefined;
   const cronologiaPropia: MomentoVista[] = plot.timeline
-    .filter((e) => e.suspectIds.includes(suspectId))
-    .filter((e) => e.isPublic || soyCulpable || !senalado || !e.suspectIds.includes(senalado))
+    .filter((e) => e.participanteIds.includes(participanteId))
+    .filter((e) => e.isPublic || soyCulpable || !senalado || !e.participanteIds.includes(senalado))
     .map((e) => ({ time: e.time, description: e.description }));
 
   // ---- Salas, con cuánta gente hay en cada una esta ronda ----
@@ -270,15 +270,15 @@ export function vistaDeJugador(
       rotulo: e.rotulo,
       opciones: entidadesDe(game, e.categoria).map((ent) => {
         if (!cat?.sonJugadores) return { id: ent.id, nombre: ent.name };
-        const suyo = plot.characters.find((c) => c.suspectId === ent.id);
+        const suyo = plot.characters.find((c) => c.participanteId === ent.id);
         const nombre = suyo?.characterName ?? ent.name;
-        return { id: ent.id, nombre: ent.id === suspectId ? `${nombre} (tú)` : nombre };
+        return { id: ent.id, nombre: ent.id === participanteId ? `${nombre} (tú)` : nombre };
       }),
     };
   });
 
   // ---- Qué se puede hacer ahora mismo ----
-  const acciones = accionesDisponibles(sesion, suspectId).map((a) => ({
+  const acciones = accionesDisponibles(sesion, participanteId).map((a) => ({
     id: a.id,
     rotulo: a.rotulo,
     campos: (a.eligeDe ?? []).map((c) => ({
@@ -308,7 +308,7 @@ export function vistaDeJugador(
       : {}),
   }));
 
-  const miAcusacion = sesion.acusaciones.find((a) => a.suspectId === suspectId);
+  const miAcusacion = sesion.acusaciones.find((a) => a.participanteId === participanteId);
 
   const vista: VistaJugador = {
     rev: sesion.rev ?? 0,
@@ -344,7 +344,7 @@ export function vistaDeJugador(
       reglas: (manifiesto.reglas ?? REGLAS_JUGADOR).map((r) => `${r.titulo}. ${r.texto}`),
     },
     yo: {
-      suspectId,
+      participanteId,
       displayName: jugador.displayName,
       characterName: personaje?.characterName ?? jugador.displayName,
       role: personaje?.role ?? '',
@@ -363,20 +363,20 @@ export function vistaDeJugador(
       pediEmpezar: jugador.pideEmpezar === true,
     },
     jugadores: sesion.players
-      .filter((p) => p.suspectId !== suspectId)
+      .filter((p) => p.participanteId !== participanteId)
       .map((p) => {
-        const suPersonaje = plot.characters.find((c) => c.suspectId === p.suspectId);
-        const suSospechoso = personasDe(game).find((s) => s.id === p.suspectId);
+        const suPersonaje = plot.characters.find((c) => c.participanteId === p.participanteId);
+        const suSospechoso = personasDe(game).find((s) => s.id === p.participanteId);
         const suSala = sesion.phase === 'ronda-abierta' ? salaDe(p, sesion.round) : undefined;
         return {
-          suspectId: p.suspectId,
+          participanteId: p.participanteId,
           displayName: p.displayName,
           characterName: suPersonaje?.characterName ?? p.displayName,
           role: suPersonaje?.role ?? '',
           photoUrl: fotoParaJugador(suSospechoso?.photoUrl, game.id),
           conectado: estaConectado(p, sesion.id),
           salaActual: suSala ? lugaresDe(game).find((r) => r.id === suSala)?.name : undefined,
-          yaAcuso: sesion.acusaciones.some((a) => a.suspectId === p.suspectId),
+          yaAcuso: sesion.acusaciones.some((a) => a.participanteId === p.participanteId),
         };
       }),
     salas,
@@ -390,7 +390,7 @@ export function vistaDeJugador(
      * clave con valor `undefined` desaparece al serializar a JSON: la vista de
      * CLUEDO sale byte a byte como salia. Lo comprueba el maestro de oro.
      */
-    estadoDelJuego: proyectarEstado(game, sesion, suspectId),
+    estadoDelJuego: proyectarEstado(game, sesion, participanteId),
     /*
      * LAS COSAS DE LA MESA, y esto es deuda anotada, no diseño.
      *
@@ -432,9 +432,9 @@ export function vistaDeJugador(
   // ---- El desenlace: la ÚNICA puerta por la que sale la solución ----
   if (terminada) {
     const ganador = sesion.winnerId
-      ? sesion.players.find((p) => p.suspectId === sesion.winnerId)
+      ? sesion.players.find((p) => p.participanteId === sesion.winnerId)
       : undefined;
-    const acusacionGanadora = sesion.acusaciones.find((a) => a.suspectId === sesion.winnerId);
+    const acusacionGanadora = sesion.acusaciones.find((a) => a.participanteId === sesion.winnerId);
 
     // Un renglón por eje, ya resuelto a nombres. Antes eran tres campos
     // —asesino, arma y sala— y el móvil los pintaba uno a uno; ahora recorre
@@ -467,16 +467,16 @@ export function vistaDeJugador(
       // aquella condición el desenlace se quedaba sin ganador que anunciar.
       ganador: ganador
         ? {
-            suspectId: ganador.suspectId,
+            participanteId: ganador.participanteId,
             displayName: ganador.displayName,
             at: acusacionGanadora?.at ?? sesion.updatedAt,
           }
         : undefined,
       clasificacion: sesion.players
         .map((p) => {
-          const suya = sesion.acusaciones.find((a) => a.suspectId === p.suspectId);
+          const suya = sesion.acusaciones.find((a) => a.participanteId === p.participanteId);
           return {
-            suspectId: p.suspectId,
+            participanteId: p.participanteId,
             displayName: p.displayName,
             acerto: suya?.correcta ?? false,
             at: suya?.at,
@@ -505,21 +505,21 @@ export function vistaDeGameMaster(game: GameSession, sesion: LiveSession): Vista
   const ocupacion = lugaresDe(game).map((r) => ({
     roomId: r.id,
     roomName: r.name,
-    suspectIds: sesion.players
+    participanteIds: sesion.players
       .filter((p) => salaDe(p, sesion.round) === r.id)
-      .map((p) => p.suspectId),
+      .map((p) => p.participanteId),
   }));
 
   const girosPendientes = (plot?.material?.twists ?? [])
     .filter((t) => t.round === sesion.round)
     .filter((t) => {
-      const jugador = sesion.players.find((p) => p.suspectId === t.suspectId);
+      const jugador = sesion.players.find((p) => p.participanteId === t.participanteId);
       return jugador ? !jugador.girosRecibidos.includes(t.id) : false;
     })
     .map((t) => ({
       id: t.id,
-      suspectId: t.suspectId,
-      displayName: sesion.players.find((p) => p.suspectId === t.suspectId)?.displayName ?? '',
+      participanteId: t.participanteId,
+      displayName: sesion.players.find((p) => p.participanteId === t.participanteId)?.displayName ?? '',
       round: t.round,
     }));
 
@@ -555,7 +555,7 @@ export function vistaDeGameMaster(game: GameSession, sesion: LiveSession): Vista
          * verdad ahí sería decirle quién rompió el sello.
          */
         acusaciones: sesion.acusaciones.map((a) => ({
-          suspectId: a.suspectId,
+          participanteId: a.participanteId,
           respuestas: {},
           correcta: false,
           at: a.at,
@@ -599,7 +599,7 @@ export function vistaDeGameMaster(game: GameSession, sesion: LiveSession): Vista
     acusacionesRecibidas: sesion.acusaciones.length,
     listos: sesion.players
       .filter((p) => p.pideEmpezar)
-      .map((p) => ({ suspectId: p.suspectId, displayName: p.displayName })),
+      .map((p) => ({ participanteId: p.participanteId, displayName: p.displayName })),
     revelaSolucion,
   };
 }
@@ -653,7 +653,7 @@ export function partidaParaElTaller(game: GameSession): GameSession {
        * `cronologiaPublica`: un momento con una sola persona no lo vio nadie
        * más, por mucho que venga marcado como público.
        */
-      timeline: plot.timeline.filter((e) => e.isPublic === true && e.suspectIds.length > 1),
+      timeline: plot.timeline.filter((e) => e.isPublic === true && e.participanteIds.length > 1),
       // La pista se lee; a quién apunta, no.
       clues: plot.clues.map((c) => ({ ...c, pointsTo: '' })),
       material: plot.material

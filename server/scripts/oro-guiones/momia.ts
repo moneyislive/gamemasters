@@ -93,7 +93,7 @@ function sesionInicial(game: GameSession): LiveSession {
     round: 0,
     totalRounds: VIGILIAS,
     players: personasDe(game).map((s, i) => ({
-      suspectId: s.id,
+      participanteId: s.id,
       displayName: s.name,
       joinCode: `MOMIA${i}`,
       joined: true,

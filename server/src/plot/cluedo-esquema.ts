@@ -19,7 +19,7 @@ const PERSONAJE_SCHEMA: Record<string, unknown> = {
   type: 'object',
   additionalProperties: false,
   required: [
-    'suspectId',
+    'participanteId',
     'characterName',
     'role',
     'publicPersona',
@@ -30,7 +30,7 @@ const PERSONAJE_SCHEMA: Record<string, unknown> = {
     'personalHook',
   ],
   properties: {
-    suspectId: {
+    participanteId: {
       type: 'string',
       description: 'Id EXACTO del sospechoso real al que corresponde este personaje',
     },
@@ -162,11 +162,11 @@ export const PLOT_SCHEMA: Record<string, unknown> = {
       items: {
         type: 'object',
         additionalProperties: false,
-        required: ['time', 'description', 'suspectIds', 'isPublic'],
+        required: ['time', 'description', 'participanteIds', 'isPublic'],
         properties: {
           time: { type: 'string', description: 'Hora del evento, p. ej. "21:40"' },
           description: { type: 'string', description: 'Qué ocurrió' },
-          suspectIds: {
+          participanteIds: {
             type: 'array',
             description: 'Ids EXACTOS de los sospechosos implicados en el evento',
             items: { type: 'string' },

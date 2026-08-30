@@ -955,10 +955,10 @@ export function ejeDeJugadores(m: ManifiestoDeJuego): DefinicionEje | undefined 
 export function esElSenalado(
   m: ManifiestoDeJuego,
   solucion: Record<EjeId, string>,
-  suspectId: string,
+  participanteId: string,
 ): boolean {
   const e = ejeDeJugadores(m);
-  return Boolean(e && solucion[e.id] === suspectId);
+  return Boolean(e && solucion[e.id] === participanteId);
 }
 
 /**

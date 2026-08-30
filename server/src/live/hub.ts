@@ -28,7 +28,7 @@ interface AvisoRegistrado {
   clave: AvisoClave;
   texto: string;
   /** Si va dirigido a una sola persona. */
-  suspectId?: string;
+  participanteId?: string;
 }
 
 const esperas = new Map<string, Set<EsperaPendiente>>();
@@ -80,10 +80,10 @@ export function anunciar(
   rev: number,
   clave: AvisoClave,
   texto: string,
-  suspectId?: string,
+  participanteId?: string,
 ): void {
   const lista = avisos.get(gameId) ?? [];
-  lista.push({ rev, clave, texto, suspectId });
+  lista.push({ rev, clave, texto, participanteId });
   while (lista.length > MAX_AVISOS) lista.shift();
   avisos.set(gameId, lista);
   avisarCambio(gameId);
@@ -93,11 +93,11 @@ export function anunciar(
 export function avisosDesde(
   gameId: string,
   desdeRev: number,
-  suspectId: string | null,
+  participanteId: string | null,
 ): Array<{ clave: AvisoClave; texto: string }> {
   return (avisos.get(gameId) ?? [])
     .filter((a) => a.rev > desdeRev)
-    .filter((a) => !a.suspectId || a.suspectId === suspectId)
+    .filter((a) => !a.participanteId || a.participanteId === participanteId)
     .map((a) => ({ clave: a.clave, texto: a.texto }));
 }
 

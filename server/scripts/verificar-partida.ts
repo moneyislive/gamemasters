@@ -120,7 +120,7 @@ function sembrar(dir: string): { game: GameSession; sesion: LiveSession } {
     round: 0,
     totalRounds: 3,
     players: game.suspects.map((s, i) => ({
-      suspectId: s.id,
+      participanteId: s.id,
       displayName: s.name,
       joinCode: `CODIG${i}`,
       joined: false,
@@ -515,12 +515,12 @@ async function jugar(): Promise<void> {
   comprobar('y quién fue', Boolean(v.desenlace?.culpableId));
   comprobar(
     'gané, porque acerté los tres ejes',
-    v.desenlace?.ganador?.suspectId === 's0',
+    v.desenlace?.ganador?.participanteId === 's0',
     v.desenlace?.ganador,
   );
   comprobar(
     'la clasificación me da todos los aciertos',
-    v.desenlace?.clasificacion.find((c) => c.suspectId === 's0')?.aciertos ===
+    v.desenlace?.clasificacion.find((c) => c.participanteId === 's0')?.aciertos ===
       ejesDe(manifiesto).length,
     v.desenlace?.clasificacion,
   );

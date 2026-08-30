@@ -8,7 +8,7 @@
  *
  *   1. Sin contraseña, la clave de firma era pública. Cualquier invitado podía
  *      fabricarse la credencial de OTRO jugador —solo hacen falta su `gameId`
- *      y su `suspectId`, que la propia vista le da— y leer su dosier entero:
+ *      y su `participanteId`, que la propia vista le da— y leer su dosier entero:
  *      secreto, motivo y «soyCulpable». Es decir, la solución en la ronda uno.
  *      Se comprobó fabricando un testigo válido sin conocer nada.
  *

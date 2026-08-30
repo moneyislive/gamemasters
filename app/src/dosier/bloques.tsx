@@ -437,7 +437,7 @@ const Mesa: Bloque = ({ vista, manifiesto }) => (
     <Ornamento />
     <Seccion>{rotuloDeGente(manifiesto)}</Seccion>
     {vista.jugadores.map((j) => (
-      <View key={j.suspectId} style={estilos.fila}>
+      <View key={j.participanteId} style={estilos.fila}>
         <View
           style={[
             estilos.punto,

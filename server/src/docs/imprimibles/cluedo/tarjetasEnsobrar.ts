@@ -83,8 +83,8 @@ export function tarjetasEnsobrar(
     .map((giro) => {
       total++;
       return tarjeta(
-        `GIRO ${giro.round} · ${nombreDe(giro.suspectId).toUpperCase()}`,
-        `Para ${nombreDe(giro.suspectId)}, al cerrar la ronda ${giro.round}`,
+        `GIRO ${giro.round} · ${nombreDe(giro.participanteId).toUpperCase()}`,
+        `Para ${nombreDe(giro.participanteId)}, al cerrar la ronda ${giro.round}`,
         giro.instruction,
         'Entrégasela en mano y en silencio. Nadie más debe saber que la ha recibido.',
       );

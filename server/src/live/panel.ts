@@ -52,7 +52,7 @@ export interface PartidaDelPanel {
   titulo: string;
   /** El personaje que te tocó. */
   personaje: string;
-  suspectId: string;
+  participanteId: string;
   estado: EstadoDePartida;
   /** Cuándo. ISO, para que lo formatee el móvil con su idioma y su zona. */
   cuando?: string;
@@ -123,10 +123,10 @@ function motivoDe(estado: EstadoDePartida, verificado: boolean, ajena: boolean):
  */
 function resultadoDe(
   sesion: LiveSession,
-  suspectId: string,
+  participanteId: string,
 ): PartidaDelPanel['resultado'] | undefined {
   if (sesion.phase !== 'desenlace') return undefined;
-  const mia = sesion.acusaciones.find((a) => a.suspectId === suspectId);
+  const mia = sesion.acusaciones.find((a) => a.participanteId === participanteId);
 
   /*
    * SI EL JUEGO DEJÓ ESCRITO QUIÉN GANÓ, manda eso.
@@ -143,19 +143,19 @@ function resultadoDe(
   const ganadores = sesion.ganadores;
   if (ganadores && ganadores.length > 0) {
     const nombres = ganadores
-      .map((id) => sesion.players.find((p) => p.suspectId === id)?.displayName)
+      .map((id) => sesion.players.find((p) => p.participanteId === id)?.displayName)
       .filter((n): n is string => Boolean(n));
     return {
       ganador: nombres.length === 1 ? nombres[0] : `${nombres.length} de los que jugaron`,
-      gane: ganadores.includes(suspectId),
+      gane: ganadores.includes(participanteId),
       acerte: Boolean(mia?.correcta),
     };
   }
 
-  const ganador = sesion.players.find((p) => p.suspectId === sesion.winnerId);
+  const ganador = sesion.players.find((p) => p.participanteId === sesion.winnerId);
   return {
     ganador: ganador?.displayName,
-    gane: Boolean(sesion.winnerId) && sesion.winnerId === suspectId,
+    gane: Boolean(sesion.winnerId) && sesion.winnerId === participanteId,
     acerte: Boolean(mia?.correcta),
   };
 }
@@ -197,12 +197,12 @@ export async function panelDe(cuenta: Account): Promise<PartidaDelPanel[]> {
         gameId: sesion.id,
         titulo: resumen.name,
         personaje: jugador.displayName,
-        suspectId: jugador.suspectId,
+        participanteId: jugador.participanteId,
         estado,
         cuando: sesion.startedAt ?? resumen.updatedAt,
         puedeEntrar,
         motivo: puedeEntrar ? undefined : motivoDe(estado, Boolean(verificado), ajena),
-        resultado: resultadoDe(sesion, jugador.suspectId),
+        resultado: resultadoDe(sesion, jugador.participanteId),
       });
     }
   }
@@ -220,7 +220,7 @@ export async function panelDe(cuenta: Account): Promise<PartidaDelPanel[]> {
       gameId: p.gameId,
       titulo: p.titulo,
       personaje: p.personaje,
-      suspectId: '',
+      participanteId: '',
       estado: 'retirada',
       cuando: p.jugadaEl,
       puedeEntrar: false,

@@ -149,17 +149,17 @@ export function instalar(api) {
   api.registrarJuego(FAROLA);
 
   api.registrarAcciones('la-farola', {
-    aguantar: ({ sesion, suspectId, numeros }) => {
+    aguantar: ({ sesion, participanteId, numeros }) => {
       const estado = (sesion.estado ??= {});
       const mio = (estado.farola ??= {});
-      mio[suspectId] = (mio[suspectId] ?? 0) + (numeros.minutos ?? 0);
-      return { aguantados: mio[suspectId] };
+      mio[participanteId] = (mio[participanteId] ?? 0) + (numeros.minutos ?? 0);
+      return { aguantados: mio[participanteId] };
     },
   });
 
-  api.registrarProyeccion('la-farola', (game, sesion, suspectId) => ({
+  api.registrarProyeccion('la-farola', (game, sesion, participanteId) => ({
     // Solo lo tuyo: lo que aguantan los demas no se enseña.
-    aguantado: sesion.estado?.farola?.[suspectId] ?? 0,
+    aguantado: sesion.estado?.farola?.[participanteId] ?? 0,
     cuantosSiguen: api.entidadesDe(game, 'trasnochadores').length,
   }));
 
@@ -256,9 +256,9 @@ const sembrada = {
     setting: 'La acera, debajo de la farola.',
     solution: { respuestas: {} },
     characters: [
-      { suspectId: 't0', characterName: 'Ana', role: 'Trasnochadora', publicPersona: '', knowledge: [] },
-      { suspectId: 't1', characterName: 'Bruno', role: 'Trasnochador', publicPersona: '', knowledge: [] },
-      { suspectId: 't2', characterName: 'Carla', role: 'Trasnochadora', publicPersona: '', knowledge: [] },
+      { participanteId: 't0', characterName: 'Ana', role: 'Trasnochadora', publicPersona: '', knowledge: [] },
+      { participanteId: 't1', characterName: 'Bruno', role: 'Trasnochador', publicPersona: '', knowledge: [] },
+      { participanteId: 't2', characterName: 'Carla', role: 'Trasnochadora', publicPersona: '', knowledge: [] },
     ],
     timeline: [],
     clues: [],

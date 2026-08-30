@@ -86,7 +86,7 @@ function partidaDeReferencia(): GameSession {
     })),
     twists: personasDe(game).slice(0, 4).map((s, i) => ({
       id: `giro-${i}`,
-      suspectId: s.id,
+      participanteId: s.id,
       round: (i % 2) + 2,
       instruction: `Giro personal ${i + 1}: recuerdas algo que no habías contado.`,
     })),
@@ -112,7 +112,7 @@ function sesionInicial(game: GameSession): LiveSession {
     round: 0,
     totalRounds: 4,
     players: personasDe(game).map((s, i) => ({
-      suspectId: s.id,
+      participanteId: s.id,
       displayName: s.name,
       joinCode: `CODIG${i}`,
       joined: true,
@@ -154,7 +154,7 @@ function velada({ game, sesion, retratar }: Mesa): void {
     // Los giros de esta ronda se entregan a sus destinatarios.
     for (const t of game.plot?.material?.twists ?? []) {
       if (t.round !== ronda) continue;
-      const j = sesion.players.find((p) => p.suspectId === t.suspectId);
+      const j = sesion.players.find((p) => p.participanteId === t.participanteId);
       if (j && !j.girosRecibidos.includes(t.id)) j.girosRecibidos.push(t.id);
     }
 

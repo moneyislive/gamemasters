@@ -18,7 +18,7 @@ import { documentUrl } from '../../api/client';
 
 interface Props {
   gameId: string;
-  suspectId: string;
+  participanteId: string;
   /** `null` mientras no se sabe; evita parpadeos al abrir el menú. */
   capacidades: DocumentCapabilities | null;
   /** Estilo del botón que abre el menú. */
@@ -36,7 +36,7 @@ interface Props {
 
 export default function DownloadMenu({
   gameId,
-  suspectId,
+  participanteId,
   capacidades,
   compacto = true,
   etiqueta = 'Descargar',
@@ -106,7 +106,7 @@ export default function DownloadMenu({
                   href={
                     construirUrl
                       ? construirUrl(formato.variant, formato.format)
-                      : documentUrl(gameId, suspectId, {
+                      : documentUrl(gameId, participanteId, {
                           variant: formato.variant,
                           format: formato.format,
                           download: true,
@@ -125,7 +125,7 @@ export default function DownloadMenu({
               <a
                 className="docs-descarga-item docs-descarga-item--imprimir"
                 role="menuitem"
-                href={documentUrl(gameId, suspectId, { print: 'auto' })}
+                href={documentUrl(gameId, participanteId, { print: 'auto' })}
                 target="_blank"
                 rel="noreferrer"
                 onClick={() => setAbierto(false)}

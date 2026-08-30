@@ -362,7 +362,7 @@ comprobar('hay una narración por vigilia, más la apertura',
   const sesionFalsa = {
     id: 'tarde',
     players: entidadesDe(partidaEnJuego, 'expedicionarios').map((e) => ({
-      suspectId: e.id,
+      participanteId: e.id,
       displayName: e.name,
       joinCode: 'AAAAAA',
       joined: true,
@@ -566,7 +566,7 @@ const AVERIAS: Averia[] = [
   {
     nombre: 'se deja a una persona sin dosier',
     romper: (r) => {
-      r.expedicionarios = r.expedicionarios.filter((e) => e.suspectId !== 'e3');
+      r.expedicionarios = r.expedicionarios.filter((e) => e.participanteId !== 'e3');
       return 'dosier de Carla';
     },
     espera: /no escribió su papel/,
@@ -1034,7 +1034,7 @@ seccion('La segunda tirada: cuándo se pide y cuándo no');
   // EL CASO REAL: el modelo escribe los seis dosieres pero se inventa los ids,
   // así que no casa ninguno y salen seis dosieres mínimos sin un solo error.
   const idsInventados = copiar(buena);
-  for (const [i, p] of idsInventados.expedicionarios.entries()) p.suspectId = `persona-${i + 1}`;
+  for (const [i, p] of idsInventados.expedicionarios.entries()) p.participanteId = `persona-${i + 1}`;
   comprobar('con los ids inventados, se pide otra',
     loQueFalta(idsInventados, entidades, cimientos).some((f) => f.includes('dosieres')));
 

@@ -92,12 +92,12 @@ export async function cerrarPartidaEnCuentas(
     if (!cuenta) continue;
     if (cuenta.partidas.some((p) => p.gameId === game.id)) continue;
 
-    const personaje = plot.characters.find((c) => c.suspectId === jugador.suspectId);
-    const suya = sesion.acusaciones.find((a) => a.suspectId === jugador.suspectId);
+    const personaje = plot.characters.find((c) => c.participanteId === jugador.participanteId);
+    const suya = sesion.acusaciones.find((a) => a.participanteId === jugador.participanteId);
     /*
      * QUIEN ERA EL SENALADO, preguntado al manifiesto y no a CLUEDO.
      *
-     * Antes: `culpableDe(plot.solution) === jugador.suspectId`, y `culpableDe`
+     * Antes: `culpableDe(plot.solution) === jugador.participanteId`, y `culpableDe`
      * lee la clave `culpable` de la solucion. En un juego cuyo eje se llame
      * `saqueador` esa clave no existe, asi que `eraCulpable` era SIEMPRE falso
      * y el trofeo de quien se sale con la suya no se concedia nunca — sin dar
@@ -107,7 +107,7 @@ export async function cerrarPartidaEnCuentas(
      * girado. Para CLUEDO devuelve exactamente lo mismo.
      */
     const manifiesto = manifiestoDe(sesion.juego ?? game.settings?.juego);
-    const eraCulpable = esElSenalado(manifiesto, plot.solution.respuestas, jugador.suspectId);
+    const eraCulpable = esElSenalado(manifiesto, plot.solution.respuestas, jugador.participanteId);
     /*
      * ¿GANÓ? SE LE PREGUNTA AL JUEGO.
      *
@@ -126,7 +126,7 @@ export async function cerrarPartidaEnCuentas(
      * registra ninguno, así que su historial sale idéntico.
      */
     const ganadores = ganadoresDe(game, sesion);
-    const gano = ganadores ? ganadores.includes(jugador.suspectId) : sesion.winnerId === jugador.suspectId;
+    const gano = ganadores ? ganadores.includes(jugador.participanteId) : sesion.winnerId === jugador.participanteId;
 
     const partida: PartidaJugada = {
       gameId: game.id,

@@ -23,7 +23,7 @@ export function hojaSolucion(
   const publicos = new Set(cronologiaPublica(plot));
   const nombreDe = (id: string): string => sospechososDe(game).find((s) => s.id === id)?.name ?? id;
   const personajeDe = (id: string): string =>
-    plot.characters.find((c) => c.suspectId === id)?.characterName ?? nombreDe(id);
+    plot.characters.find((c) => c.participanteId === id)?.characterName ?? nombreDe(id);
 
   const asesino = nombreDe(culpableDe(plot.solution));
   const arma = objetosDe(game).find((w) => w.id === objetoDe(plot.solution))?.name ?? '';
@@ -41,7 +41,7 @@ export function hojaSolucion(
   const secretos = plot.characters
     .map(
       (p) =>
-        `        <tr><td style="width:38mm;"><strong>${esc(nombreDe(p.suspectId))}</strong><br /><span style="font-size:10.5pt; color:#6b5638;">${esc(p.characterName)}</span></td><td>${esc(p.secret)}<br /><em style="color:#6b5638;">Coartada: ${esc(p.alibi)}</em></td></tr>`,
+        `        <tr><td style="width:38mm;"><strong>${esc(nombreDe(p.participanteId))}</strong><br /><span style="font-size:10.5pt; color:#6b5638;">${esc(p.characterName)}</span></td><td>${esc(p.secret)}<br /><em style="color:#6b5638;">Coartada: ${esc(p.alibi)}</em></td></tr>`,
     )
     .join('\n');
 

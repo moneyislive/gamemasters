@@ -35,8 +35,8 @@ function seccion(titulo: string): void {
   console.log(`\n· ${titulo}`);
 }
 
-function jugador(suspectId: string, lastSeenAt?: string): LivePlayer {
-  return { suspectId, displayName: suspectId, joinCode: 'AAAAAA', joined: true, lastSeenAt } as unknown as LivePlayer;
+function jugador(participanteId: string, lastSeenAt?: string): LivePlayer {
+  return { participanteId, displayName: participanteId, joinCode: 'AAAAAA', joined: true, lastSeenAt } as unknown as LivePlayer;
 }
 
 const haceUnRato = (ms: number): string => new Date(Date.now() - ms).toISOString();

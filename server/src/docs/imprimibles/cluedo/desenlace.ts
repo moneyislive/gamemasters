@@ -13,7 +13,7 @@ export function desenlace(
   opciones: DocumentRenderOptions,
 ): string {
   const asesino = sospechososDe(game).find((s) => s.id === culpableDe(plot.solution));
-  const personaje = plot.characters.find((c) => c.suspectId === culpableDe(plot.solution));
+  const personaje = plot.characters.find((c) => c.participanteId === culpableDe(plot.solution));
   const arma = objetosDe(game).find((w) => w.id === objetoDe(plot.solution));
   const sala = salasDe(game).find((r) => r.id === lugarDe(plot.solution));
   const finale = plot.material?.finale;

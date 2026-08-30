@@ -426,7 +426,7 @@ async function peticion<T>(
 export interface RespuestaEntrar {
   token: string;
   gameId: string;
-  suspectId: string;
+  participanteId: string;
   displayName: string;
 }
 
@@ -620,7 +620,7 @@ export interface InvitacionVista {
   gameId: string;
   titulo: string;
   personaje: string;
-  suspectId: string;
+  participanteId: string;
   fase: string;
   paraEl: string;
   directa: boolean;
@@ -722,7 +722,7 @@ export interface PartidaDelPanel {
   gameId: string;
   titulo: string;
   personaje: string;
-  suspectId: string;
+  participanteId: string;
   estado: 'espera' | 'en-curso' | 'pausada' | 'terminada' | 'retirada';
   cuando?: string;
   puedeEntrar: boolean;
@@ -747,14 +747,14 @@ export const entrarEnPartida = entrarDesdeInvitacion;
 
 export function entrarDesdeInvitacion(
   gameId: string,
-  suspectId: string,
+  participanteId: string,
 ): Promise<
   | { requiereCodigo: true; motivo: string }
-  | { requiereCodigo: false; token: string; gameId: string; suspectId: string; displayName: string }
+  | { requiereCodigo: false; token: string; gameId: string; participanteId: string; displayName: string }
 > {
   return peticion('/cuenta/entrar-en-partida', {
     method: 'POST',
-    body: JSON.stringify({ gameId, suspectId }),
+    body: JSON.stringify({ gameId, participanteId }),
   });
 }
 

@@ -86,7 +86,7 @@ const sesionDe = (id: string, sospechosos: Array<{ id: string; name: string; ema
   round: 0,
   totalRounds: 3,
   players: sospechosos.map((s, i) => ({
-    suspectId: s.id,
+    participanteId: s.id,
     displayName: s.name,
     email: s.email,
     joinCode: `CODIG${i}`,

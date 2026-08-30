@@ -116,13 +116,13 @@ export function computeStaleness(game: GameSession): StalenessReport {
    */
   const nombrePorId = new Map(personasDe(game).map((s) => [s.id, s.name]));
 
-  const conPersonaje = new Set(plot.characters.map((c) => c.suspectId));
+  const conPersonaje = new Set(plot.characters.map((c) => c.participanteId));
   const suspectsWithoutCharacter = personasDe(game)
     .filter((s) => !conPersonaje.has(s.id))
     .map((s) => s.id);
   const orphanCharacters = plot.characters
-    .filter((c) => !idsSospechosos.has(c.suspectId))
-    .map((c) => c.suspectId);
+    .filter((c) => !idsSospechosos.has(c.participanteId))
+    .map((c) => c.participanteId);
 
   // Los dosieres del Game Master ('gm') y del sobre sellado ('solution') no
   // corresponden a ningún sospechoso.
@@ -165,7 +165,7 @@ export function computeStaleness(game: GameSession): StalenessReport {
   ).length;
 
   const brokenTimelineEvents = plot.timeline.filter((evento) =>
-    evento.suspectIds.some((id) => !idsSospechosos.has(id)),
+    evento.participanteIds.some((id) => !idsSospechosos.has(id)),
   ).length;
 
   // El tablero solo puede quedar obsoleto en el modo de rejilla generada.

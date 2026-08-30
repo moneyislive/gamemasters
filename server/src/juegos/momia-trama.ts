@@ -360,7 +360,7 @@ function construirExpedicion(
         `te costará caro.`;
 
     return {
-      suspectId: persona.id,
+      participanteId: persona.id,
       characterName: persona.name,
       role: ficha.rol,
       publicPersona: `${persona.name}, ${ficha.rol.toLowerCase()} de la expedición.`,
@@ -407,20 +407,20 @@ function construirCronologia(): TimelineEvent[] {
     {
       time: '04:10',
       description: 'El lacre de la cámara sellada aparece partido. Nadie dice haber oído nada.',
-      suspectIds: [],
+      participanteIds: [],
       isPublic: true,
     },
     {
       time: '06:00',
       description: 'Se saca la primera reliquia. El aire dentro de la tumba ya está enrarecido.',
-      suspectIds: [],
+      participanteIds: [],
       isPublic: true,
     },
     {
       time: '21:00',
       description:
         'Cae la noche y las lámparas empiezan a apagarse solas. Se organiza la primera vigilia.',
-      suspectIds: [],
+      participanteIds: [],
       isPublic: true,
     },
   ];
@@ -480,7 +480,7 @@ export function tramaDe(plot: Plot | undefined): TramaMomia | undefined {
  */
 export function estadoInicial(
   trama: TramaMomia,
-  suspectIds: string[],
+  participanteIds: string[],
   /*
    * EL REPARTO YA RESUELTO, incluida la gente que llegó tarde.
    *
@@ -503,7 +503,7 @@ export function estadoInicial(
   dones: Record<string, DonId> = trama.dones,
 ): EstadoMomia {
   const gente: EstadoMomia['gente'] = {};
-  for (const id of suspectIds) {
+  for (const id of participanteIds) {
     gente[id] = {
       marcas: 0,
       amuletos: AMULETOS_INICIALES,
@@ -599,7 +599,7 @@ export function ampliarExpedicion(game: GameSession, plot: Plot): { anadidos: st
   if (!trama) return { anadidos: [] };
 
   const expedicionarios = entidadesDe(game, 'expedicionarios');
-  const yaEscritos = new Set(plot.characters.map((c) => c.suspectId));
+  const yaEscritos = new Set(plot.characters.map((c) => c.participanteId));
   const anadidos: string[] = [];
 
   // El reparto lo decide `donesAlDia`, que es la MISMA función que consulta el
@@ -618,7 +618,7 @@ export function ampliarExpedicion(game: GameSession, plot: Plot): { anadidos: st
     const don = trama.dones[persona.id];
     const ficha = DONES_REPARTIBLES.find((d) => d.don === don) ?? DONES_REPARTIBLES[0]!;
     plot.characters.push({
-      suspectId: persona.id,
+      participanteId: persona.id,
       characterName: persona.name,
       role: ficha.rol,
       publicPersona: 'Se incorporó a la expedición con el trabajo ya empezado.',

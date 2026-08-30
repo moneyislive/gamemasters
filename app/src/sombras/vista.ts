@@ -59,7 +59,7 @@ export interface PasoVisible {
 
 /** Lo que se sabe de otra persona: solo lo que en la mesa se ve. */
 export interface GenteVisible {
-  suspectId: string;
+  participanteId: string;
   prendas: number;
   prendasRecibidas: number;
   /** Que ha propuesto es público; QUÉ ha propuesto, no. */
@@ -363,10 +363,10 @@ export function leerEstadoSombras(v: unknown): EstadoSombrasVisible | null {
     }),
     mesa: leerLista(v.mesa, (x) => {
       if (!esObjeto(x)) return null;
-      const suspectId = cadena(x.suspectId);
-      if (!suspectId) return null;
+      const participanteId = cadena(x.participanteId);
+      if (!participanteId) return null;
       return {
-        suspectId,
+        participanteId,
         prendas: entero(x.prendas),
         prendasRecibidas: entero(x.prendasRecibidas),
         haPropuesto: x.haPropuesto === true,

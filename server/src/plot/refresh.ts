@@ -192,7 +192,7 @@ function repararIdsSolucion(plot: Plot, game: GameSession): void {
   repararRespuestas(plot, game, (categoria, candidatas) => {
     const cat = manifiesto.categorias.find((c) => c.id === categoria);
     if (!cat?.sonJugadores) return undefined;
-    return candidatas.find((e) => plot.characters.some((p) => p.suspectId === e.id));
+    return candidatas.find((e) => plot.characters.some((p) => p.participanteId === e.id));
   });
 }
 
@@ -212,13 +212,13 @@ function podarTrama(plot: Plot, game: GameSession): void {
 
   // Se calculan ANTES de podar: después ya no sabríamos a quién citaba la cronología.
   const nombresBorrados = plot.characters
-    .filter((personaje) => !idsSospechosos.has(personaje.suspectId))
+    .filter((personaje) => !idsSospechosos.has(personaje.participanteId))
     .flatMap((personaje) => nombresCitables(personaje.characterName))
     .map((nombre) => nombre.toLowerCase());
 
   // Personajes de jugadores que ya no participan.
   plot.characters = plot.characters.filter((personaje) =>
-    idsSospechosos.has(personaje.suspectId),
+    idsSospechosos.has(personaje.participanteId),
   );
 
   // Pistas escondidas en salas que ya no existen (las que no citan sala se conservan).
@@ -230,11 +230,11 @@ function podarTrama(plot: Plot, game: GameSession): void {
   // queda sin nadie Y además su descripción hablaba de alguien que ya no juega.
   const cronologia: TimelineEvent[] = [];
   for (const evento of plot.timeline) {
-    const vivos = evento.suspectIds.filter((id) => idsSospechosos.has(id));
+    const vivos = evento.participanteIds.filter((id) => idsSospechosos.has(id));
     if (vivos.length === 0 && citaANombreBorrado(evento.description, nombresBorrados)) {
       continue;
     }
-    cronologia.push({ ...evento, suspectIds: vivos });
+    cronologia.push({ ...evento, participanteIds: vivos });
   }
   plot.timeline = cronologia;
 
@@ -250,7 +250,7 @@ function podarTrama(plot: Plot, game: GameSession): void {
    * `respuestas['saqueador']`, así que devolvía cadena vacía y la comparación no
    * excluía a nadie.
    *
-   * Hoy eso no rompía nada visible —no hay `suspectId` vacío, así que el filtro
+   * Hoy eso no rompía nada visible —no hay `participanteId` vacío, así que el filtro
    * simplemente no filtraba— y por eso llevaba aquí sin que saltara ninguna
    * alarma. Pero la protección que esta línea existe para dar, la de que un giro
    * no delate a quien resulta ser, NO ESTABA OCURRIENDO en dos de los tres
@@ -261,8 +261,8 @@ function podarTrama(plot: Plot, game: GameSession): void {
     const manifiesto = manifiestoSiExiste(game.settings?.juego);
     plot.material.twists = plot.material.twists.filter(
       (giro) =>
-        idsSospechosos.has(giro.suspectId) &&
-        !(manifiesto && esElSenalado(manifiesto, plot.solution.respuestas, giro.suspectId)),
+        idsSospechosos.has(giro.participanteId) &&
+        !(manifiesto && esElSenalado(manifiesto, plot.solution.respuestas, giro.participanteId)),
     );
   }
 }

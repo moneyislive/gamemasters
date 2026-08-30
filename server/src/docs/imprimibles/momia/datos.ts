@@ -224,7 +224,7 @@ export interface VistaMomia {
   /** Quién rompió el sello, si la trama lo dice. */
   saqueador?: { entidad?: Entidad; personaje?: string };
   /** El don de cada expedicionario, con su texto de papel. */
-  donDe: (suspectId: string) => DonEscrito | undefined;
+  donDe: (participanteId: string) => DonEscrito | undefined;
   nombreDeRito: (id: string) => string;
   nombreDeCamara: (id: string) => string;
   informe?: InformeDelPapiro;
@@ -267,11 +267,11 @@ export function vistaDeLaMomia(game: GameSession, plot: Plot): VistaMomia {
     saqueador: saqueadorId
       ? {
           entidad: buscar(expedicionarios, saqueadorId),
-          personaje: plot.characters.find((c) => c.suspectId === saqueadorId)?.characterName,
+          personaje: plot.characters.find((c) => c.participanteId === saqueadorId)?.characterName,
         }
       : undefined,
-    donDe: (suspectId: string) => {
-      const don = trama?.dones[suspectId];
+    donDe: (participanteId: string) => {
+      const don = trama?.dones[participanteId];
       return don ? DONES[don] : undefined;
     },
     nombreDeRito: (id: string) => buscar(ritos, id)?.name ?? id,

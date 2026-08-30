@@ -95,8 +95,8 @@ export default function PanelDeLasSombras({
 
   const nombreDe = (categoria: string, id: string): string =>
     entidadDe(game as GameSession, categoria, id)?.name ?? '—';
-  const nombreJugador = (suspectId: string): string =>
-    sesion.players.find((p) => p.suspectId === suspectId)?.displayName ?? '—';
+  const nombreJugador = (participanteId: string): string =>
+    sesion.players.find((p) => p.participanteId === participanteId)?.displayName ?? '—';
 
   /** ¿Se puede pasar de la fase actual a esta otra? Lo dice el manifiesto. */
   const puedeIrA = (fase: LivePhase): boolean =>
@@ -153,17 +153,17 @@ export default function PanelDeLasSombras({
    * echar a andar, pero sin la senda dentro—.
    */
   const recuento = new Map<string, { senda: string[]; apoyos: string[]; peso: number }>();
-  for (const [suspectId, propuesta] of reservadas ? [] : propuestas) {
+  for (const [participanteId, propuesta] of reservadas ? [] : propuestas) {
     const senda = propuesta.senda ?? [];
     if (senda.length === 0) continue;
     const clave = senda.join('>');
-    const peso = 1 + (gente[suspectId]?.prendasRecibidas ?? 0);
+    const peso = 1 + (gente[participanteId]?.prendasRecibidas ?? 0);
     const previo = recuento.get(clave);
     if (previo) {
-      previo.apoyos.push(suspectId);
+      previo.apoyos.push(participanteId);
       previo.peso += peso;
     } else {
-      recuento.set(clave, { senda, apoyos: [suspectId], peso });
+      recuento.set(clave, { senda, apoyos: [participanteId], peso });
     }
   }
   const masPesada = [...recuento.values()].sort((a, b) => b.peso - a.peso)[0];
@@ -262,7 +262,7 @@ export default function PanelDeLasSombras({
           </thead>
           <tbody>
             {sesion.players.map((p) => {
-              const suyo = gente[p.suspectId];
+              const suyo = gente[p.participanteId];
               const usado = suyo?.papelUsadoEnRonda === sesion.round;
               const recibidas = suyo?.prendasRecibidas ?? 0;
               const carga = (suyo?.enseres ?? []).map((id) => {
@@ -270,12 +270,12 @@ export default function PanelDeLasSombras({
                 return porte ? PORTES[porte] ?? nombreDe('enseres', id) : nombreDe('enseres', id);
               });
               return (
-                <tr key={p.suspectId} className={recibidas >= PRENDAS_RECIBIDAS_MAXIMO ? 'is-al-borde' : undefined}>
+                <tr key={p.participanteId} className={recibidas >= PRENDAS_RECIBIDAS_MAXIMO ? 'is-al-borde' : undefined}>
                   <td>
                     {p.displayName}
-                    {estado.estandartes?.[p.suspectId] && (
+                    {estado.estandartes?.[p.participanteId] && (
                       <span className="live-reclamada text-dim">
-                        {nombreDe('estandartes', estado.estandartes[p.suspectId]!)}
+                        {nombreDe('estandartes', estado.estandartes[p.participanteId]!)}
                       </span>
                     )}
                   </td>
@@ -323,9 +323,9 @@ export default function PanelDeLasSombras({
             </thead>
             <tbody>
               {sesion.players.map((p) => (
-                <tr key={p.suspectId}>
+                <tr key={p.participanteId}>
                   <td>{p.displayName}</td>
-                  <td>{gente[p.suspectId]?.hitos?.length ?? 0}</td>
+                  <td>{gente[p.participanteId]?.hitos?.length ?? 0}</td>
                 </tr>
               ))}
             </tbody>

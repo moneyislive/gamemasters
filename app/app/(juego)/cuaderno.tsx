@@ -223,7 +223,7 @@ export default function Cuaderno(): JSX.Element {
         >
           <Marco>
             {vista.jugadores.map((j, i) => (
-              <View key={j.suspectId} style={i === 0 ? estilos.filaPrimera : estilos.fila}>
+              <View key={j.participanteId} style={i === 0 ? estilos.filaPrimera : estilos.fila}>
                 <View
                   style={[
                     estilos.punto,

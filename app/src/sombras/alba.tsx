@@ -67,13 +67,13 @@ export function Alba(): JSX.Element {
   }
 
   const d = s.desenlace;
-  const yoGano = d.ganadores.includes(vista.yo.suspectId);
-  const eresElKancho = d.kanchoId === vista.yo.suspectId;
+  const yoGano = d.ganadores.includes(vista.yo.participanteId);
+  const eresElKancho = d.kanchoId === vista.yo.participanteId;
   const nombreDe = (id: string) =>
-    id === vista.yo.suspectId
+    id === vista.yo.participanteId
       ? vista.yo.displayName
-      : (vista.jugadores.find((j) => j.suspectId === id)?.displayName ?? 'alguien');
-  const misTrofeos = d.trofeos[vista.yo.suspectId] ?? [];
+      : (vista.jugadores.find((j) => j.participanteId === id)?.displayName ?? 'alguien');
+  const misTrofeos = d.trofeos[vista.yo.participanteId] ?? [];
 
   const titular = d.interceptada
     ? 'Os alcanzaron antes de llegar'

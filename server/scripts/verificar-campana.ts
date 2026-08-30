@@ -99,10 +99,10 @@ registrarJuego(LA_TORRE);
 
 /** Entrenar sube un nivel. Es el estado que tiene que sobrevivir a la semana. */
 registrarAcciones('la-torre', {
-  entrenar: ({ sesion, suspectId }) => {
+  entrenar: ({ sesion, participanteId }) => {
     const niveles = (sesion.estado?.niveles ?? {}) as Record<string, number>;
-    const nivel = (niveles[suspectId] ?? 1) + 1;
-    sesion.estado = { ...(sesion.estado ?? {}), niveles: { ...niveles, [suspectId]: nivel } };
+    const nivel = (niveles[participanteId] ?? 1) + 1;
+    sesion.estado = { ...(sesion.estado ?? {}), niveles: { ...niveles, [participanteId]: nivel } };
     return { nivel };
   },
 });
@@ -146,8 +146,8 @@ const plot: Plot = {
   setting: 'La frontera del norte.',
   solution: { respuestas: {}, motive: '', howItHappened: '' },
   characters: [
-    { suspectId: 'a', characterName: 'Íñigo', role: 'Explorador', publicPersona: '', secret: '', motive: '', alibi: '', knowledge: [], personalHook: '' },
-    { suspectId: 'b', characterName: 'Berta', role: 'Cantera', publicPersona: '', secret: '', motive: '', alibi: '', knowledge: [], personalHook: '' },
+    { participanteId: 'a', characterName: 'Íñigo', role: 'Explorador', publicPersona: '', secret: '', motive: '', alibi: '', knowledge: [], personalHook: '' },
+    { participanteId: 'b', characterName: 'Berta', role: 'Cantera', publicPersona: '', secret: '', motive: '', alibi: '', knowledge: [], personalHook: '' },
   ],
   timeline: [],
   clues: [
@@ -165,8 +165,8 @@ const sesion: LiveSession = {
   round: 0,
   totalRounds: 99,
   players: [
-    { suspectId: 'a', displayName: 'Íñigo', joinCode: 'TOR001', joined: true, elecciones: [], notas: '', girosRecibidos: [] },
-    { suspectId: 'b', displayName: 'Berta', joinCode: 'TOR002', joined: true, elecciones: [], notas: '', girosRecibidos: [] },
+    { participanteId: 'a', displayName: 'Íñigo', joinCode: 'TOR001', joined: true, elecciones: [], notas: '', girosRecibidos: [] },
+    { participanteId: 'b', displayName: 'Berta', joinCode: 'TOR002', joined: true, elecciones: [], notas: '', girosRecibidos: [] },
   ],
   acusaciones: [],
   tablon: [],

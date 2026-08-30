@@ -178,7 +178,7 @@ const plot: Plot = {
     howItHappened: 'La sacó de la vitrina mientras los demás discutían en el fumadero.',
   },
   characters: HEREDEROS.map((name, i) => ({
-    suspectId: `h${i}`,
+    participanteId: `h${i}`,
     characterName: `${name} Ardavín`,
     role: 'Heredero',
     publicPersona: `${name} llegó con prisa y sin abrigo.`,
@@ -198,10 +198,10 @@ const plot: Plot = {
    * llegarle al inocente.
    */
   timeline: [
-    { time: '21:30', description: 'Se sirve la cena.', suspectIds: [], isPublic: true },
-    { time: '21:50', description: 'Amelia y Bernardo discuten en la escalinata.', suspectIds: ['h0', 'h1'], isPublic: false },
-    { time: '22:05', description: 'Casilda se acerca a la vitrina mientras Amelia mira.', suspectIds: ['h0', 'h2'], isPublic: false },
-    { time: '22:10', description: 'Alguien apaga la luz de la galería.', suspectIds: ['h2'], isPublic: false },
+    { time: '21:30', description: 'Se sirve la cena.', participanteIds: [], isPublic: true },
+    { time: '21:50', description: 'Amelia y Bernardo discuten en la escalinata.', participanteIds: ['h0', 'h1'], isPublic: false },
+    { time: '22:05', description: 'Casilda se acerca a la vitrina mientras Amelia mira.', participanteIds: ['h0', 'h2'], isPublic: false },
+    { time: '22:10', description: 'Alguien apaga la luz de la galería.', participanteIds: ['h2'], isPublic: false },
   ],
   clues: [
     { id: 'c1', roomId: 'e0', description: 'La vitrina está sin cerrar.', pointsTo: 'Alguien la abrió sin forzarla.', round: 1 },
@@ -220,7 +220,7 @@ const sesion: LiveSession = {
   round: 0,
   totalRounds: 2,
   players: HEREDEROS.map((name, i) => ({
-    suspectId: `h${i}`,
+    participanteId: `h${i}`,
     displayName: name,
     joinCode: `LEG00${i}`,
     joined: true,
@@ -357,11 +357,11 @@ acusar(sesion, 'h1', { ladron: 'h2', pieza: 'p1' }, plot.solution.respuestas);
 comprobar('la equivocada no gana', sesion.winnerId === 'h1', sesion.winnerId);
 comprobar(
   'la acertada se marca correcta',
-  sesion.acusaciones.find((a) => a.suspectId === 'h1')?.correcta === true,
+  sesion.acusaciones.find((a) => a.participanteId === 'h1')?.correcta === true,
 );
 comprobar(
   'y la fallida, no',
-  sesion.acusaciones.find((a) => a.suspectId === 'h0')?.correcta === false,
+  sesion.acusaciones.find((a) => a.participanteId === 'h0')?.correcta === false,
 );
 
 // La culpable acierta —se sabe la respuesta— pero no puede ganar.
@@ -385,11 +385,11 @@ comprobar(
 );
 comprobar('y con sus rótulos', v.desenlace?.respuestas.map((r) => r.rotulo).join('/') === 'Quién/Qué');
 comprobar('se sabe quién fue', v.desenlace?.culpableId === 'h2');
-comprobar('gana quien acertó', v.desenlace?.ganador?.suspectId === 'h1');
+comprobar('gana quien acertó', v.desenlace?.ganador?.participanteId === 'h1');
 comprobar(
   'los aciertos se cuentan sobre DOS ejes',
-  v.desenlace?.clasificacion.find((c) => c.suspectId === 'h1')?.aciertos === 2 &&
-    v.desenlace?.clasificacion.find((c) => c.suspectId === 'h0')?.aciertos === 1,
+  v.desenlace?.clasificacion.find((c) => c.participanteId === 'h1')?.aciertos === 2 &&
+    v.desenlace?.clasificacion.find((c) => c.participanteId === 'h0')?.aciertos === 1,
   v.desenlace?.clasificacion,
 );
 

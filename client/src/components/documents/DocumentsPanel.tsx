@@ -24,7 +24,7 @@ import { startMaterial, startRefresh } from '../generate/GenerateOverlay';
 import './documents.css';
 
 interface Sobre {
-  suspectId: string;
+  participanteId: string;
   /** Nombre de la persona real (o "Game Master") */
   personName: string;
   /** Nombre del personaje dentro de la ficción */
@@ -203,13 +203,13 @@ export default function DocumentsPanel(): JSX.Element {
   /** ¿Alguno de estos NO se puede abrir delante de la mesa? */
   const hayReservados = imprimibles.some((d) => d.audience === 'preparer' || d.audience === 'gm');
 
-  const personajePorId = new Map((game.plot?.characters ?? []).map((c) => [c.suspectId, c]));
+  const personajePorId = new Map((game.plot?.characters ?? []).map((c) => [c.participanteId, c]));
   const idsConDocumento = new Set(documentos.map((doc) => doc.id));
   const idsSospechosos = new Set(personasDe(game).map((s) => s.id));
 
   // Un sobre por jugador actual: los que aún no tienen dosier también aparecen.
   const sobres: Sobre[] = personasDe(game).map((sospechoso) => ({
-    suspectId: sospechoso.id,
+    participanteId: sospechoso.id,
     personName: sospechoso.name,
     characterName: personajePorId.get(sospechoso.id)?.characterName,
     photoUrl: sospechoso.photoUrl,
@@ -225,7 +225,7 @@ export default function DocumentsPanel(): JSX.Element {
   for (const documento of documentos) {
     if (NO_JUGADORES.has(documento.id) || idsSospechosos.has(documento.id)) continue;
     sobres.push({
-      suspectId: documento.id,
+      participanteId: documento.id,
       personName: personajePorId.get(documento.id)?.characterName ?? documento.title,
       isGm: false,
       sinDosier: false,
@@ -235,7 +235,7 @@ export default function DocumentsPanel(): JSX.Element {
 
   if (idsConDocumento.has('gm')) {
     sobres.push({
-      suspectId: 'gm',
+      participanteId: 'gm',
       personName: game.settings.gmPlays ? 'Guía de la velada' : 'Game Master',
       isGm: true,
       sinDosier: false,
@@ -246,7 +246,7 @@ export default function DocumentsPanel(): JSX.Element {
   // Sobre sellado: solo existe cuando el Game Master juega a ciegas.
   if (idsConDocumento.has('solution')) {
     sobres.push({
-      suspectId: 'solution',
+      participanteId: 'solution',
       personName: 'El sobre del crimen',
       isGm: true,
       sinDosier: false,
@@ -287,7 +287,7 @@ export default function DocumentsPanel(): JSX.Element {
           {game.plot && (
             <DownloadMenu
               gameId={game.id}
-              suspectId="paquete"
+              participanteId="paquete"
               capacidades={capacidades}
               compacto={false}
               etiqueta="Descargar todo"
@@ -301,7 +301,7 @@ export default function DocumentsPanel(): JSX.Element {
       <div className="docs-grid">
         {sobres.map((sobre, indice) => (
           <motion.article
-            key={sobre.suspectId}
+            key={sobre.participanteId}
             className={[
               'deco-frame',
               'docs-card',
@@ -348,7 +348,7 @@ export default function DocumentsPanel(): JSX.Element {
               {sobre.isGm ? sobre.personName : (sobre.characterName ?? sobre.personName)}
             </h3>
             <p className="docs-card-sub">
-              {sobre.suspectId === 'solution'
+              {sobre.participanteId === 'solution'
                 ? 'No lo abras hasta el final'
                 : sobre.isGm
                   ? game.settings.gmPlays
@@ -380,7 +380,7 @@ export default function DocumentsPanel(): JSX.Element {
                 </button>
                 <DownloadMenu
                   gameId={game.id}
-                  suspectId={sobre.suspectId}
+                  participanteId={sobre.participanteId}
                   capacidades={capacidades}
                 />
               </div>
@@ -445,7 +445,7 @@ export default function DocumentsPanel(): JSX.Element {
                     className="btn btn--sm"
                     onClick={() =>
                       setAbierto({
-                        suspectId: doc.id,
+                        participanteId: doc.id,
                         personName: doc.name,
                         isGm: false,
                         sinDosier: false,
@@ -456,7 +456,7 @@ export default function DocumentsPanel(): JSX.Element {
                   >
                     Leer
                   </button>
-                  <DownloadMenu gameId={game.id} suspectId={doc.id} capacidades={capacidades} />
+                  <DownloadMenu gameId={game.id} participanteId={doc.id} capacidades={capacidades} />
                 </div>
               </motion.article>
             ))}
@@ -490,7 +490,7 @@ export default function DocumentsPanel(): JSX.Element {
                 <div className="docs-viewer-actions">
                   <DownloadMenu
                     gameId={game.id}
-                    suspectId={abierto.suspectId}
+                    participanteId={abierto.participanteId}
                     capacidades={capacidades}
                   />
                   <button className="btn btn--sm btn--ghost" onClick={() => setAbierto(null)}>
@@ -500,7 +500,7 @@ export default function DocumentsPanel(): JSX.Element {
               </header>
               <iframe
                 className="docs-viewer-frame"
-                src={documentUrl(game.id, abierto.suspectId)}
+                src={documentUrl(game.id, abierto.participanteId)}
                 title={`Dosier de ${abierto.personName}`}
               />
             </motion.div>

@@ -229,7 +229,7 @@ export interface TramaMomia {
   profanadas: string[];
   /** Dónde y cuándo aparece cada fragmento cierto. */
   hallazgos: Array<{ fragmentoId: string; camaraId: string; ronda: number }>;
-  /** El don de cada expedicionario, por su `suspectId`. */
+  /** El don de cada expedicionario, por su `participanteId`. */
   dones: Record<string, DonId>;
   /** La reliquia que el saqueador tiene vendida de antemano. */
   reliquiaCodiciada: string;

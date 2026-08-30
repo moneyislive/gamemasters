@@ -73,7 +73,7 @@ router.use(async (req: Request, res: Response, next: NextFunction) => {
 });
 
 /** Saca la credencial de la petición o corta con 401. */
-function credencial(req: Request, res: Response): { gameId: string; suspectId: string } | null {
+function credencial(req: Request, res: Response): { gameId: string; participanteId: string } | null {
   const cred = credencialDePeticion(req.headers.authorization);
   if (!cred) {
     res.status(401).json({ error: 'Vuelve a entrar con tu código: la sesión no es válida.' });
@@ -85,7 +85,7 @@ function credencial(req: Request, res: Response): { gameId: string; suspectId: s
 /** Compone la vista del jugador o corta con el error adecuado. */
 async function vistaActual(
   gameId: string,
-  suspectId: string,
+  participanteId: string,
   res: Response,
 ): Promise<VistaJugador | null> {
   const store = getStore();
@@ -94,7 +94,7 @@ async function vistaActual(
     res.status(404).json({ error: 'Esta partida ya no está en juego.' });
     return null;
   }
-  const vista = vistaDeJugador(game, sesion, suspectId);
+  const vista = vistaDeJugador(game, sesion, participanteId);
   if (!vista) {
     res.status(403).json({ error: 'Ya no participas en esta partida.' });
     return null;
@@ -132,7 +132,7 @@ router.post('/jugar/entrar', async (req, res) => {
   if (!jugador) return rechazar();
 
   await mutar(sesion.id, (s) => {
-    const j = s.players.find((p) => p.suspectId === jugador.suspectId);
+    const j = s.players.find((p) => p.participanteId === jugador.participanteId);
     if (j) {
       j.joined = true;
       j.lastSeenAt = new Date().toISOString();
@@ -140,9 +140,9 @@ router.post('/jugar/entrar', async (req, res) => {
   });
 
   res.json({
-    token: emitirCredencial(sesion.id, jugador.suspectId, sesion.sid),
+    token: emitirCredencial(sesion.id, jugador.participanteId, sesion.sid),
     gameId: sesion.id,
-    suspectId: jugador.suspectId,
+    participanteId: jugador.participanteId,
     displayName: jugador.displayName,
   });
 });
@@ -171,19 +171,19 @@ router.get('/jugar/vista', async (req, res) => {
       if (!huboCambio) {
         // Sin novedad: el cliente vuelve a preguntar. Se aprovecha para marcar
         // que sigue vivo, que es como se pinta «conectado» en el panel.
-        marcarPresencia(cred.gameId, cred.suspectId);
+        marcarPresencia(cred.gameId, cred.participanteId);
         res.status(204).end();
         return;
       }
     }
   }
 
-  marcarPresencia(cred.gameId, cred.suspectId);
-  const vista = await vistaActual(cred.gameId, cred.suspectId, res);
+  marcarPresencia(cred.gameId, cred.participanteId);
+  const vista = await vistaActual(cred.gameId, cred.participanteId, res);
   if (!vista) return;
   res.json({
     vista,
-    avisos: Number.isFinite(desde) ? avisosDesde(cred.gameId, desde, cred.suspectId) : [],
+    avisos: Number.isFinite(desde) ? avisosDesde(cred.gameId, desde, cred.participanteId) : [],
   });
 });
 
@@ -251,9 +251,9 @@ router.post('/jugar/accion', async (req, res) => {
       return;
     }
     const { resultado } = await mutar(cred.gameId, (s) =>
-      ejecutarAccion(game, s, cred.suspectId, accion, datos),
+      ejecutarAccion(game, s, cred.participanteId, accion, datos),
     );
-    const vista = await vistaActual(cred.gameId, cred.suspectId, res);
+    const vista = await vistaActual(cred.gameId, cred.participanteId, res);
     if (!vista) return;
     res.json({ resultado, vista });
   } catch (error) {
@@ -294,9 +294,9 @@ router.post('/jugar/sala', async (req, res) => {
       return;
     }
     await mutar(cred.gameId, (s) =>
-      ejecutarAccion(game, s, cred.suspectId, entrar.accion.id, { [entrar.campo]: roomId }),
+      ejecutarAccion(game, s, cred.participanteId, entrar.accion.id, { [entrar.campo]: roomId }),
     );
-    const vista = await vistaActual(cred.gameId, cred.suspectId, res);
+    const vista = await vistaActual(cred.gameId, cred.participanteId, res);
     if (!vista) return;
     res.json({ vista });
   } catch (error) {
@@ -310,11 +310,11 @@ router.post('/jugar/listo', async (req, res) => {
   const listo = req.body?.listo !== false;
   try {
     await mutar(cred.gameId, (s) => {
-      const jugador = s.players.find((p) => p.suspectId === cred.suspectId);
+      const jugador = s.players.find((p) => p.participanteId === cred.participanteId);
       if (!jugador) throw new Error('No participas en esta partida.');
       jugador.pideEmpezar = listo;
     });
-    const vista = await vistaActual(cred.gameId, cred.suspectId, res);
+    const vista = await vistaActual(cred.gameId, cred.participanteId, res);
     if (vista) res.json({ vista });
   } catch (error) {
     res.status(409).json({ error: mensaje(error, 'No se pudo avisar.') });
@@ -326,7 +326,7 @@ router.post('/jugar/notas', async (req, res) => {
   if (!cred) return;
   const notas = String(req.body?.notas ?? '');
   try {
-    await mutar(cred.gameId, (s) => guardarNotas(s, cred.suspectId, notas));
+    await mutar(cred.gameId, (s) => guardarNotas(s, cred.participanteId, notas));
     res.json({ ok: true });
   } catch (error) {
     res.status(409).json({ error: mensaje(error, 'No se pudieron guardar las notas.') });
@@ -370,7 +370,7 @@ router.post('/jugar/acusar', async (req, res) => {
       return;
     }
     const { resultado } = await mutar(cred.gameId, (s) =>
-      ejecutarAccion(game, s, cred.suspectId, accion.id, datos),
+      ejecutarAccion(game, s, cred.participanteId, accion.id, datos),
     );
     res.json(resultado);
   } catch (error) {
@@ -389,7 +389,7 @@ router.post('/jugar/preguntar', async (req, res) => {
       res.status(404).json({ error: 'Esta partida ya no está en juego.' });
       return;
     }
-    const vista = await vistaActual(cred.gameId, cred.suspectId, res);
+    const vista = await vistaActual(cred.gameId, cred.participanteId, res);
     if (!vista) return;
     const respuesta = await consultarConsejero(game, vista, pregunta);
     res.json({ respuesta });
@@ -435,11 +435,11 @@ router.post('/jugar/denunciar', async (req, res) => {
     await mutar(
       cred.gameId,
       (s) => {
-        const jugador = s.players.find((p) => p.suspectId === cred.suspectId);
+        const jugador = s.players.find((p) => p.participanteId === cred.participanteId);
         if (!jugador) throw new Error('Ya no participas en esta partida.');
         const lista = s.denuncias ?? [];
         lista.push({
-          suspectId: cred.suspectId,
+          participanteId: cred.participanteId,
           displayName: jugador.displayName,
           pregunta,
           respuesta,
@@ -520,7 +520,7 @@ router.get('/jugar/perfil', async (req, res) => {
   if (!cred) return;
   const store = getStore();
   const sesion = await store.getLive(cred.gameId);
-  const jugador = sesion?.players.find((p) => p.suspectId === cred.suspectId);
+  const jugador = sesion?.players.find((p) => p.participanteId === cred.participanteId);
   const cuenta = await perfilDe(jugador?.vinculo);
   res.json({
     cuenta,
@@ -548,7 +548,7 @@ router.post('/jugar/perfil/guardar', async (req, res) => {
   try {
     const store = getStore();
     const sesion = await store.getLive(cred.gameId);
-    const jugador = sesion?.players.find((p) => p.suspectId === cred.suspectId);
+    const jugador = sesion?.players.find((p) => p.participanteId === cred.participanteId);
     if (!jugador) {
       res.status(403).json({ error: 'Ya no participas en esta partida.' });
       return;
@@ -556,7 +556,7 @@ router.post('/jugar/perfil/guardar', async (req, res) => {
 
     if (!guardar) {
       await mutar(cred.gameId, (s) => {
-        const j = s.players.find((p) => p.suspectId === cred.suspectId);
+        const j = s.players.find((p) => p.participanteId === cred.participanteId);
         if (j) delete j.vinculo;
       });
       res.json({ guardando: false });
@@ -574,7 +574,7 @@ router.post('/jugar/perfil/guardar', async (req, res) => {
     // y solo el vínculo se escribe dentro.
     const vinculo = await aceptarGuardar(jugador.email, jugador.displayName);
     await mutar(cred.gameId, (s) => {
-      const j = s.players.find((p) => p.suspectId === cred.suspectId);
+      const j = s.players.find((p) => p.participanteId === cred.participanteId);
       if (j) j.vinculo = vinculo;
     });
     res.json({ guardando: true });
@@ -604,7 +604,7 @@ router.delete('/jugar/cuenta', async (req, res) => {
 
   const store = getStore();
   const sesion = await store.getLive(cred.gameId);
-  const jugador = sesion?.players.find((p) => p.suspectId === cred.suspectId);
+  const jugador = sesion?.players.find((p) => p.participanteId === cred.participanteId);
   if (!jugador) {
     res.status(403).json({ error: 'Ya no participas en esta partida.' });
     return;

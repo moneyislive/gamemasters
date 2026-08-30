@@ -87,7 +87,7 @@ export function dosierEscolta(
 
   const dosieres = gente
     .map((persona, indice) => {
-      const personaje = plot.characters.find((c) => c.suspectId === persona.id);
+      const personaje = plot.characters.find((c) => c.participanteId === persona.id);
       const disfraz = vista.disfrazDe(persona.id);
       const elDisfraz = vista.sabor?.elDisfraz[persona.id] ?? '';
       const estandarte = vista.estandarteDe(persona.id);
@@ -158,7 +158,7 @@ ${otros
 
       const columna = otros
         .map((otro) => {
-          const suyo = plot.characters.find((c) => c.suspectId === otro.id);
+          const suyo = plot.characters.find((c) => c.participanteId === otro.id);
           const suBandera = vista.estandarteDe(otro.id);
           return `        <tr>
           <td style="width:46mm;"><strong>${esc(suyo?.characterName ?? otro.name)}</strong><br /><span style="font-size:10pt; color:#7c7159;">${esc(otro.name)}</span>${
@@ -346,8 +346,8 @@ ${dosieres}`;
  * no un contrato.
  */
 registrarDosieres('sombras', {
-  tituloDeUno: (game, plot, suspectId) =>
-    `${plot.title} — Dosier de ${entidadesDe(game, 'escoltas').find((s) => s.id === suspectId)?.name ?? ''}`,
-  deUno: (game, plot, suspectId, opciones) =>
-    dosierEscolta(game, plot, { ...opciones, soloPara: suspectId }),
+  tituloDeUno: (game, plot, participanteId) =>
+    `${plot.title} — Dosier de ${entidadesDe(game, 'escoltas').find((s) => s.id === participanteId)?.name ?? ''}`,
+  deUno: (game, plot, participanteId, opciones) =>
+    dosierEscolta(game, plot, { ...opciones, soloPara: participanteId }),
 });

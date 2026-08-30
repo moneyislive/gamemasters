@@ -95,7 +95,7 @@ type Emitir = (evento: GenerateStreamEvent) => void;
  */
 export interface SaborSombras {
   senor: { nombre: string; descripcion: string };
-  /** Por `suspectId`: por qué en la ficción lleva su disfraz. */
+  /** Por `participanteId`: por qué en la ficción lleva su disfraz. */
   elDisfraz: Record<string, string>;
   /** Por id de paso: lo que hay tallado en su mojón de entrada. */
   inscripciones: Record<string, string>;
@@ -224,8 +224,8 @@ export function ensamblarTramaSombras(
   // ---- 3. Un dosier por persona, ni más ni menos ---------------------------
   const escritos = new Map<string, RespuestaSombras['escoltas'][number]>();
   for (const p of respuesta.escoltas ?? []) {
-    if (p && typeof p.suspectId === 'string' && idsColumna.has(p.suspectId) && !escritos.has(p.suspectId)) {
-      escritos.set(p.suspectId, p);
+    if (p && typeof p.participanteId === 'string' && idsColumna.has(p.participanteId) && !escritos.has(p.participanteId)) {
+      escritos.set(p.participanteId, p);
     }
   }
   const characters: PlotCharacter[] = entidades.escoltas.map((persona) => {
@@ -239,7 +239,7 @@ export function ensamblarTramaSombras(
       return dosierMinimo(persona);
     }
     return {
-      suspectId: persona.id,
+      participanteId: persona.id,
       characterName: escrito.characterName?.trim() || persona.name,
       role: escrito.role?.trim() || RECAMBIO_OFICIO,
       publicPersona: escrito.publicPersona ?? '',
@@ -262,7 +262,7 @@ export function ensamblarTramaSombras(
    */
   const nombresDelKancho = [
     kancho?.name ?? '',
-    characters.find((c) => c.suspectId === kanchoId)?.characterName ?? '',
+    characters.find((c) => c.participanteId === kanchoId)?.characterName ?? '',
   ].filter(Boolean);
 
   const depurar = (
@@ -377,7 +377,7 @@ export function ensamblarTramaSombras(
   const timeline: TimelineEvent[] = (respuesta.cronologia ?? [])
     .filter((e) => e && typeof e.descripcion === 'string' && e.descripcion.trim())
     .map((e) => {
-      const suspectIds = (e.escoltaIds ?? []).filter((id) => idsColumna.has(id));
+      const participanteIds = (e.escoltaIds ?? []).filter((id) => idsColumna.has(id));
       /*
        * Un momento con UNA sola persona nunca es público. Los públicos se
        * imprimen en el dosier de todo el mundo, así que «a las seis y media
@@ -394,7 +394,7 @@ export function ensamblarTramaSombras(
        * Y no abre ninguna brecha: un momento sin gente implicada no puede
        * delatar a nadie, que es exactamente lo que la regla protege.
        */
-      const publico = e.publico === true && suspectIds.length !== 1;
+      const publico = e.publico === true && participanteIds.length !== 1;
       if (e.publico === true && !publico) {
         incidencias.push({
           donde: `cronología ${e.hora ?? ''}`,
@@ -415,7 +415,7 @@ export function ensamblarTramaSombras(
       return {
         time: e.hora?.trim() || '00:00',
         description: descripcion,
-        suspectIds,
+        participanteIds,
         isPublic: publico,
       };
     });
@@ -555,7 +555,7 @@ export function ensamblarTramaSombras(
 /** El dosier que se escribe cuando el modelo se deja a alguien. Feo, pero jugable. */
 function dosierMinimo(persona: Entidad): PlotCharacter {
   return {
-    suspectId: persona.id,
+    participanteId: persona.id,
     characterName: persona.name,
     role: RECAMBIO_OFICIO,
     publicPersona: 'Salió de Sakai con los demás y no ha dado un paso en falso desde entonces.',
@@ -633,7 +633,7 @@ export function loQueFalta(
 
   const ids = new Set(entidades.escoltas.map((e) => e.id));
   const dosieres = (respuesta.escoltas ?? []).filter(
-    (p) => p && typeof p.suspectId === 'string' && ids.has(p.suspectId),
+    (p) => p && typeof p.participanteId === 'string' && ids.has(p.participanteId),
   ).length;
   // La mitad, y no «alguno»: que se deje a una persona lo arregla el dosier
   // mínimo sin que se note; que se deje a la mesa entera, no.

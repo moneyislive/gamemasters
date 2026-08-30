@@ -102,11 +102,11 @@ async function ampliarTrama(
 
   // Personajes nuevos válidos (el modelo puede colarse con ids inventados).
   const idsSospechosos = new Set(sospechososDe(game).map((sospechoso) => sospechoso.id));
-  const yaEscritos = new Set(plot.characters.map((personaje) => personaje.suspectId));
+  const yaEscritos = new Set(plot.characters.map((personaje) => personaje.participanteId));
   for (const personaje of nuevos) {
-    if (!idsSospechosos.has(personaje.suspectId)) continue; // id inventado: se descarta
-    if (yaEscritos.has(personaje.suspectId)) continue; // personaje de más: se descarta
-    yaEscritos.add(personaje.suspectId);
+    if (!idsSospechosos.has(personaje.participanteId)) continue; // id inventado: se descarta
+    if (yaEscritos.has(personaje.participanteId)) continue; // personaje de más: se descarta
+    yaEscritos.add(personaje.participanteId);
     plot.characters.push(personaje);
   }
 
@@ -125,7 +125,7 @@ async function ampliarTrama(
   // Orden estable: los personajes siguen el orden de la lista de jugadores.
   const orden = new Map(sospechososDe(game).map((sospechoso, indice) => [sospechoso.id, indice]));
   plot.characters.sort(
-    (a, b) => (orden.get(a.suspectId) ?? 0) - (orden.get(b.suspectId) ?? 0),
+    (a, b) => (orden.get(a.participanteId) ?? 0) - (orden.get(b.participanteId) ?? 0),
   );
 
   // Texto de la solución: reescrito por el modelo o, si no, por el generador local.
@@ -151,7 +151,7 @@ async function ampliarTrama(
 /** Reescritura local del motivo y del relato del crimen (modo demo y red de seguridad). */
 function reparacionLocal(game: GameSession, plot: Plot): ReparacionSolucion {
   const asesino = sospechososDe(game).find((s) => s.id === culpableDe(plot.solution));
-  const personaje = plot.characters.find((c) => c.suspectId === culpableDe(plot.solution));
+  const personaje = plot.characters.find((c) => c.participanteId === culpableDe(plot.solution));
   const arma = objetosDe(game).find((w) => w.id === objetoDe(plot.solution));
   const sala = salasDe(game).find((r) => r.id === lugarDe(plot.solution));
 
@@ -244,7 +244,7 @@ function construirPromptAmpliacion(
 
   const asesino = sospechososDe(game).find((s) => s.id === culpableDe(plot.solution));
   const personajeAsesino = plot.characters.find(
-    (c) => c.suspectId === culpableDe(plot.solution),
+    (c) => c.participanteId === culpableDe(plot.solution),
   );
   const arma = objetosDe(game).find((w) => w.id === objetoDe(plot.solution));
   const sala = salasDe(game).find((r) => r.id === lugarDe(plot.solution));
@@ -253,7 +253,7 @@ function construirPromptAmpliacion(
     plot.characters
       .map((personaje) =>
         [
-          `- ${personaje.characterName} (jugador real: ${nombreSospechoso(personaje.suspectId)}, id "${personaje.suspectId}")`,
+          `- ${personaje.characterName} (jugador real: ${nombreSospechoso(personaje.participanteId)}, id "${personaje.participanteId}")`,
           `  papel: ${personaje.role}`,
           `  secreto: ${personaje.secret}`,
           `  coartada: ${personaje.alibi}`,
@@ -339,7 +339,7 @@ ${nuevos}
 
 QUÉ NECESITO:
 1. "characters": EXACTAMENTE un personaje por cada persona nueva de la lista anterior, ni uno más.
-   Cada uno con suspectId EXACTO. Nada de personajes para ids que no aparezcan ahí.
+   Cada uno con participanteId EXACTO. Nada de personajes para ids que no aparezcan ahí.
 2. Los personajes nuevos deben encajar en la historia SIN CONTRADECIR nada de lo ya escrito:
    ni la víctima, ni el escenario, ni los secretos y coartadas existentes, ni la solución.
    Explica de forma natural por qué estaban en la casa esa noche.
@@ -380,11 +380,11 @@ function normalizarPersonajes(valor: unknown): PlotCharacter[] {
   for (const bruto of valor) {
     if (!bruto || typeof bruto !== 'object') continue;
     const dato = bruto as Record<string, unknown>;
-    const suspectId = textoDe(dato.suspectId);
+    const participanteId = textoDe(dato.participanteId);
     const characterName = textoDe(dato.characterName);
-    if (!suspectId || !characterName) continue;
+    if (!participanteId || !characterName) continue;
     personajes.push({
-      suspectId,
+      participanteId,
       characterName,
       role: textoDe(dato.role),
       publicPersona: textoDe(dato.publicPersona),

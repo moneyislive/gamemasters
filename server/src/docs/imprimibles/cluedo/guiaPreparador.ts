@@ -31,7 +31,7 @@ export function guiaPreparador(
 ${material.twists
   .map(
     (giro) =>
-      `          <tr><td style="font-family:'Cinzel',serif; color:#6d1a2a;">GIRO ${giro.round} · ${esc(nombreDe(giro.suspectId).toUpperCase())}</td><td>${esc(nombreDe(giro.suspectId))}</td><td>al cerrar la ronda ${giro.round}</td></tr>`,
+      `          <tr><td style="font-family:'Cinzel',serif; color:#6d1a2a;">GIRO ${giro.round} · ${esc(nombreDe(giro.participanteId).toUpperCase())}</td><td>${esc(nombreDe(giro.participanteId))}</td><td>al cerrar la ronda ${giro.round}</td></tr>`,
   )
   .join('\n')}
         </tbody>
@@ -82,7 +82,7 @@ ${material.twists
     <div class="caja caja--roja junto">
       <table>
         <tbody>
-          <tr><td style="width:30mm;"><strong>Culpable</strong></td><td>${esc(nombreDe(culpableDe(plot.solution)))} · ${esc(plot.characters.find((c) => c.suspectId === culpableDe(plot.solution))?.characterName ?? '')}</td></tr>
+          <tr><td style="width:30mm;"><strong>Culpable</strong></td><td>${esc(nombreDe(culpableDe(plot.solution)))} · ${esc(plot.characters.find((c) => c.participanteId === culpableDe(plot.solution))?.characterName ?? '')}</td></tr>
           <tr><td><strong>Objeto</strong></td><td>${esc(objetosDe(game).find((w) => w.id === objetoDe(plot.solution))?.name ?? '')}</td></tr>
           <tr><td><strong>Sala</strong></td><td>${esc(salasDe(game).find((r) => r.id === lugarDe(plot.solution))?.name ?? '')}</td></tr>
         </tbody>
@@ -115,7 +115,7 @@ ${Array.from({ length: rondas }, (_, i) => {
   const codigos = sobres.filter((s) => s.codigo.startsWith(`R${ronda}-`)).map((s) => s.codigo);
   const extras = [
     ...(material?.timelineReveals.some((r) => r.round === ronda) ? [`CRONOLOGÍA ${ronda}`] : []),
-    ...(material?.twists.filter((t) => t.round === ronda).map((t) => `GIRO ${ronda} · ${nombreDe(t.suspectId).toUpperCase()}`) ?? []),
+    ...(material?.twists.filter((t) => t.round === ronda).map((t) => `GIRO ${ronda} · ${nombreDe(t.participanteId).toUpperCase()}`) ?? []),
   ];
   return `          <tr><td>Ronda ${ronda}</td><td>${esc([...codigos, ...extras].join(' · ')) || '—'}</td></tr>`;
 }).join('\n')}

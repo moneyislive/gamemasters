@@ -143,7 +143,7 @@ export interface VinculoDeCuenta {
 
 export interface LivePlayer {
   /** Id del sospechoso de la partida: es la identidad dentro del juego. */
-  suspectId: string;
+  participanteId: string;
   /** Nombre real, para la lista de conectados del Game Master. */
   displayName: string;
   /**
@@ -206,7 +206,7 @@ export interface LivePlayer {
 
 export interface Acusacion {
   /** Quién acusa. */
-  suspectId: string;
+  participanteId: string;
   /** Un valor por eje del juego. En CLUEDO: culpable, objeto y lugar. */
   respuestas: Record<EjeId, string>;
   /**
@@ -237,7 +237,7 @@ export interface LiveSession {
    *
    * No se enseña a nadie: sirve para atar las credenciales de los móviles a la
    * sesión que hay ahora. Antes, cerrar la partida y volver a abrirla repartía
-   * códigos nuevos pero los `suspectId` seguían siendo los mismos, así que el
+   * códigos nuevos pero los `participanteId` seguían siendo los mismos, así que el
    * testigo de un móvil viejo volvía a valer y rotar los códigos no servía de
    * nada. Con esto, reabrir echa a todo el mundo de verdad.
    *
@@ -296,7 +296,7 @@ export interface LiveSession {
    * Registro de lo que se ha hecho. Sirve para contar repeticiones por ronda y
    * para que quien dirige vea el pulso de la mesa.
    */
-  acciones?: Array<{ suspectId: string; accion: string; round: number; at: string }>;
+  acciones?: Array<{ participanteId: string; accion: string; round: number; at: string }>;
   /**
    * En qué encuentro va la partida. 1 es el primero.
    *
@@ -347,7 +347,7 @@ export interface LiveSession {
    * pantalla es esa persona, no un buzón lejano.
    */
   denuncias?: Array<{
-    suspectId: string;
+    participanteId: string;
     displayName: string;
     pregunta: string;
     respuesta: string;
@@ -644,7 +644,7 @@ export interface VistaJugador {
     reglas: string[];
   };
   yo: {
-    suspectId: string;
+    participanteId: string;
     displayName: string;
     characterName: string;
     role: string;
@@ -682,7 +682,7 @@ export interface VistaJugador {
   };
   /** Los demás, con lo que cualquiera sabría de ellos. */
   jugadores: Array<{
-    suspectId: string;
+    participanteId: string;
     displayName: string;
     characterName: string;
     role: string;
@@ -842,9 +842,9 @@ export interface VistaJugador {
     reconstruccion: string;
     confesion?: string;
     epilogo?: string;
-    ganador?: { suspectId: string; displayName: string; at: string };
+    ganador?: { participanteId: string; displayName: string; at: string };
     clasificacion: Array<{
-      suspectId: string;
+      participanteId: string;
       displayName: string;
       acerto: boolean;
       at?: string;
@@ -859,13 +859,13 @@ export interface VistaGameMaster {
   /** Cuántos han emparejado y cuántos están vivos ahora mismo. */
   conectados: number;
   /** Reparto de gente por sala en la ronda en curso. */
-  ocupacion: Array<{ roomId: string; roomName: string; suspectIds: string[] }>;
+  ocupacion: Array<{ roomId: string; roomName: string; participanteIds: string[] }>;
   /** Giros pendientes de entregar en la ronda en curso. */
-  girosPendientes: Array<{ id: string; suspectId: string; displayName: string; round: number }>;
+  girosPendientes: Array<{ id: string; participanteId: string; displayName: string; round: number }>;
   /** Cuántas acusaciones se han recibido. */
   acusacionesRecibidas: number;
   /** Quiénes han avisado de que están listos para empezar. */
-  listos: Array<{ suspectId: string; displayName: string }>;
+  listos: Array<{ participanteId: string; displayName: string }>;
   /** El Game Master a ciegas no ve si son correctas. */
   revelaSolucion: boolean;
 }

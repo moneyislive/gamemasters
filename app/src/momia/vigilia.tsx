@@ -613,8 +613,8 @@ function PanelDelDon({
   const opciones: Array<{ id: string; nombre: string }> =
     don.elige === 'persona'
       ? vista.jugadores
-          .filter((j) => j.suspectId !== vista.yo.suspectId)
-          .map((j) => ({ id: j.suspectId, nombre: j.characterName || j.displayName }))
+          .filter((j) => j.participanteId !== vista.yo.participanteId)
+          .map((j) => ({ id: j.participanteId, nombre: j.characterName || j.displayName }))
       : don.elige === 'camara'
         ? vista.salas.map((s) => ({ id: s.id, nombre: s.name }))
         : don.elige === 'fragmento-propio'
@@ -787,7 +787,7 @@ function PanelDeAmuleto({
     }
   };
 
-  const otros = vista.jugadores.filter((j) => j.suspectId !== vista.yo.suspectId);
+  const otros = vista.jugadores.filter((j) => j.participanteId !== vista.yo.participanteId);
 
   return (
     <>
@@ -809,16 +809,16 @@ function PanelDeAmuleto({
           <>
             <View style={{ marginTop: espacio.md, gap: espacio.sm }}>
               {otros.map((j) => {
-                const suyo = estado.gente.find((g) => g.suspectId === j.suspectId);
-                const activo = aQuien === j.suspectId;
+                const suyo = estado.gente.find((g) => g.participanteId === j.participanteId);
+                const activo = aQuien === j.participanteId;
                 return (
                   <Pressable
-                    key={j.suspectId}
+                    key={j.participanteId}
                     accessibilityRole="button"
                     accessibilityState={{ selected: activo }}
                     onPress={() => {
                       void Haptics.selectionAsync();
-                      setAQuien(activo ? null : j.suspectId);
+                      setAQuien(activo ? null : j.participanteId);
                     }}
                     style={({ pressed }) => [
                       estilos.persona,

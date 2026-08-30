@@ -49,7 +49,7 @@ export function guiaDelPaso(
   const gente = vista.escoltas
     .map((persona) => {
       const disfraz = vista.disfrazDe(persona.id);
-      const personaje = plot.characters.find((c) => c.suspectId === persona.id);
+      const personaje = plot.characters.find((c) => c.participanteId === persona.id);
       return `        <tr>
           <td style="width:40mm;"><strong>${esc(persona.name)}</strong><br /><span style="font-size:10pt; color:#7c7159;">${esc(personaje?.characterName ?? '')}</span></td>
           <td style="width:44mm;">${esc(disfraz?.rol ?? '—')} <span class="kanji">${esc(disfraz?.kanji ?? '')}</span></td>

@@ -71,7 +71,7 @@
 
 /** El dosier de una persona real, escrito a su medida. */
 export interface EscoltaEscrito {
-  suspectId: string;
+  participanteId: string;
   characterName: string;
   role: string;
   publicPersona: string;
@@ -147,7 +147,7 @@ const ESCOLTA_SCHEMA: Record<string, unknown> = {
   type: 'object',
   additionalProperties: false,
   required: [
-    'suspectId',
+    'participanteId',
     'characterName',
     'role',
     'publicPersona',
@@ -159,7 +159,7 @@ const ESCOLTA_SCHEMA: Record<string, unknown> = {
     'elDisfraz',
   ],
   properties: {
-    suspectId: { type: 'string', description: 'Id EXACTO de la persona real a la que corresponde este dosier' },
+    participanteId: { type: 'string', description: 'Id EXACTO de la persona real a la que corresponde este dosier' },
     characterName: {
       type: 'string',
       description:

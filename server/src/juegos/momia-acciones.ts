@@ -98,7 +98,7 @@ export function estadoDe(game: GameSession, sesion: LiveSession): EstadoMomia {
   sesion.estado = sesion.estado ?? {};
   let estado = sesion.estado[CLAVE_ESTADO] as EstadoMomia | undefined;
   if (!estado) {
-    estado = estadoInicial(trama, sesion.players.map((p) => p.suspectId), dones);
+    estado = estadoInicial(trama, sesion.players.map((p) => p.participanteId), dones);
     sesion.estado[CLAVE_ESTADO] = estado;
   }
 
@@ -106,9 +106,9 @@ export function estadoDe(game: GameSession, sesion: LiveSession): EstadoMomia {
   // Sin esto, alguien que empareja tarde el móvil se queda sin marcas, sin
   // amuletos y sin don, y no hay forma de que juegue.
   for (const jugador of sesion.players) {
-    if (estado.gente[jugador.suspectId]) continue;
-    const recien = estadoInicial(trama, [jugador.suspectId], dones);
-    estado.gente[jugador.suspectId] = recien.gente[jugador.suspectId]!;
+    if (estado.gente[jugador.participanteId]) continue;
+    const recien = estadoInicial(trama, [jugador.participanteId], dones);
+    estado.gente[jugador.participanteId] = recien.gente[jugador.participanteId]!;
   }
   return estado;
 }
@@ -147,8 +147,8 @@ function vigiliaDe(sesion: LiveSession): VigiliaMomia {
 }
 
 /** ¿Es esta persona quien rompió el sello? Nunca se le pregunta al estado. */
-export function esElSaqueador(game: GameSession, suspectId: string): boolean {
-  return game.plot?.solution.respuestas[EJE_SAQUEADOR] === suspectId;
+export function esElSaqueador(game: GameSession, participanteId: string): boolean {
+  return game.plot?.solution.respuestas[EJE_SAQUEADOR] === participanteId;
 }
 
 /**
@@ -158,16 +158,16 @@ export function esElSaqueador(game: GameSession, suspectId: string): boolean {
  * `falsificar`, que no está escrito en ninguna parte porque se deduce de ser la
  * respuesta del eje. Un dato que no se guarda no se puede filtrar por descuido.
  */
-export function donesDe(game: GameSession, estado: EstadoMomia, suspectId: string): DonId[] {
-  const propio = estado.gente[suspectId]?.don;
+export function donesDe(game: GameSession, estado: EstadoMomia, participanteId: string): DonId[] {
+  const propio = estado.gente[participanteId]?.don;
   const dones: DonId[] = propio ? [propio] : [];
-  if (esElSaqueador(game, suspectId)) dones.push('falsificar');
+  if (esElSaqueador(game, participanteId)) dones.push('falsificar');
   return dones;
 }
 
 /** Recalcula el estado de tocado tras cambiar las marcas de alguien. */
-function ajustarTocado(estado: EstadoMomia, suspectId: string): void {
-  const persona = estado.gente[suspectId];
+function ajustarTocado(estado: EstadoMomia, participanteId: string): void {
+  const persona = estado.gente[participanteId];
   if (!persona) return;
   persona.marcas = Math.max(0, persona.marcas);
   persona.tocado = persona.marcas >= MARCAS_PARA_TOCADO;
@@ -199,16 +199,16 @@ export interface ResultadoExploracion {
 export function entrarEnCamara(
   game: GameSession,
   sesion: LiveSession,
-  suspectId: string,
+  participanteId: string,
   camaraId: string,
   opciones: { marcaExtra?: boolean } = {},
 ): ResultadoExploracion {
   const trama = tramaObligatoria(game);
   const estado = estadoDe(game, sesion);
-  const persona = estado.gente[suspectId];
+  const persona = estado.gente[participanteId];
   if (!persona) throw new AccionInvalida('No participas en esta expedición.');
 
-  const jugador = sesion.players.find((p) => p.suspectId === suspectId);
+  const jugador = sesion.players.find((p) => p.participanteId === participanteId);
   const yaEstuve = (jugador?.elecciones ?? []).some(
     (e) => e.round === sesion.round && e.roomId === camaraId,
   );
@@ -219,7 +219,7 @@ export function entrarEnCamara(
    * hace que el plano de la tumba, el recuento de quién hay en cada cámara y el
    * panel de quien dirige funcionen sin que la plataforma sepa nada de la Momia.
    */
-  elegirSala(sesion, suspectId, camaraId);
+  elegirSala(sesion, participanteId, camaraId);
 
   // Los fragmentos que la casa colocó aquí esta vigilia.
   const encontrados = trama.hallazgos
@@ -230,7 +230,7 @@ export function entrarEnCamara(
 
   const profanada = camaraProfanada(estado.profanadas, sesion.round) === camaraId;
   const vigilia = vigiliaDe(sesion);
-  const protegido = vigilia.protegidos.includes(suspectId);
+  const protegido = vigilia.protegidos.includes(participanteId);
 
   let marcas = 0;
   if (profanada && !protegido) marcas += 1;
@@ -238,7 +238,7 @@ export function entrarEnCamara(
   // de excavar, no un efecto de la maldición. Pero la protección la cubre igual.
   if (opciones.marcaExtra && !protegido) marcas += 1;
   persona.marcas += marcas;
-  ajustarTocado(estado, suspectId);
+  ajustarTocado(estado, participanteId);
 
   return {
     camara: camaraId,
@@ -266,14 +266,14 @@ export function entrarEnCamara(
 export function ofrendarAmuleto(
   game: GameSession,
   sesion: LiveSession,
-  suspectId: string,
+  participanteId: string,
   aQuien: string,
 ): { amuletos: number; marcasDe: number } {
   const estado = estadoDe(game, sesion);
-  if (aQuien === suspectId) {
+  if (aQuien === participanteId) {
     throw new AccionInvalida('Un amuleto no se puede gastar en uno mismo.');
   }
-  const mio = estado.gente[suspectId];
+  const mio = estado.gente[participanteId];
   const suyo = estado.gente[aQuien];
   if (!mio) throw new AccionInvalida('No participas en esta expedición.');
   if (!suyo) throw new AccionInvalida('Esa persona no está en la expedición.');
@@ -305,8 +305,8 @@ export interface ResultadoInvocacion {
 }
 
 /** El fragmento que le falta a alguien para tenerlos TODOS, si le falta uno solo. */
-function leFaltaSoloUno(estado: EstadoMomia, suspectId: string): boolean {
-  const persona = estado.gente[suspectId];
+function leFaltaSoloUno(estado: EstadoMomia, participanteId: string): boolean {
+  const persona = estado.gente[participanteId];
   if (!persona) return false;
   const ciertos = Object.values(estado.fragmentos).filter((f) => !f.falso);
   return ciertos.filter((f) => !persona.fragmentos.includes(f.id)).length <= 1;
@@ -328,15 +328,15 @@ function leFaltaSoloUno(estado: EstadoMomia, suspectId: string): boolean {
 export function invocarDon(
   game: GameSession,
   sesion: LiveSession,
-  suspectId: string,
+  participanteId: string,
   opciones: { don?: string; persona?: string; camara?: string; fragmento?: string } = {},
 ): ResultadoInvocacion {
   const trama = tramaObligatoria(game);
   const estado = estadoDe(game, sesion);
-  const persona = estado.gente[suspectId];
+  const persona = estado.gente[participanteId];
   if (!persona) throw new AccionInvalida('No participas en esta expedición.');
 
-  const disponibles = donesDe(game, estado, suspectId);
+  const disponibles = donesDe(game, estado, participanteId);
   const don = (opciones.don as DonId | undefined) ?? disponibles[0];
   if (!don || !disponibles.includes(don)) {
     throw new AccionInvalida('Ese don no es tuyo.');
@@ -345,7 +345,7 @@ export function invocarDon(
     throw new AccionInvalida('Tu don ya se ha usado esta vigilia.');
   }
 
-  const otros = Object.keys(estado.gente).filter((id) => id !== suspectId);
+  const otros = Object.keys(estado.gente).filter((id) => id !== participanteId);
   /*
    * A falta de elección, la persona más tocada; a igualdad, la primera por id.
    * DETERMINISTA Y NO AL AZAR: una partida tiene que poder repetirse con la
@@ -368,7 +368,7 @@ export function invocarDon(
        * razón de ser del juego— se cae por la puerta de atrás. Que el papiro se
        * resista es mejor regla que un tope contado.
        */
-      if (leFaltaSoloUno(estado, suspectId)) {
+      if (leFaltaSoloUno(estado, participanteId)) {
         throw new AccionInvalida('El papiro se resiste: ningún ojo puede leerlo entero.');
       }
       const candidato = Object.values(estado.fragmentos)
@@ -386,7 +386,7 @@ export function invocarDon(
 
     case 'sanar': {
       const aQuien = opciones.persona ?? masTocado;
-      if (!aQuien || aQuien === suspectId) {
+      if (!aQuien || aQuien === participanteId) {
         throw new AccionInvalida('Sanar es para otra persona, no para ti.');
       }
       const suyo = estado.gente[aQuien];
@@ -402,7 +402,7 @@ export function invocarDon(
       // Aquí sí se admite protegerse a uno mismo: el guardián carga la lámpara y
       // decide a quién alumbra. Es lo contrario del amuleto, y a propósito: uno
       // obliga a hablar, el otro es la decisión privada de quien vigila.
-      const aQuien = opciones.persona ?? masTocado ?? suspectId;
+      const aQuien = opciones.persona ?? masTocado ?? participanteId;
       if (!estado.gente[aQuien]) throw new AccionInvalida('Esa persona no está en la expedición.');
       if (!vigilia.protegidos.includes(aQuien)) vigilia.protegidos.push(aQuien);
       resultado = { don, efecto: 'La maldición no le alcanzará esta vigilia.', objetivo: aQuien };
@@ -412,7 +412,7 @@ export function invocarDon(
     case 'sobornar': {
       const manana = camaraProfanada(estado.profanadas, sesion.round + 1);
       if (!manana) throw new AccionInvalida('No hay otra vigilia después de esta.');
-      vigilia.sobornos[suspectId] = manana;
+      vigilia.sobornos[participanteId] = manana;
       resultado = {
         don,
         efecto: 'Sabes qué cámara se profanará mañana. Decide qué haces con eso.',
@@ -431,21 +431,21 @@ export function invocarDon(
         throw new AccionInvalida('Solo puedes fotografiar lo que tienes en la mano.');
       }
       fragmento.publico = true;
-      fragmento.publicadoPor = suspectId;
+      fragmento.publicadoPor = participanteId;
       resultado = { don, efecto: 'El fragmento queda sobre la mesa, a la vista de todos.', objetivo: fragmento.id };
       break;
     }
 
     case 'excavar': {
       const camaras = entidadesDe(game, 'camaras');
-      const jugador = sesion.players.find((p) => p.suspectId === suspectId);
+      const jugador = sesion.players.find((p) => p.participanteId === participanteId);
       const yaVisitadas = (jugador?.elecciones ?? [])
         .filter((e) => e.round === sesion.round)
         .map((e) => e.roomId);
       const aDonde =
         opciones.camara ?? camaras.find((c) => !yaVisitadas.includes(c.id))?.id;
       if (!aDonde) throw new AccionInvalida('No queda cámara nueva en la que entrar.');
-      const exploracion = entrarEnCamara(game, sesion, suspectId, aDonde, { marcaExtra: true });
+      const exploracion = entrarEnCamara(game, sesion, participanteId, aDonde, { marcaExtra: true });
       resultado = {
         don,
         efecto: `Has entrado en una segunda cámara. Te ha costado una marca de más.`,
@@ -478,7 +478,7 @@ export function invocarDon(
         falso: true,
         // Nace pública: fabricar un fragmento y guardárselo no serviría de nada.
         publico: true,
-        publicadoPor: suspectId,
+        publicadoPor: participanteId,
       };
       // Y va a su mano, para que en la mesa parezca un hallazgo suyo como
       // cualquier otro. Si no, el papiro delataría que salió de la nada.
@@ -518,7 +518,7 @@ export function invocarDon(
 export function proponerOrden(
   game: GameSession,
   sesion: LiveSession,
-  suspectId: string,
+  participanteId: string,
   orden: string[],
 ): { orden: string[]; at: string } {
   const estado = estadoDe(game, sesion);
@@ -535,7 +535,7 @@ export function proponerOrden(
   }
 
   const propuesta = { orden: [...orden], at: new Date().toISOString() };
-  estado.propuestas[suspectId] = propuesta;
+  estado.propuestas[participanteId] = propuesta;
   return propuesta;
 }
 
@@ -554,19 +554,19 @@ registrarAcciones('momia', {
    * escrita en dos sitios y solo está en uno es de las que se rompen al mover
    * cualquier otra cosa.
    */
-  explorar: ({ game, sesion, suspectId, datos }) =>
-    entrarEnCamara(game, sesion, suspectId, datos.camara!),
+  explorar: ({ game, sesion, participanteId, datos }) =>
+    entrarEnCamara(game, sesion, participanteId, datos.camara!),
 
-  ofrendar: ({ game, sesion, suspectId, datos }) =>
-    ofrendarAmuleto(game, sesion, suspectId, datos.aQuien!),
+  ofrendar: ({ game, sesion, participanteId, datos }) =>
+    ofrendarAmuleto(game, sesion, participanteId, datos.aQuien!),
 
   /*
    * Los campos llegan por `eligeOpcional`, que es lo que permite que una misma
    * acción pida una persona, una cámara o nada según el don. Cuál mirar lo
    * decide el reductor, porque el motor no puede: el don es secreto.
    */
-  invocar: ({ game, sesion, suspectId, datos }) =>
-    invocarDon(game, sesion, suspectId, {
+  invocar: ({ game, sesion, participanteId, datos }) =>
+    invocarDon(game, sesion, participanteId, {
       don: datos.don,
       persona: datos.objetivo,
       camara: datos.camara,
@@ -579,14 +579,14 @@ registrarAcciones('momia', {
    * llama desde una pantalla propia y desde las pruebas, y una regla que solo se
    * cumple cuando se entra por una puerta no es una regla.
    */
-  'proponer-orden': ({ game, sesion, suspectId, listas }) => {
+  'proponer-orden': ({ game, sesion, participanteId, listas }) => {
     const orden = listas.orden ?? [];
     if (orden.length === 0) {
       throw new AccionInvalida(
         'Tu propuesta no ha llegado. El sellado se entrega desde la pantalla del sellado.',
       );
     }
-    return proponerOrden(game, sesion, suspectId, orden);
+    return proponerOrden(game, sesion, participanteId, orden);
   },
 
   /**
@@ -604,12 +604,12 @@ registrarAcciones('momia', {
    * trofeo Ojo de Horus— y la victoria de verdad viaja aparte. El campo para
    * decirlo bien es el que pide §8.3 del diseño, y todavía no existe.
    */
-  senalar: ({ game, sesion, suspectId, datos }) => {
+  senalar: ({ game, sesion, participanteId, datos }) => {
     const solucion = game.plot?.solution.respuestas;
     if (!solucion) throw new AccionInvalida('Esta partida todavía no tiene saqueador.');
     const { acusacion } = registrarSenalamiento(
       sesion,
-      suspectId,
+      participanteId,
       { [EJE_SAQUEADOR]: datos[EJE_SAQUEADOR] ?? '' },
       solucion,
     );

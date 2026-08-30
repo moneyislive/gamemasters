@@ -140,7 +140,7 @@ ${bloqueNarracion}
     <h2>La solución</h2>
     <table>
       <tbody>
-        <tr><td style="width:34mm;"><strong>Culpable</strong></td><td>${esc(sospechososDe(game).find((s) => s.id === culpableDe(plot.solution))?.name ?? '')} · ${esc(plot.characters.find((c) => c.suspectId === culpableDe(plot.solution))?.characterName ?? '')}</td></tr>
+        <tr><td style="width:34mm;"><strong>Culpable</strong></td><td>${esc(sospechososDe(game).find((s) => s.id === culpableDe(plot.solution))?.name ?? '')} · ${esc(plot.characters.find((c) => c.participanteId === culpableDe(plot.solution))?.characterName ?? '')}</td></tr>
         <tr><td><strong>Objeto</strong></td><td>${esc(objetosDe(game).find((w) => w.id === objetoDe(plot.solution))?.name ?? '')}</td></tr>
         <tr><td><strong>Sala</strong></td><td>${esc(salasDe(game).find((r) => r.id === lugarDe(plot.solution))?.name ?? '')}</td></tr>
         <tr><td><strong>Motivo</strong></td><td>${esc(plot.solution.motive)}</td></tr>

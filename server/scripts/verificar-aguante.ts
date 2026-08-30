@@ -649,7 +649,7 @@ function sembrar(dir: string): void {
     round: 0,
     totalRounds: 3,
     players: game.suspects.map((s, i) => ({
-      suspectId: s.id,
+      participanteId: s.id,
       displayName: s.name,
       joinCode: `CODIG${i}`,
       joined: false,

@@ -13,7 +13,7 @@ import { aceptarGuardar, borrarCuenta, cerrarPartidaEnCuentas } from '../src/liv
 import { refrescarSesion } from '../src/live/sesion';
 
 /** Lo mínimo para que `cerrarPartidaEnCuentas` no se salga por falta de trama. */
-function tramaMinima(sesion: { players: Array<{ suspectId: string; displayName: string }> }): never {
+function tramaMinima(sesion: { players: Array<{ participanteId: string; displayName: string }> }): never {
   return {
     title: 'Prueba',
     tagline: '',
@@ -21,7 +21,7 @@ function tramaMinima(sesion: { players: Array<{ suspectId: string; displayName: 
     setting: '',
     victim: { name: 'Alguien', description: '' },
     characters: sesion.players.map((p) => ({
-      suspectId: p.suspectId,
+      participanteId: p.participanteId,
       characterName: p.displayName,
       role: '',
       publicPersona: '',
@@ -213,7 +213,7 @@ try {
       players: [
         ...((await store.getLive('velada'))?.players ?? []),
         {
-          suspectId: 'v1', displayName: 'Con dos', email: 'segundo@ejemplo.com',
+          participanteId: 'v1', displayName: 'Con dos', email: 'segundo@ejemplo.com',
           accountId: 'varios-1', joinCode: 'ZZZZZZ', joined: true, elecciones: [], notas: '',
           girosRecibidos: [],
           reclamadaPor: { cuentaId: 'varios-1', correo: 'principal@ejemplo.com', el: new Date().toISOString() },
@@ -223,7 +223,7 @@ try {
   }
   await borrarCuenta(varios);
   const trasVarios = await store.getLive('velada');
-  const silla = trasVarios?.players.find((j) => j.suspectId === 'v1');
+  const silla = trasVarios?.players.find((j) => j.participanteId === 'v1');
   salida.variosCorreos = {
     segundoBarridoEnSesion: !silla?.email,
     segundoBarridoEnPartida: !(await store.getGame('velada'))?.suspects.some((x) => x.email === 'segundo@ejemplo.com'),

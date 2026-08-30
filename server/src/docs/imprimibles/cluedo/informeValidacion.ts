@@ -74,7 +74,7 @@ export function informeValidacion(
     (sala) => !plot.clues.some((pista) => pista.roomId === sala.id),
   );
   const sinPersonaje = sospechososDe(game).filter(
-    (s) => !plot.characters.some((c) => c.suspectId === s.id),
+    (s) => !plot.characters.some((c) => c.participanteId === s.id),
   );
   const publicos = cronologiaPublica(plot);
   const hueco = huecoPorReconstruir(plot);
@@ -146,7 +146,7 @@ export function informeValidacion(
     });
     comprobaciones.push({
       titulo: 'Ningún giro le toca al culpable',
-      bien: !material.twists.some((g) => g.suspectId === culpableDe(plot.solution)),
+      bien: !material.twists.some((g) => g.participanteId === culpableDe(plot.solution)),
       detalle: 'Un giro dirigido al culpable lo señalaría delante de todos.',
     });
   }

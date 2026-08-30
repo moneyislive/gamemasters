@@ -23,7 +23,7 @@ const router = crearRouter();
 
 /** Lo que se sabe de cada envío, para pintarlo en el panel. */
 interface Resultado {
-  suspectId: string;
+  participanteId: string;
   para: string;
   enlace?: string;
   error?: string;
@@ -77,18 +77,18 @@ router.post('/games/:id/invitaciones', async (req, res) => {
    * caso corriente de «a Ana no le ha llegado, mándasela otra vez» sin volver a
    * escribirle a los otros once.
    */
-  const pedidos = Array.isArray(req.body?.suspectIds)
-    ? new Set((req.body.suspectIds as unknown[]).map((s) => String(s)))
+  const pedidos = Array.isArray(req.body?.participanteIds)
+    ? new Set((req.body.participanteIds as unknown[]).map((s) => String(s)))
     : null;
 
   const enviadas: Resultado[] = [];
   const fallidas: Resultado[] = [];
-  const sinCorreo: Array<{ suspectId: string; displayName: string }> = [];
+  const sinCorreo: Array<{ participanteId: string; displayName: string }> = [];
 
   for (const jugador of sesion.players) {
-    if (pedidos && !pedidos.has(jugador.suspectId)) continue;
+    if (pedidos && !pedidos.has(jugador.participanteId)) continue;
     if (!jugador.email) {
-      sinCorreo.push({ suspectId: jugador.suspectId, displayName: jugador.displayName });
+      sinCorreo.push({ participanteId: jugador.participanteId, displayName: jugador.displayName });
       continue;
     }
     try {
@@ -96,10 +96,10 @@ router.post('/games/:id/invitaciones', async (req, res) => {
         para: jugador.email,
         nombre: jugador.displayName,
         gameId: sesion.id,
-        suspectId: jugador.suspectId,
+        participanteId: jugador.participanteId,
         tituloPartida: partida.name,
       });
-      enviadas.push({ suspectId: jugador.suspectId, para: mensaje.para, enlace: mensaje.enlace });
+      enviadas.push({ participanteId: jugador.participanteId, para: mensaje.para, enlace: mensaje.enlace });
     } catch (error) {
       /*
        * UNA QUE FALLA NO TUMBA A LAS DEMÁS. Con doce destinatarios, la dirección
@@ -107,7 +107,7 @@ router.post('/games/:id/invitaciones', async (req, res) => {
        * en la lista sin invitación y sin que nadie se entere de cuáles.
        */
       fallidas.push({
-        suspectId: jugador.suspectId,
+        participanteId: jugador.participanteId,
         para: jugador.email,
         error: error instanceof Error ? error.message : String(error),
       });

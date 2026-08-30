@@ -6,7 +6,7 @@
  * Esto existe porque la auditoría encontró un agujero que se pudo REPRODUCIR:
  * la clave con la que se firmaban los testigos de los jugadores era, cuando no
  * había contraseña de la casa, una constante escrita en el código fuente. Con
- * ella y el `suspectId` de otro jugador —que la propia vista te da— cualquier
+ * ella y el `participanteId` de otro jugador —que la propia vista te da— cualquier
  * invitado fabricaba la credencial de un rival, le leía el dosier entero y
  * encontraba al culpable en la ronda uno.
  *
@@ -41,8 +41,8 @@ const b64url = (d: Buffer | string): string =>
 // ---------------------------------------------------------------------------
 
 /** Lo que hacía el atacante: firmar con la constante que estaba en el código. */
-function falsificarConClaveVieja(gameId: string, suspectId: string): string {
-  const carga = b64url(JSON.stringify({ gameId, suspectId, iat: Math.floor(Date.now() / 1000) }));
+function falsificarConClaveVieja(gameId: string, participanteId: string): string {
+  const carga = b64url(JSON.stringify({ gameId, participanteId, iat: Math.floor(Date.now() / 1000) }));
   const firma = b64url(
     crypto.createHmac('sha256', 'gamemasters:jugador:v1:sin-contrasena').update(carga).digest(),
   );
@@ -55,8 +55,8 @@ comprobar(
 );
 
 // Y tampoco sirve derivándola de la contraseña, que era el otro camino.
-function falsificarDesdeContrasena(gameId: string, suspectId: string, pass: string): string {
-  const carga = b64url(JSON.stringify({ gameId, suspectId, iat: 1, exp: 2 ** 31 }));
+function falsificarDesdeContrasena(gameId: string, participanteId: string, pass: string): string {
+  const carga = b64url(JSON.stringify({ gameId, participanteId, iat: 1, exp: 2 ** 31 }));
   const firma = b64url(
     crypto.createHmac('sha256', `gamemasters:jugador:v1:${pass}`).update(carga).digest(),
   );
@@ -93,13 +93,13 @@ comprobar('la cookie ya no se puede reproducir sabiendo la contraseña', cookieR
 const bueno = emitirCredencial('partida', 'jugador-1', 'sesion-a');
 const leido = verificarCredencial(bueno);
 comprobar('un testigo emitido por el servidor vale', leido !== null);
-comprobar('y dice quién es', leido?.suspectId === 'jugador-1' && leido.gameId === 'partida');
+comprobar('y dice quién es', leido?.participanteId === 'jugador-1' && leido.gameId === 'partida');
 comprobar('lleva caducidad', typeof leido?.exp === 'number' && leido.exp > Math.floor(Date.now() / 1000));
 comprobar('y la sesión en la que se emitió', leido?.sid === 'sesion-a');
 
 comprobar(
   'se lee de la cabecera Authorization',
-  credencialDePeticion(`Bearer ${bueno}`)?.suspectId === 'jugador-1',
+  credencialDePeticion(`Bearer ${bueno}`)?.participanteId === 'jugador-1',
 );
 comprobar('y una cabecera sin Bearer no cuela', credencialDePeticion(bueno) === null);
 
@@ -109,7 +109,7 @@ comprobar('y una cabecera sin Bearer no cuela', credencialDePeticion(bueno) === 
 
 const [cargaBuena] = bueno.split('.');
 const cargaManipulada = b64url(
-  JSON.stringify({ ...leido, suspectId: 'otro-jugador' }),
+  JSON.stringify({ ...leido, participanteId: 'otro-jugador' }),
 );
 comprobar(
   'cambiar a quién dice ser rompe la firma',
@@ -126,14 +126,14 @@ comprobar(
 
 const caducado = (() => {
   const carga = b64url(
-    JSON.stringify({ gameId: 'p', suspectId: 'j', iat: 1000, exp: Math.floor(Date.now() / 1000) - 60 }),
+    JSON.stringify({ gameId: 'p', participanteId: 'j', iat: 1000, exp: Math.floor(Date.now() / 1000) - 60 }),
   );
   return `${carga}.${firmarConSecreto(carga)}`;
 })();
 comprobar('un testigo caducado se rechaza aunque la firma sea buena', verificarCredencial(caducado) === null);
 
 const sinCaducidad = (() => {
-  const carga = b64url(JSON.stringify({ gameId: 'p', suspectId: 'j', iat: 1000 }));
+  const carga = b64url(JSON.stringify({ gameId: 'p', participanteId: 'j', iat: 1000 }));
   return `${carga}.${firmarConSecreto(carga)}`;
 })();
 comprobar(

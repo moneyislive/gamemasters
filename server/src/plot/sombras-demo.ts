@@ -93,7 +93,7 @@ export function respuestaDeDemostracion(
       const esKancho = persona.id === kancho?.id;
       const companero = escoltas[(i + 1) % escoltas.length]!;
       return {
-        suspectId: persona.id,
+        participanteId: persona.id,
         characterName: persona.name,
         role: ficha.rol,
         publicPersona:

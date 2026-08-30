@@ -150,7 +150,7 @@ function nuevaPartida(): { game: GameSession; sesion: LiveSession } {
     round: 0,
     totalRounds: VIGILIAS,
     players: GENTE.map((name, i) => ({
-      suspectId: `e${i}`,
+      participanteId: `e${i}`,
       displayName: name,
       joinCode: `MOMIA${i}`,
       joined: false,
@@ -508,7 +508,7 @@ async function jugarPorElCable(): Promise<void> {
   comprobar(
     'la mesa ve las marcas de los demás: es información pública',
     (await vista('e1')).estadoDelJuego !== undefined &&
-      estadoDe(await vista('e1')).mesa.find((m: any) => m.suspectId === 'e0')?.marcas === 1,
+      estadoDe(await vista('e1')).mesa.find((m: any) => m.participanteId === 'e0')?.marcas === 1,
   );
 
   paso('La cronología pública no adelanta la maldición');
@@ -952,7 +952,7 @@ function jugarElSellado(): void {
     nueva.sesion.phase = 'ronda-abierta';
     nueva.sesion.round = 1;
     nueva.sesion.estado = {
-      momia: estadoInicial(tramaDe(nueva.game.plot)!, nueva.sesion.players.map((p) => p.suspectId)),
+      momia: estadoInicial(tramaDe(nueva.game.plot)!, nueva.sesion.players.map((p) => p.participanteId)),
     };
     return nueva;
   };
@@ -1227,7 +1227,7 @@ function jugarElSellado(): void {
     game: d.game,
     sesion: d.sesion,
     plot: d.game.plot!,
-    jugador: d.sesion.players.find((p) => p.suspectId === 'e0')!,
+    jugador: d.sesion.players.find((p) => p.participanteId === 'e0')!,
     eraSenalado: false,
     gano: false,
     acerto: false,

@@ -254,7 +254,7 @@ export function renderDocumentIndex(game: GameSession): PlayerDocument[] {
  */
 export function renderPlayerDocument(
   game: GameSession,
-  suspectId: string,
+  participanteId: string,
   opciones: DocumentRenderOptions = {},
 ): PlayerDocument | null {
   const plot = game.plot;
@@ -267,14 +267,14 @@ export function renderPlayerDocument(
    * pertenecen a ninguna persona de la mesa y buscarlos entre los participantes
    * no encontraría nada.
    */
-  const suelto = dosieres.deLaMesa?.(game, plot).find((d) => d.id === suspectId);
-  if (suelto) return { id: suspectId, title: suelto.titulo, html: suelto.html(opciones) };
+  const suelto = dosieres.deLaMesa?.(game, plot).find((d) => d.id === participanteId);
+  if (suelto) return { id: participanteId, title: suelto.titulo, html: suelto.html(opciones) };
 
-  if (!personasDe(game).some((s) => s.id === suspectId)) return null;
+  if (!personasDe(game).some((s) => s.id === participanteId)) return null;
 
-  const html = dosieres.deUno(game, plot, suspectId, opciones);
+  const html = dosieres.deUno(game, plot, participanteId, opciones);
   if (html === null) return null;
-  return { id: suspectId, title: dosieres.tituloDeUno(game, plot, suspectId), html };
+  return { id: participanteId, title: dosieres.tituloDeUno(game, plot, participanteId), html };
 }
 
 /**

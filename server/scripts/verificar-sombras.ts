@@ -157,7 +157,7 @@ function nuevaPartida(): { game: GameSession; sesion: LiveSession } {
     round: 0,
     totalRounds: HORAS,
     players: GENTE.map((name, i) => ({
-      suspectId: `e${i}`,
+      participanteId: `e${i}`,
       displayName: name,
       joinCode: `SOMBR${i}`,
       joined: false,
@@ -551,7 +551,7 @@ async function jugarPorElCable(): Promise<void> {
   comprobar('la propuesta vuelve en tu propia vista', Array.isArray(miPropuesta) && miPropuesta.length === 4, miPropuesta);
   comprobar(
     'que alguien ha propuesto es público; QUÉ ha propuesto, no',
-    ((await vista('e1')).estadoDelJuego as any).mesa.some((m: any) => m.suspectId === 'e0' && m.haPropuesto) &&
+    ((await vista('e1')).estadoDelJuego as any).mesa.some((m: any) => m.participanteId === 'e0' && m.haPropuesto) &&
       !JSON.stringify(((await vista('e1')).estadoDelJuego as any).mesa).includes('"senda"'),
   );
 
@@ -566,7 +566,7 @@ async function jugarPorElCable(): Promise<void> {
   );
   comprobar(
     'y se ve quién pisó allí, que es lo que hace comprobable lo que se dijo',
-    (trasCierre.mesa ?? []).some((m: any) => m.suspectId === 'e2' && m.pisadasVistas === 1),
+    (trasCierre.mesa ?? []).some((m: any) => m.participanteId === 'e2' && m.pisadasVistas === 1),
     trasCierre.mesa,
   );
   comprobar(
@@ -781,7 +781,7 @@ function jugarElConsejo(): void {
   darPrenda(g4, s4, 'e1', 'e0');
   darPrenda(g4, s4, 'e1', 'e2');
   s4.acusaciones = [
-    { suspectId: 'e0', respuestas: { kancho: KANCHO }, at: 'z', correcta: true },
+    { participanteId: 'e0', respuestas: { kancho: KANCHO }, at: 'z', correcta: true },
   ];
   const res4 = ejecutarConsejo(g4, s4);
   const trofeos = trofeosDe(g4, s4, res4);

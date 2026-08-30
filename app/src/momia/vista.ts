@@ -68,7 +68,7 @@ export interface RitoVisible {
 
 /** Lo que se sabe de otra persona: solo lo que en la mesa se ve. */
 export interface GenteVisible {
-  suspectId: string;
+  participanteId: string;
   marcas: number;
   amuletos: number;
   tocado: boolean;
@@ -258,10 +258,10 @@ export function leerEstadoMomia(v: unknown): EstadoMomiaVisible | null {
   const publicos = leerLista(v.papiro, leerFragmento);
   const gente = leerLista(v.mesa, (x) => {
     if (!esObjeto(x)) return null;
-    const suspectId = cadena(x.suspectId);
-    if (!suspectId) return null;
+    const participanteId = cadena(x.participanteId);
+    if (!participanteId) return null;
     return {
-      suspectId,
+      participanteId,
       marcas: entero(x.marcas),
       amuletos: entero(x.amuletos),
       tocado: x.tocado === true,

@@ -66,7 +66,7 @@ const sesion = (id: string, correos: Array<string | undefined>, fase: string) =>
   round: 0,
   totalRounds: 3,
   players: correos.map((email, i) => ({
-    suspectId: `s${i}`,
+    participanteId: `s${i}`,
     displayName: `Persona ${i}`,
     email,
     joinCode: CODIGO_SECRETO,

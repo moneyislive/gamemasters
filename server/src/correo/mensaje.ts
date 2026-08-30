@@ -34,7 +34,7 @@ export interface Invitada {
   /** Cómo la llamó quien organiza, para encabezar el mensaje. */
   nombre?: string;
   gameId: string;
-  suspectId: string;
+  participanteId: string;
   /** El nombre de la partida, tal como se enseña. */
   tituloPartida: string;
 }
@@ -71,7 +71,7 @@ export interface Transporte {
  * quedaría atrás es el que nadie abre nunca en desarrollo — el del correo.
  */
 export function componerInvitacion(invitada: Invitada, origen: string): MensajeCompuesto {
-  const enlace = enlaceDeInvitacion(invitada.gameId, invitada.suspectId);
+  const enlace = enlaceDeInvitacion(invitada.gameId, invitada.participanteId);
   const privacidad = `${origen}/privacidad`;
   const saludo = invitada.nombre?.trim() ? `${invitada.nombre.trim()},` : 'Hola,';
   const titulo = invitada.tituloPartida.trim() || 'una velada de misterio';

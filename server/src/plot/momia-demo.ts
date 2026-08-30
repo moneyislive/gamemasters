@@ -116,7 +116,7 @@ export function respuestaDeDemostracion(
       const papel = PAPELES[i % PAPELES.length]!;
       const otro = expedicionarios[(i + 1) % expedicionarios.length]!;
       return {
-        suspectId: persona.id,
+        participanteId: persona.id,
         characterName: persona.name,
         role: papel.role,
         publicPersona: papel.persona,

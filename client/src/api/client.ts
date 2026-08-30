@@ -114,8 +114,8 @@ export const upsertSuspect = (gameId: string, suspect: Partial<Suspect>) =>
     method: 'POST',
     body: JSON.stringify(suspect),
   });
-export const removeSuspect = (gameId: string, suspectId: string) =>
-  request<GameSession>(`/games/${gameId}/suspects/${suspectId}`, { method: 'DELETE' });
+export const removeSuspect = (gameId: string, participanteId: string) =>
+  request<GameSession>(`/games/${gameId}/suspects/${participanteId}`, { method: 'DELETE' });
 
 export const upsertRoom = (gameId: string, room: Partial<Room>) =>
   request<GameSession>(`/games/${gameId}/rooms`, { method: 'POST', body: JSON.stringify(room) });
@@ -236,10 +236,10 @@ export interface DocumentUrlOptions {
 
 export const documentUrl = (
   gameId: string,
-  suspectId: string,
+  participanteId: string,
   opciones: DocumentUrlOptions | boolean = {},
 ): string => {
-  // Durante un tiempo la firma fue (gameId, suspectId, download): se mantiene
+  // Durante un tiempo la firma fue (gameId, participanteId, download): se mantiene
   // para no romper llamadas antiguas.
   const op: DocumentUrlOptions = typeof opciones === 'boolean' ? { download: opciones } : opciones;
   const params = new URLSearchParams();
@@ -248,7 +248,7 @@ export const documentUrl = (
   if (op.download) params.set('download', '1');
   if (op.print) params.set('print', op.print === 'auto' ? 'auto' : '1');
   const cola = params.toString();
-  return `${BASE}/games/${gameId}/documents/${suspectId}${cola ? `?${cola}` : ''}`;
+  return `${BASE}/games/${gameId}/documents/${participanteId}${cola ? `?${cola}` : ''}`;
 };
 
 /** Paquete completo de la partida en un ZIP, con carpetas por destinatario. */

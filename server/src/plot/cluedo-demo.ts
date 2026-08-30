@@ -238,7 +238,7 @@ function construirPersonajes(
       : `No sabemos mucho de ti, y eso es una ventaja: esta noche puedes ser exactamente quien quieras. Nadie podrá distinguir tu papel de tu verdad.`;
 
     return {
-      suspectId: sospechoso.id,
+      participanteId: sospechoso.id,
       characterName,
       role: cicla(ROLES, i),
       publicPersona: `${characterName} es ${cicla(ROLES, i)}, y en sociedad se comenta ante todo ${cicla(RASGOS, i)}.`,
@@ -265,44 +265,44 @@ function construirCronologia(
     {
       time: '19:00',
       description: `Los invitados van llegando; ${nombreVictima} recibe a cada uno con una copa y una indirecta.`,
-      suspectIds: todos,
+      participanteIds: todos,
       isPublic: true,
     },
     {
       time: '19:45',
       description: `Durante el aperitivo, ${nombreVictima} anuncia que a medianoche "pondrá los puntos sobre las íes". Varias copas se detienen a medio camino.`,
-      suspectIds: todos,
+      participanteIds: todos,
       isPublic: true,
     },
     {
       time: '20:30',
       description: 'Cena servida. Conversación brillante en la superficie, cuchillos afilados por debajo.',
-      suspectIds: todos,
+      participanteIds: todos,
       isPublic: true,
     },
     {
       time: '21:15',
       description: `${nombreVictima} se excusa y se retira "a atender un asunto privado". Nadie admite haberle seguido.`,
-      suspectIds: [],
+      participanteIds: [],
       isPublic: true,
     },
     {
       time: '21:40',
       description: 'Un apagón deja la casa a oscuras durante varios minutos. Pasos, un roce de telas, una puerta que no debía abrirse.',
-      suspectIds: todos,
+      participanteIds: todos,
       isPublic: true,
     },
     {
       // Delator: nadie lo vio, así que jamás debe salir del dosier del GM.
       time: '21:44',
       description: `Una silueta se desliza hacia ${salaCrimen.name} amparada por la oscuridad y vuelve al salón antes de que prendan las velas.`,
-      suspectIds: [asesino.id],
+      participanteIds: [asesino.id],
       isPublic: false,
     },
     {
       time: '21:47',
       description: `Vuelve la luz. Un grito: ${descubridor.name} encuentra el cuerpo de ${nombreVictima}. La velada se convierte en investigación.`,
-      suspectIds: [descubridor.id, ...todos.filter((id) => id !== descubridor.id)],
+      participanteIds: [descubridor.id, ...todos.filter((id) => id !== descubridor.id)],
       isPublic: true,
     },
   ];
@@ -390,20 +390,20 @@ function construirPistas(
  * La usa la ruta /refresh: en modo demo como generador principal y, con API,
  * como red de seguridad cuando el modelo no devuelve todos los personajes.
  *
- * @param suspectIds ids de los sospechosos a los que hay que dar personaje.
+ * @param participanteIds ids de los sospechosos a los que hay que dar personaje.
  */
 export function generateDemoCharacters(
   game: GameSession,
-  suspectIds: string[],
+  participanteIds: string[],
   plot: Plot,
 ): PlotCharacter[] {
   const sospechosoPorId = new Map(sospechososDe(game).map((s) => [s.id, s]));
-  const yaTienenPersonaje = new Set(plot.characters.map((personaje) => personaje.suspectId));
+  const yaTienenPersonaje = new Set(plot.characters.map((personaje) => personaje.participanteId));
 
   // Se ignoran ids repetidos, inexistentes o que ya tenían personaje.
   const pendientes: Suspect[] = [];
   const vistos = new Set<string>();
-  for (const id of suspectIds) {
+  for (const id of participanteIds) {
     const sospechoso = sospechosoPorId.get(id);
     if (!sospechoso || vistos.has(id) || yaTienenPersonaje.has(id)) continue;
     vistos.add(id);
@@ -471,7 +471,7 @@ export function generateDemoCharacters(
       : `Llegas cuando la velada ya estaba escrita, y eso es una ventaja: nadie tiene una versión previa de ti. Esta noche puedes ser exactamente quien te convenga.`;
 
     return {
-      suspectId: sospechoso.id,
+      participanteId: sospechoso.id,
       characterName,
       role: papel,
       publicPersona: `${characterName} es ${papel}, y desde su llegada no se habla en la casa de otra cosa que de ${cicla(RASGOS, desplazamiento)}.`,

@@ -40,7 +40,7 @@ import type { LiveSession } from '../../../shared/live';
 export type Proyeccion = (
   game: GameSession,
   sesion: LiveSession,
-  suspectId: string,
+  participanteId: string,
 ) => unknown | undefined;
 
 /**
@@ -68,17 +68,17 @@ export function registrarProyeccion(juego: JuegoId, proyeccion: Proyeccion): voi
 export function proyectarEstado(
   game: GameSession,
   sesion: LiveSession,
-  suspectId: string,
+  participanteId: string,
 ): unknown | undefined {
   // Por el manifiesto y no por el campo crudo, igual que `estadoParaGm` aquí
   // abajo: las partidas de CLUEDO de siempre no declaran `settings.juego`.
   const fn = PROYECCIONES[manifiestoDe(sesion.juego).id];
   if (!fn) return undefined;
   try {
-    return fn(game, sesion, suspectId);
+    return fn(game, sesion, participanteId);
   } catch (error) {
     console.error(
-      `[proyeccion] el juego «${sesion.juego}» no pudo componer su estado para ${suspectId}:`,
+      `[proyeccion] el juego «${sesion.juego}» no pudo componer su estado para ${participanteId}:`,
       error,
     );
     return undefined;

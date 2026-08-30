@@ -151,7 +151,7 @@ const game: GameSession = {
     },
     characters: [
       {
-        suspectId: 's0',
+        participanteId: 's0',
         characterName: 'Ana Escarlata',
         role: 'La heredera',
         publicPersona: 'Sonríe mucho.',
@@ -240,7 +240,7 @@ const gameMomia = {
     },
     characters: [
       {
-        suspectId: 'e0',
+        participanteId: 'e0',
         characterName: 'Marta Vance',
         role: 'Epigrafista',
         publicPersona: 'Traduce lo que nadie sabe leer.',

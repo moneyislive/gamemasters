@@ -82,8 +82,8 @@ function paso(titulo: string): void {
 
 const ahora = new Date().toISOString();
 
-const personaje = (suspectId: string, nombre: string) => ({
-  suspectId,
+const personaje = (participanteId: string, nombre: string) => ({
+  participanteId,
   characterName: nombre,
   role: 'Invitado de la casa',
   publicPersona: 'Llegó tarde y sin abrigo.',
@@ -128,7 +128,7 @@ const datos = {
           personaje('s2', 'La sobrina'),
         ],
         timeline: [
-          { time: '21:00', description: 'Se sirve la cena.', suspectIds: ['s0', 's1'], isPublic: true },
+          { time: '21:00', description: 'Se sirve la cena.', participanteIds: ['s0', 's1'], isPublic: true },
         ],
         clues: [{ id: 'c1', roomId: 'r0', description: 'Una copa rota.', pointsTo: 's1', round: 1 }],
         gmScript: ['Acto I: la cena.'],
@@ -147,7 +147,7 @@ const datos = {
       totalRounds: 3,
       players: [
         {
-          suspectId: 's0',
+          participanteId: 's0',
           displayName: 'Ana',
           email: 'ana@ejemplo.com',
           joinCode: CODIGO_PERSONAL,
@@ -157,7 +157,7 @@ const datos = {
           girosRecibidos: [],
         },
         {
-          suspectId: 's1',
+          participanteId: 's1',
           displayName: 'Bruno',
           email: 'bruno@ejemplo.com',
           joinCode: 'BRUNO1',
@@ -167,7 +167,7 @@ const datos = {
           girosRecibidos: [],
         },
         {
-          suspectId: 's2',
+          participanteId: 's2',
           displayName: 'Quien no dejó correo',
           joinCode: 'SINCOR',
           joined: false,
@@ -390,14 +390,14 @@ try {
 
   const resultado = envio.json as {
     modo?: string;
-    enviadas?: Array<{ suspectId: string; para: string; enlace: string }>;
-    sinCorreo?: Array<{ suspectId: string }>;
+    enviadas?: Array<{ participanteId: string; para: string; enlace: string }>;
+    sinCorreo?: Array<{ participanteId: string }>;
   } | null;
   comprobar('en el modo de memoria, que es el de por defecto', resultado?.modo === 'memoria', resultado?.modo);
   comprobar('a quienes tienen correo apuntado', resultado?.enviadas?.length === 2, resultado?.enviadas);
   comprobar(
     'y a quien no lo tiene se le dice, en vez de callarlo',
-    resultado?.sinCorreo?.[0]?.suspectId === 's2',
+    resultado?.sinCorreo?.[0]?.participanteId === 's2',
     resultado?.sinCorreo,
   );
 
@@ -577,7 +577,7 @@ try {
   const porSes = await pedir(PUERTO_SES, '/api/games/velada/invitaciones', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Cookie: cookieSes },
-    body: JSON.stringify({ suspectIds: ['s0'] }),
+    body: JSON.stringify({ participanteIds: ['s0'] }),
   });
   comprobar('el envío por SES se da por bueno cuando SES responde bien', porSes.estado === 200, porSes);
   comprobar('y solo se manda a quien se pide', (porSes.json as { enviadas?: unknown[] })?.enviadas?.length === 1, porSes.json);
@@ -726,7 +726,7 @@ try {
    * después, y es distinto de un sobre inventado — de ahí que se compruebe con
    * uno de verdad y no con basura.
    */
-  const caducado = cerrarSobre('enlace:v1', { gameId: 'velada', suspectId: 's0' }, -10);
+  const caducado = cerrarSobre('enlace:v1', { gameId: 'velada', participanteId: 's0' }, -10);
   const paginaCaducada = await pedir(PUERTO_REAL, `/i/${encodeURIComponent(caducado)}`);
   comprobar('la página de un sobre caducado responde 410', paginaCaducada.estado === 410, paginaCaducada.estado);
   comprobar(
@@ -811,7 +811,7 @@ try {
   const carlaSeCuela = await pedir(PUERTO_REAL, '/api/cuenta/entrar-en-partida', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-GM-Cuenta': pasaporteCarla },
-    body: JSON.stringify({ gameId: 'velada', suspectId: 's0' }),
+    body: JSON.stringify({ gameId: 'velada', participanteId: 's0' }),
   });
   comprobar(
     'y con los identificadores del sobre en la mano, tampoco se sienta',
@@ -850,10 +850,10 @@ try {
   const deAna = await abrir({ sobre: sobreDeAna }, pasaporteAna);
   comprobar('con la cuenta invitada, el sobre señala su silla', deAna.estado === 200, deAna);
   const invitacion = (deAna.json as {
-    invitacion?: { gameId: string; suspectId: string; personaje: string; directa: boolean };
+    invitacion?: { gameId: string; participanteId: string; personaje: string; directa: boolean };
   })?.invitacion;
   comprobar('con la partida', invitacion?.gameId === 'velada', invitacion);
-  comprobar('y la silla concreta', invitacion?.suspectId === 's0', invitacion);
+  comprobar('y la silla concreta', invitacion?.participanteId === 's0', invitacion);
   comprobar('y ahora sí, con el nombre de quien esperan', invitacion?.personaje === 'Ana', invitacion);
   comprobar('diciendo que puede entrar sin código', invitacion?.directa === true, invitacion);
   /*
@@ -874,7 +874,7 @@ try {
   const sentada = await pedir(PUERTO_REAL, '/api/cuenta/entrar-en-partida', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-GM-Cuenta': pasaporteAna },
-    body: JSON.stringify({ gameId: invitacion?.gameId, suspectId: invitacion?.suspectId }),
+    body: JSON.stringify({ gameId: invitacion?.gameId, participanteId: invitacion?.participanteId }),
   });
   comprobar('por la puerta de siempre, Ana se sienta', sentada.estado === 200, sentada);
   const credencial = (sentada.json as { token?: string })?.token ?? '';
@@ -910,9 +910,9 @@ try {
     Buffer.from(credencial.split('.')[0]!.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString(
       'utf8',
     ),
-  ) as { gameId: string; suspectId: string; sid?: string; exp?: number };
+  ) as { gameId: string; participanteId: string; sid?: string; exp?: number };
   comprobar('la credencial es de esta partida', carga.gameId === 'velada', carga);
-  comprobar('y de esta silla', carga.suspectId === 's0', carga);
+  comprobar('y de esta silla', carga.participanteId === 's0', carga);
   comprobar('atada a ESTA apertura de la mesa', carga.sid === 'apertura-de-hoy', carga);
   comprobar('y con fecha de caducidad', typeof carga.exp === 'number', carga);
 

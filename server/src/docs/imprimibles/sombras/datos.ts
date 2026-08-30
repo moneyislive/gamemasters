@@ -218,9 +218,9 @@ export interface VistaSombrasPapel {
   /** Quién cobra de Akechi, si la trama lo dice. */
   kancho?: { entidad?: Entidad; personaje?: string };
   /** El disfraz de cada persona, con su texto de papel. */
-  disfrazDe: (suspectId: string) => DisfrazEscrito | undefined;
+  disfrazDe: (participanteId: string) => DisfrazEscrito | undefined;
   /** El estandarte de cada persona. */
-  estandarteDe: (suspectId: string) => Entidad | undefined;
+  estandarteDe: (participanteId: string) => Entidad | undefined;
   /** El porte de un enser, si lo tiene. */
   porteDe: (enserId: string) => ReturnType<typeof fichaDePorte>;
   /** Quién carga cada enser al empezar. */
@@ -283,12 +283,12 @@ export function vistaDeLasSombras(game: GameSession, plot: Plot): VistaSombrasPa
     kancho: kanchoId
       ? {
           entidad: buscar(escoltas, kanchoId),
-          personaje: plot.characters.find((c) => c.suspectId === kanchoId)?.characterName,
+          personaje: plot.characters.find((c) => c.participanteId === kanchoId)?.characterName,
         }
       : undefined,
-    disfrazDe: (suspectId: string) => disfrazDe(trama?.papeles[suspectId]),
-    estandarteDe: (suspectId: string) => {
-      const id = trama?.estandartes[suspectId];
+    disfrazDe: (participanteId: string) => disfrazDe(trama?.papeles[participanteId]),
+    estandarteDe: (participanteId: string) => {
+      const id = trama?.estandartes[participanteId];
       return id ? buscar(estandartes, id) : undefined;
     },
     porteDe: (enserId: string) => fichaDePorte(trama?.portes[enserId] as PorteId | undefined),

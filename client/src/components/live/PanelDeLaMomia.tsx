@@ -127,20 +127,20 @@ export default function PanelDeLaMomia({
   const reservadas = propuestas.some(([, p]) => (p as { reservada?: boolean }).reservada);
 
   const recuento = new Map<string, { orden: string[]; apoyos: string[] }>();
-  for (const [suspectId, propuesta] of reservadas ? [] : propuestas) {
-    if (gente[suspectId]?.tocado) continue;
+  for (const [participanteId, propuesta] of reservadas ? [] : propuestas) {
+    if (gente[participanteId]?.tocado) continue;
     const clave = propuesta.orden.join('>');
     const previo = recuento.get(clave);
-    if (previo) previo.apoyos.push(suspectId);
-    else recuento.set(clave, { orden: propuesta.orden, apoyos: [suspectId] });
+    if (previo) previo.apoyos.push(participanteId);
+    else recuento.set(clave, { orden: propuesta.orden, apoyos: [participanteId] });
   }
   const masVotada = [...recuento.values()].sort((a, b) => b.apoyos.length - a.apoyos.length)[0];
   const hayEmpate =
     masVotada !== undefined &&
     [...recuento.values()].filter((v) => v.apoyos.length === masVotada.apoyos.length).length > 1;
 
-  const nombreJugador = (suspectId: string): string =>
-    sesion.players.find((p) => p.suspectId === suspectId)?.displayName ?? '—';
+  const nombreJugador = (participanteId: string): string =>
+    sesion.players.find((p) => p.participanteId === participanteId)?.displayName ?? '—';
 
   return (
     <>
@@ -184,12 +184,12 @@ export default function PanelDeLaMomia({
           </thead>
           <tbody>
             {sesion.players.map((p) => {
-              const suyo = gente[p.suspectId];
+              const suyo = gente[p.participanteId];
               const marcas = suyo?.marcas ?? 0;
               const alBorde = !suyo?.tocado && marcas === MARCAS_PARA_TOCADO - 1;
               return (
                 <tr
-                  key={p.suspectId}
+                  key={p.participanteId}
                   className={suyo?.tocado ? 'is-tocado' : alBorde ? 'is-al-borde' : undefined}
                 >
                   <td>{p.displayName}</td>
@@ -241,10 +241,10 @@ export default function PanelDeLaMomia({
             </thead>
             <tbody>
               {sesion.players.map((p) => {
-                const suyo = gente[p.suspectId];
+                const suyo = gente[p.participanteId];
                 const usado = suyo?.donUsadoEnRonda === sesion.round;
                 return (
-                  <tr key={p.suspectId}>
+                  <tr key={p.participanteId}>
                     <td>{p.displayName}</td>
                     <td>{suyo?.fragmentos.length ?? 0}</td>
                     <td className="text-dim">

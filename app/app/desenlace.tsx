@@ -79,8 +79,8 @@ export default function Desenlace(): JSX.Element {
     );
   }
 
-  const gane = fin.ganador?.suspectId === vista.yo.suspectId;
-  const eraYo = fin.culpableId === vista.yo.suspectId;
+  const gane = fin.ganador?.participanteId === vista.yo.participanteId;
+  const eraYo = fin.culpableId === vista.yo.participanteId;
   // El primer eje del juego es el que abre el sobre; el resto se lee debajo.
   // En CLUEDO eso es «fue Fulano, con el candelabro, en la cocina», pero la
   // pantalla ya no sabe que son tres ni cómo se llaman.
@@ -182,7 +182,7 @@ export default function Desenlace(): JSX.Element {
 
           <Seccion>Cómo quedó la mesa</Seccion>
           {fin.clasificacion.map((c, i) => (
-            <View key={c.suspectId} style={estilos.fila}>
+            <View key={c.participanteId} style={estilos.fila}>
               <Cuerpo style={estilos.puesto}>{i + 1}</Cuerpo>
               <Cuerpo style={{ flex: 1, fontSize: 17 }}>{c.displayName}</Cuerpo>
               <Cuerpo

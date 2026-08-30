@@ -96,8 +96,8 @@ export function Hora(): JSX.Element {
   const { sesion, yo } = vista;
   const s = leerEstadoSombras(vista.estadoDelJuego);
   const nombreDePaso = (id: string) => s?.pasos.find((p) => p.id === id)?.nombre ?? id;
-  const nombreDe = (suspectId: string) =>
-    vista.jugadores.find((j) => j.suspectId === suspectId)?.displayName ?? 'alguien';
+  const nombreDe = (participanteId: string) =>
+    vista.jugadores.find((j) => j.participanteId === participanteId)?.displayName ?? 'alguien';
 
   const hacer = async (
     etiqueta: string,
@@ -423,20 +423,20 @@ export function Hora(): JSX.Element {
                 <Etiqueta>¿Sobre quién?</Etiqueta>
                 <View style={estilos.opciones}>
                   {vista.jugadores
-                    .filter((j) => papelActivo !== 'trocar' || j.suspectId !== yo.suspectId)
+                    .filter((j) => papelActivo !== 'trocar' || j.participanteId !== yo.participanteId)
                     .map((j) => (
                       <Pressable
-                        key={j.suspectId}
+                        key={j.participanteId}
                         onPress={() => {
                           void Haptics.selectionAsync();
-                          setObjetivo(j.suspectId);
+                          setObjetivo(j.participanteId);
                         }}
                         style={[
                           estilos.opcion,
                           {
-                            borderColor: objetivo === j.suspectId ? C.oro400 : conAlfa(C.laton, 0.4),
+                            borderColor: objetivo === j.participanteId ? C.oro400 : conAlfa(C.laton, 0.4),
                             backgroundColor:
-                              objetivo === j.suspectId ? conAlfa(C.oro500, 0.15) : 'transparent',
+                              objetivo === j.participanteId ? conAlfa(C.oro500, 0.15) : 'transparent',
                           },
                         ]}
                       >
@@ -591,12 +591,12 @@ export function Hora(): JSX.Element {
                 <Etiqueta>Dar una prenda a</Etiqueta>
                 <View style={estilos.opciones}>
                   {vista.jugadores
-                    .filter((j) => j.suspectId !== yo.suspectId)
+                    .filter((j) => j.participanteId !== yo.participanteId)
                     .map((j) => (
                       <Pressable
-                        key={j.suspectId}
+                        key={j.participanteId}
                         onPress={() =>
-                          void hacer('avalar', 'avalar', { aQuien: j.suspectId }, () =>
+                          void hacer('avalar', 'avalar', { aQuien: j.participanteId }, () =>
                             setUltimo(`Le has dado tu palabra a ${j.displayName}.`),
                           )
                         }
@@ -638,13 +638,13 @@ export function Hora(): JSX.Element {
               <Etiqueta style={{ marginTop: espacio.md }}>Pasárselo a</Etiqueta>
               <View style={estilos.opciones}>
                 {vista.jugadores
-                  .filter((j) => j.suspectId !== yo.suspectId)
+                  .filter((j) => j.participanteId !== yo.participanteId)
                   .map((j) => (
                     <Pressable
-                      key={j.suspectId}
+                      key={j.participanteId}
                       onPress={() => {
                         setEnserElegido(enser.id);
-                        void hacer('entregar', 'entregar', { enser: enser.id, aQuien: j.suspectId }, () =>
+                        void hacer('entregar', 'entregar', { enser: enser.id, aQuien: j.participanteId }, () =>
                           setUltimo(`${enser.nombre} ahora lo lleva ${j.displayName}.`),
                         );
                       }}

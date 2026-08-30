@@ -32,7 +32,7 @@ export interface ContextoAccion {
   game: GameSession;
   sesion: LiveSession;
   /** Quién la hace. */
-  suspectId: string;
+  participanteId: string;
   /** Lo que ha elegido, campo a campo, con ids ya verificados. */
   datos: Record<string, string>;
   /**
@@ -86,9 +86,9 @@ export function registrarAcciones(juego: JuegoId, reductores: Record<string, Red
 }
 
 /** Cuántas veces ha hecho ya esta persona esta acción en la ronda en curso. */
-function vecesEsteTurno(sesion: LiveSession, suspectId: string, accion: string): number {
+function vecesEsteTurno(sesion: LiveSession, participanteId: string, accion: string): number {
   return (sesion.acciones ?? []).filter(
-    (a) => a.suspectId === suspectId && a.accion === accion && a.round === sesion.round,
+    (a) => a.participanteId === participanteId && a.accion === accion && a.round === sesion.round,
   ).length;
 }
 
@@ -100,7 +100,7 @@ function vecesEsteTurno(sesion: LiveSession, suspectId: string, accion: string):
 export function ejecutarAccion(
   game: GameSession,
   sesion: LiveSession,
-  suspectId: string,
+  participanteId: string,
   accion: string,
   /*
    * Puede traer listas ademas de valores sueltos: hay acciones cuya respuesta es
@@ -117,18 +117,18 @@ export function ejecutarAccion(
   if (!definicion.fases.includes(sesion.phase)) {
     throw new AccionInvalida(`Ahora mismo no toca ${definicion.rotulo.toLowerCase()}.`);
   }
-  if (!sesion.players.some((p) => p.suspectId === suspectId)) {
+  if (!sesion.players.some((p) => p.participanteId === participanteId)) {
     throw new AccionInvalida('No participas en esta partida.');
   }
 
   // Por turnos: solo actúa quien lo tiene. Simultáneo: cualquiera, cuando quiera.
-  if (manifiesto.turnos === 'por-turnos' && sesion.turnoDe && sesion.turnoDe !== suspectId) {
+  if (manifiesto.turnos === 'por-turnos' && sesion.turnoDe && sesion.turnoDe !== participanteId) {
     throw new AccionInvalida('No es tu turno.');
   }
 
   if (
     definicion.vecesPorTurno !== undefined &&
-    vecesEsteTurno(sesion, suspectId, accion) >= definicion.vecesPorTurno
+    vecesEsteTurno(sesion, participanteId, accion) >= definicion.vecesPorTurno
   ) {
     throw new AccionInvalida(
       definicion.vecesPorTurno === 1
@@ -237,13 +237,13 @@ export function ejecutarAccion(
     throw new AccionInvalida('Esta partida todavía no sabe hacer eso.');
   }
 
-  const resultado = reductor({ game, sesion, suspectId, datos: limpios, listas, numeros, definicion });
+  const resultado = reductor({ game, sesion, participanteId, datos: limpios, listas, numeros, definicion });
 
   // Queda registrado para poder contar repeticiones y para que quien dirige vea
   // lo que va pasando.
   sesion.acciones = [
     ...(sesion.acciones ?? []),
-    { suspectId, accion, round: sesion.round, at: new Date().toISOString() },
+    { participanteId, accion, round: sesion.round, at: new Date().toISOString() },
   ];
   return resultado;
 }
@@ -251,16 +251,16 @@ export function ejecutarAccion(
 /** Qué puede hacer ahora mismo esta persona. Lo usa la proyección. */
 export function accionesDisponibles(
   sesion: LiveSession,
-  suspectId: string,
+  participanteId: string,
 ): DefinicionAccion[] {
   const manifiesto = manifiestoDe(sesion.juego);
-  if (manifiesto.turnos === 'por-turnos' && sesion.turnoDe && sesion.turnoDe !== suspectId) {
+  if (manifiesto.turnos === 'por-turnos' && sesion.turnoDe && sesion.turnoDe !== participanteId) {
     return [];
   }
   return manifiesto.acciones.filter(
     (a) =>
       a.fases.includes(sesion.phase) &&
       (a.vecesPorTurno === undefined ||
-        vecesEsteTurno(sesion, suspectId, a.id) < a.vecesPorTurno),
+        vecesEsteTurno(sesion, participanteId, a.id) < a.vecesPorTurno),
   );
 }

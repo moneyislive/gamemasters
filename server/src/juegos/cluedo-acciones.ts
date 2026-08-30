@@ -20,8 +20,8 @@ import type { EjeId } from '../../../shared/juegos';
 
 registrarAcciones('cluedo', {
   /** Entrar en una sala a investigar. Se puede rectificar una vez. */
-  'entrar-en-sala': ({ sesion, suspectId, datos }) => {
-    elegirSala(sesion, suspectId, datos.sala!);
+  'entrar-en-sala': ({ sesion, participanteId, datos }) => {
+    elegirSala(sesion, participanteId, datos.sala!);
     return { sala: datos.sala };
   },
 
@@ -32,7 +32,7 @@ registrarAcciones('cluedo', {
    * objetivo: que un juego nuevo pueda tener otra completamente distinta sin
    * pedirle permiso a la plataforma.
    */
-  acusar: ({ game, sesion, suspectId, datos }) => {
+  acusar: ({ game, sesion, participanteId, datos }) => {
     const solucion = game.plot?.solution.respuestas;
     if (!solucion) throw new AccionInvalida('Esta partida todavía no tiene misterio.');
 
@@ -44,7 +44,7 @@ registrarAcciones('cluedo', {
       [EJES.lugar]: datos[EJES.lugar] ?? '',
     };
 
-    const { acusacion } = registrarAcusacion(sesion, suspectId, respuestas, solucion);
+    const { acusacion } = registrarAcusacion(sesion, participanteId, respuestas, solucion);
     // Deliberadamente NO se devuelve si ha acertado: se sabrá en el desenlace,
     // como en la mesa. Devolverlo aquí permitiría probar combinaciones.
     return { registrada: true, at: acusacion.at };

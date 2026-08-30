@@ -147,7 +147,7 @@ router.post('/games/:id/live/giro', async (req, res) => {
     await mutar(
       req.params.id,
       (s) => {
-        const jugador = s.players.find((p) => p.suspectId === giro.suspectId);
+        const jugador = s.players.find((p) => p.participanteId === giro.participanteId);
         if (!jugador) throw new Error('Ese jugador ya no participa.');
         if (!jugador.girosRecibidos.includes(twistId)) jugador.girosRecibidos.push(twistId);
       },
@@ -158,7 +158,7 @@ router.post('/games/:id/live/giro', async (req, res) => {
             s.rev,
             'giro',
             'Ha llegado algo para ti. Ábrelo sin que nadie te vea.',
-            giro.suspectId,
+            giro.participanteId,
           ),
       },
     );
@@ -329,7 +329,7 @@ router.post('/games/:id/live/desenlace', async (req, res) => {
       avisar: (s) => {
         anunciar(req.params.id, s.rev, 'desenlace', avisoDe(s, 'desenlace'));
         if (s.winnerId) {
-          const ganador = s.players.find((p) => p.suspectId === s.winnerId);
+          const ganador = s.players.find((p) => p.participanteId === s.winnerId);
           anunciar(
             req.params.id,
             s.rev,
