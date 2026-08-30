@@ -14,7 +14,7 @@
  */
 import { CLUEDO } from '../../../shared/juegos/cluedo';
 import type { EjeId } from '../../../shared/juegos';
-import type { PlotSolution } from '../../../shared/types';
+import type { Plot, PlotSolution } from '../../../shared/types';
 
 export { CLUEDO };
 
@@ -26,6 +26,20 @@ export const EJES = {
 } as const;
 
 /** Quién lo hizo. */
+/**
+ * La victima, para el codigo de CLUEDO.
+ *
+ * `Plot.victim` es opcional desde que un juego sin crimen no tiene por que
+ * inventarse una: una subasta ponia `{ name: '—', description: '' }` porque el
+ * contrato se lo exigia. CLUEDO SIEMPRE la tiene —su generador la escribe y su
+ * esquema la pide— pero el compilador no puede saberlo, asi que esto es el
+ * unico sitio donde se dice, en vez de repetir `?.` en las quince plantillas
+ * que la pintan.
+ */
+export function victimaDe(plot: Plot): { name: string; description: string } {
+  return plot.victim ?? { name: '', description: '' };
+}
+
 export function culpableDe(solucion: PlotSolution): string {
   return solucion.respuestas[EJES.culpable] ?? '';
 }

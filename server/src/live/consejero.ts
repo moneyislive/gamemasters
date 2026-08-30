@@ -106,9 +106,16 @@ export function contextoDelMayordomo(vista: VistaJugador): string {
 
   // Público: lo sabe cualquiera que haya entrado por la puerta.
   partes.push(`EL CASO (público): ${vista.caso.sinopsis}`);
-  partes.push(
-    `LA VÍCTIMA (público): ${vista.caso.victima.nombre}. ${vista.caso.victima.descripcion}`,
-  );
+  /*
+   * Solo si la hay. Antes era una linea fija, asi que al asistente de una
+   * expedicion arqueologica se le contaba que la victima es «el faraon sin
+   * nombre» —inventado para rellenar un campo obligatorio— y hablaba de el.
+   */
+  if (vista.caso.victima) {
+    partes.push(
+      `LA VÍCTIMA (público): ${vista.caso.victima.nombre}. ${vista.caso.victima.descripcion}`,
+    );
+  }
   partes.push(`DÓNDE (público): ${vista.caso.ambientacion}`);
 
   // El dosier de quien pregunta. Es suyo: lo tiene abierto en la app.

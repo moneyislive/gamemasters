@@ -385,10 +385,13 @@ const Caso: Bloque = ({ vista }) => (
     <Ornamento />
     <Seccion>El caso</Seccion>
     <Hoja etiqueta="Qué ha ocurrido" valor={vista.caso.sinopsis} />
-    <Hoja
-      etiqueta={`La víctima · ${vista.caso.victima.nombre}`}
-      valor={vista.caso.victima.descripcion}
-    />
+    {/* Sin victima no hay bloque. Antes salia «La victima · —». */}
+    {vista.caso.victima ? (
+      <Hoja
+        etiqueta={`La víctima · ${vista.caso.victima.nombre}`}
+        valor={vista.caso.victima.descripcion}
+      />
+    ) : null}
     <Hoja etiqueta="Dónde estáis" valor={vista.caso.ambientacion} />
   </>
 );

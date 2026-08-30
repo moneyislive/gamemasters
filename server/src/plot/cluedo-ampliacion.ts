@@ -18,7 +18,7 @@ import { registrarAmpliacion } from '../juegos/ampliaciones';
 import { generateDemoCharacters } from './cluedo-demo';
 import { PLOT_EXTENSION_SCHEMA } from './cluedo-esquema';
 import { buildStyleBlock } from './style';
-import { culpableDe, lugarDe, objetoDe } from '../juegos/cluedo';
+import { culpableDe, lugarDe, objetoDe, victimaDe } from '../juegos/cluedo';
 import { juegoDe, repararRespuestas } from '../juegos/solucion';
 import { emisorDeProgreso } from '../live/proyeccion';
 import { apuntarUso } from '../gasto/contador';
@@ -164,7 +164,7 @@ function reparacionLocal(game: GameSession, plot: Plot): ReparacionSolucion {
     motive,
     howItHappened:
       `Aprovechando el apagón de las 21:40, ${nombre} se deslizó hasta ${dondeOcurrio}, ` +
-      `donde ${plot.victim.name} esperaba a solas una conversación "privada". ` +
+      `donde ${victimaDe(plot).name} esperaba a solas una conversación "privada". ` +
       `Bastaron dos minutos y ${conQue} para zanjar el asunto. ` +
       `Después ${nombre} volvió con el resto fingiendo buscar velas, con el pulso casi firme.`,
   };
@@ -320,7 +320,7 @@ TRAMA EXISTENTE (intocable)
 - Título: ${plot.title}
 - Lema: ${plot.tagline}
 - Sinopsis pública: ${plot.synopsis}
-- Víctima: ${plot.victim.name} — ${plot.victim.description}
+- Víctima: ${victimaDe(plot).name} — ${victimaDe(plot).description}
 - Escenario: ${plot.setting}
 
 ${bloqueSolucion}

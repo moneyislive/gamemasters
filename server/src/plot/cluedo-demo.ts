@@ -21,7 +21,7 @@ import type {
   TimelineEvent,
   Weapon,
 } from '../../../shared/types';
-import { culpableDe, respuestasCluedo } from '../juegos/cluedo';
+import { culpableDe, respuestasCluedo, victimaDe } from '../juegos/cluedo';
 
 // ------------------------------ plantillas ------------------------------
 
@@ -427,7 +427,7 @@ export function generateDemoCharacters(
 
   // Nombres de los personajes que ya estaban escritos: sirven de testigos.
   const testigos = plot.characters.map((personaje) => personaje.characterName);
-  const nombreVictima = plot.victim.name;
+  const nombreVictima = victimaDe(plot).name;
 
   return pendientes.map((sospechoso, i) => {
     // Se desplazan las plantillas para no repetir las de los personajes ya escritos.

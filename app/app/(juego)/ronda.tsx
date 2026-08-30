@@ -82,14 +82,17 @@ function LaTrama({ vista }: { vista: VistaJugador }): JSX.Element {
         {vista.caso.sinopsis}
       </Cuerpo>
 
-      <View style={estilos.apartadoPapel}>
-        <Etiqueta style={{ color: color.burdeos700 }}>
-          La víctima · {vista.caso.victima.nombre}
-        </Etiqueta>
-        <Cuerpo style={{ color: color.caoba700, marginTop: espacio.sm }}>
-          {vista.caso.victima.descripcion}
-        </Cuerpo>
-      </View>
+      {/* Sin victima no hay apartado. Antes salia «La victima · —». */}
+      {vista.caso.victima ? (
+        <View style={estilos.apartadoPapel}>
+          <Etiqueta style={{ color: color.burdeos700 }}>
+            La víctima · {vista.caso.victima.nombre}
+          </Etiqueta>
+          <Cuerpo style={{ color: color.caoba700, marginTop: espacio.sm }}>
+            {vista.caso.victima.descripcion}
+          </Cuerpo>
+        </View>
+      ) : null}
 
       <View style={estilos.apartadoPapel}>
         <Etiqueta style={{ color: color.burdeos700 }}>Dónde estáis</Etiqueta>

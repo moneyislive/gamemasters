@@ -308,7 +308,10 @@ export function vistaDeJugador(
     // mundo desde que cruza la puerta.
     caso: {
       sinopsis: plot.synopsis,
-      victima: { nombre: plot.victim.name, descripcion: plot.victim.description },
+      // Solo si la hay: un juego sin crimen no manda una victima inventada.
+      ...(plot.victim
+        ? { victima: { nombre: plot.victim.name, descripcion: plot.victim.description } }
+        : {}),
       ambientacion: plot.setting,
       /*
        * LAS REGLAS DEL JUEGO QUE SE JUEGA, no las de CLUEDO. Aqui viajaba

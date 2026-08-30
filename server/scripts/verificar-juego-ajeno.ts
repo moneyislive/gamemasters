@@ -320,16 +320,19 @@ const game: GameSession = {
  * PEAJE: hay que inventarse una trama para un juego que no tiene ninguna.
  *
  * `vistaDeJugador` empieza con `if (!plot) return null`, así que sin `plot` no hay
- * partida. Y `Plot` exige `victim`, `synopsis`, `setting` y `solution`, que en una
- * subasta no significan nada: no ha muerto nadie y no hay respuesta. Se rellenan
- * con guiones y cadenas vacías. Peor: `characters` exige un `secret`, un `motive`,
- * una `alibi` y un `personalHook` por persona, y aquí nadie interpreta a nadie.
+ * partida. Y `Plot` exige `synopsis`, `setting` y `solution`, que en una subasta
+ * no significan gran cosa. Peor: `characters` exige un `secret`, un `motive`, una
+ * `alibi` y un `personalHook` por persona, y aquí nadie interpreta a nadie.
+ *
+ * UNO MENOS: `victim` ya no está. Era el peaje más visible que había —esta misma
+ * subasta ponía `{ name: '—', description: '' }` porque el contrato se lo exigía,
+ * y la app pintaba «La víctima · —» en el dosier de todo el mundo— y ahora
+ * simplemente no se declara. Ausente significa ausente.
  */
 const plot: Plot = {
   title: 'La Almoneda',
   tagline: 'Todo lo que queda de una casa, y una tarde para repartirlo.',
   synopsis: 'Se vacía la casa de la calle Mayor. Lo que no se reparta hoy, se tira.',
-  victim: { name: '—', description: '' },
   setting: 'El salón, con los muebles ya apartados contra la pared.',
   solution: { respuestas: {}, motive: '', howItHappened: '' },
   characters: POSTORES.map((name, i) => ({
@@ -479,11 +482,17 @@ comprobar(
 );
 
 /*
- * PEAJE, y este se ve en la propia vista: hay que mandar una víctima que no
- * existe. La app pintará «La víctima · —» si alguien declara el bloque del caso.
+ * ═══ UN PEAJE QUE YA NO SE COBRA ═══
+ *
+ * Esta comprobación decía `v.caso.victima.nombre === '—'` y era una de las que
+ * más molestaban de leer: afirmaba, y daba por bueno, que un juego sin crimen
+ * tiene que mandar una víctima inventada para que la plataforma lo admita.
+ *
+ * Ahora afirma lo contrario. Sin víctima, la vista NO la lleva, y la app se
+ * salta el bloque entero en vez de pintar «La víctima · —».
  */
-comprobar('la víctima va vacía porque no hay ninguna', v.caso.victima.nombre === '—');
-peaje('`Plot` exige victim, synopsis, setting y solution: un juego sin crimen se los inventa');
+comprobar('la vista no lleva víctima porque no ha muerto nadie', v.caso.victima === undefined);
+peaje('`Plot` exige synopsis, setting y solution: un juego sin crimen se los inventa igual');
 peaje('`PlotCharacter` exige secret, motive, alibi y personalHook por persona, aunque nadie interprete a nadie');
 peaje('los NOMBRES de las fases siguen siendo los de CLUEDO: una subasta llama «ronda-abierta» a «se canta un lote»');
 peaje('la categoría de personas tiene que ir a `suspects` o no hay emparejamiento, dosieres ni correos');

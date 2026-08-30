@@ -583,7 +583,17 @@ export interface VistaJugador {
    */
   caso: {
     sinopsis: string;
-    victima: { nombre: string; descripcion: string };
+    /**
+     * Quien ha muerto. AUSENTE en un juego donde no ha muerto nadie.
+     *
+     * Era obligatoria, asi que la vista de una expedicion arqueologica llevaba
+     * una victima inventada —«el faraon sin nombre»— y la de una subasta un
+     * guion: la app pintaba «La victima · —» en el dosier de todo el mundo.
+     *
+     * Ausente significa ausente: quien la pinta se salta el bloque entero. No
+     * hay cadena vacia que interpretar.
+     */
+    victima?: { nombre: string; descripcion: string };
     ambientacion: string;
     /** Las reglas que se leen en voz alta al empezar. */
     reglas: string[];

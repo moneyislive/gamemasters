@@ -224,7 +224,21 @@ export interface Plot {
   title: string;
   tagline: string;
   synopsis: string;
-  victim: { name: string; description: string };
+  /**
+   * Quien ha muerto. OPCIONAL, y esto es el peaje mas visible que tenia la
+   * plataforma.
+   *
+   * Era obligatorio, asi que un juego sin crimen tenia que inventarse una
+   * victima. No es una hipotesis: `verificar-juego-ajeno.ts` monta una subasta
+   * y pone `victim: { name: '—', description: '' }` porque no le queda otra, y
+   * la app pintaba «La victima · —» en el dosier de todo el mundo. El Misterio
+   * de la Momia se inventa «el faraon sin nombre» y El Paso de las Sombras «el
+   * señor», los dos para rellenar un hueco que su juego no tiene.
+   *
+   * Ausente significa AUSENTE: quien la pinta se la salta. No hay cadena vacia
+   * que interpretar ni guion que disimular.
+   */
+  victim?: { name: string; description: string };
   setting: string;
   solution: PlotSolution;
   characters: PlotCharacter[];

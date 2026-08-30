@@ -26,7 +26,7 @@ import { manifiestoDe } from '../../../shared/juegos';
 import { registrarDosieres } from './dosieres';
 import { esc } from './html';
 import { comoDataUri, envolver, monograma, renderBoardSvg, retrato } from './renderer';
-import { culpableDe, lugarDe, objetoDe } from '../juegos/cluedo';
+import { culpableDe, lugarDe, objetoDe, victimaDe } from '../juegos/cluedo';
 import type {
   DocumentRenderOptions,
   DocumentSectionId,
@@ -303,7 +303,7 @@ function dosierJugador(
         esAsesino
           ? `<div class="caja caja--asesino" style="margin-top:22px">
               <div class="titulo-secreto">☠ Tú eres el asesino</div>
-              <p><strong>Mataste a ${esc(plot.victim.name)}${armaDelCrimen ? ` con ${esc(armaDelCrimen.name)}` : ''}${salaDelCrimen ? `, en ${esc(salaDelCrimen.name)}` : ''}.</strong></p>
+              <p><strong>Mataste a ${esc(victimaDe(plot).name)}${armaDelCrimen ? ` con ${esc(armaDelCrimen.name)}` : ''}${salaDelCrimen ? `, en ${esc(salaDelCrimen.name)}` : ''}.</strong></p>
               <p>${esc(plot.solution.howItHappened)}</p>
               <p style="margin-bottom:0"><em>Cómo jugarlo sin delatarte:</em> participa en las conversaciones con normalidad y acusa a otros con moderación —quien más grita, antes cae—. Puedes mentir sobre tu coartada, pero mantén siempre la misma versión: las contradicciones son lo primero que se detecta. Si alguien te acorrala con una prueba, admite un detalle menor para ganar credibilidad y desvía la atención hacia el secreto de otro invitado.</p>
             </div>`
@@ -320,8 +320,8 @@ function dosierJugador(
       ? `<section>
       <h2>El caso</h2>
       <div class="caja">
-        <h3>La víctima: ${esc(plot.victim.name)}</h3>
-        <p>${esc(plot.victim.description)}</p>
+        <h3>La víctima: ${esc(victimaDe(plot).name)}</h3>
+        <p>${esc(victimaDe(plot).description)}</p>
       </div>
       <p style="margin-top:20px">${esc(plot.synopsis)}</p>
       ${bloqueDato('El lugar', plot.setting)}
@@ -535,8 +535,8 @@ function dosierGameMaster(opciones: DocumentRenderOptions, game: GameSession, pl
     `<section>
       <h2>El caso</h2>
       <div class="caja">
-        <h3>La víctima: ${esc(plot.victim.name)}</h3>
-        <p>${esc(plot.victim.description)}</p>
+        <h3>La víctima: ${esc(victimaDe(plot).name)}</h3>
+        <p>${esc(victimaDe(plot).description)}</p>
       </div>
       <p style="margin-top:20px">${esc(plot.synopsis)}</p>
       ${bloqueDato('El lugar', plot.setting)}

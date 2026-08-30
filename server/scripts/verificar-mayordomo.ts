@@ -117,8 +117,8 @@ function corpusPermitido(game: GameSession, yo: string): string {
   return [
     plot.title ?? '',
     plot.synopsis,
-    plot.victim.name,
-    plot.victim.description,
+    plot.victim?.name ?? '',
+    plot.victim?.description ?? '',
     plot.setting ?? '',
     mio.characterName,
     mio.role,

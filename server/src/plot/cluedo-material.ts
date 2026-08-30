@@ -22,7 +22,7 @@ import { DEMO_MODE } from '../config';
 import { getAnthropicClient, resolveModel } from '../agent/anthropic';
 import { numeroDeRondas } from '../docs/datos';
 import { buildStyleBlock } from './style';
-import { culpableDe, lugarDe, objetoDe } from '../juegos/cluedo';
+import { culpableDe, lugarDe, objetoDe, victimaDe } from '../juegos/cluedo';
 import { registrarMaterial } from '../juegos/materiales';
 import { emisorDeProgreso } from '../live/proyeccion';
 import { apuntarUso, volcarGasto } from '../gasto/contador';
@@ -235,7 +235,7 @@ function construirPrompt(game: GameSession, plot: Plot): string {
 
 TÍTULO: ${plot.title}
 LEMA: ${plot.tagline}
-VÍCTIMA: ${plot.victim.name} — ${plot.victim.description}
+VÍCTIMA: ${victimaDe(plot).name} — ${victimaDe(plot).description}
 AMBIENTACIÓN: ${plot.setting}
 
 PERSONAJES (usa sus ids EXACTOS en twists[].suspectId):
@@ -248,7 +248,7 @@ PISTAS POR RONDA:
 ${pistas}
 
 LA SOLUCIÓN (solo para que el material encaje; NO la reveles fuera de "finale"):
-${asesino?.characterName ?? ''} mató a ${plot.victim.name} con ${arma} en ${sala}.
+${asesino?.characterName ?? ''} mató a ${victimaDe(plot).name} con ${arma} en ${sala}.
 Motivo: ${plot.solution.motive}
 Cómo ocurrió: ${plot.solution.howItHappened}
 
@@ -344,7 +344,7 @@ async function materialDemo(game: GameSession, plot: Plot, emit: Emitir): Promis
     {
       round: 0,
       title: 'La velada empieza',
-      text: `Bienvenidos a ${plot.setting.slice(0, 80)}. Esta noche ${plot.victim.name} ha reunido a todos por una razón que nadie termina de entender. Miraos bien: dentro de un rato, uno de vosotros habrá mentido.`,
+      text: `Bienvenidos a ${plot.setting.slice(0, 80)}. Esta noche ${victimaDe(plot).name} ha reunido a todos por una razón que nadie termina de entender. Miraos bien: dentro de un rato, uno de vosotros habrá mentido.`,
       stageDirection: 'Baja la música antes de empezar.',
     },
     ...Array.from({ length: rondas }, (_, i) => ({
@@ -378,8 +378,8 @@ async function materialDemo(game: GameSession, plot: Plot, emit: Emitir): Promis
       { level: 3, text: `El crimen ocurrió en ${sala}, y ${arma} no estaba donde debía.` },
     ],
     finale: {
-      reconstruction: `Durante el tramo sin testigos, ${asesino?.characterName ?? 'el culpable'} entró en ${sala}. Lo demás fue rápido: ${arma} estaba a mano y ${plot.victim.name} no esperaba visita.`,
-      confession: `Está bien. Fui yo. No lo planeé, o eso me repito desde entonces. Cogí ${arma} porque estaba ahí, y porque llevaba años tragándome lo que ${plot.victim.name} me hizo. Me habría bastado con una disculpa. No hubo ninguna.`,
+      reconstruction: `Durante el tramo sin testigos, ${asesino?.characterName ?? 'el culpable'} entró en ${sala}. Lo demás fue rápido: ${arma} estaba a mano y ${victimaDe(plot).name} no esperaba visita.`,
+      confession: `Está bien. Fui yo. No lo planeé, o eso me repito desde entonces. Cogí ${arma} porque estaba ahí, y porque llevaba años tragándome lo que ${victimaDe(plot).name} me hizo. Me habría bastado con una disculpa. No hubo ninguna.`,
       epilogue: 'La casa se vendió al año siguiente. Nadie de los presentes volvió a aceptar una invitación a cenar sin preguntar antes quién más iba.',
     },
     generatedAt: new Date().toISOString(),
