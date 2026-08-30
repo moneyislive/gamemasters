@@ -11,7 +11,7 @@
  * Determinista: las salas se ordenan por id antes de asignarles hueco, de
  * modo que la misma partida produce siempre el mismo tablero.
  */
-import type { BoardLayout, BoardRoomPlacement, Room, SecretPassage } from '../../../shared/types';
+import type { BoardLayout, ColocacionDeLugar, Room, Pasadizo } from '../../../shared/types';
 
 const COLS = 24;
 const ROWS = 24;
@@ -147,15 +147,15 @@ export function generateBoardLayout(
    * encima y que no se note nunca. Con la rejilla que crece no puede pasar:
    * siempre hay tantos huecos como lugares.
    */
-  const colocaciones: BoardRoomPlacement[] = ordenadas.flatMap((sala, indice) => {
+  const colocaciones: ColocacionDeLugar[] = ordenadas.flatMap((sala, indice) => {
     const hueco = huecos[indice];
-    return hueco ? [{ roomId: sala.id, x: hueco.x, y: hueco.y, w: hueco.w, h: hueco.h }] : [];
+    return hueco ? [{ lugarId: sala.id, x: hueco.x, y: hueco.y, w: hueco.w, h: hueco.h }] : [];
   });
 
   return {
     grid: { cols, rows },
-    rooms: colocaciones,
-    passages: calcularPasadizos(colocaciones),
+    lugares: colocaciones,
+    pasadizos: calcularPasadizos(colocaciones),
     centerLabel: rotuloCentral,
   };
 }
@@ -164,14 +164,14 @@ export function generateBoardLayout(
  * Pasadizos secretos: max(1, round(n·2/9)) túneles entre pares de salas
  * lo más alejadas posible (diagonalmente opuestas), sin repetir sala.
  */
-function calcularPasadizos(colocaciones: BoardRoomPlacement[]): SecretPassage[] {
+function calcularPasadizos(colocaciones: ColocacionDeLugar[]): Pasadizo[] {
   const n = colocaciones.length;
   if (n < 2) return [];
   const objetivo = Math.max(1, Math.round((n * 2) / 9));
 
   interface Par {
-    a: BoardRoomPlacement;
-    b: BoardRoomPlacement;
+    a: ColocacionDeLugar;
+    b: ColocacionDeLugar;
     distancia: number;
   }
 
@@ -190,17 +190,17 @@ function calcularPasadizos(colocaciones: BoardRoomPlacement[]): SecretPassage[] 
   pares.sort(
     (p, q) =>
       q.distancia - p.distancia ||
-      `${p.a.roomId}·${p.b.roomId}`.localeCompare(`${q.a.roomId}·${q.b.roomId}`),
+      `${p.a.lugarId}·${p.b.lugarId}`.localeCompare(`${q.a.lugarId}·${q.b.lugarId}`),
   );
 
   const usadas = new Set<string>();
-  const pasadizos: SecretPassage[] = [];
+  const pasadizos: Pasadizo[] = [];
   for (const par of pares) {
     if (pasadizos.length >= objetivo) break;
-    if (usadas.has(par.a.roomId) || usadas.has(par.b.roomId)) continue;
-    usadas.add(par.a.roomId);
-    usadas.add(par.b.roomId);
-    pasadizos.push({ fromRoomId: par.a.roomId, toRoomId: par.b.roomId });
+    if (usadas.has(par.a.lugarId) || usadas.has(par.b.lugarId)) continue;
+    usadas.add(par.a.lugarId);
+    usadas.add(par.b.lugarId);
+    pasadizos.push({ desdeLugarId: par.a.lugarId, hastaLugarId: par.b.lugarId });
   }
   return pasadizos;
 }

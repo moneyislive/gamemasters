@@ -272,7 +272,16 @@ router.post('/jugar/accion', async (req, res) => {
 router.post('/jugar/sala', async (req, res) => {
   const cred = credencial(req, res);
   if (!cred) return;
-  const roomId = String(req.body?.roomId ?? '');
+  /*
+   * SE ACEPTAN LOS DOS NOMBRES, y no es por gusto.
+   *
+   * El campo se llamaba `roomId` y ahora `lugarId`. El movil se compila aparte y
+   * no tiene actualizaciones sobre el aire: durante los dias que van entre
+   * desplegar el servidor y que la gente actualice, hay telefonos ahi fuera
+   * mandando el nombre viejo. Rechazarlos seria que no se pueda entrar en ningun
+   * sitio, de noche y sin explicacion.
+   */
+  const lugarId = String(req.body?.lugarId ?? req.body?.roomId ?? '');
 
   try {
     const store = getStore();
@@ -294,7 +303,7 @@ router.post('/jugar/sala', async (req, res) => {
       return;
     }
     await mutar(cred.gameId, (s) =>
-      ejecutarAccion(game, s, cred.participanteId, entrar.accion.id, { [entrar.campo]: roomId }),
+      ejecutarAccion(game, s, cred.participanteId, entrar.accion.id, { [entrar.campo]: lugarId }),
     );
     const vista = await vistaActual(cred.gameId, cred.participanteId, res);
     if (!vista) return;

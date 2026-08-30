@@ -58,7 +58,7 @@ import {
 } from '../../src/ui';
 import { ALTO_BARRA_TOTAL } from '../../src/tema';
 import { pantallaDe } from '../../src/pantallas';
-import type { SalaVista, VistaJugador } from '../../../shared/live';
+import type { LugarVista, VistaJugador } from '../../../shared/live';
 import { Foto } from '../../src/foto';
 
 /**
@@ -192,7 +192,7 @@ export default function Ronda(): JSX.Element {
     );
   }
 
-  const { sesion, yo, salas, misPistas, miSala, narracion } = vista;
+  const { sesion, yo, lugares: salas, misPistas, miLugar, narracion } = vista;
 
   const avisar = async (listo: boolean): Promise<void> => {
     setErrorSala(null);
@@ -207,7 +207,7 @@ export default function Ronda(): JSX.Element {
     }
   };
 
-  const elegir = async (sala: SalaVista): Promise<void> => {
+  const elegir = async (sala: LugarVista): Promise<void> => {
     setErrorSala(null);
     setEligiendo(sala.id);
     try {
@@ -407,7 +407,7 @@ export default function Ronda(): JSX.Element {
             Ronda {sesion.round} de {sesion.totalRounds}
           </Etiqueta>
           <Titulo style={{ fontSize: 24, marginTop: 2 }}>
-            {abierta ? (miSala ? 'Estás investigando' : 'Elige dónde entrar') : 'Ronda cerrada'}
+            {abierta ? (miLugar ? 'Estás investigando' : 'Elige dónde entrar') : 'Ronda cerrada'}
           </Titulo>
         </View>
         {abierta && <Reloj terminaEn={sesion.roundEndsAt} ahoraServidor={sesion.ahora} />}
@@ -428,9 +428,9 @@ export default function Ronda(): JSX.Element {
 
       {abierta ? (
         <>
-          <Seccion>{miSala ? 'Puedes cambiarte una vez' : 'Salas'}</Seccion>
+          <Seccion>{miLugar ? 'Puedes cambiarte una vez' : 'Salas'}</Seccion>
           {salas.map((sala, i) => {
-            const dentro = miSala === sala.id;
+            const dentro = miLugar === sala.id;
             return (
               <Animated.View
                 key={sala.id}
@@ -480,7 +480,7 @@ export default function Ronda(): JSX.Element {
               {misPistas.map((pista, i) => (
                 <Animated.View key={pista.id} entering={FadeInUp.delay(120 * i).duration(520)}>
                   <Marco tono="papel">
-                    <Etiqueta style={{ color: color.burdeos700 }}>{pista.roomName}</Etiqueta>
+                    <Etiqueta style={{ color: color.burdeos700 }}>{pista.lugarNombre}</Etiqueta>
                     <Cuerpo style={{ color: color.caoba700, marginTop: espacio.sm }}>
                       {pista.description}
                     </Cuerpo>

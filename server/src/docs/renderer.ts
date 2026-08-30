@@ -91,7 +91,7 @@ export function renderBoardSvg(board: BoardLayout, rooms: Room[]): string {
   const nombrePorId = new Map(rooms.map((sala) => [sala.id, sala.name]));
   const centroPorId = new Map<string, { cx: number; cy: number }>();
 
-  const salas = board.rooms
+  const salas = board.lugares
     .map((colocacion) => {
       const x = colocacion.x * CELDA;
       const y = colocacion.y * CELDA;
@@ -99,8 +99,8 @@ export function renderBoardSvg(board: BoardLayout, rooms: Room[]): string {
       const h = colocacion.h * CELDA;
       const cx = x + w / 2;
       const cy = y + h / 2;
-      centroPorId.set(colocacion.roomId, { cx, cy });
-      const nombre = nombrePorId.get(colocacion.roomId) ?? 'Sala';
+      centroPorId.set(colocacion.lugarId, { cx, cy });
+      const nombre = nombrePorId.get(colocacion.lugarId) ?? 'Sala';
       // El tamaño de letra se ajusta al ancho disponible para nombres largos.
       const tamano = Math.max(11, Math.min(19, (w * 1.55) / Math.max(nombre.length, 6)));
       return `
@@ -118,13 +118,13 @@ export function renderBoardSvg(board: BoardLayout, rooms: Room[]): string {
     })
     .join('');
 
-  const pasadizos = board.passages
+  const pasadizos = board.pasadizos
     .map((pasadizo) => {
-      const a = centroPorId.get(pasadizo.fromRoomId);
-      const b = centroPorId.get(pasadizo.toRoomId);
+      const a = centroPorId.get(pasadizo.desdeLugarId);
+      const b = centroPorId.get(pasadizo.hastaLugarId);
       if (!a || !b) return '';
-      const desde = nombrePorId.get(pasadizo.fromRoomId) ?? '';
-      const hasta = nombrePorId.get(pasadizo.toRoomId) ?? '';
+      const desde = nombrePorId.get(pasadizo.desdeLugarId) ?? '';
+      const hasta = nombrePorId.get(pasadizo.hastaLugarId) ?? '';
       return `
       <g>
         <title>Pasadizo secreto: ${esc(desde)} ⇄ ${esc(hasta)}</title>

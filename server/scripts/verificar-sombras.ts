@@ -166,7 +166,7 @@ function nuevaPartida(): { game: GameSession; sesion: LiveSession } {
       girosRecibidos: [],
     })),
     respuestasEntregadas: [],
-    tablon: [],
+    porDondePasaron: [],
     rev: 1,
     updatedAt: ahora,
   };

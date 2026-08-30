@@ -228,7 +228,7 @@ const sesion: LiveSession = {
     { participanteId: 'j1', displayName: 'Nico', joinCode: 'OCA002', joined: true, elecciones: [], notas: '', girosRecibidos: [] },
   ],
   respuestasEntregadas: [],
-  tablon: [],
+  porDondePasaron: [],
   rev: 1,
   updatedAt: ahora,
 };

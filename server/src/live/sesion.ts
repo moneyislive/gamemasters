@@ -195,7 +195,7 @@ export async function abrirSesion(game: GameSession): Promise<LiveSession> {
     totalRounds: game.plot ? numeroDeRondas(game.plot) : 4,
     players: personasDe(game).map((s) => nuevoJugador(s.id, s.name, s.email)),
     respuestasEntregadas: [],
-    tablon: [],
+    porDondePasaron: [],
     rev: 1,
     updatedAt: new Date().toISOString(),
   };
@@ -363,10 +363,10 @@ export function cerrarRonda(sesion: LiveSession): void {
   for (const jugador of sesion.players) {
     const eleccion = jugador.elecciones.find((e) => e.round === sesion.round);
     if (!eleccion) continue;
-    const yaEsta = sesion.tablon.some(
-      (t) => t.round === sesion.round && t.roomId === eleccion.roomId,
+    const yaEsta = sesion.porDondePasaron.some(
+      (t) => t.round === sesion.round && t.lugarId === eleccion.lugarId,
     );
-    if (!yaEsta) sesion.tablon.push({ round: sesion.round, roomId: eleccion.roomId });
+    if (!yaEsta) sesion.porDondePasaron.push({ round: sesion.round, lugarId: eleccion.lugarId });
   }
 }
 
@@ -484,7 +484,7 @@ export function revelarDesenlace(game: GameSession, sesion: LiveSession): void {
 // Acciones de jugador
 // ---------------------------------------------------------------------------
 
-export function elegirSala(sesion: LiveSession, participanteId: string, roomId: string): void {
+export function elegirSala(sesion: LiveSession, participanteId: string, lugarId: string): void {
   if (sesion.phase !== 'ronda-abierta') {
     throw new Error('Solo puedes elegir sala con la ronda abierta.');
   }
@@ -493,18 +493,18 @@ export function elegirSala(sesion: LiveSession, participanteId: string, roomId: 
   const previa = jugador.elecciones.find((e) => e.round === sesion.round);
   if (previa) {
     // Un solo cambio por ronda, como en la mesa.
-    if (previa.roomId === roomId) return;
+    if (previa.lugarId === lugarId) return;
     if (previa.at !== undefined && jugador.elecciones.filter((e) => e.round === sesion.round).length > 1) {
       throw new Error('Ya has usado tu cambio de sala en esta ronda.');
     }
   }
-  jugador.elecciones.push({ round: sesion.round, roomId, at: new Date().toISOString() });
+  jugador.elecciones.push({ round: sesion.round, lugarId, at: new Date().toISOString() });
 }
 
 /** Sala en la que está un jugador en la ronda dada (la última que eligió). */
 export function salaDe(jugador: LivePlayer, round: number): string | undefined {
   const deLaRonda = jugador.elecciones.filter((e) => e.round === round);
-  return deLaRonda[deLaRonda.length - 1]?.roomId;
+  return deLaRonda[deLaRonda.length - 1]?.lugarId;
 }
 
 export function guardarNotas(sesion: LiveSession, participanteId: string, notas: string): void {

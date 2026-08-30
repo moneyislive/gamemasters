@@ -161,7 +161,7 @@ export function computeStaleness(game: GameSession): StalenessReport {
     .map((eje) => eje.id);
 
   const brokenClues = plot.clues.filter(
-    (pista) => pista.roomId !== undefined && !idsSalas.has(pista.roomId),
+    (pista) => pista.lugarId !== undefined && !idsSalas.has(pista.lugarId),
   ).length;
 
   const brokenTimelineEvents = plot.timeline.filter((evento) =>
@@ -171,7 +171,7 @@ export function computeStaleness(game: GameSession): StalenessReport {
   // El tablero solo puede quedar obsoleto en el modo de rejilla generada.
   let boardOutdated = false;
   if (game.boardMode === 'generated') {
-    const enTablero = new Set((game.board?.rooms ?? []).map((r) => r.roomId));
+    const enTablero = new Set((game.board?.lugares ?? []).map((r) => r.lugarId));
     boardOutdated =
       !game.board ||
       enTablero.size !== idsSalas.size ||

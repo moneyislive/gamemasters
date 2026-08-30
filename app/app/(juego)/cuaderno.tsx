@@ -153,7 +153,7 @@ export default function Cuaderno(): JSX.Element {
               {porRonda.get(ronda)!.map((p, i) => (
                 <Animated.View key={p.id} entering={FadeInUp.delay(50 * i).duration(420)}>
                   <Marco tono="papel">
-                    <Etiqueta style={{ color: color.burdeos700 }}>{p.roomName}</Etiqueta>
+                    <Etiqueta style={{ color: color.burdeos700 }}>{p.lugarNombre}</Etiqueta>
                     <Cuerpo style={{ color: color.caoba700, marginTop: espacio.sm }}>
                       {p.description}
                     </Cuerpo>

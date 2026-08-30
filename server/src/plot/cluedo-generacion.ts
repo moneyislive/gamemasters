@@ -113,11 +113,11 @@ function construirPrompt(game: GameSession): string {
   // El tablero ya está trazado cuando se pide la trama: si el modelo no conoce
   // los pasadizos REALES, se los inventa y contradice al plano de los dosieres.
   const pasadizos =
-    game.boardMode === 'generated' && game.board?.passages.length
-      ? game.board.passages
+    game.boardMode === 'generated' && game.board?.pasadizos.length
+      ? game.board.pasadizos
           .map((pasadizo) => {
-            const desde = salasDe(game).find((s) => s.id === pasadizo.fromRoomId)?.name ?? '';
-            const hasta = salasDe(game).find((s) => s.id === pasadizo.toRoomId)?.name ?? '';
+            const desde = salasDe(game).find((s) => s.id === pasadizo.desdeLugarId)?.name ?? '';
+            const hasta = salasDe(game).find((s) => s.id === pasadizo.hastaLugarId)?.name ?? '';
             return `- "${desde}" ⇄ "${hasta}"`;
           })
           .join('\n')
@@ -141,7 +141,7 @@ REQUISITOS:
 1. Trama elaborada ambientada en los años 20, adaptada al espacio REAL descrito por las salas: el escenario debe sentirse como esa casa concreta convertida en mansión.
 2. Un personaje por sospechoso, hecho A MEDIDA de la persona real: usa su nombre y su descripción psicológica; el campo personalHook debe explicar cómo el personaje aprovecha su forma de ser.
 3. Coherencia total: coartadas cruzadas entre personajes, secretos que se entrelazan con el motivo del crimen, sin contradicciones con la cronología.
-4. La solución (solution.murdererId, solution.weaponId, solution.roomId) DEBE usar ids EXISTENTES de las listas anteriores. Igual para characters[].participanteId (exactamente uno por sospechoso), clues[].roomId y timeline[].participanteIds.
+4. La solución (solution.murdererId, solution.weaponId, solution.lugarId) DEBE usar ids EXISTENTES de las listas anteriores. Igual para characters[].participanteId (exactamente uno por sospechoso), clues[].lugarId y timeline[].participanteIds.
 5. La sinopsis es pública: NO debe revelar asesino, arma ni sala del crimen.
 6. PASADIZOS: si mencionas alguno en secretos, coartadas o pistas, debe ser EXACTAMENTE uno de los listados arriba. No inventes conexiones entre salas que el plano no tiene.
 7. timeline: de 8 a 12 eventos con hora ("19:30"), mezclando públicos y secretos.

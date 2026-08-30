@@ -90,7 +90,7 @@ function sesionInicial(game: GameSession): LiveSession {
       girosRecibidos: [],
     })),
     respuestasEntregadas: [],
-    tablon: [],
+    porDondePasaron: [],
     rev: 1,
     updatedAt: AHORA,
   };

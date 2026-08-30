@@ -42,13 +42,13 @@ export function tarjetasEnsobrar(
       if (pistas.length === 0) return '';
       const porSala = new Map<string, typeof pistas>();
       for (const pista of pistas) {
-        const clave = pista.roomId ?? 'sin-sala';
+        const clave = pista.lugarId ?? 'sin-sala';
         if (!porSala.has(clave)) porSala.set(clave, []);
         porSala.get(clave)?.push(pista);
       }
       const tarjetas = [...porSala.entries()]
-        .map(([roomId, delSala]) => {
-          const sala = salasDe(game).find((r) => r.id === roomId);
+        .map(([lugarId, delSala]) => {
+          const sala = salasDe(game).find((r) => r.id === lugarId);
           const codigo = sala ? `R${ronda}-${codigos.get(sala.id) ?? ''}` : `R${ronda}-SIN-SALA`;
           total++;
           const cuerpo = delSala.map((p) => p.description).join('\n\n');

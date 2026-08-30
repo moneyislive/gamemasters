@@ -248,7 +248,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "c0",
               "name": "Cámara del Barquero",
@@ -488,7 +488,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "c0",
               "name": "Cámara del Barquero",
@@ -728,7 +728,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "c0",
               "name": "Cámara del Barquero",
@@ -968,7 +968,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "c0",
               "name": "Cámara del Barquero",
@@ -1201,7 +1201,7 @@
             }
           ],
           "respuestasEntregadas": [],
-          "tablon": [],
+          "porDondePasaron": [],
           "rev": 1,
           "updatedAt": "«instante»",
           "estado": {
@@ -1324,28 +1324,28 @@
         "conectados": 0,
         "ocupacion": [
           {
-            "roomId": "c0",
-            "roomName": "Cámara del Barquero",
+            "lugarId": "c0",
+            "lugarNombre": "Cámara del Barquero",
             "participanteIds": []
           },
           {
-            "roomId": "c1",
-            "roomName": "Pozo de las Ofrendas",
+            "lugarId": "c1",
+            "lugarNombre": "Pozo de las Ofrendas",
             "participanteIds": []
           },
           {
-            "roomId": "c2",
-            "roomName": "Antesala de los Sellos",
+            "lugarId": "c2",
+            "lugarNombre": "Antesala de los Sellos",
             "participanteIds": []
           },
           {
-            "roomId": "c3",
-            "roomName": "Corredor de las Estrellas",
+            "lugarId": "c3",
+            "lugarNombre": "Corredor de las Estrellas",
             "participanteIds": []
           },
           {
-            "roomId": "c4",
-            "roomName": "Sala de la Balanza",
+            "lugarId": "c4",
+            "lugarNombre": "Sala de la Balanza",
             "participanteIds": []
           }
         ],
@@ -1439,7 +1439,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "c0",
               "name": "Cámara del Barquero",
@@ -1679,7 +1679,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "c0",
               "name": "Cámara del Barquero",
@@ -1919,7 +1919,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "c0",
               "name": "Cámara del Barquero",
@@ -2159,7 +2159,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "c0",
               "name": "Cámara del Barquero",
@@ -2392,7 +2392,7 @@
             }
           ],
           "respuestasEntregadas": [],
-          "tablon": [],
+          "porDondePasaron": [],
           "rev": 1,
           "updatedAt": "«instante»",
           "estado": {
@@ -2515,28 +2515,28 @@
         "conectados": 0,
         "ocupacion": [
           {
-            "roomId": "c0",
-            "roomName": "Cámara del Barquero",
+            "lugarId": "c0",
+            "lugarNombre": "Cámara del Barquero",
             "participanteIds": []
           },
           {
-            "roomId": "c1",
-            "roomName": "Pozo de las Ofrendas",
+            "lugarId": "c1",
+            "lugarNombre": "Pozo de las Ofrendas",
             "participanteIds": []
           },
           {
-            "roomId": "c2",
-            "roomName": "Antesala de los Sellos",
+            "lugarId": "c2",
+            "lugarNombre": "Antesala de los Sellos",
             "participanteIds": []
           },
           {
-            "roomId": "c3",
-            "roomName": "Corredor de las Estrellas",
+            "lugarId": "c3",
+            "lugarNombre": "Corredor de las Estrellas",
             "participanteIds": []
           },
           {
-            "roomId": "c4",
-            "roomName": "Sala de la Balanza",
+            "lugarId": "c4",
+            "lugarNombre": "Sala de la Balanza",
             "participanteIds": []
           }
         ],
@@ -2644,7 +2644,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "c0",
               "name": "Cámara del Barquero",
@@ -2989,7 +2989,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "c0",
               "name": "Cámara del Barquero",
@@ -3334,7 +3334,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "c0",
               "name": "Cámara del Barquero",
@@ -3679,7 +3679,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "c0",
               "name": "Cámara del Barquero",
@@ -4013,7 +4013,7 @@
             }
           ],
           "respuestasEntregadas": [],
-          "tablon": [],
+          "porDondePasaron": [],
           "rev": 1,
           "updatedAt": "«instante»",
           "estado": {
@@ -4139,28 +4139,28 @@
         "conectados": 0,
         "ocupacion": [
           {
-            "roomId": "c0",
-            "roomName": "Cámara del Barquero",
+            "lugarId": "c0",
+            "lugarNombre": "Cámara del Barquero",
             "participanteIds": []
           },
           {
-            "roomId": "c1",
-            "roomName": "Pozo de las Ofrendas",
+            "lugarId": "c1",
+            "lugarNombre": "Pozo de las Ofrendas",
             "participanteIds": []
           },
           {
-            "roomId": "c2",
-            "roomName": "Antesala de los Sellos",
+            "lugarId": "c2",
+            "lugarNombre": "Antesala de los Sellos",
             "participanteIds": []
           },
           {
-            "roomId": "c3",
-            "roomName": "Corredor de las Estrellas",
+            "lugarId": "c3",
+            "lugarNombre": "Corredor de las Estrellas",
             "participanteIds": []
           },
           {
-            "roomId": "c4",
-            "roomName": "Sala de la Balanza",
+            "lugarId": "c4",
+            "lugarNombre": "Sala de la Balanza",
             "participanteIds": []
           }
         ],
@@ -4270,7 +4270,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "c0",
               "name": "Cámara del Barquero",
@@ -4495,7 +4495,7 @@
               "description": "Una Vaso canopo."
             }
           ],
-          "miSala": "c0",
+          "miLugar": "c0",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -4603,7 +4603,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "c0",
               "name": "Cámara del Barquero",
@@ -4828,7 +4828,7 @@
               "description": "Una Vaso canopo."
             }
           ],
-          "miSala": "c2",
+          "miLugar": "c2",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -4936,7 +4936,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "c0",
               "name": "Cámara del Barquero",
@@ -5151,7 +5151,7 @@
               "description": "Una Vaso canopo."
             }
           ],
-          "miSala": "c3",
+          "miLugar": "c3",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -5259,7 +5259,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "c0",
               "name": "Cámara del Barquero",
@@ -5497,7 +5497,7 @@
               "description": "Una Vaso canopo."
             }
           ],
-          "miSala": "c4",
+          "miLugar": "c4",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -5536,12 +5536,12 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "c1",
+                  "lugarId": "c1",
                   "at": "«instante»"
                 },
                 {
                   "round": 1,
-                  "roomId": "c0",
+                  "lugarId": "c0",
                   "at": "«instante»"
                 }
               ],
@@ -5557,7 +5557,7 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "c2",
+                  "lugarId": "c2",
                   "at": "«instante»"
                 }
               ],
@@ -5573,7 +5573,7 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "c3",
+                  "lugarId": "c3",
                   "at": "«instante»"
                 }
               ],
@@ -5589,7 +5589,7 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "c4",
+                  "lugarId": "c4",
                   "at": "«instante»"
                 }
               ],
@@ -5598,7 +5598,7 @@
             }
           ],
           "respuestasEntregadas": [],
-          "tablon": [],
+          "porDondePasaron": [],
           "rev": 1,
           "updatedAt": "«instante»",
           "estado": {
@@ -5801,34 +5801,34 @@
         "conectados": 0,
         "ocupacion": [
           {
-            "roomId": "c0",
-            "roomName": "Cámara del Barquero",
+            "lugarId": "c0",
+            "lugarNombre": "Cámara del Barquero",
             "participanteIds": [
               "e0"
             ]
           },
           {
-            "roomId": "c1",
-            "roomName": "Pozo de las Ofrendas",
+            "lugarId": "c1",
+            "lugarNombre": "Pozo de las Ofrendas",
             "participanteIds": []
           },
           {
-            "roomId": "c2",
-            "roomName": "Antesala de los Sellos",
+            "lugarId": "c2",
+            "lugarNombre": "Antesala de los Sellos",
             "participanteIds": [
               "e1"
             ]
           },
           {
-            "roomId": "c3",
-            "roomName": "Corredor de las Estrellas",
+            "lugarId": "c3",
+            "lugarNombre": "Corredor de las Estrellas",
             "participanteIds": [
               "e2"
             ]
           },
           {
-            "roomId": "c4",
-            "roomName": "Sala de la Balanza",
+            "lugarId": "c4",
+            "lugarNombre": "Sala de la Balanza",
             "participanteIds": [
               "e3"
             ]
@@ -6073,7 +6073,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "c0",
               "name": "Cámara del Barquero",
@@ -6298,7 +6298,7 @@
               "description": "Una Vaso canopo."
             }
           ],
-          "miSala": "c0",
+          "miLugar": "c0",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -6402,7 +6402,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "c0",
               "name": "Cámara del Barquero",
@@ -6627,7 +6627,7 @@
               "description": "Una Vaso canopo."
             }
           ],
-          "miSala": "c2",
+          "miLugar": "c2",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -6731,7 +6731,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "c0",
               "name": "Cámara del Barquero",
@@ -6946,7 +6946,7 @@
               "description": "Una Vaso canopo."
             }
           ],
-          "miSala": "c3",
+          "miLugar": "c3",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -7050,7 +7050,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "c0",
               "name": "Cámara del Barquero",
@@ -7288,7 +7288,7 @@
               "description": "Una Vaso canopo."
             }
           ],
-          "miSala": "c4",
+          "miLugar": "c4",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -7327,12 +7327,12 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "c1",
+                  "lugarId": "c1",
                   "at": "«instante»"
                 },
                 {
                   "round": 1,
-                  "roomId": "c0",
+                  "lugarId": "c0",
                   "at": "«instante»"
                 }
               ],
@@ -7348,7 +7348,7 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "c2",
+                  "lugarId": "c2",
                   "at": "«instante»"
                 }
               ],
@@ -7364,7 +7364,7 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "c3",
+                  "lugarId": "c3",
                   "at": "«instante»"
                 }
               ],
@@ -7380,7 +7380,7 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "c4",
+                  "lugarId": "c4",
                   "at": "«instante»"
                 }
               ],
@@ -7389,22 +7389,22 @@
             }
           ],
           "respuestasEntregadas": [],
-          "tablon": [
+          "porDondePasaron": [
             {
               "round": 1,
-              "roomId": "c1"
+              "lugarId": "c1"
             },
             {
               "round": 1,
-              "roomId": "c2"
+              "lugarId": "c2"
             },
             {
               "round": 1,
-              "roomId": "c3"
+              "lugarId": "c3"
             },
             {
               "round": 1,
-              "roomId": "c4"
+              "lugarId": "c4"
             }
           ],
           "rev": 1,
@@ -7608,34 +7608,34 @@
         "conectados": 0,
         "ocupacion": [
           {
-            "roomId": "c0",
-            "roomName": "Cámara del Barquero",
+            "lugarId": "c0",
+            "lugarNombre": "Cámara del Barquero",
             "participanteIds": [
               "e0"
             ]
           },
           {
-            "roomId": "c1",
-            "roomName": "Pozo de las Ofrendas",
+            "lugarId": "c1",
+            "lugarNombre": "Pozo de las Ofrendas",
             "participanteIds": []
           },
           {
-            "roomId": "c2",
-            "roomName": "Antesala de los Sellos",
+            "lugarId": "c2",
+            "lugarNombre": "Antesala de los Sellos",
             "participanteIds": [
               "e1"
             ]
           },
           {
-            "roomId": "c3",
-            "roomName": "Corredor de las Estrellas",
+            "lugarId": "c3",
+            "lugarNombre": "Corredor de las Estrellas",
             "participanteIds": [
               "e2"
             ]
           },
           {
-            "roomId": "c4",
-            "roomName": "Sala de la Balanza",
+            "lugarId": "c4",
+            "lugarNombre": "Sala de la Balanza",
             "participanteIds": [
               "e3"
             ]
@@ -7762,7 +7762,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "c0",
               "name": "Cámara del Barquero",
@@ -8130,7 +8130,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "c0",
               "name": "Cámara del Barquero",
@@ -8498,7 +8498,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "c0",
               "name": "Cámara del Barquero",
@@ -8856,7 +8856,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "c0",
               "name": "Cámara del Barquero",
@@ -9169,12 +9169,12 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "c1",
+                  "lugarId": "c1",
                   "at": "«instante»"
                 },
                 {
                   "round": 1,
-                  "roomId": "c0",
+                  "lugarId": "c0",
                   "at": "«instante»"
                 }
               ],
@@ -9190,7 +9190,7 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "c2",
+                  "lugarId": "c2",
                   "at": "«instante»"
                 }
               ],
@@ -9206,7 +9206,7 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "c3",
+                  "lugarId": "c3",
                   "at": "«instante»"
                 }
               ],
@@ -9222,7 +9222,7 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "c4",
+                  "lugarId": "c4",
                   "at": "«instante»"
                 }
               ],
@@ -9231,22 +9231,22 @@
             }
           ],
           "respuestasEntregadas": [],
-          "tablon": [
+          "porDondePasaron": [
             {
               "round": 1,
-              "roomId": "c1"
+              "lugarId": "c1"
             },
             {
               "round": 1,
-              "roomId": "c2"
+              "lugarId": "c2"
             },
             {
               "round": 1,
-              "roomId": "c3"
+              "lugarId": "c3"
             },
             {
               "round": 1,
-              "roomId": "c4"
+              "lugarId": "c4"
             }
           ],
           "rev": 1,
@@ -9451,28 +9451,28 @@
         "conectados": 0,
         "ocupacion": [
           {
-            "roomId": "c0",
-            "roomName": "Cámara del Barquero",
+            "lugarId": "c0",
+            "lugarNombre": "Cámara del Barquero",
             "participanteIds": []
           },
           {
-            "roomId": "c1",
-            "roomName": "Pozo de las Ofrendas",
+            "lugarId": "c1",
+            "lugarNombre": "Pozo de las Ofrendas",
             "participanteIds": []
           },
           {
-            "roomId": "c2",
-            "roomName": "Antesala de los Sellos",
+            "lugarId": "c2",
+            "lugarNombre": "Antesala de los Sellos",
             "participanteIds": []
           },
           {
-            "roomId": "c3",
-            "roomName": "Corredor de las Estrellas",
+            "lugarId": "c3",
+            "lugarNombre": "Corredor de las Estrellas",
             "participanteIds": []
           },
           {
-            "roomId": "c4",
-            "roomName": "Sala de la Balanza",
+            "lugarId": "c4",
+            "lugarNombre": "Sala de la Balanza",
             "participanteIds": []
           }
         ],
@@ -9584,7 +9584,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "c0",
               "name": "Cámara del Barquero",
@@ -9819,7 +9819,7 @@
               "description": "Una Vaso canopo."
             }
           ],
-          "miSala": "c0",
+          "miLugar": "c0",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -9929,7 +9929,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "c0",
               "name": "Cámara del Barquero",
@@ -10164,7 +10164,7 @@
               "description": "Una Vaso canopo."
             }
           ],
-          "miSala": "c3",
+          "miLugar": "c3",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -10274,7 +10274,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "c0",
               "name": "Cámara del Barquero",
@@ -10489,7 +10489,7 @@
               "description": "Una Vaso canopo."
             }
           ],
-          "miSala": "c4",
+          "miLugar": "c4",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -10599,7 +10599,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "c0",
               "name": "Cámara del Barquero",
@@ -10847,7 +10847,7 @@
               "description": "Una Vaso canopo."
             }
           ],
-          "miSala": "c0",
+          "miLugar": "c0",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -10886,22 +10886,22 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "c1",
+                  "lugarId": "c1",
                   "at": "«instante»"
                 },
                 {
                   "round": 1,
-                  "roomId": "c0",
+                  "lugarId": "c0",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "c2",
+                  "lugarId": "c2",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "c0",
+                  "lugarId": "c0",
                   "at": "«instante»"
                 }
               ],
@@ -10917,12 +10917,12 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "c2",
+                  "lugarId": "c2",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "c3",
+                  "lugarId": "c3",
                   "at": "«instante»"
                 }
               ],
@@ -10938,12 +10938,12 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "c3",
+                  "lugarId": "c3",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "c4",
+                  "lugarId": "c4",
                   "at": "«instante»"
                 }
               ],
@@ -10959,12 +10959,12 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "c4",
+                  "lugarId": "c4",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "c0",
+                  "lugarId": "c0",
                   "at": "«instante»"
                 }
               ],
@@ -10973,22 +10973,22 @@
             }
           ],
           "respuestasEntregadas": [],
-          "tablon": [
+          "porDondePasaron": [
             {
               "round": 1,
-              "roomId": "c1"
+              "lugarId": "c1"
             },
             {
               "round": 1,
-              "roomId": "c2"
+              "lugarId": "c2"
             },
             {
               "round": 1,
-              "roomId": "c3"
+              "lugarId": "c3"
             },
             {
               "round": 1,
-              "roomId": "c4"
+              "lugarId": "c4"
             }
           ],
           "rev": 1,
@@ -11244,33 +11244,33 @@
         "conectados": 0,
         "ocupacion": [
           {
-            "roomId": "c0",
-            "roomName": "Cámara del Barquero",
+            "lugarId": "c0",
+            "lugarNombre": "Cámara del Barquero",
             "participanteIds": [
               "e0",
               "e3"
             ]
           },
           {
-            "roomId": "c1",
-            "roomName": "Pozo de las Ofrendas",
+            "lugarId": "c1",
+            "lugarNombre": "Pozo de las Ofrendas",
             "participanteIds": []
           },
           {
-            "roomId": "c2",
-            "roomName": "Antesala de los Sellos",
+            "lugarId": "c2",
+            "lugarNombre": "Antesala de los Sellos",
             "participanteIds": []
           },
           {
-            "roomId": "c3",
-            "roomName": "Corredor de las Estrellas",
+            "lugarId": "c3",
+            "lugarNombre": "Corredor de las Estrellas",
             "participanteIds": [
               "e1"
             ]
           },
           {
-            "roomId": "c4",
-            "roomName": "Sala de la Balanza",
+            "lugarId": "c4",
+            "lugarNombre": "Sala de la Balanza",
             "participanteIds": [
               "e2"
             ]
@@ -11508,7 +11508,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "c0",
               "name": "Cámara del Barquero",
@@ -11743,7 +11743,7 @@
               "description": "Una Vaso canopo."
             }
           ],
-          "miSala": "c0",
+          "miLugar": "c0",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -11849,7 +11849,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "c0",
               "name": "Cámara del Barquero",
@@ -12084,7 +12084,7 @@
               "description": "Una Vaso canopo."
             }
           ],
-          "miSala": "c3",
+          "miLugar": "c3",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -12190,7 +12190,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "c0",
               "name": "Cámara del Barquero",
@@ -12405,7 +12405,7 @@
               "description": "Una Vaso canopo."
             }
           ],
-          "miSala": "c4",
+          "miLugar": "c4",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -12511,7 +12511,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "c0",
               "name": "Cámara del Barquero",
@@ -12759,7 +12759,7 @@
               "description": "Una Vaso canopo."
             }
           ],
-          "miSala": "c0",
+          "miLugar": "c0",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -12798,22 +12798,22 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "c1",
+                  "lugarId": "c1",
                   "at": "«instante»"
                 },
                 {
                   "round": 1,
-                  "roomId": "c0",
+                  "lugarId": "c0",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "c2",
+                  "lugarId": "c2",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "c0",
+                  "lugarId": "c0",
                   "at": "«instante»"
                 }
               ],
@@ -12829,12 +12829,12 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "c2",
+                  "lugarId": "c2",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "c3",
+                  "lugarId": "c3",
                   "at": "«instante»"
                 }
               ],
@@ -12850,12 +12850,12 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "c3",
+                  "lugarId": "c3",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "c4",
+                  "lugarId": "c4",
                   "at": "«instante»"
                 }
               ],
@@ -12871,12 +12871,12 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "c4",
+                  "lugarId": "c4",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "c0",
+                  "lugarId": "c0",
                   "at": "«instante»"
                 }
               ],
@@ -12885,38 +12885,38 @@
             }
           ],
           "respuestasEntregadas": [],
-          "tablon": [
+          "porDondePasaron": [
             {
               "round": 1,
-              "roomId": "c1"
-            },
-            {
-              "round": 1,
-              "roomId": "c2"
+              "lugarId": "c1"
             },
             {
               "round": 1,
-              "roomId": "c3"
+              "lugarId": "c2"
             },
             {
               "round": 1,
-              "roomId": "c4"
+              "lugarId": "c3"
+            },
+            {
+              "round": 1,
+              "lugarId": "c4"
             },
             {
               "round": 2,
-              "roomId": "c2"
+              "lugarId": "c2"
             },
             {
               "round": 2,
-              "roomId": "c3"
+              "lugarId": "c3"
             },
             {
               "round": 2,
-              "roomId": "c4"
+              "lugarId": "c4"
             },
             {
               "round": 2,
-              "roomId": "c0"
+              "lugarId": "c0"
             }
           ],
           "rev": 1,
@@ -13171,33 +13171,33 @@
         "conectados": 0,
         "ocupacion": [
           {
-            "roomId": "c0",
-            "roomName": "Cámara del Barquero",
+            "lugarId": "c0",
+            "lugarNombre": "Cámara del Barquero",
             "participanteIds": [
               "e0",
               "e3"
             ]
           },
           {
-            "roomId": "c1",
-            "roomName": "Pozo de las Ofrendas",
+            "lugarId": "c1",
+            "lugarNombre": "Pozo de las Ofrendas",
             "participanteIds": []
           },
           {
-            "roomId": "c2",
-            "roomName": "Antesala de los Sellos",
+            "lugarId": "c2",
+            "lugarNombre": "Antesala de los Sellos",
             "participanteIds": []
           },
           {
-            "roomId": "c3",
-            "roomName": "Corredor de las Estrellas",
+            "lugarId": "c3",
+            "lugarNombre": "Corredor de las Estrellas",
             "participanteIds": [
               "e1"
             ]
           },
           {
-            "roomId": "c4",
-            "roomName": "Sala de la Balanza",
+            "lugarId": "c4",
+            "lugarNombre": "Sala de la Balanza",
             "participanteIds": [
               "e2"
             ]
@@ -13325,7 +13325,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "c0",
               "name": "Cámara del Barquero",
@@ -13704,7 +13704,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "c0",
               "name": "Cámara del Barquero",
@@ -14083,7 +14083,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "c0",
               "name": "Cámara del Barquero",
@@ -14442,7 +14442,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "c0",
               "name": "Cámara del Barquero",
@@ -14765,22 +14765,22 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "c1",
+                  "lugarId": "c1",
                   "at": "«instante»"
                 },
                 {
                   "round": 1,
-                  "roomId": "c0",
+                  "lugarId": "c0",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "c2",
+                  "lugarId": "c2",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "c0",
+                  "lugarId": "c0",
                   "at": "«instante»"
                 }
               ],
@@ -14796,12 +14796,12 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "c2",
+                  "lugarId": "c2",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "c3",
+                  "lugarId": "c3",
                   "at": "«instante»"
                 }
               ],
@@ -14817,12 +14817,12 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "c3",
+                  "lugarId": "c3",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "c4",
+                  "lugarId": "c4",
                   "at": "«instante»"
                 }
               ],
@@ -14838,12 +14838,12 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "c4",
+                  "lugarId": "c4",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "c0",
+                  "lugarId": "c0",
                   "at": "«instante»"
                 }
               ],
@@ -14852,38 +14852,38 @@
             }
           ],
           "respuestasEntregadas": [],
-          "tablon": [
+          "porDondePasaron": [
             {
               "round": 1,
-              "roomId": "c1"
-            },
-            {
-              "round": 1,
-              "roomId": "c2"
+              "lugarId": "c1"
             },
             {
               "round": 1,
-              "roomId": "c3"
+              "lugarId": "c2"
             },
             {
               "round": 1,
-              "roomId": "c4"
+              "lugarId": "c3"
+            },
+            {
+              "round": 1,
+              "lugarId": "c4"
             },
             {
               "round": 2,
-              "roomId": "c2"
+              "lugarId": "c2"
             },
             {
               "round": 2,
-              "roomId": "c3"
+              "lugarId": "c3"
             },
             {
               "round": 2,
-              "roomId": "c4"
+              "lugarId": "c4"
             },
             {
               "round": 2,
-              "roomId": "c0"
+              "lugarId": "c0"
             }
           ],
           "rev": 1,
@@ -15139,28 +15139,28 @@
         "conectados": 0,
         "ocupacion": [
           {
-            "roomId": "c0",
-            "roomName": "Cámara del Barquero",
+            "lugarId": "c0",
+            "lugarNombre": "Cámara del Barquero",
             "participanteIds": []
           },
           {
-            "roomId": "c1",
-            "roomName": "Pozo de las Ofrendas",
+            "lugarId": "c1",
+            "lugarNombre": "Pozo de las Ofrendas",
             "participanteIds": []
           },
           {
-            "roomId": "c2",
-            "roomName": "Antesala de los Sellos",
+            "lugarId": "c2",
+            "lugarNombre": "Antesala de los Sellos",
             "participanteIds": []
           },
           {
-            "roomId": "c3",
-            "roomName": "Corredor de las Estrellas",
+            "lugarId": "c3",
+            "lugarNombre": "Corredor de las Estrellas",
             "participanteIds": []
           },
           {
-            "roomId": "c4",
-            "roomName": "Sala de la Balanza",
+            "lugarId": "c4",
+            "lugarNombre": "Sala de la Balanza",
             "participanteIds": []
           }
         ],
@@ -15273,7 +15273,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "c0",
               "name": "Cámara del Barquero",
@@ -15518,7 +15518,7 @@
               "description": "Una Vaso canopo."
             }
           ],
-          "miSala": "c0",
+          "miLugar": "c0",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -15629,7 +15629,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "c0",
               "name": "Cámara del Barquero",
@@ -15874,7 +15874,7 @@
               "description": "Una Vaso canopo."
             }
           ],
-          "miSala": "c4",
+          "miLugar": "c4",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -15985,7 +15985,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "c0",
               "name": "Cámara del Barquero",
@@ -16210,7 +16210,7 @@
               "description": "Una Vaso canopo."
             }
           ],
-          "miSala": "c0",
+          "miLugar": "c0",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -16321,7 +16321,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "c0",
               "name": "Cámara del Barquero",
@@ -16569,7 +16569,7 @@
               "description": "Una Vaso canopo."
             }
           ],
-          "miSala": "c1",
+          "miLugar": "c1",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -16608,32 +16608,32 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "c1",
+                  "lugarId": "c1",
                   "at": "«instante»"
                 },
                 {
                   "round": 1,
-                  "roomId": "c0",
+                  "lugarId": "c0",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "c2",
+                  "lugarId": "c2",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "c0",
+                  "lugarId": "c0",
                   "at": "«instante»"
                 },
                 {
                   "round": 3,
-                  "roomId": "c3",
+                  "lugarId": "c3",
                   "at": "«instante»"
                 },
                 {
                   "round": 3,
-                  "roomId": "c0",
+                  "lugarId": "c0",
                   "at": "«instante»"
                 }
               ],
@@ -16649,17 +16649,17 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "c2",
+                  "lugarId": "c2",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "c3",
+                  "lugarId": "c3",
                   "at": "«instante»"
                 },
                 {
                   "round": 3,
-                  "roomId": "c4",
+                  "lugarId": "c4",
                   "at": "«instante»"
                 }
               ],
@@ -16675,17 +16675,17 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "c3",
+                  "lugarId": "c3",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "c4",
+                  "lugarId": "c4",
                   "at": "«instante»"
                 },
                 {
                   "round": 3,
-                  "roomId": "c0",
+                  "lugarId": "c0",
                   "at": "«instante»"
                 }
               ],
@@ -16701,17 +16701,17 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "c4",
+                  "lugarId": "c4",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "c0",
+                  "lugarId": "c0",
                   "at": "«instante»"
                 },
                 {
                   "round": 3,
-                  "roomId": "c1",
+                  "lugarId": "c1",
                   "at": "«instante»"
                 }
               ],
@@ -16720,38 +16720,38 @@
             }
           ],
           "respuestasEntregadas": [],
-          "tablon": [
+          "porDondePasaron": [
             {
               "round": 1,
-              "roomId": "c1"
-            },
-            {
-              "round": 1,
-              "roomId": "c2"
+              "lugarId": "c1"
             },
             {
               "round": 1,
-              "roomId": "c3"
+              "lugarId": "c2"
             },
             {
               "round": 1,
-              "roomId": "c4"
+              "lugarId": "c3"
+            },
+            {
+              "round": 1,
+              "lugarId": "c4"
             },
             {
               "round": 2,
-              "roomId": "c2"
+              "lugarId": "c2"
             },
             {
               "round": 2,
-              "roomId": "c3"
+              "lugarId": "c3"
             },
             {
               "round": 2,
-              "roomId": "c4"
+              "lugarId": "c4"
             },
             {
               "round": 2,
-              "roomId": "c0"
+              "lugarId": "c0"
             }
           ],
           "rev": 1,
@@ -17058,33 +17058,33 @@
         "conectados": 0,
         "ocupacion": [
           {
-            "roomId": "c0",
-            "roomName": "Cámara del Barquero",
+            "lugarId": "c0",
+            "lugarNombre": "Cámara del Barquero",
             "participanteIds": [
               "e0",
               "e2"
             ]
           },
           {
-            "roomId": "c1",
-            "roomName": "Pozo de las Ofrendas",
+            "lugarId": "c1",
+            "lugarNombre": "Pozo de las Ofrendas",
             "participanteIds": [
               "e3"
             ]
           },
           {
-            "roomId": "c2",
-            "roomName": "Antesala de los Sellos",
+            "lugarId": "c2",
+            "lugarNombre": "Antesala de los Sellos",
             "participanteIds": []
           },
           {
-            "roomId": "c3",
-            "roomName": "Corredor de las Estrellas",
+            "lugarId": "c3",
+            "lugarNombre": "Corredor de las Estrellas",
             "participanteIds": []
           },
           {
-            "roomId": "c4",
-            "roomName": "Sala de la Balanza",
+            "lugarId": "c4",
+            "lugarNombre": "Sala de la Balanza",
             "participanteIds": [
               "e1"
             ]
@@ -17323,7 +17323,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "c0",
               "name": "Cámara del Barquero",
@@ -17568,7 +17568,7 @@
               "description": "Una Vaso canopo."
             }
           ],
-          "miSala": "c0",
+          "miLugar": "c0",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -17675,7 +17675,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "c0",
               "name": "Cámara del Barquero",
@@ -17920,7 +17920,7 @@
               "description": "Una Vaso canopo."
             }
           ],
-          "miSala": "c4",
+          "miLugar": "c4",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -18027,7 +18027,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "c0",
               "name": "Cámara del Barquero",
@@ -18252,7 +18252,7 @@
               "description": "Una Vaso canopo."
             }
           ],
-          "miSala": "c0",
+          "miLugar": "c0",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -18359,7 +18359,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "c0",
               "name": "Cámara del Barquero",
@@ -18607,7 +18607,7 @@
               "description": "Una Vaso canopo."
             }
           ],
-          "miSala": "c1",
+          "miLugar": "c1",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -18646,32 +18646,32 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "c1",
+                  "lugarId": "c1",
                   "at": "«instante»"
                 },
                 {
                   "round": 1,
-                  "roomId": "c0",
+                  "lugarId": "c0",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "c2",
+                  "lugarId": "c2",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "c0",
+                  "lugarId": "c0",
                   "at": "«instante»"
                 },
                 {
                   "round": 3,
-                  "roomId": "c3",
+                  "lugarId": "c3",
                   "at": "«instante»"
                 },
                 {
                   "round": 3,
-                  "roomId": "c0",
+                  "lugarId": "c0",
                   "at": "«instante»"
                 }
               ],
@@ -18687,17 +18687,17 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "c2",
+                  "lugarId": "c2",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "c3",
+                  "lugarId": "c3",
                   "at": "«instante»"
                 },
                 {
                   "round": 3,
-                  "roomId": "c4",
+                  "lugarId": "c4",
                   "at": "«instante»"
                 }
               ],
@@ -18713,17 +18713,17 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "c3",
+                  "lugarId": "c3",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "c4",
+                  "lugarId": "c4",
                   "at": "«instante»"
                 },
                 {
                   "round": 3,
-                  "roomId": "c0",
+                  "lugarId": "c0",
                   "at": "«instante»"
                 }
               ],
@@ -18739,17 +18739,17 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "c4",
+                  "lugarId": "c4",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "c0",
+                  "lugarId": "c0",
                   "at": "«instante»"
                 },
                 {
                   "round": 3,
-                  "roomId": "c1",
+                  "lugarId": "c1",
                   "at": "«instante»"
                 }
               ],
@@ -18758,54 +18758,54 @@
             }
           ],
           "respuestasEntregadas": [],
-          "tablon": [
+          "porDondePasaron": [
             {
               "round": 1,
-              "roomId": "c1"
-            },
-            {
-              "round": 1,
-              "roomId": "c2"
+              "lugarId": "c1"
             },
             {
               "round": 1,
-              "roomId": "c3"
+              "lugarId": "c2"
             },
             {
               "round": 1,
-              "roomId": "c4"
+              "lugarId": "c3"
+            },
+            {
+              "round": 1,
+              "lugarId": "c4"
             },
             {
               "round": 2,
-              "roomId": "c2"
+              "lugarId": "c2"
             },
             {
               "round": 2,
-              "roomId": "c3"
+              "lugarId": "c3"
             },
             {
               "round": 2,
-              "roomId": "c4"
+              "lugarId": "c4"
             },
             {
               "round": 2,
-              "roomId": "c0"
+              "lugarId": "c0"
             },
             {
               "round": 3,
-              "roomId": "c3"
+              "lugarId": "c3"
             },
             {
               "round": 3,
-              "roomId": "c4"
+              "lugarId": "c4"
             },
             {
               "round": 3,
-              "roomId": "c0"
+              "lugarId": "c0"
             },
             {
               "round": 3,
-              "roomId": "c1"
+              "lugarId": "c1"
             }
           ],
           "rev": 1,
@@ -19111,33 +19111,33 @@
         "conectados": 0,
         "ocupacion": [
           {
-            "roomId": "c0",
-            "roomName": "Cámara del Barquero",
+            "lugarId": "c0",
+            "lugarNombre": "Cámara del Barquero",
             "participanteIds": [
               "e0",
               "e2"
             ]
           },
           {
-            "roomId": "c1",
-            "roomName": "Pozo de las Ofrendas",
+            "lugarId": "c1",
+            "lugarNombre": "Pozo de las Ofrendas",
             "participanteIds": [
               "e3"
             ]
           },
           {
-            "roomId": "c2",
-            "roomName": "Antesala de los Sellos",
+            "lugarId": "c2",
+            "lugarNombre": "Antesala de los Sellos",
             "participanteIds": []
           },
           {
-            "roomId": "c3",
-            "roomName": "Corredor de las Estrellas",
+            "lugarId": "c3",
+            "lugarNombre": "Corredor de las Estrellas",
             "participanteIds": []
           },
           {
-            "roomId": "c4",
-            "roomName": "Sala de la Balanza",
+            "lugarId": "c4",
+            "lugarNombre": "Sala de la Balanza",
             "participanteIds": [
               "e1"
             ]
@@ -19265,7 +19265,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "c0",
               "name": "Cámara del Barquero",
@@ -19654,7 +19654,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "c0",
               "name": "Cámara del Barquero",
@@ -20043,7 +20043,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "c0",
               "name": "Cámara del Barquero",
@@ -20412,7 +20412,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "c0",
               "name": "Cámara del Barquero",
@@ -20735,32 +20735,32 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "c1",
+                  "lugarId": "c1",
                   "at": "«instante»"
                 },
                 {
                   "round": 1,
-                  "roomId": "c0",
+                  "lugarId": "c0",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "c2",
+                  "lugarId": "c2",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "c0",
+                  "lugarId": "c0",
                   "at": "«instante»"
                 },
                 {
                   "round": 3,
-                  "roomId": "c3",
+                  "lugarId": "c3",
                   "at": "«instante»"
                 },
                 {
                   "round": 3,
-                  "roomId": "c0",
+                  "lugarId": "c0",
                   "at": "«instante»"
                 }
               ],
@@ -20776,17 +20776,17 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "c2",
+                  "lugarId": "c2",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "c3",
+                  "lugarId": "c3",
                   "at": "«instante»"
                 },
                 {
                   "round": 3,
-                  "roomId": "c4",
+                  "lugarId": "c4",
                   "at": "«instante»"
                 }
               ],
@@ -20802,17 +20802,17 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "c3",
+                  "lugarId": "c3",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "c4",
+                  "lugarId": "c4",
                   "at": "«instante»"
                 },
                 {
                   "round": 3,
-                  "roomId": "c0",
+                  "lugarId": "c0",
                   "at": "«instante»"
                 }
               ],
@@ -20828,17 +20828,17 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "c4",
+                  "lugarId": "c4",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "c0",
+                  "lugarId": "c0",
                   "at": "«instante»"
                 },
                 {
                   "round": 3,
-                  "roomId": "c1",
+                  "lugarId": "c1",
                   "at": "«instante»"
                 }
               ],
@@ -20847,54 +20847,54 @@
             }
           ],
           "respuestasEntregadas": [],
-          "tablon": [
+          "porDondePasaron": [
             {
               "round": 1,
-              "roomId": "c1"
-            },
-            {
-              "round": 1,
-              "roomId": "c2"
+              "lugarId": "c1"
             },
             {
               "round": 1,
-              "roomId": "c3"
+              "lugarId": "c2"
             },
             {
               "round": 1,
-              "roomId": "c4"
+              "lugarId": "c3"
+            },
+            {
+              "round": 1,
+              "lugarId": "c4"
             },
             {
               "round": 2,
-              "roomId": "c2"
+              "lugarId": "c2"
             },
             {
               "round": 2,
-              "roomId": "c3"
+              "lugarId": "c3"
             },
             {
               "round": 2,
-              "roomId": "c4"
+              "lugarId": "c4"
             },
             {
               "round": 2,
-              "roomId": "c0"
+              "lugarId": "c0"
             },
             {
               "round": 3,
-              "roomId": "c3"
+              "lugarId": "c3"
             },
             {
               "round": 3,
-              "roomId": "c4"
+              "lugarId": "c4"
             },
             {
               "round": 3,
-              "roomId": "c0"
+              "lugarId": "c0"
             },
             {
               "round": 3,
-              "roomId": "c1"
+              "lugarId": "c1"
             }
           ],
           "rev": 1,
@@ -21201,28 +21201,28 @@
         "conectados": 0,
         "ocupacion": [
           {
-            "roomId": "c0",
-            "roomName": "Cámara del Barquero",
+            "lugarId": "c0",
+            "lugarNombre": "Cámara del Barquero",
             "participanteIds": []
           },
           {
-            "roomId": "c1",
-            "roomName": "Pozo de las Ofrendas",
+            "lugarId": "c1",
+            "lugarNombre": "Pozo de las Ofrendas",
             "participanteIds": []
           },
           {
-            "roomId": "c2",
-            "roomName": "Antesala de los Sellos",
+            "lugarId": "c2",
+            "lugarNombre": "Antesala de los Sellos",
             "participanteIds": []
           },
           {
-            "roomId": "c3",
-            "roomName": "Corredor de las Estrellas",
+            "lugarId": "c3",
+            "lugarNombre": "Corredor de las Estrellas",
             "participanteIds": []
           },
           {
-            "roomId": "c4",
-            "roomName": "Sala de la Balanza",
+            "lugarId": "c4",
+            "lugarNombre": "Sala de la Balanza",
             "participanteIds": []
           }
         ],
@@ -21335,7 +21335,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "c0",
               "name": "Cámara del Barquero",
@@ -21590,7 +21590,7 @@
               "description": "Una Vaso canopo."
             }
           ],
-          "miSala": "c0",
+          "miLugar": "c0",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -21701,7 +21701,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "c0",
               "name": "Cámara del Barquero",
@@ -21956,7 +21956,7 @@
               "description": "Una Vaso canopo."
             }
           ],
-          "miSala": "c0",
+          "miLugar": "c0",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -22067,7 +22067,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "c0",
               "name": "Cámara del Barquero",
@@ -22292,7 +22292,7 @@
               "description": "Una Vaso canopo."
             }
           ],
-          "miSala": "c1",
+          "miLugar": "c1",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -22403,7 +22403,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "c0",
               "name": "Cámara del Barquero",
@@ -22651,7 +22651,7 @@
               "description": "Una Vaso canopo."
             }
           ],
-          "miSala": "c2",
+          "miLugar": "c2",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -22690,42 +22690,42 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "c1",
+                  "lugarId": "c1",
                   "at": "«instante»"
                 },
                 {
                   "round": 1,
-                  "roomId": "c0",
+                  "lugarId": "c0",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "c2",
+                  "lugarId": "c2",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "c0",
+                  "lugarId": "c0",
                   "at": "«instante»"
                 },
                 {
                   "round": 3,
-                  "roomId": "c3",
+                  "lugarId": "c3",
                   "at": "«instante»"
                 },
                 {
                   "round": 3,
-                  "roomId": "c0",
+                  "lugarId": "c0",
                   "at": "«instante»"
                 },
                 {
                   "round": 4,
-                  "roomId": "c4",
+                  "lugarId": "c4",
                   "at": "«instante»"
                 },
                 {
                   "round": 4,
-                  "roomId": "c0",
+                  "lugarId": "c0",
                   "at": "«instante»"
                 }
               ],
@@ -22741,22 +22741,22 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "c2",
+                  "lugarId": "c2",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "c3",
+                  "lugarId": "c3",
                   "at": "«instante»"
                 },
                 {
                   "round": 3,
-                  "roomId": "c4",
+                  "lugarId": "c4",
                   "at": "«instante»"
                 },
                 {
                   "round": 4,
-                  "roomId": "c0",
+                  "lugarId": "c0",
                   "at": "«instante»"
                 }
               ],
@@ -22772,22 +22772,22 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "c3",
+                  "lugarId": "c3",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "c4",
+                  "lugarId": "c4",
                   "at": "«instante»"
                 },
                 {
                   "round": 3,
-                  "roomId": "c0",
+                  "lugarId": "c0",
                   "at": "«instante»"
                 },
                 {
                   "round": 4,
-                  "roomId": "c1",
+                  "lugarId": "c1",
                   "at": "«instante»"
                 }
               ],
@@ -22803,22 +22803,22 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "c4",
+                  "lugarId": "c4",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "c0",
+                  "lugarId": "c0",
                   "at": "«instante»"
                 },
                 {
                   "round": 3,
-                  "roomId": "c1",
+                  "lugarId": "c1",
                   "at": "«instante»"
                 },
                 {
                   "round": 4,
-                  "roomId": "c2",
+                  "lugarId": "c2",
                   "at": "«instante»"
                 }
               ],
@@ -22827,54 +22827,54 @@
             }
           ],
           "respuestasEntregadas": [],
-          "tablon": [
+          "porDondePasaron": [
             {
               "round": 1,
-              "roomId": "c1"
-            },
-            {
-              "round": 1,
-              "roomId": "c2"
+              "lugarId": "c1"
             },
             {
               "round": 1,
-              "roomId": "c3"
+              "lugarId": "c2"
             },
             {
               "round": 1,
-              "roomId": "c4"
+              "lugarId": "c3"
+            },
+            {
+              "round": 1,
+              "lugarId": "c4"
             },
             {
               "round": 2,
-              "roomId": "c2"
+              "lugarId": "c2"
             },
             {
               "round": 2,
-              "roomId": "c3"
+              "lugarId": "c3"
             },
             {
               "round": 2,
-              "roomId": "c4"
+              "lugarId": "c4"
             },
             {
               "round": 2,
-              "roomId": "c0"
+              "lugarId": "c0"
             },
             {
               "round": 3,
-              "roomId": "c3"
+              "lugarId": "c3"
             },
             {
               "round": 3,
-              "roomId": "c4"
+              "lugarId": "c4"
             },
             {
               "round": 3,
-              "roomId": "c0"
+              "lugarId": "c0"
             },
             {
               "round": 3,
-              "roomId": "c1"
+              "lugarId": "c1"
             }
           ],
           "rev": 1,
@@ -23237,35 +23237,35 @@
         "conectados": 0,
         "ocupacion": [
           {
-            "roomId": "c0",
-            "roomName": "Cámara del Barquero",
+            "lugarId": "c0",
+            "lugarNombre": "Cámara del Barquero",
             "participanteIds": [
               "e0",
               "e1"
             ]
           },
           {
-            "roomId": "c1",
-            "roomName": "Pozo de las Ofrendas",
+            "lugarId": "c1",
+            "lugarNombre": "Pozo de las Ofrendas",
             "participanteIds": [
               "e2"
             ]
           },
           {
-            "roomId": "c2",
-            "roomName": "Antesala de los Sellos",
+            "lugarId": "c2",
+            "lugarNombre": "Antesala de los Sellos",
             "participanteIds": [
               "e3"
             ]
           },
           {
-            "roomId": "c3",
-            "roomName": "Corredor de las Estrellas",
+            "lugarId": "c3",
+            "lugarNombre": "Corredor de las Estrellas",
             "participanteIds": []
           },
           {
-            "roomId": "c4",
-            "roomName": "Sala de la Balanza",
+            "lugarId": "c4",
+            "lugarNombre": "Sala de la Balanza",
             "participanteIds": []
           }
         ],
@@ -23503,7 +23503,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "c0",
               "name": "Cámara del Barquero",
@@ -23758,7 +23758,7 @@
               "description": "Una Vaso canopo."
             }
           ],
-          "miSala": "c0",
+          "miLugar": "c0",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -23865,7 +23865,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "c0",
               "name": "Cámara del Barquero",
@@ -24120,7 +24120,7 @@
               "description": "Una Vaso canopo."
             }
           ],
-          "miSala": "c0",
+          "miLugar": "c0",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -24227,7 +24227,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "c0",
               "name": "Cámara del Barquero",
@@ -24452,7 +24452,7 @@
               "description": "Una Vaso canopo."
             }
           ],
-          "miSala": "c1",
+          "miLugar": "c1",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -24559,7 +24559,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "c0",
               "name": "Cámara del Barquero",
@@ -24807,7 +24807,7 @@
               "description": "Una Vaso canopo."
             }
           ],
-          "miSala": "c2",
+          "miLugar": "c2",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -24846,42 +24846,42 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "c1",
+                  "lugarId": "c1",
                   "at": "«instante»"
                 },
                 {
                   "round": 1,
-                  "roomId": "c0",
+                  "lugarId": "c0",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "c2",
+                  "lugarId": "c2",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "c0",
+                  "lugarId": "c0",
                   "at": "«instante»"
                 },
                 {
                   "round": 3,
-                  "roomId": "c3",
+                  "lugarId": "c3",
                   "at": "«instante»"
                 },
                 {
                   "round": 3,
-                  "roomId": "c0",
+                  "lugarId": "c0",
                   "at": "«instante»"
                 },
                 {
                   "round": 4,
-                  "roomId": "c4",
+                  "lugarId": "c4",
                   "at": "«instante»"
                 },
                 {
                   "round": 4,
-                  "roomId": "c0",
+                  "lugarId": "c0",
                   "at": "«instante»"
                 }
               ],
@@ -24897,22 +24897,22 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "c2",
+                  "lugarId": "c2",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "c3",
+                  "lugarId": "c3",
                   "at": "«instante»"
                 },
                 {
                   "round": 3,
-                  "roomId": "c4",
+                  "lugarId": "c4",
                   "at": "«instante»"
                 },
                 {
                   "round": 4,
-                  "roomId": "c0",
+                  "lugarId": "c0",
                   "at": "«instante»"
                 }
               ],
@@ -24928,22 +24928,22 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "c3",
+                  "lugarId": "c3",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "c4",
+                  "lugarId": "c4",
                   "at": "«instante»"
                 },
                 {
                   "round": 3,
-                  "roomId": "c0",
+                  "lugarId": "c0",
                   "at": "«instante»"
                 },
                 {
                   "round": 4,
-                  "roomId": "c1",
+                  "lugarId": "c1",
                   "at": "«instante»"
                 }
               ],
@@ -24959,22 +24959,22 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "c4",
+                  "lugarId": "c4",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "c0",
+                  "lugarId": "c0",
                   "at": "«instante»"
                 },
                 {
                   "round": 3,
-                  "roomId": "c1",
+                  "lugarId": "c1",
                   "at": "«instante»"
                 },
                 {
                   "round": 4,
-                  "roomId": "c2",
+                  "lugarId": "c2",
                   "at": "«instante»"
                 }
               ],
@@ -24983,70 +24983,70 @@
             }
           ],
           "respuestasEntregadas": [],
-          "tablon": [
+          "porDondePasaron": [
             {
               "round": 1,
-              "roomId": "c1"
-            },
-            {
-              "round": 1,
-              "roomId": "c2"
+              "lugarId": "c1"
             },
             {
               "round": 1,
-              "roomId": "c3"
+              "lugarId": "c2"
             },
             {
               "round": 1,
-              "roomId": "c4"
+              "lugarId": "c3"
+            },
+            {
+              "round": 1,
+              "lugarId": "c4"
             },
             {
               "round": 2,
-              "roomId": "c2"
+              "lugarId": "c2"
             },
             {
               "round": 2,
-              "roomId": "c3"
+              "lugarId": "c3"
             },
             {
               "round": 2,
-              "roomId": "c4"
+              "lugarId": "c4"
             },
             {
               "round": 2,
-              "roomId": "c0"
+              "lugarId": "c0"
             },
             {
               "round": 3,
-              "roomId": "c3"
+              "lugarId": "c3"
             },
             {
               "round": 3,
-              "roomId": "c4"
+              "lugarId": "c4"
             },
             {
               "round": 3,
-              "roomId": "c0"
+              "lugarId": "c0"
             },
             {
               "round": 3,
-              "roomId": "c1"
+              "lugarId": "c1"
             },
             {
               "round": 4,
-              "roomId": "c4"
+              "lugarId": "c4"
             },
             {
               "round": 4,
-              "roomId": "c0"
+              "lugarId": "c0"
             },
             {
               "round": 4,
-              "roomId": "c1"
+              "lugarId": "c1"
             },
             {
               "round": 4,
-              "roomId": "c2"
+              "lugarId": "c2"
             }
           ],
           "rev": 1,
@@ -25408,35 +25408,35 @@
         "conectados": 0,
         "ocupacion": [
           {
-            "roomId": "c0",
-            "roomName": "Cámara del Barquero",
+            "lugarId": "c0",
+            "lugarNombre": "Cámara del Barquero",
             "participanteIds": [
               "e0",
               "e1"
             ]
           },
           {
-            "roomId": "c1",
-            "roomName": "Pozo de las Ofrendas",
+            "lugarId": "c1",
+            "lugarNombre": "Pozo de las Ofrendas",
             "participanteIds": [
               "e2"
             ]
           },
           {
-            "roomId": "c2",
-            "roomName": "Antesala de los Sellos",
+            "lugarId": "c2",
+            "lugarNombre": "Antesala de los Sellos",
             "participanteIds": [
               "e3"
             ]
           },
           {
-            "roomId": "c3",
-            "roomName": "Corredor de las Estrellas",
+            "lugarId": "c3",
+            "lugarNombre": "Corredor de las Estrellas",
             "participanteIds": []
           },
           {
-            "roomId": "c4",
-            "roomName": "Sala de la Balanza",
+            "lugarId": "c4",
+            "lugarNombre": "Sala de la Balanza",
             "participanteIds": []
           }
         ],
@@ -25561,7 +25561,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "c0",
               "name": "Cámara del Barquero",
@@ -25818,7 +25818,7 @@
               "description": "Una Vaso canopo."
             }
           ],
-          "miSala": "c0",
+          "miLugar": "c0",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -25925,7 +25925,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "c0",
               "name": "Cámara del Barquero",
@@ -26182,7 +26182,7 @@
               "description": "Una Vaso canopo."
             }
           ],
-          "miSala": "c0",
+          "miLugar": "c0",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -26289,7 +26289,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "c0",
               "name": "Cámara del Barquero",
@@ -26516,7 +26516,7 @@
               "description": "Una Vaso canopo."
             }
           ],
-          "miSala": "c1",
+          "miLugar": "c1",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -26623,7 +26623,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "c0",
               "name": "Cámara del Barquero",
@@ -26871,7 +26871,7 @@
               "description": "Una Vaso canopo."
             }
           ],
-          "miSala": "c2",
+          "miLugar": "c2",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -26910,42 +26910,42 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "c1",
+                  "lugarId": "c1",
                   "at": "«instante»"
                 },
                 {
                   "round": 1,
-                  "roomId": "c0",
+                  "lugarId": "c0",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "c2",
+                  "lugarId": "c2",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "c0",
+                  "lugarId": "c0",
                   "at": "«instante»"
                 },
                 {
                   "round": 3,
-                  "roomId": "c3",
+                  "lugarId": "c3",
                   "at": "«instante»"
                 },
                 {
                   "round": 3,
-                  "roomId": "c0",
+                  "lugarId": "c0",
                   "at": "«instante»"
                 },
                 {
                   "round": 4,
-                  "roomId": "c4",
+                  "lugarId": "c4",
                   "at": "«instante»"
                 },
                 {
                   "round": 4,
-                  "roomId": "c0",
+                  "lugarId": "c0",
                   "at": "«instante»"
                 }
               ],
@@ -26961,22 +26961,22 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "c2",
+                  "lugarId": "c2",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "c3",
+                  "lugarId": "c3",
                   "at": "«instante»"
                 },
                 {
                   "round": 3,
-                  "roomId": "c4",
+                  "lugarId": "c4",
                   "at": "«instante»"
                 },
                 {
                   "round": 4,
-                  "roomId": "c0",
+                  "lugarId": "c0",
                   "at": "«instante»"
                 }
               ],
@@ -26992,22 +26992,22 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "c3",
+                  "lugarId": "c3",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "c4",
+                  "lugarId": "c4",
                   "at": "«instante»"
                 },
                 {
                   "round": 3,
-                  "roomId": "c0",
+                  "lugarId": "c0",
                   "at": "«instante»"
                 },
                 {
                   "round": 4,
-                  "roomId": "c1",
+                  "lugarId": "c1",
                   "at": "«instante»"
                 }
               ],
@@ -27023,22 +27023,22 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "c4",
+                  "lugarId": "c4",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "c0",
+                  "lugarId": "c0",
                   "at": "«instante»"
                 },
                 {
                   "round": 3,
-                  "roomId": "c1",
+                  "lugarId": "c1",
                   "at": "«instante»"
                 },
                 {
                   "round": 4,
-                  "roomId": "c2",
+                  "lugarId": "c2",
                   "at": "«instante»"
                 }
               ],
@@ -27047,70 +27047,70 @@
             }
           ],
           "respuestasEntregadas": [],
-          "tablon": [
+          "porDondePasaron": [
             {
               "round": 1,
-              "roomId": "c1"
-            },
-            {
-              "round": 1,
-              "roomId": "c2"
+              "lugarId": "c1"
             },
             {
               "round": 1,
-              "roomId": "c3"
+              "lugarId": "c2"
             },
             {
               "round": 1,
-              "roomId": "c4"
+              "lugarId": "c3"
+            },
+            {
+              "round": 1,
+              "lugarId": "c4"
             },
             {
               "round": 2,
-              "roomId": "c2"
+              "lugarId": "c2"
             },
             {
               "round": 2,
-              "roomId": "c3"
+              "lugarId": "c3"
             },
             {
               "round": 2,
-              "roomId": "c4"
+              "lugarId": "c4"
             },
             {
               "round": 2,
-              "roomId": "c0"
+              "lugarId": "c0"
             },
             {
               "round": 3,
-              "roomId": "c3"
+              "lugarId": "c3"
             },
             {
               "round": 3,
-              "roomId": "c4"
+              "lugarId": "c4"
             },
             {
               "round": 3,
-              "roomId": "c0"
+              "lugarId": "c0"
             },
             {
               "round": 3,
-              "roomId": "c1"
+              "lugarId": "c1"
             },
             {
               "round": 4,
-              "roomId": "c4"
+              "lugarId": "c4"
             },
             {
               "round": 4,
-              "roomId": "c0"
+              "lugarId": "c0"
             },
             {
               "round": 4,
-              "roomId": "c1"
+              "lugarId": "c1"
             },
             {
               "round": 4,
-              "roomId": "c2"
+              "lugarId": "c2"
             }
           ],
           "rev": 1,
@@ -27521,35 +27521,35 @@
         "conectados": 0,
         "ocupacion": [
           {
-            "roomId": "c0",
-            "roomName": "Cámara del Barquero",
+            "lugarId": "c0",
+            "lugarNombre": "Cámara del Barquero",
             "participanteIds": [
               "e0",
               "e1"
             ]
           },
           {
-            "roomId": "c1",
-            "roomName": "Pozo de las Ofrendas",
+            "lugarId": "c1",
+            "lugarNombre": "Pozo de las Ofrendas",
             "participanteIds": [
               "e2"
             ]
           },
           {
-            "roomId": "c2",
-            "roomName": "Antesala de los Sellos",
+            "lugarId": "c2",
+            "lugarNombre": "Antesala de los Sellos",
             "participanteIds": [
               "e3"
             ]
           },
           {
-            "roomId": "c3",
-            "roomName": "Corredor de las Estrellas",
+            "lugarId": "c3",
+            "lugarNombre": "Corredor de las Estrellas",
             "participanteIds": []
           },
           {
-            "roomId": "c4",
-            "roomName": "Sala de la Balanza",
+            "lugarId": "c4",
+            "lugarNombre": "Sala de la Balanza",
             "participanteIds": []
           }
         ],
@@ -27710,7 +27710,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "c0",
               "name": "Cámara del Barquero",
@@ -27939,7 +27939,7 @@
               "description": "Una Vaso canopo."
             }
           ],
-          "miSala": "c0",
+          "miLugar": "c0",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -28052,7 +28052,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "c0",
               "name": "Cámara del Barquero",
@@ -28281,7 +28281,7 @@
               "description": "Una Vaso canopo."
             }
           ],
-          "miSala": "c0",
+          "miLugar": "c0",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -28394,7 +28394,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "c0",
               "name": "Cámara del Barquero",
@@ -28621,7 +28621,7 @@
               "description": "Una Vaso canopo."
             }
           ],
-          "miSala": "c1",
+          "miLugar": "c1",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -28728,7 +28728,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "c0",
               "name": "Cámara del Barquero",
@@ -28976,7 +28976,7 @@
               "description": "Una Vaso canopo."
             }
           ],
-          "miSala": "c2",
+          "miLugar": "c2",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -29015,42 +29015,42 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "c1",
+                  "lugarId": "c1",
                   "at": "«instante»"
                 },
                 {
                   "round": 1,
-                  "roomId": "c0",
+                  "lugarId": "c0",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "c2",
+                  "lugarId": "c2",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "c0",
+                  "lugarId": "c0",
                   "at": "«instante»"
                 },
                 {
                   "round": 3,
-                  "roomId": "c3",
+                  "lugarId": "c3",
                   "at": "«instante»"
                 },
                 {
                   "round": 3,
-                  "roomId": "c0",
+                  "lugarId": "c0",
                   "at": "«instante»"
                 },
                 {
                   "round": 4,
-                  "roomId": "c4",
+                  "lugarId": "c4",
                   "at": "«instante»"
                 },
                 {
                   "round": 4,
-                  "roomId": "c0",
+                  "lugarId": "c0",
                   "at": "«instante»"
                 }
               ],
@@ -29066,22 +29066,22 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "c2",
+                  "lugarId": "c2",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "c3",
+                  "lugarId": "c3",
                   "at": "«instante»"
                 },
                 {
                   "round": 3,
-                  "roomId": "c4",
+                  "lugarId": "c4",
                   "at": "«instante»"
                 },
                 {
                   "round": 4,
-                  "roomId": "c0",
+                  "lugarId": "c0",
                   "at": "«instante»"
                 }
               ],
@@ -29097,22 +29097,22 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "c3",
+                  "lugarId": "c3",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "c4",
+                  "lugarId": "c4",
                   "at": "«instante»"
                 },
                 {
                   "round": 3,
-                  "roomId": "c0",
+                  "lugarId": "c0",
                   "at": "«instante»"
                 },
                 {
                   "round": 4,
-                  "roomId": "c1",
+                  "lugarId": "c1",
                   "at": "«instante»"
                 }
               ],
@@ -29128,22 +29128,22 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "c4",
+                  "lugarId": "c4",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "c0",
+                  "lugarId": "c0",
                   "at": "«instante»"
                 },
                 {
                   "round": 3,
-                  "roomId": "c1",
+                  "lugarId": "c1",
                   "at": "«instante»"
                 },
                 {
                   "round": 4,
-                  "roomId": "c2",
+                  "lugarId": "c2",
                   "at": "«instante»"
                 }
               ],
@@ -29169,70 +29169,70 @@
               "correcta": false
             }
           ],
-          "tablon": [
+          "porDondePasaron": [
             {
               "round": 1,
-              "roomId": "c1"
-            },
-            {
-              "round": 1,
-              "roomId": "c2"
+              "lugarId": "c1"
             },
             {
               "round": 1,
-              "roomId": "c3"
+              "lugarId": "c2"
             },
             {
               "round": 1,
-              "roomId": "c4"
+              "lugarId": "c3"
+            },
+            {
+              "round": 1,
+              "lugarId": "c4"
             },
             {
               "round": 2,
-              "roomId": "c2"
+              "lugarId": "c2"
             },
             {
               "round": 2,
-              "roomId": "c3"
+              "lugarId": "c3"
             },
             {
               "round": 2,
-              "roomId": "c4"
+              "lugarId": "c4"
             },
             {
               "round": 2,
-              "roomId": "c0"
+              "lugarId": "c0"
             },
             {
               "round": 3,
-              "roomId": "c3"
+              "lugarId": "c3"
             },
             {
               "round": 3,
-              "roomId": "c4"
+              "lugarId": "c4"
             },
             {
               "round": 3,
-              "roomId": "c0"
+              "lugarId": "c0"
             },
             {
               "round": 3,
-              "roomId": "c1"
+              "lugarId": "c1"
             },
             {
               "round": 4,
-              "roomId": "c4"
+              "lugarId": "c4"
             },
             {
               "round": 4,
-              "roomId": "c0"
+              "lugarId": "c0"
             },
             {
               "round": 4,
-              "roomId": "c1"
+              "lugarId": "c1"
             },
             {
               "round": 4,
-              "roomId": "c2"
+              "lugarId": "c2"
             }
           ],
           "rev": 1,
@@ -29656,35 +29656,35 @@
         "conectados": 0,
         "ocupacion": [
           {
-            "roomId": "c0",
-            "roomName": "Cámara del Barquero",
+            "lugarId": "c0",
+            "lugarNombre": "Cámara del Barquero",
             "participanteIds": [
               "e0",
               "e1"
             ]
           },
           {
-            "roomId": "c1",
-            "roomName": "Pozo de las Ofrendas",
+            "lugarId": "c1",
+            "lugarNombre": "Pozo de las Ofrendas",
             "participanteIds": [
               "e2"
             ]
           },
           {
-            "roomId": "c2",
-            "roomName": "Antesala de los Sellos",
+            "lugarId": "c2",
+            "lugarNombre": "Antesala de los Sellos",
             "participanteIds": [
               "e3"
             ]
           },
           {
-            "roomId": "c3",
-            "roomName": "Corredor de las Estrellas",
+            "lugarId": "c3",
+            "lugarNombre": "Corredor de las Estrellas",
             "participanteIds": []
           },
           {
-            "roomId": "c4",
-            "roomName": "Sala de la Balanza",
+            "lugarId": "c4",
+            "lugarNombre": "Sala de la Balanza",
             "participanteIds": []
           }
         ],
@@ -29816,7 +29816,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "c0",
               "name": "Cámara del Barquero",
@@ -30016,7 +30016,7 @@
               "description": "Una Vaso canopo."
             }
           ],
-          "miSala": "c0",
+          "miLugar": "c0",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -30129,7 +30129,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "c0",
               "name": "Cámara del Barquero",
@@ -30329,7 +30329,7 @@
               "description": "Una Vaso canopo."
             }
           ],
-          "miSala": "c0",
+          "miLugar": "c0",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -30442,7 +30442,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "c0",
               "name": "Cámara del Barquero",
@@ -30641,7 +30641,7 @@
               "description": "Una Vaso canopo."
             }
           ],
-          "miSala": "c1",
+          "miLugar": "c1",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -30748,7 +30748,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "c0",
               "name": "Cámara del Barquero",
@@ -30968,7 +30968,7 @@
               "description": "Una Vaso canopo."
             }
           ],
-          "miSala": "c2",
+          "miLugar": "c2",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -31007,42 +31007,42 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "c1",
+                  "lugarId": "c1",
                   "at": "«instante»"
                 },
                 {
                   "round": 1,
-                  "roomId": "c0",
+                  "lugarId": "c0",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "c2",
+                  "lugarId": "c2",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "c0",
+                  "lugarId": "c0",
                   "at": "«instante»"
                 },
                 {
                   "round": 3,
-                  "roomId": "c3",
+                  "lugarId": "c3",
                   "at": "«instante»"
                 },
                 {
                   "round": 3,
-                  "roomId": "c0",
+                  "lugarId": "c0",
                   "at": "«instante»"
                 },
                 {
                   "round": 4,
-                  "roomId": "c4",
+                  "lugarId": "c4",
                   "at": "«instante»"
                 },
                 {
                   "round": 4,
-                  "roomId": "c0",
+                  "lugarId": "c0",
                   "at": "«instante»"
                 }
               ],
@@ -31058,22 +31058,22 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "c2",
+                  "lugarId": "c2",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "c3",
+                  "lugarId": "c3",
                   "at": "«instante»"
                 },
                 {
                   "round": 3,
-                  "roomId": "c4",
+                  "lugarId": "c4",
                   "at": "«instante»"
                 },
                 {
                   "round": 4,
-                  "roomId": "c0",
+                  "lugarId": "c0",
                   "at": "«instante»"
                 }
               ],
@@ -31089,22 +31089,22 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "c3",
+                  "lugarId": "c3",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "c4",
+                  "lugarId": "c4",
                   "at": "«instante»"
                 },
                 {
                   "round": 3,
-                  "roomId": "c0",
+                  "lugarId": "c0",
                   "at": "«instante»"
                 },
                 {
                   "round": 4,
-                  "roomId": "c1",
+                  "lugarId": "c1",
                   "at": "«instante»"
                 }
               ],
@@ -31120,22 +31120,22 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "c4",
+                  "lugarId": "c4",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "c0",
+                  "lugarId": "c0",
                   "at": "«instante»"
                 },
                 {
                   "round": 3,
-                  "roomId": "c1",
+                  "lugarId": "c1",
                   "at": "«instante»"
                 },
                 {
                   "round": 4,
-                  "roomId": "c2",
+                  "lugarId": "c2",
                   "at": "«instante»"
                 }
               ],
@@ -31161,70 +31161,70 @@
               "correcta": false
             }
           ],
-          "tablon": [
+          "porDondePasaron": [
             {
               "round": 1,
-              "roomId": "c1"
-            },
-            {
-              "round": 1,
-              "roomId": "c2"
+              "lugarId": "c1"
             },
             {
               "round": 1,
-              "roomId": "c3"
+              "lugarId": "c2"
             },
             {
               "round": 1,
-              "roomId": "c4"
+              "lugarId": "c3"
+            },
+            {
+              "round": 1,
+              "lugarId": "c4"
             },
             {
               "round": 2,
-              "roomId": "c2"
+              "lugarId": "c2"
             },
             {
               "round": 2,
-              "roomId": "c3"
+              "lugarId": "c3"
             },
             {
               "round": 2,
-              "roomId": "c4"
+              "lugarId": "c4"
             },
             {
               "round": 2,
-              "roomId": "c0"
+              "lugarId": "c0"
             },
             {
               "round": 3,
-              "roomId": "c3"
+              "lugarId": "c3"
             },
             {
               "round": 3,
-              "roomId": "c4"
+              "lugarId": "c4"
             },
             {
               "round": 3,
-              "roomId": "c0"
+              "lugarId": "c0"
             },
             {
               "round": 3,
-              "roomId": "c1"
+              "lugarId": "c1"
             },
             {
               "round": 4,
-              "roomId": "c4"
+              "lugarId": "c4"
             },
             {
               "round": 4,
-              "roomId": "c0"
+              "lugarId": "c0"
             },
             {
               "round": 4,
-              "roomId": "c1"
+              "lugarId": "c1"
             },
             {
               "round": 4,
-              "roomId": "c2"
+              "lugarId": "c2"
             }
           ],
           "rev": 1,
@@ -31648,35 +31648,35 @@
         "conectados": 0,
         "ocupacion": [
           {
-            "roomId": "c0",
-            "roomName": "Cámara del Barquero",
+            "lugarId": "c0",
+            "lugarNombre": "Cámara del Barquero",
             "participanteIds": [
               "e0",
               "e1"
             ]
           },
           {
-            "roomId": "c1",
-            "roomName": "Pozo de las Ofrendas",
+            "lugarId": "c1",
+            "lugarNombre": "Pozo de las Ofrendas",
             "participanteIds": [
               "e2"
             ]
           },
           {
-            "roomId": "c2",
-            "roomName": "Antesala de los Sellos",
+            "lugarId": "c2",
+            "lugarNombre": "Antesala de los Sellos",
             "participanteIds": [
               "e3"
             ]
           },
           {
-            "roomId": "c3",
-            "roomName": "Corredor de las Estrellas",
+            "lugarId": "c3",
+            "lugarNombre": "Corredor de las Estrellas",
             "participanteIds": []
           },
           {
-            "roomId": "c4",
-            "roomName": "Sala de la Balanza",
+            "lugarId": "c4",
+            "lugarNombre": "Sala de la Balanza",
             "participanteIds": []
           }
         ],
@@ -31785,7 +31785,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "c0",
               "name": "Cámara del Barquero",
@@ -31985,7 +31985,7 @@
               "description": "Una Vaso canopo."
             }
           ],
-          "miSala": "c0",
+          "miLugar": "c0",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -32098,7 +32098,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "c0",
               "name": "Cámara del Barquero",
@@ -32298,7 +32298,7 @@
               "description": "Una Vaso canopo."
             }
           ],
-          "miSala": "c0",
+          "miLugar": "c0",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -32411,7 +32411,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "c0",
               "name": "Cámara del Barquero",
@@ -32610,7 +32610,7 @@
               "description": "Una Vaso canopo."
             }
           ],
-          "miSala": "c1",
+          "miLugar": "c1",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -32717,7 +32717,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "c0",
               "name": "Cámara del Barquero",
@@ -32937,7 +32937,7 @@
               "description": "Una Vaso canopo."
             }
           ],
-          "miSala": "c2",
+          "miLugar": "c2",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -32976,42 +32976,42 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "c1",
+                  "lugarId": "c1",
                   "at": "«instante»"
                 },
                 {
                   "round": 1,
-                  "roomId": "c0",
+                  "lugarId": "c0",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "c2",
+                  "lugarId": "c2",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "c0",
+                  "lugarId": "c0",
                   "at": "«instante»"
                 },
                 {
                   "round": 3,
-                  "roomId": "c3",
+                  "lugarId": "c3",
                   "at": "«instante»"
                 },
                 {
                   "round": 3,
-                  "roomId": "c0",
+                  "lugarId": "c0",
                   "at": "«instante»"
                 },
                 {
                   "round": 4,
-                  "roomId": "c4",
+                  "lugarId": "c4",
                   "at": "«instante»"
                 },
                 {
                   "round": 4,
-                  "roomId": "c0",
+                  "lugarId": "c0",
                   "at": "«instante»"
                 }
               ],
@@ -33027,22 +33027,22 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "c2",
+                  "lugarId": "c2",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "c3",
+                  "lugarId": "c3",
                   "at": "«instante»"
                 },
                 {
                   "round": 3,
-                  "roomId": "c4",
+                  "lugarId": "c4",
                   "at": "«instante»"
                 },
                 {
                   "round": 4,
-                  "roomId": "c0",
+                  "lugarId": "c0",
                   "at": "«instante»"
                 }
               ],
@@ -33058,22 +33058,22 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "c3",
+                  "lugarId": "c3",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "c4",
+                  "lugarId": "c4",
                   "at": "«instante»"
                 },
                 {
                   "round": 3,
-                  "roomId": "c0",
+                  "lugarId": "c0",
                   "at": "«instante»"
                 },
                 {
                   "round": 4,
-                  "roomId": "c1",
+                  "lugarId": "c1",
                   "at": "«instante»"
                 }
               ],
@@ -33089,22 +33089,22 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "c4",
+                  "lugarId": "c4",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "c0",
+                  "lugarId": "c0",
                   "at": "«instante»"
                 },
                 {
                   "round": 3,
-                  "roomId": "c1",
+                  "lugarId": "c1",
                   "at": "«instante»"
                 },
                 {
                   "round": 4,
-                  "roomId": "c2",
+                  "lugarId": "c2",
                   "at": "«instante»"
                 }
               ],
@@ -33130,70 +33130,70 @@
               "correcta": false
             }
           ],
-          "tablon": [
+          "porDondePasaron": [
             {
               "round": 1,
-              "roomId": "c1"
-            },
-            {
-              "round": 1,
-              "roomId": "c2"
+              "lugarId": "c1"
             },
             {
               "round": 1,
-              "roomId": "c3"
+              "lugarId": "c2"
             },
             {
               "round": 1,
-              "roomId": "c4"
+              "lugarId": "c3"
+            },
+            {
+              "round": 1,
+              "lugarId": "c4"
             },
             {
               "round": 2,
-              "roomId": "c2"
+              "lugarId": "c2"
             },
             {
               "round": 2,
-              "roomId": "c3"
+              "lugarId": "c3"
             },
             {
               "round": 2,
-              "roomId": "c4"
+              "lugarId": "c4"
             },
             {
               "round": 2,
-              "roomId": "c0"
+              "lugarId": "c0"
             },
             {
               "round": 3,
-              "roomId": "c3"
+              "lugarId": "c3"
             },
             {
               "round": 3,
-              "roomId": "c4"
+              "lugarId": "c4"
             },
             {
               "round": 3,
-              "roomId": "c0"
+              "lugarId": "c0"
             },
             {
               "round": 3,
-              "roomId": "c1"
+              "lugarId": "c1"
             },
             {
               "round": 4,
-              "roomId": "c4"
+              "lugarId": "c4"
             },
             {
               "round": 4,
-              "roomId": "c0"
+              "lugarId": "c0"
             },
             {
               "round": 4,
-              "roomId": "c1"
+              "lugarId": "c1"
             },
             {
               "round": 4,
-              "roomId": "c2"
+              "lugarId": "c2"
             }
           ],
           "rev": 1,
@@ -33655,35 +33655,35 @@
         "conectados": 0,
         "ocupacion": [
           {
-            "roomId": "c0",
-            "roomName": "Cámara del Barquero",
+            "lugarId": "c0",
+            "lugarNombre": "Cámara del Barquero",
             "participanteIds": [
               "e0",
               "e1"
             ]
           },
           {
-            "roomId": "c1",
-            "roomName": "Pozo de las Ofrendas",
+            "lugarId": "c1",
+            "lugarNombre": "Pozo de las Ofrendas",
             "participanteIds": [
               "e2"
             ]
           },
           {
-            "roomId": "c2",
-            "roomName": "Antesala de los Sellos",
+            "lugarId": "c2",
+            "lugarNombre": "Antesala de los Sellos",
             "participanteIds": [
               "e3"
             ]
           },
           {
-            "roomId": "c3",
-            "roomName": "Corredor de las Estrellas",
+            "lugarId": "c3",
+            "lugarNombre": "Corredor de las Estrellas",
             "participanteIds": []
           },
           {
-            "roomId": "c4",
-            "roomName": "Sala de la Balanza",
+            "lugarId": "c4",
+            "lugarNombre": "Sala de la Balanza",
             "participanteIds": []
           }
         ],
@@ -33792,7 +33792,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "c0",
               "name": "Cámara del Barquero",
@@ -34096,7 +34096,7 @@
               "description": "Una Vaso canopo."
             }
           ],
-          "miSala": "c0",
+          "miLugar": "c0",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -34255,7 +34255,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "c0",
               "name": "Cámara del Barquero",
@@ -34559,7 +34559,7 @@
               "description": "Una Vaso canopo."
             }
           ],
-          "miSala": "c0",
+          "miLugar": "c0",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -34718,7 +34718,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "c0",
               "name": "Cámara del Barquero",
@@ -34989,7 +34989,7 @@
               "description": "Una Vaso canopo."
             }
           ],
-          "miSala": "c1",
+          "miLugar": "c1",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -35142,7 +35142,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "c0",
               "name": "Cámara del Barquero",
@@ -35429,7 +35429,7 @@
               "description": "Una Vaso canopo."
             }
           ],
-          "miSala": "c2",
+          "miLugar": "c2",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -35514,42 +35514,42 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "c1",
+                  "lugarId": "c1",
                   "at": "«instante»"
                 },
                 {
                   "round": 1,
-                  "roomId": "c0",
+                  "lugarId": "c0",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "c2",
+                  "lugarId": "c2",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "c0",
+                  "lugarId": "c0",
                   "at": "«instante»"
                 },
                 {
                   "round": 3,
-                  "roomId": "c3",
+                  "lugarId": "c3",
                   "at": "«instante»"
                 },
                 {
                   "round": 3,
-                  "roomId": "c0",
+                  "lugarId": "c0",
                   "at": "«instante»"
                 },
                 {
                   "round": 4,
-                  "roomId": "c4",
+                  "lugarId": "c4",
                   "at": "«instante»"
                 },
                 {
                   "round": 4,
-                  "roomId": "c0",
+                  "lugarId": "c0",
                   "at": "«instante»"
                 }
               ],
@@ -35565,22 +35565,22 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "c2",
+                  "lugarId": "c2",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "c3",
+                  "lugarId": "c3",
                   "at": "«instante»"
                 },
                 {
                   "round": 3,
-                  "roomId": "c4",
+                  "lugarId": "c4",
                   "at": "«instante»"
                 },
                 {
                   "round": 4,
-                  "roomId": "c0",
+                  "lugarId": "c0",
                   "at": "«instante»"
                 }
               ],
@@ -35596,22 +35596,22 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "c3",
+                  "lugarId": "c3",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "c4",
+                  "lugarId": "c4",
                   "at": "«instante»"
                 },
                 {
                   "round": 3,
-                  "roomId": "c0",
+                  "lugarId": "c0",
                   "at": "«instante»"
                 },
                 {
                   "round": 4,
-                  "roomId": "c1",
+                  "lugarId": "c1",
                   "at": "«instante»"
                 }
               ],
@@ -35627,22 +35627,22 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "c4",
+                  "lugarId": "c4",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "c0",
+                  "lugarId": "c0",
                   "at": "«instante»"
                 },
                 {
                   "round": 3,
-                  "roomId": "c1",
+                  "lugarId": "c1",
                   "at": "«instante»"
                 },
                 {
                   "round": 4,
-                  "roomId": "c2",
+                  "lugarId": "c2",
                   "at": "«instante»"
                 }
               ],
@@ -35668,70 +35668,70 @@
               "correcta": false
             }
           ],
-          "tablon": [
+          "porDondePasaron": [
             {
               "round": 1,
-              "roomId": "c1"
-            },
-            {
-              "round": 1,
-              "roomId": "c2"
+              "lugarId": "c1"
             },
             {
               "round": 1,
-              "roomId": "c3"
+              "lugarId": "c2"
             },
             {
               "round": 1,
-              "roomId": "c4"
+              "lugarId": "c3"
+            },
+            {
+              "round": 1,
+              "lugarId": "c4"
             },
             {
               "round": 2,
-              "roomId": "c2"
+              "lugarId": "c2"
             },
             {
               "round": 2,
-              "roomId": "c3"
+              "lugarId": "c3"
             },
             {
               "round": 2,
-              "roomId": "c4"
+              "lugarId": "c4"
             },
             {
               "round": 2,
-              "roomId": "c0"
+              "lugarId": "c0"
             },
             {
               "round": 3,
-              "roomId": "c3"
+              "lugarId": "c3"
             },
             {
               "round": 3,
-              "roomId": "c4"
+              "lugarId": "c4"
             },
             {
               "round": 3,
-              "roomId": "c0"
+              "lugarId": "c0"
             },
             {
               "round": 3,
-              "roomId": "c1"
+              "lugarId": "c1"
             },
             {
               "round": 4,
-              "roomId": "c4"
+              "lugarId": "c4"
             },
             {
               "round": 4,
-              "roomId": "c0"
+              "lugarId": "c0"
             },
             {
               "round": 4,
-              "roomId": "c1"
+              "lugarId": "c1"
             },
             {
               "round": 4,
-              "roomId": "c2"
+              "lugarId": "c2"
             }
           ],
           "rev": 1,
@@ -36198,35 +36198,35 @@
         "conectados": 0,
         "ocupacion": [
           {
-            "roomId": "c0",
-            "roomName": "Cámara del Barquero",
+            "lugarId": "c0",
+            "lugarNombre": "Cámara del Barquero",
             "participanteIds": [
               "e0",
               "e1"
             ]
           },
           {
-            "roomId": "c1",
-            "roomName": "Pozo de las Ofrendas",
+            "lugarId": "c1",
+            "lugarNombre": "Pozo de las Ofrendas",
             "participanteIds": [
               "e2"
             ]
           },
           {
-            "roomId": "c2",
-            "roomName": "Antesala de los Sellos",
+            "lugarId": "c2",
+            "lugarNombre": "Antesala de los Sellos",
             "participanteIds": [
               "e3"
             ]
           },
           {
-            "roomId": "c3",
-            "roomName": "Corredor de las Estrellas",
+            "lugarId": "c3",
+            "lugarNombre": "Corredor de las Estrellas",
             "participanteIds": []
           },
           {
-            "roomId": "c4",
-            "roomName": "Sala de la Balanza",
+            "lugarId": "c4",
+            "lugarNombre": "Sala de la Balanza",
             "participanteIds": []
           }
         ],

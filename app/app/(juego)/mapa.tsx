@@ -47,7 +47,7 @@ import {
   radio,
 } from '../../src/ui';
 import type { BoardLayout } from '../../../shared/types';
-import type { SalaVista } from '../../../shared/live';
+import type { LugarVista } from '../../../shared/live';
 
 /** Lado de celda en unidades del viewBox. El mismo que usa la web. */
 const CELDA = 40;
@@ -85,13 +85,13 @@ export default function Mapa(): JSX.Element {
 
   if (!vista) return <Pantalla><Cargando texto="Desdoblando el plano…" /></Pantalla>;
 
-  const { tablero, salas, miSala, sesion } = vista;
+  const { tablero, lugares: salas, miLugar, sesion } = vista;
   const ancho = Math.max(240, width - espacio.lg * 2);
   const abierta = sesion.phase === 'ronda-abierta';
 
   // Una partida puede tener las dos caras: el plano trazado y la foto cenital
   // del sitio de verdad. Si están las dos, se puede pasar de una a otra.
-  const hayPlano = (tablero?.plano?.rooms.length ?? 0) > 0;
+  const hayPlano = (tablero?.plano?.lugares.length ?? 0) > 0;
   const hayFoto = Boolean(tablero?.imagenUrl);
   const porDefecto: Cara | null =
     tablero?.modo === 'aerial' && hayFoto ? 'foto' : hayPlano ? 'plano' : hayFoto ? 'foto' : null;
@@ -106,7 +106,7 @@ export default function Mapa(): JSX.Element {
    * has estado y qué te dio algo. No es información nueva, la tienes en Pistas;
    * aquí solo se ve de un vistazo y sobre el plano.
    */
-  const conHallazgo = new Set(vista.misHallazgos.map((p) => p.roomId));
+  const conHallazgo = new Set(vista.misHallazgos.map((p) => p.lugarId));
 
   /*
    * LAS PALABRAS DEL SITIO SALEN DEL MANIFIESTO. Esta pantalla decía «la casa»
@@ -153,7 +153,7 @@ export default function Mapa(): JSX.Element {
   const profanada = leerEstadoMomia(vista.estadoDelJuego)?.profanada;
 
   const elegir = async (salaId: string): Promise<void> => {
-    if (!abierta || !seEntra || salaId === miSala || eligiendo) return;
+    if (!abierta || !seEntra || salaId === miLugar || eligiendo) return;
     setError(null);
     setEligiendo(salaId);
     try {
@@ -198,7 +198,7 @@ export default function Mapa(): JSX.Element {
         <PlanoAereo
           imagenUrl={tablero?.imagenUrl}
           salas={salas}
-          miSala={miSala}
+          miLugar={miLugar}
           conHallazgo={conHallazgo}
           ancho={ancho}
           alPulsar={elegir}
@@ -208,7 +208,7 @@ export default function Mapa(): JSX.Element {
         <PlanoDibujado
           plano={tablero?.plano}
           salas={salas}
-          miSala={miSala}
+          miLugar={miLugar}
           conHallazgo={conHallazgo}
           profanada={profanada}
           ancho={ancho}
@@ -229,7 +229,7 @@ export default function Mapa(): JSX.Element {
         <Leyenda
           cara={cara}
           nombreProfanada={salas.find((s) => s.id === profanada)?.name}
-          hayPasadizos={(tablero?.plano?.passages.length ?? 0) > 0}
+          hayPasadizos={(tablero?.plano?.pasadizos.length ?? 0) > 0}
         />
       )}
 
@@ -240,10 +240,10 @@ export default function Mapa(): JSX.Element {
         <Animated.View key={sala.id} entering={FadeInUp.delay(40 * i).duration(360)}>
           <Pressable
             onPress={() => void elegir(sala.id)}
-            disabled={!abierta || sala.id === miSala}
+            disabled={!abierta || sala.id === miLugar}
             style={({ pressed }) => [
               estilos.fila,
-              sala.id === miSala && estilos.filaDentro,
+              sala.id === miLugar && estilos.filaDentro,
               sala.id === profanada && estilos.filaProfanada,
               pressed && { opacity: 0.85 },
             ]}
@@ -254,8 +254,8 @@ export default function Mapa(): JSX.Element {
               </Cuerpo>
               <Cuerpo tenue style={{ fontSize: 15 }}>
                 {[
-                  sala.id === miSala ? 'Estás aquí' : null,
-                  sala.ocupantes > 0 && sala.id !== miSala
+                  sala.id === miLugar ? 'Estás aquí' : null,
+                  sala.ocupantes > 0 && sala.id !== miLugar
                     ? sala.ocupantes === 1
                       ? 'Hay alguien'
                       : `${sala.ocupantes} personas`
@@ -268,7 +268,7 @@ export default function Mapa(): JSX.Element {
                   .join(' · ') || 'Sin novedades'}
               </Cuerpo>
             </View>
-            {sala.id === miSala && <Cuerpo style={{ color: t.oro300, fontSize: 19 }}>✓</Cuerpo>}
+            {sala.id === miLugar && <Cuerpo style={{ color: t.oro300, fontSize: 19 }}>✓</Cuerpo>}
           </Pressable>
         </Animated.View>
       ))}
@@ -281,8 +281,8 @@ export default function Mapa(): JSX.Element {
 // ---------------------------------------------------------------------------
 
 interface PropsPlano {
-  salas: SalaVista[];
-  miSala?: string;
+  salas: LugarVista[];
+  miLugar?: string;
   conHallazgo: Set<string>;
   /**
    * La que cuesta una marca esta noche, si el juego tiene una.
@@ -310,8 +310,8 @@ function PlanoDibujado({
    * sitios donde más se nota, porque el plano se mira mucho y además se imprime.
    */
   const tablero = useTablero();
-  const { salas, miSala, conHallazgo, profanada, ancho, alPulsar, activo } = resto;
-  if (!plano || plano.rooms.length === 0) return null;
+  const { salas, miLugar, conHallazgo, profanada, ancho, alPulsar, activo } = resto;
+  if (!plano || plano.lugares.length === 0) return null;
 
   const lado = plano.grid.cols * CELDA;
   const alto = plano.grid.rows * CELDA;
@@ -319,8 +319,8 @@ function PlanoDibujado({
   const salaPorId = new Map(salas.map((s) => [s.id, s]));
 
   const centros = new Map<string, { cx: number; cy: number }>();
-  for (const c of plano.rooms) {
-    centros.set(c.roomId, { cx: (c.x + c.w / 2) * CELDA, cy: (c.y + c.h / 2) * CELDA });
+  for (const c of plano.lugares) {
+    centros.set(c.lugarId, { cx: (c.x + c.w / 2) * CELDA, cy: (c.y + c.h / 2) * CELDA });
   }
 
   const centro = {
@@ -438,9 +438,9 @@ function PlanoDibujado({
         </G>
 
         {/* Pasadizos secretos */}
-        {plano.passages.map((p, i) => {
-          const a = centros.get(p.fromRoomId);
-          const b = centros.get(p.toRoomId);
+        {plano.pasadizos.map((p, i) => {
+          const a = centros.get(p.desdeLugarId);
+          const b = centros.get(p.hastaLugarId);
           if (!a || !b) return null;
           return (
             <G key={`p${i}`}>
@@ -462,25 +462,25 @@ function PlanoDibujado({
         })}
 
         {/* Salas */}
-        {plano.rooms.map((c) => {
+        {plano.lugares.map((c) => {
           const x = c.x * CELDA;
           const y = c.y * CELDA;
           const w = c.w * CELDA;
           const h = c.h * CELDA;
           const cx = x + w / 2;
           const cy = y + h / 2;
-          const sala = salaPorId.get(c.roomId);
-          const nombre = (nombrePorId.get(c.roomId) ?? 'Sala').toUpperCase();
-          const dentro = miSala === c.roomId;
-          const dioAlgo = conHallazgo.has(c.roomId);
-          const marcada = c.roomId === profanada;
+          const sala = salaPorId.get(c.lugarId);
+          const nombre = (nombrePorId.get(c.lugarId) ?? 'Sala').toUpperCase();
+          const dentro = miLugar === c.lugarId;
+          const dioAlgo = conHallazgo.has(c.lugarId);
+          const marcada = c.lugarId === profanada;
           const lineas = partirNombre(nombre);
           const tam = tamanoDeLetra(lineas, w - 30);
           const haciaDerecha = cx < lado / 2;
           const puertaX = haciaDerecha ? x + w - 4 : x + 4;
 
           return (
-            <G key={c.roomId}>
+            <G key={c.lugarId}>
               {/* El parquet de la web no se porta: sus baldosas de 26 unidades
                   quedarían en 9 píxeles y solo aportarían ruido. Un caoba plano
                   con doble filete lee mucho mejor a este tamaño. */}
@@ -566,13 +566,13 @@ function PlanoDibujado({
       </Svg>
 
       {activo &&
-        plano.rooms.map((c) => (
+        plano.lugares.map((c) => (
           <Pressable
-            key={`toque-${c.roomId}`}
+            key={`toque-${c.lugarId}`}
             accessibilityRole="button"
-            accessibilityLabel={`Entrar en ${nombrePorId.get(c.roomId) ?? 'la sala'}`}
-            disabled={miSala === c.roomId}
-            onPress={() => void alPulsar(c.roomId)}
+            accessibilityLabel={`Entrar en ${nombrePorId.get(c.lugarId) ?? 'la sala'}`}
+            disabled={miLugar === c.lugarId}
+            onPress={() => void alPulsar(c.lugarId)}
             style={({ pressed }) => [
               {
                 position: 'absolute',
@@ -614,7 +614,7 @@ function BocaDePasadizo({ cx, cy }: { cx: number; cy: number }): JSX.Element {
 function PlanoAereo({
   imagenUrl,
   salas,
-  miSala,
+  miLugar,
   conHallazgo,
   ancho,
   alPulsar,
@@ -667,7 +667,7 @@ function PlanoAereo({
           onError={() => setFallo(true)}
         />
         {conChincheta.map((sala) => {
-          const dentro = sala.id === miSala;
+          const dentro = sala.id === miLugar;
           return (
             /*
               La caja que centra NO recibe toques, y esto importa mucho más de

@@ -49,7 +49,7 @@ export function tramaAlDia(plot: Plot | undefined): boolean {
   plot.solution.respuestas = respuestasCluedo({
     murdererId: s.murdererId ?? '',
     weaponId: s.weaponId ?? '',
-    roomId: s.roomId ?? '',
+    lugarId: s.roomId ?? '',
   });
   delete s.murdererId;
   delete s.weaponId;
@@ -176,6 +176,12 @@ function participantesDeLaTramaAlDia(game: GameSession): void {
   for (const personaje of plot.characters ?? []) renombrarParticipante(personaje);
   for (const momento of plot.timeline ?? []) renombrarParticipante(momento);
   for (const giro of plot.material?.twists ?? []) renombrarParticipante(giro);
+  // Y donde se encuentra cada pista, que tambien decia «sala».
+  for (const bruto of plot.clues ?? []) {
+    const pista = bruto as unknown as Record<string, unknown>;
+    if (pista.lugarId === undefined && typeof pista.roomId === 'string') pista.lugarId = pista.roomId;
+    delete pista.roomId;
+  }
 }
 
 /** Lo guardado en la SESION que llevaba el nombre viejo. */
@@ -192,6 +198,7 @@ export function alDia<T extends GameSession | null | undefined>(game: T): T {
     tramaAlDia(game.plot);
     entidadesAlDia(game);
     documentosAlDia(game);
+    planoAlDia(game);
     participantesDeLaTramaAlDia(game);
   }
   return game;
@@ -233,6 +240,70 @@ function respuestasDeLaSesionAlDia(sesion: LiveSession): void {
 }
 
 /**
+ * El plano y los lugares dejan de llamarse salas.
+ *
+ * `board.rooms` -> `board.lugares`, `passages` -> `pasadizos`, y dentro
+ * `roomId` -> `lugarId` y `fromRoomId`/`toRoomId` -> `desdeLugarId`/`hastaLugarId`.
+ *
+ * El plano es de la plataforma —la Momia dibuja camaras, las Sombras pasos y una
+ * campaña de rol dibujaria cuevas— y lo que era de CLUEDO era la palabra.
+ *
+ * SIN ESTO el plano de una partida guardada sale VACIO: `board.lugares` no
+ * existe, asi que el taller pinta un tapete sin nada encima y el movil una
+ * pestaña de mapa en blanco. Y el dosier de quien dirige revienta al listar los
+ * pasadizos, que es como se descubrio.
+ */
+function planoAlDia(game: GameSession): void {
+  const plano = game.board as unknown as Record<string, unknown> | undefined;
+  if (!plano) return;
+  if (!plano.lugares && Array.isArray(plano.rooms)) plano.lugares = plano.rooms;
+  delete plano.rooms;
+  if (!plano.pasadizos && Array.isArray(plano.passages)) plano.pasadizos = plano.passages;
+  delete plano.passages;
+
+  for (const bruto of (plano.lugares as unknown[]) ?? []) {
+    const c = bruto as Record<string, unknown>;
+    if (c.lugarId === undefined && typeof c.roomId === 'string') c.lugarId = c.roomId;
+    delete c.roomId;
+  }
+  for (const bruto of (plano.pasadizos as unknown[]) ?? []) {
+    const t = bruto as Record<string, unknown>;
+    if (t.desdeLugarId === undefined && typeof t.fromRoomId === 'string') t.desdeLugarId = t.fromRoomId;
+    if (t.hastaLugarId === undefined && typeof t.toRoomId === 'string') t.hastaLugarId = t.toRoomId;
+    delete t.fromRoomId;
+    delete t.toRoomId;
+  }
+}
+
+/**
+ * Y donde estuvo cada cual: las elecciones de turno y el registro de la sesion.
+ *
+ * `elecciones[].roomId` -> `lugarId`, y `tablon` -> `porDondePasaron`.
+ *
+ * SIN ESTO una partida a medias pierde donde esta cada persona: el panel de
+ * quien dirige enseña la mesa entera sin nadie en ninguna parte, y las pistas
+ * que alguien encontro dejan de salirle en su movil.
+ */
+function dondeEstuvieronAlDia(sesion: LiveSession): void {
+  const vieja = sesion as unknown as { tablon?: unknown[]; porDondePasaron?: unknown[] };
+  if (!vieja.porDondePasaron && Array.isArray(vieja.tablon)) vieja.porDondePasaron = vieja.tablon;
+  delete vieja.tablon;
+
+  for (const bruto of (vieja.porDondePasaron as unknown[]) ?? []) {
+    const paso = bruto as Record<string, unknown>;
+    if (paso.lugarId === undefined && typeof paso.roomId === 'string') paso.lugarId = paso.roomId;
+    delete paso.roomId;
+  }
+  for (const jugador of sesion.players ?? []) {
+    for (const bruto of jugador.elecciones ?? []) {
+      const e = bruto as unknown as Record<string, unknown>;
+      if (e.lugarId === undefined && typeof e.roomId === 'string') e.lugarId = e.roomId;
+      delete e.roomId;
+    }
+  }
+}
+
+/**
  * Pone al día una sesión en vivo recién leída.
  *
  * Las acusaciones ya entregadas llevaban la terna. Si se perdieran, una partida
@@ -241,6 +312,7 @@ function respuestasDeLaSesionAlDia(sesion: LiveSession): void {
 export function sesionAlDia<T extends LiveSession | null | undefined>(sesion: T): T {
   if (!sesion) return sesion;
   respuestasDeLaSesionAlDia(sesion);
+  dondeEstuvieronAlDia(sesion);
   participantesDeLaSesionAlDia(sesion);
   for (const a of sesion.respuestasEntregadas ?? []) {
     const vieja = a as unknown as TernaHeredada & { respuestas?: Record<string, string> };
@@ -248,7 +320,7 @@ export function sesionAlDia<T extends LiveSession | null | undefined>(sesion: T)
     a.respuestas = respuestasCluedo({
       murdererId: vieja.murdererId ?? '',
       weaponId: vieja.weaponId ?? '',
-      roomId: vieja.roomId ?? '',
+      lugarId: vieja.roomId ?? '',
     });
     delete vieja.murdererId;
     delete vieja.weaponId;

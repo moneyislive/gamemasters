@@ -223,7 +223,7 @@ function podarTrama(plot: Plot, game: GameSession): void {
 
   // Pistas escondidas en salas que ya no existen (las que no citan sala se conservan).
   plot.clues = plot.clues.filter(
-    (pista) => pista.roomId === undefined || idsSalas.has(pista.roomId),
+    (pista) => pista.lugarId === undefined || idsSalas.has(pista.lugarId),
   );
 
   // Cronología: se quitan los ids inexistentes; el evento solo se elimina si se

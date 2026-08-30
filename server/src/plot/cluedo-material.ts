@@ -222,7 +222,7 @@ function construirPrompt(game: GameSession, plot: Plot): string {
 
   const pistas = plot.clues
     .map((c) => {
-      const sala = salasDe(game).find((r) => r.id === c.roomId)?.name ?? 'sin sala';
+      const sala = salasDe(game).find((r) => r.id === c.lugarId)?.name ?? 'sin sala';
       return `- ronda ${c.round} · ${sala}: ${c.description}`;
     })
     .join('\n');

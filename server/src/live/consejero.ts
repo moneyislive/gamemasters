@@ -142,7 +142,7 @@ export function contextoDelMayordomo(vista: VistaJugador): string {
   const catLugar = cats.find((c) => c.sonLugares);
   const catCosas = cats.find((c) => !c.sonLugares && !c.sonJugadores);
   partes.push(
-    `${(catLugar?.plural ?? 'salas').toUpperCase()}: ${vista.salas.map((s) => s.name).join(', ')}.`,
+    `${(catLugar?.plural ?? 'salas').toUpperCase()}: ${vista.lugares.map((s) => s.name).join(', ')}.`,
   );
   partes.push(
     `${(catCosas?.plural ?? 'objetos').toUpperCase()}: ${vista.objetos.map((o) => o.name).join(', ')}.`,

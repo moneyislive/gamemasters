@@ -23,15 +23,15 @@ export function cartelesSala(
   opciones: DocumentRenderOptions,
 ): string {
   const nombrePorId = new Map(salasDe(game).map((sala) => [sala.id, sala.name]));
-  const pasadizos = game.board?.passages ?? [];
+  const pasadizos = game.board?.pasadizos ?? [];
   const codigos = codigosDeSala(salasDe(game));
 
   /** Salas conectadas por pasadizo con ésta, en ambos sentidos. */
-  const conectadasCon = (roomId: string): string[] => {
+  const conectadasCon = (lugarId: string): string[] => {
     const destinos: string[] = [];
     for (const paso of pasadizos) {
-      if (paso.fromRoomId === roomId) destinos.push(nombrePorId.get(paso.toRoomId) ?? '');
-      else if (paso.toRoomId === roomId) destinos.push(nombrePorId.get(paso.fromRoomId) ?? '');
+      if (paso.desdeLugarId === lugarId) destinos.push(nombrePorId.get(paso.hastaLugarId) ?? '');
+      else if (paso.hastaLugarId === lugarId) destinos.push(nombrePorId.get(paso.desdeLugarId) ?? '');
     }
     return destinos.filter(Boolean);
   };

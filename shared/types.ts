@@ -36,7 +36,7 @@ export interface Suspect {
   photoUrl?: string;
 }
 
-export interface RoomPin {
+export interface Chincheta {
   /** Posición relativa (0..1) sobre la imagen aérea */
   x: number;
   y: number;
@@ -54,7 +54,7 @@ export interface Room {
    */
   shortCode?: string;
   /** Solo en modo 'aerial': posición de la chincheta sobre la foto aérea */
-  pin?: RoomPin;
+  pin?: Chincheta;
 }
 
 export interface Weapon {
@@ -67,8 +67,8 @@ export interface Weapon {
 
 // ---------- Tablero ----------
 
-export interface BoardRoomPlacement {
-  roomId: string;
+export interface ColocacionDeLugar {
+  lugarId: string;
   /** Coordenadas en la rejilla del tablero (rejilla de 24x24 celdas) */
   x: number;
   y: number;
@@ -76,15 +76,23 @@ export interface BoardRoomPlacement {
   h: number;
 }
 
-export interface SecretPassage {
-  fromRoomId: string;
-  toRoomId: string;
+export interface Pasadizo {
+  desdeLugarId: string;
+  hastaLugarId: string;
 }
 
 export interface BoardLayout {
   grid: { cols: number; rows: number };
-  rooms: BoardRoomPlacement[];
-  passages: SecretPassage[];
+  /**
+   * DÓNDE VA CADA LUGAR EN EL PLANO.
+   *
+   * Se llamaba `rooms` y sus elementos `roomId`, porque el primer juego dibujaba
+   * las salas de una casa. La Momia dibuja cámaras, las Sombras pasos, y una
+   * campaña de rol dibujaría cuevas: el plano es de la plataforma, lo que era de
+   * CLUEDO era la palabra.
+   */
+  lugares: ColocacionDeLugar[];
+  pasadizos: Pasadizo[];
   /** Etiqueta decorativa del centro del tablero (p.ej. "ESCALERAS") */
   centerLabel: string;
 }
@@ -120,7 +128,7 @@ export interface PlotCharacter {
 
 export interface PlotClue {
   id: string;
-  roomId?: string;
+  lugarId?: string;
   description: string;
   pointsTo: string;
   /**
@@ -606,7 +614,7 @@ export interface GameSession {
     description?: string;
     photoUrl?: string;
     email?: string;
-    pin?: RoomPin;
+    pin?: Chincheta;
   }>>;
   boardMode: BoardMode;
   /**

@@ -521,7 +521,7 @@ export interface DefinicionDeRonda {
    * Sobre qué categoría se actúa. En CLUEDO se entra en una sala.
    *
    * Que esto sea una sola categoría y una sola acción es la limitación más
-   * seria que arrastra el diseño actual: `EleccionDeSala` guarda un `roomId` y
+   * seria que arrastra el diseño actual: `EleccionDeLugar` guarda un `roomId` y
    * nada más. Un juego con varias acciones distintas por ronda no cabe aquí y
    * necesitaría que esto fuese una lista de acciones con su propia forma.
    */

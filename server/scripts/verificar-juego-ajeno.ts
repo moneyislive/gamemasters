@@ -402,7 +402,7 @@ const sesion: LiveSession = {
     girosRecibidos: [],
   })),
   respuestasEntregadas: [],
-  tablon: [],
+  porDondePasaron: [],
   rev: 1,
   updatedAt: ahora,
 };
@@ -484,7 +484,7 @@ comprobar('a quien no se lo llevó no se le cobra', trasCerrar.fondo.p0 === FOND
 paso('Lo que llega al móvil es de este juego, no de un misterio');
 const v = vistaDeJugador(game, sesion, 'p1')!;
 comprobar('se compone la vista', v !== null);
-comprobar('sin salas', v.salas.length === 0, v.salas.length);
+comprobar('sin salas', v.lugares.length === 0, v.lugares.length);
 comprobar('sin pistas encontradas', v.misHallazgos.length === 0);
 comprobar('sin hechos establecidos', v.hechos.length === 0);
 comprobar('sin ejes que acusar', v.ejes.length === 0, v.ejes);

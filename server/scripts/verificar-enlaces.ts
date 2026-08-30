@@ -130,7 +130,7 @@ const datos = {
         timeline: [
           { time: '21:00', description: 'Se sirve la cena.', participanteIds: ['s0', 's1'], isPublic: true },
         ],
-        clues: [{ id: 'c1', roomId: 'r0', description: 'Una copa rota.', pointsTo: 's1', round: 1 }],
+        clues: [{ id: 'c1', lugarId: 'r0', description: 'Una copa rota.', pointsTo: 's1', round: 1 }],
         gmScript: ['Acto I: la cena.'],
       },
     },
@@ -177,7 +177,7 @@ const datos = {
         },
       ],
       respuestasEntregadas: [],
-      tablon: [],
+      porDondePasaron: [],
       rev: 1,
       updatedAt: ahora,
     },

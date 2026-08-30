@@ -61,7 +61,7 @@ import { GlifoDeDon, Grieta, Puerta } from './glifos';
 import { DONES } from './dones';
 import type { DonId } from '../../../shared/juegos/momia-tipos';
 import { codificarObjetivo, leerEstadoMomia, type EstadoMomiaVisible } from './vista';
-import type { SalaVista, VistaJugador } from '../../../shared/live';
+import type { LugarVista, VistaJugador } from '../../../shared/live';
 
 /** Lo que la barra de señalar ocupa por encima de las pestañas. */
 const ALTO_SENALAR = 78;
@@ -120,7 +120,7 @@ export function Vigilia(): JSX.Element {
   }
 
   const estado = leerEstadoMomia(vista.estadoDelJuego);
-  const { sesion, yo, salas, miSala, narracion } = vista;
+  const { sesion, yo, lugares: salas, miLugar, narracion } = vista;
 
   const avisar = async (listo: boolean): Promise<void> => {
     setErrorCamara(null);
@@ -145,7 +145,7 @@ export function Vigilia(): JSX.Element {
    * acierta en los dos casos, y el día que solo quede una, esta rama sobra y se
    * borra sin que nadie tenga que acordarse de nada.
    */
-  const entrar = async (camara: SalaVista): Promise<void> => {
+  const entrar = async (camara: LugarVista): Promise<void> => {
     setErrorCamara(null);
     setEntrando(camara.id);
     try {
@@ -296,7 +296,7 @@ export function Vigilia(): JSX.Element {
               Vigilia {sesion.round} de {sesion.totalRounds}
             </Etiqueta>
             <Titulo style={{ fontSize: 24, marginTop: 2 }}>
-              {abierta ? (miSala ? 'Estás dentro' : 'Elige cámara') : 'Vigilia cerrada'}
+              {abierta ? (miLugar ? 'Estás dentro' : 'Elige cámara') : 'Vigilia cerrada'}
             </Titulo>
           </View>
           {abierta && <Reloj terminaEn={sesion.roundEndsAt} ahoraServidor={sesion.ahora} />}
@@ -340,7 +340,7 @@ export function Vigilia(): JSX.Element {
         <AvisoError>{errorCamara}</AvisoError>
 
         {/* Con qué has salido, dicho donde acabas de pulsar y no en otra pestaña. */}
-        {loQueSaqué && miSala && (
+        {loQueSaqué && miLugar && (
           <Animated.View entering={FadeInDown.duration(400)}>
             <Marco style={estilos.loQueSaque}>
               <Cuerpo style={{ fontSize: 16 }}>{loQueSaqué}</Cuerpo>
@@ -354,7 +354,7 @@ export function Vigilia(): JSX.Element {
         {abierta ? (
           <>
             <Ornamento />
-            <Seccion>{miSala ? 'Has entrado aquí' : 'Las cámaras'}</Seccion>
+            <Seccion>{miLugar ? 'Has entrado aquí' : 'Las cámaras'}</Seccion>
             {salas.map((camara, i) => (
               <Animated.View
                 key={camara.id}
@@ -363,14 +363,14 @@ export function Vigilia(): JSX.Element {
               >
                 <FilaDeCamara
                   camara={camara}
-                  dentro={miSala === camara.id}
+                  dentro={miLugar === camara.id}
                   profanada={camara.id === profanada}
-                  bloqueada={Boolean(miSala) || entrando !== null}
+                  bloqueada={Boolean(miLugar) || entrando !== null}
                   onPress={() => void entrar(camara)}
                 />
               </Animated.View>
             ))}
-            {!miSala && (
+            {!miLugar && (
               <Cuerpo tenue style={{ fontStyle: 'italic', fontSize: 15, marginTop: 4 }}>
                 Una sola, y no se puede rectificar. Entrar en la profanada te deja una marca.
               </Cuerpo>
@@ -478,7 +478,7 @@ function FilaDeCamara({
   bloqueada,
   onPress,
 }: {
-  camara: SalaVista;
+  camara: LugarVista;
   dentro: boolean;
   profanada: boolean;
   bloqueada: boolean;
@@ -616,7 +616,7 @@ function PanelDelDon({
           .filter((j) => j.participanteId !== vista.yo.participanteId)
           .map((j) => ({ id: j.participanteId, nombre: j.characterName || j.displayName }))
       : don.elige === 'camara'
-        ? vista.salas.map((s) => ({ id: s.id, nombre: s.name }))
+        ? vista.lugares.map((s) => ({ id: s.id, nombre: s.name }))
         : don.elige === 'fragmento-propio'
           ? estado.yo.fragmentos
               .filter((f) => !f.publico)

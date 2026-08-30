@@ -204,9 +204,9 @@ const plot: Plot = {
     { time: '22:10', description: 'Alguien apaga la luz de la galería.', participanteIds: ['h2'], isPublic: false },
   ],
   clues: [
-    { id: 'c1', roomId: 'e0', description: 'La vitrina está sin cerrar.', pointsTo: 'Alguien la abrió sin forzarla.', round: 1 },
-    { id: 'c2', roomId: 'e1', description: 'Una copa con carmín.', pointsTo: 'Alguien estuvo aquí y no lo ha dicho.', round: 1 },
-    { id: 'c3', roomId: 'e2', description: 'Un pañuelo en el escalón.', pointsTo: 'Se subió con prisa.', round: 2 },
+    { id: 'c1', lugarId: 'e0', description: 'La vitrina está sin cerrar.', pointsTo: 'Alguien la abrió sin forzarla.', round: 1 },
+    { id: 'c2', lugarId: 'e1', description: 'Una copa con carmín.', pointsTo: 'Alguien estuvo aquí y no lo ha dicho.', round: 1 },
+    { id: 'c3', lugarId: 'e2', description: 'Un pañuelo en el escalón.', pointsTo: 'Se subió con prisa.', round: 2 },
   ],
   gmScript: ['Abre la velada.', 'Cierra la velada.'],
 };
@@ -229,7 +229,7 @@ const sesion: LiveSession = {
     girosRecibidos: [],
   })),
   respuestasEntregadas: [],
-  tablon: [],
+  porDondePasaron: [],
   rev: 1,
   updatedAt: ahora,
 };
@@ -278,7 +278,7 @@ elegirSala(sesion, 'h0', 'e0');
 elegirSala(sesion, 'h1', 'e1');
 v = vistaDe('h0');
 comprobar('la ronda abre', v.sesion.phase === 'ronda-abierta');
-comprobar('entro en una estancia', v.miSala === 'e0');
+comprobar('entro en una estancia', v.miLugar === 'e0');
 comprobar('y veo lo que hay allí', v.misPistas.length === 1, v.misPistas);
 comprobar('sin que me digan qué significa', v.misPistas[0]?.pointsTo === undefined);
 comprobar(

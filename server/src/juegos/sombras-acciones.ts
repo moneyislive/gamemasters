@@ -497,7 +497,7 @@ export function invocarPapel(
   const jugador = sesion.players.find((p) => p.participanteId === participanteId);
   const dondeEstoy = (jugador?.elecciones ?? [])
     .filter((e) => e.round === sesion.round)
-    .map((e) => e.roomId)
+    .map((e) => e.lugarId)
     .pop();
   persona.donde = persona.donde ?? {};
 

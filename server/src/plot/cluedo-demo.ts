@@ -184,7 +184,7 @@ export function generateDemoPlot(game: GameSession): Plot {
       respuestas: respuestasCluedo({
         murdererId: asesino.id,
         weaponId: armaCrimen.id,
-        roomId: salaCrimen.id,
+        lugarId: salaCrimen.id,
       }),
       motive: motivo,
       howItHappened:
@@ -325,7 +325,7 @@ function construirPistas(
     if (esEscenaDelCrimen) {
       pistas.push({
         id: `pista-${i + 1}-a`,
-        roomId: sala.id,
+        lugarId: sala.id,
         description: `Una alfombra ligeramente torcida y una mancha reciente que alguien limpió con más prisa que acierto.`,
         pointsTo: 'Señala esta sala como la verdadera escena del crimen.',
         // Decisiva: cierra la sala del crimen, así que va en la última ronda.
@@ -333,7 +333,7 @@ function construirPistas(
       });
       pistas.push({
         id: `pista-${i + 1}-b`,
-        roomId: sala.id,
+        lugarId: sala.id,
         description: `Una marca del tamaño y forma de ${armaCrimen.name.toLowerCase()} en el polvo de una repisa: algo estuvo ahí hasta esta misma noche.`,
         pointsTo: `Señala ${armaCrimen.name} como el arma del crimen.`,
         round: 4,
@@ -341,7 +341,7 @@ function construirPistas(
     } else {
       pistas.push({
         id: `pista-${i + 1}-a`,
-        roomId: sala.id,
+        lugarId: sala.id,
         description: cicla(
           [
             `Un pañuelo bordado con una inicial, abandonado con demasiada intención como para ser un descuido.`,
@@ -357,7 +357,7 @@ function construirPistas(
       });
       pistas.push({
         id: `pista-${i + 1}-b`,
-        roomId: sala.id,
+        lugarId: sala.id,
         description: cicla(
           [
             `Barro fresco junto a la ventana: alguien entró o salió por donde no debía.`,

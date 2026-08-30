@@ -32,7 +32,7 @@ export function hojaSolucion(
   const mapaPistas = [...porRonda.entries()]
     .flatMap(([ronda, pistas]) =>
       pistas.map((pista) => {
-        const donde = salasDe(game).find((r) => r.id === pista.roomId)?.name ?? '—';
+        const donde = salasDe(game).find((r) => r.id === pista.lugarId)?.name ?? '—';
         return `        <tr><td>${ronda}</td><td>${esc(donde)}</td><td>${esc(pista.description)}<br /><em style="color:#6d1a2a;">${esc(pista.pointsTo)}</em></td></tr>`;
       }),
     )

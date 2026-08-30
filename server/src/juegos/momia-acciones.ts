@@ -210,7 +210,7 @@ export function entrarEnCamara(
 
   const jugador = sesion.players.find((p) => p.participanteId === participanteId);
   const yaEstuve = (jugador?.elecciones ?? []).some(
-    (e) => e.round === sesion.round && e.roomId === camaraId,
+    (e) => e.round === sesion.round && e.lugarId === camaraId,
   );
   if (yaEstuve) throw new AccionInvalida('Ya has estado en esa cámara esta vigilia.');
 
@@ -441,7 +441,7 @@ export function invocarDon(
       const jugador = sesion.players.find((p) => p.participanteId === participanteId);
       const yaVisitadas = (jugador?.elecciones ?? [])
         .filter((e) => e.round === sesion.round)
-        .map((e) => e.roomId);
+        .map((e) => e.lugarId);
       const aDonde =
         opciones.camara ?? camaras.find((c) => !yaVisitadas.includes(c.id))?.id;
       if (!aDonde) throw new AccionInvalida('No queda cámara nueva en la que entrar.');

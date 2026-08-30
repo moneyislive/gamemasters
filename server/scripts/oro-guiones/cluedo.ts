@@ -122,7 +122,7 @@ function sesionInicial(game: GameSession): LiveSession {
       girosRecibidos: [],
     })),
     respuestasEntregadas: [],
-    tablon: [],
+    porDondePasaron: [],
     rev: 1,
     updatedAt: AHORA,
   };
@@ -174,7 +174,7 @@ function velada({ game, sesion, retratar }: Mesa): void {
     respuestasCluedo({
       murdererId: personasDe(game)[7]!.id,
       weaponId: entidadesDe(game, 'objetos')[0]!.id,
-      roomId: lugaresDe(game)[0]!.id,
+      lugarId: lugaresDe(game)[0]!.id,
     }),
     solucion,
   );

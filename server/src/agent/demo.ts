@@ -18,7 +18,7 @@ import type {
 import { getStore } from '../db/store';
 import { executeTool } from './tools';
 import { ejecutarHerramientaDeCategoria, faltanMinimos, sufijoDeCategoria } from './momia-herramientas';
-import { manifiestoDe } from '../../../shared/juegos';
+import { lugaresDe, manifiestoDe } from '../../../shared/juegos';
 
 const pausa = (ms: number) => new Promise<void>((resolver) => setTimeout(resolver, ms));
 
@@ -218,7 +218,7 @@ async function anadirSalas(partida: GameSession, texto: string): Promise<Resulta
   const repetidas: string[] = [];
 
   for (const nombre of nombres) {
-    const yaExiste = actual.rooms.some((r) => r.name.toLowerCase() === nombre.toLowerCase());
+    const yaExiste = lugaresDe(actual).some((r) => r.name.toLowerCase() === nombre.toLowerCase());
     if (yaExiste) {
       repetidas.push(nombre);
       continue;

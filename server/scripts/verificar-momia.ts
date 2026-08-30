@@ -159,7 +159,7 @@ function nuevaPartida(): { game: GameSession; sesion: LiveSession } {
       girosRecibidos: [],
     })),
     respuestasEntregadas: [],
-    tablon: [],
+    porDondePasaron: [],
     rev: 1,
     updatedAt: ahora,
   };
@@ -504,7 +504,7 @@ async function jugarPorElCable(): Promise<void> {
   v = await vista('e0');
   comprobar('Ana ve su marca', estadoDe(v).yo.marcas === 1, estadoDe(v).yo);
   comprobar('y sus dos amuletos intactos', estadoDe(v).yo.amuletos === 2);
-  comprobar('está en esa cámara', v.miSala === profanada, v.miSala);
+  comprobar('está en esa cámara', v.miLugar === profanada, v.miLugar);
   comprobar(
     'la mesa ve las marcas de los demás: es información pública',
     (await vista('e1')).estadoDelJuego !== undefined &&
@@ -561,7 +561,7 @@ async function jugarPorElCable(): Promise<void> {
     otraVez.datos,
   );
   v = await vista('e0');
-  comprobar('y sigue donde entró', v.miSala === profanada, v.miSala);
+  comprobar('y sigue donde entró', v.miLugar === profanada, v.miLugar);
 
   paso('Los fragmentos: solo los tuyos, y sin decir de cuáles fiarse');
   const conPapiro = Object.keys(testigos).filter(

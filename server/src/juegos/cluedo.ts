@@ -94,11 +94,11 @@ export function lugarDe(solucion: PlotSolution): string {
 export function respuestasCluedo(v: {
   murdererId: string;
   weaponId: string;
-  roomId: string;
+  lugarId: string;
 }): Record<EjeId, string> {
   return {
     [EJES.culpable]: v.murdererId,
     [EJES.objeto]: v.weaponId,
-    [EJES.lugar]: v.roomId,
+    [EJES.lugar]: v.lugarId,
   };
 }

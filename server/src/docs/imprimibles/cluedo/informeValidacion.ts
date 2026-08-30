@@ -71,7 +71,7 @@ export function informeValidacion(
   const idsSospechosos = new Set(sospechososDe(game).map((s) => s.id));
 
   const salasSinPista = salasDe(game).filter(
-    (sala) => !plot.clues.some((pista) => pista.roomId === sala.id),
+    (sala) => !plot.clues.some((pista) => pista.lugarId === sala.id),
   );
   const sinPersonaje = sospechososDe(game).filter(
     (s) => !plot.characters.some((c) => c.participanteId === s.id),

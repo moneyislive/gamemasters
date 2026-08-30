@@ -158,7 +158,7 @@ ${bloqueNarracion}
 ${[...porRonda.entries()]
   .flatMap(([ronda, pistas]) =>
     pistas.map((pista) => {
-      const sala = salasDe(game).find((r) => r.id === pista.roomId)?.name ?? '—';
+      const sala = salasDe(game).find((r) => r.id === pista.lugarId)?.name ?? '—';
       return `        <tr><td>${ronda}</td><td>${esc(sala)}</td><td>${esc(pista.description)}<br /><em style="color:#6d1a2a;">${esc(pista.pointsTo)}</em></td></tr>`;
     }),
   )

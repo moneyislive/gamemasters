@@ -164,7 +164,7 @@ const game: GameSession = {
     ],
     timeline: [],
     clues: [
-      { id: 'c0', roomId: 'r0', description: 'Una copa rota.', pointsTo: CENTINELAS.aQueApunta, round: 1 },
+      { id: 'c0', lugarId: 'r0', description: 'Una copa rota.', pointsTo: CENTINELAS.aQueApunta, round: 1 },
     ],
     gmScript: [],
     material: {

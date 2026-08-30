@@ -304,7 +304,26 @@ function medir(): Medida {
   return medida;
 }
 
-const total = (c: Cuentas): number => Object.values(c).reduce((a, b) => a + b, 0);
+/**
+ * EL FICHERO DE LA MEMORIA, contado aparte.
+ *
+ * `juegos/migracion.ts` nombra `suspects`, `roomId`, `winnerId`, `acusaciones` y
+ * todos los demás a propósito: su trabajo literal es convertir los documentos
+ * que se guardaron con esos nombres. Cada renombrado que se hace le AÑADE
+ * menciones, y si contaran como deuda el marcador subiría justo cuando se está
+ * mejorando — que es la peor propiedad que puede tener una medida.
+ *
+ * Se sigue vigilando —está en el presupuesto y no puede crecer sin que se vea—
+ * pero se enseña en su propia línea y no en el total.
+ */
+const LA_MEMORIA = 'server/src/juegos/migracion.ts';
+
+const total = (c: Cuentas): number =>
+  Object.entries(c)
+    .filter(([f]) => f !== LA_MEMORIA)
+    .reduce((a, [, n]) => a + n, 0);
+
+const enLaMemoria = (c: Cuentas): number => c[LA_MEMORIA] ?? 0;
 
 // ---------------------------------------------------------------------------
 
@@ -361,6 +380,10 @@ for (const v of VOCABULARIOS) {
   const flecha = t === previo ? '=' : t < previo ? '↓' : '↑';
   console.log(`  ${String(t).padStart(5)} ${flecha}  ${v.titulo}`);
   console.log(`         arreglo: ${v.arreglo}`);
+  const memoria = enLaMemoria(actual[v.clave]);
+  if (memoria > 0) {
+    console.log(`         (+${memoria} en migracion.ts, que es memoria y no deuda)`);
+  }
 }
 
 if (bajadas.length > 0) {

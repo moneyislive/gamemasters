@@ -65,7 +65,7 @@ const PISTA_SCHEMA: Record<string, unknown> = {
   required: ['id', 'roomId', 'description', 'pointsTo', 'round'],
   properties: {
     id: { type: 'string', description: 'Identificador único de la pista, p. ej. "pista-1"' },
-    roomId: {
+    lugarId: {
       type: 'string',
       description: 'Id EXACTO de la sala donde se encuentra la pista',
     },
@@ -138,7 +138,7 @@ export const PLOT_SCHEMA: Record<string, unknown> = {
           type: 'string',
           description: 'Id EXACTO de un arma existente de la lista proporcionada',
         },
-        roomId: {
+        lugarId: {
           type: 'string',
           description: 'Id EXACTO de una sala existente de la lista proporcionada',
         },

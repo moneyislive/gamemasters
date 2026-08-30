@@ -159,7 +159,7 @@ function sesionDe(game: GameSession, m: ManifiestoDeJuego): LiveSession {
       girosRecibidos: [],
     })),
     respuestasEntregadas: [],
-    tablon: [],
+    porDondePasaron: [],
     rev: 1,
     updatedAt: game.createdAt,
   } as unknown as LiveSession;
@@ -780,7 +780,7 @@ paso('Lo guardado con los nombres viejos se pone al dia al leerlo');
     acusaciones: [{ suspectId: 's0', respuestas: {}, at: '2026-01-01T21:00:00.000Z', correcta: false, aciertos: 0 }],
     acciones: [{ suspectId: 's1', accion: 'entrar-en-sala', round: 1, at: '2026-01-01T20:30:00.000Z' }],
     denuncias: [{ suspectId: 's0', displayName: 'Ana', pregunta: '¿?', respuesta: '…', at: '2026-01-01T20:40:00.000Z' }],
-    tablon: [],
+    porDondePasaron: [],
     rev: 3,
     updatedAt: '2026-01-01T21:00:00.000Z',
   } as unknown as LiveSession;
@@ -849,19 +849,19 @@ paso('El plano no dibuja dos lugares encima');
     }));
     const plano = generateBoardLayout(lugares as never);
 
-    if (plano.rooms.length !== cuantos) {
-      malos.push({ cuantos, que: `se dibujaron ${plano.rooms.length} de ${cuantos}` });
+    if (plano.lugares.length !== cuantos) {
+      malos.push({ cuantos, que: `se dibujaron ${plano.lugares.length} de ${cuantos}` });
       continue;
     }
-    for (let i = 0; i < plano.rooms.length && malos.length < 5; i++) {
-      for (let j = i + 1; j < plano.rooms.length; j++) {
-        if (solapan(plano.rooms[i]!, plano.rooms[j]!)) {
-          malos.push({ cuantos, que: `${plano.rooms[i]!.roomId} pisa a ${plano.rooms[j]!.roomId}` });
+    for (let i = 0; i < plano.lugares.length && malos.length < 5; i++) {
+      for (let j = i + 1; j < plano.lugares.length; j++) {
+        if (solapan(plano.lugares[i]!, plano.lugares[j]!)) {
+          malos.push({ cuantos, que: `${plano.lugares[i]!.lugarId} pisa a ${plano.lugares[j]!.lugarId}` });
           break;
         }
       }
     }
-    const fuera = plano.rooms.filter(
+    const fuera = plano.lugares.filter(
       (r) => r.x < 0 || r.y < 0 || r.x + r.w > plano.grid.cols || r.y + r.h > plano.grid.rows,
     );
     if (fuera.length > 0) {

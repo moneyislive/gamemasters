@@ -76,7 +76,7 @@ const sesion = (id: string, correos: Array<string | undefined>, fase: string) =>
     girosRecibidos: [],
   })),
   respuestasEntregadas: [],
-  tablon: [],
+  porDondePasaron: [],
   rev: 1,
   updatedAt: ahora,
 });

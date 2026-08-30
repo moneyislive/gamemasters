@@ -288,9 +288,9 @@ export function vistaSombrasDe(
     for (const jugador of sesion.players) {
       for (const eleccion of jugador.elecciones) {
         if (eleccion.round !== ronda) continue;
-        const lista = porPaso.get(eleccion.roomId) ?? [];
+        const lista = porPaso.get(eleccion.lugarId) ?? [];
         if (!lista.includes(jugador.participanteId)) lista.push(jugador.participanteId);
-        porPaso.set(eleccion.roomId, lista);
+        porPaso.set(eleccion.lugarId, lista);
       }
     }
     if (porPaso.size === 0) continue;
@@ -312,7 +312,7 @@ export function vistaSombrasDe(
     for (let ronda = 1; ronda <= hasta; ronda++) {
       const batido = pasoBatido(estado.batidos, ronda);
       if (!batido) continue;
-      if (jugador.elecciones.some((e) => e.round === ronda && e.roomId === batido)) cuenta += 1;
+      if (jugador.elecciones.some((e) => e.round === ronda && e.lugarId === batido)) cuenta += 1;
     }
     return cuenta;
   };
@@ -320,7 +320,7 @@ export function vistaSombrasDe(
   const miPaso = sesion.players
     .find((p) => p.participanteId === participanteId)
     ?.elecciones.filter((e) => e.round === sesion.round)
-    .map((e) => e.roomId)
+    .map((e) => e.lugarId)
     .pop();
 
   const kanjiDeLaHora =

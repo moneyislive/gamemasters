@@ -119,10 +119,10 @@ function seccionEscenario(game: GameSession): string {
         `<li><span class="num">${indice + 1}</span>${esc(sala.name)}${sala.description ? ` — <em>${esc(sala.description)}</em>` : ''}</li>`,
     )
     .join('');
-  const pasadizos = game.board.passages
+  const pasadizos = game.board.pasadizos
     .map((pasadizo) => {
-      const desde = salasDe(game).find((sala) => sala.id === pasadizo.fromRoomId)?.name ?? '';
-      const hasta = salasDe(game).find((sala) => sala.id === pasadizo.toRoomId)?.name ?? '';
+      const desde = salasDe(game).find((sala) => sala.id === pasadizo.desdeLugarId)?.name ?? '';
+      const hasta = salasDe(game).find((sala) => sala.id === pasadizo.hastaLugarId)?.name ?? '';
       return `<li>${esc(desde)} ⇄ ${esc(hasta)}</li>`;
     })
     .join('');
@@ -469,8 +469,8 @@ function dosierGameMaster(opciones: DocumentRenderOptions, game: GameSession, pl
                 <ol class="crono">
                   ${(porRonda.get(ronda) ?? [])
                     .map((pista) => {
-                      const nombreSala = pista.roomId
-                        ? (salasDe(game).find((sala) => sala.id === pista.roomId)?.name ?? '')
+                      const nombreSala = pista.lugarId
+                        ? (salasDe(game).find((sala) => sala.id === pista.lugarId)?.name ?? '')
                         : '';
                       return `<li>
                         <span class="hora">${esc(nombreSala || '—')}</span>

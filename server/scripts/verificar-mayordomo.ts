@@ -93,7 +93,7 @@ function partidaEnElPeorCaso(n: number): { game: GameSession; sesion: LiveSessio
       girosRecibidos: game.suspects.map((_, i) => `giro-${i}`),
     })),
     respuestasEntregadas: [],
-    tablon: [],
+    porDondePasaron: [],
     rev: 1,
     updatedAt: ahora,
   };
@@ -102,8 +102,8 @@ function partidaEnElPeorCaso(n: number): { game: GameSession; sesion: LiveSessio
   // tablón tiene contenido y los `pointsTo` ya se han desvelado.
   abrirRonda(sesion, 15);
   for (const j of sesion.players) {
-    const sala = game.plot.clues.find((c) => c.round === 1 && c.roomId)?.roomId;
-    if (sala) j.elecciones.push({ round: 1, roomId: sala, at: ahora });
+    const sala = game.plot.clues.find((c) => c.round === 1 && c.lugarId)?.lugarId;
+    if (sala) j.elecciones.push({ round: 1, lugarId: sala, at: ahora });
   }
   cerrarRonda(sesion);
 

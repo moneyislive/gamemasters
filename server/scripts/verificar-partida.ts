@@ -8,7 +8,7 @@
  * jugador no llama a funciones: manda JSON por un cable. Entre las dos cosas
  * hay una frontera que TypeScript no puede vigilar —el cuerpo de una petición
  * es `unknown`— y es justo donde vivía el error más silencioso de este
- * refactor: `api.acusar` seguía mandando `{murdererId, weaponId, roomId}`
+ * refactor: `api.acusar` seguía mandando `{murdererId, weaponId, lugarId}`
  * mientras el servidor ya esperaba `{respuestas}`. Los tres paquetes
  * compilaban y la acusación se habría perdido en la mesa, en silencio.
  *
@@ -129,7 +129,7 @@ function sembrar(dir: string): { game: GameSession; sesion: LiveSession } {
       girosRecibidos: [],
     })),
     respuestasEntregadas: [],
-    tablon: [],
+    porDondePasaron: [],
     rev: 1,
     updatedAt: ahora,
   };
@@ -298,11 +298,11 @@ async function jugar(): Promise<void> {
   comprobar('y acusar no altera la ronda en curso', v.sesion.phase === 'ronda-abierta', v.sesion.phase);
 
   paso('Elegir sala y leer lo que hay');
-  const conPista = game.plot!.clues.find((c) => c.round === 1 && c.roomId)?.roomId ?? 'r0';
-  const elegir = await pedir('/jugar/sala', { metodo: 'POST', testigo, cuerpo: { roomId: conPista } });
+  const conPista = game.plot!.clues.find((c) => c.round === 1 && c.lugarId)?.lugarId ?? 'r0';
+  const elegir = await pedir('/jugar/sala', { metodo: 'POST', testigo, cuerpo: { lugarId: conPista } });
   comprobar('elegir sala responde 200', elegir.estado === 200, elegir.datos);
   v = await vista();
-  comprobar('estoy en esa sala', v.miSala === conPista, v.miSala);
+  comprobar('estoy en esa sala', v.miLugar === conPista, v.miLugar);
   comprobar('me dan las pistas de aquí', v.misPistas.length > 0, v.misPistas.length);
   comprobar(
     'pero NO lo que significan',

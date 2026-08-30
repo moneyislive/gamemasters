@@ -222,7 +222,7 @@ export default function PanelDeLasSombras({
                   const ronda = i + 1;
                   const pisaron = sesion.players
                     .filter((p) =>
-                      p.elecciones.some((e) => e.round === ronda && e.roomId === pasoId),
+                      p.elecciones.some((e) => e.round === ronda && e.lugarId === pasoId),
                     )
                     .map((p) => p.displayName);
                   return (

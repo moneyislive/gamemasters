@@ -119,8 +119,8 @@ export const removeSuspect = (gameId: string, participanteId: string) =>
 
 export const upsertRoom = (gameId: string, room: Partial<Room>) =>
   request<GameSession>(`/games/${gameId}/rooms`, { method: 'POST', body: JSON.stringify(room) });
-export const removeRoom = (gameId: string, roomId: string) =>
-  request<GameSession>(`/games/${gameId}/rooms/${roomId}`, { method: 'DELETE' });
+export const removeRoom = (gameId: string, lugarId: string) =>
+  request<GameSession>(`/games/${gameId}/rooms/${lugarId}`, { method: 'DELETE' });
 
 export const upsertWeapon = (gameId: string, weapon: Partial<Weapon>) =>
   request<GameSession>(`/games/${gameId}/weapons`, {

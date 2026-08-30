@@ -249,7 +249,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "p0",
               "name": "El Vado del Kizu",
@@ -545,7 +545,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "p0",
               "name": "El Vado del Kizu",
@@ -841,7 +841,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "p0",
               "name": "El Vado del Kizu",
@@ -1135,7 +1135,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "p0",
               "name": "El Vado del Kizu",
@@ -1423,7 +1423,7 @@
             }
           ],
           "respuestasEntregadas": [],
-          "tablon": [],
+          "porDondePasaron": [],
           "rev": 1,
           "updatedAt": "«instante»",
           "estado": {
@@ -1582,33 +1582,33 @@
         "conectados": 0,
         "ocupacion": [
           {
-            "roomId": "p0",
-            "roomName": "El Vado del Kizu",
+            "lugarId": "p0",
+            "lugarNombre": "El Vado del Kizu",
             "participanteIds": []
           },
           {
-            "roomId": "p1",
-            "roomName": "El Collado de Kabuto",
+            "lugarId": "p1",
+            "lugarNombre": "El Collado de Kabuto",
             "participanteIds": []
           },
           {
-            "roomId": "p2",
-            "roomName": "El Bosque de Tsuge",
+            "lugarId": "p2",
+            "lugarNombre": "El Bosque de Tsuge",
             "participanteIds": []
           },
           {
-            "roomId": "p3",
-            "roomName": "El Puerto de Otogi",
+            "lugarId": "p3",
+            "lugarNombre": "El Puerto de Otogi",
             "participanteIds": []
           },
           {
-            "roomId": "p4",
-            "roomName": "La Cuesta de Kashiwabara",
+            "lugarId": "p4",
+            "lugarNombre": "La Cuesta de Kashiwabara",
             "participanteIds": []
           },
           {
-            "roomId": "p5",
-            "roomName": "La Playa de Shirako",
+            "lugarId": "p5",
+            "lugarNombre": "La Playa de Shirako",
             "participanteIds": []
           }
         ],
@@ -1707,7 +1707,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "p0",
               "name": "El Vado del Kizu",
@@ -2156,7 +2156,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "p0",
               "name": "El Vado del Kizu",
@@ -2609,7 +2609,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "p0",
               "name": "El Vado del Kizu",
@@ -3056,7 +3056,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "p0",
               "name": "El Vado del Kizu",
@@ -3493,7 +3493,7 @@
             }
           ],
           "respuestasEntregadas": [],
-          "tablon": [],
+          "porDondePasaron": [],
           "rev": 1,
           "updatedAt": "«instante»",
           "estado": {
@@ -3655,33 +3655,33 @@
         "conectados": 0,
         "ocupacion": [
           {
-            "roomId": "p0",
-            "roomName": "El Vado del Kizu",
+            "lugarId": "p0",
+            "lugarNombre": "El Vado del Kizu",
             "participanteIds": []
           },
           {
-            "roomId": "p1",
-            "roomName": "El Collado de Kabuto",
+            "lugarId": "p1",
+            "lugarNombre": "El Collado de Kabuto",
             "participanteIds": []
           },
           {
-            "roomId": "p2",
-            "roomName": "El Bosque de Tsuge",
+            "lugarId": "p2",
+            "lugarNombre": "El Bosque de Tsuge",
             "participanteIds": []
           },
           {
-            "roomId": "p3",
-            "roomName": "El Puerto de Otogi",
+            "lugarId": "p3",
+            "lugarNombre": "El Puerto de Otogi",
             "participanteIds": []
           },
           {
-            "roomId": "p4",
-            "roomName": "La Cuesta de Kashiwabara",
+            "lugarId": "p4",
+            "lugarNombre": "La Cuesta de Kashiwabara",
             "participanteIds": []
           },
           {
-            "roomId": "p5",
-            "roomName": "La Playa de Shirako",
+            "lugarId": "p5",
+            "lugarNombre": "La Playa de Shirako",
             "participanteIds": []
           }
         ],
@@ -3792,7 +3792,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "p0",
               "name": "El Vado del Kizu",
@@ -4148,7 +4148,7 @@
               "description": "La lanza de Hanzo."
             }
           ],
-          "miSala": "p4",
+          "miLugar": "p4",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -4261,7 +4261,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "p0",
               "name": "El Vado del Kizu",
@@ -4617,7 +4617,7 @@
               "description": "La lanza de Hanzo."
             }
           ],
-          "miSala": "p4",
+          "miLugar": "p4",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -4730,7 +4730,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "p0",
               "name": "El Vado del Kizu",
@@ -5080,7 +5080,7 @@
               "description": "La lanza de Hanzo."
             }
           ],
-          "miSala": "p4",
+          "miLugar": "p4",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -5193,7 +5193,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "p0",
               "name": "El Vado del Kizu",
@@ -5577,7 +5577,7 @@
               "description": "La lanza de Hanzo."
             }
           ],
-          "miSala": "p4",
+          "miLugar": "p4",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -5620,7 +5620,7 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "p4",
+                  "lugarId": "p4",
                   "at": "«instante»"
                 }
               ],
@@ -5636,7 +5636,7 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "p4",
+                  "lugarId": "p4",
                   "at": "«instante»"
                 }
               ],
@@ -5652,7 +5652,7 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "p4",
+                  "lugarId": "p4",
                   "at": "«instante»"
                 }
               ],
@@ -5668,7 +5668,7 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "p4",
+                  "lugarId": "p4",
                   "at": "«instante»"
                 }
               ],
@@ -5677,7 +5677,7 @@
             }
           ],
           "respuestasEntregadas": [],
-          "tablon": [],
+          "porDondePasaron": [],
           "rev": 1,
           "updatedAt": "«instante»",
           "estado": {
@@ -5948,28 +5948,28 @@
         "conectados": 0,
         "ocupacion": [
           {
-            "roomId": "p0",
-            "roomName": "El Vado del Kizu",
+            "lugarId": "p0",
+            "lugarNombre": "El Vado del Kizu",
             "participanteIds": []
           },
           {
-            "roomId": "p1",
-            "roomName": "El Collado de Kabuto",
+            "lugarId": "p1",
+            "lugarNombre": "El Collado de Kabuto",
             "participanteIds": []
           },
           {
-            "roomId": "p2",
-            "roomName": "El Bosque de Tsuge",
+            "lugarId": "p2",
+            "lugarNombre": "El Bosque de Tsuge",
             "participanteIds": []
           },
           {
-            "roomId": "p3",
-            "roomName": "El Puerto de Otogi",
+            "lugarId": "p3",
+            "lugarNombre": "El Puerto de Otogi",
             "participanteIds": []
           },
           {
-            "roomId": "p4",
-            "roomName": "La Cuesta de Kashiwabara",
+            "lugarId": "p4",
+            "lugarNombre": "La Cuesta de Kashiwabara",
             "participanteIds": [
               "e0",
               "e1",
@@ -5978,8 +5978,8 @@
             ]
           },
           {
-            "roomId": "p5",
-            "roomName": "La Playa de Shirako",
+            "lugarId": "p5",
+            "lugarNombre": "La Playa de Shirako",
             "participanteIds": []
           }
         ],
@@ -6234,7 +6234,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "p0",
               "name": "El Vado del Kizu",
@@ -6596,7 +6596,7 @@
               "description": "La lanza de Hanzo."
             }
           ],
-          "miSala": "p4",
+          "miLugar": "p4",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -6705,7 +6705,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "p0",
               "name": "El Vado del Kizu",
@@ -7067,7 +7067,7 @@
               "description": "La lanza de Hanzo."
             }
           ],
-          "miSala": "p4",
+          "miLugar": "p4",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -7176,7 +7176,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "p0",
               "name": "El Vado del Kizu",
@@ -7532,7 +7532,7 @@
               "description": "La lanza de Hanzo."
             }
           ],
-          "miSala": "p4",
+          "miLugar": "p4",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -7641,7 +7641,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "p0",
               "name": "El Vado del Kizu",
@@ -8031,7 +8031,7 @@
               "description": "La lanza de Hanzo."
             }
           ],
-          "miSala": "p4",
+          "miLugar": "p4",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -8074,7 +8074,7 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "p4",
+                  "lugarId": "p4",
                   "at": "«instante»"
                 }
               ],
@@ -8090,7 +8090,7 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "p4",
+                  "lugarId": "p4",
                   "at": "«instante»"
                 }
               ],
@@ -8106,7 +8106,7 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "p4",
+                  "lugarId": "p4",
                   "at": "«instante»"
                 }
               ],
@@ -8122,7 +8122,7 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "p4",
+                  "lugarId": "p4",
                   "at": "«instante»"
                 }
               ],
@@ -8131,10 +8131,10 @@
             }
           ],
           "respuestasEntregadas": [],
-          "tablon": [
+          "porDondePasaron": [
             {
               "round": 1,
-              "roomId": "p4"
+              "lugarId": "p4"
             }
           ],
           "rev": 1,
@@ -8412,28 +8412,28 @@
         "conectados": 0,
         "ocupacion": [
           {
-            "roomId": "p0",
-            "roomName": "El Vado del Kizu",
+            "lugarId": "p0",
+            "lugarNombre": "El Vado del Kizu",
             "participanteIds": []
           },
           {
-            "roomId": "p1",
-            "roomName": "El Collado de Kabuto",
+            "lugarId": "p1",
+            "lugarNombre": "El Collado de Kabuto",
             "participanteIds": []
           },
           {
-            "roomId": "p2",
-            "roomName": "El Bosque de Tsuge",
+            "lugarId": "p2",
+            "lugarNombre": "El Bosque de Tsuge",
             "participanteIds": []
           },
           {
-            "roomId": "p3",
-            "roomName": "El Puerto de Otogi",
+            "lugarId": "p3",
+            "lugarNombre": "El Puerto de Otogi",
             "participanteIds": []
           },
           {
-            "roomId": "p4",
-            "roomName": "La Cuesta de Kashiwabara",
+            "lugarId": "p4",
+            "lugarNombre": "La Cuesta de Kashiwabara",
             "participanteIds": [
               "e0",
               "e1",
@@ -8442,8 +8442,8 @@
             ]
           },
           {
-            "roomId": "p5",
-            "roomName": "La Playa de Shirako",
+            "lugarId": "p5",
+            "lugarNombre": "La Playa de Shirako",
             "participanteIds": []
           }
         ],
@@ -8572,7 +8572,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "p0",
               "name": "El Vado del Kizu",
@@ -9081,7 +9081,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "p0",
               "name": "El Vado del Kizu",
@@ -9594,7 +9594,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "p0",
               "name": "El Vado del Kizu",
@@ -10101,7 +10101,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "p0",
               "name": "El Vado del Kizu",
@@ -10573,7 +10573,7 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "p4",
+                  "lugarId": "p4",
                   "at": "«instante»"
                 }
               ],
@@ -10589,7 +10589,7 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "p4",
+                  "lugarId": "p4",
                   "at": "«instante»"
                 }
               ],
@@ -10605,7 +10605,7 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "p4",
+                  "lugarId": "p4",
                   "at": "«instante»"
                 }
               ],
@@ -10621,7 +10621,7 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "p4",
+                  "lugarId": "p4",
                   "at": "«instante»"
                 }
               ],
@@ -10630,10 +10630,10 @@
             }
           ],
           "respuestasEntregadas": [],
-          "tablon": [
+          "porDondePasaron": [
             {
               "round": 1,
-              "roomId": "p4"
+              "lugarId": "p4"
             }
           ],
           "rev": 1,
@@ -10912,33 +10912,33 @@
         "conectados": 0,
         "ocupacion": [
           {
-            "roomId": "p0",
-            "roomName": "El Vado del Kizu",
+            "lugarId": "p0",
+            "lugarNombre": "El Vado del Kizu",
             "participanteIds": []
           },
           {
-            "roomId": "p1",
-            "roomName": "El Collado de Kabuto",
+            "lugarId": "p1",
+            "lugarNombre": "El Collado de Kabuto",
             "participanteIds": []
           },
           {
-            "roomId": "p2",
-            "roomName": "El Bosque de Tsuge",
+            "lugarId": "p2",
+            "lugarNombre": "El Bosque de Tsuge",
             "participanteIds": []
           },
           {
-            "roomId": "p3",
-            "roomName": "El Puerto de Otogi",
+            "lugarId": "p3",
+            "lugarNombre": "El Puerto de Otogi",
             "participanteIds": []
           },
           {
-            "roomId": "p4",
-            "roomName": "La Cuesta de Kashiwabara",
+            "lugarId": "p4",
+            "lugarNombre": "La Cuesta de Kashiwabara",
             "participanteIds": []
           },
           {
-            "roomId": "p5",
-            "roomName": "La Playa de Shirako",
+            "lugarId": "p5",
+            "lugarNombre": "La Playa de Shirako",
             "participanteIds": []
           }
         ],
@@ -11051,7 +11051,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "p0",
               "name": "El Vado del Kizu",
@@ -11462,7 +11462,7 @@
               "description": "La lanza de Hanzo."
             }
           ],
-          "miSala": "p2",
+          "miLugar": "p2",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -11577,7 +11577,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "p0",
               "name": "El Vado del Kizu",
@@ -11988,7 +11988,7 @@
               "description": "La lanza de Hanzo."
             }
           ],
-          "miSala": "p2",
+          "miLugar": "p2",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -12103,7 +12103,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "p0",
               "name": "El Vado del Kizu",
@@ -12508,7 +12508,7 @@
               "description": "La lanza de Hanzo."
             }
           ],
-          "miSala": "p2",
+          "miLugar": "p2",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -12623,7 +12623,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "p0",
               "name": "El Vado del Kizu",
@@ -13072,7 +13072,7 @@
               "description": "La lanza de Hanzo."
             }
           ],
-          "miSala": "p2",
+          "miLugar": "p2",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -13115,12 +13115,12 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "p4",
+                  "lugarId": "p4",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "p2",
+                  "lugarId": "p2",
                   "at": "«instante»"
                 }
               ],
@@ -13136,12 +13136,12 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "p4",
+                  "lugarId": "p4",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "p2",
+                  "lugarId": "p2",
                   "at": "«instante»"
                 }
               ],
@@ -13157,12 +13157,12 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "p4",
+                  "lugarId": "p4",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "p2",
+                  "lugarId": "p2",
                   "at": "«instante»"
                 }
               ],
@@ -13178,12 +13178,12 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "p4",
+                  "lugarId": "p4",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "p2",
+                  "lugarId": "p2",
                   "at": "«instante»"
                 }
               ],
@@ -13192,10 +13192,10 @@
             }
           ],
           "respuestasEntregadas": [],
-          "tablon": [
+          "porDondePasaron": [
             {
               "round": 1,
-              "roomId": "p4"
+              "lugarId": "p4"
             }
           ],
           "rev": 1,
@@ -13558,18 +13558,18 @@
         "conectados": 0,
         "ocupacion": [
           {
-            "roomId": "p0",
-            "roomName": "El Vado del Kizu",
+            "lugarId": "p0",
+            "lugarNombre": "El Vado del Kizu",
             "participanteIds": []
           },
           {
-            "roomId": "p1",
-            "roomName": "El Collado de Kabuto",
+            "lugarId": "p1",
+            "lugarNombre": "El Collado de Kabuto",
             "participanteIds": []
           },
           {
-            "roomId": "p2",
-            "roomName": "El Bosque de Tsuge",
+            "lugarId": "p2",
+            "lugarNombre": "El Bosque de Tsuge",
             "participanteIds": [
               "e0",
               "e1",
@@ -13578,18 +13578,18 @@
             ]
           },
           {
-            "roomId": "p3",
-            "roomName": "El Puerto de Otogi",
+            "lugarId": "p3",
+            "lugarNombre": "El Puerto de Otogi",
             "participanteIds": []
           },
           {
-            "roomId": "p4",
-            "roomName": "La Cuesta de Kashiwabara",
+            "lugarId": "p4",
+            "lugarNombre": "La Cuesta de Kashiwabara",
             "participanteIds": []
           },
           {
-            "roomId": "p5",
-            "roomName": "La Playa de Shirako",
+            "lugarId": "p5",
+            "lugarNombre": "La Playa de Shirako",
             "participanteIds": []
           }
         ],
@@ -13846,7 +13846,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "p0",
               "name": "El Vado del Kizu",
@@ -14262,7 +14262,7 @@
               "description": "La lanza de Hanzo."
             }
           ],
-          "miSala": "p2",
+          "miLugar": "p2",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -14373,7 +14373,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "p0",
               "name": "El Vado del Kizu",
@@ -14789,7 +14789,7 @@
               "description": "La lanza de Hanzo."
             }
           ],
-          "miSala": "p2",
+          "miLugar": "p2",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -14900,7 +14900,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "p0",
               "name": "El Vado del Kizu",
@@ -15310,7 +15310,7 @@
               "description": "La lanza de Hanzo."
             }
           ],
-          "miSala": "p2",
+          "miLugar": "p2",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -15421,7 +15421,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "p0",
               "name": "El Vado del Kizu",
@@ -15875,7 +15875,7 @@
               "description": "La lanza de Hanzo."
             }
           ],
-          "miSala": "p2",
+          "miLugar": "p2",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -15918,12 +15918,12 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "p4",
+                  "lugarId": "p4",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "p2",
+                  "lugarId": "p2",
                   "at": "«instante»"
                 }
               ],
@@ -15939,12 +15939,12 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "p4",
+                  "lugarId": "p4",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "p2",
+                  "lugarId": "p2",
                   "at": "«instante»"
                 }
               ],
@@ -15960,12 +15960,12 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "p4",
+                  "lugarId": "p4",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "p2",
+                  "lugarId": "p2",
                   "at": "«instante»"
                 }
               ],
@@ -15981,12 +15981,12 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "p4",
+                  "lugarId": "p4",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "p2",
+                  "lugarId": "p2",
                   "at": "«instante»"
                 }
               ],
@@ -15995,14 +15995,14 @@
             }
           ],
           "respuestasEntregadas": [],
-          "tablon": [
+          "porDondePasaron": [
             {
               "round": 1,
-              "roomId": "p4"
+              "lugarId": "p4"
             },
             {
               "round": 2,
-              "roomId": "p2"
+              "lugarId": "p2"
             }
           ],
           "rev": 1,
@@ -16370,18 +16370,18 @@
         "conectados": 0,
         "ocupacion": [
           {
-            "roomId": "p0",
-            "roomName": "El Vado del Kizu",
+            "lugarId": "p0",
+            "lugarNombre": "El Vado del Kizu",
             "participanteIds": []
           },
           {
-            "roomId": "p1",
-            "roomName": "El Collado de Kabuto",
+            "lugarId": "p1",
+            "lugarNombre": "El Collado de Kabuto",
             "participanteIds": []
           },
           {
-            "roomId": "p2",
-            "roomName": "El Bosque de Tsuge",
+            "lugarId": "p2",
+            "lugarNombre": "El Bosque de Tsuge",
             "participanteIds": [
               "e0",
               "e1",
@@ -16390,18 +16390,18 @@
             ]
           },
           {
-            "roomId": "p3",
-            "roomName": "El Puerto de Otogi",
+            "lugarId": "p3",
+            "lugarNombre": "El Puerto de Otogi",
             "participanteIds": []
           },
           {
-            "roomId": "p4",
-            "roomName": "La Cuesta de Kashiwabara",
+            "lugarId": "p4",
+            "lugarNombre": "La Cuesta de Kashiwabara",
             "participanteIds": []
           },
           {
-            "roomId": "p5",
-            "roomName": "La Playa de Shirako",
+            "lugarId": "p5",
+            "lugarNombre": "La Playa de Shirako",
             "participanteIds": []
           }
         ],
@@ -16532,7 +16532,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "p0",
               "name": "El Vado del Kizu",
@@ -17097,7 +17097,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "p0",
               "name": "El Vado del Kizu",
@@ -17666,7 +17666,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "p0",
               "name": "El Vado del Kizu",
@@ -18229,7 +18229,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "p0",
               "name": "El Vado del Kizu",
@@ -18765,12 +18765,12 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "p4",
+                  "lugarId": "p4",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "p2",
+                  "lugarId": "p2",
                   "at": "«instante»"
                 }
               ],
@@ -18786,12 +18786,12 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "p4",
+                  "lugarId": "p4",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "p2",
+                  "lugarId": "p2",
                   "at": "«instante»"
                 }
               ],
@@ -18807,12 +18807,12 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "p4",
+                  "lugarId": "p4",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "p2",
+                  "lugarId": "p2",
                   "at": "«instante»"
                 }
               ],
@@ -18828,12 +18828,12 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "p4",
+                  "lugarId": "p4",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "p2",
+                  "lugarId": "p2",
                   "at": "«instante»"
                 }
               ],
@@ -18842,14 +18842,14 @@
             }
           ],
           "respuestasEntregadas": [],
-          "tablon": [
+          "porDondePasaron": [
             {
               "round": 1,
-              "roomId": "p4"
+              "lugarId": "p4"
             },
             {
               "round": 2,
-              "roomId": "p2"
+              "lugarId": "p2"
             }
           ],
           "rev": 1,
@@ -19218,33 +19218,33 @@
         "conectados": 0,
         "ocupacion": [
           {
-            "roomId": "p0",
-            "roomName": "El Vado del Kizu",
+            "lugarId": "p0",
+            "lugarNombre": "El Vado del Kizu",
             "participanteIds": []
           },
           {
-            "roomId": "p1",
-            "roomName": "El Collado de Kabuto",
+            "lugarId": "p1",
+            "lugarNombre": "El Collado de Kabuto",
             "participanteIds": []
           },
           {
-            "roomId": "p2",
-            "roomName": "El Bosque de Tsuge",
+            "lugarId": "p2",
+            "lugarNombre": "El Bosque de Tsuge",
             "participanteIds": []
           },
           {
-            "roomId": "p3",
-            "roomName": "El Puerto de Otogi",
+            "lugarId": "p3",
+            "lugarNombre": "El Puerto de Otogi",
             "participanteIds": []
           },
           {
-            "roomId": "p4",
-            "roomName": "La Cuesta de Kashiwabara",
+            "lugarId": "p4",
+            "lugarNombre": "La Cuesta de Kashiwabara",
             "participanteIds": []
           },
           {
-            "roomId": "p5",
-            "roomName": "La Playa de Shirako",
+            "lugarId": "p5",
+            "lugarNombre": "La Playa de Shirako",
             "participanteIds": []
           }
         ],
@@ -19359,7 +19359,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "p0",
               "name": "El Vado del Kizu",
@@ -19824,7 +19824,7 @@
               "description": "La lanza de Hanzo."
             }
           ],
-          "miSala": "p5",
+          "miLugar": "p5",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -19941,7 +19941,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "p0",
               "name": "El Vado del Kizu",
@@ -20406,7 +20406,7 @@
               "description": "La lanza de Hanzo."
             }
           ],
-          "miSala": "p5",
+          "miLugar": "p5",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -20523,7 +20523,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "p0",
               "name": "El Vado del Kizu",
@@ -20982,7 +20982,7 @@
               "description": "La lanza de Hanzo."
             }
           ],
-          "miSala": "p5",
+          "miLugar": "p5",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -21099,7 +21099,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "p0",
               "name": "El Vado del Kizu",
@@ -21611,7 +21611,7 @@
               "description": "La lanza de Hanzo."
             }
           ],
-          "miSala": "p5",
+          "miLugar": "p5",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -21654,17 +21654,17 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "p4",
+                  "lugarId": "p4",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "p2",
+                  "lugarId": "p2",
                   "at": "«instante»"
                 },
                 {
                   "round": 3,
-                  "roomId": "p5",
+                  "lugarId": "p5",
                   "at": "«instante»"
                 }
               ],
@@ -21680,17 +21680,17 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "p4",
+                  "lugarId": "p4",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "p2",
+                  "lugarId": "p2",
                   "at": "«instante»"
                 },
                 {
                   "round": 3,
-                  "roomId": "p5",
+                  "lugarId": "p5",
                   "at": "«instante»"
                 }
               ],
@@ -21706,17 +21706,17 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "p4",
+                  "lugarId": "p4",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "p2",
+                  "lugarId": "p2",
                   "at": "«instante»"
                 },
                 {
                   "round": 3,
-                  "roomId": "p5",
+                  "lugarId": "p5",
                   "at": "«instante»"
                 }
               ],
@@ -21732,17 +21732,17 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "p4",
+                  "lugarId": "p4",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "p2",
+                  "lugarId": "p2",
                   "at": "«instante»"
                 },
                 {
                   "round": 3,
-                  "roomId": "p5",
+                  "lugarId": "p5",
                   "at": "«instante»"
                 }
               ],
@@ -21751,14 +21751,14 @@
             }
           ],
           "respuestasEntregadas": [],
-          "tablon": [
+          "porDondePasaron": [
             {
               "round": 1,
-              "roomId": "p4"
+              "lugarId": "p4"
             },
             {
               "round": 2,
-              "roomId": "p2"
+              "lugarId": "p2"
             }
           ],
           "rev": 1,
@@ -22205,33 +22205,33 @@
         "conectados": 0,
         "ocupacion": [
           {
-            "roomId": "p0",
-            "roomName": "El Vado del Kizu",
+            "lugarId": "p0",
+            "lugarNombre": "El Vado del Kizu",
             "participanteIds": []
           },
           {
-            "roomId": "p1",
-            "roomName": "El Collado de Kabuto",
+            "lugarId": "p1",
+            "lugarNombre": "El Collado de Kabuto",
             "participanteIds": []
           },
           {
-            "roomId": "p2",
-            "roomName": "El Bosque de Tsuge",
+            "lugarId": "p2",
+            "lugarNombre": "El Bosque de Tsuge",
             "participanteIds": []
           },
           {
-            "roomId": "p3",
-            "roomName": "El Puerto de Otogi",
+            "lugarId": "p3",
+            "lugarNombre": "El Puerto de Otogi",
             "participanteIds": []
           },
           {
-            "roomId": "p4",
-            "roomName": "La Cuesta de Kashiwabara",
+            "lugarId": "p4",
+            "lugarNombre": "La Cuesta de Kashiwabara",
             "participanteIds": []
           },
           {
-            "roomId": "p5",
-            "roomName": "La Playa de Shirako",
+            "lugarId": "p5",
+            "lugarNombre": "La Playa de Shirako",
             "participanteIds": [
               "e0",
               "e1",
@@ -22492,7 +22492,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "p0",
               "name": "El Vado del Kizu",
@@ -22962,7 +22962,7 @@
               "description": "La lanza de Hanzo."
             }
           ],
-          "miSala": "p5",
+          "miLugar": "p5",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -23075,7 +23075,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "p0",
               "name": "El Vado del Kizu",
@@ -23545,7 +23545,7 @@
               "description": "La lanza de Hanzo."
             }
           ],
-          "miSala": "p5",
+          "miLugar": "p5",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -23658,7 +23658,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "p0",
               "name": "El Vado del Kizu",
@@ -24122,7 +24122,7 @@
               "description": "La lanza de Hanzo."
             }
           ],
-          "miSala": "p5",
+          "miLugar": "p5",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -24235,7 +24235,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "p0",
               "name": "El Vado del Kizu",
@@ -24752,7 +24752,7 @@
               "description": "La lanza de Hanzo."
             }
           ],
-          "miSala": "p5",
+          "miLugar": "p5",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -24795,17 +24795,17 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "p4",
+                  "lugarId": "p4",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "p2",
+                  "lugarId": "p2",
                   "at": "«instante»"
                 },
                 {
                   "round": 3,
-                  "roomId": "p5",
+                  "lugarId": "p5",
                   "at": "«instante»"
                 }
               ],
@@ -24821,17 +24821,17 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "p4",
+                  "lugarId": "p4",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "p2",
+                  "lugarId": "p2",
                   "at": "«instante»"
                 },
                 {
                   "round": 3,
-                  "roomId": "p5",
+                  "lugarId": "p5",
                   "at": "«instante»"
                 }
               ],
@@ -24847,17 +24847,17 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "p4",
+                  "lugarId": "p4",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "p2",
+                  "lugarId": "p2",
                   "at": "«instante»"
                 },
                 {
                   "round": 3,
-                  "roomId": "p5",
+                  "lugarId": "p5",
                   "at": "«instante»"
                 }
               ],
@@ -24873,17 +24873,17 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "p4",
+                  "lugarId": "p4",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "p2",
+                  "lugarId": "p2",
                   "at": "«instante»"
                 },
                 {
                   "round": 3,
-                  "roomId": "p5",
+                  "lugarId": "p5",
                   "at": "«instante»"
                 }
               ],
@@ -24892,18 +24892,18 @@
             }
           ],
           "respuestasEntregadas": [],
-          "tablon": [
+          "porDondePasaron": [
             {
               "round": 1,
-              "roomId": "p4"
+              "lugarId": "p4"
             },
             {
               "round": 2,
-              "roomId": "p2"
+              "lugarId": "p2"
             },
             {
               "round": 3,
-              "roomId": "p5"
+              "lugarId": "p5"
             }
           ],
           "rev": 1,
@@ -25349,33 +25349,33 @@
         "conectados": 0,
         "ocupacion": [
           {
-            "roomId": "p0",
-            "roomName": "El Vado del Kizu",
+            "lugarId": "p0",
+            "lugarNombre": "El Vado del Kizu",
             "participanteIds": []
           },
           {
-            "roomId": "p1",
-            "roomName": "El Collado de Kabuto",
+            "lugarId": "p1",
+            "lugarNombre": "El Collado de Kabuto",
             "participanteIds": []
           },
           {
-            "roomId": "p2",
-            "roomName": "El Bosque de Tsuge",
+            "lugarId": "p2",
+            "lugarNombre": "El Bosque de Tsuge",
             "participanteIds": []
           },
           {
-            "roomId": "p3",
-            "roomName": "El Puerto de Otogi",
+            "lugarId": "p3",
+            "lugarNombre": "El Puerto de Otogi",
             "participanteIds": []
           },
           {
-            "roomId": "p4",
-            "roomName": "La Cuesta de Kashiwabara",
+            "lugarId": "p4",
+            "lugarNombre": "La Cuesta de Kashiwabara",
             "participanteIds": []
           },
           {
-            "roomId": "p5",
-            "roomName": "La Playa de Shirako",
+            "lugarId": "p5",
+            "lugarNombre": "La Playa de Shirako",
             "participanteIds": [
               "e0",
               "e1",
@@ -25508,7 +25508,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "p0",
               "name": "El Vado del Kizu",
@@ -26127,7 +26127,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "p0",
               "name": "El Vado del Kizu",
@@ -26750,7 +26750,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "p0",
               "name": "El Vado del Kizu",
@@ -27367,7 +27367,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "p0",
               "name": "El Vado del Kizu",
@@ -27966,17 +27966,17 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "p4",
+                  "lugarId": "p4",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "p2",
+                  "lugarId": "p2",
                   "at": "«instante»"
                 },
                 {
                   "round": 3,
-                  "roomId": "p5",
+                  "lugarId": "p5",
                   "at": "«instante»"
                 }
               ],
@@ -27992,17 +27992,17 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "p4",
+                  "lugarId": "p4",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "p2",
+                  "lugarId": "p2",
                   "at": "«instante»"
                 },
                 {
                   "round": 3,
-                  "roomId": "p5",
+                  "lugarId": "p5",
                   "at": "«instante»"
                 }
               ],
@@ -28018,17 +28018,17 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "p4",
+                  "lugarId": "p4",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "p2",
+                  "lugarId": "p2",
                   "at": "«instante»"
                 },
                 {
                   "round": 3,
-                  "roomId": "p5",
+                  "lugarId": "p5",
                   "at": "«instante»"
                 }
               ],
@@ -28044,17 +28044,17 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "p4",
+                  "lugarId": "p4",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "p2",
+                  "lugarId": "p2",
                   "at": "«instante»"
                 },
                 {
                   "round": 3,
-                  "roomId": "p5",
+                  "lugarId": "p5",
                   "at": "«instante»"
                 }
               ],
@@ -28063,18 +28063,18 @@
             }
           ],
           "respuestasEntregadas": [],
-          "tablon": [
+          "porDondePasaron": [
             {
               "round": 1,
-              "roomId": "p4"
+              "lugarId": "p4"
             },
             {
               "round": 2,
-              "roomId": "p2"
+              "lugarId": "p2"
             },
             {
               "round": 3,
-              "roomId": "p5"
+              "lugarId": "p5"
             }
           ],
           "rev": 1,
@@ -28521,33 +28521,33 @@
         "conectados": 0,
         "ocupacion": [
           {
-            "roomId": "p0",
-            "roomName": "El Vado del Kizu",
+            "lugarId": "p0",
+            "lugarNombre": "El Vado del Kizu",
             "participanteIds": []
           },
           {
-            "roomId": "p1",
-            "roomName": "El Collado de Kabuto",
+            "lugarId": "p1",
+            "lugarNombre": "El Collado de Kabuto",
             "participanteIds": []
           },
           {
-            "roomId": "p2",
-            "roomName": "El Bosque de Tsuge",
+            "lugarId": "p2",
+            "lugarNombre": "El Bosque de Tsuge",
             "participanteIds": []
           },
           {
-            "roomId": "p3",
-            "roomName": "El Puerto de Otogi",
+            "lugarId": "p3",
+            "lugarNombre": "El Puerto de Otogi",
             "participanteIds": []
           },
           {
-            "roomId": "p4",
-            "roomName": "La Cuesta de Kashiwabara",
+            "lugarId": "p4",
+            "lugarNombre": "La Cuesta de Kashiwabara",
             "participanteIds": []
           },
           {
-            "roomId": "p5",
-            "roomName": "La Playa de Shirako",
+            "lugarId": "p5",
+            "lugarNombre": "La Playa de Shirako",
             "participanteIds": []
           }
         ],
@@ -28662,7 +28662,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "p0",
               "name": "El Vado del Kizu",
@@ -29181,7 +29181,7 @@
               "description": "La lanza de Hanzo."
             }
           ],
-          "miSala": "p1",
+          "miLugar": "p1",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -29298,7 +29298,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "p0",
               "name": "El Vado del Kizu",
@@ -29817,7 +29817,7 @@
               "description": "La lanza de Hanzo."
             }
           ],
-          "miSala": "p1",
+          "miLugar": "p1",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -29934,7 +29934,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "p0",
               "name": "El Vado del Kizu",
@@ -30447,7 +30447,7 @@
               "description": "La lanza de Hanzo."
             }
           ],
-          "miSala": "p1",
+          "miLugar": "p1",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -30564,7 +30564,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "p0",
               "name": "El Vado del Kizu",
@@ -31125,7 +31125,7 @@
               "description": "La lanza de Hanzo."
             }
           ],
-          "miSala": "p1",
+          "miLugar": "p1",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -31168,22 +31168,22 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "p4",
+                  "lugarId": "p4",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "p2",
+                  "lugarId": "p2",
                   "at": "«instante»"
                 },
                 {
                   "round": 3,
-                  "roomId": "p5",
+                  "lugarId": "p5",
                   "at": "«instante»"
                 },
                 {
                   "round": 4,
-                  "roomId": "p1",
+                  "lugarId": "p1",
                   "at": "«instante»"
                 }
               ],
@@ -31199,22 +31199,22 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "p4",
+                  "lugarId": "p4",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "p2",
+                  "lugarId": "p2",
                   "at": "«instante»"
                 },
                 {
                   "round": 3,
-                  "roomId": "p5",
+                  "lugarId": "p5",
                   "at": "«instante»"
                 },
                 {
                   "round": 4,
-                  "roomId": "p1",
+                  "lugarId": "p1",
                   "at": "«instante»"
                 }
               ],
@@ -31230,22 +31230,22 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "p4",
+                  "lugarId": "p4",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "p2",
+                  "lugarId": "p2",
                   "at": "«instante»"
                 },
                 {
                   "round": 3,
-                  "roomId": "p5",
+                  "lugarId": "p5",
                   "at": "«instante»"
                 },
                 {
                   "round": 4,
-                  "roomId": "p1",
+                  "lugarId": "p1",
                   "at": "«instante»"
                 }
               ],
@@ -31261,22 +31261,22 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "p4",
+                  "lugarId": "p4",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "p2",
+                  "lugarId": "p2",
                   "at": "«instante»"
                 },
                 {
                   "round": 3,
-                  "roomId": "p5",
+                  "lugarId": "p5",
                   "at": "«instante»"
                 },
                 {
                   "round": 4,
-                  "roomId": "p1",
+                  "lugarId": "p1",
                   "at": "«instante»"
                 }
               ],
@@ -31285,18 +31285,18 @@
             }
           ],
           "respuestasEntregadas": [],
-          "tablon": [
+          "porDondePasaron": [
             {
               "round": 1,
-              "roomId": "p4"
+              "lugarId": "p4"
             },
             {
               "round": 2,
-              "roomId": "p2"
+              "lugarId": "p2"
             },
             {
               "round": 3,
-              "roomId": "p5"
+              "lugarId": "p5"
             }
           ],
           "rev": 1,
@@ -31805,13 +31805,13 @@
         "conectados": 0,
         "ocupacion": [
           {
-            "roomId": "p0",
-            "roomName": "El Vado del Kizu",
+            "lugarId": "p0",
+            "lugarNombre": "El Vado del Kizu",
             "participanteIds": []
           },
           {
-            "roomId": "p1",
-            "roomName": "El Collado de Kabuto",
+            "lugarId": "p1",
+            "lugarNombre": "El Collado de Kabuto",
             "participanteIds": [
               "e0",
               "e1",
@@ -31820,23 +31820,23 @@
             ]
           },
           {
-            "roomId": "p2",
-            "roomName": "El Bosque de Tsuge",
+            "lugarId": "p2",
+            "lugarNombre": "El Bosque de Tsuge",
             "participanteIds": []
           },
           {
-            "roomId": "p3",
-            "roomName": "El Puerto de Otogi",
+            "lugarId": "p3",
+            "lugarNombre": "El Puerto de Otogi",
             "participanteIds": []
           },
           {
-            "roomId": "p4",
-            "roomName": "La Cuesta de Kashiwabara",
+            "lugarId": "p4",
+            "lugarNombre": "La Cuesta de Kashiwabara",
             "participanteIds": []
           },
           {
-            "roomId": "p5",
-            "roomName": "La Playa de Shirako",
+            "lugarId": "p5",
+            "lugarNombre": "La Playa de Shirako",
             "participanteIds": []
           }
         ],
@@ -32086,7 +32086,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "p0",
               "name": "El Vado del Kizu",
@@ -32610,7 +32610,7 @@
               "description": "La lanza de Hanzo."
             }
           ],
-          "miSala": "p1",
+          "miLugar": "p1",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -32723,7 +32723,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "p0",
               "name": "El Vado del Kizu",
@@ -33247,7 +33247,7 @@
               "description": "La lanza de Hanzo."
             }
           ],
-          "miSala": "p1",
+          "miLugar": "p1",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -33360,7 +33360,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "p0",
               "name": "El Vado del Kizu",
@@ -33878,7 +33878,7 @@
               "description": "La lanza de Hanzo."
             }
           ],
-          "miSala": "p1",
+          "miLugar": "p1",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -33991,7 +33991,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "p0",
               "name": "El Vado del Kizu",
@@ -34552,7 +34552,7 @@
               "description": "La lanza de Hanzo."
             }
           ],
-          "miSala": "p1",
+          "miLugar": "p1",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -34595,22 +34595,22 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "p4",
+                  "lugarId": "p4",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "p2",
+                  "lugarId": "p2",
                   "at": "«instante»"
                 },
                 {
                   "round": 3,
-                  "roomId": "p5",
+                  "lugarId": "p5",
                   "at": "«instante»"
                 },
                 {
                   "round": 4,
-                  "roomId": "p1",
+                  "lugarId": "p1",
                   "at": "«instante»"
                 }
               ],
@@ -34626,22 +34626,22 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "p4",
+                  "lugarId": "p4",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "p2",
+                  "lugarId": "p2",
                   "at": "«instante»"
                 },
                 {
                   "round": 3,
-                  "roomId": "p5",
+                  "lugarId": "p5",
                   "at": "«instante»"
                 },
                 {
                   "round": 4,
-                  "roomId": "p1",
+                  "lugarId": "p1",
                   "at": "«instante»"
                 }
               ],
@@ -34657,22 +34657,22 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "p4",
+                  "lugarId": "p4",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "p2",
+                  "lugarId": "p2",
                   "at": "«instante»"
                 },
                 {
                   "round": 3,
-                  "roomId": "p5",
+                  "lugarId": "p5",
                   "at": "«instante»"
                 },
                 {
                   "round": 4,
-                  "roomId": "p1",
+                  "lugarId": "p1",
                   "at": "«instante»"
                 }
               ],
@@ -34688,22 +34688,22 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "p4",
+                  "lugarId": "p4",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "p2",
+                  "lugarId": "p2",
                   "at": "«instante»"
                 },
                 {
                   "round": 3,
-                  "roomId": "p5",
+                  "lugarId": "p5",
                   "at": "«instante»"
                 },
                 {
                   "round": 4,
-                  "roomId": "p1",
+                  "lugarId": "p1",
                   "at": "«instante»"
                 }
               ],
@@ -34712,22 +34712,22 @@
             }
           ],
           "respuestasEntregadas": [],
-          "tablon": [
+          "porDondePasaron": [
             {
               "round": 1,
-              "roomId": "p4"
+              "lugarId": "p4"
             },
             {
               "round": 2,
-              "roomId": "p2"
+              "lugarId": "p2"
             },
             {
               "round": 3,
-              "roomId": "p5"
+              "lugarId": "p5"
             },
             {
               "round": 4,
-              "roomId": "p1"
+              "lugarId": "p1"
             }
           ],
           "rev": 1,
@@ -35235,13 +35235,13 @@
         "conectados": 0,
         "ocupacion": [
           {
-            "roomId": "p0",
-            "roomName": "El Vado del Kizu",
+            "lugarId": "p0",
+            "lugarNombre": "El Vado del Kizu",
             "participanteIds": []
           },
           {
-            "roomId": "p1",
-            "roomName": "El Collado de Kabuto",
+            "lugarId": "p1",
+            "lugarNombre": "El Collado de Kabuto",
             "participanteIds": [
               "e0",
               "e1",
@@ -35250,23 +35250,23 @@
             ]
           },
           {
-            "roomId": "p2",
-            "roomName": "El Bosque de Tsuge",
+            "lugarId": "p2",
+            "lugarNombre": "El Bosque de Tsuge",
             "participanteIds": []
           },
           {
-            "roomId": "p3",
-            "roomName": "El Puerto de Otogi",
+            "lugarId": "p3",
+            "lugarNombre": "El Puerto de Otogi",
             "participanteIds": []
           },
           {
-            "roomId": "p4",
-            "roomName": "La Cuesta de Kashiwabara",
+            "lugarId": "p4",
+            "lugarNombre": "La Cuesta de Kashiwabara",
             "participanteIds": []
           },
           {
-            "roomId": "p5",
-            "roomName": "La Playa de Shirako",
+            "lugarId": "p5",
+            "lugarNombre": "La Playa de Shirako",
             "participanteIds": []
           }
         ],
@@ -35393,7 +35393,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "p0",
               "name": "El Vado del Kizu",
@@ -35917,7 +35917,7 @@
               "description": "La lanza de Hanzo."
             }
           ],
-          "miSala": "p1",
+          "miLugar": "p1",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -36030,7 +36030,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "p0",
               "name": "El Vado del Kizu",
@@ -36554,7 +36554,7 @@
               "description": "La lanza de Hanzo."
             }
           ],
-          "miSala": "p1",
+          "miLugar": "p1",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -36667,7 +36667,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "p0",
               "name": "El Vado del Kizu",
@@ -37185,7 +37185,7 @@
               "description": "La lanza de Hanzo."
             }
           ],
-          "miSala": "p1",
+          "miLugar": "p1",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -37298,7 +37298,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "p0",
               "name": "El Vado del Kizu",
@@ -37859,7 +37859,7 @@
               "description": "La lanza de Hanzo."
             }
           ],
-          "miSala": "p1",
+          "miLugar": "p1",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -37902,22 +37902,22 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "p4",
+                  "lugarId": "p4",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "p2",
+                  "lugarId": "p2",
                   "at": "«instante»"
                 },
                 {
                   "round": 3,
-                  "roomId": "p5",
+                  "lugarId": "p5",
                   "at": "«instante»"
                 },
                 {
                   "round": 4,
-                  "roomId": "p1",
+                  "lugarId": "p1",
                   "at": "«instante»"
                 }
               ],
@@ -37933,22 +37933,22 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "p4",
+                  "lugarId": "p4",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "p2",
+                  "lugarId": "p2",
                   "at": "«instante»"
                 },
                 {
                   "round": 3,
-                  "roomId": "p5",
+                  "lugarId": "p5",
                   "at": "«instante»"
                 },
                 {
                   "round": 4,
-                  "roomId": "p1",
+                  "lugarId": "p1",
                   "at": "«instante»"
                 }
               ],
@@ -37964,22 +37964,22 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "p4",
+                  "lugarId": "p4",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "p2",
+                  "lugarId": "p2",
                   "at": "«instante»"
                 },
                 {
                   "round": 3,
-                  "roomId": "p5",
+                  "lugarId": "p5",
                   "at": "«instante»"
                 },
                 {
                   "round": 4,
-                  "roomId": "p1",
+                  "lugarId": "p1",
                   "at": "«instante»"
                 }
               ],
@@ -37995,22 +37995,22 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "p4",
+                  "lugarId": "p4",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "p2",
+                  "lugarId": "p2",
                   "at": "«instante»"
                 },
                 {
                   "round": 3,
-                  "roomId": "p5",
+                  "lugarId": "p5",
                   "at": "«instante»"
                 },
                 {
                   "round": 4,
-                  "roomId": "p1",
+                  "lugarId": "p1",
                   "at": "«instante»"
                 }
               ],
@@ -38019,22 +38019,22 @@
             }
           ],
           "respuestasEntregadas": [],
-          "tablon": [
+          "porDondePasaron": [
             {
               "round": 1,
-              "roomId": "p4"
+              "lugarId": "p4"
             },
             {
               "round": 2,
-              "roomId": "p2"
+              "lugarId": "p2"
             },
             {
               "round": 3,
-              "roomId": "p5"
+              "lugarId": "p5"
             },
             {
               "round": 4,
-              "roomId": "p1"
+              "lugarId": "p1"
             }
           ],
           "rev": 1,
@@ -38542,13 +38542,13 @@
         "conectados": 0,
         "ocupacion": [
           {
-            "roomId": "p0",
-            "roomName": "El Vado del Kizu",
+            "lugarId": "p0",
+            "lugarNombre": "El Vado del Kizu",
             "participanteIds": []
           },
           {
-            "roomId": "p1",
-            "roomName": "El Collado de Kabuto",
+            "lugarId": "p1",
+            "lugarNombre": "El Collado de Kabuto",
             "participanteIds": [
               "e0",
               "e1",
@@ -38557,23 +38557,23 @@
             ]
           },
           {
-            "roomId": "p2",
-            "roomName": "El Bosque de Tsuge",
+            "lugarId": "p2",
+            "lugarNombre": "El Bosque de Tsuge",
             "participanteIds": []
           },
           {
-            "roomId": "p3",
-            "roomName": "El Puerto de Otogi",
+            "lugarId": "p3",
+            "lugarNombre": "El Puerto de Otogi",
             "participanteIds": []
           },
           {
-            "roomId": "p4",
-            "roomName": "La Cuesta de Kashiwabara",
+            "lugarId": "p4",
+            "lugarNombre": "La Cuesta de Kashiwabara",
             "participanteIds": []
           },
           {
-            "roomId": "p5",
-            "roomName": "La Playa de Shirako",
+            "lugarId": "p5",
+            "lugarNombre": "La Playa de Shirako",
             "participanteIds": []
           }
         ],
@@ -38684,7 +38684,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "p0",
               "name": "El Vado del Kizu",
@@ -39209,7 +39209,7 @@
               "description": "La lanza de Hanzo."
             }
           ],
-          "miSala": "p1",
+          "miLugar": "p1",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -39322,7 +39322,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "p0",
               "name": "El Vado del Kizu",
@@ -39847,7 +39847,7 @@
               "description": "La lanza de Hanzo."
             }
           ],
-          "miSala": "p1",
+          "miLugar": "p1",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -39960,7 +39960,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "p0",
               "name": "El Vado del Kizu",
@@ -40479,7 +40479,7 @@
               "description": "La lanza de Hanzo."
             }
           ],
-          "miSala": "p1",
+          "miLugar": "p1",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -40592,7 +40592,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "p0",
               "name": "El Vado del Kizu",
@@ -41153,7 +41153,7 @@
               "description": "La lanza de Hanzo."
             }
           ],
-          "miSala": "p1",
+          "miLugar": "p1",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -41196,22 +41196,22 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "p4",
+                  "lugarId": "p4",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "p2",
+                  "lugarId": "p2",
                   "at": "«instante»"
                 },
                 {
                   "round": 3,
-                  "roomId": "p5",
+                  "lugarId": "p5",
                   "at": "«instante»"
                 },
                 {
                   "round": 4,
-                  "roomId": "p1",
+                  "lugarId": "p1",
                   "at": "«instante»"
                 }
               ],
@@ -41227,22 +41227,22 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "p4",
+                  "lugarId": "p4",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "p2",
+                  "lugarId": "p2",
                   "at": "«instante»"
                 },
                 {
                   "round": 3,
-                  "roomId": "p5",
+                  "lugarId": "p5",
                   "at": "«instante»"
                 },
                 {
                   "round": 4,
-                  "roomId": "p1",
+                  "lugarId": "p1",
                   "at": "«instante»"
                 }
               ],
@@ -41258,22 +41258,22 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "p4",
+                  "lugarId": "p4",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "p2",
+                  "lugarId": "p2",
                   "at": "«instante»"
                 },
                 {
                   "round": 3,
-                  "roomId": "p5",
+                  "lugarId": "p5",
                   "at": "«instante»"
                 },
                 {
                   "round": 4,
-                  "roomId": "p1",
+                  "lugarId": "p1",
                   "at": "«instante»"
                 }
               ],
@@ -41289,22 +41289,22 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "p4",
+                  "lugarId": "p4",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "p2",
+                  "lugarId": "p2",
                   "at": "«instante»"
                 },
                 {
                   "round": 3,
-                  "roomId": "p5",
+                  "lugarId": "p5",
                   "at": "«instante»"
                 },
                 {
                   "round": 4,
-                  "roomId": "p1",
+                  "lugarId": "p1",
                   "at": "«instante»"
                 }
               ],
@@ -41313,22 +41313,22 @@
             }
           ],
           "respuestasEntregadas": [],
-          "tablon": [
+          "porDondePasaron": [
             {
               "round": 1,
-              "roomId": "p4"
+              "lugarId": "p4"
             },
             {
               "round": 2,
-              "roomId": "p2"
+              "lugarId": "p2"
             },
             {
               "round": 3,
-              "roomId": "p5"
+              "lugarId": "p5"
             },
             {
               "round": 4,
-              "roomId": "p1"
+              "lugarId": "p1"
             }
           ],
           "rev": 1,
@@ -41882,13 +41882,13 @@
         "conectados": 0,
         "ocupacion": [
           {
-            "roomId": "p0",
-            "roomName": "El Vado del Kizu",
+            "lugarId": "p0",
+            "lugarNombre": "El Vado del Kizu",
             "participanteIds": []
           },
           {
-            "roomId": "p1",
-            "roomName": "El Collado de Kabuto",
+            "lugarId": "p1",
+            "lugarNombre": "El Collado de Kabuto",
             "participanteIds": [
               "e0",
               "e1",
@@ -41897,23 +41897,23 @@
             ]
           },
           {
-            "roomId": "p2",
-            "roomName": "El Bosque de Tsuge",
+            "lugarId": "p2",
+            "lugarNombre": "El Bosque de Tsuge",
             "participanteIds": []
           },
           {
-            "roomId": "p3",
-            "roomName": "El Puerto de Otogi",
+            "lugarId": "p3",
+            "lugarNombre": "El Puerto de Otogi",
             "participanteIds": []
           },
           {
-            "roomId": "p4",
-            "roomName": "La Cuesta de Kashiwabara",
+            "lugarId": "p4",
+            "lugarNombre": "La Cuesta de Kashiwabara",
             "participanteIds": []
           },
           {
-            "roomId": "p5",
-            "roomName": "La Playa de Shirako",
+            "lugarId": "p5",
+            "lugarNombre": "La Playa de Shirako",
             "participanteIds": []
           }
         ],
@@ -42073,7 +42073,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "p0",
               "name": "El Vado del Kizu",
@@ -42570,7 +42570,7 @@
               "description": "La lanza de Hanzo."
             }
           ],
-          "miSala": "p1",
+          "miLugar": "p1",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -42689,7 +42689,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "p0",
               "name": "El Vado del Kizu",
@@ -43186,7 +43186,7 @@
               "description": "La lanza de Hanzo."
             }
           ],
-          "miSala": "p1",
+          "miLugar": "p1",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -43305,7 +43305,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "p0",
               "name": "El Vado del Kizu",
@@ -43796,7 +43796,7 @@
               "description": "La lanza de Hanzo."
             }
           ],
-          "miSala": "p1",
+          "miLugar": "p1",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -43915,7 +43915,7 @@
               "yaAcuso": true
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "p0",
               "name": "El Vado del Kizu",
@@ -44476,7 +44476,7 @@
               "description": "La lanza de Hanzo."
             }
           ],
-          "miSala": "p1",
+          "miLugar": "p1",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -44519,22 +44519,22 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "p4",
+                  "lugarId": "p4",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "p2",
+                  "lugarId": "p2",
                   "at": "«instante»"
                 },
                 {
                   "round": 3,
-                  "roomId": "p5",
+                  "lugarId": "p5",
                   "at": "«instante»"
                 },
                 {
                   "round": 4,
-                  "roomId": "p1",
+                  "lugarId": "p1",
                   "at": "«instante»"
                 }
               ],
@@ -44550,22 +44550,22 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "p4",
+                  "lugarId": "p4",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "p2",
+                  "lugarId": "p2",
                   "at": "«instante»"
                 },
                 {
                   "round": 3,
-                  "roomId": "p5",
+                  "lugarId": "p5",
                   "at": "«instante»"
                 },
                 {
                   "round": 4,
-                  "roomId": "p1",
+                  "lugarId": "p1",
                   "at": "«instante»"
                 }
               ],
@@ -44581,22 +44581,22 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "p4",
+                  "lugarId": "p4",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "p2",
+                  "lugarId": "p2",
                   "at": "«instante»"
                 },
                 {
                   "round": 3,
-                  "roomId": "p5",
+                  "lugarId": "p5",
                   "at": "«instante»"
                 },
                 {
                   "round": 4,
-                  "roomId": "p1",
+                  "lugarId": "p1",
                   "at": "«instante»"
                 }
               ],
@@ -44612,22 +44612,22 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "p4",
+                  "lugarId": "p4",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "p2",
+                  "lugarId": "p2",
                   "at": "«instante»"
                 },
                 {
                   "round": 3,
-                  "roomId": "p5",
+                  "lugarId": "p5",
                   "at": "«instante»"
                 },
                 {
                   "round": 4,
-                  "roomId": "p1",
+                  "lugarId": "p1",
                   "at": "«instante»"
                 }
               ],
@@ -44661,22 +44661,22 @@
               "correcta": false
             }
           ],
-          "tablon": [
+          "porDondePasaron": [
             {
               "round": 1,
-              "roomId": "p4"
+              "lugarId": "p4"
             },
             {
               "round": 2,
-              "roomId": "p2"
+              "lugarId": "p2"
             },
             {
               "round": 3,
-              "roomId": "p5"
+              "lugarId": "p5"
             },
             {
               "round": 4,
-              "roomId": "p1"
+              "lugarId": "p1"
             }
           ],
           "rev": 1,
@@ -45249,13 +45249,13 @@
         "conectados": 0,
         "ocupacion": [
           {
-            "roomId": "p0",
-            "roomName": "El Vado del Kizu",
+            "lugarId": "p0",
+            "lugarNombre": "El Vado del Kizu",
             "participanteIds": []
           },
           {
-            "roomId": "p1",
-            "roomName": "El Collado de Kabuto",
+            "lugarId": "p1",
+            "lugarNombre": "El Collado de Kabuto",
             "participanteIds": [
               "e0",
               "e1",
@@ -45264,23 +45264,23 @@
             ]
           },
           {
-            "roomId": "p2",
-            "roomName": "El Bosque de Tsuge",
+            "lugarId": "p2",
+            "lugarNombre": "El Bosque de Tsuge",
             "participanteIds": []
           },
           {
-            "roomId": "p3",
-            "roomName": "El Puerto de Otogi",
+            "lugarId": "p3",
+            "lugarNombre": "El Puerto de Otogi",
             "participanteIds": []
           },
           {
-            "roomId": "p4",
-            "roomName": "La Cuesta de Kashiwabara",
+            "lugarId": "p4",
+            "lugarNombre": "La Cuesta de Kashiwabara",
             "participanteIds": []
           },
           {
-            "roomId": "p5",
-            "roomName": "La Playa de Shirako",
+            "lugarId": "p5",
+            "lugarNombre": "La Playa de Shirako",
             "participanteIds": []
           }
         ],
@@ -45425,7 +45425,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "p0",
               "name": "El Vado del Kizu",
@@ -45922,7 +45922,7 @@
               "description": "La lanza de Hanzo."
             }
           ],
-          "miSala": "p1",
+          "miLugar": "p1",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -46041,7 +46041,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "p0",
               "name": "El Vado del Kizu",
@@ -46538,7 +46538,7 @@
               "description": "La lanza de Hanzo."
             }
           ],
-          "miSala": "p1",
+          "miLugar": "p1",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -46657,7 +46657,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "p0",
               "name": "El Vado del Kizu",
@@ -47148,7 +47148,7 @@
               "description": "La lanza de Hanzo."
             }
           ],
-          "miSala": "p1",
+          "miLugar": "p1",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -47267,7 +47267,7 @@
               "yaAcuso": true
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "p0",
               "name": "El Vado del Kizu",
@@ -47828,7 +47828,7 @@
               "description": "La lanza de Hanzo."
             }
           ],
-          "miSala": "p1",
+          "miLugar": "p1",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -47871,22 +47871,22 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "p4",
+                  "lugarId": "p4",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "p2",
+                  "lugarId": "p2",
                   "at": "«instante»"
                 },
                 {
                   "round": 3,
-                  "roomId": "p5",
+                  "lugarId": "p5",
                   "at": "«instante»"
                 },
                 {
                   "round": 4,
-                  "roomId": "p1",
+                  "lugarId": "p1",
                   "at": "«instante»"
                 }
               ],
@@ -47902,22 +47902,22 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "p4",
+                  "lugarId": "p4",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "p2",
+                  "lugarId": "p2",
                   "at": "«instante»"
                 },
                 {
                   "round": 3,
-                  "roomId": "p5",
+                  "lugarId": "p5",
                   "at": "«instante»"
                 },
                 {
                   "round": 4,
-                  "roomId": "p1",
+                  "lugarId": "p1",
                   "at": "«instante»"
                 }
               ],
@@ -47933,22 +47933,22 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "p4",
+                  "lugarId": "p4",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "p2",
+                  "lugarId": "p2",
                   "at": "«instante»"
                 },
                 {
                   "round": 3,
-                  "roomId": "p5",
+                  "lugarId": "p5",
                   "at": "«instante»"
                 },
                 {
                   "round": 4,
-                  "roomId": "p1",
+                  "lugarId": "p1",
                   "at": "«instante»"
                 }
               ],
@@ -47964,22 +47964,22 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "p4",
+                  "lugarId": "p4",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "p2",
+                  "lugarId": "p2",
                   "at": "«instante»"
                 },
                 {
                   "round": 3,
-                  "roomId": "p5",
+                  "lugarId": "p5",
                   "at": "«instante»"
                 },
                 {
                   "round": 4,
-                  "roomId": "p1",
+                  "lugarId": "p1",
                   "at": "«instante»"
                 }
               ],
@@ -48013,22 +48013,22 @@
               "correcta": false
             }
           ],
-          "tablon": [
+          "porDondePasaron": [
             {
               "round": 1,
-              "roomId": "p4"
+              "lugarId": "p4"
             },
             {
               "round": 2,
-              "roomId": "p2"
+              "lugarId": "p2"
             },
             {
               "round": 3,
-              "roomId": "p5"
+              "lugarId": "p5"
             },
             {
               "round": 4,
-              "roomId": "p1"
+              "lugarId": "p1"
             }
           ],
           "rev": 1,
@@ -48639,13 +48639,13 @@
         "conectados": 0,
         "ocupacion": [
           {
-            "roomId": "p0",
-            "roomName": "El Vado del Kizu",
+            "lugarId": "p0",
+            "lugarNombre": "El Vado del Kizu",
             "participanteIds": []
           },
           {
-            "roomId": "p1",
-            "roomName": "El Collado de Kabuto",
+            "lugarId": "p1",
+            "lugarNombre": "El Collado de Kabuto",
             "participanteIds": [
               "e0",
               "e1",
@@ -48654,23 +48654,23 @@
             ]
           },
           {
-            "roomId": "p2",
-            "roomName": "El Bosque de Tsuge",
+            "lugarId": "p2",
+            "lugarNombre": "El Bosque de Tsuge",
             "participanteIds": []
           },
           {
-            "roomId": "p3",
-            "roomName": "El Puerto de Otogi",
+            "lugarId": "p3",
+            "lugarNombre": "El Puerto de Otogi",
             "participanteIds": []
           },
           {
-            "roomId": "p4",
-            "roomName": "La Cuesta de Kashiwabara",
+            "lugarId": "p4",
+            "lugarNombre": "La Cuesta de Kashiwabara",
             "participanteIds": []
           },
           {
-            "roomId": "p5",
-            "roomName": "La Playa de Shirako",
+            "lugarId": "p5",
+            "lugarNombre": "La Playa de Shirako",
             "participanteIds": []
           }
         ],
@@ -48781,7 +48781,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "p0",
               "name": "El Vado del Kizu",
@@ -49312,7 +49312,7 @@
               "description": "La lanza de Hanzo."
             }
           ],
-          "miSala": "p1",
+          "miLugar": "p1",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -49478,7 +49478,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "p0",
               "name": "El Vado del Kizu",
@@ -50009,7 +50009,7 @@
               "description": "La lanza de Hanzo."
             }
           ],
-          "miSala": "p1",
+          "miLugar": "p1",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -50175,7 +50175,7 @@
               "yaAcuso": false
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "p0",
               "name": "El Vado del Kizu",
@@ -50700,7 +50700,7 @@
               "description": "La lanza de Hanzo."
             }
           ],
-          "miSala": "p1",
+          "miLugar": "p1",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -50866,7 +50866,7 @@
               "yaAcuso": true
             }
           ],
-          "salas": [
+          "lugares": [
             {
               "id": "p0",
               "name": "El Vado del Kizu",
@@ -51430,7 +51430,7 @@
               "description": "La lanza de Hanzo."
             }
           ],
-          "miSala": "p1",
+          "miLugar": "p1",
           "misPistas": [],
           "misHallazgos": [],
           "hechos": [],
@@ -51520,22 +51520,22 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "p4",
+                  "lugarId": "p4",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "p2",
+                  "lugarId": "p2",
                   "at": "«instante»"
                 },
                 {
                   "round": 3,
-                  "roomId": "p5",
+                  "lugarId": "p5",
                   "at": "«instante»"
                 },
                 {
                   "round": 4,
-                  "roomId": "p1",
+                  "lugarId": "p1",
                   "at": "«instante»"
                 }
               ],
@@ -51551,22 +51551,22 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "p4",
+                  "lugarId": "p4",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "p2",
+                  "lugarId": "p2",
                   "at": "«instante»"
                 },
                 {
                   "round": 3,
-                  "roomId": "p5",
+                  "lugarId": "p5",
                   "at": "«instante»"
                 },
                 {
                   "round": 4,
-                  "roomId": "p1",
+                  "lugarId": "p1",
                   "at": "«instante»"
                 }
               ],
@@ -51582,22 +51582,22 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "p4",
+                  "lugarId": "p4",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "p2",
+                  "lugarId": "p2",
                   "at": "«instante»"
                 },
                 {
                   "round": 3,
-                  "roomId": "p5",
+                  "lugarId": "p5",
                   "at": "«instante»"
                 },
                 {
                   "round": 4,
-                  "roomId": "p1",
+                  "lugarId": "p1",
                   "at": "«instante»"
                 }
               ],
@@ -51613,22 +51613,22 @@
               "elecciones": [
                 {
                   "round": 1,
-                  "roomId": "p4",
+                  "lugarId": "p4",
                   "at": "«instante»"
                 },
                 {
                   "round": 2,
-                  "roomId": "p2",
+                  "lugarId": "p2",
                   "at": "«instante»"
                 },
                 {
                   "round": 3,
-                  "roomId": "p5",
+                  "lugarId": "p5",
                   "at": "«instante»"
                 },
                 {
                   "round": 4,
-                  "roomId": "p1",
+                  "lugarId": "p1",
                   "at": "«instante»"
                 }
               ],
@@ -51662,22 +51662,22 @@
               "correcta": false
             }
           ],
-          "tablon": [
+          "porDondePasaron": [
             {
               "round": 1,
-              "roomId": "p4"
+              "lugarId": "p4"
             },
             {
               "round": 2,
-              "roomId": "p2"
+              "lugarId": "p2"
             },
             {
               "round": 3,
-              "roomId": "p5"
+              "lugarId": "p5"
             },
             {
               "round": 4,
-              "roomId": "p1"
+              "lugarId": "p1"
             }
           ],
           "rev": 1,
@@ -52293,13 +52293,13 @@
         "conectados": 0,
         "ocupacion": [
           {
-            "roomId": "p0",
-            "roomName": "El Vado del Kizu",
+            "lugarId": "p0",
+            "lugarNombre": "El Vado del Kizu",
             "participanteIds": []
           },
           {
-            "roomId": "p1",
-            "roomName": "El Collado de Kabuto",
+            "lugarId": "p1",
+            "lugarNombre": "El Collado de Kabuto",
             "participanteIds": [
               "e0",
               "e1",
@@ -52308,23 +52308,23 @@
             ]
           },
           {
-            "roomId": "p2",
-            "roomName": "El Bosque de Tsuge",
+            "lugarId": "p2",
+            "lugarNombre": "El Bosque de Tsuge",
             "participanteIds": []
           },
           {
-            "roomId": "p3",
-            "roomName": "El Puerto de Otogi",
+            "lugarId": "p3",
+            "lugarNombre": "El Puerto de Otogi",
             "participanteIds": []
           },
           {
-            "roomId": "p4",
-            "roomName": "La Cuesta de Kashiwabara",
+            "lugarId": "p4",
+            "lugarNombre": "La Cuesta de Kashiwabara",
             "participanteIds": []
           },
           {
-            "roomId": "p5",
-            "roomName": "La Playa de Shirako",
+            "lugarId": "p5",
+            "lugarNombre": "La Playa de Shirako",
             "participanteIds": []
           }
         ],

@@ -55,7 +55,7 @@ export function pistasPorRonda(plot: Plot): Map<number, PlotClue[]> {
  */
 export function salasActivas(game: GameSession, plot: Plot, ronda: number): Room[] {
   const pistas = pistasPorRonda(plot).get(ronda) ?? [];
-  const ids = new Set(pistas.map((p) => p.roomId).filter((id): id is string => Boolean(id)));
+  const ids = new Set(pistas.map((p) => p.lugarId).filter((id): id is string => Boolean(id)));
   return lugaresDe(game).filter((sala) => ids.has(sala.id));
 }
 

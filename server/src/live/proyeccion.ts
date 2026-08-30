@@ -25,7 +25,7 @@ import type {
   LiveSession,
   MomentoVista,
   PistaVista,
-  SalaVista,
+  LugarVista,
   TableroVista,
   VistaGameMaster,
   VistaJugador,
@@ -64,14 +64,14 @@ function conocimientoDesbloqueado(total: number, round: number, totalRounds: num
 
 function pistaVista(
   game: GameSession,
-  clue: { id: string; roomId?: string; description: string; pointsTo: string; round: number },
+  clue: { id: string; lugarId?: string; description: string; pointsTo: string; round: number },
   conSignificado: boolean,
 ): PistaVista {
-  const sala = lugaresDe(game).find((r) => r.id === clue.roomId);
+  const sala = lugaresDe(game).find((r) => r.id === clue.lugarId);
   return {
     id: clue.id,
-    roomId: clue.roomId ?? '',
-    roomName: sala?.name ?? 'Sin sala',
+    lugarId: clue.lugarId ?? '',
+    lugarNombre: sala?.name ?? 'Sin sala',
     round: clue.round,
     description: clue.description,
     ...(conSignificado ? { pointsTo: clue.pointsTo } : {}),
@@ -169,7 +169,7 @@ export function vistaDeJugador(
       if (sala) ocupacion.set(sala, (ocupacion.get(sala) ?? 0) + 1);
     }
   }
-  const salas: SalaVista[] = lugaresDe(game).map((r) => ({
+  const salas: LugarVista[] = lugaresDe(game).map((r) => ({
     id: r.id,
     name: r.name,
     description: r.description,
@@ -201,18 +201,18 @@ export function vistaDeJugador(
       : undefined;
 
   // ---- Mis pistas: solo las de MI sala en ESTA ronda, y sin su significado ----
-  const miSala = enJuego ? salaDe(jugador, sesion.round) : undefined;
+  const miLugar = enJuego ? salaDe(jugador, sesion.round) : undefined;
   const misPistas =
-    sesion.phase === 'ronda-abierta' && miSala
+    sesion.phase === 'ronda-abierta' && miLugar
       ? plot.clues
-          .filter((c) => c.roomId === miSala && c.round === sesion.round)
+          .filter((c) => c.lugarId === miLugar && c.round === sesion.round)
           .map((c) => pistaVista(game, c, false))
       : [];
 
   /*
    * ---- LO QUE HE ENCONTRADO YO, ronda a ronda ----
    *
-   * Aquí se componía el TABLÓN COMÚN: se recorría `sesion.tablon` —las salas
+   * Aquí se componía el TABLÓN COMÚN: se recorría `sesion.porDondePasaron` —las salas
    * que había pisado cualquiera— y se enviaban sus pistas a TODOS. Con eso,
    * elegir bien la sala no servía de nada: al cerrar la ronda todo el mundo
    * tenía lo mismo, y contar lo que habías visto no le aportaba nada a nadie.
@@ -232,7 +232,7 @@ export function vistaDeJugador(
       if (!sala) continue;
       const cerrada = ronda < sesion.round || !abierta;
       for (const clue of plot.clues) {
-        if (clue.roomId === sala && clue.round === ronda) {
+        if (clue.lugarId === sala && clue.round === ronda) {
           misHallazgos.push(pistaVista(game, clue, cerrada));
         }
       }
@@ -379,7 +379,7 @@ export function vistaDeJugador(
           yaAcuso: sesion.respuestasEntregadas.some((a) => a.participanteId === p.participanteId),
         };
       }),
-    salas,
+    lugares: salas,
     tablero,
     ejes,
     acciones,
@@ -408,7 +408,7 @@ export function vistaDeJugador(
       description: w.description,
       photoUrl: fotoParaJugador(w.photoUrl, game.id),
     })),
-    miSala,
+    miLugar,
     misPistas,
     misHallazgos,
     hechos,
@@ -503,8 +503,8 @@ export function vistaDeGameMaster(game: GameSession, sesion: LiveSession): Vista
   const plot = game.plot;
 
   const ocupacion = lugaresDe(game).map((r) => ({
-    roomId: r.id,
-    roomName: r.name,
+    lugarId: r.id,
+    lugarNombre: r.name,
     participanteIds: sesion.players
       .filter((p) => salaDe(p, sesion.round) === r.id)
       .map((p) => p.participanteId),

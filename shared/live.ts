@@ -102,9 +102,9 @@ export type PapelDeFase =
 export const PAPELES_EN_JUEGO: PapelDeFase[] = ['turno', 'entreacto', 'decision'];
 
 /** Elección de sala de un jugador en una ronda concreta. */
-export interface EleccionDeSala {
+export interface EleccionDeLugar {
   round: number;
-  roomId: string;
+  lugarId: string;
   /** Hora del SERVIDOR. Nunca la del móvil. */
   at: string;
 }
@@ -178,7 +178,7 @@ export interface LivePlayer {
   joined: boolean;
   /** Última vez que su móvil dio señales de vida. */
   lastSeenAt?: string;
-  elecciones: EleccionDeSala[];
+  elecciones: EleccionDeLugar[];
   /** Cuaderno personal. Texto libre, se guarda según se escribe. */
   notas: string;
   /** Ids de los giros personales que ya se le han entregado. */
@@ -358,7 +358,16 @@ export interface LiveSession {
    * jugando ahora mismo, y a cambio no se gana nada. Quien venga detrás debe
    * saber que escribir aquí NO publica nada.
    */
-  tablon: Array<{ round: number; roomId: string }>;
+  /**
+   * POR DÓNDE PASÓ ALGUIEN en cada turno ya cerrado.
+   *
+   * Se llamaba `tablon` porque era la lista que decidía qué pistas se
+   * destapaban para TODA la mesa al cerrar la ronda. Esa regla ya no existe
+   * —lo que se encuentra es de quien lo encuentra— así que esto no publica
+   * nada: es historia de la partida, y se conserva porque las sesiones
+   * guardadas la llevan dentro.
+   */
+  porDondePasaron: Array<{ round: number; lugarId: string }>;
   /**
    * Respuestas del Mayordomo que alguien ha denunciado.
    *
@@ -557,7 +566,7 @@ export interface Account {
 // ---------------------------------------------------------------------------
 
 /** Una sala, tal como la ve un jugador. Sin nada de la trama. */
-export interface SalaVista {
+export interface LugarVista {
   id: string;
   name: string;
   description?: string;
@@ -600,8 +609,8 @@ export interface TableroVista {
 /** Una pista, tal como se le entrega a quien ha entrado en esa sala. */
 export interface PistaVista {
   id: string;
-  roomId: string;
-  roomName: string;
+  lugarId: string;
+  lugarNombre: string;
   round: number;
   description: string;
   /**
@@ -717,7 +726,15 @@ export interface VistaJugador {
     salaActual?: string;
     yaAcuso: boolean;
   }>;
-  salas: SalaVista[];
+  /**
+   * LOS LUGARES de este juego, con lo que se sabe de cada uno.
+   *
+   * Se llamaba `salas` y su tipo `LugarVista`. Una expedición tiene cámaras y un
+   * cruce de montaña tiene pasos: los dos los mandaban por un campo que decía
+   * «sala», y el móvil los pintaba bajo el rótulo que su manifiesto declara —así
+   * que la palabra sobraba solo aquí, en el contrato.
+   */
+  lugares: LugarVista[];
   /** El plano de la casa. Ausente si la partida todavía no tiene tablero. */
   tablero?: TableroVista;
   objetos: Array<{ id: string; name: string; description?: string; photoUrl?: string }>;
@@ -799,7 +816,7 @@ export interface VistaJugador {
    */
   estadoDelJuego?: unknown;
   /** La sala que has elegido esta ronda, si ya lo has hecho. */
-  miSala?: string;
+  miLugar?: string;
   /** Pistas de TU sala en esta ronda. Vacío hasta que eliges. */
   misPistas: PistaVista[];
   /**
@@ -884,7 +901,7 @@ export interface VistaGameMaster {
   /** Cuántos han emparejado y cuántos están vivos ahora mismo. */
   conectados: number;
   /** Reparto de gente por sala en la ronda en curso. */
-  ocupacion: Array<{ roomId: string; roomName: string; participanteIds: string[] }>;
+  ocupacion: Array<{ lugarId: string; lugarNombre: string; participanteIds: string[] }>;
   /** Giros pendientes de entregar en la ronda en curso. */
   girosPendientes: Array<{ id: string; participanteId: string; displayName: string; round: number }>;
   /** Cuántas acusaciones se han recibido. */

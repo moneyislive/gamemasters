@@ -184,7 +184,7 @@ function partidaDeMomia(
       girosRecibidos: [],
     })),
     respuestasEntregadas: [],
-    tablon: [],
+    porDondePasaron: [],
     estado: { momia: estado },
     rev: 3,
     updatedAt: ahora,
@@ -228,7 +228,7 @@ function partidaDeCluedo(): { game: GameSession; sesion: LiveSession } {
       girosRecibidos: [],
     })),
     respuestasEntregadas: [],
-    tablon: [],
+    porDondePasaron: [],
     rev: 3,
     updatedAt: ahora,
   } as unknown as LiveSession;
@@ -651,10 +651,10 @@ async function probar(): Promise<void> {
     const r = await pedir('/jugar/sala', {
       metodo: 'POST',
       testigo,
-      cuerpo: { roomId: 'c1' },
+      cuerpo: { lugarId: 'c1' },
     });
     comprobar('tocar una cámara en el plano entra de verdad', r.estado === 200, r.datos);
-    comprobar('y la vista dice que estás dentro', r.datos?.vista?.miSala === 'c1', r.datos?.vista?.miSala);
+    comprobar('y la vista dice que estás dentro', r.datos?.vista?.miLugar === 'c1', r.datos?.vista?.miLugar);
   }
 
   // -------------------------------------------------------------------------

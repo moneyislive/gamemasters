@@ -140,7 +140,7 @@ async function ampliarTrama(
     const idsSalas = new Set(salasDe(game).map((sala) => sala.id));
     const idsPistas = new Set(plot.clues.map((pista) => pista.id));
     pistasExtra.forEach((pista, indice) => {
-      if (!pista.roomId || !idsSalas.has(pista.roomId)) return;
+      if (!pista.lugarId || !idsSalas.has(pista.lugarId)) return;
       const id = idsPistas.has(pista.id) ? `${pista.id}-nueva-${indice + 1}` : pista.id;
       idsPistas.add(id);
       plot.clues.push({ ...pista, id });
@@ -292,7 +292,7 @@ function construirPromptAmpliacion(
       .join('\n') || '- (ninguna persona nueva)';
 
   const salasSinPista = salasDe(game)
-    .filter((sala2) => !plot.clues.some((pista) => pista.roomId === sala2.id))
+    .filter((sala2) => !plot.clues.some((pista) => pista.lugarId === sala2.id))
     .map((sala2) => `"${sala2.name}" (id "${sala2.id}")`)
     .join(', ');
 
@@ -407,13 +407,13 @@ function normalizarPistas(valor: unknown): PlotClue[] {
     const dato = bruto as Record<string, unknown>;
     const description = textoDe(dato.description);
     if (!description) return;
-    const roomId = textoDe(dato.roomId);
+    const lugar = textoDe(dato.lugarId);
     // Las pistas que llegan de una ampliación completan salas nuevas: se
     // reparten en rondas intermedias para no adelantar el desenlace.
     const ronda = Number(dato.round);
     pistas.push({
       id: textoDe(dato.id) || `pista-nueva-${indice + 1}`,
-      ...(roomId ? { roomId } : {}),
+      ...(lugar ? { lugarId: lugar } : {}),
       description,
       pointsTo: textoDe(dato.pointsTo),
       round: Number.isInteger(ronda) && ronda >= 1 && ronda <= 4 ? ronda : 2,

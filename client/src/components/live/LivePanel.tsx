@@ -571,7 +571,7 @@ export default function LivePanel(): JSX.Element {
                       </span>
                     )}
                   </td>
-                  <td className="text-dim">{donde?.roomName ?? '—'}</td>
+                  <td className="text-dim">{donde?.lugarNombre ?? '—'}</td>
                 </tr>
               );
             })}

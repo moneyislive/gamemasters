@@ -457,8 +457,8 @@ export function pedirVista(desde?: number, señal?: AbortSignal): Promise<Respue
   );
 }
 
-export function elegirSala(roomId: string): Promise<{ vista: VistaJugador }> {
-  return peticion('/jugar/sala', { method: 'POST', body: JSON.stringify({ roomId }) });
+export function elegirSala(lugarId: string): Promise<{ vista: VistaJugador }> {
+  return peticion('/jugar/sala', { method: 'POST', body: JSON.stringify({ lugarId }) });
 }
 
 export function avisarListo(listo: boolean): Promise<{ vista: VistaJugador }> {
@@ -473,7 +473,7 @@ export function guardarNotas(notas: string): Promise<{ ok: true }> {
  * Entrega la acusación: un valor por cada eje que pida el juego.
  *
  * Recibe un diccionario y no tres cadenas sueltas, y no es un detalle de
- * estilo. Antes la firma era `acusar(murdererId, weaponId, roomId)`: tres
+ * estilo. Antes la firma era `acusar(murdererId, weaponId, lugarId)`: tres
  * parámetros posicionales del mismo tipo, de modo que intercambiar dos
  * compilaba igual de bien y la partida puntuaba mal las acusaciones sin avisar
  * ni una sola vez. Con claves, esa clase de error deja de existir.

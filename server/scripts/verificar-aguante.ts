@@ -658,7 +658,7 @@ function sembrar(dir: string): void {
       girosRecibidos: [],
     })),
     respuestasEntregadas: [],
-    tablon: [],
+    porDondePasaron: [],
     rev: 1,
     updatedAt: ahora,
   };

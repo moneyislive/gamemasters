@@ -148,7 +148,7 @@ export default function BoardView(): JSX.Element {
   const board = game.board;
   const juego = game.settings?.juego;
 
-  if (!board || board.rooms.length === 0) {
+  if (!board || board.lugares.length === 0) {
     return (
       <div className="board-panel">
         <div className="board-empty">
@@ -175,8 +175,8 @@ export default function BoardView(): JSX.Element {
   const nombrePorId = new Map(lugaresDe(game).map((sala) => [sala.id, sala.name]));
 
   const centros = new Map<string, { cx: number; cy: number }>();
-  for (const colocacion of board.rooms) {
-    centros.set(colocacion.roomId, {
+  for (const colocacion of board.lugares) {
+    centros.set(colocacion.lugarId, {
       cx: (colocacion.x + colocacion.w / 2) * CELDA,
       cy: (colocacion.y + colocacion.h / 2) * CELDA,
     });
@@ -291,12 +291,12 @@ export default function BoardView(): JSX.Element {
         </g>
 
         {/* Pasadizos secretos */}
-        {board.passages.map((pasadizo, indice) => {
-          const a = centros.get(pasadizo.fromRoomId);
-          const b = centros.get(pasadizo.toRoomId);
+        {board.pasadizos.map((pasadizo, indice) => {
+          const a = centros.get(pasadizo.desdeLugarId);
+          const b = centros.get(pasadizo.hastaLugarId);
           if (!a || !b) return null;
-          const desde = nombrePorId.get(pasadizo.fromRoomId) ?? '';
-          const hasta = nombrePorId.get(pasadizo.toRoomId) ?? '';
+          const desde = nombrePorId.get(pasadizo.desdeLugarId) ?? '';
+          const hasta = nombrePorId.get(pasadizo.hastaLugarId) ?? '';
           return (
             <g className="board-passage" key={`p${indice}`}>
               <title>{`Pasadizo secreto: ${desde} ⇄ ${hasta}`}</title>
@@ -309,21 +309,21 @@ export default function BoardView(): JSX.Element {
         })}
 
         {/* Salas */}
-        {board.rooms.map((colocacion) => {
+        {board.lugares.map((colocacion) => {
           const x = colocacion.x * CELDA;
           const y = colocacion.y * CELDA;
           const w = colocacion.w * CELDA;
           const h = colocacion.h * CELDA;
           const cx = x + w / 2;
           const cy = y + h / 2;
-          const nombre = nombrePorId.get(colocacion.roomId) ?? 'Sala';
+          const nombre = nombrePorId.get(colocacion.lugarId) ?? 'Sala';
           const tamano = Math.max(11, Math.min(20, (w * 1.6) / Math.max(nombre.length, 6)));
           // La puerta se abre hacia el centro del tablero.
           const haciaDerecha = cx < ancho / 2;
           const puertaX = haciaDerecha ? x + w - 4 : x + 4;
 
           return (
-            <g key={colocacion.roomId}>
+            <g key={colocacion.lugarId}>
               <rect
                 x={x + 5}
                 y={y + 5}
@@ -374,7 +374,7 @@ export default function BoardView(): JSX.Element {
       <div className="board-footer">
         <div>
           <p className="board-legend">
-            {palabras.leyenda(board.rooms.length, board.passages.length)}
+            {palabras.leyenda(board.lugares.length, board.pasadizos.length)}
           </p>
           <p className="board-hint text-dim">
             {palabras.pistaPasos}

@@ -151,7 +151,7 @@ const plot: Plot = {
   ],
   timeline: [],
   clues: [
-    { id: 'k1', roomId: 'l0', description: 'Una cuerda cortada.', pointsTo: 'Alguien bajó por aquí.', round: 1 },
+    { id: 'k1', lugarId: 'l0', description: 'Una cuerda cortada.', pointsTo: 'Alguien bajó por aquí.', round: 1 },
   ],
   gmScript: [],
 };
@@ -169,7 +169,7 @@ const sesion: LiveSession = {
     { participanteId: 'b', displayName: 'Berta', joinCode: 'TOR002', joined: true, elecciones: [], notas: '', girosRecibidos: [] },
   ],
   respuestasEntregadas: [],
-  tablon: [],
+  porDondePasaron: [],
   rev: 1,
   updatedAt: ahora,
 };
@@ -196,7 +196,7 @@ comprobar(
   (sesion.estado?.niveles as Record<string, number>)?.a === 2,
   sesion.estado,
 );
-const tablonAntes = sesion.tablon.length;
+const tablonAntes = sesion.porDondePasaron.length;
 const rondaAntes = sesion.round;
 
 // --- Se levanta la mesa ---
@@ -236,7 +236,7 @@ comprobar(
 );
 comprobar('las notas siguen ahí', sesion.players[0]?.notas.includes('mala espina'));
 comprobar('los giros ya repartidos también', sesion.players[0]?.girosRecibidos.includes('giro-x'));
-comprobar('el tablón común se conserva', sesion.tablon.length === tablonAntes);
+comprobar('el tablón común se conserva', sesion.porDondePasaron.length === tablonAntes);
 comprobar(
   'y el estado propio del juego, que es lo más importante',
   (sesion.estado?.niveles as Record<string, number>)?.a === 2,

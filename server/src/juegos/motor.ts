@@ -2,7 +2,7 @@
  * El motor de acciones: lo que un jugador puede hacer, y quién decide qué pasa.
  *
  * Hasta ahora lo único que se podía hacer en una ronda era elegir sala, y
- * estaba escrito en el tipo (`EleccionDeSala` guarda un `roomId` y nada más).
+ * estaba escrito en el tipo (`EleccionDeLugar` guarda un `roomId` y nada más).
  * Eso vale para CLUEDO y para nada que no sea CLUEDO: una oca tira un dado, un
  * juego de rol reparte botín, un juego de espías entrega un sobre.
  *
