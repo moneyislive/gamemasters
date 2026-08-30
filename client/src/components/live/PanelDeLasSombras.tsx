@@ -417,7 +417,7 @@ export default function PanelDeLasSombras({
                     className="btn btn--primary"
                     disabled={ocupado}
                     title="Se cierra el camino: a partir de aquí solo se propone la senda y se señala."
-                    onClick={() => ejecutar(() => llamar(`/games/${game.id}/live/acusaciones`))}
+                    onClick={() => ejecutar(() => llamar(`/games/${game.id}/live/respuestas`))}
                   >
                     Abrir el consejo del alba
                   </button>

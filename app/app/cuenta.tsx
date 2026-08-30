@@ -341,7 +341,7 @@ export default function Cuenta(): JSX.Element {
                   <View style={estilos.medallas}>
                     {p.gano && <Insignia texto="Ganaste" tono={color.oro300} />}
                     {!p.gano && p.acerto && <Insignia texto="Acertaste" tono={color.oro400} />}
-                    {p.eraCulpable && <Insignia texto="Eras el culpable" tono="#e8a0a0" />}
+                    {p.eraElSenalado && <Insignia texto="Eras el culpable" tono="#e8a0a0" />}
                   </View>
                 </View>
               ))

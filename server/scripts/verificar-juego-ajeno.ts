@@ -502,7 +502,7 @@ comprobar('sin salas', v.lugares.length === 0, v.lugares.length);
 comprobar('la vista no trae bloque de CLUEDO por ningun lado', leerBloqueDePistas(v.estadoDelJuego) === null);
 comprobar('sin ejes que acusar', v.ejes.length === 0, v.ejes);
 comprobar('sin cronología pública', v.cronologia.length === 0);
-comprobar('nadie es el señalado, porque no hay a quién señalar', v.yo.soyCulpable === false);
+comprobar('nadie es el señalado, porque no hay a quién señalar', v.yo.soyElSenalado === false);
 comprobar(
   'y sí llega el estado propio del juego',
   (v.estadoDelJuego as { fondo?: number } | undefined)?.fondo === FONDO_INICIAL - 20,

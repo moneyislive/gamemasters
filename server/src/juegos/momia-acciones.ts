@@ -29,7 +29,7 @@
  * llega— y sin él se usa el don aparente, que es el que tiene en el dosier.
  *  * El cambio que falta está anotado en el informe: una línea en `motor.ts`.
  */
-import { acusar as registrarSenalamiento, elegirSala } from '../live/sesion';
+import { responder as registrarSenalamiento, elegirSala } from '../live/sesion';
 import { AccionInvalida, registrarAcciones } from './motor';
 import { registrarInicio } from './inicios';
 // Por la puerta principal: es el índice quien declara dónde vive cada
@@ -607,13 +607,13 @@ registrarAcciones('momia', {
   senalar: ({ game, sesion, participanteId, datos }) => {
     const solucion = game.plot?.solution.respuestas;
     if (!solucion) throw new AccionInvalida('Esta partida todavía no tiene saqueador.');
-    const { acusacion } = registrarSenalamiento(
+    const { respuesta } = registrarSenalamiento(
       sesion,
       participanteId,
       { [EJE_SAQUEADOR]: datos[EJE_SAQUEADOR] ?? '' },
       solucion,
     );
     // Deliberadamente no se devuelve si ha acertado: se sabrá al amanecer.
-    return { registrada: true, at: acusacion.at };
+    return { registrada: true, at: respuesta.at };
   },
 });

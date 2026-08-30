@@ -68,7 +68,7 @@ const VIBRACION: Partial<Record<AvisoClave, () => void>> = {
   'ronda-cerrada': () => void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium),
   giro: () => void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning),
   ayuda: () => void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light),
-  acusaciones: () => void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning),
+  respuestas: () => void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning),
   desenlace: () => void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success),
   ganador: () => void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success),
 };

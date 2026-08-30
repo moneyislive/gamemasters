@@ -49,21 +49,35 @@ const { width } = Dimensions.get('window');
  * RESPALDO, que es lo que hace que CLUEDO no cambie: sus ocho siguen aquí y él no
  * declara ninguno.
  */
-const ROTULO: Partial<Record<AvisoClave, { titulo: string; tono: string }>> = {
-  'ronda-abierta': { titulo: 'Comienza la ronda', tono: color.oro300 },
-  'ronda-cerrada': { titulo: 'Se cierra la ronda', tono: color.oro400 },
-  giro: { titulo: 'Algo ha cambiado', tono: '#e8a0a0' },
-  ayuda: { titulo: 'Una ayuda', tono: color.oro300 },
-  acusaciones: { titulo: 'Hora de acusar', tono: '#f0c9c0' },
-  desenlace: { titulo: 'El sobre del crimen', tono: '#f0c9c0' },
-  ganador: { titulo: 'Alguien lo ha resuelto', tono: color.oro300 },
-  /*
-   * `sellado` YA NO ESTA AQUI. Su rotulo era «Se abre El Sellado», o sea el
-   * nombre de una fase de El Misterio de la Momia dentro de la tabla de CLUEDO
-   * --que ademas no puede llegar nunca a esa fase, porque su manifiesto no la
-   * declara--. Lo trae ahora la Momia en el suyo. La tabla pasa a `Partial` para
-   * poder decir esto: aqui solo van las palabras de CLUEDO.
-   */
+/*
+ * ═══ AQUI HABIA OCHO ROTULOS, Y ERAN LOS DE CLUEDO ═══
+ *
+ *     'ronda-abierta': 'Comienza la ronda'
+ *     respuestas:      'Hora de acusar'
+ *     desenlace:       'El sobre del crimen'
+ *
+ * Con el comentario, escrito al lado, de que «aqui solo van las palabras de
+ * CLUEDO». Los otros dos juegos declaraban las suyas en su manifiesto y este no
+ * hacia falta que las declarara: las suyas ERAN el respaldo.
+ *
+ * Eso es lo que significa que un juego este dentro de la plataforma en vez de al
+ * lado, y se nota en el unico sitio donde importa: un juego nuevo que se olvide
+ * de declarar sus rotulos no ve un error —ve el telon de un asesinato en una
+ * mansion en mitad de su partida.
+ *
+ * Ahora CLUEDO los declara como los demas y aqui no queda ninguno. El respaldo
+ * es el TONO, que no es una palabra sino lo que el color significa: rojo para
+ * lo que pesa, oro para lo que celebra. Eso si es de la plataforma.
+ */
+const TONO: Partial<Record<AvisoClave, string>> = {
+  'ronda-abierta': color.oro300,
+  'ronda-cerrada': color.oro400,
+  giro: '#e8a0a0',
+  ayuda: color.oro300,
+  respuestas: '#f0c9c0',
+  desenlace: '#f0c9c0',
+  ganador: color.oro300,
+  sellado: '#f0c9c0',
 };
 
 export function TelonDeAvisos(): JSX.Element | null {
@@ -119,9 +133,17 @@ export function TelonDeAvisos(): JSX.Element | null {
   }));
 
   if (!aviso) return null;
-  const base = ROTULO[aviso.clave] ?? { titulo: 'Atención', tono: color.oro300 };
-  /* El título, del juego si lo declara; el tono, siempre de aquí. */
-  const rotulo = { ...base, titulo: rotulosDelJuego[aviso.clave] ?? base.titulo };
+  /*
+   * El TITULO lo pone el juego; el TONO, siempre esta tabla. Aqui habia ademas
+   * un respaldo de titulos con las siete palabras de CLUEDO —«Hora de acusar»,
+   * «El sobre del crimen»— que ya estaban REPETIDAS en su manifiesto, asi que
+   * no las usaba nadie y solo servian para que un juego que se olvidara de
+   * declarar las suyas viera las de un asesinato sin enterarse.
+   */
+  const rotulo = {
+    titulo: rotulosDelJuego[aviso.clave] ?? 'Atención',
+    tono: TONO[aviso.clave] ?? color.oro300,
+  };
 
   return (
     <Animated.View style={[StyleSheet.absoluteFill, estilos.telon, estiloTelon]} pointerEvents="box-none">

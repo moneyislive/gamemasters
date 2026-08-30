@@ -376,7 +376,7 @@ export default function Sellado(): JSX.Element {
  */
 function PanelSenalar(): JSX.Element {
   const { vista } = usePartida();
-  const yaSenalo = Boolean(vista?.miAcusacion);
+  const yaSenalo = Boolean(vista?.miRespuesta);
   const eje = vista?.ejes[0];
 
   return (
@@ -393,7 +393,7 @@ function PanelSenalar(): JSX.Element {
             : 'Alguien de la expedición abrió el sello por encargo. Señalarlo va aparte del orden: puedes sellar bien y aun así no verlo.'}
         </Cuerpo>
         {!yaSenalo && (
-          <Boton variante="peligro" onPress={() => router.push('/acusar')} style={{ marginTop: espacio.lg }}>
+          <Boton variante="peligro" onPress={() => router.push('/responder')} style={{ marginTop: espacio.lg }}>
             Señalar a alguien
           </Boton>
         )}

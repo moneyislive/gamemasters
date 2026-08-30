@@ -25,7 +25,7 @@
  * contenido y cada juego lo trae. Lo que se comprueba es el MOTOR.
  */
 import { manifiestoDe, registrarJuego, ejes as ejesDe } from '../../shared/juegos';
-import { abrirRonda, acusar, cerrarRonda, elegirSala } from '../src/live/sesion';
+import { abrirRonda, responder, cerrarRonda, elegirSala } from '../src/live/sesion';
 import { vistaDeGameMaster, vistaDeJugador } from '../src/live/proyeccion';
 import { repararRespuestas } from '../src/juegos/solucion';
 import { computeStaleness } from '../../shared/staleness';
@@ -307,8 +307,8 @@ comprobar(
 comprobar('en la sala de espera no hay solución', v.desenlace === undefined);
 
 // Quien se llevó la pieza lo sabe, y nadie más.
-comprobar('la culpable sabe que lo es', vistaDe('h2').yo.soyCulpable === true);
-comprobar('los demás no', vistaDe('h0').yo.soyCulpable === false);
+comprobar('la culpable sabe que lo es', vistaDe('h2').yo.soyElSenalado === true);
+comprobar('los demás no', vistaDe('h0').yo.soyElSenalado === false);
 
 // --- Ronda 1 ---
 abrirRonda(sesion, 10);
@@ -384,14 +384,14 @@ sesion.phase = 'acusaciones';
 let rechazada = false;
 try {
   // Falta un eje: no vale.
-  acusar(sesion, 'h0', { ladron: 'h2' }, plot.solution.respuestas);
+  responder(sesion, 'h0', { ladron: 'h2' }, plot.solution.respuestas);
 } catch {
   rechazada = true;
 }
 comprobar('una acusación a medias se rechaza', rechazada);
 
-acusar(sesion, 'h0', { ladron: 'h1', pieza: 'p1' }, plot.solution.respuestas);
-acusar(sesion, 'h1', { ladron: 'h2', pieza: 'p1' }, plot.solution.respuestas);
+responder(sesion, 'h0', { ladron: 'h1', pieza: 'p1' }, plot.solution.respuestas);
+responder(sesion, 'h1', { ladron: 'h2', pieza: 'p1' }, plot.solution.respuestas);
 comprobar('la equivocada no gana', sesion.primeroEnAcertar === 'h1', sesion.primeroEnAcertar);
 comprobar(
   'la acertada se marca correcta',
@@ -403,7 +403,7 @@ comprobar(
 );
 
 // La culpable acierta —se sabe la respuesta— pero no puede ganar.
-acusar(sesion, 'h2', { ladron: 'h2', pieza: 'p1' }, plot.solution.respuestas);
+responder(sesion, 'h2', { ladron: 'h2', pieza: 'p1' }, plot.solution.respuestas);
 comprobar('quien se la llevó no gana acusándose', sesion.primeroEnAcertar === 'h1');
 
 // --- Desenlace ---
@@ -422,7 +422,7 @@ comprobar(
   v.desenlace?.respuestas,
 );
 comprobar('y con sus rótulos', v.desenlace?.respuestas.map((r) => r.rotulo).join('/') === 'Quién/Qué');
-comprobar('se sabe quién fue', v.desenlace?.culpableId === 'h2');
+comprobar('se sabe quién fue', v.desenlace?.senaladoId === 'h2');
 comprobar('gana quien acertó', v.desenlace?.ganador?.participanteId === 'h1');
 comprobar(
   'los aciertos se cuentan sobre DOS ejes',

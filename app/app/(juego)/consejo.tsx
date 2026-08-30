@@ -243,7 +243,7 @@ export default function Consejo(): JSX.Element {
           <Ornamento />
           <Seccion>Quién cobra de Akechi</Seccion>
           <Marco tono="peligro">
-            {vista.miAcusacion ? (
+            {vista.miRespuesta ? (
               <>
                 <Etiqueta style={{ color: C.oro300 }}>Ya has señalado</Etiqueta>
                 <Cuerpo style={{ marginTop: espacio.xs }}>
@@ -259,7 +259,7 @@ export default function Consejo(): JSX.Element {
                 </Cuerpo>
                 <Boton
                   variante="peligro"
-                  onPress={() => router.push('/acusar')}
+                  onPress={() => router.push('/responder')}
                   style={{ marginTop: espacio.md }}
                 >
                   Señalar a alguien

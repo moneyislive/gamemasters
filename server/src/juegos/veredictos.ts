@@ -3,7 +3,7 @@
  *
  * ═══ LO QUE PASABA ═══
  *
- * `live/sesion.ts` decide el ganador dentro de `acusar()`: la primera acusación
+ * `live/sesion.ts` decide el ganador dentro de `responder()`: la primera acusación
  * correcta que no sea del propio culpable escribe `sesion.primeroEnAcertar`, y ahí se
  * acabó. Es la regla de CLUEDO —«gana quien acierta antes»— metida en código de
  * plataforma, y El Misterio de la Momia y El Paso de las Sombras entran por ahí

@@ -220,7 +220,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -230,7 +230,7 @@
               "characterName": "Bruno",
               "role": "Tsune no kata, persona corriente",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e2",
@@ -238,7 +238,7 @@
               "characterName": "Carla",
               "role": "Komusō, monje de la cesta",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -246,7 +246,7 @@
               "characterName": "Dani",
               "role": "Yamabushi, asceta de los montes",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -546,7 +546,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -556,7 +556,7 @@
               "characterName": "Ana",
               "role": "Hōkashi, juglar de camino",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e2",
@@ -564,7 +564,7 @@
               "characterName": "Carla",
               "role": "Komusō, monje de la cesta",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -572,7 +572,7 @@
               "characterName": "Dani",
               "role": "Yamabushi, asceta de los montes",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -872,7 +872,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -882,7 +882,7 @@
               "characterName": "Ana",
               "role": "Hōkashi, juglar de camino",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e1",
@@ -890,7 +890,7 @@
               "characterName": "Bruno",
               "role": "Tsune no kata, persona corriente",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -898,7 +898,7 @@
               "characterName": "Dani",
               "role": "Yamabushi, asceta de los montes",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -1196,7 +1196,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": true,
+            "soyElSenalado": true,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -1206,7 +1206,7 @@
               "characterName": "Ana",
               "role": "Hōkashi, juglar de camino",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e1",
@@ -1214,7 +1214,7 @@
               "characterName": "Bruno",
               "role": "Tsune no kata, persona corriente",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e2",
@@ -1222,7 +1222,7 @@
               "characterName": "Carla",
               "role": "Komusō, monje de la cesta",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -1798,7 +1798,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -1808,7 +1808,7 @@
               "characterName": "Bruno",
               "role": "Tsune no kata, persona corriente",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e2",
@@ -1816,7 +1816,7 @@
               "characterName": "Carla",
               "role": "Komusō, monje de la cesta",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -1824,7 +1824,7 @@
               "characterName": "Dani",
               "role": "Yamabushi, asceta de los montes",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -2277,7 +2277,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -2287,7 +2287,7 @@
               "characterName": "Ana",
               "role": "Hōkashi, juglar de camino",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e2",
@@ -2295,7 +2295,7 @@
               "characterName": "Carla",
               "role": "Komusō, monje de la cesta",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -2303,7 +2303,7 @@
               "characterName": "Dani",
               "role": "Yamabushi, asceta de los montes",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -2760,7 +2760,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -2770,7 +2770,7 @@
               "characterName": "Ana",
               "role": "Hōkashi, juglar de camino",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e1",
@@ -2778,7 +2778,7 @@
               "characterName": "Bruno",
               "role": "Tsune no kata, persona corriente",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -2786,7 +2786,7 @@
               "characterName": "Dani",
               "role": "Yamabushi, asceta de los montes",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -3237,7 +3237,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": true,
+            "soyElSenalado": true,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -3247,7 +3247,7 @@
               "characterName": "Ana",
               "role": "Hōkashi, juglar de camino",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e1",
@@ -3255,7 +3255,7 @@
               "characterName": "Bruno",
               "role": "Tsune no kata, persona corriente",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e2",
@@ -3263,7 +3263,7 @@
               "characterName": "Carla",
               "role": "Komusō, monje de la cesta",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -4000,7 +4000,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -4011,7 +4011,7 @@
               "role": "Tsune no kata, persona corriente",
               "conectado": false,
               "salaActual": "La Cuesta de Kashiwabara",
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e2",
@@ -4020,7 +4020,7 @@
               "role": "Komusō, monje de la cesta",
               "conectado": false,
               "salaActual": "La Cuesta de Kashiwabara",
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -4029,7 +4029,7 @@
               "role": "Yamabushi, asceta de los montes",
               "conectado": false,
               "salaActual": "La Cuesta de Kashiwabara",
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -4504,7 +4504,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -4515,7 +4515,7 @@
               "role": "Hōkashi, juglar de camino",
               "conectado": false,
               "salaActual": "La Cuesta de Kashiwabara",
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e2",
@@ -4524,7 +4524,7 @@
               "role": "Komusō, monje de la cesta",
               "conectado": false,
               "salaActual": "La Cuesta de Kashiwabara",
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -4533,7 +4533,7 @@
               "role": "Yamabushi, asceta de los montes",
               "conectado": false,
               "salaActual": "La Cuesta de Kashiwabara",
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -5008,7 +5008,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -5019,7 +5019,7 @@
               "role": "Hōkashi, juglar de camino",
               "conectado": false,
               "salaActual": "La Cuesta de Kashiwabara",
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e1",
@@ -5028,7 +5028,7 @@
               "role": "Tsune no kata, persona corriente",
               "conectado": false,
               "salaActual": "La Cuesta de Kashiwabara",
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -5037,7 +5037,7 @@
               "role": "Yamabushi, asceta de los montes",
               "conectado": false,
               "salaActual": "La Cuesta de Kashiwabara",
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -5506,7 +5506,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": true,
+            "soyElSenalado": true,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -5517,7 +5517,7 @@
               "role": "Hōkashi, juglar de camino",
               "conectado": false,
               "salaActual": "La Cuesta de Kashiwabara",
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e1",
@@ -5526,7 +5526,7 @@
               "role": "Tsune no kata, persona corriente",
               "conectado": false,
               "salaActual": "La Cuesta de Kashiwabara",
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e2",
@@ -5535,7 +5535,7 @@
               "role": "Komusō, monje de la cesta",
               "conectado": false,
               "salaActual": "La Cuesta de Kashiwabara",
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -6585,7 +6585,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -6595,7 +6595,7 @@
               "characterName": "Bruno",
               "role": "Tsune no kata, persona corriente",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e2",
@@ -6603,7 +6603,7 @@
               "characterName": "Carla",
               "role": "Komusō, monje de la cesta",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -6611,7 +6611,7 @@
               "characterName": "Dani",
               "role": "Yamabushi, asceta de los montes",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -7091,7 +7091,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -7101,7 +7101,7 @@
               "characterName": "Ana",
               "role": "Hōkashi, juglar de camino",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e2",
@@ -7109,7 +7109,7 @@
               "characterName": "Carla",
               "role": "Komusō, monje de la cesta",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -7117,7 +7117,7 @@
               "characterName": "Dani",
               "role": "Yamabushi, asceta de los montes",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -7597,7 +7597,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -7607,7 +7607,7 @@
               "characterName": "Ana",
               "role": "Hōkashi, juglar de camino",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e1",
@@ -7615,7 +7615,7 @@
               "characterName": "Bruno",
               "role": "Tsune no kata, persona corriente",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -7623,7 +7623,7 @@
               "characterName": "Dani",
               "role": "Yamabushi, asceta de los montes",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -8097,7 +8097,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": true,
+            "soyElSenalado": true,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -8107,7 +8107,7 @@
               "characterName": "Ana",
               "role": "Hōkashi, juglar de camino",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e1",
@@ -8115,7 +8115,7 @@
               "characterName": "Bruno",
               "role": "Tsune no kata, persona corriente",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e2",
@@ -8123,7 +8123,7 @@
               "characterName": "Carla",
               "role": "Komusō, monje de la cesta",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -9063,7 +9063,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -9073,7 +9073,7 @@
               "characterName": "Bruno",
               "role": "Tsune no kata, persona corriente",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e2",
@@ -9081,7 +9081,7 @@
               "characterName": "Carla",
               "role": "Komusō, monje de la cesta",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -9089,7 +9089,7 @@
               "characterName": "Dani",
               "role": "Yamabushi, asceta de los montes",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -9607,7 +9607,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -9617,7 +9617,7 @@
               "characterName": "Ana",
               "role": "Hōkashi, juglar de camino",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e2",
@@ -9625,7 +9625,7 @@
               "characterName": "Carla",
               "role": "Komusō, monje de la cesta",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -9633,7 +9633,7 @@
               "characterName": "Dani",
               "role": "Yamabushi, asceta de los montes",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -10155,7 +10155,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -10165,7 +10165,7 @@
               "characterName": "Ana",
               "role": "Hōkashi, juglar de camino",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e1",
@@ -10173,7 +10173,7 @@
               "characterName": "Bruno",
               "role": "Tsune no kata, persona corriente",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -10181,7 +10181,7 @@
               "characterName": "Dani",
               "role": "Yamabushi, asceta de los montes",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -10697,7 +10697,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": true,
+            "soyElSenalado": true,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -10707,7 +10707,7 @@
               "characterName": "Ana",
               "role": "Hōkashi, juglar de camino",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e1",
@@ -10715,7 +10715,7 @@
               "characterName": "Bruno",
               "role": "Tsune no kata, persona corriente",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e2",
@@ -10723,7 +10723,7 @@
               "characterName": "Carla",
               "role": "Komusō, monje de la cesta",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -11679,7 +11679,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -11690,7 +11690,7 @@
               "role": "Tsune no kata, persona corriente",
               "conectado": false,
               "salaActual": "El Bosque de Tsuge",
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e2",
@@ -11699,7 +11699,7 @@
               "role": "Komusō, monje de la cesta",
               "conectado": false,
               "salaActual": "El Bosque de Tsuge",
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -11708,7 +11708,7 @@
               "role": "Yamabushi, asceta de los montes",
               "conectado": false,
               "salaActual": "El Bosque de Tsuge",
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -12244,7 +12244,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -12255,7 +12255,7 @@
               "role": "Hōkashi, juglar de camino",
               "conectado": false,
               "salaActual": "El Bosque de Tsuge",
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e2",
@@ -12264,7 +12264,7 @@
               "role": "Komusō, monje de la cesta",
               "conectado": false,
               "salaActual": "El Bosque de Tsuge",
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -12273,7 +12273,7 @@
               "role": "Yamabushi, asceta de los montes",
               "conectado": false,
               "salaActual": "El Bosque de Tsuge",
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -12809,7 +12809,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -12820,7 +12820,7 @@
               "role": "Hōkashi, juglar de camino",
               "conectado": false,
               "salaActual": "El Bosque de Tsuge",
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e1",
@@ -12829,7 +12829,7 @@
               "role": "Tsune no kata, persona corriente",
               "conectado": false,
               "salaActual": "El Bosque de Tsuge",
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -12838,7 +12838,7 @@
               "role": "Yamabushi, asceta de los montes",
               "conectado": false,
               "salaActual": "El Bosque de Tsuge",
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -13368,7 +13368,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": true,
+            "soyElSenalado": true,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -13379,7 +13379,7 @@
               "role": "Hōkashi, juglar de camino",
               "conectado": false,
               "salaActual": "El Bosque de Tsuge",
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e1",
@@ -13388,7 +13388,7 @@
               "role": "Tsune no kata, persona corriente",
               "conectado": false,
               "salaActual": "El Bosque de Tsuge",
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e2",
@@ -13397,7 +13397,7 @@
               "role": "Komusō, monje de la cesta",
               "conectado": false,
               "salaActual": "El Bosque de Tsuge",
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -14633,7 +14633,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -14643,7 +14643,7 @@
               "characterName": "Bruno",
               "role": "Tsune no kata, persona corriente",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e2",
@@ -14651,7 +14651,7 @@
               "characterName": "Carla",
               "role": "Komusō, monje de la cesta",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -14659,7 +14659,7 @@
               "characterName": "Dani",
               "role": "Yamabushi, asceta de los montes",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -15199,7 +15199,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -15209,7 +15209,7 @@
               "characterName": "Ana",
               "role": "Hōkashi, juglar de camino",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e2",
@@ -15217,7 +15217,7 @@
               "characterName": "Carla",
               "role": "Komusō, monje de la cesta",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -15225,7 +15225,7 @@
               "characterName": "Dani",
               "role": "Yamabushi, asceta de los montes",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -15765,7 +15765,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -15775,7 +15775,7 @@
               "characterName": "Ana",
               "role": "Hōkashi, juglar de camino",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e1",
@@ -15783,7 +15783,7 @@
               "characterName": "Bruno",
               "role": "Tsune no kata, persona corriente",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -15791,7 +15791,7 @@
               "characterName": "Dani",
               "role": "Yamabushi, asceta de los montes",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -16325,7 +16325,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": true,
+            "soyElSenalado": true,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -16335,7 +16335,7 @@
               "characterName": "Ana",
               "role": "Hōkashi, juglar de camino",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e1",
@@ -16343,7 +16343,7 @@
               "characterName": "Bruno",
               "role": "Tsune no kata, persona corriente",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e2",
@@ -16351,7 +16351,7 @@
               "characterName": "Carla",
               "role": "Komusō, monje de la cesta",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -17475,7 +17475,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -17485,7 +17485,7 @@
               "characterName": "Bruno",
               "role": "Tsune no kata, persona corriente",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e2",
@@ -17493,7 +17493,7 @@
               "characterName": "Carla",
               "role": "Komusō, monje de la cesta",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -17501,7 +17501,7 @@
               "characterName": "Dani",
               "role": "Yamabushi, asceta de los montes",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -18079,7 +18079,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -18089,7 +18089,7 @@
               "characterName": "Ana",
               "role": "Hōkashi, juglar de camino",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e2",
@@ -18097,7 +18097,7 @@
               "characterName": "Carla",
               "role": "Komusō, monje de la cesta",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -18105,7 +18105,7 @@
               "characterName": "Dani",
               "role": "Yamabushi, asceta de los montes",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -18687,7 +18687,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -18697,7 +18697,7 @@
               "characterName": "Ana",
               "role": "Hōkashi, juglar de camino",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e1",
@@ -18705,7 +18705,7 @@
               "characterName": "Bruno",
               "role": "Tsune no kata, persona corriente",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -18713,7 +18713,7 @@
               "characterName": "Dani",
               "role": "Yamabushi, asceta de los montes",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -19289,7 +19289,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": true,
+            "soyElSenalado": true,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -19299,7 +19299,7 @@
               "characterName": "Ana",
               "role": "Hōkashi, juglar de camino",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e1",
@@ -19307,7 +19307,7 @@
               "characterName": "Bruno",
               "role": "Tsune no kata, persona corriente",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e2",
@@ -19315,7 +19315,7 @@
               "characterName": "Carla",
               "role": "Komusō, monje de la cesta",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -20455,7 +20455,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -20466,7 +20466,7 @@
               "role": "Tsune no kata, persona corriente",
               "conectado": false,
               "salaActual": "La Playa de Shirako",
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e2",
@@ -20475,7 +20475,7 @@
               "role": "Komusō, monje de la cesta",
               "conectado": false,
               "salaActual": "La Playa de Shirako",
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -20484,7 +20484,7 @@
               "role": "Yamabushi, asceta de los montes",
               "conectado": false,
               "salaActual": "La Playa de Shirako",
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -21080,7 +21080,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -21091,7 +21091,7 @@
               "role": "Hōkashi, juglar de camino",
               "conectado": false,
               "salaActual": "La Playa de Shirako",
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e2",
@@ -21100,7 +21100,7 @@
               "role": "Komusō, monje de la cesta",
               "conectado": false,
               "salaActual": "La Playa de Shirako",
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -21109,7 +21109,7 @@
               "role": "Yamabushi, asceta de los montes",
               "conectado": false,
               "salaActual": "La Playa de Shirako",
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -21705,7 +21705,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -21716,7 +21716,7 @@
               "role": "Hōkashi, juglar de camino",
               "conectado": false,
               "salaActual": "La Playa de Shirako",
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e1",
@@ -21725,7 +21725,7 @@
               "role": "Tsune no kata, persona corriente",
               "conectado": false,
               "salaActual": "La Playa de Shirako",
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -21734,7 +21734,7 @@
               "role": "Yamabushi, asceta de los montes",
               "conectado": false,
               "salaActual": "La Playa de Shirako",
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -22324,7 +22324,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": true,
+            "soyElSenalado": true,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -22335,7 +22335,7 @@
               "role": "Hōkashi, juglar de camino",
               "conectado": false,
               "salaActual": "La Playa de Shirako",
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e1",
@@ -22344,7 +22344,7 @@
               "role": "Tsune no kata, persona corriente",
               "conectado": false,
               "salaActual": "La Playa de Shirako",
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e2",
@@ -22353,7 +22353,7 @@
               "role": "Komusō, monje de la cesta",
               "conectado": false,
               "salaActual": "La Playa de Shirako",
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -23763,7 +23763,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -23773,7 +23773,7 @@
               "characterName": "Bruno",
               "role": "Tsune no kata, persona corriente",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e2",
@@ -23781,7 +23781,7 @@
               "characterName": "Carla",
               "role": "Komusō, monje de la cesta",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -23789,7 +23789,7 @@
               "characterName": "Dani",
               "role": "Yamabushi, asceta de los montes",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -24389,7 +24389,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -24399,7 +24399,7 @@
               "characterName": "Ana",
               "role": "Hōkashi, juglar de camino",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e2",
@@ -24407,7 +24407,7 @@
               "characterName": "Carla",
               "role": "Komusō, monje de la cesta",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -24415,7 +24415,7 @@
               "characterName": "Dani",
               "role": "Yamabushi, asceta de los montes",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -25015,7 +25015,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -25025,7 +25025,7 @@
               "characterName": "Ana",
               "role": "Hōkashi, juglar de camino",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e1",
@@ -25033,7 +25033,7 @@
               "characterName": "Bruno",
               "role": "Tsune no kata, persona corriente",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -25041,7 +25041,7 @@
               "characterName": "Dani",
               "role": "Yamabushi, asceta de los montes",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -25635,7 +25635,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": true,
+            "soyElSenalado": true,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -25645,7 +25645,7 @@
               "characterName": "Ana",
               "role": "Hōkashi, juglar de camino",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e1",
@@ -25653,7 +25653,7 @@
               "characterName": "Bruno",
               "role": "Tsune no kata, persona corriente",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e2",
@@ -25661,7 +25661,7 @@
               "characterName": "Carla",
               "role": "Komusō, monje de la cesta",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -26951,7 +26951,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -26961,7 +26961,7 @@
               "characterName": "Bruno",
               "role": "Tsune no kata, persona corriente",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e2",
@@ -26969,7 +26969,7 @@
               "characterName": "Carla",
               "role": "Komusō, monje de la cesta",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -26977,7 +26977,7 @@
               "characterName": "Dani",
               "role": "Yamabushi, asceta de los montes",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -27613,7 +27613,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -27623,7 +27623,7 @@
               "characterName": "Ana",
               "role": "Hōkashi, juglar de camino",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e2",
@@ -27631,7 +27631,7 @@
               "characterName": "Carla",
               "role": "Komusō, monje de la cesta",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -27639,7 +27639,7 @@
               "characterName": "Dani",
               "role": "Yamabushi, asceta de los montes",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -28279,7 +28279,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -28289,7 +28289,7 @@
               "characterName": "Ana",
               "role": "Hōkashi, juglar de camino",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e1",
@@ -28297,7 +28297,7 @@
               "characterName": "Bruno",
               "role": "Tsune no kata, persona corriente",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -28305,7 +28305,7 @@
               "characterName": "Dani",
               "role": "Yamabushi, asceta de los montes",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -28939,7 +28939,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": true,
+            "soyElSenalado": true,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -28949,7 +28949,7 @@
               "characterName": "Ana",
               "role": "Hōkashi, juglar de camino",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e1",
@@ -28957,7 +28957,7 @@
               "characterName": "Bruno",
               "role": "Tsune no kata, persona corriente",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e2",
@@ -28965,7 +28965,7 @@
               "characterName": "Carla",
               "role": "Komusō, monje de la cesta",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -30274,7 +30274,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -30285,7 +30285,7 @@
               "role": "Tsune no kata, persona corriente",
               "conectado": false,
               "salaActual": "El Collado de Kabuto",
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e2",
@@ -30294,7 +30294,7 @@
               "role": "Komusō, monje de la cesta",
               "conectado": false,
               "salaActual": "El Collado de Kabuto",
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -30303,7 +30303,7 @@
               "role": "Yamabushi, asceta de los montes",
               "conectado": false,
               "salaActual": "El Collado de Kabuto",
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -30957,7 +30957,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -30968,7 +30968,7 @@
               "role": "Hōkashi, juglar de camino",
               "conectado": false,
               "salaActual": "El Collado de Kabuto",
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e2",
@@ -30977,7 +30977,7 @@
               "role": "Komusō, monje de la cesta",
               "conectado": false,
               "salaActual": "El Collado de Kabuto",
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -30986,7 +30986,7 @@
               "role": "Yamabushi, asceta de los montes",
               "conectado": false,
               "salaActual": "El Collado de Kabuto",
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -31640,7 +31640,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -31651,7 +31651,7 @@
               "role": "Hōkashi, juglar de camino",
               "conectado": false,
               "salaActual": "El Collado de Kabuto",
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e1",
@@ -31660,7 +31660,7 @@
               "role": "Tsune no kata, persona corriente",
               "conectado": false,
               "salaActual": "El Collado de Kabuto",
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -31669,7 +31669,7 @@
               "role": "Yamabushi, asceta de los montes",
               "conectado": false,
               "salaActual": "El Collado de Kabuto",
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -32317,7 +32317,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": true,
+            "soyElSenalado": true,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -32328,7 +32328,7 @@
               "role": "Hōkashi, juglar de camino",
               "conectado": false,
               "salaActual": "El Collado de Kabuto",
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e1",
@@ -32337,7 +32337,7 @@
               "role": "Tsune no kata, persona corriente",
               "conectado": false,
               "salaActual": "El Collado de Kabuto",
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e2",
@@ -32346,7 +32346,7 @@
               "role": "Komusō, monje de la cesta",
               "conectado": false,
               "salaActual": "El Collado de Kabuto",
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -33889,7 +33889,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -33899,7 +33899,7 @@
               "characterName": "Bruno",
               "role": "Tsune no kata, persona corriente",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e2",
@@ -33907,7 +33907,7 @@
               "characterName": "Carla",
               "role": "Komusō, monje de la cesta",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -33915,7 +33915,7 @@
               "characterName": "Dani",
               "role": "Yamabushi, asceta de los montes",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -34573,7 +34573,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -34583,7 +34583,7 @@
               "characterName": "Ana",
               "role": "Hōkashi, juglar de camino",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e2",
@@ -34591,7 +34591,7 @@
               "characterName": "Carla",
               "role": "Komusō, monje de la cesta",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -34599,7 +34599,7 @@
               "characterName": "Dani",
               "role": "Yamabushi, asceta de los montes",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -35257,7 +35257,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -35267,7 +35267,7 @@
               "characterName": "Ana",
               "role": "Hōkashi, juglar de camino",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e1",
@@ -35275,7 +35275,7 @@
               "characterName": "Bruno",
               "role": "Tsune no kata, persona corriente",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -35283,7 +35283,7 @@
               "characterName": "Dani",
               "role": "Yamabushi, asceta de los montes",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -35935,7 +35935,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": true,
+            "soyElSenalado": true,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -35945,7 +35945,7 @@
               "characterName": "Ana",
               "role": "Hōkashi, juglar de camino",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e1",
@@ -35953,7 +35953,7 @@
               "characterName": "Bruno",
               "role": "Tsune no kata, persona corriente",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e2",
@@ -35961,7 +35961,7 @@
               "characterName": "Carla",
               "role": "Komusō, monje de la cesta",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -37384,7 +37384,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -37394,7 +37394,7 @@
               "characterName": "Bruno",
               "role": "Tsune no kata, persona corriente",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e2",
@@ -37402,7 +37402,7 @@
               "characterName": "Carla",
               "role": "Komusō, monje de la cesta",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -37410,7 +37410,7 @@
               "characterName": "Dani",
               "role": "Yamabushi, asceta de los montes",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -38068,7 +38068,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -38078,7 +38078,7 @@
               "characterName": "Ana",
               "role": "Hōkashi, juglar de camino",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e2",
@@ -38086,7 +38086,7 @@
               "characterName": "Carla",
               "role": "Komusō, monje de la cesta",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -38094,7 +38094,7 @@
               "characterName": "Dani",
               "role": "Yamabushi, asceta de los montes",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -38752,7 +38752,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -38762,7 +38762,7 @@
               "characterName": "Ana",
               "role": "Hōkashi, juglar de camino",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e1",
@@ -38770,7 +38770,7 @@
               "characterName": "Bruno",
               "role": "Tsune no kata, persona corriente",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -38778,7 +38778,7 @@
               "characterName": "Dani",
               "role": "Yamabushi, asceta de los montes",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -39430,7 +39430,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": true,
+            "soyElSenalado": true,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -39440,7 +39440,7 @@
               "characterName": "Ana",
               "role": "Hōkashi, juglar de camino",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e1",
@@ -39448,7 +39448,7 @@
               "characterName": "Bruno",
               "role": "Tsune no kata, persona corriente",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e2",
@@ -39456,7 +39456,7 @@
               "characterName": "Carla",
               "role": "Komusō, monje de la cesta",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -40863,7 +40863,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -40873,7 +40873,7 @@
               "characterName": "Bruno",
               "role": "Tsune no kata, persona corriente",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e2",
@@ -40881,7 +40881,7 @@
               "characterName": "Carla",
               "role": "Komusō, monje de la cesta",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -40889,7 +40889,7 @@
               "characterName": "Dani",
               "role": "Yamabushi, asceta de los montes",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -41548,7 +41548,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -41558,7 +41558,7 @@
               "characterName": "Ana",
               "role": "Hōkashi, juglar de camino",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e2",
@@ -41566,7 +41566,7 @@
               "characterName": "Carla",
               "role": "Komusō, monje de la cesta",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -41574,7 +41574,7 @@
               "characterName": "Dani",
               "role": "Yamabushi, asceta de los montes",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -42233,7 +42233,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -42243,7 +42243,7 @@
               "characterName": "Ana",
               "role": "Hōkashi, juglar de camino",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e1",
@@ -42251,7 +42251,7 @@
               "characterName": "Bruno",
               "role": "Tsune no kata, persona corriente",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -42259,7 +42259,7 @@
               "characterName": "Dani",
               "role": "Yamabushi, asceta de los montes",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -42912,7 +42912,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": true,
+            "soyElSenalado": true,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -42922,7 +42922,7 @@
               "characterName": "Ana",
               "role": "Hōkashi, juglar de camino",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e1",
@@ -42930,7 +42930,7 @@
               "characterName": "Bruno",
               "role": "Tsune no kata, persona corriente",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e2",
@@ -42938,7 +42938,7 @@
               "characterName": "Carla",
               "role": "Komusō, monje de la cesta",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -44440,7 +44440,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -44450,7 +44450,7 @@
               "characterName": "Bruno",
               "role": "Tsune no kata, persona corriente",
               "conectado": false,
-              "yaAcuso": true
+              "yaRespondio": true
             },
             {
               "participanteId": "e2",
@@ -44458,7 +44458,7 @@
               "characterName": "Carla",
               "role": "Komusō, monje de la cesta",
               "conectado": false,
-              "yaAcuso": true
+              "yaRespondio": true
             },
             {
               "participanteId": "e3",
@@ -44466,7 +44466,7 @@
               "characterName": "Dani",
               "role": "Yamabushi, asceta de los montes",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -45036,7 +45036,7 @@
               "description": "Chaya se adelanta con plata para comprar el paso donde se pueda comprar. Por los montes ya corre que hay samuráis en fuga y precio por ellos."
             }
           ],
-          "miAcusacion": {
+          "miRespuesta": {
             "respuestas": {
               "kancho": "e3"
             },
@@ -45103,7 +45103,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -45113,7 +45113,7 @@
               "characterName": "Ana",
               "role": "Hōkashi, juglar de camino",
               "conectado": false,
-              "yaAcuso": true
+              "yaRespondio": true
             },
             {
               "participanteId": "e2",
@@ -45121,7 +45121,7 @@
               "characterName": "Carla",
               "role": "Komusō, monje de la cesta",
               "conectado": false,
-              "yaAcuso": true
+              "yaRespondio": true
             },
             {
               "participanteId": "e3",
@@ -45129,7 +45129,7 @@
               "characterName": "Dani",
               "role": "Yamabushi, asceta de los montes",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -45699,7 +45699,7 @@
               "description": "Chaya se adelanta con plata para comprar el paso donde se pueda comprar. Por los montes ya corre que hay samuráis en fuga y precio por ellos."
             }
           ],
-          "miAcusacion": {
+          "miRespuesta": {
             "respuestas": {
               "kancho": "e3"
             },
@@ -45766,7 +45766,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -45776,7 +45776,7 @@
               "characterName": "Ana",
               "role": "Hōkashi, juglar de camino",
               "conectado": false,
-              "yaAcuso": true
+              "yaRespondio": true
             },
             {
               "participanteId": "e1",
@@ -45784,7 +45784,7 @@
               "characterName": "Bruno",
               "role": "Tsune no kata, persona corriente",
               "conectado": false,
-              "yaAcuso": true
+              "yaRespondio": true
             },
             {
               "participanteId": "e3",
@@ -45792,7 +45792,7 @@
               "characterName": "Dani",
               "role": "Yamabushi, asceta de los montes",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -46356,7 +46356,7 @@
               "description": "Chaya se adelanta con plata para comprar el paso donde se pueda comprar. Por los montes ya corre que hay samuráis en fuga y precio por ellos."
             }
           ],
-          "miAcusacion": {
+          "miRespuesta": {
             "respuestas": {
               "kancho": "e0"
             },
@@ -46423,7 +46423,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": true,
+            "soyElSenalado": true,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -46433,7 +46433,7 @@
               "characterName": "Ana",
               "role": "Hōkashi, juglar de camino",
               "conectado": false,
-              "yaAcuso": true
+              "yaRespondio": true
             },
             {
               "participanteId": "e1",
@@ -46441,7 +46441,7 @@
               "characterName": "Bruno",
               "role": "Tsune no kata, persona corriente",
               "conectado": false,
-              "yaAcuso": true
+              "yaRespondio": true
             },
             {
               "participanteId": "e2",
@@ -46449,7 +46449,7 @@
               "characterName": "Carla",
               "role": "Komusō, monje de la cesta",
               "conectado": false,
-              "yaAcuso": true
+              "yaRespondio": true
             }
           ],
           "lugares": [
@@ -47980,7 +47980,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -47990,7 +47990,7 @@
               "characterName": "Bruno",
               "role": "Tsune no kata, persona corriente",
               "conectado": false,
-              "yaAcuso": true
+              "yaRespondio": true
             },
             {
               "participanteId": "e2",
@@ -47998,7 +47998,7 @@
               "characterName": "Carla",
               "role": "Komusō, monje de la cesta",
               "conectado": false,
-              "yaAcuso": true
+              "yaRespondio": true
             },
             {
               "participanteId": "e3",
@@ -48006,7 +48006,7 @@
               "characterName": "Dani",
               "role": "Yamabushi, asceta de los montes",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -48576,7 +48576,7 @@
               "description": "Chaya se adelanta con plata para comprar el paso donde se pueda comprar. Por los montes ya corre que hay samuráis en fuga y precio por ellos."
             }
           ],
-          "miAcusacion": {
+          "miRespuesta": {
             "respuestas": {
               "kancho": "e3"
             },
@@ -48643,7 +48643,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -48653,7 +48653,7 @@
               "characterName": "Ana",
               "role": "Hōkashi, juglar de camino",
               "conectado": false,
-              "yaAcuso": true
+              "yaRespondio": true
             },
             {
               "participanteId": "e2",
@@ -48661,7 +48661,7 @@
               "characterName": "Carla",
               "role": "Komusō, monje de la cesta",
               "conectado": false,
-              "yaAcuso": true
+              "yaRespondio": true
             },
             {
               "participanteId": "e3",
@@ -48669,7 +48669,7 @@
               "characterName": "Dani",
               "role": "Yamabushi, asceta de los montes",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -49239,7 +49239,7 @@
               "description": "Chaya se adelanta con plata para comprar el paso donde se pueda comprar. Por los montes ya corre que hay samuráis en fuga y precio por ellos."
             }
           ],
-          "miAcusacion": {
+          "miRespuesta": {
             "respuestas": {
               "kancho": "e3"
             },
@@ -49306,7 +49306,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -49316,7 +49316,7 @@
               "characterName": "Ana",
               "role": "Hōkashi, juglar de camino",
               "conectado": false,
-              "yaAcuso": true
+              "yaRespondio": true
             },
             {
               "participanteId": "e1",
@@ -49324,7 +49324,7 @@
               "characterName": "Bruno",
               "role": "Tsune no kata, persona corriente",
               "conectado": false,
-              "yaAcuso": true
+              "yaRespondio": true
             },
             {
               "participanteId": "e3",
@@ -49332,7 +49332,7 @@
               "characterName": "Dani",
               "role": "Yamabushi, asceta de los montes",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -49896,7 +49896,7 @@
               "description": "Chaya se adelanta con plata para comprar el paso donde se pueda comprar. Por los montes ya corre que hay samuráis en fuga y precio por ellos."
             }
           ],
-          "miAcusacion": {
+          "miRespuesta": {
             "respuestas": {
               "kancho": "e0"
             },
@@ -49963,7 +49963,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": true,
+            "soyElSenalado": true,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -49973,7 +49973,7 @@
               "characterName": "Ana",
               "role": "Hōkashi, juglar de camino",
               "conectado": false,
-              "yaAcuso": true
+              "yaRespondio": true
             },
             {
               "participanteId": "e1",
@@ -49981,7 +49981,7 @@
               "characterName": "Bruno",
               "role": "Tsune no kata, persona corriente",
               "conectado": false,
-              "yaAcuso": true
+              "yaRespondio": true
             },
             {
               "participanteId": "e2",
@@ -49989,7 +49989,7 @@
               "characterName": "Carla",
               "role": "Komusō, monje de la cesta",
               "conectado": false,
-              "yaAcuso": true
+              "yaRespondio": true
             }
           ],
           "lugares": [
@@ -51524,7 +51524,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -51534,7 +51534,7 @@
               "characterName": "Bruno",
               "role": "Tsune no kata, persona corriente",
               "conectado": false,
-              "yaAcuso": true
+              "yaRespondio": true
             },
             {
               "participanteId": "e2",
@@ -51542,7 +51542,7 @@
               "characterName": "Carla",
               "role": "Komusō, monje de la cesta",
               "conectado": false,
-              "yaAcuso": true
+              "yaRespondio": true
             },
             {
               "participanteId": "e3",
@@ -51550,7 +51550,7 @@
               "characterName": "Dani",
               "role": "Yamabushi, asceta de los montes",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -52154,7 +52154,7 @@
               "description": "Chaya se adelanta con plata para comprar el paso donde se pueda comprar. Por los montes ya corre que hay samuráis en fuga y precio por ellos."
             }
           ],
-          "miAcusacion": {
+          "miRespuesta": {
             "respuestas": {
               "kancho": "e3"
             },
@@ -52169,7 +52169,7 @@
                 "nombre": "Dani"
               }
             ],
-            "culpableId": "e3",
+            "senaladoId": "e3",
             "motive": "A Dani le prometieron La lanza de Hanzo y algo más difícil de decir en voz alta: que en Iga no vuelva a pasar lo del año pasado. Akechi paga por que el señor no llegue a la barca, y esta noche eso significa dejar que amanezca.",
             "reconstruccion": "Dani se sumó a la columna con todo el mundo mirando y con el mismo miedo que los demás, y hasta ahí no hay nada que fingir. Lo que lleva encima es la palabra dada a un hombre de Akechi en un cruce de caminos: sabe dónde esperan los cazadores cada hora, porque se lo dijeron, y puede dejar por el camino un mojón escrito de su puño que suene a verdad. Le basta con que se ande la senda equivocada.",
             "ganador": {
@@ -52268,7 +52268,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -52278,7 +52278,7 @@
               "characterName": "Ana",
               "role": "Hōkashi, juglar de camino",
               "conectado": false,
-              "yaAcuso": true
+              "yaRespondio": true
             },
             {
               "participanteId": "e2",
@@ -52286,7 +52286,7 @@
               "characterName": "Carla",
               "role": "Komusō, monje de la cesta",
               "conectado": false,
-              "yaAcuso": true
+              "yaRespondio": true
             },
             {
               "participanteId": "e3",
@@ -52294,7 +52294,7 @@
               "characterName": "Dani",
               "role": "Yamabushi, asceta de los montes",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -52898,7 +52898,7 @@
               "description": "Chaya se adelanta con plata para comprar el paso donde se pueda comprar. Por los montes ya corre que hay samuráis en fuga y precio por ellos."
             }
           ],
-          "miAcusacion": {
+          "miRespuesta": {
             "respuestas": {
               "kancho": "e3"
             },
@@ -52913,7 +52913,7 @@
                 "nombre": "Dani"
               }
             ],
-            "culpableId": "e3",
+            "senaladoId": "e3",
             "motive": "A Dani le prometieron La lanza de Hanzo y algo más difícil de decir en voz alta: que en Iga no vuelva a pasar lo del año pasado. Akechi paga por que el señor no llegue a la barca, y esta noche eso significa dejar que amanezca.",
             "reconstruccion": "Dani se sumó a la columna con todo el mundo mirando y con el mismo miedo que los demás, y hasta ahí no hay nada que fingir. Lo que lleva encima es la palabra dada a un hombre de Akechi en un cruce de caminos: sabe dónde esperan los cazadores cada hora, porque se lo dijeron, y puede dejar por el camino un mojón escrito de su puño que suene a verdad. Le basta con que se ande la senda equivocada.",
             "ganador": {
@@ -53012,7 +53012,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -53022,7 +53022,7 @@
               "characterName": "Ana",
               "role": "Hōkashi, juglar de camino",
               "conectado": false,
-              "yaAcuso": true
+              "yaRespondio": true
             },
             {
               "participanteId": "e1",
@@ -53030,7 +53030,7 @@
               "characterName": "Bruno",
               "role": "Tsune no kata, persona corriente",
               "conectado": false,
-              "yaAcuso": true
+              "yaRespondio": true
             },
             {
               "participanteId": "e3",
@@ -53038,7 +53038,7 @@
               "characterName": "Dani",
               "role": "Yamabushi, asceta de los montes",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -53636,7 +53636,7 @@
               "description": "Chaya se adelanta con plata para comprar el paso donde se pueda comprar. Por los montes ya corre que hay samuráis en fuga y precio por ellos."
             }
           ],
-          "miAcusacion": {
+          "miRespuesta": {
             "respuestas": {
               "kancho": "e0"
             },
@@ -53651,7 +53651,7 @@
                 "nombre": "Dani"
               }
             ],
-            "culpableId": "e3",
+            "senaladoId": "e3",
             "motive": "A Dani le prometieron La lanza de Hanzo y algo más difícil de decir en voz alta: que en Iga no vuelva a pasar lo del año pasado. Akechi paga por que el señor no llegue a la barca, y esta noche eso significa dejar que amanezca.",
             "reconstruccion": "Dani se sumó a la columna con todo el mundo mirando y con el mismo miedo que los demás, y hasta ahí no hay nada que fingir. Lo que lleva encima es la palabra dada a un hombre de Akechi en un cruce de caminos: sabe dónde esperan los cazadores cada hora, porque se lo dijeron, y puede dejar por el camino un mojón escrito de su puño que suene a verdad. Le basta con que se ande la senda equivocada.",
             "ganador": {
@@ -53750,7 +53750,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": true,
+            "soyElSenalado": true,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -53760,7 +53760,7 @@
               "characterName": "Ana",
               "role": "Hōkashi, juglar de camino",
               "conectado": false,
-              "yaAcuso": true
+              "yaRespondio": true
             },
             {
               "participanteId": "e1",
@@ -53768,7 +53768,7 @@
               "characterName": "Bruno",
               "role": "Tsune no kata, persona corriente",
               "conectado": false,
-              "yaAcuso": true
+              "yaRespondio": true
             },
             {
               "participanteId": "e2",
@@ -53776,7 +53776,7 @@
               "characterName": "Carla",
               "role": "Komusō, monje de la cesta",
               "conectado": false,
-              "yaAcuso": true
+              "yaRespondio": true
             }
           ],
           "lugares": [
@@ -54422,7 +54422,7 @@
                 "nombre": "Dani"
               }
             ],
-            "culpableId": "e3",
+            "senaladoId": "e3",
             "motive": "A Dani le prometieron La lanza de Hanzo y algo más difícil de decir en voz alta: que en Iga no vuelva a pasar lo del año pasado. Akechi paga por que el señor no llegue a la barca, y esta noche eso significa dejar que amanezca.",
             "reconstruccion": "Dani se sumó a la columna con todo el mundo mirando y con el mismo miedo que los demás, y hasta ahí no hay nada que fingir. Lo que lleva encima es la palabra dada a un hombre de Akechi en un cruce de caminos: sabe dónde esperan los cazadores cada hora, porque se lo dijeron, y puede dejar por el camino un mojón escrito de su puño que suene a verdad. Le basta con que se ande la senda equivocada.",
             "ganador": {

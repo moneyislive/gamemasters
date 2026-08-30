@@ -201,7 +201,13 @@ const rutasLive = fs.readFileSync(path.join(RAIZ, 'server/src/routes/live.ts'), 
 const RUTA_DE_FASE: Record<string, RegExp> = {
   'ronda-abierta': /ronda\/abrir/,
   'ronda-cerrada': /ronda\/cerrar/,
-  acusaciones: /acusaciones/,
+  /*
+   * OJO CON LOS DOS NOMBRES. La CLAVE es el nombre de la fase, que cada juego
+   * declara y que va guardado en cada sesión; el VALOR es la ruta que la abre,
+   * y esa sí se renombró a `/live/respuestas` porque en dos de los tres juegos
+   * no se acusa a nadie.
+   */
+  acusaciones: /live\/respuestas/,
   sellado: /sellado/,
   intermedio: /encuentro\/cerrar/,
   desenlace: /desenlace/,
@@ -426,17 +432,41 @@ for (const m of juegosInstalados()) {
    * dos —los suyos son los de la app— y por eso no entra en esta comprobación.
    */
   if (m.avisos) {
+    /*
+     * ═══ ESTO RECORRIA LAS FASES, Y ERAN DOS COSAS DISTINTAS ═══
+     *
+     * Cogia los nombres de las fases alcanzables —`ronda-abierta`,
+     * `acusaciones`, `desenlace`— y los buscaba en `rotulosDeAviso`, que esta
+     * indexado por CLAVE DE AVISO. Funcionaba porque las dos listas usaban las
+     * mismas palabras, y usaban las mismas palabras porque las dos las heredaron
+     * de CLUEDO.
+     *
+     * En cuanto la clave del aviso paso a llamarse `respuestas` —en dos de los
+     * tres juegos no se acusa a nadie— y la fase siguio llamandose
+     * `acusaciones` —va guardada en cada sesion y no se puede renombrar— la
+     * coincidencia se rompio, y con ella la comprobacion.
+     *
+     * Lo que de verdad afirma es esto: si declaras el CUERPO de un telon,
+     * declara tambien su ROTULO. Lo uno sin lo otro deja el titulo por defecto
+     * encima del texto de este juego. Se comprueba por los avisos que el juego
+     * declara, que es lo que la frase dice.
+     */
     const rotulos = m.rotulosDeAviso ?? {};
-    const alcanzables = new Set<string>();
-    for (const destinos of Object.values(m.fases)) for (const d of destinos ?? []) alcanzables.add(d);
-    /* Solo las fases por las que este juego pasa de verdad. */
-    const sinRotulo = [...alcanzables].filter((f) => f !== 'intermedio' && !rotulos[f]);
+    const CLAVE_DEL_CUERPO: Record<keyof NonNullable<typeof m.avisos>, string> = {
+      rondaAbierta: 'ronda-abierta',
+      rondaCerrada: 'ronda-cerrada',
+      respuestas: 'respuestas',
+      desenlace: 'desenlace',
+    };
+    const sinRotulo = Object.entries(CLAVE_DEL_CUERPO)
+      .filter(([cuerpo, clave]) => m.avisos?.[cuerpo as keyof typeof m.avisos] && !rotulos[clave])
+      .map(([, clave]) => clave);
     comprobar(
       `${m.id}: si declara los cuerpos de los telones, declara también sus rótulos`,
       sinRotulo.length === 0,
       {
         sinRotulo,
-        porque: 'el telon saldria con el titulo de CLUEDO encima del cuerpo de este juego',
+        porque: 'el telon saldria con un titulo por defecto encima del cuerpo de este juego',
       },
     );
   }

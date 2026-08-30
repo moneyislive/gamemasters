@@ -33,7 +33,7 @@
  * clave de `LiveSession.estado`, que es un `Record<string, unknown>` justamente
  * para esto.
  */
-import { acusar as registrarSenalamiento, elegirSala } from '../live/sesion';
+import { responder as registrarSenalamiento, elegirSala } from '../live/sesion';
 import { AccionInvalida, registrarAcciones } from './motor';
 import { registrarInicio } from './inicios';
 // Por la puerta principal: es el índice quien declara dónde vive cada
@@ -824,13 +824,13 @@ registrarAcciones('sombras', {
   senalar: ({ game, sesion, participanteId, datos }) => {
     const solucion = game.plot?.solution.respuestas;
     if (!solucion) throw new AccionInvalida('Esta partida todavía no tiene kanchō.');
-    const { acusacion } = registrarSenalamiento(
+    const { respuesta } = registrarSenalamiento(
       sesion,
       participanteId,
       { [EJE_KANCHO]: datos[EJE_KANCHO] ?? '' },
       solucion,
     );
     // Deliberadamente no se devuelve si ha acertado: se sabrá al amanecer.
-    return { registrada: true, at: acusacion.at };
+    return { registrada: true, at: respuesta.at };
   },
 });

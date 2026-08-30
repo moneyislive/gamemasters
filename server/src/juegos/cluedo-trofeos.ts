@@ -9,7 +9,7 @@
  *
  * El caso que lo retrata es «Crimen perfecto», cuyo texto dice literalmente
  * «Fuiste el culpable y nadie te descubrió». Se concedía con
- * `eraCulpable && !sesion.primeroEnAcertar`, y en El Misterio de la Momia `winnerId` solo
+ * `eraElSenalado && !sesion.primeroEnAcertar`, y en El Misterio de la Momia `winnerId` solo
  * se escribe si alguien SEÑALA al saqueador. Así que en una noche en la que la
  * expedición sella la tumba en el orden bueno —o sea, en la que el saqueador
  * PIERDE— si además nadie llegó a señalarlo, el saqueador se llevaba la medalla

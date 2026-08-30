@@ -219,7 +219,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -229,7 +229,7 @@
               "characterName": "Bruno",
               "role": "Epigrafista",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e2",
@@ -237,7 +237,7 @@
               "characterName": "Carla",
               "role": "Médico de la expedición",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -245,7 +245,7 @@
               "characterName": "Dani",
               "role": "Mecenas",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -493,7 +493,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -503,7 +503,7 @@
               "characterName": "Ana",
               "role": "Capataz",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e2",
@@ -511,7 +511,7 @@
               "characterName": "Carla",
               "role": "Médico de la expedición",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -519,7 +519,7 @@
               "characterName": "Dani",
               "role": "Mecenas",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -767,7 +767,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -777,7 +777,7 @@
               "characterName": "Ana",
               "role": "Capataz",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e1",
@@ -785,7 +785,7 @@
               "characterName": "Bruno",
               "role": "Epigrafista",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -793,7 +793,7 @@
               "characterName": "Dani",
               "role": "Mecenas",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -1041,7 +1041,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": true,
+            "soyElSenalado": true,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -1051,7 +1051,7 @@
               "characterName": "Ana",
               "role": "Capataz",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e1",
@@ -1059,7 +1059,7 @@
               "characterName": "Bruno",
               "role": "Epigrafista",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e2",
@@ -1067,7 +1067,7 @@
               "characterName": "Carla",
               "role": "Médico de la expedición",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -1546,7 +1546,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -1556,7 +1556,7 @@
               "characterName": "Bruno",
               "role": "Epigrafista",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e2",
@@ -1564,7 +1564,7 @@
               "characterName": "Carla",
               "role": "Médico de la expedición",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -1572,7 +1572,7 @@
               "characterName": "Dani",
               "role": "Mecenas",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -1820,7 +1820,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -1830,7 +1830,7 @@
               "characterName": "Ana",
               "role": "Capataz",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e2",
@@ -1838,7 +1838,7 @@
               "characterName": "Carla",
               "role": "Médico de la expedición",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -1846,7 +1846,7 @@
               "characterName": "Dani",
               "role": "Mecenas",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -2094,7 +2094,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -2104,7 +2104,7 @@
               "characterName": "Ana",
               "role": "Capataz",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e1",
@@ -2112,7 +2112,7 @@
               "characterName": "Bruno",
               "role": "Epigrafista",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -2120,7 +2120,7 @@
               "characterName": "Dani",
               "role": "Mecenas",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -2368,7 +2368,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": true,
+            "soyElSenalado": true,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -2378,7 +2378,7 @@
               "characterName": "Ana",
               "role": "Capataz",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e1",
@@ -2386,7 +2386,7 @@
               "characterName": "Bruno",
               "role": "Epigrafista",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e2",
@@ -2394,7 +2394,7 @@
               "characterName": "Carla",
               "role": "Médico de la expedición",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -2887,7 +2887,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -2897,7 +2897,7 @@
               "characterName": "Bruno",
               "role": "Epigrafista",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e2",
@@ -2905,7 +2905,7 @@
               "characterName": "Carla",
               "role": "Médico de la expedición",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -2913,7 +2913,7 @@
               "characterName": "Dani",
               "role": "Mecenas",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -3266,7 +3266,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -3276,7 +3276,7 @@
               "characterName": "Ana",
               "role": "Capataz",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e2",
@@ -3284,7 +3284,7 @@
               "characterName": "Carla",
               "role": "Médico de la expedición",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -3292,7 +3292,7 @@
               "characterName": "Dani",
               "role": "Mecenas",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -3645,7 +3645,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -3655,7 +3655,7 @@
               "characterName": "Ana",
               "role": "Capataz",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e1",
@@ -3663,7 +3663,7 @@
               "characterName": "Bruno",
               "role": "Epigrafista",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -3671,7 +3671,7 @@
               "characterName": "Dani",
               "role": "Mecenas",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -4024,7 +4024,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": true,
+            "soyElSenalado": true,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -4034,7 +4034,7 @@
               "characterName": "Ana",
               "role": "Capataz",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e1",
@@ -4042,7 +4042,7 @@
               "characterName": "Bruno",
               "role": "Epigrafista",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e2",
@@ -4050,7 +4050,7 @@
               "characterName": "Carla",
               "role": "Médico de la expedición",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -4646,7 +4646,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -4657,7 +4657,7 @@
               "role": "Epigrafista",
               "conectado": false,
               "salaActual": "Antesala de los Sellos",
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e2",
@@ -4666,7 +4666,7 @@
               "role": "Médico de la expedición",
               "conectado": false,
               "salaActual": "Corredor de las Estrellas",
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -4675,7 +4675,7 @@
               "role": "Mecenas",
               "conectado": false,
               "salaActual": "Sala de la Balanza",
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -5018,7 +5018,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -5029,7 +5029,7 @@
               "role": "Capataz",
               "conectado": false,
               "salaActual": "Cámara del Barquero",
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e2",
@@ -5038,7 +5038,7 @@
               "role": "Médico de la expedición",
               "conectado": false,
               "salaActual": "Corredor de las Estrellas",
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -5047,7 +5047,7 @@
               "role": "Mecenas",
               "conectado": false,
               "salaActual": "Sala de la Balanza",
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -5390,7 +5390,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -5401,7 +5401,7 @@
               "role": "Capataz",
               "conectado": false,
               "salaActual": "Cámara del Barquero",
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e1",
@@ -5410,7 +5410,7 @@
               "role": "Epigrafista",
               "conectado": false,
               "salaActual": "Antesala de los Sellos",
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -5419,7 +5419,7 @@
               "role": "Mecenas",
               "conectado": false,
               "salaActual": "Sala de la Balanza",
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -5752,7 +5752,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": true,
+            "soyElSenalado": true,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -5763,7 +5763,7 @@
               "role": "Capataz",
               "conectado": false,
               "salaActual": "Cámara del Barquero",
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e1",
@@ -5772,7 +5772,7 @@
               "role": "Epigrafista",
               "conectado": false,
               "salaActual": "Antesala de los Sellos",
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e2",
@@ -5781,7 +5781,7 @@
               "role": "Médico de la expedición",
               "conectado": false,
               "salaActual": "Corredor de las Estrellas",
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -6608,7 +6608,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -6618,7 +6618,7 @@
               "characterName": "Bruno",
               "role": "Epigrafista",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e2",
@@ -6626,7 +6626,7 @@
               "characterName": "Carla",
               "role": "Médico de la expedición",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -6634,7 +6634,7 @@
               "characterName": "Dani",
               "role": "Mecenas",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -6976,7 +6976,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -6986,7 +6986,7 @@
               "characterName": "Ana",
               "role": "Capataz",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e2",
@@ -6994,7 +6994,7 @@
               "characterName": "Carla",
               "role": "Médico de la expedición",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -7002,7 +7002,7 @@
               "characterName": "Dani",
               "role": "Mecenas",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -7344,7 +7344,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -7354,7 +7354,7 @@
               "characterName": "Ana",
               "role": "Capataz",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e1",
@@ -7362,7 +7362,7 @@
               "characterName": "Bruno",
               "role": "Epigrafista",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -7370,7 +7370,7 @@
               "characterName": "Dani",
               "role": "Mecenas",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -7702,7 +7702,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": true,
+            "soyElSenalado": true,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -7712,7 +7712,7 @@
               "characterName": "Ana",
               "role": "Capataz",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e1",
@@ -7720,7 +7720,7 @@
               "characterName": "Bruno",
               "role": "Epigrafista",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e2",
@@ -7728,7 +7728,7 @@
               "characterName": "Carla",
               "role": "Médico de la expedición",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -8453,7 +8453,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -8463,7 +8463,7 @@
               "characterName": "Bruno",
               "role": "Epigrafista",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e2",
@@ -8471,7 +8471,7 @@
               "characterName": "Carla",
               "role": "Médico de la expedición",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -8479,7 +8479,7 @@
               "characterName": "Dani",
               "role": "Mecenas",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -8860,7 +8860,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -8870,7 +8870,7 @@
               "characterName": "Ana",
               "role": "Capataz",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e2",
@@ -8878,7 +8878,7 @@
               "characterName": "Carla",
               "role": "Médico de la expedición",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -8886,7 +8886,7 @@
               "characterName": "Dani",
               "role": "Mecenas",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -9267,7 +9267,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -9277,7 +9277,7 @@
               "characterName": "Ana",
               "role": "Capataz",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e1",
@@ -9285,7 +9285,7 @@
               "characterName": "Bruno",
               "role": "Epigrafista",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -9293,7 +9293,7 @@
               "characterName": "Dani",
               "role": "Mecenas",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -9664,7 +9664,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": true,
+            "soyElSenalado": true,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -9674,7 +9674,7 @@
               "characterName": "Ana",
               "role": "Capataz",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e1",
@@ -9682,7 +9682,7 @@
               "characterName": "Bruno",
               "role": "Epigrafista",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e2",
@@ -9690,7 +9690,7 @@
               "characterName": "Carla",
               "role": "Médico de la expedición",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -10428,7 +10428,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -10439,7 +10439,7 @@
               "role": "Epigrafista",
               "conectado": false,
               "salaActual": "Corredor de las Estrellas",
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e2",
@@ -10448,7 +10448,7 @@
               "role": "Médico de la expedición",
               "conectado": false,
               "salaActual": "Sala de la Balanza",
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -10457,7 +10457,7 @@
               "role": "Mecenas",
               "conectado": false,
               "salaActual": "Cámara del Barquero",
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -10816,7 +10816,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -10827,7 +10827,7 @@
               "role": "Capataz",
               "conectado": false,
               "salaActual": "Cámara del Barquero",
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e2",
@@ -10836,7 +10836,7 @@
               "role": "Médico de la expedición",
               "conectado": false,
               "salaActual": "Sala de la Balanza",
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -10845,7 +10845,7 @@
               "role": "Mecenas",
               "conectado": false,
               "salaActual": "Cámara del Barquero",
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -11204,7 +11204,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -11215,7 +11215,7 @@
               "role": "Capataz",
               "conectado": false,
               "salaActual": "Cámara del Barquero",
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e1",
@@ -11224,7 +11224,7 @@
               "role": "Epigrafista",
               "conectado": false,
               "salaActual": "Corredor de las Estrellas",
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -11233,7 +11233,7 @@
               "role": "Mecenas",
               "conectado": false,
               "salaActual": "Cámara del Barquero",
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -11572,7 +11572,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": true,
+            "soyElSenalado": true,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -11583,7 +11583,7 @@
               "role": "Capataz",
               "conectado": false,
               "salaActual": "Cámara del Barquero",
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e1",
@@ -11592,7 +11592,7 @@
               "role": "Epigrafista",
               "conectado": false,
               "salaActual": "Corredor de las Estrellas",
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e2",
@@ -11601,7 +11601,7 @@
               "role": "Médico de la expedición",
               "conectado": false,
               "salaActual": "Sala de la Balanza",
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -12527,7 +12527,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -12537,7 +12537,7 @@
               "characterName": "Bruno",
               "role": "Epigrafista",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e2",
@@ -12545,7 +12545,7 @@
               "characterName": "Carla",
               "role": "Médico de la expedición",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -12553,7 +12553,7 @@
               "characterName": "Dani",
               "role": "Mecenas",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -12911,7 +12911,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -12921,7 +12921,7 @@
               "characterName": "Ana",
               "role": "Capataz",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e2",
@@ -12929,7 +12929,7 @@
               "characterName": "Carla",
               "role": "Médico de la expedición",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -12937,7 +12937,7 @@
               "characterName": "Dani",
               "role": "Mecenas",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -13295,7 +13295,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -13305,7 +13305,7 @@
               "characterName": "Ana",
               "role": "Capataz",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e1",
@@ -13313,7 +13313,7 @@
               "characterName": "Bruno",
               "role": "Epigrafista",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -13321,7 +13321,7 @@
               "characterName": "Dani",
               "role": "Mecenas",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -13659,7 +13659,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": true,
+            "soyElSenalado": true,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -13669,7 +13669,7 @@
               "characterName": "Ana",
               "role": "Capataz",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e1",
@@ -13677,7 +13677,7 @@
               "characterName": "Bruno",
               "role": "Epigrafista",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e2",
@@ -13685,7 +13685,7 @@
               "characterName": "Carla",
               "role": "Médico de la expedición",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -14516,7 +14516,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -14526,7 +14526,7 @@
               "characterName": "Bruno",
               "role": "Epigrafista",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e2",
@@ -14534,7 +14534,7 @@
               "characterName": "Carla",
               "role": "Médico de la expedición",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -14542,7 +14542,7 @@
               "characterName": "Dani",
               "role": "Mecenas",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -14938,7 +14938,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -14948,7 +14948,7 @@
               "characterName": "Ana",
               "role": "Capataz",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e2",
@@ -14956,7 +14956,7 @@
               "characterName": "Carla",
               "role": "Médico de la expedición",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -14964,7 +14964,7 @@
               "characterName": "Dani",
               "role": "Mecenas",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -15360,7 +15360,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -15370,7 +15370,7 @@
               "characterName": "Ana",
               "role": "Capataz",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e1",
@@ -15378,7 +15378,7 @@
               "characterName": "Bruno",
               "role": "Epigrafista",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -15386,7 +15386,7 @@
               "characterName": "Dani",
               "role": "Mecenas",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -15762,7 +15762,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": true,
+            "soyElSenalado": true,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -15772,7 +15772,7 @@
               "characterName": "Ana",
               "role": "Capataz",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e1",
@@ -15780,7 +15780,7 @@
               "characterName": "Bruno",
               "role": "Epigrafista",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e2",
@@ -15788,7 +15788,7 @@
               "characterName": "Carla",
               "role": "Médico de la expedición",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -16633,7 +16633,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -16644,7 +16644,7 @@
               "role": "Epigrafista",
               "conectado": false,
               "salaActual": "Sala de la Balanza",
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e2",
@@ -16653,7 +16653,7 @@
               "role": "Médico de la expedición",
               "conectado": false,
               "salaActual": "Cámara del Barquero",
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -16662,7 +16662,7 @@
               "role": "Mecenas",
               "conectado": false,
               "salaActual": "Pozo de las Ofrendas",
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -17036,7 +17036,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -17047,7 +17047,7 @@
               "role": "Capataz",
               "conectado": false,
               "salaActual": "Cámara del Barquero",
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e2",
@@ -17056,7 +17056,7 @@
               "role": "Médico de la expedición",
               "conectado": false,
               "salaActual": "Cámara del Barquero",
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -17065,7 +17065,7 @@
               "role": "Mecenas",
               "conectado": false,
               "salaActual": "Pozo de las Ofrendas",
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -17439,7 +17439,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -17450,7 +17450,7 @@
               "role": "Capataz",
               "conectado": false,
               "salaActual": "Cámara del Barquero",
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e1",
@@ -17459,7 +17459,7 @@
               "role": "Epigrafista",
               "conectado": false,
               "salaActual": "Sala de la Balanza",
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -17468,7 +17468,7 @@
               "role": "Mecenas",
               "conectado": false,
               "salaActual": "Pozo de las Ofrendas",
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -17822,7 +17822,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": true,
+            "soyElSenalado": true,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -17833,7 +17833,7 @@
               "role": "Capataz",
               "conectado": false,
               "salaActual": "Cámara del Barquero",
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e1",
@@ -17842,7 +17842,7 @@
               "role": "Epigrafista",
               "conectado": false,
               "salaActual": "Sala de la Balanza",
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e2",
@@ -17851,7 +17851,7 @@
               "role": "Médico de la expedición",
               "conectado": false,
               "salaActual": "Cámara del Barquero",
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -18874,7 +18874,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -18884,7 +18884,7 @@
               "characterName": "Bruno",
               "role": "Epigrafista",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e2",
@@ -18892,7 +18892,7 @@
               "characterName": "Carla",
               "role": "Médico de la expedición",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -18900,7 +18900,7 @@
               "characterName": "Dani",
               "role": "Mecenas",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -19273,7 +19273,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -19283,7 +19283,7 @@
               "characterName": "Ana",
               "role": "Capataz",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e2",
@@ -19291,7 +19291,7 @@
               "characterName": "Carla",
               "role": "Médico de la expedición",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -19299,7 +19299,7 @@
               "characterName": "Dani",
               "role": "Mecenas",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -19672,7 +19672,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -19682,7 +19682,7 @@
               "characterName": "Ana",
               "role": "Capataz",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e1",
@@ -19690,7 +19690,7 @@
               "characterName": "Bruno",
               "role": "Epigrafista",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -19698,7 +19698,7 @@
               "characterName": "Dani",
               "role": "Mecenas",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -20051,7 +20051,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": true,
+            "soyElSenalado": true,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -20061,7 +20061,7 @@
               "characterName": "Ana",
               "role": "Capataz",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e1",
@@ -20069,7 +20069,7 @@
               "characterName": "Bruno",
               "role": "Epigrafista",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e2",
@@ -20077,7 +20077,7 @@
               "characterName": "Carla",
               "role": "Médico de la expedición",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -21004,7 +21004,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -21014,7 +21014,7 @@
               "characterName": "Bruno",
               "role": "Epigrafista",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e2",
@@ -21022,7 +21022,7 @@
               "characterName": "Carla",
               "role": "Médico de la expedición",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -21030,7 +21030,7 @@
               "characterName": "Dani",
               "role": "Mecenas",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -21440,7 +21440,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -21450,7 +21450,7 @@
               "characterName": "Ana",
               "role": "Capataz",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e2",
@@ -21458,7 +21458,7 @@
               "characterName": "Carla",
               "role": "Médico de la expedición",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -21466,7 +21466,7 @@
               "characterName": "Dani",
               "role": "Mecenas",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -21876,7 +21876,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -21886,7 +21886,7 @@
               "characterName": "Ana",
               "role": "Capataz",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e1",
@@ -21894,7 +21894,7 @@
               "characterName": "Bruno",
               "role": "Epigrafista",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -21902,7 +21902,7 @@
               "characterName": "Dani",
               "role": "Mecenas",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -22292,7 +22292,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": true,
+            "soyElSenalado": true,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -22302,7 +22302,7 @@
               "characterName": "Ana",
               "role": "Capataz",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e1",
@@ -22310,7 +22310,7 @@
               "characterName": "Bruno",
               "role": "Epigrafista",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e2",
@@ -22318,7 +22318,7 @@
               "characterName": "Carla",
               "role": "Médico de la expedición",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -23259,7 +23259,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -23270,7 +23270,7 @@
               "role": "Epigrafista",
               "conectado": false,
               "salaActual": "Cámara del Barquero",
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e2",
@@ -23279,7 +23279,7 @@
               "role": "Médico de la expedición",
               "conectado": false,
               "salaActual": "Pozo de las Ofrendas",
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -23288,7 +23288,7 @@
               "role": "Mecenas",
               "conectado": false,
               "salaActual": "Antesala de los Sellos",
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -23676,7 +23676,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -23687,7 +23687,7 @@
               "role": "Capataz",
               "conectado": false,
               "salaActual": "Cámara del Barquero",
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e2",
@@ -23696,7 +23696,7 @@
               "role": "Médico de la expedición",
               "conectado": false,
               "salaActual": "Pozo de las Ofrendas",
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -23705,7 +23705,7 @@
               "role": "Mecenas",
               "conectado": false,
               "salaActual": "Antesala de los Sellos",
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -24093,7 +24093,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -24104,7 +24104,7 @@
               "role": "Capataz",
               "conectado": false,
               "salaActual": "Cámara del Barquero",
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e1",
@@ -24113,7 +24113,7 @@
               "role": "Epigrafista",
               "conectado": false,
               "salaActual": "Cámara del Barquero",
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -24122,7 +24122,7 @@
               "role": "Mecenas",
               "conectado": false,
               "salaActual": "Antesala de los Sellos",
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -24480,7 +24480,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": true,
+            "soyElSenalado": true,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -24491,7 +24491,7 @@
               "role": "Capataz",
               "conectado": false,
               "salaActual": "Cámara del Barquero",
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e1",
@@ -24500,7 +24500,7 @@
               "role": "Epigrafista",
               "conectado": false,
               "salaActual": "Cámara del Barquero",
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e2",
@@ -24509,7 +24509,7 @@
               "role": "Médico de la expedición",
               "conectado": false,
               "salaActual": "Pozo de las Ofrendas",
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -25634,7 +25634,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -25644,7 +25644,7 @@
               "characterName": "Bruno",
               "role": "Epigrafista",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e2",
@@ -25652,7 +25652,7 @@
               "characterName": "Carla",
               "role": "Médico de la expedición",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -25660,7 +25660,7 @@
               "characterName": "Dani",
               "role": "Mecenas",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -26047,7 +26047,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -26057,7 +26057,7 @@
               "characterName": "Ana",
               "role": "Capataz",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e2",
@@ -26065,7 +26065,7 @@
               "characterName": "Carla",
               "role": "Médico de la expedición",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -26073,7 +26073,7 @@
               "characterName": "Dani",
               "role": "Mecenas",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -26460,7 +26460,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -26470,7 +26470,7 @@
               "characterName": "Ana",
               "role": "Capataz",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e1",
@@ -26478,7 +26478,7 @@
               "characterName": "Bruno",
               "role": "Epigrafista",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -26486,7 +26486,7 @@
               "characterName": "Dani",
               "role": "Mecenas",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -26843,7 +26843,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": true,
+            "soyElSenalado": true,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -26853,7 +26853,7 @@
               "characterName": "Ana",
               "role": "Capataz",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e1",
@@ -26861,7 +26861,7 @@
               "characterName": "Bruno",
               "role": "Epigrafista",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e2",
@@ -26869,7 +26869,7 @@
               "characterName": "Carla",
               "role": "Médico de la expedición",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -27896,7 +27896,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -27906,7 +27906,7 @@
               "characterName": "Bruno",
               "role": "Epigrafista",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e2",
@@ -27914,7 +27914,7 @@
               "characterName": "Carla",
               "role": "Médico de la expedición",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -27922,7 +27922,7 @@
               "characterName": "Dani",
               "role": "Mecenas",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -28311,7 +28311,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -28321,7 +28321,7 @@
               "characterName": "Ana",
               "role": "Capataz",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e2",
@@ -28329,7 +28329,7 @@
               "characterName": "Carla",
               "role": "Médico de la expedición",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -28337,7 +28337,7 @@
               "characterName": "Dani",
               "role": "Mecenas",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -28726,7 +28726,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -28736,7 +28736,7 @@
               "characterName": "Ana",
               "role": "Capataz",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e1",
@@ -28744,7 +28744,7 @@
               "characterName": "Bruno",
               "role": "Epigrafista",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -28752,7 +28752,7 @@
               "characterName": "Dani",
               "role": "Mecenas",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -29111,7 +29111,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": true,
+            "soyElSenalado": true,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -29121,7 +29121,7 @@
               "characterName": "Ana",
               "role": "Capataz",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e1",
@@ -29129,7 +29129,7 @@
               "characterName": "Bruno",
               "role": "Epigrafista",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e2",
@@ -29137,7 +29137,7 @@
               "characterName": "Carla",
               "role": "Médico de la expedición",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -30249,7 +30249,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -30259,7 +30259,7 @@
               "characterName": "Bruno",
               "role": "Epigrafista",
               "conectado": false,
-              "yaAcuso": true
+              "yaRespondio": true
             },
             {
               "participanteId": "e2",
@@ -30267,7 +30267,7 @@
               "characterName": "Carla",
               "role": "Médico de la expedición",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -30275,7 +30275,7 @@
               "characterName": "Dani",
               "role": "Mecenas",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -30577,7 +30577,7 @@
               "description": "Cae la noche y las lámparas empiezan a apagarse solas. Se organiza la primera vigilia."
             }
           ],
-          "miAcusacion": {
+          "miRespuesta": {
             "respuestas": {
               "saqueador": "e3"
             },
@@ -30642,7 +30642,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -30652,7 +30652,7 @@
               "characterName": "Ana",
               "role": "Capataz",
               "conectado": false,
-              "yaAcuso": true
+              "yaRespondio": true
             },
             {
               "participanteId": "e2",
@@ -30660,7 +30660,7 @@
               "characterName": "Carla",
               "role": "Médico de la expedición",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -30668,7 +30668,7 @@
               "characterName": "Dani",
               "role": "Mecenas",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -30970,7 +30970,7 @@
               "description": "Cae la noche y las lámparas empiezan a apagarse solas. Se organiza la primera vigilia."
             }
           ],
-          "miAcusacion": {
+          "miRespuesta": {
             "respuestas": {
               "saqueador": "e2"
             },
@@ -31035,7 +31035,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -31045,7 +31045,7 @@
               "characterName": "Ana",
               "role": "Capataz",
               "conectado": false,
-              "yaAcuso": true
+              "yaRespondio": true
             },
             {
               "participanteId": "e1",
@@ -31053,7 +31053,7 @@
               "characterName": "Bruno",
               "role": "Epigrafista",
               "conectado": false,
-              "yaAcuso": true
+              "yaRespondio": true
             },
             {
               "participanteId": "e3",
@@ -31061,7 +31061,7 @@
               "characterName": "Dani",
               "role": "Mecenas",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -31420,7 +31420,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": true,
+            "soyElSenalado": true,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -31430,7 +31430,7 @@
               "characterName": "Ana",
               "role": "Capataz",
               "conectado": false,
-              "yaAcuso": true
+              "yaRespondio": true
             },
             {
               "participanteId": "e1",
@@ -31438,7 +31438,7 @@
               "characterName": "Bruno",
               "role": "Epigrafista",
               "conectado": false,
-              "yaAcuso": true
+              "yaRespondio": true
             },
             {
               "participanteId": "e2",
@@ -31446,7 +31446,7 @@
               "characterName": "Carla",
               "role": "Médico de la expedición",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -32559,7 +32559,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -32569,7 +32569,7 @@
               "characterName": "Bruno",
               "role": "Epigrafista",
               "conectado": false,
-              "yaAcuso": true
+              "yaRespondio": true
             },
             {
               "participanteId": "e2",
@@ -32577,7 +32577,7 @@
               "characterName": "Carla",
               "role": "Médico de la expedición",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -32585,7 +32585,7 @@
               "characterName": "Dani",
               "role": "Mecenas",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -32858,7 +32858,7 @@
               "description": "Cae la noche y las lámparas empiezan a apagarse solas. Se organiza la primera vigilia."
             }
           ],
-          "miAcusacion": {
+          "miRespuesta": {
             "respuestas": {
               "saqueador": "e3"
             },
@@ -32923,7 +32923,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -32933,7 +32933,7 @@
               "characterName": "Ana",
               "role": "Capataz",
               "conectado": false,
-              "yaAcuso": true
+              "yaRespondio": true
             },
             {
               "participanteId": "e2",
@@ -32941,7 +32941,7 @@
               "characterName": "Carla",
               "role": "Médico de la expedición",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -32949,7 +32949,7 @@
               "characterName": "Dani",
               "role": "Mecenas",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -33222,7 +33222,7 @@
               "description": "Cae la noche y las lámparas empiezan a apagarse solas. Se organiza la primera vigilia."
             }
           ],
-          "miAcusacion": {
+          "miRespuesta": {
             "respuestas": {
               "saqueador": "e2"
             },
@@ -33287,7 +33287,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -33297,7 +33297,7 @@
               "characterName": "Ana",
               "role": "Capataz",
               "conectado": false,
-              "yaAcuso": true
+              "yaRespondio": true
             },
             {
               "participanteId": "e1",
@@ -33305,7 +33305,7 @@
               "characterName": "Bruno",
               "role": "Epigrafista",
               "conectado": false,
-              "yaAcuso": true
+              "yaRespondio": true
             },
             {
               "participanteId": "e3",
@@ -33313,7 +33313,7 @@
               "characterName": "Dani",
               "role": "Mecenas",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -33644,7 +33644,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": true,
+            "soyElSenalado": true,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -33654,7 +33654,7 @@
               "characterName": "Ana",
               "role": "Capataz",
               "conectado": false,
-              "yaAcuso": true
+              "yaRespondio": true
             },
             {
               "participanteId": "e1",
@@ -33662,7 +33662,7 @@
               "characterName": "Bruno",
               "role": "Epigrafista",
               "conectado": false,
-              "yaAcuso": true
+              "yaRespondio": true
             },
             {
               "participanteId": "e2",
@@ -33670,7 +33670,7 @@
               "characterName": "Carla",
               "role": "Médico de la expedición",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -34732,7 +34732,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -34742,7 +34742,7 @@
               "characterName": "Bruno",
               "role": "Epigrafista",
               "conectado": false,
-              "yaAcuso": true
+              "yaRespondio": true
             },
             {
               "participanteId": "e2",
@@ -34750,7 +34750,7 @@
               "characterName": "Carla",
               "role": "Médico de la expedición",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -34758,7 +34758,7 @@
               "characterName": "Dani",
               "role": "Mecenas",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -35031,7 +35031,7 @@
               "description": "Cae la noche y las lámparas empiezan a apagarse solas. Se organiza la primera vigilia."
             }
           ],
-          "miAcusacion": {
+          "miRespuesta": {
             "respuestas": {
               "saqueador": "e3"
             },
@@ -35096,7 +35096,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -35106,7 +35106,7 @@
               "characterName": "Ana",
               "role": "Capataz",
               "conectado": false,
-              "yaAcuso": true
+              "yaRespondio": true
             },
             {
               "participanteId": "e2",
@@ -35114,7 +35114,7 @@
               "characterName": "Carla",
               "role": "Médico de la expedición",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -35122,7 +35122,7 @@
               "characterName": "Dani",
               "role": "Mecenas",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -35395,7 +35395,7 @@
               "description": "Cae la noche y las lámparas empiezan a apagarse solas. Se organiza la primera vigilia."
             }
           ],
-          "miAcusacion": {
+          "miRespuesta": {
             "respuestas": {
               "saqueador": "e2"
             },
@@ -35460,7 +35460,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -35470,7 +35470,7 @@
               "characterName": "Ana",
               "role": "Capataz",
               "conectado": false,
-              "yaAcuso": true
+              "yaRespondio": true
             },
             {
               "participanteId": "e1",
@@ -35478,7 +35478,7 @@
               "characterName": "Bruno",
               "role": "Epigrafista",
               "conectado": false,
-              "yaAcuso": true
+              "yaRespondio": true
             },
             {
               "participanteId": "e3",
@@ -35486,7 +35486,7 @@
               "characterName": "Dani",
               "role": "Mecenas",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -35817,7 +35817,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": true,
+            "soyElSenalado": true,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -35827,7 +35827,7 @@
               "characterName": "Ana",
               "role": "Capataz",
               "conectado": false,
-              "yaAcuso": true
+              "yaRespondio": true
             },
             {
               "participanteId": "e1",
@@ -35835,7 +35835,7 @@
               "characterName": "Bruno",
               "role": "Epigrafista",
               "conectado": false,
-              "yaAcuso": true
+              "yaRespondio": true
             },
             {
               "participanteId": "e2",
@@ -35843,7 +35843,7 @@
               "characterName": "Carla",
               "role": "Médico de la expedición",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -36943,7 +36943,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -36953,7 +36953,7 @@
               "characterName": "Bruno",
               "role": "Epigrafista",
               "conectado": false,
-              "yaAcuso": true
+              "yaRespondio": true
             },
             {
               "participanteId": "e2",
@@ -36961,7 +36961,7 @@
               "characterName": "Carla",
               "role": "Médico de la expedición",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -36969,7 +36969,7 @@
               "characterName": "Dani",
               "role": "Mecenas",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -37346,7 +37346,7 @@
               "description": "Cae la noche y las lámparas empiezan a apagarse solas. Se organiza la primera vigilia."
             }
           ],
-          "miAcusacion": {
+          "miRespuesta": {
             "respuestas": {
               "saqueador": "e3"
             },
@@ -37361,7 +37361,7 @@
                 "nombre": "Dani"
               }
             ],
-            "culpableId": "e3",
+            "senaladoId": "e3",
             "motive": "Dani tenía Escarabeo de lapislázuli vendida antes de que la expedición saliera. El comprador paga por la pieza y por que la tumba quede abierta: una tumba sellada es una tumba que alguien vendrá a inventariar.",
             "reconstruccion": "Fue Dani quien rompió el lacre, de madrugada y con la excusa de comprobar las lámparas. Desde entonces juega a lo mismo que los demás —explora, comparte, propone un orden— con una diferencia: puede fabricar un fragmento de papiro que suene a verdad y no lo sea. Le basta con que la mesa ejecute un orden equivocado para que amanezca con la tumba abierta.",
             "ganador": {
@@ -37457,7 +37457,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -37467,7 +37467,7 @@
               "characterName": "Ana",
               "role": "Capataz",
               "conectado": false,
-              "yaAcuso": true
+              "yaRespondio": true
             },
             {
               "participanteId": "e2",
@@ -37475,7 +37475,7 @@
               "characterName": "Carla",
               "role": "Médico de la expedición",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             },
             {
               "participanteId": "e3",
@@ -37483,7 +37483,7 @@
               "characterName": "Dani",
               "role": "Mecenas",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -37860,7 +37860,7 @@
               "description": "Cae la noche y las lámparas empiezan a apagarse solas. Se organiza la primera vigilia."
             }
           ],
-          "miAcusacion": {
+          "miRespuesta": {
             "respuestas": {
               "saqueador": "e2"
             },
@@ -37875,7 +37875,7 @@
                 "nombre": "Dani"
               }
             ],
-            "culpableId": "e3",
+            "senaladoId": "e3",
             "motive": "Dani tenía Escarabeo de lapislázuli vendida antes de que la expedición saliera. El comprador paga por la pieza y por que la tumba quede abierta: una tumba sellada es una tumba que alguien vendrá a inventariar.",
             "reconstruccion": "Fue Dani quien rompió el lacre, de madrugada y con la excusa de comprobar las lámparas. Desde entonces juega a lo mismo que los demás —explora, comparte, propone un orden— con una diferencia: puede fabricar un fragmento de papiro que suene a verdad y no lo sea. Le basta con que la mesa ejecute un orden equivocado para que amanezca con la tumba abierta.",
             "ganador": {
@@ -37971,7 +37971,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": false,
+            "soyElSenalado": false,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -37981,7 +37981,7 @@
               "characterName": "Ana",
               "role": "Capataz",
               "conectado": false,
-              "yaAcuso": true
+              "yaRespondio": true
             },
             {
               "participanteId": "e1",
@@ -37989,7 +37989,7 @@
               "characterName": "Bruno",
               "role": "Epigrafista",
               "conectado": false,
-              "yaAcuso": true
+              "yaRespondio": true
             },
             {
               "participanteId": "e3",
@@ -37997,7 +37997,7 @@
               "characterName": "Dani",
               "role": "Mecenas",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -38350,7 +38350,7 @@
                 "nombre": "Dani"
               }
             ],
-            "culpableId": "e3",
+            "senaladoId": "e3",
             "motive": "Dani tenía Escarabeo de lapislázuli vendida antes de que la expedición saliera. El comprador paga por la pieza y por que la tumba quede abierta: una tumba sellada es una tumba que alguien vendrá a inventariar.",
             "reconstruccion": "Fue Dani quien rompió el lacre, de madrugada y con la excusa de comprobar las lámparas. Desde entonces juega a lo mismo que los demás —explora, comparte, propone un orden— con una diferencia: puede fabricar un fragmento de papiro que suene a verdad y no lo sea. Le basta con que la mesa ejecute un orden equivocado para que amanezca con la tumba abierta.",
             "ganador": {
@@ -38446,7 +38446,7 @@
             "giros": [],
             "cronologiaPropia": [],
             "notas": "",
-            "soyCulpable": true,
+            "soyElSenalado": true,
             "pediEmpezar": false
           },
           "jugadores": [
@@ -38456,7 +38456,7 @@
               "characterName": "Ana",
               "role": "Capataz",
               "conectado": false,
-              "yaAcuso": true
+              "yaRespondio": true
             },
             {
               "participanteId": "e1",
@@ -38464,7 +38464,7 @@
               "characterName": "Bruno",
               "role": "Epigrafista",
               "conectado": false,
-              "yaAcuso": true
+              "yaRespondio": true
             },
             {
               "participanteId": "e2",
@@ -38472,7 +38472,7 @@
               "characterName": "Carla",
               "role": "Médico de la expedición",
               "conectado": false,
-              "yaAcuso": false
+              "yaRespondio": false
             }
           ],
           "lugares": [
@@ -38841,7 +38841,7 @@
                 "nombre": "Dani"
               }
             ],
-            "culpableId": "e3",
+            "senaladoId": "e3",
             "motive": "Dani tenía Escarabeo de lapislázuli vendida antes de que la expedición saliera. El comprador paga por la pieza y por que la tumba quede abierta: una tumba sellada es una tumba que alguien vendrá a inventariar.",
             "reconstruccion": "Fue Dani quien rompió el lacre, de madrugada y con la excusa de comprobar las lámparas. Desde entonces juega a lo mismo que los demás —explora, comparte, propone un orden— con una diferencia: puede fabricar un fragmento de papiro que suene a verdad y no lo sea. Le basta con que la mesa ejecute un orden equivocado para que amanezca con la tumba abierta.",
             "ganador": {

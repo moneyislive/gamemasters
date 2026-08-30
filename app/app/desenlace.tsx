@@ -80,7 +80,7 @@ export default function Desenlace(): JSX.Element {
   }
 
   const gane = fin.ganador?.participanteId === vista.yo.participanteId;
-  const eraYo = fin.culpableId === vista.yo.participanteId;
+  const eraYo = fin.senaladoId === vista.yo.participanteId;
   // El primer eje del juego es el que abre el sobre; el resto se lee debajo.
   // En CLUEDO eso es «fue Fulano, con el candelabro, en la cocina», pero la
   // pantalla ya no sabe que son tres ni cómo se llaman.

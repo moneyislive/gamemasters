@@ -112,7 +112,7 @@ function PilaDePantallas(): JSX.Element {
       />
       <Stack.Screen name="(juego)" />
       <Stack.Screen
-        name="acusar"
+        name="responder"
         options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
       />
       <Stack.Screen

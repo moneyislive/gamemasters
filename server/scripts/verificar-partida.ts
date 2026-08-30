@@ -299,7 +299,7 @@ async function jugar(): Promise<void> {
     equivocada,
   );
 
-  const enRonda = await pedir('/jugar/acusar', {
+  const enRonda = await pedir('/jugar/responder', {
     metodo: 'POST',
     testigo: testigoBruno,
     cuerpo: { respuestas: equivocada },
@@ -372,7 +372,7 @@ async function jugar(): Promise<void> {
   v = await vista();
   comprobar('estamos en la ronda 2', v.sesion.round === 2, v.sesion.round);
 
-  const otraRonda = await pedir('/jugar/acusar', {
+  const otraRonda = await pedir('/jugar/responder', {
     metodo: 'POST',
     testigo: testigoBruno,
     cuerpo: { respuestas: equivocada },
@@ -424,7 +424,7 @@ async function jugar(): Promise<void> {
   );
 
   paso('Acusar con la ronda cerrada, sin pasar por ninguna fase de acusaciones');
-  const vacia = await pedir('/jugar/acusar', { metodo: 'POST', testigo, cuerpo: { respuestas: {} } });
+  const vacia = await pedir('/jugar/responder', { metodo: 'POST', testigo, cuerpo: { respuestas: {} } });
   comprobar('una acusación incompleta se rechaza', vacia.estado === 409, vacia.datos);
 
   // La correcta, compuesta desde los ejes del juego. Nadie escribe aquí
@@ -433,7 +433,7 @@ async function jugar(): Promise<void> {
   const mia: Record<string, string> = {};
   for (const eje of ejesDe(manifiesto)) mia[eje.id] = solucion[eje.id]!;
 
-  const acusar = await pedir('/jugar/acusar', { metodo: 'POST', testigo, cuerpo: { respuestas: mia } });
+  const acusar = await pedir('/jugar/responder', { metodo: 'POST', testigo, cuerpo: { respuestas: mia } });
   comprobar('la acusación se registra', acusar.estado === 200, acusar.datos);
   comprobar('con hora del servidor', typeof acusar.datos?.at === 'string');
   comprobar(
@@ -442,14 +442,14 @@ async function jugar(): Promise<void> {
     acusar.datos,
   );
 
-  const repe = await pedir('/jugar/acusar', { metodo: 'POST', testigo, cuerpo: { respuestas: mia } });
+  const repe = await pedir('/jugar/responder', { metodo: 'POST', testigo, cuerpo: { respuestas: mia } });
   comprobar('no se puede acusar dos veces', repe.estado === 409);
 
   v = await vista();
-  comprobar('mi acusación vuelve como diccionario', Boolean(v.miAcusacion?.respuestas));
+  comprobar('mi acusación vuelve como diccionario', Boolean(v.miRespuesta?.respuestas));
   comprobar(
     'con un valor por eje',
-    Object.keys(v.miAcusacion?.respuestas ?? {}).length === ejesDe(manifiesto).length,
+    Object.keys(v.miRespuesta?.respuestas ?? {}).length === ejesDe(manifiesto).length,
   );
   comprobar('sigue sin llegar la solución', v.desenlace === undefined);
 
@@ -466,7 +466,7 @@ async function jugar(): Promise<void> {
    * ya no llegaba nadie: la partida entera se volvía interminable. Por eso ahora
    * se sale al desenlace desde `ronda-cerrada`, y por eso se comprueba.
    */
-  const acusaciones = await pedir(`/games/${game.id}/live/acusaciones`, { metodo: 'POST' });
+  const acusaciones = await pedir(`/games/${game.id}/live/respuestas`, { metodo: 'POST' });
   comprobar('la ruta vieja de acusaciones sigue respondiendo 200', acusaciones.estado === 200, acusaciones.datos);
   v = await vista();
   comprobar('y deja la partida en esa fase', v.sesion.phase === 'acusaciones', v.sesion.phase);
@@ -529,7 +529,7 @@ async function jugar(): Promise<void> {
       v.desenlace.respuestas.every((r) => r.nombre.length > 0),
     v.desenlace?.respuestas,
   );
-  comprobar('y quién fue', Boolean(v.desenlace?.culpableId));
+  comprobar('y quién fue', Boolean(v.desenlace?.senaladoId));
   comprobar(
     'gané, porque acerté los tres ejes',
     v.desenlace?.ganador?.participanteId === 's0',

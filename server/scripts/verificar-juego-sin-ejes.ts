@@ -27,7 +27,7 @@ import {
   ejecutarAccion,
   registrarAcciones,
 } from '../src/juegos/motor';
-import { acusar } from '../src/live/sesion';
+import { responder } from '../src/live/sesion';
 import { vistaDeJugador } from '../src/live/proyeccion';
 import { ejes as ejesDe } from '../../shared/juegos';
 import type { ManifiestoDeJuego } from '../../shared/juegos';
@@ -245,7 +245,7 @@ comprobar('y va por turnos', manifiesto.turnos === 'por-turnos');
 let v = vistaDeJugador(game, sesion, 'j0')!;
 comprobar('se compone la vista de un juego sin misterio', Boolean(v));
 comprobar('nada que preguntar para acusar', v.ejes.length === 0, v.ejes);
-comprobar('nadie es el culpable', v.yo.soyCulpable === false);
+comprobar('nadie es el culpable', v.yo.soyElSenalado === false);
 comprobar('el título es el del juego', v.sesion.tituloPartida === 'La Oca del Misterio');
 
 // --- La acción propia del juego ---
@@ -326,11 +326,11 @@ sesion.round = 4;
 ejecutarAccion(game, sesion, 'j1', 'tirar', {});
 comprobar('se gana llegando, no acertando', sesion.primeroEnAcertar === 'j1', sesion.primeroEnAcertar);
 
-// --- Y no se puede acusar, porque no hay nada que acusar ---
+// --- Y no se puede responder, porque no hay nada que acusar ---
 let noSePuedeAcusar = false;
 try {
   sesion.phase = 'acusaciones';
-  acusar(sesion, 'j0', {}, {});
+  responder(sesion, 'j0', {}, {});
 } catch {
   noSePuedeAcusar = true;
 }
@@ -341,7 +341,7 @@ sesion.phase = 'desenlace';
 v = vistaDeJugador(game, sesion, 'j0')!;
 comprobar('el desenlace se compone igual', Boolean(v.desenlace));
 comprobar('con cero renglones de respuesta', v.desenlace?.respuestas.length === 0, v.desenlace?.respuestas);
-comprobar('sin señalar a nadie', v.desenlace?.culpableId === undefined);
+comprobar('sin señalar a nadie', v.desenlace?.senaladoId === undefined);
 comprobar('pero con su ganador', v.desenlace?.ganador?.participanteId === 'j1', v.desenlace?.ganador);
 
 // ---------------------------------------------------------------------------

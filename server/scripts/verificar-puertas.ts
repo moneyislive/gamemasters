@@ -306,9 +306,9 @@ async function probar(): Promise<void> {
     /*
      * ESTA ES LA LLAMADA QUE HACE LA APP. No `/jugar/accion`: los dos botones
      * de «Señalar al saqueador» —la barra de la vigilia y el panel del
-     * Sellado— llevan a la pantalla de acusar, y esa manda aquí.
+     * Sellado— llevan a la pantalla de responder, y esa manda aquí.
      */
-    const r = await pedir('/jugar/acusar', {
+    const r = await pedir('/jugar/responder', {
       metodo: 'POST',
       testigo,
       cuerpo: { respuestas: { saqueador: 'e3' } },
@@ -330,12 +330,31 @@ async function probar(): Promise<void> {
 
     const testigo = await entrar('MANSIO', 'MANS0A');
     const sol = cluedo.game.plot!.solution.respuestas as Record<string, string>;
-    const r = await pedir('/jugar/acusar', {
+    const r = await pedir('/jugar/responder', {
       metodo: 'POST',
       testigo,
       cuerpo: { respuestas: sol },
     });
     comprobar('acusar en CLUEDO responde 200', r.estado === 200, r.datos);
+
+    /*
+     * ═══ Y EL NOMBRE VIEJO DE LA RUTA SIGUE ATENDIENDO ═══
+     *
+     * `/jugar/acusar` paso a llamarse `/jugar/responder`, porque en dos de los
+     * tres juegos no se acusa a nadie. El movil se compila aparte y no tiene
+     * actualizaciones sobre el aire: durante los dias que van entre desplegar
+     * el servidor y que la gente actualice hay telefonos llamando al de antes.
+     *
+     * Si esto se cae, lo que se cae en la mesa es poder TERMINAR la partida, y
+     * se cae de noche, con doce personas delante y sin explicacion.
+     */
+    const otro = await entrar('MANSIO', 'MANS1A');
+    const viejo = await pedir('/jugar/acusar', {
+      metodo: 'POST',
+      testigo: otro,
+      cuerpo: { respuestas: sol },
+    });
+    comprobar('y el nombre viejo de la ruta sigue valiendo', viejo.estado === 200, viejo.datos);
   }
 
   // -------------------------------------------------------------------------
@@ -493,7 +512,7 @@ async function probar(): Promise<void> {
      * entregado al navegador de quien está jugando.
      */
     const testigoCiego = await entrar('CIEGAS', 'CIEG0A');
-    const senalado = await pedir('/jugar/acusar', {
+    const senalado = await pedir('/jugar/responder', {
       metodo: 'POST',
       testigo: testigoCiego,
       cuerpo: { respuestas: { saqueador: 'e3' } },

@@ -255,8 +255,8 @@ export default function Perfil(): JSX.Element {
                 <View style={estilos.medallas}>
                   {p.gano && <Insignia texto="Ganaste" tono={color.oro300} />}
                   {!p.gano && p.acerto && <Insignia texto="Acertaste" tono={color.oro400} />}
-                  {p.eraCulpable && <Insignia texto="Eras el culpable" tono="#e8a0a0" />}
-                  {!p.acerto && !p.eraCulpable && <Insignia texto="No diste con ello" tono="rgba(217,201,163,0.6)" />}
+                  {p.eraElSenalado && <Insignia texto="Eras el culpable" tono="#e8a0a0" />}
+                  {!p.acerto && !p.eraElSenalado && <Insignia texto="No diste con ello" tono="rgba(217,201,163,0.6)" />}
                 </View>
               </Marco>
             ))

@@ -766,6 +766,13 @@ export const SOMBRAS: ManifiestoDeJuego = {
      * puede volver a andar: si la mesa se atasca, otra hora. Ver el porqué de no
      * usar `sellado` en la cabecera y en el §6.1 del diseño.
      */
+    /*
+     * OJO: `acusaciones` aqui es el NOMBRE DE UNA FASE de este juego, no la
+     * clave del aviso. Va guardado en cada sesion, asi que renombrarlo dejaria
+     * a las partidas en curso en una fase que el grafo no conoce. Lo comprobo
+     * un renombrado automatico que se lo llevo por delante y una velada entera
+     * que dejo de poder llegar al desenlace.
+     */
     acusaciones: ['ronda-abierta', 'desenlace'],
     /* Este juego no las usa: se cruza Iga en una noche y se acaba. */
     sellado: [],
@@ -819,7 +826,7 @@ export const SOMBRAS: ManifiestoDeJuego = {
   rotulosDeAviso: {
     'ronda-abierta': 'Comienza la hora',
     'ronda-cerrada': 'Se cierra la hora',
-    acusaciones: 'El consejo del alba',
+    respuestas: 'El consejo del alba',
     desenlace: 'Amanece',
     ganador: 'El consejo ha hablado',
   },
@@ -831,7 +838,7 @@ export const SOMBRAS: ManifiestoDeJuego = {
      * dónde andaban los cazadores, y con eso se comprueba quién decía la verdad.
      */
     rondaCerrada: 'Hora cerrada. Ya se sabe por dónde andaban los cazadores.',
-    acusaciones: 'El consejo del alba. Cuatro pasos en orden, y un nombre. Se anda la senda más apoyada.',
+    respuestas: 'El consejo del alba. Cuatro pasos en orden, y un nombre. Se anda la senda más apoyada.',
     desenlace: 'Se abre el pliego de Hanzō.',
   },
 

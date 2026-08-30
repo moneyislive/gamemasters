@@ -179,13 +179,13 @@ const Identidad: Bloque = ({ vista, manifiesto }) => {
         <View
           style={[
             estilos.veredicto,
-            yo.soyCulpable ? estilos.veredictoCulpable : estilos.veredictoInocente,
+            yo.soyElSenalado ? estilos.veredictoCulpable : estilos.veredictoInocente,
           ]}
         >
           <Cuerpo
-            style={[estilos.veredictoTexto, { color: yo.soyCulpable ? '#f0c9c0' : color.oro300 }]}
+            style={[estilos.veredictoTexto, { color: yo.soyElSenalado ? '#f0c9c0' : color.oro300 }]}
           >
-            {yo.soyCulpable ? veredicto.si : veredicto.no}
+            {yo.soyElSenalado ? veredicto.si : veredicto.no}
           </Cuerpo>
         </View>
       </Marco>
@@ -194,7 +194,7 @@ const Identidad: Bloque = ({ vista, manifiesto }) => {
 };
 
 const Senalado: Bloque = ({ vista, manifiesto }) => {
-  if (!vista.yo.soyCulpable) return null;
+  if (!vista.yo.soyElSenalado) return null;
   const consejo = CONSEJO_DE_CULPABLE[manifiesto.id] ?? CONSEJO_DE_CLUEDO;
   return (
     <Animated.View entering={FadeInUp.delay(120).duration(500)}>
@@ -461,7 +461,7 @@ const Mesa: Bloque = ({ vista, manifiesto }) => (
           <Cuerpo tenue style={{ fontSize: 14 }}>
             {j.displayName}
             {j.salaActual ? ` · en ${j.salaActual}` : ''}
-            {j.yaAcuso ? ' · ya acusó' : ''}
+            {j.yaRespondio ? ' · ya acusó' : ''}
           </Cuerpo>
         </View>
       </View>

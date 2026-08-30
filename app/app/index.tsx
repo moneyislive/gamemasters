@@ -72,7 +72,7 @@ const COMO_VA: Record<string, string> = {
   lobby: 'La mesa se está llenando',
   'ronda-abierta': 'Ronda en curso',
   'ronda-cerrada': 'Puesta en común',
-  acusaciones: 'Momento de acusar',
+  respuestas: 'Momento de acusar',
   intermedio: 'Entre jornadas',
   desenlace: 'Terminada',
 };

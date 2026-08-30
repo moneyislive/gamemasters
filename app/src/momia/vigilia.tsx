@@ -412,7 +412,7 @@ export function Vigilia(): JSX.Element {
         />
       </Pantalla>
 
-      <BarraDeSenalar yaSenalo={Boolean(vista.miAcusacion)} />
+      <BarraDeSenalar yaSenalo={Boolean(vista.miRespuesta)} />
     </>
   );
 }
@@ -903,7 +903,7 @@ function BarraDeSenalar({ yaSenalo }: { yaSenalo: boolean }): JSX.Element {
         </Cuerpo>
       </View>
       {!yaSenalo && (
-        <Boton variante="peligro" onPress={() => router.push('/acusar')}>
+        <Boton variante="peligro" onPress={() => router.push('/responder')}>
           Señalar
         </Boton>
       )}

@@ -365,26 +365,26 @@ export default function Ronda(): JSX.Element {
 
   // ---- Acusaciones ----
   if (sesion.phase === 'acusaciones') {
-    const yaAcuso = Boolean(vista.miAcusacion);
+    const yaRespondio = Boolean(vista.miRespuesta);
     return (
       <Pantalla>
         <Animated.View entering={FadeInDown.duration(500)} style={estilos.centro}>
           <Sello>Momento de la verdad</Sello>
           <Titulo style={{ textAlign: 'center', marginTop: espacio.lg }}>
-            {yaAcuso ? 'Tu acusación está entregada' : 'Acusa'}
+            {yaRespondio ? 'Tu acusación está entregada' : 'Acusa'}
           </Titulo>
         </Animated.View>
         <Ornamento />
-        <Marco tono={yaAcuso ? 'oscuro' : 'peligro'}>
+        <Marco tono={yaRespondio ? 'oscuro' : 'peligro'}>
           <Cuerpo>
-            {yaAcuso
+            {yaRespondio
               ? 'Ya no se puede cambiar. Ahora toca esperar a que se abra el sobre del crimen y ver quién estuvo más cerca.'
               : 'Una sola combinación: quién, con qué y dónde. No podrás cambiarla, y gana quien acierte primero.'}
           </Cuerpo>
-          {!yaAcuso && (
+          {!yaRespondio && (
             <Boton
               variante="peligro"
-              onPress={() => router.push('/acusar')}
+              onPress={() => router.push('/responder')}
               style={{ marginTop: espacio.lg }}
             >
               Escribir mi acusación
@@ -522,7 +522,7 @@ export default function Ronda(): JSX.Element {
       </Boton>
 
     </Pantalla>
-    <BarraDeAcusar yaAcuso={Boolean(vista.miAcusacion)} />
+    <BarraDeAcusar yaRespondio={Boolean(vista.miRespuesta)} />
     </>
   );
 }
@@ -552,7 +552,7 @@ export default function Ronda(): JSX.Element {
  */
 const ALTO_ACUSAR = 78;
 
-function BarraDeAcusar({ yaAcuso }: { yaAcuso: boolean }): JSX.Element {
+function BarraDeAcusar({ yaRespondio }: { yaRespondio: boolean }): JSX.Element {
   const insets = useSafeAreaInsets();
   return (
     <Animated.View
@@ -560,15 +560,15 @@ function BarraDeAcusar({ yaAcuso }: { yaAcuso: boolean }): JSX.Element {
       style={[estilos.barraAcusar, { bottom: ALTO_BARRA_TOTAL + insets.bottom }]}
     >
       <View style={{ flex: 1 }}>
-        <Etiqueta style={{ color: yaAcuso ? color.laton : '#f0c9c0' }}>
-          {yaAcuso ? 'Tu acusación' : 'Cuando lo tengas claro'}
+        <Etiqueta style={{ color: yaRespondio ? color.laton : '#f0c9c0' }}>
+          {yaRespondio ? 'Tu acusación' : 'Cuando lo tengas claro'}
         </Etiqueta>
         <Cuerpo tenue style={{ fontSize: 13, marginTop: 2 }}>
-          {yaAcuso ? 'Entregada. Ya no se puede cambiar.' : 'Una sola vez. Gana quien acierte antes.'}
+          {yaRespondio ? 'Entregada. Ya no se puede cambiar.' : 'Una sola vez. Gana quien acierte antes.'}
         </Cuerpo>
       </View>
-      {!yaAcuso && (
-        <Boton variante="peligro" onPress={() => router.push('/acusar')}>
+      {!yaRespondio && (
+        <Boton variante="peligro" onPress={() => router.push('/responder')}>
           Acusar
         </Boton>
       )}

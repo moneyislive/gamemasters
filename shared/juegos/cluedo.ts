@@ -321,6 +321,13 @@ export const CLUEDO: ManifiestoDeJuego = {
      * faltara gente por acusar. Se conserva la fase para no romper las partidas
      * que ya esten en ella.
      */
+    /*
+     * OJO: `acusaciones` aqui es el NOMBRE DE UNA FASE de este juego, no la
+     * clave del aviso. Va guardado en cada sesion, asi que renombrarlo dejaria
+     * a las partidas en curso en una fase que el grafo no conoce. Lo comprobo
+     * un renombrado automatico que se lo llevo por delante y una velada entera
+     * que dejo de poder llegar al desenlace.
+     */
     acusaciones: ['ronda-abierta', 'desenlace'],
     /*
      * El sellado de El Misterio de la Momia NO SE NOMBRA. Estaba declarado aqui
@@ -376,13 +383,16 @@ export const CLUEDO: ManifiestoDeJuego = {
    * dentro de la tabla de CLUEDO.
    *
    * Ahora las palabras de cada juego viven en su fichero, con el resto de las
-   * suyas. La tabla de la app se queda de ultimo respaldo, para un juego que no
-   * declare ninguna.
+   * suyas. Y la tabla de la app se ha ido del todo: quedaba alli como respaldo
+   * con ESTAS OCHO LINEAS repetidas, asi que un juego que se olvidara de
+   * declarar sus rotulos no veia un error --veia el telon de un asesinato en una
+   * mansion en mitad de su partida. Ahora ve un telon sin rotulo, que es lo que
+   * de verdad pasa.
    */
   rotulosDeAviso: {
     'ronda-abierta': 'Comienza la ronda',
     'ronda-cerrada': 'Se cierra la ronda',
-    acusaciones: 'Hora de acusar',
+    respuestas: 'Hora de acusar',
     desenlace: 'El sobre del crimen',
     ganador: 'Alguien lo ha resuelto',
     giro: 'Algo ha cambiado',
@@ -392,7 +402,7 @@ export const CLUEDO: ManifiestoDeJuego = {
   avisos: {
     rondaAbierta: 'Ronda {ronda} de {total}. Elige sala.',
     rondaCerrada: 'Ronda cerrada. Lo que encontraste es tuyo: cuéntalo o guárdatelo.',
-    acusaciones: 'Momento de acusar. Una sola combinación, y no se puede cambiar.',
+    respuestas: 'Momento de acusar. Una sola combinación, y no se puede cambiar.',
     desenlace: 'Se abre el sobre del crimen.',
   },
   ceremonia: {

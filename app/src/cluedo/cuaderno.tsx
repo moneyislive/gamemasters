@@ -263,7 +263,7 @@ export function Cuaderno(): JSX.Element {
                   <Cuerpo tenue style={{ fontSize: 14 }}>
                     {j.role}
                     {j.salaActual ? ` · en ${j.salaActual}` : ''}
-                    {j.yaAcuso ? ' · ya acusó' : ''}
+                    {j.yaRespondio ? ' · ya acusó' : ''}
                   </Cuerpo>
                 </View>
               </View>

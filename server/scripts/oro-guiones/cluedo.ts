@@ -31,7 +31,7 @@
 import { entidadesDe, lugaresDe, personasDe } from '../../../shared/juegos';
 import { generateBoardLayout } from '../../src/board/generator';
 import { generateDemoPlot } from '../../src/plot/cluedo-demo';
-import { acusar, elegirSala, abrirRonda, cerrarRonda, guardarNotas } from '../../src/live/sesion';
+import { responder, elegirSala, abrirRonda, cerrarRonda, guardarNotas } from '../../src/live/sesion';
 import { EJES, respuestasCluedo } from '../../src/juegos/cluedo';
 import type { GameSession } from '../../../shared/types';
 import type { LiveSession } from '../../../shared/live';
@@ -168,7 +168,7 @@ function velada({ game, sesion, retratar }: Mesa): void {
   const solucion = game.plot!.solution.respuestas;
   // Una acusación equivocada, una a medias y la correcta: los tres casos que
   // decide el recuento de aciertos.
-  acusar(
+  responder(
     sesion,
     personasDe(game)[2]!.id,
     respuestasCluedo({
@@ -178,13 +178,13 @@ function velada({ game, sesion, retratar }: Mesa): void {
     }),
     solucion,
   );
-  acusar(
+  responder(
     sesion,
     personasDe(game)[3]!.id,
     { ...solucion, [EJES.objeto]: entidadesDe(game, 'objetos')[1]!.id },
     solucion,
   );
-  acusar(sesion, personasDe(game)[4]!.id, { ...solucion }, solucion);
+  responder(sesion, personasDe(game)[4]!.id, { ...solucion }, solucion);
   retratar('acusaciones-entregadas');
 
   sesion.phase = 'desenlace';

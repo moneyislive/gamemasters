@@ -195,7 +195,7 @@ export default function LivePanel(): JSX.Element {
    *
    * Con esto mismo se escondía el botón de abrir ronda —`!ultimaRonda &&`— y esa
    * era la única forma de acabar una partida: al llegar a la última ronda
-   * prevista no quedaba más salida que empujar a la mesa a acusar, supieran o no
+   * prevista no quedaba más salida que empujar a la mesa a responder, supieran o no
    * quién fue. `totalRounds` sale del reparto de pistas de la trama: dice cuántas
    * rondas tenía PREVISTAS quien la escribió, no cuántas hacen falta.
    *

@@ -783,7 +783,7 @@ export const MOMIA: ManifiestoDeJuego = {
     'ronda-abierta': 'Comienza la vigilia',
     'ronda-cerrada': 'Se cierra la vigilia',
     sellado: 'Se abre El Sellado',
-    acusaciones: 'Hora de señalar',
+    respuestas: 'Hora de señalar',
     desenlace: 'Ha amanecido',
     ganador: 'Alguien ha señalado',
     giro: 'Algo ha cambiado',
@@ -794,7 +794,7 @@ export const MOMIA: ManifiestoDeJuego = {
     // Al cerrar no se publica nada: lo único que llega a la mesa es lo que
     // alguien decide enseñar con su don.
     rondaCerrada: 'Vigilia cerrada. Lo que nadie ha enseñado, sigue sin saberse.',
-    acusaciones: 'Momento de señalar. Un solo nombre, y no se puede cambiar.',
+    respuestas: 'Momento de señalar. Un solo nombre, y no se puede cambiar.',
     desenlace: 'Se abre el papiro del sellado.',
   },
   ceremonia: {

@@ -102,7 +102,7 @@ function Selector({
 }
 
 /**
- * Lo que se dice al acusar, por juego.
+ * Lo que se dice al responder, por juego.
  *
  * ERA UN TERNARIO CONTRA `esMomia`, y con un tercer juego se convirtió en el
  * fallo que esta entrega ha ido persiguiendo por toda la app: El Paso de las
@@ -167,7 +167,7 @@ export default function Acusar(): JSX.Element {
     setEnviando(true);
     setError(null);
     try {
-      await api.acusar(respuestas);
+      await api.responder(respuestas);
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       await refrescar();
       router.back();

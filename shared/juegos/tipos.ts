@@ -184,7 +184,7 @@ export type ModoDeTurno = 'simultaneo' | 'por-turnos';
  *
  * Esta es la pieza que permite salir del misterio. Antes lo único que se podía
  * hacer en una ronda era elegir sala, y estaba escrito en el tipo. Aquí cada
- * juego declara su repertorio: entrar en una sala, tirar el dado, acusar,
+ * juego declara su repertorio: entrar en una sala, tirar el dado, responder,
  * repartir botín, atacar. El motor valida y ejecuta; qué significa cada una lo
  * pone el juego.
  */
@@ -817,7 +817,8 @@ export interface ManifiestoDeJuego {
   avisos?: {
     rondaAbierta: string;
     rondaCerrada: string;
-    acusaciones: string;
+    /** Se llamaba `acusaciones`. Es el telon de «entregad la respuesta». */
+    respuestas: string;
     desenlace: string;
   };
 

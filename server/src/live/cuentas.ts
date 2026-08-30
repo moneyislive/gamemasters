@@ -99,7 +99,7 @@ export async function cerrarPartidaEnCuentas(
      *
      * Antes: `culpableDe(plot.solution) === jugador.participanteId`, y `culpableDe`
      * lee la clave `culpable` de la solucion. En un juego cuyo eje se llame
-     * `saqueador` esa clave no existe, asi que `eraCulpable` era SIEMPRE falso
+     * `saqueador` esa clave no existe, asi que `eraElSenalado` era SIEMPRE falso
      * y el trofeo de quien se sale con la suya no se concedia nunca — sin dar
      * ningun error.
      *
@@ -107,7 +107,7 @@ export async function cerrarPartidaEnCuentas(
      * girado. Para CLUEDO devuelve exactamente lo mismo.
      */
     const manifiesto = manifiestoDe(sesion.juego ?? game.settings?.juego);
-    const eraCulpable = esElSenalado(manifiesto, plot.solution.respuestas, jugador.participanteId);
+    const eraElSenalado = esElSenalado(manifiesto, plot.solution.respuestas, jugador.participanteId);
     /*
      * ¿GANÓ? SE LE PREGUNTA AL JUEGO.
      *
@@ -135,7 +135,7 @@ export async function cerrarPartidaEnCuentas(
       jugadaEl: new Date().toISOString(),
       acerto: suya?.correcta ?? false,
       gano,
-      eraCulpable,
+      eraElSenalado,
     };
     cuenta.partidas.push(partida);
 
@@ -146,7 +146,7 @@ export async function cerrarPartidaEnCuentas(
      * Aquí se concedían SEIS con sus ids escritos a mano, y tres de los seis son
      * reglas de CLUEDO que se repartían a cualquier partida. El caso que lo
      * retrata es «Crimen perfecto» —«fuiste el culpable y nadie te descubrió»—,
-     * que se concedía con `eraCulpable && !sesion.primeroEnAcertar`: en El Misterio de la
+     * que se concedía con `eraElSenalado && !sesion.primeroEnAcertar`: en El Misterio de la
      * Momia `winnerId` solo se escribe si alguien SEÑALA al saqueador, así que
      * una noche en la que la expedición sella la tumba —o sea, en la que el
      * saqueador PIERDE— le daba la medalla de haberse salido con la suya si
@@ -182,7 +182,7 @@ export async function cerrarPartidaEnCuentas(
       sesion,
       plot,
       jugador,
-      eraSenalado: eraCulpable,
+      eraSenalado: eraElSenalado,
       gano,
       acerto: suya?.correcta ?? false,
     })) {

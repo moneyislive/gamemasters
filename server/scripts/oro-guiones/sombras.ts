@@ -8,7 +8,7 @@
  * y ese mensaje no lo congelaba nadie.
  */
 import { personasDe } from '../../../shared/juegos';
-import { abrirAcusaciones, abrirRonda, cerrarRonda, revelarDesenlace } from '../../src/live/sesion';
+import { abrirRespuestas, abrirRonda, cerrarRonda, revelarDesenlace } from '../../src/live/sesion';
 import { ejecutarCierre } from '../../src/juegos/cierres';
 import { generarTramaSombras, tramaDe } from '../../src/juegos/sombras-trama';
 import type { GameSession } from '../../../shared/types';
@@ -141,7 +141,7 @@ function velada({ game, sesion, retratar, accion, intentar }: Mesa): void {
     retratar(`hora-${hora}-cerrada`);
   }
 
-  intentar('abrir el consejo del alba', () => abrirAcusaciones(sesion));
+  intentar('abrir el consejo del alba', () => abrirRespuestas(sesion));
   retratar('consejo-abierto');
 
   /*

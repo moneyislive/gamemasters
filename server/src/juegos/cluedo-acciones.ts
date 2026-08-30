@@ -14,7 +14,7 @@
  */
 import { registrarAcciones } from './motor';
 import { AccionInvalida } from './motor';
-import { acusar as registrarAcusacion, elegirSala } from '../live/sesion';
+import { responder as registrarAcusacion, elegirSala } from '../live/sesion';
 import { EJES } from './cluedo';
 import type { EjeId } from '../../../shared/juegos';
 
@@ -44,9 +44,9 @@ registrarAcciones('cluedo', {
       [EJES.lugar]: datos[EJES.lugar] ?? '',
     };
 
-    const { acusacion } = registrarAcusacion(sesion, participanteId, respuestas, solucion);
+    const { respuesta } = registrarAcusacion(sesion, participanteId, respuestas, solucion);
     // Deliberadamente NO se devuelve si ha acertado: se sabrá en el desenlace,
     // como en la mesa. Devolverlo aquí permitiría probar combinaciones.
-    return { registrada: true, at: acusacion.at };
+    return { registrada: true, at: respuesta.at };
   },
 });

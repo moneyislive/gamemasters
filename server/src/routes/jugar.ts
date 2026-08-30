@@ -349,7 +349,20 @@ router.post('/jugar/notas', async (req, res) => {
  * reductor de CLUEDO, no la plataforma: un juego donde se gane de otra manera
  * escribe el suyo y esta ruta le sirve igual.
  */
-router.post('/jugar/acusar', async (req, res) => {
+/*
+ * ═══ DOS CAMINOS AL MISMO SITIO, Y HACE FALTA ═══
+ *
+ * La ruta se llamaba `/jugar/acusar` y ahora se llama `/jugar/responder`,
+ * porque en dos de los tres juegos no se acusa a nadie: se señala quién rompió
+ * el sello o quién traiciona.
+ *
+ * El nombre viejo se sigue atendiendo porque el móvil se compila aparte y no
+ * tiene actualizaciones sobre el aire: durante los días que van entre desplegar
+ * el servidor y que la gente actualice hay teléfonos llamando al de antes.
+ * Quitarlo seria que no se pueda entregar la respuesta —o sea, terminar la
+ * partida— de noche y sin explicacion.
+ */
+router.post(['/jugar/responder', '/jugar/acusar'], async (req, res) => {
   const cred = credencial(req, res);
   if (!cred) return;
 

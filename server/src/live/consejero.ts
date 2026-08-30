@@ -157,7 +157,7 @@ export function contextoDelMayordomo(vista: VistaJugador): string {
     `LAS REGLAS:\n${(juegoDe(vista).reglas ?? REGLAS_JUGADOR).map((r) => `- ${r.titulo}: ${r.texto}`).join('\n')}`,
   );
 
-  if (vista.yo.soyCulpable) {
+  if (vista.yo.soyElSenalado) {
     partes.push(
       'NOTA RESERVADA: tu interlocutor es el culpable y lo sabe por su propio dosier. Puedes ' +
         'ayudarle a sostener su coartada y a no delatarse, pero NUNCA escribas que lo es ni lo ' +

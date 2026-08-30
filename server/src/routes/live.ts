@@ -11,7 +11,7 @@ import { ejecutarCierre } from '../juegos/cierres';
 import { cerrarPartidaEnCuentas } from '../live/cuentas';
 import { vistaDeGameMaster } from '../live/proyeccion';
 import {
-  abrirAcusaciones,
+  abrirRespuestas,
   abrirSellado,
   abrirEncuentro,
   abrirRonda,
@@ -35,7 +35,7 @@ import type { Response } from 'express';
  * «Elige sala» y «Se abre el sobre del crimen». Ahora los declara cada juego en
  * su manifiesto, al lado de la ceremonia y las reglas.
  */
-function avisoDe(sesion: LiveSession, cual: 'rondaAbierta' | 'rondaCerrada' | 'acusaciones' | 'desenlace'): string {
+function avisoDe(sesion: LiveSession, cual: 'rondaAbierta' | 'rondaCerrada' | 'respuestas' | 'desenlace'): string {
   const avisos = manifiestoDe(sesion.juego).avisos;
   const plantilla = avisos?.[cual] ?? '';
   return plantilla
@@ -227,15 +227,15 @@ router.post('/games/:id/live/encuentro/abrir', async (req, res) => {
   }
 });
 
-router.post('/games/:id/live/acusaciones', async (req, res) => {
+router.post('/games/:id/live/respuestas', async (req, res) => {
   try {
-    await mutar(req.params.id, (s) => abrirAcusaciones(s), {
+    await mutar(req.params.id, (s) => abrirRespuestas(s), {
       avisar: (s) =>
         anunciar(
           req.params.id,
           s.rev,
-          'acusaciones',
-          avisoDe(s, 'acusaciones'),
+          'respuestas',
+          avisoDe(s, 'respuestas'),
         ),
     });
     await responderVista(req.params.id, res);

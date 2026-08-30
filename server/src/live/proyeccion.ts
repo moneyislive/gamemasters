@@ -125,9 +125,9 @@ export function vistaDeJugador(
    * Si el papel que me ha tocado es el que el juego señala —el asesino en
    * CLUEDO— hace falta saberlo AQUÍ y no solo al final, porque de ello depende
    * qué momentos de la cronología es seguro mandarme. Ya se calculaba para
-   * `yo.soyCulpable`; lo único que cambia es que ahora se calcula antes.
+   * `yo.soyElSenalado`; lo único que cambia es que ahora se calcula antes.
    */
-  const soyCulpable = esElSenalado(manifiesto, plot.solution.respuestas, participanteId);
+  const soyElSenalado = esElSenalado(manifiesto, plot.solution.respuestas, participanteId);
 
   // ---- Conocimiento, desbloqueado por rondas ----
   const todoElConocimiento = personaje?.knowledge ?? [];
@@ -162,7 +162,7 @@ export function vistaDeJugador(
   const senalado = ejeSenalado ? plot.solution.respuestas[ejeSenalado.id] : undefined;
   const cronologiaPropia: MomentoVista[] = plot.timeline
     .filter((e) => e.participanteIds.includes(participanteId))
-    .filter((e) => e.isPublic || soyCulpable || !senalado || !e.participanteIds.includes(senalado))
+    .filter((e) => e.isPublic || soyElSenalado || !senalado || !e.participanteIds.includes(senalado))
     .map((e) => ({ time: e.time, description: e.description }));
 
   // ---- Salas, con cuánta gente hay en cada una esta ronda ----
@@ -283,7 +283,7 @@ export function vistaDeJugador(
       : {}),
   }));
 
-  const miAcusacion = sesion.respuestasEntregadas.find((a) => a.participanteId === participanteId);
+  const miRespuesta = sesion.respuestasEntregadas.find((a) => a.participanteId === participanteId);
 
   const vista: VistaJugador = {
     rev: sesion.rev ?? 0,
@@ -334,7 +334,7 @@ export function vistaDeJugador(
       giros,
       cronologiaPropia,
       notas: jugador.notas,
-      soyCulpable,
+      soyElSenalado,
       pediEmpezar: jugador.pideEmpezar === true,
     },
     jugadores: sesion.players
@@ -351,7 +351,7 @@ export function vistaDeJugador(
           photoUrl: fotoParaJugador(suSospechoso?.photoUrl, game.id),
           conectado: estaConectado(p, sesion.id),
           salaActual: suSala ? lugaresDe(game).find((r) => r.id === suSala)?.name : undefined,
-          yaAcuso: sesion.respuestasEntregadas.some((a) => a.participanteId === p.participanteId),
+          yaRespondio: sesion.respuestasEntregadas.some((a) => a.participanteId === p.participanteId),
         };
       }),
     lugares: salas,
@@ -388,8 +388,8 @@ export function vistaDeJugador(
     narracion: narracionActual
       ? { title: narracionActual.title, text: narracionActual.text }
       : undefined,
-    miAcusacion: miAcusacion
-      ? { respuestas: { ...miAcusacion.respuestas }, at: miAcusacion.at }
+    miRespuesta: miRespuesta
+      ? { respuestas: { ...miRespuesta.respuestas }, at: miRespuesta.at }
       : undefined,
   };
 
@@ -418,7 +418,7 @@ export function vistaDeJugador(
 
     vista.desenlace = {
       respuestas,
-      culpableId: ejeDeJugadores(manifiesto)
+      senaladoId: ejeDeJugadores(manifiesto)
         ? plot.solution.respuestas[ejeDeJugadores(manifiesto)!.id]
         : undefined,
       motive: plot.solution.motive,

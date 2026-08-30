@@ -154,7 +154,7 @@ for (let n = 0; n < RONDAS; n++) {
 
   const contexto = contextoDelMayordomo(vista);
   ultimoTamano = contexto.length;
-  if (vista.yo.soyCulpable) culpablesPreguntando++;
+  if (vista.yo.soyElSenalado) culpablesPreguntando++;
 
   const permitido = corpusPermitido(game, yo);
   const ajenos = plot.characters.filter((c) => c.participanteId !== yo);

@@ -227,7 +227,7 @@ export interface LiveSession {
    *
    * Está aquí, y no solo en los ajustes de la partida, por una razón que salió
    * al intentarlo: las funciones que gobiernan las fases —`abrirRonda`,
-   * `cerrarRonda`, `abrirAcusaciones`— reciben la sesión y nada más. Sin esta
+   * `cerrarRonda`, `abrirRespuestas`— reciben la sesión y nada más. Sin esta
    * copia habría que pasarles la partida entera a todas, o buscarla en el
    * almacén dentro de una función que hoy es síncrona y pura.
    */
@@ -511,8 +511,8 @@ export interface PartidaJugada {
   acerto: boolean;
   /** ¿Fue el primero en acertar? */
   gano: boolean;
-  /** ¿Le tocó ser el culpable? */
-  eraCulpable: boolean;
+  /** ¿Le tocó ser el señalado por la respuesta? */
+  eraElSenalado: boolean;
 }
 
 /**
@@ -694,8 +694,20 @@ export interface VistaJugador {
      */
     cronologiaPropia: MomentoVista[];
     notas: string;
-    /** Solo lo sabe quien lo es. Sirve para cambiarle el tono a la app. */
-    soyCulpable: boolean;
+    /**
+     * ERES TU LA RESPUESTA. Solo lo sabes tu, y le cambia el tono a la app.
+     *
+     * Se llamaba `soyCulpable`, y en dos de los tres juegos no habia ningun
+     * culpable: en la Momia eres quien rompio el sello y en las Sombras quien
+     * traiciona. Los dos tuvieron que escribir su propia tabla de textos para
+     * tapar la palabra —«Tu rompiste el sello» / «Tu no rompiste el sello»— y
+     * el que no la escribiera se habria encontrado a un arqueologo leyendo que
+     * es el asesino.
+     *
+     * Lo que significa de verdad es esto: hay un eje de la respuesta final que
+     * señala a alguien de la mesa, y ese alguien eres tu.
+     */
+    soyElSenalado: boolean;
     /** ¿Ya ha avisado de que está listo para empezar? */
     pediEmpezar: boolean;
   };
@@ -709,7 +721,8 @@ export interface VistaJugador {
     conectado: boolean;
     /** Sala en la que está esta ronda, si la ha elegido. */
     salaActual?: string;
-    yaAcuso: boolean;
+    /** Se llamaba `yaAcuso`. ¿Ha entregado ya su respuesta? */
+    yaRespondio: boolean;
   }>;
   /**
    * LOS LUGARES de este juego, con lo que se sabe de cada uno.
@@ -756,7 +769,7 @@ export interface VistaJugador {
     cosas: Array<{ id: string; name: string; description?: string; photoUrl?: string }>;
   }>;
   /**
-   * Qué hay que responder para acusar, y con qué opciones.
+   * Qué hay que responder para responder, y con qué opciones.
    *
    * Lo compone el servidor a partir del manifiesto del juego. Antes la app
    * pintaba tres selectores escritos a mano —culpable, objeto y sala— y por
@@ -864,8 +877,8 @@ export interface VistaJugador {
   cronologia: MomentoVista[];
   /** Narración de la ronda en curso, si el Game Master la ha lanzado. */
   narracion?: { title: string; text: string };
-  /** Tu acusación, si ya la has hecho. */
-  miAcusacion?: { respuestas: Record<EjeId, string>; at: string };
+  /** Tu respuesta, si ya la has entregado. Se llamaba `miAcusacion`. */
+  miRespuesta?: { respuestas: Record<EjeId, string>; at: string };
   /** Solo cuando la partida ha terminado. */
   desenlace?: {
     /**
@@ -874,11 +887,14 @@ export interface VistaJugador {
      */
     respuestas: Array<{ ejeId: EjeId; rotulo: string; entidadId: string; nombre: string }>;
     /**
-     * Quién resultó ser. Se conserva aparte de `respuestas` porque la app lo
-     * necesita para saber si el culpable eres tú, y eso no es un eje más: es
-     * la única respuesta que además identifica a una persona de la mesa.
+     * QUIEN RESULTO SER. Se conserva aparte de `respuestas` porque la app lo
+     * necesita para saber si eres tu, y eso no es un eje mas: es la unica
+     * respuesta que ademas identifica a una persona de la mesa.
+     *
+     * Se llamaba `culpableId`. Ausente en un juego donde ningun eje señala a
+     * nadie —una subasta, una carrera— y entonces no se pinta el bloque.
      */
-    culpableId?: string;
+    senaladoId?: string;
     /**
      * POR QUE LO HIZO. Ausente en un juego donde no lo hizo nadie.
      *
@@ -935,7 +951,8 @@ export type AvisoClave =
   | 'ronda-cerrada'
   | 'giro'
   | 'ayuda'
-  | 'acusaciones'
+  /* Se llamaba `acusaciones`: es el momento de entregar la respuesta. */
+  | 'respuestas'
   /* El Sellado, de El Misterio de la Momia. */
   | 'sellado'
   | 'desenlace'

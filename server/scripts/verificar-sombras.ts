@@ -647,7 +647,7 @@ async function jugarPorElCable(): Promise<void> {
 
   paso('El consejo del alba, con las rutas que ya existen');
   await pedir(`/games/${game.id}/live/ronda/cerrar`, { metodo: 'POST' });
-  const consejo = await pedir(`/games/${game.id}/live/acusaciones`, { metodo: 'POST' });
+  const consejo = await pedir(`/games/${game.id}/live/respuestas`, { metodo: 'POST' });
   comprobar(
     'el consejo se abre por la ruta de siempre: este juego NO añade fases',
     consejo.estado === 200,
@@ -655,8 +655,8 @@ async function jugarPorElCable(): Promise<void> {
   );
   comprobar(
     'y la mesa lee el aviso de ESTE juego, no el de otro',
-    manifiestoDe('sombras').avisos?.acusaciones?.includes('consejo del alba') === true,
-    manifiestoDe('sombras').avisos?.acusaciones,
+    manifiestoDe('sombras').avisos?.respuestas?.includes('consejo del alba') === true,
+    manifiestoDe('sombras').avisos?.respuestas,
   );
 
   const echarAAndar = await pedir(`/games/${game.id}/live/cierre`, { metodo: 'POST' });

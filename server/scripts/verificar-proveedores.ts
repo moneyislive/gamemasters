@@ -69,7 +69,7 @@ fs.writeFileSync(
               jugadaEl: ahora,
               acerto: true,
               gano: true,
-              eraCulpable: false,
+              eraElSenalado: false,
             },
           ],
           trofeos: ['primera-partida'],

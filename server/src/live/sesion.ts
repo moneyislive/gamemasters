@@ -430,7 +430,7 @@ export function abrirEncuentro(sesion: LiveSession): void {
   sesion.phase = faseCon(sesion, 'espera');
 }
 
-export function abrirAcusaciones(sesion: LiveSession): void {
+export function abrirRespuestas(sesion: LiveSession): void {
   const destino = faseCon(sesion, 'decision');
   if (!puedePasarA(sesion.juego, sesion.phase, destino)) {
     throw new TransicionInvalida(sesion.phase, destino);
@@ -442,7 +442,7 @@ export function abrirAcusaciones(sesion: LiveSession): void {
 /**
  * Abre El Sellado.
  *
- * Es la hermana de `abrirAcusaciones` y hace lo mismo: comprobar que el juego
+ * Es la hermana de `abrirRespuestas` y hace lo mismo: comprobar que el juego
  * admite la transicion y cambiar de fase. La comprobacion sale del manifiesto,
  * asi que en CLUEDO —cuyo grafo declara `sellado: []`— esta llamada se rechaza
  * siempre, y ese rechazo es la garantia de que anadir la fase no le abre a
@@ -514,8 +514,8 @@ export function guardarNotas(sesion: LiveSession, participanteId: string, notas:
   jugador.notas = notas.slice(0, 20_000);
 }
 
-export interface ResultadoAcusacion {
-  acusacion: RespuestaEntregada;
+export interface ResultadoDeResponder {
+  respuesta: RespuestaEntregada;
   /** ¿Ha ganado con ella? */
   ganador: boolean;
 }
@@ -527,12 +527,12 @@ export interface ResultadoAcusacion {
  * reloj del teléfono para ganar siempre. Y el culpable no puede ganar
  * acusándose a sí mismo: su juego es no ser descubierto.
  */
-export function acusar(
+export function responder(
   sesion: LiveSession,
   participanteId: string,
   eleccion: Record<EjeId, string>,
   solucion: Record<EjeId, string>,
-): ResultadoAcusacion {
+): ResultadoDeResponder {
   /*
    * SE PUEDE ACUSAR EN CUALQUIER MOMENTO DE JUEGO, y eso es lo que hace que
    * acusar sea una decisión y no un trámite: gana quien acierta ANTES, así que
@@ -565,13 +565,13 @@ export function acusar(
   // sean otros tantos. Antes eran tres comparaciones escritas a mano.
   const correcta = aciertos(manifiesto, eleccion, solucion) === ejesDe(manifiesto).length;
 
-  const acusacion: RespuestaEntregada = {
+  const respuesta: RespuestaEntregada = {
     participanteId,
     respuestas: { ...eleccion },
     at: new Date().toISOString(),
     correcta,
   };
-  sesion.respuestasEntregadas.push(acusacion);
+  sesion.respuestasEntregadas.push(respuesta);
 
   // Quien es señalado por el eje que apunta a la mesa no puede ganar
   // acusándose: su juego es no ser descubierto.
@@ -579,7 +579,7 @@ export function acusar(
   const ganador = correcta && !esElCulpable && !sesion.primeroEnAcertar;
   if (ganador) sesion.primeroEnAcertar = participanteId;
 
-  return { acusacion, ganador };
+  return { respuesta, ganador };
 }
 
 /**
