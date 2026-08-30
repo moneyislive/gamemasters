@@ -18,6 +18,7 @@
  * sobra es un problema pequeño; una petición que revienta a mitad de preparar la
  * velada, no.
  */
+import { personasDe } from '../../../shared/juegos';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { env } from '../config';
@@ -38,7 +39,7 @@ import type { GameSession } from '../../../shared/types';
 export function fotosDe(game: GameSession): string[] {
   const urls = [
     game.boardImageUrl,
-    ...game.suspects.map((s) => s.photoUrl),
+    ...personasDe(game).map((s) => s.photoUrl),
     ...game.rooms.map((r) => r.photoUrl),
     ...game.weapons.map((w) => w.photoUrl),
     ...Object.values(game.entidades ?? {}).flatMap((lista) => lista.map((e) => e.photoUrl)),

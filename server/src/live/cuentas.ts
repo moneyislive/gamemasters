@@ -25,7 +25,7 @@ import type {
   VinculoDeCuenta,
 } from '../../../shared/live';
 import type { GameSession } from '../../../shared/types';
-import { esElSenalado, manifiestoDe } from '../../../shared/juegos';
+import { esElSenalado, manifiestoDe, personasDe } from '../../../shared/juegos';
 import { trofeosDelJuego } from '../juegos/trofeos';
 import { ganadoresDe } from '../juegos/veredictos';
 
@@ -340,7 +340,7 @@ export async function borrarCuenta(cuenta: Account): Promise<{
     if (!game) continue;
 
     let tocada = false;
-    for (const sospechoso of game.suspects) {
+    for (const sospechoso of personasDe(game)) {
       if (esSuyo(sospechoso.email)) {
         delete sospechoso.email;
         tocada = true;

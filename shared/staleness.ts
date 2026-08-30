@@ -11,7 +11,7 @@
  * regenerar y el cliente para avisar en la interfaz. Una sola fuente de verdad.
  */
 import type { GameSession } from './types';
-import { CLUEDO, entidadesDe, ejes as ejesDe, manifiestoSiExiste } from './juegos';
+import { CLUEDO, entidadesDe, ejes as ejesDe, manifiestoSiExiste, personasDe } from './juegos';
 import type { EjeId } from './juegos';
 
 export interface StalenessReport {
@@ -106,13 +106,13 @@ export function computeStaleness(game: GameSession): StalenessReport {
   // Sin trama no hay nada que pueda estar obsoleto: es un borrador.
   if (!plot) return vacio;
 
-  const idsSospechosos = new Set(game.suspects.map((s) => s.id));
+  const idsSospechosos = new Set(personasDe(game).map((s) => s.id));
   const idsSalas = new Set(game.rooms.map((r) => r.id));
   const idsArmas = new Set(game.weapons.map((w) => w.id));
-  const nombrePorId = new Map(game.suspects.map((s) => [s.id, s.name]));
+  const nombrePorId = new Map(personasDe(game).map((s) => [s.id, s.name]));
 
   const conPersonaje = new Set(plot.characters.map((c) => c.suspectId));
-  const suspectsWithoutCharacter = game.suspects
+  const suspectsWithoutCharacter = personasDe(game)
     .filter((s) => !conPersonaje.has(s.id))
     .map((s) => s.id);
   const orphanCharacters = plot.characters
@@ -126,7 +126,7 @@ export function computeStaleness(game: GameSession): StalenessReport {
   const suspectsWithoutDocument =
     documents.length === 0
       ? []
-      : game.suspects.filter((s) => !conDosier.has(s.id)).map((s) => s.id);
+      : personasDe(game).filter((s) => !conDosier.has(s.id)).map((s) => s.id);
   const orphanDocuments = documents
     .filter((d) => !NO_JUGADORES.has(d.suspectId) && !idsSospechosos.has(d.suspectId))
     .map((d) => d.suspectId);

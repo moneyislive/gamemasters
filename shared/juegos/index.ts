@@ -4,12 +4,15 @@
  * CATA. Un registro por nombre, que es lo mínimo que hace falta para que
  * «¿de qué juego es esta partida?» tenga respuesta.
  */
-import { declararAlmacen } from './entidades';
+import { declararAlmacen, entidadesDe } from './entidades';
+import type { Entidad } from './entidades';
+import { categoriaDeJugadores } from './tipos';
 import { CLUEDO } from './cluedo';
 import { MOMIA } from './momia';
 import { SOMBRAS } from './sombras';
 import type { JuegoId, ManifiestoDeJuego } from './tipos';
 import { TROFEOS } from '../live';
+import type { GameSession } from '../types';
 import type { TrofeoInfo } from '../live';
 
 /**
@@ -291,6 +294,34 @@ export function manifiestoDe(id: JuegoId | undefined): ManifiestoDeJuego {
  */
 export function manifiestoSiExiste(id: JuegoId | undefined): ManifiestoDeJuego | undefined {
   return INSTALADOS[id ?? JUEGO_POR_DEFECTO];
+}
+
+/**
+ * LAS PERSONAS SENTADAS A LA MESA, sean cuales sean para este juego.
+ *
+ * ═══ POR QUE HACE FALTA ═══
+ *
+ * El nucleo leia `game.suspects` en treinta y seis sitios: el emparejamiento de
+ * los moviles, los dosieres, los correos, la limpieza de fotos, la proyeccion,
+ * el asistente. Y `suspects` es un campo heredado de CLUEDO, asi que la
+ * categoria de personas de CUALQUIER juego tiene que acabar ahi o nada de eso
+ * funciona. Es uno de los peajes que `verify:ajeno` lleva contando desde que
+ * existe.
+ *
+ * Esto pregunta al manifiesto cual es su categoria de personas —la que declara
+ * `sonJugadores`— y devuelve sus entidades. Para los tres juegos de hoy es
+ * exactamente `game.suspects`, porque los tres declaran `almacen: 'suspects'`.
+ * Para el que venga, es donde el diga.
+ *
+ * Vacio si el juego no tiene categoria de personas. Un juego asi no puede
+ * repartir moviles, y es mejor que no reparta ninguno a que reparta los de otra
+ * categoria.
+ */
+export function personasDe(game: GameSession): Entidad[] {
+  const manifiesto = manifiestoSiExiste(game.settings?.juego);
+  if (!manifiesto) return [];
+  const cat = categoriaDeJugadores(manifiesto);
+  return cat ? entidadesDe(game, cat.id) : [];
 }
 
 /** ¿Está instalado este juego aquí? */

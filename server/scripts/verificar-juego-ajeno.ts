@@ -35,7 +35,7 @@
  * lo que todavía obliga a un juego nuevo a disfrazarse de CLUEDO, y son el
  * verdadero resultado de esta comprobación: mientras quede uno, el patrón limita.
  */
-import { manifiestoDe, papelDe, registrarJuego } from '../../shared/juegos';
+import { manifiestoDe, papelDe, personasDe, registrarJuego } from '../../shared/juegos';
 import {
   accionesDisponibles,
   ejecutarAccion,
@@ -93,13 +93,19 @@ const LA_ALMONEDA: ManifiestoDeJuego = {
       /*
        * PEAJE: la categoría de personas TIENE que ir a `suspects`.
        *
-       * Se llaman postores y no sospechosos, pero media plataforma cuelga de ese
-       * campo con ese nombre: el emparejamiento de los móviles, los dosieres y
-       * los correos leen `game.suspects` a pelo. Sin esto no se puede jugar, y no
-       * porque el motor lo exija —`entidadesDe` mira primero `game.entidades`—
-       * sino porque nadie más se ha girado.
+       * ═══ Y AQUI YA NO HAY `almacen: 'suspects'` ═══
+       *
+       * Lo habia, y con una nota que decia: «se llaman postores y no
+       * sospechosos, pero media plataforma cuelga de ese campo con ese nombre —
+       * el emparejamiento de los moviles, los dosieres y los correos leen
+       * `game.suspects` a pelo—. Sin esto no se puede jugar, y no porque el
+       * motor lo exija sino porque nadie mas se ha girado.»
+       *
+       * Ya se han girado. El nucleo pregunta `personasDe(game)`, que resuelve
+       * por el manifiesto cual es la categoria de personas y devuelve SUS
+       * entidades, vivan donde vivan. Los postores de esta subasta viven en
+       * `game.entidades.postores` y `game.suspects` esta vacio.
        */
-      almacen: 'suspects',
       presentacion: {
         titulo: 'Los postores',
         descripcion: 'Quienes se sientan a repartirse la casa.',
@@ -326,10 +332,13 @@ const game: GameSession = {
   status: 'ready',
   createdAt: ahora,
   updatedAt: ahora,
-  suspects: POSTORES.map((name, i) => ({ id: `p${i}`, name })),
+  suspects: [],
   rooms: [],
   weapons: [],
-  entidades: { lotes: LOTES.map((name, i) => ({ id: `l${i}`, name })) },
+  entidades: {
+    postores: POSTORES.map((name, i) => ({ id: `p${i}`, name })),
+    lotes: LOTES.map((name, i) => ({ id: `l${i}`, name })),
+  },
   boardMode: 'generated',
   settings: { language: 'es', juego: 'la-almoneda' },
 };
@@ -560,7 +569,25 @@ comprobar(
     papelDe(LA_ALMONEDA, 'lote-cantado') === 'turno' &&
     papelDe(LA_ALMONEDA, 'almoneda-cerrada') === 'fin',
 );
-peaje('la categoría de personas tiene que ir a `suspects` o no hay emparejamiento, dosieres ni correos');
+/*
+ * ═══ Y EL TERCERO QUE YA NO SE COBRA ═══
+ *
+ * Este era de los peores porque no lo exigia ningun tipo: la partida compilaba
+ * igual con los postores en `game.entidades`. Lo que pasaba es que el nucleo
+ * leia `game.suspects` en treinta y seis sitios —moviles, dosieres, correos,
+ * limpieza de fotos, proyeccion— y ninguno se enteraba de que ese juego guarda
+ * su gente en otro lado. Se jugaba una partida sin nadie sentado a la mesa.
+ */
+comprobar(
+  'sus personas viven fuera de `suspects` y la plataforma las encuentra igual',
+  game.suspects.length === 0 && personasDe(game).length === POSTORES.length,
+  { suspects: game.suspects.length, personas: personasDe(game).length },
+);
+comprobar(
+  'y la sesion reparte un sitio por persona, no por sospechoso',
+  sesion.players.length === POSTORES.length,
+  sesion.players.length,
+);
 peaje('`VistaJugador` obliga a mandar salas, objetos, pistas y cronología vacías aunque el juego no tenga nada de eso');
 
 // ---------------------------------------------------------------------------

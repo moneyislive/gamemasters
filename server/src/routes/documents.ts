@@ -12,7 +12,7 @@
  */
 import { once } from 'node:events';
 import { getStore } from '../db/store';
-import { manifiestoDe } from '../../../shared/juegos';
+import { manifiestoDe, personasDe } from '../../../shared/juegos';
 import { renderPlayerDocument } from '../docs/renderer';
 import { renderPrintableDocument } from '../docs/imprimibles';
 import { buscarNavegador, convertirAPdf, SinNavegador } from '../docs/pdf';
@@ -175,7 +175,7 @@ router.get('/games/:id/documents/:suspectId', async (req, res) => {
         ? 'game-master'
         : id === 'solution'
           ? 'el-sobre-del-crimen'
-          : (game.suspects.find((s) => s.id === id)?.name ?? documento.title);
+          : (personasDe(game).find((s) => s.id === id)?.name ?? documento.title);
 
     if (formato === 'pdf') {
       const pdf = await convertirAPdf(documento.html);

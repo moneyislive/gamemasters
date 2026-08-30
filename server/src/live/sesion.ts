@@ -14,15 +14,7 @@ import { senalEnMemoria, volcarPresencia } from './presencia';
 import { iniciarJuego } from '../juegos/inicios';
 import { ALFABETO_CODIGO, PAPELES_EN_JUEGO } from '../../../shared/live';
 import type { PapelDeFase } from '../../../shared/live';
-import {
-  aciertos,
-  fasesConPapel,
-  esElSenalado,
-  ejes as ejesDe,
-  manifiestoDe,
-  papelDe,
-  respuestaCompleta,
-} from '../../../shared/juegos';
+import { aciertos, ejes as ejesDe, esElSenalado, fasesConPapel, manifiestoDe, papelDe, personasDe, respuestaCompleta } from '../../../shared/juegos';
 import type { EjeId, JuegoId } from '../../../shared/juegos';
 import type { Acusacion, LivePhase, LivePlayer, LiveSession } from '../../../shared/live';
 import type { GameSession } from '../../../shared/types';
@@ -189,7 +181,7 @@ export async function abrirSesion(game: GameSession): Promise<LiveSession> {
     phase: 'lobby',
     round: 0,
     totalRounds: game.plot ? numeroDeRondas(game.plot) : 4,
-    players: game.suspects.map((s) => nuevoJugador(s.id, s.name, s.email)),
+    players: personasDe(game).map((s) => nuevoJugador(s.id, s.name, s.email)),
     acusaciones: [],
     tablon: [],
     rev: 1,
@@ -227,7 +219,7 @@ function nuevoJugador(suspectId: string, displayName: string, email?: string): L
  */
 function sincronizarJugadores(sesion: LiveSession, game: GameSession): LiveSession {
   const porId = new Map(sesion.players.map((p) => [p.suspectId, p]));
-  sesion.players = game.suspects.map((s) => {
+  sesion.players = personasDe(game).map((s) => {
     const previo = porId.get(s.id);
     if (!previo) return nuevoJugador(s.id, s.name, s.email);
     return { ...previo, displayName: s.name, email: s.email };

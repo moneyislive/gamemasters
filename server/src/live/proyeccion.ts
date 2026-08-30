@@ -31,7 +31,7 @@ import type {
   VistaJugador,
 } from '../../../shared/live';
 import type { GameSession, Plot } from '../../../shared/types';
-import { aciertos, ejeDeJugadores, ejes as ejesDe, esElSenalado, manifiestoDe } from '../../../shared/juegos';
+import { aciertos, ejeDeJugadores, ejes as ejesDe, esElSenalado, manifiestoDe, personasDe } from '../../../shared/juegos';
 import { estadoParaGm, proyectarEstado } from '../juegos/proyecciones';
 import { entidadesDe, nombreDeEntidad } from '../juegos/entidades';
 import { accionesDisponibles } from '../juegos/motor';
@@ -90,7 +90,7 @@ export function vistaDeJugador(
   if (!jugador) return null;
 
   const personaje = plot.characters.find((c) => c.suspectId === suspectId);
-  const sospechoso = game.suspects.find((s) => s.id === suspectId);
+  const sospechoso = personasDe(game).find((s) => s.id === suspectId);
   const enJuego = sesion.phase !== 'lobby';
   const abierta = sesion.phase === 'ronda-abierta';
   const terminada = sesion.phase === 'desenlace';
@@ -343,7 +343,7 @@ export function vistaDeJugador(
       .filter((p) => p.suspectId !== suspectId)
       .map((p) => {
         const suPersonaje = plot.characters.find((c) => c.suspectId === p.suspectId);
-        const suSospechoso = game.suspects.find((s) => s.id === p.suspectId);
+        const suSospechoso = personasDe(game).find((s) => s.id === p.suspectId);
         const suSala = sesion.phase === 'ronda-abierta' ? salaDe(p, sesion.round) : undefined;
         return {
           suspectId: p.suspectId,
