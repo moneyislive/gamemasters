@@ -21,6 +21,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { usePartida } from './estado';
 import { color, espacio, texto } from './tema';
 import { conAlfa, useJuego, useTema } from './tema-juego';
+import { manifiestoDe } from '../../shared/juegos';
 import type { AvisoClave } from '../../shared/live';
 
 const { width } = Dimensions.get('window');
@@ -28,49 +29,41 @@ const { width } = Dimensions.get('window');
 /**
  * Cada momento tiene su rótulo y su color.
  *
- * DOS DE ELLOS DEPENDEN DEL JUEGO, y estaban escritos en vocabulario de CLUEDO
- * para los dos. En El Misterio de la Momia no hay ningún sobre del crimen y
- * nadie «lo resuelve»: amanece, y gana un bando. Un telón a pantalla completa
- * es lo último que se lee de la noche, así que decir ahí la palabra del otro
- * juego se nota más que en ningún otro sitio.
- */
-const ROTULO_MOMIA: Partial<Record<AvisoClave, string>> = {
-  desenlace: 'Ha amanecido',
-  ganador: 'Alguien ha señalado',
-};
-
-/*
- * Y El Paso de las Sombras, por lo mismo y con más motivo: allí la noche se
- * cuenta por HORAS y no por rondas, no hay sobre del crimen y nadie «lo
- * resuelve» —decide el consejo del alba—. Sin esta tabla el telón de la última
- * pantalla de la noche decía «El sobre del crimen» en un juego que no tiene
- * ninguno.
+ * ═══ LOS RÓTULOS LOS PONE EL JUEGO ═══
  *
- * Se pasa a tabla por juego en vez de encadenar otro ternario: es exactamente
- * lo que se hizo con las paletas y con el ornamento, y por el mismo motivo.
+ * Aquí había tres tablas: la de abajo con las palabras de CLUEDO, y dos de
+ * excepciones —`ROTULO_MOMIA` y `ROTULO_SOMBRAS`— escritas al lado. Eso tenía dos
+ * problemas.
+ *
+ * El primero, que la de la Momia solo cubría DOS de los ocho rótulos, así que el
+ * telón de abrir vigilia decía «Comienza la ronda» encima de un cuerpo que decía
+ * «Vigilia 3 de 5». Título de un juego y cuerpo de otro, en la misma pantalla y a
+ * tamaño grande, que es donde más se nota.
+ *
+ * El segundo es más sintomático: el rótulo por defecto de `sellado` era «Se abre
+ * El Sellado», o sea que la tabla de CLUEDO llevaba dentro el nombre de una fase
+ * de la Momia. Las palabras se habían mezclado en las dos direcciones.
+ *
+ * Ahora cada juego declara los suyos en su manifiesto, junto al resto de sus
+ * palabras —el cuerpo del telón ya salía de ahí— y esta tabla se queda como
+ * RESPALDO, que es lo que hace que CLUEDO no cambie: sus ocho siguen aquí y él no
+ * declara ninguno.
  */
-const ROTULO_SOMBRAS: Partial<Record<AvisoClave, string>> = {
-  'ronda-abierta': 'Comienza la hora',
-  'ronda-cerrada': 'Se cierra la hora',
-  acusaciones: 'El consejo del alba',
-  desenlace: 'Amanece',
-  ganador: 'El consejo ha hablado',
-};
-
-const ROTULOS_POR_JUEGO: Record<string, Partial<Record<AvisoClave, string>>> = {
-  momia: ROTULO_MOMIA,
-  sombras: ROTULO_SOMBRAS,
-};
-
-const ROTULO: Record<AvisoClave, { titulo: string; tono: string }> = {
+const ROTULO: Partial<Record<AvisoClave, { titulo: string; tono: string }>> = {
   'ronda-abierta': { titulo: 'Comienza la ronda', tono: color.oro300 },
   'ronda-cerrada': { titulo: 'Se cierra la ronda', tono: color.oro400 },
   giro: { titulo: 'Algo ha cambiado', tono: '#e8a0a0' },
   ayuda: { titulo: 'Una ayuda', tono: color.oro300 },
   acusaciones: { titulo: 'Hora de acusar', tono: '#f0c9c0' },
-  sellado: { titulo: 'Se abre El Sellado', tono: '#f0c9c0' },
   desenlace: { titulo: 'El sobre del crimen', tono: '#f0c9c0' },
   ganador: { titulo: 'Alguien lo ha resuelto', tono: color.oro300 },
+  /*
+   * `sellado` YA NO ESTA AQUI. Su rotulo era «Se abre El Sellado», o sea el
+   * nombre de una fase de El Misterio de la Momia dentro de la tabla de CLUEDO
+   * --que ademas no puede llegar nunca a esa fase, porque su manifiesto no la
+   * declara--. Lo trae ahora la Momia en el suyo. La tabla pasa a `Partial` para
+   * poder decir esto: aqui solo van las palabras de CLUEDO.
+   */
 };
 
 export function TelonDeAvisos(): JSX.Element | null {
@@ -83,6 +76,13 @@ export function TelonDeAvisos(): JSX.Element | null {
    */
   const t = useTema();
   const juego = useJuego();
+  /*
+   * El TÍTULO puede venir del juego; el TONO no. El color dice qué clase de
+   * momento es —dorado si algo empieza, rosa si algo se decide— y eso significa
+   * lo mismo en cualquier juego; además ya sale de la paleta, así que un juego
+   * con otros colores lo recibe teñido sin declarar nada.
+   */
+  const rotulosDelJuego = manifiestoDe(juego).rotulosDeAviso ?? {};
   const opacidad = useSharedValue(0);
   const escala = useSharedValue(0.92);
   const deslizar = useSharedValue(18);
@@ -120,8 +120,8 @@ export function TelonDeAvisos(): JSX.Element | null {
 
   if (!aviso) return null;
   const base = ROTULO[aviso.clave] ?? { titulo: 'Atención', tono: color.oro300 };
-  const propios = ROTULOS_POR_JUEGO[juego ?? ''];
-  const rotulo = propios ? { ...base, titulo: propios[aviso.clave] ?? base.titulo } : base;
+  /* El título, del juego si lo declara; el tono, siempre de aquí. */
+  const rotulo = { ...base, titulo: rotulosDelJuego[aviso.clave] ?? base.titulo };
 
   return (
     <Animated.View style={[StyleSheet.absoluteFill, estilos.telon, estiloTelon]} pointerEvents="box-none">

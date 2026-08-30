@@ -749,6 +749,22 @@ export const MOMIA: ManifiestoDeJuego = {
     ],
   },
 
+  /*
+   * Los rótulos de los telones. Estaban en una tabla dentro de la app y solo
+   * cubrían DOS de los ocho, así que el telón de abrir vigilia decía «Comienza la
+   * ronda» encima de un cuerpo que decía «Vigilia 3 de 5»: título de un juego y
+   * cuerpo de otro, en la misma pantalla y a tamaño grande.
+   */
+  rotulosDeAviso: {
+    'ronda-abierta': 'Comienza la vigilia',
+    'ronda-cerrada': 'Se cierra la vigilia',
+    sellado: 'Se abre El Sellado',
+    acusaciones: 'Hora de señalar',
+    desenlace: 'Ha amanecido',
+    ganador: 'Alguien ha señalado',
+    giro: 'Algo ha cambiado',
+  },
+
   avisos: {
     rondaAbierta: 'Vigilia {ronda} de {total}. Elige cámara.',
     // Al cerrar no se publica nada: lo único que llega a la mesa es lo que

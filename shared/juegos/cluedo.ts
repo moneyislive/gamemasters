@@ -344,6 +344,31 @@ export const CLUEDO: ManifiestoDeJuego = {
     * PALABRA POR PALABRA LOS QUE YA HABÍA. CLUEDO no cambia ni una coma: esto
     * es una mudanza de sitio, no una reescritura.
     */
+  /*
+   * Los rotulos de los telones: la linea grande de encima del cuerpo.
+   *
+   * ESTABAN EN LA APP, en una tabla con las palabras de CLUEDO por defecto y dos
+   * tablas de excepciones al lado, una por cada otro juego. Eso hacia que la app
+   * fuese la duena de las palabras de los tres, y se notaba en las dos
+   * direcciones: la Momia solo tenia dos de los ocho rotulos --asi que su telon
+   * decia «Comienza la ronda» encima de «Vigilia 3 de 5»-- y la tabla por defecto
+   * llevaba dentro «Se abre El Sellado», que es el nombre de una fase de la Momia
+   * dentro de la tabla de CLUEDO.
+   *
+   * Ahora las palabras de cada juego viven en su fichero, con el resto de las
+   * suyas. La tabla de la app se queda de ultimo respaldo, para un juego que no
+   * declare ninguna.
+   */
+  rotulosDeAviso: {
+    'ronda-abierta': 'Comienza la ronda',
+    'ronda-cerrada': 'Se cierra la ronda',
+    acusaciones: 'Hora de acusar',
+    desenlace: 'El sobre del crimen',
+    ganador: 'Alguien lo ha resuelto',
+    giro: 'Algo ha cambiado',
+    ayuda: 'Una ayuda',
+  },
+
   avisos: {
     rondaAbierta: 'Ronda {ronda} de {total}. Elige sala.',
     rondaCerrada: 'Ronda cerrada. Lo que encontraste es tuyo: cuéntalo o guárdatelo.',

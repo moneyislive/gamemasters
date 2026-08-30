@@ -765,6 +765,32 @@ export interface ManifiestoDeJuego {
     desenlace: string;
   };
 
+  /**
+   * El RÓTULO de cada telón, que es la línea grande de encima del cuerpo.
+   *
+   * ═══ POR QUÉ HACÍA FALTA ADEMÁS DE `avisos` ═══
+   *
+   * `avisos` son los CUERPOS y ya salían del manifiesto: «Vigilia 3 de 5. Elige
+   * cámara». Los rótulos vivían en una tabla dentro de la app, con las palabras
+   * de CLUEDO por defecto y dos tablas de excepciones —una para la Momia y otra
+   * para las Sombras— escritas al lado. Eso tenía dos consecuencias feas.
+   *
+   * La primera, que la tabla de la Momia solo cubría dos de los ocho rótulos, así
+   * que el telón de abrir vigilia decía «Comienza la ronda» ENCIMA de un cuerpo
+   * que decía «Vigilia 3 de 5». Título de un juego, cuerpo de otro, en la misma
+   * pantalla y a tamaño grande.
+   *
+   * La segunda es peor de ver y más sintomática: el rótulo por defecto de
+   * `sellado` era «Se abre El Sellado», o sea que la tabla de CLUEDO llevaba
+   * dentro el nombre de una fase de la Momia. Las palabras de los juegos se
+   * habían mezclado en las dos direcciones.
+   *
+   * Ahora cada juego trae las suyas, en su fichero, junto al resto de sus
+   * palabras. Lo que no declare cae en el respaldo de la app, que es lo que
+   * había, y por eso CLUEDO no cambia.
+   */
+  rotulosDeAviso?: Record<string, string>;
+
   materialDeVelada?: boolean;
 
   /**

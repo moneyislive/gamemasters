@@ -262,12 +262,41 @@ for (const m of juegosInstalados()) {
     );
   }
 
-  // ---- 6. Reglas y avisos propios ----
+  // ---- 6. Reglas, avisos y rótulos propios ----
   comprobar(
     `${m.id}: trae sus propias reglas`,
     Array.isArray(m.reglas) && m.reglas.length > 0,
     'sin ellas los tres consumidores caen en las de CLUEDO: «Alguien de esta casa es un asesino»',
   );
+
+  /*
+   * ═══ EL TÍTULO Y EL CUERPO DEL TELÓN, DEL MISMO JUEGO ═══
+   *
+   * El telón a pantalla completa que anuncia cada cambio tiene dos partes: el
+   * CUERPO, que sale de `manifiesto.avisos`, y el RÓTULO, que es la línea grande
+   * de encima. Un juego que declare el cuerpo y no el rótulo se queda con el
+   * título de CLUEDO sobre su propio texto: la Momia decía «Comienza la ronda»
+   * encima de «Vigilia 3 de 5. Elige cámara», en la misma pantalla y a tamaño
+   * grande.
+   *
+   * Así que si declaras uno, declara el otro. CLUEDO no declara ninguno de los
+   * dos —los suyos son los de la app— y por eso no entra en esta comprobación.
+   */
+  if (m.avisos) {
+    const rotulos = m.rotulosDeAviso ?? {};
+    const alcanzables = new Set<string>();
+    for (const destinos of Object.values(m.fases)) for (const d of destinos ?? []) alcanzables.add(d);
+    /* Solo las fases por las que este juego pasa de verdad. */
+    const sinRotulo = [...alcanzables].filter((f) => f !== 'intermedio' && !rotulos[f]);
+    comprobar(
+      `${m.id}: si declara los cuerpos de los telones, declara también sus rótulos`,
+      sinRotulo.length === 0,
+      {
+        sinRotulo,
+        porque: 'el telon saldria con el titulo de CLUEDO encima del cuerpo de este juego',
+      },
+    );
+  }
 }
 
 // ---------------------------------------------------------------------------

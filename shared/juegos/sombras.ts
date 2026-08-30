@@ -794,6 +794,15 @@ export const SOMBRAS: ManifiestoDeJuego = {
     ],
   },
 
+  /* Los rótulos de los telones. Aquí la noche se cuenta por HORAS. */
+  rotulosDeAviso: {
+    'ronda-abierta': 'Comienza la hora',
+    'ronda-cerrada': 'Se cierra la hora',
+    acusaciones: 'El consejo del alba',
+    desenlace: 'Amanece',
+    ganador: 'El consejo ha hablado',
+  },
+
   avisos: {
     rondaAbierta: 'Hora {ronda} de {total}. Elige un paso, ve hasta él y lee lo que hay escrito en la puerta.',
     /*
