@@ -35,6 +35,7 @@ import { iniciarJuego } from '../src/juegos/inicios';
 import { trofeosDelJuego } from '../src/juegos/trofeos';
 import { generadorDeTrama } from '../src/juegos/generadores';
 import { vozDelTaller } from '../src/agent/voces';
+import { juegosConVeredicto } from '../src/juegos/veredictos';
 import { abrirRonda } from '../src/live/sesion';
 import { renderPlayerDocument } from '../src/docs/renderer';
 import { renderPrintableDocument } from '../src/docs/imprimibles';
@@ -267,6 +268,27 @@ for (const m of juegosInstalados()) {
       `${m.id}: tiene voz propia en el taller`,
       vozDelTaller(m.id) !== undefined,
       'sin ella, quien prepare esta partida habla con Edmund el mayordomo de CLUEDO',
+    );
+  }
+
+  /*
+   * ---- 2 quater. QUIEN DECIDE SU VICTORIA ----
+   *
+   * `sesion.winnerId` significa «el primero que acerto la acusacion», que es
+   * ganar en CLUEDO y no lo es en un juego de bandos. Un juego cuyo desenlace no
+   * quepa ahi tiene que dar de alta su veredicto, o la plataforma anotara en el
+   * historial de cada cuenta un ganador que no lo es --y eso no se arregla
+   * despues: la velada ya paso--.
+   *
+   * Se pregunta por el EJE: un juego cuyo eje de personas senala a alguien --el
+   * culpable, el saqueador, el kancho-- y que ademas resuelve por bandos, tiene
+   * que traerlo. CLUEDO no, porque para el `winnerId` ES la respuesta correcta.
+   */
+  if (m.id !== 'cluedo' && (m.ejes ?? []).length > 0) {
+    comprobar(
+      `${m.id}: da de alta quien gana, en vez de dejarlo en «el primero que acerto»`,
+      juegosConVeredicto().includes(m.id),
+      'sin el, el historial de la cuenta de cada persona anota mal quien gano esa noche',
     );
   }
 

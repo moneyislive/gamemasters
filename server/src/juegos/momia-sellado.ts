@@ -33,6 +33,7 @@ import type { EstadoMomia, RitoId } from '../../../shared/juegos/momia-tipos';
 import type { TrofeoId } from '../../../shared/live';
 import type { GameSession } from '../../../shared/types';
 import type { LiveSession } from '../../../shared/live';
+import { registrarVeredicto } from './veredictos';
 
 /** Un orden propuesto y quién lo respalda. */
 export interface Voto {
@@ -248,4 +249,21 @@ registrarCierre('momia', (game, sesion) => {
       ? 'El ritual se ha ejecutado. La tumba responde.'
       : 'El ritual se ha ejecutado. Algo ha salido mal.',
   };
+});
+
+/*
+ * EL VEREDICTO. Aquí ya se sabía quién gana --`resolverSellado` devuelve
+ * `ganadores`, y el propio tipo lo dice: «Es lo que `winnerId` no sabe decir»--
+ * pero la plataforma no lo preguntaba: anotaba en el historial de cada cuenta
+ * quién ganó según `winnerId`, o sea «quien primero desenmascaró al saqueador».
+ * Si la expedición sellaba la tumba y nadie llegó a señalarlo, quedaba escrito
+ * que no ganó nadie mientras aquí había diez ganadores.
+ *
+ * `selladoDe` es la función PURA --calcula, no escribe-- así que se puede llamar
+ * desde el cierre sin efectos. Devuelve `undefined` mientras la mesa no haya
+ * ejecutado el ritual, y entonces manda lo que sepa la plataforma.
+ */
+registrarVeredicto('momia', (game, sesion) => {
+  const resultado = selladoDe(game, sesion);
+  return resultado.ordenEjecutado.length > 0 ? resultado.ganadores : undefined;
 });

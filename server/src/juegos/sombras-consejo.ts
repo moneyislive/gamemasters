@@ -44,6 +44,7 @@ import type { EstadoSombras, PasoId } from '../../../shared/juegos/sombras-tipos
 import type { TrofeoId } from '../../../shared/live';
 import type { GameSession } from '../../../shared/types';
 import type { LiveSession } from '../../../shared/live';
+import { registrarVeredicto } from './veredictos';
 
 /** Una senda propuesta, quién la respalda y cuánto pesa ese respaldo. */
 export interface Voto {
@@ -324,4 +325,15 @@ registrarCierre('sombras', (game, sesion) => {
         ? 'Nadie ha propuesto un camino. La columna se queda quieta y empieza a clarear.'
         : 'La columna echa a andar. Cuatro pasos y una barca esperando, o no.',
   };
+});
+
+/*
+ * EL VEREDICTO, por lo mismo que en la Momia. Aquí además hay un caso que
+ * `winnerId` no puede representar de ninguna manera: se puede PERDER habiendo
+ * acertado la senda, si el rastro llegó al tope. Gana un bando, y a veces el
+ * bando que acertó no es el que gana.
+ */
+registrarVeredicto('sombras', (game, sesion) => {
+  const resultado = consejoDe(game, sesion);
+  return resultado.sendaAndada.length > 0 ? resultado.ganadores : undefined;
 });

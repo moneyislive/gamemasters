@@ -27,6 +27,7 @@ import type {
 import type { GameSession } from '../../../shared/types';
 import { esElSenalado, manifiestoDe } from '../../../shared/juegos';
 import { trofeosDelJuego } from '../juegos/trofeos';
+import { ganadoresDe } from '../juegos/veredictos';
 
 /** Busca la cuenta del correo, o la crea si es la primera vez. */
 export async function cuentaDe(email: string, displayName: string): Promise<Account> {
@@ -107,7 +108,25 @@ export async function cerrarPartidaEnCuentas(
      */
     const manifiesto = manifiestoDe(sesion.juego ?? game.settings?.juego);
     const eraCulpable = esElSenalado(manifiesto, plot.solution.respuestas, jugador.suspectId);
-    const gano = sesion.winnerId === jugador.suspectId;
+    /*
+     * ¿GANÓ? SE LE PREGUNTA AL JUEGO.
+     *
+     * `sesion.winnerId` significa «el primero que acertó la acusación», que es
+     * exactamente ganar en CLUEDO y no lo es en ningún juego de bandos. En El
+     * Misterio de la Momia solo se escribe si alguien SEÑALA al saqueador, así
+     * que una noche en la que la expedición sellaba bien la tumba pero nadie
+     * llegó a señalarlo quedaba anotada en el historial de las diez cuentas como
+     * que no ganó nadie. Y eso no se arregla después: la velada ya pasó.
+     *
+     * Los dos juegos ya calculaban sus ganadores --`resolverSellado` y el consejo
+     * del alba devuelven `ganadores: string[]`, y sus propios tipos dicen «es lo
+     * que winnerId no sabe decir»-- y lo que faltaba era que alguien preguntara.
+     *
+     * Un juego sin veredicto dado de alta se comporta como siempre. CLUEDO no
+     * registra ninguno, así que su historial sale idéntico.
+     */
+    const ganadores = ganadoresDe(game, sesion);
+    const gano = ganadores ? ganadores.includes(jugador.suspectId) : sesion.winnerId === jugador.suspectId;
 
     const partida: PartidaJugada = {
       gameId: game.id,
