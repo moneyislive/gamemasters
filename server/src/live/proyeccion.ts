@@ -424,7 +424,7 @@ export function vistaDeJugador(
         ? plot.solution.respuestas[ejeDeJugadores(manifiesto)!.id]
         : undefined,
       motive: plot.solution.motive,
-      reconstruccion: plot.material?.finale?.reconstruction || plot.solution.howItHappened,
+      reconstruccion: plot.material?.finale?.reconstruction || plot.solution.howItHappened || '',
       confesion: plot.material?.finale?.confession,
       epilogo: plot.material?.finale?.epilogue,
       // El ganador se anuncia haya acusado o no. Antes esto exigía que

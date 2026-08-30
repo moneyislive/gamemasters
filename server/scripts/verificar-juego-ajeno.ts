@@ -361,7 +361,12 @@ const plot: Plot = {
   tagline: 'Todo lo que queda de una casa, y una tarde para repartirlo.',
   synopsis: 'Se vacía la casa de la calle Mayor. Lo que no se reparta hoy, se tira.',
   setting: 'El salón, con los muebles ya apartados contra la pared.',
-  solution: { respuestas: {}, motive: '', howItHappened: '' },
+  /*
+   * SIN MOTIVO NI RELATO. `PlotSolution` los exigia —«por que lo hizo» y «como
+   * lo hizo»— y aqui no lo ha hecho nadie. `respuestas` se queda vacio porque
+   * este juego no tiene ejes: no hay nada que adivinar.
+   */
+  solution: { respuestas: {} },
   characters: POSTORES.map((name, i) => ({
     suspectId: `p${i}`,
     characterName: name,
@@ -531,7 +536,20 @@ comprobar(
  * salta el bloque entero en vez de pintar «La víctima · —».
  */
 comprobar('la vista no lleva víctima porque no ha muerto nadie', v.caso.victima === undefined);
-peaje('`Plot` exige synopsis, setting y solution: un juego sin crimen se los inventa igual');
+/*
+ * Y EL CUARTO. `PlotSolution` exigia `motive` y `howItHappened` —«por que lo
+ * hizo» y «como lo hizo»— asi que esta subasta escribia dos cadenas vacias, y
+ * el movil pintaba un marco con el rotulo «El motivo» y nada dentro.
+ *
+ * Lo que QUEDA es `synopsis` y `setting`, y no los quito porque no son de
+ * CLUEDO: de que va esto y donde ocurre son dos cosas que tiene cualquier
+ * juego. La subasta las rellena con frases de verdad, no con guiones.
+ */
+comprobar(
+  'no hay motivo ni relato del crimen porque no ha habido crimen',
+  plot.solution.motive === undefined && plot.solution.howItHappened === undefined,
+);
+peaje('`Plot` exige `synopsis` y `setting`, que casi todo juego tiene, y un `solution` aunque no haya nada que adivinar');
 /*
  * ═══ OTRO PEAJE QUE YA NO SE COBRA ═══
  *

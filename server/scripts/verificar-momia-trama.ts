@@ -820,9 +820,9 @@ for (const id of ['guia-expedicion', 'hoja-sellado', 'carteles-camara', 'informe
  */
 const guia = compuestos.get('guia-expedicion') ?? '';
 comprobar('la guía no lleva el motivo del saqueador',
-  !guia.includes(sana.plot.solution.motive.slice(0, 40)));
+  !guia.includes((sana.plot.solution.motive ?? '').slice(0, 40)));
 comprobar('ni el relato de cómo rompió el sello',
-  !guia.includes(sana.plot.solution.howItHappened.slice(0, 40)));
+  !guia.includes((sana.plot.solution.howItHappened ?? '').slice(0, 40)));
 comprobar('ni la frase que se lo dice a esa persona', !guia.includes('Fuiste tú'));
 comprobar('la hoja del sellado tampoco',
   !(compuestos.get('hoja-sellado') ?? '').includes('Fuiste tú'));
@@ -935,7 +935,7 @@ comprobar('a ciegas, la guía no manda a quien dirige a por el papiro',
 comprobar('y le dice quién sale con él', guiaCiega.includes('quien preparó el material'));
 comprobar('la guía a ciegas sigue sin delatar el orden', !delataElOrden(guiaCiega));
 comprobar('y sigue sin llevar el motivo del saqueador',
-  !guiaCiega.includes(sana.plot.solution.motive.slice(0, 40)));
+  !guiaCiega.includes((sana.plot.solution.motive ?? '').slice(0, 40)));
 
 /*
  * LAS DOS COSAS QUE LA GUIA A CIEGAS SEGUIA CONTANDO.

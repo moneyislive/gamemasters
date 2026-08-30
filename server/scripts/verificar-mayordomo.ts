@@ -160,8 +160,8 @@ for (let n = 0; n < RONDAS; n++) {
   const ajenos = plot.characters.filter((c) => c.suspectId !== yo);
 
   const prohibido: Array<[string, string]> = [
-    ['el relato de cómo ocurrió', plot.solution.howItHappened],
-    ['el motivo real del crimen', plot.solution.motive],
+    ['el relato de cómo ocurrió', plot.solution.howItHappened ?? ''],
+    ['el motivo real del crimen', plot.solution.motive ?? ''],
     ['el giro personal', MARCA_GIRO],
     ['la revelación de la cronología', MARCA_CRONOLOGIA],
     ['la ayuda de nivel 3', MARCA_AYUDA],

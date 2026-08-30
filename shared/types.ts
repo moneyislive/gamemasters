@@ -159,8 +159,16 @@ export interface TimelineEvent {
  */
 export interface PlotSolution {
   respuestas: Record<EjeId, string>;
-  motive: string;
-  howItHappened: string;
+  /**
+   * POR QUE Y COMO LO HIZO. Los dos son de un juego donde alguien mata.
+   *
+   * `respuestas` ya es generico —un id por eje, sean los ejes que sean— pero
+   * estos dos se quedaron con el nombre y el sentido del crimen. Una subasta
+   * escribia dos cadenas vacias; una campaña de rol no tiene ni motivo ni
+   * relato de como ocurrio, tiene una historia entera.
+   */
+  motive?: string;
+  howItHappened?: string;
 }
 
 // ---------- Material impreso (segunda llamada, opcional) ----------

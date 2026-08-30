@@ -49,7 +49,7 @@ function comprobarCeguera(game: GameSession, plot: Plot): Comprobacion[] {
       : 'Comprobado sobre el documento realmente generado.',
   }));
 
-  const relato = plot.solution.howItHappened.slice(0, 40);
+  const relato = (plot.solution.howItHappened ?? '').slice(0, 40);
   comprobaciones.push({
     titulo: 'La guía no cuenta cómo ocurrió',
     bien: relato.length === 0 || !guia.includes(relato),

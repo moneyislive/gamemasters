@@ -156,7 +156,7 @@ function reparacionLocal(game: GameSession, plot: Plot): ReparacionSolucion {
   const sala = game.rooms.find((r) => r.id === lugarDe(plot.solution));
 
   const nombre = personaje?.characterName ?? asesino?.name ?? 'el culpable';
-  const motive = personaje?.motive?.trim() || plot.solution.motive;
+  const motive = personaje?.motive?.trim() || plot.solution.motive || '';
   const dondeOcurrio = sala ? sala.name : 'la sala más apartada de la casa';
   const conQue = arma ? arma.name.toLowerCase() : 'lo primero que encontró a mano';
 

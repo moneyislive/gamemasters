@@ -831,7 +831,14 @@ export interface VistaJugador {
      * la única respuesta que además identifica a una persona de la mesa.
      */
     culpableId?: string;
-    motive: string;
+    /**
+     * POR QUE LO HIZO. Ausente en un juego donde no lo hizo nadie.
+     *
+     * Sale de `plot.solution.motive`, que se escribio para un crimen. Una
+     * subasta mandaba cadena vacia y el movil pintaba un apartado sin nada
+     * dentro.
+     */
+    motive?: string;
     reconstruccion: string;
     confesion?: string;
     epilogo?: string;

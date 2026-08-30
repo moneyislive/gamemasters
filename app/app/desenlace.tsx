@@ -120,12 +120,15 @@ export default function Desenlace(): JSX.Element {
 
       {paso >= 1 && (
         <>
-          <Animated.View entering={FadeInUp.duration(600)}>
-            <Marco tono="papel">
-              <Etiqueta style={{ color: t.burdeos700 }}>El motivo</Etiqueta>
-              <Cuerpo style={{ color: t.caoba700, marginTop: espacio.sm }}>{fin.motive}</Cuerpo>
-            </Marco>
-          </Animated.View>
+          {/* Sin motivo no hay apartado: antes salia el marco vacio. */}
+          {fin.motive ? (
+            <Animated.View entering={FadeInUp.duration(600)}>
+              <Marco tono="papel">
+                <Etiqueta style={{ color: t.burdeos700 }}>El motivo</Etiqueta>
+                <Cuerpo style={{ color: t.caoba700, marginTop: espacio.sm }}>{fin.motive}</Cuerpo>
+              </Marco>
+            </Animated.View>
+          ) : null}
           <Animated.View entering={FadeInUp.delay(140).duration(600)}>
             <Marco tono="papel">
               <Etiqueta style={{ color: t.burdeos700 }}>Cómo ocurrió</Etiqueta>
