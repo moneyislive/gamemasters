@@ -230,10 +230,96 @@ if ($SoloComprobar) {
 # Desplegar
 # ---------------------------------------------------------------------------
 
+<#
+  ═══ LA CLAVE QUE NO ESTA, EXPLICADA ═══
+
+  Aqui se decia «No esta la clave: <ruta>» y punto. Eso no ayuda en el caso mas
+  probable, que es el que paso de verdad: alguien copio el ejemplo de la
+  documentacion —`C:
+uta	u-clave.pem`— tal cual, porque parecia una ruta.
+
+  Y hay un segundo caso que importa mas: que no haya ninguna clave en el
+  ordenador. Un .pem de AWS solo se descarga UNA VEZ, al crear el par; si se
+  perdio no se puede volver a bajar, y entonces la respuesta no es «pon bien la
+  ruta» sino «entra por EC2 Instance Connect y ponte una clave nueva». Son dos
+  callejones distintos y desde fuera se ven igual.
+#>
+function Explicar-LaClaveQueFalta {
+  param([string]$Ruta)
+
+  Write-Host ''
+  Write-Host "No esta la clave: $Ruta" -ForegroundColor Red
+
+  if ($Ruta -match 'tu-clave|ruta\|LA\.IP|EJEMPLO') {
+    Write-Host ''
+    Write-Host 'Eso es el EJEMPLO de la documentacion, no una ruta de verdad.' -ForegroundColor Yellow
+  }
+
+  <#
+    SE BUSCA POR EL CONTENIDO, NO POR LA EXTENSION, y esto costo una vuelta.
+
+    Buscando `*.pem` a secas salieron NOVENTA ficheros: los paquetes de
+    certificados de cada entorno de Python del ordenador —`cacert.pem` de
+    certifi, los de prueba de `gevent`, los de `botocore`—. Ninguno es una clave
+    SSH, y el guion los ofrecia diciendo «prueba con una de esas».
+
+    Una sugerencia equivocada es PEOR que no sugerir nada: manda a probar cosas
+    que no pueden funcionar y hace dudar de si el problema era otro.
+
+    Una clave privada se reconoce por su primera linea. Eso no tiene falsos
+    positivos, que es justo lo que hace falta aqui.
+  #>
+  $sitios = @("$env:USERPROFILE\.ssh", "$env:USERPROFILE\Downloads", "$env:USERPROFILE\Desktop", "$env:USERPROFILE\Documents")
+  $candidatas = @()
+  foreach ($d in $sitios) {
+    if (-not (Test-Path $d)) { continue }
+    $ficheros = Get-ChildItem -Path $d -Include *.pem, *.ppk, id_rsa, id_ed25519 -File -Recurse -Depth 2 -ErrorAction SilentlyContinue |
+      Where-Object {
+        # `-notlike` y no `-notmatch`: son comodines, no expresiones regulares,
+        # asi que la barra invertida de una ruta de Windows es una barra y no
+        # una secuencia de escape a medias.
+        $_.Length -lt 20KB -and
+        $_.FullName -notmatch 'site-packages|node_modules|certifi|cacert' -and
+        $_.FullName -notlike '*\Lib\*' -and
+        $_.FullName -notlike '*\test\*' -and
+        $_.FullName -notlike '*\tests\*'
+      }
+    foreach ($f in $ficheros) {
+      $primera = Get-Content $f.FullName -TotalCount 1 -ErrorAction SilentlyContinue
+      if ($primera -match 'BEGIN .*PRIVATE KEY' -or $primera -match 'PuTTY-User-Key-File') {
+        $candidatas += $f.FullName
+      }
+    }
+  }
+
+  if ($candidatas) {
+    Write-Host ''
+    Write-Host 'Estas SI son claves privadas y estan en este ordenador:' -ForegroundColor Cyan
+    foreach ($c in ($candidatas | Select-Object -Unique)) { Write-Host "  $c" }
+    Write-Host ''
+    Write-Host 'Prueba con -Llave y una de esas.'
+    return
+  }
+
+  Write-Host ''
+  Write-Host 'Y NO HAY NINGUNA en Downloads, Escritorio, Documentos ni .ssh.' -ForegroundColor Yellow
+  Write-Host ''
+  Write-Host 'Un .pem de AWS solo se descarga al crear el par de claves: si se'
+  Write-Host 'perdio, no se puede volver a bajar. Dos salidas, las dos desde la'
+  Write-Host 'consola de AWS y ninguna desde aqui:'
+  Write-Host ''
+  Write-Host '  · EC2 Instance Connect  — abre una consola en el navegador, sin'
+  Write-Host '    clave. Entras y te pones una nueva en ~/.ssh/authorized_keys.'
+  Write-Host '  · Un par de claves nuevo — creas otro y lo asocias a la instancia.'
+  Write-Host ''
+  Write-Host 'Si la instancia todavia no existe, empieza por el paso 1 del LEEME.'
+  Write-Host ''
+}
+
 $argsSsh = @()
 if ($Llave) {
   if (-not (Test-Path $Llave)) {
-    Write-Host "No esta la clave: $Llave" -ForegroundColor Red
+    Explicar-LaClaveQueFalta -Ruta $Llave
     exit 2
   }
   $argsSsh += @('-i', $Llave)
