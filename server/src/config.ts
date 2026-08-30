@@ -140,6 +140,16 @@ function readHost(): string {
 /** Variables de entorno ya normalizadas. */
 export const env: {
   apiKey?: string;
+  /**
+   * QUE JUEGOS INSTALA ESTE SERVIDOR. Vacio o ausente: todos los que trae.
+   *
+   * Es lo que permite que el mismo binario sirva a paises distintos con
+   * repartos distintos —aqui la Momia, alli las Sombras— sin compilar uno por
+   * pais. Se lee una vez al arrancar; no es una perilla que se toque en marcha,
+   * porque quitar un juego con partidas abiertas dejaria a doce personas a
+   * media velada con un error en el movil.
+   */
+  juegos?: string[];
   defaultModel: ModelId;
   port: number;
   /** Dónde vive este servidor de cara al mundo, p. ej. `https://harkania.com`. */
@@ -173,6 +183,19 @@ export const env: {
   clientDir?: string;
 } = {
   apiKey: process.env.ANTHROPIC_API_KEY?.trim() || undefined,
+  /*
+   * `JUEGOS=momia,sombras`. Vacio o ausente: todos los que trae el binario.
+   *
+   * Se filtran los huecos para que `JUEGOS=` o `JUEGOS=,,` no signifiquen «un
+   * juego que se llama cadena vacia» y dejen el servidor sin ninguno.
+   */
+  juegos: (process.env.JUEGOS ?? '')
+    .split(',')
+    .map((j) => j.trim())
+    .filter(Boolean)
+    .length
+    ? (process.env.JUEGOS ?? '').split(',').map((j) => j.trim()).filter(Boolean)
+    : undefined,
   defaultModel: readDefaultModel(),
   port: readPort(),
   publicOrigin: readPublicOrigin(),

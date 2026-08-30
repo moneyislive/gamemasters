@@ -135,14 +135,47 @@ export const JUEGO_POR_DEFECTO: JuegoId = 'cluedo';
 const LLAVE = Symbol.for('gamemasters.juegos.instalados');
 const global_ = globalThis as unknown as Record<symbol, Record<JuegoId, ManifiestoDeJuego>>;
 
-const INSTALADOS: Record<JuegoId, ManifiestoDeJuego> =
-  global_[LLAVE] ?? (global_[LLAVE] = { [CLUEDO.id]: CLUEDO });
-INSTALADOS[CLUEDO.id] = CLUEDO;
-INSTALADOS[MOMIA.id] = MOMIA;
-INSTALADOS[SOMBRAS.id] = SOMBRAS;
-anotarAlmacenes(CLUEDO);
-anotarAlmacenes(MOMIA);
-anotarAlmacenes(SOMBRAS);
+const INSTALADOS: Record<JuegoId, ManifiestoDeJuego> = global_[LLAVE] ?? (global_[LLAVE] = {});
+
+/**
+ * El reparto de este servidor, si se ha elegido uno. ANCLADO AL AMBITO GLOBAL.
+ *
+ * ═══ ESTO LO ENCONTRO UNA PRUEBA EN SU PRIMERA EJECUCION ═══
+ *
+ * El filtro se aplicaba una vez, al final de `juegos/instalados.ts`, y
+ * funcionaba —el arranque imprimia «instalados: sombras»— y aun asi el servidor
+ * creaba partidas de CLUEDO tan contento.
+ *
+ * La causa es la que este mismo fichero lleva documentada desde hace tiempo unas
+ * lineas mas abajo: ESTE MODULO SE CARGA DOS VECES. Una prueba lo importa como
+ * `../../shared/juegos` y `staleness.ts` como `./juegos`, y el cargador las
+ * trata como modulos distintos. La tabla se salva porque esta anclada con
+ * `Symbol.for`; lo que no se salvaba era el filtro, porque la SEGUNDA carga
+ * volvia a ejecutar las tres altas de aqui abajo y las metia otra vez —despues
+ * de haberlas quitado—.
+ *
+ * Asi que el reparto tambien se ancla, y las altas lo respetan. Un juego que no
+ * esta en el reparto no entra por ningun camino: ni por la carga inicial, ni por
+ * la segunda, ni por `registrarJuego`.
+ */
+const LLAVE_REPARTO = Symbol.for('gamemasters.juegos.reparto');
+const globalReparto = globalThis as unknown as Record<symbol, Set<JuegoId> | undefined>;
+
+function admitido(id: JuegoId): boolean {
+  const reparto = globalReparto[LLAVE_REPARTO];
+  return reparto === undefined || reparto.has(id);
+}
+
+/** Da de alta un manifiesto si el reparto de este servidor lo admite. */
+function alta(manifiesto: ManifiestoDeJuego): void {
+  if (!admitido(manifiesto.id)) return;
+  INSTALADOS[manifiesto.id] = manifiesto;
+  anotarAlmacenes(manifiesto);
+}
+
+alta(CLUEDO);
+alta(MOMIA);
+alta(SOMBRAS);
 
 /**
  * Da de alta un juego.
@@ -154,8 +187,7 @@ anotarAlmacenes(SOMBRAS);
  * una velada entera.
  */
 export function registrarJuego(manifiesto: ManifiestoDeJuego): void {
-  INSTALADOS[manifiesto.id] = manifiesto;
-  anotarAlmacenes(manifiesto);
+  alta(manifiesto);
 }
 
 /**
@@ -169,6 +201,39 @@ export function registrarJuego(manifiesto: ManifiestoDeJuego): void {
 function anotarAlmacenes(manifiesto: ManifiestoDeJuego): void {
   for (const categoria of manifiesto.categorias) {
     if (categoria.almacen) declararAlmacen(categoria.id, categoria.almacen);
+  }
+}
+
+/**
+ * Deja instalados SOLO estos juegos. Lo llama el servidor al arrancar.
+ *
+ * ═══ POR QUE ESTO Y NO OTRA COSA ═══
+ *
+ * El objetivo es que el mismo binario sirva a paises distintos con repartos
+ * distintos: aqui se juega a la Momia, alli a las Sombras. Sin esto habria que
+ * compilar un servidor por pais, que es justo lo que no escala.
+ *
+ * Y no hace falta nada mas que esto porque el trabajo pesado ya esta hecho: con
+ * un juego fuera de `INSTALADOS`, `manifiestoDe` lanza `JuegoNoInstalado`, el
+ * middleware lo traduce a un 409 que dice cuales SI estan, el recibidor del
+ * taller no lista sus partidas y el catalogo no le pinta tarjeta. Todo eso ya se
+ * comporta bien; lo unico que faltaba era poder decidir la lista.
+ *
+ * SE LLAMA EN EL ARRANQUE Y NO EN CALIENTE. Quitar un juego con partidas
+ * abiertas dejaria a doce personas a media velada con un 409 en el movil, asi
+ * que esto no es una perilla que se toque en marcha: es lo que arranca el
+ * proceso.
+ */
+export function instalarSoloEstos(ids: JuegoId[]): void {
+  const queridos = new Set(ids);
+  /*
+   * Se ANOTA el reparto antes de filtrar, y ese orden importa: sin anotarlo, la
+   * segunda carga de este modulo volveria a dar de alta lo que se acaba de
+   * quitar. Con el anotado, las altas de arriba lo respetan cargue quien cargue.
+   */
+  globalReparto[LLAVE_REPARTO] = queridos;
+  for (const id of Object.keys(INSTALADOS)) {
+    if (!queridos.has(id)) delete INSTALADOS[id];
   }
 }
 

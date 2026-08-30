@@ -49,6 +49,13 @@ const BATERIA = [
     porque: 'los tres juegos producen exactamente lo de antes',
   },
   {
+    nombre: 'reparto por servidor',
+    donde: 'server',
+    guion: 'verify:reparto',
+    lento: true,
+    porque: 'el mismo binario con otro reparto de juegos, con servidor de verdad',
+  },
+  {
     nombre: 'núcleo agnóstico',
     donde: 'server',
     guion: 'verify:nucleo',

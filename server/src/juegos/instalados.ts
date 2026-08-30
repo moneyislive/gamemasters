@@ -36,6 +36,9 @@
  */
 import '../docs/imprimibles/casa';
 
+import { env } from '../config';
+import { instalarSoloEstos, juegosInstalados } from '../../../shared/juegos';
+
 // CLUEDO.
 import './cluedo-acciones';
 import './cluedo-trofeos';
@@ -135,6 +138,38 @@ import '../docs/imprimibles/sombras/dosierEscolta';
 
 // Y sus ocho plantillas de imprimible. Ver el porque en la linea de CLUEDO.
 import '../docs/imprimibles/sombras/registro';
+
+/*
+ * ═══ Y AHORA SE ELIGE CUALES QUEDAN INSTALADOS ═══
+ *
+ * Todo lo de arriba da de alta lo que este binario SABE hacer. Lo que este
+ * servidor OFRECE es otra cosa, y la decide `JUEGOS` en el entorno:
+ * `JUEGOS=momia,sombras` deja fuera a CLUEDO sin recompilar nada.
+ *
+ * Es lo que permite el reparto por pais con un solo binario. Y no hace falta
+ * mas que esta linea porque el trabajo pesado esta hecho: con un juego fuera de
+ * la lista, `manifiestoDe` lanza `JuegoNoInstalado`, el middleware lo traduce a
+ * un 409 que dice cuales si estan, el recibidor del taller no lista sus
+ * partidas y el catalogo no le pinta tarjeta.
+ *
+ * VA AL FINAL, despues de todas las altas, y tiene que seguir ahi: filtrar
+ * antes de que los modulos se hayan importado no filtraria nada.
+ */
+if (env.juegos) {
+  instalarSoloEstos(env.juegos);
+  const puestos = juegosInstalados().map((m) => m.id);
+  const pedidos = env.juegos.filter((j) => !puestos.includes(j));
+  console.log(`[juegos] instalados: ${puestos.join(', ') || '(ninguno)'}`);
+  if (pedidos.length > 0) {
+    /*
+     * Se avisa y NO se muere. Un `JUEGOS` con una errata dejaria el servidor sin
+     * arrancar y con el a todas las partidas de los juegos que si estan bien
+     * escritos; el aviso es suficiente y el que falta no se puede jugar de todas
+     * formas.
+     */
+    console.warn(`[juegos] pedidos pero no disponibles en este binario: ${pedidos.join(', ')}`);
+  }
+}
 
 /**
  * No exporta nada, y es a propósito.
