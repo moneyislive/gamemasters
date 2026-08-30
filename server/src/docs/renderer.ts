@@ -7,6 +7,7 @@
  * data URI cuando el fichero existe en disco, de modo que el HTML descargado
  * siga funcionando sin conexión con el servidor.
  */
+import { personasDe } from '../../../shared/juegos';
 import fs from 'node:fs';
 import path from 'node:path';
 import { env } from '../config';
@@ -226,7 +227,7 @@ export function renderDocumentIndex(game: GameSession): PlayerDocument[] {
   const dosieres = dosieresDe(game.settings?.juego);
   if (!dosieres) return [];
 
-  const indice: PlayerDocument[] = game.suspects.map((sospechoso) => ({
+  const indice: PlayerDocument[] = personasDe(game).map((sospechoso) => ({
     suspectId: sospechoso.id,
     title: dosieres.tituloDeUno(game, plot, sospechoso.id),
   }));
@@ -269,7 +270,7 @@ export function renderPlayerDocument(
   const suelto = dosieres.deLaMesa?.(game, plot).find((d) => d.id === suspectId);
   if (suelto) return { suspectId, title: suelto.titulo, html: suelto.html(opciones) };
 
-  if (!game.suspects.some((s) => s.id === suspectId)) return null;
+  if (!personasDe(game).some((s) => s.id === suspectId)) return null;
 
   const html = dosieres.deUno(game, plot, suspectId, opciones);
   if (html === null) return null;
@@ -288,7 +289,7 @@ export function renderPlayerDocuments(
   const plot = game.plot;
   if (!plot) return [];
   const documentos: PlayerDocument[] = [];
-  for (const sospechoso of game.suspects) {
+  for (const sospechoso of personasDe(game)) {
     const doc = renderPlayerDocument(game, sospechoso.id, opciones);
     if (doc) documentos.push(doc);
   }

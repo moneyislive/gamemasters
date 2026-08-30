@@ -3,7 +3,7 @@
  * de las salas registradas en la partida.
  */
 import { generateBoardLayout } from '../board/generator';
-import { manifiestoDe } from '../../../shared/juegos';
+import { lugaresDe, manifiestoDe } from '../../../shared/juegos';
 import { getStore } from '../db/store';
 import { crearRouter } from '../rutas';
 import { partidaParaElTaller } from '../live/proyeccion';
@@ -18,7 +18,7 @@ router.post('/games/:id/board', async (req, res) => {
       res.status(404).json({ error: 'No existe esa partida.' });
       return;
     }
-    game.board = generateBoardLayout(game.rooms, manifiestoDe(game.settings?.juego).rotuloCentralDelPlano);
+    game.board = generateBoardLayout(lugaresDe(game), manifiestoDe(game.settings?.juego).rotuloCentralDelPlano);
     const guardada = await store.saveGame(game);
     res.json(partidaParaElTaller(guardada));
   } catch (error) {

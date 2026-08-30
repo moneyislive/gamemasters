@@ -11,7 +11,7 @@
  * regenerar y el cliente para avisar en la interfaz. Una sola fuente de verdad.
  */
 import type { GameSession } from './types';
-import { CLUEDO, entidadesDe, ejes as ejesDe, manifiestoSiExiste, personasDe } from './juegos';
+import { CLUEDO, ejes as ejesDe, entidadesDe, lugaresDe, manifiestoSiExiste, personasDe } from './juegos';
 import type { EjeId } from './juegos';
 
 export interface StalenessReport {
@@ -107,8 +107,13 @@ export function computeStaleness(game: GameSession): StalenessReport {
   if (!plot) return vacio;
 
   const idsSospechosos = new Set(personasDe(game).map((s) => s.id));
-  const idsSalas = new Set(game.rooms.map((r) => r.id));
-  const idsArmas = new Set(game.weapons.map((w) => w.id));
+  const idsSalas = new Set(lugaresDe(game).map((r) => r.id));
+  /*
+   * Aqui habia un `idsArmas` que se calculaba y NO LO USABA NADIE. Codigo
+   * muerto desde que la solucion se comprueba por ejes: `brokenSolution`
+   * pregunta a `entidadesDe` por la categoria de cada eje, asi que las armas ya
+   * no tenian que mirarse aparte.
+   */
   const nombrePorId = new Map(personasDe(game).map((s) => [s.id, s.name]));
 
   const conPersonaje = new Set(plot.characters.map((c) => c.suspectId));

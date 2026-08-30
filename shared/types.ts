@@ -627,9 +627,18 @@ export interface GameSummary {
   status: GameStatus;
   createdAt: string;
   updatedAt: string;
-  suspectCount: number;
-  roomCount: number;
-  weaponCount: number;
+  /**
+   * CUANTAS ENTIDADES HAY DE CADA CATEGORIA.
+   *
+   * Eran `suspectCount`, `roomCount` y `weaponCount`: tres campos con nombre
+   * para las tres categorias de CLUEDO. La ficha del recibidor pintaba tres
+   * contadores y ni uno mas, asi que un juego con una cuarta categoria la tenia
+   * invisible — y uno con dos pintaba un cero.
+   *
+   * Las etiquetas ya no las pone el taller: salen del `plural` que declara cada
+   * categoria en el manifiesto.
+   */
+  entidades: Record<string, number>;
   /** Nombres de quienes la dirigen. Es lo que se pinta, no los identificadores. */
   duenosNombres?: string[];
   /**

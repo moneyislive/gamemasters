@@ -9,7 +9,7 @@
  * El prefijo numérico también es parte del producto: marca por dónde se empieza.
  */
 import { printableDocsFor } from '../../../shared/documents';
-import { manifiestoDe } from '../../../shared/juegos';
+import { manifiestoDe, personasDe } from '../../../shared/juegos';
 import { vistaGm } from './contexto';
 import { renderPrintableDocument } from './imprimibles';
 import { renderPlayerDocument } from './renderer';
@@ -124,7 +124,7 @@ export function armarPaquete(game: GameSession): Paquete {
     }
 
     // Un dosier por jugador.
-    for (const sospechoso of game.suspects) {
+    for (const sospechoso of personasDe(game)) {
       entradas.push({
         ruta: `${carpetaJugadores}/dosier_${limpiar(sospechoso.name)}`,
         componer: (op) => renderPlayerDocument(game, sospechoso.id, op)?.html ?? null,

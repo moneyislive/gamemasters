@@ -14,7 +14,7 @@
  * Al abrir una partida se reproduce la cortinilla de SU juego —puertas de caoba
  * en la mansión, una losa de piedra en la tumba— y después se navega al taller.
  */
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
 import type { KeyboardEvent, MouseEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -129,6 +129,7 @@ export default function CluedoLobbyPage() {
   // ver un solo pantallazo de burdeos antes de llegar al taller.
   useTemaDeJuego(juego);
   const palabras = palabrasDe(juego).recibidor;
+  const manifiestoDelRecibidor = manifiestoDe(juego ?? JUEGO_POR_DEFECTO);
 
   const games = partidasDe(todas, juego);
 
@@ -291,18 +292,26 @@ export default function CluedoLobbyPage() {
               <p className="case-date text-italic text-dim">
                 Última actividad · {formatDate(game.updatedAt)}
               </p>
+              {/*
+                * LOS CONTADORES SALEN DEL MANIFIESTO, no de una tupla de tres.
+                *
+                * Eran `suspectCount`, `roomCount` y `weaponCount` rotulados con
+                * `palabras.contadores`, una tupla de EXACTAMENTE tres por juego.
+                * Un juego con una cuarta categoria la tenia invisible y uno con
+                * dos pintaba un cero con una etiqueta inventada.
+                *
+                * Ahora se recorren las categorias que el juego declara y la
+                * etiqueta es su `plural`, que es donde vive esa palabra.
+                */}
               <div className="case-counts mono-caps">
-                <span>
-                  <b>{game.suspectCount}</b> {palabras.contadores[0]}
-                </span>
-                <i aria-hidden="true">·</i>
-                <span>
-                  <b>{game.roomCount}</b> {palabras.contadores[1]}
-                </span>
-                <i aria-hidden="true">·</i>
-                <span>
-                  <b>{game.weaponCount}</b> {palabras.contadores[2]}
-                </span>
+                {manifiestoDelRecibidor.categorias.map((cat, i) => (
+                  <Fragment key={cat.id}>
+                    {i > 0 && <i aria-hidden="true">·</i>}
+                    <span>
+                      <b>{game.entidades?.[cat.id] ?? 0}</b> {cat.plural}
+                    </span>
+                  </Fragment>
+                ))}
               </div>
               <span className={`case-status mono-caps ${CLASE_DE_ESTADO[game.status]}`}>
                 {palabras.estados[game.status]}

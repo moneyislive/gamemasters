@@ -11,7 +11,7 @@ import { REGLAS_CLUEDO } from '../../../shared/juegos/cluedo';
 import type { ReglaDeJuego } from '../../../shared/juegos';
 import type { GameSession, Plot, PlotClue, Room, Suspect, TimelineEvent } from '../../../shared/types';
 import { culpableDe } from '../juegos/cluedo';
-import { manifiestoSiExiste } from '../../../shared/juegos';
+import { lugaresDe, manifiestoSiExiste, personasDe } from '../../../shared/juegos';
 
 // ---------------------------------------------------------------------------
 // Rondas y reparto de pistas
@@ -56,7 +56,7 @@ export function pistasPorRonda(plot: Plot): Map<number, PlotClue[]> {
 export function salasActivas(game: GameSession, plot: Plot, ronda: number): Room[] {
   const pistas = pistasPorRonda(plot).get(ronda) ?? [];
   const ids = new Set(pistas.map((p) => p.roomId).filter((id): id is string => Boolean(id)));
-  return game.rooms.filter((sala) => ids.has(sala.id));
+  return lugaresDe(game).filter((sala) => ids.has(sala.id));
 }
 
 // ---------------------------------------------------------------------------
@@ -137,10 +137,10 @@ export interface SobreDeLaPartida {
  */
 export function inventarioSobres(game: GameSession, plot: Plot): SobreDeLaPartida[] {
   const aCiegas = game.settings?.gmPlays === true;
-  const codigos = codigosDeSala(game.rooms);
+  const codigos = codigosDeSala(lugaresDe(game));
   const sobres: SobreDeLaPartida[] = [];
 
-  for (const sospechoso of game.suspects) {
+  for (const sospechoso of personasDe(game)) {
     sobres.push({
       codigo: sospechoso.name.toUpperCase(),
       contenido: 'Su dosier de personaje',
@@ -250,7 +250,7 @@ export const REGLAS_JUGADOR: ReglaJugador[] = REGLAS_CLUEDO;
  */
 export function candidatosParaGm(game: GameSession, plot: Plot): Suspect[] {
   const conGiro = new Set((plot.material?.twists ?? []).map((giro) => giro.suspectId));
-  return game.suspects.filter(
+  return personasDe(game).filter(
     (sospechoso) =>
       sospechoso.id !== culpableDe(plot.solution) && !conGiro.has(sospechoso.id),
   );

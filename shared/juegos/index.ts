@@ -6,11 +6,11 @@
  */
 import { declararAlmacen, entidadesDe } from './entidades';
 import type { Entidad } from './entidades';
-import { categoriaDeJugadores } from './tipos';
+import { categoriaDeJugadores, categoriasDeLugar } from './tipos';
 import { CLUEDO } from './cluedo';
 import { MOMIA } from './momia';
 import { SOMBRAS } from './sombras';
-import type { JuegoId, ManifiestoDeJuego } from './tipos';
+import type { CategoriaId, JuegoId, ManifiestoDeJuego } from './tipos';
 import { TROFEOS } from '../live';
 import type { GameSession } from '../types';
 import type { TrofeoInfo } from '../live';
@@ -387,6 +387,49 @@ export function personasDe(game: GameSession): Entidad[] {
   if (!manifiesto) return [];
   const cat = categoriaDeJugadores(manifiesto);
   return cat ? entidadesDe(game, cat.id) : [];
+}
+
+/**
+ * LOS LUGARES de un juego, sean cuales sean para él.
+ *
+ * Las salas de una casa, las cámaras de una tumba, los pasos de un camino, las
+ * cuevas de un mundo. El núcleo leía `game.rooms` —un campo heredado de
+ * CLUEDO— para pintar el plano, colocar las chinchetas y decidir si hay mapa.
+ *
+ * Un juego puede tener DOS categorías de lugares o ninguna, así que esto
+ * devuelve todas juntas y en el orden que las declara el manifiesto. Vacío
+ * significa que ese juego no ocupa espacio físico, y entonces no tiene plano ni
+ * pestaña de mapa — que es lo correcto y no un caso raro.
+ */
+export function lugaresDe(game: GameSession): Entidad[] {
+  const manifiesto = manifiestoSiExiste(game.settings?.juego);
+  if (!manifiesto) return [];
+  return categoriasDeLugar(manifiesto).flatMap((c) => entidadesDe(game, c.id));
+}
+
+/**
+ * TODAS las entidades de una partida, de todas sus categorías.
+ *
+ * Para quien no necesita saber qué es cada cosa: la limpieza de fotos huérfanas,
+ * los recuentos de la ficha del recibidor. Leían los tres campos heredados uno
+ * detrás de otro, así que a un juego con una cuarta categoría se le quedaban las
+ * fotos sin borrar y el contador corto.
+ */
+export function todasLasEntidades(game: GameSession): Array<Entidad & { categoria: CategoriaId }> {
+  const manifiesto = manifiestoSiExiste(game.settings?.juego);
+  if (!manifiesto) return [];
+  return manifiesto.categorias.flatMap((c) =>
+    entidadesDe(game, c.id).map((e) => ({ ...e, categoria: c.id })),
+  );
+}
+
+/** Cuántas entidades hay de cada categoría. Para las fichas del recibidor. */
+export function recuentoDeEntidades(game: GameSession): Record<CategoriaId, number> {
+  const manifiesto = manifiestoSiExiste(game.settings?.juego);
+  if (!manifiesto) return {};
+  const cuenta: Record<CategoriaId, number> = {};
+  for (const c of manifiesto.categorias) cuenta[c.id] = entidadesDe(game, c.id).length;
+  return cuenta;
 }
 
 /** ¿Está instalado este juego aquí? */

@@ -18,7 +18,7 @@
  * sobra es un problema pequeño; una petición que revienta a mitad de preparar la
  * velada, no.
  */
-import { personasDe } from '../../../shared/juegos';
+import { personasDe, todasLasEntidades } from '../../../shared/juegos';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { env } from '../config';
@@ -39,9 +39,11 @@ import type { GameSession } from '../../../shared/types';
 export function fotosDe(game: GameSession): string[] {
   const urls = [
     game.boardImageUrl,
-    ...personasDe(game).map((s) => s.photoUrl),
-    ...game.rooms.map((r) => r.photoUrl),
-    ...game.weapons.map((w) => w.photoUrl),
+    /*
+      * TODAS las categorias, no las tres heredadas. Un juego con una cuarta
+      * categoria con fotos se las dejaba huerfanas en el disco para siempre.
+      */
+    ...todasLasEntidades(game).map((e) => e.photoUrl),
     ...Object.values(game.entidades ?? {}).flatMap((lista) => lista.map((e) => e.photoUrl)),
   ];
   return urls.filter((u): u is string => typeof u === 'string' && u.startsWith('/uploads/'));

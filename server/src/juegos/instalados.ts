@@ -61,6 +61,16 @@ import '../docs/imprimibles/cluedo/registro';
  */
 import '../docs/cluedo-dosieres';
 /*
+ * Y la voz de su asistente en el taller: Edmund, el mayordomo.
+ *
+ * Vivia DENTRO de `agent/systemPrompt.ts` como respaldo de todos, asi que un
+ * juego que se olvidara de registrar la suya recibia un mayordomo britanico
+ * explicando refutaciones en una expedicion egipcia. Ahora CLUEDO se registra
+ * como los otros dos, y quien no registre recibe un asistente generico
+ * construido desde su manifiesto.
+ */
+import '../agent/cluedo-mayordomo';
+/*
  * Y como escribe su trama, con el modelo o sin el. Esto vivia DENTRO de la
  * tuberia —doscientas lineas de un juego concreto en el camino por el que pasan
  * todos— y ahora es `cluedo-generacion.ts`, hermano de `momia-generacion.ts` y

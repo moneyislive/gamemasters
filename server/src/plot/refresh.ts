@@ -24,7 +24,7 @@ import type {
   PlotClue,
   TimelineEvent,
 } from '../../../shared/types';
-import { esElSenalado, manifiestoDe, manifiestoSiExiste } from '../../../shared/juegos';
+import { esElSenalado, lugaresDe, manifiestoDe, manifiestoSiExiste, personasDe } from '../../../shared/juegos';
 import type { StalenessReport } from '../../../shared/staleness';
 import { computeStaleness } from '../../../shared/staleness';
 import { ampliacionDe } from '../juegos/ampliaciones';
@@ -75,7 +75,7 @@ export async function runRefresh(game: GameSession, emit: Emitir): Promise<void>
       // Determinista: se reconstruye con las salas actuales.
       // En modo 'aerial' no hay rejilla que rehacer (manda la foto con chinchetas),
       // y por eso `boardOutdated` nunca es cierto en ese modo.
-      game.board = generateBoardLayout(game.rooms, manifiestoDe(game.settings?.juego).rotuloCentralDelPlano);
+      game.board = generateBoardLayout(lugaresDe(game), manifiestoDe(game.settings?.juego).rotuloCentralDelPlano);
     }
 
     // ---------- Etapa 2: poda local (gratis, sin IA) ----------
@@ -207,8 +207,8 @@ function nombresCitables(characterName: string): string[] {
 
 /** Poda gratuita: fuera personajes huérfanos, pistas sin sala y citas imposibles. */
 function podarTrama(plot: Plot, game: GameSession): void {
-  const idsSospechosos = new Set(game.suspects.map((sospechoso) => sospechoso.id));
-  const idsSalas = new Set(game.rooms.map((sala) => sala.id));
+  const idsSospechosos = new Set(personasDe(game).map((persona) => persona.id));
+  const idsSalas = new Set(lugaresDe(game).map((lugar) => lugar.id));
 
   // Se calculan ANTES de podar: después ya no sabríamos a quién citaba la cronología.
   const nombresBorrados = plot.characters

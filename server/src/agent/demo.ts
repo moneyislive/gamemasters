@@ -173,7 +173,7 @@ async function anadirSospechosos(
       repetidos.push(entrada.name);
       continue;
     }
-    const { game: actualizada } = await executeTool(actual, 'upsert_suspect', {
+    const { game: actualizada } = await executeTool(actual, 'upsert_sospechoso', {
       name: entrada.name,
       description: entrada.description,
       email: emailDetectado,
@@ -223,7 +223,7 @@ async function anadirSalas(partida: GameSession, texto: string): Promise<Resulta
       repetidas.push(nombre);
       continue;
     }
-    const { game: actualizada } = await executeTool(actual, 'upsert_room', { name: nombre });
+    const { game: actualizada } = await executeTool(actual, 'upsert_sala', { name: nombre });
     if (actualizada) actual = actualizada;
     registradas.push(nombre);
   }
@@ -263,7 +263,7 @@ async function anadirArmas(partida: GameSession, captura: string): Promise<Resul
       repetidas.push(nombre);
       continue;
     }
-    const { game: actualizada } = await executeTool(actual, 'upsert_weapon', { name: nombre });
+    const { game: actualizada } = await executeTool(actual, 'upsert_objeto', { name: nombre });
     if (actualizada) actual = actualizada;
     catalogadas.push(nombre);
   }

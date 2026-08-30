@@ -6,6 +6,7 @@
  *  - `FileStore` en caso contrario (server/data/db.json, en memoria +
  *    persistencia atómica mediante fichero temporal y rename).
  */
+import { recuentoDeEntidades } from '../../../shared/juegos';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
 import mongoose from 'mongoose';
@@ -132,9 +133,7 @@ function toSummary(game: GameSession): GameSummary {
     createdAt: game.createdAt,
     updatedAt: game.updatedAt,
     juego: game.settings?.juego,
-    suspectCount: game.suspects.length,
-    roomCount: game.rooms.length,
-    weaponCount: game.weapons.length,
+    entidades: recuentoDeEntidades(game),
     // Los ids de los dueños NO salen del almacén: el listado se filtra en la
     // ruta, que es quien sabe de parte de quién pregunta.
     huerfana: (game.duenos?.length ?? 0) === 0,

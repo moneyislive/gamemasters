@@ -77,6 +77,14 @@ const BATERIA = [
   { nombre: 'entidades', donde: 'server', guion: 'verify:entidades', porque: 'los almacenes por categoría' },
   { nombre: 'partida', donde: 'server', guion: 'verify:partida', porque: 'el ciclo de una partida' },
 
+  {
+    nombre: 'el Mayordomo',
+    donde: 'server',
+    guion: 'verify:mayordomo',
+    porque: 'el asistente no filtra la solucion en 25 tramas',
+  },
+  { nombre: 'puertas', donde: 'server', guion: 'verify:puertas', lento: true, porque: 'las rutas y el ZIP del paquete' },
+
   // ── El móvil ──────────────────────────────────────────────────────────────
   { nombre: 'móvil', donde: 'app', guion: 'verify', porque: 'pantallas, tema y tablas de módulo' },
 
