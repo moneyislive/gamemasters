@@ -97,13 +97,25 @@ export interface PlotCharacter {
   characterName: string;
   role: string;
   publicPersona: string;
-  secret: string;
-  motive: string;
-  alibi: string;
+  /**
+   * Los cuatro campos del misterio. OPCIONALES.
+   *
+   * Un secreto, un motivo y una coartada son de un juego donde alguien miente.
+   * Eran obligatorios POR PERSONA, asi que una subasta —donde nadie interpreta
+   * a nadie— tenia que escribir cuatro cadenas vacias por postor solo para que
+   * el contrato la dejara entrar.
+   *
+   * Quien los pinta ya preguntaba: la proyeccion hace `personaje?.secret ?? ''`
+   * y el movil solo enseña el bloque si el juego lo declara en `dosier`. Lo
+   * unico que faltaba era dejar de exigirlos.
+   */
+  secret?: string;
+  motive?: string;
+  alibi?: string;
+  /** Cómo se ha adaptado el personaje a la psicología de la persona real */
+  personalHook?: string;
   /** Pistas o conocimientos que este personaje posee sobre otros */
   knowledge: string[];
-  /** Cómo se ha adaptado el personaje a la psicología de la persona real */
-  personalHook: string;
 }
 
 export interface PlotClue {

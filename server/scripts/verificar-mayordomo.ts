@@ -169,9 +169,9 @@ for (let n = 0; n < RONDAS; n++) {
     ...plot.clues.map((c, i): [string, string] => [`la pista ${i + 1}`, c.description]),
     ...plot.clues.map((c, i): [string, string] => [`a qué señala la pista ${i + 1}`, c.pointsTo]),
     ...plot.timeline.map((e, i): [string, string] => [`el momento ${i + 1} de la cronología`, e.description]),
-    ...ajenos.map((c): [string, string] => [`el secreto de ${c.characterName}`, c.secret]),
-    ...ajenos.map((c): [string, string] => [`la coartada de ${c.characterName}`, c.alibi]),
-    ...ajenos.map((c): [string, string] => [`el motivo de ${c.characterName}`, c.motive]),
+    ...ajenos.map((c): [string, string] => [`el secreto de ${c.characterName}`, c.secret ?? '']),
+    ...ajenos.map((c): [string, string] => [`la coartada de ${c.characterName}`, c.alibi ?? '']),
+    ...ajenos.map((c): [string, string] => [`el motivo de ${c.characterName}`, c.motive ?? '']),
     ...ajenos.flatMap((c) =>
       (c.knowledge ?? []).map((k): [string, string] => [`lo que sabe ${c.characterName}`, k]),
     ),

@@ -608,9 +608,20 @@ paso('Los ocho imprimibles, compuestos de verdad');
   /* Y el dosier de una sola persona, que es lo que sirve el taller. */
   const uno = renderPrintableDocument(conTrama, 'dosier-escolta', { soloPara: 'e1' });
   comprobar('el dosier de una sola persona se compone', Boolean(uno?.html));
+  /*
+   * OJO CON EL `?? ''`. `secret` es opcional desde que un juego sin misterio no
+   * tiene por que inventarse uno por persona, pero aqui NO se puede rellenar con
+   * cadena vacia y seguir: `includes('')` siempre es cierto, asi que la
+   * comprobacion se invertiria y una prueba de fuga pasaria sin mirar nada.
+   *
+   * Si no hay secreto que buscar, esta prueba no puede decir nada y lo dice
+   * fallando. Una prueba de fuga que no encuentra lo que busca no esta en verde:
+   * esta rota.
+   */
+  const secretoAjeno = buena.plot.characters.find((c) => c.suspectId === 'e2')?.secret ?? '';
   comprobar(
     'y no lleva el secreto de nadie más',
-    Boolean(uno?.html) && !uno!.html!.includes(buena.plot.characters.find((c) => c.suspectId === 'e2')!.secret),
+    Boolean(uno?.html) && secretoAjeno.length > 0 && !uno!.html!.includes(secretoAjeno),
   );
 
   /* La partida sin trama tiene que dar una hoja que EXPLICA, no un folio en blanco. */

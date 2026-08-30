@@ -340,11 +340,12 @@ const plot: Plot = {
     characterName: name,
     role: 'Postor',
     publicPersona: '',
-    secret: '',
-    motive: '',
-    alibi: '',
+    /*
+     * NI SECRETO, NI MOTIVO, NI COARTADA, NI GANCHO. Aqui iban cuatro cadenas
+     * vacias por postor porque el contrato las exigia, y en una subasta nadie
+     * interpreta a nadie. Ya no hacen falta.
+     */
     knowledge: [],
-    personalHook: '',
   })),
   timeline: [],
   clues: [],
@@ -493,7 +494,24 @@ comprobar(
  */
 comprobar('la vista no lleva víctima porque no ha muerto nadie', v.caso.victima === undefined);
 peaje('`Plot` exige synopsis, setting y solution: un juego sin crimen se los inventa igual');
-peaje('`PlotCharacter` exige secret, motive, alibi y personalHook por persona, aunque nadie interprete a nadie');
+/*
+ * ═══ OTRO PEAJE QUE YA NO SE COBRA ═══
+ *
+ * `PlotCharacter` exigia un secreto, un motivo, una coartada y un gancho POR
+ * PERSONA. Los cuatro son de un juego donde alguien miente, y esta subasta
+ * escribia cuatro cadenas vacias por postor solo para que la dejaran entrar.
+ *
+ * Salio casi gratis, y eso dice algo: quien los pinta YA preguntaba —la
+ * proyeccion hace `personaje?.secret ?? ''` y el movil solo enseña el bloque si
+ * el juego lo declara en su dosier—. Lo unico que faltaba era dejar de
+ * exigirlos en el contrato.
+ */
+comprobar(
+  'los postores no tienen secreto, ni motivo, ni coartada, ni gancho',
+  plot.characters.every(
+    (c) => c.secret === undefined && c.motive === undefined && c.alibi === undefined && c.personalHook === undefined,
+  ),
+);
 peaje('los NOMBRES de las fases siguen siendo los de CLUEDO: una subasta llama «ronda-abierta» a «se canta un lote»');
 peaje('la categoría de personas tiene que ir a `suspects` o no hay emparejamiento, dosieres ni correos');
 peaje('`VistaJugador` obliga a mandar salas, objetos, pistas y cronología vacías aunque el juego no tenga nada de eso');

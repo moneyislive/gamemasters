@@ -641,8 +641,8 @@ function superficiePublica(resultado: ReturnType<typeof ensamblarTramaMomia>): A
     ...(resultado.plot.material?.hints ?? []).map((h): [string, string] => [`ayuda ${h.level}`, h.text]),
     ...resultado.plot.characters.flatMap((c): Array<[string, string]> => [
       [`${c.characterName} · cara pública`, c.publicPersona],
-      [`${c.characterName} · secreto`, c.secret],
-      [`${c.characterName} · coartada`, c.alibi],
+      [`${c.characterName} · secreto`, c.secret ?? ''],
+      [`${c.characterName} · coartada`, c.alibi ?? ''],
     ]),
     ...resultado.plot.timeline
       .filter((e) => e.isPublic)
