@@ -51,6 +51,14 @@ import '../plot/pipeline';
  * casualidad.
  */
 import '../plot/momia-generacion';
+/*
+ * Y la voz de su asistente en el taller. Esta NO tiene ninguna importacion
+ * accidental que la salve: `systemPrompt.ts` la importaba, y desde que elige por
+ * registro ya no. Sin esta linea, quien prepare una expedicion habla con Edmund
+ * el mayordomo de CLUEDO --sin ningun error, y con la cara y el nombre de El
+ * Escriba al lado, porque esos si salen del manifiesto--.
+ */
+import '../agent/momia-escriba';
 import './momia-acciones';
 import './momia-proyeccion';
 import './momia-sellado';
@@ -67,6 +75,7 @@ import '../docs/imprimibles/momia/dosierExpedicionario';
 
 // El Paso de las Sombras: reductores, proyección del estado, consejo y trofeos.
 import '../plot/sombras-generacion';
+import '../agent/sombras-guia';
 import './sombras-acciones';
 import './sombras-proyeccion';
 import './sombras-consejo';

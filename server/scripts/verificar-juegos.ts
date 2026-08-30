@@ -34,6 +34,7 @@ import { generateBoardLayout } from '../src/board/generator';
 import { iniciarJuego } from '../src/juegos/inicios';
 import { trofeosDelJuego } from '../src/juegos/trofeos';
 import { generadorDeTrama } from '../src/juegos/generadores';
+import { vozDelTaller } from '../src/agent/voces';
 import { abrirRonda } from '../src/live/sesion';
 import { renderPlayerDocument } from '../src/docs/renderer';
 import { renderPrintableDocument } from '../src/docs/imprimibles';
@@ -248,6 +249,26 @@ for (const m of juegosInstalados()) {
     (generadorDeTrama(m.id)?.rotulo ?? '').length > 0,
     'estaban en dos ternarios distintos y se podian separar: la Momia recomponia su papiro mientras la pantalla decia «Tejiendo la trama del crimen»',
   );
+
+  /*
+   * ---- 2 ter. QUIEN LE PONE VOZ A SU ASISTENTE EN EL TALLER ----
+   *
+   * `buildSystemPrompt` empezaba con un `if` por cada juego y todo lo que venia
+   * debajo era el prompt de CLUEDO. Un juego sin su linea recibia a Edmund, el
+   * mayordomo, explicando refutaciones y pasadizos secretos en una expedicion
+   * egipcia --y con la cara y el nombre de SU asistente al lado, porque esos si
+   * salen del manifiesto: la mezcla mas confusa posible--.
+   *
+   * CLUEDO no entra: su prompt ES el que hay debajo de la bifurcacion, o sea el
+   * respaldo, y darle un alta seria escribirlo dos veces.
+   */
+  if (m.id !== 'cluedo') {
+    comprobar(
+      `${m.id}: tiene voz propia en el taller`,
+      vozDelTaller(m.id) !== undefined,
+      'sin ella, quien prepare esta partida habla con Edmund el mayordomo de CLUEDO',
+    );
+  }
 
   // ---- 3. Se puede terminar la partida ----
   const puedeAcabar = Object.entries(m.fases).some(

@@ -10,8 +10,7 @@
 
 import type { GameSession } from '../../../shared/types';
 import { MOMIA, SOMBRAS } from '../../../shared/juegos';
-import { buildSystemPromptMomia } from './momia-escriba';
-import { buildSystemPromptSombras } from './sombras-guia';
+import { vozDelTaller } from './voces';
 
 /** Formatea una lista de entidades con nombre y descripción opcional. */
 function listar(
@@ -46,12 +45,24 @@ export function buildSystemPrompt(game: GameSession): string {
    * CLUEDO. Reutilizarlo para otro juego no daba un asistente mediocre: daba un
    * mayordomo británico explicando refutaciones en una expedición egipcia.
    *
-   * Cada juego trae el suyo entero, no un parche sobre este. Lo comparten es la
-   * política de herramientas y la regla de oro, que se repiten en los dos porque
-   * son prompt y el prompt no se factoriza sin perder tono.
+   * Cada juego trae el suyo entero, no un parche sobre este. Lo que comparten es
+   * la política de herramientas y la regla de oro, que se repiten en los dos
+   * porque son prompt y el prompt no se factoriza sin perder tono.
+   *
+   * SE LE PREGUNTA AL REGISTRO, no a dos `if` por id de juego. Aquí había una
+   * comparación por cada juego que existe, y todo lo que venía debajo era el de
+   * CLUEDO: un juego nuevo que se olvidara de poner su línea no daba error,
+   * recibía a Edmund. Y este fichero tenía que importar por nombre a los tres
+   * juegos solo para poder compararse con ellos.
+   *
+   * LA CAÍDA A CLUEDO SIGUE EXISTIENDO y ahora está dicha: lo que hay debajo es
+   * su prompt, y un juego sin voz dada de alta lo recibe. Lo que cambia es que la
+   * caída está escrita en una línea que se lee, en vez de escondida en el orden
+   * de dos condiciones. Quien añada un juego y no le dé voz seguirá recibiendo a
+   * Edmund; la diferencia es que `verify:juegos` se lo dirá.
    */
-  if (game.settings?.juego === MOMIA.id) return buildSystemPromptMomia(game);
-  if (game.settings?.juego === SOMBRAS.id) return buildSystemPromptSombras(game);
+  const propia = vozDelTaller(game.settings?.juego);
+  if (propia) return propia(game);
 
   const numSospechosos = game.suspects.length;
   const numSalas = game.rooms.length;
