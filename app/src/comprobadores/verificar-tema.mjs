@@ -222,7 +222,18 @@ for (const [donde, token, alfa, literal] of ESPERADO) {
     return claves;
   };
 
-  const tablas = [['PALETAS', clavesDe('PALETAS')], ['FONDOS', clavesDe('FONDOS')], ['ORNAMENTOS', clavesDe('ORNAMENTOS')]];
+  /*
+   * CUATRO tablas, no tres: al plano se le anadio la suya —el tapete y el bloque
+   * central— y si se queda sin la fila de un juego, la Tumba se vuelve a dibujar
+   * sobre el fieltro verde de la mansion. Anadir la tabla y olvidar una fila es
+   * exactamente el fallo que esta comprobacion existe para cazar.
+   */
+  const tablas = [
+    ['PALETAS', clavesDe('PALETAS')],
+    ['FONDOS', clavesDe('FONDOS')],
+    ['ORNAMENTOS', clavesDe('ORNAMENTOS')],
+    ['TABLEROS', clavesDe('TABLEROS')],
+  ];
   for (const [nombre, claves] of tablas) {
     if (claves === null) {
       console.error(`✗ tema-juego.ts ya no tiene la tabla «${nombre}»: el reparto por juego ha cambiado de forma`);
@@ -249,7 +260,9 @@ for (const [donde, token, alfa, literal] of ESPERADO) {
       console.error('✗ una tabla por juego incluye «cluedo»: tiene que llegarle por el respaldo, para que sea el MISMO objeto');
       fallos++;
     }
-    console.log(`✓ Las tres tablas por juego cubren los mismos: ${referencia.join(', ')}.`);
+    console.log(
+      `✓ Las ${conClaves.length} tablas por juego (${conClaves.map((t) => t[0]).join(', ')}) cubren los mismos: ${referencia.join(', ')}.`,
+    );
   }
 
   /* Y que el respaldo siga siendo el de CLUEDO en los tres sitios. */

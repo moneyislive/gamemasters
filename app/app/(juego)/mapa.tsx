@@ -28,7 +28,7 @@ import Svg, {
 } from 'react-native-svg';
 import * as api from '../../src/api';
 import { usePartida } from '../../src/estado';
-import { conAlfa, useTema } from '../../src/tema-juego';
+import { conAlfa, useTablero, useTema } from '../../src/tema-juego';
 import { MOMIA } from '../../src/tema-momia';
 import { leerEstadoMomia } from '../../src/momia/vista';
 import { accionDeEntrarEnLugar, categoriasDeLugar, manifiestoDe } from '../../../shared/juegos';
@@ -303,6 +303,13 @@ function PlanoDibujado({
   ...resto
 }: PropsPlano & { plano?: BoardLayout }): JSX.Element | null {
   const t = useTema();
+  /*
+   * El tapete y el bloque central del plano. Estaban escritos a mano aquí abajo
+   * —tres verdes de mesa de casino— y se pintaban igual en los tres juegos: la
+   * Tumba y los Pasos se dibujaban sobre el fieltro de la mansión. Es de los
+   * sitios donde más se nota, porque el plano se mira mucho y además se imprime.
+   */
+  const tablero = useTablero();
   const { salas, miSala, conHallazgo, profanada, ancho, alPulsar, activo } = resto;
   if (!plano || plano.rooms.length === 0) return null;
 
@@ -342,9 +349,9 @@ function PlanoDibujado({
       >
         <Defs>
           <RadialGradient id="tapete" cx="50%" cy="44%" r="74%">
-            <Stop offset="0%" stopColor="#1d4a32" />
-            <Stop offset="70%" stopColor="#123122" />
-            <Stop offset="100%" stopColor="#0a1c13" />
+            <Stop offset="0%" stopColor={tablero.tapete[0]} />
+            <Stop offset="70%" stopColor={tablero.tapete[1]} />
+            <Stop offset="100%" stopColor={tablero.tapete[2]} />
           </RadialGradient>
         </Defs>
 
@@ -404,7 +411,7 @@ function PlanoDibujado({
             width={centro.w}
             height={centro.h}
             rx={7}
-            fill="#4a1622"
+            fill={tablero.centro}
             stroke={t.oro500}
             strokeWidth={2.5}
           />
@@ -488,7 +495,7 @@ function PlanoDibujado({
                     ? 'rgba(201,162,39,0.20)'
                     : marcada
                       ? conAlfa(MOMIA.profanada, 0.22)
-                      : '#2b1a12'
+                      : t.caoba800
                 }
                 stroke={dentro ? t.oro300 : marcada ? MOMIA.profanada : t.oro500}
                 strokeWidth={dentro ? 4 : marcada ? 3.5 : 2.5}
@@ -504,7 +511,7 @@ function PlanoDibujado({
                 strokeWidth={1}
               />
               {/* Hueco de la puerta, hacia el centro del tablero */}
-              <Rect x={puertaX - 3} y={cy - 16} width={8} height={32} fill="#123122" />
+              <Rect x={puertaX - 3} y={cy - 16} width={8} height={32} fill={tablero.tapete[1]} />
 
               <SvgText
                 x={cx}

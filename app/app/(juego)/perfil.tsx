@@ -13,7 +13,7 @@ import { router } from 'expo-router';
 import Animated, { FadeInUp } from 'react-native-reanimated';
 import * as api from '../../src/api';
 import { usePartida } from '../../src/estado';
-import { TROFEOS } from '../../../shared/live';
+import { TROFEOS, TROFEOS_DE_LA_CASA } from '../../../shared/live';
 import { manifiestoDe } from '../../../shared/juegos';
 import { conAlfa, useTema } from '../../src/tema-juego';
 import type { TrofeoInfo } from '../../../shared/live';
@@ -33,17 +33,27 @@ import {
 import type { Account } from '../../../shared/live';
 
 /**
- * Los trofeos que este juego trae y la plataforma no conocía.
+ * Los trofeos que se ganan por las REGLAS de este juego.
  *
- * SE CALCULA POR DIFERENCIA, en vez de escribir «si es la Momia, estos cinco».
- * Para CLUEDO da la lista vacía —su manifiesto declara exactamente `TROFEOS`—
- * así que la sección no se pinta y su pantalla queda idéntica: la regla que
- * manda se cumple sin depender de acordarse de nada. Y el día que entre un
- * tercer juego, sus trofeos aparecen solos.
+ * SE CALCULA POR DIFERENCIA con los de la casa, en vez de escribir «si es la
+ * Momia, estos cinco»: el día que entre un juego más, sus trofeos aparecen solos.
+ *
+ * ANTES LA DIFERENCIA SE HACÍA CONTRA `TROFEOS` ENTERO, que son los seis de
+ * CLUEDO, y eso daba dos resultados equivocados a la vez. Para CLUEDO, lista
+ * vacía y sección oculta; para la Momia, sus cinco arriba y los SEIS de CLUEDO
+ * debajo, incluidos tres que desde que cada juego reparte los suyos allí ya no se
+ * pueden ganar: tres huecos permanentemente vacíos, sin explicación, de otro
+ * juego.
+ *
+ * Ahora la diferencia es contra `TROFEOS_DE_LA_CASA`, que son los tres que no
+ * dependen de las reglas de nadie. CLUEDO enseña sus tres —«Quien lo resolvió»,
+ * «Sabueso», «Crimen perfecto»— bajo su nombre y los tres de la casa debajo: los
+ * mismos seis de siempre, repartidos en dos rejillas y cada uno bajo el rótulo
+ * que le corresponde.
  */
 function trofeosPropiosDe(juego: string | undefined): TrofeoInfo[] {
-  const comunes = new Set(TROFEOS.map((t) => t.id));
-  return manifiestoDe(juego as never).trofeos.filter((t) => !comunes.has(t.id));
+  const deLaCasa = new Set<string>(TROFEOS_DE_LA_CASA);
+  return manifiestoDe(juego as never).trofeos.filter((t) => !deLaCasa.has(t.id));
 }
 
 export default function Perfil(): JSX.Element {
@@ -200,9 +210,23 @@ export default function Perfil(): JSX.Element {
             </>
           )}
 
-          <Seccion>Trofeos</Seccion>
+          {/*
+            LOS DE LA CASA, que son los tres que se ganan en cualquier juego.
+
+            Aquí se pintaba `TROFEOS` entero, o sea los SEIS de CLUEDO, en
+            cualquier partida. En una expedición a una tumba la vitrina enseñaba
+            «Quien lo resolvió», «Sabueso» y «Crimen perfecto — fuiste el culpable
+            y nadie te descubrió» junto a los de la Momia, y desde que cada juego
+            reparte los suyos esos tres ya no se pueden ganar allí: eran tres
+            huecos permanentemente vacíos, sin explicación, de otro juego.
+
+            Ahora arriba van los del juego que se juega y aquí solo los tres de la
+            plataforma. Para CLUEDO la suma es exactamente la misma lista de
+            siempre, repartida en dos rejillas.
+          */}
+          <Seccion>De la casa</Seccion>
           <View style={estilos.rejilla}>
-            {TROFEOS.map((trofeo, i) => (
+            {TROFEOS.filter((t) => (TROFEOS_DE_LA_CASA as string[]).includes(t.id)).map((trofeo, i) => (
               <Vitrina
                 key={trofeo.id}
                 trofeo={trofeo}

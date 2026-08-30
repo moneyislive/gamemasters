@@ -154,6 +154,62 @@ export function useFondo(): readonly [string, string, string] {
 }
 
 /**
+ * Los colores del PLANO, que no salen de la paleta.
+ *
+ * ═══ POR QUÉ HACE FALTA UNA TABLA APARTE ═══
+ *
+ * El plano se dibuja sobre un tapete de fieltro con un degradado radial de tres
+ * paradas, y esas tres estaban escritas a mano dentro de `mapa.tsx`:
+ * `#1d4a32`, `#123122` y `#0a1c13`. Son el verde de una mesa de casino, y se
+ * pintaban igual en los tres juegos: la Tumba de El Misterio de la Momia y los
+ * Pasos de El Paso de las Sombras se dibujaban sobre el tapete de la mansión, con
+ * sus cámaras y sus senderos encima. Es de los sitios donde más se nota que un
+ * juego está pintado encima de otro, porque el plano se mira mucho, se mira
+ * entero, y además SE IMPRIME.
+ *
+ * No se pueden sacar de la paleta porque no son ninguno de sus tonos: son tres
+ * verdes propios, algo más claros que `felt700`. Así que van en su tabla.
+ *
+ * ═══ CLUEDO NO CAMBIA NI UN PÍXEL ═══
+ *
+ * Sus tres paradas y su bloque central son exactamente los que estaban escritos
+ * en `mapa.tsx`, carácter a carácter, y llegan por el respaldo: la tabla no lo
+ * incluye, como no lo incluyen `PALETAS`, `FONDOS` ni `ORNAMENTOS`.
+ */
+export interface Tablero {
+  /** El degradado radial del tapete: centro, medio y borde. */
+  tapete: readonly [string, string, string];
+  /** El bloque del centro del plano, donde va el emblema. */
+  centro: string;
+}
+
+/** El tablero de CLUEDO: fieltro verde de casino y un bloque burdeos. */
+const TABLERO_CLUEDO: Tablero = {
+  tapete: ['#1d4a32', '#123122', '#0a1c13'],
+  centro: '#4a1622',
+};
+
+/**
+ * La Tumba: arenisca a la luz de una lámpara, oscureciendo hacia los bordes.
+ * El bloque central tira a ocre quemado, que es el burdeos de este juego.
+ *
+ * Los Pasos: el añil de la noche del monte, y un bloque de laca oscura.
+ */
+const TABLEROS: Record<string, Tablero> = {
+  momia: { tapete: ['#33240f', '#1f1508', '#0d0904'], centro: '#42200f' },
+  sombras: { tapete: ['#1a2740', '#111a2b', '#080c14'], centro: '#3a1a14' },
+};
+
+export function tableroDe(juego: JuegoId | undefined): Tablero {
+  return TABLEROS[juego ?? ''] ?? TABLERO_CLUEDO;
+}
+
+/** El tablero del juego que se esté jugando en este móvil ahora mismo. */
+export function useTablero(): Tablero {
+  return tableroDe(useJuego());
+}
+
+/**
  * `conAlfa` se REEXPORTA desde `tema.ts`, donde vive ahora.
  *
  * Se mudó para que se pueda comprobar: este fichero importa el contexto de la

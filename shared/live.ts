@@ -345,6 +345,27 @@ export interface TrofeoInfo {
   glifo: string;
 }
 
+/**
+ * Los trofeos que se ganan en CUALQUIER juego, porque no dependen de sus reglas.
+ *
+ * Haber jugado la primera partida, haber llenado el cuaderno de notas y seguir
+ * con el móvil encendido al cerrar significan lo mismo en un misterio de salón,
+ * en una expedición a una tumba y en una oca. Los reparte la plataforma, en
+ * `live/cuentas.ts`.
+ *
+ * LOS DEMÁS DE `TROFEOS` NO SON DE LA CASA, AUNQUE ESTÉN EN LA MISMA LISTA:
+ * `ganador`, `sabueso` y `culpable-impune` son reglas de CLUEDO —«fuiste el
+ * culpable y nadie te descubrió» no quiere decir nada donde no hay culpable— y
+ * se reparten desde `juegos/cluedo-trofeos.ts`, igual que la Momia reparte los
+ * suyos. Se quedan en `TROFEOS` porque esa lista ES el catálogo de CLUEDO: su
+ * manifiesto la declara tal cual.
+ *
+ * Esta constante existe para que la vitrina del perfil pueda enseñar lo que de
+ * verdad se puede ganar en la partida que se está jugando, en vez de los seis de
+ * CLUEDO en cualquier juego.
+ */
+export const TROFEOS_DE_LA_CASA: TrofeoId[] = ['primera-partida', 'escribano', 'superviviente'];
+
 export const TROFEOS: TrofeoInfo[] = [
   {
     id: 'primera-partida',
