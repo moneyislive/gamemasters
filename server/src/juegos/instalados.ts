@@ -48,6 +48,16 @@ import './cluedo-trofeos';
  */
 import '../docs/imprimibles/cluedo/registro';
 /*
+ * Y sus dosieres: el de cada persona, el de quien dirige y el sobre sellado.
+ * Eran el CUERPO de `docs/renderer.ts` —quinientas lineas de la victima, los
+ * sospechosos y los pasadizos, en el fichero que compone los dosieres de
+ * cualquier juego— y no colgaban de un `if`: eran el camino por defecto.
+ *
+ * Sin esta linea el taller no sirve ni un dosier de CLUEDO. Es visible al
+ * instante, que es justo lo contrario de lo que pasaba antes.
+ */
+import '../docs/cluedo-dosieres';
+/*
  * Y como escribe su trama, con el modelo o sin el. Esto vivia DENTRO de la
  * tuberia —doscientas lineas de un juego concreto en el camino por el que pasan
  * todos— y ahora es `cluedo-generacion.ts`, hermano de `momia-generacion.ts` y

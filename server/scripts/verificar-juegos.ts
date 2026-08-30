@@ -35,6 +35,7 @@ import { iniciarJuego } from '../src/juegos/inicios';
 import { trofeosDelJuego } from '../src/juegos/trofeos';
 import { generadorDeTrama } from '../src/juegos/generadores';
 import { ampliacionDe } from '../src/juegos/ampliaciones';
+import { dosieresDe } from '../src/docs/dosieres';
 import { vozDelTaller } from '../src/agent/voces';
 import { juegosConVeredicto } from '../src/juegos/veredictos';
 import { abrirRonda } from '../src/live/sesion';
@@ -279,6 +280,25 @@ for (const m of juegosInstalados()) {
    * import»: es que un registro sin comprobación que lo respalde se pierde,
    * antes o después, y sin hacer ruido.
    */
+  /*
+   * ---- 2 ter. QUIEN COMPONE SUS DOSIERES ----
+   *
+   * Los dosieres eran el CUERPO de `docs/renderer.ts`: quinientas lineas de la
+   * victima, los sospechosos y los pasadizos secretos dentro del fichero que
+   * los compone para cualquier juego. Y no colgaban de un `if`: eran el camino
+   * por defecto, con `if (!manifiesto.dosieresPropios)` decidiendo si ademas se
+   * añadian el de quien dirige y el sobre sellado.
+   *
+   * Ahora los tres juegos se dan de alta igual. Sin alta, el taller no sirve ni
+   * un dosier — lo caza el maestro de oro, pero «16 diferencias» dice bastante
+   * menos que esta linea.
+   */
+  comprobar(
+    `${m.id}: tiene sus dosieres dados de alta`,
+    dosieresDe(m.id) !== undefined,
+    'sin ellos el taller no sirve ni un dosier, y antes caia en el generico de CLUEDO',
+  );
+
   comprobar(
     `${m.id}: si sabe escribir una trama, sabe ponerla al día`,
     ampliacionDe(m.id) !== undefined,

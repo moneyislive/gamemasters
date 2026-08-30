@@ -44,7 +44,7 @@ import { manifiestoDe } from '../../../../../shared/juegos';
 import { PRENDAS_INICIALES } from '../../../../../shared/juegos/sombras-tipos';
 import { envolverWashi, portadaWashi, sinTrama } from './comun';
 import { vistaDeLasSombras } from './datos';
-import { registrarDosierDeUno } from '../../dosieres';
+import { registrarDosieres } from '../../dosieres';
 import type { DocumentRenderOptions, GameSession, Plot } from '../../../../../shared/types';
 
 export function dosierEscolta(
@@ -336,6 +336,18 @@ ${dosieres}`;
  * Es el MISMO documento, compuesto solo con el bloque de esa persona. Va al
  * final de su fichero para que no se pueda mover sin ver el registro.
  */
-registrarDosierDeUno('sombras', (game, plot, suspectId, opciones) =>
-  dosierEscolta(game, plot, { ...opciones, soloPara: suspectId }),
-);
+/*
+ * EL TITULO, y hasta hoy no lo elegia este juego.
+ *
+ * Lo ponia `tituloJugador` dentro de `renderer.ts`, o sea el nucleo decidiendo
+ * como se llama el dosier de alguien en CUALQUIER juego. Da la misma cadena que
+ * antes —byte a byte, lo comprueba el maestro de oro— y ahora la dice quien
+ * tiene derecho a decirla. Que los tres juegos coincidan hoy es una casualidad,
+ * no un contrato.
+ */
+registrarDosieres('sombras', {
+  tituloDeUno: (game, plot, suspectId) =>
+    `${plot.title} — Dosier de ${game.suspects.find((s) => s.id === suspectId)?.name ?? ''}`,
+  deUno: (game, plot, suspectId, opciones) =>
+    dosierEscolta(game, plot, { ...opciones, soloPara: suspectId }),
+});
