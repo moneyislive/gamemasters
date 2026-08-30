@@ -9,6 +9,7 @@
 import { useEffect, useState } from 'react';
 import { STYLE_PROMPT_MAX } from '../../../../shared/types';
 import { useAppStore } from '../../state/store';
+import { palabrasDe } from '../../juegos/palabras';
 import './studio-panels.css';
 
 interface Preset {
@@ -151,7 +152,7 @@ export default function StylePanel(): JSX.Element {
           maxLength={STYLE_PROMPT_MAX}
           value={texto}
           onChange={(event) => setTexto(event.target.value)}
-          placeholder="Escribe con tus palabras el aire que quieres darle. Por ejemplo: «que todo ocurra en un transatlántico en plena travesía, con la tensión de que el asesino no puede bajarse»."
+          placeholder={palabrasDe(game.settings?.juego).taller.ejemploDeEstilo}
         />
 
         <div className="sp-style-footer">

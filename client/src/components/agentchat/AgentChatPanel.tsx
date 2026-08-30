@@ -421,7 +421,15 @@ export default function AgentChatPanel({ gameId }: AgentChatPanelProps) {
       );
     } catch {
       if (!controlador.signal.aborted) {
-        appendToLastAssistant('⚠ No he podido contactar con la mansión. Inténtelo de nuevo, se lo ruego.');
+        /*
+         * EL AVISO LO DA EL ASISTENTE, ASÍ QUE HABLA COMO ÉL. Aquí había una
+         * cadena escrita a mano que decía «no he podido contactar con la
+         * mansión», y sale DENTRO de la burbuja de quien te estaba hablando:
+         * el Escriba, el Guía y el Jefe de Estación se referían a una casa que
+         * en su juego no existe, en la única frase que se lee cuando algo va
+         * mal. Ahora sale de `palabras.ts`, como el resto de lo que dicen.
+         */
+        appendToLastAssistant(palabras.sinLinea);
       }
     } finally {
       abortRef.current = null;

@@ -18,7 +18,8 @@ import SectionDesigner from './SectionDesigner';
 import PrintablePicker from './PrintablePicker';
 import { copiasDe } from './copias';
 import { printableDocsFor } from '../../../../shared/documents';
-import { manifiestoDe, personasDe } from '../../../../shared/juegos';
+import { categoriaDeJugadores, manifiestoDe, personasDe } from '../../../../shared/juegos';
+import { palabrasDe } from '../../juegos/palabras';
 import type { DocumentAudience } from '../../../../shared/documents';
 import { startMaterial, startRefresh } from '../generate/GenerateOverlay';
 import './documents.css';
@@ -208,6 +209,24 @@ export default function DocumentsPanel(): JSX.Element {
   const idsSospechosos = new Set(personasDe(game).map((s) => s.id));
 
   // Un sobre por jugador actual: los que aún no tienen dosier también aparecen.
+  /*
+   * CÓMO SE DICE QUE ALGUIEN YA NO JUEGA, EN LAS PALABRAS DE SU JUEGO.
+   *
+   * Aquí ponía «Ya no figura entre los sospechosos», que es de CLUEDO y salía
+   * igual en una expedición, en una columna que cruza un monte y en un turno de
+   * noche de una estación. No hace falta un campo nuevo en `palabras.ts` para
+   * arreglarlo: el manifiesto YA declara cómo se llama su gente —es el plural de
+   * la categoría `sonJugadores`— y `palabras.articulos` ya declara su género,
+   * que existe porque sin él salía «Nuevo reliquia».
+   *
+   * Con las dos cosas la frase se compone sola, y para CLUEDO da exactamente la
+   * de antes: su categoría se llama `sospechosos` y su artículo es `el`.
+   */
+  const losSuyos = categoriaDeJugadores(manifiestoDe(game.settings?.juego));
+  const yaNoFigura = losSuyos
+    ? `Ya no figura entre ${palabrasDe(game.settings?.juego).articulos[losSuyos.id] === 'la' ? 'las' : 'los'} ${losSuyos.plural}`
+    : 'Ya no juega esta partida';
+
   const sobres: Sobre[] = personasDe(game).map((sospechoso) => ({
     participanteId: sospechoso.id,
     personName: sospechoso.name,
@@ -357,7 +376,7 @@ export default function DocumentsPanel(): JSX.Element {
                   : sobre.sinDosier
                   ? 'Aún no tiene personaje ni documento'
                   : sobre.sobrante
-                    ? 'Ya no figura entre los sospechosos'
+                    ? yaNoFigura
                     : sobre.characterName && sobre.characterName !== sobre.personName
                       ? `interpretado por ${sobre.personName}`
                       : 'Dosier confidencial'}

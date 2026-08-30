@@ -104,6 +104,17 @@ export interface PalabrasDeJuego {
      * trozos daba «de El Mayordomo».
      */
     tipConAyuda: string;
+    /**
+     * El ejemplo que se lee en gris dentro del cuadro de estilo.
+     *
+     * ESTABA ESCRITO EN `StylePanel` Y HABLABA DE UN ASESINO. Es el hueco donde
+     * quien organiza escribe el aire que quiere darle a su velada, y el ejemplo
+     * es lo único que le dice de qué clase de cosa se espera que hable: uno que
+     * proponga «un transatlántico del que el asesino no puede bajarse» está
+     * enseñando a escribir para otro juego. Se escribe entero y no por trozos
+     * porque es una frase de ejemplo, no una plantilla.
+     */
+    ejemploDeEstilo: string;
     extraviadoTitulo: string;
     extraviadoTexto: string;
     extraviadoVolver: string;
@@ -165,6 +176,17 @@ export interface PalabrasDeJuego {
     servicio: string;
     pensando: string;
     marcador: string;
+    /**
+     * Lo que se lee cuando la petición no llega al servidor.
+     *
+     * VA EN LA VOZ DEL ASISTENTE, y por eso está aquí y no en un fichero de
+     * errores: aparece DENTRO de la conversación, en la burbuja de quien te
+     * estaba hablando. Escrito una sola vez para todos decía «no he podido
+     * contactar con la mansión», así que el Escriba, el Guía y el Jefe de
+     * Estación se referían a una casa que en su juego no existe — y en la única
+     * frase que la gente lee cuando algo va mal.
+     */
+    sinLinea: string;
   };
 }
 
@@ -213,6 +235,9 @@ const CLUEDO: PalabrasDeJuego = {
       'Descarta la trama y los dosieres actuales y escribe un misterio completamente nuevo.',
     tipConfirmar: 'Pulse otra vez para descartar el misterio actual y escribir uno nuevo.',
     tipConAyuda: ', con ayuda del mayordomo para lo que falte',
+    ejemploDeEstilo:
+      'Escribe con tus palabras el aire que quieres darle. Por ejemplo: «que todo ocurra en un ' +
+      'transatlántico en plena travesía, con la tensión de que el asesino no puede bajarse».',
     extraviadoTitulo: 'El expediente se ha extraviado',
     extraviadoTexto: 'No se pudo abrir este caso. Quizá fue borrado o el servidor no responde.',
     extraviadoVolver: '← Volver al recibidor',
@@ -258,6 +283,7 @@ const CLUEDO: PalabrasDeJuego = {
     servicio: 'El Mayordomo está de servicio',
     pensando: 'El Mayordomo está pensando…',
     marcador: 'Hable con El Mayordomo…',
+    sinLinea: '⚠ No he podido contactar con la mansión. Inténtelo de nuevo, se lo ruego.',
   },
 };
 
@@ -315,6 +341,9 @@ const MOMIA: PalabrasDeJuego = {
       'Descarta el papiro actual —el orden de los ritos, los dones y los dosieres— y escribe otro distinto.',
     tipConfirmar: 'Pulsa otra vez para descartar este papiro y escribir uno nuevo.',
     tipConAyuda: ', con ayuda del Escriba para lo que falte',
+    ejemploDeEstilo:
+      'Escribe con tus palabras el aire que quieres darle. Por ejemplo: «que la expedición esté ' +
+      'sin dormir desde hace tres días y que a nadie le quede sentido del humor».',
     extraviadoTitulo: 'Esta expedición se ha perdido en la arena',
     extraviadoTexto: 'No se pudo abrir. Quizá se borró, o el servidor no responde.',
     extraviadoVolver: '← Volver al campamento',
@@ -372,6 +401,7 @@ const MOMIA: PalabrasDeJuego = {
     servicio: 'El Escriba está despierto',
     pensando: 'El Escriba está escribiendo…',
     marcador: 'Habla con El Escriba…',
+    sinLinea: '⚠ No hay línea con el campamento. Vuelve a intentarlo.',
   },
 };
 
@@ -436,6 +466,9 @@ const SOMBRAS: PalabrasDeJuego = {
       'Descarta el camino actual —la senda, los disfraces y los dosieres— y traza otro distinto.',
     tipConfirmar: 'Pulsa otra vez para descartar este camino y trazar uno nuevo.',
     tipConAyuda: ', con ayuda del Guía para lo que falte',
+    ejemploDeEstilo:
+      'Escribe con tus palabras el aire que quieres darle. Por ejemplo: «que llueva toda la noche ' +
+      'y que nadie se fíe de nadie, ni siquiera de quien va delante».',
     extraviadoTitulo: 'Esta noche se ha perdido en el monte',
     extraviadoTexto: 'No se pudo abrir. Quizá se borró, o el servidor no responde.',
     extraviadoVolver: '← Volver a Sakai',
@@ -494,6 +527,7 @@ const SOMBRAS: PalabrasDeJuego = {
     servicio: 'El Guía está despierto',
     pensando: 'El Guía está mirando el monte…',
     marcador: 'Habla con El Guía…',
+    sinLinea: '⚠ No llega respuesta del monte. Prueba otra vez.',
   },
 };
 
@@ -607,6 +641,10 @@ const NUDO: PalabrasDeJuego = {
      * escribe «del Escriba» aquí en vez de componerlo.
      */
     tipConAyuda: ', con ayuda del Jefe de Estación para lo que falte',
+    /* De USTED, como todo lo que dice este juego en el taller. */
+    ejemploDeEstilo:
+      'Escriba con sus palabras el aire que quiere darle. Por ejemplo: «que haga un frío que ' +
+      'duela y que la estufa del cuarto de aparatos lleve toda la noche sin tirar».',
     extraviadoTitulo: 'Este turno no consta en el libro',
     extraviadoTexto: 'No se pudo abrir. Quizá se borró, o el servidor no responde.',
     extraviadoVolver: '← Volver a Valdehierro',
@@ -696,6 +734,12 @@ const NUDO: PalabrasDeJuego = {
     servicio: 'El Jefe de Estación está de servicio',
     pensando: 'El Jefe de Estación consulta el Reglamento…',
     marcador: 'Hable con El Jefe de Estación…',
+    /*
+     * EN SU VOZ, Y ADEMÁS EN SU MUNDO: en una estación de 1927 lo que se cae no
+     * es «la conexión», es el hilo del telégrafo. Que el aviso de un fallo de
+     * red suene a la noche que se está preparando cuesta lo mismo que no.
+     */
+    sinLinea: '⚠ Se ha cortado el hilo con la central. Inténtelo otra vez.',
   },
 };
 
