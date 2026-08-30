@@ -32,6 +32,26 @@ import { computeStaleness } from '../../shared/staleness';
 import type { ManifiestoDeJuego } from '../../shared/juegos';
 import type { GameSession, Plot } from '../../shared/types';
 import type { LiveSession } from '../../shared/live';
+import { leerBloqueDePistas } from '../../shared/mecanicas/pistas';
+import type { BloqueDePistas } from '../../shared/mecanicas/pistas';
+import type { VistaJugador } from '../../shared/live';
+import { registrarProyeccion } from '../src/juegos/proyecciones';
+import { bloqueDePistas } from '../src/mecanicas/pistas';
+
+/**
+ * El bloque de la mecanica de pistas, o un fallo ruidoso.
+ *
+ * REVIENTA a proposito cuando no esta. Estos campos viajaban en la vista comun
+ * y ahora van en `estadoDelJuego`, que es `unknown`: si esto devolviera un
+ * objeto vacio en vez de tirar, cada comprobacion de aqui abajo seguiria
+ * ejecutandose y comparando listas vacias con listas vacias. Pasarian todas, y
+ * la pestana de Pistas estaria en blanco en el movil.
+ */
+function pistasDe(v: VistaJugador): BloqueDePistas {
+  const estado = leerBloqueDePistas(v.estadoDelJuego);
+  if (!estado) throw new Error('la vista no trae el bloque de pistas: mira si el juego registra la proyeccion que lo compone');
+  return estado;
+}
 
 let hechas = 0;
 const fallos: string[] = [];
@@ -79,7 +99,7 @@ const EL_LEGADO: ManifiestoDeJuego = {
     { pantalla: 'ronda', rotulo: 'La cena', icono: 'reloj' },
     { pantalla: 'personaje', rotulo: 'Tú', icono: 'mascara' },
     { pantalla: 'mapa', rotulo: 'La casa', icono: 'plano' },
-    { pantalla: 'tablon', rotulo: 'Lo visto', icono: 'tablon' },
+    { pantalla: 'hechos', rotulo: 'Lo visto', icono: 'cartel' },
     { pantalla: 'perfil', rotulo: 'Perfil', icono: 'copa' },
   ],
   // Un dosier corto: este juego tiene pestana de `tablon` donde mirar lo visto.
@@ -133,6 +153,24 @@ const EL_LEGADO: ManifiestoDeJuego = {
 };
 
 registrarJuego(EL_LEGADO);
+
+/*
+ * ═══ Y SE APUNTA A LA MECANICA DE LAS PISTAS ═══
+ *
+ * Esta linea es, ella sola, la prueba de que la tercera capa funciona.
+ *
+ * Antes las pistas las componia el nucleo para todo el mundo, asi que este
+ * juego las tenia porque no habia forma de no tenerlas —y la Momia y las
+ * Sombras las tenian vacias por la misma razon—. Ahora se cogen llamando a una
+ * funcion, y quien la llama aqui es un juego inventado para esta prueba que no
+ * conoce a CLUEDO, no importa nada suyo, y no tiene ni sus nombres de
+ * categoria ni sus ejes ni su numero de ejes.
+ *
+ * Si esta linea se borra, las diez comprobaciones de mas abajo se caen con un
+ * error que lo dice. Si la mecanica dejara de ser reutilizable —si volviera a
+ * mirar dentro de CLUEDO por algun sitio— tambien.
+ */
+registrarProyeccion('el-legado', bloqueDePistas);
 
 // ---------------------------------------------------------------------------
 // Una partida de El Legado
@@ -279,17 +317,17 @@ elegirSala(sesion, 'h1', 'e1');
 v = vistaDe('h0');
 comprobar('la ronda abre', v.sesion.phase === 'ronda-abierta');
 comprobar('entro en una estancia', v.miLugar === 'e0');
-comprobar('y veo lo que hay allí', v.misPistas.length === 1, v.misPistas);
-comprobar('sin que me digan qué significa', v.misPistas[0]?.pointsTo === undefined);
+comprobar('y veo lo que hay allí', pistasDe(v).misPistas.length === 1, pistasDe(v).misPistas);
+comprobar('sin que me digan qué significa', pistasDe(v).misPistas[0]?.pointsTo === undefined);
 comprobar(
   'no veo lo de la estancia ajena',
-  !v.misPistas.some((p) => p.description.includes('carmín')),
+  !pistasDe(v).misPistas.some((p) => p.description.includes('carmín')),
 );
 
 cerrarRonda(sesion);
 v = vistaDe('h0');
-comprobar('al cerrar sigo teniendo solo lo mío', v.misHallazgos.length === 1, v.misHallazgos.length);
-comprobar('y ya con su significado', v.misHallazgos.every((p) => typeof p.pointsTo === 'string'));
+comprobar('al cerrar sigo teniendo solo lo mío', pistasDe(v).misHallazgos.length === 1, pistasDe(v).misHallazgos.length);
+comprobar('y ya con su significado', pistasDe(v).misHallazgos.every((p) => typeof p.pointsTo === 'string'));
 /*
  * Y LA DE LA ESTANCIA AJENA SIGUE SIN LLEGAR. Aquí decía que al cerrar «lo
  * hallado es público» y esperaba las DOS pistas, la mía y la de la estancia en
@@ -298,7 +336,7 @@ comprobar('y ya con su significado', v.misHallazgos.every((p) => typeof p.points
  */
 comprobar(
   'lo de la estancia ajena tampoco llega con la ronda cerrada',
-  !v.misHallazgos.some((p) => p.description.includes('carmín')),
+  !pistasDe(v).misHallazgos.some((p) => p.description.includes('carmín')),
 );
 
 /*

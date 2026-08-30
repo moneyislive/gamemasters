@@ -43,6 +43,13 @@ import { instalarSoloEstos, juegosInstalados } from '../../../shared/juegos';
 import './cluedo-acciones';
 import './cluedo-trofeos';
 /*
+ * Y su proyeccion, que hasta hoy no existia: sus pistas y sus hechos los
+ * componia el nucleo, en `live/proyeccion.ts`, porque CLUEDO fue el primero.
+ * Sin esta linea la vista sale sin ellos y la pestana de Pistas queda en
+ * blanco, que es exactamente el fallo mudo que este fichero existe para evitar.
+ */
+import './cluedo-proyeccion';
+/*
  * Y sus trece plantillas de imprimible. Estaban en una tabla exhaustiva dentro
  * de `docs/imprimibles/index.ts` y el compilador exigia que estuvieran todas;
  * ahora es un registro, asi que si nadie importa este modulo el paquete sale

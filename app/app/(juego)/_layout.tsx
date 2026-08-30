@@ -31,7 +31,7 @@ const PANTALLAS: Record<PantallaDeApp, true> = {
   ronda: true,
   personaje: true,
   mapa: true,
-  tablon: true,
+  hechos: true,
   cuaderno: true,
   perfil: true,
   // Las dos de El Misterio de la Momia. CLUEDO no las declara en su barra, asi

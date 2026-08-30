@@ -307,7 +307,7 @@ export type IconoId =
   | 'reloj'
   | 'mascara'
   | 'plano'
-  | 'tablon'
+  | 'cartel'
   | 'cuaderno'
   | 'copa'
   | 'mayordomo'
@@ -339,7 +339,7 @@ export type PantallaDeApp =
   | 'ronda'
   | 'personaje'
   | 'mapa'
-  | 'tablon'
+  | 'hechos'
   | 'cuaderno'
   | 'perfil'
   /*

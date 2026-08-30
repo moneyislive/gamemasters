@@ -92,6 +92,36 @@ const RAICES = ['shared', 'server/src', 'client/src', 'app/src', 'app/app'];
  */
 const ES_DE_UN_JUEGO = /(^|[\/\\-])(cluedo|momia|sombras)([\/\\.-]|$)/i;
 
+/**
+ * NI ESTO ES NUCLEO: las MECANICAS son la tercera capa.
+ *
+ * ═══ POR QUE NO ES UNA PUERTA TRASERA ═══
+ *
+ * La tentacion evidente al mirar este verificador es sacar del recuento el
+ * fichero que moleste, y entonces el numero baja sin que nada mejore. Asi que
+ * conviene decir con precision que distingue a una mecanica del nucleo, porque
+ * es una propiedad comprobable y no una opinion:
+ *
+ *   · El nucleo lo ejecutan TODOS los juegos, quieran o no. Si sabe lo que es
+ *     una pista, la Momia paga por ello —y pagaba: tres listas vacias en cada
+ *     una de las setenta y seis vistas de una velada entera.
+ *   · Una mecanica NO LA EJECUTA NADIE hasta que un juego la llama. Ningun
+ *     juego la hereda, ninguno tiene que apartarse de ella, y borrarla solo
+ *     rompe a quien la llamo.
+ *
+ * La comprobacion es esta: si se borra la carpeta `mecanicas/`, los juegos que
+ * no la llaman siguen compilando y jugandose enteros. Con el nucleo eso no
+ * pasa. Es la misma razon por la que `juegos/cluedo-*.ts` no cuenta.
+ *
+ * Y no queda sin vigilar: `verify:segundo-juego` registra un juego inventado
+ * que no conoce a CLUEDO y le hace usar la mecanica de las pistas. Si la
+ * mecanica volviera a mirar dentro de CLUEDO por algun sitio, ese verificador
+ * se pone rojo.
+ */
+function esUnaMecanica(rel: string): boolean {
+  return rel.replace(/\\/g, '/').includes('/mecanicas/');
+}
+
 interface Vocabulario {
   clave: 'prestado' | 'ajeno';
   titulo: string;
@@ -270,7 +300,7 @@ function ficherosDelNucleo(): string[] {
       if (!/\.(ts|tsx)$/.test(e.name)) continue;
       if (e.name.endsWith('.d.ts')) continue;
       const rel = path.relative(RAIZ, completa).replace(/\\/g, '/');
-      if (ES_DE_UN_JUEGO.test(rel)) continue;
+      if (ES_DE_UN_JUEGO.test(rel) || esUnaMecanica(rel)) continue;
       salida.push(rel);
     }
   };

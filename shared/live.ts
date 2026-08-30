@@ -13,7 +13,7 @@
  * envía lo que esa persona puede saber en esa ronda, y nada más.
  */
 import type { BoardLayout, BoardMode } from './types';
-import type { EjeId, JuegoId } from './juegos/tipos';
+import type { CategoriaId, EjeId, JuegoId } from './juegos/tipos';
 import type { CorreoDeCuenta, IdentidadDeProveedor } from './identidad';
 
 // ---------------------------------------------------------------------------
@@ -606,21 +606,6 @@ export interface TableroVista {
   plano?: BoardLayout;
 }
 
-/** Una pista, tal como se le entrega a quien ha entrado en esa sala. */
-export interface PistaVista {
-  id: string;
-  lugarId: string;
-  lugarNombre: string;
-  round: number;
-  description: string;
-  /**
-   * A qué señala. Solo se envía a QUIEN LA ENCONTRÓ y solo cuando la ronda en
-   * la que la encontró ya ha cerrado: mientras la ronda está abierta,
-   * interpretarla es trabajo del jugador.
-   */
-  pointsTo?: string;
-}
-
 export interface MomentoVista {
   time: string;
   description: string;
@@ -737,7 +722,39 @@ export interface VistaJugador {
   lugares: LugarVista[];
   /** El plano de la casa. Ausente si la partida todavía no tiene tablero. */
   tablero?: TableroVista;
-  objetos: Array<{ id: string; name: string; description?: string; photoUrl?: string }>;
+  /**
+   * LAS DEMAS CATEGORIAS del juego, en el orden en que las declara.
+   *
+   * ═══ AQUI HABIA UN CAMPO LLAMADO `objetos` ═══
+   *
+   * Era la tercera categoria de CLUEDO —las armas— con un hueco propio en el
+   * contrato de la plataforma. Se rellenaba buscando la categoria cuyo
+   * `almacenHeredado` fuese `weapons`, asi que funcionaba por casualidad: la
+   * Momia guardaba ahi sus amuletos y las Sombras sus enseres porque los dos
+   * habian declarado ese almacen, no porque el campo significase nada.
+   *
+   * Y tenia el limite que se ve en cuanto se escribe el cuarto juego: una
+   * partida con CUATRO categorias —cartas, conjuros, reliquias— solo podia
+   * mandar UNA. Las otras no tenian por donde salir.
+   *
+   * Ahora sale una entrada por categoria, con el rotulo que el juego declara,
+   * y la app pinta la lista sin saber a que juega. Las dos que la plataforma
+   * SI conoce no vienen aqui, porque tienen bloque propio y con mas cosas
+   * dentro: las personas van en `jugadores` —con presencia y con quien ha
+   * respondido— y los lugares en `lugares` —con ocupantes y chincheta—.
+   *
+   * No abre ninguna brecha: son las entidades del taller, que estan impresas en
+   * el material que hay encima de la mesa.
+   */
+  entidades: Array<{
+    categoriaId: CategoriaId;
+    /** «objeto» / «objetos», tal como los llama este juego. */
+    singular: string;
+    plural: string;
+    /** El rotulo ya resuelto para encabezar el bloque: «Los objetos». */
+    titulo: string;
+    cosas: Array<{ id: string; name: string; description?: string; photoUrl?: string }>;
+  }>;
   /**
    * Qué hay que responder para acusar, y con qué opciones.
    *
@@ -815,38 +832,27 @@ export interface VistaJugador {
    * maestro de oro.
    */
   estadoDelJuego?: unknown;
-  /** La sala que has elegido esta ronda, si ya lo has hecho. */
+  /** El lugar que has elegido esta ronda, si ya lo has hecho. */
   miLugar?: string;
-  /** Pistas de TU sala en esta ronda. Vacío hasta que eliges. */
-  misPistas: PistaVista[];
   /**
-   * TODO lo que has encontrado tú, ronda a ronda, desde que empezó la partida.
+   * POR DONDE HAS PASADO TU, ronda a ronda.
    *
-   * Aquí estaba `tablon`, y el cambio de nombre no es cosmético: era la lista de
-   * lo que se ponía EN COMÚN al cerrar cada ronda, y por tanto todo el mundo
-   * recibía lo mismo aunque no hubiera pisado esa sala. Entrar en una sala u
-   * otra daba igual, porque al cabo de un minuto lo tenías todo; y la mitad de
-   * la conversación de la mesa —«yo estuve en la cocina y vi esto»— se quedaba
-   * sin objeto porque ya estaba en la pantalla de los demás.
+   * ═══ POR QUE ESTO ES DE LA PLATAFORMA Y LAS PISTAS NO ═══
    *
-   * Ahora lo que se encuentra es de quien lo encuentra. Esta lista es la tuya y
-   * solo la tuya: el servidor la compone con las salas que TÚ elegiste en cada
-   * ronda. Enseñarla o callársela vuelve a ser una decisión.
+   * El plano marcaba los sitios que te habian dado algo, y lo sacaba de
+   * `misHallazgos`: una lista de PISTAS. Con eso, el mapa de un juego que no
+   * tenga pistas —la Momia, las Sombras— salia sin una sola marca, porque esa
+   * lista les llegaba vacia y nadie lo notaba: un plano limpio parece un plano
+   * al principio de la partida.
+   *
+   * Haber estado en un sitio, en cambio, significa lo mismo en cualquier juego
+   * que tenga lugares: la plataforma lo sabe porque es ella quien registra las
+   * elecciones de cada ronda. El plano marca eso, y quien ademas quiera marcar
+   * lo que encontro lo pinta desde lo suyo.
+   *
+   * Solo el tuyo. Por donde pasaron los demas no se manda a nadie.
    */
-  misHallazgos: PistaVista[];
-  /**
-   * Los hechos que la mesa puede dar por establecidos, ronda a ronda.
-   *
-   * Es la mitad pública de la investigación, y la única que queda: existía ya
-   * como cartel imprimible —«Línea temporal», material público— donde quien
-   * dirige va pegando un bloque al cerrar cada ronda. En el móvil no estaba, así
-   * que una partida sin imprimir nada se quedaba sin ella.
-   *
-   * No revela la solución: el material se escribe con el encargo explícito de
-   * que la última revelación pueda dejar la pieza final sin encajar y de que
-   * ninguna nombre al culpable.
-   */
-  hechos: Array<{ round: number; time: string; fact: string }>;
+  miRecorrido: Array<{ round: number; lugarId: string }>;
   /**
    * Lo que pasó en los encuentros anteriores.
    *

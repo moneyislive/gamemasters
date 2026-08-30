@@ -31,6 +31,23 @@ import { generateDemoPlot } from '../src/plot/cluedo-demo';
 import { CLUEDO, ejes as ejesDe, esElSenalado, fasesConPapel, manifiestoDe } from '../../shared/juegos';
 import type { GameSession } from '../../shared/types';
 import type { LiveSession, VistaJugador } from '../../shared/live';
+import { leerBloqueDePistas } from '../../shared/mecanicas/pistas';
+import type { BloqueDePistas } from '../../shared/mecanicas/pistas';
+
+/**
+ * El bloque de la mecanica de pistas, o un fallo ruidoso.
+ *
+ * REVIENTA a proposito cuando no esta. Estos campos viajaban en la vista comun
+ * y ahora van en `estadoDelJuego`, que es `unknown`: si esto devolviera un
+ * objeto vacio en vez de tirar, cada comprobacion de aqui abajo seguiria
+ * ejecutandose y comparando listas vacias con listas vacias. Pasarian todas, y
+ * la pestana de Pistas estaria en blanco en el movil.
+ */
+function pistasDe(v: VistaJugador): BloqueDePistas {
+  const estado = leerBloqueDePistas(v.estadoDelJuego);
+  if (!estado) throw new Error('la vista no trae el bloque de pistas: mira si el juego registra la proyeccion que lo compone');
+  return estado;
+}
 
 const REPO = path.resolve(import.meta.dirname ?? __dirname, '..', '..');
 const TSX = path.join(REPO, 'node_modules', 'tsx', 'dist', 'cli.mjs');
@@ -303,10 +320,10 @@ async function jugar(): Promise<void> {
   comprobar('elegir sala responde 200', elegir.estado === 200, elegir.datos);
   v = await vista();
   comprobar('estoy en esa sala', v.miLugar === conPista, v.miLugar);
-  comprobar('me dan las pistas de aquí', v.misPistas.length > 0, v.misPistas.length);
+  comprobar('me dan las pistas de aquí', pistasDe(v).misPistas.length > 0, pistasDe(v).misPistas.length);
   comprobar(
     'pero NO lo que significan',
-    v.misPistas.every((p) => p.pointsTo === undefined),
+    pistasDe(v).misPistas.every((p) => p.pointsTo === undefined),
   );
 
   paso('Cerrar la ronda');
@@ -314,10 +331,10 @@ async function jugar(): Promise<void> {
   comprobar('cerrar responde 200', cerrar.estado === 200, cerrar.datos);
   v = await vista();
   comprobar('la ronda está cerrada', v.sesion.phase === 'ronda-cerrada');
-  comprobar('lo que encontré sigue estando', v.misHallazgos.length > 0, v.misHallazgos.length);
+  comprobar('lo que encontré sigue estando', pistasDe(v).misHallazgos.length > 0, pistasDe(v).misHallazgos.length);
   comprobar(
     'y AHORA sí se dice qué significa',
-    v.misHallazgos.every((p) => typeof p.pointsTo === 'string'),
+    pistasDe(v).misHallazgos.every((p) => typeof p.pointsTo === 'string'),
   );
 
   /*

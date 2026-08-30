@@ -33,6 +33,7 @@
  * Un juego puede declarar `'giros'` aunque esta partida no tenga ninguno
  * todavía. El bloque decide si se pinta; la pantalla solo los ordena.
  */
+import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, { FadeInUp } from 'react-native-reanimated';
 import {
@@ -135,18 +136,13 @@ const VEREDICTO: Record<string, { si: string; no: string }> = {
 };
 
 /**
- * Cómo llama este juego a sus cosas y a su gente.
+ * Cómo llama este juego a su gente.
  *
- * Sale del manifiesto y no de una constante: el bloque de las cosas decía «Los
- * objetos» y el de la gente «En la mesa» en los tres juegos, así que una
- * expedición leía «Los objetos» donde tiene reliquias y una columna que cruza un
- * monte de noche leía «En la mesa».
+ * Sale del manifiesto y no de una constante: el bloque decía «En la mesa» en
+ * los tres juegos, así que una columna que cruza un monte de noche leía «En la
+ * mesa». El rótulo de las cosas vivía aquí al lado y ya no: viene resuelto en
+ * la vista, una vez por categoría.
  */
-function rotuloDeCosas(m: ManifiestoDeJuego): string {
-  const cat = m.categorias.find((c) => c.almacenHeredado === 'weapons');
-  return cat?.presentacion?.titulo ?? capitalizar(cat?.plural ?? 'objetos');
-}
-
 function rotuloDeGente(m: ManifiestoDeJuego): string {
   const cat = m.categorias.find((c) => c.sonJugadores);
   return capitalizar(cat?.plural ?? 'los demás');
@@ -412,22 +408,36 @@ const Reglas: Bloque = ({ vista }) => (
   </>
 );
 
-const Cosas: Bloque = ({ vista, manifiesto }) => {
-  if (vista.objetos.length === 0) return null;
+/*
+ * UNA SECCION POR CATEGORIA, no una sola.
+ *
+ * Esto pintaba `vista.objetos`, que era un unico bloque: la tercera categoria
+ * de CLUEDO. Un juego con reliquias Y conjuros solo veia impresa una de las
+ * dos, sin nada que avisara de que faltaba la otra. El rotulo tambien venia de
+ * buscar `almacenHeredado === 'weapons'` en el manifiesto; ahora llega ya
+ * resuelto desde el servidor, que es quien tiene el manifiesto de verdad.
+ */
+const Cosas: Bloque = ({ vista }) => {
+  const conCosas = vista.entidades.filter((cat) => cat.cosas.length > 0);
+  if (conCosas.length === 0) return null;
   return (
     <>
-      <Ornamento />
-      <Seccion>{rotuloDeCosas(manifiesto)}</Seccion>
-      <Marco>
-        {vista.objetos.map((o) => (
-          <View key={o.id} style={estilos.fila}>
-            <Cuerpo style={{ flex: 1, fontSize: 16 }}>{o.name}</Cuerpo>
-            {o.description ? (
-              <Cuerpo tenue style={{ flex: 1, fontSize: 14 }}>{o.description}</Cuerpo>
-            ) : null}
-          </View>
-        ))}
-      </Marco>
+      {conCosas.map((cat) => (
+        <React.Fragment key={cat.categoriaId}>
+          <Ornamento />
+          <Seccion>{cat.titulo}</Seccion>
+          <Marco>
+            {cat.cosas.map((o) => (
+              <View key={o.id} style={estilos.fila}>
+                <Cuerpo style={{ flex: 1, fontSize: 16 }}>{o.name}</Cuerpo>
+                {o.description ? (
+                  <Cuerpo tenue style={{ flex: 1, fontSize: 14 }}>{o.description}</Cuerpo>
+                ) : null}
+              </View>
+            ))}
+          </Marco>
+        </React.Fragment>
+      ))}
     </>
   );
 };

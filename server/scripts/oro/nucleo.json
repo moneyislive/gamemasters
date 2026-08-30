@@ -3,12 +3,9 @@
     "server/src/juegos/migracion.ts": 10
   },
   "ajeno": {
-    "app/app/(juego)/_layout.tsx": 1,
     "app/app/(juego)/consejo.tsx": 3,
-    "app/app/(juego)/cuaderno.tsx": 1,
-    "app/app/(juego)/mapa.tsx": 1,
     "app/app/(juego)/perfil.tsx": 1,
-    "app/app/(juego)/ronda.tsx": 7,
+    "app/app/(juego)/ronda.tsx": 4,
     "app/app/(juego)/sellado.tsx": 1,
     "app/app/_layout.tsx": 1,
     "app/app/acusar.tsx": 1,
@@ -17,9 +14,7 @@
     "app/app/index.tsx": 2,
     "app/src/api.ts": 2,
     "app/src/avisos.tsx": 2,
-    "app/src/dosier/bloques.tsx": 1,
     "app/src/estado.tsx": 1,
-    "app/src/iconos.tsx": 1,
     "client/src/api/client.ts": 8,
     "client/src/components/live/LivePanel.tsx": 2,
     "client/src/components/live/PanelDeLasSombras.tsx": 3,
@@ -35,7 +30,7 @@
     "server/src/docs/renderer.ts": 2,
     "server/src/juegos/migracion.ts": 48,
     "server/src/live/consejero.ts": 3,
-    "server/src/live/proyeccion.ts": 14,
+    "server/src/live/proyeccion.ts": 6,
     "server/src/live/sesion.ts": 7,
     "server/src/plot/refresh.ts": 2,
     "server/src/routes/entities.ts": 12,
@@ -43,8 +38,8 @@
     "server/src/routes/live.ts": 4,
     "shared/documents.ts": 1,
     "shared/juegos/entidades.ts": 6,
-    "shared/juegos/tipos.ts": 6,
-    "shared/live.ts": 7,
+    "shared/juegos/tipos.ts": 4,
+    "shared/live.ts": 5,
     "shared/staleness.ts": 1,
     "shared/types.ts": 12
   }

@@ -16,7 +16,7 @@
  */
 import Animated, { FadeInUp } from 'react-native-reanimated';
 import { StyleSheet, View } from 'react-native';
-import { usePartida } from '../../src/estado';
+import { usePartida } from '../estado';
 import {
   Cargando,
   Cuerpo,
@@ -28,9 +28,22 @@ import {
   Titulo,
   color,
   espacio,
-} from '../../src/ui';
+} from '../ui';
+import { leerBloqueDePistas } from '../../../shared/mecanicas/pistas';
 
-export default function Tablon(): JSX.Element {
+/*
+ * ═══ ESTA PANTALLA ES DE CLUEDO, Y POR ESO VIVE AQUI ═══
+ *
+ * Estaba en `app/(juego)/`, que es el enrutador: el sitio de las pantallas de
+ * la PLATAFORMA. Y no lo era: solo CLUEDO declara esta pestana en su barra, y
+ * lo que pinta —pistas, hechos establecidos— solo existe en CLUEDO.
+ *
+ * Mientras estuvo ahi, la ruta se llevaba la pantalla de CLUEDO para cualquier
+ * juego que declarase una pestana con ese nombre, sin avisar. Ahora la
+ * plataforma dispatcha por la tabla de `src/pantallas.ts`, igual que con la
+ * ronda y el desenlace, y dos juegos pueden tener cada uno la suya.
+ */
+export function Hechos(): JSX.Element {
   const { vista } = usePartida();
   if (!vista) return <Pantalla><Cargando /></Pantalla>;
 
@@ -42,7 +55,13 @@ export default function Tablon(): JSX.Element {
    * En orden inverso porque lo que se busca al abrir esta pantalla es lo último
    * que se ha establecido, no el principio de la noche: eso ya se sabe.
    */
-  const revelaciones = [...vista.hechos].sort((a, b) => b.round - a.round);
+  /*
+   * Los hechos vienen en el bloque de CLUEDO, no en la vista comun: alli
+   * estaban al lado de la fase y de quien esta sentado, y llegaban vacios a los
+   * dos juegos que no tienen linea temporal publica.
+   */
+  const estado = leerBloqueDePistas(vista.estadoDelJuego);
+  const revelaciones = [...(estado?.hechos ?? [])].sort((a, b) => b.round - a.round);
 
   return (
     <Pantalla>

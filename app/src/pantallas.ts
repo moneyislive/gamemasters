@@ -37,6 +37,9 @@
  * Ningún juego puede cambiarle la pantalla a otro.
  */
 import type { ComponentType } from 'react';
+import { Cuaderno } from './cluedo/cuaderno';
+import { Hechos } from './cluedo/hechos';
+import { PistasDeLaRonda } from './cluedo/pistas';
 import { Vigilia } from './momia/vigilia';
 import { Amanecer } from './momia/amanecer';
 import { Hora } from './sombras/hora';
@@ -48,17 +51,69 @@ import type { JuegoId } from '../../shared/juegos';
  *
  * NO son todas las de la app. Las demás —el mapa, el perfil, la entrada— son
  * plataforma: enseñan cosas que significan lo mismo en cualquier juego. Estas
- * dos son las únicas cuyo CONTENIDO es la mecánica.
+ * son las únicas cuyo CONTENIDO es la mecánica.
+ *
+ * ═══ `cuaderno` Y `hechos` ENTRARON DESPUÉS, Y ES INSTRUCTIVO POR QUÉ ═══
+ *
+ * No estaban aquí porque no hacía falta: sus ficheros vivían directamente en
+ * `app/(juego)/`, o sea entre las pantallas de la plataforma, y pintaban
+ * campos que la plataforma mandaba a todo el mundo —`misHallazgos`, `hechos`—
+ * aunque solo signifiquen algo en CLUEDO.
+ *
+ * Nadie veía un error porque la barra de cada juego decide qué pestañas
+ * enseñar, y ni la Momia ni las Sombras enseñan estas dos. O sea: funcionaba
+ * porque los otros dos juegos se apartaban. El día que uno declarase una
+ * pestaña llamada `cuaderno` se llevaría la de CLUEDO entera, con sus pistas y
+ * su prosa de misterio, sin un solo aviso.
  */
-export type PantallaSustituible = 'ronda' | 'desenlace';
+export type PantallaSustituible = 'ronda' | 'desenlace' | 'cuaderno' | 'hechos';
 
 export const PANTALLAS_DE_JUEGO: Record<
   JuegoId,
   Partial<Record<PantallaSustituible, ComponentType>>
 > = {
+  cluedo: { cuaderno: Cuaderno, hechos: Hechos },
   momia: { ronda: Vigilia, desenlace: Amanecer },
   sombras: { ronda: Hora, desenlace: Alba },
 };
+
+/**
+ * Los TROZOS que un juego añade a una pantalla de la plataforma sin sustituirla.
+ *
+ * ═══ POR QUÉ HACEN FALTA LAS DOS COSAS ═══
+ *
+ * Sustituir una pantalla entera vale cuando la mecánica es otra: la Vigilia de
+ * la Momia no se parece en nada a una ronda de CLUEDO. Pero a veces lo que
+ * cambia es un bloque, y sustituir la pantalla entera obligaría a copiar las
+ * doscientas líneas que sí son iguales —elegir sitio, avisar de que estás
+ * listo, el panel de acciones— para cambiar veinte.
+ *
+ * El caso concreto: la ronda genérica llevaba dentro «Lo que encuentras aquí»,
+ * la lista de pistas de tu sala. Es de CLUEDO y de nadie más, y estaba en la
+ * pantalla que se lleva cualquier juego que no declare la suya. Un juego nuevo
+ * que se pareciera a CLUEDO en lo demás heredaba un bloque de pistas que no
+ * podía llenar.
+ *
+ * Es la misma idea que `VistaJugador.estadoDelJuego` en el servidor: la
+ * plataforma deja un hueco declarado y el juego lo llena. Aquí el hueco es de
+ * pantalla en vez de datos.
+ */
+export type HuecoDeJuego = 'ronda';
+
+export const BLOQUES_DE_JUEGO: Record<
+  JuegoId,
+  Partial<Record<HuecoDeJuego, ComponentType>>
+> = {
+  cluedo: { ronda: PistasDeLaRonda },
+};
+
+/** El trozo que este juego añade a esta pantalla, si añade alguno. */
+export function bloqueDe(
+  juego: JuegoId | undefined,
+  hueco: HuecoDeJuego,
+): ComponentType | undefined {
+  return BLOQUES_DE_JUEGO[juego ?? '']?.[hueco];
+}
 
 /**
  * La pantalla propia de este juego, si la tiene.

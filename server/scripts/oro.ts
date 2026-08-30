@@ -281,7 +281,31 @@ const familia = (d: string): string =>
 const argumentos = process.argv.slice(2);
 const modo = argumentos.includes('verificar') ? 'verificar' : 'capturar';
 const forzar = argumentos.includes('--forzar');
-const pedidos = argumentos.filter((a) => !a.startsWith('--') && a !== 'verificar' && a !== 'capturar');
+/*
+ * ═══ VOLCAR: MIRAR LO DE AHORA SIN TOCAR LO DE ANTES ═══
+ *
+ * Hay una clase de cambio que este verificador no sabe juzgar solo: el que
+ * cambia a proposito la forma de lo que viaja. Un campo que se parte en dos, o
+ * tres que se mudan a otro sitio. El maestro de oro se pone rojo —debe
+ * ponerse— y entonces solo quedan dos salidas malas: leer novecientas
+ * diferencias truncadas a mano, o recapturar a ciegas y dar por buenas de paso
+ * las regresiones que hubiera debajo.
+ *
+ * La salida buena es tener las dos instantaneas y compararlas con las reglas
+ * del cambio: aplicar la transformacion a la VIEJA y exigir que salga la nueva
+ * exacta. Para eso hay que poder escribir la de ahora en otro sitio.
+ *
+ *   npx tsx scripts/oro.ts verificar --volcar C:/donde/sea
+ *
+ * No pisa nada. Sin `--volcar` se comporta exactamente igual que antes.
+ */
+const volcarEn = (() => {
+  const i = argumentos.indexOf('--volcar');
+  return i >= 0 ? argumentos[i + 1] : undefined;
+})();
+const pedidos = argumentos.filter(
+  (a, i) => !a.startsWith('--') && a !== 'verificar' && a !== 'capturar' && argumentos[i - 1] !== '--volcar',
+);
 
 const aRecorrer = pedidos.length > 0 ? GUIONES.filter((g) => pedidos.includes(g.juego)) : GUIONES;
 
@@ -299,6 +323,13 @@ for (const guion of aRecorrer) {
 
   const cuantos =
     Object.keys(actual.documentos).length + Object.keys(actual.dosieres).length + actual.partida.length;
+
+  if (volcarEn) {
+    const destino = path.join(path.resolve(volcarEn), guion.juego, 'instantanea.json');
+    fs.mkdirSync(path.dirname(destino), { recursive: true });
+    fs.writeFileSync(destino, JSON.stringify(actual, null, 2), 'utf8');
+    console.log(`${guion.juego}: volcado en ${destino}`);
+  }
 
   if (modo === 'capturar') {
     /*

@@ -79,7 +79,7 @@ export function IconoMapa(p: PropsIcono): JSX.Element {
 }
 
 /** El tablón: una cuartilla clavada con chincheta. */
-export function IconoTablon(p: PropsIcono): JSX.Element {
+export function IconoCartel(p: PropsIcono): JSX.Element {
   return (
     <Lienzo {...p}>
       <Rect x={10} y={14} width={28} height={27} rx={2.5} />
@@ -359,7 +359,7 @@ export const ICONOS: Record<IconoId, (p: PropsIcono) => JSX.Element> = {
   reloj: IconoRonda,
   mascara: IconoPersonaje,
   plano: IconoMapa,
-  tablon: IconoTablon,
+  cartel: IconoCartel,
   cuaderno: IconoCuaderno,
   copa: IconoPerfil,
   mayordomo: IconoMayordomo,

@@ -24,7 +24,6 @@ import { estaConectado, salaDe } from './sesion';
 import type {
   LiveSession,
   MomentoVista,
-  PistaVista,
   LugarVista,
   TableroVista,
   VistaGameMaster,
@@ -62,37 +61,42 @@ function conocimientoDesbloqueado(total: number, round: number, totalRounds: num
   return Math.min(total, Math.max(1, porRonda * round));
 }
 
-function pistaVista(
-  game: GameSession,
-  clue: { id: string; lugarId?: string; description: string; pointsTo: string; round: number },
-  conSignificado: boolean,
-): PistaVista {
-  const sala = lugaresDe(game).find((r) => r.id === clue.lugarId);
-  return {
-    id: clue.id,
-    lugarId: clue.lugarId ?? '',
-    lugarNombre: sala?.name ?? 'Sin sala',
-    round: clue.round,
-    description: clue.description,
-    ...(conSignificado ? { pointsTo: clue.pointsTo } : {}),
-  };
-}
-
 function cronologia(plot: Plot): MomentoVista[] {
   return cronologiaPublica(plot).map((e) => ({ time: e.time, description: e.description }));
 }
 
 /**
- * La categoria que vivia en el campo `weapons`. Ver el porque arriba.
+ * TODAS las categorias del juego menos las dos que tienen bloque propio.
  *
- * Vacio si el juego no tiene ninguna: una subasta no tiene «cosas de la mesa»
- * aparte de sus lotes, y entonces el movil no pinta ese bloque.
+ * Aqui habia un `cosasDeLaMesa()` que buscaba la categoria con
+ * `almacenHeredado === 'weapons'` y devolvia esa y ninguna mas. Servia mientras
+ * los tres juegos tuvieran exactamente tres categorias y una de ellas fuese
+ * «cosas»; el cuarto juego se habria quedado sin poder ensenar la mitad de lo
+ * suyo, y sin ningun error que lo avisara.
+ *
+ * Las personas y los lugares se quedan fuera porque ya viajan en `jugadores` y
+ * en `lugares`, con lo que la plataforma sabe de ellos —presencia, ocupantes,
+ * chincheta— que no cabe en una lista plana.
+ *
+ * Vacio es un resultado correcto: un juego de dos categorias no pinta bloque.
  */
-function cosasDeLaMesa(game: GameSession): Entidad[] {
+function lasDemasCategorias(game: GameSession): VistaJugador['entidades'] {
   const manifiesto = manifiestoSiExiste(game.settings?.juego);
   if (!manifiesto) return [];
-  const cat = manifiesto.categorias.find((c) => c.almacenHeredado === 'weapons');
-  return cat ? entidadesDe(game, cat.id) : [];
+  return manifiesto.categorias
+    .filter((c) => !c.sonJugadores && !c.sonLugares)
+    .map((c) => ({
+      categoriaId: c.id,
+      singular: c.singular,
+      plural: c.plural,
+      titulo: c.presentacion?.titulo ?? c.plural.charAt(0).toUpperCase() + c.plural.slice(1),
+      cosas: entidadesDe(game, c.id).map((e) => ({
+        id: e.id,
+        name: e.name,
+        ...(e.description ? { description: e.description } : {}),
+        ...(e.photoUrl ? { photoUrl: fotoParaJugador(e.photoUrl, game.id) } : {}),
+      })),
+    }));
 }
 
 /**
@@ -200,58 +204,29 @@ export function vistaDeJugador(
         }
       : undefined;
 
-  // ---- Mis pistas: solo las de MI sala en ESTA ronda, y sin su significado ----
   const miLugar = enJuego ? salaDe(jugador, sesion.round) : undefined;
-  const misPistas =
-    sesion.phase === 'ronda-abierta' && miLugar
-      ? plot.clues
-          .filter((c) => c.lugarId === miLugar && c.round === sesion.round)
-          .map((c) => pistaVista(game, c, false))
-      : [];
 
   /*
-   * ---- LO QUE HE ENCONTRADO YO, ronda a ronda ----
+   * ---- POR DONDE HE PASADO YO ----
    *
-   * Aquí se componía el TABLÓN COMÚN: se recorría `sesion.porDondePasaron` —las salas
-   * que había pisado cualquiera— y se enviaban sus pistas a TODOS. Con eso,
-   * elegir bien la sala no servía de nada: al cerrar la ronda todo el mundo
-   * tenía lo mismo, y contar lo que habías visto no le aportaba nada a nadie.
+   * Aqui se componian TRES bloques mas —las pistas de mi sala, todo lo que he
+   * encontrado, y los hechos publicos— y los tres se han ido a
+   * `juegos/cluedo-proyeccion.ts`, que es de quien eran. Este nucleo ya no sabe
+   * lo que es una pista.
    *
-   * Ahora se recorren MIS elecciones y nada más. La lista que sale de aquí no
-   * puede contener una pista de una sala en la que no estuve, porque el bucle no
-   * tiene por dónde llegar a ella.
-   *
-   * El significado (`pointsTo`) sigue apareciendo solo con la ronda cerrada: la
-   * regla de que durante la ronda interpretar es cosa tuya no ha cambiado, solo
-   * ha cambiado quién llega a leerla.
+   * Lo que queda es lo unico de los tres que significa algo en cualquier juego
+   * con lugares: donde has estado. Lo sabe la plataforma porque es ella la que
+   * registra las elecciones, y con ello el plano de la Momia y el de las
+   * Sombras se marcan igual que el de CLUEDO —cosa que hasta ahora no pasaba,
+   * porque el plano marcaba las pistas y ellos no tienen.
    */
-  const misHallazgos: PistaVista[] = [];
+  const miRecorrido: Array<{ round: number; lugarId: string }> = [];
   if (enJuego) {
     for (let ronda = 1; ronda <= sesion.round; ronda++) {
-      const sala = salaDe(jugador, ronda);
-      if (!sala) continue;
-      const cerrada = ronda < sesion.round || !abierta;
-      for (const clue of plot.clues) {
-        if (clue.lugarId === sala && clue.round === ronda) {
-          misHallazgos.push(pistaVista(game, clue, cerrada));
-        }
-      }
+      const lugar = salaDe(jugador, ronda);
+      if (lugar) miRecorrido.push({ round: ronda, lugarId: lugar });
     }
   }
-
-  /*
-   * ---- LOS HECHOS QUE LA MESA DA POR ESTABLECIDOS ----
-   *
-   * Son las revelaciones de la línea temporal, que ya se generaban para el
-   * cartel imprimible y que quien dirige va pegando al cerrar cada ronda. Es
-   * material declaradamente PÚBLICO, así que va entero a todo el mundo; lo único
-   * que se filtra es el calendario, para que no se lea la revelación de una
-   * ronda antes de que esa ronda haya cerrado.
-   */
-  const hechos = (plot.material?.timelineReveals ?? [])
-    .filter((r) => r.round < sesion.round || (r.round === sesion.round && !abierta))
-    .sort((a, b) => a.round - b.round)
-    .map((r) => ({ round: r.round, time: r.time, fact: r.fact }));
 
   // ---- Narración de la ronda en curso ----
   const narracionActual = plot.material?.narrations.find(
@@ -392,26 +367,15 @@ export function vistaDeJugador(
      */
     estadoDelJuego: proyectarEstado(game, sesion, participanteId),
     /*
-     * LAS COSAS DE LA MESA, y esto es deuda anotada, no diseño.
+     * LO QUE EL JUEGO TIENE APARTE DE GENTE Y DE SITIOS.
      *
-     * Era `game.weapons`, o sea el campo heredado. Ahora se resuelve por el
-     * manifiesto —la categoria que declara haber vivido ahi— para que la
-     * migracion no cambie lo que ve nadie, y sale byte a byte igual.
-     *
-     * Lo CORRECTO es que este bloque no exista en la vista comun: «las cosas»
-     * son de cada juego, y el movil ya sabe pintar bloques que el juego declara.
-     * Eso toca las pantallas, asi que va en el frente de la vista y no aqui.
+     * Una entrada por categoria y su rotulo, para que la app las pinte sin
+     * saber cuantas hay ni como se llaman. Aqui salia un unico `objetos`, que
+     * era la tercera categoria de CLUEDO con nombre de CLUEDO.
      */
-    objetos: cosasDeLaMesa(game).map((w) => ({
-      id: w.id,
-      name: w.name,
-      description: w.description,
-      photoUrl: fotoParaJugador(w.photoUrl, game.id),
-    })),
+    entidades: lasDemasCategorias(game),
     miLugar,
-    misPistas,
-    misHallazgos,
-    hechos,
+    miRecorrido,
     // La crónica de los encuentros ya cerrados: es lo que permite retomar una
     // campaña una semana después sin que nadie recuerde dónde lo dejaron.
     cronica: (sesion.cronica ?? []).map((e) => ({

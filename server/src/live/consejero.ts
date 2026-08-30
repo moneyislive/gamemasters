@@ -138,15 +138,20 @@ export function contextoDelMayordomo(vista: VistaJugador): string {
    * CASA» y «OBJETOS DE LA CASA» para cualquier juego, de modo que el asistente
    * de una expedicion arqueologica hablaba de las salas de una mansion.
    */
-  const cats = juegoDe(vista).categorias;
-  const catLugar = cats.find((c) => c.sonLugares);
-  const catCosas = cats.find((c) => !c.sonLugares && !c.sonJugadores);
+  const catLugar = juegoDe(vista).categorias.find((c) => c.sonLugares);
   partes.push(
     `${(catLugar?.plural ?? 'salas').toUpperCase()}: ${vista.lugares.map((s) => s.name).join(', ')}.`,
   );
-  partes.push(
-    `${(catCosas?.plural ?? 'objetos').toUpperCase()}: ${vista.objetos.map((o) => o.name).join(', ')}.`,
-  );
+  /*
+   * Y una linea por cada categoria que no sea gente ni sitios. Aqui se cogia
+   * SOLO LA PRIMERA, que valia mientras los tres juegos tuvieran una: en un
+   * juego de cuatro categorias, el asistente no sabria que existen las otras
+   * dos y contestaria con seguridad sobre una mesa que no es la que hay.
+   */
+  for (const cat of vista.entidades) {
+    if (cat.cosas.length === 0) continue;
+    partes.push(`${cat.plural.toUpperCase()}: ${cat.cosas.map((c) => c.name).join(', ')}.`);
+  }
 
   partes.push(
     `LAS REGLAS:\n${(juegoDe(vista).reglas ?? REGLAS_JUGADOR).map((r) => `- ${r.titulo}: ${r.texto}`).join('\n')}`,

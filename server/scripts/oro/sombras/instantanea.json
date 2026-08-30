@@ -423,26 +423,56 @@
             ],
             "encuentros": []
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "n0",
-              "name": "El farol de papel",
-              "description": "El farol de papel."
+              "categoriaId": "enseres",
+              "singular": "enser",
+              "plural": "enseres",
+              "titulo": "La carga de la columna",
+              "cosas": [
+                {
+                  "id": "n0",
+                  "name": "El farol de papel",
+                  "description": "El farol de papel."
+                },
+                {
+                  "id": "n1",
+                  "name": "La plata de Chaya",
+                  "description": "La plata de Chaya."
+                },
+                {
+                  "id": "n2",
+                  "name": "La lanza de Hanzo",
+                  "description": "La lanza de Hanzo."
+                }
+              ]
             },
             {
-              "id": "n1",
-              "name": "La plata de Chaya",
-              "description": "La plata de Chaya."
-            },
-            {
-              "id": "n2",
-              "name": "La lanza de Hanzo",
-              "description": "La lanza de Hanzo."
+              "categoriaId": "estandartes",
+              "singular": "estandarte",
+              "plural": "estandartes",
+              "titulo": "Los estandartes",
+              "cosas": [
+                {
+                  "id": "b0",
+                  "name": "Las tres malvarrosas"
+                },
+                {
+                  "id": "b1",
+                  "name": "El carro de los Hattori"
+                },
+                {
+                  "id": "b2",
+                  "name": "La tela de Chaya"
+                },
+                {
+                  "id": "b3",
+                  "name": "El pino de los Tarao"
+                }
+              ]
             }
           ],
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [],
           "cronica": [],
           "cronologia": [
             {
@@ -719,26 +749,56 @@
             ],
             "encuentros": []
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "n0",
-              "name": "El farol de papel",
-              "description": "El farol de papel."
+              "categoriaId": "enseres",
+              "singular": "enser",
+              "plural": "enseres",
+              "titulo": "La carga de la columna",
+              "cosas": [
+                {
+                  "id": "n0",
+                  "name": "El farol de papel",
+                  "description": "El farol de papel."
+                },
+                {
+                  "id": "n1",
+                  "name": "La plata de Chaya",
+                  "description": "La plata de Chaya."
+                },
+                {
+                  "id": "n2",
+                  "name": "La lanza de Hanzo",
+                  "description": "La lanza de Hanzo."
+                }
+              ]
             },
             {
-              "id": "n1",
-              "name": "La plata de Chaya",
-              "description": "La plata de Chaya."
-            },
-            {
-              "id": "n2",
-              "name": "La lanza de Hanzo",
-              "description": "La lanza de Hanzo."
+              "categoriaId": "estandartes",
+              "singular": "estandarte",
+              "plural": "estandartes",
+              "titulo": "Los estandartes",
+              "cosas": [
+                {
+                  "id": "b0",
+                  "name": "Las tres malvarrosas"
+                },
+                {
+                  "id": "b1",
+                  "name": "El carro de los Hattori"
+                },
+                {
+                  "id": "b2",
+                  "name": "La tela de Chaya"
+                },
+                {
+                  "id": "b3",
+                  "name": "El pino de los Tarao"
+                }
+              ]
             }
           ],
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [],
           "cronica": [],
           "cronologia": [
             {
@@ -1013,26 +1073,56 @@
             ],
             "encuentros": []
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "n0",
-              "name": "El farol de papel",
-              "description": "El farol de papel."
+              "categoriaId": "enseres",
+              "singular": "enser",
+              "plural": "enseres",
+              "titulo": "La carga de la columna",
+              "cosas": [
+                {
+                  "id": "n0",
+                  "name": "El farol de papel",
+                  "description": "El farol de papel."
+                },
+                {
+                  "id": "n1",
+                  "name": "La plata de Chaya",
+                  "description": "La plata de Chaya."
+                },
+                {
+                  "id": "n2",
+                  "name": "La lanza de Hanzo",
+                  "description": "La lanza de Hanzo."
+                }
+              ]
             },
             {
-              "id": "n1",
-              "name": "La plata de Chaya",
-              "description": "La plata de Chaya."
-            },
-            {
-              "id": "n2",
-              "name": "La lanza de Hanzo",
-              "description": "La lanza de Hanzo."
+              "categoriaId": "estandartes",
+              "singular": "estandarte",
+              "plural": "estandartes",
+              "titulo": "Los estandartes",
+              "cosas": [
+                {
+                  "id": "b0",
+                  "name": "Las tres malvarrosas"
+                },
+                {
+                  "id": "b1",
+                  "name": "El carro de los Hattori"
+                },
+                {
+                  "id": "b2",
+                  "name": "La tela de Chaya"
+                },
+                {
+                  "id": "b3",
+                  "name": "El pino de los Tarao"
+                }
+              ]
             }
           ],
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [],
           "cronica": [],
           "cronologia": [
             {
@@ -1331,26 +1421,56 @@
               "disponibles": 4
             }
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "n0",
-              "name": "El farol de papel",
-              "description": "El farol de papel."
+              "categoriaId": "enseres",
+              "singular": "enser",
+              "plural": "enseres",
+              "titulo": "La carga de la columna",
+              "cosas": [
+                {
+                  "id": "n0",
+                  "name": "El farol de papel",
+                  "description": "El farol de papel."
+                },
+                {
+                  "id": "n1",
+                  "name": "La plata de Chaya",
+                  "description": "La plata de Chaya."
+                },
+                {
+                  "id": "n2",
+                  "name": "La lanza de Hanzo",
+                  "description": "La lanza de Hanzo."
+                }
+              ]
             },
             {
-              "id": "n1",
-              "name": "La plata de Chaya",
-              "description": "La plata de Chaya."
-            },
-            {
-              "id": "n2",
-              "name": "La lanza de Hanzo",
-              "description": "La lanza de Hanzo."
+              "categoriaId": "estandartes",
+              "singular": "estandarte",
+              "plural": "estandartes",
+              "titulo": "Los estandartes",
+              "cosas": [
+                {
+                  "id": "b0",
+                  "name": "Las tres malvarrosas"
+                },
+                {
+                  "id": "b1",
+                  "name": "El carro de los Hattori"
+                },
+                {
+                  "id": "b2",
+                  "name": "La tela de Chaya"
+                },
+                {
+                  "id": "b3",
+                  "name": "El pino de los Tarao"
+                }
+              ]
             }
           ],
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [],
           "cronica": [],
           "cronologia": [
             {
@@ -2030,26 +2150,56 @@
             ],
             "encuentros": []
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "n0",
-              "name": "El farol de papel",
-              "description": "El farol de papel."
+              "categoriaId": "enseres",
+              "singular": "enser",
+              "plural": "enseres",
+              "titulo": "La carga de la columna",
+              "cosas": [
+                {
+                  "id": "n0",
+                  "name": "El farol de papel",
+                  "description": "El farol de papel."
+                },
+                {
+                  "id": "n1",
+                  "name": "La plata de Chaya",
+                  "description": "La plata de Chaya."
+                },
+                {
+                  "id": "n2",
+                  "name": "La lanza de Hanzo",
+                  "description": "La lanza de Hanzo."
+                }
+              ]
             },
             {
-              "id": "n1",
-              "name": "La plata de Chaya",
-              "description": "La plata de Chaya."
-            },
-            {
-              "id": "n2",
-              "name": "La lanza de Hanzo",
-              "description": "La lanza de Hanzo."
+              "categoriaId": "estandartes",
+              "singular": "estandarte",
+              "plural": "estandartes",
+              "titulo": "Los estandartes",
+              "cosas": [
+                {
+                  "id": "b0",
+                  "name": "Las tres malvarrosas"
+                },
+                {
+                  "id": "b1",
+                  "name": "El carro de los Hattori"
+                },
+                {
+                  "id": "b2",
+                  "name": "La tela de Chaya"
+                },
+                {
+                  "id": "b3",
+                  "name": "El pino de los Tarao"
+                }
+              ]
             }
           ],
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [],
           "cronica": [],
           "cronologia": [
             {
@@ -2483,26 +2633,56 @@
             ],
             "encuentros": []
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "n0",
-              "name": "El farol de papel",
-              "description": "El farol de papel."
+              "categoriaId": "enseres",
+              "singular": "enser",
+              "plural": "enseres",
+              "titulo": "La carga de la columna",
+              "cosas": [
+                {
+                  "id": "n0",
+                  "name": "El farol de papel",
+                  "description": "El farol de papel."
+                },
+                {
+                  "id": "n1",
+                  "name": "La plata de Chaya",
+                  "description": "La plata de Chaya."
+                },
+                {
+                  "id": "n2",
+                  "name": "La lanza de Hanzo",
+                  "description": "La lanza de Hanzo."
+                }
+              ]
             },
             {
-              "id": "n1",
-              "name": "La plata de Chaya",
-              "description": "La plata de Chaya."
-            },
-            {
-              "id": "n2",
-              "name": "La lanza de Hanzo",
-              "description": "La lanza de Hanzo."
+              "categoriaId": "estandartes",
+              "singular": "estandarte",
+              "plural": "estandartes",
+              "titulo": "Los estandartes",
+              "cosas": [
+                {
+                  "id": "b0",
+                  "name": "Las tres malvarrosas"
+                },
+                {
+                  "id": "b1",
+                  "name": "El carro de los Hattori"
+                },
+                {
+                  "id": "b2",
+                  "name": "La tela de Chaya"
+                },
+                {
+                  "id": "b3",
+                  "name": "El pino de los Tarao"
+                }
+              ]
             }
           ],
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [],
           "cronica": [],
           "cronologia": [
             {
@@ -2930,26 +3110,56 @@
             ],
             "encuentros": []
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "n0",
-              "name": "El farol de papel",
-              "description": "El farol de papel."
+              "categoriaId": "enseres",
+              "singular": "enser",
+              "plural": "enseres",
+              "titulo": "La carga de la columna",
+              "cosas": [
+                {
+                  "id": "n0",
+                  "name": "El farol de papel",
+                  "description": "El farol de papel."
+                },
+                {
+                  "id": "n1",
+                  "name": "La plata de Chaya",
+                  "description": "La plata de Chaya."
+                },
+                {
+                  "id": "n2",
+                  "name": "La lanza de Hanzo",
+                  "description": "La lanza de Hanzo."
+                }
+              ]
             },
             {
-              "id": "n1",
-              "name": "La plata de Chaya",
-              "description": "La plata de Chaya."
-            },
-            {
-              "id": "n2",
-              "name": "La lanza de Hanzo",
-              "description": "La lanza de Hanzo."
+              "categoriaId": "estandartes",
+              "singular": "estandarte",
+              "plural": "estandartes",
+              "titulo": "Los estandartes",
+              "cosas": [
+                {
+                  "id": "b0",
+                  "name": "Las tres malvarrosas"
+                },
+                {
+                  "id": "b1",
+                  "name": "El carro de los Hattori"
+                },
+                {
+                  "id": "b2",
+                  "name": "La tela de Chaya"
+                },
+                {
+                  "id": "b3",
+                  "name": "El pino de los Tarao"
+                }
+              ]
             }
           ],
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [],
           "cronica": [],
           "cronologia": [
             {
@@ -3401,26 +3611,56 @@
               "disponibles": 4
             }
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "n0",
-              "name": "El farol de papel",
-              "description": "El farol de papel."
+              "categoriaId": "enseres",
+              "singular": "enser",
+              "plural": "enseres",
+              "titulo": "La carga de la columna",
+              "cosas": [
+                {
+                  "id": "n0",
+                  "name": "El farol de papel",
+                  "description": "El farol de papel."
+                },
+                {
+                  "id": "n1",
+                  "name": "La plata de Chaya",
+                  "description": "La plata de Chaya."
+                },
+                {
+                  "id": "n2",
+                  "name": "La lanza de Hanzo",
+                  "description": "La lanza de Hanzo."
+                }
+              ]
             },
             {
-              "id": "n1",
-              "name": "La plata de Chaya",
-              "description": "La plata de Chaya."
-            },
-            {
-              "id": "n2",
-              "name": "La lanza de Hanzo",
-              "description": "La lanza de Hanzo."
+              "categoriaId": "estandartes",
+              "singular": "estandarte",
+              "plural": "estandartes",
+              "titulo": "Los estandartes",
+              "cosas": [
+                {
+                  "id": "b0",
+                  "name": "Las tres malvarrosas"
+                },
+                {
+                  "id": "b1",
+                  "name": "El carro de los Hattori"
+                },
+                {
+                  "id": "b2",
+                  "name": "La tela de Chaya"
+                },
+                {
+                  "id": "b3",
+                  "name": "El pino de los Tarao"
+                }
+              ]
             }
           ],
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [],
           "cronica": [],
           "cronologia": [
             {
@@ -4131,27 +4371,62 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "n0",
-              "name": "El farol de papel",
-              "description": "El farol de papel."
+              "categoriaId": "enseres",
+              "singular": "enser",
+              "plural": "enseres",
+              "titulo": "La carga de la columna",
+              "cosas": [
+                {
+                  "id": "n0",
+                  "name": "El farol de papel",
+                  "description": "El farol de papel."
+                },
+                {
+                  "id": "n1",
+                  "name": "La plata de Chaya",
+                  "description": "La plata de Chaya."
+                },
+                {
+                  "id": "n2",
+                  "name": "La lanza de Hanzo",
+                  "description": "La lanza de Hanzo."
+                }
+              ]
             },
             {
-              "id": "n1",
-              "name": "La plata de Chaya",
-              "description": "La plata de Chaya."
-            },
-            {
-              "id": "n2",
-              "name": "La lanza de Hanzo",
-              "description": "La lanza de Hanzo."
+              "categoriaId": "estandartes",
+              "singular": "estandarte",
+              "plural": "estandartes",
+              "titulo": "Los estandartes",
+              "cosas": [
+                {
+                  "id": "b0",
+                  "name": "Las tres malvarrosas"
+                },
+                {
+                  "id": "b1",
+                  "name": "El carro de los Hattori"
+                },
+                {
+                  "id": "b2",
+                  "name": "La tela de Chaya"
+                },
+                {
+                  "id": "b3",
+                  "name": "El pino de los Tarao"
+                }
+              ]
             }
           ],
           "miLugar": "p4",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "p4"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -4600,27 +4875,62 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "n0",
-              "name": "El farol de papel",
-              "description": "El farol de papel."
+              "categoriaId": "enseres",
+              "singular": "enser",
+              "plural": "enseres",
+              "titulo": "La carga de la columna",
+              "cosas": [
+                {
+                  "id": "n0",
+                  "name": "El farol de papel",
+                  "description": "El farol de papel."
+                },
+                {
+                  "id": "n1",
+                  "name": "La plata de Chaya",
+                  "description": "La plata de Chaya."
+                },
+                {
+                  "id": "n2",
+                  "name": "La lanza de Hanzo",
+                  "description": "La lanza de Hanzo."
+                }
+              ]
             },
             {
-              "id": "n1",
-              "name": "La plata de Chaya",
-              "description": "La plata de Chaya."
-            },
-            {
-              "id": "n2",
-              "name": "La lanza de Hanzo",
-              "description": "La lanza de Hanzo."
+              "categoriaId": "estandartes",
+              "singular": "estandarte",
+              "plural": "estandartes",
+              "titulo": "Los estandartes",
+              "cosas": [
+                {
+                  "id": "b0",
+                  "name": "Las tres malvarrosas"
+                },
+                {
+                  "id": "b1",
+                  "name": "El carro de los Hattori"
+                },
+                {
+                  "id": "b2",
+                  "name": "La tela de Chaya"
+                },
+                {
+                  "id": "b3",
+                  "name": "El pino de los Tarao"
+                }
+              ]
             }
           ],
           "miLugar": "p4",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "p4"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -5063,27 +5373,62 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "n0",
-              "name": "El farol de papel",
-              "description": "El farol de papel."
+              "categoriaId": "enseres",
+              "singular": "enser",
+              "plural": "enseres",
+              "titulo": "La carga de la columna",
+              "cosas": [
+                {
+                  "id": "n0",
+                  "name": "El farol de papel",
+                  "description": "El farol de papel."
+                },
+                {
+                  "id": "n1",
+                  "name": "La plata de Chaya",
+                  "description": "La plata de Chaya."
+                },
+                {
+                  "id": "n2",
+                  "name": "La lanza de Hanzo",
+                  "description": "La lanza de Hanzo."
+                }
+              ]
             },
             {
-              "id": "n1",
-              "name": "La plata de Chaya",
-              "description": "La plata de Chaya."
-            },
-            {
-              "id": "n2",
-              "name": "La lanza de Hanzo",
-              "description": "La lanza de Hanzo."
+              "categoriaId": "estandartes",
+              "singular": "estandarte",
+              "plural": "estandartes",
+              "titulo": "Los estandartes",
+              "cosas": [
+                {
+                  "id": "b0",
+                  "name": "Las tres malvarrosas"
+                },
+                {
+                  "id": "b1",
+                  "name": "El carro de los Hattori"
+                },
+                {
+                  "id": "b2",
+                  "name": "La tela de Chaya"
+                },
+                {
+                  "id": "b3",
+                  "name": "El pino de los Tarao"
+                }
+              ]
             }
           ],
           "miLugar": "p4",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "p4"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -5560,27 +5905,62 @@
               "disponibles": 4
             }
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "n0",
-              "name": "El farol de papel",
-              "description": "El farol de papel."
+              "categoriaId": "enseres",
+              "singular": "enser",
+              "plural": "enseres",
+              "titulo": "La carga de la columna",
+              "cosas": [
+                {
+                  "id": "n0",
+                  "name": "El farol de papel",
+                  "description": "El farol de papel."
+                },
+                {
+                  "id": "n1",
+                  "name": "La plata de Chaya",
+                  "description": "La plata de Chaya."
+                },
+                {
+                  "id": "n2",
+                  "name": "La lanza de Hanzo",
+                  "description": "La lanza de Hanzo."
+                }
+              ]
             },
             {
-              "id": "n1",
-              "name": "La plata de Chaya",
-              "description": "La plata de Chaya."
-            },
-            {
-              "id": "n2",
-              "name": "La lanza de Hanzo",
-              "description": "La lanza de Hanzo."
+              "categoriaId": "estandartes",
+              "singular": "estandarte",
+              "plural": "estandartes",
+              "titulo": "Los estandartes",
+              "cosas": [
+                {
+                  "id": "b0",
+                  "name": "Las tres malvarrosas"
+                },
+                {
+                  "id": "b1",
+                  "name": "El carro de los Hattori"
+                },
+                {
+                  "id": "b2",
+                  "name": "La tela de Chaya"
+                },
+                {
+                  "id": "b3",
+                  "name": "El pino de los Tarao"
+                }
+              ]
             }
           ],
           "miLugar": "p4",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "p4"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -6579,27 +6959,62 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "n0",
-              "name": "El farol de papel",
-              "description": "El farol de papel."
+              "categoriaId": "enseres",
+              "singular": "enser",
+              "plural": "enseres",
+              "titulo": "La carga de la columna",
+              "cosas": [
+                {
+                  "id": "n0",
+                  "name": "El farol de papel",
+                  "description": "El farol de papel."
+                },
+                {
+                  "id": "n1",
+                  "name": "La plata de Chaya",
+                  "description": "La plata de Chaya."
+                },
+                {
+                  "id": "n2",
+                  "name": "La lanza de Hanzo",
+                  "description": "La lanza de Hanzo."
+                }
+              ]
             },
             {
-              "id": "n1",
-              "name": "La plata de Chaya",
-              "description": "La plata de Chaya."
-            },
-            {
-              "id": "n2",
-              "name": "La lanza de Hanzo",
-              "description": "La lanza de Hanzo."
+              "categoriaId": "estandartes",
+              "singular": "estandarte",
+              "plural": "estandartes",
+              "titulo": "Los estandartes",
+              "cosas": [
+                {
+                  "id": "b0",
+                  "name": "Las tres malvarrosas"
+                },
+                {
+                  "id": "b1",
+                  "name": "El carro de los Hattori"
+                },
+                {
+                  "id": "b2",
+                  "name": "La tela de Chaya"
+                },
+                {
+                  "id": "b3",
+                  "name": "El pino de los Tarao"
+                }
+              ]
             }
           ],
           "miLugar": "p4",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "p4"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -7050,27 +7465,62 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "n0",
-              "name": "El farol de papel",
-              "description": "El farol de papel."
+              "categoriaId": "enseres",
+              "singular": "enser",
+              "plural": "enseres",
+              "titulo": "La carga de la columna",
+              "cosas": [
+                {
+                  "id": "n0",
+                  "name": "El farol de papel",
+                  "description": "El farol de papel."
+                },
+                {
+                  "id": "n1",
+                  "name": "La plata de Chaya",
+                  "description": "La plata de Chaya."
+                },
+                {
+                  "id": "n2",
+                  "name": "La lanza de Hanzo",
+                  "description": "La lanza de Hanzo."
+                }
+              ]
             },
             {
-              "id": "n1",
-              "name": "La plata de Chaya",
-              "description": "La plata de Chaya."
-            },
-            {
-              "id": "n2",
-              "name": "La lanza de Hanzo",
-              "description": "La lanza de Hanzo."
+              "categoriaId": "estandartes",
+              "singular": "estandarte",
+              "plural": "estandartes",
+              "titulo": "Los estandartes",
+              "cosas": [
+                {
+                  "id": "b0",
+                  "name": "Las tres malvarrosas"
+                },
+                {
+                  "id": "b1",
+                  "name": "El carro de los Hattori"
+                },
+                {
+                  "id": "b2",
+                  "name": "La tela de Chaya"
+                },
+                {
+                  "id": "b3",
+                  "name": "El pino de los Tarao"
+                }
+              ]
             }
           ],
           "miLugar": "p4",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "p4"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -7515,27 +7965,62 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "n0",
-              "name": "El farol de papel",
-              "description": "El farol de papel."
+              "categoriaId": "enseres",
+              "singular": "enser",
+              "plural": "enseres",
+              "titulo": "La carga de la columna",
+              "cosas": [
+                {
+                  "id": "n0",
+                  "name": "El farol de papel",
+                  "description": "El farol de papel."
+                },
+                {
+                  "id": "n1",
+                  "name": "La plata de Chaya",
+                  "description": "La plata de Chaya."
+                },
+                {
+                  "id": "n2",
+                  "name": "La lanza de Hanzo",
+                  "description": "La lanza de Hanzo."
+                }
+              ]
             },
             {
-              "id": "n1",
-              "name": "La plata de Chaya",
-              "description": "La plata de Chaya."
-            },
-            {
-              "id": "n2",
-              "name": "La lanza de Hanzo",
-              "description": "La lanza de Hanzo."
+              "categoriaId": "estandartes",
+              "singular": "estandarte",
+              "plural": "estandartes",
+              "titulo": "Los estandartes",
+              "cosas": [
+                {
+                  "id": "b0",
+                  "name": "Las tres malvarrosas"
+                },
+                {
+                  "id": "b1",
+                  "name": "El carro de los Hattori"
+                },
+                {
+                  "id": "b2",
+                  "name": "La tela de Chaya"
+                },
+                {
+                  "id": "b3",
+                  "name": "El pino de los Tarao"
+                }
+              ]
             }
           ],
           "miLugar": "p4",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "p4"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -8014,27 +8499,62 @@
               "disponibles": 4
             }
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "n0",
-              "name": "El farol de papel",
-              "description": "El farol de papel."
+              "categoriaId": "enseres",
+              "singular": "enser",
+              "plural": "enseres",
+              "titulo": "La carga de la columna",
+              "cosas": [
+                {
+                  "id": "n0",
+                  "name": "El farol de papel",
+                  "description": "El farol de papel."
+                },
+                {
+                  "id": "n1",
+                  "name": "La plata de Chaya",
+                  "description": "La plata de Chaya."
+                },
+                {
+                  "id": "n2",
+                  "name": "La lanza de Hanzo",
+                  "description": "La lanza de Hanzo."
+                }
+              ]
             },
             {
-              "id": "n1",
-              "name": "La plata de Chaya",
-              "description": "La plata de Chaya."
-            },
-            {
-              "id": "n2",
-              "name": "La lanza de Hanzo",
-              "description": "La lanza de Hanzo."
+              "categoriaId": "estandartes",
+              "singular": "estandarte",
+              "plural": "estandartes",
+              "titulo": "Los estandartes",
+              "cosas": [
+                {
+                  "id": "b0",
+                  "name": "Las tres malvarrosas"
+                },
+                {
+                  "id": "b1",
+                  "name": "El carro de los Hattori"
+                },
+                {
+                  "id": "b2",
+                  "name": "La tela de Chaya"
+                },
+                {
+                  "id": "b3",
+                  "name": "El pino de los Tarao"
+                }
+              ]
             }
           ],
           "miLugar": "p4",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "p4"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -8953,26 +9473,61 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "n0",
-              "name": "El farol de papel",
-              "description": "El farol de papel."
+              "categoriaId": "enseres",
+              "singular": "enser",
+              "plural": "enseres",
+              "titulo": "La carga de la columna",
+              "cosas": [
+                {
+                  "id": "n0",
+                  "name": "El farol de papel",
+                  "description": "El farol de papel."
+                },
+                {
+                  "id": "n1",
+                  "name": "La plata de Chaya",
+                  "description": "La plata de Chaya."
+                },
+                {
+                  "id": "n2",
+                  "name": "La lanza de Hanzo",
+                  "description": "La lanza de Hanzo."
+                }
+              ]
             },
             {
-              "id": "n1",
-              "name": "La plata de Chaya",
-              "description": "La plata de Chaya."
-            },
-            {
-              "id": "n2",
-              "name": "La lanza de Hanzo",
-              "description": "La lanza de Hanzo."
+              "categoriaId": "estandartes",
+              "singular": "estandarte",
+              "plural": "estandartes",
+              "titulo": "Los estandartes",
+              "cosas": [
+                {
+                  "id": "b0",
+                  "name": "Las tres malvarrosas"
+                },
+                {
+                  "id": "b1",
+                  "name": "El carro de los Hattori"
+                },
+                {
+                  "id": "b2",
+                  "name": "La tela de Chaya"
+                },
+                {
+                  "id": "b3",
+                  "name": "El pino de los Tarao"
+                }
+              ]
             }
           ],
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "p4"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -9466,26 +10021,61 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "n0",
-              "name": "El farol de papel",
-              "description": "El farol de papel."
+              "categoriaId": "enseres",
+              "singular": "enser",
+              "plural": "enseres",
+              "titulo": "La carga de la columna",
+              "cosas": [
+                {
+                  "id": "n0",
+                  "name": "El farol de papel",
+                  "description": "El farol de papel."
+                },
+                {
+                  "id": "n1",
+                  "name": "La plata de Chaya",
+                  "description": "La plata de Chaya."
+                },
+                {
+                  "id": "n2",
+                  "name": "La lanza de Hanzo",
+                  "description": "La lanza de Hanzo."
+                }
+              ]
             },
             {
-              "id": "n1",
-              "name": "La plata de Chaya",
-              "description": "La plata de Chaya."
-            },
-            {
-              "id": "n2",
-              "name": "La lanza de Hanzo",
-              "description": "La lanza de Hanzo."
+              "categoriaId": "estandartes",
+              "singular": "estandarte",
+              "plural": "estandartes",
+              "titulo": "Los estandartes",
+              "cosas": [
+                {
+                  "id": "b0",
+                  "name": "Las tres malvarrosas"
+                },
+                {
+                  "id": "b1",
+                  "name": "El carro de los Hattori"
+                },
+                {
+                  "id": "b2",
+                  "name": "La tela de Chaya"
+                },
+                {
+                  "id": "b3",
+                  "name": "El pino de los Tarao"
+                }
+              ]
             }
           ],
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "p4"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -9973,26 +10563,61 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "n0",
-              "name": "El farol de papel",
-              "description": "El farol de papel."
+              "categoriaId": "enseres",
+              "singular": "enser",
+              "plural": "enseres",
+              "titulo": "La carga de la columna",
+              "cosas": [
+                {
+                  "id": "n0",
+                  "name": "El farol de papel",
+                  "description": "El farol de papel."
+                },
+                {
+                  "id": "n1",
+                  "name": "La plata de Chaya",
+                  "description": "La plata de Chaya."
+                },
+                {
+                  "id": "n2",
+                  "name": "La lanza de Hanzo",
+                  "description": "La lanza de Hanzo."
+                }
+              ]
             },
             {
-              "id": "n1",
-              "name": "La plata de Chaya",
-              "description": "La plata de Chaya."
-            },
-            {
-              "id": "n2",
-              "name": "La lanza de Hanzo",
-              "description": "La lanza de Hanzo."
+              "categoriaId": "estandartes",
+              "singular": "estandarte",
+              "plural": "estandartes",
+              "titulo": "Los estandartes",
+              "cosas": [
+                {
+                  "id": "b0",
+                  "name": "Las tres malvarrosas"
+                },
+                {
+                  "id": "b1",
+                  "name": "El carro de los Hattori"
+                },
+                {
+                  "id": "b2",
+                  "name": "La tela de Chaya"
+                },
+                {
+                  "id": "b3",
+                  "name": "El pino de los Tarao"
+                }
+              ]
             }
           ],
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "p4"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -10514,26 +11139,61 @@
               "disponibles": 4
             }
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "n0",
-              "name": "El farol de papel",
-              "description": "El farol de papel."
+              "categoriaId": "enseres",
+              "singular": "enser",
+              "plural": "enseres",
+              "titulo": "La carga de la columna",
+              "cosas": [
+                {
+                  "id": "n0",
+                  "name": "El farol de papel",
+                  "description": "El farol de papel."
+                },
+                {
+                  "id": "n1",
+                  "name": "La plata de Chaya",
+                  "description": "La plata de Chaya."
+                },
+                {
+                  "id": "n2",
+                  "name": "La lanza de Hanzo",
+                  "description": "La lanza de Hanzo."
+                }
+              ]
             },
             {
-              "id": "n1",
-              "name": "La plata de Chaya",
-              "description": "La plata de Chaya."
-            },
-            {
-              "id": "n2",
-              "name": "La lanza de Hanzo",
-              "description": "La lanza de Hanzo."
+              "categoriaId": "estandartes",
+              "singular": "estandarte",
+              "plural": "estandartes",
+              "titulo": "Los estandartes",
+              "cosas": [
+                {
+                  "id": "b0",
+                  "name": "Las tres malvarrosas"
+                },
+                {
+                  "id": "b1",
+                  "name": "El carro de los Hattori"
+                },
+                {
+                  "id": "b2",
+                  "name": "La tela de Chaya"
+                },
+                {
+                  "id": "b3",
+                  "name": "El pino de los Tarao"
+                }
+              ]
             }
           ],
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "p4"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -11445,27 +12105,66 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "n0",
-              "name": "El farol de papel",
-              "description": "El farol de papel."
+              "categoriaId": "enseres",
+              "singular": "enser",
+              "plural": "enseres",
+              "titulo": "La carga de la columna",
+              "cosas": [
+                {
+                  "id": "n0",
+                  "name": "El farol de papel",
+                  "description": "El farol de papel."
+                },
+                {
+                  "id": "n1",
+                  "name": "La plata de Chaya",
+                  "description": "La plata de Chaya."
+                },
+                {
+                  "id": "n2",
+                  "name": "La lanza de Hanzo",
+                  "description": "La lanza de Hanzo."
+                }
+              ]
             },
             {
-              "id": "n1",
-              "name": "La plata de Chaya",
-              "description": "La plata de Chaya."
-            },
-            {
-              "id": "n2",
-              "name": "La lanza de Hanzo",
-              "description": "La lanza de Hanzo."
+              "categoriaId": "estandartes",
+              "singular": "estandarte",
+              "plural": "estandartes",
+              "titulo": "Los estandartes",
+              "cosas": [
+                {
+                  "id": "b0",
+                  "name": "Las tres malvarrosas"
+                },
+                {
+                  "id": "b1",
+                  "name": "El carro de los Hattori"
+                },
+                {
+                  "id": "b2",
+                  "name": "La tela de Chaya"
+                },
+                {
+                  "id": "b3",
+                  "name": "El pino de los Tarao"
+                }
+              ]
             }
           ],
           "miLugar": "p2",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "p4"
+            },
+            {
+              "round": 2,
+              "lugarId": "p2"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -11971,27 +12670,66 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "n0",
-              "name": "El farol de papel",
-              "description": "El farol de papel."
+              "categoriaId": "enseres",
+              "singular": "enser",
+              "plural": "enseres",
+              "titulo": "La carga de la columna",
+              "cosas": [
+                {
+                  "id": "n0",
+                  "name": "El farol de papel",
+                  "description": "El farol de papel."
+                },
+                {
+                  "id": "n1",
+                  "name": "La plata de Chaya",
+                  "description": "La plata de Chaya."
+                },
+                {
+                  "id": "n2",
+                  "name": "La lanza de Hanzo",
+                  "description": "La lanza de Hanzo."
+                }
+              ]
             },
             {
-              "id": "n1",
-              "name": "La plata de Chaya",
-              "description": "La plata de Chaya."
-            },
-            {
-              "id": "n2",
-              "name": "La lanza de Hanzo",
-              "description": "La lanza de Hanzo."
+              "categoriaId": "estandartes",
+              "singular": "estandarte",
+              "plural": "estandartes",
+              "titulo": "Los estandartes",
+              "cosas": [
+                {
+                  "id": "b0",
+                  "name": "Las tres malvarrosas"
+                },
+                {
+                  "id": "b1",
+                  "name": "El carro de los Hattori"
+                },
+                {
+                  "id": "b2",
+                  "name": "La tela de Chaya"
+                },
+                {
+                  "id": "b3",
+                  "name": "El pino de los Tarao"
+                }
+              ]
             }
           ],
           "miLugar": "p2",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "p4"
+            },
+            {
+              "round": 2,
+              "lugarId": "p2"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -12491,27 +13229,66 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "n0",
-              "name": "El farol de papel",
-              "description": "El farol de papel."
+              "categoriaId": "enseres",
+              "singular": "enser",
+              "plural": "enseres",
+              "titulo": "La carga de la columna",
+              "cosas": [
+                {
+                  "id": "n0",
+                  "name": "El farol de papel",
+                  "description": "El farol de papel."
+                },
+                {
+                  "id": "n1",
+                  "name": "La plata de Chaya",
+                  "description": "La plata de Chaya."
+                },
+                {
+                  "id": "n2",
+                  "name": "La lanza de Hanzo",
+                  "description": "La lanza de Hanzo."
+                }
+              ]
             },
             {
-              "id": "n1",
-              "name": "La plata de Chaya",
-              "description": "La plata de Chaya."
-            },
-            {
-              "id": "n2",
-              "name": "La lanza de Hanzo",
-              "description": "La lanza de Hanzo."
+              "categoriaId": "estandartes",
+              "singular": "estandarte",
+              "plural": "estandartes",
+              "titulo": "Los estandartes",
+              "cosas": [
+                {
+                  "id": "b0",
+                  "name": "Las tres malvarrosas"
+                },
+                {
+                  "id": "b1",
+                  "name": "El carro de los Hattori"
+                },
+                {
+                  "id": "b2",
+                  "name": "La tela de Chaya"
+                },
+                {
+                  "id": "b3",
+                  "name": "El pino de los Tarao"
+                }
+              ]
             }
           ],
           "miLugar": "p2",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "p4"
+            },
+            {
+              "round": 2,
+              "lugarId": "p2"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -13055,27 +13832,66 @@
               "disponibles": 4
             }
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "n0",
-              "name": "El farol de papel",
-              "description": "El farol de papel."
+              "categoriaId": "enseres",
+              "singular": "enser",
+              "plural": "enseres",
+              "titulo": "La carga de la columna",
+              "cosas": [
+                {
+                  "id": "n0",
+                  "name": "El farol de papel",
+                  "description": "El farol de papel."
+                },
+                {
+                  "id": "n1",
+                  "name": "La plata de Chaya",
+                  "description": "La plata de Chaya."
+                },
+                {
+                  "id": "n2",
+                  "name": "La lanza de Hanzo",
+                  "description": "La lanza de Hanzo."
+                }
+              ]
             },
             {
-              "id": "n1",
-              "name": "La plata de Chaya",
-              "description": "La plata de Chaya."
-            },
-            {
-              "id": "n2",
-              "name": "La lanza de Hanzo",
-              "description": "La lanza de Hanzo."
+              "categoriaId": "estandartes",
+              "singular": "estandarte",
+              "plural": "estandartes",
+              "titulo": "Los estandartes",
+              "cosas": [
+                {
+                  "id": "b0",
+                  "name": "Las tres malvarrosas"
+                },
+                {
+                  "id": "b1",
+                  "name": "El carro de los Hattori"
+                },
+                {
+                  "id": "b2",
+                  "name": "La tela de Chaya"
+                },
+                {
+                  "id": "b3",
+                  "name": "El pino de los Tarao"
+                }
+              ]
             }
           ],
           "miLugar": "p2",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "p4"
+            },
+            {
+              "round": 2,
+              "lugarId": "p2"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -14245,27 +15061,66 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "n0",
-              "name": "El farol de papel",
-              "description": "El farol de papel."
+              "categoriaId": "enseres",
+              "singular": "enser",
+              "plural": "enseres",
+              "titulo": "La carga de la columna",
+              "cosas": [
+                {
+                  "id": "n0",
+                  "name": "El farol de papel",
+                  "description": "El farol de papel."
+                },
+                {
+                  "id": "n1",
+                  "name": "La plata de Chaya",
+                  "description": "La plata de Chaya."
+                },
+                {
+                  "id": "n2",
+                  "name": "La lanza de Hanzo",
+                  "description": "La lanza de Hanzo."
+                }
+              ]
             },
             {
-              "id": "n1",
-              "name": "La plata de Chaya",
-              "description": "La plata de Chaya."
-            },
-            {
-              "id": "n2",
-              "name": "La lanza de Hanzo",
-              "description": "La lanza de Hanzo."
+              "categoriaId": "estandartes",
+              "singular": "estandarte",
+              "plural": "estandartes",
+              "titulo": "Los estandartes",
+              "cosas": [
+                {
+                  "id": "b0",
+                  "name": "Las tres malvarrosas"
+                },
+                {
+                  "id": "b1",
+                  "name": "El carro de los Hattori"
+                },
+                {
+                  "id": "b2",
+                  "name": "La tela de Chaya"
+                },
+                {
+                  "id": "b3",
+                  "name": "El pino de los Tarao"
+                }
+              ]
             }
           ],
           "miLugar": "p2",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "p4"
+            },
+            {
+              "round": 2,
+              "lugarId": "p2"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -14772,27 +15627,66 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "n0",
-              "name": "El farol de papel",
-              "description": "El farol de papel."
+              "categoriaId": "enseres",
+              "singular": "enser",
+              "plural": "enseres",
+              "titulo": "La carga de la columna",
+              "cosas": [
+                {
+                  "id": "n0",
+                  "name": "El farol de papel",
+                  "description": "El farol de papel."
+                },
+                {
+                  "id": "n1",
+                  "name": "La plata de Chaya",
+                  "description": "La plata de Chaya."
+                },
+                {
+                  "id": "n2",
+                  "name": "La lanza de Hanzo",
+                  "description": "La lanza de Hanzo."
+                }
+              ]
             },
             {
-              "id": "n1",
-              "name": "La plata de Chaya",
-              "description": "La plata de Chaya."
-            },
-            {
-              "id": "n2",
-              "name": "La lanza de Hanzo",
-              "description": "La lanza de Hanzo."
+              "categoriaId": "estandartes",
+              "singular": "estandarte",
+              "plural": "estandartes",
+              "titulo": "Los estandartes",
+              "cosas": [
+                {
+                  "id": "b0",
+                  "name": "Las tres malvarrosas"
+                },
+                {
+                  "id": "b1",
+                  "name": "El carro de los Hattori"
+                },
+                {
+                  "id": "b2",
+                  "name": "La tela de Chaya"
+                },
+                {
+                  "id": "b3",
+                  "name": "El pino de los Tarao"
+                }
+              ]
             }
           ],
           "miLugar": "p2",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "p4"
+            },
+            {
+              "round": 2,
+              "lugarId": "p2"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -15293,27 +16187,66 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "n0",
-              "name": "El farol de papel",
-              "description": "El farol de papel."
+              "categoriaId": "enseres",
+              "singular": "enser",
+              "plural": "enseres",
+              "titulo": "La carga de la columna",
+              "cosas": [
+                {
+                  "id": "n0",
+                  "name": "El farol de papel",
+                  "description": "El farol de papel."
+                },
+                {
+                  "id": "n1",
+                  "name": "La plata de Chaya",
+                  "description": "La plata de Chaya."
+                },
+                {
+                  "id": "n2",
+                  "name": "La lanza de Hanzo",
+                  "description": "La lanza de Hanzo."
+                }
+              ]
             },
             {
-              "id": "n1",
-              "name": "La plata de Chaya",
-              "description": "La plata de Chaya."
-            },
-            {
-              "id": "n2",
-              "name": "La lanza de Hanzo",
-              "description": "La lanza de Hanzo."
+              "categoriaId": "estandartes",
+              "singular": "estandarte",
+              "plural": "estandartes",
+              "titulo": "Los estandartes",
+              "cosas": [
+                {
+                  "id": "b0",
+                  "name": "Las tres malvarrosas"
+                },
+                {
+                  "id": "b1",
+                  "name": "El carro de los Hattori"
+                },
+                {
+                  "id": "b2",
+                  "name": "La tela de Chaya"
+                },
+                {
+                  "id": "b3",
+                  "name": "El pino de los Tarao"
+                }
+              ]
             }
           ],
           "miLugar": "p2",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "p4"
+            },
+            {
+              "round": 2,
+              "lugarId": "p2"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -15858,27 +16791,66 @@
               "disponibles": 4
             }
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "n0",
-              "name": "El farol de papel",
-              "description": "El farol de papel."
+              "categoriaId": "enseres",
+              "singular": "enser",
+              "plural": "enseres",
+              "titulo": "La carga de la columna",
+              "cosas": [
+                {
+                  "id": "n0",
+                  "name": "El farol de papel",
+                  "description": "El farol de papel."
+                },
+                {
+                  "id": "n1",
+                  "name": "La plata de Chaya",
+                  "description": "La plata de Chaya."
+                },
+                {
+                  "id": "n2",
+                  "name": "La lanza de Hanzo",
+                  "description": "La lanza de Hanzo."
+                }
+              ]
             },
             {
-              "id": "n1",
-              "name": "La plata de Chaya",
-              "description": "La plata de Chaya."
-            },
-            {
-              "id": "n2",
-              "name": "La lanza de Hanzo",
-              "description": "La lanza de Hanzo."
+              "categoriaId": "estandartes",
+              "singular": "estandarte",
+              "plural": "estandartes",
+              "titulo": "Los estandartes",
+              "cosas": [
+                {
+                  "id": "b0",
+                  "name": "Las tres malvarrosas"
+                },
+                {
+                  "id": "b1",
+                  "name": "El carro de los Hattori"
+                },
+                {
+                  "id": "b2",
+                  "name": "La tela de Chaya"
+                },
+                {
+                  "id": "b3",
+                  "name": "El pino de los Tarao"
+                }
+              ]
             }
           ],
           "miLugar": "p2",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "p4"
+            },
+            {
+              "round": 2,
+              "lugarId": "p2"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -16967,26 +17939,65 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "n0",
-              "name": "El farol de papel",
-              "description": "El farol de papel."
+              "categoriaId": "enseres",
+              "singular": "enser",
+              "plural": "enseres",
+              "titulo": "La carga de la columna",
+              "cosas": [
+                {
+                  "id": "n0",
+                  "name": "El farol de papel",
+                  "description": "El farol de papel."
+                },
+                {
+                  "id": "n1",
+                  "name": "La plata de Chaya",
+                  "description": "La plata de Chaya."
+                },
+                {
+                  "id": "n2",
+                  "name": "La lanza de Hanzo",
+                  "description": "La lanza de Hanzo."
+                }
+              ]
             },
             {
-              "id": "n1",
-              "name": "La plata de Chaya",
-              "description": "La plata de Chaya."
-            },
-            {
-              "id": "n2",
-              "name": "La lanza de Hanzo",
-              "description": "La lanza de Hanzo."
+              "categoriaId": "estandartes",
+              "singular": "estandarte",
+              "plural": "estandartes",
+              "titulo": "Los estandartes",
+              "cosas": [
+                {
+                  "id": "b0",
+                  "name": "Las tres malvarrosas"
+                },
+                {
+                  "id": "b1",
+                  "name": "El carro de los Hattori"
+                },
+                {
+                  "id": "b2",
+                  "name": "La tela de Chaya"
+                },
+                {
+                  "id": "b3",
+                  "name": "El pino de los Tarao"
+                }
+              ]
             }
           ],
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "p4"
+            },
+            {
+              "round": 2,
+              "lugarId": "p2"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -17536,26 +18547,65 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "n0",
-              "name": "El farol de papel",
-              "description": "El farol de papel."
+              "categoriaId": "enseres",
+              "singular": "enser",
+              "plural": "enseres",
+              "titulo": "La carga de la columna",
+              "cosas": [
+                {
+                  "id": "n0",
+                  "name": "El farol de papel",
+                  "description": "El farol de papel."
+                },
+                {
+                  "id": "n1",
+                  "name": "La plata de Chaya",
+                  "description": "La plata de Chaya."
+                },
+                {
+                  "id": "n2",
+                  "name": "La lanza de Hanzo",
+                  "description": "La lanza de Hanzo."
+                }
+              ]
             },
             {
-              "id": "n1",
-              "name": "La plata de Chaya",
-              "description": "La plata de Chaya."
-            },
-            {
-              "id": "n2",
-              "name": "La lanza de Hanzo",
-              "description": "La lanza de Hanzo."
+              "categoriaId": "estandartes",
+              "singular": "estandarte",
+              "plural": "estandartes",
+              "titulo": "Los estandartes",
+              "cosas": [
+                {
+                  "id": "b0",
+                  "name": "Las tres malvarrosas"
+                },
+                {
+                  "id": "b1",
+                  "name": "El carro de los Hattori"
+                },
+                {
+                  "id": "b2",
+                  "name": "La tela de Chaya"
+                },
+                {
+                  "id": "b3",
+                  "name": "El pino de los Tarao"
+                }
+              ]
             }
           ],
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "p4"
+            },
+            {
+              "round": 2,
+              "lugarId": "p2"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -18099,26 +19149,65 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "n0",
-              "name": "El farol de papel",
-              "description": "El farol de papel."
+              "categoriaId": "enseres",
+              "singular": "enser",
+              "plural": "enseres",
+              "titulo": "La carga de la columna",
+              "cosas": [
+                {
+                  "id": "n0",
+                  "name": "El farol de papel",
+                  "description": "El farol de papel."
+                },
+                {
+                  "id": "n1",
+                  "name": "La plata de Chaya",
+                  "description": "La plata de Chaya."
+                },
+                {
+                  "id": "n2",
+                  "name": "La lanza de Hanzo",
+                  "description": "La lanza de Hanzo."
+                }
+              ]
             },
             {
-              "id": "n1",
-              "name": "La plata de Chaya",
-              "description": "La plata de Chaya."
-            },
-            {
-              "id": "n2",
-              "name": "La lanza de Hanzo",
-              "description": "La lanza de Hanzo."
+              "categoriaId": "estandartes",
+              "singular": "estandarte",
+              "plural": "estandartes",
+              "titulo": "Los estandartes",
+              "cosas": [
+                {
+                  "id": "b0",
+                  "name": "Las tres malvarrosas"
+                },
+                {
+                  "id": "b1",
+                  "name": "El carro de los Hattori"
+                },
+                {
+                  "id": "b2",
+                  "name": "La tela de Chaya"
+                },
+                {
+                  "id": "b3",
+                  "name": "El pino de los Tarao"
+                }
+              ]
             }
           ],
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "p4"
+            },
+            {
+              "round": 2,
+              "lugarId": "p2"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -18706,26 +19795,65 @@
               "disponibles": 4
             }
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "n0",
-              "name": "El farol de papel",
-              "description": "El farol de papel."
+              "categoriaId": "enseres",
+              "singular": "enser",
+              "plural": "enseres",
+              "titulo": "La carga de la columna",
+              "cosas": [
+                {
+                  "id": "n0",
+                  "name": "El farol de papel",
+                  "description": "El farol de papel."
+                },
+                {
+                  "id": "n1",
+                  "name": "La plata de Chaya",
+                  "description": "La plata de Chaya."
+                },
+                {
+                  "id": "n2",
+                  "name": "La lanza de Hanzo",
+                  "description": "La lanza de Hanzo."
+                }
+              ]
             },
             {
-              "id": "n1",
-              "name": "La plata de Chaya",
-              "description": "La plata de Chaya."
-            },
-            {
-              "id": "n2",
-              "name": "La lanza de Hanzo",
-              "description": "La lanza de Hanzo."
+              "categoriaId": "estandartes",
+              "singular": "estandarte",
+              "plural": "estandartes",
+              "titulo": "Los estandartes",
+              "cosas": [
+                {
+                  "id": "b0",
+                  "name": "Las tres malvarrosas"
+                },
+                {
+                  "id": "b1",
+                  "name": "El carro de los Hattori"
+                },
+                {
+                  "id": "b2",
+                  "name": "La tela de Chaya"
+                },
+                {
+                  "id": "b3",
+                  "name": "El pino de los Tarao"
+                }
+              ]
             }
           ],
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "p4"
+            },
+            {
+              "round": 2,
+              "lugarId": "p2"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -19807,27 +20935,70 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "n0",
-              "name": "El farol de papel",
-              "description": "El farol de papel."
+              "categoriaId": "enseres",
+              "singular": "enser",
+              "plural": "enseres",
+              "titulo": "La carga de la columna",
+              "cosas": [
+                {
+                  "id": "n0",
+                  "name": "El farol de papel",
+                  "description": "El farol de papel."
+                },
+                {
+                  "id": "n1",
+                  "name": "La plata de Chaya",
+                  "description": "La plata de Chaya."
+                },
+                {
+                  "id": "n2",
+                  "name": "La lanza de Hanzo",
+                  "description": "La lanza de Hanzo."
+                }
+              ]
             },
             {
-              "id": "n1",
-              "name": "La plata de Chaya",
-              "description": "La plata de Chaya."
-            },
-            {
-              "id": "n2",
-              "name": "La lanza de Hanzo",
-              "description": "La lanza de Hanzo."
+              "categoriaId": "estandartes",
+              "singular": "estandarte",
+              "plural": "estandartes",
+              "titulo": "Los estandartes",
+              "cosas": [
+                {
+                  "id": "b0",
+                  "name": "Las tres malvarrosas"
+                },
+                {
+                  "id": "b1",
+                  "name": "El carro de los Hattori"
+                },
+                {
+                  "id": "b2",
+                  "name": "La tela de Chaya"
+                },
+                {
+                  "id": "b3",
+                  "name": "El pino de los Tarao"
+                }
+              ]
             }
           ],
           "miLugar": "p5",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "p4"
+            },
+            {
+              "round": 2,
+              "lugarId": "p2"
+            },
+            {
+              "round": 3,
+              "lugarId": "p5"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -20389,27 +21560,70 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "n0",
-              "name": "El farol de papel",
-              "description": "El farol de papel."
+              "categoriaId": "enseres",
+              "singular": "enser",
+              "plural": "enseres",
+              "titulo": "La carga de la columna",
+              "cosas": [
+                {
+                  "id": "n0",
+                  "name": "El farol de papel",
+                  "description": "El farol de papel."
+                },
+                {
+                  "id": "n1",
+                  "name": "La plata de Chaya",
+                  "description": "La plata de Chaya."
+                },
+                {
+                  "id": "n2",
+                  "name": "La lanza de Hanzo",
+                  "description": "La lanza de Hanzo."
+                }
+              ]
             },
             {
-              "id": "n1",
-              "name": "La plata de Chaya",
-              "description": "La plata de Chaya."
-            },
-            {
-              "id": "n2",
-              "name": "La lanza de Hanzo",
-              "description": "La lanza de Hanzo."
+              "categoriaId": "estandartes",
+              "singular": "estandarte",
+              "plural": "estandartes",
+              "titulo": "Los estandartes",
+              "cosas": [
+                {
+                  "id": "b0",
+                  "name": "Las tres malvarrosas"
+                },
+                {
+                  "id": "b1",
+                  "name": "El carro de los Hattori"
+                },
+                {
+                  "id": "b2",
+                  "name": "La tela de Chaya"
+                },
+                {
+                  "id": "b3",
+                  "name": "El pino de los Tarao"
+                }
+              ]
             }
           ],
           "miLugar": "p5",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "p4"
+            },
+            {
+              "round": 2,
+              "lugarId": "p2"
+            },
+            {
+              "round": 3,
+              "lugarId": "p5"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -20965,27 +22179,70 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "n0",
-              "name": "El farol de papel",
-              "description": "El farol de papel."
+              "categoriaId": "enseres",
+              "singular": "enser",
+              "plural": "enseres",
+              "titulo": "La carga de la columna",
+              "cosas": [
+                {
+                  "id": "n0",
+                  "name": "El farol de papel",
+                  "description": "El farol de papel."
+                },
+                {
+                  "id": "n1",
+                  "name": "La plata de Chaya",
+                  "description": "La plata de Chaya."
+                },
+                {
+                  "id": "n2",
+                  "name": "La lanza de Hanzo",
+                  "description": "La lanza de Hanzo."
+                }
+              ]
             },
             {
-              "id": "n1",
-              "name": "La plata de Chaya",
-              "description": "La plata de Chaya."
-            },
-            {
-              "id": "n2",
-              "name": "La lanza de Hanzo",
-              "description": "La lanza de Hanzo."
+              "categoriaId": "estandartes",
+              "singular": "estandarte",
+              "plural": "estandartes",
+              "titulo": "Los estandartes",
+              "cosas": [
+                {
+                  "id": "b0",
+                  "name": "Las tres malvarrosas"
+                },
+                {
+                  "id": "b1",
+                  "name": "El carro de los Hattori"
+                },
+                {
+                  "id": "b2",
+                  "name": "La tela de Chaya"
+                },
+                {
+                  "id": "b3",
+                  "name": "El pino de los Tarao"
+                }
+              ]
             }
           ],
           "miLugar": "p5",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "p4"
+            },
+            {
+              "round": 2,
+              "lugarId": "p2"
+            },
+            {
+              "round": 3,
+              "lugarId": "p5"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -21594,27 +22851,70 @@
               "disponibles": 4
             }
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "n0",
-              "name": "El farol de papel",
-              "description": "El farol de papel."
+              "categoriaId": "enseres",
+              "singular": "enser",
+              "plural": "enseres",
+              "titulo": "La carga de la columna",
+              "cosas": [
+                {
+                  "id": "n0",
+                  "name": "El farol de papel",
+                  "description": "El farol de papel."
+                },
+                {
+                  "id": "n1",
+                  "name": "La plata de Chaya",
+                  "description": "La plata de Chaya."
+                },
+                {
+                  "id": "n2",
+                  "name": "La lanza de Hanzo",
+                  "description": "La lanza de Hanzo."
+                }
+              ]
             },
             {
-              "id": "n1",
-              "name": "La plata de Chaya",
-              "description": "La plata de Chaya."
-            },
-            {
-              "id": "n2",
-              "name": "La lanza de Hanzo",
-              "description": "La lanza de Hanzo."
+              "categoriaId": "estandartes",
+              "singular": "estandarte",
+              "plural": "estandartes",
+              "titulo": "Los estandartes",
+              "cosas": [
+                {
+                  "id": "b0",
+                  "name": "Las tres malvarrosas"
+                },
+                {
+                  "id": "b1",
+                  "name": "El carro de los Hattori"
+                },
+                {
+                  "id": "b2",
+                  "name": "La tela de Chaya"
+                },
+                {
+                  "id": "b3",
+                  "name": "El pino de los Tarao"
+                }
+              ]
             }
           ],
           "miLugar": "p5",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "p4"
+            },
+            {
+              "round": 2,
+              "lugarId": "p2"
+            },
+            {
+              "round": 3,
+              "lugarId": "p5"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -22945,27 +24245,70 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "n0",
-              "name": "El farol de papel",
-              "description": "El farol de papel."
+              "categoriaId": "enseres",
+              "singular": "enser",
+              "plural": "enseres",
+              "titulo": "La carga de la columna",
+              "cosas": [
+                {
+                  "id": "n0",
+                  "name": "El farol de papel",
+                  "description": "El farol de papel."
+                },
+                {
+                  "id": "n1",
+                  "name": "La plata de Chaya",
+                  "description": "La plata de Chaya."
+                },
+                {
+                  "id": "n2",
+                  "name": "La lanza de Hanzo",
+                  "description": "La lanza de Hanzo."
+                }
+              ]
             },
             {
-              "id": "n1",
-              "name": "La plata de Chaya",
-              "description": "La plata de Chaya."
-            },
-            {
-              "id": "n2",
-              "name": "La lanza de Hanzo",
-              "description": "La lanza de Hanzo."
+              "categoriaId": "estandartes",
+              "singular": "estandarte",
+              "plural": "estandartes",
+              "titulo": "Los estandartes",
+              "cosas": [
+                {
+                  "id": "b0",
+                  "name": "Las tres malvarrosas"
+                },
+                {
+                  "id": "b1",
+                  "name": "El carro de los Hattori"
+                },
+                {
+                  "id": "b2",
+                  "name": "La tela de Chaya"
+                },
+                {
+                  "id": "b3",
+                  "name": "El pino de los Tarao"
+                }
+              ]
             }
           ],
           "miLugar": "p5",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "p4"
+            },
+            {
+              "round": 2,
+              "lugarId": "p2"
+            },
+            {
+              "round": 3,
+              "lugarId": "p5"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -23528,27 +24871,70 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "n0",
-              "name": "El farol de papel",
-              "description": "El farol de papel."
+              "categoriaId": "enseres",
+              "singular": "enser",
+              "plural": "enseres",
+              "titulo": "La carga de la columna",
+              "cosas": [
+                {
+                  "id": "n0",
+                  "name": "El farol de papel",
+                  "description": "El farol de papel."
+                },
+                {
+                  "id": "n1",
+                  "name": "La plata de Chaya",
+                  "description": "La plata de Chaya."
+                },
+                {
+                  "id": "n2",
+                  "name": "La lanza de Hanzo",
+                  "description": "La lanza de Hanzo."
+                }
+              ]
             },
             {
-              "id": "n1",
-              "name": "La plata de Chaya",
-              "description": "La plata de Chaya."
-            },
-            {
-              "id": "n2",
-              "name": "La lanza de Hanzo",
-              "description": "La lanza de Hanzo."
+              "categoriaId": "estandartes",
+              "singular": "estandarte",
+              "plural": "estandartes",
+              "titulo": "Los estandartes",
+              "cosas": [
+                {
+                  "id": "b0",
+                  "name": "Las tres malvarrosas"
+                },
+                {
+                  "id": "b1",
+                  "name": "El carro de los Hattori"
+                },
+                {
+                  "id": "b2",
+                  "name": "La tela de Chaya"
+                },
+                {
+                  "id": "b3",
+                  "name": "El pino de los Tarao"
+                }
+              ]
             }
           ],
           "miLugar": "p5",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "p4"
+            },
+            {
+              "round": 2,
+              "lugarId": "p2"
+            },
+            {
+              "round": 3,
+              "lugarId": "p5"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -24105,27 +25491,70 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "n0",
-              "name": "El farol de papel",
-              "description": "El farol de papel."
+              "categoriaId": "enseres",
+              "singular": "enser",
+              "plural": "enseres",
+              "titulo": "La carga de la columna",
+              "cosas": [
+                {
+                  "id": "n0",
+                  "name": "El farol de papel",
+                  "description": "El farol de papel."
+                },
+                {
+                  "id": "n1",
+                  "name": "La plata de Chaya",
+                  "description": "La plata de Chaya."
+                },
+                {
+                  "id": "n2",
+                  "name": "La lanza de Hanzo",
+                  "description": "La lanza de Hanzo."
+                }
+              ]
             },
             {
-              "id": "n1",
-              "name": "La plata de Chaya",
-              "description": "La plata de Chaya."
-            },
-            {
-              "id": "n2",
-              "name": "La lanza de Hanzo",
-              "description": "La lanza de Hanzo."
+              "categoriaId": "estandartes",
+              "singular": "estandarte",
+              "plural": "estandartes",
+              "titulo": "Los estandartes",
+              "cosas": [
+                {
+                  "id": "b0",
+                  "name": "Las tres malvarrosas"
+                },
+                {
+                  "id": "b1",
+                  "name": "El carro de los Hattori"
+                },
+                {
+                  "id": "b2",
+                  "name": "La tela de Chaya"
+                },
+                {
+                  "id": "b3",
+                  "name": "El pino de los Tarao"
+                }
+              ]
             }
           ],
           "miLugar": "p5",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "p4"
+            },
+            {
+              "round": 2,
+              "lugarId": "p2"
+            },
+            {
+              "round": 3,
+              "lugarId": "p5"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -24735,27 +26164,70 @@
               "disponibles": 4
             }
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "n0",
-              "name": "El farol de papel",
-              "description": "El farol de papel."
+              "categoriaId": "enseres",
+              "singular": "enser",
+              "plural": "enseres",
+              "titulo": "La carga de la columna",
+              "cosas": [
+                {
+                  "id": "n0",
+                  "name": "El farol de papel",
+                  "description": "El farol de papel."
+                },
+                {
+                  "id": "n1",
+                  "name": "La plata de Chaya",
+                  "description": "La plata de Chaya."
+                },
+                {
+                  "id": "n2",
+                  "name": "La lanza de Hanzo",
+                  "description": "La lanza de Hanzo."
+                }
+              ]
             },
             {
-              "id": "n1",
-              "name": "La plata de Chaya",
-              "description": "La plata de Chaya."
-            },
-            {
-              "id": "n2",
-              "name": "La lanza de Hanzo",
-              "description": "La lanza de Hanzo."
+              "categoriaId": "estandartes",
+              "singular": "estandarte",
+              "plural": "estandartes",
+              "titulo": "Los estandartes",
+              "cosas": [
+                {
+                  "id": "b0",
+                  "name": "Las tres malvarrosas"
+                },
+                {
+                  "id": "b1",
+                  "name": "El carro de los Hattori"
+                },
+                {
+                  "id": "b2",
+                  "name": "La tela de Chaya"
+                },
+                {
+                  "id": "b3",
+                  "name": "El pino de los Tarao"
+                }
+              ]
             }
           ],
           "miLugar": "p5",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "p4"
+            },
+            {
+              "round": 2,
+              "lugarId": "p2"
+            },
+            {
+              "round": 3,
+              "lugarId": "p5"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -25997,26 +27469,69 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "n0",
-              "name": "El farol de papel",
-              "description": "El farol de papel."
+              "categoriaId": "enseres",
+              "singular": "enser",
+              "plural": "enseres",
+              "titulo": "La carga de la columna",
+              "cosas": [
+                {
+                  "id": "n0",
+                  "name": "El farol de papel",
+                  "description": "El farol de papel."
+                },
+                {
+                  "id": "n1",
+                  "name": "La plata de Chaya",
+                  "description": "La plata de Chaya."
+                },
+                {
+                  "id": "n2",
+                  "name": "La lanza de Hanzo",
+                  "description": "La lanza de Hanzo."
+                }
+              ]
             },
             {
-              "id": "n1",
-              "name": "La plata de Chaya",
-              "description": "La plata de Chaya."
-            },
-            {
-              "id": "n2",
-              "name": "La lanza de Hanzo",
-              "description": "La lanza de Hanzo."
+              "categoriaId": "estandartes",
+              "singular": "estandarte",
+              "plural": "estandartes",
+              "titulo": "Los estandartes",
+              "cosas": [
+                {
+                  "id": "b0",
+                  "name": "Las tres malvarrosas"
+                },
+                {
+                  "id": "b1",
+                  "name": "El carro de los Hattori"
+                },
+                {
+                  "id": "b2",
+                  "name": "La tela de Chaya"
+                },
+                {
+                  "id": "b3",
+                  "name": "El pino de los Tarao"
+                }
+              ]
             }
           ],
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "p4"
+            },
+            {
+              "round": 2,
+              "lugarId": "p2"
+            },
+            {
+              "round": 3,
+              "lugarId": "p5"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -26620,26 +28135,69 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "n0",
-              "name": "El farol de papel",
-              "description": "El farol de papel."
+              "categoriaId": "enseres",
+              "singular": "enser",
+              "plural": "enseres",
+              "titulo": "La carga de la columna",
+              "cosas": [
+                {
+                  "id": "n0",
+                  "name": "El farol de papel",
+                  "description": "El farol de papel."
+                },
+                {
+                  "id": "n1",
+                  "name": "La plata de Chaya",
+                  "description": "La plata de Chaya."
+                },
+                {
+                  "id": "n2",
+                  "name": "La lanza de Hanzo",
+                  "description": "La lanza de Hanzo."
+                }
+              ]
             },
             {
-              "id": "n1",
-              "name": "La plata de Chaya",
-              "description": "La plata de Chaya."
-            },
-            {
-              "id": "n2",
-              "name": "La lanza de Hanzo",
-              "description": "La lanza de Hanzo."
+              "categoriaId": "estandartes",
+              "singular": "estandarte",
+              "plural": "estandartes",
+              "titulo": "Los estandartes",
+              "cosas": [
+                {
+                  "id": "b0",
+                  "name": "Las tres malvarrosas"
+                },
+                {
+                  "id": "b1",
+                  "name": "El carro de los Hattori"
+                },
+                {
+                  "id": "b2",
+                  "name": "La tela de Chaya"
+                },
+                {
+                  "id": "b3",
+                  "name": "El pino de los Tarao"
+                }
+              ]
             }
           ],
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "p4"
+            },
+            {
+              "round": 2,
+              "lugarId": "p2"
+            },
+            {
+              "round": 3,
+              "lugarId": "p5"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -27237,26 +28795,69 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "n0",
-              "name": "El farol de papel",
-              "description": "El farol de papel."
+              "categoriaId": "enseres",
+              "singular": "enser",
+              "plural": "enseres",
+              "titulo": "La carga de la columna",
+              "cosas": [
+                {
+                  "id": "n0",
+                  "name": "El farol de papel",
+                  "description": "El farol de papel."
+                },
+                {
+                  "id": "n1",
+                  "name": "La plata de Chaya",
+                  "description": "La plata de Chaya."
+                },
+                {
+                  "id": "n2",
+                  "name": "La lanza de Hanzo",
+                  "description": "La lanza de Hanzo."
+                }
+              ]
             },
             {
-              "id": "n1",
-              "name": "La plata de Chaya",
-              "description": "La plata de Chaya."
-            },
-            {
-              "id": "n2",
-              "name": "La lanza de Hanzo",
-              "description": "La lanza de Hanzo."
+              "categoriaId": "estandartes",
+              "singular": "estandarte",
+              "plural": "estandartes",
+              "titulo": "Los estandartes",
+              "cosas": [
+                {
+                  "id": "b0",
+                  "name": "Las tres malvarrosas"
+                },
+                {
+                  "id": "b1",
+                  "name": "El carro de los Hattori"
+                },
+                {
+                  "id": "b2",
+                  "name": "La tela de Chaya"
+                },
+                {
+                  "id": "b3",
+                  "name": "El pino de los Tarao"
+                }
+              ]
             }
           ],
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "p4"
+            },
+            {
+              "round": 2,
+              "lugarId": "p2"
+            },
+            {
+              "round": 3,
+              "lugarId": "p5"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -27907,26 +29508,69 @@
               "disponibles": 4
             }
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "n0",
-              "name": "El farol de papel",
-              "description": "El farol de papel."
+              "categoriaId": "enseres",
+              "singular": "enser",
+              "plural": "enseres",
+              "titulo": "La carga de la columna",
+              "cosas": [
+                {
+                  "id": "n0",
+                  "name": "El farol de papel",
+                  "description": "El farol de papel."
+                },
+                {
+                  "id": "n1",
+                  "name": "La plata de Chaya",
+                  "description": "La plata de Chaya."
+                },
+                {
+                  "id": "n2",
+                  "name": "La lanza de Hanzo",
+                  "description": "La lanza de Hanzo."
+                }
+              ]
             },
             {
-              "id": "n1",
-              "name": "La plata de Chaya",
-              "description": "La plata de Chaya."
-            },
-            {
-              "id": "n2",
-              "name": "La lanza de Hanzo",
-              "description": "La lanza de Hanzo."
+              "categoriaId": "estandartes",
+              "singular": "estandarte",
+              "plural": "estandartes",
+              "titulo": "Los estandartes",
+              "cosas": [
+                {
+                  "id": "b0",
+                  "name": "Las tres malvarrosas"
+                },
+                {
+                  "id": "b1",
+                  "name": "El carro de los Hattori"
+                },
+                {
+                  "id": "b2",
+                  "name": "La tela de Chaya"
+                },
+                {
+                  "id": "b3",
+                  "name": "El pino de los Tarao"
+                }
+              ]
             }
           ],
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "p4"
+            },
+            {
+              "round": 2,
+              "lugarId": "p2"
+            },
+            {
+              "round": 3,
+              "lugarId": "p5"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -29164,27 +30808,74 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "n0",
-              "name": "El farol de papel",
-              "description": "El farol de papel."
+              "categoriaId": "enseres",
+              "singular": "enser",
+              "plural": "enseres",
+              "titulo": "La carga de la columna",
+              "cosas": [
+                {
+                  "id": "n0",
+                  "name": "El farol de papel",
+                  "description": "El farol de papel."
+                },
+                {
+                  "id": "n1",
+                  "name": "La plata de Chaya",
+                  "description": "La plata de Chaya."
+                },
+                {
+                  "id": "n2",
+                  "name": "La lanza de Hanzo",
+                  "description": "La lanza de Hanzo."
+                }
+              ]
             },
             {
-              "id": "n1",
-              "name": "La plata de Chaya",
-              "description": "La plata de Chaya."
-            },
-            {
-              "id": "n2",
-              "name": "La lanza de Hanzo",
-              "description": "La lanza de Hanzo."
+              "categoriaId": "estandartes",
+              "singular": "estandarte",
+              "plural": "estandartes",
+              "titulo": "Los estandartes",
+              "cosas": [
+                {
+                  "id": "b0",
+                  "name": "Las tres malvarrosas"
+                },
+                {
+                  "id": "b1",
+                  "name": "El carro de los Hattori"
+                },
+                {
+                  "id": "b2",
+                  "name": "La tela de Chaya"
+                },
+                {
+                  "id": "b3",
+                  "name": "El pino de los Tarao"
+                }
+              ]
             }
           ],
           "miLugar": "p1",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "p4"
+            },
+            {
+              "round": 2,
+              "lugarId": "p2"
+            },
+            {
+              "round": 3,
+              "lugarId": "p5"
+            },
+            {
+              "round": 4,
+              "lugarId": "p1"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -29800,27 +31491,74 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "n0",
-              "name": "El farol de papel",
-              "description": "El farol de papel."
+              "categoriaId": "enseres",
+              "singular": "enser",
+              "plural": "enseres",
+              "titulo": "La carga de la columna",
+              "cosas": [
+                {
+                  "id": "n0",
+                  "name": "El farol de papel",
+                  "description": "El farol de papel."
+                },
+                {
+                  "id": "n1",
+                  "name": "La plata de Chaya",
+                  "description": "La plata de Chaya."
+                },
+                {
+                  "id": "n2",
+                  "name": "La lanza de Hanzo",
+                  "description": "La lanza de Hanzo."
+                }
+              ]
             },
             {
-              "id": "n1",
-              "name": "La plata de Chaya",
-              "description": "La plata de Chaya."
-            },
-            {
-              "id": "n2",
-              "name": "La lanza de Hanzo",
-              "description": "La lanza de Hanzo."
+              "categoriaId": "estandartes",
+              "singular": "estandarte",
+              "plural": "estandartes",
+              "titulo": "Los estandartes",
+              "cosas": [
+                {
+                  "id": "b0",
+                  "name": "Las tres malvarrosas"
+                },
+                {
+                  "id": "b1",
+                  "name": "El carro de los Hattori"
+                },
+                {
+                  "id": "b2",
+                  "name": "La tela de Chaya"
+                },
+                {
+                  "id": "b3",
+                  "name": "El pino de los Tarao"
+                }
+              ]
             }
           ],
           "miLugar": "p1",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "p4"
+            },
+            {
+              "round": 2,
+              "lugarId": "p2"
+            },
+            {
+              "round": 3,
+              "lugarId": "p5"
+            },
+            {
+              "round": 4,
+              "lugarId": "p1"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -30430,27 +32168,74 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "n0",
-              "name": "El farol de papel",
-              "description": "El farol de papel."
+              "categoriaId": "enseres",
+              "singular": "enser",
+              "plural": "enseres",
+              "titulo": "La carga de la columna",
+              "cosas": [
+                {
+                  "id": "n0",
+                  "name": "El farol de papel",
+                  "description": "El farol de papel."
+                },
+                {
+                  "id": "n1",
+                  "name": "La plata de Chaya",
+                  "description": "La plata de Chaya."
+                },
+                {
+                  "id": "n2",
+                  "name": "La lanza de Hanzo",
+                  "description": "La lanza de Hanzo."
+                }
+              ]
             },
             {
-              "id": "n1",
-              "name": "La plata de Chaya",
-              "description": "La plata de Chaya."
-            },
-            {
-              "id": "n2",
-              "name": "La lanza de Hanzo",
-              "description": "La lanza de Hanzo."
+              "categoriaId": "estandartes",
+              "singular": "estandarte",
+              "plural": "estandartes",
+              "titulo": "Los estandartes",
+              "cosas": [
+                {
+                  "id": "b0",
+                  "name": "Las tres malvarrosas"
+                },
+                {
+                  "id": "b1",
+                  "name": "El carro de los Hattori"
+                },
+                {
+                  "id": "b2",
+                  "name": "La tela de Chaya"
+                },
+                {
+                  "id": "b3",
+                  "name": "El pino de los Tarao"
+                }
+              ]
             }
           ],
           "miLugar": "p1",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "p4"
+            },
+            {
+              "round": 2,
+              "lugarId": "p2"
+            },
+            {
+              "round": 3,
+              "lugarId": "p5"
+            },
+            {
+              "round": 4,
+              "lugarId": "p1"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -31108,27 +32893,74 @@
               "disponibles": 4
             }
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "n0",
-              "name": "El farol de papel",
-              "description": "El farol de papel."
+              "categoriaId": "enseres",
+              "singular": "enser",
+              "plural": "enseres",
+              "titulo": "La carga de la columna",
+              "cosas": [
+                {
+                  "id": "n0",
+                  "name": "El farol de papel",
+                  "description": "El farol de papel."
+                },
+                {
+                  "id": "n1",
+                  "name": "La plata de Chaya",
+                  "description": "La plata de Chaya."
+                },
+                {
+                  "id": "n2",
+                  "name": "La lanza de Hanzo",
+                  "description": "La lanza de Hanzo."
+                }
+              ]
             },
             {
-              "id": "n1",
-              "name": "La plata de Chaya",
-              "description": "La plata de Chaya."
-            },
-            {
-              "id": "n2",
-              "name": "La lanza de Hanzo",
-              "description": "La lanza de Hanzo."
+              "categoriaId": "estandartes",
+              "singular": "estandarte",
+              "plural": "estandartes",
+              "titulo": "Los estandartes",
+              "cosas": [
+                {
+                  "id": "b0",
+                  "name": "Las tres malvarrosas"
+                },
+                {
+                  "id": "b1",
+                  "name": "El carro de los Hattori"
+                },
+                {
+                  "id": "b2",
+                  "name": "La tela de Chaya"
+                },
+                {
+                  "id": "b3",
+                  "name": "El pino de los Tarao"
+                }
+              ]
             }
           ],
           "miLugar": "p1",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "p4"
+            },
+            {
+              "round": 2,
+              "lugarId": "p2"
+            },
+            {
+              "round": 3,
+              "lugarId": "p5"
+            },
+            {
+              "round": 4,
+              "lugarId": "p1"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -32593,27 +34425,74 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "n0",
-              "name": "El farol de papel",
-              "description": "El farol de papel."
+              "categoriaId": "enseres",
+              "singular": "enser",
+              "plural": "enseres",
+              "titulo": "La carga de la columna",
+              "cosas": [
+                {
+                  "id": "n0",
+                  "name": "El farol de papel",
+                  "description": "El farol de papel."
+                },
+                {
+                  "id": "n1",
+                  "name": "La plata de Chaya",
+                  "description": "La plata de Chaya."
+                },
+                {
+                  "id": "n2",
+                  "name": "La lanza de Hanzo",
+                  "description": "La lanza de Hanzo."
+                }
+              ]
             },
             {
-              "id": "n1",
-              "name": "La plata de Chaya",
-              "description": "La plata de Chaya."
-            },
-            {
-              "id": "n2",
-              "name": "La lanza de Hanzo",
-              "description": "La lanza de Hanzo."
+              "categoriaId": "estandartes",
+              "singular": "estandarte",
+              "plural": "estandartes",
+              "titulo": "Los estandartes",
+              "cosas": [
+                {
+                  "id": "b0",
+                  "name": "Las tres malvarrosas"
+                },
+                {
+                  "id": "b1",
+                  "name": "El carro de los Hattori"
+                },
+                {
+                  "id": "b2",
+                  "name": "La tela de Chaya"
+                },
+                {
+                  "id": "b3",
+                  "name": "El pino de los Tarao"
+                }
+              ]
             }
           ],
           "miLugar": "p1",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "p4"
+            },
+            {
+              "round": 2,
+              "lugarId": "p2"
+            },
+            {
+              "round": 3,
+              "lugarId": "p5"
+            },
+            {
+              "round": 4,
+              "lugarId": "p1"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -33230,27 +35109,74 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "n0",
-              "name": "El farol de papel",
-              "description": "El farol de papel."
+              "categoriaId": "enseres",
+              "singular": "enser",
+              "plural": "enseres",
+              "titulo": "La carga de la columna",
+              "cosas": [
+                {
+                  "id": "n0",
+                  "name": "El farol de papel",
+                  "description": "El farol de papel."
+                },
+                {
+                  "id": "n1",
+                  "name": "La plata de Chaya",
+                  "description": "La plata de Chaya."
+                },
+                {
+                  "id": "n2",
+                  "name": "La lanza de Hanzo",
+                  "description": "La lanza de Hanzo."
+                }
+              ]
             },
             {
-              "id": "n1",
-              "name": "La plata de Chaya",
-              "description": "La plata de Chaya."
-            },
-            {
-              "id": "n2",
-              "name": "La lanza de Hanzo",
-              "description": "La lanza de Hanzo."
+              "categoriaId": "estandartes",
+              "singular": "estandarte",
+              "plural": "estandartes",
+              "titulo": "Los estandartes",
+              "cosas": [
+                {
+                  "id": "b0",
+                  "name": "Las tres malvarrosas"
+                },
+                {
+                  "id": "b1",
+                  "name": "El carro de los Hattori"
+                },
+                {
+                  "id": "b2",
+                  "name": "La tela de Chaya"
+                },
+                {
+                  "id": "b3",
+                  "name": "El pino de los Tarao"
+                }
+              ]
             }
           ],
           "miLugar": "p1",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "p4"
+            },
+            {
+              "round": 2,
+              "lugarId": "p2"
+            },
+            {
+              "round": 3,
+              "lugarId": "p5"
+            },
+            {
+              "round": 4,
+              "lugarId": "p1"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -33861,27 +35787,74 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "n0",
-              "name": "El farol de papel",
-              "description": "El farol de papel."
+              "categoriaId": "enseres",
+              "singular": "enser",
+              "plural": "enseres",
+              "titulo": "La carga de la columna",
+              "cosas": [
+                {
+                  "id": "n0",
+                  "name": "El farol de papel",
+                  "description": "El farol de papel."
+                },
+                {
+                  "id": "n1",
+                  "name": "La plata de Chaya",
+                  "description": "La plata de Chaya."
+                },
+                {
+                  "id": "n2",
+                  "name": "La lanza de Hanzo",
+                  "description": "La lanza de Hanzo."
+                }
+              ]
             },
             {
-              "id": "n1",
-              "name": "La plata de Chaya",
-              "description": "La plata de Chaya."
-            },
-            {
-              "id": "n2",
-              "name": "La lanza de Hanzo",
-              "description": "La lanza de Hanzo."
+              "categoriaId": "estandartes",
+              "singular": "estandarte",
+              "plural": "estandartes",
+              "titulo": "Los estandartes",
+              "cosas": [
+                {
+                  "id": "b0",
+                  "name": "Las tres malvarrosas"
+                },
+                {
+                  "id": "b1",
+                  "name": "El carro de los Hattori"
+                },
+                {
+                  "id": "b2",
+                  "name": "La tela de Chaya"
+                },
+                {
+                  "id": "b3",
+                  "name": "El pino de los Tarao"
+                }
+              ]
             }
           ],
           "miLugar": "p1",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "p4"
+            },
+            {
+              "round": 2,
+              "lugarId": "p2"
+            },
+            {
+              "round": 3,
+              "lugarId": "p5"
+            },
+            {
+              "round": 4,
+              "lugarId": "p1"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -34535,27 +36508,74 @@
               "disponibles": 4
             }
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "n0",
-              "name": "El farol de papel",
-              "description": "El farol de papel."
+              "categoriaId": "enseres",
+              "singular": "enser",
+              "plural": "enseres",
+              "titulo": "La carga de la columna",
+              "cosas": [
+                {
+                  "id": "n0",
+                  "name": "El farol de papel",
+                  "description": "El farol de papel."
+                },
+                {
+                  "id": "n1",
+                  "name": "La plata de Chaya",
+                  "description": "La plata de Chaya."
+                },
+                {
+                  "id": "n2",
+                  "name": "La lanza de Hanzo",
+                  "description": "La lanza de Hanzo."
+                }
+              ]
             },
             {
-              "id": "n1",
-              "name": "La plata de Chaya",
-              "description": "La plata de Chaya."
-            },
-            {
-              "id": "n2",
-              "name": "La lanza de Hanzo",
-              "description": "La lanza de Hanzo."
+              "categoriaId": "estandartes",
+              "singular": "estandarte",
+              "plural": "estandartes",
+              "titulo": "Los estandartes",
+              "cosas": [
+                {
+                  "id": "b0",
+                  "name": "Las tres malvarrosas"
+                },
+                {
+                  "id": "b1",
+                  "name": "El carro de los Hattori"
+                },
+                {
+                  "id": "b2",
+                  "name": "La tela de Chaya"
+                },
+                {
+                  "id": "b3",
+                  "name": "El pino de los Tarao"
+                }
+              ]
             }
           ],
           "miLugar": "p1",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "p4"
+            },
+            {
+              "round": 2,
+              "lugarId": "p2"
+            },
+            {
+              "round": 3,
+              "lugarId": "p5"
+            },
+            {
+              "round": 4,
+              "lugarId": "p1"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -35900,27 +37920,74 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "n0",
-              "name": "El farol de papel",
-              "description": "El farol de papel."
+              "categoriaId": "enseres",
+              "singular": "enser",
+              "plural": "enseres",
+              "titulo": "La carga de la columna",
+              "cosas": [
+                {
+                  "id": "n0",
+                  "name": "El farol de papel",
+                  "description": "El farol de papel."
+                },
+                {
+                  "id": "n1",
+                  "name": "La plata de Chaya",
+                  "description": "La plata de Chaya."
+                },
+                {
+                  "id": "n2",
+                  "name": "La lanza de Hanzo",
+                  "description": "La lanza de Hanzo."
+                }
+              ]
             },
             {
-              "id": "n1",
-              "name": "La plata de Chaya",
-              "description": "La plata de Chaya."
-            },
-            {
-              "id": "n2",
-              "name": "La lanza de Hanzo",
-              "description": "La lanza de Hanzo."
+              "categoriaId": "estandartes",
+              "singular": "estandarte",
+              "plural": "estandartes",
+              "titulo": "Los estandartes",
+              "cosas": [
+                {
+                  "id": "b0",
+                  "name": "Las tres malvarrosas"
+                },
+                {
+                  "id": "b1",
+                  "name": "El carro de los Hattori"
+                },
+                {
+                  "id": "b2",
+                  "name": "La tela de Chaya"
+                },
+                {
+                  "id": "b3",
+                  "name": "El pino de los Tarao"
+                }
+              ]
             }
           ],
           "miLugar": "p1",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "p4"
+            },
+            {
+              "round": 2,
+              "lugarId": "p2"
+            },
+            {
+              "round": 3,
+              "lugarId": "p5"
+            },
+            {
+              "round": 4,
+              "lugarId": "p1"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -36537,27 +38604,74 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "n0",
-              "name": "El farol de papel",
-              "description": "El farol de papel."
+              "categoriaId": "enseres",
+              "singular": "enser",
+              "plural": "enseres",
+              "titulo": "La carga de la columna",
+              "cosas": [
+                {
+                  "id": "n0",
+                  "name": "El farol de papel",
+                  "description": "El farol de papel."
+                },
+                {
+                  "id": "n1",
+                  "name": "La plata de Chaya",
+                  "description": "La plata de Chaya."
+                },
+                {
+                  "id": "n2",
+                  "name": "La lanza de Hanzo",
+                  "description": "La lanza de Hanzo."
+                }
+              ]
             },
             {
-              "id": "n1",
-              "name": "La plata de Chaya",
-              "description": "La plata de Chaya."
-            },
-            {
-              "id": "n2",
-              "name": "La lanza de Hanzo",
-              "description": "La lanza de Hanzo."
+              "categoriaId": "estandartes",
+              "singular": "estandarte",
+              "plural": "estandartes",
+              "titulo": "Los estandartes",
+              "cosas": [
+                {
+                  "id": "b0",
+                  "name": "Las tres malvarrosas"
+                },
+                {
+                  "id": "b1",
+                  "name": "El carro de los Hattori"
+                },
+                {
+                  "id": "b2",
+                  "name": "La tela de Chaya"
+                },
+                {
+                  "id": "b3",
+                  "name": "El pino de los Tarao"
+                }
+              ]
             }
           ],
           "miLugar": "p1",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "p4"
+            },
+            {
+              "round": 2,
+              "lugarId": "p2"
+            },
+            {
+              "round": 3,
+              "lugarId": "p5"
+            },
+            {
+              "round": 4,
+              "lugarId": "p1"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -37168,27 +39282,74 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "n0",
-              "name": "El farol de papel",
-              "description": "El farol de papel."
+              "categoriaId": "enseres",
+              "singular": "enser",
+              "plural": "enseres",
+              "titulo": "La carga de la columna",
+              "cosas": [
+                {
+                  "id": "n0",
+                  "name": "El farol de papel",
+                  "description": "El farol de papel."
+                },
+                {
+                  "id": "n1",
+                  "name": "La plata de Chaya",
+                  "description": "La plata de Chaya."
+                },
+                {
+                  "id": "n2",
+                  "name": "La lanza de Hanzo",
+                  "description": "La lanza de Hanzo."
+                }
+              ]
             },
             {
-              "id": "n1",
-              "name": "La plata de Chaya",
-              "description": "La plata de Chaya."
-            },
-            {
-              "id": "n2",
-              "name": "La lanza de Hanzo",
-              "description": "La lanza de Hanzo."
+              "categoriaId": "estandartes",
+              "singular": "estandarte",
+              "plural": "estandartes",
+              "titulo": "Los estandartes",
+              "cosas": [
+                {
+                  "id": "b0",
+                  "name": "Las tres malvarrosas"
+                },
+                {
+                  "id": "b1",
+                  "name": "El carro de los Hattori"
+                },
+                {
+                  "id": "b2",
+                  "name": "La tela de Chaya"
+                },
+                {
+                  "id": "b3",
+                  "name": "El pino de los Tarao"
+                }
+              ]
             }
           ],
           "miLugar": "p1",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "p4"
+            },
+            {
+              "round": 2,
+              "lugarId": "p2"
+            },
+            {
+              "round": 3,
+              "lugarId": "p5"
+            },
+            {
+              "round": 4,
+              "lugarId": "p1"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -37842,27 +40003,74 @@
               "disponibles": 4
             }
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "n0",
-              "name": "El farol de papel",
-              "description": "El farol de papel."
+              "categoriaId": "enseres",
+              "singular": "enser",
+              "plural": "enseres",
+              "titulo": "La carga de la columna",
+              "cosas": [
+                {
+                  "id": "n0",
+                  "name": "El farol de papel",
+                  "description": "El farol de papel."
+                },
+                {
+                  "id": "n1",
+                  "name": "La plata de Chaya",
+                  "description": "La plata de Chaya."
+                },
+                {
+                  "id": "n2",
+                  "name": "La lanza de Hanzo",
+                  "description": "La lanza de Hanzo."
+                }
+              ]
             },
             {
-              "id": "n1",
-              "name": "La plata de Chaya",
-              "description": "La plata de Chaya."
-            },
-            {
-              "id": "n2",
-              "name": "La lanza de Hanzo",
-              "description": "La lanza de Hanzo."
+              "categoriaId": "estandartes",
+              "singular": "estandarte",
+              "plural": "estandartes",
+              "titulo": "Los estandartes",
+              "cosas": [
+                {
+                  "id": "b0",
+                  "name": "Las tres malvarrosas"
+                },
+                {
+                  "id": "b1",
+                  "name": "El carro de los Hattori"
+                },
+                {
+                  "id": "b2",
+                  "name": "La tela de Chaya"
+                },
+                {
+                  "id": "b3",
+                  "name": "El pino de los Tarao"
+                }
+              ]
             }
           ],
           "miLugar": "p1",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "p4"
+            },
+            {
+              "round": 2,
+              "lugarId": "p2"
+            },
+            {
+              "round": 3,
+              "lugarId": "p5"
+            },
+            {
+              "round": 4,
+              "lugarId": "p1"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -39192,27 +41400,74 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "n0",
-              "name": "El farol de papel",
-              "description": "El farol de papel."
+              "categoriaId": "enseres",
+              "singular": "enser",
+              "plural": "enseres",
+              "titulo": "La carga de la columna",
+              "cosas": [
+                {
+                  "id": "n0",
+                  "name": "El farol de papel",
+                  "description": "El farol de papel."
+                },
+                {
+                  "id": "n1",
+                  "name": "La plata de Chaya",
+                  "description": "La plata de Chaya."
+                },
+                {
+                  "id": "n2",
+                  "name": "La lanza de Hanzo",
+                  "description": "La lanza de Hanzo."
+                }
+              ]
             },
             {
-              "id": "n1",
-              "name": "La plata de Chaya",
-              "description": "La plata de Chaya."
-            },
-            {
-              "id": "n2",
-              "name": "La lanza de Hanzo",
-              "description": "La lanza de Hanzo."
+              "categoriaId": "estandartes",
+              "singular": "estandarte",
+              "plural": "estandartes",
+              "titulo": "Los estandartes",
+              "cosas": [
+                {
+                  "id": "b0",
+                  "name": "Las tres malvarrosas"
+                },
+                {
+                  "id": "b1",
+                  "name": "El carro de los Hattori"
+                },
+                {
+                  "id": "b2",
+                  "name": "La tela de Chaya"
+                },
+                {
+                  "id": "b3",
+                  "name": "El pino de los Tarao"
+                }
+              ]
             }
           ],
           "miLugar": "p1",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "p4"
+            },
+            {
+              "round": 2,
+              "lugarId": "p2"
+            },
+            {
+              "round": 3,
+              "lugarId": "p5"
+            },
+            {
+              "round": 4,
+              "lugarId": "p1"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -39830,27 +42085,74 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "n0",
-              "name": "El farol de papel",
-              "description": "El farol de papel."
+              "categoriaId": "enseres",
+              "singular": "enser",
+              "plural": "enseres",
+              "titulo": "La carga de la columna",
+              "cosas": [
+                {
+                  "id": "n0",
+                  "name": "El farol de papel",
+                  "description": "El farol de papel."
+                },
+                {
+                  "id": "n1",
+                  "name": "La plata de Chaya",
+                  "description": "La plata de Chaya."
+                },
+                {
+                  "id": "n2",
+                  "name": "La lanza de Hanzo",
+                  "description": "La lanza de Hanzo."
+                }
+              ]
             },
             {
-              "id": "n1",
-              "name": "La plata de Chaya",
-              "description": "La plata de Chaya."
-            },
-            {
-              "id": "n2",
-              "name": "La lanza de Hanzo",
-              "description": "La lanza de Hanzo."
+              "categoriaId": "estandartes",
+              "singular": "estandarte",
+              "plural": "estandartes",
+              "titulo": "Los estandartes",
+              "cosas": [
+                {
+                  "id": "b0",
+                  "name": "Las tres malvarrosas"
+                },
+                {
+                  "id": "b1",
+                  "name": "El carro de los Hattori"
+                },
+                {
+                  "id": "b2",
+                  "name": "La tela de Chaya"
+                },
+                {
+                  "id": "b3",
+                  "name": "El pino de los Tarao"
+                }
+              ]
             }
           ],
           "miLugar": "p1",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "p4"
+            },
+            {
+              "round": 2,
+              "lugarId": "p2"
+            },
+            {
+              "round": 3,
+              "lugarId": "p5"
+            },
+            {
+              "round": 4,
+              "lugarId": "p1"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -40462,27 +42764,74 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "n0",
-              "name": "El farol de papel",
-              "description": "El farol de papel."
+              "categoriaId": "enseres",
+              "singular": "enser",
+              "plural": "enseres",
+              "titulo": "La carga de la columna",
+              "cosas": [
+                {
+                  "id": "n0",
+                  "name": "El farol de papel",
+                  "description": "El farol de papel."
+                },
+                {
+                  "id": "n1",
+                  "name": "La plata de Chaya",
+                  "description": "La plata de Chaya."
+                },
+                {
+                  "id": "n2",
+                  "name": "La lanza de Hanzo",
+                  "description": "La lanza de Hanzo."
+                }
+              ]
             },
             {
-              "id": "n1",
-              "name": "La plata de Chaya",
-              "description": "La plata de Chaya."
-            },
-            {
-              "id": "n2",
-              "name": "La lanza de Hanzo",
-              "description": "La lanza de Hanzo."
+              "categoriaId": "estandartes",
+              "singular": "estandarte",
+              "plural": "estandartes",
+              "titulo": "Los estandartes",
+              "cosas": [
+                {
+                  "id": "b0",
+                  "name": "Las tres malvarrosas"
+                },
+                {
+                  "id": "b1",
+                  "name": "El carro de los Hattori"
+                },
+                {
+                  "id": "b2",
+                  "name": "La tela de Chaya"
+                },
+                {
+                  "id": "b3",
+                  "name": "El pino de los Tarao"
+                }
+              ]
             }
           ],
           "miLugar": "p1",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "p4"
+            },
+            {
+              "round": 2,
+              "lugarId": "p2"
+            },
+            {
+              "round": 3,
+              "lugarId": "p5"
+            },
+            {
+              "round": 4,
+              "lugarId": "p1"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -41136,27 +43485,74 @@
               "disponibles": 4
             }
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "n0",
-              "name": "El farol de papel",
-              "description": "El farol de papel."
+              "categoriaId": "enseres",
+              "singular": "enser",
+              "plural": "enseres",
+              "titulo": "La carga de la columna",
+              "cosas": [
+                {
+                  "id": "n0",
+                  "name": "El farol de papel",
+                  "description": "El farol de papel."
+                },
+                {
+                  "id": "n1",
+                  "name": "La plata de Chaya",
+                  "description": "La plata de Chaya."
+                },
+                {
+                  "id": "n2",
+                  "name": "La lanza de Hanzo",
+                  "description": "La lanza de Hanzo."
+                }
+              ]
             },
             {
-              "id": "n1",
-              "name": "La plata de Chaya",
-              "description": "La plata de Chaya."
-            },
-            {
-              "id": "n2",
-              "name": "La lanza de Hanzo",
-              "description": "La lanza de Hanzo."
+              "categoriaId": "estandartes",
+              "singular": "estandarte",
+              "plural": "estandartes",
+              "titulo": "Los estandartes",
+              "cosas": [
+                {
+                  "id": "b0",
+                  "name": "Las tres malvarrosas"
+                },
+                {
+                  "id": "b1",
+                  "name": "El carro de los Hattori"
+                },
+                {
+                  "id": "b2",
+                  "name": "La tela de Chaya"
+                },
+                {
+                  "id": "b3",
+                  "name": "El pino de los Tarao"
+                }
+              ]
             }
           ],
           "miLugar": "p1",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "p4"
+            },
+            {
+              "round": 2,
+              "lugarId": "p2"
+            },
+            {
+              "round": 3,
+              "lugarId": "p5"
+            },
+            {
+              "round": 4,
+              "lugarId": "p1"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -42553,27 +44949,74 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "n0",
-              "name": "El farol de papel",
-              "description": "El farol de papel."
+              "categoriaId": "enseres",
+              "singular": "enser",
+              "plural": "enseres",
+              "titulo": "La carga de la columna",
+              "cosas": [
+                {
+                  "id": "n0",
+                  "name": "El farol de papel",
+                  "description": "El farol de papel."
+                },
+                {
+                  "id": "n1",
+                  "name": "La plata de Chaya",
+                  "description": "La plata de Chaya."
+                },
+                {
+                  "id": "n2",
+                  "name": "La lanza de Hanzo",
+                  "description": "La lanza de Hanzo."
+                }
+              ]
             },
             {
-              "id": "n1",
-              "name": "La plata de Chaya",
-              "description": "La plata de Chaya."
-            },
-            {
-              "id": "n2",
-              "name": "La lanza de Hanzo",
-              "description": "La lanza de Hanzo."
+              "categoriaId": "estandartes",
+              "singular": "estandarte",
+              "plural": "estandartes",
+              "titulo": "Los estandartes",
+              "cosas": [
+                {
+                  "id": "b0",
+                  "name": "Las tres malvarrosas"
+                },
+                {
+                  "id": "b1",
+                  "name": "El carro de los Hattori"
+                },
+                {
+                  "id": "b2",
+                  "name": "La tela de Chaya"
+                },
+                {
+                  "id": "b3",
+                  "name": "El pino de los Tarao"
+                }
+              ]
             }
           ],
           "miLugar": "p1",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "p4"
+            },
+            {
+              "round": 2,
+              "lugarId": "p2"
+            },
+            {
+              "round": 3,
+              "lugarId": "p5"
+            },
+            {
+              "round": 4,
+              "lugarId": "p1"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -43169,27 +45612,74 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "n0",
-              "name": "El farol de papel",
-              "description": "El farol de papel."
+              "categoriaId": "enseres",
+              "singular": "enser",
+              "plural": "enseres",
+              "titulo": "La carga de la columna",
+              "cosas": [
+                {
+                  "id": "n0",
+                  "name": "El farol de papel",
+                  "description": "El farol de papel."
+                },
+                {
+                  "id": "n1",
+                  "name": "La plata de Chaya",
+                  "description": "La plata de Chaya."
+                },
+                {
+                  "id": "n2",
+                  "name": "La lanza de Hanzo",
+                  "description": "La lanza de Hanzo."
+                }
+              ]
             },
             {
-              "id": "n1",
-              "name": "La plata de Chaya",
-              "description": "La plata de Chaya."
-            },
-            {
-              "id": "n2",
-              "name": "La lanza de Hanzo",
-              "description": "La lanza de Hanzo."
+              "categoriaId": "estandartes",
+              "singular": "estandarte",
+              "plural": "estandartes",
+              "titulo": "Los estandartes",
+              "cosas": [
+                {
+                  "id": "b0",
+                  "name": "Las tres malvarrosas"
+                },
+                {
+                  "id": "b1",
+                  "name": "El carro de los Hattori"
+                },
+                {
+                  "id": "b2",
+                  "name": "La tela de Chaya"
+                },
+                {
+                  "id": "b3",
+                  "name": "El pino de los Tarao"
+                }
+              ]
             }
           ],
           "miLugar": "p1",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "p4"
+            },
+            {
+              "round": 2,
+              "lugarId": "p2"
+            },
+            {
+              "round": 3,
+              "lugarId": "p5"
+            },
+            {
+              "round": 4,
+              "lugarId": "p1"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -43779,27 +46269,74 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "n0",
-              "name": "El farol de papel",
-              "description": "El farol de papel."
+              "categoriaId": "enseres",
+              "singular": "enser",
+              "plural": "enseres",
+              "titulo": "La carga de la columna",
+              "cosas": [
+                {
+                  "id": "n0",
+                  "name": "El farol de papel",
+                  "description": "El farol de papel."
+                },
+                {
+                  "id": "n1",
+                  "name": "La plata de Chaya",
+                  "description": "La plata de Chaya."
+                },
+                {
+                  "id": "n2",
+                  "name": "La lanza de Hanzo",
+                  "description": "La lanza de Hanzo."
+                }
+              ]
             },
             {
-              "id": "n1",
-              "name": "La plata de Chaya",
-              "description": "La plata de Chaya."
-            },
-            {
-              "id": "n2",
-              "name": "La lanza de Hanzo",
-              "description": "La lanza de Hanzo."
+              "categoriaId": "estandartes",
+              "singular": "estandarte",
+              "plural": "estandartes",
+              "titulo": "Los estandartes",
+              "cosas": [
+                {
+                  "id": "b0",
+                  "name": "Las tres malvarrosas"
+                },
+                {
+                  "id": "b1",
+                  "name": "El carro de los Hattori"
+                },
+                {
+                  "id": "b2",
+                  "name": "La tela de Chaya"
+                },
+                {
+                  "id": "b3",
+                  "name": "El pino de los Tarao"
+                }
+              ]
             }
           ],
           "miLugar": "p1",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "p4"
+            },
+            {
+              "round": 2,
+              "lugarId": "p2"
+            },
+            {
+              "round": 3,
+              "lugarId": "p5"
+            },
+            {
+              "round": 4,
+              "lugarId": "p1"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -44459,27 +46996,74 @@
               "disponibles": 4
             }
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "n0",
-              "name": "El farol de papel",
-              "description": "El farol de papel."
+              "categoriaId": "enseres",
+              "singular": "enser",
+              "plural": "enseres",
+              "titulo": "La carga de la columna",
+              "cosas": [
+                {
+                  "id": "n0",
+                  "name": "El farol de papel",
+                  "description": "El farol de papel."
+                },
+                {
+                  "id": "n1",
+                  "name": "La plata de Chaya",
+                  "description": "La plata de Chaya."
+                },
+                {
+                  "id": "n2",
+                  "name": "La lanza de Hanzo",
+                  "description": "La lanza de Hanzo."
+                }
+              ]
             },
             {
-              "id": "n1",
-              "name": "La plata de Chaya",
-              "description": "La plata de Chaya."
-            },
-            {
-              "id": "n2",
-              "name": "La lanza de Hanzo",
-              "description": "La lanza de Hanzo."
+              "categoriaId": "estandartes",
+              "singular": "estandarte",
+              "plural": "estandartes",
+              "titulo": "Los estandartes",
+              "cosas": [
+                {
+                  "id": "b0",
+                  "name": "Las tres malvarrosas"
+                },
+                {
+                  "id": "b1",
+                  "name": "El carro de los Hattori"
+                },
+                {
+                  "id": "b2",
+                  "name": "La tela de Chaya"
+                },
+                {
+                  "id": "b3",
+                  "name": "El pino de los Tarao"
+                }
+              ]
             }
           ],
           "miLugar": "p1",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "p4"
+            },
+            {
+              "round": 2,
+              "lugarId": "p2"
+            },
+            {
+              "round": 3,
+              "lugarId": "p5"
+            },
+            {
+              "round": 4,
+              "lugarId": "p1"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -45905,27 +48489,74 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "n0",
-              "name": "El farol de papel",
-              "description": "El farol de papel."
+              "categoriaId": "enseres",
+              "singular": "enser",
+              "plural": "enseres",
+              "titulo": "La carga de la columna",
+              "cosas": [
+                {
+                  "id": "n0",
+                  "name": "El farol de papel",
+                  "description": "El farol de papel."
+                },
+                {
+                  "id": "n1",
+                  "name": "La plata de Chaya",
+                  "description": "La plata de Chaya."
+                },
+                {
+                  "id": "n2",
+                  "name": "La lanza de Hanzo",
+                  "description": "La lanza de Hanzo."
+                }
+              ]
             },
             {
-              "id": "n1",
-              "name": "La plata de Chaya",
-              "description": "La plata de Chaya."
-            },
-            {
-              "id": "n2",
-              "name": "La lanza de Hanzo",
-              "description": "La lanza de Hanzo."
+              "categoriaId": "estandartes",
+              "singular": "estandarte",
+              "plural": "estandartes",
+              "titulo": "Los estandartes",
+              "cosas": [
+                {
+                  "id": "b0",
+                  "name": "Las tres malvarrosas"
+                },
+                {
+                  "id": "b1",
+                  "name": "El carro de los Hattori"
+                },
+                {
+                  "id": "b2",
+                  "name": "La tela de Chaya"
+                },
+                {
+                  "id": "b3",
+                  "name": "El pino de los Tarao"
+                }
+              ]
             }
           ],
           "miLugar": "p1",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "p4"
+            },
+            {
+              "round": 2,
+              "lugarId": "p2"
+            },
+            {
+              "round": 3,
+              "lugarId": "p5"
+            },
+            {
+              "round": 4,
+              "lugarId": "p1"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -46521,27 +49152,74 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "n0",
-              "name": "El farol de papel",
-              "description": "El farol de papel."
+              "categoriaId": "enseres",
+              "singular": "enser",
+              "plural": "enseres",
+              "titulo": "La carga de la columna",
+              "cosas": [
+                {
+                  "id": "n0",
+                  "name": "El farol de papel",
+                  "description": "El farol de papel."
+                },
+                {
+                  "id": "n1",
+                  "name": "La plata de Chaya",
+                  "description": "La plata de Chaya."
+                },
+                {
+                  "id": "n2",
+                  "name": "La lanza de Hanzo",
+                  "description": "La lanza de Hanzo."
+                }
+              ]
             },
             {
-              "id": "n1",
-              "name": "La plata de Chaya",
-              "description": "La plata de Chaya."
-            },
-            {
-              "id": "n2",
-              "name": "La lanza de Hanzo",
-              "description": "La lanza de Hanzo."
+              "categoriaId": "estandartes",
+              "singular": "estandarte",
+              "plural": "estandartes",
+              "titulo": "Los estandartes",
+              "cosas": [
+                {
+                  "id": "b0",
+                  "name": "Las tres malvarrosas"
+                },
+                {
+                  "id": "b1",
+                  "name": "El carro de los Hattori"
+                },
+                {
+                  "id": "b2",
+                  "name": "La tela de Chaya"
+                },
+                {
+                  "id": "b3",
+                  "name": "El pino de los Tarao"
+                }
+              ]
             }
           ],
           "miLugar": "p1",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "p4"
+            },
+            {
+              "round": 2,
+              "lugarId": "p2"
+            },
+            {
+              "round": 3,
+              "lugarId": "p5"
+            },
+            {
+              "round": 4,
+              "lugarId": "p1"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -47131,27 +49809,74 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "n0",
-              "name": "El farol de papel",
-              "description": "El farol de papel."
+              "categoriaId": "enseres",
+              "singular": "enser",
+              "plural": "enseres",
+              "titulo": "La carga de la columna",
+              "cosas": [
+                {
+                  "id": "n0",
+                  "name": "El farol de papel",
+                  "description": "El farol de papel."
+                },
+                {
+                  "id": "n1",
+                  "name": "La plata de Chaya",
+                  "description": "La plata de Chaya."
+                },
+                {
+                  "id": "n2",
+                  "name": "La lanza de Hanzo",
+                  "description": "La lanza de Hanzo."
+                }
+              ]
             },
             {
-              "id": "n1",
-              "name": "La plata de Chaya",
-              "description": "La plata de Chaya."
-            },
-            {
-              "id": "n2",
-              "name": "La lanza de Hanzo",
-              "description": "La lanza de Hanzo."
+              "categoriaId": "estandartes",
+              "singular": "estandarte",
+              "plural": "estandartes",
+              "titulo": "Los estandartes",
+              "cosas": [
+                {
+                  "id": "b0",
+                  "name": "Las tres malvarrosas"
+                },
+                {
+                  "id": "b1",
+                  "name": "El carro de los Hattori"
+                },
+                {
+                  "id": "b2",
+                  "name": "La tela de Chaya"
+                },
+                {
+                  "id": "b3",
+                  "name": "El pino de los Tarao"
+                }
+              ]
             }
           ],
           "miLugar": "p1",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "p4"
+            },
+            {
+              "round": 2,
+              "lugarId": "p2"
+            },
+            {
+              "round": 3,
+              "lugarId": "p5"
+            },
+            {
+              "round": 4,
+              "lugarId": "p1"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -47811,27 +50536,74 @@
               "disponibles": 4
             }
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "n0",
-              "name": "El farol de papel",
-              "description": "El farol de papel."
+              "categoriaId": "enseres",
+              "singular": "enser",
+              "plural": "enseres",
+              "titulo": "La carga de la columna",
+              "cosas": [
+                {
+                  "id": "n0",
+                  "name": "El farol de papel",
+                  "description": "El farol de papel."
+                },
+                {
+                  "id": "n1",
+                  "name": "La plata de Chaya",
+                  "description": "La plata de Chaya."
+                },
+                {
+                  "id": "n2",
+                  "name": "La lanza de Hanzo",
+                  "description": "La lanza de Hanzo."
+                }
+              ]
             },
             {
-              "id": "n1",
-              "name": "La plata de Chaya",
-              "description": "La plata de Chaya."
-            },
-            {
-              "id": "n2",
-              "name": "La lanza de Hanzo",
-              "description": "La lanza de Hanzo."
+              "categoriaId": "estandartes",
+              "singular": "estandarte",
+              "plural": "estandartes",
+              "titulo": "Los estandartes",
+              "cosas": [
+                {
+                  "id": "b0",
+                  "name": "Las tres malvarrosas"
+                },
+                {
+                  "id": "b1",
+                  "name": "El carro de los Hattori"
+                },
+                {
+                  "id": "b2",
+                  "name": "La tela de Chaya"
+                },
+                {
+                  "id": "b3",
+                  "name": "El pino de los Tarao"
+                }
+              ]
             }
           ],
           "miLugar": "p1",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "p4"
+            },
+            {
+              "round": 2,
+              "lugarId": "p2"
+            },
+            {
+              "round": 3,
+              "lugarId": "p5"
+            },
+            {
+              "round": 4,
+              "lugarId": "p1"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -49295,27 +52067,74 @@
               }
             }
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "n0",
-              "name": "El farol de papel",
-              "description": "El farol de papel."
+              "categoriaId": "enseres",
+              "singular": "enser",
+              "plural": "enseres",
+              "titulo": "La carga de la columna",
+              "cosas": [
+                {
+                  "id": "n0",
+                  "name": "El farol de papel",
+                  "description": "El farol de papel."
+                },
+                {
+                  "id": "n1",
+                  "name": "La plata de Chaya",
+                  "description": "La plata de Chaya."
+                },
+                {
+                  "id": "n2",
+                  "name": "La lanza de Hanzo",
+                  "description": "La lanza de Hanzo."
+                }
+              ]
             },
             {
-              "id": "n1",
-              "name": "La plata de Chaya",
-              "description": "La plata de Chaya."
-            },
-            {
-              "id": "n2",
-              "name": "La lanza de Hanzo",
-              "description": "La lanza de Hanzo."
+              "categoriaId": "estandartes",
+              "singular": "estandarte",
+              "plural": "estandartes",
+              "titulo": "Los estandartes",
+              "cosas": [
+                {
+                  "id": "b0",
+                  "name": "Las tres malvarrosas"
+                },
+                {
+                  "id": "b1",
+                  "name": "El carro de los Hattori"
+                },
+                {
+                  "id": "b2",
+                  "name": "La tela de Chaya"
+                },
+                {
+                  "id": "b3",
+                  "name": "El pino de los Tarao"
+                }
+              ]
             }
           ],
           "miLugar": "p1",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "p4"
+            },
+            {
+              "round": 2,
+              "lugarId": "p2"
+            },
+            {
+              "round": 3,
+              "lugarId": "p5"
+            },
+            {
+              "round": 4,
+              "lugarId": "p1"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -49992,27 +52811,74 @@
               }
             }
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "n0",
-              "name": "El farol de papel",
-              "description": "El farol de papel."
+              "categoriaId": "enseres",
+              "singular": "enser",
+              "plural": "enseres",
+              "titulo": "La carga de la columna",
+              "cosas": [
+                {
+                  "id": "n0",
+                  "name": "El farol de papel",
+                  "description": "El farol de papel."
+                },
+                {
+                  "id": "n1",
+                  "name": "La plata de Chaya",
+                  "description": "La plata de Chaya."
+                },
+                {
+                  "id": "n2",
+                  "name": "La lanza de Hanzo",
+                  "description": "La lanza de Hanzo."
+                }
+              ]
             },
             {
-              "id": "n1",
-              "name": "La plata de Chaya",
-              "description": "La plata de Chaya."
-            },
-            {
-              "id": "n2",
-              "name": "La lanza de Hanzo",
-              "description": "La lanza de Hanzo."
+              "categoriaId": "estandartes",
+              "singular": "estandarte",
+              "plural": "estandartes",
+              "titulo": "Los estandartes",
+              "cosas": [
+                {
+                  "id": "b0",
+                  "name": "Las tres malvarrosas"
+                },
+                {
+                  "id": "b1",
+                  "name": "El carro de los Hattori"
+                },
+                {
+                  "id": "b2",
+                  "name": "La tela de Chaya"
+                },
+                {
+                  "id": "b3",
+                  "name": "El pino de los Tarao"
+                }
+              ]
             }
           ],
           "miLugar": "p1",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "p4"
+            },
+            {
+              "round": 2,
+              "lugarId": "p2"
+            },
+            {
+              "round": 3,
+              "lugarId": "p5"
+            },
+            {
+              "round": 4,
+              "lugarId": "p1"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -50683,27 +53549,74 @@
               }
             }
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "n0",
-              "name": "El farol de papel",
-              "description": "El farol de papel."
+              "categoriaId": "enseres",
+              "singular": "enser",
+              "plural": "enseres",
+              "titulo": "La carga de la columna",
+              "cosas": [
+                {
+                  "id": "n0",
+                  "name": "El farol de papel",
+                  "description": "El farol de papel."
+                },
+                {
+                  "id": "n1",
+                  "name": "La plata de Chaya",
+                  "description": "La plata de Chaya."
+                },
+                {
+                  "id": "n2",
+                  "name": "La lanza de Hanzo",
+                  "description": "La lanza de Hanzo."
+                }
+              ]
             },
             {
-              "id": "n1",
-              "name": "La plata de Chaya",
-              "description": "La plata de Chaya."
-            },
-            {
-              "id": "n2",
-              "name": "La lanza de Hanzo",
-              "description": "La lanza de Hanzo."
+              "categoriaId": "estandartes",
+              "singular": "estandarte",
+              "plural": "estandartes",
+              "titulo": "Los estandartes",
+              "cosas": [
+                {
+                  "id": "b0",
+                  "name": "Las tres malvarrosas"
+                },
+                {
+                  "id": "b1",
+                  "name": "El carro de los Hattori"
+                },
+                {
+                  "id": "b2",
+                  "name": "La tela de Chaya"
+                },
+                {
+                  "id": "b3",
+                  "name": "El pino de los Tarao"
+                }
+              ]
             }
           ],
           "miLugar": "p1",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "p4"
+            },
+            {
+              "round": 2,
+              "lugarId": "p2"
+            },
+            {
+              "round": 3,
+              "lugarId": "p5"
+            },
+            {
+              "round": 4,
+              "lugarId": "p1"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -51413,27 +54326,74 @@
               }
             }
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "n0",
-              "name": "El farol de papel",
-              "description": "El farol de papel."
+              "categoriaId": "enseres",
+              "singular": "enser",
+              "plural": "enseres",
+              "titulo": "La carga de la columna",
+              "cosas": [
+                {
+                  "id": "n0",
+                  "name": "El farol de papel",
+                  "description": "El farol de papel."
+                },
+                {
+                  "id": "n1",
+                  "name": "La plata de Chaya",
+                  "description": "La plata de Chaya."
+                },
+                {
+                  "id": "n2",
+                  "name": "La lanza de Hanzo",
+                  "description": "La lanza de Hanzo."
+                }
+              ]
             },
             {
-              "id": "n1",
-              "name": "La plata de Chaya",
-              "description": "La plata de Chaya."
-            },
-            {
-              "id": "n2",
-              "name": "La lanza de Hanzo",
-              "description": "La lanza de Hanzo."
+              "categoriaId": "estandartes",
+              "singular": "estandarte",
+              "plural": "estandartes",
+              "titulo": "Los estandartes",
+              "cosas": [
+                {
+                  "id": "b0",
+                  "name": "Las tres malvarrosas"
+                },
+                {
+                  "id": "b1",
+                  "name": "El carro de los Hattori"
+                },
+                {
+                  "id": "b2",
+                  "name": "La tela de Chaya"
+                },
+                {
+                  "id": "b3",
+                  "name": "El pino de los Tarao"
+                }
+              ]
             }
           ],
           "miLugar": "p1",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "p4"
+            },
+            {
+              "round": 2,
+              "lugarId": "p2"
+            },
+            {
+              "round": 3,
+              "lugarId": "p5"
+            },
+            {
+              "round": 4,
+              "lugarId": "p1"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {

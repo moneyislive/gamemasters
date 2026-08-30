@@ -48,6 +48,7 @@ import { ejes as ejesDe } from '../../shared/juegos';
 import type { ManifiestoDeJuego } from '../../shared/juegos';
 import type { GameSession, Plot } from '../../shared/types';
 import type { LiveSession } from '../../shared/live';
+import { leerBloqueDePistas } from '../../shared/mecanicas/pistas';
 
 let hechas = 0;
 const fallos: string[] = [];
@@ -485,8 +486,20 @@ paso('Lo que llega al móvil es de este juego, no de un misterio');
 const v = vistaDeJugador(game, sesion, 'p1')!;
 comprobar('se compone la vista', v !== null);
 comprobar('sin salas', v.lugares.length === 0, v.lugares.length);
-comprobar('sin pistas encontradas', v.misHallazgos.length === 0);
-comprobar('sin hechos establecidos', v.hechos.length === 0);
+/*
+ * LA COMPROBACION SE HA VUELTO MAS FUERTE, no mas debil.
+ *
+ * Aqui decia «sin pistas encontradas: `v.misHallazgos.length === 0`» y «sin
+ * hechos establecidos». Eran ciertas y no valian de mucho: los campos EXISTIAN
+ * en la vista de este juego, con su forma de misterio, y lo unico que se
+ * comprobaba es que venian vacios. Un array vacio es lo que devuelve tambien
+ * una plataforma que no ha sabido rellenarlos.
+ *
+ * Ahora ni siquiera existen: viven en el bloque que CLUEDO declara, y este
+ * juego declara el suyo. Que `leerEstadoCluedo` devuelva `null` es la prueba de
+ * que la vista de una almoneda no lleva NADA con forma de crimen.
+ */
+comprobar('la vista no trae bloque de CLUEDO por ningun lado', leerBloqueDePistas(v.estadoDelJuego) === null);
 comprobar('sin ejes que acusar', v.ejes.length === 0, v.ejes);
 comprobar('sin cronología pública', v.cronologia.length === 0);
 comprobar('nadie es el señalado, porque no hay a quién señalar', v.yo.soyCulpable === false);

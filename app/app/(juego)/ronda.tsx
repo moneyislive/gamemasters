@@ -57,7 +57,7 @@ import {
   texto,
 } from '../../src/ui';
 import { ALTO_BARRA_TOTAL } from '../../src/tema';
-import { pantallaDe } from '../../src/pantallas';
+import { bloqueDe, pantallaDe } from '../../src/pantallas';
 import type { LugarVista, VistaJugador } from '../../../shared/live';
 import { Foto } from '../../src/foto';
 
@@ -181,6 +181,7 @@ export default function Ronda(): JSX.Element {
    */
   const Propia = pantallaDe(vista?.sesion.juego, 'ronda');
   if (Propia) return <Propia />;
+  const BloqueDelJuego = bloqueDe(vista?.sesion.juego, 'ronda');
 
   if (cargando && !vista) return <Pantalla><Cargando texto="Buscando la partida…" /></Pantalla>;
   if (!vista) {
@@ -192,7 +193,7 @@ export default function Ronda(): JSX.Element {
     );
   }
 
-  const { sesion, yo, lugares: salas, misPistas, miLugar, narracion } = vista;
+  const { sesion, yo, lugares: salas, miLugar, narracion } = vista;
 
   const avisar = async (listo: boolean): Promise<void> => {
     setErrorSala(null);
@@ -473,26 +474,14 @@ export default function Ronda(): JSX.Element {
             );
           })}
 
-          {misPistas.length > 0 && (
-            <>
-              <Ornamento />
-              <Seccion>Lo que encuentras aquí</Seccion>
-              {misPistas.map((pista, i) => (
-                <Animated.View key={pista.id} entering={FadeInUp.delay(120 * i).duration(520)}>
-                  <Marco tono="papel">
-                    <Etiqueta style={{ color: color.burdeos700 }}>{pista.lugarNombre}</Etiqueta>
-                    <Cuerpo style={{ color: color.caoba700, marginTop: espacio.sm }}>
-                      {pista.description}
-                    </Cuerpo>
-                  </Marco>
-                </Animated.View>
-              ))}
-              <Cuerpo tenue style={{ fontStyle: 'italic', fontSize: 15 }}>
-                Esto lo has visto tú y nadie más. Qué significa es cosa tuya, y contarlo o no
-                también. Al cerrar la ronda se queda guardado en tus pistas.
-              </Cuerpo>
-            </>
-          )}
+          {/*
+            EL TROZO QUE PONE EL JUEGO. Aquí estaba «Lo que encuentras aquí»,
+            la lista de pistas de tu sala, escrita dentro de la ronda GENÉRICA:
+            un bloque de CLUEDO en la pantalla que se lleva cualquier juego que
+            no declare la suya. Ahora lo declara CLUEDO, en `src/pantallas.ts`,
+            y para los demás esto no pinta nada.
+          */}
+          {BloqueDelJuego && <BloqueDelJuego />}
         </>
       ) : (
         <Marco>

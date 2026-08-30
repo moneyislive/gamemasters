@@ -32,6 +32,7 @@ import { conAlfa, useTablero, useTema } from '../../src/tema-juego';
 import { MOMIA } from '../../src/tema-momia';
 import { leerEstadoMomia } from '../../src/momia/vista';
 import { accionDeEntrarEnLugar, categoriasDeLugar, manifiestoDe } from '../../../shared/juegos';
+import { leerBloqueDePistas, lugaresConHallazgo } from '../../../shared/mecanicas/pistas';
 import {
   Cargando,
   Cuerpo,
@@ -99,14 +100,26 @@ export default function Mapa(): JSX.Element {
   const conChincheta = salas.filter((s) => s.pin).length;
 
   /*
-   * Salas en las que YO he encontrado algo. Antes eran las salas de las que
-   * había salido algo al tablón común —o sea, las de cualquiera—, y con eso el
-   * plano acababa marcado entero para todo el mundo por igual. Ahora las pistas
-   * son de quien las encuentra, así que esto marca tu propio recorrido: dónde
-   * has estado y qué te dio algo. No es información nueva, la tienes en Pistas;
-   * aquí solo se ve de un vistazo y sobre el plano.
+   * ═══ POR DONDE HAS PASADO TU ═══
+   *
+   * Esto marcaba `misHallazgos`: las salas donde habías encontrado una PISTA.
+   * Y el plano es de la plataforma —lo miran los tres juegos, y la Momia lo
+   * llama «Tumba»—, así que en un juego sin pistas la lista llegaba vacía y el
+   * plano salía sin una sola marca. Nadie lo notaba: un plano limpio parece un
+   * plano al principio de la partida.
+   *
+   * Ahora marca dónde has estado, que significa lo mismo en cualquier juego con
+   * lugares y lo sabe la plataforma. Y quien además distinga «aquí saqué algo»
+   * lo pinta encima desde lo suyo, que es lo de abajo.
    */
-  const conHallazgo = new Set(vista.misHallazgos.map((p) => p.lugarId));
+  const dondeEstuve = new Set(vista.miRecorrido.map((e) => e.lugarId));
+
+  /*
+   * Y la marca extra de CLUEDO, si esta partida es de CLUEDO: los sitios que te
+   * dieron algo. Sale de su bloque, igual que la Vigilia de la Momia saca el
+   * suyo, y para cualquier otro juego esto es un conjunto vacío.
+   */
+  const conHallazgo = lugaresConHallazgo(leerBloqueDePistas(vista.estadoDelJuego));
 
   /*
    * LAS PALABRAS DEL SITIO SALEN DEL MANIFIESTO. Esta pantalla decía «la casa»
@@ -199,6 +212,7 @@ export default function Mapa(): JSX.Element {
           imagenUrl={tablero?.imagenUrl}
           salas={salas}
           miLugar={miLugar}
+          dondeEstuve={dondeEstuve}
           conHallazgo={conHallazgo}
           ancho={ancho}
           alPulsar={elegir}
@@ -209,6 +223,7 @@ export default function Mapa(): JSX.Element {
           plano={tablero?.plano}
           salas={salas}
           miLugar={miLugar}
+          dondeEstuve={dondeEstuve}
           conHallazgo={conHallazgo}
           profanada={profanada}
           ancho={ancho}
@@ -260,7 +275,11 @@ export default function Mapa(): JSX.Element {
                       ? 'Hay alguien'
                       : `${sala.ocupantes} personas`
                     : null,
-                  conHallazgo.has(sala.id) ? 'Aquí encontraste algo' : null,
+                  conHallazgo.has(sala.id)
+                    ? 'Aquí encontraste algo'
+                    : dondeEstuve.has(sala.id)
+                      ? 'Ya has estado'
+                      : null,
                   // Lo primero de la lista si toca: entrar ahí cuesta una marca.
                   sala.id === profanada ? 'Profanada esta noche' : null,
                 ]
@@ -283,6 +302,18 @@ export default function Mapa(): JSX.Element {
 interface PropsPlano {
   salas: LugarVista[];
   miLugar?: string;
+  /**
+   * Los lugares por los que has pasado. De la plataforma: vale en cualquier
+   * juego que tenga sitios donde entrar.
+   */
+  dondeEstuve: Set<string>;
+  /**
+   * Y los que ademas te dieron algo, si el juego distingue esas dos cosas.
+   *
+   * Vacio en un juego que no lo distinga —la Momia, las Sombras—, y entonces el
+   * plano marca solo el recorrido. Antes esta era la unica marca que habia, asi
+   * que sus planos salian en blanco.
+   */
   conHallazgo: Set<string>;
   /**
    * La que cuesta una marca esta noche, si el juego tiene una.
@@ -310,7 +341,7 @@ function PlanoDibujado({
    * sitios donde más se nota, porque el plano se mira mucho y además se imprime.
    */
   const tablero = useTablero();
-  const { salas, miLugar, conHallazgo, profanada, ancho, alPulsar, activo } = resto;
+  const { salas, miLugar, dondeEstuve, conHallazgo, profanada, ancho, alPulsar, activo } = resto;
   if (!plano || plano.lugares.length === 0) return null;
 
   const lado = plano.grid.cols * CELDA;
@@ -473,6 +504,7 @@ function PlanoDibujado({
           const nombre = (nombrePorId.get(c.lugarId) ?? 'Sala').toUpperCase();
           const dentro = miLugar === c.lugarId;
           const dioAlgo = conHallazgo.has(c.lugarId);
+          const estuve = !dioAlgo && dondeEstuve.has(c.lugarId);
           const marcada = c.lugarId === profanada;
           const lineas = partirNombre(nombre);
           const tam = tamanoDeLetra(lineas, w - 30);
@@ -540,6 +572,21 @@ function PlanoDibujado({
                       fill={t.oro300}
                     />
                   ))}
+                </G>
+              )}
+
+              {/* Un anillo sin lacre: pasaste por aquí y no sacaste nada. */}
+              {estuve && (
+                <G>
+                  <Circle
+                    cx={x + w - 26}
+                    cy={y + 26}
+                    r={8}
+                    fill="none"
+                    stroke={t.oro400}
+                    strokeWidth={1.2}
+                    opacity={0.55}
+                  />
                 </G>
               )}
 
@@ -615,6 +662,7 @@ function PlanoAereo({
   imagenUrl,
   salas,
   miLugar,
+  dondeEstuve,
   conHallazgo,
   ancho,
   alPulsar,
@@ -705,7 +753,13 @@ function PlanoAereo({
                 style={[estilos.chinchetaCabeza, dentro && estilos.chinchetaDentro]}
               >
                 <Cuerpo style={{ fontSize: 13, color: t.tinta }}>
-                  {conHallazgo.has(sala.id) ? '✦' : sala.ocupantes > 0 ? String(sala.ocupantes) : '·'}
+                  {conHallazgo.has(sala.id)
+                    ? '✦'
+                    : sala.ocupantes > 0
+                      ? String(sala.ocupantes)
+                      : dondeEstuve.has(sala.id)
+                        ? '◦'
+                        : '·'}
                 </Cuerpo>
               </Pressable>
               <View style={estilos.chinchetaEtiqueta} pointerEvents="none">

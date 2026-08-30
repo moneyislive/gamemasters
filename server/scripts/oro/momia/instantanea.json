@@ -371,26 +371,60 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "q0",
-              "name": "Escarabeo de lapislázuli",
-              "description": "Una Escarabeo de lapislázuli."
+              "categoriaId": "reliquias",
+              "singular": "reliquia",
+              "plural": "reliquias",
+              "titulo": "Las reliquias",
+              "cosas": [
+                {
+                  "id": "q0",
+                  "name": "Escarabeo de lapislázuli",
+                  "description": "Una Escarabeo de lapislázuli."
+                },
+                {
+                  "id": "q1",
+                  "name": "Máscara funeraria",
+                  "description": "Una Máscara funeraria."
+                },
+                {
+                  "id": "q2",
+                  "name": "Vaso canopo",
+                  "description": "Una Vaso canopo."
+                }
+              ]
             },
             {
-              "id": "q1",
-              "name": "Máscara funeraria",
-              "description": "Una Máscara funeraria."
-            },
-            {
-              "id": "q2",
-              "name": "Vaso canopo",
-              "description": "Una Vaso canopo."
+              "categoriaId": "ritos",
+              "singular": "rito",
+              "plural": "ritos",
+              "titulo": "Los cinco ritos",
+              "cosas": [
+                {
+                  "id": "t0",
+                  "name": "Rito del Agua"
+                },
+                {
+                  "id": "t1",
+                  "name": "Rito del Aliento"
+                },
+                {
+                  "id": "t2",
+                  "name": "Rito del Nombre"
+                },
+                {
+                  "id": "t3",
+                  "name": "Rito de la Balanza"
+                },
+                {
+                  "id": "t4",
+                  "name": "Rito del Silencio"
+                }
+              ]
             }
           ],
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [],
           "cronica": [],
           "cronologia": [
             {
@@ -611,26 +645,60 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "q0",
-              "name": "Escarabeo de lapislázuli",
-              "description": "Una Escarabeo de lapislázuli."
+              "categoriaId": "reliquias",
+              "singular": "reliquia",
+              "plural": "reliquias",
+              "titulo": "Las reliquias",
+              "cosas": [
+                {
+                  "id": "q0",
+                  "name": "Escarabeo de lapislázuli",
+                  "description": "Una Escarabeo de lapislázuli."
+                },
+                {
+                  "id": "q1",
+                  "name": "Máscara funeraria",
+                  "description": "Una Máscara funeraria."
+                },
+                {
+                  "id": "q2",
+                  "name": "Vaso canopo",
+                  "description": "Una Vaso canopo."
+                }
+              ]
             },
             {
-              "id": "q1",
-              "name": "Máscara funeraria",
-              "description": "Una Máscara funeraria."
-            },
-            {
-              "id": "q2",
-              "name": "Vaso canopo",
-              "description": "Una Vaso canopo."
+              "categoriaId": "ritos",
+              "singular": "rito",
+              "plural": "ritos",
+              "titulo": "Los cinco ritos",
+              "cosas": [
+                {
+                  "id": "t0",
+                  "name": "Rito del Agua"
+                },
+                {
+                  "id": "t1",
+                  "name": "Rito del Aliento"
+                },
+                {
+                  "id": "t2",
+                  "name": "Rito del Nombre"
+                },
+                {
+                  "id": "t3",
+                  "name": "Rito de la Balanza"
+                },
+                {
+                  "id": "t4",
+                  "name": "Rito del Silencio"
+                }
+              ]
             }
           ],
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [],
           "cronica": [],
           "cronologia": [
             {
@@ -851,26 +919,60 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "q0",
-              "name": "Escarabeo de lapislázuli",
-              "description": "Una Escarabeo de lapislázuli."
+              "categoriaId": "reliquias",
+              "singular": "reliquia",
+              "plural": "reliquias",
+              "titulo": "Las reliquias",
+              "cosas": [
+                {
+                  "id": "q0",
+                  "name": "Escarabeo de lapislázuli",
+                  "description": "Una Escarabeo de lapislázuli."
+                },
+                {
+                  "id": "q1",
+                  "name": "Máscara funeraria",
+                  "description": "Una Máscara funeraria."
+                },
+                {
+                  "id": "q2",
+                  "name": "Vaso canopo",
+                  "description": "Una Vaso canopo."
+                }
+              ]
             },
             {
-              "id": "q1",
-              "name": "Máscara funeraria",
-              "description": "Una Máscara funeraria."
-            },
-            {
-              "id": "q2",
-              "name": "Vaso canopo",
-              "description": "Una Vaso canopo."
+              "categoriaId": "ritos",
+              "singular": "rito",
+              "plural": "ritos",
+              "titulo": "Los cinco ritos",
+              "cosas": [
+                {
+                  "id": "t0",
+                  "name": "Rito del Agua"
+                },
+                {
+                  "id": "t1",
+                  "name": "Rito del Aliento"
+                },
+                {
+                  "id": "t2",
+                  "name": "Rito del Nombre"
+                },
+                {
+                  "id": "t3",
+                  "name": "Rito de la Balanza"
+                },
+                {
+                  "id": "t4",
+                  "name": "Rito del Silencio"
+                }
+              ]
             }
           ],
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [],
           "cronica": [],
           "cronologia": [
             {
@@ -1113,26 +1215,60 @@
               "disponibles": 4
             }
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "q0",
-              "name": "Escarabeo de lapislázuli",
-              "description": "Una Escarabeo de lapislázuli."
+              "categoriaId": "reliquias",
+              "singular": "reliquia",
+              "plural": "reliquias",
+              "titulo": "Las reliquias",
+              "cosas": [
+                {
+                  "id": "q0",
+                  "name": "Escarabeo de lapislázuli",
+                  "description": "Una Escarabeo de lapislázuli."
+                },
+                {
+                  "id": "q1",
+                  "name": "Máscara funeraria",
+                  "description": "Una Máscara funeraria."
+                },
+                {
+                  "id": "q2",
+                  "name": "Vaso canopo",
+                  "description": "Una Vaso canopo."
+                }
+              ]
             },
             {
-              "id": "q1",
-              "name": "Máscara funeraria",
-              "description": "Una Máscara funeraria."
-            },
-            {
-              "id": "q2",
-              "name": "Vaso canopo",
-              "description": "Una Vaso canopo."
+              "categoriaId": "ritos",
+              "singular": "rito",
+              "plural": "ritos",
+              "titulo": "Los cinco ritos",
+              "cosas": [
+                {
+                  "id": "t0",
+                  "name": "Rito del Agua"
+                },
+                {
+                  "id": "t1",
+                  "name": "Rito del Aliento"
+                },
+                {
+                  "id": "t2",
+                  "name": "Rito del Nombre"
+                },
+                {
+                  "id": "t3",
+                  "name": "Rito de la Balanza"
+                },
+                {
+                  "id": "t4",
+                  "name": "Rito del Silencio"
+                }
+              ]
             }
           ],
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [],
           "cronica": [],
           "cronologia": [
             {
@@ -1562,26 +1698,60 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "q0",
-              "name": "Escarabeo de lapislázuli",
-              "description": "Una Escarabeo de lapislázuli."
+              "categoriaId": "reliquias",
+              "singular": "reliquia",
+              "plural": "reliquias",
+              "titulo": "Las reliquias",
+              "cosas": [
+                {
+                  "id": "q0",
+                  "name": "Escarabeo de lapislázuli",
+                  "description": "Una Escarabeo de lapislázuli."
+                },
+                {
+                  "id": "q1",
+                  "name": "Máscara funeraria",
+                  "description": "Una Máscara funeraria."
+                },
+                {
+                  "id": "q2",
+                  "name": "Vaso canopo",
+                  "description": "Una Vaso canopo."
+                }
+              ]
             },
             {
-              "id": "q1",
-              "name": "Máscara funeraria",
-              "description": "Una Máscara funeraria."
-            },
-            {
-              "id": "q2",
-              "name": "Vaso canopo",
-              "description": "Una Vaso canopo."
+              "categoriaId": "ritos",
+              "singular": "rito",
+              "plural": "ritos",
+              "titulo": "Los cinco ritos",
+              "cosas": [
+                {
+                  "id": "t0",
+                  "name": "Rito del Agua"
+                },
+                {
+                  "id": "t1",
+                  "name": "Rito del Aliento"
+                },
+                {
+                  "id": "t2",
+                  "name": "Rito del Nombre"
+                },
+                {
+                  "id": "t3",
+                  "name": "Rito de la Balanza"
+                },
+                {
+                  "id": "t4",
+                  "name": "Rito del Silencio"
+                }
+              ]
             }
           ],
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [],
           "cronica": [],
           "cronologia": [
             {
@@ -1802,26 +1972,60 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "q0",
-              "name": "Escarabeo de lapislázuli",
-              "description": "Una Escarabeo de lapislázuli."
+              "categoriaId": "reliquias",
+              "singular": "reliquia",
+              "plural": "reliquias",
+              "titulo": "Las reliquias",
+              "cosas": [
+                {
+                  "id": "q0",
+                  "name": "Escarabeo de lapislázuli",
+                  "description": "Una Escarabeo de lapislázuli."
+                },
+                {
+                  "id": "q1",
+                  "name": "Máscara funeraria",
+                  "description": "Una Máscara funeraria."
+                },
+                {
+                  "id": "q2",
+                  "name": "Vaso canopo",
+                  "description": "Una Vaso canopo."
+                }
+              ]
             },
             {
-              "id": "q1",
-              "name": "Máscara funeraria",
-              "description": "Una Máscara funeraria."
-            },
-            {
-              "id": "q2",
-              "name": "Vaso canopo",
-              "description": "Una Vaso canopo."
+              "categoriaId": "ritos",
+              "singular": "rito",
+              "plural": "ritos",
+              "titulo": "Los cinco ritos",
+              "cosas": [
+                {
+                  "id": "t0",
+                  "name": "Rito del Agua"
+                },
+                {
+                  "id": "t1",
+                  "name": "Rito del Aliento"
+                },
+                {
+                  "id": "t2",
+                  "name": "Rito del Nombre"
+                },
+                {
+                  "id": "t3",
+                  "name": "Rito de la Balanza"
+                },
+                {
+                  "id": "t4",
+                  "name": "Rito del Silencio"
+                }
+              ]
             }
           ],
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [],
           "cronica": [],
           "cronologia": [
             {
@@ -2042,26 +2246,60 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "q0",
-              "name": "Escarabeo de lapislázuli",
-              "description": "Una Escarabeo de lapislázuli."
+              "categoriaId": "reliquias",
+              "singular": "reliquia",
+              "plural": "reliquias",
+              "titulo": "Las reliquias",
+              "cosas": [
+                {
+                  "id": "q0",
+                  "name": "Escarabeo de lapislázuli",
+                  "description": "Una Escarabeo de lapislázuli."
+                },
+                {
+                  "id": "q1",
+                  "name": "Máscara funeraria",
+                  "description": "Una Máscara funeraria."
+                },
+                {
+                  "id": "q2",
+                  "name": "Vaso canopo",
+                  "description": "Una Vaso canopo."
+                }
+              ]
             },
             {
-              "id": "q1",
-              "name": "Máscara funeraria",
-              "description": "Una Máscara funeraria."
-            },
-            {
-              "id": "q2",
-              "name": "Vaso canopo",
-              "description": "Una Vaso canopo."
+              "categoriaId": "ritos",
+              "singular": "rito",
+              "plural": "ritos",
+              "titulo": "Los cinco ritos",
+              "cosas": [
+                {
+                  "id": "t0",
+                  "name": "Rito del Agua"
+                },
+                {
+                  "id": "t1",
+                  "name": "Rito del Aliento"
+                },
+                {
+                  "id": "t2",
+                  "name": "Rito del Nombre"
+                },
+                {
+                  "id": "t3",
+                  "name": "Rito de la Balanza"
+                },
+                {
+                  "id": "t4",
+                  "name": "Rito del Silencio"
+                }
+              ]
             }
           ],
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [],
           "cronica": [],
           "cronologia": [
             {
@@ -2304,26 +2542,60 @@
               "disponibles": 4
             }
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "q0",
-              "name": "Escarabeo de lapislázuli",
-              "description": "Una Escarabeo de lapislázuli."
+              "categoriaId": "reliquias",
+              "singular": "reliquia",
+              "plural": "reliquias",
+              "titulo": "Las reliquias",
+              "cosas": [
+                {
+                  "id": "q0",
+                  "name": "Escarabeo de lapislázuli",
+                  "description": "Una Escarabeo de lapislázuli."
+                },
+                {
+                  "id": "q1",
+                  "name": "Máscara funeraria",
+                  "description": "Una Máscara funeraria."
+                },
+                {
+                  "id": "q2",
+                  "name": "Vaso canopo",
+                  "description": "Una Vaso canopo."
+                }
+              ]
             },
             {
-              "id": "q1",
-              "name": "Máscara funeraria",
-              "description": "Una Máscara funeraria."
-            },
-            {
-              "id": "q2",
-              "name": "Vaso canopo",
-              "description": "Una Vaso canopo."
+              "categoriaId": "ritos",
+              "singular": "rito",
+              "plural": "ritos",
+              "titulo": "Los cinco ritos",
+              "cosas": [
+                {
+                  "id": "t0",
+                  "name": "Rito del Agua"
+                },
+                {
+                  "id": "t1",
+                  "name": "Rito del Aliento"
+                },
+                {
+                  "id": "t2",
+                  "name": "Rito del Nombre"
+                },
+                {
+                  "id": "t3",
+                  "name": "Rito de la Balanza"
+                },
+                {
+                  "id": "t4",
+                  "name": "Rito del Silencio"
+                }
+              ]
             }
           ],
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [],
           "cronica": [],
           "cronologia": [
             {
@@ -2868,26 +3140,60 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "q0",
-              "name": "Escarabeo de lapislázuli",
-              "description": "Una Escarabeo de lapislázuli."
+              "categoriaId": "reliquias",
+              "singular": "reliquia",
+              "plural": "reliquias",
+              "titulo": "Las reliquias",
+              "cosas": [
+                {
+                  "id": "q0",
+                  "name": "Escarabeo de lapislázuli",
+                  "description": "Una Escarabeo de lapislázuli."
+                },
+                {
+                  "id": "q1",
+                  "name": "Máscara funeraria",
+                  "description": "Una Máscara funeraria."
+                },
+                {
+                  "id": "q2",
+                  "name": "Vaso canopo",
+                  "description": "Una Vaso canopo."
+                }
+              ]
             },
             {
-              "id": "q1",
-              "name": "Máscara funeraria",
-              "description": "Una Máscara funeraria."
-            },
-            {
-              "id": "q2",
-              "name": "Vaso canopo",
-              "description": "Una Vaso canopo."
+              "categoriaId": "ritos",
+              "singular": "rito",
+              "plural": "ritos",
+              "titulo": "Los cinco ritos",
+              "cosas": [
+                {
+                  "id": "t0",
+                  "name": "Rito del Agua"
+                },
+                {
+                  "id": "t1",
+                  "name": "Rito del Aliento"
+                },
+                {
+                  "id": "t2",
+                  "name": "Rito del Nombre"
+                },
+                {
+                  "id": "t3",
+                  "name": "Rito de la Balanza"
+                },
+                {
+                  "id": "t4",
+                  "name": "Rito del Silencio"
+                }
+              ]
             }
           ],
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [],
           "cronica": [],
           "cronologia": [
             {
@@ -3213,26 +3519,60 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "q0",
-              "name": "Escarabeo de lapislázuli",
-              "description": "Una Escarabeo de lapislázuli."
+              "categoriaId": "reliquias",
+              "singular": "reliquia",
+              "plural": "reliquias",
+              "titulo": "Las reliquias",
+              "cosas": [
+                {
+                  "id": "q0",
+                  "name": "Escarabeo de lapislázuli",
+                  "description": "Una Escarabeo de lapislázuli."
+                },
+                {
+                  "id": "q1",
+                  "name": "Máscara funeraria",
+                  "description": "Una Máscara funeraria."
+                },
+                {
+                  "id": "q2",
+                  "name": "Vaso canopo",
+                  "description": "Una Vaso canopo."
+                }
+              ]
             },
             {
-              "id": "q1",
-              "name": "Máscara funeraria",
-              "description": "Una Máscara funeraria."
-            },
-            {
-              "id": "q2",
-              "name": "Vaso canopo",
-              "description": "Una Vaso canopo."
+              "categoriaId": "ritos",
+              "singular": "rito",
+              "plural": "ritos",
+              "titulo": "Los cinco ritos",
+              "cosas": [
+                {
+                  "id": "t0",
+                  "name": "Rito del Agua"
+                },
+                {
+                  "id": "t1",
+                  "name": "Rito del Aliento"
+                },
+                {
+                  "id": "t2",
+                  "name": "Rito del Nombre"
+                },
+                {
+                  "id": "t3",
+                  "name": "Rito de la Balanza"
+                },
+                {
+                  "id": "t4",
+                  "name": "Rito del Silencio"
+                }
+              ]
             }
           ],
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [],
           "cronica": [],
           "cronologia": [
             {
@@ -3558,26 +3898,60 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "q0",
-              "name": "Escarabeo de lapislázuli",
-              "description": "Una Escarabeo de lapislázuli."
+              "categoriaId": "reliquias",
+              "singular": "reliquia",
+              "plural": "reliquias",
+              "titulo": "Las reliquias",
+              "cosas": [
+                {
+                  "id": "q0",
+                  "name": "Escarabeo de lapislázuli",
+                  "description": "Una Escarabeo de lapislázuli."
+                },
+                {
+                  "id": "q1",
+                  "name": "Máscara funeraria",
+                  "description": "Una Máscara funeraria."
+                },
+                {
+                  "id": "q2",
+                  "name": "Vaso canopo",
+                  "description": "Una Vaso canopo."
+                }
+              ]
             },
             {
-              "id": "q1",
-              "name": "Máscara funeraria",
-              "description": "Una Máscara funeraria."
-            },
-            {
-              "id": "q2",
-              "name": "Vaso canopo",
-              "description": "Una Vaso canopo."
+              "categoriaId": "ritos",
+              "singular": "rito",
+              "plural": "ritos",
+              "titulo": "Los cinco ritos",
+              "cosas": [
+                {
+                  "id": "t0",
+                  "name": "Rito del Agua"
+                },
+                {
+                  "id": "t1",
+                  "name": "Rito del Aliento"
+                },
+                {
+                  "id": "t2",
+                  "name": "Rito del Nombre"
+                },
+                {
+                  "id": "t3",
+                  "name": "Rito de la Balanza"
+                },
+                {
+                  "id": "t4",
+                  "name": "Rito del Silencio"
+                }
+              ]
             }
           ],
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [],
           "cronica": [],
           "cronologia": [
             {
@@ -3925,26 +4299,60 @@
               "disponibles": 4
             }
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "q0",
-              "name": "Escarabeo de lapislázuli",
-              "description": "Una Escarabeo de lapislázuli."
+              "categoriaId": "reliquias",
+              "singular": "reliquia",
+              "plural": "reliquias",
+              "titulo": "Las reliquias",
+              "cosas": [
+                {
+                  "id": "q0",
+                  "name": "Escarabeo de lapislázuli",
+                  "description": "Una Escarabeo de lapislázuli."
+                },
+                {
+                  "id": "q1",
+                  "name": "Máscara funeraria",
+                  "description": "Una Máscara funeraria."
+                },
+                {
+                  "id": "q2",
+                  "name": "Vaso canopo",
+                  "description": "Una Vaso canopo."
+                }
+              ]
             },
             {
-              "id": "q1",
-              "name": "Máscara funeraria",
-              "description": "Una Máscara funeraria."
-            },
-            {
-              "id": "q2",
-              "name": "Vaso canopo",
-              "description": "Una Vaso canopo."
+              "categoriaId": "ritos",
+              "singular": "rito",
+              "plural": "ritos",
+              "titulo": "Los cinco ritos",
+              "cosas": [
+                {
+                  "id": "t0",
+                  "name": "Rito del Agua"
+                },
+                {
+                  "id": "t1",
+                  "name": "Rito del Aliento"
+                },
+                {
+                  "id": "t2",
+                  "name": "Rito del Nombre"
+                },
+                {
+                  "id": "t3",
+                  "name": "Rito de la Balanza"
+                },
+                {
+                  "id": "t4",
+                  "name": "Rito del Silencio"
+                }
+              ]
             }
           ],
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [],
           "cronica": [],
           "cronologia": [
             {
@@ -4478,27 +4886,66 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "q0",
-              "name": "Escarabeo de lapislázuli",
-              "description": "Una Escarabeo de lapislázuli."
+              "categoriaId": "reliquias",
+              "singular": "reliquia",
+              "plural": "reliquias",
+              "titulo": "Las reliquias",
+              "cosas": [
+                {
+                  "id": "q0",
+                  "name": "Escarabeo de lapislázuli",
+                  "description": "Una Escarabeo de lapislázuli."
+                },
+                {
+                  "id": "q1",
+                  "name": "Máscara funeraria",
+                  "description": "Una Máscara funeraria."
+                },
+                {
+                  "id": "q2",
+                  "name": "Vaso canopo",
+                  "description": "Una Vaso canopo."
+                }
+              ]
             },
             {
-              "id": "q1",
-              "name": "Máscara funeraria",
-              "description": "Una Máscara funeraria."
-            },
-            {
-              "id": "q2",
-              "name": "Vaso canopo",
-              "description": "Una Vaso canopo."
+              "categoriaId": "ritos",
+              "singular": "rito",
+              "plural": "ritos",
+              "titulo": "Los cinco ritos",
+              "cosas": [
+                {
+                  "id": "t0",
+                  "name": "Rito del Agua"
+                },
+                {
+                  "id": "t1",
+                  "name": "Rito del Aliento"
+                },
+                {
+                  "id": "t2",
+                  "name": "Rito del Nombre"
+                },
+                {
+                  "id": "t3",
+                  "name": "Rito de la Balanza"
+                },
+                {
+                  "id": "t4",
+                  "name": "Rito del Silencio"
+                }
+              ]
             }
           ],
           "miLugar": "c0",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "c0"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -4811,27 +5258,66 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "q0",
-              "name": "Escarabeo de lapislázuli",
-              "description": "Una Escarabeo de lapislázuli."
+              "categoriaId": "reliquias",
+              "singular": "reliquia",
+              "plural": "reliquias",
+              "titulo": "Las reliquias",
+              "cosas": [
+                {
+                  "id": "q0",
+                  "name": "Escarabeo de lapislázuli",
+                  "description": "Una Escarabeo de lapislázuli."
+                },
+                {
+                  "id": "q1",
+                  "name": "Máscara funeraria",
+                  "description": "Una Máscara funeraria."
+                },
+                {
+                  "id": "q2",
+                  "name": "Vaso canopo",
+                  "description": "Una Vaso canopo."
+                }
+              ]
             },
             {
-              "id": "q1",
-              "name": "Máscara funeraria",
-              "description": "Una Máscara funeraria."
-            },
-            {
-              "id": "q2",
-              "name": "Vaso canopo",
-              "description": "Una Vaso canopo."
+              "categoriaId": "ritos",
+              "singular": "rito",
+              "plural": "ritos",
+              "titulo": "Los cinco ritos",
+              "cosas": [
+                {
+                  "id": "t0",
+                  "name": "Rito del Agua"
+                },
+                {
+                  "id": "t1",
+                  "name": "Rito del Aliento"
+                },
+                {
+                  "id": "t2",
+                  "name": "Rito del Nombre"
+                },
+                {
+                  "id": "t3",
+                  "name": "Rito de la Balanza"
+                },
+                {
+                  "id": "t4",
+                  "name": "Rito del Silencio"
+                }
+              ]
             }
           ],
           "miLugar": "c2",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "c2"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -5134,27 +5620,66 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "q0",
-              "name": "Escarabeo de lapislázuli",
-              "description": "Una Escarabeo de lapislázuli."
+              "categoriaId": "reliquias",
+              "singular": "reliquia",
+              "plural": "reliquias",
+              "titulo": "Las reliquias",
+              "cosas": [
+                {
+                  "id": "q0",
+                  "name": "Escarabeo de lapislázuli",
+                  "description": "Una Escarabeo de lapislázuli."
+                },
+                {
+                  "id": "q1",
+                  "name": "Máscara funeraria",
+                  "description": "Una Máscara funeraria."
+                },
+                {
+                  "id": "q2",
+                  "name": "Vaso canopo",
+                  "description": "Una Vaso canopo."
+                }
+              ]
             },
             {
-              "id": "q1",
-              "name": "Máscara funeraria",
-              "description": "Una Máscara funeraria."
-            },
-            {
-              "id": "q2",
-              "name": "Vaso canopo",
-              "description": "Una Vaso canopo."
+              "categoriaId": "ritos",
+              "singular": "rito",
+              "plural": "ritos",
+              "titulo": "Los cinco ritos",
+              "cosas": [
+                {
+                  "id": "t0",
+                  "name": "Rito del Agua"
+                },
+                {
+                  "id": "t1",
+                  "name": "Rito del Aliento"
+                },
+                {
+                  "id": "t2",
+                  "name": "Rito del Nombre"
+                },
+                {
+                  "id": "t3",
+                  "name": "Rito de la Balanza"
+                },
+                {
+                  "id": "t4",
+                  "name": "Rito del Silencio"
+                }
+              ]
             }
           ],
           "miLugar": "c3",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "c3"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -5480,27 +6005,66 @@
               "disponibles": 4
             }
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "q0",
-              "name": "Escarabeo de lapislázuli",
-              "description": "Una Escarabeo de lapislázuli."
+              "categoriaId": "reliquias",
+              "singular": "reliquia",
+              "plural": "reliquias",
+              "titulo": "Las reliquias",
+              "cosas": [
+                {
+                  "id": "q0",
+                  "name": "Escarabeo de lapislázuli",
+                  "description": "Una Escarabeo de lapislázuli."
+                },
+                {
+                  "id": "q1",
+                  "name": "Máscara funeraria",
+                  "description": "Una Máscara funeraria."
+                },
+                {
+                  "id": "q2",
+                  "name": "Vaso canopo",
+                  "description": "Una Vaso canopo."
+                }
+              ]
             },
             {
-              "id": "q1",
-              "name": "Máscara funeraria",
-              "description": "Una Máscara funeraria."
-            },
-            {
-              "id": "q2",
-              "name": "Vaso canopo",
-              "description": "Una Vaso canopo."
+              "categoriaId": "ritos",
+              "singular": "rito",
+              "plural": "ritos",
+              "titulo": "Los cinco ritos",
+              "cosas": [
+                {
+                  "id": "t0",
+                  "name": "Rito del Agua"
+                },
+                {
+                  "id": "t1",
+                  "name": "Rito del Aliento"
+                },
+                {
+                  "id": "t2",
+                  "name": "Rito del Nombre"
+                },
+                {
+                  "id": "t3",
+                  "name": "Rito de la Balanza"
+                },
+                {
+                  "id": "t4",
+                  "name": "Rito del Silencio"
+                }
+              ]
             }
           ],
           "miLugar": "c4",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "c4"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -6281,27 +6845,66 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "q0",
-              "name": "Escarabeo de lapislázuli",
-              "description": "Una Escarabeo de lapislázuli."
+              "categoriaId": "reliquias",
+              "singular": "reliquia",
+              "plural": "reliquias",
+              "titulo": "Las reliquias",
+              "cosas": [
+                {
+                  "id": "q0",
+                  "name": "Escarabeo de lapislázuli",
+                  "description": "Una Escarabeo de lapislázuli."
+                },
+                {
+                  "id": "q1",
+                  "name": "Máscara funeraria",
+                  "description": "Una Máscara funeraria."
+                },
+                {
+                  "id": "q2",
+                  "name": "Vaso canopo",
+                  "description": "Una Vaso canopo."
+                }
+              ]
             },
             {
-              "id": "q1",
-              "name": "Máscara funeraria",
-              "description": "Una Máscara funeraria."
-            },
-            {
-              "id": "q2",
-              "name": "Vaso canopo",
-              "description": "Una Vaso canopo."
+              "categoriaId": "ritos",
+              "singular": "rito",
+              "plural": "ritos",
+              "titulo": "Los cinco ritos",
+              "cosas": [
+                {
+                  "id": "t0",
+                  "name": "Rito del Agua"
+                },
+                {
+                  "id": "t1",
+                  "name": "Rito del Aliento"
+                },
+                {
+                  "id": "t2",
+                  "name": "Rito del Nombre"
+                },
+                {
+                  "id": "t3",
+                  "name": "Rito de la Balanza"
+                },
+                {
+                  "id": "t4",
+                  "name": "Rito del Silencio"
+                }
+              ]
             }
           ],
           "miLugar": "c0",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "c0"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -6610,27 +7213,66 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "q0",
-              "name": "Escarabeo de lapislázuli",
-              "description": "Una Escarabeo de lapislázuli."
+              "categoriaId": "reliquias",
+              "singular": "reliquia",
+              "plural": "reliquias",
+              "titulo": "Las reliquias",
+              "cosas": [
+                {
+                  "id": "q0",
+                  "name": "Escarabeo de lapislázuli",
+                  "description": "Una Escarabeo de lapislázuli."
+                },
+                {
+                  "id": "q1",
+                  "name": "Máscara funeraria",
+                  "description": "Una Máscara funeraria."
+                },
+                {
+                  "id": "q2",
+                  "name": "Vaso canopo",
+                  "description": "Una Vaso canopo."
+                }
+              ]
             },
             {
-              "id": "q1",
-              "name": "Máscara funeraria",
-              "description": "Una Máscara funeraria."
-            },
-            {
-              "id": "q2",
-              "name": "Vaso canopo",
-              "description": "Una Vaso canopo."
+              "categoriaId": "ritos",
+              "singular": "rito",
+              "plural": "ritos",
+              "titulo": "Los cinco ritos",
+              "cosas": [
+                {
+                  "id": "t0",
+                  "name": "Rito del Agua"
+                },
+                {
+                  "id": "t1",
+                  "name": "Rito del Aliento"
+                },
+                {
+                  "id": "t2",
+                  "name": "Rito del Nombre"
+                },
+                {
+                  "id": "t3",
+                  "name": "Rito de la Balanza"
+                },
+                {
+                  "id": "t4",
+                  "name": "Rito del Silencio"
+                }
+              ]
             }
           ],
           "miLugar": "c2",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "c2"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -6929,27 +7571,66 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "q0",
-              "name": "Escarabeo de lapislázuli",
-              "description": "Una Escarabeo de lapislázuli."
+              "categoriaId": "reliquias",
+              "singular": "reliquia",
+              "plural": "reliquias",
+              "titulo": "Las reliquias",
+              "cosas": [
+                {
+                  "id": "q0",
+                  "name": "Escarabeo de lapislázuli",
+                  "description": "Una Escarabeo de lapislázuli."
+                },
+                {
+                  "id": "q1",
+                  "name": "Máscara funeraria",
+                  "description": "Una Máscara funeraria."
+                },
+                {
+                  "id": "q2",
+                  "name": "Vaso canopo",
+                  "description": "Una Vaso canopo."
+                }
+              ]
             },
             {
-              "id": "q1",
-              "name": "Máscara funeraria",
-              "description": "Una Máscara funeraria."
-            },
-            {
-              "id": "q2",
-              "name": "Vaso canopo",
-              "description": "Una Vaso canopo."
+              "categoriaId": "ritos",
+              "singular": "rito",
+              "plural": "ritos",
+              "titulo": "Los cinco ritos",
+              "cosas": [
+                {
+                  "id": "t0",
+                  "name": "Rito del Agua"
+                },
+                {
+                  "id": "t1",
+                  "name": "Rito del Aliento"
+                },
+                {
+                  "id": "t2",
+                  "name": "Rito del Nombre"
+                },
+                {
+                  "id": "t3",
+                  "name": "Rito de la Balanza"
+                },
+                {
+                  "id": "t4",
+                  "name": "Rito del Silencio"
+                }
+              ]
             }
           ],
           "miLugar": "c3",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "c3"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -7271,27 +7952,66 @@
               "disponibles": 4
             }
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "q0",
-              "name": "Escarabeo de lapislázuli",
-              "description": "Una Escarabeo de lapislázuli."
+              "categoriaId": "reliquias",
+              "singular": "reliquia",
+              "plural": "reliquias",
+              "titulo": "Las reliquias",
+              "cosas": [
+                {
+                  "id": "q0",
+                  "name": "Escarabeo de lapislázuli",
+                  "description": "Una Escarabeo de lapislázuli."
+                },
+                {
+                  "id": "q1",
+                  "name": "Máscara funeraria",
+                  "description": "Una Máscara funeraria."
+                },
+                {
+                  "id": "q2",
+                  "name": "Vaso canopo",
+                  "description": "Una Vaso canopo."
+                }
+              ]
             },
             {
-              "id": "q1",
-              "name": "Máscara funeraria",
-              "description": "Una Máscara funeraria."
-            },
-            {
-              "id": "q2",
-              "name": "Vaso canopo",
-              "description": "Una Vaso canopo."
+              "categoriaId": "ritos",
+              "singular": "rito",
+              "plural": "ritos",
+              "titulo": "Los cinco ritos",
+              "cosas": [
+                {
+                  "id": "t0",
+                  "name": "Rito del Agua"
+                },
+                {
+                  "id": "t1",
+                  "name": "Rito del Aliento"
+                },
+                {
+                  "id": "t2",
+                  "name": "Rito del Nombre"
+                },
+                {
+                  "id": "t3",
+                  "name": "Rito de la Balanza"
+                },
+                {
+                  "id": "t4",
+                  "name": "Rito del Silencio"
+                }
+              ]
             }
           ],
           "miLugar": "c4",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "c4"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -8007,26 +8727,65 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "q0",
-              "name": "Escarabeo de lapislázuli",
-              "description": "Una Escarabeo de lapislázuli."
+              "categoriaId": "reliquias",
+              "singular": "reliquia",
+              "plural": "reliquias",
+              "titulo": "Las reliquias",
+              "cosas": [
+                {
+                  "id": "q0",
+                  "name": "Escarabeo de lapislázuli",
+                  "description": "Una Escarabeo de lapislázuli."
+                },
+                {
+                  "id": "q1",
+                  "name": "Máscara funeraria",
+                  "description": "Una Máscara funeraria."
+                },
+                {
+                  "id": "q2",
+                  "name": "Vaso canopo",
+                  "description": "Una Vaso canopo."
+                }
+              ]
             },
             {
-              "id": "q1",
-              "name": "Máscara funeraria",
-              "description": "Una Máscara funeraria."
-            },
-            {
-              "id": "q2",
-              "name": "Vaso canopo",
-              "description": "Una Vaso canopo."
+              "categoriaId": "ritos",
+              "singular": "rito",
+              "plural": "ritos",
+              "titulo": "Los cinco ritos",
+              "cosas": [
+                {
+                  "id": "t0",
+                  "name": "Rito del Agua"
+                },
+                {
+                  "id": "t1",
+                  "name": "Rito del Aliento"
+                },
+                {
+                  "id": "t2",
+                  "name": "Rito del Nombre"
+                },
+                {
+                  "id": "t3",
+                  "name": "Rito de la Balanza"
+                },
+                {
+                  "id": "t4",
+                  "name": "Rito del Silencio"
+                }
+              ]
             }
           ],
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "c0"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -8375,26 +9134,65 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "q0",
-              "name": "Escarabeo de lapislázuli",
-              "description": "Una Escarabeo de lapislázuli."
+              "categoriaId": "reliquias",
+              "singular": "reliquia",
+              "plural": "reliquias",
+              "titulo": "Las reliquias",
+              "cosas": [
+                {
+                  "id": "q0",
+                  "name": "Escarabeo de lapislázuli",
+                  "description": "Una Escarabeo de lapislázuli."
+                },
+                {
+                  "id": "q1",
+                  "name": "Máscara funeraria",
+                  "description": "Una Máscara funeraria."
+                },
+                {
+                  "id": "q2",
+                  "name": "Vaso canopo",
+                  "description": "Una Vaso canopo."
+                }
+              ]
             },
             {
-              "id": "q1",
-              "name": "Máscara funeraria",
-              "description": "Una Máscara funeraria."
-            },
-            {
-              "id": "q2",
-              "name": "Vaso canopo",
-              "description": "Una Vaso canopo."
+              "categoriaId": "ritos",
+              "singular": "rito",
+              "plural": "ritos",
+              "titulo": "Los cinco ritos",
+              "cosas": [
+                {
+                  "id": "t0",
+                  "name": "Rito del Agua"
+                },
+                {
+                  "id": "t1",
+                  "name": "Rito del Aliento"
+                },
+                {
+                  "id": "t2",
+                  "name": "Rito del Nombre"
+                },
+                {
+                  "id": "t3",
+                  "name": "Rito de la Balanza"
+                },
+                {
+                  "id": "t4",
+                  "name": "Rito del Silencio"
+                }
+              ]
             }
           ],
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "c2"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -8733,26 +9531,65 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "q0",
-              "name": "Escarabeo de lapislázuli",
-              "description": "Una Escarabeo de lapislázuli."
+              "categoriaId": "reliquias",
+              "singular": "reliquia",
+              "plural": "reliquias",
+              "titulo": "Las reliquias",
+              "cosas": [
+                {
+                  "id": "q0",
+                  "name": "Escarabeo de lapislázuli",
+                  "description": "Una Escarabeo de lapislázuli."
+                },
+                {
+                  "id": "q1",
+                  "name": "Máscara funeraria",
+                  "description": "Una Máscara funeraria."
+                },
+                {
+                  "id": "q2",
+                  "name": "Vaso canopo",
+                  "description": "Una Vaso canopo."
+                }
+              ]
             },
             {
-              "id": "q1",
-              "name": "Máscara funeraria",
-              "description": "Una Máscara funeraria."
-            },
-            {
-              "id": "q2",
-              "name": "Vaso canopo",
-              "description": "Una Vaso canopo."
+              "categoriaId": "ritos",
+              "singular": "rito",
+              "plural": "ritos",
+              "titulo": "Los cinco ritos",
+              "cosas": [
+                {
+                  "id": "t0",
+                  "name": "Rito del Agua"
+                },
+                {
+                  "id": "t1",
+                  "name": "Rito del Aliento"
+                },
+                {
+                  "id": "t2",
+                  "name": "Rito del Nombre"
+                },
+                {
+                  "id": "t3",
+                  "name": "Rito de la Balanza"
+                },
+                {
+                  "id": "t4",
+                  "name": "Rito del Silencio"
+                }
+              ]
             }
           ],
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "c3"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -9114,26 +9951,65 @@
               "disponibles": 4
             }
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "q0",
-              "name": "Escarabeo de lapislázuli",
-              "description": "Una Escarabeo de lapislázuli."
+              "categoriaId": "reliquias",
+              "singular": "reliquia",
+              "plural": "reliquias",
+              "titulo": "Las reliquias",
+              "cosas": [
+                {
+                  "id": "q0",
+                  "name": "Escarabeo de lapislázuli",
+                  "description": "Una Escarabeo de lapislázuli."
+                },
+                {
+                  "id": "q1",
+                  "name": "Máscara funeraria",
+                  "description": "Una Máscara funeraria."
+                },
+                {
+                  "id": "q2",
+                  "name": "Vaso canopo",
+                  "description": "Una Vaso canopo."
+                }
+              ]
             },
             {
-              "id": "q1",
-              "name": "Máscara funeraria",
-              "description": "Una Máscara funeraria."
-            },
-            {
-              "id": "q2",
-              "name": "Vaso canopo",
-              "description": "Una Vaso canopo."
+              "categoriaId": "ritos",
+              "singular": "rito",
+              "plural": "ritos",
+              "titulo": "Los cinco ritos",
+              "cosas": [
+                {
+                  "id": "t0",
+                  "name": "Rito del Agua"
+                },
+                {
+                  "id": "t1",
+                  "name": "Rito del Aliento"
+                },
+                {
+                  "id": "t2",
+                  "name": "Rito del Nombre"
+                },
+                {
+                  "id": "t3",
+                  "name": "Rito de la Balanza"
+                },
+                {
+                  "id": "t4",
+                  "name": "Rito del Silencio"
+                }
+              ]
             }
           ],
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "c4"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -9802,27 +10678,70 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "q0",
-              "name": "Escarabeo de lapislázuli",
-              "description": "Una Escarabeo de lapislázuli."
+              "categoriaId": "reliquias",
+              "singular": "reliquia",
+              "plural": "reliquias",
+              "titulo": "Las reliquias",
+              "cosas": [
+                {
+                  "id": "q0",
+                  "name": "Escarabeo de lapislázuli",
+                  "description": "Una Escarabeo de lapislázuli."
+                },
+                {
+                  "id": "q1",
+                  "name": "Máscara funeraria",
+                  "description": "Una Máscara funeraria."
+                },
+                {
+                  "id": "q2",
+                  "name": "Vaso canopo",
+                  "description": "Una Vaso canopo."
+                }
+              ]
             },
             {
-              "id": "q1",
-              "name": "Máscara funeraria",
-              "description": "Una Máscara funeraria."
-            },
-            {
-              "id": "q2",
-              "name": "Vaso canopo",
-              "description": "Una Vaso canopo."
+              "categoriaId": "ritos",
+              "singular": "rito",
+              "plural": "ritos",
+              "titulo": "Los cinco ritos",
+              "cosas": [
+                {
+                  "id": "t0",
+                  "name": "Rito del Agua"
+                },
+                {
+                  "id": "t1",
+                  "name": "Rito del Aliento"
+                },
+                {
+                  "id": "t2",
+                  "name": "Rito del Nombre"
+                },
+                {
+                  "id": "t3",
+                  "name": "Rito de la Balanza"
+                },
+                {
+                  "id": "t4",
+                  "name": "Rito del Silencio"
+                }
+              ]
             }
           ],
           "miLugar": "c0",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "c0"
+            },
+            {
+              "round": 2,
+              "lugarId": "c0"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -10147,27 +11066,70 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "q0",
-              "name": "Escarabeo de lapislázuli",
-              "description": "Una Escarabeo de lapislázuli."
+              "categoriaId": "reliquias",
+              "singular": "reliquia",
+              "plural": "reliquias",
+              "titulo": "Las reliquias",
+              "cosas": [
+                {
+                  "id": "q0",
+                  "name": "Escarabeo de lapislázuli",
+                  "description": "Una Escarabeo de lapislázuli."
+                },
+                {
+                  "id": "q1",
+                  "name": "Máscara funeraria",
+                  "description": "Una Máscara funeraria."
+                },
+                {
+                  "id": "q2",
+                  "name": "Vaso canopo",
+                  "description": "Una Vaso canopo."
+                }
+              ]
             },
             {
-              "id": "q1",
-              "name": "Máscara funeraria",
-              "description": "Una Máscara funeraria."
-            },
-            {
-              "id": "q2",
-              "name": "Vaso canopo",
-              "description": "Una Vaso canopo."
+              "categoriaId": "ritos",
+              "singular": "rito",
+              "plural": "ritos",
+              "titulo": "Los cinco ritos",
+              "cosas": [
+                {
+                  "id": "t0",
+                  "name": "Rito del Agua"
+                },
+                {
+                  "id": "t1",
+                  "name": "Rito del Aliento"
+                },
+                {
+                  "id": "t2",
+                  "name": "Rito del Nombre"
+                },
+                {
+                  "id": "t3",
+                  "name": "Rito de la Balanza"
+                },
+                {
+                  "id": "t4",
+                  "name": "Rito del Silencio"
+                }
+              ]
             }
           ],
           "miLugar": "c3",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "c2"
+            },
+            {
+              "round": 2,
+              "lugarId": "c3"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -10472,27 +11434,70 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "q0",
-              "name": "Escarabeo de lapislázuli",
-              "description": "Una Escarabeo de lapislázuli."
+              "categoriaId": "reliquias",
+              "singular": "reliquia",
+              "plural": "reliquias",
+              "titulo": "Las reliquias",
+              "cosas": [
+                {
+                  "id": "q0",
+                  "name": "Escarabeo de lapislázuli",
+                  "description": "Una Escarabeo de lapislázuli."
+                },
+                {
+                  "id": "q1",
+                  "name": "Máscara funeraria",
+                  "description": "Una Máscara funeraria."
+                },
+                {
+                  "id": "q2",
+                  "name": "Vaso canopo",
+                  "description": "Una Vaso canopo."
+                }
+              ]
             },
             {
-              "id": "q1",
-              "name": "Máscara funeraria",
-              "description": "Una Máscara funeraria."
-            },
-            {
-              "id": "q2",
-              "name": "Vaso canopo",
-              "description": "Una Vaso canopo."
+              "categoriaId": "ritos",
+              "singular": "rito",
+              "plural": "ritos",
+              "titulo": "Los cinco ritos",
+              "cosas": [
+                {
+                  "id": "t0",
+                  "name": "Rito del Agua"
+                },
+                {
+                  "id": "t1",
+                  "name": "Rito del Aliento"
+                },
+                {
+                  "id": "t2",
+                  "name": "Rito del Nombre"
+                },
+                {
+                  "id": "t3",
+                  "name": "Rito de la Balanza"
+                },
+                {
+                  "id": "t4",
+                  "name": "Rito del Silencio"
+                }
+              ]
             }
           ],
           "miLugar": "c4",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "c3"
+            },
+            {
+              "round": 2,
+              "lugarId": "c4"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -10830,27 +11835,70 @@
               "disponibles": 4
             }
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "q0",
-              "name": "Escarabeo de lapislázuli",
-              "description": "Una Escarabeo de lapislázuli."
+              "categoriaId": "reliquias",
+              "singular": "reliquia",
+              "plural": "reliquias",
+              "titulo": "Las reliquias",
+              "cosas": [
+                {
+                  "id": "q0",
+                  "name": "Escarabeo de lapislázuli",
+                  "description": "Una Escarabeo de lapislázuli."
+                },
+                {
+                  "id": "q1",
+                  "name": "Máscara funeraria",
+                  "description": "Una Máscara funeraria."
+                },
+                {
+                  "id": "q2",
+                  "name": "Vaso canopo",
+                  "description": "Una Vaso canopo."
+                }
+              ]
             },
             {
-              "id": "q1",
-              "name": "Máscara funeraria",
-              "description": "Una Máscara funeraria."
-            },
-            {
-              "id": "q2",
-              "name": "Vaso canopo",
-              "description": "Una Vaso canopo."
+              "categoriaId": "ritos",
+              "singular": "rito",
+              "plural": "ritos",
+              "titulo": "Los cinco ritos",
+              "cosas": [
+                {
+                  "id": "t0",
+                  "name": "Rito del Agua"
+                },
+                {
+                  "id": "t1",
+                  "name": "Rito del Aliento"
+                },
+                {
+                  "id": "t2",
+                  "name": "Rito del Nombre"
+                },
+                {
+                  "id": "t3",
+                  "name": "Rito de la Balanza"
+                },
+                {
+                  "id": "t4",
+                  "name": "Rito del Silencio"
+                }
+              ]
             }
           ],
           "miLugar": "c0",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "c4"
+            },
+            {
+              "round": 2,
+              "lugarId": "c0"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -11726,27 +12774,70 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "q0",
-              "name": "Escarabeo de lapislázuli",
-              "description": "Una Escarabeo de lapislázuli."
+              "categoriaId": "reliquias",
+              "singular": "reliquia",
+              "plural": "reliquias",
+              "titulo": "Las reliquias",
+              "cosas": [
+                {
+                  "id": "q0",
+                  "name": "Escarabeo de lapislázuli",
+                  "description": "Una Escarabeo de lapislázuli."
+                },
+                {
+                  "id": "q1",
+                  "name": "Máscara funeraria",
+                  "description": "Una Máscara funeraria."
+                },
+                {
+                  "id": "q2",
+                  "name": "Vaso canopo",
+                  "description": "Una Vaso canopo."
+                }
+              ]
             },
             {
-              "id": "q1",
-              "name": "Máscara funeraria",
-              "description": "Una Máscara funeraria."
-            },
-            {
-              "id": "q2",
-              "name": "Vaso canopo",
-              "description": "Una Vaso canopo."
+              "categoriaId": "ritos",
+              "singular": "rito",
+              "plural": "ritos",
+              "titulo": "Los cinco ritos",
+              "cosas": [
+                {
+                  "id": "t0",
+                  "name": "Rito del Agua"
+                },
+                {
+                  "id": "t1",
+                  "name": "Rito del Aliento"
+                },
+                {
+                  "id": "t2",
+                  "name": "Rito del Nombre"
+                },
+                {
+                  "id": "t3",
+                  "name": "Rito de la Balanza"
+                },
+                {
+                  "id": "t4",
+                  "name": "Rito del Silencio"
+                }
+              ]
             }
           ],
           "miLugar": "c0",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "c0"
+            },
+            {
+              "round": 2,
+              "lugarId": "c0"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -12067,27 +13158,70 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "q0",
-              "name": "Escarabeo de lapislázuli",
-              "description": "Una Escarabeo de lapislázuli."
+              "categoriaId": "reliquias",
+              "singular": "reliquia",
+              "plural": "reliquias",
+              "titulo": "Las reliquias",
+              "cosas": [
+                {
+                  "id": "q0",
+                  "name": "Escarabeo de lapislázuli",
+                  "description": "Una Escarabeo de lapislázuli."
+                },
+                {
+                  "id": "q1",
+                  "name": "Máscara funeraria",
+                  "description": "Una Máscara funeraria."
+                },
+                {
+                  "id": "q2",
+                  "name": "Vaso canopo",
+                  "description": "Una Vaso canopo."
+                }
+              ]
             },
             {
-              "id": "q1",
-              "name": "Máscara funeraria",
-              "description": "Una Máscara funeraria."
-            },
-            {
-              "id": "q2",
-              "name": "Vaso canopo",
-              "description": "Una Vaso canopo."
+              "categoriaId": "ritos",
+              "singular": "rito",
+              "plural": "ritos",
+              "titulo": "Los cinco ritos",
+              "cosas": [
+                {
+                  "id": "t0",
+                  "name": "Rito del Agua"
+                },
+                {
+                  "id": "t1",
+                  "name": "Rito del Aliento"
+                },
+                {
+                  "id": "t2",
+                  "name": "Rito del Nombre"
+                },
+                {
+                  "id": "t3",
+                  "name": "Rito de la Balanza"
+                },
+                {
+                  "id": "t4",
+                  "name": "Rito del Silencio"
+                }
+              ]
             }
           ],
           "miLugar": "c3",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "c2"
+            },
+            {
+              "round": 2,
+              "lugarId": "c3"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -12388,27 +13522,70 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "q0",
-              "name": "Escarabeo de lapislázuli",
-              "description": "Una Escarabeo de lapislázuli."
+              "categoriaId": "reliquias",
+              "singular": "reliquia",
+              "plural": "reliquias",
+              "titulo": "Las reliquias",
+              "cosas": [
+                {
+                  "id": "q0",
+                  "name": "Escarabeo de lapislázuli",
+                  "description": "Una Escarabeo de lapislázuli."
+                },
+                {
+                  "id": "q1",
+                  "name": "Máscara funeraria",
+                  "description": "Una Máscara funeraria."
+                },
+                {
+                  "id": "q2",
+                  "name": "Vaso canopo",
+                  "description": "Una Vaso canopo."
+                }
+              ]
             },
             {
-              "id": "q1",
-              "name": "Máscara funeraria",
-              "description": "Una Máscara funeraria."
-            },
-            {
-              "id": "q2",
-              "name": "Vaso canopo",
-              "description": "Una Vaso canopo."
+              "categoriaId": "ritos",
+              "singular": "rito",
+              "plural": "ritos",
+              "titulo": "Los cinco ritos",
+              "cosas": [
+                {
+                  "id": "t0",
+                  "name": "Rito del Agua"
+                },
+                {
+                  "id": "t1",
+                  "name": "Rito del Aliento"
+                },
+                {
+                  "id": "t2",
+                  "name": "Rito del Nombre"
+                },
+                {
+                  "id": "t3",
+                  "name": "Rito de la Balanza"
+                },
+                {
+                  "id": "t4",
+                  "name": "Rito del Silencio"
+                }
+              ]
             }
           ],
           "miLugar": "c4",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "c3"
+            },
+            {
+              "round": 2,
+              "lugarId": "c4"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -12742,27 +13919,70 @@
               "disponibles": 4
             }
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "q0",
-              "name": "Escarabeo de lapislázuli",
-              "description": "Una Escarabeo de lapislázuli."
+              "categoriaId": "reliquias",
+              "singular": "reliquia",
+              "plural": "reliquias",
+              "titulo": "Las reliquias",
+              "cosas": [
+                {
+                  "id": "q0",
+                  "name": "Escarabeo de lapislázuli",
+                  "description": "Una Escarabeo de lapislázuli."
+                },
+                {
+                  "id": "q1",
+                  "name": "Máscara funeraria",
+                  "description": "Una Máscara funeraria."
+                },
+                {
+                  "id": "q2",
+                  "name": "Vaso canopo",
+                  "description": "Una Vaso canopo."
+                }
+              ]
             },
             {
-              "id": "q1",
-              "name": "Máscara funeraria",
-              "description": "Una Máscara funeraria."
-            },
-            {
-              "id": "q2",
-              "name": "Vaso canopo",
-              "description": "Una Vaso canopo."
+              "categoriaId": "ritos",
+              "singular": "rito",
+              "plural": "ritos",
+              "titulo": "Los cinco ritos",
+              "cosas": [
+                {
+                  "id": "t0",
+                  "name": "Rito del Agua"
+                },
+                {
+                  "id": "t1",
+                  "name": "Rito del Aliento"
+                },
+                {
+                  "id": "t2",
+                  "name": "Rito del Nombre"
+                },
+                {
+                  "id": "t3",
+                  "name": "Rito de la Balanza"
+                },
+                {
+                  "id": "t4",
+                  "name": "Rito del Silencio"
+                }
+              ]
             }
           ],
           "miLugar": "c0",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "c4"
+            },
+            {
+              "round": 2,
+              "lugarId": "c0"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -13580,26 +14800,69 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "q0",
-              "name": "Escarabeo de lapislázuli",
-              "description": "Una Escarabeo de lapislázuli."
+              "categoriaId": "reliquias",
+              "singular": "reliquia",
+              "plural": "reliquias",
+              "titulo": "Las reliquias",
+              "cosas": [
+                {
+                  "id": "q0",
+                  "name": "Escarabeo de lapislázuli",
+                  "description": "Una Escarabeo de lapislázuli."
+                },
+                {
+                  "id": "q1",
+                  "name": "Máscara funeraria",
+                  "description": "Una Máscara funeraria."
+                },
+                {
+                  "id": "q2",
+                  "name": "Vaso canopo",
+                  "description": "Una Vaso canopo."
+                }
+              ]
             },
             {
-              "id": "q1",
-              "name": "Máscara funeraria",
-              "description": "Una Máscara funeraria."
-            },
-            {
-              "id": "q2",
-              "name": "Vaso canopo",
-              "description": "Una Vaso canopo."
+              "categoriaId": "ritos",
+              "singular": "rito",
+              "plural": "ritos",
+              "titulo": "Los cinco ritos",
+              "cosas": [
+                {
+                  "id": "t0",
+                  "name": "Rito del Agua"
+                },
+                {
+                  "id": "t1",
+                  "name": "Rito del Aliento"
+                },
+                {
+                  "id": "t2",
+                  "name": "Rito del Nombre"
+                },
+                {
+                  "id": "t3",
+                  "name": "Rito de la Balanza"
+                },
+                {
+                  "id": "t4",
+                  "name": "Rito del Silencio"
+                }
+              ]
             }
           ],
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "c0"
+            },
+            {
+              "round": 2,
+              "lugarId": "c0"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -13959,26 +15222,69 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "q0",
-              "name": "Escarabeo de lapislázuli",
-              "description": "Una Escarabeo de lapislázuli."
+              "categoriaId": "reliquias",
+              "singular": "reliquia",
+              "plural": "reliquias",
+              "titulo": "Las reliquias",
+              "cosas": [
+                {
+                  "id": "q0",
+                  "name": "Escarabeo de lapislázuli",
+                  "description": "Una Escarabeo de lapislázuli."
+                },
+                {
+                  "id": "q1",
+                  "name": "Máscara funeraria",
+                  "description": "Una Máscara funeraria."
+                },
+                {
+                  "id": "q2",
+                  "name": "Vaso canopo",
+                  "description": "Una Vaso canopo."
+                }
+              ]
             },
             {
-              "id": "q1",
-              "name": "Máscara funeraria",
-              "description": "Una Máscara funeraria."
-            },
-            {
-              "id": "q2",
-              "name": "Vaso canopo",
-              "description": "Una Vaso canopo."
+              "categoriaId": "ritos",
+              "singular": "rito",
+              "plural": "ritos",
+              "titulo": "Los cinco ritos",
+              "cosas": [
+                {
+                  "id": "t0",
+                  "name": "Rito del Agua"
+                },
+                {
+                  "id": "t1",
+                  "name": "Rito del Aliento"
+                },
+                {
+                  "id": "t2",
+                  "name": "Rito del Nombre"
+                },
+                {
+                  "id": "t3",
+                  "name": "Rito de la Balanza"
+                },
+                {
+                  "id": "t4",
+                  "name": "Rito del Silencio"
+                }
+              ]
             }
           ],
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "c2"
+            },
+            {
+              "round": 2,
+              "lugarId": "c3"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -14318,26 +15624,69 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "q0",
-              "name": "Escarabeo de lapislázuli",
-              "description": "Una Escarabeo de lapislázuli."
+              "categoriaId": "reliquias",
+              "singular": "reliquia",
+              "plural": "reliquias",
+              "titulo": "Las reliquias",
+              "cosas": [
+                {
+                  "id": "q0",
+                  "name": "Escarabeo de lapislázuli",
+                  "description": "Una Escarabeo de lapislázuli."
+                },
+                {
+                  "id": "q1",
+                  "name": "Máscara funeraria",
+                  "description": "Una Máscara funeraria."
+                },
+                {
+                  "id": "q2",
+                  "name": "Vaso canopo",
+                  "description": "Una Vaso canopo."
+                }
+              ]
             },
             {
-              "id": "q1",
-              "name": "Máscara funeraria",
-              "description": "Una Máscara funeraria."
-            },
-            {
-              "id": "q2",
-              "name": "Vaso canopo",
-              "description": "Una Vaso canopo."
+              "categoriaId": "ritos",
+              "singular": "rito",
+              "plural": "ritos",
+              "titulo": "Los cinco ritos",
+              "cosas": [
+                {
+                  "id": "t0",
+                  "name": "Rito del Agua"
+                },
+                {
+                  "id": "t1",
+                  "name": "Rito del Aliento"
+                },
+                {
+                  "id": "t2",
+                  "name": "Rito del Nombre"
+                },
+                {
+                  "id": "t3",
+                  "name": "Rito de la Balanza"
+                },
+                {
+                  "id": "t4",
+                  "name": "Rito del Silencio"
+                }
+              ]
             }
           ],
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "c3"
+            },
+            {
+              "round": 2,
+              "lugarId": "c4"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -14710,26 +16059,69 @@
               "disponibles": 4
             }
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "q0",
-              "name": "Escarabeo de lapislázuli",
-              "description": "Una Escarabeo de lapislázuli."
+              "categoriaId": "reliquias",
+              "singular": "reliquia",
+              "plural": "reliquias",
+              "titulo": "Las reliquias",
+              "cosas": [
+                {
+                  "id": "q0",
+                  "name": "Escarabeo de lapislázuli",
+                  "description": "Una Escarabeo de lapislázuli."
+                },
+                {
+                  "id": "q1",
+                  "name": "Máscara funeraria",
+                  "description": "Una Máscara funeraria."
+                },
+                {
+                  "id": "q2",
+                  "name": "Vaso canopo",
+                  "description": "Una Vaso canopo."
+                }
+              ]
             },
             {
-              "id": "q1",
-              "name": "Máscara funeraria",
-              "description": "Una Máscara funeraria."
-            },
-            {
-              "id": "q2",
-              "name": "Vaso canopo",
-              "description": "Una Vaso canopo."
+              "categoriaId": "ritos",
+              "singular": "rito",
+              "plural": "ritos",
+              "titulo": "Los cinco ritos",
+              "cosas": [
+                {
+                  "id": "t0",
+                  "name": "Rito del Agua"
+                },
+                {
+                  "id": "t1",
+                  "name": "Rito del Aliento"
+                },
+                {
+                  "id": "t2",
+                  "name": "Rito del Nombre"
+                },
+                {
+                  "id": "t3",
+                  "name": "Rito de la Balanza"
+                },
+                {
+                  "id": "t4",
+                  "name": "Rito del Silencio"
+                }
+              ]
             }
           ],
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "c4"
+            },
+            {
+              "round": 2,
+              "lugarId": "c0"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -15501,27 +16893,74 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "q0",
-              "name": "Escarabeo de lapislázuli",
-              "description": "Una Escarabeo de lapislázuli."
+              "categoriaId": "reliquias",
+              "singular": "reliquia",
+              "plural": "reliquias",
+              "titulo": "Las reliquias",
+              "cosas": [
+                {
+                  "id": "q0",
+                  "name": "Escarabeo de lapislázuli",
+                  "description": "Una Escarabeo de lapislázuli."
+                },
+                {
+                  "id": "q1",
+                  "name": "Máscara funeraria",
+                  "description": "Una Máscara funeraria."
+                },
+                {
+                  "id": "q2",
+                  "name": "Vaso canopo",
+                  "description": "Una Vaso canopo."
+                }
+              ]
             },
             {
-              "id": "q1",
-              "name": "Máscara funeraria",
-              "description": "Una Máscara funeraria."
-            },
-            {
-              "id": "q2",
-              "name": "Vaso canopo",
-              "description": "Una Vaso canopo."
+              "categoriaId": "ritos",
+              "singular": "rito",
+              "plural": "ritos",
+              "titulo": "Los cinco ritos",
+              "cosas": [
+                {
+                  "id": "t0",
+                  "name": "Rito del Agua"
+                },
+                {
+                  "id": "t1",
+                  "name": "Rito del Aliento"
+                },
+                {
+                  "id": "t2",
+                  "name": "Rito del Nombre"
+                },
+                {
+                  "id": "t3",
+                  "name": "Rito de la Balanza"
+                },
+                {
+                  "id": "t4",
+                  "name": "Rito del Silencio"
+                }
+              ]
             }
           ],
           "miLugar": "c0",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "c0"
+            },
+            {
+              "round": 2,
+              "lugarId": "c0"
+            },
+            {
+              "round": 3,
+              "lugarId": "c0"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -15857,27 +17296,74 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "q0",
-              "name": "Escarabeo de lapislázuli",
-              "description": "Una Escarabeo de lapislázuli."
+              "categoriaId": "reliquias",
+              "singular": "reliquia",
+              "plural": "reliquias",
+              "titulo": "Las reliquias",
+              "cosas": [
+                {
+                  "id": "q0",
+                  "name": "Escarabeo de lapislázuli",
+                  "description": "Una Escarabeo de lapislázuli."
+                },
+                {
+                  "id": "q1",
+                  "name": "Máscara funeraria",
+                  "description": "Una Máscara funeraria."
+                },
+                {
+                  "id": "q2",
+                  "name": "Vaso canopo",
+                  "description": "Una Vaso canopo."
+                }
+              ]
             },
             {
-              "id": "q1",
-              "name": "Máscara funeraria",
-              "description": "Una Máscara funeraria."
-            },
-            {
-              "id": "q2",
-              "name": "Vaso canopo",
-              "description": "Una Vaso canopo."
+              "categoriaId": "ritos",
+              "singular": "rito",
+              "plural": "ritos",
+              "titulo": "Los cinco ritos",
+              "cosas": [
+                {
+                  "id": "t0",
+                  "name": "Rito del Agua"
+                },
+                {
+                  "id": "t1",
+                  "name": "Rito del Aliento"
+                },
+                {
+                  "id": "t2",
+                  "name": "Rito del Nombre"
+                },
+                {
+                  "id": "t3",
+                  "name": "Rito de la Balanza"
+                },
+                {
+                  "id": "t4",
+                  "name": "Rito del Silencio"
+                }
+              ]
             }
           ],
           "miLugar": "c4",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "c2"
+            },
+            {
+              "round": 2,
+              "lugarId": "c3"
+            },
+            {
+              "round": 3,
+              "lugarId": "c4"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -16193,27 +17679,74 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "q0",
-              "name": "Escarabeo de lapislázuli",
-              "description": "Una Escarabeo de lapislázuli."
+              "categoriaId": "reliquias",
+              "singular": "reliquia",
+              "plural": "reliquias",
+              "titulo": "Las reliquias",
+              "cosas": [
+                {
+                  "id": "q0",
+                  "name": "Escarabeo de lapislázuli",
+                  "description": "Una Escarabeo de lapislázuli."
+                },
+                {
+                  "id": "q1",
+                  "name": "Máscara funeraria",
+                  "description": "Una Máscara funeraria."
+                },
+                {
+                  "id": "q2",
+                  "name": "Vaso canopo",
+                  "description": "Una Vaso canopo."
+                }
+              ]
             },
             {
-              "id": "q1",
-              "name": "Máscara funeraria",
-              "description": "Una Máscara funeraria."
-            },
-            {
-              "id": "q2",
-              "name": "Vaso canopo",
-              "description": "Una Vaso canopo."
+              "categoriaId": "ritos",
+              "singular": "rito",
+              "plural": "ritos",
+              "titulo": "Los cinco ritos",
+              "cosas": [
+                {
+                  "id": "t0",
+                  "name": "Rito del Agua"
+                },
+                {
+                  "id": "t1",
+                  "name": "Rito del Aliento"
+                },
+                {
+                  "id": "t2",
+                  "name": "Rito del Nombre"
+                },
+                {
+                  "id": "t3",
+                  "name": "Rito de la Balanza"
+                },
+                {
+                  "id": "t4",
+                  "name": "Rito del Silencio"
+                }
+              ]
             }
           ],
           "miLugar": "c0",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "c3"
+            },
+            {
+              "round": 2,
+              "lugarId": "c4"
+            },
+            {
+              "round": 3,
+              "lugarId": "c0"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -16552,27 +18085,74 @@
               "disponibles": 4
             }
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "q0",
-              "name": "Escarabeo de lapislázuli",
-              "description": "Una Escarabeo de lapislázuli."
+              "categoriaId": "reliquias",
+              "singular": "reliquia",
+              "plural": "reliquias",
+              "titulo": "Las reliquias",
+              "cosas": [
+                {
+                  "id": "q0",
+                  "name": "Escarabeo de lapislázuli",
+                  "description": "Una Escarabeo de lapislázuli."
+                },
+                {
+                  "id": "q1",
+                  "name": "Máscara funeraria",
+                  "description": "Una Máscara funeraria."
+                },
+                {
+                  "id": "q2",
+                  "name": "Vaso canopo",
+                  "description": "Una Vaso canopo."
+                }
+              ]
             },
             {
-              "id": "q1",
-              "name": "Máscara funeraria",
-              "description": "Una Máscara funeraria."
-            },
-            {
-              "id": "q2",
-              "name": "Vaso canopo",
-              "description": "Una Vaso canopo."
+              "categoriaId": "ritos",
+              "singular": "rito",
+              "plural": "ritos",
+              "titulo": "Los cinco ritos",
+              "cosas": [
+                {
+                  "id": "t0",
+                  "name": "Rito del Agua"
+                },
+                {
+                  "id": "t1",
+                  "name": "Rito del Aliento"
+                },
+                {
+                  "id": "t2",
+                  "name": "Rito del Nombre"
+                },
+                {
+                  "id": "t3",
+                  "name": "Rito de la Balanza"
+                },
+                {
+                  "id": "t4",
+                  "name": "Rito del Silencio"
+                }
+              ]
             }
           ],
           "miLugar": "c1",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "c4"
+            },
+            {
+              "round": 2,
+              "lugarId": "c0"
+            },
+            {
+              "round": 3,
+              "lugarId": "c1"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -17551,27 +19131,74 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "q0",
-              "name": "Escarabeo de lapislázuli",
-              "description": "Una Escarabeo de lapislázuli."
+              "categoriaId": "reliquias",
+              "singular": "reliquia",
+              "plural": "reliquias",
+              "titulo": "Las reliquias",
+              "cosas": [
+                {
+                  "id": "q0",
+                  "name": "Escarabeo de lapislázuli",
+                  "description": "Una Escarabeo de lapislázuli."
+                },
+                {
+                  "id": "q1",
+                  "name": "Máscara funeraria",
+                  "description": "Una Máscara funeraria."
+                },
+                {
+                  "id": "q2",
+                  "name": "Vaso canopo",
+                  "description": "Una Vaso canopo."
+                }
+              ]
             },
             {
-              "id": "q1",
-              "name": "Máscara funeraria",
-              "description": "Una Máscara funeraria."
-            },
-            {
-              "id": "q2",
-              "name": "Vaso canopo",
-              "description": "Una Vaso canopo."
+              "categoriaId": "ritos",
+              "singular": "rito",
+              "plural": "ritos",
+              "titulo": "Los cinco ritos",
+              "cosas": [
+                {
+                  "id": "t0",
+                  "name": "Rito del Agua"
+                },
+                {
+                  "id": "t1",
+                  "name": "Rito del Aliento"
+                },
+                {
+                  "id": "t2",
+                  "name": "Rito del Nombre"
+                },
+                {
+                  "id": "t3",
+                  "name": "Rito de la Balanza"
+                },
+                {
+                  "id": "t4",
+                  "name": "Rito del Silencio"
+                }
+              ]
             }
           ],
           "miLugar": "c0",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "c0"
+            },
+            {
+              "round": 2,
+              "lugarId": "c0"
+            },
+            {
+              "round": 3,
+              "lugarId": "c0"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -17903,27 +19530,74 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "q0",
-              "name": "Escarabeo de lapislázuli",
-              "description": "Una Escarabeo de lapislázuli."
+              "categoriaId": "reliquias",
+              "singular": "reliquia",
+              "plural": "reliquias",
+              "titulo": "Las reliquias",
+              "cosas": [
+                {
+                  "id": "q0",
+                  "name": "Escarabeo de lapislázuli",
+                  "description": "Una Escarabeo de lapislázuli."
+                },
+                {
+                  "id": "q1",
+                  "name": "Máscara funeraria",
+                  "description": "Una Máscara funeraria."
+                },
+                {
+                  "id": "q2",
+                  "name": "Vaso canopo",
+                  "description": "Una Vaso canopo."
+                }
+              ]
             },
             {
-              "id": "q1",
-              "name": "Máscara funeraria",
-              "description": "Una Máscara funeraria."
-            },
-            {
-              "id": "q2",
-              "name": "Vaso canopo",
-              "description": "Una Vaso canopo."
+              "categoriaId": "ritos",
+              "singular": "rito",
+              "plural": "ritos",
+              "titulo": "Los cinco ritos",
+              "cosas": [
+                {
+                  "id": "t0",
+                  "name": "Rito del Agua"
+                },
+                {
+                  "id": "t1",
+                  "name": "Rito del Aliento"
+                },
+                {
+                  "id": "t2",
+                  "name": "Rito del Nombre"
+                },
+                {
+                  "id": "t3",
+                  "name": "Rito de la Balanza"
+                },
+                {
+                  "id": "t4",
+                  "name": "Rito del Silencio"
+                }
+              ]
             }
           ],
           "miLugar": "c4",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "c2"
+            },
+            {
+              "round": 2,
+              "lugarId": "c3"
+            },
+            {
+              "round": 3,
+              "lugarId": "c4"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -18235,27 +19909,74 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "q0",
-              "name": "Escarabeo de lapislázuli",
-              "description": "Una Escarabeo de lapislázuli."
+              "categoriaId": "reliquias",
+              "singular": "reliquia",
+              "plural": "reliquias",
+              "titulo": "Las reliquias",
+              "cosas": [
+                {
+                  "id": "q0",
+                  "name": "Escarabeo de lapislázuli",
+                  "description": "Una Escarabeo de lapislázuli."
+                },
+                {
+                  "id": "q1",
+                  "name": "Máscara funeraria",
+                  "description": "Una Máscara funeraria."
+                },
+                {
+                  "id": "q2",
+                  "name": "Vaso canopo",
+                  "description": "Una Vaso canopo."
+                }
+              ]
             },
             {
-              "id": "q1",
-              "name": "Máscara funeraria",
-              "description": "Una Máscara funeraria."
-            },
-            {
-              "id": "q2",
-              "name": "Vaso canopo",
-              "description": "Una Vaso canopo."
+              "categoriaId": "ritos",
+              "singular": "rito",
+              "plural": "ritos",
+              "titulo": "Los cinco ritos",
+              "cosas": [
+                {
+                  "id": "t0",
+                  "name": "Rito del Agua"
+                },
+                {
+                  "id": "t1",
+                  "name": "Rito del Aliento"
+                },
+                {
+                  "id": "t2",
+                  "name": "Rito del Nombre"
+                },
+                {
+                  "id": "t3",
+                  "name": "Rito de la Balanza"
+                },
+                {
+                  "id": "t4",
+                  "name": "Rito del Silencio"
+                }
+              ]
             }
           ],
           "miLugar": "c0",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "c3"
+            },
+            {
+              "round": 2,
+              "lugarId": "c4"
+            },
+            {
+              "round": 3,
+              "lugarId": "c0"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -18590,27 +20311,74 @@
               "disponibles": 4
             }
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "q0",
-              "name": "Escarabeo de lapislázuli",
-              "description": "Una Escarabeo de lapislázuli."
+              "categoriaId": "reliquias",
+              "singular": "reliquia",
+              "plural": "reliquias",
+              "titulo": "Las reliquias",
+              "cosas": [
+                {
+                  "id": "q0",
+                  "name": "Escarabeo de lapislázuli",
+                  "description": "Una Escarabeo de lapislázuli."
+                },
+                {
+                  "id": "q1",
+                  "name": "Máscara funeraria",
+                  "description": "Una Máscara funeraria."
+                },
+                {
+                  "id": "q2",
+                  "name": "Vaso canopo",
+                  "description": "Una Vaso canopo."
+                }
+              ]
             },
             {
-              "id": "q1",
-              "name": "Máscara funeraria",
-              "description": "Una Máscara funeraria."
-            },
-            {
-              "id": "q2",
-              "name": "Vaso canopo",
-              "description": "Una Vaso canopo."
+              "categoriaId": "ritos",
+              "singular": "rito",
+              "plural": "ritos",
+              "titulo": "Los cinco ritos",
+              "cosas": [
+                {
+                  "id": "t0",
+                  "name": "Rito del Agua"
+                },
+                {
+                  "id": "t1",
+                  "name": "Rito del Aliento"
+                },
+                {
+                  "id": "t2",
+                  "name": "Rito del Nombre"
+                },
+                {
+                  "id": "t3",
+                  "name": "Rito de la Balanza"
+                },
+                {
+                  "id": "t4",
+                  "name": "Rito del Silencio"
+                }
+              ]
             }
           ],
           "miLugar": "c1",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "c4"
+            },
+            {
+              "round": 2,
+              "lugarId": "c0"
+            },
+            {
+              "round": 3,
+              "lugarId": "c1"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -19530,26 +21298,73 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "q0",
-              "name": "Escarabeo de lapislázuli",
-              "description": "Una Escarabeo de lapislázuli."
+              "categoriaId": "reliquias",
+              "singular": "reliquia",
+              "plural": "reliquias",
+              "titulo": "Las reliquias",
+              "cosas": [
+                {
+                  "id": "q0",
+                  "name": "Escarabeo de lapislázuli",
+                  "description": "Una Escarabeo de lapislázuli."
+                },
+                {
+                  "id": "q1",
+                  "name": "Máscara funeraria",
+                  "description": "Una Máscara funeraria."
+                },
+                {
+                  "id": "q2",
+                  "name": "Vaso canopo",
+                  "description": "Una Vaso canopo."
+                }
+              ]
             },
             {
-              "id": "q1",
-              "name": "Máscara funeraria",
-              "description": "Una Máscara funeraria."
-            },
-            {
-              "id": "q2",
-              "name": "Vaso canopo",
-              "description": "Una Vaso canopo."
+              "categoriaId": "ritos",
+              "singular": "rito",
+              "plural": "ritos",
+              "titulo": "Los cinco ritos",
+              "cosas": [
+                {
+                  "id": "t0",
+                  "name": "Rito del Agua"
+                },
+                {
+                  "id": "t1",
+                  "name": "Rito del Aliento"
+                },
+                {
+                  "id": "t2",
+                  "name": "Rito del Nombre"
+                },
+                {
+                  "id": "t3",
+                  "name": "Rito de la Balanza"
+                },
+                {
+                  "id": "t4",
+                  "name": "Rito del Silencio"
+                }
+              ]
             }
           ],
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "c0"
+            },
+            {
+              "round": 2,
+              "lugarId": "c0"
+            },
+            {
+              "round": 3,
+              "lugarId": "c0"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -19919,26 +21734,73 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "q0",
-              "name": "Escarabeo de lapislázuli",
-              "description": "Una Escarabeo de lapislázuli."
+              "categoriaId": "reliquias",
+              "singular": "reliquia",
+              "plural": "reliquias",
+              "titulo": "Las reliquias",
+              "cosas": [
+                {
+                  "id": "q0",
+                  "name": "Escarabeo de lapislázuli",
+                  "description": "Una Escarabeo de lapislázuli."
+                },
+                {
+                  "id": "q1",
+                  "name": "Máscara funeraria",
+                  "description": "Una Máscara funeraria."
+                },
+                {
+                  "id": "q2",
+                  "name": "Vaso canopo",
+                  "description": "Una Vaso canopo."
+                }
+              ]
             },
             {
-              "id": "q1",
-              "name": "Máscara funeraria",
-              "description": "Una Máscara funeraria."
-            },
-            {
-              "id": "q2",
-              "name": "Vaso canopo",
-              "description": "Una Vaso canopo."
+              "categoriaId": "ritos",
+              "singular": "rito",
+              "plural": "ritos",
+              "titulo": "Los cinco ritos",
+              "cosas": [
+                {
+                  "id": "t0",
+                  "name": "Rito del Agua"
+                },
+                {
+                  "id": "t1",
+                  "name": "Rito del Aliento"
+                },
+                {
+                  "id": "t2",
+                  "name": "Rito del Nombre"
+                },
+                {
+                  "id": "t3",
+                  "name": "Rito de la Balanza"
+                },
+                {
+                  "id": "t4",
+                  "name": "Rito del Silencio"
+                }
+              ]
             }
           ],
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "c2"
+            },
+            {
+              "round": 2,
+              "lugarId": "c3"
+            },
+            {
+              "round": 3,
+              "lugarId": "c4"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -20288,26 +22150,73 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "q0",
-              "name": "Escarabeo de lapislázuli",
-              "description": "Una Escarabeo de lapislázuli."
+              "categoriaId": "reliquias",
+              "singular": "reliquia",
+              "plural": "reliquias",
+              "titulo": "Las reliquias",
+              "cosas": [
+                {
+                  "id": "q0",
+                  "name": "Escarabeo de lapislázuli",
+                  "description": "Una Escarabeo de lapislázuli."
+                },
+                {
+                  "id": "q1",
+                  "name": "Máscara funeraria",
+                  "description": "Una Máscara funeraria."
+                },
+                {
+                  "id": "q2",
+                  "name": "Vaso canopo",
+                  "description": "Una Vaso canopo."
+                }
+              ]
             },
             {
-              "id": "q1",
-              "name": "Máscara funeraria",
-              "description": "Una Máscara funeraria."
-            },
-            {
-              "id": "q2",
-              "name": "Vaso canopo",
-              "description": "Una Vaso canopo."
+              "categoriaId": "ritos",
+              "singular": "rito",
+              "plural": "ritos",
+              "titulo": "Los cinco ritos",
+              "cosas": [
+                {
+                  "id": "t0",
+                  "name": "Rito del Agua"
+                },
+                {
+                  "id": "t1",
+                  "name": "Rito del Aliento"
+                },
+                {
+                  "id": "t2",
+                  "name": "Rito del Nombre"
+                },
+                {
+                  "id": "t3",
+                  "name": "Rito de la Balanza"
+                },
+                {
+                  "id": "t4",
+                  "name": "Rito del Silencio"
+                }
+              ]
             }
           ],
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "c3"
+            },
+            {
+              "round": 2,
+              "lugarId": "c4"
+            },
+            {
+              "round": 3,
+              "lugarId": "c0"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -20680,26 +22589,73 @@
               "disponibles": 4
             }
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "q0",
-              "name": "Escarabeo de lapislázuli",
-              "description": "Una Escarabeo de lapislázuli."
+              "categoriaId": "reliquias",
+              "singular": "reliquia",
+              "plural": "reliquias",
+              "titulo": "Las reliquias",
+              "cosas": [
+                {
+                  "id": "q0",
+                  "name": "Escarabeo de lapislázuli",
+                  "description": "Una Escarabeo de lapislázuli."
+                },
+                {
+                  "id": "q1",
+                  "name": "Máscara funeraria",
+                  "description": "Una Máscara funeraria."
+                },
+                {
+                  "id": "q2",
+                  "name": "Vaso canopo",
+                  "description": "Una Vaso canopo."
+                }
+              ]
             },
             {
-              "id": "q1",
-              "name": "Máscara funeraria",
-              "description": "Una Máscara funeraria."
-            },
-            {
-              "id": "q2",
-              "name": "Vaso canopo",
-              "description": "Una Vaso canopo."
+              "categoriaId": "ritos",
+              "singular": "rito",
+              "plural": "ritos",
+              "titulo": "Los cinco ritos",
+              "cosas": [
+                {
+                  "id": "t0",
+                  "name": "Rito del Agua"
+                },
+                {
+                  "id": "t1",
+                  "name": "Rito del Aliento"
+                },
+                {
+                  "id": "t2",
+                  "name": "Rito del Nombre"
+                },
+                {
+                  "id": "t3",
+                  "name": "Rito de la Balanza"
+                },
+                {
+                  "id": "t4",
+                  "name": "Rito del Silencio"
+                }
+              ]
             }
           ],
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "c4"
+            },
+            {
+              "round": 2,
+              "lugarId": "c0"
+            },
+            {
+              "round": 3,
+              "lugarId": "c1"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -21573,27 +23529,78 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "q0",
-              "name": "Escarabeo de lapislázuli",
-              "description": "Una Escarabeo de lapislázuli."
+              "categoriaId": "reliquias",
+              "singular": "reliquia",
+              "plural": "reliquias",
+              "titulo": "Las reliquias",
+              "cosas": [
+                {
+                  "id": "q0",
+                  "name": "Escarabeo de lapislázuli",
+                  "description": "Una Escarabeo de lapislázuli."
+                },
+                {
+                  "id": "q1",
+                  "name": "Máscara funeraria",
+                  "description": "Una Máscara funeraria."
+                },
+                {
+                  "id": "q2",
+                  "name": "Vaso canopo",
+                  "description": "Una Vaso canopo."
+                }
+              ]
             },
             {
-              "id": "q1",
-              "name": "Máscara funeraria",
-              "description": "Una Máscara funeraria."
-            },
-            {
-              "id": "q2",
-              "name": "Vaso canopo",
-              "description": "Una Vaso canopo."
+              "categoriaId": "ritos",
+              "singular": "rito",
+              "plural": "ritos",
+              "titulo": "Los cinco ritos",
+              "cosas": [
+                {
+                  "id": "t0",
+                  "name": "Rito del Agua"
+                },
+                {
+                  "id": "t1",
+                  "name": "Rito del Aliento"
+                },
+                {
+                  "id": "t2",
+                  "name": "Rito del Nombre"
+                },
+                {
+                  "id": "t3",
+                  "name": "Rito de la Balanza"
+                },
+                {
+                  "id": "t4",
+                  "name": "Rito del Silencio"
+                }
+              ]
             }
           ],
           "miLugar": "c0",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "c0"
+            },
+            {
+              "round": 2,
+              "lugarId": "c0"
+            },
+            {
+              "round": 3,
+              "lugarId": "c0"
+            },
+            {
+              "round": 4,
+              "lugarId": "c0"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -21939,27 +23946,78 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "q0",
-              "name": "Escarabeo de lapislázuli",
-              "description": "Una Escarabeo de lapislázuli."
+              "categoriaId": "reliquias",
+              "singular": "reliquia",
+              "plural": "reliquias",
+              "titulo": "Las reliquias",
+              "cosas": [
+                {
+                  "id": "q0",
+                  "name": "Escarabeo de lapislázuli",
+                  "description": "Una Escarabeo de lapislázuli."
+                },
+                {
+                  "id": "q1",
+                  "name": "Máscara funeraria",
+                  "description": "Una Máscara funeraria."
+                },
+                {
+                  "id": "q2",
+                  "name": "Vaso canopo",
+                  "description": "Una Vaso canopo."
+                }
+              ]
             },
             {
-              "id": "q1",
-              "name": "Máscara funeraria",
-              "description": "Una Máscara funeraria."
-            },
-            {
-              "id": "q2",
-              "name": "Vaso canopo",
-              "description": "Una Vaso canopo."
+              "categoriaId": "ritos",
+              "singular": "rito",
+              "plural": "ritos",
+              "titulo": "Los cinco ritos",
+              "cosas": [
+                {
+                  "id": "t0",
+                  "name": "Rito del Agua"
+                },
+                {
+                  "id": "t1",
+                  "name": "Rito del Aliento"
+                },
+                {
+                  "id": "t2",
+                  "name": "Rito del Nombre"
+                },
+                {
+                  "id": "t3",
+                  "name": "Rito de la Balanza"
+                },
+                {
+                  "id": "t4",
+                  "name": "Rito del Silencio"
+                }
+              ]
             }
           ],
           "miLugar": "c0",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "c2"
+            },
+            {
+              "round": 2,
+              "lugarId": "c3"
+            },
+            {
+              "round": 3,
+              "lugarId": "c4"
+            },
+            {
+              "round": 4,
+              "lugarId": "c0"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -22275,27 +24333,78 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "q0",
-              "name": "Escarabeo de lapislázuli",
-              "description": "Una Escarabeo de lapislázuli."
+              "categoriaId": "reliquias",
+              "singular": "reliquia",
+              "plural": "reliquias",
+              "titulo": "Las reliquias",
+              "cosas": [
+                {
+                  "id": "q0",
+                  "name": "Escarabeo de lapislázuli",
+                  "description": "Una Escarabeo de lapislázuli."
+                },
+                {
+                  "id": "q1",
+                  "name": "Máscara funeraria",
+                  "description": "Una Máscara funeraria."
+                },
+                {
+                  "id": "q2",
+                  "name": "Vaso canopo",
+                  "description": "Una Vaso canopo."
+                }
+              ]
             },
             {
-              "id": "q1",
-              "name": "Máscara funeraria",
-              "description": "Una Máscara funeraria."
-            },
-            {
-              "id": "q2",
-              "name": "Vaso canopo",
-              "description": "Una Vaso canopo."
+              "categoriaId": "ritos",
+              "singular": "rito",
+              "plural": "ritos",
+              "titulo": "Los cinco ritos",
+              "cosas": [
+                {
+                  "id": "t0",
+                  "name": "Rito del Agua"
+                },
+                {
+                  "id": "t1",
+                  "name": "Rito del Aliento"
+                },
+                {
+                  "id": "t2",
+                  "name": "Rito del Nombre"
+                },
+                {
+                  "id": "t3",
+                  "name": "Rito de la Balanza"
+                },
+                {
+                  "id": "t4",
+                  "name": "Rito del Silencio"
+                }
+              ]
             }
           ],
           "miLugar": "c1",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "c3"
+            },
+            {
+              "round": 2,
+              "lugarId": "c4"
+            },
+            {
+              "round": 3,
+              "lugarId": "c0"
+            },
+            {
+              "round": 4,
+              "lugarId": "c1"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -22634,27 +24743,78 @@
               "disponibles": 4
             }
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "q0",
-              "name": "Escarabeo de lapislázuli",
-              "description": "Una Escarabeo de lapislázuli."
+              "categoriaId": "reliquias",
+              "singular": "reliquia",
+              "plural": "reliquias",
+              "titulo": "Las reliquias",
+              "cosas": [
+                {
+                  "id": "q0",
+                  "name": "Escarabeo de lapislázuli",
+                  "description": "Una Escarabeo de lapislázuli."
+                },
+                {
+                  "id": "q1",
+                  "name": "Máscara funeraria",
+                  "description": "Una Máscara funeraria."
+                },
+                {
+                  "id": "q2",
+                  "name": "Vaso canopo",
+                  "description": "Una Vaso canopo."
+                }
+              ]
             },
             {
-              "id": "q1",
-              "name": "Máscara funeraria",
-              "description": "Una Máscara funeraria."
-            },
-            {
-              "id": "q2",
-              "name": "Vaso canopo",
-              "description": "Una Vaso canopo."
+              "categoriaId": "ritos",
+              "singular": "rito",
+              "plural": "ritos",
+              "titulo": "Los cinco ritos",
+              "cosas": [
+                {
+                  "id": "t0",
+                  "name": "Rito del Agua"
+                },
+                {
+                  "id": "t1",
+                  "name": "Rito del Aliento"
+                },
+                {
+                  "id": "t2",
+                  "name": "Rito del Nombre"
+                },
+                {
+                  "id": "t3",
+                  "name": "Rito de la Balanza"
+                },
+                {
+                  "id": "t4",
+                  "name": "Rito del Silencio"
+                }
+              ]
             }
           ],
           "miLugar": "c2",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "c4"
+            },
+            {
+              "round": 2,
+              "lugarId": "c0"
+            },
+            {
+              "round": 3,
+              "lugarId": "c1"
+            },
+            {
+              "round": 4,
+              "lugarId": "c2"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -23741,27 +25901,78 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "q0",
-              "name": "Escarabeo de lapislázuli",
-              "description": "Una Escarabeo de lapislázuli."
+              "categoriaId": "reliquias",
+              "singular": "reliquia",
+              "plural": "reliquias",
+              "titulo": "Las reliquias",
+              "cosas": [
+                {
+                  "id": "q0",
+                  "name": "Escarabeo de lapislázuli",
+                  "description": "Una Escarabeo de lapislázuli."
+                },
+                {
+                  "id": "q1",
+                  "name": "Máscara funeraria",
+                  "description": "Una Máscara funeraria."
+                },
+                {
+                  "id": "q2",
+                  "name": "Vaso canopo",
+                  "description": "Una Vaso canopo."
+                }
+              ]
             },
             {
-              "id": "q1",
-              "name": "Máscara funeraria",
-              "description": "Una Máscara funeraria."
-            },
-            {
-              "id": "q2",
-              "name": "Vaso canopo",
-              "description": "Una Vaso canopo."
+              "categoriaId": "ritos",
+              "singular": "rito",
+              "plural": "ritos",
+              "titulo": "Los cinco ritos",
+              "cosas": [
+                {
+                  "id": "t0",
+                  "name": "Rito del Agua"
+                },
+                {
+                  "id": "t1",
+                  "name": "Rito del Aliento"
+                },
+                {
+                  "id": "t2",
+                  "name": "Rito del Nombre"
+                },
+                {
+                  "id": "t3",
+                  "name": "Rito de la Balanza"
+                },
+                {
+                  "id": "t4",
+                  "name": "Rito del Silencio"
+                }
+              ]
             }
           ],
           "miLugar": "c0",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "c0"
+            },
+            {
+              "round": 2,
+              "lugarId": "c0"
+            },
+            {
+              "round": 3,
+              "lugarId": "c0"
+            },
+            {
+              "round": 4,
+              "lugarId": "c0"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -24103,27 +26314,78 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "q0",
-              "name": "Escarabeo de lapislázuli",
-              "description": "Una Escarabeo de lapislázuli."
+              "categoriaId": "reliquias",
+              "singular": "reliquia",
+              "plural": "reliquias",
+              "titulo": "Las reliquias",
+              "cosas": [
+                {
+                  "id": "q0",
+                  "name": "Escarabeo de lapislázuli",
+                  "description": "Una Escarabeo de lapislázuli."
+                },
+                {
+                  "id": "q1",
+                  "name": "Máscara funeraria",
+                  "description": "Una Máscara funeraria."
+                },
+                {
+                  "id": "q2",
+                  "name": "Vaso canopo",
+                  "description": "Una Vaso canopo."
+                }
+              ]
             },
             {
-              "id": "q1",
-              "name": "Máscara funeraria",
-              "description": "Una Máscara funeraria."
-            },
-            {
-              "id": "q2",
-              "name": "Vaso canopo",
-              "description": "Una Vaso canopo."
+              "categoriaId": "ritos",
+              "singular": "rito",
+              "plural": "ritos",
+              "titulo": "Los cinco ritos",
+              "cosas": [
+                {
+                  "id": "t0",
+                  "name": "Rito del Agua"
+                },
+                {
+                  "id": "t1",
+                  "name": "Rito del Aliento"
+                },
+                {
+                  "id": "t2",
+                  "name": "Rito del Nombre"
+                },
+                {
+                  "id": "t3",
+                  "name": "Rito de la Balanza"
+                },
+                {
+                  "id": "t4",
+                  "name": "Rito del Silencio"
+                }
+              ]
             }
           ],
           "miLugar": "c0",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "c2"
+            },
+            {
+              "round": 2,
+              "lugarId": "c3"
+            },
+            {
+              "round": 3,
+              "lugarId": "c4"
+            },
+            {
+              "round": 4,
+              "lugarId": "c0"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -24435,27 +26697,78 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "q0",
-              "name": "Escarabeo de lapislázuli",
-              "description": "Una Escarabeo de lapislázuli."
+              "categoriaId": "reliquias",
+              "singular": "reliquia",
+              "plural": "reliquias",
+              "titulo": "Las reliquias",
+              "cosas": [
+                {
+                  "id": "q0",
+                  "name": "Escarabeo de lapislázuli",
+                  "description": "Una Escarabeo de lapislázuli."
+                },
+                {
+                  "id": "q1",
+                  "name": "Máscara funeraria",
+                  "description": "Una Máscara funeraria."
+                },
+                {
+                  "id": "q2",
+                  "name": "Vaso canopo",
+                  "description": "Una Vaso canopo."
+                }
+              ]
             },
             {
-              "id": "q1",
-              "name": "Máscara funeraria",
-              "description": "Una Máscara funeraria."
-            },
-            {
-              "id": "q2",
-              "name": "Vaso canopo",
-              "description": "Una Vaso canopo."
+              "categoriaId": "ritos",
+              "singular": "rito",
+              "plural": "ritos",
+              "titulo": "Los cinco ritos",
+              "cosas": [
+                {
+                  "id": "t0",
+                  "name": "Rito del Agua"
+                },
+                {
+                  "id": "t1",
+                  "name": "Rito del Aliento"
+                },
+                {
+                  "id": "t2",
+                  "name": "Rito del Nombre"
+                },
+                {
+                  "id": "t3",
+                  "name": "Rito de la Balanza"
+                },
+                {
+                  "id": "t4",
+                  "name": "Rito del Silencio"
+                }
+              ]
             }
           ],
           "miLugar": "c1",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "c3"
+            },
+            {
+              "round": 2,
+              "lugarId": "c4"
+            },
+            {
+              "round": 3,
+              "lugarId": "c0"
+            },
+            {
+              "round": 4,
+              "lugarId": "c1"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -24790,27 +27103,78 @@
               "disponibles": 4
             }
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "q0",
-              "name": "Escarabeo de lapislázuli",
-              "description": "Una Escarabeo de lapislázuli."
+              "categoriaId": "reliquias",
+              "singular": "reliquia",
+              "plural": "reliquias",
+              "titulo": "Las reliquias",
+              "cosas": [
+                {
+                  "id": "q0",
+                  "name": "Escarabeo de lapislázuli",
+                  "description": "Una Escarabeo de lapislázuli."
+                },
+                {
+                  "id": "q1",
+                  "name": "Máscara funeraria",
+                  "description": "Una Máscara funeraria."
+                },
+                {
+                  "id": "q2",
+                  "name": "Vaso canopo",
+                  "description": "Una Vaso canopo."
+                }
+              ]
             },
             {
-              "id": "q1",
-              "name": "Máscara funeraria",
-              "description": "Una Máscara funeraria."
-            },
-            {
-              "id": "q2",
-              "name": "Vaso canopo",
-              "description": "Una Vaso canopo."
+              "categoriaId": "ritos",
+              "singular": "rito",
+              "plural": "ritos",
+              "titulo": "Los cinco ritos",
+              "cosas": [
+                {
+                  "id": "t0",
+                  "name": "Rito del Agua"
+                },
+                {
+                  "id": "t1",
+                  "name": "Rito del Aliento"
+                },
+                {
+                  "id": "t2",
+                  "name": "Rito del Nombre"
+                },
+                {
+                  "id": "t3",
+                  "name": "Rito de la Balanza"
+                },
+                {
+                  "id": "t4",
+                  "name": "Rito del Silencio"
+                }
+              ]
             }
           ],
           "miLugar": "c2",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "c4"
+            },
+            {
+              "round": 2,
+              "lugarId": "c0"
+            },
+            {
+              "round": 3,
+              "lugarId": "c1"
+            },
+            {
+              "round": 4,
+              "lugarId": "c2"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -25801,27 +28165,78 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "q0",
-              "name": "Escarabeo de lapislázuli",
-              "description": "Una Escarabeo de lapislázuli."
+              "categoriaId": "reliquias",
+              "singular": "reliquia",
+              "plural": "reliquias",
+              "titulo": "Las reliquias",
+              "cosas": [
+                {
+                  "id": "q0",
+                  "name": "Escarabeo de lapislázuli",
+                  "description": "Una Escarabeo de lapislázuli."
+                },
+                {
+                  "id": "q1",
+                  "name": "Máscara funeraria",
+                  "description": "Una Máscara funeraria."
+                },
+                {
+                  "id": "q2",
+                  "name": "Vaso canopo",
+                  "description": "Una Vaso canopo."
+                }
+              ]
             },
             {
-              "id": "q1",
-              "name": "Máscara funeraria",
-              "description": "Una Máscara funeraria."
-            },
-            {
-              "id": "q2",
-              "name": "Vaso canopo",
-              "description": "Una Vaso canopo."
+              "categoriaId": "ritos",
+              "singular": "rito",
+              "plural": "ritos",
+              "titulo": "Los cinco ritos",
+              "cosas": [
+                {
+                  "id": "t0",
+                  "name": "Rito del Agua"
+                },
+                {
+                  "id": "t1",
+                  "name": "Rito del Aliento"
+                },
+                {
+                  "id": "t2",
+                  "name": "Rito del Nombre"
+                },
+                {
+                  "id": "t3",
+                  "name": "Rito de la Balanza"
+                },
+                {
+                  "id": "t4",
+                  "name": "Rito del Silencio"
+                }
+              ]
             }
           ],
           "miLugar": "c0",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "c0"
+            },
+            {
+              "round": 2,
+              "lugarId": "c0"
+            },
+            {
+              "round": 3,
+              "lugarId": "c0"
+            },
+            {
+              "round": 4,
+              "lugarId": "c0"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -26165,27 +28580,78 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "q0",
-              "name": "Escarabeo de lapislázuli",
-              "description": "Una Escarabeo de lapislázuli."
+              "categoriaId": "reliquias",
+              "singular": "reliquia",
+              "plural": "reliquias",
+              "titulo": "Las reliquias",
+              "cosas": [
+                {
+                  "id": "q0",
+                  "name": "Escarabeo de lapislázuli",
+                  "description": "Una Escarabeo de lapislázuli."
+                },
+                {
+                  "id": "q1",
+                  "name": "Máscara funeraria",
+                  "description": "Una Máscara funeraria."
+                },
+                {
+                  "id": "q2",
+                  "name": "Vaso canopo",
+                  "description": "Una Vaso canopo."
+                }
+              ]
             },
             {
-              "id": "q1",
-              "name": "Máscara funeraria",
-              "description": "Una Máscara funeraria."
-            },
-            {
-              "id": "q2",
-              "name": "Vaso canopo",
-              "description": "Una Vaso canopo."
+              "categoriaId": "ritos",
+              "singular": "rito",
+              "plural": "ritos",
+              "titulo": "Los cinco ritos",
+              "cosas": [
+                {
+                  "id": "t0",
+                  "name": "Rito del Agua"
+                },
+                {
+                  "id": "t1",
+                  "name": "Rito del Aliento"
+                },
+                {
+                  "id": "t2",
+                  "name": "Rito del Nombre"
+                },
+                {
+                  "id": "t3",
+                  "name": "Rito de la Balanza"
+                },
+                {
+                  "id": "t4",
+                  "name": "Rito del Silencio"
+                }
+              ]
             }
           ],
           "miLugar": "c0",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "c2"
+            },
+            {
+              "round": 2,
+              "lugarId": "c3"
+            },
+            {
+              "round": 3,
+              "lugarId": "c4"
+            },
+            {
+              "round": 4,
+              "lugarId": "c0"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -26499,27 +28965,78 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "q0",
-              "name": "Escarabeo de lapislázuli",
-              "description": "Una Escarabeo de lapislázuli."
+              "categoriaId": "reliquias",
+              "singular": "reliquia",
+              "plural": "reliquias",
+              "titulo": "Las reliquias",
+              "cosas": [
+                {
+                  "id": "q0",
+                  "name": "Escarabeo de lapislázuli",
+                  "description": "Una Escarabeo de lapislázuli."
+                },
+                {
+                  "id": "q1",
+                  "name": "Máscara funeraria",
+                  "description": "Una Máscara funeraria."
+                },
+                {
+                  "id": "q2",
+                  "name": "Vaso canopo",
+                  "description": "Una Vaso canopo."
+                }
+              ]
             },
             {
-              "id": "q1",
-              "name": "Máscara funeraria",
-              "description": "Una Máscara funeraria."
-            },
-            {
-              "id": "q2",
-              "name": "Vaso canopo",
-              "description": "Una Vaso canopo."
+              "categoriaId": "ritos",
+              "singular": "rito",
+              "plural": "ritos",
+              "titulo": "Los cinco ritos",
+              "cosas": [
+                {
+                  "id": "t0",
+                  "name": "Rito del Agua"
+                },
+                {
+                  "id": "t1",
+                  "name": "Rito del Aliento"
+                },
+                {
+                  "id": "t2",
+                  "name": "Rito del Nombre"
+                },
+                {
+                  "id": "t3",
+                  "name": "Rito de la Balanza"
+                },
+                {
+                  "id": "t4",
+                  "name": "Rito del Silencio"
+                }
+              ]
             }
           ],
           "miLugar": "c1",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "c3"
+            },
+            {
+              "round": 2,
+              "lugarId": "c4"
+            },
+            {
+              "round": 3,
+              "lugarId": "c0"
+            },
+            {
+              "round": 4,
+              "lugarId": "c1"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -26854,27 +29371,78 @@
               "disponibles": 4
             }
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "q0",
-              "name": "Escarabeo de lapislázuli",
-              "description": "Una Escarabeo de lapislázuli."
+              "categoriaId": "reliquias",
+              "singular": "reliquia",
+              "plural": "reliquias",
+              "titulo": "Las reliquias",
+              "cosas": [
+                {
+                  "id": "q0",
+                  "name": "Escarabeo de lapislázuli",
+                  "description": "Una Escarabeo de lapislázuli."
+                },
+                {
+                  "id": "q1",
+                  "name": "Máscara funeraria",
+                  "description": "Una Máscara funeraria."
+                },
+                {
+                  "id": "q2",
+                  "name": "Vaso canopo",
+                  "description": "Una Vaso canopo."
+                }
+              ]
             },
             {
-              "id": "q1",
-              "name": "Máscara funeraria",
-              "description": "Una Máscara funeraria."
-            },
-            {
-              "id": "q2",
-              "name": "Vaso canopo",
-              "description": "Una Vaso canopo."
+              "categoriaId": "ritos",
+              "singular": "rito",
+              "plural": "ritos",
+              "titulo": "Los cinco ritos",
+              "cosas": [
+                {
+                  "id": "t0",
+                  "name": "Rito del Agua"
+                },
+                {
+                  "id": "t1",
+                  "name": "Rito del Aliento"
+                },
+                {
+                  "id": "t2",
+                  "name": "Rito del Nombre"
+                },
+                {
+                  "id": "t3",
+                  "name": "Rito de la Balanza"
+                },
+                {
+                  "id": "t4",
+                  "name": "Rito del Silencio"
+                }
+              ]
             }
           ],
           "miLugar": "c2",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "c4"
+            },
+            {
+              "round": 2,
+              "lugarId": "c0"
+            },
+            {
+              "round": 3,
+              "lugarId": "c1"
+            },
+            {
+              "round": 4,
+              "lugarId": "c2"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -27922,27 +30490,78 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "q0",
-              "name": "Escarabeo de lapislázuli",
-              "description": "Una Escarabeo de lapislázuli."
+              "categoriaId": "reliquias",
+              "singular": "reliquia",
+              "plural": "reliquias",
+              "titulo": "Las reliquias",
+              "cosas": [
+                {
+                  "id": "q0",
+                  "name": "Escarabeo de lapislázuli",
+                  "description": "Una Escarabeo de lapislázuli."
+                },
+                {
+                  "id": "q1",
+                  "name": "Máscara funeraria",
+                  "description": "Una Máscara funeraria."
+                },
+                {
+                  "id": "q2",
+                  "name": "Vaso canopo",
+                  "description": "Una Vaso canopo."
+                }
+              ]
             },
             {
-              "id": "q1",
-              "name": "Máscara funeraria",
-              "description": "Una Máscara funeraria."
-            },
-            {
-              "id": "q2",
-              "name": "Vaso canopo",
-              "description": "Una Vaso canopo."
+              "categoriaId": "ritos",
+              "singular": "rito",
+              "plural": "ritos",
+              "titulo": "Los cinco ritos",
+              "cosas": [
+                {
+                  "id": "t0",
+                  "name": "Rito del Agua"
+                },
+                {
+                  "id": "t1",
+                  "name": "Rito del Aliento"
+                },
+                {
+                  "id": "t2",
+                  "name": "Rito del Nombre"
+                },
+                {
+                  "id": "t3",
+                  "name": "Rito de la Balanza"
+                },
+                {
+                  "id": "t4",
+                  "name": "Rito del Silencio"
+                }
+              ]
             }
           ],
           "miLugar": "c0",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "c0"
+            },
+            {
+              "round": 2,
+              "lugarId": "c0"
+            },
+            {
+              "round": 3,
+              "lugarId": "c0"
+            },
+            {
+              "round": 4,
+              "lugarId": "c0"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -28264,27 +30883,78 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "q0",
-              "name": "Escarabeo de lapislázuli",
-              "description": "Una Escarabeo de lapislázuli."
+              "categoriaId": "reliquias",
+              "singular": "reliquia",
+              "plural": "reliquias",
+              "titulo": "Las reliquias",
+              "cosas": [
+                {
+                  "id": "q0",
+                  "name": "Escarabeo de lapislázuli",
+                  "description": "Una Escarabeo de lapislázuli."
+                },
+                {
+                  "id": "q1",
+                  "name": "Máscara funeraria",
+                  "description": "Una Máscara funeraria."
+                },
+                {
+                  "id": "q2",
+                  "name": "Vaso canopo",
+                  "description": "Una Vaso canopo."
+                }
+              ]
             },
             {
-              "id": "q1",
-              "name": "Máscara funeraria",
-              "description": "Una Máscara funeraria."
-            },
-            {
-              "id": "q2",
-              "name": "Vaso canopo",
-              "description": "Una Vaso canopo."
+              "categoriaId": "ritos",
+              "singular": "rito",
+              "plural": "ritos",
+              "titulo": "Los cinco ritos",
+              "cosas": [
+                {
+                  "id": "t0",
+                  "name": "Rito del Agua"
+                },
+                {
+                  "id": "t1",
+                  "name": "Rito del Aliento"
+                },
+                {
+                  "id": "t2",
+                  "name": "Rito del Nombre"
+                },
+                {
+                  "id": "t3",
+                  "name": "Rito de la Balanza"
+                },
+                {
+                  "id": "t4",
+                  "name": "Rito del Silencio"
+                }
+              ]
             }
           ],
           "miLugar": "c0",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "c2"
+            },
+            {
+              "round": 2,
+              "lugarId": "c3"
+            },
+            {
+              "round": 3,
+              "lugarId": "c4"
+            },
+            {
+              "round": 4,
+              "lugarId": "c0"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -28604,27 +31274,78 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "q0",
-              "name": "Escarabeo de lapislázuli",
-              "description": "Una Escarabeo de lapislázuli."
+              "categoriaId": "reliquias",
+              "singular": "reliquia",
+              "plural": "reliquias",
+              "titulo": "Las reliquias",
+              "cosas": [
+                {
+                  "id": "q0",
+                  "name": "Escarabeo de lapislázuli",
+                  "description": "Una Escarabeo de lapislázuli."
+                },
+                {
+                  "id": "q1",
+                  "name": "Máscara funeraria",
+                  "description": "Una Máscara funeraria."
+                },
+                {
+                  "id": "q2",
+                  "name": "Vaso canopo",
+                  "description": "Una Vaso canopo."
+                }
+              ]
             },
             {
-              "id": "q1",
-              "name": "Máscara funeraria",
-              "description": "Una Máscara funeraria."
-            },
-            {
-              "id": "q2",
-              "name": "Vaso canopo",
-              "description": "Una Vaso canopo."
+              "categoriaId": "ritos",
+              "singular": "rito",
+              "plural": "ritos",
+              "titulo": "Los cinco ritos",
+              "cosas": [
+                {
+                  "id": "t0",
+                  "name": "Rito del Agua"
+                },
+                {
+                  "id": "t1",
+                  "name": "Rito del Aliento"
+                },
+                {
+                  "id": "t2",
+                  "name": "Rito del Nombre"
+                },
+                {
+                  "id": "t3",
+                  "name": "Rito de la Balanza"
+                },
+                {
+                  "id": "t4",
+                  "name": "Rito del Silencio"
+                }
+              ]
             }
           ],
           "miLugar": "c1",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "c3"
+            },
+            {
+              "round": 2,
+              "lugarId": "c4"
+            },
+            {
+              "round": 3,
+              "lugarId": "c0"
+            },
+            {
+              "round": 4,
+              "lugarId": "c1"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -28959,27 +31680,78 @@
               "disponibles": 4
             }
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "q0",
-              "name": "Escarabeo de lapislázuli",
-              "description": "Una Escarabeo de lapislázuli."
+              "categoriaId": "reliquias",
+              "singular": "reliquia",
+              "plural": "reliquias",
+              "titulo": "Las reliquias",
+              "cosas": [
+                {
+                  "id": "q0",
+                  "name": "Escarabeo de lapislázuli",
+                  "description": "Una Escarabeo de lapislázuli."
+                },
+                {
+                  "id": "q1",
+                  "name": "Máscara funeraria",
+                  "description": "Una Máscara funeraria."
+                },
+                {
+                  "id": "q2",
+                  "name": "Vaso canopo",
+                  "description": "Una Vaso canopo."
+                }
+              ]
             },
             {
-              "id": "q1",
-              "name": "Máscara funeraria",
-              "description": "Una Máscara funeraria."
-            },
-            {
-              "id": "q2",
-              "name": "Vaso canopo",
-              "description": "Una Vaso canopo."
+              "categoriaId": "ritos",
+              "singular": "rito",
+              "plural": "ritos",
+              "titulo": "Los cinco ritos",
+              "cosas": [
+                {
+                  "id": "t0",
+                  "name": "Rito del Agua"
+                },
+                {
+                  "id": "t1",
+                  "name": "Rito del Aliento"
+                },
+                {
+                  "id": "t2",
+                  "name": "Rito del Nombre"
+                },
+                {
+                  "id": "t3",
+                  "name": "Rito de la Balanza"
+                },
+                {
+                  "id": "t4",
+                  "name": "Rito del Silencio"
+                }
+              ]
             }
           ],
           "miLugar": "c2",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "c4"
+            },
+            {
+              "round": 2,
+              "lugarId": "c0"
+            },
+            {
+              "round": 3,
+              "lugarId": "c1"
+            },
+            {
+              "round": 4,
+              "lugarId": "c2"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -29999,27 +32771,78 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "q0",
-              "name": "Escarabeo de lapislázuli",
-              "description": "Una Escarabeo de lapislázuli."
+              "categoriaId": "reliquias",
+              "singular": "reliquia",
+              "plural": "reliquias",
+              "titulo": "Las reliquias",
+              "cosas": [
+                {
+                  "id": "q0",
+                  "name": "Escarabeo de lapislázuli",
+                  "description": "Una Escarabeo de lapislázuli."
+                },
+                {
+                  "id": "q1",
+                  "name": "Máscara funeraria",
+                  "description": "Una Máscara funeraria."
+                },
+                {
+                  "id": "q2",
+                  "name": "Vaso canopo",
+                  "description": "Una Vaso canopo."
+                }
+              ]
             },
             {
-              "id": "q1",
-              "name": "Máscara funeraria",
-              "description": "Una Máscara funeraria."
-            },
-            {
-              "id": "q2",
-              "name": "Vaso canopo",
-              "description": "Una Vaso canopo."
+              "categoriaId": "ritos",
+              "singular": "rito",
+              "plural": "ritos",
+              "titulo": "Los cinco ritos",
+              "cosas": [
+                {
+                  "id": "t0",
+                  "name": "Rito del Agua"
+                },
+                {
+                  "id": "t1",
+                  "name": "Rito del Aliento"
+                },
+                {
+                  "id": "t2",
+                  "name": "Rito del Nombre"
+                },
+                {
+                  "id": "t3",
+                  "name": "Rito de la Balanza"
+                },
+                {
+                  "id": "t4",
+                  "name": "Rito del Silencio"
+                }
+              ]
             }
           ],
           "miLugar": "c0",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "c0"
+            },
+            {
+              "round": 2,
+              "lugarId": "c0"
+            },
+            {
+              "round": 3,
+              "lugarId": "c0"
+            },
+            {
+              "round": 4,
+              "lugarId": "c0"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -30312,27 +33135,78 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "q0",
-              "name": "Escarabeo de lapislázuli",
-              "description": "Una Escarabeo de lapislázuli."
+              "categoriaId": "reliquias",
+              "singular": "reliquia",
+              "plural": "reliquias",
+              "titulo": "Las reliquias",
+              "cosas": [
+                {
+                  "id": "q0",
+                  "name": "Escarabeo de lapislázuli",
+                  "description": "Una Escarabeo de lapislázuli."
+                },
+                {
+                  "id": "q1",
+                  "name": "Máscara funeraria",
+                  "description": "Una Máscara funeraria."
+                },
+                {
+                  "id": "q2",
+                  "name": "Vaso canopo",
+                  "description": "Una Vaso canopo."
+                }
+              ]
             },
             {
-              "id": "q1",
-              "name": "Máscara funeraria",
-              "description": "Una Máscara funeraria."
-            },
-            {
-              "id": "q2",
-              "name": "Vaso canopo",
-              "description": "Una Vaso canopo."
+              "categoriaId": "ritos",
+              "singular": "rito",
+              "plural": "ritos",
+              "titulo": "Los cinco ritos",
+              "cosas": [
+                {
+                  "id": "t0",
+                  "name": "Rito del Agua"
+                },
+                {
+                  "id": "t1",
+                  "name": "Rito del Aliento"
+                },
+                {
+                  "id": "t2",
+                  "name": "Rito del Nombre"
+                },
+                {
+                  "id": "t3",
+                  "name": "Rito de la Balanza"
+                },
+                {
+                  "id": "t4",
+                  "name": "Rito del Silencio"
+                }
+              ]
             }
           ],
           "miLugar": "c0",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "c2"
+            },
+            {
+              "round": 2,
+              "lugarId": "c3"
+            },
+            {
+              "round": 3,
+              "lugarId": "c4"
+            },
+            {
+              "round": 4,
+              "lugarId": "c0"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -30624,27 +33498,78 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "q0",
-              "name": "Escarabeo de lapislázuli",
-              "description": "Una Escarabeo de lapislázuli."
+              "categoriaId": "reliquias",
+              "singular": "reliquia",
+              "plural": "reliquias",
+              "titulo": "Las reliquias",
+              "cosas": [
+                {
+                  "id": "q0",
+                  "name": "Escarabeo de lapislázuli",
+                  "description": "Una Escarabeo de lapislázuli."
+                },
+                {
+                  "id": "q1",
+                  "name": "Máscara funeraria",
+                  "description": "Una Máscara funeraria."
+                },
+                {
+                  "id": "q2",
+                  "name": "Vaso canopo",
+                  "description": "Una Vaso canopo."
+                }
+              ]
             },
             {
-              "id": "q1",
-              "name": "Máscara funeraria",
-              "description": "Una Máscara funeraria."
-            },
-            {
-              "id": "q2",
-              "name": "Vaso canopo",
-              "description": "Una Vaso canopo."
+              "categoriaId": "ritos",
+              "singular": "rito",
+              "plural": "ritos",
+              "titulo": "Los cinco ritos",
+              "cosas": [
+                {
+                  "id": "t0",
+                  "name": "Rito del Agua"
+                },
+                {
+                  "id": "t1",
+                  "name": "Rito del Aliento"
+                },
+                {
+                  "id": "t2",
+                  "name": "Rito del Nombre"
+                },
+                {
+                  "id": "t3",
+                  "name": "Rito de la Balanza"
+                },
+                {
+                  "id": "t4",
+                  "name": "Rito del Silencio"
+                }
+              ]
             }
           ],
           "miLugar": "c1",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "c3"
+            },
+            {
+              "round": 2,
+              "lugarId": "c4"
+            },
+            {
+              "round": 3,
+              "lugarId": "c0"
+            },
+            {
+              "round": 4,
+              "lugarId": "c1"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -30951,27 +33876,78 @@
               "disponibles": 4
             }
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "q0",
-              "name": "Escarabeo de lapislázuli",
-              "description": "Una Escarabeo de lapislázuli."
+              "categoriaId": "reliquias",
+              "singular": "reliquia",
+              "plural": "reliquias",
+              "titulo": "Las reliquias",
+              "cosas": [
+                {
+                  "id": "q0",
+                  "name": "Escarabeo de lapislázuli",
+                  "description": "Una Escarabeo de lapislázuli."
+                },
+                {
+                  "id": "q1",
+                  "name": "Máscara funeraria",
+                  "description": "Una Máscara funeraria."
+                },
+                {
+                  "id": "q2",
+                  "name": "Vaso canopo",
+                  "description": "Una Vaso canopo."
+                }
+              ]
             },
             {
-              "id": "q1",
-              "name": "Máscara funeraria",
-              "description": "Una Máscara funeraria."
-            },
-            {
-              "id": "q2",
-              "name": "Vaso canopo",
-              "description": "Una Vaso canopo."
+              "categoriaId": "ritos",
+              "singular": "rito",
+              "plural": "ritos",
+              "titulo": "Los cinco ritos",
+              "cosas": [
+                {
+                  "id": "t0",
+                  "name": "Rito del Agua"
+                },
+                {
+                  "id": "t1",
+                  "name": "Rito del Aliento"
+                },
+                {
+                  "id": "t2",
+                  "name": "Rito del Nombre"
+                },
+                {
+                  "id": "t3",
+                  "name": "Rito de la Balanza"
+                },
+                {
+                  "id": "t4",
+                  "name": "Rito del Silencio"
+                }
+              ]
             }
           ],
           "miLugar": "c2",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "c4"
+            },
+            {
+              "round": 2,
+              "lugarId": "c0"
+            },
+            {
+              "round": 3,
+              "lugarId": "c1"
+            },
+            {
+              "round": 4,
+              "lugarId": "c2"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -31968,27 +34944,78 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "q0",
-              "name": "Escarabeo de lapislázuli",
-              "description": "Una Escarabeo de lapislázuli."
+              "categoriaId": "reliquias",
+              "singular": "reliquia",
+              "plural": "reliquias",
+              "titulo": "Las reliquias",
+              "cosas": [
+                {
+                  "id": "q0",
+                  "name": "Escarabeo de lapislázuli",
+                  "description": "Una Escarabeo de lapislázuli."
+                },
+                {
+                  "id": "q1",
+                  "name": "Máscara funeraria",
+                  "description": "Una Máscara funeraria."
+                },
+                {
+                  "id": "q2",
+                  "name": "Vaso canopo",
+                  "description": "Una Vaso canopo."
+                }
+              ]
             },
             {
-              "id": "q1",
-              "name": "Máscara funeraria",
-              "description": "Una Máscara funeraria."
-            },
-            {
-              "id": "q2",
-              "name": "Vaso canopo",
-              "description": "Una Vaso canopo."
+              "categoriaId": "ritos",
+              "singular": "rito",
+              "plural": "ritos",
+              "titulo": "Los cinco ritos",
+              "cosas": [
+                {
+                  "id": "t0",
+                  "name": "Rito del Agua"
+                },
+                {
+                  "id": "t1",
+                  "name": "Rito del Aliento"
+                },
+                {
+                  "id": "t2",
+                  "name": "Rito del Nombre"
+                },
+                {
+                  "id": "t3",
+                  "name": "Rito de la Balanza"
+                },
+                {
+                  "id": "t4",
+                  "name": "Rito del Silencio"
+                }
+              ]
             }
           ],
           "miLugar": "c0",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "c0"
+            },
+            {
+              "round": 2,
+              "lugarId": "c0"
+            },
+            {
+              "round": 3,
+              "lugarId": "c0"
+            },
+            {
+              "round": 4,
+              "lugarId": "c0"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -32281,27 +35308,78 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "q0",
-              "name": "Escarabeo de lapislázuli",
-              "description": "Una Escarabeo de lapislázuli."
+              "categoriaId": "reliquias",
+              "singular": "reliquia",
+              "plural": "reliquias",
+              "titulo": "Las reliquias",
+              "cosas": [
+                {
+                  "id": "q0",
+                  "name": "Escarabeo de lapislázuli",
+                  "description": "Una Escarabeo de lapislázuli."
+                },
+                {
+                  "id": "q1",
+                  "name": "Máscara funeraria",
+                  "description": "Una Máscara funeraria."
+                },
+                {
+                  "id": "q2",
+                  "name": "Vaso canopo",
+                  "description": "Una Vaso canopo."
+                }
+              ]
             },
             {
-              "id": "q1",
-              "name": "Máscara funeraria",
-              "description": "Una Máscara funeraria."
-            },
-            {
-              "id": "q2",
-              "name": "Vaso canopo",
-              "description": "Una Vaso canopo."
+              "categoriaId": "ritos",
+              "singular": "rito",
+              "plural": "ritos",
+              "titulo": "Los cinco ritos",
+              "cosas": [
+                {
+                  "id": "t0",
+                  "name": "Rito del Agua"
+                },
+                {
+                  "id": "t1",
+                  "name": "Rito del Aliento"
+                },
+                {
+                  "id": "t2",
+                  "name": "Rito del Nombre"
+                },
+                {
+                  "id": "t3",
+                  "name": "Rito de la Balanza"
+                },
+                {
+                  "id": "t4",
+                  "name": "Rito del Silencio"
+                }
+              ]
             }
           ],
           "miLugar": "c0",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "c2"
+            },
+            {
+              "round": 2,
+              "lugarId": "c3"
+            },
+            {
+              "round": 3,
+              "lugarId": "c4"
+            },
+            {
+              "round": 4,
+              "lugarId": "c0"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -32593,27 +35671,78 @@
               }
             ]
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "q0",
-              "name": "Escarabeo de lapislázuli",
-              "description": "Una Escarabeo de lapislázuli."
+              "categoriaId": "reliquias",
+              "singular": "reliquia",
+              "plural": "reliquias",
+              "titulo": "Las reliquias",
+              "cosas": [
+                {
+                  "id": "q0",
+                  "name": "Escarabeo de lapislázuli",
+                  "description": "Una Escarabeo de lapislázuli."
+                },
+                {
+                  "id": "q1",
+                  "name": "Máscara funeraria",
+                  "description": "Una Máscara funeraria."
+                },
+                {
+                  "id": "q2",
+                  "name": "Vaso canopo",
+                  "description": "Una Vaso canopo."
+                }
+              ]
             },
             {
-              "id": "q1",
-              "name": "Máscara funeraria",
-              "description": "Una Máscara funeraria."
-            },
-            {
-              "id": "q2",
-              "name": "Vaso canopo",
-              "description": "Una Vaso canopo."
+              "categoriaId": "ritos",
+              "singular": "rito",
+              "plural": "ritos",
+              "titulo": "Los cinco ritos",
+              "cosas": [
+                {
+                  "id": "t0",
+                  "name": "Rito del Agua"
+                },
+                {
+                  "id": "t1",
+                  "name": "Rito del Aliento"
+                },
+                {
+                  "id": "t2",
+                  "name": "Rito del Nombre"
+                },
+                {
+                  "id": "t3",
+                  "name": "Rito de la Balanza"
+                },
+                {
+                  "id": "t4",
+                  "name": "Rito del Silencio"
+                }
+              ]
             }
           ],
           "miLugar": "c1",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "c3"
+            },
+            {
+              "round": 2,
+              "lugarId": "c4"
+            },
+            {
+              "round": 3,
+              "lugarId": "c0"
+            },
+            {
+              "round": 4,
+              "lugarId": "c1"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -32920,27 +36049,78 @@
               "disponibles": 4
             }
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "q0",
-              "name": "Escarabeo de lapislázuli",
-              "description": "Una Escarabeo de lapislázuli."
+              "categoriaId": "reliquias",
+              "singular": "reliquia",
+              "plural": "reliquias",
+              "titulo": "Las reliquias",
+              "cosas": [
+                {
+                  "id": "q0",
+                  "name": "Escarabeo de lapislázuli",
+                  "description": "Una Escarabeo de lapislázuli."
+                },
+                {
+                  "id": "q1",
+                  "name": "Máscara funeraria",
+                  "description": "Una Máscara funeraria."
+                },
+                {
+                  "id": "q2",
+                  "name": "Vaso canopo",
+                  "description": "Una Vaso canopo."
+                }
+              ]
             },
             {
-              "id": "q1",
-              "name": "Máscara funeraria",
-              "description": "Una Máscara funeraria."
-            },
-            {
-              "id": "q2",
-              "name": "Vaso canopo",
-              "description": "Una Vaso canopo."
+              "categoriaId": "ritos",
+              "singular": "rito",
+              "plural": "ritos",
+              "titulo": "Los cinco ritos",
+              "cosas": [
+                {
+                  "id": "t0",
+                  "name": "Rito del Agua"
+                },
+                {
+                  "id": "t1",
+                  "name": "Rito del Aliento"
+                },
+                {
+                  "id": "t2",
+                  "name": "Rito del Nombre"
+                },
+                {
+                  "id": "t3",
+                  "name": "Rito de la Balanza"
+                },
+                {
+                  "id": "t4",
+                  "name": "Rito del Silencio"
+                }
+              ]
             }
           ],
           "miLugar": "c2",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "c4"
+            },
+            {
+              "round": 2,
+              "lugarId": "c0"
+            },
+            {
+              "round": 3,
+              "lugarId": "c1"
+            },
+            {
+              "round": 4,
+              "lugarId": "c2"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -34079,27 +37259,78 @@
               }
             }
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "q0",
-              "name": "Escarabeo de lapislázuli",
-              "description": "Una Escarabeo de lapislázuli."
+              "categoriaId": "reliquias",
+              "singular": "reliquia",
+              "plural": "reliquias",
+              "titulo": "Las reliquias",
+              "cosas": [
+                {
+                  "id": "q0",
+                  "name": "Escarabeo de lapislázuli",
+                  "description": "Una Escarabeo de lapislázuli."
+                },
+                {
+                  "id": "q1",
+                  "name": "Máscara funeraria",
+                  "description": "Una Máscara funeraria."
+                },
+                {
+                  "id": "q2",
+                  "name": "Vaso canopo",
+                  "description": "Una Vaso canopo."
+                }
+              ]
             },
             {
-              "id": "q1",
-              "name": "Máscara funeraria",
-              "description": "Una Máscara funeraria."
-            },
-            {
-              "id": "q2",
-              "name": "Vaso canopo",
-              "description": "Una Vaso canopo."
+              "categoriaId": "ritos",
+              "singular": "rito",
+              "plural": "ritos",
+              "titulo": "Los cinco ritos",
+              "cosas": [
+                {
+                  "id": "t0",
+                  "name": "Rito del Agua"
+                },
+                {
+                  "id": "t1",
+                  "name": "Rito del Aliento"
+                },
+                {
+                  "id": "t2",
+                  "name": "Rito del Nombre"
+                },
+                {
+                  "id": "t3",
+                  "name": "Rito de la Balanza"
+                },
+                {
+                  "id": "t4",
+                  "name": "Rito del Silencio"
+                }
+              ]
             }
           ],
           "miLugar": "c0",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "c0"
+            },
+            {
+              "round": 2,
+              "lugarId": "c0"
+            },
+            {
+              "round": 3,
+              "lugarId": "c0"
+            },
+            {
+              "round": 4,
+              "lugarId": "c0"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -34542,27 +37773,78 @@
               }
             }
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "q0",
-              "name": "Escarabeo de lapislázuli",
-              "description": "Una Escarabeo de lapislázuli."
+              "categoriaId": "reliquias",
+              "singular": "reliquia",
+              "plural": "reliquias",
+              "titulo": "Las reliquias",
+              "cosas": [
+                {
+                  "id": "q0",
+                  "name": "Escarabeo de lapislázuli",
+                  "description": "Una Escarabeo de lapislázuli."
+                },
+                {
+                  "id": "q1",
+                  "name": "Máscara funeraria",
+                  "description": "Una Máscara funeraria."
+                },
+                {
+                  "id": "q2",
+                  "name": "Vaso canopo",
+                  "description": "Una Vaso canopo."
+                }
+              ]
             },
             {
-              "id": "q1",
-              "name": "Máscara funeraria",
-              "description": "Una Máscara funeraria."
-            },
-            {
-              "id": "q2",
-              "name": "Vaso canopo",
-              "description": "Una Vaso canopo."
+              "categoriaId": "ritos",
+              "singular": "rito",
+              "plural": "ritos",
+              "titulo": "Los cinco ritos",
+              "cosas": [
+                {
+                  "id": "t0",
+                  "name": "Rito del Agua"
+                },
+                {
+                  "id": "t1",
+                  "name": "Rito del Aliento"
+                },
+                {
+                  "id": "t2",
+                  "name": "Rito del Nombre"
+                },
+                {
+                  "id": "t3",
+                  "name": "Rito de la Balanza"
+                },
+                {
+                  "id": "t4",
+                  "name": "Rito del Silencio"
+                }
+              ]
             }
           ],
           "miLugar": "c0",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "c2"
+            },
+            {
+              "round": 2,
+              "lugarId": "c3"
+            },
+            {
+              "round": 3,
+              "lugarId": "c4"
+            },
+            {
+              "round": 4,
+              "lugarId": "c0"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -34972,27 +38254,78 @@
               }
             }
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "q0",
-              "name": "Escarabeo de lapislázuli",
-              "description": "Una Escarabeo de lapislázuli."
+              "categoriaId": "reliquias",
+              "singular": "reliquia",
+              "plural": "reliquias",
+              "titulo": "Las reliquias",
+              "cosas": [
+                {
+                  "id": "q0",
+                  "name": "Escarabeo de lapislázuli",
+                  "description": "Una Escarabeo de lapislázuli."
+                },
+                {
+                  "id": "q1",
+                  "name": "Máscara funeraria",
+                  "description": "Una Máscara funeraria."
+                },
+                {
+                  "id": "q2",
+                  "name": "Vaso canopo",
+                  "description": "Una Vaso canopo."
+                }
+              ]
             },
             {
-              "id": "q1",
-              "name": "Máscara funeraria",
-              "description": "Una Máscara funeraria."
-            },
-            {
-              "id": "q2",
-              "name": "Vaso canopo",
-              "description": "Una Vaso canopo."
+              "categoriaId": "ritos",
+              "singular": "rito",
+              "plural": "ritos",
+              "titulo": "Los cinco ritos",
+              "cosas": [
+                {
+                  "id": "t0",
+                  "name": "Rito del Agua"
+                },
+                {
+                  "id": "t1",
+                  "name": "Rito del Aliento"
+                },
+                {
+                  "id": "t2",
+                  "name": "Rito del Nombre"
+                },
+                {
+                  "id": "t3",
+                  "name": "Rito de la Balanza"
+                },
+                {
+                  "id": "t4",
+                  "name": "Rito del Silencio"
+                }
+              ]
             }
           ],
           "miLugar": "c1",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "c3"
+            },
+            {
+              "round": 2,
+              "lugarId": "c4"
+            },
+            {
+              "round": 3,
+              "lugarId": "c0"
+            },
+            {
+              "round": 4,
+              "lugarId": "c1"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
@@ -35412,27 +38745,78 @@
               }
             }
           },
-          "objetos": [
+          "entidades": [
             {
-              "id": "q0",
-              "name": "Escarabeo de lapislázuli",
-              "description": "Una Escarabeo de lapislázuli."
+              "categoriaId": "reliquias",
+              "singular": "reliquia",
+              "plural": "reliquias",
+              "titulo": "Las reliquias",
+              "cosas": [
+                {
+                  "id": "q0",
+                  "name": "Escarabeo de lapislázuli",
+                  "description": "Una Escarabeo de lapislázuli."
+                },
+                {
+                  "id": "q1",
+                  "name": "Máscara funeraria",
+                  "description": "Una Máscara funeraria."
+                },
+                {
+                  "id": "q2",
+                  "name": "Vaso canopo",
+                  "description": "Una Vaso canopo."
+                }
+              ]
             },
             {
-              "id": "q1",
-              "name": "Máscara funeraria",
-              "description": "Una Máscara funeraria."
-            },
-            {
-              "id": "q2",
-              "name": "Vaso canopo",
-              "description": "Una Vaso canopo."
+              "categoriaId": "ritos",
+              "singular": "rito",
+              "plural": "ritos",
+              "titulo": "Los cinco ritos",
+              "cosas": [
+                {
+                  "id": "t0",
+                  "name": "Rito del Agua"
+                },
+                {
+                  "id": "t1",
+                  "name": "Rito del Aliento"
+                },
+                {
+                  "id": "t2",
+                  "name": "Rito del Nombre"
+                },
+                {
+                  "id": "t3",
+                  "name": "Rito de la Balanza"
+                },
+                {
+                  "id": "t4",
+                  "name": "Rito del Silencio"
+                }
+              ]
             }
           ],
           "miLugar": "c2",
-          "misPistas": [],
-          "misHallazgos": [],
-          "hechos": [],
+          "miRecorrido": [
+            {
+              "round": 1,
+              "lugarId": "c4"
+            },
+            {
+              "round": 2,
+              "lugarId": "c0"
+            },
+            {
+              "round": 3,
+              "lugarId": "c1"
+            },
+            {
+              "round": 4,
+              "lugarId": "c2"
+            }
+          ],
           "cronica": [],
           "cronologia": [
             {
