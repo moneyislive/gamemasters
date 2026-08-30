@@ -729,6 +729,26 @@ export const MOMIA: ManifiestoDeJuego = {
     desenlace: [],
   },
 
+  /*
+   * QUE SIGNIFICA CADA UNA DE MIS FASES.
+   *
+   * El nucleo le hacia cinco preguntas a la fase comparando con NOMBRES:
+   * `fase === 'lobby'`, `phase === 'desenlace'`, `phase === 'ronda-abierta'`.
+   * Con los nombres abiertos eso deja de significar nada, asi que se declara.
+   *
+   * Los tres juegos de hoy dicen lo mismo, y no es duplicacion que haya que
+   * factorizar: es que los tres nacieron del mismo molde. El dia que uno tenga
+   * dos fases abiertas o ninguna sala de espera, su tabla dejara de parecerse a
+   * las otras y estara bien.
+   */
+  papelDeFase: {
+    'lobby': 'espera',
+    'ronda-abierta': 'turno',
+    'ronda-cerrada': 'entreacto',
+    'sellado': 'decision',
+    'desenlace': 'fin',
+  },
+
   trofeos: TROFEOS_MOMIA,
   seccionesDeDosier: SECCIONES_MOMIA,
   preparacion: {

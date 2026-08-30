@@ -35,7 +35,7 @@
  * lo que todavía obliga a un juego nuevo a disfrazarse de CLUEDO, y son el
  * verdadero resultado de esta comprobación: mientras quede uno, el patrón limita.
  */
-import { manifiestoDe, registrarJuego } from '../../shared/juegos';
+import { manifiestoDe, papelDe, registrarJuego } from '../../shared/juegos';
 import {
   accionesDisponibles,
   ejecutarAccion,
@@ -135,7 +135,7 @@ const LA_ALMONEDA: ManifiestoDeJuego = {
     {
       id: 'pujar',
       rotulo: 'Pujar',
-      fases: ['ronda-abierta'],
+      fases: ['lote-cantado'],
       eligeDe: [{ campo: 'lote', categoria: 'lotes', rotulo: '¿Por cuál pujas?' }],
       /*
        * LA PUJA ES UN NÚMERO, y ahora se puede pedir.
@@ -154,7 +154,7 @@ const LA_ALMONEDA: ManifiestoDeJuego = {
       ],
       vecesPorTurno: 1,
     },
-    { id: 'pasar', rotulo: 'Pasar', fases: ['ronda-abierta'], vecesPorTurno: 1 },
+    { id: 'pasar', rotulo: 'Pasar', fases: ['lote-cantado'], vecesPorTurno: 1 },
   ],
 
   /*
@@ -201,10 +201,28 @@ const LA_ALMONEDA: ManifiestoDeJuego = {
    * `ronda-abierta` es «se canta un lote», `ronda-cerrada` es «adjudicado» y
    * `desenlace` es «la cuenta». Traducido, no dicho.
    */
+  /*
+   * ═══ SUS PROPIOS NOMBRES DE FASE ═══
+   *
+   * Aqui ponia `lobby`, `ronda-abierta`, `ronda-cerrada` y `desenlace`, que son
+   * los de CLUEDO, porque `LivePhase` era una union cerrada de siete y no habia
+   * otros. Una almoneda llamaba «ronda-abierta» a que se canta un lote.
+   *
+   * Ahora los nombres son suyos. La plataforma no reconoce ninguno: pregunta el
+   * PAPEL, que se declara justo debajo. Esta es la prueba de que el peaje se
+   * fue de verdad y no solo de la lista.
+   */
   fases: {
-    lobby: ['ronda-abierta'],
-    'ronda-abierta': ['ronda-cerrada'],
-    'ronda-cerrada': ['ronda-abierta', 'desenlace'],
+    'sala-vacia': ['lote-cantado'],
+    'lote-cantado': ['lote-adjudicado'],
+    'lote-adjudicado': ['lote-cantado', 'almoneda-cerrada'],
+  },
+
+  papelDeFase: {
+    'sala-vacia': 'espera',
+    'lote-cantado': 'turno',
+    'lote-adjudicado': 'entreacto',
+    'almoneda-cerrada': 'fin',
   },
 
   reglas: [
@@ -357,7 +375,7 @@ const sesion: LiveSession = {
   id: game.id,
   juego: 'la-almoneda',
   code: 'ALMON',
-  phase: 'lobby',
+  phase: 'sala-vacia',
   round: 0,
   totalRounds: 5,
   players: POSTORES.map((name, i) => ({
@@ -392,7 +410,18 @@ comprobar(
 
 paso('Se juega una subasta entera');
 abrirRonda(sesion, 10);
-comprobar('la sala se abre', sesion.phase === 'ronda-abierta');
+/*
+ * Y ESTA ES LA LINEA QUE MAS DICE DE TODO EL FICHERO.
+ *
+ * Antes afirmaba `sesion.phase === 'ronda-abierta'`, porque la plataforma solo
+ * sabia llevar la partida a las siete fases de CLUEDO. `abrirRonda` tenia
+ * escrito el nombre.
+ *
+ * Ahora la subasta abre `lote-cantado`, que es una fase que solo existe en su
+ * manifiesto, y la conduce el mismo `abrirRonda` de siempre — preguntando cual
+ * de las fases de este juego hace el papel de turno.
+ */
+comprobar('la sala se abre en la fase que ESTE juego llama suya', sesion.phase === 'lote-cantado');
 
 sesion.turnoDe = 'p0';
 const disponibles = accionesDisponibles(sesion, 'p0').map((a) => a.id);
@@ -464,7 +493,7 @@ comprobar(
  * propia —o sea, publicar una versión nueva del binario— solo para poder teclear
  * una cifra.
  */
-sesion.phase = 'ronda-abierta';
+sesion.phase = 'lote-cantado';
 /*
  * Se le pregunta a p2 y no a p1: `vecesPorTurno: 1` cuenta POR RONDA, y p1 ya
  * pujó en esta. Preguntarle a él devolvería la lista vacía por el motivo
@@ -512,7 +541,25 @@ comprobar(
     (c) => c.secret === undefined && c.motive === undefined && c.alibi === undefined && c.personalHook === undefined,
   ),
 );
-peaje('los NOMBRES de las fases siguen siendo los de CLUEDO: una subasta llama «ronda-abierta» a «se canta un lote»');
+/*
+ * ═══ Y OTRO PEAJE QUE YA NO SE COBRA ═══
+ *
+ * Este era el que el propio informe de arquitectura marcaba como «el bloqueo de
+ * fondo». `LivePhase` era una union cerrada de siete nombres —seis de CLUEDO y
+ * uno que añadio la Momia cuando le hizo falta, lo cual describe el problema
+ * entero: para tener una fase propia habia que venir al contrato de todos y
+ * añadir un renglon.
+ *
+ * Esta subasta ya no lo paga: sus fases se llaman `sala-vacia`, `lote-cantado`,
+ * `lote-adjudicado` y `almoneda-cerrada`, y la plataforma la conduce sin
+ * reconocer ni uno de esos nombres.
+ */
+comprobar(
+  'sus fases se llaman como quiere y la plataforma las entiende igual',
+  papelDe(LA_ALMONEDA, 'sala-vacia') === 'espera' &&
+    papelDe(LA_ALMONEDA, 'lote-cantado') === 'turno' &&
+    papelDe(LA_ALMONEDA, 'almoneda-cerrada') === 'fin',
+);
 peaje('la categoría de personas tiene que ir a `suspects` o no hay emparejamiento, dosieres ni correos');
 peaje('`VistaJugador` obliga a mandar salas, objetos, pistas y cronología vacías aunque el juego no tenga nada de eso');
 

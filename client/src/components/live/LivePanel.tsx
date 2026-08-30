@@ -11,8 +11,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ComponentType } from 'react';
 import { useAppStore } from '../../state/store';
-import { manifiestoDe } from '../../../../shared/juegos';
-import { FASES_EN_JUEGO } from '../../../../shared/live';
+import { manifiestoDe, papelDe } from '../../../../shared/juegos';
+import { PAPELES_EN_JUEGO } from '../../../../shared/live';
 import type { LivePhase, VistaGameMaster } from '../../../../shared/live';
 import { palabrasDe } from '../../juegos/palabras';
 import type { PalabrasDeJuego } from '../../juegos/palabras';
@@ -183,8 +183,13 @@ export default function LivePanel(): JSX.Element {
   const { sesion } = vista;
   // Gente de la partida que no tiene silla en la sesion abierta.
   const sinSilla = game.suspects.filter((s) => !sesion.players.some((p) => p.suspectId === s.id));
-  const enRonda = sesion.phase === 'ronda-abierta';
-  const rondaCerrada = sesion.phase === 'ronda-cerrada';
+  /*
+   * POR EL PAPEL, NO POR EL NOMBRE. Eran `sesion.phase === 'ronda-abierta'` y
+   * `=== 'ronda-cerrada'`, o sea el taller reconociendo las fases de CLUEDO. Un
+   * juego que llame `lote-cantado` a su turno tenia el panel apagado entero.
+   */
+  const enRonda = papelDe(manifiesto, sesion.phase) === 'turno';
+  const rondaCerrada = papelDe(manifiesto, sesion.phase) === 'entreacto';
   /*
    * ¿Se ha agotado lo que la trama tenía escrito? Es un AVISO, no un tope.
    *
@@ -423,7 +428,7 @@ export default function LivePanel(): JSX.Element {
             dice cuanta gente queda por acusar —y es de lo que depende decidir
             cuando abrir el sobre. Atado a `acusaciones` se habria quedado a
             cero para siempre. */}
-        {FASES_EN_JUEGO.includes(sesion.phase) && (
+        {PAPELES_EN_JUEGO.includes(papelDe(manifiesto, sesion.phase)) && (
           <p className="text-dim text-italic">
             {/*
               CON LA PALABRA DEL JUEGO, y sale de `palabras.ts` como el resto de

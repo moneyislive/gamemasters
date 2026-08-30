@@ -22,7 +22,7 @@
  * que separa las dos mitades: si un humano lo diría como una tabla, es dato; si
  * lo diría como «y entonces…», es código.
  */
-import type { LivePhase, TrofeoInfo } from '../live';
+import type { LivePhase, PapelDeFase, TrofeoInfo } from '../live';
 import type { DocumentSectionInfo } from '../types';
 import type { PrintableDocInfo } from '../documents';
 
@@ -689,12 +689,42 @@ export interface ManifiestoDeJuego {
    * tumba. Ese es el peaje que un juego nuevo pagaba solo por entrar, y el
    * comprobador `verify:ajeno` lo tenía en su lista.
    *
-   * LO QUE NO CAMBIA es que los nombres de las fases siguen siendo los de CLUEDO:
-   * una almoneda tiene que llamar `ronda-abierta` a «se canta un lote». Abrir
-   * `LivePhase` a cadena libre es el paso siguiente y es más caro, porque toca la
-   * máquina de estados y los rótulos de la app.
+   * Y LOS NOMBRES YA SON LIBRES. Eran los siete de CLUEDO —una almoneda tenía
+   * que llamar `ronda-abierta` a «se canta un lote»— y ahora un juego pone los
+   * suyos. Lo que la plataforma necesita saber de cada uno no es el nombre sino
+   * el PAPEL, y eso se declara justo debajo.
    */
   fases: Partial<Record<LivePhase, LivePhase[]>>;
+
+  /**
+   * Qué significa cada una de tus fases para la plataforma.
+   *
+   * ═══ POR QUÉ HACE FALTA DECLARARLO ═══
+   *
+   * El núcleo le hacía cinco preguntas a la fase y se las hacía COMPARANDO CON
+   * NOMBRES: `if (fase === 'lobby')` para saber si aún no había empezado,
+   * `phase === 'desenlace'` para saber si podía enseñar la respuesta,
+   * `sesion.phase === 'ronda-abierta'` para saber si admitía elecciones. Con los
+   * nombres abiertos, esas comparaciones dejan de significar nada — y sin nada
+   * que las sustituya, un juego con sus propias fases se quedaría sin sala de
+   * espera, sin desenlace y sin turno abierto.
+   *
+   * Así que se declara. La plataforma no reconoce ningún nombre: pregunta el
+   * papel y actúa.
+   *
+   * ═══ QUÉ PASA CON LO QUE NO SE DECLARE ═══
+   *
+   * Una fase sin papel es `'entreacto'`: se está jugando y el turno no admite
+   * acciones. Es el papel que menos daño hace si alguien se olvida — no deja
+   * entrar a nadie por error ni destapa la solución antes de tiempo.
+   *
+   * ═══ LOS TRES JUEGOS DE HOY DECLARAN LO MISMO ═══
+   *
+   * Y no es duplicación que haya que factorizar: es que los tres nacieron del
+   * mismo molde. El día que uno tenga dos fases abiertas o ninguna sala de
+   * espera, su tabla dejará de parecerse a las otras y estará bien.
+   */
+  papelDeFase: Partial<Record<LivePhase, PapelDeFase>>;
 
   trofeos: TrofeoInfo[];
   seccionesDeDosier: DocumentSectionInfo[];
@@ -942,4 +972,35 @@ export function aciertos(
   solucion: Record<EjeId, string>,
 ): number {
   return ejes(m).filter((e) => respuestas[e.id] === solucion[e.id]).length;
+}
+
+// ---------------------------------------------------------------------------
+// El papel de una fase
+// ---------------------------------------------------------------------------
+
+/**
+ * Qué es esta fase para la plataforma.
+ *
+ * Lo declara el juego. Una fase sin declarar es `'entreacto'` —se está jugando
+ * y el turno no admite acciones— porque es el papel que menos daño hace si
+ * alguien se olvida: no deja entrar a nadie por error ni destapa la solución
+ * antes de tiempo.
+ */
+export function papelDe(m: ManifiestoDeJuego, fase: LivePhase): PapelDeFase {
+  return m.papelDeFase[fase] ?? 'entreacto';
+}
+
+/** ¿Esta fase hace este papel? */
+export function faseEs(m: ManifiestoDeJuego, fase: LivePhase, papel: PapelDeFase): boolean {
+  return papelDe(m, fase) === papel;
+}
+
+/**
+ * Las fases de este juego que hacen un papel dado.
+ *
+ * Sustituye a mirar en una lista de nombres. Un juego puede tener dos fases
+ * abiertas —exploración y combate— o ninguna sala de espera.
+ */
+export function fasesConPapel(m: ManifiestoDeJuego, papel: PapelDeFase): LivePhase[] {
+  return Object.keys(m.fases).filter((f) => papelDe(m, f) === papel);
 }

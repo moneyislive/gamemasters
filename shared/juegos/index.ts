@@ -24,6 +24,9 @@ import type { TrofeoInfo } from '../live';
 export {
   aciertos,
   accionDeAcusacion,
+  faseEs,
+  fasesConPapel,
+  papelDe,
   accionDeEntrarEnLugar,
   categoria,
   categoriaDeJugadores,

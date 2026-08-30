@@ -108,6 +108,15 @@ const LA_OCA: ManifiestoDeJuego = {
     intermedio: [],
     desenlace: [],
   },
+
+  papelDeFase: {
+    lobby: 'espera',
+    'ronda-abierta': 'turno',
+    'ronda-cerrada': 'entreacto',
+    intermedio: 'pausa',
+    acusaciones: 'decision',
+    desenlace: 'fin',
+  },
   trofeos: [],
   seccionesDeDosier: [],
   documentos: [],

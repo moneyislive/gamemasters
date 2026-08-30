@@ -12,8 +12,17 @@ import { numeroDeRondas } from '../docs/datos';
 import { avisarCambio } from './hub';
 import { senalEnMemoria, volcarPresencia } from './presencia';
 import { iniciarJuego } from '../juegos/inicios';
-import { ALFABETO_CODIGO, FASES_EN_JUEGO } from '../../../shared/live';
-import { aciertos, esElSenalado, ejes as ejesDe, manifiestoDe, respuestaCompleta } from '../../../shared/juegos';
+import { ALFABETO_CODIGO, PAPELES_EN_JUEGO } from '../../../shared/live';
+import type { PapelDeFase } from '../../../shared/live';
+import {
+  aciertos,
+  fasesConPapel,
+  esElSenalado,
+  ejes as ejesDe,
+  manifiestoDe,
+  papelDe,
+  respuestaCompleta,
+} from '../../../shared/juegos';
 import type { EjeId, JuegoId } from '../../../shared/juegos';
 import type { Acusacion, LivePhase, LivePlayer, LiveSession } from '../../../shared/live';
 import type { GameSession } from '../../../shared/types';
@@ -272,11 +281,38 @@ export class TransicionInvalida extends Error {
 }
 
 /** Minutos por defecto de una ronda. El Game Master puede alargarla. */
+
+/**
+ * A qué fase de ESTE juego lleva una transición.
+ *
+ * ═══ LAS TRANSICIONES TENIAN ESCRITO EL NOMBRE ═══
+ *
+ * `abrirRonda` decía literalmente «pasa a la fase llamada `ronda-abierta`», y
+ * las otras seis igual. Mientras los nombres fueron los mismos para todos eso
+ * funcionaba; en cuanto un juego llama `lote-cantado` a su turno, `abrirRonda`
+ * revienta con «No se puede pasar de sala-vacia a ronda-abierta» — que es un
+ * mensaje sobre fases que ese juego no tiene.
+ *
+ * Ahora se pregunta por el PAPEL y el juego contesta con su nombre.
+ *
+ * PREFIERE LA ALCANZABLE. Si desde donde estamos hay camino a una de las
+ * candidatas, esa; si no, la primera que declare. Importa en un juego con dos
+ * fases del mismo papel —una campaña con dos clases de turno— donde ir a la que
+ * toca no es lo mismo que ir a la primera de la lista.
+ */
+function faseCon(sesion: LiveSession, papel: PapelDeFase): LivePhase {
+  const manifiesto = manifiestoDe(sesion.juego);
+  const candidatas = fasesConPapel(manifiesto, papel);
+  const desdeAqui = manifiesto.fases[sesion.phase] ?? [];
+  return candidatas.find((f) => desdeAqui.includes(f)) ?? candidatas[0] ?? papel;
+}
+
 export const MINUTOS_POR_RONDA = 15;
 
 export function abrirRonda(sesion: LiveSession, minutos = MINUTOS_POR_RONDA): void {
-  if (!puedePasarA(sesion.juego, sesion.phase,'ronda-abierta')) {
-    throw new TransicionInvalida(sesion.phase, 'ronda-abierta');
+  const destino = faseCon(sesion, 'turno');
+  if (!puedePasarA(sesion.juego, sesion.phase, destino)) {
+    throw new TransicionInvalida(sesion.phase, destino);
   }
   const ahora = new Date();
   sesion.round += 1;
@@ -301,17 +337,18 @@ export function abrirRonda(sesion: LiveSession, minutos = MINUTOS_POR_RONDA): vo
    * que ya se había entregado.
    */
   if (sesion.round > sesion.totalRounds) sesion.totalRounds = sesion.round;
-  sesion.phase = 'ronda-abierta';
+  sesion.phase = destino;
   sesion.roundStartedAt = ahora.toISOString();
   sesion.roundEndsAt = new Date(ahora.getTime() + minutos * 60_000).toISOString();
   if (!sesion.startedAt) sesion.startedAt = ahora.toISOString();
 }
 
 export function cerrarRonda(sesion: LiveSession): void {
-  if (!puedePasarA(sesion.juego, sesion.phase,'ronda-cerrada')) {
-    throw new TransicionInvalida(sesion.phase, 'ronda-cerrada');
+  const destino = faseCon(sesion, 'entreacto');
+  if (!puedePasarA(sesion.juego, sesion.phase, destino)) {
+    throw new TransicionInvalida(sesion.phase, destino);
   }
-  sesion.phase = 'ronda-cerrada';
+  sesion.phase = destino;
   sesion.roundEndsAt = undefined;
   /*
    * Se anota en qué salas estuvo alguien. NO ES UN TABLÓN: esta lista publicaba
@@ -345,8 +382,9 @@ export function cerrarEncuentro(
   sesion: LiveSession,
   cierre: { titulo: string; resumen: string },
 ): void {
-  if (!puedePasarA(sesion.juego, sesion.phase, 'intermedio')) {
-    throw new TransicionInvalida(sesion.phase, 'intermedio');
+  const destino = faseCon(sesion, 'pausa');
+  if (!puedePasarA(sesion.juego, sesion.phase, destino)) {
+    throw new TransicionInvalida(sesion.phase, destino);
   }
 
   const cronica = sesion.cronica ?? [];
@@ -364,7 +402,7 @@ export function cerrarEncuentro(
       cerradoEl: new Date().toISOString(),
     },
   ];
-  sesion.phase = 'intermedio';
+  sesion.phase = destino;
   sesion.roundEndsAt = undefined;
   // Nadie tiene el turno mientras la mesa está levantada.
   sesion.turnoDe = undefined;
@@ -380,18 +418,20 @@ export function cerrarEncuentro(
  * ambiguo todo lo ya escrito en el tablón y en la crónica.
  */
 export function abrirEncuentro(sesion: LiveSession): void {
-  if (sesion.phase !== 'intermedio') {
-    throw new TransicionInvalida(sesion.phase, 'ronda-abierta');
+  // Por el papel: solo se retoma desde una pausa entre encuentros.
+  if (papelDe(manifiestoDe(sesion.juego), sesion.phase) !== 'pausa') {
+    throw new TransicionInvalida(sesion.phase, faseCon(sesion, 'espera'));
   }
   sesion.encuentro = (sesion.encuentro ?? 1) + 1;
-  sesion.phase = 'lobby';
+  sesion.phase = faseCon(sesion, 'espera');
 }
 
 export function abrirAcusaciones(sesion: LiveSession): void {
-  if (!puedePasarA(sesion.juego, sesion.phase,'acusaciones')) {
-    throw new TransicionInvalida(sesion.phase, 'acusaciones');
+  const destino = faseCon(sesion, 'decision');
+  if (!puedePasarA(sesion.juego, sesion.phase, destino)) {
+    throw new TransicionInvalida(sesion.phase, destino);
   }
-  sesion.phase = 'acusaciones';
+  sesion.phase = destino;
   sesion.roundEndsAt = undefined;
 }
 
@@ -405,18 +445,20 @@ export function abrirAcusaciones(sesion: LiveSession): void {
  * CLUEDO una puerta que no deberia tener.
  */
 export function abrirSellado(sesion: LiveSession): void {
-  if (!puedePasarA(sesion.juego, sesion.phase, 'sellado')) {
-    throw new TransicionInvalida(sesion.phase, 'sellado');
+  const destino = faseCon(sesion, 'decision');
+  if (!puedePasarA(sesion.juego, sesion.phase, destino)) {
+    throw new TransicionInvalida(sesion.phase, destino);
   }
-  sesion.phase = 'sellado';
+  sesion.phase = destino;
   sesion.roundEndsAt = undefined;
 }
 
 export function revelarDesenlace(game: GameSession, sesion: LiveSession): void {
-  if (!puedePasarA(sesion.juego, sesion.phase,'desenlace')) {
-    throw new TransicionInvalida(sesion.phase, 'desenlace');
+  const destino = faseCon(sesion, 'fin');
+  if (!puedePasarA(sesion.juego, sesion.phase, destino)) {
+    throw new TransicionInvalida(sesion.phase, destino);
   }
-  sesion.phase = 'desenlace';
+  sesion.phase = destino;
   /*
    * QUIÉNES GANARON, PREGUNTÁNDOLE AL JUEGO, y se guarda aquí y una sola vez.
    *
@@ -497,10 +539,13 @@ export function acusar(
    * Lo que NO cambia: una acusación por persona y para toda la partida, no por
    * ronda. Lo comprueba la línea de abajo contra `sesion.acusaciones` entera.
    *
-   * `FASES_EN_JUEGO` incluye la fase `acusaciones`, así que las partidas que ya
-   * estén ahí siguen funcionando igual.
+   * POR EL PAPEL, NO POR EL NOMBRE. Era `FASES_EN_JUEGO.includes(sesion.phase)`
+   * contra una lista de cuatro nombres escrita en el contrato comun —los de
+   * CLUEDO mas el sellado de la Momia—, asi que un juego con fases propias no
+   * podia señalar a nadie en ninguna de ellas. Ahora se pregunta si en esta
+   * fase se esta jugando, que es lo que hace falta saber.
    */
-  if (!FASES_EN_JUEGO.includes(sesion.phase)) {
+  if (!PAPELES_EN_JUEGO.includes(papelDe(manifiestoDe(sesion.juego), sesion.phase))) {
     throw new Error('Todavía no se puede acusar.');
   }
   if (sesion.acusaciones.some((a) => a.suspectId === suspectId)) {

@@ -113,6 +113,15 @@ const EL_LEGADO: ManifiestoDeJuego = {
     desenlace: [],
   },
 
+  papelDeFase: {
+    lobby: 'espera',
+    'ronda-abierta': 'turno',
+    'ronda-cerrada': 'entreacto',
+    intermedio: 'pausa',
+    acusaciones: 'decision',
+    desenlace: 'fin',
+  },
+
   trofeos: [
     { id: 'primera-partida', nombre: 'Primera velada', descripcion: 'Jugaste una entera.', glifo: '🕯' },
   ],

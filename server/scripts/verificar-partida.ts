@@ -28,7 +28,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { generateBoardLayout } from '../src/board/generator';
 import { generateDemoPlot } from '../src/plot/cluedo-demo';
-import { esElSenalado, manifiestoDe, ejes as ejesDe } from '../../shared/juegos';
+import { CLUEDO, ejes as ejesDe, esElSenalado, fasesConPapel, manifiestoDe } from '../../shared/juegos';
 import type { GameSession } from '../../shared/types';
 import type { LiveSession, VistaJugador } from '../../shared/live';
 
@@ -464,25 +464,38 @@ async function jugar(): Promise<void> {
   v = await vista();
   comprobar('quedando la ronda cerrada', v.sesion.phase === 'ronda-cerrada', v.sesion.phase);
 
-  paso('La fase de otro juego no le abre a CLUEDO ninguna puerta');
+  paso('CLUEDO no llega a ninguna fase que no haya declarado');
   /*
-   * `sellado` la trae El Misterio de la Momia y se anadio a `LivePhase`, que es
-   * el contrato COMUN. Ampliar una union cerrada para meter contenido de un solo
-   * juego es justo el tipo de cambio que puede colarle a los demas una fase que
-   * no deberian tener, y aqui se comprueba que no: el grafo de CLUEDO declara
-   * `sellado: []`, asi que la transicion se rechaza.
+   * ═══ ESTA PRUEBA CAMBIO DE FORMA, Y CONVIENE SABER POR QUE ═══
    *
-   * Sin esta linea, el dia que alguien escriba `sellado: ['desenlace']` por
-   * descuido en el manifiesto de CLUEDO, no lo notaria nadie.
+   * Antes decia: «`sellado` la trae la Momia, se añadio a `LivePhase` —que es el
+   * contrato COMUN— y aqui se comprueba que no se le cuela a CLUEDO». Tenia todo
+   * el sentido mientras `LivePhase` era una union cerrada donde cada juego venia
+   * a añadir su renglon.
+   *
+   * Ya no lo es. Los nombres los pone cada juego y la plataforma pregunta por el
+   * PAPEL, asi que `sellado` y `acusaciones` resultaron ser la misma transicion
+   * —«se decide la partida»— con dos nombres, y las dos rutas hacen lo mismo.
+   * La pregunta que valia la pena hacer es otra, y es la de abajo: que CLUEDO no
+   * pueda acabar en una fase que su manifiesto no declara.
    */
   const selladoEnCluedo = await pedir(`/games/${game.id}/live/sellado`, { metodo: 'POST' });
-  comprobar(
-    'CLUEDO rechaza pasar al sellado',
-    selladoEnCluedo.estado === 409,
-    selladoEnCluedo.datos,
-  );
   v = await vista();
-  comprobar('y se queda donde estaba', v.sesion.phase === 'ronda-cerrada', v.sesion.phase);
+  comprobar(
+    'la ruta del sellado no deja a CLUEDO en una fase que no declara',
+    Object.keys(CLUEDO.fases).includes(v.sesion.phase),
+    { fase: v.sesion.phase, declaradas: Object.keys(CLUEDO.fases) },
+  );
+  comprobar(
+    'y CLUEDO no declara ninguna fase llamada «sellado»',
+    !Object.keys(CLUEDO.fases).includes('sellado') && CLUEDO.papelDeFase['sellado'] === undefined,
+    { porque: 'era de la Momia y estaba en el contrato comun' },
+  );
+  comprobar(
+    'su fase de decision es la suya',
+    fasesConPapel(CLUEDO, 'decision').join(',') === 'acusaciones',
+    fasesConPapel(CLUEDO, 'decision'),
+  );
 
   paso('El desenlace');
   const desenlace = await pedir(`/games/${game.id}/live/desenlace`, { metodo: 'POST' });

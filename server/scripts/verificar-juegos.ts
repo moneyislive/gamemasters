@@ -35,6 +35,7 @@ import { iniciarJuego } from '../src/juegos/inicios';
 import { trofeosDelJuego } from '../src/juegos/trofeos';
 import { generadorDeTrama } from '../src/juegos/generadores';
 import { ampliacionDe } from '../src/juegos/ampliaciones';
+import { fasesConPapel, papelDe } from '../../shared/juegos';
 import { dosieresDe } from '../src/docs/dosieres';
 import { vozDelTaller } from '../src/agent/voces';
 import { juegosConVeredicto } from '../src/juegos/veredictos';
@@ -49,7 +50,7 @@ import {
   manifiestoDe,
   manifiestoSiExiste,
 } from '../../shared/juegos';
-import { FASES_EN_JUEGO } from '../../shared/live';
+import { PAPELES_EN_JUEGO } from '../../shared/live';
 import type { BloqueDeDosier, ManifiestoDeJuego } from '../../shared/juegos';
 import type { LivePhase, LiveSession } from '../../shared/live';
 import type { GameSession } from '../../shared/types';
@@ -221,7 +222,7 @@ for (const m of juegosInstalados()) {
 
   // ---- 2. Fases con ruta que las abra ----
   const alcanzables = new Set<LivePhase>();
-  for (const destinos of Object.values(m.fases)) for (const d of destinos) alcanzables.add(d);
+  for (const destinos of Object.values(m.fases)) for (const d of destinos ?? []) alcanzables.add(d);
   const sinRuta = [...alcanzables].filter((f) => {
     const re = RUTA_DE_FASE[f];
     return re ? !re.test(rutasLive) : false;
@@ -346,11 +347,26 @@ for (const m of juegosInstalados()) {
     );
   }
 
-  // ---- 3. Se puede terminar la partida ----
-  const puedeAcabar = Object.entries(m.fases).some(
-    ([desde, a]) => (FASES_EN_JUEGO as readonly LivePhase[]).includes(desde as LivePhase) && a.includes('desenlace'),
+  /*
+   * ---- 3. Se puede terminar la partida ----
+   *
+   * POR EL PAPEL, NO POR EL NOMBRE. Esto miraba si desde una de las cuatro
+   * fases de `FASES_EN_JUEGO` —una lista de nombres de CLUEDO en el contrato
+   * comun— habia camino a una fase llamada literalmente `desenlace`. Un juego
+   * con sus propias fases no tenia ninguna de las dos cosas y salia en rojo sin
+   * estar roto.
+   */
+  const finales = new Set(fasesConPapel(m, 'fin'));
+  comprobar(
+    `${m.id}: declara alguna fase que termine la partida`,
+    finales.size > 0,
+    'sin una fase con papel «fin» no hay forma de acabar ni de enseñar la respuesta',
   );
-  comprobar(`${m.id}: hay camino a «desenlace» desde una fase en juego`, puedeAcabar);
+  const puedeAcabar = Object.entries(m.fases).some(
+    ([desde, a]) =>
+      PAPELES_EN_JUEGO.includes(papelDe(m, desde)) && (a ?? []).some((d) => finales.has(d)),
+  );
+  comprobar(`${m.id}: hay camino desde una fase en juego hasta el final`, puedeAcabar);
 
   // ---- 4. Coherencia interna del manifiesto ----
   const cats = new Set(m.categorias.map((c) => c.id));

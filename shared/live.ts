@@ -20,41 +20,86 @@ import type { CorreoDeCuenta, IdentidadDeProveedor } from './identidad';
 // Estado de la partida
 // ---------------------------------------------------------------------------
 
-export type LivePhase =
+/**
+ * En qué momento de la partida se está. CADENA LIBRE.
+ *
+ * ═══ ERA UNA UNIÓN CERRADA DE SIETE ═══
+ *
+ * `lobby`, `ronda-abierta`, `ronda-cerrada`, `acusaciones`, `sellado`,
+ * `intermedio` y `desenlace`. Seis nombres de CLUEDO y uno —`sellado`— que
+ * añadió El Misterio de la Momia cuando le hizo falta, lo cual describe el
+ * problema entero: para tener una fase propia había que venir a este fichero,
+ * que es el contrato de todos, y añadir un renglón.
+ *
+ * Y el que no venía, fingía. Una subasta llama `ronda-abierta` a «se canta un
+ * lote». Una campaña de rol con exploración, combate y descanso tendría que
+ * repartir tres momentos que no se parecen en nada entre unos nombres que
+ * hablan de rondas y acusaciones — o pedir tres renglones más aquí, y el
+ * siguiente juego otros tantos.
+ *
+ * ═══ QUÉ LA SUSTITUYE ═══
+ *
+ * Cada juego declara SUS fases en `manifiesto.fases`, con los nombres que
+ * quiera, y dice qué SIGNIFICA cada una con `manifiesto.papelDeFase`. La
+ * plataforma no reconoce ningún nombre: pregunta por el papel.
+ *
+ * Los tres juegos de hoy conservan los nombres que tenían, así que nada cambia
+ * para ellos. Lo que cambia es que ya no son los únicos posibles.
+ */
+export type LivePhase = string;
+
+/**
+ * Qué significa una fase PARA LA PLATAFORMA.
+ *
+ * Son las cinco preguntas que el núcleo le hacía a la fase, y se las hacía
+ * comparando con nombres: `if (fase === 'lobby')`, `if (phase === 'desenlace')`,
+ * `sesion.phase === 'ronda-abierta'`. Aquí están dichas por lo que quieren
+ * saber, que es lo único que la plataforma tiene derecho a preguntar.
+ */
+export type PapelDeFase =
   /** Aún no ha empezado: la gente va llegando y emparejando el móvil. */
-  | 'lobby'
-  /** Ronda en curso: se elige sala y se leen pistas. */
-  | 'ronda-abierta'
-  /** Ronda cerrada: puesta en común, lo encontrado pasa al tablón. */
-  | 'ronda-cerrada'
-  /** Ventana de acusación: todos escriben a la vez. */
-  | 'acusaciones'
+  | 'espera'
   /**
-   * El Sellado: la mesa ejecuta el ritual y se decide en bloque.
+   * EL TURNO QUE SE REPITE, abierto a acciones.
    *
-   * La trae El Misterio de la Momia y CLUEDO no pasa nunca por aquí. No es una
-   * fase de acusación con otro nombre: en una acusación cada cual responde por
-   * su cuenta y gana quien acierta; en el sellado se ejecuta UNA propuesta, la
-   * más votada, y de ella depende que gane un bando o el otro.
+   * La ronda de CLUEDO, la vigilia de la Momia, la hora de las Sombras, el lote
+   * que se canta en una subasta. Es la fase que se abre y se cierra una y otra
+   * vez hasta que la partida se decide.
    */
-  | 'sellado'
+  | 'turno'
+  /** El turno terminó y se habla, pero la partida sigue. */
+  | 'entreacto'
   /**
-   * Se cierra la sesión de hoy, pero la partida NO ha terminado.
+   * DONDE SE DECIDE LA PARTIDA.
+   *
+   * Las acusaciones de CLUEDO, el Sellado de la Momia, el consejo del alba de
+   * las Sombras. Son la misma transición con tres nombres, y hasta hoy eran tres
+   * fases distintas en el contrato común porque cada juego trajo la suya.
+   *
+   * No es un turno más: de un turno se sale al siguiente turno, y de aquí se
+   * sale al final.
+   */
+  | 'decision'
+  /**
+   * Se cierra la sesión de hoy y la partida NO ha terminado.
    *
    * Es lo que separa una velada de una campaña. Un CLUEDO no pasa nunca por
-   * aquí: empieza y acaba la misma noche. Una campaña de rol de varios días
-   * vive aquí entre encuentro y encuentro, conservándolo todo.
+   * aquí: empieza y acaba la misma noche. Una campaña de varios días vive aquí
+   * entre encuentro y encuentro, conservándolo todo.
    */
-  | 'intermedio'
-  /** Desenlace revelado. */
-  | 'desenlace';
+  | 'pausa'
+  /** Se acabó: ya se puede enseñar la respuesta. */
+  | 'fin';
 
-export const FASES_EN_JUEGO: LivePhase[] = [
-  'ronda-abierta',
-  'ronda-cerrada',
-  'acusaciones',
-  'sellado',
-];
+/**
+ * Los papeles en los que se está JUGANDO.
+ *
+ * Sustituye a `FASES_EN_JUEGO`, que era una lista de cuatro nombres —los de
+ * CLUEDO más el sellado de la Momia— en el contrato común. Preguntar por el
+ * papel en vez de por el nombre es lo que permite que un juego tenga cinco
+ * fases de juego o una sola.
+ */
+export const PAPELES_EN_JUEGO: PapelDeFase[] = ['turno', 'entreacto', 'decision'];
 
 /** Elección de sala de un jugador en una ronda concreta. */
 export interface EleccionDeSala {
