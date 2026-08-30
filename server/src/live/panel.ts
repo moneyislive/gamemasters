@@ -126,8 +126,33 @@ function resultadoDe(
   suspectId: string,
 ): PartidaDelPanel['resultado'] | undefined {
   if (sesion.phase !== 'desenlace') return undefined;
-  const ganador = sesion.players.find((p) => p.suspectId === sesion.winnerId);
   const mia = sesion.acusaciones.find((a) => a.suspectId === suspectId);
+
+  /*
+   * SI EL JUEGO DEJÓ ESCRITO QUIÉN GANÓ, manda eso.
+   *
+   * Aquí se leía solo `winnerId`, que significa «el primero que acertó la
+   * acusación». En un juego de bandos eso no es ganar: una noche en la que la
+   * expedición sellaba bien la tumba y nadie llegó a señalar al saqueador salía
+   * en esta lista como que no ganó nadie. `revelarDesenlace` guarda `ganadores`
+   * preguntándole al juego, y aquí solo hay que leerlo.
+   *
+   * Con varios ganadores no se nombra a uno: se dice cuántos. Poner el primero de
+   * la lista sería inventarse un protagonista donde ganó un bando.
+   */
+  const ganadores = sesion.ganadores;
+  if (ganadores && ganadores.length > 0) {
+    const nombres = ganadores
+      .map((id) => sesion.players.find((p) => p.suspectId === id)?.displayName)
+      .filter((n): n is string => Boolean(n));
+    return {
+      ganador: nombres.length === 1 ? nombres[0] : `${nombres.length} de los que jugaron`,
+      gane: ganadores.includes(suspectId),
+      acerte: Boolean(mia?.correcta),
+    };
+  }
+
+  const ganador = sesion.players.find((p) => p.suspectId === sesion.winnerId);
   return {
     ganador: ganador?.displayName,
     gane: Boolean(sesion.winnerId) && sesion.winnerId === suspectId,

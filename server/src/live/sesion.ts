@@ -17,6 +17,7 @@ import { aciertos, esElSenalado, ejes as ejesDe, manifiestoDe, respuestaCompleta
 import type { EjeId, JuegoId } from '../../../shared/juegos';
 import type { Acusacion, LivePhase, LivePlayer, LiveSession } from '../../../shared/live';
 import type { GameSession } from '../../../shared/types';
+import { ganadoresDe } from '../juegos/veredictos';
 
 // ---------------------------------------------------------------------------
 // Candado por partida
@@ -411,11 +412,26 @@ export function abrirSellado(sesion: LiveSession): void {
   sesion.roundEndsAt = undefined;
 }
 
-export function revelarDesenlace(sesion: LiveSession): void {
+export function revelarDesenlace(game: GameSession, sesion: LiveSession): void {
   if (!puedePasarA(sesion.juego, sesion.phase,'desenlace')) {
     throw new TransicionInvalida(sesion.phase, 'desenlace');
   }
   sesion.phase = 'desenlace';
+  /*
+   * QUIÉNES GANARON, PREGUNTÁNDOLE AL JUEGO, y se guarda aquí y una sola vez.
+   *
+   * `winnerId` --que se sigue escribiendo igual-- significa «el primero que
+   * acertó la acusación»: en CLUEDO es exactamente ganar y en un juego de bandos
+   * no lo es. Se resuelve en este instante porque es cuando la partida termina y
+   * el resultado ya no cambia, y se GUARDA porque quien lo lee después --el panel
+   * de partidas de cada cuenta-- tiene la sesión pero no la partida entera, y
+   * cargarla por cada fila sería un viaje al almacén por línea de una lista.
+   *
+   * Un juego sin veredicto dado de alta no escribe nada, y entonces manda
+   * `winnerId`, que es lo que había. CLUEDO no registra ninguno.
+   */
+  const ganadores = ganadoresDe(game, sesion);
+  if (ganadores) sesion.ganadores = ganadores;
 }
 
 // ---------------------------------------------------------------------------

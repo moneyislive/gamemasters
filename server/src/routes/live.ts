@@ -314,7 +314,18 @@ router.post('/games/:id/live/cierre', async (req, res) => {
 
 router.post('/games/:id/live/desenlace', async (req, res) => {
   try {
-    await mutar(req.params.id, (s) => revelarDesenlace(s), {
+    /*
+     * Se carga la partida porque `revelarDesenlace` le pregunta al juego quién
+     * ganó, y para eso hace falta la trama --la Momia necesita saber quién era el
+     * saqueador--. Es una lectura de más en la transición que ocurre UNA vez por
+     * velada, a cambio de que el resultado quede bien escrito para siempre.
+     */
+    const partida = await getStore().getGame(req.params.id);
+    if (!partida) {
+      res.status(404).json({ error: 'Esa partida no existe.' });
+      return;
+    }
+    await mutar(req.params.id, (s) => revelarDesenlace(partida, s), {
       avisar: (s) => {
         anunciar(req.params.id, s.rev, 'desenlace', avisoDe(s, 'desenlace'));
         if (s.winnerId) {

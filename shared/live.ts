@@ -215,6 +215,24 @@ export interface LiveSession {
   /** Sospechoso que ganó, decidido por la primera acusación correcta. */
   winnerId?: string;
   /**
+   * Quiénes ganaron de verdad, según las reglas del juego.
+   *
+   * `winnerId` significa «el primero que acertó la acusación», que es ganar en
+   * CLUEDO y no lo es en un juego de bandos: en El Misterio de la Momia gana la
+   * expedición entera o gana el saqueador, y en El Paso de las Sombras se puede
+   * PERDER habiendo acertado la senda, si el rastro llegó al tope.
+   *
+   * Se escribe UNA vez, al revelar el desenlace, preguntándole al juego con
+   * `ganadoresDe`. Se guarda en vez de recalcularse porque quien lo lee después
+   * —el panel de partidas de cada cuenta— tiene la sesión pero no la partida
+   * entera, y cargarla por cada fila sería un viaje al almacén por línea de una
+   * lista.
+   *
+   * Ausente en CLUEDO y en las partidas de antes: entonces manda `winnerId`, que
+   * es lo que había.
+   */
+  ganadores?: string[];
+  /**
    * Lo que cada juego necesita guardar y el motor no interpreta.
    *
    * Las posiciones de una oca, los puntos de vida de una campaña de rol, las
