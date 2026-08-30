@@ -23,7 +23,7 @@
  * Si alguien añade `vista.misPistas` o `vista.tablon` al contexto «para que
  * ayude mejor», esto falla. Esa es toda su razón de ser.
  */
-import { generateDemoPlot } from '../src/plot/demoPlot';
+import { generateDemoPlot } from '../src/plot/cluedo-demo';
 import { generateBoardLayout } from '../src/board/generator';
 import { contextoDelMayordomo } from '../src/live/consejero';
 import { vistaDeJugador } from '../src/live/proyeccion';

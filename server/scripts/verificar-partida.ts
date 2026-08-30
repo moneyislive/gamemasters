@@ -27,7 +27,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { generateBoardLayout } from '../src/board/generator';
-import { generateDemoPlot } from '../src/plot/demoPlot';
+import { generateDemoPlot } from '../src/plot/cluedo-demo';
 import { esElSenalado, manifiestoDe, ejes as ejesDe } from '../../shared/juegos';
 import type { GameSession } from '../../shared/types';
 import type { LiveSession, VistaJugador } from '../../shared/live';

@@ -9,7 +9,7 @@
 import type { GenerateStreamEvent } from '../../../shared/types';
 import { getStore } from '../db/store';
 import { generadorDeMaterial } from '../juegos/materiales';
-import '../plot/material';
+import '../plot/cluedo-material';
 import { crearRouter } from '../rutas';
 import { quienPide } from '../gasto/quien';
 import { cabeHoy, mensajeDeTope } from '../gasto/tope';

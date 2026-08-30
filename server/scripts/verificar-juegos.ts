@@ -29,11 +29,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { generarTramaMomia } from '../src/juegos/momia-trama';
 import { generarTramaSombras } from '../src/juegos/sombras-trama';
-import { generateDemoPlot } from '../src/plot/demoPlot';
+import { generateDemoPlot } from '../src/plot/cluedo-demo';
 import { generateBoardLayout } from '../src/board/generator';
 import { iniciarJuego } from '../src/juegos/inicios';
 import { trofeosDelJuego } from '../src/juegos/trofeos';
 import { generadorDeTrama } from '../src/juegos/generadores';
+import { ampliacionDe } from '../src/juegos/ampliaciones';
 import { vozDelTaller } from '../src/agent/voces';
 import { juegosConVeredicto } from '../src/juegos/veredictos';
 import { abrirRonda } from '../src/live/sesion';
@@ -255,6 +256,33 @@ for (const m of juegosInstalados()) {
     `${m.id}: y su generador trae el rótulo que se lee mientras escribe`,
     (generadorDeTrama(m.id)?.rotulo ?? '').length > 0,
     'estaban en dos ternarios distintos y se podian separar: la Momia recomponia su papiro mientras la pantalla decia «Tejiendo la trama del crimen»',
+  );
+
+  /*
+   * ---- 2 bis. QUIEN SABE ESCRIBIR UNA TRAMA SABE PONERLA AL DIA ----
+   *
+   * No es simetría por gusto: quien prepara una partida toca los datos DESPUÉS
+   * de generar —añade a alguien, borra un lugar— y entonces la trama se queda
+   * vieja. `runRefresh` poda lo que puede gratis y para lo demás le pregunta al
+   * juego con `ampliacionDe`. Un juego que genera y no amplía deja esa partida
+   * marcada `ready` con los personajes que faltan sin escribir, sin un error.
+   *
+   * ESTA COMPROBACIÓN NACIÓ DE HABERLO ROTO. Al partir `refresh.ts` —que tenía
+   * dentro las cuatrocientas líneas de la ampliación de CLUEDO— el
+   * `registrarAmpliacion('cluedo', …)` se quedó en un módulo que no importaba
+   * nadie. Se probó quitando el import de `instalados.ts` y la batería entera
+   * siguió en verde: doce comprobadores, tres maestros de oro y dos veladas
+   * completas, todos contentos con CLUEDO sin poder repararse.
+   *
+   * Es exactamente el fallo que `instalados.ts` describe en su cabecera y que ya
+   * estuvo a punto de ocurrir dos veces. La lección no es «acuérdate del
+   * import»: es que un registro sin comprobación que lo respalde se pierde,
+   * antes o después, y sin hacer ruido.
+   */
+  comprobar(
+    `${m.id}: si sabe escribir una trama, sabe ponerla al día`,
+    ampliacionDe(m.id) !== undefined,
+    'sin ampliacion, una partida que se queda vieja sale `ready` con lo que falta sin escribir',
   );
 
   /*

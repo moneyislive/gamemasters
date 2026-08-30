@@ -48,7 +48,7 @@ import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import { generateBoardLayout } from '../src/board/generator';
-import { generateDemoPlot } from '../src/plot/demoPlot';
+import { generateDemoPlot } from '../src/plot/cluedo-demo';
 import { limitarIntentos } from '../src/puerta/limitador';
 import { crearRouter } from '../src/rutas';
 import type { GameSession } from '../../shared/types';

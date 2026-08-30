@@ -48,12 +48,27 @@ import './cluedo-trofeos';
  */
 import '../docs/imprimibles/cluedo/registro';
 /*
- * El generador de trama de CLUEDO vive en la tuberia, porque alli viven sus dos
- * variantes --con clave de API y sin ella--. Se importa igual: desde que se
- * eligen por registro y no por un ternario, no cargar este modulo significa que
- * NADIE puede generar una trama de CLUEDO, y el fallo saldria al pulsar el boton.
+ * Y como escribe su trama, con el modelo o sin el. Esto vivia DENTRO de la
+ * tuberia —doscientas lineas de un juego concreto en el camino por el que pasan
+ * todos— y ahora es `cluedo-generacion.ts`, hermano de `momia-generacion.ts` y
+ * `sombras-generacion.ts`.
+ *
+ * Sin esta linea NADIE puede generar una trama de CLUEDO, y el fallo saldria al
+ * pulsar el boton: desde que se elige por registro y no por un ternario, no
+ * cargar el modulo es no tener generador.
  */
-import '../plot/pipeline';
+import '../plot/cluedo-generacion';
+/*
+ * Y como pone al dia una trama suya que se quedo vieja. Vivia dentro de
+ * `refresh.ts` —o sea en el camino de cualquier juego— y ahora es
+ * `cluedo-ampliacion.ts`.
+ *
+ * OJO: al partir el fichero, el alta se quedo en un modulo que NO importaba
+ * nadie. Sin esta linea, `ampliacionDe('cluedo')` devuelve undefined,
+ * `runRefresh` se salta la etapa entera y la partida sale marcada `ready` con
+ * los personajes que faltan sin escribir. Sin un solo error.
+ */
+import '../plot/cluedo-ampliacion';
 
 // El Misterio de la Momia: reductores, proyección del estado y trofeos.
 /*

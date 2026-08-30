@@ -29,7 +29,7 @@
  * (`sesion.acciones`) sí cambiaría, y ese sí viaja en la vista.
  */
 import { generateBoardLayout } from '../../src/board/generator';
-import { generateDemoPlot } from '../../src/plot/demoPlot';
+import { generateDemoPlot } from '../../src/plot/cluedo-demo';
 import { acusar, elegirSala, abrirRonda, cerrarRonda, guardarNotas } from '../../src/live/sesion';
 import { EJES, respuestasCluedo } from '../../src/juegos/cluedo';
 import type { GameSession } from '../../../shared/types';

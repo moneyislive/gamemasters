@@ -1,7 +1,7 @@
 /**
  * La trama de El Paso de las Sombras, escrita sin llamar a ningún modelo.
  *
- * Es el equivalente de `plot/demoPlot.ts` para este juego, y hace la misma
+ * Es el equivalente de `plot/cluedo-demo.ts` para este juego, y hace la misma
  * falta que aquél: hay que poder jugar, probar y desarrollar sin clave de API.
  * Pero aquí carga con algo más que sabor. En CLUEDO la trama de demostración
  * elige un asesino, un arma y una sala; aquí tiene que trazar la senda,
