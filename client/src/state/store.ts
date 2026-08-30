@@ -68,12 +68,6 @@ interface AppState {
    */
   upsertEntidad: (categoria: string, datos: Record<string, unknown>) => Promise<void>;
   removeEntidad: (categoria: string, id: string) => Promise<void>;
-  upsertSuspect: (suspect: Partial<Suspect>) => Promise<void>;
-  removeSuspect: (participanteId: string) => Promise<void>;
-  upsertRoom: (room: Partial<Room>) => Promise<void>;
-  removeRoom: (lugarId: string) => Promise<void>;
-  upsertWeapon: (weapon: Partial<Weapon>) => Promise<void>;
-  removeWeapon: (weaponId: string) => Promise<void>;
   regenerateBoard: () => Promise<void>;
 
   addChatMessage: (message: ChatMessage) => void;
@@ -109,14 +103,22 @@ let popupSeq = 0;
  * almacén heredado desaparezca, se borra esta tabla y la función de abajo se
  * queda en una línea.
  */
-const RUTA_HEREDADA: Record<string, string> = {
-  sospechosos: 'suspects',
-  salas: 'rooms',
-  objetos: 'weapons',
-};
-
+/*
+ * ═══ AQUI HABIA UNA TABLA, Y YA NO HACE FALTA ═══
+ *
+ *     const RUTA_HEREDADA = { sospechosos: 'suspects', salas: 'rooms', ... }
+ *
+ * Las tres categorias de CLUEDO iban por sus rutas viejas —`/games/:id/suspects`
+ * y companyia— y todo lo demas por la generica. Convivian porque cambiar el
+ * taller de CLUEDO no le aportaba nada a nadie aquella noche.
+ *
+ * Ahora si aporta: eran las ultimas tres URL del backend con el nombre de una
+ * cosa de CLUEDO dentro, y con ellas se han ido ciento ochenta lineas de
+ * servidor que hacian lo mismo que la generica con otra letra. Un juego nuevo
+ * ya no tiene tres rutas privilegiadas que no puede usar.
+ */
 function rutaDeCategoria(categoria: string): string {
-  return RUTA_HEREDADA[categoria] ?? `entidades/${categoria}`;
+  return `entidades/${categoria}`;
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -177,36 +179,6 @@ export const useAppStore = create<AppState>((set, get) => ({
     const { game } = get();
     if (!game) return;
     set({ game: await api.removeEntidad(game.id, rutaDeCategoria(categoria), id) });
-  },
-  upsertSuspect: async (suspect) => {
-    const { game } = get();
-    if (!game) return;
-    set({ game: await api.upsertSuspect(game.id, suspect) });
-  },
-  removeSuspect: async (participanteId) => {
-    const { game } = get();
-    if (!game) return;
-    set({ game: await api.removeSuspect(game.id, participanteId) });
-  },
-  upsertRoom: async (room) => {
-    const { game } = get();
-    if (!game) return;
-    set({ game: await api.upsertRoom(game.id, room) });
-  },
-  removeRoom: async (lugarId) => {
-    const { game } = get();
-    if (!game) return;
-    set({ game: await api.removeRoom(game.id, lugarId) });
-  },
-  upsertWeapon: async (weapon) => {
-    const { game } = get();
-    if (!game) return;
-    set({ game: await api.upsertWeapon(game.id, weapon) });
-  },
-  removeWeapon: async (weaponId) => {
-    const { game } = get();
-    if (!game) return;
-    set({ game: await api.removeWeapon(game.id, weaponId) });
   },
   regenerateBoard: async () => {
     const { game } = get();

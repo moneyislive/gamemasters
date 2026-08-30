@@ -701,15 +701,41 @@ export interface ChatMessage {
 
 // ---------- Comandos de UI que el agente puede invocar ----------
 
-export type HighlightTarget =
-  | 'suspects'
-  | 'rooms'
-  | 'weapons'
-  | 'style'
-  | 'board'
-  | 'documents'
-  | 'live'
-  | 'generate';
+/**
+ * A que panel del taller manda mirar el asistente.
+ *
+ * ═══ ERA UNA LISTA CERRADA CON LAS PESTANAS DE CLUEDO ═══
+ *
+ *     'suspects' | 'rooms' | 'weapons' | 'style' | 'board' | ...
+ *
+ * Las tres primeras son las categorias del primer juego, metidas en un contrato
+ * que comparten todos. Y como no podia crecer con las categorias de cada juego
+ * nuevo, el taller tenia que TRADUCIR: cuando el asistente decia «mira los
+ * sospechosos», buscaba que categoria de la Momia vivia en ese mismo almacen
+ * heredado y abria `expedicionarios`.
+ *
+ * Traducir funcionaba, y aun asi era el sintoma: el asistente de una expedicion
+ * arqueologica solo sabia pedir paneles con nombres de un asesinato, y si la
+ * traduccion se caia no saltaba ningun error —no pasaba NADA, que es peor: la
+ * pantalla se quedaba igual y parecia que el asistente no funcionaba.
+ *
+ * Ahora es el id de la pestaña, que para las categorias ES el id de la
+ * categoria del juego. Quien lo valida es el servidor, que arma el `enum` de la
+ * herramienta desde el manifiesto de ESTA partida: el modelo no puede pedir una
+ * pestaña que no exista porque no la tiene en la lista.
+ *
+ * Los paneles fijos —`style`, `board`, `documents`, `live`, `generate`— son de
+ * la plataforma y estan en `PANELES_DEL_TALLER`.
+ */
+export type HighlightTarget = string;
+
+/**
+ * Los paneles que tiene el taller ademas de uno por categoria.
+ *
+ * Estan aqui y no en el manifiesto porque no son de ningun juego: todo juego
+ * tiene estilo, tablero, documentos, partida en vivo y generacion.
+ */
+export const PANELES_DEL_TALLER = ['style', 'board', 'documents', 'live', 'generate'] as const;
 
 export interface UiPopupCommand {
   kind: 'popup';

@@ -85,24 +85,19 @@ function pestanasDe(manifiesto: ManifiestoDeJuego, juego: string): Pestana[] {
   ];
 }
 
-/**
- * Lo que pide el agente, traducido a una pestaña de ESTE juego.
+/*
+ * ═══ AQUI HABIA UNA TRADUCCION, Y SOBRA ═══
  *
- * El agente habla el vocabulario de CLUEDO —`suspects`, `rooms`, `weapons`—
- * porque es el que está escrito en `HighlightTarget`, que es contrato común y
- * no puede crecer con las categorías de cada juego nuevo. Aquí se traduce al id
- * de la categoría que en este juego vive en ese mismo almacén: cuando el agente
- * dice «mira los sospechosos», en la Momia se abre `expedicionarios`.
+ * `pestanaPedida()` cogia lo que pedia el agente —`suspects`, `rooms`,
+ * `weapons`, que era el vocabulario de `HighlightTarget`— y buscaba que
+ * categoria de ESTE juego vivia en ese almacen heredado, para que «mira los
+ * sospechosos» abriera `expedicionarios` en la Momia.
  *
- * Sin esta traducción no saltaría un error: no pasaría NADA, que es peor. El
- * agente pediría una pestaña inexistente, la pantalla se quedaría igual, y
- * quien lo mira concluiría que el agente no funciona.
+ * Funcionaba, y era el sintoma: el asistente de una expedicion arqueologica
+ * solo sabia pedir paneles con nombres de un asesinato. Ahora el servidor arma
+ * el `enum` de la herramienta desde el manifiesto de la partida, asi que lo que
+ * llega ya es el id de la pestaña y no hay nada que traducir.
  */
-function pestanaPedida(manifiesto: ManifiestoDeJuego, objetivo: string): string {
-  if (objetivo !== 'suspects' && objetivo !== 'rooms' && objetivo !== 'weapons') return objetivo;
-  return manifiesto.categorias.find((c) => c.almacenHeredado === objetivo)?.id ?? objetivo;
-}
-
 const demoTip = (asistente: string) =>
   `Sin clave de API de Anthropic: ${asistente} responde con un guion local. ` +
   'Añada ANTHROPIC_API_KEY al servidor para el agente completo.';
@@ -211,12 +206,12 @@ export default function StudioPage() {
           store.pushPopup(command);
           break;
         case 'highlight':
-          flashHighlight(pestanaPedida(manifiesto, command.target));
+          flashHighlight(command.target);
           break;
         case 'navigate':
           // 'generate' no es una pestaña: lo interpretamos como resaltar el botón.
           if (command.target === 'generate') flashHighlight('generate');
-          else store.setActiveTab(pestanaPedida(manifiesto, command.target));
+          else store.setActiveTab(command.target);
           break;
         case 'start_generation':
           void startGeneration().catch(() =>

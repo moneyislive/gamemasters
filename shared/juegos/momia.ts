@@ -28,6 +28,7 @@ import type { TrofeoInfo } from '../live';
 import type { DocumentSectionInfo } from '../types';
 import type { PrintableDocInfo } from '../documents';
 import type { ManifiestoDeJuego, ReferenciaDeTrama, ReglaDeJuego } from './tipos';
+import { RITOS_DEL_SELLADO } from './momia-tipos';
 import type { TramaMomia } from './momia-tipos';
 
 /**
@@ -475,6 +476,8 @@ export const MOMIA: ManifiestoDeJuego = {
        * poner en común, poco para que se pueda razonar en voz alta.
        */
       minimo: 5,
+      /* Y no valen ni cuatro ni seis: ver arriba. */
+      exacto: RITOS_DEL_SELLADO,
       /*
        * SIN `almacen`, y es la primera categoría de la plataforma que no lo
        * tiene. Los ritos no son personas ni lugares ni objetos: no hay campo

@@ -109,26 +109,12 @@ export const upsertEntidad = (gameId: string, ruta: string, datos: Record<string
 export const removeEntidad = (gameId: string, ruta: string, id: string) =>
   request<GameSession>(`/games/${gameId}/${ruta}/${id}`, { method: 'DELETE' });
 
-export const upsertSuspect = (gameId: string, suspect: Partial<Suspect>) =>
-  request<GameSession>(`/games/${gameId}/suspects`, {
-    method: 'POST',
-    body: JSON.stringify(suspect),
-  });
-export const removeSuspect = (gameId: string, participanteId: string) =>
-  request<GameSession>(`/games/${gameId}/suspects/${participanteId}`, { method: 'DELETE' });
-
-export const upsertRoom = (gameId: string, room: Partial<Room>) =>
-  request<GameSession>(`/games/${gameId}/rooms`, { method: 'POST', body: JSON.stringify(room) });
-export const removeRoom = (gameId: string, lugarId: string) =>
-  request<GameSession>(`/games/${gameId}/rooms/${lugarId}`, { method: 'DELETE' });
-
-export const upsertWeapon = (gameId: string, weapon: Partial<Weapon>) =>
-  request<GameSession>(`/games/${gameId}/weapons`, {
-    method: 'POST',
-    body: JSON.stringify(weapon),
-  });
-export const removeWeapon = (gameId: string, weaponId: string) =>
-  request<GameSession>(`/games/${gameId}/weapons/${weaponId}`, { method: 'DELETE' });
+/*
+ * Aqui vivian `upsertSuspect`, `removeSuspect`, `upsertRoom`, `removeRoom`,
+ * `upsertWeapon` y `removeWeapon`: seis funciones con tres URL de CLUEDO
+ * dentro. Las dos de arriba, por categoria, hacen lo mismo para cualquier
+ * juego, y son las unicas que llamaba nadie.
+ */
 
 // ---------- Tablero ----------
 

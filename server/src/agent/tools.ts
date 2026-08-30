@@ -1,11 +1,9 @@
 /**
  * Herramientas del asistente del taller.
  *
- * - `agentTools`: las de CLUEDO, tal cual estaban. Se sigue exportando con este
- *   nombre porque lo importa el taller y lo congela el maestro de oro.
- * - `herramientasDe(game)`: las que le tocan a ESTA partida. CLUEDO recibe las
- *   suyas; cualquier otro juego, las de sus categorías generadas desde su
- *   manifiesto (`momia-herramientas.ts`) más las comunes.
+ * - `herramientasDe(game)`: las que le tocan a ESTA partida. Las de sus
+ *   categorías, generadas desde su manifiesto, más las comunes. Ya no hay
+ *   ninguna rama para CLUEDO: entra por donde entran los demás.
  * - `executeTool`: ejecuta una herramienta sobre la partida. Las de mutación
  *   guardan con el store y devuelven la partida actualizada; las `ui_*`
  *   devuelven un comando de interfaz; `get_game_state` devuelve un resumen JSON.
@@ -20,35 +18,43 @@
 
 import type Anthropic from '@anthropic-ai/sdk';
 import { nanoid } from 'nanoid';
-import type {
-  GameSession,
-  HighlightTarget,
-  Room,
-  Suspect,
-  UiCommand,
-  Weapon,
-} from '../../../shared/types';
+import { PANELES_DEL_TALLER } from '../../../shared/types';
+import type { GameSession, HighlightTarget, UiCommand } from '../../../shared/types';
 import { getStore } from '../db/store';
 import { normalizeStylePrompt } from '../plot/style';
-import { CLUEDO, entidadesDe, manifiestoDe } from '../../../shared/juegos';
+import { entidadesDe, manifiestoDe } from '../../../shared/juegos';
 import {
   ejecutarHerramientaDeCategoria,
   faltanMinimos,
   herramientasDeCategorias,
 } from './momia-herramientas';
 
-/** Objetivos válidos para realce/navegación en la interfaz. */
-const OBJETIVOS_UI: HighlightTarget[] = [
-  'suspects',
-  'rooms',
-  'weapons',
-  'board',
-  'documents',
-  'generate',
-];
-
-/** Mínimos exigidos antes de poder generar la trama. */
-export const MINIMOS = { sospechosos: 3, salas: 4, armas: 3 } as const;
+/**
+ * Los paneles del taller de ESTA partida: uno por categoria, mas los fijos.
+ *
+ * ═══ ERA UNA CONSTANTE, Y ESTABA ESCRITA EN CLUEDO ═══
+ *
+ *     ['suspects', 'rooms', 'weapons', 'board', 'documents', 'generate']
+ *
+ * Con eso, el asistente de El Misterio de la Momia solo sabia mandar mirar
+ * paneles llamados «sospechosos», «salas» y «armas», que en una tumba no
+ * existen. El taller lo tapaba traduciendo por el almacen heredado —una
+ * traduccion que, si fallaba, no daba error: dejaba la pantalla quieta.
+ *
+ * Ahora sale del manifiesto y va en el `enum` de la herramienta, asi que el
+ * modelo ve la lista de verdad y no puede pedir otra cosa.
+ *
+ * Los mínimos que había aquí —`{ sospechosos: 3, salas: 4, armas: 3 }`— se han
+ * ido por lo mismo: son tres números de CLUEDO, y encima uno de ellos no
+ * coincidía con su propio manifiesto. Los declara cada categoría y los cuenta
+ * `faltanMinimos`, que es la función que la generación hace valer de verdad.
+ */
+function panelesDe(game: GameSession): HighlightTarget[] {
+  return [
+    ...manifiestoDe(game.settings?.juego).categorias.map((c) => c.id),
+    ...PANELES_DEL_TALLER,
+  ];
+}
 
 
 /**
@@ -60,7 +66,9 @@ export const MINIMOS = { sospechosos: 3, salas: 4, armas: 3 } as const;
  * prompt. Tener una sola copia evita que dentro de tres juegos haya cinco
  * variantes de `ui_popup` que se hayan ido separando.
  */
-const HERRAMIENTAS_COMUNES: Anthropic.Messages.Tool[] = [
+function herramientasComunes(game: GameSession): Anthropic.Messages.Tool[] {
+  const paneles = panelesDe(game);
+  return [
   {
     name: 'set_game_name',
     description: 'Cambia el nombre de la partida. Úsala cuando el usuario bautice o renombre la velada.',
@@ -125,7 +133,7 @@ const HERRAMIENTAS_COMUNES: Anthropic.Messages.Tool[] = [
       properties: {
         target: {
           type: 'string',
-          enum: ['suspects', 'rooms', 'weapons', 'board', 'documents', 'generate'],
+          enum: paneles,
           description: 'Panel a realzar.',
         },
       },
@@ -141,7 +149,7 @@ const HERRAMIENTAS_COMUNES: Anthropic.Messages.Tool[] = [
       properties: {
         target: {
           type: 'string',
-          enum: ['suspects', 'rooms', 'weapons', 'board', 'documents', 'generate'],
+          enum: paneles,
           description: 'Pestaña de destino.',
         },
       },
@@ -151,24 +159,40 @@ const HERRAMIENTAS_COMUNES: Anthropic.Messages.Tool[] = [
   {
     name: 'start_generation',
     description:
-      'Lanza la generación de tablero, trama y dosieres. SOLO cuando la partida cumpla los mínimos (3 sospechosos, 4 salas, 3 armas) Y el usuario haya confirmado explícitamente que terminó de configurar. Si ya existe una trama, la nueva la reemplazará: adviértelo antes.',
+      'Lanza la generación de tablero, trama y dosieres. SOLO cuando la partida cumpla los mínimos ' +
+      `(${minimosEnPalabras(game)}) Y el usuario haya confirmado explícitamente que terminó de ` +
+      'configurar. Si ya existe una trama, la nueva la reemplazará: adviértelo antes.',
     input_schema: { type: 'object', properties: {} },
   },
-];
+  ];
+}
+
+/**
+ * «3 sospechosos, 4 salas, 3 armas» — con las palabras de ESTE juego.
+ *
+ * Estaba escrito a mano en la descripción de `start_generation`, así que el
+ * asistente de una expedición leía que hacían falta tres sospechosos y cuatro
+ * salas, y se lo pedía al anfitrión. Que luego no existieran no lo enteraba de
+ * nada: la herramienta contestaba con otros mínimos distintos.
+ */
+function minimosEnPalabras(game: GameSession): string {
+  return manifiestoDe(game.settings?.juego)
+    .categorias.map((c) => `${c.exacto ?? c.minimo} ${c.plural}${c.exacto !== undefined ? ' exactos' : ''}`)
+    .join(', ');
+}
 
 
 /**
  * Las herramientas que se le pasan al asistente de ESTA partida.
  *
- * CLUEDO recibe las suyas de siempre; cualquier otro juego recibe las de sus
- * categorías, generadas desde su manifiesto, más las comunes. Un juego con
- * «ritos» puede así darlos de alta, cosa que con `upsert_weapon` no tenía
- * manera de hacer.
+ * Las de sus categorías, generadas desde su manifiesto, más las comunes. Un
+ * juego con «ritos» puede así darlos de alta, cosa que con `upsert_weapon` no
+ * tenía manera de hacer.
  */
 export function herramientasDe(game: GameSession): Anthropic.Messages.Tool[] {
   return [
     ...herramientasDeCategorias(manifiestoDe(game.settings?.juego)),
-    ...HERRAMIENTAS_COMUNES,
+    ...herramientasComunes(game),
   ];
 }
 
@@ -241,75 +265,53 @@ export async function executeTool(
 
     case 'get_game_state': {
       /*
-       * Para un juego que no sea CLUEDO, el resumen va POR CATEGORÍA: llamar
-       * «armas» a las reliquias de una tumba y «sospechosos» a una expedición
-       * confunde al asistente en cada consulta, y además dejaba fuera cualquier
-       * categoría que no fuese una de las tres.
-       *
-       * LO QUE NO SALE, NI AQUÍ NI EN LA RAMA DE CLUEDO: nada de `game.plot`
+       * LO QUE NO SALE DE AQUÍ: nada de `game.plot`
        * salvo el título. Ni la solución, ni los secretos, ni el orden verdadero
        * de los ritos, ni qué fragmentos son falsos. Es la única defensa que
        * funciona —no dárselo— y la vigila `npm run verify:secretos-agente`.
        */
       const manifiesto = manifiestoDe(game.settings?.juego);
-      if (manifiesto.id !== CLUEDO.id) {
-        return {
-          result: JSON.stringify({
-            id: game.id,
-            nombre: game.name,
-            juego: manifiesto.id,
-            estado: game.status,
-            modoTablero: game.boardMode,
-            categorias: Object.fromEntries(
-              manifiesto.categorias.map((cat) => [
-                cat.id,
-                entidadesDe(game, cat.id).map((e) => ({
-                  id: e.id,
-                  nombre: e.name,
-                  descripcion: e.description ?? null,
-                  tieneFoto: Boolean(e.photoUrl),
-                  ...(cat.admiteEmail ? { tieneCorreo: Boolean(e.email) } : {}),
-                })),
-              ]),
-            ),
-            tramaGenerada: Boolean(game.plot),
-            tituloTrama: game.plot?.title ?? null,
-            dosieres: game.documents?.length ?? 0,
-            faltan: faltanMinimos(game),
-          }),
-        };
-      }
-
-      const resumen = {
-        id: game.id,
-        nombre: game.name,
-        estado: game.status,
-        modoTablero: game.boardMode,
-        sospechosos: game.suspects.map((s) => ({
-          id: s.id,
-          nombre: s.name,
-          email: s.email ?? null,
-          descripcion: s.description ?? null,
-          tieneFoto: Boolean(s.photoUrl),
-        })),
-        salas: game.rooms.map((r) => ({
-          id: r.id,
-          nombre: r.name,
-          descripcion: r.description ?? null,
-          tieneFoto: Boolean(r.photoUrl),
-        })),
-        armas: game.weapons.map((w) => ({
-          id: w.id,
-          nombre: w.name,
-          descripcion: w.description ?? null,
-          tieneFoto: Boolean(w.photoUrl),
-        })),
-        tramaGenerada: Boolean(game.plot),
-        tituloTrama: game.plot?.title ?? null,
-        dosieres: game.documents?.length ?? 0,
-        minimos: MINIMOS,
+      /*
+       * ═══ AQUI HABIA DOS RESUMENES ═══
+       *
+       * Uno por categoria para todos los juegos, y otro escrito a mano para
+       * CLUEDO —`sospechosos`, `salas`, `armas`, leidos de `game.suspects` y
+       * companyia— detras de un `if (manifiesto.id !== CLUEDO.id)`.
+       *
+       * Hacian LO MISMO. El de CLUEDO existia porque fue el primero y nadie lo
+       * borro al escribir el generico; el precio de tenerlo era que cualquier
+       * arreglo habia que hacerlo dos veces, y que una categoria nueva de
+       * CLUEDO —si algun dia la tiene— no habria salido en su resumen.
+       *
+       * El generico gana ademas en dos cosas concretas: nombra las categorias
+       * como las llama el juego, y manda `tieneCorreo: bool` en vez del correo
+       * entero, que es un dato personal que el modelo no necesita para nada.
+       */
+      return {
+        result: JSON.stringify({
+          id: game.id,
+          nombre: game.name,
+          juego: manifiesto.id,
+          estado: game.status,
+          modoTablero: game.boardMode,
+          categorias: Object.fromEntries(
+            manifiesto.categorias.map((cat) => [
+              cat.id,
+              entidadesDe(game, cat.id).map((e) => ({
+                id: e.id,
+                nombre: e.name,
+                descripcion: e.description ?? null,
+                tieneFoto: Boolean(e.photoUrl),
+                ...(cat.admiteEmail ? { tieneCorreo: Boolean(e.email) } : {}),
+              })),
+            ]),
+          ),
+          tramaGenerada: Boolean(game.plot),
+          tituloTrama: game.plot?.title ?? null,
+          dosieres: game.documents?.length ?? 0,
+          faltan: faltanMinimos(game),
+        }),
       };
-      return { result: JSON.stringify(resumen) };
     }
 
     case 'ui_popup': {
@@ -329,63 +331,44 @@ export async function executeTool(
 
     case 'ui_highlight': {
       const objetivo = texto(datos, 'target');
-      if (!objetivo || !OBJETIVOS_UI.includes(objetivo as HighlightTarget)) {
-        return {
-          result: `Error: target inválido. Usa uno de: ${OBJETIVOS_UI.join(', ')}.`,
-        };
+      const paneles = panelesDe(game);
+      if (!objetivo || !paneles.includes(objetivo)) {
+        return { result: `Error: target inválido. Usa uno de: ${paneles.join(', ')}.` };
       }
       return {
         result: `Panel «${objetivo}» realzado en la interfaz.`,
-        ui: { kind: 'highlight', target: objetivo as HighlightTarget },
+        ui: { kind: 'highlight', target: objetivo },
       };
     }
 
     case 'ui_navigate': {
       const objetivo = texto(datos, 'target');
-      if (!objetivo || !OBJETIVOS_UI.includes(objetivo as HighlightTarget)) {
-        return {
-          result: `Error: target inválido. Usa uno de: ${OBJETIVOS_UI.join(', ')}.`,
-        };
+      const paneles = panelesDe(game);
+      if (!objetivo || !paneles.includes(objetivo)) {
+        return { result: `Error: target inválido. Usa uno de: ${paneles.join(', ')}.` };
       }
       return {
         result: `Navegación a la pestaña «${objetivo}».`,
-        ui: { kind: 'navigate', target: objetivo as HighlightTarget },
+        ui: { kind: 'navigate', target: objetivo },
       };
     }
 
     case 'start_generation': {
       /*
-       * Los mínimos de un juego que no sea CLUEDO salen de su manifiesto, que es
-       * donde los declara. Escritos aquí a mano, un juego nuevo habría podido
-       * generar sin sus cinco ritos y la partida habría salido sin puzle.
+       * Tambien tenia dos ramas, y la de CLUEDO comparaba `game.suspects`,
+       * `game.rooms` y `game.weapons` contra tres numeros escritos aqui:
+       * `{ sospechosos: 3, salas: 4, armas: 3 }`. Uno de ellos ni siquiera
+       * coincidia con el manifiesto de CLUEDO —que decia tres salas— asi que
+       * el taller enseñaba «al menos tres estancias» y luego el servidor se
+       * negaba a generar con tres.
+       *
+       * `faltanMinimos` lee el manifiesto y es la misma cuenta que hace valer
+       * la generacion de verdad. Con una sola, no puede haber contradiccion.
        */
-      if (manifiestoDe(game.settings?.juego).id !== CLUEDO.id) {
-        const faltan = faltanMinimos(game);
-        if (faltan.length > 0) {
-          return {
-            result: `No se puede generar todavía. Faltan mínimos (${faltan.join('; ')}). Pide al usuario los datos que faltan.`,
-          };
-        }
+      const faltan = faltanMinimos(game);
+      if (faltan.length > 0) {
         return {
-          result:
-            'Orden de generación enviada a la interfaz: el cliente lanzará ahora el proceso de tablero, trama y dosieres.',
-          ui: { kind: 'start_generation' },
-        };
-      }
-
-      const faltantes: string[] = [];
-      if (game.suspects.length < MINIMOS.sospechosos) {
-        faltantes.push(`sospechosos: hay ${game.suspects.length}, mínimo ${MINIMOS.sospechosos}`);
-      }
-      if (game.rooms.length < MINIMOS.salas) {
-        faltantes.push(`salas: hay ${game.rooms.length}, mínimo ${MINIMOS.salas}`);
-      }
-      if (game.weapons.length < MINIMOS.armas) {
-        faltantes.push(`armas: hay ${game.weapons.length}, mínimo ${MINIMOS.armas}`);
-      }
-      if (faltantes.length > 0) {
-        return {
-          result: `No se puede generar todavía. Faltan mínimos (${faltantes.join('; ')}). Pide al usuario los datos que faltan.`,
+          result: `No se puede generar todavía. Faltan mínimos (${faltan.join('; ')}). Pide al usuario los datos que faltan.`,
         };
       }
       return {

@@ -15,14 +15,11 @@
     "app/src/api.ts": 2,
     "app/src/avisos.tsx": 2,
     "app/src/estado.tsx": 1,
-    "client/src/api/client.ts": 8,
     "client/src/components/live/LivePanel.tsx": 2,
     "client/src/components/live/PanelDeLasSombras.tsx": 3,
     "client/src/juegos/palabras.ts": 1,
-    "client/src/pages/StudioPage.tsx": 3,
-    "client/src/state/store.ts": 7,
+    "client/src/state/store.ts": 1,
     "server/src/agent/demo.ts": 6,
-    "server/src/agent/tools.ts": 18,
     "server/src/board/generator.ts": 2,
     "server/src/db/store.ts": 3,
     "server/src/docs/datos.ts": 7,
@@ -33,7 +30,6 @@
     "server/src/live/proyeccion.ts": 6,
     "server/src/live/sesion.ts": 7,
     "server/src/plot/refresh.ts": 2,
-    "server/src/routes/entities.ts": 12,
     "server/src/routes/jugar.ts": 2,
     "server/src/routes/live.ts": 4,
     "shared/documents.ts": 1,
@@ -41,6 +37,6 @@
     "shared/juegos/tipos.ts": 4,
     "shared/live.ts": 5,
     "shared/staleness.ts": 1,
-    "shared/types.ts": 12
+    "shared/types.ts": 9
   }
 }

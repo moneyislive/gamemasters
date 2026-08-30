@@ -1047,7 +1047,7 @@ async function comprobarServidor(): Promise<void> {
   // Una foto compartida por DOS entidades. Es el caso que haría destructiva una
   // limpieza ingenua: quitar una no puede dejar sin foto a la otra.
   comprobar('la foto sembrada está', hay(FOTO));
-  const quitarSala = await pedir('/api/games/aguante/rooms/r0', { metodo: 'DELETE', cookie });
+  const quitarSala = await pedir('/api/games/aguante/entidades/salas/r0', { metodo: 'DELETE', cookie });
   comprobar('se puede quitar la sala', quitarSala.estado === 200, quitarSala.datos);
   comprobar(
     'y la foto SIGUE, porque el sospechoso la comparte',
@@ -1057,7 +1057,7 @@ async function comprobarServidor(): Promise<void> {
 
   // Ahora al sospechoso se le cambia la foto por otra: la vieja queda sin dueño.
   fs.writeFileSync(path.join(carpetaFotos, 'otra.png'), PNG_MINIMO);
-  const cambiar = await pedir('/api/games/aguante/suspects', {
+  const cambiar = await pedir('/api/games/aguante/entidades/sospechosos', {
     metodo: 'POST',
     cookie,
     cuerpo: { id: 's0', name: 'Ana', photoUrl: '/uploads/otra.png' },

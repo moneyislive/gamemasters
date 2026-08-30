@@ -58,6 +58,22 @@ export interface DefinicionCategoria {
   /** Por debajo de esto la partida no se puede generar. */
   minimo: number;
   /**
+   * Y si hacen falta EXACTAMENTE tantas, ni una mas.
+   *
+   * ═══ LA REGLA VIVIA EN TRES SITIOS, NINGUNO DE ELLOS EL JUEGO ═══
+   *
+   * Los ritos del sellado de El Misterio de la Momia son cinco. Ni cuatro —con
+   * 24 ordenes posibles la mesa lo resuelve por fuerza bruta en diez minutos—
+   * ni seis. Es una regla del juego, y estaba escrita como `if (cat.id ===
+   * 'ritos')` en el generador de herramientas del asistente y como una tabla de
+   * excepciones —`'momia:ritos': RITOS_DEL_SELLADO`— en el taller.
+   *
+   * O sea: para saber cuantos ritos hacen falta habia que mirar en dos ficheros
+   * que no son de la Momia, y un juego nuevo con una categoria de numero fijo
+   * tenia que aprender a editarlos. Ahora lo dice quien lo sabe.
+   */
+  exacto?: number;
+  /**
    * Estas entidades SON las personas sentadas a la mesa.
    *
    * Como máximo una categoría puede serlo, y es la que ata el juego al mundo

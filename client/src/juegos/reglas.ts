@@ -7,7 +7,7 @@
  * excepciones que están aquí porque no caben allí todavía. Las dos están
  * anotadas para el informe de arquitectura.
  */
-import { entidadesDe, RITOS_DEL_SELLADO } from '../../../shared/juegos';
+import { categoria as categoriaDe, entidadesDe, manifiestoDe } from '../../../shared/juegos';
 import type { CategoriaId, DefinicionCategoria, JuegoId, ManifiestoDeJuego } from '../../../shared/juegos';
 import type { GameSession } from '../../../shared/types';
 
@@ -33,23 +33,14 @@ const MINIMO_HEREDADO: Record<CategoriaId, number> = {
   // el servidor exige y un manifiesto no declara.
 };
 
-/**
- * EXCEPCIÓN 2: las categorías que admiten un número EXACTO.
+/*
+ * LA EXCEPCIÓN 2 SE HA IDO, y con ella su tabla.
  *
- * Los ritos del sellado son cinco. Ni cuatro —con 24 órdenes posibles la mesa
- * lo resuelve por fuerza bruta en diez minutos— ni seis —con 720 la sobremesa
- * se hace larga—. Está razonado en `shared/juegos/momia.ts` y en el diseño.
- *
- * El manifiesto solo sabe decir `minimo`, así que «exactamente cinco» no cabe
- * en él y vive aquí. LO SUYO SERÍA `DefinicionCategoria.maximo`: con eso, una
- * categoría exacta sería la que tiene mínimo y máximo iguales, se diría en el
- * mismo sitio que todo lo demás, y este fichero perdería la mitad. Va en el
- * informe.
+ * Aquí vivía `CUENTA_EXACTA = { 'momia:ritos': 5 }`: la regla de que los ritos
+ * del sellado son cinco, escrita en el taller, o sea a dos capas del juego que
+ * la tiene. Este mismo comentario decía cuál era el arreglo —que lo dijera el
+ * manifiesto— y ya lo dice: `DefinicionCategoria.exacto`.
  */
-const CUENTA_EXACTA: Record<string, number> = {
-  'momia:ritos': RITOS_DEL_SELLADO,
-};
-
 export interface RequisitoDeCategoria {
   categoria: DefinicionCategoria;
   /** Cuántas hay dadas de alta. */
@@ -67,7 +58,7 @@ export function cuentaExactaDe(
   juego: JuegoId,
   categoria: CategoriaId,
 ): number | undefined {
-  return CUENTA_EXACTA[`${juego}:${categoria}`];
+  return categoriaDe(manifiestoDe(juego), categoria)?.exacto;
 }
 
 /** Cuántas entidades pide una categoría antes de poder generar. */

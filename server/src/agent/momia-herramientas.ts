@@ -245,8 +245,13 @@ export function faltanMinimos(game: GameSession): string[] {
     // `entidades: {}` escrito en partidas de CLUEDO que no lo tenían, y el
     // maestro de oro compara la partida byte a byte.
     const cuantas = entidadesDe(game, cat.id).length;
-    if (cat.id === 'ritos' && cuantas !== 5) {
-      faltan.push(`${cat.plural}: hay ${cuantas} y hacen falta exactamente 5`);
+    /*
+     * Aquí decía `if (cat.id === 'ritos' && cuantas !== 5)`: una regla de El
+     * Misterio de la Momia escrita en un fichero que atiende a todos los
+     * juegos. Ahora lo declara la categoría, que es quien lo sabe.
+     */
+    if (cat.exacto !== undefined && cuantas !== cat.exacto) {
+      faltan.push(`${cat.plural}: hay ${cuantas} y hacen falta exactamente ${cat.exacto}`);
       continue;
     }
     if (cuantas < cat.minimo) faltan.push(`${cat.plural}: hay ${cuantas}, mínimo ${cat.minimo}`);
