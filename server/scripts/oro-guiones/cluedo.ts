@@ -28,6 +28,7 @@
  * mejora — y entonces habrá que recapturar, porque el registro de acciones
  * (`sesion.acciones`) sí cambiaría, y ese sí viaja en la vista.
  */
+import { entidadesDe, lugaresDe, personasDe } from '../../../shared/juegos';
 import { generateBoardLayout } from '../../src/board/generator';
 import { generateDemoPlot } from '../../src/plot/cluedo-demo';
 import { acusar, elegirSala, abrirRonda, cerrarRonda, guardarNotas } from '../../src/live/sesion';
@@ -73,7 +74,7 @@ function partidaDeReferencia(): GameSession {
     boardMode: 'generated',
     settings: { language: 'es' },
   };
-  game.board = generateBoardLayout(game.rooms);
+  game.board = generateBoardLayout(lugaresDe(game));
   game.plot = generateDemoPlot(game);
   game.plot.material = {
     generatedAt: AHORA,
@@ -83,7 +84,7 @@ function partidaDeReferencia(): GameSession {
       text: `Texto que se lee en alto al abrir la ronda ${round}.`,
       stageDirection: round === 2 ? 'Apaga una lámpara.' : '',
     })),
-    twists: game.suspects.slice(0, 4).map((s, i) => ({
+    twists: personasDe(game).slice(0, 4).map((s, i) => ({
       id: `giro-${i}`,
       suspectId: s.id,
       round: (i % 2) + 2,
@@ -110,7 +111,7 @@ function sesionInicial(game: GameSession): LiveSession {
     phase: 'lobby',
     round: 0,
     totalRounds: 4,
-    players: game.suspects.map((s, i) => ({
+    players: personasDe(game).map((s, i) => ({
       suspectId: s.id,
       displayName: s.name,
       joinCode: `CODIG${i}`,
@@ -142,12 +143,12 @@ function velada({ game, sesion, retratar }: Mesa): void {
     retratar(`ronda-${ronda}-abierta`);
 
     // Cada jugador entra en una sala distinta; el reparto es determinista.
-    game.suspects.forEach((s, i) => {
-      elegirSala(sesion, s.id, game.rooms[(i + ronda) % game.rooms.length]!.id);
+    personasDe(game).forEach((s, i) => {
+      elegirSala(sesion, s.id, lugaresDe(game)[(i + ronda) % lugaresDe(game).length]!.id);
     });
     // Y uno se cambia de idea, que es un caso propio.
-    elegirSala(sesion, game.suspects[0]!.id, game.rooms[(ronda + 3) % game.rooms.length]!.id);
-    guardarNotas(sesion, game.suspects[1]!.id, `Notas de la ronda ${ronda}.`);
+    elegirSala(sesion, personasDe(game)[0]!.id, lugaresDe(game)[(ronda + 3) % lugaresDe(game).length]!.id);
+    guardarNotas(sesion, personasDe(game)[1]!.id, `Notas de la ronda ${ronda}.`);
     retratar(`ronda-${ronda}-elegidas`);
 
     // Los giros de esta ronda se entregan a sus destinatarios.
@@ -169,21 +170,21 @@ function velada({ game, sesion, retratar }: Mesa): void {
   // decide el recuento de aciertos.
   acusar(
     sesion,
-    game.suspects[2]!.id,
+    personasDe(game)[2]!.id,
     respuestasCluedo({
-      murdererId: game.suspects[7]!.id,
-      weaponId: game.weapons[0]!.id,
-      roomId: game.rooms[0]!.id,
+      murdererId: personasDe(game)[7]!.id,
+      weaponId: entidadesDe(game, 'objetos')[0]!.id,
+      roomId: lugaresDe(game)[0]!.id,
     }),
     solucion,
   );
   acusar(
     sesion,
-    game.suspects[3]!.id,
-    { ...solucion, [EJES.objeto]: game.weapons[1]!.id },
+    personasDe(game)[3]!.id,
+    { ...solucion, [EJES.objeto]: entidadesDe(game, 'objetos')[1]!.id },
     solucion,
   );
-  acusar(sesion, game.suspects[4]!.id, { ...solucion }, solucion);
+  acusar(sesion, personasDe(game)[4]!.id, { ...solucion }, solucion);
   retratar('acusaciones-entregadas');
 
   sesion.phase = 'desenlace';

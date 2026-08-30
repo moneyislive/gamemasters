@@ -6,6 +6,7 @@
  * puede caer en sus manos, y por eso el propio documento lo avisa en su primera
  * página, en grande.
  */
+import { salasDe, sospechososDe } from '../../../juegos/cluedo';
 import { codigosDeSala, pistasPorRonda } from '../../datos';
 import { esc } from '../../html';
 import { envolver, portada } from '../comun';
@@ -28,10 +29,10 @@ export function tarjetasEnsobrar(
   vista: VistaGm,
   opciones: DocumentRenderOptions,
 ): string {
-  const codigos = codigosDeSala(game.rooms);
+  const codigos = codigosDeSala(salasDe(game));
   const porRonda = pistasPorRonda(plot);
   const material = plot.material;
-  const nombreDe = (id: string): string => game.suspects.find((s) => s.id === id)?.name ?? id;
+  const nombreDe = (id: string): string => sospechososDe(game).find((s) => s.id === id)?.name ?? id;
 
   let total = 0;
 
@@ -47,7 +48,7 @@ export function tarjetasEnsobrar(
       }
       const tarjetas = [...porSala.entries()]
         .map(([roomId, delSala]) => {
-          const sala = game.rooms.find((r) => r.id === roomId);
+          const sala = salasDe(game).find((r) => r.id === roomId);
           const codigo = sala ? `R${ronda}-${codigos.get(sala.id) ?? ''}` : `R${ronda}-SIN-SALA`;
           total++;
           const cuerpo = delSala.map((p) => p.description).join('\n\n');

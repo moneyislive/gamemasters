@@ -12,7 +12,7 @@ import { esc } from '../../html';
 import { envolver, portada } from '../comun';
 import type { VistaGm } from '../../contexto';
 import type { DocumentRenderOptions, GameSession, Plot } from '../../../../../shared/types';
-import { culpableDe, lugarDe, objetoDe } from '../../../juegos/cluedo';
+import { culpableDe, lugarDe, objetoDe, objetosDe, salasDe, sospechososDe } from '../../../juegos/cluedo';
 
 function lista(elementos: string[]): string {
   return `<ul>${elementos.map((e) => `<li>${e}</li>`).join('')}</ul>`;
@@ -140,9 +140,9 @@ ${bloqueNarracion}
     <h2>La solución</h2>
     <table>
       <tbody>
-        <tr><td style="width:34mm;"><strong>Culpable</strong></td><td>${esc(game.suspects.find((s) => s.id === culpableDe(plot.solution))?.name ?? '')} · ${esc(plot.characters.find((c) => c.suspectId === culpableDe(plot.solution))?.characterName ?? '')}</td></tr>
-        <tr><td><strong>Objeto</strong></td><td>${esc(game.weapons.find((w) => w.id === objetoDe(plot.solution))?.name ?? '')}</td></tr>
-        <tr><td><strong>Sala</strong></td><td>${esc(game.rooms.find((r) => r.id === lugarDe(plot.solution))?.name ?? '')}</td></tr>
+        <tr><td style="width:34mm;"><strong>Culpable</strong></td><td>${esc(sospechososDe(game).find((s) => s.id === culpableDe(plot.solution))?.name ?? '')} · ${esc(plot.characters.find((c) => c.suspectId === culpableDe(plot.solution))?.characterName ?? '')}</td></tr>
+        <tr><td><strong>Objeto</strong></td><td>${esc(objetosDe(game).find((w) => w.id === objetoDe(plot.solution))?.name ?? '')}</td></tr>
+        <tr><td><strong>Sala</strong></td><td>${esc(salasDe(game).find((r) => r.id === lugarDe(plot.solution))?.name ?? '')}</td></tr>
         <tr><td><strong>Motivo</strong></td><td>${esc(plot.solution.motive)}</td></tr>
       </tbody>
     </table>
@@ -158,7 +158,7 @@ ${bloqueNarracion}
 ${[...porRonda.entries()]
   .flatMap(([ronda, pistas]) =>
     pistas.map((pista) => {
-      const sala = game.rooms.find((r) => r.id === pista.roomId)?.name ?? '—';
+      const sala = salasDe(game).find((r) => r.id === pista.roomId)?.name ?? '—';
       return `        <tr><td>${ronda}</td><td>${esc(sala)}</td><td>${esc(pista.description)}<br /><em style="color:#6d1a2a;">${esc(pista.pointsTo)}</em></td></tr>`;
     }),
   )
@@ -172,7 +172,7 @@ ${[...porRonda.entries()]
     vista.hayPreparador ? 'Game Master · a ciegas' : 'Game Master',
     'Manual de la velada',
     plot.tagline,
-    `${game.suspects.length} jugadores · ${rondas} rondas`,
+    `${sospechososDe(game).length} jugadores · ${rondas} rondas`,
   )}
 
 ${encabezado}

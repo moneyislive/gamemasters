@@ -18,7 +18,7 @@ import SectionDesigner from './SectionDesigner';
 import PrintablePicker from './PrintablePicker';
 import { copiasDe } from './copias';
 import { printableDocsFor } from '../../../../shared/documents';
-import { manifiestoDe } from '../../../../shared/juegos';
+import { manifiestoDe, personasDe } from '../../../../shared/juegos';
 import type { DocumentAudience } from '../../../../shared/documents';
 import { startMaterial, startRefresh } from '../generate/GenerateOverlay';
 import './documents.css';
@@ -205,10 +205,10 @@ export default function DocumentsPanel(): JSX.Element {
 
   const personajePorId = new Map((game.plot?.characters ?? []).map((c) => [c.suspectId, c]));
   const idsConDocumento = new Set(documentos.map((doc) => doc.suspectId));
-  const idsSospechosos = new Set(game.suspects.map((s) => s.id));
+  const idsSospechosos = new Set(personasDe(game).map((s) => s.id));
 
   // Un sobre por jugador actual: los que aún no tienen dosier también aparecen.
-  const sobres: Sobre[] = game.suspects.map((sospechoso) => ({
+  const sobres: Sobre[] = personasDe(game).map((sospechoso) => ({
     suspectId: sospechoso.id,
     personName: sospechoso.name,
     characterName: personajePorId.get(sospechoso.id)?.characterName,

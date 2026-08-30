@@ -20,6 +20,7 @@
  * el guion; se anota y se sigue. Un maestro de oro que solo recorra el camino
  * feliz deja sin red justo la mitad del código que más se toca al refactorizar.
  */
+import { lugaresDe, personasDe } from '../../../shared/juegos';
 import { abrirRonda, abrirSellado, cerrarRonda, revelarDesenlace } from '../../src/live/sesion';
 import { ejecutarCierre } from '../../src/juegos/cierres';
 import { generarTramaMomia, tramaDe } from '../../src/juegos/momia-trama';
@@ -91,7 +92,7 @@ function sesionInicial(game: GameSession): LiveSession {
     phase: 'lobby',
     round: 0,
     totalRounds: VIGILIAS,
-    players: game.suspects.map((s, i) => ({
+    players: personasDe(game).map((s, i) => ({
       suspectId: s.id,
       displayName: s.name,
       joinCode: `MOMIA${i}`,
@@ -109,8 +110,8 @@ function sesionInicial(game: GameSession): LiveSession {
 }
 
 function velada({ game, sesion, retratar, accion, intentar }: Mesa): void {
-  const gente = game.suspects.map((s) => s.id);
-  const camaras = game.rooms.map((r) => r.id);
+  const gente = personasDe(game).map((s) => s.id);
+  const camaras = lugaresDe(game).map((r) => r.id);
   const trama = tramaDe(game.plot);
 
   retratar('sala-de-espera');

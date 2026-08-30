@@ -12,14 +12,14 @@
 import { esc } from '../../html';
 import { envolver, portada } from '../comun';
 import type { DocumentRenderOptions, GameSession, Plot } from '../../../../../shared/types';
-import { culpableDe } from '../../../juegos/cluedo';
+import { culpableDe, sospechososDe } from '../../../juegos/cluedo';
 
 export function matrizConocimiento(
   game: GameSession,
   plot: Plot,
   opciones: DocumentRenderOptions,
 ): string {
-  const nombreDe = (id: string): string => game.suspects.find((s) => s.id === id)?.name ?? id;
+  const nombreDe = (id: string): string => sospechososDe(game).find((s) => s.id === id)?.name ?? id;
 
   /** ¿El texto menciona a algún otro personaje? Sirve para sugerir el cruce. */
   const mencionados = (texto: string, exceptoId: string): string[] => {

@@ -12,7 +12,7 @@ import { cronologiaPublica, pistasPorRonda } from '../../datos';
 import { esc } from '../../html';
 import { envolver, portada } from '../comun';
 import type { DocumentRenderOptions, GameSession, Plot } from '../../../../../shared/types';
-import { culpableDe, lugarDe, objetoDe } from '../../../juegos/cluedo';
+import { culpableDe, lugarDe, objetoDe, objetosDe, salasDe, sospechososDe } from '../../../juegos/cluedo';
 
 export function hojaSolucion(
   game: GameSession,
@@ -21,18 +21,18 @@ export function hojaSolucion(
 ): string {
   const porRonda = pistasPorRonda(plot);
   const publicos = new Set(cronologiaPublica(plot));
-  const nombreDe = (id: string): string => game.suspects.find((s) => s.id === id)?.name ?? id;
+  const nombreDe = (id: string): string => sospechososDe(game).find((s) => s.id === id)?.name ?? id;
   const personajeDe = (id: string): string =>
     plot.characters.find((c) => c.suspectId === id)?.characterName ?? nombreDe(id);
 
   const asesino = nombreDe(culpableDe(plot.solution));
-  const arma = game.weapons.find((w) => w.id === objetoDe(plot.solution))?.name ?? '';
-  const sala = game.rooms.find((r) => r.id === lugarDe(plot.solution))?.name ?? '';
+  const arma = objetosDe(game).find((w) => w.id === objetoDe(plot.solution))?.name ?? '';
+  const sala = salasDe(game).find((r) => r.id === lugarDe(plot.solution))?.name ?? '';
 
   const mapaPistas = [...porRonda.entries()]
     .flatMap(([ronda, pistas]) =>
       pistas.map((pista) => {
-        const donde = game.rooms.find((r) => r.id === pista.roomId)?.name ?? '—';
+        const donde = salasDe(game).find((r) => r.id === pista.roomId)?.name ?? '—';
         return `        <tr><td>${ronda}</td><td>${esc(donde)}</td><td>${esc(pista.description)}<br /><em style="color:#6d1a2a;">${esc(pista.pointsTo)}</em></td></tr>`;
       }),
     )

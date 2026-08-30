@@ -1,4 +1,5 @@
 import type { PrintableDocInfo } from '../../../../shared/documents';
+import { lugaresDe, personasDe } from '../../../../shared/juegos';
 import type { GameSession } from '../../../../shared/types';
 
 /**
@@ -12,11 +13,11 @@ export function copiasDe(doc: PrintableDocInfo, game: GameSession): string {
   const caras = doc.sides === 'una' ? 'a una cara' : 'a doble cara';
   switch (doc.copies) {
     case 'una-por-jugador': {
-      const n = game.suspects.length;
+      const n = personasDe(game).length;
       return `${n} ${n === 1 ? 'copia' : 'copias'} · una por jugador · ${caras}`;
     }
     case 'una-por-sala': {
-      const n = game.rooms.length;
+      const n = lugaresDe(game).length;
       return `${n} ${n === 1 ? 'página' : 'páginas'} · una por sala · ${caras}`;
     }
     default:

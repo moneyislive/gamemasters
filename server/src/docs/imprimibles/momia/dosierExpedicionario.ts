@@ -25,7 +25,7 @@
  * el juego se acabó antes de repartirlos.
  */
 import { esc } from '../../html';
-import { manifiestoDe } from '../../../../../shared/juegos';
+import { entidadesDe, manifiestoDe } from '../../../../../shared/juegos';
 import { envolverPapiro, portadaPapiro, sinTrama } from './comun';
 import { vistaDeLaMomia } from './datos';
 import type { DocumentRenderOptions, GameSession, Plot } from '../../../../../shared/types';
@@ -195,7 +195,7 @@ ${dosieres}`;
  */
 registrarDosieres('momia', {
   tituloDeUno: (game, plot, suspectId) =>
-    `${plot.title} — Dosier de ${game.suspects.find((s) => s.id === suspectId)?.name ?? ''}`,
+    `${plot.title} — Dosier de ${entidadesDe(game, 'expedicionarios').find((s) => s.id === suspectId)?.name ?? ''}`,
   deUno: (game, plot, suspectId, opciones) =>
     dosierExpedicionario(game, plot, { ...opciones, soloPara: suspectId }),
 });

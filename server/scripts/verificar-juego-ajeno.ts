@@ -93,7 +93,7 @@ const LA_ALMONEDA: ManifiestoDeJuego = {
       /*
        * PEAJE: la categoría de personas TIENE que ir a `suspects`.
        *
-       * ═══ Y AQUI YA NO HAY `almacen: 'suspects'` ═══
+       * ═══ Y AQUI YA NO HAY `almacenHeredado: 'suspects'` ═══
        *
        * Lo habia, y con una nota que decia: «se llaman postores y no
        * sospechosos, pero media plataforma cuelga de ese campo con ese nombre —
@@ -419,7 +419,7 @@ comprobar('sin lugares: ninguna categoría los declara', !m.categorias.some((c) 
 comprobar('sin dosier: nadie interpreta a nadie', m.dosier.length === 0);
 comprobar(
   'una categoría vive fuera de los tres campos heredados',
-  m.categorias.some((c) => !c.almacen),
+  m.categorias.some((c) => !c.almacenHeredado),
 );
 
 paso('Se juega una subasta entera');

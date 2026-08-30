@@ -31,7 +31,17 @@ import type {
   VistaJugador,
 } from '../../../shared/live';
 import type { GameSession, Plot } from '../../../shared/types';
-import { aciertos, ejeDeJugadores, ejes as ejesDe, esElSenalado, manifiestoDe, personasDe } from '../../../shared/juegos';
+import {
+  aciertos,
+  ejeDeJugadores,
+  ejes as ejesDe,
+  esElSenalado,
+  lugaresDe,
+  manifiestoDe,
+  manifiestoSiExiste,
+  personasDe,
+} from '../../../shared/juegos';
+import type { Entidad } from '../../../shared/juegos';
 import { estadoParaGm, proyectarEstado } from '../juegos/proyecciones';
 import { entidadesDe, nombreDeEntidad } from '../juegos/entidades';
 import { accionesDisponibles } from '../juegos/motor';
@@ -57,7 +67,7 @@ function pistaVista(
   clue: { id: string; roomId?: string; description: string; pointsTo: string; round: number },
   conSignificado: boolean,
 ): PistaVista {
-  const sala = game.rooms.find((r) => r.id === clue.roomId);
+  const sala = lugaresDe(game).find((r) => r.id === clue.roomId);
   return {
     id: clue.id,
     roomId: clue.roomId ?? '',
@@ -70,6 +80,19 @@ function pistaVista(
 
 function cronologia(plot: Plot): MomentoVista[] {
   return cronologiaPublica(plot).map((e) => ({ time: e.time, description: e.description }));
+}
+
+/**
+ * La categoria que vivia en el campo `weapons`. Ver el porque arriba.
+ *
+ * Vacio si el juego no tiene ninguna: una subasta no tiene «cosas de la mesa»
+ * aparte de sus lotes, y entonces el movil no pinta ese bloque.
+ */
+function cosasDeLaMesa(game: GameSession): Entidad[] {
+  const manifiesto = manifiestoSiExiste(game.settings?.juego);
+  if (!manifiesto) return [];
+  const cat = manifiesto.categorias.find((c) => c.almacenHeredado === 'weapons');
+  return cat ? entidadesDe(game, cat.id) : [];
 }
 
 /**
@@ -146,7 +169,7 @@ export function vistaDeJugador(
       if (sala) ocupacion.set(sala, (ocupacion.get(sala) ?? 0) + 1);
     }
   }
-  const salas: SalaVista[] = game.rooms.map((r) => ({
+  const salas: SalaVista[] = lugaresDe(game).map((r) => ({
     id: r.id,
     name: r.name,
     description: r.description,
@@ -352,7 +375,7 @@ export function vistaDeJugador(
           role: suPersonaje?.role ?? '',
           photoUrl: fotoParaJugador(suSospechoso?.photoUrl, game.id),
           conectado: estaConectado(p, sesion.id),
-          salaActual: suSala ? game.rooms.find((r) => r.id === suSala)?.name : undefined,
+          salaActual: suSala ? lugaresDe(game).find((r) => r.id === suSala)?.name : undefined,
           yaAcuso: sesion.acusaciones.some((a) => a.suspectId === p.suspectId),
         };
       }),
@@ -368,7 +391,18 @@ export function vistaDeJugador(
      * CLUEDO sale byte a byte como salia. Lo comprueba el maestro de oro.
      */
     estadoDelJuego: proyectarEstado(game, sesion, suspectId),
-    objetos: game.weapons.map((w) => ({
+    /*
+     * LAS COSAS DE LA MESA, y esto es deuda anotada, no diseño.
+     *
+     * Era `game.weapons`, o sea el campo heredado. Ahora se resuelve por el
+     * manifiesto —la categoria que declara haber vivido ahi— para que la
+     * migracion no cambie lo que ve nadie, y sale byte a byte igual.
+     *
+     * Lo CORRECTO es que este bloque no exista en la vista comun: «las cosas»
+     * son de cada juego, y el movil ya sabe pintar bloques que el juego declara.
+     * Eso toca las pantallas, asi que va en el frente de la vista y no aqui.
+     */
+    objetos: cosasDeLaMesa(game).map((w) => ({
       id: w.id,
       name: w.name,
       description: w.description,
@@ -468,7 +502,7 @@ export function vistaDeGameMaster(game: GameSession, sesion: LiveSession): Vista
   const revelaSolucion = game.settings?.gmPlays !== true;
   const plot = game.plot;
 
-  const ocupacion = game.rooms.map((r) => ({
+  const ocupacion = lugaresDe(game).map((r) => ({
     roomId: r.id,
     roomName: r.name,
     suspectIds: sesion.players

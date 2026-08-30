@@ -22,7 +22,7 @@
  */
 import { plantillaDe } from './registro';
 import { printableDocInfo, resolveGmMode } from '../../../../shared/documents';
-import { manifiestoDe } from '../../../../shared/juegos';
+import { lugaresDe, manifiestoDe } from '../../../../shared/juegos';
 import { vistaGm } from '../contexto';
 import type { PrintableDocId, PrintableDocInfo } from '../../../../shared/documents';
 import type { DocumentRenderOptions, GameSession, PlayerDocument } from '../../../../shared/types';
@@ -61,7 +61,7 @@ export function renderPrintableDocument(
    * el núcleo sabiendo que los carteles de cámara son de la Momia. Ahora lo
    * declara cada documento en su ficha.
    */
-  if (info.necesitaLugares && game.rooms.length === 0) return null;
+  if (info.necesitaLugares && lugaresDe(game).length === 0) return null;
 
   const plantilla = plantillaDe(manifiestoDe(game.settings?.juego).id, id);
   if (!plantilla) return null;

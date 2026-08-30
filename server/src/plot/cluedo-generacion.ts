@@ -10,6 +10,7 @@
  * sitio le contaba a quien viniera detras una cosa que no es verdad: que la
  * tuberia es de CLUEDO y los demas juegos son excepciones.
  */
+import { objetosDe, salasDe, sospechososDe } from '../juegos/cluedo';
 import type { GameSession, Plot } from '../../../shared/types';
 import { DEMO_MODE } from '../config';
 import { getAnthropicClient, resolveModel } from '../agent/anthropic';
@@ -84,7 +85,7 @@ async function generarTramaConApi(game: GameSession, emit: Emitir): Promise<Plot
 
 function construirPrompt(game: GameSession): string {
   const sospechosos =
-    game.suspects
+    sospechososDe(game)
       .map((s) => {
         // El correo NO va al modelo. Estos son invitados de verdad, y su
         // dirección no aporta absolutamente nada a escribir un personaje: era
@@ -100,12 +101,12 @@ function construirPrompt(game: GameSession): string {
       .join('\n') || '- (sin sospechosos registrados)';
 
   const salas =
-    game.rooms
+    salasDe(game)
       .map((r) => `- id: "${r.id}" · nombre: "${r.name}"${r.description?.trim() ? ` · descripción: ${r.description.trim()}` : ''}`)
       .join('\n') || '- (sin salas registradas)';
 
   const armas =
-    game.weapons
+    objetosDe(game)
       .map((w) => `- id: "${w.id}" · nombre: "${w.name}"${w.description?.trim() ? ` · descripción: ${w.description.trim()}` : ''}`)
       .join('\n') || '- (sin armas registradas)';
 
@@ -115,8 +116,8 @@ function construirPrompt(game: GameSession): string {
     game.boardMode === 'generated' && game.board?.passages.length
       ? game.board.passages
           .map((pasadizo) => {
-            const desde = game.rooms.find((s) => s.id === pasadizo.fromRoomId)?.name ?? '';
-            const hasta = game.rooms.find((s) => s.id === pasadizo.toRoomId)?.name ?? '';
+            const desde = salasDe(game).find((s) => s.id === pasadizo.fromRoomId)?.name ?? '';
+            const hasta = salasDe(game).find((s) => s.id === pasadizo.toRoomId)?.name ?? '';
             return `- "${desde}" ⇄ "${hasta}"`;
           })
           .join('\n')

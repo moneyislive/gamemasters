@@ -100,7 +100,7 @@ function pestanasDe(manifiesto: ManifiestoDeJuego, juego: string): Pestana[] {
  */
 function pestanaPedida(manifiesto: ManifiestoDeJuego, objetivo: string): string {
   if (objetivo !== 'suspects' && objetivo !== 'rooms' && objetivo !== 'weapons') return objetivo;
-  return manifiesto.categorias.find((c) => c.almacen === objetivo)?.id ?? objetivo;
+  return manifiesto.categorias.find((c) => c.almacenHeredado === objetivo)?.id ?? objetivo;
 }
 
 const demoTip = (asistente: string) =>

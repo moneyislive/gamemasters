@@ -18,7 +18,7 @@ import { registrarAmpliacion } from '../juegos/ampliaciones';
 import { generateDemoCharacters } from './cluedo-demo';
 import { PLOT_EXTENSION_SCHEMA } from './cluedo-esquema';
 import { buildStyleBlock } from './style';
-import { culpableDe, lugarDe, objetoDe, victimaDe } from '../juegos/cluedo';
+import { culpableDe, lugarDe, objetoDe, objetosDe, salasDe, sospechososDe, victimaDe } from '../juegos/cluedo';
 import { juegoDe, repararRespuestas } from '../juegos/solucion';
 import { emisorDeProgreso } from '../live/proyeccion';
 import { apuntarUso } from '../gasto/contador';
@@ -68,7 +68,7 @@ async function ampliarTrama(
 
   // (b) Personas incorporadas después que aún no tienen personaje.
   const faltantes = informe.suspectsWithoutCharacter.filter((id) =>
-    game.suspects.some((sospechoso) => sospechoso.id === id),
+    sospechososDe(game).some((sospechoso) => sospechoso.id === id),
   );
 
   let nuevos: PlotCharacter[] = [];
@@ -101,7 +101,7 @@ async function ampliarTrama(
   }
 
   // Personajes nuevos válidos (el modelo puede colarse con ids inventados).
-  const idsSospechosos = new Set(game.suspects.map((sospechoso) => sospechoso.id));
+  const idsSospechosos = new Set(sospechososDe(game).map((sospechoso) => sospechoso.id));
   const yaEscritos = new Set(plot.characters.map((personaje) => personaje.suspectId));
   for (const personaje of nuevos) {
     if (!idsSospechosos.has(personaje.suspectId)) continue; // id inventado: se descarta
@@ -111,7 +111,7 @@ async function ampliarTrama(
   }
 
   // (f) Red de seguridad: si el modelo dejó a alguien sin personaje, lo cubre el demo.
-  const sinPersonaje = game.suspects
+  const sinPersonaje = sospechososDe(game)
     .filter((sospechoso) => !yaEscritos.has(sospechoso.id))
     .map((sospechoso) => sospechoso.id);
   if (sinPersonaje.length > 0) {
@@ -123,7 +123,7 @@ async function ampliarTrama(
   }
 
   // Orden estable: los personajes siguen el orden de la lista de jugadores.
-  const orden = new Map(game.suspects.map((sospechoso, indice) => [sospechoso.id, indice]));
+  const orden = new Map(sospechososDe(game).map((sospechoso, indice) => [sospechoso.id, indice]));
   plot.characters.sort(
     (a, b) => (orden.get(a.suspectId) ?? 0) - (orden.get(b.suspectId) ?? 0),
   );
@@ -137,7 +137,7 @@ async function ampliarTrama(
 
   // Pistas extra para salas que se hubieran quedado a oscuras.
   if (pistasExtra.length > 0) {
-    const idsSalas = new Set(game.rooms.map((sala) => sala.id));
+    const idsSalas = new Set(salasDe(game).map((sala) => sala.id));
     const idsPistas = new Set(plot.clues.map((pista) => pista.id));
     pistasExtra.forEach((pista, indice) => {
       if (!pista.roomId || !idsSalas.has(pista.roomId)) return;
@@ -150,10 +150,10 @@ async function ampliarTrama(
 
 /** Reescritura local del motivo y del relato del crimen (modo demo y red de seguridad). */
 function reparacionLocal(game: GameSession, plot: Plot): ReparacionSolucion {
-  const asesino = game.suspects.find((s) => s.id === culpableDe(plot.solution));
+  const asesino = sospechososDe(game).find((s) => s.id === culpableDe(plot.solution));
   const personaje = plot.characters.find((c) => c.suspectId === culpableDe(plot.solution));
-  const arma = game.weapons.find((w) => w.id === objetoDe(plot.solution));
-  const sala = game.rooms.find((r) => r.id === lugarDe(plot.solution));
+  const arma = objetosDe(game).find((w) => w.id === objetoDe(plot.solution));
+  const sala = salasDe(game).find((r) => r.id === lugarDe(plot.solution));
 
   const nombre = personaje?.characterName ?? asesino?.name ?? 'el culpable';
   const motive = personaje?.motive?.trim() || plot.solution.motive || '';
@@ -240,14 +240,14 @@ function construirPromptAmpliacion(
   solucionRota: boolean,
 ): string {
   const nombreSospechoso = (id: string): string =>
-    game.suspects.find((sospechoso) => sospechoso.id === id)?.name ?? '(jugador desconocido)';
+    sospechososDe(game).find((sospechoso) => sospechoso.id === id)?.name ?? '(jugador desconocido)';
 
-  const asesino = game.suspects.find((s) => s.id === culpableDe(plot.solution));
+  const asesino = sospechososDe(game).find((s) => s.id === culpableDe(plot.solution));
   const personajeAsesino = plot.characters.find(
     (c) => c.suspectId === culpableDe(plot.solution),
   );
-  const arma = game.weapons.find((w) => w.id === objetoDe(plot.solution));
-  const sala = game.rooms.find((r) => r.id === lugarDe(plot.solution));
+  const arma = objetosDe(game).find((w) => w.id === objetoDe(plot.solution));
+  const sala = salasDe(game).find((r) => r.id === lugarDe(plot.solution));
 
   const personajesExistentes =
     plot.characters
@@ -262,7 +262,7 @@ function construirPromptAmpliacion(
       .join('\n') || '- (la trama se ha quedado sin ningún personaje escrito)';
 
   const salas =
-    game.rooms
+    salasDe(game)
       .map(
         (sala2) =>
           `- id: "${sala2.id}" · nombre: "${sala2.name}"${sala2.description?.trim() ? ` · descripción: ${sala2.description.trim()}` : ''}`,
@@ -270,7 +270,7 @@ function construirPromptAmpliacion(
       .join('\n') || '- (sin salas registradas)';
 
   const armas =
-    game.weapons
+    objetosDe(game)
       .map(
         (arma2) =>
           `- id: "${arma2.id}" · nombre: "${arma2.name}"${arma2.description?.trim() ? ` · descripción: ${arma2.description.trim()}` : ''}`,
@@ -280,7 +280,7 @@ function construirPromptAmpliacion(
   const nuevos =
     faltantes
       .map((id) => {
-        const sospechoso = game.suspects.find((s) => s.id === id);
+        const sospechoso = sospechososDe(game).find((s) => s.id === id);
         if (!sospechoso) return '';
         const lineas = [`- id: "${sospechoso.id}" · nombre: "${sospechoso.name}"`];
         if (sospechoso.description?.trim()) {
@@ -291,7 +291,7 @@ function construirPromptAmpliacion(
       .filter(Boolean)
       .join('\n') || '- (ninguna persona nueva)';
 
-  const salasSinPista = game.rooms
+  const salasSinPista = salasDe(game)
     .filter((sala2) => !plot.clues.some((pista) => pista.roomId === sala2.id))
     .map((sala2) => `"${sala2.name}" (id "${sala2.id}")`)
     .join(', ');

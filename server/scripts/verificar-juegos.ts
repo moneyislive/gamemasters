@@ -114,7 +114,7 @@ function partidaDe(m: ManifiestoDeJuego): GameSession | null {
       id: `${cat.id[0]}${i}`,
       name: cat.sonJugadores ? (GENTE[i] ?? `Persona ${i + 1}`) : `${capitalizar(cat.singular)} ${i + 1}`,
     }));
-    if (cat.almacen) (game as unknown as Record<string, unknown>)[cat.almacen] = lista;
+    if (cat.almacenHeredado) (game as unknown as Record<string, unknown>)[cat.almacenHeredado] = lista;
     else (game.entidades as Record<string, unknown>)[cat.id] = lista;
   }
 

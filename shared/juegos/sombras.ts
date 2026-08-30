@@ -401,7 +401,7 @@ export const SOMBRAS: ManifiestoDeJuego = {
        * de los móviles, el reparto de dosieres y los correos. Una categoría de
        * personas que viviera en otro sitio se quedaría sin nada de eso.
        */
-      almacen: 'suspects',
+      almacenHeredado: 'suspects',
       presentacion: {
         titulo: 'La columna',
         descripcion:
@@ -433,7 +433,7 @@ export const SOMBRAS: ManifiestoDeJuego = {
       sonLugares: true,
       admiteFoto: true,
       // En `rooms` porque de ahí cuelgan el plano y las chinchetas.
-      almacen: 'rooms',
+      almacenHeredado: 'rooms',
       presentacion: {
         titulo: 'Los pasos del camino',
         descripcion:
@@ -464,7 +464,7 @@ export const SOMBRAS: ManifiestoDeJuego = {
       minimo: 3,
       admiteFoto: true,
       // El tercer campo heredado. No le pega el nombre, pero es donde cabe.
-      almacen: 'weapons',
+      almacenHeredado: 'weapons',
       presentacion: {
         titulo: 'La carga de la columna',
         descripcion:

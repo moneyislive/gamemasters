@@ -22,7 +22,7 @@ import { DEMO_MODE } from '../config';
 import { getAnthropicClient, resolveModel } from '../agent/anthropic';
 import { numeroDeRondas } from '../docs/datos';
 import { buildStyleBlock } from './style';
-import { culpableDe, lugarDe, objetoDe, victimaDe } from '../juegos/cluedo';
+import { culpableDe, lugarDe, objetoDe, objetosDe, salasDe, sospechososDe, victimaDe } from '../juegos/cluedo';
 import { registrarMaterial } from '../juegos/materiales';
 import { emisorDeProgreso } from '../live/proyeccion';
 import { apuntarUso, volcarGasto } from '../gasto/contador';
@@ -210,7 +210,7 @@ async function materialConApi(game: GameSession, plot: Plot, emit: Emitir): Prom
 function construirPrompt(game: GameSession, plot: Plot): string {
   const rondas = numeroDeRondas(plot);
   const nombre = (id: string): string =>
-    game.suspects.find((s) => s.id === id)?.name ?? id;
+    sospechososDe(game).find((s) => s.id === id)?.name ?? id;
 
   const personajes = plot.characters
     .map((p) => `- id: "${p.suspectId}" · ${p.characterName} (${nombre(p.suspectId)}) · ${p.role}`)
@@ -222,14 +222,14 @@ function construirPrompt(game: GameSession, plot: Plot): string {
 
   const pistas = plot.clues
     .map((c) => {
-      const sala = game.rooms.find((r) => r.id === c.roomId)?.name ?? 'sin sala';
+      const sala = salasDe(game).find((r) => r.id === c.roomId)?.name ?? 'sin sala';
       return `- ronda ${c.round} · ${sala}: ${c.description}`;
     })
     .join('\n');
 
   const asesino = plot.characters.find((c) => c.suspectId === culpableDe(plot.solution));
-  const arma = game.weapons.find((w) => w.id === objetoDe(plot.solution))?.name ?? '';
-  const sala = game.rooms.find((r) => r.id === lugarDe(plot.solution))?.name ?? '';
+  const arma = objetosDe(game).find((w) => w.id === objetoDe(plot.solution))?.name ?? '';
+  const sala = salasDe(game).find((r) => r.id === lugarDe(plot.solution))?.name ?? '';
 
   return `Escribe el material impreso de esta partida de misterio en vivo, que YA tiene trama cerrada.
 
@@ -256,7 +256,7 @@ LA PARTIDA TIENE ${rondas} RONDAS.
 
 REQUISITOS:
 1. narrations: exactamente ${rondas + 1} entradas, con round 0 (apertura) y round 1..${rondas}. Ninguna revela la solución: son el telón que se levanta al empezar cada tramo.
-2. twists: entre 2 y ${Math.min(6, Math.max(2, game.suspects.length - 1))} giros, cada uno para un sospechoso DISTINTO y NINGUNO para el culpable —si el culpable recibiera un giro se delataría solo—. Reparte entre las rondas 2 y ${rondas}. Cada uno debe darle a ese jugador algo NUEVO que contar o que ocultar.
+2. twists: entre 2 y ${Math.min(6, Math.max(2, sospechososDe(game).length - 1))} giros, cada uno para un sospechoso DISTINTO y NINGUNO para el culpable —si el culpable recibiera un giro se delataría solo—. Reparte entre las rondas 2 y ${rondas}. Cada uno debe darle a ese jugador algo NUEVO que contar o que ocultar.
 3. timelineReveals: una entrada por ronda (1..${rondas}), en orden cronológico, que vaya rellenando el tramo sin testigos. La última puede dejar la pieza final sin encajar, pero no nombra al culpable.
 4. hints: tres ayudas graduadas. La de nivel 3 puede señalar la sala o el objeto, nunca a la persona.
 5. finale: la reconstrucción, la confesión en primera persona para que la lea quien interpretó al culpable, y el epílogo.
@@ -274,7 +274,7 @@ REQUISITOS:
  * solo— o repetir persona. Aquí se descarta lo imposible antes de guardarlo.
  */
 function sanear(material: PrintMaterial, game: GameSession, plot: Plot): PrintMaterial {
-  const idsValidos = new Set(game.suspects.map((s) => s.id));
+  const idsValidos = new Set(sospechososDe(game).map((s) => s.id));
   const rondas = numeroDeRondas(plot);
   const vistos = new Set<string>();
 
@@ -334,9 +334,9 @@ async function materialDemo(game: GameSession, plot: Plot, emit: Emitir): Promis
   }
 
   const rondas = numeroDeRondas(plot);
-  const inocentes = game.suspects.filter((s) => s.id !== culpableDe(plot.solution));
-  const arma = game.weapons.find((w) => w.id === objetoDe(plot.solution))?.name ?? 'el arma';
-  const sala = game.rooms.find((r) => r.id === lugarDe(plot.solution))?.name ?? 'la sala';
+  const inocentes = sospechososDe(game).filter((s) => s.id !== culpableDe(plot.solution));
+  const arma = objetosDe(game).find((w) => w.id === objetoDe(plot.solution))?.name ?? 'el arma';
+  const sala = salasDe(game).find((r) => r.id === lugarDe(plot.solution))?.name ?? 'la sala';
   const asesino = plot.characters.find((c) => c.suspectId === culpableDe(plot.solution));
   const publicos = plot.timeline.filter((e) => e.isPublic);
 

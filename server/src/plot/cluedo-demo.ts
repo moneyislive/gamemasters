@@ -21,7 +21,7 @@ import type {
   TimelineEvent,
   Weapon,
 } from '../../../shared/types';
-import { culpableDe, respuestasCluedo, victimaDe } from '../juegos/cluedo';
+import { culpableDe, objetosDe, respuestasCluedo, salasDe, sospechososDe, victimaDe } from '../juegos/cluedo';
 
 // ------------------------------ plantillas ------------------------------
 
@@ -137,15 +137,15 @@ function conReserva<T>(lista: T[], reserva: T[]): T[] {
 // ------------------------------ generador ------------------------------
 
 export function generateDemoPlot(game: GameSession): Plot {
-  const sospechosos: Suspect[] = conReserva(game.suspects, [
+  const sospechosos: Suspect[] = conReserva(sospechososDe(game), [
     { id: 'invitado-1', name: 'Un invitado sin nombre' },
     { id: 'invitado-2', name: 'Una silueta en el umbral' },
   ]);
-  const salas: Room[] = conReserva(game.rooms, [
+  const salas: Room[] = conReserva(salasDe(game), [
     { id: 'sala-1', name: 'El Gran Salón' },
     { id: 'sala-2', name: 'La Biblioteca' },
   ]);
-  const armas: Weapon[] = conReserva(game.weapons, [
+  const armas: Weapon[] = conReserva(objetosDe(game), [
     { id: 'arma-1', name: 'El candelabro' },
     { id: 'arma-2', name: 'La cuerda de seda' },
   ]);
@@ -397,7 +397,7 @@ export function generateDemoCharacters(
   suspectIds: string[],
   plot: Plot,
 ): PlotCharacter[] {
-  const sospechosoPorId = new Map(game.suspects.map((s) => [s.id, s]));
+  const sospechosoPorId = new Map(sospechososDe(game).map((s) => [s.id, s]));
   const yaTienenPersonaje = new Set(plot.characters.map((personaje) => personaje.suspectId));
 
   // Se ignoran ids repetidos, inexistentes o que ya tenían personaje.
@@ -411,7 +411,7 @@ export function generateDemoCharacters(
   }
   if (pendientes.length === 0) return [];
 
-  const salas: Room[] = conReserva(game.rooms, [
+  const salas: Room[] = conReserva(salasDe(game), [
     { id: 'sala-1', name: 'El Gran Salón' },
     { id: 'sala-2', name: 'La Biblioteca' },
   ]);

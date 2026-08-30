@@ -5,17 +5,17 @@
 import { esc } from '../../html';
 import { envolver, portada } from '../comun';
 import type { DocumentRenderOptions, GameSession, Plot } from '../../../../../shared/types';
-import { culpableDe, lugarDe, objetoDe } from '../../../juegos/cluedo';
+import { culpableDe, lugarDe, objetoDe, objetosDe, salasDe, sospechososDe } from '../../../juegos/cluedo';
 
 export function desenlace(
   game: GameSession,
   plot: Plot,
   opciones: DocumentRenderOptions,
 ): string {
-  const asesino = game.suspects.find((s) => s.id === culpableDe(plot.solution));
+  const asesino = sospechososDe(game).find((s) => s.id === culpableDe(plot.solution));
   const personaje = plot.characters.find((c) => c.suspectId === culpableDe(plot.solution));
-  const arma = game.weapons.find((w) => w.id === objetoDe(plot.solution));
-  const sala = game.rooms.find((r) => r.id === lugarDe(plot.solution));
+  const arma = objetosDe(game).find((w) => w.id === objetoDe(plot.solution));
+  const sala = salasDe(game).find((r) => r.id === lugarDe(plot.solution));
   const finale = plot.material?.finale;
 
   const reconstruccion = finale?.reconstruction?.trim() || plot.solution.howItHappened;
@@ -101,7 +101,7 @@ ${
           </tr>
         </thead>
         <tbody>
-${game.suspects
+${sospechososDe(game)
   .map(
     (s) =>
       `          <tr><td>${esc(s.name)}</td><td></td><td></td><td></td><td></td></tr>`,

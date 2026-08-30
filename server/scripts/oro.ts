@@ -55,7 +55,7 @@ import { vistaDeGameMaster, vistaDeJugador } from '../src/live/proyeccion';
 import { ejecutarAccion } from '../src/juegos/motor';
 import { iniciarJuego } from '../src/juegos/inicios';
 import { printableDocsFor } from '../../shared/documents';
-import { manifiestoDe } from '../../shared/juegos';
+import { manifiestoDe, personasDe } from '../../shared/juegos';
 import { alDia } from '../src/juegos/migracion';
 import { GUION as CLUEDO } from './oro-guiones/cluedo';
 import { GUION as MOMIA } from './oro-guiones/momia';
@@ -137,7 +137,7 @@ function capturarDocumentos(game: GameSession): Instantanea['documentos'] {
 
 function capturarDosieres(game: GameSession): Instantanea['dosieres'] {
   const salida: Instantanea['dosieres'] = {};
-  for (const s of game.suspects) {
+  for (const s of personasDe(game)) {
     for (const variant of VARIANTES) {
       const doc = renderPlayerDocument(game, s.id, { variant });
       salida[`${s.id}/${variant}`] = doc
@@ -165,7 +165,7 @@ function capturarPartida(guion: GuionDeOro, game: GameSession): Paso[] {
 
   const retratar = (paso: string): void => {
     const jugadores: Record<string, unknown> = {};
-    for (const s of game.suspects) {
+    for (const s of personasDe(game)) {
       jugadores[s.id] = sinReloj(vistaDeJugador(game, sesion, s.id));
     }
     pasos.push({
@@ -326,7 +326,7 @@ for (const guion of aRecorrer) {
     console.log(`\n${guion.juego} · ${guion.titulo}`);
     console.log(`  ${Object.keys(actual.documentos).length} documentos imprimibles`);
     console.log(`  ${Object.keys(actual.dosieres).length} dosieres`);
-    console.log(`  ${actual.partida.length} pasos de partida × ${game.suspects.length} jugadores`);
+    console.log(`  ${actual.partida.length} pasos de partida × ${personasDe(game).length} jugadores`);
     console.log(`  ${(fs.statSync(instantanea).size / 1024).toFixed(0)} KB`);
     continue;
   }

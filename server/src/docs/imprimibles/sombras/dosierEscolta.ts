@@ -40,7 +40,7 @@
  * antes de repartirlos.
  */
 import { esc } from '../../html';
-import { manifiestoDe } from '../../../../../shared/juegos';
+import { entidadesDe, manifiestoDe } from '../../../../../shared/juegos';
 import { PRENDAS_INICIALES } from '../../../../../shared/juegos/sombras-tipos';
 import { envolverWashi, portadaWashi, sinTrama } from './comun';
 import { vistaDeLasSombras } from './datos';
@@ -347,7 +347,7 @@ ${dosieres}`;
  */
 registrarDosieres('sombras', {
   tituloDeUno: (game, plot, suspectId) =>
-    `${plot.title} — Dosier de ${game.suspects.find((s) => s.id === suspectId)?.name ?? ''}`,
+    `${plot.title} — Dosier de ${entidadesDe(game, 'escoltas').find((s) => s.id === suspectId)?.name ?? ''}`,
   deUno: (game, plot, suspectId, opciones) =>
     dosierEscolta(game, plot, { ...opciones, soloPara: suspectId }),
 });

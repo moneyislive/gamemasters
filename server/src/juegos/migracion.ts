@@ -18,6 +18,8 @@
  * cargarlo y se guarda ya con la forma nueva la próxima vez que se toque.
  */
 import { respuestasCluedo } from './cluedo';
+import { manifiestoSiExiste } from '../../../shared/juegos';
+import type { Entidad } from '../../../shared/juegos';
 import type { GameSession, Plot } from '../../../shared/types';
 import type { LiveSession } from '../../../shared/live';
 
@@ -55,9 +57,62 @@ export function tramaAlDia(plot: Plot | undefined): boolean {
   return true;
 }
 
+/**
+ * Muda las entidades de los tres campos heredados a `entidades`.
+ *
+ * ═══ QUÉ SE ESTÁ CONVIRTIENDO ═══
+ *
+ * Una partida guardaba sus cosas en `suspects`, `rooms` y `weapons`: tres
+ * campos con nombre en el contrato común, heredados del primer juego. Un juego
+ * cuya categoría de personas no se llamara «sospechosos» tenía que declarar
+ * `almacenHeredado: 'suspects'` para que sus datos acabaran ahí, y todo el
+ * núcleo leía esos tres campos por su nombre.
+ *
+ * Ahora todas las categorías de todos los juegos viven en
+ * `game.entidades[categoria]`. Esto trae las partidas viejas a ese sitio.
+ *
+ * ═══ POR QUÉ AL LEER Y NO EN UN PROCESO APARTE ═══
+ *
+ * Porque es el patrón que ya usaba este fichero para la terna de la acusación, y
+ * porque un proceso por lotes hay que acordarse de correrlo —en cada base, en
+ * cada país, después de cada despliegue— y esto no. Una partida se pone al día
+ * la primera vez que alguien la abre, y se queda así al guardarla.
+ *
+ * SE VACÍA EL CAMPO VIEJO. Dejarlo lleno significaría dos copias de la misma
+ * lista divergiendo en cuanto alguien edite: quien lea por `entidadesDe` vería
+ * la nueva y quien leyera el campo a pelo vería la vieja para siempre. Y
+ * quedaría escondido, que es lo peor.
+ */
+function entidadesAlDia(game: GameSession): void {
+  const manifiesto = manifiestoSiExiste(game.settings?.juego);
+  if (!manifiesto) return;
+
+  for (const cat of manifiesto.categorias) {
+    const campo = cat.almacenHeredado;
+    if (!campo) continue;
+    const viejas = game[campo] as unknown as Entidad[] | undefined;
+    if (!viejas || viejas.length === 0) continue;
+
+    game.entidades ??= {};
+    /*
+     * Si ya hay algo en el sitio nuevo, manda lo nuevo y lo viejo se descarta.
+     * Es el caso de una partida que se guardó a medio migrar —posible si un
+     * despliegue se revierte— y ahí lo correcto es quedarse con lo último que
+     * se escribió, no fusionar dos listas y duplicar a la mitad de la mesa.
+     */
+    if (!game.entidades[cat.id] || game.entidades[cat.id]!.length === 0) {
+      game.entidades[cat.id] = viejas;
+    }
+    (game as unknown as Record<string, unknown>)[campo] = [];
+  }
+}
+
 /** Pone al día una partida recién leída del almacén. Devuelve la misma. */
 export function alDia<T extends GameSession | null | undefined>(game: T): T {
-  if (game) tramaAlDia(game.plot);
+  if (game) {
+    tramaAlDia(game.plot);
+    entidadesAlDia(game);
+  }
   return game;
 }
 

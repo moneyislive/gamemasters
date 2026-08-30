@@ -14,7 +14,9 @@
  */
 import { CLUEDO } from '../../../shared/juegos/cluedo';
 import type { EjeId } from '../../../shared/juegos';
-import type { Plot, PlotSolution } from '../../../shared/types';
+import type { GameSession, Plot, PlotSolution } from '../../../shared/types';
+import { entidadesDe } from '../../../shared/juegos';
+import type { Entidad } from '../../../shared/juegos';
 
 export { CLUEDO };
 
@@ -26,6 +28,33 @@ export const EJES = {
 } as const;
 
 /** Quién lo hizo. */
+/**
+ * LAS TRES CATEGORIAS DE CLUEDO, para su propio codigo.
+ *
+ * Sus plantillas y su generador leian `game.suspects`, `game.rooms` y
+ * `game.weapons` a pelo — noventa y tres veces entre los dieciseis ficheros —
+ * porque esos eran los campos donde vivian sus entidades.
+ *
+ * Ya no viven ahi: TODAS las categorias de TODOS los juegos se guardan en
+ * `game.entidades[categoria]`, y esos tres campos solo los conserva la
+ * migracion para traerse los datos de una partida antigua.
+ *
+ * Que CLUEDO nombre sus propias categorias esta bien y no es deuda: `salas` es
+ * suyo igual que `camaras` es de la Momia. Lo que no estaba bien era que las
+ * nombrara con los campos del contrato comun.
+ */
+export function sospechososDe(game: GameSession): Entidad[] {
+  return entidadesDe(game, 'sospechosos');
+}
+
+export function salasDe(game: GameSession): Entidad[] {
+  return entidadesDe(game, 'salas');
+}
+
+export function objetosDe(game: GameSession): Entidad[] {
+  return entidadesDe(game, 'objetos');
+}
+
 /**
  * La victima, para el codigo de CLUEDO.
  *

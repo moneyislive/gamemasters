@@ -143,7 +143,7 @@ const VEREDICTO: Record<string, { si: string; no: string }> = {
  * monte de noche leía «En la mesa».
  */
 function rotuloDeCosas(m: ManifiestoDeJuego): string {
-  const cat = m.categorias.find((c) => c.almacen === 'weapons');
+  const cat = m.categorias.find((c) => c.almacenHeredado === 'weapons');
   return cat?.presentacion?.titulo ?? capitalizar(cat?.plural ?? 'objetos');
 }
 

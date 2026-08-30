@@ -7,6 +7,7 @@
  * regla del juego —dar la contraseña equivocada en un paso no te gasta la hora—
  * y ese mensaje no lo congelaba nadie.
  */
+import { personasDe } from '../../../shared/juegos';
 import { abrirAcusaciones, abrirRonda, cerrarRonda, revelarDesenlace } from '../../src/live/sesion';
 import { ejecutarCierre } from '../../src/juegos/cierres';
 import { generarTramaSombras, tramaDe } from '../../src/juegos/sombras-trama';
@@ -78,7 +79,7 @@ function sesionInicial(game: GameSession): LiveSession {
     phase: 'lobby',
     round: 0,
     totalRounds: HORAS,
-    players: game.suspects.map((s, i) => ({
+    players: personasDe(game).map((s, i) => ({
       suspectId: s.id,
       displayName: s.name,
       joinCode: `SOMBR${i}`,
@@ -96,7 +97,7 @@ function sesionInicial(game: GameSession): LiveSession {
 }
 
 function velada({ game, sesion, retratar, accion, intentar }: Mesa): void {
-  const gente = game.suspects.map((s) => s.id);
+  const gente = personasDe(game).map((s) => s.id);
   const trama = tramaDe(game.plot);
   const senda = trama?.sendaVerdadera ?? [];
   const contrasenas = trama?.contrasenas ?? {};

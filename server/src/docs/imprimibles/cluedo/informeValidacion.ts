@@ -12,7 +12,7 @@ import { esc } from '../../html';
 import { renderPlayerDocument } from '../../renderer';
 import { envolver, portada } from '../comun';
 import type { DocumentRenderOptions, GameSession, Plot } from '../../../../../shared/types';
-import { culpableDe, lugarDe, objetoDe } from '../../../juegos/cluedo';
+import { culpableDe, lugarDe, objetoDe, objetosDe, salasDe, sospechososDe } from '../../../juegos/cluedo';
 
 interface Comprobacion {
   titulo: string;
@@ -68,12 +68,12 @@ export function informeValidacion(
   const rondas = numeroDeRondas(plot);
   const porRonda = pistasPorRonda(plot);
   const sobres = inventarioSobres(game, plot);
-  const idsSospechosos = new Set(game.suspects.map((s) => s.id));
+  const idsSospechosos = new Set(sospechososDe(game).map((s) => s.id));
 
-  const salasSinPista = game.rooms.filter(
+  const salasSinPista = salasDe(game).filter(
     (sala) => !plot.clues.some((pista) => pista.roomId === sala.id),
   );
-  const sinPersonaje = game.suspects.filter(
+  const sinPersonaje = sospechososDe(game).filter(
     (s) => !plot.characters.some((c) => c.suspectId === s.id),
   );
   const publicos = cronologiaPublica(plot);
@@ -85,14 +85,14 @@ export function informeValidacion(
       bien: sinPersonaje.length === 0,
       detalle: sinPersonaje.length
         ? `Sin personaje: ${sinPersonaje.map((s) => s.name).join(', ')}. Actualiza el misterio antes de imprimir.`
-        : `${game.suspects.length} personajes, uno por jugador.`,
+        : `${sospechososDe(game).length} personajes, uno por jugador.`,
     },
     {
       titulo: 'La solución apunta a gente y cosas que existen',
       bien:
         idsSospechosos.has(culpableDe(plot.solution)) &&
-        game.weapons.some((w) => w.id === objetoDe(plot.solution)) &&
-        game.rooms.some((r) => r.id === lugarDe(plot.solution)),
+        objetosDe(game).some((w) => w.id === objetoDe(plot.solution)) &&
+        salasDe(game).some((r) => r.id === lugarDe(plot.solution)),
       detalle:
         'Culpable, objeto y sala siguen formando parte de la partida. Si falla, actualiza el misterio.',
     },
@@ -101,7 +101,7 @@ export function informeValidacion(
       bien: salasSinPista.length === 0,
       detalle: salasSinPista.length
         ? `Sin pistas: ${salasSinPista.map((s) => s.name).join(', ')}. Se pueden usar igual, pero nadie encontrará nada allí.`
-        : `${game.rooms.length} salas con evidencia repartida.`,
+        : `${salasDe(game).length} salas con evidencia repartida.`,
     },
     {
       titulo: 'Ninguna ronda se queda vacía',
@@ -156,9 +156,9 @@ export function informeValidacion(
   const recuento = `    <table>
       <thead><tr><th>Material</th><th style="width:26mm;">Cantidad</th></tr></thead>
       <tbody>
-        <tr><td>Jugadores</td><td>${game.suspects.length}</td></tr>
-        <tr><td>Salas</td><td>${game.rooms.length}</td></tr>
-        <tr><td>Objetos</td><td>${game.weapons.length}</td></tr>
+        <tr><td>Jugadores</td><td>${sospechososDe(game).length}</td></tr>
+        <tr><td>Salas</td><td>${salasDe(game).length}</td></tr>
+        <tr><td>Objetos</td><td>${objetosDe(game).length}</td></tr>
         <tr><td>Rondas</td><td>${rondas}</td></tr>
         <tr><td>Pistas</td><td>${plot.clues.length}</td></tr>
         <tr><td>Sobres que hay que rotular</td><td>${sobres.length}</td></tr>

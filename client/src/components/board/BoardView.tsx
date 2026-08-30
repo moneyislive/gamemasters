@@ -3,6 +3,7 @@
  *  - Modo 'generated': tablero SVG estilo CLUEDO dibujado desde `game.board`.
  *  - Modo 'aerial': la fotografía cenital del espacio real con chinchetas.
  */
+import { lugaresDe } from '../../../../shared/juegos';
 import { useState } from 'react';
 import { useAppStore } from '../../state/store';
 import { palabrasDe } from '../../juegos/palabras';
@@ -83,7 +84,7 @@ export default function BoardView(): JSX.Element {
   /* ------------------------------------------------------------------ */
 
   if (game.boardMode === 'aerial') {
-    const conChincheta = game.rooms.filter((sala) => sala.pin);
+    const conChincheta = lugaresDe(game).filter((sala) => sala.pin);
 
     if (!game.boardImageUrl) {
       return (
@@ -154,12 +155,12 @@ export default function BoardView(): JSX.Element {
           <PlanoDecorativo />
           <h3>El plano está por trazar</h3>
           <p className="text-dim text-italic">
-            {game.rooms.length === 0 ? palabras.sinLugares : palabras.invitacion}
+            {lugaresDe(game).length === 0 ? palabras.sinLugares : palabras.invitacion}
           </p>
           <button
             className="btn btn--primary"
             onClick={() => void recalcular()}
-            disabled={recalculando || game.rooms.length === 0}
+            disabled={recalculando || lugaresDe(game).length === 0}
           >
             {recalculando ? 'Trazando…' : 'Construir tablero'}
           </button>
@@ -171,7 +172,7 @@ export default function BoardView(): JSX.Element {
 
   const ancho = board.grid.cols * CELDA;
   const alto = board.grid.rows * CELDA;
-  const nombrePorId = new Map(game.rooms.map((sala) => [sala.id, sala.name]));
+  const nombrePorId = new Map(lugaresDe(game).map((sala) => [sala.id, sala.name]));
 
   const centros = new Map<string, { cx: number; cy: number }>();
   for (const colocacion of board.rooms) {

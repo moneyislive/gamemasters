@@ -558,8 +558,30 @@ export interface GameSession {
   updatedAt: string;
   /** Lo que ha costado, en tokens. Ausente en las partidas anteriores a esto. */
   gasto?: GastoDeLaPartida;
+  /**
+   * ═══ LOS TRES CAMPOS HEREDADOS. YA NO SE ESCRIBE EN ELLOS ═══
+   *
+   * Aquí vivían las entidades de una partida desde antes de que existieran las
+   * categorías, y por eso todo juego tenía que declarar `almacenHeredado` para
+   * que las suyas acabaran en uno de los tres. El núcleo los leía por su nombre
+   * en treinta y cinco ficheros.
+   *
+   * Ya no. Toda categoría de todo juego se guarda en `entidades[categoria]`, y
+   * `alDia` trae aquí lo que hubiera —dejándolos vacíos— la primera vez que una
+   * partida antigua sale del almacén.
+   *
+   * SIGUEN SIENDO OBLIGATORIOS, y a propósito: son cientos de documentos
+   * guardados en Mongo que los llevan dentro, y quitar el campo del tipo no los
+   * quita de la base. Cuando no queden partidas anteriores a la migración se
+   * pueden borrar de aquí, de `almacenHeredado` en los tres manifiestos y del
+   * respaldo de `entidadesDe`. Hasta entonces son memoria, no almacén.
+   *
+   * @deprecated Lee con `entidadesDe`, `personasDe` o `lugaresDe`.
+   */
   suspects: Suspect[];
+  /** @deprecated Ver `suspects`. */
   rooms: Room[];
+  /** @deprecated Ver `suspects`. */
   weapons: Weapon[];
   /**
    * Las entidades por categoría, para juegos que no sean CLUEDO.

@@ -165,8 +165,8 @@ async function jugar(): Promise<void> {
   comprobar('la Momia declara la categoría «ritos»', Boolean(ritos));
   comprobar(
     'y NO tiene campo heredado, que es lo que la hace la prueba buena',
-    ritos?.almacen === undefined,
-    ritos?.almacen,
+    ritos?.almacenHeredado === undefined,
+    ritos?.almacenHeredado,
   );
 
   paso('Cada juego trae sus propias reglas');
@@ -229,17 +229,34 @@ async function jugar(): Promise<void> {
     entidadesDe(edicion.datos as GameSession, 'ritos'),
   );
 
-  paso('Las categorías con campo heredado siguen yendo al suyo');
+  paso('TODA categoría va a `entidades`, tenga campo heredado o no');
   const camara = await pedir('/games/tumba/entidades/camaras', {
     metodo: 'POST',
     cuerpo: { name: 'Cámara del Barquero' },
   });
   comprobar('el alta de una cámara responde 200', camara.estado === 200, camara.datos);
   const conCamara = camara.datos as GameSession;
+  /*
+   * ═══ ESTA COMPROBACION SE DIO LA VUELTA, Y ES EL PUNTO DEL FRENTE ═══
+   *
+   * Decia: «y la camara va a `rooms`, no a `entidades`». Afirmaba —y daba por
+   * bueno— que la categoria de lugares de la Momia acabara en un campo heredado
+   * de CLUEDO, porque `listaDeCategoria` mandaba ahi a toda categoria que
+   * declarase `almacen`.
+   *
+   * Ahora TODAS las categorias de TODOS los juegos se guardan igual. Los tres
+   * campos viejos solo los conserva la migracion, que trae las partidas
+   * antiguas a su sitio la primera vez que alguien las abre.
+   */
   comprobar(
-    'y la cámara va a `rooms`, no a `entidades`',
-    conCamara.rooms.length === 1 && conCamara.entidades?.camaras === undefined,
+    'la cámara va a `entidades`, como todo lo demás',
+    (conCamara.entidades?.camaras ?? []).length === 1,
     { rooms: conCamara.rooms.length, entidades: Object.keys(conCamara.entidades ?? {}) },
+  );
+  comprobar(
+    'y el campo heredado se queda vacío',
+    conCamara.rooms.length === 0,
+    { porque: 'dos copias de la misma lista divergen en cuanto alguien edita' },
   );
   comprobar(
     'y se lee igual por categoría',

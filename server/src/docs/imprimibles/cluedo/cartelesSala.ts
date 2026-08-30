@@ -2,6 +2,7 @@
  * Carteles de sala: una página por zona de la casa. Son los que convierten un
  * salón corriente en el escenario del misterio.
  */
+import { salasDe } from '../../../juegos/cluedo';
 import { codigosDeSala } from '../../datos';
 import { esc } from '../../html';
 import { envolver, portada } from '../comun';
@@ -21,9 +22,9 @@ export function cartelesSala(
   plot: Plot,
   opciones: DocumentRenderOptions,
 ): string {
-  const nombrePorId = new Map(game.rooms.map((sala) => [sala.id, sala.name]));
+  const nombrePorId = new Map(salasDe(game).map((sala) => [sala.id, sala.name]));
   const pasadizos = game.board?.passages ?? [];
-  const codigos = codigosDeSala(game.rooms);
+  const codigos = codigosDeSala(salasDe(game));
 
   /** Salas conectadas por pasadizo con ésta, en ambos sentidos. */
   const conectadasCon = (roomId: string): string[] => {
@@ -35,7 +36,7 @@ export function cartelesSala(
     return destinos.filter(Boolean);
   };
 
-  const carteles = game.rooms
+  const carteles = salasDe(game)
     .map((sala) => {
       const vecinas = conectadasCon(sala.id);
       // Las salas sin pasadizo no llevan pie: un recuadro vacío solo confunde.
@@ -84,7 +85,7 @@ ${notaPasadizo}
     'Un cartel por sala',
     'Carteles de sala',
     plot.tagline,
-    `Imprime de la página 2 a la ${game.rooms.length + 1} y cuelga cada cartel en su zona`,
+    `Imprime de la página 2 a la ${salasDe(game).length + 1} y cuelga cada cartel en su zona`,
   )}
 
     <div class="caja junto">

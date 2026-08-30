@@ -200,7 +200,7 @@ export function registrarJuego(manifiesto: ManifiestoDeJuego): void {
  */
 function anotarAlmacenes(manifiesto: ManifiestoDeJuego): void {
   for (const categoria of manifiesto.categorias) {
-    if (categoria.almacen) declararAlmacen(categoria.id, categoria.almacen);
+    if (categoria.almacenHeredado) declararAlmacen(categoria.id, categoria.almacenHeredado);
   }
 }
 

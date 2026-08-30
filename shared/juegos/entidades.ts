@@ -94,7 +94,15 @@ export function declararAlmacen(categoria: CategoriaId, campo: CampoHeredado): v
   CAMPO_HEREDADO[categoria] = campo;
 }
 
-/** Las entidades de una categoría, vengan de donde vengan. */
+/**
+ * Las entidades de una categoría, vengan de donde vengan.
+ *
+ * EL RESPALDO AL CAMPO HEREDADO SIGUE AQUÍ y es a propósito: es lo que hace que
+ * una partida que todavía no ha pasado por `alDia` —una montada a mano en una
+ * prueba, o una leída de un fichero suelto— se siga leyendo bien. Es el único
+ * sitio del núcleo, junto con la migración, donde nombrar los tres campos de
+ * CLUEDO no es deuda sino memoria.
+ */
 export function entidadesDe(game: GameSession, categoria: CategoriaId): Entidad[] {
   const propias = game.entidades?.[categoria];
   if (propias) return propias;
@@ -116,11 +124,18 @@ export function entidadesDe(game: GameSession, categoria: CategoriaId): Entidad[
  * que nadie hubiera cambiado nada.
  */
 export function listaDeCategoria(game: GameSession, categoria: CategoriaId): Entidad[] {
-  const campo = CAMPO_HEREDADO[categoria];
-  if (campo) {
-    if (!game[campo]) (game as unknown as Record<string, unknown>)[campo] = [];
-    return game[campo] as unknown as Entidad[];
-  }
+  /*
+   * ═══ SIEMPRE EN `entidades`, PARA TODOS LOS JUEGOS ═══
+   *
+   * Aquí había un `if (campo)` que mandaba las tres categorías de CLUEDO a
+   * `game.suspects`, `game.rooms` y `game.weapons`. O sea que dar de alta un
+   * sospechoso escribía en un sitio y dar de alta un rito en otro, según de qué
+   * juego fuera la categoría.
+   *
+   * Ahora todo se guarda igual. Los campos heredados solo los sigue leyendo
+   * `entidadesDe` para las partidas que aún no han pasado por la migración, y
+   * `alDia` las convierte en cuanto salen del almacén.
+   */
   if (!game.entidades) game.entidades = {};
   if (!game.entidades[categoria]) game.entidades[categoria] = [];
   return game.entidades[categoria]!;

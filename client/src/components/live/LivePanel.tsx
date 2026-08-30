@@ -11,7 +11,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ComponentType } from 'react';
 import { useAppStore } from '../../state/store';
-import { manifiestoDe, papelDe } from '../../../../shared/juegos';
+import { manifiestoDe, papelDe, personasDe } from '../../../../shared/juegos';
 import { PAPELES_EN_JUEGO } from '../../../../shared/live';
 import type { LivePhase, VistaGameMaster } from '../../../../shared/live';
 import { palabrasDe } from '../../juegos/palabras';
@@ -182,7 +182,7 @@ export default function LivePanel(): JSX.Element {
 
   const { sesion } = vista;
   // Gente de la partida que no tiene silla en la sesion abierta.
-  const sinSilla = game.suspects.filter((s) => !sesion.players.some((p) => p.suspectId === s.id));
+  const sinSilla = personasDe(game).filter((s) => !sesion.players.some((p) => p.suspectId === s.id));
   /*
    * POR EL PAPEL, NO POR EL NOMBRE. Eran `sesion.phase === 'ronda-abierta'` y
    * `=== 'ronda-cerrada'`, o sea el taller reconociendo las fases de CLUEDO. Un

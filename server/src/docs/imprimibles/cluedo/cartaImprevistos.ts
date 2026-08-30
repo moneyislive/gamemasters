@@ -9,6 +9,7 @@
  * puede nombrar la sala o el objeto del crimen, así que va en sobre cerrado y
  * él la lee por primera vez en voz alta, como todos.
  */
+import { sospechososDe } from '../../../juegos/cluedo';
 import { numeroDeRondas } from '../../datos';
 import { esc } from '../../html';
 import { envolver, portada } from '../comun';
@@ -96,7 +97,7 @@ ${ayudas
       </p>
     </div>`;
 
-  const contenido = `${portada('Ten esta hoja al lado', 'Imprevistos', plot.tagline, `${game.suspects.length} jugadores · ${rondas} rondas`)}
+  const contenido = `${portada('Ten esta hoja al lado', 'Imprevistos', plot.tagline, `${sospechososDe(game).length} jugadores · ${rondas} rondas`)}
 
     <h2 style="margin-top:0;">Respuestas que sirven siempre</h2>
     <table>

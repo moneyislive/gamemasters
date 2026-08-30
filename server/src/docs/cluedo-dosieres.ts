@@ -26,7 +26,7 @@ import { manifiestoDe } from '../../../shared/juegos';
 import { registrarDosieres } from './dosieres';
 import { esc } from './html';
 import { comoDataUri, envolver, monograma, renderBoardSvg, retrato } from './renderer';
-import { culpableDe, lugarDe, objetoDe, victimaDe } from '../juegos/cluedo';
+import { culpableDe, lugarDe, objetoDe, objetosDe, salasDe, sospechososDe, victimaDe } from '../juegos/cluedo';
 import type {
   DocumentRenderOptions,
   DocumentSectionId,
@@ -50,7 +50,7 @@ function bloqueDato(etiqueta: string, valor: string | undefined): string {
 
 function seccionSospechosos(game: GameSession, plot: Plot): string {
   const personajePorId = new Map(plot.characters.map((c) => [c.suspectId, c]));
-  const fichas = game.suspects
+  const fichas = sospechososDe(game)
     .map((sospechoso) => {
       const personaje = personajePorId.get(sospechoso.id);
       return `<div class="ficha">
@@ -68,8 +68,8 @@ function seccionSospechosos(game: GameSession, plot: Plot): string {
 }
 
 function seccionArmas(game: GameSession): string {
-  if (game.weapons.length === 0) return '';
-  const fichas = game.weapons
+  if (objetosDe(game).length === 0) return '';
+  const fichas = objetosDe(game)
     .map(
       (arma: Weapon) => `<div class="ficha ficha--objeto">
         ${retrato(arma.name, arma.photoUrl, 'retrato')}
@@ -88,7 +88,7 @@ function seccionArmas(game: GameSession): string {
 function seccionEscenario(game: GameSession): string {
   if (game.boardMode === 'aerial') {
     const imagen = comoDataUri(game.boardImageUrl);
-    const conChincheta = game.rooms.filter((sala) => sala.pin);
+    const conChincheta = salasDe(game).filter((sala) => sala.pin);
     const chinchetas = conChincheta
       .map(
         (sala, indice) =>
@@ -113,7 +113,7 @@ function seccionEscenario(game: GameSession): string {
   }
 
   if (!game.board) return '';
-  const leyenda = game.rooms
+  const leyenda = salasDe(game)
     .map(
       (sala, indice) =>
         `<li><span class="num">${indice + 1}</span>${esc(sala.name)}${sala.description ? ` — <em>${esc(sala.description)}</em>` : ''}</li>`,
@@ -121,14 +121,14 @@ function seccionEscenario(game: GameSession): string {
     .join('');
   const pasadizos = game.board.passages
     .map((pasadizo) => {
-      const desde = game.rooms.find((sala) => sala.id === pasadizo.fromRoomId)?.name ?? '';
-      const hasta = game.rooms.find((sala) => sala.id === pasadizo.toRoomId)?.name ?? '';
+      const desde = salasDe(game).find((sala) => sala.id === pasadizo.fromRoomId)?.name ?? '';
+      const hasta = salasDe(game).find((sala) => sala.id === pasadizo.toRoomId)?.name ?? '';
       return `<li>${esc(desde)} ⇄ ${esc(hasta)}</li>`;
     })
     .join('');
   return `<section>
     <h2>El escenario</h2>
-    ${renderBoardSvg(game.board, game.rooms)}
+    ${renderBoardSvg(game.board, salasDe(game))}
     <ol class="leyenda">${leyenda}</ol>
     ${
       pasadizos
@@ -246,8 +246,8 @@ function dosierJugador(
 ): PlayerDocument {
   const esAsesino = culpableDe(plot.solution) === sospechoso.id;
   const nombrePersonaje = personaje?.characterName ?? sospechoso.name;
-  const armaDelCrimen = game.weapons.find((arma) => arma.id === objetoDe(plot.solution));
-  const salaDelCrimen = game.rooms.find((sala) => sala.id === lugarDe(plot.solution));
+  const armaDelCrimen = objetosDe(game).find((arma) => arma.id === objetoDe(plot.solution));
+  const salaDelCrimen = salasDe(game).find((sala) => sala.id === lugarDe(plot.solution));
 
   const portada = `<div class="portada">
     <span class="sello">Confidencial · solo para sus ojos</span>
@@ -358,9 +358,9 @@ function dosierJugador(
  * personaje, para que nadie —él tampoco— sepa quién fue hasta el final.
  */
 function dosierSolucion(opciones: DocumentRenderOptions, game: GameSession, plot: Plot): PlayerDocument {
-  const asesino = game.suspects.find((s) => s.id === culpableDe(plot.solution));
-  const arma = game.weapons.find((w) => w.id === objetoDe(plot.solution));
-  const sala = game.rooms.find((r) => r.id === lugarDe(plot.solution));
+  const asesino = sospechososDe(game).find((s) => s.id === culpableDe(plot.solution));
+  const arma = objetosDe(game).find((w) => w.id === objetoDe(plot.solution));
+  const sala = salasDe(game).find((r) => r.id === lugarDe(plot.solution));
   const personaje = plot.characters.find((c) => c.suspectId === culpableDe(plot.solution));
 
   const contenido = `<div class="portada">
@@ -400,10 +400,10 @@ function dosierSolucion(opciones: DocumentRenderOptions, game: GameSession, plot
  */
 function dosierGameMaster(opciones: DocumentRenderOptions, game: GameSession, plot: Plot): PlayerDocument {
   const nombreDe = (id: string): string =>
-    game.suspects.find((sospechoso) => sospechoso.id === id)?.name ?? id;
-  const asesino = game.suspects.find((s) => s.id === culpableDe(plot.solution));
-  const arma = game.weapons.find((w) => w.id === objetoDe(plot.solution));
-  const sala = game.rooms.find((r) => r.id === lugarDe(plot.solution));
+    sospechososDe(game).find((sospechoso) => sospechoso.id === id)?.name ?? id;
+  const asesino = sospechososDe(game).find((s) => s.id === culpableDe(plot.solution));
+  const arma = objetosDe(game).find((w) => w.id === objetoDe(plot.solution));
+  const sala = salasDe(game).find((r) => r.id === lugarDe(plot.solution));
 
   const portada = `<div class="portada">
     <span class="sello">Confidencial · Game Master</span>
@@ -470,7 +470,7 @@ function dosierGameMaster(opciones: DocumentRenderOptions, game: GameSession, pl
                   ${(porRonda.get(ronda) ?? [])
                     .map((pista) => {
                       const nombreSala = pista.roomId
-                        ? (game.rooms.find((sala) => sala.id === pista.roomId)?.name ?? '')
+                        ? (salasDe(game).find((sala) => sala.id === pista.roomId)?.name ?? '')
                         : '';
                       return `<li>
                         <span class="hora">${esc(nombreSala || '—')}</span>
@@ -577,11 +577,11 @@ function dosierGameMaster(opciones: DocumentRenderOptions, game: GameSession, pl
  */
 registrarDosieres('cluedo', {
   tituloDeUno: (game, plot, suspectId) => {
-    const sospechoso = game.suspects.find((s) => s.id === suspectId);
+    const sospechoso = sospechososDe(game).find((s) => s.id === suspectId);
     return sospechoso ? tituloJugador(plot, sospechoso) : 'Dosier';
   },
   deUno: (game, plot, suspectId, opciones) => {
-    const sospechoso = game.suspects.find((s) => s.id === suspectId);
+    const sospechoso = sospechososDe(game).find((s) => s.id === suspectId);
     if (!sospechoso) return null;
     const personaje = plot.characters.find((c) => c.suspectId === suspectId);
     return dosierJugador(opciones, game, plot, sospechoso, personaje).html ?? null;

@@ -6,7 +6,7 @@
  * él, el reparto vive solo en la cabeza de quien montó la partida.
  */
 import { printableDocsFor, resolveGmMode } from '../../../../shared/documents';
-import { manifiestoDe } from '../../../../shared/juegos';
+import { lugaresDe, manifiestoDe, personasDe } from '../../../../shared/juegos';
 import { esc } from '../html';
 import { envolver, portada } from './comun';
 import type { PrintableDocInfo } from '../../../../shared/documents';
@@ -14,8 +14,8 @@ import type { DocumentRenderOptions, GameSession, Plot } from '../../../../share
 
 function copias(doc: PrintableDocInfo, game: GameSession): string {
   const caras = doc.sides === 'una' ? 'a una cara' : 'a doble cara';
-  if (doc.copies === 'una-por-jugador') return `${game.suspects.length} copias · ${caras}`;
-  if (doc.copies === 'una-por-sala') return `${game.rooms.length} páginas · ${caras}`;
+  if (doc.copies === 'una-por-jugador') return `${personasDe(game).length} copias · ${caras}`;
+  if (doc.copies === 'una-por-sala') return `${lugaresDe(game).length} páginas · ${caras}`;
   return `1 copia · ${caras}`;
 }
 
@@ -65,15 +65,15 @@ export function indicePaquete(
   const parteDosieres = traeLosSuyos
     ? ficha(
         'Los dosieres',
-        `Uno por persona, cada uno con sus secretos. Están abajo, con su nombre. ${game.suspects
+        `Uno por persona, cada uno con sus secretos. Están abajo, con su nombre. ${personasDe(game)
           .map((s) => s.name)
           .join(', ')}.`,
-        `${game.suspects.length} copias · a doble cara`,
+        `${personasDe(game).length} copias · a doble cara`,
       )
     : `${ficha(
         'Dosieres de los jugadores',
-        `Uno por persona, cada uno con sus secretos. ${game.suspects.map((s) => s.name).join(', ')}.`,
-        `${game.suspects.length} copias · a doble cara`,
+        `Uno por persona, cada uno con sus secretos. ${personasDe(game).map((s) => s.name).join(', ')}.`,
+        `${personasDe(game).length} copias · a doble cara`,
       )}
 ${ficha(
         aCiegas ? 'Guía de la velada' : 'Dosier del Game Master',
