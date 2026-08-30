@@ -219,12 +219,78 @@ export function juegosInstalados(): ManifiestoDeJuego[] {
 }
 
 /**
- * El manifiesto de un juego.
+ * Se ha pedido el manifiesto de un juego que este servidor no tiene instalado.
  *
- * Nunca devuelve undefined: una partida sin juego declarado —todas las que ya
- * existen— es CLUEDO. Sin esto, añadir el campo obligaría a migrar la base de
- * datos, y el objetivo era justamente no tener que hacerlo.
+ * No es un error de programación: es la situación normal el día que haya un
+ * servidor por país y cada uno instale su reparto. Lo que no es normal es
+ * seguir adelante.
+ */
+export class JuegoNoInstalado extends Error {
+  constructor(public readonly juego: JuegoId) {
+    super(`«${juego}» no es un juego instalado aquí.`);
+    this.name = 'JuegoNoInstalado';
+  }
+}
+
+/**
+ * El manifiesto de un juego. FALLA SI NO ESTÁ INSTALADO.
+ *
+ * ═══ ANTES DEVOLVÍA CLUEDO Y NO SE ENTERABA NADIE ═══
+ *
+ * El cuerpo era `INSTALADOS[id ?? JUEGO_POR_DEFECTO] ?? CLUEDO`, y ese `??
+ * CLUEDO` colapsaba dos casos que no tienen nada que ver:
+ *
+ *   · UNA PARTIDA SIN JUEGO DECLARADO. Todas las de antes de existir el campo.
+ *     Son CLUEDO de verdad, y caer ahí es correcto — es lo que evitó tener que
+ *     migrar la base de datos entera.
+ *
+ *   · UN JUEGO QUE NO ESTÁ INSTALADO. Aquí caer en CLUEDO significa que la
+ *     partida SE JUEGA como CLUEDO: con sus fases, sus acciones, sus
+ *     imprimibles y sus trofeos, sobre los datos de otro juego. Sin un solo
+ *     error por ninguna parte.
+ *
+ * Mientras la lista de juegos fue la misma en todas partes, el segundo caso no
+ * podía darse y el colapso era inofensivo. Con juegos instalados por servidor
+ * pasa a ser el modo de fallo más probable que hay, y de los peores: el que no
+ * falla. Una velada entera repartiendo sobres de un asesinato que no ocurre.
+ *
+ * Y había una consecuencia escondida. `generadores.ts` hace
+ * `GENERADORES[manifiestoDe(juego).id]`, así que con un id desconocido siempre
+ * encontraba el de CLUEDO — y el bloque «FALLA CERRADO» de `plot/pipeline.ts`,
+ * escrito justamente para negarse a generar sin generador, era código muerto
+ * que no podía ejecutarse nunca.
+ *
+ * ═══ CUÁNDO USAR ESTA Y CUÁNDO LA OTRA ═══
+ *
+ * En el SERVIDOR, esta: si no se sabe a qué se juega, no se juega. Fallar es
+ * infinitamente mejor que repartir el material equivocado, y las rutas
+ * convierten esto en una respuesta clara.
+ *
+ * En el TALLER y en el MÓVIL, `manifiestoSiExiste`: allí una excepción durante
+ * el pintado es una pantalla en blanco, que no ayuda a nadie. Lo que hay que
+ * hacer allí es enseñar que ese juego no está disponible.
  */
 export function manifiestoDe(id: JuegoId | undefined): ManifiestoDeJuego {
-  return INSTALADOS[id ?? JUEGO_POR_DEFECTO] ?? CLUEDO;
+  const manifiesto = manifiestoSiExiste(id);
+  if (!manifiesto) throw new JuegoNoInstalado(id ?? JUEGO_POR_DEFECTO);
+  return manifiesto;
+}
+
+/**
+ * El manifiesto de un juego, o nada si no está instalado.
+ *
+ * Para quien puede seguir sin saberlo: listar un catálogo, pintar un rótulo,
+ * decidir si una partida está caducada, contestar «¿este juego se cierra con un
+ * ritual?». Ninguna de esas cosas mejora reventando.
+ *
+ * `undefined` sigue cayendo en CLUEDO, que es lo que son las partidas de antes
+ * del campo.
+ */
+export function manifiestoSiExiste(id: JuegoId | undefined): ManifiestoDeJuego | undefined {
+  return INSTALADOS[id ?? JUEGO_POR_DEFECTO];
+}
+
+/** ¿Está instalado este juego aquí? */
+export function juegoInstalado(id: JuegoId | undefined): boolean {
+  return manifiestoSiExiste(id) !== undefined;
 }

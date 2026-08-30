@@ -11,7 +11,7 @@ import { REGLAS_CLUEDO } from '../../../shared/juegos/cluedo';
 import type { ReglaDeJuego } from '../../../shared/juegos';
 import type { GameSession, Plot, PlotClue, Room, Suspect, TimelineEvent } from '../../../shared/types';
 import { culpableDe } from '../juegos/cluedo';
-import { manifiestoDe } from '../../../shared/juegos';
+import { manifiestoSiExiste } from '../../../shared/juegos';
 
 // ---------------------------------------------------------------------------
 // Rondas y reparto de pistas
@@ -195,8 +195,8 @@ export function inventarioSobres(game: GameSession, plot: Plot): SobreDeLaPartid
     }
   }
   if (sobres.length === sobresAntes) {
-    const manifiesto = manifiestoDe(game.settings?.juego);
-    const turno = manifiesto.barra.find((p) => p.pantalla === 'ronda')?.rotulo ?? 'Ronda';
+    const manifiesto = manifiestoSiExiste(game.settings?.juego);
+    const turno = manifiesto?.barra.find((p) => p.pantalla === 'ronda')?.rotulo ?? 'Ronda';
     for (let ronda = 1; ronda <= numeroDeRondas(plot); ronda += 1) {
       sobres.push({
         codigo: `${turno.toUpperCase()} ${ronda}`,

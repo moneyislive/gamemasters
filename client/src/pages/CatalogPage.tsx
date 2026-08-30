@@ -15,7 +15,7 @@
  */
 import type { CSSProperties, KeyboardEvent, ReactElement } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { juegosInstalados, manifiestoDe } from '../../../shared/juegos';
+import { juegosInstalados, manifiestoDe, manifiestoSiExiste } from '../../../shared/juegos';
 import { useTemaDeJuego } from '../lib/tema';
 import { motion } from 'framer-motion';
 import type { Variants } from 'framer-motion';
@@ -412,7 +412,7 @@ export default function CatalogPage() {
            * cajas. En la Momia coinciden porque su lema ya explicaba mejor el
            * juego que cualquier frase que se pudiera escribir aparte.
            */
-          const titulo = cerrado ? game.title : manifiestoDe(game.id).nombre;
+          const titulo = cerrado ? game.title : (manifiestoSiExiste(game.id)?.nombre ?? game.title);
           return (
           <motion.article
             key={game.id}

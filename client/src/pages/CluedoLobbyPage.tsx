@@ -20,7 +20,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import type { Variants } from 'framer-motion';
 import type { GameStatus, GameSummary } from '../../../shared/types';
-import { JUEGO_POR_DEFECTO, manifiestoDe } from '../../../shared/juegos';
+import { JUEGO_POR_DEFECTO, manifiestoDe, manifiestoSiExiste } from '../../../shared/juegos';
 import * as api from '../api/client';
 import { useAppStore } from '../state/store';
 import TransicionDeEntrada from '../components/transition/TransicionDeEntrada';
@@ -91,7 +91,20 @@ function partidasDe(games: GameSummary[], juego: string | undefined): GameSummar
    * CLUEDO, y solo en ese.
    */
   const cual = manifiestoDe(juego ?? JUEGO_POR_DEFECTO).id;
-  return games.filter((g) => manifiestoDe((g as ResumenDePartida).juego).id === cual);
+  /*
+   * EL LADO DE LA PARTIDA, BLANDO, y aquí sí importa la diferencia.
+   *
+   * Esto recorre TODAS las partidas de la cuenta, y una cuenta puede tener
+   * guardada una de un juego que este servidor no instala —lo normal el día que
+   * haya un servidor por país—. Con la versión que revienta, esa sola partida
+   * dejaría el recibidor en blanco: no se vería ninguna, ni siquiera las que sí
+   * se pueden jugar.
+   *
+   * Sin manifiesto, `?.id` es `undefined` y no coincide con ningún recibidor,
+   * así que la partida no aparece en ninguno. Que es lo correcto: no se puede
+   * ofrecer entrar a algo que aquí no se sabe jugar.
+   */
+  return games.filter((g) => manifiestoSiExiste((g as ResumenDePartida).juego)?.id === cual);
 }
 
 const listVariants: Variants = {

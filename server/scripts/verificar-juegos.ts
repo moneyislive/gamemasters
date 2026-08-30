@@ -41,7 +41,12 @@ import { renderPlayerDocument } from '../src/docs/renderer';
 import { renderPrintableDocument } from '../src/docs/imprimibles';
 import { imprimiblesRegistrados, plantillaDe } from '../src/docs/imprimibles/registro';
 import { printableDocsFor } from '../../shared/documents';
-import { juegosInstalados, manifiestoDe } from '../../shared/juegos';
+import {
+  JuegoNoInstalado,
+  juegosInstalados,
+  manifiestoDe,
+  manifiestoSiExiste,
+} from '../../shared/juegos';
 import { FASES_EN_JUEGO } from '../../shared/live';
 import type { BloqueDeDosier, ManifiestoDeJuego } from '../../shared/juegos';
 import type { LivePhase, LiveSession } from '../../shared/live';
@@ -601,6 +606,81 @@ paso('Las medallas de un juego no se reparten en otro');
       { sinDeclarar, porque: 'un trofeo no declarado se gana en silencio y no se pinta en la vitrina' },
     );
   }
+}
+
+// ---------------------------------------------------------------------------
+// Un juego que no esta instalado, ¿se puede jugar por error?
+// ---------------------------------------------------------------------------
+
+paso('Un juego que no esta instalado no se juega como otro');
+
+/*
+ * ═══ POR QUE ESTO ES LO MAS GRAVE DE TODO EL FICHERO ═══
+ *
+ * `manifiestoDe` devolvia CLUEDO para cualquier id desconocido. Mientras la
+ * lista de juegos fue la misma en todas partes eso era inofensivo: no habia id
+ * desconocido posible. Con juegos instalados por servidor —que es a donde va
+ * esto— pasa a ser el modo de fallo mas probable que hay, y del peor tipo: el
+ * que NO FALLA.
+ *
+ * Una partida de un juego no instalado se abria y se jugaba entera como CLUEDO.
+ * Con sus fases, sus acciones, sus imprimibles y sus trofeos, sobre los datos de
+ * otro juego, sin un solo error por ninguna parte. Doce personas alrededor de
+ * una mesa repartiendo sobres de un asesinato que no ocurre.
+ */
+{
+  const inventado = 'juego-que-no-existe-en-ninguna-parte';
+
+  let lanzo: unknown;
+  try {
+    manifiestoDe(inventado);
+  } catch (e) {
+    lanzo = e;
+  }
+  comprobar(
+    'manifiestoDe falla con un juego que no esta instalado',
+    lanzo instanceof JuegoNoInstalado,
+    { devolvio: lanzo === undefined ? 'nada, siguio adelante' : String(lanzo) },
+  );
+  comprobar(
+    'y el error dice de QUE juego se trata',
+    lanzo instanceof JuegoNoInstalado && lanzo.juego === inventado,
+    { porque: 'sin el nombre hay que abrir los registros para saber lo que el error ya sabia' },
+  );
+
+  /*
+   * Y las dos cosas que NO pueden cambiar al arreglar lo de arriba, porque son
+   * las que mantienen vivas las partidas de antes de que existiera el campo.
+   */
+  comprobar(
+    'una partida sin juego declarado sigue siendo CLUEDO',
+    manifiestoDe(undefined).id === 'cluedo',
+    { porque: 'son todas las partidas anteriores al campo; sin esto habria que migrar la base' },
+  );
+  comprobar(
+    'manifiestoSiExiste contesta «no se» en vez de reventar',
+    manifiestoSiExiste(inventado) === undefined && manifiestoSiExiste(undefined)?.id === 'cluedo',
+  );
+
+  /*
+   * El generador es el sitio donde el respaldo silencioso hacia mas daño, y
+   * ademas dejaba codigo muerto: `plot/pipeline.ts` tiene un bloque «FALLA
+   * CERRADO» escrito para negarse a generar sin generador, y era inalcanzable
+   * porque `GENERADORES[manifiestoDe(juego).id]` siempre encontraba el de
+   * CLUEDO. O sea que a una partida de un juego desconocido se le generaba un
+   * asesinato.
+   */
+  let generadorLanzo = false;
+  try {
+    generadorDeTrama(inventado);
+  } catch (e) {
+    generadorLanzo = e instanceof JuegoNoInstalado;
+  }
+  comprobar(
+    'no se le puede pedir una trama a un juego que no esta instalado',
+    generadorLanzo,
+    { porque: 'antes se le generaba un asesinato de CLUEDO, y el «FALLA CERRADO» era codigo muerto' },
+  );
 }
 
 // ---------------------------------------------------------------------------

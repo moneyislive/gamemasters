@@ -21,7 +21,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { usePartida } from './estado';
 import { color, espacio, texto } from './tema';
 import { conAlfa, useJuego, useTema } from './tema-juego';
-import { manifiestoDe } from '../../shared/juegos';
+import { manifiestoDe, manifiestoSiExiste } from '../../shared/juegos';
 import type { AvisoClave } from '../../shared/live';
 
 const { width } = Dimensions.get('window');
@@ -82,7 +82,7 @@ export function TelonDeAvisos(): JSX.Element | null {
    * lo mismo en cualquier juego; además ya sale de la paleta, así que un juego
    * con otros colores lo recibe teñido sin declarar nada.
    */
-  const rotulosDelJuego = manifiestoDe(juego).rotulosDeAviso ?? {};
+  const rotulosDelJuego = manifiestoSiExiste(juego)?.rotulosDeAviso ?? {};
   const opacidad = useSharedValue(0);
   const escala = useSharedValue(0.92);
   const deslizar = useSharedValue(18);

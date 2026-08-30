@@ -14,7 +14,7 @@ import Animated, { FadeInUp } from 'react-native-reanimated';
 import * as api from '../../src/api';
 import { usePartida } from '../../src/estado';
 import { TROFEOS, TROFEOS_DE_LA_CASA } from '../../../shared/live';
-import { manifiestoDe } from '../../../shared/juegos';
+import { manifiestoDe, manifiestoSiExiste } from '../../../shared/juegos';
 import { conAlfa, useTema } from '../../src/tema-juego';
 import type { TrofeoInfo } from '../../../shared/live';
 import {
@@ -53,7 +53,7 @@ import type { Account } from '../../../shared/live';
  */
 function trofeosPropiosDe(juego: string | undefined): TrofeoInfo[] {
   const deLaCasa = new Set<string>(TROFEOS_DE_LA_CASA);
-  return manifiestoDe(juego as never).trofeos.filter((t) => !deLaCasa.has(t.id));
+  return (manifiestoSiExiste(juego)?.trofeos ?? []).filter((t) => !deLaCasa.has(t.id));
 }
 
 export default function Perfil(): JSX.Element {
@@ -200,7 +200,7 @@ export default function Perfil(): JSX.Element {
             */}
           {propios.length > 0 && (
             <>
-              <Seccion>{manifiestoDe(vista?.sesion.juego).nombre}</Seccion>
+              <Seccion>{manifiestoSiExiste(vista?.sesion.juego)?.nombre ?? ''}</Seccion>
               <View style={estilos.rejilla}>
                 {propios.map((t, i) => (
                   <Vitrina key={t.id} trofeo={t} ganado={cuenta.trofeos.includes(t.id)} orden={i} />

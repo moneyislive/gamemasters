@@ -17,6 +17,7 @@ import path from 'node:path';
 import cors from 'cors';
 import express from 'express';
 import type { NextFunction, Request, Response } from 'express';
+import { JuegoNoInstalado, juegosInstalados } from '../../shared/juegos';
 import { DEMO_MODE, env } from './config';
 import authRouter, { passwordRequired, requireAuth, tallerAbiertoPara } from './auth';
 import aterrizajeRouter from './enlaces/aterrizaje';
@@ -284,11 +285,41 @@ if (env.clientDir) {
 
 // Middleware de error final: cualquier excepción no controlada → 500 en JSON.
 app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
-  console.error('[servidor] Error no controlado:', err);
   if (res.headersSent) {
+    console.error('[servidor] Error no controlado:', err);
     res.end();
     return;
   }
+
+  /*
+   * UN JUEGO QUE NO ESTÁ INSTALADO NO ES UN FALLO DEL SERVIDOR.
+   *
+   * Es la situación normal el día que haya un servidor por país y cada uno
+   * instale su reparto: alguien tiene guardada una partida de un juego que
+   * aquí no existe. Antes de que `manifiestoDe` fallara, esa partida se abría
+   * y SE JUGABA COMO CLUEDO, sin un solo error. Ahora falla, que es lo
+   * correcto — pero contestar «Error interno del servidor» sería mentir por el
+   * otro lado: no hay nada roto, hay algo que aquí no se puede hacer.
+   *
+   * 409 y no 500: quien pregunta puede entenderlo y actuar. Y el mensaje lleva
+   * el nombre del juego, porque «no está instalado» sin decir cuál obliga a
+   * abrir los registros para averiguar lo que el error ya sabía.
+   */
+  if (err instanceof JuegoNoInstalado) {
+    console.warn(`[servidor] Se ha pedido algo de «${err.juego}», que no está instalado aquí.`);
+    res.status(409).json({
+      error: err.message,
+      juego: err.juego,
+      /*
+       * Se dice qué SÍ hay. Con juegos por servidor, lo primero que necesita
+       * saber quien recibe esto es si se ha equivocado de servidor.
+       */
+      instalados: juegosInstalados().map((m) => m.id),
+    });
+    return;
+  }
+
+  console.error('[servidor] Error no controlado:', err);
   res.status(500).json({ error: 'Error interno del servidor.' });
 });
 

@@ -21,7 +21,7 @@
  * entrega es que CLUEDO no cambie ni un píxel. Si alguien las retoca, que sea
  * queriendo.
  */
-import { manifiestoDe } from '../../../shared/juegos';
+import { manifiestoDe, manifiestoSiExiste } from '../../../shared/juegos';
 import type { DefinicionCategoria, JuegoId } from '../../../shared/juegos';
 
 export interface PalabrasDeJuego {
@@ -516,7 +516,7 @@ export function palabrasDe(juego: JuegoId | undefined): PalabrasDeJuego {
 
 /** El nombre del asistente de un juego. Sale del manifiesto, no de aquí. */
 export function nombreDelAsistente(juego: JuegoId | undefined): string {
-  return manifiestoDe(juego).asistente.nombre;
+  return manifiestoSiExiste(juego)?.asistente.nombre ?? 'El asistente';
 }
 
 /**

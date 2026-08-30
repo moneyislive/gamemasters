@@ -11,7 +11,7 @@
  * regenerar y el cliente para avisar en la interfaz. Una sola fuente de verdad.
  */
 import type { GameSession } from './types';
-import { entidadesDe, ejes as ejesDe, manifiestoDe } from './juegos';
+import { CLUEDO, entidadesDe, ejes as ejesDe, manifiestoSiExiste } from './juegos';
 import type { EjeId } from './juegos';
 
 export interface StalenessReport {
@@ -136,9 +136,19 @@ export function computeStaleness(game: GameSession): StalenessReport {
   // Las entidades vivas se piden POR CATEGORÍA, no por los tres campos de
   // CLUEDO. Tenerlos escritos a mano aquí hacía que cualquier otro juego
   // saliese con la solución rota; lo encontró la prueba del segundo juego.
-  const manifiesto = manifiestoDe(game.settings?.juego);
-  const brokenSolution = ejesDe(manifiesto)
+  /*
+   * BLANDO, porque esto lo pinta el taller en cada partida de la lista.
+   *
+   * Sin manifiesto no se puede decir si la solución está rota —los ejes salen
+   * de él— y lo honesto es no decir nada, no inventarse que está bien ni
+   * reventar la lista entera por una partida de un juego que aquí no está
+   * instalado. Quien decide qué hacer con esa partida es la ruta que intente
+   * abrirla, y esa sí falla.
+   */
+  const manifiesto = manifiestoSiExiste(game.settings?.juego);
+  const brokenSolution = ejesDe(manifiesto ?? CLUEDO)
     .filter((eje) => {
+      if (!manifiesto) return false;
       const id = plot.solution.respuestas[eje.id];
       if (!id) return true;
       return !entidadesDe(game, eje.categoria).some((e) => e.id === id);
@@ -175,7 +185,7 @@ export function computeStaleness(game: GameSession): StalenessReport {
    * vigilias y en varios hallazgos, y no hacen falta nueve avisos de lo mismo.
    */
   const vistas = new Set<string>();
-  const brokenGameRefs = (manifiesto.referenciasDeLaTrama?.(plot.delJuego) ?? [])
+  const brokenGameRefs = (manifiesto?.referenciasDeLaTrama?.(plot.delJuego) ?? [])
     .filter((cita) => !entidadesDe(game, cita.categoria).some((e) => e.id === cita.id))
     .filter((cita) => {
       const clave = `${cita.categoria}|${cita.id}`;
@@ -212,7 +222,7 @@ export function computeStaleness(game: GameSession): StalenessReport {
   // Un aviso por eje roto, con la pregunta que ese eje hace. Antes eran tres
   // frases escritas a mano; ahora las escribe el juego en su manifiesto.
   for (const ejeId of brokenSolution) {
-    const eje = ejesDe(manifiesto).find((e) => e.id === ejeId);
+    const eje = ejesDe(manifiesto ?? CLUEDO).find((e) => e.id === ejeId);
     summary.push(
       eje
         ? `La respuesta a «${eje.pregunta}» ya no señala a nada que exista: el caso no tiene solución.`
