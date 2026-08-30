@@ -25,9 +25,13 @@ navegador, `npx expo start --web`.
 La app necesita saber dónde está el servidor. Por defecto usa
 `http://localhost:5174`; para otra dirección:
 
-```bash
-EXPO_PUBLIC_API_URL=https://tu-servidor npx expo start
+```powershell
+$env:EXPO_PUBLIC_API_URL = 'https://tu-servidor'; npx expo start
 ```
+
+En bash o zsh, `EXPO_PUBLIC_API_URL=https://tu-servidor npx expo start`. Ese
+prefijo de una linea NO existe en PowerShell: alli no da error, simplemente no
+pone nada, y la app se levanta apuntando a `localhost` como si tal cosa.
 
 o cámbiala desde la propia pantalla de entrada, en «Cambiar de servidor».
 

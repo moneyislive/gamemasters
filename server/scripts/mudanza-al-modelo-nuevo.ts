@@ -1,8 +1,10 @@
 /**
  * LA MUDANZA: se lleva lo guardado al modelo nuevo, de una vez y para siempre.
  *
- *   npx tsx scripts/mudanza-al-modelo-nuevo.ts                 ← en seco, no escribe
- *   npx tsx scripts/mudanza-al-modelo-nuevo.ts --de-verdad     ← escribe
+ *   npx tsx scripts/mudanza-al-modelo-nuevo.ts --base harkania
+ *   npx tsx scripts/mudanza-al-modelo-nuevo.ts --base harkania --de-verdad
+ *
+ * Sin `--de-verdad` va EN SECO: dice lo que haria y no escribe nada.
  *
  * ═══ POR QUE EXISTE ESTE FICHERO, Y POR QUE ES DE UN SOLO USO ═══
  *
@@ -41,11 +43,14 @@
  *
  * 1. EN SECO POR DEFECTO. Escribir exige `--de-verdad` tecleado a mano.
  *
- * 2. EXIGE EL NOMBRE DE LA BASE. `MONGODB_DB` o una URI que lo lleve dentro.
- *    Sin nombre, mongoose se conecta a `test` —una base vacia— y un guion como
- *    este recorreria cero documentos y diria «todo convertido, 0 errores».
- *    La produccion es «harkania»; ya hubo un guion que miro donde no era y dio
- *    el parte en verde.
+ * 2. EXIGE EL NOMBRE DE LA BASE, y se dice con `--base`. Sin nombre, mongoose
+ *    se conecta a `test` —una base vacia— y este guion recorreria cero
+ *    documentos y diria «todo convertido, 0 errores». La produccion es
+ *    «harkania»; ya hubo un guion que miro donde no era y dio el parte en verde.
+ *
+ *    Es una BANDERA y no una variable de entorno a proposito: `MONGODB_DB=... `
+ *    delante del comando es sintaxis de `sh`, y en PowerShell no pone nada ni
+ *    avisa. El seguro no puede depender de la consola de cada cual.
  *
  * 3. COPIA ANTES DE TOCAR. Se vuelca cada documento tal como estaba a un
  *    fichero con la fecha en el nombre, ANTES de escribir nada. No se borra
@@ -55,9 +60,30 @@ import fs from 'node:fs';
 import path from 'node:path';
 import mongoose from 'mongoose';
 import { env } from '../src/config';
-import { resolveDbName } from '../src/db/store';
 
 const DE_VERDAD = process.argv.includes('--de-verdad');
+
+/**
+ * A que base de datos ir, dicho como argumento y no como variable de entorno.
+ *
+ * ═══ POR QUE UNA BANDERA Y NO `MONGODB_DB=...` DELANTE ═══
+ *
+ * Porque ese prefijo es de `sh`. En PowerShell —que es la consola por defecto
+ * en Windows, donde se trabaja este repositorio— `MONGODB_DB=harkania npx tsx
+ * ...` NO da error: no pone nada. El guion arranca sin nombre de base, mongoose
+ * se va a `test`, y esto recorreria cero documentos y daria el parte en verde.
+ *
+ * O sea: el fallo mas caro que puede tener este fichero —mirar donde no es y
+ * decir que todo bien— dependia de en que consola lo escribiera cada cual. Con
+ * una bandera se lee igual en las dos y no hay nada que traducir.
+ *
+ * `MONGODB_DB` se sigue admitiendo: es lo que usa el servidor y hay guiones que
+ * ya la ponen.
+ */
+const BASE_PEDIDA = (() => {
+  const i = process.argv.indexOf('--base');
+  return i >= 0 ? process.argv[i + 1]?.trim() : undefined;
+})();
 
 // ---------------------------------------------------------------------------
 // Las conversiones, una por una
@@ -81,12 +107,33 @@ async function main(): Promise<void> {
    * lleva la base dentro, así que hay que distinguir «no hace falta» de «no se
    * sabe». Sin ninguna de las dos cosas, mongoose se iría a `test`.
    */
-  const dbName = resolveDbName(env.mongoUri, env.mongoDbName);
+  /*
+   * ═══ AQUI SE LLAMABA A `resolveDbName`, Y ESO ERA EL FALLO ═══
+   *
+   * Esa funcion es la del SERVIDOR, y tiene un respaldo: sin nombre explicito y
+   * con una URI que no lo lleve dentro, devuelve `'gamemasters'`. Para arrancar
+   * el servidor eso esta bien. Aqui anulaba el seguro entero.
+   *
+   * Se vio corriendo esto sin bandera: no se nego, se fue tan tranquilo a una
+   * base llamada `gamemasters` —que EXISTE y tiene partidas dentro, otras— y
+   * dio un parte perfectamente creible de tres documentos por mudar. Un
+   * `--de-verdad` detras habria reescrito la base equivocada.
+   *
+   * Asi que este guion no acepta respaldos. O se dice el nombre, o la URI lo
+   * lleva dentro, o no se hace nada.
+   */
+  const explicita = BASE_PEDIDA || env.mongoDbName?.trim() || '';
   const uriLlevaBase = /mongodb(\+srv)?:\/\/[^/]+\/[^?]+/.test(env.mongoUri);
-  if (!dbName && !uriLlevaBase) {
-    console.error('No sé a qué base de datos ir. Pon MONGODB_DB (en producción: harkania).');
+  if (!explicita && !uriLlevaBase) {
+    console.error('No sé a qué base de datos ir, y no me la voy a inventar.');
+    console.error('');
+    console.error('  npx tsx scripts/mudanza-al-modelo-nuevo.ts --base harkania');
+    console.error('');
+    console.error('En producción es «harkania». Hay otra base llamada «gamemasters»');
+    console.error('con partidas dentro: elegir mal aquí reescribe la que no es.');
     process.exit(2);
   }
+  const dbName = explicita || undefined;
 
   await mongoose.connect(env.mongoUri, { serverSelectionTimeoutMS: 8000, ...(dbName ? { dbName } : {}) });
   const db = mongoose.connection.db!;
