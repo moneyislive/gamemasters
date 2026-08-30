@@ -16,7 +16,8 @@
     "build": "npm run build -w server && npm run build -w client && npm run build:app",
     "start": "npm run start -w server",
     "typecheck": "npm run typecheck -w server && npm run typecheck -w client",
-    "build:app": "cd app && npm install --include=dev && npx expo export --platform web --output-dir dist"
+    "build:app": "cd app && npm install --include=dev && npx expo export --platform web --output-dir dist",
+    "verificar": "node scripts/verificar-todo.mjs"
   },
   "devDependencies": {
     "concurrently": "^9.1.0"
