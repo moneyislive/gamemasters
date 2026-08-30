@@ -64,6 +64,55 @@ const HUECOS_COMPACTOS: Hueco[] = [
   { x: 6, y: 13, w: 5, h: 5 },
 ];
 
+/**
+ * Cuando no caben en las tablas fijas: una rejilla que crece.
+ *
+ * ═══ EL FALLO QUE ESTO CIERRA ═══
+ *
+ * La colocación era `huecos[indice % huecos.length]`, y ese `%` era una bomba
+ * de relojería. Con diecisiete lugares, el decimoséptimo recibía EXACTAMENTE
+ * las mismas coordenadas que el primero: dos salas dibujadas una encima de
+ * otra, en silencio, sin un aviso ni un error. En el plano se ve una sola, y
+ * quien mira cuenta dieciséis donde hay diecisiete.
+ *
+ * Diecisiete lugares es mucho para un misterio en una casa y es poco para casi
+ * cualquier otra cosa. Un mundo de campaña con sus aldeas, sus cuevas y sus
+ * caminos pasa de dieciséis sin despeinarse, y con el `%` habría descubierto el
+ * problema mirando un plano que ya estaba mal.
+ *
+ * ═══ POR QUÉ NO SE CAMBIAN LAS TABLAS FIJAS ═══
+ *
+ * Porque están calibradas: los huecos amplios de 6×6 y los compactos de 5×5
+ * componen el perímetro clásico, con esquinas primero y pasillo entre salas, y
+ * eso se ve mejor que cualquier rejilla automática. Hasta dieciséis lugares no
+ * cambia nada — ni un píxel, y el maestro de oro lo comprueba.
+ *
+ * A partir de ahí se tesela. Es más feo y es correcto, que en este orden es lo
+ * que hace falta.
+ */
+function rejillaQueCrece(cuantos: number): { huecos: Hueco[]; cols: number; rows: number } {
+  const LADO = 5;
+  const PASO = LADO + 1; // una celda de pasillo entre lugares
+
+  // Cuadrada o casi: es la que menos hueco desperdicia y la que mejor se lee.
+  const columnas = Math.ceil(Math.sqrt(cuantos));
+  const filas = Math.ceil(cuantos / columnas);
+
+  const cols = columnas * PASO - 1;
+  const rows = filas * PASO - 1;
+
+  const huecos: Hueco[] = [];
+  for (let i = 0; i < cuantos; i++) {
+    huecos.push({
+      x: (i % columnas) * PASO,
+      y: Math.floor(i / columnas) * PASO,
+      w: LADO,
+      h: LADO,
+    });
+  }
+  return { huecos, cols, rows };
+}
+
 /** Genera el BoardLayout determinista para las salas dadas. */
 export function generateBoardLayout(
   rooms: Room[],
@@ -77,15 +126,34 @@ export function generateBoardLayout(
 ): BoardLayout {
   // Orden estable por id: mismo conjunto de salas → mismo tablero.
   const ordenadas = [...rooms].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
-  const huecos = ordenadas.length <= HUECOS_AMPLIOS.length ? HUECOS_AMPLIOS : HUECOS_COMPACTOS;
 
-  const colocaciones: BoardRoomPlacement[] = ordenadas.map((sala, indice) => {
-    const hueco = huecos[indice % huecos.length];
-    return { roomId: sala.id, x: hueco.x, y: hueco.y, w: hueco.w, h: hueco.h };
+  let huecos: Hueco[];
+  let cols = COLS;
+  let rows = ROWS;
+  if (ordenadas.length <= HUECOS_AMPLIOS.length) {
+    huecos = HUECOS_AMPLIOS;
+  } else if (ordenadas.length <= HUECOS_COMPACTOS.length) {
+    huecos = HUECOS_COMPACTOS;
+  } else {
+    const crecida = rejillaQueCrece(ordenadas.length);
+    huecos = crecida.huecos;
+    cols = crecida.cols;
+    rows = crecida.rows;
+  }
+
+  /*
+   * Sin el `%` de antes. Si algún día vuelve a faltar un hueco es mejor que se
+   * note —el lugar se queda fuera del plano y salta a la vista— que dibujar dos
+   * encima y que no se note nunca. Con la rejilla que crece no puede pasar:
+   * siempre hay tantos huecos como lugares.
+   */
+  const colocaciones: BoardRoomPlacement[] = ordenadas.flatMap((sala, indice) => {
+    const hueco = huecos[indice];
+    return hueco ? [{ roomId: sala.id, x: hueco.x, y: hueco.y, w: hueco.w, h: hueco.h }] : [];
   });
 
   return {
-    grid: { cols: COLS, rows: ROWS },
+    grid: { cols, rows },
     rooms: colocaciones,
     passages: calcularPasadizos(colocaciones),
     centerLabel: rotuloCentral,

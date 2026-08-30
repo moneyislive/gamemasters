@@ -26,7 +26,7 @@ import type {
   PlotClue,
   TimelineEvent,
 } from '../../../shared/types';
-import { manifiestoDe } from '../../../shared/juegos';
+import { esElSenalado, manifiestoDe, manifiestoSiExiste } from '../../../shared/juegos';
 import type { StalenessReport } from '../../../shared/staleness';
 import { computeStaleness } from '../../../shared/staleness';
 import { DEMO_MODE } from '../config';
@@ -245,13 +245,31 @@ function podarTrama(plot: Plot, game: GameSession): void {
   }
   plot.timeline = cronologia;
 
-  // Material impreso: un giro dirigido a alguien que ya no juega no se puede
-  // entregar, y uno dirigido al culpable lo delataría si la solución se ha
-  // reasignado al reparar la trama.
+  /*
+   * Material impreso: un giro dirigido a alguien que ya no juega no se puede
+   * entregar, y uno dirigido a quien resulta ser la respuesta lo delataría si la
+   * solución se ha reasignado al reparar la trama.
+   *
+   * POR EL EJE DEL JUEGO, NO POR `culpableDe`. Esta función poda la trama de
+   * CUALQUIER juego —`refresh.ts:110` la llama bajo un simple `if (game.plot)`,
+   * sin mirar a qué se juega— y `culpableDe` lee `respuestas['culpable']`, que
+   * es el eje de CLUEDO. En El Misterio de la Momia la respuesta vive en
+   * `respuestas['saqueador']`, así que devolvía cadena vacía y la comparación no
+   * excluía a nadie.
+   *
+   * Hoy eso no rompía nada visible —no hay `suspectId` vacío, así que el filtro
+   * simplemente no filtraba— y por eso llevaba aquí sin que saltara ninguna
+   * alarma. Pero la protección que esta línea existe para dar, la de que un giro
+   * no delate a quien resulta ser, NO ESTABA OCURRIENDO en dos de los tres
+   * juegos. `esElSenalado` deduce el eje de que su categoría sea la de los
+   * jugadores, así que funciona en los tres y en el que venga.
+   */
   if (plot.material) {
+    const manifiesto = manifiestoSiExiste(game.settings?.juego);
     plot.material.twists = plot.material.twists.filter(
       (giro) =>
-        idsSospechosos.has(giro.suspectId) && giro.suspectId !== culpableDe(plot.solution),
+        idsSospechosos.has(giro.suspectId) &&
+        !(manifiesto && esElSenalado(manifiesto, plot.solution.respuestas, giro.suspectId)),
     );
   }
 }

@@ -120,6 +120,26 @@ const VOCABULARIOS: Vocabulario[] = [
       'tablon',
       'misPistas',
       'misHallazgos',
+      /*
+       * LOS ACCESORES DE EJE DE CLUEDO, y hacía falta añadirlos a mano.
+       *
+       * `culpableDe` NO casaba con `\bculpable\b`: la «D» de `De` es carácter
+       * de palabra, así que la frontera no está ahí y la expresión no llegaba.
+       * El resultado era un agujero silencioso justo en el sitio de más
+       * acoplamiento que hay — `docs/imprimibles/` está lleno de
+       * `culpableDe(plot.solution)`, `objetoDe(...)` y `lugarDe(...)`.
+       *
+       * Se descubrió porque una mejora real —sacar `culpableDe` de
+       * `plot/refresh.ts`— no movió el contador ni una unidad. Un contador que
+       * no baja cuando arreglas algo está midiendo otra cosa.
+       *
+       * `EJES` es la tabla de la que salen los tres. Está en `juegos/cluedo.ts`
+       * y quien la importe fuera de CLUEDO está leyendo los ejes de CLUEDO.
+       */
+      'culpableDe',
+      'objetoDe',
+      'lugarDe',
+      'EJES',
     ],
   },
 ];

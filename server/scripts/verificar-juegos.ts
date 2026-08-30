@@ -609,6 +609,83 @@ paso('Las medallas de un juego no se reparten en otro');
 }
 
 // ---------------------------------------------------------------------------
+// El plano, ¿cabe cualquier numero de lugares?
+// ---------------------------------------------------------------------------
+
+paso('El plano no dibuja dos lugares encima');
+
+/*
+ * ═══ EL FALLO QUE ESTO CIERRA ═══
+ *
+ * La colocacion era `huecos[indice % huecos.length]` sobre una tabla de
+ * dieciseis. Con diecisiete lugares, el decimoseptimo recibia EXACTAMENTE las
+ * coordenadas del primero: dos dibujados uno encima de otro, en silencio, sin
+ * un aviso ni un error. En el plano se ve uno solo y quien mira cuenta
+ * dieciseis donde hay diecisiete.
+ *
+ * Diecisiete es mucho para un misterio en una casa y es poco para casi
+ * cualquier otra cosa. Se prueba hasta sesenta porque el objetivo declarado es
+ * que quepa un mundo de campaña entero, con sus aldeas, sus cuevas y sus
+ * caminos.
+ */
+{
+  const solapan = (a: { x: number; y: number; w: number; h: number },
+                   b: { x: number; y: number; w: number; h: number }): boolean =>
+    a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+
+  const malos: Array<{ cuantos: number; que: string }> = [];
+  for (let cuantos = 1; cuantos <= 60; cuantos++) {
+    const lugares = Array.from({ length: cuantos }, (_, i) => ({
+      // Con relleno a la izquierda: el generador ordena por id, y sin esto
+      // «sala-10» iria antes que «sala-9» y la prueba mediria otra cosa.
+      id: `sala-${String(i).padStart(3, '0')}`,
+      name: `Lugar ${i + 1}`,
+    }));
+    const plano = generateBoardLayout(lugares as never);
+
+    if (plano.rooms.length !== cuantos) {
+      malos.push({ cuantos, que: `se dibujaron ${plano.rooms.length} de ${cuantos}` });
+      continue;
+    }
+    for (let i = 0; i < plano.rooms.length && malos.length < 5; i++) {
+      for (let j = i + 1; j < plano.rooms.length; j++) {
+        if (solapan(plano.rooms[i]!, plano.rooms[j]!)) {
+          malos.push({ cuantos, que: `${plano.rooms[i]!.roomId} pisa a ${plano.rooms[j]!.roomId}` });
+          break;
+        }
+      }
+    }
+    const fuera = plano.rooms.filter(
+      (r) => r.x < 0 || r.y < 0 || r.x + r.w > plano.grid.cols || r.y + r.h > plano.grid.rows,
+    );
+    if (fuera.length > 0) {
+      malos.push({ cuantos, que: `${fuera.length} lugares se salen de la rejilla` });
+    }
+  }
+
+  comprobar(
+    'de 1 a 60 lugares: todos se dibujan y ninguno pisa a otro',
+    malos.length === 0,
+    malos.slice(0, 5),
+  );
+
+  /*
+   * Y que hasta dieciseis NO haya cambiado nada. Las tablas fijas estan
+   * calibradas —esquinas primero, pasillo entre lugares, el perimetro clasico—
+   * y se ven mejor que cualquier rejilla automatica. La rejilla que crece es
+   * para cuando ya no queda mas remedio.
+   */
+  const doce = generateBoardLayout(
+    Array.from({ length: 12 }, (_, i) => ({ id: `s${i}`, name: `S${i}` })) as never,
+  );
+  comprobar(
+    'hasta 16 lugares se sigue usando el perimetro clasico de 24x24',
+    doce.grid.cols === 24 && doce.grid.rows === 24,
+    { grid: doce.grid },
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Un juego que no esta instalado, ¿se puede jugar por error?
 // ---------------------------------------------------------------------------
 
