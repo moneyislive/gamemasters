@@ -1,5 +1,26 @@
 # EL TERCER JUEGO — MANUAL DE MONTAJE
 
+> **AVISO DE FECHA.** Este manual se escribió el 28 de agosto de 2026, antes de que
+> entrara El Paso de las Sombras y antes del trabajo de aislamiento del 29 al 30.
+> Sigue siendo la mejor guía de montaje que hay, pero **cinco de sus pasos han
+> cambiado** y conviene leer `AISLAMIENTO-DE-JUEGOS.md` al lado:
+>
+> - **Paso 7 (fases):** ya NO hay que declarar las siete. La tabla es `Partial`, así
+>   que solo se nombran las fases por las que el juego pasa.
+> - **Paso 9 (`ronda`):** ya es opcional. Se confirmó que no lo lee nadie.
+> - **Nuevo:** `dosier` es OBLIGATORIO en el manifiesto — la lista de bloques del
+>   dosier del móvil, en orden. Sin respaldo, a propósito.
+> - **Paso 6 (formas de entrada):** hay una quinta, `pideNumero`, y el panel
+>   genérico de la app SÍ la pinta.
+> - **Etapas 3 y 5:** hay tres registros nuevos que dar de alta en `instalados.ts`
+>   — `registrarGenerador` (la trama), `registrarVoz` (el asistente del taller) y
+>   `registrarVeredicto` (quién gana) — y CLUEDO ya no es la rama por defecto de
+>   ninguno de los tres.
+>
+> Además, dos cosas que este manual da por rotas están ARREGLADAS: el
+> `PrintablePicker` y el despacho por registro de `refresh.ts` y `material.ts`.
+
+
 Raíz del repositorio: `C:/Users/QWERTY/Documents/GameMasters`. Todas las rutas de abajo son relativas a esa raíz. El juego nuevo se llama `tercero` (id) y `TERCERO` (constante) en todos los ejemplos; sustitúyelo entero.
 
 Regla que gobierna el orden entero: **cada vez que amplías una unión cerrada, el compilador te obliga a completar su `Record` en el mismo commit**. Por eso el manifiesto arranca con `trofeos: []`, `documentos: []` y `seccionesDeDosier: []`, y esas tres listas se rellenan en la etapa donde se escribe lo que hay detrás. Empezar declarándolas llenas te deja con el árbol sin compilar durante días.
