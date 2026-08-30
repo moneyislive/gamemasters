@@ -1,5 +1,16 @@
 # Cada juego, el suyo
 
+> **AVISO — 30 de agosto de 2026, por la tarde.** Este documento cuenta lo que se
+> hizo la noche del 29 al 30, y **su §3 ya no es cierto**: de los cinco peajes que
+> enumera quedan dos. Se fueron los nombres de fase de CLUEDO, la obligación de
+> guardar las personas en `suspects`, la víctima inventada y los cuatro campos de
+> misterio por persona.
+>
+> Se conserva porque el resto —§2, §4 y §5— sigue describiendo bien de dónde
+> venimos y por qué. Para escribir un juego HOY, mira
+> [ESCRIBIR-UN-JUEGO.md](ESCRIBIR-UN-JUEGO.md). Para el estado real de los peajes,
+> corre `npm run verify:ajeno`, que los cuenta él solo.
+
 **Qué se aisló la noche del 29 al 30 de agosto de 2026, qué se generalizó, y qué peajes siguen cobrándose.**
 
 ---
