@@ -187,6 +187,7 @@ export const IMPRIMIBLES_SOMBRAS: PrintableDocInfo[] = [
   },
   {
     id: 'carteles-paso',
+    necesitaLugares: true,
     name: 'Carteles de los pasos',
     summary:
       'Un cartel por habitación, con su nombre y LA CONTRASEÑA que hay que ir a leer. Es lo que convierte tu casa en el camino de Iga.',

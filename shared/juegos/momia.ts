@@ -169,6 +169,7 @@ export const IMPRIMIBLES_MOMIA: PrintableDocInfo[] = [
   },
   {
     id: 'carteles-camara',
+    necesitaLugares: true,
     name: 'Carteles de las cámaras',
     summary: 'Un cartel por cámara para pegar en las puertas de tu casa. Es lo que convierte el pasillo en una tumba.',
     audience: 'room',

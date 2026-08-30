@@ -39,6 +39,7 @@ import { juegosConVeredicto } from '../src/juegos/veredictos';
 import { abrirRonda } from '../src/live/sesion';
 import { renderPlayerDocument } from '../src/docs/renderer';
 import { renderPrintableDocument } from '../src/docs/imprimibles';
+import { imprimiblesRegistrados, plantillaDe } from '../src/docs/imprimibles/registro';
 import { printableDocsFor } from '../../shared/documents';
 import { juegosInstalados, manifiestoDe } from '../../shared/juegos';
 import { FASES_EN_JUEGO } from '../../shared/live';
@@ -405,6 +406,42 @@ for (const m of juegosInstalados()) {
 
   const docs = printableDocsFor(game.settings, m.documentos);
   comprobar(`${m.id}: su paquete trae imprimibles`, docs.length > 0, docs.length);
+
+  /*
+   * ═══ LO DECLARADO Y LO ENCHUFADO, PIEZA A PIEZA ═══
+   *
+   * Antes esto lo garantizaba el COMPILADOR: las plantillas vivían en un
+   * `Record<PrintableDocId, Plantilla>` exhaustivo, así que declarar un
+   * documento sin escribir su plantilla no compilaba. Esa tabla era también el
+   * cuello de botella —un fichero del núcleo con las veintinueve plantillas de
+   * los tres juegos— y al partirla en un registro por juego se perdió el aviso.
+   *
+   * Lo que se perdió hay que recuperarlo aquí, porque el fallo sin esto es de
+   * los malos: el documento no revienta ni avisa, sale AUSENTE del paquete y
+   * quien prepara la velada descubre que le falta una hoja cuando ya tiene a
+   * doce personas en casa.
+   *
+   * Y se mira en las dos direcciones. Una plantilla registrada que el juego no
+   * declara no puede salir por ningún sitio: es código muerto que se seguirá
+   * manteniendo, y suele ser el rastro de un documento que se renombró en el
+   * manifiesto y no en el registro.
+   */
+  const declarados = new Set(m.documentos.map((d) => d.id));
+  const registrados = new Set(imprimiblesRegistrados(m.id));
+  const sinPlantilla = [...declarados].filter(
+    (id) => !registrados.has(id) && plantillaDe(m.id, id) === undefined,
+  );
+  comprobar(
+    `${m.id}: todo documento declarado tiene plantilla`,
+    sinPlantilla.length === 0,
+    { sinPlantilla, porque: 'saldría ausente del paquete, sin reventar y sin avisar' },
+  );
+  const sinDeclarar = [...registrados].filter((id) => !declarados.has(id));
+  comprobar(
+    `${m.id}: no registra plantillas que no declara`,
+    sinDeclarar.length === 0,
+    { sinDeclarar, porque: 'no puede salir por ningún sitio: es código muerto' },
+  );
   for (const doc of docs) {
     let html: string | undefined;
     let reventó: string | null = null;

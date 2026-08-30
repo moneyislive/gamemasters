@@ -11,44 +11,37 @@
  * `resolveGmMode` recibe la forma que necesita y no `GameSettings` entero.
  */
 
-export type PrintableDocId =
-  | 'indice-paquete'
-  | 'manual-gm'
-  | 'hojas-investigacion'
-  | 'carteles-sala'
-  | 'linea-temporal'
-  | 'etiquetas-sobres'
-  | 'carta-imprevistos'
-  | 'tarjetas-ensobrar'
-  | 'guia-preparador'
-  | 'hoja-solucion'
-  | 'matriz-conocimiento'
-  | 'desenlace'
-  | 'informe-validacion'
-  /* Los de El Misterio de la Momia. Ver shared/juegos/momia.ts. */
-  | 'guia-expedicion'
-  | 'dosier-expedicionario'
-  | 'fragmentos-papiro'
-  | 'carteles-camara'
-  | 'hoja-sellado'
-  | 'tabla-marcas'
-  | 'papiro-sellado'
-  | 'informe-papiro'
-  /*
-   * Los de El Paso de las Sombras. Ver shared/juegos/sombras.ts.
-   *
-   * Son OCHO y no nueve: el índice del paquete se reutiliza —`indice-paquete`,
-   * el de la casa— porque esa hoja se compone entera desde el catálogo del juego
-   * y desde `manifiesto.preparacion`. Es lo mismo que hace la Momia.
-   */
-  | 'guia-del-paso'
-  | 'dosier-escolta'
-  | 'hitos-camino'
-  | 'carteles-paso'
-  | 'hoja-consejo'
-  | 'tabla-rastro'
-  | 'senda-verdadera'
-  | 'informe-senda';
+/**
+ * El identificador de un documento imprimible. CADENA LIBRE, y esto es
+ * importante.
+ *
+ * ═══ ERA UNA UNIÓN CERRADA DE VEINTINUEVE ═══
+ *
+ * Trece de CLUEDO, ocho de la Momia y ocho de las Sombras, todos escritos aquí,
+ * en un fichero del núcleo que se compila para todos. Y no era solo la lista:
+ * enfrente había un `Record<PrintableDocId, Plantilla>` EXHAUSTIVO en
+ * `docs/imprimibles/index.ts`, así que el compilador exigía que cada documento
+ * de cada juego estuviera enchufado ahí.
+ *
+ * O sea que añadir un juego con imprimibles obligaba a tocar dos ficheros del
+ * tronco, y un juego con treinta documentos —una campaña de rol tiene fichas,
+ * mapas, cartas de encuentro, tablas de botín— habría metido treinta renglones
+ * en el contrato común. Eso no escala: es exactamente el cuello de botella que
+ * hace que el núcleo crezca cada vez que un juego crece.
+ *
+ * ═══ QUÉ LA SUSTITUYE ═══
+ *
+ * Cada juego declara sus documentos en su manifiesto (`manifiesto.documentos`)
+ * y registra sus plantillas con `registrarImprimibles`. Quien compone un
+ * documento pregunta al catálogo DEL JUEGO que se juega, que es lo que ya hacía
+ * `fichaDelDocumento`. La unión cerrada no aportaba seguridad real —el catálogo
+ * ya era el que mandaba— y sí imponía el peaje.
+ *
+ * Lo que se pierde: el compilador ya no avisa si un juego declara un documento
+ * y se olvida de registrar su plantilla. Lo cubre `npm run verify:juegos`, que
+ * recorre los juegos instalados y comprueba justo eso.
+ */
+export type PrintableDocId = string;
 
 /** Para quién es el documento. Determina en qué grupo se pinta en la interfaz. */
 export type DocumentAudience = 'players' | 'gm' | 'preparer' | 'room';
@@ -96,6 +89,19 @@ export interface PrintableDocInfo {
    * sección obligatoria.
    */
   porPersona?: boolean;
+  /**
+   * ¿Necesita al menos un LUGAR para tener sentido?
+   *
+   * Estaba en un `Set` dentro de `docs/imprimibles/index.ts` con los tres ids
+   * que lo cumplen, uno por juego. O sea: el núcleo sabía que los carteles de
+   * cámara son de la Momia y los de paso, de las Sombras. Es un dato sobre un
+   * documento, así que va con el documento.
+   *
+   * Y no es cosmético en un caso: sin pasos no hay carteles, sin carteles no hay
+   * contraseñas que leer, y El Paso de las Sombras no se puede jugar. Que el
+   * documento no salga es mejor que un folio con una portada y nada más.
+   */
+  necesitaLugares?: boolean;
 }
 
 export const PRINTABLE_DOCS: PrintableDocInfo[] = [
@@ -134,6 +140,7 @@ export const PRINTABLE_DOCS: PrintableDocInfo[] = [
   },
   {
     id: 'carteles-sala',
+    necesitaLugares: true,
     name: 'Carteles de sala',
     summary:
       'Un cartel por página para marcar cada zona de la casa, con hueco para el sobre de la ronda y los pasadizos señalados.',

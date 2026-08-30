@@ -29,9 +29,24 @@
  * descubrirlo con doce personas esperando.
  */
 
+/*
+ * Primero los imprimibles DE LA CASA: los que sirven a cualquier juego que los
+ * declare. Van antes que ningun juego porque lo de un juego manda sobre lo de
+ * la casa, y asi el orden de lectura coincide con el de precedencia.
+ */
+import '../docs/imprimibles/casa';
+
 // CLUEDO.
 import './cluedo-acciones';
 import './cluedo-trofeos';
+/*
+ * Y sus trece plantillas de imprimible. Estaban en una tabla exhaustiva dentro
+ * de `docs/imprimibles/index.ts` y el compilador exigia que estuvieran todas;
+ * ahora es un registro, asi que si nadie importa este modulo el paquete sale
+ * SIN UN SOLO DOCUMENTO y no falla nada al arrancar. Es el mismo fallo que ya
+ * estuvo a punto de ocurrir con los reductores de la Momia.
+ */
+import '../docs/imprimibles/cluedo';
 /*
  * El generador de trama de CLUEDO vive en la tuberia, porque alli viven sus dos
  * variantes --con clave de API y sin ella--. Se importa igual: desde que se
@@ -73,6 +88,9 @@ import './momia-sellado';
  */
 import '../docs/imprimibles/momia/dosierExpedicionario';
 
+// Y sus ocho plantillas de imprimible. Ver el porque en la linea de CLUEDO.
+import '../docs/imprimibles/momia/registro';
+
 // El Paso de las Sombras: reductores, proyección del estado, consejo y trofeos.
 import '../plot/sombras-generacion';
 import '../agent/sombras-guia';
@@ -89,6 +107,9 @@ import './sombras-trama';
 
 // Y su dosier por persona, que lo sirve el taller. Ver el porqué arriba.
 import '../docs/imprimibles/sombras/dosierEscolta';
+
+// Y sus ocho plantillas de imprimible. Ver el porque en la linea de CLUEDO.
+import '../docs/imprimibles/sombras/registro';
 
 /**
  * No exporta nada, y es a propósito.
