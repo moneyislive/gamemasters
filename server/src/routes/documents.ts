@@ -128,7 +128,7 @@ router.get('/games/:id/documents.zip', async (req, res) => {
   res.end();
 });
 
-router.get('/games/:id/documents/:suspectId', async (req, res) => {
+router.get('/games/:id/documents/:documento', async (req, res) => {
   try {
     const game = await getStore().getGame(req.params.id);
     if (!game) {
@@ -136,14 +136,14 @@ router.get('/games/:id/documents/:suspectId', async (req, res) => {
       return;
     }
 
-    const id = req.params.suspectId;
+    const id = req.params.documento;
     const esImprimible = isPrintableDocId(id, manifiestoDe(game.settings?.juego).documentos);
 
     // Los imprimibles NO están en el índice guardado: se calculan al vuelo desde
     // el catálogo, para que aparezcan también en partidas generadas antes de
     // que existieran, sin obligar a regenerarlas.
     if (!esImprimible) {
-      const enIndice = game.documents?.some((doc) => doc.suspectId === id);
+      const enIndice = game.documents?.some((doc) => doc.id === id);
       if (!enIndice) {
         res.status(404).json({ error: 'Ese dosier todavía no se ha generado.' });
         return;

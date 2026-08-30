@@ -127,14 +127,14 @@ export function computeStaleness(game: GameSession): StalenessReport {
   // Los dosieres del Game Master ('gm') y del sobre sellado ('solution') no
   // corresponden a ningún sospechoso.
   const NO_JUGADORES = new Set(['gm', 'solution']);
-  const conDosier = new Set(documents.map((d) => d.suspectId));
+  const conDosier = new Set(documents.map((d) => d.id));
   const suspectsWithoutDocument =
     documents.length === 0
       ? []
       : personasDe(game).filter((s) => !conDosier.has(s.id)).map((s) => s.id);
   const orphanDocuments = documents
-    .filter((d) => !NO_JUGADORES.has(d.suspectId) && !idsSospechosos.has(d.suspectId))
-    .map((d) => d.suspectId);
+    .filter((d) => !NO_JUGADORES.has(d.id) && !idsSospechosos.has(d.id))
+    .map((d) => d.id);
 
   // Un eje está roto si su respuesta no señala a ninguna entidad viva de la
   // categoría que ese eje declara.

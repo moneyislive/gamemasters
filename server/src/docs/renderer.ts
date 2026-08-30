@@ -228,7 +228,7 @@ export function renderDocumentIndex(game: GameSession): PlayerDocument[] {
   if (!dosieres) return [];
 
   const indice: PlayerDocument[] = personasDe(game).map((sospechoso) => ({
-    suspectId: sospechoso.id,
+    id: sospechoso.id,
     title: dosieres.tituloDeUno(game, plot, sospechoso.id),
   }));
 
@@ -243,7 +243,7 @@ export function renderDocumentIndex(game: GameSession): PlayerDocument[] {
    * queda ningún caso por defecto.
    */
   for (const suelto of dosieres.deLaMesa?.(game, plot) ?? []) {
-    indice.push({ suspectId: suelto.id, title: suelto.titulo });
+    indice.push({ id: suelto.id, title: suelto.titulo });
   }
   return indice;
 }
@@ -268,13 +268,13 @@ export function renderPlayerDocument(
    * no encontraría nada.
    */
   const suelto = dosieres.deLaMesa?.(game, plot).find((d) => d.id === suspectId);
-  if (suelto) return { suspectId, title: suelto.titulo, html: suelto.html(opciones) };
+  if (suelto) return { id: suspectId, title: suelto.titulo, html: suelto.html(opciones) };
 
   if (!personasDe(game).some((s) => s.id === suspectId)) return null;
 
   const html = dosieres.deUno(game, plot, suspectId, opciones);
   if (html === null) return null;
-  return { suspectId, title: dosieres.tituloDeUno(game, plot, suspectId), html };
+  return { id: suspectId, title: dosieres.tituloDeUno(game, plot, suspectId), html };
 }
 
 /**
@@ -294,7 +294,7 @@ export function renderPlayerDocuments(
     if (doc) documentos.push(doc);
   }
   for (const suelto of dosieresDe(game.settings?.juego)?.deLaMesa?.(game, plot) ?? []) {
-    documentos.push({ suspectId: suelto.id, title: suelto.titulo, html: suelto.html(opciones) });
+    documentos.push({ id: suelto.id, title: suelto.titulo, html: suelto.html(opciones) });
   }
   return documentos;
 }

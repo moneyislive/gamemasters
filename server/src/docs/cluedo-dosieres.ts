@@ -343,7 +343,7 @@ function dosierJugador(
     .join('\n');
 
   return {
-    suspectId: sospechoso.id,
+    id: sospechoso.id,
     title: tituloJugador(plot, sospechoso),
     html: envolver(`${plot.title} — ${sospechoso.name}`, contenido, opciones),
   };
@@ -386,7 +386,7 @@ function dosierSolucion(opciones: DocumentRenderOptions, game: GameSession, plot
     </section>`;
 
   return {
-    suspectId: 'solution',
+    id: 'solution',
     title: tituloSolucion(plot),
     html: envolver(`${plot.title} — Solución`, contenido, opciones),
   };
@@ -562,7 +562,7 @@ function dosierGameMaster(opciones: DocumentRenderOptions, game: GameSession, pl
     .join('\n');
 
   return {
-    suspectId: 'gm',
+    id: 'gm',
     title: tituloGameMaster(plot, aCiegas),
     html: envolver(`${plot.title} — Game Master`, contenido, opciones),
   };

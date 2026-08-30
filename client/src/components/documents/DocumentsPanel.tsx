@@ -204,7 +204,7 @@ export default function DocumentsPanel(): JSX.Element {
   const hayReservados = imprimibles.some((d) => d.audience === 'preparer' || d.audience === 'gm');
 
   const personajePorId = new Map((game.plot?.characters ?? []).map((c) => [c.suspectId, c]));
-  const idsConDocumento = new Set(documentos.map((doc) => doc.suspectId));
+  const idsConDocumento = new Set(documentos.map((doc) => doc.id));
   const idsSospechosos = new Set(personasDe(game).map((s) => s.id));
 
   // Un sobre por jugador actual: los que aún no tienen dosier también aparecen.
@@ -223,10 +223,10 @@ export default function DocumentsPanel(): JSX.Element {
   // 'gm' y 'solution' no corresponden a ningún sospechoso y nunca sobran; sin
   // excluir el segundo, el sobre del crimen se pintaba dos veces.
   for (const documento of documentos) {
-    if (NO_JUGADORES.has(documento.suspectId) || idsSospechosos.has(documento.suspectId)) continue;
+    if (NO_JUGADORES.has(documento.id) || idsSospechosos.has(documento.id)) continue;
     sobres.push({
-      suspectId: documento.suspectId,
-      personName: personajePorId.get(documento.suspectId)?.characterName ?? documento.title,
+      suspectId: documento.id,
+      personName: personajePorId.get(documento.id)?.characterName ?? documento.title,
       isGm: false,
       sinDosier: false,
       sobrante: true,

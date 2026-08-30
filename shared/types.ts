@@ -294,7 +294,15 @@ export interface Plot {
 // ---------- Documentos por jugador ----------
 
 export interface PlayerDocument {
-  suspectId: string;
+  /**
+   * QUE ES ESTE DOCUMENTO. No siempre es una persona.
+   *
+   * Se llamaba `suspectId` y guardaba tres cosas distintas: el id de alguien de
+   * la mesa (su dosier), las cadenas `gm` y `solution` (los dosieres que no son
+   * de nadie) y el id de un imprimible entero. Llamar `suspectId` a
+   * «informe-validacion» era una mentira que costaba un rato entender.
+   */
+  id: string;
   title: string;
   /**
    * HTML completo autocontenido y tematizado (estilos y fotos embebidos).

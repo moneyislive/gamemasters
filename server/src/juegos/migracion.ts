@@ -107,11 +107,35 @@ function entidadesAlDia(game: GameSession): void {
   }
 }
 
+/**
+ * El indice de dosieres guardado llamaba `suspectId` a lo que no siempre es una
+ * persona.
+ *
+ * Ahi caben tres cosas: el id de alguien de la mesa, las cadenas `gm` y
+ * `solution` —los dosieres que no son de nadie— y el id de un imprimible
+ * entero. Llamar `suspectId` a «informe-validacion» era una mentira que costaba
+ * un rato entender, asi que el campo pasa a llamarse `id`.
+ *
+ * SIN ESTO, una partida guardada se queda con el indice ilegible: la interfaz
+ * lista dosieres sin nombre y `computeStaleness` cree que a todo el mundo le
+ * falta el suyo, asi que marca la partida caducada y ofrece regenerarla.
+ */
+function documentosAlDia(game: GameSession): void {
+  for (const doc of game.documents ?? []) {
+    const viejo = doc as unknown as { suspectId?: string; id?: string };
+    if (viejo.id === undefined && typeof viejo.suspectId === 'string') {
+      viejo.id = viejo.suspectId;
+    }
+    delete viejo.suspectId;
+  }
+}
+
 /** Pone al día una partida recién leída del almacén. Devuelve la misma. */
 export function alDia<T extends GameSession | null | undefined>(game: T): T {
   if (game) {
     tramaAlDia(game.plot);
     entidadesAlDia(game);
+    documentosAlDia(game);
   }
   return game;
 }

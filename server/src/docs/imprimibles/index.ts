@@ -67,7 +67,7 @@ export function renderPrintableDocument(
   if (!plantilla) return null;
 
   return {
-    suspectId: id,
+    id,
     title: info.name,
     html: plantilla(game, plot, vistaGm(game), opciones),
   };
