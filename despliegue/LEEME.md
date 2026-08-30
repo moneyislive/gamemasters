@@ -20,16 +20,29 @@ lo demás**:
 2. **IP elástica**: asociarla. Sin ella la IP cambia en cada parada y el DNS
    apunta al vacío.
 3. **DNS en Namecheap** (*Advanced DNS*): registro `A` para `@` y otro para
-   `www`, los dos a la IP elástica. Borra el registro de aparcamiento
-   (`192.64.119.242`) y la redirección `URL Redirect` si está puesta.
+   `www`, los dos a la IP elástica. Borra los registros de aparcamiento y la
+   redirección `URL Redirect` si está puesta.
+
+   > **No busques una IP concreta.** Aquí decía «borra el registro de
+   > aparcamiento (`192.64.119.242`)» y a día de hoy los dos registros apuntan a
+   > `198.54.117.242`: Namecheap cambia esa IP cuando quiere, y quien venga a
+   > buscar la del paréntesis no la va a encontrar y se quedará pensando que
+   > mira otra cosa. Lo que hay que borrar es **todo lo que no sea tu IP
+   > elástica**, diga la IP que diga.
+   >
+   > Cómo se reconoce un aparcamiento sin saberse la IP: contesta en el puerto
+   > 80 con la cabecera `Server: namecheap-web` y no contesta en el 443. Eso lo
+   > dice `.\despliegue\desplegar.ps1 -SoloComprobar` con todas las letras.
 
 Comprueba la propagación **desde tu portátil**, no desde la instancia:
 
-```bash
-nslookup harkania.com
+```powershell
+Resolve-DnsName harkania.com -Type A | Select-Object Name, IPAddress
 ```
 
-Hasta que eso devuelva tu IP elástica, no sigas: certbot fallará.
+Hasta que eso devuelva tu IP elástica, no sigas: certbot fallará. La propagación
+puede tardar; se mira desde **tu ordenador**, no desde la instancia, porque es
+lo que va a resolver Let's Encrypt.
 
 ---
 
@@ -253,7 +266,8 @@ aplicación desvinculada del dominio.
 **Desde Windows**, que es de donde se trabaja:
 
 ```powershell
-.\despliegue\desplegar.ps1 -Servidor ubuntu@LA.IP.ELASTICA -Llave C:uta	u-clave.pem
+.\despliegue\desplegar.ps1 -Servidor ubuntu@LA.IP.ELASTICA -Llave C:
+uta	u-clave.pem
 ```
 
 Los datos se recuerdan en `destino.local.json` —que está en `.gitignore`, porque
