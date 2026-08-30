@@ -1,0 +1,443 @@
+{
+  "id": "oro-momia",
+  "name": "Expedición de referencia",
+  "status": "ready",
+  "createdAt": "2026-03-01T21:00:00.000Z",
+  "updatedAt": "2026-03-01T21:00:00.000Z",
+  "suspects": [
+    {
+      "id": "e0",
+      "name": "Ana",
+      "description": "Miembro de la expedición número 1.",
+      "email": "ana@ejemplo.es"
+    },
+    {
+      "id": "e1",
+      "name": "Bruno",
+      "description": "Miembro de la expedición número 2.",
+      "email": "bruno@ejemplo.es"
+    },
+    {
+      "id": "e2",
+      "name": "Carla",
+      "description": "Miembro de la expedición número 3.",
+      "email": "carla@ejemplo.es"
+    },
+    {
+      "id": "e3",
+      "name": "Dani",
+      "description": "Miembro de la expedición número 4.",
+      "email": "dani@ejemplo.es"
+    }
+  ],
+  "rooms": [
+    {
+      "id": "c0",
+      "name": "Cámara del Barquero",
+      "description": "Descripción de Cámara del Barquero."
+    },
+    {
+      "id": "c1",
+      "name": "Pozo de las Ofrendas",
+      "description": "Descripción de Pozo de las Ofrendas."
+    },
+    {
+      "id": "c2",
+      "name": "Antesala de los Sellos",
+      "description": "Descripción de Antesala de los Sellos."
+    },
+    {
+      "id": "c3",
+      "name": "Corredor de las Estrellas",
+      "description": "Descripción de Corredor de las Estrellas."
+    },
+    {
+      "id": "c4",
+      "name": "Sala de la Balanza",
+      "description": "Descripción de Sala de la Balanza."
+    }
+  ],
+  "weapons": [
+    {
+      "id": "q0",
+      "name": "Escarabeo de lapislázuli",
+      "description": "Una Escarabeo de lapislázuli."
+    },
+    {
+      "id": "q1",
+      "name": "Máscara funeraria",
+      "description": "Una Máscara funeraria."
+    },
+    {
+      "id": "q2",
+      "name": "Vaso canopo",
+      "description": "Una Vaso canopo."
+    }
+  ],
+  "entidades": {
+    "ritos": [
+      {
+        "id": "t0",
+        "name": "Rito del Agua"
+      },
+      {
+        "id": "t1",
+        "name": "Rito del Aliento"
+      },
+      {
+        "id": "t2",
+        "name": "Rito del Nombre"
+      },
+      {
+        "id": "t3",
+        "name": "Rito de la Balanza"
+      },
+      {
+        "id": "t4",
+        "name": "Rito del Silencio"
+      }
+    ]
+  },
+  "boardMode": "generated",
+  "settings": {
+    "language": "es",
+    "juego": "momia"
+  },
+  "plot": {
+    "title": "El Misterio de la Momia",
+    "tagline": "El sello está roto. Alguien de la expedición lo quiso así.",
+    "synopsis": "La expedición abrió ayer la cámara sellada de Expedición de referencia. El lacre llevaba tres mil años intacto y ahora está partido en dos. Desde esa noche el aire se enrarece, las lámparas se apagan solas y quien pasa demasiado tiempo en las cámaras profanadas empieza a marcarse. Antes del amanecer hay que volver a sellar la tumba, y el sellado es un ritual de cinco ritos que deben pronunciarse en un orden exacto. Ese orden estaba escrito en un papiro que se rompió al abrirse la cámara: cada fragmento que aparece dice una sola cosa sobre el orden, y nadie tiene bastantes para saberlo todo. Pero el sello no se rompió solo. Alguien de los 4 lo abrió a propósito, por encargo de un comprador, y no quiere que la tumba vuelva a cerrarse.",
+    "victim": {
+      "name": "el faraón sin nombre",
+      "description": "Lo enterraron con el nombre borrado de todas las paredes para que no pudiera ser llamado ni juzgado. Tres mil años después alguien ha abierto su puerta, y lo que sea que quisieron encerrar con él ya está fuera."
+    },
+    "setting": "Expedición de referencia, convertida por una noche en la tumba: Cámara del Barquero, Pozo de las Ofrendas, Antesala de los Sellos, Corredor de las Estrellas, Sala de la Balanza. Cada vigilia una de esas cámaras está profanada, y entrar en ella deja marca.",
+    "solution": {
+      "respuestas": {
+        "saqueador": "e3"
+      },
+      "motive": "Dani tenía Escarabeo de lapislázuli vendida antes de que la expedición saliera. El comprador paga por la pieza y por que la tumba quede abierta: una tumba sellada es una tumba que alguien vendrá a inventariar.",
+      "howItHappened": "Fue Dani quien rompió el lacre, de madrugada y con la excusa de comprobar las lámparas. Desde entonces juega a lo mismo que los demás —explora, comparte, propone un orden— con una diferencia: puede fabricar un fragmento de papiro que suene a verdad y no lo sea. Le basta con que la mesa ejecute un orden equivocado para que amanezca con la tumba abierta."
+    },
+    "characters": [
+      {
+        "suspectId": "e0",
+        "characterName": "Ana",
+        "role": "Capataz",
+        "publicPersona": "Ana, capataz de la expedición.",
+        "secret": "Viste a Bruno rondar la cámara sellada la noche anterior a que se rompiera el lacre. Puede que no signifique nada. Puede que sí, y entonces callarlo te costará caro.",
+        "motive": "Volver a casa con el nombre limpio y sin una sola marca encima.",
+        "alibi": "Dormías cuando se rompió el sello. Como todo el mundo, dices.",
+        "knowledge": [
+          "Tu don: Conoces los pasadizos. Entras en una segunda cámara la misma vigilia, y lo pagas con una marca.",
+          "Nadie tiene fragmentos suficientes para deducir el orden en solitario. Es a propósito: hay que ponerlos en común.",
+          "Un amuleto quita una marca, pero nunca puedes gastarlo en ti. Si vas por dos marcas, tendrás que pedirlo.",
+          "A las tres marcas quedas tocado: sigues jugando y sigues pudiendo señalar, pero tu propuesta de orden ya no cuenta en la votación.",
+          "No todo lo que se lee en un fragmento es cierto. Alguien de esta mesa puede fabricarlos."
+        ],
+        "personalHook": "El papel se te ha escrito a medida. Quien te conoce dice de ti: «Miembro de la expedición número 1.». Úsalo: en esta mesa lo que convence no son los datos, es quién los cuenta."
+      },
+      {
+        "suspectId": "e1",
+        "characterName": "Bruno",
+        "role": "Epigrafista",
+        "publicPersona": "Bruno, epigrafista de la expedición.",
+        "secret": "Viste a Carla rondar la cámara sellada la noche anterior a que se rompiera el lacre. Puede que no signifique nada. Puede que sí, y entonces callarlo te costará caro.",
+        "motive": "Volver a casa con el nombre limpio y sin una sola marca encima.",
+        "alibi": "Dormías cuando se rompió el sello. Como todo el mundo, dices.",
+        "knowledge": [
+          "Tu don: Lees jeroglíficos como quien lee el periódico. Cada vigilia sacas un fragmento de más, y solo tú lo ves.",
+          "Nadie tiene fragmentos suficientes para deducir el orden en solitario. Es a propósito: hay que ponerlos en común.",
+          "Un amuleto quita una marca, pero nunca puedes gastarlo en ti. Si vas por dos marcas, tendrás que pedirlo.",
+          "A las tres marcas quedas tocado: sigues jugando y sigues pudiendo señalar, pero tu propuesta de orden ya no cuenta en la votación.",
+          "No todo lo que se lee en un fragmento es cierto. Alguien de esta mesa puede fabricarlos."
+        ],
+        "personalHook": "El papel se te ha escrito a medida. Quien te conoce dice de ti: «Miembro de la expedición número 2.». Úsalo: en esta mesa lo que convence no son los datos, es quién los cuenta."
+      },
+      {
+        "suspectId": "e2",
+        "characterName": "Carla",
+        "role": "Médico de la expedición",
+        "publicPersona": "Carla, médico de la expedición de la expedición.",
+        "secret": "Viste a Dani rondar la cámara sellada la noche anterior a que se rompiera el lacre. Puede que no signifique nada. Puede que sí, y entonces callarlo te costará caro.",
+        "motive": "Volver a casa con el nombre limpio y sin una sola marca encima.",
+        "alibi": "Dormías cuando se rompió el sello. Como todo el mundo, dices.",
+        "knowledge": [
+          "Tu don: Sabes qué hacer con la fiebre de la tumba. Una vez por vigilia le quitas una marca a alguien sin gastar amuleto.",
+          "Nadie tiene fragmentos suficientes para deducir el orden en solitario. Es a propósito: hay que ponerlos en común.",
+          "Un amuleto quita una marca, pero nunca puedes gastarlo en ti. Si vas por dos marcas, tendrás que pedirlo.",
+          "A las tres marcas quedas tocado: sigues jugando y sigues pudiendo señalar, pero tu propuesta de orden ya no cuenta en la votación.",
+          "No todo lo que se lee en un fragmento es cierto. Alguien de esta mesa puede fabricarlos."
+        ],
+        "personalHook": "El papel se te ha escrito a medida. Quien te conoce dice de ti: «Miembro de la expedición número 3.». Úsalo: en esta mesa lo que convence no son los datos, es quién los cuenta."
+      },
+      {
+        "suspectId": "e3",
+        "characterName": "Dani",
+        "role": "Mecenas",
+        "publicPersona": "Dani, mecenas de la expedición.",
+        "secret": "Fuiste tú. Rompiste el lacre de madrugada, con la excusa de revisar las lámparas, porque tienes Escarabeo de lapislázuli vendida desde antes de salir de El Cairo. Tu comprador paga por la pieza y por que la tumba siga abierta. Puedes fabricar un fragmento de papiro que suene a verdad: úsalo cuando la mesa esté a punto de acertar, no antes. Ganas si el orden que se ejecuta es el equivocado.",
+        "motive": "Una pieza vendida por adelantado y un comprador que no acepta devoluciones.",
+        "alibi": "Dormías cuando se rompió el sello. Como todo el mundo, dices.",
+        "knowledge": [
+          "Tu don: Pagas la expedición y también a los guías. Sabes de antemano qué cámara se profanará la vigilia siguiente.",
+          "Nadie tiene fragmentos suficientes para deducir el orden en solitario. Es a propósito: hay que ponerlos en común.",
+          "Un amuleto quita una marca, pero nunca puedes gastarlo en ti. Si vas por dos marcas, tendrás que pedirlo.",
+          "A las tres marcas quedas tocado: sigues jugando y sigues pudiendo señalar, pero tu propuesta de orden ya no cuenta en la votación.",
+          "No todo lo que se lee en un fragmento es cierto. Alguien de esta mesa puede fabricarlos."
+        ],
+        "personalHook": "El papel se te ha escrito a medida. Quien te conoce dice de ti: «Miembro de la expedición número 4.». Úsalo: en esta mesa lo que convence no son los datos, es quién los cuenta."
+      }
+    ],
+    "timeline": [
+      {
+        "time": "04:10",
+        "description": "El lacre de la cámara sellada aparece partido. Nadie dice haber oído nada.",
+        "suspectIds": [],
+        "isPublic": true
+      },
+      {
+        "time": "06:00",
+        "description": "Se saca la primera reliquia. El aire dentro de la tumba ya está enrarecido.",
+        "suspectIds": [],
+        "isPublic": true
+      },
+      {
+        "time": "21:00",
+        "description": "Cae la noche y las lámparas empiezan a apagarse solas. Se organiza la primera vigilia.",
+        "suspectIds": [],
+        "isPublic": true
+      }
+    ],
+    "clues": [],
+    "gmScript": [
+      "Antes de que llegue nadie: pega los carteles en las puertas, reparte los dosieres en sobres cerrados y quédate el papiro del sellado. No lo dejes sobre la mesa.",
+      "Abre la velada leyendo la sinopsis. Presenta la tumba, presenta al faraón sin nombre, y deja claro que antes del amanecer hay que sellarla.",
+      "Al abrir cada vigilia, anuncia EN VOZ ALTA qué cámara está profanada esta noche. Es información pública: entrar sabiendo el precio es la decisión del juego.",
+      "Deja que exploren. Cada cual entra en una cámara y sale con un fragmento; quien entró en la profanada sale además con una marca.",
+      "Recuerda que los amuletos solo se gastan en otras personas. Es lo que obliga a hablar: quien va por dos marcas tiene que pedirlo en voz alta.",
+      "Cierra la vigilia con la puesta en común. Que cada cual cuente lo que quiera de lo que ha encontrado. Nadie está obligado a decir la verdad.",
+      "Cuando veas que la mesa ya casi lo tiene —o que la noche se alarga—, abre el Sellado: cada persona propone un orden completo y señala a quien cree el saqueador.",
+      "Ejecuta el orden más votado. Si es el correcto, la tumba se sella y gana la expedición entera menos el saqueador. Si no, amanece con la tumba abierta y gana él solo.",
+      "Cierra revelando el orden verdadero, quién rompió el sello y por qué. El papiro del sellado lo tienes tú."
+    ],
+    "delJuego": {
+      "ordenVerdadero": [
+        "t2",
+        "t3",
+        "t1",
+        "t4",
+        "t0"
+      ],
+      "restricciones": [
+        {
+          "id": "frag-1",
+          "restriccion": {
+            "tipo": "no-posicion",
+            "a": "t1",
+            "posicion": 1
+          },
+          "texto": "Rito del Aliento jamás se pronuncia el primero."
+        },
+        {
+          "id": "frag-2",
+          "restriccion": {
+            "tipo": "antes",
+            "a": "t2",
+            "b": "t3"
+          },
+          "texto": "Rito del Nombre se pronuncia antes que Rito de la Balanza, aunque medien otros entre ambos."
+        },
+        {
+          "id": "frag-3",
+          "restriccion": {
+            "tipo": "antes",
+            "a": "t3",
+            "b": "t0"
+          },
+          "texto": "Rito de la Balanza se pronuncia antes que Rito del Agua, aunque medien otros entre ambos."
+        },
+        {
+          "id": "frag-4",
+          "restriccion": {
+            "tipo": "antes",
+            "a": "t1",
+            "b": "t4"
+          },
+          "texto": "Rito del Aliento se pronuncia antes que Rito del Silencio, aunque medien otros entre ambos."
+        },
+        {
+          "id": "frag-5",
+          "restriccion": {
+            "tipo": "no-posicion",
+            "a": "t4",
+            "posicion": 5
+          },
+          "texto": "Rito del Silencio jamás se pronuncia el quinto."
+        },
+        {
+          "id": "frag-6",
+          "restriccion": {
+            "tipo": "no-posicion",
+            "a": "t1",
+            "posicion": 2
+          },
+          "texto": "Rito del Aliento jamás se pronuncia el segundo."
+        }
+      ],
+      "falsasCandidatas": [
+        {
+          "id": "falsa-1",
+          "restriccion": {
+            "tipo": "posicion",
+            "a": "t0",
+            "posicion": 4
+          },
+          "texto": "Rito del Agua se pronuncia el cuarto del sellado."
+        },
+        {
+          "id": "falsa-2",
+          "restriccion": {
+            "tipo": "posicion",
+            "a": "t0",
+            "posicion": 3
+          },
+          "texto": "Rito del Agua se pronuncia el tercero del sellado."
+        },
+        {
+          "id": "falsa-3",
+          "restriccion": {
+            "tipo": "posicion",
+            "a": "t3",
+            "posicion": 4
+          },
+          "texto": "Rito de la Balanza se pronuncia el cuarto del sellado."
+        },
+        {
+          "id": "falsa-4",
+          "restriccion": {
+            "tipo": "inmediatamente-antes",
+            "a": "t0",
+            "b": "t4"
+          },
+          "texto": "Nada se interpone entre Rito del Agua y Rito del Silencio: uno sigue al otro."
+        }
+      ],
+      "profanadas": [
+        "c1",
+        "c4",
+        "c2",
+        "c4"
+      ],
+      "hallazgos": [
+        {
+          "fragmentoId": "frag-4",
+          "camaraId": "c0",
+          "ronda": 1
+        },
+        {
+          "fragmentoId": "frag-1",
+          "camaraId": "c1",
+          "ronda": 1
+        },
+        {
+          "fragmentoId": "frag-6",
+          "camaraId": "c2",
+          "ronda": 1
+        },
+        {
+          "fragmentoId": "frag-3",
+          "camaraId": "c3",
+          "ronda": 1
+        },
+        {
+          "fragmentoId": "frag-2",
+          "camaraId": "c4",
+          "ronda": 1
+        },
+        {
+          "fragmentoId": "frag-5",
+          "camaraId": "c0",
+          "ronda": 2
+        },
+        {
+          "fragmentoId": "frag-4",
+          "camaraId": "c1",
+          "ronda": 2
+        },
+        {
+          "fragmentoId": "frag-1",
+          "camaraId": "c2",
+          "ronda": 2
+        },
+        {
+          "fragmentoId": "frag-6",
+          "camaraId": "c3",
+          "ronda": 2
+        },
+        {
+          "fragmentoId": "frag-3",
+          "camaraId": "c4",
+          "ronda": 2
+        },
+        {
+          "fragmentoId": "frag-2",
+          "camaraId": "c0",
+          "ronda": 3
+        },
+        {
+          "fragmentoId": "frag-5",
+          "camaraId": "c1",
+          "ronda": 3
+        },
+        {
+          "fragmentoId": "frag-4",
+          "camaraId": "c2",
+          "ronda": 3
+        },
+        {
+          "fragmentoId": "frag-1",
+          "camaraId": "c3",
+          "ronda": 3
+        },
+        {
+          "fragmentoId": "frag-6",
+          "camaraId": "c4",
+          "ronda": 3
+        },
+        {
+          "fragmentoId": "frag-3",
+          "camaraId": "c0",
+          "ronda": 4
+        },
+        {
+          "fragmentoId": "frag-2",
+          "camaraId": "c1",
+          "ronda": 4
+        },
+        {
+          "fragmentoId": "frag-5",
+          "camaraId": "c2",
+          "ronda": 4
+        },
+        {
+          "fragmentoId": "frag-4",
+          "camaraId": "c3",
+          "ronda": 4
+        },
+        {
+          "fragmentoId": "frag-1",
+          "camaraId": "c4",
+          "ronda": 4
+        }
+      ],
+      "dones": {
+        "e0": "excavar",
+        "e1": "descifrar",
+        "e2": "sanar",
+        "e3": "sobornar"
+      },
+      "reliquiaCodiciada": "q0"
+    }
+  }
+}
