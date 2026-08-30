@@ -7,12 +7,12 @@
  * el desenlace. En modo anfitrión se le añade una segunda parte con el mapa
  * completo del caso.
  */
-import { inventarioSobres, numeroDeRondas, pistasPorRonda, salasActivas } from '../datos';
-import { esc } from '../html';
-import { envolver, portada } from './comun';
-import type { VistaGm } from '../contexto';
-import type { DocumentRenderOptions, GameSession, Plot } from '../../../../shared/types';
-import { culpableDe, lugarDe, objetoDe } from '../../juegos/cluedo';
+import { inventarioSobres, numeroDeRondas, pistasPorRonda, salasActivas } from '../../datos';
+import { esc } from '../../html';
+import { envolver, portada } from '../comun';
+import type { VistaGm } from '../../contexto';
+import type { DocumentRenderOptions, GameSession, Plot } from '../../../../../shared/types';
+import { culpableDe, lugarDe, objetoDe } from '../../../juegos/cluedo';
 
 function lista(elementos: string[]): string {
   return `<ul>${elementos.map((e) => `<li>${e}</li>`).join('')}</ul>`;

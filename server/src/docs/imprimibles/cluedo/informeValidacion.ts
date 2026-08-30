@@ -7,12 +7,12 @@
  * gente que juega. Y en modo a ciegas comprueba, sobre el HTML realmente
  * generado, que la guía del Game Master no lleva dentro la solución.
  */
-import { inventarioSobres, numeroDeRondas, pistasPorRonda, salasActivas, cronologiaPublica, huecoPorReconstruir } from '../datos';
-import { esc } from '../html';
-import { renderPlayerDocument } from '../renderer';
-import { envolver, portada } from './comun';
-import type { DocumentRenderOptions, GameSession, Plot } from '../../../../shared/types';
-import { culpableDe, lugarDe, objetoDe } from '../../juegos/cluedo';
+import { inventarioSobres, numeroDeRondas, pistasPorRonda, salasActivas, cronologiaPublica, huecoPorReconstruir } from '../../datos';
+import { esc } from '../../html';
+import { renderPlayerDocument } from '../../renderer';
+import { envolver, portada } from '../comun';
+import type { DocumentRenderOptions, GameSession, Plot } from '../../../../../shared/types';
+import { culpableDe, lugarDe, objetoDe } from '../../../juegos/cluedo';
 
 interface Comprobacion {
   titulo: string;

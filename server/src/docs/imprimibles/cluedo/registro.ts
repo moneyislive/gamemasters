@@ -23,7 +23,7 @@ import { informeValidacion } from './informeValidacion';
 import { lineaTemporal } from './lineaTemporal';
 import { manualGm } from './manualGm';
 import { matrizConocimiento } from './matrizConocimiento';
-import { registrarImprimibles } from './registro';
+import { registrarImprimibles } from '../registro';
 import { tarjetasEnsobrar } from './tarjetasEnsobrar';
 
 /*

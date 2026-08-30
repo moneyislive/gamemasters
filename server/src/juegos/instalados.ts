@@ -46,7 +46,7 @@ import './cluedo-trofeos';
  * SIN UN SOLO DOCUMENTO y no falla nada al arrancar. Es el mismo fallo que ya
  * estuvo a punto de ocurrir con los reductores de la Momia.
  */
-import '../docs/imprimibles/cluedo';
+import '../docs/imprimibles/cluedo/registro';
 /*
  * El generador de trama de CLUEDO vive en la tuberia, porque alli viven sus dos
  * variantes --con clave de API y sin ella--. Se importa igual: desde que se

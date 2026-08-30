@@ -2,10 +2,10 @@
  * Carteles de sala: una página por zona de la casa. Son los que convierten un
  * salón corriente en el escenario del misterio.
  */
-import { codigosDeSala } from '../datos';
-import { esc } from '../html';
-import { envolver, portada } from './comun';
-import type { DocumentRenderOptions, GameSession, Plot } from '../../../../shared/types';
+import { codigosDeSala } from '../../datos';
+import { esc } from '../../html';
+import { envolver, portada } from '../comun';
+import type { DocumentRenderOptions, GameSession, Plot } from '../../../../../shared/types';
 
 /** El nombre es el protagonista del cartel: se encoge si es muy largo. */
 function tamanoDelNombre(nombre: string): number {

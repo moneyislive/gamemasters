@@ -5,10 +5,10 @@
  * no es lo que cuenta sino lo que calla: el tramo sin testigos. Ese hueco es la
  * pregunta que sostiene la partida.
  */
-import { cronologiaPublica, huecoPorReconstruir, numeroDeRondas } from '../datos';
-import { esc } from '../html';
-import { envolver, portada } from './comun';
-import type { DocumentRenderOptions, Plot } from '../../../../shared/types';
+import { cronologiaPublica, huecoPorReconstruir, numeroDeRondas } from '../../datos';
+import { esc } from '../../html';
+import { envolver, portada } from '../comun';
+import type { DocumentRenderOptions, Plot } from '../../../../../shared/types';
 
 export function lineaTemporal(plot: Plot, opciones: DocumentRenderOptions): string {
   const eventos = cronologiaPublica(plot);

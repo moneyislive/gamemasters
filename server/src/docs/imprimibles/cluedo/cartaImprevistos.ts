@@ -9,11 +9,11 @@
  * puede nombrar la sala o el objeto del crimen, así que va en sobre cerrado y
  * él la lee por primera vez en voz alta, como todos.
  */
-import { numeroDeRondas } from '../datos';
-import { esc } from '../html';
-import { envolver, portada } from './comun';
-import type { VistaGm } from '../contexto';
-import type { DocumentRenderOptions, GameSession, Plot } from '../../../../shared/types';
+import { numeroDeRondas } from '../../datos';
+import { esc } from '../../html';
+import { envolver, portada } from '../comun';
+import type { VistaGm } from '../../contexto';
+import type { DocumentRenderOptions, GameSession, Plot } from '../../../../../shared/types';
 
 const INCIDENCIAS: Array<[string, string]> = [
   [

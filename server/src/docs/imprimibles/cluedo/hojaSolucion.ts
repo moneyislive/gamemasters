@@ -8,11 +8,11 @@
  * Solo tiene sentido en modo anfitrión. A ciegas, este documento es justo lo
  * que no puede tener.
  */
-import { cronologiaPublica, pistasPorRonda } from '../datos';
-import { esc } from '../html';
-import { envolver, portada } from './comun';
-import type { DocumentRenderOptions, GameSession, Plot } from '../../../../shared/types';
-import { culpableDe, lugarDe, objetoDe } from '../../juegos/cluedo';
+import { cronologiaPublica, pistasPorRonda } from '../../datos';
+import { esc } from '../../html';
+import { envolver, portada } from '../comun';
+import type { DocumentRenderOptions, GameSession, Plot } from '../../../../../shared/types';
+import { culpableDe, lugarDe, objetoDe } from '../../../juegos/cluedo';
 
 export function hojaSolucion(
   game: GameSession,

@@ -5,11 +5,11 @@
  * prepara, y todo esto vive en su manual. Aquí se explica lo único que el
  * manual no puede decir sin romper la ceguera: a quién le toca cada cosa.
  */
-import { candidatosParaGm, inventarioSobres, numeroDeRondas } from '../datos';
-import { esc } from '../html';
-import { envolver, portada } from './comun';
-import type { DocumentRenderOptions, GameSession, Plot } from '../../../../shared/types';
-import { culpableDe, lugarDe, objetoDe } from '../../juegos/cluedo';
+import { candidatosParaGm, inventarioSobres, numeroDeRondas } from '../../datos';
+import { esc } from '../../html';
+import { envolver, portada } from '../comun';
+import type { DocumentRenderOptions, GameSession, Plot } from '../../../../../shared/types';
+import { culpableDe, lugarDe, objetoDe } from '../../../juegos/cluedo';
 
 export function guiaPreparador(
   game: GameSession,

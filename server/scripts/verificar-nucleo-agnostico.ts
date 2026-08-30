@@ -73,13 +73,22 @@ const RAICES = ['shared', 'server/src', 'client/src', 'app/src', 'app/app'];
  * entero —`momia-acciones.ts`, `sombras/datos.ts`, `cluedo.ts`— y no depende de
  * mantener a mano una lista que se quedaría vieja al segundo juego nuevo.
  *
- * OJO CON LO QUE ESTO DEJA DENTRO DEL NÚCLEO. `docs/imprimibles/manualGm.ts` no
- * se llama «cluedo» y sin embargo solo sirve a CLUEDO: habla de sospechosos, de
- * salas y del culpable. Que cuente como núcleo NO es un fallo de esta medida —
- * es el hallazgo. Ese fichero está en la carpeta genérica, lo alcanza el
- * catálogo genérico, y viaja a un servidor que quizá no tenga CLUEDO instalado.
- * O se muda a la carpeta de CLUEDO, o se generaliza. Las dos salidas son
- * buenas; quedarse como está, no.
+ * OJO CON LO QUE ESTO DEJA DENTRO DEL NÚCLEO. Hay ficheros que no se llaman
+ * «cluedo» y solo sirven a CLUEDO. Que cuenten como núcleo NO es un fallo de
+ * esta medida: es el hallazgo. Están en carpetas genéricas, los alcanza el
+ * código genérico, y viajan a un servidor que quizá no tenga CLUEDO instalado.
+ * O se mudan a la carpeta de CLUEDO, o se generalizan. Las dos salidas son
+ * buenas; quedarse como están, no.
+ *
+ * Once ya se mudaron: las plantillas de imprimible de CLUEDO vivían sueltas en
+ * `docs/imprimibles/` —`manualGm.ts`, `hojaSolucion.ts`, `matrizConocimiento.ts`
+ * y ocho más— al lado de las carpetas `momia/` y `sombras/`. Mudarlas a
+ * `imprimibles/cluedo/` quitó 115 menciones de un golpe sin cambiar un byte de
+ * lo que se imprime.
+ *
+ * El que queda por decidir es `docs/renderer.ts`, que compone los dosieres y es
+ * el fichero más acoplado que hay. No es una mudanza: tiene dentro el dosier
+ * genérico de CLUEDO Y el mecanismo por el que cada juego registra el suyo.
  */
 const ES_DE_UN_JUEGO = /(^|[\/\\-])(cluedo|momia|sombras)([\/\\.-]|$)/i;
 

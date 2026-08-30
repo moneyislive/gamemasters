@@ -2,10 +2,10 @@
  * El desenlace: lo que se lee al abrir el sobre, después de recoger todas las
  * acusaciones. Es el único documento del paquete que se abre en público.
  */
-import { esc } from '../html';
-import { envolver, portada } from './comun';
-import type { DocumentRenderOptions, GameSession, Plot } from '../../../../shared/types';
-import { culpableDe, lugarDe, objetoDe } from '../../juegos/cluedo';
+import { esc } from '../../html';
+import { envolver, portada } from '../comun';
+import type { DocumentRenderOptions, GameSession, Plot } from '../../../../../shared/types';
+import { culpableDe, lugarDe, objetoDe } from '../../../juegos/cluedo';
 
 export function desenlace(
   game: GameSession,

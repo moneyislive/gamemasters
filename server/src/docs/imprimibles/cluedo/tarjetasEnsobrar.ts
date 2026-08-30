@@ -6,11 +6,11 @@
  * puede caer en sus manos, y por eso el propio documento lo avisa en su primera
  * página, en grande.
  */
-import { codigosDeSala, pistasPorRonda } from '../datos';
-import { esc } from '../html';
-import { envolver, portada } from './comun';
-import type { VistaGm } from '../contexto';
-import type { DocumentRenderOptions, GameSession, Plot } from '../../../../shared/types';
+import { codigosDeSala, pistasPorRonda } from '../../datos';
+import { esc } from '../../html';
+import { envolver, portada } from '../comun';
+import type { VistaGm } from '../../contexto';
+import type { DocumentRenderOptions, GameSession, Plot } from '../../../../../shared/types';
 
 function tarjeta(codigo: string, titulo: string, cuerpo: string, pie?: string): string {
   return `    <div class="caja junto" style="border-width:2px; padding:6mm 7mm;">

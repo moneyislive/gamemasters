@@ -2,9 +2,9 @@
  * Hoja de investigación y acusación: dos caras que se fotocopian una vez por
  * jugador. No contiene ni un dato de la trama, solo el título y las rondas.
  */
-import { numeroDeRondas } from '../datos';
-import { envolver, portada } from './comun';
-import type { DocumentRenderOptions, Plot } from '../../../../shared/types';
+import { numeroDeRondas } from '../../datos';
+import { envolver, portada } from '../comun';
+import type { DocumentRenderOptions, Plot } from '../../../../../shared/types';
 
 export function hojasInvestigacion(plot: Plot, opciones: DocumentRenderOptions): string {
   const rondas = numeroDeRondas(plot);

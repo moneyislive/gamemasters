@@ -9,10 +9,10 @@
  * Solo en modo anfitrión: cruzar los secretos ajenos es exactamente lo que un
  * Game Master a ciegas no puede ver.
  */
-import { esc } from '../html';
-import { envolver, portada } from './comun';
-import type { DocumentRenderOptions, GameSession, Plot } from '../../../../shared/types';
-import { culpableDe } from '../../juegos/cluedo';
+import { esc } from '../../html';
+import { envolver, portada } from '../comun';
+import type { DocumentRenderOptions, GameSession, Plot } from '../../../../../shared/types';
+import { culpableDe } from '../../../juegos/cluedo';
 
 export function matrizConocimiento(
   game: GameSession,
