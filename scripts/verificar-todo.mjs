@@ -56,6 +56,13 @@ const BATERIA = [
     porque: 'el mismo binario con otro reparto de juegos, con servidor de verdad',
   },
   {
+    nombre: 'juego de fuera',
+    donde: 'server',
+    guion: 'verify:de-fuera',
+    lento: true,
+    porque: 'un juego que no esta en el binario se instala desde disco y se juega',
+  },
+  {
     nombre: 'núcleo agnóstico',
     donde: 'server',
     guion: 'verify:nucleo',

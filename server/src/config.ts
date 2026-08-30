@@ -150,6 +150,14 @@ export const env: {
    * media velada con un error en el movil.
    */
   juegos?: string[];
+  /**
+   * JUEGOS QUE NO VIENEN DENTRO DEL BINARIO.
+   *
+   * Acepta lo que acepte `import()`: el nombre de un paquete de `node_modules`
+   * o una ruta de fichero. Es lo que permite añadir un juego a un servidor sin
+   * tocar este repositorio, compilar y desplegar en todas partes.
+   */
+  juegosDeFuera?: string[];
   defaultModel: ModelId;
   port: number;
   /** Dónde vive este servidor de cara al mundo, p. ej. `https://harkania.com`. */
@@ -196,6 +204,10 @@ export const env: {
     .length
     ? (process.env.JUEGOS ?? '').split(',').map((j) => j.trim()).filter(Boolean)
     : undefined,
+  juegosDeFuera: (process.env.JUEGOS_EXTERNOS ?? '')
+    .split(',')
+    .map((j) => j.trim())
+    .filter(Boolean),
   defaultModel: readDefaultModel(),
   port: readPort(),
   publicOrigin: readPublicOrigin(),

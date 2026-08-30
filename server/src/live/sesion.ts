@@ -178,7 +178,19 @@ export async function abrirSesion(game: GameSession): Promise<LiveSession> {
     // Nuevo en cada apertura: es lo que invalida los móviles de la anterior.
     sid: nanoid(16),
     code: await codigoLibre(),
-    phase: 'lobby',
+    /*
+     * LA FASE DE ESPERA DE ESTE JUEGO, no la llamada `lobby`.
+     *
+     * Era el ultimo nombre de fase escrito a mano en el nucleo, y lo encontro la
+     * prueba del juego de fuera: «La Farola» llama `antes-de-salir` a su sala de
+     * espera, y su mesa se abria en `lobby` — una fase que ese juego no declara,
+     * asi que desde ella no habia camino a ninguna parte y la partida nacia
+     * muerta.
+     *
+     * Sin fase de espera declarada se cae en `lobby`, que es lo que tienen las
+     * partidas de siempre.
+     */
+    phase: fasesConPapel(manifiestoDe(game.settings?.juego), 'espera')[0] ?? 'lobby',
     round: 0,
     totalRounds: game.plot ? numeroDeRondas(game.plot) : 4,
     players: personasDe(game).map((s) => nuevoJugador(s.id, s.name, s.email)),

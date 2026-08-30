@@ -17,7 +17,8 @@ import path from 'node:path';
 import cors from 'cors';
 import express from 'express';
 import type { NextFunction, Request, Response } from 'express';
-import { JuegoNoInstalado, juegosInstalados } from '../../shared/juegos';
+import { JuegoNoInstalado, instalarSoloEstos, juegosInstalados } from '../../shared/juegos';
+import { instalarJuegosDeFuera } from './juegos/enchufe';
 import { DEMO_MODE, env } from './config';
 import authRouter, { passwordRequired, requireAuth, tallerAbiertoPara } from './auth';
 import aterrizajeRouter from './enlaces/aterrizaje';
@@ -419,6 +420,33 @@ const activeModel = await getStore().getConfigModel();
  * otra forma — la pagina se sirve igual de bien con un enlace roto dentro.
  */
 comprobarLaDescarga();
+
+/*
+ * ═══ LOS JUEGOS QUE VIENEN DE FUERA, ANTES DE ESCUCHAR ═══
+ *
+ * Se instalan aquí y no en `juegos/instalados.ts` por una razón sencilla: esto
+ * es asíncrono —hay que `await import(...)`— y aquel fichero es una lista de
+ * imports que corre al cargarse. Meter un `await` allí obligaría a que todo el
+ * arranque lo esperase de forma implícita, que es peor de leer y peor de
+ * depurar.
+ *
+ * Y va ANTES de escuchar, no después: un servidor que acepta partidas de un
+ * juego que todavía se está cargando contesta «eso no se puede hacer en esta
+ * partida» durante los primeros segundos, y ese es el peor error que hay — el
+ * que aparece una vez y no se reproduce.
+ */
+const deFuera = env.juegosDeFuera ?? [];
+if (deFuera.length > 0) {
+  const puestos = await instalarJuegosDeFuera(deFuera);
+  console.log(`[juegos] de fuera: ${puestos.join(', ') || '(ninguno)'}`);
+  /*
+   * El reparto se vuelve a aplicar DESPUES, si lo hay. Un juego de fuera se da
+   * de alta con `registrarJuego`, que respeta el reparto anotado, asi que esto
+   * es cinturon y tirantes; se deja porque el orden de estas dos cosas es
+   * exactamente la clase de detalle que se rompe al reordenar el arranque.
+   */
+  if (env.juegos) instalarSoloEstos(env.juegos);
+}
 
 app.listen(env.port, env.host, () => {
   const storageLabel =
