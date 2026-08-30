@@ -180,35 +180,26 @@ const LA_ALMONEDA: ManifiestoDeJuego = {
   },
 
   /*
-   * PEAJE: `ronda` es obligatorio y no lo lee absolutamente nadie.
-   *
-   * Hay que declarar sobre qué categoría actúa la ronda y cuántos cambios
-   * admite, y las dos cosas son de CLUEDO —«entras en una sala y puedes cambiarte
-   * una vez»—. Aquí no significan nada y aun así el compilador las pide. Se
-   * rellenan con lo primero que encaja.
+   * Sin `ronda`. Era obligatorio y una subasta no tenía qué poner: sus dos campos
+   * son de CLUEDO —«sobre qué categoría actúas» y «cuántas veces puedes
+   * cambiarte»— y aquí no significan nada. Ya es opcional.
    */
-  ronda: { accionSobre: 'lotes', cambiosPermitidos: 0 },
 
   /*
-   * PEAJE: hay que declarar las SIETE fases de CLUEDO, con sus nombres.
+   * SOLO LAS FASES POR LAS QUE PASA. La tabla era un `Record` exhaustivo y había
+   * que nombrar las siete que existen, incluidas `sellado` --de El Misterio de la
+   * Momia-- y `acusaciones` --de un juego donde se acusa--, aunque fuera para
+   * ponerlas a `[]`. Una almoneda tenía que declarar que no pasa por el sellado
+   * de una tumba. Ahora es parcial y solo se nombran las tres que se usan.
    *
-   * Una almoneda tiene otro ritmo: se abre la sala, se canta un lote, se puja, se
-   * adjudica, y al final se hace la cuenta. Nada de eso se puede nombrar. Hay que
-   * traducirlo al vocabulario de un misterio de salón —`ronda-abierta` es «se
-   * canta un lote», `ronda-cerrada` es «adjudicado», `desenlace` es «la cuenta»—
-   * y además declarar `sellado`, que es una fase de El Misterio de la Momia, y
-   * `acusaciones`, que es de un juego donde se acusa. Se ponen a `[]` para decir
-   * «por aquí no paso», pero hay que nombrarlas: `Record<LivePhase, LivePhase[]>`
-   * es exhaustivo.
+   * QUEDA EL OTRO MEDIO PEAJE: los NOMBRES siguen siendo los de CLUEDO. Aquí
+   * `ronda-abierta` es «se canta un lote», `ronda-cerrada` es «adjudicado» y
+   * `desenlace` es «la cuenta». Traducido, no dicho.
    */
   fases: {
     lobby: ['ronda-abierta'],
     'ronda-abierta': ['ronda-cerrada'],
     'ronda-cerrada': ['ronda-abierta', 'desenlace'],
-    acusaciones: [],
-    sellado: [],
-    intermedio: [],
-    desenlace: [],
   },
 
   reglas: [
@@ -444,8 +435,7 @@ comprobar(
 comprobar('la víctima va vacía porque no hay ninguna', v.caso.victima.nombre === '—');
 peaje('`Plot` exige victim, synopsis, setting y solution: un juego sin crimen se los inventa');
 peaje('`PlotCharacter` exige secret, motive, alibi y personalHook por persona, aunque nadie interprete a nadie');
-peaje('`fases` obliga a declarar las SIETE de CLUEDO, incluidas `sellado` y `acusaciones`, que son de otros juegos');
-peaje('`ronda: { accionSobre, cambiosPermitidos }` es obligatorio y no lo lee nadie');
+peaje('los NOMBRES de las fases siguen siendo los de CLUEDO: una subasta llama «ronda-abierta» a «se canta un lote»');
 peaje('la categoría de personas tiene que ir a `suspects` o no hay emparejamiento, dosieres ni correos');
 peaje('una acción no puede pedir un número: `eligeDe` solo sabe pedir una entidad de una categoría');
 peaje('`VistaJugador` obliga a mandar salas, objetos, pistas y cronología vacías aunque el juego no tenga nada de eso');

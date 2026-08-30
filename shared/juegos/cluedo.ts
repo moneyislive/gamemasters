@@ -323,11 +323,12 @@ export const CLUEDO: ManifiestoDeJuego = {
      */
     acusaciones: ['ronda-abierta', 'desenlace'],
     /*
-     * El sellado es de El Misterio de la Momia. Aqui se declara vacio, que es
-     * la forma de decir «este juego no pasa por ahi»: si alguien intentase
-     * llevar una partida de CLUEDO a esa fase, `sePuedeIr` lo rechaza.
+     * El sellado de El Misterio de la Momia NO SE NOMBRA. Estaba declarado aqui
+     * como `sellado: []` porque la tabla era un `Record` exhaustivo y habia que
+     * nombrar las siete fases aunque fuera para decir que no. Ahora es parcial:
+     * una fase ausente y una fase vacia significan lo mismo, y `sePuedeIr` sigue
+     * rechazando el salto igual, porque lee con `?.includes(...) ?? false`.
      */
-    sellado: [],
     // Una velada empieza y acaba la misma noche: nunca hay intermedio.
     intermedio: [],
     desenlace: [],

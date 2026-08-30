@@ -548,7 +548,23 @@ export interface ManifiestoDeJuego {
   /** Quién ayuda desde el botón central. */
   asistente: AsistenteDeJuego;
 
-  ronda: DefinicionDeRonda;
+  /**
+   * Cómo es una ronda de este juego.
+   *
+   * OPCIONAL, Y CONVIENE SABER POR QUÉ: hoy no lo lee absolutamente nadie. Un
+   * grep de `accionSobre` y `cambiosPermitidos` sobre los tres paquetes no
+   * devuelve un solo uso de producción, y los dos juegos que lo declaran lo dicen
+   * en sus propios comentarios («el manifiesto declara `cambiosPermitidos: 0`
+   * para decirlo, pero ese campo hoy no…»). El límite real de repeticiones lo
+   * pone `vecesPorTurno`, y el «un solo cambio por ronda» de CLUEDO está cableado
+   * dentro de `elegirSala`.
+   *
+   * Se conserva porque es DOCUMENTACIÓN útil —dice de un vistazo sobre qué actúa
+   * la ronda— y se hace opcional porque exigirlo era cobrarle a un juego nuevo
+   * por rellenar un campo que nadie consulta. Un juego cuya ronda no vaya «sobre»
+   * ninguna categoría, como una subasta, no tenía qué poner.
+   */
+  ronda?: DefinicionDeRonda;
 
   /**
    * Cómo se llama el bloque del centro del plano.
@@ -614,8 +630,27 @@ export interface ManifiestoDeJuego {
    */
   reglas?: ReglaDeJuego[];
 
-  /** Qué fase puede seguir a cuál. Hoy ya es una tabla, solo que una sola. */
-  fases: Record<LivePhase, LivePhase[]>;
+  /**
+   * Qué fase puede seguir a cuál.
+   *
+   * PARCIAL A PROPÓSITO: una fase que no aparezca es una fase por la que este
+   * juego no pasa, y da exactamente igual que ponerla a `[]`. Los cuatro sitios
+   * que leen esta tabla lo hacen con `fases[desde]?.includes(hasta) ?? false`, o
+   * sea que una clave ausente ya se respondía «no» desde siempre.
+   *
+   * Era un `Record` exhaustivo, y eso obligaba a CADA juego a nombrar las siete
+   * fases que hay hoy —incluidas `sellado`, que es de El Misterio de la Momia, y
+   * `acusaciones`, que es de un juego donde se acusa— aunque fuera para ponerlas
+   * a `[]`. Una subasta tenía que declarar que no pasa por el sellado de una
+   * tumba. Ese es el peaje que un juego nuevo pagaba solo por entrar, y el
+   * comprobador `verify:ajeno` lo tenía en su lista.
+   *
+   * LO QUE NO CAMBIA es que los nombres de las fases siguen siendo los de CLUEDO:
+   * una almoneda tiene que llamar `ronda-abierta` a «se canta un lote». Abrir
+   * `LivePhase` a cadena libre es el paso siguiente y es más caro, porque toca la
+   * máquina de estados y los rótulos de la app.
+   */
+  fases: Partial<Record<LivePhase, LivePhase[]>>;
 
   trofeos: TrofeoInfo[];
   seccionesDeDosier: DocumentSectionInfo[];
