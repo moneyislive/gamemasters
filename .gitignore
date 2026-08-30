@@ -11,3 +11,12 @@ herramientas/
 
 # El empaquetado web de la app: lo genera el despliegue.
 app/dist/
+
+# Las copias que hace `mudanza-al-modelo-nuevo.ts` antes de escribir en Mongo.
+#
+# Son VOLCADOS DE PRODUCCION: llevan dentro los nombres y los correos reales de
+# quien ha jugado. Se guardan a proposito —una mudanza sin copia no se puede
+# deshacer— y por eso mismo no pueden acabar en el repositorio.
+#
+# Se descubrio mirando el fichero antes de empujar: tres correos de gmail.
+server/scripts/copias/
