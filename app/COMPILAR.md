@@ -198,17 +198,31 @@ https://github.com/moneyislive/gamemasters/releases/download/v1.0.0/harkania.apk
 
 ## Paso 8 · Decírselo al servidor
 
-En el panel de Render, en *Environment*, añade dos variables:
+En el panel de Render, en *Environment*, **una sola variable**:
 
 | Variable | Valor |
 | --- | --- |
-| `APK_URL` | la dirección que acabas de copiar |
 | `APK_VERSION` | `1.0.0` |
 
 Guarda. Render reinicia el servicio solo.
 
+> **No pongas `APK_URL`.** La dirección se deduce de la versión: el servidor
+> compone `releases/download/v{versión}/harkania-{versión}.apk` él solo.
+>
+> Aquí decía que pusieras las dos, y eso es una trampa: si `APK_URL` está
+> definida **manda ella y la versión se ignora**. Así que el día que subas
+> `APK_VERSION` a la siguiente y te olvides de la otra, la página anunciará la
+> nueva y descargará la vieja. Ya pasó una vez con la 1.0.2 —el botón daba 404 y
+> la página se veía perfecta— y es lo que motivó que la dirección se dedujera.
+>
+> `APK_URL` existe solo para cuando el fichero no esté en GitHub o no siga ese
+> patrón. Si no es tu caso, déjala vacía.
+
 Entra en `https://tu-servidor/descargar` y comprueba que sale el botón. Si dice
-«Todavía no hay descarga», es que `APK_URL` no se guardó bien.
+«Todavía no hay descarga», es que `APK_VERSION` no se guardó. Y si el botón sale
+pero da 404, es que la release de GitHub no se llama exactamente
+`v{versión}` o el fichero no es `harkania-{versión}.apk`: el servidor lo avisa en
+su registro al arrancar.
 
 **Y ya está.** Esa dirección es la que le pasas a tus invitados.
 
@@ -224,7 +238,11 @@ Entra en `https://tu-servidor/descargar` y comprueba que sale el botón. Si dice
    Como es fácil olvidarlo, lo lleva EAS: `eas.json` tiene `autoIncrement` en el
    perfil `apk`, así que cada compilación recibe el suyo automáticamente.
 2. Repite los pasos 5, 6 y 7 (con la etiqueta `v1.0.1`).
-3. Actualiza `APK_URL` y `APK_VERSION` en Render.
+3. Actualiza **solo `APK_VERSION`** en Render.
+
+   El nombre de la etiqueta y el del fichero tienen que cuadrar con ese número:
+   etiqueta `v1.0.1` y fichero `harkania-1.0.1.apk`. Si no, el botón sale y da
+   404.
 
 Ten en cuenta que **quien ya tenga la app instalada no se entera**: fuera de la
 tienda no hay actualización automática. Por eso la página de descarga muestra el
