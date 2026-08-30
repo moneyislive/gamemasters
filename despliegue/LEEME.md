@@ -1,5 +1,27 @@
 # Poner GameMasters en producción, en una EC2, bajo harkania.com
 
+> ## ⚠ ESTO NO ES LO QUE ESTÁ EN PRODUCCIÓN HOY
+>
+> **Producción es Render**, en `https://harkania.onrender.com`, definida en
+> [`render.yaml`](../render.yaml) y desplegada sola con cada push a `main`. Ahí
+> está la base `harkania`, el disco de las fotos y el APK que usa la gente
+> —`app/eas.json`, perfil `apk`, apunta a esa dirección—.
+>
+> Esta guía es **la otra ruta**: montarlo a mano en una EC2 propia bajo
+> `harkania.com`. Está sin terminar —el dominio sigue en el aparcamiento del
+> registrador— y no hay nada vivo detrás.
+>
+> Se dice aquí arriba porque leerla del tirón hace pensar que describe lo que
+> hay funcionando, y desde ahí se acaba tocando DNS y certificados de un
+> servidor que no existe mientras el de verdad está en otro sitio. Pasó.
+>
+> **Para desplegar lo que está vivo no hay que hacer nada**: se empuja a `main`
+> y Render reconstruye. Se comprueba con:
+>
+> ```powershell
+> .\despliegue\desplegar.ps1 -SoloComprobar -Dominio https://harkania.onrender.com
+> ```
+
 Los comandos están en el orden en que hay que darlos. **El orden importa**: casi
 todo lo que sale mal la primera noche es un paso hecho antes de tiempo.
 
