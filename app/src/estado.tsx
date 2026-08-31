@@ -12,7 +12,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState } f
 import { AppState } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import * as api from './api';
-import { repartirFallo } from './conexion-reglas';
+import { hayQueAvisar, repartirFallo } from './conexion-reglas';
 import type { AvisoClave, VistaJugador } from '../../shared/live';
 
 export interface Aviso {
@@ -85,6 +85,12 @@ export function ProveedorPartida({ children }: { children: React.ReactNode }): J
   const revRef = useRef<number>(-1);
   const activoRef = useRef(true);
   const abortRef = useRef<AbortController | null>(null);
+  /*
+   * Fallos SEGUIDOS de plataforma. Se lleva en una ref y no en estado porque
+   * cambiarlo no tiene que repintar nada: lo unico que se pinta es el veredicto
+   * de `hayQueAvisar`, y ese ya vive en `sinRed`.
+   */
+  const fallosSeguidos = useRef(0);
   const contadorAviso = useRef(0);
   /**
    * La credencial guardada se lee AQUÍ, no en la pantalla de entrada.
@@ -144,7 +150,8 @@ export function ProveedorPartida({ children }: { children: React.ReactNode }): J
       const { sinRed: esDeLaRed, deLaPartida } = repartirFallo(
         e instanceof api.ErrorApi ? e.estado : 0,
       );
-      setSinRed(esDeLaRed);
+      fallosSeguidos.current = esDeLaRed ? fallosSeguidos.current + 1 : 0;
+      setSinRed(esDeLaRed && hayQueAvisar(fallosSeguidos.current));
       if (deLaPartida) {
         anotarAviso({
           gameId: api.partidaActiva(),
@@ -210,6 +217,7 @@ export function ProveedorPartida({ children }: { children: React.ReactNode }): J
            * otra vez, así que después de un corte el aviso se quedaba puesto
            * PARA SIEMPRE con el móvil perfectamente conectado.
            */
+          fallosSeguidos.current = 0;
           setSinRed(false);
           anotarAviso(null);
           setCargando(false);
@@ -239,7 +247,11 @@ export function ProveedorPartida({ children }: { children: React.ReactNode }): J
           const estado = e instanceof api.ErrorApi ? e.estado : 0;
 
           // De quién es el problema lo decide `repartirFallo`, en un solo sitio.
-          setSinRed(repartirFallo(estado).sinRed);
+          // CUANDO contarlo lo decide `hayQueAvisar`: un tropiezo suelto no es
+          // una caida, y el sondeo largo los provoca solo.
+          const esDeLaRed = repartirFallo(estado).sinRed;
+          fallosSeguidos.current = esDeLaRed ? fallosSeguidos.current + 1 : 0;
+          setSinRed(esDeLaRed && hayQueAvisar(fallosSeguidos.current));
 
           if (estado === 401) {
             /*

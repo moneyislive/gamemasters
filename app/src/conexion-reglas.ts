@@ -43,3 +43,41 @@ export function repartirFallo(estado: number): Reparto {
   const deLaPartida = estado === 401 || estado === 403 || estado === 404;
   return { sinRed: !deLaPartida, deLaPartida };
 }
+
+/**
+ * Cuántos fallos SEGUIDOS hacen falta para decir «sin conexión».
+ *
+ * ═══ POR QUÉ NO ES UNO ═══
+ *
+ * El sondeo largo deja la conexión CALLADA hasta veinticinco segundos: el
+ * servidor no contesta hasta que la partida cambia. Veinticinco segundos de
+ * silencio es justo lo que cortan los NAT de las operadoras y algunos proxies,
+ * y cuando lo cortan, el móvil ve un fetch fallido sin código HTTP.
+ *
+ * Con tolerancia cero, ese corte —del que la partida se recupera sola en el
+ * siguiente sondeo, dos segundos y medio después— encendía la franja «Sin
+ * conexión» a lo ancho de la app. De ahí la sensación de estar desconectándose
+ * continuamente MIENTRAS EL JUEGO RESPONDE PERFECTAMENTE: no es que se pierda
+ * la partida, es que el aviso no distingue un tropiezo de una caída.
+ *
+ * Se aguanta uno y se avisa al segundo. El precio es que una caída de verdad
+ * tarda un sondeo más en anunciarse —dos segundos y medio— y a cambio los
+ * tropiezos, que son la inmensa mayoría, no se ven.
+ *
+ * NO ES UN PARCHE COSMÉTICO SOBRE UN FALLO DE RED: es que un aviso que salta
+ * con cada tropiezo deja de significar nada, y entonces el día que la conexión
+ * se cae de verdad, nadie lo mira.
+ */
+export const FALLOS_ANTES_DE_AVISAR = 2;
+
+/**
+ * ¿Toca ya poner la franja?
+ *
+ * Se cuenta aparte de `repartirFallo` porque son dos preguntas distintas:
+ * aquella dice DE QUIÉN es el problema, esta dice SI YA MERECE LA PENA
+ * contarlo. Mezclarlas obligaría a que el reparto llevara memoria, y su gracia
+ * es justamente no llevarla.
+ */
+export function hayQueAvisar(fallosSeguidos: number): boolean {
+  return fallosSeguidos >= FALLOS_ANTES_DE_AVISAR;
+}
