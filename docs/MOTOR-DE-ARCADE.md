@@ -669,6 +669,60 @@ costumbre.
 
 ---
 
+## 5 bis. `opciones()`: dos preguntas que parecían una
+
+Este apartado lo escribe una corrección. La primera versión del §11 decía que
+`opciones()` es «la misma función que el mueble usa para pintar y el reductor usa
+para validar, de modo que la regla se escribe una sola vez». Suena bien y es
+**casi** cierto — y el «casi» costaría rehacer la validación de todos los juegos
+el día que se descubra.
+
+### La firma: recibe la VISTA, jamás el estado
+
+```ts
+opciones(vista: unknown, quien: QuienMira): readonly Opcion[]
+```
+
+Con el estado, `opciones()` sería **una segunda proyección con su propio tapado**:
+escrita dos veces, probada la mitad, y `verify:mesa` no la mira. Recibiendo la
+vista **no puede ofrecer nada que la proyección no hubiera dejado pasar**. Es
+imposible por construcción y no por disciplina, que es la única forma de garantía
+que este motor acepta.
+
+### La regla: «sólo si», nunca «si y sólo si»
+
+El reductor **rechaza lo que `opciones()` no ofreció, y sigue validando lo que
+sí**. El bicondicional es falso en cuanto existe información oculta a quien
+actúa, y el contraejemplo vive dentro de Riberas:
+
+> **Aceptar un trueque exige que el OFERENTE tenga la mercancía, y su mano no
+> está en la vista del aceptante.**
+
+Con «si y sólo si», ese juego tendría que elegir entre ofrecer un trueque que
+revienta al aceptarse, o filtrar la mano del oferente para poder ofrecerlo bien.
+Las dos salidas son peores que la regla.
+
+Y no es que la regla se escriba dos veces: es que **son dos reglas distintas que
+parecían una**. «Qué te puedo ofrecer a ti, con lo que tú sabes» y «qué es legal,
+con todo lo que hay» son preguntas diferentes. El «sólo si» las mantiene
+separadas sin duplicar nada: `opciones()` no puede ofrecer de más, y el reductor
+no puede confiarse de menos. El rechazo devuelve **el mismo objeto de estado**,
+que es el que la mesa ya cuenta como movimiento que no cambió nada.
+
+### Los identificadores que publica son seudónimos por asiento
+
+Un id no puede derivarse del contenido oculto. `"carta:oros-7"` esconde un
+secreto dentro de un identificador, y **`verify:mesa` no lo caza**: busca la forma
+canónica *con comillas*, así que `"carta:oros-7"` no contiene `"oros-7"`. Un
+secreto embebido en un id es invisible para el comprobador que existe para
+cazarlo.
+
+Además el id tiene que ser **estable entre revisiones para ese observador**, o
+cualquier superficie que reconcilie por identidad se desincroniza en cada
+reordenación.
+
+---
+
 ## 6. El transporte
 
 **El sondeo largo se queda y no se toca.** Las tres razones escritas en la
@@ -1064,9 +1118,10 @@ fichero.**
   programa obligaría al motor a saber qué es un turno; y en cuanto el motor sabe
   qué es un turno, el primer juego rico decide qué forma tiene. La preocupación
   legítima —que al que no tiene el turno ni se le pinte el botón— la cubre
-  `opciones()`, que es **cliente y no autoridad**: la misma función que el mueble
-  usa para pintar y el reductor usa para validar, de modo que la regla sigue
-  escrita una sola vez. **Un concepto entero desaparece en vez de generalizarse.**
+  `opciones()`, que es **cliente y no autoridad**. **Un concepto entero
+  desaparece en vez de generalizarse.** Cómo se escribe `opciones()` sin
+  duplicar la regla —y por qué no es la misma función llamada dos veces— está
+  en §5 bis.
 - **Conceptos que solo pide el hexagonal, ascendidos a mecánica común:**
   `recursos.ts` con costes declarados, `trueque.ts` con ciclo de vida,
   `turnos.ts` con serpentina, y los derivados memorizados para la carretera más
