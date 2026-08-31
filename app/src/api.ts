@@ -785,8 +785,86 @@ export function estadoAvatar3D(tarea: string): Promise<EstadoDeGeneracion> {
   return peticion(`/generacion/avatar/${encodeURIComponent(tarea)}`, {}, undefined, 30000);
 }
 
+/**
+ * Los fondos generados de cada sala, y el ÚNICO sitio de este fichero donde la
+ * forma de lo que llega se comprueba en vez de creerse.
+ *
+ * ═══ POR QUÉ ESTA FUNCIÓN NO SE PARECE A SUS HERMANAS ═══
+ *
+ * `peticion<T>` es un molde: lee el JSON y lo devuelve como `T` sin mirarlo. Eso
+ * vale mientras servidor y móvil vayan a la par, y es lo que hacen todas las
+ * demás de este fichero. Aquí no vale, y no por gusto: la portada INDEXA lo que
+ * devuelve —`fondos[sala]`, en `src/fondos-sala.tsx`— sobre un estado declarado
+ * `Record<string, string>`, o sea NO anulable. Un `undefined` ahí no degrada:
+ * deja la pantalla entera en negro.
+ *
+ * Y llegaba. Levantando la app SOLA, sin la API —que es como se desarrolla la
+ * Sala de Arcade—, `/api/generacion/fondos` lo contesta el servidor de
+ * desarrollo de Expo con un 200 y otro cuerpo. Entonces:
+ *
+ *   · NO hay excepción, así que el `.catch(() => undefined)` de quien llama no
+ *     se entera. Esa es la parte que engaña: parece protegido y no lo está,
+ *     porque lo que falló no fue la petición sino la FORMA de la respuesta.
+ *   · `r.fondos` es `undefined` y se escribe tal cual en un estado cuyo tipo
+ *     promete que eso no puede pasar.
+ *   · La portada muere con «Cannot read properties of undefined (reading
+ *     'cluedo')», que no menciona ni los fondos ni la red.
+ *
+ * ═══ POR QUÉ SE ARREGLA AQUÍ Y NO EN LA PANTALLA ═══
+ *
+ * Porque la mentira es de esta firma: prometía `Record<string, string>` y
+ * entregaba lo que hubiera. Taparlo en la portada dejaría la promesa rota para
+ * el siguiente que la llame, y taparlo dentro de `FondoDeSalas` —tolerando un
+ * `undefined` al pintar— escondería el fallo en vez de arreglarlo: la pantalla
+ * saldría sin fondos y nadie sabría por qué. Aquí la firma vuelve a ser verdad.
+ *
+ * Es el mismo criterio que `app/app/(juego)/puesto.tsx` aplica al planteamiento
+ * de los instrumentos, que llega como `unknown` y se lee con una función que
+ * devuelve `undefined` si no encaja. Su cabecera lo razona: un móvil puede
+ * llevar una versión más vieja que el servidor.
+ *
+ * ═══ EL MISMO PATRÓN ESTÁ EN OTROS SITIOS Y ALLÍ NO MUERDE ═══
+ *
+ * `app/app/(juego)/perfil.tsx` hace `setCuenta(r.cuenta)`, `setInvitacion(...)`
+ * y `setGuardando(...)` sin comprobar nada, igual que hacía esto. No se tocan, y
+ * conviene saber por qué para no «arreglarlos» a ciegas: sus estados son
+ * `Account | null`, `string | null` y un booleano, y se leen como condiciones.
+ * Un `undefined` ahí es falsy, y la pantalla sale como si no hubiera datos —que
+ * es exactamente lo que hay—.
+ *
+ * O sea que lo que mata NO es alimentar un estado sin comprobar la forma: es
+ * hacerlo sobre un estado NO ANULABLE que luego se INDEXA. Ésa es la
+ * combinación que hay que buscar el día que aparezca otro fallo así.
+ */
 export function pedirFondos(): Promise<{ disponible: boolean; fondos: Record<string, string> }> {
-  return peticion('/generacion/fondos');
+  return peticion<unknown>('/generacion/fondos').then(leerFondos);
+}
+
+/**
+ * Lo que llega, convertido en lo que se prometió.
+ *
+ * NO LANZA, a propósito: un servidor que todavía no sabe generar fondos y algo
+ * que no es nuestro servidor tienen que dar lo mismo —ningún fondo— porque la
+ * portada hace lo mismo en los dos casos, que es enseñar los telones pintados a
+ * mano. Lanzar obligaría a cada llamante a distinguir dos casos que no se
+ * distinguen.
+ *
+ * Se filtra ENTRADA A ENTRADA y no de golpe: un mapa con nueve direcciones
+ * buenas y una nula tiene nueve fondos, no cero. Descartarlo entero por una mala
+ * sería castigar a las salas que sí tienen ilustración.
+ */
+function leerFondos(v: unknown): { disponible: boolean; fondos: Record<string, string> } {
+  const raiz = typeof v === 'object' && v !== null ? (v as Record<string, unknown>) : {};
+  const crudo =
+    typeof raiz.fondos === 'object' && raiz.fondos !== null
+      ? (raiz.fondos as Record<string, unknown>)
+      : {};
+  const fondos: Record<string, string> = {};
+  for (const sala of Object.keys(crudo)) {
+    const url = crudo[sala];
+    if (typeof url === 'string' && url !== '') fondos[sala] = url;
+  }
+  return { disponible: raiz.disponible === true, fondos };
 }
 
 export function generarFondo(sala: string): Promise<{ sala: string; url: string }> {
