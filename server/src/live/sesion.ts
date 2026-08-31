@@ -10,7 +10,7 @@ import { nanoid } from 'nanoid';
 import { getStore } from '../db/store';
 import { numeroDeRondas } from '../docs/datos';
 import { avisarCambio } from './hub';
-import { senalEnMemoria, volcarPresencia } from './presencia';
+import { senalEnMemoria, volcarPresencia } from '../mecanicas/presencia';
 import { iniciarJuego } from '../juegos/inicios';
 import { ALFABETO_CODIGO, PAPELES_EN_JUEGO } from '../../../shared/live';
 import type { PapelDeFase } from '../../../shared/live';

@@ -12,7 +12,7 @@ import path from 'node:path';
 import { env } from '../config';
 import { getStore } from '../db/store';
 import { avisosDesde, esperarCambio } from '../live/hub';
-import { marcarPresencia } from '../live/presencia';
+import { marcarPresencia } from '../mecanicas/presencia';
 import { consultarConsejero } from '../live/consejero';
 import { aceptarGuardar, borrarCuenta, perfilDe } from '../live/cuentas';
 import { firmaDeFotoValida } from '../live/fotos';

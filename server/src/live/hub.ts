@@ -15,7 +15,7 @@
  * Además, cada aviso se guarda con su revisión, de modo que un móvil que estaba
  * en segundo plano recupera al volver los avisos que se perdió.
  */
-import { olvidarPresencia } from './presencia';
+import { olvidarPresencia } from '../mecanicas/presencia';
 import type { AvisoClave } from '../../../shared/live';
 
 interface EsperaPendiente {

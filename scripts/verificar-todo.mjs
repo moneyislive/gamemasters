@@ -203,6 +203,40 @@ const BATERIA = [
   { nombre: 'trama · las Sombras', donde: 'server', guion: 'verify:sombras-trama', porque: 'su generación no entrega una noche rota' },
   { nombre: 'senda · las Sombras', donde: 'server', guion: 'verify:senda-sombras', porque: 'la senda se puede andar' },
   { nombre: 'aviso legal', donde: 'server', guion: 'verify:legal', porque: 'lo que se publica dice lo que hay' },
+
+  // ── La Sala de Arcade: el segundo motor ───────────────────────────────────
+  /*
+   * ═══ ESTOS TRES ENTRAN AQUÍ EL MISMO DÍA QUE NACEN ═══
+   *
+   * Y no es una formalidad. La cabecera de este fichero cuenta que dieciocho
+   * comprobadores estuvieron fuera de la lista y dos llevaban rojos un tiempo
+   * indeterminado, uno de ellos el que garantiza que el asistente no chive la
+   * solución. Un comprobador que no está en la batería no es una red: es un
+   * fichero.
+   *
+   * Los tres son de la fase 0 del motor de arcade y los tres vigilan una regla
+   * que no tiene rincón: la frontera entre los dos motores alcanza a `shared/`,
+   * a `server/src/` y a cualquiera que importe de ellos, así que la pregunta
+   * «¿lo he roto?» solo tiene respuesta honesta si se corren con todo lo demás.
+   */
+  {
+    nombre: 'arcade pobre',
+    donde: 'server',
+    guion: 'verify:arcade-pobre',
+    porque: 'un arcade sin tablero, sin turnos, sin red ni asientos entra — y dice qué peajes paga',
+  },
+  {
+    nombre: 'fronteras',
+    donde: 'server',
+    guion: 'verify:fronteras',
+    porque: 'los dos motores siguen sin conocerse, y el núcleo del arcade sin importar node:',
+  },
+  {
+    nombre: 'pureza del reductor',
+    donde: 'server',
+    guion: 'verify:pureza',
+    porque: 'nada de lo que hace que la misma partida dé dos resultados distintos',
+  },
 ];
 
 

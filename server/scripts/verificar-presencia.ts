@@ -13,7 +13,7 @@ import {
   presenciasVivas,
   senalEnMemoria,
   volcarPresencia,
-} from '../src/live/presencia';
+} from '../src/mecanicas/presencia';
 import { estaConectado, ultimaSenal } from '../src/live/sesion';
 import type { LivePlayer, LiveSession } from '../../shared/live';
 

@@ -54,7 +54,10 @@
     "verify:legal": "tsx scripts/verificar-legal.ts",
     "jugar:fondo": "tsx scripts/jugar-a-fondo.ts",
     "verify:estado": "tsx scripts/verificar-estado-del-juego.ts",
-    "verify:estabilidad": "tsx scripts/verificar-estabilidad.ts --quieto"
+    "verify:estabilidad": "tsx scripts/verificar-estabilidad.ts --quieto",
+    "verify:arcade-pobre": "tsx scripts/verificar-arcade-pobre.ts",
+    "verify:fronteras": "tsx scripts/verificar-fronteras.ts",
+    "verify:pureza": "tsx scripts/verificar-pureza.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",

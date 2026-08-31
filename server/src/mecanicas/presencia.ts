@@ -37,6 +37,35 @@
  * Y al leer se toma SIEMPRE la señal más reciente de las dos, memoria o
  * documento. Nunca se pierde presencia por consultar el sitio equivocado, y una
  * partida vieja leída de la base de datos se comporta exactamente como antes.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * POR QUÉ ESTE FICHERO SE MUDÓ DE `live/` A `mecanicas/`
+ * ─────────────────────────────────────────────────────────────────────────────
+ *
+ * Estaba en `live/` por dónde NACIÓ, no por lo que hace. «Quién sigue delante
+ * del móvil» no sabe si lo que se juega es un misterio con Game Master o un
+ * arcade de dos minutos, y no tiene por qué saberlo: es infraestructura.
+ *
+ * Mientras hubo un solo motor daba igual. Deja de dar igual con el motor de
+ * arcade, y no como cuestión de orden: es una DEPENDENCIA ESTRUCTURAL de la mesa
+ * en línea, porque sin presencia no se detecta a quien se fue de la mesa — y en
+ * un arcade eso ocurre cada dos minutos en vez de una vez por noche.
+ *
+ * La alternativa era archivarlo como «excepción»: dejarlo en `live/` y permitir
+ * que el arcade importara de ahí. Eso crea una CATEGORÍA —una zona compartida
+ * entre los dos motores, con precedente de ampliarla— y quien llegue en tres
+ * meses lee la categoría y no el razonamiento. La capa `mecanicas/` ya existe
+ * para exactamente esto y su definición está escrita al lado, en `pistas.ts`:
+ * código que sirve a varios juegos, que ninguno tiene la obligación de usar, y
+ * que no sabe quién lo usa.
+ *
+ * LO QUE FALTA PARA QUE SEA UNA MECÁNICA DE VERDAD, y conviene dejarlo escrito
+ * en vez de dar la mudanza por terminada: `volcarPresencia` sigue recibiendo una
+ * `LiveSession`, o sea que hoy solo la puede llamar el motor de veladas. Las
+ * otras tres funciones —`marcarPresencia`, `senalEnMemoria`, `olvidarPresencia`—
+ * ya son agnósticas y son las que usa el arcade. Girar esa cuarta es un cambio
+ * dentro de veladas con maestro de oro de por medio, y por eso no se ha hecho
+ * en la misma mudanza: se mueve una cosa cada vez.
  */
 import type { LiveSession } from '../../../shared/live';
 
