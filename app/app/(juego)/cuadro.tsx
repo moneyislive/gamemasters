@@ -63,7 +63,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
-import Animated, { FadeIn, FadeInDown, FadeInUp } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeInUp } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import * as api from '../../src/api';
 import { usePartida } from '../../src/estado';
@@ -88,6 +88,7 @@ import {
 } from '../../src/ui';
 import { conAlfa } from '../../src/tema-juego';
 import { COLOR_NUDO as C, NUDO as N } from '../../src/tema-nudo';
+import { Teleindicador, Via } from '../../src/nudo/teleindicador';
 import {
   BarraDelRetraso,
   Contador,
@@ -400,40 +401,68 @@ export default function PantallaCuadro(): JSX.Element {
     return (
       <Pantalla>
         <AvisoDeLaPartida />
-        <Animated.View entering={FadeInDown.duration(500)} style={estilos.centro}>
-          <Sello>{N.estacion} · turno de noche</Sello>
-          <Titulo style={{ textAlign: 'center', marginTop: espacio.lg }}>
-            {sesion.tituloPartida}
-          </Titulo>
-          <Cuerpo tenue style={{ textAlign: 'center', fontStyle: 'italic', marginTop: 4 }}>
-            {sesion.lema}
-          </Cuerpo>
-          <Ornamento style={{ marginVertical: espacio.lg }} />
-          <Cuerpo style={{ textAlign: 'center' }}>
-            Ardió el telégrafo y con él el cuadro de marchas. Seis convoyes vienen rodando y no se
-            les puede avisar. Abre tu sobre antes de empezar: las tiras que salvaste no las tiene
-            nadie más, y solas no dicen nada.
-          </Cuerpo>
-          <Boton
-            onPress={() => router.push('/(juego)/personaje')}
-            style={{ marginTop: espacio.lg, alignSelf: 'stretch' }}
+        {/*
+          LA ENTRADA SE COMPONE POR CAPAS, no aparece de golpe.
+
+          Antes esto era un `FadeInDown` sobre el bloque entero, el mismo que
+          usan los otros tres juegos: el título de una estación de tren entraba
+          exactamente igual que el de una expedición al Valle de los Reyes.
+
+          Ahora primero se enciende el rótulo de la estación, después el cuadro
+          se escribe tablilla a tablilla, después se tiende la vía y solo al
+          final llegan el parte y los botones. Los retardos van escalonados a
+          mano y no encadenados: una cadena de animaciones que se disparan unas
+          a otras se descuadra en cuanto una tarda de más, y aquí basta con que
+          cada capa sepa cuándo le toca.
+        */}
+        <View style={estilos.centro}>
+          <Animated.View entering={FadeIn.duration(340)}>
+            <Sello>{N.estacion} · turno de noche</Sello>
+          </Animated.View>
+
+          <Teleindicador texto={sesion.tituloPartida} style={{ marginTop: espacio.lg }} />
+
+          <Animated.View entering={FadeIn.duration(420).delay(880)}>
+            <Cuerpo tenue style={{ textAlign: 'center', fontStyle: 'italic', marginTop: espacio.sm }}>
+              {sesion.lema}
+            </Cuerpo>
+          </Animated.View>
+
+          <Via style={{ marginVertical: espacio.lg }} />
+
+          <Animated.View entering={FadeInUp.duration(460).delay(1040)}>
+            <Cuerpo style={{ textAlign: 'center' }}>
+              Ardió el telégrafo y con él el cuadro de marchas. Seis convoyes vienen rodando y no se
+              les puede avisar. Abre tu sobre antes de empezar: las tiras que salvaste no las tiene
+              nadie más, y solas no dicen nada.
+            </Cuerpo>
+          </Animated.View>
+
+          <Animated.View
+            entering={FadeInUp.duration(460).delay(1180)}
+            style={{ alignSelf: 'stretch', alignItems: 'center' }}
           >
-            Ver tu oficio
-          </Boton>
-          <View style={{ height: espacio.md }} />
-          <Cuerpo tenue style={{ textAlign: 'center', fontSize: 14 }}>
-            {sesion.listos} de {sesion.total} están en su puesto.
-          </Cuerpo>
-          <Boton
-            variante={vista.yo.pediEmpezar ? 'secundario' : 'primario'}
-            cargando={avisando}
-            onPress={() => void avisar(!vista.yo.pediEmpezar)}
-            style={{ marginTop: espacio.sm, alignSelf: 'stretch' }}
-          >
-            {vista.yo.pediEmpezar ? 'Todavía no estoy' : 'Estoy en mi puesto'}
-          </Boton>
-          <AvisoError>{errorAccion}</AvisoError>
-        </Animated.View>
+            <Boton
+              onPress={() => router.push('/(juego)/personaje')}
+              style={{ marginTop: espacio.lg, alignSelf: 'stretch' }}
+            >
+              Ver tu oficio
+            </Boton>
+            <View style={{ height: espacio.md }} />
+            <Cuerpo tenue style={{ textAlign: 'center', fontSize: 14 }}>
+              {sesion.listos} de {sesion.total} están en su puesto.
+            </Cuerpo>
+            <Boton
+              variante={vista.yo.pediEmpezar ? 'secundario' : 'primario'}
+              cargando={avisando}
+              onPress={() => void avisar(!vista.yo.pediEmpezar)}
+              style={{ marginTop: espacio.sm, alignSelf: 'stretch' }}
+            >
+              {vista.yo.pediEmpezar ? 'Todavía no estoy' : 'Estoy en mi puesto'}
+            </Boton>
+            <AvisoError>{errorAccion}</AvisoError>
+          </Animated.View>
+        </View>
       </Pantalla>
     );
   }
