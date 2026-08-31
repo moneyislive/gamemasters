@@ -57,7 +57,10 @@
     "verify:estabilidad": "tsx scripts/verificar-estabilidad.ts --quieto",
     "verify:arcade-pobre": "tsx scripts/verificar-arcade-pobre.ts",
     "verify:fronteras": "tsx scripts/verificar-fronteras.ts",
-    "verify:pureza": "tsx scripts/verificar-pureza.ts"
+    "verify:pureza": "tsx scripts/verificar-pureza.ts",
+    "verify:sin-red": "tsx scripts/verificar-sin-red.ts",
+    "verify:procedencia": "tsx scripts/verificar-procedencia.ts",
+    "oro:arcade": "tsx scripts/oro-arcade.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",

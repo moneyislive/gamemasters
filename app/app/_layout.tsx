@@ -111,6 +111,15 @@ function PilaDePantallas(): JSX.Element {
         options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
       />
       <Stack.Screen name="(juego)" />
+      {/*
+       * La Sala de Arcade, hermana de `(juego)` y sin nada en común con ella. Va
+       * aquí arriba y no dentro de `(juego)` porque un arcade no se juega DENTRO
+       * de una partida: no hay invitación, ni Game Master, ni mesa. Se abre desde
+       * la portada y se juega solo. Meterlo en el otro grupo lo habría dejado
+       * debajo de la barra de pestañas de una velada, que es la primera de las
+       * cien líneas que acaban deshaciendo la separación de los dos motores.
+       */}
+      <Stack.Screen name="(arcade)" />
       <Stack.Screen
         name="responder"
         options={{ presentation: 'modal', animation: 'slide_from_bottom' }}

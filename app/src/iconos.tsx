@@ -13,6 +13,7 @@
  */
 import Svg, { Circle, G, Path, Rect } from 'react-native-svg';
 import type { IconoId } from '../../shared/juegos';
+import type { IconoDeArcade } from '../../shared/arcade';
 
 export interface PropsIcono {
   size?: number;
@@ -405,4 +406,47 @@ export const ICONOS: Record<IconoId, (p: PropsIcono) => JSX.Element> = {
   /* Los dos de El Nudo de Valdehierro. */
   aguja: IconoAguja,
   locomotora: IconoLocomotora,
+};
+
+/**
+ * ═══ Y AQUÍ EMPIEZA LA OTRA FAMILIA: LOS ICONOS DE LA SALA DE ARCADE ═══
+ *
+ * Tabla PROPIA, con su unión cerrada propia, y no una entrada más en `ICONOS`.
+ *
+ * La razón está escrita en `shared/arcade/tipos.ts` y no es de estilo: los iconos
+ * de las veladas son el vocabulario de tres misterios —un torii, un escarabajo, un
+ * mayordomo— y en una sala de arcade no significan nada. Juntar las dos tablas
+ * obligaría a `IconoDeArcade` a ser `IconoId`, o sea a que el contrato del arcade
+ * importara el de las veladas, que es exactamente la frontera que `verify:fronteras`
+ * vigila.
+ *
+ * Y hay uno solo porque hay un juego. La disciplina es la misma que la de `IconoId`,
+ * cuya lista creció juego a juego con la razón escrita al lado de cada tanda:
+ * inventar cuatro iconos para cuatro juegos que no existen es adivinar qué dibujo
+ * necesita un juego que nadie ha escrito.
+ */
+
+/**
+ * El mando: una cruceta y dos botones.
+ *
+ * Es el genérico de la Sala —el arcade que no ha pedido nada mejor— y tenía que
+ * ser reconocible a 23 píxeles junto a una máscara, un farol y una locomotora.
+ * La silueta de un mando no se parece a ninguna de las tres, y la cruceta es lo
+ * único que lo dice a ese tamaño: sin ella, el contorno redondeado se lee como una
+ * pastilla de jabón.
+ */
+export function IconoMando(p: PropsIcono): JSX.Element {
+  return (
+    <Lienzo {...p}>
+      <Path d="M16 16 h16 a10 10 0 0 1 10 10 v6 a6 6 0 0 1 -11 3.5 l-2 -2.5 h-10 l-2 2.5 a6 6 0 0 1 -11 -3.5 v-6 a10 10 0 0 1 10 -10 z" />
+      <Path d="M15 24 v6" />
+      <Path d="M12 27 h6" />
+      <Circle cx={32} cy={25} r={2} />
+      <Circle cx={36} cy={29} r={2} />
+    </Lienzo>
+  );
+}
+
+export const ICONOS_DE_ARCADE: Record<IconoDeArcade, (p: PropsIcono) => JSX.Element> = {
+  mando: IconoMando,
 };

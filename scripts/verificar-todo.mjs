@@ -237,6 +237,38 @@ const BATERIA = [
     guion: 'verify:pureza',
     porque: 'nada de lo que hace que la misma partida dé dos resultados distintos',
   },
+  /*
+   * ═══ Y ESTOS TRES SON LOS DE LA FASE 1: «LA FRENTE» ═══
+   *
+   * Entran el mismo día que el juego, y por la misma razón que los tres de
+   * arriba. Pero hay una diferencia que conviene tener presente: aquéllos vigilan
+   * el CONTRATO, que se rompe con un `import` razonable, y éstos vigilan un JUEGO
+   * QUE SE PUBLICA.
+   *
+   * Los dos primeros cazan cosas que no dan ningún error cuando ocurren. Una
+   * llamada a la red en un juego que se vende como «sin conexión» funciona
+   * perfectamente mientras haya cobertura, y el fallo lo descubre alguien en el
+   * metro. Una marca registrada colada en una baraja no rompe nada nunca: la
+   * descubre una tienda, retirando la app.
+   */
+  {
+    nombre: 'La Frente sin red',
+    donde: 'server',
+    guion: 'verify:sin-red',
+    porque: 'una partida entera con `fetch`, los sockets y el canal sustituidos por funciones que lanzan',
+  },
+  {
+    nombre: 'procedencia y marcas',
+    donde: 'server',
+    guion: 'verify:procedencia',
+    porque: 'todo arcade dice de dónde salen sus reglas, y ninguna marca vetada aparece en sus barajas',
+  },
+  {
+    nombre: 'oro · arcade',
+    donde: 'server',
+    guion: 'oro:arcade',
+    porque: 'un registro de movimientos grabado y el estado final byte a byte, con `canonico.ts`',
+  },
 ];
 
 

@@ -7,19 +7,50 @@
  *   · VELADAS. Se juegan en la vida real, alrededor de una mesa, y las prepara
  *     una persona desde el taller. La app es el cuaderno de cada invitado. No
  *     se «entra» a una velada desde aquí: te invitan.
- *   · MINIJUEGOS. Se juegan solo, en el móvil, ahora mismo. Son el relleno de
- *     los ratos muertos, no el producto.
+ *   · LA SALA DE ARCADE. Se juegan aquí mismo, ahora, sin montar nada y sin
+ *     esperar a nadie. Uno solo o la mesa entera alrededor de un móvil.
  *
- * Mezclarlas sería el error de diseño más caro posible: alguien tocaría una
- * velada esperando jugar y se encontraría con que necesita cinco amigos y una
- * cena. Por eso una familia es alta y con retrato, y la otra ancha y plana.
+ * ═══ ESTE COMENTARIO DECÍA OTRA COSA, Y HABÍA QUE CORREGIRLO ═══
  *
- * DE DÓNDE SALEN LOS DATOS. Las veladas, del registro de manifiestos: lo que
- * hay instalado de verdad en el servidor es lo que se ve. Nada de una lista
- * escrita a mano que se queda vieja el día que se instale el segundo juego.
+ * Decía que los minijuegos son «el relleno de los ratos muertos, NO EL PRODUCTO».
+ * Era verdad cuando se escribió —`minijuegos()` devolvía una lista vacía y la
+ * portada anunciaba una sala cableándose— y ha dejado de serlo: la Sala de Arcade
+ * es LA SEGUNDA CATEGORÍA DE JUEGOS de la plataforma, con su propio motor, su
+ * propio contrato y su propio registro, y el propietario ha declarado obsoleta la
+ * frase.
+ *
+ * Y no es una cuestión de tono. Una frase así, escrita en la cabecera del fichero
+ * que decide qué se enseña en la portada, es la que hace que dentro de seis meses
+ * alguien pinte la sala más pequeña, la mande más abajo o no se moleste en
+ * arreglarle un fallo. Un comentario que describe mal el producto acaba
+ * construyendo el producto que describe.
+ *
+ * Lo que NO ha cambiado es la separación, que sigue siendo la razón de ser de este
+ * fichero: mezclar las dos familias sería el error de diseño más caro posible
+ * —alguien tocaría una velada esperando jugar y se encontraría con que necesita
+ * cinco amigos y una cena— y por eso una es alta y con retrato y la otra ancha y
+ * plana.
+ *
+ * DE DÓNDE SALEN LOS DATOS. De los dos registros, y son DOS y no uno: las veladas
+ * de `shared/juegos` y los arcades de `shared/arcade`, cada uno anclado con su
+ * propio `Symbol.for`. Lo que hay instalado de verdad es lo que se ve, y ninguna
+ * de las dos listas está escrita a mano. Que los registros estén separados es lo
+ * que impide que un arcade aparezca por descuido en el carrusel de veladas: si
+ * compartieran tabla, la única defensa sería un `if (esArcade)` dentro de
+ * `veladas()`, que es la primera de las cien banderas que deshacen la separación.
  */
 import { juegosInstalados } from '../../shared/juegos';
 import type { IconoId } from '../../shared/juegos';
+import { arcadesInstalados } from '../../shared/arcade';
+import type { IconoDeArcade, ManifiestoDeArcade } from '../../shared/arcade';
+/*
+ * Y ESTA IMPORTACIÓN ES LA QUE LLENA LA SALA. Importarla instala los arcades que
+ * trae el binario: es el mismo trato que `shared/juegos/index.ts` da a las
+ * veladas, y por el mismo motivo —una lista escrita a mano en otro sitio se queda
+ * vieja el día que entre el segundo juego—.
+ */
+import '../../shared/arcade/juegos';
+import { MUEBLES, rutaDeArcade } from './arcade/muebles';
 
 /** El color con el que se reconoce cada mundo de un vistazo. */
 export interface Paleta {
@@ -44,13 +75,34 @@ export interface Velada {
   disponible: boolean;
 }
 
+/**
+ * Un arcade, tal como lo pinta la portada.
+ *
+ * ═══ SU `icono` ES DE OTRA FAMILIA, Y NO ES UN DESCUIDO ═══
+ *
+ * `IconoDeArcade` y no `IconoId`. Son dos uniones cerradas distintas porque son
+ * dos vocabularios distintos: un torii, un escarabajo y un mayordomo son los
+ * emblemas de tres misterios y no significan nada en una sala de arcade. Compartir
+ * el tipo obligaría al contrato del arcade a importar el de las veladas, que es
+ * justo la frontera que sostiene los dos motores.
+ *
+ * La app pinta cada uno con su tabla: `ICONOS` para las veladas e
+ * `ICONOS_DE_ARCADE` para éstos, las dos en `app/src/iconos.tsx`.
+ */
 export interface Minijuego {
   id: string;
   nombre: string;
   gancho: string;
-  icono: IconoId;
+  icono: IconoDeArcade;
   paleta: Paleta;
-  /** `null` mientras no exista: la portada lo dice, no lo disimula. */
+  /**
+   * Adónde lleva la tarjeta. `null` si esta app no sabe pintar su mueble.
+   *
+   * Puede pasar de verdad y no es un caso teórico: el registro es de EJECUCIÓN
+   * —un arcade se instala llamando a una función— y la app es un binario. Un
+   * arcade que declare un mueble que esta versión no trae se lista con la verdad
+   * por delante en vez de con una tarjeta que no hace nada al tocarla.
+   */
   ruta: string | null;
 }
 
@@ -178,14 +230,54 @@ export function veladas(): Velada[] {
 }
 
 /**
- * Los minijuegos.
+ * Cómo se pinta cada arcade instalado.
  *
- * Hoy está vacío, y la portada lo dice con una tarjeta que invita a volver, en
- * vez de fingir un catálogo que no existe. En cuanto haya uno, se añade aquí
- * con su ruta y aparece solo.
+ * Misma disciplina que `RETRATOS`: se mira por identificador y quien no esté en la
+ * tabla se lleva la paleta por defecto en vez de romper la portada. Instalar un
+ * juego nuevo no puede dejar la Sala en blanco.
+ */
+const PALETAS_DE_ARCADE: Record<string, Paleta> = {
+  /*
+   * La Frente lleva el verde de neón de la Sala, que es el acento con el que la
+   * portada separa esta familia de la otra. Ver `app/src/arcade/muebles.ts`, donde
+   * viven los mismos colores para la pantalla del juego: la tarjeta y lo que se
+   * abre al tocarla tienen que ser del mismo color, que es la regla que este
+   * fichero ya aplicaba a las veladas.
+   */
+  frente: { acento: '#5fd4c8', fondo: ['#0c1c19', '#06110f'] },
+};
+
+const PALETA_DE_ARCADE_POR_DEFECTO: Paleta = { acento: '#5fd4c8', fondo: ['#12232b', '#060c0f'] };
+
+/**
+ * LOS ARCADES INSTALADOS. Ya no devuelve `[]`.
+ *
+ * ═══ LEE DEL REGISTRO, Y NO DE UNA LISTA ESCRITA AQUÍ ═══
+ *
+ * Es la misma decisión que `veladas()` y por la misma razón: lo que hay instalado
+ * de verdad es lo que se ve. Una lista a mano se queda vieja el día que entre el
+ * segundo juego, y peor —anunciaría en la portada un juego que este binario no
+ * sabe jugar—.
+ *
+ * ═══ Y LEE DEL REGISTRO DE ARCADES, QUE ES OTRO ═══
+ *
+ * `arcadesInstalados()` de `shared/arcade`, anclado en
+ * `Symbol.for('gamemasters.arcade.instalados')`, y NO `juegosInstalados()`. Si un
+ * arcade se registrara en el reparto de veladas, `veladas()` lo pintaría en el
+ * carrusel de la portada —entre CLUEDO y la Momia, con su retrato alto y su
+ * «Una noche»— y para evitarlo alguien metería un `if (esArcade)` ahí arriba. Dos
+ * registros con dos símbolos distintos hacen que esa línea no se pueda escribir
+ * por descuido.
  */
 export function minijuegos(): Minijuego[] {
-  return [];
+  return arcadesInstalados().map((m: ManifiestoDeArcade) => ({
+    id: m.id,
+    nombre: m.nombre,
+    gancho: m.gancho,
+    icono: m.icono,
+    paleta: PALETAS_DE_ARCADE[m.id] ?? PALETA_DE_ARCADE_POR_DEFECTO,
+    ruta: MUEBLES[m.mueble].seSabePintar ? rutaDeArcade(m) : null,
+  }));
 }
 
 /**

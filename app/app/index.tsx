@@ -54,7 +54,9 @@ import { SelloDeCuenta } from '../src/sello-cuenta';
 import { FondoDeSalas } from '../src/fondos-sala';
 import { AVATAR_POR_DEFECTO, cargarAvatar, olvidarModelo3D, type Avatar } from '../src/avatar';
 import { Latido, Pulsable, useMenosMovimiento } from '../src/vivo';
-import { veladas } from '../src/vitrina';
+import { minijuegos, veladas } from '../src/vitrina';
+import type { Minijuego } from '../src/vitrina';
+import { ICONOS_DE_ARCADE } from '../src/iconos';
 import { todosLosTrofeos } from '../../shared/juegos';
 import { color, espacio, fuente, radio } from '../src/tema';
 
@@ -185,6 +187,12 @@ export default function Portada(): JSX.Element {
   const rango = rangoDe(jugadas.length);
 
   const catalogo = veladas();
+  /*
+   * Y la Sala. Se lee del registro de arcades en cada pintado, igual que el
+   * catálogo de veladas: son dos registros distintos y no se pueden confundir. Ver
+   * `app/src/vitrina.ts`, donde está escrito por qué están separados.
+   */
+  const sala = minijuegos();
   /*
    * El mundo 3D llega al borde a propósito —meterle margen dejaría una franja
    * negra que rompe la profundidad— pero la botonera de encima SÍ tiene que
@@ -474,20 +482,46 @@ export default function Portada(): JSX.Element {
         />
 
         {/* ================= 4 · LA SALA DE ARCADE ================= */}
+        {/*
+          ═══ ESTA SECCIÓN ANUNCIABA UNA PROMESA VIEJA ═══
+
+          Decía «Partidas de un minuto para cuando no hay mesa que montar», debajo
+          de un rótulo que llamaba a esto «el relleno de los ratos muertos». Las
+          dos frases las ha declarado obsoletas el propietario, y las dos decían lo
+          mismo: que la Sala es lo que se hace cuando no se puede hacer lo bueno.
+
+          Es la SEGUNDA CATEGORÍA DE JUEGOS de la plataforma, con su propio motor y
+          su propio contrato, y La Frente no es un rato muerto: son doce personas
+          de pie gritándole a alguien que lleva un móvil en la cabeza. Anunciarlo
+          como relleno era vender mal lo que hay.
+
+          Y la regla de la cabecera de este fichero sigue mandando: nada de lo que
+          se enseña es mentira. Antes no había ninguno y se decía; ahora hay uno y
+          se enseña ese uno, con su gancho y su tarjeta. El día que la Sala se
+          quede vacía —un reparto de servidor sin arcades— vuelve a salir el aviso
+          de que no hay nada, en vez de un hueco.
+        */}
         <View style={estilos.seccion}>
           <Titular
             texto="La sala de arcade"
-            nota="Minijuegos para ti solo, aquí mismo, en un rato muerto."
+            nota="Juegos para ahora mismo: se abre y se juega, sin montar nada."
             acento="#5fd4c8"
           />
-          <View style={estilos.arcade}>
-            <View style={estilos.arcadeNeon} />
-            <Text style={estilos.arcadeTitulo}>Cableándose…</Text>
-            <Text style={estilos.arcadeCuerpo}>
-              Las máquinas están llegando. Partidas de un minuto para cuando no hay mesa que
-              montar: acertijos, memoria, pulso. Vuelve pronto.
-            </Text>
-          </View>
+          {sala.length === 0 ? (
+            <View style={estilos.arcade}>
+              <View style={estilos.arcadeNeon} />
+              <Text style={estilos.arcadeTitulo}>Cableándose…</Text>
+              <Text style={estilos.arcadeCuerpo}>
+                Este servidor no trae ninguna máquina instalada todavía. Vuelve pronto.
+              </Text>
+            </View>
+          ) : (
+            <View style={{ gap: espacio.md }}>
+              {sala.map((minijuego) => (
+                <TarjetaDeArcade key={minijuego.id} minijuego={minijuego} />
+              ))}
+            </View>
+          )}
         </View>
 
         {/* ================= 5 · TU LEYENDA ================= */}
@@ -603,6 +637,61 @@ export default function Portada(): JSX.Element {
 // ---------------------------------------------------------------------------
 // Piezas
 // ---------------------------------------------------------------------------
+
+/**
+ * LA TARJETA DE UN ARCADE. Ancha y plana, y esa forma es la mitad del mensaje.
+ *
+ * Las veladas son altas y con retrato porque prometen una noche; éstas son anchas
+ * y planas porque prometen ahora mismo. Nadie puede tocar una creyendo que va a
+ * jugar y encontrarse con que necesita cinco amigos y una cena, ni al revés.
+ *
+ * `gancho` y no `lema`: son dos cosas distintas y el contrato del arcade las
+ * separa a propósito. El lema de una velada es literatura para un dosier impreso;
+ * el gancho es la línea que hace que alguien toque la tarjeta, de pie y con prisa.
+ */
+function TarjetaDeArcade({ minijuego }: { minijuego: Minijuego }): JSX.Element {
+  const Icono = ICONOS_DE_ARCADE[minijuego.icono];
+  /*
+   * Sin ruta, la tarjeta no es pulsable y lo dice. Pasa cuando el arcade declara
+   * un mueble que esta versión de la app no sabe pintar: el registro es de
+   * ejecución y la app es un binario. Fingir que se puede tocar y no hacer nada al
+   * tocarla sería exactamente el fallo mudo que esta portada tiene prohibido.
+   */
+  const ruta = minijuego.ruta;
+  const sePuedeJugar = ruta !== null;
+
+  const cuerpo = (
+    <View style={[estilos.arcade, { borderColor: minijuego.paleta.acento + '66' }]}>
+      <View style={[estilos.arcadeNeon, { backgroundColor: minijuego.paleta.acento + 'a6' }]} />
+      <View style={estilos.arcadeFila}>
+        <Icono size={30} color={minijuego.paleta.acento} />
+        <View style={{ flex: 1 }}>
+          <Text style={[estilos.arcadeTitulo, { color: minijuego.paleta.acento }]}>
+            {minijuego.nombre}
+          </Text>
+          <Text style={estilos.arcadeCuerpo}>
+            {sePuedeJugar
+              ? minijuego.gancho
+              : `${minijuego.gancho} — esta versión de la app todavía no sabe pintarlo.`}
+          </Text>
+        </View>
+        {sePuedeJugar && (
+          <Text style={[estilos.arcadeFlecha, { color: minijuego.paleta.acento }]}>›</Text>
+        )}
+      </View>
+    </View>
+  );
+
+  if (ruta === null) return cuerpo;
+  return (
+    <Pulsable
+      onPress={() => router.push(ruta)}
+      accessibilityLabel={`Jugar a ${minijuego.nombre}`}
+    >
+      {cuerpo}
+    </Pulsable>
+  );
+}
 
 function Titular({
   texto,
@@ -1090,6 +1179,8 @@ const estilos = StyleSheet.create({
     borderRadius: 2,
     backgroundColor: 'rgba(95,212,200,0.65)',
   },
+  arcadeFila: { flexDirection: 'row', alignItems: 'center', gap: espacio.md },
+  arcadeFlecha: { fontSize: 26, opacity: 0.8 },
   arcadeTitulo: { fontFamily: fuente.titulo, fontSize: 17, color: '#5fd4c8', letterSpacing: 1 },
   arcadeCuerpo: {
     fontFamily: fuente.cuerpo,
