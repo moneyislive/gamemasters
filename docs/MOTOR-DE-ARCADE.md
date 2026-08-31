@@ -4,9 +4,10 @@
 
 Escrito el 31 de agosto de 2026, después de auditar los tres candidatos externos
 que había sobre la mesa —ir-engine, boardgame.io y una tabla de siete
-repositorios de juegos— más los backends de multijugador del mercado. Si algo de
-aquí no coincide con el código, gana el código: corre `npm run verificar` y
-créele a él.
+repositorios de juegos— más los backends de multijugador del mercado. **Revisado
+el mismo día**, tras una auditoría externa que encontró siete fallos de diseño y
+cuatro menores; lo que cambió está en el §13. Si algo de aquí no coincide con el
+código, gana el código: corre `npm run verificar` y créele a él.
 
 Este documento es el hermano de [INFORME-ARQUITECTURA.md](INFORME-ARQUITECTURA.md),
 que cuenta cómo se sacó CLUEDO de las entrañas del motor de veladas. Aquel
@@ -55,21 +56,30 @@ falta aquí:
 Hoy esa capa tiene un solo inquilino en cada lado. Un segundo es lo que la
 convierte en capa y no en excepción.
 
-### Las dos únicas excepciones, y son nominales
+### Lo que estaba mal colocado, y por qué NO se llama «excepción»
 
-Se admiten **dos**, porque son piezas de plataforma mal archivadas y no piezas de
-velada:
+Había dos ficheros en `live/` que no son de veladas sino de plataforma.
+`presencia.ts` **se ha movido a `server/src/mecanicas/presencia.ts`**: no era una
+excepción archivada mal, era una **dependencia estructural** de la fase 2, porque
+sin presencia no se detecta a quien se fue de la mesa. Y de paso deja de existir
+un peaje: `olvidar` de una mesa de arcade ya no llama de rebote a algo de
+veladas, llama a una mecánica compartida.
 
-| Fichero | Qué es | Por qué no es de veladas |
+Queda uno:
+
+| Fichero | Dónde debe acabar | Por qué no se ha movido |
 |---|---|---|
-| `server/src/live/token.ts` | Credencial HMAC sin estado, con `exp` y `sid` | Es identidad, no juego. Su sitio natural es `server/src/identidad/`, que ya existe |
-| `server/src/live/presencia.ts` | Presencia en memoria | Es infraestructura, y su cabecera ya razona por qué no toca la base |
+| `server/src/live/token.ts` | `server/src/identidad/`, que ya existe | Es la ruta de autenticación —el sitio donde un fallo deja que un invitado lea la solución— y hay otra sesión auditando ese árbol. Se mueve cuando cierre |
 
-**No se mueven hoy.** Mover `token.ts` es un diff dentro de veladas y hay otra
-sesión trabajando en el mismo árbol. Se importan tal cual, y la excepción se
-escribe como **lista literal de dos rutas dentro de `verificar-fronteras.ts`**,
-de modo que añadir una tercera exige editar el comprobador — un acto visible en
-el diff y no un import que se cuela.
+Y la lista dentro de `verificar-fronteras.ts` **no se llama «excepciones»: se
+llama «mal colocados»**, con la ruta de destino escrita al lado y el motivo de la
+espera. La diferencia no es cosmética y es el punto entero:
+
+> Una lista de **excepciones** es una categoría — una zona compartida entre los
+> dos motores, con precedente de ampliarla. Quien llegue en tres meses lee la
+> categoría, no el razonamiento que la justificaba. Una lista de **destinos
+> pendientes** no invita a crecer: cada línea es una deuda con dirección, y
+> añadir una es admitir que has puesto algo donde no va.
 
 ### Por qué la independencia y no la generalización
 
@@ -121,9 +131,9 @@ Eso no es minimalismo estético. Nombrar esos conceptos en el núcleo sería
 reconstruir el problema de CLUEDO con vocabulario de tablero, porque son
 exactamente la forma del primer juego rico que se escriba.
 
-### Los cuatro juegos-prueba
+### Los cinco juegos-prueba
 
-Todo lo que sigue se justifica contra estos cuatro, y ninguno es negociable:
+Todo lo que sigue se justifica contra estos cinco, y ninguno es negociable:
 
 | Nombre | Qué es | Qué rompe |
 |---|---|---|
@@ -131,6 +141,50 @@ Todo lo que sigue se justifica contra estos cuatro, y ninguno es negociable:
 | **La Ronda** | Fiesta en línea por turnos, cuatro personas, mano oculta | Mesa sin Game Master, asientos anónimos, información oculta |
 | **El Arcade** | 60 fps, un jugador, con marcador | Sin turnos, bucle de fotogramas, marcador que hay que verificar |
 | **Riberas** | Tablero hexagonal propio, 2–6, comercio | Identidades derivadas, negociación entre dos de los cuales uno no tiene el turno |
+| **La Larga** | Riberas jugado en turnos de DÍAS: se entra, se juega uno, se cierra la app | La duración |
+
+**La Larga entró tarde y por eso está escrito que entró tarde.** Los cuatro
+primeros rompen el dispositivo, la mesa, el ritmo y el tablero; ninguno rompía la
+DURACIÓN, y una partida asíncrona de varios días es una forma de producto
+completamente normal en una app de juegos de mesa — Riberas por turnos asíncronos
+es una funcionalidad obvia, no una hipótesis. Rompe cuatro supuestos que el resto
+del diseño da por sentados a la vez:
+
+- **La mesa en memoria** deja de valer: una partida de tres días no puede vivir
+  en un proceso que Render reemplaza en cada despliegue.
+- **La presencia deja de ser un proxy de participación.** En una velada, quien no
+  está conectado no está jugando. Aquí, quien no está conectado sigue en la
+  partida y le toca.
+- **Los plazos dejan de medirse en tics.** «Veinticuatro horas para mover» no es
+  un número de fotogramas.
+- **Un `rev` rancio deja de ser un error y pasa a ser lo normal.** El cliente
+  puede volver con una revisión de hace tres días, y eso no es un móvil
+  manipulado: es alguien que volvió del trabajo.
+
+Y una distinción hermana, que cuesta una línea ahora y es un caso especial
+después: **la proyección es por ASIENTO, y un espectador no tiene asiento.**
+Alguien que mira una partida sin jugarla tiene que caber en la firma desde el
+principio.
+
+---
+
+## 1 bis. El vocabulario propio, en una página
+
+Este documento inventa siete palabras. Son consistentes y esa consistencia es una
+virtud, pero hay que aprenderlas antes de leer una línea de código — y ya hubo
+que renombrar una (`reparto`) por chocar con un significado que ya existía en el
+repositorio. Este glosario existe para que la segunda colisión se vea venir.
+
+| Palabra | Qué significa AQUÍ | Con qué NO hay que confundirla |
+|---|---|---|
+| **sede** | Quién ejecuta el reductor: `'dispositivo'` o `'servidor'` | No es dónde está el servidor, ni cuánta gente hay delante del móvil |
+| **mueble** | La superficie donde se pinta el juego: `formulario`, `tablero`, `lienzo`, `escena` | No es una pantalla de `expo-router`. Un mueble puede servir a muchos juegos |
+| **canal** | Cómo viajan los avisos de que la mesa cambió: `sondeo` o `continuo` | **No es `reparto`**, que en este repositorio significa *qué juegos están instalados* (`verify:reparto`, `Symbol.for('gamemasters.juegos.reparto')`) |
+| **asiento** | Un sitio en la mesa, anónimo y efímero: un nombre tecleado | No es un `participante` de plataforma, que tiene cuenta, correo y obligaciones de datos |
+| **`loSecreto`** | La función que un juego exporta SOLO para pruebas: los valores que jamás pueden salir en la proyección ajena | **No es un `testigo`**, que en este repositorio es la credencial HMAC de `token.ts` (`verify:tokens` se llama «testigos» en la batería) |
+| **procedencia** | De dónde salen las reglas del juego, legalmente | No es la licencia del código, que es otra cosa y va aparte |
+| **enchufe** | Por dónde entra un juego que no viene dentro del binario | No aísla. Mismo proceso, mismos permisos |
+| **peaje** | Algo que un juego-prueba tiene que FINGIR para entrar por el motor | No es un fallo. Es el precio que el motor todavía cobra, y es un entregable |
 
 ---
 
@@ -358,13 +412,13 @@ jugadores { minimo, maximo }
 sede: 'dispositivo' | 'servidor'      // EJE 1: quién ejecuta el reductor
 tickHz: number                        // EJE 2: 0 = sin reloj, y es legítimo
 mueble: MuebleDeArcade                // unión CERRADA
-secretos: boolean                     // si es true, la proyección es obligatoria
-marcador?: … 
-procedencia: ProcedenciaDeArcade      // unión CERRADA, obligatoria
+secretos: boolean                     // si es true, proyección Y `loSecreto`
+marcador: MarcadorDeArcade            // unión CERRADA y OBLIGATORIA, con 'ninguno'
+procedencia: ProcedenciaDeArcade      // unión CERRADA, obligatoria y discriminada
 ```
 
 **Solo dos ejes, y el resto se deriva.** La mesa, los asientos, el transporte y la
-exigencia de reejecutabilidad salen de `sede` y de la existencia de `marcador`.
+exigencia de reejecutabilidad salen de `sede` y de `marcador`.
 
 > **La regla que evita el deslizamiento: lo que un programador pueda poner mal,
 > se DERIVA, no se declara.** Ni un campo del manifiesto que alguien pueda poner
@@ -372,6 +426,27 @@ exigencia de reejecutabilidad salen de `sede` y de la existencia de `marcador`.
 > `deterministaExigido` y no hay `transporte`: una bandera que exime de un
 > comprobador es una bandera que se pone a `false` el día que el comprobador se
 > pone rojo.
+
+### `marcador` NO puede ser opcional, y la primera versión de este documento se equivocaba
+
+La regla de arriba estaba escrita y aun así `marcador` salía como `marcador?:`,
+con la exigencia de reejecutabilidad derivándose de **la existencia del campo**.
+Eso es la misma bandera con otro disfraz, y de hecho peor: **omitir un campo
+opcional es más silencioso que poner uno a `false`**. El día que
+`verify:marcador` se ponga rojo, borrar tres líneas del manifiesto lo apaga, y en
+el diff eso parece una limpieza.
+
+Por eso es unión cerrada obligatoria con `'ninguno'` como valor explícito. Cuesta
+exactamente lo mismo de escribir, y renunciar a la verificación pasa a ser una
+palabra que alguien tuvo que teclear a propósito y que un revisor ve.
+
+### `procedencia: 'licenciado'` sin metadatos es una etiqueta que nadie puede auditar
+
+Los otros tres valores se sostienen solos: `'dominio-publico'`,
+`'mecanica-generica'` y `'creacion-propia'` son afirmaciones comprobables leyendo
+el juego. `'licenciado'` no dice nada sin **titular, referencia de la licencia y
+vigencia** al lado, y el tipo tiene que obligarlo — unión discriminada, no tres
+campos opcionales sueltos que alguien deja en blanco.
 
 ---
 
@@ -388,7 +463,7 @@ del estado y tres tipos de movimiento; los recursos son un objeto; la carretera
 más larga es una función del juego. **El motor no necesita nombrar ninguno de los
 tres y por tanto no puede quedarse corto en ninguno.**
 
-*Lo obligan los cuatro.*
+*Lo obligan los cinco.*
 
 ### 5.2 Reductor puro
 
@@ -400,7 +475,7 @@ servidor, ni predicción futura.
 Que viva en `shared/` y no en `server/` no es orden: es **la condición** para que
 el mismo fichero corra en Hermes y en Node.
 
-*Lo obligan los cuatro.*
+*Lo obligan los cinco.*
 
 ### 5.3 Movimiento con carga libre
 
@@ -428,6 +503,33 @@ frecuencia.
 lo necesita, y por eso `tickHz: 0` tiene que ser un valor legítimo y no un caso
 especial.*
 
+#### El plazo que no vencía nunca
+
+Con `tickHz: 0` y autoridad de servidor, las dos reglas de arriba chocan: los
+plazos vencen entrando por el reductor, **pero si nadie se mueve no entra nada**.
+Una oferta de comercio con caducidad no caduca. Un turno con reloj no pasa.
+
+**La salida no es un temporizador de servidor** —eso rompería la reproducibilidad
+que el reductor puro acaba de comprar— sino **evaluación perezosa del plazo en la
+lectura**: antes de devolver, el sondeo compara el reloj de pared con los plazos
+absolutos que hay en el estado e inyecta un `tic` si toca. El reductor sigue
+siendo la única puerta y sigue siendo puro.
+
+Conviene decir por qué eso basta, porque el caso que asusta no es el que parece.
+Si un jugador cierra la app, **los demás siguen sondeando**, y su lectura hace
+vencer el plazo del ausente. La partida solo se queda quieta cuando **nadie**
+mira — y una mesa que nadie mira, quieta, es exactamente lo correcto.
+
+Pero convierte una lectura en una escritura, y eso tiene dos consecuencias que
+hay que escribir **antes** de implementarlo, no después:
+
+1. **El candado tiene que cubrir la ruta de lectura.** Hoy solo cubre la de
+   escritura.
+2. **La espera larga necesita despertarse por vencimiento**, no solo por
+   `avisarCambio`: un sondeo aparcado veinticinco segundos puede tener un plazo
+   que vence dentro de esa ventana. Eso es un **sexto verbo** en `canal/`, y por
+   eso está anotado aquí y no descubierto en la fase 2.
+
 ### 5.5 Azar sembrado
 
 `Math.random()` dentro de un reductor rompe la pureza, impide repetir una partida
@@ -438,7 +540,40 @@ que nadie prediga la siguiente carta.
 Sube a `shared/mecanicas/` y no al núcleo del arcade porque una velada con dados
 lo querría igual.
 
-*Lo obligan los cuatro.*
+*Lo obligan los cinco.*
+
+#### Y el azar no es el único que rompe el determinismo: `Math` también
+
+Prohibir `Math.random` no basta, y esto es lo que revienta seis meses tarde. La
+especificación de ECMAScript deja una familia entera de funciones como
+**implementation-approximated**: `sin`, `cos`, `tan`, `asin`, `acos`, `atan`,
+`atan2`, `exp`, `expm1`, `log`, `log1p`, `log2`, `log10`, `pow`, `cbrt`, `hypot`
+y las hiperbólicas. V8, JavaScriptCore y Hermes usan librerías matemáticas
+distintas y devuelven **últimos bits distintos**.
+
+Eso pega exactamente donde está la prueba dura: `verify:determinismo` compara
+Node contra Hermes. El día que un arcade use `Math.sin` para una trayectoria o
+`Math.pow` para una curva de dificultad, la repetición divergirá en un bit, el
+hash no coincidirá, y se estará depurando una desincronización intermitente en un
+modelo concreto de móvil — que es el fallo que la fase 3 existe para cazar seis
+meses antes.
+
+**Lo que SÍ es seguro y no se prohíbe:** `+`, `−`, `×`, `÷` y `Math.sqrt`, que
+están fijadas por IEEE 754. Esa frase tiene que estar en el mensaje del
+comprobador: sin ella, alguien prohibirá `Math` entero o no prohibirá nada.
+
+Los sustitutos van en `shared/mecanicas/`: tablas precalculadas o aproximaciones
+propias en punto fijo. `Math.fround` sobre el resultado reduce la divergencia
+—es lo que hace Rune— pero **no la demuestra**, y no debe venderse como solución.
+
+#### Serialización canónica, o el comprobador da falsos rojos
+
+Si `verify:determinismo` compara hashes de estado, hace falta fijar una
+serialización con **claves ordenadas**. Hoy dos estados semánticamente idénticos
+con distinto orden de inserción darían hashes distintos, y un comprobador que
+grita cuando no pasa nada se acaba desactivando — que es peor que no tenerlo.
+Vive en `shared/mecanicas/canonico.ts`, y rechaza lo no serializable en vez de
+tragárselo.
 
 ### 5.6 `sede`: dispositivo o servidor
 
@@ -478,6 +613,33 @@ se oculta nada en el cliente: sencillamente no se envía».
 concepto de plataforma y no de tablero: quien lleva el móvil en la frente es el
 único que NO puede ver la palabra.*
 
+#### `loSecreto`: por qué exigir la proyección no basta
+
+Exigir que la proyección exista no comprueba que haga algo. **Un juego puede
+declarar `secretos: true`, registrar la identidad como proyección y pasar todos
+los comprobadores en verde mientras filtra el mazo entero.** Y un comprobador
+genérico sobre estado opaco no puede cazarlo, porque no sabe qué es la zona
+oculta — no puede saberlo, y ese es el precio de la opacidad.
+
+Se cierra sin romperla: un juego con `secretos: true` registra, junto a la
+proyección y **solo para pruebas**, una función
+
+```ts
+loSecreto(estado: unknown): unknown[]
+```
+
+que devuelve los valores que jamás pueden aparecer en la proyección de otro
+asiento. **El motor no la llama nunca en ejecución**, así que sigue sin
+interpretar el estado; la llama `verify:mesa`, y entonces la comprobación es
+real. Y si un juego declara `secretos: true` sin registrarla, el arranque falla —
+el mismo patrón que ya se usa para la proyección ausente.
+
+> **Se llama `loSecreto` y no «testigo» a propósito.** «Testigo» ya significa
+> otra cosa en este repositorio: es la credencial HMAC de `token.ts`, y el
+> comprobador `verify:tokens` se llama «testigos» en la batería. Reutilizar la
+> palabra sería repetir exactamente el error que obligó a renombrar `reparto`
+> antes de escribir una línea. Ver el glosario en §1 bis.
+
 ### Y once más, que llegan cuando llega su juego
 
 Fin como función del estado · revisión (`rev`) y rechazo de movimientos rancios ·
@@ -513,7 +675,7 @@ completo.
 **El punto de ruptura no es la latencia: es la frecuencia.** El sondeo largo deja
 de valer alrededor de dos a cinco cambios por segundo, porque cada cambio cuesta
 un ciclo petición/respuesta completo. Un arcade a 30–60 Hz es una petición cada
-16–33 ms por cliente: no es un ajuste, es otra cosa. **Y ninguno de los cuatro
+16–33 ms por cliente: no es un ajuste, es otra cosa. **Y ninguno de los cinco
 juegos-prueba lo pide.**
 
 **La regla que protege la arquitectura el día que llegue el segundo canal:** un
@@ -534,9 +696,28 @@ en caliente** sin que el juego se entere.
    retrasar el canal continuo.
 3. Las mesas de arcade **no heredan el patrón de `mutar`** (candado + lectura y
    escritura completa por acción): correcto a ritmo de velada, seis lecturas y
-   seis escrituras por segundo en una mesa de seis. Almacén en memoria con
-   persistencia diferida. El repositorio ya diagnosticó esta clase de problema
-   una vez en `presencia.ts`.
+   seis escrituras por segundo en una mesa de seis. El repositorio ya diagnosticó
+   esta clase de problema una vez en `presencia.ts`.
+
+### Y un cuarto que no es del transporte sino del almacenamiento, y no es futuro
+
+«Almacén en memoria con persistencia diferida» más «cada despliegue de Render
+reemplaza la instancia» da una consecuencia que **pasa el día uno de la fase 2**:
+cada `git push` mata todas las partidas en curso. En veladas duele poco porque el
+estado vive en Mongo; aquí, no.
+
+La persistencia diferida está bien razonada para las seis escrituras por segundo
+de un arcade en tiempo real, y es **innecesaria** para una mesa por turnos, donde
+hay un movimiento cada varios segundos. Así que se parte **por frecuencia y no
+por familia**:
+
+- `tickHz === 0` → **escritura síncrona**. Riberas, La Ronda y La Larga.
+- `tickHz > 0` → **escritura diferida**. El Arcade y lo que venga detrás.
+
+Y en los dos casos, **volcado al recibir `SIGTERM`**, que es lo que Render manda
+antes de reemplazar la instancia. Con La Larga en la lista de juegos-prueba esto
+deja de ser una optimización y pasa a ser un requisito: una partida de tres días
+no puede vivir en un proceso.
 
 ---
 
@@ -637,6 +818,11 @@ clon que copió las reglas legítimamente pero también el aspecto.
   AGPL. Se carga en el mismo proceso, y la sección 13 de la AGPL obliga a ofrecer
   el código a quien interactúe por red — o sea, en Render, publicar el motor
   entero. **Mirar código ajeno no contamina; copiarlo sí.**
+  <br>Pero **esa comprobación es orientativa y su cabecera tiene que decirlo**:
+  el campo `license` del `package.json` es autodeclarado, y el §2.3 de este mismo
+  documento recoge dos casos donde no coincidía con la realidad. Rechaza lo que
+  se declara mal; no demuestra nada sobre lo que se declara bien. Confundirla con
+  una garantía es peor que no tenerla.
 - **Que un repo clon tenga licencia MIT no cambia nada.** MIT licencia «el
   Software» —el código de quien escribió el repo— y no otorga ni puede otorgar
   derechos sobre la marca CATAN, que es de Catan GmbH.
@@ -703,9 +889,28 @@ andamiaje.
 `server/src/routes/arcade.ts` montado **delante** de `requireAuth`, proyección
 obligatoria por `secretos: true`, y la medición del presupuesto por movimiento.
 
+Y cuatro cosas que esta fase tiene que traer YA, porque escribirlas después
+significa reescribir `mesas.ts`:
+
+1. **El sexto verbo de `canal/`** y la evaluación perezosa de plazos en la
+   lectura (§5.4). Con él, el candado pasa a cubrir la ruta de lectura.
+2. **La persistencia partida por frecuencia** y el volcado en `SIGTERM` (§6).
+   Sin eso, cada despliegue mata las partidas en curso desde el día uno.
+3. **Presencia y participación dejan de ser lo mismo.** En una velada, quien no
+   está conectado no está jugando; en una mesa asíncrona, sigue en la partida y
+   le toca.
+4. **Un `rev` rancio de días no es un error.** Es alguien que volvió del trabajo,
+   y la resincronización tiene que tratarlo como el caso normal.
+
+Las cuatro las obliga **La Larga**, que se estrena después de Riberas pero cuyos
+requisitos se pagan aquí. Escribir `mesas.ts` pensando solo en La Ronda —cuatro
+personas, diez minutos, todas mirando— es cómo la mesa saldría con forma de
+partida corta.
+
 *Demuestra:* autoridad de servidor sin Game Master; asientos anónimos; el mismo
 reductor corriendo en los dos lados; información oculta que no se filtra **porque
-no se envía**; y que el sondeo de 25 segundos basta y sobra.
+no se envía** y que `loSecreto` demuestra que no se filtra; y que el sondeo de 25
+segundos basta y sobra.
 
 ### Fase 3 — El tiempo real de un jugador: «El Arcade»
 
@@ -730,6 +935,19 @@ negociación entre dos personas de las cuales una no tiene el turno se escriben
 enteros dentro del juego, con **cero cambios en `shared/arcade/motor.ts`**. Ese
 diff vacío *es* la demostración de que el núcleo nació agnóstico.
 
+### Fase 4 bis — La duración: «La Larga»
+
+El mismo Riberas, jugado en turnos de días. No es un juego nuevo: es el **mismo
+manifiesto y el mismo reductor** con la mesa persistida, los plazos en horas de
+reloj de pared en vez de en tics, y avisos al que le toca.
+
+*Demuestra:* que la duración no es una propiedad del motor. Si La Larga necesita
+tocar `shared/arcade/`, es que la fase 2 se escribió pensando en partidas de diez
+minutos y hay que volver. Si solo necesita configuración y un aviso, el eje
+estaba bien elegido. **Es la más barata de todas las fases si las anteriores se
+hicieron bien, y la más cara si no** — que es exactamente para lo que sirve un
+juego-prueba.
+
 ### Fase 5 — Solo si alguien lo pide: terceros, canal continuo y 3D
 
 `ARCADES_EXTERNOS`, el presupuesto exigido y no solo medido, el mueble `escena`,
@@ -737,7 +955,7 @@ y la segunda implementación de `canal/`.
 
 *Demuestra:* que la costura del transporte funcionaba, porque añadir un timbre
 más rápido no toca el reductor, ni la proyección, ni el manifiesto, ni ninguno de
-los cuatro juegos ya entregados.
+los cinco juegos ya entregados.
 
 ---
 
@@ -752,16 +970,32 @@ lo que hay que replicar.
 |---|---|---|
 | `verify:arcade-pobre` | El «La Almoneda» de esta familia, y la pieza más importante de las once. Monta un juego deliberadamente miserable —sin tablero, sin turnos, sin red, sin asientos con identidad, sin puntuación, sin azar y sin secretos—, lo juega entero y al terminar imprime los **peajes** que aún paga | 0 |
 | `verify:fronteras` | Que arcade no importe de live, docs ni agent, y al revés; que `shared/arcade` no importe de `shared/juegos`; y que `shared/arcade/motor.ts` no importe **nada** de `node:` — el día que importe `node:crypto`, La Frente deja de poder existir | 0 |
-| `verify:pureza` | Prohibidos `Date`, `Math.random`, `fetch`, `async` y la mutación global en el camino del reductor. Prohibido `for…in` en la lógica: el orden de las claves con forma de entero es numérico y no de inserción, así que dos clientes recorren distinto | 0 |
+| `verify:pureza` | Prohibidos `Date`, `Math.random`, `fetch`, `async`, `setTimeout` y la mutación global en el camino del reductor. Prohibido `for…in` en la lógica: el orden de las claves con forma de entero es numérico y no de inserción, así que dos clientes recorren distinto. **Y prohibidas las trascendentales de `Math`** —`sin`, `cos`, `pow`, `exp`, `log`, `atan2`, `hypot`, `cbrt`…—, que la espec deja *implementation-approximated* y que Hermes y V8 redondean distinto; `+ − × ÷` y `Math.sqrt` sí son seguras y el mensaje tiene que decirlo | 0 |
 | `verify:nucleo` | El que **ya existe**. Sus raíces son `['shared','server/src','client/src','app/src','app/app']`, así que las carpetas nuevas cuentan desde el primer commit. Nacer en cero y quedarse en cero es gratis; empezar en cuarenta ya no | 0 |
 | `verify:sin-red` | Juega una partida entera de La Frente con la capa de red sustituida por una función que **lanza**. Una sola llamada, rojo. Es más fuerte que declarar un transporte «ninguno», porque no comprueba una intención sino un hecho | 1 |
 | `verify:procedencia` | Que todo manifiesto declare su procedencia, y una lista negra de marcas registradas —en fichero, revisable, con un comentario que explique por qué está cada nombre— contrastada contra el nombre visible, el lema, los rótulos y el contenido de las barajas | 1 |
 | `oro:arcade` | Hermano de `oro:verificar`: un registro de movimientos grabado por arcade y el estado final byte a byte | 1 |
-| `verify:mesa` | **Levantando el servidor**, no en proceso. Actuar sin asiento, mandar un `rev` rancio, comprobar que la zona oculta no aparece en la proyección de nadie, cortar y resincronizar. Y que un manifiesto con `secretos: true` sin proyección **no deje arrancar** | 2 |
-| `verify:determinismo` | El mismo registro de movimientos dos veces, comparando el hash del estado; y después en Node y en Hermes, comparando entre sí | 3 |
+| `verify:mesa` | **Levantando el servidor**, no en proceso. Actuar sin asiento, mandar un `rev` rancio, cortar y resincronizar. Y lo que de verdad cierra el agujero: llamar a `loSecreto(estado)` del juego y comprobar que **ninguno** de esos valores aparece en la proyección de otro asiento — sin eso, una proyección que sea la identidad pasa en verde. Más que un manifiesto con `secretos: true` sin proyección o sin `loSecreto` **no deje arrancar** | 2 |
+| `verify:determinismo` | El mismo registro de movimientos dos veces, comparando el hash del estado **serializado con `canonico.ts`**, y después en Node y en Hermes, comparando entre sí. Sin la serialización canónica, dos estados idénticos con distinto orden de inserción darían hashes distintos y el comprobador gritaría sin que pase nada | 3 |
 | `verify:marcador` | Una repetición fabricada se rechaza; una real se acepta al reejecutarla; un récord enviado como cifra suelta se rechaza siempre; y la duración declarada se contrasta con el tiempo de pared | 3 |
 | `verify:presupuesto` | Un reductor que tarde más del tope síncrono, o produzca un estado mayor del permitido, se rechaza **antes** de bloquear el bucle de eventos | 5 |
 | `verify:arcade-de-fuera` | Calcado del de veladas: escribe un arcade entero en un fichero temporal, arranca el servidor y lo juega — incluida la ruta de Windows por `pathToFileURL` | 5 |
+
+### Los peajes que se pueden derivar, se derivan
+
+La primera implementación de `verify:arcade-pobre` declaraba sus doce peajes con
+un `peajes.push(texto)`. Lo señaló quien la escribió, y tiene razón: **borrar una
+línea sin arreglar la causa no pone nada en rojo**, o sea que el entregable más
+valioso de la fase es el único que se puede maquillar en silencio — y este
+repositorio ya tiene tres casos anotados de comprobadores que pasaban en verde
+sin comprobar nada.
+
+Los peajes que son HECHOS se derivan leyendo el fichero que los causa: el
+`PLAZO_MS` fijo de `hub.ts`, la aserción a `AvisoClave` en `canal/sondeo.ts`. Si
+la causa desaparece, el peaje desaparece solo; y si alguien borra la línea con la
+causa viva, el comprobador lo caza. Los que son JUICIOS —«`gancho` obliga a
+escribir una frase de venta»— pueden seguir declarados, pero la cabecera tiene
+que separar las dos mitades para que nadie las confunda.
 
 **No ampliar `verify:legal`.** Ese comprobador verifica otra cosa por completo:
 los documentos públicos de la LSSI —aviso legal, privacidad, términos— servidos
@@ -814,21 +1048,45 @@ fichero.**
 - **Física determinista compartida es un proyecto en sí mismo**, no una casilla
   que se marca. Builds distintas del mismo motor de física producen resultados de
   coma flotante distintos y divergen.
+- **Los avisos de La Larga están fuera de alcance hoy.** Que a alguien le llegue
+  al móvil «te toca» tres días después es una capacidad de plataforma
+  —notificaciones push, con sus credenciales y sus dos tiendas— que este
+  documento no diseña. La Larga se puede jugar sin ellos abriendo la app; con
+  ellos es un producto. Queda dicho para que no aparezca como sorpresa en la fase
+  4 bis.
+- **El sexto verbo está nombrado, no diseñado.** Se sabe qué tiene que hacer
+  —despertar una espera larga por vencimiento de plazo y no solo por
+  `avisarCambio`— y no cómo evita despertar a todo el mundo cada vez. Se diseña
+  en la fase 2, con el candado delante.
 
 ---
 
 ## 13. Procedencia de este documento
 
-Investigación de quince agentes con 742 consultas, sometida a tres revisores
-adversarios cuyo encargo era **refutar, no confirmar**. Se corrigieron treinta y
-cinco afirmaciones de la investigación previa y de la primera pasada, entre ellas
-dos licencias mal atribuidas y un bloqueo de importación que solo aparece al
-arrancar el servidor.
-
 Los hechos del repositorio citados aquí —`cluedo.ts:103`, `index.ts:219/227`, las
 raíces de `verify:nucleo`, `baseUrl "/jugar"`, los cinco verbos de `hub.ts`,
 `vitrina.ts:187` y la capa `mecanicas/`— se comprobaron uno a uno sobre el árbol
-de trabajo.
+de trabajo. Cada afirmación sobre un proyecto ajeno se tomó de su fuente, y
+después alguien intentó **refutarla, no confirmarla**; así se cazaron dos
+licencias mal atribuidas y un bloqueo de importación que solo aparece al arrancar
+el servidor.
+
+Eso es todo lo que hay que decir sobre la procedencia. **Una versión anterior de
+esta sección presumía de cuántos agentes y cuántas consultas costó el informe**,
+y eso era exactamente el error que el resto del documento se dedica a desmontar:
+las estrellas de un repositorio, un README bonito y un recuento de esfuerzo son
+señales indirectas, y ninguna sustituye a haber abierto la fuente. La frase que
+abre el documento —«si algo de aquí no coincide con el código, gana el código»—
+ya hace todo el trabajo.
+
+Este documento se ha corregido una vez, tras una auditoría externa que encontró
+siete fallos de diseño y cuatro menores. De ahí salieron: las trascendentales de
+`Math`, la serialización canónica, el plazo que no vencía nunca, `loSecreto`,
+`marcador` como unión obligatoria, la persistencia partida por frecuencia, «La
+Larga» como quinto juego-prueba, los espectadores, el traslado de `presencia.ts`,
+la advertencia sobre la detección de licencias, los metadatos de `'licenciado'` y
+el glosario del §1 bis. Queda escrito aquí porque un documento que no dice en qué
+se equivocó invita a creerle más de lo que merece.
 
 Versión navegable del mismo informe:
 <https://claude.ai/code/artifact/a1674903-8c12-4897-a986-00c7667e0456>
