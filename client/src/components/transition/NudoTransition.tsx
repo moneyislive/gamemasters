@@ -1,38 +1,50 @@
 /**
  * NudoTransition — entrar en una partida de El Nudo de Valdehierro.
  *
- * QUÉ CUENTA, en 3,2 s: está nevando sobre un andén a oscuras → por la
- * izquierda llega el faro de una máquina → PASA UN TREN ENTERO de izquierda a
- * derecha, con las ventanas encendidas, y mientras pasa no se ve nada más → y
- * cuando la cola sale por la derecha, lo que había detrás todo el rato es el
- * rótulo de la estación.
+ * QUÉ CUENTA, en 3,2 s: sobre una noche vacía se van trazando CINCO LÍNEAS
+ * desde el borde izquierdo → se curvan y se juntan todas en un mismo punto →
+ * ese punto prende → y lo que hay en el nudo es el rótulo de la estación, con
+ * la vía saliendo por la derecha hacia lo que venga después.
  *
- * POR QUÉ EXISTE, TENIENDO YA TRES. Porque las tres cuentan otra cosa. Dos
- * puertas de caoba que se abren hacia dentro son una casa que te recibe; dos
- * losas que alguien empuja son un sitio donde no había que entrar; un farol que
- * se apaga es que a partir de ahí se anda a oscuras. Aquí no se abre nada y no
- * se apaga nada: aquí PASA ALGO POR DELANTE, sin pedir permiso y sin que se le
- * pueda parar, que es exactamente lo que hacen los seis convoyes de esta noche.
- * Reutilizar cualquiera de las tres y pintarla de ámbar habría dado justo lo
- * que hay que evitar: el mismo juego de otro color.
+ * ═══ POR QUÉ SE TIRÓ EL TREN QUE HABÍA ═══
  *
- * EL TREN VA A VELOCIDAD CONSTANTE, y es la única de las cuatro cortinillas sin
- * una sola curva de suavizado en su movimiento principal. No es un descuido: un
- * `easeOut` lo habría hecho frenar al salir, y un tren que frena al pasar por
- * una estación es un tren que para. Este no para —no puede: viene rodando y
- * nadie le ha podido avisar—, así que su transición es `linear` y se va del
- * encuadre a la misma velocidad a la que entró.
+ * La cortinilla anterior pasaba un convoy entero por delante de la cámara. La
+ * idea era buena y el resultado no: a tamaño de pantalla, una fila de ventanas
+ * iluminadas cruzando el encuadre no se lee como un tren, se lee como una
+ * empalizada de bloques amarillos. Y encima duraba lo que dura un tren, o sea
+ * que la empalizada era casi toda la cortinilla.
  *
- * EL RÓTULO NO ENTRA: YA ESTABA. Se enciende debajo del tren, mientras el tren
- * lo tapa entero, y para cuando la cola destapa el centro de la pantalla ya
- * lleva rato a plena opacidad. Es la diferencia entre «aparece un cartel» y
- * «detrás había una estación», y es todo el efecto. Los números que lo
- * sostienen están en `TREN` y `ROTULO`, con la cuenta hecha ahí abajo.
+ * Lo que se pierde al quitarlo es el «algo pasa por delante sin pedir permiso».
+ * Lo que se gana es que la cortinilla diga POR FIN LO QUE ES EL JUEGO: esto no
+ * va de un tren, va de un NUDO —cinco líneas que se cruzan en el mismo sitio a
+ * la misma hora— y de rehacer a mano el orden en que pasan. Un haz de líneas
+ * anudándose es literalmente el tablero de la partida.
  *
- * LA NIEVE VA DELANTE DEL TREN, no detrás. Cuesta una capa más y es lo que
- * mete la cámara en la intemperie: si la nieve estuviera al fondo, esto sería
- * un tren pasando por una foto; con la nieve por encima, quien mira está de pie
- * en el andén y se está mojando.
+ * ═══ POR QUÉ NO SE PARECE A LAS OTRAS TRES ═══
+ *
+ * Dos puertas de caoba que se abren son una casa que te recibe; dos losas que
+ * alguien empuja, un sitio donde no había que entrar; un farol que se apaga, que
+ * a partir de ahí se anda a oscuras. Las tres son ATMÓSFERA: masas, luz, materia.
+ *
+ * Esta es la única que es GEOMETRÍA, y esa es su diferencia. No se abre nada, no
+ * se apaga nada y no pasa nada por delante: se DIBUJA algo, con precisión de
+ * plano, delante de quien mira. Es el mismo registro que la pantalla «Planta»
+ * del juego y el mismo que su cuadro de marchas, así que la cortinilla ya está
+ * enseñando cómo se piensa esta partida antes de que empiece.
+ *
+ * ═══ SON CINCO Y NO SEIS, A PROPÓSITO ═══
+ *
+ * Los convoyes de la noche son seis; las líneas que se anudan aquí son CINCO,
+ * porque cinco es lo que dice el pie del rótulo —«cruce de cinco líneas»— y ese
+ * rótulo lleva ahí desde antes que esta animación. Que el dibujo contradiga al
+ * cartel que tiene debajo es la clase de descuido que no se ve y se nota.
+ *
+ * ═══ EL ORDEN DE LOS TIEMPOS ═══
+ *
+ * El nudo tiene que estar CERRADO antes de que el rótulo empiece a encenderse:
+ * si el cartel aparece con líneas todavía andando, se leen como dos animaciones
+ * a la vez en vez de como una consecuencia de la otra. Los números están abajo,
+ * con la cuenta hecha.
  */
 import { useEffect } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -44,39 +56,56 @@ interface NudoTransitionProps {
 }
 
 /**
- * LOS TIEMPOS, EN UN SOLO SITIO Y EN SEGUNDOS.
+ * LAS CINCO LÍNEAS, EN COORDENADAS DEL PLANO (1000 × 560).
  *
- * Y una cuenta que hay que rehacer entera si se toca cualquiera de estos
- * números, porque de ella depende que el efecto funcione:
+ * Todas nacen fuera del encuadre por la izquierda —en `-40`, no en `0`— para
+ * que ninguna empiece con un cabo suelto a la vista: una línea que arranca
+ * dentro de la pantalla parece cortada, no parece que venga de lejos.
  *
- * El tren mide 180 vw y recorre 280 vw (de `-180vw` a `100vw`), o sea que en
- * cada segundo avanza 280/`TREN.dura` vw. Con eso salen los tres instantes que
- * importan, contados desde que arranca (`TREN.en`):
- *
- *   · Tapa la pantalla entera cuando ha andado 100 vw → 0,63 s.
- *   · La cola destapa el CENTRO cuando ha andado 230 vw → 1,44 s.
- *   · Sale del todo cuando ha andado los 280 vw → 1,75 s.
- *
- * De ahí las dos reglas: `ROTULO.en` tiene que caer DESPUÉS del primero (si no,
- * se ve encenderse el cartel en pantalla vacía y se acabó la sorpresa), y
- * `ROTULO.en + ROTULO.dura` tiene que caer ANTES del segundo (si no, la cola
- * destapa un cartel a medio encender, que es peor que las dos cosas). Hoy son
- * 1,15 y 1,85 contra 1,08 y 1,89: entra por los pelos por los dos lados, y esa
- * estrechez es la que hace que se lea como una sola cosa.
+ * La del centro entra recta; las otras cuatro corren rectas un trecho y luego
+ * se curvan hacia el nudo con una Bézier. El tramo recto es lo que hace que se
+ * lean como VÍAS y no como cables: una vía de tren no empieza a curvarse en el
+ * horizonte, va derecha hasta que una aguja la desvía.
  */
-const TREN = { en: 0.45, dura: 1.75 } as const;
-const ROTULO = { en: 1.15, dura: 0.7 } as const;
-/** El pie, ya con el tren fuera del encuadre. Va abajo, donde nada lo tapaba. */
-const LEMA = { en: 2.05, dura: 0.7 } as const;
+const NUDO = { x: 500, y: 280 } as const;
+const ALTURAS = [80, 180, 280, 380, 480] as const;
+
+function trazadoDesde(y: number): string {
+  if (y === NUDO.y) return `M -40 ${y} H ${NUDO.x}`;
+  return `M -40 ${y} H 250 C 360 ${y} 400 ${NUDO.y} ${NUDO.x} ${NUDO.y}`;
+}
+
+/**
+ * LOS TIEMPOS, EN UN SOLO SITIO Y EN SEGUNDOS, con la cuenta hecha.
+ *
+ * Las líneas arrancan escalonadas de fuera hacia dentro, así que la última en
+ * salir es la que cierra el nudo: empieza en `LINEA.en + 4 × LINEA.paso` y
+ * termina `LINEA.dura` después. Hoy: 0,18 + 4 × 0,085 + 0,75 = 1,27 s.
+ *
+ * De ahí las dos reglas que sostienen el efecto:
+ *
+ *   · `PRENDE.en` va JUSTO en ese 1,27: el fogonazo es lo que confirma que el
+ *     nudo se ha cerrado, y adelantarlo lo convierte en un destello suelto.
+ *   · `ROTULO.en` va DESPUÉS del fogonazo, nunca a la vez. Si se solapan, el
+ *     ojo tiene dos cosas encendiéndose y no sabe cuál es la importante.
+ *
+ * La vía de salida se traza a la vez que el rótulo aparece, y eso sí se quiere
+ * solapado: son la misma idea —la línea sigue, la estación es solo un punto de
+ * ella— y separarlas las contaría como dos sucesos.
+ */
+const LINEA = { en: 0.18, dura: 0.75, paso: 0.085 } as const;
+const PRENDE = { en: 1.27, dura: 0.55 } as const;
+const SALIDA = { en: 1.5, dura: 0.6 } as const;
+const ROTULO = { en: 1.62, dura: 0.7 } as const;
+/** El pie, ya con el plano entero dibujado y quieto. */
+const LEMA = { en: 2.15, dura: 0.7 } as const;
 
 /**
  * Duración total de la secuencia en milisegundos.
  *
- * El lema acaba de entrar en 2,75 s y el tren se fue en 2,2, así que la estación
- * se queda sola casi medio segundo antes de que el velo empiece a irse. Ese
- * reposo es lo que de verdad se disfruta, y es la misma cuenta que hace la
- * cortinilla de las Sombras (3400) por la misma razón. Se queda en 3200 porque
- * aquí no hay relevo entre dos escenas: hay una que tapa y otra que queda.
+ * El lema acaba de entrar en 2,85 s, así que el plano se queda solo y quieto
+ * un tercio de segundo antes de que el velo se vaya. Ese reposo es lo que de
+ * verdad se disfruta, y es la misma cuenta que hacen las otras tres.
  */
 const TOTAL_MS = 3200;
 
@@ -97,14 +126,83 @@ export default function NudoTransition({ active, onComplete }: NudoTransitionPro
           exit={{ opacity: 0, transition: { duration: 0.5 } }}
           aria-hidden="true"
         >
-          {/* El andén nevado y la bombilla que lo alumbra desde arriba. */}
-          <div className="tn-anden" />
+          {/*
+            EL PLANO. Va en un SVG y no en divs porque lo que se anima es el
+            TRAZO —`pathLength`, que framer sabe animar solo— y eso no existe
+            fuera de un `path`. Dibujarlo con bordes de caja habría obligado a
+            fingir las curvas con rotaciones, que es como se acaba con seis
+            elementos donde cabía una línea.
+
+            `slice` y no `meet`: el plano tiene que llegar a los cuatro bordes
+            en cualquier proporción de pantalla. Con `meet` aparecerían franjas
+            vacías arriba y abajo en una ventana ancha, y el haz dejaría de
+            venir «de fuera» para venir de un rectángulo dibujado en medio.
+          */}
+          <svg
+            className="tn-plano"
+            viewBox="0 0 1000 560"
+            preserveAspectRatio="xMidYMid slice"
+            aria-hidden="true"
+          >
+            {ALTURAS.map((y, i) => (
+              /*
+               * Dos trazos por línea, el mismo camino: uno ancho y casi
+               * transparente que hace de resplandor, y encima el hilo nítido.
+               * Es más barato y más limpio que un `filter: blur`, que en una
+               * pantalla grande obliga al navegador a rasterizar el SVG entero.
+               */
+              <g key={y}>
+                <motion.path
+                  d={trazadoDesde(y)}
+                  className="tn-linea tn-linea--halo"
+                  initial={{ pathLength: 0 }}
+                  animate={{ pathLength: 1 }}
+                  transition={{
+                    duration: LINEA.dura,
+                    delay: LINEA.en + i * LINEA.paso,
+                    ease: 'easeInOut',
+                  }}
+                />
+                <motion.path
+                  d={trazadoDesde(y)}
+                  className="tn-linea"
+                  initial={{ pathLength: 0 }}
+                  animate={{ pathLength: 1 }}
+                  transition={{
+                    duration: LINEA.dura,
+                    delay: LINEA.en + i * LINEA.paso,
+                    ease: 'easeInOut',
+                  }}
+                />
+              </g>
+            ))}
+
+            {/* La vía que sale del nudo hacia la derecha: la noche continúa. */}
+            <motion.path
+              d={`M ${NUDO.x} ${NUDO.y} H 1040`}
+              className="tn-linea tn-linea--salida"
+              initial={{ pathLength: 0 }}
+              animate={{ pathLength: 1 }}
+              transition={{ duration: SALIDA.dura, delay: SALIDA.en, ease: 'easeOut' }}
+            />
+
+            {/* El fogonazo del nudo al cerrarse. */}
+            <motion.circle
+              cx={NUDO.x}
+              cy={NUDO.y}
+              r={9}
+              className="tn-chispa"
+              initial={{ opacity: 0, scale: 0.4 }}
+              animate={{ opacity: [0, 1, 0], scale: [0.4, 3.4, 4.6] }}
+              transition={{ duration: PRENDE.dura, delay: PRENDE.en, ease: 'easeOut' }}
+              style={{ transformOrigin: `${NUDO.x}px ${NUDO.y}px` }}
+            />
+          </svg>
 
           {/*
-            El rótulo esmaltado. Va DEBAJO del tren en el orden de capas (z 2
-            contra z 3) y se enciende mientras el tren lo tapa: ver la cuenta de
-            `ROTULO` ahí arriba. Texto de hierro sobre ámbar, que es como se
-            rotulaba una estación y de paso lo único legible de la pantalla.
+            El rótulo esmaltado, en el nudo. Texto de hierro sobre ámbar, que es
+            como se rotulaba una estación: lo que se lee de noche desde la
+            ventanilla de un tren en marcha es oscuro sobre amarillo.
           */}
           <motion.div
             className="tn-rotulo"
@@ -115,27 +213,6 @@ export default function NudoTransition({ active, onComplete }: NudoTransitionPro
             <span className="tn-rotulo-nombre">VALDEHIERRO</span>
             <span className="tn-rotulo-linea" />
             <span className="tn-rotulo-pie">CRUCE DE CINCO LÍNEAS · ALT. 1.148 M</span>
-          </motion.div>
-
-          {/*
-            El tren. Una sola pieza que se traslada: el faro le sale por delante
-            y las ventanas y el derrame de luz van dentro, así que todo el
-            convoy es UN `transform` y ni un solo recálculo de disposición.
-          */}
-          <motion.div
-            className="tn-tren"
-            initial={{ x: '-180vw' }}
-            animate={{ x: '100vw' }}
-            transition={{ duration: TREN.dura, delay: TREN.en, ease: 'linear' }}
-          >
-            {/* El faro de la máquina, que asoma antes que el hierro. */}
-            <div className="tn-faro" />
-            {/* La fila de ventanas: de un tren de noche no se ve otra cosa. */}
-            <div className="tn-ventanas" />
-            {/* La luz que las ventanas echan sobre la nieve del andén. */}
-            <div className="tn-derrame" />
-            {/* Los testeros: el corte oscuro entre coche y coche, cada 800 px. */}
-            <div className="tn-testeros" />
           </motion.div>
 
           {/*

@@ -11,13 +11,19 @@
    cortinilla se pinta ANTES de que el documento tenga `data-juego` puesto —es
    lo primero que se ve al pulsar la ficha del catálogo, y el tema se aplica al
    entrar en el recibidor— así que un `var(--acento)` aquí traería el dorado de
-   la casa y las ventanas del tren saldrían del color equivocado justo en el
-   único fotograma que la gente mira con atención. Es la misma lección que ya
-   está escrita en la cabecera de la hoja de las Sombras.
+   la casa y el haz de líneas saldría del color equivocado justo en el único
+   fotograma que la gente mira con atención. Es la misma lección que ya está
+   escrita en la cabecera de la hoja de las Sombras.
 
-   TODO LO QUE SE MUEVE SE MUEVE CON `transform`. El tren mide casi dos
-   pantallas de largo: animarlo con `left` sería repintar dos pantallas de
-   degradados sesenta veces por segundo en un móvil de hace cuatro años.
+   AQUÍ HUBO UN TREN. Cruzaba la pantalla entera con las ventanas encendidas, y
+   a tamaño de monitor no se leía como un tren sino como una empalizada de
+   bloques amarillos. Lo que se pinta ahora es el NUDO —cinco líneas que se
+   juntan en un punto—, que es lo que de verdad es esta partida. Si alguien
+   vuelve a buscar aquí las clases del convoy, no están y no es un descuido.
+
+   LO QUE SE ANIMA ES EL TRAZO, no la posición de nada: `pathLength` sobre
+   cinco `path`, que el navegador resuelve sin recalcular disposición ni una
+   sola vez. Por eso el plano va en un SVG y no en cajas con bordes.
    ===================================================================== */
 
 .tn-velo {
@@ -27,27 +33,6 @@
   overflow: hidden;
   /* Azul de hulla, no negro puro: el negro puro se lee como «se ha roto». */
   background: #080b11;
-}
-
-/* ---------------------------------------------------------------------
-   El andén
-   --------------------------------------------------------------------- */
-
-/*
- * La franja de abajo. Hace dos cosas a la vez: da suelo al tren —sin ella
- * flota— y pone la nieve pisada que devuelve algo de la luz de las ventanas.
- * El filo de arriba es de ámbar muy bajo, que es el canto del andén cogiendo
- * la luz de la bombilla.
- */
-.tn-anden {
-  position: absolute;
-  inset: auto 0 0 0;
-  z-index: 1;
-  height: 32%;
-  border-top: 1px solid rgba(217, 166, 72, 0.16);
-  background:
-    linear-gradient(180deg, rgba(222, 210, 187, 0.06), rgba(222, 210, 187, 0.015) 38%, transparent 78%),
-    linear-gradient(180deg, #0b0f15, #080b11);
 }
 
 /* ---------------------------------------------------------------------
@@ -117,120 +102,69 @@
    El tren
    --------------------------------------------------------------------- */
 
-/*
- * El coche, en capas horizontales: el filo del techo, la moldura donde pega la
- * luz del andén, la caja, la faja de debajo de las ventanas, los bajos y la
- * sombra de los bogies. Se pinta con un solo degradado de paradas duras porque
- * a esta velocidad nadie va a mirar dos veces, y porque cada elemento de más
- * son dos pantallas más que componer sesenta veces por segundo.
- */
-.tn-tren {
-  position: absolute;
-  z-index: 3;
-  left: 0;
-  top: 22%;
-  width: 180vw;
-  height: 46%;
-  will-change: transform;
-  background: linear-gradient(
-    180deg,
-    #05070b 0 5%,
-    #131a24 5% 10%,
-    #0f151d 10% 13%,
-    #1b222d 13% 60%,
-    #10161e 60% 64%,
-    #080c12 64% 84%,
-    #04060a 84% 100%
-  );
-  box-shadow: 0 0 70px rgba(0, 0, 0, 0.85);
-}
+/* ---------------------------------------------------------------------
+   El plano: las cinco líneas anudándose
+   --------------------------------------------------------------------- */
 
 /*
- * El faro de la máquina, colgado por DELANTE del morro: entra en cuadro unos
- * dos décimas antes que el hierro, que es lo que hace que el tren se anuncie en
- * vez de aparecer. En una noche con nieve un faro no ilumina, deslumbra: de ahí
- * el desenfoque grande y que el centro llegue casi a blanco.
- */
-.tn-faro {
-  position: absolute;
-  top: -45%;
-  right: -26vw;
-  width: 42vw;
-  height: 190%;
-  pointer-events: none;
-  filter: blur(26px);
-  background: radial-gradient(
-    46% 40% at 62% 50%,
-    rgba(255, 244, 214, 0.55),
-    rgba(217, 166, 72, 0.22) 44%,
-    transparent 72%
-  );
-}
-
-/*
- * La fila de ventanas. Un patrón que se repite cada 62 px: 18 de montante, 32
- * de cristal encendido y 12 de entrepaño.
+ * El SVG ocupa el velo entero y se recorta (`slice`, en el componente) para
+ * llegar a los cuatro bordes en cualquier proporción de ventana.
  *
- * LOS NÚMEROS SON EL DIBUJO ENTERO, y la primera versión los tenía al doble:
- * con ventanas de 52 px de ancho y un tercio de la altura del coche salían
- * siete puertas amarillas cruzando la pantalla, que es un autobús. Un coche de
- * viajeros tiene la ventana MÁS ALTA QUE ANCHA y caben veinte en un encuadre;
- * eso es lo que se reconoce como un tren de noche, y no hay que dibujar nada
- * más para conseguirlo.
- *
- * El desenfoque de medio píxel tampoco es un adorno: es lo que le quita el filo
- * de gráfico vectorial y lo que hace que a esta velocidad se lea como luz y no
- * como una valla amarilla.
+ * `overflow: visible` NO es cosmético: los trazos nacen en x = -40, fuera de la
+ * caja del `viewBox`, y sin esto el navegador los recorta justo en el borde y
+ * las cinco líneas aparecen empezando de la nada a la vez. El cabo tiene que
+ * quedarse FUERA del encuadre para que parezca que vienen de lejos.
  */
-.tn-ventanas {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 17%;
-  height: 21%;
-  filter: blur(0.5px);
-  background: repeating-linear-gradient(
-    90deg,
-    transparent 0 18px,
-    rgba(236, 203, 139, 0.92) 18px 50px,
-    transparent 50px 62px
-  );
-}
-
-/*
- * Lo que las ventanas echan sobre la nieve del andén al pasar por delante.
- *
- * ARRANCA DEBAJO DE LA CAJA Y NO DENTRO. Empezaba a media altura del coche y el
- * desenfoque le lavaba los bajos: el tren perdía su masa y quedaba una mancha
- * parda del tamaño de media pantalla. La luz de una ventana no ilumina la
- * chapa que tiene debajo —sale hacia fuera—, así que esto empieza donde acaba
- * el coche y se muere a media nieve.
- */
-.tn-derrame {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 88%;
-  height: 70%;
-  pointer-events: none;
-  filter: blur(26px);
-  background: linear-gradient(
-    180deg,
-    rgba(217, 166, 72, 0.22),
-    rgba(217, 166, 72, 0.07) 40%,
-    transparent 76%
-  );
-}
-
-/*
- * Los testeros: el corte negro entre coche y coche, cada 800 px. Son la única
- * pista de que esto son SEIS unidades enganchadas y no una cinta infinita, y
- * sin ellos el tren parecía un friso de ventanas.
- */
-.tn-testeros {
+.tn-plano {
   position: absolute;
   inset: 0;
-  background: repeating-linear-gradient(90deg, transparent 0 744px, #05070b 744px 800px);
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+/*
+ * El hilo. `round` en las dos puntas es lo que evita que un trazo a medio
+ * dibujar termine en un corte a escuadra: a esta escala un cabo plano se ve
+ * como un error de pintado, y uno redondeado se ve como una vía que sigue.
+ */
+.tn-linea {
+  fill: none;
+  stroke: #d9a648;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/*
+ * El resplandor: el mismo camino, muy ancho y casi transparente. Hace el
+ * trabajo de un `filter: blur` por una fracción de su coste —un filtro obliga
+ * al navegador a rasterizar el SVG entero en cada fotograma, y aquí hay once
+ * trazos animándose a la vez—.
+ */
+.tn-linea--halo {
+  stroke: rgba(217, 166, 72, 0.16);
+  stroke-width: 11;
+}
+
+/*
+ * La vía de salida va un punto más apagada que las cinco que entran. Es
+ * jerarquía y no capricho: lo que ya ha pasado —las líneas anudándose— pesa
+ * más que lo que queda por pasar, y con el mismo brillo la salida se lleva la
+ * mirada fuera del rótulo justo cuando el rótulo se enciende.
+ */
+.tn-linea--salida {
+  stroke: rgba(217, 166, 72, 0.62);
+  stroke-width: 1.8;
+}
+
+/* El fogonazo del nudo al cerrarse. */
+.tn-chispa {
+  fill: rgba(236, 203, 139, 0.55);
+  stroke: rgba(236, 203, 139, 0.9);
+  stroke-width: 1.2;
 }
 
 /* ---------------------------------------------------------------------
@@ -326,8 +260,19 @@
  * centra el rótulo es otra propiedad y sobrevive, que es justo lo que se quiere.
  */
 @media (prefers-reduced-motion: reduce) {
-  .tn-tren,
   .tn-nieve {
+    display: none;
+  }
+  /*
+   * Las líneas se quedan DIBUJADAS, no escondidas: son el plano del sitio en el
+   * que se entra, y quitarlas dejaría una pantalla negra con un cartel encima.
+   * Lo que se anula es el TRAZADO, que es lo único que se mueve.
+   */
+  .tn-plano path {
+    stroke-dasharray: none !important;
+    stroke-dashoffset: 0 !important;
+  }
+  .tn-chispa {
     display: none;
   }
   .tn-rotulo,
