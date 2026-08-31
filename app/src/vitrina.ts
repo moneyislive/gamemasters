@@ -50,6 +50,7 @@ import type { IconoDeArcade, ManifiestoDeArcade } from '../../shared/arcade';
  * vieja el día que entre el segundo juego—.
  */
 import '../../shared/arcade/juegos';
+import type { Href } from 'expo-router';
 import { MUEBLES, rutaDeArcade } from './arcade/muebles';
 
 /** El color con el que se reconoce cada mundo de un vistazo. */
@@ -103,7 +104,7 @@ export interface Minijuego {
    * arcade que declare un mueble que esta versión no trae se lista con la verdad
    * por delante en vez de con una tarjeta que no hace nada al tocarla.
    */
-  ruta: string | null;
+  ruta: Href | null;
 }
 
 /** Un hueco de promoción. Vacío hoy; la portada lo salta sin dejar agujero. */

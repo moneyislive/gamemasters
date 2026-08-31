@@ -37,12 +37,37 @@
  * pide. Lo que compran es que el día que llegue Riberas, el compilador obligue a
  * escribir el tablero antes de dejar instalar el juego.
  */
+import type { Href } from 'expo-router';
 import type { ManifiestoDeArcade, MuebleDeArcade } from '../../../shared/arcade';
+
+/**
+ * Las cuatro rutas del grupo `(arcade)`, dichas como unión y no como cadena.
+ *
+ * ═══ POR QUÉ NO ES `string`, Y CÓMO SE DESCUBRIÓ ═══
+ *
+ * `app.json` declara `typedRoutes: true`, así que `expo-router` GENERA la unión
+ * de rutas que existen de verdad a partir del árbol de ficheros, y `router.push`
+ * solo acepta una de ellas. Con `ruta: string` esto compilaba igualmente
+ * mientras el fichero generado —`.expo/types/router.d.ts`, que no está
+ * versionado— no se hubiera puesto al día. En cuanto alguien levanta la app, se
+ * regenera y el tipado se vuelve estricto.
+ *
+ * O sea que era un verde que dependía de un artefacto local: pasaba en la
+ * máquina donde nadie había arrancado el servidor de desarrollo y fallaba en la
+ * de al lado. Se cazó al integrar, corriendo la batería después de haber jugado
+ * una partida — no antes.
+ *
+ * Escrito como unión, el compilador exige que cada entrada de `MUEBLES`
+ * corresponda a un fichero real de `app/app/(arcade)/`. Un mueble nuevo sin su
+ * pantalla no compila, que es la misma disciplina que `MuebleDeArcade` tiene en
+ * el manifiesto.
+ */
+export type RutaDeMueble = '/formulario' | '/tablero' | '/lienzo' | '/escena';
 
 /** Qué sabe la app de cada mueble. */
 export interface Mueble {
   /** La ruta de `expo-router` que lo pinta. Coincide con el nombre del mueble. */
-  ruta: string;
+  ruta: RutaDeMueble;
   /** ¿Sabe la app pintarlo ya, o solo sabe decir que falta? */
   seSabePintar: boolean;
   /** Qué es, en una línea, para la pantalla que explica lo que falta. */
@@ -84,9 +109,16 @@ export const MUEBLES: Record<MuebleDeArcade, Mueble> = {
  * El juego viaja como parámetro y el mueble como ruta, y no al revés. Con una
  * ruta por juego —`/frente`— cada arcade nuevo obligaría a publicar una versión de
  * la app, que es exactamente lo que el enchufe de la fase 5 existe para evitar.
+ *
+ * Y va como OBJETO y no como cadena montada a mano. Con la cadena había que
+ * acordarse de `encodeURIComponent` —un identificador de arcade con un espacio o
+ * un `&` habría partido la consulta en dos— y además `router.push` no puede
+ * comprobar una plantilla: `${ruta}?arcade=${id}` es `string` para el
+ * compilador, por muy literal que sea el trozo de delante. Con el objeto, la
+ * ruta se comprueba y los parámetros los escapa `expo-router`.
  */
-export function rutaDeArcade(manifiesto: ManifiestoDeArcade): string {
-  return `${MUEBLES[manifiesto.mueble].ruta}?arcade=${encodeURIComponent(manifiesto.id)}`;
+export function rutaDeArcade(manifiesto: ManifiestoDeArcade): Href {
+  return { pathname: MUEBLES[manifiesto.mueble].ruta, params: { arcade: manifiesto.id } };
 }
 
 /**
