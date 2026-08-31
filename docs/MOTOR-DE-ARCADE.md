@@ -511,9 +511,25 @@ Una oferta de comercio con caducidad no caduca. Un turno con reloj no pasa.
 
 **La salida no es un temporizador de servidor** —eso rompería la reproducibilidad
 que el reductor puro acaba de comprar— sino **evaluación perezosa del plazo en la
-lectura**: antes de devolver, el sondeo compara el reloj de pared con los plazos
-absolutos que hay en el estado e inyecta un `tic` si toca. El reductor sigue
-siendo la única puerta y sigue siendo puro.
+lectura**: antes de devolver, el sondeo compara el reloj de pared con el plazo
+absoluto e inyecta un `tic` si toca. El reductor sigue siendo la única puerta y
+sigue siendo puro.
+
+> **El plazo vive en la MESA, no en el estado del juego.** Esta línea decía «los
+> plazos absolutos que hay en el estado» hasta que la fase 2 intentó
+> implementarlo y descubrió que no se puede: con `tickHz: 0` no hay conversión
+> entre tics y reloj de pared —`ticsPara(45, 0)` es infinito por contrato— y,
+> sobre todo, **la autoridad no puede mirar dentro de un estado opaco**, que es
+> la decisión de la que cuelga el diseño entero.
+>
+> Así que la mesa sabe cuánto se espera y cuándo se acaba, y lo elige quien la
+> abre; el juego solo dice **qué significa que venza**, en su rama del tic, igual
+> que dice qué significa cualquier otro movimiento. Y encaja mejor con La Larga
+> de lo que encajaba la versión anterior: «veinticuatro horas por turno» es una
+> decisión de quien monta la partida, no una regla de Riberas.
+>
+> Queda dicho que si un juego necesitara **varios vencimientos a la vez** esto se
+> queda corto, y que ese día habrá que volver aquí.
 
 Conviene decir por qué eso basta, porque el caso que asusta no es el que parece.
 Si un jugador cierra la app, **los demás siguen sondeando**, y su lectura hace
