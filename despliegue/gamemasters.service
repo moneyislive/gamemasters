@@ -23,6 +23,20 @@ WorkingDirectory=/opt/gamemasters
 # sin que nada avise.
 Environment=NODE_ENV=production
 
+# LAS MESAS DE LA SALA DE ARCADE, DENTRO DE LO QUE SE PUEDE ESCRIBIR.
+#
+# Sin esta línea se guardarían en `/opt/gamemasters/data/mesas`, o sea dentro de
+# WorkingDirectory — y con `ProtectSystem=strict` de más abajo eso es de SOLO
+# LECTURA: el fichero no se puede ni crear. El servidor arranca igual, las
+# partidas se juegan igual y no queda ni una en el disco, así que el primer
+# `systemctl restart` se lleva todas las que hubiera abiertas. Con «La Larga»
+# —partidas de días— eso no es una molestia: es perder la partida.
+#
+# La carpeta cuelga de /var/lib/gamemasters, que es el único ReadWritePaths de
+# esta unidad. Si algún día se añade otra ruta escribible, ésta puede moverse;
+# lo que no puede es quedarse sin declarar.
+Environment=MESAS_DIR=/var/lib/gamemasters/mesas
+
 # Los secretos NO van en esta unidad: la leen todos los usuarios de la máquina
 # (`systemctl cat`). Van en un fichero aparte, propiedad de root y en modo 600.
 EnvironmentFile=/etc/gamemasters/entorno

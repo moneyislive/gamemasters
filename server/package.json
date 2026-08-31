@@ -60,6 +60,7 @@
     "verify:pureza": "tsx scripts/verificar-pureza.ts",
     "verify:sin-red": "tsx scripts/verificar-sin-red.ts",
     "verify:procedencia": "tsx scripts/verificar-procedencia.ts",
+    "verify:mesa": "tsx scripts/verificar-mesa.ts",
     "oro:arcade": "tsx scripts/oro-arcade.ts"
   },
   "dependencies": {

@@ -36,6 +36,13 @@ import {
   MANIFIESTO_FRENTE,
   proyectarLaFrente,
 } from './frente';
+import {
+  avanzarLaRonda,
+  loSecretoDeLaRonda,
+  MANIFIESTO_RONDA,
+  proyectarLaRonda,
+} from './ronda';
+import type { EstadoDeLaRonda } from './ronda';
 
 export {
   ACIERTO,
@@ -64,6 +71,30 @@ export type {
   VistaDeQuienLoLleva,
 } from './frente';
 
+export {
+  avanzarLaRonda,
+  BARAJA as BARAJA_DE_LA_RONDA,
+  CARTAS_POR_MANO,
+  EMPEZAR as EMPEZAR_LA_RONDA,
+  JUGADORES,
+  JUGAR,
+  loSecretoDeLaRonda,
+  MANIFIESTO_RONDA,
+  partidaNueva as partidaNuevaDeLaRonda,
+  proyectarLaRonda,
+  RONDA,
+  seAcabo as seAcaboLaRonda,
+} from './ronda';
+export type {
+  Carta,
+  CartaEnLaBaza,
+  EstadoDeLaRonda,
+  JugadorDeLaRonda,
+  JugadorVisto,
+  MomentoDeLaRonda,
+  VistaDeLaRonda,
+} from './ronda';
+
 /**
  * EL ALTA. Manifiesto, reductor, proyección y `loSecreto` por la misma puerta.
  *
@@ -78,4 +109,27 @@ instalarArcade({
   avanzar: avanzarLaFrente,
   proyeccion: proyectarLaFrente,
   loSecreto: loSecretoDeLaFrente,
+});
+
+/**
+ * «LA RONDA», el de la fase 2: la mesa en línea con mano oculta.
+ *
+ * ═══ POR QUÉ SU ESTADO SE INSTALA COMO `EstadoDeLaRonda | undefined` ═══
+ *
+ * Porque una mesa de arcade nace con `estado: undefined` —el árbitro lo
+ * documenta como una forma legítima de empezar— y es el reductor quien construye
+ * lo suyo en el primer movimiento, con la semilla y los asientos que le llegan en
+ * el contexto. Eso es lo que hace que reejecutar el diario reparta exactamente
+ * las mismas cartas.
+ *
+ * El parámetro se escribe a mano y no se deja inferir porque las tres funciones
+ * lo usan en posiciones distintas —el reductor lo recibe y devuelve, la
+ * proyección solo lo recibe— y con la inferencia el compilador escoge una de las
+ * dos y las otras dos dejan de encajar.
+ */
+instalarArcade<EstadoDeLaRonda | undefined>({
+  manifiesto: MANIFIESTO_RONDA,
+  avanzar: avanzarLaRonda,
+  proyeccion: proyectarLaRonda,
+  loSecreto: loSecretoDeLaRonda,
 });

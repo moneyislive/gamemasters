@@ -157,6 +157,15 @@ ponerCanal({
   avisarCambio: () => clavar('canal.avisarCambio'),
   anunciar: () => clavar('canal.anunciar'),
   avisosDesde: () => clavar('canal.avisosDesde'),
+  /*
+   * El sexto verbo lo trae la fase 2 y entra aquí el mismo día, sin excepción:
+   * un juego de dispositivo que pidiera un despertador por vencimiento estaría
+   * hablando con el servidor tanto como si llamara a `avisarCambio`. Que `Canal`
+   * sea una interfaz cerrada es lo que obliga a que este fichero se entere de que
+   * hay un verbo nuevo —no compila hasta que se añade— en vez de quedarse
+   * comprobando cinco puertas de seis sin decirlo.
+   */
+  despertarAlVencer: () => clavar('canal.despertarAlVencer'),
   olvidar: () => clavar('canal.olvidar'),
 });
 
@@ -823,7 +832,7 @@ if (fallos.length > 0) {
 
 console.log(
   '\nLa Frente se juega entera —dos rondas, el reloj venciendo, la proyección al revés—\n' +
-    'con `fetch`, los sockets, el DNS, el UDP y los cinco verbos del canal sustituidos\n' +
+    'con `fetch`, los sockets, el DNS, el UDP y los seis verbos del canal sustituidos\n' +
     'por funciones que lanzan. No es que declare que no usa la red: es que no la usa.',
 );
 process.exit(0);

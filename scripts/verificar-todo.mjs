@@ -291,6 +291,30 @@ const BATERIA = [
     guion: 'oro:arcade',
     porque: 'un registro de movimientos grabado y el estado final byte a byte, con `canonico.ts`',
   },
+  /*
+   * ═══ Y ÉSTE ES EL DE LA FASE 2: LA MESA EN LÍNEA ═══
+   *
+   * Va marcado `lento` porque LEVANTA SERVIDORES —cuatro, contando los dos que
+   * tienen que NEGARSE a arrancar— y eso no es una manía: es el patrón de fallo
+   * que esta casa ya tiene apuntado dos veces, VERDE EN PROCESO Y ROTO AL
+   * ARRANCAR. La mitad de lo que comprueba no se puede comprobar de otra forma:
+   * que `routes/arcade.ts` esté montado DELANTE de `requireAuth` no significa
+   * nada sin un servidor con su guardián puesto, y que un arcade con secretos
+   * sin tapar impida arrancar solo se ve arrancando.
+   *
+   * Y trae la comprobación que de verdad cierra el agujero de la información
+   * oculta: se juega una partida entera de cuatro y se contrasta, revisión a
+   * revisión, lo que se le mandó a cada cual contra las manos de los otros tres.
+   * Sin eso, una proyección que fuera la identidad pasaría en verde.
+   */
+  {
+    nombre: 'la mesa en línea',
+    donde: 'server',
+    guion: 'verify:mesa',
+    lento: true,
+    porque:
+      'una mesa de cuatro con mano oculta y servidor de verdad: el plazo vence por la lectura, el `rev` rancio se rechaza al escribir y no al leer, y ninguna carta sale hacia el móvil de otro',
+  },
 ];
 
 

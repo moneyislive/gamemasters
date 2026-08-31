@@ -30,6 +30,31 @@
  * cientos a la vez. `esperas` y `avisos` son `Map` de ámbito de módulo, o sea
  * memoria del proceso, y sin `olvidar` crecen sin techo hasta que Render mata la
  * instancia por memoria. No es una hipótesis: es aritmética.
+ *
+ * ═══ Y POR QUÉ AHORA SON SEIS: EL PLAZO QUE NO VENCÍA NUNCA ═══
+ *
+ * El sexto lo trae la fase 2 y estaba NOMBRADO Y NO DISEÑADO en el §12 del
+ * documento. El problema, entero, en cuatro frases:
+ *
+ *   · Un juego por turnos declara `tickHz: 0`, así que nadie le mete tics.
+ *   · Un turno con plazo necesita que ALGO entre por el reductor para vencer, y
+ *     la salida acordada no es un temporizador de servidor —rompería la
+ *     reejecutabilidad— sino que la LECTURA evalúe el plazo y meta el tic.
+ *   · Pero una lectura puede estar APARCADA veinticinco segundos dentro de
+ *     `esperarCambio`, y un plazo que vence dentro de esa ventana no despierta a
+ *     nadie: `avisarCambio` solo lo llama quien escribe, y aquí no escribe nadie
+ *     porque justamente el problema es que nadie se mueve.
+ *   · Resultado sin el sexto verbo: el plazo vence hasta veinticinco segundos
+ *     tarde, y con varias vueltas seguidas de sondeo la mesa se queda quieta
+ *     mucho más de lo que el juego prometió.
+ *
+ * `despertarAlVencer` es la respuesta, y lo que la hace aceptable es lo que NO
+ * hace: no toca ningún estado, no mete ningún movimiento y no sabe qué es una
+ * partida. Lo único que hace es soltar una espera aparcada para que la LECTURA
+ * —que sigue siendo la única puerta, bajo el mismo candado— evalúe el plazo como
+ * si el móvil acabara de preguntar. La reejecutabilidad no se toca: el tic lo
+ * mete la lectura y queda en el diario, exactamente igual que si hubiera llegado
+ * un movimiento.
  */
 
 /**
@@ -55,7 +80,7 @@ export interface AvisoDeMesa {
 }
 
 /**
- * LOS CINCO VERBOS. Es todo lo que un canal tiene que saber hacer.
+ * LOS SEIS VERBOS. Es todo lo que un canal tiene que saber hacer.
  *
  * No hay `suscribirse`, ni `emitir`, ni `sala`, ni nada que suene a WebSocket, y
  * eso es deliberado: si el contrato tuviera forma de conexión permanente, el
@@ -67,6 +92,11 @@ export interface AvisoDeMesa {
  * cabecera de `hub.ts` y es la que hay que conservar con las dos manos: si se
  * pierde un aviso, la siguiente petición trae el estado completo. Un canal que
  * exigiera entrega fiable sería un canal que no se puede degradar.
+ *
+ * Y esa regla alcanza también al sexto: si un despertar por vencimiento se
+ * pierde, el plazo vence en la siguiente lectura y no pasa nada más que unos
+ * segundos de retraso. Un verbo cuyo fallo fuera irrecuperable no cabría en este
+ * contrato.
  */
 export interface Canal {
   /**
@@ -90,6 +120,37 @@ export interface Canal {
    * que no van dirigidos a nadie.
    */
   avisosDesde(mesa: string, desdeRev: number, quien: string | null): AvisoDeMesa[];
+
+  /**
+   * EL SEXTO VERBO. Despierta a quien espere en esta mesa dentro de tantos ms.
+   *
+   * Lo llama quien va a aparcar una lectura sabiendo que hay un plazo que vence
+   * antes de que se agote la espera. Al saltar, hace exactamente lo mismo que
+   * `avisarCambio`: soltar a los que esperan en ESA mesa, para que su lectura
+   * vuelva a pasar por el candado y evalúe el plazo.
+   *
+   * ═══ LAS TRES REGLAS QUE LO HACEN BARATO ═══
+   *
+   *  1. ES POR MESA, NO GLOBAL. Un solo despertador para todo el proceso
+   *     soltaría a las cuatrocientas mesas cada vez que venciera un plazo de una,
+   *     que es exactamente lo que el §12 del diseño dejaba sin resolver —«no se
+   *     sabe cómo evita despertar a todo el mundo cada vez»—. Con la mesa por
+   *     delante, quien se despierta es quien tenía el plazo.
+   *  2. HAY UNO SOLO POR MESA, Y GANA EL MÁS CERCANO. Cuatro móviles sondeando
+   *     la misma mesa lo piden cuatro veces con el mismo vencimiento; se queda el
+   *     primero. Sin esta regla, cada vuelta de sondeo dejaría un temporizador
+   *     nuevo y una mesa quieta acumularía uno por móvil y por vuelta.
+   *  3. ES UNA PISTA, NO UNA PROMESA. Que salte tarde, o que no salte, solo
+   *     cuesta que el plazo venza en la siguiente lectura. Ningún estado depende
+   *     de él, y por eso no rompe la reejecutabilidad ni sobrevivir a un
+   *     despliegue le importa a nadie.
+   *
+   * Un `dentroDeMs` negativo o cero significa «ya ha vencido»: se despierta en
+   * cuanto se pueda, sin esperar. No se hace en el acto y a propósito, porque
+   * quien llama está a punto de aparcar su propia espera y despertarla ANTES de
+   * que exista sería no despertarla.
+   */
+  despertarAlVencer(mesa: string, dentroDeMs: number): void;
 
   /** Se acabó esta mesa: se suelta todo lo suyo. */
   olvidar(mesa: string): void;
@@ -123,6 +184,9 @@ export const CANAL_QUE_LANZA: Canal = {
   },
   avisosDesde(mesa) {
     throw sinCanal('avisosDesde', mesa);
+  },
+  despertarAlVencer(mesa) {
+    throw sinCanal('despertarAlVencer', mesa);
   },
   olvidar(mesa) {
     throw sinCanal('olvidar', mesa);

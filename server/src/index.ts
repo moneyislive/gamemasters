@@ -13,6 +13,21 @@ import fs from 'node:fs';
  * que no lleva a ningun sitio, en produccion, con la mesa puesta.
  */
 import './juegos/instalados';
+/*
+ * Y DA DE ALTA LOS ARCADES, que son el otro motor y el otro registro.
+ *
+ * Son dos importaciones y no una a propósito: `shared/arcade` tiene su propio
+ * `Symbol.for`, separado del de veladas, y esa separación es la que impide que
+ * un minijuego acabe pintado en el carrusel de veladas de la portada. Si
+ * compartieran tabla, la única defensa sería un `if (esArcade)` dentro de
+ * `veladas()`, que es la primera de las cien banderas que deshacen la separación.
+ *
+ * Sin esta línea, `exigirSecretosTapados()` de ahí abajo comprobaría un registro
+ * VACÍO y pasaría en verde sin haber mirado nada — que es la forma exacta en que
+ * este repositorio ya se ha encontrado tres comprobadores felicitando a todo el
+ * mundo. La garantía y las altas van juntas o no valen ninguna de las dos.
+ */
+import '../../shared/arcade/juegos';
 import path from 'node:path';
 import cors from 'cors';
 import express from 'express';
@@ -29,6 +44,10 @@ import legalRouter from './legal/documentos';
 import limitadorDeIntentos from './puerta/montaje';
 import wellKnownRouter from './enlaces/well-known';
 import { getStorageKind, getStore, initStore } from './db/store';
+import { exigirSecretosTapados } from '../../shared/arcade';
+import { ponerCanal } from './canal';
+import { canalDeSondeo } from './canal/sondeo';
+import arcadeRouter from './routes/arcade';
 import boardRouter from './routes/board';
 import chatRouter from './routes/chat';
 import configRouter from './routes/config';
@@ -217,6 +236,20 @@ app.use('/api', limitadorDeIntentos);
 // de la casa. Su credencial es el testigo firmado que recibe al emparejar el
 // móvil, y cada ruta lo verifica por su cuenta.
 app.use('/api', jugarRouter);
+/*
+ * ═══ LA SALA DE ARCADE VA AQUÍ, JUNTO A `jugarRouter` Y DELANTE DEL GUARDIÁN ═══
+ *
+ * No por comodidad: un arcade NO TIENE GAME MASTER. Todo el ciclo de una velada
+ * lo abre `routes/live.ts` detrás de `requireAuth` porque hay alguien que dirige
+ * y que conoce la contraseña de la casa. Aquí no: cuatro personas abren una mesa
+ * con un código de cinco letras y juegan, sin taller, sin cuenta y sin correo.
+ *
+ * Montarlo detrás del guardián significaría que para echar una partida de cartas
+ * de cinco minutos hay que saber la contraseña del estudio de misterios, y eso
+ * es exactamente el acoplamiento con el taller que el segundo motor existe para
+ * no tener. Su propia puerta es la llave de asiento que reparte al sentarse.
+ */
+app.use('/api', arcadeRouter);
 // La cuenta va con ellos: quien juega no conoce la contraseña de la casa.
 app.use('/api', cuentaRouter);
 // El estudio de generación: su puerta la pone él (cualquier identidad + tope).
@@ -337,6 +370,48 @@ app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
 function comprobarArranque(): void {
   // Falla aquí si falta el secreto de firma en producción.
   secretoDeFirma();
+
+  /*
+   * ═══ EL CANAL DE LA SALA DE ARCADE, PUESTO ANTES DE ATENDER A NADIE ═══
+   *
+   * Mientras nadie instale uno, `elCanal()` devuelve el CANAL QUE LANZA, y eso
+   * es deliberado: un canal mudo que se tragara las llamadas dejaría un servidor
+   * donde las mesas funcionan y nadie se entera de nada, sin un solo error — el
+   * modo de fallo favorito de este repositorio y el que más caro ha salido
+   * siempre, el que no falla.
+   *
+   * Va aquí y no junto al montaje del router porque esto es arranque y aquello
+   * es encaminamiento, y porque lo que hay que garantizar es que esté puesto
+   * ANTES de escuchar: un canal instalado en el segundo tres de vida del proceso
+   * deja tres segundos de mesas que no avisan a nadie.
+   */
+  ponerCanal(canalDeSondeo);
+
+  /*
+   * ═══ LA GARANTÍA QUE LA FASE 0 DEJÓ ESCRITA Y NO LLAMABA NADIE ═══
+   *
+   * `exigirSecretosTapados()` existe desde el primer commit del motor de arcade,
+   * funciona, tiene sus dos excepciones escritas y su propia cabecera decía:
+   * «NADIE LA LLAMA TODAVÍA … una garantía que existe y no está conectada es una
+   * garantía que no existe». Esta línea es la que la conecta.
+   *
+   * QUÉ IMPIDE, EN CONCRETO. Que arranque un servidor con un arcade que declara
+   * `secretos: true` y no ha registrado proyección —o no ha registrado
+   * `loSecreto`—. Sin proyección, el estado ENTERO viajaría a todos los
+   * dispositivos de la mesa: las cuatro manos a los cuatro móviles, la partida
+   * jugándose con normalidad y nadie viendo un error jamás. Sin `loSecreto`, la
+   * proyección existiría y no habría forma de comprobar que hace algo: un juego
+   * puede registrar la identidad —`(estado) => estado`— y pasar todos los
+   * comprobadores en verde mientras lo filtra todo.
+   *
+   * Y VA AQUÍ, EN LAS COMPROBACIONES DE ARRANQUE, Y NO AL PROYECTAR. Un fallo al
+   * proyectar ocurre con la mesa puesta y la gente dentro, y la única salida
+   * decente en ese momento es cortar la partida — o sea castigar a quien está
+   * jugando por un error de quien instaló el juego. Un servidor que se niega a
+   * arrancar se arregla en cinco minutos; uno que arranca filtrando no se
+   * arregla nunca, porque nadie se entera.
+   */
+  exigirSecretosTapados();
 
   /*
    * Las costuras de prueba de OIDC permiten apuntar la verificación de

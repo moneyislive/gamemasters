@@ -108,6 +108,7 @@ const IMPRESCINDIBLES = [
   'PUBLIC_ORIGIN', // sin ella no arranca en producción
   'HOST', // en Render hay que abrir la escucha
   'UPLOADS_DIR', // sin ella las subidas van al disco efímero
+  'MESAS_DIR', // sin ella cada despliegue mata las partidas de arcade en curso
   'APP_PASSWORD',
   'PLAYER_TOKEN_SECRET',
   'MONGODB_URI',

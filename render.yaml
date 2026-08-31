@@ -77,6 +77,16 @@ services:
       - key: UPLOADS_DIR
         value: /var/data/uploads
 
+      # Las mesas de la Sala de Arcade, y va DENTRO del mismo disco por la misma
+      # razón, con una consecuencia peor si se olvida: `startCommand: npm start`
+      # corre con el directorio en `server/`, así que sin esta variable las
+      # partidas se escribirían en `server/data/mesas`, que es el sistema de ficheros
+      # efímero del contenedor y desaparece en CADA despliegue. Una partida de
+      # «La Larga» dura días: moriría en el siguiente `git push` igual que si
+      # viviera solo en memoria, y sin que nadie viera un error.
+      - key: MESAS_DIR
+        value: /var/data/mesas
+
       - key: ANTHROPIC_MODEL
         value: claude-fable-5
       - key: MONGODB_DB
