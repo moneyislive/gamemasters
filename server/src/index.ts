@@ -44,7 +44,7 @@ import legalRouter from './legal/documentos';
 import limitadorDeIntentos from './puerta/montaje';
 import wellKnownRouter from './enlaces/well-known';
 import { getStorageKind, getStore, initStore } from './db/store';
-import { exigirSecretosTapados } from '../../shared/arcade';
+import { exigirQueAguantenVacio, exigirSecretosTapados } from '../../shared/arcade';
 import { ponerCanal } from './canal';
 import { canalDeSondeo } from './canal/sondeo';
 import arcadeRouter from './routes/arcade';
@@ -412,6 +412,13 @@ function comprobarArranque(): void {
    * arregla nunca, porque nadie se entera.
    */
   exigirSecretosTapados();
+  /*
+   * Y que aguanten la mesa RECIEN ABIERTA, que nace sin estado a proposito. Un
+   * juego de servidor que no admita `undefined` en sus tres puertas compila,
+   * se instala, y devuelve 500 en la primera lectura de toda mesa nueva —con
+   * una mesa huerfana dentro de la tabla—. Lo destapo un revisor de la fase 2.
+   */
+  exigirQueAguantenVacio();
 
   /*
    * Las costuras de prueba de OIDC permiten apuntar la verificación de

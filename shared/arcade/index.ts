@@ -38,12 +38,13 @@ import {
   ArcadeSinProyeccion,
   hayLoSecreto,
   hayProyeccion,
+  loSecretoDe,
   proyectar,
   registrarLoSecreto,
   registrarProyeccion,
 } from './proyeccion';
 import type { LoSecreto, Proyeccion } from './proyeccion';
-import { exigeProyeccion, problemasDelManifiesto } from './tipos';
+import { ESPECTADOR, exigeProyeccion, necesitaMesa, problemasDelManifiesto } from './tipos';
 import type { ArcadeId, ManifiestoDeArcade, QuienMira } from './tipos';
 import type { ContextoMovimiento, Movimiento } from './movimiento';
 
@@ -371,4 +372,117 @@ export function exigirSecretosTapados(): void {
     error.message += `\nY hay más sin tapar: ${otros.join('; ')}.`;
   }
   throw error;
+}
+
+// ---------------------------------------------------------------------------
+// QUE UN JUEGO DE SERVIDOR AGUANTE LA MESA VACÍA
+// ---------------------------------------------------------------------------
+
+/** Un arcade que revienta cuando le preguntan por una mesa recién abierta. */
+export interface ArcadeQueNoAguantaVacio {
+  arcade: ArcadeId;
+  /** Cuál de las tres puertas se cayó. */
+  donde: 'avanzar' | 'proyeccion' | 'lo-secreto';
+  fallo: string;
+}
+
+/**
+ * Los arcades de servidor que NO sobreviven a que su mesa esté recién abierta.
+ *
+ * ═══ EL AGUJERO QUE ESTO TAPA, Y CÓMO SE ENCONTRÓ ═══
+ *
+ * Una mesa nace con `estado: undefined`, y es deliberado: así el reductor puede
+ * construir su estado inicial en el PRIMER movimiento, cuando ya conoce la
+ * semilla y los asientos —que al abrir todavía no existen—. Está razonado en
+ * `Mesa.estado` del árbitro.
+ *
+ * El problema es que `instalarArcade<E>` ata el reductor y la proyección al
+ * mismo `E`, y nada obliga a que `E` incluya `undefined`. Un juego de servidor
+ * puede declarar `E = SuEstado`, compilar, instalarse, y reventar en la PRIMERA
+ * LECTURA de toda mesa recién abierta. Lo destapó un revisor de la fase 2
+ * abriendo una mesa y pidiéndola: HTTP 500, y una mesa huérfana en la tabla a la
+ * que nadie podía sentarse, cerrar ni borrar.
+ *
+ * La Ronda sobrevivía sólo porque su autor se acordó de escribir
+ * `EstadoDeLaRonda | undefined`. Acordarse no es una garantía: es la definición
+ * de lo que este motor existe para no depender.
+ *
+ * ═══ POR QUÉ EN EL ARRANQUE Y NO EN EL TIPO ═══
+ *
+ * Por lo mismo que `exigirSecretosTapados()`, y la razón está escrita ahí
+ * arriba: **un arcade puede venir de fuera del binario, y allí no hay
+ * compilador**. Una unión que obligara a `E | undefined` protegería a los juegos
+ * de dentro y a ninguno de los de fuera, que son justo los que nadie ha revisado.
+ *
+ * ═══ LO QUE ESTA SONDA COMPRUEBA Y LO QUE NO, DICHO ANTES DE QUE ALGUIEN SE FÍE ═══
+ *
+ * Comprueba ENTERO lo que se puede comprobar entero: la proyección y `loSecreto`
+ * con la mesa vacía, que es exactamente por donde salió el 500 y por donde vuelve
+ * a salir en cuanto alguien abra una mesa.
+ *
+ * Del reductor comprueba UNA cosa: que no se caiga con un movimiento que no
+ * conoce. Eso caza la forma común del fallo —mirar dentro del estado antes de
+ * mirar de qué movimiento se trata— y NO caza un reductor que sólo reviente en
+ * uno de sus movimientos propios, porque el manifiesto de arcade no declara los
+ * movimientos y no hay lista que recorrer. Queda dicho para que nadie lea un
+ * verde de aquí como «este juego aguanta cualquier cosa».
+ */
+export function arcadesQueNoAguantanVacio(): ArcadeQueNoAguantaVacio[] {
+  const mal: ArcadeQueNoAguantaVacio[] = [];
+
+  for (const instalado of Object.values(INSTALADOS)) {
+    const m = instalado.manifiesto;
+    // Un juego de dispositivo no tiene mesa que abrir: nadie le va a preguntar.
+    if (!necesitaMesa(m)) continue;
+
+    const ctx: ContextoMovimiento = { quien: null, azar: 1, tic: 0, asientos: [] };
+    const apuntar = (donde: ArcadeQueNoAguantaVacio['donde'], error: unknown): void => {
+      mal.push({ arcade: m.id, donde, fallo: error instanceof Error ? error.message : String(error) });
+    };
+
+    try {
+      instalado.avanzar(undefined, { tipo: 'sonda:mesa-vacia' }, ctx);
+    } catch (error) {
+      apuntar('avanzar', error);
+    }
+    if (hayProyeccion(m.id)) {
+      try {
+        proyectar(m.id, undefined, ESPECTADOR);
+      } catch (error) {
+        apuntar('proyeccion', error);
+      }
+    }
+    if (hayLoSecreto(m.id)) {
+      try {
+        loSecretoDe(m.id, undefined);
+      } catch (error) {
+        apuntar('lo-secreto', error);
+      }
+    }
+  }
+
+  return mal;
+}
+
+/**
+ * Y la versión que NO deja arrancar, hermana de `exigirSecretosTapados()`.
+ *
+ * Se lanza con el primero y se nombran los demás por la misma razón: quien lea
+ * el registro necesita la lista entera para no arreglarlos de uno en uno a golpe
+ * de despliegue.
+ */
+export function exigirQueAguantenVacio(): void {
+  const mal = arcadesQueNoAguantanVacio();
+  const primero = mal[0];
+  if (primero === undefined) return;
+  const otros =
+    mal.length > 1 ? `\nY hay más: ${mal.slice(1).map((x) => `${x.arcade} (${x.donde})`).join('; ')}.` : '';
+  throw new Error(
+    `El arcade «${primero.arcade}» declara \`sede: 'servidor'\` y se cae cuando su mesa acaba de abrirse: ` +
+      `\`${primero.donde}\` con el estado vacío lanza «${primero.fallo}».\n` +
+      'Una mesa nace SIN estado a propósito, para que el reductor lo construya en el primer movimiento ' +
+      'con la semilla y los asientos ya puestos. Así que sus tres puertas tienen que admitir `undefined`: ' +
+      'declara el estado del juego como `SuEstado | undefined` y trátalo como «la partida aún no ha empezado».' +
+      otros,
+  );
 }
