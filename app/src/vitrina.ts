@@ -51,7 +51,18 @@ import type { IconoDeArcade, ManifiestoDeArcade } from '../../shared/arcade';
  */
 import '../../shared/arcade/juegos';
 import type { Href } from 'expo-router';
-import { MUEBLES, rutaDeArcade } from './arcade/muebles';
+import { rutaDeArcade } from './arcade/muebles';
+/*
+ * Y LA PREGUNTA DE SI SE SABE PINTAR SALE DE UNA SOLA TABLA.
+ *
+ * Antes salía de `MUEBLES[m.mueble].seSabePintar`, que contesta a otra cosa: si
+ * esta app sabe pintar ese MUEBLE. Con dos arcades de formulario eso empezó a
+ * mentir —«La Ronda» salía con tarjeta pulsable y al tocarla decía que no sabía
+ * pintarse— porque la pantalla del mueble decidía con SU tabla, la de qué juegos
+ * trae el binario. Ver `./arcade/pintados.ts`, donde vive ahora la única
+ * respuesta y el razonamiento entero.
+ */
+import { seSabePintar } from './arcade/pintados';
 
 /** El color con el que se reconoce cada mundo de un vistazo. */
 export interface Paleta {
@@ -277,7 +288,7 @@ export function minijuegos(): Minijuego[] {
     gancho: m.gancho,
     icono: m.icono,
     paleta: PALETAS_DE_ARCADE[m.id] ?? PALETA_DE_ARCADE_POR_DEFECTO,
-    ruta: MUEBLES[m.mueble].seSabePintar ? rutaDeArcade(m) : null,
+    ruta: seSabePintar(m) ? rutaDeArcade(m) : null,
   }));
 }
 

@@ -8,6 +8,7 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
+    "postinstall": "setup-skia-web public",
     "verify": "node src/comprobadores/verificar-app.mjs && node src/comprobadores/verificar-tema.mjs && node src/comprobadores/verificar-conexion.mjs",
     "verify:rutas": "node src/comprobadores/verificar-rutas.mjs",
     "build": "expo export --platform web --output-dir dist"
@@ -16,6 +17,7 @@
     "@expo-google-fonts/cinzel": "^0.4.2",
     "@expo-google-fonts/cormorant-garamond": "^0.4.1",
     "@react-three/fiber": "^9.7.0",
+    "@shopify/react-native-skia": "2.6.2",
     "expo": "~57.0.11",
     "expo-apple-authentication": "~57.0.1",
     "expo-auth-session": "~57.0.6",

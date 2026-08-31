@@ -30,6 +30,8 @@
  * provide an export named …». Cuesta una línea por nombre y se paga una vez.
  */
 import { instalarArcade } from '../index';
+import { avanzarElArcade, MANIFIESTO_EL_ARCADE } from './arcade';
+import type { EstadoDelArcade } from './arcade';
 import {
   avanzarLaFrente,
   loSecretoDeLaFrente,
@@ -43,6 +45,40 @@ import {
   proyectarLaRonda,
 } from './ronda';
 import type { EstadoDeLaRonda } from './ronda';
+
+export {
+  avanzarElArcade,
+  CAIDA_LENTA,
+  CAIDA_MEDIO,
+  CAIDA_RAPIDA,
+  CAMPO,
+  EL_ARCADE,
+  EMPEZAR as EMPEZAR_EL_ARCADE,
+  intervaloCon,
+  INTERVALO_INICIAL,
+  INTERVALO_MINIMO,
+  MANIFIESTO_EL_ARCADE,
+  NAVE_MEDIO_ALTO,
+  NAVE_MEDIO_ANCHO,
+  NAVE_Y,
+  OTRA as OTRA_PARTIDA,
+  partidaNueva as partidaNuevaDelArcade,
+  puntuacionDelArcade,
+  RUMBO,
+  seAcabo as seAcaboElArcade,
+  TICK_HZ as TICK_HZ_DEL_ARCADE,
+  TOPE_DE_CAIDAS,
+  VELOCIDAD_NAVE,
+} from './arcade';
+export type { Caida, EstadoDelArcade, MomentoDelArcade, Rumbo } from './arcade';
+
+export {
+  arcadesConCifraSinPuntuacion,
+  EstadoSinCifra,
+  hayPuntuacion,
+  puntuacionDe,
+} from './puntuaciones';
+export type { Puntuacion } from './puntuaciones';
 
 export {
   ACIERTO,
@@ -132,4 +168,30 @@ instalarArcade<EstadoDeLaRonda | undefined>({
   avanzar: avanzarLaRonda,
   proyeccion: proyectarLaRonda,
   loSecreto: loSecretoDeLaRonda,
+});
+
+/**
+ * «EL ARCADE», el de la fase 3: sesenta fotogramas por segundo y una cifra.
+ *
+ * ═══ ENTRA CON DOS ALTAS Y NO CON CUATRO, Y ESO ES UNA NOTICIA ═══
+ *
+ * Ni proyección ni `loSecreto`: declara `secretos: false` porque sus secretos
+ * serían secretos entre asientos y aquí solo hay un asiento —de hecho ninguno: un
+ * aparato y quien lo sujeta—. Está razonado entero en la cabecera de `arcade.ts`.
+ *
+ * Lo que sí trae y no cabe por esta puerta es la PUNTUACIÓN: `instalarArcade` no
+ * tiene hueco para ella, así que la cifra de un estado opaco se lee desde una
+ * tabla de al lado (`./puntuaciones.ts`) en vez de venir con el alta. La cabecera
+ * de ese fichero cuenta la grieta entera y qué habría que añadirle al núcleo para
+ * cerrarla; aquí queda dicho que el alta de este juego está INCOMPLETA por una
+ * limitación del contrato y no por descuido de quien la escribió.
+ *
+ * El parámetro se escribe a mano por lo mismo que en La Ronda: el reductor admite
+ * `undefined` —una mesa nace sin estado, aunque este juego no tenga mesa— y con
+ * la inferencia el compilador escoge una de las dos posiciones y la otra deja de
+ * encajar.
+ */
+instalarArcade<EstadoDelArcade | undefined>({
+  manifiesto: MANIFIESTO_EL_ARCADE,
+  avanzar: avanzarElArcade,
 });

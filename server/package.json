@@ -61,6 +61,10 @@
     "verify:sin-red": "tsx scripts/verificar-sin-red.ts",
     "verify:procedencia": "tsx scripts/verificar-procedencia.ts",
     "verify:mesa": "tsx scripts/verificar-mesa.ts",
+    "verify:determinismo": "tsx scripts/verificar-determinismo.ts",
+    "verify:marcador": "tsx scripts/verificar-marcador.ts",
+    "verify:canvaskit": "tsx scripts/verificar-canvaskit.ts",
+    "verify:bucle": "tsx scripts/verificar-bucle.ts",
     "oro:arcade": "tsx scripts/oro-arcade.ts"
   },
   "dependencies": {
@@ -73,11 +77,15 @@
     "nanoid": "^5.0.9"
   },
   "devDependencies": {
+    "@babel/core": "^7.29.7",
+    "@babel/plugin-transform-classes": "^7.29.7",
+    "@types/babel__core": "^7.20.5",
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
     "@types/multer": "^1.4.12",
     "@types/node": "^20.17.10",
     "esbuild": "^0.28.1",
+    "hermes-engine-cli": "0.12.0",
     "mongodb-memory-server": "^10.4.3",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2"

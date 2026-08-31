@@ -24,18 +24,27 @@
  * `app/app/(juego)/_layout.tsx`: se paga una línea y a cambio el compilador no
  * deja estrenarse a medias.
  *
- * ═══ LOS TRES QUE TODAVÍA NO SE PINTAN, Y POR QUÉ ESTÁN AQUÍ IGUAL ═══
+ * ═══ LOS DOS QUE TODAVÍA NO SE PINTAN, Y POR QUÉ ESTÁN AQUÍ IGUAL ═══
  *
- * De los cuatro muebles del contrato, la fase 1 solo entrega `formulario`. Los
- * otros tres tienen su entrada y su ruta, y esa ruta enseña una pantalla que dice
- * la verdad —qué mueble falta y qué fase lo trae— en vez de quedarse en blanco.
+ * De los cuatro muebles del contrato hay dos entregados —`formulario` con La
+ * Frente y La Ronda, y `lienzo` con El Arcade—. Los otros dos tienen su entrada y
+ * su ruta, y esa ruta enseña una pantalla que dice la verdad —qué mueble falta y
+ * qué fase lo trae— en vez de quedarse en blanco.
  *
  * No es andamiaje ni un catálogo fingido: HOY NO SE PUEDE LLEGAR A NINGUNA DE LAS
- * TRES, porque no hay ningún arcade instalado que declare esos muebles y la ruta
- * se calcula a partir del manifiesto. Son el equivalente de `papiro` y `sellado`
- * en el otro motor: existen en el binario y solo se pintan donde un manifiesto las
+ * DOS, porque no hay ningún arcade instalado que declare esos muebles y la ruta se
+ * calcula a partir del manifiesto. Son el equivalente de `papiro` y `sellado` en
+ * el otro motor: existen en el binario y solo se pintan donde un manifiesto las
  * pide. Lo que compran es que el día que llegue Riberas, el compilador obligue a
  * escribir el tablero antes de dejar instalar el juego.
+ *
+ * ═══ Y `seSabePintar` NO ES LA PREGUNTA QUE HAY QUE HACERSE ═══
+ *
+ * Dice si esta app sabe pintar ese MUEBLE, y eso no basta para saber si un arcade
+ * concreto se puede jugar: hacen falta además los píxeles de ESE JUEGO. Preguntar
+ * solo esto fue lo que hizo que «La Ronda» saliera en la Sala con tarjeta pulsable
+ * y al tocarla dijera que no se sabía pintar. La pregunta buena es
+ * `seSabePintar(manifiesto)` de `./pintados.ts`, que junta las dos mitades.
  */
 import type { Href } from 'expo-router';
 import type { ManifiestoDeArcade, MuebleDeArcade } from '../../../shared/arcade';
@@ -91,9 +100,9 @@ export const MUEBLES: Record<MuebleDeArcade, Mueble> = {
   },
   lienzo: {
     ruta: '/lienzo',
-    seSabePintar: false,
-    loQueEs: 'Dos dimensiones a ritmo de fotograma, con el bucle en el hilo de interfaz.',
-    cuandoLlega: 'Llega con El Arcade, el de sesenta fotogramas por segundo.',
+    seSabePintar: true,
+    loQueEs: 'Dos dimensiones a ritmo de fotograma, dibujadas con Skia sobre la GPU.',
+    cuandoLlega: 'Ya está: lo estrena El Arcade, el de sesenta fotogramas por segundo.',
   },
   escena: {
     ruta: '/escena',

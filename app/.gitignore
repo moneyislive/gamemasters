@@ -39,3 +39,22 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# ---------------------------------------------------------------------------
+# El binario de CanvasKit, que LO GENERA LA INSTALACION Y NO SE VERSIONA
+# ---------------------------------------------------------------------------
+#
+# En web, Skia es CanvasKit: ocho megabytes de WebAssembly que hay que servir
+# desde `public/`. Lo copia ahi `npx setup-skia-web public`, que esta enganchado
+# al `postinstall` de `package.json` — asi que un clon recien instalado y el
+# despliegue de Render lo tienen sin que nadie se acuerde de nada.
+#
+# NO SE VERSIONA porque es una COPIA EXACTA de un fichero que ya viaja dentro de
+# `node_modules/canvaskit-wasm`, y meter ocho megabytes de binario duplicado en
+# el historial de git es para siempre.
+#
+# Y por eso `verify:canvaskit` comprueba las DOS cosas: que el fichero este y que
+# el `postinstall` que lo pone siga escrito. Este repositorio ya tiene apuntado
+# un verde que dependia de un fichero sin versionar; la diferencia es que aquel
+# no tenia quien lo repusiera.
+public/canvaskit.wasm

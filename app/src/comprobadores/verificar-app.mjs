@@ -1000,6 +1000,93 @@ for (const pantalla of ['index.tsx', 'avatar.tsx', 'cuenta.tsx']) {
 
 
 // ---------------------------------------------------------------------------
+// La Sala no anuncia lo que no sabe pintar
+// ---------------------------------------------------------------------------
+
+/**
+ * EL ESCAPARATE ESTABA MINTIENDO, Y ASÍ.
+ *
+ * `vitrina.ts` decidía si la tarjeta de un arcade era pulsable mirando
+ * `MUEBLES[m.mueble].seSabePintar`, que contesta a otra pregunta: si esta app sabe
+ * pintar ese MUEBLE. La pantalla del mueble decidía otra cosa —si sabe pintar ESE
+ * JUEGO, con su propia tabla— y en cuanto entró el segundo arcade de formulario
+ * las dos respuestas dejaron de coincidir: «La Ronda» salía en la Sala con tarjeta
+ * pulsable y al tocarla aparecía «esta app todavía no sabe pintarlo».
+ *
+ * La portada tiene doctrina escrita contra eso en su propia cabecera —«nada de lo
+ * que se enseña es mentira… no se rellena con cajas muertas»— y la estaba
+ * incumpliendo.
+ *
+ * El arreglo fue estructural: una sola tabla, en `src/arcade/pintados.ts`, y las
+ * dos pantallas leen de ella. Esto vigila que siga siendo así, porque el arreglo
+ * se deshace con una línea razonable — alguien que quiera saber si un mueble se
+ * pinta y tenga `MUEBLES` a mano.
+ *
+ * NO se puede comprobar llamando a la función: `pintados.ts` trae dentro
+ * componentes de React Native y de Skia, y esto corre en Node pelado. Así que se
+ * lee el código, que es menos, y se dice que es menos.
+ */
+paso('La Sala no anuncia ningún arcade que no sepa pintar');
+{
+  const vitrina = leer(path.join(SRC, 'vitrina.ts'));
+  const pintados = leer(path.join(SRC, 'arcade', 'pintados.ts'));
+  const pintar = leer(path.join(SRC, 'arcade', 'pintar.tsx'));
+
+  comprobar('existe la tabla única `src/arcade/pintados.ts`', pintados.length > 0);
+  comprobar(
+    'y declara qué componente pinta cada arcade',
+    /LOS_QUE_PINTA\s*:\s*Record</.test(pintados),
+    'sin la tabla, cada pantalla vuelve a decidir por su cuenta',
+  );
+  comprobar(
+    'y la pregunta «¿se sabe pintar este arcade?» junta el juego Y el mueble',
+    /LOS_QUE_PINTA\[[^\]]+\]\s*!==\s*undefined\s*&&\s*MUEBLES\[/.test(pintados),
+    'con solo una de las dos mitades, la tarjeta vuelve a mentir en un sentido o en el otro',
+  );
+
+  comprobar(
+    'la portada saca la respuesta de esa tabla',
+    /\bseSabePintar\s*\(/.test(vitrina) && /from '\.\/arcade\/pintados'/.test(vitrina),
+    'si `vitrina.ts` vuelve a decidirlo por su cuenta, la Sala vuelve a ofrecer tarjetas que no ' +
+      'llevan a ninguna parte',
+  );
+  /*
+   * Se mira SOLO EL CUERPO de `minijuegos()` y no el fichero entero, y no es un
+   * atajo: la cabecera de `vitrina.ts` CITA la línea vieja para contar el fallo
+   * que hubo. Un comprobador que se pusiera rojo por sus propias explicaciones
+   * empujaría a no escribirlas — es la misma regla que `verify:pureza` aplica
+   * quitando los comentarios antes de mirar.
+   */
+  const cuerpoDeMinijuegos = cuerpoDe(vitrina, 'export function minijuegos') ?? '';
+  comprobar('se encuentra el cuerpo de `minijuegos()`', cuerpoDeMinijuegos.length > 0);
+  comprobar(
+    'y NO vuelve a decidirlo mirando solo el mueble',
+    !/MUEBLES\[[^\]]*\]\.seSabePintar/.test(cuerpoDeMinijuegos),
+    'ésa es exactamente la línea que hacía pulsable la tarjeta de un juego que la app no pinta',
+  );
+  comprobar(
+    'la pantalla de un mueble pinta desde la misma tabla',
+    /LOS_QUE_PINTA/.test(pintar) && /from '\.\/pintados'/.test(pintar),
+    'con una tabla propia dentro de cada ruta de mueble, la cuarta copia se queda atrás',
+  );
+
+  /*
+   * Y la vacuna, con las dos formas del fallo. Sin esto, un `\b` perdido en un
+   * renombrado dejaría estas seis comprobaciones sin encontrar nada y en verde
+   * para siempre — que es el patrón que esta casa tiene apuntado tres veces.
+   */
+  comprobar(
+    'la comprobación caza la línea vieja si vuelve',
+    /MUEBLES\[[^\]]*\]\.seSabePintar/.test('ruta: MUEBLES[m.mueble].seSabePintar ? rutaDeArcade(m) : null,'),
+    'la expresión regular no reconoce el fallo que existe para cazar',
+  );
+  comprobar(
+    'y no se la caza a sí misma con la línea buena',
+    !/MUEBLES\[[^\]]*\]\.seSabePintar/.test('ruta: seSabePintar(m) ? rutaDeArcade(m) : null,'),
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Ninguna tabla de modulo nombra algo que todavia no existe
 // ---------------------------------------------------------------------------
 

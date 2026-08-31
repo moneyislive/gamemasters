@@ -23,4 +23,29 @@ config.resolver.nodeModulesPaths = [
   path.resolve(raizRepo, 'node_modules'),
 ];
 
+/*
+ * ═══ Y AQUÍ NO HAY NADA PARA `canvaskit.wasm`, QUE ES LO QUE HABÍA QUE MIRAR ═══
+ *
+ * El §7 del diseño del motor de arcade dejó apuntado que, al entrar Skia, habría
+ * que «ejecutar `setup-skia-web` y añadir el `.wasm` a los activos públicos de
+ * `app/metro.config.js`». Se comprobó al entrar, y de las dos mitades solo hace
+ * falta la primera:
+ *
+ *   · `setup-skia-web public` copia el binario a `app/public/`, y está enganchado
+ *     al `postinstall` de `package.json`, así que un clon recién instalado y el
+ *     despliegue de Render lo tienen sin que nadie se acuerde de nada.
+ *   · Y no hace falta tocar NADA aquí: desde el SDK 49, Expo sirve `app/public/`
+ *     tal cual en desarrollo y lo copia al exportar la web — está en
+ *     `@expo/cli/build/src/export/publicFolder.js`. Nadie importa el `.wasm` desde
+ *     JavaScript —el cargador de Emscripten lo pide por HTTP en tiempo de
+ *     ejecución—, así que meterlo en `resolver.assetExts` no compraría nada y
+ *     sería una línea que parece hacer algo.
+ *
+ * Queda escrito porque quien lea aquel §7 va a venir aquí a buscar la línea que
+ * falta, y no encontrarla se parece demasiado a un olvido. Lo que sí existe es un
+ * comprobador —`verify:canvaskit`— que vigila las dos cosas que de verdad dejan la
+ * web en blanco: que el binario esté servido y que se pida bajo el `baseUrl` de
+ * `app.json` y no desde la raíz del dominio.
+ */
+
 module.exports = config;

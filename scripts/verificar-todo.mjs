@@ -315,6 +315,64 @@ const BATERIA = [
     porque:
       'una mesa de cuatro con mano oculta y servidor de verdad: el plazo vence por la lectura, el `rev` rancio se rechaza al escribir y no al leer, y ninguna carta sale hacia el móvil de otro',
   },
+  /*
+   * ═══ Y ESTOS CUATRO SON LOS DE LA FASE 3: «EL ARCADE» ═══
+   *
+   * El primero es LA PRUEBA DURA DE TODA LA ARQUITECTURA y conviene decir por qué
+   * con ese nombre. Todo el motor de arcade cuelga de que el reductor sea puro: de
+   * ahí salen la verificación de marcadores, la repetición de partidas y la
+   * autoridad barata de servidor. Eso está declarado en cabeceras y vigilado
+   * estáticamente por `pureza del reductor`, que caza las siete formas conocidas de
+   * perderla — pero un barrido estático no puede DEMOSTRAR nada. Esto lo demuestra:
+   * juega cuatro partidas, las reejecuta, y las corre en Node y en Hermes.
+   *
+   * La divergencia de coma flotante entre motores de JavaScript es el fallo que no
+   * reproduce ningún test escrito a mano, y que se manifiesta seis meses después
+   * como «el jugador ve una partida distinta a la del vecino», en un solo modelo de
+   * móvil. Si aparece, aparece AQUÍ y no allí.
+   *
+   * Los otros tres vigilan cosas que tampoco dan ningún error cuando ocurren: una
+   * puntuación que nadie comprueba pasa por buena para siempre, una pantalla en
+   * blanco en web no escribe nada en ninguna consola, y un bucle que da sesenta
+   * pasos de golpe se ve como que la nave «saltó», si es que alguien lo ve.
+   *
+   * Y el primero lleva un TERCER escalón que no estaba y que resultó ser el que
+   * hacía falta: la partida jugada contra la misma partida expandida desde su
+   * repetición. Los otros dos escalones juegan las dos veces con el mismo bucle, o
+   * sea que demuestran que el reductor es reproducible —lo que `pureza del
+   * reductor` ya vigila— y no tocaban `movimientosDe`, que es de lo que cuelga el
+   * marcador entero. Con la expansión desfasada un paso, esta fase pasó cincuenta y
+   * tres comprobaciones en verde rechazando récords honrados.
+   */
+  {
+    nombre: 'determinismo',
+    donde: 'server',
+    guion: 'verify:determinismo',
+    porque:
+      'el mismo registro da el mismo estado dos veces, da el mismo estado en Node y en Hermes, y la partida expandida desde su repetición da el mismo estado que la jugada — comparado con `canonico.ts` y no con `JSON.stringify`',
+  },
+  {
+    nombre: 'marcador',
+    donde: 'server',
+    guion: 'verify:marcador',
+    lento: true,
+    porque:
+      'una repetición fabricada se rechaza, una real se acepta al reejecutarla, un récord enviado como cifra suelta se rechaza siempre, y la duración declarada se contrasta con el reloj de pared',
+  },
+  {
+    nombre: 'CanvasKit en web',
+    donde: 'server',
+    guion: 'verify:canvaskit',
+    porque:
+      'el `.wasm` de Skia está servido y se pide donde está en las DOS disposiciones —en la raíz con Metro, bajo el `baseUrl` en producción—, y ningún fichero de la cadena de la portada, derivada siguiendo los `import`, importa Skia antes de tiempo',
+  },
+  {
+    nombre: 'paso fijo',
+    donde: 'server',
+    guion: 'verify:bucle',
+    porque:
+      'la misma cantidad de reloj da la misma cantidad de pasos a 30, 60 y 120 Hz; un fotograma enorme se recorta y la deuda se pierde; y un atasco del hilo de JavaScript no se convierte en un salto de la nave que nadie ve',
+  },
 ];
 
 

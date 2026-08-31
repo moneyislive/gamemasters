@@ -63,6 +63,13 @@ import {
   candadosDeMesaVivos,
 } from '../arcade/mesas';
 import type { VistaDeMesa } from '../arcade/mesas';
+import {
+  anunciarInicio,
+  ArcadeSinRecords,
+  avisosAbiertos,
+  recordsDe,
+  registrarRecord,
+} from '../arcade/marcadores';
 import { loMedido } from '../arcade/presupuesto';
 import { elCanal } from '../canal';
 import { despertadoresVivos } from '../canal/sondeo';
@@ -683,7 +690,144 @@ router.get('/arcade/diagnostico', (_req, res) => {
     candados: candadosDeMesaVivos(),
     despertadores: despertadoresVivos(),
     almacen: saludDelAlmacen(),
+    avisosDeArcade: avisosAbiertos(),
   });
+});
+
+// ---------------------------------------------------------------------------
+// EL MARCADOR: dos avisos y una tabla
+//
+// ═══ POR QUÉ ESTO NO SON MESAS, AUNQUE SE LE PAREZCA ═══
+//
+// Un arcade de un jugador no tiene mesa: no hay asientos, ni `rev`, ni canal, ni
+// nadie con quien sincronizarse. El reductor corre en el móvil de principio a fin
+// y el servidor no ve un solo fotograma. Lo único que hace el servidor es lo que
+// el §6 del diseño le asigna en esa fila —«el cliente simula, el servidor
+// VERIFICA»— y eso son exactamente dos momentos: repartir la semilla al empezar y
+// reejecutar la partida al terminar.
+//
+// Meter esto en `mesas.ts` habría obligado a abrir una mesa, sentarse en ella y
+// llevarle un `rev` a un juego que no tiene nada de eso: el peaje clásico, «el
+// que no venía, fingía». Son tres rutas y ninguna toca el almacén de mesas.
+//
+// ═══ Y POR QUÉ TAMPOCO VAN DETRÁS DE NINGUNA CREDENCIAL ═══
+//
+// Por lo mismo que el resto de la Sala: no hay cuenta que pedir. La defensa de
+// estas rutas es que la de fin EXIGE una de inicio, que la de inicio está acotada
+// por conexión, y que un aviso se gasta una sola vez. Ver `marcadores.ts`.
+// ---------------------------------------------------------------------------
+
+/**
+ * ANUNCIAR EL INICIO: se cuentan TODAS, como en la apertura de mesa.
+ *
+ * Y por la misma razón: esto no falla casi nunca —no hay nada que acertar— así
+ * que un contador de fallos no contaría nada. Lo que hay que acotar es el
+ * VOLUMEN, porque cada aviso ocupa una entrada en un mapa de memoria durante dos
+ * horas, y quien pida mil avisos por segundo llena esa tabla sin jugar a nada.
+ *
+ * Ciento veinte por conexión son dos partidas por minuto durante diez minutos
+ * seguidos: más de lo que aguanta nadie jugando de verdad.
+ */
+const contadorDeInicios = limitarIntentos({
+  nombre: 'inicio de partida de arcade',
+  credencial: (req) => {
+    const cuerpo = req.body as { arcade?: unknown } | undefined;
+    return typeof cuerpo?.arcade === 'string' ? cuerpo.arcade : 'sin-arcade';
+  },
+  porCredencial: 120,
+  porIp: 120,
+  esFallo: () => true,
+});
+
+/**
+ * EMPIEZA UNA PARTIDA: toma la semilla, y apunto la hora.
+ *
+ * La semilla la elige el servidor y ésa es la mitad de la verificación. Está
+ * contado entero en `InicioAnunciado.semilla`: si la eligiera el aparato, quien
+ * juega probaría semillas hasta encontrar la fácil y después jugaría ésa,
+ * honradamente, y la repetición cuadraría.
+ */
+router.post('/arcade/partidas', contadorDeInicios, (req, res) => {
+  const cuerpo = req.body as { arcade?: unknown };
+  const arcade = typeof cuerpo.arcade === 'string' ? cuerpo.arcade : '';
+  try {
+    res.json(anunciarInicio(arcade));
+  } catch (error) {
+    if (error instanceof ArcadeSinRecords) {
+      /*
+       * 404 si no está instalado y 409 si está y no admite récords, porque son dos
+       * arreglos distintos: lo primero lo arregla instalar el juego —o dejar de
+       * pedirlo—, y lo segundo no lo arregla nada, porque ese arcade declaró que
+       * no publica ninguna cifra. Contestar lo mismo a las dos mandaría a la app a
+       * reintentar donde no hay nada que reintentar.
+       */
+      res
+        .status(error.porque === 'no-instalado' ? 404 : 409)
+        .json({ error: error.message, motivo: error.porque });
+      return;
+    }
+    throw error;
+  }
+});
+
+/**
+ * SE ACABÓ: aquí llega la repetición entera, y aquí se deja de creer al móvil.
+ *
+ * ═══ NO HAY NINGUNA RUTA QUE ACEPTE UNA CIFRA SUELTA, Y ESO ES EL DISEÑO ═══
+ *
+ * Se podría haber escrito `POST /arcade/records { arcade, cifra }` y añadirle
+ * después una verificación opcional. Con eso, el día que la verificación diera un
+ * problema, alguien la haría opcional de verdad y la ruta seguiría ahí aceptando
+ * números. Aquí el cuerpo o es una repetición o no es nada: quien mande una cifra
+ * suelta se lleva un 400 por `repeticion-mal-formada`, siempre, y no hay ningún
+ * camino que lo salve.
+ *
+ * ═══ LOS CÓDIGOS: 400 PARA LO MAL ESCRITO, 409 PARA LO QUE NO CUADRA ═══
+ *
+ * La diferencia importa para quien escriba la app: un 400 es un fallo de quien
+ * manda —una repetición mal montada, un movimiento reservado— y reintentar no
+ * arregla nada. Un 409 es una partida que no se acepta —la cifra no sale, el
+ * reloj no acompaña, el aviso ha caducado—, y ahí lo que toca es empezar otra.
+ */
+router.post('/arcade/records', (req, res) => {
+  const veredicto = registrarRecord(req.body);
+  if (veredicto.acepta) {
+    res.json({
+      aceptado: true,
+      record: veredicto.record,
+      /*
+       * Lo medido va de vuelta para que la app pueda enseñarlo si quiere y, sobre
+       * todo, para que `verify:marcador` compruebe la comparación con el reloj de
+       * pared desde fuera, sin tener que mirar dentro del proceso.
+       */
+      declaradoMs: Math.round(veredicto.declaradoMs),
+      paredMs: veredicto.paredMs,
+    });
+    return;
+  }
+  res.status(veredicto.motivo === 'repeticion-mal-formada' ? 400 : 409).json({
+    aceptado: false,
+    motivo: veredicto.motivo,
+    detalle: veredicto.detalle,
+    error: veredicto.porque,
+  });
+});
+
+/**
+ * LA TABLA de un arcade, de mejor a peor.
+ *
+ * Sin credencial: son cifras y nada más. No lleva nombres porque en el motor de
+ * arcade no hay cuentas y un asiento es un nombre tecleado — el día que la tabla
+ * quiera decir de quién es cada récord, eso es una decisión de producto con datos
+ * personales detrás, y no un campo que se añade aquí.
+ */
+router.get('/arcade/records/:arcade', (req, res) => {
+  const arcade = String(req.params.arcade ?? '');
+  if (!arcadeInstalado(arcade)) {
+    res.status(404).json({ error: `«${arcade}» no es un arcade instalado en este servidor.` });
+    return;
+  }
+  res.json({ arcade, records: recordsDe(arcade) });
 });
 
 export default router;
