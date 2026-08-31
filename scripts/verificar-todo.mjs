@@ -48,6 +48,28 @@ const BATERIA = [
   // ── Que compile ────────────────────────────────────────────────────────────
   { nombre: 'tipos · servidor', donde: 'server', guion: 'typecheck', porque: 'el contrato se respeta' },
   { nombre: 'tipos · taller', donde: 'client', guion: 'typecheck', porque: 'el taller sigue el contrato' },
+  /*
+   * ═══ ESTE VA JUSTO ENCIMA DE `tipos · móvil`, Y EL ORDEN ES LA MITAD ═══
+   *
+   * `tipos · móvil` comprueba las rutas contra `app/.expo/types/router.d.ts`,
+   * que `expo-router` GENERA y que `.gitignore` deja fuera del repositorio: solo
+   * se rehace cuando alguien levanta la app. O sea que su veredicto no habla del
+   * código, habla del código MÁS un artefacto local de antigüedad desconocida.
+   *
+   * El 31 de agosto de 2026 dio las tres respuestas posibles sobre el MISMO
+   * código en la misma tarde: verde con la tabla tan vieja que no apretaba, rojo
+   * de verdad con la tabla recién hecha, y rojo falso con la tabla de la víspera
+   * rechazando cuatro rutas que sí existían. El verde es el peor de los tres.
+   *
+   * Puesto delante, cuando el de abajo falle, el de arriba ya habrá dicho si es
+   * que hay un fallo o es que la tabla habla de otro árbol.
+   */
+  {
+    nombre: 'rutas · móvil',
+    donde: 'app',
+    guion: 'verify:rutas',
+    porque: 'la tabla de rutas generada conoce las pantallas que hay, así que el typecheck de abajo significa algo',
+  },
   { nombre: 'tipos · móvil', donde: 'app', guion: 'typecheck', porque: 'la app sigue el contrato' },
 
   // ── Que se comporte igual ─────────────────────────────────────────────────

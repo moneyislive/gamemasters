@@ -9,6 +9,7 @@
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
     "verify": "node src/comprobadores/verificar-app.mjs && node src/comprobadores/verificar-tema.mjs && node src/comprobadores/verificar-conexion.mjs",
+    "verify:rutas": "node src/comprobadores/verificar-rutas.mjs",
     "build": "expo export --platform web --output-dir dist"
   },
   "dependencies": {
