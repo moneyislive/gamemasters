@@ -29,6 +29,7 @@ import type { LivePhase, VistaGameMaster } from '../../../../shared/live';
 import type { GameSession } from '../../../../shared/types';
 import type { PropsDeMandosPropios } from './PanelDeLaMomia';
 import { llamar } from './llamar';
+import type { EstadoSombrasParaElPanel } from '../../../../shared/juegos';
 
 /**
  * El estado del juego, leído a la defensiva.
@@ -39,31 +40,18 @@ import { llamar } from './llamar';
  * y se diferencian en los que no usa, así que se leen igual — pero se leen campo
  * a campo y no con un `as`, porque un panel roto a media noche no tiene arreglo.
  */
-interface EstadoParaElPanel {
-  rastro?: number;
-  rastroMaximo?: number;
-  batidos?: string[];
-  gente?: Record<
-    string,
-    {
-      prendas?: number;
-      prendasRecibidas?: number;
-      hitos?: string[];
-      enseres?: string[];
-      papelUsadoEnRonda?: number;
-    }
-  >;
-  estandartes?: Record<string, string>;
-  portes?: Record<string, string>;
-  hitos?: Record<string, { id: string; texto?: string; publico?: boolean }>;
-  propuestas?: Record<string, { senda?: string[]; reservada?: boolean }>;
-  consejo?: {
-    sendaAndada?: string[];
-    correcta?: boolean;
-    interceptada?: boolean;
-    votos?: Array<{ senda: string[]; apoyos: string[]; peso: number }>;
-  };
-}
+/*
+ * LA FORMA LA DECLARA `shared`, no este fichero.
+ *
+ * Aqui habia una interfaz escrita a mano con los mismos nombres de campo que
+ * manda la proyeccion del servidor. Los dos lados hablaban de `rastroMaximo` y
+ * `papelUsadoEnRonda` sin que nada comprobara que hablaban de lo mismo:
+ * `ProyeccionParaGm` devuelve `unknown`. Renombrar alli compilaba y dejaba esta
+ * tarjeta sin pintar, de noche y sin error.
+ *
+ * Ahora es un solo tipo, firmado por la proyeccion y leido aqui.
+ */
+type EstadoParaElPanel = EstadoSombrasParaElPanel;
 
 function estadoDe(vista: VistaGameMaster): EstadoParaElPanel | null {
   const bruto = (vista.sesion.estado as { sombras?: unknown } | undefined)?.sombras;

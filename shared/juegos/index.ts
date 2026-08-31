@@ -57,6 +57,7 @@ export type {
   JuegoId,
   ManifiestoDeJuego,
   ModoDeTurno,
+  ParcialProfundo,
 } from './tipos';
 export { CLUEDO };
 export { MOMIA };
@@ -72,6 +73,7 @@ export type {
   DonId,
   EstadoDePersona,
   EstadoMomia,
+  EstadoMomiaParaElPanel,
   Fragmento,
   Restriccion,
   RitoId,
@@ -100,6 +102,7 @@ export type {
   CondicionEscrita,
   EstadoDeEscolta,
   EstadoSombras,
+  EstadoSombrasParaElPanel,
   Hito,
   PapelId,
   PasoId,
@@ -155,6 +158,7 @@ export type {
   TelegramaEscrito,
   TramaNudo,
   EstadoNudo,
+  EstadoNudoParaElPanel,
   EstadoDeFerroviario,
   OrdenCursada,
   OficioId,

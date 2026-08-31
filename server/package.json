@@ -51,7 +51,8 @@
     "verify:puertas": "tsx scripts/verificar-puertas.ts",
     "verify:arranque": "tsx scripts/verificar-arranque.ts",
     "verify:conexion": "tsx scripts/verificar-conexion.ts",
-    "verify:legal": "tsx scripts/verificar-legal.ts"
+    "verify:legal": "tsx scripts/verificar-legal.ts",
+    "verify:estado": "tsx scripts/verificar-estado-del-juego.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",

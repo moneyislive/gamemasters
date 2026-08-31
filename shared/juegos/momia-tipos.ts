@@ -234,3 +234,66 @@ export interface TramaMomia {
   /** La reliquia que el saqueador tiene vendida de antemano. */
   reliquiaCodiciada: string;
 }
+
+/**
+ * El estado tal y como le llega AL PANEL DEL TALLER.
+ *
+ * ═══ POR QUE NO VALE `EstadoMomia` A SECAS ═══
+ *
+ * El panel puede recibir dos cosas distintas: dirigiendo de la forma normal, el
+ * estado GUARDADO tal cual; dirigiendo A CIEGAS, lo que devuelve
+ * `registrarProyeccionParaGm`, con lo que decidiria la partida tapado. Ahi las
+ * propuestas llegan con el orden VACIO y un `reservada: true`, y sus claves
+ * siguen estando a proposito —sin ellas el boton de ejecutar el ritual se
+ * desactiva y no hay forma de terminar la noche.
+ *
+ * Y `ordenVerdadero` NO ESTA, que es lo importante: la proyeccion a ciegas no lo
+ * manda, y este tipo tampoco lo nombra. Con `EstadoMomia` el panel tenia
+ * disponible el campo que jamas debe pintar.
+ *
+ * ═══ COMO SE LEIA ANTES ═══
+ *
+ * Con dos `as`: el panel hacia `estado as EstadoMomia` —un tipo que no es el que
+ * llega— y luego `(p as { reservada?: boolean }).reservada` para leer un campo
+ * que aquel tipo no tiene. Dos rodeos que dejaban la forma real sin declarar en
+ * ningun sitio, con `ProyeccionParaGm` devolviendo `unknown` al otro lado.
+ */
+export interface EstadoMomiaParaElPanel {
+  /*
+   * ═══ OBLIGATORIO LO QUE LLEGA SIEMPRE, OPCIONAL LO QUE NO ═══
+   *
+   * Se escribio primero con TODO opcional, por fidelidad al `unknown` del que
+   * viene. Y era peor: obligaba a un `?? []` en cada lectura del panel para
+   * defenderse de un caso que no ocurre —las dos rutas, la guardada y la
+   * proyectada, mandan siempre estos cuatro— y ese ruido esconde las lecturas
+   * que SI necesitan defensa.
+   *
+   * Lo que se gana no es la opcionalidad: es que los NOMBRES esten comprobados.
+   * Eso funciona igual con campos obligatorios.
+   */
+  profanadas: string[];
+  gente: Record<
+    string,
+    {
+      marcas: number;
+      amuletos: number;
+      tocado: boolean;
+      fragmentos: string[];
+      /** Ausente si todavia no lo ha usado. */
+      donUsadoEnRonda?: number;
+    }
+  >;
+  /** El texto solo viene en los que ya estan sobre la mesa. */
+  fragmentos: Record<string, { id: string; texto?: string; publico: boolean }>;
+  /** El orden llega VACIO y con `reservada` cuando quien dirige tambien juega. */
+  propuestas: Record<string, { orden: string[]; at?: string; reservada?: boolean }>;
+  /** Cuantas hay, para poder contar sin ensenarlas. Solo a ciegas. */
+  propuestasEntregadas?: number;
+  /** Solo cuando el sellado ya se ha ejecutado. */
+  sellado?: {
+    ordenEjecutado: string[];
+    correcto: boolean;
+    votos: Array<{ orden: string[]; apoyos: string[] }>;
+    at: string;
+  };
+}

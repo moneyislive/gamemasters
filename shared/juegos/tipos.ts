@@ -1051,3 +1051,33 @@ export function faseEs(m: ManifiestoDeJuego, fase: LivePhase, papel: PapelDeFase
 export function fasesConPapel(m: ManifiestoDeJuego, papel: PapelDeFase): LivePhase[] {
   return Object.keys(m.fases).filter((f) => papelDe(m, f) === papel);
 }
+
+/**
+ * El mismo tipo, con TODO opcional hasta el fondo.
+ *
+ * ═══ PARA QUE HACE FALTA ═══
+ *
+ * El estado de un juego viaja al taller dentro de `LiveSession.estado`, que es
+ * `Record<string, unknown>`: sin tipar a proposito, porque el nucleo no puede
+ * conocer la forma de un juego que no conoce.
+ *
+ * Los paneles del taller lo leen, y hacian lo razonable: escribir a mano una
+ * interfaz con todo opcional, porque lo que llega es JSON de la red y el tipo de
+ * la red es «lo que haya». El problema no es la opcionalidad —esa es correcta—
+ * sino que al escribirla a mano se REPITEN LOS NOMBRES DE LOS CAMPOS. Y una
+ * copia de los nombres se separa del original sin que nada avise: se renombra
+ * `retraso` en el servidor, el panel sigue compilando, y la tarjeta del retraso
+ * deja de pintarse. Sin error, de noche, con la mesa puesta.
+ *
+ * Con esto se tienen las dos cosas: todo opcional, y los nombres comprobados
+ * contra el tipo de verdad. Un renombrado rompe la compilacion del panel, que
+ * es donde uno quiere enterarse.
+ *
+ * NO SUSTITUYE A LEER CAMPO A CAMPO. El tipo describe lo que deberia llegar; que
+ * llegue sigue siendo cosa del codigo defensivo de cada panel.
+ */
+export type ParcialProfundo<T> = T extends (infer U)[]
+  ? Array<ParcialProfundo<U>>
+  : T extends object
+    ? { [K in keyof T]?: ParcialProfundo<T[K]> }
+    : T;

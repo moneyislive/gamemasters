@@ -36,6 +36,7 @@ import {
 import type { EstadoNudo, Instrumento, OficioId } from '../../../shared/juegos/nudo-tipos';
 import type { LiveSession } from '../../../shared/live';
 import type { GameSession } from '../../../shared/types';
+import type { EstadoNudoParaElPanel } from '../../../shared/juegos';
 
 /**
  * El instrumento SIN su solución, listo para viajar.
@@ -233,7 +234,13 @@ registrarProyeccion('nudo', (game, sesion, participanteId) =>
  * puestos están rendidos, quién lleva cuánto margen y la crónica de órdenes.
  * Con eso se dirige la noche entera sin conocer el cuadro.
  */
-registrarProyeccionParaGm('nudo', (game, sesion) => {
+/*
+ * EL TIPO DE RETORNO NO ES ADORNO. `ProyeccionParaGm` devuelve `unknown`, asi
+ * que sin esta firma nada comprueba que lo que se manda aqui sea lo que el
+ * panel del taller espera. Con ella, renombrar un campo rompe la compilacion en
+ * vez de dejar una tarjeta del puesto de mando sin pintar.
+ */
+registrarProyeccionParaGm('nudo', (game, sesion): EstadoNudoParaElPanel => {
   const estado = estadoDe(game, sesion);
   return {
     despachados: estado.despachados,

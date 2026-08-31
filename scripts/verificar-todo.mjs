@@ -6,7 +6,7 @@
  *
  * ═══ POR QUÉ HACE FALTA ═══
  *
- * Hay treinta y nueve comprobadores y no había forma de correrlos todos.
+ * Hay cuarenta comprobadores y no había forma de correrlos todos.
  * Mientras cada uno vigilaba su rincón eso daba igual: quien tocaba la Momia
  * corría `verify:momia` y ya está.
  *
@@ -144,6 +144,14 @@ const BATERIA = [
    * todos los que no necesitan ni la base de producción ni media hora.
    */
   { nombre: 'secretos del agente', donde: 'server', guion: 'verify:secretos-agente', porque: 'el asistente no puede chivar la solución' },
+  /*
+   * EL UNICO HUECO SIN TIPAR DEL CONTRATO. `VistaJugador.estadoDelJuego` es
+   * `unknown` a proposito —el nucleo no puede tipar lo que no conoce— y por eso
+   * es el unico sitio donde el servidor y la app pueden dejar de hablar el
+   * mismo idioma sin que el compilador diga nada. Esto le da al lector de la app
+   * lo que el servidor manda de verdad, y comprueba que lo entiende.
+   */
+  { nombre: 'estado del juego', donde: 'server', guion: 'verify:estado', porque: 'lo que el servidor mete en `estadoDelJuego`, la app lo entiende' },
   { nombre: 'entorno', donde: 'server', guion: 'verify:entorno', porque: 'el despliegue y el código hablan de lo mismo' },
   { nombre: 'almacén', donde: 'server', guion: 'verify:almacen', porque: 'lo que se guarda se vuelve a leer igual' },
   { nombre: 'presencia', donde: 'server', guion: 'verify:presencia', porque: 'quién está conectado y quién no' },

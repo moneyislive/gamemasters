@@ -22,7 +22,7 @@
  * mandos propios, se añade el suyo al lado y `LivePanel` no crece.
  */
 import { entidadDe, MARCAS_PARA_TOCADO } from '../../../../shared/juegos';
-import type { EstadoMomia } from '../../../../shared/juegos';
+import type { EstadoMomiaParaElPanel } from '../../../../shared/juegos';
 import type { VistaGameMaster } from '../../../../shared/live';
 import type { GameSession } from '../../../../shared/types';
 import { llamar } from './llamar';
@@ -49,9 +49,18 @@ export interface PropsDeMandosPropios {
  * pintar ceros, que es lo que llevaría a quien dirige a pensar que nadie ha
  * explorado nada.
  */
-function estadoDe(vista: VistaGameMaster): EstadoMomia | null {
+/*
+ * LA FORMA LA DECLARA `shared`, y no es `EstadoMomia`.
+ *
+ * Aqui se hacia `estado as EstadoMomia`, que es el estado GUARDADO. Lo que llega
+ * dirigiendo a ciegas es la proyeccion: propuestas vaciadas con `reservada`, y
+ * SIN `ordenVerdadero`. O sea que el tipo prometia un campo que no llega —y que
+ * jamas debe pintarse— y no declaraba el que si llega, que habia que leer con
+ * otro `as` mas abajo.
+ */
+function estadoDe(vista: VistaGameMaster): EstadoMomiaParaElPanel | null {
   const estado = vista.sesion.estado?.momia;
-  return estado ? (estado as EstadoMomia) : null;
+  return estado ? (estado as EstadoMomiaParaElPanel) : null;
 }
 
 /** «●●○» — las marcas de una persona, de un vistazo. */
@@ -124,7 +133,7 @@ export default function PanelDeLaMomia({
    * propuestas llegan marcadas como reservadas: llegan sus CLAVES, para saber
    * cuántas hay y poder ejecutar el ritual, pero sin el orden dentro.
    */
-  const reservadas = propuestas.some(([, p]) => (p as { reservada?: boolean }).reservada);
+  const reservadas = propuestas.some(([, p]) => p.reservada);
 
   const recuento = new Map<string, { orden: string[]; apoyos: string[] }>();
   for (const [participanteId, propuesta] of reservadas ? [] : propuestas) {

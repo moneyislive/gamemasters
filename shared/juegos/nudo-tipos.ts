@@ -284,8 +284,28 @@ export const CONVOYES_MAXIMOS = 8;
  */
 let cacheDeCuadros: { clave: string; cuadros: Cuadro[]; donde: FranjaDe[] } | undefined;
 
+
+/**
+ * El separador de la clave de cache: el caracter nulo.
+ *
+ * Ningun id de convoy puede contenerlo, asi que dos listas distintas no pueden
+ * dar la misma clave. Con una coma o un guion si podrian —["a,b"] y ["a","b"]
+ * dan lo mismo— y dos cuadros distintos compartirian entrada de cache: la
+ * partida jugaria con el cuadro de otra, sin error y sin nada raro que mirar.
+ *
+ * ESTABA ESCRITO COMO BYTE CRUDO dentro de la cadena, y eso convertia el
+ * fichero entero en binario para las herramientas: `file` lo llamaba «data» y
+ * `grep -rn` lo SALTABA sin decir nada, asi que cualquier busqueda por el
+ * repositorio se dejaba fuera estas setecientas lineas —y una busqueda que se
+ * salta un fichero en silencio es peor que una que no encuentra nada.
+ *
+ * Como escape el comportamiento es identico: una cadena de un solo caracter
+ * nulo. Lo que cambia es que el fichero vuelve a ser texto.
+ */
+const SEPARADOR_DE_CLAVE = '\u0000';
+
 function tablaDeCuadros(convoyes: ConvoyId[]): { cuadros: Cuadro[]; donde: FranjaDe[] } {
-  const clave = convoyes.join(' ');
+  const clave = convoyes.join(SEPARADOR_DE_CLAVE);
   if (cacheDeCuadros?.clave === clave) return cacheDeCuadros;
   const cuadros = ordenaciones(convoyes);
   const tabla = { clave, cuadros, donde: cuadros.map(franjasDe) };
@@ -769,4 +789,67 @@ export function aMorse(palabra: string): string[] {
   return normalizarParte(palabra)
     .split('')
     .map((letra) => MORSE[letra] ?? '');
+}
+
+/**
+ * El estado tal y como le llega AL PANEL DEL TALLER.
+ *
+ * ═══ POR QUE NO VALE `EstadoNudo` A SECAS ═══
+ *
+ * El panel puede recibir dos cosas, y ademas en dos SITIOS distintos:
+ *
+ *   · Dirigiendo de la forma normal, el estado guardado, colgando de
+ *     `sesion.estado.nudo`.
+ *   · Dirigiendo A CIEGAS, lo que devuelve `registrarProyeccionParaGm`, que lo
+ *     pone EN LA RAIZ y sin la clave —a diferencia de la Momia y las Sombras—.
+ *     Y con los instrumentos sin solucion dentro.
+ *
+ * Todo opcional porque cualquiera de las dos rutas puede no traer algo, y
+ * `amanecer` solo existe cuando la noche ya ha terminado.
+ *
+ * ═══ Y POR QUE ESTA AQUI Y NO EN EL PANEL ═══
+ *
+ * Porque estaba en el panel, escrito a mano, y `ProyeccionParaGm` devuelve
+ * `unknown`: los dos lados hablaban de `puestosRendidos` y `franjasPerdidas`
+ * sin que nada comprobara que hablaban de lo mismo. Renombrar un campo en la
+ * proyeccion compilaba, pasaba la bateria entera, y dejaba una tarjeta del
+ * puesto de mando sin pintar. Sin error, de noche, con la mesa puesta.
+ *
+ * Ahora lo firma la proyeccion como tipo de retorno y lo importa el panel.
+ */
+export interface EstadoNudoParaElPanel {
+  despachados?: number;
+  salidos?: string[];
+  retraso?: number;
+  conformidades?: number;
+  puestosRendidos?: string[];
+  ordenes?: Array<{
+    franja?: number;
+    convoy?: string;
+    quien?: string;
+    aceptada?: boolean;
+    retraso?: number;
+    at?: string;
+  }>;
+  franjasPerdidas?: number[];
+  gente?: Record<
+    string,
+    {
+      margen?: number;
+      manaUsada?: boolean;
+      consultas?: number;
+      instrumentosResueltos?: number;
+    }
+  >;
+  /** Solo cuando la noche ha terminado. */
+  amanecer?: {
+    cruzaron?: number;
+    correoPaso?: boolean;
+    retrasoFinal?: number;
+    puertoCerrado?: boolean;
+    ganadores?: string[];
+    anuncio?: string;
+  };
+  /** Sin solucion dentro: quien dirige no resuelve ninguno. */
+  instrumentos?: Record<string, unknown>;
 }

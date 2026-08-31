@@ -45,6 +45,7 @@ import {
 import type { LivePhase, VistaGameMaster } from '../../../../shared/live';
 import type { PropsDeMandosPropios } from './PanelDeLaMomia';
 import { llamar } from './llamar';
+import type { EstadoNudoParaElPanel } from '../../../../shared/juegos';
 
 /**
  * El estado de la noche, leído a la defensiva.
@@ -71,39 +72,19 @@ import { llamar } from './llamar';
  * Y por eso todos los campos son opcionales aquí abajo aunque en `EstadoNudo` no
  * lo sean: lo que llega es JSON de la red, y el tipo de la red es «lo que haya».
  */
-interface EstadoParaElPanel {
-  despachados?: number;
-  salidos?: string[];
-  retraso?: number;
-  conformidades?: number;
-  puestosRendidos?: string[];
-  ordenes?: Array<{
-    franja?: number;
-    convoy?: string;
-    quien?: string;
-    aceptada?: boolean;
-    retraso?: number;
-    at?: string;
-  }>;
-  franjasPerdidas?: number[];
-  gente?: Record<
-    string,
-    {
-      margen?: number;
-      manaUsada?: boolean;
-      consultas?: number;
-      instrumentosResueltos?: number;
-    }
-  >;
-  amanecer?: {
-    cruzaron?: number;
-    correoPaso?: boolean;
-    retrasoFinal?: number;
-    puertoCerrado?: boolean;
-    ganadores?: string[];
-    anuncio?: string;
-  };
-}
+/*
+ * LA FORMA LA DECLARA `shared`, no este fichero.
+ *
+ * Aqui habia una interfaz escrita a mano con los mismos nombres de campo que
+ * manda la proyeccion del servidor, y nada comprobaba que fueran los mismos:
+ * `ProyeccionParaGm` devuelve `unknown`. Renombrar alli compilaba y dejaba esta
+ * tarjeta sin pintar, de noche y sin error.
+ *
+ * Los campos siguen siendo todos opcionales por lo que dice el comentario de
+ * arriba —lo que llega es JSON de la red— pero ahora los NOMBRES estan
+ * comprobados contra el tipo que firma la proyeccion.
+ */
+type EstadoParaElPanel = EstadoNudoParaElPanel;
 
 /**
  * ¿Esto de la raíz es el estado de la noche o el `estado` de otra cosa?

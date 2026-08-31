@@ -39,6 +39,7 @@ import type {
   EstadoMomia, Restriccion } from '../../../shared/juegos/momia-tipos';
 import type { GameSession } from '../../../shared/types';
 import type { LiveSession } from '../../../shared/live';
+import type { EstadoMomiaParaElPanel } from '../../../shared/juegos';
 
 /** Un fragmento tal y como se lee. Sin decir si es verdad. */
 export interface FragmentoVisto {
@@ -332,7 +333,13 @@ function universoDeFragmentos(game: GameSession, estado: EstadoMomia): Array<[st
   return [...universo.entries()].sort(([a], [b]) => a.localeCompare(b));
 }
 
-registrarProyeccionParaGm('momia', (game, sesion) => {
+/*
+ * EL TIPO DE RETORNO NO ES ADORNO. `ProyeccionParaGm` devuelve `unknown`, asi
+ * que sin esta firma nada comprueba que lo que se manda aqui sea lo que el
+ * panel del taller espera. Con ella, renombrar un campo rompe la compilacion en
+ * vez de dejar una tarjeta del puesto de mando sin pintar.
+ */
+registrarProyeccionParaGm('momia', (game, sesion): { momia: EstadoMomiaParaElPanel } | undefined => {
   const estado = (sesion.estado as { momia?: EstadoMomia } | undefined)?.momia;
   if (!estado) return undefined;
 

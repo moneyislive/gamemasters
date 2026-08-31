@@ -424,3 +424,62 @@ export function normalizarContrasena(valor: string): string {
     .toLowerCase()
     .replace(/[^a-z0-9]/g, '');
 }
+
+/**
+ * El estado tal y como le llega AL PANEL DEL TALLER.
+ *
+ * ═══ POR QUE NO VALE `EstadoSombras` A SECAS ═══
+ *
+ * El panel puede recibir dos cosas distintas:
+ *
+ *   · Dirigiendo de la forma normal, el estado GUARDADO tal cual —`EstadoSombras`—,
+ *     porque quien dirige y no juega puede verlo todo.
+ *   · Dirigiendo A CIEGAS, lo que devuelve `registrarProyeccionParaGm`: el mismo
+ *     estado con lo que decidiria la partida tapado. Las propuestas llegan con
+ *     la senda VACIA y un `reservada: true`, y sus claves siguen ahi a proposito
+ *     —sin ellas el boton de echar a andar se desactiva y no hay forma de
+ *     terminar la noche.
+ *
+ * O sea que la forma que ve el panel no es la guardada ni la proyectada: es lo
+ * que las dos tienen en comun, con todo opcional porque cualquiera de las dos
+ * puede omitir cosas.
+ *
+ * ═══ Y POR QUE ESTA AQUI Y NO EN EL PANEL ═══
+ *
+ * Porque estaba en el panel, escrita a mano, y `ProyeccionParaGm` devuelve
+ * `unknown`: los dos lados hablaban de `rastroMaximo` y `papelUsadoEnRonda` sin
+ * que nada comprobara que hablaban de lo mismo. Renombrar un campo en la
+ * proyeccion compilaba, pasaba la bateria, y dejaba una tarjeta del puesto de
+ * mando sin pintar. Sin error, de noche, con la mesa puesta.
+ *
+ * Ahora lo firma la proyeccion como tipo de retorno y lo importa el panel. Un
+ * renombrado rompe la compilacion, que es donde uno quiere enterarse.
+ */
+export interface EstadoSombrasParaElPanel {
+  rastro?: number;
+  rastroMaximo?: number;
+  batidos?: string[];
+  gente?: Record<
+    string,
+    {
+      prendas?: number;
+      prendasRecibidas?: number;
+      hitos?: string[];
+      enseres?: string[];
+      papelUsadoEnRonda?: number;
+    }
+  >;
+  estandartes?: Record<string, string>;
+  portes?: Record<string, string>;
+  hitos?: Record<string, { id: string; texto?: string; publico?: boolean }>;
+  /** Con la senda vacia y `reservada` cuando quien dirige tambien juega. */
+  propuestas?: Record<string, { senda?: string[]; at?: string; reservada?: boolean }>;
+  /** Cuantas hay, para poder contar sin ensenarlas. */
+  propuestasEntregadas?: number;
+  consejo?: {
+    sendaAndada?: string[];
+    correcta?: boolean;
+    interceptada?: boolean;
+    votos?: Array<{ senda: string[]; apoyos: string[]; peso: number }>;
+  };
+}

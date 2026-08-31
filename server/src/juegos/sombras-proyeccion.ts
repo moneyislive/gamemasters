@@ -61,6 +61,7 @@ import { TRAMOS_DE_LA_SENDA } from '../../../shared/juegos/sombras-tipos';
 import type { Condicion, EstadoSombras, PorteId } from '../../../shared/juegos/sombras-tipos';
 import type { GameSession } from '../../../shared/types';
 import type { LiveSession } from '../../../shared/live';
+import type { EstadoSombrasParaElPanel } from '../../../shared/juegos';
 
 /** Un hito tal y como se lee. Sin decir si es verdad. */
 export interface HitoVisto {
@@ -528,7 +529,13 @@ function universoDeHitos(game: GameSession, estado: EstadoSombras): Array<[strin
   return [...universo.entries()].sort(([a], [b]) => a.localeCompare(b));
 }
 
-registrarProyeccionParaGm('sombras', (game, sesion) => {
+/*
+ * EL TIPO DE RETORNO NO ES ADORNO. `ProyeccionParaGm` devuelve `unknown`, asi
+ * que sin esta firma nada comprueba que lo que se manda aqui sea lo que el
+ * panel del taller espera leer. Con ella, renombrar un campo rompe la
+ * compilacion en vez de dejar una tarjeta sin pintar.
+ */
+registrarProyeccionParaGm('sombras', (game, sesion): { sombras: EstadoSombrasParaElPanel } | undefined => {
   const estado = (sesion.estado as { sombras?: EstadoSombras } | undefined)?.sombras;
   if (!estado) return undefined;
 
