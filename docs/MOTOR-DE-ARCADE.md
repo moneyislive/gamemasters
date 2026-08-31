@@ -137,7 +137,7 @@ Todo lo que sigue se justifica contra estos cinco, y ninguno es negociable:
 
 | Nombre | Qué es | Qué rompe |
 |---|---|---|
-| **La Frente** | El móvil enseña un nombre, te lo pones en la frente | Un solo dispositivo, sin red, sin cuenta, sin asientos registrados, reloj de pared, entrada por acelerómetro |
+| **La Frente** | El móvil enseña un nombre, te lo pones en la frente | Un solo dispositivo, sin red, sin cuenta, sin asientos registrados, reloj de pared, **entrada a ciegas** |
 | **La Ronda** | Fiesta en línea por turnos, cuatro personas, mano oculta | Mesa sin Game Master, asientos anónimos, información oculta |
 | **El Arcade** | 60 fps, un jugador, con marcador | Sin turnos, bucle de fotogramas, marcador que hay que verificar |
 | **Riberas** | Tablero hexagonal propio, 2–6, comercio | Identidades derivadas, negociación entre dos de los cuales uno no tiene el turno |
@@ -873,9 +873,37 @@ que hace ese orden **comprobable** en vez de una buena intención.
 ### Fase 1 — El juego más pobre posible: «La Frente»
 
 `sede: 'dispositivo'`, con reloj, mueble `formulario`, baraja compilada dentro.
-Inclinación por `DeviceMotion`, `expo-keep-awake`, orientación bloqueada.
+`expo-keep-awake` y `expo-screen-orientation`. **Sin sensores.**
 `minijuegos()` deja de devolver `[]`. Sin red, sin cuentas, sin mesa, sin Skia,
 sin una sola dependencia nueva de pintado.
+
+#### La entrada a ciegas, y por qué no hay acelerómetro
+
+`expo-sensors` queda **descartado para esta fase**, y conviene decir qué se
+pierde: el sensor no servía para saber cómo está puesto el móvil, servía para
+**decir «acerté» y «paso» sin ver la pantalla**. Quien lleva el aparato en la
+frente lo tiene mirando hacia los demás y no ve nada.
+
+Así que la entrada tiene que ser un gesto que se pueda hacer a ciegas, y no todos
+lo son: **un botón en una zona de la pantalla no vale**, porque acertar una mitad
+concreta sin mirar es adivinar. Lo que sí funciona sin vista es la **dirección**,
+que es propioceptiva:
+
+- **Deslizar hacia abajo → acerté.** Es el mismo gesto que inclinar el móvil
+  hacia abajo en el juego de siempre, hecho con el pulgar.
+- **Deslizar hacia arriba → paso.**
+- **Un golpe de vibración** confirma que el gesto entró, porque es la única
+  confirmación que se percibe sin ver la pantalla.
+
+Las tres piezas ya están instaladas —`react-native-gesture-handler` y
+`expo-haptics` vienen con la app—, así que esta fase sigue sin añadir una sola
+dependencia de interacción.
+
+Y queda anotado que **el sensor no está rechazado, está aplazado**: la
+inclinación es mejor gesto que el deslizamiento porque no exige tocar un aparato
+que está apoyado en una cara. Si La Frente funciona y la gente lo pide, entra
+después — y entonces habrá que escribir el texto de `NSMotionUsageDescription`,
+que es copy de producto y no configuración.
 
 *Demuestra:* que un juego puede existir **sin servidor, sin cuenta, sin asientos
 registrados, sin turnos, sin tablero y sin puntuación enviada a ningún sitio**, y
