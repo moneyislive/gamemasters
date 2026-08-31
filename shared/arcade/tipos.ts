@@ -140,6 +140,32 @@ export type MuebleDeArcade =
   | 'escena';
 
 /**
+ * Los mismos cuatro, en una lista que se puede recorrer EN EJECUCIÓN.
+ *
+ * ═══ POR QUÉ HACEN FALTA LAS DOS FORMAS ═══
+ *
+ * La unión protege a los juegos que vienen DENTRO del binario: el compilador no
+ * deja escribir `mueble: 'mi-mueble'`. No protege a los que vienen de FUERA por
+ * el enchufe, que llegan sin compilador de por medio — el mismo razonamiento
+ * que ya justifica que las dos garantías de arranque sean de ejecución.
+ *
+ * Y no protegerlos costaba caro, porque los dos consumidores desreferencian sin
+ * guardia (`MUEBLES[m.mueble].ruta` y `.seSabePintar`): un arcade instalado con
+ * un mueble desconocido no fallaba al instalarse —fallaba después, **reventando
+ * la Sala entera con un `TypeError` sin nombre**, para todos los juegos, en la
+ * pantalla que enseña el catálogo—. Lo señaló una revisión externa.
+ *
+ * El `satisfies` es lo que ata las dos formas: añadir un mueble a la unión y
+ * olvidarse de esta lista no compila.
+ */
+export const MUEBLES_DEL_CONTRATO = [
+  'formulario',
+  'tablero',
+  'lienzo',
+  'escena',
+] as const satisfies readonly MuebleDeArcade[];
+
+/**
  * De dónde salen las reglas de este arcade. UNIÓN CERRADA Y OBLIGATORIA.
  *
  * ═══ ESTO ES UN CAMPO LEGAL, Y CUESTA MENOS HOY QUE MAÑANA ═══
@@ -445,8 +471,48 @@ export function necesitaMesa(m: ManifiestoDeArcade): boolean {
   return m.sede === 'servidor';
 }
 
-/** ¿Está este arcade obligado a registrar una proyección para poder arrancar? */
+/**
+ * ¿Está este arcade obligado a registrar una proyección para poder arrancar?
+ *
+ * ═══ ESTO ERA `return m.secretos` Y DEJABA UN AGUJERO MUDO ═══
+ *
+ * Con esa versión, `vistaDeAsiento` devolvía **el estado entero** cuando no
+ * había proyección y el booleano estaba a `false`. O sea que un juego con manos
+ * ocultas que se olvidara de escribir `secretos: true` publicaba la partida
+ * completa a todos los asientos… **y el comprobador de fugas lo daba por bueno**,
+ * porque también salta a los arcades que no declaran secretos: se comprobaba un
+ * conjunto vacío y se anunciaba que no había fugas. Lo señaló una revisión
+ * externa, y es el peor de los fallos posibles según la doctrina de esta casa —
+ * un verde que no mira nada.
+ *
+ * No se puede arreglar adivinando: el estado es OPACO y nadie de fuera del juego
+ * puede saber si dentro hay algo que esconder. Lo que sí se puede es cambiar el
+ * valor por defecto. **Una mesa de servidor con más de un asiento tiene que
+ * declarar una proyección SIEMPRE**, aunque no esconda nada; si de verdad no
+ * esconde nada, esa proyección es la identidad y se escribe en una línea. La
+ * diferencia es que ahora es una línea que alguien escribió a propósito, en vez
+ * de un silencio que nadie notó.
+ *
+ * Es la misma corrección que ya se le hizo a `marcador` cuando era opcional:
+ * omitir es más silencioso que declarar, y en el diff parece limpieza.
+ */
 export function exigeProyeccion(m: ManifiestoDeArcade): boolean {
+  return m.secretos || (necesitaMesa(m) && m.jugadores.maximo > 1);
+}
+
+/**
+ * ¿Y está obligado a registrar `loSecreto`?
+ *
+ * SOLO si declara secretos, y aquí no se ensancha nada a propósito. `loSecreto`
+ * dice **qué valores no pueden salir**, así que solo tiene sentido cuando hay
+ * algo que no puede salir: exigírselo a un juego sin secretos sería pedirle que
+ * escriba «no escondo nada» en un fichero para que un comprobador lo lea, que es
+ * ceremonia y no garantía.
+ *
+ * Que sean dos preguntas y no una es el arreglo: antes las dos colgaban del
+ * mismo booleano, y ensanchar una habría ensanchado la otra.
+ */
+export function exigeLoSecreto(m: ManifiestoDeArcade): boolean {
   return m.secretos;
 }
 
@@ -490,6 +556,20 @@ export function problemasDelManifiesto(m: ManifiestoDeArcade): string[] {
   }
   if (m.marcador.tipo === 'cifra' && !m.marcador.rotulo) {
     problemas.push('publica una cifra y no dice cómo se llama: `marcador.rotulo` está vacío');
+  }
+  /*
+   * EL MUEBLE, que hasta hoy no se comprobaba. Un arcade de fuera con un mueble
+   * desconocido no reventaba aquí: reventaba en la Sala, con un `TypeError` sin
+   * nombre, llevándose por delante el catálogo de TODOS los juegos. Fallar en la
+   * instalación y no más tarde es la misma lección que este fichero ya tiene
+   * escrita para la procedencia, y hace falta repetirla aquí porque los dos
+   * consumidores del mueble desreferencian sin guardia.
+   */
+  if (!(MUEBLES_DEL_CONTRATO as readonly string[]).includes(m.mueble)) {
+    problemas.push(
+      `declara el mueble «${String(m.mueble)}», que esta app no conoce. Los que hay son: ` +
+        `${MUEBLES_DEL_CONTRATO.join(', ')}. Un mueble nuevo se añade al contrato y a la app a la vez.`,
+    );
   }
   problemas.push(...problemasDeLaProcedencia(m.procedencia));
   return problemas;

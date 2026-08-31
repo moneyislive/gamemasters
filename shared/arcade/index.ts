@@ -44,7 +44,13 @@ import {
   registrarProyeccion,
 } from './proyeccion';
 import type { LoSecreto, Proyeccion } from './proyeccion';
-import { ESPECTADOR, exigeProyeccion, necesitaMesa, problemasDelManifiesto } from './tipos';
+import {
+  ESPECTADOR,
+  exigeLoSecreto,
+  exigeProyeccion,
+  necesitaMesa,
+  problemasDelManifiesto,
+} from './tipos';
 import type { ArcadeId, ManifiestoDeArcade, QuienMira } from './tipos';
 import type { ContextoMovimiento, Movimiento } from './movimiento';
 
@@ -334,11 +340,18 @@ export interface SecretoSinTapar {
 export function arcadesConSecretosSinTapar(): SecretoSinTapar[] {
   const mal: SecretoSinTapar[] = [];
   for (const instalado of Object.values(INSTALADOS)) {
-    if (!exigeProyeccion(instalado.manifiesto)) continue;
-    const id = instalado.manifiesto.id;
+    const m = instalado.manifiesto;
+    const id = m.id;
     const falta: Array<'proyeccion' | 'lo-secreto'> = [];
-    if (!hayProyeccion(id)) falta.push('proyeccion');
-    if (!hayLoSecreto(id)) falta.push('lo-secreto');
+    /*
+     * DOS PREGUNTAS Y NO UNA, y por eso ya no hay un `continue` que se salte el
+     * arcade entero. Con el `continue`, un juego que se olvidara de declarar
+     * secretos no solo filtraba: se saltaba esta comprobacion, asi que el
+     * comprobador de fugas anunciaba que no habia fugas habiendo mirado un
+     * conjunto vacio.
+     */
+    if (exigeProyeccion(m) && !hayProyeccion(id)) falta.push('proyeccion');
+    if (exigeLoSecreto(m) && !hayLoSecreto(id)) falta.push('lo-secreto');
     if (falta.length > 0) mal.push({ arcade: id, falta });
   }
   return mal;
