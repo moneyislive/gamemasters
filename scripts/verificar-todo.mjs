@@ -104,6 +104,26 @@ const BATERIA = [
   { nombre: 'móvil', donde: 'app', guion: 'verify', porque: 'pantallas, tema y tablas de módulo' },
 
   // ── Las veladas largas ────────────────────────────────────────────────────
+  /*
+   * ═══ LA QUE NO SABE A QUÉ JUEGA ═══
+   *
+   * Las tres veladas de abajo conocen su juego: saben qué es una cámara, un
+   * paso, una franja, y comprueban las reglas de cada uno. Esta no sabe nada:
+   * lee `acciones` del manifiesto, saca las opciones de la vista del jugador y
+   * juega los CUATRO hasta el desenlace con el mismo código.
+   *
+   * Es la única que cubre CLUEDO de punta a punta, y la única que responde a la
+   * pregunta que da sentido a toda la arquitectura por capas: ¿se puede jugar a
+   * esto sin saber a qué se juega? El día que haga falta un `if` por juego para
+   * que avance, deja de pasar, y eso es exactamente lo que se quiere saber.
+   */
+  {
+    nombre: 'jugar sin saber a qué',
+    donde: 'server',
+    guion: 'jugar:fondo',
+    lento: true,
+    porque: 'los cuatro juegos, hasta el desenlace, con un jugador que solo lee el manifiesto',
+  },
   {
     nombre: 'velada · la Momia',
     donde: 'server',
