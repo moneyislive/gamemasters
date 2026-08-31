@@ -52,7 +52,8 @@
     "verify:arranque": "tsx scripts/verificar-arranque.ts",
     "verify:conexion": "tsx scripts/verificar-conexion.ts",
     "verify:legal": "tsx scripts/verificar-legal.ts",
-    "verify:estado": "tsx scripts/verificar-estado-del-juego.ts"
+    "verify:estado": "tsx scripts/verificar-estado-del-juego.ts",
+    "verify:estabilidad": "tsx scripts/verificar-estabilidad.ts --quieto"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",

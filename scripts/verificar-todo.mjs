@@ -152,6 +152,19 @@ const BATERIA = [
    * lo que el servidor manda de verdad, y comprueba que lo entiende.
    */
   { nombre: 'estado del juego', donde: 'server', guion: 'verify:estado', porque: 'lo que el servidor mete en `estadoDelJuego`, la app lo entiende' },
+  /*
+   * DOS MINUTOS DE SONDEO DE VERDAD. Seis moviles haciendo lo mismo que hace la
+   * app, con la mesa quieta —que es el caso dificil, porque el sondeo tiene que
+   * aguantar sus veinticinco segundos callado— mientras se vigila cada segundo
+   * cuantos figuran conectados. Va con los lentos por lo que tarda.
+   */
+  {
+    nombre: 'estabilidad de la conexión',
+    donde: 'server',
+    guion: 'verify:estabilidad',
+    lento: true,
+    porque: 'seis móviles sondeando dos minutos sin que nadie deje de figurar conectado',
+  },
   { nombre: 'entorno', donde: 'server', guion: 'verify:entorno', porque: 'el despliegue y el código hablan de lo mismo' },
   { nombre: 'almacén', donde: 'server', guion: 'verify:almacen', porque: 'lo que se guarda se vuelve a leer igual' },
   { nombre: 'presencia', donde: 'server', guion: 'verify:presencia', porque: 'quién está conectado y quién no' },
