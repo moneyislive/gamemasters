@@ -709,6 +709,24 @@ separadas sin duplicar nada: `opciones()` no puede ofrecer de más, y el reducto
 no puede confiarse de menos. El rechazo devuelve **el mismo objeto de estado**,
 que es el que la mesa ya cuenta como movimiento que no cambió nada.
 
+### La factura del «sólo si», y hay que tenerla escrita
+
+La regla tiene un precio y conviene cobrarlo por adelantado en vez de descubrirlo
+depurando. El §5.2 obliga a que un movimiento rechazado devuelva **el mismo
+objeto de estado**, nunca un motivo: es lo que mantiene el reductor puro y lo que
+la mesa ya cuenta como «no pasó nada».
+
+Mientras el rechazo era raro, eso era una incomodidad. Con el «sólo si», **el
+rechazo silencioso pasa a ser el camino normal**: cada sitio donde un juego
+ejerce la regla produce un movimiento que la app solo puede describir como «la
+mesa está igual que estaba», deduciéndolo de que la revisión no subió. Nunca
+*por qué*.
+
+O sea que la regla del espejo **encarece** el hueco que ya existía —no hay canal
+entre «el reductor rechazó» y la pantalla— y lo convierte de deuda anotada en
+deuda urgente. No es un reproche a la regla: es su factura. Y está escrita aquí
+para que quien la pague sepa de dónde viene.
+
 ### Los identificadores que publica son seudónimos por asiento
 
 Un id no puede derivarse del contenido oculto. `"carta:oros-7"` esconde un
