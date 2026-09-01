@@ -1,0 +1,391 @@
+/**
+ * LA SALA DE LA PORTADA: que enseñe lo que hay y que no mienta sobre ello.
+ *
+ * ═══ QUÉ CAMBIÓ PARA QUE ESTO HAGA FALTA ═══
+ *
+ * La Sala se componía del registro COMPILADO: los cinco arcades que vienen
+ * dentro del binario. Ahora se fusiona con el catálogo del SERVIDOR, o sea con
+ * manifiestos escritos en otro repositorio y cargados por `ARCADES_EXTERNOS`. Eso
+ * mete en la portada dos clases de dato que antes no llegaban: valores que no
+ * están en las uniones cerradas de este binario, y juegos cuyas reglas no vienen
+ * aquí.
+ *
+ * Y el juicio de qué se puede jugar pasó de un sí/no a NUEVE ramas. Nueve ramas
+ * no se compran leyendo: hay que EJECUTARLAS. Por eso `arcade/del-servidor.ts` es
+ * un módulo puro, sin un solo `import` de ejecución, y por eso este comprobador
+ * lo carga de verdad en vez de mirarlo con expresiones regulares.
+ *
+ * ═══ POR QUÉ CON MANIFIESTOS FABRICADOS Y NO CON LOS DE CASA ═══
+ *
+ * Por lo mismo que `laTerceraPregunta` en el comprobador del escritorio: una
+ * comprobación atada a los arcades instalados hoy se apaga sola el día que
+ * alguien los cambie, y nadie se entera. Fabricando un caso por rama, la regla se
+ * compra ella sola y para siempre.
+ *
+ * Lo que NO se puede fabricar es la relación entre el juicio y el binario de
+ * verdad, así que eso se lee aparte: que las listas con las que se ejercita sean
+ * las que el binario declara.
+ *
+ * Corre con `node` pelado, en segundos, sin Metro y sin red.
+ */
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import ts from 'typescript';
+
+const AQUI = path.dirname(fileURLToPath(import.meta.url));
+const SRC = path.resolve(AQUI, '..');
+const APP = path.resolve(SRC, '..', 'app');
+
+const fallos = [];
+let cuantas = 0;
+
+function comprobar(que, condicion, detalle) {
+  cuantas++;
+  if (condicion) return;
+  fallos.push(
+    `${que}${detalle === undefined ? '' : `\n      ${String(JSON.stringify(detalle)).slice(0, 300)}`}`,
+  );
+}
+
+function paso(titulo) {
+  console.log(`\n· ${titulo}`);
+}
+
+function leer(fichero) {
+  return fs.readFileSync(fichero, 'utf8');
+}
+
+async function cargarModuloTs(fichero) {
+  const js = ts.transpileModule(leer(fichero), {
+    compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext },
+  }).outputText;
+  return import(`data:text/javascript;base64,${Buffer.from(js, 'utf8').toString('base64')}`);
+}
+
+const { dondeSePinta, loQueLlega, queSeEnsena } = await cargarModuloTs(
+  path.join(SRC, 'arcade', 'del-servidor.ts'),
+);
+
+/**
+ * El binario con el que se ejercita el juicio.
+ *
+ * Es el de VERDAD —se comprueba más abajo contra las tablas— y no uno inventado:
+ * probar la regla contra un binario imaginario compraría que la regla es
+ * coherente consigo misma, que no es lo que hay que comprar.
+ */
+const BINARIO = {
+  juegos: ['frente', 'el-arcade', 'riberas', 'peonza'],
+  muebles: ['formulario', 'tablero', 'lienzo', 'escena'],
+  genericosDelContrato: ['formulario', 'tablero'],
+  genericos: ['tablero'],
+};
+
+/** Un manifiesto con lo justo para el juicio. */
+function manifiesto(campos) {
+  return {
+    id: 'de-prueba',
+    nombre: 'De prueba',
+    gancho: 'Un gancho.',
+    icono: 'mando',
+    mueble: 'tablero',
+    sede: 'servidor',
+    ...campos,
+  };
+}
+
+// ---------------------------------------------------------------------------
+
+paso('El juicio contesta las nueve, y cada una la suya');
+{
+  const dentro = dondeSePinta(manifiesto({ id: 'frente', mueble: 'formulario', sede: 'dispositivo' }), BINARIO);
+  comprobar('un juego que trae el binario se juega', dentro.aqui === true, dentro);
+  comprobar('y se sabe que es por su componente propio', dentro.aqui && dentro.porComponentePropio === true, dentro);
+
+  /*
+   * ═══ LA VACUNA QUE MÁS IMPORTA, Y NO ES TEÓRICA ═══
+   *
+   * `GET /api/arcade` publica HOY `publicaOpciones: false` para La Frente, El
+   * Arcade y La Peonza: ninguno registra `opciones()` porque los tres pintan su
+   * propia pantalla. Un juicio que preguntara «¿publica algo?» antes que «¿lo
+   * traigo dentro?» apagaría las tres tarjetas con una frase perfectamente
+   * razonada y perfectamente falsa — y el cliente de escritorio hace justo esa
+   * pregunta primero, así que copiarle el orden es el error a mano.
+   */
+  const frenteSinOpciones = dondeSePinta(
+    manifiesto({ id: 'frente', mueble: 'formulario', sede: 'dispositivo', publicaOpciones: false }),
+    BINARIO,
+  );
+  comprobar(
+    'un juego del binario SIN opciones() sigue jugable, pase lo que pase con publicaOpciones',
+    frenteSinOpciones.aqui === true,
+    frenteSinOpciones,
+  );
+
+  const deFuera = dondeSePinta(manifiesto({ id: 'de-fuera', mueble: 'tablero' }), BINARIO);
+  comprobar('un arcade de FUERA con mueble genérico se juega', deFuera.aqui === true, deFuera);
+  comprobar('y se sabe que NO es por componente propio', deFuera.aqui && deFuera.porComponentePropio === false, deFuera);
+
+  /*
+   * La segunda vacuna: endurecer esta línea apaga el enchufe entero. Un arcade de
+   * tablero resuelve su dibujo DENTRO de su proyección, así que no necesita
+   * publicar opciones — y exigírselas dejaría fuera a todos los de fuera.
+   */
+  const tableroSinOpciones = dondeSePinta(
+    manifiesto({ id: 'de-fuera', mueble: 'tablero', publicaOpciones: false }),
+    BINARIO,
+  );
+  comprobar(
+    'un arcade de fuera con mueble tablero se juega aunque no publique opciones',
+    tableroSinOpciones.aqui === true,
+    tableroSinOpciones,
+  );
+
+  const raro = dondeSePinta(manifiesto({ id: 'raro', mueble: 'holograma' }), BINARIO);
+  comprobar('un mueble que este binario no conoce se apaga', raro.aqui === false, raro);
+  comprobar('y dice que es eso', !raro.aqui && raro.razon === 'mueble-desconocido', raro);
+  comprobar(
+    'y su motivo NOMBRA el mueble, que es lo único accionable',
+    !raro.aqui && raro.porque.includes('holograma'),
+    raro,
+  );
+
+  const propio = dondeSePinta(manifiesto({ id: 'de-fuera', mueble: 'lienzo' }), BINARIO);
+  comprobar('un mueble propio de un juego que no viene dentro se apaga', propio.aqui === false, propio);
+  comprobar('y dice que sus píxeles están en el binario', !propio.aqui && propio.razon === 'pixeles-en-el-binario', propio);
+  /*
+   * Y NO puede decir «se juega en la app», que es lo que dice el cliente de
+   * escritorio para este mismo caso. Esto ES la app: mandar a alguien a donde ya
+   * está es la peor clase de mensaje honrado.
+   */
+  comprobar(
+    'y NO manda a nadie a la app, porque esto es la app',
+    !propio.aqui && !/en la app/i.test(propio.porque),
+    propio,
+  );
+
+  /*
+   * Y ESTE ES EL CASO QUE ESTE COMPROBADOR ENCONTRO, y que el juicio contestaba
+   * mal: `formulario` es generico DEL CONTRATO y esta app todavia no lo pinta. Con
+   * una sola lista de genericos salia como «sus pixeles viven en su binario», que
+   * manda a esperar algo que no va a pasar nunca. Lo que le pasa es lo contrario:
+   * llega con una version nueva de la app y el juego no toca nada.
+   */
+  const sinPincel = dondeSePinta(
+    manifiesto({ id: 'de-fuera', mueble: 'formulario', publicaOpciones: true }),
+    { ...BINARIO, genericos: [] },
+  );
+  comprobar('un mueble generico que esta version no pinta se apaga', sinPincel.aqui === false, sinPincel);
+  comprobar('y dice que le falta a la APP, no al juego', !sinPincel.aqui && sinPincel.razon === 'mueble-sin-pincel', sinPincel);
+  comprobar(
+    'y no lo confunde con los pixeles propios',
+    !sinPincel.aqui && sinPincel.razon !== 'pixeles-en-el-binario',
+    sinPincel,
+  );
+
+  /*
+   * ═══ LAS TRES QUE SIGUEN SE EJERCITAN CON UN BINARIO QUE NO EXISTE TODAVIA ═══
+   *
+   * Y hay que decirlo en voz alta. Con el binario de HOY son inalcanzables: el
+   * unico mueble generico que esta app pinta es `tablero`, y un `tablero` sale por
+   * la rama de arriba antes de llegar aqui. O sea que estas tres ramas del juicio
+   * no las recorre ninguna tarjeta de ninguna pantalla de nadie.
+   *
+   * Se comprueban igual, y con un binario fabricado que pinta formularios, porque
+   * el dia que esta app estrene el pintor generico de formularios —que es una deuda
+   * escrita en `pintados.ts`— estas tres pasan a decidir de verdad y nadie va a
+   * volver a leerlas. Un comprobador que solo cubre lo alcanzable hoy es un
+   * comprobador que se queda corto justo cuando el codigo crece.
+   */
+  const CON_FORMULARIOS = { ...BINARIO, genericos: ['formulario', 'tablero'] };
+
+  const sinMesa = dondeSePinta(
+    manifiesto({ id: 'de-fuera', mueble: 'formulario', sede: 'dispositivo' }),
+    CON_FORMULARIOS,
+  );
+  comprobar('un juego de aparato que no viene dentro se apaga', sinMesa.aqui === false, sinMesa);
+  comprobar('y dice que no hay ni mesa ni reglas', !sinMesa.aqui && sinMesa.razon === 'ni-mesa-ni-reductor', sinMesa);
+
+  const mudo = dondeSePinta(
+    manifiesto({ id: 'de-fuera', mueble: 'formulario', publicaOpciones: false }),
+    CON_FORMULARIOS,
+  );
+  comprobar('un mueble de lista sin lista se apaga', mudo.aqui === false, mudo);
+  comprobar('y dice que no publica nada', !mudo.aqui && mudo.razon === 'no-publica-nada', mudo);
+
+  /*
+   * La tercera vacuna: `undefined` NO es `false`. Un servidor más viejo que este
+   * binario no manda el campo, y desde aquí no se sabe. Colapsarlos es decirle a
+   * alguien que un juego «no publica nada» cuando lo que pasa es que no se ha
+   * preguntado.
+   */
+  const calla = dondeSePinta(manifiesto({ id: 'de-fuera', mueble: 'formulario' }), CON_FORMULARIOS);
+  comprobar('si el servidor no lo dice, no se contesta como que no publica', calla.aqui === false && calla.razon === 'el-servidor-no-lo-dice', calla);
+  comprobar(
+    'y las dos razones son distintas de verdad',
+    !mudo.aqui && !calla.aqui && mudo.porque !== calla.porque,
+    { mudo: mudo.porque, calla: calla.porque },
+  );
+
+  const conOpciones = dondeSePinta(
+    manifiesto({ id: 'de-fuera', mueble: 'formulario', publicaOpciones: true }),
+    CON_FORMULARIOS,
+  );
+  comprobar('un mueble de lista CON lista se juega', conOpciones.aqui === true, conOpciones);
+}
+
+paso('Y el binario con el que se juzga es el de verdad');
+{
+  /*
+   * Sin esto, arriba se estaría probando una regla contra un binario imaginario:
+   * el día que entre un mueble genérico nuevo, el juicio lo trataría bien y esta
+   * prueba seguiría verde con la lista vieja.
+   */
+  const pintados = leer(path.join(SRC, 'arcade', 'pintados.ts'));
+  const muebles = leer(path.join(SRC, 'arcade', 'muebles.ts'));
+
+  comprobar(
+    'el binario declara sus tres listas derivándolas de las tablas',
+    /juegos:\s*Object\.keys\(LOS_QUE_PINTA\)/.test(pintados) &&
+      /genericos:\s*Object\.keys\(LOS_MUEBLES_GENERICOS\)/.test(pintados),
+    'derivadas es lo que impide que se separen de las tablas',
+  );
+  comprobar(
+    '`tablero` está entre los genéricos, que es lo que desbloquea el enchufe',
+    /tablero:\s*ElTableroEnLinea/.test(pintados),
+  );
+  comprobar(
+    'y hay al menos un mueble PROPIO fuera de los genéricos',
+    /lienzo/.test(muebles) && !/lienzo:\s*[A-Z]/.test(pintados.split('LOS_MUEBLES_GENERICOS')[1] ?? ''),
+    'sin un mueble propio, la rama `pixeles-en-el-binario` no la recorre nadie',
+  );
+  /*
+   * Las claves de `LOS_QUE_PINTA` son CONSTANTES (`[FRENTE]`, `[RIBERAS]`…) y no
+   * literales, asi que buscar la cadena 'riberas' en el fichero no encuentra nada.
+   * Se cuentan las entradas y se contrastan con la lista de arriba: un juego nuevo
+   * con pintor propio obliga a tocar esta prueba, que es justo lo que se quiere.
+   */
+  const cuerpoDeLosQuePinta = pintados.split('LOS_QUE_PINTA: Record<ArcadeId, ComponentType> = {')[1] ?? '';
+  const entradas = (cuerpoDeLosQuePinta.split('};')[0] ?? '').match(/^\s*\[[A-Z_]+\]:/gm) ?? [];
+  comprobar(
+    'el binario trae exactamente los juegos con los que se juzga arriba',
+    entradas.length === BINARIO.juegos.length,
+    { enLaTabla: entradas.length, conLosQueSeJuzga: BINARIO.juegos.length },
+  );
+  for (const constante of ['FRENTE', 'EL_ARCADE', 'RIBERAS', 'PEONZA']) {
+    comprobar(`y «${constante}» esta entre ellos`, new RegExp(`\\[${constante}\\]:`).test(pintados), constante);
+  }
+}
+
+paso('Lo que llega por el cable se mira antes de pintarlo');
+{
+  comprobar('un cuerpo que no es objeto no pasa', loQueLlega(null) === null && loQueLlega(7) === null);
+  comprobar('un 200 sin lista no pasa', loQueLlega({}) === null);
+  comprobar('una lista vacía SÍ pasa: es un servidor sin arcades, no un fallo', Array.isArray(loQueLlega({ arcades: [] })));
+
+  /*
+   * ═══ ESTO ES LO QUE EVITA LA PANTALLA EN BLANCO ═══
+   *
+   * Un `nombre` que sea un objeto lanza «Objects are not valid as a React child»
+   * DURANTE el render, y la portada no tiene `ErrorBoundary`: el throw desmonta
+   * la raíz. No se cae una tarjeta, se cae la app.
+   */
+  const sucio = loQueLlega({
+    arcades: [
+      manifiesto({ id: 'bueno' }),
+      manifiesto({ id: 'sin-nombre', nombre: '' }),
+      manifiesto({ id: 'nombre-objeto', nombre: { es: 'malo' } }),
+      manifiesto({ id: 'sin-mueble', mueble: 42 }),
+      manifiesto({ id: 'sede-rara', sede: 'la-nube' }),
+      { no: 'es un manifiesto' },
+      null,
+      'una cadena suelta',
+    ],
+  });
+  comprobar('de ocho, solo pasa el bueno', sucio.length === 1, sucio.map((m) => m.id));
+  comprobar('y el que pasa es el bueno', sucio[0]?.id === 'bueno', sucio[0]);
+}
+
+paso('Los tres momentos, y lo compilado nunca se quita');
+{
+  const dentro = [manifiesto({ id: 'frente' }), manifiesto({ id: 'peonza' })];
+
+  const pidiendo = queSeEnsena({ que: 'pidiendo' }, dentro);
+  comprobar('mientras se pide, salen los del binario', pidiendo.arcades.length === 2, pidiendo);
+  comprobar('y NO se dice que no hay servidor: todavía no se sabe', pidiendo.sinServidor === false, pidiendo);
+
+  const sinRed = queSeEnsena({ que: 'sin-servidor' }, dentro);
+  comprobar('sin servidor, siguen saliendo los del binario', sinRed.arcades.length === 2, sinRed);
+  comprobar('y ahí sí se dice', sinRed.sinServidor === true, sinRed);
+
+  const puesto = queSeEnsena(
+    { que: 'puesto', arcades: [manifiesto({ id: 'frente' }), manifiesto({ id: 'de-fuera' })] },
+    dentro,
+  );
+  comprobar('con servidor, se fusiona sin duplicar', puesto.arcades.length === 3, puesto.arcades.map((m) => m.id));
+  comprobar(
+    'y el de fuera entra',
+    puesto.arcades.some((m) => m.id === 'de-fuera'),
+    puesto.arcades.map((m) => m.id),
+  );
+  /*
+   * Un servidor que no liste un arcade compilado NO lo borra de la pantalla: se
+   * puede jugar igual si corre en el aparato, y quitarlo sería esconder algo
+   * jugable por una respuesta que no habla de él.
+   */
+  const servidorVacio = queSeEnsena({ que: 'puesto', arcades: [] }, dentro);
+  comprobar(
+    'un servidor sin arcades no borra los del binario',
+    servidorVacio.arcades.length === 2,
+    servidorVacio.arcades.map((m) => m.id),
+  );
+  comprobar('y gana lo compilado cuando los dos hablan del mismo', puesto.arcades[0]?.id === 'frente', puesto.arcades[0]);
+}
+
+paso('La portada no puede reventar por un icono que no conoce');
+{
+  const vitrina = leer(path.join(SRC, 'vitrina.ts'));
+  const iconos = leer(path.join(SRC, 'iconos.tsx'));
+  const portada = leer(path.join(APP, 'index.tsx'));
+
+  comprobar(
+    'la lista de iconos conocidos se deriva de la tabla',
+    /ICONOS_DE_ARCADE_CONOCIDOS[^=]*=\s*Object\.keys\(ICONOS_DE_ARCADE\)/.test(iconos),
+    'escrita a mano se separa de la tabla y vuelve el `undefined`',
+  );
+  comprobar(
+    'la Sala normaliza el icono contra esa lista',
+    /ICONOS_DE_ARCADE_CONOCIDOS/.test(vitrina) && /ICONO_DE_ARCADE_POR_DEFECTO/.test(vitrina),
+    'sin esto, un arcade de fuera con otro icono deja `undefined` en la tarjeta',
+  );
+  comprobar(
+    'y la tarjeta lleva además su propio respaldo',
+    /ICONOS_DE_ARCADE\[[^\]]+\]\s*\?\?/.test(portada),
+    'dos guardias para un agujero que el compilador no ve y que ya tumbó esta portada una vez',
+  );
+  comprobar(
+    'la razón por la que no se puede jugar se pinta',
+    /minijuego\.porque/.test(portada),
+    'sin esto vuelve la frase única, que es falsa en tres de los cuatro casos',
+  );
+  comprobar(
+    'y la portada pide el catálogo por la puerta de la casa',
+    /pedirCatalogoDeArcade/.test(portada),
+    'una dirección escrita a mano se salta la elección de servidor',
+  );
+}
+
+// ---------------------------------------------------------------------------
+
+if (fallos.length > 0) {
+  console.error(`\n✘ ${fallos.length} de ${cuantas} comprobaciones han fallado:\n`);
+  for (const f of fallos) console.error(`   · ${f}`);
+  process.exit(1);
+}
+
+console.log(
+  `\n✔ ${cuantas} comprobaciones. La Sala de la portada enseña lo que trae el binario Y lo que\n` +
+    '  instaló el servidor, cada tarjeta apagada dice SU razón y no una frase para todas, un\n' +
+    'icono o un nombre que esta versión no conozca no se lleva la pantalla por delante, y lo\n' +
+    '  que viene dentro se puede jugar aunque no conteste nadie.',
+);

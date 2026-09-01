@@ -1064,11 +1064,49 @@ paso('La Sala no anuncia ningún arcade que no sepa pintar');
       'entrega arcades que ningún móvil puede abrir',
   );
 
+  /*
+   * ═══ Y ESTA CAMBIÓ CUANDO LA SALA EMPEZÓ A LISTAR LO DEL SERVIDOR ═══
+   *
+   * Pedía que `vitrina.ts` llamara a `seSabePintar(`. La regla que compraba —que
+   * la vitrina NO decida por su cuenta— sigue siendo la misma; lo que cambió es
+   * quién contesta. `seSabePintar` da un sí o un no, y desde que la Sala lista
+   * arcades que este binario no conoce hace falta además el POR QUÉ: son cuatro
+   * causas distintas y una frase para todas es falsa en tres.
+   *
+   * Lo contesta `dondeSePinta`, que vive en `arcade/del-servidor.ts` para poder
+   * EJECUTARSE desde un comprobador de Node —`pintados.ts` no puede, trae React
+   * Native dentro— y que recibe lo que este binario pinta como DATO.
+   *
+   * Así que lo que se exige ahora son las dos mitades de esa delegación: que la
+   * vitrina llame al juicio, y que lo alimente con la descripción que sale de las
+   * tablas de verdad. Con una sola de las dos se puede deshacer el arreglo sin
+   * ponerse rojo: llamar al juicio con listas escritas a mano es exactamente
+   * volver a decidirlo por su cuenta, con un rodeo.
+   */
   comprobar(
-    'la portada saca la respuesta de esa tabla',
-    /\bseSabePintar\s*\(/.test(vitrina) && /from '\.\/arcade\/pintados'/.test(vitrina),
+    'la portada saca la respuesta del juicio y no la inventa',
+    /\bdondeSePinta\s*\(/.test(vitrina) && /from '\.\/arcade\/pintados'/.test(vitrina),
     'si `vitrina.ts` vuelve a decidirlo por su cuenta, la Sala vuelve a ofrecer tarjetas que no ' +
       'llevan a ninguna parte',
+  );
+  comprobar(
+    'y lo alimenta con lo que este binario pinta de verdad',
+    /LO_QUE_PINTA_ESTE_BINARIO/.test(vitrina) && /LO_QUE_PINTA_ESTE_BINARIO/.test(pintados),
+    'el juicio es correcto y el dato es lo que puede mentir: alimentarlo con una lista escrita ' +
+      'a mano es decidirlo por su cuenta con un rodeo',
+  );
+  /*
+   * Y LAS TRES LISTAS SE DERIVAN DE LAS TABLAS, que es lo que impide que se
+   * separen de ellas. Escritas a mano compilan igual, pasan lo de arriba, y se
+   * quedan viejas en silencio el día que entre un mueble genérico nuevo — que es
+   * justo el día en que un arcade de fuera dejaría de salir sin que nada fallara.
+   */
+  comprobar(
+    'y esas listas salen de las tablas, no de un literal',
+    /juegos:\s*Object\.keys\(LOS_QUE_PINTA\)/.test(pintados) &&
+      /genericos:\s*Object\.keys\(LOS_MUEBLES_GENERICOS\)/.test(pintados),
+    'una lista escrita a mano se queda vieja el día que entre el mueble siguiente, y el fallo ' +
+      'es que un arcade instalado deja de aparecer sin que nada se ponga rojo',
   );
   /*
    * Se mira SOLO EL CUERPO de `minijuegos()` y no el fichero entero, y no es un

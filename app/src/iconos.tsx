@@ -450,3 +450,28 @@ export function IconoMando(p: PropsIcono): JSX.Element {
 export const ICONOS_DE_ARCADE: Record<IconoDeArcade, (p: PropsIcono) => JSX.Element> = {
   mando: IconoMando,
 };
+
+/**
+ * LOS ICONOS QUE ESTE BINARIO TRAE, recorribles.
+ *
+ * ═══ POR QUÉ HACE FALTA UNA LISTA SI YA HAY UNA UNIÓN ═══
+ *
+ * Porque la unión es de compilación y el catálogo de la Sala viene POR LA RED.
+ * `IconoDeArcade` tiene hoy un solo miembro, así que un arcade instalado en el
+ * servidor —cuyo manifiesto lo escribe otro repositorio— puede declarar
+ * cualquier cosa, la tabla de arriba devolver `undefined`, y la portada intentar
+ * pintar `<undefined />`. Eso lanza durante el render, y como esa pantalla no
+ * tiene `ErrorBoundary`, se lleva la raíz entera: pantalla en blanco y para todos
+ * los juegos, no sólo para el que traía el icono raro.
+ *
+ * TypeScript no lo pide: `noUncheckedIndexedAccess` sólo marca las firmas de
+ * índice, y un `Record` de clave finita no lo es. O sea que es exactamente la
+ * clase de fallo que el compilador bendice.
+ *
+ * Se deriva con `Object.keys` de la tabla y no se escribe a mano, que es lo que
+ * hace que no se puedan separar: un icono nuevo entra arriba y aparece aquí solo.
+ */
+export const ICONOS_DE_ARCADE_CONOCIDOS: readonly string[] = Object.keys(ICONOS_DE_ARCADE);
+
+/** El que se pone cuando el declarado no existe en este binario. */
+export const ICONO_DE_ARCADE_POR_DEFECTO: IconoDeArcade = 'mando';

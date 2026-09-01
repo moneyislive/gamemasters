@@ -54,9 +54,11 @@ import { SelloDeCuenta } from '../src/sello-cuenta';
 import { FondoDeSalas } from '../src/fondos-sala';
 import { AVATAR_POR_DEFECTO, cargarAvatar, olvidarModelo3D, type Avatar } from '../src/avatar';
 import { Latido, Pulsable, useMenosMovimiento } from '../src/vivo';
-import { minijuegos, veladas } from '../src/vitrina';
+import { arcadesDeEsteBinario, laSala, veladas } from '../src/vitrina';
 import type { Minijuego } from '../src/vitrina';
-import { ICONOS_DE_ARCADE } from '../src/iconos';
+import { loQueLlega, queSeEnsena } from '../src/arcade/del-servidor';
+import type { EstadoDelCatalogo } from '../src/arcade/del-servidor';
+import { ICONO_DE_ARCADE_POR_DEFECTO, ICONOS_DE_ARCADE } from '../src/iconos';
 import { todosLosTrofeos } from '../../shared/juegos';
 import { color, espacio, fuente, radio } from '../src/tema';
 
@@ -119,6 +121,13 @@ export default function Portada(): JSX.Element {
   const { vista, cargando, refrescar } = usePartida();
   const { width, height } = useWindowDimensions();
   const [portada, setPortada] = useState<api.Portada | null>(null);
+  /*
+   * EL CATÁLOGO DE LA SALA, que es lo único de esta pantalla que viene del
+   * servidor sin credencial. Empieza en `pidiendo` y no en `sin-servidor`: son
+   * dos cosas distintas y confundirlas haría que la Sala dijera «no se ha podido
+   * hablar con el servidor» durante el primer segundo de cada arranque.
+   */
+  const [catalogoDeArcade, setCatalogoDeArcade] = useState<EstadoDelCatalogo>({ que: 'pidiendo' });
 
   const scrollY = useSharedValue(0);
   const alScroll = useAnimatedScrollHandler((e) => {
@@ -166,6 +175,55 @@ export default function Portada(): JSX.Element {
     })();
   }, []);
 
+  /**
+   * EL CATÁLOGO DE LA SALA, aparte de la portada y a propósito.
+   *
+   * ═══ POR QUÉ NO VA DENTRO DE `cargarPortada` ═══
+   *
+   * Porque `cargarPortada` se rinde antes de preguntar si no hay cuenta —tiene
+   * que hacerlo: lo que pide son TUS invitaciones y TUS partidas— y la Sala no es
+   * tuya. Metiéndolo ahí, el escaparate desaparecería justo para quien todavía no
+   * ha entrado, que es a quien hay que enseñárselo.
+   *
+   * Y falla en silencio a propósito. Un servidor que no contesta NO puede dejar
+   * esta pantalla sin Sala: La Frente, El Arcade y La Peonza corren dentro del
+   * aparato y se juegan sin cobertura. Lo que se pierde sin red es lo que hubiera
+   * instalado el servidor, y eso se DICE debajo de la lista en vez de dejar un
+   * hueco. Es la misma doctrina que `arcade/marcador.ts` escribe para el
+   * marcador: nada de lo que hay aquí puede impedir jugar.
+   */
+  const cargarCatalogo = useCallback(() => {
+    setCatalogoDeArcade({ que: 'pidiendo' });
+    void (async () => {
+      try {
+        /*
+         * ═══ EL DISCO ANTES QUE LA PREGUNTA, Y AQUÍ TAMBIÉN ═══
+         *
+         * `cargarSesionGuardada()` no carga sólo la sesión: carga LA DIRECCIÓN DEL
+         * SERVIDOR que alguien eligió. Sin esta línea, `peticion` usa todavía la de
+         * por defecto —en web, el origen de la página— y la primera petición del
+         * arranque se va al sitio equivocado.
+         *
+         * Medido y no supuesto: sin ella, con la app servida por Metro en el 8081,
+         * el catálogo se pedía a `localhost:8081/api/arcade`. Metro contesta 200
+         * con otra cosa, `loQueLlega` la rechaza —que es su trabajo— y la Sala
+         * enseñaba «no se ha podido preguntar a este servidor» teniendo el servidor
+         * perfectamente levantado al lado. Un fallo que se ve como red y es de
+         * orden.
+         *
+         * `cargarPortada` empieza con esta misma línea y por esta misma razón. Que
+         * las dos la necesiten no es repetición: son dos cargas independientes y
+         * ninguna puede dar por hecho que la otra ya corrió.
+         */
+        await api.cargarSesionGuardada();
+        const arcades = loQueLlega(await api.pedirCatalogoDeArcade());
+        setCatalogoDeArcade(arcades === null ? { que: 'sin-servidor' } : { que: 'puesto', arcades });
+      } catch {
+        setCatalogoDeArcade({ que: 'sin-servidor' });
+      }
+    })();
+  }, []);
+
   const cargarFigura = useCallback(() => {
     void cargarAvatar().then(setAvatar);
     // Los fondos generados: si el servidor no tiene, los telones aguantan.
@@ -177,6 +235,14 @@ export default function Portada(): JSX.Element {
 
   useEffect(cargarPortada, [cargarPortada]);
   useEffect(cargarFigura, [cargarFigura]);
+  /*
+   * El catálogo se pide UNA VEZ al montar y NO con `useFocusEffect`. Lo que hay
+   * instalado en un servidor no cambia mientras alguien tiene la app abierta, y
+   * volver a pedirlo cada vez que se vuelve a esta pantalla sería una petición
+   * por cada ida y vuelta a un juego. Si falla, hay un botón para reintentar, que
+   * es lo que de verdad hace falta.
+   */
+  useEffect(cargarCatalogo, [cargarCatalogo]);
   // Al volver del editor, el avatar puede haber cambiado.
   useFocusEffect(cargarPortada);
   useFocusEffect(cargarFigura);
@@ -188,11 +254,31 @@ export default function Portada(): JSX.Element {
 
   const catalogo = veladas();
   /*
-   * Y la Sala. Se lee del registro de arcades en cada pintado, igual que el
-   * catálogo de veladas: son dos registros distintos y no se pueden confundir. Ver
-   * `app/src/vitrina.ts`, donde está escrito por qué están separados.
+   * Y LA SALA, que ya no es sólo lo que trae el binario.
+   *
+   * Se FUSIONA lo compilado con lo que dice el servidor, y lo compilado es un
+   * suelo que no se quita nunca. Las otras dos formas de hacer esto están mal y
+   * conviene dejarlo dicho para que nadie las «arregle» de vuelta:
+   *
+   *   · Esperar al servidor esconde La Frente, El Arcade y La Peonza —que corren
+   *     dentro del aparato y se juegan en el metro— hasta que conteste alguien, o
+   *     para siempre si no hay red. Enseñar «no hay nada» teniendo tres cosas
+   *     jugables a mano es tan mentira como una caja muerta.
+   *   · Sustituir lo compilado por lo del servidor borraría una tarjeta buena
+   *     porque una respuesta no habla de ella.
+   *
+   * Fusionar es además UNA SOLA REGLA en los tres momentos —pidiendo, puesto y
+   * sin servidor— así que no hay transición que parpadee. El razonamiento entero
+   * está en `queSeEnsena`, en `app/src/arcade/del-servidor.ts`.
+   *
+   * Los dos registros siguen siendo dos: `veladas()` arriba y esto aquí. Ver
+   * `app/src/vitrina.ts`, donde está escrito por qué no se pueden confundir.
    */
-  const sala = minijuegos();
+  const { arcades: arcadesDeLaSala, sinServidor } = queSeEnsena(
+    catalogoDeArcade,
+    arcadesDeEsteBinario(),
+  );
+  const sala = laSala(arcadesDeLaSala);
   /*
    * El mundo 3D llega al borde a propósito —meterle margen dejaría una franja
    * negra que rompe la profundidad— pero la botonera de encima SÍ tiene que
@@ -520,6 +606,29 @@ export default function Portada(): JSX.Element {
               {sala.map((minijuego) => (
                 <TarjetaDeArcade key={minijuego.id} minijuego={minijuego} />
               ))}
+              {/*
+                ═══ Y SI EL SERVIDOR NO CONTESTÓ, SE DICE DEBAJO ═══
+
+                Debajo y no en lugar de la lista: lo de arriba se puede jugar
+                igual, porque viene dentro de la app. Lo que falta es lo que
+                hubiera instalado el servidor, y eso es una frase, no un hueco.
+
+                Y no se dice mientras se está pidiendo. «Pidiendo» y «no contestó»
+                son dos cosas distintas, y confundirlas haría que esta línea
+                apareciera durante el primer segundo de cada arranque —o sea que
+                se aprendería a ignorarla justo cuando importa—.
+              */}
+              {sinServidor && (
+                <Pulsable onPress={cargarCatalogo} accessibilityLabel="Reintentar la sala">
+                  <View style={estilos.salaSinRed}>
+                    <Text style={estilos.salaSinRedTexto}>
+                      Éstos vienen dentro de la app. No se ha podido preguntar a este servidor
+                      si tiene alguno más instalado.
+                    </Text>
+                    <Text style={estilos.salaSinRedAccion}>Reintentar ›</Text>
+                  </View>
+                </Pulsable>
+              )}
             </View>
           )}
         </View>
@@ -650,7 +759,22 @@ export default function Portada(): JSX.Element {
  * el gancho es la línea que hace que alguien toque la tarjeta, de pie y con prisa.
  */
 function TarjetaDeArcade({ minijuego }: { minijuego: Minijuego }): JSX.Element {
-  const Icono = ICONOS_DE_ARCADE[minijuego.icono];
+  /*
+   * ═══ EL `??` NO SOBRA AUNQUE EL COMPILADOR DIGA QUE SÍ ═══
+   *
+   * `laSala` ya normaliza el icono contra los que este binario trae, así que en
+   * teoría aquí siempre hay función. Se deja el respaldo igualmente porque lo que
+   * hay al otro lado de este índice es una tabla de UNA sola clave alimentada con
+   * un campo que escribe otro repositorio, y el precio de equivocarse no es una
+   * tarjeta fea: `<undefined />` lanza durante el render, esta pantalla no tiene
+   * `ErrorBoundary`, y el throw desmonta la raíz. Pantalla en blanco, para todos
+   * los juegos y sin mensaje.
+   *
+   * Dos guardias para el mismo agujero es exactamente lo que merece un agujero
+   * que el compilador no ve —`noUncheckedIndexedAccess` no marca los `Record` de
+   * clave finita— y que ya tumbó esta portada una vez.
+   */
+  const Icono = ICONOS_DE_ARCADE[minijuego.icono] ?? ICONOS_DE_ARCADE[ICONO_DE_ARCADE_POR_DEFECTO];
   /*
    * Sin ruta, la tarjeta no es pulsable y lo dice. Pasa cuando el arcade declara
    * un mueble que esta versión de la app no sabe pintar: el registro es de
@@ -661,19 +785,50 @@ function TarjetaDeArcade({ minijuego }: { minijuego: Minijuego }): JSX.Element {
   const sePuedeJugar = ruta !== null;
 
   const cuerpo = (
-    <View style={[estilos.arcade, { borderColor: minijuego.paleta.acento + '66' }]}>
-      <View style={[estilos.arcadeNeon, { backgroundColor: minijuego.paleta.acento + 'a6' }]} />
+    <View
+      style={[
+        estilos.arcade,
+        { borderColor: minijuego.paleta.acento + (sePuedeJugar ? '66' : '22') },
+      ]}
+    >
+      <View
+        style={[
+          estilos.arcadeNeon,
+          { backgroundColor: minijuego.paleta.acento + (sePuedeJugar ? 'a6' : '33') },
+        ]}
+      />
       <View style={estilos.arcadeFila}>
-        <Icono size={30} color={minijuego.paleta.acento} />
+        <Icono size={30} color={minijuego.paleta.acento + (sePuedeJugar ? '' : '66')} />
         <View style={{ flex: 1 }}>
-          <Text style={[estilos.arcadeTitulo, { color: minijuego.paleta.acento }]}>
+          <Text
+            style={[
+              estilos.arcadeTitulo,
+              { color: minijuego.paleta.acento + (sePuedeJugar ? '' : '99') },
+            ]}
+          >
             {minijuego.nombre}
           </Text>
-          <Text style={estilos.arcadeCuerpo}>
-            {sePuedeJugar
-              ? minijuego.gancho
-              : `${minijuego.gancho} — esta versión de la app todavía no sabe pintarlo.`}
-          </Text>
+          <Text style={estilos.arcadeCuerpo}>{minijuego.gancho}</Text>
+          {/*
+            ═══ LA RAZÓN, EN SU PROPIO RENGLÓN Y CADA UNA LA SUYA ═══
+
+            Aquí había una sola frase pegada al gancho: «— esta versión de la app
+            todavía no sabe pintarlo». Servía cuando la Sala sólo listaba lo que
+            venía dentro, porque entonces era el único motivo posible. Desde que
+            se lista también lo del SERVIDOR hay cuatro, y esa frase es falsa en
+            tres: un juego puede faltar porque el mueble es desconocido, porque
+            sus píxeles viven en otro binario, porque no hay ni mesa ni reglas
+            aquí, o porque el juego no publica nada que pintar. Quien las lee hace
+            algo distinto con cada una —actualizar, esperar, o nada—, y darle la
+            equivocada es mandarle a hacer algo que no sirve.
+
+            Va en renglón aparte y no pegada al gancho porque son dos voces: el
+            gancho lo escribió el juego para atraer, y esto lo escribe la app para
+            explicar. Juntas se leen como si el juego se disculpara.
+          */}
+          {minijuego.porque !== null && (
+            <Text style={estilos.arcadeMotivo}>{minijuego.porque}</Text>
+          )}
         </View>
         {sePuedeJugar && (
           <Text style={[estilos.arcadeFlecha, { color: minijuego.paleta.acento }]}>›</Text>
@@ -1189,6 +1344,50 @@ const estilos = StyleSheet.create({
     color: color.pergaminoTenue,
     opacity: 0.8,
     marginTop: 6,
+  },
+  /*
+   * LA RAZÓN por la que un arcade no se puede jugar aquí. Más pequeña que el
+   * gancho y con menos luz, porque no compite con él: el gancho es el juego y
+   * esto es una nota al pie sobre este teléfono. En cursiva por lo mismo que en
+   * la Sala de escritorio — se lee como voz de la casa y no del juego.
+   */
+  arcadeMotivo: {
+    fontFamily: fuente.cuerpo,
+    fontSize: 13.5,
+    lineHeight: 19,
+    fontStyle: 'italic',
+    color: color.pergaminoTenue,
+    opacity: 0.55,
+    marginTop: 8,
+  },
+  /*
+   * El aviso de que no se pudo preguntar al servidor. Va con el mismo verde de la
+   * Sala pero SIN el neón de arriba: no es una máquina más de la fila, es una
+   * nota sobre la fila. Con borde discontinuo, que es como esta casa dice
+   * «esto no es contenido, es un estado».
+   */
+  salaSinRed: {
+    borderRadius: radio.lg,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: 'rgba(95,212,200,0.28)',
+    paddingVertical: espacio.md,
+    paddingHorizontal: espacio.lg,
+    gap: 6,
+  },
+  salaSinRedTexto: {
+    fontFamily: fuente.cuerpo,
+    fontSize: 13.5,
+    lineHeight: 19,
+    color: color.pergaminoTenue,
+    opacity: 0.6,
+  },
+  salaSinRedAccion: {
+    fontFamily: fuente.titulo,
+    fontSize: 13,
+    letterSpacing: 1,
+    color: '#5fd4c8',
+    opacity: 0.9,
   },
 
   vitrina: {

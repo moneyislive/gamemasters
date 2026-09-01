@@ -11,6 +11,7 @@
     "postinstall": "setup-skia-web public",
     "verify": "node src/comprobadores/verificar-app.mjs && node src/comprobadores/verificar-tema.mjs && node src/comprobadores/verificar-conexion.mjs",
     "verify:rutas": "node src/comprobadores/verificar-rutas.mjs",
+    "verify:sala": "node src/comprobadores/verificar-sala.mjs",
     "verify:relojes": "node src/comprobadores/verificar-relojes.mjs",
     "build": "expo export --platform web --output-dir dist"
   },

@@ -153,6 +153,28 @@ const BATERIA = [
     porque:
       'la pausa del sondeo cabe en la ventana de presencia del servidor —así que nadie sale «(fuera)» teniendo la app delante—, no se pausa mientras se reúne la mesa, y la cuenta atrás ni trunca ni sube',
   },
+  /*
+   * ═══ Y ÉSTE VA DETRÁS, PORQUE LO QUE COMPRA DESCANSA SOBRE «arcade de fuera» ═══
+   *
+   * Que un arcade que nadie compiló se instale y salga en el catálogo del servidor
+   * lo compra aquél; lo de aquí es que la PORTADA lo enseñe sin mentir sobre él y
+   * sin caerse por él. Son dos cosas, y la segunda no se ve hasta que existe la
+   * primera.
+   *
+   * Corre con `node` pelado y en segundos: no levanta Metro ni pide red. Lo que
+   * ejercita de verdad es el juicio de nueve ramas, cargando el módulo puro
+   * `app/src/arcade/del-servidor.ts` y llamándolo con manifiestos fabricados. Lo
+   * que se rompe en silencio no es que la Sala se vea fea: es que una tarjeta
+   * mienta sobre por qué no se puede jugar, o que un icono que este binario no
+   * conozca deje la portada en blanco.
+   */
+  {
+    nombre: 'sala · móvil',
+    donde: 'app',
+    guion: 'verify:sala',
+    porque:
+      'la Sala de la portada enseña lo que trae el binario Y lo que instaló el servidor, y cada tarjeta apagada dice SU razón —el mueble que no conozco, los píxeles que viven en otro binario, el juego sin mesa ni reglas aquí, el que no publica nada— en vez de una frase para todas; lo que llega por el cable se valida campo a campo antes de pintarlo, porque un nombre que no sea texto lanza durante el render y esa pantalla no tiene red debajo',
+  },
 
   // ── Las veladas largas ────────────────────────────────────────────────────
   /*

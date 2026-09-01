@@ -642,6 +642,28 @@ export function pedirPortada(): Promise<Portada> {
   return peticion('/cuenta/portada');
 }
 
+/**
+ * EL CATÁLOGO DE ARCADES DE ESTE SERVIDOR, para la Sala de la portada.
+ *
+ * ═══ VA SIN CREDENCIAL, Y NO ES UN DESCUIDO ═══
+ *
+ * `peticion` añade las cabeceras que haya, pero esta ruta no las mira: el router
+ * de arcade se monta ANTES del guardián en `server/src/index.ts`, porque un
+ * arcade no tiene Game Master ni cuenta. Y hace falta que sea así: la portada se
+ * pinta también para quien todavía no ha entrado, y la Sala tiene que salirle
+ * entera. Si esto exigiera sesión, el escaparate sólo existiría para quien ya
+ * está dentro, que es justo al revés de para lo que sirve un escaparate.
+ *
+ * Devuelve el cuerpo CRUDO, sin tipar. Quien lo valida es `loQueLlega` en
+ * `arcade/del-servidor.ts`, y va allí y no aquí por dos razones: porque lo que
+ * llega son manifiestos escritos en OTRO repositorio —los de `ARCADES_EXTERNOS`—
+ * y decidir cuáles valen es una regla de la Sala y no del transporte; y porque
+ * allí un comprobador de Node puede ejercitarla sin levantar nada.
+ */
+export function pedirCatalogoDeArcade(señal?: AbortSignal): Promise<unknown> {
+  return peticion('/arcade', {}, señal);
+}
+
 // ---------------------------------------------------------------------------
 // El estudio de generación: avatares 3D y fondos
 // ---------------------------------------------------------------------------

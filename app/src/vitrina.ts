@@ -59,10 +59,21 @@ import { rutaDeArcade } from './arcade/muebles';
  * esta app sabe pintar ese MUEBLE. Con dos arcades de formulario eso empezó a
  * mentir —«La Ronda» salía con tarjeta pulsable y al tocarla decía que no sabía
  * pintarse— porque la pantalla del mueble decidía con SU tabla, la de qué juegos
- * trae el binario. Ver `./arcade/pintados.ts`, donde vive ahora la única
- * respuesta y el razonamiento entero.
+ * trae el binario.
+ *
+ * Y AHORA LA CONTESTA `dondeSePinta`, que es la misma respuesta con una razón
+ * dentro. El cambio no es de sitio sino de forma: desde que la Sala lista también
+ * lo que hay en el SERVIDOR, «no se puede jugar aquí» tiene cuatro causas
+ * distintas y una frase para todas sería falsa en tres de ellas. `seSabePintar`
+ * sigue existiendo y sigue siendo la única puerta para quien sólo necesita el
+ * sí o el no; esto es esa misma puerta con el motivo. Vive en
+ * `./arcade/del-servidor.ts` y no aquí porque es lo único de este camino que se
+ * puede equivocar en silencio, y allí un comprobador de Node puede EJECUTARLO.
  */
-import { seSabePintar } from './arcade/pintados';
+import { LO_QUE_PINTA_ESTE_BINARIO } from './arcade/pintados';
+import { dondeSePinta } from './arcade/del-servidor';
+import type { ArcadeDelCatalogo } from './arcade/del-servidor';
+import { ICONO_DE_ARCADE_POR_DEFECTO, ICONOS_DE_ARCADE_CONOCIDOS } from './iconos';
 
 /** El color con el que se reconoce cada mundo de un vistazo. */
 export interface Paleta {
@@ -116,6 +127,21 @@ export interface Minijuego {
    * por delante en vez de con una tarjeta que no hace nada al tocarla.
    */
   ruta: Href | null;
+  /**
+   * POR QUÉ no se puede jugar aquí, o `null` si sí se puede.
+   *
+   * Antes había una sola frase para todos los casos —«esta versión de la app
+   * todavía no sabe pintarlo»— y con el catálogo del servidor deja de ser cierta
+   * más de la mitad de las veces: un juego puede no salir porque el mueble es
+   * desconocido, porque sus píxeles viven en un binario que no es éste, porque no
+   * hay mesa ni reglas aquí, o porque el juego no publica nada que pintar. Son
+   * cuatro cosas distintas y quien las lee hace algo distinto con cada una:
+   * actualizar la app, esperar, o nada.
+   *
+   * Va aquí y no en la pantalla porque el juicio que lo produce se ejercita desde
+   * un comprobador de Node, y la pantalla no.
+   */
+  porque: string | null;
 }
 
 /** Un hueco de promoción. Vacío hoy; la portada lo salta sin dejar agujero. */
@@ -282,14 +308,60 @@ const PALETA_DE_ARCADE_POR_DEFECTO: Paleta = { acento: '#5fd4c8', fondo: ['#1223
  * por descuido.
  */
 export function minijuegos(): Minijuego[] {
-  return arcadesInstalados().map((m: ManifiestoDeArcade) => ({
-    id: m.id,
-    nombre: m.nombre,
-    gancho: m.gancho,
-    icono: m.icono,
-    paleta: PALETAS_DE_ARCADE[m.id] ?? PALETA_DE_ARCADE_POR_DEFECTO,
-    ruta: seSabePintar(m) ? rutaDeArcade(m) : null,
-  }));
+  return laSala(arcadesDeEsteBinario());
+}
+
+/**
+ * LOS QUE VIENEN DENTRO, dichos con la forma del catálogo.
+ *
+ * Se saca aparte porque es la mitad compilada de la fusión, y porque el
+ * `publicaOpciones` que se les pone aquí NO es un dato inventado: se les pone
+ * `undefined` a propósito. Este binario no puede contestar esa pregunta —quien
+ * la contesta es `hayOpciones()`, que mira el registro del proceso del servidor—
+ * y para estos cinco no hace falta, porque el juicio los reconoce por la primera
+ * pregunta, la del pintor propio. Poner `false` aquí sería una respuesta
+ * inventada que además apagaría La Frente si algún día cambiara el orden.
+ */
+export function arcadesDeEsteBinario(): ArcadeDelCatalogo[] {
+  return arcadesInstalados().map((m: ManifiestoDeArcade) => ({ ...m }));
+}
+
+/**
+ * LA SALA: de manifiestos a tarjetas, con la razón por delante cuando no se
+ * puede jugar.
+ *
+ * ═══ EL ICONO SE NORMALIZA AQUÍ, Y ES LA LÍNEA QUE EVITA LA PANTALLA EN BLANCO ═══
+ *
+ * `ICONOS_DE_ARCADE` tiene HOY una sola clave, `mando`, y `IconoDeArcade` es una
+ * unión cerrada de un solo miembro. O sea que cualquier arcade instalado en el
+ * servidor que declare otro icono —y puede declarar lo que quiera: su manifiesto
+ * lo escribe otro repositorio— haría que la tabla devolviera `undefined` y que la
+ * portada intentara pintar `<undefined />`. Eso no rompe una tarjeta: React lanza
+ * durante el render, esta pantalla no tiene `ErrorBoundary` y el throw desmonta
+ * la raíz. Pantalla en blanco, y para todos los juegos.
+ *
+ * El compilador no avisa de esto y conviene saber por qué: `noUncheckedIndexedAccess`
+ * sólo añade `| undefined` a las firmas de índice, no a los `Record` de clave
+ * finita. Con una unión cerrada, TypeScript cree que la clave siempre está.
+ *
+ * Así que el valor se contrasta contra la lista recorrible y lo que no esté cae a
+ * `mando`. Un icono genérico en una tarjeta es un detalle; la app que no abre, no.
+ */
+export function laSala(catalogo: readonly ArcadeDelCatalogo[]): Minijuego[] {
+  return catalogo.map((m) => {
+    const donde = dondeSePinta(m, LO_QUE_PINTA_ESTE_BINARIO);
+    return {
+      id: m.id,
+      nombre: m.nombre,
+      gancho: m.gancho,
+      icono: (ICONOS_DE_ARCADE_CONOCIDOS as readonly string[]).includes(m.icono)
+        ? m.icono
+        : ICONO_DE_ARCADE_POR_DEFECTO,
+      paleta: PALETAS_DE_ARCADE[m.id] ?? PALETA_DE_ARCADE_POR_DEFECTO,
+      ruta: donde.aqui ? rutaDeArcade(m) : null,
+      porque: donde.aqui ? null : donde.porque,
+    };
+  });
 }
 
 /**

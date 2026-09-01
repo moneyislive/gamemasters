@@ -37,8 +37,16 @@
  * `muebles.ts` y las pantallas, y nadie importa esto salvo quien decide.
  */
 import type { ComponentType } from 'react';
+/*
+ * De `tipos.ts` y no del índice de `shared/arcade`, igual que hace
+ * `escritorio/src/muebles.ts`: la lista no se reexporta desde el índice, y el
+ * índice es núcleo SELLADO —tocarlo para añadir una reexportación pondría rojo
+ * `verify:nucleo-quieto` por una comodidad.
+ */
+import { MUEBLES_DEL_CONTRATO } from '../../../shared/arcade/tipos';
 import type { ArcadeId, ManifiestoDeArcade, MuebleDeArcade } from '../../../shared/arcade';
 import { EL_ARCADE, FRENTE, PEONZA, RIBERAS } from '../../../shared/arcade/juegos';
+import type { LoQuePintaEsteBinario } from './del-servidor';
 import { ElArcade } from './arcade';
 import { LaPeonza } from './escena';
 import { LaFrente } from './frente';
@@ -129,6 +137,32 @@ export const LOS_QUE_PINTA: Record<ArcadeId, ComponentType> = {
  */
 export const LOS_MUEBLES_GENERICOS: Partial<Record<MuebleDeArcade, ComponentType>> = {
   tablero: ElTableroEnLinea,
+};
+
+/**
+ * LO QUE ESTE BINARIO SABE PINTAR, dicho como tres listas de cadenas.
+ *
+ * ═══ POR QUÉ ESTO EXISTE Y NO SE PREGUNTA A LAS TABLAS DIRECTAMENTE ═══
+ *
+ * Porque quien tiene que hacer el juicio —`arcade/del-servidor.ts`— no puede
+ * importar este fichero: aquí dentro hay componentes de React Native y de Skia, y
+ * ese juicio tiene nueve ramas que sólo se compran EJECUTÁNDOLAS desde un
+ * comprobador de Node. Así que el conocimiento sale de aquí, que es donde vive, y
+ * viaja como dato.
+ *
+ * Se derivan de las tablas con `Object.keys` y no se escriben a mano, que es la
+ * diferencia entre una lista que se queda vieja y una que no puede: el día que
+ * entre un mueble genérico nuevo, entra en `LOS_MUEBLES_GENERICOS` y aparece aquí
+ * solo.
+ *
+ * Y son cadenas y no los tipos cerrados a propósito: lo que se va a contrastar
+ * con esto viene POR LA RED, donde una unión cerrada no protege de nada.
+ */
+export const LO_QUE_PINTA_ESTE_BINARIO: LoQuePintaEsteBinario = {
+  juegos: Object.keys(LOS_QUE_PINTA),
+  muebles: MUEBLES_DEL_CONTRATO.filter((m) => MUEBLES[m].seSabePintar),
+  genericosDelContrato: MUEBLES_DEL_CONTRATO.filter((m) => MUEBLES[m].quienPinta === 'la-plataforma'),
+  genericos: Object.keys(LOS_MUEBLES_GENERICOS),
 };
 
 /**

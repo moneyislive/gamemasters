@@ -79,6 +79,26 @@ export interface Mueble {
   ruta: RutaDeMueble;
   /** ¿Sabe la app pintarlo ya, o solo sabe decir que falta? */
   seSabePintar: boolean;
+  /**
+   * QUIÉN PONE LOS PÍXELES, que no es lo mismo que si esta app los tiene.
+   *
+   * `la-plataforma` —`formulario` y `tablero`— significa que un cliente puede
+   * pintar un juego que NO CONOCE, a partir de lo que el juego declara. `el-juego`
+   * —`lienzo` y `escena`— significa que los píxeles viven en el binario del propio
+   * juego, que es la decisión del §7: el enchufe alcanza a las reglas y no a los
+   * píxeles.
+   *
+   * Hace falta separarlo de `seSabePintar` porque son dos preguntas y la Sala las
+   * contesta distinto. Un `formulario` de un arcade de fuera que esta app todavía
+   * no pinta es un «todavía no» —llegará con una versión nueva y el juego no tiene
+   * que hacer nada—; un `lienzo` de un juego que no viene dentro es un «nunca por
+   * esta vía». Fundirlas manda a quien lee a hacer algo que no sirve.
+   *
+   * El cliente de escritorio tiene este mismo campo y con los mismos valores. Son
+   * dos tablas y no una a propósito —cada cliente sabe qué pinta ÉL— pero esta
+   * columna es del CONTRATO y tiene que coincidir en las dos.
+   */
+  quienPinta: 'la-plataforma' | 'el-juego';
   /** Qué es, en una línea, para la pantalla que explica lo que falta. */
   loQueEs: string;
   /** Qué juego lo estrena, para no prometer fechas sino trabajo. */
@@ -88,18 +108,21 @@ export interface Mueble {
 export const MUEBLES: Record<MuebleDeArcade, Mueble> = {
   formulario: {
     ruta: '/formulario',
+    quienPinta: 'la-plataforma',
     seSabePintar: true,
     loQueEs: 'Vistas normales: botones, listas, un cronómetro grande. Coste cero.',
     cuandoLlega: 'Ya está: lo estrena La Frente.',
   },
   tablero: {
     ruta: '/tablero',
+    quienPinta: 'la-plataforma',
     seSabePintar: true,
     loQueEs: 'Una topología declarada, pintada con SVG. El tablero es dato, no reductor.',
     cuandoLlega: 'Ya está: lo estrena Riberas, el delta hexagonal.',
   },
   lienzo: {
     ruta: '/lienzo',
+    quienPinta: 'el-juego',
     seSabePintar: true,
     loQueEs: 'Dos dimensiones a ritmo de fotograma, dibujadas con Skia sobre la GPU.',
     cuandoLlega: 'Ya está: lo estrena El Arcade, el de sesenta fotogramas por segundo.',
@@ -127,6 +150,7 @@ export const MUEBLES: Record<MuebleDeArcade, Mueble> = {
    */
   escena: {
     ruta: '/escena',
+    quienPinta: 'el-juego',
     seSabePintar: true,
     loQueEs: 'Tres dimensiones, y solo a través del lienzo común de la app.',
     cuandoLlega: 'Ya está: lo estrena La Peonza, que es la puerta y no el juego.',
