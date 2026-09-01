@@ -80,9 +80,31 @@ export interface Opcion {
   tipo: string;
   /** Su carga, ya montada. `unknown` por lo mismo que `Movimiento.carga`. */
   carga: unknown;
-  /** Lo que se lee en el botón. */
+  /**
+   * Lo que se lee en el botón.
+   *
+   * ═══ AQUÍ EL COMPROBADOR DE SECRETOS NO LLEGA, Y HAY QUE SABERLO ═══
+   *
+   * `id` lleva arriba la advertencia de no meter contenido oculto dentro. Ésta es
+   * la misma trampa y conviene decirla en su sitio, porque el rótulo la sortea
+   * todavía más fácil: `verify:mesa` busca los valores de `loSecreto` en forma
+   * CANÓNICA —`"espadas-10"`, con comillas— y un rótulo escrito para una persona
+   * dice «As de bastos». Es la misma carta re-codificada, y no hay coincidencia
+   * de texto que buscar.
+   *
+   * La diferencia con `id` es que aquí no se puede pedir otra cosa: un botón de
+   * carta tiene que decir qué carta es. Así que la regla del rótulo no es
+   * «no nombres lo oculto» sino que la defensa es ESTRUCTURAL y hay que
+   * respetarla: `opciones()` recibe LA VISTA DE UN OBSERVADOR y sólo debe nombrar
+   * lo que esa vista ya le manda a esa persona. Nombrar algo sacado de otro sitio
+   * —de un campo que la proyección recorta para otros, de un cálculo sobre lo que
+   * no se ve— es una fuga que NINGÚN comprobador de este árbol caza.
+   *
+   * Dicho para quien añada la opción de mañana: si tu rótulo menciona algo de
+   * otra persona, no esperes que la batería te avise. No lo hará.
+   */
   rotulo: string;
-  /** Una línea que explica qué hace o por qué conviene. Vacía si sobra. */
+  /** Una línea que explica qué hace o por qué conviene. Vacía si sobra, y con la misma advertencia que `rotulo`. */
   ayuda: string;
 }
 
