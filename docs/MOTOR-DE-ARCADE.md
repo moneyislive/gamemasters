@@ -822,6 +822,29 @@ minijuego.
 - **`tablero`** — `react-native-svg` (ya instalado, 15.15.4) sobre una topología
   declarada. El tablero es dato, no reductor. Llega con Riberas.
 
+#### «La plataforma» son DOS, y eso no se sabía cuando se escribió esto
+
+Los dos renglones de arriba nombran React Native porque cuando se escribieron
+sólo había un cliente. Hoy hay dos, y los muebles genéricos se pintan en los dos:
+
+- **La app** (`app/app/(arcade)/`) — Vistas de React Native y `react-native-svg`,
+  que es lo que ya decían los dos renglones.
+- **El cliente de escritorio** (`escritorio/`) — DOM y SVG del navegador, sin una
+  sola línea de React Native, para quien juega desde un PC.
+
+El segundo no es una comodidad: es **la única medida que existe de si este
+contrato estaba atado a React Native**. Se escribió entero contra `shared/arcade`
+sin cambiarle un byte —el mismo tipo de medida que el diff vacío de la fase 4, y
+por el mismo motivo: una afirmación de independencia que nadie ha intentado
+romper no vale nada—. Y falló donde tenía que fallar: el cliente descubrió que
+con el manifiesto en la mano NO se puede saber si un juego publica `opciones()`,
+porque `opciones()` es opcional en el alta y el registro vive en el servidor. De
+ahí sale `publicaOpciones` en el catálogo, que es lo único que hubo que añadir.
+
+Lo que **no** se implementa en escritorio es `lienzo` y `escena`, y no por falta
+de tiempo: sus píxeles viven en el binario de la app por la decisión de la
+sección siguiente. Un PC los ve apagados y con el motivo escrito.
+
 ### Propios — los pinta el juego, están en el binario y cuestan publicación
 
 - **`lienzo`** — Empieza en Vistas + Reanimated 4.5.1, que ya demuestra en
