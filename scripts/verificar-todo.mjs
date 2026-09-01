@@ -373,6 +373,29 @@ const BATERIA = [
     porque:
       'la misma cantidad de reloj da la misma cantidad de pasos a 30, 60 y 120 Hz; un fotograma enorme se recorta y la deuda se pierde; y un atasco del hilo de JavaScript no se convierte en un salto de la nave que nadie ve',
   },
+
+  /*
+   * LOS DOS DE LA FASE 4, Y VAN EN ESTE ORDEN A PROPÓSITO.
+   *
+   * Primero el juego y después el núcleo, porque si Riberas está roto el segundo
+   * no significa nada: un núcleo quieto es trivialmente cierto cuando no hay nada
+   * rico encima que pudiera haberlo movido. Leídos de arriba abajo, los dos
+   * juntos son la afirmación entera de la fase.
+   */
+  {
+    nombre: 'Riberas',
+    donde: 'server',
+    guion: 'verify:riberas',
+    porque:
+      'el mismo vértice tiene una sola llave por los tres caminos, ninguna choza toca a otra, la serpentina va y vuelve, el Vado Largo se pierde cuando un vecino planta una choza en medio, un trueque caduca solo, y quien no tiene el turno contesta — con el reductor rechazando lo que `opciones()` no ofreció y validando igual lo que sí',
+  },
+  {
+    nombre: 'núcleo del arcade quieto',
+    donde: 'server',
+    guion: 'verify:nucleo-quieto',
+    porque:
+      'el juego más rico de los cuatro entra sin mover un byte del contrato, del árbitro, de la mesa ni del canal — que es lo que la fase 4 existe para demostrar, y aquí deja de ser un párrafo para pasar a ser algo que se ejecuta',
+  },
 ];
 
 

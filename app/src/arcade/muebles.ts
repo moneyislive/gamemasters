@@ -94,9 +94,9 @@ export const MUEBLES: Record<MuebleDeArcade, Mueble> = {
   },
   tablero: {
     ruta: '/tablero',
-    seSabePintar: false,
+    seSabePintar: true,
     loQueEs: 'Una topología declarada, pintada con SVG. El tablero es dato, no reductor.',
-    cuandoLlega: 'Llega con Riberas, el juego de tablero propio.',
+    cuandoLlega: 'Ya está: lo estrena Riberas, el delta hexagonal.',
   },
   lienzo: {
     ruta: '/lienzo',

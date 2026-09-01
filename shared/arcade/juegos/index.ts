@@ -45,6 +45,13 @@ import {
   proyectarLaRonda,
 } from './ronda';
 import type { EstadoDeLaRonda } from './ronda';
+import {
+  avanzarRiberas,
+  loSecretoDeRiberas,
+  MANIFIESTO_RIBERAS,
+  proyectarRiberas,
+} from './riberas';
+import type { EstadoDeRiberas } from './riberas';
 
 export {
   avanzarElArcade,
@@ -131,6 +138,53 @@ export type {
   VistaDeLaRonda,
 } from './ronda';
 
+export {
+  ACEPTAR,
+  ALZAR,
+  avanzarRiberas,
+  bienDeLaFicha,
+  BIENES,
+  cuentaDeBienes,
+  deQuienEsElPaso,
+  EMPEZAR as EMPEZAR_RIBERAS,
+  FUNDAR,
+  largoDelVado,
+  loSecretoDeRiberas,
+  MANIFIESTO_RIBERAS,
+  OFRECER,
+  opcionesDeRiberas,
+  partidaNueva as partidaNuevaDeRiberas,
+  PASAR,
+  proyectarRiberas,
+  puntosDe,
+  PUNTOS_DEL_VADO,
+  PUNTOS_PARA_GANAR,
+  recalcularElVado,
+  RECHAZAR,
+  RIBERAS,
+  seAcabo as seAcaboRiberas,
+  tableroDeRiberas,
+  TIRAR,
+  TOPE_DE_PIEZAS,
+  VADO_MINIMO,
+} from './riberas';
+export type {
+  Bien,
+  Colono,
+  ColonoVisto,
+  EstadoDeRiberas,
+  EstadoDelTrato,
+  Ficha,
+  Isla,
+  MomentoDeRiberas,
+  Opcion,
+  Pieza,
+  Terreno,
+  Trato,
+  Vado,
+  VistaDeRiberas,
+} from './riberas';
+
 /**
  * EL ALTA. Manifiesto, reductor, proyección y `loSecreto` por la misma puerta.
  *
@@ -194,4 +248,34 @@ instalarArcade<EstadoDeLaRonda | undefined>({
 instalarArcade<EstadoDelArcade | undefined>({
   manifiesto: MANIFIESTO_EL_ARCADE,
   avanzar: avanzarElArcade,
+});
+
+/**
+ * «RIBERAS», el de la fase 4: el tablero hexagonal propio.
+ *
+ * ═══ ENTRA POR LA MISMA PUERTA QUE LOS OTROS TRES, Y ESA ES LA NOTICIA ═══
+ *
+ * Es el juego más rico de los cuatro —comercio con ciclo de vida, recursos
+ * ocultos, un premio derivado que se recalcula, orden en serpentina y alguien
+ * contestando sin tener el turno— y su alta es literalmente igual de larga que la
+ * de La Ronda. Ni un campo nuevo en el manifiesto, ni un parámetro más en
+ * `instalarArcade`, ni una llamada aparte. Eso es lo que la fase 4 existe para
+ * demostrar, y por eso el tablero hexagonal va el cuarto y no el primero.
+ *
+ * Lo único suyo que NO cabe por esta puerta es `opciones()`, y no porque falte un
+ * hueco que haya que abrir: no hace falta ninguno. Sus dos clientes viven dentro
+ * del propio juego —el portillo del reductor y el tablero declarado que compone
+ * la proyección—, así que lo que le llega al móvil es el tablero ya resuelto y la
+ * plataforma no necesita saber que la función existe. Está razonado entero en la
+ * cabecera de `riberas.ts`.
+ *
+ * El parámetro se escribe a mano, como en los otros dos, porque las tres
+ * funciones usan el estado en posiciones distintas y con la inferencia el
+ * compilador escoge una y las demás dejan de encajar.
+ */
+instalarArcade<EstadoDeRiberas | undefined>({
+  manifiesto: MANIFIESTO_RIBERAS,
+  avanzar: avanzarRiberas,
+  proyeccion: proyectarRiberas,
+  loSecreto: loSecretoDeRiberas,
 });

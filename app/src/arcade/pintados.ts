@@ -38,10 +38,11 @@
  */
 import type { ComponentType } from 'react';
 import type { ArcadeId, ManifiestoDeArcade } from '../../../shared/arcade';
-import { EL_ARCADE, FRENTE } from '../../../shared/arcade/juegos';
+import { EL_ARCADE, FRENTE, RIBERAS } from '../../../shared/arcade/juegos';
 import { ElArcade } from './arcade';
 import { LaFrente } from './frente';
 import { MUEBLES } from './muebles';
+import { ElTableroEnLinea } from './tablero-en-linea';
 
 /**
  * QUÉ COMPONENTE PINTA CADA ARCADE QUE TRAE ESTE BINARIO.
@@ -64,6 +65,22 @@ import { MUEBLES } from './muebles';
 export const LOS_QUE_PINTA: Record<ArcadeId, ComponentType> = {
   [FRENTE]: LaFrente,
   [EL_ARCADE]: ElArcade,
+  /*
+   * RIBERAS SE PINTA CON UN COMPONENTE QUE NO SABE QUE ES RIBERAS, y ésa es la
+   * novedad de la fase 4. `ElTableroEnLinea` lee el arcade de la ruta, se sienta a
+   * una mesa, saca el tablero declarado de la vista y lo pinta: no nombra ni una
+   * regla, ni una pieza, ni un recurso.
+   *
+   * O sea que esta línea NO es la deuda que describe el párrafo de arriba: no dice
+   * «así se pinta Riberas», dice «Riberas está entre los que este binario deja
+   * jugar». Sigue haciendo falta porque `seSabePintar` pregunta las dos cosas —que
+   * el mueble se sepa pintar y que el juego esté en la lista— y quitar la segunda
+   * mitad haría pulsable en la Sala la tarjeta de cualquier arcade de tablero que
+   * un servidor tuviera instalado, aunque este binario no lo conociera de nada.
+   * Ese día llegará con el enchufe de la fase 5, y entonces la pregunta será otra;
+   * hoy la respuesta honesta sigue siendo una entrada por juego.
+   */
+  [RIBERAS]: ElTableroEnLinea,
 };
 
 /**

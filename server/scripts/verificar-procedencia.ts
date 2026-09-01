@@ -28,6 +28,34 @@
  * `verify:sin-red`, que es el comprobador que sí conoce este juego; éste sigue sin
  * saber qué es una baraja, que es la mitad de su valor.)
  *
+ * ═══ LO QUE ESTE VERDE NO DEMUESTRA, Y HAY QUE LEERLO ANTES QUE NADA ═══
+ *
+ * Su verde dice exactamente una cosa: «nadie ha tecleado, como palabra entera y
+ * dentro de una cadena literal, ninguno de los nombres de la lista». Se lee como
+ * una garantía y no lo es. Tres huecos concretos, escritos aquí porque el sitio
+ * donde se descubren solos es tarde:
+ *
+ *  · NO VE LA EVOCACIÓN ESTRUCTURAL, que es la mitad del riesgo de verdad. Un
+ *    juego puede no nombrar a nadie y ser, pieza por pieza, otro juego con otras
+ *    palabras. Eso NO es ilegal —las reglas y las mecánicas no son objeto de
+ *    copyright, §8— pero sí es sancionable que su ficha de tienda lo evoque, y ahí
+ *    esto no llega. Lo que sí cubre ese riesgo es la defensa entera del §8: nombre
+ *    no evocador, arte propio, y la cabecera del juego diciendo sin adornar qué es
+ *    suyo y qué es del género. Se lee; no se ejecuta.
+ *  · NO VE LO QUE NO ES UNA CADENA LITERAL. `literalesDe` extrae lo que va entre
+ *    comillas, así que un nombre de campo o una clave de objeto quedan fuera. Es
+ *    lo correcto —lo publicado son textos— pero conviene saberlo antes de dar por
+ *    barrido un fichero entero.
+ *  · COMPARA PALABRAS ENTERAS, y esa decisión está razonada en `apareceEn` y no se
+ *    va a cambiar: sin ella «Lego» casaría dentro de «alegoría» y un comprobador
+ *    que da falsos rojos acaba desactivado, que es peor que no tenerlo. Pero
+ *    significa que una forma derivada —un verbo sacado de un nombre— no casa con su
+ *    entrada aunque la entrada esté puesta.
+ *
+ * Y la lista es tan buena como lo que lleva escrito: ver el apartado de las FORMAS
+ * CASTELLANAS en `marcas-registradas.ts`, que es la mitad que se cuela en un
+ * producto en español.
+ *
  * ═══ POR QUÉ NO SE AMPLÍA `verify:legal` ═══
  *
  * Porque verifica otra materia por completo: que el aviso legal, la privacidad y
@@ -518,9 +546,22 @@ if (fallos.length > 0 || reproches.length > 0) {
 
 const cuantos =
   instalados.length === 1 ? 'El único arcade instalado declara' : `Los ${instalados.length} arcades instalados declaran`;
+/*
+ * EL CIERRE DICE LO QUE SE HA COMPROBADO Y LO QUE NO, en la misma pantalla.
+ *
+ * Decía sólo la primera mitad, y esa frase se lee como «legalmente en orden»
+ * cuando lo único que afirma es que nadie tecleó una palabra de una lista. Con el
+ * límite escrito al lado, quien lo lee sabe qué le queda por mirar a mano; sin él,
+ * un verde de veintiuna comprobaciones sustituye a la revisión que de verdad hace
+ * falta. Ver la cabecera para los tres huecos, uno a uno.
+ */
 console.log(
   `\n${cuantos} de dónde salen sus reglas, y ninguna de las ${MARCAS_VETADAS.length}\n` +
     'marcas vetadas aparece en su nombre, su gancho, sus rótulos ni en las cartas\n' +
-    'de sus barajas.',
+    'de sus barajas.\n' +
+    '\nY lo que esto NO dice: no ve la evocación estructural —un juego que no nombra\n' +
+    'a nadie y lo evoca pieza por pieza—, no mira fuera de las cadenas literales, y\n' +
+    'compara palabras enteras, así que una forma derivada de un nombre vetado no\n' +
+    'casa. Eso se revisa leyendo, y la cabecera de cada juego tiene que decirlo.',
 );
 process.exit(0);

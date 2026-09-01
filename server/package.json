@@ -65,6 +65,8 @@
     "verify:marcador": "tsx scripts/verificar-marcador.ts",
     "verify:canvaskit": "tsx scripts/verificar-canvaskit.ts",
     "verify:bucle": "tsx scripts/verificar-bucle.ts",
+    "verify:riberas": "tsx scripts/verificar-riberas.ts",
+    "verify:nucleo-quieto": "tsx scripts/verificar-nucleo-quieto.ts",
     "oro:arcade": "tsx scripts/oro-arcade.ts"
   },
   "dependencies": {

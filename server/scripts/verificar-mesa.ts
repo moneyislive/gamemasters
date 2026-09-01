@@ -52,6 +52,19 @@
  *     muerta sin ningún error.
  * 15. UN ALMACÉN QUE NO PUEDE ESCRIBIR SE DICE, y no se contesta «hecho».
  *
+ * Y UNA DECIMOSEXTA, que entró todavía después y por el mismo motivo que las
+ * cinco de arriba:
+ *
+ * 16. LOS TRES ARCADES DE SERVIDOR, Y NO SÓLO LA RONDA. Este fichero se escribió
+ *     con dos arcades instalados y se quedó igual con cuatro: Riberas —el único
+ *     cuya proyección lleva dentro un TABLERO entero y calculado, que es la
+ *     superficie más ancha que publica ningún juego de esta casa— no aparecía ni
+ *     una vez, mientras la frase de cierre de aquí abajo se leía como si cubriera
+ *     todo. Ahora se abre su mesa, se juega leyendo el tablero que baja, se le
+ *     rechaza un `rev` rancio y se vigilan sus fichas por el cable. Y la línea del
+ *     catálogo, que decía «los dos arcades instalados» y comprobaba dos `includes`
+ *     con cuatro instalados, se contrasta contra el registro.
+ *
  * ═══ LA PARTE QUE NO PUEDE IR POR HTTP, Y POR QUÉ NO ES UNA TRAMPA ═══
  *
  * `loSecreto(estado)` necesita EL ESTADO, y el estado no sale por la red: sale
@@ -104,7 +117,13 @@ import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { canonico } from '../../shared/mecanicas/canonico';
-import { ESPECTADOR, loSecretoDe, registrarProyeccion, vistaDeAsiento } from '../../shared/arcade';
+import {
+  arcadesInstalados,
+  ESPECTADOR,
+  loSecretoDe,
+  registrarProyeccion,
+  vistaDeAsiento,
+} from '../../shared/arcade';
 import type { ArcadeId, AsientoId, ManifiestoDeArcade, QuienMira } from '../../shared/arcade';
 /*
  * EL ALTA DE LOS ARCADES, ESTÁTICA Y LA PRIMERA.
@@ -119,6 +138,7 @@ import {
   EMPEZAR as EMPEZAR_LA_FRENTE,
   partidaNueva as partidaNuevaDeLaFrente,
   proyectarLaRonda,
+  proyectarRiberas,
   TICS_PARA_COLOCARSE,
 } from '../../shared/arcade/juegos';
 import { abrirMesa, avanzarElReloj, jugar } from '../src/arcade/arbitro';
@@ -249,6 +269,69 @@ function dormir(ms: number): Promise<void> {
 
 const RONDA = 'la-ronda';
 const FRENTE = 'frente';
+const RIBERAS = 'riberas';
+
+/**
+ * ═══ POR QUÉ RIBERAS ENTRÓ AQUÍ, Y POR QUÉ NO ESTABA ═══
+ *
+ * Este fichero se escribió en la fase 2, con dos arcades instalados, y la fase 4 lo
+ * dejó tal cual —byte a byte— mientras se afirmaba que `verify:mesa` cubría los
+ * tres arcades de servidor. No los cubría: `RIBERAS` no aparecía ni una vez, y la
+ * frase de cierre —«la mano de cada cual no sale de su móvil, comprobado sobre lo
+ * que de verdad viajó por el cable»— era cierta para La Ronda y no decía nada del
+ * juego de aquella fase.
+ *
+ * Y no era un hueco cualquiera. Riberas es el ÚNICO arcade cuya proyección lleva
+ * dentro un TABLERO ENTERO y calculado —decenas de caras, líneas y nudos, con
+ * rótulos y ayudas de texto libre—, y ese objeto es justo lo que baja por el cable.
+ * El tablero se compone a partir de la vista Y de `opciones()`, o sea por dos
+ * caminos, y una fuga por el segundo no la delataría el juego de campos cerrado de
+ * la vista. Nadie abría una mesa de Riberas por HTTP, nadie la sondeaba, nadie le
+ * rechazaba un `rev` rancio y nadie ejercía su proyección por el camino del
+ * registro.
+ *
+ * Lo que sigue lo cierra por los dos lados, igual que La Ronda: en proceso contra
+ * el estado de verdad con `loSecreto`, y por la red contra lo que de verdad viajó.
+ */
+
+/**
+ * UN MOVIMIENTO QUE ESTE TABLERO OFRECE, sacado del TABLERO DECLARADO y no del
+ * juego.
+ *
+ * Es a propósito, y es la misma doctrina que `deQuienEsElTurno` aquí abajo: este
+ * comprobador dirige la partida como la dirige un cliente, leyendo lo que le
+ * mandaron. Si tuviera que importar `opcionesDeRiberas` para saber qué se puede
+ * hacer, estaría comprobando la implementación; leyendo el tablero comprueba además
+ * que lo que VIAJA basta para jugar, que es media promesa del mueble genérico.
+ *
+ * `saltar` deja pasar los movimientos que ahora no interesan —el de pasar turno,
+ * sobre todo, que si no se esquiva convierte la partida en una ronda de gente
+ * pasando y no se coloca ni una pieza—.
+ */
+function unToqueDelTablero(
+  vista: unknown,
+  saltar: (m: { tipo: string; carga: unknown }) => boolean = () => false,
+): { tipo: string; carga: unknown } | null {
+  const tablero = (vista as { tablero?: unknown }).tablero;
+  if (typeof tablero !== 'object' || tablero === null) return null;
+  const t = tablero as Record<string, unknown>;
+  const toques: Array<{ tipo: string; carga: unknown }> = [];
+  for (const lista of ['nudos', 'lineas', 'caras', 'acciones']) {
+    const piezas = t[lista];
+    if (!Array.isArray(piezas)) continue;
+    for (const pieza of piezas) {
+      const toque = (pieza as { toque?: unknown }).toque;
+      if (typeof toque !== 'object' || toque === null) continue;
+      const m = toque as { tipo?: unknown; carga?: unknown };
+      if (typeof m.tipo !== 'string') continue;
+      toques.push({ tipo: m.tipo, carga: m.carga });
+    }
+  }
+  for (const m of toques) {
+    if (!saltar(m)) return m;
+  }
+  return toques[0] ?? null;
+}
 
 /**
  * ¿Aparece este valor dentro de esta vista?
@@ -420,6 +503,104 @@ for (const semilla of [1, 7, 12345, 987654321, 2 ** 31]) {
   revisionesExaminadas += partidaEnProceso(semilla, semilla % 2 === 1);
 }
 console.log(`  ${revisionesExaminadas} revisiones examinadas en cinco partidas`);
+
+paso('En proceso: Riberas, con su tablero dentro de la proyección');
+
+/*
+ * ═══ LA MITAD QUE FALTABA, Y QUÉ AÑADE SOBRE LA DE LA RONDA ═══
+ *
+ * `reprochesDeSecretos` es la misma función que acaba de dar verde a cinco partidas
+ * de La Ronda, y aquí se le da un juego cuya proyección lleva un tablero de decenas
+ * de figuras con rótulos y ayudas de texto libre. Es el caso que de verdad la pone
+ * a prueba: en La Ronda lo que sale son campos; aquí sale además un dibujo entero
+ * compuesto a partir de `opciones()`, y una ficha de otro colono que se colara en el
+ * rótulo de un botón viajaría igual de lejos que si estuviera en un campo.
+ *
+ * Se juega LEYENDO EL TABLERO, o sea como jugaría un cliente, y en cada revisión se
+ * mira. La colocación es donde más piezas cambian de mano por movimiento, así que
+ * es donde una fuga tiene más sitios por los que salir.
+ */
+{
+  const TRES: AsientoId[] = ['a-ana', 'a-bruno', 'a-carla'];
+  let revisiones = 0;
+  let conFichas = 0;
+
+  for (const semilla of [3, 77, 20260901]) {
+    let mesa: Mesa = abrirMesa({
+      id: `riberas-${semilla}`,
+      arcade: RIBERAS,
+      semilla,
+      asientos: TRES,
+    });
+
+    const revisar = (): void => {
+      revisiones++;
+      /*
+       * Se cuenta cuántas revisiones tenían algo que esconder. Sin este recuento,
+       * una partida que no llegara a repartir el delta daría cero reproches sobre
+       * cero secretos y saldría verde para siempre — el verde por conjunto vacío
+       * que esta casa ya tiene apuntado tres veces.
+       */
+      if (loSecretoDe(RIBERAS, mesa.estado).length > 0) conFichas++;
+      const reproches = reprochesDeSecretos(RIBERAS, mesa.estado, TRES, false);
+      comprobar(
+        `Riberas, semilla ${semilla}, rev ${mesa.rev}: ninguna ficha ajena en ninguna vista`,
+        reproches.length === 0,
+        reproches,
+      );
+    };
+
+    revisar();
+    for (let vuelta = 0; vuelta < 40; vuelta++) {
+      const espectador = vistaDeAsiento(RIBERAS, mesa.estado, ESPECTADOR) as {
+        turnoDe?: unknown;
+        momento?: unknown;
+      };
+      if (espectador.momento === 'terminada') break;
+      const quien = typeof espectador.turnoDe === 'string' ? espectador.turnoDe : TRES[0];
+      const suya = vistaDeAsiento(RIBERAS, mesa.estado, quien as AsientoId);
+      const movimiento = unToqueDelTablero(suya, (m) => m.tipo === 'riberas:pasar');
+      if (movimiento === null) break;
+      mesa = jugar(mesa, { quien: quien as AsientoId, movimiento, rev: mesa.rev });
+      revisar();
+    }
+  }
+
+  comprobar(
+    'se han jugado bastantes revisiones de Riberas como para que el verde signifique algo',
+    revisiones > 40,
+    { revisiones },
+  );
+  comprobar(
+    'y en la mayoría había fichas repartidas, o sea algo que esconder',
+    conFichas > revisiones / 2,
+    { conFichas, revisiones },
+  );
+  console.log(`  ${revisiones} revisiones de Riberas examinadas, ${conFichas} con fichas repartidas`);
+
+  /*
+   * LA VACUNA, con la misma forma que la de La Ronda y por la misma razón: cero
+   * reproches también sale de un comprobador que no mira. Se le pone la identidad
+   * como proyección —o sea, se destapan los almacenes— y la misma función que acaba
+   * de dar verde tiene que ponerse roja.
+   */
+  const sembrada: Mesa = jugar(
+    abrirMesa({ id: 'riberas-vacuna', arcade: RIBERAS, semilla: 5, asientos: TRES }),
+    { quien: TRES[0] as AsientoId, movimiento: { tipo: 'riberas:empezar', carga: {} }, rev: 0 },
+  );
+  comprobar(
+    'antes de envenenar, la partida de la vacuna está limpia',
+    reprochesDeSecretos(RIBERAS, sembrada.estado, TRES, false).length === 0,
+  );
+  registrarProyeccion(RIBERAS, (estado: unknown) => estado);
+  const envenenados = reprochesDeSecretos(RIBERAS, sembrada.estado, TRES, false);
+  comprobar('con la identidad como proyección de Riberas, salta', envenenados.length > 0);
+  registrarProyeccion(RIBERAS, proyectarRiberas);
+  comprobar(
+    'y al devolver la proyección buena, vuelve a estar limpia',
+    reprochesDeSecretos(RIBERAS, sembrada.estado, TRES, false).length === 0,
+  );
+}
 
 paso('En proceso: «La Frente» al revés — la sala VE la palabra y ningún asiento');
 
@@ -606,7 +787,28 @@ try {
     const catalogo = await pedir('/arcade');
     comprobar('el catálogo de arcades se sirve sin credencial', catalogo.estado === 200);
     const ids = (catalogo.datos.arcades ?? []).map((a: ManifiestoDeArcade) => a.id);
-    comprobar('y trae los dos arcades instalados', ids.includes(FRENTE) && ids.includes(RONDA), ids);
+    /*
+     * ═══ TODOS LOS INSTALADOS, Y NO «LOS DOS» ═══
+     *
+     * Esta línea decía «y trae los dos arcades instalados» y comprobaba dos
+     * `includes` mientras el registro ya instalaba cuatro. Pasaba en verde por lo
+     * que NO miraba: un arcade nuevo podía no salir por el catálogo y esto seguía
+     * felicitando a todo el mundo. Ahora se contrasta contra el registro, que es la
+     * única lista que no envejece — el día que entre el quinto, o se cae aquí o
+     * sale, y las dos cosas son correctas.
+     */
+    const instalados = arcadesInstalados().map((m) => m.id).sort();
+    const publicados = [...ids].sort();
+    comprobar(
+      `y trae TODOS los arcades instalados, que hoy son ${String(instalados.length)}`,
+      instalados.length > 0 && instalados.join(',') === publicados.join(','),
+      { instalados, publicados },
+    );
+    comprobar(
+      'incluidos los tres de servidor, que son los que tienen mesa',
+      ids.includes(FRENTE) && ids.includes(RONDA) && ids.includes(RIBERAS),
+      ids,
+    );
 
     /*
      * La prueba de que este router está DELANTE del guardián y no detrás: una
@@ -1138,6 +1340,210 @@ try {
       'LA LLAVE NO SALE EN NINGUNA VISTA, ni en la de su dueño',
       !JSON.stringify(r.datos).includes(gente[0]!.llave),
     );
+  }
+
+  // ── Riberas por el cable ─────────────────────────────────────────────────
+  paso('Riberas por HTTP: se abre, se juega, y el tablero que baja no lleva fichas ajenas');
+
+  /*
+   * ═══ EL MISMO CAMINO QUE LA RONDA, PARA EL JUEGO QUE LO ESTRENA TODO ═══
+   *
+   * Esto no repite la comprobación de arriba con otro nombre: la ejerce sobre lo
+   * único que hace distinto a este arcade. La proyección de Riberas lleva dentro un
+   * TABLERO YA RESUELTO —caras, líneas, nudos, botones y paneles con rótulos y
+   * ayudas de texto libre— y ese objeto es lo que baja por el cable. Es la
+   * superficie más ancha que publica ningún juego de esta casa, y hasta hoy no la
+   * miraba nadie desde fuera del proceso.
+   *
+   * Se juega la colocación entera leyendo el tablero, o sea como jugaría el móvil,
+   * y en cada revisión se guarda lo que se le mandó a cada cual. Al final se exige
+   * que ninguna ficha de un almacén saliera hacia otro asiento ni hacia el
+   * espectador — la misma prueba que no depende de creerse nada del servidor,
+   * porque no usa el estado.
+   */
+  {
+    const abrirRiberas = await pedir('/arcade/mesas', {
+      metodo: 'POST',
+      cuerpo: { arcade: RIBERAS, nombre: 'Ana' },
+    });
+    comprobar('se abre una mesa de Riberas sin credencial', abrirRiberas.estado === 201, abrirRiberas.datos);
+    const codigoR = String(abrirRiberas.datos.codigo ?? '');
+    const genteR = [
+      { nombre: 'Ana', asiento: abrirRiberas.datos.asiento as string, llave: abrirRiberas.datos.llave as string },
+    ];
+    for (const nombre of ['Beto', 'Cira']) {
+      const r = await pedir(`/arcade/mesas/${codigoR}/asientos`, { metodo: 'POST', cuerpo: { nombre } });
+      comprobar(`${nombre} se sienta en la mesa de Riberas`, r.estado === 200, r.datos);
+      genteR.push({ nombre, asiento: r.datos.asiento as string, llave: r.datos.llave as string });
+    }
+
+    const viajado: Array<{ rev: number; quien: string; texto: string; misFichas: string[] }> = [];
+    const mirarConTodosR = async (): Promise<void> => {
+      for (const uno of genteR) {
+        const r = await pedir(`/arcade/mesas/${codigoR}`, { llave: uno.llave });
+        comprobar(`${uno.nombre} puede mirar la mesa de Riberas`, r.estado === 200, r.datos);
+        const m = r.datos.mesa;
+        viajado.push({
+          rev: m.rev,
+          quien: uno.asiento,
+          texto: JSON.stringify(m),
+          misFichas: Array.isArray(m.vista.misFichas) ? m.vista.misFichas : [],
+        });
+      }
+      const espectador = await pedir(`/arcade/mesas/${codigoR}`);
+      comprobar('y un espectador sin llave también', espectador.estado === 200);
+      comprobar('sin ser nadie', espectador.datos.mesa.yo === null);
+      comprobar(
+        'y sin una sola ficha suya: quien mira no juega',
+        Array.isArray(espectador.datos.mesa.vista.misFichas) &&
+          (espectador.datos.mesa.vista.misFichas as unknown[]).length === 0,
+        espectador.datos.mesa.vista.misFichas,
+      );
+      viajado.push({
+        rev: espectador.datos.mesa.rev,
+        quien: 'espectador',
+        texto: JSON.stringify(espectador.datos.mesa),
+        misFichas: [],
+      });
+    };
+
+    await mirarConTodosR();
+
+    /*
+     * EL TABLERO TIENE QUE VENIR DENTRO, y se dice con todas las letras: si un día
+     * la proyección dejara de traerlo, la app se quedaría en la pantalla de «esta
+     * mesa no trae tablero» y todo lo de abajo pasaría en verde sobre nada.
+     */
+    {
+      const r = await pedir(`/arcade/mesas/${codigoR}`, { llave: genteR[0]!.llave });
+      const tablero = r.datos.mesa.vista.tablero as Record<string, unknown> | undefined;
+      comprobar('la vista de Riberas trae el tablero declarado dentro', tablero !== undefined, Object.keys(r.datos.mesa.vista ?? {}));
+      comprobar(
+        'con las cinco listas y el aviso, que es lo que el mueble sabe pintar',
+        tablero !== undefined &&
+          ['caras', 'lineas', 'nudos', 'acciones', 'paneles'].every((k) => Array.isArray(tablero[k])) &&
+          typeof tablero.aviso === 'string',
+        tablero === undefined ? null : Object.keys(tablero).sort(),
+      );
+    }
+
+    // Un `rev` rancio al MOVER también se rechaza aquí: es la puerta, no el juego.
+    {
+      const ahora = await pedir(`/arcade/mesas/${codigoR}`, { llave: genteR[0]!.llave });
+      const rancio = await pedir(`/arcade/mesas/${codigoR}/movimientos`, {
+        metodo: 'POST',
+        llave: genteR[0]!.llave,
+        cuerpo: { rev: (ahora.datos.mesa.rev as number) - 1, tipo: 'riberas:empezar', carga: {} },
+      });
+      comprobar('un `rev` rancio al mover en Riberas se rechaza con 409', rancio.estado === 409, rancio.datos);
+      comprobar('y con el estado completo dentro, para poder reintentar sin otro viaje', rancio.datos.mesa !== undefined);
+    }
+
+    /*
+     * Y AHORA SE JUEGA, leyendo el tablero que baja. Treinta movimientos bastan para
+     * pasar la colocación entera de tres colonos —seis chozas y seis veredas— y
+     * entrar en la partida, que es donde los almacenes ya tienen fichas dentro.
+     */
+    let movimientosR = 0;
+    for (let i = 0; i < 30; i++) {
+      const espectador = await pedir(`/arcade/mesas/${codigoR}`);
+      const vista = espectador.datos.mesa.vista as { turnoDe?: unknown; momento?: unknown };
+      if (vista.momento === 'terminada') break;
+      const quien = typeof vista.turnoDe === 'string' ? vista.turnoDe : genteR[0]!.asiento;
+      const suyo = genteR.find((g) => g.asiento === quien) ?? genteR[0]!;
+      const mia = await pedir(`/arcade/mesas/${codigoR}`, { llave: suyo.llave });
+      const movimiento = unToqueDelTablero(mia.datos.mesa.vista, (m) => m.tipo === 'riberas:pasar');
+      if (movimiento === null) break;
+      const r = await pedir(`/arcade/mesas/${codigoR}/movimientos`, {
+        metodo: 'POST',
+        llave: suyo.llave,
+        cuerpo: { rev: mia.datos.mesa.rev, tipo: movimiento.tipo, carga: movimiento.carga },
+      });
+      if (r.estado !== 200) break;
+      /*
+       * Si la revisión no sube, el juego ignoró el movimiento — y como el
+       * movimiento salió del propio tablero, eso sería un botón mudo. Se corta y la
+       * comprobación de abajo lo dice, en vez de girar treinta veces en vacío.
+       */
+      if ((r.datos.mesa.rev as number) === (mia.datos.mesa.rev as number)) break;
+      movimientosR++;
+      await mirarConTodosR();
+    }
+
+    comprobar(
+      'se juegan de verdad varios movimientos de Riberas por HTTP, sacados del tablero que bajó',
+      movimientosR >= 12,
+      { movimientosR },
+    );
+
+    /*
+     * ═══ LO QUE VIAJÓ: NI UNA FICHA AJENA, EN NINGUNA REVISIÓN ═══
+     *
+     * Igual que con La Ronda: cada asiento dijo cuáles eran sus fichas —`misFichas`,
+     * que es suyo y tiene que salir— y se exige que ninguna apareciera, EN ESA MISMA
+     * REVISIÓN, en lo que se le mandó a otro ni al espectador. Con la proyección
+     * quitada, cada ficha saldría en tres respuestas y esto se pondría rojo docenas
+     * de veces.
+     */
+    const porRevR = new Map<number, typeof viajado>();
+    for (const uno of viajado) {
+      const lista = porRevR.get(uno.rev) ?? [];
+      lista.push(uno);
+      porRevR.set(uno.rev, lista);
+    }
+
+    let fichasVigiladas = 0;
+    let escapesR = 0;
+    const ejemplosR: string[] = [];
+    for (const [rev, enEsaRev] of porRevR) {
+      for (const duena of enEsaRev) {
+        for (const ficha of duena.misFichas) {
+          fichasVigiladas++;
+          for (const otra of enEsaRev) {
+            if (otra.quien === duena.quien) continue;
+            /*
+             * Con comillas, igual que `aparece`: una ficha lleva número de serie
+             * —`b12:junco`— y sin las comillas `b1:junco` casaría dentro de
+             * `b12:junco`. El número de serie está ahí precisamente para que dos
+             * almacenes iguales no den falsos rojos, y buscarlo mal lo desharía.
+             */
+            if (!otra.texto.includes(`"${ficha}"`)) continue;
+            escapesR++;
+            if (ejemplosR.length < 5) {
+              ejemplosR.push(`rev ${rev}: «${ficha}» de ${duena.quien} salió hacia ${otra.quien}`);
+            }
+          }
+        }
+      }
+    }
+
+    comprobar(
+      'se han vigilado bastantes fichas de Riberas como para que el verde signifique algo',
+      fichasVigiladas > 40,
+      { fichasVigiladas, revisiones: porRevR.size },
+    );
+    comprobar(
+      'ninguna ficha de un almacén salió hacia otro asiento ni hacia el espectador',
+      escapesR === 0,
+      ejemplosR,
+    );
+    console.log(`  ${fichasVigiladas} fichas vigiladas en ${porRevR.size} revisiones de Riberas`);
+
+    /*
+     * Y LA FORMA DE LA VISTA, cerrada igual que la de La Ronda y por lo mismo: un
+     * campo nuevo que alguien añada con la mejor intención pone rojo esto y obliga a
+     * venir a pensar si ese campo puede salir.
+     */
+    {
+      const r = await pedir(`/arcade/mesas/${codigoR}`, { llave: genteR[0]!.llave });
+      const campos = Object.keys(r.datos.mesa.vista).sort().join(',');
+      comprobar(
+        'y la vista de Riberas manda exactamente estos campos',
+        campos ===
+          'colonos,desde,faltaVereda,ganadores,islas,misFichas,momento,paso,tablero,tirado,tratos,turnoDe,ultimaChoza,ultimaTirada,vado,yo',
+        campos,
+      );
+    }
   }
 
   // ── Cortar y resincronizar ───────────────────────────────────────────────
@@ -2074,7 +2480,9 @@ if (fallos.length === 0) {
     '\nLa mesa existe: se abre con un código, se entra sin cuenta, la revisión manda al escribir\n' +
       'y no al leer, el plazo vence porque alguien MIRA, la espera aparcada se despierta por\n' +
       'vencimiento, la partida sobrevive a que el proceso muera, y la mano de cada cual no sale\n' +
-      'de su móvil — comprobado sobre lo que de verdad viajó por el cable.',
+      'de su móvil — comprobado sobre lo que de verdad viajó por el cable, y en LOS TRES arcades\n' +
+      'de servidor y no sólo en La Ronda: Riberas también se abre, se juega leyendo el tablero que\n' +
+      'baja, y ni una ficha de un almacén sale hacia otro asiento ni hacia quien mira sin jugar.',
   );
   process.exit(0);
 }

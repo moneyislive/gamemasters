@@ -206,6 +206,52 @@ const PERSONAS_CON_MARCA_VIVA: MarcaVetada[] = [
 ];
 
 /**
+ * FORMAS CASTELLANAS DE MARCAS QUE LA LISTA SÓLO TENÍA EN INGLÉS.
+ *
+ * ═══ LA MITAD QUE SE CUELA EN UN PRODUCTO EN ESPAÑOL ═══
+ *
+ * Esta lista se escribió mirando los nombres tal y como se registran, y casi todos
+ * se registran en inglés. Pero esta casa publica EN CASTELLANO: quien un día meta
+ * una marca ajena en un gancho o en un rótulo la va a escribir traducida, porque es
+ * como se dice aquí y como se vendió aquí durante años. `Settlers` estaba y su
+ * traducción no, y esa traducción —«Colonos»— es justamente la que llevaba el
+ * nombre castellano del juego más copiado de su género.
+ *
+ * ═══ POR QUÉ ENTRAN CON APELLIDO Y NO SUELTAS ═══
+ *
+ * Por la regla que ya está escrita arriba y que no se rompe por comodidad: aquí sólo
+ * entran nombres INEQUÍVOCOS, y los ambiguos van con su acompañante. «Colonos» a
+ * secas sería el peor cepo posible en este repositorio —es un sustantivo corriente y
+ * es además el nombre de un campo de un juego de esta misma casa—, y un comprobador
+ * que da falsos rojos acaba desactivado, que es estrictamente peor que no tenerlo.
+ *
+ * ═══ Y LO QUE ESTO SIGUE SIN CAZAR, PARA QUE NADIE LO DÉ POR CAZADO ═══
+ *
+ * La comparación es por PALABRAS ENTERAS, así que una forma derivada —«coloniza»,
+ * «colonizadores»— no casa con ninguna de estas entradas ni aunque estén puestas.
+ * Eso NO se arregla ampliando la lista: se arregla leyendo la ficha de tienda antes
+ * de publicarla, y está dicho en la cabecera de `verificar-procedencia.ts` junto a
+ * los otros dos límites del comprobador.
+ */
+const FORMAS_CASTELLANAS: MarcaVetada[] = [
+  {
+    nombre: 'Los Colonos de Catán',
+    porque:
+      'El nombre con el que el juego de colonización hexagonal más conocido se vendió en España durante años. «Catan» ya está vetado por su cuenta, pero el título completo es la forma que alguien escribiría de memoria en una descripción, y tenerlo escrito hace que la entrada se entienda sin ir a buscarla.',
+  },
+  {
+    nombre: 'Colonos de Catan',
+    porque:
+      'La misma, sin artículo y sin tilde, que es como se teclea con prisa. La comparación normaliza los acentos, pero no inventa artículos: dos grafías, dos entradas.',
+  },
+  {
+    nombre: 'Monopolio',
+    porque:
+      'La traducción castellana del nombre de Hasbro, usada además comercialmente. Va con su porqué explícito porque «monopolio» es también una palabra de economía: si algún día diera un falso rojo sobre un texto legítimo, ésta es la línea que hay que discutir, y se discutirá con un argumento y no con una corazonada.',
+  },
+];
+
+/**
  * TODA la lista, que es lo que lee el comprobador.
  *
  * Se junta aquí y no se exporta por familias porque quien comprueba no tiene por
@@ -218,4 +264,5 @@ export const MARCAS_VETADAS: readonly MarcaVetada[] = [
   ...JUEGOS,
   ...MARCAS_QUE_PARECEN_PALABRAS,
   ...PERSONAS_CON_MARCA_VIVA,
+  ...FORMAS_CASTELLANAS,
 ];
