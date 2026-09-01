@@ -843,12 +843,57 @@ function bienesDeLaCarga(carga: unknown, campo: string): Bien[] | null {
  * El azar nace sin sembrar en `partidaNueva()` y se siembra AQUÍ con `ctx.azar`,
  * que lo elige el servidor. Si lo eligiera el dispositivo, un cliente manipulado
  * probaría semillas hasta dar con el delta que le conviene.
+ *
+ * ═══ EL AFORO SE RECHAZA CON MOTIVO, Y ES LA OTRA MITAD DEL «SÓLO SI» ═══
+ *
+ * `opcionesDeReunion()` ofrece «Repartir el delta» a cualquiera que tenga
+ * asiento sin mirar el aforo. Ofrecer de más es lo que el «sólo si» permite
+ * —pero sólo se sostiene si el reductor, al rechazar lo que se ofreció de más,
+ * DICE POR QUÉ. Esa mitad faltaba.
+ *
+ * (Y una precisión sobre la cabecera de `opcionesDeReunion`, que dice que el
+ * aforo «no está en la vista y no puede estarlo»: la segunda mitad se quedó
+ * vieja. Desde la fase 5 la proyección recibe un tercer parámetro con los
+ * sentados —`proyectarRiberas(estado, quien, sentados)`— así que HOY se podría
+ * publicar el recuento y dejar de ofrecer el botón hasta que se llene la mesa.
+ * No se hace aquí porque cambiar qué se ofrece es cambiar el juego y esto es un
+ * arreglo de lo que se calla, no de lo que se enseña; queda apuntado.)
+ *
+ * Devolver `estado` a secas no era descuido: antes de la fase 5 no había otra
+ * forma. Ya la hay, y lo que se medía contra el servidor vivo era esto: quien
+ * abre una mesa y pulsa el único botón que ve —estando solo, que es como se
+ * abre toda mesa— recibe un 200, la revisión no se mueve y `motivo` llega
+ * `null`. Un botón que no hace nada y nadie que lo explique, en el primer
+ * segundo de la primera partida de cualquiera.
+ *
+ * El motivo no filtra nada: cuánta gente hay sentada viaja en
+ * `VistaDeMesa.asientos` y la ven los seis. Sólo pone en palabras lo que ya
+ * está en la pantalla de quien pulsó.
+ *
+ * Y el tope de arriba se rechaza igual aunque hoy no se alcance —la mesa no deja
+ * sentarse por encima del máximo—, porque una pareja de guardas donde una
+ * explica y la otra calla se lee como un olvido, y el día que el aforo cambie de
+ * sitio la muda sería la que deja a alguien mirando un botón muerto.
  */
-function repartirElDelta(estado: EstadoDeRiberas, ctx: ContextoMovimiento): EstadoDeRiberas {
+function repartirElDelta(
+  estado: EstadoDeRiberas,
+  ctx: ContextoMovimiento,
+): EstadoDeRiberas | Rechazo<EstadoDeRiberas> {
   if (estado.momento !== 'reuniendo') return estado;
   const cuantos = ctx.asientos.length;
-  if (cuantos < MANIFIESTO_RIBERAS.jugadores.minimo) return estado;
-  if (cuantos > MANIFIESTO_RIBERAS.jugadores.maximo) return estado;
+  if (cuantos < MANIFIESTO_RIBERAS.jugadores.minimo) {
+    return rechazar(
+      estado,
+      `Todavía no sois bastantes: hacen falta al menos ${MANIFIESTO_RIBERAS.jugadores.minimo} ` +
+        'sentados para repartir el delta.',
+    );
+  }
+  if (cuantos > MANIFIESTO_RIBERAS.jugadores.maximo) {
+    return rechazar(
+      estado,
+      `En este delta caben ${MANIFIESTO_RIBERAS.jugadores.maximo} como mucho, y sois ${cuantos}.`,
+    );
+  }
 
   const hexes = mallaDeRadio(RADIO_DEL_DELTA);
 
