@@ -20,6 +20,12 @@
       "port": 8081
     },
     {
+      "name": "sala",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--prefix", "../GameMasters-arcade/server"],
+      "port": 5174
+    },
+    {
       "name": "veladas",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "web", "--prefix", "../GameMasters-veladas/app"],
