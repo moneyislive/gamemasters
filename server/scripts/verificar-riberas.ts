@@ -56,7 +56,7 @@ import {
   MovimientoRechazado,
 } from '../src/arcade/arbitro';
 import type { Mesa } from '../src/arcade/arbitro';
-import { aplicar, hayOpciones, opcionesDeArcade, reejecutarEn } from '../../shared/arcade';
+import { aplicar, aplicarConMotivo, hayOpciones, opcionesDeArcade, reejecutarEn } from '../../shared/arcade';
 import type { ContextoMovimiento, Movimiento } from '../../shared/arcade';
 import { canonico } from '../../shared/mecanicas/canonico';
 import {
@@ -130,6 +130,25 @@ function avanzarRiberas(
   ctx: ContextoMovimiento,
 ): EstadoDeRiberas {
   return aplicar(reglasDeRiberas, estado, movimiento, ctx) as EstadoDeRiberas;
+}
+
+/**
+ * EL MOTIVO CON EL QUE EL REDUCTOR RECHAZA, por la misma puerta que la ruta.
+ *
+ * ═══ POR QUÉ HACE FALTA UNA SEGUNDA PUERTA SI YA HAY UNA ═══
+ *
+ * `avanzarRiberas` de arriba llama a `aplicar()`, que DESENVUELVE el rechazo y
+ * devuelve el estado de dentro. Eso es lo correcto para las treinta
+ * comprobaciones que preguntan «¿ejecutó el movimiento?», y es lo que hace que
+ * sigan valiendo tal cual ahora que `contestar` rechaza con motivo: el estado que
+ * sale del envoltorio es EL MISMO OBJETO.
+ *
+ * Pero por esa puerta el motivo se tira, así que con ella sola un reductor mudo y
+ * uno que explica pasan igual — y la prueba felicitaría al que se calla. Ésta es
+ * la puerta que usa `server/src/arcade/mesas.ts` para contestarle a quien movió.
+ */
+function motivoDe(estado: EstadoDeRiberas, movimiento: Movimiento, ctx: ContextoMovimiento): string | null {
+  return aplicarConMotivo(reglasDeRiberas, estado, movimiento, ctx).motivo;
 }
 
 let hechas = 0;
@@ -596,6 +615,11 @@ const ctxDe = (quien: string, asientos: readonly string[]): {
   comprobar('B entrega la sal y recibe el junco', tieneB.some((f) => f.endsWith(':junco')) && !tieneB.some((f) => f.endsWith(':sal')), tieneB);
   comprobar('y el contador de fichas no ha avanzado: las mismas fichas cambian de manos', aceptado.siguienteFicha === conOferta.siguienteFicha);
   comprobar('nadie más puede contestar a un trueque que no es suyo', avanzarRiberas(conOferta, { tipo: ACEPTAR, carga: { trato: 't1' } }, ctxDe('A', DOS)) === conOferta);
+  comprobar(
+    'y se le dice, en vez de dejarle mirando un botón que no hizo nada',
+    (motivoDe(conOferta, { tipo: ACEPTAR, carga: { trato: 't1' } }, ctxDe('A', DOS)) ?? '').length > 0,
+    motivoDe(conOferta, { tipo: ACEPTAR, carga: { trato: 't1' } }, ctxDe('A', DOS)),
+  );
 
   /* CADUCAR AL PASAR EL TURNO. */
   const tras = avanzarRiberas(conOferta, { tipo: PASAR, carga: {} }, ctxDe('A', DOS));
@@ -613,6 +637,17 @@ const ctxDe = (quien: string, asientos: readonly string[]): {
   comprobar('cuando vence el plazo, el trueque abierto caduca', trasElTic.tratos[0]?.estado === 'caducada');
   comprobar('y el turno pasa solo, para que la mesa no se quede quieta', trasElTic.turno === 1);
   comprobar('un trueque ya caducado no se puede aceptar', avanzarRiberas(trasElTic, { tipo: ACEPTAR, carga: { trato: 't1' } }, ctxDe('B', DOS)) === trasElTic);
+  {
+    /*
+     * Y SE LE DICE, aunque el que habla aquí no es `contestar` sino EL PORTILLO:
+     * `opciones()` no ofrece aceptar un trueque caducado, así que el movimiento se
+     * para una capa antes con el mensaje corto y ciego. Se comprueba igual, porque
+     * lo que hay que comprar es que quien pulsa recibe una explicación — de quién
+     * venga es un detalle de dónde está la guarda.
+     */
+    const tarde = motivoDe(trasElTic, { tipo: ACEPTAR, carga: { trato: 't1' } }, ctxDe('B', DOS)) ?? '';
+    comprobar('y se le dice, en vez de dejarle mirando la pantalla', tarde.length > 0, tarde);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -655,6 +690,33 @@ paso('El §5 bis: «sólo si», nunca «si y sólo si»');
   const intento = avanzarRiberas(gastado, { tipo: ACEPTAR, carga: { trato: 't1' } }, ctxDe('B', DOS));
   comprobar('y aun así el reductor lo rechaza: el oferente ya no tiene la mercancía', intento === gastado);
   comprobar('el trueque se queda como estaba, ni aceptado ni roto', intento.tratos[0]?.estado === 'propuesta');
+  /*
+   * ═══ Y AHORA LO DICE, PERO SIN DECIR POR QUÉ — QUE ES LA PARTE DELICADA ═══
+   *
+   * `motor.ts` deja escrita la regla y nombra este caso con estas palabras: un
+   * motivo no puede decir nada que la proyección de quien mueve no dijera ya. El
+   * almacén del oferente NO está en la vista de quien acepta —taparlo es para lo
+   * que existe el «sólo si»— así que «el oferente no tiene la sal que prometía»
+   * sería una fuga por la puerta de atrás, en un texto que ningún comprobador de
+   * secretos mira: `verify:mesa` busca valores canónicos y un motivo es una frase.
+   *
+   * Por eso esto se comprueba A LA LETRA. Es la clase de línea que alguien
+   * «mejora» con la mejor intención —nombrar el bien que falta para que el mensaje
+   * ayude más— y con eso el almacén ajeno empieza a salir de su asiento sin que
+   * nada se ponga rojo.
+   */
+  const suMotivo = motivoDe(gastado, { tipo: ACEPTAR, carga: { trato: 't1' } }, ctxDe('B', DOS)) ?? '';
+  comprobar('y lo dice, en vez de tragárselo en silencio', suMotivo.length > 0, suMotivo);
+  comprobar(
+    'y NO nombra ningún bien: el almacén ajeno no sale ni por un texto',
+    !BIENES.some((b) => suMotivo.toLowerCase().includes(b)),
+    suMotivo,
+  );
+  comprobar(
+    'ni nombra al oferente ni dice que le falte algo',
+    !/tiene|falta|gast/i.test(suMotivo),
+    suMotivo,
+  );
 
   /*
    * Y LA OTRA MITAD: lo que `opciones()` NO ofreció, se rechaza. Aquí, un

@@ -1442,16 +1442,64 @@ function ofrecer(
  * filtrar el almacén ajeno.
  *
  * Así que la aceptación se ofrece y AQUÍ se vuelve a validar con todo lo que
- * hay. Si el oferente ya gastó la mercancía, el trueque no se ejecuta y el
- * movimiento devuelve el estado tal cual. Son dos reglas distintas que parecían
- * una, y ninguna de las dos sobra.
+ * hay. Son dos reglas distintas que parecían una, y ninguna de las dos sobra.
+ *
+ * ═══ Y CADA RECHAZO DICE POR QUÉ, QUE ES LA MITAD QUE FALTABA ═══
+ *
+ * Ésta es la pantalla donde más falta hace, y es por la forma del juego: aceptar
+ * un trueque es lo ÚNICO que se hace sin tener el turno, o sea con la mesa
+ * moviéndose por debajo mientras miras. Entre que se pinta el botón y se pulsa
+ * pueden pasar cuatro cosas —que caduque el trueque, que lo acepten antes, que
+ * el oferente gaste lo que prometía, que lo gastes tú— y las cuatro daban el
+ * mismo silencio.
+ *
+ * ═══ Y EL MOTIVO DEL CASO GORDO NO DICE POR QUÉ, A PROPÓSITO ═══
+ *
+ * Cuando el oferente ya gastó la mercancía, aquí se contesta «ese trueque ya no
+ * está en pie» y NO «el oferente ya no tiene lo que prometía». La segunda es la
+ * que sale sola al escribirla, y es una fuga.
+ *
+ * La regla está en la cabecera de `aplicarConMotivo`, en `shared/arcade/motor.ts`,
+ * y nombra este caso con estas palabras: un motivo NO PUEDE DECIR NADA QUE LA
+ * PROYECCIÓN DE QUIEN MUEVE NO DIJERA YA. El almacén del oferente no está en la
+ * vista de quien acepta —y no puede estarlo: taparlo es justo para lo que existe
+ * el «sólo si»—, así que un motivo que hable de él lo saca por la puerta de
+ * atrás, en un texto que ningún comprobador de secretos mira: `verify:mesa` busca
+ * valores canónicos y un motivo es una frase.
+ *
+ * Se pensó el argumento contrario —que quien acepta podría deducirlo por
+ * eliminación, viendo que a él no le falta nada— y no basta: la deducción es
+ * suya, y confirmársela es darle certeza donde tenía sospecha. Además dejaría la
+ * puerta abierta al siguiente que quiera «mejorar» el mensaje nombrando el bien.
+ *
+ * ═══ Y TODAS LAS DEMÁS GUARDAS SE QUEDAN MUDAS, QUE ES LO QUE COSTÓ VER ═══
+ *
+ * Se escribieron con motivo —«ese trueque ya no está en la mesa», «caducó al
+ * pasar el turno», «no te lo han ofrecido a ti»— y hubo que quitarlos todos,
+ * porque son TEXTO MUERTO: a esas guardas no llega nadie.
+ *
+ * El portillo de `avanzarRiberas` corre ANTES que esto y rechaza todo lo que
+ * `opciones()` no ofreció. Y `opciones()` sólo ofrece aceptar un trueque que esté
+ * en pie, que sea para quien mira y del que quien mira tenga su mitad — o sea
+ * exactamente las condiciones de las cuatro guardas de arriba. Se midió: el caso
+ * del trueque caducado sale por el portillo, con su mensaje corto y ciego, y no
+ * llega aquí.
+ *
+ * Queda UNA sola guarda alcanzable, y no por casualidad: es la que `opciones()`
+ * NO PUEDE comprobar, porque mira el almacén del oferente y ése no está en la
+ * vista de quien acepta. Es el contraejemplo del «sólo si» y es justo la que
+ * necesitaba explicarse.
+ *
+ * `yo < 0` y `oferente < 0` son además cinturones para el compilador: el árbitro
+ * ya comprobó que quien mueve está sentado, y un trueque guardado apunta a dos
+ * asientos que existen.
  */
 function contestar(
   estado: EstadoDeRiberas,
   ctx: ContextoMovimiento,
   id: string | null,
   acepta: boolean,
-): EstadoDeRiberas {
+): EstadoDeRiberas | Rechazo<EstadoDeRiberas> {
   if (estado.momento !== 'jugando' || id === null) return estado;
   const yo = indiceDelAsiento(estado, ctx.quien);
   if (yo < 0) return estado;
@@ -1470,7 +1518,22 @@ function contestar(
    * LAS DOS MITADES, y la primera es la que `opciones()` no podía comprobar.
    */
   const suyo = cobrar((estado.colonos[oferente] as Colono).almacen, trato.da);
-  if (suyo === null) return estado;
+  if (suyo === null) {
+    /* La redacción es la que el contrato deja escrita. Ver la cabecera. */
+    return rechazar(estado, 'Ese trueque ya no está en pie.');
+  }
+  /*
+   * Y ÉSTA SE QUEDA MUDA POR EL MISMO MOTIVO QUE LAS DE ARRIBA. Se le puso texto
+   * y hubo que quitárselo: `opciones()` comprueba `llegaPara(v.misFichas, ...)`
+   * antes de ofrecer aceptar —mi propio almacén SÍ está en mi vista— así que si
+   * me falta mi mitad la opción no se ofrece y el portillo para el movimiento una
+   * capa antes. Aquí no llega nadie.
+   *
+   * Que el par de guardas quede asimétrico —una habla y la otra calla— es
+   * justamente lo que hay que ver: no son dos comprobaciones equivalentes, son
+   * las DOS MITADES del contraejemplo, y sólo una de ellas es la que `opciones()`
+   * no podía hacer.
+   */
   const mio = cobrar((estado.colonos[yo] as Colono).almacen, trato.pide);
   if (mio === null) return estado;
 
