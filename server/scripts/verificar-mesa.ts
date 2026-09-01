@@ -1420,10 +1420,31 @@ try {
       r.datos.mesa.motivo === null,
       r.datos.mesa.motivo,
     );
+    /*
+     * ═══ ESTA LISTA SE AMPLÍA A MANO, Y ESE ES SU VALOR ═══
+     *
+     * Tres campos nuevos, y los tres se justifican aquí porque este comprobador es
+     * la única puerta por la que se entera nadie de que la vista ha crecido. Un
+     * campo que aparece sin que esta línea cambie es un campo que nadie miró.
+     *
+     *   · `ultimaBaza` y `ganoLaUltima` — la baza que se acaba de resolver y quién
+     *     se la llevó. PÚBLICOS por construcción: son cartas que se echaron boca
+     *     arriba y las vio la mesa entera, y `loSecretoDeLaRonda` sólo declara
+     *     secretas las que quedan EN LAS MANOS. Existen porque `resolverLaBaza`
+     *     vacía `baza` en el mismo movimiento en que entra la cuarta carta, así
+     *     que sin guardarla esa carta no la ve nunca nadie.
+     *   · `tablero` — el `TableroDeclarado` que pinta el mueble genérico. No trae
+     *     nada que no estuviera ya en los otros campos: se COMPONE a partir de la
+     *     vista ya recortada, con la misma técnica que Riberas, así que no puede
+     *     enseñar lo que la proyección no dejó pasar. La búsqueda de secretos de
+     *     este mismo fichero lo recorre igual que a todo lo demás, que es lo que
+     *     de verdad lo compra.
+     */
     const deLaVista = Object.keys(r.datos.mesa.vista).sort().join(',');
     comprobar(
       'y la vista de La Ronda exactamente estos',
-      deLaVista === 'baza,desde,ganadores,jugadores,mano,miMano,momento,turnoDe',
+      deLaVista ===
+        'baza,desde,ganadores,ganoLaUltima,jugadores,mano,miMano,momento,tablero,turnoDe,ultimaBaza',
       deLaVista,
     );
     const deUnAsiento = Object.keys(r.datos.mesa.asientos[0]).sort().join(',');

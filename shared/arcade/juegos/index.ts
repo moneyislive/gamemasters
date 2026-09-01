@@ -42,6 +42,7 @@ import {
   avanzarLaRonda,
   loSecretoDeLaRonda,
   MANIFIESTO_RONDA,
+  opcionesDeLaRonda,
   proyectarLaRonda,
 } from './ronda';
 import type { EstadoDeLaRonda } from './ronda';
@@ -148,10 +149,12 @@ export {
   JUGAR,
   loSecretoDeLaRonda,
   MANIFIESTO_RONDA,
+  opcionesDeLaRonda,
   partidaNueva as partidaNuevaDeLaRonda,
   proyectarLaRonda,
   RONDA,
   seAcabo as seAcaboLaRonda,
+  tableroDeLaRonda,
 } from './ronda';
 export type {
   Carta,
@@ -242,11 +245,37 @@ instalarArcade({
  * proyección solo lo recibe— y con la inferencia el compilador escoge una de las
  * dos y las otras dos dejan de encajar.
  */
+/*
+ * ═══ Y CON `opciones()`, QUE ES LA MITAD DE LO QUE LA HACE JUGABLE ═══
+ *
+ * La mitad, y conviene que quede escrito porque registrarla sola NO basta y
+ * durante un rato pareció que sí.
+ *
+ * Sin `opciones()` este juego no tenía botones: una partida repartida y en marcha
+ * daba cero opciones a los cuatro sentados, así que no se podía jugar en ningún
+ * cliente. Pero con `opciones()` y NADA MÁS, el mueble `formulario` pinta una
+ * lista de botones y punto: quien tiene el turno ve cinco cartas y nada del
+ * juego —ni la baza, ni el marcador, ni de quién es el turno—, los otros tres ven
+ * una pantalla de disculpa, y al terminar la partida no se entera nadie de quién
+ * ha ganado. Medido sobre una partida real, no supuesto.
+ *
+ * Por eso La Ronda declara además un TABLERO —`tableroDeLaRonda`, y su manifiesto
+ * dice `mueble: 'tablero'`—, que es lo que trae el aviso, los paneles y las
+ * cartas de la baza dibujadas. Las dos piezas juntas son las que la hacen
+ * jugable, y en los DOS clientes: el de escritorio pinta el tablero con SVG del
+ * navegador y la app con `ElTableroEnLinea`, que es el mismo camino genérico que
+ * ya recorre un arcade instalado desde fuera.
+ *
+ * Que `opciones` sea opcional en el alta sigue estando bien —La Frente y El
+ * Arcade pintan su propia pantalla y no les falta—; lo que estaba mal era que
+ * este juego no hiciera ninguna de las dos cosas.
+ */
 instalarArcade<EstadoDeLaRonda | undefined>({
   manifiesto: MANIFIESTO_RONDA,
   avanzar: avanzarLaRonda,
   proyeccion: proyectarLaRonda,
   loSecreto: loSecretoDeLaRonda,
+  opciones: opcionesDeLaRonda,
 });
 
 /**

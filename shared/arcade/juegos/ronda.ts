@@ -87,9 +87,24 @@
 import { barajar, sembrar } from '../../mecanicas/azar';
 import type { Azar } from '../../mecanicas/azar';
 import { esTic } from '../reloj';
+import { rechazar } from '../motor';
+import type { Rechazo } from '../motor';
 import type { ContextoMovimiento, Movimiento } from '../movimiento';
-import { ESPECTADOR } from '../tipos';
-import type { ArcadeId, AsientoId, ManifiestoDeArcade, QuienMira } from '../tipos';
+import type { Opcion } from '../opciones';
+import { comoSeLlama, ESPECTADOR, NADIE_SENTADO } from '../tipos';
+import type {
+  ArcadeId,
+  AsientoId,
+  LosSentados,
+  ManifiestoDeArcade,
+  QuienMira,
+} from '../tipos';
+import type {
+  AccionDeTablero,
+  CaraDeTablero,
+  PanelDeTablero,
+  TableroDeclarado,
+} from '../../mecanicas/tablero-declarado';
 
 /** El identificador de este arcade. */
 export const RONDA: ArcadeId = 'la-ronda';
@@ -238,6 +253,28 @@ export interface EstadoDeLaRonda {
   /** Por qué baza va, de 1 a `CARTAS_POR_MANO`. */
   mano: number;
   /**
+   * LA BAZA QUE ACABA DE RESOLVERSE, para que se pueda ver.
+   *
+   * ═══ POR QUÉ HACE FALTA GUARDARLA, Y NO ES UN ADORNO ═══
+   *
+   * `resolverLaBaza` vacía `baza` en el MISMO movimiento en que entra la cuarta
+   * carta. Sin esto, esa cuarta carta no existe para nadie: quien la echa ve
+   * desaparecer la baza entera en el mismo instante, y los otros tres nunca
+   * llegan a ver ni la carta ni quién se llevó la mano. Un juego de bazas en el
+   * que no se ve la baza no es que se vea mal: no se puede jugar, porque la
+   * decisión siguiente depende de lo que acaba de pasar.
+   *
+   * Vive en el ESTADO y no se calcula en la vista porque no se puede calcular:
+   * la información se destruye al resolver. Es el mismo motivo por el que Riberas
+   * guarda `ultimaChoza` y `ultimaTirada`.
+   *
+   * No es secreto: son cartas que se echaron boca arriba y las vio la mesa
+   * entera. Por eso NO entra en `loSecretoDeLaRonda`, y por eso se puede dibujar.
+   */
+  ultimaBaza: CartaEnLaBaza[];
+  /** Quién se llevó `ultimaBaza`, o `null` si todavía no se ha resuelto ninguna. */
+  ganoLaUltima: AsientoId | null;
+  /**
    * EL AZAR. Secreto entero: con la semilla y el acumulador se calcula el
    * reparto completo. Sale de la partida en la proyección y no vuelve a entrar.
    */
@@ -273,6 +310,8 @@ export function partidaNueva(): EstadoDeLaRonda {
     momento: 'reuniendo',
     jugadores: [],
     baza: [],
+    ultimaBaza: [],
+    ganoLaUltima: null,
     turno: 0,
     mano: 0,
     azar: sembrar(0),
@@ -300,6 +339,26 @@ export function partidaNueva(): EstadoDeLaRonda {
  *     devuelve el estado tal cual. Nunca una excepción: quien hospeda no tiene
  *     forma de distinguir «lo rechacé» de «reventé».
  *
+ * ═══ Y DESDE HOY ESAS DEVOLUCIONES PUEDEN LLEVAR ETIQUETA, QUE NO LAS CAMBIA ═══
+ *
+ * Las guardas que puede alcanzar una persona ya no devuelven el estado pelado
+ * sino `rechazar(estado, motivo)`. Conviene decir por qué eso NO rompe las reglas
+ * de arriba, porque leído deprisa lo parece.
+ *
+ * Un `Rechazo` es un envoltorio con clave de SÍMBOLO que lleva dentro EL MISMO
+ * estado que se recibió. `aplicar()` lo abre, se queda el estado y TIRA el
+ * motivo, así que a la mesa le llega exactamente lo de antes: el mismo objeto,
+ * la revisión sin mover y nada que escribir en el diario. La regla 1 se cumple
+ * —lo que sale hacia la mesa es EL MISMO objeto— y la 3 también: por esta función
+ * sigue saliendo un estado y no una excepción. Lo único que se añade es que quien
+ * mandó el movimiento se entera de por qué no pasó nada, y ese motivo viaja solo
+ * en su respuesta: no se guarda, no entra en el diario, y una lectura posterior
+ * lo trae `null`.
+ *
+ * `motor.ts` tiene el párrafo hermano de éste en su propia lista de reglas, que
+ * es de donde sale la doctrina. Lo que NO lleva motivo, a propósito: el tic —no
+ * hay nadie a quien contestar— y los movimientos que este juego no conoce.
+ *
  * ═══ AQUÍ SE VALIDA LA CARGA, Y ESE ES EL TRATO ═══
  *
  * El árbitro NO mira lo que viene dentro del movimiento — no puede, el estado es
@@ -312,7 +371,7 @@ export function avanzarLaRonda(
   estado: EstadoDeLaRonda | undefined,
   movimiento: Movimiento,
   ctx: ContextoMovimiento,
-): EstadoDeLaRonda {
+): EstadoDeLaRonda | Rechazo<EstadoDeLaRonda> {
   const actual = estado ?? partidaNueva();
 
   if (esTic(movimiento)) return sePasoElPlazo(actual);
@@ -351,9 +410,10 @@ function cartaDeLaCarga(carga: unknown): Carta | null {
  * REPARTE Y ARRANCA.
  *
  * Solo desde `'reuniendo'` y solo con los cuatro sentados. Un segundo `empezar`
- * a mitad de partida devuelve el estado tal cual, que es lo correcto: es un
- * móvil que mandó dos veces el mismo movimiento, no una petición de volver a
- * barajar.
+ * a mitad de partida no vuelve a barajar —es un móvil que mandó dos veces el
+ * mismo movimiento— y desde hoy, además, lo DICE: devuelve el mismo estado
+ * envuelto en un `Rechazo` con el motivo. Para la mesa no ha pasado nada; para
+ * quien lo mandó, hay una explicación.
  *
  * ═══ QUIÉN SE SIENTA LO DICE `ctx.asientos`, Y NO ESTE FICHERO ═══
  *
@@ -362,9 +422,40 @@ function cartaDeLaCarga(carga: unknown): Carta | null {
  * en el orden en que llegan, que es el orden en que se sentaron, y ese orden es
  * el turno.
  */
-function repartir(estado: EstadoDeLaRonda, ctx: ContextoMovimiento): EstadoDeLaRonda {
-  if (estado.momento !== 'reuniendo') return estado;
-  if (ctx.asientos.length !== JUGADORES) return estado;
+function repartir(
+  estado: EstadoDeLaRonda,
+  ctx: ContextoMovimiento,
+): EstadoDeLaRonda | Rechazo<EstadoDeLaRonda> {
+  if (estado.momento !== 'reuniendo') {
+    /*
+     * Los dos motivos se separan porque son dos situaciones distintas y quien lo
+     * lee actua distinto: en una espera su turno, en la otra ya no hay nada que
+     * esperar. Meterlas en un texto unico —«ya ha empezado» a quien reparte sobre
+     * una partida TERMINADA— es decirle que siga mirando una mesa acabada.
+     */
+    return rechazar(
+      estado,
+      estado.momento === 'terminada'
+        ? 'Esta partida ya termino. Para jugar otra hace falta una mesa nueva.'
+        : 'La partida ya ha empezado: no se vuelve a repartir.',
+    );
+  }
+  /*
+   * EL AFORO, QUE ES EL PRIMER BOTÓN QUE VE TODO EL MUNDO. Quien abre la mesa es
+   * el primer sentado, así que el primer `ronda:empezar` de cualquier partida cae
+   * aquí y seguirá cayendo hasta que lleguen los otros tres. Sin motivo, eso es
+   * un botón que no hace nada durante todo el rato que se tarda en reunir gente.
+   *
+   * Y no filtra: cuántos hay sentados viaja en `VistaDeMesa.asientos` y lo ven los
+   * cuatro. El motivo solo pone en palabras lo que ya está en la pantalla.
+   */
+  if (ctx.asientos.length !== JUGADORES) {
+    return rechazar(
+      estado,
+      `Faltan jugadores: La Ronda se juega entre ${JUGADORES} exactos, y ahora mismo ` +
+        `sois ${ctx.asientos.length}.`,
+    );
+  }
 
   const repartida = barajar(sembrar(ctx.azar), BARAJA);
   const monton = repartida.valor;
@@ -390,6 +481,8 @@ function repartir(estado: EstadoDeLaRonda, ctx: ContextoMovimiento): EstadoDeLaR
     momento: 'jugando',
     jugadores,
     baza: [],
+    ultimaBaza: [],
+    ganoLaUltima: null,
     turno: 0,
     mano: 1,
     azar: repartida.azar,
@@ -410,19 +503,64 @@ function repartir(estado: EstadoDeLaRonda, ctx: ContextoMovimiento): EstadoDeLaR
  * dos comprobaciones son distintas y hacen falta las dos: sin la del árbitro,
  * cualquiera juega en cualquier mesa; sin ésta, los cuatro sentados juegan
  * cuando quieran.
+ *
+ * ═══ LAS CUATRO RECHAZAN CON MOTIVO, Y NINGUNO DE LOS CUATRO FILTRA ═══
+ *
+ * La de mirar despacio —«no es tu turno»— necesita una aclaración sobre CUÁNDO
+ * se alcanza, porque la respuesta obvia es la equivocada. NO se alcanza porque
+ * dos de los cuatro pulsen a la vez: `opcionesDeLaRonda` corta con `if
+ * (v.turnoDe !== quien) return []`, así que a los otros tres no se les pinta
+ * ningún botón; y aunque lo mandaran a mano, la mesa compara la revisión ANTES
+ * de llamar al reductor y esa carrera sale por `revision-rancia` con un 409, que
+ * ni siquiera llega aquí.
+ *
+ * Se alcanza con un movimiento FABRICADO —alguien que manda `ronda:jugar` sin
+ * pasar por la pantalla— o con un cliente que no pinte desde `opciones()`. O sea
+ * que es una red de seguridad, no la ruta común, y el motivo está para que quien
+ * escribe ese cliente sepa qué hizo mal en vez de mirar un 200 mudo.
+ *
+ * Y no filtra: `turnoDe` es campo público de la vista y viaja a los cuatro.
+ *
+ * Los otros tres, uno a uno: `momento` es público; la carga es lo que mandó
+ * quien mueve y hablar de ella no toca el estado de nadie; y «esa carta no está
+ * en tu mano» habla de `miMano`, que es el campo que la proyección manda SOLO a
+ * su dueño. Lo que ningún motivo puede hacer —y no lo hace— es decir cuál sería
+ * la carta buena, ni nombrar una carta de otra mano.
+ *
+ * La quinta guarda, `quienJuega === undefined`, se queda MUDA a propósito, y el
+ * motivo hay que decirlo con cuidado porque el fácil no vale: no es que
+ * `jugadores` esté vacío —eso ya lo excluye la primera línea— sino que la guarda
+ * salta con CUALQUIER `turno` fuera de rango. Que no pueda haberlo depende de que
+ * los tres únicos sitios que escriben `turno` lo dejen dentro: `repartir` pone 0,
+ * `soltar` hace `(turno + 1) % JUGADORES` y `resolverLaBaza` lo saca de un
+ * índice del propio array. Es un cinturón para el compilador
+ * —`noUncheckedIndexedAccess`— sostenido por esos tres sitios, no una regla del
+ * juego. Un motivo ahí sería texto que nadie leerá nunca y que el próximo lector
+ * confundiría con un caso real.
  */
 function echar(
   estado: EstadoDeLaRonda,
   ctx: ContextoMovimiento,
   carta: Carta | null,
-): EstadoDeLaRonda {
-  if (estado.momento !== 'jugando') return estado;
-  if (carta === null) return estado;
+): EstadoDeLaRonda | Rechazo<EstadoDeLaRonda> {
+  if (estado.momento !== 'jugando') {
+    return rechazar(
+      estado,
+      estado.momento === 'reuniendo'
+        ? 'Todavía no se ha repartido: aquí no hay cartas que echar.'
+        : 'La partida ya terminó.',
+    );
+  }
+  if (carta === null) return rechazar(estado, 'Ese movimiento no trae ninguna carta dentro.');
 
   const quienJuega = estado.jugadores[estado.turno];
   if (quienJuega === undefined) return estado;
-  if (ctx.quien === null || ctx.quien !== quienJuega.asiento) return estado;
-  if (!quienJuega.mano.includes(carta)) return estado;
+  if (ctx.quien === null || ctx.quien !== quienJuega.asiento) {
+    return rechazar(estado, 'No es tu turno: le toca a otro.');
+  }
+  if (!quienJuega.mano.includes(carta)) {
+    return rechazar(estado, 'Esa carta no está en tu mano.');
+  }
 
   return soltar(estado, carta, false);
 }
@@ -532,13 +670,21 @@ function resolverLaBaza(estado: EstadoDeLaRonda): EstadoDeLaRonda {
     if ((jugadores[i] as JugadorDeLaRonda).asiento === ganadora.asiento) turno = i;
   }
 
+  /*
+   * La baza que se acaba de resolver se GUARDA antes de vaciarla. Es la unica
+   * oportunidad: dentro de una linea deja de existir, y con ella la cuarta carta
+   * y el nombre de quien se llevo la mano. Ver `ultimaBaza` en `EstadoDeLaRonda`.
+   */
+  const resuelta = { ultimaBaza: estado.baza, ganoLaUltima: ganadora.asiento };
+
   const quedanCartas = jugadores.some((j) => j.mano.length > 0);
   if (quedanCartas) {
-    return { ...estado, jugadores, baza: [], turno, mano: estado.mano + 1 };
+    return { ...estado, ...resuelta, jugadores, baza: [], turno, mano: estado.mano + 1 };
   }
 
   return {
     ...estado,
+    ...resuelta,
     momento: 'terminada',
     jugadores,
     baza: [],
@@ -591,6 +737,15 @@ export function seAcabo(estado: EstadoDeLaRonda | undefined): boolean {
 /** Lo que se sabe de cada jugador SIN mirarle las cartas. */
 export interface JugadorVisto {
   asiento: AsientoId;
+  /**
+   * Lo que tecleó al sentarse, o su identificador si no consta.
+   *
+   * Entra por la PROYECCIÓN y no por el estado, que es la decisión de la fase 5:
+   * un nombre es presentación y alguien puede cambiarlo, así que en el camino del
+   * reductor la misma partida reejecutada tras un renombrado daría otro estado.
+   * Aquí es dato de salida y no entra en ninguna regla.
+   */
+  nombre: string;
   /** Cuántas cartas le quedan. El número sí es público: se cuentan mirando. */
   cartas: number;
   bazas: number;
@@ -630,6 +785,16 @@ export interface VistaDeLaRonda {
   /** Lo ya echado en la baza en curso. Boca arriba para todos. */
   baza: CartaEnLaBaza[];
   /**
+   * LA BAZA ANTERIOR, entera, y quién se la llevó.
+   *
+   * Es lo que permite que la cuarta carta se vea: al completarse la baza se
+   * resuelve en el mismo movimiento y `baza` vuelve a quedar vacía. Público por
+   * construcción —son cartas que se echaron boca arriba— y por eso no está en
+   * `loSecretoDeLaRonda`.
+   */
+  ultimaBaza: CartaEnLaBaza[];
+  ganoLaUltima: AsientoId | null;
+  /**
    * MIS CARTAS, y solo las mías.
    *
    * Vacía para el espectador y para cualquiera que no esté jugando esta partida.
@@ -642,7 +807,12 @@ export interface VistaDeLaRonda {
   miMano: Carta[];
   /** Quién ha ganado. Vacío hasta que termina. */
   ganadores: AsientoId[];
+  /** El tablero YA RESUELTO, para el mueble genérico. Ver `tableroDeLaRonda`. */
+  tablero: TableroDeclarado;
 }
+
+/** La vista sin el tablero: lo que de verdad tapa la proyección. */
+type VistaSinTablero = Omit<VistaDeLaRonda, 'tablero'>;
 
 /**
  * LA PROYECCIÓN: esto es lo que se ve desde aquí.
@@ -663,9 +833,24 @@ export interface VistaDeLaRonda {
 export function proyectarLaRonda(
   estado: EstadoDeLaRonda | undefined,
   quien: QuienMira,
+  sentados: LosSentados = NADIE_SENTADO,
 ): VistaDeLaRonda {
-  const e = estado ?? partidaNueva();
+  const base = loQueSeVe(estado ?? partidaNueva(), quien, sentados);
+  return { ...base, tablero: tableroDeLaRonda(base, quien) };
+}
 
+/**
+ * EL TAPADO: todo lo público, más lo mío y nada de lo ajeno.
+ *
+ * Va aparte del tablero porque el tablero se DIBUJA a partir de esto, y mezclar
+ * las dos cosas en una función haría que el recorte de secretos —lo único que
+ * aquí es delicado— se leyera entre coordenadas.
+ */
+function loQueSeVe(
+  e: EstadoDeLaRonda,
+  quien: QuienMira,
+  sentados: LosSentados,
+): VistaSinTablero {
   const mia =
     quien === ESPECTADOR ? undefined : e.jugadores.find((j) => j.asiento === quien);
 
@@ -676,11 +861,14 @@ export function proyectarLaRonda(
     turnoDe: e.momento === 'jugando' ? (e.jugadores[e.turno]?.asiento ?? null) : null,
     jugadores: e.jugadores.map((j) => ({
       asiento: j.asiento,
+      nombre: comoSeLlama(sentados, j.asiento),
       cartas: j.mano.length,
       bazas: j.bazas,
       pasadas: j.pasadas,
     })),
     baza: e.baza.map((c) => ({ asiento: c.asiento, carta: c.carta })),
+    ultimaBaza: e.ultimaBaza.map((c) => ({ asiento: c.asiento, carta: c.carta })),
+    ganoLaUltima: e.ganoLaUltima,
     miMano: mia === undefined ? [] : [...mia.mano],
     ganadores: [...e.ganadores],
   };
@@ -733,6 +921,403 @@ export function loSecretoDeLaRonda(estado: EstadoDeLaRonda | undefined): unknown
     for (const carta of j.mano) secretos.push(carta);
   }
   return secretos;
+}
+
+// ---------------------------------------------------------------------------
+// LO QUE SE PUEDE HACER, para que un mueble genérico lo pinte
+// ---------------------------------------------------------------------------
+
+/**
+ * LAS OPCIONES DE LA RONDA.
+ *
+ * ═══ POR QUÉ ESTO NO EXISTÍA, Y POR QUÉ ESO ERA UN AGUJERO Y NO UNA ELECCIÓN ═══
+ *
+ * `opciones()` es OPCIONAL en el alta a propósito: un juego que pinta su propia
+ * pantalla —La Frente, El Arcade— no la necesita y no le falta. Pero La Ronda
+ * declara `mueble: 'formulario'`, y un formulario SE PINTA A PARTIR DE ESTA
+ * LISTA: sin ella no hay botones, y sin botones no hay juego. El resultado,
+ * medido antes de escribir esto, era que una partida repartida y en marcha daba
+ * CERO opciones a los cuatro sentados y al espectador. La Ronda no es que
+ * estuviera a medias en un cliente: no se podía jugar en ninguno.
+ *
+ * Que la batería estuviera verde no lo contradice y conviene decirlo: los
+ * comprobadores compran lo que este juego TIENE —reductor, proyección, secretos,
+ * marcador— y ninguno preguntaba si alguien puede pulsar algo.
+ *
+ * ═══ LA REGLA DEL §5 bis: «SOLO SI», JAMÁS «SI Y SOLO SI» ═══
+ *
+ * La regla canónica está en `shared/arcade/opciones.ts`: el reductor rechaza lo
+ * que no se ofreció y sigue validando lo que sí. O sea que ofrecer de MÁS está
+ * permitido; lo que no vale es que el reductor acepte algo que nadie ofreció.
+ *
+ * Este juego ofrece de más exactamente una vez, y hay que decirlo sin adornos
+ * porque es lo primero que ve cualquiera: mientras se reúne la mesa se ofrece
+ * «Repartir las cartas» a quien tenga asiento, y `repartir` lo RECHAZA hasta que
+ * se sienten los cuatro. O sea que el único botón de la pantalla falla durante
+ * todo el rato que se tarda en reunir gente.
+ *
+ * Se podría dejar de ofrecer —la proyección recibe los sentados, así que aquí
+ * habría con qué mirar el aforo— y no se hace: un botón que explica lo que falta
+ * enseña más que un botón ausente. Quien abre la mesa ve que hay algo que hacer y
+ * cuánta gente le falta para hacerlo, y eso solo se sostiene desde que el rechazo
+ * DICE POR QUÉ y cuántos son. Sin el motivo esto sería un botón roto.
+ *
+ * ═══ Y LA TRAMPA, QUE ES LO ÚNICO DELICADO DE ESTE FICHERO ═══
+ *
+ * La carta va en la `carga`. NUNCA en el `id`.
+ *
+ * No porque `jugar:espadas-10` filtrara nada —la opción se le ofrece solo a su
+ * dueño, que ya tiene esa carta en `miMano`— sino por algo peor y permanente:
+ * movería el secreto de una superficie que el comprobador VE a una que no ve.
+ * `verify:mesa` busca cada valor de `loSecretoDeLaRonda` en forma canónica, o sea
+ * `"espadas-10"` CON COMILLAS, y cuenta en cuántas vistas de asiento aparece. En
+ * `carga: { carta }` serializa `{"carta":"espadas-10"}` y se cuenta; dentro de
+ * `'jugar:espadas-10'` lo que queda pegado a la `e` es un `:` y NO HAY
+ * COINCIDENCIA. Un secreto embebido en un id es invisible para el comprobador que
+ * existe para cazarlo, y el día que alguien añada una opción que nombre la carta
+ * de OTRO —un cante, una apuesta contra una carta concreta— esa opción se pone
+ * roja si la carta viaja en la `carga`, y pasa en verde si va escondida en un
+ * identificador.
+ *
+ * ═══ Y AHORA LO QUE ESTA PROTECCIÓN NO CUBRE, QUE HAY QUE DECIRLO ═══
+ *
+ * El `rotulo` de cada opción es «As de bastos»: la carta, re-codificada para que
+ * la lea una persona. `canonico('As de bastos')` no contiene `"bastos-1"`, así
+ * que `verify:mesa` TAMPOCO llega ahí. O sea que la superficie de opciones tiene
+ * una mitad medida —`id` y `carga`— y una mitad ciega —`rotulo` y `ayuda`—, y
+ * sería falso decir que sacar la carta del id deja el asunto cerrado.
+ *
+ * No se puede arreglar poniendo el rótulo en clave: un botón de carta tiene que
+ * decir qué carta es, o no es un botón. Lo que sí se puede es saber dónde está el
+ * límite, y es éste: la defensa del rótulo NO es textual sino estructural — las
+ * opciones se calculan por observador, con `opciones(vista, quien)`, a partir de
+ * la vista de ESE observador, y `miMano` solo lleva la suya. Mientras eso se
+ * respete, un rótulo no puede nombrar una carta que quien lo recibe no tuviera ya.
+ *
+ * La consecuencia práctica, para quien añada la opción de mañana: una opción que
+ * mencione algo ajeno hay que cazarla LEYENDO, porque medir no la caza. Por eso
+ * la carta va igualmente en la `carga` aunque el reductor pudiera deducirla —es
+ * la mitad que el comprobador sí ve— y por eso `Opcion.rotulo` lleva desde hoy la
+ * misma advertencia que ya llevaba `Opcion.id`.
+ *
+ * En La Ronda esto muerde más que en ningún otro juego de la casa, y es por una
+ * razón que conviene dejar escrita: aquí el vocabulario SECRETO y el de los
+ * MOVIMIENTOS son LAS MISMAS CADENAS. Riberas puede permitirse
+ * `ofrecer:s2:junco:limo` porque recorre `BIENES`, la lista pública de CLASES, y
+ * lo secreto allí es la ficha con su número de serie. La Ronda no tiene ninguna
+ * clase pública de la que la carta sea instancia, ni un montón público del que
+ * sacar el identificador. Copiar aquí la forma de Riberas es precisamente el
+ * error.
+ *
+ * Tampoco vale `BARAJA.indexOf(carta)`: es una biyección con las cuarenta cartas,
+ * o sea la carta codificada, y «derivarse de contenido oculto» incluye toda
+ * codificación sin pérdida — y ésa además burla al humano que revise el diff.
+ *
+ * Lo que queda del vocabulario público que el §5 bis enumera —«el tipo del
+ * movimiento, la llave de un sitio del tablero, un número de orden»— es el número
+ * de orden, que es exactamente el hueco que la regla dejó para este caso. Va con
+ * la baza delante (`jugar:3:2`) para que un id no se reutilice nunca para otra
+ * carta ni siquiera entre bazas: `mano` es público y se lee en la propia vista.
+ *
+ * El índice no añade ni un bit: cuántas cartas le quedan a cada cual ya es
+ * público —`JugadorVisto.cartas`, «se cuentan mirando»— y una POSICIÓN no dice
+ * qué carta es. Y es estable mientras la lista vive, que es la otra mitad de la
+ * regla: `miMano` sale de `[...mia.mano]` y la mano solo se encoge con un
+ * `filter`; el orden no se baraja nunca.
+ */
+export function opcionesDeLaRonda(vista: unknown, quien: QuienMira): readonly Opcion[] {
+  const v = comoVista(vista);
+  if (v === null) return [];
+  /*
+   * El espectador MIRA. No es que no le toque: es que no tiene asiento, y una
+   * lista de botones para alguien que no puede mandar un movimiento sería una
+   * pantalla que promete lo que no cumple.
+   */
+  if (quien === ESPECTADOR) return [];
+
+  if (v.momento === 'reuniendo') {
+    return [
+      {
+        id: 'empezar',
+        tipo: EMPEZAR,
+        carga: {},
+        rotulo: 'Repartir las cartas',
+        ayuda: `Hacen falta ${JUGADORES} sentados exactos. Se reparten ${CARTAS_POR_MANO} a cada uno.`,
+      },
+    ];
+  }
+
+  if (v.momento !== 'jugando') return [];
+  if (v.turnoDe !== quien) return [];
+
+  return v.miMano.map((carta, i) => ({
+    id: `jugar:${v.mano}:${i}`,
+    tipo: JUGAR,
+    carga: { carta },
+    rotulo: comoSeLee(carta),
+    ayuda: '',
+  }));
+}
+
+/**
+ * Mira si esto tiene forma de vista de La Ronda.
+ *
+ * Se comprueban las listas y no cada carta de dentro, por lo mismo que en
+ * `esTableroDeclarado`: lo que caza es el caso real —una vista de otro juego, o
+ * un cliente más viejo que el servidor— y para eso basta.
+ */
+function comoVista(vista: unknown): VistaSinTablero | null {
+  if (typeof vista !== 'object' || vista === null) return null;
+  const v = vista as Partial<VistaSinTablero>;
+  if (v.desde !== 'la-ronda') return null;
+  if (!Array.isArray(v.miMano) || !Array.isArray(v.baza)) return null;
+  if (!Array.isArray(v.ultimaBaza) || !Array.isArray(v.jugadores)) return null;
+  if (typeof v.mano !== 'number') return null;
+  return v as VistaSinTablero;
+}
+
+/**
+ * `'espadas-10'` se lee «10 de espadas». Y el uno es el as.
+ *
+ * Va aquí y no en el mueble porque es vocabulario DE ESTE JUEGO: un mueble
+ * genérico no sabe qué es un palo, y si lo supiera dejaría de ser genérico. El
+ * rótulo es lo único que una persona lee del botón, y `espadas-10` es un
+ * identificador de programa, no una carta.
+ *
+ * ═══ LO QUE VALIDA Y LO QUE NO, DICHO EXACTO ═══
+ *
+ * Sólo mira que haya un guion con algo a cada lado. NO comprueba el palo contra
+ * `PALOS` ni el número contra 1..10, así que `'espadas-010'` sale «010 de
+ * espadas» y `'a-b-c'` sale «c de a-b». Eso es deliberado y no un descuido: quien
+ * decide si una carta existe es `fuerzaDe`, con la posición en `BARAJA`, y esa
+ * decisión no se duplica aquí —dos sitios que opinan sobre qué es una carta
+ * válida acaban discrepando—. Esto solo da formato.
+ *
+ * La consecuencia práctica es que una carta con la forma cambiada se PINTA rara
+ * en vez de reventar, y el reductor la rechaza igual cuando alguien la manda. Se
+ * ve el fallo y no se cuela, que es el orden correcto de las dos cosas.
+ *
+ * Sin guion sí se devuelve tal cual: no hay nada que formatear.
+ */
+function comoSeLee(carta: Carta): string {
+  const guion = carta.lastIndexOf('-');
+  if (guion <= 0) return carta;
+  const palo = carta.slice(0, guion);
+  const valor = carta.slice(guion + 1);
+  if (palo.length === 0 || valor.length === 0) return carta;
+  return `${valor === '1' ? 'As' : valor} de ${palo}`;
+}
+
+// ---------------------------------------------------------------------------
+// EL TABLERO DECLARADO: la baza, el marcador y de quién es el turno
+// ---------------------------------------------------------------------------
+
+/*
+ * ═══ POR QUÉ UN JUEGO DE CARTAS DECLARA UN TABLERO ═══
+ *
+ * Porque tiene uno. Una baza son cuatro cartas boca arriba puestas en fila sobre
+ * una mesa, y eso es una topología declarada tan literal como un delta de
+ * hexágonos: sitios con algo encima. No se declara un tablero para colarse en el
+ * mueble bueno; se declara porque describe lo que hay.
+ *
+ * La alternativa que se descartó, dicha para que no haya que volver a pensarla:
+ * sacar `aviso` y `paneles` del tablero a una superficie nueva —un «tapete»— que
+ * pudiera acompañar también al mueble `formulario`. Se descartó porque
+ * generalizaría el contrato para un caso que no lo obliga, y porque el motivo
+ * para hacerlo era que La Ronda no tenía nada que dibujar — y sí lo tiene. El día
+ * que exista un juego con contexto y de verdad sin nada que dibujar, ese juego
+ * forzará la superficie nueva y se diseñará con dos ejemplos delante en vez de
+ * con uno inventado.
+ *
+ * Y lo que el mueble `formulario` pierde por esto: nada, porque nunca lo tuvo. Un
+ * formulario pinta la lista de `opciones()` y NADA MÁS —está escrito en
+ * `app/src/arcade/pintados.ts`, que lo deja fuera a sabiendas— así que La Ronda
+ * como formulario enseñaba cinco botones a quien tenía el turno y una pantalla de
+ * disculpa a los otros tres. Medido, no supuesto.
+ */
+
+/** Lo que ocupa una carta y lo que se deja entre ellas, en unidades del `viewBox`. */
+const ANCHO_DE_CARTA = 90;
+const ALTO_DE_CARTA = 130;
+const HUECO_ENTRE_CARTAS = 16;
+
+/**
+ * EL TABLERO DE LA RONDA: la baza en el centro y el marcador al lado.
+ *
+ * ═══ QUÉ BAZA SE DIBUJA, QUE ES LA DECISIÓN DE ESTA FUNCIÓN ═══
+ *
+ * La de en curso si hay algo echado; si no hay nada, LA ANTERIOR. Y hace falta
+ * que sea así: `resolverLaBaza` vacía `baza` en el mismo movimiento en que entra
+ * la cuarta carta, así que entre una baza y la siguiente el centro de la mesa
+ * queda vacío justo en el instante en que hay algo que mirar — quién ganó y con
+ * qué. Dibujar solo `baza` dejaría la cuarta carta sin existir para nadie.
+ *
+ * Cuando se dibuja la anterior, la ganadora va `destacada` y el aviso lo dice
+ * además con palabras. Las dos cosas: el color solo no vale para quien no lo
+ * distinga.
+ */
+export function tableroDeLaRonda(vista: unknown, quien: QuienMira): TableroDeclarado {
+  const v = comoVista(vista);
+  if (v === null) return tableroVacio('Esta vista no es de La Ronda.');
+
+  const acciones = opcionesDeLaRonda(v, quien).map(comoAccion);
+  if (v.momento === 'reuniendo') {
+    return tableroVacio(
+      `Todavía no hay partida. Cuando os sentéis ${JUGADORES}, cualquiera puede repartir.`,
+      acciones,
+    );
+  }
+
+  /*
+   * `enCurso` distingue los dos dibujos, y no es lo mismo que «hay cartas»: con la
+   * partida terminada `baza` está vacía y `ultimaBaza` llena, y ahí lo que se
+   * enseña es la última mano jugada, que es lo que se quiere ver al acabar.
+   */
+  const enCurso = v.baza.length > 0;
+  const echadas = enCurso ? v.baza : v.ultimaBaza;
+  const ganadora = enCurso ? null : v.ganoLaUltima;
+
+  const caras: CaraDeTablero[] = echadas.map((echada, i) => ({
+    /*
+     * EL IDENTIFICADOR ES UN SITIO, NO UNA CARTA. Misma regla que en las opciones
+     * y por el mismo motivo, aunque aquí la carta ya sea pública: si mañana esta
+     * fila dibujara algo que no lo es, el identificador ya estaría escrito con la
+     * forma que no delata. Ver la cabecera de `opcionesDeLaRonda`.
+     */
+    id: `sitio:${i}`,
+    puntos: sitioDeLaBaza(i, echadas.length),
+    relleno: echada.asiento === ganadora ? '#2f4f3a' : '#1d2b24',
+    borde: echada.asiento === ganadora ? '#7fd1a0' : '#3d5147',
+    rotulo: comoSeLee(echada.carta),
+    cifra: nombreDe(v, echada.asiento),
+    destacada: echada.asiento === ganadora,
+    /*
+     * Una carta ya echada NO SE TOCA: está sobre la mesa y no hay ningún
+     * movimiento que la tenga por objeto. `null` y no un movimiento inerte,
+     * porque `opcionesSueltas` compara por movimiento y un `toque` inventado
+     * escondería un botón de la lista de abajo.
+     */
+    toque: null,
+  }));
+
+  return {
+    vista: encuadreDeLaBaza(),
+    caras,
+    /* Ni aristas ni vértices: una baza no tiene caminos que recorrer. */
+    lineas: [],
+    nudos: [],
+    acciones,
+    paneles: panelesDe(v),
+    aviso: avisoDe(v, quien),
+  };
+}
+
+/** Un tablero sin baza: solo el aviso y los botones que haya. */
+function tableroVacio(aviso: string, acciones: AccionDeTablero[] = []): TableroDeclarado {
+  return {
+    vista: { x: 0, y: 0, ancho: 100, alto: 100 },
+    caras: [],
+    lineas: [],
+    nudos: [],
+    acciones,
+    paneles: [],
+    aviso,
+  };
+}
+
+/** Una opción, dicha como botón del tablero. */
+function comoAccion(o: Opcion): AccionDeTablero {
+  return {
+    id: o.id,
+    rotulo: o.rotulo,
+    ayuda: o.ayuda,
+    disponible: true,
+    toque: { tipo: o.tipo, carga: o.carga },
+  };
+}
+
+/**
+ * El rectángulo de la carta que va en el sitio `i` de `cuantas`.
+ *
+ * Se centra sobre el origen para que el dibujo no dependa de cuántas cartas haya:
+ * con una carta echada y con cuatro, la fila queda centrada en el mismo sitio en
+ * vez de crecer hacia un lado en cada movimiento.
+ */
+function sitioDeLaBaza(i: number, cuantas: number): Array<{ x: number; y: number }> {
+  const paso = ANCHO_DE_CARTA + HUECO_ENTRE_CARTAS;
+  const izquierda = (i - (cuantas - 1) / 2) * paso - ANCHO_DE_CARTA / 2;
+  const arriba = -ALTO_DE_CARTA / 2;
+  return [
+    { x: izquierda, y: arriba },
+    { x: izquierda + ANCHO_DE_CARTA, y: arriba },
+    { x: izquierda + ANCHO_DE_CARTA, y: arriba + ALTO_DE_CARTA },
+    { x: izquierda, y: arriba + ALTO_DE_CARTA },
+  ];
+}
+
+/**
+ * El `viewBox`, calculado para EL MÁXIMO de cartas y no para las que hay.
+ *
+ * Si se encuadrara lo dibujado, cada carta echada cambiaría la escala de todo el
+ * tablero y las tres anteriores darían un salto de tamaño en mitad de la baza.
+ * Se reserva sitio para las cuatro desde el principio, que es lo que hace una
+ * mesa de verdad.
+ */
+function encuadreDeLaBaza(): { x: number; y: number; ancho: number; alto: number } {
+  const paso = ANCHO_DE_CARTA + HUECO_ENTRE_CARTAS;
+  const ancho = JUGADORES * paso;
+  const alto = ALTO_DE_CARTA * 1.6;
+  return { x: -ancho / 2, y: -alto / 2, ancho, alto };
+}
+
+/** Cómo se llama quien ocupa ese asiento, según la propia vista. */
+function nombreDe(v: VistaSinTablero, asiento: AsientoId): string {
+  for (const j of v.jugadores) if (j.asiento === asiento) return j.nombre;
+  return asiento;
+}
+
+/** Los bloques de texto de al lado: el marcador y por qué mano va. */
+function panelesDe(v: VistaSinTablero): PanelDeTablero[] {
+  const marcador = v.jugadores.map((j) => {
+    const suyas = j.cartas === 1 ? '1 carta' : `${j.cartas} cartas`;
+    const bazas = j.bazas === 1 ? '1 baza' : `${j.bazas} bazas`;
+    const pasadas = j.pasadas > 0 ? ` · ${j.pasadas} por plazo` : '';
+    return `${j.nombre} — ${bazas}, ${suyas}${pasadas}`;
+  });
+  const paneles: PanelDeTablero[] = [{ titulo: 'La mesa', lineas: marcador }];
+
+  if (v.momento === 'jugando') {
+    paneles.push({
+      titulo: 'La partida',
+      lineas: [`Baza ${v.mano} de ${CARTAS_POR_MANO}.`, 'Se lleva la baza la carta más alta.'],
+    });
+  }
+  return paneles;
+}
+
+/**
+ * LA LÍNEA DE ARRIBA: lo que hay que saber sin mirar nada más.
+ *
+ * Dice DOS cosas cuando hay dos que decir —quién se llevó la baza anterior y a
+ * quién le toca ahora— porque separarlas obligaría a mirar en dos sitios para
+ * entender un solo instante de la partida.
+ */
+function avisoDe(v: VistaSinTablero, quien: QuienMira): string {
+  if (v.momento === 'terminada') {
+    const nombres = v.ganadores.map((a) => nombreDe(v, a));
+    if (nombres.length === 0) return 'Se acabó la partida.';
+    if (nombres.length === 1) return `Gana ${nombres[0] as string}.`;
+    return `Empatan ${nombres.join(' y ')}.`;
+  }
+
+  const partes: string[] = [];
+  if (v.baza.length === 0 && v.ganoLaUltima !== null) {
+    partes.push(`${nombreDe(v, v.ganoLaUltima)} se llevó la baza.`);
+  }
+  if (v.turnoDe === null) partes.push('No le toca a nadie.');
+  else if (v.turnoDe === quien) partes.push('Te toca: echa una carta.');
+  else partes.push(`Le toca a ${nombreDe(v, v.turnoDe)}.`);
+  return partes.join(' ');
 }
 
 // ---------------------------------------------------------------------------
@@ -803,7 +1388,7 @@ export const MANIFIESTO_RONDA: ManifiestoDeArcade = {
    * Y es un mueble GENÉRICO, que es lo que permitirá que un arcade de fuera del
    * binario lo use sin estar dentro.
    */
-  mueble: 'formulario',
+  mueble: 'tablero',
 
   /*
    * SÍ, Y ES LA RAZÓN DE SER DE ESTE JUEGO DENTRO DEL PLAN. Declararlo `true` no
