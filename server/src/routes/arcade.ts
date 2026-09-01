@@ -85,6 +85,7 @@ import {
   arcadeInstalado,
   arcadesInstalados,
   ArcadeNoInstalado,
+  hayOpciones,
 } from '../../../shared/arcade';
 import { turnoDeLaVista } from '../../../shared/mecanicas/turno-declarado';
 import type { Request, Response } from 'express';
@@ -297,9 +298,35 @@ const contadorDeAperturas = limitarIntentos({
  * es información de nadie. La app lo lee del registro compilado cuando el juego
  * viene en el binario; esto es lo que hará falta el día que un servidor instale
  * un reparto distinto del que trae la app.
+ *
+ * ═══ Y ADEMÁS DEL MANIFIESTO, UN DATO QUE SOLO SABE ESTE PROCESO ═══
+ *
+ * `publicaOpciones` no está en el manifiesto y no puede estarlo: el manifiesto
+ * dice qué mueble usa el juego —o sea CON QUÉ se le pinta— y no si el juego ha
+ * registrado la función que le da a ese mueble algo que pintar. `opciones()` es
+ * OPCIONAL en el alta a propósito (ver `shared/arcade/opciones.ts`: un juego de
+ * un solo aparato pinta su propia pantalla y no le falta), así que hay altas
+ * perfectamente legales que declaran `mueble: 'formulario'` y no publican ni un
+ * botón.
+ *
+ * Para un cliente que pinta los muebles genéricos —el de escritorio— esa
+ * diferencia es la que hay entre una tarjeta que lleva a una mesa jugable y una
+ * tarjeta que lleva a una mesa muerta: se abre, se persiste, se reparte el
+ * código a tres personas y las cuatro se encuentran con una pantalla que no
+ * tiene nada que enseñar. Con solo el manifiesto en la mano ese cliente NO puede
+ * distinguir los dos casos, porque el registro de arcades vive aquí y no en el
+ * navegador — y con `ARCADES_EXTERNOS` puede vivir SOLO aquí.
+ *
+ * `hayOpciones()` existe en el contrato desde la fase 5 y decía en su propia
+ * línea para qué era —«para que un mueble no pinte una lista vacía como si fuera
+ * nada que hacer»—; hasta hoy no la llamaba nadie desde una respuesta. Es un
+ * campo NUEVO y por tanto opcional en el otro extremo: un cliente empaquetado
+ * contra un servidor más viejo no lo recibirá, y eso no puede ser un fallo.
  */
 router.get('/arcade', (_req, res) => {
-  res.json({ arcades: arcadesInstalados() });
+  res.json({
+    arcades: arcadesInstalados().map((m) => ({ ...m, publicaOpciones: hayOpciones(m.id) })),
+  });
 });
 
 // ---------------------------------------------------------------------------

@@ -26,12 +26,33 @@
  * la plataforma acabó con la forma de CLUEDO «una línea cada vez, ninguna
  * culpable, todas razonables». La única defensa que ha funcionado es medir.
  *
+ * ═══ Y DESDE EL CLIENTE DE ESCRITORIO, UNA SEGUNDA FRONTERA ═══
+ *
+ * La misma idea aplicada a otra pared. `escritorio/` es un cliente de navegador
+ * que se escribió para demostrar que el contrato del arcade NO estaba atado a
+ * React Native, y esa demostración vale exactamente lo que valga la promesa de
+ * que no importa nada de `app/`. Hoy es cierta —se han leído sus importaciones
+ * una a una— pero era cierta POR DISCIPLINA DE UNA PERSONA y no por
+ * construcción: un `import { SALA } from '../../app/src/arcade/muebles'` para
+ * reaprovechar unos colores compila, empaqueta y pasa la batería entera en
+ * verde, y a partir de ahí el escritorio arrastra la carpeta del móvil sin que
+ * nadie se entere. Es justo la propiedad que ese cliente existía para demostrar,
+ * y era la única que se había quedado sin red.
+ *
  * ═══ QUÉ MIRA ═══
  *
- * Los ficheros de `shared/` y de `server/src/`, que es lo que se compila para
- * todos. `server/scripts/` queda fuera a propósito, por lo mismo que en
- * `verify:nucleo`: un guion de desarrollo no viaja a ningún servidor, y este
- * mismo comprobador tendría que excluirse a sí mismo.
+ * Los ficheros de `shared/`, de `server/src/` y de `escritorio/`. Los dos
+ * primeros son lo que se compila para todos; `server/scripts/` queda fuera a
+ * propósito, por lo mismo que en `verify:nucleo`: un guion de desarrollo no
+ * viaja a ningún servidor, y este mismo comprobador tendría que excluirse a sí
+ * mismo.
+ *
+ * `escritorio/scripts/` SÍ entra, y la diferencia no es una incoherencia: lo que
+ * allí se protege no es «qué llega a un servidor» sino «este cliente no está
+ * atado al móvil», y un comprobador que importara de `app/` ataría el paquete
+ * igual. De hecho ni siquiera arrancaría —corre con `tsx` en Node, y allí no hay
+ * React Native—, así que la regla solo adelanta el fallo al sitio donde se
+ * entiende.
  *
  * Se leen los `import`, los `export … from`, los `import()` dinámicos y los
  * `require()`. Los comentarios NO cuentan: media cabecera de este repositorio
@@ -44,8 +65,13 @@ import { sinComentarios } from './sin-comentarios';
 
 const RAIZ = path.resolve(import.meta.dirname ?? __dirname, '..', '..');
 
-/** Dónde vive el código que se compila para todos. */
-const RAICES = ['shared', 'server/src'];
+/**
+ * Dónde vive el código que se compila para todos, más el cliente de escritorio.
+ *
+ * `escritorio/` va entero —`src` y `scripts`— por lo que dice la cabecera: la
+ * frontera que se le vigila no es la de los dos motores, es la del móvil.
+ */
+const RAICES = ['shared', 'server/src', 'escritorio/src', 'escritorio/scripts'];
 
 // ---------------------------------------------------------------------------
 // LO QUE ESTÁ MAL COLOCADO — con su destino, no con su permiso
@@ -302,6 +328,48 @@ function juzgar(fichero: string, i: Importacion): void {
       );
     }
   }
+
+  /*
+   * ── REGLA 7 · el cliente de escritorio no importa de ningún otro cliente ──
+   *
+   * ═══ LA PROPIEDAD QUE ESTA REGLA GUARDA, Y LO QUE VALDRÍA SIN ELLA ═══
+   *
+   * `escritorio/` existe para contestar una pregunta cara: ¿estaba el contrato
+   * del arcade atado a React Native? La respuesta —«no, y aquí está un cliente
+   * de navegador que lo consume tal cual sin mover una línea de
+   * `shared/arcade/`»— solo vale mientras el cliente no se traiga nada de
+   * `app/src/`. Un solo `import` para reaprovechar unos colores y la
+   * demostración pasa a demostrar lo contrario, sin un error en ninguna consola.
+   *
+   * Se prohíben los tres a la vez y no solo `app/`:
+   *
+   *   · `app/src` — es React Native. Es el que destruiría la demostración.
+   *   · `client/src` — es el taller del Game Master, va detrás de `requireAuth`
+   *     y NO SABE QUE EL ARCADE EXISTE, cero menciones. Eso es el §0 y es un
+   *     activo; la primera importación en cualquiera de las dos direcciones lo
+   *     gasta entero.
+   *   · `server/src` — es código de Node. Aquí no rompería una separación de
+   *     diseño: rompería el empaquetado, y de la peor manera, porque `vite` a
+   *     veces sabe resolver lo que el navegador después no puede ejecutar.
+   *
+   * Lo que sí puede importar, y es la lista entera: `shared/`, su propio paquete
+   * y los paquetes de `node_modules`. No hace falta escribirlo: lo que no está
+   * prohibido aquí lo permite el `tsconfig`, y ampliar esta lista es un diff.
+   */
+  if (dentroDe(fichero, 'escritorio')) {
+    for (const ajeno of ['app/src', 'client/src', 'server/src']) {
+      if (!dentroDe(destino, ajeno)) continue;
+      romper(
+        'escritorio no importa de app, client ni server',
+        fichero,
+        i,
+        'Este cliente existe para demostrar que el contrato del arcade se consume desde un ' +
+          'navegador sin tocarlo. Lo que necesite de fuera lo coge de `shared/` —que es el ' +
+          'sitio del código que sirve a todos— o lo escribe aquí. Traérselo de otro cliente ' +
+          'ata el escritorio a ese cliente y deja la demostración sin objeto.',
+      );
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -391,7 +459,7 @@ console.log(`  ${MAL_COLOCADOS.length} fichero(s) mal colocado(s), con su destin
 for (const e of MAL_COLOCADOS) console.log(`    · ${e.ruta}  →  ${e.destino}   (desde ${e.desde})`);
 
 if (hallazgos.length === 0) {
-  console.log('\nLos dos motores siguen sin conocerse.');
+  console.log('\nLos dos motores siguen sin conocerse, y el escritorio sigue sin conocer a la app.');
   process.exit(0);
 }
 

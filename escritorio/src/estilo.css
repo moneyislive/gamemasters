@@ -1,0 +1,501 @@
+/*
+ * LA HOJA DE ESTILO DE UN CLIENTE DE ESCRITORIO.
+ *
+ * ═══ LAS TRES DECISIONES QUE LA HACEN DE PC Y NO UNA APP ESTIRADA ═══
+ *
+ * 1. LA REJILLA NO ESTIRA LAS TARJETAS. Las columnas son de ancho FIJO
+ *    (`repeat(auto-fill, 21rem)`), así que un monitor ancho enseña MÁS tarjetas,
+ *    no tarjetas más anchas. Ese es exactamente el síntoma de una app de móvil
+ *    llevada a un navegador: una columna de tarjetas de un metro de largo con un
+ *    renglón de texto dentro.
+ *
+ * 2. EL TEXTO ES PARA UN MONITOR, NO PARA UNA MANO. La base es 17 px con
+ *    interlineado ancho y los párrafos tienen `max-width` en `ch`: una línea de
+ *    ciento veinte caracteres es legible en un teléfono a treinta centímetros y
+ *    es un ladrillo a setenta.
+ *
+ * 3. HAY RATÓN, ASÍ QUE HAY `hover`. Lo que se puede pulsar se dice ANTES de
+ *    pulsarlo —el cursor cambia, la pieza del tablero se ilumina— y eso es
+ *    información que en una pantalla táctil sencillamente no existe. Y hay
+ *    `:focus-visible` en todo lo pulsable, porque quien tiene teclado navega con
+ *    el tabulador y un foco invisible es una pantalla que no se puede usar sin
+ *    ratón.
+ *
+ * Los colores son los de la Sala: verde de fondo, neón encima. No se toma nada
+ * del taller —ni su tema, ni sus tipos, ni sus componentes—: esto es de la
+ * familia del arcade y no de la de las veladas, y compartir la hoja de estilo
+ * sería la primera costura por la que las dos cosas se vuelven una.
+ */
+
+:root {
+  --fondo: #06110f;
+  --panel: #0c1c19;
+  --panel-alto: #102723;
+  --neon: #5fd4c8;
+  --neon-tenue: #2f6b64;
+  --palabra: #f2fbf9;
+  --palabra-tenue: #9dbdb8;
+  --aviso: #e8a04a;
+  --fallo: #d4636f;
+  --radio: 10px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--fondo);
+  color: var(--palabra);
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  font-size: 17px;
+  line-height: 1.6;
+}
+
+a {
+  color: var(--neon);
+}
+
+code {
+  font-family: 'Cascadia Mono', Consolas, monospace;
+  font-size: 0.9em;
+  color: var(--neon);
+}
+
+:focus-visible {
+  outline: 2px solid var(--neon);
+  outline-offset: 3px;
+}
+
+/* --- El armazón ---------------------------------------------------------- */
+
+.sala {
+  min-height: 100vh;
+}
+
+.cabecera {
+  display: flex;
+  align-items: baseline;
+  gap: 1rem;
+  padding: 1rem 2.5rem;
+  border-bottom: 1px solid var(--neon-tenue);
+}
+
+.vuelta {
+  font-size: 1.1rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  text-decoration: none;
+}
+
+.silla {
+  color: var(--palabra-tenue);
+  font-size: 0.9rem;
+}
+
+/*
+ * El `max-width` es la otra mitad de «ancho aprovechado sin estirar»: la rejilla
+ * puede crecer, pero no hasta que la cabecera y el texto queden a dos palmos de
+ * distancia en una pantalla ultrapanorámica.
+ */
+.dentro {
+  max-width: 92rem;
+  margin: 0 auto;
+  padding: 2rem 2.5rem 4rem;
+}
+
+.titulo {
+  font-size: 2rem;
+  margin: 0 0 0.25rem;
+}
+
+.entradilla,
+.letra-chica p {
+  max-width: 68ch;
+}
+
+.entradilla {
+  color: var(--palabra-tenue);
+  margin: 0 0 2rem;
+}
+
+.letra-chica {
+  font-size: 0.9rem;
+  color: var(--palabra-tenue);
+  max-width: 68ch;
+}
+
+.aviso {
+  border-left: 3px solid var(--aviso);
+  background: rgba(232, 160, 74, 0.08);
+  color: var(--aviso);
+  padding: 0.6rem 1rem;
+  margin: 0 0 1rem;
+  border-radius: 0 var(--radio) var(--radio) 0;
+  max-width: 70ch;
+}
+
+/* --- El catálogo --------------------------------------------------------- */
+
+.rejilla {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, 21rem);
+  justify-content: start;
+  gap: 1.25rem;
+}
+
+.tarjeta {
+  display: block;
+  background: var(--panel);
+  border: 1px solid var(--neon-tenue);
+  border-radius: var(--radio);
+  padding: 1.25rem;
+  min-height: 15rem;
+  text-decoration: none;
+  color: inherit;
+}
+
+.tarjeta-jugable {
+  transition:
+    border-color 0.12s,
+    transform 0.12s;
+}
+
+.tarjeta-jugable:hover {
+  border-color: var(--neon);
+  transform: translateY(-2px);
+}
+
+/*
+ * La tarjeta de lo que se juega en la app se ve APAGADA pero no escondida, y
+ * sigue siendo legible: quien tiene ese arcade en el móvil tiene que reconocerlo
+ * aquí. Nada de `display: none` y nada de `opacity: .3`, que es esconder con
+ * otro nombre.
+ */
+.tarjeta-en-la-app {
+  background: transparent;
+  border-style: dashed;
+  color: var(--palabra-tenue);
+}
+
+.nombre-del-arcade {
+  font-size: 1.3rem;
+  margin: 0 0 0.4rem;
+}
+
+.gancho {
+  margin: 0 0 1rem;
+  color: var(--palabra-tenue);
+}
+
+.ficha {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 1.5rem;
+  margin: 0 0 0.75rem;
+  font-size: 0.85rem;
+}
+
+.ficha dt {
+  color: var(--neon-tenue);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.72rem;
+}
+
+.ficha dd {
+  margin: 0;
+}
+
+.a-jugar {
+  margin: 1rem 0 0;
+  color: var(--neon);
+  font-weight: 600;
+}
+
+.en-la-app {
+  margin: 1rem 0 0;
+  padding-top: 0.75rem;
+  border-top: 1px dashed var(--neon-tenue);
+  color: var(--aviso);
+  font-size: 0.9rem;
+}
+
+/* Las tarjetas fantasma: mismo tamaño, para que al llegar la lista nada salte. */
+.tarjeta-fantasma {
+  border-style: solid;
+  border-color: rgba(95, 212, 200, 0.15);
+}
+
+.raya {
+  display: block;
+  height: 0.9rem;
+  margin-bottom: 0.9rem;
+  border-radius: 4px;
+  background: rgba(95, 212, 200, 0.09);
+  width: 70%;
+}
+
+.raya-larga {
+  width: 90%;
+  height: 1.4rem;
+}
+
+.raya-corta {
+  width: 40%;
+}
+
+.sin-servidor {
+  max-width: 60ch;
+  border: 1px solid var(--fallo);
+  border-radius: var(--radio);
+  padding: 1.5rem;
+  background: rgba(212, 99, 111, 0.06);
+}
+
+.sin-servidor h2 {
+  margin-top: 0;
+  color: var(--fallo);
+}
+
+/* --- Botones ------------------------------------------------------------- */
+
+.opciones {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.opcion {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  min-width: 14rem;
+  text-align: left;
+  background: var(--panel-alto);
+  color: var(--palabra);
+  border: 1px solid var(--neon-tenue);
+  border-radius: var(--radio);
+  padding: 0.7rem 1rem;
+  font: inherit;
+  cursor: pointer;
+  transition: border-color 0.12s, background 0.12s;
+}
+
+.opcion:hover:not(:disabled) {
+  border-color: var(--neon);
+  background: #143430;
+}
+
+.opcion:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.opcion-sobria {
+  background: transparent;
+}
+
+.opcion-texto {
+  display: flex;
+  flex-direction: column;
+}
+
+.opcion-rotulo {
+  font-weight: 600;
+}
+
+.opcion-ayuda {
+  font-size: 0.82rem;
+  color: var(--palabra-tenue);
+}
+
+/* El número del atajo, con pinta de tecla porque es una tecla. */
+.atajo {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  border: 1px solid var(--neon-tenue);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  font-family: 'Cascadia Mono', Consolas, monospace;
+  font-size: 0.8rem;
+  color: var(--neon);
+}
+
+.nada-que-hacer {
+  color: var(--palabra-tenue);
+  font-style: italic;
+  max-width: 62ch;
+}
+
+.rotulo-de-panel {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--neon-tenue);
+  margin: 0 0 0.6rem;
+}
+
+/* --- La mesa ------------------------------------------------------------- */
+
+/*
+ * Dos columnas: el mueble ocupa lo que quede y el carril lateral es FIJO. Un
+ * carril elástico haría que el tablero cambiara de tamaño al entrar alguien en
+ * la mesa —porque la lista de sentados crece— y un tablero que se mueve solo es
+ * insufrible.
+ */
+.tablero-y-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 22rem;
+  gap: 2rem;
+  align-items: start;
+}
+
+@media (max-width: 60rem) {
+  .tablero-y-panel {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.rail {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  position: sticky;
+  top: 1rem;
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--neon-tenue);
+  border-radius: var(--radio);
+  padding: 1rem 1.25rem;
+}
+
+.renglones {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.renglones li {
+  padding: 0.15rem 0;
+  border-bottom: 1px solid rgba(95, 212, 200, 0.08);
+}
+
+.renglones li:last-child {
+  border-bottom: none;
+}
+
+.renglones .yo {
+  color: var(--neon);
+  font-weight: 600;
+}
+
+.cronica {
+  max-height: 16rem;
+  overflow-y: auto;
+  font-size: 0.9rem;
+  color: var(--palabra-tenue);
+}
+
+.codigo-grande {
+  font-family: 'Cascadia Mono', Consolas, monospace;
+  font-size: 2.2rem;
+  letter-spacing: 0.28em;
+  color: var(--neon);
+  margin: 0;
+}
+
+.vestibulo {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  max-width: 56rem;
+}
+
+.dos-columnas {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
+  gap: 1.25rem;
+}
+
+.campo {
+  display: block;
+  width: 100%;
+  margin: 0 0 0.8rem;
+  padding: 0.6rem 0.8rem;
+  background: var(--fondo);
+  color: var(--palabra);
+  border: 1px solid var(--neon-tenue);
+  border-radius: var(--radio);
+  font: inherit;
+}
+
+.campo-codigo {
+  font-family: 'Cascadia Mono', Consolas, monospace;
+  font-size: 1.4rem;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+}
+
+/* --- El retablo ---------------------------------------------------------- */
+
+.retablo {
+  margin-bottom: 1.5rem;
+}
+
+.aviso-del-tablero {
+  font-size: 1.05rem;
+  margin: 0 0 0.75rem;
+  color: var(--palabra);
+}
+
+/*
+ * El tablero manda en el alto, y se le da todo el que quepa en la ventana. En un
+ * teléfono se encaja por anchura porque la pantalla es estrecha y alta; en un
+ * monitor, que es ancho y bajo, encajar por anchura deja el dibujo diminuto con
+ * media pantalla en negro.
+ */
+.lienzo-del-tablero {
+  display: block;
+  width: 100%;
+  max-height: 62vh;
+  background: var(--panel);
+  border: 1px solid var(--neon-tenue);
+  border-radius: var(--radio);
+}
+
+.pieza-tocable {
+  cursor: pointer;
+}
+
+.pieza-tocable:hover {
+  filter: brightness(1.35);
+}
+
+.pieza-quieta {
+  cursor: progress;
+}
+
+.texto-de-cara,
+.cifra-de-cara {
+  fill: var(--palabra);
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  font-size: 14px;
+  pointer-events: none;
+}
+
+.cifra-de-cara {
+  fill: var(--neon);
+  font-weight: 700;
+}

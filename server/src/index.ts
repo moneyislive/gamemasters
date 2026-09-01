@@ -40,6 +40,7 @@ import authRouter, { passwordRequired, requireAuth, tallerAbiertoPara } from './
 import aterrizajeRouter from './enlaces/aterrizaje';
 import descargaRouter, { comprobarLaDescarga } from './enlaces/descarga';
 import jugarWebRouter from './enlaces/jugar-web';
+import escritorioWebRouter, { carpetaDelEscritorio } from './enlaces/escritorio-web';
 import correoRouter from './correo/router';
 import legalRouter from './legal/documentos';
 import limitadorDeIntentos from './puerta/montaje';
@@ -210,6 +211,14 @@ app.use(descargaRouter);
  * guardian: quien juega no conoce la contrasena de la casa.
  */
 app.use(jugarWebRouter);
+
+/*
+ * La Sala de Arcade para un PC, en `/sala`. Va junto a la app y por el mismo
+ * motivo: delante del guardian, porque un arcade no tiene Game Master y su
+ * puerta es la llave de asiento que reparte al sentarse. Es un cliente aparte y
+ * no la app de movil ensanchada; ver la cabecera de `enlaces/escritorio-web.ts`.
+ */
+app.use(escritorioWebRouter);
 
 /**
  * Señal de vida, para quien vigila el servicio.
@@ -605,6 +614,15 @@ app.listen(env.port, env.host, () => {
   console.log(`   » Escuchando en ....... http://localhost:${env.port}`);
   console.log(
     `   » Cliente ............. ${env.clientDir ? `servido desde ${env.clientDir}` : 'no compilado (en desarrollo lo sirve Vite en el 5173)'}`,
+  );
+  /*
+   * Se dice DÓNDE la ha encontrado o que no la ha encontrado, y no un simple
+   * «sí/no»: el fallo típico de esto es tener un empaquetado viejo en la otra
+   * carpeta candidata, y con un «servido» a secas nadie lo ve nunca.
+   */
+  const salaCompilada = carpetaDelEscritorio();
+  console.log(
+    `   » Sala de Arcade ...... ${salaCompilada ? `http://localhost:${env.port}/sala (desde ${salaCompilada})` : 'no compilada (npm run build -w escritorio; en desarrollo, Vite en el 5175)'}`,
   );
   console.log(`   » Subidas ............. ${uploadsDir}`);
   console.log(

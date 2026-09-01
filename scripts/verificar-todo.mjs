@@ -48,6 +48,12 @@ const BATERIA = [
   // ── Que compile ────────────────────────────────────────────────────────────
   { nombre: 'tipos · servidor', donde: 'server', guion: 'typecheck', porque: 'el contrato se respeta' },
   { nombre: 'tipos · taller', donde: 'client', guion: 'typecheck', porque: 'el taller sigue el contrato' },
+  {
+    nombre: 'tipos · escritorio',
+    donde: 'escritorio',
+    guion: 'typecheck',
+    porque: 'el cliente de PC de la Sala de Arcade sigue el contrato — y compila contra el mismo `shared/arcade` que la app, así que un cambio en el contrato se ve aquí antes que en una pantalla',
+  },
   /*
    * ═══ ESTE VA JUSTO ENCIMA DE `tipos · móvil`, Y EL ORDEN ES LA MITAD ═══
    *
@@ -495,6 +501,27 @@ const BATERIA = [
     lento: true,
     porque:
       'un arcade escrito en un fichero temporal fuera del repositorio se instala por `ARCADES_EXTERNOS` —con la ruta de Windows, que es donde falla el cargador—, sale en el catálogo, abre mesa, esconde la mano de cada cual, pinta con el mueble genérico desde sus propias `opciones()` y dice POR QUÉ rechaza un movimiento',
+  },
+
+  /*
+   * ═══ EL CLIENTE DE ESCRITORIO, Y VA DESPUÉS DEL ARCADE DE FUERA ═══
+   *
+   * Porque lo que compra descansa sobre lo que compran los dos de arriba: que un
+   * arcade que nadie compiló se instala y publica sus `opciones()` es del
+   * anterior; lo de aquí es que UNA PANTALLA no pinta nada más que eso.
+   *
+   * Es rápido a propósito: no levanta servidor y no abre navegador. Renderiza los
+   * componentes de verdad con `react-dom/server` contra una partida de Riberas
+   * jugada en el momento con el reductor de `shared/`. Lo que quedaría fuera de
+   * un comprobador que levantara el navegador —que se vea bonito— no es lo que se
+   * rompe en silencio; lo que se rompe en silencio es lo de aquí.
+   */
+  {
+    nombre: 'escritorio honrado',
+    donde: 'escritorio',
+    guion: 'verify:escritorio',
+    porque:
+      'el cliente de PC enseña TODOS los arcades instalados y no miente sobre cuáles se pueden jugar en él: son pulsables los que cumplen las TRES condiciones —mueble que pinta la plataforma, mesa en el servidor, y algo declarado que pintar: su lista de `opciones()` o el mueble `tablero`—, y los demás salen igual, apagados y diciendo POR QUÉ, cada uno la suya —solo el que de verdad se juega en la app manda a la app—, ni desaparecen ni dan error al pulsarlos, y un mueble que no conozca tampoco tumba el catálogo; y sus dos muebles genéricos no pintan ni una palabra, ni una pieza ni un movimiento que no viniera dentro de la proyección',
   },
 ];
 

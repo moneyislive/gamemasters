@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "workspaces": [
     "client",
+    "escritorio",
     "server"
   ],
   "engines": {
@@ -13,9 +14,10 @@
     "dev": "concurrently -n server,client -c yellow,cyan \"npm run dev -w server\" \"npm run dev -w client\"",
     "dev:server": "npm run dev -w server",
     "dev:client": "npm run dev -w client",
-    "build": "npm run build -w server && npm run build -w client && npm run build:app",
+    "dev:escritorio": "npm run dev -w escritorio",
+    "build": "npm run build -w server && npm run build -w client && npm run build -w escritorio && npm run build:app",
     "start": "npm run start -w server",
-    "typecheck": "npm run typecheck -w server && npm run typecheck -w client",
+    "typecheck": "npm run typecheck -w server && npm run typecheck -w client && npm run typecheck -w escritorio",
     "build:app": "cd app && npm install --include=dev && npx expo export --platform web --output-dir dist",
     "verificar": "node scripts/verificar-todo.mjs"
   },

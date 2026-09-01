@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <!--
+      NADA DE `width=device-width` AQUÍ, y no es un descuido copiado a medias del
+      taller: esto es un cliente de PC. La app de móvil ya existe en /jugar y se
+      queda como está; lo que falta es una pantalla pensada para un monitor y un
+      ratón, y para eso la anchura de referencia es la de la ventana, no la de un
+      teléfono. Lo que sí hay es `initial-scale`, para que un portátil con la
+      pantalla escalada no salga con todo diminuto.
+    -->
+    <meta name="viewport" content="width=1024, initial-scale=1.0" />
+    <title>Sala de Arcade</title>
+    <meta name="theme-color" content="#06110f" />
+  </head>
+  <body>
+    <div id="raiz"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
