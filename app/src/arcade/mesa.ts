@@ -55,6 +55,8 @@ import { cargarSesionGuardada, servidorActual } from '../api';
 import type { MovimientoDeclarado } from '../../../shared/mecanicas/tablero-declarado';
 import type { ArcadeId } from '../../../shared/arcade';
 import { elSitioGuardado, guardarElSitio, olvidarElSitio } from './bolsillo';
+import { pausaAntesDeVolverAPreguntar } from './relojes';
+import { turnoDeLaVista } from '../../../shared/mecanicas/turno-declarado';
 
 /** Lo que el servidor cuenta de una mesa. El campo `vista` es del juego. */
 export interface MesaVista {
@@ -64,6 +66,8 @@ export interface MesaVista {
   tic: number;
   terminada: boolean;
   venceEn: number | null;
+  /** Desde cuándo se espera al que tiene el turno, en epoch ms. Ver `mesas.ts`. */
+  turnoDesde: number;
   asientos: Array<{ id: string; nombre: string; presente: boolean }>;
   yo: string | null;
   vista: unknown;
@@ -86,7 +90,16 @@ export interface LaMesa {
   aviso: string;
   /** Hay algo en vuelo: no se toca nada más hasta que vuelva. */
   quieto: boolean;
-  abrir: (nombre: string) => void;
+  /**
+   * Abre una mesa. `plazoSegundos` es de quien abre y no del juego.
+   *
+   * «Veinticuatro horas por turno» es una decisión de producto de quien monta la
+   * partida, no una regla de Riberas — está escrito así en la cabecera de
+   * `mesas.ts` y es el eje entero de la fase 4 bis. Sin este parámetro, la app
+   * sólo sabría abrir mesas del plazo por defecto, o sea que una partida de días
+   * existiría en el servidor y no habría forma de empezarla desde el móvil.
+   */
+  abrir: (nombre: string, plazoSegundos?: number) => void;
   entrar: (codigo: string, nombre: string) => void;
   mover: (movimiento: MovimientoDeclarado) => void;
   salir: () => void;
@@ -104,6 +117,15 @@ const CABECERA_DE_ASIENTO = 'x-asiento';
  * por segundo mientras la pantalla está abierta.
  */
 const ESPERA_TRAS_FALLO_MS = 2000;
+
+/*
+ * LA PAUSA DEL SONDEO SE FUE A `relojes.ts`, con su porqué entero.
+ *
+ * Estaba aquí, exportada y sin que la mirara ningún comprobador. Se ha movido a un
+ * fichero SIN NINGÚN `import` —igual que `conexion-reglas.ts`— para que
+ * `verificar-relojes.mjs` pueda llamarla de verdad con números en vez de leer su
+ * texto. Los tres defectos que esa red caza ahora estaban los tres aquí dentro.
+ */
 
 /** Se conecta a una mesa de un arcade y la mantiene al día. */
 export function usarMesaDeArcade(arcade: ArcadeId): LaMesa {
@@ -265,7 +287,30 @@ export function usarMesaDeArcade(arcade: ArcadeId): LaMesa {
            * veinticinco segundos del sondeo y nadie movió. Se vuelve a preguntar
            * y no se cuenta como fallo.
            */
-          if (r.status === 204) continue;
+          if (r.status === 204) {
+            /*
+             * El servidor acaba de decir que no ha pasado nada en veinticinco
+             * segundos. Si el plazo está lejos —una mesa de días— se espera un poco
+             * antes de volver a aparcarse. Ver `pausaAntesDeVolverAPreguntar`, que
+             * cuenta qué se paga y qué se ahorra.
+             */
+            const turno = turnoDeLaVista(mesa?.vista);
+            const pausa = pausaAntesDeVolverAPreguntar(
+              mesa?.venceEn ?? null,
+              mesa?.terminada ?? false,
+              /*
+               * MIENTRAS NO LE TOQUE A NADIE NO SE PAUSA: la mesa se está
+               * reuniendo y es el único rato en que dos personas se esperan
+               * mirando la pantalla. El porqué entero, y lo que costaba, está en
+               * `pausaAntesDeVolverAPreguntar`.
+               */
+              turno.declarado && turno.de !== null,
+              Date.now(),
+            );
+            if (pausa > 0) await esperar(pausa);
+            if (parado) return;
+            continue;
+          }
           if (!r.ok) throw new Error(`el servidor contestó ${String(r.status)}`);
           const datos = (await r.json()) as { mesa: MesaVista };
           if (parado) return;
@@ -290,11 +335,18 @@ export function usarMesaDeArcade(arcade: ArcadeId): LaMesa {
      * convierte el bucle en una cadena sin huecos. Sin ella, el segundo sondeo
      * volvería a preguntar desde la revisión vieja y el servidor contestaría al
      * instante con lo mismo, en bucle cerrado.
+     *
+     * Y `venceEn` y `terminada` están por lo mismo desde la fase 4 bis: la pausa
+     * entre vueltas se calcula con ellos, así que un bucle que capturara los de su
+     * primer repintado seguiría pausando como si el plazo estuviera donde estaba
+     * hace tres turnos. Hoy los tres cambian a la vez —un vencimiento sube la
+     * revisión— así que esto no añade ni un reinicio del sondeo; está para que siga
+     * siendo cierto el día que dejen de cambiar juntos.
      */
-  }, [fase, mesa?.rev, cabeceras]);
+  }, [fase, mesa?.rev, mesa?.venceEn, mesa?.terminada, cabeceras]);
 
   const abrir = useCallback(
-    (nombre: string) => {
+    (nombre: string, plazoSegundos?: number) => {
       void (async () => {
         ponerQuieto(true);
         ponerFase('yendo');
@@ -302,7 +354,17 @@ export function usarMesaDeArcade(arcade: ArcadeId): LaMesa {
           const r = await fetch(`${servidorActual()}/api/arcade/mesas`, {
             method: 'POST',
             headers: cabeceras(true),
-            body: JSON.stringify({ arcade, nombre }),
+            /*
+             * El plazo sólo viaja si quien abre eligió uno: omitirlo deja que mande
+             * el defecto del servidor, que es lo correcto —el número lo decide quien
+             * hospeda— y evita que la app tenga una segunda copia de «dos minutos»
+             * que se desincronice con la de `mesas.ts` el día que cambie.
+             */
+            body: JSON.stringify({
+              arcade,
+              nombre,
+              ...(plazoSegundos === undefined ? {} : { plazoSegundos }),
+            }),
           });
           const datos = (await r.json()) as {
             error?: string;

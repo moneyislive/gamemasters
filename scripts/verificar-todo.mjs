@@ -124,6 +124,29 @@ const BATERIA = [
 
   // ── El móvil ──────────────────────────────────────────────────────────────
   { nombre: 'móvil', donde: 'app', guion: 'verify', porque: 'pantallas, tema y tablas de módulo' },
+  /*
+   * ═══ LOS RELOJES DE LA MESA LARGA, QUE SON DE LA APP Y NO LOS MIRABA NADIE ═══
+   *
+   * La fase 4 bis dejó tres funciones puras en la app —la pausa del sondeo y los
+   * dos rótulos de tiempo— exportadas y sin un solo consumidor fuera de su
+   * fichero, con `verify:larga` entero del lado del servidor. Los tres defectos
+   * que se colaron estaban ahí dentro, y ninguno da error en ningún sitio: una
+   * mesa entera pintada «(fuera)» con todos delante de la pantalla, una mesa de
+   * veinticuatro horas que dice «quedan 23 h» nada más abrirla, y un rótulo que al
+   * bajar un minuto pasa de «2 días» a «47 h».
+   *
+   * Va aquí y no dentro de `verify:larga` porque no necesita servidor: llama a las
+   * funciones con números. Y la comprobación que más vale es la que ata el tope de
+   * la pausa a `CONECTADO_MS` del servidor LEYÉNDOLO de su fichero — el invariante
+   * que se rompió no vivía en ninguno de los dos ficheros, vivía entre ellos.
+   */
+  {
+    nombre: 'relojes · móvil',
+    donde: 'app',
+    guion: 'verify:relojes',
+    porque:
+      'la pausa del sondeo cabe en la ventana de presencia del servidor —así que nadie sale «(fuera)» teniendo la app delante—, no se pausa mientras se reúne la mesa, y la cuenta atrás ni trunca ni sube',
+  },
 
   // ── Las veladas largas ────────────────────────────────────────────────────
   /*
@@ -389,12 +412,48 @@ const BATERIA = [
     porque:
       'el mismo vértice tiene una sola llave por los tres caminos, ninguna choza toca a otra, la serpentina va y vuelve, el Vado Largo se pierde cuando un vecino planta una choza en medio, un trueque caduca solo, y quien no tiene el turno contesta — con el reductor rechazando lo que `opciones()` no ofreció y validando igual lo que sí',
   },
+  /*
+   * Y LA FASE 4 BIS, QUE VA ENTRE MEDIAS Y NO AL FINAL.
+   *
+   * Aquí abajo, después del núcleo, se leería como «y además una cosa larga». Va
+   * detrás de Riberas porque juega A RIBERAS —La Larga no es un juego nuevo, es el
+   * mismo con la mesa persistida y los plazos en horas de reloj de pared— y delante
+   * del núcleo por el mismo motivo por el que Riberas va delante: si La Larga está
+   * rota, un núcleo quieto no significa nada.
+   *
+   * Es `lento` porque levanta el servidor DOS veces: la mitad de lo que afirma
+   * —que una partida sobrevive a que el proceso muera— no se puede comprobar sin
+   * matar un proceso de verdad.
+   */
+  {
+    nombre: 'La Larga',
+    donde: 'server',
+    guion: 'verify:larga',
+    lento: true,
+    porque:
+      'una mesa de Riberas con veinticuatro horas por turno se abre con la misma petición que una de treinta segundos, sobrevive a que el proceso muera con turnos jugados antes y después, resincroniza a quien vuelve con un `rev` de hace tres días, deja que el plazo del ausente venza por la lectura de otro, mantiene en la partida a quien cerró la app, y tras tres días sin que nadie mire ha perdido UN turno y no setenta y dos — con el reloj inyectado, no esperando',
+  },
   {
     nombre: 'núcleo del arcade quieto',
     donde: 'server',
     guion: 'verify:nucleo-quieto',
+    /*
+     * ═══ ESTA FRASE DECÍA «NI DE LA MESA», Y LA FASE 4 BIS LA MOVIÓ ═══
+     *
+     * Decía «sin mover un byte del contrato, del árbitro, de la mesa ni del canal».
+     * Dejarla así sería la peor clase de mentira que cabe en este fichero: el
+     * comprobador estaría verde —se volvió a sellar a sabiendas— y el renglón que
+     * dice qué compra estaría contando la fase anterior.
+     *
+     * Lo que sigue siendo cierto, y es lo que la fase 4 vino a demostrar, es que el
+     * CONTRATO no se ha movido: `shared/arcade/`, el árbitro y el canal siguen byte
+     * a byte como estaban. Lo que se movió fue `mesas.ts`, que es la capa de mesa y
+     * no el contrato, y se movió por seis líneas de La Larga: un campo que dice
+     * desde cuándo se espera al que tiene el turno. Está justificado en la cabecera
+     * de aquel fichero y el sello lleva la fecha.
+     */
     porque:
-      'el juego más rico de los cuatro entra sin mover un byte del contrato, del árbitro, de la mesa ni del canal — que es lo que la fase 4 existe para demostrar, y aquí deja de ser un párrafo para pasar a ser algo que se ejecuta',
+      'el juego más rico de los cuatro entra sin mover un byte del contrato, del árbitro ni del canal — y `mesas.ts` sólo se movió por el campo de duración de la fase 4 bis, sellado aparte y a sabiendas',
   },
 ];
 

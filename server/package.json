@@ -61,6 +61,7 @@
     "verify:sin-red": "tsx scripts/verificar-sin-red.ts",
     "verify:procedencia": "tsx scripts/verificar-procedencia.ts",
     "verify:mesa": "tsx scripts/verificar-mesa.ts",
+    "verify:larga": "tsx scripts/verificar-larga.ts",
     "verify:determinismo": "tsx scripts/verificar-determinismo.ts",
     "verify:marcador": "tsx scripts/verificar-marcador.ts",
     "verify:canvaskit": "tsx scripts/verificar-canvaskit.ts",

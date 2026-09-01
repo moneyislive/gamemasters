@@ -43,6 +43,24 @@
  *     revisión de la semana pasada devuelve el estado completo y ya está. Ver
  *     `mirar`.
  *
+ * ═══ Y LO QUE LA FASE 4 BIS TUVO QUE AÑADIR, QUE ES UNA COSA Y SE DICE ═══
+ *
+ * Cuando La Larga se estrenó de verdad, las cuatro de arriba estaban pagadas y
+ * `PLAZO_MAXIMO_S` ya admitía siete días, así que una partida en turnos de
+ * veinticuatro horas no necesitó ni una línea nueva: es `plazoSegundos: 86400` en
+ * la petición que abre la mesa. El eje estaba bien elegido y eso es lo que el §9
+ * quería medir.
+ *
+ * Lo único que faltaba era `turnoDesde`, y faltaba porque es una pregunta que
+ * sólo existe a escala de días: DESDE CUÁNDO se está esperando a quien tiene el
+ * turno. En una partida de diez minutos nadie la hace —los cuatro están mirando
+ * la pantalla—; en una de tres días es de lo que cuelga que se pueda escribir un
+ * «te toca a ti». La otra mitad de esa pregunta, a QUIÉN le toca, no puede vivir
+ * aquí porque el estado es opaco: la declara el juego en su vista y la lee
+ * `shared/mecanicas/turno-declarado.ts`.
+ *
+ * Lo comprueba `verify:larga`, con el servidor levantado y el reloj inyectado.
+ *
  * ═══ EL PLAZO QUE NO VENCÍA NUNCA ═══
  *
  * El §5.4 del diseño lo plantea así: con `tickHz: 0` y autoridad de servidor,
@@ -206,6 +224,7 @@ import { medirMovimiento, medirTamano } from './presupuesto';
 import { marcarPresencia, olvidarPresencia, senalEnMemoria } from '../mecanicas/presencia';
 import { manifiestoDeArcade, necesitaMesa, tieneReloj, vistaDeAsiento } from '../../../shared/arcade';
 import type { ArcadeId, AsientoId, ManifiestoDeArcade, Movimiento } from '../../../shared/arcade';
+import { turnoDeLaVista } from '../../../shared/mecanicas/turno-declarado';
 
 // ---------------------------------------------------------------------------
 // El vocabulario
@@ -248,16 +267,66 @@ export interface MesaEnCurso {
   /** Quién está sentado, en el orden en que se sentaron. */
   sillas: Silla[];
   /**
-   * Cuánto se espera sin que pase nada antes de meter un tic, en milisegundos.
+   * CUÁNTO DURA UN TURNO antes de que se meta un tic, en milisegundos.
    *
    * Lo elige quien abre la mesa: diez minutos para una partida de after, un día
    * para una de las que duran una semana. Cero significa que esta mesa no tiene
    * plazo y no se le mete ningún tic nunca — legítimo para un juego sin nada que
    * caducar.
+   *
+   * Decía «cuánto se espera SIN QUE PASE NADA», o sea un tiempo de inactividad, y
+   * ese matiz costaba caro: entonces cualquier cosa que pasara —incluida la de un
+   * jugador al que no le toca contestando un trueque— empujaba el vencimiento
+   * hacia adelante y al que tenía el turno no se le pasaba la hora nunca. Es un
+   * plazo POR TURNO, se reprograma cuando cambia el turno, y así es como lo dice
+   * el §5.4 del diseño y como lo rotula la app: «veinticuatro horas por turno».
+   * Ver `empiezaTurnoNuevo`.
    */
   plazoMs: number;
   /** Instante absoluto de pared en que toca meter el tic. `null` si no hay plazo. */
   venceEn: number | null;
+  /**
+   * DESDE CUÁNDO SE ESPERA AL QUE TIENE EL TURNO, en epoch ms.
+   *
+   * ═══ POR QUÉ ES UN CAMPO Y NO SE DERIVA, QUE ERA LA TENTACIÓN ═══
+   *
+   * Parece que sobra: con `venceEn` y `plazoMs` sale una resta. Y la resta es
+   * falsa en los dos casos que a La Larga le importan.
+   *
+   *   · CON `plazoMs: 0` no hay `venceEn` en absoluto, así que no hay nada de lo
+   *     que restar. Una mesa sin prisa es legítima —«esta partida no tiene
+   *     plazo»— y de ella se sigue queriendo saber cuánto lleva parada, que es
+   *     justo la pregunta que decide si merece la pena avisar a nadie.
+   *   · Y CON PLAZO, `venceEn` se reprograma en cada tic aunque el tic no cambie
+   *     nada (ver `ponerAlDiaElPlazo`), de modo que la resta iría saltando hacia
+   *     adelante sola y una mesa parada tres días parecería recién movida.
+   *
+   * ═══ Y POR QUÉ NO VALE `ultimoToqueEn`, QUE ES CASI LO MISMO ═══
+   *
+   * Casi. `ultimoToqueEn` lo mueve TAMBIÉN sentarse, y sentarse no cambia de
+   * quién es el turno. En una mesa de La Larga que se reúne despacio —la gente
+   * va llegando a lo largo del día— cada uno que llega reiniciaría la cuenta
+   * de «cuánto lleva esperándose a fulano», que es el número entero del que
+   * cuelga el aviso. Son dos preguntas distintas y por eso son dos campos: uno
+   * dice cuándo se tocó la MESA y el otro cuándo cambió la PARTIDA.
+   *
+   * ═══ Y POR QUÉ NO BASTABA «CUÁNDO CAMBIÓ EL ESTADO», QUE ES LO QUE DECÍA AQUÍ ═══
+   *
+   * Aquí estaba escrito que esta capa no sabe a quién le toca y no le hace falta,
+   * porque «cuándo cambió el estado» ya es el instante en que empezó a esperarse a
+   * quien le toque ahora. Es falso en cuanto un juego deja mover a quien no tiene
+   * el turno, y Riberas es exactamente ese juego: contestar un trueque cambia el
+   * estado y NO cambia el turno, así que el contador volvía a cero sin que el que
+   * tiene el turno hubiera hecho nada, y el aviso «lleva más de N horas» no se
+   * disparaba jamás.
+   *
+   * Esta capa sigue sin mirar el estado. Lee de la VISTA a quién le toca —donde el
+   * juego lo declara a propósito, ver `shared/mecanicas/turno-declarado.ts`— y
+   * reinicia el contador cuando ese valor CAMBIA. Si el juego no declara turno se
+   * cae a la regla vieja, que para un juego sin turnos es lo correcto y para uno
+   * con turnos no declarados no es peor que antes. Ver `empiezaTurnoNuevo`.
+   */
+  turnoDesde: number;
   /** Cuándo se abrió, en epoch ms. Para el barrido de mesas viejas. */
   abiertaEn: number;
   /** Cuándo se tocó por última vez. Para lo mismo. */
@@ -282,6 +351,20 @@ export interface VistaDeMesa {
    * decremente, o sea a escribir el estado sin que pase nada.
    */
   venceEn: number | null;
+  /**
+   * DESDE CUÁNDO SE ESPERA, en epoch ms. Ver `MesaEnCurso.turnoDesde`.
+   *
+   * Sale en la vista porque es la mitad de la pregunta que La Larga tiene que
+   * poder contestar —«a quién le toca y DESDE CUÁNDO»— y porque una pantalla que
+   * dice «lleva dos días sin mover» necesita el mismo dato que necesitaría quien
+   * escribiera el aviso. La otra mitad, a quién le toca, no puede salir de aquí:
+   * el estado es opaco y esta capa no lo mira. La declara el juego en su vista y
+   * la lee `turnoDeLaVista`.
+   *
+   * Instante absoluto y no «hace tanto», por lo mismo que `venceEn`: una cuenta
+   * que sube obliga al servidor a escribirla, y el móvil sabe restar.
+   */
+  turnoDesde: number;
   /** Quiénes están en la partida. Estar aquí NO depende de estar conectado. */
   asientos: Array<{
     id: AsientoId;
@@ -417,9 +500,138 @@ interface Guardado {
    * nuevo. Hoy solo sirve para descartar lo que no reconoce, que es infinitamente
    * mejor que interpretarlo mal: una mesa medio entendida es una partida que se
    * comporta raro.
+   *
+   * ═══ SE SIGUE ESCRIBIENDO LA 2 AUNQUE ESTA FASE AÑADA UN CAMPO ═══
+   *
+   * La primera versión de la fase 4 bis escribía `version: 3`. Se ha vuelto atrás,
+   * y la razón es el sentido de la compatibilidad que no se miró: HACIA ATRÁS.
+   *
+   * El lector de la versión publicada hace, literalmente, `if (leido.version !== 2
+   * || !leido.mesa) continue;` — o sea que un fichero de la 3 se le descarta EN
+   * SILENCIO: sin error, sin línea en el registro, y con `almacen.fallos` a cero.
+   * Y revertir un despliegue es una operación normal que el §6 dice que pasa en
+   * cada push. Con la 3 escrita, revertir al día siguiente hace desaparecer TODAS
+   * las partidas en curso sin un solo aviso; y como `codigoLibre()` sólo mira la
+   * tabla en memoria, el código liberado se puede reasignar y sobreescribir el
+   * fichero original. Es el mismo fallo que esta fase existe para impedir, visto
+   * desde el otro lado.
+   *
+   * Escribir la 2 no cuesta nada porque el cambio es ADITIVO y el lector viejo hace
+   * `recuperadas.push(leido.mesa)` sin mirar los campos que no conoce: `turnoDesde`
+   * le viaja dentro, no lo lee y no le estorba. Y en el otro sentido tampoco hace
+   * falta el número, porque `alDiaDesdeElDisco` mira el VALOR y no la versión, y
+   * deriva `turnoDesde` cuando no está. El mismo fichero lo entienden las dos.
+   *
+   * La regla que queda escrita para la próxima vez: el número sube cuando un lector
+   * viejo interpretaría MAL el fichero, no cuando hay un campo nuevo. El día que
+   * cambie el SIGNIFICADO de un campo que ya existe, ese día sube — y ese día hay
+   * que mirar también qué le pasa a quien revierta.
    */
   version: 2;
   mesa: MesaEnCurso;
+}
+
+/**
+ * LA 3 TAMBIÉN SE LEE, AUNQUE YA NO SE ESCRIBA, Y ES LA PRIMERA VEZ QUE ESTE
+ * CAMPO SIRVE PARA ALGO.
+ *
+ * La 3 está en la lista porque la primera versión de esta fase llegó a escribir
+ * ficheros con ese número —en pruebas y en cualquier árbol donde se probara— y
+ * borrarla de aquí convertiría esas mesas en partidas perdidas por exactamente el
+ * mecanismo que la vuelta a la 2 quiere evitar. Leer de más es barato; leer de
+ * menos cuesta partidas.
+ *
+ * ═══ POR QUÉ AQUÍ SÍ SE ACEPTA LA VIEJA, SI LA CABECERA DICE «NO SE MIGRA» ═══
+ *
+ * Lo que la cabecera dice que no se migra es el FORMATO de la fase 2 —un solo
+ * `mesas.json` con todas las mesas dentro— y sigue siendo verdad: aquello era
+ * otra disposición del almacén y una migración que nadie ejecuta es código que se
+ * descubre roto el día que hace falta.
+ *
+ * Esto es otra cosa: la misma disposición con UN CAMPO MÁS, y un campo que se
+ * deriva de lo que el fichero viejo ya trae. Y descartar tendría un precio que en
+ * esta fase concreta es el peor posible: La Larga existe para que una partida
+ * sobreviva a los despliegues, así que estrenarla borrando todas las mesas de
+ * quien actualice sería incumplir la fase con el código de la fase.
+ *
+ * `ultimoToqueEn` es la mejor aproximación que hay a «cuándo cambió la partida
+ * por última vez» en un fichero que no lo guardaba: se pasa de largo como mucho
+ * por lo que tardó en llegar el último que se sentó, y a la escala de días de La
+ * Larga eso no cambia ninguna decisión.
+ */
+const VERSIONES_QUE_SE_LEEN = [2, 3];
+
+/** ¿Es un instante de reloj utilizable, o hay que reponerlo? */
+function esInstante(x: unknown): x is number {
+  return typeof x === 'number' && Number.isFinite(x);
+}
+
+/**
+ * Rellena lo que una versión vieja no traía. Devuelve `null` si no se reconoce.
+ *
+ * `nombre` es sólo para el registro, y está porque un descarte mudo aquí es una
+ * partida que desaparece sin que nadie pueda averiguar por qué. Ver `leer()`.
+ */
+function alDiaDesdeElDisco(leido: Partial<Guardado>, nombre: string): MesaEnCurso | null {
+  if (typeof leido.version !== 'number' || !VERSIONES_QUE_SE_LEEN.includes(leido.version)) {
+    /*
+     * SE DICE, Y ÉSTE ES EL ÚNICO SITIO DONDE SE PUEDE DECIR.
+     *
+     * El fichero no se borra —puede que lo entienda la instancia de al lado, o la
+     * de mañana— pero el silencio no vale: una mesa que no se recupera y no se
+     * cuenta se ve desde fuera como «este servidor perdió tu partida», con el
+     * diagnóstico diciendo `mesas: 0` y `almacen.fallos: 0` a la vez. Que es la
+     * combinación que no le deja a nadie ni empezar a mirar.
+     */
+    console.error(
+      `[arcade] La mesa guardada en «${nombre}» trae una versión que este servidor no lee ` +
+        `(${JSON.stringify(leido.version)}; se leen ${VERSIONES_QUE_SE_LEEN.join(', ')}). ` +
+        'No se recupera y NO se borra: el fichero sigue ahí.',
+    );
+    return null;
+  }
+  if (!leido.mesa) {
+    console.error(`[arcade] La mesa guardada en «${nombre}» no trae mesa dentro y se ignora.`);
+    return null;
+  }
+  const m = leido.mesa;
+  /*
+   * ═══ PRIMERO EL CAMPO DEL QUE SE DERIVA, Y NO AL REVÉS ═══
+   *
+   * `ultimoToqueEn` se valida ANTES que `turnoDesde` porque es de donde sale
+   * `turnoDesde` cuando falta. Sin esto, un fichero sin `ultimoToqueEn` metía un
+   * `undefined` en la tabla y las tres consecuencias no daban error en ningún
+   * sitio: la vista salía SIN el campo —rompiendo el juego cerrado de campos que
+   * `verificar-mesa.ts` afirma—, `esperandoMs` salía `null`, y sobre todo
+   * `barrerLasViejas` hacía `ahora - undefined`, que es `NaN`, y `NaN <=
+   * OLVIDO_MS` es FALSO: la retención de treinta días se convertía en borrado
+   * inmediato en el siguiente `abrir` de un desconocido.
+   *
+   * Se REPONE en vez de descartar la mesa. Descartarla sería tirar una partida
+   * entera por un campo de contabilidad que no cambia ninguna regla del juego, y
+   * `abiertaEn` —o, en el peor caso, ahora mismo— es una aproximación que a la
+   * escala de días de La Larga no cambia ninguna decisión.
+   */
+  const ahora = Date.now();
+  if (!esInstante(m.abiertaEn)) m.abiertaEn = ahora;
+  if (!esInstante(m.ultimoToqueEn)) m.ultimoToqueEn = m.abiertaEn;
+  /*
+   * Se mira el VALOR y no la versión, y no es lo mismo: un fichero escrito por una
+   * instancia a medio desplegar podría traerlo mal igual, y lo que hace falta es
+   * que ninguna mesa llegue a la tabla con un `NaN` dentro. Un `NaN` aquí no
+   * falla: se propaga a la vista, sale por la red, y la pantalla dice «hace NaN
+   * horas» sin que nada se ponga rojo en ningún sitio.
+   */
+  if (!esInstante(m.turnoDesde)) m.turnoDesde = m.ultimoToqueEn;
+  /*
+   * Y el plazo, por lo mismo: `plazoMs` entra en `Date.now() + m.plazoMs`, así que
+   * un `undefined` ahí produce un `venceEn` que es `NaN`, y `ahora < NaN` es falso
+   * — o sea una mesa que vence en CADA lectura y mete un tic por sondeo. Cero
+   * significa «sin prisa», que es el respaldo honesto cuando no se sabe.
+   */
+  if (!esInstante(m.plazoMs) || m.plazoMs < 0) m.plazoMs = 0;
+  if (m.venceEn !== null && !esInstante(m.venceEn)) m.venceEn = null;
+  return m;
 }
 
 /**
@@ -459,8 +671,9 @@ const almacenEnFichero: AlmacenDeMesas = {
     for (const nombre of nombres) {
       try {
         const leido = JSON.parse(fs.readFileSync(path.join(CARPETA, nombre), 'utf8')) as Partial<Guardado>;
-        if (leido.version !== 2 || !leido.mesa) continue;
-        recuperadas.push(leido.mesa);
+        const mesa = alDiaDesdeElDisco(leido, nombre);
+        if (mesa === null) continue;
+        recuperadas.push(mesa);
       } catch (error) {
         /*
          * Una mesa ilegible se salta y se DICE, en vez de tumbar el arranque o
@@ -527,6 +740,12 @@ let almacen: AlmacenDeMesas = almacenEnFichero;
 export function ponerAlmacenDeMesas(otro: AlmacenDeMesas): void {
   almacen = otro;
   cargadas = false;
+  /*
+   * Y el reloj del barrido vuelve a cero: cambiar el almacén es empezar de nuevo,
+   * y un guion que monte dos escenarios seguidos no debe heredar «ya se barrió
+   * hace un rato» del anterior. Ver `barrerSiTocaPorReloj`.
+   */
+  ultimoBarridoEn = 0;
 }
 
 // ---------------------------------------------------------------------------
@@ -589,10 +808,62 @@ const OLVIDO_MS = 30 * 24 * 60 * 60_000;
 /** Cuánto hace falta que se haya visto a alguien para pintarlo conectado. */
 const CONECTADO_MS = 60_000;
 
+/**
+ * Cada cuánto, como mucho, se repasa la tabla entera buscando mesas olvidadas.
+ *
+ * ═══ POR QUÉ HAY QUE ACORDARSE DE BARRER Y NO BASTA CON `abrir` ═══
+ *
+ * Barrer sólo desde `abrir` se porta mal por los DOS lados, y los dos importan a
+ * la escala de La Larga:
+ *
+ *   · En una instancia donde el grupo está jugando su partida de días y nadie
+ *     abre mesas nuevas, NO SE BARRE NUNCA. La carpeta crece un fichero por
+ *     partida jugada, para siempre, que es exactamente la fuga que `OLVIDO_MS`
+ *     dice estar cerrando.
+ *   · Y al revés: el borrado de tu partida abandonada no lo dispara el paso del
+ *     tiempo sino el `abrir` de un desconocido, en el instante en que ese
+ *     desconocido pulsa el botón. Desde fuera, «tu mesa desapareció porque otro
+ *     abrió la suya» no se distingue de «este servidor perdió tu partida».
+ *
+ * Así que también se barre en la LECTURA, que es lo único que ocurre siempre en
+ * un servidor con partidas vivas. Con un tope: repasar la tabla en cada sondeo de
+ * cada móvil sería O(mesas) por petición, que es justo la clase de coste que la
+ * cabecera de `mesas` se niega a pagar. Una hora es infinitamente más fino que
+ * treinta días y sigue siendo nada.
+ *
+ * NO se pone un temporizador, y no es pereza: un `setInterval` de ámbito de
+ * módulo mantiene vivo el bucle de eventos, ensucia el apagado, y obliga a todos
+ * los guiones de comprobación que importan este fichero a acordarse de pararlo.
+ * Un barrido perezoso colgado de la actividad hace el mismo trabajo sin nada de
+ * eso, y una instancia sin actividad no tiene ninguna prisa por barrer.
+ */
+const CADA_CUANTO_SE_BARRE_MS = 60 * 60_000;
+
+let ultimoBarridoEn = 0;
+
+/** Barre si toca por reloj. Lo llaman las lecturas; `abrir` barre siempre. */
+function barrerSiTocaPorReloj(ahora: number): void {
+  if (ahora - ultimoBarridoEn < CADA_CUANTO_SE_BARRE_MS) return;
+  barrerLasViejas(ahora);
+}
+
 function barrerLasViejas(ahora: number): void {
+  ultimoBarridoEn = ahora;
   for (const [codigo, m] of mesas) {
     if (ahora - m.ultimoToqueEn <= OLVIDO_MS) continue;
     mesas.delete(codigo);
+    /*
+     * SE DICE, Y ANTES NO SE DECÍA. Éste es el único sitio del servidor que
+     * borra una partida entera, y hacerlo en silencio deja al que vuelve con un
+     * 404 y a quien mira el registro sin nada que leer: `almacen.fallos` sigue a
+     * cero porque no ha fallado nada, que es lo peor de todo. Con esta línea, la
+     * desaparición de una mesa se puede FECHAR y contar contra `OLVIDO_MS`.
+     */
+    console.log(
+      `[arcade] Se olvida la mesa ${codigo}: llevaba ${String(
+        Math.round((ahora - m.ultimoToqueEn) / 86_400_000),
+      )} día(s) sin que nadie la tocara (el límite son ${String(OLVIDO_MS / 86_400_000)}).`,
+    );
     /*
      * Y su fichero se va con ella. Con el almacén de un solo fichero esto salía
      * gratis —la siguiente escritura completa ya no la incluía— y con un fichero
@@ -1016,6 +1287,81 @@ const PREFIJO_RESERVADO = 'arcade:';
 // ---------------------------------------------------------------------------
 
 /**
+ * A QUIÉN LE TOCA, SEGÚN LA VISTA DEL ESPECTADOR. `undefined` si no lo dice.
+ *
+ * ═══ POR QUÉ ESTA CAPA MIRA ESTO, SI EL ESTADO ES OPACO ═══
+ *
+ * No mira el estado: mira la PROYECCIÓN, que es lo que el juego publica a
+ * propósito y ya viaja por el cable a cuatro móviles. Es exactamente la misma
+ * técnica y el mismo motivo que `tableroDeLaVista` para pintar el mueble
+ * genérico, y está contado entero en `shared/mecanicas/turno-declarado.ts`. La
+ * ruta `/turno` lleva haciéndolo desde que existe; lo nuevo es que la mesa
+ * también lo necesita, y por la razón de abajo.
+ *
+ * ═══ QUÉ SE ROMPÍA SIN ESTO, QUE ES EL AGUJERO QUE LA FASE 2 CREÍA CERRADO ═══
+ *
+ * `mover` reprogramaba `venceEn` y `turnoDesde` con la condición «el estado ha
+ * cambiado», sin mirar QUIÉN movió. La cabecera de `mover` cuenta cómo se cerró
+ * el caso «cualquier movimiento»; quedó abierto el caso «cualquier movimiento QUE
+ * CAMBIE ALGO», y en un juego con comercio ése es un movimiento normal y
+ * legítimo. En Riberas, `opcionesDeTurno` ofrece aceptar y rechazar un trueque A
+ * QUIEN NO LE TOCA —está antes del `if (v.turnoDe !== quien) return opciones`— y
+ * contestar cambia el estado. Con plazo de un día: Ana tiene el turno, ofrece un
+ * trueque y cierra la app; veinte horas después Bruno lo rechaza, y con eso Ana
+ * se lleva veinticuatro horas más de plazo y `esperandoMs` vuelve a cero. Con
+ * ocho tratos recordados son ocho días de turno prorrogado y ocho días de aviso
+ * que no se dispara nunca. Sin colusión y sin cliente manipulado.
+ *
+ * La regla correcta no es «ha cambiado el estado» sino EL TURNO HA CAMBIADO, que
+ * es lo que significa de verdad «empieza a esperarse a otro». Y esta capa puede
+ * preguntarlo sin saber qué es un turno, porque no lo deduce: lo lee de donde el
+ * juego lo declaró.
+ *
+ * ═══ Y SI EL JUEGO NO LO DECLARA ═══
+ *
+ * Se devuelve `undefined` y quien llama se cae a la regla vieja —«ha cambiado el
+ * estado»—, que es peor pero no es nada nuevo. Exigirle a todos los juegos que
+ * declaren `turnoDe` sería convertir esto en una regla de plataforma, que es
+ * justo lo que el §5.3 prohíbe: «en cuanto el motor sabe qué es un turno, el
+ * primer juego rico decide qué forma tiene».
+ *
+ * Se lee de la vista del ESPECTADOR (`null`) y no de la de nadie: de quién es el
+ * turno no es secreto de ninguno, y la del espectador es la única que por
+ * contrato no lleva secretos dentro.
+ */
+function turnoQueDeclara(arcade: ArcadeId, estado: Mesa['estado']): string | null | undefined {
+  let vista: unknown;
+  try {
+    vista = vistaDeAsiento(arcade, estado, null);
+  } catch {
+    /*
+     * `vistaDeAsiento` lanza si un juego declara secretos y no tiene proyección
+     * registrada. Eso no debería poder ocurrir —`exigirSecretosTapados()` impide
+     * arrancar— pero si ocurriera, quien manda es la regla vieja y no una
+     * excepción que tumbe un movimiento legítimo por una pregunta accesoria.
+     */
+    return undefined;
+  }
+  const turno = turnoDeLaVista(vista);
+  return turno.declarado ? turno.de : undefined;
+}
+
+/**
+ * ¿EMPIEZA UN TURNO NUEVO entre estos dos estados? Es lo que reinicia los relojes.
+ *
+ * Devuelve `true` también cuando el juego no declara turno, y no por comodidad:
+ * ahí la única señal que hay es que el estado cambió, que es la regla con la que
+ * se vivía antes de esta fase. Un juego sin turnos declarados no empeora.
+ */
+function empiezaTurnoNuevo(arcade: ArcadeId, antes: Mesa['estado'], despues: Mesa['estado']): boolean {
+  const deAntes = turnoQueDeclara(arcade, antes);
+  if (deAntes === undefined) return true;
+  const deDespues = turnoQueDeclara(arcade, despues);
+  if (deDespues === undefined) return true;
+  return deAntes !== deDespues;
+}
+
+/**
  * Tope de tics que se meten de una vez. Ver `ponerAlDiaElPlazo`.
  *
  * No debería llegarse nunca, porque cada tic reprograma el vencimiento a partir
@@ -1077,8 +1423,27 @@ function ponerAlDiaElPlazo(m: MesaEnCurso, manifiesto: ManifiestoDeArcade): bool
     m.venceEn = Date.now() + m.plazoMs;
     if (despues.estado === antes.estado) continue;
 
+    /*
+     * EL TIC QUE PASA EL TURNO EMPIEZA UN TURNO NUEVO, y ése es el caso de La
+     * Larga que más importa: a quien le tocaba se le pasó la hora, el juego
+     * decidió qué significa eso —en Riberas, pasar el turno— y desde ESTE
+     * instante se está esperando a otra persona. Sin esto, el aviso del turno
+     * siguiente heredaría la antigüedad del anterior y diría «lleva tres días sin
+     * mover» de alguien a quien le acaba de tocar.
+     *
+     * Y SE PREGUNTA POR EL TURNO Y NO POR EL ESTADO, que es la corrección de esta
+     * ronda. En la colocación de Riberas el tic COLOCA POR EL AUSENTE y deja el
+     * turno donde estaba —lo decide el juego en su rama del tic, y esta capa no
+     * tiene por qué saberlo—. Con la condición vieja, ese tic ponía `turnoDesde` a
+     * ahora y el aviso decía «acaba de empezar» de alguien que llevaba un día sin
+     * aparecer. Se sigue esperando a la misma persona: la cuenta no se toca.
+     *
+     * Se calcula ANTES de mover `m.mesa` porque hacen falta los dos estados.
+     */
+    const otroTurno = empiezaTurnoNuevo(antes.arcade, antes.estado, despues.estado);
     m.mesa = despues;
     m.ultimoToqueEn = Date.now();
+    if (otroTurno) m.turnoDesde = m.ultimoToqueEn;
     medirTamano(m.mesa.arcade, m.mesa.estado, tieneReloj(manifiesto));
     cambio = true;
   }
@@ -1152,6 +1517,13 @@ export async function abrir(datos: {
     sillas: [silla],
     plazoMs: plazoValido(datos.plazoSegundos) * 1000,
     venceEn: null,
+    /*
+     * Se espera a alguien desde que la mesa existe, y no desde que se reparte. Es
+     * lo correcto y además es lo útil: una mesa de La Larga abierta el martes a la
+     * que nunca llegó el segundo jugador tiene que poder decir «lleva cuatro días
+     * esperando», que es exactamente lo que se necesita para decidir cerrarla.
+     */
+    turnoDesde: ahora,
     abiertaEn: ahora,
     ultimoToqueEn: ahora,
   };
@@ -1278,6 +1650,19 @@ export async function sentarse(codigo: string, nombre: string): Promise<Silla> {
  * una revisión vieja no cambia nada de nadie.
  */
 export async function mirar(codigo: string, llave: string | null): Promise<VistaDeMesa> {
+  /*
+   * Y de paso se barre, como mucho una vez por hora. Va aquí y no sólo en `abrir`
+   * porque la lectura es lo único que ocurre siempre: en una instancia donde el
+   * grupo lleva una semana con su partida y nadie abre mesas nuevas, `abrir` no se
+   * llama jamás y la carpeta no se limpiaba nunca. Ver `CADA_CUANTO_SE_BARRE_MS`.
+   *
+   * Fuera del candado y antes de pedirlo, exactamente donde lo hace `abrir`: es un
+   * repaso de la tabla, no una operación sobre esta mesa. Si la barrida se lleva
+   * por delante la mesa que se está mirando —treinta días sin que nadie la
+   * tocara—, `conLaMesa` contesta `MesaDesconocida`, que es la verdad.
+   */
+  cargar();
+  barrerSiTocaPorReloj(Date.now());
   return conLaMesa(codigo, async (m) => {
     const manifiesto = manifiestoDeArcade(m.mesa.arcade);
     const yo = asientoDe(m, llave);
@@ -1391,12 +1776,41 @@ export async function mover(
      * otros cinco indefinidamente, que es justo la garantía que esta fase existe
      * para traer.
      *
-     * La regla correcta, y la única que esta capa puede escribir sin saber qué
-     * es un turno: EL PLAZO SE REPROGRAMA CUANDO EL ESTADO CAMBIA. La mesa no
-     * puede saber a quién le tocaba —el estado es opaco— pero sí sabe si el
-     * juego avanzó, que es lo que significa de verdad «ha pasado algo».
+     * ═══ Y POR QUÉ «EL ESTADO CAMBIA» TAMPOCO BASTABA ═══
+     *
+     * Eso cerró el caso «cualquier movimiento» y dejó abierto el caso «cualquier
+     * movimiento QUE CAMBIE ALGO», que en un juego con comercio es un movimiento
+     * normal y legítimo. En Riberas, `opcionesDeTurno` ofrece aceptar y rechazar
+     * un trueque A QUIEN NO LE TOCA, y contestar devuelve un estado nuevo. Medido
+     * con cuatro sentados, plazo de cuatro horas y el juego en `jugando`: J1 tiene
+     * el turno, propone trueques y se calla; J2 rechaza uno cada tres horas; a las
+     * doce horas no había vencido ni uno de los tres plazos que tocaban y
+     * `/turno` publicaba `esperandoMs: 12` —doce MILISEGUNDOS— de alguien que
+     * llevaba doce horas sin mover. Con el plazo de La Larga y los ocho tratos que
+     * se recuerdan, son ocho días de turno prorrogado por un tercero.
+     *
+     * ═══ LA REGLA DE AHORA: EMPIEZA UN TURNO NUEVO ═══
+     *
+     * Los dos relojes de la mesa —hasta cuándo hay tiempo y desde cuándo se
+     * espera— hablan del TURNO, así que se reinician cuando cambia el turno y no
+     * cuando cambia cualquier cosa. Esta capa no deduce el turno: lo lee de la
+     * vista, donde el juego lo declara. Ver `empiezaTurnoNuevo`.
+     *
+     * La consecuencia, dicha en voz alta porque es un cambio de significado: el
+     * plazo pasa a ser POR TURNO y no por movimiento. «Veinticuatro horas por
+     * turno» —que es como lo dice el §5.4 y como lo rotula la app— significa que
+     * el que tiene el turno tiene un día para todo lo suyo: tirar, construir y
+     * pasar. Antes, cada cosa que hiciera le regalaba otro día entero, y cada cosa
+     * que hicieran los demás también.
+     *
+     * `cambio` sigue existiendo y sigue siendo «el estado ha cambiado», porque
+     * decide otra cosa distinta: si hay algo que guardar y que avisar. Un
+     * movimiento que el reductor ignora no es nada para la mesa; uno que cambia el
+     * estado sin cambiar el turno sí es algo —hay que guardarlo y hay que
+     * repintarlo— pero no empieza ningún turno.
      */
     const cambio = despues.estado !== antes.estado;
+    const otroTurno = cambio && empiezaTurnoNuevo(antes.arcade, antes.estado, despues.estado);
 
     if (!cambio) {
       /*
@@ -1411,7 +1825,19 @@ export async function mover(
 
     m.mesa = despues;
     m.ultimoToqueEn = Date.now();
-    if (m.plazoMs > 0) m.venceEn = Date.now() + m.plazoMs;
+    /*
+     * LAS DOS, JUNTAS Y CON LA MISMA CONDICIÓN, que es lo que ya decía esta nota y
+     * ahora es verdad: `venceEn` dice hasta cuándo hay tiempo y `turnoDesde` desde
+     * cuándo se está esperando, las dos hablan del MISMO turno, y si una se moviera
+     * sin la otra la cuenta atrás y la antigüedad hablarían de turnos distintos.
+     *
+     * Y es la misma razón por la que NO está en `sentarse`: llegar a la mesa sube
+     * la revisión y toca la mesa, pero no cambia de quién es el turno.
+     */
+    if (otroTurno) {
+      if (m.plazoMs > 0) m.venceEn = Date.now() + m.plazoMs;
+      m.turnoDesde = m.ultimoToqueEn;
+    }
     medirTamano(m.mesa.arcade, m.mesa.estado, tieneReloj(manifiesto));
     await guardar(manifiesto, m);
     return vistaDe(m, yo);
@@ -1523,6 +1949,7 @@ function vistaDe(m: MesaEnCurso, yo: AsientoId | null): VistaDeMesa {
     tic: m.mesa.tic,
     terminada: m.mesa.terminada,
     venceEn: m.venceEn,
+    turnoDesde: m.turnoDesde,
     asientos: m.sillas.map((s) => ({
       id: s.id,
       nombre: s.nombre,

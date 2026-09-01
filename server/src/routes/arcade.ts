@@ -80,6 +80,7 @@ import {
   arcadesInstalados,
   ArcadeNoInstalado,
 } from '../../../shared/arcade';
+import { turnoDeLaVista } from '../../../shared/mecanicas/turno-declarado';
 import type { Request, Response } from 'express';
 import { crearRouter } from '../rutas';
 
@@ -471,6 +472,114 @@ function responderConLaMesa(res: Response, mesa: VistaDeMesa, desde: number): vo
     avisos: Number.isFinite(desde) ? elCanal().avisosDesde(mesa.codigo, desde, mesa.yo) : [],
   });
 }
+
+// ---------------------------------------------------------------------------
+// A QUIÉN LE TOCA, QUE ES LO ÚNICO QUE LA FASE 4 BIS AÑADE A ESTA PUERTA
+// ---------------------------------------------------------------------------
+
+/**
+ * A QUIÉN LE TOCA Y DESDE CUÁNDO.
+ *
+ * ═══ POR QUÉ ESTO EXISTE, SI EL §12 DEJA LAS NOTIFICACIONES FUERA DE ALCANCE ═══
+ *
+ * Y sigue dejándolas: aquí no hay ni un `push`, ni un testigo de dispositivo, ni
+ * una cola de envíos, y no los va a haber en esta fase. Lo que hay es LO QUE HACE
+ * FALTA PARA QUE ALGÚN DÍA SE PUEDA ESCRIBIR UNO, que es otra cosa y es barato.
+ *
+ * Un aviso de La Larga dice exactamente dos datos: a quién y desde cuándo. Si el
+ * servidor no sabe contestarlos, el aviso no se puede escribir nunca —ni por
+ * nosotros, ni por nadie que monte este motor— y la fase habría entregado una
+ * partida de tres días en la que la única forma de enterarse de que te toca es
+ * abrir la app a ver. Que es justo lo que una partida de tres días no puede pedir.
+ *
+ * ═══ DE DÓNDE SALE «A QUIÉN», QUE ES LA PARTE DELICADA ═══
+ *
+ * No del estado: es OPACO y esta capa no lo mira, que es la decisión de la que
+ * cuelga el diseño entero. Sale de la VISTA, que es lo que el juego publica a
+ * propósito, y se lee con `turnoDeLaVista` — la misma técnica y el mismo motivo
+ * que `tableroDeLaVista` para pintar el mueble genérico. Está contado entero en
+ * `shared/mecanicas/turno-declarado.ts`.
+ *
+ * Y se lee de la vista del ESPECTADOR, con `mirar(codigo, null)`, no de la de
+ * quien pregunta. Dos razones, y la segunda es la que importa:
+ *
+ *   · No hace falta llave. Quien va a mandar el aviso es el servidor, no un
+ *     asiento, y de quién es el turno no es secreto de nadie: los dos juegos por
+ *     turnos de esta casa lo publican igual en las cuatro vistas.
+ *   · La vista del espectador es la ÚNICA que por contrato no lleva secretos
+ *     dentro. Si un juego mal escrito pusiera en `turnoDe` algo que no debe
+ *     salir, leyéndolo de ahí no sale de donde ya estaba.
+ *
+ * ═══ Y «DESDE CUÁNDO» SALE DE LA MESA, QUE ES QUIEN SABE QUÉ HORA ES ═══
+ *
+ * `turnoDesde` es un campo de la mesa y no del juego, por lo mismo que `venceEn`:
+ * un reductor puro no sabe qué hora es y no debe saberlo. Se manda además
+ * `esperandoMs` ya restado, porque el consumidor natural de esto es un guion que
+ * decide «avisa si lleva más de N horas» y hacerle restar dos instantes contra un
+ * reloj que no es el del servidor es pedirle que se equivoque.
+ *
+ * ═══ SIN CREDENCIAL, IGUAL QUE LA LECTURA DE AL LADO ═══
+ *
+ * Se sirve lo mismo que ya sale en el `GET` de la mesa —el asiento a quien le
+ * toca es un seudónimo por mesa (§5 bis) y su nombre es el que se teclea— sin una
+ * sola carta de nadie dentro. Exigir la llave aquí no protegería nada y sí
+ * impediría el único uso que esto tiene: un proceso que repasa las mesas para
+ * decidir a quién hay que dar un toque.
+ *
+ * LO QUE NO HACE, DICHO EN VOZ ALTA: no manda nada, no guarda a quién se avisó y
+ * no sabe si alguien lo leyó. Eso es la fase que el §12 aplaza, y prometerlo aquí
+ * a medias sería peor que no tenerlo.
+ */
+router.get('/arcade/mesas/:codigo/turno', async (req, res) => {
+  const codigo = String(req.params.codigo ?? '').toUpperCase();
+  try {
+    /*
+     * Pasa por `mirar`, y eso NO es de paso: `mirar` evalúa el plazo bajo el
+     * candado. O sea que preguntar a quién le toca es una de las lecturas que
+     * pueden hacer vencer el turno del ausente, exactamente igual que la de
+     * cualquiera de los otros jugadores. Preguntarlo por un camino que no pasara
+     * por ahí daría la respuesta de antes del vencimiento —«le toca a quien lleva
+     * tres días sin aparecer»— y el aviso saldría hacia quien ya no le toca.
+     */
+    const mesa = await mirar(codigo, null);
+    const turno = turnoDeLaVista(mesa.vista);
+    const ahora = Date.now();
+
+    res.json({
+      codigo: mesa.codigo,
+      arcade: mesa.arcade,
+      rev: mesa.rev,
+      terminada: mesa.terminada,
+      /*
+       * `declarado: false` se dice tal cual en vez de mandar `turnoDe: null`. Son
+       * dos cosas distintas —«este juego no tiene turnos» y «ahora mismo no le
+       * toca a nadie»— y confundirlas es lo que convertiría un juego cuya vista
+       * cambió de forma en una mesa que parece parada para siempre.
+       */
+      declaraTurno: turno.declarado,
+      turnoDe: turno.declarado ? turno.de : null,
+      /* El nombre tecleado, para que el aviso pueda decirlo sin un segundo viaje. */
+      nombre: turno.declarado
+        ? (mesa.asientos.find((a) => a.id === turno.de)?.nombre ?? null)
+        : null,
+      turnoDesde: mesa.turnoDesde,
+      esperandoMs: Math.max(0, ahora - mesa.turnoDesde),
+      venceEn: mesa.venceEn,
+      quedanMs: mesa.venceEn === null ? null : mesa.venceEn - ahora,
+      /*
+       * La presencia va porque es la mitad de la decisión de avisar y no se puede
+       * deducir de lo demás: a quien está mirando la pantalla no hay que darle
+       * ningún toque. Y es COSMÉTICA para la partida —quien no está sigue
+       * jugando— que es la línea entera del punto 3 de esta fase.
+       */
+      presente: turno.declarado
+        ? (mesa.asientos.find((a) => a.id === turno.de)?.presente ?? false)
+        : false,
+    });
+  } catch (error) {
+    if (!contestarElFallo(error, res)) throw error;
+  }
+});
 
 // ---------------------------------------------------------------------------
 // Mover

@@ -1323,9 +1323,24 @@ try {
      */
     const r = await pedir(`/arcade/mesas/${codigo}`, { llave: gente[0]!.llave });
     const campos = Object.keys(r.datos.mesa).sort().join(',');
+    /*
+     * ═══ `turnoDesde` ENTRÓ AQUÍ EN LA FASE 4 BIS, Y ESTA LÍNEA HIZO SU TRABAJO ═══
+     *
+     * Se puso roja el día que se añadió, que es exactamente para lo que existe: un
+     * campo nuevo en lo que sale por la red no puede colarse porque nadie lo mire.
+     * Añadirlo aquí NO es poner verde un comprobador molesto: es la firma de que
+     * alguien vino a pensar si ese campo puede salir.
+     *
+     * Y puede: `turnoDesde` es un instante de reloj de pared que dice desde cuándo
+     * se está esperando al que tiene el turno. Es un dato de la MESA y no del juego
+     * —la mesa es la autoridad y sí sabe qué hora es—, no lleva dentro nada de
+     * ningún asiento, y ya sale la mitad de la misma información en `venceEn`, que
+     * está aquí desde la fase 2. Lo necesita la pantalla para decir «lleva dos días
+     * sin mover» en una partida de días.
+     */
     comprobar(
       'la mesa manda exactamente estos campos',
-      campos === 'arcade,asientos,codigo,rev,terminada,tic,venceEn,vista,yo',
+      campos === 'arcade,asientos,codigo,rev,terminada,tic,turnoDesde,venceEn,vista,yo',
       campos,
     );
     const deLaVista = Object.keys(r.datos.mesa.vista).sort().join(',');
