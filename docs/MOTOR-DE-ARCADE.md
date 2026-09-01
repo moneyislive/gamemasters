@@ -817,10 +817,43 @@ minijuego.
 
 ### Genéricos — los pinta la plataforma, y son los únicos que un arcade de FUERA puede usar
 
-- **`formulario`** — Vistas de React Native. Botones, listas, cantidades, un
-  cronómetro grande. Coste cero. Aquí van La Frente y La Ronda.
-- **`tablero`** — `react-native-svg` (ya instalado, 15.15.4) sobre una topología
-  declarada. El tablero es dato, no reductor. Llega con Riberas.
+- **`formulario`** — Botones y listas, pintados desde `opciones()`. Coste cero.
+  Aquí va La Frente.
+- **`tablero`** — Una topología declarada, pintada con SVG. El tablero es dato, no
+  reductor. Lo estrena Riberas, y desde la fase 6 lo usa también La Ronda.
+
+#### La Ronda se escribió como `formulario` y acabó siendo `tablero`
+
+Este documento la puso en la primera lista, y estuvo mal. Lo que se descubrió al
+hacerla jugable:
+
+**Un `formulario` pinta la lista de `opciones()` y NADA MÁS.** No es una carencia
+de la implementación: es lo que el mueble es. Así que La Ronda como formulario
+enseñaba cinco botones con nombres de carta a quien tenía el turno, una pantalla
+de disculpa a los otros tres, y al terminar no decía quién había ganado. Un juego
+de bazas en el que no se ve la baza no se ve mal — no se puede jugar, porque la
+decisión siguiente depende de lo que acaba de pasar.
+
+**La salida no fue ampliar el contrato.** Se consideró sacar `aviso` y `paneles`
+del tablero declarado a una superficie nueva que pudiera acompañar también a un
+formulario, y se descartó: generalizaba para un caso que no lo obligaba. El
+motivo para hacerlo era que La Ronda no tenía nada que dibujar, y sí lo tiene —
+una baza son cuatro cartas boca arriba en fila sobre una mesa, que es una
+topología declarada tan literal como un delta de hexágonos. El día que exista un
+juego con contexto y de verdad sin nada que dibujar, ese juego forzará la
+superficie nueva y se diseñará con dos ejemplos delante en vez de con uno
+inventado.
+
+**Y lo que eso compró, que es lo que decide.** Un juego de `tablero` lo pintan los
+dos clientes con código que ya existía: el de escritorio con su retablo y la app
+con `ElTableroEnLinea`, que es el mismo camino genérico que recorre un arcade
+instalado desde fuera. Con la superficie nueva habría habido que escribir además
+el pintor de formularios de la app, que hoy no existe y que `pintados.ts` deja
+fuera a sabiendas.
+
+> **Regla que queda de aquí:** un juego con estado que enseñar y mueble genérico
+> declara `tablero`. `formulario` es para lo que de verdad es una lista de
+> acciones y nada más.
 
 #### «La plataforma» son DOS, y eso no se sabía cuando se escribió esto
 
