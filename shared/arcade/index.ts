@@ -31,8 +31,9 @@
  * Un contrato que importan el móvil y el servidor no puede depender de esa
  * sutileza. Cuesta una línea por nombre y se paga una vez.
  */
-import type { Avanzar, MovimientoRegistrado } from './motor';
-import { aplicar, reejecutar } from './motor';
+import type { Aplicado, Avanzar, MovimientoRegistrado } from './motor';
+import { aplicar, aplicarConMotivo, reejecutar } from './motor';
+import type { Opcion, Opciones } from './opciones';
 import {
   ArcadeSinLoSecreto,
   ArcadeSinProyeccion,
@@ -48,10 +49,18 @@ import {
   ESPECTADOR,
   exigeLoSecreto,
   exigeProyeccion,
+  exigeReejecutabilidad,
+  NADIE_SENTADO,
   necesitaMesa,
   problemasDelManifiesto,
 } from './tipos';
-import type { ArcadeId, ManifiestoDeArcade, QuienMira } from './tipos';
+import type {
+  ArcadeId,
+  LosSentados,
+  ManifiestoDeArcade,
+  Puntuacion,
+  QuienMira,
+} from './tipos';
 import type { ContextoMovimiento, Movimiento } from './movimiento';
 
 // ---------------------------------------------------------------------------
@@ -60,9 +69,11 @@ import type { ContextoMovimiento, Movimiento } from './movimiento';
 
 export {
   cabenEnLaMesa,
+  comoSeLlama,
   ESPECTADOR,
   exigeProyeccion,
   exigeReejecutabilidad,
+  NADIE_SENTADO,
   necesitaMesa,
   problemasDelManifiesto,
   tieneReloj,
@@ -71,19 +82,24 @@ export type {
   AforoDeArcade,
   ArcadeId,
   AsientoId,
+  AsientoNombrado,
   IconoDeArcade,
+  LosSentados,
   ManifiestoDeArcade,
   MarcadorDeArcade,
   MuebleDeArcade,
   ProcedenciaDeArcade,
+  Puntuacion,
   QuienMira,
   SedeDeArcade,
 } from './tipos';
 
 export type { ContextoMovimiento, Movimiento } from './movimiento';
 
-export { aplicar, reejecutar, ReductorMudo } from './motor';
-export type { Avanzar, MovimientoRegistrado } from './motor';
+export { aplicar, aplicarConMotivo, esRechazo, rechazar, reejecutar, ReductorMudo } from './motor';
+export type { Aplicado, Avanzar, MovimientoRegistrado, Rechazo } from './motor';
+
+export type { Opcion, Opciones } from './opciones';
 
 export {
   ArcadeSinLoSecreto,
@@ -127,6 +143,49 @@ export interface ArcadeInstalado {
    * propio fichero.
    */
   avanzar: Avanzar<unknown>;
+  /**
+   * QUÉ SE PUEDE HACER AHORA MISMO, si el juego lo dice. Ver `opciones.ts`.
+   *
+   * ═══ POR QUÉ VIVE EN ESTA TABLA Y NO EN UNA SUYA ═══
+   *
+   * Porque partir el alta en dos tablas es exactamente el fallo que
+   * `app/src/arcade/pintados.ts` tuvo que matar: dos tablas contestando a
+   * preguntas parecidas dejan de coincidir en cuanto entra el segundo inquilino,
+   * y nadie se entera hasta que una pantalla enseña una tarjeta pulsable que no
+   * lleva a ninguna parte.
+   *
+   * Un `Symbol.for('gamemasters.arcade.opciones')` nuevo habría sido una línea y
+   * habría traído consigo un tercer anclaje al ámbito global, un tercer sitio del
+   * que olvidarse al dar de baja un arcade y una tercera respuesta posible a «¿qué
+   * sabe la plataforma de este juego?». `opciones` entra por la misma puerta que
+   * el reductor porque es lo mismo que el reductor: reglas como código.
+   *
+   * (`proyeccion` y `loSecreto` sí viven en la otra tabla, y eso NO es la doble
+   * tabla: son las dos mitades de una sola cosa —qué se tapa—, se preguntan
+   * siempre juntas, y `olvidarElTapado` las quita a la vez. La cabecera de
+   * `proyeccion.ts` lo tiene escrito.)
+   */
+  opciones?: Opciones;
+  /**
+   * CÓMO SE LE LEE LA CIFRA A SU ESTADO, si publica alguna. Ver `Puntuacion`.
+   *
+   * ═══ ESTABA EN UNA TABLA LLANA DE `juegos/`, Y AHORA ESTÁ AQUÍ ═══
+   *
+   * Aquella tabla se justificaba con esta frase, escrita en su cabecera: «una tabla
+   * llana no tiene el problema de la doble carga… el problema de `INSTALADOS` era
+   * que las ALTAS se perdían; aquí no hay altas». Era cierto mientras fue una
+   * constante escrita a mano. Dejó de serlo el día que el enchufe de la fase 5 le
+   * añadió una función para dar de alta la cifra de un arcade de FUERA: desde
+   * entonces sí había altas en tiempo de ejecución, y el modo de fallo que aquel
+   * razonamiento descartaba estaba vivo — con el síntoma peor de todos, que es un
+   * récord honrado rechazado meses después y sólo en despliegue.
+   *
+   * Vive aquí por lo mismo que `opciones`: es lo que la plataforma sabe de un
+   * juego, entra por la misma puerta que el reductor, y esta tabla ya está anclada
+   * con `Symbol.for` porque la doble carga de módulo es un fallo REAL que este
+   * repositorio ya pagó una vez con `shared/juegos/index.ts`.
+   */
+  puntuacion?: Puntuacion;
 }
 
 /**
@@ -194,7 +253,7 @@ export class ArcadeNoInstalado extends Error {
  * `secretos: true` la traiga, y eso lo comprueba `exigirProyecciones()` cuando
  * ya están todas las altas hechas — para no obligar a un orden.
  */
-export function instalarArcade<E>(alta: {
+export function instalarArcade<E, V = unknown>(alta: {
   manifiesto: ManifiestoDeArcade;
   avanzar: Avanzar<E>;
   proyeccion?: Proyeccion<E>;
@@ -204,6 +263,57 @@ export function instalarArcade<E>(alta: {
    * compilador. Lo exige `exigirSecretosTapados()` al arrancar. Ver `LoSecreto`.
    */
   loSecreto?: LoSecreto<E>;
+  /**
+   * QUÉ PUEDE HACER CADA CUAL AHORA MISMO, mirando LA VISTA y jamás el estado.
+   *
+   * ═══ ESTE HUECO ES DE LA FASE 5, Y HASTA HOY NO EXISTÍA ═══
+   *
+   * `opciones()` está en el §5 bis del diseño desde el principio y este alta no lo
+   * admitía, así que Riberas —el juego de la fase 4— lo resolvió por dentro:
+   * exporta su función, la llama su propio reductor para ejercer el «sólo si» y la
+   * llama su propio dibujo de tablero. Funciona, y tiene un límite que sólo se ve
+   * desde fuera: **un arcade que no esté en el binario no puede tener opciones
+   * genéricas**, porque no hay forma de que le diga a la plataforma «pregúntame».
+   *
+   * El §7 dice que los muebles genéricos «son los únicos que un arcade de FUERA
+   * puede usar». Sin este hueco, esa frase valía sólo para un juego que se
+   * resolviera él mismo el dibujo entero.
+   *
+   * Es OPCIONAL de verdad: La Frente y El Arcade pintan su propia pantalla y no la
+   * necesitan. Ver `Opciones` para la firma y para por qué recibe la vista.
+   *
+   * ═══ LO QUE AQUÍ NO SE AÑADE, Y POR QUÉ SE DICE EN VOZ ALTA ═══
+   *
+   * Falta todavía una quinta cosa para que un mueble genérico pueda pintar un
+   * juego de fuera SIN que el juego le mande el dibujo ya resuelto: un vocabulario
+   * declarado de formas, con el que la plataforma —y no el juego— componga lo que
+   * se ve. Hoy ese dibujo viaja resuelto dentro de la vista (`tablero-declarado.ts`),
+   * y eso funciona porque quien lo resuelve es un juego de esta casa.
+   *
+   * NO SE AÑADE HOY Y NO SE LE PONE NOMBRE, a propósito. Un vocabulario geométrico
+   * sólo se puede validar con DOS juegos pintados que lo usen de verdad; con uno
+   * solo saldría con la forma de ese uno, que es el error que este motor entero
+   * existe para no repetir. Y hoy su único inquilino sería Riberas. Nombrar el
+   * hueco ahora sería peor que dejarlo: un nombre invita a que alguien lo rellene
+   * antes de que exista con qué medirlo.
+   */
+  opciones?: Opciones<V>;
+  /**
+   * CÓMO SE LE LEE LA CIFRA A ESTE JUEGO, si publica alguna.
+   *
+   * ═══ ESTE HUECO CIERRA UNA GRIETA QUE LLEVABA ABIERTA DESDE LA FASE 3 ═══
+   *
+   * El manifiesto declara `marcador` —que hay cifra, cómo se llama y quién gana— y
+   * el núcleo no tenía forma de saber CUÁL es el número, porque el estado es opaco.
+   * De ahí salía una tabla escrita a mano en `juegos/puntuaciones.ts` cuya propia
+   * cabecera decía, desde el primer día, que su sitio era éste.
+   *
+   * Es OPCIONAL en el tipo y obligatoria de hecho cuando `exigeReejecutabilidad()`
+   * es cierta — igual que `loSecreto` con `secretos: true`, y por el mismo motivo:
+   * un arcade puede venir de fuera del binario, y allí no hay compilador. Lo exige
+   * `exigirCifrasLegibles()` al arrancar, cuando ya están todas las altas hechas.
+   */
+  puntuacion?: Puntuacion;
 }): void {
   const problemas = problemasDelManifiesto(alta.manifiesto);
   if (problemas.length > 0) throw new ArcadeMalEscrito(alta.manifiesto.id, problemas);
@@ -211,6 +321,8 @@ export function instalarArcade<E>(alta: {
   INSTALADOS[alta.manifiesto.id] = {
     manifiesto: alta.manifiesto,
     avanzar: alta.avanzar as Avanzar<unknown>,
+    ...(alta.opciones ? { opciones: alta.opciones as Opciones } : {}),
+    ...(alta.puntuacion ? { puntuacion: alta.puntuacion } : {}),
   };
   if (alta.proyeccion) registrarProyeccion(alta.manifiesto.id, alta.proyeccion);
   if (alta.loSecreto) registrarLoSecreto(alta.manifiesto.id, alta.loSecreto);
@@ -270,6 +382,187 @@ export function avanzar(
   return aplicar(reductorDe(arcade), estado, movimiento, ctx);
 }
 
+/**
+ * AVANZAR CONSERVANDO EL MOTIVO del rechazo, si el juego lo dio.
+ *
+ * Hermana de `avanzar()` y con el mismo trato que `aplicarConMotivo()` tiene con
+ * `aplicar()`: el motivo hay que pedirlo por su nombre, para que quien sólo
+ * quiera el estado no se encuentre de pronto con un objeto donde esperaba uno.
+ *
+ * La llama quien atiende un movimiento que ha mandado alguien —el árbitro— y no
+ * la llama nadie en el camino de una reejecución: allí no hay nadie mirando.
+ */
+export function avanzarConMotivo(
+  arcade: ArcadeId,
+  estado: unknown,
+  movimiento: Movimiento,
+  ctx: ContextoMovimiento,
+): Aplicado<unknown> {
+  return aplicarConMotivo(reductorDe(arcade), estado, movimiento, ctx);
+}
+
+/**
+ * ¿QUÉ PUEDE HACER `quien` AHORA MISMO, según el propio juego?
+ *
+ * ═══ QUIÉN LLAMA A ESTO EN PRODUCCIÓN, PORQUE ES LA MITAD DE SU VALOR ═══
+ *
+ * `server/src/arcade/mesas.ts`, al componer TODA vista de mesa: la lista viaja en
+ * `VistaDeMesa.opciones` y el mueble genérico pinta un botón por opción sin saber a
+ * qué se juega. Escrito aquí porque durante un rato esta función no la llamó nadie
+ * más que un comprobador, y un hueco que nadie recorre es una garantía que no
+ * existe: el arcade de fuera seguía sin poder decirle a la plataforma «pregúntame»,
+ * que era exactamente el motivo por el que se abrió el hueco.
+ *
+ * La pregunta se hace en el SERVIDOR y no en el móvil por una razón que no tiene
+ * vuelta: el código de un arcade de fuera no está en el binario de la app, así que
+ * allí esta misma llamada lanzaría `ArcadeNoInstalado`.
+ *
+ * Devuelve la lista vacía si el arcade no registró `opciones`, y eso NO es un
+ * fallo: la mitad de los juegos pintan su propia pantalla y no tienen nada que
+ * contestar. Un mueble genérico que reciba la lista vacía enseña lo que sepa
+ * enseñar sin botones, que es exactamente lo que corresponde.
+ *
+ * Recibe LA VISTA y no el estado, y esta función es el sitio donde esa regla se
+ * vuelve imposible de saltar desde fuera: quien llama aquí no tiene el estado —lo
+ * que tiene es lo que le llegó por la red— y por tanto no puede pasar otra cosa
+ * aunque quisiera.
+ */
+export function opcionesDeArcade(arcade: ArcadeId, vista: unknown, quien: QuienMira): readonly Opcion[] {
+  const instalado = INSTALADOS[arcade];
+  if (!instalado) throw new ArcadeNoInstalado(arcade);
+  return instalado.opciones ? instalado.opciones(vista, quien) : [];
+}
+
+/** ¿Dice este arcade qué se puede hacer? Para que un mueble no pinte una lista vacía como si fuera «nada que hacer». */
+export function hayOpciones(arcade: ArcadeId): boolean {
+  return INSTALADOS[arcade]?.opciones !== undefined;
+}
+
+// ---------------------------------------------------------------------------
+// LA CIFRA DE UN ESTADO OPACO
+//
+// ═══ POR QUÉ ESTO VIVE EN EL NÚCLEO DESDE LA FASE 5, Y NO ANTES ═══
+//
+// Vivía en `shared/arcade/juegos/puntuaciones.ts`, en una tabla llana escrita a
+// mano, y aquella cabecera decía desde el primer día que su sitio era éste y por
+// qué no podía estarlo: las fases 3 y 4 tenían prohibido tocar el núcleo, porque
+// el diff vacío ERA la medida de la fase 4.
+//
+// Esa medida ya está tomada. Y mientras tanto, el enchufe de la fase 5 le añadió
+// a aquella tabla una función de ALTA para que un arcade de fuera pudiera
+// declarar su cifra, con lo que el argumento que sostenía que la tabla no
+// necesitaba anclaje —«aquí no hay altas»— quedó falso y el fallo que descartaba
+// quedó vivo. Aquí abajo no hay tabla nueva: es la misma `INSTALADOS` de siempre.
+// ---------------------------------------------------------------------------
+
+/**
+ * Este arcade publica una cifra y nadie sabe leérsela.
+ *
+ * Hermana de `ArcadeSinProyeccion`, y con el mismo trato: se comprueba al arrancar
+ * y no al primer récord. Un arcade así no está roto a medias — está roto entero, y
+ * la única forma de que se note pronto es negarse a levantar el proceso.
+ */
+export class ArcadeSinPuntuacion extends Error {
+  constructor(public readonly arcade: ArcadeId) {
+    super(
+      `El arcade «${arcade}» publica una cifra y nadie sabe leérsela: su alta no trae ` +
+        '`puntuacion`. Sin ella no se puede verificar ningún récord suyo, porque el estado que ' +
+        'sale de reejecutar una partida es opaco y sólo el juego sabe qué número hay dentro.',
+    );
+    this.name = 'ArcadeSinPuntuacion';
+  }
+}
+
+/**
+ * DA DE ALTA CÓMO SE LE LEE LA CIFRA A UN ARCADE YA INSTALADO.
+ *
+ * Existe aparte del alta por un solo motivo, y es el enchufe: un arcade de fuera
+ * se instala con `instalarArcade` y puede querer registrar su cifra en otra línea
+ * —o un comprobador quiere cambiarla sin volver a instalar el juego entero—. Lo
+ * normal y lo recomendado es pasarla dentro del alta.
+ *
+ * FALLA si el arcade no está instalado, y eso es deliberado: registrar la cifra de
+ * un juego que no existe no es un aviso, es una fila que nunca se va a leer. Es la
+ * misma negativa que da `manifiestoDeArcade`, y por la misma lección.
+ */
+export function registrarPuntuacion(arcade: ArcadeId, puntuacion: Puntuacion): void {
+  const instalado = INSTALADOS[arcade];
+  if (!instalado) throw new ArcadeNoInstalado(arcade);
+  instalado.puntuacion = puntuacion;
+}
+
+/** Quita la de un arcade, dejándolo instalado. Para las pruebas. */
+export function olvidarPuntuacion(arcade: ArcadeId): void {
+  const instalado = INSTALADOS[arcade];
+  if (instalado) delete instalado.puntuacion;
+}
+
+/** ¿Sabe alguien leerle la cifra a este arcade? */
+export function hayPuntuacion(arcade: ArcadeId): boolean {
+  return INSTALADOS[arcade]?.puntuacion !== undefined;
+}
+
+/**
+ * LA CIFRA DE ESTE ESTADO, según las reglas de este arcade.
+ *
+ * FALLA si no hay quien la lea, y no devuelve cero. Un cero por defecto sería la
+ * lección más cara de este repositorio repetida: `manifiestoDe` devolvía CLUEDO
+ * cuando no encontraba el juego, y una partida entera se jugaba con las reglas de
+ * otro sin que nada diera un error. Aquí el equivalente sería aceptar todos los
+ * récords de un juego con un cero, y que nadie se enterara.
+ */
+export function puntuacionDe(arcade: ArcadeId, estado: unknown): number {
+  const instalado = INSTALADOS[arcade];
+  if (!instalado) throw new ArcadeNoInstalado(arcade);
+  if (instalado.puntuacion === undefined) throw new ArcadeSinPuntuacion(arcade);
+  return instalado.puntuacion(estado);
+}
+
+/**
+ * Los arcades instalados que publican una cifra y a los que nadie sabe leérsela.
+ *
+ * No lanza, por lo mismo que `problemasDelManifiesto` y que
+ * `arcadesConSecretosSinTapar`: quien lo llama sabe mejor qué hacer con la lista.
+ * La versión que no deja arrancar es `exigirCifrasLegibles()`.
+ */
+export function arcadesConCifraSinPuntuacion(): ArcadeId[] {
+  const mal: ArcadeId[] = [];
+  for (const m of arcadesInstalados()) {
+    if (!exigeReejecutabilidad(m)) continue;
+    if (!hayPuntuacion(m.id)) mal.push(m.id);
+  }
+  return mal;
+}
+
+/**
+ * Y LA VERSIÓN QUE NO DEJA ARRANCAR. La llama quien levanta el proceso.
+ *
+ * ═══ POR QUÉ AHORA SÍ SE ENGANCHA AL ARRANQUE ═══
+ *
+ * Porque hasta hoy no podía. Esta comprobación vivía en `juegos/`, y colgar del
+ * arranque una garantía escrita en la carpeta de los juegos habría sido meter una
+ * regla de plataforma donde no toca — así que se quedó llamada sólo por
+ * `verify:marcador`, o sea sólo en la batería y nunca en un despliegue.
+ *
+ * Lo que costaba: NADIE IMPEDÍA INSTALAR UN ARCADE CON CIFRA Y SIN FORMA DE
+ * LEERLA. El arranque no fallaba; fallaba la verificación del PRIMER récord, o sea
+ * meses más tarde y delante de alguien que acababa de jugar. Con el enchufe de la
+ * fase 5 eso dejó de ser hipotético: un arcade de fuera declara su `marcador` en
+ * un fichero que nadie de esta casa ha revisado.
+ *
+ * Ahora es lo que es el resto de este motor: una negativa ruidosa a arrancar.
+ */
+export function exigirCifrasLegibles(): void {
+  const mal = arcadesConCifraSinPuntuacion();
+  const primero = mal[0];
+  if (primero === undefined) return;
+  const error = new ArcadeSinPuntuacion(primero);
+  if (mal.length > 1) {
+    error.message += `\nY hay más sin cifra legible: ${mal.slice(1).join(', ')}.`;
+  }
+  throw error;
+}
+
 /** Reejecuta una partida entera de un arcade instalado. Ver `motor.reejecutar`. */
 export function reejecutarEn(
   arcade: ArcadeId,
@@ -299,9 +592,18 @@ export function reejecutarEn(
  * que la registre también, porque registrarla es una declaración de intención
  * más fuerte que el booleano. Al revés no: el booleano solo, sin función, no
  * puede recortar nada.
+ *
+ * `sentados` lleva quién ocupa cada asiento y cómo se llama, y su valor por
+ * defecto es «no consta»: ver `Proyeccion`. Quien tiene una mesa delante lo pasa;
+ * quien proyecta desde un comprobador o desde el propio reductor, no.
  */
-export function vistaDeAsiento(arcade: ArcadeId, estado: unknown, quien: QuienMira): unknown {
-  if (hayProyeccion(arcade)) return proyectar(arcade, estado, quien);
+export function vistaDeAsiento(
+  arcade: ArcadeId,
+  estado: unknown,
+  quien: QuienMira,
+  sentados: LosSentados = NADIE_SENTADO,
+): unknown {
+  if (hayProyeccion(arcade)) return proyectar(arcade, estado, quien, sentados);
   const manifiesto = manifiestoDeArcade(arcade);
   if (exigeProyeccion(manifiesto)) throw new ArcadeSinProyeccion(arcade);
   return estado;

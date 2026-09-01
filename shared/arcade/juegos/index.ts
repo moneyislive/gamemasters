@@ -49,9 +49,13 @@ import {
   avanzarRiberas,
   loSecretoDeRiberas,
   MANIFIESTO_RIBERAS,
+  opcionesDeRiberas,
   proyectarRiberas,
 } from './riberas';
 import type { EstadoDeRiberas } from './riberas';
+import { avanzarLaPeonza, MANIFIESTO_PEONZA } from './peonza';
+import type { EstadoDeLaPeonza } from './peonza';
+import { laCifraDeElArcade } from './puntuaciones';
 
 export {
   avanzarElArcade,
@@ -80,12 +84,33 @@ export {
 export type { Caida, EstadoDelArcade, MomentoDelArcade, Rumbo } from './arcade';
 
 export {
-  arcadesConCifraSinPuntuacion,
-  EstadoSinCifra,
-  hayPuntuacion,
-  puntuacionDe,
-} from './puntuaciones';
-export type { Puntuacion } from './puntuaciones';
+  avanzarLaPeonza,
+  EMPUJAR,
+  EMPUJON,
+  estaGirando,
+  GIRO_MAXIMO,
+  MANIFIESTO_PEONZA,
+  partidaNueva as partidaNuevaDeLaPeonza,
+  PEONZA,
+  ROCE,
+  TICK_HZ as TICK_HZ_DE_LA_PEONZA,
+  VUELTA,
+} from './peonza';
+export type { EstadoDeLaPeonza } from './peonza';
+
+/*
+ * ═══ LA PUNTUACIÓN YA NO SE REEXPORTA DESDE AQUÍ, Y ES LA NOTICIA DE LA FASE 5 ═══
+ *
+ * Aquí había seis nombres reexportados de `./puntuaciones`: la tabla, sus altas,
+ * sus consultas y el tipo. Todo eso vive ahora en el NÚCLEO —`shared/arcade`— y se
+ * importa de ahí, que es lo honrado: son funciones de plataforma, no de juegos, y
+ * dejarlas asomando por la carpeta de los juegos haría creer que una casa que
+ * quiera leer una cifra tiene que pasar por el reparto de este binario.
+ *
+ * De este fichero se sigue exportando lo que sí es del juego: `EstadoSinCifra`, que
+ * la lanza El Arcade cuando le dan un estado que no es suyo.
+ */
+export { EstadoSinCifra, laCifraDeElArcade } from './puntuaciones';
 
 export {
   ACIERTO,
@@ -227,18 +252,24 @@ instalarArcade<EstadoDeLaRonda | undefined>({
 /**
  * «EL ARCADE», el de la fase 3: sesenta fotogramas por segundo y una cifra.
  *
- * ═══ ENTRA CON DOS ALTAS Y NO CON CUATRO, Y ESO ES UNA NOTICIA ═══
+ * ═══ ENTRA CON TRES Y NO CON CUATRO, Y LA TERCERA ES NUEVA ═══
  *
  * Ni proyección ni `loSecreto`: declara `secretos: false` porque sus secretos
  * serían secretos entre asientos y aquí solo hay un asiento —de hecho ninguno: un
  * aparato y quien lo sujeta—. Está razonado entero en la cabecera de `arcade.ts`.
  *
- * Lo que sí trae y no cabe por esta puerta es la PUNTUACIÓN: `instalarArcade` no
- * tiene hueco para ella, así que la cifra de un estado opaco se lee desde una
- * tabla de al lado (`./puntuaciones.ts`) en vez de venir con el alta. La cabecera
- * de ese fichero cuenta la grieta entera y qué habría que añadirle al núcleo para
- * cerrarla; aquí queda dicho que el alta de este juego está INCOMPLETA por una
- * limitación del contrato y no por descuido de quien la escribió.
+ * ═══ Y LA PUNTUACIÓN YA ENTRA POR ESTA PUERTA: ES LA DEUDA DE LA FASE 3, PAGADA ═══
+ *
+ * Aquí ponía que el alta de este juego estaba INCOMPLETA por una limitación del
+ * contrato: `instalarArcade` no tenía hueco para la puntuación, así que la cifra
+ * de un estado opaco se leía de una tabla escrita a mano en `./puntuaciones.ts`.
+ * Aquella tabla dejó de ser inofensiva en cuanto la fase 5 le añadió altas EN
+ * EJECUCIÓN para el enchufe —era llana y sin anclar, y su propia cabecera
+ * argumentaba que podía serlo «porque aquí no hay altas»—. La cabecera de ese
+ * fichero cuenta la mudanza entera.
+ *
+ * `puntuacion` es ahora un campo del alta como los demás, va a la misma tabla
+ * anclada que el reductor, y lo que se pasa es la función del propio juego.
  *
  * El parámetro se escribe a mano por lo mismo que en La Ronda: el reductor admite
  * `undefined` —una mesa nace sin estado, aunque este juego no tenga mesa— y con
@@ -248,6 +279,7 @@ instalarArcade<EstadoDeLaRonda | undefined>({
 instalarArcade<EstadoDelArcade | undefined>({
   manifiesto: MANIFIESTO_EL_ARCADE,
   avanzar: avanzarElArcade,
+  puntuacion: laCifraDeElArcade,
 });
 
 /**
@@ -262,20 +294,54 @@ instalarArcade<EstadoDelArcade | undefined>({
  * `instalarArcade`, ni una llamada aparte. Eso es lo que la fase 4 existe para
  * demostrar, y por eso el tablero hexagonal va el cuarto y no el primero.
  *
- * Lo único suyo que NO cabe por esta puerta es `opciones()`, y no porque falte un
- * hueco que haya que abrir: no hace falta ninguno. Sus dos clientes viven dentro
- * del propio juego —el portillo del reductor y el tablero declarado que compone
- * la proyección—, así que lo que le llega al móvil es el tablero ya resuelto y la
- * plataforma no necesita saber que la función existe. Está razonado entero en la
- * cabecera de `riberas.ts`.
+ * ═══ Y DESDE LA FASE 5 ENTRA ADEMÁS SU `opciones()` ═══
  *
- * El parámetro se escribe a mano, como en los otros dos, porque las tres
- * funciones usan el estado en posiciones distintas y con la inferencia el
- * compilador escoge una y las demás dejan de encajar.
+ * Este comentario decía que `opciones()` no cabía por esta puerta «y no porque
+ * falte un hueco que haya que abrir: no hace falta ninguno», porque sus dos
+ * clientes vivían dentro del propio juego. Era cierto PARA UN JUEGO DE DENTRO DEL
+ * BINARIO, y sólo para eso: un arcade de fuera no tiene forma de llamarse a sí
+ * mismo desde una pantalla que no ha escrito, así que sin el hueco la frase del
+ * §7 —«los muebles genéricos son los únicos que un arcade de FUERA puede usar»—
+ * valía a medias.
+ *
+ * Registrarla no cambia nada de cómo juega Riberas: sus dos clientes internos
+ * siguen llamándola directamente, porque llamarla por el registro sería resolver
+ * un id para ejecutar la función del fichero que se está leyendo. Lo que compra es
+ * que la plataforma pueda preguntársela a CUALQUIER arcade, incluido uno que no
+ * conozca — y con eso, que un mueble genérico pinte botones sin saber a qué se
+ * juega.
+ *
+ * Los dos parámetros se escriben a mano: el estado porque las tres funciones lo
+ * usan en posiciones distintas y con la inferencia el compilador escoge una y las
+ * demás dejan de encajar, y la vista porque `opcionesDeRiberas` recibe `unknown`
+ * a propósito —lo que le llega en el móvil es lo que vino por la red— y dejarlo
+ * inferir la ataría a la forma de la vista, que es lo contrario de lo que hace
+ * falta.
  */
-instalarArcade<EstadoDeRiberas | undefined>({
+instalarArcade<EstadoDeRiberas | undefined, unknown>({
   manifiesto: MANIFIESTO_RIBERAS,
   avanzar: avanzarRiberas,
   proyeccion: proyectarRiberas,
   loSecreto: loSecretoDeRiberas,
+  opciones: opcionesDeRiberas,
+});
+
+/**
+ * «LA PEONZA», la de la fase 5: la puerta del mueble `escena`, y nada más.
+ *
+ * ═══ ENTRA CON UN ALTA DE DOS LÍNEAS, Y ESO ES LO QUE TIENE QUE DEMOSTRAR ═══
+ *
+ * Ni proyección, ni `loSecreto`, ni opciones, ni puntuación: es un juego de un
+ * aparato y una persona mirando girar una peonza. Que un arcade en TRES
+ * DIMENSIONES quepa con exactamente la misma alta que el más pobre de todos es lo
+ * que dice que el mueble es un dato del manifiesto y no una rama del motor.
+ *
+ * NO ES UN JUEGO-PRUEBA. Los cinco juegos-prueba empujan el motor por un eje cada
+ * uno; éste no empuja nada y no pretende hacerlo. Su cabecera cuenta por qué es
+ * deliberadamente pobre: un arcade de demostración rico se convierte en el modelo
+ * de cómo se escribe uno de escena, y entonces el mueble sale con su forma.
+ */
+instalarArcade<EstadoDeLaPeonza | undefined>({
+  manifiesto: MANIFIESTO_PEONZA,
+  avanzar: avanzarLaPeonza,
 });

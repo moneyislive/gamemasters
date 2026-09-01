@@ -23,7 +23,7 @@
  */
 import { StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
-import { arcadeInstalado, manifiestoDeArcadeSiExiste } from '../../../shared/arcade';
+import { manifiestoDeArcadeSiExiste } from '../../../shared/arcade';
 import type { MuebleDeArcade } from '../../../shared/arcade';
 /*
  * ESTA IMPORTACIÓN INSTALA. Es el mismo trato que `shared/juegos/index.ts` da a
@@ -34,15 +34,35 @@ import type { MuebleDeArcade } from '../../../shared/arcade';
  */
 import '../../../shared/arcade/juegos';
 import { MUEBLES, SALA } from './muebles';
-import { LOS_QUE_PINTA } from './pintados';
+import { quienPinta, quienPintaElMueble } from './pintados';
 
 /** Pinta el arcade que pida la ruta, si este mueble es el suyo y se sabe pintar. */
 export function PintarEnElMueble({ mueble }: { mueble: MuebleDeArcade }): JSX.Element {
   const { arcade } = useLocalSearchParams<{ arcade?: string }>();
   const id = typeof arcade === 'string' ? arcade : '';
 
-  if (!arcadeInstalado(id)) {
-    return <NoHayNada que={`No hay ningún arcade llamado «${id}» instalado en esta app.`} />;
+  /*
+   * ═══ AQUÍ HABÍA UN `arcadeInstalado(id)` QUE CERRABA LA PUERTA ANTES DE MIRAR ═══
+   *
+   * Y con él, todo lo que la fase 5 añadió para los arcades de fuera quedaba
+   * inalcanzable. El registro de ESTA app se llena importando
+   * `shared/arcade/juegos`, o sea los cinco que trae el binario: un arcade
+   * instalado sólo en el servidor NUNCA está instalado aquí. Medido en pantalla,
+   * con el servidor levantado con `ARCADES_EXTERNOS` y entrando por enlace directo
+   * a `/tablero?arcade=el-vado`: «No hay ningún arcade llamado «el-vado» instalado
+   * en esta app», y ni `LOS_MUEBLES_GENERICOS` ni `ElTableroEnLinea` llegaban a
+   * ejecutarse. La tabla que la fase añadió existía y no la recorría ningún camino.
+   *
+   * Lo que se decide ahora es lo único que se puede decidir sin manifiesto: si el
+   * mueble de ESTA RUTA es genérico. Si lo es, se pinta — un mueble genérico no
+   * necesita saber a qué se juega, que es su definición. Si no lo es, se dice, y el
+   * mensaje sigue diciendo exactamente qué pasa.
+   *
+   * La comprobación del ID VACÍO se queda porque es otra cosa: una ruta sin
+   * `?arcade=` no es un arcade desconocido, es una dirección incompleta.
+   */
+  if (id.length === 0) {
+    return <NoHayNada que="Esta dirección no dice a qué arcade quiere entrar." />;
   }
 
   const manifiesto = manifiestoDeArcadeSiExiste(id);
@@ -60,23 +80,48 @@ export function PintarEnElMueble({ mueble }: { mueble: MuebleDeArcade }): JSX.El
     );
   }
 
-  const Pintar = LOS_QUE_PINTA[id];
+  /*
+   * ═══ QUIÉN PINTA: SU COMPONENTE, O EL DE SU MUEBLE SI ES GENÉRICO ═══
+   *
+   * Esto se resolvía con la tabla por juego a secas —una entrada por juego— y ésa era
+   * la deuda que la fase 5 vino a pagar: un arcade de tablero instalado en el
+   * servidor pero desconocido para este binario no se podía pintar aunque su
+   * mueble fuera genérico y su proyección trajera el dibujo entero resuelto. La
+   * pregunta la contesta `quienPinta` en `pintados.ts`, que es también la que
+   * contesta la Sala — una sola respuesta, como manda la cabecera de aquel
+   * fichero.
+   */
+  const Pintar =
+    manifiesto === undefined ? quienPintaElMueble(mueble) : quienPinta(manifiesto);
   if (Pintar === undefined) {
     /*
      * El juego está instalado y su mueble es éste, y aun así este binario no sabe
-     * pintarlo. Pasa de verdad y no es un caso teórico: el registro es de
-     * EJECUCIÓN —un arcade se instala llamando a una función— y la app es un
-     * binario compilado. Es exactamente lo que le ocurriría a un arcade de fuera
-     * que declarase un mueble genérico, y por eso se le dice qué falta.
+     * pintarlo. Pasa de verdad y no es un caso teórico: es lo que le ocurre a un
+     * arcade de FUERA que declare un mueble propio —`lienzo`, `escena`—, que es la
+     * decisión de producto del §7 y no un fallo: el enchufe alcanza a las reglas y
+     * no a los píxeles.
+     *
+     * Y también es lo que le pasa a un arcade que este binario no conoce por un
+     * mueble que no es genérico: sin manifiesto no hay componente propio posible, y
+     * sin mueble genérico no hay nada que poner en su lugar. El mensaje distingue
+     * los dos casos porque el arreglo es distinto — uno se arregla publicando una
+     * versión de la app, y el otro comprobando que la dirección sea la buena.
      *
      * Lo que NO puede pasar es llegar aquí DESDE LA SALA: la tarjeta de un arcade
      * que no se sabe pintar no es pulsable, y las dos decisiones salen de la misma
-     * tabla. Ver `pintados.ts`.
+     * función. Ver `pintados.ts`.
      */
     const ficha = MUEBLES[mueble];
+    if (manifiesto === undefined) {
+      return (
+        <NoHayNada
+          que={`Esta app no conoce ningún arcade llamado «${id}», y el mueble «${mueble}» no se puede pintar sin conocerlo. ${ficha.cuandoLlega}`}
+        />
+      );
+    }
     return (
       <NoHayNada
-        que={`«${manifiesto?.nombre ?? id}» declara el mueble «${mueble}» y esta versión de la app no trae con qué pintarlo. ${ficha.cuandoLlega}`}
+        que={`«${manifiesto.nombre}» declara el mueble «${mueble}» y esta versión de la app no trae con qué pintarlo. ${ficha.cuandoLlega}`}
       />
     );
   }

@@ -70,7 +70,13 @@ import {
   recordsDe,
   registrarRecord,
 } from '../arcade/marcadores';
-import { loMedido } from '../arcade/presupuesto';
+import {
+  ArcadeFueraDePresupuesto,
+  loMedido,
+  losApartados,
+  TOPE_BYTES,
+  TOPE_MS,
+} from '../arcade/presupuesto';
 import { elCanal } from '../canal';
 import { despertadoresVivos } from '../canal/sondeo';
 import { MovimientoRechazado } from '../arcade/arbitro';
@@ -178,6 +184,30 @@ function contestarElFallo(error: unknown, res: Response, vista?: VistaDeMesa): b
       motivo: 'no-guardado',
       codigo: error.codigo,
       mesa: vista,
+    });
+    return true;
+  }
+  if (error instanceof ArcadeFueraDePresupuesto) {
+    /*
+     * ═══ 503, Y ES EL CÓDIGO EXACTO ═══
+     *
+     * No es 400 —quien movió no hizo nada mal—, ni 403 —no le falta ninguna
+     * credencial—, ni 500 —el servidor está perfectamente y sirviendo todo lo
+     * demás—. Lo que pasa es que ESTE arcade está apartado: el servicio de ese
+     * juego no está disponible y no lo va a estar reintentando. 503 dice eso, y
+     * además es lo que evita que un cliente entre en un bucle de reintentos contra
+     * un juego que va a rechazárselo todo.
+     *
+     * NO va la mesa dentro, al revés que en `revision-rancia`: componerla obligaría
+     * a proyectar, o sea a volver a ejecutar código del arcade que acaba de
+     * demostrar que se pasa del presupuesto. Enseñar el estado no vale una segunda
+     * pasada por el mismo hilo.
+     */
+    res.status(503).json({
+      error: error.message,
+      motivo: 'fuera-de-presupuesto',
+      arcade: error.arcade,
+      porque: error.porque,
     });
     return true;
   }
@@ -744,14 +774,18 @@ router.delete('/arcade/mesas/:codigo', async (req, res) => {
 // ---------------------------------------------------------------------------
 
 /**
- * EL PRESUPUESTO POR MOVIMIENTO, MEDIDO Y NO EXIGIDO.
+ * EL PRESUPUESTO POR MOVIMIENTO, MEDIDO **Y EXIGIDO** DESDE LA FASE 5.
  *
- * El diseño pone el tope en la fase 5, la de los terceros, y con razón: hoy todo
- * el código es de casa y rechazar un movimiento propio por lento sería tirar una
- * partida de cuatro personas para castigar a quien escribió el juego. Lo que sí
- * se puede hacer hoy es dejar la báscula puesta, para que el día que haya que
- * elegir el tope sea con números medidos sobre juegos reales y no con una
- * intuición.
+ * Aquí ponía «medido y no exigido», con el razonamiento de por qué el tope no se
+ * podía inventar antes de tener números. Ya los hay, y ya hay contra quién hacen
+ * falta: con `ARCADES_EXTERNOS`, un reductor ajeno corre en este mismo proceso y
+ * un bucle suyo se lleva por delante las veladas en curso. `presupuesto.ts` cuenta
+ * exactamente qué garantiza y qué no —y lo que no garantiza es interrumpir el
+ * primer movimiento que se pase, porque eso no se puede hacer en un solo hilo—.
+ *
+ * `apartados` es lo que hay que mirar cuando un juego deja de responder: dice qué
+ * arcade está en cuarentena y por qué, con el número medido dentro. Sin eso, un
+ * arcade apartado se vería desde fuera como «da 503 y no sé por qué».
  *
  * Se sirve sin credencial y a propósito: son tiempos y tamaños agregados por
  * arcade, sin una sola partida dentro. Ponerlo detrás del guardián del taller
@@ -765,11 +799,13 @@ router.get('/arcade/presupuesto', (_req, res) => {
       msMedia: m.movimientos > 0 ? m.msTotal / m.movimientos : 0,
     })),
     /*
-     * Lo que se EXIGIRÁ, dicho aquí para que no se invente en la fase 5: hoy no
-     * hay tope, y decirlo con un `null` es más honesto que no decir nada.
+     * Los topes van EN LA RESPUESTA y no sólo en el código, para que quien escriba
+     * un arcade de fuera sepa contra qué se mide sin tener este repositorio
+     * delante. Un límite que sólo conoce quien lo aplica no es un contrato.
      */
-    topeMs: null,
-    topeBytes: null,
+    topeMs: TOPE_MS,
+    topeBytes: TOPE_BYTES,
+    apartados: losApartados(),
   });
 });
 

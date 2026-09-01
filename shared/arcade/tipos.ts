@@ -102,6 +102,97 @@ export const ESPECTADOR = null;
 export type QuienMira = AsientoId | typeof ESPECTADOR;
 
 /**
+ * UN ASIENTO CON EL NOMBRE QUE SE LE ENSEÑA A LA GENTE.
+ *
+ * ═══ QUÉ AGUJERO CIERRA ESTO, Y SE VE EN LA PRIMERA PANTALLA ═══
+ *
+ * Un juego con mesa escribe textos sobre la gente: «a fulano le toca», «mengano
+ * gana», «zutano te ofrece un trueque». Y hasta la fase 5 NO SABÍA CÓMO SE LLAMA
+ * NADIE. `ContextoMovimiento.asientos` lleva identificadores y la proyección sólo
+ * recibía un `QuienMira`, porque un asiento es «un sitio en la mesa, anónimo y
+ * efímero» y los nombres los reparte la autoridad.
+ *
+ * El resultado era que el aviso grande de la partida decía «aJLFR7ZJ3 coloca una
+ * choza» mientras la barra de arriba —que la pinta la app con los datos de la
+ * mesa— decía correctamente «Ana · Bruno». Nueve caracteres aleatorios donde
+ * tenía que ir un nombre, en lo primero que se lee.
+ *
+ * ═══ POR QUÉ ENTRA POR LA PROYECCIÓN Y NO POR EL CONTEXTO DEL MOVIMIENTO ═══
+ *
+ * Ésta es la decisión importante y es la que mantiene la reejecutabilidad en pie.
+ * Un nombre es un dato de PRESENTACIÓN que alguien teclea y puede cambiar; si
+ * entrara en `ContextoMovimiento`, el estado del juego pasaría a depender de él y
+ * la misma partida reejecutada después de que alguien se renombrara daría OTRO
+ * estado. Eso rompería el marcador, la repetición y `oro:arcade` a la vez, y lo
+ * haría en silencio.
+ *
+ * La proyección, en cambio, no está en el camino del reductor: es una lectura,
+ * no se guarda en el diario y no alimenta ningún estado. Ahí un nombre no puede
+ * hacer daño.
+ *
+ * ═══ Y POR QUÉ NO SE QUEDA EN EL MUEBLE, QUE ERA EL RODEO DE LA FASE 4 ═══
+ *
+ * Riberas lo rodeó escribiendo un hueco —`{asiento:aY9TK2MBJ}`— dentro de cada
+ * cadena, para que el mueble lo sustituyera al pintar. Funcionaba y era genérico,
+ * y tenía dos costes que sólo se pagan mientras el sitio es el equivocado: el
+ * juego escribía un microlenguaje de plantillas dentro de sus propios textos, y
+ * cualquier superficie que NO fuera ese mueble —un aviso, un registro, una
+ * pantalla nueva— enseñaba el hueco en crudo. Con el nombre dentro de la vista,
+ * lo que viaja por el cable ya está escrito para leerse.
+ */
+export interface AsientoNombrado {
+  readonly asiento: AsientoId;
+  /**
+   * Lo que tecleó quien se sentó. NUNCA una credencial ni un correo: la llave
+   * con la que un asiento demuestra que es él no sale en ninguna vista, y esto
+   * viaja a las vistas de todos por definición.
+   */
+  readonly nombre: string;
+}
+
+/**
+ * QUIÉN ESTÁ SENTADO, en el orden en que se sentó.
+ *
+ * Puede estar vacía y eso no es una mesa a medio montar: un juego de un solo
+ * aparato no tiene asientos, y una lectura hecha desde un comprobador o desde el
+ * propio reductor tampoco los conoce. Un juego que reciba la lista vacía tiene
+ * que seguir pintando algo legible —el identificador, que al menos identifica a
+ * alguien—, y esa degradación es contrato y no cortesía: ver `NADIE_SENTADO`.
+ */
+export type LosSentados = readonly AsientoNombrado[];
+
+/**
+ * LA MESA QUE NO SABE NOMBRES. El valor por defecto, escrito una vez.
+ *
+ * Existe para que nadie tenga que inventarse un `[]` en cada frontera y para que
+ * el nombre diga lo que significa: no es «todavía no ha llegado la lista», es
+ * «aquí no hay nombres que dar». Lo usan el reductor cuando se proyecta a sí
+ * mismo para ejercer el «sólo si», las sondas de arranque y cualquier lectura
+ * hecha fuera de una mesa.
+ */
+export const NADIE_SENTADO: LosSentados = [];
+
+/**
+ * CÓMO SE LLAMA ESTE ASIENTO, o su identificador si no consta.
+ *
+ * La degradación es deliberada y está copiada de lo que ya hacía el rodeo del
+ * mueble: un asiento que no esté en la lista —alguien que se fue, una vista de
+ * una revisión anterior a que se sentara, un reductor que se proyecta a sí mismo
+ * con `NADIE_SENTADO`— se queda con su identificador a la vista. Enseñar el
+ * identificador es feo; enseñar un hueco es mentira, y borrarlo deja frases
+ * cojas del tipo «— 1 pto», sin sujeto.
+ *
+ * Vive aquí y no en cada juego porque si no, cada juego escribiría su propio
+ * `?? id` y el tercero se dejaría el suyo a medias.
+ */
+export function comoSeLlama(sentados: LosSentados, asiento: AsientoId): string {
+  for (const s of sentados) {
+    if (s.asiento === asiento) return s.nombre.length > 0 ? s.nombre : asiento;
+  }
+  return asiento;
+}
+
+/**
  * Con qué se pinta un arcade. UNIÓN CERRADA.
  *
  * ═══ POR QUÉ CERRADA, CON LA MISMA DISCIPLINA QUE `IconoId` ═══
@@ -454,6 +545,39 @@ export interface ManifiestoDeArcade {
 export function exigeReejecutabilidad(m: ManifiestoDeArcade): boolean {
   return m.marcador.tipo !== 'ninguno';
 }
+
+/**
+ * CÓMO SE LE LEE LA CIFRA A UN ESTADO OPACO. La escribe el juego.
+ *
+ * ═══ POR QUÉ ESTE TIPO ESTÁ AQUÍ Y NO EN `juegos/` ═══
+ *
+ * Porque el manifiesto declara `marcador` —o sea QUE hay una cifra y cómo se
+ * llama— y no puede declarar CUÁL es: el estado es opaco por diseño, y quien
+ * reejecuta una repetición para verificar un récord se queda con un `unknown` en
+ * la mano. Esa asimetría era la grieta del contrato que `juegos/puntuaciones.ts`
+ * lleva denunciando desde la fase 3: la cifra estaba prometida en el núcleo y la
+ * forma de leerla vivía en una tabla escrita a mano al lado de los juegos.
+ *
+ * Aquella tabla se defendía con un argumento que dejó de ser cierto en cuanto el
+ * enchufe de la fase 5 le dio de alta la puntuación de un arcade de fuera: era una
+ * tabla llana de módulo, y valía «porque no hay altas, así que la doble carga no
+ * importa». Con altas en tiempo de ejecución sí importa, y el modo de fallo es el
+ * que esta casa ya pagó una vez: si el módulo se resuelve por dos especificadores
+ * distintos, el arcade de fuera registra su cifra en una copia y quien la lee mira
+ * la otra. El síntoma no es un error de arranque — es un récord honrado rechazado
+ * meses después, delante de quien acababa de jugarlo.
+ *
+ * Con el tipo aquí, la puntuación entra por `instalarArcade` y vive en la MISMA
+ * tabla `INSTALADOS`, que ya está anclada con `Symbol.for` justo por ese motivo.
+ * Sin símbolo nuevo, sin una tercera exención de `verify:pureza` y sin una segunda
+ * respuesta posible a «¿qué sabe la plataforma de este juego?».
+ *
+ * Recibe `unknown` y no un estado tipado porque quien llama tiene un `unknown`: el
+ * registro guarda los reductores como `Avanzar<unknown>` porque no puede conocer
+ * la forma de un estado que no conoce. La conversión la hace el juego, que es el
+ * único que sabe lo que metió, y en un solo sitio.
+ */
+export type Puntuacion = (estado: unknown) => number;
 
 /** ¿Le entra el tiempo a este arcade por el reductor? */
 export function tieneReloj(m: ManifiestoDeArcade): boolean {

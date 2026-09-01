@@ -54,6 +54,142 @@
  *     cierto si no hay nada rico que lo empuje: sin esto, borrar Riberas dejaría
  *     este comprobador en verde diciendo que el motor aguanta un juego que ya no
  *     existe.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * EL SELLO SE VOLVIÓ A PONER EN LA FASE 5, A SABIENDAS. QUÉ SE MOVIÓ Y POR QUÉ
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Éste es el sitio donde tiene que estar escrito, porque el fichero del sello son
+ * huellas y no dice nada. Y conviene leer primero POR QUÉ el núcleo llevaba cuatro
+ * fases sin moverse: no porque no le faltara nada, sino porque el diff vacío ERA
+ * la medida de la fase 4 —«¿cabe el juego más rico sin tocar el motor?»— y
+ * comprarla con un parche habría falseado el resultado. Esa medida ya está tomada
+ * y publicada. Lo que sigue es la deuda que rodeaba, pagada.
+ *
+ * TRES HUECOS, y cada uno tenía su rodeo escrito en algún sitio:
+ *
+ *  A · `opciones()` NO TENÍA HUECO EN EL ALTA. El §5 bis lo define y
+ *      `instalarArcade` no lo admitía, así que Riberas lo resolvía por dentro
+ *      —llamándose a sí mismo desde su reductor y desde su tablero— y un arcade de
+ *      FUERA del binario no podía tener opciones genéricas: no hay forma de que le
+ *      diga a la plataforma «pregúntame». Con eso, la frase del §7 —«los muebles
+ *      genéricos son los únicos que un arcade de fuera puede usar»— valía a medias.
+ *      · `shared/arcade/opciones.ts` (NUEVO): `Opcion` y `Opciones<V>`. El tipo
+ *        vivía dentro de Riberas porque el núcleo no podía tenerlo.
+ *      · `shared/arcade/index.ts`: `opciones?` en el alta —EN LA MISMA TABLA, sin
+ *        símbolo nuevo—, `opcionesDeArcade()` y `hayOpciones()`.
+ *
+ *  B · UN JUEGO CON MESA NO PODÍA NOMBRAR A NADIE. La proyección sólo recibía un
+ *      `QuienMira`, así que el aviso de la partida decía «aJLFR7ZJ3 coloca una
+ *      choza». Riberas lo rodeaba escribiendo huecos que rellenaba el mueble
+ *      (`huecoDeAsiento` en `mecanicas/tablero-declarado.ts`, hoy borrado).
+ *      · `shared/arcade/tipos.ts`: `AsientoNombrado`, `LosSentados`,
+ *        `NADIE_SENTADO` y `comoSeLlama()`.
+ *      · `shared/arcade/proyeccion.ts`: tercer argumento de `Proyeccion`.
+ *      Entra por la PROYECCIÓN y no por `ContextoMovimiento` a propósito: un
+ *      nombre es presentación, y en el camino del reductor haría que la misma
+ *      partida reejecutada tras un renombrado diera otro estado.
+ *
+ *  C · NO HABÍA CANAL ENTRE «EL REDUCTOR RECHAZÓ» Y LA PANTALLA. Es la factura del
+ *      «sólo si» del §5 bis, que convierte el rechazo silencioso en el camino
+ *      normal.
+ *      · `shared/arcade/motor.ts`: `Rechazo`, `rechazar()`, `esRechazo()`,
+ *        `aplicarConMotivo()`. El motivo NO viaja dentro del estado —lo rompería
+ *        todo— sino en un envoltorio que `aplicar()` abre y tira, así que
+ *        `reejecutar()` sigue dando exactamente el mismo estado.
+ *      · `shared/arcade/index.ts`: `avanzarConMotivo()`.
+ *      · `server/src/arcade/arbitro.ts`: `jugarConMotivo()` y `Jugado`. El árbitro
+ *        TRANSPORTA el motivo y no lo interpreta: sigue sin saber qué significa.
+ *
+ * Y DOS FICHEROS MÁS, que no son contrato y se movieron por lo de arriba:
+ *  · `server/src/arcade/mesas.ts`: pasa los nombres a la proyección, saca el
+ *    motivo en `VistaDeMesa`, y usa las puertas del presupuesto EXIGIDO.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * Y SE VOLVIÓ A SELLAR UNA SEGUNDA VEZ, TRAS LA REVISIÓN DE LA MISMA FASE 5
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Tres revisores adversarios leyeron lo de arriba y encontraron que dos de los
+ * tres huecos estaban a medias. Lo que se movió al pagarlos, y por qué:
+ *
+ *  D · EL HUECO A NO LO RECORRÍA NADIE. `opcionesDeArcade()` y `hayOpciones()` se
+ *      escribieron y no las llamaba ningún camino de producción: el único llamante
+ *      del árbol era un comprobador. La plataforma seguía pintando el dibujo YA
+ *      RESUELTO que el juego mete en su vista, así que el motivo escrito para abrir
+ *      el hueco —«un arcade de fuera no puede decirle a la plataforma pregúntame»—
+ *      seguía siendo cierto, y un arcade de fuera que registrara `opciones()` sin
+ *      resolverse el tablero se quedaba con la pantalla en blanco.
+ *      · `server/src/arcade/mesas.ts`: `VistaDeMesa.opciones`, compuesta en TODA
+ *        vista de mesa preguntándole al registro. La pregunta se hace en el
+ *        servidor y no en el móvil porque el código de un arcade de fuera no está
+ *        en el binario de la app: allí la misma llamada lanzaría `ArcadeNoInstalado`.
+ *      · `shared/arcade/index.ts`: sólo cabecera en `opcionesDeArcade()`, para
+ *        dejar escrito quién la llama en producción.
+ *      La otra mitad es de la app (`tablero-en-linea.tsx` pinta un botón por
+ *      opción) y la prueba es un segundo arcade de fuera, «El Vado», que NO se
+ *      dibuja a sí mismo.
+ *
+ *  E · LA PUNTUACIÓN SEGUÍA FUERA DEL ALTA, y eso pasó de ser una deuda anotada a
+ *      un fallo vivo: la fase 5 le añadió a la tabla llana de
+ *      `juegos/puntuaciones.ts` un `registrarPuntuacion()` para el enchufe, y la
+ *      cabecera de aquella tabla justificaba no anclarla diciendo «aquí no hay
+ *      altas». Con altas en ejecución, una doble carga de módulo —el fallo real que
+ *      esta casa ya pagó con `shared/juegos/index.ts`— hace que el arcade de fuera
+ *      registre su cifra en una copia y que quien la lee mire la otra.
+ *      · `shared/arcade/tipos.ts`: el tipo `Puntuacion`.
+ *      · `shared/arcade/index.ts`: `puntuacion?` en el alta —EN LA MISMA TABLA
+ *        `INSTALADOS`, sin símbolo nuevo—, `registrarPuntuacion()`,
+ *        `puntuacionDe()`, `hayPuntuacion()`, `olvidarPuntuacion()`,
+ *        `arcadesConCifraSinPuntuacion()`, `exigirCifrasLegibles()` y
+ *        `ArcadeSinPuntuacion`. Es exactamente la mudanza que la cabecera de
+ *        aquella tabla llevaba pidiendo por escrito desde la fase 3.
+ *      Y con ella, la tercera garantía de arranque: un arcade que publica una cifra
+ *      y no trae cómo leerla ya no arranca, en vez de fallar meses después contra
+ *      el primer récord honrado.
+ *
+ *  F · Y DOS CORRECCIONES EN LA AUTORIDAD, que no son contrato pero sí sello:
+ *      · `server/src/arcade/mesas.ts` y `server/src/arcade/arbitro.ts`: un RECHAZO
+ *        deja de contar como cambio aunque el reductor devuelva otro objeto de
+ *        estado. Es el caso `estado ?? partidaNueva()` que la cabecera de `Rechazo`
+ *        declara legítimo, y que hacía subir la revisión, engordar el diario y
+ *        TIRAR el motivo en el primer movimiento de toda mesa de servidor.
+ *      · `server/src/arcade/mesas.ts`: el tic pesa su estado con la puerta que
+ *        EXIGE, y un arcade apartado deja de llevarse por delante las lecturas.
+ *
+ * LO QUE NO SE HA MOVIDO, y hay que decirlo porque es lo que sigue comprando este
+ * comprobador: el núcleo sigue sin nombrar a ningún juego, sigue sin importar nada
+ * de `juegos/`, `movimiento.ts` y `reloj.ts` siguen byte a byte, `motor.ts` no se
+ * ha vuelto a tocar en esta segunda vuelta, y las dos comprobaciones que no se
+ * pueden sellar siguen mordiendo.
+ *
+ * ═══ Y `server/src/canal/` NO SE HA TOCADO, QUE ES UNA DECISIÓN Y NO UN OLVIDO ═══
+ *
+ * El §9 pone en la fase 5 «la segunda implementación de `canal/`» —un canal
+ * continuo—, y NO SE HA ESCRITO. El propio §6 dice por qué no debería escribirse
+ * todavía, y la frase no admite lectura amable: escribir el transporte rápido antes
+ * de que exista un juego que lo pida es «cómo el motor volvería a nacer deformado,
+ * esta vez por el transporte».
+ *
+ * Ninguno de los cinco juegos lo pide, y se puede decir uno a uno: La Frente no
+ * toca la red; La Ronda y Riberas van por turnos y su unidad de tiempo es el turno,
+ * no el fotograma; La Larga es Riberas con plazos de días; El Arcade corre entero
+ * en el móvil y sube una repetición al terminar; La Peonza es de un aparato. No hay
+ * ningún juego cuyo nombre se pueda escribir aquí.
+ *
+ * Y lo que se ahorra no es trabajo, es una forma concreta de equivocarse:
+ * predicción y reconciliación son las dos piezas que hay que escribir, las dos son
+ * difíciles, y las dos SÓLO se pueden probar contra un juego que se desincronice de
+ * verdad. Sin él, lo que se entregaría es código que compila, pasa unas pruebas
+ * escritas por quien lo escribió, y sale con la forma del primer juego que lo use
+ * seis meses después.
+ *
+ * Lo que sí está y sigue estando: la COSTURA. `ponerCanal`/`elCanal` con sus
+ * verbos, `rev` viajando en cada vista, «dame el estado desde la revisión N» en la
+ * misma ruta que lee la mesa, y `verify:arcade-pobre` jugando una partida entera
+ * con el canal sustituido por uno que LANZA. O sea que el día que llegue el juego
+ * que lo pida, lo que hay que escribir es un timbre más rápido detrás de una
+ * interfaz que ya tiene dos implementaciones probadas —la de sondeo y la que
+ * revienta— y no un protocolo distinto.
  */
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';

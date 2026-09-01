@@ -68,8 +68,13 @@ import os from 'node:os';
 import path from 'node:path';
 import '../../shared/arcade/juegos';
 import { EL_ARCADE, FRENTE, RONDA } from '../../shared/arcade/juegos';
-import { arcadesConCifraSinPuntuacion, puntuacionDe } from '../../shared/arcade/juegos/puntuaciones';
-import { instalarArcade, manifiestoDeArcade, olvidarArcade } from '../../shared/arcade';
+import {
+  arcadesConCifraSinPuntuacion,
+  instalarArcade,
+  manifiestoDeArcade,
+  olvidarArcade,
+  puntuacionDe,
+} from '../../shared/arcade';
 import {
   anunciarInicio,
   olvidarLosMarcadores,
@@ -159,12 +164,31 @@ function partidaDeVerdad(tics: number): PartidaJugada {
  * que falla un día de cada diez es peor que no tenerlo: enseña a volver a correr
  * la batería en vez de a leerla, que es exactamente lo contrario de lo que una
  * batería sirve para enseñar.
+ *
+ * ═══ Y LA MISMA LECCIÓN OTRA VEZ, POR LA OTRA MITAD ═══
+ *
+ * Esta función buscaba una partida LARGA, y quien la llama comprueba además que el
+ * robot haya MOVIDO —«hay entradas grabadas», más de tres—. Son dos condiciones y
+ * aquí sólo se buscaba una: en cuanto la primera semilla daba los tics enteros, el
+ * bucle no volvía a entrar y se devolvía esa partida aunque el robot casi no
+ * hubiera tocado el mando. Se puso rojo con `entradas.length === 1` — exactamente
+ * el fallo de un día de cada diez que la nota de arriba describe, con otra cara.
+ *
+ * Se buscan las dos, y el mínimo vive en una constante y no repetido en la
+ * llamada: la condición que se BUSCA y la que se COMPRUEBA tienen que ser el mismo
+ * número, o vuelve a pasar lo mismo dentro de un año.
  */
+const MINIMO_DE_ENTRADAS = 4;
+
 function partidaQueDura(tics: number): PartidaJugada {
+  const vale = (p: PartidaJugada): boolean =>
+    p.tics >= tics && p.entradas.length >= MINIMO_DE_ENTRADAS;
   let mejor = partidaDeVerdad(tics);
-  for (let intento = 0; intento < 25 && mejor.tics < tics; intento++) {
+  for (let intento = 0; intento < 25 && !vale(mejor); intento++) {
     const otra = partidaDeVerdad(tics);
+    /* La mejor es la que más dura; a igualdad de tics, la que más movió. */
     if (otra.tics > mejor.tics) mejor = otra;
+    else if (otra.tics === mejor.tics && otra.entradas.length > mejor.entradas.length) mejor = otra;
   }
   return mejor;
 }
@@ -206,7 +230,11 @@ let buena = partidaQueDura(TICS_DE_PRUEBA);
     buena.tics === TICS_DE_PRUEBA,
     `la mejor de veinticinco intentos duró ${buena.tics}`,
   );
-  comprobar('y el robot ha hecho algo: hay entradas grabadas', buena.entradas.length > 3, buena.entradas.length);
+  comprobar(
+    'y el robot ha hecho algo: hay entradas grabadas',
+    buena.entradas.length >= MINIMO_DE_ENTRADAS,
+    buena.entradas.length,
+  );
 
   const v = registrarRecord({
     arcade: EL_ARCADE,

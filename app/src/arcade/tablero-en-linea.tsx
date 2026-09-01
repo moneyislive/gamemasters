@@ -39,9 +39,11 @@ import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { manifiestoDeArcadeSiExiste } from '../../../shared/arcade';
-import { tableroConLosNombres, tableroDeLaVista } from '../../../shared/mecanicas/tablero-declarado';
+import { tableroDeLaVista } from '../../../shared/mecanicas/tablero-declarado';
+import type { MovimientoDeclarado } from '../../../shared/mecanicas/tablero-declarado';
 import { turnoDeLaVista } from '../../../shared/mecanicas/turno-declarado';
 import { usarMesaDeArcade } from './mesa';
+import type { OpcionDeMesa } from './mesa';
 import { cuantoLleva, cuantoQueda } from './relojes';
 import { SALA } from './muebles';
 import { Retablo } from './retablo';
@@ -147,15 +149,18 @@ export function ElTableroEnLinea(): JSX.Element {
   }, [venceEn, latido]);
 
   /*
-   * ═══ QUIÉN ES QUIÉN, Y POR QUÉ LO PONE ESTA PANTALLA Y NO EL JUEGO ═══
+   * ═══ QUIÉN ES QUIÉN, Y QUÉ CAMBIÓ EN LA FASE 5 ═══
    *
-   * Los nombres son de la MESA, no de las reglas: un asiento es «un sitio en la
-   * mesa, anónimo y efímero» (§5.7) y quien reparte sitios es la autoridad. El
-   * juego escribe huecos con el identificador dentro y aquí se rellenan con lo que
-   * ya viene en `mesa.asientos` — lo mismo que pinta la barra de arriba.
+   * Esta tabla rellenaba los huecos que el juego escribía dentro de sus textos
+   * —`{asiento:aY9TK2MBJ}`— porque hasta la fase 5 el juego no sabía cómo se
+   * llamaba nadie. Ya no hace falta para eso: la proyección recibe quién está
+   * sentado (`Proyeccion`, tercer argumento) y lo que llega por el cable trae los
+   * nombres puestos. `tableroConLosNombres` se ha borrado con el rodeo entero.
    *
-   * Y esto NO le enseña a este mueble a qué se juega: «asiento» es vocabulario de
-   * plataforma y está en el glosario del §1 bis. Sigue sin saber qué es una choza.
+   * La tabla se queda porque sigue haciendo falta para lo que es de la PANTALLA y
+   * no del juego: la línea que dice «le toca a Ana», que este mueble compone él
+   * solo a partir del turno declarado en la vista. Eso no viaja escrito porque el
+   * juego no tiene por qué saber que existe esa línea.
    */
   const nombres = useMemo(() => {
     const tabla = new Map<string, string>();
@@ -239,13 +244,53 @@ export function ElTableroEnLinea(): JSX.Element {
   }
 
   const tablero = tableroDeLaVista(mesa.mesa.vista);
+  /*
+   * ═══ LAS OPCIONES QUE MANDA EL JUEGO, QUE ES EL HUECO DE LA FASE 5 ═══
+   *
+   * Un juego que se resuelve su propio dibujo —Riberas, y «La Orilla» del
+   * comprobador— mete el movimiento DENTRO de cada pieza del tablero, y esta lista
+   * no hace falta: pintarla además sería un segundo juego de botones diciendo lo
+   * mismo debajo del primero.
+   *
+   * Lo que arregla es el otro caso, que es el que dejaba el hueco sin pagar: un
+   * arcade que registra `opciones()` y NO se resuelve el tablero. Antes caía en la
+   * rama de aquí abajo —«esta vista no trae tablero»— con la pantalla vacía y un
+   * botón de salir, o sea que el hueco existía en la tabla del registro y no
+   * servía para jugar a nada. Ahora se pinta un botón por opción, con el rótulo y
+   * la ayuda que escribió el juego, y se manda `tipo` y `carga` tal cual vienen:
+   * este fichero no traduce ni una cadena, que es lo que lo mantiene genérico.
+   */
+  const opciones = mesa.mesa.opciones ?? [];
   if (tablero === null) {
+    if (opciones.length > 0) {
+      return (
+        <View style={estilos.todo}>
+          <View style={estilos.barra}>
+            <View style={estilos.barraFila}>
+              <Text style={estilos.codigo}>Mesa {mesa.mesa.codigo}</Text>
+              <Pressable onPress={mesa.salir} style={estilos.salir}>
+                <Text style={estilos.salirRotulo}>Salir</Text>
+              </Pressable>
+            </View>
+            <Text style={estilos.gente}>
+              {mesa.mesa.asientos
+                .map((a) => `${a.nombre}${a.presente ? '' : ' (fuera)'}`)
+                .join(' · ')}
+            </Text>
+            <LineaDelTurno mesa={mesa.mesa} nombres={nombres} />
+          </View>
+          {mesa.aviso.length > 0 ? <Text style={estilos.fallo}>{mesa.aviso}</Text> : null}
+          <LasOpciones opciones={opciones} alTocar={mesa.mover} quieto={mesa.quieto} />
+        </View>
+      );
+    }
     return (
       <View style={estilos.centro}>
         <Text style={estilos.titulo}>{manifiesto?.nombre ?? id}</Text>
         <Text style={estilos.texto}>
-          Esta mesa está abierta y lo que manda no trae tablero, así que no hay nada que pintar
-          aquí. Suele significar que esta versión de la app es más vieja que el servidor.
+          Esta mesa está abierta y lo que manda no trae tablero ni dice qué se puede hacer, así
+          que no hay nada que pintar aquí. Suele significar que esta versión de la app es más vieja
+          que el servidor.
         </Text>
         <Pressable style={estilos.boton} onPress={mesa.salir}>
           <Text style={estilos.botonRotulo}>Salir de la mesa</Text>
@@ -296,11 +341,64 @@ export function ElTableroEnLinea(): JSX.Element {
         <LineaDelTurno mesa={mesa.mesa} nombres={nombres} />
       </View>
       {mesa.aviso.length > 0 ? <Text style={estilos.fallo}>{mesa.aviso}</Text> : null}
-      <Retablo
-        tablero={tableroConLosNombres(tablero, nombres)}
-        alTocar={mesa.mover}
-        quieto={mesa.quieto}
-      />
+      {/*
+        EL TABLERO SE PINTA TAL Y COMO LLEGA. Ya no se le sustituye nada.
+
+        Hasta la fase 5 aquí se llamaba a `tableroConLosNombres`, que recorría el
+        aviso, los rótulos, los botones y los paneles rellenando huecos. Ahora los
+        nombres vienen puestos desde la proyección, así que este mueble no toca ni
+        una cadena de lo que el juego escribió — que es exactamente lo que un
+        mueble genérico debería hacer con un texto que no entiende.
+      */}
+      <Retablo tablero={tablero} alTocar={mesa.mover} quieto={mesa.quieto} />
+    </View>
+  );
+}
+
+/**
+ * LOS BOTONES DE UN JUEGO QUE ESTE BINARIO NO CONOCE.
+ *
+ * ═══ POR QUÉ ESTO PUEDE SER TAN TONTO, Y TIENE QUE SERLO ═══
+ *
+ * Cada opción trae dentro EL MOVIMIENTO ENTERO —`tipo` y `carga`, ya montados por
+ * el juego— así que aquí no hay ni una comparación por tipo, ni un `switch`, ni una
+ * traducción de nada. Es la misma decisión que toma `MovimientoDeclarado` en el
+ * tablero declarado y por el mismo motivo: en cuanto un mueble genérico entiende lo
+ * que pinta, deja de ser genérico y empieza a salir a medida del primer juego que
+ * lo use.
+ *
+ * Lo único que este componente decide es la FORMA, que es lo suyo: un botón por
+ * opción, con su rótulo, su ayuda debajo si la trae, y el mínimo de dedo de 44 que
+ * el retablo aplica a sus figuras.
+ *
+ * `quieto` apaga los botones mientras hay algo en vuelo. Sin eso, dos toques
+ * seguidos mandan el segundo con la revisión vieja y vuelve rancio — que es un
+ * rechazo de la autoridad por culpa de la pantalla y no del juego.
+ */
+function LasOpciones({
+  opciones,
+  alTocar,
+  quieto,
+}: {
+  opciones: readonly OpcionDeMesa[];
+  alTocar: (movimiento: MovimientoDeclarado) => void;
+  quieto: boolean;
+}): JSX.Element {
+  return (
+    <View style={estilos.opciones}>
+      {opciones.map((o) => (
+        <Pressable
+          key={o.id}
+          style={[estilos.opcion, quieto ? estilos.opcionQuieta : null]}
+          disabled={quieto}
+          onPress={() => {
+            alTocar({ tipo: o.tipo, carga: o.carga });
+          }}
+        >
+          <Text style={estilos.opcionRotulo}>{o.rotulo}</Text>
+          {o.ayuda.length > 0 ? <Text style={estilos.opcionAyuda}>{o.ayuda}</Text> : null}
+        </Pressable>
+      ))}
     </View>
   );
 }
@@ -425,4 +523,20 @@ const estilos = StyleSheet.create({
   plazoRotulo: { color: SALA.neonTenue, fontSize: 13, fontWeight: '600' },
   plazoRotuloElegido: { color: SALA.palabra, fontSize: 13, fontWeight: '800' },
   fallo: { color: SALA.fallo, fontSize: 13, paddingHorizontal: 16, textAlign: 'center' },
+  opciones: { padding: 16, gap: 10 },
+  /* 44 de alto: el mismo mínimo de dedo que el retablo aplica a sus figuras. */
+  opcion: {
+    minHeight: 44,
+    justifyContent: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderColor: SALA.neon,
+    borderWidth: 1,
+    borderRadius: 10,
+    backgroundColor: SALA.panel,
+    gap: 2,
+  },
+  opcionQuieta: { borderColor: SALA.neonTenue, opacity: 0.5 },
+  opcionRotulo: { color: SALA.palabra, fontSize: 15, fontWeight: '700' },
+  opcionAyuda: { color: SALA.neonTenue, fontSize: 12 },
 });

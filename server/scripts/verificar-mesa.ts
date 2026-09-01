@@ -121,6 +121,7 @@ import {
   arcadesInstalados,
   ESPECTADOR,
   loSecretoDe,
+  opcionesDeArcade,
   registrarProyeccion,
   vistaDeAsiento,
 } from '../../shared/arcade';
@@ -374,9 +375,28 @@ function reprochesDeSecretos(
   const secretos = loSecretoDe(arcade, estado);
   if (secretos.length === 0) return reproches;
 
+  /*
+   * ═══ SE MIRA LA VISTA Y TAMBIÉN LAS OPCIONES, QUE VIAJAN AL LADO ═══
+   *
+   * Desde la fase 5, lo que se le manda a un asiento no es sólo su proyección:
+   * `VistaDeMesa.opciones` lleva lo que el juego contesta a «qué puedes hacer», con
+   * el movimiento ya montado dentro, y eso sale por la red exactamente igual. Un
+   * comprobador que sólo mirara la vista dejaría media superficie sin vigilar
+   * justo el día que esa superficie se estrenó.
+   *
+   * Por construcción no debería poder filtrar —`opciones()` recibe LA VISTA y
+   * jamás el estado, así que no tiene de dónde sacar lo tapado— y por eso mismo
+   * conviene medirlo: una garantía «por construcción» que nadie comprueba es una
+   * garantía que deja de serlo el día que alguien cambie la firma.
+   */
+  const loQueSeLeManda = (quien: QuienMira): unknown => {
+    const vista = vistaDeAsiento(arcade, estado, quien);
+    return { vista, opciones: opcionesDeArcade(arcade, vista, quien) };
+  };
+
   const vistas = new Map<QuienMira, unknown>();
-  for (const asiento of asientos) vistas.set(asiento, vistaDeAsiento(arcade, estado, asiento));
-  const delEspectador = vistaDeAsiento(arcade, estado, ESPECTADOR);
+  for (const asiento of asientos) vistas.set(asiento, loQueSeLeManda(asiento));
+  const delEspectador = loQueSeLeManda(ESPECTADOR);
 
   for (const secreto of secretos) {
     const donde: AsientoId[] = [];
@@ -1338,10 +1358,67 @@ try {
      * está aquí desde la fase 2. Lo necesita la pantalla para decir «lleva dos días
      * sin mover» en una partida de días.
      */
+    /*
+     * ═══ Y `motivo` ENTRÓ EN LA FASE 5, POR LA MISMA PUERTA Y CON EL MISMO TRÁMITE ═══
+     *
+     * Esta línea se volvió a poner roja, que es su trabajo. Lo que se vino a pensar,
+     * escrito para que no haya que volver a pensarlo:
+     *
+     *   · QUÉ ES. El texto con el que el juego dice POR QUÉ no ha pasado nada.
+     *     Con la regla del «sólo si» del §5 bis, el rechazo silencioso es el camino
+     *     normal —el reductor devuelve el mismo objeto de estado— y hasta ahora la
+     *     app sólo podía decir «la mesa está igual que estaba», deduciéndolo de que
+     *     la revisión no había subido.
+     *   · POR QUÉ PUEDE SALIR. Va SÓLO en la respuesta de mover, o sea sólo a quien
+     *     movió; en esta lectura vale `null`. No se guarda, no entra en el diario y
+     *     no sale en la vista de nadie más.
+     *   · QUÉ TIENE QUE CUIDAR EL JUEGO, que ninguna comprobación puede imponerle:
+     *     un motivo no puede contar nada que la proyección de quien mueve no
+     *     contara ya. «El oferente no tiene la sal que prometía» sería una fuga por
+     *     la puerta de atrás. Está escrito en la cabecera de `Rechazo`.
+     *
+     * La comprobación de que aquí llega `null` en una LECTURA está unas líneas más
+     * abajo, y es la que impide que un motivo se quede pegado a la mesa.
+     */
+    /*
+     * ═══ Y `opciones` ENTRÓ DESPUÉS, EN LA MISMA FASE Y CON EL MISMO TRÁMITE ═══
+     *
+     * Tercera vez que esta línea se pone roja, tercera vez que hace su trabajo. Lo
+     * que se vino a pensar, escrito para no volver a pensarlo:
+     *
+     *   · QUÉ ES. Lo que el propio juego contesta a «qué puede hacer ESTE asiento
+     *     ahora mismo»: una lista de opciones con el movimiento ya montado dentro.
+     *     Viaja para que un mueble genérico pueda pintarle los botones a un arcade
+     *     que la app NO trae en su binario — sin esto, `opciones()` era un hueco del
+     *     registro que no recorría nadie en producción.
+     *   · POR QUÉ PUEDE SALIR, Y ES LO ÚNICO QUE IMPORTA AQUÍ. Porque `opciones()`
+     *     recibe LA VISTA y jamás el estado (§5 bis), y la vista que se le pasa es
+     *     la que se acaba de proyectar PARA ESTE ASIENTO. No puede ofrecer nada
+     *     construido con algo que la proyección no hubiera dejado pasar: imposible
+     *     por construcción y no por disciplina. Si la firma recibiera el estado,
+     *     este campo sería una segunda proyección con su propio tapado, y la fuga
+     *     más ancha del servidor.
+     *   · QUÉ TIENE QUE CUIDAR EL JUEGO, y ninguna comprobación puede imponérselo:
+     *     que el `id` de una opción sea un SEUDÓNIMO y no un derivado del contenido
+     *     oculto. `"pagar-con-b17:junco"` escondería un secreto dentro de un
+     *     identificador y la búsqueda de este fichero NO lo cazaría, porque busca la
+     *     forma canónica CON COMILLAS. Está escrito en `Opcion.id` y en el §5 bis.
+     *   · Y LO QUE SÍ SE COMPRUEBA. `reprochesDeSecretos` mira ahora la vista Y las
+     *     opciones de cada asiento —se amplió en esta misma tanda, porque sólo mirar
+     *     la vista habría dejado sin vigilar la superficie nueva el día que se
+     *     estrenaba—. Un juego que colara aquí la mano de otro en forma canónica
+     *     se pone rojo.
+     */
     comprobar(
       'la mesa manda exactamente estos campos',
-      campos === 'arcade,asientos,codigo,rev,terminada,tic,turnoDesde,venceEn,vista,yo',
+      campos ===
+        'arcade,asientos,codigo,motivo,opciones,rev,terminada,tic,turnoDesde,venceEn,vista,yo',
       campos,
+    );
+    comprobar(
+      'y al MIRAR la mesa el motivo viene vacío: es de un intento, no de la partida',
+      r.datos.mesa.motivo === null,
+      r.datos.mesa.motivo,
     );
     const deLaVista = Object.keys(r.datos.mesa.vista).sort().join(',');
     comprobar(
@@ -1885,7 +1962,7 @@ try {
   }
 
   // ── El presupuesto, MEDIDO ───────────────────────────────────────────────
-  paso('El presupuesto por movimiento: medido, y todavía no exigido');
+  paso('El presupuesto por movimiento: medido con el servidor levantado, y ya exigido');
 
   {
     const r = await pedir('/arcade/presupuesto');
@@ -1896,11 +1973,33 @@ try {
     comprobar('con un peor tiempo anotado', laRonda.msPeor > 0, laRonda);
     comprobar('y el movimiento que lo causó', typeof laRonda.peorMovimiento === 'string');
     comprobar('y un tamaño de estado medido', laRonda.bytesPeor > 0, laRonda);
+    /*
+     * ═══ ESTO DECÍA «Y NO HAY TOPE», Y LA FASE 5 LO PUSO ═══
+     *
+     * La frase entera era «exigir es de la fase 5, cuando entren terceros». Los
+     * terceros han entrado —`ARCADES_EXTERNOS`— y con ellos hay código ajeno en
+     * este mismo proceso: un reductor suyo mal escrito no estropea su partida, se
+     * lleva por delante las veladas en curso. El tope existe y sale publicado, para
+     * que quien escriba un arcade de fuera sepa contra qué se mide sin tener este
+     * repositorio delante.
+     *
+     * Lo que ese tope garantiza y lo que NO —que no se puede interrumpir el primer
+     * movimiento que se pase, porque Node es de un solo hilo— está en la cabecera
+     * de `presupuesto.ts`, y quien lo ejercita es `verify:presupuesto`. Aquí sólo
+     * se afirma que la báscula sigue midiendo con el servidor levantado y que los
+     * topes viajan.
+     */
     comprobar(
-      'y NO hay tope: exigir es de la fase 5, cuando entren terceros',
-      r.datos.topeMs === null && r.datos.topeBytes === null,
+      'y ahora SÍ hay tope, y viaja publicado con las medidas',
+      typeof r.datos.topeMs === 'number' && typeof r.datos.topeBytes === 'number',
       r.datos,
     );
+    comprobar(
+      'con los dos juegos de esta mesa muy por debajo de él',
+      laRonda.msPeor < r.datos.topeMs && laRonda.bytesPeor < r.datos.topeBytes,
+      { peorMs: laRonda.msPeor, peorBytes: laRonda.bytesPeor, topes: [r.datos.topeMs, r.datos.topeBytes] },
+    );
+    comprobar('y nadie está apartado', (r.datos.apartados ?? []).length === 0, r.datos.apartados);
     console.log(
       `  La Ronda · ${laRonda.movimientos} movimientos · peor ${laRonda.msPeor.toFixed(2)} ms ` +
         `(${laRonda.peorMovimiento}) · estado mayor ${laRonda.bytesPeor} caracteres`,

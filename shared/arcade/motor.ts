@@ -69,8 +69,22 @@ import type { ContextoMovimiento, Movimiento } from './movimiento';
  *
  * Las tres las vigila `verify:pureza` en lo que se puede vigilar estáticamente,
  * y la primera y la tercera las caza `verify:arcade-pobre` jugando de verdad.
+ *
+ * ═══ Y DESDE LA FASE 5 PUEDE DEVOLVER, ADEMÁS, UN `Rechazo` ═══
+ *
+ * Que sigue llevando un estado dentro. No es una cuarta regla ni una excepción a
+ * la tercera: es la tercera con una etiqueta al lado. Ver `Rechazo`, aquí abajo,
+ * para por qué el motivo NO puede viajar dentro del estado y por qué esto no
+ * rompe la reejecutabilidad.
+ *
+ * Un reductor que no lo use no cambia ni una línea: devolver `E` sigue siendo
+ * devolver `E`, y los cuatro juegos anteriores compilan sin tocarse.
  */
-export type Avanzar<E = unknown> = (estado: E, movimiento: Movimiento, ctx: ContextoMovimiento) => E;
+export type Avanzar<E = unknown> = (
+  estado: E,
+  movimiento: Movimiento,
+  ctx: ContextoMovimiento,
+) => E | Rechazo<E>;
 
 /**
  * Un movimiento tal como quedó registrado, con TODO lo que hizo falta para
@@ -92,6 +106,132 @@ export type Avanzar<E = unknown> = (estado: E, movimiento: Movimiento, ctx: Cont
 export interface MovimientoRegistrado {
   movimiento: Movimiento;
   ctx: ContextoMovimiento;
+}
+
+// ---------------------------------------------------------------------------
+// EL CANAL ENTRE «EL REDUCTOR RECHAZÓ» Y LA PANTALLA
+// ---------------------------------------------------------------------------
+
+/**
+ * LA MARCA DE UN RECHAZO, con `Symbol.for` y no con un campo `tipo: 'rechazo'`.
+ *
+ * ═══ POR QUÉ UN SÍMBOLO Y NO UNA CLAVE NORMAL ═══
+ *
+ * Porque el estado de un juego es OPACO y el motor no puede reservarse ninguna
+ * clave dentro de él. Con `{ rechazo: true, estado, motivo }`, un juego cuyo
+ * estado tuviera un campo `rechazo` —perfectamente legítimo en un juego de
+ * subastas o de trueques— vería sus estados confundidos con rechazos, y el
+ * síntoma sería que la partida deja de avanzar sin ningún error.
+ *
+ * Y hay una segunda propiedad que vale más que la primera: UNA PROPIEDAD CON
+ * CLAVE DE SÍMBOLO NO SOBREVIVE A `JSON.stringify` NI A `canonico.ts`. O sea que
+ * un estado leído del disco, recibido por la red o rehecho desde una repetición
+ * no puede parecerse jamás a un rechazo, por mucho que alguien lo intente. La
+ * frontera entre «esto es un estado» y «esto es un rechazo» no depende de que
+ * nadie se equivoque.
+ *
+ * `Symbol.for` y no `Symbol()` por lo mismo que las dos tablas del registro: este
+ * fichero se puede cargar dos veces —una ruta lo importa como
+ * `../../shared/arcade` y otra como `./arcade`— y con un símbolo privado por
+ * módulo, un rechazo creado por una copia no lo reconocería la otra. El síntoma
+ * sería que el motivo se pierde y el estado del juego se sustituye por el objeto
+ * envoltorio, o sea la partida en blanco.
+ */
+const MARCA_DE_RECHAZO = Symbol.for('gamemasters.arcade.rechazo');
+
+/**
+ * «NO, Y POR ESTO». Lo que un reductor devuelve cuando rechaza un movimiento.
+ *
+ * ═══ QUÉ PROBLEMA RESUELVE, Y POR QUÉ SE VOLVIÓ URGENTE ═══
+ *
+ * El §5.2 obliga a que un movimiento rechazado devuelva EL MISMO ESTADO, nunca un
+ * motivo: es lo que mantiene el reductor puro y lo que la mesa ya cuenta como «no
+ * pasó nada». Mientras el rechazo era raro, eso era una incomodidad — la app
+ * podía decir «la mesa está igual que estaba» y casi nunca hacía falta.
+ *
+ * Con la regla del «sólo si» del §5 bis, el rechazo silencioso pasa a ser EL
+ * CAMINO NORMAL: cada sitio donde un juego ejerce la regla produce un movimiento
+ * que la pantalla sólo puede describir deduciendo que la revisión no subió. Nunca
+ * *por qué*. Ésa es la factura de la regla del espejo, está escrita en el diseño
+ * como tal, y esto es lo que la paga.
+ *
+ * ═══ POR QUÉ EL MOTIVO NO PUEDE VIAJAR DENTRO DEL ESTADO ═══
+ *
+ * Porque el estado es lo que se guarda, lo que se compara byte a byte en
+ * `oro:arcade` y lo que sale de reejecutar el diario. Un motivo dentro de él
+ * significaría que el estado final de una partida depende de qué movimientos
+ * ILEGALES intentó alguien por el camino, y entonces:
+ *
+ *   · dos personas jugando la misma partida legítima acabarían con estados
+ *     distintos según cuántas veces hubieran tocado un botón apagado,
+ *   · la repetición que se sube para verificar un récord dejaría de cuadrar,
+ *   · y un juego con secretos podría filtrar por ahí lo que la proyección tapa.
+ *
+ * ═══ CÓMO SE CONSERVAN LA PUREZA Y LA REEJECUTABILIDAD ═══
+ *
+ * El rechazo NO es estado: es un envoltorio que `aplicar()` abre y tira. La
+ * función sigue siendo pura —dados los mismos argumentos devuelve el mismo
+ * envoltorio con el mismo estado dentro— y `reejecutar()` pasa por `aplicar()`,
+ * que se queda sólo con el estado. **El mismo registro de movimientos sigue dando
+ * exactamente el mismo estado**, con motivo o sin él.
+ *
+ * Quien quiera el motivo lo pide por su nombre con `aplicarConMotivo()`, y quien
+ * no, no se entera de que existe.
+ *
+ * ═══ LO QUE UN MOTIVO NO PUEDE SER ═══
+ *
+ * Un motivo viaja SÓLO a quien mandó el movimiento, en la respuesta de su propia
+ * petición, y nunca a la vista de nadie más. Aun así hay una regla que el juego
+ * tiene que respetar y que ninguna comprobación estática puede imponerle: **NO
+ * PUEDE DECIR NADA QUE LA PROYECCIÓN DE QUIEN MUEVE NO DIJERA YA**. «El oferente
+ * no tiene la sal que prometía» es una fuga por la puerta de atrás: dice algo del
+ * almacén ajeno, que es justo lo que el «sólo si» existe para poder tapar. «Ese
+ * trueque ya no está en pie» dice lo mismo sin contar nada.
+ */
+export interface Rechazo<E> {
+  readonly [MARCA_DE_RECHAZO]: true;
+  /**
+   * El estado que sigue valiendo.
+   *
+   * Por contrato es EL QUE SE RECIBIÓ, que es lo que la mesa cuenta como
+   * movimiento que no cambió nada. Se consideró imponerlo en `aplicar()` —
+   * comprobar la identidad y lanzar si no cuadra— y se descartó por un caso
+   * legítimo y frecuente: un reductor que construye su estado inicial en el
+   * primer movimiento (`estado ?? partidaNueva()`) y rechaza ese mismo
+   * movimiento devuelve algo que NO es idénticamente lo que recibió, porque lo
+   * que recibió era `undefined`. Lanzar ahí convertiría una mesa recién abierta
+   * en un error del servidor.
+   *
+   * La reejecutabilidad no depende de esa identidad: depende de que el reductor
+   * sea determinista, que es lo que ya se vigila en otros cuatro sitios.
+   */
+  readonly estado: E;
+  /** Qué decirle a quien lo intentó, en su idioma y sin contar lo que no ve. */
+  readonly motivo: string;
+}
+
+/**
+ * RECHAZA ESTE MOVIMIENTO, y di por qué.
+ *
+ * Se llama desde dentro del reductor, en el sitio donde antes había un
+ * `return estado` mudo. Un juego que no la use sigue siendo válido: el rechazo
+ * sin motivo es lo que había y sigue estando bien para un juego cuyo botón nunca
+ * se pinta cuando no se puede pulsar.
+ */
+export function rechazar<E>(estado: E, motivo: string): Rechazo<E> {
+  return { [MARCA_DE_RECHAZO]: true, estado, motivo };
+}
+
+/**
+ * ¿ES ESTO UN RECHAZO Y NO UN ESTADO?
+ *
+ * Se pregunta por el símbolo y no por la forma. Un juego cuyo estado tuviera
+ * casualmente un campo `motivo` y otro `estado` no se confunde con esto ni
+ * queriendo.
+ */
+export function esRechazo<E>(salida: E | Rechazo<E>): salida is Rechazo<E> {
+  if (typeof salida !== 'object' || salida === null) return false;
+  return (salida as { [MARCA_DE_RECHAZO]?: unknown })[MARCA_DE_RECHAZO] === true;
 }
 
 /**
@@ -127,9 +267,46 @@ export function aplicar<E>(
   movimiento: Movimiento,
   ctx: ContextoMovimiento,
 ): E {
+  return aplicarConMotivo(reductor, estado, movimiento, ctx).estado;
+}
+
+/**
+ * Lo que sale de aplicar un movimiento: el estado, y por qué no pasó nada.
+ *
+ * `motivo` es `null` cuando el reductor no rechazó, y también cuando rechazó SIN
+ * decir por qué —devolviendo el estado tal cual, que es lo que hacían los cuatro
+ * juegos anteriores y sigue siendo legítimo—. Los dos casos se distinguen desde
+ * fuera comparando el estado por identidad, que es lo que la mesa ya hacía.
+ */
+export interface Aplicado<E> {
+  estado: E;
+  motivo: string | null;
+}
+
+/**
+ * APLICA UN MOVIMIENTO Y CONSERVA EL MOTIVO, si lo hubo.
+ *
+ * Es la misma puerta que `aplicar()` —de hecho aquélla llama a ésta— y existe
+ * aparte para que el motivo haya que PEDIRLO por su nombre. Si `aplicar()`
+ * devolviera el envoltorio, todo el que hoy escribe `estado = aplicar(...)`
+ * tendría de pronto un objeto donde esperaba un estado, y el fallo sería mudo:
+ * la partida seguiría corriendo con el envoltorio dentro hasta que alguien
+ * mirara la pantalla.
+ *
+ * Lo llama quien atiende un movimiento de fuera —el árbitro, y el bucle de un
+ * juego de dispositivo—, que es el único que tiene a quién contárselo.
+ * `reejecutar()` NO lo llama: ahí no hay nadie mirando y el motivo no existe.
+ */
+export function aplicarConMotivo<E>(
+  reductor: Avanzar<E>,
+  estado: E,
+  movimiento: Movimiento,
+  ctx: ContextoMovimiento,
+): Aplicado<E> {
   const siguiente = reductor(estado, movimiento, ctx);
   if (siguiente === undefined) throw new ReductorMudo(movimiento.tipo);
-  return siguiente;
+  if (esRechazo(siguiente)) return { estado: siguiente.estado, motivo: siguiente.motivo };
+  return { estado: siguiente, motivo: null };
 }
 
 /**

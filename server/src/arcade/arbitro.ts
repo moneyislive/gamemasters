@@ -62,7 +62,7 @@
  * misma autoridad en local arrastraría el bus del servidor.
  */
 import {
-  avanzar,
+  avanzarConMotivo,
   manifiestoDeArcade,
   movimientoDeTic,
 } from '../../../shared/arcade';
@@ -275,6 +275,52 @@ export function manifiestoDeLaMesa(mesa: Mesa): ManifiestoDeArcade {
  * regla del juego por el camino.
  */
 export function jugar(mesa: Mesa, peticion: Peticion): Mesa {
+  return jugarConMotivo(mesa, peticion).mesa;
+}
+
+/**
+ * LO QUE SALE DE MOVER: la mesa nueva y, si el juego lo dijo, por qué no pasó nada.
+ *
+ * ═══ POR QUÉ EL MOTIVO NO ES UN CAMPO DE `Mesa` ═══
+ *
+ * Porque `Mesa` se guarda —`mesas.ts` la escribe en disco y en la base— y un
+ * motivo es de UN movimiento y de UNA persona, no de la partida. Metido dentro,
+ * se persistiría, viajaría a los demás asientos en la siguiente lectura, y la
+ * primera vez que alguien lo mirara sería un texto de hace tres días diciéndole a
+ * quien no lo intentó por qué no pudo.
+ *
+ * Y hay una segunda razón, más dura: `Mesa.estado` es lo que se compara byte a
+ * byte y lo que sale de reejecutar el diario. Cualquier cosa que dependa de los
+ * movimientos ILEGALES que alguien intentó por el camino no puede vivir cerca de
+ * él. La cabecera de `Rechazo`, en `shared/arcade/motor.ts`, lo cuenta entero.
+ */
+export interface Jugado {
+  mesa: Mesa;
+  /**
+   * El motivo del juego, o `null`.
+   *
+   * `null` significa las dos cosas —«no rechazó» y «rechazó sin decir por qué»—
+   * y se distinguen desde fuera comparando `mesa.estado` con el de antes, que es
+   * lo que la mesa ya hacía para saber si algo cambió.
+   *
+   * NO es un `MotivoDeRechazo`: aquéllos son de la AUTORIDAD —una unión cerrada
+   * que se traduce a un código HTTP— y éste es del JUEGO, texto libre en su
+   * idioma para que lo lea una persona. Confundirlos sería meter una regla de
+   * juego en la capa que no puede tener ninguna.
+   */
+  motivo: string | null;
+}
+
+/**
+ * MOVER CONSERVANDO EL MOTIVO. Es la puerta de verdad; `jugar` es su atajo.
+ *
+ * Existe desde la fase 5, y lo que la hace falta está escrito en `Rechazo`: con
+ * la regla del «sólo si» del §5 bis, el rechazo silencioso pasó a ser el camino
+ * normal, y hasta hoy no había ningún canal entre «el reductor rechazó» y la
+ * pantalla. Éste es ese canal, y no cruza ninguna línea: el árbitro sigue sin
+ * saber qué significa el motivo, sólo lo transporta.
+ */
+export function jugarConMotivo(mesa: Mesa, peticion: Peticion): Jugado {
   if (mesa.terminada) {
     throw new MovimientoRechazado('mesa-terminada', 'Esta partida ya ha terminado.');
   }
@@ -344,7 +390,29 @@ export function avanzarElReloj(mesa: Mesa): Mesa {
     throw new MovimientoRechazado('mesa-terminada', 'Esta partida ya ha terminado.');
   }
   const conElRelojAdelantado: Mesa = { ...mesa, tic: mesa.tic + 1 };
-  return aplicarMovimiento(conElRelojAdelantado, movimientoDeTic(), null);
+  const jugado = aplicarMovimiento(conElRelojAdelantado, movimientoDeTic(), null);
+  /*
+   * ═══ UN TIC RECHAZADO SE DEVUELVE COMO SI NO HUBIERA PASADO ═══
+   *
+   * Aquí ponía «el tic no lleva motivo a ninguna parte, y por eso aquí se tira»,
+   * y era verdad a medias: el motivo no tiene a quién contarse —nadie manda el
+   * tic, no hay pantalla esperando— pero el RECHAZO sí significa algo, y tirarlo
+   * entero dejaba pasar una mesa cambiada.
+   *
+   * El caso es el mismo que el de `mover`: un juego que construye su estado en el
+   * primer movimiento (`estado ?? partidaNueva()`) y rechaza el tic devuelve un
+   * objeto que no es idénticamente el que recibió. `ponerAlDiaElPlazo` compara por
+   * identidad para descartar el tic que no cambia nada, así que ese rechazo se le
+   * colaba como si fuera un cambio: revisión arriba, entrada en el diario y aviso
+   * a los demás por un tic que el juego acababa de rechazar.
+   *
+   * Devolver la mesa QUE SE RECIBIÓ —y no `conElRelojAdelantado`— hace las dos
+   * cosas a la vez: el tic no cuenta, y quien compare por identidad ve el mismo
+   * objeto y lo descarta solo. El plazo sí se reprograma, que es lo correcto: el
+   * tiempo pasó aunque el juego no quisiera hacer nada con él.
+   */
+  if (jugado.motivo !== null) return mesa;
+  return jugado.mesa;
 }
 
 /**
@@ -355,7 +423,7 @@ export function avanzarElReloj(mesa: Mesa): Mesa {
  * cambiaron a mitad de partida — el razonamiento largo está en
  * `MovimientoRegistrado`, en `shared/arcade/motor.ts`.
  */
-function aplicarMovimiento(mesa: Mesa, movimiento: Movimiento, quien: AsientoId | null): Mesa {
+function aplicarMovimiento(mesa: Mesa, movimiento: Movimiento, quien: AsientoId | null): Jugado {
   const ctx: ContextoMovimiento = {
     quien,
     azar: mesa.semilla,
@@ -363,12 +431,22 @@ function aplicarMovimiento(mesa: Mesa, movimiento: Movimiento, quien: AsientoId 
     asientos: mesa.asientos,
   };
 
-  const estado = avanzar(mesa.arcade, mesa.estado, movimiento, ctx);
+  /*
+   * `avanzarConMotivo` en vez de `avanzar`, y es todo lo que la fase 5 cambia
+   * aquí. Devuelve el mismo estado que devolvía —el envoltorio lo abre el núcleo,
+   * no esta capa— y además el texto que el juego haya querido dar. El diario
+   * guarda el movimiento y el contexto, y NO el motivo: reejecutar el diario
+   * tiene que dar exactamente lo mismo con motivo o sin él.
+   */
+  const { estado, motivo } = avanzarConMotivo(mesa.arcade, mesa.estado, movimiento, ctx);
 
   return {
-    ...mesa,
-    estado,
-    rev: mesa.rev + 1,
-    diario: [...mesa.diario, { movimiento, ctx }],
+    mesa: {
+      ...mesa,
+      estado,
+      rev: mesa.rev + 1,
+      diario: [...mesa.diario, { movimiento, ctx }],
+    },
+    motivo,
   };
 }

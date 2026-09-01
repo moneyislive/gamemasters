@@ -42,7 +42,8 @@
  * interpretar la forma del estado. Una función la escribe quien conoce su juego;
  * una declaración la interpreta quien no lo conoce.
  */
-import type { ArcadeId, QuienMira } from './tipos';
+import { NADIE_SENTADO } from './tipos';
+import type { ArcadeId, LosSentados, QuienMira } from './tipos';
 
 /**
  * LO QUE SALE HACIA UN ASIENTO. Lo escribe el juego.
@@ -65,8 +66,27 @@ import type { ArcadeId, QuienMira } from './tipos';
  * «La Frente», quien lleva el móvil en la frente es el único que NO puede ver la
  * palabra, mientras que los demás sí. La proyección no es «tapar lo mío»: es
  * «esto es lo que se ve desde aquí».
+ *
+ * ═══ EL TERCER ARGUMENTO ES DE LA FASE 5, Y ES LO QUE DEJA NOMBRAR A ALGUIEN ═══
+ *
+ * `sentados` trae quién ocupa cada asiento y cómo se llama. Sin él, un juego con
+ * mesa no podía escribir «a Ana le toca» —sólo sabía identificadores— y la fase 4
+ * lo rodeó desde el mueble. El razonamiento largo de por qué entra POR AQUÍ y no
+ * por `ContextoMovimiento` está en `AsientoNombrado`, y se resume en una línea:
+ * un nombre es presentación, y meterlo en el camino del reductor haría que la
+ * misma partida reejecutada tras un renombrado diera otro estado.
+ *
+ * PUEDE LLEGAR VACÍO (`NADIE_SENTADO`) y no es un caso raro: lo recibe así el
+ * propio reductor cuando se proyecta a sí mismo para ejercer el «sólo si», y
+ * cualquier lectura hecha fuera de una mesa. Un juego que no lo trate se queda
+ * enseñando identificadores, que es feo y legible; uno que se caiga por ello está
+ * roto. Ver `comoSeLlama`.
  */
-export type Proyeccion<E = unknown> = (estado: E, quien: QuienMira) => unknown;
+export type Proyeccion<E = unknown> = (
+  estado: E,
+  quien: QuienMira,
+  sentados: LosSentados,
+) => unknown;
 
 /**
  * LO QUE JAMÁS PUEDE SALIR EN LA PROYECCIÓN DE OTRO. Solo para pruebas.
@@ -247,11 +267,22 @@ export function loSecretoDe(arcade: ArcadeId, estado: unknown): unknown[] {
  * un juego que filtra: quien llama tiene que decidir, y para eso está
  * `vistaDeAsiento()` en `index.ts`, que mira el manifiesto y sabe si este juego
  * tenía algo que tapar.
+ *
+ * `sentados` es OPCIONAL en la llamada y obligatorio en la firma del juego, y esa
+ * asimetría es a propósito: quien proyecta desde fuera de una mesa —un
+ * comprobador, una sonda de arranque, el propio reductor— no tiene lista que
+ * pasar y no debe tener que inventarse una; quien escribe el juego sí tiene que
+ * ver el argumento en su firma para saber que existe.
  */
-export function proyectar(arcade: ArcadeId, estado: unknown, quien: QuienMira): unknown {
+export function proyectar(
+  arcade: ArcadeId,
+  estado: unknown,
+  quien: QuienMira,
+  sentados: LosSentados = NADIE_SENTADO,
+): unknown {
   const proyeccion = TAPADO[arcade]?.proyeccion;
   if (!proyeccion) throw new ProyeccionNoRegistrada(arcade);
-  return proyeccion(estado, quien);
+  return proyeccion(estado, quien, sentados);
 }
 
 /**

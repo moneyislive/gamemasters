@@ -56,7 +56,8 @@ import {
   MovimientoRechazado,
 } from '../src/arcade/arbitro';
 import type { Mesa } from '../src/arcade/arbitro';
-import { reejecutarEn } from '../../shared/arcade';
+import { aplicar, hayOpciones, opcionesDeArcade, reejecutarEn } from '../../shared/arcade';
+import type { ContextoMovimiento, Movimiento } from '../../shared/arcade';
 import { canonico } from '../../shared/mecanicas/canonico';
 import {
   aristaDeHex,
@@ -77,7 +78,7 @@ import '../../shared/arcade/juegos';
 import {
   ACEPTAR,
   ALZAR,
-  avanzarRiberas,
+  avanzarRiberas as reglasDeRiberas,
   BIENES,
   deQuienEsElPaso,
   EMPEZAR_RIBERAS,
@@ -103,6 +104,33 @@ import type {
   Ficha,
   Opcion,
 } from '../../shared/arcade/juegos';
+
+/**
+ * EL REDUCTOR, LLAMADO POR LA PUERTA DE LA PLATAFORMA. Cambio de la fase 5.
+ *
+ * ═══ POR QUÉ YA NO SE LLAMA A `avanzarRiberas` DIRECTAMENTE ═══
+ *
+ * Desde la fase 5 un reductor puede devolver, además de un estado, un `Rechazo`
+ * —el mismo estado con un motivo al lado— que es lo que por fin permite que la
+ * pantalla diga POR QUÉ no pasó nada. El envoltorio lo abre `aplicar()`, que es
+ * la única puerta por la que la plataforma mete un movimiento.
+ *
+ * Este fichero llamaba al reductor a pelo en treinta sitios y comparaba el
+ * resultado por identidad —«y si lo manda, devuelve el mismo objeto»— que es la
+ * comprobación correcta y la que hay que conservar. Con la llamada a pelo, esas
+ * treinta líneas verían el envoltorio; con `aplicar()` ven exactamente lo que ve
+ * el árbitro, que es lo que de verdad hay que comprobar.
+ *
+ * O sea que esto no es un apaño para que compile: es que un comprobador que llama
+ * al reductor por debajo de la plataforma comprueba algo que nadie ejecuta.
+ */
+function avanzarRiberas(
+  estado: EstadoDeRiberas | undefined,
+  movimiento: Movimiento,
+  ctx: ContextoMovimiento,
+): EstadoDeRiberas {
+  return aplicar(reglasDeRiberas, estado, movimiento, ctx) as EstadoDeRiberas;
+}
 
 let hechas = 0;
 const fallos: string[] = [];
@@ -962,6 +990,51 @@ paso('Los topes: lo que el reductor no va a aceptar, `opciones()` no lo ofrece')
     );
     comprobar('con las cuatro torres puestas no se ofrece levantar otra', ofrecidas.length === 0, ofrecidas.map((o) => o.id).slice(0, 4));
   }
+}
+
+// ---------------------------------------------------------------------------
+paso('La plataforma puede PREGUNTARLE al juego qué se puede hacer (fase 5)');
+// ---------------------------------------------------------------------------
+
+{
+  /*
+   * ═══ POR QUÉ ESTA COMPROBACIÓN EXISTE, Y NO ES UNA TAUTOLOGÍA ═══
+   *
+   * `opciones()` tenía hasta la fase 5 un solo camino: el juego se llamaba a sí
+   * mismo, desde su reductor y desde su tablero. Eso vale para un juego que está
+   * DENTRO del binario y no vale para uno de fuera, que no tiene forma de decirle a
+   * la plataforma «pregúntame». Por eso el alta ganó su hueco.
+   *
+   * Y un hueco que nadie recorre es una garantía que no existe — este repositorio
+   * ya tiene apuntado el caso de `exigirSecretosTapados()`, que se escribió en la
+   * fase 0, funcionaba, y no la llamaba nadie hasta la fase 2. Así que aquí se
+   * recorre: se le pregunta al REGISTRO, por identificador de arcade, y se contrasta
+   * contra lo que contesta el juego llamado directamente.
+   *
+   * Lo que caza: que alguien quite `opciones` del alta de `juegos/index.ts` —una
+   * línea, y en el diff parece limpieza— y con eso deje sin botones a cualquier
+   * mueble genérico que le pregunte a este juego sin conocerlo.
+   */
+  const DOS = ['A', 'B'];
+  const ctx = { quien: 'A', azar: 7, tic: 0, asientos: DOS };
+  const repartida = avanzarRiberas(undefined, { tipo: EMPEZAR_RIBERAS, carga: {} }, ctx);
+  const vista = proyectarRiberas(repartida, 'A');
+
+  comprobar('el registro sabe que este arcade dice qué se puede hacer', hayOpciones(RIBERAS));
+  const porElRegistro = opcionesDeArcade(RIBERAS, vista, 'A');
+  const porElJuego = opcionesDeRiberas(vista, 'A');
+  comprobar('y ofrece algo, para que la comparación no sea sobre dos listas vacías', porElRegistro.length > 0);
+  comprobar(
+    'lo que contesta el registro es exactamente lo que contesta el juego',
+    canonico(porElRegistro) === canonico(porElJuego),
+    { registro: porElRegistro.length, juego: porElJuego.length },
+  );
+  /*
+   * Y AL ESPECTADOR NO SE LE OFRECE NADA, preguntado por la misma puerta. Es la
+   * mitad del contrato que un mueble genérico necesita: quien mira sin asiento ve
+   * el tablero y no ve botones.
+   */
+  comprobar('y a quien mira sin asiento no se le ofrece nada', opcionesDeArcade(RIBERAS, vista, null).length === 0);
 }
 
 // ---------------------------------------------------------------------------

@@ -158,6 +158,17 @@ export const env: {
    * tocar este repositorio, compilar y desplegar en todas partes.
    */
   juegosDeFuera?: string[];
+  /**
+   * `ARCADES_EXTERNOS=@harkania/arcade-tal,/opt/arcades/otro.mjs`.
+   *
+   * Los arcades que NO vienen dentro del binario. Es el gemelo de
+   * `juegosDeFuera`, con su propia variable y no compartiendo la de veladas por
+   * lo mismo que los dos registros no comparten símbolo: son dos familias y un
+   * servidor puede querer instalar arcades de terceros sin abrir la puerta a
+   * veladas de terceros, o al revés. Ver `server/src/arcade/enchufe.ts`, que
+   * advierte por escrito de que esto NO aísla.
+   */
+  arcadesDeFuera?: string[];
   defaultModel: ModelId;
   port: number;
   /** Dónde vive este servidor de cara al mundo, p. ej. `https://harkania.com`. */
@@ -204,6 +215,11 @@ export const env: {
     .length
     ? (process.env.JUEGOS ?? '').split(',').map((j) => j.trim()).filter(Boolean)
     : undefined,
+  /* Mismo trato que `JUEGOS_EXTERNOS`, y con la misma limpieza de huecos. */
+  arcadesDeFuera: (process.env.ARCADES_EXTERNOS ?? '')
+    .split(',')
+    .map((a) => a.trim())
+    .filter(Boolean),
   juegosDeFuera: (process.env.JUEGOS_EXTERNOS ?? '')
     .split(',')
     .map((j) => j.trim())

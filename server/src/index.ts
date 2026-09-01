@@ -34,6 +34,7 @@ import express from 'express';
 import type { NextFunction, Request, Response } from 'express';
 import { JuegoNoInstalado, instalarSoloEstos, juegosInstalados } from '../../shared/juegos';
 import { instalarJuegosDeFuera } from './juegos/enchufe';
+import { instalarArcadesDeFuera } from './arcade/enchufe';
 import { DEMO_MODE, env } from './config';
 import authRouter, { passwordRequired, requireAuth, tallerAbiertoPara } from './auth';
 import aterrizajeRouter from './enlaces/aterrizaje';
@@ -44,7 +45,11 @@ import legalRouter from './legal/documentos';
 import limitadorDeIntentos from './puerta/montaje';
 import wellKnownRouter from './enlaces/well-known';
 import { getStorageKind, getStore, initStore } from './db/store';
-import { exigirQueAguantenVacio, exigirSecretosTapados } from '../../shared/arcade';
+import {
+  exigirCifrasLegibles,
+  exigirQueAguantenVacio,
+  exigirSecretosTapados,
+} from '../../shared/arcade';
 import { ponerCanal } from './canal';
 import { canalDeSondeo } from './canal/sondeo';
 import arcadeRouter from './routes/arcade';
@@ -419,6 +424,28 @@ function comprobarArranque(): void {
    * una mesa huerfana dentro de la tabla—. Lo destapo un revisor de la fase 2.
    */
   exigirQueAguantenVacio();
+  /*
+   * ═══ Y QUE LA CIFRA QUE PUBLICAN SE PUEDA LEER ═══
+   *
+   * Tercera hermana de las dos de arriba, y la última en llegar porque hasta la
+   * fase 5 esta comprobación vivía en `shared/arcade/juegos/`: colgar del arranque
+   * una garantía escrita en la carpeta de los juegos habría sido meter una regla de
+   * plataforma donde no toca, así que la llamaba sólo `verify:marcador` — o sea la
+   * batería, y nunca un despliegue.
+   *
+   * QUÉ IMPIDE. Que arranque un servidor con un arcade que declara
+   * `marcador: { tipo: 'cifra' }` y no trae `puntuacion`. El estado es opaco: sin
+   * esa función, la repetición que alguien suba para verificar un récord se
+   * reejecuta perfectamente y nadie sabe qué número mirar dentro. El fallo no salía
+   * al arrancar — salía la PRIMERA VEZ que alguien subía un récord, meses después y
+   * delante de quien acababa de jugarlo, con la forma de un récord honrado
+   * rechazado. Es el falso negativo que más caro sale, porque el daño no es el
+   * error: es dejar de creerse la cifra.
+   *
+   * Y con `ARCADES_EXTERNOS` dejó de ser hipotético: un arcade de fuera declara su
+   * `marcador` en un fichero que nadie de esta casa ha revisado.
+   */
+  exigirCifrasLegibles();
 
   /*
    * Las costuras de prueba de OIDC permiten apuntar la verificación de
@@ -479,6 +506,33 @@ process.on('uncaughtException', (error) => {
   console.error('[servidor] Excepción no capturada — el proceso termina:', error);
   process.exit(1);
 });
+
+/*
+ * ═══ LOS ARCADES QUE VIENEN DE FUERA, Y VAN ANTES DE `comprobarArranque()` ═══
+ *
+ * Los juegos de VELADA de fuera se instalan más abajo, después de escuchar, y ahí
+ * está bien: aquel enchufe no tiene ninguna garantía de arranque detrás.
+ *
+ * Los arcades sí, y son dos: `exigirSecretosTapados()` —que impide arrancar con un
+ * arcade que declara secretos y no los tapa— y `exigirQueAguantenVacio()` —que
+ * impide arrancar con uno que revienta en la primera lectura de toda mesa recién
+ * abierta—. Las dos viven dentro de `comprobarArranque()`.
+ *
+ * Instalar los de fuera DESPUÉS las dejaría cubriendo sólo a los cuatro de dentro,
+ * que son precisamente los únicos que alguien ya ha revisado. O sea: la
+ * comprobación seguiría en verde y ya no comprobaría nada de lo que importa, que
+ * es el modo de fallo que esta casa tiene apuntado tres veces.
+ *
+ * Va antes de `initStore()` porque no lo necesita —instalar un arcade es escribir
+ * en una tabla en memoria— y porque cuanto antes se sepa que un arcade filtra,
+ * mejor. `await` en el ámbito superior, que es lo que ya hace `initStore()` justo
+ * debajo: el módulo es ESM.
+ */
+const arcadesDeFuera = env.arcadesDeFuera ?? [];
+if (arcadesDeFuera.length > 0) {
+  const puestos = await instalarArcadesDeFuera(arcadesDeFuera);
+  console.log(`[arcade] de fuera: ${puestos.join(', ') || '(ninguno)'}`);
+}
 
 comprobarArranque();
 

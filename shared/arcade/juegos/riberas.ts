@@ -130,7 +130,6 @@ import {
   verticesVecinos,
 } from '../../mecanicas/malla-hexagonal';
 import type { Hex, LlaveDeArista, LlaveDeVertice } from '../../mecanicas/malla-hexagonal';
-import { huecoDeAsiento } from '../../mecanicas/tablero-declarado';
 import type {
   AccionDeTablero,
   CaraDeTablero,
@@ -139,10 +138,25 @@ import type {
   PanelDeTablero,
   TableroDeclarado,
 } from '../../mecanicas/tablero-declarado';
+import { rechazar } from '../motor';
+import type { Rechazo } from '../motor';
+import type { Opcion } from '../opciones';
 import { esTic } from '../reloj';
 import type { ContextoMovimiento, Movimiento } from '../movimiento';
-import { ESPECTADOR } from '../tipos';
-import type { ArcadeId, AsientoId, ManifiestoDeArcade, QuienMira } from '../tipos';
+import { comoSeLlama, ESPECTADOR, NADIE_SENTADO } from '../tipos';
+import type { ArcadeId, AsientoId, LosSentados, ManifiestoDeArcade, QuienMira } from '../tipos';
+
+/**
+ * `Opcion` SE REEXPORTA Y YA NO SE DEFINE AQUÍ.
+ *
+ * Vivía en este fichero porque en la fase 4 el núcleo no tenía registro para
+ * `opciones()` y no podía tener su tipo. Ahora lo tiene (`shared/arcade/opciones.ts`),
+ * y el tipo vive donde vive la firma que lo usa. Se reexporta para no romper a
+ * quien lo importaba de aquí —`shared/arcade/juegos/index.ts` y el comprobador del
+ * juego— y porque leer «las opciones de Riberas» desde el fichero de Riberas es
+ * lo que espera quien lo abre.
+ */
+export type { Opcion };
 
 /** El identificador de este arcade. */
 export const RIBERAS: ArcadeId = 'riberas';
@@ -648,7 +662,7 @@ export function avanzarRiberas(
   estado: EstadoDeRiberas | undefined,
   movimiento: Movimiento,
   ctx: ContextoMovimiento,
-): EstadoDeRiberas {
+): EstadoDeRiberas | Rechazo<EstadoDeRiberas> {
   const actual = estado ?? partidaNueva();
 
   if (esTic(movimiento)) return venceElPlazo(actual);
@@ -660,9 +674,40 @@ export function avanzarRiberas(
    * Se usa la proyección SIN el tablero porque el tablero es un dibujo de la
    * vista y de las propias opciones: se calcula DESPUÉS y no puede alimentarlas.
    * Meterlo aquí sería pintar un tablero entero en cada movimiento para tirarlo.
+   *
+   * ═══ SE PROYECTA CON `NADIE_SENTADO`, Y ESO NO ES UN DESCUIDO ═══
+   *
+   * Los nombres de la mesa no están —ni pueden estar— en el camino del reductor:
+   * si estuvieran, la misma partida reejecutada después de que alguien se
+   * renombrara daría otro estado. Aquí no hacen ninguna falta, porque el portillo
+   * compara `tipo` y `carga`, que es lo que `estaOfrecido` mira; los nombres sólo
+   * viven en `rotulo` y `ayuda`, que nadie compara. La vista que se calcula aquí
+   * enseña identificadores y muere en esta línea.
    */
-  const vista = loQueSeVe(actual, ctx.quien);
-  if (!estaOfrecido(opcionesDeRiberas(vista, ctx.quien), movimiento)) return actual;
+  const vista = loQueSeVe(actual, ctx.quien, NADIE_SENTADO);
+  if (!estaOfrecido(opcionesDeRiberas(vista, ctx.quien), movimiento)) {
+    /*
+     * ═══ Y AQUÍ SE PAGA LA FACTURA DEL «SÓLO SI» (fase 5) ═══
+     *
+     * Antes esto era un `return actual` mudo, y con la regla del espejo el rechazo
+     * silencioso es el CAMINO NORMAL: el móvil sólo podía decir «la mesa está
+     * igual que estaba», deduciéndolo de que la revisión no subió.
+     *
+     * El motivo es deliberadamente CORTO Y CIEGO. No dice qué le falta a quien
+     * mueve —eso obligaría a mirar cosas que quizá no estén en su vista, y sería
+     * una fuga por la puerta de atrás— sino sólo que, con lo que él ve, eso ya no
+     * se podía hacer. El caso real que produce esta línea es la carrera de dos
+     * personas sobre el mismo vértice, o un trueque que caducó entre que se pintó
+     * el botón y se pulsó.
+     *
+     * El estado que se devuelve es EL MISMO objeto, que es lo que la mesa cuenta
+     * como movimiento que no cambió nada.
+     */
+    return rechazar(
+      actual,
+      'Eso ya no se puede hacer: la mesa cambió entre que se pintó el botón y lo pulsaste.',
+    );
+  }
 
   switch (movimiento.tipo) {
     case EMPEZAR:
@@ -1753,6 +1798,24 @@ function indiceDelAsiento(estado: EstadoDeRiberas, quien: AsientoId | null): num
 /** Lo que se sabe de un colono SIN mirarle el almacén. */
 export interface ColonoVisto {
   asiento: AsientoId;
+  /**
+   * CÓMO SE LLAMA, para poder escribir una frase que se lea.
+   *
+   * Lo trae la proyección desde la mesa (tercer argumento de `Proyeccion`) y es
+   * de la fase 5: hasta entonces este juego no sabía cómo se llamaba nadie y
+   * escribía huecos que rellenaba el mueble. Ver `mecanicas/tablero-declarado.ts`,
+   * donde está contado el rodeo que esto sustituye.
+   *
+   * Puede ser el propio identificador —eso hace `comoSeLlama` cuando el asiento no
+   * consta— y ése es el caso normal cuando el reductor se proyecta a sí mismo para
+   * ejercer el «sólo si», donde no hay mesa que preguntar. Es texto degradado y no
+   * texto roto, que es lo que hace falta.
+   *
+   * Y NO ENTRA EN EL ESTADO. Vive sólo en la vista: si estuviera en el estado, la
+   * misma partida reejecutada después de que alguien se renombrara daría otro
+   * estado y el marcador dejaría de cuadrar.
+   */
+  nombre: string;
   color: string;
   /** CUÁNTOS bienes tiene. El número es público: se cuentan mirando su montón. */
   bienes: number;
@@ -1815,7 +1878,11 @@ type VistaSinTablero = Omit<VistaDeRiberas, 'tablero'>;
  * Ni el azar sale por aquí, y eso no es cosmético: quien tenga la semilla y el
  * acumulador calcula todas las tiradas que quedan.
  */
-function loQueSeVe(estado: EstadoDeRiberas, quien: QuienMira): VistaSinTablero {
+function loQueSeVe(
+  estado: EstadoDeRiberas,
+  quien: QuienMira,
+  sentados: LosSentados,
+): VistaSinTablero {
   const mio =
     quien === ESPECTADOR ? undefined : estado.colonos.find((c) => c.asiento === quien);
 
@@ -1826,6 +1893,7 @@ function loQueSeVe(estado: EstadoDeRiberas, quien: QuienMira): VistaSinTablero {
     momento: estado.momento,
     colonos: estado.colonos.map((c, i) => ({
       asiento: c.asiento,
+      nombre: comoSeLlama(sentados, c.asiento),
       color: c.color,
       bienes: c.almacen.length,
       chozas: [...c.chozas],
@@ -1869,9 +1937,29 @@ function asientoDelTurno(estado: EstadoDeRiberas): AsientoId | null {
 export function proyectarRiberas(
   estado: EstadoDeRiberas | undefined,
   quien: QuienMira,
+  sentados: LosSentados = NADIE_SENTADO,
 ): VistaDeRiberas {
-  const base = loQueSeVe(estado ?? partidaNueva(), quien);
+  const base = loQueSeVe(estado ?? partidaNueva(), quien, sentados);
   return { ...base, tablero: tableroDeRiberas(base, quien) };
+}
+
+/**
+ * CÓMO SE LLAMA ESTE ASIENTO, SEGÚN LA VISTA. Y sólo según la vista.
+ *
+ * Los nombres llegan a la vista dentro de cada colono, así que todo lo que se
+ * escriba a partir de aquí —los paneles, el aviso, la ayuda de un trueque— sale de
+ * lo que la proyección dejó pasar y de nada más. Es la misma regla que gobierna
+ * `opciones()` y por el mismo motivo: si esto mirara el estado, sería una segunda
+ * proyección con su propio tapado.
+ *
+ * Un asiento que no esté entre los colonos —alguien que se fue, un ganador de una
+ * partida vieja— se queda con su identificador, que es feo y legible.
+ */
+function nombreEnLaVista(v: VistaSinTablero, asiento: AsientoId): string {
+  for (const c of v.colonos) {
+    if (c.asiento === asiento) return c.nombre.length > 0 ? c.nombre : asiento;
+  }
+  return asiento;
 }
 
 /**
@@ -1908,36 +1996,14 @@ export function loSecretoDeRiberas(estado: EstadoDeRiberas | undefined): unknown
 // `opciones()`: QUÉ TE PUEDO OFRECER A TI, CON LO QUE TÚ SABES
 // ---------------------------------------------------------------------------
 
-/**
- * UNA COSA QUE SE PUEDE HACER AHORA MISMO.
- *
- * `carga` es la carga EXACTA del movimiento, ya montada. Que la opción traiga el
- * movimiento entero y no «el vértice tal» es lo que mantiene mudo al mueble: la
- * pantalla manda lo que la pieza lleva dentro y no traduce nada, y por tanto no
- * hay código por juego dentro de la pantalla.
+/*
+ * `Opcion` VIVÍA AQUÍ Y AHORA VIVE EN EL NÚCLEO, con su documentación entera:
+ * `shared/arcade/opciones.ts`. Vivía aquí porque en la fase 4 el núcleo no tenía
+ * registro para `opciones()` y por tanto no podía tener su tipo; ahora sí lo
+ * tiene, y un tipo que aparece en la firma de un alta no puede vivir dentro de
+ * uno de los juegos que se dan de alta. La regla del seudónimo por asiento y la
+ * de la estabilidad entre revisiones se leen allí, no menos escritas.
  */
-export interface Opcion {
-  /**
-   * SEUDÓNIMO POR ASIENTO, y nunca un derivado del contenido oculto (§5 bis).
-   *
-   * Los ids de aquí salen del vocabulario PÚBLICO —el tipo del movimiento y la
-   * llave canónica del sitio del tablero, que cualquiera ve— y jamás de una
-   * ficha. `'pagar-con-b17:junco'` escondería un secreto dentro de un
-   * identificador, y `verify:mesa` NO lo cazaría: busca la forma canónica CON
-   * COMILLAS, y esa cadena no contiene `"b17:junco"`. Un secreto embebido en un
-   * id es invisible para el comprobador que existe para cazarlo.
-   *
-   * Y es ESTABLE entre revisiones para ese observador: el mismo vértice se llama
-   * igual antes y después de tirar el dado, porque su nombre sale de la
-   * geometría y no de la posición en una lista. Sin eso, cualquier superficie que
-   * reconcilie por identidad se desincroniza en cada reordenación.
-   */
-  id: string;
-  tipo: string;
-  carga: unknown;
-  rotulo: string;
-  ayuda: string;
-}
 
 /**
  * QUÉ PUEDE HACER `quien` AHORA MISMO, CON LO QUE ÉL SABE.
@@ -2066,7 +2132,7 @@ function opcionesDeTurno(v: VistaSinTablero, quien: AsientoId): readonly Opcion[
       tipo: RECHAZAR,
       carga: { trato: trato.id },
       rotulo: `Rechazar el trueque ${trato.id}`,
-      ayuda: `${huecoDeAsiento(trato.de)} te ofrece ${listar(trato.da)} por ${listar(trato.pide)}.`,
+      ayuda: `${nombreEnLaVista(v, trato.de)} te ofrece ${listar(trato.da)} por ${listar(trato.pide)}.`,
     });
     /*
      * SE OFRECE ACEPTAR SI YO TENGO LO QUE SE ME PIDE, y no se comprueba que el
@@ -2219,7 +2285,7 @@ function opcionesDeTrueque(v: VistaSinTablero, mio: ColonoVisto): Opcion[] {
           tipo: OFRECER,
           carga: { para: otro.asiento, da: [doy], pide: [quiero] },
           rotulo: `Ofrecer ${doy} por ${quiero}`,
-          ayuda: `A ${huecoDeAsiento(otro.asiento)}. Caduca al acabar tu turno.`,
+          ayuda: `A ${nombreEnLaVista(v, otro.asiento)}. Caduca al acabar tu turno.`,
         });
       }
     }
@@ -2440,27 +2506,27 @@ function panelesDe(v: VistaSinTablero): PanelDeTablero[] {
   }
 
   /*
-   * ═══ AQUÍ SE NOMBRA A LA GENTE, Y NO CON SU IDENTIFICADOR ═══
+   * ═══ AQUÍ SE NOMBRA A LA GENTE, Y AHORA CON SU NOMBRE ═══
    *
-   * `huecoDeAsiento` escribe un hueco que el mueble rellena con el nombre que la
-   * mesa ya conoce. Este juego NO sabe cómo se llama nadie y no debe saberlo: un
-   * asiento es «un sitio en la mesa, anónimo y efímero» (§5.7), los nombres los
-   * reparte la autoridad y el contexto del movimiento sólo trae `AsientoId[]`.
+   * Hasta la fase 5 esto escribía un hueco —`{asiento:aY9TK2MBJ}`— que el mueble
+   * rellenaba al pintar, porque el juego no sabía cómo se llama nadie: la
+   * proyección sólo recibía un `QuienMira`. El panel decía «aY9TK2MBJ — 1 pto, 0
+   * bienes» mientras la barra de arriba decía «Ana · Bruno», y con seis en la mesa
+   * no había forma de saber quién iba ganando.
    *
-   * Sin esto, el panel de la mesa decía «aY9TK2MBJ — 1 pto, 0 bienes» mientras la
-   * barra de arriba decía «Ana · Bruno», y con seis en la mesa no había forma de
-   * saber quién iba ganando ni quién te ofrecía un trueque. La razón entera —y por
-   * qué no se arregla ni tocando el núcleo ni sustituyendo en la app— está en
-   * `mecanicas/tablero-declarado.ts`.
+   * Ahora el nombre llega DENTRO de la vista (`ColonoVisto.nombre`), puesto por la
+   * proyección a partir de quién está sentado. Se lee con `nombreEnLaVista` y no
+   * de una lista aparte, para que nada de lo que se escribe aquí pueda salirse de
+   * lo que la proyección dejó pasar.
    */
   const marcador = v.colonos.map(
     (c) =>
-      `${huecoDeAsiento(c.asiento)} — ${c.puntos} pto${c.puntos === 1 ? '' : 's'}, ${c.bienes} bien${c.bienes === 1 ? '' : 'es'}, vereda más larga ${c.vado}`,
+      `${nombreEnLaVista(v, c.asiento)} — ${c.puntos} pto${c.puntos === 1 ? '' : 's'}, ${c.bienes} bien${c.bienes === 1 ? '' : 'es'}, vereda más larga ${c.vado}`,
   );
 
   const tratos = v.tratos.map(
     (t) =>
-      `${t.id}: ${huecoDeAsiento(t.de)} da ${listar(t.da)} por ${listar(t.pide)} a ${huecoDeAsiento(t.para)} — ${t.estado}`,
+      `${t.id}: ${nombreEnLaVista(v, t.de)} da ${listar(t.da)} por ${listar(t.pide)} a ${nombreEnLaVista(v, t.para)} — ${t.estado}`,
   );
 
   const paneles: PanelDeTablero[] = [
@@ -2471,7 +2537,7 @@ function panelesDe(v: VistaSinTablero): PanelDeTablero[] {
       lineas: [
         v.vado.de === null
           ? `Vacante. Hacen falta ${VADO_MINIMO} veredas seguidas.`
-          : `De ${huecoDeAsiento(v.vado.de)}, con ${v.vado.largo} veredas. Vale ${PUNTOS_DEL_VADO} puntos.`,
+          : `De ${nombreEnLaVista(v, v.vado.de)}, con ${v.vado.largo} veredas. Vale ${PUNTOS_DEL_VADO} puntos.`,
       ],
     },
   ];
@@ -2482,16 +2548,16 @@ function panelesDe(v: VistaSinTablero): PanelDeTablero[] {
 /** La línea grande de arriba: qué se espera y de quién. */
 function avisoDe(v: VistaSinTablero, quien: QuienMira): string {
   if (v.momento === 'terminada') {
-    /* Los nombres los pone el mueble: ver `huecoDeAsiento` y `panelesDe`. */
+    /* Los nombres vienen dentro de la vista desde la fase 5: ver `panelesDe`. */
     return v.ganadores.length === 1
-      ? `Gana ${huecoDeAsiento(v.ganadores[0] as string)}.`
-      : `Empate entre ${v.ganadores.map(huecoDeAsiento).join(', ')}.`;
+      ? `Gana ${nombreEnLaVista(v, v.ganadores[0] as string)}.`
+      : `Empate entre ${v.ganadores.map((g) => nombreEnLaVista(v, g)).join(', ')}.`;
   }
   if (v.momento === 'reuniendo') {
     return `El delta está sin repartir. Con ${MANIFIESTO_RIBERAS.jugadores.minimo} sentados se puede empezar.`;
   }
   const suyo = v.turnoDe === quien;
-  const de = v.turnoDe === null ? 'nadie' : huecoDeAsiento(v.turnoDe);
+  const de = v.turnoDe === null ? 'nadie' : nombreEnLaVista(v, v.turnoDe);
   if (v.momento === 'colocando') {
     const que = v.faltaVereda ? 'la vereda de salida' : 'una choza';
     return suyo ? `Coloca ${que}.` : `${de} coloca ${que}.`;

@@ -1,11 +1,11 @@
 {
   "server/src/arcade/arbitro.ts": {
-    "huella": "7dbd77f38292ea80",
-    "lineas": 375
+    "huella": "bb973d707d6b4eed",
+    "lineas": 453
   },
   "server/src/arcade/mesas.ts": {
-    "huella": "76691a9277bc7d6c",
-    "lineas": 1979
+    "huella": "c15377f0f74a7a08",
+    "lineas": 2278
   },
   "server/src/canal/index.ts": {
     "huella": "72b651d609fac007",
@@ -16,28 +16,32 @@
     "lineas": 228
   },
   "shared/arcade/index.ts": {
-    "huella": "7d5b65ad4114a26a",
-    "lineas": 502
+    "huella": "38a239b6daab1e43",
+    "lineas": 804
   },
   "shared/arcade/motor.ts": {
-    "huella": "e40134e3a51db760",
-    "lineas": 165
+    "huella": "22b5a3b870f4d936",
+    "lineas": 342
   },
   "shared/arcade/movimiento.ts": {
     "huella": "2a6a8155e748a041",
     "lineas": 147
   },
+  "shared/arcade/opciones.ts": {
+    "huella": "51ccc85ec28f873c",
+    "lineas": 115
+  },
   "shared/arcade/proyeccion.ts": {
-    "huella": "74bf7f6fd3021f6c",
-    "lineas": 272
+    "huella": "8f1f7e1e7304324f",
+    "lineas": 303
   },
   "shared/arcade/reloj.ts": {
     "huella": "8e4ab6ee3881c130",
     "lineas": 171
   },
   "shared/arcade/tipos.ts": {
-    "huella": "9b9c79d115da35a0",
-    "lineas": 627
+    "huella": "e72d376d58ce632a",
+    "lineas": 751
   },
   "shared/mecanicas/azar.ts": {
     "huella": "9d67a2ff5e92facf",

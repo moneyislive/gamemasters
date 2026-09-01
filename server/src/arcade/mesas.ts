@@ -216,14 +216,32 @@ import {
   abrirMesa as abrirMesaDelArbitro,
   avanzarElReloj,
   cerrarMesa,
-  jugar,
+  jugarConMotivo,
   MovimientoRechazado,
 } from './arbitro';
 import type { Mesa } from './arbitro';
-import { medirMovimiento, medirTamano } from './presupuesto';
+import {
+  ArcadeFueraDePresupuesto,
+  conPresupuesto,
+  enCuarentena,
+  pesarElEstado,
+} from './presupuesto';
 import { marcarPresencia, olvidarPresencia, senalEnMemoria } from '../mecanicas/presencia';
-import { manifiestoDeArcade, necesitaMesa, tieneReloj, vistaDeAsiento } from '../../../shared/arcade';
-import type { ArcadeId, AsientoId, ManifiestoDeArcade, Movimiento } from '../../../shared/arcade';
+import {
+  hayOpciones,
+  manifiestoDeArcade,
+  necesitaMesa,
+  opcionesDeArcade,
+  tieneReloj,
+  vistaDeAsiento,
+} from '../../../shared/arcade';
+import type {
+  ArcadeId,
+  AsientoId,
+  ManifiestoDeArcade,
+  Movimiento,
+  Opcion,
+} from '../../../shared/arcade';
 import { turnoDeLaVista } from '../../../shared/mecanicas/turno-declarado';
 
 // ---------------------------------------------------------------------------
@@ -384,6 +402,60 @@ export interface VistaDeMesa {
   yo: AsientoId | null;
   /** LO QUE EL JUEGO DEJA VER DESDE AQUÍ. Opaco: lo compone la proyección. */
   vista: unknown;
+  /**
+   * QUÉ PUEDE HACER ESTE ASIENTO AHORA MISMO, dicho por el juego.
+   *
+   * ═══ POR QUÉ VIAJA, EN VEZ DE PREGUNTARLO LA APP ═══
+   *
+   * Porque un arcade de FUERA no está en el binario del móvil. La app tiene el
+   * registro de los cuatro juegos que trae dentro y de ninguno más, así que
+   * preguntarle allí por un arcade instalado sólo en el servidor lanzaría
+   * `ArcadeNoInstalado`. El código del juego vive aquí; la respuesta viaja con la
+   * vista, igual que viaja la proyección y por el mismo motivo.
+   *
+   * Es la lista que hace posible un mueble genérico DE VERDAD: la pantalla pinta
+   * un botón por opción, manda `tipo` y `carga` tal cual vienen y no traduce nada,
+   * así que no hay una línea de código por juego dentro del mueble.
+   *
+   * ═══ LO QUE ESTA LISTA NO ES ═══
+   *
+   * No es autoridad. Es la regla del «sólo si» del §5 bis: el reductor rechaza lo
+   * que `opciones()` no ofreció y SIGUE validando lo que sí. Que algo esté aquí no
+   * significa que vaya a salir bien —el contraejemplo vive en Riberas: aceptar un
+   * trueque exige que el oferente tenga la mercancía, y su almacén no está en la
+   * vista de quien acepta—. Para eso está el `motivo` de aquí abajo.
+   *
+   * Vacía cuando el juego no registra `opciones()`, que es la mitad de ellos y no
+   * es un fallo: un juego que pinta su propia pantalla no tiene nada que contestar.
+   */
+  opciones: readonly Opcion[];
+  /**
+   * POR QUÉ NO PASÓ NADA, dicho por el juego. `null` casi siempre.
+   *
+   * ═══ EL CANAL QUE FALTABA, Y POR QUÉ VIVE AQUÍ Y NO EN EL ESTADO ═══
+   *
+   * Con la regla del «sólo si» del §5 bis, el rechazo silencioso es el camino
+   * NORMAL: el reductor devuelve el mismo estado y hasta la fase 5 la app sólo
+   * podía decir «la mesa está igual que estaba», deduciéndolo de que la revisión
+   * no subió. Nunca por qué.
+   *
+   * Ahora el juego puede decirlo —`rechazar()` en `shared/arcade/motor.ts`— y
+   * llega hasta aquí. Tres propiedades hacen que esto no rompa nada:
+   *
+   *   · SÓLO SALE EN LA RESPUESTA DE MOVER, y por tanto sólo a quien movió. Una
+   *     lectura (`mirar`) lo trae siempre a `null`: el motivo es de un intento
+   *     concreto de una persona concreta y no es un campo de la mesa.
+   *   · NO SE GUARDA. No está en `MesaEnCurso` ni en lo que se escribe en disco,
+   *     así que no sobrevive ni al siguiente sondeo.
+   *   · Y NO ENTRA EN EL DIARIO, o sea que reejecutar la partida da exactamente
+   *     lo mismo con motivos o sin ellos.
+   *
+   * Lo que viaja es TEXTO DEL JUEGO, no un código de la autoridad. Los códigos de
+   * la autoridad —`no-estas-sentado`, `revision-rancia`, `mesa-terminada`— siguen
+   * siendo una unión cerrada que se traduce a un HTTP y siguen llegando por la vía
+   * de la excepción. Son dos canales porque son dos capas.
+   */
+  motivo: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -1403,11 +1475,44 @@ const TICS_DE_GOLPE = 8;
  * transcurrido sin que nadie mire, que es lo que significa de verdad «se te pasó
  * la hora».
  */
-function ponerAlDiaElPlazo(m: MesaEnCurso, manifiesto: ManifiestoDeArcade): boolean {
+function ponerAlDiaElPlazo(m: MesaEnCurso): boolean {
   if (m.plazoMs <= 0 || m.mesa.terminada) {
     m.venceEn = null;
     return false;
   }
+
+  /*
+   * ═══ UN ARCADE APARTADO DEJA DE TICAR, PERO SUS MESAS SE SIGUEN LEYENDO ═══
+   *
+   * Esta salida no estaba, y su ausencia convertía la cuarentena en algo mucho
+   * peor de lo que promete `presupuesto.ts` («sus mesas dejan de aceptar
+   * MOVIMIENTOS»): `mirar()` llama aquí, aquí se entraba en `conPresupuesto`, y
+   * `exigirPresupuesto` lanzaba ANTES de tocar el reductor. Como `m.venceEn` se
+   * reprogramaba DESPUÉS de la llamada que lanzaba, el plazo no se reprogramaba
+   * nunca y TODA lectura posterior volvía a lanzar. Medido: arcade apartado, plazo
+   * de un segundo, lectura inmediata bien; pasado el plazo, `ArcadeFueraDePresu-
+   * puesto`; y la siguiente igual, para siempre. Cuatro personas jugando a un
+   * arcade que se pasó una vez se quedaban sin poder ni VER el tablero, ni leer
+   * por qué, hasta reiniciar el proceso.
+   *
+   * ═══ Y ESTA LÍNEA ES UN ATAJO, NO LA GARANTÍA. HAY QUE DECIRLO ═══
+   *
+   * Quien de verdad arregla lo de arriba es el `catch` de `ArcadeFueraDePresupuesto`
+   * de unas líneas más abajo, que reprograma el plazo y descarta el tic. Se
+   * comprobó quitando esta línea: `verify:presupuesto` sigue en verde, porque el
+   * comportamiento observable no cambia.
+   *
+   * Se queda porque ahorra fabricar una excepción en CADA sondeo de CADA mesa de un
+   * arcade apartado —cuatro móviles preguntando cada pocos segundos— y porque dice
+   * en una línea lo que si no hay que deducir del `catch`: un arcade apartado no
+   * tica. Pero queda escrito que es una comodidad y no la defensa, para que nadie
+   * lea aquí una garantía que en realidad vive doce líneas más abajo.
+   *
+   * Lo que un apartado SIGUE haciendo en una lectura es proyectar. Eso no ha
+   * cambiado y nunca estuvo dentro del presupuesto —que envuelve al reductor y no a
+   * la proyección— y es lo que permite seguir enseñando el tablero.
+   */
+  if (enCuarentena(m.mesa.arcade) !== null) return false;
 
   let cambio = false;
   for (let vueltas = 0; vueltas < TICS_DE_GOLPE; vueltas++) {
@@ -1419,7 +1524,55 @@ function ponerAlDiaElPlazo(m: MesaEnCurso, manifiesto: ManifiestoDeArcade): bool
     if (ahora < m.venceEn) return cambio;
 
     const antes = m.mesa;
-    const despues = medirMovimiento(m.mesa.arcade, 'arcade:tic', () => avanzarElReloj(antes));
+    let despues: typeof antes;
+    try {
+      /*
+       * EL TIC TAMBIÉN PASA POR EL PRESUPUESTO, y era el camino que más falta hacía
+       * cubrir: se mete solo, sin que nadie lo pida, y hasta TICS_DE_GOLPE veces
+       * seguidas. Un reductor que tarde en su tic multiplica ese coste por el número
+       * de plazos vencidos, y lo hace dentro de la petición de quien pasaba por ahí a
+       * mirar. Si se pasa del tope, `conPresupuesto` lanza: el tic se descarta, la
+       * mesa se queda como estaba y el arcade queda apartado.
+       */
+      despues = conPresupuesto(m.mesa.arcade, 'arcade:tic', () => avanzarElReloj(antes));
+      /*
+       * ═══ Y EL TIC PESA SU ESTADO IGUAL QUE LO PESA UN MOVIMIENTO ═══
+       *
+       * Aquí había un `medirTamano(...)` —abajo, después de asignar `m.mesa`— que
+       * sólo ANOTABA, y que además muestreaba uno de cada sesenta cuando el arcade
+       * tenía reloj. O sea que el segundo tope, el que protege el disco y la red,
+       * tenía una puerta trasera entera por el camino que la cabecera de
+       * `presupuesto.ts` señala como el que más falta hacía cubrir: un arcade
+       * movido por plazo que engorde su estado en cada tic no entraba NUNCA en
+       * cuarentena por tamaño, y sus tics se guardaban y viajaban.
+       *
+       * Se pesa ANTES de asignar `m.mesa`, por lo mismo que en `mover`: si se pasa
+       * del tope, lo que hay que hacer es no quedárselo, y como el reductor es puro
+       * revertir es no asignar.
+       *
+       * Y sólo cuando el estado cambió: un tic que no cambia nada devuelve el mismo
+       * objeto, y volver a serializarlo sería pagar la báscula por nada.
+       */
+      if (despues.estado !== antes.estado) pesarElEstado(antes.arcade, despues.estado);
+    } catch (error) {
+      /*
+       * ═══ EL TIC QUE SE PASA APARTA AL ARCADE Y NO TUMBA LA LECTURA ═══
+       *
+       * Antes esta excepción salía hasta `mirar()` y de ahí hasta un 503 sin mesa
+       * dentro. El castigo ya está puesto —`conPresupuesto` apunta la cuarentena en
+       * su `finally`, y `pesarElEstado` antes de lanzar—, así que dejarla subir no
+       * añade ninguna protección: sólo le quita la pantalla a quien pasaba por ahí
+       * a mirar. Se descarta el tic, se reprograma el plazo para no reintentarlo en
+       * bucle, y se sale con lo que se hubiera acumulado.
+       *
+       * Cualquier otro error SÍ sube: un reductor que revienta no es lo mismo que
+       * uno que se pasa del presupuesto, y taparlo aquí escondería un fallo del
+       * juego detrás de una mesa que parece parada.
+       */
+      m.venceEn = Date.now() + m.plazoMs;
+      if (error instanceof ArcadeFueraDePresupuesto) return cambio;
+      throw error;
+    }
     m.venceEn = Date.now() + m.plazoMs;
     if (despues.estado === antes.estado) continue;
 
@@ -1444,7 +1597,6 @@ function ponerAlDiaElPlazo(m: MesaEnCurso, manifiesto: ManifiestoDeArcade): bool
     m.mesa = despues;
     m.ultimoToqueEn = Date.now();
     if (otroTurno) m.turnoDesde = m.ultimoToqueEn;
-    medirTamano(m.mesa.arcade, m.mesa.estado, tieneReloj(manifiesto));
     cambio = true;
   }
   return cambio;
@@ -1667,7 +1819,7 @@ export async function mirar(codigo: string, llave: string | null): Promise<Vista
     const manifiesto = manifiestoDeArcade(m.mesa.arcade);
     const yo = asientoDe(m, llave);
 
-    if (ponerAlDiaElPlazo(m, manifiesto)) await guardar(manifiesto, m);
+    if (ponerAlDiaElPlazo(m)) await guardar(manifiesto, m);
 
     /*
      * La presencia se marca AQUÍ, en la lectura, porque es lo que significa: «se
@@ -1736,21 +1888,79 @@ export async function mover(
     const manifiesto = manifiestoDeArcade(m.mesa.arcade);
     const yo = asientoDe(m, llave);
 
-    const vencio = ponerAlDiaElPlazo(m, manifiesto);
+    const vencio = ponerAlDiaElPlazo(m);
 
     /*
-     * `jugar` lanza `MovimientoRechazado` con su motivo, y aquí no se traduce a
-     * nada: sube tal cual hasta la ruta, que es quien sabe convertir un motivo en
-     * un código HTTP. Traducirlo aquí obligaría a este fichero a saber de HTTP,
-     * y entonces no se podría usar la misma autoridad desde un guion de
-     * comprobación sin montar un servidor.
+     * `jugarConMotivo` lanza `MovimientoRechazado` cuando quien rechaza es LA
+     * AUTORIDAD —no estás sentado, la revisión es rancia, la mesa terminó— y ese
+     * motivo es una unión cerrada que sube tal cual hasta la ruta, que es quien
+     * sabe convertirlo en un código HTTP. Traducirlo aquí obligaría a este fichero
+     * a saber de HTTP, y entonces no se podría usar la misma autoridad desde un
+     * guion de comprobación sin montar un servidor.
+     *
+     * Y devuelve, además, el motivo que dé EL JUEGO cuando es el reductor quien
+     * rechaza. Ése no es una excepción y no puede serlo: el movimiento entró por
+     * la puerta, la autoridad lo dio por bueno, y el juego decidió que no procedía
+     * — que con la regla del «sólo si» es el camino normal y no un error. Ver
+     * `VistaDeMesa.motivo`.
      */
     const antes = m.mesa;
     let despues: typeof antes;
+    let motivoDelJuego: string | null = null;
     try {
-      despues = medirMovimiento(antes.arcade, movimiento.tipo, () =>
-        jugar(antes, { quien: yo, movimiento, rev }),
+      const jugado = conPresupuesto(antes.arcade, movimiento.tipo, () =>
+        jugarConMotivo(antes, { quien: yo, movimiento, rev }),
       );
+      motivoDelJuego = jugado.motivo;
+      /*
+       * ═══ UN RECHAZO NO ES UN CAMBIO, AUNQUE EL OBJETO DE ESTADO SEA OTRO ═══
+       *
+       * Aquí ponía `despues = jugado.mesa` a secas, y el `cambio` de más abajo se
+       * calculaba comparando estados POR IDENTIDAD. Eso daba por «pasó algo» un
+       * caso que el propio contrato declara legítimo y que produce un objeto
+       * distinto: un reductor que construye su estado inicial en el primer
+       * movimiento —`estado ?? partidaNueva()`— y rechaza ese mismo movimiento
+       * devuelve algo que NO es idénticamente lo que recibió, porque lo que recibió
+       * era `undefined`. La cabecera de `Rechazo`, en `shared/arcade/motor.ts`,
+       * cita EXACTAMENTE ese caso como «legítimo y frecuente» y es el motivo por el
+       * que `aplicar()` no exige la identidad.
+       *
+       * Lo que salía de ahí, reproducido contra el árbitro y contra la API: mesa de
+       * Riberas recién abierta, movimiento no ofrecido → `cambio` daba cierto, el
+       * motivo se tiraba por la rama de «sí pasó algo», la revisión subía de 0 a 1,
+       * el diario se quedaba con un movimiento RECHAZADO dentro, y se despertaba a
+       * los demás asientos por un cambio que no existía. En la app quedaba peor que
+       * antes de esta fase: `seIgnoro` compara revisiones, daba falso, y quien
+       * movía no veía NI el motivo nuevo NI la frase de respaldo vieja. O sea que
+       * el agujero que esta fase existe para cerrar seguía entero en el PRIMER
+       * movimiento de todas las mesas de servidor.
+       *
+       * La regla, en una línea: EL RECHAZO SE DESCARTA ENTERO —revisión, diario y
+       * estado— y se sale por la rama de «no pasó nada», que es la única que lleva
+       * el motivo. Y es además donde se IMPONE, en la capa que puede permitírselo,
+       * el contrato que el núcleo decidió no imponer: «el estado de un rechazo es
+       * el que se recibió». Un reductor que devuelva otro no lo cuela por la puerta
+       * de atrás; lo volverá a construir igual en el primer movimiento que sí
+       * acepte, porque es puro y determinista.
+       */
+      const rechazado = jugado.motivo !== null;
+      despues = rechazado ? antes : jugado.mesa;
+      /*
+       * ═══ Y SE PESA EL ESTADO ANTES DE QUEDÁRSELO ═══
+       *
+       * Aquí y no después de `m.mesa = despues`: si se pasa del tope, lo que hay
+       * que hacer es NO quedárselo. Como el reductor es puro, «revertir» es
+       * exactamente no asignar — el estado de antes sigue intacto en `antes`.
+       *
+       * Va dentro del `try` a propósito, para que su excepción salga por el mismo
+       * sitio que la del tiempo y por el mismo camino: se guarda el plazo si venció
+       * y se relanza. Un arcade que se pasa no puede dejar la mesa a medias.
+       *
+       * Se pesa `despues` y no `jugado.mesa`: lo que hay que pesar es lo que la
+       * mesa se va a quedar. Pesar el estado de un rechazo —que se tira— sería
+       * apartar un arcade por algo que nunca llegó a existir.
+       */
+      if (despues.estado !== antes.estado) pesarElEstado(antes.arcade, despues.estado);
     } catch (error) {
       if (vencio) await guardar(manifiesto, m);
       throw error;
@@ -1820,7 +2030,13 @@ export async function mover(
        * que no hay a quién avisar.
        */
       if (vencio) await guardar(manifiesto, m);
-      return vistaDe(m, yo);
+      /*
+       * Y AQUÍ VA EL MOTIVO, que es justo el caso para el que existe: el reductor
+       * no cambió nada. Antes esta rama devolvía una vista idéntica a la anterior
+       * y quien movía sólo podía deducir, por que la revisión no había subido, que
+       * algo no se había hecho. Ahora, si el juego dijo por qué, lo dice.
+       */
+      return vistaDe(m, yo, motivoDelJuego);
     }
 
     m.mesa = despues;
@@ -1838,7 +2054,14 @@ export async function mover(
       if (m.plazoMs > 0) m.venceEn = Date.now() + m.plazoMs;
       m.turnoDesde = m.ultimoToqueEn;
     }
-    medirTamano(m.mesa.arcade, m.mesa.estado, tieneReloj(manifiesto));
+    /*
+     * Y AQUÍ NO SE VUELVE A PESAR. Había un `medirTamano(...)` en esta línea que
+     * serializaba el estado ENTERO por segunda vez en el mismo movimiento —
+     * `pesarElEstado`, unas líneas arriba, ya lo había serializado, anotado el
+     * máximo y comprobado el tope—. O sea que el camino más caliente del servidor
+     * pagaba dos veces `canonico()` para llenar la misma estadística. Se quita: la
+     * báscula del tamaño es ahora una sola, y es la que exige.
+     */
     await guardar(manifiesto, m);
     return vistaDe(m, yo);
   });
@@ -1939,10 +2162,24 @@ function asientoDe(m: MesaEnCurso, llave: string | null): AsientoId | null {
   return silla ? silla.id : null;
 }
 
-/** Compone lo que se le enseña a alguien. La proyección la hace el juego. */
-function vistaDe(m: MesaEnCurso, yo: AsientoId | null): VistaDeMesa {
+/**
+ * Compone lo que se le enseña a alguien. La proyección la hace el juego.
+ *
+ * `motivo` sólo lo pasa `mover`, y sólo cuando el juego dijo algo. Las demás
+ * puertas lo dejan en `null` porque un motivo es de UN intento de UNA persona:
+ * ver `VistaDeMesa.motivo`.
+ */
+function vistaDe(m: MesaEnCurso, yo: AsientoId | null, motivo: string | null = null): VistaDeMesa {
   const ahora = Date.now();
+  const vista = vistaDeAsiento(
+    m.mesa.arcade,
+    m.mesa.estado,
+    yo,
+    m.sillas.map((s) => ({ asiento: s.id, nombre: s.nombre })),
+  );
   return {
+    motivo,
+    opciones: loQueSePuedeHacer(m.mesa.arcade, vista, yo),
     codigo: m.codigo,
     arcade: m.mesa.arcade,
     rev: m.mesa.rev,
@@ -1966,9 +2203,71 @@ function vistaDe(m: MesaEnCurso, yo: AsientoId | null): VistaDeMesa {
      * — pero está, porque un respaldo silencioso que mandara el estado entero
      * convertiría un juego mal instalado en un juego que filtra, y nadie lo
      * vería jamás.
+     *
+     * ═══ Y DESDE LA FASE 5 SE LE PASA QUIÉN ESTÁ SENTADO ═══
+     *
+     * Con nombre. Es lo que permite que un juego con mesa escriba «a Ana le toca»
+     * en vez de «a aJLFR7ZJ3 le toca»: hasta ahora la proyección sólo recibía un
+     * identificador de observador, y Riberas lo rodeaba escribiendo huecos que
+     * rellenaba el mueble al pintar. El razonamiento de por qué entra por aquí y
+     * no por el contexto del movimiento está en `AsientoNombrado`, y se resume en
+     * que un nombre no puede tocar el camino del reductor: si lo tocara, la misma
+     * partida reejecutada después de un renombrado daría otro estado.
+     *
+     * Va la LLAVE PÚBLICA y el nombre, y nunca `s.llave`, que es el secreto con el
+     * que un asiento demuestra que es él y que no sale en ninguna vista.
+     *
+     * Se calcula arriba y no aquí porque `opciones()` la necesita: ver
+     * `loQueSePuedeHacer`, que recibe LA VISTA y jamás el estado.
      */
-    vista: vistaDeAsiento(m.mesa.arcade, m.mesa.estado, yo),
+    vista,
   };
+}
+
+/**
+ * QUÉ PUEDE HACER ESTE ASIENTO AHORA MISMO, preguntado AL JUEGO.
+ *
+ * ═══ ESTA FUNCIÓN ES EL ÚNICO CONSUMIDOR DE PRODUCCIÓN DE `opciones()` ═══
+ *
+ * Y sin ella, el hueco que la fase 5 abrió en el alta era una garantía que no
+ * existía. El motivo escrito para abrirlo es que «un arcade de FUERA no puede
+ * tener opciones genéricas: no hay forma de decirle a la plataforma pregúntame», y
+ * eso seguía siendo cierto: `opcionesDeArcade()` y `hayOpciones()` no las llamaba
+ * NADIE fuera de un comprobador, `ElTableroEnLinea` pintaba el dibujo ya resuelto
+ * que el juego mete en su vista, y un arcade de fuera que registrara `opciones()`
+ * y NO se resolviera el tablero se quedaba con la pantalla vacía. El hueco existía
+ * en la tabla y no cambiaba nada de lo que un juego nuevo tiene que escribir.
+ *
+ * ═══ POR QUÉ SE PREGUNTA AQUÍ, EN EL SERVIDOR, Y NO EN LA APP ═══
+ *
+ * Porque un arcade de fuera NO ESTÁ EN EL BINARIO DEL MÓVIL. La app puede llamar
+ * al registro para los cuatro juegos que trae dentro y para ningún otro:
+ * `opcionesDeArcade('la-orilla', …)` desde el móvil lanzaría `ArcadeNoInstalado`.
+ * El único sitio donde el código del arcade de fuera existe es este proceso, así
+ * que la respuesta tiene que viajar con la vista — igual que viaja la proyección,
+ * y por exactamente el mismo motivo.
+ *
+ * ═══ Y POR QUÉ ESTO NO PUEDE TUMBAR UNA LECTURA ═══
+ *
+ * `opciones()` es código del juego corriendo en el hilo del servidor, así que pasa
+ * por el presupuesto como todo lo suyo: si tarda, el arcade queda apartado. Lo que
+ * NO puede es llevarse por delante la petición. Una lectura tiene que seguir
+ * enseñando el tablero de un arcade apartado —es la promesa escrita en
+ * `presupuesto.ts`: «sus mesas dejan de aceptar MOVIMIENTOS»— y una lista de
+ * botones vacía es una degradación honrada: la pantalla enseña lo que sepa enseñar
+ * sin botones, que es lo que `opcionesDeArcade` ya documenta para el juego que no
+ * registra nada.
+ *
+ * El castigo no se pierde por atrapar: `conPresupuesto` apunta la cuarentena en su
+ * `finally`, antes de que esta captura vea nada.
+ */
+function loQueSePuedeHacer(arcade: ArcadeId, vista: unknown, yo: AsientoId | null): readonly Opcion[] {
+  if (!hayOpciones(arcade)) return [];
+  try {
+    return conPresupuesto(arcade, 'arcade:opciones', () => opcionesDeArcade(arcade, vista, yo));
+  } catch {
+    return [];
+  }
 }
 
 /** Cuántas mesas hay vivas. Para el diagnóstico y para comprobar que no hay fuga. */

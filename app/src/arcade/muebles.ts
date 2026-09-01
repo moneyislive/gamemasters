@@ -104,11 +104,32 @@ export const MUEBLES: Record<MuebleDeArcade, Mueble> = {
     loQueEs: 'Dos dimensiones a ritmo de fotograma, dibujadas con Skia sobre la GPU.',
     cuandoLlega: 'Ya está: lo estrena El Arcade, el de sesenta fotogramas por segundo.',
   },
+  /*
+   * ═══ ESTE DECÍA `seSabePintar: false` Y «CUESTA MEGABYTES A TODO EL MUNDO» ═══
+   *
+   * La segunda mitad ya no es cierta, y por eso la primera ha cambiado. `three` y
+   * `@react-three/fiber` ESTÁN DENTRO del binario desde antes de que existiera la
+   * Sala de Arcade: los trae `app/src/escena-avatar.tsx`, que es el retrato 3D de
+   * las veladas, y están declarados en `app/package.json`. El coste en megabytes
+   * está pagado desde hace meses; lo que faltaba era la puerta.
+   *
+   * Lo que la fase 5 entrega es esa puerta —`app/src/arcade/escena.tsx` y su
+   * escena— con «La Peonza» detrás, que es deliberadamente el arcade más pobre
+   * posible: empujar y mirar. Un juego de demostración rico se convertiría en el
+   * modelo de cómo se escribe un arcade de escena, y entonces el mueble saldría
+   * con su forma.
+   *
+   * Y lo que sigue pendiente, dicho donde se lee: PROBARLO EN UN IPHONE FÍSICO. La
+   * documentación de r3f advierte de cierres `EXC_BAD_ACCESS` en simulador y esa
+   * prueba no se ha hecho todavía — ni con esta escena ni con la del avatar, que
+   * lleva más tiempo. Ningún comprobador puede cubrirlo: un guion de Node no abre
+   * un contexto de GL.
+   */
   escena: {
     ruta: '/escena',
-    seSabePintar: false,
+    seSabePintar: true,
     loQueEs: 'Tres dimensiones, y solo a través del lienzo común de la app.',
-    cuandoLlega: 'Llega cuando alguien lo pida, y no antes: cuesta megabytes a todo el mundo.',
+    cuandoLlega: 'Ya está: lo estrena La Peonza, que es la puerta y no el juego.',
   },
 };
 

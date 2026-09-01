@@ -71,6 +71,44 @@ export interface MesaVista {
   asientos: Array<{ id: string; nombre: string; presente: boolean }>;
   yo: string | null;
   vista: unknown;
+  /**
+   * POR QUÉ NO PASÓ NADA, dicho por el juego. Sólo llega al mover, y sólo a quien
+   * movió. `null` en toda lectura. Ver `VistaDeMesa.motivo` en el servidor.
+   *
+   * Opcional en el tipo a propósito: una app publicada puede estar hablando con un
+   * servidor más viejo que ella —o al revés— y un campo que falta no puede ser un
+   * fallo. Lo que hace la pantalla cuando no viene es exactamente lo que hacía
+   * antes de que existiera.
+   */
+  motivo?: string | null;
+  /**
+   * QUÉ SE PUEDE HACER AHORA MISMO, dicho por el juego y traído por el servidor.
+   *
+   * Es lo que hace que un mueble genérico pueda pintar los botones de un juego que
+   * este binario NO conoce: la pregunta se la hace el servidor —que es el único
+   * proceso donde vive el código de un arcade de fuera— y la respuesta viaja con la
+   * vista. Ver `VistaDeMesa.opciones` en `server/src/arcade/mesas.ts`.
+   *
+   * Opcional por lo mismo que `motivo`: una app publicada puede estar hablando con
+   * un servidor más viejo que ella, y un campo que falta no puede ser un fallo.
+   */
+  opciones?: OpcionDeMesa[];
+}
+
+/**
+ * UNA COSA QUE SE PUEDE HACER, tal como llega por la red.
+ *
+ * Se declara aquí y no se importa de `shared/arcade/opciones.ts` a propósito: esto
+ * es lo que la app RECIBE, y lo que recibe puede venir de un servidor con otra
+ * versión. Importar el tipo del contrato haría creer al compilador que lo que llega
+ * está garantizado, y lo único garantizado es lo que se comprueba al pintarlo.
+ */
+export interface OpcionDeMesa {
+  id: string;
+  tipo: string;
+  carga: unknown;
+  rotulo: string;
+  ayuda: string;
 }
 
 /** En qué punto está esta pantalla. */
@@ -472,17 +510,46 @@ export function usarMesaDeArcade(arcade: ArcadeId): LaMesa {
            * quien decide con esa misma comparación si avisar a los demás—, así que
            * misma revisión con respuesta correcta significa «el juego no lo tomó».
            *
-           * Y el texto no puede decir POR QUÉ: sólo lo sabe el reductor, y el
-           * contrato del §5.2 es que rechazar es devolver el mismo estado, nunca una
-           * excepción con un motivo. Así que se dice lo que se sabe, que ya es
-           * infinitamente más que el silencio: se intentó y no se pudo.
+           * ═══ Y DESDE LA FASE 5 EL TEXTO SÍ PUEDE DECIR POR QUÉ ═══
+           *
+           * Aquí ponía que no podía, y era verdad: el §5.2 obliga a que rechazar sea
+           * devolver el mismo estado y nunca una excepción con un motivo, así que lo
+           * único honrado que se podía escribir era «la mesa está igual que estaba».
+           *
+           * El motivo viaja ahora POR FUERA del estado —`rechazar()` en el núcleo,
+           * `VistaDeMesa.motivo` en el servidor— y llega en la respuesta de ESTE
+           * movimiento y de ningún otro. La frase de antes se queda como respaldo
+           * para los juegos que rechazan sin decir nada, que siguen siendo
+           * perfectamente válidos: un juego cuyo botón nunca se pinta cuando no se
+           * puede pulsar no tiene nada que explicar.
+           *
+           * ═══ Y EL MOTIVO MANDA SOBRE LA COMPARACIÓN DE REVISIONES ═══
+           *
+           * El orden de estas dos condiciones estaba al revés —primero `seIgnoro`,
+           * y sólo dentro se miraba el motivo— y eso ataba el canal nuevo a una
+           * deducción que puede fallar. Falló: mientras el servidor contaba como
+           * «cambio» un rechazo que devolvía otro objeto de estado, la revisión
+           * subía, `seIgnoro` daba falso y el aviso se ponía a cadena VACÍA. Quien
+           * movía no veía ni el motivo ni la frase de respaldo, que es peor que
+           * antes de que existiera el canal.
+           *
+           * Aquello se ha arreglado donde tocaba —en el servidor, que ahora
+           * descarta el rechazo entero— y aquí se quita la dependencia: si el juego
+           * DIJO algo, se enseña, punto. Un motivo sólo puede venir de un rechazo y
+           * sólo viaja en la respuesta de este movimiento, así que no hay ningún
+           * caso en que enseñarlo sea mentira. La comparación de revisiones se
+           * queda para lo único que sabe hacer: el respaldo de los juegos que
+           * rechazan SIN decir por qué, que siguen siendo perfectamente válidos.
            */
+          const loQueDijoElJuego = r.ok ? (datos.mesa?.motivo ?? '') : '';
           const seIgnoro = r.ok && datos.mesa !== undefined && datos.mesa.rev === rev;
           ponerAviso(
             r.ok
-              ? seIgnoro
-                ? 'Ese movimiento no se ha podido hacer ahora mismo: la mesa está igual que estaba.'
-                : ''
+              ? loQueDijoElJuego.length > 0
+                ? loQueDijoElJuego
+                : seIgnoro
+                  ? 'Ese movimiento no se ha podido hacer ahora mismo: la mesa está igual que estaba.'
+                  : ''
               : (datos.error ?? 'ese movimiento no se ha podido hacer'),
           );
         } catch (error) {

@@ -1038,10 +1038,30 @@ paso('La Sala no anuncia ningún arcade que no sepa pintar');
     /LOS_QUE_PINTA\s*:\s*Record</.test(pintados),
     'sin la tabla, cada pantalla vuelve a decidir por su cuenta',
   );
+  /*
+   * ═══ ESTA COMPROBACIÓN CAMBIÓ EN LA FASE 5, Y NO SE HA RELAJADO ═══
+   *
+   * Pedía literalmente `LOS_QUE_PINTA[…] !== undefined && MUEBLES[…]`, o sea UNA
+   * ENTRADA POR JUEGO. Con el enchufe, eso era la mentira contraria: un arcade de
+   * tablero instalado en un servidor y desconocido para este binario salía con la
+   * tarjeta apagada aunque su mueble supiera pintar un juego que no conoce.
+   *
+   * La pregunta sigue teniendo DOS mitades y las dos siguen exigidas — lo que
+   * cambia es la segunda: ya no es «está este juego en la lista» sino «hay CON QUÉ
+   * pintarlo», que es o su componente propio o el genérico de su mueble. Eso lo
+   * contesta `quienPinta`, y `seSabePintar` no puede contestarlo sin él.
+   */
   comprobar(
-    'y la pregunta «¿se sabe pintar este arcade?» junta el juego Y el mueble',
-    /LOS_QUE_PINTA\[[^\]]+\]\s*!==\s*undefined\s*&&\s*MUEBLES\[/.test(pintados),
+    'y la pregunta «¿se sabe pintar este arcade?» sigue juntando las dos mitades',
+    /MUEBLES\[[^\]]+\]\.seSabePintar\) return false/.test(pintados) &&
+      /return quienPinta\(manifiesto\) !== undefined/.test(pintados),
     'con solo una de las dos mitades, la tarjeta vuelve a mentir en un sentido o en el otro',
+  );
+  comprobar(
+    'y hay una tabla de muebles genéricos, que es lo que desbloquea un arcade de fuera',
+    /LOS_MUEBLES_GENERICOS/.test(pintados) && /tablero:\s*ElTableroEnLinea/.test(pintados),
+    'sin ella, `seSabePintar` vuelve a exigir una entrada por juego y el enchufe del servidor ' +
+      'entrega arcades que ningún móvil puede abrir',
   );
 
   comprobar(
@@ -1064,10 +1084,23 @@ paso('La Sala no anuncia ningún arcade que no sepa pintar');
     !/MUEBLES\[[^\]]*\]\.seSabePintar/.test(cuerpoDeMinijuegos),
     'ésa es exactamente la línea que hacía pulsable la tarjeta de un juego que la app no pinta',
   );
+  /*
+   * Se mira el CUERPO de `PintarEnElMueble` y no el fichero entero, por lo mismo
+   * que arriba con `minijuegos()`: la cabecera de esa función cita la línea vieja
+   * —`LOS_QUE_PINTA[id]` a secas— para contar qué cambió en la fase 5, y un
+   * comprobador que se pusiera rojo por una explicación empuja a no escribirlas.
+   */
+  const cuerpoDePintar = cuerpoDe(pintar, 'export function PintarEnElMueble') ?? '';
+  comprobar('se encuentra el cuerpo de `PintarEnElMueble()`', cuerpoDePintar.length > 0);
   comprobar(
-    'la pantalla de un mueble pinta desde la misma tabla',
-    /LOS_QUE_PINTA/.test(pintar) && /from '\.\/pintados'/.test(pintar),
+    'la pantalla de un mueble pinta desde la misma función que decide la Sala',
+    /quienPinta\(/.test(cuerpoDePintar) && /from '\.\/pintados'/.test(pintar),
     'con una tabla propia dentro de cada ruta de mueble, la cuarta copia se queda atrás',
+  );
+  comprobar(
+    'y no vuelve a resolverlo con una tabla por juego',
+    !/LOS_QUE_PINTA\s*\[/.test(cuerpoDePintar),
+    'ésa es la línea que dejaba sin pintar a un arcade de fuera con mueble genérico',
   );
 
   /*

@@ -1,74 +1,51 @@
 /**
- * QUÉ NÚMERO PUBLICA CADA ARCADE, LEÍDO DE SU ESTADO OPACO.
+ * CÓMO SE LE LEE LA CIFRA A «EL ARCADE», Y NADA MÁS.
  *
- * ═══ ESTE FICHERO ES UN HALLAZGO Y NO UNA PIEZA MÁS, ASÍ QUE VA DELANTE ═══
+ * ═══ ESTE FICHERO ERA UN HALLAZGO, Y LA FASE 5 LO HA PAGADO ═══
  *
- * El manifiesto de arcade declara `marcador`, y ese campo dice CÓMO SE LEE el
- * número —«Esquivadas», gana el más alto— y de él se deriva la exigencia de
- * reejecutabilidad. Lo que NO dice, y lo que el núcleo no tiene forma de saber,
- * es CUÁL ES EL NÚMERO: el estado es opaco por diseño, y un servidor que
- * reejecuta una repetición se queda con un `unknown` en la mano y una cifra que
- * el móvil declara al lado.
- *
- * O sea que verificar un marcador exige una función por juego —«dame la cifra de
- * este estado»— y `instalarArcade()` no tiene hueco para ella. Las cuatro cosas
- * que un arcade registra hoy son manifiesto, reductor, proyección y `loSecreto`;
- * la puntuación es la quinta y falta.
- *
- * ESO ES UNA GRIETA DEL CONTRATO Y SE DICE ASÍ. La fase 3 no la puede cerrar
- * porque `shared/arcade/*.ts` es núcleo y esta fase tiene prohibido tocarlo —con
- * razón: el valor de esta arquitectura es precisamente que el núcleo no se toque
- * juego a juego—. Así que la tabla vive aquí, en `juegos/`, que es donde ya viven
- * las altas, y queda escrito qué habría que hacer con ella:
+ * Aquí vivía una TABLA de puntuaciones por juego, con una cabecera larga que
+ * denunciaba una grieta del contrato: el manifiesto declara `marcador` —o sea QUE
+ * hay una cifra y cómo se llama— y el núcleo no tenía forma de saber CUÁL es el
+ * número, porque el estado es opaco. `instalarArcade()` no tenía hueco para la
+ * función que lo lee, así que la tabla se escribió aquí, en `juegos/`, y quedó
+ * apuntado qué habría que hacer para cerrarlo bien:
  *
  *     `instalarArcade({ manifiesto, avanzar, proyeccion?, loSecreto?, puntuacion? })`
  *     con `puntuacion` OBLIGATORIA de hecho cuando `exigeReejecutabilidad(m)` sea
  *     cierta, comprobada al arrancar por una hermana de `exigirSecretosTapados()`.
  *
- * ═══ LO QUE SE PIERDE MIENTRAS TANTO, DICHO SIN ADORNOS ═══
+ * Eso es exactamente lo que hay ahora, línea por línea: `Puntuacion` vive en
+ * `shared/arcade/tipos.ts`, el hueco está en el alta, la tabla es `INSTALADOS` —la
+ * de siempre, anclada con `Symbol.for`— y `exigirCifrasLegibles()` la llama el
+ * arranque del servidor, junto a `exigirSecretosTapados()`.
  *
- * Tres cosas concretas, y ninguna es teórica:
+ * ═══ POR QUÉ HABÍA QUE MOVERLO Y NO BASTABA CON DEJARLO ═══
  *
- *  1. UN ARCADE DE FUERA DEL BINARIO NO PUEDE TENER MARCADOR. El enchufe de la
- *     fase 5 carga manifiesto y reductor desde un fichero; no puede añadir una
- *     fila a una tabla escrita a mano en este repositorio. Hoy no hay ninguno, y
- *     por eso se puede vivir con ello un tiempo.
- *  2. NADIE IMPIDE INSTALAR UN ARCADE CON CIFRA Y SIN FORMA DE LEERLA. El
- *     arranque no falla; falla la verificación del primer récord, o sea más
- *     tarde y delante de alguien que estaba jugando. Con el hueco en el núcleo
- *     sería una negativa ruidosa a arrancar, que es el patrón que este motor usa
- *     para todo lo demás.
- *  3. Y esta tabla puede quedarse vieja EN SILENCIO. Contra eso sí hay defensa
- *     aquí abajo: `arcadesConCifraSinPuntuacion()`, que la llama
- *     `verify:marcador` y no deja pasar un juego con cifra que no esté.
+ * La tabla llana se defendía así, y merece citarse porque el argumento era bueno y
+ * dejó de serlo: «una tabla llana no tiene el problema de la doble carga… el
+ * problema de `INSTALADOS` era que las ALTAS se perdían; aquí no hay altas».
  *
- * ═══ POR QUÉ UNA TABLA LLANA Y NO UN REGISTRO ANCLADO CON `Symbol.for` ═══
+ * Cierto mientras fue una constante escrita a mano. La propia fase 5 le añadió un
+ * `registrarPuntuacion()` para que el enchufe pudiera darle de alta la cifra a un
+ * arcade de FUERA, y con eso sí había altas en tiempo de ejecución: si este módulo
+ * se resolvía por dos especificadores distintos —el fallo real que esta casa ya
+ * pagó con `shared/juegos/index.ts` y que motivó las dos exenciones de
+ * `verify:pureza`—, el arcade de fuera registraba su cifra en una copia y quien la
+ * leía miraba la otra. El síntoma no habría sido un error de arranque: habría sido
+ * un récord honrado rechazado, en silencio, meses después y sólo en despliegue —
+ * justo el falso negativo que `MovimientoRegistrado` describe como «el único sitio
+ * donde destruye la confianza en la cifra».
  *
- * Porque no hace falta y porque `verify:pureza` prohíbe tocar el ámbito global en
- * `shared/arcade/`, con dos exenciones escritas a mano que existen por un fallo
- * real de doble carga de módulo. Un registro más querría una tercera exención, y
- * eso es exactamente la clase de línea que se añade «solo esta vez».
+ * ═══ LO QUE SE QUEDA AQUÍ, Y POR QUÉ SÓLO ESTO ═══
  *
- * Una tabla llana no tiene el problema de la doble carga: si el módulo se carga
- * dos veces hay dos tablas IDÉNTICAS, porque su contenido está escrito en el
- * fichero y no se llena en tiempo de ejecución. El problema de `INSTALADOS` era
- * que las ALTAS se perdían; aquí no hay altas.
+ * Leerle la cifra a El Arcade es CONOCIMIENTO DEL JUEGO —hay que saber qué tiene
+ * su estado dentro— y por tanto no puede vivir en el núcleo. Se queda aquí, se
+ * pasa en el alta de ese juego (`juegos/index.ts`), y `EstadoSinCifra` con ella,
+ * porque la lanza esta función y no el motor.
  */
 import { EL_ARCADE, puntuacionDelArcade } from './arcade';
 import type { EstadoDelArcade } from './arcade';
-import { arcadesInstalados, exigeReejecutabilidad } from '../index';
-import type { ArcadeId } from '../tipos';
-
-/**
- * Leer una cifra de un estado que no se conoce.
- *
- * Recibe `unknown` y no el estado tipado porque quien llama —el servidor, tras
- * reejecutar una repetición— tiene un `unknown` en la mano: el motor guarda los
- * reductores como `Avanzar<unknown>` porque no puede conocer la forma de un
- * estado que no conoce. La conversión la hace el juego, que es el único que sabe
- * lo que metió, y en un solo sitio.
- */
-export type Puntuacion = (estado: unknown) => number;
+import type { ArcadeId, Puntuacion } from '../tipos';
 
 /**
  * Un estado que no tiene la forma que este juego esperaba.
@@ -97,66 +74,14 @@ function esEstadoDelArcade(estado: unknown): estado is EstadoDelArcade {
 }
 
 /**
- * LA TABLA. Una fila por arcade que publique una cifra.
+ * LA CIFRA DE EL ARCADE. Se pasa en su alta, en `juegos/index.ts`.
  *
- * Los que declaran `{ tipo: 'ninguno' }` no están y no tienen por qué estar: no
- * hay ninguna cifra que nadie tenga que creerse, así que no hay nada que leer.
- * `arcadesConCifraSinPuntuacion()` comprueba justo eso y no lo contrario.
+ * Comprueba la forma antes de leer y LANZA si no cuadra, en vez de devolver cero:
+ * un cero silencioso convertiría «esta repetición no es de este juego» en «jugaste
+ * y no esquivaste nada», que es la misma clase de mentira que el `manifiestoDe`
+ * que devolvía CLUEDO por defecto.
  */
-const PUNTUACIONES: Record<ArcadeId, Puntuacion> = {
-  [EL_ARCADE]: (estado: unknown): number => {
-    if (!esEstadoDelArcade(estado)) throw new EstadoSinCifra(EL_ARCADE);
-    return puntuacionDelArcade(estado);
-  },
+export const laCifraDeElArcade: Puntuacion = (estado: unknown): number => {
+  if (!esEstadoDelArcade(estado)) throw new EstadoSinCifra(EL_ARCADE);
+  return puntuacionDelArcade(estado);
 };
-
-/** ¿Sabe alguien leerle la cifra a este arcade? */
-export function hayPuntuacion(arcade: ArcadeId): boolean {
-  return PUNTUACIONES[arcade] !== undefined;
-}
-
-/**
- * La cifra de este estado, según las reglas de este arcade.
- *
- * FALLA si no hay quien la lea, y no devuelve cero. Un cero por defecto sería la
- * lección más cara de este repositorio repetida: `manifiestoDe` devolvía CLUEDO
- * cuando no encontraba el juego, y una partida entera se jugaba con las reglas de
- * otro sin que nada diera un error. Aquí el equivalente sería rechazar todos los
- * récords de un juego —o aceptarlos todos con cero— y que nadie se enterara.
- */
-export function puntuacionDe(arcade: ArcadeId, estado: unknown): number {
-  const leer = PUNTUACIONES[arcade];
-  if (leer === undefined) {
-    throw new Error(
-      `El arcade «${arcade}» publica una cifra y nadie sabe leérsela: no hay entrada suya en ` +
-        '`shared/arcade/juegos/puntuaciones.ts`. Mientras el núcleo no tenga hueco para la ' +
-        'puntuación en `instalarArcade`, esa tabla es el sitio; la cabecera del fichero cuenta ' +
-        'por qué y qué habría que hacer para cerrarlo bien.',
-    );
-  }
-  return leer(estado);
-}
-
-/**
- * Los arcades instalados que publican una cifra y a los que nadie sabe leérsela.
- *
- * ═══ POR QUÉ NO LANZA Y POR QUÉ NO SE LLAMA AL ARRANCAR ═══
- *
- * No lanza por lo mismo que `problemasDelManifiesto`: quien lo llama sabe mejor
- * qué hacer. Y no se engancha al arranque del servidor porque colgar una garantía
- * nueva del arranque desde `juegos/` sería meter una regla de plataforma en la
- * carpeta de los juegos — que es justo lo que este fichero denuncia. Su sitio es
- * el núcleo, y hasta que lo tenga, quien pregunta es `verify:marcador`.
- *
- * O sea que esto NO impide arrancar con la tabla vieja: lo pone rojo en la
- * batería. Es menos que lo que hacen `exigirSecretosTapados()` y
- * `exigirQueAguantenVacio()`, y queda dicho para que nadie lo lea como lo mismo.
- */
-export function arcadesConCifraSinPuntuacion(): ArcadeId[] {
-  const mal: ArcadeId[] = [];
-  for (const m of arcadesInstalados()) {
-    if (!exigeReejecutabilidad(m)) continue;
-    if (!hayPuntuacion(m.id)) mal.push(m.id);
-  }
-  return mal;
-}

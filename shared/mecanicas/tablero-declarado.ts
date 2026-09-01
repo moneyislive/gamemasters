@@ -65,119 +65,41 @@ export interface PuntoDeTablero {
   y: number;
 }
 
-// ---------------------------------------------------------------------------
-// NOMBRAR A LA GENTE SIN QUE EL JUEGO SEPA CÓMO SE LLAMA NADIE
-// ---------------------------------------------------------------------------
-
-/**
- * EL HUECO DONDE VA UN NOMBRE, y por qué hace falta uno.
+/*
+ * ═══════════════════════════════════════════════════════════════════════════
+ * AQUÍ VIVÍA EL RODEO PARA NOMBRAR A LA GENTE, Y LA FASE 5 LO BORRÓ
+ * ═══════════════════════════════════════════════════════════════════════════
  *
- * ═══ EL PROBLEMA, QUE SE VE EN LA PRIMERA PANTALLA ═══
+ * Había tres funciones —`huecoDeAsiento`, `conLosNombres` y
+ * `tableroConLosNombres`— que resolvían un problema real: un juego con mesa
+ * escribe textos sobre la gente («a fulano le toca», «mengano gana») y no sabía
+ * cómo se llama nadie, porque `ContextoMovimiento.asientos` lleva identificadores
+ * y la proyección sólo recibía un `QuienMira`. El aviso grande de la partida
+ * decía «aJLFR7ZJ3 coloca una choza» mientras la barra de arriba decía «Ana ·
+ * Bruno».
  *
- * Un juego con mesa escribe textos sobre la gente: «a fulano le toca», «mengano
- * gana», «zutano te ofrece un trueque». Y NO SABE CÓMO SE LLAMA NADIE. No es un
- * descuido: `ContextoMovimiento.asientos` lleva `AsientoId[]` y la proyección
- * recibe un `QuienMira`, porque un asiento es «un sitio en la mesa, anónimo y
- * efímero» (§5.7) y los nombres los reparte la autoridad, no las reglas. Repartir
- * sitios es autoridad; el juego los LEE.
+ * La salida era escribir un hueco dentro de la propia cadena —`{asiento:aY9TK2MBJ}`—
+ * y que el mueble lo sustituyera al pintar. Funcionaba, era genérico y estaba
+ * razonado: su cabecera decía que la vía obvia —meter los nombres en el contrato—
+ * era «exactamente lo que la fase 4 existe para NO hacer», porque el diff vacío
+ * del núcleo era LA medida de aquella fase y comprarla con un parche la habría
+ * falseado.
  *
- * El resultado, sin esto, es que el aviso grande de la partida dice «aJLFR7ZJ3
- * coloca una choza» mientras la barra de arriba —que la pinta la app con los datos
- * de la mesa— dice correctamente «Ana · Bruno». Nueve caracteres aleatorios donde
- * tenía que ir un nombre, en lo primero que se lee.
+ * Esa medida ya está tomada y publicada, así que el argumento caducó y quedó el
+ * sitio correcto: **el contrato**. La proyección recibe ahora quién está sentado
+ * y cómo se llama (`Proyeccion`, tercer argumento; `comoSeLlama` en `tipos.ts`),
+ * y el juego escribe la frase ya legible. Lo que se gana al mover el arreglo:
  *
- * ═══ POR QUÉ NO SE ARREGLA POR NINGUNA DE LAS DOS VÍAS OBVIAS ═══
+ *   · el juego deja de escribir un microlenguaje de plantillas dentro de sus
+ *     propios textos, que era una segunda gramática que nadie validaba;
+ *   · y CUALQUIER superficie que lea la vista —un aviso, un registro, una
+ *     pantalla que aún no existe— ve el nombre. Con el hueco, sólo lo veía el
+ *     mueble que se acordara de llamar a la sustitución, y las demás enseñaban
+ *     `{asiento:aY9TK2MBJ}` en crudo.
  *
- * · Metiendo los nombres en el contrato del núcleo. Sería tocar
- *   `shared/arcade/movimiento.ts`, que es exactamente lo que la fase 4 existe para
- *   NO hacer: el diff vacío del núcleo es la demostración, y comprarla con un
- *   parche en la plataforma es falsear el resultado. Y sería además una decisión
- *   equivocada por su cuenta: el núcleo pasaría a tener una opinión sobre qué es
- *   un nombre visible.
- * · Sustituyéndolos en la app. No puede: el tablero viaja YA RESUELTO dentro de la
- *   proyección —cadenas hechas— y el mueble no sabe qué trozo de cada cadena era
- *   un asiento.
- *
- * ═══ LA TERCERA VÍA, QUE ES ÉSTA ═══
- *
- * El juego escribe un HUECO con el identificador dentro —`{asiento:aY9TK2MBJ}`— y
- * el mueble lo rellena con los nombres que ya tiene. Y no rompe la mudez del
- * mueble, que es lo que había que cuidar: «asiento» es vocabulario de PLATAFORMA
- * —está en el §1 bis y en el §5.7— y no de ningún juego. El mueble sigue sin saber
- * qué es una choza, una vereda o un trueque; lo único que aprende es que en un
- * texto puede venir dicho un asiento, que es algo que ya sabe porque la mesa se lo
- * manda con nombre y todo.
- *
- * Un arcade de fuera del binario usa esto igual que uno de dentro: es una función
- * de `mecanicas/`, y apuntarse es llamarla.
- *
- * ═══ POR QUÉ CON LLAVES Y NO CON UN CAMPO APARTE ═══
- *
- * Se consideró que cada panel llevara una lista de asientos al lado del texto. Eso
- * obliga a partir cada frase en trozos y a que el mueble sepa recomponerlas, o sea
- * a inventar un lenguaje de plantillas de verdad. Con el hueco dentro de la propia
- * cadena, el juego escribe la frase entera en su idioma y con su orden —que en
- * castellano no es el mismo que en inglés— y el mueble hace una sustitución.
+ * Queda escrito y no borrado del todo porque el rodeo era correcto en su fase, y
+ * un fichero que no dice qué tuvo dentro invita a reinventarlo.
  */
-const HUECO = /\{asiento:([^}]{1,64})\}/g;
-
-/**
- * El hueco donde el mueble pondrá el nombre de este asiento.
- *
- * El identificador va DENTRO del hueco a propósito: así, si nadie lo sustituye
- * —una app más vieja que el servidor, o un mueble que no llame a `conLosNombres`—
- * lo que se lee sigue identificando a alguien en vez de quedarse en blanco. Un
- * texto degradado es mejor que un texto mutilado.
- */
-export function huecoDeAsiento(asiento: string): string {
-  return `{asiento:${asiento}}`;
-}
-
-/**
- * RELLENA LOS HUECOS de un texto con los nombres que dé la mesa.
- *
- * Un asiento que no esté en la tabla se queda con su identificador a la vista, y
- * eso es deliberado: pasa de verdad —alguien que se fue y ya no sale en la lista, o
- * una vista de una revisión anterior a que se sentara— y borrarlo dejaría frases
- * cojas del tipo «— 1 pto», sin sujeto. Enseñar el identificador es feo; enseñar un
- * hueco es mentira.
- */
-export function conLosNombres(texto: string, nombres: ReadonlyMap<string, string>): string {
-  HUECO.lastIndex = 0;
-  return texto.replace(HUECO, (_todo, id: string) => nombres.get(id) ?? id);
-}
-
-/**
- * El tablero entero con los nombres puestos. Lo llama el mueble, una vez por
- * repintado, justo antes de dibujar.
- *
- * Recorre TODO lo que lleva texto y no sólo el aviso: el marcador, los rótulos de
- * las caras, los botones y su ayuda. Que la sustitución esté en un solo sitio es lo
- * que evita el fallo de siempre —arreglar el aviso, olvidar el panel— y que el día
- * que el tipo gane un campo de texto, el compilador no avise pero el diff sí se lea
- * aquí.
- */
-export function tableroConLosNombres(
-  tablero: TableroDeclarado,
-  nombres: ReadonlyMap<string, string>,
-): TableroDeclarado {
-  if (nombres.size === 0) return tablero;
-  const nombrar = (t: string): string => conLosNombres(t, nombres);
-  return {
-    ...tablero,
-    aviso: nombrar(tablero.aviso),
-    caras: tablero.caras.map((c) => ({ ...c, rotulo: nombrar(c.rotulo) })),
-    acciones: tablero.acciones.map((a) => ({
-      ...a,
-      rotulo: nombrar(a.rotulo),
-      ayuda: nombrar(a.ayuda),
-    })),
-    paneles: tablero.paneles.map((p) => ({
-      titulo: nombrar(p.titulo),
-      lineas: p.lineas.map(nombrar),
-    })),
-  };
-}
 
 /**
  * QUÉ MOVIMIENTO MANDA UN TOQUE.

@@ -79,10 +79,10 @@ import { randomInt, randomUUID } from 'node:crypto';
 import {
   exigeReejecutabilidad,
   manifiestoDeArcadeSiExiste,
+  puntuacionDe,
   tieneReloj,
 } from '../../../shared/arcade';
 import type { ArcadeId, ManifiestoDeArcade } from '../../../shared/arcade';
-import { puntuacionDe } from '../../../shared/arcade/juegos/puntuaciones';
 import { leerRepeticion, reejecutar, RepeticionMalFormada } from './repeticiones';
 import type { MotivoMalFormada, Repeticion } from './repeticiones';
 

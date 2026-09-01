@@ -438,22 +438,63 @@ const BATERIA = [
     donde: 'server',
     guion: 'verify:nucleo-quieto',
     /*
-     * ═══ ESTA FRASE DECÍA «NI DE LA MESA», Y LA FASE 4 BIS LA MOVIÓ ═══
+     * ═══ ESTA FRASE HA CAMBIADO DOS VECES, Y LAS DOS POR EL MISMO MOTIVO ═══
      *
      * Decía «sin mover un byte del contrato, del árbitro, de la mesa ni del canal».
-     * Dejarla así sería la peor clase de mentira que cabe en este fichero: el
-     * comprobador estaría verde —se volvió a sellar a sabiendas— y el renglón que
-     * dice qué compra estaría contando la fase anterior.
+     * La fase 4 bis le quitó «la mesa» —`mesas.ts` se movió por el campo de
+     * duración— y la fase 5 le quita «el contrato» y «el árbitro».
      *
-     * Lo que sigue siendo cierto, y es lo que la fase 4 vino a demostrar, es que el
-     * CONTRATO no se ha movido: `shared/arcade/`, el árbitro y el canal siguen byte
-     * a byte como estaban. Lo que se movió fue `mesas.ts`, que es la capa de mesa y
-     * no el contrato, y se movió por seis líneas de La Larga: un campo que dice
-     * desde cuándo se espera al que tiene el turno. Está justificado en la cabecera
-     * de aquel fichero y el sello lleva la fecha.
+     * Dejarla como estaba sería la peor clase de mentira que cabe en este fichero:
+     * el comprobador estaría verde —se volvió a sellar a sabiendas— y el renglón
+     * que dice qué compra estaría contando una fase anterior.
+     *
+     * LO QUE ESTE COMPROBADOR SIGUE COMPRANDO, y no es poco: que el núcleo no
+     * nombre a ningún juego, que no importe nada de `juegos/`, que Riberas siga
+     * encima empujándolo, y que cualquier movimiento futuro sea una DECISIÓN —un
+     * sello con fecha en el diff— y no un descuido de tres líneas escondido entre
+     * las trescientas de un juego.
+     *
+     * Lo que se movió en la fase 5 y por qué, resumido: `opciones.ts` (nuevo),
+     * `tipos.ts` (nombres de asiento), `proyeccion.ts` (tercer argumento),
+     * `motor.ts` (rechazo con motivo), `index.ts` (el alta y los lectores) y
+     * `arbitro.ts` (transportar el motivo). Los tres huecos que las cuatro fases
+     * anteriores rodearon a propósito para no falsear la medida de la fase 4 — que
+     * ya está tomada y publicada.
      */
     porque:
-      'el juego más rico de los cuatro entra sin mover un byte del contrato, del árbitro ni del canal — y `mesas.ts` sólo se movió por el campo de duración de la fase 4 bis, sellado aparte y a sabiendas',
+      'el núcleo sigue sin nombrar a ningún juego y sin importar de `juegos/`, con Riberas encima; y lo que la fase 5 movió del contrato está sellado a sabiendas, con el sello en el diff',
+  },
+
+  /*
+   * ═══ LOS DOS DE LA FASE 5, Y VAN EN ESTE ORDEN ═══
+   *
+   * Primero el presupuesto y después el arcade de fuera, porque el primero es la
+   * comprobación de SEGURIDAD del segundo: el enchufe mete código ajeno en este
+   * mismo proceso, y lo único que hay entre un reductor mal escrito y todas las
+   * veladas en curso es el tope. Leídos en este orden, el segundo se apoya en el
+   * primero; al revés, parece que el enchufe entra sin red.
+   *
+   * El segundo va `lento` porque LEVANTA UN SERVIDOR, y no por manía: la mitad de
+   * lo que afirma no se puede comprobar de otra forma. Que las garantías de
+   * arranque —`exigirSecretosTapados()` y `exigirQueAguantenVacio()`— alcancen a un
+   * arcade que llega por una variable de entorno sólo se ve arrancando; y la ruta
+   * de Windows por `pathToFileURL` es un fallo del CARGADOR DE MÓDULOS, que no
+   * aparece hasta que hay un `import()` de verdad.
+   */
+  {
+    nombre: 'presupuesto exigido',
+    donde: 'server',
+    guion: 'verify:presupuesto',
+    porque:
+      'un reductor que se pasa del tope —de tiempo síncrono o de tamaño de estado— se rechaza sin dejar rastro en la mesa y no vuelve a entrar en el hilo: se le para ANTES de llamarle, contando las entradas; y los demás arcades siguen jugando',
+  },
+  {
+    nombre: 'arcade de fuera',
+    donde: 'server',
+    guion: 'verify:arcade-de-fuera',
+    lento: true,
+    porque:
+      'un arcade escrito en un fichero temporal fuera del repositorio se instala por `ARCADES_EXTERNOS` —con la ruta de Windows, que es donde falla el cargador—, sale en el catálogo, abre mesa, esconde la mano de cada cual, pinta con el mueble genérico desde sus propias `opciones()` y dice POR QUÉ rechaza un movimiento',
   },
 ];
 
