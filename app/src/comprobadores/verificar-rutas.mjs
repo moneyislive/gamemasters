@@ -208,10 +208,35 @@ if (!fs.existsSync(GENERADO)) {
 const esperadas = rutasDelArbol(PANTALLAS);
 const declaradas = rutasDeclaradas(fs.readFileSync(GENERADO, 'utf8'));
 
-const faltan = [...esperadas.keys()].filter((r) => !declaradas.has(r)).sort();
-const sobran = [...declaradas].filter((r) => !esperadas.has(r) && !DE_LA_CASA.has(r)).sort();
+/*
+ * ═══ LA BASURA SE SEPARA DE LO QUE FALTA, Y NO ES COSMÉTICA ═══
+ *
+ * Una ruta de `expo-router` sale del árbol de ficheros, así que NUNCA puede
+ * llevar `..` dentro: no hay forma de escribir una pantalla que suba de
+ * directorio. Cuando aparece `/../src/arcade/bolsillo` en la tabla, eso no es
+ * una ruta que se haya quedado sin fichero: es un ESPECIFICADOR DE MÓDULO que
+ * se ha colado en la generación.
+ *
+ * Pasó de verdad, y por eso está escrito: dos `expo start --web` de otra sesión
+ * vigilando este mismo árbol regeneraban la tabla al vuelo mientras la batería
+ * corría, y metían dentro rutas de módulo de ficheros recién creados. La
+ * primera versión de este comprobador las anunciaba como «3 rutas que la tabla
+ * declara y ya no tienen fichero», que manda a quien lo lea a buscar pantallas
+ * borradas que nunca existieron. Media hora de búsqueda por un mensaje.
+ *
+ * Separarlas cambia el diagnóstico y el arreglo: lo que falta se arregla
+ * regenerando; la basura se arregla regenerando CON LOS OTROS EMPAQUETADORES
+ * PARADOS, porque si no la vuelven a meter en cuanto se escriba un fichero.
+ */
+const esBasura = (r) => r.includes('..');
 
-if (faltan.length > 0 || sobran.length > 0) {
+const declaradasDeVerdad = new Set([...declaradas].filter((r) => !esBasura(r)));
+const basura = [...declaradas].filter(esBasura).sort();
+
+const faltan = [...esperadas.keys()].filter((r) => !declaradasDeVerdad.has(r)).sort();
+const sobran = [...declaradasDeVerdad].filter((r) => !esperadas.has(r) && !DE_LA_CASA.has(r)).sort();
+
+if (faltan.length > 0 || sobran.length > 0 || basura.length > 0) {
   console.error('✗ La tabla de rutas generada NO está al día con las pantallas que hay.');
   console.error('');
   if (faltan.length > 0) {
@@ -224,6 +249,16 @@ if (faltan.length > 0 || sobran.length > 0) {
     console.error(`  ${sobran.length} ruta(s) que la tabla declara y ya no tienen fichero —`);
     console.error('  navegar a ellas compila y revienta al pulsar:');
     for (const r of sobran) console.error(`      ${r}`);
+    console.error('');
+  }
+  if (basura.length > 0) {
+    console.error(`  ${basura.length} entrada(s) que NO son rutas: llevan \`..\` dentro, y ninguna pantalla puede`);
+    console.error('  subir de directorio. Son especificadores de MODULO colados en la generacion:');
+    for (const r of basura) console.error(`      ${r}`);
+    console.error('');
+    console.error('  Esto NO se arregla buscando pantallas borradas. Lo escribe un empaquetador VIVO');
+    console.error('  mientras se regenera: mira si hay otro `expo start` corriendo contra este arbol');
+    console.error('  —`netstat -ano | grep LISTENING`— y regenera con el suyo parado, o volvera a meterlas.');
     console.error('');
   }
   console.error('  Mientras no coincidan, el veredicto de `tipos · móvil` habla de otro árbol.');
