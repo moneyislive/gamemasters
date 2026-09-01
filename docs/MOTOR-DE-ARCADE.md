@@ -613,10 +613,12 @@ tecleado, sin cuenta, sin correo y sin obligaciones de datos personales.
 
 ### 5.8 Proyección obligatoria
 
-Si el manifiesto declara `secretos: true` y no hay proyección registrada, **el
+Si un arcade está obligado a proyectar y no hay proyección registrada, **el
 arranque falla**. Un fallo mudo —un juego que filtra el mazo y nadie ve un
 error— se convierte en una negativa ruidosa a arrancar, que es lo que ya hace el
-registro de veladas con las altas perdidas.
+registro de veladas con las altas perdidas. Quién está obligado lo contesta
+`exigeProyeccion()`, en `shared/arcade/tipos.ts`, y no es sólo quien declara
+secretos: el otro caso está en el apartado de aquí abajo.
 
 No se deriva de unas «zonas» declaradas en el manifiesto: eso obligaría al motor
 a interpretar la forma del estado, y contradice la opacidad de la que cuelga todo
@@ -628,6 +630,65 @@ se oculta nada en el cliente: sencillamente no se envía».
 *Lo obligan La Ronda y Riberas. Y La Frente al revés, que es lo que lo hace un
 concepto de plataforma y no de tablero: quien lleva el móvil en la frente es el
 único que NO puede ver la palabra.*
+
+#### Toda mesa de servidor de más de uno proyecta, aunque no esconda nada
+
+**Este apartado decía que la proyección la exige `secretos: true` y nada más, y
+eso es falso.** Dejó de ser cierto en cuanto `exigeProyeccion()` dejó de ser
+`return m.secretos`. Hoy la función, entera, es:
+
+```ts
+return m.secretos || (necesitaMesa(m) && m.jugadores.maximo > 1);
+```
+
+O sea que **una mesa de SERVIDOR con más de un asiento tiene que registrar
+proyección aunque su estado no tenga absolutamente nada que esconder**.
+
+El porqué lo tiene escrito la propia función y no hace falta repetirlo entero:
+con la versión vieja, `vistaDeAsiento` devolvía el estado ENTERO cuando no había
+proyección y el booleano estaba a `false`, así que un juego con manos ocultas que
+se olvidara de escribir `secretos: true` publicaba la partida completa a todos los
+asientos **y el comprobador de fugas lo daba por bueno** —también se salta a los
+arcades que no declaran secretos, o sea que comprobaba un conjunto vacío y
+anunciaba que no había fugas—. Adivinarlo no se puede: el estado es opaco y nadie
+de fuera del juego sabe si dentro hay algo que tapar. Lo único que se podía
+cambiar era el valor por defecto, y eso es lo que se cambió.
+
+**Lo que cuesta que esto no estuviera escrito aquí lo paga el siguiente que
+escriba un arcade**, y el camino es exacto: sede de servidor, dos asientos o más,
+`secretos: false` porque el juego enseña el tablero entero; lee este §5.8, ve que
+no declara secretos, no registra proyección — y **el servidor se niega a arrancar**
+con `ArcadeSinProyeccion`. Lo lanza `exigirSecretosTapados()`, que
+`server/src/index.ts` llama antes de ponerse a escuchar. La negativa es correcta y
+no hay que ablandarla: lo que faltaba era que la regla estuviera donde la lee
+quien va a escribir el juego, y no sólo en el código que se la aplica.
+
+Y cuando de verdad no hay nada que tapar, la proyección es la identidad y se
+escribe en una línea:
+
+```ts
+registrarProyeccion<EstadoDelJuego>('mi-arcade', (estado) => estado);
+```
+
+La diferencia con el silencio de antes es que ahora es una línea que alguien
+escribió a propósito. El caso vivo está en `verificar-arcade-de-fuera.ts`: «El
+Vado» es de servidor, admite dos, declara `secretos: false` y registra proyección
+igualmente — si se la quitaran, ese comprobador se pondría rojo al arrancar el
+servidor y no al jugar.
+
+Dos avisos para quien vaya después al código:
+
+- **`loSecreto` NO se ensancha con esto.** Se le sigue pidiendo sólo a quien
+  declara `secretos: true` —`exigeLoSecreto()`, en el mismo fichero—, porque dice
+  *qué valores no pueden salir* y a un juego sin secretos eso le sobra: sería
+  pedirle que escriba «no escondo nada» para que un comprobador lo lea. Son dos
+  preguntas y no una, y ése es justo el arreglo: antes colgaban del mismo booleano
+  y ensanchar una habría ensanchado la otra.
+- **Las funciones que lo aplican se llaman `arcadesConSecretosSinTapar()` y
+  `exigirSecretosTapados()`, y el nombre se les quedó corto.** En esa lista sale
+  también un arcade **sin** secretos al que sólo le falta la proyección. Quien lea
+  el nombre y dé por hecho que a su juego no le afecta porque no esconde nada, se
+  equivoca — y se entera arrancando.
 
 #### `loSecreto`: por qué exigir la proyección no basta
 
@@ -709,23 +770,82 @@ separadas sin duplicar nada: `opciones()` no puede ofrecer de más, y el reducto
 no puede confiarse de menos. El rechazo devuelve **el mismo objeto de estado**,
 que es el que la mesa ya cuenta como movimiento que no cambió nada.
 
-### La factura del «sólo si», y hay que tenerla escrita
+### La factura del «sólo si», que ya está pagada
 
-La regla tiene un precio y conviene cobrarlo por adelantado en vez de descubrirlo
-depurando. El §5.2 obliga a que un movimiento rechazado devuelva **el mismo
-objeto de estado**, nunca un motivo: es lo que mantiene el reductor puro y lo que
-la mesa ya cuenta como «no pasó nada».
+**Este apartado cobraba el canal de motivos como «deuda urgente» y afirmaba que
+«no hay canal entre "el reductor rechazó" y la pantalla». Era cierto cuando se
+escribió y hoy es falso: el canal está construido de punta a punta.** Se corrige
+aquí porque una deuda que se cobra dos veces manda a alguien a construir por
+segunda vez lo que ya existe, y esta vez lo construiría al lado.
 
+La factura era real, y conviene dejar de dónde venía. El §5.2 obliga a que un
+movimiento rechazado devuelva **el mismo objeto de estado**, nunca un motivo: es
+lo que mantiene el reductor puro y lo que la mesa cuenta como «no pasó nada».
 Mientras el rechazo era raro, eso era una incomodidad. Con el «sólo si», **el
 rechazo silencioso pasa a ser el camino normal**: cada sitio donde un juego
-ejerce la regla produce un movimiento que la app solo puede describir como «la
+ejerce la regla producía un movimiento que la app sólo podía describir como «la
 mesa está igual que estaba», deduciéndolo de que la revisión no subió. Nunca
 *por qué*.
 
-O sea que la regla del espejo **encarece** el hueco que ya existía —no hay canal
-entre «el reductor rechazó» y la pantalla— y lo convierte de deuda anotada en
-deuda urgente. No es un reproche a la regla: es su factura. Y está escrita aquí
-para que quien la pague sepa de dónde viene.
+Se pagó **sin tocar el §5.2**, y ésa es la parte que hay que entender antes de
+tocar nada: el rechazo sigue devolviendo el mismo objeto de estado, y **el motivo
+viaja por fuera**.
+
+- **El núcleo.** `rechazar(estado, motivo)` y `Rechazo<E>`, en
+  `shared/arcade/motor.ts`. Un `Rechazo` es un envoltorio con clave de SÍMBOLO
+  —`Symbol.for('gamemasters.arcade.rechazo')`, anclado por lo mismo que las tablas
+  del registro: este fichero se puede cargar por dos especificadores distintos, y
+  con un símbolo privado por módulo una copia no reconocería el rechazo de la
+  otra— que lleva dentro el estado y la frase. No es estado: `aplicar()` lo abre y
+  tira la frase, `reejecutar()` pasa por `aplicar()`, y **el mismo diario sigue
+  dando exactamente el mismo estado final, con motivo o sin él**. Un juego que no
+  use `rechazar()` sigue siendo válido: devolver el estado a secas es lo que había
+  y sigue estando bien para un juego cuyo botón nunca se pinta cuando no se puede
+  pulsar.
+- **La puerta que sí lo conserva.** `aplicarConMotivo()` devuelve
+  `{ estado, motivo }` y existe aparte para que el motivo haya que PEDIRLO por su
+  nombre: si `aplicar()` devolviera el envoltorio, todo el que hoy escribe
+  `estado = aplicar(...)` tendría de pronto un objeto donde espera un estado, y el
+  fallo sería mudo. Encima van `avanzarConMotivo()` —`shared/arcade/index.ts`— y
+  `jugarConMotivo()` —`server/src/arcade/arbitro.ts`—.
+- **El transporte.** `VistaDeMesa.motivo`, en `server/src/arcade/mesas.ts`. Lo
+  rellena sólo `mover` y sólo para quien mandó ese movimiento; toda lectura lo trae
+  a `null`, porque un motivo es de UN intento de UNA persona y no un campo de la
+  mesa.
+- **La pantalla.** `app/src/arcade/mesa.ts` y `escritorio/src/mesa.ts` lo pintan,
+  con la frase vieja —«la mesa está igual que estaba»— degradada a respaldo para
+  los juegos que rechazan sin decir nada.
+
+Y un rechazo **no cuenta como movimiento**: la mesa lo descarta entero —revisión,
+diario y estado—, así que ni sube la `rev`, ni entra en el diario, ni despierta a
+los demás asientos. Ahí se impone además, en la capa que puede permitírselo, el
+contrato que el núcleo decidió NO imponer —«el estado de un rechazo es el que se
+recibió»—, y el núcleo no lo impone por un caso legítimo y frecuente: un reductor
+que construye su estado inicial en el primer movimiento (`estado ?? partidaNueva()`)
+y rechaza ese mismo movimiento devuelve algo que no es idénticamente lo que
+recibió, porque lo que recibió era `undefined`.
+
+#### Lo que sigue sin estar, que es poco y no es nada
+
+- **Un motivo puede filtrar, y ningún comprobador genérico lo caza.** La regla
+  —**un motivo no puede decir nada que la proyección de quien mueve no dijera
+  ya**— está escrita en `motor.ts` y no la impone nada estático: `verify:mesa`
+  busca valores canónicos *con comillas* y un motivo es una frase en castellano.
+  Hoy se comprueba A MANO y en un solo juego: `verificar-riberas.ts` afirma a la
+  letra que el motivo de un trueque que ya no se puede pagar no nombra ningún
+  bien, ni al oferente, ni dice que le falte algo. Es la clase de línea que
+  alguien «mejora» para que el mensaje ayude más, y con eso el almacén ajeno
+  empieza a salir de su asiento sin que nada se ponga rojo.
+- **Los juegos de dispositivo no tienen el canal.** `app/src/arcade/bucle.ts` y
+  `app/src/arcade/local.ts` llaman a `avanzar()`, no a `avanzarConMotivo()`, así
+  que un `rechazar()` dentro de un arcade de `sede: 'dispositivo'` se traga el
+  motivo en silencio. La cabecera de `aplicarConMotivo()` ya da por hecho lo
+  contrario —dice que la llama «el árbitro, y el bucle de un juego de
+  dispositivo»— y esa mitad todavía no es cierta. No se pierde nada hoy porque los
+  que llaman a `rechazar()` son La Ronda, Riberas y el arcade de fuera de
+  `verificar-arcade-de-fuera.ts`, los tres de servidor; queda escrito para que el
+  día que un juego de aparato lo intente, el motivo mudo no haya que descubrirlo
+  depurando.
 
 ### Los identificadores que publica son seudónimos por asiento
 
@@ -1147,7 +1267,7 @@ lo que hay que replicar.
 | `verify:sin-red` | Juega una partida entera de La Frente con la capa de red sustituida por una función que **lanza**. Una sola llamada, rojo. Es más fuerte que declarar un transporte «ninguno», porque no comprueba una intención sino un hecho | 1 |
 | `verify:procedencia` | Que todo manifiesto declare su procedencia, y una lista negra de marcas registradas —en fichero, revisable, con un comentario que explique por qué está cada nombre— contrastada contra el nombre visible, el lema, los rótulos y el contenido de las barajas | 1 |
 | `oro:arcade` | Hermano de `oro:verificar`: un registro de movimientos grabado por arcade y el estado final byte a byte | 1 |
-| `verify:mesa` | **Levantando el servidor**, no en proceso. Actuar sin asiento, mandar un `rev` rancio, cortar y resincronizar. Y lo que de verdad cierra el agujero: llamar a `loSecreto(estado)` del juego y comprobar que **ninguno** de esos valores aparece en la proyección de otro asiento — sin eso, una proyección que sea la identidad pasa en verde. Más que un manifiesto con `secretos: true` sin proyección o sin `loSecreto` **no deje arrancar** | 2 |
+| `verify:mesa` | **Levantando el servidor**, no en proceso. Actuar sin asiento, mandar un `rev` rancio, cortar y resincronizar. Y lo que de verdad cierra el agujero: llamar a `loSecreto(estado)` del juego y comprobar que **ninguno** de esos valores aparece en la proyección de otro asiento — sin eso, una proyección que sea la identidad pasa en verde. Más que un manifiesto **obligado a proyectar** sin proyección **no deje arrancar**, y obligados lo están los que declaran `secretos: true` **y toda mesa de servidor de más de un asiento** (ver §5.8); y que uno con `secretos: true` sin `loSecreto` tampoco arranque. **Hoy el arcade que monta para eso declara secretos**, así que la rama ancha no la levanta ninguna prueba de arranque en negativo: sólo la cubre de rebote `verify:arcade-de-fuera`, cuyo «El Vado» es de servidor, admite dos, no declara secretos y proyecta | 2 |
 | `verify:determinismo` | El mismo registro de movimientos dos veces, comparando el hash del estado **serializado con `canonico.ts`**, y después en Node y en Hermes, comparando entre sí. Sin la serialización canónica, dos estados idénticos con distinto orden de inserción darían hashes distintos y el comprobador gritaría sin que pase nada | 3 |
 | `verify:marcador` | Una repetición fabricada se rechaza; una real se acepta al reejecutarla; un récord enviado como cifra suelta se rechaza siempre; y la duración declarada se contrasta con el tiempo de pared | 3 |
 | `verify:presupuesto` | Un reductor que tarde más del tope síncrono, o produzca un estado mayor del permitido, se rechaza **antes** de bloquear el bucle de eventos | 5 |
@@ -1260,6 +1380,17 @@ Larga» como quinto juego-prueba, los espectadores, el traslado de `presencia.ts
 la advertencia sobre la detección de licencias, los metadatos de `'licenciado'` y
 el glosario del §1 bis. Queda escrito aquí porque un documento que no dice en qué
 se equivocó invita a creerle más de lo que merece.
+
+Y se ha corregido **una segunda vez**, tras una auditoría adversaria contra el
+código ya escrito, con dos hallazgos que son el mismo fallo por los dos lados:
+**el diseño se había quedado atrás respecto del código**. El §5.8 seguía diciendo
+que sólo `secretos: true` obliga a proyectar cuando `exigeProyeccion()` obliga
+además a toda mesa de servidor de más de un asiento —una regla que sólo vivía en
+el código que la aplica, o sea que su primera víctima iba a ser quien no la
+leyera—, y el §5 bis seguía cobrando como «deuda urgente» un canal de motivos de
+rechazo que estaba construido de punta a punta. La frase de arriba —«si algo de
+aquí no coincide con el código, gana el código»— no basta por sí sola: quien lee
+un diseño no sabe qué párrafos tiene que ir a contrastar.
 
 Versión navegable del mismo informe:
 <https://claude.ai/code/artifact/a1674903-8c12-4897-a986-00c7667e0456>

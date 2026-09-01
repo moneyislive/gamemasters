@@ -41,7 +41,21 @@ Environment=MESAS_DIR=/var/lib/gamemasters/mesas
 # (`systemctl cat`). Van en un fichero aparte, propiedad de root y en modo 600.
 EnvironmentFile=/etc/gamemasters/entorno
 
-ExecStart=/usr/bin/node dist/index.js
+# EL BINARIO ESTA EN `server/dist/`, NO EN `dist/`.
+#
+# Aqui ponia `dist/index.js`, y con `WorkingDirectory=/opt/gamemasters` eso
+# apunta a un fichero que el build NO CREA NUNCA: `server/package.json` compila
+# con `--outfile=dist/index.js` y lo hace desde `server/`, asi que el resultado
+# es `/opt/gamemasters/server/dist/index.js`.
+#
+# El servicio no podia levantar en esta maquina, y el sintoma es del peor tipo:
+# systemd dice «status=1/FAILURE» y el diario, «Cannot find module», sin
+# nombrar ni el build ni la carpeta que falta.
+#
+# El WorkingDirectory se queda como esta A PROPOSITO: de el cuelgan la ruta por
+# defecto de MESAS_DIR y las busquedas del taller y del cliente de escritorio,
+# que son relativas a la raiz del repositorio y no a `server/`.
+ExecStart=/usr/bin/node server/dist/index.js
 
 Restart=always
 RestartSec=5

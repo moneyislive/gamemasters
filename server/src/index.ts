@@ -42,6 +42,7 @@ import descargaRouter, { comprobarLaDescarga } from './enlaces/descarga';
 import jugarWebRouter from './enlaces/jugar-web';
 import escritorioWebRouter, { carpetaDelEscritorio } from './enlaces/escritorio-web';
 import correoRouter from './correo/router';
+import { modoDeCorreo } from './correo';
 import legalRouter from './legal/documentos';
 import limitadorDeIntentos from './puerta/montaje';
 import wellKnownRouter from './enlaces/well-known';
@@ -457,6 +458,25 @@ function comprobarArranque(): void {
   exigirCifrasLegibles();
 
   /*
+   * ═══ EL MODO DE CORREO, QUE SE VALIDABA CUANDO YA ERA TARDE ═══
+   *
+   * `modoDeCorreo()` lanza si `CORREO_MODO` no es «memoria» ni «ses», y
+   * `.env.example` lo anuncia diciendo que el servidor NO ARRANCA con un modo
+   * desconocido. No era verdad: la función sólo la llamaba `transporte()`, o sea
+   * al mandar el PRIMER correo.
+   *
+   * Y ése es el peor momento posible. Un modo mal escrito —«SES », «smtp»— dejaba
+   * arrancar el servidor tan tranquilo, y el fallo aparecía cuando alguien
+   * invitaba a doce personas a una velada: la invitación no sale, el Game Master
+   * ve un error que habla de una variable de entorno, y para entonces ya ha
+   * repartido la fecha.
+   *
+   * Una línea, al lado de las otras garantías, y el aviso llega cuando se
+   * despliega en vez de cuando se juega.
+   */
+  modoDeCorreo();
+
+  /*
    * Las costuras de prueba de OIDC permiten apuntar la verificación de
    * identidad a un emisor y a unas claves cualesquiera. Es justo lo que hace
    * falta para probarlo sin cuentas de Google ni de Apple, y justo lo que
@@ -479,7 +499,30 @@ function comprobarArranque(): void {
     );
   }
 
+  /*
+   * ═══ «FALTA» Y «ESTÁ MAL ESCRITA» NO SON LO MISMO, Y DECÍAN LO MISMO ═══
+   *
+   * `readPublicOrigin()` devuelve `undefined` en los dos casos: cuando la
+   * variable no está y cuando está pero `new URL(...)` no la traga. Así que
+   * quien escribía `harkania.com` sin el `https://` —el error más fácil de todos
+   * y el que más se comete— recibía «Falta PUBLIC_ORIGIN» con la variable
+   * puesta delante, y se iba a mirar el panel del despliegue en vez de mirar el
+   * valor.
+   *
+   * Se distingue AQUÍ y no dentro de `readPublicOrigin` a propósito: esa función
+   * contesta «el origen que se puede usar, o ninguno», y ése es su contrato
+   * entero. Quien tiene que dar un diagnóstico es quien se niega a arrancar.
+   */
   if (process.env.NODE_ENV === 'production' && !env.publicOrigin) {
+    const crudo = process.env.PUBLIC_ORIGIN?.trim();
+    if (crudo) {
+      throw new Error(
+        `PUBLIC_ORIGIN vale «${crudo}», y no se puede leer como una dirección. Casi siempre es ` +
+          'que le falta el esquema: hace falta «https://harkania.com», no «harkania.com».\n' +
+          'Sin un origen legible el servidor se cree lo que diga la cabecera Host, y de ahí ' +
+          'cuelgan la dirección de vuelta de Google y el flag «secure» de las cookies.',
+      );
+    }
     throw new Error(
       'Falta PUBLIC_ORIGIN y esto es producción. Sin ella el servidor se cree lo que diga la ' +
         'cabecera Host, así que la dirección de vuelta que se le manda a Google la elige quien ' +
@@ -488,6 +531,41 @@ function comprobarArranque(): void {
         'Y de ella cuelga el flag «secure» de las cookies: sin origen, una sesión de noventa ' +
         'días puede acabar viajando en claro sin que nada falle a la vista.\n' +
         'Defínela con el dominio público, sin barra final. Ejemplo: https://harkania.com',
+    );
+  }
+
+  /*
+   * ═══ Y LA QUINTA, QUE ES LA QUE FALTABA Y PIERDE PARTIDAS ═══
+   *
+   * `MONGODB_URI` va en `render.yaml` con `sync: false`: no la trae el blueprint,
+   * la teclea una persona en el panel. Si falta —una sincronización rechazada,
+   * una errata en el nombre de la clave, un servicio nuevo creado desde otra
+   * rama— `initStore()` se salta entera la rama de Mongo y cae al fichero JSON
+   * local. Y eso, en un contenedor, es el sistema de ficheros efímero.
+   *
+   * EL MODO DE FALLO ES EL PEOR QUE HAY: no hay error. El servidor levanta,
+   * `/api/salud` contesta que sí, Render da el despliegue por bueno, y la gente
+   * monta veladas y juega tan tranquila. Todo se guarda de verdad… hasta el
+   * siguiente `git push`, que se lleva el disco y con él lo que no estaba en
+   * Mongo. Nadie relaciona una cosa con la otra, porque entre las dos pasan días.
+   *
+   * Va aquí y no en `store.ts` por lo mismo que las otras cuatro: negarse a
+   * arrancar se arregla en cinco minutos y con el aviso delante; arrancar mal se
+   * descubre cuando ya se han perdido las partidas de alguien.
+   *
+   * Y comprueba LA VARIABLE, no la conexión. Comprobar la conexión ataría el
+   * arranque a que Atlas conteste en ese instante, y un parpadeo de red dejaría
+   * el servicio sin levantar por algo que se arregla solo. Lo que esta guarda
+   * compra es que nadie se haya olvidado de configurarla, que es el fallo real.
+   */
+  if (process.env.NODE_ENV === 'production' && !process.env.MONGODB_URI?.trim()) {
+    throw new Error(
+      'Falta MONGODB_URI y esto es producción. Sin ella el servidor NO da error: cae al fichero ' +
+        'JSON local, que en un contenedor vive en el sistema de ficheros efímero y desaparece en ' +
+        'el siguiente despliegue.\nTodo parece ir bien —la salud dice que sí, las partidas se ' +
+        'guardan y se juegan— hasta que un «git push» se lleva semanas de veladas sin que nada lo ' +
+        'relacione con esto.\nDefínela en el panel del despliegue, o arranca sin ' +
+        'NODE_ENV=production si de verdad quieres una instancia sobre fichero.',
     );
   }
 }

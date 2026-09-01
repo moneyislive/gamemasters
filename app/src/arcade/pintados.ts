@@ -54,22 +54,55 @@ import { MUEBLES } from './muebles';
 import { ElTableroEnLinea } from './tablero-en-linea';
 
 /**
- * QUÉ COMPONENTE PINTA CADA ARCADE QUE TRAE ESTE BINARIO.
+ * QUÉ ARCADES DEL BINARIO TIENEN PANTALLA PROPIA. NO SON TODOS, Y ESO ES LO NUEVO.
  *
- * ═══ POR QUÉ SIGUE HABIENDO UNA TABLA POR JUEGO, QUE ES UNA DEUDA ═══
+ * Cuatro filas para cinco arcades instalados, y la resta es la noticia: «La Ronda»
+ * viene dentro —`shared/arcade/juegos/index.ts` la da de alta— y NO tiene fila
+ * aquí. La pinta `LOS_MUEBLES_GENERICOS`, por el mismo camino exacto que recorre un
+ * arcade que no está en el binario.
  *
- * Un mueble genérico de verdad —`formulario`, `tablero`— tendría que preguntarle
- * al juego qué se puede hacer ahora mismo y pintar eso sin saber a qué se juega.
- * Esa función existe en el diseño, se llama `opciones()`, y llega con Riberas en
- * la fase 4. Escribirla hoy, con dos juegos y los dos de fiesta, la dejaría con la
- * forma de La Frente — el error que este motor entero existe para no repetir.
+ * ═══ ESTE BLOQUE DECÍA «SIGUE HABIENDO UNA TABLA POR JUEGO, QUE ES UNA DEUDA» ═══
  *
- * `lienzo` es otra cosa y ahí la tabla NO es deuda: es la decisión de producto más
- * cara del diseño, escrita en su §7. Un juego que quiere sus propios píxeles está
- * en el binario, y el enchufe de la fase 5 alcanza a las reglas y no a los
- * píxeles. Un arcade de fuera con mueble `lienzo` no se puede pintar, y eso no es
- * un fallo que arreglar: es lo que se decidió, y lo que se ahorra es escribir un
- * intérprete de escenas que saldría a medida del primer juego que lo usara.
+ * Se escribió en la fase 4 y describía la Sala de aquel día. Sus tres afirmaciones
+ * son hoy falsas, y hay que decir cuáles para que nadie las vuelva a escribir:
+ *
+ *   · «`opciones()` … llega con Riberas en la fase 4». Riberas la escribió, sí,
+ *     pero DENTRO de su fichero: la llamaban su propio reductor y su propio
+ *     tablero, y el alta no tenía hueco para ella. No por descuido — abrirlo habría
+ *     sido tocar `shared/arcade/`, o sea falsear la única medida que la fase 4
+ *     existía para tomar, que un juego rico cabe con el diff del núcleo vacío. El
+ *     hueco es de la fase 5: `opciones?: Opciones<V>` en `instalarArcade`, que es
+ *     lo que permite preguntarle a un arcade QUE NO SE CONOCE qué se puede hacer.
+ *     El porqué entero está en `shared/arcade/opciones.ts`.
+ *   · «con dos juegos y los dos de fiesta». Son cinco —La Frente, La Ronda, El
+ *     Arcade, Riberas y La Peonza— y entre ellos cubren los cuatro muebles del
+ *     contrato.
+ *   · «escribirla hoy … la dejaría con la forma de La Frente». Para `tablero` ya
+ *     está escrita y no salió con la forma de nadie: el mismo componente pinta
+ *     Riberas, pinta La Ronda y pinta un arcade que este binario no conoce. A qué
+ *     precio se compró eso está abajo, y no se repite aquí.
+ *
+ * ═══ TENER FILA AQUÍ NO ES LA DEUDA. LO QUE FALTA DEBAJO, SÍ ═══
+ *
+ * Una pantalla propia sobre un mueble genérico es legítima, y `quienPinta` la
+ * protege a propósito: La Frente es de `formulario` y quiere la suya, no que la
+ * plataforma le pinte encima. Lo que falta es lo de DEBAJO — para `formulario` no
+ * hay nada. Si La Frente no estuviera en esta tabla no se pintaría, y un arcade de
+ * fuera que declare ese mueble sale hoy con la tarjeta apagada aunque el mueble
+ * esté entregado y la app sepa pintarlo.
+ *
+ * Qué le falta a `formulario` para tener pintor genérico —y por qué escribirlo con
+ * un solo inquilino sería peor que no tenerlo— está razonado abajo, en
+ * `LOS_MUEBLES_GENERICOS`. Ahí, y una sola vez.
+ *
+ * ═══ Y PARA `lienzo` Y `escena` ESTA TABLA NO ES DEUDA DE NINGUNA CLASE ═══
+ *
+ * Es la decisión de producto más cara del diseño, escrita en su §7. Un juego que
+ * quiere sus propios píxeles está en el binario, y el enchufe de la fase 5 alcanza
+ * a las reglas y no a los píxeles. Un arcade de fuera con esos muebles no se puede
+ * pintar, y eso no es un fallo que arreglar: es lo que se decidió, y lo que se
+ * ahorra es escribir un intérprete de escenas que saldría a medida del primer juego
+ * que lo usara.
  */
 export const LOS_QUE_PINTA: Record<ArcadeId, ComponentType> = {
   [FRENTE]: LaFrente,

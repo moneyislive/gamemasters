@@ -85,6 +85,27 @@ async function pedir(
   return { estado: r.status, datos };
 }
 
+/**
+ * Lo último que dijo el servidor por sus salidas.
+ *
+ * ═══ ESTO FALTABA, Y COSTÓ DOS BATERÍAS EN ROJO SIN DIAGNÓSTICO ═══
+ *
+ * El proceso se lanzaba con `stdio: 'ignore'`, así que cuando no arrancaba este
+ * comprobador decía «el servidor no arrancó» y nada más — no porque no supiera
+ * más, sino porque había tirado a la basura lo que el propio servidor estaba
+ * gritando. Se vio en la batería dos veces seguidas, con treinta segundos de
+ * espera agotada y cero pistas, mientras suelto arrancaba en 1,6 segundos.
+ *
+ * Un fallo intermitente sin evidencia no se puede ni descartar ni arreglar: se
+ * repite la batería a ver si sale, que es exactamente cómo un rojo de verdad
+ * acaba tratándose como ruido.
+ *
+ * `verificar-mesa.ts` ya tenía esto escrito con su motivo —«media hora por un
+ * dato que el proceso ya había dicho en voz alta»— y lo mismo `marcador` y
+ * `larga`. Este fichero y otros dos no lo copiaron.
+ */
+let loQueDijoElServidor = '';
+
 async function esperarServidor(): Promise<void> {
   for (let i = 0; i < 120; i++) {
     try {
@@ -95,7 +116,12 @@ async function esperarServidor(): Promise<void> {
     }
     await new Promise((r) => setTimeout(r, 250));
   }
-  throw new Error('el servidor no arrancó');
+  throw new Error(
+    `el servidor no arrancó en el puerto ${String(PUERTO)} tras 30 s. Dijo:\n` +
+      (loQueDijoElServidor.trim().length > 0
+        ? loQueDijoElServidor.slice(-1500)
+        : '(nada: ni una línea por salida ni por error, así que ni siquiera llegó a arrancar)'),
+  );
 }
 
 /**
@@ -208,8 +234,14 @@ try {
       // Lo único que cambia respecto de un servidor normal.
       JUEGOS: REPARTO,
     },
-    stdio: 'ignore',
+    /*
+     * `pipe` y no `ignore`: sin esto, un arranque fallido no deja ni una linea y
+     * el comprobador solo puede decir «no arranco». Ver `loQueDijoElServidor`.
+     */
+    stdio: 'pipe',
   });
+  servidor.stdout?.on('data', (d: Buffer) => (loQueDijoElServidor += d.toString()));
+  servidor.stderr?.on('data', (d: Buffer) => (loQueDijoElServidor += d.toString()));
   await esperarServidor();
   await comprobarElReparto();
 } catch (e) {

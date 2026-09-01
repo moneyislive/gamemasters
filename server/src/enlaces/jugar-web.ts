@@ -90,7 +90,7 @@ if (carpeta) {
        <div><h1>Todavía no se puede jugar aquí</h1>
        <p style="opacity:.8">La versión de navegador no está compilada en este servidor.</p>
        <p style="opacity:.5;font-size:.85rem">Para quien administra: falta
-       <code>npm run build -w app</code> en el despliegue.</p></div>
+       <code>npm run build:app</code> en la raiz del repositorio.</p></div>
        </body></html>`,
     );
   });

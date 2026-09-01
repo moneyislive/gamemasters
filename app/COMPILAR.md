@@ -180,19 +180,49 @@ correo y ábrelo desde el teléfono.
 GitHub sirve archivos grandes gratis, con las cabeceras correctas y con una
 dirección que no caduca. Es el sitio.
 
+**Antes de subir nada, renombra el fichero.** EAS te lo da con un nombre suyo,
+largo y con un identificador dentro. Ponle exactamente este, con el guion y con
+la versión que estés publicando:
+
+```
+harkania-1.0.0.apk
+```
+
 1. Ve a **https://github.com/moneyislive/gamemasters/releases/new**
 2. En *Choose a tag*, escribe `v1.0.0` y pulsa **Create new tag**.
 3. En *Release title*, pon `v1.0.0`.
-4. **Arrastra el fichero `.apk`** a la caja de abajo («Attach binaries…») y
-   espera a que suba del todo.
+4. **Arrastra el fichero ya renombrado** a la caja de abajo («Attach
+   binaries…») y espera a que suba del todo. GitHub bautiza el adjunto con el
+   nombre que traiga el fichero, así que si se te olvidó renombrarlo, esta es
+   la última oportunidad.
 5. Pulsa **Publish release**.
 
-Ahora, en la página de la release, **haz clic derecho sobre el nombre del `.apk`
-→ Copiar dirección del enlace**. Eso es lo que necesitas. Tiene esta pinta:
+Para comprobar que ha quedado bien, en la página de la release **haz clic
+derecho sobre el nombre del `.apk` → Copiar dirección del enlace**. Tiene que
+salir exactamente esta:
 
 ```
-https://github.com/moneyislive/gamemasters/releases/download/v1.0.0/harkania.apk
+https://github.com/moneyislive/gamemasters/releases/download/v1.0.0/harkania-1.0.0.apk
 ```
+
+> **De dónde sale ese nombre, para no tener que deducirlo otra vez.** No es una
+> costumbre ni un capricho: esa dirección la construye el servidor, en la
+> función `apk()` de `server/src/enlaces/descarga.ts`, pegando
+> `https://github.com/{APK_REPO}/releases/download/v{APK_VERSION}/harkania-{APK_VERSION}.apk`
+> — donde `APK_REPO` vale `moneyislive/gamemasters` si no la defines. El
+> servidor **no pregunta a GitHub cómo se llama tu fichero**: lo da por
+> supuesto. El que tiene que cumplir el patrón eres tú, al subirlo.
+>
+> **Aquí el ejemplo decía `harkania.apk`, sin la versión, y hoy es falso.**
+> Cuando se escribió esta guía lo era: la dirección se ponía entera a mano en
+> `APK_URL`, y entonces el fichero podía llamarse como quisieras. Al día
+> siguiente se cambió el servidor para deducirla de la versión —por lo que
+> cuenta el paso 8— y se actualizó el paso 8, pero este ejemplo se quedó como
+> estaba. Quien lo copiara publicaba la release con el nombre corto, y el
+> resultado no es un error visible: el botón de `/descargar` **sale igual**,
+> porque solo depende de que `APK_VERSION` esté puesta, y da 404 al pulsarlo.
+> Justo el fallo que el servidor se rediseñó para hacer imposible, colándose
+> otra vez por la puerta de atrás: la documentación.
 
 ---
 

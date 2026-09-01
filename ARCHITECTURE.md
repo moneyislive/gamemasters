@@ -11,13 +11,23 @@ jugadores, el espacio físico y los objetos aportados.
 - `app/` — Expo (React Native) + expo-router. La app de los jugadores para la
   partida en vivo: iOS, Android y web con un solo código. Ver `app/README.md`.
 - `client/` — React 18 + Vite + TypeScript. Zustand, react-router-dom v6, framer-motion.
+- `escritorio/` — React 18 + Vite + TypeScript. La Sala de Arcade para PC: DOM y
+  SVG del navegador, sin una sola línea de React Native. No lleva `react-router`
+  ni Zustand aunque el taller sí los lleve — no es de su familia: son dos
+  pantallas y una consulta, y cada arcade es una dirección (`/sala/riberas`,
+  con el código de la mesa en `?codigo=`), que es lo que convierte «te paso el
+  código» en «te paso el enlace» delante de un teclado.
 - `server/` — Node 20 + Express 4 + TypeScript (ESM, ejecutado con tsx). Mongoose
   (MongoDB Atlas) con fallback a fichero JSON. `@anthropic-ai/sdk`.
 - `shared/types.ts` — contrato de tipos. Importar SIEMPRE con ruta relativa
   (`../../shared/types` desde `server/src/*`, `../../../shared/types` desde
   `client/src/<dir>/*`). Solo importar TIPOS de ahí (import type).
 
-Puertos: cliente 5173 (proxy `/api` y `/uploads` → 5174), servidor 5174.
+Puertos: cliente 5173 (proxy `/api` y `/uploads` → 5174), servidor 5174,
+escritorio 5175 (proxy `/api` → 5174, solo en desarrollo: en producción lo sirve
+el mismo Node en `/sala`, y por eso el escritorio habla siempre con rutas
+relativas y no tiene una rama de «si estoy en dev, apunta a otro sitio», que es
+una rama que solo se prueba en dev).
 
 ## Reglas comunes
 
@@ -36,6 +46,105 @@ Puertos: cliente 5173 (proxy `/api` y `/uploads` → 5174), servidor 5174.
   `.agent-highlight`, tokens `--gold-*`, `--felt-*`, `--parchment`, fuentes
   `var(--font-heading)` / `var(--font-body)` / `var(--font-display)`).
   Cada módulo puede añadir su propio CSS en ficheros nuevos dentro de su ownership.
+
+## El segundo motor: la Sala de Arcade (shared/arcade/, server/src/arcade/, server/src/canal/)
+
+Todo lo que sigue en este documento hasta el despliegue —la puerta del taller, el
+modelo de datos, la API REST, el agente, la generación, los dosieres y el
+estudio— es de **un solo motor**: el de las veladas, partidas que dirige un Game
+Master. Hay un segundo, y su contrato entero está en
+[docs/MOTOR-DE-ARCADE.md](docs/MOTOR-DE-ARCADE.md): ahí hay que ir antes de
+escribir una línea de arcade, porque este apartado solo dice que existe y dónde
+vive. Un arcade es un juego **sin Game Master**: nadie da de alta a los
+jugadores, no hay trama generada por IA, no hay dosieres imprimibles y no hay
+taller detrás.
+
+### La regla de la que cuelgan todas las demás: independencia total
+
+**El motor de arcade no extiende el de veladas, no lo hereda, no lo configura y
+no comparte su contrato.** Son dos motores hermanos que conviven en el mismo
+repositorio y en el mismo proceso de Node, y que no se conocen. Eso no es una
+preferencia de estilo, y `verify:fronteras`
+(`server/scripts/verificar-fronteras.ts`) lo comprueba leyendo las importaciones
+de verdad, no la intención:
+
+- `server/src/arcade/**` no importa de `server/src/live/**`, `server/src/docs/**`
+  ni `server/src/agent/**`, **y al revés**. La dirección contraria es igual de
+  grave: un motor de veladas que sabe qué es un arcade es un motor con dos modos,
+  y el segundo es el que no se probó.
+- `shared/arcade/**` no importa de `shared/juegos/**`, ni de `shared/live`,
+  `shared/types`, `shared/documents` o `shared/staleness`. O sea que el
+  manifiesto de arcade está escrito desde cero: no hereda, no extiende y no hace
+  `Omit<ManifiestoDeJuego, …>`. Once campos y dos ejes (`sede` y `tickHz`).
+- `shared/arcade/motor.ts` no importa **nada** de `node:`. Tiene que correr
+  dentro de Hermes, en un móvil y sin red: el día que importe `node:crypto`
+  —para una semilla, para un hash, para lo que sea— un juego de un solo
+  dispositivo deja de poder existir.
+- El registro es propio, anclado en
+  `Symbol.for('gamemasters.arcade.instalados')` y separado del
+  `gamemasters.juegos.instalados` de las veladas. Si un arcade entrara en el
+  reparto de veladas, `app/src/vitrina.ts` lo pintaría en el carrusel de la
+  portada, y para evitarlo alguien metería un `if (esArcade)` en `veladas()` —
+  que es la primera de las cien banderas que acaban deshaciendo la separación.
+
+**Lo único que comparten es `mecanicas/`, y es deliberado.** Una mecánica es
+código que sirve a varios juegos, que ninguno tiene la obligación de usar y que
+no sabe quién lo usa: apuntarse es llamar a una función, sin registro, sin
+herencia y sin configuración. En `shared/mecanicas/` viven `azar.ts` (semilla y
+contador dentro del estado, para poder rebobinar una partida), `canonico.ts`
+(serialización con claves ordenadas, sin la cual dos estados idénticos con
+distinto orden de inserción darían hashes distintos y el comprobador de
+determinismo gritaría sin que pase nada), `malla-hexagonal.ts`,
+`tablero-declarado.ts`, `turno-declarado.ts` y `pistas.ts`; en
+`server/src/mecanicas/`, `presencia.ts` — que estaba en `live/` y se movió, no
+como excepción archivada sino porque sin presencia no se detecta a quien se fue
+de la mesa, y una mesa de arcade no puede pagar peaje a las veladas para
+saberlo.
+
+### El árbol, y la frase que lo ordena
+
+**`shared/` son las reglas. `server/` es la autoridad.**
+
+- `shared/arcade/` — `tipos.ts` (el manifiesto), `motor.ts` (el tipo `Avanzar`:
+  `(estado, movimiento, ctx) => estado`, puro, sin E/S y sin mutar nada; o un
+  `Rechazo` que lleva dentro el estado que sigue valiendo, que es lo que la mesa
+  cuenta como movimiento que no cambió nada), `movimiento.ts` (`{tipo, carga?}`
+  con carga libre, no un vocabulario de formulario), `proyeccion.ts`, `opciones.ts`,
+  `reloj.ts` (el tiempo como número de tic: los plazos vencen ENTRANDO por el
+  reductor, nunca como un `setTimeout` del servidor, que rompería la
+  reejecutabilidad), `index.ts` (el registro) y `juegos/` con el manifiesto, el
+  reductor y la proyección de cada arcade.
+- `server/src/arcade/` — `arbitro.ts` valida QUIÉN y CUÁNDO y luego llama al
+  mismo `avanzar()` de `shared/` que corre en el móvil: no duplica ni una regla.
+  `mesas.ts` (una mesa nace de un código que genera el primer jugador, no de una
+  lista de personas que copió un Game Master), `enchufe.ts`, `marcadores.ts`,
+  `repeticiones.ts`, `presupuesto.ts`.
+- `server/src/canal/` — cómo se entera un dispositivo de que la mesa ha cambiado.
+  `index.ts` declara los seis verbos (`esperarCambio`, `avisarCambio`,
+  `anunciar`, `avisosDesde`, `despertarAlVencer`, `olvidar`) y `sondeo.ts` es un
+  adaptador sobre el `hub.ts` de las veladas **sin tocarle un byte**. Que quepa
+  en un adaptador es la prueba de que los verbos no son un invento: son lo que
+  `hub.ts` ya expone de hecho.
+
+### La ruta va DELANTE del guardián, y es a propósito
+
+`server/src/routes/arcade.ts` se monta junto a `jugarRouter` y **antes** de
+`app.use('/api', requireAuth)`. No es comodidad ni descuido: todo el ciclo de una
+velada lo abre `routes/live.ts` detrás de `requireAuth` porque hay alguien que
+dirige y ese alguien entró por la puerta del taller. En un arcade no dirige
+nadie, así que exigir la contraseña de la casa dejaría el segundo motor sin
+jugadores. Lo mismo vale para el estático de `/sala` (`enlaces/escritorio-web.ts`).
+
+### Y se pinta desde los dos clientes de jugador
+
+Los muebles genéricos —`formulario` y `tablero`— los pinta la plataforma, y la
+plataforma son **dos**: `app/app/(arcade)/` con `app/src/arcade/` (React Native y
+`react-native-svg`) y `escritorio/` (DOM y SVG del navegador). El segundo no es
+una comodidad: es la única medida que existe de si este contrato estaba atado a
+React Native, y se escribió entero contra `shared/arcade` sin cambiarle un byte.
+Los muebles propios —`lienzo` y `escena`— los pinta el juego con sus píxeles y
+viven en el binario de la app; en escritorio salen apagados y con el motivo
+escrito.
 
 ## La puerta del taller (server/src/auth.ts)
 

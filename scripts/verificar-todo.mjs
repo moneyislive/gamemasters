@@ -26,8 +26,24 @@
  *
  * QUÉ SE QUEDA FUERA, Y POR QUÉ. `verify:mongo` mira la base de producción;
  * `oro:capturar` es destructivo; `verify:aguante` tarda minutos y es una prueba
- * de carga; `verify:arranque`, `verify:conexion` y `verify:puerta-google`
- * necesitan credenciales o red. Los demás están todos aquí.
+ * de carga. Los demás están todos aquí.
+ *
+ * ═══ Y AQUÍ HABÍA UN CUARTO MOTIVO QUE ERA FALSO ═══
+ *
+ * Este párrafo decía también que `verify:arranque`, `verify:conexion` y
+ * `verify:puerta-google` «necesitan credenciales o red». Ninguno de los tres las
+ * necesita, y se comprobó corriéndolos en una máquina sin nada configurado:
+ * salida 0 en 1 s, 0 s y 5 s. Los dos primeros no leen ni una variable de
+ * entorno ni abren una conexión; el tercero SE FABRICA su propia credencial
+ * —se pone un `PLAYER_TOKEN_SECRET` de mentira y arranca un servidor con el
+ * entorno que él elige—, que es justo lo contrario de necesitar una de verdad.
+ *
+ * Lo que compraban mientras nadie los corría: `verify:arranque` vigila que
+ * ninguna pantalla de la app pregunte por la sesión antes de cargarla del disco
+ * —el fallo se ve como «no tienes cuenta» teniéndola—, y `verify:puerta-google`
+ * es la puerta de identidad entera. Tres comprobadores buenos, escritos, verdes
+ * y sin correr, por una frase que nadie volvió a comprobar. Es el cuarto caso de
+ * esta clase que apunta este fichero, y los otros tres están aquí arriba.
  *
  * ═══ EL ORDEN NO ES ALFABÉTICO ═══
  *
@@ -152,6 +168,35 @@ const BATERIA = [
     guion: 'verify:relojes',
     porque:
       'la pausa del sondeo cabe en la ventana de presencia del servidor —así que nadie sale «(fuera)» teniendo la app delante—, no se pausa mientras se reúne la mesa, y la cuenta atrás ni trunca ni sube',
+  },
+  /*
+   * ═══ LOS TRES QUE ESTABAN FUERA POR UN MOTIVO QUE NO ERA CIERTO ═══
+   *
+   * Ver la cabecera de este fichero. Los tres corren en segundos y sin nada
+   * configurado; el de la puerta de Google va marcado `lento` no por lo que
+   * tarda —cinco segundos— sino porque LEVANTA SERVIDORES, que es el criterio
+   * que separa las dos mitades de esta lista.
+   */
+  {
+    nombre: 'arranque · móvil',
+    donde: 'server',
+    guion: 'verify:arranque',
+    porque:
+      'ninguna pantalla de la app pregunta por la sesión antes de haberla cargado del disco —ese fallo se ve como «no tienes cuenta» teniéndola, y no se reintenta solo—',
+  },
+  {
+    nombre: 'conexión',
+    donde: 'server',
+    guion: 'verify:conexion',
+    porque: 'las reglas de reconexión del cliente y del servidor dicen lo mismo',
+  },
+  {
+    nombre: 'puerta de Google',
+    donde: 'server',
+    guion: 'verify:puerta-google',
+    lento: true,
+    porque:
+      'la puerta de identidad entera, con servidor de verdad y una credencial fabricada por la propia prueba: quien entra con Google entra como quién dice ser y no como otro',
   },
   /*
    * ═══ Y ÉSTE VA DETRÁS, PORQUE LO QUE COMPRA DESCANSA SOBRE «arcade de fuera» ═══

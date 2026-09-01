@@ -24,19 +24,56 @@
  * `app/app/(juego)/_layout.tsx`: se paga una línea y a cambio el compilador no
  * deja estrenarse a medias.
  *
- * ═══ LOS DOS QUE TODAVÍA NO SE PINTAN, Y POR QUÉ ESTÁN AQUÍ IGUAL ═══
+ * ═══ AQUÍ DECÍA QUE DOS DE LOS CUATRO NO SE PINTABAN. SE PINTAN LOS CUATRO ═══
  *
- * De los cuatro muebles del contrato hay dos entregados —`formulario` con La
- * Frente y La Ronda, y `lienzo` con El Arcade—. Los otros dos tienen su entrada y
- * su ruta, y esa ruta enseña una pantalla que dice la verdad —qué mueble falta y
- * qué fase lo trae— en vez de quedarse en blanco.
+ * Decía que había «dos entregados —`formulario` con La Frente y La Ronda, y
+ * `lienzo` con El Arcade—», que los otros dos enseñaban una pantalla explicando
+ * qué fase los traería, y en mayúsculas que «HOY NO SE PUEDE LLEGAR A NINGUNA DE
+ * LAS DOS, porque no hay ningún arcade instalado que declare esos muebles». Las
+ * dos afirmaciones caducaron, y por caminos distintos, que conviene separar porque
+ * la segunda es la que se vuelve a escribir sola:
  *
- * No es andamiaje ni un catálogo fingido: HOY NO SE PUEDE LLEGAR A NINGUNA DE LAS
- * DOS, porque no hay ningún arcade instalado que declare esos muebles y la ruta se
- * calcula a partir del manifiesto. Son el equivalente de `papiro` y `sellado` en
- * el otro motor: existen en el binario y solo se pintan donde un manifiesto las
- * pide. Lo que compran es que el día que llegue Riberas, el compilador obligue a
- * escribir el tablero antes de dejar instalar el juego.
+ *   · Los muebles llegaron. `tablero` lo estrenó Riberas —el delta hexagonal— y
+ *     `escena` lo estrenó La Peonza, que es a propósito el arcade más pobre que se
+ *     podía escribir, empujar y mirar, para que el mueble no saliera con la forma
+ *     de su primer inquilino. Con eso, los cuatro `seSabePintar` de la tabla de
+ *     abajo dicen `true` y ninguna de las cuatro rutas de `app/app/(arcade)/` monta
+ *     ya `MueblePendiente`: las cuatro son la misma línea sobre `PintarEnElMueble`.
+ *     La pantalla de «pendiente» sigue en `app/src/arcade/pendiente.tsx` sin que la
+ *     importe nadie; quien la borre no rompe nada.
+ *   · Y el reparto de juegos que la frase daba por cierto tampoco lo era ya: La
+ *     Ronda NO es de `formulario`. Se movió a `tablero` al hacerla jugable, porque
+ *     un formulario pinta la lista de `opciones()` y nada más, y un juego de bazas
+ *     en el que no se ve la baza no es que se vea mal: no se puede jugar. Está
+ *     razonado entero en el §7 de `docs/MOTOR-DE-ARCADE.md`, que corrige ahí su
+ *     propia lista.
+ *
+ * Así que quién estrena cada uno, que es lo que sí vale la pena tener a mano y es
+ * lo mismo que dice el `cuandoLlega` de cada fila: La Frente el `formulario`,
+ * Riberas el `tablero` —y desde la fase 6 lo usa también La Ronda—, El Arcade el
+ * `lienzo` y La Peonza la `escena`.
+ *
+ * ═══ LA DISTINCIÓN QUE SÍ QUEDA VIVA NO ES ÉSA: ES `quienPinta` ═══
+ *
+ * Que los cuatro se pinten no los iguala, y el bloque de arriba, tal y como estaba
+ * escrito, invitaba a creer que sí: contaba la única diferencia que había como si
+ * fuera la única que puede haber. Era un CALENDARIO —«esto todavía no, esto ya»— y
+ * los calendarios se cumplen. Lo que separa de verdad a `formulario` y `tablero`
+ * de `lienzo` y `escena` es de quién son los píxeles, y eso no lo mueve ninguna
+ * fase: los dos primeros los pinta LA PLATAFORMA a partir de lo que el juego
+ * declara, así que pueden pintar un arcade que este binario no conoce —es lo que
+ * hace `LOS_MUEBLES_GENERICOS` de `./pintados.ts`—; los otros dos los pinta EL
+ * JUEGO, sus píxeles viajan dentro del binario, y un arcade de fuera que los
+ * declare se queda con la tarjeta apagada. No es un fallo que arreglar: es la
+ * decisión de producto del §7 —el enchufe alcanza a las reglas y no a los
+ * píxeles—, y por eso vive como campo `quienPinta` en el interfaz de abajo, con su
+ * razonamiento, y no como un comentario que se pueda perder al reordenar la tabla.
+ *
+ * La diferencia práctica entre los dos campos es la fecha de caducidad, y por eso
+ * son dos. `seSabePintar` es un estado que se mueve —fue `false` para dos de estos
+ * cuatro y hoy no lo es para ninguno— y quien lo lea tiene que aceptar que mañana
+ * diga otra cosa. `quienPinta` no se mueve, porque no dice lo que falta sino lo
+ * que el mueble ES.
  *
  * ═══ Y `seSabePintar` NO ES LA PREGUNTA QUE HAY QUE HACERSE ═══
  *

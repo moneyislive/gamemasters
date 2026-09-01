@@ -75,7 +75,9 @@ import {
   loMedido,
   losApartados,
   TOPE_BYTES,
+  TOPE_CARGA_BYTES,
   TOPE_MS,
+  TOPE_TIPO_CARACTERES,
 } from '../arcade/presupuesto';
 import { elCanal } from '../canal';
 import { despertadoresVivos } from '../canal/sondeo';
@@ -416,7 +418,47 @@ router.post('/arcade/mesas', contadorDeAperturas, async (req, res) => {
  */
 router.post('/arcade/mesas/:codigo/asientos', contadorDeCodigos, async (req, res) => {
   const codigo = String(req.params.codigo ?? '').toUpperCase();
-  const cuerpo = req.body as { nombre?: unknown };
+  const cuerpo = req.body as { nombre?: unknown; arcade?: unknown };
+
+  /*
+   * ═══ A QUÉ JUEGO CREÍA ESTAR ENTRANDO, Y POR QUÉ HAY QUE PREGUNTARLO ═══
+   *
+   * El código de una mesa son cinco letras y NO DICE de qué juego es. El producto
+   * las reparte por un chat —«pásale esto a quien falte»— así que llegan solas,
+   * sin su juego al lado.
+   *
+   * Con lo que había, alguien que estuviera en la pantalla de Riberas y tecleara
+   * el código de una mesa de La Ronda SE SENTABA: la ruta sólo leía el nombre. Y
+   * a partir de ahí todo va mal en silencio — el cliente pinta la mesa bajo el
+   * nombre del juego equivocado, guarda la llave en el cajón de otro arcade, y
+   * quien se sentó ve una partida que no entiende sin que nada haya fallado.
+   *
+   * ES OPCIONAL A PROPÓSITO, como `publicaOpciones` y por lo mismo: un cliente
+   * empaquetado antes que este servidor no lo manda, y eso no puede ser un error
+   * —seguiría entrando como hasta ahora—. Lo que se gana es que el cliente que SÍ
+   * lo dice recibe un 409 con el arcade de verdad dentro, y puede ofrecer el
+   * enlace correcto en vez de sentar a alguien en la mesa equivocada.
+   */
+  if (typeof cuerpo.arcade === 'string' && cuerpo.arcade.length > 0) {
+    try {
+      const suya = await mirar(codigo, null);
+      if (suya.arcade !== cuerpo.arcade) {
+        res.status(409).json({
+          error:
+            `Ese código es de una mesa de «${suya.arcade}», y estás entrando desde ` +
+            `«${cuerpo.arcade}».`,
+          motivo: 'otro-arcade',
+          arcade: suya.arcade,
+          codigo,
+        });
+        return;
+      }
+    } catch (error) {
+      if (!contestarElFallo(error, res)) throw error;
+      return;
+    }
+  }
+
   try {
     const silla = await sentarse(codigo, typeof cuerpo.nombre === 'string' ? cuerpo.nombre : '');
     /*
@@ -481,7 +523,24 @@ router.post('/arcade/mesas/:codigo/asientos', contadorDeCodigos, async (req, res
  * `!==` significa «lo que tienes no es lo que hay»: si no coincide, se manda el
  * estado completo y se acabó. Igual que `hub.ts`.
  */
-router.get('/arcade/mesas/:codigo', async (req, res) => {
+/*
+ * ═══ Y AQUI TAMBIEN SE CUENTA, QUE ES LO QUE FALTABA ═══
+ *
+ * `sentarse` llevaba el contador y esta ruta no, y las dos dan EL MISMO ORACULO:
+ * 404 si el codigo no existe, 200 si existe. Poner el candado en una puerta y
+ * dejar la de al lado abierta no protege nada — quien quiera adivinar codigos
+ * los enumera por aqui a la velocidad que aguante la red, y cuando acierte va a
+ * sentarse con el codigo ya sabido, gastando UN intento de los treinta.
+ *
+ * Son cinco letras y digitos: 28,6 millones de combinaciones, que suena a mucho
+ * hasta que se recuerda que no hace falta acertar una EN CONCRETO, sino
+ * CUALQUIERA de las que estan vivas.
+ *
+ * Mismo contador y mismo `esFallo`, a proposito: es la misma credencial —el
+ * codigo— y compartir el recuento es lo que impide turnarse entre las dos
+ * puertas para gastar el doble.
+ */
+router.get('/arcade/mesas/:codigo', contadorDeCodigos, async (req, res) => {
   const codigo = String(req.params.codigo ?? '').toUpperCase();
   const llave = llaveDe(req);
   const desde = Number(req.query.desde);
@@ -587,7 +646,8 @@ function responderConLaMesa(res: Response, mesa: VistaDeMesa, desde: number): vo
  * no sabe si alguien lo leyó. Eso es la fase que el §12 aplaza, y prometerlo aquí
  * a medias sería peor que no tenerlo.
  */
-router.get('/arcade/mesas/:codigo/turno', async (req, res) => {
+/* Y la de a quien le toca, por lo mismo: contesta 404 o 200 sobre el codigo. */
+router.get('/arcade/mesas/:codigo/turno', contadorDeCodigos, async (req, res) => {
   const codigo = String(req.params.codigo ?? '').toUpperCase();
   try {
     /*
@@ -675,6 +735,57 @@ router.post('/arcade/mesas/:codigo/movimientos', async (req, res) => {
     res.status(400).json({ error: 'Falta `tipo`: qué clase de movimiento es.' });
     return;
   }
+  /*
+   * ═══ Y AQUÍ SE ACOTA LO QUE ELIGE QUIEN LLAMA, QUE NO ES VALIDAR LA CARGA ═══
+   *
+   * La cabecera de arriba dice que esta ruta NO mira lo que viene dentro de la
+   * carga, y sigue siendo verdad: qué es un vértice o una carta lo decide el
+   * reductor y nadie más. Esto no mira QUÉ hay dentro. Mira CUÁNTO ocupa, que es
+   * otra cosa y sí es de esta capa.
+   *
+   * Hace falta porque el §5 bis metió en el camino cronometrado algo que no
+   * elige el arcade: el portillo canoniza `{ tipo, carga }` para comprobar que
+   * `opciones()` lo había ofrecido. Sin tope, quien manda el movimiento elige
+   * cuánto tarda esa medición, y el presupuesto le pasa la factura AL JUEGO. Una
+   * carga de 240 kB anidada tarda 152 ms —tres veces el tope— y la cuarentena
+   * resultante es por arcade, permanente y sin puerta para levantarla: todas las
+   * mesas de ese juego dejaban de aceptar movimientos hasta reiniciar el proceso.
+   * Una petición, sin cuenta y sin conocer ningún código.
+   *
+   * Se comprueba ANTES de `mover` porque después ya es tarde: el coste está en el
+   * camino, no en el resultado.
+   *
+   * `JSON.stringify` y no `canonico`: aquí sólo hace falta el tamaño, y
+   * `stringify` no ordena claves ni recorre de más — es justo la parte barata de
+   * lo que luego sería caro. Sobre un cuerpo ya acotado a 256 kB por express su
+   * coste es del orden del milisegundo, y si le dan algo que no se puede
+   * serializar falla CERRANDO la puerta, que es el lado bueno del que fallar.
+   */
+  if (cuerpo.tipo.length > TOPE_TIPO_CARACTERES) {
+    res.status(400).json({
+      error: `El \`tipo\` de un movimiento no puede pasar de ${String(TOPE_TIPO_CARACTERES)} caracteres.`,
+    });
+    return;
+  }
+  if (cuerpo.carga !== undefined) {
+    let bytes: number;
+    try {
+      bytes = JSON.stringify(cuerpo.carga)?.length ?? 0;
+    } catch {
+      res.status(400).json({
+        error: 'La `carga` de ese movimiento no se puede serializar: mira que no tenga ciclos.',
+      });
+      return;
+    }
+    if (bytes > TOPE_CARGA_BYTES) {
+      res.status(400).json({
+        error:
+          `La \`carga\` de un movimiento no puede pasar de ${String(TOPE_CARGA_BYTES)} bytes, ` +
+          `y ésta ocupa ${String(bytes)}.`,
+      });
+      return;
+    }
+  }
 
   try {
     const mesa = await mover(codigo, llave, cuerpo.rev, {
@@ -710,14 +821,33 @@ router.post('/arcade/mesas/:codigo/movimientos', async (req, res) => {
      * quien pregunta no tiene asiento y lo que se le manda es la vista de
      * espectador, que no lleva la mano de nadie.
      */
+    /*
+     * ═══ Y EL «NO GUARDADO» TAMBIÉN LA LLEVA, QUE ES LO QUE FALTABA ═══
+     *
+     * `AlmacenNoGuarda` compone su 503 con `mesa: vista` y su cabecera explica
+     * por qué hace falta: el movimiento ENTRÓ —está en memoria y los otros ya lo
+     * ven— y no está guardado, así que hay que decir las dos cosas y mandar el
+     * estado bueno para que quien movió no haga un segundo viaje.
+     *
+     * Sólo que la vista no se componía nunca para ese error: esta línea miraba
+     * únicamente `MovimientoRechazado`, así que el 503 salía siempre con
+     * `mesa: undefined` y prometía en su propio texto algo que no llevaba dentro.
+     *
+     * Y SE AVISA A LOS DEMÁS, que es la otra mitad. Un movimiento que entró en
+     * memoria y no se guardó SÍ cambió la mesa para los otros tres: sin el aviso
+     * se quedan sondeando hasta que expire su espera, mirando un tablero que ya
+     * no es el que hay. El fallo de disco es de quien movió; la partida de los
+     * demás sigue.
+     */
     let vista: VistaDeMesa | undefined;
-    if (error instanceof MovimientoRechazado) {
+    if (error instanceof MovimientoRechazado || error instanceof AlmacenNoGuarda) {
       try {
         vista = await mirar(codigo, llave);
       } catch {
         vista = undefined;
       }
     }
+    if (error instanceof AlmacenNoGuarda) elCanal().avisarCambio(codigo);
     if (!contestarElFallo(error, res, vista)) throw error;
   }
 });
@@ -832,6 +962,13 @@ router.get('/arcade/presupuesto', (_req, res) => {
      */
     topeMs: TOPE_MS,
     topeBytes: TOPE_BYTES,
+    /*
+     * Y los dos que acotan lo que MANDA quien llama, por lo mismo: quien escribe
+     * un arcade de fuera tiene que saber contra qué se le mide sin tener este
+     * repositorio delante, y estos dos deciden si su movimiento entra siquiera.
+     */
+    topeTipoCaracteres: TOPE_TIPO_CARACTERES,
+    topeCargaBytes: TOPE_CARGA_BYTES,
     apartados: losApartados(),
   });
 });

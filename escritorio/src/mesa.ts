@@ -176,6 +176,15 @@ export interface LaMesa {
   entrar: (codigo: string, nombre: string) => void;
   mover: (movimiento: MovimientoDeclarado) => void;
   salir: () => void;
+  /**
+   * Tirar la mesa entera, para todos. Ver su implementación.
+   *
+   * Es lo único que saca a cuatro personas de una mesa congelada por un asiento
+   * que nadie libera, y por eso está aquí al lado de `salir` y no escondido:
+   * quien pinta la pantalla tiene que poder ofrecer las dos cosas y explicar en
+   * qué se diferencian.
+   */
+  tirar: () => void;
 }
 
 const CABECERA_DE_ASIENTO = 'x-asiento';
@@ -548,13 +557,55 @@ export function usarMesaDeArcade(arcade: string, silla: string): LaMesa {
     olvidarElSitio(arcade, silla);
   }, [arcade, silla]);
 
+  /**
+   * TIRAR LA MESA, que es lo que faltaba y deja a la gente sin salida.
+   *
+   * ═══ POR QUÉ NO BASTA CON LEVANTARSE ═══
+   *
+   * `salir` borra la llave de ESTE navegador y nada más: el asiento sigue en la
+   * mesa del servidor, porque un asiento no se libera nunca. Con el plazo «Sin
+   * prisa» —que los dos clientes ofrecen— eso no es un detalle: cuatro personas
+   * abren una mesa de La Ronda, una tiene que irse antes de repartir y pulsa
+   * «Levantarse», los otros tres reparten porque el servidor sigue contando
+   * cuatro, y se le dan cinco cartas a alguien que no está. A partir de ahí no
+   * hay plazo que venza, nadie puede jugar por él, y la mesa se queda congelada
+   * PARA SIEMPRE sin que nadie pueda hacer nada.
+   *
+   * `DELETE /arcade/mesas/:codigo` existe desde la fase 2, comprueba que quien lo
+   * pide está sentado y no lo llamaba ningún cliente: sólo lo ejercitaba
+   * `verify:mesa`. Éste es exactamente su caso de uso.
+   *
+   * ═══ Y NO SE PREGUNTA «¿SEGURO?» AQUÍ ═══
+   *
+   * La confirmación es de la pantalla, no de esto. Aquí vive lo que hace, y
+   * mezclarlo obligaría a que este fichero supiera pintar un diálogo.
+   *
+   * Se olvida el sitio pase lo que pase: si el borrado falla —la mesa ya no
+   * existe, la red se fue— quien pulsó igualmente quiere irse, y dejarle dentro
+   * de una mesa que cree haber tirado es el peor de los dos resultados.
+   */
+  const tirar = useCallback(async (): Promise<void> => {
+    const donde = codigo.current;
+    const mia = llave.current;
+    if (donde === null || mia === null) return;
+    try {
+      await fetch(ruta(`/mesas/${donde}`), {
+        method: 'DELETE',
+        headers: { 'x-asiento': mia },
+      });
+    } catch {
+      /* Da igual por qué no se pudo: quien pulsó se va de todas formas. */
+    }
+    salir();
+  }, [salir]);
+
   /*
    * Hacia fuera sigue siendo UNA CADENA. De dónde salió el renglón es cosa de
    * este fichero: la pantalla lo pinta igual venga de donde venga, y darle el
    * origen la invitaría a pintar dos avisos distintos, que es cómo se acaba
    * teniendo dos sitios donde mirar cuando algo va mal.
    */
-  return { fase, mesa, aviso: aviso.texto, cronica, quieto, abrir, entrar, mover, salir };
+  return { fase, mesa, aviso: aviso.texto, cronica, quieto, abrir, entrar, mover, salir, tirar };
 }
 
 function textoDelFallo(error: unknown): string {

@@ -359,6 +359,35 @@ function LaMesaPuesta({
               <span className="opcion-ayuda">Se olvida el asiento en este navegador.</span>
             </span>
           </button>
+          {/*
+            ═══ Y LA SALIDA DE VERDAD, QUE NO EXISTÍA ═══
+
+            «Levantarse» sólo olvida la llave AQUÍ: el asiento sigue en la mesa
+            del servidor, porque un asiento no se libera nunca. Con el plazo «Sin
+            prisa» eso deja la mesa congelada para todos —se reparte contando a
+            quien se fue, no hay plazo que venza, nadie puede jugar por él— y
+            hasta hoy no había ninguna forma de salir de ahí.
+
+            Se pregunta antes de hacerlo porque afecta a los demás, y por eso el
+            rótulo dice «para todos»: es la diferencia entera con el de arriba.
+          */}
+          <button
+            type="button"
+            className="opcion opcion-sobria"
+            onClick={() => {
+              const seguro = globalThis.confirm(
+                '¿Tirar la mesa? Se acaba la partida para todos los que estén sentados.',
+              );
+              if (seguro) mesa.tirar();
+            }}
+          >
+            <span className="opcion-texto">
+              <span className="opcion-rotulo">Tirar la mesa</span>
+              <span className="opcion-ayuda">
+                Se acaba para todos. Para cuando alguien se ha ido y la partida no puede seguir.
+              </span>
+            </span>
+          </button>
         </aside>
       </div>
     </main>

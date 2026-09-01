@@ -1192,6 +1192,103 @@ try {
     );
   }
 
+  // ── El sobre que elige quien llama ────────────────────────────────────────
+  /*
+   * ═══ ESTO REPRODUCE UN ATAQUE QUE FUNCIONABA, Y POR ESO ESTÁ AQUÍ ═══
+   *
+   * Una auditoría lo encontró y lo ejecutó: sin cuenta, sin conocer ningún código
+   * y con UNA sola petición, un desconocido dejaba un arcade entero en cuarentena
+   * permanente. El camino era éste:
+   *
+   *   1. Abrir una mesa (la ruta va delante del guardián, y debe ir).
+   *   2. Mandar un movimiento con ~240 kB de carga muy anidada.
+   *   3. El portillo del §5 bis canoniza `{ tipo, carga }` para ver si
+   *      `opciones()` lo había ofrecido — DENTRO del tramo que cronometra el
+   *      presupuesto. Medido: 152 ms, tres veces el tope de 50.
+   *   4. La cuarentena se apunta contra EL ARCADE, es por juego, es permanente y
+   *      no tiene puerta para levantarla. Todas las mesas de ese juego —incluidas
+   *      las de gente jugando— dejaban de aceptar movimientos hasta reiniciar.
+   *
+   * El presupuesto medía trabajo cuyo tamaño elegía quien llamaba, y le pasaba la
+   * factura al juego. La cuarentena NO se tocó: su permanencia está razonada
+   * donde se declara y es buena. Lo que se corta es el otro extremo, en la puerta.
+   *
+   * Se comprueba POR HTTP y no en proceso a propósito: el tope vive en la ruta, y
+   * un comprobador que llamara a `mover` directamente pasaría por encima de él y
+   * daría verde sin comprar nada. Es el mismo error que este repositorio ya tiene
+   * apuntado en otro sitio.
+   */
+  paso('Una carga enorme no puede castigar al arcade: se para en la puerta');
+
+  {
+    const antes = await pedir(`/arcade/mesas/${codigo}`, { llave: gente[0]!.llave });
+    const revAntes = antes.datos.mesa.rev as number;
+
+    /* Lo que medía la auditoría: anidamiento profundo repetido, ~240 kB. */
+    const hondo = (n: number): unknown => {
+      let x: unknown = 'x';
+      for (let i = 0; i < n; i++) x = [x];
+      return x;
+    };
+    const enorme = Array.from({ length: 120 }, () => hondo(1000));
+
+    const conCargaEnorme = await pedir(`/arcade/mesas/${codigo}/movimientos`, {
+      metodo: 'POST',
+      llave: gente[0]!.llave,
+      cuerpo: { rev: revAntes, tipo: 'ataque', carga: enorme },
+    });
+    comprobar(
+      'una carga desproporcionada se rechaza con 400 y no llega al reductor',
+      conCargaEnorme.estado === 400,
+      { estado: conCargaEnorme.estado, datos: conCargaEnorme.datos },
+    );
+
+    const tipoLargo = await pedir(`/arcade/mesas/${codigo}/movimientos`, {
+      metodo: 'POST',
+      llave: gente[0]!.llave,
+      cuerpo: { rev: revAntes, tipo: 'z'.repeat(4000), carga: {} },
+    });
+    comprobar(
+      'y un `tipo` de cuatro mil caracteres también',
+      tipoLargo.estado === 400,
+      { estado: tipoLargo.estado, datos: tipoLargo.datos },
+    );
+
+    /*
+     * LO QUE DE VERDAD SE COMPRA: que después de los dos intentos el arcade siga
+     * jugándose. Sin el tope, aquí ya estaría apartado y esta lectura daría 503.
+     */
+    const despues = await pedir(`/arcade/mesas/${codigo}`, { llave: gente[0]!.llave });
+    comprobar(
+      'y el arcade sigue vivo: la mesa se puede leer después del intento',
+      despues.estado === 200,
+      { estado: despues.estado, datos: despues.datos },
+    );
+    comprobar(
+      'y la mesa no se ha movido',
+      despues.datos.mesa.rev === revAntes,
+      { antes: revAntes, despues: despues.datos.mesa.rev },
+    );
+
+    const presupuesto = await pedir('/arcade/presupuesto');
+    const apartados = (presupuesto.datos.apartados ?? []) as Array<{ arcade: string }>;
+    comprobar(
+      'y NADIE ha quedado en cuarentena por un sobre que eligió quien llamaba',
+      apartados.length === 0,
+      apartados,
+    );
+    /*
+     * Y los dos topes se publican, por lo mismo que los otros dos: quien escribe
+     * un arcade de fuera tiene que saber contra qué se le mide.
+     */
+    comprobar(
+      'los topes del sobre se publican en el diagnóstico',
+      typeof presupuesto.datos.topeTipoCaracteres === 'number' &&
+        typeof presupuesto.datos.topeCargaBytes === 'number',
+      presupuesto.datos,
+    );
+  }
+
   // ── Presencia ≠ participación ─────────────────────────────────────────────
   paso('Presencia y participación NO son lo mismo');
 
