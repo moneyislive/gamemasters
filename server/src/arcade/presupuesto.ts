@@ -174,7 +174,15 @@ function anotarTiempo(arcade: ArcadeId, tipo: string, ms: number): void {
   m.msTotal += ms;
   if (ms > m.msPeor) {
     m.msPeor = ms;
-    m.peorMovimiento = tipo;
+    /*
+     * SE RECORTA, aunque la puerta ya lo acote. `peorMovimiento` sale por
+     * `/api/arcade/presupuesto`, que no pide credencial, así que esto es texto
+     * que alguien de fuera elige y este servidor devuelve. Hoy la ruta de
+     * movimientos corta en `TOPE_TIPO_CARACTERES` y con eso bastaría; el recorte
+     * está aquí ADEMÁS porque `conPresupuesto` no es de la ruta: el día que lo
+     * llame otro camino sin acotar, el eco vuelve solo y nadie lo vería.
+     */
+    m.peorMovimiento = tipo.slice(0, TOPE_TIPO_CARACTERES);
   }
 }
 
@@ -257,6 +265,71 @@ export const TOPE_MS = 50;
  * cada movimiento a cuatro móviles.
  */
 export const TOPE_BYTES = 512 * 1024;
+
+/**
+ * LO QUE PUEDE MANDAR QUIEN LLAMA, y por qué esto vive al lado de los otros dos.
+ *
+ * ═══ EL AGUJERO QUE ESTOS DOS TOPES CIERRAN ═══
+ *
+ * Los dos topes de arriba miden EL TRABAJO DEL ARCADE y castigan al arcade. Eso
+ * es correcto mientras el trabajo dependa sólo del reductor. Pero el §5 bis puso
+ * en el camino medido algo que NO elige el arcade: el portillo llama a
+ * `canonico({ tipo, carga })` sobre el movimiento que llega POR LA RED, para
+ * comprobar que `opciones()` lo había ofrecido.
+ *
+ * Con eso, quien manda el movimiento elige cuánto tarda la medición. Medido: una
+ * carga de 240 kB con mil niveles de anidamiento tarda 152 ms en canonizarse,
+ * tres veces el tope. La cuarentena se apuntaba contra el ARCADE —no contra
+ * quien la provocó— y es por juego, permanente y sin puerta para levantarla, así
+ * que una sola petición sin cuenta ni código dejaba a Riberas sin poder aceptar
+ * un movimiento en TODAS sus mesas hasta reiniciar el proceso. Y el diagnóstico
+ * público lo remataba acusando al juego de la casa con el texto del atacante.
+ *
+ * La cuarentena NO se toca: su permanencia está razonada donde se declara y es
+ * buena. Lo que se corta es el otro extremo de la cadena — que el sobre no pueda
+ * ser grande.
+ *
+ * ═══ POR QUÉ NO BASTABA EL TOPE DE CUERPO DE EXPRESS ═══
+ *
+ * Porque son 256 kB, y son 256 kB por una buena razón: la misma puerta acepta
+ * fotos de invitados. Un tope de cuerpo mide el sobre entero de cualquier ruta;
+ * esto mide lo que entra en el reductor de un juego, que es otra cosa y mucho
+ * más pequeña.
+ *
+ * ═══ LOS NÚMEROS, Y POR QUÉ SON HOLGADOS ═══
+ *
+ * Un movimiento real de esta casa es `{ vertice: 'v:-1,-1|0,-2|0,-1' }` o
+ * `{ carta: 'oros-7' }`: decenas de bytes. Ocho kilobytes son tres órdenes de
+ * magnitud de sitio para un arcade de fuera que quiera mandar algo compuesto.
+ *
+ * Y el número está elegido MIDIENDO EL PEOR CASO QUE DEJA PASAR, que es lo que de
+ * verdad decide si el tope sirve. Lo caro de `canonico` no es el tamaño sino la
+ * PROFUNDIDAD, así que el peor sobre de ocho kilobytes no es uno lleno de texto
+ * sino uno anidado hasta el fondo. Medido en esta máquina:
+ *
+ *   · el ataque, 240 kB anidados ......... 167,7 ms — tres veces el tope. Parado.
+ *   · un movimiento de verdad, 31 B ........ 0,1 ms
+ *   · ocho kilobytes PLANOS ................ 0,0 ms
+ *   · ocho kilobytes ANIDADOS A TOPE ....... 7,8 ms  ← el peor que entra hoy
+ *
+ * O sea que el sobre puede gastar como mucho 7,8 de los 50 ms, y le deja al
+ * reductor los otros 42 — que son dos órdenes de magnitud más de lo que cuesta el
+ * movimiento más caro de la casa. Ése es el margen que hace que la cuarentena
+ * vuelva a significar lo que decía significar: que el REDUCTOR va lento.
+ *
+ * Si algún día hiciera falta más sitio para la carga, lo que hay que subir NO es
+ * este número a ciegas: hay que volver a medir el sobre anidado, porque es esa
+ * curva y no la del tamaño la que se acerca al tope.
+ *
+ * Y `tipo` se acota aparte porque no es sólo coste: viaja al diagnóstico público
+ * como `peorMovimiento`, así que sin tope es un sitio donde alguien de fuera
+ * escribe un cuarto de megabyte que luego sirve este servidor.
+ *
+ * Los dos SE PUBLICAN en `/api/arcade/presupuesto` por lo mismo que los otros: un
+ * límite que sólo conoce quien lo aplica no es un contrato.
+ */
+export const TOPE_TIPO_CARACTERES = 64;
+export const TOPE_CARGA_BYTES = 8 * 1024;
 
 /**
  * LOS ARCADES CASTIGADOS, con el porqué escrito.

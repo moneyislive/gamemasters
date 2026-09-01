@@ -16,8 +16,8 @@
     "lineas": 228
   },
   "shared/arcade/index.ts": {
-    "huella": "38a239b6daab1e43",
-    "lineas": 804
+    "huella": "802c4e20742051e4",
+    "lineas": 837
   },
   "shared/arcade/motor.ts": {
     "huella": "22b5a3b870f4d936",
@@ -32,7 +32,7 @@
     "lineas": 137
   },
   "shared/arcade/proyeccion.ts": {
-    "huella": "8f1f7e1e7304324f",
+    "huella": "c762752f546ffcae",
     "lineas": 303
   },
   "shared/arcade/reloj.ts": {
@@ -40,7 +40,7 @@
     "lineas": 171
   },
   "shared/arcade/tipos.ts": {
-    "huella": "e72d376d58ce632a",
+    "huella": "dc55d655f69cb60f",
     "lineas": 751
   },
   "shared/mecanicas/azar.ts": {

@@ -502,7 +502,7 @@ export interface ManifiestoDeArcade {
    * Un fallo mudo —un juego que filtra el mazo y nadie ve un error— se convierte
    * así en una negativa ruidosa a arrancar. Es lo que ya hace el registro de
    * veladas con las altas perdidas, y es lo que comprueba
-   * `exigirProyecciones()` en `index.ts`.
+   * `exigirSecretosTapados()` en `index.ts`.
    */
   secretos: boolean;
 
@@ -663,7 +663,7 @@ export function cabenEnLaMesa(m: ManifiestoDeArcade, cuantos: number): boolean {
  * NO comprueba que exista proyección cuando `secretos: true`. Eso no se puede
  * saber mirando el manifiesto —la proyección se registra aparte, y puede
  * registrarse después—, así que es una comprobación de ARRANQUE y vive en
- * `exigirProyecciones()`.
+ * `exigirSecretosTapados()`.
  */
 export function problemasDelManifiesto(m: ManifiestoDeArcade): string[] {
   const problemas: string[] = [];

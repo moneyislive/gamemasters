@@ -25,7 +25,7 @@
  *
  * ═══ ENTONCES, ¿QUÉ PASA SI UN JUEGO CON SECRETOS NO REGISTRA NINGUNA? ═══
  *
- * QUE NO ARRANCA. `exigirProyecciones()` en `index.ts` se niega en voz alta.
+ * QUE NO ARRANCA. `exigirSecretosTapados()` en `index.ts` se niega en voz alta.
  *
  * La alternativa —seguir adelante mandando el estado entero— es un fallo mudo
  * del peor tipo que hay: nadie ve un error, la partida se juega, y la mano de

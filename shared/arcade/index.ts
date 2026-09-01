@@ -40,6 +40,7 @@ import {
   hayLoSecreto,
   hayProyeccion,
   loSecretoDe,
+  olvidarElTapado,
   proyectar,
   registrarLoSecreto,
   registrarProyeccion,
@@ -250,7 +251,7 @@ export class ArcadeNoInstalado extends Error {
  *
  * La proyección va aparte y es opcional porque de verdad lo es: la mitad de los
  * arcades no tienen nada que esconder. Lo que no es opcional es que un juego con
- * `secretos: true` la traiga, y eso lo comprueba `exigirProyecciones()` cuando
+ * `secretos: true` la traiga, y eso lo comprueba `exigirSecretosTapados()` cuando
  * ya están todas las altas hechas — para no obligar a un orden.
  */
 export function instalarArcade<E, V = unknown>(alta: {
@@ -317,6 +318,27 @@ export function instalarArcade<E, V = unknown>(alta: {
 }): void {
   const problemas = problemasDelManifiesto(alta.manifiesto);
   if (problemas.length > 0) throw new ArcadeMalEscrito(alta.manifiesto.id, problemas);
+
+  /*
+   * ═══ UN ALTA BORRA LO QUE HUBIERA CON ESE ID, Y SIN ESTO SE HEREDABA ═══
+   *
+   * La línea de abajo sustituye la entrada entera, así que el manifiesto y el
+   * reductor son los del que llega. Pero la proyección y `loSecreto` NO viven
+   * aquí: viven en otra tabla, y en ella sólo se escribe si el alta los trae. O
+   * sea que un arcade instalado ENCIMA de otro sin registrar proyección se
+   * quedaba con LA PROYECCIÓN DEL ANTERIOR.
+   *
+   * Y las garantías de arranque lo daban por bueno: `exigirSecretosTapados()`
+   * pregunta si hay proyección para ese id, y la había — la de otro juego. Un
+   * arcade de fuera que reutilizara un id, por descuido o a propósito, arrancaba
+   * declarando `secretos: true`, sin haber escrito una línea de tapado, y con una
+   * función recortando un estado que no es el suyo. Lo que sale de ahí no lo sabe
+   * nadie, y la comprobación que existe para impedirlo felicitaba.
+   *
+   * Se olvida ANTES de registrar y no después, para que el orden no importe: lo
+   * que quede al salir de aquí es exactamente lo que trajo este alta.
+   */
+  olvidarElTapado(alta.manifiesto.id);
 
   INSTALADOS[alta.manifiesto.id] = {
     manifiesto: alta.manifiesto,
@@ -578,7 +600,7 @@ export function reejecutarEn(
  * ═══ AQUÍ ESTÁ LA ÚNICA DECISIÓN DELICADA DEL FICHERO ═══
  *
  * Un arcade con `secretos: true` se proyecta, y si no hay proyección esto no se
- * llega a ejecutar nunca porque `exigirProyecciones()` habrá impedido arrancar.
+ * llega a ejecutar nunca porque `exigirSecretosTapados()` habrá impedido arrancar.
  *
  * Un arcade con `secretos: false` manda el estado ENTERO. Y conviene decir por
  * qué eso NO es «una proyección por defecto», que es lo que `proyeccion.ts` se
@@ -666,11 +688,22 @@ export function arcadesConSecretosSinTapar(): SecretoSinTapar[] {
  * solo puede llevar un `arcade` dentro, y quien lea el registro necesita la
  * lista entera para no arreglarlos de uno en uno a golpe de despliegue.
  *
- * NADIE LA LLAMA TODAVÍA, y conviene que esté escrito: en la fase 0 no hay
- * `routes/arcade.ts` ni ningún arcade instalado que proteger, así que el
- * enganche al arranque del servidor es de la fase 2. Una garantía que existe y
- * no está conectada es una garantía que no existe; queda apuntado aquí para que
- * no se dé por hecha.
+ * ═══ QUIÉN LA LLAMA, QUE ES LO QUE ESTE PÁRRAFO DECÍA AL REVÉS ═══
+ *
+ * Aquí ponía «NADIE LA LLAMA TODAVÍA», escrito en la fase 0 con toda la razón —no
+ * había ni rutas de arcade ni arcades que proteger— y con esta advertencia al
+ * lado: «una garantía que existe y no está conectada es una garantía que no
+ * existe». La advertencia funcionó: la fase 2 la conectó.
+ *
+ * La llama `comprobarArranque()` en `server/src/index.ts`, y va DESPUÉS de
+ * instalar los arcades de fuera a propósito — puesta antes, comprobaría sólo los
+ * cinco del binario, que son justamente los que alguien ya ha revisado, y dejaría
+ * pasar sin mirar los que vienen de otro repositorio. El razonamiento entero está
+ * en ese fichero, junto a la llamada.
+ *
+ * Y se queda escrito lo que decía antes, porque la frase vieja sobrevivió a su
+ * propio arreglo: alguien que la leyera hoy daría por hecho que esta función es
+ * decorativa, que es exactamente lo contrario de lo que es.
  */
 export function exigirSecretosTapados(): void {
   const mal = arcadesConSecretosSinTapar();
