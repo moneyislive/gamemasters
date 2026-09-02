@@ -499,7 +499,8 @@ export const NUDO: ManifiestoDeJuego = {
 
   ficha: {
     duracionMinutos: 180,
-    edadMinima: 8,
+    /* El suelo de los términos, no una calificación. Ver `FichaDeJuego`. */
+    edadMinima: 14,
     /* Seis convoyes, seis franjas y cuatro oficios que se reparten el cuadro: es el más pesado de los cuatro. */
     dificultad: 4,
     jugadoresMaximo: 12,

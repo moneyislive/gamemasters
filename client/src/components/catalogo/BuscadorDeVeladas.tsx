@@ -130,9 +130,21 @@ const HORAS = [
   { valor: '4', texto: '4 horas o menos' },
 ];
 
+/*
+ * EMPIEZA EN CATORCE, Y NO ES UN RECORTE ESTÉTICO.
+ *
+ * Ofrecía 6, 8, 10 y 12. Los términos que esta plataforma publica dicen que «no
+ * está dirigida a menores de catorce años», así que preguntar por el más joven de
+ * la mesa y sugerir «seis años» era invitar a una mesa que el propio servicio no
+ * admite —y además no devolvía nada, porque ninguna ficha puede bajar de catorce:
+ * el suelo está explicado en `FichaDeJuego.edadMinima`—.
+ *
+ * Un desplegable con cuatro opciones que no pueden dar resultado no es una
+ * comodidad: es una pregunta que promete algo que no hay.
+ */
 const EDADES = [
   { valor: '', texto: 'Cualquiera' },
-  ...[6, 8, 10, 12, 14, 16, 18].map((e) => ({ valor: String(e), texto: `${e} años` })),
+  ...[14, 16, 18].map((e) => ({ valor: String(e), texto: `${e} años` })),
 ];
 
 const DIFICULTADES = [

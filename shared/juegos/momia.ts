@@ -373,7 +373,8 @@ export const MOMIA: ManifiestoDeJuego = {
 
   ficha: {
     duracionMinutos: 180,
-    edadMinima: 8,
+    /* El suelo de los términos, no una calificación. Ver `FichaDeJuego`. */
+    edadMinima: 14,
     /* El sellado es un rompecabezas de orden con restricciones: se deduce, no se adivina. */
     dificultad: 3,
     jugadoresMaximo: 10,

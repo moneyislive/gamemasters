@@ -112,7 +112,8 @@ export const CLUEDO: ManifiestoDeJuego = {
    */
   ficha: {
     duracionMinutos: 180,
-    edadMinima: 8,
+    /* El suelo de los términos, no una calificación. Ver `FichaDeJuego`. */
+    edadMinima: 14,
     /* La casa es la puerta de entrada: se explica en una frase y se juega sin haber leído nada. */
     dificultad: 1,
     jugadoresMaximo: 20,

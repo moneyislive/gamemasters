@@ -354,14 +354,28 @@ const GAMES: readonly CatalogGame[] = [
      * SIN MANIFIESTO TODAVÍA, así que su ficha vive aquí. El día que se instale
      * se la lleva consigo y esto sobra: la portada dejará de saber nada de él,
      * que es lo correcto.
+     *
+     * ═══ Y POR ESO LA FICHA ES CORTA: LO QUE NO EXISTE NO SE MIDE ═══
+     *
+     * Aquí decía además `duracionMinutos: 180`, `edadMinima: 8`, `dificultad: 2` y
+     * `modo: 'en-vivo-y-online'`. Ninguno de los cuatro se podía saber: no hay
+     * reductor, no hay trama y no hay una sola partida jugada. Eran el hueco de
+     * la tarjeta rellenado con lo que sonaba bien.
+     *
+     * El peor era el modo. «En vivo y online» es una CAPACIDAD, y además la que
+     * más pesa al elegir —es lo único que decide si la velada se puede jugar con
+     * gente que no puede venir—: prometerla de un juego que no está escrito es
+     * exactamente la clase de mentira que esta portada tiene prohibida. Y no era
+     * gratis: `cubreElModo` trata «en vivo y online» como el comodín que sirve a
+     * las tres búsquedas, o sea que los dos juegos inexistentes eran los que más
+     * aparecían.
+     *
+     * Queda lo que SÍ es la promesa y no una medida: para cuánta gente se piensa y
+     * de qué va. Lo demás lo traerá su manifiesto el día que exista.
      */
     ficha: {
-      duracionMinutos: 180,
-      edadMinima: 8,
-      dificultad: 2,
       jugadoresMinimo: 3,
       jugadoresMaximo: 6,
-      modo: 'en-vivo-y-online',
       temas: ['rol', 'fantasía', 'mazmorras', 'dragones', 'campaña', 'aventura'],
     },
     cta: 'Bajar a la mazmorra →',
@@ -468,14 +482,13 @@ const GAMES: readonly CatalogGame[] = [
     id: 'potter',
     title: 'Harry Potter',
     tagline: 'Hechizos, casas rivales y secretos en los pasillos del castillo.',
-    /* Sin manifiesto todavía: su ficha vive aquí, como la de Dungeons & Dragons. */
+    /*
+     * Sin manifiesto todavía: su ficha vive aquí, como la de Dungeons & Dragons,
+     * y por lo mismo es corta. Ver el razonamiento entero allí arriba.
+     */
     ficha: {
-      duracionMinutos: 180,
-      edadMinima: 8,
-      dificultad: 2,
       jugadoresMinimo: 4,
       jugadoresMaximo: 12,
-      modo: 'en-vivo-y-online',
       temas: ['magia', 'castillo', 'casas', 'hechizos', 'fantasía', 'colegio'],
     },
     cta: 'Cruzar el andén →',

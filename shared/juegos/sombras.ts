@@ -389,7 +389,8 @@ export const SOMBRAS: ManifiestoDeJuego = {
 
   ficha: {
     duracionMinutos: 180,
-    edadMinima: 8,
+    /* El suelo de los términos, no una calificación. Ver `FichaDeJuego`. */
+    edadMinima: 14,
     /* Una huida con traidor dentro: hay que deducir la senda y de quién no fiarse a la vez. */
     dificultad: 3,
     jugadoresMaximo: 10,

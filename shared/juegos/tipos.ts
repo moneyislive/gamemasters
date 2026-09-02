@@ -651,9 +651,40 @@ export const NOMBRE_DE_MODO: Record<ModoDePartida, string> = {
  * en ninguna otra parte.
  */
 export interface FichaDeJuego {
-  /** Lo que dura una velada, en minutos. */
+  /**
+   * Lo que dura una velada, en minutos.
+   *
+   * QUE LOS CUATRO JUEGOS DIGAN EL MISMO NÚMERO NO ES UN DESCUIDO, y conviene
+   * dejarlo escrito porque parece uno: no son cuatro medidas que casualmente
+   * coinciden, es UNA sola afirmación —una velada de esta casa dura una tarde—
+   * aplicada a los cuatro. El día que alguno se desmarque de verdad, se cambia el
+   * suyo y deja de ser una cifra compartida.
+   *
+   * Lo que SÍ sería mentira es ponerle duración a un juego que aún no existe: de
+   * uno sin manifiesto no se sabe cuánto dura, y una tarjeta que lo diga se lo
+   * está inventando.
+   */
   duracionMinutos?: number;
-  /** A partir de qué edad se puede jugar. */
+  /**
+   * A partir de qué edad se puede jugar.
+   *
+   * ═══ EL SUELO NO LO PONE EL JUEGO: LO PONEN LOS TÉRMINOS ═══
+   *
+   * Los términos que esta plataforma PUBLICA dicen, con esas palabras, que «no
+   * está dirigida a menores de catorce años» (`server/src/legal/terminos.ts`, y
+   * la política de privacidad lo repite). Así que ninguna ficha puede declarar
+   * menos de catorce sin contradecir un texto legal que el servidor sirve en la
+   * misma sesión en la que se pinta la tarjeta.
+   *
+   * Las primeras fichas decían `8`. No era una calificación por contenido —nadie
+   * ha calificado estos juegos— sino un número puesto para rellenar el hueco, y
+   * daba la peor de las dos versiones posibles: la portada invitando a una mesa
+   * de niños de ocho años que los términos no admiten.
+   *
+   * De modo que hoy este campo dice el suelo de la plataforma, no una nota de
+   * contenido. Un juego PUEDE subirlo —uno con violencia explícita diría 16 o
+   * 18—; lo que no puede es bajarlo.
+   */
   edadMinima?: number;
   dificultad?: NivelDeDificultad;
   /** Cuántas personas caben como mucho. El mínimo lo dice su categoría de personas. */
