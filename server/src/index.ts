@@ -558,6 +558,39 @@ function comprobarArranque(): void {
    * el servicio sin levantar por algo que se arregla solo. Lo que esta guarda
    * compra es que nadie se haya olvidado de configurarla, que es el fallo real.
    */
+  /*
+   * ═══ Y LA SEXTA: `MESAS_DIR`, QUE ENTRA POR PRIMERA VEZ EN ESTE DESPLIEGUE ═══
+   *
+   * Es la hermana exacta de la de abajo, y hace falta por lo mismo: sin ella, la
+   * carpeta de las mesas cae al valor por defecto —`data/mesas` junto al
+   * proceso— que en un contenedor es el sistema de ficheros EFÍMERO. Y con
+   * `startCommand: npm start` el proceso corre desde `server/`, así que las
+   * partidas se escribirían en `server/data/mesas` y desaparecerían en CADA
+   * despliegue. Una partida de «La Larga» dura días: moriría en el siguiente
+   * `git push` igual que si viviera solo en memoria, y sin un error.
+   *
+   * Y NO ES UNA HIPÓTESIS. Esta variable va en `render.yaml` como dato del
+   * blueprint, no como secreto, o sea que existe en producción si y sólo si la
+   * sincronización la aplica — y este repositorio ya tiene esa cicatriz escrita:
+   * `render.yaml` declaraba `UPLOADS_DIR`, la sincronización fue rechazada por
+   * otro motivo, y la variable nunca llegó a crearse. La carpeta se declara en el
+   * fichero y no existe en la máquina, que es justo el caso que nadie mira.
+   *
+   * Se comprueba que esté PUESTA, no que se pueda escribir en ella: de eso ya se
+   * encarga el almacén, que cuenta sus fallos y los publica en el diagnóstico.
+   * Lo que esta guarda compra es que nadie se la haya dejado sin crear.
+   */
+  if (process.env.NODE_ENV === 'production' && !process.env.MESAS_DIR?.trim()) {
+    throw new Error(
+      'Falta MESAS_DIR y esto es producción. Sin ella las mesas de la Sala de Arcade se escriben ' +
+        'en «data/mesas» junto al proceso, que en un contenedor es el sistema de ficheros efímero ' +
+        'y desaparece en cada despliegue.\nNada da error: las mesas se abren, se juegan y se ' +
+        'guardan, y el siguiente «git push» se lleva las partidas en curso —y una de «La Larga» ' +
+        'dura días—.\nDefínela apuntando DENTRO del disco persistente. En Render va en ' +
+        'render.yaml; comprueba en el panel que la sincronización la ha creado de verdad.',
+    );
+  }
+
   if (process.env.NODE_ENV === 'production' && !process.env.MONGODB_URI?.trim()) {
     throw new Error(
       'Falta MONGODB_URI y esto es producción. Sin ella el servidor NO da error: cae al fichero ' +

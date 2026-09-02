@@ -573,6 +573,22 @@ function LaFicha({
   const enlaceParaLosDemas = `${window.location.origin}${BASE}/${encodeURIComponent(mesa.arcade)}?codigo=${mesa.codigo}`;
   /* La silla propia se enseña aparte, para saber en qué ventana se está. */
   const enQueSilla = silla.length > 0 ? `silla «${silla}»` : '';
+  /*
+   * ═══ Y AQUÍ SE ENSEÑA QUE `?silla=` EXISTE ═══
+   *
+   * El cajón por ventana estaba escrito, probado y funcionando, y no lo sabía
+   * nadie: no aparecía en ninguna pantalla ni en ningún documento, así que la
+   * única forma de usarlo era leer el código de `bolsillo.ts`. Una función que hay
+   * que descubrir leyendo el fuente no está entregada.
+   *
+   * Y el caso que resuelve es el primero que hace cualquiera: probar la mesa
+   * consigo mismo. Dos ventanas del mismo navegador comparten `localStorage`, o
+   * sea que sin esto la segunda pisa la llave de la primera y quien recargue
+   * vuelve sentado en la silla de otro. La siguiente letra basta —son cajones,
+   * no asientos: el asiento lo da el servidor—.
+   */
+  const siguienteSilla = silla.length === 0 ? 'b' : String.fromCharCode(silla.charCodeAt(0) + 1);
+  const otraVentana = `${enlaceParaLosDemas}&silla=${encodeURIComponent(siguienteSilla)}`;
 
   return (
     <section className="panel">
@@ -581,6 +597,14 @@ function LaFicha({
       <p className="letra-chica">
         Pásale esto a quien falte, o el enlace entero:{' '}
         <a href={enlaceParaLosDemas}>{enlaceParaLosDemas}</a>
+      </p>
+      <p className="letra-chica">
+        ¿Pruebas tú solo desde este mismo navegador?{' '}
+        <a href={otraVentana} target="_blank" rel="noreferrer">
+          Abre otra ventana en la silla «{siguienteSilla}»
+        </a>{' '}
+        — dos pestañas comparten el bolsillo, y sin esto la segunda te quita el
+        asiento de la primera.
       </p>
       <ul className="renglones">
         {mesa.asientos.map((a) => (

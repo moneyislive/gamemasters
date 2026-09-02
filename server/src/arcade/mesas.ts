@@ -232,6 +232,7 @@ import {
   manifiestoDeArcade,
   necesitaMesa,
   opcionesDeArcade,
+  seAcaboLaPartida,
   tieneReloj,
   vistaDeAsiento,
 } from '../../../shared/arcade';
@@ -1269,13 +1270,26 @@ export class MesaDesconocida extends Error {
   }
 }
 
-/** La mesa está llena, o el aforo del juego no admite a nadie más. */
+/**
+ * NO SE PUEDE ENTRAR EN ESTA MESA. Son tres puertas cerradas distintas y el
+ * mensaje lo dice, porque a quien llega le importa la diferencia: si esta llena
+ * puede pedir sitio en otra, si ya empezo puede pedir que le abran una nueva, y
+ * si termino no hay nada que esperar. El `motivo` viaja aparte para quien quiera
+ * ramificar; los clientes de hoy pintan el texto, y por eso el texto no miente.
+ */
 export class MesaLlena extends Error {
   constructor(
     public readonly codigo: string,
     public readonly maximo: number,
+    public readonly motivo: 'mesa-llena' | 'mesa-empezada' | 'mesa-terminada' = 'mesa-llena',
   ) {
-    super(`En esta mesa caben ${maximo} y ya están todos sentados.`);
+    super(
+      motivo === 'mesa-terminada'
+        ? 'Esa partida ya terminó.'
+        : motivo === 'mesa-empezada'
+          ? 'Esa partida ya empezó y no se puede entrar con ella en marcha.'
+          : `En esta mesa caben ${maximo} y ya están todos sentados.`,
+    );
     this.name = 'MesaLlena';
   }
 }
@@ -1475,6 +1489,36 @@ const TICS_DE_GOLPE = 8;
  * transcurrido sin que nadie mire, que es lo que significa de verdad «se te pasó
  * la hora».
  */
+/**
+ * ═══ SE CIERRA LA MESA CUANDO EL JUEGO DICE QUE SE ACABÓ ═══
+ *
+ * Y hasta hoy no lo decía NADIE. El árbitro documenta desde el primer día que
+ * «quien hospeda llama a `cerrarMesa` cuando el estado del juego dice que se
+ * acabó», los tres juegos de servidor exportan su `seAcabo`… y el único que lo
+ * llamaba era el motor del aparato. En el servidor, `cerrarMesa` sólo se
+ * ejecutaba desde `POST /cerrar`, que no llama ningún cliente. O sea que NINGUNA
+ * mesa se cerraba jamás: la partida acabada seguía pintando su cuenta atrás, el
+ * plazo seguía venciendo, y cada mirada metía un tic en un juego terminado.
+ *
+ * Va en las DOS puertas por las que cambia el estado —el movimiento y el tic— y
+ * no sólo en la primera: en La Ronda el tic juega por quien no aparece, así que
+ * la última carta de una partida la puede echar el reloj y no una persona.
+ *
+ * Y SE APAGA EL PLAZO, que es la mitad visible: `venceEn` es lo que el móvil
+ * pinta como cuenta atrás, y en el tic se reprograma ANTES de saber qué hizo el
+ * reductor. Sin apagarlo aquí, una partida acabada seguía enseñando «quedan
+ * veinticuatro horas» para siempre. Una mesa cerrada no espera a nadie.
+ *
+ * Devuelve si ha cerrado, para que quien llama sepa que hay algo que guardar.
+ */
+function cerrarSiSeAcabo(m: MesaEnCurso): boolean {
+  if (m.mesa.terminada) return false;
+  if (!seAcaboLaPartida(m.mesa.arcade, m.mesa.estado)) return false;
+  m.mesa = cerrarMesa(m.mesa);
+  m.venceEn = null;
+  return true;
+}
+
 function ponerAlDiaElPlazo(m: MesaEnCurso): boolean {
   if (m.plazoMs <= 0 || m.mesa.terminada) {
     m.venceEn = null;
@@ -1597,6 +1641,8 @@ function ponerAlDiaElPlazo(m: MesaEnCurso): boolean {
     m.mesa = despues;
     m.ultimoToqueEn = Date.now();
     if (otroTurno) m.turnoDesde = m.ultimoToqueEn;
+    /* Y si con ese tic se acabó, se cierra y se para: no hay más plazos que vencer. */
+    if (cerrarSiSeAcabo(m)) return true;
     cambio = true;
   }
   return cambio;
@@ -1767,7 +1813,25 @@ function semillaNueva(): number {
 export async function sentarse(codigo: string, nombre: string): Promise<Silla> {
   return conLaMesa(codigo, async (m) => {
     const manifiesto = manifiestoDeArcade(m.mesa.arcade);
-    if (m.mesa.terminada) throw new MesaLlena(codigo, manifiesto.jugadores.maximo);
+    if (m.mesa.terminada) throw new MesaLlena(codigo, manifiesto.jugadores.maximo, 'mesa-terminada');
+    /*
+     * ═══ Y CON LA PARTIDA EMPEZADA NO SE SIENTA NADIE ═══
+     *
+     * Faltaba, y el agujero era de los que no dan error: en Riberas —de 2 a 6—
+     * dos personas repartian, una tercera llegaba con el codigo del chat y el
+     * servidor le daba silla. El reductor copio los asientos AL REPARTIR, asi que
+     * esa tercera no es colono: ve el tablero, ve de quien es el turno y no tiene
+     * un solo boton, nunca. Y sale en la lista de la mesa como si jugara, asi que
+     * los otros dos creen que son tres. Ademas su silla gasta aforo, y no hay
+     * verbo de levantarse: seis curiosos dejaban la mesa llena para siempre.
+     *
+     * Se reusa la clase `MesaLlena` —misma puerta, mismo 409— pero NO su mensaje:
+     * decirle «caben 6 y ya estan todos» a quien llega a una mesa de tres seria
+     * mentira, y ademas la que le haria teclear el codigo otra vez creyendo que se
+     * equivoco. El texto y el `motivo` distinguen los tres casos; ver la clase.
+     */
+    if (m.mesa.empezada === true)
+      throw new MesaLlena(codigo, manifiesto.jugadores.maximo, 'mesa-empezada');
     if (m.sillas.length + 1 > manifiesto.jugadores.maximo) {
       throw new MesaLlena(codigo, manifiesto.jugadores.maximo);
     }
@@ -2039,8 +2103,16 @@ export async function mover(
       return vistaDe(m, yo, motivoDelJuego);
     }
 
-    m.mesa = despues;
+    /*
+     * LA MESA RECUERDA QUE YA EMPEZO. Va aqui, en `mover` y dentro de `cambio`,
+     * porque el hecho que interesa es exacto: UN ASIENTO mando algo y el estado
+     * cambio. No vale ponerlo en el tic —el tic de La Ronda reparte solo, y una
+     * mesa a la que nadie ha llegado aun se cerraria sola—. Ver `Mesa.empezada`,
+     * donde esta el porque de que tampoco valga mirar el estado ni el diario.
+     */
+    m.mesa = { ...despues, empezada: true };
     m.ultimoToqueEn = Date.now();
+    cerrarSiSeAcabo(m);
     /*
      * LAS DOS, JUNTAS Y CON LA MISMA CONDICIÓN, que es lo que ya decía esta nota y
      * ahora es verdad: `venceEn` dice hasta cuándo hay tiempo y `turnoDesde` desde

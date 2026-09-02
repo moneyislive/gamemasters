@@ -134,7 +134,7 @@ function contestarElFallo(error: unknown, res: Response, vista?: VistaDeMesa): b
     return true;
   }
   if (error instanceof MesaLlena) {
-    res.status(409).json({ error: error.message, motivo: 'mesa-llena' });
+    res.status(409).json({ error: error.message, motivo: error.motivo });
     return true;
   }
   if (error instanceof ArcadeNoInstalado) {
@@ -719,7 +719,19 @@ router.get('/arcade/mesas/:codigo/turno', contadorDeCodigos, async (req, res) =>
  * «para tenerla en un solo sitio» — y subirla es reconstruir el acoplamiento que
  * todo esto existe para no tener.
  */
-router.post('/arcade/mesas/:codigo/movimientos', async (req, res) => {
+/*
+ * Y las tres que quedaban tambien cuentan. Las seis rutas con `:codigo` dan el
+ * MISMO ORACULO —404 si no existe, otra cosa si existe— asi que un candado en
+ * tres puertas y tres abiertas no protege nada: quien quiera adivinar codigos
+ * enumera por la que no cuenta. Mismo contador y misma credencial en las seis, a
+ * proposito: compartir el recuento impide turnarse entre ellas.
+ *
+ * Medido: el limitador no devuelve 429 en estas puertas —no bloquea a quien no se
+ * identifica, que dejaria fuera a una casa entera detras de la misma IP— sino que
+ * FRENA. De 1 ms a 2,3 s en cuarenta intentos, o sea unos dos anos por conexion
+ * para acertar uno de los 28,6 millones de codigos.
+ */
+router.post('/arcade/mesas/:codigo/movimientos', contadorDeCodigos, async (req, res) => {
   const codigo = String(req.params.codigo ?? '').toUpperCase();
   const llave = llaveDe(req);
   const cuerpo = req.body as { rev?: unknown; tipo?: unknown; carga?: unknown };
@@ -864,7 +876,7 @@ router.post('/arcade/mesas/:codigo/movimientos', async (req, res) => {
  * conceptos que el diseño aplaza a propósito. La mesa NO desaparece: se queda
  * cerrada para que los cuatro puedan ver el resultado.
  */
-router.post('/arcade/mesas/:codigo/cerrar', async (req, res) => {
+router.post('/arcade/mesas/:codigo/cerrar', contadorDeCodigos, async (req, res) => {
   const codigo = String(req.params.codigo ?? '').toUpperCase();
   const llave = llaveDe(req);
   try {
@@ -901,7 +913,7 @@ router.post('/arcade/mesas/:codigo/cerrar', async (req, res) => {
  * automático de las mesas viejas vive en `mesas.ts` y se lleva la memoria de la
  * autoridad; esto se lleva además la del transporte.
  */
-router.delete('/arcade/mesas/:codigo', async (req, res) => {
+router.delete('/arcade/mesas/:codigo', contadorDeCodigos, async (req, res) => {
   const codigo = String(req.params.codigo ?? '').toUpperCase();
   const llave = llaveDe(req);
   try {

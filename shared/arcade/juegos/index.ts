@@ -44,6 +44,7 @@ import {
   MANIFIESTO_RONDA,
   opcionesDeLaRonda,
   proyectarLaRonda,
+  seAcabo as seAcaboLaRonda,
 } from './ronda';
 import type { EstadoDeLaRonda } from './ronda';
 import {
@@ -52,6 +53,7 @@ import {
   MANIFIESTO_RIBERAS,
   opcionesDeRiberas,
   proyectarRiberas,
+  seAcabo as seAcaboRiberas,
 } from './riberas';
 import type { EstadoDeRiberas } from './riberas';
 import { avanzarLaPeonza, MANIFIESTO_PEONZA } from './peonza';
@@ -276,6 +278,7 @@ instalarArcade<EstadoDeLaRonda | undefined>({
   proyeccion: proyectarLaRonda,
   loSecreto: loSecretoDeLaRonda,
   opciones: opcionesDeLaRonda,
+  seAcabo: seAcaboLaRonda,
 });
 
 /**
@@ -353,6 +356,7 @@ instalarArcade<EstadoDeRiberas | undefined, unknown>({
   proyeccion: proyectarRiberas,
   loSecreto: loSecretoDeRiberas,
   opciones: opcionesDeRiberas,
+  seAcabo: seAcaboRiberas,
 });
 
 /**

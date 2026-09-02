@@ -2669,6 +2669,189 @@ paso('El volcado al recibir la señal, ejercitado en proceso');
   );
 }
 
+paso('Con la partida empezada no se sienta nadie');
+
+/*
+ * ═══ EL TERCERO QUE LLEGA CON EL CÓDIGO DEL CHAT ═══
+ *
+ * Riberas admite de 2 a 6, así que el aforo NO es lo que cierra esta puerta: con
+ * dos repartiendo, un tercero entraba y el servidor le daba silla. El reductor
+ * copió los asientos AL REPARTIR, o sea que ese tercero no es colono: ve el
+ * tablero, ve de quién es el turno y no tiene un solo botón, nunca. Salía en la
+ * lista como si jugara y gastaba aforo sin poder levantarse.
+ *
+ * Y la segunda mitad es la que decide CÓMO se sabe que empezó: NO vale mirar el
+ * estado ni el diario. En La Ronda basta que alguien MIRE para que el plazo venza
+ * y el tic reparta solo; con esa regla, una mesa a la que aún no ha llegado nadie
+ * se cerraría a sí misma. Por eso lo apunta `mover` y no el tic, y por eso aquí
+ * se comprueban las dos cosas juntas: que el tarde no entra y que el tic no cierra.
+ */
+{
+  const mesas = await import('../src/arcade/mesas');
+  mesas.ponerAlmacenDeMesas({
+    leer: () => [],
+    guardar: async () => {},
+    borrar: async () => {},
+    guardarYa: () => {},
+  });
+
+  const enRiberas = await mesas.abrir({ arcade: RIBERAS, nombre: 'Ana', plazoSegundos: 600 });
+  const suCodigo = enRiberas.mesa.codigo;
+  await mesas.sentarse(suCodigo, 'Bea');
+  const aTiempo = await mesas.sentarse(suCodigo, 'Cid');
+  comprobar(
+    'antes de repartir se sienta quien llega, que para eso el aforo son seis',
+    typeof aTiempo.llave === 'string' && aTiempo.llave.length > 0,
+    aTiempo,
+  );
+
+  /* Se lee para saber la revisión de AHORA: cada uno que se sienta la sube. */
+  const antesDeRepartir = await mesas.mirar(suCodigo, enRiberas.silla.llave);
+  /* Con `carga: {}`: el portillo compara tipo Y carga, y la opcion la trae vacia. */
+  const repartido = await mesas.mover(suCodigo, enRiberas.silla.llave, antesDeRepartir.rev, {
+    tipo: 'riberas:empezar',
+    carga: {},
+  });
+  comprobar(
+    'el delta se ha repartido de verdad, que si no lo de abajo sería verde por nada',
+    repartido.rev > antesDeRepartir.rev,
+    { antes: antesDeRepartir.rev, despues: repartido.rev },
+  );
+
+  let alSentarse: unknown;
+  try {
+    await mesas.sentarse(suCodigo, 'Dan');
+  } catch (error) {
+    alSentarse = error;
+  }
+  comprobar(
+    'REPARTIDO EL DELTA, EL QUE LLEGA TARDE NO SE SIENTA',
+    alSentarse instanceof mesas.MesaLlena,
+    alSentarse instanceof Error ? alSentarse.name : alSentarse,
+  );
+  comprobar(
+    'y no se le miente: no se le dice que la mesa está llena, se le dice que ya empezó',
+    alSentarse instanceof mesas.MesaLlena &&
+      alSentarse.motivo === 'mesa-empezada' &&
+      !alSentarse.message.includes('caben'),
+    alSentarse instanceof Error ? alSentarse.message : alSentarse,
+  );
+
+  /* La otra mitad: el tic reparte, y el tic NO puede cerrar la puerta. */
+  const enRonda = await mesas.abrir({ arcade: RONDA, nombre: 'Uno', plazoSegundos: 1 });
+  await dormir(1200);
+  const conTic = await mesas.mirar(enRonda.mesa.codigo, enRonda.silla.llave);
+  comprobar('el plazo ha vencido con una sola mirada', conTic.tic >= 1, conTic.tic);
+
+  let alSentarseTrasElTic: unknown;
+  try {
+    for (const nombre of ['Dos', 'Tres', 'Cuatro']) {
+      await mesas.sentarse(enRonda.mesa.codigo, nombre);
+    }
+  } catch (error) {
+    alSentarseTrasElTic = error;
+  }
+  comprobar(
+    'EL TIC NO CIERRA LA MESA: los tres que faltaban siguen entrando después de él',
+    alSentarseTrasElTic === undefined,
+    alSentarseTrasElTic instanceof Error ? alSentarseTrasElTic.message : alSentarseTrasElTic,
+  );
+}
+
+paso('La mesa se cierra sola cuando el juego dice que se acabó');
+
+/*
+ * ═══ UNA PARTIDA ENTERA, HASTA QUE NO QUEDA CARTA ═══
+ *
+ * El árbitro dice desde el primer día que «quien hospeda llama a `cerrarMesa`
+ * cuando el estado del juego dice que se acabó», los tres juegos de servidor
+ * exportan su `seAcabo`… y en el servidor no lo llamaba nadie: `cerrarMesa` sólo
+ * salía de `POST /cerrar`, que no pulsa ningún cliente. Así que ninguna mesa se
+ * cerraba nunca y una partida acabada seguía pintando su cuenta atrás.
+ *
+ * Se juega DE VERDAD, veinte cartas, cogiendo cada vez la primera opción que la
+ * mesa le ofrece a quien tiene el turno. Una partida simulada con el estado a
+ * mano comprobaría el ayudante; ésta comprueba el camino.
+ */
+{
+  const mesas = await import('../src/arcade/mesas');
+  mesas.ponerAlmacenDeMesas({
+    leer: () => [],
+    guardar: async () => {},
+    borrar: async () => {},
+    guardarYa: () => {},
+  });
+
+  /* Un plazo corto: la segunda mitad de esta prueba necesita que venza. */
+  const partida = await mesas.abrir({ arcade: RONDA, nombre: 'Ana', plazoSegundos: 1 });
+  const cod = partida.mesa.codigo;
+  const llaveDe = new Map<AsientoId, string>();
+  llaveDe.set(partida.silla.id, partida.silla.llave);
+  for (const nombre of ['Bea', 'Cid', 'Dan']) {
+    const silla = await mesas.sentarse(cod, nombre);
+    llaveDe.set(silla.id, silla.llave);
+  }
+
+  const arranque = await mesas.mirar(cod, partida.silla.llave);
+  await mesas.mover(cod, partida.silla.llave, arranque.rev, { tipo: 'ronda:empezar', carga: {} });
+
+  /*
+   * Se para A UNA CARTA DEL FINAL: la última la tiene que echar el TIC, y no una
+   * persona. En La Ronda el reloj juega por quien no aparece, o sea que el final
+   * de una partida puede llegar por el camino del tic —y si `cerrarSiSeAcabo` sólo
+   * estuviera en `mover`, esa mesa se quedaría abierta para siempre.
+   */
+  let jugadas = 0;
+  for (let vuelta = 0; vuelta < 40 && jugadas < 19; vuelta++) {
+    const publica = await mesas.mirar(cod, partida.silla.llave);
+    if (publica.terminada) break;
+    const deQuien = (publica.vista as { turnoDe?: AsientoId } | undefined)?.turnoDe;
+    const suLlave = deQuien === undefined ? undefined : llaveDe.get(deQuien);
+    if (suLlave === undefined) break;
+    const suya = await mesas.mirar(cod, suLlave);
+    const opcion = suya.opciones?.[0];
+    if (opcion === undefined) break;
+    await mesas.mover(cod, suLlave, suya.rev, { tipo: opcion.tipo, carga: opcion.carga });
+    jugadas++;
+  }
+  comprobar(
+    'se han jugado a mano las diecinueve primeras cartas',
+    jugadas === 19,
+    { jugadas },
+  );
+  const aFaltaDeUna = await mesas.mirar(cod, partida.silla.llave);
+  comprobar(
+    'y a falta de una, la mesa SIGUE ABIERTA: no se cierra antes de tiempo',
+    !aFaltaDeUna.terminada,
+    { terminada: aFaltaDeUna.terminada, momento: (aFaltaDeUna.vista as { momento?: string })?.momento },
+  );
+
+  await dormir(1200);
+  const trasElTic = await mesas.mirar(cod, partida.silla.llave);
+  comprobar(
+    'LA ÚLTIMA CARTA LA ECHA EL RELOJ Y LA MESA SE CIERRA: el tic también cierra',
+    trasElTic.terminada,
+    { terminada: trasElTic.terminada, momento: (trasElTic.vista as { momento?: string })?.momento },
+  );
+  comprobar(
+    'y con la mesa cerrada ya no hay cuenta atrás que pintar',
+    trasElTic.venceEn === null || trasElTic.venceEn === undefined,
+    trasElTic.venceEn,
+  );
+
+  let alMoverEnLaAcabada: unknown;
+  try {
+    await mesas.mover(cod, partida.silla.llave, trasElTic.rev, { tipo: 'ronda:jugar', carga: {} });
+  } catch (error) {
+    alMoverEnLaAcabada = error;
+  }
+  comprobar(
+    'y en una mesa acabada ya no se mueve',
+    alMoverEnLaAcabada instanceof Error && alMoverEnLaAcabada.name === 'MovimientoRechazado',
+    alMoverEnLaAcabada instanceof Error ? alMoverEnLaAcabada.name : alMoverEnLaAcabada,
+  );
+}
+
 // ---------------------------------------------------------------------------
 
 try {

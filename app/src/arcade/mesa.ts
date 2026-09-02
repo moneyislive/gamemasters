@@ -141,6 +141,14 @@ export interface LaMesa {
   entrar: (codigo: string, nombre: string) => void;
   mover: (movimiento: MovimientoDeclarado) => void;
   salir: () => void;
+  /**
+   * TIRA LA MESA PARA TODOS. La tenía el escritorio y no la tenía la app, que es
+   * justo la asimetría que esta casa no admite: si algo se puede hacer desde el
+   * PC, se tiene que poder hacer desde el móvil. Y aquí importa más que en el
+   * PC, porque el móvil es el aparato con el que se juega de verdad y era el
+   * único desde el que una mesa mal abierta se quedaba abierta para siempre.
+   */
+  tirar: () => void;
 }
 
 /** La cabecera con la que un asiento demuestra que es él. Ver `routes/arcade.ts`. */
@@ -166,6 +174,22 @@ const ESPERA_TRAS_FALLO_MS = 2000;
  */
 
 /** Se conecta a una mesa de un arcade y la mantiene al día. */
+/*
+ * ═══ DE QUÉ MESAS SE HA SALIDO A PROPÓSITO EN ESTA EJECUCIÓN ═══
+ *
+ * Vive en el módulo y no en el componente porque tiene que sobrevivir a que la
+ * pantalla se desmonte —salir es justamente eso— y NO tiene que sobrevivir a
+ * cerrar la app. Esa es la distinción entera: al cerrar la app se vuelve al
+ * asiento, y al salir a propósito no se vuelve solo, pero el asiento sigue ahí.
+ *
+ * Antes esto se conseguia OLVIDANDO la llave, y el olvido costaba el asiento: el
+ * botón prometía «el asiento sigue siendo tuyo y se recupera volviendo a entrar
+ * con el código» y entrar con el código crea un asiento NUEVO, que en partida
+ * empezada no juega —y desde que el servidor no sienta a nadie con la partida en
+ * marcha, ni siquiera entra: 409—. Se guardaba la llave para nada.
+ */
+const salidasDeEstaEjecucion = new Set<string>();
+
 export function usarMesaDeArcade(arcade: ArcadeId): LaMesa {
   const [fase, ponerFase] = useState<FaseDeLaMesa>('fuera');
   const [mesa, ponerMesa] = useState<MesaVista | null>(null);
@@ -212,6 +236,8 @@ export function usarMesaDeArcade(arcade: ArcadeId): LaMesa {
     void (async () => {
       const sitio = await elSitioGuardado(arcade);
       if (!vivo.current || sitio === null) return;
+      /* De la mesa de la que uno acaba de salir no se vuelve solo. Ver el registro. */
+      if (salidasDeEstaEjecucion.has(`${arcade}:${sitio.codigo}`)) return;
       /* Si mientras se leía el bolsillo alguien ya abrió mesa, manda lo de ahora. */
       if (codigo.current !== null) return;
 
@@ -349,6 +375,34 @@ export function usarMesaDeArcade(arcade: ArcadeId): LaMesa {
             if (parado) return;
             continue;
           }
+          /*
+           * ═══ UN 404 NO ES UN FALLO DE RED: ES QUE LA MESA YA NO ESTÁ ═══
+           *
+           * Y confundirlos encerraba a la gente. Cuando alguien tira la mesa —o
+           * cuando caduca— el servidor la olvida y avisa por el canal, así que las
+           * peticiones aparcadas de los demás se sueltan EN EL ACTO y reciben 404.
+           * Cayéndose al `catch` genérico eso se pintaba como «se ha perdido la mesa,
+           * reintentando» y el bucle volvía a preguntar cada dos segundos PARA
+           * SIEMPRE, con el tablero viejo delante.
+           *
+           * Aquí es peor que en el escritorio: este cliente no tiene botón de tirar
+           * la mesa, así que quien se quedaba dentro no tenía ninguna salida salvo
+           * cerrar la app.
+           *
+           * La regla del fichero —«un asiento solo se olvida si el servidor lo
+           * NIEGA»— no se rompe: se cumple. Un 404 es exactamente el servidor
+           * negando esa mesa, que no es lo mismo que no haber podido preguntar.
+           */
+          if (r.status === 404) {
+            parado = true;
+            codigo.current = null;
+            llave.current = null;
+            ponerMesa(null);
+            ponerFase('fuera');
+            void olvidarElSitio(arcade);
+            ponerAviso('Esa mesa ya no existe: la han tirado o ha caducado.');
+            return;
+          }
           if (!r.ok) throw new Error(`el servidor contestó ${String(r.status)}`);
           const datos = (await r.json()) as { mesa: MesaVista };
           if (parado) return;
@@ -439,10 +493,50 @@ export function usarMesaDeArcade(arcade: ArcadeId): LaMesa {
         ponerFase('yendo');
         try {
           const limpio = elCodigo.trim().toUpperCase();
+          /*
+           * ═══ SI ESE CÓDIGO YA ES EL NUESTRO, SE VUELVE; NO SE ENTRA ═══
+           *
+           * Entrar crea un asiento NUEVO, y el bolsillo puede tener ya una llave de
+           * ESTA misma mesa: es el caso de quien pulsa «Salir» y quiere volver, y
+           * también el de quien teclea el código de la mesa en la que ya está
+           * sentado. Se lee con la llave, igual que hace la recuperación al montar.
+           *
+           * Si el servidor NIEGA esa llave —mesa cerrada, asiento caducado— no se
+           * corta: se sigue por la puerta de siempre y se pide asiento. Lo que no
+           * puede pasar es lo de antes, que con la llave buena en el bolsillo se
+           * pidiera silla nueva y el servidor contestara 409 con la partida en
+           * marcha, dejando fuera de su propia mesa a quien ya jugaba.
+           */
+          const guardado = await elSitioGuardado(arcade);
+          if (guardado !== null && guardado.codigo === limpio) {
+            const vuelta = await fetch(
+              `${servidorActual()}/api/arcade/mesas/${limpio}?desde=-1`,
+              { headers: { 'x-asiento': guardado.llave } },
+            );
+            if (vuelta.ok) {
+              const loSuyo = (await vuelta.json()) as { mesa?: MesaVista };
+              if (loSuyo.mesa !== undefined && loSuyo.mesa.yo !== null) {
+                salidasDeEstaEjecucion.delete(`${arcade}:${limpio}`);
+                codigo.current = loSuyo.mesa.codigo;
+                llave.current = guardado.llave;
+                ponerMesa(loSuyo.mesa);
+                ponerFase('dentro');
+                ponerAviso('');
+                return;
+              }
+            }
+          }
           const r = await fetch(`${servidorActual()}/api/arcade/mesas/${limpio}/asientos`, {
             method: 'POST',
             headers: cabeceras(true),
-            body: JSON.stringify({ nombre }),
+            /*
+             * `arcade` VA EN EL CUERPO, y sin esto la guarda del servidor —que
+             * compara este juego con el de la mesa y contesta 409— no se ejecuta
+             * nunca: está envuelta en `if (typeof cuerpo.arcade === 'string')`.
+             * El caso que cierra: un código de cinco letras no dice de qué juego
+             * es, y se reparten por un chat.
+             */
+            body: JSON.stringify({ nombre, arcade }),
           });
           const datos = (await r.json()) as { error?: string; llave?: string; mesa?: MesaVista };
           if (!r.ok || datos.mesa === undefined) throw new Error(datos.error ?? 'no se pudo entrar');
@@ -563,20 +657,52 @@ export function usarMesaDeArcade(arcade: ArcadeId): LaMesa {
   );
 
   /*
-   * Salir OLVIDA el sitio, y eso es lo que lo distingue de cerrar la app: al cerrar
-   * se vuelve al mismo asiento, y al salir a propósito no. Sin el olvido, la
-   * pantalla se reabriría sola en la mesa de la que uno acaba de irse.
+   * Salir CIERRA LA PANTALLA Y SE QUEDA EL ASIENTO. Lo único que se apunta es que
+   * de esta mesa no se vuelve solo mientras dure la ejecución —ver el registro de
+   * arriba—, que era todo lo que el olvido conseguía de útil.
    */
   const salir = useCallback(() => {
+    if (codigo.current !== null) salidasDeEstaEjecucion.add(`${arcade}:${codigo.current}`);
     codigo.current = null;
     llave.current = null;
     ponerMesa(null);
     ponerAviso('');
     ponerFase('fuera');
-    void olvidarElSitio(arcade);
   }, [arcade]);
 
-  return { fase, mesa, aviso, quieto, abrir, entrar, mover, salir };
+  /*
+   * TIRAR ES OTRA COSA QUE SALIR, y por eso sí olvida el sitio: al salir la mesa
+   * sigue ahí con tu asiento dentro, y al tirarla no queda mesa a la que volver.
+   * Guardar la llave de una mesa borrada sólo sirve para que al abrir la app te
+   * intente devolver a ella y te diga que ya no existe.
+   *
+   * Si el borrado falla no se corta: quien lo pulsa se va igual. El servidor
+   * contesta 403 a quien no esté sentado, y una mesa huérfana se barre sola.
+   */
+  const tirar = useCallback(() => {
+    void (async () => {
+      const donde = codigo.current;
+      const mia = llave.current;
+      if (donde !== null && mia !== null) {
+        try {
+          await fetch(`${servidorActual()}/api/arcade/mesas/${donde}`, {
+            method: 'DELETE',
+            headers: { [CABECERA_DE_ASIENTO]: mia },
+          });
+        } catch {
+          /* Da igual por qué no se pudo: quien pulsa se va de todas formas. */
+        }
+      }
+      codigo.current = null;
+      llave.current = null;
+      ponerMesa(null);
+      ponerAviso('');
+      ponerFase('fuera');
+      await olvidarElSitio(arcade);
+    })();
+  }, [arcade]);
+
+  return { fase, mesa, aviso, quieto, abrir, entrar, mover, salir, tirar };
 }
 
 /** Lo que se le puede enseñar a alguien de un fallo, sin pila ni jerga. */

@@ -36,10 +36,13 @@
  *     juega— y el plazo, de la mesa.
  */
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { manifiestoDeArcadeSiExiste } from '../../../shared/arcade';
-import { tableroDeLaVista } from '../../../shared/mecanicas/tablero-declarado';
+import {
+  opcionesSueltas,
+  tableroDeLaVista,
+} from '../../../shared/mecanicas/tablero-declarado';
 import type { MovimientoDeclarado } from '../../../shared/mecanicas/tablero-declarado';
 import { turnoDeLaVista } from '../../../shared/mecanicas/turno-declarado';
 import { usarMesaDeArcade } from './mesa';
@@ -248,9 +251,17 @@ export function ElTableroEnLinea(): JSX.Element {
    * ═══ LAS OPCIONES QUE MANDA EL JUEGO, QUE ES EL HUECO DE LA FASE 5 ═══
    *
    * Un juego que se resuelve su propio dibujo —Riberas, y «La Orilla» del
-   * comprobador— mete el movimiento DENTRO de cada pieza del tablero, y esta lista
-   * no hace falta: pintarla además sería un segundo juego de botones diciendo lo
-   * mismo debajo del primero.
+   * comprobador— mete el movimiento DENTRO de cada pieza del tablero, y pintar la
+   * lista entera debajo sería un segundo juego de botones diciendo lo mismo.
+   *
+   * Pero NO pintar ninguna era el otro extremo, y era el que estaba puesto:
+   * `opciones()` puede ofrecer cosas que no son ninguna pieza —aceptar un trato,
+   * pasar, rendirse— y con tablero delante este mueble las escondía TODAS. Hoy no
+   * se notaba porque los dos juegos de mesa de esta casa meten lo suyo en
+   * `acciones` —La Ronda lo hace por esto mismo—, pero un arcade de fuera con
+   * tablero y un «pasar» suelto perdía ese botón en el móvil y lo tenía en el
+   * escritorio. Por eso baja `opcionesSueltas`, la misma que usa el escritorio:
+   * cada movimiento se enseña exactamente una vez.
    *
    * Lo que arregla es el otro caso, que es el que dejaba el hueco sin pagar: un
    * arcade que registra `opciones()` y NO se resuelve el tablero. Antes caía en la
@@ -271,6 +282,7 @@ export function ElTableroEnLinea(): JSX.Element {
               <Pressable onPress={mesa.salir} style={estilos.salir}>
                 <Text style={estilos.salirRotulo}>Salir</Text>
               </Pressable>
+              <BotonTirar tirar={mesa.tirar} />
             </View>
             <Text style={estilos.gente}>
               {mesa.mesa.asientos
@@ -299,6 +311,8 @@ export function ElTableroEnLinea(): JSX.Element {
     );
   }
 
+  const sueltas = opcionesSueltas(tablero, opciones);
+
   return (
     <View style={estilos.todo}>
       <View style={estilos.barra}>
@@ -317,6 +331,7 @@ export function ElTableroEnLinea(): JSX.Element {
           <Pressable onPress={mesa.salir} style={estilos.salir}>
             <Text style={estilos.salirRotulo}>Salir</Text>
           </Pressable>
+          <BotonTirar tirar={mesa.tirar} />
         </View>
         <Text style={estilos.gente}>
           {mesa.mesa.asientos.map((a) => `${a.nombre}${a.presente ? '' : ' (fuera)'}`).join(' · ')}
@@ -351,7 +366,51 @@ export function ElTableroEnLinea(): JSX.Element {
         mueble genérico debería hacer con un texto que no entiende.
       */}
       <Retablo tablero={tablero} alTocar={mesa.mover} quieto={mesa.quieto} />
+      {/*
+        Y DEBAJO, LO QUE EL TABLERO NO ENSEÑA. Ni una más: `opcionesSueltas` quita
+        las que ya salen dentro de una pieza o de una acción, comparando por forma
+        canónica del movimiento y no por identificador. Casi siempre esta lista
+        queda vacía —y entonces no se pinta nada—; cuando no, es un movimiento
+        legal que hasta hoy sólo existía en el escritorio.
+      */}
+      {sueltas.length > 0 ? (
+        <LasOpciones opciones={sueltas} alTocar={mesa.mover} quieto={mesa.quieto} />
+      ) : null}
     </View>
+  );
+}
+
+/**
+ * TIRAR LA MESA, QUE NO ES SALIR.
+ *
+ * Salir cierra esta pantalla y te deja el asiento; tirar acaba la partida PARA
+ * TODOS. Lo tenía el escritorio y no lo tenía la app, o sea que desde el móvil
+ * —que es el aparato con el que se juega— una mesa abierta por error se quedaba
+ * abierta y gastando aforo hasta que la barriera el servidor.
+ *
+ * Se pregunta antes, por lo mismo que en el escritorio: afecta a gente que no
+ * está mirando esta pantalla. Y el rótulo de la pregunta dice «para todos», que
+ * es la diferencia entera con el botón de al lado.
+ *
+ * Está en las DOS barras —la del tablero y la del juego que sólo trae opciones—
+ * porque las dos son una mesa viva. Tenerlo en una sola sería la misma asimetría
+ * que se acaba de corregir, sólo que dentro del mismo cliente.
+ */
+function BotonTirar({ tirar }: { tirar: () => void }): JSX.Element {
+  return (
+    <Pressable
+      onPress={() => {
+        Alert.alert('¿Tirar la mesa?', 'Se acaba la partida para todos los que estén sentados.', [
+          { text: 'No', style: 'cancel' },
+          { text: 'Tirarla', style: 'destructive', onPress: tirar },
+        ]);
+      }}
+      style={estilos.salir}
+      accessibilityRole="button"
+      accessibilityLabel="Tirar la mesa para todos"
+    >
+      <Text style={estilos.salirRotulo}>Tirar</Text>
+    </Pressable>
   );
 }
 

@@ -59,6 +59,8 @@
  * donde puede no haber movimiento va `null`, que sí sobrevive al viaje.
  */
 
+import { canonico } from './canonico';
+
 /** Un punto del plano, en las unidades que declare el propio tablero. */
 export interface PuntoDeTablero {
   x: number;
@@ -238,4 +240,58 @@ export function tableroDeLaVista(vista: unknown): TableroDeclarado | null {
   if (typeof vista !== 'object' || vista === null) return null;
   const posible = (vista as { tablero?: unknown }).tablero;
   return esTableroDeclarado(posible) ? posible : null;
+}
+
+/**
+ * LAS OPCIONES QUE EL TABLERO NO ENSEÑA YA, Y NI UNA MÁS.
+ *
+ * ═══ POR QUÉ HACE FALTA, Y POR QUÉ NO SE ARREGLA ESCONDIENDO LAS OPCIONES ═══
+ *
+ * Con un tablero delante, un movimiento puede llegar por tres sitios: dentro del
+ * `toque` de una pieza, dentro de una `accion` declarada, o en la lista de
+ * `opciones()`. Y no son tres listas distintas: son tres formas de enseñar los
+ * mismos movimientos, y un juego perfectamente correcto los publica por más de
+ * una —Riberas resuelve su tablero A PARTIR de sus propias opciones, así que
+ * mientras la mesa se reúne el mismo «repartir» sale como acción del tablero y
+ * como opción—.
+ *
+ * Pintar las tres listas tal cual da botones repetidos, y un botón repetido no es
+ * solo feo: hace creer que hay dos cosas distintas que hacer.
+ *
+ * La salida fácil sería no pintar `opciones()` cuando hay tablero. Y sería la
+ * mentira más cara de un cliente, porque `opciones()` puede ofrecer cosas que NO
+ * son ninguna pieza —aceptar un trato, pasar, rendirse— y que por tanto no tienen
+ * dónde dibujarse. Esconderlas es esconder movimientos legales.
+ *
+ * ═══ Y VIVE AQUÍ Y NO EN UN CLIENTE, QUE ES LA CORRECCIÓN DE HOY ═══
+ *
+ * Esto nació en `escritorio/src/plan.ts` y se quedó allí, así que la app hacía
+ * justo lo que este comentario llamaba la mentira más cara: con tablero delante
+ * no pintaba ni una opción. Hoy no se nota porque los dos juegos de mesa de esta
+ * casa meten todo lo suyo en `acciones` —La Ronda lo hace por esto mismo—, pero
+ * un arcade de FUERA con tablero y un «pasar» suelto perdía ese botón en el
+ * móvil y lo tenía en el escritorio. Dos clientes que no ofrecen los mismos
+ * movimientos legales es exactamente lo que el §7 existe para que no pase.
+ *
+ * Así que se enseña cada movimiento EXACTAMENTE UNA VEZ: el tablero primero
+ * —que es donde tiene sentido espacial— y debajo solo lo que el tablero no
+ * enseña. La comparación es por forma canónica del movimiento y no por
+ * identificador: los `id` de las opciones y los de las piezas son de dos espacios
+ * de nombres distintos, y el juego no tiene ninguna obligación de hacerlos
+ * coincidir. `canonico` es la mecánica que este repositorio ya tiene para
+ * preguntar «¿son el mismo valor?» sin depender del orden de las claves.
+ */
+export function opcionesSueltas<O extends { tipo: string; carga: unknown }>(
+  tablero: TableroDeclarado,
+  opciones: readonly O[],
+): readonly O[] {
+  const yaEstan = new Set<string>();
+  const apuntar = (t: MovimientoDeclarado | null): void => {
+    if (t !== null) yaEstan.add(canonico({ tipo: t.tipo, carga: t.carga }));
+  };
+  for (const c of tablero.caras) apuntar(c.toque);
+  for (const l of tablero.lineas) apuntar(l.toque);
+  for (const n of tablero.nudos) apuntar(n.toque);
+  for (const a of tablero.acciones) apuntar(a.toque);
+  return opciones.filter((o) => !yaEstan.has(canonico({ tipo: o.tipo, carga: o.carga })));
 }

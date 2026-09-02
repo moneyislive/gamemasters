@@ -39,8 +39,11 @@
  *     de su primer inquilino. Con eso, los cuatro `seSabePintar` de la tabla de
  *     abajo dicen `true` y ninguna de las cuatro rutas de `app/app/(arcade)/` monta
  *     ya `MueblePendiente`: las cuatro son la misma línea sobre `PintarEnElMueble`.
- *     La pantalla de «pendiente» sigue en `app/src/arcade/pendiente.tsx` sin que la
- *     importe nadie; quien la borre no rompe nada.
+ *     La pantalla de «pendiente» decía aquí que seguía en el árbol «sin que la
+ *     importe nadie; quien la borre no rompe nada». Borrada: una pantalla que
+ *     explica por qué un mueble aún no existe, en un binario donde los cuatro
+ *     existen, no es código de reserva — es una respuesta falsa esperando a que
+ *     alguien la enchufe.
  *   · Y el reparto de juegos que la frase daba por cierto tampoco lo era ya: La
  *     Ronda NO es de `formulario`. Se movió a `tablero` al hacerla jugable, porque
  *     un formulario pinta la lista de `opciones()` y nada más, y un juego de bazas

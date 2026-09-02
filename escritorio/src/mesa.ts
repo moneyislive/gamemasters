@@ -371,6 +371,30 @@ export function usarMesaDeArcade(arcade: string, silla: string): LaMesa {
             if (parado) return;
             continue;
           }
+          /*
+           * ═══ UN 404 NO ES UN FALLO DE RED: ES QUE LA MESA YA NO ESTÁ ═══
+           *
+           * Y confundirlos encerraba a la gente. Cuando alguien tira la mesa —o
+           * cuando caduca— el servidor la olvida y avisa por el canal, así que las
+           * peticiones aparcadas de los demás se sueltan EN EL ACTO y reciben 404.
+           * Cayéndose al `catch` genérico, eso se pintaba como «reintentando» y el
+           * bucle volvía a preguntar cada dos segundos PARA SIEMPRE, con el tablero
+           * viejo delante y sin ninguna forma de salir.
+           *
+           * Y desde que la lectura lleva contador de códigos, además se
+           * autobloqueaba: cada 404 cuenta, así que sobre la petición treinta el
+           * «reintentando» se convertía en un 429 que tampoco dice nada.
+           *
+           * La regla del fichero —«un asiento solo se olvida si el servidor lo
+           * NIEGA»— no se rompe: se cumple. Un 404 es exactamente el servidor
+           * negando esa mesa, que es distinto de no haber podido preguntar.
+           */
+          if (r.status === 404) {
+            parado = true;
+            salir();
+            ponerAviso({ texto: 'Esa mesa ya no existe: la han tirado o ha caducado.', de: 'la-red' });
+            return;
+          }
           if (!r.ok) throw new Error(`el servidor contestó ${String(r.status)}`);
           const datos = (await r.json()) as { mesa: MesaVista; avisos?: AvisoDeMesa[] };
           if (parado) return;
@@ -467,7 +491,22 @@ export function usarMesaDeArcade(arcade: string, silla: string): LaMesa {
   const entrar = useCallback(
     (elCodigo: string, nombre: string) => {
       const limpio = elCodigo.trim().toUpperCase();
-      sentarse(`/mesas/${limpio}/asientos`, { nombre }, 'No se ha podido entrar');
+      /*
+       * ═══ SE MANDA A QUE JUEGO CREEMOS ESTAR ENTRANDO, Y ESA ES LA MITAD ═══
+       *
+       * El servidor tiene desde hoy una guarda que compara este `arcade` con el de
+       * la mesa y contesta 409 si no coinciden. Sin esta línea esa guarda es CODIGO
+       * MUERTO: está envuelta en `if (typeof cuerpo.arcade === 'string')`, así que
+       * no mandarlo la salta entera.
+       *
+       * Y el caso que cierra es de todos los días: el código son cinco letras y no
+       * dice de qué juego es; el producto las reparte por un chat. Quien esté en la
+       * pantalla de Riberas y teclee el código de una mesa de La Ronda se sentaba
+       * —el servidor sólo leía el nombre— y a partir de ahí el cliente pintaba la
+       * mesa bajo el juego equivocado y guardaba la llave en el cajón de otro
+       * arcade.
+       */
+      sentarse(`/mesas/${limpio}/asientos`, { nombre, arcade }, 'No se ha podido entrar');
     },
     [sentarse],
   );

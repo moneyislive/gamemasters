@@ -579,6 +579,17 @@ export function exigeReejecutabilidad(m: ManifiestoDeArcade): boolean {
  */
 export type Puntuacion = (estado: unknown) => number;
 
+/**
+ * ¿SE ACABÓ LA PARTIDA? Lo contesta EL JUEGO, no el motor.
+ *
+ * La distinción no es ceremonia. El § del diseño que aplaza «fin como función del
+ * estado» aplaza que EL MOTOR lo calcule, porque en cuanto lo calcule tendrá una
+ * opinión sobre qué es terminar: si hay un ganador, si son varios, si se puede
+ * seguir jugando después. Esto no calcula nada: pregunta, y devuelve un sí o un
+ * no. Quién ganó sigue siendo asunto del juego y de su vista.
+ */
+export type SeAcabo = (estado: unknown) => boolean;
+
 /** ¿Le entra el tiempo a este arcade por el reductor? */
 export function tieneReloj(m: ManifiestoDeArcade): boolean {
   return m.tickHz > 0;

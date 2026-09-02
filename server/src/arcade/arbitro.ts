@@ -173,6 +173,44 @@ export interface Mesa {
    * sería una prueba de nada.
    */
   diario: readonly MovimientoRegistrado[];
+
+  /**
+   * ¿HA EMPEZADO YA LA PARTIDA? Un hecho de la MESA, no del juego.
+   *
+   * ═══ PARA QUÉ HACE FALTA, Y QUÉ PASABA SIN ESTO ═══
+   *
+   * `sentarse` sólo miraba dos cosas: que la mesa no estuviera terminada y que
+   * cupiera uno más. Nada le preguntaba si ya se había repartido, así que en
+   * Riberas —que admite de 2 a 6— pasaba esto: Ana y Bea abren mesa y reparten;
+   * Cid llega tarde con el código del chat y EL SERVIDOR LE DA SILLA. El reductor
+   * copió los asientos al repartir y no le incluye, así que Cid ve el tablero, ve
+   * «le toca a Ana» y no tiene un solo botón, nunca, sin que nada falle. Y la
+   * lista de la mesa dice que juega, así que Ana y Bea leen tres nombres y creen
+   * que son tres.
+   *
+   * Peor: su silla GASTA AFORO. Seis curiosos con el código dejan la mesa llena
+   * para siempre, y no hay verbo de levantarse.
+   *
+   * Y el juego lo prometía por escrito: la ayuda de «Repartir el delta» dice «a
+   * partir de aquí no entra nadie más». La mesa lo desmentía.
+   *
+   * ═══ POR QUÉ UN CAMPO Y NO `estado !== undefined` NI `diario.length > 0` ═══
+   *
+   * Porque los dos mienten para algún juego. La mesa NO PUEDE mirar dentro del
+   * estado —es opaco, y de ahí cuelga el diseño entero— y los dos atajos dependen
+   * de cómo se porte el reductor: en La Ronda, un tic sobre una mesa sin repartir
+   * ya construye su estado inicial, así que con cualquiera de los dos atajos
+   * nadie podría sentarse a una mesa que lleva un minuto esperando.
+   *
+   * Esto es un hecho que la mesa SÍ sabe sin abrir nada: que un movimiento
+   * MANDADO POR UN ASIENTO cambió el estado. Lo pone `mover` y no el tic, que es
+   * la diferencia exacta.
+   *
+   * OPCIONAL, para las mesas ya guardadas antes de que este campo existiera: allí
+   * llega `undefined`, que es falso, y se sientan como hasta ahora. Declararlo
+   * obligatorio no lo haría aparecer en el disco.
+   */
+  empezada?: boolean;
 }
 
 /** Por qué se ha rechazado un movimiento. UNIÓN CERRADA. */

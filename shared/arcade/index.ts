@@ -60,6 +60,7 @@ import type {
   LosSentados,
   ManifiestoDeArcade,
   Puntuacion,
+  SeAcabo,
   QuienMira,
 } from './tipos';
 import type { ContextoMovimiento, Movimiento } from './movimiento';
@@ -186,6 +187,12 @@ export interface ArcadeInstalado {
    * con `Symbol.for` porque la doble carga de módulo es un fallo REAL que este
    * repositorio ya pagó una vez con `shared/juegos/index.ts`.
    */
+  /**
+   * ¿Ha terminado esta partida? Ver `SeAcabo`. Vive aquí por lo mismo que
+   * `puntuacion`: es lo que la plataforma sabe de un juego y entra por la misma
+   * puerta que el reductor.
+   */
+  seAcabo?: SeAcabo;
   puntuacion?: Puntuacion;
 }
 
@@ -314,6 +321,26 @@ export function instalarArcade<E, V = unknown>(alta: {
    * un arcade puede venir de fuera del binario, y allí no hay compilador. Lo exige
    * `exigirCifrasLegibles()` al arrancar, cuando ya están todas las altas hechas.
    */
+  /**
+   * ¿HA TERMINADO? Lo pregunta QUIEN HOSPEDA para cerrar la mesa.
+   *
+   * El árbitro lo dice desde el primer día —«quien hospeda llama a `cerrarMesa`
+   * cuando el estado del juego dice que se acabó. El juego sí lo sabe»— y hasta
+   * hoy no había por dónde preguntarlo: los tres juegos de servidor exportaban su
+   * `seAcabo` y sólo lo llamaba el motor DEL APARATO, que los tiene importados por
+   * su nombre. En el servidor no existía el hueco, así que ninguna mesa se cerraba
+   * jamás: una partida acabada seguía con su cuenta atrás corriendo, admitía tics
+   * y no daba nunca por terminada la espera.
+   *
+   * Es OPCIONAL de verdad: un arcade sin final —uno que se juega hasta que la
+   * gente se cansa— no tiene nada que declarar aquí, y su mesa vive hasta que
+   * alguien la tira. Lo que NO puede pasar es lo de antes: que el juego lo sepa,
+   * lo exporte, y no haya forma de que se lo pregunten.
+   *
+   * Se recibe con EL ESTADO DEL JUEGO y se guarda opaco, igual que el reductor:
+   * quien lo escribe no tiene por qué poner `unknown` en su propia firma.
+   */
+  seAcabo?: (estado: E) => boolean;
   puntuacion?: Puntuacion;
 }): void {
   const problemas = problemasDelManifiesto(alta.manifiesto);
@@ -345,6 +372,7 @@ export function instalarArcade<E, V = unknown>(alta: {
     avanzar: alta.avanzar as Avanzar<unknown>,
     ...(alta.opciones ? { opciones: alta.opciones as Opciones } : {}),
     ...(alta.puntuacion ? { puntuacion: alta.puntuacion } : {}),
+    ...(alta.seAcabo ? { seAcabo: alta.seAcabo as SeAcabo } : {}),
   };
   if (alta.proyeccion) registrarProyeccion(alta.manifiesto.id, alta.proyeccion);
   if (alta.loSecreto) registrarLoSecreto(alta.manifiesto.id, alta.loSecreto);
@@ -538,6 +566,49 @@ export function puntuacionDe(arcade: ArcadeId, estado: unknown): number {
   if (!instalado) throw new ArcadeNoInstalado(arcade);
   if (instalado.puntuacion === undefined) throw new ArcadeSinPuntuacion(arcade);
   return instalado.puntuacion(estado);
+}
+
+/**
+ * DA DE ALTA CÓMO SE LE PREGUNTA A UN ARCADE YA INSTALADO SI SE ACABÓ.
+ *
+ * Existe aparte del alta por el mismo motivo que `registrarPuntuacion`: el
+ * enchufe. Un arcade de fuera se instala en una línea y declara su final en otra.
+ * Lo normal y lo recomendado es pasarlo dentro del alta.
+ */
+export function registrarFinal(arcade: ArcadeId, seAcabo: SeAcabo): void {
+  const instalado = INSTALADOS[arcade];
+  if (!instalado) throw new ArcadeNoInstalado(arcade);
+  instalado.seAcabo = seAcabo;
+}
+
+/** Quita el de un arcade, dejándolo instalado. Para las pruebas. */
+export function olvidarFinal(arcade: ArcadeId): void {
+  const instalado = INSTALADOS[arcade];
+  if (instalado) delete instalado.seAcabo;
+}
+
+/** ¿Sabe este arcade decir cuándo se acaba? */
+export function hayFinal(arcade: ArcadeId): boolean {
+  return INSTALADOS[arcade]?.seAcabo !== undefined;
+}
+
+/**
+ * ¿SE ACABÓ ESTA PARTIDA?
+ *
+ * Y AQUÍ EL «NO» POR DEFECTO SÍ ES CORRECTO, al revés que en `puntuacionDe`, que
+ * lanza. La diferencia está en qué cuesta equivocarse: un cero por defecto acepta
+ * récords falsos en silencio y nadie se entera; un «todavía no» por defecto deja
+ * la mesa ABIERTA, que es exactamente donde estaba antes de existir esta puerta y
+ * lo que un arcade sin final quiere. Cerrar por defecto sí sería grave: echaría a
+ * la gente de una partida en marcha.
+ *
+ * FALLA, eso sí, si el arcade no está instalado: eso no es «no tiene final», es
+ * una pregunta sobre un juego que no existe.
+ */
+export function seAcaboLaPartida(arcade: ArcadeId, estado: unknown): boolean {
+  const instalado = INSTALADOS[arcade];
+  if (!instalado) throw new ArcadeNoInstalado(arcade);
+  return instalado.seAcabo ? instalado.seAcabo(estado) : false;
 }
 
 /**

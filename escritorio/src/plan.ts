@@ -30,7 +30,6 @@
  * concreta y contar lo que sale.
  */
 import type { Opcion } from '../../shared/arcade';
-import { canonico } from '../../shared/mecanicas/canonico';
 import type {
   MovimientoDeclarado,
   PuntoDeTablero,
@@ -181,48 +180,16 @@ export function loQueSePinta(tablero: TableroDeclarado): PiezaPintada[] {
   return piezas;
 }
 
-/**
- * LAS OPCIONES QUE EL TABLERO NO ENSEÑA YA, Y NI UNA MÁS.
+/*
+ * «LAS OPCIONES QUE EL TABLERO NO ENSEÑA YA» SE MUDÓ A `shared/mecanicas`.
  *
- * ═══ POR QUÉ HACE FALTA, Y POR QUÉ NO SE ARREGLA ESCONDIENDO LAS OPCIONES ═══
- *
- * Con un tablero delante, un movimiento puede llegar por tres sitios: dentro del
- * `toque` de una pieza, dentro de una `accion` declarada, o en la lista de
- * `opciones()`. Y no son tres listas distintas: son tres formas de enseñar los
- * mismos movimientos, y un juego perfectamente correcto los publica por más de
- * una —Riberas resuelve su tablero A PARTIR de sus propias opciones, así que
- * mientras la mesa se reúne el mismo «repartir» sale como acción del tablero y
- * como opción.
- *
- * Pintar las tres listas tal cual da botones repetidos, y un botón repetido no
- * es solo feo: hace creer que hay dos cosas distintas que hacer.
- *
- * La salida fácil sería no pintar `opciones()` cuando hay tablero. Y sería la
- * mentira más cara de este cliente, porque `opciones()` puede ofrecer cosas que
- * NO son ninguna pieza —aceptar un trato, pasar, rendirse— y que por tanto no
- * tienen dónde dibujarse. Esconderlas es esconder movimientos legales.
- *
- * Así que se enseña cada movimiento EXACTAMENTE UNA VEZ: el tablero primero
- * —que es donde tiene sentido espacial— y debajo solo lo que el tablero no
- * enseña. La comparación es por forma canónica del movimiento y no por
- * identificador: los `id` de las opciones y los de las piezas son de dos
- * espacios de nombres distintos, y el juego no tiene ninguna obligación de
- * hacerlos coincidir. `canonico` es la mecánica que este repositorio ya tiene
- * para preguntar «¿son el mismo valor?» sin depender del orden de las claves.
+ * Nació aquí y se quedó aquí, y por eso la app hacía justo lo que su comentario
+ * llamaba la mentira más cara: con tablero delante no pintaba ni una opción
+ * suelta. Un cabo así no se arregla copiándolo al otro cliente. Se reexporta con
+ * el mismo nombre para no tocar a quien ya la llamaba; el razonamiento entero
+ * está en `tablero-declarado.ts`, al lado de `tableroDeLaVista`.
  */
-export function opcionesSueltas(
-  tablero: TableroDeclarado,
-  opciones: readonly Opcion[],
-): readonly Opcion[] {
-  const yaEstan = new Set<string>();
-  for (const p of loQueSePinta(tablero)) {
-    if (p.toque !== null) yaEstan.add(canonico({ tipo: p.toque.tipo, carga: p.toque.carga }));
-  }
-  for (const a of tablero.acciones) {
-    yaEstan.add(canonico({ tipo: a.toque.tipo, carga: a.toque.carga }));
-  }
-  return opciones.filter((o) => !yaEstan.has(canonico({ tipo: o.tipo, carga: o.carga })));
-}
+export { opcionesSueltas } from '../../shared/mecanicas/tablero-declarado';
 
 /**
  * El encuadre del `<svg viewBox>`, sacado de la ventana que declaró el juego.
