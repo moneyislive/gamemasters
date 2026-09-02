@@ -103,6 +103,23 @@ export const CLUEDO: ManifiestoDeJuego = {
   nombre: 'CLUEDO',
   lema: 'Alguien de esta casa miente.',
 
+  /*
+   * VEINTE Y NO OCHO. La tarjeta del catálogo decía «3 – 8» desde que existe,
+   * y era un número escrito a mano en la portada que no salía de ninguna parte:
+   * nada del taller ni del servidor impide sentar a más. El mínimo, en cambio,
+   * no se declara aquí — lo dice `sospechosos.minimo`, que es lo que de verdad
+   * impide generar la partida.
+   */
+  ficha: {
+    duracionMinutos: 180,
+    edadMinima: 8,
+    /* La casa es la puerta de entrada: se explica en una frase y se juega sin haber leído nada. */
+    dificultad: 1,
+    jugadoresMaximo: 20,
+    modo: 'en-vivo',
+    temas: ['misterio', 'asesinato', 'mansión', 'deducción', 'años veinte', 'interrogatorio'],
+  },
+
   categorias: [
     {
       id: 'sospechosos',

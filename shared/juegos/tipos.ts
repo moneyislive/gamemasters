@@ -580,6 +580,89 @@ export interface DefinicionDeRonda {
  * `donde` es para poder decir en qué se rompió: «la vigilia 3 profana una cámara
  * que ya no existe» se entiende; «falta una entidad», no.
  */
+/* ------------------------------------------------------------------ */
+/* La ficha de la caja                                                 */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Lo que cuesta el juego, en cuatro niveles.
+ *
+ * NÚMERO Y NO PALABRA, y no es capricho: el catálogo tiene que poder ORDENAR
+ * por esto —«enséñame primero lo que no sea muy difícil»— y una palabra no se
+ * ordena sola. El nombre que se le pone delante a quien mira vive en
+ * `NOMBRE_DE_DIFICULTAD`, aquí al lado, para que el taller y el móvil no puedan
+ * llamar cosas distintas al mismo nivel.
+ */
+export type NivelDeDificultad = 1 | 2 | 3 | 4;
+
+/** Cómo se dice cada nivel. Un solo sitio, para que nadie lo diga de otra forma. */
+export const NOMBRE_DE_DIFICULTAD: Record<NivelDeDificultad, string> = {
+  1: 'Iniciación',
+  2: 'Media',
+  3: 'Alta',
+  4: 'Experta',
+};
+
+/** Dónde se juega: en la misma mesa, en la mesa y a distancia, o solo a distancia. */
+export type ModoDePartida = 'en-vivo' | 'en-vivo-y-online' | 'online';
+
+export const NOMBRE_DE_MODO: Record<ModoDePartida, string> = {
+  'en-vivo': 'En vivo',
+  'en-vivo-y-online': 'En vivo y online',
+  online: 'Online',
+};
+
+/**
+ * Lo que hay escrito en el costado de la caja: cuánto dura, desde qué edad,
+ * cuánto cuesta, cuántos caben y dónde se juega.
+ *
+ * ═══ POR QUÉ VIVE AQUÍ Y NO EN LA PORTADA ═══
+ *
+ * Porque no es ilustración, es DATO DEL JUEGO. El catálogo del taller lo pinta,
+ * pero quien lo sabe es el juego: el día que la app quiera decir «esta velada
+ * dura tres horas» antes de repartir los móviles, o que el recibidor quiera
+ * avisar de que hay catorce personas apuntadas a un juego de diez, la respuesta
+ * tiene que ser la misma que la de la tarjeta. Escrito en la portada no lo
+ * sería: sería una segunda verdad que nadie compara con la primera.
+ *
+ * Es exactamente lo que ya pasó con el candado del catálogo, que era un booleano
+ * escrito a mano y anunciaba «próximamente» un juego que ya se podía jugar.
+ *
+ * ═══ TODO OPCIONAL, Y EL BLOQUE ENTERO TAMBIÉN ═══
+ *
+ * Un juego sin ficha se cataloga igual; simplemente no se le puede filtrar por
+ * lo que no ha dicho. Y eso es deliberado: un filtro que DESCARTA por un dato
+ * que falta miente más que uno que no filtra. Quien busque «hasta dos horas» no
+ * quiere que desaparezca un juego que no ha declarado cuánto dura: quiere verlo
+ * después.
+ *
+ * ═══ EL MÍNIMO DE PERSONAS NO ESTÁ AQUÍ, Y ES A PROPÓSITO ═══
+ *
+ * Ya lo dice la categoría de personas del juego, en su `minimo`, y de ahí sale
+ * lo que impide generar una partida con dos. Repetirlo aquí sería abrir la
+ * puerta a que la tarjeta prometa «desde 3» mientras el taller exige 4. Lo lee
+ * `jugadoresMinimoDe`, más abajo. El MÁXIMO sí vive aquí, porque hoy no existe
+ * en ninguna otra parte.
+ */
+export interface FichaDeJuego {
+  /** Lo que dura una velada, en minutos. */
+  duracionMinutos?: number;
+  /** A partir de qué edad se puede jugar. */
+  edadMinima?: number;
+  dificultad?: NivelDeDificultad;
+  /** Cuántas personas caben como mucho. El mínimo lo dice su categoría de personas. */
+  jugadoresMaximo?: number;
+  modo?: ModoDePartida;
+  /**
+   * De qué va, en palabras sueltas: «misterio», «mansión», «deducción».
+   *
+   * Es lo único de esta ficha que no se filtra sino que se BUSCA. Sirve para que
+   * quien escriba «japón» en el buscador del catálogo encuentre El Paso de las
+   * Sombras sin que la palabra tenga que estar en su título ni en su lema.
+   */
+  temas?: string[];
+}
+
 export interface ReferenciaDeTrama {
   categoria: string;
   id: string;
@@ -590,6 +673,14 @@ export interface ManifiestoDeJuego {
   id: JuegoId;
   nombre: string;
   lema: string;
+
+  /**
+   * La ficha de la caja: duracion, edad, dificultad, aforo y modo.
+   *
+   * Opcional entera. Lo que un juego no diga, el catalogo no lo filtra —lo
+   * ordena detras—, que es lo honesto cuando el dato falta.
+   */
+  ficha?: FichaDeJuego;
 
   /** Las familias de entidades que se dan de alta al preparar la partida. */
   categorias: DefinicionCategoria[];
@@ -902,6 +993,20 @@ export function categoria(m: ManifiestoDeJuego, id: CategoriaId): DefinicionCate
 /** La categoría cuyas entidades son las personas que juegan. */
 export function categoriaDeJugadores(m: ManifiestoDeJuego): DefinicionCategoria | undefined {
   return m.categorias.find((c) => c.sonJugadores);
+}
+
+/**
+ * Desde cuántas personas se puede jugar a esto.
+ *
+ * Sale de la categoría de personas y NO de la ficha, que es el único sitio donde
+ * ese número ya mandaba: por debajo de él la partida no se genera. Así la
+ * tarjeta del catálogo no puede prometer un aforo que el taller vaya a rechazar.
+ *
+ * `undefined` en un juego sin categoría de personas —que puede existir—, y
+ * entonces el catálogo simplemente no dice desde cuántos.
+ */
+export function jugadoresMinimoDe(m: ManifiestoDeJuego): number | undefined {
+  return categoriaDeJugadores(m)?.minimo;
 }
 
 /** Las categorías que ocupan un sitio del espacio real. */
