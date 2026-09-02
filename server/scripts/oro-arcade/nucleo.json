@@ -4,8 +4,8 @@
     "lineas": 491
   },
   "server/src/arcade/mesas.ts": {
-    "huella": "1edabc4e5ff8ae2a",
-    "lineas": 2531
+    "huella": "3d1b5c01fc6e6bd5",
+    "lineas": 2546
   },
   "server/src/canal/index.ts": {
     "huella": "72b651d609fac007",
@@ -16,8 +16,8 @@
     "lineas": 228
   },
   "shared/arcade/index.ts": {
-    "huella": "7a04b60b4d7ffba1",
-    "lineas": 984
+    "huella": "f87ee65dfaf0783d",
+    "lineas": 985
   },
   "shared/arcade/motor.ts": {
     "huella": "22b5a3b870f4d936",
