@@ -936,7 +936,22 @@ function cargar(): void {
      * de mentira. Y es el sitio barato: una vez por mesa al recuperarla, no una
      * por lectura.
      */
-    cerrarSiSeAcabo(m, false);
+    if (cerrarSiSeAcabo(m, false)) {
+      /*
+       * Y SE GUARDA, que si no se repite en cada arranque. Al recuperar no pasa
+       * por `mover` ni por el tic, y `ponerAlDiaElPlazo` sale antes de tiempo en
+       * una mesa ya terminada, así que nadie escribiría nunca: en memoria queda
+       * cerrada y en disco sigue diciendo que no. Sanaba sólo si el proceso
+       * terminaba de forma limpia; tras una caída, otra vez.
+       *
+       * Sin esperar, porque `cargar()` es síncrona a propósito —la llaman rutas que
+       * ya tienen su mesa en la mano— y esto es un apaño del respaldo, no algo de
+       * lo que dependa la respuesta.
+       */
+      void almacen.guardar(m).catch((error: unknown) => {
+        console.error(`[arcade] No se ha podido guardar el cierre de la mesa ${m.codigo}:`, error);
+      });
+    }
     mesas.set(m.codigo, m);
     recuperadas++;
   }

@@ -115,6 +115,8 @@ const puertaDeCodigos = (): ReturnType<typeof limitarIntentos> =>
     porCredencial: 30,
     porIp: 60,
     esFallo: (estado) => estado === 404,
+    /* Como la de verdad: aqui acertar es gratis, asi que no perdona la direccion. */
+    elAciertoPerdonaLaDireccion: false,
   });
 
 paso('Enumerar códigos distintos llena el cubo de la dirección');
@@ -184,22 +186,74 @@ paso('Y a quien juega no le estorba: los aciertos no cuentan');
   comprobar('doscientas lecturas buenas seguidas pasan todas', todas);
 }
 
+paso('Y LA PUERTA DE LA CASA, que es la que este guion no probaba');
+/*
+ * ═══ POR QUÉ HACÍA FALTA, Y QUÉ SE COLÓ SIN ELLA ═══
+ *
+ * Las cuatro de arriba usan la puerta de los códigos, donde cada intento lleva una
+ * credencial DISTINTA. La de la casa es lo contrario: su credencial es la
+ * constante `'casa'`, así que el cubo fino y el grueso cuentan exactamente los
+ * mismos sucesos.
+ *
+ * Con eso, estrechar el perdón a la credencial propia convertía el cubo grueso en
+ * un contador que no se vacía NUNCA. Y el fallo sale con la forma que la cabecera
+ * del limitador declara inadmisible: doce personas de la misma wifi, dos erratas
+ * cada una, y las últimas reciben 429 CON LA CONTRASEÑA BUENA. Esta batería lo
+ * dejó pasar entero porque no tenía ni una comprobación de esta forma de puerta.
+ */
+{
+  const puertaDeLaCasa = limitarIntentos({
+    nombre: 'prueba de la casa',
+    credencial: () => 'casa',
+    porCredencial: 8,
+    porIp: 20,
+  });
+  let rechazadas = 0;
+  /* Doce personas, la misma wifi, dos erratas y la buena. */
+  for (let persona = 0; persona < 12; persona++) {
+    await pedir(puertaDeLaCasa, '192.0.2.44', 'casa', 401);
+    await pedir(puertaDeLaCasa, '192.0.2.44', 'casa', 401);
+    const buena = await pedir(puertaDeLaCasa, '192.0.2.44', 'casa', 200);
+    if (!buena.paso) rechazadas++;
+  }
+  comprobar(
+    'DOCE PERSONAS DE LA MISMA WIFI CON DOS ERRATAS CADA UNA ENTRAN LAS DOCE',
+    rechazadas === 0,
+    { rechazadas },
+  );
+
+  /* Y sigue cerrándose ante quien sólo falla, que es para lo que existe. */
+  const soloFallos = limitarIntentos({
+    nombre: 'prueba de la casa',
+    credencial: () => 'casa',
+    porCredencial: 8,
+    porIp: 20,
+  });
+  let cerrada = false;
+  for (let i = 0; i < 30; i++) {
+    const r = await pedir(soloFallos, '192.0.2.45', 'casa', 401);
+    if (!r.paso) cerrada = true;
+  }
+  comprobar('y a quien sólo falla se le cierra igual', cerrada);
+}
+
 console.log('');
 if (fallos.length > 0) {
   console.log(`${fallos.length} de ${hechas} comprobaciones han fallado:\n`);
   for (const f of fallos) console.log(`  ✗ ${f}`);
   console.log('');
 }
-if (hechas < 4) {
+if (hechas < 6) {
   console.error('Se han hecho menos comprobaciones de las que este guión tiene escritas.');
   process.exit(2);
 }
 if (fallos.length === 0) {
   console.log(`${hechas} comprobaciones`);
   console.log(
-    '\nEl limitador frena a quien enumera y no estorba a quien juega: el cubo por' +
-      ' dirección cuenta los fallos contra códigos distintos y NO se vacía con un' +
-      ' acierto, que era por donde se colaba el oráculo de qué códigos existen.',
+    '\nEl limitador frena a quien enumera y no estorba ni a quien juega ni a quien entra' +
+      ' en su casa: en la puerta de los códigos un acierto no lava el cubo de la' +
+      ' dirección —acertar ahí es gratis— y en la de la contraseña sí, porque acertar' +
+      ' exige tenerla.',
   );
   process.exit(0);
 }

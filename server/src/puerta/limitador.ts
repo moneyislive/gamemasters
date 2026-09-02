@@ -14,7 +14,7 @@
  * minuto, en cuanto se sientan a la mesa: un limitador que cuente peticiones las
  * echa a todas de la mesa a la vez, y ese fallo aparece exactamente el día que
  * importa. Contando solo los fallos, doce entradas correctas no gastan nada. Y
- * una entrada correcta además PERDONA lo anterior: quien se equivoca dos veces
+ * una entrada correcta perdona lo anterior —en las puertas donde acertar exige tener el secreto; ver `elAciertoPerdonaLaDireccion`—: quien se equivoca dos veces
  * al teclear y acierta a la tercera deja el contador a cero.
  *
  * EL PELIGRO DE VERDAD ESTÁ EN DE DÓNDE SALE LA IP. Detrás de nginx, `req.ip`
@@ -201,6 +201,27 @@ export interface OpcionesDeLimitador {
    * alguien probando credenciales.
    */
   esFallo?: (estado: number) => boolean;
+  /**
+   * ¿UN ACIERTO PERDONA TAMBIÉN EL CUBO DE LA DIRECCIÓN?
+   *
+   * ═══ LA PREGUNTA DE VERDAD ES: ¿QUÉ PRUEBA UN ACIERTO EN ESTA PUERTA? ═══
+   *
+   * En la puerta de la casa, acertar exige TENER la contraseña: quien la produce
+   * ya no necesita adivinarla, así que perdonar es gratis y además hace falta —su
+   * credencial es constante (`'casa'`), o sea que el cubo fino y el grueso cuentan
+   * lo mismo, y no perdonar el grueso lo convierte en un contador que no se vacía
+   * NUNCA: doce personas de la misma wifi con dos erratas cada una y las tres
+   * últimas reciben 429 con la contraseña BUENA—.
+   *
+   * En la puerta de los códigos de mesa es al revés: un acierto es GRATIS —leer tu
+   * propia mesa— y no dice nada de los cincuenta y nueve códigos ajenos contra los
+   * que se falló. Ahí perdonar la dirección abre el oráculo entero.
+   *
+   * Por eso se declara puerta por puerta y no se adivina. Por defecto SÍ, que es
+   * lo que hacían todas y lo correcto para las de contraseña; la de los códigos
+   * dice que no.
+   */
+  elAciertoPerdonaLaDireccion?: boolean;
 }
 
 interface Registro {
@@ -227,6 +248,7 @@ export function limitarIntentos(opciones: OpcionesDeLimitador): RequestHandler {
   const porCredencial = opciones.porCredencial ?? POR_CREDENCIAL;
   const porIp = opciones.porIp ?? POR_IP;
   const esFallo = opciones.esFallo ?? ((estado: number) => estado === 401 || estado === 403);
+  const perdonaLaDireccion = opciones.elAciertoPerdonaLaDireccion ?? true;
 
   const registros = new Map<string, Registro>();
   let yaAvisado = false;
@@ -293,7 +315,7 @@ export function limitarIntentos(opciones: OpcionesDeLimitador): RequestHandler {
      * además la mejor prueba que hay de que detrás de esa dirección está la
      * velada y no alguien probando a ciegas.
      *
-     * ═══ PERO SÓLO PERDONA SU PROPIA CREDENCIAL, NO EL CUBO DE LA DIRECCIÓN ═══
+     * ═══ Y EN ALGUNAS PUERTAS SÓLO PERDONA SU PROPIA CREDENCIAL ═══
      *
      * Esto borraba LAS DOS CLAVES, y con eso el cubo por dirección —que es el
      * único que ve una enumeración— se vaciaba con cualquier acierto. Medido
@@ -305,9 +327,13 @@ export function limitarIntentos(opciones: OpcionesDeLimitador): RequestHandler {
      *
      * El razonamiento de arriba justifica perdonar ESTA credencial desde ESTA
      * dirección —acertar dice algo sobre ella—, y no justifica borrar lo que se
-     * falló contra otras cincuenta y nueve, que es de lo que no dice nada. El cubo
-     * grueso sólo cuenta FALLOS, así que a quien juega no le estorba: para llenarlo
-     * hay que teclear sesenta códigos que no existen.
+     * falló contra otras cincuenta y nueve, que es de lo que no dice nada.
+     *
+     * PERO SÓLO DONDE ACERTAR CUESTA ALGO, y esto se escribió primero para todas y
+     * rompió la puerta de la casa: allí la credencial es constante, así que los dos
+     * cubos cuentan lo mismo y el grueso pasaba a no vaciarse nunca —medido: doce
+     * personas de la misma wifi con dos erratas cada una y las tres últimas
+     * reciben 429 con la contraseña buena—. Ver `elAciertoPerdonaLaDireccion`.
      */
     const anotar = (claveFina: string, claves: string[]): void => {
       res.on('finish', () => {
@@ -317,7 +343,7 @@ export function limitarIntentos(opciones: OpcionesDeLimitador): RequestHandler {
           return;
         }
         if (res.statusCode >= 200 && res.statusCode < 300) {
-          registros.delete(claveFina);
+          for (const clave of perdonaLaDireccion ? claves : [claveFina]) registros.delete(clave);
         }
       });
     };

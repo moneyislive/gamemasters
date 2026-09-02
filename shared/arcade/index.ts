@@ -328,9 +328,10 @@ export function instalarArcade<E, V = unknown>(alta: {
    *
    * El árbitro lo dice desde el primer día —«quien hospeda llama a `cerrarMesa`
    * cuando el estado del juego dice que se acabó. El juego sí lo sabe»— y hasta
-   * hoy no había por dónde preguntarlo: los tres juegos de servidor exportaban su
-   * `seAcabo` y sólo lo llamaba el motor DEL APARATO, que los tiene importados por
-   * su nombre. En el servidor no existía el hueco, así que ninguna mesa se cerraba
+   * hoy no había por dónde preguntarlo: los DOS juegos de servidor —La Ronda y
+   * Riberas; el tercero que exporta `seAcabo` es El Arcade, que es de aparato— lo
+   * tenían escrito y sólo lo llamaba el motor DEL APARATO, que los tiene importados
+   * por su nombre. En el servidor no existía el hueco, así que ninguna mesa se cerraba
    * jamás: una partida acabada seguía con su cuenta atrás corriendo, admitía tics
    * y no daba nunca por terminada la espera.
    *

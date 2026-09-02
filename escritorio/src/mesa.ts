@@ -500,6 +500,14 @@ export function usarMesaDeArcade(arcade: string, silla: string): LaMesa {
         void (async () => {
           ponerQuieto(true);
           ponerFase('yendo');
+          /*
+           * `pideSilla` se decide DENTRO y se ejecuta FUERA del `finally`, y no es
+           * un rodeo: `sentarse` gestiona su propio `quieto`, así que soltarlo aquí
+           * mientras él lo tenía puesto reactivaba el botón de Entrar a mitad de la
+           * petición —y la tecla Enter ni siquiera mira `quieto`—, con lo que una
+           * sola intención podía mandar dos asientos. Medido.
+           */
+          let pideSilla = true;
           try {
             const r = await fetch(ruta(`/mesas/${limpio}?desde=-1`), {
               headers: { [CABECERA_DE_ASIENTO]: guardado.llave },
@@ -511,16 +519,19 @@ export function usarMesaDeArcade(arcade: string, silla: string): LaMesa {
                 codigo.current = loSuyo.mesa.codigo;
                 llave.current = guardado.llave;
                 ponerMesa(loSuyo.mesa);
+                ponerCronica([]);
                 ponerFase('dentro');
                 ponerAviso(SIN_AVISO);
-                return;
+                pideSilla = false;
               }
             }
-            sentarse(`/mesas/${limpio}/asientos`, { nombre, arcade }, 'No se ha podido entrar');
           } catch {
-            sentarse(`/mesas/${limpio}/asientos`, { nombre, arcade }, 'No se ha podido entrar');
+            /* La llave no se pudo comprobar: se sigue por la puerta de siempre. */
           } finally {
             ponerQuieto(false);
+          }
+          if (pideSilla) {
+            sentarse(`/mesas/${limpio}/asientos`, { nombre, arcade }, 'No se ha podido entrar');
           }
         })();
         return;

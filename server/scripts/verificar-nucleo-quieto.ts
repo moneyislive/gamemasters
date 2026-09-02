@@ -209,6 +209,12 @@
  * Los tres los encontró una auditoría adversaria, y los tres estaban ESCRITOS y
  * sin llamar por nadie. Es el mismo patrón que el hueco D de la vuelta anterior.
  *
+ * Y UNA VUELTA MÁS, del verificador que leyó lo de arriba: el cierre al recuperar
+ * NO SE GUARDABA. En memoria la mesa quedaba cerrada y en disco seguía diciendo
+ * que no, porque ese camino no pasa por `mover` ni por el tic y `ponerAlDiaElPlazo`
+ * sale antes de tiempo en una mesa terminada. Sanaba sólo con un apagado limpio;
+ * tras una caída, otra vez en cada arranque. Se escribe al recuperar, sin esperar.
+ *
  * ═══ Y `server/src/canal/` NO SE HA TOCADO, QUE ES UNA DECISIÓN Y NO UN OLVIDO ═══
  *
  * El §9 pone en la fase 5 «la segunda implementación de `canal/`» —un canal

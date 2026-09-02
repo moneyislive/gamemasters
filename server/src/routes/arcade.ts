@@ -263,6 +263,14 @@ const contadorDeCodigos = limitarIntentos({
   porCredencial: 30,
   porIp: 60,
   esFallo: (estado) => estado === 404,
+  /*
+   * Y AQUÍ EL ACIERTO NO PERDONA LA DIRECCIÓN, que es lo que distingue esta puerta
+   * de la de la casa: acertar aquí es GRATIS —leer tu propia mesa— y no dice nada
+   * de los códigos ajenos contra los que se falló. Con el perdón puesto bastaba
+   * meter una lectura propia cada cincuenta y nueve intentos para que el contador
+   * volviera a cero, y el oráculo de qué códigos existen seguía abierto.
+   */
+  elAciertoPerdonaLaDireccion: false,
 });
 
 /**

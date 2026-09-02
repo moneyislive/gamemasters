@@ -2769,8 +2769,9 @@ paso('La mesa se cierra sola cuando el juego dice que se acabó');
  * ═══ UNA PARTIDA ENTERA, HASTA QUE NO QUEDA CARTA ═══
  *
  * El árbitro dice desde el primer día que «quien hospeda llama a `cerrarMesa`
- * cuando el estado del juego dice que se acabó», los tres juegos de servidor
- * exportan su `seAcabo`… y en el servidor no lo llamaba nadie: `cerrarMesa` sólo
+ * cuando el estado del juego dice que se acabó», los DOS juegos de servidor
+ * —La Ronda y Riberas; el tercero que exporta `seAcabo` es El Arcade, y ése es de
+ * aparato— lo tenían escrito… y en el servidor no lo llamaba nadie: `cerrarMesa` sólo
  * salía de `POST /cerrar`, que no pulsa ningún cliente. Así que ninguna mesa se
  * cerraba nunca y una partida acabada seguía pintando su cuenta atrás.
  *
@@ -2921,15 +2922,6 @@ paso('La mesa se cierra sola cuando el juego dice que se acabó');
    *
    * Es toda mesa guardada por un servidor anterior a esto, y toda mesa que se
    * cerró en memoria con el almacén caído. Por `mover` y por el tic NO se alcanza
-   * —los dos exigen que el estado cambie, y sobre una partida acabada no cambia—
-   * así que se quedaba abierta para siempre. Se recupera una de verdad, se le
-   * quita la marca, y se comprueba que al recuperarla se cierra sola.
-   */
-  /*
-   * ═══ LA MESA QUE YA ESTABA ACABADA Y NADIE MARCÓ ═══
-   *
-   * Es toda mesa guardada por un servidor anterior a esto, y toda mesa que se
-   * cerró en memoria con el almacén caído. Por `mover` y por el tic NO se alcanza
    * —los dos exigen que el estado CAMBIE, y sobre una partida acabada no cambia:
    * el reductor la rechaza y el tic devuelve el mismo estado— así que se quedaba
    * abierta para siempre y rearmando la cuenta atrás en cada mirada.
@@ -3059,7 +3051,7 @@ if (fallos.length === 0) {
     '\nLa mesa existe: se abre con un código, se entra sin cuenta, la revisión manda al escribir\n' +
       'y no al leer, el plazo vence porque alguien MIRA, la espera aparcada se despierta por\n' +
       'vencimiento, la partida sobrevive a que el proceso muera, y la mano de cada cual no sale\n' +
-      'de su móvil — comprobado sobre lo que de verdad viajó por el cable, y en LOS TRES arcades\n' +
+      'de su móvil — comprobado sobre lo que de verdad viajó por el cable, y en LOS DOS arcades\n' +
       'de servidor y no sólo en La Ronda: Riberas también se abre, se juega leyendo el tablero que\n' +
       'baja, y ni una ficha de un almacén sale hacia otro asiento ni hacia quien mira sin jugar.',
   );

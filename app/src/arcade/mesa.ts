@@ -545,6 +545,8 @@ export function usarMesaDeArcade(arcade: ArcadeId): LaMesa {
             await guardarElSitio(arcade, { codigo: datos.mesa.codigo, llave: datos.llave });
           }
           ponerMesa(datos.mesa);
+          /* Mesa nueva: lo que se dijera de la anterior ya no habla de nada. */
+          ponerCronica([]);
           ponerFase('dentro');
           ponerAviso(SIN_AVISO);
         } catch (error) {
@@ -592,6 +594,7 @@ export function usarMesaDeArcade(arcade: ArcadeId): LaMesa {
                 codigo.current = loSuyo.mesa.codigo;
                 llave.current = guardado.llave;
                 ponerMesa(loSuyo.mesa);
+                ponerCronica([]);
                 ponerFase('dentro');
                 ponerAviso(SIN_AVISO);
                 return;
@@ -618,6 +621,8 @@ export function usarMesaDeArcade(arcade: ArcadeId): LaMesa {
             await guardarElSitio(arcade, { codigo: datos.mesa.codigo, llave: datos.llave });
           }
           ponerMesa(datos.mesa);
+          /* Mesa nueva: lo que se dijera de la anterior ya no habla de nada. */
+          ponerCronica([]);
           ponerFase('dentro');
           ponerAviso(SIN_AVISO);
         } catch (error) {
@@ -738,6 +743,7 @@ export function usarMesaDeArcade(arcade: ArcadeId): LaMesa {
     codigo.current = null;
     llave.current = null;
     ponerMesa(null);
+    ponerCronica([]);
     ponerAviso(SIN_AVISO);
     ponerFase('fuera');
   }, [arcade]);
@@ -748,8 +754,9 @@ export function usarMesaDeArcade(arcade: ArcadeId): LaMesa {
    * Guardar la llave de una mesa borrada sólo sirve para que al abrir la app te
    * intente devolver a ella y te diga que ya no existe.
    *
-   * Si el borrado falla no se corta: quien lo pulsa se va igual. El servidor
-   * contesta 403 a quien no esté sentado, y una mesa huérfana se barre sola.
+     * Si el borrado falla NO se olvida el sitio, que es lo contrario de lo que
+   * decía esta línea: la mesa sigue viva con tu asiento dentro y tirar la llave
+   * te deja fuera de tu propia partida. El porqué entero, abajo.
    */
   const tirar = useCallback(() => {
     void (async () => {
@@ -788,6 +795,7 @@ export function usarMesaDeArcade(arcade: ArcadeId): LaMesa {
       codigo.current = null;
       llave.current = null;
       ponerMesa(null);
+      ponerCronica([]);
       ponerAviso(SIN_AVISO);
       ponerFase('fuera');
       await olvidarElSitio(arcade);
