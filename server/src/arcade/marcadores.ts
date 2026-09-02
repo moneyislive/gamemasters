@@ -388,6 +388,31 @@ const RECORDS = new Map<ArcadeId, RecordDeArcade[]>();
  * todo se rechace por un fallo tonto.
  */
 export function registrarRecord(crudo: unknown): Veredicto {
+  /*
+   * ═══ EL PORTERO BARATO VA PRIMERO, Y ANTES IBA DETRÁS ═══
+   *
+   * `leerRepeticion` canoniza la carga de CADA entrada, y eso es el trabajo caro
+   * de esta ruta —240 kB anidados son 167,7 ms de hilo bloqueado, medido en la
+   * cabecera del presupuesto—. Se pagaba ENTERO para acabar contestando
+   * «sin-aviso-de-inicio», que es una comprobación de una búsqueda en un mapa.
+   *
+   * Se mira aquí, con lo que se puede leer sin validar nada: si el cuerpo trae un
+   * `partida` que es una cadena y no hay aviso para ella, no hace falta seguir. Si
+   * `partida` no es una cadena —o no hay cuerpo— se cae al camino de siempre, que
+   * es el que sabe decir POR QUÉ la repetición está mal formada. O sea que esto no
+   * relaja ninguna validación: sólo se ahorra el trabajo de quien ya perdió.
+   */
+  const laPartida = (crudo as { partida?: unknown } | null | undefined)?.partida;
+  if (typeof laPartida === 'string' && !AVISOS.has(laPartida)) {
+    return {
+      acepta: false,
+      motivo: 'sin-aviso-de-inicio',
+      detalle: null,
+      porque:
+        'Esa partida no la ha empezado este servidor, o el aviso ya ha caducado. Empieza una ' +
+        'partida con `POST /arcade/partidas` y sube el récord de esa.',
+    };
+  }
   let repeticion: Repeticion;
   try {
     repeticion = leerRepeticion(crudo);

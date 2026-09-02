@@ -528,6 +528,12 @@ const estilos = StyleSheet.create({
   },
   botonTexto: { color: SALA.fondo, fontSize: 17, fontWeight: '800', letterSpacing: 2 },
 
-  salir: { paddingVertical: 8, paddingHorizontal: 16 },
+  salir: {
+    /* 44 de alto: con 8 de relleno y 15 de letra se quedaba en 34. */
+    minHeight: 44,
+    justifyContent: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+  },
   salirTexto: { color: SALA.neonTenue, fontSize: 15 },
 });

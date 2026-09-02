@@ -151,9 +151,12 @@ router.get(['/descargar', '/descargar.html'], (_req, res) => {
          <p>Aún no se ha publicado ninguna versión instalable en este servidor.
             Pídele el archivo a quien organiza la velada, o entra con tu código
             desde el navegador.</p>
-         <p class="nota">Para quien administra: se configura con la variable
-            <code>APK_URL</code>, apuntando al archivo publicado en GitHub
-            Releases.</p>`,
+         <p class="nota">Para quien administra: pon <code>APK_VERSION</code> con
+            el número de <code>app/app.json</code> y publica en GitHub Releases la
+            etiqueta <code>v{versión}</code> con el fichero
+            <code>harkania-{versión}.apk</code>. La dirección se deduce de ahí.
+            <code>APK_URL</code> es sólo para cuando el archivo NO esté en GitHub:
+            si está puesta manda ella y la versión se ignora.</p>`,
       ),
     );
     return;

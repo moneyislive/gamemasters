@@ -1,9 +1,17 @@
 # 🔎 GameMasters
 
 Plataforma web para **Game Masters**: organiza juegos reales con ayuda de agentes de IA
-especializados en el lore de cada juego. Primer juego disponible: **CLUEDO** — un
-miniverso visual años 20 donde un agente experto te guía para crear una partida en vivo
-con trama procedural adaptada a tus jugadores, tu espacio físico y tus objetos.
+especializados en el lore de cada juego.
+
+Hay **dos cosas distintas** dentro, y conviene saberlo antes de leer nada más:
+
+- **Las veladas** —CLUEDO, La Momia, El Nudo, Sombras—: juegos de una tarde con un
+  agente que teje la trama a medida de tus jugadores, tu espacio y tus objetos. El
+  primero y el más desarrollado sigue siendo CLUEDO, y es el que describe todo lo
+  que viene debajo.
+- **La Sala de Arcade** —La Frente, La Ronda, El Arcade, Riberas, La Peonza—: otro
+  motor, hermano y no heredero, con sus mesas en línea y su propio cliente de
+  escritorio. Está contado en `docs/MOTOR-DE-ARCADE.md`.
 
 ## Características
 
@@ -11,7 +19,9 @@ con trama procedural adaptada a tus jugadores, tu espacio físico y tus objetos.
   conoce las reglas oficiales, el lore y la psicología de jugadores. Puedes hablarle
   por texto **o por voz**, y puede rellenar datos por ti e invocar popups y
   resaltados en la interfaz para guiarte.
-- 🕵️ **Sospechosos, salas y armas** con descripciones y fotos; las descripciones
+- 🕵️ **Personajes, lugares y objetos** con descripciones y fotos —así se llaman hoy en
+  el código y en la base: `entidades` por categoría, y no los `suspects`, `rooms` y
+  `weapons` de las primeras versiones—; las descripciones
   psicológicas de cada persona se usan para tejer una trama a su medida.
 - 🗺️ **Tablero procedural** estilo Cluedo con pasadizos secretos al ratio clásico,
   o **modo foto aérea**: sube una foto del espacio real y coloca chinchetas.
@@ -55,6 +65,11 @@ Sin `ANTHROPIC_API_KEY` la plataforma entra en modo demo.
    La cadena que da Atlas **no incluye nombre de base de datos**; en ese caso la
    plataforma usa `gamemasters`. Puedes forzar otra con `MONGODB_DB=` o
    escribiéndola en la propia URI antes del `?`.
+
+   > **Ojo con cuál eliges.** La base de PRODUCCIÓN es `harkania` (así está en
+   > `render.yaml`), y en el mismo clúster hay otra llamada `gamemasters` —la que
+   > sale por defecto— con partidas dentro. Apuntar a la que no es no da ningún
+   > error: da un parte creíble sobre las partidas equivocadas.
 5. Comprueba la conexión antes de arrancar:
 
    ```bash
@@ -65,8 +80,29 @@ Sin `ANTHROPIC_API_KEY` la plataforma entra en modo demo.
    si algo falla, indica la causa probable (credenciales, filtro de IP o DNS).
 
 Al arrancar, el servidor indica qué almacenamiento está usando, y `/api/config`
-lo expone como `storage: "mongo" | "file"`. Si la conexión falla, la plataforma
-no se cae: avisa por consola y sigue con el fichero JSON.
+lo expone como `storage: "mongo" | "file"`. Si la conexión falla **en desarrollo**,
+la plataforma no se cae: avisa por consola y sigue con el fichero JSON.
+
+**En producción no**: con `NODE_ENV=production` el servidor se NIEGA a arrancar sin
+Mongo, a propósito —arrancar contra un fichero local en un disco efímero es perder
+las partidas sin que nadie se entere—. Aquí ponía lo contrario.
+
+### Si vienes de una versión anterior a la mudanza del modelo
+
+El modelo de datos cambió de nombre (`suspects`/`rooms`/`weapons` → `entidades`,
+`salas` → `lugares`, y unos cuantos campos más) y **la conversión al leer ya no
+existe**: se hizo una vez con un guión y se quitó. Una partida guardada por una
+versión anterior no se lee, y el síntoma no es un error: es una partida con la mesa
+vacía. Antes de desplegar, desde `server/`:
+
+```bash
+npx tsx scripts/mudanza-al-modelo-nuevo.ts --base harkania
+```
+
+Eso es en seco y dice qué tocaría; repite con `--de-verdad` para escribir. `--base`
+**no es opcional** (ver el aviso de arriba sobre las dos bases). Se puede correr con
+el servidor viejo todavía en marcha: su lector es idempotente y sigue entendiendo lo
+ya mudado, así que no hay ventana en la que nadie se quede fuera.
 
 ## Publicar en internet (Render)
 
@@ -236,9 +272,17 @@ antes o usa el plan de pago.
 ## Estructura
 
 ```
-client/   React + Vite (miniverso CLUEDO, estudio de creación, tablero SVG, dosieres)
-server/   Express + Mongoose/JSON + agente Anthropic (chat SSE, tools de UI, pipeline de trama)
-shared/   Tipos compartidos (contrato central)
+client/      React + Vite (miniverso CLUEDO, estudio de creación, tablero SVG, dosieres)
+server/      Express + Mongoose/JSON + agente Anthropic (chat SSE, tools de UI, pipeline)
+app/         La app de móvil (React Native / Expo). Es lo que se publica en `/descargar`
+escritorio/  La Sala de Arcade para PC (React + Vite), servida por el mismo Node
+shared/      Tipos y mecánicas compartidas (contrato central de los DOS motores)
+docs/        El diseño escrito: motor de arcade, aislamiento de juegos, auditorías
+scripts/     La batería (`npm run verificar`)
+despliegue/  La unidad de systemd y el guión de la VPS
 ```
+
+Faltaban aquí `app/`, `escritorio/`, `docs/`, `scripts/` y `despliegue/`, y una de
+ellas —`app/`— es justo el producto que se publica.
 
 Detalles de diseño y contratos: [ARCHITECTURE.md](ARCHITECTURE.md).

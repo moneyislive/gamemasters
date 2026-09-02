@@ -292,10 +292,11 @@ function LaMesaPuesta({
    * situación que va a existir en cuanto haya despliegues parciales», que es lo
    * que ya razona la cabecera de `catalogo.tsx` para el mueble desconocido. Sin
    * esta guarda, `plan.ts` hacía `opciones.length` sobre `undefined`, y eso no
-   * se lleva por delante la mesa: se lleva la Sala entera, catálogo incluido,
-   * porque no hay ningún error boundary en este cliente. El síntoma es una
-   * página EN BLANCO sin una palabra, que es justo el fallo mudo que este
-   * cliente existe para no tener.
+   * se lleva por delante la mesa: se lleva la Sala entera, catálogo incluido.
+   * Aquí ponía «porque no hay ningún error boundary en este cliente», y sí lo
+   * hay —`RedDeSeguridad`, montada en `main.tsx`—; lo que hace es que en vez de
+   * una página en blanco salga una pantalla que dice que algo se rompió. Sigue
+   * siendo la Sala entera caída por una mesa, que es lo que esta guarda evita.
    *
    * La guarda va aquí y no dentro de `mesa.ts` a propósito: `MesaVista` describe
    * LO QUE LLEGA POR EL CABLE, y lo que llega es que el campo puede faltar.

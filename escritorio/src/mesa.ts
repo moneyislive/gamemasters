@@ -82,71 +82,26 @@ export interface AvisoDeMesa {
   texto: string;
 }
 
-/**
- * DE DÓNDE SALE EL RENGLÓN QUE HAY EN PANTALLA, Y POR QUÉ HAY QUE SABERLO.
+/*
+ * «DE DÓNDE SALE EL RENGLÓN QUE HAY EN PANTALLA» SE MUDÓ A `shared/mecanicas`.
  *
- * ═══ EL FALLO QUE ESTO ARREGLA, CONTADO ENTERO ═══
- *
- * Hay un solo renglón de aviso y lo escriben dos cosas que no se parecen en
- * nada: la RED —«se ha perdido la mesa, reintentando»— y TU ÚLTIMA JUGADA —«ese
- * movimiento no se ha podido hacer»—. Mientras fue una cadena suelta, el bucle
- * de sondeo lo borraba entero cada vez que una respuesta traía algo, porque para
- * el sondeo borrar significaba «ya vuelvo a hablar con el servidor».
- *
- * Y ahí se iba por delante lo único que dice que tu movimiento no ha entrado. La
- * secuencia medida: Ana pulsa una pieza, el reductor la rechaza —que con la
- * regla del «sólo si» del §5 bis es el camino NORMAL y no una rareza—, aparece
- * el aviso; medio segundo después Bruno mueve, el sondeo de Ana despierta con un
- * `200` y borra el aviso. Ana ve el tablero cambiar y da por hecho que movió
- * ella. Es exactamente el fallo que la regla 2 de este fichero existe para
- * evitar, reintroducido veinte líneas más abajo por una línea que parecía
- * limpieza.
- *
- * ═══ LA REGLA, Y POR QUÉ NO ES UN TEMPORIZADOR ═══
- *
- * Un aviso de red lo borra la red cuando se recupera: eso es información nueva
- * sobre lo mismo. Un aviso sobre TU JUGADA no lo puede borrar que juegue otro,
- * porque que juegue otro no dice nada sobre tu jugada. Lo borra lo único que lo
- * deja de ser verdad: que vuelvas a mover, que te sientes en otra mesa o que te
- * levantes.
- *
- * La alternativa evidente —que se borre solo a los cinco segundos— es peor de lo
- * que parece: la ventana en la que alguien mira la pantalla no la marca un
- * cronómetro, y un mensaje que se va solo obliga a estar delante justo entonces.
- * Que se quede hasta que vuelvas a hacer algo es la única regla que no depende de
- * dónde estuvieras mirando.
+ * Nació aquí, se quedó aquí, y la app arrastró el fallo entero: su sondeo hacía
+ * `ponerAviso('')` en cada respuesta buena, o sea que borraba el motivo del
+ * rechazo justo cuando el tablero cambia por la jugada de otro —que es el
+ * instante en el que más se parece a que la tuya entró—. Una regla que los dos
+ * clientes necesitan y que sólo uno tenía no es una regla: es una casualidad.
+ * Se reexporta con los mismos nombres; el razonamiento entero está allí.
  */
-type DeDondeSaleElAviso =
-  /** Del bucle de sondeo: la conexión. Se borra sola cuando se recupera. */
-  | 'la-red'
-  /** De tu último movimiento. Solo la borra otra acción tuya. */
-  | 'tu-jugada';
-
-export interface AvisoPuesto {
-  texto: string;
-  de: DeDondeSaleElAviso;
-}
-
-export const SIN_AVISO: AvisoPuesto = { texto: '', de: 'la-red' };
-
-/**
- * QUÉ QUEDA EN PANTALLA CUANDO EL SONDEO TRAE ALGO.
- *
- * Tres líneas y una función exportada, y las dos cosas son a propósito. Esta
- * regla vivía escrita dentro del bucle de sondeo y por eso no la miraba ningún
- * comprobador: es una decisión de una línea metida en un `async` de cuarenta que
- * no se puede llamar desde Node sin montar React, sin un servidor y sin una
- * mesa. Sacada aquí se le puede dar un aviso y contar lo que devuelve, que es la
- * misma cirugía que este cliente ya hace con `queSePinta` y con `loQuePide`.
- *
- * Y la regla, otra vez en corto: una respuesta del sondeo es información nueva
- * sobre la CONEXIÓN. Borra lo que la conexión había dicho, y no toca lo que dijo
- * tu jugada — porque que juegue otro no dice nada sobre si la tuya entró.
- */
-export function loQueQuedaTrasElSondeo(antes: AvisoPuesto): AvisoPuesto {
-  if (antes.texto.length === 0) return SIN_AVISO;
-  return antes.de === 'la-red' ? SIN_AVISO : antes;
-}
+export type { AvisoPuesto, DeDondeSaleElAviso } from '../../shared/mecanicas/aviso-puesto';
+export {
+  loQueQuedaTrasElSondeo,
+  SIN_AVISO,
+} from '../../shared/mecanicas/aviso-puesto';
+import {
+  loQueQuedaTrasElSondeo,
+  SIN_AVISO,
+} from '../../shared/mecanicas/aviso-puesto';
+import type { AvisoPuesto } from '../../shared/mecanicas/aviso-puesto';
 
 export type FaseDeLaMesa =
   /** No estamos en ninguna mesa: se abre una o se entra con un código. */
@@ -205,6 +160,22 @@ function ruta(cola: string): string {
   return `/api/arcade${cola}`;
 }
 
+/*
+ * ═══ DE QUÉ MESAS SE HA LEVANTADO UNO A PROPÓSITO EN ESTA PESTAÑA ═══
+ *
+ * Vive en el módulo y no en el componente: tiene que sobrevivir a que la pantalla
+ * se desmonte —levantarse es justamente eso— y NO tiene que sobrevivir a recargar
+ * la página. Con eso basta para lo único que el olvido conseguía de útil: que la
+ * Sala no te devuelva sola a la mesa de la que acabas de irte.
+ *
+ * Antes esto se conseguía OLVIDANDO la llave, y el olvido costaba el asiento:
+ * entrar con el código pide silla NUEVA, y desde que el servidor no sienta a
+ * nadie con la partida en marcha eso es un 409 —o sea que «Levantarse» pasó a
+ * ser una puerta de un solo sentido—. La app resolvió esto mismo; este cliente se
+ * quedó con el fallo, que es la asimetría al revés.
+ */
+const salidasDeEstaPestana = new Set<string>();
+
 export function usarMesaDeArcade(arcade: string, silla: string): LaMesa {
   const [fase, ponerFase] = useState<FaseDeLaMesa>('fuera');
   const [mesa, ponerMesa] = useState<MesaVista | null>(null);
@@ -242,9 +213,11 @@ export function usarMesaDeArcade(arcade: string, silla: string): LaMesa {
    *
    * El sondeo pide «avisos desde la revisión que tengo», y los bordes de ese
    * intervalo no son de este lado: dos vueltas seguidas pueden traer el mismo
-   * aviso. En la app eso no se veía porque allí los avisos son un rótulo que
-   * pasa; aquí son una crónica que se queda en pantalla, y un renglón repetido
-   * se lee como que ha pasado dos veces.
+   * aviso. Aquí ponía que «en la app eso no se veía porque allí los avisos son un
+   * rótulo que pasa», y era peor: la app los TIRABA —casteaba la respuesta a
+   * `{ mesa }` y los descartaba en silencio—. Ya no: tiene su crónica, con este
+   * mismo descarte de repetidos, porque un renglón repetido se lee como que ha
+   * pasado dos veces.
    */
   const anotar = useCallback((nuevos: AvisoDeMesa[]): void => {
     if (nuevos.length === 0) return;
@@ -266,6 +239,8 @@ export function usarMesaDeArcade(arcade: string, silla: string): LaMesa {
 
   useEffect(() => {
     const sitio = elSitioGuardado(arcade, silla);
+    /* De la mesa de la que uno acaba de levantarse no se vuelve solo. */
+    if (sitio !== null && salidasDeEstaPestana.has(`${arcade}:${silla}:${sitio.codigo}`)) return;
     if (sitio === null) return;
     if (codigo.current !== null) return;
 
@@ -506,9 +481,53 @@ export function usarMesaDeArcade(arcade: string, silla: string): LaMesa {
        * mesa bajo el juego equivocado y guardaba la llave en el cajón de otro
        * arcade.
        */
+      /*
+       * ═══ SI ESE CÓDIGO YA ES EL NUESTRO, SE VUELVE; NO SE ENTRA ═══
+       *
+       * Entrar crea un asiento NUEVO, y el bolsillo puede tener ya una llave de
+       * ESTA misma mesa: es el caso de quien pulsa «Levantarse» y quiere volver, y
+       * también el de quien teclea el código de la mesa en la que ya está sentado.
+       * Se lee con la llave, igual que hace la recuperación al montar.
+       *
+       * Si el servidor NIEGA esa llave —mesa cerrada, asiento caducado— no se
+       * corta: se sigue por la puerta de siempre y se pide asiento. Lo que no puede
+       * volver a pasar es que con la llave buena en el bolsillo se pidiera silla
+       * nueva y el servidor contestara 409 con la partida en marcha, dejando fuera
+       * de su propia mesa a quien ya jugaba.
+       */
+      const guardado = elSitioGuardado(arcade, silla);
+      if (guardado !== null && guardado.codigo === limpio) {
+        void (async () => {
+          ponerQuieto(true);
+          ponerFase('yendo');
+          try {
+            const r = await fetch(ruta(`/mesas/${limpio}?desde=-1`), {
+              headers: { [CABECERA_DE_ASIENTO]: guardado.llave },
+            });
+            if (r.ok) {
+              const loSuyo = (await r.json()) as { mesa?: MesaVista };
+              if (loSuyo.mesa !== undefined && loSuyo.mesa.yo !== null) {
+                salidasDeEstaPestana.delete(`${arcade}:${silla}:${limpio}`);
+                codigo.current = loSuyo.mesa.codigo;
+                llave.current = guardado.llave;
+                ponerMesa(loSuyo.mesa);
+                ponerFase('dentro');
+                ponerAviso(SIN_AVISO);
+                return;
+              }
+            }
+            sentarse(`/mesas/${limpio}/asientos`, { nombre, arcade }, 'No se ha podido entrar');
+          } catch {
+            sentarse(`/mesas/${limpio}/asientos`, { nombre, arcade }, 'No se ha podido entrar');
+          } finally {
+            ponerQuieto(false);
+          }
+        })();
+        return;
+      }
       sentarse(`/mesas/${limpio}/asientos`, { nombre, arcade }, 'No se ha podido entrar');
     },
-    [sentarse],
+    [arcade, silla, sentarse],
   );
 
   // -------------------------------------------------------------------------
@@ -583,17 +602,23 @@ export function usarMesaDeArcade(arcade: string, silla: string): LaMesa {
   );
 
   /**
-   * Levantarse. Se olvida el asiento a propósito: quien pulsa esto está diciendo
-   * que no quiere volver, y es lo único que distingue irse de perder la conexión.
+   * Levantarse: CIERRA LA PANTALLA Y SE QUEDA EL ASIENTO.
+   *
+   * Lo único que se apunta es que de esta mesa no se vuelve solo mientras dure la
+   * pestaña —ver el registro de arriba—, que era todo lo que el olvido conseguía
+   * de útil. Olvidar la llave costaba el asiento entero, y desde la guarda de
+   * «partida empezada» costaba la partida.
    */
   const salir = useCallback(() => {
+    if (codigo.current !== null) {
+      salidasDeEstaPestana.add(`${arcade}:${silla}:${codigo.current}`);
+    }
     codigo.current = null;
     llave.current = null;
     ponerMesa(null);
     ponerCronica([]);
     ponerAviso(SIN_AVISO);
     ponerFase('fuera');
-    olvidarElSitio(arcade, silla);
   }, [arcade, silla]);
 
   /**
@@ -635,8 +660,14 @@ export function usarMesaDeArcade(arcade: string, silla: string): LaMesa {
     } catch {
       /* Da igual por qué no se pudo: quien pulsó se va de todas formas. */
     }
+    /*
+     * Y AQUÍ SÍ SE OLVIDA, que es la diferencia con levantarse: tras tirarla no
+     * queda mesa a la que volver, y guardar la llave de una mesa borrada sólo
+     * sirve para que la Sala te intente devolver a ella y te diga que no existe.
+     */
+    olvidarElSitio(arcade, silla);
     salir();
-  }, [salir]);
+  }, [arcade, silla, salir]);
 
   /*
    * Hacia fuera sigue siendo UNA CADENA. De dónde salió el renglón es cosa de

@@ -93,6 +93,7 @@ export type {
   ProcedenciaDeArcade,
   Puntuacion,
   QuienMira,
+  SeAcabo,
   SedeDeArcade,
 } from './tipos';
 
@@ -187,13 +188,13 @@ export interface ArcadeInstalado {
    * con `Symbol.for` porque la doble carga de módulo es un fallo REAL que este
    * repositorio ya pagó una vez con `shared/juegos/index.ts`.
    */
+  puntuacion?: Puntuacion;
   /**
    * ¿Ha terminado esta partida? Ver `SeAcabo`. Vive aquí por lo mismo que
    * `puntuacion`: es lo que la plataforma sabe de un juego y entra por la misma
    * puerta que el reductor.
    */
   seAcabo?: SeAcabo;
-  puntuacion?: Puntuacion;
 }
 
 /**
@@ -321,6 +322,7 @@ export function instalarArcade<E, V = unknown>(alta: {
    * un arcade puede venir de fuera del binario, y allí no hay compilador. Lo exige
    * `exigirCifrasLegibles()` al arrancar, cuando ya están todas las altas hechas.
    */
+  puntuacion?: Puntuacion;
   /**
    * ¿HA TERMINADO? Lo pregunta QUIEN HOSPEDA para cerrar la mesa.
    *
@@ -341,7 +343,6 @@ export function instalarArcade<E, V = unknown>(alta: {
    * quien lo escribe no tiene por qué poner `unknown` en su propia firma.
    */
   seAcabo?: (estado: E) => boolean;
-  puntuacion?: Puntuacion;
 }): void {
   const problemas = problemasDelManifiesto(alta.manifiesto);
   if (problemas.length > 0) throw new ArcadeMalEscrito(alta.manifiesto.id, problemas);
@@ -575,10 +576,20 @@ export function puntuacionDe(arcade: ArcadeId, estado: unknown): number {
  * enchufe. Un arcade de fuera se instala en una línea y declara su final en otra.
  * Lo normal y lo recomendado es pasarlo dentro del alta.
  */
-export function registrarFinal(arcade: ArcadeId, seAcabo: SeAcabo): void {
+export function registrarFinal<E = unknown>(
+  arcade: ArcadeId,
+  seAcabo: (estado: E) => boolean,
+): void {
   const instalado = INSTALADOS[arcade];
   if (!instalado) throw new ArcadeNoInstalado(arcade);
-  instalado.seAcabo = seAcabo;
+  /*
+   * Se recibe con EL ESTADO DEL JUEGO y se guarda opaco, exactamente como en el
+   * alta. Con `SeAcabo` a secas ni siquiera el `seAcabo` de La Ronda encajaba por
+   * esta puerta —pide `EstadoDeLaRonda | undefined`—, o sea que la puerta del
+   * enchufe era más estrecha que la de casa, que es justo lo que el contrato dice
+   * que no puede pasar.
+   */
+  instalado.seAcabo = seAcabo as SeAcabo;
 }
 
 /** Quita el de un arcade, dejándolo instalado. Para las pruebas. */
@@ -609,6 +620,53 @@ export function seAcaboLaPartida(arcade: ArcadeId, estado: unknown): boolean {
   const instalado = INSTALADOS[arcade];
   if (!instalado) throw new ArcadeNoInstalado(arcade);
   return instalado.seAcabo ? instalado.seAcabo(estado) : false;
+}
+
+/**
+ * Los arcades CON MESA que no saben decir cuándo se acaban.
+ *
+ * ═══ POR QUÉ ESTO TIENE QUE EXISTIR, Y NO SOLO EL HUECO ═══
+ *
+ * Porque sin él, omitir `seAcabo` es MÁS SILENCIOSO QUE DECLARARLO, que es
+ * exactamente el error que `MarcadorDeArcade` documenta como corregido: aquello
+ * se resolvió con una unión cerrada donde «este juego no puntua» hay que
+ * ESCRIBIRLO. Aquí el precio del olvido es una mesa que no se cierra jamás: la
+ * partida acabada sigue con su cuenta atrás, admite tics y no termina nunca. Sin
+ * esta guarda, ese fallo —que ya se pagó una vez— se reintroduce gratis y en un
+ * diff parece limpieza.
+ *
+ * Y SOLO SE LES EXIGE A LOS DE MESA, que es de donde sale la obligación: un juego
+ * de aparato no tiene mesa que cerrar y su bucle ya le pregunta por su nombre.
+ *
+ * Un juego con mesa que de verdad no termine —uno que se juega hasta que la gente
+ * se cansa— lo dice con `seAcabo: () => false`. Una línea, escrita a propósito, y
+ * entonces «no acaba» es una decisión legible y no un hueco.
+ *
+ * No lanza, por lo mismo que sus hermanas: quien llama sabe mejor qué hacer con
+ * la lista. La versión que no deja arrancar es `exigirFinalesDeclarados()`.
+ */
+export function arcadesConMesaSinFinal(): ArcadeId[] {
+  const mal: ArcadeId[] = [];
+  for (const m of arcadesInstalados()) {
+    if (!necesitaMesa(m)) continue;
+    if (!hayFinal(m.id)) mal.push(m.id);
+  }
+  return mal;
+}
+
+/** Y la que no deja arrancar. La llama quien levanta el proceso. */
+export function exigirFinalesDeclarados(): void {
+  const mal = arcadesConMesaSinFinal();
+  const primero = mal[0];
+  if (primero === undefined) return;
+  const otros = mal.length > 1 ? `\nY hay más sin final declarado: ${mal.slice(1).join(', ')}.` : '';
+  throw new Error(
+    `El arcade «${primero}» abre mesas y no sabe decir cuándo se acaba una: su alta no trae ` +
+      '`seAcabo`. Sin eso su mesa no se cierra NUNCA —la partida acabada sigue pintando su cuenta ' +
+      'atrás, admite tics y no termina—, y el olvido no se distingue de la decisión.\n' +
+      'Si de verdad no termina, decláralo: `seAcabo: () => false`.' +
+      otros,
+  );
 }
 
 /**
@@ -801,7 +859,7 @@ export function exigirSecretosTapados(): void {
 export interface ArcadeQueNoAguantaVacio {
   arcade: ArcadeId;
   /** Cuál de las tres puertas se cayó. */
-  donde: 'avanzar' | 'proyeccion' | 'lo-secreto';
+  donde: 'avanzar' | 'proyeccion' | 'lo-secreto' | 'se-acabo';
   fallo: string;
 }
 
@@ -878,6 +936,23 @@ export function arcadesQueNoAguantanVacio(): ArcadeQueNoAguantaVacio[] {
         apuntar('lo-secreto', error);
       }
     }
+    /*
+     * Y LA CUARTA PUERTA, que nació sin sonda. `seAcaboLaPartida` se pregunta con
+     * el estado de la mesa, y el estado de una mesa recién abierta es `undefined`:
+     * un `seAcabo` que desreferencie sin mirar tumba la primera LECTURA de toda
+     * mesa nueva —500, y una mesa a la que nadie puede sentarse ni cerrar—.
+     *
+     * Los dos que la declaran hoy hacen `(estado ?? partidaNueva())`, así que
+     * pasan. Quien no lo haga se entera al arrancar y no en producción, que es
+     * para lo que existe esta función entera.
+     */
+    if (hayFinal(m.id)) {
+      try {
+        seAcaboLaPartida(m.id, undefined);
+      } catch (error) {
+        apuntar('se-acabo', error);
+      }
+    }
   }
 
   return mal;
@@ -900,7 +975,8 @@ export function exigirQueAguantenVacio(): void {
     `El arcade «${primero.arcade}» declara \`sede: 'servidor'\` y se cae cuando su mesa acaba de abrirse: ` +
       `\`${primero.donde}\` con el estado vacío lanza «${primero.fallo}».\n` +
       'Una mesa nace SIN estado a propósito, para que el reductor lo construya en el primer movimiento ' +
-      'con la semilla y los asientos ya puestos. Así que sus tres puertas tienen que admitir `undefined`: ' +
+      'con la semilla y los asientos ya puestos. Así que TODAS sus puertas tienen que admitir ' +
+      '`undefined` —el reductor, la proyección, `loSecreto` y `seAcabo`—: ' +
       'declara el estado del juego como `SuEstado | undefined` y trátalo como «la partida aún no ha empezado».' +
       otros,
   );

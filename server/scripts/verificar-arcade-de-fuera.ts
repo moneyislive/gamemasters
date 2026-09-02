@@ -315,6 +315,8 @@ export function instalar(api) {
     proyeccion: proyectar,
     loSecreto,
     opciones,
+    /* Y cuando se acaba, que un juego con mesa tiene que saber decirlo. */
+    seAcabo: (estado) => (estado ?? RECIEN).ganador !== null,
   });
 
   /* Y cómo se le lee la cifra, que sin el enchufe no se podía dar de alta. */
@@ -385,6 +387,13 @@ export function instalar(api) {
         { id: 'bajar', tipo: 'bajar', carga: {}, rotulo: 'Bajar el vado', ayuda: 'Hasta el fondo.' },
       ];
     },
+    /*
+     * ESTE NO SE ACABA NUNCA, Y HAY QUE ESCRIBIRLO. Se sube y se baja hasta que
+     * la gente se cansa: no hay final. La plataforma exige que un juego con mesa
+     * lo declare precisamente para que «no acaba» sea una decisión legible y no
+     * un olvido —que es lo que pasaba antes, con la mesa sin cerrarse jamás—.
+     */
+    seAcabo: () => false,
   });
 }
 `;

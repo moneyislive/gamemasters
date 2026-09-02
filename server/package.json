@@ -48,6 +48,7 @@
     "verify:sombras-trama": "tsx scripts/verificar-sombras-trama.ts",
     "verify:nudo": "tsx scripts/verificar-nudo.ts",
     "verify:cuadro-nudo": "tsx scripts/verificar-nudo-cuadro.ts",
+    "verify:limitador": "tsx scripts/verificar-limitador.ts",
     "verify:puertas": "tsx scripts/verificar-puertas.ts",
     "verify:arranque": "tsx scripts/verificar-arranque.ts",
     "verify:conexion": "tsx scripts/verificar-conexion.ts",

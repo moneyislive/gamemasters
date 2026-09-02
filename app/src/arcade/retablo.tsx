@@ -314,6 +314,17 @@ export function Retablo({ tablero, alTocar, quieto }: QueSePinta): JSX.Element {
               key={accion.id}
               disabled={!accion.disponible || quieto}
               onPress={() => alTocar(accion.toque)}
+              /*
+               * EL RÓTULO ES EL DEL JUEGO, que es lo único que hay: este mueble no
+               * sabe a qué se juega. En el escritorio estas mismas acciones son
+               * `<button>` de verdad —y hasta las figuras del SVG llevan `role` y
+               * `aria-label`—, o sea que sin esto se podía jugar con lector de
+               * pantalla desde el PC y no desde el móvil.
+               */
+              accessibilityRole="button"
+              accessibilityLabel={accion.rotulo}
+              accessibilityHint={accion.ayuda.length > 0 ? accion.ayuda : undefined}
+              accessibilityState={{ disabled: !accion.disponible || quieto }}
               style={({ pressed }) => [
                 estilos.boton,
                 (!accion.disponible || quieto) && estilos.botonApagado,
@@ -507,6 +518,9 @@ const estilos = StyleSheet.create({
   lienzo: { backgroundColor: SALA.panel, borderRadius: 12, overflow: 'hidden', padding: 4 },
   botones: { gap: 8 },
   boton: {
+    /* Los 44 de dedo que este mismo fichero razona largo para las figuras. */
+    minHeight: 44,
+    justifyContent: 'center',
     backgroundColor: SALA.panel,
     borderColor: SALA.neonTenue,
     borderWidth: 1,

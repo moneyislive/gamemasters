@@ -30,7 +30,7 @@
  * provide an export named …». Cuesta una línea por nombre y se paga una vez.
  */
 import { instalarArcade } from '../index';
-import { avanzarElArcade, MANIFIESTO_EL_ARCADE } from './arcade';
+import { avanzarElArcade, MANIFIESTO_EL_ARCADE, seAcabo as seAcaboElArcade } from './arcade';
 import type { EstadoDelArcade } from './arcade';
 import {
   avanzarLaFrente,
@@ -312,6 +312,7 @@ instalarArcade<EstadoDelArcade | undefined>({
   manifiesto: MANIFIESTO_EL_ARCADE,
   avanzar: avanzarElArcade,
   puntuacion: laCifraDeElArcade,
+  seAcabo: seAcaboElArcade,
 });
 
 /**

@@ -25,21 +25,23 @@
  * —«son campos del estado opaco y tipos de movimiento DE UN SOLO JUEGO»—, y lo
  * único que sube es la canonicalización hexagonal, que es geometría y no regla.
  *
- * ═══ LO ÚNICO QUE NO CUPO, DICHO EN VOZ ALTA ═══
+ * ═══ LO QUE NO CUPO EN LA FASE 4, Y CUPO EN LA 5 ═══
  *
- * `opciones()` es un concepto del diseño (§5 bis) y el núcleo NO tiene registro
- * para él: `instalarArcade` admite manifiesto, reductor, proyección y
- * `loSecreto`, y nada más. Añadirle un hueco sería tocar `shared/arcade/`, o sea
- * exactamente lo que esta fase existe para no hacer.
+ * Aquí ponía que `opciones()` —concepto del §5 bis— no tenía registro en el
+ * núcleo, que `instalarArcade` admitía «manifiesto, reductor, proyección y
+ * `loSecreto`, y nada más», y que añadirle un hueco habría sido tocar
+ * `shared/arcade/`. Eso fue verdad exactamente una fase.
  *
- * La salida no es un rodeo: es que NO HACE FALTA. `opciones()` tiene dos
- * clientes y los dos están aquí dentro —el portillo del reductor y el pintado
- * del tablero declarado—, y el móvil no la llama nunca porque lo que le llega
- * por la red es el tablero YA RESUELTO, con el movimiento escrito dentro de cada
- * pieza. Un arcade de fuera del binario podría hacer lo mismo sin que la
- * plataforma supiera que existe la función. Queda apuntado igual, porque el día
- * que un segundo juego de tablero quiera lo mismo, tener el registro en el
- * núcleo dejará de ser una comodidad y pasará a ser lo correcto.
+ * El argumento que lo sostenía —«NO HACE FALTA: los dos clientes de `opciones()`
+ * están aquí dentro»— era cierto PARA UN JUEGO DE DENTRO DEL BINARIO, y sólo
+ * para eso: un arcade de fuera no puede llamarse a sí mismo desde una pantalla
+ * que no ha escrito, así que sin el hueco la frase del §7 —«los muebles
+ * genéricos son los únicos que un arcade de FUERA puede usar»— valía a medias.
+ * La fase 5 abrió el hueco y Riberas lo declara como los demás.
+ *
+ * Lo que NO cambió es cómo juega Riberas: sus dos clientes internos siguen
+ * llamándola directamente, porque hacerlo por el registro sería resolver un
+ * identificador para ejecutar la función del fichero que se está leyendo.
  *
  * ═══ LO LEGAL, QUE AQUÍ NO ES UN TRÁMITE ═══
  *

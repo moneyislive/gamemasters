@@ -3,7 +3,7 @@
  *
  * ═══ POR QUÉ SE PREGUNTA Y NO SE IMPORTA ═══
  *
- * Los seis arcades del binario están en `shared/arcade/juegos` y se podrían
+ * Los cinco arcades del binario están en `shared/arcade/juegos` y se podrían
  * importar: saldría una lista sin una sola petición. Y sería un catálogo que
  * MIENTE en el único caso que le da valor a esta pantalla — el servidor puede
  * tener instalados arcades que este empaquetado no conoce, porque entraron por

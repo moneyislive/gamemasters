@@ -276,9 +276,17 @@ export const RUMBO = 'rumbo';
 /** Vuelve a dejarlo todo como al principio, para pedir otra semilla y empezar. */
 export const OTRA = 'otra';
 
-/** ¿Se acabó ya? Función del estado, no un campo aparte. */
-export function seAcabo(estado: EstadoDelArcade): boolean {
-  return estado.momento === 'perdida';
+/**
+ * ¿Se acabó ya? Función del estado, no un campo aparte.
+ *
+ * ADMITE `undefined` como los otros dos, y no por simetría: sin eso NO SE PUEDE
+ * DECLARAR. Su alta es `instalarArcade<EstadoDelArcade | undefined>`, y con
+ * `strictFunctionTypes` una función que exige el estado no encaja donde se pide
+ * una que admite `undefined`. O sea que esto no estaba sin declarar por descuido:
+ * era imposible declararlo, y desde fuera se veía igual que un olvido.
+ */
+export function seAcabo(estado: EstadoDelArcade | undefined): boolean {
+  return (estado ?? partidaNueva()).momento === 'perdida';
 }
 
 /**
@@ -288,8 +296,8 @@ export function seAcabo(estado: EstadoDelArcade): boolean {
  * de lo que cuelga el diseño entero. El manifiesto dice que hay una cifra y cómo
  * se llama; qué número es, solo lo sabe el juego.
  *
- * Se registra en `./puntuaciones.ts`, que explica largo por qué esa tabla no está
- * en el núcleo y debería estarlo.
+ * Entra por el alta, como el reductor. La tabla escrita a mano de
+ * `./puntuaciones.ts` ya se mudó al núcleo; ese fichero cuenta la mudanza entera.
  */
 export function puntuacionDelArcade(estado: EstadoDelArcade): number {
   return estado.esquivadas;

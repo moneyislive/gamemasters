@@ -162,6 +162,53 @@
  * ha vuelto a tocar en esta segunda vuelta, y las dos comprobaciones que no se
  * pueden sellar siguen mordiendo.
  *
+ * ════════════════════════════════════════════════════════════════════════════
+ * TERCER SELLADO: EL MOTOR NO SABÍA PREGUNTAR SI UNA PARTIDA ACABÓ
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * El árbitro documenta desde el primer día que «quien hospeda llama a `cerrarMesa`
+ * cuando el estado del juego dice que se acabó», los dos juegos de servidor
+ * exportaban su `seAcabo`… y el único que lo llamaba era el motor DEL APARATO, que
+ * los tiene importados por su nombre. En el servidor no existía el hueco, así que
+ * NINGUNA mesa se cerraba jamás: la partida acabada seguía pintando su cuenta
+ * atrás, admitía tics y no terminaba nunca. Tres fases con ese peaje.
+ *
+ *  G · EL HUECO, calcado del de `puntuacion` porque es el mismo caso —lo que el
+ *      juego sabe y la plataforma pregunta por su nombre—, y en el ALTA y no en
+ *      una tabla del servidor para que también lo pueda declarar un arcade de
+ *      FUERA; si no, sus mesas serían las únicas que no se cierran.
+ *      · `shared/arcade/tipos.ts`: el tipo `SeAcabo`. NO es «fin como función del
+ *        estado»: eso aplaza que el MOTOR lo calcule, y esto no calcula —pregunta,
+ *        y contesta sí o no—. Quién ganó sigue siendo del juego y de su vista.
+ *      · `shared/arcade/index.ts`: `seAcabo?` en el alta, `registrarFinal()`,
+ *        `olvidarFinal()`, `hayFinal()`, `seAcaboLaPartida()`,
+ *        `arcadesConMesaSinFinal()` y `exigirFinalesDeclarados()`. Y la sonda de
+ *        mesa vacía prueba también esta cuarta puerta, que nació sin ella.
+ *      El «no» por defecto de `seAcaboLaPartida` es correcto al revés que el de
+ *      `puntuacionDe`, que lanza: un cero por defecto acepta récords falsos en
+ *      silencio; un «todavía no» deja la mesa ABIERTA, que es donde estaba antes.
+ *      Cerrar por defecto sí sería grave: echaría a la gente de una partida viva.
+ *      Y la guarda de arranque existe porque, sin ella, OMITIR es más silencioso
+ *      que declarar —el error que `MarcadorDeArcade` documenta como corregido—.
+ *
+ *  H · `server/src/arcade/arbitro.ts`: `Mesa.empezada`. Con la partida en marcha no
+ *      se sienta nadie, y no vale mirar el estado ni el diario: un tic sobre una
+ *      mesa de La Ronda a la que no ha llegado nadie ya construye su estado, así
+ *      que con esa regla la mesa se cerraría la puerta a sí misma.
+ *
+ *  I · `server/src/arcade/mesas.ts`: quien hospeda, que es quien pregunta y quien
+ *      cierra. En las dos puertas por las que cambia el estado —`mover` y el tic—
+ *      y además AL RECUPERAR DEL ALMACÉN, que es la única por la que se alcanza una
+ *      partida que ya terminó sin quedar marcada. Envuelto en el presupuesto y con
+ *      el fallo dicho: es la única puerta del motor que ejecuta código de un arcade
+ *      ajeno, y sin báscula un `seAcabo` que revienta tumbaba la LECTURA entera.
+ *      También aquí: los dos enganches del canal —`cuandoSeCierreUnaMesa`, para que
+ *      «Se acabó la partida» se anuncie de verdad, y `cuandoSeOlvideUnaMesa`, para
+ *      que el barrido de las viejas no deje su entrada en el concentrador—.
+ *
+ * Los tres los encontró una auditoría adversaria, y los tres estaban ESCRITOS y
+ * sin llamar por nadie. Es el mismo patrón que el hueco D de la vuelta anterior.
+ *
  * ═══ Y `server/src/canal/` NO SE HA TOCADO, QUE ES UNA DECISIÓN Y NO UN OLVIDO ═══
  *
  * El §9 pone en la fase 5 «la segunda implementación de `canal/`» —un canal

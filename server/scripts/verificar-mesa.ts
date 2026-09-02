@@ -124,6 +124,9 @@ import {
   opcionesDeArcade,
   registrarProyeccion,
   vistaDeAsiento,
+  olvidarFinal,
+  registrarFinal,
+  hayFinal,
 } from '../../shared/arcade';
 import type { ArcadeId, AsientoId, ManifiestoDeArcade, QuienMira } from '../../shared/arcade';
 /*
@@ -139,9 +142,11 @@ import {
   EMPEZAR as EMPEZAR_LA_FRENTE,
   partidaNueva as partidaNuevaDeLaFrente,
   proyectarLaRonda,
+  seAcaboLaRonda,
   proyectarRiberas,
   TICS_PARA_COLOCARSE,
 } from '../../shared/arcade/juegos';
+import type { MesaEnCurso } from '../src/arcade/mesas';
 import { abrirMesa, avanzarElReloj, jugar } from '../src/arcade/arbitro';
 import type { Mesa } from '../src/arcade/arbitro';
 
@@ -2775,9 +2780,13 @@ paso('La mesa se cierra sola cuando el juego dice que se acabó');
  */
 {
   const mesas = await import('../src/arcade/mesas');
+  /* Se queda con lo que de verdad pasó por el almacén: hace falta más abajo. */
+  const guardadas = new Map<string, MesaEnCurso>();
   mesas.ponerAlmacenDeMesas({
     leer: () => [],
-    guardar: async () => {},
+    guardar: async (m) => {
+      guardadas.set(m.codigo, structuredClone(m));
+    },
     borrar: async () => {},
     guardarYa: () => {},
   });
@@ -2839,12 +2848,167 @@ paso('La mesa se cierra sola cuando el juego dice que se acabó');
     trasElTic.venceEn,
   );
 
+  /*
+   * ═══ Y AHORA POR EL OTRO CAMINO, QUE ES EL QUE SE ESCAPÓ ═══
+   *
+   * Lo de arriba comprueba el tic. La primera versión de esta comprobación se
+   * quedó ahí, y por eso salió verde con un fallo dentro: por la puerta de
+   * `mover`, el cierre apagaba el plazo y tres líneas después `if (otroTurno)` lo
+   * volvía a armar, y así se guardaba. No se veía en pantalla porque los dos
+   * clientes miran `terminada` antes de pintar el reloj; el dato guardado mentía.
+   */
+  const porMover = await mesas.abrir({ arcade: RONDA, nombre: 'Ana', plazoSegundos: 600 });
+  const codPorMover = porMover.mesa.codigo;
+  const llavePorMover = new Map<AsientoId, string>();
+  llavePorMover.set(porMover.silla.id, porMover.silla.llave);
+  for (const nombre of ['Bea', 'Cid', 'Dan']) {
+    const silla = await mesas.sentarse(codPorMover, nombre);
+    llavePorMover.set(silla.id, silla.llave);
+  }
+  const arranquePorMover = await mesas.mirar(codPorMover, porMover.silla.llave);
+  await mesas.mover(codPorMover, porMover.silla.llave, arranquePorMover.rev, {
+    tipo: 'ronda:empezar',
+    carga: {},
+  });
+  let cartas = 0;
+  let ultimaRespuesta: Awaited<ReturnType<typeof mesas.mover>> | null = null;
+  for (let vuelta = 0; vuelta < 40; vuelta++) {
+    const publica = await mesas.mirar(codPorMover, porMover.silla.llave);
+    if (publica.terminada) break;
+    const deQuien = (publica.vista as { turnoDe?: AsientoId } | undefined)?.turnoDe;
+    const suLlave = deQuien === undefined ? undefined : llavePorMover.get(deQuien);
+    if (suLlave === undefined) break;
+    const suya = await mesas.mirar(codPorMover, suLlave);
+    const opcion = suya.opciones?.[0];
+    if (opcion === undefined) break;
+    ultimaRespuesta = await mesas.mover(codPorMover, suLlave, suya.rev, {
+      tipo: opcion.tipo,
+      carga: opcion.carga,
+    });
+    cartas++;
+  }
+  const acabadaPorMover = await mesas.mirar(codPorMover, porMover.silla.llave);
+  comprobar(
+    'la partida también se acaba jugando las veinte cartas a mano',
+    cartas === 20 && acabadaPorMover.terminada,
+    { cartas, terminada: acabadaPorMover.terminada },
+  );
+  /*
+   * SE MIRA LA RESPUESTA DEL PROPIO MOVIMIENTO QUE CIERRA, y no una lectura de
+   * después: es el único instante en el que se ve. Con el fallo dentro —apagar el
+   * plazo y rearmarlo tres líneas más abajo— esta respuesta sale con cuenta atrás
+   * y una lectura posterior ya sale limpia, así que comprobarlo un momento más
+   * tarde es comprobar el instante equivocado. La primera versión de esto lo
+   * comprobaba tarde y salía verde teniendo el fallo delante.
+   */
+  comprobar(
+    'Y ACABADA POR UN MOVIMIENTO, LA RESPUESTA DE ESE MOVIMIENTO NO TRAE CUENTA ATRÁS',
+    ultimaRespuesta !== null &&
+      ultimaRespuesta.terminada &&
+      (ultimaRespuesta.venceEn === null || ultimaRespuesta.venceEn === undefined),
+    ultimaRespuesta === null
+      ? 'no hubo movimiento'
+      : { terminada: ultimaRespuesta.terminada, venceEn: ultimaRespuesta.venceEn },
+  );
+  comprobar(
+    'y al releerla tampoco',
+    acabadaPorMover.venceEn === null || acabadaPorMover.venceEn === undefined,
+    acabadaPorMover.venceEn,
+  );
+
+  /*
+   * ═══ LA MESA QUE YA ESTABA ACABADA Y NADIE MARCÓ ═══
+   *
+   * Es toda mesa guardada por un servidor anterior a esto, y toda mesa que se
+   * cerró en memoria con el almacén caído. Por `mover` y por el tic NO se alcanza
+   * —los dos exigen que el estado cambie, y sobre una partida acabada no cambia—
+   * así que se quedaba abierta para siempre. Se recupera una de verdad, se le
+   * quita la marca, y se comprueba que al recuperarla se cierra sola.
+   */
+  /*
+   * ═══ LA MESA QUE YA ESTABA ACABADA Y NADIE MARCÓ ═══
+   *
+   * Es toda mesa guardada por un servidor anterior a esto, y toda mesa que se
+   * cerró en memoria con el almacén caído. Por `mover` y por el tic NO se alcanza
+   * —los dos exigen que el estado CAMBIE, y sobre una partida acabada no cambia:
+   * el reductor la rechaza y el tic devuelve el mismo estado— así que se quedaba
+   * abierta para siempre y rearmando la cuenta atrás en cada mirada.
+   *
+   * Se coge la mesa de verdad —la que pasó por el almacén, con su estado acabado
+   * dentro—, se le quita la marca, y se comprueba que al RECUPERARLA se cierra.
+   */
+  const laQueSeGuardo = guardadas.get(codPorMover);
+  comprobar(
+    'el almacén ha visto la mesa acabada, que es de donde sale la de abajo',
+    laQueSeGuardo !== undefined && laQueSeGuardo.mesa.terminada,
+    laQueSeGuardo === undefined ? 'no se guardó' : laQueSeGuardo.mesa.terminada,
+  );
+  if (laQueSeGuardo !== undefined) {
+    const comoLaGuardoElServidorViejo: MesaEnCurso = {
+      ...laQueSeGuardo,
+      mesa: { ...laQueSeGuardo.mesa, terminada: false },
+      venceEn: Date.now() + 60_000,
+    };
+    mesas.ponerAlmacenDeMesas({
+      leer: () => [comoLaGuardoElServidorViejo],
+      guardar: async () => {},
+      borrar: async () => {},
+      guardarYa: () => {},
+    });
+    const recuperada = await mesas.mirar(codPorMover, porMover.silla.llave);
+    comprobar(
+      'UNA MESA ACABADA QUE LLEGA SIN MARCAR SE CIERRA AL RECUPERARLA',
+      recuperada.terminada,
+      { terminada: recuperada.terminada },
+    );
+    comprobar(
+      'y se le apaga la cuenta atrás que traía puesta',
+      recuperada.venceEn === null || recuperada.venceEn === undefined,
+      recuperada.venceEn,
+    );
+  }
+
   let alMoverEnLaAcabada: unknown;
   try {
     await mesas.mover(cod, partida.silla.llave, trasElTic.rev, { tipo: 'ronda:jugar', carga: {} });
   } catch (error) {
     alMoverEnLaAcabada = error;
   }
+  /*
+   * ═══ UN `seAcabo` QUE REVIENTA NO SE LLEVA LA MESA POR DELANTE ═══
+   *
+   * `seAcabo` es código de un arcade —y el motivo escrito para meterlo en el alta
+   * es que lo declare uno de FUERA—, así que era la única puerta del motor que
+   * ejecutaba código ajeno sin báscula y sin red. Medido antes de envolverlo: la
+   * LECTURA se caía entera —una mesa que no se podía ni ver— y por la puerta de
+   * `mover` el movimiento quedaba aplicado en memoria y sin guardar.
+   *
+   * Se ejercita sobre La Ronda y se le devuelve el suyo al salir.
+   */
+  registrarFinal(RONDA, () => {
+    throw new Error('un seAcabo de fuera que revienta');
+  });
+  let alMirarConElFinalRoto: unknown;
+  let vistaConElFinalRoto: Awaited<ReturnType<typeof mesas.mirar>> | null = null;
+  try {
+    vistaConElFinalRoto = await mesas.mirar(codPorMover, porMover.silla.llave);
+  } catch (error) {
+    alMirarConElFinalRoto = error;
+  }
+  comprobar(
+    'CON UN `seAcabo` QUE REVIENTA, LA MESA SE SIGUE PUDIENDO VER',
+    alMirarConElFinalRoto === undefined && vistaConElFinalRoto !== null,
+    alMirarConElFinalRoto instanceof Error ? alMirarConElFinalRoto.message : 'bien',
+  );
+  olvidarFinal(RONDA);
+  comprobar(
+    'y quitarle el final a un arcade lo deja instalado y sin final',
+    !hayFinal(RONDA),
+    hayFinal(RONDA),
+  );
+  registrarFinal(RONDA, seAcaboLaRonda);
+  comprobar('y se le devuelve el suyo', hayFinal(RONDA), hayFinal(RONDA));
+
   comprobar(
     'y en una mesa acabada ya no se mueve',
     alMoverEnLaAcabada instanceof Error && alMoverEnLaAcabada.name === 'MovimientoRechazado',

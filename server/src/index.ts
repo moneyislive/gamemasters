@@ -49,10 +49,12 @@ import wellKnownRouter from './enlaces/well-known';
 import { getStorageKind, getStore, initStore } from './db/store';
 import {
   exigirCifrasLegibles,
+  exigirFinalesDeclarados,
   exigirQueAguantenVacio,
   exigirSecretosTapados,
 } from '../../shared/arcade';
-import { ponerCanal } from './canal';
+import { elCanal, ponerCanal } from './canal';
+import { cuandoSeCierreUnaMesa, cuandoSeOlvideUnaMesa } from './arcade/mesas';
 import { canalDeSondeo } from './canal/sondeo';
 import arcadeRouter from './routes/arcade';
 import boardRouter from './routes/board';
@@ -403,6 +405,33 @@ function comprobarArranque(): void {
   ponerCanal(canalDeSondeo);
 
   /*
+   * ═══ Y QUE EL CIERRE DE UNA MESA SE OIGA ═══
+   *
+   * «Se acabó la partida» sólo se anunciaba desde `POST /cerrar`, que no pulsa
+   * ningún cliente. Desde que las mesas se cierran solas al terminar el juego,
+   * ese aviso no salía por ningún sitio: la partida acababa y el único rastro era
+   * un tablero quieto.
+   *
+   * Va aquí, pegado a `ponerCanal` y por el mismo motivo: `arcade/mesas.ts` no
+   * importa el canal a propósito, así que el hecho sale de allí y el encaminado
+   * se decide aquí. `anunciar` y no `avisarCambio` a secas porque queda GUARDADO
+   * con su revisión: quien estuviera en segundo plano lo recupera al volver.
+   */
+  cuandoSeCierreUnaMesa((codigo, rev) => {
+    elCanal().anunciar(codigo, rev, { clave: 'arcade:mesa-cerrada', texto: 'Se acabó la partida.' });
+  });
+
+  /*
+   * Y que el canal se OLVIDE de la mesa que el barrido se lleva. Sin esto, la
+   * entrada de esa mesa en el mapa de avisos del concentrador se quedaba para
+   * siempre: `olvidar()` sólo lo llamaban la apertura fallida y el `DELETE`, y el
+   * barrido de las viejas es el único camino por el que una mesa desaparece sola.
+   */
+  cuandoSeOlvideUnaMesa((codigo) => {
+    elCanal().olvidar(codigo);
+  });
+
+  /*
    * ═══ LA GARANTÍA QUE LA FASE 0 DEJÓ ESCRITA Y NO LLAMABA NADIE ═══
    *
    * `exigirSecretosTapados()` existe desde el primer commit del motor de arcade,
@@ -456,6 +485,59 @@ function comprobarArranque(): void {
    * `marcador` en un fichero que nadie de esta casa ha revisado.
    */
   exigirCifrasLegibles();
+
+  /*
+   * ═══ Y LA CUARTA: QUE UN JUEGO CON MESA SEPA DECIR CUÁNDO SE ACABA ═══
+   *
+   * QUÉ IMPIDE. Que arranque un servidor con un arcade de mesa cuya alta no trae
+   * `seAcabo`. El precio de ese olvido es una mesa que NO SE CIERRA NUNCA: la
+   * partida acabada sigue pintando su cuenta atrás, sigue admitiendo tics y no
+   * termina jamás. Y no es hipotético ni futuro: es el fallo que este servidor
+   * tuvo desde la fase 2 hasta hoy, en los dos juegos de mesa a la vez, porque el
+   * hueco para preguntarlo no existía.
+   *
+   * Ahora existe, y por eso hace falta esto: sin la guarda, omitirlo es más
+   * silencioso que declararlo y el fallo vuelve gratis. Un juego que de verdad no
+   * termine lo dice con `seAcabo: () => false`, que es una línea y una decisión.
+   */
+  exigirFinalesDeclarados();
+
+  /*
+   * ═══ QUIÉN HAY DELANTE, QUE DECIDE SI EL LIMITADOR PROTEGE O ATACA ═══
+   *
+   * `PROXY_DE_CONFIANZA` no la comprobaba nadie, y es la que decide si se sabe de
+   * dónde llega cada petición. Sin ella `procedenciaDe` cae al seguro de casa
+   * —`loopback`—, y detrás de un balanceador eso significa que el otro extremo del
+   * TCP es SIEMPRE suyo: todas las peticiones del mundo entran con la misma
+   * dirección y «fiable: true».
+   *
+   * Las dos caras del desastre, y las dos están escritas en `render.yaml`: ocho
+   * contraseñas mal tecleadas por cualquiera dejan fuera del taller a TODOS los
+   * Game Masters, y sesenta códigos fallidos dejan a todo el mundo fuera del
+   * arcade. Un limitador que no sabe de quién habla no es media protección: es un
+   * arma apuntando a la casa.
+   *
+   * Se exige SÓLO en producción, y por el mismo motivo que las otras: en casa el
+   * `loopback` es el valor correcto y pedirla ahí sería ruido. Y se exige por el
+   * mismo escarmiento que `MESAS_DIR`: va como dato del blueprint y no como
+   * secreto, o sea que existe si y sólo si la sincronización la aplicó —y este
+   * repositorio ya tiene esa cicatriz con `UPLOADS_DIR`—.
+   */
+  if (process.env.NODE_ENV === 'production') {
+    const delante = process.env.PROXY_DE_CONFIANZA?.trim() ?? '';
+    if (delante !== 'plataforma') {
+      throw new Error(
+        delante.length === 0
+          ? 'Falta `PROXY_DE_CONFIANZA` y en producción hay un balanceador delante. Sin ella el ' +
+            'limitador toma la dirección del balanceador como la de todo el mundo: ocho ' +
+            'contraseñas mal tecleadas por cualquiera dejan a TODOS fuera. Pónla a ' +
+            '`plataforma` (ya está declarada en `render.yaml`).'
+          : `\`PROXY_DE_CONFIANZA\` vale «${delante}» y el único valor que activa la confianza es ` +
+            '`plataforma`. Cualquier otra cosa cae en el seguro de casa, que detrás de un ' +
+            'balanceador convierte al limitador en un arma apuntando a la casa entera.',
+      );
+    }
+  }
 
   /*
    * ═══ EL MODO DE CORREO, QUE SE VALIDABA CUANDO YA ERA TARDE ═══
@@ -589,6 +671,37 @@ function comprobarArranque(): void {
         'dura días—.\nDefínela apuntando DENTRO del disco persistente. En Render va en ' +
         'render.yaml; comprueba en el panel que la sincronización la ha creado de verdad.',
     );
+  }
+
+  /*
+   * ═══ Y QUE ADEMÁS SE PUEDA ESCRIBIR AHÍ ═══
+   *
+   * Aquí ponía que comprobar la escritura no hacía falta porque «de eso ya se
+   * encarga el almacén, que cuenta sus fallos y los publica en el diagnóstico».
+   * Era falso para la mitad que más duele: el fallo de LECTURA no se contaba ni se
+   * publicaba —su `catch` era mudo—, así que una carpeta sin permisos daba
+   * `mesas: 0` y `almacen.fallos: 0` a la vez. Eso ya se arregló en `mesas.ts`, y
+   * aun así enterarse al arrancar es mejor que enterarse al guardar: para
+   * entonces hay una partida en curso que se pierde.
+   *
+   * Es exactamente lo que hace `UPLOADS_DIR` unas líneas más arriba, con el
+   * argumento escrito de que «arrancar escribiendo en un sitio que no es el que se
+   * pidió es peor que no arrancar». Aquí vale igual.
+   */
+  if (process.env.NODE_ENV === 'production') {
+    const carpeta = process.env.MESAS_DIR?.trim();
+    if (carpeta !== undefined && carpeta.length > 0) {
+      try {
+        fs.mkdirSync(carpeta, { recursive: true });
+        fs.accessSync(carpeta, fs.constants.W_OK);
+      } catch (error) {
+        throw new Error(
+          `No se puede escribir en \`MESAS_DIR\` («${carpeta}»). Ahí viven las partidas de arcade ` +
+            'en curso: sin esa carpeta se pierden todas al desplegar, y el síntoma es una mesa ' +
+            `que desaparece sin decir nada. Revisa el disco y los permisos. Causa: ${String(error)}`,
+        );
+      }
+    }
   }
 
   if (process.env.NODE_ENV === 'production' && !process.env.MONGODB_URI?.trim()) {

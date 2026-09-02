@@ -166,10 +166,17 @@ paso('El juicio contesta las nueve, y cada una la suya');
 
   /*
    * Y ESTE ES EL CASO QUE ESTE COMPROBADOR ENCONTRO, y que el juicio contestaba
-   * mal: `formulario` es generico DEL CONTRATO y esta app todavia no lo pinta. Con
-   * una sola lista de genericos salia como «sus pixeles viven en su binario», que
-   * manda a esperar algo que no va a pasar nunca. Lo que le pasa es lo contrario:
-   * llega con una version nueva de la app y el juego no toca nada.
+   * mal: un mueble que es generico DEL CONTRATO y que esta version de la app aun
+   * no pinta. Con una sola lista de genericos salia como «sus pixeles viven en su
+   * binario», que manda a esperar algo que no va a pasar nunca. Lo que le pasa es
+   * lo contrario: llega con una version nueva de la app y el juego no toca nada.
+   *
+   * EL BINARIO DE AQUI ES FABRICADO (`genericos: []`), y desde que la app pinta
+   * tambien los formularios eso importa: hoy NO hay ningun mueble del contrato sin
+   * pincel, asi que esta rama no la recorre ninguna tarjeta de nadie. Se prueba
+   * igual, porque el dia que el contrato estrene un quinto mueble la rama pasa a
+   * decidir de verdad y nadie va a volver a leerla. `formulario` se usa aqui como
+   * SUPLENTE, no como descripcion de lo que la app pinta.
    */
   const sinPincel = dondeSePinta(
     manifiesto({ id: 'de-fuera', mueble: 'formulario', publicaOpciones: true }),
@@ -184,18 +191,18 @@ paso('El juicio contesta las nueve, y cada una la suya');
   );
 
   /*
-   * ═══ LAS TRES QUE SIGUEN SE EJERCITAN CON UN BINARIO QUE NO EXISTE TODAVIA ═══
+   * ═══ LAS TRES QUE SIGUEN YA SI SE ALCANZAN, Y ANTES NO ═══
    *
-   * Y hay que decirlo en voz alta. Con el binario de HOY son inalcanzables: el
-   * unico mueble generico que esta app pinta es `tablero`, y un `tablero` sale por
-   * la rama de arriba antes de llegar aqui. O sea que estas tres ramas del juicio
-   * no las recorre ninguna tarjeta de ninguna pantalla de nadie.
+   * Aqui ponia que eran inalcanzables «con el binario de HOY», porque el unico
+   * mueble generico que la app pintaba era `tablero` y un tablero sale por la rama
+   * de arriba antes de llegar aqui. Ese texto se escribio como deuda —«el dia que
+   * esta app estrene el pintor generico de formularios»— y ese dia ya llego: la
+   * app da de alta `formulario` en `LOS_MUEBLES_GENERICOS`, porque no hacerlo
+   * dejaba un arcade de fuera jugable en el PC y no en el movil.
    *
-   * Se comprueban igual, y con un binario fabricado que pinta formularios, porque
-   * el dia que esta app estrene el pintor generico de formularios —que es una deuda
-   * escrita en `pintados.ts`— estas tres pasan a decidir de verdad y nadie va a
-   * volver a leerlas. Un comprobador que solo cubre lo alcanzable hoy es un
-   * comprobador que se queda corto justo cuando el codigo crece.
+   * Asi que estas tres deciden de verdad desde hoy, y el binario fabricado de
+   * abajo coincide con el real. Se deja fabricado a proposito: lo que se prueba es
+   * el JUICIO, y atarlo a la tabla verdadera lo volveria verde por reflejo.
    */
   const CON_FORMULARIOS = { ...BINARIO, genericos: ['formulario', 'tablero'] };
 

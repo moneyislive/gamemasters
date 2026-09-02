@@ -87,7 +87,7 @@ export interface EstadoDeLaPeonza {
   giro: number;
   /** Cuántas veces se ha empujado. Es suyo y no se publica en ninguna parte. */
   empujones: number;
-  /** Cuántos tics lleva. Para que la pantalla pueda decir algo si quiere. */
+  /** Cuántos tics lleva GIRANDO —los de la peonza parada no cuentan—. Para que la pantalla pueda decir algo si quiere. */
   tics: number;
 }
 

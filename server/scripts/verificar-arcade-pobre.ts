@@ -1099,7 +1099,7 @@ peajeDeclarado('`procedencia` es obligatoria: papeleo legal para un juego de pul
 peajeDeclarado('para correr en las dos sedes hacen falta DOS manifiestos: `sede` es del juego, no de la mesa');
 peajeDeclarado('el estado es opaco, así que el juego se convierte a su tipo en cada frontera con el árbitro');
 peajeDeclarado('nadie reparte tics: `tickHz` declara el ritmo y el bucle lo escribe quien hospeda');
-peajeDeclarado('el fin lo anota quien hospeda leyendo el estado: el árbitro no sabe que la partida acabó');
+peajeDeclarado('el fin lo declara el JUEGO y lo pregunta quien hospeda: el árbitro sigue sin saberlo');
 
 // ---------------------------------------------------------------------------
 

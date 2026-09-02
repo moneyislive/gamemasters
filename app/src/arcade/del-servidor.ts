@@ -173,11 +173,14 @@ export function dondeSePinta(
    * 4. ¿LO PINTA ESTA VERSIÓN? Y si no, es un «todavía no», que es otra cosa.
    *
    * El mueble está en el contrato y la plataforma es quien lo pinta, pero este
-   * binario aún no trae ese pincel. Hoy le pasa a `formulario`: la app no tiene
-   * pantalla genérica de formularios —`pintados.ts` lo deja fuera a sabiendas,
-   * porque a un formulario le falta qué pintar ENCIMA de los botones—. Llegará
-   * con una versión nueva y el juego no tiene que cambiar nada, que es justo lo
-   * contrario del caso de arriba.
+   * binario aún no trae ese pincel. Llegará con una versión nueva y el juego no
+   * tiene que cambiar nada, que es justo lo contrario del caso de arriba.
+   *
+   * HOY NO LE PASA A NINGUNO, y conviene decirlo porque durante un tiempo le pasó
+   * a `formulario` —y eso significaba que un arcade de fuera de formulario se
+   * jugaba en el PC y no aquí, que es la regla de la casa rota—. Esta rama se
+   * queda: el contrato tiene cuatro muebles y el día que entre un quinto, entra
+   * por aquí y con una frase que no culpa al juego.
    */
   if (!binario.genericos.includes(mueble)) {
     return {

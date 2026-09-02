@@ -20,12 +20,15 @@
  * ═══ LO QUE SIGUE SIENDO DEUDA, Y CONVIENE NO PERDERLO ═══
  *
  * `formulario` es un mueble GENÉRICO en el diseño: «los pinta la plataforma, y son
- * los únicos que un arcade de FUERA puede usar». Hoy no lo es del todo, porque el
- * juego que se pinta sale de una tabla y no de preguntarle al propio juego qué se
- * puede hacer. Esa función existe en el diseño, se llama `opciones()` y llega con
- * Riberas en la fase 4: es CLIENTE y no autoridad, la misma que el mueble usa para
- * pintar y el reductor para validar, de modo que la regla se escribe una vez.
- * Escribirla hoy la dejaría con la forma de los dos juegos que hay, que es
+ * los únicos que un arcade de FUERA puede usar». Y ya lo es: `opciones()` entró en
+ * el alta en la fase 5 —aquí ponía que llegaba «con Riberas en la fase 4», y no
+ * fue así: Riberas se la resolvió por dentro y el hueco del contrato tardó una
+ * fase más—, y desde entonces la plataforma le puede preguntar a cualquier arcade
+ * qué se puede hacer sin saber a qué se juega.
+ *
+ * LO QUE SIGUE SIENDO DEUDA es lo otro: un vocabulario declarado de FORMAS con el
+ * que pintar algo ENCIMA de los botones —un cronómetro, unas cartas, un
+ * marcador—. Escribirlo hoy lo dejaría con la forma de los juegos que hay, que es
  * exactamente el error que todo este motor existe para no repetir.
  */
 import { PintarEnElMueble } from '../../src/arcade/pintar';

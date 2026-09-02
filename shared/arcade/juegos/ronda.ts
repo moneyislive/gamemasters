@@ -933,9 +933,12 @@ export function loSecretoDeLaRonda(estado: EstadoDeLaRonda | undefined): unknown
  * ═══ POR QUÉ ESTO NO EXISTÍA, Y POR QUÉ ESO ERA UN AGUJERO Y NO UNA ELECCIÓN ═══
  *
  * `opciones()` es OPCIONAL en el alta a propósito: un juego que pinta su propia
- * pantalla —La Frente, El Arcade— no la necesita y no le falta. Pero La Ronda
- * declara `mueble: 'formulario'`, y un formulario SE PINTA A PARTIR DE ESTA
- * LISTA: sin ella no hay botones, y sin botones no hay juego. El resultado,
+ * pantalla —La Frente, El Arcade— no la necesita y no le falta. Pero La Ronda se
+ * pinta con un mueble GENÉRICO, y un mueble genérico saca los botones DE ESTA
+ * LISTA: sin ella no hay botones, y sin botones no hay juego. (Cuando esto se
+ * escribió decía `mueble: 'formulario'`; hoy su manifiesto dice `tablero`, y se
+ * movió justo por lo de abajo —un juego de bazas en el que no se ve la baza no
+ * es que se vea mal: no se puede jugar—.) El resultado,
  * medido antes de escribir esto, era que una partida repartida y en marcha daba
  * CERO opciones a los cuatro sentados y al espectador. La Ronda no es que
  * estuviera a medias en un cliente: no se podía jugar en ninguno.

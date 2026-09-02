@@ -52,6 +52,11 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { cargarSesionGuardada, servidorActual } from '../api';
+import {
+  loQueQuedaTrasElSondeo,
+  SIN_AVISO,
+} from '../../../shared/mecanicas/aviso-puesto';
+import type { AvisoPuesto } from '../../../shared/mecanicas/aviso-puesto';
 import type { MovimientoDeclarado } from '../../../shared/mecanicas/tablero-declarado';
 import type { ArcadeId } from '../../../shared/arcade';
 import { elSitioGuardado, guardarElSitio, olvidarElSitio } from './bolsillo';
@@ -149,9 +154,29 @@ export interface LaMesa {
    * único desde el que una mesa mal abierta se quedaba abierta para siempre.
    */
   tirar: () => void;
+  /**
+   * LO QUE HA IDO PASANDO, de lo más nuevo a lo más viejo.
+   *
+   * El servidor los manda CON la mesa —en el mismo viaje y a propósito: pedirlos
+   * aparte abre la ventana en la que el móvil se lleva la revisión nueva sin los
+   * avisos de esa revisión, y como pedirá los siguientes «desde» ahí, esos avisos
+   * no le llegarían nunca—. Este cliente los tiraba: un `as { mesa }` los
+   * descartaba en silencio, con lo que «Se acabó la partida» llegaba al PC y no
+   * llegaba jamás al móvil.
+   */
+  cronica: readonly AvisoDeMesa[];
 }
 
 /** La cabecera con la que un asiento demuestra que es él. Ver `routes/arcade.ts`. */
+/** Un renglón de lo que ha ido pasando en la mesa. Lo manda el canal con la mesa. */
+export interface AvisoDeMesa {
+  clave: string;
+  texto: string;
+}
+
+/** Lo que se recuerda de la crónica. Una mesa de días produce muchos avisos. */
+const TOPE_DE_CRONICA = 40;
+
 const CABECERA_DE_ASIENTO = 'x-asiento';
 
 /**
@@ -193,7 +218,40 @@ const salidasDeEstaEjecucion = new Set<string>();
 export function usarMesaDeArcade(arcade: ArcadeId): LaMesa {
   const [fase, ponerFase] = useState<FaseDeLaMesa>('fuera');
   const [mesa, ponerMesa] = useState<MesaVista | null>(null);
-  const [aviso, ponerAviso] = useState('');
+  /*
+   * EL AVISO LLEVA DE DÓNDE SALE, y no es adorno: el bucle de sondeo borraba
+   * este renglón en cada respuesta buena, o sea que se llevaba por delante el
+   * motivo del rechazo justo cuando el tablero cambia por la jugada de otro —el
+   * instante en el que más se parece a que la tuya sí entró—. La regla y el fallo
+   * medido están en `shared/mecanicas/aviso-puesto.ts`; el escritorio la tenía
+   * desde hace tiempo y este cliente no.
+   */
+  const [aviso, ponerAviso] = useState<AvisoPuesto>(SIN_AVISO);
+  const avisoDeLaRed = useCallback((texto: string) => {
+    ponerAviso({ texto, de: 'la-red' });
+  }, []);
+  const avisoDeTuJugada = useCallback((texto: string) => {
+    ponerAviso({ texto, de: 'tu-jugada' });
+  }, []);
+  const [cronica, ponerCronica] = useState<readonly AvisoDeMesa[]>([]);
+  /*
+   * Se descartan los repetidos consecutivos: el canal reparte por revisión y una
+   * respuesta puede traer dos veces el mismo aviso. Un renglón repetido se lee
+   * como que ha pasado dos veces.
+   */
+  const anotarLosAvisos = useCallback((nuevos: readonly AvisoDeMesa[]): void => {
+    if (nuevos.length === 0) return;
+    ponerCronica((antes) => {
+      const juntos = [...nuevos].reverse().concat(antes);
+      const limpios: AvisoDeMesa[] = [];
+      for (const a of juntos) {
+        const ultimo = limpios[limpios.length - 1];
+        if (ultimo !== undefined && ultimo.clave === a.clave && ultimo.texto === a.texto) continue;
+        limpios.push(a);
+      }
+      return limpios.slice(0, TOPE_DE_CRONICA);
+    });
+  }, []);
   const [quieto, ponerQuieto] = useState(false);
 
   /*
@@ -297,10 +355,10 @@ export function usarMesaDeArcade(arcade: ArcadeId): LaMesa {
         if (loNiegaElServidor) {
           await olvidarElSitio(arcade);
           if (!vivo.current) return;
-          ponerAviso('Ese asiento ya no vale. Abre una mesa o entra con un código.');
+          avisoDeLaRed('Ese asiento ya no vale. Abre una mesa o entra con un código.');
         } else {
           if (!vivo.current) return;
-          ponerAviso(
+          avisoDeLaRed(
             `No se ha podido volver a la mesa ${sitio.codigo}: el servidor contestó ` +
               `${String(r.status)}. El asiento sigue guardado.`,
           );
@@ -309,7 +367,7 @@ export function usarMesaDeArcade(arcade: ArcadeId): LaMesa {
       } catch (error) {
         /* Ni una excepción de red borra un asiento: ver el bloque de arriba. */
         if (!vivo.current) return;
-        ponerAviso(
+        avisoDeLaRed(
           `No se ha podido volver a la mesa ${sitio.codigo}: ${textoDelFallo(error)}. ` +
             'El asiento sigue guardado.',
         );
@@ -385,9 +443,11 @@ export function usarMesaDeArcade(arcade: ArcadeId): LaMesa {
            * reintentando» y el bucle volvía a preguntar cada dos segundos PARA
            * SIEMPRE, con el tablero viejo delante.
            *
-           * Aquí es peor que en el escritorio: este cliente no tiene botón de tirar
-           * la mesa, así que quien se quedaba dentro no tenía ninguna salida salvo
-           * cerrar la app.
+           * Aquí ponía que era peor que en el escritorio «porque este cliente no
+           * tiene botón de tirar la mesa». Ya lo tiene —y «Salir» también sacó
+           * siempre de ahí—, así que lo que queda es lo de verdad: un 404 en bucle
+           * es la mesa negada, y confundirlo con la red dejaba el tablero viejo
+           * delante para siempre.
            *
            * La regla del fichero —«un asiento solo se olvida si el servidor lo
            * NIEGA»— no se rompe: se cumple. Un 404 es exactamente el servidor
@@ -400,17 +460,29 @@ export function usarMesaDeArcade(arcade: ArcadeId): LaMesa {
             ponerMesa(null);
             ponerFase('fuera');
             void olvidarElSitio(arcade);
-            ponerAviso('Esa mesa ya no existe: la han tirado o ha caducado.');
+            avisoDeLaRed('Esa mesa ya no existe: la han tirado o ha caducado.');
             return;
           }
           if (!r.ok) throw new Error(`el servidor contestó ${String(r.status)}`);
-          const datos = (await r.json()) as { mesa: MesaVista };
+          /*
+           * `avisos` TAMBIÉN SE LEE, y hasta hoy este cliente los tiraba. El
+           * servidor los manda con la mesa —en el mismo viaje y a propósito— y
+           * este `as` los descartaba en silencio, con lo que «Se acabó la
+           * partida» llegaba al PC y no llegaba nunca al móvil.
+           */
+          const datos = (await r.json()) as { mesa: MesaVista; avisos?: AvisoDeMesa[] };
           if (parado) return;
           ponerMesa(datos.mesa);
-          ponerAviso('');
+          anotarLosAvisos(datos.avisos ?? []);
+          /*
+           * SE BORRA LO QUE PUSO LA RED, Y SOLO ESO. Que esta respuesta haya
+           * llegado es información nueva sobre la conexión y sobre nada más: no
+           * dice si tu último movimiento entró. Ver `aviso-puesto.ts`.
+           */
+          ponerAviso(loQueQuedaTrasElSondeo);
         } catch (error) {
           if (parado) return;
-          ponerAviso(`Se ha perdido la mesa: ${textoDelFallo(error)}. Reintentando.`);
+          avisoDeLaRed(`Se ha perdido la mesa: ${textoDelFallo(error)}. Reintentando.`);
           await esperar(ESPERA_TRAS_FALLO_MS);
         }
       }
@@ -474,10 +546,10 @@ export function usarMesaDeArcade(arcade: ArcadeId): LaMesa {
           }
           ponerMesa(datos.mesa);
           ponerFase('dentro');
-          ponerAviso('');
+          ponerAviso(SIN_AVISO);
         } catch (error) {
           ponerFase('fuera');
-          ponerAviso(`No se ha podido abrir la mesa: ${textoDelFallo(error)}`);
+          avisoDeLaRed(`No se ha podido abrir la mesa: ${textoDelFallo(error)}`);
         } finally {
           ponerQuieto(false);
         }
@@ -521,7 +593,7 @@ export function usarMesaDeArcade(arcade: ArcadeId): LaMesa {
                 llave.current = guardado.llave;
                 ponerMesa(loSuyo.mesa);
                 ponerFase('dentro');
-                ponerAviso('');
+                ponerAviso(SIN_AVISO);
                 return;
               }
             }
@@ -547,10 +619,10 @@ export function usarMesaDeArcade(arcade: ArcadeId): LaMesa {
           }
           ponerMesa(datos.mesa);
           ponerFase('dentro');
-          ponerAviso('');
+          ponerAviso(SIN_AVISO);
         } catch (error) {
           ponerFase('fuera');
-          ponerAviso(`No se ha podido entrar: ${textoDelFallo(error)}`);
+          avisoDeLaRed(`No se ha podido entrar: ${textoDelFallo(error)}`);
         } finally {
           ponerQuieto(false);
         }
@@ -637,7 +709,7 @@ export function usarMesaDeArcade(arcade: ArcadeId): LaMesa {
            */
           const loQueDijoElJuego = r.ok ? (datos.mesa?.motivo ?? '') : '';
           const seIgnoro = r.ok && datos.mesa !== undefined && datos.mesa.rev === rev;
-          ponerAviso(
+          avisoDeTuJugada(
             r.ok
               ? loQueDijoElJuego.length > 0
                 ? loQueDijoElJuego
@@ -647,7 +719,7 @@ export function usarMesaDeArcade(arcade: ArcadeId): LaMesa {
               : (datos.error ?? 'ese movimiento no se ha podido hacer'),
           );
         } catch (error) {
-          ponerAviso(`No ha salido el movimiento: ${textoDelFallo(error)}`);
+          avisoDeTuJugada(`No ha salido el movimiento: ${textoDelFallo(error)}`);
         } finally {
           ponerQuieto(false);
         }
@@ -666,7 +738,7 @@ export function usarMesaDeArcade(arcade: ArcadeId): LaMesa {
     codigo.current = null;
     llave.current = null;
     ponerMesa(null);
-    ponerAviso('');
+    ponerAviso(SIN_AVISO);
     ponerFase('fuera');
   }, [arcade]);
 
@@ -683,26 +755,50 @@ export function usarMesaDeArcade(arcade: ArcadeId): LaMesa {
     void (async () => {
       const donde = codigo.current;
       const mia = llave.current;
-      if (donde !== null && mia !== null) {
-        try {
-          await fetch(`${servidorActual()}/api/arcade/mesas/${donde}`, {
-            method: 'DELETE',
-            headers: { [CABECERA_DE_ASIENTO]: mia },
-          });
-        } catch {
-          /* Da igual por qué no se pudo: quien pulsa se va de todas formas. */
-        }
+      if (donde === null || mia === null) return;
+      let laMesaYaNoEsta = false;
+      let queDijo = '';
+      try {
+        const r = await fetch(`${servidorActual()}/api/arcade/mesas/${donde}`, {
+          method: 'DELETE',
+          headers: { [CABECERA_DE_ASIENTO]: mia },
+        });
+        /* Un 404 también cuenta: la mesa no está, que es lo que se venía a hacer. */
+        laMesaYaNoEsta = r.ok || r.status === 404;
+        if (!laMesaYaNoEsta) queDijo = `el servidor contestó ${String(r.status)}`;
+      } catch (error) {
+        queDijo = textoDelFallo(error);
+      }
+      if (!vivo.current) return;
+      /*
+       * ═══ SI NO SE HA TIRADO, NO SE TIRA LA LLAVE ═══
+       *
+       * La primera versión de esto olvidaba el sitio pasara lo que pasara. Con un
+       * 403 —llave caducada—, un 500 o el móvil sin cobertura, la mesa seguía
+       * viva CON TU ASIENTO DENTRO y acababas de tirar la única llave: teclear el
+       * código ya no te devuelve, porque con la partida empezada el servidor
+       * contesta 409. Expulsión definitiva de tu propia partida, por un fallo de
+       * red. Y «una mesa huérfana se barre sola» no consuela: una mesa con otros
+       * tres sentados no está huérfana.
+       */
+      if (!laMesaYaNoEsta) {
+        avisoDeTuJugada(`No se ha podido tirar la mesa: ${queDijo}. Tu asiento sigue ahí.`);
+        return;
       }
       codigo.current = null;
       llave.current = null;
       ponerMesa(null);
-      ponerAviso('');
+      ponerAviso(SIN_AVISO);
       ponerFase('fuera');
       await olvidarElSitio(arcade);
     })();
-  }, [arcade]);
+  }, [arcade, avisoDeTuJugada]);
 
-  return { fase, mesa, aviso, quieto, abrir, entrar, mover, salir, tirar };
+  /*
+   * Hacia fuera sigue siendo UNA CADENA. De dónde salió el renglón es cosa de
+   * este fichero: la pantalla lo pinta igual venga de donde venga.
+   */
+  return { fase, mesa, aviso: aviso.texto, cronica, quieto, abrir, entrar, mover, salir, tirar };
 }
 
 /** Lo que se le puede enseñar a alguien de un fallo, sin pila ni jerga. */

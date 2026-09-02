@@ -726,10 +726,21 @@ router.get('/arcade/mesas/:codigo/turno', contadorDeCodigos, async (req, res) =>
  * enumera por la que no cuenta. Mismo contador y misma credencial en las seis, a
  * proposito: compartir el recuento impide turnarse entre ellas.
  *
- * Medido: el limitador no devuelve 429 en estas puertas —no bloquea a quien no se
- * identifica, que dejaria fuera a una casa entera detras de la misma IP— sino que
- * FRENA. De 1 ms a 2,3 s en cuarenta intentos, o sea unos dos anos por conexion
- * para acertar uno de los 28,6 millones de codigos.
+ * Y AQUI HABIA UN NUMERO QUE NO ERA EL DEL ATAQUE. Ponia: «de 1 ms a 2,3 s en
+ * cuarenta intentos, o sea unos dos anos por conexion». Ese retardo sale de
+ * martillear EL MISMO codigo cuarenta veces, que no es lo que hace quien enumera:
+ * quien enumera prueba codigos DISTINTOS, y en el camino degradado la clave del
+ * contador es el propio codigo que se adivina, asi que cada intento estrena
+ * contador. Medido: 45 codigos inventados seguidos, peor espera 4 ms, cero 429.
+ *
+ * Lo que de verdad protege es el cubo por DIRECCION, que solo existe cuando se
+ * sabe de donde llega cada peticion —en Render, `PROXY_DE_CONFIANZA=plataforma`,
+ * y el arranque ahora se niega a levantar sin ella—. Y ese cubo se vaciaba con
+ * cualquier respuesta buena hasta que se arreglo el perdon del limitador: ver
+ * `puerta/limitador.ts`, donde esta el ataque escrito.
+ *
+ * Con las dos cosas puestas, enumerar cuesta 429 a los sesenta fallos por
+ * direccion y no se puede lavar acertando de vez en cuando.
  */
 router.post('/arcade/mesas/:codigo/movimientos', contadorDeCodigos, async (req, res) => {
   const codigo = String(req.params.codigo ?? '').toUpperCase();
@@ -880,7 +891,19 @@ router.post('/arcade/mesas/:codigo/cerrar', contadorDeCodigos, async (req, res) 
   const codigo = String(req.params.codigo ?? '').toUpperCase();
   const llave = llaveDe(req);
   try {
+    /*
+     * SE MIRA ANTES si ya estaba cerrada, porque `cerrar()` no hace nada sobre una
+     * mesa terminada y esta ruta anunciaba igualmente. Repetir la llamada apilaba
+     * un aviso más y soltaba TODOS los sondeos aparcados de la mesa: los otros
+     * móviles entraban en un ciclo cerrado de petición y respuesta —batería, datos
+     * y una vuelta por el candado en cada una— sin que pasara nada.
+     */
+    const antes = await mirar(codigo, llave);
     const mesa = await cerrar(codigo, llave);
+    if (antes.terminada) {
+      res.json({ mesa });
+      return;
+    }
     /*
      * `anunciar` y no `avisarCambio` a secas: es un suceso que la app celebra, y
      * además queda GUARDADO con su revisión, de modo que quien estuviera en
@@ -918,9 +941,20 @@ router.delete('/arcade/mesas/:codigo', contadorDeCodigos, async (req, res) => {
   const llave = llaveDe(req);
   try {
     /*
-     * Se comprueba que quien lo pide está sentado ANTES de borrar nada. Sin esto,
-     * cualquiera que conociera un código —y un código se dicta en voz alta en un
-     * bar— podría tirar la partida de otros cuatro.
+     * Se comprueba que quien lo pide está sentado ANTES de borrar nada, Y ESO DA
+     * MENOS DE LO QUE PARECE: sentarse sólo pide el código, así que quien lo tenga
+     * puede pedir silla y después tirar la mesa. La comprobación no cierra esa
+     * puerta; le añade una petición.
+     *
+     * Lo que SÍ garantiza es lo otro, y no es poco: que nadie tire una mesa
+     * EMPEZADA sin haber jugado en ella. Desde la guarda de «partida empezada» no
+     * se sienta nadie con el juego en marcha, o sea que la ventana en la que un
+     * curioso con el código puede hacer daño es exactamente la de reunirse —donde
+     * todavía no hay partida que perder—.
+     *
+     * Y no se restringe a quien abrió la mesa, aunque el motor lo sepa
+     * (`m.sillas[0]`): el caso de uso escrito de este botón es «alguien se ha ido y
+     * la partida no puede seguir», y el que se va puede ser justo el que abrió.
      */
     const antes = await mirar(codigo, llave);
     if (antes.yo === null) {
@@ -1110,7 +1144,34 @@ router.post('/arcade/partidas', contadorDeInicios, (req, res) => {
  * arregla nada. Un 409 es una partida que no se acepta —la cifra no sale, el
  * reloj no acompaña, el aviso ha caducado—, y ahí lo que toca es empezar otra.
  */
-router.post('/arcade/records', (req, res) => {
+/**
+ * Y LA DE SUBIR RÉCORDS, QUE ERA LA ÚNICA SIN CONTADOR.
+ *
+ * ═══ POR QUÉ IMPORTA MÁS QUE LAS OTRAS ═══
+ *
+ * Porque el trabajo caro va ANTES de saber si el cuerpo vale para algo: leer una
+ * repetición canoniza la carga de CADA entrada, y la medida está tomada en la
+ * cabecera del presupuesto —240 kB anidados, 167,7 ms de hilo bloqueado—. Sin
+ * credencial, sin código y sin límite de tasa, unas pocas conexiones dejaban el
+ * proceso quieto. Y las veladas viven en el mismo proceso.
+ *
+ * Se cuentan TODAS —`esFallo: () => true`— y no sólo los rechazos, por lo mismo
+ * que en el inicio de partida: aquí no hay nada que adivinar, así que lo que hay
+ * que acotar es el VOLUMEN. Sesenta por conexión en diez minutos es una partida
+ * cada diez segundos sin parar: más de lo que sube nadie jugando de verdad.
+ */
+const contadorDeRecords = limitarIntentos({
+  nombre: 'récord de arcade',
+  credencial: (req) => {
+    const cuerpo = req.body as { arcade?: unknown } | undefined;
+    return typeof cuerpo?.arcade === 'string' ? cuerpo.arcade : 'sin-arcade';
+  },
+  porCredencial: 60,
+  porIp: 60,
+  esFallo: () => true,
+});
+
+router.post('/arcade/records', contadorDeRecords, (req, res) => {
   const veredicto = registrarRecord(req.body);
   if (veredicto.acepta) {
     res.json({

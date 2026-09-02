@@ -37,13 +37,15 @@ import { SALA } from '../../src/arcade/muebles';
  * saldría nada —sin error y sin aviso— hasta que alguien abriera la Sala. Se paga
  * una línea y a cambio el compilador no deja estrenarse a medias.
  *
- * TRES DE LOS CUATRO TODAVÍA NO SE PINTAN, y sus rutas lo dicen con todas las
- * letras en vez de quedarse en blanco. No son un catálogo fingido: hoy no se puede
- * llegar a ninguna, porque la ruta se calcula desde el manifiesto del juego y no
- * hay ningún arcade instalado que declare esos muebles. Son el equivalente de
- * `papiro` y `sellado` en el otro motor —existen en el binario y solo se pintan
- * donde un manifiesto las pide— y lo que compran es que el día que llegue Riberas
- * el compilador obligue a escribir el tablero ANTES de dejar instalar el juego.
+ * LOS CUATRO SE PINTAN YA, y aquí ponía que tres no. Lo escribía cuando la fase 1
+ * entregaba `formulario` y las otras tres rutas montaban una pantalla de «todavía
+ * no»: `tablero` lo estrenó Riberas, `escena` La Peonza, `lienzo` El Arcade, y la
+ * pantalla de «pendiente» ya no existe. Las cuatro rutas son hoy la misma línea
+ * sobre `PintarEnElMueble`.
+ *
+ * Lo que compra el `Record` completo sigue siendo lo mismo y por eso se queda: el
+ * día que el contrato estrene un quinto mueble, esto no compila hasta que tenga
+ * su ruta —que es el equivalente de `papiro` y `sellado` en el otro motor—.
  */
 const MUEBLES: Record<MuebleDeArcade, true> = {
   formulario: true,

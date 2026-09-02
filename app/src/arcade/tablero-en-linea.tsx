@@ -46,7 +46,7 @@ import {
 import type { MovimientoDeclarado } from '../../../shared/mecanicas/tablero-declarado';
 import { turnoDeLaVista } from '../../../shared/mecanicas/turno-declarado';
 import { usarMesaDeArcade } from './mesa';
-import type { OpcionDeMesa } from './mesa';
+import type { OpcionDeMesa, AvisoDeMesa} from './mesa';
 import { cuantoLleva, cuantoQueda } from './relojes';
 import { SALA } from './muebles';
 import { Retablo } from './retablo';
@@ -209,6 +209,10 @@ export function ElTableroEnLinea(): JSX.Element {
               key={p.rotulo}
               style={[estilos.plazo, i === plazo ? estilos.plazoElegido : null]}
               onPress={() => ponerPlazo(i)}
+              accessibilityRole="radio"
+              accessibilityState={{ selected: i === plazo }}
+              accessibilityLabel={`Plazo por turno: ${p.rotulo}`}
+              accessibilityHint={p.ayuda}
             >
               <Text style={i === plazo ? estilos.plazoRotuloElegido : estilos.plazoRotulo}>
                 {p.rotulo}
@@ -221,6 +225,9 @@ export function ElTableroEnLinea(): JSX.Element {
           style={estilos.boton}
           disabled={mesa.quieto || nombre.trim().length === 0}
           onPress={() => mesa.abrir(nombre.trim(), PLAZOS[plazo]?.segundos)}
+          accessibilityRole="button"
+          accessibilityLabel="Abrir una mesa"
+          accessibilityState={{ disabled: mesa.quieto || nombre.trim().length === 0 }}
         >
           <Text style={estilos.botonRotulo}>Abrir una mesa</Text>
         </Pressable>
@@ -238,6 +245,11 @@ export function ElTableroEnLinea(): JSX.Element {
           style={estilos.boton}
           disabled={mesa.quieto || nombre.trim().length === 0 || codigo.trim().length === 0}
           onPress={() => mesa.entrar(codigo, nombre.trim())}
+          accessibilityRole="button"
+          accessibilityLabel="Sentarse en la mesa de ese código"
+          accessibilityState={{
+            disabled: mesa.quieto || nombre.trim().length === 0 || codigo.trim().length === 0,
+          }}
         >
           <Text style={estilos.botonRotulo}>Sentarse</Text>
         </Pressable>
@@ -279,7 +291,12 @@ export function ElTableroEnLinea(): JSX.Element {
           <View style={estilos.barra}>
             <View style={estilos.barraFila}>
               <Text style={estilos.codigo}>Mesa {mesa.mesa.codigo}</Text>
-              <Pressable onPress={mesa.salir} style={estilos.salir}>
+              <Pressable
+                onPress={mesa.salir}
+                style={estilos.salir}
+                accessibilityRole="button"
+                accessibilityLabel="Salir de esta pantalla sin dejar la mesa"
+              >
                 <Text style={estilos.salirRotulo}>Salir</Text>
               </Pressable>
               <BotonTirar tirar={mesa.tirar} />
@@ -293,6 +310,7 @@ export function ElTableroEnLinea(): JSX.Element {
           </View>
           {mesa.aviso.length > 0 ? <Text style={estilos.fallo}>{mesa.aviso}</Text> : null}
           <LasOpciones opciones={opciones} alTocar={mesa.mover} quieto={mesa.quieto} />
+          <LaCronica cronica={mesa.cronica} />
         </View>
       );
     }
@@ -304,7 +322,12 @@ export function ElTableroEnLinea(): JSX.Element {
           que no hay nada que pintar aquí. Suele significar que esta versión de la app es más vieja
           que el servidor.
         </Text>
-        <Pressable style={estilos.boton} onPress={mesa.salir}>
+        <Pressable
+          style={estilos.boton}
+          onPress={mesa.salir}
+          accessibilityRole="button"
+          accessibilityLabel="Salir de la mesa"
+        >
           <Text style={estilos.botonRotulo}>Salir de la mesa</Text>
         </Pressable>
       </View>
@@ -328,7 +351,12 @@ export function ElTableroEnLinea(): JSX.Element {
             asiento sigue siendo tuyo y se recupera volviendo a entrar con el
             código—, sólo cierra esta pantalla.
           */}
-          <Pressable onPress={mesa.salir} style={estilos.salir}>
+          <Pressable
+                onPress={mesa.salir}
+                style={estilos.salir}
+                accessibilityRole="button"
+                accessibilityLabel="Salir de esta pantalla sin dejar la mesa"
+              >
             <Text style={estilos.salirRotulo}>Salir</Text>
           </Pressable>
           <BotonTirar tirar={mesa.tirar} />
@@ -376,6 +404,31 @@ export function ElTableroEnLinea(): JSX.Element {
       {sueltas.length > 0 ? (
         <LasOpciones opciones={sueltas} alTocar={mesa.mover} quieto={mesa.quieto} />
       ) : null}
+      <LaCronica cronica={mesa.cronica} />
+    </View>
+  );
+}
+
+/**
+ * LO QUE HA IDO PASANDO, y hasta hoy no se veía en el móvil.
+ *
+ * El servidor manda los avisos del canal PEGADOS a la mesa, en el mismo viaje.
+ * Este cliente los descartaba con un `as { mesa }`, así que «Se acabó la
+ * partida» llegaba al PC y no llegaba nunca aquí —y el comentario del servidor
+ * que lo manda decía, literalmente, que es «un suceso que la app celebra»—.
+ *
+ * Se enseñan los tres últimos y no los cuarenta: en una pantalla de móvil la
+ * crónica entera se comería el tablero, que es lo que se ha venido a mirar.
+ */
+function LaCronica({ cronica }: { cronica: readonly AvisoDeMesa[] }): JSX.Element | null {
+  if (cronica.length === 0) return null;
+  return (
+    <View style={estilos.cronica}>
+      {cronica.slice(0, 3).map((a, i) => (
+        <Text key={`${String(i)}:${a.clave}`} style={estilos.cronicaRenglon}>
+          {a.texto}
+        </Text>
+      ))}
     </View>
   );
 }
@@ -453,6 +506,16 @@ function LasOpciones({
           onPress={() => {
             alTocar({ tipo: o.tipo, carga: o.carga });
           }}
+          /*
+           * EL RÓTULO ES EL DEL JUEGO, tal cual. Este mueble no sabe a qué se
+           * juega, así que no puede inventarse una etiqueta mejor —y en el
+           * escritorio estos mismos botones son `<button>` de verdad, o sea que
+           * con lector de pantalla se podía jugar desde el PC y no desde el móvil.
+           */
+          accessibilityRole="button"
+          accessibilityLabel={o.rotulo}
+          accessibilityHint={o.ayuda.length > 0 ? o.ayuda : undefined}
+          accessibilityState={{ disabled: quieto }}
         >
           <Text style={estilos.opcionRotulo}>{o.rotulo}</Text>
           {o.ayuda.length > 0 ? <Text style={estilos.opcionAyuda}>{o.ayuda}</Text> : null}
@@ -477,7 +540,23 @@ function LineaDelTurno({
   mesa: { terminada: boolean; venceEn: number | null; turnoDesde: number; yo: string | null; vista: unknown };
   nombres: Map<string, string>;
 }): JSX.Element | null {
-  if (mesa.terminada) return null;
+  /*
+   * SE DICE QUE HA TERMINADO, en vez de apagar la línea y no poner nada.
+   *
+   * Esto devolvía `null` y `terminada` no se pintaba en ningún otro sitio de la
+   * app, o sea que al acabar una partida el móvil se quedaba con el tablero
+   * quieto y sin una palabra. Se notaba poco porque hasta hace nada NINGUNA mesa
+   * se cerraba jamás; en cuanto empezaron a cerrarse, el silencio pasó a ser lo
+   * normal. Quién ganó lo dice el juego en el `aviso` de su tablero: aquí sólo
+   * se dice que se acabó, que es lo único que esta capa sabe.
+   */
+  if (mesa.terminada) {
+    return (
+      <Text style={estilos.terminada} accessibilityRole="text">
+        La partida ha terminado.
+      </Text>
+    );
+  }
 
   const turno = turnoDeLaVista(mesa.vista);
   if (!turno.declarado) return null;
@@ -541,7 +620,11 @@ const estilos = StyleSheet.create({
     paddingHorizontal: 14,
     fontSize: 16,
   },
+  /* El mínimo de dedo de 44, que este fichero exige en otros tres sitios. */
   boton: {
+    /* El mínimo de dedo de 44, que este fichero ya exige en otros tres estilos. */
+    minHeight: 44,
+    justifyContent: 'center',
     backgroundColor: SALA.panel,
     borderColor: SALA.neon,
     borderWidth: 1,
@@ -583,6 +666,9 @@ const estilos = StyleSheet.create({
   plazoRotuloElegido: { color: SALA.palabra, fontSize: 13, fontWeight: '800' },
   fallo: { color: SALA.fallo, fontSize: 13, paddingHorizontal: 16, textAlign: 'center' },
   opciones: { padding: 16, gap: 10 },
+  terminada: { color: SALA.neon, fontSize: 14, fontWeight: '700', marginTop: 6 },
+  cronica: { paddingHorizontal: 16, paddingBottom: 12, gap: 2 },
+  cronicaRenglon: { color: SALA.neonTenue, fontSize: 12 },
   /* 44 de alto: el mismo mínimo de dedo que el retablo aplica a sus figuras. */
   opcion: {
     minHeight: 44,

@@ -170,6 +170,24 @@ export const LOS_QUE_PINTA: Record<ArcadeId, ComponentType> = {
  */
 export const LOS_MUEBLES_GENERICOS: Partial<Record<MuebleDeArcade, ComponentType>> = {
   tablero: ElTableroEnLinea,
+  /*
+   * ═══ Y `formulario`, QUE ESTABA FUERA CON UNA RAZÓN YA CADUCADA ═══
+   *
+   * Aquí ponía que un formulario se queda fuera porque «le falta qué pintar ENCIMA
+   * de los botones» —un cronómetro, unas cartas, un marcador— y que escribir ese
+   * vocabulario con un solo inquilino lo dejaría con su forma. El argumento sigue
+   * siendo bueno PARA EL VOCABULARIO, y sigue sin escribirse. Lo que no era bueno
+   * es la consecuencia: el cliente de escritorio SÍ pinta un formulario genérico
+   * —un botón por opción y nada más—, así que un arcade de FUERA con
+   * `mueble: 'formulario'` se podía jugar en el PC y no en el móvil.
+   *
+   * Eso rompe la regla que manda en esta casa: ningún juego se juega sólo desde
+   * un PC. Y el pincel ya estaba escrito: la rama de `ElTableroEnLinea` para una
+   * vista SIN tablero pinta el código, los asientos, de quién es el turno, la
+   * crónica y un botón por opción —o sea, más de lo que pinta el del escritorio—.
+   * Faltaba darlo de alta, que es esta línea.
+   */
+  formulario: ElTableroEnLinea,
 };
 
 /**

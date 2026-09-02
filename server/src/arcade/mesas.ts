@@ -228,6 +228,7 @@ import {
 } from './presupuesto';
 import { marcarPresencia, olvidarPresencia, senalEnMemoria } from '../mecanicas/presencia';
 import {
+  hayFinal,
   hayOpciones,
   manifiestoDeArcade,
   necesitaMesa,
@@ -731,12 +732,36 @@ const almacenEnFichero: AlmacenDeMesas = {
     let nombres: string[];
     try {
       nombres = fs.readdirSync(CARPETA).filter((n) => n.endsWith('.json'));
-    } catch {
+    } catch (error) {
       /*
-       * No existe todavía. Se parte de vacío y no se lanza: un servidor que no
-       * arranca porque no hay carpeta de mesas deja fuera también a las veladas,
-       * que no tienen nada que ver.
+       * ═══ «NO EXISTE» Y «NO PUEDO» NO SON LO MISMO, Y AQUÍ LO ERAN ═══
+       *
+       * Un `catch` mudo con el comentario «no existe todavía» encima. Y el caso que
+       * de verdad muerde es el otro, el que la cabecera de este fichero ya
+       * describe: una VPS con `ProtectSystem=strict` y `MESAS_DIR` fuera de
+       * `ReadWritePaths` da `EACCES` aquí. Con esto se devolvía `[]` en silencio,
+       * TODAS las partidas en curso desaparecían sin una línea en el registro, y
+       * el diagnóstico publicaba `mesas: 0` junto a `almacen.fallos: 0` —que es,
+       * con las palabras de este mismo fichero, la combinación que no le deja a
+       * nadie ni empezar a mirar—.
+       *
+       * `ENOENT` sigue siendo el caso normal y sigue sin decir nada: la carpeta se
+       * crea al guardar la primera mesa. Cualquier otra cosa SE DICE, y en voz
+       * alta, nombrando la variable —porque el arreglo siempre está ahí—.
+       *
+       * Y NO SE LANZA, que era y sigue siendo lo correcto: un servidor que no
+       * arranca por la carpeta de las mesas deja fuera también a las veladas, que
+       * no tienen nada que ver.
        */
+      const codigo = (error as { code?: string } | null)?.code;
+      if (codigo !== 'ENOENT') {
+        console.error(
+          `[arcade] NO SE PUEDE LEER LA CARPETA DE LAS MESAS «${CARPETA}» (${codigo ?? 'sin código'}). ` +
+            'El servidor arranca SIN NINGUNA partida recuperada, y las que hubiera guardadas siguen ' +
+            'en disco. Revisa `MESAS_DIR` y los permisos de esa ruta:',
+          error,
+        );
+      }
       return [];
     }
 
@@ -810,6 +835,43 @@ const almacenEnFichero: AlmacenDeMesas = {
 let almacen: AlmacenDeMesas = almacenEnFichero;
 
 /** Cambia el almacén. Para las pruebas, y para el día que haya una base detrás. */
+/**
+ * ═══ A QUIÉN SE LE AVISA CUANDO UNA MESA SE CIERRA SOLA ═══
+ *
+ * Se inyecta, como el almacén, y por el mismo motivo: este fichero no importa el
+ * canal a propósito —ver la cabecera— y aun así el hecho «esta partida acaba de
+ * terminar» tiene que llegar a quien esté mirando.
+ *
+ * El agujero que tapa: «Se acabó la partida» sólo se anunciaba desde
+ * `POST /cerrar`, que no pulsa ningún cliente. Cuando las mesas empezaron a
+ * cerrarse solas al acabar, ese aviso dejó de salir por ningún sitio: la partida
+ * terminaba y el único rastro era que el tablero se quedaba quieto.
+ */
+let alCerrarseUnaMesa: ((codigo: string, rev: number) => void) | null = null;
+
+/** Lo llama quien levanta el proceso, junto a `ponerCanal`. */
+export function cuandoSeCierreUnaMesa(avisar: (codigo: string, rev: number) => void): void {
+  alCerrarseUnaMesa = avisar;
+}
+
+/**
+ * ═══ Y A QUIÉN SE LE DICE QUE UNA MESA HA DESAPARECIDO ═══
+ *
+ * La fuga que tapa: el barrido de las viejas borra la mesa y su fichero y NO
+ * avisaba al canal, que no puede —este fichero no lo importa—. `olvidar()` sólo
+ * lo llamaban la apertura fallida y el `DELETE`, así que la entrada de esa mesa
+ * en el mapa de avisos del concentrador se quedaba para siempre. Es exactamente
+ * lo que la cabecera del canal dice que `olvidar` existe para no tener: «mapas de
+ * ámbito de módulo que crecen sin techo hasta que Render mata la instancia. No es
+ * una hipótesis: es aritmética».
+ */
+let alOlvidarseUnaMesa: ((codigo: string) => void) | null = null;
+
+/** Lo llama quien levanta el proceso, junto a `ponerCanal`. */
+export function cuandoSeOlvideUnaMesa(avisar: (codigo: string) => void): void {
+  alOlvidarseUnaMesa = avisar;
+}
+
 export function ponerAlmacenDeMesas(otro: AlmacenDeMesas): void {
   almacen = otro;
   cargadas = false;
@@ -856,6 +918,25 @@ function cargar(): void {
    */
   let recuperadas = 0;
   for (const m of almacen.leer()) {
+    /*
+     * ═══ Y LO QUE SE RECUPERA YA ACABADO SE CIERRA AQUÍ ═══
+     *
+     * Las otras dos puertas —`mover` y el tic— sólo se cruzan cuando el estado
+     * CAMBIA, así que una partida que terminó y no quedó marcada no se cierra por
+     * ninguna de las dos: el reductor rechaza todo movimiento sobre una partida
+     * acabada —luego no hay cambio— y el tic devuelve el mismo estado. Se quedaba
+     * abierta PARA SIEMPRE y rearmando la cuenta atrás en cada mirada, que es
+     * exactamente el síntoma que todo esto vino a matar.
+     *
+     * Y no es hipotético: son todas las mesas guardadas por un servidor anterior
+     * a este cambio, y las que se cerraron en memoria con el almacén caído.
+     *
+     * Va en `cargar` y no en el `leer` del almacén de ficheros a propósito: por
+     * aquí pasan LOS DOS almacenes, así que también se puede ejercitar con uno
+     * de mentira. Y es el sitio barato: una vez por mesa al recuperarla, no una
+     * por lectura.
+     */
+    cerrarSiSeAcabo(m, false);
     mesas.set(m.codigo, m);
     recuperadas++;
   }
@@ -946,6 +1027,14 @@ function barrerLasViejas(ahora: number): void {
     void almacen.borrar(codigo).catch((error: unknown) => {
       console.error(`[arcade] No se ha podido borrar la mesa vieja ${codigo}:`, error);
     });
+    /* Y que el canal se olvide también de ella. Ver `cuandoSeOlvideUnaMesa`. */
+    if (alOlvidarseUnaMesa !== null) {
+      try {
+        alOlvidarseUnaMesa(codigo);
+      } catch (error) {
+        console.error(`[arcade] No se ha podido olvidar en el canal la mesa ${codigo}:`, error);
+      }
+    }
   }
 }
 
@@ -1494,7 +1583,8 @@ const TICS_DE_GOLPE = 8;
  *
  * Y hasta hoy no lo decía NADIE. El árbitro documenta desde el primer día que
  * «quien hospeda llama a `cerrarMesa` cuando el estado del juego dice que se
- * acabó», los tres juegos de servidor exportan su `seAcabo`… y el único que lo
+ * acabó», los DOS juegos de servidor —La Ronda y Riberas; el tercero que exporta
+ * `seAcabo` es El Arcade, que es de aparato— lo tenían escrito… y el único que lo
  * llamaba era el motor del aparato. En el servidor, `cerrarMesa` sólo se
  * ejecutaba desde `POST /cerrar`, que no llama ningún cliente. O sea que NINGUNA
  * mesa se cerraba jamás: la partida acabada seguía pintando su cuenta atrás, el
@@ -1509,13 +1599,70 @@ const TICS_DE_GOLPE = 8;
  * reductor. Sin apagarlo aquí, una partida acabada seguía enseñando «quedan
  * veinticuatro horas» para siempre. Una mesa cerrada no espera a nadie.
  *
+ * POR ESO VA LA ÚLTIMA de las dos puertas y no en medio: la primera versión de
+ * esto apagaba el plazo y tres líneas después `if (otroTurno)` lo volvía a armar,
+ * y así se guardaba. No se veía porque los dos clientes miran `terminada` antes
+ * de pintar el reloj —o sea que el síntoma estaba tapado y el dato guardado
+ * mentía—, y la comprobación que se escribió sólo cubría el camino del tic, que
+ * era justo el que funcionaba.
+ *
+ * ═══ Y PASA POR LA BÁSCULA, COMO TODO LO QUE ESCRIBE EL JUEGO ═══
+ *
+ * `seAcabo` es código de un arcade, y el motivo escrito para meterlo en el alta
+ * es que lo pueda declarar uno de FUERA. Sin envolverlo era la única puerta del
+ * motor que ejecuta código ajeno sin presupuesto y sin red: medido, un `seAcabo`
+ * que revienta tumbaba la LECTURA entera —500 en una mesa que no se podía ni
+ * ver— y, por la puerta de `mover`, dejaba el movimiento aplicado en memoria y
+ * sin guardar, porque `guardar()` viene después.
+ *
+ * Y el fallo se DICE. Un `catch` mudo aquí sería peor que el de al lado: una mesa
+ * que no se cierra nunca es exactamente el fallo que esta función existe para
+ * matar, y en silencio no se distingue de un juego que aún no ha terminado.
+ *
  * Devuelve si ha cerrado, para que quien llama sepa que hay algo que guardar.
  */
-function cerrarSiSeAcabo(m: MesaEnCurso): boolean {
+function cerrarSiSeAcabo(m: MesaEnCurso, seAvisa = true): boolean {
   if (m.mesa.terminada) return false;
-  if (!seAcaboLaPartida(m.mesa.arcade, m.mesa.estado)) return false;
+  /*
+   * El atajo va PRIMERO y hace dos cosas: se ahorra la báscula en los arcades que
+   * no declaran final —que es el caso normal— y, sobre todo, no grita cuando la
+   * mesa es de un arcade que esta instancia no tiene instalado. Al recuperar del
+   * disco eso pasa de verdad: un reparto distinto deja mesas de juegos ausentes.
+   */
+  if (!hayFinal(m.mesa.arcade)) return false;
+  let seAcabo: boolean;
+  try {
+    seAcabo = conPresupuesto(m.mesa.arcade, 'arcade:se-acabo', () =>
+      seAcaboLaPartida(m.mesa.arcade, m.mesa.estado),
+    );
+  } catch (error) {
+    if (!(error instanceof ArcadeFueraDePresupuesto)) {
+      console.error(
+        `[arcade] El «seAcabo» de «${m.mesa.arcade}» ha fallado en la mesa ${m.codigo}. ` +
+          'La mesa se queda ABIERTA, que es lo único seguro que se puede hacer sin su respuesta:',
+        error,
+      );
+    }
+    return false;
+  }
+  if (!seAcabo) return false;
   m.mesa = cerrarMesa(m.mesa);
   m.venceEn = null;
+  /*
+   * Y SE DICE. `seAvisa` es falso sólo al recuperar del almacén: anunciar ahí
+   * sería contarle «se acabó la partida» a quien abra la app después de un
+   * despliegue, de una partida que terminó hace tres días.
+   *
+   * Envuelto, porque un oyente no puede tumbar un movimiento que ya entró: para
+   * cuando se llega aquí el estado está cambiado y aún falta guardarlo.
+   */
+  if (seAvisa && alCerrarseUnaMesa !== null) {
+    try {
+      alCerrarseUnaMesa(m.codigo, m.mesa.rev);
+    } catch (error) {
+      console.error(`[arcade] No se ha podido anunciar el cierre de la mesa ${m.codigo}:`, error);
+    }
+  }
   return true;
 }
 
@@ -2106,13 +2253,16 @@ export async function mover(
     /*
      * LA MESA RECUERDA QUE YA EMPEZO. Va aqui, en `mover` y dentro de `cambio`,
      * porque el hecho que interesa es exacto: UN ASIENTO mando algo y el estado
-     * cambio. No vale ponerlo en el tic —el tic de La Ronda reparte solo, y una
-     * mesa a la que nadie ha llegado aun se cerraria sola—. Ver `Mesa.empezada`,
-     * donde esta el porque de que tampoco valga mirar el estado ni el diario.
+     * cambio. No vale ponerlo en el tic: el tic de La Ronda CONSTRUYE el estado
+     * inicial —medido: cuatro plazos vencidos seguidos dejan `momento: reuniendo`
+     * y el estado ya creado—, así que con esa regla una mesa a la que aún no ha
+     * llegado nadie se cerraría LA PUERTA a sí misma: nadie podría sentarse.
+     * (Cerrar la mesa es otra cosa en este fichero: es `terminada`.)
+     * Ver `Mesa.empezada`, donde está el porqué de que tampoco valga mirar el
+     * estado ni el diario.
      */
     m.mesa = { ...despues, empezada: true };
     m.ultimoToqueEn = Date.now();
-    cerrarSiSeAcabo(m);
     /*
      * LAS DOS, JUNTAS Y CON LA MISMA CONDICIÓN, que es lo que ya decía esta nota y
      * ahora es verdad: `venceEn` dice hasta cuándo hay tiempo y `turnoDesde` desde
@@ -2127,6 +2277,12 @@ export async function mover(
       m.turnoDesde = m.ultimoToqueEn;
     }
     /*
+     * Y AHORA, con el plazo ya reprogramado, se mira si se acabó: si se acabó, lo
+     * apaga. Al revés —que es como estaba— lo apagaba y `otroTurno` lo volvía a
+     * encender. Ver `cerrarSiSeAcabo`.
+     */
+    cerrarSiSeAcabo(m);
+    /*
      * Y AQUÍ NO SE VUELVE A PESAR. Había un `medirTamano(...)` en esta línea que
      * serializaba el estado ENTERO por segunda vez en el mismo movimiento —
      * `pesarElEstado`, unas líneas arriba, ya lo había serializado, anotado el
@@ -2140,19 +2296,23 @@ export async function mover(
 }
 
 /**
- * CIERRA LA MESA. Lo pide quien está sentado, cuando el juego dice que se acabó.
+ * CIERRA LA MESA A MANO. Lo pide quien está sentado.
  *
- * ═══ POR QUÉ NO LO DECIDE LA AUTORIDAD SOLA ═══
+ * ═══ YA NO ES LA ÚNICA FORMA DE QUE UNA MESA SE CIERRE ═══
  *
- * Porque «fin como función del estado» es uno de los conceptos que el diseño
- * aplaza hasta que llegue un juego que lo pida, y aplazarlo tiene un motivo: en
- * cuanto la plataforma sepa preguntarle a un juego si ha terminado, tendrá una
- * opinión sobre qué es terminar —si hay un ganador, si son varios, si se puede
- * seguir jugando después—. El estado es opaco y este fichero no puede mirarlo.
+ * Aquí ponía que cerrar tenía que ser «un acto de quien está en la mesa» porque
+ * «fin como función del estado» estaba aplazado y «el estado es opaco y este
+ * fichero no puede mirarlo». Lo segundo sigue siendo verdad y lo primero ya no:
+ * el motor no MIRA el estado, se lo PREGUNTA al juego —`cerrarSiSeAcabo`, unas
+ * líneas arriba—, que es otra cosa y no le da al motor ninguna opinión sobre qué
+ * es terminar. Quién ganó lo sigue diciendo el juego y nadie más.
  *
- * Así que cerrar es un acto de quien está en la mesa. Es el peaje que esta fase
- * paga, y está pagado a la vista: `verify:arcade-pobre` ya lo lleva anotado como
- * «el fin lo anota quien hospeda leyendo el estado».
+ * Y hacía falta: el peaje se pagó durante tres fases con una mesa que no se
+ * cerraba jamás, porque ningún cliente pulsa esto.
+ *
+ * Esta puerta se queda igualmente, y no por compatibilidad: es la única forma de
+ * acabar una partida que el juego NO da por acabada —alguien se fue y los demás
+ * no quieren seguir—.
  *
  * Una mesa cerrada NO se borra: se marca `terminada` y se queda hasta que el
  * barrido se la lleve. Borrarla en el acto dejaría a los otros tres con una
@@ -2337,7 +2497,28 @@ function loQueSePuedeHacer(arcade: ArcadeId, vista: unknown, yo: AsientoId | nul
   if (!hayOpciones(arcade)) return [];
   try {
     return conPresupuesto(arcade, 'arcade:opciones', () => opcionesDeArcade(arcade, vista, yo));
-  } catch {
+  } catch (error) {
+    /*
+     * ═══ SE TRAGA EL FALLO, PERO NO EN SILENCIO ═══
+     *
+     * Devolver lista vacía es lo correcto —una lectura tiene que seguir enseñando
+     * el tablero de un arcade apartado—, y el `catch` mudo NO lo era: cubría
+     * también un `TypeError` dentro del `opciones()` de un arcade, sobre todo de
+     * fuera. El síntoma es de los peores que hay: los cuatro sentados ven el
+     * tablero, la revisión sube, el plazo corre, y ninguno tiene un solo botón.
+     * Ni error, ni 500, ni una línea en el registro, ni entrada en el
+     * diagnóstico. La mesa parece jugable y no lo es.
+     *
+     * El presupuesto SÍ se calla, porque ya deja rastro donde toca: `conPresupuesto`
+     * apunta la cuarentena y el arcade sale en `GET /arcade/presupuesto`.
+     */
+    if (!(error instanceof ArcadeFueraDePresupuesto)) {
+      console.error(
+        `[arcade] El «opciones()» de «${arcade}» ha fallado. Quien mire esta mesa no verá ` +
+          'ningún botón, así que la partida parecerá jugable y no lo será:',
+        error,
+      );
+    }
     return [];
   }
 }

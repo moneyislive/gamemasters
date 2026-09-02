@@ -102,7 +102,15 @@ export async function elSitioGuardado(arcade: string): Promise<SitioGuardado | n
   return { codigo: crudo.slice(0, corte), llave: crudo.slice(corte + 1) };
 }
 
-/** Olvida el sitio. Se llama al salir a propósito, y al descubrir que ya no vale. */
+/**
+ * Olvida el sitio. Lo llaman TIRAR la mesa —tras la que no queda mesa a la que
+ * volver— y el descubrir que la llave ya no vale.
+ *
+ * NO lo llama «salir», y eso es lo contrario de lo que decía esta línea: salir
+ * cierra la pantalla y te deja el asiento. Olvidarlo ahí costaba la partida,
+ * porque volver a entrar con el código pide silla NUEVA —y con la partida ya
+ * empezada el servidor contesta 409—.
+ */
 export async function olvidarElSitio(arcade: string): Promise<void> {
   try {
     if (Platform.OS === 'web') {

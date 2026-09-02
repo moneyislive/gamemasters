@@ -142,6 +142,12 @@ const BATERIA = [
     guion: 'verify:mayordomo',
     porque: 'el asistente no filtra la solucion en 25 tramas',
   },
+  {
+    nombre: 'limitador',
+    donde: 'server',
+    guion: 'verify:limitador',
+    porque: 'que enumerar codigos cueste, y que un acierto no lo lave',
+  },
   { nombre: 'puertas', donde: 'server', guion: 'verify:puertas', lento: true, porque: 'las rutas y el ZIP del paquete' },
 
   // ── El móvil ──────────────────────────────────────────────────────────────

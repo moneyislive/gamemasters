@@ -292,8 +292,24 @@ export function limitarIntentos(opciones: OpcionesDeLimitador): RequestHandler {
      * dos veces y acierta a la tercera no debe arrastrar nada, y un acierto es
      * además la mejor prueba que hay de que detrás de esa dirección está la
      * velada y no alguien probando a ciegas.
+     *
+     * ═══ PERO SÓLO PERDONA SU PROPIA CREDENCIAL, NO EL CUBO DE LA DIRECCIÓN ═══
+     *
+     * Esto borraba LAS DOS CLAVES, y con eso el cubo por dirección —que es el
+     * único que ve una enumeración— se vaciaba con cualquier acierto. Medido
+     * sobre la puerta de los códigos de mesa: se abre una mesa propia y luego se
+     * repite «cincuenta y nueve códigos inventados más una lectura de la mía»; esa
+     * lectura devuelve 200 y pone el contador a cero, así que nunca se llega al
+     * tope y el «oráculo de qué códigos existen» sigue abierto con un 1,7 % de
+     * peticiones de más.
+     *
+     * El razonamiento de arriba justifica perdonar ESTA credencial desde ESTA
+     * dirección —acertar dice algo sobre ella—, y no justifica borrar lo que se
+     * falló contra otras cincuenta y nueve, que es de lo que no dice nada. El cubo
+     * grueso sólo cuenta FALLOS, así que a quien juega no le estorba: para llenarlo
+     * hay que teclear sesenta códigos que no existen.
      */
-    const anotar = (claves: string[]): void => {
+    const anotar = (claveFina: string, claves: string[]): void => {
       res.on('finish', () => {
         const cuando = Date.now();
         if (esFallo(res.statusCode)) {
@@ -301,7 +317,7 @@ export function limitarIntentos(opciones: OpcionesDeLimitador): RequestHandler {
           return;
         }
         if (res.statusCode >= 200 && res.statusCode < 300) {
-          for (const clave of claves) registros.delete(clave);
+          registros.delete(claveFina);
         }
       });
     };
@@ -325,7 +341,7 @@ export function limitarIntentos(opciones: OpcionesDeLimitador): RequestHandler {
       // Sin IP útil, lo único que separa a unas personas de otras es qué están
       // intentando abrir. Se cuenta por credencial y jamás se cierra la puerta.
       const clave = `credencial:${credencial}`;
-      anotar([clave]);
+      anotar(clave, [clave]);
       const fallos = vigente(clave, ahora)?.fallos ?? 0;
       const retardo = Math.min(
         RETARDO_MAXIMO_MS,
@@ -366,7 +382,7 @@ export function limitarIntentos(opciones: OpcionesDeLimitador): RequestHandler {
       return;
     }
 
-    anotar([claveFina, claveGruesa]);
+    anotar(claveFina, [claveFina, claveGruesa]);
     next();
   };
 }
