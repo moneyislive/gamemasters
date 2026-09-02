@@ -234,7 +234,7 @@ export const CLUEDO: ManifiestoDeJuego = {
     { pantalla: 'personaje', rotulo: 'Tú', icono: 'mascara' },
     { pantalla: 'mapa', rotulo: 'Mapa', icono: 'plano' },
     { pantalla: 'hechos', rotulo: 'Hechos', icono: 'cartel' },
-    { pantalla: 'cuaderno', rotulo: 'Pistas', icono: 'farol' },
+    { pantalla: 'cuaderno', rotulo: 'Pistas', icono: 'monoculo' },
     { pantalla: 'perfil', rotulo: 'Perfil', icono: 'copa' },
   ],
 

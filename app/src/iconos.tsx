@@ -179,6 +179,48 @@ export function IconoFarol({ size = 31, color }: PropsIcono): JSX.Element {
 }
 
 /**
+ * EL MONÓCULO: la lente y su cordón. Es el de «Pistas» en CLUEDO.
+ *
+ * ═══ POR QUÉ SUSTITUYE AL FAROL, Y NO ES CUESTIÓN DE GUSTO ═══
+ *
+ * El farol se salía de la barra por dos sitios a la vez. El primero es el que se
+ * ve: su cuerpo mide 19 de ancho por 37 de alto, o sea casi el doble de alto que
+ * de ancho, cuando sus cinco vecinos son prácticamente cuadrados —la máscara 28×30,
+ * el plano 35×35, el cuaderno 33×35—. Entre ellos no se lee como uno más: se lee
+ * como uno que sobresale. El segundo no se ve y pesa igual: el farol se dibuja con
+ * trazo 2,4 y rellenos, y toda la barra va a trazo 3 y sin masa. Es exactamente lo
+ * que la cabecera de los iconos de la Momia describe como «iconos de otro juego de
+ * iconos pegados al lado», sólo que aquí lo era el de casa.
+ *
+ * ═══ Y POR QUÉ NO SE CONFUNDE CON EL RELOJ, QUE TAMBIÉN ES UN CÍRCULO ═══
+ *
+ * Es la pregunta que había que contestar antes de dibujarlo, porque los dos viven
+ * en la MISMA barra de CLUEDO. Tres cosas los separan a 23 píxeles, y ninguna es
+ * un detalle fino:
+ *
+ *   · El reloj está CENTRADO (cx 24) y el monóculo va corrido a la izquierda
+ *     (cx 19), así que la silueta no se apoya en el mismo sitio.
+ *   · El reloj tiene las agujas DENTRO —una uve— y el monóculo está hueco: a este
+ *     tamaño, lo que hay dentro de un círculo es lo primero que se distingue.
+ *   · El reloj lleva su corona ARRIBA y en el eje; el monóculo lleva el cordón
+ *     saliendo en diagonal hacia la derecha, que es una cola y no un remate.
+ *
+ * El hueco menor entre el cordón y el aro es de 4,7 unidades, por encima de las
+ * dos que este fichero da por mínimas: a 23 píxeles no se cierra en una mancha.
+ */
+export function IconoMonoculo(p: PropsIcono): JSX.Element {
+  return (
+    <Lienzo {...p}>
+      <Circle cx={19} cy={28} r={13} />
+      {/* El puente, que arranca en el propio aro para que no quede aire. */}
+      <Path d="M28.5 19 L32 15.5" />
+      {/* El cordón: sube, dobla y cae. Es lo único que no es un círculo. */}
+      <Path d="M32 15.5 c5-4 10.5-1 9 4.8 c-1 4-3.5 5.5-4.5 10.2" />
+    </Lienzo>
+  );
+}
+
+/**
  * Todos los iconos, por su nombre en el manifiesto.
  *
  * Es un `Record` sobre la unión cerrada a propósito: si alguien añade un icono
@@ -403,6 +445,7 @@ export const ICONOS: Record<IconoId, (p: PropsIcono) => JSX.Element> = {
   copa: IconoPerfil,
   mayordomo: IconoMayordomo,
   farol: IconoFarol,
+  monoculo: IconoMonoculo,
   /* Los dos de El Nudo de Valdehierro. */
   aguja: IconoAguja,
   locomotora: IconoLocomotora,

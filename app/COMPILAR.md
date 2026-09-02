@@ -182,10 +182,10 @@ dirección que no caduca. Es el sitio.
 
 **Antes de subir nada, renombra el fichero.** EAS te lo da con un nombre suyo,
 largo y con un identificador dentro. Ponle exactamente este, con el guion y con
-**la versión que dice `app/app.json`** —hoy `1.1.0`—:
+**la versión que dice `app/app.json`** —hoy `1.1.1`—:
 
 ```
-harkania-1.1.0.apk
+harkania-1.1.1.apk
 ```
 
 > **El número de aquí sale de `app/app.json`, no de este documento.** Esta guía
@@ -195,8 +195,8 @@ harkania-1.1.0.apk
 > `/descargar` sale igual y da 404—. Mira `app/app.json` antes de teclear nada.
 
 1. Ve a **https://github.com/moneyislive/gamemasters/releases/new**
-2. En *Choose a tag*, escribe `v1.1.0` —la misma versión, con `v` delante— y pulsa **Create new tag**.
-3. En *Release title*, pon `v1.1.0`.
+2. En *Choose a tag*, escribe `v1.1.1` —la misma versión, con `v` delante— y pulsa **Create new tag**.
+3. En *Release title*, pon `v1.1.1`.
 4. **Arrastra el fichero ya renombrado** a la caja de abajo («Attach
    binaries…») y espera a que suba del todo. GitHub bautiza el adjunto con el
    nombre que traiga el fichero, así que si se te olvidó renombrarlo, esta es
@@ -208,7 +208,7 @@ derecho sobre el nombre del `.apk` → Copiar dirección del enlace**. Tiene que
 salir exactamente esta:
 
 ```
-https://github.com/moneyislive/gamemasters/releases/download/v1.1.0/harkania-1.1.0.apk
+https://github.com/moneyislive/gamemasters/releases/download/v1.1.1/harkania-1.1.1.apk
 ```
 
 > **De dónde sale ese nombre, para no tener que deducirlo otra vez.** No es una
@@ -238,7 +238,7 @@ En el panel de Render, en *Environment*, **una sola variable**:
 
 | Variable | Valor |
 | --- | --- |
-| `APK_VERSION` | `1.1.0` |
+| `APK_VERSION` | `1.1.1` |
 
 Guarda. Render reinicia el servicio solo.
 

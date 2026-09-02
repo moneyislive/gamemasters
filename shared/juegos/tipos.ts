@@ -293,6 +293,12 @@ export type IconoId =
   | 'copa'
   | 'mayordomo'
   | 'farol'
+  /*
+   * El monóculo, que releva al farol en la pestaña de Pistas de CLUEDO. El farol
+   * se queda: lo usan de asistente El Farolero y La Abuela, y de porte nocturno
+   * las Sombras. Lo que se cambia es a quién representa, no lo que existe.
+   */
+  | 'monoculo'
   /* Los de El Misterio de la Momia. */
   | 'papiro'
   | 'anj'
