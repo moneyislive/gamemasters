@@ -1,11 +1,11 @@
 {
   "server/src/arcade/arbitro.ts": {
-    "huella": "bb973d707d6b4eed",
-    "lineas": 453
+    "huella": "3f252d2e687dcc0b",
+    "lineas": 491
   },
   "server/src/arcade/mesas.ts": {
-    "huella": "c15377f0f74a7a08",
-    "lineas": 2278
+    "huella": "c8e5603d638ca368",
+    "lineas": 2350
   },
   "server/src/canal/index.ts": {
     "huella": "72b651d609fac007",
@@ -16,8 +16,8 @@
     "lineas": 228
   },
   "shared/arcade/index.ts": {
-    "huella": "802c4e20742051e4",
-    "lineas": 837
+    "huella": "cd3d720fd15b671b",
+    "lineas": 908
   },
   "shared/arcade/motor.ts": {
     "huella": "22b5a3b870f4d936",
@@ -40,8 +40,8 @@
     "lineas": 171
   },
   "shared/arcade/tipos.ts": {
-    "huella": "dc55d655f69cb60f",
-    "lineas": 751
+    "huella": "8f492c7b2b8ee06b",
+    "lineas": 762
   },
   "shared/mecanicas/azar.ts": {
     "huella": "9d67a2ff5e92facf",
