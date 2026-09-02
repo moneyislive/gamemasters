@@ -736,6 +736,7 @@ export default function CatalogPage() {
         transition={{ delay: 0.68, duration: 0.7 }}
       >
         <BuscadorDeVeladas
+          juegos={estanteria}
           criterios={criterios}
           onCambio={setCriterios}
           encajan={encajan.length}

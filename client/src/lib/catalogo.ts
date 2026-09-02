@@ -171,6 +171,36 @@ function cuantoCumple(juego: Catalogable, c: Criterios): number {
 }
 
 /**
+ * ¿Hay en la estantería alguna caja que cumpla esto?
+ *
+ * ═══ PARA QUE UN DESPLEGABLE NO PUEDA PROMETER LO QUE NO HAY ═══
+ *
+ * Las listas de opciones estaban escritas a mano, y una lista escrita a mano se
+ * separa de los datos en cuanto alguien toca una ficha. Pasó, y con las seis
+ * cajas de hoy había SEIS opciones muertas: «1 hora o menos» y «2 horas o
+ * menos» cuando las cuatro veladas duran tres; «Media» cuando nadie es de nivel
+ * 2; «2 personas» cuando el que menos pide son tres; y «En vivo y online» y
+ * «Online» cuando ninguno se juega a distancia. Elegir cualquiera de ellas era
+ * hacerle una pregunta a la estantería cuya respuesta ya se sabía.
+ *
+ * Es la misma avería que la línea «3 – 8 jugadores» de CLUEDO, que llevaba años
+ * escrita a mano contradiciendo a la realidad, y se cierra igual: preguntando.
+ *
+ * ═══ Y PREGUNTA CON LA MISMA FUNCIÓN QUE PUNTÚA ═══
+ *
+ * Monta unos criterios con ese único campo puesto y llama a `cuantoCumple`. No
+ * es un atajo: es lo que hace IMPOSIBLE que ofrecer y puntuar discrepen. Una
+ * segunda copia de las reglas —«un juego cubre "online" si declara
+ * "en-vivo-y-online"»— se habría quedado atrás el día que una de las dos
+ * cambiara, y entonces el desplegable ofrecería lo que el filtro no encuentra,
+ * que es exactamente el fallo que esto viene a cerrar.
+ */
+export function algunoCumple(juegos: readonly Catalogable[], criterio: Partial<Criterios>): boolean {
+  const c: Criterios = { ...SIN_CRITERIOS, ...criterio };
+  return juegos.some((juego) => cuantoCumple(juego, c) > 0);
+}
+
+/**
  * La estantería en dos montones: lo que encaja y lo demás.
  *
  * ORDEN ESTABLE dentro de cada montón. Es lo que hace que tocar un filtro no
