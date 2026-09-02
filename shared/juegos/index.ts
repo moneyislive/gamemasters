@@ -39,7 +39,10 @@ export {
   ejes,
   ejeDeJugadores,
   esElSenalado,
+  jugadoresMinimoDe,
   respuestaCompleta,
+  NOMBRE_DE_DIFICULTAD,
+  NOMBRE_DE_MODO,
 } from './tipos';
 export type {
   BloqueDeDosier,
@@ -50,7 +53,10 @@ export type {
   DefinicionEje,
   AsistenteDeJuego,
   EjeId,
+  FichaDeJuego,
   IconoId,
+  ModoDePartida,
+  NivelDeDificultad,
   PantallaDeApp,
   PestanaDeBarra,
   ReglaDeJuego,

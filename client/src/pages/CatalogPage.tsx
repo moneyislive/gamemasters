@@ -13,10 +13,27 @@
  *
  * Todo el arte es tipográfico / SVG inline: sin imágenes externas.
  */
+import { useMemo, useState } from 'react';
 import type { CSSProperties, KeyboardEvent, ReactElement } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { juegosInstalados, manifiestoDe, manifiestoSiExiste } from '../../../shared/juegos';
+import {
+  juegosInstalados,
+  jugadoresMinimoDe,
+  manifiestoDe,
+  manifiestoSiExiste,
+  NOMBRE_DE_DIFICULTAD,
+  NOMBRE_DE_MODO,
+} from '../../../shared/juegos';
 import { useTemaDeJuego } from '../lib/tema';
+import BuscadorDeVeladas from '../components/catalogo/BuscadorDeVeladas';
+import {
+  cuantosCriterios,
+  duracionEnPalabras,
+  lineaDeJugadores,
+  repartir,
+  SIN_CRITERIOS,
+} from '../lib/catalogo';
+import type { Criterios, FichaDeCatalogo } from '../lib/catalogo';
 import { motion } from 'framer-motion';
 import type { Variants } from 'framer-motion';
 import '../styles/catalog.css';
@@ -299,7 +316,15 @@ interface CatalogGame {
   /** Solo para los que aún no existen: los instalados dicen su nombre solos. */
   title: string;
   tagline: string;
-  players: string;
+  /**
+   * La ficha de la caja, SOLO para los juegos que aún no existen.
+   *
+   * Un juego instalado la trae en su manifiesto y esta se ignora — no se
+   * combinan, y esa es toda la gracia: mezclarlas dejaría a la portada capaz de
+   * contradecir al juego, que es de lo que se viene huyendo. Aquí abajo solo
+   * hay ficha donde no hay manifiesto que la tenga.
+   */
+  ficha?: FichaDeCatalogo;
   /** La invitación a entrar. Cada casa recibe a su manera. */
   cta: string;
   /** Paleta propia de la tarjeta vía variables CSS */
@@ -312,7 +337,6 @@ const GAMES: readonly CatalogGame[] = [
     id: 'cluedo',
     title: 'CLUEDO',
     tagline: 'Un asesinato en la mansión. Los invitados son los sospechosos.',
-    players: '3 – 8 jugadores · En vivo',
     cta: 'Entrar en la mansión →',
     palette: {
       '--card-bg1': 'var(--felt-900)',
@@ -326,7 +350,20 @@ const GAMES: readonly CatalogGame[] = [
     id: 'dragones',
     title: 'Dungeons & Dragons',
     tagline: 'Mazmorras, dragones y una campaña tejida a medida del grupo.',
-    players: '3 – 6 jugadores',
+    /*
+     * SIN MANIFIESTO TODAVÍA, así que su ficha vive aquí. El día que se instale
+     * se la lleva consigo y esto sobra: la portada dejará de saber nada de él,
+     * que es lo correcto.
+     */
+    ficha: {
+      duracionMinutos: 180,
+      edadMinima: 8,
+      dificultad: 2,
+      jugadoresMinimo: 3,
+      jugadoresMaximo: 6,
+      modo: 'en-vivo-y-online',
+      temas: ['rol', 'fantasía', 'mazmorras', 'dragones', 'campaña', 'aventura'],
+    },
     cta: 'Bajar a la mazmorra →',
     palette: {
       '--card-bg1': '#230b09',
@@ -340,7 +377,6 @@ const GAMES: readonly CatalogGame[] = [
     id: 'momia',
     title: 'El Misterio de la Momia',
     tagline: 'El sello está roto. Alguien de la expedición lo quiso así.',
-    players: '4 – 10 jugadores · En vivo',
     cta: 'Bajar a la tumba →',
     /*
      * La ficha lleva la paleta del juego, no una paleta cualquiera: la noche de
@@ -367,7 +403,6 @@ const GAMES: readonly CatalogGame[] = [
     id: 'sombras',
     title: 'El Paso de las Sombras',
     tagline: 'Honnō-ji arde. Antes del alba hay que cruzar Iga, y uno de los que guían cobra de Akechi.',
-    players: '4 – 10 jugadores · En vivo',
     cta: 'Salir de Sakai →',
     /*
      * La ficha lleva la paleta del juego, no una paleta cualquiera: la noche del
@@ -407,7 +442,6 @@ const GAMES: readonly CatalogGame[] = [
      * dos personas discutiendo la misma maniobra, que es lo que pasa de verdad
      * en un turno de noche.
      */
-    players: '4 – 12 jugadores · En vivo',
     cta: 'Entrar de turno →',
     /*
      * La ficha lleva la paleta del juego, no una paleta cualquiera: el azul de
@@ -434,7 +468,16 @@ const GAMES: readonly CatalogGame[] = [
     id: 'potter',
     title: 'Harry Potter',
     tagline: 'Hechizos, casas rivales y secretos en los pasillos del castillo.',
-    players: '4 – 12 jugadores',
+    /* Sin manifiesto todavía: su ficha vive aquí, como la de Dungeons & Dragons. */
+    ficha: {
+      duracionMinutos: 180,
+      edadMinima: 8,
+      dificultad: 2,
+      jugadoresMinimo: 4,
+      jugadoresMaximo: 12,
+      modo: 'en-vivo-y-online',
+      temas: ['magia', 'castillo', 'casas', 'hechizos', 'fantasía', 'colegio'],
+    },
     cta: 'Cruzar el andén →',
     palette: {
       '--card-bg1': '#0b1130',
@@ -483,12 +526,143 @@ export default function CatalogPage() {
   const instalados = new Set(juegosInstalados().map((j) => j.id));
   const abrir = (id: string) => navigate(`/${id}`);
 
+  const [criterios, setCriterios] = useState<Criterios>(SIN_CRITERIOS);
+  const pedidos = cuantosCriterios(criterios);
+
+  /*
+   * La estantería, ya resuelta: cada caja con su nombre de verdad, su ficha de
+   * verdad y su candado de verdad, antes de que nadie la ordene.
+   *
+   * `useMemo` no es aquí una optimización de manual: `repartir` ordena, y
+   * ordenar sobre una lista que se vuelve a construir en cada tecleo haría que
+   * las tarjetas se remontaran mientras se escribe en el buscador. Con las
+   * identidades estables, React mueve los mismos nodos en vez de crearlos otra
+   * vez, que es lo que deja que la animación de colocación se vea.
+   */
+  const estanteria = useMemo(
+    () =>
+      GAMES.map((game) => {
+        const manifiesto = manifiestoSiExiste(game.id);
+        // Bloqueado = no instalado. Antes era un booleano escrito a mano que
+        // podía desmentir a la realidad.
+        const cerrado = !instalados.has(game.id);
+        /*
+         * El NOMBRE lo dice el juego: es su identidad y no puede haber dos.
+         * La FRASE de la ficha, en cambio, se queda aquí, y no por descuido.
+         * Son dos textos distintos con dos trabajos distintos: el lema del
+         * manifiesto es un gancho que se lee dentro del juego («Alguien de
+         * esta casa miente»), y esta frase tiene que explicar en una línea a
+         * qué se juega, que es lo que hace falta en una estantería con cuatro
+         * cajas. En la Momia coinciden porque su lema ya explicaba mejor el
+         * juego que cualquier frase que se pudiera escribir aparte.
+         */
+        const titulo = cerrado ? game.title : (manifiesto?.nombre ?? game.title);
+        /*
+         * INSTALADO: MANDA SU MANIFIESTO, Y SIN MEZCLAR. El respaldo de la
+         * portada solo entra donde no hay manifiesto —los dos juegos que aún no
+         * existen—. Combinarlos dejaría a la portada capaz de completar lo que
+         * un juego calla, y entonces la tarjeta afirmaría cosas que el juego no
+         * ha dicho: es el mismo agujero por el que se coló el «próximamente» de
+         * la Momia cuando ya se podía jugar.
+         *
+         * El mínimo de personas se pega aquí porque en el manifiesto no vive en
+         * la ficha sino en la categoría de personas, que es donde de verdad
+         * impide generar una partida.
+         */
+        const ficha: FichaDeCatalogo = manifiesto
+          ? { ...(manifiesto.ficha ?? {}), jugadoresMinimo: jugadoresMinimoDe(manifiesto) }
+          : (game.ficha ?? {});
+        return { ...game, cerrado, titulo, lema: game.tagline, ficha };
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+
+  const { encajan, resto } = useMemo(
+    () => repartir(estanteria, criterios),
+    [estanteria, criterios],
+  );
+
   const onCardKey = (event: KeyboardEvent<HTMLElement>) => {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
       const id = event.currentTarget.getAttribute('data-juego');
       if (id) abrir(id);
     }
+  };
+
+  /**
+   * Una caja de la estantería.
+   *
+   * Se pinta con una función y no dos veces en el JSX porque las tarjetas salen
+   * en DOS listas —lo que encaja y lo demás— y duplicar treinta líneas de
+   * marcado para eso es la forma de que dentro de un mes solo una de las dos
+   * tenga el arreglo que se haga.
+   *
+   * `layout="position"` y no `layout` a secas: cuando el orden cambia, lo único
+   * que tiene que moverse es DÓNDE está la tarjeta. Con `layout` entero, framer
+   * anima también el tamaño escalando la caja, y una tarjeta escalada durante
+   * medio segundo deforma su tipografía y —peor— es una caja de consulta, así
+   * que sus `cqi` se recalculan y el texto salta.
+   */
+  const pintar = (juego: (typeof estanteria)[number]) => {
+    const { ficha, cerrado, titulo } = juego;
+    const aforo = lineaDeJugadores(
+      ficha,
+      ficha.modo === undefined ? undefined : NOMBRE_DE_MODO[ficha.modo],
+    );
+    /*
+     * Lo que no se sabe no se escribe. Un juego sin ficha no enseña una línea de
+     * guiones ni un «desconocido»: enseña una tarjeta más corta, que es la
+     * verdad.
+     */
+    const datos = [
+      duracionEnPalabras(ficha.duracionMinutos),
+      ficha.edadMinima === undefined ? undefined : `Desde ${ficha.edadMinima} años`,
+      ficha.dificultad === undefined ? undefined : NOMBRE_DE_DIFICULTAD[ficha.dificultad],
+    ].filter((x): x is string => Boolean(x));
+
+    return (
+      <motion.article
+        key={juego.id}
+        layout="position"
+        className={`catalog-card deco-frame deco-corners ${cerrado ? 'is-locked' : 'is-open'}`}
+        style={juego.palette}
+        variants={cardVariants}
+        whileHover={cerrado ? undefined : { y: -10 }}
+        data-juego={juego.id}
+        onClick={cerrado ? undefined : () => abrir(juego.id)}
+        onKeyDown={cerrado ? undefined : onCardKey}
+        role={cerrado ? undefined : 'button'}
+        tabIndex={cerrado ? undefined : 0}
+        aria-label={cerrado ? `${titulo} (próximamente)` : `Jugar a ${titulo}`}
+      >
+        <div className="card-art">{juego.art}</div>
+        <div className="card-body">
+          <h2 className="card-title">{titulo}</h2>
+          <p className="card-tagline">{juego.tagline}</p>
+          {/*
+            EL PIE, EN UN BLOQUE Y NO SUELTO. Es lo que mantiene alineadas las
+            invitaciones de una misma fila: el bloque entero baja al fondo de la
+            tarjeta con un `margin-top: auto`, así que da igual que un juego
+            tenga aforo y otro no — antes ese empujón lo daba la línea de
+            jugadores, y una tarjeta sin ella se descolgaba.
+          */}
+          <div className="card-pie">
+            {aforo && <p className="card-players mono-caps">{aforo}</p>}
+            {datos.length > 0 && <p className="card-datos mono-caps">{datos.join(' · ')}</p>}
+            {cerrado ? (
+              <span className="card-coming mono-caps">
+                <LockIcon /> Próximamente
+              </span>
+            ) : (
+              <span className="card-cta mono-caps">{juego.cta}</span>
+            )}
+          </div>
+        </div>
+        {cerrado && <div className="card-veil" aria-hidden="true" />}
+      </motion.article>
+    );
   };
 
   return (
@@ -536,58 +710,52 @@ export default function CatalogPage() {
         </motion.p>
       </header>
 
+      {/*
+        EL BUSCADOR VA AQUÍ Y NO ARRIBA DEL TODO, entre la promesa y la
+        estantería. Encima del logotipo sería lo primero que se ve y convertiría
+        un cartel en un directorio; debajo de las cajas no lo encontraría nadie.
+        Aquí es donde ya se ha leído de qué va esto y todavía no se ha empezado a
+        mirar, que es el momento en el que a alguien le apetece acotar.
+      */}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.68, duration: 0.7 }}
+      >
+        <BuscadorDeVeladas
+          criterios={criterios}
+          onCambio={setCriterios}
+          encajan={encajan.length}
+          total={estanteria.length}
+        />
+      </motion.div>
+
       <motion.main
         className="catalog-grid"
         variants={gridVariants}
         initial="hidden"
         animate="visible"
       >
-        {GAMES.map((game) => {
-          // Bloqueado = no instalado. Antes era un booleano escrito a mano que
-          // podía desmentir a la realidad.
-          const cerrado = !instalados.has(game.id);
-          /*
-           * El NOMBRE lo dice el juego: es su identidad y no puede haber dos.
-           * La FRASE de la ficha, en cambio, se queda aquí, y no por descuido.
-           * Son dos textos distintos con dos trabajos distintos: el lema del
-           * manifiesto es un gancho que se lee dentro del juego («Alguien de
-           * esta casa miente»), y esta frase tiene que explicar en una línea a
-           * qué se juega, que es lo que hace falta en una estantería con cuatro
-           * cajas. En la Momia coinciden porque su lema ya explicaba mejor el
-           * juego que cualquier frase que se pudiera escribir aparte.
-           */
-          const titulo = cerrado ? game.title : (manifiestoSiExiste(game.id)?.nombre ?? game.title);
-          return (
-          <motion.article
-            key={game.id}
-            className={`catalog-card deco-frame deco-corners ${cerrado ? 'is-locked' : 'is-open'}`}
-            style={game.palette}
-            variants={cardVariants}
-            whileHover={cerrado ? undefined : { y: -10 }}
-            data-juego={game.id}
-            onClick={cerrado ? undefined : () => abrir(game.id)}
-            onKeyDown={cerrado ? undefined : onCardKey}
-            role={cerrado ? undefined : 'button'}
-            tabIndex={cerrado ? undefined : 0}
-            aria-label={cerrado ? `${titulo} (próximamente)` : `Jugar a ${titulo}`}
-          >
-            <div className="card-art">{game.art}</div>
-            <div className="card-body">
-              <h2 className="card-title">{titulo}</h2>
-              <p className="card-tagline">{game.tagline}</p>
-              <p className="card-players mono-caps">{game.players}</p>
-              {cerrado ? (
-                <span className="card-coming mono-caps">
-                  <LockIcon /> Próximamente
-                </span>
-              ) : (
-                <span className="card-cta mono-caps">{game.cta}</span>
-              )}
-            </div>
-            {cerrado && <div className="card-veil" aria-hidden="true" />}
-          </motion.article>
-          );
-        })}
+        {encajan.map(pintar)}
+
+        {/*
+          EL CORTE. Solo aparece cuando se ha pedido algo y hay algo que no lo
+          cumple, y dice cuál de las dos cosas está pasando: que lo de abajo es
+          lo demás de la casa, o que no ha encajado nada y lo de abajo es lo que
+          más se acerca. Sin este renglón, una estantería reordenada se lee como
+          una estantería barajada.
+        */}
+        {pedidos > 0 && resto.length > 0 && (
+          <motion.p layout="position" className="catalog-corte mono-caps">
+            <span>
+              {encajan.length > 0
+                ? 'Lo demás que hay en la casa'
+                : 'Nada encaja del todo — esto es lo que más se acerca'}
+            </span>
+          </motion.p>
+        )}
+
+        {resto.map(pintar)}
       </motion.main>
 
       <footer className="catalog-footer">

@@ -497,6 +497,16 @@ export const NUDO: ManifiestoDeJuego = {
   nombre: 'El Nudo de Valdehierro',
   lema: 'Ardió el cuadro de marchas y seis convoyes vienen rodando. Quedan seis franjas para rehacerlo.',
 
+  ficha: {
+    duracionMinutos: 180,
+    edadMinima: 8,
+    /* Seis convoyes, seis franjas y cuatro oficios que se reparten el cuadro: es el más pesado de los cuatro. */
+    dificultad: 4,
+    jugadoresMaximo: 12,
+    modo: 'en-vivo',
+    temas: ['ferrocarril', 'trenes', 'logística', 'invierno', 'nieve', 'telegramas', 'turno de noche'],
+  },
+
   categorias: [
     {
       id: 'ferroviarios',

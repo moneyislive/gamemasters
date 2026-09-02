@@ -371,6 +371,16 @@ export const MOMIA: ManifiestoDeJuego = {
   nombre: 'El Misterio de la Momia',
   lema: 'El sello está roto. Alguien de la expedición lo quiso así.',
 
+  ficha: {
+    duracionMinutos: 180,
+    edadMinima: 8,
+    /* El sellado es un rompecabezas de orden con restricciones: se deduce, no se adivina. */
+    dificultad: 3,
+    jugadoresMaximo: 10,
+    modo: 'en-vivo',
+    temas: ['misterio', 'arqueología', 'egipto', 'tumba', 'expedición', 'enigma', 'sellado'],
+  },
+
   categorias: [
     {
       id: 'expedicionarios',

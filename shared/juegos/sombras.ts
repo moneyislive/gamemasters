@@ -387,6 +387,16 @@ export const SOMBRAS: ManifiestoDeJuego = {
   nombre: 'El Paso de las Sombras',
   lema: 'Honnō-ji arde. Antes del alba hay que cruzar Iga, y uno de los que guían cobra de Akechi.',
 
+  ficha: {
+    duracionMinutos: 180,
+    edadMinima: 8,
+    /* Una huida con traidor dentro: hay que deducir la senda y de quién no fiarse a la vez. */
+    dificultad: 3,
+    jugadoresMaximo: 10,
+    modo: 'en-vivo',
+    temas: ['traición', 'japón', 'huida', 'nocturno', 'sengoku', 'escolta', 'sendas'],
+  },
+
   categorias: [
     {
       id: 'escoltas',
