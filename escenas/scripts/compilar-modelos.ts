@@ -27,6 +27,7 @@
  * el `.glb` compilado. Ver `arte/README.md`.
  */
 import { NodeIO } from '@gltf-transform/core';
+import type { Node } from '@gltf-transform/core';
 import { dedup, mergeDocuments, prune, weld } from '@gltf-transform/functions';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -402,6 +403,99 @@ function revisaLosNombres(): void {
   process.exit(2);
 }
 
+/**
+ * LAS PIEZAS QUE HAY QUE CENTRAR, Y POR QUÉ NO SE CENTRAN TODAS.
+ *
+ * ═══ LA VALLA APARECÍA A UNA TESELA DE DONDE SE PONÍA ═══
+ *
+ * Medido en el `.glb`: `fence_wood_straight` tiene toda su geometría en `x = -1,0`, no
+ * en su origen. Es la convención del pack para las piezas de BORDE: van pegadas a un
+ * lado de la tesela, y el lado está a un apotema —que vale exactamente 1— del centro.
+ *
+ * Pero en este mundo la valla NO se usa como pieza de borde: `asentamiento.ts` reparte
+ * «cuatro vallas de huerto, sueltas y torcidas» alrededor del caserío y `poblar.ts` la
+ * echa entre los trastos sueltos de tres biomas. En los dos casos se coloca por su
+ * CENTRO, así que aparecía 5,47 unidades —una tesela entera, dos personas— más allá de
+ * donde el código decía, y en la dirección de su propio giro, o sea a un sitio distinto
+ * cada vez. Repartida por todo el tablero y sin nada que la delatara.
+ *
+ * ═══ Y POR QUÉ AQUÍ Y NO EN CADA SITIO QUE LA COLOCA ═══
+ *
+ * Porque son tres sitios hoy y serán cinco mañana. Corregir el desvío en cada llamada
+ * es pedir que nadie se olvide nunca; corregirlo al compilar hace que la pieza cumpla
+ * la convención de esta casa —el origen es el centro— y que quien la coloque no tenga
+ * que saber de qué pack salió.
+ *
+ * ═══ Y POR QUÉ NO SE CENTRAN LAS DEMÁS PIEZAS DESCENTRADAS ═══
+ *
+ * `muro-esquina` también tiene su geometría fuera del origen, y ÉSA sí se usa como
+ * pieza de borde: la muralla de la fortaleza se montó con la convención del pack y se
+ * verificó junta a junta —«seis juntas, cero fallos»—. Centrarla rompería el recinto.
+ * La lista es explícita por eso: descentrado no es sinónimo de mal puesto.
+ */
+const A_CENTRAR = new Set(['valla', 'valla-puerta']);
+
+/**
+ * Centra la geometría de una pieza sobre su origen en el plano, dejando la altura.
+ *
+ * La caja se MIDE, no se supone: si el pack cambia la valla de sitio, esto la vuelve a
+ * centrar sola. Y se niega a hacerlo si la pieza trae giros o escalas en sus nodos,
+ * porque entonces acumular traslaciones no basta y el resultado sería silenciosamente
+ * falso — que es peor que no hacerlo.
+ */
+function centraEnHorizontal(nombre: string, raices: Node[]): void {
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minZ = Infinity;
+  let maxZ = -Infinity;
+
+  const anda = (nodo: Node, dx: number, dy: number, dz: number): void => {
+    const giro = nodo.getRotation();
+    const talla = nodo.getScale();
+    if (
+      giro[0] !== 0 || giro[1] !== 0 || giro[2] !== 0 || Math.abs(giro[3]) !== 1 ||
+      talla[0] !== 1 || talla[1] !== 1 || talla[2] !== 1
+    ) {
+      console.error(
+        `No se puede centrar «${nombre}»: el nodo «${nodo.getName()}» trae giro o escala.
+` +
+          'Acumular traslaciones no basta ahí, y centrarla a medias sería peor que no hacerlo.',
+      );
+      process.exit(2);
+    }
+    const t = nodo.getTranslation();
+    const x = dx + t[0];
+    const y = dy + t[1];
+    const z = dz + t[2];
+    const malla = nodo.getMesh();
+    if (malla !== null) {
+      for (const prim of malla.listPrimitives()) {
+        const pos = prim.getAttribute('POSITION');
+        if (pos === null) continue;
+        const v = [0, 0, 0];
+        for (let i = 0; i < pos.getCount(); i++) {
+          pos.getElement(i, v);
+          minX = Math.min(minX, x + (v[0] as number));
+          maxX = Math.max(maxX, x + (v[0] as number));
+          minZ = Math.min(minZ, z + (v[2] as number));
+          maxZ = Math.max(maxZ, z + (v[2] as number));
+        }
+      }
+    }
+    for (const h of nodo.listChildren()) anda(h, x, y, z);
+  };
+  for (const r of raices) anda(r, 0, 0, 0);
+  if (!Number.isFinite(minX)) return;
+
+  const cx = (minX + maxX) / 2;
+  const cz = (minZ + maxZ) / 2;
+  for (const r of raices) {
+    const t = r.getTranslation();
+    r.setTranslation([(t[0] as number) - cx, t[1] as number, (t[2] as number) - cz]);
+  }
+  console.log(`  centrada «${nombre}»: estaba a (${cx.toFixed(3)}, ${cz.toFixed(3)}) de su origen`);
+}
+
 async function main(): Promise<void> {
   revisaLosNombres();
 
@@ -454,6 +548,7 @@ async function main(): Promise<void> {
     }
     const envoltorio = destino.createNode(pieza.nombre);
     for (const r of raices) envoltorio.addChild(r);
+    if (A_CENTRAR.has(pieza.nombre)) centraEnHorizontal(pieza.nombre, raices);
     escena.addChild(envoltorio);
     for (const e of escenasTraidas) e.dispose();
     metidos++;

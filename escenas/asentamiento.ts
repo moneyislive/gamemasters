@@ -332,12 +332,36 @@ function fortaleza(color: ColorDeJugador, llave: LlaveDeVertice): PiezaDeAsentam
    * Cabe, pero justo: mide 1,9754 de ancho sobre una tesela cuya apotema es 1,0, o
    * sea que le sobra el 1,2%. Por eso va SOLO en su tesela y nada más se pone ahí — y
    * por eso mira hacia la puerta, que es lo único que se puede elegir.
+   *
+   * ═══ Y MIRABA A CUALQUIER SITIO MENOS A ELLA ═══
+   *
+   * El giro era `puerta * SEIS`, o sea el ÍNDICE DE DIRECCIÓN DE LA MALLA multiplicado
+   * por sesenta grados, como si el índice `k` de la malla y el lado `k` del pack fueran
+   * el mismo. No lo son, y no se diferencian en un desfase que se pudiera absorber: la
+   * relación es un ESPEJO, `(2 - k) mod 6`. Medido, dirección a dirección:
+   *
+   *     k          0    1    2    3    4    5
+   *     ladoDelPack 2    1    0    5    4    3
+   *
+   * Coinciden dos de seis. O sea que en cuatro de cada seis ciudades el castillo
+   * miraba a un sitio sin relación con su propia puerta, y en las otras dos acertaba
+   * por casualidad. Es exactamente el fallo contra el que avisa la cabecera de
+   * `ladoHacia`: una tabla mental de equivalencias que deja de valer sin avisar.
+   *
+   * Ahora el ángulo sale de la MISMA cuenta que orienta la muralla: se mira dónde cae
+   * la tesela de la puerta y se pregunta por su ángulo del pack. Así el castillo y su
+   * puerta no pueden discrepar aunque cambie el convenio de la malla.
+   *
+   * Aviso honesto sobre lo que esto arregla y lo que no: el castillo del pack es casi
+   * simétrico a la altura de su puerta —medido, radio entre 1,00 y 1,10 en los doce
+   * sectores de treinta grados—, así que el cambio se ve poco. Lo que se arregla es que
+   * el número significaba una cosa y se usaba como otra.
    */
   piezas.push({
     modelo: modeloDePieza('ciudad', color),
     donde: { x: 0, y: 0 },
     sobre: 0,
-    giro: puerta * SEIS,
+    giro: ladoDelPack(anillo[puerta] as Punto) * SEIS,
     talla: 1,
     cuando: 0.76,
   });

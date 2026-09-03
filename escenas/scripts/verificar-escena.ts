@@ -46,6 +46,8 @@ import {
 import { cuantasFormasDeCauce, cuantasFormasDeCruce, ladoHaciaElVecino } from '../sendas';
 import { hexesDeVertice, vecino, verticesDeHex } from '../../shared/mecanicas/malla-hexagonal';
 import { CUERPO, piezaDeOrilla } from '../aguas';
+import { piezasDeAsentamiento } from '../asentamiento';
+import { MODELO, modeloDePieza } from '../modelos';
 import { RADIO_DE_COMARCA, RADIO_DE_TESELA } from '../escala';
 import { laMarinaDelMundo } from '../marina';
 import { crearRelieve, hexDePunto } from '../relieve';
@@ -524,6 +526,69 @@ paso('El mundo cubre los cincuenta y cuatro vértices donde se construye');
 
 // ---------------------------------------------------------------------------
 
+/**
+ * LO QUE SE LEVANTA EN UN VÉRTICE MIRA A DONDE DEBE.
+ *
+ * ═══ EL ÍNDICE DE LA MALLA NO ES EL LADO DEL PACK ═══
+ *
+ * Es la trampa recurrente de este árbol, y la cabecera de `ladoHacia` ya avisaba de
+ * ella: la malla numera sus seis direcciones y el pack numera sus seis lados, y NO son
+ * la misma numeración. Medido, dirección a dirección:
+ *
+ *     k de la malla   0    1    2    3    4    5
+ *     lado del pack   2    1    0    5    4    3
+ *
+ * Coinciden dos de seis, y ni siquiera con un desfase constante que se pudiera
+ * absorber: es un espejo. El castillo de la fortaleza se giraba con `puerta * 60°`,
+ * o sea usando el índice de la malla como si fuera un ángulo, así que en cuatro de cada
+ * seis ciudades miraba a un sitio sin relación con su propia puerta.
+ *
+ * Se comprueba sobre la SALIDA y no sobre la fórmula: se busca la pieza de la puerta
+ * entre las de la muralla y se exige que el castillo lleve el ángulo de donde esa
+ * puerta está. Así la comprobación sigue valiendo si mañana cambia la cuenta.
+ */
+paso('El castillo de una ciudad mira a su propia puerta');
+{
+  const SEIS = Math.PI / 3;
+  const anguloDelPack = (p: Punto): number =>
+    ((Math.round(Math.atan2(-p.y, p.x) / SEIS) + 6) % 6) * SEIS;
+
+  const malOrientados: string[] = [];
+  const puertas = new Set<number>();
+  let ciudades = 0;
+  for (const hex of mallaDeRadio(2)) {
+    for (const vertice of verticesDeHex(hex)) {
+      const piezas = piezasDeAsentamiento('ciudad', 'blue', vertice);
+      const puerta = piezas.find((x) => x.modelo === MODELO.muroEsquinaPuerta);
+      const castillo = piezas.find((x) => x.modelo === modeloDePieza('ciudad', 'blue'));
+      if (puerta === undefined || castillo === undefined) {
+        malOrientados.push(`${vertice}: falta la puerta o el castillo`);
+        continue;
+      }
+      ciudades++;
+      const debido = anguloDelPack(puerta.donde);
+      puertas.add(Math.round(debido / SEIS));
+      if (Math.abs(castillo.giro - debido) > 1e-9) {
+        malOrientados.push(
+          `${vertice}: castillo a ${(castillo.giro / SEIS).toFixed(2)} y puerta a ${(debido / SEIS).toFixed(2)}`,
+        );
+      }
+    }
+  }
+  comprobar(
+    'el castillo lleva el ángulo del lado por donde está su puerta',
+    malOrientados.length === 0,
+    { ciudades, mal: malOrientados.slice(0, 4) },
+  );
+  comprobar(
+    'y la puerta no cae siempre en el mismo lado',
+    puertas.size >= 5,
+    [...puertas].sort((x, y) => x - y),
+  );
+}
+
+// ---------------------------------------------------------------------------
+
 paso('Lo que hay en el agua sigue las reglas del agua');
 {
   const TERRENOS = [
@@ -694,7 +759,7 @@ if (fallos.length > 0) {
  * a veintitrés: durante ese tiempo el guion podía morirse en la novena sin que nadie se
  * enterara. Un guardia desfasado no guarda nada.
  */
-const COMPROBACIONES_ESCRITAS = 33;
+const COMPROBACIONES_ESCRITAS = 35;
 if (hechas < COMPROBACIONES_ESCRITAS) {
   console.error(
     `Solo se han hecho ${hechas} de las ${COMPROBACIONES_ESCRITAS} comprobaciones que ` +
