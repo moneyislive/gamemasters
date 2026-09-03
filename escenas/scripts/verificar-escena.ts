@@ -36,7 +36,21 @@ import {
   verticesDeArista,
 } from '../../shared/mecanicas/malla-hexagonal';
 import type { Punto } from '../../shared/mecanicas/malla-hexagonal';
-import { PALETA, puntosDeLaCifra } from '../paleta';
+import { COLUMNAS_DEL_ATLAS, FILAS_DEL_ATLAS, PALETA, puntosDeLaCifra } from '../paleta';
+import {
+  NOMBRE_QUE_SOBREVIVE,
+  nombresEnElGlb,
+  PIEZAS_DE_COLOR,
+  todosLosNombres,
+} from '../nombres';
+import { cuantasFormasDeCauce, cuantasFormasDeCruce, ladoHaciaElVecino } from '../sendas';
+import { vecino } from '../../shared/mecanicas/malla-hexagonal';
+import { CUERPO } from '../aguas';
+import { RADIO_DE_TESELA } from '../escala';
+import { laMarinaDelMundo } from '../marina';
+import { crearRelieve } from '../relieve';
+import fs from 'node:fs';
+import path from 'node:path';
 
 let hechas = 0;
 const fallos: string[] = [];
@@ -250,8 +264,275 @@ paso('La paleta no deja ningún terreno sin color');
   const sinColor = [...deRiberas, ...deColonizacion].filter((t) => PALETA[t] === undefined);
   comprobar('los doce terrenos conocidos tienen color', sinColor.length === 0, sinColor);
 
-  const malFormado = Object.entries(PALETA).filter(([, c]) => !/^#[0-9a-f]{6}$/i.test(c));
+  const malFormado = Object.entries(PALETA).filter(([, t]) => !/^#[0-9a-f]{6}$/i.test(t.color));
   comprobar('y todos los colores son notación que three entiende', malFormado.length === 0, malFormado);
+
+  /*
+   * Y la celda del atlas tiene que existir DENTRO del atlas. Una celda fuera de
+   * rango no revienta: desplaza las UV a un trozo de textura que no es de nadie y
+   * la comarca sale del color equivocado, que es de los fallos que se miran diez
+   * veces sin verlos porque el mundo sigue pintándose entero.
+   */
+  const celdaMala = Object.entries(PALETA).filter(
+    ([, t]) =>
+      !Number.isInteger(t.celda[0]) ||
+      !Number.isInteger(t.celda[1]) ||
+      t.celda[0] < 0 ||
+      t.celda[0] >= COLUMNAS_DEL_ATLAS ||
+      t.celda[1] < 0 ||
+      t.celda[1] >= FILAS_DEL_ATLAS,
+  );
+  comprobar('y todas las celdas del atlas caen dentro del atlas', celdaMala.length === 0, celdaMala);
+}
+
+// ---------------------------------------------------------------------------
+
+/*
+ * ¿ESTÁ DENTRO DEL `.glb` TODO LO QUE EL CÓDIGO PIDE, Y CON ESE NOMBRE EXACTO?
+ *
+ * ═══ POR QUÉ ESTA COMPROBACIÓN EXISTE ═══
+ *
+ * Porque su ausencia costó una tarde. Los nombres de modelo llevaban dos puntos
+ * —`arbol:a`, `poblado:blue`—, el `.glb` se compilaba con los 114 nodos correctos,
+ * y en pantalla no aparecía NI UNA de esas piezas: ni un árbol, ni una montaña, ni
+ * una sola construcción de jugador. Sin error, sin hueco, sin nada. `GLTFLoader`
+ * borra los caracteres reservados de los nombres de nodo al cargar, así que
+ * `catalogo.get('arbol:a')` devolvía `undefined` para siempre.
+ *
+ * Lo que lo hacía tan difícil de ver es que NO fallaba en Node: el `.glb` leído con
+ * cualquier otra herramienta tiene los nombres bien. Sólo fallaba al pintar. Así
+ * que aquí se comprueban las dos mitades: que la pieza esté, y que su nombre sea de
+ * los que llegan enteros al navegador.
+ *
+ * ═══ Y POR QUÉ SE LEE EL `.glb` A MANO ═══
+ *
+ * Un GLB son doce bytes de cabecera y luego trozos con longitud y tipo; el primero
+ * es el JSON. Sacar los nombres de los nodos de la escena es leer un entero y
+ * parsear. Meter aquí una librería de glTF para eso pondría en la batería una
+ * dependencia que sólo hace falta al compilar.
+ */
+{
+  const RAIZ = path.resolve(import.meta.dirname ?? __dirname, '..');
+  const fichero = path.join(RAIZ, 'modelos', 'tablero.glb');
+  paso('Cada pieza que el código pide está dentro del .glb, y con su nombre entero');
+
+  if (!fs.existsSync(fichero)) {
+    comprobar('el tablero.glb compilado existe', false, path.relative(RAIZ, fichero));
+  } else {
+    const bruto = fs.readFileSync(fichero);
+    const largoDelJson = bruto.readUInt32LE(12);
+    const json = JSON.parse(bruto.subarray(20, 20 + largoDelJson).toString('utf8')) as {
+      scenes?: Array<{ nodes?: number[] }>;
+      nodes?: Array<{ name?: string }>;
+    };
+    const nodos = json.nodes ?? [];
+    const raices = json.scenes?.[0]?.nodes ?? [];
+    const dentro = new Set(
+      raices.map((i) => nodos[i]?.name).filter((n): n is string => n !== undefined),
+    );
+
+    /*
+     * SE CONTRASTA CONTRA `nombresEnElGlb()` Y NO CONTRA `todosLosNombres()`.
+     *
+     * Son dos listas distintas desde que las piezas de jugador entran una sola vez: el
+     * fichero trae `ciudad`, y `ciudad-red` se fabrica al cargar moviendo las UV. Pedirle
+     * al `.glb` los nombres que el CÓDIGO usa le exigiría veintiuna piezas que nunca van
+     * a estar dentro, y este comprobador diría que falta lo que sobra a propósito.
+     */
+    const faltan = nombresEnElGlb().filter((n) => !dentro.has(n));
+    comprobar('no falta ninguna pieza de las que el código nombra', faltan.length === 0, faltan);
+
+    /*
+     * Y AL REVÉS, que es la mitad que faltaba: una pieza dentro del fichero que nadie
+     * pide son kilobytes que se despliegan a todo el mundo sin que nadie sepa por qué.
+     * El compilador ya lo comprueba antes de escribir; esto lo vuelve a comprobar sobre
+     * el fichero de verdad, por si el que hay no salió de este compilador.
+     */
+    const sobran = [...dentro].filter((n) => !nombresEnElGlb().includes(n));
+    comprobar('ni sobra ninguna que no pida nadie', sobran.length === 0, sobran);
+
+    /*
+     * LAS PIEZAS DE COLOR SON EXACTAMENTE LAS SIETE, y con su nombre pelado. Si alguien
+     * vuelve a meter `ciudad-blue` en el fichero, las dos listas se solapan y el ahorro
+     * se deshace sin que nada proteste.
+     */
+    const conColor = [...dentro].filter((n) => /-(blue|red|green|yellow)$/.test(n));
+    comprobar(
+      'y ninguna pieza de color entra ya con su color en el nombre',
+      conColor.length === 0,
+      conColor,
+    );
+    const derivadas = todosLosNombres().filter((n) => !nombresEnElGlb().includes(n));
+    comprobar(
+      'las que se fabrican moviendo UV son las siete piezas por cuatro colores',
+      derivadas.length === PIEZAS_DE_COLOR.length * 4,
+      { derivadas: derivadas.length, esperadas: PIEZAS_DE_COLOR.length * 4 },
+    );
+
+    const mancillados = [...dentro].filter((n) => !NOMBRE_QUE_SOBREVIVE.test(n));
+    comprobar(
+      'y ningún nombre lleva algo que GLTFLoader vaya a borrar al cargar',
+      mancillados.length === 0,
+      mancillados,
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+
+/*
+ * ¿SABE LA RED DE CAMINOS RESOLVER CUALQUIER CRUCE?
+ *
+ * El generador traza caminos que serpentean, así que puede pedir cualquier
+ * combinación de lados por los que un camino atraviesa un hexágono. Si faltara una,
+ * esa tesela se quedaría sin pieza y el camino saldría PARTIDO — un trozo de sendero
+ * que se corta en seco y sigue tres teselas más allá. Se ve, pero cuesta relacionarlo
+ * con su causa.
+ *
+ * El pack trae trece trazados y entre los trece, girados, cubren las 63 formas
+ * posibles: 1 de una boca, 3 de dos, 4 de tres, 3 de cuatro, 1 de cinco y 1 de seis.
+ * Aquí se comprueba que la tabla las tenga TODAS, y de paso que los seis vecinos de
+ * la malla caigan en seis lados distintos del pack — que es lo que hace que dos
+ * teselas contiguas casen sus bocas.
+ */
+{
+  paso('La red de caminos sabe resolver cualquier cruce');
+
+  comprobar(
+    'la tabla cubre las 63 formas de atravesar un hexágono',
+    cuantasFormasDeCruce() === 63,
+    cuantasFormasDeCruce(),
+  );
+
+  /*
+   * Y los cauces cubren seis menos: las seis formas de UNA sola boca. No es un
+   * agujero del pack, es una regla — un río que se acaba dentro del mapa no existe.
+   * Si esta cuenta cambiara, sería que alguien ha metido una pieza de río de una boca
+   * y entonces el generador podría trazar ríos que no desembocan.
+   */
+  comprobar(
+    'y los cauces cubren las 57 que le quedan a un río, sin la de una sola boca',
+    cuantasFormasDeCauce() === 57,
+    cuantasFormasDeCauce(),
+  );
+
+  const lados = [0, 1, 2, 3, 4, 5].map((j) => ladoHaciaElVecino(j));
+  comprobar(
+    'y los seis vecinos de la malla caen en seis lados distintos del pack',
+    new Set(lados).size === 6,
+    lados,
+  );
+}
+
+/**
+ * LO QUE HAY EN EL AGUA, SOBRE VEINTE TABLEROS.
+ *
+ * ═══ POR QUÉ SE COMPRUEBA CONTANDO Y NO MIRANDO ═══
+ *
+ * Los tres fallos que ha tenido esta parte eran INVISIBLES en pantalla. Un muelle que
+ * sale de un acantilado se ve; un nenúfar que sale demasiado a menudo, no — hay que
+ * contar cuatrocientas matas para que aparezca. El último costó justo eso: el sorteo
+ * de «¿nenúfar?» compartía canal con la puerta de «¿hay mata aquí?», así que para la
+ * primera mata de cada celda los dos argumentos coincidían y el segundo sorteo salía
+ * siempre por debajo del umbral. Resultado: 63 % de nenúfares con un tope posible del
+ * 45 %, y ni una sola captura en la que se notara.
+ *
+ * Por eso el tope es una comprobación y no un comentario. Ver `marina.ts`.
+ */
+paso('Lo que hay en el agua sigue las reglas del agua');
+{
+  const TERRENOS = [
+    'bosque', 'bosque', 'bosque', 'bosque', 'pradera', 'pradera', 'pradera', 'pradera',
+    'campo', 'campo', 'campo', 'campo', 'colina', 'colina', 'colina',
+    'montana', 'montana', 'montana', 'desierto',
+  ];
+  const islas = mallaDeRadio(2).map((hex, i) => ({
+    hex,
+    terreno: TERRENOS[i % TERRENOS.length] ?? 'pradera',
+  }));
+
+  const SEMILLAS = 20;
+  const muelleEnTierra: string[] = [];
+  const muelleEnCuesta: string[] = [];
+  const barcoEnTierra: string[] = [];
+  const mataFuera: string[] = [];
+  const mataSeca: string[] = [];
+  let matas = 0;
+  let nenufares = 0;
+  const cuentaDeMuelles = new Set<number>();
+  const cuentaDeBarcos = new Set<number>();
+
+  for (let semilla = 0; semilla < SEMILLAS; semilla++) {
+    const teselas = crearRelieve(islas, semilla).todas();
+    const marina = laMarinaDelMundo(teselas, semilla);
+    cuentaDeMuelles.add(marina.muelles.length);
+    cuentaDeBarcos.add(marina.barcos.length);
+
+    /* El índice del mundo, para preguntarle si un punto cae en tierra. */
+    const suelo = new Map<string, (typeof teselas)[number]>();
+    for (const t of teselas) suelo.set(`${String(t.sub.q)},${String(t.sub.r)}`, t);
+
+    const enQueCelda = (p: { x: number; y: number }): string => {
+      const q = ((Math.sqrt(3) / 3) * p.x - (1 / 3) * p.y) / RADIO_DE_TESELA;
+      const r = ((2 / 3) * p.y) / RADIO_DE_TESELA;
+      const s2 = -q - r;
+      let rq = Math.round(q);
+      let rr = Math.round(r);
+      const rs = Math.round(s2);
+      if (Math.abs(rq - q) > Math.abs(rr - r) && Math.abs(rq - q) > Math.abs(rs - s2)) {
+        rq = -rr - rs;
+      } else if (Math.abs(rr - r) > Math.abs(rs - s2)) {
+        rr = -rq - rs;
+      }
+      return `${String(rq)},${String(rr)}`;
+    };
+
+    /* 1. Un muelle se apoya FUERA del mundo, y su tierra de al lado está a nivel cero. */
+    for (const m of marina.muelles) {
+      const celda = enQueCelda(m.punto);
+      if (suelo.has(celda)) muelleEnTierra.push(`s${String(semilla)} ${celda}`);
+      let aRas = false;
+      const [cq, cr] = celda.split(',').map(Number);
+      for (let k = 0; k < 6; k++) {
+        const v = vecino({ q: cq ?? 0, r: cr ?? 0 }, k);
+        const t = suelo.get(`${String(v.q)},${String(v.r)}`);
+        if (t !== undefined && t.nivel === 0) aRas = true;
+      }
+      if (!aRas) muelleEnCuesta.push(`s${String(semilla)} ${celda}`);
+    }
+
+    /* 2. Un barco flota, y no encima de un cabo. */
+    for (const b of marina.barcos) {
+      if (suelo.has(enQueCelda(b.punto))) barcoEnTierra.push(`s${String(semilla)} ${enQueCelda(b.punto)}`);
+    }
+
+    /* 3. Una mata crece dentro de su propia celda de agua ancha, no en la de al lado. */
+    for (const m of marina.matas) {
+      matas++;
+      if (m.nenufar) nenufares++;
+      const t = suelo.get(enQueCelda(m.punto));
+      if (t === undefined) mataFuera.push(`s${String(semilla)}`);
+      else if (t.agua !== CUERPO) mataSeca.push(`s${String(semilla)} agua=${String(t.agua)}`);
+    }
+  }
+
+  comprobar('ningún muelle se apoya en tierra firme', muelleEnTierra.length === 0, muelleEnTierra.slice(0, 4));
+  comprobar('y todos salen de una orilla a nivel del mar', muelleEnCuesta.length === 0, muelleEnCuesta.slice(0, 4));
+  comprobar('ningún barco navega por encima de un cabo', barcoEnTierra.length === 0, barcoEnTierra.slice(0, 4));
+  comprobar('cada junco crece dentro de la celda de agua que lo trajo', mataFuera.length === 0, mataFuera.slice(0, 4));
+  comprobar('y ninguno crece en agua que no sea ancha', mataSeca.length === 0, mataSeca.slice(0, 4));
+  /*
+   * EL TOPE DEL NENÚFAR. El sorteo es `< 0,45` y sólo entra en juego si la celda es
+   * remanso, así que la proporción tiene que quedar POR DEBAJO de 45 y no en 45: si
+   * alguna vez sale por encima, es que dos decisiones han vuelto a compartir canal.
+   */
+  comprobar(
+    'los nenúfares no pasan del tope de su sorteo — dos decisiones, dos canales',
+    matas === 0 || nenufares / matas < 0.45,
+    { matas, nenufares, parte: matas === 0 ? 0 : Number((nenufares / matas).toFixed(3)) },
+  );
+  comprobar('no todos los tableros tienen los mismos muelles', cuentaDeMuelles.size >= 3, [...cuentaDeMuelles]);
+  comprobar('ni los mismos barcos', cuentaDeBarcos.size >= 3, [...cuentaDeBarcos]);
 }
 
 // ---------------------------------------------------------------------------
@@ -263,10 +544,23 @@ if (fallos.length > 0) {
   console.log('');
 }
 
-if (hechas < 8) {
+/**
+ * EL GUARDIA DE «NO SE HAN HECHO TODAS».
+ *
+ * El número va a mano y hay que subirlo al añadir comprobaciones. Es a propósito: un
+ * guion que se cae a la mitad termina con código cero y una lista corta de aciertos, y
+ * eso se lee como verde. Con el número escrito, salir con menos es un fallo ruidoso.
+ *
+ * El suelo estuvo en ocho mientras el guion tenía ocho, y se quedó ahí mientras crecía
+ * a veintitrés: durante ese tiempo el guion podía morirse en la novena sin que nadie se
+ * enterara. Un guardia desfasado no guarda nada.
+ */
+const COMPROBACIONES_ESCRITAS = 26;
+if (hechas < COMPROBACIONES_ESCRITAS) {
   console.error(
-    `Solo se han hecho ${hechas} comprobaciones. Este guion tiene ocho escritas: si salen\n` +
-      'menos, se ha caído por el camino sin decirlo.',
+    `Solo se han hecho ${hechas} de las ${COMPROBACIONES_ESCRITAS} comprobaciones que ` +
+      'tiene escritas este guion: se ha caído por el camino sin decirlo. ' +
+      'Si has añadido comprobaciones nuevas, sube el número.',
   );
   process.exit(2);
 }

@@ -32,3 +32,18 @@ despliegue/destino.local.json
 # que nadie lo pida. Dentro va una partida entera con los NOMBRES que tecleo cada
 # cual, que es el mismo motivo por el que no entran las copias de la mudanza.
 data/mesas/
+
+# El material bruto de KayKit: los zips y lo descomprimido.
+#
+# Son 44 MB de FBX, OBJ y GLTF de los que el juego usa una fraccion, y entran en git
+# a cambio de nada. La licencia lo permite: los cuatro packs traen su License.txt y
+# los cuatro son CC0, tambien el EXTRA de pago —lo que se compra es el apoyo, no un
+# permiso—, asi que cualquiera puede volver a bajarlos.
+#
+# Lo que SI se versiona es el GLB ya compilado, `escenas/modelos/tablero.glb`: son
+# 4,5 MB con las 143 piezas que el mundo usa de verdad, y es lo unico que se
+# despliega. Un binario de ese tamano en git se nota, y aun asi entra: sin el, nadie
+# puede levantar el proyecto sin bajarse antes 44 MB de material bruto y compilar.
+#
+# `arte/README.md` dice de donde sale cada pack y como rehacer el GLB.
+arte/kaykit/

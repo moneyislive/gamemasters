@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "verify:escena": "tsx scripts/verificar-escena.ts"
+    "verify:escena": "tsx scripts/verificar-escena.ts",
+    "compilar:modelos": "tsx scripts/compilar-modelos.ts"
   },
   "description": "Las escenas 3D que pintan los DOS clientes. Sin Canvas propio: lo monta quien la usa.",
   "peerDependencies": {
@@ -12,6 +13,9 @@
     "three": ">=0.185.0"
   },
   "devDependencies": {
+    "@gltf-transform/core": "^4.5.0",
+    "@gltf-transform/extensions": "^4.5.0",
+    "@gltf-transform/functions": "^4.5.0",
     "@react-three/fiber": "^9.7.0",
     "@types/three": "^0.185.4",
     "three": "^0.185.1"

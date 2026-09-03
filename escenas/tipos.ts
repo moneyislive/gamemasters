@@ -52,7 +52,21 @@ export interface IslaEn3D {
 }
 
 /** Lo que se puede levantar en un vértice. Dos clases, como el tablero plano. */
-export type ClaseDePieza = 'choza' | 'torre';
+export type ClaseDePieza = 'poblado' | 'ciudad';
+
+/**
+ * EL COLOR DE UN JUGADOR, y por qué es una palabra y no un `#rrggbb`.
+ *
+ * Porque una construcción NO se tiñe: se elige el modelo del pack que ya viene
+ * pintado de ese color. Teñir un material con la textura de KayKit da un edificio
+ * de un solo color plano y pierde el sombreado que trae cocido, que es justo lo que
+ * lo hace parecer una maqueta buena y no un bloque.
+ *
+ * Los caminos SÍ llevan color en hexadecimal, y no es incoherencia: se dibujan con
+ * geometría propia porque miden lo que mide la arista y no hay pieza del pack que
+ * estirar sesenta unidades sin que se note.
+ */
+export type ColorDeJugador = 'blue' | 'red' | 'green' | 'yellow';
 
 /**
  * Una pieza en un vértice.
@@ -66,8 +80,7 @@ export type ClaseDePieza = 'choza' | 'torre';
 export interface PiezaEn3D {
   vertice: LlaveDeVertice;
   clase: ClaseDePieza;
-  /** Color del dueño, en la notación que entiende three: `'#c8402a'`. */
-  color: string;
+  color: ColorDeJugador;
 }
 
 /** Un camino en una arista. La llave son los dos hexágonos que la comparten. */
