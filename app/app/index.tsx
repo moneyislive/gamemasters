@@ -1184,9 +1184,17 @@ function TarjetaDeArcade({
         {/* LOS TRES DATOS, en la franja levantada y cada uno con su rótulo encima. */}
         <View style={estilos.datos}>
           <DatoDeFicha etiqueta="Aforo" valor={aforoEnCifra(aforo)} cifra />
+          {/*
+            «APARATO» Y NO «DISPOSITIVO», y es una corrección de mirar la pantalla.
+            La columna mide un tercio de la ficha y «DISPOSITIVO» en versalitas con
+            tracking no cabe: partía a mitad de palabra —«DISPOSITIV / O»—, que es
+            de las pocas cosas que se leen como un fallo antes que como un diseño.
+            «Aparato» dice lo mismo, cabe en una línea, y además es la palabra que
+            usa el cliente de escritorio desde antes que esto existiera.
+          */}
           <DatoDeFicha
             etiqueta="Sede"
-            valor={ficha === undefined ? '—' : enElServidor ? 'Servidor' : 'Dispositivo'}
+            valor={ficha === undefined ? '—' : enElServidor ? 'Servidor' : 'Aparato'}
             tabique
           />
           <DatoDeFicha etiqueta="Ritmo" valor={leerRitmo(ficha)} tabique />
@@ -1235,7 +1243,14 @@ function TarjetaDeArcade({
                 viva && !enElServidor ? estilos.pilotoVivo : estilos.pilotoFrio,
               ]}
             />
-            <Text style={estilos.estadoTexto} numberOfLines={1}>
+            {/*
+              DOS LÍNEAS Y NO UNA. Con `numberOfLines={1}` el estado se truncaba
+              —«SE JUEGA AHORA · SIN…»— porque al lado tiene «Echar una», que no
+              cede. Y un estado a medias es peor que un estado en dos renglones:
+              lo que se comía eran justo las dos palabras que importan, que es si
+              hace falta red.
+            */}
+            <Text style={estilos.estadoTexto} numberOfLines={2}>
               {estado}
             </Text>
           </View>
