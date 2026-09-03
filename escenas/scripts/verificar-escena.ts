@@ -44,11 +44,11 @@ import {
   todosLosNombres,
 } from '../nombres';
 import { cuantasFormasDeCauce, cuantasFormasDeCruce, ladoHaciaElVecino } from '../sendas';
-import { vecino } from '../../shared/mecanicas/malla-hexagonal';
-import { CUERPO } from '../aguas';
-import { RADIO_DE_TESELA } from '../escala';
+import { hexesDeVertice, vecino, verticesDeHex } from '../../shared/mecanicas/malla-hexagonal';
+import { CUERPO, piezaDeOrilla } from '../aguas';
+import { RADIO_DE_COMARCA, RADIO_DE_TESELA } from '../escala';
 import { laMarinaDelMundo } from '../marina';
-import { crearRelieve } from '../relieve';
+import { crearRelieve, hexDePunto } from '../relieve';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -439,6 +439,91 @@ paso('La paleta no deja ningún terreno sin color');
  *
  * Por eso el tope es una comprobación y no un comentario. Ver `marina.ts`.
  */
+/**
+ * QUE EL MUNDO CUBRA SUS PROPIOS VÉRTICES.
+ *
+ * Los cincuenta y cuatro vértices del tablero son donde se funda. Dieciséis de ellos
+ * no tenían ni una subtesela debajo —siempre los mismos, en todas las semillas— porque
+ * el contorno del mundo es el borde exacto de las diecinueve comarcas y un vértice del
+ * perímetro cae JUSTO ENCIMA de ese borde: la subtesela que lo contiene le tocaba a una
+ * comarca que no existe.
+ *
+ * No se veía por ningún lado. `alturaEn` devolvía cero tan tranquilo, y el veto de agua
+ * sobre los sitios de construcción los descartaba con un `.filter` silencioso, así que
+ * el río podía pasar justo por donde se construye.
+ *
+ * Se comprueban las tres cosas, y la tercera es la que de verdad importa para jugar: no
+ * basta con que haya una tesela bajo el poblado, hace falta el ANILLO de seis alrededor,
+ * que es lo que ocupa la muralla de una fortaleza.
+ */
+paso('El mundo cubre los cincuenta y cuatro vértices donde se construye');
+{
+  const TERRENOS = [
+    'bosque', 'bosque', 'bosque', 'bosque', 'pradera', 'pradera', 'pradera', 'pradera',
+    'campo', 'campo', 'campo', 'campo', 'colina', 'colina', 'colina',
+    'montana', 'montana', 'montana', 'desierto',
+  ];
+  const hexes = mallaDeRadio(2);
+  const islas = hexes.map((hex, i) => ({ hex, terreno: TERRENOS[i % TERRENOS.length] ?? 'pradera' }));
+  const vertices = new Set<string>();
+  for (const h of hexes) for (const v of verticesDeHex(h)) vertices.add(v);
+
+  let sinSuelo = 0;
+  let sinAnillo = 0;
+  let declarados = 0;
+  const SEMILLAS = 12;
+  for (let semilla = 0; semilla < SEMILLAS; semilla++) {
+    const relieve = crearRelieve(islas, semilla);
+    declarados += relieve.verticesSinSuelo;
+    const dentro = new Set(relieve.todas().map((t) => `${String(t.sub.q)},${String(t.sub.r)}`));
+    for (const v of vertices) {
+      const c = hexDePunto(puntoDeVertice(v, RADIO_DE_COMARCA), RADIO_DE_TESELA);
+      if (!dentro.has(`${String(c.q)},${String(c.r)}`)) sinSuelo++;
+      for (let k = 0; k < 6; k++) {
+        const w = vecino(c, k);
+        if (!dentro.has(`${String(w.q)},${String(w.r)}`)) {
+          sinAnillo++;
+          break;
+        }
+      }
+    }
+  }
+  /*
+   * Y NINGUNA FORMA DE COSTA SE QUEDA SIN DIBUJAR.
+   *
+   * Las cuatro teselas de costa del pack cubren tramos CONTIGUOS de uno a cuatro
+   * lados, así que las 63 formas posibles no caben en ellas: un istmo con agua en dos
+   * lados opuestos son dos tramos, y una isla de una tesela son cinco o seis lados
+   * seguidos. Antes esos casos devolvían `null` y la tesela se dibujaba como hierba
+   * corriente — un agujero en la línea de agua.
+   *
+   * Ahora se dibuja el tramo más largo. Se comprueban las 63 por fuerza bruta, que son
+   * 63: no hay excusa para muestrear.
+   */
+  const sinPieza: number[] = [];
+  for (let bits = 1; bits < 64; bits++) if (piezaDeOrilla(bits) === null) sinPieza.push(bits);
+  comprobar(
+    'las 63 formas de costa posibles tienen todas una pieza que las dibuje',
+    sinPieza.length === 0,
+    sinPieza,
+  );
+
+  comprobar('ningún vértice del tablero se queda sin tesela debajo', sinSuelo === 0, {
+    sinSuelo,
+    de: vertices.size * SEMILLAS,
+  });
+  comprobar('y todos tienen el anillo de seis que ocupa una muralla', sinAnillo === 0, {
+    sinAnillo,
+  });
+  comprobar(
+    'y el relieve lo declara él mismo, para que no haya que venir a contarlo',
+    declarados === 0,
+    { declarados },
+  );
+}
+
+// ---------------------------------------------------------------------------
+
 paso('Lo que hay en el agua sigue las reglas del agua');
 {
   const TERRENOS = [
@@ -609,7 +694,7 @@ if (fallos.length > 0) {
  * a veintitrés: durante ese tiempo el guion podía morirse en la novena sin que nadie se
  * enterara. Un guardia desfasado no guarda nada.
  */
-const COMPROBACIONES_ESCRITAS = 29;
+const COMPROBACIONES_ESCRITAS = 33;
 if (hechas < COMPROBACIONES_ESCRITAS) {
   console.error(
     `Solo se han hecho ${hechas} de las ${COMPROBACIONES_ESCRITAS} comprobaciones que ` +

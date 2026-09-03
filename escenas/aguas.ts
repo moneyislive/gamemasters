@@ -1559,6 +1559,71 @@ export function tiradaDe(bits: number): { largo: number; primero: number } | nul
 }
 
 /**
+ * LA TIRADA MÁS LARGA DE UN PATRÓN QUE NO TIENE PIEZA.
+ *
+ * ═══ EL ISTMO DE UNA TESELA ═══
+ *
+ * Medido sobre sesenta tableros: de las 63 formas posibles, las únicas que aparecen y
+ * no se pueden dibujar son `{0,3}` y `{1,4}` — agua en dos lados OPUESTOS. Es una
+ * lengua de tierra de UNA tesela de ancho con mar a los dos costados, y ninguna pieza
+ * del pack puede enseñar dos playas enfrentadas: sus cuatro costas dibujan tramos
+ * CONTIGUOS de uno a cuatro lados, no dos tramos sueltos.
+ *
+ * Salían tres en sesenta tableros. Pocas, pero el síntoma era el peor posible: la
+ * tesela se quedaba SIN pieza de costa y se dibujaba como hierba corriente, o sea un
+ * agujero en la línea de agua — exactamente el fallo del «río con orilla a ratos», en
+ * pequeño y en otro sitio.
+ *
+ * ═══ POR QUÉ SE QUEDA LA TIRADA MÁS LARGA Y NO SE INUNDA LA TESELA ═══
+ *
+ * Inundarla sería lo natural —un istmo de un paso lo borra la erosión— pero el agua ya
+ * se cerró morfológicamente mucho antes, y volver a tocarla aquí es reabrir un bucle
+ * que costó converger. Y peor: algunas de esas lenguas son justo el delantal que le da
+ * suelo a un vértice del tablero, así que inundarlas devolvería el fallo que el
+ * delantal vino a arreglar.
+ *
+ * Así que se dibuja la playa del lado que más agua tiene y el otro se queda sin ella.
+ * Es una concesión, y se nota si alguien va a buscarla: una tesela cada veinte
+ * tableros con playa en un costado y hierba hasta el borde en el otro. Frente a la
+ * alternativa —sin playa por ninguno— es estrictamente mejor, y frente a mover el agua
+ * es infinitamente más barato.
+ */
+function tiradaMasLarga(bits: number): number {
+  /*
+   * LOS SEIS LADOS CON AGUA no tienen arranque: no hay ningún lado seco detrás del cual
+   * empiece la tirada, así que el bucle de abajo no encontraría ninguno y devolvería
+   * cero. Es una tesela de tierra rodeada de agua por completo, o sea una isla de una
+   * sola tesela. No sale en sesenta tableros, pero devolver `null` por un caso que
+   * «no puede pasar» es la forma habitual de que pase.
+   */
+  if (bits === 0b111111) return 0b001111;
+
+  let mejor = 0;
+  let mejorLargo = 0;
+  for (let inicio = 0; inicio < 6; inicio++) {
+    /* Sólo cuentan los arranques: un lado con agua cuyo anterior no la tiene. */
+    if ((bits & (1 << inicio)) === 0) continue;
+    if ((bits & (1 << ((inicio + 5) % 6))) !== 0) continue;
+    let largo = 0;
+    let tramo = 0;
+    for (let k = 0; k < 6; k++) {
+      const lado = (inicio + k) % 6;
+      if ((bits & (1 << lado)) === 0) break;
+      /* La costa más ancha del pack cubre CUATRO lados; de ahí no se pasa. */
+      if (largo === 4) break;
+      tramo |= 1 << lado;
+      largo++;
+    }
+    /* Desempate por el lado más bajo, para que sea reproducible. */
+    if (largo > mejorLargo) {
+      mejorLargo = largo;
+      mejor = tramo;
+    }
+  }
+  return mejor;
+}
+
+/**
  * LA TESELA DE COSTA que corresponde a un conjunto de lados con agua.
  *
  * Los «primeros canónicos» están MEDIDOS sobre los `.gltf`, no supuestos: la A trae
@@ -1571,7 +1636,7 @@ export function tiradaDe(bits: number): { largo: number; primero: number } | nul
  * Se cerraron dieciocho costas distintas sin ella y con cero fallos.
  */
 export function piezaDeOrilla(bits: number): { modelo: string; giro: number } | null {
-  const tirada = tiradaDe(bits);
+  const tirada = tiradaDe(bits) ?? tiradaDe(tiradaMasLarga(bits));
   if (tirada === null || tirada.largo === 0) return null;
   const cuales = [
     { modelo: 'orilla-a', canonico: 5 },

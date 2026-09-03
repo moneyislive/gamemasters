@@ -83,7 +83,13 @@
  * con la misma semilla ven el mismo mundo sin mandarse un solo byte— y sigue siendo
  * comprobable.
  */
-import { DIRECCIONES, centroDeHex, mallaDeRadio, vecino } from '../shared/mecanicas/malla-hexagonal';
+import {
+  DIRECCIONES,
+  centroDeHex,
+  comparaHex,
+  mallaDeRadio,
+  vecino,
+} from '../shared/mecanicas/malla-hexagonal';
 import type { Hex, LlaveDeVertice, Punto } from '../shared/mecanicas/malla-hexagonal';
 import { puntoDeVertice, verticesDe } from '../shared/mecanicas/malla-hexagonal';
 import { ESCALON, RADIO_DE_COMARCA, RADIO_DE_TESELA, TESELAS_POR_RADIO } from './escala';
@@ -393,6 +399,15 @@ export interface Relieve {
   subteselasDe(hex: Hex): Subtesela[];
   /** Todas las del mundo, de una vez. */
   todas(): Subtesela[];
+  /**
+   * CUÁNTOS VÉRTICES DEL TABLERO SE HAN QUEDADO SIN SUELO DEBAJO.
+   *
+   * Tiene que ser CERO, y por eso está aquí: durante mucho tiempo fueron dieciséis de
+   * cincuenta y cuatro y no había forma de enterarse desde fuera. Es un invariante que
+   * el delantal garantiza por construcción, y aun así se mide, porque un invariante
+   * que no se mide es una promesa.
+   */
+  readonly verticesSinSuelo: number;
 }
 
 /**
@@ -797,6 +812,92 @@ export function crearRelieve(comarcas: readonly ComarcaDelMundo[], semilla = 0):
       rangos.push((Math.abs(paso.q) + Math.abs(paso.r) + Math.abs(paso.q + paso.r)) / 2);
     }
   }
+  /* ── EL DELANTAL: QUE EL MUNDO CUBRA SUS PROPIOS VÉRTICES ─────────────────
+   *
+   * ═══ QUÉ PASABA ═══
+   *
+   * Dieciséis de los cincuenta y cuatro vértices del tablero NO tenían ni una
+   * subtesela debajo. Medido, en todas las semillas, siempre los mismos dieciséis.
+   *
+   * ═══ POR QUÉ, QUE ES LO INTERESANTE ═══
+   *
+   * El reparto de subteselas en comarcas es una partición EXACTA del plano: cada
+   * subtesela pertenece a una comarca y a una sola, existan o no. El mundo son las
+   * subteselas de las diecinueve comarcas que hay, así que su contorno es exactamente
+   * el borde de esas diecinueve.
+   *
+   * Y un vértice del tablero es una ESQUINA de comarca: cae JUSTO ENCIMA de ese
+   * contorno. La subtesela que lo contiene puede tocarle a cualquiera de las tres
+   * comarcas que se juntan ahí, y en el borde del tablero una o dos de esas tres no
+   * existen. O sea que era una moneda al aire: de los treinta vértices del perímetro,
+   * catorce caían dentro y dieciséis fuera.
+   *
+   * No era un fallo de redondeo que se pudiera apretar con un epsilon. Era el mundo
+   * cortado exactamente por donde se construye.
+   *
+   * ═══ LO QUE SE ROMPÍA, QUE ERAN DOS COSAS Y NO UNA ═══
+   *
+   *   · `alturaEn` de esos vértices devolvía CERO tan tranquilo —no hay tesela que
+   *     mirar—, así que un poblado fundado ahí se hundía o flotaba, según el terreno.
+   *   · Y el veto de agua sobre los vértices se calcula mapeando cada vértice a su
+   *     subtesela y filtrando los que no existen. Dieciséis se caían por ese filtro
+   *     sin decir nada, así que el río podía pasar justo por donde se construye.
+   *
+   * ═══ EL ARREGLO ═══
+   *
+   * Se añaden las subteselas que faltan para que CADA vértice tenga suelo bajo los
+   * pies y su anillo de seis alrededor — que es lo que ocupa una fortaleza, así que
+   * es la unidad correcta y no una elección estética. Son 112 subteselas sobre 2.736,
+   * un 4,1%.
+   *
+   * Cada una se arrima a la comarca EXISTENTE más cercana, que es la que le da su
+   * bioma: así el delantal continúa el terreno de al lado en vez de inventarse uno.
+   * La partición sigue siendo exacta para todo lo demás; esto es un añadido explícito
+   * encima, y por eso se hace aquí y no tocando `comarcaDeSubtesela`, que es pura y
+   * tiene que seguir siéndolo.
+   *
+   * Efecto secundario, y bueno: el contorno del mundo deja de ser el borde geométrico
+   * de diecinueve hexágonos y se ensancha un poco en cada vértice. La costa se lee
+   * menos como el recorte de una plantilla.
+   */
+  {
+    const centrosDeComarca = unicas.map((c) => ({
+      hex: c.hex,
+      punto: centroDeHex(c.hex, RADIO_DE_COMARCA),
+    }));
+
+    /** La comarca existente cuyo centro cae más cerca. Desempate entero. */
+    function comarcaMasCercana(centro: Punto): Hex {
+      let mejor = centrosDeComarca[0] as (typeof centrosDeComarca)[number];
+      let corta = Infinity;
+      for (const c of centrosDeComarca) {
+        const d = (c.punto.x - centro.x) ** 2 + (c.punto.y - centro.y) ** 2;
+        if (d < corta - 1e-9 || (Math.abs(d - corta) <= 1e-9 && comparaHex(c.hex, mejor.hex) < 0)) {
+          corta = d;
+          mejor = c;
+        }
+      }
+      return mejor.hex;
+    }
+
+    function agrega(sub: Hex): void {
+      if (indice.has(llaveDeSub(sub))) return;
+      const suya = comarcaMasCercana(centroDeHex(sub, RADIO_DE_TESELA));
+      const dq = sub.q - suya.q * TESELAS_POR_RADIO;
+      const dr = sub.r - suya.r * TESELAS_POR_RADIO;
+      indice.set(llaveDeSub(sub), subteselas.length);
+      subteselas.push(sub);
+      deComarca.push(suya);
+      rangos.push((Math.abs(dq) + Math.abs(dr) + Math.abs(dq + dr)) / 2);
+    }
+
+    for (const { punto } of cotaDelRellano.values()) {
+      const centro = hexDePunto(punto, RADIO_DE_TESELA);
+      agrega(centro);
+      for (let k = 0; k < 6; k++) agrega(vecino(centro, k));
+    }
+  }
+
   const N = subteselas.length;
 
   /** El centro de cada subtesela, y su altura CRUDA. Calculados una vez. */
@@ -818,6 +919,28 @@ export function crearRelieve(comarcas: readonly ComarcaDelMundo[], semilla = 0):
    * tiene que pasar. Y no hay ciclo: la hidrología no mira los rellanos y los
    * rellanos no miran la hidrología, sólo su resultado. Una sola dirección.
    */
+  /*
+   * LOS ÍNDICES DE LOS VÉRTICES, Y POR QUÉ SE CUENTAN LOS QUE FALTAN.
+   *
+   * Esto era un `.map(...).filter(i => i !== undefined)` en la llamada de abajo, y el
+   * filtro se tragaba en silencio los dieciséis vértices que no tenían subtesela. El
+   * veto de agua sobre los sitios de construcción nunca llegaba a ellos: el río podía
+   * pasar justo por donde se funda un poblado, y no había nada que mirar.
+   *
+   * Con el delantal no debería faltar ninguno NUNCA. Pero un invariante que sólo se
+   * cumple por construcción y no se mide es un invariante que alguien romperá sin
+   * enterarse, así que el hueco se cuenta y sale por `verticesSinSuelo`. Es la misma
+   * lección del `.filter` de antes, aplicada a su propio arreglo: el problema no era
+   * el filtro, era que tiraba sin contar.
+   */
+  const indicesDeLosVertices: number[] = [];
+  let verticesSinSuelo = 0;
+  for (const v of cotaDelRellano.values()) {
+    const i = indice.get(llaveDeSub(hexDePunto(v.punto, RADIO_DE_TESELA)));
+    if (i === undefined) verticesSinSuelo++;
+    else indicesDeLosVertices.push(i);
+  }
+
   const aguas = trazaLasAguas({
     n: N,
     subteselas,
@@ -825,9 +948,7 @@ export function crearRelieve(comarcas: readonly ComarcaDelMundo[], semilla = 0):
     perfil,
     terrenos: subteselas.map((_, i) => terrenoDeComarca(deComarca[i] as Hex)),
     comarcas: deComarca,
-    enVertices: [...cotaDelRellano.values()]
-      .map((v) => indice.get(llaveDeSub(hexDePunto(v.punto, RADIO_DE_TESELA))))
-      .filter((i): i is number => i !== undefined),
+    enVertices: indicesDeLosVertices,
     enPlazas: unicas
       .map((c) =>
         indice.get(
@@ -1019,5 +1140,6 @@ export function crearRelieve(comarcas: readonly ComarcaDelMundo[], semilla = 0):
       for (const c of unicas) salida.push(...(porComarca.get(llaveDeSub(c.hex)) ?? []));
       return salida;
     },
+    verticesSinSuelo,
   };
 }
