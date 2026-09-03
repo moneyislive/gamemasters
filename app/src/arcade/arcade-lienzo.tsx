@@ -56,6 +56,47 @@
  * que sí. Es lo mismo que hace `WithSkiaWeb` del propio paquete, escrito a mano
  * para no arrastrar el cargador de web dentro del binario de Android y de iOS.
  *
+ * ═══ EL COLOR DE ESTA PANTALLA: DOS SITIOS, Y NINGUNO ES DECORACIÓN ═══
+ *
+ * La Sala no reparte su acento en veinte detalles, porque repartido se apaga.
+ * Aquí sólo hay dos cosas teñidas y las dos dicen algo que hace falta saber en
+ * medio de una partida de sesenta hercios, sin leer:
+ *
+ *   · `SALA.acento` es LA NAVE y es el botón. Las dos son lo mismo: lo que
+ *     responde al dedo. Todo lo demás de la pantalla —campo, rótulos, cifra,
+ *     avisos— es gris frío.
+ *   · `SALA.alarma` es LO QUE CAE, y no se tiñe con el tema a propósito. Si la
+ *     basura llevara el acento diría lo mismo que la nave, que es exactamente lo
+ *     contrario de lo que hay que entender en un juego de esquivar. Está
+ *     razonado en `muebles.ts`, donde vive la constante.
+ *
+ * Y no hay tercer color: ni el error de subida ni el «sin conexión» son rojos.
+ * Lo urgente aquí es que te matan, no que el servidor no conteste.
+ *
+ * ═══ Y ESTA PANTALLA ES EL CASO QUE `muebles.ts` DABA POR IMPOSIBLE ═══
+ *
+ * `SALA.alarma` se declara allí fijo a costa de una incomodidad escrita: con el
+ * tema en ÁMBAR el naranja de la alarma se le parece al acento. La constante
+ * aguanta porque «los dos no coinciden nunca en la misma pantalla —la placa de
+ * acento es de la Sala y la alarma es de dentro de una partida—, y el día que
+ * coincidan habrá que resolverlo, no ignorarlo».
+ *
+ * AQUÍ COINCIDEN. La nave lleva el acento y lo que cae lleva la alarma, a medio
+ * metro la una de la otra y a sesenta fotogramas por segundo. Hoy no se nota
+ * porque el tema es violeta para todo el mundo; el día que alguien encienda
+ * `TEMAS_DE_SALA.ambar`, este juego pide distinguir un ámbar de un naranja en
+ * marcha, que es justo lo que no se puede hacer.
+ *
+ * No se arregla desde este fichero —la salida es de la tabla: una alarma que se
+ * aparte cuando el tema se le acerque, o un ámbar que no sea ese— y por eso aquí
+ * sólo queda dicho, con nombre y sitio, para quien encienda el segundo tema.
+ *
+ * OJO CON EL ATLAS: `useTexture` hornea la imagen UNA VEZ, al montar, con las
+ * dependencias vacías. Hoy da igual porque `SALA` es una constante compilada,
+ * pero el día que la Sala deje elegir tema en caliente —`TEMAS_DE_SALA` ya tiene
+ * los cuatro— la nave se quedará del color viejo hasta que se vuelva a entrar, y
+ * será un fallo mudo. Se arregla pasándole las dependencias, no aquí.
+ *
  * ═══ LO QUE NO SE HA PODIDO COMPROBAR, DICHO AQUÍ ═══
  *
  * Este fichero COMPILA y no se ha visto correr: en la máquina donde se escribió no
@@ -72,6 +113,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { router } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useSharedValue } from 'react-native-reanimated';
 import { Atlas, Canvas, Group, RoundedRect, Skia, useRSXformBuffer, useTexture } from '@shopify/react-native-skia';
 import type { SkRect } from '@shopify/react-native-skia';
@@ -94,7 +136,14 @@ import { usarPartidaDeFotogramas } from './bucle';
 import { usarElAparatoQuieto, usarPrimerPlano } from './local';
 import { anunciarQueEmpiezo, subirLaPartida } from './marcador';
 import type { ComoFue, PartidaAnunciada } from './marcador';
-import { SALA } from './muebles';
+import { LETRA, RADIO, SALA } from './muebles';
+/*
+ * `conAlfa` se IMPORTA y no se copia. Es la única transparencia de este fichero
+ * y cabría en una línea, que es justamente por lo que alguien la duplicó una vez
+ * en otro sitio: dos copias de la misma función terminan siendo dos funciones
+ * distintas el día que una se arregla.
+ */
+import { conAlfa } from '../tema';
 
 /** El lado de cada sprite dentro del atlas, en píxeles de la imagen horneada. */
 const LADO_DEL_SPRITE = 64;
@@ -308,6 +357,10 @@ export default function ArcadeConLienzo(): JSX.Element {
    *
    * Dos de 64 × 64, uno al lado del otro: la nave y lo que cae. Los colores son
    * los de la Sala, que es lo que separa esta familia de la de las veladas.
+   *
+   * NO están horneados en ninguna imagen: son formas de Skia pintadas con la
+   * tabla, así que cambiar `SALA` los cambia. Lo que sí se hornea es el
+   * resultado, y sólo al montar — ver el aviso del atlas en la cabecera.
    */
   const textura = useTexture(
     <Group>
@@ -319,12 +372,27 @@ export default function ArcadeConLienzo(): JSX.Element {
         Si se cambian `NAVE_MEDIO_ANCHO` o `NAVE_MEDIO_ALTO` en las reglas, esta
         banda se cambia con ellos.
       */}
-      <RoundedRect x={0} y={15} width={64} height={34} r={14} color={SALA.neon} />
-      <RoundedRect x={22} y={22} width={20} height={20} r={8} color={SALA.palabra} />
-      {/* Y LO QUE CAE, que sí es cuadrado y coincide exacto con su caja. */}
+      <RoundedRect x={0} y={15} width={64} height={34} r={14} color={SALA.acento} />
+      {/*
+        El hueco de la nave va en BLANCO y no en el gris del texto: está encima
+        de un campo de acento saturado, y ahí el gris de leer se ensucia. Es la
+        misma regla que en la Sala pone `blanco` sobre la placa del nombre.
+      */}
+      <RoundedRect x={22} y={22} width={20} height={20} r={8} color={SALA.blanco} />
+      {/*
+        Y LO QUE CAE, que sí es cuadrado y coincide exacto con su caja. En
+        `alarma`, que es el único color de la tabla que significa «esto te mata»
+        y el único que no se tiñe con el tema — con el aviso de la cabecera sobre
+        lo que pasa aquí el día que el tema sea ámbar.
+      */}
       <Group transform={[{ translateX: LADO_DEL_SPRITE }]}>
-        <RoundedRect x={0} y={0} width={64} height={64} r={12} color={SALA.aviso} />
-        <RoundedRect x={16} y={16} width={32} height={32} r={6} color={SALA.fondo} />
+        <RoundedRect x={0} y={0} width={64} height={64} r={12} color={SALA.alarma} />
+        {/*
+          El agujero se pinta con el SUELO y no con el campo que hay detrás: así
+          se lee como vacío y no como una pieza más, y sigue leyéndose igual el
+          día que la superficie del campo cambie de escalón.
+        */}
+        <RoundedRect x={16} y={16} width={32} height={32} r={6} color={SALA.suelo} />
       </Group>
     </Group>,
     { width: LADO_DEL_SPRITE * 2, height: LADO_DEL_SPRITE },
@@ -398,7 +466,18 @@ export default function ArcadeConLienzo(): JSX.Element {
         <Text style={estilos.cifra}>{esquivadas}</Text>
       </View>
 
-      <View style={{ width: lado, height: lado }}>
+      {/*
+        EL CAMPO ES UNA SUPERFICIE, Y SE DICE COMO SE DICEN AQUÍ TODAS: un
+        escalón de elevación sobre el suelo y un filo de un píxel alrededor. Ni
+        marco de máquina, ni bisel, ni chapa — en esta Sala no hay materia, y un
+        lienzo negro sobre fondo negro no es sobriedad: es que no se ve dónde
+        empieza el juego.
+
+        Los dos píxeles de más son el borde: el hueco interior tiene que seguir
+        midiendo `lado` EXACTO, porque de ahí sale `escala` y con ella la caja de
+        colisión. Un píxel comido aquí mueve la nave respecto a lo que la mata.
+      */}
+      <View style={[estilos.campo, { width: lado + 2, height: lado + 2 }]}>
         <Canvas style={{ width: lado, height: lado }}>
           {/*
             UNA SOLA LLAMADA DE DIBUJO, sean dos sprites o veinticinco. Es la razón
@@ -456,17 +535,19 @@ export default function ArcadeConLienzo(): JSX.Element {
                 <Text style={estilos.pista}>
                   Mantén pulsada la mitad izquierda o la derecha para moverte.
                 </Text>
-                <Pressable
-                  style={estilos.boton}
-                  onPress={empezar}
-                  disabled={preparando}
-                  accessibilityRole="button"
-                  accessibilityLabel="Empezar"
-                >
-                  <Text style={estilos.botonTexto}>{preparando ? 'Preparando…' : 'Empezar'}</Text>
-                </Pressable>
+                <BotonDeArcade
+                  texto={preparando ? 'Preparando…' : 'Empezar'}
+                  alPulsar={empezar}
+                  apagado={preparando}
+                />
+                {/*
+                  Sin conexión NO es una alarma: se puede jugar igual, sólo que
+                  la partida no cuenta. El naranja está reservado para lo que se
+                  acaba y lo que mata, y gastarlo aquí sería enseñárselo a quien
+                  juega antes de que signifique algo.
+                */}
                 {!preparando && anuncio === null ? (
-                  <Text style={estilos.aviso}>
+                  <Text style={estilos.pista}>
                     Sin conexión con el servidor: se puede jugar, pero esta partida no entra en la
                     tabla.
                   </Text>
@@ -475,7 +556,15 @@ export default function ArcadeConLienzo(): JSX.Element {
             ) : (
               <>
                 <Text style={estilos.texto}>Se acabó. {esquivadas} esquivadas.</Text>
-                <Text style={subiendo ? estilos.pista : comoFue?.publicada ? estilos.pista : estilos.aviso}>
+                {/*
+                  LAS TRES FRASES VAN DEL MISMO COLOR, y antes la de fallo iba en
+                  naranja. Que la partida no se haya podido publicar no es una
+                  emergencia: es una noticia, y la da la frase. El color de aviso
+                  de esta Sala significa una cosa sola —que te matan— y si además
+                  significara «el servidor dijo que no», dejaría de avisar de la
+                  primera, que es la que hay que ver de reojo y en un segundo.
+                */}
+                <Text style={estilos.pista}>
                   {subiendo
                     ? 'Mandando la partida para que la comprueben…'
                     : comoFue === null
@@ -484,14 +573,7 @@ export default function ArcadeConLienzo(): JSX.Element {
                         ? `Comprobada: ${comoFue.cifra} cuenta para la tabla.`
                         : comoFue.porque}
                 </Text>
-                <Pressable
-                  style={estilos.boton}
-                  onPress={otra}
-                  accessibilityRole="button"
-                  accessibilityLabel="Otra partida"
-                >
-                  <Text style={estilos.botonTexto}>Otra</Text>
-                </Pressable>
+                <BotonDeArcade texto="Otra" alPulsar={otra} etiqueta="Otra partida" />
               </>
             )}
           </View>
@@ -510,11 +592,89 @@ export default function ArcadeConLienzo(): JSX.Element {
   );
 }
 
+/**
+ * EL BOTÓN GRANDE, QUE ES DONDE VIVE EL COLOR CUANDO NO SE ESTÁ JUGANDO.
+ *
+ * Existe como pieza y no como dos `Pressable` calcados porque el acento es una
+ * decisión de la Sala, no de esta pantalla: si mañana el campo de color se pinta
+ * de otra manera, se cambia aquí y las dos pantallas —«Empezar» y «Otra»— dicen
+ * lo mismo. Dos copias es cómo se acaba teniendo un botón que brilla y otro que
+ * no sin que nadie lo haya decidido.
+ *
+ * APAGADO NO ES EL MISMO BOTÓN MÁS PÁLIDO: pierde el campo de acento entero y se
+ * queda en teja con filo, porque en esta Sala el acento significa «esto responde
+ * al dedo». Mientras se pide la partida al servidor, no responde.
+ */
+function BotonDeArcade({
+  texto,
+  alPulsar,
+  apagado = false,
+  etiqueta,
+}: {
+  texto: string;
+  alPulsar: () => void;
+  apagado?: boolean;
+  etiqueta?: string;
+}): JSX.Element {
+  return (
+    <Pressable
+      style={[estilos.boton, apagado ? estilos.botonApagado : null]}
+      onPress={alPulsar}
+      disabled={apagado}
+      accessibilityRole="button"
+      accessibilityState={{ disabled: apagado }}
+      accessibilityLabel={etiqueta ?? texto}
+    >
+      {/*
+        El degradado va DETRÁS del texto y no como fondo del `Pressable` porque
+        en React Native un fondo es un color plano y esto son dos. Los dos puntos
+        salen de la maqueta —cae hacia abajo y algo a la derecha—, y el borde
+        queda fuera del relleno absoluto, así que el filo se sigue viendo.
+      */}
+      {apagado ? null : (
+        <LinearGradient
+          colors={[SALA.acento, SALA.acentoHondo]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 0.4, y: 1 }}
+          style={StyleSheet.absoluteFill}
+        />
+      )}
+      <Text style={[estilos.botonTexto, apagado ? estilos.botonTextoApagado : null]}>{texto}</Text>
+    </Pressable>
+  );
+}
+
 const estilos = StyleSheet.create({
-  pantalla: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: SALA.fondo, gap: 12 },
-  cabecera: { alignItems: 'center', gap: 2 },
-  rotulo: { color: SALA.neonTenue, fontSize: 13, fontWeight: '800', letterSpacing: 4 },
-  cifra: { color: SALA.neon, fontSize: 40, fontWeight: '900' },
+  pantalla: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: SALA.suelo, gap: 12 },
+  cabecera: { alignItems: 'center', gap: 4 },
+  /*
+   * El rótulo del marcador iba con cuatro de tracking y a un gris que se quedaba
+   * en 3,1 a 1 contra el fondo, o sea ilegible con el móvil en la mano y la
+   * pantalla inclinada. `tenue` es el gris de leer de la tabla y pasa de 6 a 1;
+   * el tracking baja al de los rótulos pequeños de la Sala, que ya está medido.
+   */
+  rotulo: { ...LETRA.rotuloChico, color: SALA.tenue, fontSize: 13 },
+  /*
+   * La cifra es lo único grande de la pantalla y va en `blanco`, que es lo que
+   * la tabla reserva para las cifras grandes: no es un acento, es EL DATO. Y con
+   * `tabular-nums` porque sube mientras se juega — sin ellas el número entero se
+   * ensancha y se estrecha a cada esquivada, y lo que se ve es un temblor.
+   */
+  cifra: {
+    ...LETRA.rotulo,
+    color: SALA.blanco,
+    fontSize: 40,
+    lineHeight: 44,
+    fontVariant: ['tabular-nums'],
+  },
+  campo: {
+    backgroundColor: SALA.pared,
+    borderRadius: RADIO.ficha,
+    borderWidth: 1,
+    borderColor: SALA.filo,
+    /* Para que lo que cae no se salga por la esquina redondeada. */
+    overflow: 'hidden',
+  },
   mandos: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, flexDirection: 'row' },
   mitad: { flex: 1 },
   encima: {
@@ -527,21 +687,52 @@ const estilos = StyleSheet.create({
     justifyContent: 'center',
     padding: 24,
     gap: 12,
-    backgroundColor: 'rgba(6,17,15,0.82)',
+    /*
+     * Era un `rgba(6,17,15,0.82)` a mano, y ese verde-negro no era de ninguna
+     * paleta: venía de la Sala anterior. Ahora es el suelo de la casa con su
+     * alfa, así que el velo sigue al fondo si el fondo cambia.
+     */
+    backgroundColor: conAlfa(SALA.suelo, 0.82),
   },
-  texto: { color: SALA.palabra, fontSize: 18, lineHeight: 26, textAlign: 'center', maxWidth: 340 },
-  pista: { color: SALA.neonTenue, fontSize: 14, lineHeight: 20, textAlign: 'center', maxWidth: 340 },
-  aviso: { color: SALA.aviso, fontSize: 14, lineHeight: 20, textAlign: 'center', maxWidth: 340 },
+  texto: { ...LETRA.cuerpo, color: SALA.palabra, fontSize: 18, lineHeight: 26, textAlign: 'center', maxWidth: 340 },
+  pista: { ...LETRA.cuerpo, color: SALA.tenue, fontSize: 14, lineHeight: 20, textAlign: 'center', maxWidth: 340 },
   boton: {
     marginTop: 6,
+    /* 48 de alto y no 44 justos: es el botón principal y se pulsa de pie. */
+    minHeight: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
     paddingVertical: 12,
-    paddingHorizontal: 28,
-    borderRadius: 10,
+    /* 28 de hueco menos el píxel del filo, que también ocupa. */
+    paddingHorizontal: 27,
+    borderRadius: RADIO.mando,
     borderWidth: 1,
-    borderColor: SALA.neon,
-    backgroundColor: SALA.panel,
+    borderColor: SALA.filoVivo,
+    /*
+     * El color de abajo del degradado, plano, debajo de él. No es adorno: el
+     * `LinearGradient` es un hijo que se monta, y sin esto el primer fotograma
+     * enseñaría un botón transparente con el texto blanco al aire.
+     */
+    backgroundColor: SALA.acentoHondo,
+    overflow: 'hidden',
   },
-  botonTexto: { color: SALA.neon, fontSize: 17, fontWeight: '700' },
-  salir: { paddingVertical: 8, paddingHorizontal: 16 },
-  salirTexto: { color: SALA.neonTenue, fontSize: 15 },
+  botonApagado: { backgroundColor: SALA.teja, borderColor: SALA.filo },
+  botonTexto: { ...LETRA.rotulo, color: SALA.blanco, fontSize: 15 },
+  botonTextoApagado: { color: SALA.tenue },
+  /*
+   * «Volver» era texto suelto de 34 de alto: por debajo del mínimo de dedo, y en
+   * la esquina de una pantalla que se juega con los pulgares. Se queda en la
+   * pastilla con filo de la maqueta, que además le da forma de cosa pulsable sin
+   * gastar ni una gota de acento.
+   */
+  salir: {
+    minHeight: 44,
+    justifyContent: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+    borderRadius: RADIO.mando,
+    borderWidth: 1,
+    borderColor: SALA.filo,
+  },
+  salirTexto: { ...LETRA.rotuloChico, color: SALA.tenue, fontSize: 13 },
 });

@@ -36,6 +36,33 @@
  * los que sólo juegan veladas, y el §7 lo reserva para el mueble `lienzo`, que es
  * el que de verdad necesita sesenta fotogramas por segundo. Un tablero por turnos
  * se repinta cuando alguien mueve.
+ *
+ * ═══ EL COLOR DE ESTA PANTALLA ESTÁ REPARTIDO, Y EL REPARTO ES LA REGLA ═══
+ *
+ * Hay dos paletas en el mismo SVG y no se mezclan nunca:
+ *
+ *   · LA DEL JUEGO pinta las FIGURAS —`cara.relleno`, `cara.borde`, `linea.color`,
+ *     `nudo.color`—. Llegan en el dato y salen enteras. Un arcade de fuera elige
+ *     de qué color es su delta, y este fichero no tiene ninguna opinión sobre eso.
+ *   · LA DE LA SALA (`SALA`, en `./muebles`) pinta el MARCO —el suelo, los
+ *     paneles, los botones, los rótulos— y, dentro del dibujo, sólo el ESTADO:
+ *     que una pieza se puede tocar, que una cara está destacada, que un botón no
+ *     está disponible. Estado es lo único que el juego NO puede saber pintar,
+ *     porque depende de a quién se le está enseñando la partida.
+ *
+ * De ahí sale la regla que explica cada color de abajo: `SALA.acento` aparece
+ * SÓLO donde algo se puede tocar o está elegido ahora mismo. Si se usara además
+ * para los títulos y los bordes —que es lo que hacía la versión anterior con su
+ * `neon`— dejaría de querer decir «esto responde al dedo» y sería decoración.
+ *
+ * ═══ Y AQUÍ NO SE ESCRIBE UN COLOR A MANO ═══
+ *
+ * Había tres hexadecimales sueltos: dos blancos casi iguales para los rótulos de
+ * las caras y un `#10141b` que no pertenecía a ninguna paleta de esta casa —era
+ * el gris del fondo de una maqueta, copiado a un borde—. Un color escrito a mano
+ * no se puede repintar: la Sala entera se cambia de violeta a ámbar tocando tres
+ * valores de `SALA`, y lo que esté fuera de la tabla se queda como estaba y
+ * canta.
  */
 import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
@@ -47,7 +74,7 @@ import type {
   NudoDeTablero,
   TableroDeclarado,
 } from '../../../shared/mecanicas/tablero-declarado';
-import { SALA } from './muebles';
+import { LETRA, RADIO, SALA } from './muebles';
 
 /**
  * ═══ EL ALTO DEL LIENZO SE CALCULA, Y ANTES ESTABA CLAVADO EN 360 ═══
@@ -95,8 +122,14 @@ const TEXTO_MINIMO_PX = 13;
  * de todo el fichero que hay que cambiar a la vez que un estilo: si alguien toca uno
  * de esos dos rellenos y se olvida de ésta, la estimación de ancho se queda coja y
  * los objetivos salen un poco más pequeños, sin que nada se caiga.
+ *
+ * Los 4 del `lienzo` ya no son 4 de relleno: son 3 de relleno y 1 de filo, porque
+ * la Sala separa una superficie de otra con un píxel de borde y no con un cambio de
+ * material. Se ha restado del hueco en vez de sumarse encima —que era lo cómodo—
+ * precisamente para que esta cuenta no se moviera: un borde que se ignora se come
+ * dos píxeles del ancho útil, y de ahí salen los objetivos del dedo.
  */
-const MARGENES_DEL_RETABLO = 16 * 2 + 4 * 2;
+const MARGENES_DEL_RETABLO = 16 * 2 + (3 + 1) * 2;
 
 /** Lo que hace falta para pintar un tablero y poder tocarlo. */
 export interface QueSePinta {
@@ -174,7 +207,26 @@ export function Retablo({ tablero, alTocar, quieto }: QueSePinta): JSX.Element {
 
   return (
     <ScrollView style={estilos.todo} contentContainerStyle={estilos.dentro}>
-      <Text style={estilos.aviso}>{tablero.aviso}</Text>
+      {/*
+        EL AVISO ES EL PANEL DEL TURNO, y por eso lleva el único acento del marco.
+
+        Dice de quién es el turno, qué se espera o quién ganó: es lo que está vivo
+        de esta pantalla, que es la definición de dónde puede aparecer el acento.
+        Va como raíl al borde y no como color del texto porque una frase entera en
+        violeta se lee peor que la misma frase en blanco con un raíl al lado, y
+        porque el texto lo escribe el JUEGO — teñirlo sería la Sala hablando por
+        encima de sus palabras.
+
+        Y se pinta sólo si hay frase. Antes se pintaba siempre: con `aviso` vacío
+        era un `Text` invisible y daba igual, pero un panel con fondo y raíl sí se
+        ve, y sería una caja de color anunciando nada.
+      */}
+      {tablero.aviso.length > 0 ? (
+        <View style={estilos.aviso}>
+          <View style={estilos.avisoRail} />
+          <Text style={estilos.avisoTexto}>{tablero.aviso}</Text>
+        </View>
+      ) : null}
 
       {tablero.caras.length > 0 || tablero.nudos.length > 0 ? (
         <View style={estilos.lienzo} onLayout={medir}>
@@ -193,7 +245,14 @@ export function Retablo({ tablero, alTocar, quieto }: QueSePinta): JSX.Element {
                   key={cara.id}
                   points={cara.puntos.map((p) => `${p.x},${p.y}`).join(' ')}
                   fill={cara.relleno}
-                  stroke={cara.destacada ? SALA.neon : cara.borde}
+                  /*
+                   * El relleno y el borde son del juego; el borde se le quita
+                   * SÓLO cuando hay que decir «ésta, ahora mismo», que es estado
+                   * y no color. El acento va en el contorno y no en la cara: el
+                   * contorno cae entre el relleno del juego y lo que hay debajo,
+                   * que es terreno de la Sala, y el relleno no.
+                   */
+                  stroke={cara.destacada ? SALA.acento : cara.borde}
                   strokeWidth={cara.destacada ? 6 : 2}
                   onPress={cara.toque === null || quieto ? undefined : () => alTocar(cara.toque as MovimientoDeclarado)}
                 />
@@ -207,7 +266,8 @@ export function Retablo({ tablero, alTocar, quieto }: QueSePinta): JSX.Element {
                   y1={linea.desde.y}
                   x2={linea.hasta.x}
                   y2={linea.hasta.y}
-                  stroke={linea.toque !== null ? SALA.neon : linea.color}
+                  /* Acento = se puede tocar. Si no, el color que declaró el juego. */
+                  stroke={linea.toque !== null ? SALA.acento : linea.color}
                   strokeWidth={linea.toque !== null ? Math.max(linea.grosor, 8) : linea.grosor}
                   strokeLinecap="round"
                   opacity={linea.tenue && linea.toque === null ? 0.45 : 1}
@@ -220,6 +280,17 @@ export function Retablo({ tablero, alTocar, quieto }: QueSePinta): JSX.Element {
                 <CifraDeLaCara key={`cifra-${cara.id}`} cara={cara} escala={escala} />
               ))}
             </G>
+            {/*
+              EL CONTORNO DE UN NUDO DICE SI RESPONDE, y nada más.
+
+              Pulsable, el acento. Quieto, el filo de la Sala: un píxel de blanco
+              muy bajo que despega la pieza de lo que tenga debajo. Aquí había un
+              `#10141b` escrito a mano, un gris de fondo haciendo de borde; era casi
+              del color del suelo, así que sobre el suelo no separaba nada y sobre
+              una cara clara era una mancha oscura. El filo va con alfa justamente
+              para servir sobre las tres cosas —el suelo, el panel y el relleno que
+              declare el juego— sin tener que declarar tres colores.
+            */}
             <G>
               {tablero.nudos.map((nudo) =>
                 nudo.forma === 'cuadrado' ? (
@@ -230,7 +301,7 @@ export function Retablo({ tablero, alTocar, quieto }: QueSePinta): JSX.Element {
                     width={nudo.radio * 2}
                     height={nudo.radio * 2}
                     fill={nudo.color}
-                    stroke={nudo.toque !== null ? SALA.neon : '#10141b'}
+                    stroke={nudo.toque !== null ? SALA.acento : SALA.filo}
                     strokeWidth={nudo.toque !== null ? 5 : 2}
                     onPress={nudo.toque === null || quieto ? undefined : () => alTocar(nudo.toque as MovimientoDeclarado)}
                   />
@@ -241,7 +312,7 @@ export function Retablo({ tablero, alTocar, quieto }: QueSePinta): JSX.Element {
                     cy={nudo.punto.y}
                     r={nudo.radio}
                     fill={nudo.color}
-                    stroke={nudo.toque !== null ? SALA.neon : '#10141b'}
+                    stroke={nudo.toque !== null ? SALA.acento : SALA.filo}
                     strokeWidth={nudo.toque !== null ? 5 : 2}
                     opacity={nudo.tenue && nudo.toque === null ? 0.4 : 1}
                     onPress={nudo.toque === null || quieto ? undefined : () => alTocar(nudo.toque as MovimientoDeclarado)}
@@ -269,6 +340,12 @@ export function Retablo({ tablero, alTocar, quieto }: QueSePinta): JSX.Element {
               las dos áreas se solapan, gana el nudo. Es lo correcto porque un nudo
               es un punto y una vereda es un trazo largo: quien apunta a un cruce
               apunta fino, y quien apunta a una orilla tiene toda su longitud.
+
+              Estas dos figuras se pintan del color del suelo, y no porque se vea:
+              a opacidad 0,001 no se ve ninguno. Es para el día en que alguien suba
+              esa opacidad para depurar —hay que hacerlo para creerse dónde está el
+              área— y para que lo que salga entonces sea la sala y no un borrón
+              negro encima del tablero.
             */}
             <G>
               {tablero.lineas.map((linea) =>
@@ -279,7 +356,7 @@ export function Retablo({ tablero, alTocar, quieto }: QueSePinta): JSX.Element {
                     y1={linea.desde.y}
                     x2={linea.hasta.x}
                     y2={linea.hasta.y}
-                    stroke="#000000"
+                    stroke={SALA.suelo}
                     strokeOpacity={0.001}
                     strokeWidth={grosorParaElDedo(linea, escala)}
                     strokeLinecap="round"
@@ -296,7 +373,7 @@ export function Retablo({ tablero, alTocar, quieto }: QueSePinta): JSX.Element {
                     cx={nudo.punto.x}
                     cy={nudo.punto.y}
                     r={radioParaElDedo(nudo, tablero.nudos, escala)}
-                    fill="#000000"
+                    fill={SALA.suelo}
                     fillOpacity={0.001}
                     onPress={() => alTocar(nudo.toque as MovimientoDeclarado)}
                   />
@@ -309,32 +386,44 @@ export function Retablo({ tablero, alTocar, quieto }: QueSePinta): JSX.Element {
 
       {tablero.acciones.length > 0 ? (
         <View style={estilos.botones}>
-          {tablero.acciones.map((accion) => (
-            <Pressable
-              key={accion.id}
-              disabled={!accion.disponible || quieto}
-              onPress={() => alTocar(accion.toque)}
-              /*
-               * EL RÓTULO ES EL DEL JUEGO, que es lo único que hay: este mueble no
-               * sabe a qué se juega. En el escritorio estas mismas acciones son
-               * `<button>` de verdad —y hasta las figuras del SVG llevan `role` y
-               * `aria-label`—, o sea que sin esto se podía jugar con lector de
-               * pantalla desde el PC y no desde el móvil.
-               */
-              accessibilityRole="button"
-              accessibilityLabel={accion.rotulo}
-              accessibilityHint={accion.ayuda.length > 0 ? accion.ayuda : undefined}
-              accessibilityState={{ disabled: !accion.disponible || quieto }}
-              style={({ pressed }) => [
-                estilos.boton,
-                (!accion.disponible || quieto) && estilos.botonApagado,
-                pressed && estilos.botonPulsado,
-              ]}
-            >
-              <Text style={estilos.botonRotulo}>{accion.rotulo}</Text>
-              {accion.ayuda.length > 0 ? <Text style={estilos.botonAyuda}>{accion.ayuda}</Text> : null}
-            </Pressable>
-          ))}
+          {tablero.acciones.map((accion) => {
+            /*
+             * «Jugable» junta las dos razones por las que un botón no responde —el
+             * juego dice que no toca, o hay un movimiento en vuelo— porque para el
+             * dedo son la misma: no pasa nada al pulsar. Se calcula una vez y de
+             * ella salen el borde, el fondo y el color del rótulo, que antes se
+             * repetían tres veces la misma condición.
+             */
+            const jugable = accion.disponible && !quieto;
+            return (
+              <Pressable
+                key={accion.id}
+                disabled={!jugable}
+                onPress={() => alTocar(accion.toque)}
+                /*
+                 * EL RÓTULO ES EL DEL JUEGO, que es lo único que hay: este mueble no
+                 * sabe a qué se juega. En el escritorio estas mismas acciones son
+                 * `<button>` de verdad —y hasta las figuras del SVG llevan `role` y
+                 * `aria-label`—, o sea que sin esto se podía jugar con lector de
+                 * pantalla desde el PC y no desde el móvil.
+                 */
+                accessibilityRole="button"
+                accessibilityLabel={accion.rotulo}
+                accessibilityHint={accion.ayuda.length > 0 ? accion.ayuda : undefined}
+                accessibilityState={{ disabled: !jugable }}
+                style={({ pressed }) => [
+                  estilos.boton,
+                  jugable ? estilos.botonVivo : estilos.botonApagado,
+                  pressed && jugable && estilos.botonPulsado,
+                ]}
+              >
+                <Text style={[estilos.botonRotulo, !jugable && estilos.botonRotuloApagado]}>
+                  {accion.rotulo}
+                </Text>
+                {accion.ayuda.length > 0 ? <Text style={estilos.botonAyuda}>{accion.ayuda}</Text> : null}
+              </Pressable>
+            );
+          })}
         </View>
       ) : null}
 
@@ -482,13 +571,27 @@ function CifraDeLaCara({
   const anchoDeLaCara = maxX > minX ? maxX - minX : 0;
   const tamRotulo = tamanoDeTexto(22, escala, anchoDeLaCara, cara.rotulo.length);
   const tamCifra = tamanoDeTexto(36, escala, anchoDeLaCara, Math.max(2, cara.cifra.length));
+  /*
+   * ═══ LOS DOS TEXTOS VAN EN BLANCO SIEMPRE, TAMBIÉN EL DE UNA CARA DESTACADA ═══
+   *
+   * Van escritos ENCIMA del relleno que declaró el juego, que puede ser cualquier
+   * color: es la misma situación que la placa de la Sala, donde el texto sobre el
+   * campo de color va en `blanco` y no en `palabra`.
+   *
+   * Y la cifra de una cara destacada iba en el color que brilla. Se le quita, que
+   * es lo único de aquí que cambia de aspecto y no sólo de nombre: ese color no
+   * sabe sobre qué relleno va a caer —el juego elige— y el resultado era una cifra
+   * violeta sobre un terreno cualquiera, sin contraste que nadie pudiera prometer.
+   * Lo destacado se sigue viendo, y mejor: el contorno del polígono pasa de 2 a 6
+   * en acento, y ése sí cae en terreno de la Sala.
+   */
   return (
     <G>
       {cara.rotulo.length > 0 ? (
         <SvgText
           x={centro.x}
           y={centro.y - tamRotulo * 0.4}
-          fill="#f2fbf9"
+          fill={SALA.blanco}
           fontSize={tamRotulo}
           textAnchor="middle"
         >
@@ -499,7 +602,7 @@ function CifraDeLaCara({
         <SvgText
           x={centro.x}
           y={centro.y + tamCifra * 0.8}
-          fill={cara.destacada ? SALA.neon : '#f2fbf9'}
+          fill={SALA.blanco}
           fontSize={tamCifra}
           fontWeight="bold"
           textAnchor="middle"
@@ -512,27 +615,91 @@ function CifraDeLaCara({
 }
 
 const estilos = StyleSheet.create({
-  todo: { flex: 1, backgroundColor: SALA.fondo },
+  todo: { flex: 1, backgroundColor: SALA.suelo },
   dentro: { padding: 16, gap: 14 },
-  aviso: { color: SALA.neon, fontSize: 17, fontWeight: '700', textAlign: 'center' },
-  lienzo: { backgroundColor: SALA.panel, borderRadius: 12, overflow: 'hidden', padding: 4 },
+
+  /*
+   * El panel del turno, como en la maqueta: teja, un filo de un píxel y el raíl de
+   * acento pegado al canto izquierdo. El raíl es un `View` aparte y no un
+   * `borderLeftWidth` porque un borde de un solo lado junto a `borderRadius` es
+   * justo lo que Android dibuja mal; dos nodos más salen más baratos que un
+   * artefacto que sólo se ve en un aparato.
+   */
+  aviso: {
+    backgroundColor: SALA.teja,
+    borderWidth: 1,
+    borderColor: SALA.filo,
+    borderRadius: RADIO.ficha,
+    overflow: 'hidden',
+    paddingVertical: 13,
+    paddingRight: 14,
+    /* 15 = los 14 de los otros lados más los 3 del raíl, menos el filo. */
+    paddingLeft: 15,
+  },
+  avisoRail: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, backgroundColor: SALA.acento },
+  /*
+   * En caja normal, y es la diferencia con los rótulos de aquí abajo: el aviso es
+   * una FRASE entera —«Ada levanta choza en la ribera baja»— y no una etiqueta de
+   * dos palabras. Un rótulo corto en mayúsculas es un cartel; una frase larga en
+   * mayúsculas se lee peor y suena a grito. Lo que hace de cartel aquí es el
+   * cuerpo grande y el peso, que es de donde sale la voz según `LETRA`.
+   */
+  avisoTexto: { ...LETRA.cuerpo, color: SALA.palabra, fontSize: 17, fontWeight: '700' },
+
+  /* Los 4 por lado que cuenta MARGENES_DEL_RETABLO: 3 de relleno y 1 de filo. */
+  lienzo: {
+    backgroundColor: SALA.teja,
+    borderWidth: 1,
+    borderColor: SALA.filo,
+    borderRadius: RADIO.ficha,
+    overflow: 'hidden',
+    padding: 3,
+  },
+
   botones: { gap: 8 },
   boton: {
     /* Los 44 de dedo que este mismo fichero razona largo para las figuras. */
     minHeight: 44,
     justifyContent: 'center',
-    backgroundColor: SALA.panel,
-    borderColor: SALA.neonTenue,
     borderWidth: 1,
-    borderRadius: 10,
+    borderRadius: RADIO.mando,
     paddingVertical: 10,
     paddingHorizontal: 14,
   },
-  botonApagado: { opacity: 0.4 },
-  botonPulsado: { borderColor: SALA.neon },
-  botonRotulo: { color: SALA.palabra, fontSize: 15, fontWeight: '700' },
-  botonAyuda: { color: SALA.neonTenue, fontSize: 12, marginTop: 2 },
-  panel: { backgroundColor: SALA.panel, borderRadius: 10, padding: 12, gap: 3 },
-  panelTitulo: { color: SALA.neon, fontSize: 13, fontWeight: '800', letterSpacing: 2 },
-  panelLinea: { color: SALA.palabra, fontSize: 13 },
+  /*
+   * ═══ DISPONIBLE Y NO DISPONIBLE SE DISTINGUEN POR COLOR, NO POR OPACIDAD ═══
+   *
+   * Lo apagado era `opacity: 0.4` sobre todo el botón. Eso apaga también la letra,
+   * y una ayuda de 12 px al 40 % no la lee nadie: es el mismo agujero de contraste
+   * que tenía el `neonTenue` de la Sala vieja, que es la flaqueza que este rediseño
+   * viene a cerrar. Ahora el que responde se levanta un escalón —`tejaAlta`— y se
+   * ciñe con el acento, que aquí quiere decir exactamente «esto se puede tocar»; el
+   * que no responde se queda en la teja con su filo, y su rótulo baja a `tenue`,
+   * que sobre la teja sigue estando muy por encima del mínimo legible.
+   */
+  botonVivo: { backgroundColor: SALA.tejaAlta, borderColor: SALA.acento },
+  botonApagado: { backgroundColor: SALA.teja, borderColor: SALA.filo },
+  /* Pulsado: el halo es el acento casi transparente, o sea el botón encendido. */
+  botonPulsado: { backgroundColor: SALA.halo },
+  botonRotulo: { ...LETRA.rotulo, color: SALA.blanco, fontSize: 15 },
+  botonRotuloApagado: { color: SALA.tenue },
+  botonAyuda: { ...LETRA.cuerpo, color: SALA.tenue, fontSize: 12, marginTop: 2 },
+
+  panel: {
+    backgroundColor: SALA.teja,
+    borderWidth: 1,
+    borderColor: SALA.filo,
+    borderRadius: RADIO.ficha,
+    padding: 12,
+    gap: 3,
+  },
+  /*
+   * El título del panel es un rótulo pequeño, y va en `tenue` y no en `cifra`: son
+   * 13 px, el mínimo legible que este fichero se impone, y a ese tamaño `cifra`
+   * —blanco al 34 %— se queda en 3,4:1 sobre la teja. `tenue` da casi 6:1 con la
+   * misma jerarquía, porque lo que separa al título de sus líneas es la caja alta
+   * y el tracking, no lo apagado que esté.
+   */
+  panelTitulo: { ...LETRA.rotuloChico, color: SALA.tenue, fontSize: 13 },
+  panelLinea: { ...LETRA.cuerpo, color: SALA.palabra, fontSize: 13 },
 });
