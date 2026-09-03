@@ -610,13 +610,6 @@ export function Delta({
 
       for (const t of teselas) {
         /*
-         * Qué tesela va aquí, por orden de mando: primero la rampa —si hay que
-         * subir, subir manda—, luego el camino, y si no, el suelo del bioma. Una
-         * rampa con camino existe en el pack pero sólo en la variante recta, así que
-         * mientras no esté compilada gana la rampa: un camino que se corta un tramo
-         * se lee; una cuesta que no se puede subir, no.
-         */
-        /*
          * EL ORDEN DE MANDO: agua > orilla > senda > rampa > tesela.
          *
          * El agua manda sobre todo porque su celda no es suelo. Luego la ORILLA, y
@@ -731,9 +724,12 @@ export function Delta({
          * través y sus orillas de costa, sí cabe y además tiene sentido: eso es un río
          * navegable.
          *
-         * Las piedras van en el centro del cauce y a poca altura, que es donde asoma
-         * una piedra de río: la lámina está medio escalón por debajo de la cara de la
-         * tesela, así que se hunden un poco a propósito.
+         * Y VAN A LA LÁMINA, no a la cara de la tesela. `cota` es la cara de arriba de
+         * la tesela de agua; el agua que se ve está `LAMINA` por debajo, que son 1,09.
+         * Poniéndolas en `cota - 0,38` —«un poco hundidas», decía este comentario—
+         * quedaban 0,71 FLOTANDO sobre el agua: una piedra suspendida en el aire y un
+         * bote navegando por encima de su propio reflejo. La resta pequeña va después
+         * de la lámina, no en vez de ella.
          */
         /*
          * EL PUENTE, donde un camino se mete en el agua.
@@ -769,7 +765,7 @@ export function Delta({
         }
 
         if (t.agua === CUERPO && t.porte === HONDO) {
-          const enElAgua = cota - ESCALON * 0.07;
+          const enElAgua = cota + LAMINA - ESCALON * 0.04;
           if (fraccionDeCelda(t.sub.q, t.sub.r, CANAL_DE_LA_PIEDRA) < 0.22) {
             empuja(
               cosas,

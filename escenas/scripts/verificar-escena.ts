@@ -533,6 +533,60 @@ paso('Lo que hay en el agua sigue las reglas del agua');
   );
   comprobar('no todos los tableros tienen los mismos muelles', cuentaDeMuelles.size >= 3, [...cuentaDeMuelles]);
   comprobar('ni los mismos barcos', cuentaDeBarcos.size >= 3, [...cuentaDeBarcos]);
+
+  /*
+   * Y QUE NO SE REPITAN LOS SITIOS, que es distinto de que no se repita el número.
+   *
+   * Éste es el comprobador que faltaba. La marina pasaba las seis comprobaciones de
+   * arriba —los muelles en su sitio, los barcos flotando, el número variando de 1 a 6 y
+   * de 2 a 9— y aun así era la MISMA FLOTA en todos los tableros: de los catorce
+   * canales de sorteo, la semilla entraba sólo en los dos que deciden cuántos hay.
+   * Medido entonces: 206 barcos puestos en 12 sitios distintos, y uno de ellos con
+   * barco en 40 de 40 tableros.
+   *
+   * No se ve mirando un tablero. No se ve ni mirando dos. Se ve contando cuarenta, y
+   * por eso esto es una comprobación y no una nota.
+   *
+   * El umbral no es «todos distintos» porque no tiene por qué serlo: dos tableros
+   * pueden coincidir en un sitio por casualidad. Se exige que NINGÚN sitio se repita en
+   * más de una cuarta parte de los tableros, que es holgadísimo para un sorteo sano y
+   * imposible para una plantilla.
+   */
+  const sitiosDeBarco = new Map<string, number>();
+  const sitiosDeMata = new Map<string, number>();
+  for (let semilla = 0; semilla < SEMILLAS; semilla++) {
+    const marina = laMarinaDelMundo(crearRelieve(islas, semilla).todas(), semilla);
+    for (const b of marina.barcos) {
+      const k = `${b.punto.x.toFixed(1)},${b.punto.y.toFixed(1)}`;
+      sitiosDeBarco.set(k, (sitiosDeBarco.get(k) ?? 0) + 1);
+    }
+    for (const m of marina.matas) {
+      const k = `${m.punto.x.toFixed(1)},${m.punto.y.toFixed(1)}`;
+      sitiosDeMata.set(k, (sitiosDeMata.get(k) ?? 0) + 1);
+    }
+  }
+  const TOPE = Math.ceil(SEMILLAS / 4);
+  const barcoTerco = [...sitiosDeBarco].filter(([, veces]) => veces > TOPE);
+  comprobar(
+    'ningún barco fondea en el mismo punto en más de un cuarto de los tableros',
+    barcoTerco.length === 0,
+    { tope: TOPE, sitios: sitiosDeBarco.size, tercos: barcoTerco.slice(0, 4) },
+  );
+  const mataTerca = [...sitiosDeMata].filter(([, veces]) => veces > TOPE);
+  comprobar(
+    'ni ningún junco crece siempre en la misma celda',
+    mataTerca.length === 0,
+    { tope: TOPE, sitios: sitiosDeMata.size, tercas: mataTerca.slice(0, 4) },
+  );
+
+  /*
+   * Y AL REVÉS: que siga siendo REPRODUCIBLE. Variar por tablero y dar siempre lo
+   * mismo para la misma semilla son las dos mitades de la misma exigencia, y arreglar
+   * la primera rompiendo la segunda es muy fácil.
+   */
+  const unaVez = JSON.stringify(laMarinaDelMundo(crearRelieve(islas, 7).todas(), 7));
+  const otraVez = JSON.stringify(laMarinaDelMundo(crearRelieve(islas, 7).todas(), 7));
+  comprobar('y la misma semilla sigue dando la misma marina', unaVez === otraVez);
 }
 
 // ---------------------------------------------------------------------------
@@ -555,7 +609,7 @@ if (fallos.length > 0) {
  * a veintitrés: durante ese tiempo el guion podía morirse en la novena sin que nadie se
  * enterara. Un guardia desfasado no guarda nada.
  */
-const COMPROBACIONES_ESCRITAS = 26;
+const COMPROBACIONES_ESCRITAS = 29;
 if (hechas < COMPROBACIONES_ESCRITAS) {
   console.error(
     `Solo se han hecho ${hechas} de las ${COMPROBACIONES_ESCRITAS} comprobaciones que ` +

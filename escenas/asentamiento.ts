@@ -48,7 +48,7 @@
  */
 import { DIRECCIONES, centroDeHex, vecino } from '../shared/mecanicas/malla-hexagonal';
 import type { LlaveDeVertice, Punto } from '../shared/mecanicas/malla-hexagonal';
-import { RADIO_DE_TESELA } from './escala';
+import { ESCALA_DEL_PACK, RADIO_DE_TESELA } from './escala';
 import { MODELO, modeloDeBandera, modeloDePieza, modeloDeTorre } from './nombres';
 import { fraccion, revoltijo } from './revoltijo';
 import type { ClaseDePieza, ColorDeJugador } from './tipos';
@@ -210,8 +210,10 @@ function caserio(color: ColorDeJugador, llave: LlaveDeVertice): PiezaDeAsentamie
 /**
  * EL RECINTO AMURALLADO DE UNA CIUDAD.
  *
- * Seis torres en las esquinas de un hexágono de un paso de radio, seis lienzos de
- * muro cerrando entre ellas —uno de los cuales es la puerta— y el castillo dentro.
+ * TRES torres —no seis: seis serían una empalizada— en un anillo de las seis teselas
+ * vecinas del vértice, seis codos de muralla cerrando la vuelta entera —uno de ellos
+ * es la puerta—, el castillo dentro y la bandera arriba, en la torre más lejana de la
+ * puerta.
  *
  * ═══ POR QUÉ EL MURO VA EN EL PUNTO MEDIO Y NO EN LA ESQUINA ═══
  *
@@ -220,13 +222,17 @@ function caserio(color: ColorDeJugador, llave: LlaveDeVertice): PiezaDeAsentamie
  * otra, sus dos extremos caen EXACTAMENTE en las dos esquinas. Ponerlo en la esquina
  * dejaría medio muro por fuera del recinto y medio hueco en el otro lado.
  *
- * ═══ Y POR QUÉ LA TORRE VA SOBRE UN ZÓCALO ═══
+ * ═══ ESTA CABECERA DECÍA OTRA COSA, Y CONVIENE SABER CUÁL ═══
  *
- * Porque el pack trae los dos y están hechos para apilarse: el zócalo mide 1,5 de
- * alto con la base a cero y la torre otros 2,19. Juntos son veinte unidades de mundo,
- * ocho personas: desde el suelo se ven por encima del muro, que es lo que tiene que
- * pasar en una fortaleza. La torre sola se quedaría a la altura del lienzo y el
- * recinto se leería como un corral.
+ * Decía «seis torres», y el bucle de veinticinco líneas más abajo pone tres desde
+ * hace tiempo. Y explicaba con detalle por qué la torre va sobre un zócalo, cuando el
+ * cuerpo de la propia función explica —también con detalle— por qué se le quitó: los
+ * dos modelos comparten el fuste vértice a vértice y apilarlos daba una torre con la
+ * piedra repetida por dentro.
+ *
+ * O sea que la función se contradecía consigo misma dos veces en la misma pantalla.
+ * Un comentario así no es ruido: es la documentación de una decisión, y quien lo lea
+ * con prisa «arreglará» el código para que cuadre con él.
  */
 function fortaleza(color: ColorDeJugador, llave: LlaveDeVertice): PiezaDeAsentamiento[] {
   const [a, b] = comoNumeros(llave);
@@ -336,11 +342,29 @@ function fortaleza(color: ColorDeJugador, llave: LlaveDeVertice): PiezaDeAsentam
     cuando: 0.76,
   });
 
-  /* Y su bandera, en una de las torres. */
+  /*
+   * Y SU BANDERA, ARRIBA DE UNA TORRE. Las dos mitades de esa frase eran falsas.
+   *
+   * Iba a `(puerta + 3) % 6`, que es la tesela opuesta a la puerta — pero las torres
+   * están en los índices PARES, así que la mitad de las veces la bandera se plantaba
+   * en un codo de muralla donde no hay torre ninguna.
+   *
+   * Y sobre todo iba a `sobre: 0`, o sea al SUELO del recinto. Medido: con `talla`
+   * 2,4 el vuelo mide 3,64 unidades de mundo y el codo de muralla mide 6,02. La
+   * bandera quedaba enterrada detrás del muro, invisible desde fuera y casi desde
+   * arriba. Una bandera que no se ve no es una bandera: es geometría que se dibuja.
+   *
+   * Ahora sube a la azotea de la torre, que mide 2,192 del pack. La cuenta se escribe
+   * a partir de la medida y de la escala, no como un número suelto: si mañana cambia
+   * la torre o la escala del mundo, la bandera sube con ellas.
+   */
+  const ALTURA_DE_LA_TORRE_EN_EL_PACK = 2.192;
+  /* Índice de torre —siempre par— más lejano de la puerta. */
+  const torreDeLaBandera = ((puerta + 3) % 6) & ~1;
   piezas.push({
     modelo: modeloDeBandera(color),
-    donde: anillo[(puerta + 3) % 6] as Punto,
-    sobre: 0,
+    donde: anillo[torreDeLaBandera] as Punto,
+    sobre: ALTURA_DE_LA_TORRE_EN_EL_PACK * ESCALA_DEL_PACK,
     giro: 0,
     talla: 2.4,
     cuando: 0.94,

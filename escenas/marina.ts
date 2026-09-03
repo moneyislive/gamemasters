@@ -79,6 +79,38 @@ import { fraccion, revoltijo } from './revoltijo';
  * Ninguna de las dos se ve mirando el tablero: se ven contando. Por eso la regla es de
  * escritura y no de revisión — un canal, una pregunta.
  */
+/**
+ * EL DESPLAZAMIENTO POR SEMILLA, que es lo que faltaba y no se veía.
+ *
+ * De los catorce canales de aquí, la semilla entraba SÓLO en los dos que deciden
+ * cuántos muelles y cuántos barcos hay. Todo lo demás —el orden de los cantiles, la
+ * distancia mar adentro, el rumbo, la holgura, la talla, dónde crece cada junco— era
+ * función pura de `(q, r, lado)` con canal constante.
+ *
+ * Y como el tablero del catán es siempre `mallaDeRadio(2)`, el conjunto de subteselas
+ * es el mismo en toda partida: los mismos cantiles salían primeros en el mismo orden y
+ * la flota se colocaba en los mismos sitios. Medido sobre 40 tableros: 206 barcos
+ * puestos en 12 SITIOS DISTINTOS, y uno de ellos con barco en 40 de 40. La cabecera de
+ * `laMarinaDelMundo` prometía justo lo contrario.
+ *
+ * Los muelles se salvaban a medias por casualidad: su mérito pesa 0,75 de
+ * habitabilidad, que sí depende de la semilla. 144 muelles en 57 sitios. O sea que el
+ * fallo estaba tapado a medias por lo único que miraba el terreno.
+ *
+ * ═══ POR QUÉ NO SE USA EL 7.919 DE `relieve.ts` ═══
+ *
+ * `relieve.ts` y `aguas.ts` desplazan con `+ semilla · 7.919`, y `ruido.ts` separa los
+ * dos ejes de su retorcido con ESE MISMO 7.919. Sumar el mismo primo por dos motivos
+ * distintos hace que el canal `c` de la semilla `s+1` sea el canal `c + 7.919` de la
+ * semilla `s`: el retorcido vertical de un tablero acaba siendo el horizontal del
+ * siguiente. Está en la lista de lo que queda por mirar.
+ *
+ * Aquí se usa otro primo, y grande, para no añadir a ese enredo: con 104.729 el canal
+ * más bajo de la semilla 1 queda a más de sesenta mil del más alto de la semilla 0, y
+ * ninguna suma de canal y semilla puede caer encima de otra.
+ */
+const SALTO_DE_SEMILLA = 104_729;
+
 const CANAL_DEL_MERITO = 41_011;
 const CANAL_DEL_RUMBO = 41_017;
 const CANAL_DEL_SENTIDO = 41_019;
@@ -93,6 +125,8 @@ const CANAL_DEL_NENUFAR = 41_053;
 const CANAL_DEL_LADEO = 41_059;
 const CANAL_DEL_ARRIMO = 41_063;
 const CANAL_DEL_SITIO = 41_057;
+const CANAL_DE_LA_VARIANTE = 41_069;
+const CANAL_DE_LA_TALLA_DEL_BARCO = 41_077;
 
 /** Cuánto mide un paso de tesela a tesela: la distancia entre dos centros vecinos. */
 const PASO = Math.sqrt(3) * RADIO_DE_TESELA;
@@ -245,9 +279,9 @@ function cantiles(teselas: readonly Subtesela[], hay: ReadonlySet<string>): Cant
  * relación con las casas, que es exactamente el aspecto de tablero generado a máquina
  * que se intenta evitar.
  */
-function conMerito(lista: Cantil[]): Cantil[] {
+function conMerito(lista: Cantil[], canal: (n: number) => number): Cantil[] {
   for (const c of lista) {
-    const suerte = fraccion(c.tesela.sub.q, c.tesela.sub.r, CANAL_DEL_MERITO);
+    const suerte = fraccion(c.tesela.sub.q, c.tesela.sub.r, canal(CANAL_DEL_MERITO));
     c.merito = c.tesela.habitabilidad * 0.75 + suerte * 0.25;
   }
   return lista;
@@ -327,7 +361,11 @@ function sobreTierra(p: Punto, hay: ReadonlySet<string>): boolean {
  * a la orilla, y uno plantado en mitad del agua se lee como un error aunque nadie sepa
  * decir cuál.
  */
-function juncales(teselas: readonly Subtesela[], hay: ReadonlySet<string>): Mata[] {
+function juncales(
+  teselas: readonly Subtesela[],
+  hay: ReadonlySet<string>,
+  canal: (n: number) => number,
+): Mata[] {
   const agua = new Set<string>();
   for (const t of teselas) if (t.agua === CUERPO) agua.add(`${String(t.sub.q)},${String(t.sub.r)}`);
   if (agua.size === 0) return [];
@@ -350,10 +388,11 @@ function juncales(teselas: readonly Subtesela[], hay: ReadonlySet<string>): Mata
       aTierra.push({ x: dx / largo, y: dy / largo });
     }
     if (aTierra.length === 0) continue;
-    if (fraccion(t.sub.q, t.sub.r, CANAL_DEL_JUNCO) > ORILLA_CON_PLANTA) continue;
+    if (fraccion(t.sub.q, t.sub.r, canal(CANAL_DEL_JUNCO)) > ORILLA_CON_PLANTA) continue;
 
     const remanso = aTierra.length >= LADOS_DE_REMANSO;
-    const cuantas = 1 + Math.floor(fraccion(t.sub.r, t.sub.q, CANAL_DEL_SITIO) * MATAS_POR_CELDA);
+    const cuantas =
+      1 + Math.floor(fraccion(t.sub.r, t.sub.q, canal(CANAL_DEL_SITIO)) * MATAS_POR_CELDA);
     for (let i = 0; i < cuantas; i++) {
       /*
        * Cada mata se arrima a UNO de los lados de tierra, repartidas entre los que haya,
@@ -370,18 +409,19 @@ function juncales(teselas: readonly Subtesela[], hay: ReadonlySet<string>): Mata
       const lado = aTierra[(((i + t.sub.q) % aTierra.length) + aTierra.length) % aTierra.length];
       if (lado === undefined) continue;
       const arrimo =
-        (0.35 + fraccion(t.sub.q + i, t.sub.r, CANAL_DEL_ARRIMO) * 0.45) * RADIO_DE_TESELA;
-      const ladeo = (fraccion(t.sub.q, t.sub.r + i, CANAL_DEL_LADEO) - 0.5) * RADIO_DE_TESELA * 0.5;
+        (0.35 + fraccion(t.sub.q + i, t.sub.r, canal(CANAL_DEL_ARRIMO)) * 0.45) * RADIO_DE_TESELA;
+      const ladeo =
+        (fraccion(t.sub.q, t.sub.r + i, canal(CANAL_DEL_LADEO)) - 0.5) * RADIO_DE_TESELA * 0.5;
       salida.push({
         punto: {
           x: t.centro.x + lado.x * arrimo - lado.y * ladeo,
           y: t.centro.y + lado.y * arrimo + lado.x * ladeo,
         },
-        giro: fraccion(t.sub.q + i * 7, t.sub.r, CANAL_DEL_GIRO) * Math.PI * 2,
-        talla: 0.8 + fraccion(t.sub.r + i * 7, t.sub.q, CANAL_DE_LA_TALLA) * 0.7,
+        giro: fraccion(t.sub.q + i * 7, t.sub.r, canal(CANAL_DEL_GIRO)) * Math.PI * 2,
+        talla: 0.8 + fraccion(t.sub.r + i * 7, t.sub.q, canal(CANAL_DE_LA_TALLA)) * 0.7,
         nivelDelAgua: t.nivelDelAgua,
-        nenufar: remanso && fraccion(t.sub.q + i, t.sub.r + i, CANAL_DEL_NENUFAR) < 0.45,
-        variante: revoltijo(t.sub.q + i, t.sub.r, CANAL_DEL_SITIO) % 3,
+        nenufar: remanso && fraccion(t.sub.q + i, t.sub.r + i, canal(CANAL_DEL_NENUFAR)) < 0.45,
+        variante: revoltijo(t.sub.q + i, t.sub.r, canal(CANAL_DE_LA_VARIANTE)) % 3,
       });
     }
   }
@@ -399,7 +439,14 @@ export function laMarinaDelMundo(teselas: readonly Subtesela[], semilla: number)
   const hay = new Set<string>();
   for (const t of teselas) hay.add(`${String(t.sub.q)},${String(t.sub.r)}`);
 
-  const matas = juncales(teselas, hay);
+  /*
+   * El desviador de canal, igual que en `relieve.ts` y `aguas.ts`: cada pregunta se
+   * hace en un canal distinto Y en un canal distinto POR TABLERO. Sin esto, todo lo de
+   * abajo es una plantilla.
+   */
+  const canal = (n: number): number => n + semilla * SALTO_DE_SEMILLA;
+
+  const matas = juncales(teselas, hay, canal);
 
   const costa = cantiles(teselas, hay);
   if (costa.length === 0) return { muelles: [], barcos: [], matas, celdasDeCosta: 0 };
@@ -418,6 +465,7 @@ export function laMarinaDelMundo(teselas: readonly Subtesela[], semilla: number)
     costa.filter(
       (c) => c.tesela.nivel === 0 && c.tesela.habitabilidad >= HABITABILIDAD_DE_PUERTO,
     ),
+    canal,
   ).sort(porMerito);
 
   const muelles: Amarre[] = apartados(paraMuelle, cuantosMuelles, MUELLES_APARTADOS).map((c) => ({
@@ -429,7 +477,7 @@ export function laMarinaDelMundo(teselas: readonly Subtesela[], semilla: number)
     punto: c.fuera,
     giro: anguloDelPack(c.hacia),
     talla: 1,
-    color: revoltijo(c.tesela.sub.q, c.tesela.sub.r, CANAL_DEL_COLOR) % 4,
+    color: revoltijo(c.tesela.sub.q, c.tesela.sub.r, canal(CANAL_DEL_COLOR)) % 4,
   }));
 
   /*
@@ -439,8 +487,14 @@ export function laMarinaDelMundo(teselas: readonly Subtesela[], semilla: number)
    * los amontonaría todos delante del mismo pueblo.
    */
   const paraBarco = [...costa].sort((a, b) => {
-    const fa = fraccion(a.tesela.sub.q, a.lado, CANAL_DEL_RUMBO);
-    const fb = fraccion(b.tesela.sub.q, b.lado, CANAL_DEL_RUMBO);
+    /*
+     * La clave lleva la `r` además de la `q`, y no es cosmético: con sólo `(q, lado)`
+     * todos los cantiles de una misma columna de subteselas compartían clave, y el
+     * desempate caía en `porMerito` — o sea en la habitabilidad, que es justo lo que el
+     * comentario de abajo dice que NO debe ordenar los barcos.
+     */
+    const fa = fraccion(a.tesela.sub.q * 31 + a.tesela.sub.r, a.lado, canal(CANAL_DEL_RUMBO));
+    const fb = fraccion(b.tesela.sub.q * 31 + b.tesela.sub.r, b.lado, canal(CANAL_DEL_RUMBO));
     if (fa !== fb) return fa - fb;
     return porMerito(a, b);
   });
@@ -452,7 +506,7 @@ export function laMarinaDelMundo(teselas: readonly Subtesela[], semilla: number)
     if (barcos.length >= cuantosBarcos) break;
     const lejos =
       MAR_ADENTRO_MINIMO +
-      fraccion(c.tesela.sub.q, c.tesela.sub.r + c.lado, CANAL_DE_LA_DISTANCIA) *
+      fraccion(c.tesela.sub.q, c.tesela.sub.r + c.lado, canal(CANAL_DE_LA_DISTANCIA)) *
         (MAR_ADENTRO_MAXIMO - MAR_ADENTRO_MINIMO);
     const punto = {
       x: c.tesela.centro.x + c.hacia.x * lejos * PASO,
@@ -480,13 +534,18 @@ export function laMarinaDelMundo(teselas: readonly Subtesela[], semilla: number)
      * flota no salga formando línea.
      */
     const perpendicular = { x: -c.hacia.y, y: c.hacia.x };
-    const alReves = fraccion(c.tesela.sub.r, c.lado, CANAL_DEL_SENTIDO) < 0.5 ? -1 : 1;
+    /* Lleva la `q` además de la `r`: sin ella, 267 de 455 cantiles giraban igual. */
+    const alReves =
+      fraccion(c.tesela.sub.r * 31 + c.tesela.sub.q, c.lado, canal(CANAL_DEL_SENTIDO)) < 0.5
+        ? -1
+        : 1;
     const holgura =
-      (fraccion(c.tesela.sub.q + c.lado, c.tesela.sub.r, CANAL_DE_LA_HOLGURA) - 0.5) * (Math.PI / 3);
+      (fraccion(c.tesela.sub.q + c.lado, c.tesela.sub.r, canal(CANAL_DE_LA_HOLGURA)) - 0.5) *
+      (Math.PI / 3);
     barcos.push({
       punto,
       giro: anguloDelPack({ x: perpendicular.x * alReves, y: perpendicular.y * alReves }) + holgura,
-      talla: 0.85 + fraccion(c.tesela.sub.q, c.lado, CANAL_DE_LA_TALLA) * 0.4,
+      talla: 0.85 + fraccion(c.tesela.sub.q, c.lado, canal(CANAL_DE_LA_TALLA_DEL_BARCO)) * 0.4,
       color: 0,
     });
     yaPuestos.push(punto);
