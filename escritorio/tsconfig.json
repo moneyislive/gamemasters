@@ -14,5 +14,5 @@
     "noEmit": true,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["src", "scripts", "../shared", "vite.config.ts"]
+  "include": ["src", "scripts", "../shared", "../escenas", "vite.config.ts"]
 }

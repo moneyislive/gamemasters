@@ -590,6 +590,13 @@ const BATERIA = [
    * rompe en silencio; lo que se rompe en silencio es lo de aquí.
    */
   {
+    nombre: 'escena y malla',
+    donde: 'escenas',
+    guion: 'verify:escena',
+    porque:
+      'la escena 3D y la malla hexagonal dicen lo mismo: cada vértice cae en la esquina exacta de su isla y no cerca, cada camino va de vértice a vértice y mide un radio, y los puntos de cada número son las formas de sacarlo con dos dados. Lo que NO prueba, y hay que decirlo, es que se vea bien: eso exige ojos y un aparato de verdad',
+  },
+  {
     nombre: 'escritorio honrado',
     donde: 'escritorio',
     guion: 'verify:escritorio',

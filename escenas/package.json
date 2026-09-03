@@ -1,0 +1,19 @@
+{
+  "name": "escenas",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "verify:escena": "tsx scripts/verificar-escena.ts"
+  },
+  "description": "Las escenas 3D que pintan los DOS clientes. Sin Canvas propio: lo monta quien la usa.",
+  "peerDependencies": {
+    "react": ">=19",
+    "three": ">=0.185.0"
+  },
+  "devDependencies": {
+    "@react-three/fiber": "^9.7.0",
+    "@types/three": "^0.185.4",
+    "three": "^0.185.1"
+  }
+}
