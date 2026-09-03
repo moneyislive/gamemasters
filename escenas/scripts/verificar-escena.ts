@@ -45,7 +45,7 @@ import {
 } from '../nombres';
 import { cuantasFormasDeCauce, cuantasFormasDeCruce, ladoHaciaElVecino } from '../sendas';
 import { hexesDeVertice, vecino, verticesDeHex } from '../../shared/mecanicas/malla-hexagonal';
-import { CUERPO, piezaDeOrilla } from '../aguas';
+import { CAUCE, CUERPO, piezaDeOrilla } from '../aguas';
 import { piezasDeAsentamiento } from '../asentamiento';
 import { MODELO, modeloDePieza } from '../modelos';
 import { RADIO_DE_COMARCA, RADIO_DE_TESELA } from '../escala';
@@ -514,6 +514,43 @@ paso('El mundo cubre los cincuenta y cuatro vértices donde se construye');
     sinSuelo,
     de: vertices.size * SEMILLAS,
   });
+
+  /*
+   * Y NO HAY AGUA ENCIMA DE ESE SUELO, que es la otra mitad de lo mismo.
+   *
+   * De poco sirve garantizar que hay tesela bajo el vértice si el río puede pasar por
+   * encima: en los dos casos no se puede fundar. Se mira la tesela del vértice Y SU
+   * ANILLO DE SEIS, que es exactamente lo que ocupa una fortaleza, y se exige que
+   * ninguna de las siete sea agua.
+   *
+   * Es la regla DURA, y se distingue a propósito del margen: `aguas.ts` veta además el
+   * cauce a dos pasos y el cuerpo a tres, que son holguras estéticas —que el arroyo no
+   * pase rozando el pueblo—. Ésas pueden negociarse; ésta no. Se supo cuando aplicar el
+   * margen del cauce a la desembocadura secó el mundo: los tableros con agua cayeron de
+   * 40 sobre 60 a 15, porque el margen veda el 67% de la costa y la boca está obligada
+   * a tocarla. Con la regla dura —radio 1— se veda el 46% y salen 43 de 60.
+   */
+  let aguaEnObra = 0;
+  for (let semilla = 0; semilla < SEMILLAS; semilla++) {
+    const teselas = crearRelieve(islas, semilla).todas();
+    const agua = new Set<string>();
+    for (const t of teselas) {
+      if (t.agua === CAUCE || t.agua === CUERPO) agua.add(`${String(t.sub.q)},${String(t.sub.r)}`);
+    }
+    for (const v of vertices) {
+      const c = hexDePunto(puntoDeVertice(v, RADIO_DE_COMARCA), RADIO_DE_TESELA);
+      if (agua.has(`${String(c.q)},${String(c.r)}`)) aguaEnObra++;
+      for (let k = 0; k < 6; k++) {
+        const w = vecino(c, k);
+        if (agua.has(`${String(w.q)},${String(w.r)}`)) aguaEnObra++;
+      }
+    }
+  }
+  comprobar(
+    'ni hay agua encima de las siete teselas que ocupa una fortaleza',
+    aguaEnObra === 0,
+    { aguaEnObra },
+  );
   comprobar('y todos tienen el anillo de seis que ocupa una muralla', sinAnillo === 0, {
     sinAnillo,
   });
@@ -759,7 +796,7 @@ if (fallos.length > 0) {
  * a veintitrés: durante ese tiempo el guion podía morirse en la novena sin que nadie se
  * enterara. Un guardia desfasado no guarda nada.
  */
-const COMPROBACIONES_ESCRITAS = 35;
+const COMPROBACIONES_ESCRITAS = 36;
 if (hechas < COMPROBACIONES_ESCRITAS) {
   console.error(
     `Solo se han hecho ${hechas} de las ${COMPROBACIONES_ESCRITAS} comprobaciones que ` +

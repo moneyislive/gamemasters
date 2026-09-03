@@ -141,6 +141,29 @@ const VETO_VERTICE_CUERPO = 3;
 const VETO_PLAZA_CAUCE = 1;
 const VETO_PLAZA_CUERPO = 2;
 
+/**
+ * Y EL VETO DE LA BOCA, que es MÁS CORTO que el del cauce y tiene su razón.
+ *
+ * La boca es la única celda del cauce que está obligada a tocar el borde del mundo, y
+ * el borde es donde se apiñan treinta de los cincuenta y cuatro vértices. Medido sobre
+ * las 276 celdas de borde de un tablero: el veto del cauce —radio 2— deja vedado el
+ * 67% de la costa, y el del cuerpo —radio 3— el 89%.
+ *
+ * Aplicarle a la boca el radio del cauce parece lo coherente y seca el mundo: los
+ * tableros con agua caían de 40 sobre 60 a 15. No porque el río no encuentre camino,
+ * sino porque no encuentra por dónde desembocar.
+ *
+ * Así que la boca se veta por lo que de verdad hace falta y no por analogía: radio 1,
+ * que es la tesela del vértice más su anillo de seis, o sea EXACTAMENTE el suelo que
+ * ocupa una fortaleza. Deja vedado el 46% de la costa y conserva los cuarenta tableros
+ * con agua.
+ *
+ * El radio 2 del cauce es un MARGEN —que el arroyo no pase rozando el pueblo— y el
+ * radio 1 de la boca es una IMPOSIBILIDAD —que no se construya sobre el agua—. Copiar
+ * el margen donde hacía falta la imposibilidad es lo que secaba el tablero.
+ */
+const VETO_BOCA = 1;
+
 /** Los canales del ruido, separados y con nombre. */
 const CANAL = {
   desempate: 21_001,
@@ -518,6 +541,42 @@ export function trazaLasAguas(mundo: MundoParaAguas): Aguas {
   const encauzado = (i: number, tau: number): boolean =>
     (caudal[i] as number) * (pendiente[i] as number) ** 0.6 >= tau;
 
+  /* ── Los vetos, que van ANTES de elegir la boca ──────────────────────────
+   *
+   * Estaban doscientas líneas más abajo, después de escoger las desembocaduras, y por
+   * eso la boca era lo único del río que nunca pasaba por `transitable()`: cuando se
+   * elegía, `vedadoCauce` todavía no existía.
+   *
+   * Durante mucho tiempo no se notó, y la razón de que se note ahora es interesante:
+   * dieciséis de los cincuenta y cuatro vértices no tenían subtesela debajo y se caían
+   * del veto por un `.filter` silencioso. Al darles suelo, entraron en el veto — y con
+   * ellos apareció borde nuevo justo a su lado, que es donde el río busca su boca.
+   * Medido: 37 celdas de cauce dentro del veto de vértice en sesenta tableros, donde
+   * antes había cero porque el vértice ni contaba.
+   *
+   * O sea que arreglar un fallo destapó otro que llevaba ahí desde el principio. Se
+   * anota porque es el argumento a favor de contar lo que se filtra: el `.filter` no
+   * sólo escondía su propio fallo, escondía éste.
+   *
+   * El bloque no depende de nada de la hidrología —sólo de la malla y de dónde se
+   * construye— así que subirlo no cambia ningún resultado salvo el que se quería
+   * cambiar.
+   */
+  const dVertice = distanciasDesde(mundo.enVertices, n, vecinos);
+  const dPlaza = distanciasDesde(mundo.enPlazas, n, vecinos);
+  const vedadoCauce = new Uint8Array(n);
+  const vedadoCuerpo = new Uint8Array(n);
+  for (let i = 0; i < n; i++) {
+    vedadoCauce[i] =
+      (dVertice[i] as number) <= VETO_VERTICE_CAUCE || (dPlaza[i] as number) <= VETO_PLAZA_CAUCE
+        ? 1
+        : 0;
+    vedadoCuerpo[i] =
+      (dVertice[i] as number) <= VETO_VERTICE_CUERPO || (dPlaza[i] as number) <= VETO_PLAZA_CUERPO
+        ? 1
+        : 0;
+  }
+
   /** Las celdas del borde que recogen algo: las desembocaduras candidatas. */
   const bocas: number[] = [];
   for (let i = 0; i < n; i++) {
@@ -537,6 +596,14 @@ export function trazaLasAguas(mundo: MundoParaAguas): Aguas {
   const elegidas: number[] = [];
   for (const b of bocas) {
     if ((caudal[b] as number) < CAUDAL_MINIMO_DE_BOCA) break;
+    /*
+     * Y LA BOCA TAMBIÉN SE VETA, que era lo único del cauce que no pasaba por ningún
+     * filtro. Con su propio radio: ver `VETO_BOCA`. Como las bocas van ordenadas por
+     * caudal, saltarse una vedada no deja el tablero sin río — coge la siguiente.
+     */
+    if ((dVertice[b] as number) <= VETO_BOCA || (dPlaza[b] as number) <= VETO_PLAZA_CAUCE) {
+      continue;
+    }
     const sb = mundo.subteselas[b] as Hex;
     let lejos = true;
     for (const e of elegidas) {
@@ -605,22 +672,7 @@ export function trazaLasAguas(mundo: MundoParaAguas): Aguas {
     grupos.push(bolsa);
   }
 
-  /* ── 4.7 Los vetos ───────────────────────────────────────────────────────── */
-
-  const dVertice = distanciasDesde(mundo.enVertices, n, vecinos);
-  const dPlaza = distanciasDesde(mundo.enPlazas, n, vecinos);
-  const vedadoCauce = new Uint8Array(n);
-  const vedadoCuerpo = new Uint8Array(n);
-  for (let i = 0; i < n; i++) {
-    vedadoCauce[i] =
-      (dVertice[i] as number) <= VETO_VERTICE_CAUCE || (dPlaza[i] as number) <= VETO_PLAZA_CAUCE
-        ? 1
-        : 0;
-    vedadoCuerpo[i] =
-      (dVertice[i] as number) <= VETO_VERTICE_CUERPO || (dPlaza[i] as number) <= VETO_PLAZA_CUERPO
-        ? 1
-        : 0;
-  }
+  /* ── 4.7 Los vetos: subidos, y el porqué está donde se usan ──────────────── */
 
   /**
    * QUÉ LAGOS SE CONSERVAN.
@@ -996,6 +1048,39 @@ export function trazaLasAguas(mundo: MundoParaAguas): Aguas {
   for (const cadena of cadenas) {
     for (const i of cadena) {
       if (porte[i] !== HONDO) continue;
+      /*
+       * EL VETO SE COMPROBABA AL TALLAR Y SE OLVIDABA AL ENSANCHAR.
+       *
+       * Un sitio de construcción tiene DOS radios de veda, y no por capricho: el cauce
+       * tallado cabe a dos celdas de un vértice —es una acequia dentro de la tesela— y
+       * un cuerpo de agua no cabe hasta tres, porque moja a sus vecinas y ahí ya no se
+       * levanta nada.
+       *
+       * El trazado respetaba el primero y el ensanche no volvía a mirar el segundo: la
+       * celda entraba en `mojadas` sólo por ser HONDA. Y como las vecinas SÍ se
+       * comprobaban, el fallo tenía la forma más engañosa posible — el código de al
+       * lado hacía lo correcto tres líneas más abajo.
+       *
+       * Medido sobre sesenta tableros, y el contraste no deja lugar a dudas: celdas de
+       * CAUCE dentro de su propio veto, CERO; celdas de CUERPO dentro del suyo, 293, o
+       * sea 4,9 por tablero y en 40 de los 60. El río se ensanchaba encima del sitio de
+       * fundar en dos de cada tres partidas.
+       *
+       * ═══ Y POR QUÉ SE ESTRECHA EN VEZ DE APARTARSE ═══
+       *
+       * Porque el agua ya está trazada: moverla aquí es reabrir la hidrología entera
+       * con el cierre morfológico ya hecho. Lo que se hace es no ensancharla — el tramo
+       * se queda en cauce tallado— y bajarle el porte a RÍO, que es lo que de verdad
+       * es: un río que pasa estrecho. Con eso recupera además su banda de arena, porque
+       * el margen se dibuja justo para los tramos de porte RÍO.
+       *
+       * Se lee como lo que es: el río se abre en la llanura y se encaja al pasar junto
+       * al pueblo. La regla del juego asomando por el paisaje en vez de contradiciéndolo.
+       */
+      if (vedadoCuerpo[i] === 1) {
+        porte[i] = RIO;
+        continue;
+      }
       mojadas.push(i);
       /*
        * Se mojan las vecinas MÁS BAJAS, que es por donde se desbordaría de verdad, y
@@ -1082,28 +1167,6 @@ export function trazaLasAguas(mundo: MundoParaAguas): Aguas {
        */
       if (porte[v] === RIO) margen[i] = 1;
     }
-  }
-
-  /**
-   * LA MÁSCARA: por qué lados sale el agua de cada celda de cauce.
-   *
-   * Los cruces salen solos. Si dos ramas llegan a la misma celda, sus lados se
-   * acumulan en el mismo conjunto y la tabla devuelve la pieza de tres bocas — no hay
-   * que detectar las confluencias ni tratarlas aparte.
-   *
-   * La celda de la boca añade además el lado que mira AFUERA del tablero, que es lo
-   * que la salva de quedarse con una sola boca y sin pieza.
-   */
-  const mascara = new Uint8Array(n);
-  for (let i = 0; i < n; i++) {
-    if (clase[i] !== CAUCE) continue;
-    let bits = 0;
-    for (let k = 0; k < 6; k++) {
-      const v = vecinos[i * 6 + k] as number;
-      const esAgua = v < 0 || clase[v] === CAUCE || clase[v] === CUERPO;
-      if (esAgua) bits |= 1 << (ladoHaciaVecino[k] as number);
-    }
-    mascara[i] = bits;
   }
 
   /* ── 4.11 El cono de cavado ──────────────────────────────────────────────── */
@@ -1310,6 +1373,44 @@ export function trazaLasAguas(mundo: MundoParaAguas): Aguas {
      * confiar cuando aparezca el caso.
      */
     if (tiradaDe(bits) === null) orillasImposibles++;
+  }
+
+  /**
+   * LA MÁSCARA: por qué lados sale el agua de cada celda de cauce.
+   *
+   * Los cruces salen solos. Si dos ramas llegan a la misma celda, sus lados se
+   * acumulan en el mismo conjunto y la tabla devuelve la pieza de tres bocas — no hay
+   * que detectar las confluencias ni tratarlas aparte.
+   *
+   * La celda de la boca añade además el lado que mira AFUERA del tablero, que es lo
+   * que la salva de quedarse con una sola boca y sin pieza.
+   *
+   * ═══ Y VA AQUÍ, DESPUÉS DEL CIERRE, QUE ES LA CORRECCIÓN ═══
+   *
+   * Se calculaba doscientas líneas más arriba, antes del cierre morfológico de costas.
+   * Pero el cierre INUNDA celdas —para eso está: convierte en agua lo que no tiene
+   * pieza de costa dibujable— y una celda de tierra que se vuelve agua cambia la
+   * máscara de todos sus vecinos de cauce. Nadie volvía a mirarla.
+   *
+   * El síntoma es sutil y por eso duró: el cauce tallado de esa tesela apuntaba a un
+   * lado donde ya no había tierra, o dejaba de apuntar a uno donde ahora hay agua. Se
+   * ve como un río que se corta contra su propia orilla.
+   *
+   * Medido: 12 teselas de 2.497 en sesenta tableros, un 0,5%, repartidas en 6 tableros.
+   * Poco, y aun así el orden estaba mal: la máscara describe el agua, así que tiene que
+   * leerse cuando el agua ya está decidida. Moverla cuesta nada y quita una clase
+   * entera de fallo, no doce casos.
+   */
+  const mascara = new Uint8Array(n);
+  for (let i = 0; i < n; i++) {
+    if (clase[i] !== CAUCE) continue;
+    let bits = 0;
+    for (let k = 0; k < 6; k++) {
+      const v = vecinos[i * 6 + k] as number;
+      const esAgua = v < 0 || clase[v] === CAUCE || clase[v] === CUERPO;
+      if (esAgua) bits |= 1 << (ladoHaciaVecino[k] as number);
+    }
+    mascara[i] = bits;
   }
 
   /** A cuántos pasos está cada celda de la orilla más cercana. Para la banda de arena. */

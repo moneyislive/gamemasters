@@ -988,6 +988,60 @@ export function crearRelieve(comarcas: readonly ComarcaDelMundo[], semilla = 0):
   }
 
   /**
+   * UNA PLAYA QUE NO LLEGA AL AGUA NO ES UNA PLAYA: ES UN ACANTILADO.
+   *
+   * ═══ LA REGLA DECIDÍA CON UN NIVEL Y SE PINTABA OTRO ═══
+   *
+   * La regla de costas de `aguas.ts` juzga con `nivelTrasCavar`, que es la altura
+   * después de excavar el río y ANTES de mezclar los rellanos de los vértices. Y lo
+   * que se dibuja es el nivel de aquí, que es el de después. Entre los dos hay un paso
+   * más: el rellano, que levanta o baja la celda para dejarla llana donde se construye.
+   *
+   * Así que una celda del borde podía valer cero para la regla —«toca el mar, ponle
+   * playa»— y acabar dibujada un escalón más arriba. El resultado es una tesela de
+   * costa con su arena colgando 5,47 unidades sobre el mar, o sea dos personas de aire
+   * entre la playa y el agua.
+   *
+   * Medido sobre sesenta tableros: 51 lados así, TODOS en el borde del tablero y
+   * ninguno al revés —ninguna playa hundida—, lo que encaja con la causa: el rellano
+   * de un vértice del perímetro levantando su celda.
+   *
+   * ═══ POR QUÉ SE QUITA EL LADO Y NO SE BAJA LA TESELA ═══
+   *
+   * Bajarla desharía el rellano, que existe para que ahí se pueda construir, y en el
+   * borde del tablero eso es justo donde acabamos de garantizar que hay suelo. Así que
+   * se quita la playa: la tesela se dibuja como terreno normal y enseña su canto contra
+   * el agua, que es exactamente lo que es. El pack no tiene pieza de acantilado costero
+   * y el canto de la tesela hace ese papel sin inventar nada.
+   *
+   * Se comprueba lado a lado y no de golpe: una celda puede tocar un lago a su mismo
+   * nivel por un lado y el mar un escalón más abajo por otro. El primero conserva su
+   * playa; el segundo la pierde.
+   */
+  const orillaANivel = new Uint8Array(N);
+  const SEIS_DEL_PACK = Math.PI / 3;
+  for (let i = 0; i < N; i++) {
+    const bits = aguas.orilla[i] as number;
+    if (bits === 0) continue;
+    const sub = subteselas[i] as Hex;
+    const centro = centrosDeSub[i] as Punto;
+    let limpio = bits;
+    for (let k = 0; k < 6; k++) {
+      const v = vecino(sub, k);
+      const c = centroDeHex(v, RADIO_DE_TESELA);
+      /* El lado del pack sale del ángulo, no de una tabla: ver `asentamiento.ts`. */
+      const lado =
+        (Math.round(Math.atan2(-(c.y - centro.y), c.x - centro.x) / SEIS_DEL_PACK) + 6) % 6;
+      if ((bits & (1 << lado)) === 0) continue;
+      const j = indice.get(llaveDeSub(v));
+      /* Fuera del mundo está el mar, y el mar está al nivel cero. */
+      const nivelDelAgua = j === undefined ? 0 : (aguas.nivelAgua[j] as number);
+      if ((niveles[i] as number) !== nivelDelAgua) limpio &= ~(1 << lado);
+    }
+    orillaANivel[i] = limpio;
+  }
+
+  /**
    * EL NIVEL DE UNA SUBTESELA CUALQUIERA, esté o no dentro del mundo.
    *
    * Dentro se lee del array; fuera se calcula. Lo de fuera pasa sólo al mirar los
@@ -1105,7 +1159,7 @@ export function crearRelieve(comarcas: readonly ComarcaDelMundo[], semilla = 0):
       agua: aguas.clase[i] as number,
       nivelDelAgua: aguas.nivelAgua[i] as number,
       cauce: aguas.mascara[i] as number,
-      orilla: aguas.orilla[i] as number,
+      orilla: orillaANivel[i] as number,
       aOrilla: aguas.dOrilla[i] as number,
       porte: aguas.porte[i] as number,
       margen: aguas.margen[i] === 1,
