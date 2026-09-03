@@ -30,6 +30,13 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "web", "--prefix", "../GameMasters-veladas/app"],
       "port": 8082
+    },
+    {
+      "name": "escritorio3d",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--prefix", "../GameMasters-catan/escritorio"],
+      "port": 5175,
+      "url": "http://localhost:5175"
     }
   ]
 }
