@@ -1131,6 +1131,21 @@ function TarjetaDeArcade({
         */}
         <LinearGradient
           colors={viva ? [SALA.acento, SALA.acentoHondo] : [SALA.tejaAlta, SALA.teja]}
+          /*
+           * EL HONDO LLEGA AL 62 % Y NO AL FINAL, Y ESTO ES CONTRASTE Y NO GUSTO.
+           *
+           * El texto de la placa es blanco, y el blanco sólo aguanta sobre el
+           * extremo HONDO del degradado: medido, sobre el claro da 3,66:1 en
+           * violeta y 1,98:1 en ámbar, o sea el nombre del juego casi ilegible.
+           * Sobre el hondo da 6,57 y 4,64, que pasan.
+           *
+           * Con el degradado repartido hasta el 100 %, el nombre se apoyaba en
+           * una mezcla a medio camino. Cerrándolo en el 62 % el tercio de abajo
+           * —donde se apoya el texto, por el `flex-end` de aquí abajo— es hondo
+           * del todo, y la mitad de arriba sigue siendo el acento vivo, que es
+           * lo que tiene que brillar.
+           */
+          locations={[0, 0.62]}
           start={{ x: 0, y: 0 }}
           end={{ x: 0.45, y: 1 }}
           style={[
@@ -1861,7 +1876,23 @@ const estilos = StyleSheet.create({
     paddingTop: 21,
     paddingBottom: 21,
   },
-  placaHilera: { paddingHorizontal: HUECO, paddingTop: 15, paddingBottom: 16 },
+  /*
+   * LAS DE LA HILERA APOYAN EL TEXTO ABAJO, IGUAL QUE LA DESTACADA, y por la
+   * misma razón que ella: ahí es donde el degradado ya es hondo y el blanco se
+   * lee. Sin `flex-end` el nombre flotaba en mitad de la placa, encima del
+   * acento vivo, y en ámbar y en verde se quedaba en 2:1.
+   *
+   * El `minHeight` es lo que deja sitio para que se vea la franja viva por
+   * encima del texto: sin él la placa mide lo que mide el texto y el degradado
+   * no tiene recorrido donde lucir.
+   */
+  placaHilera: {
+    paddingHorizontal: HUECO,
+    minHeight: 104,
+    justifyContent: 'flex-end',
+    paddingTop: 15,
+    paddingBottom: 16,
+  },
   /* Con pastilla y sin sitio: se le reserva el hueco en vez de dejar que se pisen. */
   placaConPastilla: { minHeight: 96, paddingRight: 150 },
 
@@ -1869,7 +1900,14 @@ const estilos = StyleSheet.create({
   nombreDestacado: { fontSize: 38, lineHeight: 42 },
   nombreHilera: { fontSize: 20, lineHeight: 24 },
   textoApagado: { color: SALA.palabra },
-  gancho: { ...LETRA.cuerpo, color: conAlfa(SALA.blanco, 0.92) },
+  /*
+   * EL GANCHO VA A BLANCO ENTERO Y NO AL 92 %, y es la diferencia entre pasar y
+   * no pasar. Sobre el hondo de ámbar y de verde, ese 8 % de transparencia baja
+   * el contraste a 4,18:1, justo por debajo del mínimo de texto normal; a opacidad
+   * llena sube a 4,64. La suavidad del 92 % era un gusto de la maqueta; la
+   * legibilidad de la frase que explica a qué se juega, no.
+   */
+  gancho: { ...LETRA.cuerpo, color: SALA.blanco },
   ganchoDestacado: { fontSize: 17, lineHeight: 24, marginTop: 11, maxWidth: 268 },
   ganchoHilera: { fontSize: 15, lineHeight: 20, marginTop: 6 },
   ganchoApagado: { color: SALA.tenue },

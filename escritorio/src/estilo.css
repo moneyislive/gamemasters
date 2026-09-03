@@ -427,12 +427,37 @@ code {
  * El resplandor de la esquina es `--halo`, o sea el mismo acento: no es un brillo
  * de material, es la luz del propio color.
  */
+/*
+ * EL NOMBRE NO SE APOYA EN EL ACENTO VIVO, Y ESO NO ES OPCIONAL.
+ *
+ * Aquí ponía `var(--acento)` plano, con el argumento de que el blanco sobre él da
+ * 3,6:1 y que para un titular de 800 el mínimo son 3:1. Es cierto EN VIOLETA y
+ * sólo en violeta: medido en los cuatro temas, el blanco sobre el acento da
+ * 1,98:1 en ámbar y 2,11:1 en verde. Eso no es un titular flojo, es un titular
+ * que no se lee, y el tema es cosa de quien juega.
+ *
+ * La franja viva se conserva —es la decisión de que el color viva en un sitio y
+ * sea grande— pero va ENCIMA del texto y no debajo: el degradado toca fondo a los
+ * 2,3rem y el nombre empieza a los 2,4rem, así que TODO el texto de la placa se
+ * apoya en `--acento-hondo`, donde el blanco da 4,64:1 en el peor de los cuatro
+ * temas. Las paradas van en rem y no en porcentaje a propósito: un porcentaje
+ * depende del alto del elemento, y el alto depende de si el nombre ocupa una
+ * línea o dos.
+ *
+ * Es el mismo sitio al que llega la app por otro camino: allí la placa tiene alto
+ * mínimo y el texto va pegado abajo con `flex-end`.
+ */
 .nombre-del-arcade {
   margin: 0;
-  padding: 1.05rem 1.1rem 0;
+  padding: 2.4rem 1.1rem 0;
   background:
     radial-gradient(120% 190% at 12% -30%, var(--halo) 0%, transparent 66%),
-    var(--acento);
+    linear-gradient(
+      180deg,
+      var(--acento) 0,
+      var(--acento) 1.1rem,
+      var(--acento-hondo) 2.3rem
+    );
   color: var(--blanco);
   font-size: 1.25rem;
   font-weight: 800;
@@ -442,19 +467,16 @@ code {
 }
 
 /*
- * Y el degradado toca fondo al 40 %, no al final, POR CONTRASTE Y NO POR GUSTO.
- * El blanco sobre `--acento` da 3,6:1: de sobra para el nombre, que es grande y
- * de 800 —ahí el mínimo son 3:1—, y por debajo del 4,5:1 que necesita el gancho,
- * que es letra normal. Hundiendo el color en el primer 40 % del párrafo, la
- * primera línea ya cae sobre 4,8:1 y el resto sobre 6,6:1. La maqueta llega al
- * mismo sitio por otro camino: allí el gancho está pegado ABAJO de una placa
- * alta, o sea sobre la parte honda del degradado. Aquí el párrafo ocupa todo lo
- * que queda de placa, así que el que tiene que darse prisa es el degradado.
+ * EL GANCHO YA NACE EN EL HONDO. Antes arrancaba en `--acento` y se hundía en el
+ * primer 40 % del párrafo, que en violeta bastaba y en ámbar y en verde no: su
+ * primera línea caía sobre una mezcla a medio camino. Ahora el color viene ya
+ * hundido desde el nombre, así que aquí es plano y no hay costura: los dos
+ * hermanos comparten el mismo `--acento-hondo`.
  */
 .gancho {
   margin: 0;
   padding: 0.5rem 1.1rem 1.05rem;
-  background: linear-gradient(180deg, var(--acento) 0%, var(--acento-hondo) 40%);
+  background: var(--acento-hondo);
   color: var(--blanco);
   font-size: 0.95rem;
   line-height: 1.45;
