@@ -596,6 +596,28 @@ const BATERIA = [
     porque:
       'la escena 3D y la malla hexagonal dicen lo mismo: cada vértice cae en la esquina exacta de su isla y no cerca, cada camino va de vértice a vértice y mide un radio, y los puntos de cada número son las formas de sacarlo con dos dados. Lo que NO prueba, y hay que decirlo, es que se vea bien: eso exige ojos y un aparato de verdad',
   },
+  /*
+   * ═══ LOS AVENTUREROS, Y POR QUÉ ÉSTE VA DETRÁS DE LA ESCENA ═══
+   *
+   * Porque mide contra ella: la altura de un personaje se contrasta con
+   * `ALTURA_DE_UNA_PERSONA` de `escala.ts`, que es la unidad de la que cuelga
+   * toda la geometría que el de arriba comprueba. Si la escala está rota, esto
+   * no significa nada.
+   *
+   * Lo que caza no da error en ningún sitio: una textura empotrada que se cuele
+   * se ve perfectamente en el PC y deja un HUECO en el móvil, porque Hermes no
+   * la sabe abrir; y una pista de animación que no encuentre su hueso —el pack
+   * los llama `foot.l` y `GLTFLoader` los deja en `footl`— deja al personaje
+   * clavado en T, sin un solo aviso. Por eso carga los siete ficheros con el
+   * `GLTFLoader` de three de verdad, en Node, y no con una copia de su regla.
+   */
+  {
+    nombre: 'aventureros',
+    donde: 'escenas',
+    guion: 'verify:aventureros',
+    porque:
+      'los seis aventureros compilados llevan el mismo rig de veintitrés huesos, el color horneado en cada vértice y ninguna textura que Hermes no sepa abrir; miden lo que mide una persona en `escala.ts`; y cada pista de los doce clips de `animaciones.glb` encuentra su hueso en cada personaje con el nombre que GLTFLoader deja al cargar',
+  },
   {
     nombre: 'escritorio honrado',
     donde: 'escritorio',

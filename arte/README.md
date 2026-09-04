@@ -70,6 +70,47 @@ son las UV de los vértices que caen en la celda (0,3) del atlas, una columna po
 Los otros tres colores se fabrican al cargar moviendo esas UV, que es la misma técnica
 con la que se pintan los biomas. Ver `CELDA_DEL_JUGADOR` en `escenas/paleta.ts`.
 
+## Los aventureros: seis personajes y una biblioteca de clips
+
+Del pack **KayKit Adventurers 2.0 FREE** (`arte/kaykit/adventurers/`) salen siete ficheros
+más en `escenas/modelos/aventureros/`, con otro compilador:
+
+```bash
+npm run compilar:aventureros -w escenas
+npm run verify:aventureros -w escenas
+```
+
+| sale | entra |
+| --- | --- |
+| `caballero.glb`, `barbaro.glb`, `maga.glb`, `exploradora.glb`, `picaro.glb`, `encapuchado.glb` | `Characters/gltf/{Knight,Barbarian,Mage,Ranger,Rogue,Rogue_Hooded}.glb` |
+| `animaciones.glb` (doce clips: `reposo-a`, `reposo-b`, `andar`, `correr`, `saludar`, `recoger`, `aparecer`, `usar`, `lanzar`, `golpe`, `salto`, `t-pose`) | `Animations/gltf/Rig_Medium/Rig_Medium_General.glb` y `Rig_Medium_MovementBasic.glb` |
+
+Los seis personajes llevan el mismo esqueleto —`Rig_Medium`, 23 huesos— y por eso una
+sola biblioteca de clips vale para todos: se carga una vez y cualquier clip se aplica a
+cualquier personaje por el nombre de sus huesos. La tabla completa de equivalencias
+(nombre nuestro ↔ fichero del pack ↔ clip del pack) está en la cabecera de
+`escenas/scripts/compilar-aventureros.ts`.
+
+Dos cosas que el compilador hace y conviene saber:
+
+- **La textura se hornea en el color de cada vértice.** El pack trae un PNG empotrado por
+  personaje, y en el móvil eso no se puede abrir: `GLTFLoader` lo decodifica con un
+  `<img>` que Hermes no tiene (ver `app/src/tres/texturas-nativas.ts`). Como las texturas
+  de KayKit son paletas de celdas planas, muestrear el PNG en la UV de cada vértice y
+  guardarlo en `COLOR_0` pinta lo mismo y no deja nada que el móvil no sepa cargar. Los
+  seis salen sin textura, sin UV y con el material en blanco; el PNG lo decodifica
+  `pngjs`, que es JavaScript puro.
+- **Los huesos se llaman como en el pack, con punto** (`foot.l`), y `GLTFLoader` les
+  quita el punto al cargar (`footl`). Pasa igual en los personajes y en la biblioteca,
+  así que el retarget por nombre funciona; `verify:aventureros` lo comprueba cargando los
+  siete ficheros con el `GLTFLoader` de three de verdad y buscando el hueso de cada pista
+  en cada personaje. No se renombran para que Blender y el propio pack sigan reconociendo
+  el rig.
+
+Y un dato que manda sobre todo lo demás: el caballero mide **2,543**, que es
+`ALTURA_DE_UNA_PERSONA` en `escenas/escala.ts` y la unidad del mundo entero. Los otros
+cinco miden entre 2,17 y 2,66 según el sombrero; el esqueleto es idéntico en los seis.
+
 ## Lo que queda por hacer
 
 El `.glb` pesa 4,2 MB, y de eso 3,5 MB son 114.929 vértices con posición, normal y UV en

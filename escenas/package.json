@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "verify:escena": "tsx scripts/verificar-escena.ts",
-    "compilar:modelos": "tsx scripts/compilar-modelos.ts"
+    "verify:aventureros": "tsx scripts/verificar-aventureros.ts",
+    "compilar:modelos": "tsx scripts/compilar-modelos.ts",
+    "compilar:aventureros": "tsx scripts/compilar-aventureros.ts"
   },
   "description": "Las escenas 3D que pintan los DOS clientes. Sin Canvas propio: lo monta quien la usa.",
   "peerDependencies": {
@@ -18,6 +20,7 @@
     "@gltf-transform/functions": "^4.5.0",
     "@react-three/fiber": "^9.7.0",
     "@types/three": "^0.185.4",
+    "pngjs": "3.4.0",
     "three": "^0.185.1"
   }
 }
