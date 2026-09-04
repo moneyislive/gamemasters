@@ -583,7 +583,7 @@ paso('La pantalla de Riberas en tres dimensiones no sabe reglas y no bombea');
   /* La semilla y la ruta de modelos son las compartidas, no copias. */
   comprobar(
     'la semilla del delta es la de `shared/mecanicas/semilla.ts`, sin copia local',
-    /from '\.\.\/\.\.\/\.\.\/shared\/arcade\/semilla'/.test(escena) && !/0x811c_9dc5/.test(escena),
+    /from '\.\.\/\.\.\/\.\.\/shared\/mecanicas\/semilla'/.test(escena) && !/0x811c_9dc5/.test(escena),
   );
   comprobar(
     'y la ruta del tablero sale de `escenas/ruta-de-modelos.ts`, no de las figuras del embarcadero',
