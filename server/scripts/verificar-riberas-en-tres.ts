@@ -52,9 +52,11 @@ import {
   manoEnTres,
   meToca,
   opcionesFueraDelTablero,
+  seVeEnTres,
   tableroEnTres,
   truequesPosibles,
 } from '../../shared/arcade/juegos/riberas-en-tres';
+import { COLORES_EN_3D } from '../../shared/arcade/juegos/riberas-en-3d';
 
 let hechas = 0;
 const fallos: string[] = [];
@@ -118,8 +120,8 @@ const TRES = ['A', 'B', 'C'] as const;
     barraA,
   );
   comprobar(
-    'el poblado y la ciudad llevan el color del colono en el nombre del modelo, y el puente no',
-    porId['poblado']?.modelo === 'poblado-blue' && porId['ciudad']?.modelo === 'ciudad-blue' && porId['puente']?.modelo === 'puente',
+    'el poblado y la ciudad llevan el color del colono en el nombre del modelo (A es el primero del atlas), y el puente no',
+    porId['poblado']?.modelo === `poblado-${COLORES_EN_3D[0]}` && porId['ciudad']?.modelo === `ciudad-${COLORES_EN_3D[0]}` && porId['puente']?.modelo === 'puente',
   );
   comprobar('B, que no tiene el turno, tiene la barra apagada', barraEnTres(vistaB, 'B').every((p) => !p.disponible));
   comprobar('un mirón sin asiento no tiene barra', barraEnTres(vistaA, null).length === 0);
@@ -159,12 +161,12 @@ const TRES = ['A', 'B', 'C'] as const;
   const tableroFundado = tableroEnTres(vistaFundada);
   comprobar('el árbitro acepta el movimiento del sitio tal cual', fundada.rev === empezada.rev + 1, { antes: empezada.rev, despues: fundada.rev });
   comprobar(
-    'y el delta enseña la choza como poblado azul en ese vértice',
+    'y el delta enseña la choza como poblado del color de A en ese vértice: el mismo que la barra enseñaba',
     tableroFundado !== null &&
       tableroFundado.piezas.length === 1 &&
       tableroFundado.piezas[0]?.vertice === primerSitio &&
       tableroFundado.piezas[0]?.clase === 'poblado' &&
-      tableroFundado.piezas[0]?.color === 'blue',
+      tableroFundado.piezas[0]?.color === COLORES_EN_3D[0],
     tableroFundado?.piezas,
   );
 
@@ -193,18 +195,19 @@ const TRES = ['A', 'B', 'C'] as const;
   const tableroAlzado = tableroEnTres(proyectarRiberas(estadoDe(alzada), 'A'));
   comprobar('la vereda entra por el mismo camino', alzada.rev === fundada.rev + 1);
   comprobar(
-    'y el delta la enseña como camino con el color hexadecimal del colono',
+    'y el delta la enseña como camino del mismo color que las piezas de A',
     tableroAlzado !== null &&
       tableroAlzado.caminos.length === 1 &&
       tableroAlzado.caminos[0]?.arista === sitioDeVereda &&
-      /^#[0-9a-f]{6}$/i.test(tableroAlzado.caminos[0]?.color ?? ''),
+      tableroAlzado.caminos[0]?.color === COLORES_EN_3D[0],
     tableroAlzado?.caminos,
   );
 
   /* La serpentina pasa a B: A se apaga, B se enciende. */
   const vistaB2 = proyectarRiberas(estadoDe(alzada), 'B');
   comprobar('ahora le toca a B', meToca(vistaB2) && !meToca(proyectarRiberas(estadoDe(alzada), 'A')));
-  comprobar('B ve el poblado como el segundo color del pack', barraEnTres(vistaB2, 'B').find((p) => p.id === 'poblado')?.modelo === 'poblado-red');
+  comprobar('B ve el poblado con el segundo color del atlas, por orden de asiento', barraEnTres(vistaB2, 'B').find((p) => p.id === 'poblado')?.modelo === `poblado-${COLORES_EN_3D[1]}`);
+  comprobar('y con tres en la mesa caben los colores: se ve en tres', seVeEnTres(vistaB2) === true);
   comprobar('y el delta que ve B es el mismo que ve A', JSON.stringify(tableroEnTres(vistaB2)) === JSON.stringify(tableroAlzado));
 
   /* La mano en la colocación está vacía y no rompe nada. */
@@ -299,7 +302,20 @@ function escenarioDeTrueque(deA: readonly Bien[], deB: readonly Bien[]): EstadoD
   comprobar('y el puente se enciende exactamente cuando las reglas ofrecen alzar', barraConVereda['puente'] === hayAlzar, { barra: barraConVereda, hayAlzar });
 }
 
-/* ═══ 4. VACUNAS: LO QUE NO ES DE RIBERAS NO SE PINTA ═══ */
+/* ═══ 4. CUANDO NO CABEN LOS COLORES, NO SE PINTA UN TABLERO QUE MIENTE ═══ */
+{
+  const CINCO = ['A', 'B', 'C', 'D', 'E'];
+  const abierta = abrirMesa({ id: 'RIB-3D-5', arcade: RIBERAS, semilla: 3, asientos: CINCO });
+  const empezada = jugar(abierta, { quien: 'A', rev: abierta.rev, movimiento: { tipo: EMPEZAR_RIBERAS, carga: {} } });
+  const vista = proyectarRiberas(estadoDe(empezada), 'E');
+  comprobar('cinco colonos son más que los colores del atlas: no se ve en tres', COLORES_EN_3D.length === 4 && seVeEnTres(vista) === false);
+  comprobar('y el tablero en tres es `null` aunque haya islas, para que el cliente pinte el plano', vista.islas.length === 19 && tableroEnTres(vista) === null);
+  comprobar('el quinto colono no tiene barra, porque no tendría color', barraEnTres(vista, 'E').length === 0);
+  comprobar('ni el primero: la mesa entera se ve en plano, no unos en tres y otros no', barraEnTres(proyectarRiberas(estadoDe(empezada), 'A'), 'A').length === 0 || tableroEnTres(proyectarRiberas(estadoDe(empezada), 'A')) === null);
+  comprobar('pero las opciones fuera del tablero y el turno siguen sirviendo al plano', meToca(proyectarRiberas(estadoDe(empezada), 'A')) && opcionesFueraDelTablero(opcionesDeRiberas(vista, 'E')).length === 0);
+}
+
+/* ═══ 5. VACUNAS: LO QUE NO ES DE RIBERAS NO SE PINTA ═══ */
 {
   const ajena = { desde: 'frente', momento: 'jugando', colonos: [], islas: [{}] };
   comprobar('una vista de otro juego no se pinta', esVistaQueSePinta(ajena) === false && tableroEnTres(ajena) === null);

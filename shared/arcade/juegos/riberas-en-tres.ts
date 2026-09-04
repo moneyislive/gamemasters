@@ -15,35 +15,46 @@
  *
  * NO HAY NINGUNA REGLA AQUÍ. Dónde se puede construir lo dice `riberas-en-3d.ts`
  * llamando a `opcionesDeRiberas`, la misma lista que el reductor exige antes de
- * aceptar nada; qué hay construido lo dice la vista. Este fichero sólo cambia de
- * forma lo que ya está decidido en otro sitio.
+ * aceptar nada; qué hay construido lo dice `deltaDeLaVista`, del mismo fichero.
+ * Este fichero sólo cambia de forma lo que ya está decidido en otro sitio.
  *
- * ═══ POR QUÉ NO IMPORTA NADA DE `escenas/` ═══
+ * ═══ QUÉ PONE ESTE FICHERO ENCIMA DE `riberas-en-3d.ts` ═══
  *
- * Por la misma razón que `riberas-en-3d.ts`: `shared/` lo compilan cuatro
- * paquetes y dos de ellos no tienen `three`. Los tipos de salida se declaran aquí
- * con la MISMA forma que los de la escena (`DeltaEn3D`, `CartaEnLaMano`,
- * `PiezaDeBarra`, `Colocando`) y encajan por estructura. Si la escena cambiara la
- * suya, el cliente que junta las dos dejaría de compilar, que es exactamente donde
- * se quiere que se note.
+ * `riberas-en-3d.ts` lee la vista (`deltaDeLaVista`, `manoDeLaVista`,
+ * `bastanColores`) y dice dónde cabe cada obra (`obraPosible`). Lo que falta para
+ * que una pantalla juegue es lo que hay aquí: la BARRA (qué pieza se enciende y con
+ * qué modelo), el ANILLO con el movimiento de cada sitio para mandarlo tal cual al
+ * soltar, las OPCIONES que no se tocan en el tablero (tirar, pasar, contestar), y
+ * los TRUEQUES por carta (qué se puede pedir a cambio, a quién). Nada de esto se
+ * duplica en los clientes.
+ *
+ * ═══ POR QUÉ SÓLO SE IMPORTAN TIPOS DE `escenas/` ═══
+ *
+ * `shared/` lo compilan cuatro paquetes y dos de ellos no tienen `three`. Un
+ * `import type` se borra al compilar, así que las formas de salida son las de la
+ * escena de verdad (`DeltaEn3D`, `ColorDeJugador`) sin arrastrar su código; es lo
+ * mismo que hace `riberas-en-3d.ts`. `CartaEnLaMano`, `PiezaDeBarra` y `Colocando`
+ * se declaran aquí con la misma forma y encajan por estructura.
  *
  * ═══ LO QUE ES PROVISIONAL, DICHO CON TODAS LAS LETRAS ═══
  *
- * 1. El COLOR de las piezas. `tablero.glb` trae hoy las piezas de jugador en los
- *    cuatro colores del pack (`blue`, `red`, `green`, `yellow`), y la escena las
- *    fabrica moviendo las UV de la textura. Riberas tiene SEIS colonos con su
- *    propia paleta (`ColonoVisto.color`, la misma de `escenas/embarcadero/tema.ts`).
- *    Mientras el tablero se compile con textura, aquí se reparten los cuatro del
- *    pack por orden de asiento; los caminos, que la escena tiñe con un `#rrggbb`,
- *    ya llevan el color de Riberas. El día que el tablero se hornee a color por
- *    vértice y se tiña al cargar como el embarcadero, `colorDePiezaDelColono` pasa
- *    a devolver el `#rrggbb` del colono y esta nota desaparece.
- * 2. Los BIENES. La escena conoce cinco bienes por el nombre de sus modelos del
- *    pack de recursos —madera, ladrillo, mineral, lana, grano— y Riberas llama a
- *    los suyos limo, junco, sal, piedra y grano. La correspondencia es por PAPEL en
- *    el juego, no por parecido: el junco es lo que se tala, el limo lo que se cuece,
- *    la piedra lo que se pica, la sal lo que se recoge del prado. Cuando la escena
- *    acepte los bienes de Riberas por su nombre, esta tabla sobra.
+ * 1. Los COLORES. `tablero.glb` trae hoy las piezas de jugador en los cuatro
+ *    colores del atlas (`COLORES_EN_3D`, repartidos por orden de asiento en
+ *    `deltaDeLaVista`) y Riberas admite SEIS colonos. No se reparte con un módulo
+ *    —dos colonos del mismo color es una partida injugable sin ningún error a la
+ *    vista—: `seVeEnTres` pregunta antes, y si no bastan los colores el tablero en
+ *    tres devuelve `null` y el cliente enseña el tablero plano de siempre. Cuando el
+ *    tablero se hornee a color y se tiña al cargar como el embarcadero, esta nota y
+ *    ese límite desaparecen.
+ * 2. Los BIENES. Riberas llama a los suyos limo, junco, sal, piedra y grano, y así
+ *    salen de `manoDeLaVista`. Pero los iconos de las cartas de la escena son hoy
+ *    los del pack —madera, ladrillo, mineral, lana, grano— y sin traducir, cuatro de
+ *    las cinco cartas saldrían sin dibujo reconocible. La tabla `BIEN_EN_LA_ESCENA`
+ *    traduce SÓLO para pintar, por PAPEL en el juego y no por parecido: el junco es
+ *    lo que se tala, el limo lo que se cuece, la piedra lo que se pica, la sal lo que
+ *    se recoge del prado. La carga que va al reductor lleva siempre el nombre de
+ *    Riberas (`bienDeRiberas` deshace la traducción). Cuando llegue el arte propio
+ *    de Riberas, esta tabla sobra.
  *
  * ═══ LOS IDENTIFICADORES DE LA BARRA SON NUESTROS ═══
  *
@@ -52,10 +63,11 @@
  * enseña modelos; el movimiento habla el segundo porque va al reductor. La
  * traducción entre los dos está en `PIEZAS_DE_LA_BARRA` y en ningún otro sitio.
  */
+import type { ColorDeJugador, DeltaEn3D } from '../../../escenas/tipos';
 import type { Hex, LlaveDeArista, LlaveDeVertice } from '../../mecanicas/malla-hexagonal';
 import type { AsientoId } from '../tipos';
 import { ALZAR, FUNDAR, OFRECER } from './riberas';
-import { obraPosible } from './riberas-en-3d';
+import { bastanColores, COLORES_EN_3D, deltaDeLaVista, manoDeLaVista, obraPosible } from './riberas-en-3d';
 import type { PiezaDeObra, SitioDeObra } from './riberas-en-3d';
 
 // ---------------------------------------------------------------------------
@@ -98,21 +110,21 @@ export function esVistaQueSePinta(vista: unknown): vista is VistaQueSePinta {
   );
 }
 
+/**
+ * ¿SE PUEDE ENSEÑAR ESTA MESA EN TRES DIMENSIONES? Es de Riberas y caben sus
+ * colonos en los colores que el tablero sabe pintar. Si no, el cliente pinta el
+ * tablero plano: pobre y honrado, mejor que un tablero que miente.
+ */
+export function seVeEnTres(vista: unknown): boolean {
+  return esVistaQueSePinta(vista) && bastanColores(vista);
+}
+
 // ---------------------------------------------------------------------------
 // LO QUE SE ENTREGA A LA ESCENA, con la forma que ella espera
 // ---------------------------------------------------------------------------
 
-/** Los cuatro colores que el pack trae compilados. Ver «lo que es provisional», 1. */
-export type ColorDelPack = 'blue' | 'red' | 'green' | 'yellow';
-export const COLORES_DEL_PACK: readonly ColorDelPack[] = ['blue', 'red', 'green', 'yellow'];
-
-/** La misma forma que `DeltaEn3D` de `escenas/tipos.ts`. */
-export interface TableroEnTres {
-  readonly islas: readonly { readonly hex: Hex; readonly terreno: string; readonly cifra: number | null }[];
-  readonly piezas: readonly { readonly vertice: LlaveDeVertice; readonly clase: 'poblado' | 'ciudad'; readonly color: ColorDelPack }[];
-  readonly caminos: readonly { readonly arista: LlaveDeArista; readonly color: string }[];
-  readonly ladron: Hex | null;
-}
+/** El tablero tal como lo pinta la escena. Es `DeltaEn3D` con su nombre de aquí. */
+export type TableroEnTres = DeltaEn3D;
 
 /** La misma forma que `CartaEnLaMano` de `escenas/baraja.ts`. */
 export interface CartaEnTres {
@@ -164,63 +176,37 @@ export function indiceDelColono(vista: VistaQueSePinta, asiento: AsientoId | nul
   return vista.colonos.findIndex((c) => c.asiento === asiento);
 }
 
-/** El color de pack con el que se pintan las piezas del colono `i`. Provisional: ver la cabecera. */
-export function colorDePiezaDelColono(i: number): ColorDelPack {
-  const n = COLORES_DEL_PACK.length;
-  return COLORES_DEL_PACK[((i % n) + n) % n] as ColorDelPack;
+/**
+ * El color con el que `deltaDeLaVista` pinta las piezas del colono `i`, o `null` si
+ * para ese colono no hay color: es el MISMO reparto —por orden de asiento, sin
+ * módulo— para que la barra enseñe la pieza del color que luego aparece en el tablero.
+ */
+export function colorDePiezaDelColono(i: number): ColorDeJugador | null {
+  return i < 0 ? null : (COLORES_EN_3D[i] ?? null);
 }
 
 /**
  * EL TABLERO EN TRES DIMENSIONES que sale de la vista, o `null` si todavía no hay
- * delta (mientras se reúne la mesa) o si la vista no es de Riberas.
- *
- * La cifra `0` de la duna pasa a `null`: en Riberas cero significa «no rinde», y en
- * la escena `null` significa «sin número», que es lo mismo dicho en su idioma.
+ * delta (mientras se reúne la mesa), si la vista no es de Riberas, o si la mesa no
+ * cabe en los colores del tablero (`seVeEnTres`). En los tres casos el cliente no
+ * pinta la escena; en el último pinta el tablero plano.
  */
 export function tableroEnTres(vista: unknown): TableroEnTres | null {
-  if (!esVistaQueSePinta(vista) || vista.islas.length === 0) return null;
-  const piezas: TableroEnTres['piezas'][number][] = [];
-  const caminos: TableroEnTres['caminos'][number][] = [];
-  vista.colonos.forEach((c, i) => {
-    const color = colorDePiezaDelColono(i);
-    for (const v of c.chozas) piezas.push({ vertice: v, clase: 'poblado', color });
-    for (const v of c.torres) piezas.push({ vertice: v, clase: 'ciudad', color });
-    for (const a of c.veredas) caminos.push({ arista: a, color: c.color });
-  });
-  return {
-    islas: vista.islas.map((i) => ({ hex: i.hex, terreno: i.terreno, cifra: i.numero > 0 ? i.numero : null })),
-    piezas,
-    caminos,
-    /* Riberas no tiene ladrón: la duna simplemente no rinde. */
-    ladron: null,
-  };
+  if (!seVeEnTres(vista) || !esVistaQueSePinta(vista) || vista.islas.length === 0) return null;
+  return deltaDeLaVista(vista);
 }
 
 // ---------------------------------------------------------------------------
 // La mano
 // ---------------------------------------------------------------------------
 
-/** El bien de una ficha `b17:junco`, o `null` si la ficha no tiene esa forma. */
-export function bienDeLaFicha(ficha: string): string | null {
-  const dosPuntos = ficha.indexOf(':');
-  if (dosPuntos < 0 || dosPuntos === ficha.length - 1) return null;
-  return ficha.slice(dosPuntos + 1);
-}
-
 /**
- * MI MANO, tal como la pinta la escena: una carta por ficha, con el identificador de
- * la ficha (único, que es lo que la baraja pide) y el bien traducido al nombre que la
- * escena conoce. Vacía para quien mira sin jugar.
+ * MI MANO, tal como la pinta la escena: las cartas de `manoDeLaVista` (una por
+ * ficha, con el identificador de la ficha como llave) con el bien traducido al
+ * nombre del icono que la escena tiene hoy. Vacía para quien mira sin jugar.
  */
 export function manoEnTres(vista: unknown): CartaEnTres[] {
-  if (!esVistaQueSePinta(vista) || vista.misFichas === undefined) return [];
-  const cartas: CartaEnTres[] = [];
-  for (const ficha of vista.misFichas) {
-    const bien = bienDeLaFicha(ficha);
-    if (bien === null) continue;
-    cartas.push({ id: ficha, bien: BIEN_EN_LA_ESCENA[bien] ?? bien });
-  }
-  return cartas;
+  return manoDeLaVista(vista).map((c) => ({ id: c.id, bien: BIEN_EN_LA_ESCENA[c.bien] ?? c.bien }));
 }
 
 // ---------------------------------------------------------------------------
@@ -230,11 +216,13 @@ export function manoEnTres(vista: unknown): CartaEnTres[] {
 /**
  * LA BARRA DE CONSTRUIR de este asiento: las tres obras, encendida cada una si las
  * reglas ofrecen ahora mismo algún sitio para ella. El modelo del poblado y de la
- * ciudad lleva el color del colono; el puente es de nadie.
+ * ciudad lleva el color del colono; el puente es de nadie. Vacía para un mirón y
+ * para un colono al que no le llega color (ver `seVeEnTres`).
  */
 export function barraEnTres(vista: unknown, quien: AsientoId | null): PiezaDeLaBarraEnTres[] {
   if (!esVistaQueSePinta(vista) || quien === null) return [];
-  const color = colorDePiezaDelColono(Math.max(0, indiceDelColono(vista, quien)));
+  const color = colorDePiezaDelColono(indiceDelColono(vista, quien));
+  if (color === null) return [];
   return PIEZAS_DE_LA_BARRA.map(({ id, pieza }) => ({
     id,
     pieza,
