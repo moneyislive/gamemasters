@@ -54,6 +54,21 @@ import { cuantasFormasDeCauce, cuantasFormasDeCruce, ladoHaciaElVecino } from '.
 import { hexesDeVertice, vecino, verticesDeHex } from '../../shared/mecanicas/malla-hexagonal';
 import { CAUCE, CUERPO, piezaDeOrilla } from '../aguas';
 import { piezasDeAsentamiento } from '../asentamiento';
+import {
+  acercando,
+  acotadoAlTablero,
+  ALTURA_MINIMA_DEL_OJO,
+  APARTE_MAXIMO,
+  arrastrandoLaMirada,
+  CERCANIA_DE_SALIDA,
+  comoAlPrincipio,
+  estaComoAlPrincipio,
+  factorValido,
+  MAS_CERCA,
+  MAS_LEJOS,
+  ojoYMira,
+  pellizcando,
+} from '../acercar';
 import { sitiosDelTablero, sitiosPermitidos } from '../sitios';
 import {
   alejarseParaQueQuepa,
@@ -1520,6 +1535,100 @@ paso('Un puente cubre su arista, salva lo que tiene debajo y encaja con el camin
 }
 
 // ---------------------------------------------------------------------------
+// ACERCARSE AL TABLERO Y MOVERSE POR ÉL
+//
+// Todo lo de `acercar.ts` son números y topes, y los topes son justamente lo que se
+// rompe sin que nadie lo vea: un acercamiento sin límite mete la cámara dentro de una
+// colina, y una mirada sin límite deja a alguien mirando el mar sin saber volver.
+// ---------------------------------------------------------------------------
+{
+  const PANTALLA = { ancho: 1000, alto: 600 };
+  const ALCANCE = 200;
+
+  comprobar('se empieza mirando el tablero entero, desde su centro', estaComoAlPrincipio(CERCANIA_DE_SALIDA));
+
+  /* Acercar y alejar. */
+  const unPaso = acercando(CERCANIA_DE_SALIDA, 1);
+  comprobar('un paso acerca', unPaso.factor < 1);
+  comprobar(
+    'y el paso es multiplicativo: dos pasos son el cuadrado de uno',
+    Math.abs(acercando(CERCANIA_DE_SALIDA, 2).factor - unPaso.factor * unPaso.factor) < 1e-9,
+  );
+  comprobar('acercar y alejar el mismo paso vuelve al sitio', Math.abs(acercando(unPaso, -1).factor - 1) < 1e-9);
+  comprobar(
+    'por mucho que se insista, no se pasa del tope de cerca',
+    acercando(CERCANIA_DE_SALIDA, 100).factor === MAS_CERCA,
+  );
+  comprobar('ni del de lejos', acercando(CERCANIA_DE_SALIDA, -100).factor === MAS_LEJOS);
+  comprobar(
+    'y desde muy cerca se ve media comarca, que es lo que se pedía',
+    ALCANCE * MAS_CERCA > 25 && ALCANCE * MAS_CERCA < 40,
+    ALCANCE * MAS_CERCA,
+  );
+  comprobar('un pellizco que abre acerca, y uno que cierra aleja', pellizcando(CERCANIA_DE_SALIDA, 1, 2).factor < 1 && pellizcando(CERCANIA_DE_SALIDA, 0.5, 0.5).factor === 1);
+  comprobar('una escala imposible no mueve nada', pellizcando(CERCANIA_DE_SALIDA, 1, 0) === CERCANIA_DE_SALIDA && pellizcando(CERCANIA_DE_SALIDA, 1, Number.NaN) === CERCANIA_DE_SALIDA);
+  comprobar('acercar cero pasos tampoco', acercando(CERCANIA_DE_SALIDA, 0) === CERCANIA_DE_SALIDA);
+  comprobar('y un factor imposible cae en el tablero entero', factorValido(Number.NaN) === 1 && factorValido(Number.POSITIVE_INFINITY) === 1);
+
+  /* Mover la mirada: se arrastra el mundo, no la cámara. */
+  const cerca = acercando(CERCANIA_DE_SALIDA, 6);
+  const aLaDerecha = arrastrandoLaMirada(cerca, 200, 0, 0, ALCANCE, PANTALLA);
+  comprobar('arrastrar a la derecha lleva la mirada a la izquierda: se mueve el mundo', aLaDerecha.centro.x < 0, aLaDerecha.centro);
+  comprobar('y no toca lo cerca que se está', aLaDerecha.factor === cerca.factor);
+  const haciaAbajo = arrastrandoLaMirada(cerca, 0, 200, 0, ALCANCE, PANTALLA);
+  comprobar('arrastrar hacia abajo trae lo que estaba al fondo', haciaAbajo.centro.z < 0, haciaAbajo.centro);
+
+  /*
+   * GIRADO UN CUARTO DE VUELTA, «a la derecha» ya no es el eje X del mundo. Sin esto,
+   * arrastrar movería el mapa en diagonal en cuanto se hubiera girado un poco.
+   */
+  const girado = arrastrandoLaMirada(cerca, 200, 0, Math.PI / 2, ALCANCE, PANTALLA);
+  comprobar(
+    'con el tablero girado, el arrastre sigue los ejes de la pantalla y no los del mundo',
+    Math.abs(girado.centro.z) > Math.abs(girado.centro.x),
+    girado.centro,
+  );
+
+  /* Lo que se recorre depende de lo cerca que se esté. */
+  const deLejos = arrastrandoLaMirada(CERCANIA_DE_SALIDA, 200, 0, 0, ALCANCE, PANTALLA);
+  comprobar(
+    'de lejos, el mismo gesto recorre más mundo que de cerca',
+    Math.abs(deLejos.centro.x) > Math.abs(aLaDerecha.centro.x),
+    { deLejos: deLejos.centro.x, deCerca: aLaDerecha.centro.x },
+  );
+
+  /* El tope: no se sale del tablero. */
+  let lejisimos = cerca;
+  for (let i = 0; i < 40; i++) lejisimos = arrastrandoLaMirada(lejisimos, 400, 0, 0, ALCANCE, PANTALLA);
+  comprobar(
+    'por mucho que se arrastre, la mirada no se sale del tablero',
+    Math.hypot(lejisimos.centro.x, lejisimos.centro.z) <= ALCANCE * APARTE_MAXIMO + 1e-9,
+    lejisimos.centro,
+  );
+  comprobar('y se queda en el borde en vez de rebotar', Math.abs(Math.hypot(lejisimos.centro.x, lejisimos.centro.z) - ALCANCE) < 1e-6);
+  comprobar('volver al principio deja el tablero entero y centrado', estaComoAlPrincipio(comoAlPrincipio()));
+
+  /* Dónde acaban el ojo y el punto de mira. */
+  const alrededor = (d: number): readonly [number, number, number] => [0, d * 0.2, d];
+  const puesto = ojoYMira(CERCANIA_DE_SALIDA, ALCANCE, alrededor);
+  comprobar('sin acercarse, se mira al centro del delta', puesto.mira[0] === 0 && puesto.mira[2] === 0);
+  comprobar('y el ojo está donde lo pone el mirador', puesto.ojo[2] === ALCANCE);
+  const enUnaEsquina = ojoYMira({ factor: 0.2, centro: { x: 100, z: -50 } }, ALCANCE, alrededor);
+  comprobar('acercarse a una esquina mueve el ojo Y el punto al que mira', enUnaEsquina.mira[0] === 100 && enUnaEsquina.mira[2] === -50);
+  comprobar(
+    'el ojo va sobre esa esquina, a la distancia acercada',
+    Math.abs(enUnaEsquina.ojo[0] - 100) < 1e-9 && Math.abs(enUnaEsquina.ojo[2] - (-50 + ALCANCE * 0.2)) < 1e-9,
+    enUnaEsquina.ojo,
+  );
+  const rasante = ojoYMira({ factor: MAS_CERCA, centro: { x: 0, z: 0 } }, ALCANCE, (d) => [0, d * 0.001, d]);
+  comprobar(
+    'y por muy cerca y muy raso que se mire, el ojo no se mete dentro del mundo',
+    rasante.ojo[1] >= ALTURA_MINIMA_DEL_OJO,
+    rasante.ojo,
+  );
+}
+
+// ---------------------------------------------------------------------------
 
 console.log('');
 if (fallos.length > 0) {
@@ -1539,7 +1648,7 @@ if (fallos.length > 0) {
  * a veintitrés: durante ese tiempo el guion podía morirse en la novena sin que nadie se
  * enterara. Un guardia desfasado no guarda nada.
  */
-const COMPROBACIONES_ESCRITAS = 77;
+const COMPROBACIONES_ESCRITAS = 99;
 if (hechas < COMPROBACIONES_ESCRITAS) {
   console.error(
     `Solo se han hecho ${hechas} de las ${COMPROBACIONES_ESCRITAS} comprobaciones que ` +
