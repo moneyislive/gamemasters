@@ -25,18 +25,32 @@
  * no haya un `reposo-a` que reproducir la figura no se enseña. Se ve un farol y
  * un barco un instante antes que a su dueño, que es lo que se vería en un muelle.
  *
- * ═══ EL CAMBIO DE FIGURA ═══
+ * ═══ EL CAMBIO DE FIGURA: EL «QUÉ» Y EL «CUÁNDO», DESACOPLADOS ═══
  *
  * `figura` puede cambiar con el asiento montado (me visto, o el otro se viste).
- * La figura VISIBLE no cambia hasta que `gestos.ts` dice `cambiaYa`: primero el
- * `lanzar` cortado con la vieja, un soplo de humo, y la nueva `aparece`.
+ * Lo que se PIDE es una cosa y lo que se VE es otra, y el paso de una a otra lo
+ * decide cada fotograma mirando el estado, no un efecto de React:
+ *
+ *   · Si la figura pedida aún no está cargada, no pasa nada: se espera.
+ *   · Si está cargada y no hay nada que despedir —la vieja nunca llegó, o
+ *     falló—, o el aventurero ya va en el barco, se cambia en seco: nadie vería
+ *     el gesto y esperarlo dejaría la figura equivocada.
+ *   · Si está cargada y el aventurero espera, ENTONCES se entra en
+ *     `vistiendose`: el `lanzar` cortado con la vieja, un soplo de humo, y la
+ *     nueva `aparece` cuando `gestos.ts` dice `cambiaYa`.
+ *
+ * La primera versión mandaba `se-viste` al cambiar la prop y sólo cambiaba la
+ * figura si el `.glb` nuevo llegaba dentro de los 1,9 s de la fase: si tardaba
+ * más, la vieja se quedaba para siempre, para mí y para los demás. Y si se
+ * cambiaba de figura antes de que cargase la primera, se pintaba la primera.
  *
  * ═══ LO QUE SE SUELTA AL DESMONTAR ═══
  *
  * El mezclador se para y se desengancha de su raíz, el esqueleto del clon suelta
  * su textura de huesos, y la geometría y el material del humo se destruyen. Las
- * geometrías del barco y la bandera NO: son de la caché de `tinte.ts` y las
- * comparten los asientos del mismo color; las suelta la escena entera al irse.
+ * geometrías del barco, la bandera y el estandarte NO: son de la caché de
+ * `tinte.ts` y las comparten los asientos del mismo color; las suelta la escena
+ * entera al irse (`soltarTintes`).
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { JSX } from 'react';
@@ -78,6 +92,8 @@ export interface PropsDelAventurero {
   readonly modoDeNacer: ModoDeNacer;
   readonly retraso: number;
   readonly zarpando: boolean;
+  /** Cuántos barcos han atracado desde que se montó la escena: cada uno más es alguien a quien saludar. */
+  readonly llegadas: number;
   readonly semilla: number;
   /** `null` si el embarcadero no llegó: entonces hay figura, pero ni barco ni bandera. */
   readonly catalogo: CatalogoDelEmbarcadero | null;
@@ -92,6 +108,8 @@ const A_FLOTE = LAMINA + 0.06;
 const FUNDIDO = 0.22;
 /** El aventurero va sobre la cubierta del barco, que está a esta altura de la lámina. */
 const CUBIERTA = 1.1;
+/** Cuánto tarda en saludar al que llega cada asiento más que el anterior. */
+const ESCALON_DEL_SALUDO = 0.15;
 
 const pinza = (x: number, a: number, b: number): number => Math.min(b, Math.max(a, x));
 const suaveFuera = (t: number): number => 1 - Math.pow(1 - pinza(t, 0, 1), 3);
@@ -162,21 +180,27 @@ function reproduce(m: Marioneta, clip: NombreDeClip, bucle: boolean, desde: numb
 /* ──────────────────────────────── El amarre ──────────────────────────────── */
 
 export function Aventurero(props: PropsDelAventurero): JSX.Element {
-  const { amarre, color, figura, presente, calidad, modoDeNacer, retraso, zarpando, semilla, catalogo, figuras, biblioteca, alAtracar } = props;
+  const { amarre, indice, color, figura, presente, esLocal, calidad, modoDeNacer, retraso, zarpando, llegadas, semilla, catalogo, figuras, biblioteca, alAtracar } = props;
   const camara = useThree((s) => s.camera);
 
   /* La máquina de estados y los sucesos pendientes de aplicar en el siguiente fotograma. */
   const estado = useRef<EstadoDeAventurero | null>(null);
   const pendientes = useRef<Suceso[]>([]);
   const primeraPresencia = useRef(true);
-  const primeraFigura = useRef(true);
   const atracado = useRef(false);
   const alAtracarRef = useRef(alAtracar);
   alAtracarRef.current = alAtracar;
 
-  /* La figura que se VE, que va por detrás de la que se pide. */
+  /*
+   * La figura que se VE, que va por detrás de la que se pide. La pedida se lee en
+   * cada fotograma; el cambio lo decide el hilo de dibujo (ver la cabecera), y
+   * `vestidoPedidoPara` recuerda para qué figura se mandó ya el `se-viste`, para
+   * no mandarlo en cada fotograma mientras la máquina lo aplica.
+   */
   const [figuraVisible, ponerFiguraVisible] = useState<FiguraId>(figura);
   const figuraPedida = useRef(figura);
+  figuraPedida.current = figura;
+  const vestidoPedidoPara = useRef<FiguraId | null>(null);
 
   useEffect(() => {
     if (primeraPresencia.current) {
@@ -187,17 +211,21 @@ export function Aventurero(props: PropsDelAventurero): JSX.Element {
   }, [presente]);
 
   useEffect(() => {
-    figuraPedida.current = figura;
-    if (primeraFigura.current) {
-      primeraFigura.current = false;
-      return;
-    }
-    if (figura !== figuraVisible) pendientes.current.push('se-viste');
-  }, [figura, figuraVisible]);
-
-  useEffect(() => {
     if (zarpando) pendientes.current.push('zarpa');
   }, [zarpando]);
+
+  /*
+   * Alguien ha atracado: se saluda, escalonado por asiento. Se programa con el
+   * reloj de la escena en el siguiente fotograma (−1 = «pendiente de fechar»), y
+   * los que ya estaban al montar no cuentan: sólo las llegadas de verdad.
+   */
+  const llegadasVistas = useRef(llegadas);
+  const saludaEn = useRef<number | null>(null);
+  useEffect(() => {
+    if (llegadas === llegadasVistas.current) return;
+    llegadasVistas.current = llegadas;
+    saludaEn.current = -1;
+  }, [llegadas]);
 
   /* La marioneta: el clon con su mezclador. Se rehace al cambiar la figura visible o al llegar la biblioteca. */
   const cargado = figuras.get(figuraVisible);
@@ -221,6 +249,12 @@ export function Aventurero(props: PropsDelAventurero): JSX.Element {
     const p = catalogo?.piezas.get(PIEZA.bandera);
     return p === undefined ? null : tenir(p, color).clone(true);
   }, [catalogo, color]);
+  /* El estandarte, sólo en la plataforma del local, junto al farol: 72 vértices y una llamada. */
+  const estandarte = useMemo(() => {
+    if (!esLocal) return null;
+    const p = catalogo?.piezas.get(PIEZA.estandarte);
+    return p === undefined ? null : tenir(p, color).clone(true);
+  }, [catalogo, color, esLocal]);
 
   /* El humo del cambio de figura: catorce motas que viven 1,3 s. */
   const humo = useMemo(() => {
@@ -258,11 +292,33 @@ export function Aventurero(props: PropsDelAventurero): JSX.Element {
     e = siguiente(e, 'tic', ahora);
     estado.current = e;
 
-    /* El cambio de figura: cuando `gestos.ts` lo dice, y con humo. */
+    /* El saludo al que llega, cuando le toca a este asiento. */
+    if (saludaEn.current !== null) {
+      if (saludaEn.current < 0) saludaEn.current = ahora + ESCALON_DEL_SALUDO * Math.max(0, indice);
+      else if (ahora >= saludaEn.current) {
+        saludaEn.current = null;
+        pendientes.current.push('saluda');
+      }
+    }
+
+    /* El cambio de figura: el «qué» lo dice la prop, el «cuándo» el estado (ver la cabecera). */
     const vestido = progresoDeVestido(e, ahora);
-    if (e.fase === 'vistiendose' && vestido.cambiaYa && figuraVisible !== figuraPedida.current && figuras.has(figuraPedida.current)) {
-      humoDesde.current = ahora;
-      ponerFiguraVisible(figuraPedida.current);
+    const pedida = figuraPedida.current;
+    if (pedida !== figuraVisible && figuras.has(pedida)) {
+      if (marioneta === null || e.fase === 'zarpando' || e.fase === 'zarpado') {
+        /* Nada que despedir, o nadie que lo vea: en seco. */
+        vestidoPedidoPara.current = null;
+        ponerFiguraVisible(pedida);
+      } else if (e.fase === 'vistiendose') {
+        if (vestido.cambiaYa) {
+          humoDesde.current = ahora;
+          vestidoPedidoPara.current = null;
+          ponerFiguraVisible(pedida);
+        }
+      } else if ((e.fase === 'esperando' || e.fase === 'ausente') && vestidoPedidoPara.current !== pedida) {
+        vestidoPedidoPara.current = pedida;
+        pendientes.current.push('se-viste');
+      }
     }
 
     /* El barco: cabeceo, llegada desde la niebla y zarpe hacia ella. */
@@ -379,6 +435,12 @@ export function Aventurero(props: PropsDelAventurero): JSX.Element {
       <group ref={grupoDeLaBandera} position={[amarre.bandera.x, tablas, amarre.bandera.z]}>
         {bandera === null ? null : <primitive object={bandera} />}
       </group>
+
+      {estandarte === null ? null : (
+        <group position={[amarre.estandarte.x, tablas, amarre.estandarte.z]} rotation={[0, amarre.giro + 0.6, 0]}>
+          <primitive object={estandarte} scale={[s, s, s]} />
+        </group>
+      )}
 
       <group ref={grupoDeLaFigura} visible={false}>
         {marioneta === null ? null : <primitive object={marioneta.raiz} />}

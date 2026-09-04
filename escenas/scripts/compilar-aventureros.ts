@@ -77,13 +77,13 @@
  *     npm run compilar:aventureros -w escenas
  *     npm run verify:aventureros -w escenas
  */
-import { NodeIO, PropertyType } from '@gltf-transform/core';
-import type { Accessor, Animation, Document, Node } from '@gltf-transform/core';
+import { PropertyType } from '@gltf-transform/core';
+import type { Accessor, Animation, Document, Node, NodeIO } from '@gltf-transform/core';
 import { dedup, mergeDocuments, prune, resample } from '@gltf-transform/functions';
 import fs from 'node:fs';
 import path from 'node:path';
 import { ALTURA_DE_UNA_PERSONA, enPersonas } from '../escala';
-import { desnudaElMaterial, horneaLaPrimitiva, pngDeLaTextura, rendirse } from './hornear';
+import { desnudaElMaterial, escritorDeGlb, horneaLaPrimitiva, pngDeLaTextura, rendirse } from './hornear';
 
 const RAIZ = path.resolve(import.meta.dirname ?? __dirname, '..', '..');
 const PACK = path.join(RAIZ, 'arte/kaykit/adventurers/KayKit_Adventurers_2.0_FREE');
@@ -429,7 +429,8 @@ async function main(): Promise<void> {
         'Es CC0 y no se versiona a propósito. `arte/README.md` dice cómo bajarlo.',
     );
   }
-  const io = new NodeIO();
+  /* Con los atributos separados, no entrelazados: ver `escritorDeGlb` en `hornear.ts`. */
+  const io = escritorDeGlb();
 
   console.log('\nPersonajes');
   console.log('  nombre        vértices  triáng.     kB  altura  personas  desvío sRGB');

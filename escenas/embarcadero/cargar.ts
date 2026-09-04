@@ -126,34 +126,19 @@ export interface Instanciable {
   readonly material: THREE.Material;
 }
 
-/**
- * UNA COPIA DE LA GEOMETRÍA SIN BÚFERES ENTRELAZADOS, y en silencio.
+/*
+ * LAS GEOMETRÍAS SE CLONAN CON `clone()` A SECAS, y por qué eso es noticia.
  *
- * El compilador deja los atributos del `.glb` entrelazados en un solo búfer, y
- * `BufferGeometry.clone()` los desentrelaza avisando por consola UNA VEZ POR
- * ATRIBUTO: doscientas líneas de «Cloning an interleaved buffer attribute» al
- * montar la cala, que entierran cualquier aviso de verdad. Aquí se hace la
- * misma copia a mano —flotantes ya desnormalizados, que es lo que `getX` da—
- * sin decir nada. Un atributo que no venga entrelazado se clona tal cual.
+ * Hubo aquí una `copiaDesentrelazada` que copiaba los atributos a mano: el
+ * compilador dejaba los atributos del `.glb` entrelazados en un solo búfer, y
+ * `BufferGeometry.clone()` los desentrelazaba avisando por consola UNA VEZ POR
+ * ATRIBUTO —doscientas líneas al montar la cala—. Ya no hace falta: los `.glb`
+ * se escriben con los atributos separados y con el paso igual al elemento (ver la
+ * cabecera de `hornear.ts`), `GLTFLoader` los carga como `BufferAttribute`
+ * normales, y `verify:embarcadero-modelos` y `verify:aventureros` exigen que
+ * ninguno llegue entrelazado. Si un día vuelven los avisos, lo que ha cambiado
+ * es el compilador, no esto.
  */
-export function copiaDesentrelazada(geometria: THREE.BufferGeometry): THREE.BufferGeometry {
-  const copia = new THREE.BufferGeometry();
-  for (const nombre of Object.keys(geometria.attributes)) {
-    const atributo = geometria.getAttribute(nombre);
-    if ((atributo as THREE.InterleavedBufferAttribute).isInterleavedBufferAttribute) {
-      const n = atributo.count;
-      const tamano = atributo.itemSize;
-      const plano = new Float32Array(n * tamano);
-      for (let i = 0; i < n; i++) for (let k = 0; k < tamano; k++) plano[i * tamano + k] = atributo.getComponent(i, k);
-      copia.setAttribute(nombre, new THREE.BufferAttribute(plano, tamano));
-    } else {
-      copia.setAttribute(nombre, (atributo as THREE.BufferAttribute).clone());
-    }
-  }
-  const indice = geometria.getIndex();
-  if (indice !== null) copia.setIndex(indice.clone());
-  return copia;
-}
 
 /** Como `aplana` en `delta.tsx`: TODAS las mallas del modelo, en el marco del nodo raíz. */
 export function aplana(modelo: THREE.Object3D): Instanciable[] {
@@ -165,7 +150,7 @@ export function aplana(modelo: THREE.Object3D): Instanciable[] {
     const malla = n as THREE.Mesh;
     if (!malla.isMesh) return;
     malla.updateWorldMatrix(true, false);
-    const geometria = copiaDesentrelazada(malla.geometry);
+    const geometria = malla.geometry.clone();
     geometria.applyMatrix4(new THREE.Matrix4().copy(inversa).multiply(malla.matrixWorld));
     const material = Array.isArray(malla.material) ? (malla.material[0] as THREE.Material) : malla.material;
     salida.push({ geometria, material });

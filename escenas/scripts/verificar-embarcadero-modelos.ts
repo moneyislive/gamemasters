@@ -265,8 +265,8 @@ const trianguloPorPieza = new Map<string, number>();
     for (const { prim, nodo } of prims) {
       const donde = `${raiz.getName()}/${nodo.getName()}`;
       const color = prim.getAttribute('COLOR_0');
-      /* 5121 es UNSIGNED_BYTE: bytes normalizados, que es lo que escribe el compilador. */
-      if (color === null || color.getType() !== 'VEC3' || color.getComponentType() !== 5121 || !color.getNormalized()) {
+      /* 5121 es UNSIGNED_BYTE: bytes normalizados, VEC4 con el alfa a 255, que es lo que escribe el horno. */
+      if (color === null || color.getType() !== 'VEC4' || color.getComponentType() !== 5121 || !color.getNormalized()) {
         sinColor.push(donde);
       }
       if (prim.listSemantics().some((s) => s.startsWith('TEXCOORD_'))) conUv.push(donde);
@@ -277,7 +277,7 @@ const trianguloPorPieza = new Map<string, number>();
     trianguloPorPieza.set(raiz.getName(), triangulos);
   }
   comprobar('cada pieza trae geometría', sinGeometria.length === 0, sinGeometria);
-  comprobar('todas las primitivas llevan COLOR_0 como VEC3 de bytes normalizados', sinColor.length === 0, sinColor);
+  comprobar('todas las primitivas llevan COLOR_0 como VEC4 de bytes normalizados', sinColor.length === 0, sinColor);
   comprobar('y ninguna conserva UV: sin textura son bytes muertos', conUv.length === 0, conUv);
   comprobar('y todas traen normales, que sin ellas la luz de la hora azul no filetea nada', sinNormal.length === 0, sinNormal);
 }
@@ -320,13 +320,14 @@ paso('Las piezas que se tiñen llevan su máscara, y las demás no');
         if (tinte !== null) conMascaraDeMas.push(donde);
         continue;
       }
-      if (tinte === null || tinte.getType() !== 'SCALAR' || tinte.getComponentType() !== 5121 || !tinte.getNormalized()) {
+      /* 5126 es FLOAT: la máscara va en flotantes de 0 o 1 para que su paso sea el del elemento (ver hornear.ts). */
+      if (tinte === null || tinte.getType() !== 'SCALAR' || tinte.getComponentType() !== 5126 || tinte.getNormalized()) {
         malFormada.push(donde);
         continue;
       }
-      const valores = tinte.getArray() as Uint8Array;
+      const valores = tinte.getArray() as Float32Array;
       for (const v of valores) {
-        if (v === 255) con++;
+        if (v === 1) con++;
         else if (v === 0) sin++;
         else {
           conValoresRaros.push(`${donde}: ${v}`);
@@ -341,11 +342,11 @@ paso('Las piezas que se tiñen llevan su máscara, y las demás no');
     if (!entera && sin === 0) planaSinQuerer.push(`${nombre}: ${con} de color, 0 sin color`);
   }
   comprobar(
-    `las ${PIEZAS_QUE_SE_TINEN.length} piezas que se tiñen llevan ${ATRIBUTO_DE_TINTE} como escalar de bytes normalizados`,
+    `las ${PIEZAS_QUE_SE_TINEN.length} piezas que se tiñen llevan ${ATRIBUTO_DE_TINTE} como escalar flotante`,
     malFormada.length === 0,
     malFormada,
   );
-  comprobar('y la máscara sólo vale 0 o 255', conValoresRaros.length === 0, conValoresRaros);
+  comprobar('y la máscara sólo vale 0 o 1', conValoresRaros.length === 0, conValoresRaros);
   comprobar('en cada una hay vértices de color', sinColorDeAsiento.length === 0, sinColorDeAsiento);
   comprobar(
     'el muelle y la bandera tienen también vértices SIN color: la madera no se tiñe',
@@ -471,6 +472,7 @@ function cargaConThree(ruta: string): Promise<GLTF> {
 
   const mallasMal: string[] = [];
   const tinteMal: string[] = [];
+  const entrelazados: string[] = [];
   let mallas = 0;
   for (const raiz of gltf?.scene.children ?? []) {
     const seTine = PIEZAS_QUE_SE_TINEN.includes(raiz.name as NombreDePieza);
@@ -486,8 +488,11 @@ function cargaConThree(ruta: string): Promise<GLTF> {
         );
       }
       const tinte = malla.geometry.getAttribute(ATRIBUTO_DE_TINTE_CARGADO);
-      if (seTine !== (tinte !== undefined) || (tinte !== undefined && !tinte.normalized)) {
+      if (seTine !== (tinte !== undefined) || (tinte !== undefined && (tinte.normalized || tinte.itemSize !== 1))) {
         tinteMal.push(`${raiz.name}/${o.name}: ${ATRIBUTO_DE_TINTE_CARGADO}=${String(tinte !== undefined)} normalizado=${String(tinte?.normalized)}`);
+      }
+      for (const [nombre, atributo] of Object.entries(malla.geometry.attributes)) {
+        if ((atributo as { isInterleavedBufferAttribute?: boolean }).isInterleavedBufferAttribute === true) entrelazados.push(`${raiz.name}/${o.name}.${nombre}`);
       }
     });
   }
@@ -497,6 +502,13 @@ function cargaConThree(ruta: string): Promise<GLTF> {
     tinteMal.length === 0,
     tinteMal,
   );
+  /*
+   * NINGÚN ATRIBUTO LLEGA ENTRELAZADO. Si uno llegara, cada `clone()` de la escena
+   * (aplanar, fundir, teñir) avisaría por consola una vez por atributo y por pieza,
+   * y esas doscientas líneas entierran cualquier aviso de verdad. La regla que lo
+   * evita está en `hornear.ts`: atributos separados y con el paso igual al elemento.
+   */
+  comprobar('y ningún atributo llega entrelazado: se clonan en silencio', mallas > 0 && entrelazados.length === 0, entrelazados.slice(0, 6));
 
   const molino = gltf?.scene.getObjectByName(PIEZA.molino);
   let aspas: Object3D | undefined;
@@ -524,7 +536,7 @@ if (fallos.length > 0) {
  * cae a la mitad termina con código cero y una lista corta de aciertos, y eso se lee
  * como verde. El número va a mano y hay que subirlo al añadir comprobaciones.
  */
-const COMPROBACIONES_ESCRITAS = 32;
+const COMPROBACIONES_ESCRITAS = 33;
 if (hechas < COMPROBACIONES_ESCRITAS) {
   console.error(
     `Solo se han hecho ${hechas} de las ${COMPROBACIONES_ESCRITAS} comprobaciones que ` +

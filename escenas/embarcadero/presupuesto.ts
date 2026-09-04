@@ -108,15 +108,15 @@ export interface RenglonDelPresupuesto {
  * LO QUE LA ESCENA PONE ADEMÁS DE LA CALA, con seis sentados y calidad plena.
  *
  * Seis plataformas de amarre (la cala trae los dos tramos; las seis plataformas
- * las pone la escena), un barco y una bandera por sentado, un farol por amarre,
- * un disco de contacto por aventurero, el mar, el cielo y las brumas. Los
- * aventureros entran con su media de triángulos: seis figuras distintas es lo
- * normal, y seis iguales de la más pesada es un caso que el comprobador imprime
- * aparte para que se vea.
+ * las pone la escena), un barco y una bandera por sentado, el estandarte del
+ * local, un farol por amarre, un disco de contacto por aventurero, el mar, el
+ * cielo y las brumas. Los aventureros entran con los triángulos que se le den:
+ * el comprobador exige el tope con el PEOR caso (seis iguales de la más pesada),
+ * porque seis exploradoras es una mesa posible, e imprime la media aparte.
  */
 export function renglonesFijos(
   triangulosPorPieza: ReadonlyMap<string, number>,
-  mediaDeUnAventurero: number,
+  triangulosDeUnAventurero: number,
   sentados = 6,
 ): RenglonDelPresupuesto[] {
   const de = (pieza: string): number => triangulosPorPieza.get(pieza) ?? 0;
@@ -124,8 +124,9 @@ export function renglonesFijos(
     { que: 'plataformas de amarre (muelle)', cuantos: 6, triangulos: 6 * de('muelle') },
     { que: 'barcos de asiento', cuantos: sentados, triangulos: sentados * de('barco') },
     { que: 'banderas de asiento', cuantos: sentados, triangulos: sentados * de('bandera') },
+    { que: 'el estandarte del local', cuantos: 1, triangulos: de('estandarte') },
     { que: 'botes de los amarres vacíos', cuantos: 6 - sentados, triangulos: (6 - sentados) * de('bote') },
-    { que: 'aventureros (media)', cuantos: sentados, triangulos: sentados * mediaDeUnAventurero },
+    { que: 'aventureros', cuantos: sentados, triangulos: sentados * triangulosDeUnAventurero },
     { que: 'postes de farol', cuantos: 6, triangulos: 6 * triangulosDelPoste() },
     { que: 'esferas de farol', cuantos: 6, triangulos: 6 * triangulosDeLaEsfera() },
     { que: 'discos de contacto', cuantos: sentados, triangulos: sentados * SEGMENTOS_DEL_DISCO },

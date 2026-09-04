@@ -30,13 +30,36 @@
  *
  * `alEstarListo` se llama SIEMPRE y una sola vez: cuando el embarcadero y la
  * figura local han llegado O HAN FALLADO, se deja pintar un fotograma con lo que
- * haya y en el siguiente se avisa. Si `traer` no contesta nunca —ni bien ni
- * mal—, un tope de quince segundos avisa igual con cielo, agua y luz. `alFallar`
- * se llama una vez por fichero que no llegó, antes o después de eso. `alZarpar`
- * se llama exactamente una vez por coreografía: a los 3,2 s de empezarla o, si
- * `zarpando` llega sin embarcadero, en el fotograma siguiente sin esperar a nada.
- * `alMedir` va una vez por segundo con la media real de milisegundos del reloj
- * de `useFrame` y cuántos fotogramas cubre.
+ * haya y en el siguiente se avisa. «Han llegado» se mira en el ESTADO —qué
+ * figuras están cargadas y cuáles fallaron— y no en quién pidió qué: la figura
+ * local puede cambiar mientras carga a una que ya pidió otro asiento, y esa no
+ * se vuelve a pedir; si el arranque esperase a «la promesa de la local», el telón
+ * taparía un mundo cargado hasta el tope. Si `traer` no contesta nunca —ni bien
+ * ni mal—, un tope de quince segundos avisa igual con cielo, agua y luz.
+ * `alFallar` se llama una vez por fichero que no llegó, antes o después de eso.
+ * `alZarpar` se llama exactamente una vez por coreografía: a los 3,2 s de
+ * empezarla o, si `zarpando` llega sin embarcadero, en el fotograma siguiente sin
+ * esperar a nada. `alMedir` va una vez por segundo con la media real de
+ * milisegundos del reloj de `useFrame` (cada fotograma acotado a 100 ms: un
+ * navegador en segundo plano deja pasar segundos entre dos, y la media salía en
+ * miles) y cuántos fotogramas cubre.
+ *
+ * ═══ `zarpando` ES DE IDA ═══
+ *
+ * La partida no se «desempieza»: `empezada` llega y se queda. Si `zarpando`
+ * vuelve a `false`, aquí no pasa nada —los aventureros siguen en su barco y los
+ * barcos alejándose— porque no hay coreografía de vuelta a puerto, a sabiendas.
+ * El banco lo refleja: una vez zarpado, se recarga.
+ *
+ * ═══ QUIÉN NACE CÓMO ═══
+ *
+ * Quien ya estaba en la PRIMERA VISTA de una mesa nace quieto y escalonado, sin
+ * coreografía; quien aparece después llega en barco. «Primera vista» es la del
+ * montaje Y la primera con un código nuevo: al entrar con código desde la orilla
+ * el componente ya está montado, y sin esta regla los cinco que ya estaban
+ * emergían de la niebla a la vez. Y cuando alguien atraca, los que esperan le
+ * saludan escalonados (0,15 s por asiento): el suceso `saluda` de `gestos.ts`
+ * sale de un contador de llegadas que se pasa por props.
  *
  * ═══ LO QUE NO HAY, A PROPÓSITO ═══
  *
@@ -45,8 +68,8 @@
  * sombras: ningún cliente las activa en su `Canvas`, y en su lugar cada
  * aventurero lleva un disco de contacto. Ni estado escrito tras desmontar: cada
  * promesa comprueba `vivo` antes de tocar nada, y al irse se sueltan mezcladores,
- * geometrías clonadas, materiales propios, la textura de las partículas y el
- * temporizador del tope.
+ * geometrías clonadas y teñidas, materiales propios, la textura de las partículas
+ * y el temporizador del tope.
  */
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { JSX } from 'react';
@@ -94,7 +117,7 @@ import {
   SEGMENTOS_DEL_CIELO,
 } from './presupuesto';
 import { colorDeAsiento } from './tema';
-import { tenirGeometria } from './tinte';
+import { soltarTintes, tenirGeometria } from './tinte';
 import type { AsientoEnElMuelle, PropsDelEmbarcadero } from './tipos';
 
 /* ─────────────────────────────── Constantes ─────────────────────────────── */
@@ -112,8 +135,19 @@ const TOPE_DE_ARRANQUE_MS = 15_000;
 const ESCALON_DE_NACIMIENTO = 0.25;
 /** El farol a cada intensidad: ocupado y presente, ausente, y amarre vacío (el noray a oscuras). */
 const FAROL = { vivo: 1.6, ausente: 0.55, apagado: 0.05 } as const;
-/** El arrastre: ±25° con el dedo, ±2° con el ratón sin pulsar. */
+/** El arrastre: ±25° con el dedo, ±2° con el ratón (pulsado o no). */
 const ARRASTRE = { dedo: (25 * Math.PI) / 180, raton: (2 * Math.PI) / 180 } as const;
+/** Por debajo de esta relación de aspecto la ventana es «de móvil» y no lleva la tercera luz. */
+const ASPECTO_PANORAMICO_PARA_LUCES = 1.2;
+/**
+ * EL REFLEJO DEL FAROL: un plano vertical aditivo de pie sobre la lámina, de este
+ * alto, puesto a esta distancia del farol HACIA LA CÁMARA. Hacia la cámara y no
+ * bajo el farol porque el farol está sobre las tablas: bajo él no hay agua que
+ * refleje nada, y la que hay delante de la plataforma sí se ve. Con la
+ * profundidad activa, a propósito: sin ella el reflejo de un amarre lejano se
+ * pintaría encima del pecho del aventurero que tenga delante.
+ */
+const REFLEJO = { alto: 2.2, ancho: 0.8, delante: 3.0 } as const;
 
 const pinza = (x: number, a: number, b: number): number => Math.min(b, Math.max(a, x));
 
@@ -538,11 +572,17 @@ function Faroles({
         e.setColorAt(i, color.copy(COLOR_DEL_FAROL).multiplyScalar(0.12 + brillo));
       }
       if (pl !== null) {
-        /* El reflejo: un plano vertical aditivo bajo el farol, encarado a la cámara, que se estira con el brillo. */
+        /*
+         * El reflejo: de pie SOBRE la lámina (antes iba centrado 1,4 bajo ella y el
+         * mar, que escribe profundidad, lo tapaba entero), delante de la plataforma
+         * por el lado de la cámara, encarado a ella y estirándose con el brillo.
+         */
         const haciaLaCamara = Math.atan2(cam.position.x - a.farol.x, cam.position.z - a.farol.z);
+        const alto = REFLEJO.alto + 0.3 * Math.sin(t * 2.3 + i);
         auxGiro.setFromAxisAngle(eje, haciaLaCamara);
-        pl.setMatrixAt(i, auxMatriz.compose(auxPosicion.set(a.farol.x, LAMINA - 1.4, a.farol.z), auxGiro, auxEscala.set(1.1, 3.2 + 0.4 * Math.sin(t * 2.3 + i), 1)));
-        pl.setColorAt(i, color.copy(COLOR_DEL_FAROL).multiplyScalar(Math.max(0, brillo - FAROL.apagado) * 0.4));
+        auxPosicion.set(a.farol.x + Math.sin(haciaLaCamara) * REFLEJO.delante, LAMINA + alto / 2, a.farol.z + Math.cos(haciaLaCamara) * REFLEJO.delante);
+        pl.setMatrixAt(i, auxMatriz.compose(auxPosicion, auxGiro, auxEscala.set(REFLEJO.ancho, alto, 1)));
+        pl.setColorAt(i, color.copy(COLOR_DEL_FAROL).multiplyScalar(Math.max(0, brillo - FAROL.apagado) * 0.45));
       }
     });
     if (e !== null) {
@@ -559,7 +599,7 @@ function Faroles({
     <group>
       <instancedMesh ref={postes} args={[materiales.cilindro, materiales.poste, amarres.length]} />
       <instancedMesh ref={esferas} args={[materiales.bola, materiales.esfera, amarres.length]} frustumCulled={false} />
-      {reflejos ? <instancedMesh ref={planos} args={[materiales.hoja, materiales.plano, amarres.length]} frustumCulled={false} /> : null}
+      {reflejos ? <instancedMesh ref={planos} args={[materiales.hoja, materiales.plano, amarres.length]} frustumCulled={false} renderOrder={5} /> : null}
     </group>
   );
 }
@@ -722,12 +762,14 @@ export function Embarcadero(props: PropsDelEmbarcadero): JSX.Element {
    * A QUIÉN LE TOCA QUÉ AMARRE, y que no cambie. El local siempre el 0. Los demás
    * cogen el primer amarre libre la primera vez que se les ve y lo conservan
    * aunque se levante alguien delante: un amarre que se recorriera al irse otro
-   * sería un aventurero teletransportado. Y quién estaba ya al montar nace
-   * quieto y escalonado; quien llega después, en barco.
+   * sería un aventurero teletransportado. Y quién estaba ya en la primera vista
+   * de la mesa —la del montaje, o la primera con un código nuevo— nace quieto y
+   * escalonado; quien llega después, en barco.
    */
   const amarreDe = useRef(new Map<string, number>());
   const modoDe = useRef(new Map<string, { modo: ModoDeNacer; retraso: number }>());
   const yaMontado = useRef(false);
+  const codigoDeLaVistaAnterior = useRef<string | null | undefined>(undefined);
   const yo = mesa.asientos.find((a) => a.id === mesa.yo) ?? null;
   const figuraLocal: FiguraId | null = esFigura(figuraQuePruebo)
     ? figuraQuePruebo
@@ -740,6 +782,10 @@ export function Embarcadero(props: PropsDelEmbarcadero): JSX.Element {
     const idsDeAhora = new Set(mesa.asientos.map((a) => a.id));
     for (const id of [...amarreDe.current.keys()]) if (!idsDeAhora.has(id)) amarreDe.current.delete(id);
     for (const id of [...modoDe.current.keys()]) if (!idsDeAhora.has(id) && id !== 'local') modoDe.current.delete(id);
+    /* La primera vista con este código es un montaje: los presentes nacen quietos. */
+    const estreno = codigoDeLaVistaAnterior.current !== mesa.codigo;
+    codigoDeLaVistaAnterior.current = mesa.codigo;
+    const llegaEnBarco = yaMontado.current && !estreno;
 
     if (figuraLocal !== null) {
       const modo = modoDe.current.get('local') ?? { modo: yaMontado.current ? 'aparecer' : 'quieto', retraso: 0 };
@@ -774,8 +820,8 @@ export function Embarcadero(props: PropsDelEmbarcadero): JSX.Element {
         amarreDe.current.set(a.id, cual);
       }
       const modo = modoDe.current.get(a.id) ?? {
-        modo: yaMontado.current ? 'barco' : 'quieto',
-        retraso: yaMontado.current ? 0 : ESCALON_DE_NACIMIENTO * (orden + 1),
+        modo: llegaEnBarco ? 'barco' : 'quieto',
+        retraso: llegaEnBarco ? 0 : ESCALON_DE_NACIMIENTO * (orden + 1),
       };
       modoDe.current.set(a.id, modo);
       orden++;
@@ -793,7 +839,7 @@ export function Embarcadero(props: PropsDelEmbarcadero): JSX.Element {
       });
     });
     return lista;
-  }, [mesa.asientos, mesa.yo, mesa.tema, yo, figuraLocal, cala]);
+  }, [mesa.asientos, mesa.yo, mesa.tema, mesa.codigo, yo, figuraLocal, cala]);
 
   useEffect(() => {
     yaMontado.current = true;
@@ -821,8 +867,10 @@ export function Embarcadero(props: PropsDelEmbarcadero): JSX.Element {
   const [biblioteca, ponerBiblioteca] = useState<readonly THREE.AnimationClip[]>([]);
   const [figuras, ponerFiguras] = useState<ReadonlyMap<FiguraId, AventureroCargado>>(new Map());
   const pedidas = useRef(new Set<FiguraId>());
+  /* El ESTADO de cada figura pedida, para el arranque: llegó, o falló. Por referencia porque lo leen promesas. */
+  const figurasListas = useRef(new Set<FiguraId>());
+  const figurasFallidas = useRef(new Set<FiguraId>());
   const embarcaderoResuelto = useRef(false);
-  const localResuelta = useRef<FiguraId | null>(null);
   const [arranque, ponerArranque] = useState(false);
   const arranqueRef = useRef(false);
   arranqueRef.current = arranque;
@@ -835,13 +883,22 @@ export function Embarcadero(props: PropsDelEmbarcadero): JSX.Element {
   };
   const porQue = (fallo: unknown): string => (fallo instanceof Error ? fallo.message : String(fallo));
 
-  /* El arranque está cuando el embarcadero y la figura local han contestado, bien o mal. */
+  /*
+   * EL ARRANQUE ESTÁ cuando el embarcadero ha contestado y la figura local DE
+   * AHORA está cargada o ha fallado, la haya pedido quien la haya pedido. Se
+   * llama desde cada promesa que termina y desde el cambio de figura local.
+   */
   const compruebaArranque = (): void => {
-    if (!vivo.current || arranqueRef.current) return;
-    if (embarcaderoResuelto.current && (figuraLocalRef.current === null || localResuelta.current === figuraLocalRef.current)) ponerArranque(true);
+    if (!vivo.current || arranqueRef.current || !embarcaderoResuelto.current) return;
+    const local = figuraLocalRef.current;
+    if (local === null || figurasListas.current.has(local) || figurasFallidas.current.has(local)) ponerArranque(true);
   };
 
-  /* 1. El embarcadero: lo primero, con o sin él se avisa. */
+  /*
+   * 1. El embarcadero: lo primero, con o sin él se avisa. Depende sólo del
+   * cargador: `falla` y `compruebaArranque` leen referencias, no cierres, y volver
+   * a pedir el embarcadero al cambiar cualquier otra cosa sería pedirlo dos veces.
+   */
   useEffect(() => {
     cargador.embarcadero().then(
       (c) => {
@@ -865,10 +922,9 @@ export function Embarcadero(props: PropsDelEmbarcadero): JSX.Element {
     return () => {
       clearTimeout(tope);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cargador]);
 
-  /* 2. Las figuras que hacen falta, la local la primera; 3. la biblioteca, después de la local. */
+  /* 2. Las figuras que hacen falta, la local la primera; 3. la biblioteca, después de la primera figura. */
   const figurasQueHacenFalta = useMemo(() => {
     const lista: FiguraId[] = [];
     for (const s of sentados) if (!lista.includes(s.figura)) lista.push(s.figura);
@@ -876,6 +932,11 @@ export function Embarcadero(props: PropsDelEmbarcadero): JSX.Element {
   }, [sentados]);
   const bibliotecaPedida = useRef(false);
 
+  /*
+   * Depende de la lista de figuras y del cargador, y de nada más: cada figura se
+   * pide UNA vez por montaje (`pedidas`), y el arranque no lee la promesa sino los
+   * conjuntos de listas y fallidas, que son referencias.
+   */
   useEffect(() => {
     const pideBiblioteca = (): void => {
       if (bibliotecaPedida.current) return;
@@ -892,39 +953,36 @@ export function Embarcadero(props: PropsDelEmbarcadero): JSX.Element {
     for (const id of figurasQueHacenFalta) {
       if (pedidas.current.has(id)) continue;
       pedidas.current.add(id);
-      const esLaLocal = id === figuraLocalRef.current;
       cargador.aventurero(id).then(
         (a) => {
           if (!vivo.current) return;
+          figurasListas.current.add(id);
           ponerFiguras((antes) => {
             const nuevas = new Map(antes);
             nuevas.set(id, a);
             return nuevas;
           });
-          if (esLaLocal) {
-            localResuelta.current = id;
-            compruebaArranque();
-          }
+          compruebaArranque();
           pideBiblioteca();
         },
         (fallo: unknown) => {
+          figurasFallidas.current.add(id);
           falla(`no ha llegado la figura «${datosDeFigura(id).nombre}»: ${porQue(fallo)}`);
-          if (esLaLocal) {
-            localResuelta.current = id;
-            compruebaArranque();
-          }
+          compruebaArranque();
           pideBiblioteca();
         },
       );
     }
     if (figurasQueHacenFalta.length === 0 && !bibliotecaPedida.current) pideBiblioteca();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cargador, figurasQueHacenFalta]);
 
-  /* Si la figura local cambia antes de que llegue la primera, el arranque espera a la nueva. */
+  /*
+   * Si la figura local cambia antes del arranque —a una que aún no llegó, o a una
+   * que ya llegó para otro asiento—, se vuelve a mirar el estado. Depende sólo de
+   * la figura local: `compruebaArranque` no cierra sobre nada más.
+   */
   useEffect(() => {
     compruebaArranque();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [figuraLocal]);
 
   // -------------------------------------------------------------------------
@@ -933,6 +991,13 @@ export function Embarcadero(props: PropsDelEmbarcadero): JSX.Element {
 
   const mundo = useMemo(() => (catalogo === null ? null : construirMundo(cala, catalogo)), [cala, catalogo]);
   useEffect(() => () => mundo?.soltar(), [mundo]);
+  /* Las geometrías teñidas (barcos, banderas, estandarte, madera) son copias nuestras: se sueltan al irse. */
+  useEffect(
+    () => () => {
+      if (catalogo !== null) soltarTintes(catalogo.piezas.values());
+    },
+    [catalogo],
+  );
 
   const mar = useMemo(() => ({ geometria: geometriaDelMar(), material: materialDelAgua(cala.sol) }), [cala.sol]);
   const cielo = useMemo(() => materialDelCielo(cala.sol), [cala.sol]);
@@ -955,6 +1020,7 @@ export function Embarcadero(props: PropsDelEmbarcadero): JSX.Element {
   // -------------------------------------------------------------------------
 
   const camara = useThree((s) => s.camera) as THREE.PerspectiveCamera;
+  const tamanoDelLienzo = useThree((s) => s.size);
   useEffect(() => {
     /* El plano lejano tiene que dejar dentro la cúpula y el mar; la cámara de serie de r3f se queda en mil. */
     camara.near = 0.3;
@@ -976,22 +1042,24 @@ export function Embarcadero(props: PropsDelEmbarcadero): JSX.Element {
   const colorDeNiebla = useMemo(() => new THREE.Color(COLOR_DEL_HORIZONTE), []);
 
   useEffect(() => {
-    if (zarpando === true) {
-      zarpe.current = { pedido: true, desde: null, avisado: false };
-    } else {
-      zarpe.current = { pedido: false, desde: null, avisado: false };
-    }
+    /* De ida: un `false` después del `true` no deshace nada (ver la cabecera). */
+    if (zarpando === true) zarpe.current = { pedido: true, desde: null, avisado: false };
   }, [zarpando]);
 
+  /* Cuántos han atracado desde que se montó: los que esperan saludan al que llega. */
+  const [llegadas, ponerLlegadas] = useState(0);
   const alAtracar = useMemo(
     () => (amarre: Amarre) => {
       llegada.current = { desde: -1, amarre };
+      ponerLlegadas((n) => n + 1);
     },
     [],
   );
 
   const ocupados = Math.max(1, sentados.length);
   const franja = pinza(ventana.franjaInferior, 0, 0.8);
+  const aspectoDeLaVentana =
+    ventana.ancho > 0 && ventana.alto > 0 ? ventana.ancho / ventana.alto : tamanoDelLienzo.width / Math.max(1, tamanoDelLienzo.height);
 
   useFrame((s, dtCrudo) => {
     const t = s.clock.elapsedTime;
@@ -1070,9 +1138,9 @@ export function Embarcadero(props: PropsDelEmbarcadero): JSX.Element {
       cam.updateProjectionMatrix();
     }
 
-    /* ─ La medida: una vez por segundo, con la media real. ─ */
+    /* ─ La medida: una vez por segundo, con la media real y cada fotograma acotado a 100 ms. ─ */
     const m = medida.current;
-    m.segundos += dtCrudo;
+    m.segundos += dt;
     m.fotogramas++;
     if (m.segundos >= 1) {
       const info = s.gl.info.render;
@@ -1087,7 +1155,14 @@ export function Embarcadero(props: PropsDelEmbarcadero): JSX.Element {
     }
   });
 
-  /* El arrastre: ±25° con el dedo, ±2° con el ratón sin pulsar, y vuelta con muelle al soltar. */
+  /*
+   * EL ARRASTRE: ±25° con el dedo, ±2° con el ratón (pulsado o no), y vuelta con
+   * muelle al soltar. Lo recibe UN solo objeto, la cúpula, que rodea a la cámara
+   * y por tanto está bajo el puntero siempre: cuando lo recibían también el mar y
+   * la cúpula, pasar del uno al otro disparaba un `leave` en medio del arrastre y
+   * lo cortaba. El `leave` de la cúpula sólo llega al salir del lienzo, y ahí sí
+   * hay que soltar.
+   */
   const alPulsar = (e: ThreeEvent<PointerEvent>): void => {
     arrastre.current.activo = true;
     arrastre.current.x0 = e.pointer.x;
@@ -1095,7 +1170,8 @@ export function Embarcadero(props: PropsDelEmbarcadero): JSX.Element {
   const alMover = (e: ThreeEvent<PointerEvent>): void => {
     const ar = arrastre.current;
     const tipo = (e as { pointerType?: string }).pointerType ?? 'touch';
-    if (ar.activo) ar.objetivo = pinza((e.pointer.x - ar.x0) * ARRASTRE.dedo, -ARRASTRE.dedo, ARRASTRE.dedo);
+    const tope = tipo === 'mouse' ? ARRASTRE.raton : ARRASTRE.dedo;
+    if (ar.activo) ar.objetivo = pinza((e.pointer.x - ar.x0) * tope, -tope, tope);
     else if (tipo === 'mouse') ar.objetivo = e.pointer.x * ARRASTRE.raton;
   };
   const alSoltar = (): void => {
@@ -1133,7 +1209,8 @@ export function Embarcadero(props: PropsDelEmbarcadero): JSX.Element {
       <directionalLight position={[solX * 200, 14, solZ * 200]} intensity={1.7} color="#ff9a4d" />
       <pointLight position={[farolLocal.farol.x, tablas + 2.9, farolLocal.farol.z]} color="#ffb765" intensity={26} distance={24} decay={2} />
       <pointLight position={[cala.taberna.x, cala.taberna.y + 4.5, cala.taberna.z]} color="#ffa254" intensity={60} distance={46} decay={2} />
-      {plena ? (
+      {/* La tercera luz, la de la atalaya, sólo en el PC: el móvil arranca en plena y llevaba tres. */}
+      {plena && aspectoDeLaVentana >= ASPECTO_PANORAMICO_PARA_LUCES ? (
         <pointLight
           position={[cala.atalaya.x, cala.atalaya.y + (mundo?.alturaDeLaAtalaya ?? 13) + 0.6, cala.atalaya.z]}
           color={COLOR_DE_LA_LLAMA}
@@ -1143,17 +1220,8 @@ export function Embarcadero(props: PropsDelEmbarcadero): JSX.Element {
         />
       ) : null}
 
-      {/* El mar, a la cota de la lámina. */}
-      <mesh
-        geometry={mar.geometria}
-        material={mar.material}
-        position={[0, LAMINA, 0]}
-        frustumCulled={false}
-        onPointerDown={alPulsar}
-        onPointerMove={alMover}
-        onPointerUp={alSoltar}
-        onPointerLeave={alSoltar}
-      />
+      {/* El mar, a la cota de la lámina. Sin puntero: el arrastre lo recibe la cúpula sola. */}
+      <mesh geometry={mar.geometria} material={mar.material} position={[0, LAMINA, 0]} frustumCulled={false} />
 
       {mundo === null ? null : <LaCala mundo={mundo} />}
 
@@ -1185,6 +1253,7 @@ export function Embarcadero(props: PropsDelEmbarcadero): JSX.Element {
           modoDeNacer={s.modoDeNacer}
           retraso={s.retraso}
           zarpando={zarpando === true}
+          llegadas={llegadas}
           semilla={(semilla ^ (s.amarre.indice * 0x9e37_79b9)) >>> 0}
           catalogo={catalogo}
           figuras={figuras}

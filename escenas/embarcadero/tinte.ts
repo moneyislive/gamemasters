@@ -33,14 +33,17 @@
  * azul del pack está medido en sRGB (`AZUL_DEL_PACK`) y se pasa a lineal por el
  * mismo camino antes de medirle la luminancia.
  *
- * ═══ LA CACHÉ ES POR (PIEZA, COLOR) ═══
+ * ═══ LA CACHÉ ES POR (PIEZA, COLOR), Y SE SUELTA AL DESMONTAR ═══
  *
  * Seis asientos con seis colores son seis geometrías de barco, no treinta y seis
  * ni una por fotograma. Quien pide el mismo tinte para la misma pieza recibe el
- * mismo objeto, y puede instanciarlo o clonarlo barato.
+ * mismo objeto, y puede instanciarlo o clonarlo barato. Las geometrías teñidas
+ * son NUESTRAS (copias), y sin `dispose` se quedaban en la GPU al irse la escena:
+ * `soltarTintes` las suelta pieza a pieza. `dispose` borra la copia de la GPU y
+ * no los datos, así que si la escena vuelve a montarse con el mismo catálogo,
+ * la caché sigue valiendo y three vuelve a subirlas sola.
  */
 import * as THREE from 'three';
-import { copiaDesentrelazada } from './cargar';
 import { ATRIBUTO_DE_TINTE_CARGADO, AZUL_DEL_PACK } from './piezas';
 
 const cache = new WeakMap<THREE.Object3D, Map<string, THREE.Object3D>>();
@@ -101,8 +104,8 @@ export function tenirGeometria(geometria: THREE.BufferGeometry, hex: string): TH
   const hecha = porColor.get(hex);
   if (hecha !== undefined) return hecha;
 
-  /* La copia se hace sin entrelazar y en silencio: ver `copiaDesentrelazada` en `cargar.ts`. */
-  const copia = copiaDesentrelazada(geometria);
+  /* `clone()` a secas: los atributos ya no llegan entrelazados (ver `cargar.ts`). */
+  const copia = geometria.clone();
   const n = color.count;
   /*
    * Se pasa a flotantes de tres componentes: el compilador guarda bytes
@@ -153,6 +156,30 @@ export function tenir(pieza: THREE.Object3D, hex: string): THREE.Object3D {
   });
   porColor.set(hex, copia);
   return copia;
+}
+
+/**
+ * SUELTA DE LA GPU las geometrías teñidas de estas piezas (todas las de todos los
+ * colores) y olvida sus copias teñidas. Para llamarlo al desmontar la escena con
+ * las piezas de su catálogo. Devuelve cuántas geometrías ha soltado.
+ */
+export function soltarTintes(piezas: Iterable<THREE.Object3D>): number {
+  let soltadas = 0;
+  for (const pieza of piezas) {
+    pieza.traverse((n) => {
+      const malla = n as THREE.Mesh;
+      if (!malla.isMesh) return;
+      const porColor = cacheDeGeometrias.get(malla.geometry);
+      if (porColor === undefined) return;
+      for (const g of porColor.values()) {
+        g.dispose();
+        soltadas++;
+      }
+      cacheDeGeometrias.delete(malla.geometry);
+    });
+    cache.delete(pieza);
+  }
+  return soltadas;
 }
 
 /** ¿Lleva esta pieza máscara de tinte en alguna de sus mallas? */

@@ -24,6 +24,17 @@
  * Un plano regular gasta sus vértices donde no se miran. Aquí los anillos crecen
  * geométricamente: dos metros entre vértices a los pies del muelle y cien en el
  * horizonte, con menos de tres mil vértices en total.
+ *
+ * ═══ CERCA DEL MUELLE EL AGUA SE MUEVE MÁS, Y CON UN RIZO CORTO ═══
+ *
+ * Los dos senos largos (ondas de unos cincuenta metros) hacen el mar de lejos;
+ * a los pies del muelle, con la cámara a dos metros del agua, esa marejada de
+ * siete centímetros se lee como una lámina quieta y negra. A menos de veinte
+ * unidades del origen la amplitud sube hasta el doble y entra un tercer seno
+ * corto (siete metros) que rompe la normal y con ella el fresnel: es lo que hace
+ * que el agua junto a la plataforma brille y se mueva. Se apaga con la
+ * distancia para no rizar la lámina de las orillas, que están a veinte metros y
+ * tienen su propia agua plana a la misma cota.
  */
 import * as THREE from 'three';
 import { RADIO_EXTERIOR_DEL_MAR, RADIO_INTERIOR_DEL_MAR, RAZON_DEL_MAR, SECTORES_DEL_MAR } from './presupuesto';
@@ -42,14 +53,20 @@ varying vec3 vPosicionMundo;
 
 void main() {
   vec4 mundo = modelMatrix * vec4(position, 1.0);
+  /* Cerca del muelle (el origen) el agua se mueve el doble; de lejos, lo de siempre. */
+  float cerca = 1.0 - smoothstep(6.0, 20.0, length(mundo.xz));
+  float amp = amplitud * (1.0 + cerca);
   /* Dos senos con direcciones y frecuencias distintas: el patrón no se repite. */
   float f1 = dot(mundo.xz, vec2(0.093, 0.061)) + tiempo * 0.9;
   float f2 = dot(mundo.xz, vec2(-0.047, 0.118)) + tiempo * 0.63;
-  float alza = amplitud * (sin(f1) + 0.6 * sin(f2));
+  /* Y un rizo corto sólo cerca, que es lo que se ve moverse a los pies. */
+  float f3 = dot(mundo.xz, vec2(0.71, 0.55)) + tiempo * 2.1;
+  float ampRizo = amplitud * 0.35 * cerca;
+  float alza = amp * (sin(f1) + 0.6 * sin(f2)) + ampRizo * sin(f3);
   mundo.y += alza;
   /* La normal, derivando los mismos senos: sin extensiones ni derivadas de pantalla. */
-  float dx = amplitud * (cos(f1) * 0.093 + 0.6 * cos(f2) * -0.047);
-  float dz = amplitud * (cos(f1) * 0.061 + 0.6 * cos(f2) * 0.118);
+  float dx = amp * (cos(f1) * 0.093 + 0.6 * cos(f2) * -0.047) + ampRizo * cos(f3) * 0.71;
+  float dz = amp * (cos(f1) * 0.061 + 0.6 * cos(f2) * 0.118) + ampRizo * cos(f3) * 0.55;
   vNormalMundo = normalize(vec3(-dx, 1.0, -dz));
   vPosicionMundo = mundo.xyz;
   vec4 mvPosition = viewMatrix * mundo;
@@ -105,6 +122,7 @@ export interface UniformsDelAgua extends Record<string, THREE.IUniform> {
 export function materialDelAgua(sol: { readonly x: number; readonly z: number }): THREE.ShaderMaterial & { uniforms: UniformsDelAgua } {
   const uniforms: UniformsDelAgua = {
     tiempo: { value: 0 },
+    /* Siete centímetros de lejos; cerca del muelle el vértice la dobla. */
     amplitud: { value: 0.07 },
     hondo: { value: new THREE.Color(COLOR_HONDO) },
     reflejo: { value: new THREE.Color(COLOR_DEL_REFLEJO) },

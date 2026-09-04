@@ -196,12 +196,9 @@ function Banco(): JSX.Element {
       return antes.map((a, i) => (i === cual ? { ...a, presente: !a.presente } : a));
     });
   };
+  /* De ida, como `zarpando` en la escena: no hay vuelta a puerto; para volver a verlo, se recarga. */
   const zarpar = (): void => {
-    if (zarpando) {
-      ponerZarpando(false);
-      ponerZarpo(null);
-      return;
-    }
+    if (zarpando) return;
     zarpeDesde.current = performance.now();
     ponerZarpo('esperando alZarpar…');
     ponerZarpando(true);
@@ -248,8 +245,8 @@ function Banco(): JSX.Element {
             <button type="button" onClick={presencia} disabled={asientos.length < 2}>
               Presencia de uno
             </button>
-            <button type="button" onClick={zarpar} className={zarpando ? 'vivo' : undefined}>
-              {zarpando ? 'Volver' : 'Zarpar'}
+            <button type="button" onClick={zarpar} className={zarpando ? 'vivo' : undefined} disabled={zarpando} title="Zarpar es de ida: para volver a verlo, recarga la página">
+              {zarpando ? 'Zarpado (recarga para volver)' : 'Zarpar'}
             </button>
             <button type="button" onClick={() => ponerCalidad((c) => (c === 'plena' ? 'sobria' : 'plena'))}>
               Calidad: {calidad}

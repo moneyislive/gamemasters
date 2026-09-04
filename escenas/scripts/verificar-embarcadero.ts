@@ -20,7 +20,13 @@
  *   · Que la CÁMARA deja al aventurero local entero y por encima de la hoja del
  *     HUD en 9:19,5 con la hoja al 36 %, 3:4 con 0,3 y 16:9 con 0, y con 1, 2, 4 y
  *     6 ocupados. Es la promesa del §3 y se comprueba con la misma proyección que
- *     usa la escena.
+ *     usa la escena. Y que los SEIS AMARRES entran en el encuadre útil de las tres
+ *     ventanas sin apilarse (dos amarres nunca a menos del 6 % del ancho en x),
+ *     que en panorámico el local cae en el tercio izquierdo, que el barco del
+ *     local está al costado del muelle y no detrás, que ningún barco tapa al
+ *     aventurero de otro amarre desde el reposo, que barcos y plataformas no se
+ *     montan unos sobre otros, y que ningún trasto queda en el pasillo de la
+ *     cámara. Todo lo que se vio mal en el banco y se pudo escribir como número.
  *   · Que los GESTOS nunca devuelven `t-pose` en diez mil pasos con sucesos al
  *     azar sembrados, que todos los clips que piden existen en `animaciones.glb`
  *     con la duración que `gestos.ts` tiene apuntada, y que toda fase transitoria
@@ -28,8 +34,9 @@
  *   · Que el PRESUPUESTO del §2 se cumple con las multiplicidades REALES de una
  *     cala llena (la que genera `cala.ts`, no una estimación) y los triángulos
  *     por pieza leídos de `embarcadero.glb`, más lo que la escena añade a mano
- *     (`presupuesto.ts`) y seis aventureros. Se imprime la tabla para que quien
- *     ajuste sepa dónde pesa.
+ *     (`presupuesto.ts`) y seis aventureros DE LA MÁS PESADA: seis exploradoras
+ *     es una mesa posible y el tope se exige con ella, no con la media. Se
+ *     imprime la tabla para que quien ajuste sepa dónde pesa.
  *   · Que la PALETA de colonos de `tema.ts` es la de `riberas.ts`, leída como
  *     texto porque el juego no la exporta.
  *
@@ -57,7 +64,16 @@ import {
   teselasDeTierra,
 } from '../embarcadero/cala';
 import type { Cala } from '../embarcadero/cala';
-import { DURACION_DEL_ZARPE as ZARPE_DE_LA_CAMARA, encuadre, limiteDeLosPies, mira, proyecta } from '../embarcadero/camara';
+import {
+  BORDE_UTIL,
+  DURACION_DEL_ZARPE as ZARPE_DE_LA_CAMARA,
+  encuadre,
+  limiteDeLosPies,
+  mira,
+  proyecta,
+  SEPARACION_ENTRE_AMARRES,
+} from '../embarcadero/camara';
+import type { Pose } from '../embarcadero/camara';
 import { CLIP, FIGURAS } from '../embarcadero/figuras';
 import type { NombreDeClip } from '../embarcadero/figuras';
 import {
@@ -140,6 +156,73 @@ const cala = calas[0] as Cala;
   comprobar('y el barco de cada amarre flota en el agua, en todas las semillas probadas', barcosEnTierra.length === 0, barcosEnTierra.map((a) => a.indice));
   const fijos = calas.every((c) => JSON.stringify(c.amarres) === JSON.stringify(cala.amarres) && JSON.stringify(c.muelle) === JSON.stringify(cala.muelle));
   comprobar('los amarres y el muelle son los mismos con cualquier semilla: la cámara se comprueba contra ellos', fijos);
+
+  /*
+   * EL BARCO DEL LOCAL VA AL COSTADO DE −x DEL MUELLE, no detrás de la cabeza:
+   * detrás, sus velas tapaban media pantalla. Al costado quiere decir con el
+   * casco (2,74 de media manga) fuera de las tablas (5,47 de media pieza) y a la
+   * altura del muelle, no mar adentro.
+   */
+  const local = cala.amarres[0] as Cala['amarres'][number];
+  comprobar('el barco del local está al costado de −x del muelle, con el casco fuera de las tablas y a la altura de la cabeza', local.barco.x + 2.74 < -5.47 && Math.abs(local.barco.z) < 4, local.barco);
+
+  /*
+   * NI LOS BARCOS SE POSAN SOBRE OTRA PLATAFORMA NI DOS PLATAFORMAS SE SOLAPAN.
+   * Rectángulos orientados en planta (plataforma 10,9 × 2,7; barco 5,5 de manga
+   * por 12,4 de eslora) y el teorema del eje separador sobre sus cuatro ejes.
+   */
+  interface Caja { x: number; z: number; giro: number; medioX: number; medioZ: number }
+  const solapan = (a: Caja, b: Caja): boolean => {
+    const esquinas = (c: Caja): Array<[number, number]> => {
+      const dx = [Math.cos(c.giro), -Math.sin(c.giro)] as const;
+      const dz = [Math.sin(c.giro), Math.cos(c.giro)] as const;
+      return ([[1, 1], [1, -1], [-1, 1], [-1, -1]] as const).map(([sx, sz]) => [
+        c.x + dx[0] * c.medioX * sx + dz[0] * c.medioZ * sz,
+        c.z + dx[1] * c.medioX * sx + dz[1] * c.medioZ * sz,
+      ]);
+    };
+    const ea = esquinas(a);
+    const eb = esquinas(b);
+    for (const c of [a, b]) {
+      for (const e of [[Math.cos(c.giro), -Math.sin(c.giro)], [Math.sin(c.giro), Math.cos(c.giro)]] as const) {
+        const pa = ea.map((q) => q[0] * e[0] + q[1] * e[1]);
+        const pb = eb.map((q) => q[0] * e[0] + q[1] * e[1]);
+        if (Math.max(...pa) < Math.min(...pb) || Math.max(...pb) < Math.min(...pa)) return false;
+      }
+    }
+    return true;
+  };
+  const plataforma = (a: Cala['amarres'][number]): Caja => ({ x: a.x, z: a.z, giro: a.giro, medioX: 5.47, medioZ: 1.37 });
+  const barco = (a: Cala['amarres'][number]): Caja => ({ x: a.barco.x, z: a.barco.z, giro: a.barco.giro, medioX: 2.74, medioZ: 6.2 });
+  const choques: string[] = [];
+  for (const a of cala.amarres) {
+    for (const b of cala.amarres) {
+      if (a.indice < b.indice && solapan(plataforma(a), plataforma(b))) choques.push(`plataformas ${String(a.indice)} y ${String(b.indice)}`);
+      if (a.indice !== b.indice && solapan(barco(a), plataforma(b))) choques.push(`barco ${String(a.indice)} sobre la plataforma ${String(b.indice)}`);
+      if (a.indice < b.indice && solapan(barco(a), barco(b))) choques.push(`barcos ${String(a.indice)} y ${String(b.indice)}`);
+    }
+  }
+  comprobar('ningún barco se posa sobre otra plataforma, ni se solapan dos plataformas o dos barcos', choques.length === 0, choques);
+
+  /*
+   * NINGÚN TRASTO EN EL PASILLO DE LA CÁMARA: nada puesto (salvo los tramos del
+   * muelle) en x ±2,5 y z de 1 a 9, ni a menos de 3 u del punto de pie del local.
+   * A dos metros de la lente un barril es una pared. Y en la cabeza, tres como
+   * mucho y pequeños (talla 0,85 a 1).
+   */
+  const enElPasillo: string[] = [];
+  const enLaCabeza: string[] = [];
+  for (const c of calas) {
+    for (const p of c.piezas) {
+      if (p.pieza === PIEZA.muelle) continue;
+      const enPasillo = Math.abs(p.x) <= 2.5 && p.z >= 1 && p.z <= 9;
+      if (enPasillo || Math.hypot(p.x, p.z) < 3) enElPasillo.push(`${String(c.semilla)}:${p.pieza}(${p.x.toFixed(1)},${p.z.toFixed(1)})`);
+      if (Math.abs(p.x) <= 5.5 && Math.abs(p.z) <= 1.4 && p.pieza !== PIEZA.bote) enLaCabeza.push(`${p.pieza}×${String(p.talla)}`);
+    }
+  }
+  comprobar('ningún trasto queda en el pasillo de la cámara ni a menos de 3 u del local, en ocho semillas', enElPasillo.length === 0, enElPasillo.slice(0, 6));
+  const trastosDeLaCabeza = enLaCabeza.length / calas.length;
+  comprobar('en la cabeza del muelle hay tres trastos como mucho, de talla 0,85 a 1', trastosDeLaCabeza <= 3 && enLaCabeza.every((t) => { const talla = Number(t.split('×')[1]); return talla >= 0.85 && talla <= 1; }), enLaCabeza.slice(0, 4));
 }
 
 // ---------------------------------------------------------------------------
@@ -221,6 +304,57 @@ paso('La cámara deja al local entero y por encima de la hoja');
   const base = encuadre(6, 16 / 9, 0);
   const mar = proyecta(base, 16 / 9, { x: 0, y: 0, z: -30 });
   comprobar('desde el reposo, el mar queda delante de la cámara y por encima del local en pantalla', mar.delante && mar.y > proyecta(base, 16 / 9, { x: 0, y: 0, z: 0 }).y);
+
+  /*
+   * LOS SEIS AMARRES SE VEN Y NO SE APILAN. Para las tres ventanas y los cuatro
+   * aforos, el punto de pie de cada amarre proyecta dentro del encuadre útil
+   * (±BORDE_UTIL en x, por encima de la hoja y por debajo del borde de arriba), y
+   * dos amarres cualesquiera distan al menos SEPARACION_ENTRE_AMARRES en x
+   * proyectada, que es el 6 % del ancho de la pantalla. Es lo que faltaba en el
+   * banco: en retrato con seis sentados no aparecía ninguno.
+   */
+  const tapa = (pose: Pose, pie: { x: number; z: number }, b: { x: number; z: number }): boolean => {
+    const cx = pose.posicion.x;
+    const cz = pose.posicion.z;
+    const vx = pie.x - cx;
+    const vz = pie.z - cz;
+    const t = ((b.x - cx) * vx + (b.z - cz) * vz) / (vx * vx + vz * vz);
+    if (t <= 0 || t >= 1) return false;
+    return Math.hypot(cx + vx * t - b.x, cz + vz * t - b.z) < 3.4;
+  };
+  const tapados: string[] = [];
+  const localFueraDelTercio: string[] = [];
+  for (const v of ventanas) {
+    for (const ocupados of [1, 2, 4, 6]) {
+      const pose = encuadre(ocupados, v.aspecto, v.franja);
+      const puntos = cala.amarres.map((a) => proyecta(pose, v.aspecto, { x: a.pie.x, y: a.pie.y, z: a.pie.z }));
+      const fuera = puntos
+        .map((p, i) => ({ i, p }))
+        .filter(({ p }) => !p.delante || Math.abs(p.x) > BORDE_UTIL || p.y < -1 + 2 * v.franja || p.y > 0.97)
+        .map(({ i, p }) => `${String(i)}:(${p.x.toFixed(2)},${p.y.toFixed(2)})`);
+      comprobar(`${v.nombre} y ${String(ocupados)} ocupados: los seis amarres proyectan dentro del encuadre útil`, fuera.length === 0, fuera);
+      let minima = Infinity;
+      let par = '';
+      for (let i = 0; i < puntos.length; i++) {
+        for (let j = i + 1; j < puntos.length; j++) {
+          const d = Math.abs((puntos[i] as { x: number }).x - (puntos[j] as { x: number }).x);
+          if (d < minima) {
+            minima = d;
+            par = `${String(i)}-${String(j)}`;
+          }
+        }
+      }
+      comprobar(`${v.nombre} y ${String(ocupados)} ocupados: ningún par de amarres a menos del 6 % del ancho en x`, minima >= SEPARACION_ENTRE_AMARRES, { minima: Number(minima.toFixed(3)), par });
+      for (const a of cala.amarres) {
+        for (const b of cala.amarres) {
+          if (a.indice !== b.indice && tapa(pose, b.pie, a.barco)) tapados.push(`${v.nombre}/${String(ocupados)}: el barco ${String(a.indice)} tapa al ${String(b.indice)}`);
+        }
+      }
+      if (v.aspecto > 1.5 && (puntos[0] as { x: number }).x > -0.34) localFueraDelTercio.push(`${String(ocupados)} ocupados: x=${(puntos[0] as { x: number }).x.toFixed(2)}`);
+    }
+  }
+  comprobar('ningún barco tapa al aventurero de otro amarre desde la pose de reposo, en ninguna ventana', tapados.length === 0, tapados.slice(0, 6));
+  comprobar('en panorámico el local cae en el tercio izquierdo con cualquier aforo', localFueraDelTercio.length === 0, localFueraDelTercio);
 }
 
 // ---------------------------------------------------------------------------
@@ -365,19 +499,20 @@ function triangulosDe(nodo: Node): number {
   }
   const laCala = peorCala ?? { semilla: 0, total: 0, filas: [] };
   laCala.filas.sort((a, b) => b[2] - a[2]);
-  const fijos = renglonesFijos(triangulosPorPieza, media, 6);
+  /* El PEOR caso manda: seis iguales de la figura más pesada. La media se imprime para orientar. */
+  const fijos = renglonesFijos(triangulosPorPieza, peor, 6);
   const totalFijo = fijos.reduce((s, r) => s + r.triangulos, 0);
   const total = laCala.total + totalFijo;
-  const conLaPeorFigura = total - fijos.filter((r) => r.que.startsWith('aventureros')).reduce((s, r) => s + r.triangulos, 0) + 6 * peor;
+  const conFigurasMedias = total - 6 * peor + 6 * media;
 
   console.log(`  La cala más pesada (semilla ${String(laCala.semilla)}): ${Math.round(laCala.total).toLocaleString('es-ES')} triángulos en ${String(laCala.filas.reduce((s, f) => s + f[1], 0))} piezas puestas`);
   for (const [n, k, tri] of laCala.filas.slice(0, 14)) console.log(`    ${n.padEnd(20)} × ${String(k).padStart(3)} = ${Math.round(tri).toLocaleString('es-ES').padStart(7)}`);
-  console.log('  Lo que la escena añade con seis sentados:');
+  console.log('  Lo que la escena añade con seis sentados de la figura más pesada:');
   for (const r of fijos) console.log(`    ${r.que.padEnd(34)} × ${String(r.cuantos).padStart(3)} = ${Math.round(r.triangulos).toLocaleString('es-ES').padStart(7)}`);
   console.log(`  Aventureros: media ${Math.round(media).toLocaleString('es-ES')}, el más pesado ${Math.round(peor).toLocaleString('es-ES')} (${[...porFigura.entries()].map(([f, t]) => `${f} ${String(Math.round(t))}`).join(', ')})`);
-  console.log(`  TOTAL ${Math.round(total).toLocaleString('es-ES')} triángulos con figuras medias; ${Math.round(conLaPeorFigura).toLocaleString('es-ES')} si los seis fueran la más pesada; tope ${TOPE_DE_TRIANGULOS.toLocaleString('es-ES')}`);
+  console.log(`  TOTAL ${Math.round(total).toLocaleString('es-ES')} triángulos con seis de la más pesada (${Math.round(conFigurasMedias).toLocaleString('es-ES')} con figuras medias); tope ${TOPE_DE_TRIANGULOS.toLocaleString('es-ES')}`);
 
-  comprobar(`una cala llena con seis sentados baja de ${TOPE_DE_TRIANGULOS.toLocaleString('es-ES')} triángulos`, total > 0 && total < TOPE_DE_TRIANGULOS, Math.round(total));
+  comprobar(`una cala llena con seis sentados de la figura más pesada baja de ${TOPE_DE_TRIANGULOS.toLocaleString('es-ES')} triángulos`, total > 0 && total < TOPE_DE_TRIANGULOS, Math.round(total));
   comprobar('la cala sola no pasa de 43.000: el resto es de los aventureros y de lo que la escena añade', laCala.total > 0 && laCala.total < 43_000, Math.round(laCala.total));
   const sinTriangulos = laCala.filas.filter(([, , tri]) => tri === 0).map(([n]) => n);
   comprobar('toda pieza que la cala pone tiene geometría en el fichero', sinTriangulos.length === 0, sinTriangulos);
@@ -411,7 +546,7 @@ if (fallos.length > 0) {
  * cae a la mitad termina con código cero y una lista corta de aciertos, y eso se lee
  * como verde. El número va a mano y hay que subirlo al añadir comprobaciones.
  */
-const COMPROBACIONES_ESCRITAS = 42;
+const COMPROBACIONES_ESCRITAS = 72;
 if (hechas < COMPROBACIONES_ESCRITAS) {
   console.error(
     `Solo se han hecho ${String(hechas)} de las ${String(COMPROBACIONES_ESCRITAS)} comprobaciones que ` +
@@ -425,10 +560,12 @@ if (fallos.length === 0) {
   console.log(`${String(hechas)} comprobaciones`);
   console.log(
     '\nLa cala sale igual para la misma semilla y distinta para otro código; los seis amarres están\n' +
-      'en el agua con tablas bajo los pies; las orillas cierran; la cámara deja al local entero sobre\n' +
-      'la hoja en las tres ventanas y los cuatro aforos; los gestos nunca piden t-pose y salen de toda\n' +
-      'fase; una cala llena con seis sentados cabe en el presupuesto; y la paleta es la de Riberas.\n' +
-      'Lo que esto NO prueba es que se vea bien ni cuántas llamadas salen: eso es del banco.',
+      'en el agua con tablas bajo los pies, sin montarse unos sobre otros y con el barco del local al\n' +
+      'costado; las orillas cierran; la cámara deja al local entero sobre la hoja y a los seis amarres\n' +
+      'dentro y separados en las tres ventanas y los cuatro aforos, sin que un barco tape a nadie; los\n' +
+      'gestos nunca piden t-pose y salen de toda fase; una cala llena con seis de la figura más pesada\n' +
+      'cabe en el presupuesto; y la paleta es la de Riberas. Lo que esto NO prueba es que se vea bien\n' +
+      'ni cuántas llamadas salen: eso es del banco.',
   );
   process.exit(0);
 }

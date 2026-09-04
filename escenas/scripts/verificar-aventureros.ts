@@ -197,8 +197,8 @@ for (const n of [...PERSONAJES, BIBLIOTECA]) documentos.set(n, await io.read(fic
     for (const malla of root.listMeshes()) {
       for (const prim of malla.listPrimitives()) {
         const color = prim.getAttribute('COLOR_0');
-        /* 5121 es UNSIGNED_BYTE: bytes normalizados, que es lo que dice el compilador. */
-        if (color === null || color.getType() !== 'VEC3' || color.getComponentType() !== 5121 || !color.getNormalized()) {
+        /* 5121 es UNSIGNED_BYTE: bytes normalizados, VEC4 con el alfa a 255, que es lo que escribe el horno. */
+        if (color === null || color.getType() !== 'VEC4' || color.getComponentType() !== 5121 || !color.getNormalized()) {
           sinColor.push(`${nombre}/${malla.getName()}`);
         }
         if (prim.listSemantics().some((s) => s.startsWith('TEXCOORD_'))) conUv.push(`${nombre}/${malla.getName()}`);
@@ -224,7 +224,7 @@ for (const n of [...PERSONAJES, BIBLIOTECA]) documentos.set(n, await io.read(fic
   comprobar('los seis cuelgan de un único nodo Rig_Medium', sinRaizUnica.length === 0, sinRaizUnica);
   comprobar('cada uno lleva una sola piel con los 23 huesos del rig, ni uno más', pielMala.length === 0, pielMala);
   comprobar(
-    'todas las primitivas llevan COLOR_0 como VEC3 de bytes normalizados',
+    'todas las primitivas llevan COLOR_0 como VEC4 de bytes normalizados',
     sinColor.length === 0,
     sinColor,
   );
@@ -411,6 +411,7 @@ function cargaConThree(ruta: string): Promise<GLTF> {
   const HUESOS_SANEADOS = HUESOS.map((h) => PropertyBinding.sanitizeNodeName(h));
   const huesosMal: string[] = [];
   const mallasMal: string[] = [];
+  const entrelazados: string[] = [];
   const escenas = new Map<string, Object3D>();
   for (const n of PERSONAJES) {
     const gltf = cargados.get(n);
@@ -425,6 +426,9 @@ function cargaConThree(ruta: string): Promise<GLTF> {
         const color = malla.geometry.getAttribute('color');
         if (color === undefined || !material.vertexColors || material.map !== null) {
           mallasMal.push(`${n}/${o.name}: color=${String(color !== undefined)} vertexColors=${String(material.vertexColors)} map=${String(material.map !== null)}`);
+        }
+        for (const [nombre, atributo] of Object.entries(malla.geometry.attributes)) {
+          if ((atributo as { isInterleavedBufferAttribute?: boolean }).isInterleavedBufferAttribute === true) entrelazados.push(`${n}/${o.name}.${nombre}`);
         }
       }
     });
@@ -442,6 +446,11 @@ function cargaConThree(ruta: string): Promise<GLTF> {
   const cambian = HUESOS.filter((h, i) => h !== HUESOS_SANEADOS[i]).length;
   comprobar('y el saneado hace algo: dieciocho de los veintitrés cambian de nombre al cargar', cambian === 18, cambian);
   comprobar('todas sus mallas llegan con el color por vértice encendido y sin mapa', mallasMal.length === 0, mallasMal);
+  /*
+   * NINGÚN ATRIBUTO LLEGA ENTRELAZADO: si uno llegara, cada clon de la escena
+   * avisaría por consola una vez por atributo. La regla está en `hornear.ts`.
+   */
+  comprobar('y ningún atributo llega entrelazado: se clonan en silencio', escenas.size === PERSONAJES.length && entrelazados.length === 0, entrelazados.slice(0, 6));
 
   const biblioteca = cargados.get(BIBLIOTECA);
   const clips = biblioteca?.animations ?? [];
@@ -494,7 +503,7 @@ if (fallos.length > 0) {
  * cae a la mitad termina con código cero y una lista corta de aciertos, y eso se lee
  * como verde. El número va a mano y hay que subirlo al añadir comprobaciones.
  */
-const COMPROBACIONES_ESCRITAS = 27;
+const COMPROBACIONES_ESCRITAS = 28;
 if (hechas < COMPROBACIONES_ESCRITAS) {
   console.error(
     `Solo se han hecho ${hechas} de las ${COMPROBACIONES_ESCRITAS} comprobaciones que ` +

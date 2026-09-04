@@ -25,8 +25,8 @@
  * las cuatro variantes son la MISMA geometría con otras UV: sólo cambian los
  * vértices que caen en la fila del atlas donde el pack pone los colores de jugador.
  * Aquí entra SÓLO la azul, y con ella una máscara por vértice —el atributo `_TINTE`,
- * 0 o 255— que dice qué vértices son «del color». La escena pinta esos vértices del
- * color del asiento al cargar.
+ * un flotante a 0 o a 1— que dice qué vértices son «del color». La escena pinta esos
+ * vértices del color del asiento al cargar.
  *
  * Se tiñe y no se compila por color por dos razones que están en `piezas.ts` y en
  * `docs/EL-MUELLE.md` §1.5 y §1.6: Riberas sienta a SEIS y el pack sólo trae cuatro
@@ -86,7 +86,7 @@
  *     npm run compilar:embarcadero -w escenas
  *     npm run verify:embarcadero-modelos -w escenas
  */
-import { Document, NodeIO } from '@gltf-transform/core';
+import { Document } from '@gltf-transform/core';
 import type { Accessor, Mesh, Node, Primitive } from '@gltf-transform/core';
 import { dedup, mergeDocuments, prune, weld } from '@gltf-transform/functions';
 import fs from 'node:fs';
@@ -94,7 +94,7 @@ import path from 'node:path';
 import { ATRIBUTO_DE_TINTE, PIEZAS_DEL_EMBARCADERO, PIEZAS_QUE_SE_TINEN } from '../embarcadero/piezas';
 import type { PiezaDelEmbarcadero } from '../embarcadero/piezas';
 import { NOMBRE_QUE_SOBREVIVE } from '../nombres';
-import { desnudaElMaterial, horneaLaPrimitiva, pngDeLaTextura, rendirse } from './hornear';
+import { desnudaElMaterial, escritorDeGlb, horneaLaPrimitiva, pngDeLaTextura, rendirse } from './hornear';
 
 const RAIZ = path.resolve(import.meta.dirname ?? __dirname, '..', '..');
 const PACK = path.join(RAIZ, 'arte/kaykit/hexagon-extra/KayKit_Medieval_Hexagon_Pack_1.0_EXTRA/Assets/gltf');
@@ -191,17 +191,23 @@ function derivaElTinte(azul: Document, rojo: Document, pieza: PiezaDelEmbarcader
       }
     }
 
+    /* El color horneado es VEC4 (r, g, b, alfa a 255): se comparan los tres primeros. */
     const colA = (pa.getAttribute('COLOR_0') as Accessor).getArray() as Uint8Array;
     const colR = (pr.getAttribute('COLOR_0') as Accessor).getArray() as Uint8Array;
-    const mascara = new Uint8Array(n);
+    /*
+     * La máscara va en FLOTANTES de 0 o 1 y no en bytes: un escalar de un byte
+     * se escribe con paso 4 (relleno) y `GLTFLoader` lo cargaría entrelazado;
+     * pesa lo mismo. Ver la cabecera de `hornear.ts`.
+     */
+    const mascara = new Float32Array(n);
     for (let i = 0; i < n; i++) {
       const d = Math.max(
-        Math.abs((colA[i * 3] as number) - (colR[i * 3] as number)),
-        Math.abs((colA[i * 3 + 1] as number) - (colR[i * 3 + 1] as number)),
-        Math.abs((colA[i * 3 + 2] as number) - (colR[i * 3 + 2] as number)),
+        Math.abs((colA[i * 4] as number) - (colR[i * 4] as number)),
+        Math.abs((colA[i * 4 + 1] as number) - (colR[i * 4 + 1] as number)),
+        Math.abs((colA[i * 4 + 2] as number) - (colR[i * 4 + 2] as number)),
       );
       if (d > UMBRAL_DE_TINTE) {
-        mascara[i] = 255;
+        mascara[i] = 1;
         con++;
       } else {
         sin++;
@@ -211,7 +217,6 @@ function derivaElTinte(azul: Document, rojo: Document, pieza: PiezaDelEmbarcader
       .createAccessor(`${saneado(malla.getName())}${ATRIBUTO_DE_TINTE}`)
       .setType('SCALAR')
       .setArray(mascara)
-      .setNormalized(true)
       .setBuffer(bufer);
     pa.setAttribute(ATRIBUTO_DE_TINTE, tinte);
   }
@@ -287,7 +292,8 @@ async function main(): Promise<void> {
   );
   if (faltan.length > 0) rendirse(`Faltan en el pack:\n${faltan.map((f) => `  ${f}`).join('\n')}`);
 
-  const io = new NodeIO();
+  /* Con los atributos separados, no entrelazados: ver `escritorDeGlb` en `hornear.ts`. */
+  const io = escritorDeGlb();
   const destino = new Document();
   const escena = destino.createScene('embarcadero');
   destino.getRoot().setDefaultScene(escena);

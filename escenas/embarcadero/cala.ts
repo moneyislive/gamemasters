@@ -43,7 +43,7 @@
  */
 import { centroDeHex, mallaDeRadio, vecinos } from '../../shared/mecanicas/malla-hexagonal';
 import type { Hex } from '../../shared/mecanicas/malla-hexagonal';
-import { ESCALON, LAMINA, RADIO_DE_TESELA } from '../escala';
+import { ESCALA_DEL_PACK, ESCALON, LAMINA, RADIO_DE_TESELA } from '../escala';
 import { PIEZA } from './piezas';
 import type { NombreDePieza } from './piezas';
 
@@ -116,6 +116,8 @@ export interface Amarre {
   /** El poste de la bandera y el farol, sobre la plataforma. */
   readonly bandera: { readonly x: number; readonly z: number };
   readonly farol: { readonly x: number; readonly z: number };
+  /** El estandarte del color del asiento, junto al farol. Sólo lo planta el local. */
+  readonly estandarte: { readonly x: number; readonly z: number };
   /** Desde dónde llega el barco cuando alguien se sienta: fuera, en la niebla. */
   readonly llegadaDesde: { readonly x: number; readonly z: number };
 }
@@ -177,25 +179,70 @@ const SOL = { x: -0.25, z: -0.968 };
 const A_FLOTE = LAMINA + 0.06;
 
 /**
+ * A qué altura están las tablas de la pieza `muelle`, para posar los trastos
+ * encima y no hundidos en ellas. Es el mismo nivel que `cargar.ts` mide al
+ * cargar (el de más vértices sobre cero: 0,04 del pack); aquí va el número
+ * porque la cala es aritmética y no abre el fichero.
+ */
+const TABLAS = 0.04 * ESCALA_DEL_PACK;
+
+/**
  * LOS SEIS AMARRES, EN ABANICO Y RETROCEDIENDO.
  *
  * El 0 es el local, en la cabeza del muelle. Los otros cinco se abren a los dos
- * lados de la boca y cada uno está más lejos que el anterior, para que en
- * retrato se lean como profundidad y no como una fila. El abanico carga un poco
- * a la derecha porque en panorámico el local va en el tercio izquierdo y el
- * resto del encuadre es para los demás.
+ * lados del eje del muelle, alternando, y cada uno está más lejos que el
+ * anterior, para que en retrato se lean como profundidad y no como una fila.
  *
- * Ángulos desde el eje −z (el mar), y distancia al local. Están dentro del
- * remanso con margen de una tesela, que es lo que exige «cada amarre sobre agua».
+ * ═══ POR QUÉ ESTOS ÁNGULOS Y NO OTROS: EL CONO DEL MÓVIL ═══
+ *
+ * En retrato (9:19,5) con 50° de campo vertical el cono horizontal de la cámara
+ * es de ±12°: lo que no está dentro no existe en el teléfono. Los cinco azimuts,
+ * vistos desde la cámara de reposo (unas 9 u detrás del local), son +4,3°,
+ * −7,3°, +8,0°, −3,9° y −10,4°: ninguno cae detrás del local (sus hombros ocupan
+ * ±3°), alternan de lado y guardan al menos 3,1° entre sí, que es lo que hace
+ * falta para que en el panorámico (32°, girado 13° a la derecha) dos amarres
+ * disten el 6 % del ancho de pantalla que exige `verify:embarcadero`. Las filas
+ * van a 13, 18,5, 24, 30 y 37 u porque las plataformas miden 10,9 × 2,7 y los
+ * barcos 12,4 × 5,5: con menos separación radial, el barco de una fila se posa
+ * sobre la plataforma de la siguiente. Se calculó con `proyecta()` de
+ * `camara.ts` y se comprueba con ella.
+ *
+ * `angulo` es desde el eje −z (el mar) medido en el origen, y `distancia` al
+ * local. `corrido` es cuánto se desplaza el barco por el lado largo de la
+ * plataforma, con signo hacia +x del mundo: hacia fuera en las filas 1 a 3 (para
+ * que el barco no tape a nadie de los que están detrás), hacia dentro en la 4
+ * (hacia fuera se posaría sobre la plataforma 5) y nada en la 5, que es la
+ * última y no tiene a nadie detrás.
+ *
+ * ═══ LO QUE ESTO DEJA VER, DICHO PARA QUE NADIE LO BUSQUE ═══
+ *
+ * Con el cono de ±12°, en retrato se ven las seis plataformas con su figura, su
+ * farol y su bandera, y de los barcos sólo los de las filas 4 y 5, de fondo; los
+ * de las filas 1 a 3 y el del local quedan fuera del cono, y entran al arrastrar
+ * o al zarpar. Cualquier barco dentro del cono tapa a quien tenga detrás: son 12
+ * u de alto por 5,5 de manga, o sea ±6° a treinta unidades.
  */
-const ABANICO: readonly { readonly angulo: number; readonly distancia: number }[] = [
-  { angulo: 0, distancia: 0 },
-  { angulo: -26, distancia: 12 },
-  { angulo: 30, distancia: 14 },
-  { angulo: -6, distancia: 19 },
-  { angulo: 20, distancia: 23 },
-  { angulo: 8, distancia: 28 },
+const ABANICO: readonly { readonly angulo: number; readonly distancia: number; readonly corrido: number }[] = [
+  { angulo: 0, distancia: 0, corrido: 0 },
+  { angulo: 7.3, distancia: 13, corrido: 7 },
+  { angulo: -10.9, distancia: 18.5, corrido: -7 },
+  { angulo: 11.1, distancia: 24, corrido: 7 },
+  { angulo: -5.1, distancia: 30, corrido: 7 },
+  { angulo: -13.0, distancia: 37, corrido: 0 },
 ];
+
+/**
+ * EL BARCO DEL LOCAL, AL COSTADO DEL MUELLE Y NO DETRÁS DE ÉL.
+ *
+ * Atracado del lado del mar de la cabeza (donde estuvo), sus velas de 12 u
+ * tapaban media pantalla: ni la cala, ni los demás amarres, ni el horizonte. Va
+ * al flanco de −x del muelle, paralelo a él y con la proa al mar, con el casco a
+ * medio metro de la punta de las tablas: más cerca de lo que está no cabe sin
+ * atravesar la plataforma (5,47 de media pieza más 2,74 de media manga). Desde
+ * la pose de reposo queda fuera del cono en las dos ventanas; se ve al arrastrar
+ * y en el zarpe, cuando el local corre hacia él.
+ */
+const BARCO_DEL_LOCAL = { x: -8.65, z: 0.8 };
 
 const GRADOS = Math.PI / 180;
 
@@ -212,28 +259,36 @@ function amarres(): Amarre[] {
     const nx = Math.sin(giro);
     const nz = Math.cos(giro);
     /*
-     * EL BARCO, AL COSTADO Y DEL LADO DEL MAR. La plataforma del pack mide 10,9 de
-     * largo por 2,7 de ancho y el barco 12,4 por 5,5: puesto en la punta del lado
-     * largo, como estaba, el casco atravesaba las tablas. Va paralelo a ella, a 5,5
-     * del centro por el lado corto que da al mar —el opuesto a la cámara en la
-     * cabeza del muelle, el opuesto a la cabeza en el abanico— y corrido 3,5 por el
-     * lado largo, para que el mástil no tape al aventurero desde la cámara.
+     * EL BARCO DE UN AMARRE DEL ABANICO: paralelo a la plataforma, a 5,5 del
+     * centro por el lado corto que da al mar (el opuesto a la cabeza) y corrido
+     * por el lado largo lo que diga la tabla, con el signo hacia +x del mundo sea
+     * cual sea el giro de la plataforma. La proa del pack apunta a +z local, así
+     * que con `giro + π/2` queda a lo largo de `d`.
      */
-    const lado = indice === 0 ? -1 : 1;
-    const costado = 5.5;
-    const corrido = 3.5;
-    const barcoX = x + nx * costado * lado + dx * corrido;
-    const barcoZ = z + nz * costado * lado + dz * corrido;
+    const corrido = a.corrido * (Math.sign(dx) || 1);
+    const barcoX = indice === 0 ? BARCO_DEL_LOCAL.x : x + nx * 5.5 + dx * corrido;
+    const barcoZ = indice === 0 ? BARCO_DEL_LOCAL.z : z + nz * 5.5 + dz * corrido;
+    /* El del local, paralelo al muelle (eje z) con la proa a −z: media vuelta sobre la proa del pack. */
+    const giroDelBarco = indice === 0 ? Math.PI : giro + Math.PI / 2;
     return {
       indice,
       x,
       z,
       giro,
       pie: { x, y: 0, z },
-      barco: { x: barcoX, z: barcoZ, giro: giro + Math.PI / 2 },
+      barco: { x: barcoX, z: barcoZ, giro: giroDelBarco },
       bandera: { x: x - dx * 1.7, z: z - dz * 1.7 },
       farol: { x: x + dx * 1.6, z: z + dz * 1.6 - 1.0 },
-      llegadaDesde: { x: barcoX - SOL.x * 70 * 0.4, z: barcoZ - 70 },
+      estandarte: { x: x + dx * 2.6, z: z + dz * 2.6 - 1.1 },
+      /*
+       * Los barcos emergen de la niebla en línea recta desde 70 u mar adentro,
+       * por su propia x. Dos calles se cruzan con lo que ya está atracado sólo si
+       * un asiento se vuelve a ocupar cuando hay otro más lejano ocupado (la 1
+       * pasa por donde está el barco de la 3; la 2 roza la plataforma 5): es un
+       * caso raro y de dos segundos, y se prefiere a una calle en diagonal que
+       * cruzaría el abanico entero.
+       */
+      llegadaDesde: { x: barcoX, z: barcoZ - 70 },
     };
   });
 }
@@ -444,15 +499,19 @@ export function generarCala(semilla: number): Cala {
   /* 3. Debajo de la terraza, un fondo por tesela: sin él se vería el hueco entre los dos niveles. */
   for (const t of teselas) if (t.nivel === 1) pon(PIEZA.fondo, t.x, 0, t.z, 0, 1, 0);
 
-  /* 4. Los trastos del muelle, a los lados de las tablas. Sitios fijos: son el primer plano. */
-  pon(PIEZA.barril, 1.9, 0, 4.6, 0.4);
-  pon(PIEZA.barril, 2.5, 0, 6.3, 1.9);
-  pon(PIEZA.caja, -2.1, 0, 8.6, 0.2);
-  pon(PIEZA.cajaGrande, -2.3, 0, 11.4, -0.3);
-  pon(PIEZA.saco, 1.8, 0, 10.4, 2.4);
-  pon(PIEZA.ancla, -1.7, 0, 3.4, 2.1);
-  pon(PIEZA.cubo, 2.2, 0, 8.9, 0);
-  pon(PIEZA.bote, -3.4, A_FLOTE, 6.0, 0.35, 1, 0, 'bote');
+  /*
+   * 4. Los trastos de la cabeza del muelle: TRES, pequeños y en las puntas de la
+   * plataforma. Hubo siete en los tramos entre la cámara y el local, y a dos
+   * metros de la lente un barril es una pared: en retrato tapaban el pie del
+   * muelle y en panorámico el tercio inferior derecho. `verify:embarcadero`
+   * exige que ningún trasto quede en el pasillo de la cámara (x en ±2,5, z de 1
+   * a 9) ni a menos de 3 u del punto de pie. El bote amarrado va al costado del
+   * mar por +x, donde el panorámico lo ve y no estorba a nadie.
+   */
+  pon(PIEZA.barril, -4.5, TABLAS, 0.75, 0.4, 0.9);
+  pon(PIEZA.caja, 4.65, TABLAS, 0.85, 0.2, 0.9);
+  pon(PIEZA.ancla, 4.3, TABLAS, -0.75, 2.1, 0.85);
+  pon(PIEZA.bote, 4.6, A_FLOTE, -3.3, 0.35, 1, 0, 'bote');
 
   /* 5. El caserío del embarque: en la terraza lo que cabe en ella, el resto en la pradera de al lado. */
   const terraza = teselas
@@ -518,7 +577,11 @@ export function generarCala(semilla: number): Cala {
   /*
    * Sólo las arboledas medianas y pequeñas (480 y 432 triángulos): la grande y la
    * B pesan el doble y en una cala salían diez, o sea once mil triángulos de
-   * follaje que se llevaban el presupuesto de dos aventureros.
+   * follaje que se llevaban el presupuesto de dos aventureros. Y pocas (una de
+   * cada doce teselas de pradera) con árboles sueltos en una de cada cuatro: el
+   * presupuesto se exige con SEIS EXPLORADORAS (8.900 triángulos cada una), y
+   * lo que se recorta para que quepan es esto, que de lejos no se echa en falta,
+   * y no el caserío ni los amarres, que son la imagen.
    */
   const arboledas: readonly NombreDePieza[] = [PIEZA.arboledaMedia, PIEZA.arboledaPequena];
   const rocas: readonly NombreDePieza[] = [PIEZA.rocaA, PIEZA.rocaC];
@@ -536,26 +599,26 @@ export function generarCala(semilla: number): Cala {
       if (u < 0.3) pon(PIEZA.arbolA, t.x, y, t.z, giro, 1, 1);
       continue;
     }
-    if (u < 0.14) {
+    if (u < 0.08) {
       const cual = arboledas[Math.floor(azar() * arboledas.length)] ?? PIEZA.arboledaMedia;
       pon(cual, t.x, y, t.z, giro, 0.9 + azar() * 0.3, 0);
-    } else if (u < 0.46) {
-      /* Tres árboles A (50 triángulos) por cada B (220): el B es el frondoso y se reserva. */
-      pon(azar() < 0.75 ? PIEZA.arbolA : PIEZA.arbolB, t.x + (azar() - 0.5) * 3, y, t.z + (azar() - 0.5) * 3, giro, 0.9 + azar() * 0.4, 0);
-    } else if (u < 0.52) {
+    } else if (u < 0.34) {
+      /* Cuatro árboles A (50 triángulos) por cada B (220): el B es el frondoso y se reserva. */
+      pon(azar() < 0.8 ? PIEZA.arbolA : PIEZA.arbolB, t.x + (azar() - 0.5) * 3, y, t.z + (azar() - 0.5) * 3, giro, 0.9 + azar() * 0.4, 0);
+    } else if (u < 0.4) {
       pon(PIEZA.tocon, t.x, y, t.z, giro, 1, 0);
-    } else if (u < 0.6) {
+    } else if (u < 0.48) {
       pon(rocas[azar() < 0.5 ? 0 : 1] ?? PIEZA.rocaA, t.x, y, t.z, giro, 0.8 + azar() * 0.6, 0);
     }
   }
 
   /* 7. Juncos y nenúfares en los remansos: en el agua pegada a cada orilla, del lado del agua. */
-  /* Tres juncos ligeros por cada uno de los frondosos: el B pesa dos veces y media el A. */
-  const juncos: readonly NombreDePieza[] = [PIEZA.juncoA, PIEZA.juncoA, PIEZA.juncoA, PIEZA.juncoB];
+  /* Cinco juncos ligeros por cada uno de los frondosos: el B pesa dos veces y media el A (162 triángulos). */
+  const juncos: readonly NombreDePieza[] = [PIEZA.juncoA, PIEZA.juncoA, PIEZA.juncoA, PIEZA.juncoA, PIEZA.juncoA, PIEZA.juncoB];
   for (const t of teselas) {
     if (t.clase !== 'orilla') continue;
     const u = azar();
-    if (u > 0.5) continue;
+    if (u > 0.44) continue;
     /* El lado del agua: la media de las direcciones hacia los vecinos mojados. */
     let dx = 0;
     let dz = 0;
@@ -592,12 +655,13 @@ export function generarCala(semilla: number): Cala {
   }
   pon(PIEZA.colinasArboladas, 44, 0, -82, 0.4, 1.6);
   pon(PIEZA.colinaB, -46, 0, -78, 2.1, 1.5);
-  const cuantasNubes = 6;
+  /* Cuatro nubes (366 triángulos cada pequeña) y UN barco de nadie (1.580): es lo que se recortó del fondo para que quepan seis exploradoras. */
+  const cuantasNubes = 4;
   for (let i = 0; i < cuantasNubes; i++) {
     const angulo = (-70 + (140 * (i + 0.5)) / cuantasNubes + (azar() - 0.5) * 14) * GRADOS;
     const distancia = 160 + azar() * 260;
     pon(
-      /* Una grande y cinco pequeñas: la grande pesa casi el doble y de lejos no se nota. */
+      /* Una grande y tres pequeñas: la grande pesa casi el doble y de lejos no se nota. */
       i === 0 ? PIEZA.nubeGrande : PIEZA.nubePequena,
       Math.sin(angulo) * distancia,
       60 + azar() * 50,
@@ -608,8 +672,9 @@ export function generarCala(semilla: number): Cala {
       'nube',
     );
   }
-  for (let i = 0; i < 2; i++) {
-    const angulo = (i === 0 ? -34 : 24) * GRADOS + (azar() - 0.5) * 10 * GRADOS;
+  {
+    /* Hacia donde se puso el sol, para que se recorte contra la brasa. */
+    const angulo = -30 * GRADOS + (azar() - 0.5) * 12 * GRADOS;
     const distancia = 105 + azar() * 70;
     pon(PIEZA.barcoDeNadie, Math.sin(angulo) * distancia, A_FLOTE, -Math.cos(angulo) * distancia, azar() * Math.PI * 2, 1.4, 0, 'barco-de-nadie');
   }

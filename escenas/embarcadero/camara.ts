@@ -45,22 +45,43 @@ export interface Pose {
 
 /* ───────────────────────── Las poses de reposo del §3 ───────────────────────── */
 
-/** Retrato: ojos a 2,15 u, a 7,5 u del local, 55° de campo. El local en el centro. */
+/**
+ * Retrato: ojos a 2,4 u, a 8,6 u del local, 50° de campo. El local en el centro.
+ *
+ * Estuvo a 7,5 u con 55°: la cabeza rozaba el tercio superior y no había aire.
+ * Con la hoja del móvil, la bisección de `encuadre` clava los pies del local en
+ * su límite, así que la única forma de ganar aire por arriba es que el local sea
+ * más pequeño en pantalla: más lejos y con menos campo. El cono horizontal que
+ * queda en 9:19,5 es de ±12°, y a él se ajusta el abanico de `cala.ts`.
+ */
 export const POSE_RETRATO: Pose = {
-  posicion: { x: 0, y: 2.15, z: 7.5 },
-  objetivo: { x: 0, y: 1.25, z: 0 },
-  fov: 55,
+  posicion: { x: 0, y: 2.4, z: 8.6 },
+  objetivo: { x: 0, y: 1.35, z: 0 },
+  fov: 50,
 };
 
 /**
- * Panorámico: a 9 u, 38°, el local en el tercio izquierdo. Se consigue corriendo la
- * cámara a la derecha y mirando un poco a la derecha de él: con 16:9 y 38° el local
- * cae en x ≈ −0,38 del encuadre, justo dentro del tercio.
+ * Panorámico: a 9 u sobre el eje del muelle, 32°, girada 13° a la derecha y con
+ * la mirada 4° por debajo de la horizontal, hacia el mar. El local cae en
+ * x ≈ −0,45 del encuadre (el tercio izquierdo de verdad) y la mirada cruza el
+ * abanico de amarres y llega al horizonte.
+ *
+ * ═══ POR QUÉ SOBRE EL EJE Y NO CORRIDA A LA DERECHA, Y POR QUÉ 32° ═══
+ *
+ * La primera versión corría la cámara 1,8 u a la derecha. Eso mueve al local
+ * —que está a 9 u— once grados a la izquierda, y a los amarres —a 20 o 40 u—
+ * sólo tres o cuatro: todo el abanico se apilaba a la derecha del local en una
+ * franja de 0,07 del ancho, unos detrás de otros. Sobre el eje, los azimuts son
+ * los mismos que en retrato, y el abanico se reparte a los dos lados de él.
+ * Y 32° en vez de 38° porque con dieciséis novenos el campo horizontal es casi
+ * el triple que en el móvil: seis figuras que en retrato distan 3,3° se
+ * juntarían a 0,09 del ancho, y el 6 % que exige `verify:embarcadero` sale
+ * exactamente con 32°. El local ocupa la mitad del alto, que es un plano medio.
  */
 export const POSE_PANORAMICA: Pose = {
-  posicion: { x: 1.8, y: 2.3, z: 9.0 },
-  objetivo: { x: 2.2, y: 1.2, z: -4.0 },
-  fov: 38,
+  posicion: { x: 0, y: 2.4, z: 9.0 },
+  objetivo: { x: 30 * Math.sin((13 * Math.PI) / 180), y: 2.4 - 30 * Math.tan((4 * Math.PI) / 180), z: 9.0 - 30 * Math.cos((13 * Math.PI) / 180) },
+  fov: 32,
 };
 
 /** Desde el aire, para el zarpe: la grúa sube hasta aquí mientras el cielo amanece. */
@@ -76,6 +97,19 @@ const ASPECTO_PANORAMICO = 1.6;
 
 /** El 22 % del alto útil que el local nunca pierde sobre la hoja. */
 export const MARGEN_SOBRE_LA_HOJA = 0.22;
+
+/** Cuánto retrocede la cámara por cada ocupado más que el local. */
+export const RETROCESO_POR_OCUPADO = 0.1;
+
+/**
+ * El encuadre ÚTIL para un amarre: hasta dónde puede proyectar su punto de pie
+ * para que la figura quede dentro con la respiración de la cámara encima (la
+ * órbita de ±3° mueve un punto lejano unos 0,16 del semiancho en retrato). Y la
+ * separación mínima entre dos amarres en x proyectada: el 6 % del ancho de la
+ * pantalla, o sea 0,12 en coordenadas de −1 a 1.
+ */
+export const BORDE_UTIL = 0.9;
+export const SEPARACION_ENTRE_AMARRES = 0.12;
 
 export const DURACION_DE_LA_LLEGADA = 0.8;
 export const DURACION_DEL_ZARPE = 3.2;
@@ -146,11 +180,13 @@ function poseBase(ocupados: number, aspecto: number): Pose {
   const t = suave(pinza((aspecto - ASPECTO_RETRATO) / (ASPECTO_PANORAMICO - ASPECTO_RETRATO), 0, 1));
   const base = mezclaDePoses(POSE_RETRATO, POSE_PANORAMICA, t);
   /*
-   * Con más gente la cámara retrocede un poco por su eje, hasta 1,2 u con los seis,
-   * para que el abanico entre. Es poco a propósito: la cala se enciende amarre a
-   * amarre y el encuadre no debe dar un salto cada vez que alguien se sienta.
+   * Con más gente la cámara retrocede un poco por su eje, hasta medio metro con
+   * los seis. Es poco a propósito: la cala se enciende amarre a amarre y el
+   * encuadre no debe dar un salto cada vez que alguien se sienta. Fue 0,24 por
+   * ocupado cuando el abanico no cabía; ahora el abanico está hecho para el cono
+   * y el retroceso sólo da un respiro.
    */
-  const extra = pinza(ocupados - 1, 0, 5) * 0.24;
+  const extra = pinza(ocupados - 1, 0, 5) * RETROCESO_POR_OCUPADO;
   const eje = unitario(resta(base.posicion, base.objetivo));
   return { ...base, posicion: suma(base.posicion, por(eje, extra)) };
 }

@@ -43,18 +43,43 @@
  *     téxel antes de interpolar —que es lo que hace la GPU con una textura sRGB—
  *     y se guarda el resultado lineal. Guardar el sRGB tal cual daría colores
  *     lavados, con el gamma aplicado dos veces.
- *   · `COLOR_0` se escribe como VEC3 de BYTES SIN SIGNO NORMALIZADOS y no como
- *     flotantes: 4 bytes por vértice (3 más el relleno de alineación) contra 12.
- *     Con 5.000 a 8.000 vértices por personaje son 40 a 60 kB de diferencia —y
- *     la exploradora, que es la más pesada, no cabría en 450 kB con flotantes—.
- *     El coste es cuantizar un valor lineal a 256 escalones, que sólo se nota en
- *     los negros más profundos: hasta seis pasos de sRGB, medido (entre 4,7 y
- *     6,3 según el personaje), que es la diferencia entre un negro y otro negro.
+ *   · `COLOR_0` se escribe como VEC4 de BYTES SIN SIGNO NORMALIZADOS y no como
+ *     flotantes: 4 bytes por vértice contra 12 (o 16). Con 5.000 a 8.000
+ *     vértices por personaje son 40 a 60 kB de diferencia —y la exploradora, que
+ *     es la más pesada, no cabría en 450 kB con flotantes—. El coste es
+ *     cuantizar un valor lineal a 256 escalones, que sólo se nota en los negros
+ *     más profundos: hasta seis pasos de sRGB, medido (entre 4,7 y 6,3 según el
+ *     personaje), que es la diferencia entre un negro y otro negro.
  *     `horneaLaPrimitiva` devuelve ese desvío para que cada compilador lo imprima.
+ *     El cuarto byte es el alfa, siempre 255, y está ahí por lo que cuenta el
+ *     apartado siguiente; ninguna pieza lo usa.
  *
  * Y sin textura, las UV son bytes muertos que viajarían a cada móvil para no
  * leerse nunca: `TEXCOORD_0` se quita al hornear.
+ *
+ * ═══ LOS ATRIBUTOS SE ESCRIBEN SEPARADOS Y CON EL PASO IGUAL AL ELEMENTO ═══
+ *
+ * `NodeIO` escribe por defecto los atributos de cada primitiva ENTRELAZADOS en un
+ * solo búfer (posición, normal, color, hueso… vértice a vértice). Al cargar, three
+ * los deja como `InterleavedBufferAttribute`, y cada `clone()` de una geometría
+ * —la escena clona al aplanar, al fundir y al teñir— desentrelaza avisando por
+ * consola una vez POR ATRIBUTO: doscientas líneas al montar la cala que entierran
+ * cualquier aviso de verdad. Con `VertexLayout.SEPARATE` cada atributo va en su
+ * `bufferView`… y no basta, medido: `GLTFLoader` entrelaza siempre que el
+ * `byteStride` del `bufferView` no sea igual al tamaño del elemento, y un VEC3
+ * de bytes ocupa 3 pero se escribe con paso 4 (el relleno de alineación que ya
+ * se pagaba). Por eso el color va como VEC4 —el relleno pasa a ser el alfa, y el
+ * fichero pesa exactamente lo mismo— y la máscara `_TINTE` del embarcadero como
+ * un FLOTANTE de 0 o 1 (4 bytes, los mismos que un byte con tres de relleno).
+ * Así three carga TODO como `BufferAttribute` normal, se clona en silencio, y
+ * `verify:aventureros` y `verify:embarcadero-modelos` exigen que siga siendo así.
+ *
+ * Los siete aventureros y el embarcadero se recompilaron con esto el 4 de
+ * septiembre de 2026, y por eso sus md5 no son los de la primera compilación: la
+ * geometría y el color son los mismos valores, lo que cambia es cómo están
+ * colocados en el búfer.
  */
+import { NodeIO, VertexLayout } from '@gltf-transform/core';
 import type { Accessor, Document, Material, Primitive, Texture } from '@gltf-transform/core';
 import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
@@ -93,6 +118,15 @@ function cargaPngjs(): ModuloPng {
   }
 }
 const { PNG } = cargaPngjs();
+
+/**
+ * EL LECTOR-ESCRITOR DE LOS DOS COMPILADORES, con los atributos separados. Se
+ * construye aquí y no en cada compilador para que los dos escriban igual: ver la
+ * cabecera.
+ */
+export function escritorDeGlb(): NodeIO {
+  return new NodeIO().setVertexLayout(VertexLayout.SEPARATE);
+}
 
 /** Se para sin compilar a medias: un fichero a medias se carga y deja huecos mudos. */
 export function rendirse(motivo: string): never {
@@ -214,7 +248,8 @@ export function horneaLaPrimitiva(doc: Document, prim: Primitive, png: PngDecodi
   if (prim.getAttribute('COLOR_0') !== null) rendirse(`La primitiva «${nombre}» ya trae COLOR_0: este pack no lo traía, algo ha cambiado.`);
 
   const n = uv.getCount();
-  const bytes = new Uint8Array(n * 3);
+  /* VEC4: rojo, verde, azul y un alfa a 255 que ocupa el byte de relleno. Ver la cabecera. */
+  const bytes = new Uint8Array(n * 4);
   const st = [0, 0];
   const color = [0, 0, 0];
   let peor = 0;
@@ -224,16 +259,17 @@ export function horneaLaPrimitiva(doc: Document, prim: Primitive, png: PngDecodi
     for (let c = 0; c < 3; c++) {
       const lineal = color[c] as number;
       const byte = Math.max(0, Math.min(255, Math.round(lineal * 255)));
-      bytes[i * 3 + c] = byte;
+      bytes[i * 4 + c] = byte;
       peor = Math.max(peor, Math.abs(aSrgb(byte / 255) - aSrgb(lineal)));
     }
+    bytes[i * 4 + 3] = 255;
   }
 
   const bufer = doc.getRoot().listBuffers()[0];
   if (bufer === undefined) rendirse('El documento no tiene búfer: no se puede escribir el color.');
   const colores: Accessor = doc
     .createAccessor(`${nombre}_COLOR_0`)
-    .setType('VEC3')
+    .setType('VEC4')
     .setArray(bytes)
     .setNormalized(true)
     .setBuffer(bufer);
