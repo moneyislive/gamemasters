@@ -1554,20 +1554,83 @@ paso('Un puente cubre su arista, salva lo que tiene debajo y encaja con el camin
   );
 
   /*
-   * Y LA MEDIDA DEL MODELO ES LA QUE HAY DENTRO DEL FICHERO.
+   * Y LA MEDIDA DEL MODELO ES LA QUE HAY DENTRO DEL FICHERO — AHORA SI.
    *
    * `CAJA_DEL_PUENTE` decide cuantos tramos caben en una arista. Si un dia entra otro
    * modelo de puente con otro tamano, todo el reparto se hace con la medida del anterior y
-   * el puente sale con huecos o solapado — sin un error en ninguna consola. Esto lo ata al
-   * binario compilado, que es el unico sitio donde esa medida es un hecho.
+   * el puente sale con huecos o solapado, sin un error en ninguna consola.
+   *
+   * ═══ LA PRIMERA VERSION DE ESTA COMPROBACION NO PODIA FALLAR ═══
+   *
+   * Comparaba `CAJA_DEL_PUENTE` contra los mismos tres numeros escritos a mano — 1,924,
+   * 1,333 y 1,25 — o sea la constante contra si misma. Y su comentario decia «esto lo ata
+   * al binario compilado, que es el unico sitio donde esa medida es un hecho», que era
+   * literalmente falso: no abria el fichero. Se escribio el mismo dia que se cazo otra
+   * tautologia doce lineas mas arriba en este guion, lo cual dice bastante de lo facil que
+   * es escribir una.
+   *
+   * ═══ Y NO HACE FALTA DECODIFICAR EL BINARIO PARA ATARLO ═══
+   *
+   * glTF obliga a que el accesor de POSITION lleve sus cotas `min` y `max` en el JSON, asi
+   * que la caja de una malla se lee sin tocar un solo byte del bloque binario. Es la misma
+   * cabecera que este guion ya abre para mirar los nombres de los nodos.
    */
-  comprobar(
-    'la caja del puente que usa el reparto es la que trae el .glb',
-    Math.abs(CAJA_DEL_PUENTE.largo - 1.924) < 0.002 &&
-      Math.abs(CAJA_DEL_PUENTE.ancho - 1.333) < 0.002 &&
-      Math.abs(CAJA_DEL_PUENTE.alto - 1.25) < 0.002,
-    CAJA_DEL_PUENTE,
-  );
+  {
+    /* Se vuelve a abrir el fichero aqui: el bloque que lo lee mas arriba no llega hasta aca. */
+    const glb = path.join(import.meta.dirname ?? __dirname, '..', 'modelos', 'tablero.glb');
+    const crudo = fs.readFileSync(glb);
+    const json = JSON.parse(
+      crudo.subarray(20, 20 + crudo.readUInt32LE(12)).toString('utf8'),
+    ) as {
+      nodes?: Array<{ name?: string; mesh?: number; scale?: number[]; children?: number[] }>;
+      meshes?: Array<{ primitives?: Array<{ attributes?: Record<string, number> }> }>;
+      accessors?: Array<{ min?: number[]; max?: number[] }>;
+    };
+    /*
+     * SE RECORRE EL SUBARBOL, y esto tambien costo una vuelta: el nodo `puente` NO lleva la
+     * malla encima. El compilador mete cada pieza como un nodo con nuestro nombre y le
+     * cuelga debajo lo que traia el pack, asi que mirar solo el nodo raiz da CERO
+     * primitivas — que es lo que dijo esta comprobacion la primera vez que de verdad abrio
+     * el fichero.
+     *
+     * La escala se acumula al bajar: una malla puede venir escalada en cualquier nivel, y
+     * mirar solo la del nodo de arriba daria una caja del tamaño equivocado sin avisar.
+     */
+    const cotas: Array<{ min: number[]; max: number[]; escala: number[] }> = [];
+    const bajar = (iNodo: number, escala: number[]): void => {
+      const nodo = (json.nodes ?? [])[iNodo];
+      if (nodo === undefined) return;
+      const suya = nodo.scale ?? [1, 1, 1];
+      const acumulada = [0, 1, 2].map((k) => (escala[k] ?? 1) * (suya[k] ?? 1));
+      const malla = nodo.mesh === undefined ? undefined : (json.meshes ?? [])[nodo.mesh];
+      for (const prim of malla?.primitives ?? []) {
+        const iAcc = prim.attributes?.['POSITION'];
+        const acc = iAcc === undefined ? undefined : (json.accessors ?? [])[iAcc];
+        if (acc?.min !== undefined && acc.max !== undefined) {
+          cotas.push({ min: acc.min, max: acc.max, escala: acumulada });
+        }
+      }
+      for (const hijo of nodo.children ?? []) bajar(hijo, acumulada);
+    };
+    const iPuente = (json.nodes ?? []).findIndex((n) => n.name === 'puente');
+    if (iPuente >= 0) bajar(iPuente, [1, 1, 1]);
+
+    const caja = (eje: number): number => {
+      if (cotas.length === 0) return NaN;
+      const lo = Math.min(...cotas.map((c) => (c.min[eje] as number) * (c.escala[eje] as number)));
+      const hi = Math.max(...cotas.map((c) => (c.max[eje] as number) * (c.escala[eje] as number)));
+      return hi - lo;
+    };
+    const medida = { ancho: caja(0), alto: caja(1), largo: caja(2) };
+    comprobar(
+      'la caja del puente que usa el reparto es la que de verdad trae el .glb',
+      cotas.length > 0 &&
+        Math.abs(medida.ancho - CAJA_DEL_PUENTE.ancho) < 0.002 &&
+        Math.abs(medida.alto - CAJA_DEL_PUENTE.alto) < 0.002 &&
+        Math.abs(medida.largo - CAJA_DEL_PUENTE.largo) < 0.002,
+      { enElFichero: medida, enElCodigo: CAJA_DEL_PUENTE, primitivas: cotas.length },
+    );
+  }
 }
 
 // ---------------------------------------------------------------------------
