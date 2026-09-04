@@ -1131,8 +1131,23 @@ code {
   pointer-events: none;
 }
 
+/*
+ * EL RAÍL SE DESPLAZA SOLO, Y EL MUNDO SE QUEDA QUIETO DETRÁS.
+ *
+ * `.muelle` recorta lo que sobresale para que la escena no ensanche la página,
+ * y con eso el raíl —tres paneles y sus botones— se quedaba sin fondo en una
+ * ventana baja: el botón de «Sentarse» caía justo debajo del borde y no había
+ * rueda que llegara a él. Medido en una ventana de 900 px de alto. El raíl toma
+ * como techo el alto de la ventana menos la cabecera y el aire de la hoja, y
+ * desplaza lo suyo; la escena no se mueve, que es lo que se quiere de un fondo.
+ */
 .muelle-rail {
   pointer-events: auto;
+  max-height: calc(100vh - 4.4rem - 6rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  padding-right: 0.25rem;
 }
 
 .muelle-rail .panel {
@@ -1307,6 +1322,10 @@ code {
 
   .muelle-rail {
     position: static;
+    /* Debajo de la escena ya no hay nada que tapar: desplaza la página, no el raíl. */
+    max-height: none;
+    overflow-y: visible;
+    padding-right: 0;
   }
 
   .muelle-rail .panel {
