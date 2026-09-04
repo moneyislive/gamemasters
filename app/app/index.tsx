@@ -78,7 +78,7 @@ import { color, conAlfa, espacio, fuente, radio } from '../src/tema';
  * contrato— así que no arrastra Skia al grafo de la portada, que es lo que la
  * dejaría en blanco en web y lo que vigila un comprobador.
  */
-import { CUENTA_DE_AFORO, LETRA, RADIO, SALA } from '../src/arcade/muebles';
+import { LETRA, RADIO, SALA } from '../src/arcade/muebles';
 import {
   LuzDeEsquina,
   PastillaDeEstado,
@@ -1985,7 +1985,7 @@ const estilos = StyleSheet.create({
    * raíl es un dato. Doce muescas, cuatro, una — las cinco máquinas se distinguen
    * por el largo del raíl antes de leer una palabra.
    *
-   * Las medidas son de `CUENTA_DE_AFORO`; el hueco lo calcula `huecoDelRail`.
+   * Las medidas y el hueco los pone `piezas.tsx`, que es donde vive el raíl.
    */
   /*
    * EL RAÍL LO PINTA `piezas.tsx`; lo único que es de la tarjeta es el hueco que
@@ -2103,11 +2103,17 @@ const estilos = StyleSheet.create({
    * jerarquía la da el escalón de cuerpo —12,5 contra 14— y no una rebaja de
    * alfa: `tenue` entero da 5,95 sobre la teja, y al 85 % se quedaría en 4,64.
    */
-  menores: { ...LETRA.cuerpo, fontSize: 12.5, lineHeight: 17, color: SALA.tenue },
+  /*
+   * 13 Y NO 12,5. La regla de esta casa es que ningún texto baja de 13, y estas dos
+   * líneas del pie la rompían por medio punto: se escribieron buscando un escalón
+   * por debajo de la de datos, y el escalón ya lo daba el 14 contra el 13. Medio
+   * punto de cuerpo no compra jerarquía; sólo compra un renglón peor de leer.
+   */
+  menores: { ...LETRA.cuerpo, fontSize: 13, lineHeight: 18, color: SALA.tenue },
   motivo: {
     ...LETRA.cuerpo,
-    fontSize: 12.5,
-    lineHeight: 17,
+    fontSize: 13,
+    lineHeight: 18,
     fontStyle: 'italic',
     color: SALA.tenue,
   },
