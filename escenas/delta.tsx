@@ -150,7 +150,7 @@ import { apuntaLosLados, piezaDeCauce, piezaDeSenda, teselasDeUnCamino } from '.
 import { CAUCE, CUERPO, HONDO, piezaDeOrilla } from './aguas';
 import { CELDA_DE_LA_ARENA } from './paleta';
 import { geometriaDeContornos } from './formas';
-import { CONTORNOS_DEL_BIEN } from './iconos';
+import { CONTORNOS_DE_LA_CARTA, CONTORNOS_DEL_BIEN } from './iconos';
 import { sitiosDelTablero, sitiosPermitidos } from './sitios';
 import { DISTANCIA_DE_LA_BARRA, huecosDeLaBarra } from './barra';
 import {
@@ -160,6 +160,19 @@ import {
   loQueSeVeEnLaBaraja,
 } from './baraja';
 import type { CartaEnLaMano, HuecoDeCarta } from './baraja';
+import {
+  casillasDeLaMano,
+  colorDeLaFamilia,
+  enLaZonaDeLasCartas,
+  huecosDeLasCartas,
+  loQueSeVeEnLasCartas,
+  puertasDeLaCarta,
+} from './cartas';
+import type {
+  CartaDelMazo,
+  CartaDelMazoColocada,
+  CasillaDeLaMano,
+} from './cartas';
 /*
  * `stopPropagation` sólo para a los objetos de DETRÁS dentro de la escena; la cámara
  * escucha fuera y no se entera. `loCogeLaInterfaz` es lo que se lo dice, y tiene que ir en
@@ -202,7 +215,41 @@ const COLOR_DE_LA_SENAL = '#39ff14';
 const ORDEN_DE_LA_BARRA = 1000;
 const ORDEN_DE_LAS_CARTAS = 1010;
 const ORDEN_DE_LAS_AREAS = 2000;
+/**
+ * Y LA MANO DEL MAZO, EN UN TRAMO PROPIO Y SIN TOCAR EL DE LOS BIENES.
+ *
+ * Va por encima de todo lo anterior aunque no lo necesite: las dos manos están en lados
+ * opuestos del lienzo y `verify:escena` exige que no se rocen, así que sus órdenes de
+ * dibujo no pueden pelearse ni queriendo. El tramo aparte es para el día que alguien
+ * mueva una de las dos — que se cruce en la pantalla no debe además cruzarse aquí.
+ *
+ * El hueco que se le deja a las cartas del mazo es el mismo que el de los bienes: diez por
+ * carta para sus capas, más lo que el imán y el estar cogida les suman.
+ */
+const ORDEN_DE_LAS_CARTAS_DEL_MAZO = 3000;
+const ORDEN_DE_LAS_CASILLAS = 4000;
 const COLOR_DEL_PUNTO = '#2a2118';
+
+/**
+ * DE DÓNDE SALE EL DIBUJO DE UNA CARTA DEL MAZO, Y POR QUÉ ESTA LÍNEA ESTÁ SUELTA.
+ *
+ * Los nueve dibujos que pide el §6 de `docs/LAS-CARTAS-DE-RIBERAS.md` —las cuatro familias
+ * que se juegan más los cinco títulos— viven en su PROPIA tabla de `escenas/iconos.ts`, y
+ * no mezclados con los de los bienes. Está bien que sea así: son dos vocabularios
+ * distintos, y una sola tabla dejaría que una carta del mazo se dibujara con la gavilla de
+ * grano sin que nada lo impidiera. Ese es exactamente el fallo que `verify:escena` vigila
+ * por el otro lado con la sal.
+ *
+ * La línea está sola y con nombre propio porque `iconos.ts` LO ESCRIBE
+ * `compilar-iconos.ts`: no se edita a mano, y si algún día el compilador reorganiza sus
+ * tablas, éste es el único sitio de la escena que hay que tocar.
+ *
+ * Un dibujo que todavía no esté compilado no revienta: la búsqueda devuelve `undefined`,
+ * el reparto de contornos sale vacío, `geometriaDeContornos` devuelve `null` y la carta se
+ * pinta con su color de familia y sin dibujo. Se ve que falta, que es lo correcto.
+ */
+const CONTORNOS_DEL_DIBUJO: Readonly<Record<string, readonly (readonly number[])[]>> =
+  CONTORNOS_DE_LA_CARTA;
 
 /** El plano de la malla puesto en el mundo: la `y` del tablero es la `z`. */
 function alMundo(p: Punto, altura: number): [number, number, number] {
@@ -1627,6 +1674,384 @@ function Baraja({
   );
 }
 
+/**
+ * UNA CARTA DEL MAZO EN LA MANO DE LA IZQUIERDA.
+ *
+ * Es la hermana de `Carta` mirada al espejo, y las dos diferencias que tiene son las dos
+ * que se ven en pantalla:
+ *
+ *   · SALE HACIA LA DERECHA al señalarla o al cogerla, no hacia la izquierda. Esta mano
+ *     se esconde por el borde izquierdo, así que «hacia dentro» es al revés que allí.
+ *   · EL DIBUJO VA EN LA MITAD DERECHA de la carta. En la mano de bienes va en la
+ *     izquierda porque ésa es la mitad que asoma cuando la mano está en reposo; aquí la
+ *     que asoma es la otra. Puesto en el centro, el dibujo quedaría fuera de la pantalla
+ *     justo cuando hace falta para saber qué carta es — que es cuando está en reposo.
+ *
+ * Y una tercera que no está en la de bienes: una carta que ahora mismo no se puede ni
+ * jugar ni revelar se dibuja APAGADA y no se quita. Saber que tienes tres guardias
+ * guardadas para el turno que viene es parte de lo que se juega; una mano que esconde lo
+ * que hoy no sirve obliga a acordarse de memoria de lo que se compró.
+ *
+ * Se MUEVE hacia su sitio en vez de saltar a él, con el mismo suavizado por paso de tiempo
+ * que la mano de bienes: sin eso, mover el cursor un píxel teletransporta media mano y el
+ * imán se lee como un parpadeo.
+ */
+function CartaDelMazoEnLaMano({
+  colocada,
+  cogida,
+  onCoger,
+}: {
+  colocada: CartaDelMazoColocada;
+  cogida: boolean;
+  onCoger: (carta: CartaDelMazo) => void;
+}): JSX.Element {
+  const grupo = useRef<THREE.Group>(null);
+  const [encima, setEncima] = useState(false);
+  const { carta, hueco, apagada } = colocada;
+
+  const geometria = useMemo(
+    () => formaDeCarta(hueco.ancho, hueco.alto),
+    [hueco.ancho, hueco.alto],
+  );
+  const color = useMemo(() => colorDeLaFamilia(carta.familia), [carta.familia]);
+  const icono = useMemo(
+    () => geometriaDeContornos(CONTORNOS_DEL_DIBUJO[carta.dibujo] ?? []),
+    [carta.dibujo],
+  );
+
+  useFrame((estado, delta) => {
+    const g = grupo.current;
+    if (g === null) return;
+    const cuanto = 1 - Math.exp(-16 * delta);
+    /* Hacia DENTRO es hacia la derecha: el espejo de la mano de bienes. */
+    const destinoX = hueco.x + (encima || cogida ? hueco.ancho * 0.1 : 0);
+    g.position.x += (destinoX - g.position.x) * cuanto;
+    g.position.y += (hueco.y - g.position.y) * cuanto;
+    g.rotation.z += (hueco.giro - g.rotation.z) * cuanto;
+    const quiere = 1 + hueco.iman * 0.1 + (encima || cogida ? 0.08 : 0);
+    g.scale.x += (quiere - g.scale.x) * cuanto;
+    g.scale.y = g.scale.x;
+  });
+
+  /*
+   * El mismo apilado que la mano de bienes y por la misma razón: las cartas se solapan y
+   * están todas a la misma distancia, así que sin un orden escrito el pintor elige el que
+   * quiere y el dibujo de una acaba encima del naipe de al lado. La señalada por el imán
+   * salta al frente, y la cogida por encima de toda la mano.
+   */
+  const base =
+    ORDEN_DE_LAS_CARTAS_DEL_MAZO +
+    hueco.orden +
+    Math.round(hueco.iman * 300) +
+    (cogida ? 600 : 0);
+
+  /* Apagada NO es invisible: se sigue leyendo cuál es, sólo que no llama. */
+  const cuerpo = apagada ? 0.38 : 1;
+
+  return (
+    <group ref={grupo} position={[hueco.x, hueco.y, hueco.z]}>
+      {/* El borde claro, que es lo que separa una carta de la de detrás al solaparse. */}
+      <mesh
+        geometry={geometria}
+        position={[0, 0, -0.002]}
+        scale={1.045}
+        renderOrder={base}
+        raycast={() => null}
+      >
+        <meshBasicMaterial
+          color={cogida ? COLOR_DE_LA_SENAL : '#f4ecd8'}
+          transparent
+          opacity={apagada ? 0.5 : 1}
+          toneMapped={false}
+          depthTest={false}
+          depthWrite={false}
+        />
+      </mesh>
+      <mesh
+        geometry={geometria}
+        renderOrder={base + 1}
+        onPointerOver={(e) => {
+          e.stopPropagation();
+          setEncima(true);
+        }}
+        onPointerOut={() => setEncima(false)}
+        /*
+         * SÓLO EL BOTÓN PRIMARIO, igual que las cuatro puertas que ya había. Sin esto,
+         * apoyar el arrastre de la cámara con el botón derecho encima de la mano cogería
+         * una carta sin que nadie lo pidiera — que es literalmente lo que pasó con la
+         * barra y con los anillos. Ver `noEsElPrimario`.
+         *
+         * Coger otra vez la misma carta la suelta, y eso lo decide quien monta el cliente:
+         * aquí sólo se avisa de que se ha pulsado. La escena no sabe qué hay cogido de la
+         * otra mano ni tiene por qué saberlo.
+         */
+        onPointerDown={(e) => {
+          if (noEsElPrimario(e)) return;
+          e.stopPropagation();
+          loCogeLaInterfaz(e.nativeEvent);
+          onCoger(carta);
+        }}
+      >
+        <meshBasicMaterial
+          color={color}
+          transparent
+          opacity={cuerpo}
+          toneMapped={false}
+          depthTest={false}
+          depthWrite={false}
+        />
+      </mesh>
+      {icono !== null && (
+        <mesh
+          geometry={icono}
+          position={[hueco.ancho * 0.24, hueco.alto * 0.04, 0.01]}
+          scale={hueco.alto * 0.4}
+          renderOrder={base + 2}
+          raycast={() => null}
+        >
+          <meshBasicMaterial
+            color="#f7f1e2"
+            transparent
+            opacity={cuerpo}
+            toneMapped={false}
+            depthTest={false}
+            depthWrite={false}
+          />
+        </mesh>
+      )}
+    </group>
+  );
+}
+
+/**
+ * UNA CASILLA DE LA MANO: «suéltala aquí y la revelo», «suéltala aquí y la juego».
+ *
+ * ═══ ES EL ÁREA DE TRUEQUE, Y ESO ES LA DECISIÓN ═══
+ *
+ * El §5 del diseño pide que un título se revele arrastrándolo a una casilla «igual que un
+ * bien se arrastra al área de trueque», y para jugar una carta se pedía «la forma más
+ * parecida a lo que ya hay». Lo más parecido a un área de trueque es un área de trueque:
+ * mismo naipe redondeado, mismo borde que se enciende en verde al pasar por encima, misma
+ * suelta con `onPointerUp`.
+ *
+ * Y esa última parte no es un detalle de estilo: disparar al SOLTAR hace que arrastrar la
+ * carta hasta aquí y pulsar la casilla sean el MISMO camino de código, como ya pasa con el
+ * anillo del tablero. Con `onClick` sólo funcionaría el segundo, porque un clic exige que
+ * la pulsación y la suelta caigan en el mismo objeto.
+ *
+ * ═══ QUÉ DISTINGUE UNA DE OTRA ═══
+ *
+ * El color de la cara, y no un rótulo — un rótulo costaría una fuente dentro del lienzo.
+ * `revelar` va del color del pergamino del borde de las cartas: lo que se revela se pone
+ * boca arriba y lo ve todo el mundo. `jugar` va del verde de las señales, que en esta
+ * escena ya significa «aquí se puede actuar» desde el primer anillo.
+ *
+ * Además casi nunca salen las dos: una carta o es un título que se revela o es una de las
+ * otras cuatro familias que se juega, nunca las dos cosas. Ver `puertasDeLaCarta`.
+ */
+function Casilla({
+  casilla,
+  dibujo,
+  onSoltar,
+}: {
+  casilla: CasillaDeLaMano;
+  dibujo: string;
+  onSoltar: (clase: CasillaDeLaMano['clase']) => void;
+}): JSX.Element {
+  const [encima, setEncima] = useState(false);
+  const { clase, hueco } = casilla;
+  const geometria = useMemo(
+    () => formaDeCarta(hueco.ancho, hueco.alto),
+    [hueco.ancho, hueco.alto],
+  );
+  const icono = useMemo(
+    () => geometriaDeContornos(CONTORNOS_DEL_DIBUJO[dibujo] ?? []),
+    [dibujo],
+  );
+
+  return (
+    <group position={[hueco.x, hueco.y, hueco.z]} scale={encima ? 1.1 : 1}>
+      <mesh
+        geometry={geometria}
+        renderOrder={ORDEN_DE_LAS_CASILLAS + 1}
+        onPointerOver={(e) => {
+          e.stopPropagation();
+          setEncima(true);
+        }}
+        onPointerOut={() => setEncima(false)}
+        onPointerUp={(e) => {
+          if (noEsElPrimario(e)) return;
+          e.stopPropagation();
+          onSoltar(clase);
+        }}
+      >
+        <meshBasicMaterial
+          color={clase === 'revelar' ? '#f4ecd8' : COLOR_DE_LA_SENAL}
+          transparent
+          opacity={encima ? 0.95 : 0.55}
+          toneMapped={false}
+          depthTest={false}
+          depthWrite={false}
+        />
+      </mesh>
+      {/* El borde, en verde cuando está señalada: el mismo idioma que el anillo. */}
+      <mesh
+        geometry={geometria}
+        position={[0, 0, -0.002]}
+        scale={1.06}
+        renderOrder={ORDEN_DE_LAS_CASILLAS}
+        raycast={() => null}
+      >
+        <meshBasicMaterial
+          color={encima ? COLOR_DE_LA_SENAL : '#0d1f1a'}
+          transparent
+          opacity={encima ? 1 : 0.6}
+          toneMapped={false}
+          depthTest={false}
+          depthWrite={false}
+        />
+      </mesh>
+      {icono !== null && (
+        <mesh
+          geometry={icono}
+          position={[0, 0, 0.01]}
+          scale={hueco.alto * 0.62}
+          renderOrder={ORDEN_DE_LAS_CASILLAS + 2}
+          raycast={() => null}
+        >
+          <meshBasicMaterial
+            color="#2a2118"
+            toneMapped={false}
+            depthTest={false}
+            depthWrite={false}
+          />
+        </mesh>
+      )}
+    </group>
+  );
+}
+
+/**
+ * LA MANO DEL MAZO ENTERA, pegada a la cámara por el borde IZQUIERDO.
+ *
+ * ═══ LO QUE CUESTA, PARA QUE NADIE TENGA QUE MEDIRLO ═══
+ *
+ * TRES llamadas de dibujo por carta —borde, cara y dibujo— y tres por casilla, y las
+ * casillas sólo existen mientras hay una carta cogida. El mismo coste por carta que la
+ * mano de bienes, que también son tres.
+ *
+ * El techo es fácil de acotar y por eso se escribe: las casillas nunca pasan de dos, así
+ * que son seis como mucho, y una mano gorda de ocho cartas son veinticuatro. Nada de esto
+ * se instancia y no debe instanciarse: cada carta tiene su geometría —depende de su ancho
+ * y su alto, que cambian con la pantalla—, su color de familia y su dibujo, o sea que no
+ * hay dos copias de nada. Instanciar es para lo que se repite, y el mundo de ahí abajo,
+ * que sí se repite miles de veces, va instanciado.
+ *
+ * NO lleva luz propia ni testigo que borre la profundidad, y las dos ausencias son a
+ * propósito. Luz no, porque aquí todo es `meshBasicMaterial` y un material básico no la
+ * mira: la de la mano de bienes es de cuando sus cartas llevaban piezas en tres
+ * dimensiones encima. Y borrado de profundidad tampoco, porque todo esto se dibuja con
+ * `depthTest={false}` y el orden lo manda `renderOrder`: no queda nada que borrar, y un
+ * `clearDepth` más por fotograma es un cambio de estado a cambio de nada.
+ *
+ * ═══ EL CURSOR SE LEE, NO SE ATRAPA ═══
+ *
+ * De `estado.pointer`, que r3f da normalizado de -1 a 1, convertido a coordenadas de
+ * cámara. Lo mismo que hace la mano de bienes y por lo mismo: un plano invisible que
+ * recogiera los eventos taparía el tablero, y esta mano tiene que despertar al ACERCARSE
+ * y no al tocarla.
+ *
+ * La diferencia con aquélla es que aquí se mira también la `y`. Abajo a la izquierda no
+ * está esta mano: está la barra de construir, que ocupa el 82 % del ancho. Ver
+ * `enLaZonaDeLasCartas`.
+ */
+function ManoDelMazo({
+  cartas,
+  cogida,
+  onCoger,
+  onJugar,
+  onRevelar,
+}: {
+  cartas: readonly CartaDelMazo[];
+  cogida: string | null;
+  onCoger: (carta: CartaDelMazo) => void;
+  onJugar: (carta: CartaDelMazo) => void;
+  onRevelar: (carta: CartaDelMazo) => void;
+}): JSX.Element {
+  const grupo = useRef<THREE.Group>(null);
+  const [forma, setForma] = useState({ campo: (45 * Math.PI) / 180, proporcion: 16 / 9 });
+  const [apunta, setApunta] = useState<number | null>(null);
+
+  useFrame((estado) => {
+    const g = grupo.current;
+    if (g === null) return;
+    g.position.copy(estado.camera.position);
+    g.quaternion.copy(estado.camera.quaternion);
+
+    const c = estado.camera as THREE.PerspectiveCamera;
+    const campo = ((c.isPerspectiveCamera ? c.fov : 45) * Math.PI) / 180;
+    const proporcion = estado.size.width / Math.max(1, estado.size.height);
+    if (Math.abs(campo - forma.campo) > 1e-6 || Math.abs(proporcion - forma.proporcion) > 1e-4) {
+      setForma({ campo, proporcion });
+    }
+
+    const { alto, ancho } = loQueSeVeEnLasCartas(campo, proporcion);
+    const x = estado.pointer.x * (ancho / 2);
+    const y = estado.pointer.y * (alto / 2);
+    const cerca = enLaZonaDeLasCartas(x, y, campo, proporcion) ? y : null;
+    if (cerca === null ? apunta !== null : apunta === null || Math.abs(cerca - apunta) > 1e-4) {
+      setApunta(cerca);
+    }
+  });
+
+  const colocadas = useMemo(
+    () => huecosDeLasCartas(cartas, forma.campo, forma.proporcion, apunta),
+    [cartas, forma, apunta],
+  );
+
+  /*
+   * QUÉ CASILLAS SE ENCIENDEN LO DECIDE `cartas.ts`, no este componente.
+   *
+   * Con nada cogido no sale ninguna. Con una carta que ahora no se puede ni jugar ni
+   * revelar, tampoco — y eso SE VE, que es la mitad del asunto: la carta se levanta, no
+   * aparece ningún sitio donde soltarla, y ya está dicho que hoy no. Mucho mejor que
+   * dejarla caer sin más, que se lee como que el juego no ha oído el gesto.
+   */
+  const laCogida = useMemo(
+    () => cartas.find((c) => c.id === cogida) ?? null,
+    [cartas, cogida],
+  );
+  const casillas = useMemo(
+    () => casillasDeLaMano(puertasDeLaCarta(laCogida), forma.campo, forma.proporcion),
+    [laCogida, forma],
+  );
+
+  return (
+    <group ref={grupo}>
+      {casillas.map((casilla) => (
+        <Casilla
+          key={`casilla:${casilla.clase}`}
+          casilla={casilla}
+          dibujo={laCogida === null ? '' : laCogida.dibujo}
+          onSoltar={(clase) => {
+            if (laCogida === null) return;
+            if (clase === 'revelar') onRevelar(laCogida);
+            else onJugar(laCogida);
+          }}
+        />
+      ))}
+      {colocadas.map((c) => (
+        <CartaDelMazoEnLaMano
+          key={`mazo:${c.carta.id}`}
+          colocada={c}
+          cogida={cogida === c.carta.id}
+          onCoger={onCoger}
+        />
+      ))}
+    </group>
+  );
+}
+
 export function Delta({
   datos,
   modelos,
@@ -1641,6 +2066,11 @@ export function Delta({
   onCogerCarta,
   seCambianPor = [],
   onProponerTrueque,
+  cartasDelMazo = [],
+  cartaDelMazoCogida = null,
+  onCogerCartaDelMazo,
+  onJugarCarta,
+  onRevelarCarta,
 }: {
   datos: DeltaEn3D;
   modelos: CatalogoDeModelos;
@@ -1684,6 +2114,37 @@ export function Delta({
   seCambianPor?: readonly string[];
   /** Aviso de que se ha soltado la carta cogida sobre el area de un bien. */
   onProponerTrueque?: (bien: string) => void;
+  /**
+   * LA MANO DE CARTAS DEL MAZO, para la franja de la izquierda. Vacía, no hay mano.
+   *
+   * ═══ TODO ESTO ES OPCIONAL, Y NO ES UN DETALLE ═══
+   *
+   * Sin ninguna de estas cinco entradas la escena se pinta exactamente como antes. Hace
+   * falta que sea así porque este mismo `<Delta>` lo montan TRES sitios —la app, el
+   * cliente de escritorio y el banco de pruebas 3D— y las reglas de las cartas se están
+   * escribiendo en otro fichero mientras esto se lee. Un parámetro obligatorio dejaría los
+   * tres rotos hasta que llegara, y el que peor: el banco de pruebas, que es donde se
+   * mira si algo se ve bien.
+   *
+   * Llega ya resuelta, como la mano de bienes: la escena no sabe de quién es el turno ni
+   * cuántas cartas tienen los demás. `sePuedeJugar` y `sePuedeRevelar` vienen decididas
+   * por quien conoce las reglas — es la misma frontera que los anillos y la barra.
+   */
+  cartasDelMazo?: readonly CartaDelMazo[];
+  /** Cuál está cogida ahora mismo, para dibujarla levantada. */
+  cartaDelMazoCogida?: string | null;
+  /**
+   * Aviso de que alguien ha pulsado una carta del mazo.
+   *
+   * Coger la misma otra vez la suelta, y coger una de aquí suelta lo que hubiera cogido de
+   * la mano de bienes y al revés. Las tres cosas las hace QUIEN MONTA EL CLIENTE, no la
+   * escena: aquí sólo se avisa de la pulsación, igual que en la barra y en la baraja.
+   */
+  onCogerCartaDelMazo?: (carta: CartaDelMazo) => void;
+  /** Aviso de que la carta cogida se ha soltado sobre la casilla de jugar. */
+  onJugarCarta?: (carta: CartaDelMazo) => void;
+  /** Aviso de que la carta cogida —un título— se ha soltado sobre la casilla de revelar. */
+  onRevelarCarta?: (carta: CartaDelMazo) => void;
 }): JSX.Element {
   /**
    * Cada modelo, aplanado una vez a geometría + material para poder instanciarlo.
@@ -2188,6 +2649,21 @@ export function Delta({
           onCoger={(c) => onCogerCarta?.(c)}
           seCambianPor={seCambianPor}
           onProponer={(b) => onProponerTrueque?.(b)}
+        />
+      )}
+
+      {/*
+        * Y la mano del mazo, en el borde de enfrente. Con la lista vacía no se monta nada
+        * —ni el grupo, ni el lector del cursor— que es lo que tiene que pasar en una
+        * partida sin cartas y en el banco de pruebas.
+        */}
+      {cartasDelMazo.length > 0 && (
+        <ManoDelMazo
+          cartas={cartasDelMazo}
+          cogida={cartaDelMazoCogida}
+          onCoger={(c) => onCogerCartaDelMazo?.(c)}
+          onJugar={(c) => onJugarCarta?.(c)}
+          onRevelar={(c) => onRevelarCarta?.(c)}
         />
       )}
 

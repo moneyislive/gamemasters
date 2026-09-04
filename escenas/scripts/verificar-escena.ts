@@ -93,6 +93,21 @@ import {
   loQueSeVeEnLaBaraja,
   manoPorGrupos,
 } from '../baraja';
+import {
+  casillasDeLaMano,
+  colorDeLaFamilia,
+  COLOR_SIN_FAMILIA,
+  enLaZonaDeLasCartas,
+  FAMILIA_DE_LOS_TITULOS,
+  franjaDeLasCartas,
+  huecosDeLasCartas,
+  loQueSeVeEnLasCartas,
+  manoDelMazoPorFamilias,
+  ORDEN_DE_LAS_FAMILIAS,
+  pasoDentroDelGrupo,
+  puertasDeLaCarta,
+} from '../cartas';
+import type { CartaDelMazo } from '../cartas';
 import { cuantosTriangulos, geometriaDeContornos } from '../formas';
 import {
   CAJA_DEL_PUENTE,
@@ -100,7 +115,7 @@ import {
   puenteEntre,
   SUPERFICIE_DEL_CAMINO,
 } from '../puente';
-import { BIENES_CON_ICONO, CONTORNOS_DEL_BIEN } from '../iconos';
+import { BIENES_CON_ICONO, CONTORNOS_DE_LA_CARTA, CONTORNOS_DEL_BIEN } from '../iconos';
 import { MODELO, modeloDePieza } from '../modelos';
 import { ESCALON, RADIO_DE_COMARCA, RADIO_DE_TESELA } from '../escala';
 import { laMarinaDelMundo } from '../marina';
@@ -875,6 +890,517 @@ paso('La mano se agrupa por bien, cabe, asoma y el imán reparte');
     'y los cinco se convierten en triángulos, encajados en el mismo cuadrado',
     rotos.length === 0,
     rotos,
+  );
+}
+
+// ---------------------------------------------------------------------------
+
+/**
+ * LA MANO DEL MAZO: que quepa a la izquierda SIN PISAR A NADIE.
+ *
+ * ═══ POR QUÉ ÉSTA ES LA QUE MÁS FALTA HACE MEDIR ═══
+ *
+ * La barra y la mano de bienes tenían el lienzo para ellas solas: una abajo, la otra a la
+ * derecha, y entre ellas media pantalla de aire. Esta tercera llega a un sitio que ya está
+ * ocupado por los lados —la barra ocupa el 82 % del ancho por abajo y en un móvil de pie
+ * pasa por debajo de la franja de lado a lado— y sólo se salva por ALTURA. Una separación
+ * que depende de un número contra otro número es exactamente lo que hay que medir: en
+ * pantalla, dos cosas que se rozan por dos milésimas se ven perfectamente bien hasta el
+ * día que alguien cambia un tercer número en otro fichero.
+ *
+ * Así que aquí no se comprueban las cotas escritas en `cartas.ts`: se llama a
+ * `huecosDeLaBarra`, a `huecosDeLaBaraja` y a `areasDeTrueque` DE VERDAD y se mide contra
+ * lo que devuelven. Es lo que hace que el día que la barra crezca, esto se ponga rojo en
+ * vez de solaparse en silencio.
+ *
+ * Y lo otro que se mira es lo que pidió Miguel y no se puede ver de un vistazo: que un
+ * grupo de cinco guardias NO ocupe cinco huecos. Un abanico que crece en línea recta se
+ * ve bien con tres cartas y se come la mano con doce, y para cuando se ve ya está jugado.
+ */
+paso('La mano del mazo se agrupa por familias, cabe a la izquierda y no pisa a nadie');
+{
+  const CAMPO = (45 * Math.PI) / 180;
+  const PANTALLAS: Array<[string, number]> = [
+    ['monitor', 16 / 9],
+    ['móvil de pie', 9 / 19.5],
+  ];
+
+  const naipe = (
+    id: string,
+    familia: string,
+    jugar = true,
+    revelar = false,
+  ): CartaDelMazo => ({
+    id,
+    familia,
+    dibujo: familia,
+    nombre: id,
+    sePuedeJugar: jugar,
+    sePuedeRevelar: revelar,
+  });
+
+  /** Una mano a propósito desordenada: el reparto tiene que agruparla él. */
+  const manoDe = (cuantas: number): CartaDelMazo[] =>
+    Array.from({ length: cuantas }, (_, i) =>
+      naipe(
+        `m${String(i)}`,
+        ORDEN_DE_LAS_FAMILIAS[(i * 3 + (i % 2)) % ORDEN_DE_LAS_FAMILIAS.length] ?? 'guardia',
+      ),
+    );
+
+  /** La mano más gorda que el mazo del §2 permite tener a la vez. */
+  const manoEntera = (): CartaDelMazo[] => [
+    ...Array.from({ length: 14 }, (_, i) => naipe(`g${String(i)}`, 'guardia')),
+    ...Array.from({ length: 2 }, (_, i) => naipe(`a${String(i)}`, 'anobueno')),
+    ...Array.from({ length: 2 }, (_, i) => naipe(`c${String(i)}`, 'acaparamiento')),
+    ...Array.from({ length: 2 }, (_, i) => naipe(`d${String(i)}`, 'dosveredas')),
+    ...Array.from({ length: 5 }, (_, i) =>
+      naipe(`t${String(i)}`, FAMILIA_DE_LOS_TITULOS, false, true),
+    ),
+  ];
+
+  /* Todo lo que esta mano llega a dibujar: las cartas quietas, tiradas por el imán, y las
+   * dos casillas. Se mide TODO junto contra los vecinos, porque un vecino no distingue si
+   * lo pisa una carta o una casilla. */
+  const todoLoQueOcupa = (
+    mano: readonly CartaDelMazo[],
+    prop: number,
+  ): Array<{ x: number; y: number; ancho: number; alto: number }> => {
+    const cajas: Array<{ x: number; y: number; ancho: number; alto: number }> = [];
+    const quietas = huecosDeLasCartas(mano, CAMPO, prop, null);
+    const apuntes: Array<number | null> = [null, ...quietas.map((c) => c.hueco.y)];
+    for (const apunta of apuntes) {
+      for (const c of huecosDeLasCartas(mano, CAMPO, prop, apunta)) cajas.push(c.hueco);
+    }
+    for (const c of casillasDeLaMano(['revelar', 'jugar'], CAMPO, prop)) cajas.push(c.hueco);
+    return cajas;
+  };
+
+  /* ── Que quepa en su franja, en las dos pantallas y con las dos manos extremas ── */
+  const desbordan: string[] = [];
+  for (const [nombre, prop] of PANTALLAS) {
+    const franja = franjaDeLasCartas(CAMPO, prop);
+    const { ancho } = loQueSeVeEnLasCartas(CAMPO, prop);
+    for (const mano of [manoDe(1), manoDe(4), manoDe(9), manoEntera()]) {
+      const puestas = huecosDeLasCartas(mano, CAMPO, prop, null);
+      if (puestas.length !== mano.length) {
+        desbordan.push(`${nombre}/${String(mano.length)}: salen ${String(puestas.length)}`);
+      }
+      for (const caja of todoLoQueOcupa(mano, prop)) {
+        if (caja.y + caja.alto / 2 > franja.techo + 1e-9) {
+          desbordan.push(`${nombre}/${String(mano.length)}: se sale por arriba`);
+        }
+        if (caja.y - caja.alto / 2 < franja.piso - 1e-9) {
+          desbordan.push(`${nombre}/${String(mano.length)}: se mete por debajo del piso`);
+        }
+        if (caja.x + caja.ancho / 2 > franja.derecha + 1e-9) {
+          desbordan.push(`${nombre}/${String(mano.length)}: se sale de la franja por la derecha`);
+        }
+        /* Y de todas asoma algo: el canto derecho cae dentro de la pantalla. */
+        if (caja.x + caja.ancho / 2 <= -ancho / 2 + 1e-9) {
+          desbordan.push(`${nombre}/${String(mano.length)}: una carta no asoma nada`);
+        }
+      }
+    }
+  }
+  comprobar(
+    'la mano del mazo cabe en su franja con una carta y con el mazo entero en la mano',
+    desbordan.length === 0,
+    desbordan.slice(0, 4),
+  );
+
+  /*
+   * Y LA FRANJA CABE EN LA PANTALLA, que es la comprobación que le falta a la de arriba.
+   *
+   * Aquélla mide las cartas contra su propia franja, así que subir el techo de la franja
+   * la deja verde con la mano medio fuera del lienzo: se comprueban de acuerdo entre sí y
+   * las dos equivocadas. Esto ata la franja a algo que no puede moverse con ella — el
+   * canto de la pantalla — y de paso exige que sus tres cotas vayan en el orden que dicen
+   * ser: piso debajo del suelo y suelo debajo del techo.
+   */
+  const fuera: string[] = [];
+  for (const [nombre, prop] of PANTALLAS) {
+    const franja = franjaDeLasCartas(CAMPO, prop);
+    const { alto } = loQueSeVeEnLasCartas(CAMPO, prop);
+    if (franja.techo >= alto / 2) fuera.push(`${nombre}: el techo se sale por arriba`);
+    if (franja.piso <= -alto / 2) fuera.push(`${nombre}: el piso se sale por abajo`);
+    if (franja.derecha >= 0) fuera.push(`${nombre}: la franja pasa del centro de la pantalla`);
+    if (franja.piso >= franja.suelo || franja.suelo >= franja.techo) {
+      fuera.push(`${nombre}: las tres cotas no van en orden`);
+    }
+  }
+  comprobar(
+    'y la franja donde vive cabe entera en la pantalla, con sus tres cotas en orden',
+    fuera.length === 0,
+    fuera,
+  );
+
+  /* ── Agrupada por familias ── */
+  const revuelta = manoDe(11);
+  const puestas = huecosDeLasCartas(revuelta, CAMPO, 16 / 9, null);
+  const seguidas = puestas.map((c) => c.carta.familia);
+  const vistas = new Set<string>();
+  let cortadas = 0;
+  for (let i = 0; i < seguidas.length; i++) {
+    const familia = seguidas[i] as string;
+    if (i > 0 && seguidas[i - 1] !== familia && vistas.has(familia)) cortadas++;
+    vistas.add(familia);
+  }
+  comprobar('las cartas de la misma familia salen seguidas', cortadas === 0, {
+    cortadas,
+    seguidas,
+  });
+
+  comprobar(
+    'y dos manos con las mismas cartas salen iguales aunque lleguen en otro orden',
+    JSON.stringify(manoDelMazoPorFamilias(revuelta).map((c) => c.id)) ===
+      JSON.stringify(manoDelMazoPorFamilias([...revuelta].reverse()).map((c) => c.id)),
+  );
+
+  comprobar(
+    'y una familia que la escena no conoce va al final en vez de perderse',
+    (() => {
+      const conIntrusa = [...manoDe(4), naipe('x', 'una familia de otro juego')];
+      const salida = manoDelMazoPorFamilias(conIntrusa);
+      return salida.length === 5 && salida[salida.length - 1]?.id === 'x';
+    })(),
+  );
+
+  /*
+   * EL SALTO ENTRE FAMILIAS. Si el hueco entre dos familias fuera igual que el de dentro,
+   * estarían agrupadas en los números y no en la pantalla, que es donde importa. Se exige
+   * el DOBLE y no «mayor»: una diferencia que no se ve no separa nada.
+   */
+  let dentro = Infinity;
+  let entre = 0;
+  for (let i = 1; i < puestas.length; i++) {
+    const a = puestas[i - 1] as (typeof puestas)[number];
+    const b = puestas[i] as (typeof puestas)[number];
+    const salto = Math.abs(b.hueco.y - a.hueco.y);
+    if (b.abreGrupo) entre = Math.max(entre, salto);
+    else dentro = Math.min(dentro, salto);
+  }
+  comprobar(
+    'y las familias no se solapan entre sí: el salto entre ellas es al menos el doble que el de dentro',
+    entre > dentro * 2,
+    { dentro: Number(dentro.toFixed(4)), entre: Number(entre.toFixed(4)) },
+  );
+
+  let malOrden = 0;
+  for (let i = 1; i < puestas.length; i++) {
+    const a = (puestas[i - 1] as (typeof puestas)[number]).hueco.orden;
+    const b = (puestas[i] as (typeof puestas)[number]).hueco.orden;
+    if (b - a < 3) malOrden++;
+  }
+  comprobar(
+    'cada carta del mazo tiene su propio orden de dibujo, con sitio para sus capas',
+    malOrden === 0,
+    { pares: malOrden },
+  );
+
+  /*
+   * ── UN GRUPO GRANDE SE APRIETA EN VEZ DE DESBORDAR ──
+   *
+   * Es lo que pidió Miguel dicho con números: cinco guardias no pueden ocupar cinco huecos.
+   * Se mide en los dos sitios donde puede romperse — el paso, que tiene que encoger, y lo
+   * que el grupo mide de punta a punta, que tiene que dejar de crecer.
+   */
+  const cincoGuardias = huecosDeLasCartas(
+    Array.from({ length: 5 }, (_, i) => naipe(`g${String(i)}`, 'guardia')),
+    CAMPO,
+    16 / 9,
+    null,
+  );
+  const primera = cincoGuardias[0];
+  const ultima = cincoGuardias[cincoGuardias.length - 1];
+  const mideElGrupo =
+    primera === undefined || ultima === undefined
+      ? Infinity
+      : (primera.hueco.y - ultima.hueco.y) / primera.hueco.alto + 1;
+  comprobar(
+    'un grupo de cinco guardias no ocupa cinco huecos: se apila con solape',
+    mideElGrupo < 2.2,
+    { altosDeCarta: Number(mideElGrupo.toFixed(3)) },
+  );
+
+  const pasos = [2, 3, 5, 8, 11, 14].map((n) => pasoDentroDelGrupo(n));
+  const recorridos = [2, 3, 5, 8, 11, 14].map((n) => (n - 1) * pasoDentroDelGrupo(n));
+  comprobar(
+    'y el abanico de un grupo se cierra según crece: el paso nunca sube y el recorrido se topa',
+    pasos.every((p, i) => i === 0 || p <= (pasos[i - 1] as number) + 1e-9) &&
+      recorridos.every((r, i) => i === 0 || r >= (recorridos[i - 1] as number) - 1e-9) &&
+      (recorridos[recorridos.length - 1] as number) <= 1.2 + 1e-9,
+    { pasos: pasos.map((p) => Number(p.toFixed(3))), recorridos: recorridos.map((r) => Number(r.toFixed(3))) },
+  );
+
+  /*
+   * ── NO PISA A LA BARRA ──
+   *
+   * La barra vive abajo y centrada, y lo más alto que tiene es su placa de fondo: el centro
+   * de sus huecos más tres cuartos de lado. Se prueban de una a seis piezas porque el lado
+   * depende de cuántas hay, y en un monitor la barra corta —que es la más alta— es la que
+   * más sube.
+   */
+  const pisanLaBarra: string[] = [];
+  for (const [nombre, prop] of PANTALLAS) {
+    let techoDeLaBarra = -Infinity;
+    for (let piezas = 1; piezas <= 6; piezas++) {
+      const hueco = huecosDeLaBarra(piezas, CAMPO, prop)[0];
+      if (hueco === undefined) continue;
+      techoDeLaBarra = Math.max(techoDeLaBarra, hueco.y + hueco.lado * 0.75);
+    }
+    for (const caja of todoLoQueOcupa(manoEntera(), prop)) {
+      if (caja.y - caja.alto / 2 < techoDeLaBarra + 1e-9) {
+        pisanLaBarra.push(`${nombre}: baja a ${caja.y.toFixed(4)} y la barra llega a ${techoDeLaBarra.toFixed(4)}`);
+      }
+    }
+  }
+  comprobar(
+    'la mano del mazo no invade la zona de la barra de construir',
+    pisanLaBarra.length === 0,
+    pisanLaBarra.slice(0, 2),
+  );
+
+  /*
+   * ── NI LA DE LOS BIENES ──
+   *
+   * Contra las dos cosas que la mano de bienes dibuja: sus cartas —con el imán a tope, que
+   * es cuando más adentro llegan— y su columna de áreas de trueque, que llega mucho más
+   * adentro todavía. Las áreas sólo existen mientras hay un bien cogido y coger una carta
+   * del mazo suelta el bien, así que en teoría no coinciden nunca; se miden igual, porque
+   * esa exclusión la sostiene el cliente y no la geometría.
+   */
+  const pisanLosBienes: string[] = [];
+  for (const [nombre, prop] of PANTALLAS) {
+    const bienes = ['limo', 'junco', 'sal', 'piedra', 'grano'];
+    const manoDeBienes = Array.from({ length: 14 }, (_, i) => ({
+      id: `b${String(i)}`,
+      bien: bienes[i % bienes.length] as string,
+    }));
+    let canto = Infinity;
+    const quietas = huecosDeLaBaraja(manoDeBienes, CAMPO, prop, null);
+    for (const apunta of [null, ...quietas.map((c) => c.hueco.y)]) {
+      for (const c of huecosDeLaBaraja(manoDeBienes, CAMPO, prop, apunta)) {
+        canto = Math.min(canto, c.hueco.x - c.hueco.ancho / 2);
+      }
+    }
+    for (const a of areasDeTrueque(bienes.length, CAMPO, prop)) {
+      canto = Math.min(canto, a.x - a.ancho / 2);
+    }
+    for (const caja of todoLoQueOcupa(manoEntera(), prop)) {
+      if (caja.x + caja.ancho / 2 > canto - 1e-9) {
+        pisanLosBienes.push(`${nombre}: llega a ${(caja.x + caja.ancho / 2).toFixed(4)} y los bienes empiezan en ${canto.toFixed(4)}`);
+      }
+    }
+  }
+  comprobar(
+    'ni la zona de la mano de bienes, ni la columna de áreas de trueque',
+    pisanLosBienes.length === 0,
+    pisanLosBienes.slice(0, 2),
+  );
+
+  /* ── El imán, medido sobre nueve cartas apuntando a la del medio ── */
+  const nueve = manoDe(9);
+  const quieta = huecosDeLasCartas(nueve, CAMPO, 16 / 9, null);
+  const enMedio = quieta[4];
+  const tirada =
+    enMedio === undefined ? [] : huecosDeLasCartas(nueve, CAMPO, 16 / 9, enMedio.hueco.y);
+  const sale = (i: number): number => {
+    const a = quieta[i];
+    const b = tirada[i];
+    return a === undefined || b === undefined ? 0 : b.hueco.x - a.hueco.x;
+  };
+  comprobar(
+    'el imán tira más de la carta señalada que de sus vecinas, y de éstas más que de las lejanas',
+    sale(4) > sale(3) && sale(3) > sale(2) && sale(2) > sale(1) && sale(1) > sale(0),
+    [0, 1, 2, 3, 4].map((i) => Number(sale(i).toFixed(4))),
+  );
+  comprobar(
+    'y con el cursor fuera de la franja no tira de ninguna',
+    quieta.every((c) => c.hueco.iman === 0),
+  );
+
+  /*
+   * ── DÓNDE DESPIERTA ──
+   *
+   * Por la izquierda sí, en el centro no, y —lo que la separa de la mano de bienes— sobre
+   * la barra tampoco: la esquina de abajo a la izquierda es de la barra, y si la mano
+   * despertara allí, pasar el dedo por la primera pieza levantaría una carta.
+   */
+  const donde: string[] = [];
+  for (const [nombre, prop] of PANTALLAS) {
+    const franja = franjaDeLasCartas(CAMPO, prop);
+    const { alto, ancho } = loQueSeVeEnLasCartas(CAMPO, prop);
+    if (!enLaZonaDeLasCartas(franja.derecha, alto * 0.2, CAMPO, prop)) {
+      donde.push(`${nombre}: no despierta en su propia franja`);
+    }
+    if (enLaZonaDeLasCartas(0, alto * 0.2, CAMPO, prop)) {
+      donde.push(`${nombre}: despierta en el centro de la pantalla`);
+    }
+    if (enLaZonaDeLasCartas(ancho / 2 - 1e-6, alto * 0.2, CAMPO, prop)) {
+      donde.push(`${nombre}: despierta en la mano de bienes`);
+    }
+    if (enLaZonaDeLasCartas(-ancho / 2 + 1e-6, franja.piso - alto * 0.05, CAMPO, prop)) {
+      donde.push(`${nombre}: despierta encima de la barra`);
+    }
+  }
+  comprobar(
+    'la mano despierta por el borde izquierdo, y ni en el centro ni sobre la barra',
+    donde.length === 0,
+    donde,
+  );
+
+  /* ── Con cero cartas no se pinta NADA ── */
+  comprobar(
+    'con cero cartas del mazo no se pinta nada: ni un hueco, ni una casilla',
+    huecosDeLasCartas([], CAMPO, 16 / 9, null).length === 0 &&
+      huecosDeLasCartas([], CAMPO, 9 / 19.5, 0).length === 0 &&
+      casillasDeLaMano([], CAMPO, 16 / 9).length === 0 &&
+      puertasDeLaCarta(null).length === 0,
+  );
+
+  /*
+   * ── QUIÉN ABRE QUÉ CASILLA ──
+   *
+   * Lo importante de aquí es la tercera línea: una carta que NO es un título no abre la
+   * casilla de revelar por mucho que el juego mande `sePuedeRevelar` en `true`. Revelar
+   * una guardia no es una jugada mal dibujada — es una carta que se enseña y ya no se
+   * puede desenseñar.
+   */
+  const unTitulo = naipe('t', FAMILIA_DE_LOS_TITULOS, false, true);
+  const unaGuardia = naipe('g', 'guardia', true, false);
+  const guardada = naipe('h', 'guardia', false, false);
+  const mentirosa = naipe('m', 'guardia', false, true);
+  comprobar(
+    'un título que se puede revelar abre la casilla de revelar, y sólo ésa',
+    JSON.stringify(puertasDeLaCarta(unTitulo)) === JSON.stringify(['revelar']),
+    puertasDeLaCarta(unTitulo),
+  );
+  comprobar(
+    'una carta que se puede jugar abre la de jugar, y sólo ésa',
+    JSON.stringify(puertasDeLaCarta(unaGuardia)) === JSON.stringify(['jugar']),
+    puertasDeLaCarta(unaGuardia),
+  );
+  comprobar(
+    'y ninguna carta que no sea un título abre la de revelar, diga lo que diga el juego',
+    puertasDeLaCarta(mentirosa).length === 0 &&
+      puertasDeLaCarta(guardada).length === 0,
+    { mentirosa: puertasDeLaCarta(mentirosa), guardada: puertasDeLaCarta(guardada) },
+  );
+
+  const conGuardada = huecosDeLasCartas([unaGuardia, guardada, unTitulo], CAMPO, 16 / 9, null);
+  comprobar(
+    'una carta que no se puede ni jugar ni revelar sale apagada, y NO desaparece',
+    conGuardada.length === 3 &&
+      conGuardada.filter((c) => c.apagada).length === 1 &&
+      conGuardada.find((c) => c.carta.id === 'h')?.apagada === true,
+    conGuardada.map((c) => `${c.carta.id}:${String(c.apagada)}`),
+  );
+
+  /* ── Las casillas: en el pie de la franja, sin pisarse y sin llegar a las cartas ── */
+  const malasCasillas: string[] = [];
+  for (const [nombre, prop] of PANTALLAS) {
+    const franja = franjaDeLasCartas(CAMPO, prop);
+    const casillas = casillasDeLaMano(['revelar', 'jugar'], CAMPO, prop);
+    if (casillas.length !== 2) malasCasillas.push(`${nombre}: salen ${String(casillas.length)}`);
+    for (let i = 0; i < casillas.length; i++) {
+      const a = (casillas[i] as (typeof casillas)[number]).hueco;
+      if (a.y + a.alto / 2 > franja.suelo + 1e-9) {
+        malasCasillas.push(`${nombre}: una casilla sube hasta donde están las cartas`);
+      }
+      if (a.ancho <= a.alto) malasCasillas.push(`${nombre}: una casilla sale más alta que ancha`);
+      for (let j = i + 1; j < casillas.length; j++) {
+        const b = (casillas[j] as (typeof casillas)[number]).hueco;
+        if (Math.abs(a.y - b.y) < (a.alto + b.alto) / 2 - 1e-9) {
+          malasCasillas.push(`${nombre}: dos casillas se pisan`);
+        }
+      }
+    }
+    /* Y con una sola, la de abajo se queda donde estaba: el sitio no baila. */
+    const sola = casillasDeLaMano(['jugar'], CAMPO, prop)[0];
+    const abajo = casillas[0];
+    if (sola === undefined || abajo === undefined || Math.abs(sola.hueco.y - abajo.hueco.y) > 1e-9) {
+      malasCasillas.push(`${nombre}: la casilla de abajo cambia de sitio según cuántas haya`);
+    }
+  }
+  comprobar(
+    'las casillas caben en el pie de la franja, no se pisan y no suben a la mano',
+    malasCasillas.length === 0,
+    malasCasillas.slice(0, 3),
+  );
+
+  /*
+   * ── LOS COLORES DE LAS FAMILIAS ──
+   *
+   * Cinco familias, cinco colores, y ninguno igual a otro ni al de reserva. Sin dibujo
+   * compilado todavía, el color es LO ÚNICO que distingue una pila de otra en reposo: dos
+   * familias del mismo tono serían dos montones idénticos en la pantalla con la que se
+   * decide qué jugar.
+   */
+  const colores = ORDEN_DE_LAS_FAMILIAS.map((f) => colorDeLaFamilia(f));
+  comprobar(
+    'las cinco familias tienen color propio, distinto entre sí y distinto al de reserva',
+    new Set(colores).size === ORDEN_DE_LAS_FAMILIAS.length &&
+      colores.every((c) => c !== COLOR_SIN_FAMILIA),
+    colores,
+  );
+  comprobar(
+    'y una familia desconocida sale con el de reserva en vez de reventar',
+    colorDeLaFamilia('una familia de otro juego') === COLOR_SIN_FAMILIA,
+  );
+
+  /*
+   * ── LOS NUEVE DIBUJOS QUE LA MANO PUEDE PEDIR ──
+   *
+   * `delta.tsx` busca el dibujo de una carta en `CONTORNOS_DE_LA_CARTA`, y una búsqueda
+   * fallida NO revienta: devuelve contornos vacíos, `geometriaDeContornos` da `null`, y la
+   * carta se pinta con su color y sin nada dentro. Es lo correcto —mejor una carta pelada
+   * que una carta con el dibujo de otra— pero es también la forma más silenciosa de que
+   * media mano se quede muda: nueve naipes de colores planos se ven como una decisión de
+   * arte.
+   *
+   * Así que se pide aquí lo que pide la mano, con los mismos nombres, y se exige que salga
+   * geometría de verdad. Que no falte ninguno es cosa del compilador de iconos; que la
+   * mano los ENCUENTRE es cosa de esta escena, y esto es lo segundo.
+   */
+  const DIBUJOS_DE_LAS_CARTAS = [
+    'guardia',
+    'anobueno',
+    'acaparamiento',
+    'dosveredas',
+    'molino',
+    'cantera',
+    'torreon',
+    'faro',
+    'huerto',
+  ];
+  const mudas: string[] = [];
+  for (const dibujo of DIBUJOS_DE_LAS_CARTAS) {
+    const g = geometriaDeContornos(CONTORNOS_DE_LA_CARTA[dibujo] ?? []);
+    if (g === null) {
+      mudas.push(`${dibujo}: la mano no lo encuentra`);
+      continue;
+    }
+    const caja = g.boundingBox;
+    if (caja === null) {
+      mudas.push(`${dibujo}: sin caja`);
+      continue;
+    }
+    const lado = Math.max(caja.max.x - caja.min.x, caja.max.y - caja.min.y);
+    if (Math.abs(lado - 1) > 1e-6) mudas.push(`${dibujo}: lado ${lado.toFixed(3)} y no 1`);
+    if (cuantosTriangulos(g) < 8) {
+      mudas.push(`${dibujo}: sólo ${String(cuantosTriangulos(g))} triángulos`);
+    }
+  }
+  comprobar(
+    'los nueve dibujos que la mano del mazo puede pedir los encuentra y dan triángulos',
+    mudas.length === 0,
+    mudas,
+  );
+  comprobar(
+    'y ninguno de ellos se busca por error en la tabla de los bienes',
+    DIBUJOS_DE_LAS_CARTAS.every((d) => !BIENES_CON_ICONO.includes(d)),
+    DIBUJOS_DE_LAS_CARTAS.filter((d) => BIENES_CON_ICONO.includes(d)),
   );
 }
 
@@ -1762,7 +2288,7 @@ if (fallos.length > 0) {
  * a veintitrés: durante ese tiempo el guion podía morirse en la novena sin que nadie se
  * enterara. Un guardia desfasado no guarda nada.
  */
-const COMPROBACIONES_ESCRITAS = 106;
+const COMPROBACIONES_ESCRITAS = 130;
 if (hechas < COMPROBACIONES_ESCRITAS) {
   console.error(
     `Solo se han hecho ${hechas} de las ${COMPROBACIONES_ESCRITAS} comprobaciones que ` +

@@ -11,7 +11,7 @@
  * fallo sería SILENCIOSO — lo que no se cae, no lanza y no se ve hasta que
  * alguien lleva media partida.
  *
- * Son seis cosas y las seis tienen esa forma:
+ * Son siete cosas y las siete tienen esa forma:
  *
  *  1. LA CANONICALIZACIÓN. Un vértice de una malla hexagonal tiene TRES nombres y
  *     una arista DOS. Si no se normalizan, la regla de distancia dirá que está
@@ -29,6 +29,13 @@
  *     exige que el OFERENTE tenga la mercancía, y su almacén no está en la vista
  *     del aceptante. Es la comprobación más importante de todas, porque es la que
  *     el diseño tuvo que corregir sobre la marcha.
+ *  7. EL MAZO, que es la segunda economía y llegó después. Sus fallos son de los
+ *     mismos: una carta jugada el turno que se compra convierte tres bienes en un
+ *     efecto inmediato y nadie lo nota hasta que alguien encadena tres; un
+ *     acaparamiento que se lleva un bien de más parece mala suerte; y un mazo que
+ *     se sortea al comprar en vez de barajarse al empezar da partidas distintas con
+ *     el mismo diario — ése no rompe el juego, rompe `reejecutarEn` y con él el
+ *     motor entero.
  *
  * ═══ Y LAS VACUNAS, QUE NO SON ADORNO ═══
  *
@@ -76,29 +83,45 @@ import {
 import type { Hex, LlaveDeVertice } from '../../shared/mecanicas/malla-hexagonal';
 import '../../shared/arcade/juegos';
 import {
+  ACAPARAMIENTO,
   ACEPTAR,
   ALZAR,
+  ANO_BUENO,
   avanzarRiberas as reglasDeRiberas,
   BIENES,
+  CARTAS_DEL_MAZO,
+  claseDeLaCarta,
+  CLASES_DE_CARTA,
+  comoSiSiempreHubieraHabidoMazo,
+  COMPRAR,
+  COSTE_DE_LA_CARTA,
   deQuienEsElPaso,
+  DOS_VEREDAS,
   EMPEZAR_RIBERAS,
   FUNDAR,
+  GUARDIA,
+  GUARDIA_MINIMA,
   largoDelVado,
   loSecretoDeRiberas,
   OFRECER,
   opcionesDeRiberas,
   PASAR,
   RECHAZAR,
+  REVELAR,
   proyectarRiberas,
   puntosDe,
   recalcularElVado,
+  recalcularLaGuardia,
   RIBERAS,
   TIRAR,
-  TOPE_DE_PIEZAS,
   VADO_MINIMO,
+  VEREDAS_DE_LA_CARTA,
+  TOPE_DE_PIEZAS,
 } from '../../shared/arcade/juegos';
 import type {
   Bien,
+  CartaDeRiberas,
+  CartaEnMano,
   Colono,
   EstadoDeRiberas,
   Ficha,
@@ -526,7 +549,7 @@ function caminoDeCinco(hex: Hex): string[] {
   const trasRomper = recalcularElVado(partido);
   comprobar(
     'y el Vado Largo queda vacante, porque tres es menos que el mínimo',
-    trasRomper.de === null && trasRomper.largo === 0 && VADO_MINIMO === 4,
+    trasRomper.de === null && trasRomper.largo === 0 && VADO_MINIMO === 5,
     trasRomper,
   );
 
@@ -536,6 +559,31 @@ function caminoDeCinco(hex: Hex): string[] {
    * de arriba pasaría por casualidad.
    */
   comprobar('y sin esa choza volvería a medir cinco', largoDelVado(camino, []) === 5);
+
+  /*
+   * ═══ EL MÍNIMO SUBIÓ A CINCO, Y ÉSTA ES LA ÚNICA QUE LO MIDE ═══
+   *
+   * Todo lo de arriba usa caminos de cinco y seis, así que TODO seguía verde con el
+   * mínimo en cuatro y sigue verde con el mínimo en cinco: ninguna de esas
+   * comprobaciones estaba mirando el número. La que muerde es ésta —cuatro veredas
+   * seguidas NO dan el Vado— y es la que se pone roja el día que alguien lo baje.
+   *
+   * Se monta sobre una cadena de CUATRO de verdad, y se afirma primero que mide
+   * cuatro: sin eso, «no hay vado» también saldría verde si el camino midiera cero
+   * porque las aristas no se tocaran, que es el verde que dice que se miró.
+   */
+  const cuatro = caminoDeCinco({ q: 0, r: 0 }).slice(0, 4);
+  comprobar('cuatro veredas seguidas miden cuatro', largoDelVado(cuatro, []) === 4, largoDelVado(cuatro, []));
+  const conCuatro: EstadoDeRiberas = {
+    ...base,
+    colonos: base.colonos.map((c, i) => (i === 0 ? { ...c, veredas: cuatro } : c)),
+  };
+  const conElMinimoNuevo = recalcularElVado(conCuatro);
+  comprobar(
+    'y con cuatro NO hay Vado Largo: el mínimo es cinco desde que lo pidió Miguel',
+    conElMinimoNuevo.de === null && conElMinimoNuevo.largo === 0,
+    conElMinimoNuevo,
+  );
 
   /* Y el premio vale puntos de verdad, que es lo que lo hace un premio. */
   const conPremio: EstadoDeRiberas = { ...conCamino, vado: primero };
@@ -767,6 +815,644 @@ paso('El §5 bis: «sólo si», nunca «si y sólo si»');
   comprobar(
     'y una carga que no es ni serializable tampoco',
     avanzarRiberas(gastado, { tipo: FUNDAR, carga: { vertice: undefined } }, ctxDe('A', DOS)) === gastado,
+  );
+}
+
+// ---------------------------------------------------------------------------
+paso('EL MAZO: se baraja una vez, y se puede contar');
+// ---------------------------------------------------------------------------
+
+/*
+ * ═══ QUÉ SE COMPRA EN ESTA SECCIÓN, Y POR QUÉ CADA COSA ═══
+ *
+ * El mazo es la segunda economía del juego, y sus fallos tienen todos la forma que
+ * este fichero persigue: no se caen, se juegan. Una carta que se puede jugar el
+ * turno que se compra convierte tres bienes en un efecto inmediato y nadie lo nota
+ * hasta que alguien encadena tres. Un acaparamiento que se lleva un bien de más deja
+ * a otro sin nada y parece mala suerte. Y un mazo que se sortea al comprar en vez de
+ * barajarse al empezar da partidas distintas con el mismo diario, que es la única
+ * cosa de aquí que rompe el motor entero y no sólo el juego.
+ *
+ * Todo se juega sobre PARTIDAS DE VERDAD: mesa abierta con el árbitro, `EMPEZAR`
+ * mandado por la puerta de la plataforma, y los movimientos elegidos de lo que
+ * `opciones()` ofrece. Lo único que se pone a mano es lo que el azar tardaría cien
+ * turnos en dar: qué bienes tiene cada cual, qué cartas hay en cada mano y en qué
+ * orden está el mazo. Sin eso, la mitad de estos bloques no se visitaría nunca — y
+ * un bloque que no se visita sale verde sin comprobar nada.
+ */
+
+/** El mazo con el que empieza una mesa de esta semilla. */
+function mazoDe(semilla: number): CartaDeRiberas[] {
+  const abierta = abrirMesa({ id: 'RIB-MAZO', arcade: RIBERAS, semilla, asientos: ['A', 'B'] });
+  const empezada = jugar(abierta, {
+    quien: 'A',
+    rev: abierta.rev,
+    movimiento: { tipo: EMPEZAR_RIBERAS, carga: {} },
+  });
+  return estadoDe(empezada).mazo;
+}
+
+/** Cuántas cartas de cada clase hay en una lista. */
+function porClase(mazo: readonly CartaDeRiberas[]): Map<string, number> {
+  const cuenta = new Map<string, number>();
+  for (const carta of mazo) {
+    const clase = claseDeLaCarta(carta) ?? '?';
+    cuenta.set(clase, (cuenta.get(clase) ?? 0) + 1);
+  }
+  return cuenta;
+}
+
+{
+  const uno = mazoDe(90210);
+  const otra = mazoDe(90210);
+  const distinta = mazoDe(1234);
+
+  comprobar('el mazo tiene veinticinco cartas', uno.length === CARTAS_DEL_MAZO && uno.length === 25, uno.length);
+
+  const cuenta = porClase(uno);
+  comprobar('catorce guardias', cuenta.get('guardia') === 14, cuenta.get('guardia'));
+  comprobar('dos años buenos, dos acaparamientos y dos dobles veredas', cuenta.get('ano-bueno') === 2 && cuenta.get('acaparamiento') === 2 && cuenta.get('dos-veredas') === 2, [...cuenta]);
+  comprobar(
+    'y CINCO títulos distintos, uno de cada, que es lo que pidió Miguel',
+    ['molino', 'cantera', 'torreon', 'faro', 'huerto'].every((t) => cuenta.get(t) === 1),
+    [...cuenta],
+  );
+  comprobar('ninguna clase de más ni de menos: nueve y no otra cosa', cuenta.size === CLASES_DE_CARTA.length, [...cuenta.keys()]);
+  comprobar('y ninguna carta repite seudónimo, que es lo que las hace distinguibles', new Set(uno).size === uno.length);
+
+  /*
+   * ═══ LA MISMA SEMILLA, EL MISMO MAZO. ES LO QUE SOSTIENE `reejecutarEn` ═══
+   *
+   * Si la carta se sorteara al comprarla, esto seguiría verde —no habría mazo que
+   * comparar— y la divergencia aparecería en la reejecución de una partida jugada,
+   * o sea meses después y en un diario que nadie sabe leer.
+   */
+  comprobar('con la misma semilla el mazo sale idéntico', canonico(uno) === canonico(otra));
+  comprobar('y con otra semilla sale distinto', canonico(uno) !== canonico(distinta));
+
+  /*
+   * LA VACUNA DEL BARAJADO: la bolsa se escribe con las catorce guardias delante,
+   * así que un mazo SIN barajar empezaría por catorce guardias. Sin esta línea,
+   * «con la misma semilla sale igual» también pasaría si `barajar` no hiciera nada.
+   */
+  comprobar(
+    'y está barajado de verdad: no empieza por las catorce guardias de la bolsa',
+    !uno.slice(0, 14).every((c) => claseDeLaCarta(c) === 'guardia'),
+    uno.slice(0, 14),
+  );
+}
+
+// ---------------------------------------------------------------------------
+paso('EL MAZO: comprar, jugar y revelar, con partidas de verdad');
+// ---------------------------------------------------------------------------
+
+/**
+ * UNA PARTIDA EN MARCHA, CON EL MAZO Y LAS MANOS PUESTAS.
+ *
+ * Sale de una mesa abierta con el árbitro y de un `EMPEZAR` mandado por la puerta
+ * de siempre, así que el delta, los colores y el orden de los colonos son los de
+ * verdad. Lo que se coloca a mano es lo que el azar no da a tiempo, y ni una regla:
+ * quien contesta a todo lo que se prueba aquí es `opcionesDeRiberas` y el reductor.
+ *
+ * Cada colono recibe una choza y una vereda propias para que las opciones de obra
+ * existan —sin nada puesto no hay dónde alzar y media prueba no visitaría nada— y
+ * `turnosAbiertos` arranca en uno, que es lo que hace que una carta con el sello 0
+ * sea de un turno anterior y una con el sello 1 sea de hoy.
+ */
+function escenarioDeMazo(monta: {
+  bienes: readonly (readonly Bien[])[];
+  mazo?: readonly CartaDeRiberas[];
+  manos?: readonly (readonly CartaEnMano[])[];
+  guardias?: readonly number[];
+  semilla?: number;
+  tirado?: boolean;
+}): EstadoDeRiberas {
+  const asientos = ['A', 'B', 'C'].slice(0, monta.bienes.length);
+  const abierta = abrirMesa({
+    id: 'RIB-CARTAS',
+    arcade: RIBERAS,
+    semilla: monta.semilla ?? 31,
+    asientos,
+  });
+  const base = estadoDe(
+    jugar(abierta, { quien: 'A', rev: abierta.rev, movimiento: { tipo: EMPEZAR_RIBERAS, carga: {} } }),
+  );
+  let serie = 1;
+  return {
+    ...base,
+    momento: 'jugando',
+    paso: base.colonos.length * 2,
+    faltaVereda: false,
+    ultimaChoza: null,
+    turno: 0,
+    tirado: monta.tirado ?? true,
+    ultimaTirada: 8,
+    turnosAbiertos: 1,
+    cartaJugada: false,
+    veredasGratis: 0,
+    siguienteFicha: 500,
+    mazo: monta.mazo === undefined ? base.mazo : [...monta.mazo],
+    colonos: base.colonos.map((c, i) => ({
+      ...c,
+      almacen: (monta.bienes[i] ?? []).map((b) => `b${serie++}:${b}` as Ficha),
+      mano: [...(monta.manos?.[i] ?? [])].map((m) => ({ ...m })),
+      guardias: monta.guardias?.[i] ?? 0,
+      chozas: [verticeDeHex({ q: i * 2 - 2, r: 0 }, 0)],
+      veredas: [aristaDeHex({ q: i * 2 - 2, r: 0 }, 0)],
+    })),
+  };
+}
+
+/** Lo que se le ofrece a un asiento sobre un estado suelto. */
+function ofrecidasA(estado: EstadoDeRiberas, quien: string): readonly Opcion[] {
+  return opcionesDeRiberas(proyectarRiberas(estado, quien), quien);
+}
+
+/** Una mesa de verdad puesta sobre un estado montado, para jugar con el árbitro. */
+function mesaSobre(id: string, estado: EstadoDeRiberas, asientos: readonly string[]): Mesa {
+  return abrirMesa({ id, arcade: RIBERAS, semilla: 77, asientos: [...asientos], estado });
+}
+
+/** Cuántas fichas de este bien tiene este colono. */
+function cuantos(colono: Colono, bien: Bien): number {
+  return colono.almacen.filter((f) => f.endsWith(`:${bien}`)).length;
+}
+
+const EL_TRIO = ['A', 'B', 'C'];
+
+/* ── COMPRAR: cuesta exactamente sal, piedra y grano ────────────────────── */
+{
+  comprobar('el coste de una carta es uno de cada: sal, piedra y grano', canonico([...COSTE_DE_LA_CARTA].sort()) === canonico(['grano', 'piedra', 'sal']), COSTE_DE_LA_CARTA);
+
+  const justo = escenarioDeMazo({
+    bienes: [['sal', 'piedra', 'grano', 'limo'], ['limo'], []],
+    mazo: ['c1:guardia', 'c2:faro'],
+  });
+  const conLaCompra = ofrecidasA(justo, 'A').find((o) => o.tipo === COMPRAR);
+  comprobar('con sal, piedra y grano se ofrece comprar', conLaCompra !== undefined);
+
+  let mesaDeCompra = mesaSobre('RIB-COMPRA', justo, EL_TRIO);
+  mesaDeCompra = mover(mesaDeCompra, 'A', conLaCompra as Opcion);
+  const comprada = estadoDe(mesaDeCompra);
+  const suyo = comprada.colonos[0] as Colono;
+  comprobar('la carta entra en la mano y sale del mazo', suyo.mano.length === 1 && comprada.mazo.length === 1, { mano: suyo.mano.length, mazo: comprada.mazo.length });
+  comprobar('y la que sale es la de ARRIBA del mazo barajado, no otra', suyo.mano[0]?.carta === 'c1:guardia', suyo.mano);
+  comprobar(
+    'se paga exactamente sal, piedra y grano: el limo sigue ahí',
+    suyo.almacen.length === 1 && cuantos(suyo, 'limo') === 1,
+    suyo.almacen,
+  );
+  comprobar('y la carta queda sellada con el turno en que se compró', suyo.mano[0]?.comprada === justo.turnosAbiertos);
+
+  /* SIN LOS TRES BIENES NO SE OFRECE, y mandarlo igual no hace nada. */
+  const corto = escenarioDeMazo({ bienes: [['sal', 'piedra'], [], []], mazo: ['c1:guardia'] });
+  comprobar('sin el grano no se ofrece comprar', ofrecidasA(corto, 'A').every((o) => o.tipo !== COMPRAR));
+  comprobar(
+    'y mandarlo igual devuelve EL MISMO objeto de estado',
+    avanzarRiberas(corto, { tipo: COMPRAR, carga: {} }, ctxDe('A', EL_TRIO)) === corto,
+  );
+
+  /* EL MAZO SE AGOTA, Y ENTONCES NO SE PUEDE COMPRAR. */
+  const vacio = escenarioDeMazo({ bienes: [['sal', 'piedra', 'grano'], [], []], mazo: [] });
+  comprobar('con el mazo agotado no se ofrece comprar, aunque sobren bienes', ofrecidasA(vacio, 'A').every((o) => o.tipo !== COMPRAR));
+  comprobar(
+    'y mandarlo igual tampoco hace nada',
+    avanzarRiberas(vacio, { tipo: COMPRAR, carga: {} }, ctxDe('A', EL_TRIO)) === vacio,
+  );
+  /*
+   * LA VACUNA DEL MAZO VACÍO: con UNA carta dentro y los mismos bienes, sí se
+   * ofrece. Sin ella, «no se ofrece comprar» saldría verde también si el montaje
+   * hubiera dejado a A sin bienes, o si comprar hubiera dejado de ofrecerse nunca.
+   */
+  const conUna = escenarioDeMazo({ bienes: [['sal', 'piedra', 'grano'], [], []], mazo: ['c1:huerto'] });
+  comprobar('y con una sola carta en el mazo sí se ofrece: el cero de arriba es por el mazo', ofrecidasA(conUna, 'A').some((o) => o.tipo === COMPRAR));
+}
+
+/* ── LA COMPRADA HOY NO SE JUEGA HOY, Y MAÑANA SÍ ──────────────────────── */
+{
+  /*
+   * ═══ ESTA ES LA REGLA QUE MÁS CARO SALDRÍA SALTARSE, Y SE JUEGA ENTERA ═══
+   *
+   * Se compra una guardia, se intenta jugar en el mismo turno, se pasa el turno de
+   * verdad —con el árbitro, y B tira y pasa como cualquiera— y se vuelve a mirar.
+   * Montar el «turno siguiente» a mano habría comprobado la comparación de dos
+   * números; jugándolo, se comprueba además que `turnosAbiertos` avanza donde tiene
+   * que avanzar, que es donde de verdad podría estar el fallo.
+   */
+  const DOS_AQUI = ['A', 'B'];
+  const inicial = escenarioDeMazo({
+    bienes: [['sal', 'piedra', 'grano'], ['limo', 'junco']],
+    mazo: ['c1:guardia'],
+  });
+  let partida = mesaSobre('RIB-ESPERA', inicial, DOS_AQUI);
+  partida = mover(partida, 'A', opcionesEn(partida, 'A').find((o) => o.tipo === COMPRAR) as Opcion);
+
+  comprobar('recién comprada, la guardia NO se ofrece', opcionesEn(partida, 'A').every((o) => o.tipo !== GUARDIA));
+  comprobar(
+    'y si se manda igual, el reductor devuelve el mismo objeto',
+    avanzarRiberas(
+      estadoDe(partida),
+      { tipo: GUARDIA, carga: { carta: 'c1', a: 'B' } },
+      ctxDe('A', DOS_AQUI),
+    ) === estadoDe(partida),
+  );
+
+  /* Se juega el turno de B por la puerta de siempre: tirar y pasar. */
+  partida = mover(partida, 'A', opcionesEn(partida, 'A').find((o) => o.tipo === PASAR) as Opcion);
+  partida = mover(partida, 'B', opcionesEn(partida, 'B').find((o) => o.tipo === TIRAR) as Opcion);
+  partida = mover(partida, 'B', opcionesEn(partida, 'B').find((o) => o.tipo === PASAR) as Opcion);
+  partida = mover(partida, 'A', opcionesEn(partida, 'A').find((o) => o.tipo === TIRAR) as Opcion);
+
+  const alTurnoSiguiente = opcionesEn(partida, 'A').filter((o) => o.tipo === GUARDIA);
+  comprobar('y al turno siguiente sí se ofrece', alTurnoSiguiente.length > 0, opcionesEn(partida, 'A').map((o) => o.id).slice(0, 8));
+  comprobar(
+    'y entra de verdad: la mano se queda sin ella y la guardia queda jugada',
+    (() => {
+      const jugada = estadoDe(mover(partida, 'A', alTurnoSiguiente[0] as Opcion));
+      const suyo = jugada.colonos[0] as Colono;
+      return suyo.mano.length === 0 && suyo.guardias === 1 && jugada.cartaJugada;
+    })(),
+  );
+}
+
+/* ── UNA CARTA POR TURNO ────────────────────────────────────────────────── */
+{
+  const DOS_AQUI = ['A', 'B'];
+  const conDos = escenarioDeMazo({
+    bienes: [[], ['limo', 'junco']],
+    manos: [[{ carta: 'c1:guardia', comprada: 0 }, { carta: 'c2:guardia', comprada: 0 }], []],
+  });
+  const antes = ofrecidasA(conDos, 'A').filter((o) => o.tipo === GUARDIA);
+  comprobar('con dos guardias de ayer en la mano, se ofrecen las dos', antes.length === 2 && new Set(antes.map((o) => o.id)).size === 2, antes.map((o) => o.id));
+
+  const primera = avanzarRiberas(conDos, { tipo: GUARDIA, carga: { carta: 'c1', a: 'B' } }, ctxDe('A', DOS_AQUI));
+  comprobar('la primera entra', primera !== conDos && (primera.colonos[0] as Colono).guardias === 1);
+  comprobar('y la segunda ya no se ofrece: una carta por turno', ofrecidasA(primera, 'A').every((o) => o.tipo !== GUARDIA));
+  comprobar(
+    'y mandarla devuelve el mismo objeto',
+    avanzarRiberas(primera, { tipo: GUARDIA, carga: { carta: 'c2', a: 'B' } }, ctxDe('A', DOS_AQUI)) === primera,
+  );
+  comprobar('la carta que no se jugó sigue en la mano', (primera.colonos[0] as Colono).mano.length === 1);
+}
+
+/* ── LA GUARDIA ROBA DE VERDAD ──────────────────────────────────────────── */
+{
+  const conVictima = escenarioDeMazo({
+    bienes: [['limo'], ['sal', 'piedra', 'grano'], []],
+    manos: [[{ carta: 'c1:guardia', comprada: 0 }], [], []],
+  });
+
+  /* A quien no tiene nada no se le ofrece robar, y a quien tiene sí. */
+  const contra = ofrecidasA(conVictima, 'A').filter((o) => o.tipo === GUARDIA);
+  comprobar('sólo se ofrece robar a quien tiene algo', contra.length === 1 && contra[0]?.id === 'jugar-guardia:c1:B', contra.map((o) => o.id));
+  comprobar(
+    'y robarle a quien no tiene nada devuelve el mismo objeto',
+    avanzarRiberas(conVictima, { tipo: GUARDIA, carga: { carta: 'c1', a: 'C' } }, ctxDe('A', EL_TRIO)) === conVictima,
+  );
+
+  const robado = avanzarRiberas(conVictima, { tipo: GUARDIA, carga: (contra[0] as Opcion).carga }, ctxDe('A', EL_TRIO));
+  const ladron = robado.colonos[0] as Colono;
+  const victima = robado.colonos[1] as Colono;
+  const antesB = (conVictima.colonos[1] as Colono).almacen;
+  comprobar('el ladrón gana una ficha y la víctima pierde una', ladron.almacen.length === 2 && victima.almacen.length === 2, { ladron: ladron.almacen, victima: victima.almacen });
+  const laQueFalta = antesB.filter((f) => !victima.almacen.includes(f));
+  comprobar('falta exactamente una del almacén de la víctima', laQueFalta.length === 1, laQueFalta);
+  comprobar(
+    'y esa MISMA ficha, con su número de serie, está ahora en el del ladrón',
+    ladron.almacen.includes(laQueFalta[0] as Ficha),
+    { robada: laQueFalta[0], ladron: ladron.almacen },
+  );
+  comprobar('nadie más pierde nada', (robado.colonos[2] as Colono).almacen.length === 0);
+  comprobar('y la guardia cuenta: jugada, y fuera de la mano', ladron.guardias === 1 && ladron.mano.length === 0);
+
+  /*
+   * ═══ LA VACUNA DEL AZAR: no es «la primera de la lista» ═══
+   *
+   * Con cuatro fichas iguales de clase distinta y ocho semillas, si el robo cogiera
+   * siempre la primera del almacén saldría ocho veces la misma. Es la comprobación
+   * que separa «roba al azar» de «roba la más vieja», que es lo que sale solo al
+   * escribirlo y además filtraría el ORDEN del almacén ajeno, que no es público.
+   */
+  const robadas = new Set<string>();
+  for (const semilla of [1, 2, 3, 4, 5, 6, 7, 8]) {
+    const mesa4 = escenarioDeMazo({
+      semilla,
+      bienes: [[], ['limo', 'junco', 'sal', 'piedra']],
+      manos: [[{ carta: 'c1:guardia', comprada: 0 }], []],
+    });
+    const tras = avanzarRiberas(mesa4, { tipo: GUARDIA, carga: { carta: 'c1', a: 'B' } }, ctxDe('A', ['A', 'B']));
+    const suya = (tras.colonos[0] as Colono).almacen[0];
+    if (suya !== undefined) robadas.add(suya.slice(suya.indexOf(':') + 1));
+  }
+  comprobar('con distintas semillas no roba siempre el mismo bien: es al azar', robadas.size > 1, [...robadas]);
+}
+
+/* ── EL ACAPARAMIENTO SE LLEVA TODOS LOS DE ESE BIEN, Y NINGUNO MÁS ─────── */
+{
+  const conMontones = escenarioDeMazo({
+    bienes: [['grano'], ['sal', 'sal', 'limo'], ['sal']],
+    manos: [[{ carta: 'c1:acaparamiento', comprada: 0 }], [], []],
+  });
+  const cuales = ofrecidasA(conMontones, 'A').filter((o) => o.tipo === ACAPARAMIENTO);
+  comprobar(
+    'se ofrecen los CINCO bienes, incluso los que nadie tiene: los almacenes ajenos no se miran',
+    cuales.length === BIENES.length,
+    cuales.map((o) => o.id),
+  );
+
+  const acaparada = avanzarRiberas(conMontones, { tipo: ACAPARAMIENTO, carga: { carta: 'c1', bien: 'sal' } }, ctxDe('A', EL_TRIO));
+  const mio = acaparada.colonos[0] as Colono;
+  comprobar('se lleva las tres sales, de los dos colonos', cuantos(mio, 'sal') === 3, mio.almacen);
+  comprobar('y no toca su grano ni se lo inventa', cuantos(mio, 'grano') === 1 && mio.almacen.length === 4);
+  comprobar('a B le queda su limo y nada más', canonico((acaparada.colonos[1] as Colono).almacen.map((f) => f.slice(f.indexOf(':') + 1))) === canonico(['limo']));
+  comprobar('y C se queda sin nada', (acaparada.colonos[2] as Colono).almacen.length === 0);
+  comprobar('las fichas cambian de dueño enteras: el contador no avanza', acaparada.siguienteFicha === conMontones.siguienteFicha);
+
+  /*
+   * LA VACUNA: acaparar un bien que NO tiene nadie no mueve una sola ficha. Sin
+   * ella, «se lleva todas las sales» pasaría igual con una rama que se llevara el
+   * almacén entero de todo el mundo.
+   */
+  const enBalde = avanzarRiberas(conMontones, { tipo: ACAPARAMIENTO, carga: { carta: 'c1', bien: 'piedra' } }, ctxDe('A', EL_TRIO));
+  comprobar('acaparar lo que nadie tiene no mueve nada de nadie', (enBalde.colonos[0] as Colono).almacen.length === 1 && (enBalde.colonos[1] as Colono).almacen.length === 3 && (enBalde.colonos[2] as Colono).almacen.length === 1);
+  comprobar('pero la carta sí se gasta: se apostó y se perdió', (enBalde.colonos[0] as Colono).mano.length === 0 && enBalde.cartaJugada);
+}
+
+/* ── EL AÑO BUENO DA DOS, Y PUEDEN SER DOS IGUALES ──────────────────────── */
+{
+  const conElAno = escenarioDeMazo({
+    bienes: [[], [], []],
+    manos: [[{ carta: 'c1:ano-bueno', comprada: 0 }], [], []],
+  });
+  const pares = ofrecidasA(conElAno, 'A').filter((o) => o.tipo === ANO_BUENO);
+  comprobar('se ofrecen los quince pares: los cinco iguales y los diez distintos', pares.length === 15, pares.length);
+  comprobar('entre ellos el par de dos granos', pares.some((o) => o.id === 'jugar-ano:c1:grano:grano'));
+  comprobar(
+    'y ningún par se ofrece dos veces dado la vuelta',
+    !pares.some((o) => o.id === 'jugar-ano:c1:grano:sal') || !pares.some((o) => o.id === 'jugar-ano:c1:sal:grano'),
+    pares.map((o) => o.id),
+  );
+
+  const dosIguales = avanzarRiberas(conElAno, { tipo: ANO_BUENO, carga: { carta: 'c1', bienes: ['grano', 'grano'] } }, ctxDe('A', EL_TRIO));
+  const conGrano = dosIguales.colonos[0] as Colono;
+  comprobar('coger dos granos da DOS granos', conGrano.almacen.length === 2 && cuantos(conGrano, 'grano') === 2, conGrano.almacen);
+  comprobar('y son fichas nuevas del arcón, con números de serie distintos', new Set(conGrano.almacen).size === 2 && dosIguales.siguienteFicha === conElAno.siguienteFicha + 2);
+  comprobar('sin quitarle nada a nadie', (dosIguales.colonos[1] as Colono).almacen.length === 0);
+
+  /*
+   * EL PAR VA EN EL ORDEN EN QUE SE OFRECE, y esta línea lo aprendió en rojo: con
+   * `['sal','limo']` el portillo lo rechaza, porque lo que se ofrece es
+   * `['limo','sal']` —el orden de `BIENES`— y el portillo compara la forma canónica
+   * contra las opciones. No es una molestia: es la mitad del §5 bis funcionando, y
+   * es la razón por la que la carga se coge de la opción y no se escribe a mano.
+   */
+  const elPar = pares.find((o) => o.id === 'jugar-ano:c1:limo:sal');
+  comprobar('el par de limo y sal se ofrece, en el orden en que lo ofrece el juego', elPar !== undefined, pares.map((o) => o.id).slice(0, 6));
+  const distintos = avanzarRiberas(conElAno, { tipo: ANO_BUENO, carga: (elPar as Opcion).carga }, ctxDe('A', EL_TRIO));
+  const mezcla = distintos.colonos[0] as Colono;
+  comprobar('y dos distintos dan uno de cada', cuantos(mezcla, 'sal') === 1 && cuantos(mezcla, 'limo') === 1, mezcla.almacen);
+  comprobar(
+    'mientras que el mismo par al revés no está ofrecido y el portillo lo para',
+    avanzarRiberas(conElAno, { tipo: ANO_BUENO, carga: { carta: 'c1', bienes: ['sal', 'limo'] } }, ctxDe('A', EL_TRIO)) === conElAno,
+  );
+
+  /* LA VACUNA: uno solo, o tres, no son un año bueno. */
+  comprobar(
+    'pedir un solo bien no es esta carta, y se rechaza',
+    avanzarRiberas(conElAno, { tipo: ANO_BUENO, carga: { carta: 'c1', bienes: ['sal'] } }, ctxDe('A', EL_TRIO)) === conElAno,
+  );
+  comprobar(
+    'y pedir tres tampoco',
+    avanzarRiberas(conElAno, { tipo: ANO_BUENO, carga: { carta: 'c1', bienes: ['sal', 'sal', 'sal'] } }, ctxDe('A', EL_TRIO)) === conElAno,
+  );
+}
+
+/* ── LAS DOS VEREDAS PONEN DOS: NI UNA NI TRES ─────────────────────────── */
+{
+  /*
+   * A NO TIENE NI UN BIEN, y eso es lo que hace la prueba honrada: antes de la
+   * carta no se le ofrece ni una vereda, con la carta se le ofrecen, y cuando se
+   * gastan las dos deja de ofrecérsele. Con almacén, «ya no se ofrecen» podría ser
+   * verde por poder pagarlas.
+   */
+  const DOS_AQUI = ['A', 'B'];
+  const conLaCarta = escenarioDeMazo({
+    bienes: [[], []],
+    manos: [[{ carta: 'c1:dos-veredas', comprada: 0 }], []],
+  });
+  comprobar('sin bienes no se ofrece ninguna vereda', ofrecidasA(conLaCarta, 'A').every((o) => o.tipo !== ALZAR));
+  const laCarta = ofrecidasA(conLaCarta, 'A').find((o) => o.tipo === DOS_VEREDAS);
+  comprobar('pero sí se ofrece jugar Las Dos Veredas', laCarta !== undefined);
+
+  let partida = mesaSobre('RIB-VEREDAS', conLaCarta, DOS_AQUI);
+  partida = mover(partida, 'A', laCarta as Opcion);
+  const jugada = estadoDe(partida);
+  comprobar('al jugarla quedan dos veredas gratis pendientes', jugada.veredasGratis === VEREDAS_DE_LA_CARTA && jugada.veredasGratis === 2, jugada.veredasGratis);
+  comprobar('y la carta sale de la mano', (jugada.colonos[0] as Colono).mano.length === 0);
+
+  const conPendientes = opcionesEn(partida, 'A');
+  comprobar('mientras queden, no se ofrece otra cosa que veredas', conPendientes.length > 0 && conPendientes.every((o) => o.tipo === ALZAR || o.tipo === REVELAR), conPendientes.map((o) => o.id).slice(0, 6));
+  comprobar(
+    'y todas las que se ofrecen son aristas libres pegadas a lo suyo: las reglas de siempre',
+    conPendientes
+      .filter((o) => o.tipo === ALZAR)
+      .every((o) => {
+        const donde = (o.carga as { donde: string }).donde;
+        const suyas = (jugada.colonos[0] as Colono).veredas;
+        const ajenas = (jugada.colonos[1] as Colono).veredas;
+        return !suyas.includes(donde) && !ajenas.includes(donde) && aristasDeVertice(verticeDeHex({ q: -2, r: 0 }, 0)).length === 3;
+      }),
+  );
+
+  const antesDeLaPrimera = (jugada.colonos[0] as Colono).veredas.length;
+  partida = mover(partida, 'A', opcionesEn(partida, 'A').find((o) => o.tipo === ALZAR) as Opcion);
+  const conUna = estadoDe(partida);
+  comprobar('la primera entra sin pagarse: el almacén sigue vacío', (conUna.colonos[0] as Colono).almacen.length === 0);
+  comprobar('y queda UNA pendiente', conUna.veredasGratis === 1, conUna.veredasGratis);
+  comprobar('con una vereda más en el tablero', (conUna.colonos[0] as Colono).veredas.length === antesDeLaPrimera + 1);
+
+  partida = mover(partida, 'A', opcionesEn(partida, 'A').find((o) => o.tipo === ALZAR) as Opcion);
+  const conDos = estadoDe(partida);
+  comprobar('la segunda entra y ya no queda ninguna', conDos.veredasGratis === 0);
+  comprobar(
+    'y son DOS y no tres: sin bienes, no se ofrece ni una vereda más',
+    (conDos.colonos[0] as Colono).veredas.length === antesDeLaPrimera + VEREDAS_DE_LA_CARTA &&
+      opcionesEn(partida, 'A').every((o) => o.tipo !== ALZAR),
+    { veredas: (conDos.colonos[0] as Colono).veredas.length, ofrecidas: opcionesEn(partida, 'A').map((o) => o.id) },
+  );
+  comprobar('el almacén sigue vacío: las dos fueron gratis', (conDos.colonos[0] as Colono).almacen.length === 0);
+  comprobar('y la segunda sale de donde dejó la primera, o de la choza: no se coló ninguna suelta', (conDos.colonos[0] as Colono).veredas.length === new Set((conDos.colonos[0] as Colono).veredas).size);
+}
+
+/* ── LOS TÍTULOS: uno revelado suma, uno oculto sólo para su dueño ──────── */
+{
+  const DOS_AQUI = ['A', 'B'];
+  const conTitulo = escenarioDeMazo({
+    bienes: [[], []],
+    manos: [[{ carta: 'c1:molino', comprada: 0 }], []],
+  });
+
+  const suya = proyectarRiberas(conTitulo, 'A');
+  const ajena = proyectarRiberas(conTitulo, 'B');
+  const publicosDeA = (v: { colonos: readonly { asiento: string; puntos: number }[] }): number =>
+    v.colonos.find((c) => c.asiento === 'A')?.puntos ?? -1;
+
+  comprobar('un título OCULTO no suma en público', publicosDeA(suya) === publicosDeA(ajena), { suya: publicosDeA(suya), ajena: publicosDeA(ajena) });
+  comprobar('pero sí en la vista de su dueño, con lo oculto dentro', suya.misPuntos === publicosDeA(suya) + 1, { misPuntos: suya.misPuntos, publicos: publicosDeA(suya) });
+  comprobar('y en la de nadie más: B no ve ningún punto de más', ajena.misPuntos === (ajena.colonos.find((c) => c.asiento === 'B')?.puntos ?? -1));
+
+  const revelar = ofrecidasA(conTitulo, 'A').find((o) => o.tipo === REVELAR);
+  comprobar('revelar se ofrece', revelar !== undefined);
+  const revelado = avanzarRiberas(conTitulo, { tipo: REVELAR, carga: (revelar as Opcion).carga }, ctxDe('A', DOS_AQUI));
+  comprobar('al revelarlo, el título queda a la vista', canonico((revelado.colonos[0] as Colono).titulos) === canonico(['molino']));
+  comprobar('y suma un punto EN PÚBLICO', publicosDeA(proyectarRiberas(revelado, 'B')) === publicosDeA(ajena) + 1);
+  comprobar('sin sumar dos veces a su dueño', proyectarRiberas(revelado, 'A').misPuntos === suya.misPuntos);
+  comprobar('revelar no gasta la jugada del turno', revelado.cartaJugada === false);
+
+  /*
+   * SE PUEDE REVELAR EL MISMO TURNO EN QUE SE COMPRÓ, Y ANTES DE TIRAR. Las dos
+   * son excepciones escritas en el §3 del diseño, y las dos existen por lo mismo:
+   * los puntos con los que se gana son los públicos, así que un título que no se
+   * pudiera enseñar sería una mano con la que no se puede ganar.
+   */
+  const reciente = escenarioDeMazo({
+    bienes: [[], []],
+    manos: [[{ carta: 'c1:faro', comprada: 1 }], []],
+  });
+  comprobar('un título comprado HOY se puede revelar hoy', ofrecidasA(reciente, 'A').some((o) => o.tipo === REVELAR));
+  const sinTirar = escenarioDeMazo({
+    bienes: [[], []],
+    manos: [[{ carta: 'c1:faro', comprada: 0 }], []],
+    tirado: false,
+  });
+  comprobar('y antes de tirar los dados, también', ofrecidasA(sinTirar, 'A').some((o) => o.tipo === REVELAR));
+  comprobar('mientras que jugar una carta antes de tirar no se ofrece', ofrecidasA(sinTirar, 'A').every((o) => o.tipo !== GUARDIA && o.tipo !== COMPRAR));
+
+  /*
+   * LA VACUNA DEL «OCULTO NO SUMA»: si `puntosDe` contara la mano, los dos números
+   * de arriba serían iguales y la comprobación pasaría por casualidad. Aquí se
+   * exige que el oculto CAMBIE algo — que `misPuntos` no sea igual a los públicos.
+   */
+  comprobar('y con la carta en la mano los dos números NO coinciden: el oculto se cuenta', suya.misPuntos !== publicosDeA(suya));
+}
+
+/* ── LA MAYOR GUARDIA: al tercero, y sólo se supera estrictamente ──────── */
+{
+  /*
+   * ═══ MISMA REGLA QUE EL VADO LARGO, Y COMPROBADA CON LAS MISMAS PALABRAS ═══
+   *
+   * Está escrito así a propósito: las dos funciones son la misma regla sobre dos
+   * cuentas, y el día que alguien toque una de ellas, el bloque gemelo es lo que
+   * dice si la otra se quedó atrás.
+   */
+  const conCuentas = (cuentas: readonly number[]): EstadoDeRiberas =>
+    escenarioDeMazo({ bienes: [[], [], []], guardias: cuentas });
+
+  comprobar('sin guardias jugadas, el premio está vacante', recalcularLaGuardia(conCuentas([0, 0, 0])).de === null);
+  comprobar(
+    'con DOS no basta: hacen falta tres',
+    recalcularLaGuardia(conCuentas([2, 0, 0])).de === null && GUARDIA_MINIMA === 3,
+    recalcularLaGuardia(conCuentas([2, 0, 0])),
+  );
+  const alTercero = recalcularLaGuardia(conCuentas([3, 0, 0]));
+  comprobar('con la TERCERA, el premio es de A', alTercero.de === 'A' && alTercero.cuantas === 3, alTercero);
+
+  const empatados: EstadoDeRiberas = { ...conCuentas([3, 3, 0]), guardia: alTercero };
+  comprobar('empatar a tres no se lo quita a A: quien empata no arrebata', recalcularLaGuardia(empatados).de === 'A', recalcularLaGuardia(empatados));
+
+  const superado: EstadoDeRiberas = { ...conCuentas([3, 4, 0]), guardia: alTercero };
+  const trasSuperar = recalcularLaGuardia(superado);
+  comprobar('y con cuatro, B se lo lleva: superar ESTRICTAMENTE sí', trasSuperar.de === 'B' && trasSuperar.cuantas === 4, trasSuperar);
+
+  /* Vale un punto de verdad, que es lo que lo hace un premio. */
+  const conPremio: EstadoDeRiberas = { ...conCuentas([3, 0, 0]), guardia: alTercero };
+  comprobar(
+    'quien tiene La Mayor Guardia suma un punto por ella',
+    puntosDe(conPremio, conPremio.colonos[0] as Colono) ===
+      puntosDe({ ...conPremio, guardia: { de: null, cuantas: 0 } }, conPremio.colonos[0] as Colono) + 1,
+  );
+
+  /*
+   * ═══ Y QUE SE RECALCULE SOLO, QUE ES LA PARTE QUE MÁS DUELE ═══
+   *
+   * Un premio derivado que hay que acordarse de recalcular es un premio que un día
+   * no se recalcula. Aquí se juega la tercera guardia en una partida de verdad y se
+   * exige que el premio ya sea suyo al salir del movimiento, sin que nadie llame a
+   * nada.
+   */
+  const aPuntoDeGanarlo = escenarioDeMazo({
+    bienes: [[], ['limo'], []],
+    manos: [[{ carta: 'c1:guardia', comprada: 0 }], [], []],
+    guardias: [2, 0, 0],
+  });
+  comprobar('con dos jugadas todavía no es de nadie', recalcularLaGuardia(aPuntoDeGanarlo).de === null);
+  const conLaTercera = avanzarRiberas(aPuntoDeGanarlo, { tipo: GUARDIA, carga: { carta: 'c1', a: 'B' } }, ctxDe('A', EL_TRIO));
+  comprobar(
+    'y al jugar la tercera el premio ya es suyo, sin que nadie lo pida',
+    conLaTercera.guardia.de === 'A' && conLaTercera.guardia.cuantas === 3,
+    conLaTercera.guardia,
+  );
+  comprobar('y sale en la vista de todos, que es lo que hace que se vea venir', proyectarRiberas(conLaTercera, 'B').guardia.de === 'A');
+}
+
+/* ── LO QUE NO PUEDE SALIR: la mano ajena, ni dentro de un identificador ── */
+{
+  /*
+   * ═══ EL §5 BIS APLICADO A LAS CARTAS, QUE ES DONDE MÁS FÁCIL SE CUELA ═══
+   *
+   * `revelar:molino` se escribe solo y publica qué título tengo. Y `verify:mesa` no
+   * lo cazaría: busca la forma canónica del secreto —`"c1:molino"`, con comillas— y
+   * esa cadena no está en ese identificador. Es literalmente el agujero que el §5
+   * bis describe con su propio ejemplo, así que se mira aquí, por subcadena.
+   */
+  const conMano = escenarioDeMazo({
+    bienes: [['sal', 'piedra', 'grano'], ['limo'], []],
+    manos: [
+      [
+        { carta: 'c1:molino', comprada: 0 },
+        { carta: 'c2:guardia', comprada: 0 },
+      ],
+      [{ carta: 'c3:huerto', comprada: 0 }],
+      [],
+    ],
+  });
+  const secretos = loSecretoDeRiberas(conMano).filter((s): s is string => typeof s === 'string');
+  comprobar('hay cartas secretas que buscar, en las manos y en el mazo', secretos.filter((s) => s.startsWith('c')).length >= CARTAS_DEL_MAZO, secretos.filter((s) => s.startsWith('c')).length);
+
+  const publicados: string[] = [];
+  for (const quien of EL_TRIO) {
+    const vista = proyectarRiberas(conMano, quien);
+    for (const o of opcionesDeRiberas(vista, quien)) publicados.push(o.id);
+    for (const a of vista.tablero.acciones) publicados.push(a.id);
+    for (const p of vista.tablero.paneles) publicados.push(p.titulo);
+  }
+  const contaminados = publicados.filter((id) => secretos.some((s) => id.includes(s)));
+  comprobar('ningún identificador publicado lleva una carta dentro', contaminados.length === 0, contaminados.slice(0, 4));
+  comprobar('y los hay de sobra que mirar, o esto no probaría nada', publicados.length > 10, publicados.length);
+
+  /* LA VACUNA: el identificador que se escribe solo SÍ se cazaría. */
+  const envenenado = `revelar:${secretos.find((s) => s.endsWith(':molino')) ?? 'c1:molino'}`;
+  comprobar('y un id escrito con la carta dentro sí se caza', secretos.some((s) => envenenado.includes(s)));
+
+  /* Y LA MANO AJENA NO VIAJA, ni entera ni contada carta a carta. */
+  for (const quien of EL_TRIO) {
+    const texto = canonico(proyectarRiberas(conMano, quien));
+    const ajenas = conMano.colonos
+      .filter((c) => c.asiento !== quien)
+      .flatMap((c) => c.mano.map((m) => m.carta))
+      .filter((carta) => texto.includes(canonico(carta)));
+    comprobar(`en la vista de ${quien} no hay ni una carta ajena`, ajenas.length === 0, ajenas);
+  }
+  comprobar(
+    'ni el mazo entero sale en la vista de nadie: el número, y nada más',
+    !conMano.mazo.some((carta) => canonico(proyectarRiberas(conMano, 'A')).includes(canonico(carta))) &&
+      proyectarRiberas(conMano, 'A').mazo === conMano.mazo.length,
+  );
+  comprobar('y el espectador no ve ninguna carta de nadie', !secretos.some((s) => canonico(proyectarRiberas(conMano, null)).includes(canonico(s))));
+  comprobar(
+    'lo que sí es público es CUÁNTAS tiene cada cual',
+    proyectarRiberas(conMano, 'C').colonos.map((c) => c.cartas).join(',') === '2,1,0',
+    proyectarRiberas(conMano, 'C').colonos.map((c) => c.cartas),
   );
 }
 
@@ -1383,6 +2069,81 @@ paso('El tablero en 3D marca lo que dicen las reglas, y nada mas');
   );
 }
 
+paso('Una partida guardada ANTES del mazo se sigue abriendo');
+{
+  /*
+   * ═══ EL FALLO QUE ESTO COMPRA, Y CÓMO SE VEÍA ═══
+   *
+   * Las mesas se guardan en disco y una partida de las largas dura días. Cuando el
+   * mazo entró, `EstadoDeRiberas` creció con seis campos, y una mesa escrita el día
+   * anterior no los tiene. Medido sobre las seis que había guardadas: las diecisiete
+   * vistas —dos o tres asientos por mesa, más el espectador— reventaban con «Cannot
+   * read properties of undefined» al leer el dueño de la guardia, que no existía.
+   *
+   * Y no se leía como lo que era: quien volvía a su partida no veía «esta versión no
+   * sabe abrir tu mesa», veía que la Sala no cargaba. La partida entera en el disco,
+   * inalcanzable.
+   *
+   * Se construye el estado viejo QUITANDO los campos de uno de verdad, y no
+   * escribiendo a mano uno antiguo: un estado inventado envejece solo, y el día que se
+   * añada el séptimo campo esta comprobación seguiría pasando sin comprobar nada.
+   */
+  const abierta = abrirMesa({ id: 'RIB-VIEJA', arcade: RIBERAS, semilla: 4, asientos: [...TRES] });
+  const empezada = jugar(abierta, { quien: 'A', rev: abierta.rev, movimiento: { tipo: EMPEZAR_RIBERAS, carga: {} } });
+  const alDia = estadoDe(empezada);
+
+  /* Lo que había en el disco: sin mazo, sin guardia, sin mano y sin lo que cuelga de ellos. */
+  const comoEstabaEnElDisco = JSON.parse(JSON.stringify(alDia)) as Record<string, unknown>;
+  for (const campo of ['mazo', 'guardia', 'turnosAbiertos', 'cartaJugada', 'veredasGratis']) {
+    delete comoEstabaEnElDisco[campo];
+  }
+  const colonosViejos = (comoEstabaEnElDisco['colonos'] as Record<string, unknown>[]).map((c) => {
+    const copia = { ...c };
+    delete copia['mano'];
+    delete copia['guardias'];
+    delete copia['titulos'];
+    return copia;
+  });
+  comprobar('el estado de antes no tiene ninguno de los campos nuevos', 
+    !('mazo' in comoEstabaEnElDisco) && !('guardia' in comoEstabaEnElDisco) && !('mano' in (colonosViejos[0] ?? {})));
+  comprobarUnaPartidaVieja({ ...comoEstabaEnElDisco, colonos: colonosViejos } as unknown as EstadoDeRiberas);
+
+  function comprobarUnaPartidaVieja(vieja: EstadoDeRiberas): void {
+    for (const quien of ['A', 'B', 'C', null]) {
+      let seAbrio = true;
+      let cuantasOpciones = -1;
+      try {
+        const vista = proyectarRiberas(vieja, quien as never);
+        cuantasOpciones = opcionesDeRiberas(vista, quien as never).length;
+        JSON.stringify(vista);
+      } catch {
+        seAbrio = false;
+      }
+      comprobar(`la partida de antes se abre para ${quien ?? 'el espectador'}`, seAbrio);
+      comprobar(`y se le puede preguntar qué puede hacer (${quien ?? 'espectador'})`, cuantasOpciones >= 0);
+    }
+
+    /* Y se sigue JUGANDO: el mazo vacío no se puede comprar, pero lo demás está entero. */
+    const vistaDeA = proyectarRiberas(vieja, 'A');
+    comprobar('la partida de antes se abre con el mazo vacío', (vistaDeA as unknown as { mazo: number }).mazo === 0);
+    comprobar('sin cartas en la mano de nadie', (vistaDeA as unknown as { misCartas: unknown[] }).misCartas.length === 0);
+    comprobar(
+      'y sin ofrecer comprar, que es más honrado que repartir cartas a mitad de partida',
+      !opcionesDeRiberas(vistaDeA, 'A').some((o) => o.tipo === COMPRAR),
+    );
+    comprobar(
+      'el delta, las piezas y los bienes siguen donde estaban',
+      (vistaDeA as unknown as { islas: unknown[] }).islas.length === 19 &&
+        (vistaDeA as unknown as { colonos: unknown[] }).colonos.length === 3,
+    );
+
+    /* Y un estado que YA tiene los campos no se toca: hay comprobaciones que comparan por identidad. */
+    comprobar(
+      'y a un estado que ya está al día no se le da una copia nueva',
+      comoSiSiempreHubieraHabidoMazo(alDia) === alDia,
+    );
+  }
+}
 /**
  * EL GUARDIA DE «NO SE HAN HECHO TODAS», que este guion no tenia.
  *
@@ -1394,7 +2155,7 @@ paso('El tablero en 3D marca lo que dicen las reglas, y nada mas');
  * El numero va a mano y hay que subirlo al anadir comprobaciones. Ese es el precio, y es
  * barato al lado de un verde que no ha comprobado nada.
  */
-const COMPROBACIONES_ESCRITAS = 154;
+const COMPROBACIONES_ESCRITAS = 269;
 if (hechas < COMPROBACIONES_ESCRITAS) {
   console.error(
     `Solo se han hecho ${hechas} de las ${COMPROBACIONES_ESCRITAS} comprobaciones que ` +
@@ -1409,7 +2170,11 @@ if (fallos.length === 0) {
     `✔ ${hechas} comprobaciones. El mismo vértice tiene una sola llave por los tres caminos, ninguna\n` +
       '  choza toca a otra, la serpentina va y vuelve, el Vado Largo se rompe cuando un vecino planta\n' +
       '  una choza en medio, un trueque caduca solo, y quien no tiene el turno contesta — mientras el\n' +
-      '  reductor rechaza lo que `opciones()` no ofreció y sigue validando lo que sí.',
+      '  reductor rechaza lo que `opciones()` no ofreció y sigue validando lo que sí.\n' +
+      '  Y el mazo: veinticinco cartas barajadas una vez con la semilla de la mesa, una carta que no se\n' +
+      '  juega el turno que se compra, una por turno, la guardia que roba a ciegas, el acaparamiento que\n' +
+      '  se lleva todos los de un bien y ninguno más, las dos veredas que son dos, y un título que sólo\n' +
+      '  suma en público cuando se enseña — con La Mayor Guardia al tercero y sólo si se supera.',
   );
   process.exit(0);
 }

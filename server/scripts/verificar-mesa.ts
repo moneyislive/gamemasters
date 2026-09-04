@@ -1629,7 +1629,28 @@ try {
       genteR.push({ nombre, asiento: r.datos.asiento as string, llave: r.datos.llave as string });
     }
 
+    /*
+     * ═══ SE VIGILAN LAS FICHAS Y LAS CARTAS POR LA MISMA LISTA ═══
+     *
+     * `misCartas` nació con el mazo y es la segunda cosa privada que este juego manda
+     * por el cable. Meterla aquí el mismo día que se estrena es justamente lo que
+     * este fichero se reprocha no haber hecho con `opciones`: una superficie nueva
+     * que nadie vigila es una fuga esperando a que alguien la estrene.
+     *
+     * Las dos se guardan juntas porque las dos son cadenas con número de serie
+     * —`b12:junco`, `c7:guardia`— y la búsqueda es la misma: con comillas, en la
+     * misma revisión, en lo que se le mandó a otro.
+     */
     const viajado: Array<{ rev: number; quien: string; texto: string; misFichas: string[] }> = [];
+    const loPrivadoDe = (vista: { misFichas?: unknown; misCartas?: unknown }): string[] => {
+      const fichas = Array.isArray(vista.misFichas) ? (vista.misFichas as string[]) : [];
+      const cartas = Array.isArray(vista.misCartas)
+        ? (vista.misCartas as { carta?: unknown }[]).flatMap((c) =>
+            typeof c?.carta === 'string' ? [c.carta] : [],
+          )
+        : [];
+      return [...fichas, ...cartas];
+    };
     const mirarConTodosR = async (): Promise<void> => {
       for (const uno of genteR) {
         const r = await pedir(`/arcade/mesas/${codigoR}`, { llave: uno.llave });
@@ -1639,17 +1660,16 @@ try {
           rev: m.rev,
           quien: uno.asiento,
           texto: JSON.stringify(m),
-          misFichas: Array.isArray(m.vista.misFichas) ? m.vista.misFichas : [],
+          misFichas: loPrivadoDe(m.vista),
         });
       }
       const espectador = await pedir(`/arcade/mesas/${codigoR}`);
       comprobar('y un espectador sin llave también', espectador.estado === 200);
       comprobar('sin ser nadie', espectador.datos.mesa.yo === null);
       comprobar(
-        'y sin una sola ficha suya: quien mira no juega',
-        Array.isArray(espectador.datos.mesa.vista.misFichas) &&
-          (espectador.datos.mesa.vista.misFichas as unknown[]).length === 0,
-        espectador.datos.mesa.vista.misFichas,
+        'y sin una sola ficha ni carta suya: quien mira no juega',
+        loPrivadoDe(espectador.datos.mesa.vista).length === 0,
+        { fichas: espectador.datos.mesa.vista.misFichas, cartas: espectador.datos.mesa.vista.misCartas },
       );
       viajado.push({
         rev: espectador.datos.mesa.rev,
@@ -1789,10 +1809,32 @@ try {
     {
       const r = await pedir(`/arcade/mesas/${codigoR}`, { llave: genteR[0]!.llave });
       const campos = Object.keys(r.datos.mesa.vista).sort().join(',');
+      /*
+       * ═══ ESTA LÍNEA SE PUSO ROJA CON EL MAZO, Y ASÍ ES COMO TIENE QUE PASAR ═══
+       *
+       * Entraron ocho campos y el rojo obligó a venir a mirarlos uno a uno. Los que
+       * hay que saber, porque son los que podrían haber sido una fuga:
+       *
+       *   · `misCartas` — MI mano, y sólo la mía. Es el gemelo de `misFichas` y viaja
+       *     por la misma razón y con el mismo riesgo: cada carta lleva número de serie
+       *     —`c7:guardia`— para que la de otro no se confunda con la mía, y la búsqueda
+       *     de secretos de este fichero la vigila igual. La de otro asiento NO sale, y
+       *     lo que sale de los demás es `colonos[].cartas`, un número.
+       *   · `misPuntos` — mis puntos CON los títulos que no he enseñado. Es un número
+       *     de una sola persona, y por eso no viaja en `colonos[].puntos`, que son los
+       *     públicos. Un título sin revelar no cuenta para nadie más, y con él no se
+       *     gana: hay que enseñarlo.
+       *   · `mazo` — CUÁNTAS cartas quedan, nunca cuáles. Contar el mazo es información
+       *     legítima del juego; su orden es la partida entera por venir, y es secreto
+       *     entero en `loSecreto`.
+       *   · `guardia`, `cartaJugada`, `turnosAbiertos`, `veredasGratis` — públicos los
+       *     cuatro: un premio derivado que todos ven venir, y tres cosas que pasaron en
+       *     voz alta sobre la mesa.
+       */
       comprobar(
         'y la vista de Riberas manda exactamente estos campos',
         campos ===
-          'colonos,desde,faltaVereda,ganadores,islas,misFichas,momento,paso,tablero,tirado,tratos,turnoDe,ultimaChoza,ultimaTirada,vado,yo',
+          'cartaJugada,colonos,desde,faltaVereda,ganadores,guardia,islas,mazo,misCartas,misFichas,misPuntos,momento,paso,tablero,tirado,tratos,turnoDe,turnosAbiertos,ultimaChoza,ultimaTirada,vado,veredasGratis,yo',
         campos,
       );
     }

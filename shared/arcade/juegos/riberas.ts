@@ -25,6 +25,31 @@
  * —«son campos del estado opaco y tipos de movimiento DE UN SOLO JUEGO»—, y lo
  * único que sube es la canonicalización hexagonal, que es geometría y no regla.
  *
+ * ═══ EL MAZO, QUE LLEGÓ DESPUÉS Y ES LA MITAD DEL JUEGO ═══
+ *
+ * Hasta aquí Riberas repartía, fundaba, alzaba, tiraba, cobraba, truequeaba y daba
+ * el Vado Largo, y con eso una partida es sólo construir: la decide quien tuvo
+ * mejores números. Lo que faltaba es la SEGUNDA ECONOMÍA — cambiar tres bienes por
+ * una carta que no sabes cuál es — y está entero en `docs/LAS-CARTAS-DE-RIBERAS.md`,
+ * que es de donde salen las decisiones que aquí sólo se ejecutan.
+ *
+ * Las tres que gobiernan el código y que no se pueden deshacer luego:
+ *
+ *   · SE BARAJA UNA VEZ, AL EMPEZAR, con la semilla de la mesa. No se sortea al
+ *     comprar. Un mazo se puede contar —quedan tres guardias, ya no puede salir un
+ *     título— y sobre todo: un sorteo por compra dependería del orden en que llegan
+ *     las peticiones, y con eso `reejecutarEn` deja de valer. Ver `EstadoDeRiberas.mazo`.
+ *   · UNA CARTA COMPRADA NO SE JUEGA HOY, Y SÓLO SE JUEGA UNA POR TURNO. Sin lo
+ *     primero el mazo es una tienda; sin lo segundo, una mano guardada es una jugada
+ *     única que gana la partida sin que nadie pueda responder.
+ *   · LO OCULTO NO VIAJA, NI DENTRO DE UN IDENTIFICADOR. Cada carta lleva número de
+ *     serie por lo mismo que las fichas, y lo que se publica de ella es un seudónimo.
+ *     Ver `Carta`, y el §5 bis.
+ *
+ * Y lo que la Guardia NO hace: mover una pieza de la desgracia por el tablero. Este
+ * juego no la tiene —su desgracia es el ESTIAJE— así que roba, que es lo otro que
+ * hacía aquella carta. Está razonado en `jugarLaGuardia`.
+ *
  * ═══ LO QUE NO CUPO EN LA FASE 4, Y CUPO EN LA 5 ═══
  *
  * Aquí ponía que `opciones()` —concepto del §5 bis— no tenía registro en el
@@ -305,8 +330,25 @@ const PUNTOS_DE_LA_PIEZA: Record<Pieza, number> = { vereda: 0, choza: 1, torre: 
 /** Lo que vale el Vado Largo a quien lo tenga. */
 export const PUNTOS_DEL_VADO = 2;
 
-/** El mínimo para que el Vado Largo exista. Con tres veredas no hay vado. */
-export const VADO_MINIMO = 4;
+/**
+ * EL MÍNIMO PARA QUE EL VADO LARGO EXISTA. Con cuatro veredas ya no hay vado.
+ *
+ * ═══ VALÍA CUATRO Y AHORA VALE CINCO, Y NO ES UN AJUSTE DE EQUILIBRIO ═══
+ *
+ * Con cuatro el premio caía en la primera o segunda ronda: la colocación ya deja
+ * dos veredas puestas, y dos más son un turno con bienes. A partir de ahí saltaba
+ * de mano en mano cada vez que alguien alargaba la suya. Un premio que se alcanza
+ * antes de que la partida empiece y que cambia de dueño sin que su dueño haga
+ * nada no es un premio: es ruido en el marcador.
+ *
+ * Y hay que decir lo que subirlo OBLIGA A MIRAR, porque es la parte cara: una
+ * comprobación escrita contra el número viejo que se pone VERDE con el nuevo sin
+ * tocarla no es una comprobación que haya aguantado el cambio — es una que no
+ * estaba mirando el mínimo. Por eso el comprobador tiene, al lado de las que
+ * hablan de cinco, la vacuna que dice que CUATRO veredas seguidas no dan el Vado:
+ * es la única que se pone roja si alguien vuelve a bajar el número.
+ */
+export const VADO_MINIMO = 5;
 
 /** Con cuántos puntos se gana. */
 export const PUNTOS_PARA_GANAR = 8;
@@ -353,6 +395,187 @@ const TRATOS_QUE_SE_RECUERDAN = 8;
 const BIENES_POR_LADO_DEL_TRUEQUE = 1;
 
 // ---------------------------------------------------------------------------
+// EL MAZO: la segunda economía
+// ---------------------------------------------------------------------------
+
+/**
+ * LAS NUEVE CLASES DE CARTA, que son cinco familias.
+ *
+ * Los cinco TÍTULOS —Molino, Cantera, Torreón, Faro, Huerto— son una sola familia
+ * con cinco caras: cuestan lo mismo, valen lo mismo y hacen lo mismo. Que sean
+ * cinco dibujos y no uno repetido cinco veces es una decisión de producto y no de
+ * reglas: la mitad de la gracia de guardarse un título es lo que se enseña al
+ * revelarlo, y cinco veces el mismo cartón no enseña nada.
+ *
+ * Los nombres son de Riberas y de ninguna otra parte, por lo mismo que los bienes
+ * y los terrenos: ver la cabecera del fichero. Y hay una razón añadida que no es
+ * de estilo — uno de los nombres con que se conoce la carta que aquí se llama EL
+ * ACAPARAMIENTO es a la vez una marca viva y una palabra de economía, y está en la
+ * lista de `server/scripts/marcas-registradas.ts`. Escribirlo aquí pondría rojo
+ * `verify:procedencia`, y con razón: ese comprobador barre las cadenas literales
+ * de esta carpeta justamente porque es donde una baraja puede estar.
+ */
+export type ClaseDeCarta =
+  | 'guardia'
+  | 'ano-bueno'
+  | 'acaparamiento'
+  | 'dos-veredas'
+  | Titulo;
+
+/** Las cinco cartas de punto. Se revelan; no se juegan. */
+export type Titulo = 'molino' | 'cantera' | 'torreon' | 'faro' | 'huerto';
+
+/** Los cinco títulos, en el orden en que se enseñan y en que se recorren. */
+export const TITULOS: readonly Titulo[] = ['molino', 'cantera', 'torreon', 'faro', 'huerto'];
+
+/** Las nueve, en el orden en que se enseñan. Los títulos, al final y juntos. */
+export const CLASES_DE_CARTA: readonly ClaseDeCarta[] = [
+  'guardia',
+  'ano-bueno',
+  'acaparamiento',
+  'dos-veredas',
+  ...TITULOS,
+];
+
+/** Cómo se llama cada carta cuando hay que escribirla en un botón. */
+const NOMBRE_DE_LA_CARTA: Record<ClaseDeCarta, string> = {
+  guardia: 'La Guardia',
+  'ano-bueno': 'El Año Bueno',
+  acaparamiento: 'El Acaparamiento',
+  'dos-veredas': 'Las Dos Veredas',
+  molino: 'El Molino',
+  cantera: 'La Cantera',
+  torreon: 'El Torreón',
+  faro: 'El Faro',
+  huerto: 'El Huerto',
+};
+
+/**
+ * LAS VEINTICINCO CARTAS, y el reparto es una decisión de este juego.
+ *
+ * Catorce guardias de veinticinco no es un número bonito: es lo que hace que La
+ * Mayor Guardia sea alcanzable —tres jugadas, y más que nadie— sin que comprar
+ * deje de ser una apuesta. Con menos guardias el premio no se reparte nunca; con
+ * más, el mazo deja de sorprender y comprar se vuelve un cambio seguro.
+ *
+ * Va en orden fijo y se baraja después. Escribirla ya revuelta sería un montón de
+ * cartas cuyo reparto nadie puede contar leyendo, que es justo lo contrario de lo
+ * que este fichero quiere de sus datos.
+ */
+const BOLSA_DE_CARTAS: readonly ClaseDeCarta[] = [
+  'guardia', 'guardia', 'guardia', 'guardia', 'guardia', 'guardia', 'guardia',
+  'guardia', 'guardia', 'guardia', 'guardia', 'guardia', 'guardia', 'guardia',
+  'molino',
+  'cantera',
+  'torreon',
+  'faro',
+  'huerto',
+  'ano-bueno', 'ano-bueno',
+  'acaparamiento', 'acaparamiento',
+  'dos-veredas', 'dos-veredas',
+];
+
+/** Cuántas cartas tiene el mazo al empezar. Se exporta para poder comprobarlo. */
+export const CARTAS_DEL_MAZO = BOLSA_DE_CARTAS.length;
+
+/** Lo que cuesta una carta: uno de cada. Se cobra con `cobrar`, como todo. */
+export const COSTE_DE_LA_CARTA: readonly Bien[] = ['sal', 'piedra', 'grano'];
+
+/** Cuántas guardias jugadas hacen falta para que La Mayor Guardia exista. */
+export const GUARDIA_MINIMA = 3;
+
+/** Lo que vale La Mayor Guardia a quien la tenga. */
+export const PUNTOS_DE_LA_GUARDIA = 1;
+
+/** Lo que vale cada título revelado. */
+export const PUNTOS_DEL_TITULO = 1;
+
+/** Cuántas veredas regala Las Dos Veredas. Están en el nombre y en la regla. */
+export const VEREDAS_DE_LA_CARTA = 2;
+
+/**
+ * Cuántos bienes da El Año Bueno.
+ *
+ * Vale dos, igual que `VEREDAS_DE_LA_CARTA`, y son dos constantes y no una: que
+ * hoy coincidan es casualidad de dos reglas distintas, y la primera vez que
+ * alguien quiera tocar una de las dos, la que comparte constante arrastra a la
+ * otra sin que nadie lo pida.
+ */
+export const BIENES_DEL_ANO_BUENO = 2;
+
+/**
+ * UNA CARTA: `'c7:guardia'`. Seudónimo delante, clase detrás.
+ *
+ * ═══ POR QUÉ CADA CARTA LLEVA NÚMERO DE SERIE, IGUAL QUE UNA FICHA ═══
+ *
+ * Por la misma razón exacta que `Ficha`, y conviene leer aquella cabecera entera.
+ * Dos colonos con una guardia cada uno producirían el mismo valor secreto, ese
+ * valor aparecería legítimamente en dos vistas, y `verify:mesa` —que comprueba
+ * que ningún secreto salga en más de un asiento— se pondría rojo sin que hubiera
+ * pasado nada. Un comprobador que grita cuando no pasa nada acaba desactivado.
+ *
+ * ═══ Y POR QUÉ EL SEUDÓNIMO VA DELANTE Y SEPARADO ═══
+ *
+ * Porque LA CARTA ENTERA ES SECRETA y el botón para jugarla no puede serlo: el
+ * §5 bis prohíbe que un identificador de opción lleve dentro algo oculto, y
+ * `verify:mesa` NO lo cazaría —busca la forma canónica, con comillas, y
+ * `'jugar-guardia:c7:B'` no contiene `"c7:guardia"`—. Así que lo que se publica es
+ * `c7` a secas, que no dice qué carta es, y el reductor lo resuelve contra la mano
+ * de quien mueve, que es el único sitio donde ese seudónimo significa algo.
+ *
+ * Es el mismo trato que el trueque le da a `t1`, y está escrito allí: un
+ * identificador derivado del contenido es un sitio por donde un secreto viaja sin
+ * que el comprobador lo vea.
+ */
+export type Carta = string;
+
+/**
+ * UNA CARTA EN LA MANO, con el turno en que se compró.
+ *
+ * El turno hace falta porque una carta comprada NO se juega el mismo turno (§1.4
+ * del diseño): sin esa regla, tres bienes se convierten en un efecto inmediato y
+ * el mazo pasa a ser una tienda. Guardarlo por carta y no por colono es lo que
+ * permite comprar una carta y jugar OTRA en el mismo turno, que es correcto.
+ *
+ * El sello se compara contra `turnosAbiertos`, que es un contador que sólo sube.
+ * El índice del turno no serviría: vuelve a cero cada ronda, y una carta comprada
+ * en la ronda anterior parecería recién comprada.
+ */
+export interface CartaEnMano {
+  carta: Carta;
+  /** El valor de `turnosAbiertos` cuando se compró. */
+  comprada: number;
+}
+
+/**
+ * La clase de una carta, leída de su propio identificador.
+ *
+ * Se contrasta contra LA LISTA y no con un `in` sobre la tabla de nombres, que es
+ * como se escribió primero: `'toString' in NOMBRE_DE_LA_CARTA` es cierto, así que
+ * una cadena `'c1:toString'` habría salido de aquí como si fuera una clase de
+ * carta. Hoy ninguna carta se fabrica fuera de este fichero y no hay camino para
+ * que llegue una así; la lista cuesta lo mismo y no depende de que siga sin
+ * haberlo.
+ */
+export function claseDeLaCarta(carta: Carta): ClaseDeCarta | null {
+  const corte = carta.indexOf(':');
+  if (corte < 0) return null;
+  const resto = carta.slice(corte + 1);
+  return (CLASES_DE_CARTA as readonly string[]).includes(resto) ? (resto as ClaseDeCarta) : null;
+}
+
+/** El seudónimo de una carta: lo ÚNICO suyo que se puede publicar. */
+export function seudonimoDeLaCarta(carta: Carta): string {
+  const corte = carta.indexOf(':');
+  return corte < 0 ? carta : carta.slice(0, corte);
+}
+
+/** ¿Es esta clase uno de los cinco títulos? */
+export function esTitulo(clase: ClaseDeCarta): clase is Titulo {
+  return (TITULOS as readonly string[]).includes(clase);
+}
+
+// ---------------------------------------------------------------------------
 // LOS MOVIMIENTOS
 // ---------------------------------------------------------------------------
 
@@ -379,6 +602,44 @@ export const RECHAZAR = 'riberas:rechazar';
 
 /** Cierra el turno. `carga` vacía. */
 export const PASAR = 'riberas:pasar';
+
+/*
+ * ═══ LOS SEIS DEL MAZO, Y POR QUÉ SON SEIS TIPOS Y NO UNO ═══
+ *
+ * Se podría escribir un solo `riberas:jugar` con la clase de la carta dentro de la
+ * carga, y sería menos código. No se hace, por dos razones que se ven al leer y no
+ * al escribir:
+ *
+ *   · Cada una pide argumentos distintos —a quién robas, qué dos bienes coges, qué
+ *     bien acaparas, ninguno— y un solo tipo obligaría a una carga con cuatro
+ *     campos opcionales de los que cada rama usa uno. Eso no es una carga: es
+ *     cuatro cargas disfrazadas de una, y el compilador deja de ayudar.
+ *   · El portillo del §5 bis compara `{tipo, carga}` en forma canónica contra lo
+ *     ofrecido. Con tipos distintos, una carga mal formada ni siquiera se parece a
+ *     otra opción; con un tipo único, todas se parecen entre sí.
+ *
+ * REVELAR es el sexto y NO es «jugar una carta»: no gasta la jugada del turno y se
+ * puede hacer el mismo turno en que se compró (§1.4). Que tenga tipo propio es lo
+ * que hace que esa diferencia no dependa de un `if` dentro de una rama común.
+ */
+
+/** Compra la carta de arriba del mazo. `carga` vacía. */
+export const COMPRAR = 'riberas:comprar';
+
+/** Juega una guardia y roba. `carga: { carta: 'c7', a: 'asiento' }`. */
+export const GUARDIA = 'riberas:guardia';
+
+/** Juega el año bueno. `carga: { carta: 'c7', bienes: [Bien, Bien] }`. */
+export const ANO_BUENO = 'riberas:ano-bueno';
+
+/** Juega el acaparamiento. `carga: { carta: 'c7', bien: Bien }`. */
+export const ACAPARAMIENTO = 'riberas:acaparamiento';
+
+/** Juega las dos veredas. `carga: { carta: 'c7' }`. Las veredas se alzan después. */
+export const DOS_VEREDAS = 'riberas:dos-veredas';
+
+/** Revela un título. `carga: { carta: 'c7' }`. No cuenta como jugar una carta. */
+export const REVELAR = 'riberas:revelar';
 
 // ---------------------------------------------------------------------------
 // EL ESTADO
@@ -453,6 +714,29 @@ export interface Colono {
   chozas: LlaveDeVertice[];
   torres: LlaveDeVertice[];
   veredas: LlaveDeArista[];
+
+  /**
+   * SU MANO DE CARTAS. Secreta entera, como el almacén y por lo mismo.
+   *
+   * Lo que sí es público es CUÁNTAS tiene, y sale en la vista como un número: se
+   * cuentan mirando el montón que tiene delante, igual que los bienes.
+   */
+  mano: CartaEnMano[];
+
+  /**
+   * CUÁNTAS GUARDIAS HA JUGADO. Público: una guardia se juega en voz alta.
+   *
+   * Es un número y no la lista de las cartas jugadas, y eso es deliberado: una
+   * carta que sale de la mano deja de ser secreta, y si se guardara con su
+   * identificador —`'c7:guardia'`— ese mismo valor pasaría a aparecer en las seis
+   * vistas. `loSecretoDeRiberas` lo declara secreto mientras está en la mano, así
+   * que `verify:mesa` se pondría rojo al jugarla. Con un contador, un secreto
+   * nunca se vuelve público: desaparece.
+   */
+  guardias: number;
+
+  /** Los títulos que ha revelado. Públicos, y un punto cada uno. */
+  titulos: Titulo[];
 }
 
 /** En qué punto está un trueque. El ciclo de vida entero, y es de este juego. */
@@ -498,6 +782,20 @@ export interface Trato {
 export interface Vado {
   de: AsientoId | null;
   largo: number;
+}
+
+/**
+ * Quién tiene La Mayor Guardia y con cuántas. `de: null` si está vacante.
+ *
+ * Es un tipo aparte y no `Vado` reutilizado, aunque los dos tengan la misma forma:
+ * `largo` se cuenta en veredas encadenadas y `cuantas` en cartas jugadas, y son dos
+ * cosas que no se comparan entre sí. Compartir el tipo invitaría a compartir la
+ * función, y la función es lo único que de verdad se comparte —la REGLA del máximo
+ * estricto, que está escrita una vez y se aplica dos.
+ */
+export interface Guardia {
+  de: AsientoId | null;
+  cuantas: number;
 }
 
 /**
@@ -560,6 +858,62 @@ export interface EstadoDeRiberas {
   /** ¿Ya se ha tirado en este turno? Sin tirar no se alza ni se trueca. */
   tirado: boolean;
 
+  /**
+   * EL MAZO, BARAJADO UNA VEZ AL EMPEZAR. Secreto entero.
+   *
+   * ═══ POR QUÉ UN MAZO Y NO UN SORTEO POR COMPRA ═══
+   *
+   * Sortear la carta al comprarla parece lo mismo y no lo es, por dos razones que
+   * el §1.3 del diseño llama irreversibles:
+   *
+   *   · UN MAZO SE PUEDE CONTAR. Quedan tres guardias, ya no puede salir un
+   *     título: eso es información legítima del juego y parte de lo que se decide
+   *     al comprar tarde. Con un sorteo por compra no hay nada que contar.
+   *   · Y SOBRE TODO: un sorteo por compra depende del ORDEN EN QUE LLEGAN LAS
+   *     PETICIONES. Dos servidores con el mismo diario darían partidas distintas,
+   *     `reejecutarEn` dejaría de valer y con él la comprobación que sostiene el
+   *     motor entero. Barajado una vez, la carta que sale es función del estado y
+   *     de nada más.
+   *
+   * Se roba por delante, que es «la de arriba». Y cuando se acaba NO SE REBARAJA:
+   * un mazo que vuelve a empezar deja de poder contarse.
+   */
+  mazo: Carta[];
+
+  /**
+   * CUÁNTOS TURNOS SE HAN ABIERTO desde que la partida empezó a jugarse.
+   *
+   * Sólo sube, nunca vuelve a cero, y por eso sirve de sello de compra: una carta
+   * comprada se juega cuando `turnosAbiertos` haya pasado del número que lleva
+   * dentro. El índice `turno` no serviría —vuelve a cero cada ronda— y contar
+   * rondas tampoco: con dos colonos, la ronda siguiente es el turno siguiente sólo
+   * la mitad de las veces.
+   */
+  turnosAbiertos: number;
+
+  /** ¿Se ha jugado ya una carta en este turno? Una por turno, y los títulos no cuentan. */
+  cartaJugada: boolean;
+
+  /**
+   * CUÁNTAS VEREDAS GRATIS QUEDAN POR ALZAR. Público.
+   *
+   * ═══ ES EL MISMO MECANISMO QUE `faltaVereda`, Y ESO ES TODO EL TRUCO ═══
+   *
+   * Las Dos Veredas no puede resolverse dentro de un solo movimiento con dos
+   * aristas en la carga: la segunda vereda puede salir de la primera, así que
+   * ofrecer los pares legales de golpe obligaría a razonar sobre un tablero que
+   * todavía no existe. La colocación inicial ya tenía ese problema —choza y luego
+   * su vereda— y lo resolvió encadenando dos movimientos con un campo en el estado.
+   *
+   * Aquí igual: jugar la carta pone un dos aquí, y a partir de ese momento
+   * `opciones()` no ofrece otra cosa que veredas y `trazar` no las cobra. Cada una
+   * baja el contador, y el tablero de la segunda es el que dejó la primera.
+   *
+   * Se apaga solo si no queda ni un sitio legal —una carta no puede dejar la mesa
+   * atascada— y al pasar el turno.
+   */
+  veredasGratis: number;
+
   /** La última suma de los dos dados. Cero antes de la primera tirada. */
   ultimaTirada: number;
 
@@ -574,6 +928,9 @@ export interface EstadoDeRiberas {
 
   /** El premio derivado. Se recalcula solo; ver `recalcularElVado`. */
   vado: Vado;
+
+  /** El otro premio derivado. Misma regla, otra cuenta; ver `recalcularLaGuardia`. */
+  guardia: Guardia;
 
   /**
    * EL AZAR. Secreto entero: con la semilla y el acumulador se calculan todas
@@ -604,13 +961,81 @@ export function partidaNueva(): EstadoDeRiberas {
     faltaVereda: false,
     ultimaChoza: null,
     tirado: false,
+    mazo: [],
+    turnosAbiertos: 0,
+    cartaJugada: false,
+    veredasGratis: 0,
     ultimaTirada: 0,
     tratos: [],
     siguienteFicha: 1,
     siguienteTrato: 1,
     vado: { de: null, largo: 0 },
+    guardia: { de: null, cuantas: 0 },
     azar: sembrar(0),
     ganadores: [],
+  };
+}
+
+/**
+ * UNA PARTIDA GUARDADA ANTES DEL MAZO TIENE QUE PODER ABRIRSE.
+ *
+ * ═══ POR QUÉ ESTO NO ES UNA CORTESÍA ═══
+ *
+ * Las mesas de Riberas se guardan en disco —`MESAS_DIR`, y en el despliegue eso es
+ * un disco persistente— y una partida de las largas dura días. Cuando el mazo entró,
+ * el estado creció con seis campos, y una mesa escrita el día anterior no los tiene:
+ * al proyectarla, `estado.guardia.de` reventaba con «Cannot read properties of
+ * undefined». Medido sobre las seis mesas que había guardadas: diecisiete vistas
+ * rotas de diecisiete.
+ *
+ * Y el fallo no se lee como lo que es. Quien vuelve a su partida no ve «esta versión
+ * no sabe abrir tu mesa»: ve que la Sala no carga. La partida existe entera en el
+ * disco y es inalcanzable.
+ *
+ * ═══ POR QUÉ AQUÍ Y NO EN QUIEN LEE EL FICHERO ═══
+ *
+ * Porque el que lee el fichero —`mesas.ts`— es núcleo sellado y NO SABE A QUÉ SE
+ * JUEGA: no puede conocer los campos de Riberas sin dejar de ser agnóstico, que es
+ * la única propiedad que ese fichero existe para tener. El juego es quien sabe qué
+ * le falta a un estado suyo, así que el juego es quien lo rellena, en las dos puertas
+ * por las que entra un estado: el reductor y la proyección.
+ *
+ * Rellena con lo que habría habido si el mazo hubiera existido desde el principio y
+ * nadie lo hubiera tocado: mazo vacío —no se puede comprar, que es más honrado que
+ * repartir cartas a mitad de partida—, sin cartas en ninguna mano, sin guardias y sin
+ * premio. La partida sigue exactamente donde estaba.
+ *
+ * NO devuelve un objeto nuevo si no falta nada, y eso importa: media docena de
+ * comprobaciones de este juego comparan estados POR IDENTIDAD para saber que un
+ * movimiento no cambió nada.
+ */
+export function comoSiSiempreHubieraHabidoMazo(estado: EstadoDeRiberas): EstadoDeRiberas {
+  const faltaEnLaMesa =
+    estado.mazo === undefined ||
+    estado.guardia === undefined ||
+    estado.turnosAbiertos === undefined ||
+    estado.cartaJugada === undefined ||
+    estado.veredasGratis === undefined;
+  const faltaEnAlguien = estado.colonos.some(
+    (c) => c.mano === undefined || c.guardias === undefined || c.titulos === undefined,
+  );
+  if (!faltaEnLaMesa && !faltaEnAlguien) return estado;
+
+  return {
+    ...estado,
+    mazo: estado.mazo ?? [],
+    turnosAbiertos: estado.turnosAbiertos ?? 0,
+    cartaJugada: estado.cartaJugada ?? false,
+    veredasGratis: estado.veredasGratis ?? 0,
+    guardia: estado.guardia ?? { de: null, cuantas: 0 },
+    colonos: faltaEnAlguien
+      ? estado.colonos.map((c) => ({
+          ...c,
+          mano: c.mano ?? [],
+          guardias: c.guardias ?? 0,
+          titulos: c.titulos ?? [],
+        }))
+      : estado.colonos,
   };
 }
 
@@ -665,7 +1090,7 @@ export function avanzarRiberas(
   movimiento: Movimiento,
   ctx: ContextoMovimiento,
 ): EstadoDeRiberas | Rechazo<EstadoDeRiberas> {
-  const actual = estado ?? partidaNueva();
+  const actual = comoSiSiempreHubieraHabidoMazo(estado ?? partidaNueva());
 
   if (esTic(movimiento)) return venceElPlazo(actual);
 
@@ -728,6 +1153,33 @@ export function avanzarRiberas(
       return contestar(actual, ctx, tratoDeLaCarga(movimiento.carga), false);
     case PASAR:
       return pasarTurno(actual, ctx);
+    case COMPRAR:
+      return comprarUnaCarta(actual, ctx);
+    case GUARDIA:
+      return jugarLaGuardia(
+        actual,
+        ctx,
+        campoDeTexto(movimiento.carga, 'carta'),
+        campoDeTexto(movimiento.carga, 'a'),
+      );
+    case ANO_BUENO:
+      return jugarElAnoBueno(
+        actual,
+        ctx,
+        campoDeTexto(movimiento.carga, 'carta'),
+        bienesDeLaCarga(movimiento.carga, 'bienes', BIENES_DEL_ANO_BUENO),
+      );
+    case ACAPARAMIENTO:
+      return jugarElAcaparamiento(
+        actual,
+        ctx,
+        campoDeTexto(movimiento.carga, 'carta'),
+        bienDeLaCarga(movimiento.carga, 'bien'),
+      );
+    case DOS_VEREDAS:
+      return jugarLasDosVeredas(actual, ctx, campoDeTexto(movimiento.carga, 'carta'));
+    case REVELAR:
+      return revelarUnTitulo(actual, ctx, campoDeTexto(movimiento.carga, 'carta'));
     default:
       /*
        * Un movimiento que este juego no conoce se ignora y devuelve el estado. No
@@ -811,17 +1263,22 @@ function piezaDeLaCarga(carga: unknown): Pieza | null {
 }
 
 /**
- * Lee un lado de un trueque de la carga, o `null` si ahí no venía uno.
+ * Lee una lista de bienes de la carga, o `null` si ahí no venía una.
  *
- * Exige EXACTAMENTE `BIENES_POR_LADO_DEL_TRUEQUE` bienes, que hoy es uno: ver esa
- * constante para por qué un trueque de este juego es uno por uno y por qué esto
- * está escrito aquí aunque el portillo ya lo rechace antes.
+ * Exige EXACTAMENTE `cuantos`, y quien llama dice cuántos: `BIENES_POR_LADO_DEL_TRUEQUE`
+ * para un lado de un trueque —hoy uno, y ver esa constante para por qué un trueque
+ * de este juego es uno por uno— y `BIENES_DEL_ANO_BUENO` para la carta.
+ *
+ * El número entra por parámetro y no se mira aquí dentro porque esta función no
+ * sabe de qué regla la están llamando, y no debe: en el momento en que decidiera
+ * ella el número, las dos reglas compartirían un valor que nadie pidió que fuera
+ * el mismo.
  */
-function bienesDeLaCarga(carga: unknown, campo: string): Bien[] | null {
+function bienesDeLaCarga(carga: unknown, campo: string, cuantos: number): Bien[] | null {
   if (typeof carga !== 'object' || carga === null) return null;
   const posible = (carga as Record<string, unknown>)[campo];
   if (!Array.isArray(posible)) return null;
-  if (posible.length !== BIENES_POR_LADO_DEL_TRUEQUE) return null;
+  if (posible.length !== cuantos) return null;
   const bienes: Bien[] = [];
   for (const uno of posible) {
     if (typeof uno !== 'string') return null;
@@ -829,6 +1286,13 @@ function bienesDeLaCarga(carga: unknown, campo: string): Bien[] | null {
     bienes.push(uno as Bien);
   }
   return bienes;
+}
+
+/** Un bien suelto de la carga, o `null` si ahí no venía uno de los cinco. */
+function bienDeLaCarga(carga: unknown, campo: string): Bien | null {
+  const posible = campoDeTexto(carga, campo);
+  if (posible === null) return null;
+  return (BIENES as readonly string[]).includes(posible) ? (posible as Bien) : null;
 }
 
 // ---------------------------------------------------------------------------
@@ -916,6 +1380,22 @@ function repartirElDelta(
     islas.push({ hex: hexes[i] as Hex, terreno, numero });
   }
 
+  /*
+   * ═══ EL MAZO SE BARAJA AQUÍ, UNA VEZ, Y CON EL AZAR DE LA MESA ═══
+   *
+   * En el mismo sitio y con el mismo azar que las islas y los números, encadenado
+   * detrás: `barajar` devuelve el azar ya avanzado y se le pasa al siguiente. Con
+   * eso, todo lo que la partida sortea sale de la semilla que eligió el servidor
+   * y de nada más — que es lo que hace que reejecutar el diario reparta las mismas
+   * islas Y reparta las mismas cartas.
+   *
+   * El número de serie se pone DESPUÉS de barajar y en el orden del mazo. Da igual
+   * a efectos de juego —el mazo es secreto entero— y hace que `c1` sea la primera
+   * carta que se compra, que es lo único que ayuda al depurar.
+   */
+  const mazoRevuelto = barajar(numerosRevueltos.azar, BOLSA_DE_CARTAS);
+  const mazo: Carta[] = mazoRevuelto.valor.map((clase, i) => `c${i + 1}:${clase}`);
+
   const colonos: Colono[] = [];
   for (let i = 0; i < cuantos; i++) {
     colonos.push({
@@ -925,6 +1405,9 @@ function repartirElDelta(
       chozas: [],
       torres: [],
       veredas: [],
+      mano: [],
+      guardias: 0,
+      titulos: [],
     });
   }
 
@@ -933,13 +1416,17 @@ function repartirElDelta(
     momento: 'colocando',
     colonos,
     islas,
+    mazo,
     turno: 0,
     paso: 0,
     faltaVereda: false,
     ultimaChoza: null,
     tirado: false,
+    turnosAbiertos: 0,
+    cartaJugada: false,
+    veredasGratis: 0,
     ultimaTirada: 0,
-    azar: numerosRevueltos.azar,
+    azar: mazoRevuelto.azar,
   };
 }
 
@@ -1115,6 +1602,15 @@ function alzar(
  *
  * Durante la colocación es GRATIS y tiene que pegarse a la choza recién fundada.
  * Después se paga y tiene que pegarse a algo propio: una vereda o una choza.
+ *
+ * ═══ Y HAY UN TERCER CASO, QUE ES LAS DOS VEREDAS ═══
+ *
+ * Con `veredasGratis` por encima de cero la vereda es legal donde lo sería
+ * pagándola —las mismas reglas de dónde, exactamente las mismas— y no se cobra.
+ * Lo que cambia es SÓLO el precio, y por eso el caso vive aquí dentro y no en una
+ * función paralela: una segunda función que colocara veredas sería un segundo juez
+ * sobre dónde se puede, y dos jueces que casi siempre coinciden es la peor clase
+ * de fallo. Ver `EstadoDeRiberas.veredasGratis`.
  */
 function trazar(estado: EstadoDeRiberas, yo: number, arista: LlaveDeArista): EstadoDeRiberas {
   const mio = estado.colonos[yo];
@@ -1133,8 +1629,9 @@ function trazar(estado: EstadoDeRiberas, yo: number, arista: LlaveDeArista): Est
     if (!pegaConLoMio(estado, yo, arista)) return estado;
   }
 
+  const gratis = !colocando && estado.veredasGratis > 0;
   let almacen = mio.almacen;
-  if (!colocando) {
+  if (!colocando && !gratis) {
     const cobrado = cobrar(almacen, COSTES.vereda);
     if (cobrado === null) return estado;
     almacen = cobrado;
@@ -1144,8 +1641,39 @@ function trazar(estado: EstadoDeRiberas, yo: number, arista: LlaveDeArista): Est
     i !== yo ? c : { ...c, almacen, veredas: [...c.veredas, arista] },
   );
 
-  const conLaVereda = conElVado({ ...estado, colonos });
+  const puesta: EstadoDeRiberas = { ...estado, colonos };
+  /*
+   * El contador baja aquí y se APAGA si ya no queda sitio: la segunda vereda de la
+   * carta puede haberse quedado sin dónde ir justo porque la primera se comió el
+   * último hueco, y un contador que se quedara en uno dejaría a quien la jugó sin
+   * más opción que ninguna. Una mesa que no avanza es lo que esto existe para no
+   * dejar pasar.
+   */
+  const quedan = gratis ? estado.veredasGratis - 1 : estado.veredasGratis;
+  const conLaVereda = conElVado({
+    ...puesta,
+    veredasGratis: quedan > 0 && hayDondeTrazar(puesta, yo) ? quedan : 0,
+  });
   return puedeHaberGanado(colocando ? avanzarLaSerpentina(conLaVereda) : conLaVereda);
+}
+
+/**
+ * ¿LE QUEDA A ESTE COLONO ALGÚN SITIO DONDE TRAZAR UNA VEREDA?
+ *
+ * Sin mirar el precio, que es justo lo que hace falta para Las Dos Veredas: la
+ * pregunta es «¿hay dónde?», no «¿te llega?». Mira el tope de piezas porque un
+ * colono con las doce puestas no tiene dónde poner la trece, y ésa es la otra
+ * forma de que la carta se quede a medias.
+ */
+function hayDondeTrazar(estado: EstadoDeRiberas, yo: number): boolean {
+  const mio = estado.colonos[yo];
+  if (mio === undefined) return false;
+  if (mio.veredas.length >= TOPE_DE_PIEZAS.vereda) return false;
+  for (const arista of aristasDelDelta(estado)) {
+    if (aristaOcupada(estado, arista)) continue;
+    if (pegaConLoMio(estado, yo, arista)) return true;
+  }
+  return false;
 }
 
 /** ¿Toca esta arista algo mío —una vereda o una choza— por alguno de sus extremos? */
@@ -1216,6 +1744,10 @@ function avanzarLaSerpentina(estado: EstadoDeRiberas): EstadoDeRiberas {
       ultimaChoza: null,
       turno: 0,
       tirado: false,
+      /* El primero de verdad. Ver `turnosAbiertos`: cuenta desde uno y sólo sube. */
+      turnosAbiertos: 1,
+      cartaJugada: false,
+      veredasGratis: 0,
     };
   }
   return { ...estado, paso: estado.paso + 1, faltaVereda: false, ultimaChoza: null };
@@ -1407,8 +1939,8 @@ function ofrecer(
   if (!estado.tirado) return estado;
 
   const para = campoDeTexto(carga, 'para');
-  const da = bienesDeLaCarga(carga, 'da');
-  const pide = bienesDeLaCarga(carga, 'pide');
+  const da = bienesDeLaCarga(carga, 'da', BIENES_POR_LADO_DEL_TRUEQUE);
+  const pide = bienesDeLaCarga(carga, 'pide', BIENES_POR_LADO_DEL_TRUEQUE);
   if (para === null || da === null || pide === null) return estado;
 
   const otro = indiceDelAsiento(estado, para);
@@ -1612,6 +2144,336 @@ function caducarLosAbiertos(tratos: readonly Trato[]): { tratos: Trato[]; hubo: 
 }
 
 // ---------------------------------------------------------------------------
+// EL MAZO: comprar, jugar y revelar
+// ---------------------------------------------------------------------------
+
+/**
+ * ¿ES MÍO EL TURNO? Devuelve mi índice, o −1.
+ *
+ * NO mira si se ha tirado, y eso es a propósito: revelar un título se puede hacer
+ * en cualquier momento del turno propio —incluso antes de tirar— y todo lo demás
+ * del mazo exige haber tirado. Poner el `tirado` aquí dentro habría metido en una
+ * sola función dos reglas que el §3 del diseño separa expresamente.
+ */
+function elTurnoEsDe(estado: EstadoDeRiberas, ctx: ContextoMovimiento): number {
+  if (estado.momento !== 'jugando') return -1;
+  const yo = indiceDelAsiento(estado, ctx.quien);
+  if (yo < 0 || yo !== estado.turno) return -1;
+  return yo;
+}
+
+/** La carta de mi mano que lleva ese seudónimo, o `null`. Ver `Carta`. */
+function laCartaDeLaMano(mio: Colono, seudonimo: string | null): CartaEnMano | null {
+  if (seudonimo === null) return null;
+  for (const enMano of mio.mano) {
+    if (seudonimoDeLaCarta(enMano.carta) === seudonimo) return enMano;
+  }
+  return null;
+}
+
+/**
+ * LAS DOS REGLAS QUE ATRAVIESAN TODAS LAS CARTAS QUE SE JUEGAN.
+ *
+ * Una por turno, y nunca la que se compró en este mismo turno. Las dos existen por
+ * lo mismo y está escrito en el §1.4 y el §1.5 del diseño: sin ellas, tres bienes
+ * se convierten en un efecto inmediato y una mano guardada se convierte en una
+ * jugada única que gana la partida sin que nadie pueda responder.
+ *
+ * Los títulos NO pasan por aquí: no se juegan, se revelan, y revelar no hace nada
+ * salvo enseñar lo que ya se tenía.
+ *
+ * ═══ Y ESTA COPIA ESTÁ A LA SOMBRA DEL PORTILLO. MEDIDO, NO SUPUESTO ═══
+ *
+ * Las dos reglas están escritas dos veces —aquí sobre el estado, y en
+ * `opcionesDelMazo` sobre la vista—, y el sitio donde MUERDEN es el segundo: como
+ * `opciones()` no ofrece la carta, el portillo para el movimiento antes de llegar
+ * aquí. Se comprobó quitando esta función y dejando la otra: el comprobador siguió
+ * en verde entero. Quitando la de `opcionesDelMazo`, se ponen rojas cuatro
+ * comprobaciones a la vez.
+ *
+ * No sobra, y es el mismo trato que reciben las guardas de fase de `fundar` y los
+ * topes de `trazar`: una regla que sólo vive en `opciones()` es una regla que se
+ * salta cualquier camino que no pase por ahí —el reloj ya entra por uno—, y quien
+ * lea esta rama dentro de un año no debe tener que demostrar el teorema del
+ * portillo para saber que está a salvo. Lo que sí hay que saber es cuál de las dos
+ * copias hay que tocar para cambiar la regla: LAS DOS, y lo dice el comprobador.
+ */
+function sePuedeJugarLaCarta(estado: EstadoDeRiberas, enMano: CartaEnMano): boolean {
+  if (estado.cartaJugada) return false;
+  return enMano.comprada < estado.turnosAbiertos;
+}
+
+/** La mano sin esa carta. Una carta jugada no vuelve: no hay descarte que mirar. */
+function sinLaCarta(mano: readonly CartaEnMano[], carta: Carta): CartaEnMano[] {
+  return mano.filter((m) => m.carta !== carta);
+}
+
+/**
+ * COMPRA LA CARTA DE ARRIBA DEL MAZO.
+ *
+ * ═══ LAS DOS GUARDAS DE AQUÍ ESTÁN MUDAS, Y ESO ES UNA DECISIÓN ═══
+ *
+ * Ni «no te llega» ni «el mazo se acabó» dicen nada, y es por la doctrina que
+ * `contestar` deja escrita entera: un motivo sólo se escribe donde `opciones()` NO
+ * pudo comprobar la condición, porque en los demás casos es TEXTO MUERTO al que no
+ * llega nadie. Aquí las dos condiciones están en la vista de quien compra —su
+ * propio almacén, y cuántas cartas quedan, que es público— así que `opciones()` no
+ * ofrece el botón y el portillo para el movimiento una capa antes, con su mensaje
+ * corto y ciego.
+ *
+ * Se escriben igual porque quien lea esto dentro de un año no debe tener que
+ * demostrar el teorema del portillo para saber que la rama está a salvo.
+ */
+function comprarUnaCarta(estado: EstadoDeRiberas, ctx: ContextoMovimiento): EstadoDeRiberas {
+  const yo = elTurnoEsDe(estado, ctx);
+  if (yo < 0 || !estado.tirado) return estado;
+  const mio = estado.colonos[yo] as Colono;
+
+  const arriba = estado.mazo[0];
+  if (arriba === undefined) return estado;
+
+  const almacen = cobrar(mio.almacen, COSTE_DE_LA_CARTA);
+  if (almacen === null) return estado;
+
+  const colonos = estado.colonos.map((c, i) =>
+    i !== yo
+      ? c
+      : {
+          ...c,
+          almacen,
+          /* El sello de compra, que es lo que impide jugarla hoy. Ver `CartaEnMano`. */
+          mano: [...c.mano, { carta: arriba, comprada: estado.turnosAbiertos }],
+        },
+  );
+  return { ...estado, colonos, mazo: estado.mazo.slice(1) };
+}
+
+/**
+ * JUEGA UNA GUARDIA: le quitas un bien AL AZAR a un colono que elijas.
+ *
+ * ═══ ROBA, Y NO MUEVE A NADIE ═══
+ *
+ * En la familia de la que viene esta mecánica, esta carta mueve la pieza de la
+ * desgracia por el tablero. RIBERAS NO TIENE ESA PIEZA: su desgracia es el
+ * ESTIAJE, que no ocupa una isla sino que corta la producción del turno, y eso
+ * está escrito desde el principio —`riberas-en-3d.ts` dice que «`ladron` sale
+ * siempre `null`, y eso no es un hueco por rellenar»—. Así que la guardia hace lo
+ * OTRO que hacía aquella carta, que es robar.
+ *
+ * ═══ AL AZAR DEL ESTADO, Y NO LA PRIMERA DE LA LISTA ═══
+ *
+ * Coger «la primera» sería determinista y también sería una fuga de reglas: el
+ * orden del almacén ajeno es el orden en que le fueron llegando las fichas, o sea
+ * información que quien roba no tiene y no debe tener. Con `estado.azar` la carta
+ * roba a ciegas, que es lo que dice la regla, y sigue siendo reejecutable — que
+ * es exactamente para lo que el azar vive dentro del estado.
+ *
+ * Y la ficha viaja ENTERA, con su número de serie, por lo mismo que en el trueque:
+ * un secreto que cambia de manos deja de aparecer en una vista y empieza a
+ * aparecer en la otra, que es justo lo que `verify:mesa` comprueba.
+ */
+function jugarLaGuardia(
+  estado: EstadoDeRiberas,
+  ctx: ContextoMovimiento,
+  seudonimo: string | null,
+  aQuien: string | null,
+): EstadoDeRiberas {
+  const yo = elTurnoEsDe(estado, ctx);
+  if (yo < 0 || !estado.tirado) return estado;
+  const mio = estado.colonos[yo] as Colono;
+
+  const enMano = laCartaDeLaMano(mio, seudonimo);
+  if (enMano === null || claseDeLaCarta(enMano.carta) !== 'guardia') return estado;
+  if (!sePuedeJugarLaCarta(estado, enMano)) return estado;
+
+  const victima = indiceDelAsiento(estado, aQuien);
+  if (victima < 0 || victima === yo) return estado;
+  const suyo = estado.colonos[victima] as Colono;
+  /* A quien no tiene nada no se le roba, y por eso tampoco se ofrece robarle. */
+  if (suyo.almacen.length === 0) return estado;
+
+  const tirada = enteroEntre(estado.azar, 0, suyo.almacen.length - 1);
+  const robada = suyo.almacen[tirada.valor] as Ficha;
+
+  const colonos = estado.colonos.map((c, i) => {
+    if (i === victima) return { ...c, almacen: c.almacen.filter((_, k) => k !== tirada.valor) };
+    if (i === yo) {
+      return {
+        ...c,
+        almacen: [...c.almacen, robada],
+        mano: sinLaCarta(c.mano, enMano.carta),
+        guardias: c.guardias + 1,
+      };
+    }
+    return c;
+  });
+
+  /*
+   * EL PREMIO SE RECALCULA AQUÍ, y es el único sitio donde hace falta: La Mayor
+   * Guardia sólo se mueve cuando alguien juega una guardia. El Vado Largo cuelga
+   * además de `fundar`, porque una choza ajena parte una cadena; una guardia
+   * ajena no le quita guardias a nadie.
+   */
+  return puedeHaberGanado(
+    conLaGuardia({ ...estado, colonos, azar: tirada.azar, cartaJugada: true }),
+  );
+}
+
+/**
+ * JUEGA EL AÑO BUENO: dos bienes cualesquiera del arcón, iguales o distintos.
+ *
+ * Las fichas se FABRICAN, con `siguienteFicha`, porque vienen del arcón y no de
+ * nadie: son bienes nuevos en la partida. Es el mismo camino por el que nacen las
+ * de la cosecha, y por eso el contador es el mismo — dos fichas con el mismo
+ * número de serie serían dos secretos indistinguibles, y ahí es donde
+ * `verify:mesa` empieza a dar rojos que no significan nada.
+ *
+ * No se mira si ha ganado: dos bienes no dan un punto.
+ */
+function jugarElAnoBueno(
+  estado: EstadoDeRiberas,
+  ctx: ContextoMovimiento,
+  seudonimo: string | null,
+  bienes: Bien[] | null,
+): EstadoDeRiberas {
+  const yo = elTurnoEsDe(estado, ctx);
+  if (yo < 0 || !estado.tirado || bienes === null) return estado;
+  const mio = estado.colonos[yo] as Colono;
+
+  const enMano = laCartaDeLaMano(mio, seudonimo);
+  if (enMano === null || claseDeLaCarta(enMano.carta) !== 'ano-bueno') return estado;
+  if (!sePuedeJugarLaCarta(estado, enMano)) return estado;
+
+  let siguiente = estado.siguienteFicha;
+  const nuevas: Ficha[] = bienes.map((b) => `b${siguiente++}:${b}`);
+
+  const colonos = estado.colonos.map((c, i) =>
+    i !== yo
+      ? c
+      : { ...c, almacen: [...c.almacen, ...nuevas], mano: sinLaCarta(c.mano, enMano.carta) },
+  );
+  return { ...estado, colonos, siguienteFicha: siguiente, cartaJugada: true };
+}
+
+/**
+ * JUEGA EL ACAPARAMIENTO: dices un bien y TODOS los demás te dan los que tengan.
+ *
+ * Se recorren los colonos en el orden de la lista y las fichas en el orden de cada
+ * almacén, que es orden fijo: si el recorrido dependiera del orden de un objeto,
+ * dos reejecuciones de la misma partida dejarían el almacén de quien acapara con
+ * las mismas fichas en distinto orden, y el hash del estado no cuadraría.
+ *
+ * Puede no llevarse nada, y eso es correcto: quien la juega no ve los almacenes
+ * ajenos y apuesta. Por eso se ofrecen los cinco bienes y no sólo los que alguien
+ * tiene — ofrecer sólo esos sería publicar, en una lista de botones, qué tienen
+ * los demás.
+ */
+function jugarElAcaparamiento(
+  estado: EstadoDeRiberas,
+  ctx: ContextoMovimiento,
+  seudonimo: string | null,
+  bien: Bien | null,
+): EstadoDeRiberas {
+  const yo = elTurnoEsDe(estado, ctx);
+  if (yo < 0 || !estado.tirado || bien === null) return estado;
+  const mio = estado.colonos[yo] as Colono;
+
+  const enMano = laCartaDeLaMano(mio, seudonimo);
+  if (enMano === null || claseDeLaCarta(enMano.carta) !== 'acaparamiento') return estado;
+  if (!sePuedeJugarLaCarta(estado, enMano)) return estado;
+
+  const cosecha: Ficha[] = [];
+  for (let i = 0; i < estado.colonos.length; i++) {
+    if (i === yo) continue;
+    for (const ficha of (estado.colonos[i] as Colono).almacen) {
+      if (bienDeLaFicha(ficha) === bien) cosecha.push(ficha);
+    }
+  }
+
+  const colonos = estado.colonos.map((c, i) => {
+    if (i === yo) {
+      return { ...c, almacen: [...c.almacen, ...cosecha], mano: sinLaCarta(c.mano, enMano.carta) };
+    }
+    const quedan = c.almacen.filter((f) => bienDeLaFicha(f) !== bien);
+    /* A quien no tenía ninguno se le devuelve EL MISMO objeto: no le pasó nada. */
+    return quedan.length === c.almacen.length ? c : { ...c, almacen: quedan };
+  });
+  return { ...estado, colonos, cartaJugada: true };
+}
+
+/**
+ * JUEGA LAS DOS VEREDAS: alzas dos sin pagarlas, donde las reglas te dejen.
+ *
+ * Esta función no pone ninguna vereda. Lo único que hace es dejar el contador en
+ * dos y quitarse la carta de la mano; las veredas se alzan después, una a una, con
+ * el movimiento de siempre y por la función de siempre. El porqué está en
+ * `EstadoDeRiberas.veredasGratis` y es la parte que importa de esta carta: la
+ * segunda vereda puede salir de la primera, así que no se puede elegir el par de
+ * antemano.
+ *
+ * Si no queda un solo sitio legal, la carta no se juega —y tampoco se ofrece—.
+ * Gastar una carta para no poner nada no es una jugada: es una carta perdida por
+ * un descuido de quien escribió las opciones.
+ */
+function jugarLasDosVeredas(
+  estado: EstadoDeRiberas,
+  ctx: ContextoMovimiento,
+  seudonimo: string | null,
+): EstadoDeRiberas {
+  const yo = elTurnoEsDe(estado, ctx);
+  if (yo < 0 || !estado.tirado) return estado;
+  const mio = estado.colonos[yo] as Colono;
+
+  const enMano = laCartaDeLaMano(mio, seudonimo);
+  if (enMano === null || claseDeLaCarta(enMano.carta) !== 'dos-veredas') return estado;
+  if (!sePuedeJugarLaCarta(estado, enMano)) return estado;
+  if (!hayDondeTrazar(estado, yo)) return estado;
+
+  const colonos = estado.colonos.map((c, i) =>
+    i !== yo ? c : { ...c, mano: sinLaCarta(c.mano, enMano.carta) },
+  );
+  return { ...estado, colonos, veredasGratis: VEREDAS_DE_LA_CARTA, cartaJugada: true };
+}
+
+/**
+ * REVELA UN TÍTULO: lo enseñas, vale un punto en público y ya no se puede guardar.
+ *
+ * ═══ POR QUÉ ESTO NO ES «JUGAR UNA CARTA» ═══
+ *
+ * Porque no hace nada. Un título guardado ya vale su punto para su dueño —§1.6, y
+ * está en `puntosOcultosDe`—; revelarlo sólo pone en público lo que ya contaba en
+ * privado. Cobrarle la jugada del turno, o el turno de espera de la compra, sería
+ * castigar un movimiento que no cambia el juego de nadie.
+ *
+ * Y hay una razón que no es de elegancia: los puntos con los que se GANA son los
+ * públicos, así que quien tenga el octavo punto en un título tiene que poder
+ * revelarlo para ganar. Si revelar costara el turno o la jugada, habría manos con
+ * las que no se puede ganar. Por eso además se ofrece SIEMPRE en el turno propio,
+ * antes de tirar y después.
+ */
+function revelarUnTitulo(
+  estado: EstadoDeRiberas,
+  ctx: ContextoMovimiento,
+  seudonimo: string | null,
+): EstadoDeRiberas {
+  const yo = elTurnoEsDe(estado, ctx);
+  if (yo < 0) return estado;
+  const mio = estado.colonos[yo] as Colono;
+
+  const enMano = laCartaDeLaMano(mio, seudonimo);
+  if (enMano === null) return estado;
+  const clase = claseDeLaCarta(enMano.carta);
+  if (clase === null || !esTitulo(clase)) return estado;
+
+  const colonos = estado.colonos.map((c, i) =>
+    i !== yo
+      ? c
+      : { ...c, mano: sinLaCarta(c.mano, enMano.carta), titulos: [...c.titulos, clase] },
+  );
+  return puedeHaberGanado({ ...estado, colonos });
+}
+
+// ---------------------------------------------------------------------------
 // PASAR EL TURNO Y EL PLAZO
 // ---------------------------------------------------------------------------
 
@@ -1623,7 +2485,15 @@ function pasarTurno(estado: EstadoDeRiberas, ctx: ContextoMovimiento): EstadoDeR
   return siguienteTurno(estado);
 }
 
-/** Lo común: caducan los abiertos, avanza el turno y se borra la tirada. */
+/**
+ * Lo común: caducan los abiertos, avanza el turno y se borra la tirada.
+ *
+ * Y se borra TODO lo que dura un turno: la carta jugada y las veredas gratis que
+ * quedaran sin alzar. Lo segundo es una decisión y no un descuido: quien juega Las
+ * Dos Veredas y luego pasa sin poner la segunda la pierde, porque la alternativa
+ * —guardársela para el turno siguiente— convierte una carta en un crédito que hay
+ * que recordar, y nadie que mire el tablero sabría que existe.
+ */
 function siguienteTurno(estado: EstadoDeRiberas): EstadoDeRiberas {
   const caducados = caducarLosAbiertos(estado.tratos);
   return {
@@ -1631,6 +2501,9 @@ function siguienteTurno(estado: EstadoDeRiberas): EstadoDeRiberas {
     tratos: caducados.tratos,
     turno: (estado.turno + 1) % Math.max(1, estado.colonos.length),
     tirado: false,
+    turnosAbiertos: estado.turnosAbiertos + 1,
+    cartaJugada: false,
+    veredasGratis: 0,
   };
 }
 
@@ -1829,14 +2702,112 @@ function conElVado(estado: EstadoDeRiberas): EstadoDeRiberas {
 }
 
 // ---------------------------------------------------------------------------
+// LA MAYOR GUARDIA: el segundo premio derivado
+// ---------------------------------------------------------------------------
+
+/**
+ * RECALCULA LA MAYOR GUARDIA, con la MISMA regla que el Vado Largo.
+ *
+ * ═══ ES LA COPIA DEL PATRÓN DE `recalcularElVado`, Y ESO ES LO CORRECTO ═══
+ *
+ * Línea a línea es la misma función con otra cuenta dentro, y la tentación de
+ * escribir una sola con un `Record` de cuentas y un mínimo por parámetro es real.
+ * No se hace, y la razón no es pereza:
+ *
+ *   · LO QUE SE COMPARTE ES LA REGLA, y la regla es corta y está escrita entera en
+ *     la cabecera de aquélla: el dueño conserva mientras siga llegando al mínimo, y
+ *     sólo se lo quita quien lo SUPERE ESTRICTAMENTE siendo el único que lo supera.
+ *     Lo que no se comparte es qué se cuenta, y ahí no hay nada que abstraer:
+ *     `largoDelVado` es una búsqueda exhaustiva sobre un grafo y `c.guardias` es un
+ *     campo.
+ *   · Una función común tendría que devolver un tipo común, y `Vado` y `Guardia` son
+ *     dos tipos a propósito —ver `Guardia`—. Unificarlos para poder unificar la
+ *     función es dejar que la implementación decida el vocabulario del juego.
+ *
+ * Lo que sí hay que mantener a mano es que las dos cambien juntas si la regla
+ * cambia, y para eso está la comprobación: el comprobador prueba el empate y la
+ * superación estricta EN LOS DOS, con las mismas palabras.
+ */
+export function recalcularLaGuardia(estado: EstadoDeRiberas): Guardia {
+  const cuentas = estado.colonos.map((c) => c.guardias);
+
+  const iActual = estado.guardia.de === null ? -1 : indiceDelAsiento(estado, estado.guardia.de);
+  const actual = iActual < 0 ? 0 : (cuentas[iActual] ?? 0);
+  const sigueSiendoSuya = iActual >= 0 && actual >= GUARDIA_MINIMA;
+
+  const umbral = sigueSiendoSuya ? actual : GUARDIA_MINIMA - 1;
+  let mejor = umbral;
+  let cuantos = 0;
+  let quien = -1;
+  for (let i = 0; i < cuentas.length; i++) {
+    if (i === iActual && sigueSiendoSuya) continue;
+    const suyas = cuentas[i] as number;
+    if (suyas > mejor) {
+      mejor = suyas;
+      cuantos = 1;
+      quien = i;
+    } else if (suyas === mejor && suyas > umbral) {
+      cuantos++;
+    }
+  }
+
+  if (cuantos === 1 && quien >= 0) {
+    return { de: (estado.colonos[quien] as Colono).asiento, cuantas: mejor };
+  }
+  if (sigueSiendoSuya) return { de: estado.guardia.de, cuantas: actual };
+  return { de: null, cuantas: 0 };
+}
+
+/** Deja La Mayor Guardia al día, devolviendo EL MISMO objeto si no cambió. */
+function conLaGuardia(estado: EstadoDeRiberas): EstadoDeRiberas {
+  const guardia = recalcularLaGuardia(estado);
+  if (guardia.de === estado.guardia.de && guardia.cuantas === estado.guardia.cuantas) {
+    return estado;
+  }
+  return { ...estado, guardia };
+}
+
+// ---------------------------------------------------------------------------
 // PUNTOS Y FIN
 // ---------------------------------------------------------------------------
 
-/** Cuántos puntos tiene un colono AHORA MISMO. Derivado, nunca guardado. */
+/**
+ * CUÁNTOS PUNTOS TIENE UN COLONO EN PÚBLICO. Derivado, nunca guardado.
+ *
+ * ═══ «EN PÚBLICO» ES LA PALABRA QUE HAY QUE LEER ═══
+ *
+ * Aquí entran las piezas del tablero, los dos premios y los títulos REVELADOS.
+ * NO entran los títulos que siguen en la mano, y no es un olvido: es el §1.6 del
+ * diseño. Los cuenta `puntosOcultosDe`, y sólo se le enseñan a su dueño.
+ *
+ * De este número cuelga `puedeHaberGanado`, así que la consecuencia es una regla
+ * de verdad: CON UN TÍTULO SIN REVELAR NO SE GANA. Hay que enseñarlo, y por eso
+ * revelar se ofrece siempre en el turno propio.
+ */
 export function puntosDe(estado: EstadoDeRiberas, colono: Colono): number {
   const dePiezas =
     colono.chozas.length * PUNTOS_DE_LA_PIEZA.choza + colono.torres.length * PUNTOS_DE_LA_PIEZA.torre;
-  return dePiezas + (estado.vado.de === colono.asiento ? PUNTOS_DEL_VADO : 0);
+  const dePremios =
+    (estado.vado.de === colono.asiento ? PUNTOS_DEL_VADO : 0) +
+    (estado.guardia.de === colono.asiento ? PUNTOS_DE_LA_GUARDIA : 0);
+  return dePiezas + dePremios + colono.titulos.length * PUNTOS_DEL_TITULO;
+}
+
+/**
+ * LOS PUNTOS QUE SÓLO CUENTA SU DUEÑO: los títulos que siguen en la mano.
+ *
+ * Es la mitad del §1.6 que hace que las últimas rondas se jueguen distinto — saber
+ * que vas ganando en secreto cambia si compras o si construyes—. Sale de aquí y
+ * entra en la vista SÓLO por `misPuntos`, que la proyección no le manda a nadie
+ * más.
+ */
+export function puntosOcultosDe(colono: Colono): number {
+  let ocultos = 0;
+  for (const enMano of colono.mano) {
+    const clase = claseDeLaCarta(enMano.carta);
+    if (clase !== null && esTitulo(clase)) ocultos += PUNTOS_DEL_TITULO;
+  }
+  return ocultos;
 }
 
 /**
@@ -1932,9 +2903,22 @@ export interface ColonoVisto {
   chozas: LlaveDeVertice[];
   torres: LlaveDeVertice[];
   veredas: LlaveDeArista[];
+  /** Sus puntos PÚBLICOS. Los títulos sin revelar no están aquí. Ver `puntosDe`. */
   puntos: number;
   /** El largo de su cadena de veredas. Público: las veredas están a la vista. */
   vado: number;
+  /**
+   * CUÁNTAS CARTAS TIENE EN LA MANO. El número, no cuáles (§4 del diseño).
+   *
+   * Mismo trato que `bienes`: se cuentan mirando el montón que tiene delante, y
+   * saber que alguien lleva cuatro cartas guardadas es exactamente la información
+   * que hace que la mesa se ponga nerviosa a tiempo.
+   */
+  cartas: number;
+  /** Cuántas guardias ha jugado. Público: es lo que hace ver venir el premio. */
+  guardias: number;
+  /** Los títulos que ha revelado. Públicos, y un punto cada uno. */
+  titulos: Titulo[];
 }
 
 /**
@@ -1962,6 +2946,23 @@ export interface VistaDeRiberas {
   /** Los trueques. PÚBLICOS: una oferta se dice en voz alta. */
   tratos: Trato[];
   vado: Vado;
+  /** El segundo premio. Público entero, como el Vado. */
+  guardia: Guardia;
+  /** Cuántas cartas quedan en el mazo. Público: un mazo se cuenta (§1.3). */
+  mazo: number;
+  /** ¿Se ha jugado ya una carta en este turno? Público: se jugó en voz alta. */
+  cartaJugada: boolean;
+  /**
+   * CUÁNTOS TURNOS SE HAN ABIERTO. Público, y hace falta en la vista.
+   *
+   * Sin él, `opciones()` no podría saber si una carta de MI mano es de este turno o
+   * del anterior: el sello vive en la carta y sólo significa algo comparado con
+   * este contador. Y no es un secreto de nadie — cuántos turnos se han jugado lo
+   * sabe cualquiera que esté mirando la mesa.
+   */
+  turnosAbiertos: number;
+  /** Cuántas veredas gratis quedan por alzar. Pública, como la carta que las dio. */
+  veredasGratis: number;
   /** Quién soy yo aquí, o `null` si miro sin asiento. */
   yo: AsientoId | null;
   /**
@@ -1974,6 +2975,25 @@ export interface VistaDeRiberas {
    * un entorno hostil y basta con abrir las herramientas del navegador.
    */
   misFichas: Ficha[];
+  /**
+   * MI MANO DE CARTAS, y sólo la mía. Mismo trato que `misFichas`.
+   *
+   * Vacía para el espectador y para quien no juegue esta partida. No viaja tapada
+   * ni contada: sencillamente no se envía. Que la vista de otro no las traiga «ni
+   * por asomo» lo comprueba `verify:mesa` sobre el cable de verdad, y lo comprueba
+   * porque cada carta lleva número de serie — ver `Carta`.
+   */
+  misCartas: CartaEnMano[];
+  /**
+   * MIS PUNTOS CON LO OCULTO DENTRO. Sólo míos (§1.6 y §4 del diseño).
+   *
+   * Es `puntos` del colono propio más los títulos que sigo teniendo en la mano. Los
+   * demás ven mis públicos y yo veo los dos números, que es lo que permite que la
+   * pantalla distinga «lo que se ve» de «lo que sólo cuento yo».
+   *
+   * Cero para quien mira sin asiento.
+   */
+  misPuntos: number;
   ganadores: AsientoId[];
   /** El tablero YA RESUELTO, para el mueble genérico. Ver `tableroDeRiberas`. */
   tablero: TableroDeclarado;
@@ -2011,6 +3031,10 @@ function loQueSeVe(
       veredas: [...c.veredas],
       puntos: puntosDe(estado, c),
       vado: largoDelVado(c.veredas, bloqueadosDe(i)),
+      /* CUÁNTAS, no cuáles: la mano es de su dueño y el montón se ve desde fuera. */
+      cartas: c.mano.length,
+      guardias: c.guardias,
+      titulos: [...c.titulos],
     })),
     islas: estado.islas.map((i) => ({ hex: { q: i.hex.q, r: i.hex.r }, terreno: i.terreno, numero: i.numero })),
     turnoDe: asientoDelTurno(estado),
@@ -2021,8 +3045,19 @@ function loQueSeVe(
     ultimaTirada: estado.ultimaTirada,
     tratos: estado.tratos.map((t) => ({ ...t, da: [...t.da], pide: [...t.pide] })),
     vado: { de: estado.vado.de, largo: estado.vado.largo },
+    guardia: { de: estado.guardia.de, cuantas: estado.guardia.cuantas },
+    /*
+     * DEL MAZO SALE EL NÚMERO Y NUNCA LA LISTA. Contar lo que queda es información
+     * legítima —§1.3— y el orden de lo que queda es la partida entera por venir.
+     */
+    mazo: estado.mazo.length,
+    cartaJugada: estado.cartaJugada,
+    turnosAbiertos: estado.turnosAbiertos,
+    veredasGratis: estado.veredasGratis,
     yo: quien === ESPECTADOR ? null : quien,
     misFichas: mio === undefined ? [] : [...mio.almacen],
+    misCartas: mio === undefined ? [] : mio.mano.map((m) => ({ ...m })),
+    misPuntos: mio === undefined ? 0 : puntosDe(estado, mio) + puntosOcultosDe(mio),
     ganadores: [...estado.ganadores],
   };
 }
@@ -2049,7 +3084,7 @@ export function proyectarRiberas(
   quien: QuienMira,
   sentados: LosSentados = NADIE_SENTADO,
 ): VistaDeRiberas {
-  const base = loQueSeVe(estado ?? partidaNueva(), quien, sentados);
+  const base = loQueSeVe(comoSiSiempreHubieraHabidoMazo(estado ?? partidaNueva()), quien, sentados);
   return { ...base, tablero: tableroDeRiberas(base, quien) };
 }
 
@@ -2094,11 +3129,26 @@ function nombreEnLaVista(v: VistaSinTablero, asiento: AsientoId): string {
  * y pondría rojo un comprobador sin que hubiera pasado nada. Ver `Ficha`.
  */
 export function loSecretoDeRiberas(estado: EstadoDeRiberas | undefined): unknown[] {
-  const e = estado ?? partidaNueva();
+  const e = comoSiSiempreHubieraHabidoMazo(estado ?? partidaNueva());
   const secretos: unknown[] = [e.azar];
   for (const c of e.colonos) {
     for (const ficha of c.almacen) secretos.push(ficha);
+    for (const enMano of c.mano) secretos.push(enMano.carta);
   }
+  /*
+   * ═══ EL MAZO ENTERO ES SECRETO, Y NO APARECE EN NINGUNA VISTA ═══
+   *
+   * Es el caso de La Frente —el azar no sale en la vista de nadie— y la misma
+   * regla lo cubre: «ningún valor secreto puede aparecer en la vista de MÁS DE UN
+   * asiento» se cumple de sobra con cero. Declararlo aquí igualmente es lo que
+   * convierte en rojo el día que alguien mande el mazo por el cable «para que la
+   * pantalla pueda pintar el lomo con las cartas que quedan».
+   *
+   * Y una carta que se JUEGA no pasa a estar en dos sitios: sale de la mano y lo
+   * que queda es un contador. Ver `Colono.guardias`. Un secreto que se vuelve
+   * público es un rojo de `verify:mesa` esperando a que alguien juegue esa carta.
+   */
+  for (const carta of e.mazo) secretos.push(carta);
   return secretos;
 }
 
@@ -2148,7 +3198,24 @@ export function opcionesDeRiberas(vista: unknown, quien: QuienMira): readonly Op
   return [];
 }
 
-/** Mira si esto tiene forma de vista de Riberas. Con o sin tablero: da igual. */
+/**
+ * Mira si esto tiene forma de vista de Riberas. Con o sin tablero: da igual.
+ *
+ * ═══ LO DEL MAZO SE NORMALIZA EN VEZ DE EXIGIRSE, Y HAY QUE SABER POR QUÉ ═══
+ *
+ * Lo que le llega a esto es `unknown` de verdad: viene por la red, y quien la
+ * manda puede ser un cliente de la versión de ayer o un banco de pruebas que monta
+ * una vista a mano —`vistaDePrueba`, en `riberas-en-3d.ts`, existe justamente para
+ * probar los anillos del tablero sin partida—. Si los campos del mazo entraran en
+ * las cuatro guardas de arriba, a una vista sin ellos se le devolvería `null` y el
+ * juego ENTERO se apagaría: ni fundar, ni alzar, ni pasar. Un campo que falta
+ * apagaría las reglas que no tienen nada que ver con él.
+ *
+ * Así que los campos que decidían si hay juego siguen siendo los de siempre, y los
+ * del mazo se rellenan con «no hay mazo»: sin cartas no se ofrece ninguna opción de
+ * carta, que es exactamente lo correcto. Lo que NO se hace es inventarse colonos ni
+ * islas: eso sí cambiaría qué se puede hacer.
+ */
 function comoVista(vista: unknown): VistaSinTablero | null {
   if (typeof vista !== 'object' || vista === null) return null;
   const v = vista as Partial<VistaSinTablero>;
@@ -2156,7 +3223,23 @@ function comoVista(vista: unknown): VistaSinTablero | null {
   if (!Array.isArray(v.colonos) || !Array.isArray(v.islas)) return null;
   if (!Array.isArray(v.misFichas)) return null;
   if (!Array.isArray(v.tratos)) return null;
-  return v as VistaSinTablero;
+  return {
+    ...(v as VistaSinTablero),
+    colonos: v.colonos.map((c) => ({
+      ...c,
+      cartas: typeof c.cartas === 'number' ? c.cartas : 0,
+      guardias: typeof c.guardias === 'number' ? c.guardias : 0,
+      titulos: Array.isArray(c.titulos) ? c.titulos : [],
+    })),
+    misCartas: Array.isArray(v.misCartas) ? v.misCartas : [],
+    misPuntos: typeof v.misPuntos === 'number' ? v.misPuntos : 0,
+    mazo: typeof v.mazo === 'number' ? v.mazo : 0,
+    cartaJugada: v.cartaJugada === true,
+    turnosAbiertos: typeof v.turnosAbiertos === 'number' ? v.turnosAbiertos : 0,
+    veredasGratis: typeof v.veredasGratis === 'number' ? v.veredasGratis : 0,
+    guardia:
+      typeof v.guardia === 'object' && v.guardia !== null ? v.guardia : { de: null, cuantas: 0 },
+  };
 }
 
 /**
@@ -2270,6 +3353,32 @@ function opcionesDeTurno(v: VistaSinTablero, quien: AsientoId): readonly Opcion[
       rotulo: 'Tirar los dados',
       ayuda: 'Las islas con esa suma rinden a quien las toca. Con siete no rinde nadie.',
     });
+    /*
+     * REVELAR TAMBIÉN AQUÍ, ANTES DE TIRAR, y va después de `tirar` en la lista a
+     * propósito: quien recorre las opciones de arriba abajo —un comprobador, un
+     * cliente tonto— tiene que encontrarse primero lo que mueve la partida.
+     *
+     * Que se ofrezca antes de tirar no es un capricho: los puntos con los que se
+     * gana son los públicos, así que quien tiene el octavo en un título tiene que
+     * poder enseñarlo en cualquier momento de su turno. Ver `revelarUnTitulo`.
+     */
+    opciones.push(...opcionesDeRevelar(v));
+    return opciones;
+  }
+
+  /*
+   * ═══ LAS DOS VEREDAS MANDAN MIENTRAS QUEDEN, Y NO SE OFRECE NADA MÁS ═══
+   *
+   * Es el mismo corte que hace la colocación con `faltaVereda`: quien tiene una
+   * vereda pendiente no puede hacer otra cosa hasta ponerla. La alternativa —dejar
+   * abierto todo el turno un crédito de dos veredas— convierte una carta en algo
+   * que hay que recordar, y nadie que mire el tablero sabría que existe.
+   *
+   * Revelar sí sigue ofreciéndose, por lo mismo de arriba: no es una jugada.
+   */
+  if (v.veredasGratis > 0) {
+    opciones.push(...opcionesDeVeredaGratis(v, mio));
+    opciones.push(...opcionesDeRevelar(v));
     return opciones;
   }
 
@@ -2349,6 +3458,15 @@ function opcionesDeTurno(v: VistaSinTablero, quien: AsientoId): readonly Opcion[
   }
 
   opciones.push(...opcionesDeTrueque(v, mio));
+  opciones.push(...opcionesDelMazo(v, mio));
+  /*
+   * REVELAR SALE POR LOS TRES CAMINOS DEL TURNO —antes de tirar, con veredas de la
+   * carta pendientes y aquí—, y eso es lo que quiere decir «siempre». Escrito tres
+   * veces y no una porque los otros dos caminos SE VAN por su `return`: meterlo en
+   * un solo sitio significaría no ofrecerlo en dos tercios del turno, y con el
+   * octavo punto guardado en un título eso es una mano con la que no se puede ganar.
+   */
+  opciones.push(...opcionesDeRevelar(v));
 
   opciones.push({
     id: 'pasar',
@@ -2357,6 +3475,191 @@ function opcionesDeTurno(v: VistaSinTablero, quien: AsientoId): readonly Opcion[
     rotulo: 'Pasar el turno',
     ayuda: 'Los trueques que sigan abiertos caducan.',
   });
+  return opciones;
+}
+
+/**
+ * LAS VEREDAS DE LA CARTA: las mismas de siempre, sin cobrar.
+ *
+ * Se ofrecen exactamente donde se ofrecerían pagándolas —sin mirar el almacén, que
+ * es lo único que cambia— y con el MISMO `id` y la MISMA carga que la vereda
+ * normal. Que el identificador sea el mismo no es descuido: el sitio es el mismo, y
+ * el tablero declarado busca `vereda:${arista}` para saber qué línea se puede
+ * tocar. Dos identificadores para la misma línea harían que el mapa dejara de
+ * encenderla justo el turno en que la carta la regala.
+ */
+function opcionesDeVeredaGratis(v: VistaSinTablero, mio: ColonoVisto): Opcion[] {
+  return sitiosDeVereda(v, mio).map((arista) => ({
+    id: `vereda:${arista}`,
+    tipo: ALZAR,
+    carga: { que: 'vereda', donde: arista },
+    rotulo: 'Trazar vereda',
+    ayuda:
+      v.veredasGratis <= 1
+        ? 'La última de la carta, y es gratis.'
+        : `Gratis: te quedan ${v.veredasGratis} de la carta.`,
+  }));
+}
+
+/**
+ * DÓNDE PODRÍA ESTE COLONO TRAZAR UNA VEREDA, sin mirar si le llega para pagarla.
+ *
+ * Es la misma pregunta que `hayDondeTrazar` le hace al estado, hecha sobre la
+ * vista. Existe separada de las opciones porque hay dos sitios que necesitan la
+ * respuesta y sólo uno necesita los botones: Las Dos Veredas se ofrece únicamente
+ * si hay al menos un sitio, y contar botones para saberlo sería fabricar una lista
+ * para tirarla.
+ */
+function sitiosDeVereda(v: VistaSinTablero, mio: ColonoVisto): LlaveDeArista[] {
+  if (mio.veredas.length >= TOPE_DE_PIEZAS.vereda) return [];
+  const sitios: LlaveDeArista[] = [];
+  for (const arista of aristasDe(v.islas.map((i) => i.hex))) {
+    if (aristaTomada(v, arista)) continue;
+    if (!pegaConLoSuyo(v, mio, arista)) continue;
+    sitios.push(arista);
+  }
+  return sitios;
+}
+
+/**
+ * REVELAR UN TÍTULO. Siempre en el turno propio, y nunca con el título en el `id`.
+ *
+ * ═══ ÉSTA ES LA OPCIÓN QUE MÁS FÁCIL SE ESCRIBE MAL, Y ESTÁ AVISADO ═══
+ *
+ * Lo natural es `id: 'revelar:molino'`, que se lee de maravilla al depurar y
+ * publica QUÉ TÍTULO TENGO — que es secreto hasta que lo enseñe—. Y `verify:mesa`
+ * no lo cazaría: busca la forma canónica del secreto, `"c7:molino"`, y esa cadena
+ * no está ahí. Es literalmente el agujero que el §5 bis describe con su propio
+ * ejemplo.
+ *
+ * Así que el `id` lleva el SEUDÓNIMO de la carta y nada más. El rótulo sí nombra el
+ * título, y eso es correcto y está autorizado en la cabecera de `Opcion.rotulo`:
+ * las opciones se calculan sobre LA VISTA DE UN OBSERVADOR y esta carta ya está en
+ * `misCartas`, que es suya. Lo que no se puede es nombrar algo de otro.
+ */
+function opcionesDeRevelar(v: VistaSinTablero): Opcion[] {
+  const opciones: Opcion[] = [];
+  for (const enMano of v.misCartas) {
+    const clase = claseDeLaCarta(enMano.carta);
+    if (clase === null || !esTitulo(clase)) continue;
+    const suyo = seudonimoDeLaCarta(enMano.carta);
+    opciones.push({
+      id: `revelar:${suyo}`,
+      tipo: REVELAR,
+      carga: { carta: suyo },
+      rotulo: `Revelar ${NOMBRE_DE_LA_CARTA[clase]}`,
+      ayuda: 'Vale un punto, y a la vista de todos. No cuenta como jugar una carta.',
+    });
+  }
+  return opciones;
+}
+
+/**
+ * COMPRAR, Y JUGAR LO QUE SE PUEDA JUGAR.
+ *
+ * ═══ QUÉ SE COMPRUEBA AQUÍ Y QUÉ NO, QUE ES LA MITAD DEL §5 bis ═══
+ *
+ * Se comprueba todo lo que está EN MI VISTA: que me llegue el coste (mi almacén es
+ * mío), que quede mazo (el número es público), que no haya jugado ya una carta
+ * (público), que la carta no sea de este turno (el sello viaja en mi propia mano) y
+ * —para la guardia— que a quien voy a robar le quede algo, porque cuántos bienes
+ * tiene cada cual es público.
+ *
+ * Y NO se comprueba lo que no puedo ver: al acaparar se ofrecen los cinco bienes
+ * aunque nadie tenga ninguno. Filtrar por lo que los demás tienen sería publicar
+ * sus almacenes en una lista de botones — la fuga más barata de todas, y por una
+ * puerta que ningún comprobador de secretos mira.
+ */
+function opcionesDelMazo(v: VistaSinTablero, mio: ColonoVisto): Opcion[] {
+  const opciones: Opcion[] = [];
+
+  if (v.mazo > 0 && llegaPara(v.misFichas, COSTE_DE_LA_CARTA)) {
+    opciones.push({
+      id: 'comprar',
+      tipo: COMPRAR,
+      carga: {},
+      rotulo: 'Comprar una carta',
+      ayuda: `Cuesta ${listar(COSTE_DE_LA_CARTA)}. Quedan ${v.mazo} en el mazo, y no se juega hasta tu turno siguiente.`,
+    });
+  }
+
+  for (const enMano of v.misCartas) {
+    const clase = claseDeLaCarta(enMano.carta);
+    if (clase === null || esTitulo(clase)) continue;
+    /* Una por turno, y nunca la de hoy. Las dos reglas, mirando lo que veo yo. */
+    if (v.cartaJugada) continue;
+    if (enMano.comprada >= v.turnosAbiertos) continue;
+
+    const suyo = seudonimoDeLaCarta(enMano.carta);
+    const como = NOMBRE_DE_LA_CARTA[clase];
+
+    if (clase === 'guardia') {
+      for (const otro of v.colonos) {
+        if (otro.asiento === mio.asiento) continue;
+        /* A quien no tiene nada no se le roba: es público cuántos bienes tiene. */
+        if (otro.bienes === 0) continue;
+        opciones.push({
+          id: `jugar-guardia:${suyo}:${otro.asiento}`,
+          tipo: GUARDIA,
+          carga: { carta: suyo, a: otro.asiento },
+          rotulo: `${como}: robar a ${nombreEnLaVista(v, otro.asiento)}`,
+          ayuda: 'Le quitas un bien al azar. Cuenta para La Mayor Guardia.',
+        });
+      }
+      continue;
+    }
+
+    if (clase === 'ano-bueno') {
+      /*
+       * LOS PARES SIN REPETIR: `sal y grano` y `grano y sal` son la misma jugada, y
+       * ofrecerla dos veces sería pintar dos botones que hacen lo mismo. Se recorre
+       * con el segundo índice desde el primero, que además deja el par `sal y sal`
+       * dentro — dos iguales es legal y es la mitad de la gracia de la carta.
+       */
+      for (let a = 0; a < BIENES.length; a++) {
+        for (let b = a; b < BIENES.length; b++) {
+          const uno = BIENES[a] as Bien;
+          const otro = BIENES[b] as Bien;
+          opciones.push({
+            id: `jugar-ano:${suyo}:${uno}:${otro}`,
+            tipo: ANO_BUENO,
+            carga: { carta: suyo, bienes: [uno, otro] },
+            rotulo: `${como}: coger ${listar([uno, otro])}`,
+            ayuda: 'Salen del arcón, no de nadie.',
+          });
+        }
+      }
+      continue;
+    }
+
+    if (clase === 'acaparamiento') {
+      for (const bien of BIENES) {
+        opciones.push({
+          id: `jugar-acaparar:${suyo}:${bien}`,
+          tipo: ACAPARAMIENTO,
+          carga: { carta: suyo, bien },
+          rotulo: `${como}: pedir ${bien}`,
+          ayuda: 'Todos los demás te dan los que tengan de ése, y puede que no tengan ninguno.',
+        });
+      }
+      continue;
+    }
+
+    /*
+     * LAS DOS VEREDAS, y sólo si hay dónde poner al menos una: es público, se ve
+     * mirando el tablero, y una carta que se gasta sin poner nada es una carta que
+     * se pierde por un descuido de esta función.
+     */
+    if (sitiosDeVereda(v, mio).length === 0) continue;
+    opciones.push({
+      id: `jugar-veredas:${suyo}`,
+      tipo: DOS_VEREDAS,
+      carga: { carta: suyo },
+      rotulo: `${como}`,
+      ayuda: `Alzas ${VEREDAS_DE_LA_CARTA} veredas sin pagarlas, una detrás de otra.`,
+    });
+  }
+
   return opciones;
 }
 
@@ -2629,18 +3932,50 @@ function panelesDe(v: VistaSinTablero): PanelDeTablero[] {
    * de una lista aparte, para que nada de lo que se escribe aquí pueda salirse de
    * lo que la proyección dejó pasar.
    */
-  const marcador = v.colonos.map(
-    (c) =>
-      `${nombreEnLaVista(v, c.asiento)} — ${c.puntos} pto${c.puntos === 1 ? '' : 's'}, ${c.bienes} bien${c.bienes === 1 ? '' : 'es'}, vereda más larga ${c.vado}`,
-  );
+  /*
+   * EL MARCADOR DICE LOS PUNTOS PÚBLICOS DE CADA CUAL, y de nadie los ocultos.
+   *
+   * Los de quien mira llevan además su cuenta con lo oculto dentro, y se escribe
+   * aparte —«y N contando lo tuyo»— en vez de sumarlo al número de la lista. Si se
+   * sumara ahí, el mismo renglón diría un número distinto en cada pantalla y nadie
+   * podría hablar del marcador en voz alta.
+   */
+  const marcador = v.colonos.map((c) => {
+    const suyo = c.asiento === v.yo && v.misPuntos !== c.puntos ? ` (y ${v.misPuntos} contándote lo oculto)` : '';
+    return (
+      `${nombreEnLaVista(v, c.asiento)} — ${c.puntos} pto${c.puntos === 1 ? '' : 's'}${suyo}, ` +
+      `${c.bienes} bien${c.bienes === 1 ? '' : 'es'}, ${c.cartas} carta${c.cartas === 1 ? '' : 's'}, ` +
+      `vereda más larga ${c.vado}`
+    );
+  });
 
   const tratos = v.tratos.map(
     (t) =>
       `${t.id}: ${nombreEnLaVista(v, t.de)} da ${listar(t.da)} por ${listar(t.pide)} a ${nombreEnLaVista(v, t.para)} — ${t.estado}`,
   );
 
+  /*
+   * MI MANO, POR FAMILIAS Y NO CARTA A CARTA.
+   *
+   * Es lo que pide el §5 del diseño para la pantalla, y aquí además ahorra la
+   * pregunta de qué hacer con cinco guardias iguales. Sale SÓLO en mi panel,
+   * porque sale de `misCartas`, que la proyección no le manda a nadie más.
+   */
+  const mano: string[] = [];
+  for (const clase of CLASES_DE_CARTA) {
+    const cuantas = v.misCartas.filter((m) => claseDeLaCarta(m.carta) === clase).length;
+    if (cuantas > 0) mano.push(`${NOMBRE_DE_LA_CARTA[clase]}: ${cuantas}`);
+  }
+  if (mano.length === 0) mano.push('Sin cartas.');
+  mano.push(`Quedan ${v.mazo} en el mazo.`);
+
+  const guardias = v.colonos
+    .filter((c) => c.guardias > 0)
+    .map((c) => `${nombreEnLaVista(v, c.asiento)}: ${c.guardias}`);
+
   const paneles: PanelDeTablero[] = [
     { titulo: 'Lo mío', lineas: mios },
+    { titulo: 'Mis cartas', lineas: mano },
     { titulo: 'La mesa', lineas: marcador },
     {
       titulo: 'El Vado Largo',
@@ -2648,6 +3983,15 @@ function panelesDe(v: VistaSinTablero): PanelDeTablero[] {
         v.vado.de === null
           ? `Vacante. Hacen falta ${VADO_MINIMO} veredas seguidas.`
           : `De ${nombreEnLaVista(v, v.vado.de)}, con ${v.vado.largo} veredas. Vale ${PUNTOS_DEL_VADO} puntos.`,
+      ],
+    },
+    {
+      titulo: 'La Mayor Guardia',
+      lineas: [
+        v.guardia.de === null
+          ? `Vacante. Hacen falta ${GUARDIA_MINIMA} guardias jugadas.`
+          : `De ${nombreEnLaVista(v, v.guardia.de)}, con ${v.guardia.cuantas}. Vale ${PUNTOS_DE_LA_GUARDIA} punto.`,
+        ...guardias,
       ],
     },
   ];

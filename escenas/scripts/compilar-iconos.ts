@@ -1,5 +1,16 @@
 /**
- * COMPILA LOS ICONOS DE LOS BIENES A UN MÓDULO DE TYPESCRIPT.
+ * COMPILA LOS ICONOS DE RIBERAS A UN MÓDULO DE TYPESCRIPT.
+ *
+ *   npx tsx escenas/scripts/compilar-iconos.ts
+ *
+ * Escribe `escenas/iconos.ts`, y lo escribe ENTERO cada vez. Dentro van dos cosas de
+ * origen distinto, y esa diferencia es la mitad de este fichero:
+ *
+ *  · Los ICONOS DE LOS BIENES, que se leen de los `.svg` de `arte/game-icons/`. Arte
+ *    ajeno y provisional; este guion no sabe de quién y a propósito.
+ *  · Los DIBUJOS DE LAS NUEVE CARTAS del mazo, que no se leen de ninguna parte: están
+ *    escritos aquí abajo en coordenadas, con la cabecera de cada uno contando qué se ve.
+ *    Este guion es su original, no su copia.
  *
  * ═══ POR QUÉ NO SE CARGAN LOS `.svg` DIRECTAMENTE ═══
  *
@@ -35,15 +46,20 @@
  *
  * ═══ Y POR QUÉ NO CONOCE A NADIE ═══
  *
- * Este guion no sabe de dónde salen los iconos ni quién los hizo: lee los `.svg` que haya
- * en la carpeta, por su nombre de fichero. El arte de ahora es PROVISIONAL —ver
- * `arte/game-icons/LEEME.md`— y cambiarlo tiene que ser dejar cinco ficheros y volver a
- * ejecutar esto, sin tocar una línea de la escena. Un arte provisional del que dependa
+ * Este guion no sabe de dónde salen los iconos de los bienes ni quién los hizo: lee los
+ * `.svg` que haya en la carpeta, por su nombre de fichero. El arte de ahora es PROVISIONAL
+ * —ver `arte/game-icons/LEEME.md`— y cambiarlo tiene que ser dejar cinco ficheros y volver
+ * a ejecutar esto, sin tocar una línea de la escena. Un arte provisional del que dependa
  * código ya no es provisional.
+ *
+ * Con las cartas es al revés y también a propósito: no hay fichero que dejar porque el
+ * dibujo ES este código. El porqué está donde empiezan, más abajo.
  */
 
 import fs from 'node:fs';
 import path from 'node:path';
+import { ShapePath } from 'three';
+import { cuantosTriangulos, geometriaDeContornos } from '../formas';
 import { aplanaTrazo, simplificaContorno } from './aplana-trazo';
 
 const RAIZ = path.resolve(import.meta.dirname ?? __dirname, '..', '..');
@@ -163,37 +179,942 @@ function leeUno(bien: string, fichero: string): Icono {
 
 const iconos = BIENES.map((b) => leeUno(b.bien, b.fichero));
 
+// ---------------------------------------------------------------------------
+
+/**
+ * ═══ Y AQUÍ EMPIEZA LO QUE NO VIENE DE NINGÚN `.svg`: LAS CARTAS ═══
+ *
+ * Los cuatro bienes de arriba se leen de un fichero porque su arte es de fuera y
+ * provisional. Las nueve cartas del mazo NO: se dibujan aquí, en coordenadas, y este
+ * guion es su original.
+ *
+ * Se hace así por una razón que se ve en cuanto se intenta lo otro. La cabecera del
+ * fichero generado dice, con toda la razón, que nadie lo edite a mano — se sobrescribe.
+ * Así que un dibujo escrito directamente en `escenas/iconos.ts` es un dibujo con fecha de
+ * caducidad: dura hasta que alguien vuelva a compilar los bienes, y entonces desaparece
+ * sin que falle nada. Poniéndolo aquí, recompilar lo vuelve a escribir igual.
+ *
+ * La alternativa honrada era dejar nueve `.svg` en una carpeta y leerlos, como los bienes.
+ * No se hizo, y el motivo es el mismo por el que existe `arte/game-icons/LEEME.md`: un
+ * `.svg` no dice de dónde salió ni quién lo hizo, y este árbol ya tuvo cinco dibujos
+ * ajenos colándose hacia producción sin su atribución. Un dibujo escrito en coordenadas,
+ * con su cabecera al lado contando qué se ve y por qué, no tiene esa duda: es de la casa
+ * porque está aquí.
+ */
+
+/** Un punto del lienzo. La `y` crece HACIA ABAJO, igual que en SVG. */
+type Punto = readonly [number, number];
+
+/** La misma décima con la que se recorta el arte que sí viene de `.svg`. */
+function decima(n: number): number {
+  return Math.round(n * 10) / 10;
+}
+
+/** El doble del área con signo. Sólo interesa el SIGNO: dice cómo está enrollado. */
+function areaFirmada(puntos: readonly Punto[]): number {
+  let suma = 0;
+  for (let i = 0, j = puntos.length - 1; i < puntos.length; j = i++) {
+    const a = puntos[i] as Punto;
+    const b = puntos[j] as Punto;
+    suma += b[0] * a[1] - a[0] * b[1];
+  }
+  return suma;
+}
+
+/**
+ * DE PUNTOS A TIRA, CON EL ENROLLADO PUESTO A MANO, Y ESTO NO ES COSMÉTICO.
+ *
+ * `ShapePath.toShapes` —el mismo que usa `SVGLoader`, y el que va a enhebrar esto en los
+ * dos clientes— decide qué contorno es silueta y qué contorno es AGUJERO sumando números
+ * de vuelta con la regla `nonzero`. Un contorno metido dentro de otro y enrollado en el
+ * MISMO sentido no sale como agujero: sale como repetición, y el algoritmo lo descarta por
+ * redundante. O sea que una tronera dibujada del revés no se ve mal — se ve como si no
+ * estuviera, y el torreón sale macizo sin que nada falle.
+ *
+ * Por eso el sentido no se escribe en las listas de puntos, donde se pierde a la primera
+ * corrección: se impone aquí. `macizo` deja el contorno positivo y `hueco` negativo, y
+ * quien dibuja sólo tiene que decir cuál de las dos cosas quiere.
+ */
+function tira(puntos: readonly Punto[], positiva: boolean): number[] {
+  const ordenados = areaFirmada(puntos) >= 0 === positiva ? puntos : [...puntos].reverse();
+  const salida: number[] = [];
+  for (const p of ordenados) salida.push(decima(p[0]), decima(p[1]));
+  return salida;
+}
+
+/** Una silueta: lo que se pinta. */
+function macizo(puntos: readonly Punto[]): number[] {
+  return tira(puntos, true);
+}
+
+/** Un agujero DENTRO de una silueta: lo que deja pasar el color de la carta. */
+function hueco(puntos: readonly Punto[]): number[] {
+  return tira(puntos, false);
+}
+
+/** Un arco, en grados y en sentido antihorario visual (0° a la derecha, 90° arriba). */
+function arco(
+  cx: number,
+  cy: number,
+  radio: number,
+  desde: number,
+  hasta: number,
+  lados: number,
+): Punto[] {
+  const puntos: Punto[] = [];
+  for (let i = 0; i <= lados; i++) {
+    const grados = desde + ((hasta - desde) * i) / lados;
+    const a = (grados * Math.PI) / 180;
+    puntos.push([cx + radio * Math.cos(a), cy - radio * Math.sin(a)]);
+  }
+  return puntos;
+}
+
+/**
+ * Un círculo, con la opción de abollarlo. `ondas` y `amplitud` sirven para la copa del
+ * huerto: un círculo perfecto se lee como una pelota y no como un árbol.
+ */
+function circulo(
+  cx: number,
+  cy: number,
+  radio: number,
+  lados: number,
+  ondas = 0,
+  amplitud = 0,
+): Punto[] {
+  const puntos: Punto[] = [];
+  for (let i = 0; i < lados; i++) {
+    const a = (2 * Math.PI * i) / lados;
+    const r = radio * (1 + amplitud * Math.cos(ondas * a));
+    puntos.push([cx + r * Math.cos(a), cy - r * Math.sin(a)]);
+  }
+  return puntos;
+}
+
+/**
+ * UNA LÍNEA CON CUERPO: de una polilínea a la cinta rellena que la dibuja.
+ *
+ * ═══ POR QUÉ NO HAY TRAZOS DE VERDAD ═══
+ *
+ * Porque lo que viaja a los clientes son contornos que se rellenan de un color plano; no
+ * hay grosor de línea que ajustar en ninguna parte. Una lanza o un aspa de molino son
+ * líneas, así que se convierten en el polígono que las contiene y se rellenan igual que
+ * todo lo demás.
+ *
+ * ═══ Y POR QUÉ EL GROSOR ES TAN GORDO ═══
+ *
+ * Porque `arte/game-icons/LEEME.md` lo midió antes que nadie: la carta pinta el icono
+ * pequeño sobre un fondo de color, y un trazo de dos píxeles desaparece. Sobre este lienzo
+ * de 512, dibujado a un centenar de píxeles, un grosor de 20 son cuatro píxeles — que es
+ * el mínimo que sobrevive en un móvil. Es la razón de que estos dibujos tengan pocas
+ * líneas y gordas en vez de muchas y finas.
+ *
+ * El INGLETE de cada codo se limita a propósito: sin tope, un codo cerrado dispara la
+ * punta a varias veces el grosor y la cinta se cruza consigo misma, que es un polígono no
+ * simple — y ahí el triangulador deja de contar lo que hay dentro y lo que hay fuera.
+ */
+function trazo(camino: readonly Punto[], grosor: number): number[] {
+  if (camino.length < 2) {
+    console.error('Un trazo necesita al menos dos puntos.');
+    process.exit(2);
+  }
+  const medio = grosor / 2;
+
+  const normales: Punto[] = [];
+  for (let i = 0; i + 1 < camino.length; i++) {
+    const a = camino[i] as Punto;
+    const b = camino[i + 1] as Punto;
+    const dx = b[0] - a[0];
+    const dy = b[1] - a[1];
+    const largo = Math.hypot(dx, dy);
+    if (largo < 1e-9) {
+      console.error('Un trazo trae dos puntos pegados y ahí no hay dirección que seguir.');
+      process.exit(2);
+    }
+    normales.push([-dy / largo, dx / largo]);
+  }
+
+  const izquierda: Punto[] = [];
+  const derecha: Punto[] = [];
+  for (let i = 0; i < camino.length; i++) {
+    const aqui = camino[i] as Punto;
+    const antes = normales[Math.max(0, i - 1)] as Punto;
+    const luego = normales[Math.min(normales.length - 1, i)] as Punto;
+    let mx = antes[0] + luego[0];
+    let my = antes[1] + luego[1];
+    const largo = Math.hypot(mx, my);
+    if (largo < 1e-6) {
+      mx = antes[0];
+      my = antes[1];
+    } else {
+      mx /= largo;
+      my /= largo;
+    }
+    /* El tope del inglete: 0,35 deja crecer la punta hasta unas tres veces el grosor. */
+    const cuanto = medio / Math.max(0.35, mx * antes[0] + my * antes[1]);
+    izquierda.push([aqui[0] + mx * cuanto, aqui[1] + my * cuanto]);
+    derecha.push([aqui[0] - mx * cuanto, aqui[1] - my * cuanto]);
+  }
+
+  return macizo([...izquierda, ...derecha.reverse()]);
+}
+
+/**
+ * UN TRAVESAÑO de una banda en perspectiva: el hueco que cruza una vereda de lado a lado.
+ *
+ * La banda se da como sus cuatro esquinas —abajo-izquierda, abajo-derecha, arriba-derecha,
+ * arriba-izquierda— y `parte` dice a qué altura se corta, de 0 abajo a 1 arriba. Se
+ * interpola en vez de escribir las coordenadas porque la banda se estrecha al subir: un
+ * travesaño de anchura fija se saldría por los lados en lo alto, y ahí deja de ser un
+ * agujero para partir la vereda en dos trozos.
+ */
+function travesano(
+  banda: readonly Punto[],
+  parte: number,
+  margen: number,
+  grosor: number,
+): Punto[] {
+  const abajoIzq = banda[0] as Punto;
+  const abajoDer = banda[1] as Punto;
+  const arribaDer = banda[2] as Punto;
+  const arribaIzq = banda[3] as Punto;
+  const izq = abajoIzq[0] + (arribaIzq[0] - abajoIzq[0]) * parte;
+  const der = abajoDer[0] + (arribaDer[0] - abajoDer[0]) * parte;
+  const y = abajoIzq[1] + (arribaIzq[1] - abajoIzq[1]) * parte;
+  return [
+    [izq + margen, y - grosor / 2],
+    [der - margen, y - grosor / 2],
+    [der - margen, y + grosor / 2],
+    [izq + margen, y + grosor / 2],
+  ];
+}
+
+// ---------------------------------------------------------------------------
+
+/** Un dibujo de carta, con lo que se ve escrito al lado para quien lea el generado. */
+interface Dibujo {
+  /** La llave con la que la escena lo pide. Es el nombre de la familia, no su rótulo. */
+  carta: string;
+  /** QUÉ SE VE, en una frase. Viaja al fichero generado. */
+  que: string;
+  contornos: number[][];
+}
+
+/*
+ * ═══ EL PULSO DE LOS NUEVE, DICHO UNA VEZ PARA LOS NUEVE ═══
+ *
+ * Miguel mandó dos referencias y se quedó con la segunda: TRAZO CLARO SOBRE FONDO OSCURO,
+ * línea limpia, sin acuarela y sin relleno de color. Es además lo que ya hacen los cuatro
+ * bienes, que la carta pinta en crema sobre el color de su tierra.
+ *
+ * Y sobre eso manda una restricción que decide casi todo lo demás: estas cartas se ven en
+ * una MANO, dentro de una escena en tres dimensiones, en un móvil. Ahí un dibujo mide poco
+ * más de un centenar de píxeles y encima se mueve. Así que aquí no hay detalle fino: cada
+ * uno son formas grandes y pocas —ninguno pasa de nueve contornos—, y lo que distingue una
+ * carta de otra tiene que verse en su SILUETA, porque a ese tamaño es lo único que llega.
+ *
+ * De ahí las tres reglas que siguen los nueve:
+ *
+ *  · Masa donde hay masa y línea donde hay línea. Un yelmo o un saco son bultos y van
+ *    macizos; el asta de una lanza o el aspa de un molino son líneas y van en cinta. Todo
+ *    contorno macizo, todo del mismo crema: mezclar siluetas rellenas con contornos huecos
+ *    daría dos estilos en la misma mano.
+ *  · El detalle de dentro es AGUJERO y no línea. Las troneras del yelmo, la puerta del
+ *    torreón, la fruta del huerto: se dibujan quitando, que a este tamaño es lo único que
+ *    se distingue. Una raya clara encima de una masa clara no existe.
+ *  · Nada de lo que hay dentro toca el borde. Un agujero que muerde el filo deja de ser
+ *    agujero y parte la silueta en dos, y eso no se ve hasta que la carta está en la mano.
+ *
+ * Los cinco títulos —molino, cantera, torreón, faro y huerto— valen lo mismo y hacen lo
+ * mismo, así que la única razón de que sean cinco dibujos y no uno repetido es que se
+ * distingan de un vistazo. Están elegidos por silueta y no por tema: aspas en X, un perfil
+ * escalonado, almenas, un cuerpo que se estrecha con destellos, y una copa redonda.
+ */
+const CARTAS: readonly Dibujo[] = [
+  /*
+   * LA GUARDIA: un yelmo cerrado, con la lanza pasando por detrás.
+   *
+   * El yelmo va macizo y con las dos troneras vaciadas porque es lo que se lee entero de
+   * golpe: a este tamaño una cara con dos ranuras es una cara. La lanza NO se dibuja
+   * entera y luego se tapa —aquí nada tapa a nada, todo es del mismo crema— sino que se
+   * dibuja rota en los dos trozos que se verían, uno a cada lado del yelmo. Eso es lo que
+   * hace que pase por DETRÁS en vez de quedarse clavada encima.
+   *
+   * El asta va más gorda que cualquier otra línea de las nueve —24 y no 20— y eso salió de
+   * medirlo, no de gusto: rasterizada al tamaño que tiene en la mano, con 18 los dos trozos
+   * se rompían en puntos sueltos y la carta quedaba en un yelmo con motas alrededor. Un
+   * trazo partido en dos tramos cortos necesita más cuerpo que uno largo para sobrevivir al
+   * mismo tamaño.
+   *
+   * Se descartó la silueta con capa: a cien píxeles una capa es un borrón, y dos borrones
+   * distintos en la misma mano no se distinguen.
+   */
+  {
+    carta: 'guardia',
+    que: 'Un yelmo con dos troneras y una lanza que le pasa por detrás.',
+    contornos: [
+      macizo([
+        [172, 330],
+        ...arco(256, 280, 84, 180, 0, 16),
+        [340, 330],
+        [350, 344],
+        [162, 344],
+      ]),
+      hueco([
+        [196, 276],
+        [246, 276],
+        [246, 300],
+        [196, 300],
+      ]),
+      hueco([
+        [266, 276],
+        [316, 276],
+        [316, 300],
+        [266, 300],
+      ]),
+      trazo(
+        [
+          [86, 446],
+          [172, 363],
+        ],
+        24,
+      ),
+      trazo(
+        [
+          [330, 212],
+          [400, 145],
+        ],
+        24,
+      ),
+      macizo([
+        [436, 110],
+        [414, 167],
+        [378, 131],
+      ]),
+    ],
+  },
+
+  /*
+   * EL AÑO BUENO: una cesta con el pico rebosando por encima del borde.
+   *
+   * Las dos espigas cruzadas que pedía el encargo se descartaron por una razón concreta:
+   * el bien `grano` YA es una gavilla, y en la misma mano conviven la carta y los bienes.
+   * Dos dibujos de espiga uno al lado del otro es enseñar dos veces la misma cosa justo
+   * donde hay que decidir qué se gasta.
+   *
+   * La cesta con la carga asomando resuelve lo mismo sin repetirse, y lo hace por silueta:
+   * un trapecio con tres bultos encima se lee lleno aunque no se distinga de qué.
+   */
+  {
+    carta: 'anobueno',
+    que: 'Una cesta de borde ancho con tres bultos rebosando por encima.',
+    contornos: [
+      macizo([
+        [128, 282],
+        [384, 282],
+        [384, 308],
+        [352, 308],
+        [330, 420],
+        [298, 442],
+        [214, 442],
+        [182, 420],
+        [160, 308],
+        [128, 308],
+      ]),
+      macizo(circulo(180, 236, 30, 24)),
+      macizo(circulo(256, 204, 34, 26)),
+      macizo(circulo(332, 238, 28, 24)),
+    ],
+  },
+
+  /*
+   * EL ACAPARAMIENTO: un saco atado por el cuello, con el nudo abierto arriba.
+   *
+   * Todo el peso lo lleva la silueta: panza ancha, cuello estrangulado y la tela abierta
+   * en dos picos. Eso ya es un saco atado sin dibujar ni una cuerda.
+   *
+   * La cuerda son dos ranuras vaciadas en el cuello y no dos líneas encima, por lo mismo
+   * que las troneras del yelmo: una raya crema sobre una masa crema no se ve. Y son DOS y
+   * no una porque una sola ranura se lee como una grieta; dos paralelas se leen como algo
+   * enrollado.
+   *
+   * La mano cerrada sobre un fardo que también valía se dejó fuera: una mano a este tamaño
+   * es una mancha con dedos, y la mancha se parece demasiado a la copa del huerto.
+   */
+  {
+    carta: 'acaparamiento',
+    que: 'Un saco de panza ancha, atado por el cuello con dos vueltas de cuerda.',
+    contornos: [
+      macizo([
+        [214, 150],
+        [256, 178],
+        [298, 150],
+        [306, 214],
+        [352, 258],
+        [388, 332],
+        [376, 406],
+        [320, 446],
+        [192, 446],
+        [136, 406],
+        [124, 332],
+        [160, 258],
+        [206, 214],
+      ]),
+      hueco([
+        [224, 222],
+        [288, 222],
+        [288, 234],
+        [224, 234],
+      ]),
+      hueco([
+        [216, 242],
+        [296, 242],
+        [296, 254],
+        [216, 254],
+      ]),
+    ],
+  },
+
+  /*
+   * LAS DOS VEREDAS: dos calzadas de tablas alejándose, con sus travesaños.
+   *
+   * Se eligieron dos tramos PARALELOS y no una bifurcación, aunque la Y sea más bonita:
+   * la carta da dos veredas, no una decisión entre dos caminos, y una horquilla dice lo
+   * segundo. Dos bandas separadas se cuentan.
+   *
+   * Se estrechan hacia arriba porque una vereda de Riberas es una pasarela de tablas sobre
+   * el agua —eso es lo que tiende `puente.ts`— y la perspectiva es lo que la separa de dos
+   * barras cualesquiera. Los travesaños son huecos y no tablas dibujadas encima, otra vez
+   * por lo mismo, y se estrechan con la banda porque uno de anchura fija se saldría por el
+   * lado justo en lo alto, donde partiría la vereda en dos.
+   */
+  {
+    carta: 'dosveredas',
+    que: 'Dos pasarelas de tablas, en paralelo, estrechándose al alejarse.',
+    contornos: (() => {
+      const izquierda: Punto[] = [
+        [76, 438],
+        [192, 438],
+        [214, 166],
+        [166, 166],
+      ];
+      const derecha: Punto[] = [
+        [320, 438],
+        [436, 438],
+        [346, 166],
+        [298, 166],
+      ];
+      const alturas = [0.22, 0.5, 0.78];
+      return [
+        macizo(izquierda),
+        macizo(derecha),
+        ...alturas.map((t) => hueco(travesano(izquierda, t, 20, 20 - 8 * t))),
+        ...alturas.map((t) => hueco(travesano(derecha, t, 20, 20 - 8 * t))),
+      ];
+    })(),
+  },
+
+  /*
+   * EL MOLINO: torre con caperuza y cuatro aspas en aspa.
+   *
+   * La X de las aspas es la silueta más reconocible de los cinco títulos y por eso este es
+   * el que más grande va: se distingue de los otros cuatro antes de saber qué es. Las aspas
+   * cruzan por delante de la torre y no se recortan contra ella —al revés que la lanza de
+   * la Guardia— porque aquí no hay nada que esté detrás: un molino tiene el eje delante.
+   *
+   * La puerta vaciada abajo no es adorno: sin ella la torre es un trapecio y podría ser
+   * cualquier cosa con un aspa encima.
+   */
+  {
+    carta: 'molino',
+    que: 'Una torre con caperuza y puerta, y cuatro aspas cruzadas sobre ella.',
+    contornos: (() => {
+      const eje: Punto = [256, 214];
+      const brazo = 190;
+      const puntas: Punto[] = [45, 135, 225, 315].map((grados) => {
+        const a = (grados * Math.PI) / 180;
+        return [eje[0] + brazo * Math.cos(a), eje[1] - brazo * Math.sin(a)];
+      });
+      return [
+        macizo([
+          [192, 438],
+          [320, 438],
+          [304, 250],
+          [256, 206],
+          [208, 250],
+        ]),
+        hueco([...arco(256, 362, 26, 180, 0, 10), [282, 404], [230, 404]]),
+        ...puntas.map((punta) => trazo([eje, punta], 26)),
+      ];
+    })(),
+  },
+
+  /*
+   * LA CANTERA: el frente escalonado de un cantil, con dos bloques ya sacados.
+   *
+   * El escalonado ES el dibujo. El bien `piedra` ya es un montón de cascotes, así que una
+   * cantera hecha de piedras sueltas sería el mismo dibujo con otro nombre; lo que hace
+   * cantera a una cantera es que alguien se ha llevado el material por bancadas, y eso se
+   * ve en el perfil.
+   *
+   * Los dos bloques flotan fuera del cantil, en el hueco que dejan los escalones, y son
+   * cuadriláteros torcidos y no piedras redondas: cortados, no caídos.
+   *
+   * Las tres ranuras del frente son los estratos y hacen dos cosas a la vez. Dicen que eso
+   * es roca en capas y no una escalera, y le quitan tinta a la única silueta de las nueve
+   * que era una mancha maciza: al lado de las otras ocho, un cuadrante relleno se lee como
+   * un borrón antes que como un cantil.
+   */
+  {
+    carta: 'cantera',
+    que: 'Un cantil cortado en tres bancadas y tres estratos, con dos bloques ya extraídos.',
+    contornos: [
+      macizo([
+        [438, 442],
+        [438, 132],
+        [300, 132],
+        [300, 206],
+        [224, 206],
+        [224, 280],
+        [148, 280],
+        [148, 354],
+        [86, 354],
+        [86, 442],
+      ]),
+      hueco([
+        [258, 250],
+        [420, 250],
+        [420, 270],
+        [258, 270],
+      ]),
+      hueco([
+        [182, 322],
+        [420, 322],
+        [420, 342],
+        [182, 342],
+      ]),
+      hueco([
+        [120, 394],
+        [420, 394],
+        [420, 414],
+        [120, 414],
+      ]),
+      macizo([
+        [96, 196],
+        [158, 182],
+        [168, 234],
+        [106, 248],
+      ]),
+      macizo([
+        [110, 116],
+        [172, 102],
+        [182, 154],
+        [120, 168],
+      ]),
+    ],
+  },
+
+  /*
+   * EL TORREÓN: cinco almenas, una tronera y una puerta en arco, sobre un zócalo.
+   *
+   * Las almenas son toda la carta: es lo único que un torreón tiene y un faro no, y son la
+   * diferencia entre estos dos títulos vistos de lejos. Por eso el cuerpo es RECTO y
+   * ancho, mientras que el faro se estrecha: dos torres que se distinguen sólo por lo que
+   * llevan encima se confunden en cuanto la mano se mueve.
+   *
+   * Son CINCO y no cuatro por una razón que sólo se ve dibujándolo: con un número par el
+   * centro cae en una escotadura, y entonces la tronera queda debajo del hueco de las
+   * almenas. Las dos se leen como una sola ranura larga partida por un puentecillo, y el
+   * torreón se convierte en una torre agrietada. Con un número impar el centro es almena,
+   * y la tronera se apoya en macizo.
+   *
+   * El zócalo del pie hace lo mismo con menos: apoya la torre y le quita el aire de
+   * chimenea que tiene un rectángulo suelto.
+   */
+  {
+    carta: 'torreon',
+    que: 'Una torre de cinco almenas, con tronera, puerta en arco y zócalo al pie.',
+    contornos: [
+      macizo([
+        [130, 438],
+        [130, 410],
+        [142, 410],
+        [142, 168],
+        [174, 168],
+        [174, 212],
+        [191, 212],
+        [191, 168],
+        [223, 168],
+        [223, 212],
+        [240, 212],
+        [240, 168],
+        [272, 168],
+        [272, 212],
+        [289, 212],
+        [289, 168],
+        [321, 168],
+        [321, 212],
+        [338, 212],
+        [338, 168],
+        [370, 168],
+        [370, 410],
+        [382, 410],
+        [382, 438],
+      ]),
+      hueco([
+        [244, 236],
+        [268, 236],
+        [268, 292],
+        [244, 292],
+      ]),
+      hueco([...arco(256, 352, 34, 180, 0, 10), [290, 392], [222, 392]]),
+    ],
+  },
+
+  /*
+   * EL FARO: fuste que se estrecha, linterna con caperuza, y cuatro destellos.
+   *
+   * Los destellos son cuatro rayas sueltas separadas del cuerpo, y esa separación es el
+   * dibujo entero: pegadas serían dos aleros y el faro se leería como una casa. Sueltas,
+   * el hueco entre la linterna y la raya se lee como aire, y el aire con rayas se lee como
+   * luz.
+   *
+   * Las dos franjas vaciadas del fuste son las bandas pintadas de un faro de verdad, y de
+   * paso rompen el trapecio para que no se confunda con la torre de la cantera.
+   */
+  {
+    carta: 'faro',
+    que: 'Un faro que se estrecha, con dos franjas, y cuatro destellos sueltos a los lados.',
+    contornos: [
+      macizo([
+        [176, 446],
+        [336, 446],
+        [306, 248],
+        [322, 248],
+        [322, 224],
+        [302, 224],
+        [302, 178],
+        [256, 146],
+        [210, 178],
+        [210, 224],
+        [190, 224],
+        [190, 248],
+        [206, 248],
+      ]),
+      hueco([
+        [220, 306],
+        [292, 306],
+        [292, 328],
+        [220, 328],
+      ]),
+      hueco([
+        [210, 378],
+        [302, 378],
+        [302, 400],
+        [210, 400],
+      ]),
+      trazo(
+        [
+          [142, 152],
+          [190, 176],
+        ],
+        20,
+      ),
+      trazo(
+        [
+          [128, 214],
+          [184, 214],
+        ],
+        20,
+      ),
+      trazo(
+        [
+          [370, 152],
+          [322, 176],
+        ],
+        20,
+      ),
+      trazo(
+        [
+          [384, 214],
+          [328, 214],
+        ],
+        20,
+      ),
+    ],
+  },
+
+  /*
+   * EL HUERTO: un árbol con tres frutas y el suelo apuntado a los lados.
+   *
+   * La copa es un círculo abollado con cinco lóbulos y no un círculo limpio, que es lo que
+   * separa un árbol de una pelota con palo. Las frutas son huecos —tres puntos oscuros
+   * dentro de la copa— y no bultos encima: dibujadas por fuera se pegarían al borde y la
+   * copa quedaría con bollos.
+   *
+   * Las dos rayas del suelo no tocan el tronco. Tocándolo serían raíces, y una raíz a este
+   * tamaño ensucia el pie del árbol; separadas se leen como tierra, que es lo que hace
+   * huerto y no bosque.
+   */
+  {
+    carta: 'huerto',
+    que: 'Un árbol de copa lobulada con tres frutas huecas, tronco y suelo a los lados.',
+    contornos: [
+      macizo(circulo(256, 222, 120, 40, 5, 0.085)),
+      macizo([
+        [238, 300],
+        [274, 300],
+        [286, 446],
+        [226, 446],
+      ]),
+      hueco(circulo(206, 196, 19, 14)),
+      hueco(circulo(300, 184, 19, 14)),
+      hueco(circulo(252, 264, 19, 14)),
+      macizo([
+        [146, 424],
+        [206, 424],
+        [206, 442],
+        [146, 442],
+      ]),
+      macizo([
+        [306, 424],
+        [366, 424],
+        [366, 442],
+        [306, 442],
+      ]),
+    ],
+  },
+];
+
+/*
+ * LA SAL, DIBUJADA Y APARCADA A UN LADO. Léase entero antes de moverla.
+ *
+ * De los cinco bienes de Riberas, `sal` es el único sin dibujo, y no por descuido: el
+ * icono que le tocaba era una oveja de otro juego, y enseñar un bien que no se tiene en la
+ * pantalla con la que se decide qué ofrecer es peor que no enseñar nada. Está contado en
+ * `arte/game-icons/LEEME.md` y afirmado en `escenas/scripts/verificar-escena.ts`, que hoy
+ * comprueba que `sal` NO tiene icono.
+ *
+ * Aquí queda dibujada —eras de evaporación y un montón—, pero FUERA de `CONTORNOS_DEL_BIEN`
+ * a propósito. Meterla en el mapa sin más pone la batería en rojo, porque esa comprobación
+ * está escrita para que activar la sal sea una decisión de alguien y no un efecto lateral
+ * de recompilar. Son dos pasos y hay que darlos juntos:
+ *
+ *   1. Mover esta entrada al mapa de los bienes (una línea aquí).
+ *   2. Cambiar en `verificar-escena.ts` la comprobación «y `sal` sigue SIN icono» por la
+ *      contraria, que es lo que su propio comentario pide que se haga a mano.
+ *
+ * Y hay una tercera cosa que no es opcional: los otros cuatro bienes siguen siendo arte
+ * ajeno y provisional. Una sal de la casa entre cuatro de Delapouite son cinco iconos de
+ * dos manos distintas, que es justo lo que `LEEME.md` avisa que se nota más que ninguna
+ * otra cosa. Esto está listo para el día que se dibujen los otros cuatro, no para adelantar
+ * uno solo.
+ */
+const SAL: Dibujo = {
+  carta: 'sal',
+  que: 'Cuatro eras de evaporación en perspectiva y, delante, el montón recogido.',
+  contornos: [
+    macizo([
+      [176, 168],
+      [250, 168],
+      [246, 214],
+      [166, 214],
+    ]),
+    macizo([
+      [262, 168],
+      [336, 168],
+      [346, 214],
+      [266, 214],
+    ]),
+    macizo([
+      [156, 228],
+      [248, 228],
+      [242, 286],
+      [140, 286],
+    ]),
+    macizo([
+      [264, 228],
+      [356, 228],
+      [372, 286],
+      [270, 286],
+    ]),
+    macizo([
+      [150, 444],
+      [362, 444],
+      [256, 318],
+    ]),
+  ],
+};
+
+// ---------------------------------------------------------------------------
+
+/**
+ * LO QUE SE COMPRUEBA DE CADA DIBUJO, Y POR QUÉ SE COMPRUEBA AQUÍ.
+ *
+ * Un icono mal armado no falla: se dibuja igual y sale raro, y «sale raro» se lee como una
+ * decisión de arte. Estas cuatro medidas son las que separan un dibujo de un accidente, y
+ * ninguna se puede ver mirando el fichero generado.
+ *
+ * La tercera es la que de verdad justifica esto. `toShapes` DESCARTA en silencio todo
+ * contorno que, según la regla `nonzero`, no cambie nada: un agujero enrollado al revés, o
+ * un trozo encerrado dentro de otro sin querer. No avisa, no falla, simplemente no está.
+ * Contando cuántos contornos entran y cuántos salen, ese silencio se convierte en un rojo.
+ *
+ * Se comprueba aquí ADEMÁS de en `verify:escena`, y no en su lugar. La batería de la
+ * escena mira lo suyo: que la mano encuentre los nueve nombres que pide y que den
+ * geometría. Eso no dice nada de si el dibujo está bien armado, porque un icono al que le
+ * falta un agujero da geometría estupendamente. Y sobre todo llega tarde: quien mueve un
+ * punto lo mueve aquí, y aquí es donde tiene que enterarse.
+ */
+function revisa(dibujo: Dibujo): { contornos: number; puntos: number; triangulos: number } {
+  const donde = `el dibujo de ${dibujo.carta}`;
+  const contornos = dibujo.contornos;
+
+  if (contornos.length === 0 || contornos.length > 12) {
+    console.error(
+      `${donde} tiene ${String(contornos.length)} contornos, y el trato son doce como mucho.\n` +
+        'Se ve a tamaño de carta en un móvil: lo que no cabe en una docena de formas grandes\n' +
+        'no se lee, se emborrona.',
+    );
+    process.exit(2);
+  }
+
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  let puntos = 0;
+  for (const contorno of contornos) {
+    if (contorno.length < 6) {
+      console.error(`${donde} trae un contorno de menos de tres puntos.`);
+      process.exit(2);
+    }
+    for (let i = 0; i + 1 < contorno.length; i += 2) {
+      const x = contorno[i] as number;
+      const y = contorno[i + 1] as number;
+      if (x < 0 || x > LIENZO || y < 0 || y > LIENZO) {
+        console.error(`${donde} se sale del lienzo por (${String(x)}, ${String(y)}).`);
+        process.exit(2);
+      }
+      minX = Math.min(minX, x);
+      maxX = Math.max(maxX, x);
+      minY = Math.min(minY, y);
+      maxY = Math.max(maxY, y);
+      puntos++;
+    }
+  }
+
+  /*
+   * Que LLENE el lienzo. Cada icono se normaliza por su lado mayor al pintarlo, así que
+   * uno dibujado pequeño no sale pequeño: sale igual de grande y con menos puntos, o sea
+   * más basto. Lo que sí se nota es lo contrario, un dibujo alargado: encajado por el lado
+   * mayor, queda estrecho al lado de sus compañeros. Con esto los nueve salen parecidos.
+   */
+  const mayor = Math.max(maxX - minX, maxY - minY);
+  const menor = Math.min(maxX - minX, maxY - minY);
+  if (mayor < LIENZO * 0.5) {
+    console.error(`${donde} sólo ocupa ${String(Math.round(mayor))} del lienzo de ${String(LIENZO)}.`);
+    process.exit(2);
+  }
+  if (menor < mayor * 0.55) {
+    console.error(
+      `${donde} mide ${String(Math.round(maxX - minX))}×${String(Math.round(maxY - minY))}: ` +
+        'demasiado alargado, y encajado por el lado mayor saldrá flaco al lado de los otros.',
+    );
+    process.exit(2);
+  }
+
+  const camino = new ShapePath();
+  for (const contorno of contornos) {
+    camino.moveTo(contorno[0] as number, contorno[1] as number);
+    for (let i = 2; i + 1 < contorno.length; i += 2) {
+      camino.lineTo(contorno[i] as number, contorno[i + 1] as number);
+    }
+  }
+  const formas = camino.toShapes();
+  const aprovechados = formas.reduce((total, f) => total + 1 + f.holes.length, 0);
+  if (aprovechados !== contornos.length) {
+    console.error(
+      `${donde} entra con ${String(contornos.length)} contornos y sale con ${String(aprovechados)}.\n` +
+        'Los que faltan los ha descartado `toShapes` por no cambiar nada: casi siempre es un\n' +
+        'agujero enrollado al derecho, o una pieza que ha quedado dentro de otra sin querer.\n' +
+        'No fallaría en pantalla; simplemente no se vería.',
+    );
+    process.exit(2);
+  }
+
+  const geometria = geometriaDeContornos(contornos);
+  if (geometria === null) {
+    console.error(`${donde} no da geometría.`);
+    process.exit(2);
+  }
+  const triangulos = cuantosTriangulos(geometria);
+  if (triangulos < 8) {
+    console.error(`${donde} sólo da ${String(triangulos)} triángulos.`);
+    process.exit(2);
+  }
+  geometria.dispose();
+
+  return { contornos: contornos.length, puntos, triangulos };
+}
+
+const revisiones = new Map<string, ReturnType<typeof revisa>>();
+for (const dibujo of [...CARTAS, SAL]) {
+  if (revisiones.has(dibujo.carta)) {
+    console.error(`Hay dos dibujos con la llave ${dibujo.carta}.`);
+    process.exit(2);
+  }
+  revisiones.set(dibujo.carta, revisa(dibujo));
+}
+
+// ---------------------------------------------------------------------------
+
+function comoTira(contorno: readonly number[]): string {
+  return `    [${contorno.join(',')}],`;
+}
+
 const cuerpo = iconos
   .map(
     (i) =>
-      `  ${i.bien}: [\n${i.contornos.map((c) => `    [${c.join(',')}],`).join('\n')}\n  ],`,
+      `  ${i.bien}: [\n${i.contornos.map(comoTira).join('\n')}\n  ],`,
   )
   .join('\n');
 
+const cuerpoDeLasCartas = CARTAS.map(
+  (d) =>
+    `  /** ${d.que} */\n  ${d.carta}: [\n${d.contornos.map(comoTira).join('\n')}\n  ],`,
+).join('\n');
+
+const cuerpoDeLaSal = SAL.contornos.map(comoTira).join('\n');
+
 const salida = `/**
- * LOS ICONOS DE LOS CINCO BIENES, en contornos de puntos.
+ * LOS ICONOS DE RIBERAS: los bienes y las cartas del mazo, en contornos de puntos.
  *
  * ═══ ESTE FICHERO SE GENERA. NO SE EDITA A MANO ═══
  *
- * Lo escribe \`escenas/scripts/compilar-iconos.ts\` a partir de los \`.svg\` de
- * \`arte/game-icons/\`. Cualquier cambio hecho aquí desaparece en la siguiente
- * compilación.
+ * Lo escribe \`escenas/scripts/compilar-iconos.ts\`. Cualquier cambio hecho aquí desaparece
+ * en la siguiente compilación, y desaparece EN SILENCIO: el dibujo se ve hasta que alguien
+ * vuelva a compilar. Si hay que mover un punto, se mueve allí.
  *
- * Cada bien trae sus CONTORNOS: tiras llanas de \`x, y, x, y\` en el sistema de
- * coordenadas de SVG, con un lienzo de ${String(LIENZO)}×${String(LIENZO)} y la \`y\`
- * creciendo HACIA ABAJO. Quien los dibuje en tres dimensiones tiene que darles la vuelta
- * en \`y\`, o el trigo sale cabeza abajo.
+ * Los dos mapas tienen orígenes distintos, y conviene saber cuál se está tocando:
+ *
+ *  · \`CONTORNOS_DEL_BIEN\` sale de los \`.svg\` de \`arte/game-icons/\`. Es arte AJENO y
+ *    PROVISIONAL —de Delapouite, game-icons.net, CC BY 3.0— y su condición para quedarse
+ *    está en \`arte/game-icons/LEEME.md\`.
+ *  · \`CONTORNOS_DE_LA_CARTA\` no sale de ningún fichero: está dibujado en coordenadas
+ *    dentro del compilador, que es su original. Es de la casa.
+ *
+ * Todo viene en tiras llanas de \`x, y, x, y\` en el sistema de coordenadas de SVG, con un
+ * lienzo de ${String(LIENZO)}×${String(LIENZO)} y la \`y\` creciendo HACIA ABAJO. Quien los dibuje en tres
+ * dimensiones tiene que darles la vuelta en \`y\`, o el trigo sale cabeza abajo.
+ *
+ * Un contorno metido dentro de otro es un AGUJERO, y sale enrollado al revés a propósito:
+ * es lo que \`ShapePath.toShapes\` mira para distinguir un hueco de una silueta.
  *
  * Vienen aplanados y no como trazos de SVG por una razón dura: analizar SVG en tiempo de
  * ejecución exige \`DOMParser\`, que es del navegador y NO existe en React Native. Un
  * icono analizado al vuelo se vería en el escritorio y saldría vacío en la app, sin un
  * error en ninguna consola. Ver \`escenas/scripts/aplana-trazo.ts\`.
- *
- * ═══ EL ARTE DE AHORA ES PROVISIONAL ═══
- *
- * Son de Delapouite (game-icons.net), CC BY 3.0, y están para probar la interfaz
- * mientras se dibujan los propios. La condición para que se queden y cómo se
- * sustituyen están en \`arte/game-icons/LEEME.md\`.
  */
 
 /** El lienzo cuadrado en el que están dibujados todos. */
@@ -206,15 +1127,62 @@ ${cuerpo}
 
 /** Los bienes que tienen icono. Sirve para comprobar que no falta ninguno. */
 export const BIENES_CON_ICONO: readonly string[] = Object.keys(CONTORNOS_DEL_BIEN);
+
+/**
+ * LOS DIBUJOS DE LAS NUEVE CARTAS DEL MAZO, por su familia.
+ *
+ * Las llaves son las familias de \`docs/LAS-CARTAS-DE-RIBERAS.md\`: las cuatro que se
+ * juegan y los cinco títulos, que valen un punto cada uno y sólo se distinguen por el
+ * dibujo — de ahí que sean cinco y no uno repetido cinco veces.
+ *
+ * Se pintan igual que los bienes: crema plano sobre el color de la carta, encajados por su
+ * lado mayor en un cuadrado de lado uno. Quien los coloque no tiene que saber nada más.
+ */
+export const CONTORNOS_DE_LA_CARTA: Readonly<Record<string, readonly (readonly number[])[]>> = {
+${cuerpoDeLasCartas}
+};
+
+/** Las cartas que tienen dibujo. Sirve para comprobar que no falta ninguna. */
+export const CARTAS_CON_ICONO: readonly string[] = Object.keys(CONTORNOS_DE_LA_CARTA);
+
+/**
+ * LA SAL, DIBUJADA Y FUERA DEL MAPA DE LOS BIENES A PROPÓSITO.
+ *
+ * ${SAL.que}
+ *
+ * \`sal\` es el único bien sin icono, y no por descuido: el provisional que le tocaba era
+ * una oveja de otro juego, y enseñar un bien que no se tiene en la pantalla con la que se
+ * decide qué ofrecer es peor que no enseñar nada. Está contado en
+ * \`arte/game-icons/LEEME.md\` y afirmado en \`escenas/scripts/verificar-escena.ts\`, que
+ * hoy comprueba que \`sal\` NO tiene icono.
+ *
+ * Así que aquí está dibujada pero NO en \`CONTORNOS_DEL_BIEN\`: meterla sin más pone la
+ * batería en rojo, porque esa comprobación está escrita para que activar la sal sea una
+ * decisión de alguien y no un efecto lateral de recompilar. Los pasos, y hay que darlos
+ * juntos, están en el compilador, encima de este dibujo.
+ */
+export const CONTORNOS_DE_LA_SAL: readonly (readonly number[])[] = [
+${cuerpoDeLaSal}
+];
 `;
 
 fs.writeFileSync(DESTINO, salida, 'utf8');
 
 const kb = (salida.length / 1024).toFixed(1);
-console.log(`\n  ${String(iconos.length)} iconos compilados · ${kb} kB en ${path.relative(RAIZ, DESTINO)}`);
+console.log(
+  `\n  ${String(iconos.length)} bienes + ${String(CARTAS.length)} cartas · ${kb} kB en ` +
+    `${path.relative(RAIZ, DESTINO)}`,
+);
 for (const i of iconos) {
   console.log(
-    `    ${i.bien.padEnd(10)} ${String(i.contornos.length).padStart(2)} contorno(s) · ` +
-      `${String(i.puntos)} puntos`,
+    `    ${i.bien.padEnd(14)} ${String(i.contornos.length).padStart(2)} contorno(s) · ` +
+      `${String(i.puntos)} puntos   (de .svg)`,
+  );
+}
+for (const [carta, medida] of revisiones) {
+  console.log(
+    `    ${carta.padEnd(14)} ${String(medida.contornos).padStart(2)} contorno(s) · ` +
+      `${String(medida.puntos)} puntos · ${String(medida.triangulos)} triángulos` +
+      `${carta === SAL.carta ? '   (dibujada, SIN activar)' : ''}`,
   );
 }

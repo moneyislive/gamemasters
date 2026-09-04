@@ -1,5 +1,14 @@
 # Arte PROVISIONAL de las cartas de recurso
 
+> **Esta carpeta ya no es todo el arte de los iconos, y conviene saberlo antes de leer
+> nada más.** Los nueve dibujos de las cartas del mazo —La Guardia, El Año Bueno, El
+> Acaparamiento, Las Dos Veredas y los cinco títulos— NO están aquí ni en ningún `.svg`:
+> son de la casa y se dibujan en coordenadas dentro de
+> `escenas/scripts/compilar-iconos.ts`. No tienen licencia que cumplir ni atribución que
+> dar. Todo lo que sigue —la deuda, los dos finales, la sustitución— es sólo de los
+> iconos de los BIENES. El reparto completo está al final, en **De dónde sale cada
+> dibujo**.
+
 **Estos cinco iconos no son los definitivos.** Están aquí para poder probar la interfaz
 de la mano —la baraja del lateral, el imán, las áreas de trueque— con algo que se lea
 como una carta, mientras se dibujan los nuestros.
@@ -90,3 +99,43 @@ entero y su licencia va con él, no porque haga falta.
 
 Cuando llegue el arte propio: son **cinco** dibujos con los nombres de Riberas, y el
 quinto —la sal— es el que hoy no existe.
+
+## De dónde sale cada dibujo
+
+Ahora hay **dos** orígenes, y no se mezclan. Ésta es la tabla entera de lo que la escena
+puede pintar, para que nadie tenga que deducirlo abriendo `escenas/iconos.ts`:
+
+| Dibujo | De dónde sale | Licencia | Dónde vive el original |
+|---|---|---|---|
+| `limo`, `junco`, `piedra`, `grano` | Delapouite, game-icons.net | CC BY 3.0, **con atribución pendiente** | los `.svg` de esta carpeta |
+| Las nueve cartas del mazo | de la casa, dibujadas para Riberas | ninguna, es nuestro | `escenas/scripts/compilar-iconos.ts` |
+| `sal` | de la casa, dibujada y **sin activar** | ninguna, es nuestro | `escenas/scripts/compilar-iconos.ts` |
+
+Los nueve dibujos de las cartas se escribieron en coordenadas y no como `.svg` a
+propósito, y el porqué está en la cabecera del compilador: un `.svg` suelto en una
+carpeta no dice de dónde salió ni quién lo hizo, que es exactamente el agujero por el que
+estos cinco iconos ajenos llevan meses camino de producción sin su aviso. Un dibujo
+escrito en código, con su cabecera al lado contando qué se ve y por qué, no admite esa
+duda.
+
+Son diez: nueve para el mazo y uno más, la sal, que es el bien que se quedó sin dibujo.
+
+### La sal: dibujada, y por qué sigue apagada
+
+Está dibujada —cuatro eras de evaporación en perspectiva y el montón recogido delante—,
+pero **fuera de `CONTORNOS_DEL_BIEN`**, en su propia constante `CONTORNOS_DE_LA_SAL`. Se
+puede ver, no se pinta. No es un olvido; son tres cosas:
+
+1. `escenas/scripts/verificar-escena.ts` **afirma hoy que la sal no tiene icono**, y esa
+   línea existe para que nadie «arregle» la sal emparejándole la oveja. Meter la sal en
+   el mapa sin cambiarla pone la batería en rojo.
+2. Encenderla son dos pasos y hay que darlos juntos: mover la entrada al mapa de los
+   bienes (una línea en el compilador) y dar la vuelta a esa comprobación, que es lo que
+   su propio comentario pide que se haga a mano.
+3. Y hay un motivo de arte que pesa más que los dos anteriores. Los otros cuatro bienes
+   siguen siendo de Delapouite. Una sal de la casa entre cuatro ajenos son **cinco iconos
+   de dos manos distintas** en la misma fila de la pantalla, que es justo lo que este
+   fichero avisa arriba que se nota más que ninguna otra cosa. La sal está lista para el
+   día en que se dibujen los otros cuatro; no para adelantar uno solo.
+
+Con eso, la deuda de esta carpeta queda dicha entera: **faltan cuatro**, no cinco.

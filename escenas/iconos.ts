@@ -1,27 +1,31 @@
 /**
- * LOS ICONOS DE LOS CINCO BIENES, en contornos de puntos.
+ * LOS ICONOS DE RIBERAS: los bienes y las cartas del mazo, en contornos de puntos.
  *
  * ═══ ESTE FICHERO SE GENERA. NO SE EDITA A MANO ═══
  *
- * Lo escribe `escenas/scripts/compilar-iconos.ts` a partir de los `.svg` de
- * `arte/game-icons/`. Cualquier cambio hecho aquí desaparece en la siguiente
- * compilación.
+ * Lo escribe `escenas/scripts/compilar-iconos.ts`. Cualquier cambio hecho aquí desaparece
+ * en la siguiente compilación, y desaparece EN SILENCIO: el dibujo se ve hasta que alguien
+ * vuelva a compilar. Si hay que mover un punto, se mueve allí.
  *
- * Cada bien trae sus CONTORNOS: tiras llanas de `x, y, x, y` en el sistema de
- * coordenadas de SVG, con un lienzo de 512×512 y la `y`
- * creciendo HACIA ABAJO. Quien los dibuje en tres dimensiones tiene que darles la vuelta
- * en `y`, o el trigo sale cabeza abajo.
+ * Los dos mapas tienen orígenes distintos, y conviene saber cuál se está tocando:
+ *
+ *  · `CONTORNOS_DEL_BIEN` sale de los `.svg` de `arte/game-icons/`. Es arte AJENO y
+ *    PROVISIONAL —de Delapouite, game-icons.net, CC BY 3.0— y su condición para quedarse
+ *    está en `arte/game-icons/LEEME.md`.
+ *  · `CONTORNOS_DE_LA_CARTA` no sale de ningún fichero: está dibujado en coordenadas
+ *    dentro del compilador, que es su original. Es de la casa.
+ *
+ * Todo viene en tiras llanas de `x, y, x, y` en el sistema de coordenadas de SVG, con un
+ * lienzo de 512×512 y la `y` creciendo HACIA ABAJO. Quien los dibuje en tres
+ * dimensiones tiene que darles la vuelta en `y`, o el trigo sale cabeza abajo.
+ *
+ * Un contorno metido dentro de otro es un AGUJERO, y sale enrollado al revés a propósito:
+ * es lo que `ShapePath.toShapes` mira para distinguir un hueco de una silueta.
  *
  * Vienen aplanados y no como trazos de SVG por una razón dura: analizar SVG en tiempo de
  * ejecución exige `DOMParser`, que es del navegador y NO existe en React Native. Un
  * icono analizado al vuelo se vería en el escritorio y saldría vacío en la app, sin un
  * error en ninguna consola. Ver `escenas/scripts/aplana-trazo.ts`.
- *
- * ═══ EL ARTE DE AHORA ES PROVISIONAL ═══
- *
- * Son de Delapouite (game-icons.net), CC BY 3.0, y están para probar la interfaz
- * mientras se dibujan los propios. La condición para que se queden y cómo se
- * sustituyen están en `arte/game-icons/LEEME.md`.
  */
 
 /** El lienzo cuadrado en el que están dibujados todos. */
@@ -127,3 +131,120 @@ export const CONTORNOS_DEL_BIEN: Readonly<Record<string, readonly (readonly numb
 
 /** Los bienes que tienen icono. Sirve para comprobar que no falta ninguno. */
 export const BIENES_CON_ICONO: readonly string[] = Object.keys(CONTORNOS_DEL_BIEN);
+
+/**
+ * LOS DIBUJOS DE LAS NUEVE CARTAS DEL MAZO, por su familia.
+ *
+ * Las llaves son las familias de `docs/LAS-CARTAS-DE-RIBERAS.md`: las cuatro que se
+ * juegan y los cinco títulos, que valen un punto cada uno y sólo se distinguen por el
+ * dibujo — de ahí que sean cinco y no uno repetido cinco veces.
+ *
+ * Se pintan igual que los bienes: crema plano sobre el color de la carta, encajados por su
+ * lado mayor en un cuadrado de lado uno. Quien los coloque no tiene que saber nada más.
+ */
+export const CONTORNOS_DE_LA_CARTA: Readonly<Record<string, readonly (readonly number[])[]>> = {
+  /** Un yelmo con dos troneras y una lanza que le pasa por detrás. */
+  guardia: [
+    [172,330,172,280,173.6,263.6,178.4,247.9,186.2,233.3,196.6,220.6,209.3,210.2,223.9,202.4,239.6,197.6,256,196,272.4,197.6,288.1,202.4,302.7,210.2,315.4,220.6,325.8,233.3,333.6,247.9,338.4,263.6,340,280,340,330,350,344,162,344],
+    [196,300,246,300,246,276,196,276],
+    [266,300,316,300,316,276,266,276],
+    [77.7,437.4,163.7,354.4,180.3,371.6,94.3,454.6],
+    [321.7,203.3,391.7,136.3,408.3,153.7,338.3,220.7],
+    [436,110,414,167,378,131],
+  ],
+  /** Una cesta de borde ancho con tres bultos rebosando por encima. */
+  anobueno: [
+    [128,282,384,282,384,308,352,308,330,420,298,442,214,442,182,420,160,308,128,308],
+    [209,243.8,206,251,201.2,257.2,195,262,187.8,265,180,266,172.2,265,165,262,158.8,257.2,154,251,151,243.8,150,236,151,228.2,154,221,158.8,214.8,165,210,172.2,207,180,206,187.8,207,195,210,201.2,214.8,206,221,209,228.2,210,236],
+    [289,212.1,286.1,219.8,281.4,226.5,275.3,232,268.1,235.8,260.1,237.8,251.9,237.8,243.9,235.8,236.7,232,230.6,226.5,225.9,219.8,223,212.1,222,204,223,195.9,225.9,188.2,230.6,181.5,236.7,176,243.9,172.2,251.9,170.2,260.1,170.2,268.1,172.2,275.3,176,281.4,181.5,286.1,188.2,289,195.9,290,204],
+    [359,245.2,356.2,252,351.8,257.8,346,262.2,339.2,265,332,266,324.8,265,318,262.2,312.2,257.8,307.8,252,305,245.2,304,238,305,230.8,307.8,224,312.2,218.2,318,213.8,324.8,211,332,210,339.2,211,346,213.8,351.8,218.2,356.2,224,359,230.8,360,238],
+  ],
+  /** Un saco de panza ancha, atado por el cuello con dos vueltas de cuerda. */
+  acaparamiento: [
+    [214,150,256,178,298,150,306,214,352,258,388,332,376,406,320,446,192,446,136,406,124,332,160,258,206,214],
+    [224,234,288,234,288,222,224,222],
+    [216,254,296,254,296,242,216,242],
+  ],
+  /** Dos pasarelas de tablas, en paralelo, estrechándose al alejarse. */
+  dosveredas: [
+    [166,166,214,166,192,438,76,438],
+    [298,166,346,166,436,438,320,438],
+    [115.8,387.3,176.8,387.3,176.8,369,115.8,369],
+    [141,310,183,310,183,294,141,294],
+    [166.2,232.7,189.2,232.7,189.2,219,166.2,219],
+    [335.2,387.3,396.2,387.3,396.2,369,335.2,369],
+    [329,310,371,310,371,294,329,294],
+    [322.8,232.7,345.8,232.7,345.8,219,322.8,219],
+  ],
+  /** Una torre con caperuza y puerta, y cuatro aspas cruzadas sobre ella. */
+  molino: [
+    [208,250,256,206,304,250,320,438,192,438],
+    [230,404,282,404,282,362,280.7,354,277,346.7,271.3,341,264,337.3,256,336,248,337.3,240.7,341,235,346.7,231.3,354,230,362],
+    [246.8,204.8,381.2,70.5,399.5,88.8,265.2,223.2],
+    [246.8,223.2,112.5,88.8,130.8,70.5,265.2,204.8],
+    [265.2,223.2,130.8,357.5,112.5,339.2,246.8,204.8],
+    [265.2,204.8,399.5,339.2,381.2,357.5,246.8,223.2],
+  ],
+  /** Un cantil cortado en tres bancadas y tres estratos, con dos bloques ya extraídos. */
+  cantera: [
+    [86,442,86,354,148,354,148,280,224,280,224,206,300,206,300,132,438,132,438,442],
+    [258,270,420,270,420,250,258,250],
+    [182,342,420,342,420,322,182,322],
+    [120,414,420,414,420,394,120,394],
+    [96,196,158,182,168,234,106,248],
+    [110,116,172,102,182,154,120,168],
+  ],
+  /** Una torre de cinco almenas, con tronera, puerta en arco y zócalo al pie. */
+  torreon: [
+    [130,438,130,410,142,410,142,168,174,168,174,212,191,212,191,168,223,168,223,212,240,212,240,168,272,168,272,212,289,212,289,168,321,168,321,212,338,212,338,168,370,168,370,410,382,410,382,438],
+    [244,292,268,292,268,236,244,236],
+    [222,392,290,392,290,352,288.3,341.5,283.5,332,276,324.5,266.5,319.7,256,318,245.5,319.7,236,324.5,228.5,332,223.7,341.5,222,352],
+  ],
+  /** Un faro que se estrecha, con dos franjas, y cuatro destellos sueltos a los lados. */
+  faro: [
+    [206,248,190,248,190,224,210,224,210,178,256,146,302,178,302,224,322,224,322,248,306,248,336,446,176,446],
+    [220,328,292,328,292,306,220,306],
+    [210,400,302,400,302,378,210,378],
+    [146.5,143.1,194.5,167.1,185.5,184.9,137.5,160.9],
+    [128,204,184,204,184,224,128,224],
+    [374.5,160.9,326.5,184.9,317.5,167.1,365.5,143.1],
+    [384,224,328,224,328,204,384,204],
+  ],
+  /** Un árbol de copa lobulada con tres frutas huecas, tronco y suelo a los lados. */
+  huerto: [
+    [381.6,241.9,370.1,259.1,356.5,273.2,344.8,286.5,335.8,301.8,326.5,319.1,313.8,335.3,296.2,345.8,275.9,347.6,256,342,238.4,333.4,222.1,326.4,204.8,322.5,185.5,319.1,166,312,150.7,298.5,142.7,279.8,141.9,259.1,144.6,239.6,146.2,222,144.6,204.4,141.9,184.9,142.7,164.2,150.7,145.5,166,132,185.5,124.9,204.8,121.5,222.1,117.6,238.4,110.6,256,102,275.9,96.4,296.2,98.2,313.8,108.7,326.5,124.9,335.8,142.2,344.8,157.5,356.5,170.8,370.1,184.9,381.6,202.1,386.2,222],
+    [238,300,274,300,286,446,226,446],
+    [225,196,223.1,187.8,217.8,181.1,210.2,177.5,201.8,177.5,194.2,181.1,188.9,187.8,187,196,188.9,204.2,194.2,210.9,201.8,214.5,210.2,214.5,217.8,210.9,223.1,204.2],
+    [319,184,317.1,175.8,311.8,169.1,304.2,165.5,295.8,165.5,288.2,169.1,282.9,175.8,281,184,282.9,192.2,288.2,198.9,295.8,202.5,304.2,202.5,311.8,198.9,317.1,192.2],
+    [271,264,269.1,255.8,263.8,249.1,256.2,245.5,247.8,245.5,240.2,249.1,234.9,255.8,233,264,234.9,272.2,240.2,278.9,247.8,282.5,256.2,282.5,263.8,278.9,269.1,272.2],
+    [146,424,206,424,206,442,146,442],
+    [306,424,366,424,366,442,306,442],
+  ],
+};
+
+/** Las cartas que tienen dibujo. Sirve para comprobar que no falta ninguna. */
+export const CARTAS_CON_ICONO: readonly string[] = Object.keys(CONTORNOS_DE_LA_CARTA);
+
+/**
+ * LA SAL, DIBUJADA Y FUERA DEL MAPA DE LOS BIENES A PROPÓSITO.
+ *
+ * Cuatro eras de evaporación en perspectiva y, delante, el montón recogido.
+ *
+ * `sal` es el único bien sin icono, y no por descuido: el provisional que le tocaba era
+ * una oveja de otro juego, y enseñar un bien que no se tiene en la pantalla con la que se
+ * decide qué ofrecer es peor que no enseñar nada. Está contado en
+ * `arte/game-icons/LEEME.md` y afirmado en `escenas/scripts/verificar-escena.ts`, que
+ * hoy comprueba que `sal` NO tiene icono.
+ *
+ * Así que aquí está dibujada pero NO en `CONTORNOS_DEL_BIEN`: meterla sin más pone la
+ * batería en rojo, porque esa comprobación está escrita para que activar la sal sea una
+ * decisión de alguien y no un efecto lateral de recompilar. Los pasos, y hay que darlos
+ * juntos, están en el compilador, encima de este dibujo.
+ */
+export const CONTORNOS_DE_LA_SAL: readonly (readonly number[])[] = [
+    [176,168,250,168,246,214,166,214],
+    [262,168,336,168,346,214,266,214],
+    [156,228,248,228,242,286,140,286],
+    [264,228,356,228,372,286,270,286],
+    [256,318,362,444,150,444],
+];
