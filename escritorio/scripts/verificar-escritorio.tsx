@@ -86,7 +86,7 @@ import {
   tableroEnTres,
   truequesPosibles,
 } from '../../shared/arcade/juegos/riberas-en-tres';
-import { semillaDelCodigo } from '../../shared/arcade/semilla';
+import { semillaDelCodigo } from '../../shared/mecanicas/semilla';
 
 let hechas = 0;
 const fallos: string[] = [];

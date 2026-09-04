@@ -69,7 +69,7 @@
  * Nada de `app/` (lo vigila `verify:fronteras`), nada de `drei`, y de
  * `escenas/embarcadero/` sólo lo que decide quién tiene tema (`tema.ts`, y ésa la
  * lee la Sala). La ruta del modelo y la semilla vienen de `escenas/ruta-de-modelos.ts`
- * y `shared/arcade/semilla.ts`, que no arrastran ninguna tabla: aquí hubo una copia
+ * y `shared/mecanicas/semilla.ts`, que no arrastran ninguna tabla: aquí hubo una copia
  * de cada una, y la de la semilla ya no pasaba a mayúsculas.
  */
 import { Component, useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -103,7 +103,7 @@ import {
   truequesPosibles,
 } from '../../shared/arcade/juegos/riberas-en-tres';
 import type { IdDeLaBarra, TableroEnTres, TruequePosible } from '../../shared/arcade/juegos/riberas-en-tres';
-import { semillaDelCodigo } from '../../shared/arcade/semilla';
+import { semillaDelCodigo } from '../../shared/mecanicas/semilla';
 import type { TableroDeclarado } from '../../shared/mecanicas/tablero-declarado';
 import { Formulario } from './formulario';
 import type { LaMesa, MesaVista } from './mesa';

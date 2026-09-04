@@ -44,7 +44,7 @@
 import { centroDeHex, mallaDeRadio, vecinos } from '../../shared/mecanicas/malla-hexagonal';
 import type { Hex } from '../../shared/mecanicas/malla-hexagonal';
 import { ESCALA_DEL_PACK, ESCALON, LAMINA, RADIO_DE_TESELA } from '../escala';
-import { semillaDelCodigo } from '../../shared/arcade/semilla';
+import { semillaDelCodigo } from '../../shared/mecanicas/semilla';
 import { PIEZA } from './piezas';
 import type { NombreDePieza } from './piezas';
 
@@ -54,7 +54,7 @@ import type { NombreDePieza } from './piezas';
 export const SEMILLA_DE_LA_ORILLA = 0x5eed_0b1e;
 
 /**
- * Cinco letras → un entero. Es LA semilla compartida de `shared/arcade/semilla.ts`
+ * Cinco letras → un entero. Es LA semilla compartida de `shared/mecanicas/semilla.ts`
  * —la misma que usa el delta de Riberas, para que un código dé un solo mundo en
  * todos los aparatos—; aquí sólo se dice qué cala hay cuando no hay mesa.
  */

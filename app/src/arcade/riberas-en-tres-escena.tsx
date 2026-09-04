@@ -96,12 +96,12 @@ import type {
 /*
  * LA SEMILLA DEL MUNDO SALE DEL CÓDIGO DE LA MESA, y el cálculo es el compartido.
  * El relieve, los árboles y los ríos del delta son una función de la semilla; con
- * la de `shared/arcade/semilla.ts` los seis asientos de una mesa —en la app y en el
+ * la de `shared/mecanicas/semilla.ts` los seis asientos de una mesa —en la app y en el
  * escritorio— ven el mismo mundo, que es lo que hace que «detrás de la colina»
  * signifique algo dicho en voz alta. Hubo una copia local de este hash aquí, y la
  * cabecera de aquel fichero cuenta por qué tres copias acabaron divergiendo.
  */
-import { semillaDelCodigo } from '../../../shared/arcade/semilla';
+import { semillaDelCodigo } from '../../../shared/mecanicas/semilla';
 import { Delta, encuadreDelDelta } from '../../../escenas/delta';
 import { ojoDelMirador } from '../../../escenas/camara';
 import type { Mirador } from '../../../escenas/camara';
