@@ -29,6 +29,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import {
   aristaEntre,
+  aristasDe,
   mallaDeRadio,
   puntoDeVertice,
   verticeEntre,
@@ -39,7 +40,12 @@ import type { Colocando } from '../../escenas/sitios';
 import { Delta, encuadreDelDelta, RADIO_DE_COMARCA } from '../../escenas/delta';
 import { crearRelieve } from '../../escenas/relieve';
 import type { Relieve } from '../../escenas/relieve';
-import { catalogoDeModelos } from '../../escenas/modelos';
+import {
+  catalogoDeModelos,
+  MODELO,
+  modeloDePieza,
+  modeloDeTorre,
+} from '../../escenas/modelos';
 import type { CatalogoDeModelos } from '../../escenas/modelos';
 import {
   ALTURA_DE_UNA_PERSONA,
@@ -271,6 +277,8 @@ const BOTON = {
 
 /** Los cincuenta y cuatro vértices del tablero, para el banco. El juego los traerá él. */
 const todosLosVertices: LlaveDeVertice[] = verticesDe(mallaDeRadio(2)) as LlaveDeVertice[];
+/** Y sus setenta y dos aristas, que es donde van los puentes y los caminos. */
+const todasLasAristas: string[] = aristasDe(mallaDeRadio(2));
 
 function Banco(): JSX.Element {
   /*
@@ -325,10 +333,38 @@ function Banco(): JSX.Element {
    * esta lista vendrá del servidor y lo demás no cambia: la escena ya no opina.
    */
   const [colocando, ponerColocando] = useState<Colocando | null>(null);
+  const [tomada, ponerTomada] = useState<string | null>(null);
+
+  /*
+   * LA BARRA DEL BANCO, con una regla de mentira.
+   *
+   * Aquí «disponible» es siempre cierto porque no hay mano de cartas todavía. En la
+   * partida de verdad lo dirá el juego mirando lo que el jugador puede pagar, y esto no
+   * cambia: la escena ya enseña apagado lo que no está disponible.
+   */
+  const barra = useMemo(
+    () => [
+      { id: 'poblado', modelo: modeloDePieza('poblado', 'red'), disponible: true },
+      { id: 'ciudad', modelo: modeloDePieza('ciudad', 'red'), disponible: true },
+      { id: 'puente', modelo: MODELO.puente, disponible: true },
+      { id: 'torre', modelo: modeloDeTorre('red'), disponible: false },
+    ],
+    [],
+  );
   const libres = useMemo(
     () => todosLosVertices.filter((v) => !obras.some((o) => o.vertice === v)),
     [obras],
   );
+
+  /*
+   * Y LAS ARISTAS, que el puente no va en un vértice.
+   *
+   * Se vio probando: pasarle al puente la lista de vértices lo dejaba con CERO anillos,
+   * porque la escena filtra por clase de sitio y ninguna llave de vértice es una arista.
+   * La escena hizo lo correcto —no inventó nada— y quien decía tonterías era esta regla
+   * de mentira del banco.
+   */
+  const aristasLibres = useMemo(() => todasLasAristas, []);
 
   /* Los seis vértices de la comarca central, que es donde mira la cámara. */
   const sitios = useMemo(() => {
@@ -436,6 +472,16 @@ function Banco(): JSX.Element {
               modelos={modelos}
               semilla={semilla}
               colocando={colocando}
+              barra={barra}
+              tomada={tomada}
+              onTomarDeLaBarra={(id) => {
+                ponerTomada(id);
+                ponerColocando(
+                  id === 'puente'
+                    ? { clase: 'arista', donde: aristasLibres }
+                    : { clase: 'vertice', donde: libres },
+                );
+              }}
               onElegirSitio={(sitio) => {
                 ponerObras((antes) => [
                   ...antes,
@@ -446,6 +492,7 @@ function Banco(): JSX.Element {
                   },
                 ]);
                 ponerColocando(null);
+                ponerTomada(null);
               }}
             />
             <Testigo
@@ -459,9 +506,16 @@ function Banco(): JSX.Element {
 
       <div
         style={{
+          /*
+           * ARRIBA, y no abajo, desde que hay barra de construir.
+           *
+           * El panel del banco estaba abajo a la izquierda y ahí es donde vive ahora la
+           * barra de piezas: la tapaba entera. Es un panel de pruebas y la barra es el
+           * juego, así que se aparta el panel.
+           */
           position: 'absolute',
           left: 18,
-          bottom: 18,
+          top: 18,
           color: '#cfe3d6',
           font: '13px/1.6 system-ui, sans-serif',
           background: 'rgba(6,17,15,0.72)',

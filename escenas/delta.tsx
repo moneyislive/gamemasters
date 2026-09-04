@@ -114,6 +114,8 @@ import { apuntaLosLados, piezaDeCauce, piezaDeSenda, teselasDeUnCamino } from '.
 import { CAUCE, CUERPO, HONDO, piezaDeOrilla } from './aguas';
 import { CELDA_DE_LA_ARENA } from './paleta';
 import { sitiosDelTablero, sitiosPermitidos } from './sitios';
+import { DISTANCIA_DE_LA_BARRA, huecosDeLaBarra } from './barra';
+import type { HuecoDeLaBarra, PiezaDeBarra } from './barra';
 import type { Colocando, Sitio } from './sitios';
 import type { CaminoEn3D, DeltaEn3D, IslaEn3D, PiezaEn3D } from './tipos';
 
@@ -610,28 +612,71 @@ function Senal({
        */}
       <mesh
         ref={agarre}
-        position={[0, ALTO_DE_AGARRE / 2, 0]}
+        position={[0, ALTO_DEL_ANILLO * 0.6, 0]}
         onPointerOver={(e) => {
           e.stopPropagation();
           setEncima(true);
         }}
         onPointerOut={() => setEncima(false)}
-        onClick={(e) => {
+        /*
+         * SE DISPARA AL SOLTAR, NO AL PULSAR, y con eso salen los DOS gestos de uno.
+         *
+         * Lo que se pidió son dos formas de construir: pulsar el anillo, o arrastrar la
+         * pieza desde la barra y soltarla encima. Parecen dos interacciones y son la
+         * misma vista desde dos sitios — lo único que las distingue es dónde se pulsó
+         * antes de soltar.
+         *
+         * · Pulsar el anillo: el puntero baja y sube sobre el anillo. Soltar aquí.
+         * · Arrastrar: el puntero baja sobre la barra, se mueve, y sube sobre el anillo.
+         *   Soltar aquí también.
+         *
+         * Con `onClick` sólo funcionaba el primero, porque un clic exige que la pulsación
+         * y la suelta caigan en el mismo objeto. Con `onPointerUp` funcionan los dos y no
+         * hay dos caminos de código que puedan separarse.
+         *
+         * No se captura el puntero al pulsar en la barra a propósito: capturarlo haría
+         * que la suelta se entregara a la barra y nunca al anillo, que es exactamente lo
+         * contrario de lo que hace falta.
+         */
+        onPointerUp={(e) => {
           e.stopPropagation();
           onElegir(sitio);
         }}
       >
-        <cylinderGeometry args={[RADIO_DE_TESELA, RADIO_DE_TESELA, ALTO_DE_AGARRE, 8]} />
+        <cylinderGeometry args={[RADIO_DE_TESELA, RADIO_DE_TESELA, ALTO_DEL_ANILLO * 1.6, 8]} />
         <meshBasicMaterial colorWrite={false} depthWrite={false} />
       </mesh>
       {/*
-       * Va sin profundidad —ni escritura ni prueba— y de los dos lados: así no lo tapa el
-       * canto de la tesela de al lado cuando el sitio cae en una ladera, ni desaparece
-       * mirándolo desde debajo del suelo en la vista de tierra.
+       * SÍ PRUEBA LA PROFUNDIDAD, y esto es una corrección que sólo se ve jugando.
+       *
+       * La primera versión lo dibujaba con `depthTest={false}` para que no lo tapara el
+       * canto de la tesela de al lado en una ladera. Y conseguía algo peor: el anillo de
+       * un vértice del otro extremo del tablero se dibujaba ENCIMA de la montaña que
+       * tenía delante. Se veía un anillo, se pulsaba, y no pasaba nada — porque el rayo
+       * sí respeta la geometría y chocaba con la montaña.
+       *
+       * Un marcador que se ve donde no está es peor que un marcador escondido: el
+       * escondido enseña que ahí no se puede pulsar, y el otro miente. Ahora lo que se
+       * ve es lo que se puede pulsar, y si una montaña tapa un sitio es porque de verdad
+       * está detrás de una montaña.
+       *
+       * ═══ Y FLOTA POR ENCIMA DEL PAISAJE, QUE ES LA OTRA MITAD ═══
+       *
+       * Al activar la profundidad, la mitad de los anillos desapareció: un vértice del
+       * catán cae en medio de una comarca poblada, con árboles de seis unidades y casas
+       * de cinco alrededor. Un anillo a ras de suelo queda ENTERRADO entre el follaje —
+       * honesto pero inservible.
+       *
+       * Así que sube por encima de lo que crece: dos personas y media, que es más alto
+       * que un árbol del pack y más bajo que la cámara de tierra. Y el cilindro del asa
+       * llega desde el suelo hasta más arriba del anillo, así que se pulsa donde se ve.
+       *
+       * No escribe profundidad para no tapar lo que tiene detrás, y va de los dos lados
+       * para que no desaparezca visto desde el ras del suelo.
        */}
       <mesh
         ref={anillo}
-        position={[0, ALTURA_DE_UNA_PERSONA * 0.12, 0]}
+        position={[0, ALTO_DEL_ANILLO, 0]}
         rotation={[-Math.PI / 2, 0, 0]}
         renderOrder={2}
       >
@@ -641,7 +686,6 @@ function Senal({
           transparent
           opacity={0.7}
           depthWrite={false}
-          depthTest={false}
           side={THREE.DoubleSide}
         />
       </mesh>
@@ -649,12 +693,249 @@ function Senal({
   );
 }
 
-/** Lo alto que es el cilindro invisible que recibe el toque, antes de escalarlo. */
-const ALTO_DE_AGARRE = ALTURA_DE_UNA_PERSONA * 2;
+/**
+ * A QUÉ ALTURA FLOTA EL ANILLO SOBRE EL SUELO DE SU SITIO.
+ *
+ * Dos personas y media. Sale de medir contra lo que crece en una comarca: el árbol del
+ * pack levanta 1,2 del pack —seis y medio de mundo— y la casa de paisaje 1,28. Por
+ * debajo de eso el anillo se pierde entre el follaje; muy por encima deja de leerse como
+ * una marca EN un sitio y pasa a ser un globo.
+ */
+const ALTO_DEL_ANILLO = ALTURA_DE_UNA_PERSONA * 2.5;
 /** Cuánto sube y baja la opacidad del anillo. Lo justo para que se note vivo. */
 const LATIDO_DE_LA_SENAL = 0.18;
 /** Qué parte del alto de la pantalla ocupa una señal, mire desde donde mire la cámara. */
 const PARTE_DE_PANTALLA = 0.035;
+
+/**
+ * UNA PIEZA PUESTA EN SU HUECO DE LA BARRA.
+ *
+ * Se escala para que quepa en el hueco sea del tamaño que sea: el castillo mide 3,98 del
+ * pack y la casa 1,28, así que sin normalizar el castillo saldría tres veces más grande
+ * que la casa y la barra parecería rota. Se mide la caja de la geometría y se divide.
+ *
+ * Gira despacio porque es un modelo y no un icono: girando se le ve la forma, y es lo
+ * que distingue enseñar la pieza de verdad de enseñar una foto suya.
+ */
+function PiezaEnLaBarra({
+  pieza,
+  hueco,
+  mallas,
+  tomada,
+  onTomar,
+}: {
+  pieza: PiezaDeBarra;
+  hueco: HuecoDeLaBarra;
+  mallas: readonly Instanciable[];
+  tomada: boolean;
+  onTomar: (id: string) => void;
+}): JSX.Element {
+  const grupo = useRef<THREE.Group>(null);
+  const [encima, setEncima] = useState(false);
+
+  /*
+   * CUÁNTO SE ESCALA Y DÓNDE TIENE LOS PIES.
+   *
+   * Las dos cosas se miden de la caja de la geometría, y las dos hacen falta. El alto,
+   * para que el castillo —3,98 del pack— y la casa —1,28— salgan del mismo tamaño en la
+   * barra en vez de uno tres veces mayor que el otro.
+   *
+   * Y el suelo, porque los modelos del pack NO tienen todos su origen en la base: el
+   * puente lo tiene por el medio. Sin corregirlo, la barra sale con unas piezas
+   * apoyadas y otras medio hundidas, y parece un fallo de dibujo cuando es un fallo de
+   * suposición.
+   */
+  const { talla, pies } = useMemo(() => {
+    let alto = 0;
+    let bajo = Infinity;
+    for (const m of mallas) {
+      m.geometria.computeBoundingBox();
+      const caja = m.geometria.boundingBox;
+      if (caja === null) continue;
+      alto = Math.max(alto, caja.max.y - caja.min.y);
+      bajo = Math.min(bajo, caja.min.y);
+    }
+    const t = alto > 0 ? (hueco.lado * 0.62) / alto : 1;
+    return { talla: t, pies: Number.isFinite(bajo) ? -bajo * t : 0 };
+  }, [mallas, hueco.lado]);
+
+  useFrame((estado) => {
+    const g = grupo.current;
+    if (g === null) return;
+    const t = estado.clock.elapsedTime;
+    g.rotation.y = t * 0.5;
+    const crece = encima || tomada ? 1.18 : 1;
+    const sube = encima || tomada ? hueco.lado * 0.12 : 0;
+    g.position.y =
+      -hueco.lado * 0.34 + pies * crece + sube + (tomada ? Math.sin(t * 6) * hueco.lado * 0.03 : 0);
+    g.scale.setScalar(talla * crece);
+  });
+
+  return (
+    <group position={[hueco.x, hueco.y, hueco.z]}>
+      {/*
+       * EL ASA ES LA CASILLA ENTERA, y esto costó una prueba en pantalla.
+       *
+       * La primera versión ponía el asa en el ZÓCALO, debajo de la pieza, razonando que
+       * es una superficie ancha y plana. Y al probarlo no se cogía nada: uno pulsa la
+       * CASA, no el posavasos que tiene debajo. Lo que hay que poder agarrar es lo que
+       * se ve.
+       *
+       * Así que el asa es una caja invisible del tamaño del hueco, con la pieza y el
+       * zócalo dentro. Los modelos no reciben rayos —`raycast={() => null}`— para que un
+       * hueco entre las almenas del castillo no deje pasar el dedo al tablero de detrás.
+       *
+       * Invisible por `colorWrite`, no por `visible={false}`: r3f descarta de sus eventos
+       * los objetos invisibles, y con `visible={false}` el asa no recibiría nada.
+       */}
+      <mesh
+        onPointerOver={(e) => {
+          e.stopPropagation();
+          setEncima(true);
+        }}
+        onPointerOut={() => setEncima(false)}
+        onPointerDown={(e) => {
+          e.stopPropagation();
+          if (pieza.disponible) onTomar(pieza.id);
+        }}
+      >
+        <boxGeometry args={[hueco.lado, hueco.lado, hueco.lado * 0.8]} />
+        <meshBasicMaterial colorWrite={false} depthWrite={false} />
+      </mesh>
+      {/* El zócalo, que ya sólo es adorno: le da sitio a la pieza y dice si está apagada. */}
+      <mesh position={[0, -hueco.lado * 0.42, 0]} raycast={() => null}>
+        <cylinderGeometry args={[hueco.lado * 0.46, hueco.lado * 0.5, hueco.lado * 0.12, 6]} />
+        <meshStandardMaterial
+          color={tomada ? COLOR_DE_LA_SENAL : encima ? '#f0e3c2' : '#c8b48a'}
+          transparent
+          opacity={pieza.disponible ? 0.92 : 0.3}
+          roughness={0.7}
+        />
+      </mesh>
+      <group ref={grupo}>
+        {mallas.map((m, i) => (
+          <mesh
+            key={`barra:${pieza.id}:${String(i)}`}
+            geometry={m.geometria}
+            material={m.material}
+            raycast={() => null}
+          />
+        ))}
+      </group>
+    </group>
+  );
+}
+
+/**
+ * LA BARRA DE ABAJO, pegada a la cámara.
+ *
+ * ═══ CÓMO SE PEGA, SIN TOCAR EL ÁRBOL DE LA ESCENA ═══
+ *
+ * Se copian la posición y el giro de la cámara sobre el grupo en cada fotograma, y los
+ * huecos van dentro en coordenadas locales. Es lo mismo que colgar el grupo de la cámara
+ * pero sin moverlo de sitio en el árbol, que en r3f obliga a manipular el objeto de la
+ * cámara a mano y a acordarse de descolgarlo.
+ *
+ * ═══ Y POR QUÉ SE BORRA LA PROFUNDIDAD ANTES ═══
+ *
+ * La barra vive a dos unidades de la cámara y en la vista de tablero nada del mundo se
+ * le acerca. Pero en la vista de tierra la cámara camina entre árboles, y un tronco a
+ * unidad y media taparía media barra. Se borra el buffer de profundidad justo antes de
+ * dibujarla: a partir de ahí la barra se dibuja sobre todo lo demás, pero SIN perder su
+ * propia profundidad, así que un castillo sigue tapándose a sí mismo como debe.
+ *
+ * Poner `depthTest={false}` en los materiales daría el mismo «va delante» y rompería eso
+ * otro: las caras de atrás del castillo se dibujarían encima de las de delante.
+ */
+function Barra({
+  piezas,
+  aplanados,
+  tomada,
+  onTomar,
+}: {
+  piezas: readonly PiezaDeBarra[];
+  aplanados: Map<string, Instanciable[]>;
+  tomada: string | null;
+  onTomar: (id: string) => void;
+}): JSX.Element {
+  const grupo = useRef<THREE.Group>(null);
+  const [forma, setForma] = useState({ campo: (45 * Math.PI) / 180, proporcion: 16 / 9 });
+
+  useFrame((estado) => {
+    const g = grupo.current;
+    if (g === null) return;
+    g.position.copy(estado.camera.position);
+    g.quaternion.copy(estado.camera.quaternion);
+
+    const c = estado.camera as THREE.PerspectiveCamera;
+    const campo = ((c.isPerspectiveCamera ? c.fov : 45) * Math.PI) / 180;
+    const proporcion = estado.size.width / Math.max(1, estado.size.height);
+    if (Math.abs(campo - forma.campo) > 1e-6 || Math.abs(proporcion - forma.proporcion) > 1e-4) {
+      setForma({ campo, proporcion });
+    }
+  });
+
+  const huecos = useMemo(
+    () => huecosDeLaBarra(piezas.length, forma.campo, forma.proporcion),
+    [piezas.length, forma],
+  );
+
+  return (
+    <group ref={grupo} renderOrder={1000}>
+      {/*
+       * El testigo que borra la profundidad. No escribe color y no recibe rayos: sólo
+       * está para que el pintor pase por él justo antes de la barra.
+       */}
+      <mesh renderOrder={999} onBeforeRender={(gl) => gl.clearDepth()} raycast={() => null}>
+        <planeGeometry args={[0.001, 0.001]} />
+        <meshBasicMaterial colorWrite={false} depthWrite={false} />
+      </mesh>
+      {/*
+       * Su propia luz, y con alcance corto. La barra gira con la cámara, así que con la
+       * luz del mundo se le apagarían las piezas cada vez que el jugador diera media
+       * vuelta al tablero. Con `distance` a tres unidades no llega al mundo y no lo
+       * altera.
+       */}
+      <pointLight position={[0.4, 0.6, -1.2]} intensity={3.5} distance={3} decay={1.4} />
+      {/*
+       * EL FONDO DE LA BARRA, y por qué hace falta aunque no se «vea» nada en él.
+       *
+       * Sin él, cuatro modelos flotando en la parte de abajo se leen como cuatro
+       * edificios más del tablero, sólo que muy grandes y en primer plano. El fondo los
+       * separa del mundo: dice «esto es tuyo, no es paisaje». Es el mismo trabajo que
+       * hace el marco de un cuadro y por eso es tan tenue — se nota si falta, no si está.
+       */}
+      {huecos.length > 0 && (
+        <mesh position={[0, (huecos[0] as HuecoDeLaBarra).y, -DISTANCIA_DE_LA_BARRA - 0.02]} raycast={() => null}>
+          <planeGeometry
+            args={[
+              (huecos[huecos.length - 1] as HuecoDeLaBarra).x -
+                (huecos[0] as HuecoDeLaBarra).x +
+                (huecos[0] as HuecoDeLaBarra).lado * 1.7,
+              (huecos[0] as HuecoDeLaBarra).lado * 1.5,
+            ]}
+          />
+          <meshBasicMaterial color="#0d1f1a" transparent opacity={0.42} depthWrite={false} />
+        </mesh>
+      )}
+      {piezas.map((pieza, i) => {
+        const hueco = huecos[i];
+        const mallas = aplanados.get(pieza.modelo);
+        if (hueco === undefined || mallas === undefined) return null;
+        return (
+          <PiezaEnLaBarra
+            key={`barra:${pieza.id}`}
+            pieza={pieza}
+            hueco={hueco}
+            mallas={mallas}
+            tomada={tomada === pieza.id}
+            onTomar={onTomar}
+          />
+        );
+      })}
+    </group>
+  );
+}
 
 export function Delta({
   datos,
@@ -662,6 +943,9 @@ export function Delta({
   semilla = 0,
   colocando = null,
   onElegirSitio,
+  barra = [],
+  tomada = null,
+  onTomarDeLaBarra,
 }: {
   datos: DeltaEn3D;
   modelos: CatalogoDeModelos;
@@ -672,8 +956,19 @@ export function Delta({
    * Los sitios legales llegan DE FUERA: la escena no los calcula. Ver `sitios.ts`.
    */
   colocando?: Colocando | null;
-  /** Aviso de que alguien ha pulsado una flecha. La escena no decide qué pasa después. */
+  /** Aviso de que alguien ha pulsado un anillo. La escena no decide qué pasa después. */
   onElegirSitio?: (sitio: Sitio) => void;
+  /**
+   * Lo que se puede coger de la barra de abajo. Vacío o sin poner, no hay barra.
+   *
+   * Qué está disponible lo decide el juego: la escena las enseña apagadas y no deja
+   * cogerlas, igual que el anillo no sabe por qué un vértice vale.
+   */
+  barra?: readonly PiezaDeBarra[];
+  /** Cuál está cogida ahora mismo, para dibujarla levantada. */
+  tomada?: string | null;
+  /** Aviso de que alguien ha cogido una pieza de la barra. */
+  onTomarDeLaBarra?: (id: string) => void;
 }): JSX.Element {
   /**
    * Cada modelo, aplanado una vez a geometría + material para poder instanciarlo.
@@ -1193,6 +1488,15 @@ export function Delta({
        * ninguna, que es lo que tiene que pasar cuando el juego dice que no se puede
        * poner nada en ningún sitio — y se ve, en vez de dejar al jugador probando.
        */}
+      {barra.length > 0 && (
+        <Barra
+          piezas={barra}
+          aplanados={aplanados}
+          tomada={tomada}
+          onTomar={(id) => onTomarDeLaBarra?.(id)}
+        />
+      )}
+
       {colocando !== null &&
         sitiosPermitidos(sitios, colocando).map((sitio) => (
           <Senal

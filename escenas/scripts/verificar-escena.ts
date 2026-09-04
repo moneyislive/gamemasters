@@ -47,6 +47,8 @@ import { cuantasFormasDeCauce, cuantasFormasDeCruce, ladoHaciaElVecino } from '.
 import { hexesDeVertice, vecino, verticesDeHex } from '../../shared/mecanicas/malla-hexagonal';
 import { CAUCE, CUERPO, piezaDeOrilla } from '../aguas';
 import { piezasDeAsentamiento } from '../asentamiento';
+import { sitiosDelTablero, sitiosPermitidos } from '../sitios';
+import { dentroDelHueco, huecosDeLaBarra, loQueSeVe } from '../barra';
 import { MODELO, modeloDePieza } from '../modelos';
 import { RADIO_DE_COMARCA, RADIO_DE_TESELA } from '../escala';
 import { laMarinaDelMundo } from '../marina';
@@ -564,6 +566,111 @@ paso('El mundo cubre los cincuenta y cuatro vértices donde se construye');
 // ---------------------------------------------------------------------------
 
 /**
+ * LOS SITIOS Y LA BARRA: lo que se puede pulsar y lo que se puede coger.
+ *
+ * Son las dos listas de las que cuelga la interfaz de juego, y las dos se pueden contar
+ * sin abrir una ventana. Que salgan 54 vértices y 72 aristas no es una curiosidad: es que
+ * la malla y la escena están de acuerdo sobre cuántos sitios tiene un tablero.
+ *
+ * Y de la barra se comprueba lo único que puede salir mal sin que nadie lo vea: que en
+ * una pantalla estrecha las piezas ENCOJAN en vez de amontonarse o salirse. Un móvil de
+ * pie tiene menos de la mitad del ancho de un monitor a igualdad de alto, y ahí es donde
+ * una barra pensada en un portátil se rompe.
+ */
+paso('Los sitios se pueden contar y la barra cabe en cualquier pantalla');
+{
+  const TERRENOS = [
+    'bosque', 'bosque', 'bosque', 'bosque', 'pradera', 'pradera', 'pradera', 'pradera',
+    'campo', 'campo', 'campo', 'campo', 'colina', 'colina', 'colina',
+    'montana', 'montana', 'montana', 'desierto',
+  ];
+  const hexes = mallaDeRadio(2);
+  const islas = hexes.map((hex, i) => ({ hex, terreno: TERRENOS[i % TERRENOS.length] ?? 'pradera' }));
+  const relieve = crearRelieve(islas, 3);
+  const sitios = sitiosDelTablero(hexes, (p) => relieve.alturaEn(p));
+
+  comprobar(
+    'un tablero tiene 54 vértices, 72 aristas y 19 comarcas',
+    sitios.vertices.length === 54 && sitios.aristas.length === 72 && sitios.comarcas.length === 19,
+    {
+      vertices: sitios.vertices.length,
+      aristas: sitios.aristas.length,
+      comarcas: sitios.comarcas.length,
+    },
+  );
+
+  const llaves = new Set(sitios.todos.map((x) => `${x.clase}:${x.llave}`));
+  comprobar('y ningún sitio sale dos veces', llaves.size === sitios.todos.length, {
+    distintos: llaves.size,
+    total: sitios.todos.length,
+  });
+
+  /*
+   * Los permitidos son EXACTAMENTE los que se piden, ni uno más. Es la comprobación de
+   * que la escena no opina: con la lista vacía no puede aparecer ni un anillo, y con
+   * llaves de vértice pedidas como aristas tampoco.
+   */
+  const tres = sitios.vertices.slice(0, 3).map((x) => x.llave);
+  comprobar(
+    'la escena ofrece exactamente los sitios que le dan, y ninguno con la lista vacía',
+    sitiosPermitidos(sitios, { clase: 'vertice', donde: tres }).length === 3 &&
+      sitiosPermitidos(sitios, { clase: 'vertice', donde: [] }).length === 0 &&
+      sitiosPermitidos(sitios, { clase: 'arista', donde: tres }).length === 0,
+  );
+
+  /* Y la barra, en las tres formas de pantalla que existen de verdad. */
+  const CAMPO = (45 * Math.PI) / 180;
+  const PANTALLAS: Array<[string, number]> = [
+    ['monitor', 16 / 9],
+    ['tableta', 4 / 3],
+    ['móvil de pie', 9 / 19.5],
+  ];
+  const malas: string[] = [];
+  for (const [nombre, proporcion] of PANTALLAS) {
+    const { alto, ancho } = loQueSeVe(CAMPO, proporcion);
+    for (const cuantos of [1, 2, 4, 6, 8, 10]) {
+      const huecos = huecosDeLaBarra(cuantos, CAMPO, proporcion);
+      if (huecos.length !== cuantos) {
+        malas.push(`${nombre}/${String(cuantos)}: salen ${String(huecos.length)}`);
+      }
+      for (let i = 0; i < huecos.length; i++) {
+        const a = huecos[i];
+        if (a === undefined) continue;
+        if (Math.abs(a.x) + a.lado / 2 > ancho / 2 + 1e-9) {
+          malas.push(`${nombre}/${String(cuantos)}: se sale por el lado`);
+        }
+        if (Math.abs(a.y) + a.lado / 2 > alto / 2 + 1e-9) {
+          malas.push(`${nombre}/${String(cuantos)}: se sale por abajo`);
+        }
+        for (let j = i + 1; j < huecos.length; j++) {
+          const b = huecos[j];
+          if (b !== undefined && dentroDelHueco(a, b.x, b.y)) {
+            malas.push(`${nombre}/${String(cuantos)}: dos piezas encima`);
+          }
+        }
+      }
+    }
+  }
+  comprobar(
+    'la barra cabe entera y sin solapes en monitor, tableta y móvil',
+    malas.length === 0,
+    malas.slice(0, 4),
+  );
+
+  const enMonitor = huecosDeLaBarra(6, CAMPO, 16 / 9)[0]?.lado ?? 0;
+  const enMovil = huecosDeLaBarra(6, CAMPO, 9 / 19.5)[0]?.lado ?? 0;
+  comprobar(
+    'y en una pantalla estrecha las piezas encogen en vez de amontonarse',
+    enMovil < enMonitor,
+    { monitor: Number(enMonitor.toFixed(3)), movil: Number(enMovil.toFixed(3)) },
+  );
+
+  comprobar('con cero piezas no hay barra', huecosDeLaBarra(0, CAMPO, 16 / 9).length === 0);
+}
+
+// ---------------------------------------------------------------------------
+
+/**
  * LO QUE SE LEVANTA EN UN VÉRTICE MIRA A DONDE DEBE.
  *
  * ═══ EL ÍNDICE DE LA MALLA NO ES EL LADO DEL PACK ═══
@@ -796,7 +903,7 @@ if (fallos.length > 0) {
  * a veintitrés: durante ese tiempo el guion podía morirse en la novena sin que nadie se
  * enterara. Un guardia desfasado no guarda nada.
  */
-const COMPROBACIONES_ESCRITAS = 36;
+const COMPROBACIONES_ESCRITAS = 42;
 if (hechas < COMPROBACIONES_ESCRITAS) {
   console.error(
     `Solo se han hecho ${hechas} de las ${COMPROBACIONES_ESCRITAS} comprobaciones que ` +
