@@ -113,7 +113,9 @@ export const FICHERO_DE_ANIMACIONES = 'animaciones.glb';
  * por el proxy de Vite y en producción es el mismo Node. Las sirve
  * `server/src/routes/modelos.ts`, delante del guardián.
  */
-export const RUTA_DE_MODELOS = '/api/arcade/modelos';
+import { RUTA_DE_MODELOS } from '../ruta-de-modelos';
+
+export { RUTA_DE_MODELOS };
 
 export function rutaDelAventurero(id: FiguraId): string {
   return `${RUTA_DE_MODELOS}/aventureros/${figura(id).fichero}`;

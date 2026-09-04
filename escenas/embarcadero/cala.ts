@@ -44,6 +44,7 @@
 import { centroDeHex, mallaDeRadio, vecinos } from '../../shared/mecanicas/malla-hexagonal';
 import type { Hex } from '../../shared/mecanicas/malla-hexagonal';
 import { ESCALA_DEL_PACK, ESCALON, LAMINA, RADIO_DE_TESELA } from '../escala';
+import { semillaDelCodigo } from '../../shared/arcade/semilla';
 import { PIEZA } from './piezas';
 import type { NombreDePieza } from './piezas';
 
@@ -53,18 +54,12 @@ import type { NombreDePieza } from './piezas';
 export const SEMILLA_DE_LA_ORILLA = 0x5eed_0b1e;
 
 /**
- * Cinco letras → un entero. Un hash multiplicativo basta: no hay que repartir
- * criptografía, sólo que dos códigos distintos den calas distintas casi siempre.
+ * Cinco letras → un entero. Es LA semilla compartida de `shared/arcade/semilla.ts`
+ * —la misma que usa el delta de Riberas, para que un código dé un solo mundo en
+ * todos los aparatos—; aquí sólo se dice qué cala hay cuando no hay mesa.
  */
 export function semillaDeCodigo(codigo: string | null | undefined): number {
-  if (codigo === null || codigo === undefined || codigo.length === 0) return SEMILLA_DE_LA_ORILLA;
-  let h = 0x811c_9dc5;
-  const texto = codigo.toUpperCase();
-  for (let i = 0; i < texto.length; i++) {
-    h ^= texto.charCodeAt(i);
-    h = Math.imul(h, 0x0100_0193) >>> 0;
-  }
-  return h >>> 0;
+  return semillaDelCodigo(codigo, SEMILLA_DE_LA_ORILLA);
 }
 
 /** Un sorteo reproducible (mulberry32). Devuelve fracciones en [0, 1). */

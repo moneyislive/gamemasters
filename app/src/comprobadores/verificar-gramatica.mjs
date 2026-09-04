@@ -320,7 +320,7 @@ if (fallos.length > 0) {
 }
 
 console.log(
-  `\n✔ ${cuantas} comprobaciones. La gramática de la Sala se cumple en las siete pantallas: un\n` +
+  `\n✔ ${cuantas} comprobaciones. La gramática de la Sala se cumple en todas las pantallas de app/src/arcade: un\n` +
     '  botón apagado se apaga con color y no con opacidad, el blanco no se apoya en el acento\n' +
     '  vivo, el raíl de aforo se pinta en un solo sitio y ningún texto baja de 13.\n',
 );
