@@ -177,8 +177,6 @@ import { rutaDelTablero } from '../../escenas/ruta-de-modelos';
 import type { Opcion } from '../../shared/arcade';
 import {
   barraEnTres,
-  BIEN_EN_LA_ESCENA,
-  bienDeRiberas,
   bienesQueSeCambianPor,
   colocandoEnTres,
   manoEnTres,
@@ -718,9 +716,7 @@ export function RiberasEnTres({ manifiesto, mesa, puesta, tablero, opciones }: L
   const cartaCogida = useMemo(() => mano.find((c) => c.id === cogida) ?? null, [mano, cogida]);
   const seCambianPor = useMemo(() => {
     if (cartaCogida === null || quieto) return [];
-    return bienesQueSeCambianPor(vista, opciones, bienDeRiberas(cartaCogida.bien)).map(
-      (b) => BIEN_EN_LA_ESCENA[b] ?? b,
-    );
+    return bienesQueSeCambianPor(vista, opciones, cartaCogida.bien);
   }, [cartaCogida, quieto, vista, opciones]);
 
   const alTomarDeLaBarra = useCallback(
@@ -762,8 +758,8 @@ export function RiberasEnTres({ manifiesto, mesa, puesta, tablero, opciones }: L
   const alProponerTrueque = useCallback(
     (bienEnLaEscena: string) => {
       if (quieto || cartaCogida === null) return;
-      const doy = bienDeRiberas(cartaCogida.bien);
-      const quiero = bienDeRiberas(bienEnLaEscena);
+      const doy = cartaCogida.bien;
+      const quiero = bienEnLaEscena;
       const posibles = truequesPosibles(vista, opciones, doy, quiero);
       ponerCogida(null);
       const unico = posibles[0];

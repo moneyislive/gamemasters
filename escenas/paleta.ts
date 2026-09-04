@@ -260,12 +260,24 @@ export function terrenoDe(terreno: string): Terreno {
  * bosque, la carta de madera se retoca con él. Dos sitios con el mismo color escrito a
  * mano acaban discrepando; uno derivado del otro no puede.
  */
+/**
+ * DE QUÉ TERRENO SALE CADA BIEN. Sirve para darle a la carta el color de su tierra.
+ *
+ * Son los cinco de Riberas, y la tabla no se inventa: es `RINDE` de `riberas.ts` dicha
+ * aquí. Estaban los del catán —madera, ladrillo, lana— de cuando el tablero todavía no
+ * hablaba con el motor; no se traducen a los de Riberas en ningún sitio, se sustituyen,
+ * porque el juego nombra sus bienes y lo que tiene que adaptarse es el dibujo.
+ *
+ * Duplicar `RINDE` aquí tiene un motivo y una consecuencia. El motivo: `escenas/` no puede
+ * importar `riberas.ts` —sería la escena opinando de reglas—. La consecuencia: si un día
+ * cambia qué rinde una marisma, esto no se entera. Por eso `verify:escena` lo vigila.
+ */
 export const TERRENO_DEL_BIEN: Readonly<Record<string, string>> = {
-  madera: 'bosque',
-  ladrillo: 'colina',
-  mineral: 'montana',
-  lana: 'pradera',
-  grano: 'campo',
+  limo: 'marisma',
+  junco: 'carrizal',
+  sal: 'salina',
+  piedra: 'cantil',
+  grano: 'vega',
 };
 
 /** El color de la carta de un bien: el de su terreno. Uno desconocido sale de reserva. */

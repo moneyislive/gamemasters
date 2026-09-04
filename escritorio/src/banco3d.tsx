@@ -528,7 +528,8 @@ function Banco(): JSX.Element {
    * verdad esto llega del servidor.
    */
   const mano = useMemo(() => {
-    const BIENES = ['madera', 'ladrillo', 'mineral', 'lana', 'grano'];
+    /* Los cinco de Riberas, que es a lo que se juega. `sal` sigue sin icono a proposito. */
+    const BIENES = ['limo', 'junco', 'sal', 'piedra', 'grano'];
     return Array.from({ length: 11 }, (_, i) => ({
       id: `c${String(i)}`,
       bien: BIENES[(i * 3 + (i % 2)) % BIENES.length] as string,
@@ -766,7 +767,7 @@ function Banco(): JSX.Element {
               seCambianPor={
                 cogida === null
                   ? []
-                  : ['madera', 'ladrillo', 'mineral', 'lana', 'grano'].filter(
+                  : ['limo', 'junco', 'sal', 'piedra', 'grano'].filter(
                       (b) => b !== mano.find((c) => c.id === cogida)?.bien,
                     )
               }

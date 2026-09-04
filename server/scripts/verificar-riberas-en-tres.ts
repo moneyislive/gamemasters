@@ -10,7 +10,7 @@
  * nada. Si esa traducción miente, el fallo es de los silenciosos: la barra ofrece
  * una obra que las reglas no permiten, el anillo señala un vértice donde el
  * servidor va a rechazar el movimiento, o la mano enseña «lana» donde el juego
- * tiene sal. Nada se cae; se juega mal.
+ * tiene junco. Nada se cae; se juega mal.
  *
  * Por eso aquí NO se comprueba contra vistas inventadas: se abre una mesa de
  * verdad con el árbitro, se empieza, se funda y se alza, y a cada paso se mira que
@@ -32,6 +32,7 @@ import { aristaDeHex, verticeDeHex } from '../../shared/mecanicas/malla-hexagona
 import '../../shared/arcade/juegos';
 import {
   ALZAR,
+  bienDeLaFicha,
   EMPEZAR_RIBERAS,
   FUNDAR,
   OFRECER,
@@ -44,8 +45,6 @@ import {
 import type { Bien, EstadoDeRiberas, Ficha } from '../../shared/arcade/juegos';
 import {
   barraEnTres,
-  BIEN_EN_LA_ESCENA,
-  bienDeRiberas,
   bienesQueSeCambianPor,
   colocandoEnTres,
   esVistaQueSePinta,
@@ -248,12 +247,18 @@ function escenarioDeTrueque(deA: readonly Bien[], deB: readonly Bien[]): EstadoD
   /* La mano. */
   const mano = manoEnTres(vistaA);
   comprobar('la mano tiene una carta por ficha, con su identificador de serie', mano.length === 3 && new Set(mano.map((c) => c.id)).size === 3, mano);
-  comprobar('y los bienes van traducidos al idioma de la escena', mano.map((c) => c.bien).join(',') === 'madera,ladrillo,madera', mano);
+  /*
+   * LOS BIENES VIAJAN CON SU NOMBRE, y esto es una comprobación y no una obviedad:
+   * aquí hubo una tabla que los traducía al catán para reaprovechar sus iconos, y con
+   * ella la carta de sal se dibujaba como una oveja. En un juego de trueques eso no es
+   * un provisional: es enseñar un bien que no se tiene.
+   */
+  comprobar('y los bienes salen con su nombre de Riberas, sin traducir', mano.map((c) => c.bien).join(',') === 'junco,limo,junco', mano);
   comprobar(
-    'la traducción va y vuelve para los cinco bienes',
-    (['limo', 'junco', 'sal', 'piedra', 'grano'] as const).every((b) => bienDeRiberas(BIEN_EN_LA_ESCENA[b] as string) === b),
+    'lo que la mano enseña es exactamente lo que va en la carga del movimiento',
+    mano.every((c) => bienDeLaFicha(c.id) === c.bien),
+    mano.map((c) => [c.id, c.bien]),
   );
-  comprobar('un bien que la escena no conoce pasa tal cual, sin romper', bienDeRiberas('ambar') === 'ambar');
 
   /* Lo que se cambia por junco: lo que A no tiene ya. */
   const porJunco = bienesQueSeCambianPor(vistaA, opcionesA, 'junco');
@@ -323,11 +328,11 @@ function escenarioDeTrueque(deA: readonly Bien[], deB: readonly Bien[]): EstadoD
   comprobar('ni trueques', bienesQueSeCambianPor(ajena, [], 'junco').length === 0 && truequesPosibles(ajena, [], 'junco', 'sal').length === 0);
   comprobar('`null` y `undefined` tampoco', tableroEnTres(null) === null && tableroEnTres(undefined) === null);
   const rota = { desde: 'riberas', momento: 'jugando', colonos: [], islas: [], misFichas: ['sinbien', 'b1:', ':grano', 'b2:sal'] };
-  comprobar('una ficha sin la forma `serie:bien` se salta en vez de romper la mano', manoEnTres(rota).map((c) => c.bien).join(',') === 'grano,lana', manoEnTres(rota));
+  comprobar('una ficha sin la forma `serie:bien` se salta en vez de romper la mano', manoEnTres(rota).map((c) => c.bien).join(',') === 'grano,sal', manoEnTres(rota));
 }
 
 /* ═══ EL RECUENTO, PARA QUE NO SE VACÍE SIN QUE NADIE LO NOTE ═══ */
-const MINIMO = 55;
+const MINIMO = 60;
 if (hechas < MINIMO) {
   console.log(`✘ este comprobador debería hacer al menos ${MINIMO} comprobaciones y ha hecho ${hechas}: alguien ha borrado un bloque`);
   process.exit(2);

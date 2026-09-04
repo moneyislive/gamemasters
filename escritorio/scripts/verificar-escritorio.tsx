@@ -77,7 +77,6 @@ import { FIGURAS } from '../../escenas/embarcadero/figuras';
 import { semillaDeCodigo } from '../../escenas/embarcadero/cala';
 import { RiberasEnTres } from '../src/riberas-en-tres';
 import {
-  bienDeRiberas,
   bienesQueSeCambianPor,
   colocandoEnTres,
   manoEnTres,
@@ -1170,7 +1169,7 @@ function riberasEnTres(): void {
   }
   const porLaMano = new Set<string>();
   for (const carta of manoEnTres(vista)) {
-    const doy = bienDeRiberas(carta.bien);
+    const doy = carta.bien;
     for (const quiero of bienesQueSeCambianPor(vista, opciones, doy)) {
       for (const t of truequesPosibles(vista, opciones, doy, quiero)) {
         porLaMano.add(canonico({ tipo: t.opcion.tipo, carga: t.opcion.carga }));

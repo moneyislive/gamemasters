@@ -63,3 +63,30 @@ Medido sobre éstos, que es lo que la tubería y la carta dan por hecho:
   fondo de color, y un trazo de dos píxeles desaparece.
 - **Los cinco del mismo pulso.** Es lo que más se nota y lo que más cuesta: cinco iconos
   buenos de cinco manos distintas se ven peor que cinco regulares de la misma.
+
+## Al día: ahora se dibujan los bienes de RIBERAS, y falta uno
+
+Estos iconos se eligieron con los nombres del catán, antes de que el tablero hablara con
+el motor. Los bienes que reparte el juego son otros —`limo`, `junco`, `sal`, `piedra`,
+`grano`— y **no se traducen en ningún sitio**: se dibuja el vocabulario que hay.
+
+Cuatro tienen una lectura defendible y se usan así:
+
+| bien de Riberas | sale de | icono provisional |
+|---|---|---|
+| `limo` | marisma | `brick-pile.svg` (terrones de barro) |
+| `junco` | carrizal | `wood-pile.svg` (haz de tallos) |
+| `piedra` | cantil | `stone-pile.svg` |
+| `grano` | vega | `grain-bundle.svg` |
+
+**`sal` se queda sin icono**, y es a propósito: ninguno de los cinco significa sal. Su
+carta sale con su color y sin dibujo, que se lee como «falta el dibujo». La alternativa
+que se descartó era emparejarle la oveja —traducir `sal` a `lana`—, y eso no es un
+provisional: en un juego de trueques, ver una oveja cuando tienes sal es enseñar un bien
+que no tienes, justo en la pantalla con la que se decide qué ofrecer.
+
+`sheep.svg` queda SIN USAR por eso mismo. Se conserva porque el conjunto se descargó
+entero y su licencia va con él, no porque haga falta.
+
+Cuando llegue el arte propio: son **cinco** dibujos con los nombres de Riberas, y el
+quinto —la sal— es el que hoy no existe.

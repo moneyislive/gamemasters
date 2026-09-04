@@ -100,8 +100,6 @@ import '../../../shared/arcade/juegos';
 import { opcionesSueltas, tableroDeLaVista } from '../../../shared/mecanicas/tablero-declarado';
 import {
   barraEnTres,
-  BIEN_EN_LA_ESCENA,
-  bienDeRiberas,
   bienesQueSeCambianPor,
   colocandoEnTres,
   esVistaQueSePinta,
@@ -567,9 +565,7 @@ function LaMesaEnTres({
     () =>
       cartaCogida === undefined
         ? []
-        : bienesQueSeCambianPor(laVista, opciones, bienDeRiberas(cartaCogida.bien)).map(
-            (b) => BIEN_EN_LA_ESCENA[b] ?? b,
-          ),
+        : bienesQueSeCambianPor(laVista, opciones, cartaCogida.bien),
     [laVista, opciones, cartaCogida],
   );
   const fueraDelTablero = useMemo(() => opcionesFueraDelTablero(opciones), [opciones]);
@@ -656,8 +652,8 @@ function LaMesaEnTres({
       const posibles = truequesPosibles(
         laVista,
         opciones,
-        bienDeRiberas(cartaCogida.bien),
-        bienDeRiberas(bienDeLaEscena),
+        cartaCogida.bien,
+        bienDeLaEscena,
       );
       if (posibles.length === 0) return;
       const unico = posibles[0];

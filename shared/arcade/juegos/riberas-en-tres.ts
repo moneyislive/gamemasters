@@ -38,7 +38,7 @@
  *
  * ═══ LO QUE ES PROVISIONAL, DICHO CON TODAS LAS LETRAS ═══
  *
- * 1. Los COLORES. `tablero.glb` trae hoy las piezas de jugador en los cuatro
+ * 1. Los COLORES (y la única que queda). `tablero.glb` trae hoy las piezas de jugador en los cuatro
  *    colores del atlas (`COLORES_EN_3D`, repartidos por orden de asiento en
  *    `deltaDeLaVista`) y Riberas admite SEIS colonos. No se reparte con un módulo
  *    —dos colonos del mismo color es una partida injugable sin ningún error a la
@@ -46,15 +46,15 @@
  *    tres devuelve `null` y el cliente enseña el tablero plano de siempre. Cuando el
  *    tablero se hornee a color y se tiña al cargar como el embarcadero, esta nota y
  *    ese límite desaparecen.
- * 2. Los BIENES. Riberas llama a los suyos limo, junco, sal, piedra y grano, y así
- *    salen de `manoDeLaVista`. Pero los iconos de las cartas de la escena son hoy
- *    los del pack —madera, ladrillo, mineral, lana, grano— y sin traducir, cuatro de
- *    las cinco cartas saldrían sin dibujo reconocible. La tabla `BIEN_EN_LA_ESCENA`
- *    traduce SÓLO para pintar, por PAPEL en el juego y no por parecido: el junco es
- *    lo que se tala, el limo lo que se cuece, la piedra lo que se pica, la sal lo que
- *    se recoge del prado. La carga que va al reductor lleva siempre el nombre de
- *    Riberas (`bienDeRiberas` deshace la traducción). Cuando llegue el arte propio
- *    de Riberas, esta tabla sobra.
+ * (Aquí hubo una segunda cosa provisional y ya no está: una tabla que traducía los
+ * bienes de Riberas —limo, junco, sal, piedra, grano— a los del catán para poder
+ * reaprovechar sus iconos. Duró un día. En un juego de trueques se mira la mano para
+ * decidir qué ofrecer, y ver una OVEJA cuando lo que se tiene es sal no es un dibujo
+ * provisional: es enseñar un bien que no se tiene. Un dibujo ausente se lee como
+ * «falta el dibujo»; uno equivocado se lee como otra cosa. Ahora `escenas/iconos.ts`
+ * dibuja los cinco de Riberas —la sal todavía sin icono, a sabiendas— y aquí no se
+ * traduce nada: el bien viaja con su nombre de la vista al dibujo y del dibujo a la
+ * carga del movimiento.)
  *
  * ═══ LOS IDENTIFICADORES DE LA BARRA SON NUESTROS ═══
  *
@@ -157,15 +157,6 @@ export const PIEZAS_DE_LA_BARRA: readonly { readonly id: IdDeLaBarra; readonly p
   { id: 'puente', pieza: 'vereda' },
 ];
 
-/** Los bienes de Riberas dichos con los nombres que la escena conoce. Ver «provisional», 2. */
-export const BIEN_EN_LA_ESCENA: Readonly<Record<string, string>> = {
-  junco: 'madera',
-  limo: 'ladrillo',
-  piedra: 'mineral',
-  sal: 'lana',
-  grano: 'grano',
-};
-
 // ---------------------------------------------------------------------------
 // De la vista al tablero
 // ---------------------------------------------------------------------------
@@ -201,12 +192,16 @@ export function tableroEnTres(vista: unknown): TableroEnTres | null {
 // ---------------------------------------------------------------------------
 
 /**
- * MI MANO, tal como la pinta la escena: las cartas de `manoDeLaVista` (una por
- * ficha, con el identificador de la ficha como llave) con el bien traducido al
- * nombre del icono que la escena tiene hoy. Vacía para quien mira sin jugar.
+ * MI MANO, tal como la pinta la escena: una carta por ficha, con el identificador de
+ * la ficha como llave y el bien con SU nombre. Vacía para quien mira sin jugar.
+ *
+ * No hay nada que hacer aquí —es `manoDeLaVista` tal cual— y se deja escrito de todas
+ * formas: este es el sitio donde estuvo la tabla que traducía los bienes al catán, y
+ * tener la función nombrada evita que el día que alguien necesite tocar la mano vuelva
+ * a abrirla en el cliente.
  */
 export function manoEnTres(vista: unknown): CartaEnTres[] {
-  return manoDeLaVista(vista).map((c) => ({ id: c.id, bien: BIEN_EN_LA_ESCENA[c.bien] ?? c.bien }));
+  return manoDeLaVista(vista);
 }
 
 // ---------------------------------------------------------------------------
@@ -300,8 +295,8 @@ function truequeDeLaOpcion<O extends OpcionQueLlega>(vista: VistaQueSePinta, o: 
 
 /**
  * QUÉ BIENES SE PUEDEN PEDIR A CAMBIO de uno que doy, según lo que el juego ofrece
- * ahora. Los nombres son los de RIBERAS (`sal`, `junco`…), que es lo que va en la
- * carga; la escena los recibe traducidos por `BIEN_EN_LA_ESCENA` para pintarlos.
+ * ahora. Los nombres son los de RIBERAS (`sal`, `junco`…), que son los mismos que la
+ * escena pinta y los mismos que van en la carga del movimiento: no se traducen.
  */
 export function bienesQueSeCambianPor<O extends OpcionQueLlega>(vista: unknown, opciones: readonly O[], doy: string): string[] {
   if (!esVistaQueSePinta(vista)) return [];
@@ -327,14 +322,6 @@ export function truequesPosibles<O extends OpcionQueLlega>(vista: unknown, opcio
     if (t !== null && t.doy === doy && t.quiero === quiero) lista.push(t);
   }
   return lista;
-}
-
-/** El bien de Riberas que corresponde a una carta de la mano ya traducida. */
-export function bienDeRiberas(bienEnLaEscena: string): string {
-  for (const [deRiberas, deLaEscena] of Object.entries(BIEN_EN_LA_ESCENA)) {
-    if (deLaEscena === bienEnLaEscena) return deRiberas;
-  }
-  return bienEnLaEscena;
 }
 
 /** ¿Me toca a mí? `false` para quien mira sin jugar o mientras se reúne la mesa. */
