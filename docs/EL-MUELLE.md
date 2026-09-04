@@ -134,9 +134,13 @@ motas, y los aventureros.
 
 **Presupuesto** con seis sentados: ≤ 110 000 triángulos y ≤ 70 llamadas de dibujo
 en la calidad plena; la calidad sobria quita motas, brumas, reflejos y una luz.
-Sombras sólo en PC (una caja alrededor de los muelles). En móvil, discos de
-contacto bajo cada aventurero. Se mide en Node sumando piezas y se mira en el
-banco.
+**Sin sombras proyectadas en ningún cliente**: ningún `Canvas` activa el mapa de
+sombras, y cada aventurero lleva un disco de contacto en las dos calidades. La
+primera versión de este documento prometía sombras en PC; el código no las tiene
+y no las echa de menos a la hora azul, donde la luz es rasante y difusa. La
+tercera luz puntual (el fuego de la atalaya) sólo entra en calidad plena y en
+ventana panorámica. Se mide en Node sumando piezas con la cala real y se mira en
+el banco.
 
 ## 3. La cámara
 
@@ -156,7 +160,10 @@ fotograma.
   alto útil ni sale del encuadre. Se comprueba para 9:19,5, 3:4 y 16:9.
 - **Al llegar alguien:** su barco emerge de la niebla, atraca en su amarre, el
   aventurero salta a las tablas; la cámara abre 1,5 u y gira 6° hacia allí
-  durante 0,8 s y vuelve. Si hay un campo de texto con el foco, no se mueve.
+  durante 0,8 s y vuelve. Quedarse quieta mientras la persona escribe el código
+  con el teclado abierto está pendiente: la escena no ve el DOM y el contrato
+  no lleva todavía por dónde decírselo (`Ventana.escribiendo`, cuando se
+  descongele `tipos.ts`).
 - **Entrada del jugador:** arrastre horizontal ±25° con muelle en móvil; ±2° con
   el ratón en PC.
 - **Al zarpar** (cuando llega `empezada: true` EN LA VISTA, nunca al pulsar):
@@ -265,7 +272,10 @@ presencia, la figura elegida y «copiado». Todo lo demás, grises fríos.
 `Canvas` único con el amanecer sobre el delta real (fase 2, con el tablero 3D);
 vista en tercera persona; accesorios (armas, escudos, jarras del pack);
 sonido; enlace corto `/r/CODIGO` con `intentFilter` propio; elegir color; notificar
-al móvil de que la mesa se ha llenado.
+al móvil de que la mesa se ha llenado; sombras proyectadas; la cámara quieta
+mientras se escribe; ventanas emisivas en el caserío (hoy el color va horneado y
+la taberna sólo tiene su luz); el farol de popa de los barcos de nadie; y la
+prueba en un Android y un iPhone físicos, que ningún comprobador sustituye.
 
 ## 10. Riesgos
 

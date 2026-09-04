@@ -245,8 +245,15 @@ export function Muelle({
       desembarcado.current = false;
       return;
     }
-    /* Sin mundo no hay coreografía que esperar: al tablero. */
-    if (!listo || fallo !== null) {
+    /*
+     * Sin mundo no hay coreografía que esperar: al tablero. Y SÓLO sin mundo:
+     * `alFallar` puede llegar por una sola figura que no se abrió, con la cala y
+     * los demás en pie, y eso no es motivo para saltarse el zarpe. Si lo que
+     * falló fue el embarcadero entero, el contrato dice que la escena avisa
+     * `alZarpar` en el fotograma siguiente, así que tampoco hay que adivinarlo
+     * aquí: basta con el telón (`listo`) y el tope.
+     */
+    if (!listo) {
       desembarcar();
       return;
     }
@@ -254,7 +261,7 @@ export function Muelle({
     return () => {
       clearTimeout(tope);
     };
-  }, [zarpando, listo, fallo, desembarcar]);
+  }, [zarpando, listo, desembarcar]);
 
   // -------------------------------------------------------------------------
 
@@ -283,7 +290,13 @@ export function Muelle({
                 ventana={ventana}
                 traer={traer}
                 calidad="plena"
-                figuraQuePruebo={figura}
+                /*
+                 * Mi figura sólo se prueba en la orilla o sentado. Mirando una mesa
+                 * ajena sin asiento (`yo` nulo con código), ponerla pintaría a un
+                 * séptimo aventurero en la cabeza del muelle y dejaría fuera a uno
+                 * de los seis de verdad.
+                 */
+                figuraQuePruebo={mesaEnElMuelle.codigo === null || mesaEnElMuelle.yo !== null ? figura : undefined}
                 zarpando={zarpando}
                 alEstarListo={alEstarListo}
                 alZarpar={desembarcar}

@@ -46,7 +46,13 @@ import type { ManifiestoDeArcade } from '../../../shared/arcade';
 /* Instala los arcades del binario, por si se llega aquí por enlace directo. Ver `pintar.tsx`. */
 import '../../../shared/arcade/juegos';
 import { Embarcadero } from '../../../escenas/embarcadero/Embarcadero';
-import type { Calidad, MesaEnElMuelle, Ventana } from '../../../escenas/embarcadero/tipos';
+import type { Calidad, MesaEnElMuelle, Traer, Ventana } from '../../../escenas/embarcadero/tipos';
+/*
+ * Sólo la constante del mapeo tonal: el `Canvas` sigue entrando por `tres/Lienzo`,
+ * que es lo que la regla del §7 protege. Ver `escena-peonza.tsx`, que hace lo mismo
+ * con las geometrías.
+ */
+import { ACESFilmicToneMapping } from 'three';
 import { esFigura } from '../../../escenas/embarcadero/figuras';
 import type { FiguraId } from '../../../escenas/embarcadero/figuras';
 import { temaDelMuelle } from '../../../escenas/embarcadero/tema';
@@ -63,6 +69,26 @@ import { NoHayNada } from './pintar';
 
 /** Cuánto se espera a la coreografía de zarpar antes de irse igual, en ms. */
 const TOPE_DE_ZARPAR_MS = 3500;
+
+/**
+ * CÓMO SE PIDEN LOS BYTES DE UN MODELO, y por qué está FUERA del componente.
+ *
+ * `cargadorPara` de la escena cachea un cargador por función `traer`: si la
+ * función fuera una por instancia de pantalla, cada visita al Muelle desde la
+ * portada estrenaría un cargador y volvería a bajar el embarcadero (1,7 MB), las
+ * animaciones y las figuras — y en nativo `fetch` no tiene caché de disco de
+ * serie. Una sola función para toda la app es una sola caché para toda la app.
+ *
+ * No depende de nada de la pantalla: la dirección del servidor y la lectura de
+ * la sesión guardada son globales de `api.ts`, y se espera a la segunda por lo
+ * mismo que en `mesa.ts`: antes de leerla, `servidorActual()` es media respuesta.
+ */
+const traer: Traer = async (ruta) => {
+  await cargarSesionGuardada();
+  const r = await fetch(`${servidorActual()}${ruta}`);
+  if (!r.ok) throw new Error(`el servidor contestó ${String(r.status)} al pedir ${ruta}`);
+  return r.arrayBuffer();
+};
 
 /** Lo que tarda el telón en fundirse cuando el mundo ya está, en ms. */
 const FUNDIDO_MS = 600;
@@ -241,13 +267,6 @@ function ElMuelleDe({ manifiesto, tema }: { manifiesto: ManifiestoDeArcade; tema
     Animated.timing(telon, { toValue: 0, duration: FUNDIDO_MS, useNativeDriver: true }).start();
   }, [listo, telon]);
 
-  const traer = useCallback(async (ruta: string): Promise<ArrayBuffer> => {
-    await cargarSesionGuardada();
-    const r = await fetch(`${servidorActual()}${ruta}`);
-    if (!r.ok) throw new Error(`el servidor contestó ${String(r.status)} al pedir ${ruta}`);
-    return r.arrayBuffer();
-  }, []);
-
   const alMedir = useCallback((medidaDelHilo: MuestraDelHilo & { triangulos: number; llamadas: number }) => {
     if (Platform.OS !== 'android' || calidadJuzgada.current) return;
     muestras.current.push({ ms: medidaDelHilo.ms, fotogramas: medidaDelHilo.fotogramas });
@@ -314,7 +333,20 @@ function ElMuelleDe({ manifiesto, tema }: { manifiesto: ManifiestoDeArcade; tema
   return (
     <View style={estilos.todo} onLayout={medirTodo}>
       {lienzoMontado && figura !== null ? (
-        <Canvas style={estilos.lienzo} gl={{ antialias: true }} dpr={[1, 2]}>
+        <Canvas
+          style={estilos.lienzo}
+          gl={{ antialias: true }}
+          dpr={[1, 2]}
+          /*
+           * El mismo mapeo tonal que el escritorio y el banco (§2): ACES a 0,95.
+           * Sin esto r3f deja la exposición en 1 y lo que se juzga en el banco
+           * sale un paso más claro en el móvil, cielo y brasa incluidos.
+           */
+          onCreated={({ gl }) => {
+            gl.toneMapping = ACESFilmicToneMapping;
+            gl.toneMappingExposure = 0.95;
+          }}
+        >
           <Embarcadero
             mesa={mesaEnElMuelle}
             ventana={ventana}

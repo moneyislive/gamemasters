@@ -770,9 +770,14 @@ const estilos = StyleSheet.create({
     borderRadius: RADIO.mando,
     backgroundColor: conAlfa(SALA.suelo, 0.35),
   },
-  plazoElegido: { borderColor: SALA.acento, backgroundColor: SALA.acentoHondo },
+  /*
+   * El plazo elegido se marca con el filo vivo y la teja alta, NO con el acento:
+   * el §5 reserva el acento a lo que está vivo o zarpa, y un chip de ajuste no es
+   * ninguna de las dos cosas. La primera versión lo pintaba de violeta.
+   */
+  plazoElegido: { borderColor: SALA.filoVivo, backgroundColor: SALA.tejaAlta },
   plazoRotulo: { ...LETRA.rotuloChico, color: SALA.tenue, fontSize: 13 },
-  plazoRotuloElegido: { ...LETRA.rotuloChico, color: SALA.blanco, fontSize: 13, fontWeight: '800' },
+  plazoRotuloElegido: { ...LETRA.rotuloChico, color: SALA.palabra, fontSize: 13, fontWeight: '800' },
   casillas: { flexDirection: 'row', justifyContent: 'center', gap: 8, position: 'relative' },
   casilla: {
     width: 44,
