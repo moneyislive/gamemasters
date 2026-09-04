@@ -14,14 +14,73 @@ const raizRepo = path.resolve(raizApp, '..');
 
 const config = getDefaultConfig(raizApp);
 
-// Carpetas de fuera del proyecto que Metro debe vigilar y resolver.
-config.watchFolders = [path.resolve(raizRepo, 'shared')];
+const raizShared = path.resolve(raizRepo, 'shared');
+const raizEscenas = path.resolve(raizRepo, 'escenas');
+
+/*
+ * Carpetas de fuera del proyecto que Metro debe vigilar y resolver.
+ *
+ * `escenas/` entra con `shared/` desde que el lobby de la Sala se pinta en tres
+ * dimensiones: las escenas las comparten los dos clientes —la app y el escritorio—
+ * y por eso viven fuera de los dos. Ver la cabecera de `escenas/tipos.ts`.
+ */
+config.watchFolders = [raizShared, raizEscenas];
 
 // Los módulos se buscan primero en la app y después en la raíz del repositorio.
 config.resolver.nodeModulesPaths = [
   path.resolve(raizApp, 'node_modules'),
   path.resolve(raizRepo, 'node_modules'),
 ];
+
+/*
+ * ═══ UNA SOLA COPIA DE `three`, DE `react` Y DE R3F, AUNQUE HAYA VARIAS EN EL DISCO ═══
+ *
+ * La app es un proyecto de npm aparte, con su `node_modules`; `escenas/` es un
+ * paquete del taller de la raíz, y la raíz tiene OTRO `three` y OTRO `react`
+ * (versiones distintas incluso: 19.2.3 aquí, 19.2.8 allí). Metro resuelve cada
+ * `import` subiendo por las carpetas desde el fichero que importa, así que un
+ * `import * as THREE from 'three'` escrito en `escenas/delta.tsx` encontraría
+ * primero el `three` de la raíz, y el `Canvas` de la app —que trae el suyo—
+ * recibiría mallas fabricadas por otra copia del motor. Con `react` es peor: dos
+ * copias son «Invalid hook call» en el primer `useFrame`, sin más pista.
+ *
+ * Por eso, para lo que viene de FUERA de la app, estos paquetes se resuelven como
+ * si los pidiera la propia app. Sólo estos: son los que guardan estado global o
+ * comparan con `instanceof`. Lo demás sigue el camino normal.
+ */
+const UNICOS = new Set(['react', 'react-dom', 'react-native', 'three', '@react-three/fiber', 'scheduler']);
+
+function paqueteDe(especificador) {
+  if (especificador.startsWith('.') || path.isAbsolute(especificador)) return null;
+  const trozos = especificador.split('/');
+  return especificador.startsWith('@') ? trozos.slice(0, 2).join('/') : trozos[0];
+}
+
+function vieneDeFuera(fichero) {
+  return (
+    fichero.startsWith(raizShared + path.sep) || fichero.startsWith(raizEscenas + path.sep)
+  );
+}
+
+const resolverAnterior = config.resolver.resolveRequest;
+function resolverComoAntes(context, moduleName, platform) {
+  return resolverAnterior
+    ? resolverAnterior(context, moduleName, platform)
+    : context.resolveRequest(context, moduleName, platform);
+}
+
+config.resolver.resolveRequest = (context, moduleName, platform) => {
+  const paquete = paqueteDe(moduleName);
+  if (paquete !== null && UNICOS.has(paquete) && vieneDeFuera(context.originModulePath)) {
+    // Como si lo pidiera un fichero de la app: la búsqueda arranca en app/node_modules.
+    return resolverComoAntes(
+      { ...context, originModulePath: path.join(raizApp, 'package.json') },
+      moduleName,
+      platform,
+    );
+  }
+  return resolverComoAntes(context, moduleName, platform);
+};
 
 /*
  * ═══ Y AQUÍ NO HAY NADA PARA `canvaskit.wasm`, QUE ES LO QUE HABÍA QUE MIRAR ═══

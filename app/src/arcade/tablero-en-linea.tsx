@@ -131,13 +131,13 @@ import { Retablo } from './retablo';
  *
  * Va el último a propósito: es el caso raro, y quien lo elige sabe lo que elige.
  */
-const PLAZOS: Array<{ rotulo: string; segundos: number | undefined; ayuda: string }> = [
-  { rotulo: 'Como venga', segundos: undefined, ayuda: 'El plazo por defecto del servidor.' },
-  { rotulo: 'Un rato', segundos: 10 * 60, ayuda: 'Diez minutos por turno. Para jugar del tirón.' },
-  { rotulo: 'Un día', segundos: 24 * 60 * 60, ayuda: 'Veinticuatro horas por turno. La Larga.' },
-  { rotulo: 'Tres días', segundos: 3 * 24 * 60 * 60, ayuda: 'Para una partida de la semana entera.' },
-  { rotulo: 'Sin prisa', segundos: 0, ayuda: 'Sin plazo: el turno no se pasa solo nunca.' },
-];
+/*
+ * LA TABLA VIVE EN `plazos.ts` DESDE QUE LA PIDE TAMBIÉN EL MUELLE. Estaba aquí, y
+ * la hoja del Muelle nació con una copia; dos copias de «qué clase de partida se
+ * puede abrir» son dos respuestas que se separan solas. El razonamiento de los
+ * cinco botones sigue escrito en la cabecera de aquel fichero.
+ */
+import { PLAZOS } from './plazos';
 
 /*
  * LOS DOS RÓTULOS DE TIEMPO SE FUERON A `relojes.ts`, con su porqué entero.
@@ -1470,3 +1470,24 @@ const estilos = StyleSheet.create({
   opcionRotuloQuieto: { color: BOTON.quieto.tinta },
   opcionAyuda: { ...LETRA.cuerpo, color: SALA.tenue, fontSize: 13, lineHeight: 18 },
 });
+
+/*
+ * ═══ LO QUE EL PINTOR PROPIO DE RIBERAS REUTILIZA DE AQUÍ, Y POR QUÉ SE EXPORTA ═══
+ *
+ * `riberas-en-tres-escena.tsx` pinta la misma mesa que esta pantalla —barra, línea
+ * del turno, aviso, opciones sueltas y crónica— y en vez del `Retablo` pone un
+ * lienzo de tres dimensiones. Todo lo que no es el lienzo es ESTA pantalla, y
+ * copiarlo allí sería estrenar la segunda copia de la barra de la mesa: la primera
+ * ya se separó sola una vez, y está contado en la cabecera de `BarraDeLaMesa`.
+ *
+ * Los estilos van con las piezas por lo mismo: el vestíbulo de abrir o entrar que
+ * aquel fichero pinta cuando no hay mesa usa estos campos, estos chips y este
+ * botón, y un vestíbulo con OTRO contorno de campo a un toque de distancia se lee
+ * como un descuido antes que como otra pantalla. Se exporta la tabla entera y no
+ * seis entradas sueltas para que la siguiente que haga falta no obligue a volver
+ * aquí.
+ *
+ * Nada de lo de arriba cambia: esta pantalla sigue siendo el mueble genérico, y
+ * sigue sin saber a qué se juega.
+ */
+export { BarraDeLaMesa, LineaDelTurno, LasOpciones, LaCronica, ElAviso, estilos as ESTILOS_DE_LA_MESA };

@@ -215,6 +215,51 @@
  * sale antes de tiempo en una mesa terminada. Sanaba sólo con un apagado limpio;
  * tras una caída, otra vez en cada arranque. Se escribe al recuperar, sin esperar.
  *
+ * ════════════════════════════════════════════════════════════════════════════
+ * CUARTO SELLADO: LA MESA GANA UNA FIGURA POR ASIENTO Y DICE SI YA SE JUEGA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Lo que lo motivó es un LOBBY 3D previo a la partida de Riberas: cada persona
+ * sentada elige un aventurero y los demás lo ven en el acto por el sondeo largo
+ * que ya existe. Se movió UN fichero, `server/src/arcade/mesas.ts`, y nada del
+ * contrato: `shared/arcade/` sigue byte a byte, `arbitro.ts` también, y el canal
+ * tampoco. Y se movió para NO tener que hacer lo otro, que era la tentación:
+ * meter el personaje elegido en el estado de Riberas, o sea escribir en un juego
+ * un dato que no es una regla suya y hacer que la misma partida reejecutada
+ * dependiera de la ropa que llevaba cada cual.
+ *
+ *  J · `Silla.figura?: string`, y con ella `abrir({ …, figura? })`,
+ *      `sentarse(codigo, nombre, figura?)` y el verbo nuevo `vestir(codigo,
+ *      llave, figura)`. La figura es PRESENTACIÓN DE LA MESA, como el nombre, y
+ *      no una regla de ningún juego: no entra en el diario, no pasa por el
+ *      reductor, no reprograma el plazo y se puede cambiar con la partida en
+ *      marcha. Sube la revisión —por lo mismo que sentarse la sube: los demás
+ *      sondean— y sale en `VistaDeMesa.asientos[].figura`, sólo cuando está.
+ *      EL NÚCLEO SIGUE SIN NOMBRAR NINGÚN ASPECTO CONCRETO: la cadena es OPACA
+ *      para la autoridad, que sólo le exige una forma —minúsculas, dígitos y
+ *      guiones, de 1 a 32— y la rechaza (`FiguraMalEscrita`, 400) en vez de
+ *      arreglarla. No hay lista de figuras válidas en el servidor, ni aquí ni en
+ *      la ruta que sirve los modelos: qué es un «centinela» lo saben el cliente y
+ *      la carpeta `escenas/`, y esas dos no son núcleo.
+ *
+ *  K · `VistaDeMesa.empezada: boolean`. Es `Mesa.empezada` puesto en la vista, y
+ *      nada más: un dato que la autoridad ya tenía desde el hueco H —para no
+ *      sentar a nadie con la partida en marcha— y que los clientes NO PODÍAN
+ *      LEER. Para saber si la mesa se reunía o jugaba tenían que mirar dentro de
+ *      la vista del juego, o sea saber a qué se juega; un lobby genérico no puede.
+ *
+ * Y LA PERSISTENCIA NO SUBE DE VERSIÓN, a propósito y por la regla escrita en
+ * `Guardado`: una silla guardada sin `figura` es una silla sin figura, y un
+ * lector viejo se limita a no leer el campo. Al leer se mira el VALOR —una figura
+ * fuera de forma en el disco se quita— igual que se hace con `plazoMs`.
+ *
+ * Lo comprueba `verify:mesa` por el cable y desde dentro: la figura la ve el otro
+ * asiento y el espectador, `PUT /figura` despierta una lectura aparcada en mucho
+ * menos de veinticinco segundos, sin llave es 403, mal escrita es 400 y no cambia
+ * nada, vestirse con la partida empezada no toca ni diario ni tic ni plazo ni
+ * vista, el almacén recibe la silla entera, y un fichero al que se le quitó la
+ * figura a mano se lee como una mesa de antes.
+ *
  * ═══ Y `server/src/canal/` NO SE HA TOCADO, QUE ES UNA DECISIÓN Y NO UN OLVIDO ═══
  *
  * El §9 pone en la fase 5 «la segunda implementación de `canal/`» —un canal

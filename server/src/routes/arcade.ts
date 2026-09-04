@@ -50,6 +50,7 @@ import {
   AlmacenNoGuarda,
   ArcadeSinMesa,
   cerrar,
+  FiguraMalEscrita,
   MesaDesconocida,
   MesaLlena,
   mesasVivas,
@@ -60,6 +61,7 @@ import {
   PLAZO_MAXIMO_S,
   saludDelAlmacen,
   sentarse,
+  vestir,
   candadosDeMesaVivos,
 } from '../arcade/mesas';
 import type { VistaDeMesa } from '../arcade/mesas';
@@ -167,6 +169,16 @@ function contestarElFallo(error: unknown, res: Response, vista?: VistaDeMesa): b
      * la plataforma.
      */
     res.status(400).json({ error: error.message, motivo: 'movimiento-reservado', tipo: error.tipo });
+    return true;
+  }
+  if (error instanceof FiguraMalEscrita) {
+    /*
+     * 400, y por lo mismo que el de arriba: lo mandado está mal escrito y
+     * reintentarlo igual no lo arregla. La autoridad NO lo normaliza —ver
+     * `Silla.figura`—, así que la única forma de que el cliente se entere de que
+     * «Caballero» no vale por la mayúscula es que se le diga aquí.
+     */
+    res.status(400).json({ error: error.message, motivo: 'figura-mal-escrita' });
     return true;
   }
   if (error instanceof AlmacenNoGuarda) {
@@ -344,6 +356,29 @@ router.get('/arcade', (_req, res) => {
 // ---------------------------------------------------------------------------
 
 /**
+ * La `figura` del cuerpo, si viene. Es la del asiento de quien abre o se sienta.
+ *
+ * Aquí sólo se mira que sea UNA CADENA si viene: un número o un objeto no son
+ * «una figura mal escrita», son un cuerpo mal montado, y se dicen como tal. Qué
+ * forma tiene que tener la cadena lo decide la autoridad —`Silla.figura`— y lo
+ * rechaza con `FiguraMalEscrita`, que aquí se traduce a 400. Dos comprobaciones
+ * en dos capas porque son dos preguntas: si el JSON está bien y si el dato vale.
+ */
+function figuraDelCuerpo(
+  cuerpo: { figura?: unknown },
+  res: Response,
+): { figura: string | undefined } | null {
+  if (cuerpo.figura === undefined) return { figura: undefined };
+  if (typeof cuerpo.figura !== 'string') {
+    res.status(400).json({
+      error: 'Si mandas `figura`, tiene que ser una cadena: el identificador del aspecto elegido.',
+    });
+    return null;
+  }
+  return { figura: cuerpo.figura };
+}
+
+/**
  * ABRE UNA MESA. La abre el primer jugador y se sienta de paso.
  *
  * Devuelve el código —para dictarlo— y la llave —para guardarla—. La llave no
@@ -352,7 +387,12 @@ router.get('/arcade', (_req, res) => {
  * coja. Es el precio de no tener cuentas, y es un precio y no un descuido.
  */
 router.post('/arcade/mesas', contadorDeAperturas, async (req, res) => {
-  const cuerpo = req.body as { arcade?: unknown; nombre?: unknown; plazoSegundos?: unknown };
+  const cuerpo = req.body as {
+    arcade?: unknown;
+    nombre?: unknown;
+    plazoSegundos?: unknown;
+    figura?: unknown;
+  };
   const arcade = typeof cuerpo.arcade === 'string' ? cuerpo.arcade : '';
   if (!arcadeInstalado(arcade)) {
     res.status(409).json({
@@ -371,11 +411,15 @@ router.post('/arcade/mesas', contadorDeAperturas, async (req, res) => {
     return;
   }
 
+  const conFigura = figuraDelCuerpo(cuerpo, res);
+  if (conFigura === null) return;
+
   try {
     const abierta = await abrir({
       arcade,
       nombre: typeof cuerpo.nombre === 'string' ? cuerpo.nombre : '',
       plazoSegundos,
+      figura: conFigura.figura,
     });
     /*
      * La respuesta se compone con la MISMA `mirar` que usan las demás rutas, y no
@@ -426,7 +470,10 @@ router.post('/arcade/mesas', contadorDeAperturas, async (req, res) => {
  */
 router.post('/arcade/mesas/:codigo/asientos', contadorDeCodigos, async (req, res) => {
   const codigo = String(req.params.codigo ?? '').toUpperCase();
-  const cuerpo = req.body as { nombre?: unknown; arcade?: unknown };
+  const cuerpo = req.body as { nombre?: unknown; arcade?: unknown; figura?: unknown };
+
+  const conFigura = figuraDelCuerpo(cuerpo, res);
+  if (conFigura === null) return;
 
   /*
    * ═══ A QUÉ JUEGO CREÍA ESTAR ENTRANDO, Y POR QUÉ HAY QUE PREGUNTARLO ═══
@@ -468,7 +515,11 @@ router.post('/arcade/mesas/:codigo/asientos', contadorDeCodigos, async (req, res
   }
 
   try {
-    const silla = await sentarse(codigo, typeof cuerpo.nombre === 'string' ? cuerpo.nombre : '');
+    const silla = await sentarse(
+      codigo,
+      typeof cuerpo.nombre === 'string' ? cuerpo.nombre : '',
+      conFigura.figura,
+    );
     /*
      * Los otros tres están sondeando y tienen que enterarse de que ha llegado
      * alguien. Se avisa DESPUÉS de que la mesa esté guardada: al despertar, el
@@ -480,6 +531,64 @@ router.post('/arcade/mesas/:codigo/asientos', contadorDeCodigos, async (req, res
     elCanal().avisarCambio(codigo);
     const mesa = await mirar(codigo, silla.llave);
     res.json({ asiento: silla.id, llave: silla.llave, mesa });
+  } catch (error) {
+    if (!contestarElFallo(error, res)) throw error;
+  }
+});
+
+/**
+ * SE CAMBIA DE FIGURA: quien está sentado elige otro aspecto para su asiento.
+ *
+ * ═══ ES EL VERBO DEL LOBBY, Y NO ES UN MOVIMIENTO ═══
+ *
+ * Antes de repartir, cada persona sentada elige un personaje y los demás tienen
+ * que verlo en el acto. Eso es exactamente lo que `sentarse` ya hace con el
+ * nombre —un dato del asiento que sube la revisión para que los que sondean se
+ * enteren— y por eso esta ruta se parece a aquélla y no a la de mover: no lleva
+ * `rev`, no pasa por el reductor y no le importa si la partida ya empezó. Lo que
+ * significa la figura lo sabe el cliente; el servidor la guarda y la reparte. Ver
+ * `vestir` en `mesas.ts`.
+ *
+ * ═══ Y SE AVISA, COMO AL SENTARSE, SÓLO SI LA REVISIÓN SUBIÓ ═══
+ *
+ * Sin el aviso, los otros asientos se quedan aparcados en su sondeo largo hasta
+ * que expire —veinticinco segundos— mirando la figura vieja, y el lobby parece
+ * roto en lo único que hace. Se avisa DESPUÉS de que la mesa esté guardada, por
+ * lo mismo que al sentarse. Y sólo si la revisión cambió: vestirse con la misma
+ * figura no es nada, y despertar a los demás para que repinten lo mismo es un
+ * viaje de ida y vuelta por cada reintento de un cliente. Se mira la revisión
+ * de antes con `mirar`, que es como lo hace la ruta de cerrar.
+ *
+ * ═══ EL CUERPO CABE EN EL ANALIZADOR GLOBAL, COMPROBADO ═══
+ *
+ * `index.ts` monta `express.json({ limit: '256kb' })` a nivel de aplicación y
+ * ANTES de todos los routers de `/api`, así que `req.body` llega aquí ya
+ * analizado para un `PUT` igual que para un `POST`, y un cuerpo de más de 256 kB
+ * se corta con un 413 antes de entrar. Una figura mide 32 caracteres como mucho:
+ * no hace falta ni un analizador propio ni un límite aparte.
+ *
+ * Sin llave, o con una que no es de esta mesa, se contesta lo mismo que a mover
+ * sin asiento: 403 con `no-estas-sentado`. Una figura mal escrita es 400 y no
+ * cambia nada. Cuenta en `contadorDeCodigos` como todas las rutas con `:codigo`,
+ * porque da el mismo oráculo sobre si el código existe.
+ */
+router.put('/arcade/mesas/:codigo/figura', contadorDeCodigos, async (req, res) => {
+  const codigo = String(req.params.codigo ?? '').toUpperCase();
+  const llave = llaveDe(req);
+  const cuerpo = req.body as { figura?: unknown };
+
+  if (typeof cuerpo.figura !== 'string') {
+    res.status(400).json({
+      error: 'Falta `figura`: el identificador del aspecto elegido, como cadena.',
+    });
+    return;
+  }
+
+  try {
+    const antes = await mirar(codigo, llave);
+    const mesa = await vestir(codigo, llave, cuerpo.figura);
+    if (mesa.rev !== antes.rev) elCanal().avisarCambio(codigo);
+    res.json({ mesa });
   } catch (error) {
     if (!contestarElFallo(error, res)) throw error;
   }

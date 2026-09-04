@@ -59,8 +59,23 @@ export interface MesaVista {
   terminada: boolean;
   venceEn: number | null;
   turnoDesde: number;
-  asientos: Array<{ id: string; nombre: string; presente: boolean }>;
+  /**
+   * `figura` es el aspecto que eligió ese asiento, tal cual lo escribió su
+   * cliente, y falta —sin clave— cuando no eligió. Es una cadena opaca aquí
+   * igual que en el servidor: qué se pinta con ella lo decide
+   * `escenas/embarcadero/figuras.ts`, y una que este binario no conozca se
+   * pinta como la de serie del asiento.
+   */
+  asientos: Array<{ id: string; nombre: string; presente: boolean; figura?: string }>;
   yo: string | null;
+  /**
+   * ¿YA SE JUEGA? `false` mientras la mesa se reúne, `true` desde el primer
+   * movimiento que cambió el estado. OPCIONAL por lo mismo que `opciones`: lo
+   * estrenó el servidor para el Muelle y un servidor anterior no lo manda. No se
+   * lee a pelo: se lee con `haEmpezado` (`empezada.ts`), que sabe inferirlo
+   * cuando falta.
+   */
+  empezada?: boolean;
   vista: unknown;
   /**
    * QUÉ SE PUEDE HACER AHORA MISMO, dicho por el juego y traído por el servidor.
@@ -127,9 +142,15 @@ export interface LaMesa {
   cronica: AvisoDeMesa[];
   /** Hay una petición que escribe en curso: los botones se quedan quietos. */
   quieto: boolean;
-  abrir: (nombre: string, plazoSegundos?: number) => void;
-  entrar: (codigo: string, nombre: string) => void;
+  /** `figura` viaja con el alta si se da, y es el aspecto de MI asiento desde el primer sondeo de los demás. */
+  abrir: (nombre: string, plazoSegundos?: number, figura?: string) => void;
+  entrar: (codigo: string, nombre: string, figura?: string) => void;
   mover: (movimiento: MovimientoDeclarado) => void;
+  /**
+   * Cambiar el aspecto de mi asiento con la mesa ya abierta. Ver su implementación:
+   * no es un movimiento y no pasa por el reductor.
+   */
+  vestir: (figura: string) => void;
   salir: () => void;
   /**
    * Tirar la mesa entera, para todos. Ver su implementación.
@@ -452,11 +473,21 @@ export function usarMesaDeArcade(arcade: string, silla: string): LaMesa {
     [arcade, silla, cabeceras],
   );
 
+  /*
+   * `figura` se manda SÓLO si viene, igual que `plazoSegundos`: el servidor trata
+   * la clave ausente como «no dijo», y mandar `undefined` en un JSON es no
+   * mandar nada, pero mandar `null` o `''` sería una figura mal escrita y un 400.
+   */
   const abrir = useCallback(
-    (nombre: string, plazoSegundos?: number) => {
+    (nombre: string, plazoSegundos?: number, figura?: string) => {
       sentarse(
         '/mesas',
-        { arcade, nombre, ...(plazoSegundos === undefined ? {} : { plazoSegundos }) },
+        {
+          arcade,
+          nombre,
+          ...(plazoSegundos === undefined ? {} : { plazoSegundos }),
+          ...(figura === undefined ? {} : { figura }),
+        },
         'No se ha podido abrir la mesa',
       );
     },
@@ -464,8 +495,9 @@ export function usarMesaDeArcade(arcade: string, silla: string): LaMesa {
   );
 
   const entrar = useCallback(
-    (elCodigo: string, nombre: string) => {
+    (elCodigo: string, nombre: string, figura?: string) => {
       const limpio = elCodigo.trim().toUpperCase();
+      const cuerpoDeAsiento = { nombre, arcade, ...(figura === undefined ? {} : { figura }) };
       /*
        * ═══ SE MANDA A QUE JUEGO CREEMOS ESTAR ENTRANDO, Y ESA ES LA MITAD ═══
        *
@@ -531,14 +563,65 @@ export function usarMesaDeArcade(arcade: string, silla: string): LaMesa {
             ponerQuieto(false);
           }
           if (pideSilla) {
-            sentarse(`/mesas/${limpio}/asientos`, { nombre, arcade }, 'No se ha podido entrar');
+            sentarse(`/mesas/${limpio}/asientos`, cuerpoDeAsiento, 'No se ha podido entrar');
           }
         })();
         return;
       }
-      sentarse(`/mesas/${limpio}/asientos`, { nombre, arcade }, 'No se ha podido entrar');
+      sentarse(`/mesas/${limpio}/asientos`, cuerpoDeAsiento, 'No se ha podido entrar');
     },
     [arcade, silla, sentarse],
+  );
+
+  // -------------------------------------------------------------------------
+  // Vestirse
+  // -------------------------------------------------------------------------
+
+  /**
+   * CAMBIAR DE FIGURA CON LA MESA ABIERTA. Es el verbo del Muelle.
+   *
+   * ═══ NO ES UN MOVIMIENTO, Y POR ESO NO SE PARECE A `mover` ═══
+   *
+   * No lleva `rev`, no pasa por el reductor, no reprograma el plazo y no mira si
+   * la partida empezó (`docs/EL-MUELLE.md`, §1.2). Lo que sí hace el servidor es
+   * subir la revisión para que los demás, que están aparcados en su sondeo largo,
+   * se enteren en el acto; y contesta con la mesa entera, que se pone tal cual
+   * porque es más nueva que la que había.
+   *
+   * ═══ Y NO TOCA `quieto` ═══
+   *
+   * `quieto` apaga los botones de la pantalla mientras hay una escritura en
+   * vuelo, y vestirse no compite con nada: el peor caso de dos vestidos seguidos
+   * es que gane el último, que es lo que quien pulsó dos veces quería. Apagar el
+   * botón de empezar por haber cambiado de sombrero sería castigar lo barato.
+   *
+   * Un fallo se dice como lo dice la red —`la-red`—: lo borra el siguiente sondeo
+   * bueno, y un vestido que no entró no es una jugada perdida.
+   */
+  const vestir = useCallback(
+    (figura: string) => {
+      void (async () => {
+        const donde = codigo.current;
+        if (donde === null || llave.current === null) return;
+        try {
+          const r = await fetch(ruta(`/mesas/${donde}/figura`), {
+            method: 'PUT',
+            headers: cabeceras(true),
+            body: JSON.stringify({ figura }),
+          });
+          const datos = (await r.json()) as { error?: string; mesa?: MesaVista };
+          if (!r.ok || datos.mesa === undefined) {
+            throw new Error(datos.error ?? `el servidor contestó ${String(r.status)}`);
+          }
+          if (!vivo.current || codigo.current !== donde) return;
+          ponerMesa(datos.mesa);
+        } catch (error) {
+          if (!vivo.current) return;
+          ponerAviso({ texto: `No se ha podido cambiar de figura: ${textoDelFallo(error)}`, de: 'la-red' });
+        }
+      })();
+    },
+    [cabeceras],
   );
 
   // -------------------------------------------------------------------------
@@ -686,7 +769,7 @@ export function usarMesaDeArcade(arcade: string, silla: string): LaMesa {
    * origen la invitaría a pintar dos avisos distintos, que es cómo se acaba
    * teniendo dos sitios donde mirar cuando algo va mal.
    */
-  return { fase, mesa, aviso: aviso.texto, cronica, quieto, abrir, entrar, mover, salir, tirar };
+  return { fase, mesa, aviso: aviso.texto, cronica, quieto, abrir, entrar, mover, vestir, salir, tirar };
 }
 
 function textoDelFallo(error: unknown): string {

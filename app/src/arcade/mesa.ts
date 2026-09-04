@@ -73,9 +73,26 @@ export interface MesaVista {
   venceEn: number | null;
   /** Desde cuándo se espera al que tiene el turno, en epoch ms. Ver `mesas.ts`. */
   turnoDesde: number;
-  asientos: Array<{ id: string; nombre: string; presente: boolean }>;
+  /**
+   * `figura` es el aventurero que eligió ese asiento, si eligió. Es una CADENA
+   * OPACA para el servidor —`Silla.figura` en `mesas.ts` no sabe qué es un
+   * caballero— y puede venir una que este binario no conozca; quién la traduce a
+   * un dibujo es `escenas/embarcadero/figuras.ts`, y una desconocida se pinta como
+   * la de serie del asiento. Opcional por lo de siempre: un servidor anterior al
+   * Muelle no la manda.
+   */
+  asientos: Array<{ id: string; nombre: string; presente: boolean; figura?: string }>;
   yo: string | null;
   vista: unknown;
+  /**
+   * ¿YA SE JUEGA, O TODAVÍA SE REÚNE LA MESA? Lo pone la autoridad desde que
+   * existe el Muelle. Opcional porque un servidor más viejo no lo manda, y
+   * entonces se infiere de `opciones`: la única puerta para leerlo es
+   * `haEmpezado()` en `./empezada.ts`, que es quien sabe inferir y quien
+   * documenta lo que la inferencia no puede prometer. Leer este campo a pelo es
+   * volver a tener dos respuestas.
+   */
+  empezada?: boolean;
   /**
    * POR QUÉ NO PASÓ NADA, dicho por el juego. Sólo llega al mover, y sólo a quien
    * movió. `null` en toda lectura. Ver `VistaDeMesa.motivo` en el servidor.
@@ -142,8 +159,23 @@ export interface LaMesa {
    * sólo sabría abrir mesas del plazo por defecto, o sea que una partida de días
    * existiría en el servidor y no habría forma de empezarla desde el móvil.
    */
-  abrir: (nombre: string, plazoSegundos?: number) => void;
-  entrar: (codigo: string, nombre: string) => void;
+  abrir: (nombre: string, plazoSegundos?: number, figura?: string) => void;
+  /**
+   * `figura` en los dos: es el aventurero con el que se llega al Muelle, y viaja
+   * en el mismo cuerpo que el nombre para que el asiento nazca vestido y los demás
+   * lo vean llegar ya con su figura, en vez de con la de serie y un cambio un
+   * sondeo después. Si no viene, no se manda nada: la mesa no la exige y el
+   * servidor decide la de serie igual que decide el plazo por defecto.
+   */
+  entrar: (codigo: string, nombre: string, figura?: string) => void;
+  /**
+   * CAMBIARSE DE FIGURA YA SENTADO. No es un movimiento —no entra en el diario ni
+   * pasa por el reductor, y no reprograma el plazo— y por eso tiene su propia
+   * ruta: `PUT …/figura` con la llave del asiento. La mesa que vuelve se pone tal
+   * cual, que es lo que hace que la figura nueva se vea en este aparato en el
+   * acto y en los demás en su siguiente vuelta de sondeo.
+   */
+  vestir: (figura: string) => void;
   mover: (movimiento: MovimientoDeclarado) => void;
   salir: () => void;
   /**
@@ -165,6 +197,19 @@ export interface LaMesa {
    * llegaba jamás al móvil.
    */
   cronica: readonly AvisoDeMesa[];
+  /**
+   * TODAVÍA SE ESTÁ MIRANDO EL BOLSILLO. `true` desde que se monta hasta que la
+   * recuperación del sitio guardado ha terminado, haya encontrado mesa o no.
+   *
+   * Existe por el Muelle, que tiene que decidir si monta un lienzo de tres
+   * dimensiones o se va derecho al juego, y esa decisión depende de si la mesa
+   * recuperada ya ha empezado. Antes de este campo no había forma de saberlo: la
+   * fase es `fuera` tanto ANTES de leer el bolsillo como DESPUÉS de no encontrar
+   * nada, y la lectura es asíncrona. Montar el lienzo en ese hueco y desmontarlo
+   * medio segundo después para irse al tablero es pagar la carga entera de la
+   * escena por un fotograma que nadie ve.
+   */
+  recuperando: boolean;
 }
 
 /** La cabecera con la que un asiento demuestra que es él. Ver `routes/arcade.ts`. */
@@ -253,6 +298,7 @@ export function usarMesaDeArcade(arcade: ArcadeId): LaMesa {
     });
   }, []);
   const [quieto, ponerQuieto] = useState(false);
+  const [recuperando, ponerRecuperando] = useState(true);
 
   /*
    * El código y la llave viven en referencias y no en estado, y no es un atajo: el
@@ -292,6 +338,19 @@ export function usarMesaDeArcade(arcade: ArcadeId): LaMesa {
    */
   useEffect(() => {
     void (async () => {
+      /*
+       * `recuperando` se apaga por CUALQUIER salida de este bloque, incluidas las
+       * tempranas —sin bolsillo, mesa de la que se salió a propósito, alguien ya
+       * abrió—: lo que promete es «ya se ha mirado», no «se ha encontrado».
+       */
+      try {
+        await recuperarElSitio();
+      } finally {
+        if (vivo.current) ponerRecuperando(false);
+      }
+    })();
+
+    async function recuperarElSitio(): Promise<void> {
       const sitio = await elSitioGuardado(arcade);
       if (!vivo.current || sitio === null) return;
       /* De la mesa de la que uno acaba de salir no se vuelve solo. Ver el registro. */
@@ -373,7 +432,7 @@ export function usarMesaDeArcade(arcade: ArcadeId): LaMesa {
         );
         ponerFase('fuera');
       }
-    })();
+    }
     /*
      * Sólo al montar y sólo por arcade: es una recuperación, no un sondeo. Volver a
      * dispararla al cambiar cualquier otra cosa pisaría la mesa que ya tenemos.
@@ -510,7 +569,7 @@ export function usarMesaDeArcade(arcade: ArcadeId): LaMesa {
   }, [fase, mesa?.rev, mesa?.venceEn, mesa?.terminada, cabeceras]);
 
   const abrir = useCallback(
-    (nombre: string, plazoSegundos?: number) => {
+    (nombre: string, plazoSegundos?: number, figura?: string) => {
       void (async () => {
         ponerQuieto(true);
         ponerFase('yendo');
@@ -528,6 +587,8 @@ export function usarMesaDeArcade(arcade: ArcadeId): LaMesa {
               arcade,
               nombre,
               ...(plazoSegundos === undefined ? {} : { plazoSegundos }),
+              /* Igual que el plazo: sólo viaja si quien abre llegó con una. */
+              ...(figura === undefined ? {} : { figura }),
             }),
           });
           const datos = (await r.json()) as {
@@ -561,7 +622,7 @@ export function usarMesaDeArcade(arcade: ArcadeId): LaMesa {
   );
 
   const entrar = useCallback(
-    (elCodigo: string, nombre: string) => {
+    (elCodigo: string, nombre: string, figura?: string) => {
       void (async () => {
         ponerQuieto(true);
         ponerFase('yendo');
@@ -611,7 +672,11 @@ export function usarMesaDeArcade(arcade: ArcadeId): LaMesa {
              * El caso que cierra: un código de cinco letras no dice de qué juego
              * es, y se reparten por un chat.
              */
-            body: JSON.stringify({ nombre, arcade }),
+            body: JSON.stringify({
+              nombre,
+              arcade,
+              ...(figura === undefined ? {} : { figura }),
+            }),
           });
           const datos = (await r.json()) as { error?: string; llave?: string; mesa?: MesaVista };
           if (!r.ok || datos.mesa === undefined) throw new Error(datos.error ?? 'no se pudo entrar');
@@ -734,6 +799,48 @@ export function usarMesaDeArcade(arcade: ArcadeId): LaMesa {
   );
 
   /*
+   * ═══ VESTIRSE NO ES UN MOVIMIENTO, Y POR ESO NO PASA POR `mover` ═══
+   *
+   * `mover` manda la revisión y espera que el juego acepte o rechace; cambiar de
+   * figura no toca el estado del juego, no entra en el diario y no reprograma el
+   * plazo — es la segunda de las decisiones que no se deshacen en
+   * `docs/EL-MUELLE.md`. El servidor SÍ sube la revisión para que los demás se
+   * enteren por el sondeo, y por eso lo que vuelve se pone tal cual: es la mesa
+   * entera, con la figura nueva puesta en mi asiento.
+   *
+   * Sin asiento no se manda nada: la ruta contesta 403 y aquí ya se sabe. La
+   * elección local no se pierde por eso —la guarda `figura.ts` antes de llamar
+   * aquí— y viajará con el siguiente `abrir` o `entrar`.
+   */
+  const vestir = useCallback(
+    (figura: string) => {
+      void (async () => {
+        const donde = codigo.current;
+        const mia = llave.current;
+        if (donde === null || mia === null) return;
+        ponerQuieto(true);
+        try {
+          const r = await fetch(`${servidorActual()}/api/arcade/mesas/${donde}/figura`, {
+            method: 'PUT',
+            headers: { 'content-type': 'application/json', [CABECERA_DE_ASIENTO]: mia },
+            body: JSON.stringify({ figura }),
+          });
+          const datos = (await r.json()) as { error?: string; mesa?: MesaVista };
+          if (!vivo.current) return;
+          if (!r.ok) throw new Error(datos.error ?? `el servidor contestó ${String(r.status)}`);
+          if (datos.mesa !== undefined) ponerMesa(datos.mesa);
+        } catch (error) {
+          if (!vivo.current) return;
+          avisoDeTuJugada(`No se ha podido cambiar de figura: ${textoDelFallo(error)}`);
+        } finally {
+          if (vivo.current) ponerQuieto(false);
+        }
+      })();
+    },
+    [avisoDeTuJugada],
+  );
+
+  /*
    * Salir CIERRA LA PANTALLA Y SE QUEDA EL ASIENTO. Lo único que se apunta es que
    * de esta mesa no se vuelve solo mientras dure la ejecución —ver el registro de
    * arriba—, que era todo lo que el olvido conseguía de útil.
@@ -806,7 +913,20 @@ export function usarMesaDeArcade(arcade: ArcadeId): LaMesa {
    * Hacia fuera sigue siendo UNA CADENA. De dónde salió el renglón es cosa de
    * este fichero: la pantalla lo pinta igual venga de donde venga.
    */
-  return { fase, mesa, aviso: aviso.texto, cronica, quieto, abrir, entrar, mover, salir, tirar };
+  return {
+    fase,
+    mesa,
+    aviso: aviso.texto,
+    cronica,
+    quieto,
+    recuperando,
+    abrir,
+    entrar,
+    vestir,
+    mover,
+    salir,
+    tirar,
+  };
 }
 
 /** Lo que se le puede enseñar a alguien de un fallo, sin pila ni jerga. */

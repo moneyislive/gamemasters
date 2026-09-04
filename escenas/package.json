@@ -1,0 +1,29 @@
+{
+  "name": "escenas",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "verify:escena": "tsx scripts/verificar-escena.ts",
+    "verify:aventureros": "tsx scripts/verificar-aventureros.ts",
+    "compilar:modelos": "tsx scripts/compilar-modelos.ts",
+    "compilar:aventureros": "tsx scripts/compilar-aventureros.ts",
+    "compilar:embarcadero": "tsx scripts/compilar-embarcadero.ts",
+    "verify:embarcadero-modelos": "tsx scripts/verificar-embarcadero-modelos.ts",
+    "verify:embarcadero": "tsx scripts/verificar-embarcadero.ts"
+  },
+  "description": "Las escenas 3D que pintan los DOS clientes. Sin Canvas propio: lo monta quien la usa.",
+  "peerDependencies": {
+    "react": ">=19",
+    "three": ">=0.185.0"
+  },
+  "devDependencies": {
+    "@gltf-transform/core": "^4.5.0",
+    "@gltf-transform/extensions": "^4.5.0",
+    "@gltf-transform/functions": "^4.5.0",
+    "@react-three/fiber": "^9.7.0",
+    "@types/three": "^0.185.4",
+    "pngjs": "3.4.0",
+    "three": "^0.185.1"
+  }
+}

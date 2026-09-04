@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <!--
+      EL BANCO DE PRUEBAS DEL TABLERO EN TRES DIMENSIONES.
+
+      Entrada APARTE de `index.html`, y a propósito: la Sala tiene su enrutador
+      probado por `verify:escritorio`, y meter aquí una ruta nueva para mirar una
+      escena obligaría a tocarlo. Esto no es una pantalla del producto — es el
+      sitio donde se mira si la escena compila, si se ve y si rinde, antes de que
+      exista un juego que la use.
+
+      Vive en el árbol y no en un apaño temporal porque va a hacer falta cada vez
+      que se toque la escena: es el único sitio donde se puede ver el tablero sin
+      levantar un servidor, abrir una mesa y repartir.
+    -->
+    <meta name="viewport" content="width=1024, initial-scale=1.0" />
+    <title>Banco de pruebas · el delta en 3D</title>
+    <meta name="theme-color" content="#06110f" />
+  </head>
+  <body>
+    <div id="raiz"></div>
+    <script type="module" src="/src/banco3d.tsx"></script>
+  </body>
+</html>

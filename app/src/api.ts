@@ -643,6 +643,39 @@ export function pedirPortada(): Promise<Portada> {
 }
 
 /**
+ * QUIÉN SOY para el servidor, sin un 401 cuando no soy nadie.
+ *
+ * `/cuenta/yo` contesta `{ cuenta: null }` a quien no tiene sesión en vez de
+ * fallar, que es lo que necesita una pantalla que se pinta igual para quien tiene
+ * cuenta y para quien no —el lobby de la Sala— y que sólo quiere saber si hay una
+ * figura elegida que seguir. `figura` viene `null` cuando no se ha elegido ninguna
+ * y viene AUSENTE cuando el servidor es más viejo que esta app: la pantalla trata
+ * las dos igual, pero el tipo lo dice para que nadie lo confunda con «sin cuenta».
+ */
+export interface QuienSoy {
+  id: string;
+  displayName: string;
+  email: string;
+  taller: boolean;
+  via: string[];
+  figura?: string | null;
+}
+
+export function quienSoy(): Promise<{ cuenta: QuienSoy | null }> {
+  return peticion('/cuenta/yo');
+}
+
+/**
+ * Guarda en la cuenta el aventurero elegido, para que siga a la persona de un
+ * aparato a otro. La misma forma que exige la mesa al sentarse: minúsculas,
+ * dígitos y guiones. Quien la llama ya ha guardado la elección en el aparato; si
+ * esto falla —sin red, sin cuenta— la elección de hoy no se pierde.
+ */
+export function guardarMiFigura(figura: string): Promise<{ figura: string }> {
+  return peticion('/cuenta/figura', { method: 'PUT', body: JSON.stringify({ figura }) });
+}
+
+/**
  * EL CATÁLOGO DE ARCADES DE ESTE SERVIDOR, para la Sala de la portada.
  *
  * ═══ VA SIN CREDENCIAL, Y NO ES UN DESCUIDO ═══

@@ -65,9 +65,28 @@ import { loQueSePinta, opcionesSueltas, queSePinta } from '../src/plan';
 import { canonico } from '../../shared/mecanicas/canonico';
 import { CICLO_MAXIMO_MS, pausaAntesDeVolverAPreguntar, TOPE_DE_PAUSA_MS, VENTANA_DE_PRESENCIA } from '../src/relojes';
 import { Retablo } from '../src/retablo';
-import { loQuePide, PLAZOS } from '../src/sala';
+import { loQuePide, PLAZOS, tocaElMuelle } from '../src/sala';
 import { loQueQuedaTrasElSondeo, SIN_AVISO } from '../src/mesa';
+import type { LaMesa, MesaVista } from '../src/mesa';
 import { loQueSeDiceDeUnFallo } from '../src/red-de-seguridad';
+import { haEmpezado } from '../src/empezada';
+import { Muelle } from '../src/muelle';
+import { temaDelMuelle, tieneMuelle } from '../../escenas/embarcadero/tema';
+import { FIGURAS } from '../../escenas/embarcadero/figuras';
+import { semillaDeCodigo } from '../../escenas/embarcadero/cala';
+import { RiberasEnTres } from '../src/riberas-en-tres';
+import {
+  bienDeRiberas,
+  bienesQueSeCambianPor,
+  colocandoEnTres,
+  manoEnTres,
+  opcionesFueraDelTablero,
+  PIEZAS_DE_LA_BARRA,
+  seVeEnTres,
+  tableroEnTres,
+  truequesPosibles,
+} from '../../shared/arcade/juegos/riberas-en-tres';
+import { semillaDelCodigo } from '../../shared/mecanicas/semilla';
 
 let hechas = 0;
 const fallos: string[] = [];
@@ -394,9 +413,23 @@ function elCatalogoNoMiente(): void {
 // 2 · No se pinta nada que la proyección no haya dado
 // ---------------------------------------------------------------------------
 
-/** Una partida de Riberas de verdad, jugada aquí con el reductor de `shared/`. */
-function laProyeccionDeVerdad(): { vista: unknown; opciones: readonly Opcion[] } {
-  const asientos = ['s1', 's2'];
+/** Los nombres de los asientos de prueba, por orden: los dos de siempre y los que hacen falta para pasar de cuatro. */
+const NOMBRES_DE_PRUEBA = ['Ana', 'Bruno', 'Carla', 'Darío', 'Elena', 'Fabio'];
+
+/** Los asientos de una mesa de prueba con tantos sentados: `s1`, `s2`, ... con su nombre. */
+function sentadosDePrueba(cuantosAsientos: number): { asiento: string; nombre: string }[] {
+  return NOMBRES_DE_PRUEBA.slice(0, cuantosAsientos).map((nombre, i) => ({ asiento: `s${String(i + 1)}`, nombre }));
+}
+
+/**
+ * Una partida de Riberas de verdad, jugada aquí con el reductor de `shared/`. Con
+ * dos asientos si no se dice otra cosa; con cinco es la mesa que el tablero en tres
+ * dimensiones NO sabe pintar —el atlas trae cuatro colores— y ésa es la que en la
+ * primera versión del pintor salía como cincuenta y cuatro botones sueltos.
+ */
+function laProyeccionDeVerdad(cuantosAsientos = 2): { vista: unknown; opciones: readonly Opcion[] } {
+  const sentados = sentadosDePrueba(cuantosAsientos);
+  const asientos = sentados.map((s) => s.asiento);
   const ctx = (quien: string | null): ContextoMovimiento => ({
     quien,
     azar: 987_654,
@@ -407,10 +440,6 @@ function laProyeccionDeVerdad(): { vista: unknown; opciones: readonly Opcion[] }
   let estado: unknown = undefined;
   estado = avanzar(RIBERAS, estado, { tipo: EMPEZAR_RIBERAS, carga: {} }, ctx('s1'));
 
-  const sentados = [
-    { asiento: 's1', nombre: 'Ana' },
-    { asiento: 's2', nombre: 'Bruno' },
-  ];
   const vista = proyectar(RIBERAS, estado, 's1', sentados);
   /*
    * Las opciones se piden por el mismo camino que las pide la mesa: la función
@@ -814,12 +843,466 @@ function lasDirecciones(): void {
 }
 
 // ---------------------------------------------------------------------------
+// 5 · El muelle: cuándo se pinta, y que el raíl exista sin el mundo
+// ---------------------------------------------------------------------------
+
+/**
+ * Una mesa de mentira SÓLO en lo que no es del juego: las funciones del gancho
+ * no hacen nada y la vista es la que se le pase. Lo que sale del juego —las
+ * opciones— sale del reductor de verdad, más abajo.
+ */
+function unaMesa(fase: LaMesa['fase'], vista: MesaVista | null): LaMesa {
+  const nada = (): void => undefined;
+  return {
+    fase,
+    mesa: vista,
+    aviso: '',
+    cronica: [],
+    quieto: false,
+    abrir: nada,
+    entrar: nada,
+    mover: nada,
+    vestir: nada,
+    salir: nada,
+    tirar: nada,
+  };
+}
+
+function elMuelle(): void {
+  paso('Si la partida ha empezado se sabe sin abrir la vista del juego');
+
+  /*
+   * ═══ LAS DOS FUENTES, Y EL ORDEN ENTRE ELLAS ═══
+   *
+   * `empezada` lo estrenó el servidor para el Muelle; un servidor anterior manda
+   * la vista sin él y entonces se infiere de `opciones`. Las opciones de aquí son
+   * las del juego DE VERDAD: las de la mesa recién abierta —que ofrece empezar— y
+   * las de después del reparto, sacadas del mismo reductor que usa la sección 2.
+   * Una lista inventada aquí probaría la inferencia contra lo que este fichero se
+   * imagina que ofrece Riberas.
+   */
+  const sentados = [
+    { asiento: 's1', nombre: 'Ana' },
+    { asiento: 's2', nombre: 'Bruno' },
+  ];
+  const reunida = proyectar(RIBERAS, undefined, 's1', sentados);
+  const opcionesDeReunion = opcionesDeArcade(RIBERAS, reunida, 's1');
+  const { opciones: opcionesJugando } = laProyeccionDeVerdad();
+
+  comprobar(
+    'con el campo puesto, manda el campo: «empezada: true» aunque las opciones aún ofrezcan empezar',
+    haEmpezado({ empezada: true, opciones: opcionesDeReunion }) &&
+      !haEmpezado({ empezada: false, opciones: opcionesJugando }),
+  );
+  comprobar(
+    'sin el campo, una mesa cuyo juego ofrece empezar no ha empezado',
+    opcionesDeReunion.length > 0 && !haEmpezado({ opciones: opcionesDeReunion }),
+    opcionesDeReunion.map((o) => o.id),
+  );
+  comprobar(
+    'y sin el campo y sin esa opción —o sin lista siquiera— se contesta que sí, que es caer al tablero de siempre',
+    haEmpezado({ opciones: opcionesJugando }) && haEmpezado({}) && !haEmpezado(null),
+    opcionesJugando.map((o) => o.id),
+  );
+
+  paso('El muelle se pinta sólo a quien lo tiene, y sólo hasta zarpar');
+
+  const orilla = { vioLaReunion: false, zarpado: false };
+  const trasLaReunion = { vioLaReunion: true, zarpado: false };
+  const zarpado = { vioLaReunion: true, zarpado: true };
+  comprobar(
+    'un arcade sin muelle no lo pinta nunca, en ninguna fase: los demás no cambian ni un píxel',
+    (['fuera', 'yendo', 'dentro'] as const).every(
+      (f) =>
+        !tocaElMuelle(false, f, false, orilla) &&
+        !tocaElMuelle(false, f, true, trasLaReunion) &&
+        !tocaElMuelle(false, f, false, trasLaReunion),
+    ),
+  );
+  comprobar(
+    'con muelle: en la orilla y mientras la mesa se reúne, se pinta',
+    tocaElMuelle(true, 'fuera', false, orilla) &&
+      tocaElMuelle(true, 'yendo', false, orilla) &&
+      tocaElMuelle(true, 'dentro', false, orilla),
+  );
+  comprobar(
+    'al llegar «empezada» delante de uno se sigue pintando —la coreografía— y al desembarcar ya no',
+    tocaElMuelle(true, 'dentro', true, trasLaReunion) && !tocaElMuelle(true, 'dentro', true, zarpado),
+  );
+  comprobar(
+    'y quien vuelve a una mesa que ya jugaba va directo al tablero, sin coreografía',
+    !tocaElMuelle(true, 'dentro', true, orilla),
+  );
+  comprobar(
+    'Riberas tiene muelle y el resto de los instalados no',
+    tieneMuelle('riberas') && arcadesInstalados().filter((m) => tieneMuelle(m.id)).length === 1,
+    arcadesInstalados().filter((m) => tieneMuelle(m.id)).map((m) => m.id),
+  );
+
+  paso('El raíl del muelle existe entero sin el mundo, y en Node no se monta el Canvas');
+
+  /*
+   * ═══ POR QUÉ SE RENDERIZA EN NODE UN COMPONENTE CON UN `Canvas` DENTRO ═══
+   *
+   * Porque es la regla del §5 del diseño —«el HUD nunca depende del Canvas»—
+   * hecha comprobación: si el mundo no arranca, se abre, se entra y se reparte
+   * igual. Aquí no hay `window`, así que el `Canvas` no puede montarse (lo
+   * protege un `typeof window` en `muelle.tsx`); lo que se cuenta es que el raíl
+   * tiene todo lo demás. Y de paso, que ningún cambio futuro cuele el `Canvas`
+   * fuera de esa guarda: el día que pase, esto revienta en Node antes que en un
+   * navegador sin WebGL.
+   */
+  const riberas = elCatalogoQuePublicaElServidor().find((m) => m.id === 'riberas');
+  const tema = temaDelMuelle('riberas');
+  comprobar('Riberas está instalado y tiene tema de muelle', riberas !== undefined && tema !== undefined);
+  if (riberas === undefined || tema === undefined) return;
+
+  const enLaOrilla = renderToStaticMarkup(
+    <Muelle
+      manifiesto={riberas}
+      tema={tema}
+      mesa={unaMesa('fuera', null)}
+      silla=""
+      codigoDeLaUrl="ABCDE"
+      zarpando={false}
+      alDesembarcar={() => undefined}
+    />,
+  );
+  const textoDeLaOrilla = palabrasDe(enLaOrilla);
+  comprobar('en la orilla no hay ningún <canvas>', !enLaOrilla.includes('<canvas'), enLaOrilla.slice(0, 300));
+  comprobar('pero sí el telón con el nombre del lugar', textoDeLaOrilla.includes(tema.lugar));
+  comprobar(
+    'y los campos del vestíbulo de siempre: abrir, sentarse y el código de la dirección puesto',
+    textoDeLaOrilla.includes('Abrir mesa') &&
+      textoDeLaOrilla.includes('Sentarse') &&
+      enLaOrilla.includes('value="ABCDE"'),
+  );
+  comprobar(
+    'y una figura elegida, que es una de las seis y se puede cambiar',
+    FIGURAS.some((f) => textoDeLaOrilla.includes(f.nombre)) && textoDeLaOrilla.includes('Cambiar'),
+  );
+  comprobar(
+    'los plazos que se ofrecen son los mismos que en la mesa de siempre',
+    PLAZOS.every((p) => textoDeLaOrilla.includes(p.rotulo)),
+  );
+
+  const vista: MesaVista = {
+    codigo: 'QWXYZ',
+    arcade: 'riberas',
+    rev: 3,
+    tic: 0,
+    terminada: false,
+    venceEn: null,
+    turnoDesde: 0,
+    asientos: [
+      { id: 's1', nombre: 'Ana', presente: true, figura: 'maga' },
+      { id: 's2', nombre: 'Bruno', presente: false },
+    ],
+    yo: 's1',
+    vista: reunida,
+    opciones: opcionesDeReunion,
+  };
+  const enElMuelle = renderToStaticMarkup(
+    <Muelle
+      manifiesto={riberas}
+      tema={tema}
+      mesa={unaMesa('dentro', vista)}
+      silla=""
+      codigoDeLaUrl=""
+      zarpando={false}
+      alDesembarcar={() => undefined}
+    />,
+  );
+  const textoDelMuelle = palabrasDe(enElMuelle);
+  comprobar('en el muelle tampoco hay <canvas>', !enElMuelle.includes('<canvas'));
+  comprobar(
+    'se ve el código y se puede copiar, y el enlace también',
+    textoDelMuelle.includes('QWXYZ') &&
+      textoDelMuelle.includes('Copiar código') &&
+      textoDelMuelle.includes('Copiar enlace'),
+  );
+  comprobar(
+    'los sentados salen con su nombre, quién soy yo, y un piloto por cabeza con el que falta apagado',
+    textoDelMuelle.includes('Ana (tú)') &&
+      textoDelMuelle.includes('Bruno') &&
+      enElMuelle.split('class="piloto').length - 1 === 2 &&
+      enElMuelle.split('piloto-vivo').length - 1 === 1,
+  );
+  comprobar(
+    'la opción de empezar sale con el rótulo y la ayuda que escribió el juego, y ninguna otra palabra de cosecha propia como movimiento',
+    opcionesDeReunion.every((o) => textoDelMuelle.includes(o.rotulo) && textoDelMuelle.includes(o.ayuda)) &&
+      enElMuelle.split('class="opcion opcion-zarpar"').length - 1 === 1,
+  );
+  comprobar(
+    'y se puede levantar uno, tirar la mesa y cambiar de aventurero',
+    textoDelMuelle.includes('Levantarse') &&
+      textoDelMuelle.includes('Tirar la mesa') &&
+      textoDelMuelle.includes('Cambiar de aventurero'),
+  );
+  comprobar(
+    'la figura de un asiento se pinta por su nombre, y la del que no eligió es la de serie',
+    textoDelMuelle.includes('La Maga') && FIGURAS.filter((f) => textoDelMuelle.includes(f.nombre)).length >= 1,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 6 · Riberas en tres dimensiones: sin Canvas en Node, y cada movimiento una vez
+// ---------------------------------------------------------------------------
+
+/**
+ * EL PINTOR PROPIO DE RIBERAS, renderizado en Node como el muelle y por lo mismo.
+ *
+ * Aquí no hay `window`, así que el `Canvas` no puede montarse (lo protege un
+ * `typeof window` en `riberas-en-tres.tsx`) y lo que se cuenta es lo que queda
+ * alrededor: el telón con el nombre y el formulario de lo que el tablero no enseña.
+ *
+ * Y la comprobación que importa de verdad es la misma que la del retablo —cada
+ * movimiento exactamente una vez— con la escena en medio: lo que sale como botón
+ * tiene que ser lo que NO ofrece ni la barra ni la mano, y entre las tres cosas
+ * tienen que estar TODAS las opciones del juego. Esconder una sería peor que
+ * repetirla. Se comprueba con la traducción de `shared/` y la proyección de verdad,
+ * porque un botón de más o de menos aquí no da error en ninguna consola.
+ *
+ * Y se abre TAMBIÉN una mesa de cinco, que es la que el lienzo no sabe pintar: ahí
+ * tiene que salir el retablo de siempre y decir por qué. Dos asientos recién
+ * empezados no habrían cogido nunca el pintor confundiendo «no cabe» con «no hay islas».
+ */
+function riberasEnTres(): void {
+  paso('Riberas en tres dimensiones: sin ventana no hay Canvas, y sí lo demás');
+
+  const riberas = elCatalogoQuePublicaElServidor().find((m) => m.id === 'riberas');
+  comprobar('Riberas está instalado', riberas !== undefined);
+  if (riberas === undefined) return;
+
+  const { vista, opciones } = laProyeccionDeVerdad();
+  const tablero = tableroDeLaVista(vista);
+  comprobar('y su proyección trae tablero declarado y delta con islas', tablero !== null && tableroEnTres(vista) !== null);
+  if (tablero === null) return;
+
+  const puesta: MesaVista = {
+    codigo: 'QWXYZ',
+    arcade: 'riberas',
+    rev: 7,
+    tic: 0,
+    terminada: false,
+    venceEn: null,
+    turnoDesde: 0,
+    asientos: [
+      { id: 's1', nombre: 'Ana', presente: true },
+      { id: 's2', nombre: 'Bruno', presente: true },
+    ],
+    yo: 's1',
+    vista,
+    opciones,
+  };
+  const html = renderToStaticMarkup(
+    <RiberasEnTres
+      manifiesto={riberas}
+      mesa={unaMesa('dentro', puesta)}
+      puesta={puesta}
+      tablero={tablero}
+      opciones={opciones}
+    />,
+  );
+  const texto = palabrasDe(html);
+  comprobar('no hay ningún <canvas>', !html.includes('<canvas'), html.slice(0, 300));
+  comprobar('pero sí el telón con el nombre del juego', texto.includes(riberas.nombre));
+  comprobar('y no se cae al retablo SVG sin que haya fallado nada', cuantos(html, 'svg') === 0);
+  comprobar(
+    'el aviso del tablero, que es del juego, sigue en pantalla',
+    tablero.aviso.length === 0 || texto.includes(tablero.aviso),
+    tablero.aviso,
+  );
+
+  /*
+   * CADA MOVIMIENTO UNA VEZ. Lo que sale como botón es exactamente lo que queda fuera
+   * del tablero; y lo que queda dentro tiene que poder salir por la barra o por la mano.
+   */
+  const fuera = opcionesFueraDelTablero(opciones);
+  const botones = html.split('class="opcion-rotulo"').length - 1;
+  comprobar(
+    'salen como botón exactamente las opciones que el tablero no enseña',
+    botones === fuera.length,
+    { botones, fuera: fuera.map((o) => o.id) },
+  );
+  for (const o of fuera) {
+    comprobar(`el rótulo «${o.rotulo}» sale tal cual`, texto.includes(o.rotulo));
+  }
+  const dentro = opciones.filter((o) => !fuera.includes(o));
+  for (const o of dentro) {
+    comprobar(`«${o.rotulo}» no se pinta como botón: lo enseña la escena`, !texto.includes(o.rotulo), o.id);
+  }
+
+  const porLaBarra = new Set<string>();
+  for (const { id } of PIEZAS_DE_LA_BARRA) {
+    const colocando = colocandoEnTres(vista, 's1', id);
+    if (colocando === null) continue;
+    for (const m of colocando.movimientos.values()) porLaBarra.add(canonico(m));
+  }
+  const porLaMano = new Set<string>();
+  for (const carta of manoEnTres(vista)) {
+    const doy = bienDeRiberas(carta.bien);
+    for (const quiero of bienesQueSeCambianPor(vista, opciones, doy)) {
+      for (const t of truequesPosibles(vista, opciones, doy, quiero)) {
+        porLaMano.add(canonico({ tipo: t.opcion.tipo, carga: t.opcion.carga }));
+      }
+    }
+  }
+  const alcanzables = new Set([
+    ...porLaBarra,
+    ...porLaMano,
+    ...fuera.map((o) => canonico({ tipo: o.tipo, carga: o.carga })),
+  ]);
+  comprobar(
+    'y no se pierde ni una: todo lo que ofreció el juego sale por la barra, por la mano o por un botón',
+    opciones.every((o) => alcanzables.has(canonico({ tipo: o.tipo, carga: o.carga }))),
+    opciones
+      .filter((o) => !alcanzables.has(canonico({ tipo: o.tipo, carga: o.carga })))
+      .map((o) => o.id),
+  );
+  comprobar(
+    'la barra ofrece algo, o esto no habría comprobado el camino de la escena',
+    porLaBarra.size > 0,
+    porLaBarra.size,
+  );
+
+  /*
+   * ═══ CINCO COLONOS: HAY DELTA, PERO NO CABE EN EL LIENZO ═══
+   *
+   * `tableroEnTres` devuelve `null` con cinco o seis colonos aunque haya islas,
+   * porque el atlas sólo trae cuatro colores de jugador. La primera versión del
+   * pintor leía ese `null` como «delta sin repartir» y pintaba un formulario con
+   * los cincuenta y cuatro «Fundar aquí» sueltos: sin tablero, sin telón y sin el
+   * aviso del turno. Los dos asientos de arriba no lo habrían cogido nunca. Aquí se
+   * abre la mesa con cinco, se EMPIEZA de verdad, y se exige el retablo de siempre.
+   */
+  paso('Con cinco colonos hay delta pero no colores: se cae al retablo, y se dice por qué');
+
+  const cinco = laProyeccionDeVerdad(5);
+  const tableroDeCinco = tableroDeLaVista(cinco.vista);
+  comprobar(
+    'la mesa de cinco trae tablero declarado con caras, y la traducción dice que no cabe en tres',
+    tableroDeCinco !== null &&
+      tableroDeCinco.caras.length > 0 &&
+      !seVeEnTres(cinco.vista) &&
+      tableroEnTres(cinco.vista) === null,
+    { caras: tableroDeCinco?.caras.length, seVe: seVeEnTres(cinco.vista) },
+  );
+  if (tableroDeCinco === null) return;
+
+  const puestaDeCinco: MesaVista = {
+    ...puesta,
+    asientos: sentadosDePrueba(5).map((s) => ({ id: s.asiento, nombre: s.nombre, presente: true })),
+    vista: cinco.vista,
+    opciones: cinco.opciones,
+  };
+  const htmlDeCinco = renderToStaticMarkup(
+    <RiberasEnTres
+      manifiesto={riberas}
+      mesa={unaMesa('dentro', puestaDeCinco)}
+      puesta={puestaDeCinco}
+      tablero={tableroDeCinco}
+      opciones={cinco.opciones}
+    />,
+  );
+  const textoDeCinco = palabrasDe(htmlDeCinco);
+  comprobar('con cinco sale el retablo SVG', htmlDeCinco.includes('<svg'), htmlDeCinco.slice(0, 300));
+  comprobar('y ningún <canvas>', !htmlDeCinco.includes('<canvas'));
+  comprobar('ni el telón: no se está esperando a ningún modelo', !htmlDeCinco.includes('riberas-telon'));
+  comprobar(
+    'el aviso del tablero, que es del juego, sigue en pantalla',
+    tableroDeCinco.aviso.length > 0 && htmlDeCinco.includes('aviso-del-tablero') && textoDeCinco.includes(tableroDeCinco.aviso),
+    tableroDeCinco.aviso,
+  );
+  comprobar(
+    'y la letra chica dice que es por los colores, no por un fallo',
+    htmlDeCinco.includes('riberas-sin-mundo') &&
+      textoDeCinco.includes('sólo sabe pintar cuatro colores') &&
+      !textoDeCinco.includes('no ha arrancado'),
+  );
+  /*
+   * Y los botones son EXACTAMENTE los de «y además puedes»: lo que el retablo no
+   * enseña. Con la primera versión salían tantos como opciones —los cincuenta y
+   * cuatro sitios de fundar incluidos—; el retablo los pinta como nudos, no como botones.
+   */
+  const sueltasDeCinco = opcionesSueltas(tableroDeCinco, cinco.opciones);
+  const botonesDeCinco = htmlDeCinco.split('class="opcion-rotulo"').length - 1;
+  comprobar(
+    'los sitios de fundar los enseña el retablo, no un formulario de botones sueltos',
+    sueltasDeCinco.length < cinco.opciones.length && botonesDeCinco === sueltasDeCinco.length,
+    { botones: botonesDeCinco, sueltas: sueltasDeCinco.length, opciones: cinco.opciones.length },
+  );
+  comprobar(
+    'y con dos colonos —el caso de arriba— sigue saliendo el telón y ningún <svg>',
+    html.includes('riberas-telon') && !html.includes('<svg'),
+  );
+
+  /*
+   * Y la misma mesa de cinco ANTES de empezar: sin caras no hay nada que pintar,
+   * ni en tres ni en dos, y lo único que se ofrece es el formulario con «Empezar».
+   */
+  const reunidaDeCinco = proyectar(RIBERAS, undefined, 's1', sentadosDePrueba(5));
+  const opcionesReunida = opcionesDeArcade(RIBERAS, reunidaDeCinco, 's1');
+  const tableroReunido = tableroDeLaVista(reunidaDeCinco);
+  comprobar('la mesa de cinco reunida trae tablero declarado sin caras', tableroReunido !== null && tableroReunido.caras.length === 0);
+  if (tableroReunido !== null) {
+    const puestaReunida: MesaVista = { ...puestaDeCinco, vista: reunidaDeCinco, opciones: opcionesReunida };
+    const htmlReunida = renderToStaticMarkup(
+      <RiberasEnTres
+        manifiesto={riberas}
+        mesa={unaMesa('dentro', puestaReunida)}
+        puesta={puestaReunida}
+        tablero={tableroReunido}
+        opciones={opcionesReunida}
+      />,
+    );
+    comprobar(
+      'y sin repartir no hay retablo ni telón: sólo el formulario, con todas las opciones que ofrece el juego',
+      !htmlReunida.includes('<svg') &&
+        !htmlReunida.includes('riberas-telon') &&
+        htmlReunida.split('class="opcion-rotulo"').length - 1 === opcionesReunida.length &&
+        opcionesReunida.length > 0,
+      opcionesReunida.map((o) => o.id),
+    );
+  }
+
+  paso('Y la semilla del delta sale del código de la mesa, igual para todos');
+
+  comprobar(
+    'el mismo código da la misma semilla, y otro código da otra',
+    semillaDelCodigo('QWXYZ') === semillaDelCodigo('QWXYZ') && semillaDelCodigo('QWXYZ') !== semillaDelCodigo('QWXYA'),
+  );
+  comprobar(
+    'y es un entero no negativo, que es lo que la escena espera',
+    Number.isInteger(semillaDelCodigo('ABCDE')) && semillaDelCodigo('ABCDE') >= 0,
+    semillaDelCodigo('ABCDE'),
+  );
+  /*
+   * LA SEMILLA ES UNA. Hubo una copia en `riberas-en-tres.tsx` que no pasaba a
+   * mayúsculas: la misma mesa daba un delta en el PC y otro en la app según cómo
+   * se hubiera tecleado el código. La cala del muelle y el delta tienen que salir
+   * del mismo entero para el mismo código, en cualquier caja.
+   */
+  comprobar(
+    'la cala del muelle y el delta salen de la misma semilla para el mismo código',
+    semillaDeCodigo('QWXYZ') === semillaDelCodigo('QWXYZ') && semillaDeCodigo('abcde') === semillaDelCodigo('abcde'),
+    { cala: semillaDeCodigo('QWXYZ'), delta: semillaDelCodigo('QWXYZ') },
+  );
+  comprobar(
+    'y las mayúsculas no cambian el mundo: «qwxyz» y «QWXYZ» son la misma mesa',
+    semillaDelCodigo('qwxyz') === semillaDelCodigo('QWXYZ') && semillaDeCodigo('abcde') === semillaDeCodigo('ABCDE'),
+  );
+}
+
+// ---------------------------------------------------------------------------
 
 elCatalogoNoMiente();
 noSePintaDeMas();
 laPausaCabe();
 loQueLaPantallaDecideSola();
 lasDirecciones();
+elMuelle();
+riberasEnTres();
 
 console.log('');
 if (fallos.length === 0) {
@@ -831,7 +1314,11 @@ if (fallos.length === 0) {
       '  De los demás dice por qué no, y cada negativa dice la SUYA: solo la que de verdad se\n' +
       '  juega en la app manda a la app. Y sus dos muebles no pintan ni una palabra, ni una pieza\n' +
       '  ni un movimiento que no viniera dentro de la proyección: comprobado renderizando los\n' +
-      '  componentes de verdad contra una partida de verdad.\n' +
+      '  componentes de verdad contra una partida de verdad. Y el Muelle se pinta sólo al arcade\n' +
+      '  que lo tiene y sólo hasta zarpar, con su raíl entero sin necesidad de un Canvas. Y el\n' +
+      '  delta en tres dimensiones de Riberas enseña cada movimiento exactamente una vez entre\n' +
+      '  la barra, la mano y sus botones, también sin Canvas; con cinco colonos cae al retablo\n' +
+      '  de siempre diciendo por qué, y su semilla es la misma que la de la cala del muelle.\n' +
       '\n  Lo que esto NO prueba: que el reparto de los cuatro muebles entre propios y genéricos\n' +
       '  sea el del §7 —es una decisión de producto y no se deriva del contrato—, ni que la ruta\n' +
       '  del catálogo mande de verdad publicaOpciones: aquí no se levanta ningún servidor.',

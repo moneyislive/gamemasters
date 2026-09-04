@@ -28,6 +28,39 @@ const SERVIDOR = process.env.GM_API_URL ?? 'http://localhost:5174';
 export default defineConfig({
   base: '/sala/',
   plugins: [react()],
+  /*
+   * ═══ UNA SOLA COPIA DE R3F, DE `three` Y DE `react`, AUNQUE HAYA VARIAS EN EL DISCO ═══
+   *
+   * `escenas/` es un paquete del taller con su propio `node_modules`, y npm ha
+   * dejado ahí una copia de `@react-three/fiber` distinta de la de `escritorio/`.
+   * Vite resuelve cada `import` desde el fichero que importa, así que el
+   * `useFrame` que escribe `escenas/delta.tsx` vendría de una copia y el `Canvas`
+   * que monta este cliente de otra: dos contextos de React distintos, y el
+   * `useFrame` de la escena no corre nunca — sin un error en ninguna consola.
+   *
+   * `dedupe` obliga a resolver estos paquetes desde la raíz de ESTE proyecto,
+   * vengan de donde vengan. Sólo los que guardan estado global o comparan con
+   * `instanceof`; el resto sigue el camino normal. La app hace lo mismo en su
+   * `metro.config.js`, con otro mecanismo y por la misma razón.
+   */
+  resolve: {
+    dedupe: ['react', 'react-dom', 'three', '@react-three/fiber', 'scheduler'],
+  },
+  /*
+   * EL MOTOR 3D VA EN SU PROPIO TROZO. Desde que la Sala pinta el Muelle, `three`
+   * y r3f entran en el empaquetado para TODOS los arcades, tengan muelle o no, y
+   * el trozo principal pasaba de 200 kB a más de un mega. Separarlos no ahorra
+   * bytes al que abre Riberas —los pide igual— pero deja al que abre La Ronda con
+   * la Sala de siempre, y el navegador cachea el motor aparte de la Sala, que
+   * cambia mucho más a menudo que él.
+   */
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: { tres: ['three', '@react-three/fiber'] },
+      },
+    },
+  },
   server: {
     /*
      * 5173 es el taller y 5174 el servidor. Este pide el siguiente libre para

@@ -4,37 +4,67 @@
     {
       "name": "taller",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev", "-w", "client"],
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "-w",
+        "client"
+      ],
       "port": 5173
     },
     {
       "name": "movil",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "web", "--prefix", "app"],
+      "runtimeArgs": [
+        "run",
+        "web",
+        "--prefix",
+        "app"
+      ],
       "port": 8081
     },
     {
       "name": "arcade",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "web", "--prefix", "../GameMasters-arcade/app"],
+      "runtimeArgs": [
+        "run",
+        "web",
+        "--prefix",
+        "../GameMasters-arcade/app"
+      ],
       "port": 8081
     },
     {
       "name": "sala",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev", "--prefix", "../GameMasters-arcade/server"],
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--prefix",
+        "../GameMasters-arcade/server"
+      ],
       "port": 5174
     },
     {
       "name": "veladas",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "web", "--prefix", "../GameMasters-veladas/app"],
+      "runtimeArgs": [
+        "run",
+        "web",
+        "--prefix",
+        "../GameMasters-veladas/app"
+      ],
       "port": 8082
     },
     {
       "name": "escritorio3d",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev", "--prefix", "../GameMasters-catan/escritorio"],
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "-w",
+        "escritorio"
+      ],
       "port": 5175,
       "url": "http://localhost:5175"
     }

@@ -84,6 +84,21 @@ export default function DisposicionDeLaSala(): JSX.Element {
       {(Object.keys(MUEBLES) as MuebleDeArcade[]).map((mueble) => (
         <Stack.Screen key={mueble} name={mueble} />
       ))}
+      {/*
+        ═══ EL MUELLE NO ES UN MUEBLE, Y POR ESO NO ESTÁ EN EL `Record` ═══
+
+        `MUEBLES` es el `Record` sobre la unión cerrada del CONTRATO: lo que un
+        manifiesto puede declarar como superficie. El Muelle no lo declara ningún
+        manifiesto —quién lo tiene lo dice `escenas/embarcadero/tema.ts`— porque es
+        una pantalla previa de la plataforma, lo que hay antes de que la partida
+        empiece. Meterlo en el `Record` obligaría a inventar un quinto mueble en el
+        contrato sellado para que compilara, y ese mueble no pintaría ningún juego.
+
+        Así que va aparte, como pantalla suelta de la misma pila, y la razón de que
+        comparta pila es la de siempre: el fondo del `fade` entre el lobby y el
+        tablero al zarpar es propiedad de la pila, y tiene que ser el mismo suelo.
+      */}
+      <Stack.Screen name="muelle" />
     </Stack>
   );
 }

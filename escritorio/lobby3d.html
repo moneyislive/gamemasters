@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <!--
+      EL BANCO DE PRUEBAS DEL MUELLE EN TRES DIMENSIONES.
+
+      Entrada APARTE de `index.html`, como `banco3d.html` y por lo mismo: la Sala
+      tiene su enrutador probado por `verify:escritorio`, y meter una ruta nueva
+      para mirar una escena obligaría a tocarlo. Esto no es una pantalla del
+      producto — es donde se juzga si el embarcadero SE VE bien, que es lo único
+      que ningún comprobador de Node puede decir: el tinte del barco, la brasa
+      sobre el agua, si la cámara deja al local entero sobre la hoja del móvil,
+      cuántas llamadas de dibujo salen de verdad.
+
+      Sin servidor: los modelos entran por las direcciones que da Vite, y la mesa
+      es de mentira, con botones para sentar, levantar, vestir, ausentar y zarpar.
+      Se abre con `npm run dev -w escritorio` en /sala/lobby3d.html, y acepta
+      ?codigo=ABCDE&sentados=3&aspecto=retrato para abrirlo en un estado concreto.
+    -->
+    <meta name="viewport" content="width=1024, initial-scale=1.0" />
+    <title>Banco de pruebas · el muelle en 3D</title>
+    <meta name="theme-color" content="#080a0e" />
+  </head>
+  <body>
+    <div id="raiz"></div>
+    <script type="module" src="/src/banco-lobby.tsx"></script>
+  </body>
+</html>

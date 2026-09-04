@@ -515,6 +515,20 @@ const BATERIA = [
       'el mismo vértice tiene una sola llave por los tres caminos, ninguna choza toca a otra, la serpentina va y vuelve, el Vado Largo se pierde cuando un vecino planta una choza en medio, un trueque caduca solo, y quien no tiene el turno contesta — con el reductor rechazando lo que `opciones()` no ofreció y validando igual lo que sí',
   },
   /*
+   * Y LA TRADUCCIÓN A LA ESCENA, detrás de las reglas y delante del núcleo: el
+   * tablero 3D no es un motor ni un juego nuevo, es el pintor propio de Riberas, y
+   * lo único suyo que puede mentir en silencio es la traducción de la vista a lo
+   * que la escena recibe. Se comprueba con una mesa de verdad, no con vistas
+   * inventadas.
+   */
+  {
+    nombre: 'Riberas en tres',
+    donde: 'server',
+    guion: 'verify:riberas-en-tres',
+    porque:
+      'la barra se enciende exactamente cuando las reglas ofrecen la obra, cada sitio del anillo es un vértice o una arista que `opcionesDeRiberas` ofrece y su movimiento es el de la opción sin montar nada, la mano traduce los cinco bienes y vuelve, y una vista que no es de Riberas devuelve nada en vez de un delta vacío',
+  },
+  /*
    * Y LA FASE 4 BIS, QUE VA ENTRE MEDIAS Y NO AL FINAL.
    *
    * Aquí abajo, después del núcleo, se leería como «y además una cosa larga». Va
@@ -612,6 +626,56 @@ const BATERIA = [
    * un comprobador que levantara el navegador —que se vea bonito— no es lo que se
    * rompe en silencio; lo que se rompe en silencio es lo de aquí.
    */
+  {
+    nombre: 'escena y malla',
+    donde: 'escenas',
+    guion: 'verify:escena',
+    porque:
+      'la escena 3D y la malla hexagonal dicen lo mismo: cada vértice cae en la esquina exacta de su isla y no cerca, cada camino va de vértice a vértice y mide un radio, y los puntos de cada número son las formas de sacarlo con dos dados. Lo que NO prueba, y hay que decirlo, es que se vea bien: eso exige ojos y un aparato de verdad',
+  },
+  /*
+   * ═══ LOS AVENTUREROS, Y POR QUÉ ÉSTE VA DETRÁS DE LA ESCENA ═══
+   *
+   * Porque mide contra ella: la altura de un personaje se contrasta con
+   * `ALTURA_DE_UNA_PERSONA` de `escala.ts`, que es la unidad de la que cuelga
+   * toda la geometría que el de arriba comprueba. Si la escala está rota, esto
+   * no significa nada.
+   *
+   * Lo que caza no da error en ningún sitio: una textura empotrada que se cuele
+   * se ve perfectamente en el PC y deja un HUECO en el móvil, porque Hermes no
+   * la sabe abrir; y una pista de animación que no encuentre su hueso —el pack
+   * los llama `foot.l` y `GLTFLoader` los deja en `footl`— deja al personaje
+   * clavado en T, sin un solo aviso. Por eso carga los siete ficheros con el
+   * `GLTFLoader` de three de verdad, en Node, y no con una copia de su regla.
+   */
+  {
+    nombre: 'aventureros',
+    donde: 'escenas',
+    guion: 'verify:aventureros',
+    porque:
+      'los seis aventureros compilados llevan el mismo rig de veintitrés huesos, el color horneado en cada vértice y ninguna textura que Hermes no sepa abrir; miden lo que mide una persona en `escala.ts`; y cada pista de los doce clips de `animaciones.glb` encuentra su hueso en cada personaje con el nombre que GLTFLoader deja al cargar',
+  },
+  /*
+   * EL EMBARCADERO SON DOS COMPROBADORES Y NO UNO, por la misma razón que el
+   * tablero separa `verify:escena` de mirar el `.glb`: uno abre el fichero
+   * compilado y el otro hace aritmética. Si se fundieran, un `.glb` que faltara
+   * dejaría sin correr la comprobación de la cala y la cámara, que no lo
+   * necesitan para nada. El diseño entero está en `docs/EL-MUELLE.md`.
+   */
+  {
+    nombre: 'embarcadero · modelos',
+    donde: 'escenas',
+    guion: 'verify:embarcadero-modelos',
+    porque:
+      'el `.glb` del lobby trae exactamente las piezas que `piezas.ts` declara, todas con el color horneado y ninguna con textura, las que se tiñen llevan su máscara de tinte y ninguna es plana, y el conjunto que una escena llena pone en pantalla cabe en el presupuesto de un móvil',
+  },
+  {
+    nombre: 'embarcadero · cala y cámara',
+    donde: 'escenas',
+    guion: 'verify:embarcadero',
+    porque:
+      'la cala que se genera con el código de la mesa es la misma para los seis aparatos, sus seis amarres caen sobre agua y no se solapan, la cámara deja al aventurero local entero y encima de la hoja del HUD en retrato, en tableta y en panorámico, la máquina de estados de los aventureros no se queda nunca en T-pose, y la paleta de colonos es la de Riberas',
+  },
   {
     nombre: 'escritorio honrado',
     donde: 'escritorio',

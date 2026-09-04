@@ -88,9 +88,26 @@
  */
 import type { Href } from 'expo-router';
 import type { ManifiestoDeArcade, MuebleDeArcade } from '../../../shared/arcade';
+/*
+ * De `escenas/embarcadero/tema.ts` y no del manifiesto, y no es un descuido:
+ * quién tiene Muelle lo deciden los clientes que lo pintan —los dos compilan
+ * `escenas/`—, no el contrato del arcade, que está sellado y no sabe qué es un
+ * lobby. Es dato sin `three`: importarlo aquí no arrastra nada al arranque.
+ */
+import { tieneMuelle } from '../../../escenas/embarcadero/tema';
 
 /**
- * Las cuatro rutas del grupo `(arcade)`, dichas como unión y no como cadena.
+ * Las rutas del grupo `(arcade)`, dichas como unión y no como cadena.
+ *
+ * ═══ `/muelle` ESTÁ EN LA UNIÓN Y NO ES UN MUEBLE ═══
+ *
+ * Cuatro son muebles —una superficie por juego— y la quinta es una PANTALLA
+ * PREVIA de la plataforma: lo que hay antes de que la partida empiece, para los
+ * arcades que tienen lobby en tres dimensiones. Va en esta unión porque la unión
+ * dice qué ficheros hay en `app/app/(arcade)/`, que es lo que el tipado de rutas
+ * comprueba; NO va en `MUEBLES`, porque ningún manifiesto puede declararla y
+ * `MUEBLES` es el `Record` sobre lo que un manifiesto declara. Ver
+ * `rutaDeArcade`, que es quien decide cuándo se pasa por ella.
  *
  * ═══ POR QUÉ NO ES `string`, Y CÓMO SE DESCUBRIÓ ═══
  *
@@ -111,7 +128,7 @@ import type { ManifiestoDeArcade, MuebleDeArcade } from '../../../shared/arcade'
  * pantalla no compila, que es la misma disciplina que `MuebleDeArcade` tiene en
  * el manifiesto.
  */
-export type RutaDeMueble = '/formulario' | '/tablero' | '/lienzo' | '/escena';
+export type RutaDeMueble = '/formulario' | '/tablero' | '/lienzo' | '/escena' | '/muelle';
 
 /** Qué sabe la app de cada mueble. */
 export interface Mueble {
@@ -212,6 +229,35 @@ export const MUEBLES: Record<MuebleDeArcade, Mueble> = {
  * ruta se comprueba y los parámetros los escapa `expo-router`.
  */
 export function rutaDeArcade(manifiesto: ManifiestoDeArcade): Href {
+  /*
+   * ═══ SI TIENE MUELLE, SE PASA POR EL MUELLE; EL MUEBLE NO CAMBIA ═══
+   *
+   * Riberas sigue con `mueble: 'tablero'` y ésa es la cuarta decisión de
+   * `docs/EL-MUELLE.md`: cambiar el mueble rompería el escritorio y los binarios
+   * publicados. Lo que cambia es adónde lleva la tarjeta de la Sala: al lobby, que
+   * al zarpar navega él al mueble que diga el manifiesto (`rutaDelMueble`). Y si
+   * la mesa guardada en el bolsillo ya ha empezado, el propio Muelle se salta a sí
+   * mismo sin montar el lienzo — ver `muelle-escena.tsx`.
+   *
+   * `sede === 'servidor'` porque un lobby es donde se espera a los demás, y un
+   * arcade de aparato no espera a nadie: no tiene mesa, ni código, ni asientos
+   * que ver llegar. Un tema declarado para un arcade de dispositivo es un error
+   * de quien lo declaró, y aquí se ignora en vez de mandar a alguien a un lobby
+   * sin mesa.
+   */
+  if (manifiesto.sede === 'servidor' && tieneMuelle(manifiesto.id)) {
+    return { pathname: '/muelle', params: { arcade: manifiesto.id } };
+  }
+  return rutaDelMueble(manifiesto);
+}
+
+/**
+ * LA PANTALLA DEL JUEGO, sin pasar por ningún lobby: el mueble que declara el
+ * manifiesto, con el juego como parámetro. Es lo que `rutaDeArcade` hacía antes
+ * de que existiera el Muelle y lo que el Muelle usa para zarpar. Nadie más
+ * debería llamarla desde la Sala: la Sala navega con `rutaDeArcade`.
+ */
+export function rutaDelMueble(manifiesto: ManifiestoDeArcade): Href {
   return { pathname: MUEBLES[manifiesto.mueble].ruta, params: { arcade: manifiesto.id } };
 }
 
