@@ -515,6 +515,20 @@ const BATERIA = [
       'el mismo vértice tiene una sola llave por los tres caminos, ninguna choza toca a otra, la serpentina va y vuelve, el Vado Largo se pierde cuando un vecino planta una choza en medio, un trueque caduca solo, y quien no tiene el turno contesta — con el reductor rechazando lo que `opciones()` no ofreció y validando igual lo que sí',
   },
   /*
+   * Y LA TRADUCCIÓN A LA ESCENA, detrás de las reglas y delante del núcleo: el
+   * tablero 3D no es un motor ni un juego nuevo, es el pintor propio de Riberas, y
+   * lo único suyo que puede mentir en silencio es la traducción de la vista a lo
+   * que la escena recibe. Se comprueba con una mesa de verdad, no con vistas
+   * inventadas.
+   */
+  {
+    nombre: 'Riberas en tres',
+    donde: 'server',
+    guion: 'verify:riberas-en-tres',
+    porque:
+      'la barra se enciende exactamente cuando las reglas ofrecen la obra, cada sitio del anillo es un vértice o una arista que `opcionesDeRiberas` ofrece y su movimiento es el de la opción sin montar nada, la mano traduce los cinco bienes y vuelve, y una vista que no es de Riberas devuelve nada en vez de un delta vacío',
+  },
+  /*
    * Y LA FASE 4 BIS, QUE VA ENTRE MEDIAS Y NO AL FINAL.
    *
    * Aquí abajo, después del núcleo, se leería como «y además una cosa larga». Va
