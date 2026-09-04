@@ -251,7 +251,7 @@ import { turnoDeLaVista } from '../../../shared/mecanicas/turno-declarado';
 // ---------------------------------------------------------------------------
 
 /**
- * UN SITIO OCUPADO. Un nombre tecleado y una llave, y nada más.
+ * UN SITIO OCUPADO. Un nombre tecleado, una llave y, si quiere, una figura.
  *
  * ═══ POR QUÉ HAY UNA LLAVE SI LOS ASIENTOS SON ANÓNIMOS ═══
  *
@@ -276,6 +276,91 @@ export interface Silla {
   nombre: string;
   /** El secreto con el que demuestra que es él. NO sale en ninguna vista. */
   llave: string;
+  /**
+   * QUÉ ASPECTO HA ELEGIDO ESTE ASIENTO. Opcional: ausente si no ha elegido.
+   *
+   * ═══ ES UNA CADENA OPACA, Y ESO ES LO QUE PERMITE QUE VIVA AQUÍ ═══
+   *
+   * Un lobby en el que cada persona elige un personaje antes de jugar necesita
+   * que los demás vean lo que eligió, y lo único que sabe llevar un dato de un
+   * asiento a los otros en tiempo real es esta mesa, por su revisión y su
+   * sondeo. Así que el dato vive en la silla. Pero la autoridad NO SABE QUÉ ES:
+   * no conoce ningún aspecto, no tiene una lista de válidos, no lo traduce y no
+   * lo dibuja. Lo escribe el cliente y lo interpreta el cliente; el servidor lo
+   * guarda y lo reparte igual que reparte el nombre. Es presentación de la mesa,
+   * como el nombre, y no una regla de ningún juego: por eso no entra en el
+   * diario, no pasa por el reductor y la misma partida reejecutada da lo mismo
+   * con figuras que sin ellas.
+   *
+   * Lo único que la autoridad impone es la FORMA —minúsculas, dígitos, guiones
+   * y guiones bajos, de 1 a 32— y la impone rechazando, nunca arreglando: una
+   * figura que se normalizara en silencio sería un cliente pidiendo «Caballero»
+   * y viendo «caballero» sin saber por qué, que es un fallo que no se puede
+   * depurar desde fuera. Ver `FiguraMalEscrita`.
+   *
+   * Sale en `VistaDeMesa.asientos[].figura` para todos los que miran, y sólo
+   * cuando está puesta: una silla sin figura viaja SIN la clave, no con `null`.
+   */
+  figura?: string;
+}
+
+/**
+ * LA FORMA QUE TIENE QUE TENER UNA FIGURA, y nada más que la forma.
+ *
+ * Minúsculas y dígitos, separados como mucho por un guión o un guión bajo, sin
+ * empezar ni acabar por ellos. Es la forma de un nombre de fichero sin
+ * extensión, y no es casualidad: el cliente la usará para pedir un modelo, y una
+ * cadena que no puede llevar barras, puntos ni mayúsculas no puede salirse de la
+ * carpeta que le toca ni depender de si el disco distingue mayúsculas. Que la
+ * autoridad no sepa qué es una figura no significa que le valga cualquier cosa.
+ */
+const FORMA_DE_FIGURA = /^[a-z0-9]+(?:[-_][a-z0-9]+)*$/;
+
+/** Treinta y dos: de sobra para un nombre y demasiado corto para una carga. */
+const LARGO_MAXIMO_DE_FIGURA = 32;
+
+/**
+ * LA FIGURA NO TIENE LA FORMA QUE SE EXIGE. Se rechaza; NO se arregla.
+ *
+ * Es un error propio y no un `MovimientoRechazado` porque no es un movimiento
+ * —no toca la partida— y porque su código HTTP es otro: 400, lo mandado está
+ * mal escrito y reintentarlo igual no lo arregla. La ruta lo traduce.
+ */
+export class FiguraMalEscrita extends Error {
+  constructor(public readonly figura: string) {
+    super(
+      `«${figura.slice(0, 40)}» no vale como figura: tiene que ser de 1 a ${String(LARGO_MAXIMO_DE_FIGURA)} ` +
+        'caracteres, sólo minúsculas, dígitos y guiones (`-` o `_`) entre medias, sin barras, puntos ' +
+        'ni mayúsculas. No se corrige sola: se manda bien escrita.',
+    );
+    this.name = 'FiguraMalEscrita';
+  }
+}
+
+/** ¿Tiene la forma exigida? La misma pregunta para lo que llega y lo que se lee del disco. */
+function tieneFormaDeFigura(figura: unknown): figura is string {
+  return (
+    typeof figura === 'string' &&
+    figura.length >= 1 &&
+    figura.length <= LARGO_MAXIMO_DE_FIGURA &&
+    FORMA_DE_FIGURA.test(figura)
+  );
+}
+
+/**
+ * La figura que llega de fuera, comprobada. `undefined` sigue siendo «no dijo».
+ *
+ * Lanza en vez de devolver `undefined` para lo mal escrito, y la diferencia es
+ * toda la garantía: si lo mal escrito se tratara como «no dijo nada» —que es lo
+ * que hace `plazoValido` con un plazo raro—, el cliente que mandó «Caballero»
+ * vería a su asiento sin figura y no tendría forma de saber que fue por la
+ * mayúscula. Un plazo por defecto es un producto razonable; una figura por
+ * defecto es un fallo mudo.
+ */
+function figuraValida(figura: string | undefined): string | undefined {
+  if (figura === undefined) return undefined;
+  if (!tieneFormaDeFigura(figura)) throw new FiguraMalEscrita(String(figura));
+  return figura;
 }
 
 /** Una mesa viva, con todo lo que la autoridad guarda de ella. */
@@ -363,6 +448,22 @@ export interface VistaDeMesa {
   tic: number;
   terminada: boolean;
   /**
+   * ¿YA SE JUEGA, O TODAVÍA SE ESTÁ REUNIENDO LA MESA?
+   *
+   * Es `Mesa.empezada` de `arbitro.ts` puesto en la vista, y nada más: la
+   * autoridad lo tenía desde que «con la partida empezada no se sienta nadie», y
+   * los clientes no podían leerlo. Para saber si la mesa se reunía o jugaba tenían
+   * que mirar DENTRO de la vista del juego —`momento === 'jugando'` en La Ronda,
+   * otra cosa en Riberas—, o sea saber a qué se juega. Un lobby previo a la
+   * partida, que es un mueble genérico, necesita esta pregunta contestada sin
+   * abrir la vista, y es exactamente la misma que la mesa ya se hace a sí misma
+   * para cerrar la puerta.
+   *
+   * `false` mientras se reúne; `true` desde el primer movimiento de un asiento que
+   * cambió el estado. Lo pone `mover` y no el tic: ver `Mesa.empezada`.
+   */
+  empezada: boolean;
+  /**
    * Cuándo vence el plazo, en epoch ms, o `null` si esta mesa no tiene.
    *
    * Sale en la vista porque el móvil lo necesita para pintar la cuenta atrás, y
@@ -399,6 +500,16 @@ export interface VistaDeMesa {
      * puede estar tres días sin abrir la app y seguir jugando.
      */
     presente: boolean;
+    /**
+     * El aspecto que eligió, tal cual lo escribió su cliente. Ver `Silla.figura`.
+     *
+     * AUSENTE cuando no lo ha elegido, y ausente de verdad: ni `null` ni
+     * `undefined` como clave. Lo que cruza el cable es JSON y en JSON una clave
+     * con `undefined` no existe, así que la vista se compone sin ella para que lo
+     * que afirma `verify:mesa` sobre las claves de un asiento sea lo mismo en
+     * proceso que por la red.
+     */
+    figura?: string;
   }>;
   /** Quién soy yo aquí, o `null` si miro sin asiento. */
   yo: AsientoId | null;
@@ -705,6 +816,26 @@ function alDiaDesdeElDisco(leido: Partial<Guardado>, nombre: string): MesaEnCurs
    */
   if (!esInstante(m.plazoMs) || m.plazoMs < 0) m.plazoMs = 0;
   if (m.venceEn !== null && !esInstante(m.venceEn)) m.venceEn = null;
+  /*
+   * ═══ Y LA FIGURA DE CADA SILLA, QUE ES UN CAMPO QUE LAS MESAS VIEJAS NO TRAEN ═══
+   *
+   * Una silla guardada antes de que existiera `figura` llega sin la clave, y eso
+   * es exactamente una silla sin figura: no hay nada que derivar ni que reponer, y
+   * por eso el número de versión del fichero NO sube —la regla de `Guardado` dice
+   * que sube cuando un lector viejo interpretaría MAL el fichero, y un lector
+   * viejo se limita a no leer este campo—.
+   *
+   * Lo que sí se mira es el VALOR, por lo mismo que con `plazoMs`: un fichero
+   * escrito a mano, o por una instancia con otra gramática, podría traer aquí
+   * cualquier cosa, y la tabla no puede quedarse con una figura que la puerta de
+   * entrada habría rechazado. Se QUITA, no se arregla: en la tabla queda una silla
+   * sin figura, que es un estado legítimo y visible, y no una figura inventada.
+   */
+  if (Array.isArray(m.sillas)) {
+    for (const silla of m.sillas) {
+      if (silla.figura !== undefined && !tieneFormaDeFigura(silla.figura)) delete silla.figura;
+    }
+  }
   return m;
 }
 
@@ -1811,7 +1942,7 @@ function ponerAlDiaElPlazo(m: MesaEnCurso): boolean {
 }
 
 // ---------------------------------------------------------------------------
-// ABRIR, SENTARSE, MIRAR, MOVER, CERRAR
+// ABRIR, SENTARSE, VESTIR, MIRAR, MOVER, CERRAR
 // ---------------------------------------------------------------------------
 
 /** El plazo por defecto si quien abre no dice otra cosa: dos minutos por turno. */
@@ -1832,13 +1963,19 @@ export const PLAZO_MAXIMO_S = 7 * 24 * 60 * 60;
  * «veinticuatro horas por turno» es una decisión de producto de quien monta la
  * partida. Se admite `0` explícito, que significa «esta mesa no tiene prisa» y
  * deja los plazos apagados.
+ *
+ * `figura` es la del asiento de quien abre, si ya la eligió. Se comprueba ANTES
+ * de nada, con el manifiesto: una figura mal escrita tiene que fallar en la
+ * petición que abre y sin dejar mesa detrás, no después de repartir un código.
  */
 export async function abrir(datos: {
   arcade: ArcadeId;
   nombre: string;
   plazoSegundos?: number;
+  figura?: string;
 }): Promise<{ mesa: MesaEnCurso; silla: Silla }> {
   cargar();
+  const figura = figuraValida(datos.figura);
   const ahora = Date.now();
   barrerLasViejas(ahora);
 
@@ -1858,7 +1995,7 @@ export async function abrir(datos: {
   if (!necesitaMesa(manifiesto)) throw new ArcadeSinMesa(datos.arcade, manifiesto.nombre);
 
   const codigo = codigoLibre();
-  const silla = sillaNueva(datos.nombre);
+  const silla = sillaNueva(datos.nombre, figura);
 
   const enCurso: MesaEnCurso = {
     codigo,
@@ -1926,12 +2063,22 @@ function plazoValido(pedido: number | undefined): number {
   return Math.min(Math.floor(pedido), PLAZO_MAXIMO_S);
 }
 
-function sillaNueva(nombre: string): Silla {
+/**
+ * Una silla recién ocupada. La `figura` llega YA COMPROBADA por `figuraValida`.
+ *
+ * Se añade sólo si la hay, y no como `figura: undefined`: la silla se serializa
+ * ENTERA al guardar —`JSON.stringify` de la mesa, sin lista de campos a mano— y
+ * una clave con `undefined` desaparece al escribir pero no al comparar en
+ * proceso. Que la silla en memoria y la silla en disco tengan las mismas claves
+ * es lo que evita una diferencia que sólo aparece tras un reinicio.
+ */
+function sillaNueva(nombre: string, figura: string | undefined): Silla {
   const limpio = nombre.trim().slice(0, 24);
   return {
     id: `a${letrasAlAzar(8)}`,
     nombre: limpio.length > 0 ? limpio : 'Alguien',
     llave: letrasAlAzar(LARGO_DE_LA_LLAVE),
+    ...(figura === undefined ? {} : { figura }),
   };
 }
 
@@ -1971,8 +2118,13 @@ function semillaNueva(): number {
  * deliberado: los otros tres están sondeando y tienen que enterarse de que ha
  * llegado alguien. El precio es que un movimiento en vuelo se queda rancio y hay
  * que reintentarlo, lo cual solo puede pasar mientras la mesa se reúne.
+ *
+ * `figura` es la del asiento nuevo, si ya la eligió, y se comprueba ANTES de
+ * pedir el candado: una petición mal escrita no tiene por qué ponerse a la cola
+ * de la mesa. Es el mismo orden que `mover` con el prefijo reservado.
  */
-export async function sentarse(codigo: string, nombre: string): Promise<Silla> {
+export async function sentarse(codigo: string, nombre: string, figura?: string): Promise<Silla> {
+  const figuraDelNuevo = figuraValida(figura);
   return conLaMesa(codigo, async (m) => {
     const manifiesto = manifiestoDeArcade(m.mesa.arcade);
     if (m.mesa.terminada) throw new MesaLlena(codigo, manifiesto.jugadores.maximo, 'mesa-terminada');
@@ -1998,7 +2150,7 @@ export async function sentarse(codigo: string, nombre: string): Promise<Silla> {
       throw new MesaLlena(codigo, manifiesto.jugadores.maximo);
     }
 
-    const silla = sillaNueva(nombre);
+    const silla = sillaNueva(nombre, figuraDelNuevo);
     m.sillas = [...m.sillas, silla];
     m.mesa = {
       ...m.mesa,
@@ -2008,6 +2160,71 @@ export async function sentarse(codigo: string, nombre: string): Promise<Silla> {
     m.ultimoToqueEn = Date.now();
     await guardar(manifiesto, m);
     return silla;
+  });
+}
+
+/**
+ * VESTIRSE: quien está sentado cambia la figura de su asiento.
+ *
+ * ═══ NO ES UN MOVIMIENTO, Y ESO DECIDE TODO LO QUE HACE Y LO QUE NO ═══
+ *
+ * Cambiar de aspecto no toca la partida. Por eso NO entra en el diario, NO pasa
+ * por el reductor, NO comprueba la revisión de quien lo pide, NO reprograma el
+ * plazo ni `turnoDesde`, y NO le importa si la partida está empezada o terminada:
+ * el diario reejecutado da el mismo estado con figuras que sin ellas, que es la
+ * única garantía que un dato de presentación tiene que respetar. Es la misma
+ * línea que los nombres —entran por la proyección y jamás por el contexto del
+ * movimiento— y por el mismo motivo.
+ *
+ * Lo que SÍ hace es lo que hace `sentarse`: SUBE LA REVISIÓN aunque no toque el
+ * estado del juego, porque los demás están sondeando con `?desde=rev` y la única
+ * forma de que se enteren de que alguien cambió de figura es que la revisión
+ * cambie. Sin esto, el cambio tardaría hasta veinticinco segundos en verse y el
+ * lobby parecería roto justo en lo único que hace. El precio es el mismo que el
+ * de `sentarse`: un movimiento en vuelo con la revisión de antes sale rancio y
+ * se reintenta.
+ *
+ * Y toca la mesa —`ultimoToqueEn`— porque una mesa en la que alguien se está
+ * vistiendo no es una mesa abandonada. No toca `turnoDesde`, que habla del turno.
+ *
+ * ═══ LA MISMA FIGURA OTRA VEZ NO ES NADA ═══
+ *
+ * Si la figura que llega es la que ya tenía, no se sube la revisión ni se guarda:
+ * un cliente que repite la petición —por un reintento, por pulsar dos veces— no
+ * despierta a los demás para que repinten lo mismo. Es la regla de `mover` con el
+ * movimiento que el juego ignora, aplicada aquí.
+ *
+ * Sin llave válida se rechaza con el MISMO error que actuar sin asiento en
+ * `mover` y `cerrar`, para que la ruta lo traduzca al mismo código. Devuelve la
+ * vista de quien vistió.
+ */
+export async function vestir(codigo: string, llave: string | null, figura: string): Promise<VistaDeMesa> {
+  /* Antes del candado, como en `sentarse`: lo mal escrito no se pone a la cola. */
+  if (!tieneFormaDeFigura(figura)) throw new FiguraMalEscrita(String(figura));
+  const limpia: string = figura;
+  return conLaMesa(codigo, async (m) => {
+    const manifiesto = manifiestoDeArcade(m.mesa.arcade);
+    const yo = asientoDe(m, llave);
+    if (yo === null) {
+      throw new MovimientoRechazado(
+        'no-estas-sentado',
+        'Solo puede cambiar de figura quien está sentado a la mesa.',
+      );
+    }
+    const silla = m.sillas.find((s) => s.id === yo);
+    if (silla === undefined || silla.figura === limpia) return vistaDe(m, yo);
+
+    /*
+     * Se reemplaza la silla en vez de mutarla, por lo mismo que `sentarse`
+     * reconstruye la lista: `m.sillas` es lo que se serializa entero al guardar,
+     * y una silla nueva con la figura dentro es lo que garantiza que en disco
+     * queda exactamente lo que hay en memoria.
+     */
+    m.sillas = m.sillas.map((s) => (s.id === yo ? { ...s, figura: limpia } : s));
+    m.mesa = { ...m.mesa, rev: m.mesa.rev + 1 };
+    m.ultimoToqueEn = Date.now();
+    await guardar(manifiesto, m);
+    return vistaDe(m, yo);
   });
 }
 
@@ -2432,12 +2649,25 @@ function vistaDe(m: MesaEnCurso, yo: AsientoId | null, motivo: string | null = n
     rev: m.mesa.rev,
     tic: m.mesa.tic,
     terminada: m.mesa.terminada,
+    /*
+     * `=== true` y no el campo a secas: en el árbitro es opcional —las mesas
+     * guardadas antes de que existiera no lo traen— y aquí sale siempre como un
+     * booleano, para que ningún cliente tenga que distinguir «falso» de «no dice».
+     */
+    empezada: m.mesa.empezada === true,
     venceEn: m.venceEn,
     turnoDesde: m.turnoDesde,
     asientos: m.sillas.map((s) => ({
       id: s.id,
       nombre: s.nombre,
       presente: ahora - senalEnMemoria(clavePresencia(m.codigo), s.id) < CONECTADO_MS,
+      /*
+       * La figura sólo si la hay, y como clave AUSENTE y no como `undefined`: lo
+       * que cruza el cable es JSON y ahí no existe la diferencia, así que la vista
+       * se compone igual en proceso para que las dos afirmen las mismas claves.
+       * Y nunca `s.llave`, por lo mismo de siempre.
+       */
+      ...(s.figura === undefined ? {} : { figura: s.figura }),
     })),
     yo,
     /*

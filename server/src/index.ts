@@ -57,6 +57,7 @@ import { elCanal, ponerCanal } from './canal';
 import { cuandoSeCierreUnaMesa, cuandoSeOlvideUnaMesa } from './arcade/mesas';
 import { canalDeSondeo } from './canal/sondeo';
 import arcadeRouter from './routes/arcade';
+import modelosRouter from './routes/modelos';
 import boardRouter from './routes/board';
 import chatRouter from './routes/chat';
 import configRouter from './routes/config';
@@ -267,6 +268,13 @@ app.use('/api', jugarRouter);
  * no tener. Su propia puerta es la llave de asiento que reparte al sentarse.
  */
 app.use('/api', arcadeRouter);
+/*
+ * Y los modelos 3D del lobby de la Sala, JUSTO AL LADO y por la misma razón: un
+ * lobby que pidiera su tablero y sus aventureros detrás del guardián pintaría
+ * figuras en blanco a todo el que juega. Sólo sirve bytes de `escenas/modelos`;
+ * no sabe qué hay dentro. Ver la cabecera de `routes/modelos.ts`.
+ */
+app.use('/api', modelosRouter);
 // La cuenta va con ellos: quien juega no conoce la contraseña de la casa.
 app.use('/api', cuentaRouter);
 // El estudio de generación: su puerta la pone él (cualquier identidad + tope).

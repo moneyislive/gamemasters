@@ -28,6 +28,24 @@ const SERVIDOR = process.env.GM_API_URL ?? 'http://localhost:5174';
 export default defineConfig({
   base: '/sala/',
   plugins: [react()],
+  /*
+   * ═══ UNA SOLA COPIA DE R3F, DE `three` Y DE `react`, AUNQUE HAYA VARIAS EN EL DISCO ═══
+   *
+   * `escenas/` es un paquete del taller con su propio `node_modules`, y npm ha
+   * dejado ahí una copia de `@react-three/fiber` distinta de la de `escritorio/`.
+   * Vite resuelve cada `import` desde el fichero que importa, así que el
+   * `useFrame` que escribe `escenas/delta.tsx` vendría de una copia y el `Canvas`
+   * que monta este cliente de otra: dos contextos de React distintos, y el
+   * `useFrame` de la escena no corre nunca — sin un error en ninguna consola.
+   *
+   * `dedupe` obliga a resolver estos paquetes desde la raíz de ESTE proyecto,
+   * vengan de donde vengan. Sólo los que guardan estado global o comparan con
+   * `instanceof`; el resto sigue el camino normal. La app hace lo mismo en su
+   * `metro.config.js`, con otro mecanismo y por la misma razón.
+   */
+  resolve: {
+    dedupe: ['react', 'react-dom', 'three', '@react-three/fiber', 'scheduler'],
+  },
   server: {
     /*
      * 5173 es el taller y 5174 el servidor. Este pide el siguiente libre para

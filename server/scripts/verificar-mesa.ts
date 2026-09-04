@@ -113,6 +113,7 @@
 import { spawn } from 'node:child_process';
 import type { ChildProcess } from 'node:child_process';
 import fs from 'node:fs';
+import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -742,6 +743,14 @@ function entorno(): NodeJS.ProcessEnv {
     TMP: process.env.TMP,
     PORT: String(PUERTO),
     NODE_ENV: 'test',
+    /*
+     * El servidor arranca en una carpeta temporal, así que las dos candidatas
+     * relativas de `routes/modelos.ts` —`../escenas/modelos` y `escenas/modelos`—
+     * no existen desde ahí. Se le dice dónde están, como haría un despliegue que
+     * arrancara desde otro sitio. Que la búsqueda relativa funciona desde
+     * `server/` y desde la raíz se comprueba EN PROCESO, más abajo.
+     */
+    MODELOS_DIR: path.join(REPO, 'escenas', 'modelos'),
   };
 }
 
@@ -1511,10 +1520,27 @@ try {
      *     estrenaba—. Un juego que colara aquí la mano de otro en forma canónica
      *     se pone rojo.
      */
+    /*
+     * ═══ Y `empezada` ENTRÓ CON EL LOBBY 3D, CUARTA VEZ QUE ESTA LÍNEA SE PONE ROJA ═══
+     *
+     * Lo que se vino a pensar, escrito para no volver a pensarlo:
+     *
+     *   · QUÉ ES. `Mesa.empezada` del árbitro puesto en la vista: `false` mientras
+     *     la mesa se reúne, `true` desde el primer movimiento de un asiento que
+     *     cambió el estado. La autoridad lo tenía desde que «con la partida
+     *     empezada no se sienta nadie», y los clientes no podían leerlo.
+     *   · POR QUÉ PUEDE SALIR. Es un booleano de la MESA, no del juego: no lleva
+     *     dentro nada de ningún asiento y no dice nada que la propia vista del
+     *     juego no dejara deducir a quien supiera a qué se juega. Lo que compra es
+     *     justo lo contrario: que un mueble genérico —el lobby previo a la partida—
+     *     sepa si se reúne o se juega SIN abrir la vista del juego.
+     *   · Y LO QUE NO ES. No es `terminada`: una mesa puede estar empezada y no
+     *     terminada, y una recién abierta no está ni lo uno ni lo otro.
+     */
     comprobar(
       'la mesa manda exactamente estos campos',
       campos ===
-        'arcade,asientos,codigo,motivo,opciones,rev,terminada,tic,turnoDesde,venceEn,vista,yo',
+        'arcade,asientos,codigo,empezada,motivo,opciones,rev,terminada,tic,turnoDesde,venceEn,vista,yo',
       campos,
     );
     comprobar(
@@ -1549,8 +1575,19 @@ try {
         'baza,desde,ganadores,ganoLaUltima,jugadores,mano,miMano,momento,tablero,turnoDe,ultimaBaza',
       deLaVista,
     );
+    /*
+     * ═══ `figura` NO ESTÁ AQUÍ, Y ES UNA DECISIÓN: SÓLO VIAJA CUANDO ESTÁ PUESTA ═══
+     *
+     * Esta mesa se abrió sin figuras, así que cada asiento sigue siendo
+     * exactamente `id,nombre,presente`. Un asiento CON figura trae además
+     * `figura`, y lo trae como clave presente; uno sin ella no trae la clave, ni
+     * `null` ni `undefined`. Lo que cruza el cable es JSON y ahí una clave con
+     * `undefined` no existe, así que la vista se compone sin ella también en
+     * proceso, para que esta afirmación valga igual desde dentro que desde fuera.
+     * Las dos formas se afirman en el bloque del lobby, más abajo.
+     */
     const deUnAsiento = Object.keys(r.datos.mesa.asientos[0]).sort().join(',');
-    comprobar('y cada asiento estos', deUnAsiento === 'id,nombre,presente', deUnAsiento);
+    comprobar('y cada asiento sin figura estos, y ni uno más', deUnAsiento === 'id,nombre,presente', deUnAsiento);
     comprobar(
       'LA LLAVE NO SALE EN NINGUNA VISTA, ni en la de su dueño',
       !JSON.stringify(r.datos).includes(gente[0]!.llave),
@@ -2129,6 +2166,435 @@ try {
     );
   }
 
+  // ── EL LOBBY: LA FIGURA DE CADA ASIENTO ──────────────────────────────────
+  paso('El lobby: cada asiento elige una figura, y los demás la ven al instante');
+
+  {
+    /*
+     * ═══ QUÉ SE AFIRMA AQUÍ, Y POR QUÉ ES DE LA MESA Y NO DE NINGÚN JUEGO ═══
+     *
+     * Un lobby 3D previo a la partida en el que cada persona elige un aventurero
+     * necesita tres cosas de la autoridad, y ninguna de las tres sabe qué es un
+     * aventurero: que un asiento pueda llevar una `figura` —una cadena opaca que
+     * escribe y lee el cliente—, que cambiarla despierte a los demás igual que
+     * los despierta sentarse, y que se pueda saber si la mesa se reúne o ya juega
+     * sin abrir la vista del juego (`empezada`). Se comprueba POR EL CABLE, que
+     * es donde se vería si la figura se colara con la forma equivocada, se
+     * quedara sin avisar, o tardara los veinticinco segundos del sondeo en llegar.
+     */
+    const abierta = await pedir('/arcade/mesas', {
+      metodo: 'POST',
+      cuerpo: { arcade: RONDA, nombre: 'Ana', plazoSegundos: 600, figura: 'centinela' },
+    });
+    comprobar('abrir una mesa con figura devuelve 201', abierta.estado === 201, abierta.datos);
+    const cod = String(abierta.datos.codigo ?? '');
+    const ana = { asiento: abierta.datos.asiento as string, llave: abierta.datos.llave as string };
+    const asientoDe = (mesa: any, id: string): any =>
+      ((mesa?.asientos ?? []) as any[]).find((a) => a.id === id);
+    comprobar(
+      'y quien abrió ve su figura en su propio asiento',
+      asientoDe(abierta.datos.mesa, ana.asiento)?.figura === 'centinela',
+      abierta.datos.mesa?.asientos,
+    );
+    comprobar(
+      '`empezada` es false mientras la mesa se reúne',
+      abierta.datos.mesa?.empezada === false,
+      abierta.datos.mesa?.empezada,
+    );
+
+    const bruno = await pedir(`/arcade/mesas/${cod}/asientos`, {
+      metodo: 'POST',
+      cuerpo: { nombre: 'Bruno', figura: 'cazadora' },
+    });
+    comprobar('sentarse con figura devuelve 200', bruno.estado === 200, bruno.datos);
+    const elDeBruno = { asiento: bruno.datos.asiento as string, llave: bruno.datos.llave as string };
+    comprobar(
+      'Bruno ve la figura de Ana en la vista que recibe al sentarse',
+      asientoDe(bruno.datos.mesa, ana.asiento)?.figura === 'centinela',
+      bruno.datos.mesa?.asientos,
+    );
+    comprobar(
+      'y la suya',
+      asientoDe(bruno.datos.mesa, elDeBruno.asiento)?.figura === 'cazadora',
+      bruno.datos.mesa?.asientos,
+    );
+
+    const carla = await pedir(`/arcade/mesas/${cod}/asientos`, {
+      metodo: 'POST',
+      cuerpo: { nombre: 'Carla' },
+    });
+    comprobar('sentarse sin figura sigue valiendo: la figura es opcional', carla.estado === 200, carla.datos);
+    const elDeCarla = { asiento: carla.datos.asiento as string, llave: carla.datos.llave as string };
+
+    const espectador = await pedir(`/arcade/mesas/${cod}`);
+    comprobar(
+      'un espectador sin llave ve las figuras: son públicas, como los nombres',
+      asientoDe(espectador.datos.mesa, ana.asiento)?.figura === 'centinela' &&
+        asientoDe(espectador.datos.mesa, elDeBruno.asiento)?.figura === 'cazadora',
+      espectador.datos.mesa?.asientos,
+    );
+    const clavesDeCarla = Object.keys(asientoDe(espectador.datos.mesa, elDeCarla.asiento) ?? {})
+      .sort()
+      .join(',');
+    comprobar(
+      'un asiento SIN figura viaja sin la clave, no con `null`: exactamente id,nombre,presente',
+      clavesDeCarla === 'id,nombre,presente',
+      clavesDeCarla,
+    );
+    const clavesDeAna = Object.keys(asientoDe(espectador.datos.mesa, ana.asiento) ?? {})
+      .sort()
+      .join(',');
+    comprobar(
+      'y uno CON figura exactamente figura,id,nombre,presente',
+      clavesDeAna === 'figura,id,nombre,presente',
+      clavesDeAna,
+    );
+    comprobar(
+      'y la llave sigue sin salir en ninguna vista',
+      !JSON.stringify(espectador.datos).includes(ana.llave) &&
+        !JSON.stringify(bruno.datos.mesa).includes(ana.llave),
+    );
+
+    /*
+     * ═══ EL CAMBIO DESPIERTA AL QUE SONDEA, Y ÉSE ES EL UMBRAL QUE IMPORTA ═══
+     *
+     * Bruno se aparca con `?desde=rev` y nadie mueve. Lo único que puede soltar
+     * esa espera antes de los veinticinco segundos de `hub.ts` es que la ruta de
+     * vestirse avise por el canal después de subir la revisión. Si alguien quita
+     * el aviso, esto no falla por poco: tarda veinticinco segundos y se pone rojo.
+     */
+    const antesDeVestir = await pedir(`/arcade/mesas/${cod}`, { llave: ana.llave });
+    const rev = antesDeVestir.datos.mesa.rev as number;
+    const aparcada = pedir(`/arcade/mesas/${cod}?desde=${String(rev)}`, { llave: elDeBruno.llave });
+    await dormir(400);
+    const vestida = await pedir(`/arcade/mesas/${cod}/figura`, {
+      metodo: 'PUT',
+      llave: ana.llave,
+      cuerpo: { figura: 'druida' },
+    });
+    comprobar(
+      'PUT /figura contesta 200 con la mesa dentro',
+      vestida.estado === 200 && vestida.datos.mesa !== undefined,
+      vestida.datos,
+    );
+    comprobar(
+      'y la figura ha cambiado en la vista de quien vistió',
+      asientoDe(vestida.datos.mesa, ana.asiento)?.figura === 'druida',
+      vestida.datos.mesa?.asientos,
+    );
+    comprobar(
+      'y la revisión ha subido EN UNO: los demás tienen que enterarse',
+      vestida.datos.mesa?.rev === rev + 1,
+      { antes: rev, despues: vestida.datos.mesa?.rev },
+    );
+    const despierta = await aparcada;
+    comprobar(
+      'la lectura aparcada del otro asiento se despertó en mucho menos de 25 s',
+      despierta.ms < 5_000,
+      { ms: despierta.ms, umbral: 'muy por debajo de los 25 s de `hub.ts`' },
+    );
+    comprobar('con un 200, y no con un 204', despierta.estado === 200, despierta.estado);
+    comprobar(
+      'y con la figura nueva ya dentro',
+      asientoDe(despierta.datos.mesa, ana.asiento)?.figura === 'druida',
+      despierta.datos.mesa?.asientos,
+    );
+    console.log(`  la espera aparcada volvió en ${(despierta.ms / 1000).toFixed(1)} s con la figura nueva`);
+
+    const repetida = await pedir(`/arcade/mesas/${cod}/figura`, {
+      metodo: 'PUT',
+      llave: ana.llave,
+      cuerpo: { figura: 'druida' },
+    });
+    comprobar(
+      'la misma figura otra vez es 200 y NO sube la revisión: no se despierta a nadie por nada',
+      repetida.estado === 200 && repetida.datos.mesa?.rev === rev + 1,
+      repetida.datos.mesa?.rev,
+    );
+
+    // ── Sin llave, y con una que no es de aquí ──
+    const sinLlave = await pedir(`/arcade/mesas/${cod}/figura`, {
+      metodo: 'PUT',
+      cuerpo: { figura: 'ermitano' },
+    });
+    comprobar(
+      'vestirse SIN LLAVE se rechaza con 403, el mismo código que mover sin asiento',
+      sinLlave.estado === 403,
+      sinLlave.datos,
+    );
+    comprobar('y por el mismo motivo', sinLlave.datos.motivo === 'no-estas-sentado', sinLlave.datos);
+    const llaveAjena = await pedir(`/arcade/mesas/${cod}/figura`, {
+      metodo: 'PUT',
+      llave: 'UNALLAVEQUENADIEREPARTIO',
+      cuerpo: { figura: 'ermitano' },
+    });
+    comprobar('y una llave inventada tampoco viste a nadie', llaveAjena.estado === 403, llaveAjena.datos);
+
+    // ── Mal escritas: 400, y NUNCA normalizadas en silencio ──
+    const revTrasVestir = repetida.datos.mesa?.rev as number;
+    for (const mala of [
+      'Caballero',
+      'a/b',
+      'x'.repeat(40),
+      '',
+      '-druida',
+      'dru--ida',
+      'druida_',
+      'ñu',
+      'a.b',
+      'a b',
+    ]) {
+      const r = await pedir(`/arcade/mesas/${cod}/figura`, {
+        metodo: 'PUT',
+        llave: ana.llave,
+        cuerpo: { figura: mala },
+      });
+      comprobar(
+        `una figura mal escrita («${mala.slice(0, 12)}») es 400 y no se normaliza`,
+        r.estado === 400 && r.datos.motivo === 'figura-mal-escrita',
+        r.datos,
+      );
+    }
+    const noCadena = await pedir(`/arcade/mesas/${cod}/figura`, {
+      metodo: 'PUT',
+      llave: ana.llave,
+      cuerpo: { figura: 7 },
+    });
+    comprobar(
+      'y una figura que no es una cadena es 400 y lo dice',
+      noCadena.estado === 400 && /cadena/.test(String(noCadena.datos.error)),
+      noCadena.datos,
+    );
+    const sinFigura = await pedir(`/arcade/mesas/${cod}/figura`, {
+      metodo: 'PUT',
+      llave: ana.llave,
+      cuerpo: {},
+    });
+    comprobar('y sin `figura` en el cuerpo, 400', sinFigura.estado === 400, sinFigura.datos);
+    const intacta = await pedir(`/arcade/mesas/${cod}`, { llave: ana.llave });
+    comprobar(
+      'y después de todos los rechazos nada ha cambiado: ni la figura ni la revisión',
+      asientoDe(intacta.datos.mesa, ana.asiento)?.figura === 'druida' &&
+        intacta.datos.mesa.rev === revTrasVestir,
+      { asientos: intacta.datos.mesa?.asientos, rev: intacta.datos.mesa?.rev },
+    );
+
+    const mesasAntes = (await pedir('/arcade/diagnostico')).datos.mesas as number;
+    const abrirMal = await pedir('/arcade/mesas', {
+      metodo: 'POST',
+      cuerpo: { arcade: RONDA, nombre: 'Eva', figura: 'Caballero' },
+    });
+    comprobar(
+      'abrir una mesa con la figura mal escrita es 400',
+      abrirMal.estado === 400 && abrirMal.datos.motivo === 'figura-mal-escrita',
+      abrirMal.datos,
+    );
+    comprobar(
+      'y NO deja una mesa detrás',
+      (await pedir('/arcade/diagnostico')).datos.mesas === mesasAntes,
+    );
+    const abrirNoCadena = await pedir('/arcade/mesas', {
+      metodo: 'POST',
+      cuerpo: { arcade: RONDA, nombre: 'Eva', figura: ['x'] },
+    });
+    comprobar(
+      'y con una figura que no es cadena, 400 que lo dice',
+      abrirNoCadena.estado === 400 && /cadena/.test(String(abrirNoCadena.datos.error)),
+      abrirNoCadena.datos,
+    );
+    const sentarseMal = await pedir(`/arcade/mesas/${cod}/asientos`, {
+      metodo: 'POST',
+      cuerpo: { nombre: 'Diego', figura: 'a/b' },
+    });
+    comprobar(
+      'sentarse con la figura mal escrita es 400',
+      sentarseMal.estado === 400 && sentarseMal.datos.motivo === 'figura-mal-escrita',
+      sentarseMal.datos,
+    );
+    const sinSentar = await pedir(`/arcade/mesas/${cod}`);
+    comprobar(
+      'y no se ha sentado: siguen siendo tres, con la misma revisión',
+      sinSentar.datos.mesa.asientos.length === 3 && sinSentar.datos.mesa.rev === revTrasVestir,
+      sinSentar.datos.mesa?.asientos,
+    );
+
+    // ── `empezada`: reunirse no es empezar; el primer movimiento aceptado sí ──
+    const diego = await pedir(`/arcade/mesas/${cod}/asientos`, {
+      metodo: 'POST',
+      cuerpo: { nombre: 'Diego', figura: 'ermitano' },
+    });
+    comprobar('el cuarto se sienta, con figura', diego.estado === 200, diego.datos);
+    comprobar(
+      'y con cuatro sentados `empezada` sigue siendo false: reunirse no es empezar',
+      diego.datos.mesa?.empezada === false,
+      diego.datos.mesa?.empezada,
+    );
+    const repartida = await pedir(`/arcade/mesas/${cod}/movimientos`, {
+      metodo: 'POST',
+      llave: ana.llave,
+      cuerpo: { rev: diego.datos.mesa.rev, tipo: 'ronda:empezar' },
+    });
+    comprobar('se reparte', repartida.estado === 200, repartida.datos);
+    comprobar(
+      'y tras el primer movimiento aceptado `empezada` es true en la respuesta',
+      repartida.datos.mesa?.empezada === true,
+      repartida.datos.mesa?.empezada,
+    );
+    const mirando = await pedir(`/arcade/mesas/${cod}`);
+    comprobar(
+      'y también para quien mira sin llave, sin abrir la vista del juego',
+      mirando.datos.mesa?.empezada === true,
+      mirando.datos.mesa?.empezada,
+    );
+
+    // ── Vestirse con la partida en marcha: no es un movimiento ──
+    const antesDeLaSegunda = await pedir(`/arcade/mesas/${cod}`, { llave: elDeBruno.llave });
+    const a = antesDeLaSegunda.datos.mesa;
+    const enMarcha = await pedir(`/arcade/mesas/${cod}/figura`, {
+      metodo: 'PUT',
+      llave: elDeBruno.llave,
+      cuerpo: { figura: 'barquera' },
+    });
+    comprobar(
+      'CON LA PARTIDA EMPEZADA se sigue pudiendo cambiar de figura',
+      enMarcha.estado === 200 && asientoDe(enMarcha.datos.mesa, elDeBruno.asiento)?.figura === 'barquera',
+      enMarcha.datos,
+    );
+    const d = enMarcha.datos.mesa ?? {};
+    comprobar('sube la revisión en uno', d.rev === a.rev + 1, { antes: a.rev, despues: d.rev });
+    comprobar(
+      'y NO toca el tic ni el plazo: vestirse no es un movimiento y no reprograma nada',
+      d.tic === a.tic && d.venceEn === a.venceEn && a.venceEn !== null,
+      { antes: { tic: a.tic, venceEn: a.venceEn }, despues: { tic: d.tic, venceEn: d.venceEn } },
+    );
+    comprobar('ni desde cuándo se espera', d.turnoDesde === a.turnoDesde, {
+      antes: a.turnoDesde,
+      despues: d.turnoDesde,
+    });
+    comprobar(
+      'ni la vista del juego: la mano y el turno son los mismos',
+      JSON.stringify(d.vista) === JSON.stringify(a.vista),
+    );
+    comprobar(
+      'y la partida sigue empezada y sin terminar',
+      d.empezada === true && d.terminada === false,
+      { empezada: d.empezada, terminada: d.terminada },
+    );
+  }
+
+  // ── LOS MODELOS 3D ───────────────────────────────────────────────────────
+  paso('Los modelos 3D se sirven como bytes: el servidor no sabe qué son');
+
+  {
+    /*
+     * El lobby pide el tablero y los aventureros al MISMO origen que la mesa, por
+     * `/api/arcade/modelos`. Lo que se afirma es lo que un visor 3D necesita y lo
+     * que un servidor mal montado rompe sin error: el tipo —servido como
+     * `application/octet-stream` el navegador lo descarga en vez de cargarlo—, el
+     * tamaño entero, `HEAD`, la caché, y que un nombre fuera de forma no llega al
+     * sistema de ficheros. El servidor en esta prueba arranca en una carpeta
+     * temporal con `MODELOS_DIR` puesta; la búsqueda relativa se comprueba en
+     * proceso más abajo.
+     */
+    const fichero = path.join(REPO, 'escenas', 'modelos', 'tablero.glb');
+    comprobar('el tablero existe en el repositorio: `escenas/modelos/tablero.glb`', fs.existsSync(fichero), fichero);
+    const tamano = fs.existsSync(fichero) ? fs.statSync(fichero).size : -1;
+    const url = `${BASE}/arcade/modelos/tablero.glb`;
+
+    const r = await fetch(url);
+    const bytes = new Uint8Array(await r.arrayBuffer());
+    comprobar('GET /api/arcade/modelos/tablero.glb contesta 200', r.status === 200, r.status);
+    const tipo = r.headers.get('content-type') ?? '';
+    comprobar('con `Content-Type: model/gltf-binary`', tipo.startsWith('model/gltf-binary'), tipo);
+    comprobar(
+      'y anuncia y manda el tamaño del fichero real',
+      Number(r.headers.get('content-length')) === tamano && bytes.length === tamano,
+      { anunciado: r.headers.get('content-length'), recibido: bytes.length, real: tamano },
+    );
+    comprobar(
+      'y lo que llega empieza por la firma «glTF»: son los bytes del fichero, no un HTML',
+      bytes[0] === 0x67 && bytes[1] === 0x6c && bytes[2] === 0x54 && bytes[3] === 0x46,
+      Array.from(bytes.slice(0, 4)),
+    );
+    const cache = r.headers.get('cache-control') ?? '';
+    comprobar(
+      'con `Cache-Control: public, max-age=3600`',
+      /public/.test(cache) && /max-age=3600/.test(cache),
+      cache,
+    );
+    const etag = r.headers.get('etag');
+    comprobar('y un ETag', etag !== null && etag.length > 0, etag);
+
+    const head = await fetch(url, { method: 'HEAD' });
+    const cuerpoDelHead = await head.text();
+    comprobar(
+      'HEAD contesta 200 con el mismo tamaño anunciado y sin cuerpo',
+      head.status === 200 &&
+        Number(head.headers.get('content-length')) === tamano &&
+        cuerpoDelHead.length === 0,
+      { estado: head.status, anunciado: head.headers.get('content-length'), cuerpo: cuerpoDelHead.length },
+    );
+    /*
+     * ═══ CON `node:http` Y NO CON `fetch`, Y HAY QUE DECIR POR QUÉ ═══
+     *
+     * El `fetch` de Node (undici) sigue la especificación al pie de la letra, y
+     * ésta manda que una petición a la que se le pone `If-None-Match` a mano viaje
+     * además con `Cache-Control: no-cache` y `Pragma: no-cache`. `fresh` —lo que
+     * `send` usa para decidir el 304— ve ese `no-cache` y contesta 200 SIEMPRE,
+     * que es lo correcto: el cliente ha dicho que no quiere una respuesta de
+     * caché. O sea que con `fetch` esta comprobación era roja con el servidor
+     * perfectamente bien (medido: las cabeceras que llegaban al servidor llevaban
+     * el `no-cache` que nadie había escrito). Un navegador no añade esa cabecera
+     * a sus revalidaciones, y `node:http` manda exactamente lo que se le da.
+     */
+    const condicional = await new Promise<number>((resolver, rechazar) => {
+      const peticion = http.request(
+        url,
+        { method: 'GET', headers: { 'If-None-Match': etag ?? '' } },
+        (respuesta) => {
+          respuesta.resume();
+          respuesta.on('end', () => resolver(respuesta.statusCode ?? 0));
+        },
+      );
+      peticion.on('error', rechazar);
+      peticion.end();
+    });
+    comprobar(
+      'y con `If-None-Match` contesta 304: el cliente no vuelve a bajar cuatro megas',
+      condicional === 304,
+      condicional,
+    );
+
+    for (const malo of [
+      '..%2Ftablero.glb',
+      '%2e%2e%2ftablero.glb',
+      'Caballero.glb',
+      'caballero.gltf',
+      'caba.llero.glb',
+      'sin-extension',
+      'caballero.glb%00',
+      `${'x'.repeat(70)}.glb`,
+    ]) {
+      const rm = await fetch(`${BASE}/arcade/modelos/aventureros/${malo}`);
+      await rm.arrayBuffer();
+      comprobar(
+        `un aventurero con nombre fuera de forma («${malo.slice(0, 20)}») es 404`,
+        rm.status === 404,
+        rm.status,
+      );
+    }
+    const bienFormadoPeroAusente = await pedir('/arcade/modelos/aventureros/no-hay-nadie-con-este-nombre.glb');
+    comprobar(
+      'un nombre bien formado que no existe es un 404 limpio en JSON, no un 500',
+      bienFormadoPeroAusente.estado === 404 && typeof bienFormadoPeroAusente.datos?.error === 'string',
+      bienFormadoPeroAusente.datos,
+    );
+    const otro = await pedir('/arcade/modelos/otro.glb');
+    comprobar('y fuera de las dos rutas no se sirve nada', otro.estado === 404, otro.estado);
+    const salud = await pedir('/salud');
+    comprobar('y el servidor sigue en pie después de todo eso', salud.estado === 200, salud.estado);
+  }
+
   // ── LA MESA PERSISTE ─────────────────────────────────────────────────────
   paso('La mesa persiste: el proceso muere y la partida sigue ahí');
 
@@ -2140,14 +2606,58 @@ try {
       llave: viva.gente[0]!.llave,
       cuerpo: { rev: arranque.datos.mesa.rev, tipo: 'ronda:empezar' },
     });
+    /*
+     * ═══ Y LAS FIGURAS, QUE SE GUARDAN CON LA SILLA Y SE LEEN COMO VENGAN ═══
+     *
+     * Tres sillas, tres casos, en el MISMO fichero que va a leer el proceso nuevo:
+     *   · la de Ana lleva figura y tiene que volver;
+     *   · a la de Bruno se le QUITA del fichero a mano, que es exactamente lo que
+     *     trae una mesa guardada antes de que este campo existiera: una silla sin
+     *     figura, no una mesa corrupta;
+     *   · a la de Carla se le escribe una figura fuera de forma, que la puerta de
+     *     entrada habría rechazado: al leer se quita, y no sale por el cable.
+     * Se edita el fichero con el servidor vivo y se le mata sin volcar, así que lo
+     * que arranca lee lo editado y no lo que el proceso tenía en memoria.
+     */
+    for (const [quien, figura] of [
+      [0, 'centinela'],
+      [1, 'cazadora'],
+      [2, 'druida'],
+    ] as const) {
+      const v = await pedir(`/arcade/mesas/${viva.codigo}/figura`, {
+        metodo: 'PUT',
+        llave: viva.gente[quien]!.llave,
+        cuerpo: { figura },
+      });
+      comprobar(`${viva.gente[quien]!.nombre} se viste de ${figura} con la partida en marcha`, v.estado === 200, v.datos);
+    }
     const antes = await pedir(`/arcade/mesas/${viva.codigo}`, { llave: viva.gente[0]!.llave });
     const manoAntes = (antes.datos.mesa.vista.miMano as string[]).join(',');
     const revAntes = antes.datos.mesa.rev as number;
 
+    const ficheroDeLaMesa = path.join(dir, 'data', 'mesas', `${viva.codigo}.json`);
     comprobar(
       'con `tickHz: 0` la escritura es SÍNCRONA, así que el fichero ya está en disco',
-      fs.existsSync(path.join(dir, 'data', 'mesas', `${viva.codigo}.json`)),
+      fs.existsSync(ficheroDeLaMesa),
     );
+    {
+      const guardado = JSON.parse(fs.readFileSync(ficheroDeLaMesa, 'utf8'));
+      const sillaGuardada = (id: string): any =>
+        ((guardado.mesa?.sillas ?? []) as any[]).find((s) => s.id === id);
+      comprobar(
+        'el fichero guarda la silla ENTERA, figura incluida: no hay una lista de campos a mano',
+        sillaGuardada(viva.gente[0]!.asiento)?.figura === 'centinela',
+        guardado.mesa?.sillas,
+      );
+      comprobar(
+        'y sigue escribiendo la versión 2: un campo nuevo que un lector viejo ignora no sube el número',
+        guardado.version === 2,
+        guardado.version,
+      );
+      delete sillaGuardada(viva.gente[1]!.asiento).figura;
+      sillaGuardada(viva.gente[2]!.asiento).figura = 'Caballero';
+      fs.writeFileSync(ficheroDeLaMesa, JSON.stringify(guardado), 'utf8');
+    }
 
     /*
      * ═══ SE MATA A LO BRUTO, Y ESO ES LO QUE HACE LA PRUEBA FUERTE ═══
@@ -2173,6 +2683,27 @@ try {
       antes: revAntes,
       despues: despues.datos.mesa.rev,
     });
+    {
+      const asientoTras = (id: string): any =>
+        ((despues.datos.mesa?.asientos ?? []) as any[]).find((a) => a.id === id);
+      comprobar(
+        'la figura guardada vuelve con la mesa',
+        asientoTras(viva.gente[0]!.asiento)?.figura === 'centinela',
+        despues.datos.mesa?.asientos,
+      );
+      const deBruno = asientoTras(viva.gente[1]!.asiento);
+      comprobar(
+        'una silla guardada SIN figura —una mesa de antes de este campo— es una silla sin figura, no una mesa corrupta',
+        deBruno !== undefined && !('figura' in deBruno),
+        deBruno,
+      );
+      const deCarla = asientoTras(viva.gente[2]!.asiento);
+      comprobar(
+        'y una figura fuera de forma escrita en el disco se quita al leer en vez de salir por el cable',
+        deCarla !== undefined && !('figura' in deCarla),
+        deCarla,
+      );
+    }
     comprobar(
       'y la misma mano en el mismo asiento: la llave sigue valiendo',
       (despues.datos.mesa.vista.miMano as string[]).join(',') === manoAntes,
@@ -2761,6 +3292,205 @@ paso('Con la partida empezada no se sienta nadie');
     alSentarseTrasElTic === undefined,
     alSentarseTrasElTic instanceof Error ? alSentarseTrasElTic.message : alSentarseTrasElTic,
   );
+}
+
+paso('Vestirse no es un movimiento: ni diario, ni reductor, ni plazo');
+
+/*
+ * ═══ LO QUE NO SE VE POR EL CABLE, MIRADO DESDE DENTRO ═══
+ *
+ * Por HTTP ya está comprobado que vestirse sube la revisión y no toca ni el tic ni
+ * el plazo ni la vista. Lo que el cable no enseña es el DIARIO —que no viaja— y
+ * qué se le entrega exactamente al almacén. Las dos cosas son la garantía entera
+ * de que una figura es presentación y no regla: si entrara en el diario, la misma
+ * partida reejecutada dependería de la ropa de cada cual; y si el almacén
+ * recibiera una lista de campos escrita a mano en vez de la silla entera, la
+ * figura se perdería en el primer reinicio sin que nadie viera un error.
+ */
+{
+  const mesas = await import('../src/arcade/mesas');
+  const guardadas: any[] = [];
+  mesas.ponerAlmacenDeMesas({
+    leer: () => [],
+    guardar: async (m) => {
+      /* Una copia por JSON: exactamente lo que escribiría el almacén de ficheros. */
+      guardadas.push(JSON.parse(JSON.stringify(m)));
+    },
+    borrar: async () => {},
+    guardarYa: () => {},
+  });
+
+  const abierta = await mesas.abrir({ arcade: RONDA, nombre: 'Ana', plazoSegundos: 600, figura: 'centinela' });
+  comprobar('la silla de quien abre lleva su figura', abierta.silla.figura === 'centinela', abierta.silla);
+  const m = abierta.mesa;
+  const codigo = m.codigo;
+  const llave = abierta.silla.llave;
+  for (const nombre of ['Bruno', 'Carla', 'Diego']) await mesas.sentarse(codigo, nombre);
+
+  const antesDeRepartir = await mesas.mirar(codigo, llave);
+  const repartida = await mesas.mover(codigo, llave, antesDeRepartir.rev, { tipo: 'ronda:empezar' });
+  comprobar('la partida está empezada, y la vista lo dice', repartida.empezada === true, repartida.empezada);
+
+  const diarioAntes = m.mesa.diario.length;
+  const ticAntes = m.mesa.tic;
+  const venceAntes = m.venceEn;
+  const turnoDesdeAntes = m.turnoDesde;
+  const estadoAntes = m.mesa.estado;
+  const revAntes = m.mesa.rev;
+  const guardadasAntesDeVestir = guardadas.length;
+
+  const vestida = await mesas.vestir(codigo, llave, 'druida');
+  comprobar(
+    'vestirse sube la revisión en uno, en la tabla y en la vista devuelta',
+    m.mesa.rev === revAntes + 1 && vestida.rev === revAntes + 1,
+    { tabla: m.mesa.rev, vista: vestida.rev, antes: revAntes },
+  );
+  comprobar('y NO añade nada al diario', m.mesa.diario.length === diarioAntes, {
+    antes: diarioAntes,
+    despues: m.mesa.diario.length,
+  });
+  comprobar('ni toca el estado del juego: es el MISMO objeto', m.mesa.estado === estadoAntes);
+  comprobar(
+    'ni el tic, ni el plazo, ni desde cuándo se espera',
+    m.mesa.tic === ticAntes && m.venceEn === venceAntes && m.turnoDesde === turnoDesdeAntes,
+    { tic: [ticAntes, m.mesa.tic], venceEn: [venceAntes, m.venceEn], turnoDesde: [turnoDesdeAntes, m.turnoDesde] },
+  );
+  comprobar('pero sí se guarda: hubo una escritura', guardadas.length === guardadasAntesDeVestir + 1, {
+    antes: guardadasAntesDeVestir,
+    despues: guardadas.length,
+  });
+  const ultima = guardadas[guardadas.length - 1];
+  comprobar(
+    'y lo guardado lleva la silla ENTERA con la figura nueva: se serializa la silla, no una lista de campos',
+    ultima?.sillas?.[0]?.figura === 'druida' && ultima?.sillas?.[0]?.id === abierta.silla.id,
+    ultima?.sillas,
+  );
+  comprobar(
+    'y las sillas sin figura se guardan sin la clave',
+    ultima?.sillas?.[1] !== undefined && !('figura' in ultima.sillas[1]),
+    ultima?.sillas?.[1],
+  );
+  comprobar(
+    'y quien mira sin llave la ve igual: es pública, como el nombre',
+    (await mesas.mirar(codigo, null)).asientos[0]?.figura === 'druida',
+  );
+
+  const revTrasVestir = m.mesa.rev;
+  const guardadasTrasVestir = guardadas.length;
+  await mesas.vestir(codigo, llave, 'druida');
+  comprobar(
+    'la misma figura otra vez no sube la revisión ni escribe nada',
+    m.mesa.rev === revTrasVestir && guardadas.length === guardadasTrasVestir,
+    { rev: [revTrasVestir, m.mesa.rev], guardadas: [guardadasTrasVestir, guardadas.length] },
+  );
+
+  let sinLlave: unknown;
+  try {
+    await mesas.vestir(codigo, null, 'druida');
+  } catch (error) {
+    sinLlave = error;
+  }
+  comprobar(
+    'sin llave se rechaza como actuar sin asiento: el mismo error que `mover` y `cerrar`',
+    sinLlave instanceof Error &&
+      sinLlave.name === 'MovimientoRechazado' &&
+      (sinLlave as { motivo?: string }).motivo === 'no-estas-sentado',
+    sinLlave instanceof Error ? sinLlave.name : sinLlave,
+  );
+
+  for (const mala of ['Caballero', 'a/b', 'x'.repeat(40), '', '-a', 'a--b', 'a_', 'ñu']) {
+    let alVestir: unknown;
+    try {
+      await mesas.vestir(codigo, llave, mala);
+    } catch (error) {
+      alVestir = error;
+    }
+    comprobar(
+      `«${mala.slice(0, 12)}» se rechaza con FiguraMalEscrita, no se arregla`,
+      alVestir instanceof mesas.FiguraMalEscrita,
+      alVestir instanceof Error ? alVestir.name : alVestir,
+    );
+  }
+  comprobar(
+    'y después de los rechazos la figura que había sigue, con la misma revisión',
+    m.sillas[0]?.figura === 'druida' && m.mesa.rev === revTrasVestir,
+    { sillas: m.sillas.map((s) => s.figura), rev: m.mesa.rev },
+  );
+
+  const vivasAntes = mesas.mesasVivas();
+  let alAbrirMal: unknown;
+  try {
+    await mesas.abrir({ arcade: RONDA, nombre: 'Eva', figura: 'Caballero' });
+  } catch (error) {
+    alAbrirMal = error;
+  }
+  comprobar(
+    'abrir con una figura mal escrita falla en la petición que abre y no deja mesa',
+    alAbrirMal instanceof mesas.FiguraMalEscrita && mesas.mesasVivas() === vivasAntes,
+    { error: alAbrirMal instanceof Error ? alAbrirMal.name : alAbrirMal, vivas: [vivasAntes, mesas.mesasVivas()] },
+  );
+  const otra = await mesas.abrir({ arcade: RONDA, nombre: 'Uno' });
+  const sillasAntes = otra.mesa.sillas.length;
+  let alSentarseMal: unknown;
+  try {
+    await mesas.sentarse(otra.mesa.codigo, 'Dos', 'a/b');
+  } catch (error) {
+    alSentarseMal = error;
+  }
+  comprobar(
+    'y sentarse con una figura mal escrita no sienta a nadie',
+    alSentarseMal instanceof mesas.FiguraMalEscrita && otra.mesa.sillas.length === sillasAntes,
+    { error: alSentarseMal instanceof Error ? alSentarseMal.name : alSentarseMal },
+  );
+  comprobar(
+    'mientras que sin figura se sienta como siempre: la firma vieja sigue valiendo',
+    (await mesas.sentarse(otra.mesa.codigo, 'Dos')).figura === undefined && otra.mesa.sillas.length === sillasAntes + 1,
+  );
+}
+
+paso('Los modelos se buscan desde donde arranca el proceso, como el escritorio');
+
+/*
+ * El servidor de arriba arrancó en una carpeta temporal con `MODELOS_DIR` puesta,
+ * así que aquello no dice nada de las DOS candidatas relativas, que son las que
+ * usan los despliegues: `../escenas/modelos` desde `server/` —Render y el
+ * portátil— y `escenas/modelos` desde la raíz —la VPS—. Se comprueban las dos
+ * cambiando de directorio en este mismo proceso, y que desde cualquier otro sitio
+ * la búsqueda conteste que no hay carpeta en vez de inventarse una.
+ */
+{
+  const { carpetaDeLosModelos } = await import('../src/routes/modelos');
+  const esperada = path.join(REPO, 'escenas', 'modelos');
+  const laMisma = (a: string | undefined): boolean => a !== undefined && path.relative(a, esperada) === '';
+  const cwdAntes = process.cwd();
+  const modelosDirAntes = process.env.MODELOS_DIR;
+  delete process.env.MODELOS_DIR;
+  try {
+    process.chdir(path.join(REPO, 'server'));
+    comprobar(
+      'desde `server/` —Render y el portátil— se encuentra `../escenas/modelos`',
+      laMisma(carpetaDeLosModelos()),
+      carpetaDeLosModelos(),
+    );
+    process.chdir(REPO);
+    comprobar(
+      'y desde la raíz —la VPS, con `WorkingDirectory=/opt/gamemasters`— se encuentra `escenas/modelos`',
+      laMisma(carpetaDeLosModelos()),
+      carpetaDeLosModelos(),
+    );
+    process.chdir(os.tmpdir());
+    comprobar(
+      'y desde cualquier otro sitio no se inventa ninguna: contesta que no hay',
+      carpetaDeLosModelos() === undefined,
+      carpetaDeLosModelos(),
+    );
+    process.env.MODELOS_DIR = esperada;
+    comprobar('salvo que `MODELOS_DIR` lo diga', laMisma(carpetaDeLosModelos()), carpetaDeLosModelos());
+  } finally {
+    process.chdir(cwdAntes);
+    if (modelosDirAntes === undefined) delete process.env.MODELOS_DIR;
+    else process.env.MODELOS_DIR = modelosDirAntes;
+  }
 }
 
 paso('La mesa se cierra sola cuando el juego dice que se acabó');
