@@ -185,27 +185,77 @@ export function RailDeAforo({
     <View
       style={[estilos.rail, { gap: hueco }, estilo]}
       accessibilityRole="image"
-      accessibilityLabel={`Aforo: de ${aforo.minimo} a ${aforo.maximo} jugadores`}
+      /*
+       * «UNA PERSONA» Y NO «DE 1 A 1 JUGADORES». La fórmula genérica sale mal en
+       * las dos máquinas de un solo jugador —El Arcade y La Peonza—, que son dos de
+       * las cinco: un lector de pantalla leía «aforo: de uno a uno jugadores».
+       * Es la misma frase que la tarjeta compone en su pie, y aquí es la ÚNICA
+       * versión que se oye, porque en las pantallas de dentro no hay pie.
+       */
+      accessibilityLabel={
+        aforo.minimo === aforo.maximo
+          ? `Aforo: ${aforo.maximo} ${aforo.maximo === 1 ? 'persona' : 'personas'}`
+          : `Aforo: de ${aforo.minimo} a ${aforo.maximo} personas`
+      }
     >
       {Array.from({ length: aforo.maximo }, (_, i) => (
         <View
           key={i}
           style={[
-            estilos.muesca,
-            i < encendidas ? estilos.muescaAlta : estilos.muescaBaja,
+            MUESCA.base,
+            i < encendidas ? MUESCA.alta : MUESCA.baja,
             viva
               ? i < encendidas
-                ? estilos.muescaViva
-                : estilos.muescaFria
+                ? MUESCA.viva
+                : MUESCA.fria
               : i < encendidas
-                ? estilos.muescaMuertaViva
-                : estilos.muescaMuertaFria,
+                ? MUESCA.muertaViva
+                : MUESCA.muertaFria,
           ]}
         />
       ))}
     </View>
   );
 }
+
+/**
+ * ═══ LA GRAMÁTICA DE UNA MUESCA, SUELTA Y EXPORTADA ═══
+ *
+ * El raíl de aforo no es el único instrumento de muescas de esta Sala: La Peonza
+ * pinta con ellas un MEDIDOR DE GIRO —diez muescas, una por cada diez por ciento
+ * de giro restante— y hace bien en no usar `RailDeAforo`, porque aquello se
+ * anuncia como «aforo de N a M personas» y esto es un `progressbar` con valor
+ * vivo. Pasarle el giro haría que un lector de pantalla dijera que esta peonza
+ * admite de tres a diez jugadores.
+ *
+ * Pero son el MISMO objeto físico, y si cada uno declara sus tres colores, vuelve
+ * exactamente el fallo que `piezas.tsx` existe para cerrar: la corrección de la
+ * muesca apagada —del 34 % al 70 %, porque al 34 se separa de su fondo por 1,80:1
+ * en ámbar— tendría otra vez dos sitios adonde llegar.
+ *
+ * Así que la forma se exporta y el instrumento se queda en quien lo pinta. El
+ * `HUECO` va aquí también para que nadie tenga que importar `CUENTA_DE_AFORO`:
+ * quien nombra esa tabla está dibujando un raíl de aforo, y sólo hay uno.
+ */
+export const HUECO_DE_MUESCAS = CUENTA_DE_AFORO.hueco;
+export const ALTO_DE_MUESCAS = CUENTA_DE_AFORO.altoEncendida;
+
+export const MUESCA = StyleSheet.create({
+  /*
+   * RADIO 1 Y NO 2. Con 2, una muesca apagada —3 de ancho por 7 de alto— sale
+   * redondeada hasta parecer un punto, y el raíl deja de leerse como una cuenta de
+   * rayas para leerse como una fila de lunares. La encendida, que mide 15, no lo
+   * notaba; la apagada lo era casi entera.
+   */
+  base: { width: CUENTA_DE_AFORO.grosor, borderRadius: 1 },
+  /* La diferencia entre encendida y apagada la lleva el ALTO, nunca el alfa. */
+  alta: { height: CUENTA_DE_AFORO.altoEncendida },
+  baja: { height: CUENTA_DE_AFORO.altoApagada },
+  viva: { backgroundColor: SALA.blanco },
+  fria: { backgroundColor: conAlfa(SALA.blanco, 0.7) },
+  muertaViva: { backgroundColor: conAlfa(SALA.blanco, 0.5) },
+  muertaFria: { backgroundColor: conAlfa(SALA.blanco, 0.4) },
+});
 
 // ---------------------------------------------------------------------------
 // La pastilla de estado
@@ -320,20 +370,6 @@ const estilos = StyleSheet.create({
     alignItems: 'flex-end',
     height: CUENTA_DE_AFORO.altoEncendida,
   },
-  /*
-   * RADIO 1 Y NO 2. Con 2, una muesca apagada —3 de ancho por 7 de alto— sale
-   * redondeada hasta parecer un punto, y el raíl deja de leerse como una cuenta de
-   * rayas para leerse como una fila de lunares. La encendida, que mide 15, no lo
-   * notaba; la apagada lo era casi entera.
-   */
-  muesca: { width: CUENTA_DE_AFORO.grosor, borderRadius: 1 },
-  muescaAlta: { height: CUENTA_DE_AFORO.altoEncendida },
-  muescaBaja: { height: CUENTA_DE_AFORO.altoApagada },
-  muescaViva: { backgroundColor: SALA.blanco },
-  muescaFria: { backgroundColor: conAlfa(SALA.blanco, 0.7) },
-  muescaMuertaViva: { backgroundColor: conAlfa(SALA.blanco, 0.5) },
-  muescaMuertaFria: { backgroundColor: conAlfa(SALA.blanco, 0.4) },
-
   pastilla: {
     flexDirection: 'row',
     alignItems: 'center',
