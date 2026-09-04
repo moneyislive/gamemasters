@@ -165,7 +165,7 @@ function avanzarElGordo(estado: EstadoDePrueba | undefined, movimiento: Movimien
 }
 
 /**
- * EL BUENO. Se porta como se porta cualquiera de los cuatro juegos de la casa, y
+ * EL BUENO. Se porta como se porta cualquiera de los juegos de la casa, y
  * además ejerce el «sólo si» con motivo, para comprobar que un rechazo del JUEGO
  * no tiene nada que ver con un rechazo del PRESUPUESTO.
  */

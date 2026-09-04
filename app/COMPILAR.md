@@ -266,7 +266,12 @@ su registro al arrancar.
 
 ## Cuando quieras sacar una versión nueva
 
-1. Abre `app/app.json` y sube `"version"` — el número que ve la gente.
+1. Sube `"version"` en `app/app.json` **y en `app/package.json`** — el número que
+   ve la gente. Son dos ficheros y siempre han ido en pareja: el de `app.json` se
+   graba en el binario y lo anuncia la página de descarga; el de `package.json`
+   es el que sale en cualquier registro de compilación. Este paso decía sólo el
+   primero, y por eso la versión de la entrega del 4 de septiembre estuvo a punto
+   de salir con el nombre de la anterior.
 
    No busques `versionCode`: ya no está, y es a propósito. Android usa ese
    segundo número para decidir si una instalación es más nueva que la anterior,

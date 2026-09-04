@@ -6,7 +6,9 @@
  *
  * ═══ POR QUÉ HACE FALTA ═══
  *
- * Hay cuarenta comprobadores y no había forma de correrlos todos.
+ * Hay setenta y tantos comprobadores y no había forma de correrlos todos.
+ * (El número exacto lo dice la BATERIA de aquí abajo, que es la que manda: escribirlo
+ * dos veces garantiza que uno de los dos mienta, y el que miente es siempre éste.)
  * Mientras cada uno vigilaba su rincón eso daba igual: quien tocaba la Momia
  * corría `verify:momia` y ya está.
  *

@@ -464,7 +464,7 @@ paso('Lo que no se puede sellar: el núcleo sigue sin saber a qué se juega');
    *
    * Se preguntan a `arcadesInstalados()`, así que el quinto juego que alguien
    * instale entra solo en esta búsqueda. Con una lista escrita a mano, la
-   * comprobación protegería de los cuatro juegos que ya existen y de ninguno de
+   * comprobación protegería de los cinco juegos que ya existen y de ninguno de
    * los que vengan — que son justamente los que todavía nadie ha revisado.
    */
   const ids = arcadesInstalados().map((m) => m.id);
@@ -525,7 +525,7 @@ if (fallos.length === 0) {
   console.log(
     `✔ ${hechas} comprobaciones. Los ${String(Object.keys(ahora).length)} ficheros del núcleo del arcade están\n` +
       '  byte a byte como estaban, ninguno nombra a ningún juego, ninguno importa de `juegos/`, y el\n' +
-      '  juego más rico de los cuatro —tablero hexagonal, comercio, premio derivado y serpentina—\n' +
+      '  juego más rico de los cinco —tablero hexagonal, comercio, premio derivado y serpentina—\n' +
       '  sigue instalado encima sin haberlos movido.',
   );
   process.exit(0);

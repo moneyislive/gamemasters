@@ -73,6 +73,17 @@ amanecer sobre el muelle sea el amanecer sobre el delta.
    al cargar como el embarcadero. Nunca con un módulo: dos colonos del mismo
    color es una partida injugable sin ningún error a la vista. No se elige
    color: se deriva.
+
+   Y HAY UNA SEGUNDA CONSECUENCIA DEL MISMO MODELO SIN HORNEAR, más grande: en
+   la APP NATIVA el delta no se pinta NUNCA, ni con dos colonos. `tablero.glb`
+   lleva la textura empotrada, Hermes no la decodifica, y `texturas-nativas.ts`
+   la sustituye por blanco para que la carga no reviente entera: el tablero
+   llegaría sin un solo color, y uno donde no se distingue una salina de un
+   cantil no es una versión más pobre, es uno que no se puede jugar. Así que en
+   iOS y Android se juega sobre el retablo —y ni se pide el modelo—, con la
+   constante `EL_DELTA_SE_VE_AQUI` de `riberas-en-tres-escena.tsx` como único
+   interruptor. En la web se cumple lo del párrafo de arriba tal cual. El día del
+   horneado se borra esa constante y las dos notas sobran a la vez.
 7. **`escenas/embarcadero/` es agnóstico de plataforma.** Sólo `three`, React y
    el núcleo de r3f (`useFrame`, `useThree`). Ni `drei`, ni DOM, ni Expo, ni
    `fetch`: los bytes entran por una función `traer` que inyecta cada cliente. El
@@ -277,19 +288,20 @@ presencia, la figura elegida y «copiado». Todo lo demás, grises fríos.
 |---|---|---|
 | `escenas/embarcadero/` | `piezas.ts`, `figuras.ts`, `tema.ts`, `tipos.ts` | Los contratos (ya escritos) |
 | | `cala.ts`, `camara.ts`, `gestos.ts` | Aritmética pura y comprobable: la cala sembrada, las poses y restricciones de cámara, la máquina de estados |
-| | `cargar.ts`, `tinte.ts`, `agua.ts`, `cielo.ts`, `aventurero.tsx`, `Embarcadero.tsx` | La escena |
-| `escenas/scripts/` | `hornear.ts`, `compilar-embarcadero.ts`, `verificar-embarcadero-modelos.ts`, `verificar-embarcadero.ts` | Compilación y comprobadores |
-| `escenas/modelos/` | `embarcadero.glb` | El compilado, versionado |
+| | `cargar.ts`, `tinte.ts`, `agua.ts`, `cielo.ts`, `particulas.ts`, `presupuesto.ts`, `aventurero.tsx`, `Embarcadero.tsx` | La escena |
+| `escenas/scripts/` | `hornear.ts`, `compilar-embarcadero.ts`, `compilar-aventureros.ts`, `verificar-embarcadero-modelos.ts`, `verificar-embarcadero.ts`, `verificar-aventureros.ts` | Compilación y comprobadores |
+| `escenas/modelos/` | `embarcadero.glb`, `tablero.glb`, `aventureros/*.glb` (los seis y sus animaciones) | Los compilados, versionados: 8,1 MB que viajan con el despliegue |
 | `escenas/` | `ruta-de-modelos.ts` | La ruta de los modelos, sin tablas detrás: la importan los dos clientes |
+| | `acercar.ts` | Acercarse al tablero y mover la mirada por él: pura, con sus topes, comprobada en `verify:escena` |
 | `shared/mecanicas/` | `semilla.ts` | LA semilla de una mesa (FNV-1a en mayúsculas): la cala del Muelle y el delta de Riberas la comparten para que un código dé un solo mundo en todos los aparatos |
 | `shared/arcade/juegos/` | `riberas-en-tres.ts` | La ÚNICA traducción de la vista de Riberas a la escena: barra, anillos con su movimiento, opciones fuera del tablero, trueques por carta, `seVeEnTres`. Se apoya en `riberas-en-3d.ts` (`deltaDeLaVista`, `obraPosible`) |
 | `server/scripts/` | `verificar-riberas-en-tres.ts` | Su comprobador, con una mesa real del árbitro (`verify:riberas-en-tres`, en la batería tras Riberas) |
 | `escritorio/` | `lobby3d.html`, `src/banco-lobby.tsx`, `src/banco-lobby.css` | El banco de pruebas con asientos simulados |
 | | `src/muelle.tsx`, `src/sala.tsx`, `src/mesa.ts`, `src/estilo.css` | El lobby en la Sala web |
 | | `src/riberas-en-tres.tsx` | La partida de Riberas en tres dimensiones en la Sala web (pintor propio; respaldo SVG) |
-| `app/` | `app/(arcade)/muelle.tsx`, `app/(arcade)/_layout.tsx`, `src/arcade/muelle.tsx`, `src/arcade/muelle-escena.tsx`, `src/arcade/figura.ts`, `src/arcade/mesa.ts`, `src/arcade/muebles.ts` | El lobby en la app |
+| `app/` | `app/(arcade)/muelle.tsx`, `app/(arcade)/_layout.tsx`, `src/arcade/muelle.tsx`, `src/arcade/muelle-escena.tsx`, `src/arcade/hoja-del-muelle.tsx`, `src/arcade/figura.ts`, `src/arcade/empezada.ts`, `src/arcade/plazos.ts`, `src/arcade/piezas.tsx`, `src/arcade/mesa.ts`, `src/arcade/muebles.ts` | El lobby en la app |
 | | `src/arcade/traer.ts` | La única función que pide modelos en la app (espera la sesión guardada y pide al servidor elegido) |
-| | `src/arcade/riberas-en-tres.tsx`, `src/arcade/riberas-en-tres-escena.tsx`, `src/arcade/mirador-tactil.ts` | La partida de Riberas en tres dimensiones en la app: pintor propio en `LOS_QUE_PINTA[RIBERAS]`, con el gesto de girar como worklet |
+| | `src/arcade/riberas-en-tres.tsx`, `src/arcade/riberas-en-tres-escena.tsx`, `src/arcade/mirador-tactil.ts` | El pintor propio de Riberas en `LOS_QUE_PINTA[RIBERAS]`. HOY EN LA APP PINTA EL RETABLO SVG, no el delta: ver la decisión 6 del §1. El código del delta está entero y el gesto de girar es un worklet; lo único que lo apaga es la constante `EL_DELTA_SE_VE_AQUI` |
 | `server/` | hecho: `mesas.ts`, `routes/arcade.ts`, `routes/modelos.ts`, `routes/cuenta.ts` | El contrato |
 
 ## 8. Cómo se mira y cómo se comprueba
