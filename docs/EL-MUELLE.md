@@ -273,7 +273,7 @@ presencia, la figura elegida y «copiado». Todo lo demás, grises fríos.
 | `escenas/scripts/` | `hornear.ts`, `compilar-embarcadero.ts`, `verificar-embarcadero-modelos.ts`, `verificar-embarcadero.ts` | Compilación y comprobadores |
 | `escenas/modelos/` | `embarcadero.glb` | El compilado, versionado |
 | `escenas/` | `ruta-de-modelos.ts` | La ruta de los modelos, sin tablas detrás: la importan los dos clientes |
-| `shared/arcade/` | `semilla.ts` | LA semilla de una mesa (FNV-1a en mayúsculas): la cala del Muelle y el delta de Riberas la comparten para que un código dé un solo mundo en todos los aparatos |
+| `shared/mecanicas/` | `semilla.ts` | LA semilla de una mesa (FNV-1a en mayúsculas): la cala del Muelle y el delta de Riberas la comparten para que un código dé un solo mundo en todos los aparatos |
 | `shared/arcade/juegos/` | `riberas-en-tres.ts` | La ÚNICA traducción de la vista de Riberas a la escena: barra, anillos con su movimiento, opciones fuera del tablero, trueques por carta, `seVeEnTres`. Se apoya en `riberas-en-3d.ts` (`deltaDeLaVista`, `obraPosible`) |
 | `server/scripts/` | `verificar-riberas-en-tres.ts` | Su comprobador, con una mesa real del árbitro (`verify:riberas-en-tres`, en la batería tras Riberas) |
 | `escritorio/` | `lobby3d.html`, `src/banco-lobby.tsx`, `src/banco-lobby.css` | El banco de pruebas con asientos simulados |
