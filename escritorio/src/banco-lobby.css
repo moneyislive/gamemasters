@@ -1,0 +1,206 @@
+/*
+ * EL BANCO DEL MUELLE: un panel de mandos a la izquierda y el marco a la derecha.
+ *
+ * Los colores son los de la Sala (`estilo.css`: suelo #080a0e, grises fríos) y
+ * no los verdes de `banco3d`, para que lo que se juzgue sea la escena y no un
+ * panel que compita con ella. El marco lleva el tamaño físico del aparato que se
+ * simula, encogido para caber, y la hoja del HUD se pinta ENCIMA como una lámina
+ * gris translúcida: lo que se mira es si el aventurero queda entero por encima.
+ */
+html,
+body {
+  margin: 0;
+  background: #080a0e;
+  color: #cdd3df;
+  font: 13px/1.5 system-ui, sans-serif;
+}
+
+.banco-lobby {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  grid-template-columns: 300px 1fr;
+}
+
+.banco-panel {
+  overflow: auto;
+  padding: 14px 16px 24px;
+  border-right: 1px solid #1c2230;
+  background: #0b0e15;
+}
+
+.banco-panel section {
+  margin-top: 16px;
+}
+
+.banco-panel h2 {
+  margin: 0 0 6px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: #7f8aa0;
+}
+
+.banco-rotulo {
+  font-size: 11px;
+  letter-spacing: 2px;
+  color: #7f8aa0;
+}
+
+.banco-botones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.banco-botones button {
+  padding: 6px 10px;
+  border: 1px solid #2a3245;
+  border-radius: 8px;
+  background: #121722;
+  color: #cdd3df;
+  font: inherit;
+  cursor: pointer;
+}
+
+.banco-botones button:hover {
+  border-color: #3d4a66;
+}
+
+.banco-botones button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.banco-botones button.vivo {
+  border-color: #e0b83d;
+  color: #ffe3a0;
+}
+
+.banco-codigo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.banco-codigo input {
+  width: 6ch;
+  padding: 5px 8px;
+  border: 1px solid #2a3245;
+  border-radius: 6px;
+  background: #121722;
+  color: #ffe3a0;
+  font: inherit;
+  font-size: 15px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+}
+
+.banco-sentados {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.banco-sentados li {
+  padding: 2px 0;
+}
+
+.piloto {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 7px;
+  border-radius: 50%;
+  background: #3a4358;
+  vertical-align: middle;
+}
+
+.piloto.vivo {
+  background: #4fbf7a;
+}
+
+.tenue {
+  color: #7f8aa0;
+}
+
+.banco-medida {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.banco-estado {
+  margin: 6px 0 0;
+  color: #7f8aa0;
+}
+
+.banco-estado.vivo {
+  color: #4fbf7a;
+}
+
+.banco-fallo {
+  margin: 6px 0 0;
+  color: #ff8b7a;
+}
+
+.banco-direccion {
+  margin: 0;
+  word-break: break-all;
+}
+
+.banco-direccion a {
+  color: #8fb4ff;
+}
+
+.banco-marco-sitio {
+  display: grid;
+  place-items: center;
+  overflow: auto;
+  padding: 20px;
+}
+
+.banco-marco {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid #2a3245;
+  border-radius: 14px;
+  background: #080a0e;
+  box-shadow: 0 0 0 1px #000, 0 24px 60px rgba(0, 0, 0, 0.6);
+}
+
+.banco-marco canvas {
+  display: block;
+}
+
+/* La hoja del HUD del móvil: gris translúcida, encima de la escena y sin coger el ratón. */
+.banco-hoja {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(120, 128, 144, 0.55);
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 12px;
+  letter-spacing: 1px;
+  pointer-events: none;
+}
+
+/* El telón: el suelo de la Sala con el nombre del lugar, hasta que llega alEstarListo. */
+.banco-telon {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: #080a0e;
+  color: #cdd3df;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  pointer-events: none;
+}
