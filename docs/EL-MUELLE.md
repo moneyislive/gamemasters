@@ -131,9 +131,17 @@ primera vista. Sin mesa (en la orilla, eligiendo figura) se usa una semilla fija
 
 **Luz y atmósfera** (todo `three` núcleo, sin postprocesado): `hemisphereLight`
 azul/tierra, una `directionalLight` de contraluz `#FF9A4D` casi rasante que
-filetea hombros y aspas, dos `pointLight` en móvil (farol local, taberna) y tres
-en PC, `fog` del color del cielo a la altura del horizonte, tone mapping ACES a
-0,95. Agua propia: malla plana con dos senos de desplazamiento en el vértice,
+filetea hombros y aspas, LA LUZ DE CARA `#C8D6F0` que va con la cámara —apartada
+28° y a 60 de alto, para modelar en vez de aplanar—, dos `pointLight` en móvil
+(farol local, taberna) y tres en PC, `fog` del color del cielo a la altura del
+horizonte, tone mapping ACES a 0,95.
+
+La luz de cara se añadió el 4-sep-2026, al ver el muelle en producción: con sólo
+el contraluz, los aventureros y los trastos quedaban en silueta y el lobby no
+enseñaba a nadie. No sustituye al contraluz —el horizonte sigue encendido detrás—
+y no lleva sombras ni cuesta una llamada de dibujo. Va con la cámara porque el
+muelle se gira con el dedo: lo que se quiere es que siempre se vea la cara que se
+está mirando. Ver `LUZ_DE_CARA` en `Embarcadero.tsx`. Agua propia: malla plana con dos senos de desplazamiento en el vértice,
 fresnel entre hondo `#0D1A33` y reflejo de cielo `#2A2F55`, y una franja de
 brillo de la brasa; bajo cada farol encendido, un plano vertical aditivo que hace
 de reflejo. Cuatrocientas motas (`Points`, aditivas, con parpadeo por vértice) en

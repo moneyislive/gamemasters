@@ -140,6 +140,48 @@ const ARRASTRE = { dedo: (25 * Math.PI) / 180, raton: (2 * Math.PI) / 180 } as c
 /** Por debajo de esta relación de aspecto la ventana es «de móvil» y no lleva la tercera luz. */
 const ASPECTO_PANORAMICO_PARA_LUCES = 1.2;
 /**
+ * LA LUZ DE CARA, Y POR QUÉ LA HORA AZUL LA NECESITA.
+ *
+ * El §2 pide contraluz: el sol se acaba de poner DETRÁS de la cala, y esa es la
+ * imagen. Pero una escena a contraluz y nada más deja en silueta justamente lo
+ * que se ha venido a mirar —tu aventurero, el de los demás, los trastos del
+ * muelle—: se distinguen los bultos y no las caras, que es como decir que el
+ * lobby no enseña a nadie. Se vio al abrirlo en producción.
+ *
+ * Así que se añade UNA luz más, la que en un retrato va delante del modelo: viene
+ * de donde mira la cámara, no del sol. No la sustituye —el horizonte sigue
+ * encendido detrás y las siluetas siguen recortándose contra él—, sólo levanta el
+ * lado que da a quien mira.
+ *
+ * Tres decisiones dentro:
+ *
+ *   · VA CON LA CÁMARA, no clavada. El muelle se gira con el dedo, y una luz fija
+ *     dejaría media vuelta a oscuras: lo que se quiere es que SIEMPRE se vea la
+ *     cara que se está mirando.
+ *   · NO DE FRENTE PLANO. Se aparta `GIRO` sobre el eje vertical y se sube
+ *     `ALTURA`: de frente exacto, una figura se aplana y pierde el volumen — es el
+ *     flash de una foto de carnet. Apartada, modela.
+ *   · FRÍA Y CONTENIDA. El color es el del cielo de esa hora, no el naranja del
+ *     sol: una luz cálida por delante contaría que hay un segundo sol donde está
+ *     la cámara. Y la intensidad es la justa para leer una cara; subirla más
+ *     convertiría la hora azul en un mediodía nublado.
+ *
+ * No lleva sombras —ningún cliente las activa aquí— ni cuesta una llamada de
+ * dibujo: el presupuesto del §2 no se mueve.
+ */
+const LUZ_DE_CARA = {
+  color: '#c8d6f0',
+  intensidad: 1.25,
+  /** Grados que se aparta del eje de la cámara, para que modele en vez de aplanar. */
+  giro: (28 * Math.PI) / 180,
+  /** A qué altura se pone, en unidades de mundo: por encima de las cabezas. */
+  altura: 60,
+  /** A qué distancia del centro. Da igual para una direccional; se elige lejos y estable. */
+  lejania: 140,
+} as const;
+/** El eje vertical, uno para toda la escena: girar sobre él no necesita uno nuevo por fotograma. */
+const EJE_VERTICAL = new THREE.Vector3(0, 1, 0);
+/**
  * EL REFLEJO DEL FAROL: un plano vertical aditivo de pie sobre la lámina, de este
  * alto, puesto a esta distancia del farol HACIA LA CÁMARA. Hacia la cámara y no
  * bajo el farol porque el farol está sobre las tablas: bajo él no hay agua que
@@ -735,6 +777,32 @@ function BotesVacios({ amarres, partes }: { amarres: readonly Amarre[]; partes: 
 
 /* ─────────────────────────────── La escena entera ─────────────────────────────── */
 
+/**
+ * La luz que va con la cámara. Ver `LUZ_DE_CARA`: se recoloca en cada fotograma
+ * porque el muelle se gira, y apunta al centro de la cala, que es el objetivo por
+ * omisión de una luz direccional.
+ */
+function LuzDeCara(): JSX.Element {
+  const luz = useRef<THREE.DirectionalLight>(null);
+  const sitio = useMemo(() => new THREE.Vector3(), []);
+  useFrame((s) => {
+    const l = luz.current;
+    if (l === null) return;
+    /*
+     * Del centro HACIA la cámara, en el plano del agua: así la luz llega por
+     * delante de lo que se está mirando, se gire el muelle a donde se gire. Si la
+     * cámara estuviera justo encima del centro no habría dirección que copiar, y
+     * se toma una fija en vez de dividir por cero.
+     */
+    sitio.set(s.camera.position.x, 0, s.camera.position.z);
+    if (sitio.lengthSq() < 1e-6) sitio.set(0, 0, 1);
+    sitio.normalize().applyAxisAngle(EJE_VERTICAL, LUZ_DE_CARA.giro).multiplyScalar(LUZ_DE_CARA.lejania);
+    sitio.y = LUZ_DE_CARA.altura;
+    l.position.copy(sitio);
+  });
+  return <directionalLight ref={luz} intensity={LUZ_DE_CARA.intensidad} color={LUZ_DE_CARA.color} />;
+}
+
 export function Embarcadero(props: PropsDelEmbarcadero): JSX.Element {
   const { mesa, ventana, traer, calidad, figuraQuePruebo, zarpando } = props;
   const plena = calidad === 'plena';
@@ -1207,6 +1275,7 @@ export function Embarcadero(props: PropsDelEmbarcadero): JSX.Element {
       {/* Las luces del §2: hemisférica, contraluz rasante desde donde se puso el sol, y los faroles con luz. */}
       <hemisphereLight args={['#3a4a7a', '#1a1410', 0.9]} />
       <directionalLight position={[solX * 200, 14, solZ * 200]} intensity={1.7} color="#ff9a4d" />
+      <LuzDeCara />
       <pointLight position={[farolLocal.farol.x, tablas + 2.9, farolLocal.farol.z]} color="#ffb765" intensity={26} distance={24} decay={2} />
       <pointLight position={[cala.taberna.x, cala.taberna.y + 4.5, cala.taberna.z]} color="#ffa254" intensity={60} distance={46} decay={2} />
       {/* La tercera luz, la de la atalaya, sólo en el PC: el móvil arranca en plena y llevaba tres. */}
