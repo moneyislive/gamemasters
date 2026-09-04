@@ -59,7 +59,9 @@ amanecer sobre el muelle sea el amanecer sobre el delta.
    saldría gris. `embarcadero.glb` se compila desde el mismo pack con `COLOR_0`
    por vértice, como los aventureros, y las piezas de color de jugador entran
    UNA vez con una máscara `_TINTE` que la escena pinta del color del asiento.
-   Ver `escenas/embarcadero/piezas.ts`.
+   El barco y el estandarte del pack son fichas pintadas enteras, así que su
+   máscara es toda 255 y al teñirlos hay que conservar la luminancia de cada
+   vértice para no perder el volumen. Ver `escenas/embarcadero/piezas.ts`.
 6. **El color de asiento es la paleta de Riberas, por orden de llegada.** Seis
    colores (`tema.ts`), los mismos y en el mismo orden que el tablero SVG del
    juego, para que quien llegue al tablero se reconozca. El tablero 3D usa hoy

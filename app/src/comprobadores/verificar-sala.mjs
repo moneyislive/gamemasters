@@ -407,6 +407,86 @@ paso('La portada no puede reventar por un icono que no conoce');
   );
 }
 
+paso('La Sala manda al Muelle a quien lo tiene, y al mueble a quien no');
+{
+  /*
+   * ═══ `rutaDeArcade` YA NO ES UNA LÍNEA, Y HAY QUE LEERLA ═══
+   *
+   * Desde el Muelle, la tarjeta de un arcade con lobby en tres dimensiones lleva
+   * a `/muelle?arcade=…` y NO al mueble que declara su manifiesto; el mueble no
+   * cambia —Riberas sigue siendo `tablero`— y al zarpar es el propio Muelle quien
+   * navega con `rutaDelMueble`. Quién tiene muelle lo dice
+   * `escenas/embarcadero/tema.ts`, no el manifiesto (sellado).
+   *
+   * Lo que se compra aquí es que las dos puertas sigan siendo dos y en el orden
+   * bueno: que la Sala navegue con `rutaDeArcade`, que `rutaDeArcade` pregunte a
+   * `tieneMuelle` Y a la sede antes de mandar al Muelle, y que `rutaDelMueble`
+   * siga siendo la del mueble a secas. Un día alguien «simplifica» y la tarjeta
+   * de Riberas vuelve a abrir el tablero vacío sin pasar por el embarcadero.
+   */
+  const muebles = leer(path.join(SRC, 'arcade', 'muebles.ts'));
+  const vitrina = leer(path.join(SRC, 'vitrina.ts'));
+  const escena = leer(path.join(SRC, 'arcade', 'muelle-escena.tsx'));
+
+  comprobar('`muebles.ts` importa `tieneMuelle` del tema del embarcadero', /import \{ tieneMuelle \} from '\.\.\/\.\.\/\.\.\/escenas\/embarcadero\/tema'/.test(muebles));
+  comprobar(
+    '`rutaDeArcade` manda al Muelle sólo con muelle Y con sede en el servidor',
+    /sede === 'servidor' && tieneMuelle\(manifiesto\.id\)[\s\S]{0,120}pathname: '\/muelle'/.test(muebles),
+    'sin la sede, un arcade de aparato con tema iría a un lobby sin mesa',
+  );
+  comprobar(
+    'y en otro caso cae a `rutaDelMueble`, que es lo que hacía antes',
+    /return rutaDelMueble\(manifiesto\);/.test(muebles) &&
+      /export function rutaDelMueble[\s\S]{0,200}MUEBLES\[manifiesto\.mueble\]\.ruta/.test(muebles),
+  );
+  comprobar('la Sala sigue navegando con `rutaDeArcade` y no con la del mueble', /rutaDeArcade\(m\)/.test(vitrina) && !/rutaDelMueble/.test(vitrina));
+  comprobar('y el Muelle zarpa con `rutaDelMueble`, nunca con `rutaDeArcade`', /router\.replace\(rutaDelMueble\(manifiesto\)\)/.test(escena) && !/rutaDeArcade/.test(escena), 'con `rutaDeArcade` zarparía hacia sí mismo');
+  comprobar(
+    '`/muelle` está en la unión de rutas del grupo, para que el tipado de rutas la conozca',
+    /RutaDeMueble = [^;]*'\/muelle'/.test(muebles),
+  );
+  comprobar(
+    'y la pila de `(arcade)` declara la pantalla `muelle` fuera del `Record` de muebles',
+    /<Stack\.Screen name="muelle" \/>/.test(leer(path.join(APP, '(arcade)', '_layout.tsx'))),
+  );
+}
+
+paso('Si la mesa ha empezado se sabe sin abrir la vista del juego');
+{
+  /*
+   * `empezada.ts` no importa nada, así que se EJECUTA: los tres casos que el
+   * encargo pide —el campo viene `true`, viene `false`, y no viene pero el juego
+   * ofrece la opción de empezar— más los bordes que la propia función documenta.
+   * El Muelle decide con esto si monta el lienzo y cuándo zarpa; una inferencia
+   * mal hecha manda a la gente al tablero antes de repartir.
+   */
+  const { haEmpezado, opcionDeEmpezar } = await cargarModuloTs(path.join(SRC, 'arcade', 'empezada.ts'));
+  const empezar = { id: 'empezar', tipo: 'riberas:empezar', carga: {}, rotulo: 'Repartir el delta', ayuda: '' };
+  const otra = { id: 'fundar:0', tipo: 'riberas:fundar', carga: { vertice: 0 }, rotulo: 'Fundar', ayuda: '' };
+
+  comprobar('si viene `true`, ha empezado', haEmpezado({ empezada: true, opciones: [empezar] }) === true);
+  comprobar('si viene `false`, no ha empezado aunque no ofrezca nada', haEmpezado({ empezada: false, opciones: [] }) === false);
+  comprobar(
+    'si no viene y el juego ofrece empezar, NO ha empezado',
+    haEmpezado({ opciones: [empezar] }) === false,
+  );
+  comprobar('si no viene y ofrece otras cosas, sí ha empezado', haEmpezado({ opciones: [otra] }) === true);
+  comprobar('sin mesa no ha empezado nada', haEmpezado(null) === false && haEmpezado(undefined) === false);
+  comprobar('una mesa terminada no se reúne', haEmpezado({ terminada: true, opciones: [empezar] }) === true);
+  comprobar(
+    'la opción de empezar se reconoce por el `id` o por el último tramo del `tipo`',
+    opcionDeEmpezar([otra, { ...empezar, id: 'x' }])?.tipo === 'riberas:empezar' &&
+      opcionDeEmpezar([{ ...empezar, tipo: 'otro:arrancar' }])?.id === 'empezar' &&
+      opcionDeEmpezar([otra]) === undefined,
+  );
+  comprobar(
+    'y el Muelle y la hoja preguntan por esta puerta y no leen `empezada` a pelo',
+    /haEmpezado\(mesa\.mesa\)/.test(leer(path.join(SRC, 'arcade', 'muelle-escena.tsx'))) &&
+      /opcionDeEmpezar\(/.test(leer(path.join(SRC, 'arcade', 'hoja-del-muelle.tsx'))) &&
+      !/\.empezada\b/.test(leer(path.join(SRC, 'arcade', 'muelle-escena.tsx'))),
+  );
+}
+
 // ---------------------------------------------------------------------------
 
 if (fallos.length > 0) {

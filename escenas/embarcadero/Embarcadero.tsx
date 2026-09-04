@@ -25,7 +25,7 @@ export function Embarcadero({ alEstarListo, alMedir }: PropsDelEmbarcadero): JSX
   useFrame((estado) => {
     if (alMedir !== undefined && Math.floor(estado.clock.elapsedTime) !== Math.floor(estado.clock.elapsedTime - 1 / 60)) {
       const info = estado.gl.info.render;
-      alMedir({ triangulos: info.triangles, llamadas: info.calls, ms: 0 });
+      alMedir({ triangulos: info.triangles, llamadas: info.calls, ms: 0, fotogramas: 0 });
     }
   });
 

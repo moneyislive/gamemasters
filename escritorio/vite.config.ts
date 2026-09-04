@@ -46,6 +46,21 @@ export default defineConfig({
   resolve: {
     dedupe: ['react', 'react-dom', 'three', '@react-three/fiber', 'scheduler'],
   },
+  /*
+   * EL MOTOR 3D VA EN SU PROPIO TROZO. Desde que la Sala pinta el Muelle, `three`
+   * y r3f entran en el empaquetado para TODOS los arcades, tengan muelle o no, y
+   * el trozo principal pasaba de 200 kB a más de un mega. Separarlos no ahorra
+   * bytes al que abre Riberas —los pide igual— pero deja al que abre La Ronda con
+   * la Sala de siempre, y el navegador cachea el motor aparte de la Sala, que
+   * cambia mucho más a menudo que él.
+   */
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: { tres: ['three', '@react-three/fiber'] },
+      },
+    },
+  },
   server: {
     /*
      * 5173 es el taller y 5174 el servidor. Este pide el siguiente libre para

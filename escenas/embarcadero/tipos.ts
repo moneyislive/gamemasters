@@ -81,12 +81,39 @@ export interface PropsDelEmbarcadero {
   readonly figuraQuePruebo?: string;
   /** Empieza la coreografía de zarpar. La escena avisa cuando termina. */
   readonly zarpando?: boolean;
-  /** El primer fotograma con el mundo cargado se ha pintado: ya se puede quitar el telón. */
+  /**
+   * El primer fotograma con el mundo se ha pintado: ya se puede quitar el telón.
+   *
+   * SE LLAMA SIEMPRE, exactamente una vez, aunque alguna pieza no haya llegado:
+   * si falta un aventurero, o falta el embarcadero entero, la escena pinta lo que
+   * tenga (cielo, agua, luz) y avisa igual, y `alFallar` cuenta lo que faltó. El
+   * telón de los dos clientes sólo se levanta con esto; si un fallo impidiera
+   * llamarlo, el mundo quedaría tapado para siempre sin un solo error.
+   */
   readonly alEstarListo?: () => void;
-  /** La coreografía de zarpar ha terminado: ya se puede cambiar de pantalla. */
+  /**
+   * La coreografía de zarpar ha terminado: ya se puede cambiar de pantalla.
+   * Exactamente una vez por coreografía, y también si `zarpando` llega con el
+   * mundo a medio cargar (entonces, en cuanto se pueda, y sin esperar a nada).
+   */
   readonly alZarpar?: () => void;
-  /** Algo no se pudo cargar. La escena sigue en pie con lo que tenga; el HUD decide qué decir. */
+  /**
+   * Algo no se pudo cargar. Puede llegar ANTES o DESPUÉS de `alEstarListo`, y
+   * más de una vez (una por fichero). La escena sigue en pie con lo que tenga; el
+   * HUD decide qué decir. El motivo es una frase para una persona, en castellano.
+   */
   readonly alFallar?: (motivo: string) => void;
-  /** Lo que pasa por el hilo de dibujo cada segundo, para el banco y el modo sobrio. */
-  readonly alMedir?: (medida: { triangulos: number; llamadas: number; ms: number }) => void;
+  /**
+   * Lo que pasa por el hilo de dibujo, UNA VEZ POR SEGUNDO, para el banco y para
+   * elegir la calidad: triángulos y llamadas del último fotograma, la media de
+   * milisegundos por fotograma del último segundo, y cuántos fotogramas cubre esa
+   * media. `fotogramas` existe para que quien decide la calidad cuente fotogramas
+   * de verdad en vez de estimarlos desde `ms`.
+   */
+  readonly alMedir?: (medida: {
+    triangulos: number;
+    llamadas: number;
+    ms: number;
+    fotogramas: number;
+  }) => void;
 }

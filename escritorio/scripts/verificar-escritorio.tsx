@@ -65,9 +65,14 @@ import { loQueSePinta, opcionesSueltas, queSePinta } from '../src/plan';
 import { canonico } from '../../shared/mecanicas/canonico';
 import { CICLO_MAXIMO_MS, pausaAntesDeVolverAPreguntar, TOPE_DE_PAUSA_MS, VENTANA_DE_PRESENCIA } from '../src/relojes';
 import { Retablo } from '../src/retablo';
-import { loQuePide, PLAZOS } from '../src/sala';
+import { loQuePide, PLAZOS, tocaElMuelle } from '../src/sala';
 import { loQueQuedaTrasElSondeo, SIN_AVISO } from '../src/mesa';
+import type { LaMesa, MesaVista } from '../src/mesa';
 import { loQueSeDiceDeUnFallo } from '../src/red-de-seguridad';
+import { haEmpezado } from '../src/empezada';
+import { Muelle } from '../src/muelle';
+import { temaDelMuelle, tieneMuelle } from '../../escenas/embarcadero/tema';
+import { FIGURAS } from '../../escenas/embarcadero/figuras';
 
 let hechas = 0;
 const fallos: string[] = [];
@@ -814,12 +819,216 @@ function lasDirecciones(): void {
 }
 
 // ---------------------------------------------------------------------------
+// 5 · El muelle: cuándo se pinta, y que el raíl exista sin el mundo
+// ---------------------------------------------------------------------------
+
+/**
+ * Una mesa de mentira SÓLO en lo que no es del juego: las funciones del gancho
+ * no hacen nada y la vista es la que se le pase. Lo que sale del juego —las
+ * opciones— sale del reductor de verdad, más abajo.
+ */
+function unaMesa(fase: LaMesa['fase'], vista: MesaVista | null): LaMesa {
+  const nada = (): void => undefined;
+  return {
+    fase,
+    mesa: vista,
+    aviso: '',
+    cronica: [],
+    quieto: false,
+    abrir: nada,
+    entrar: nada,
+    mover: nada,
+    vestir: nada,
+    salir: nada,
+    tirar: nada,
+  };
+}
+
+function elMuelle(): void {
+  paso('Si la partida ha empezado se sabe sin abrir la vista del juego');
+
+  /*
+   * ═══ LAS DOS FUENTES, Y EL ORDEN ENTRE ELLAS ═══
+   *
+   * `empezada` lo estrenó el servidor para el Muelle; un servidor anterior manda
+   * la vista sin él y entonces se infiere de `opciones`. Las opciones de aquí son
+   * las del juego DE VERDAD: las de la mesa recién abierta —que ofrece empezar— y
+   * las de después del reparto, sacadas del mismo reductor que usa la sección 2.
+   * Una lista inventada aquí probaría la inferencia contra lo que este fichero se
+   * imagina que ofrece Riberas.
+   */
+  const sentados = [
+    { asiento: 's1', nombre: 'Ana' },
+    { asiento: 's2', nombre: 'Bruno' },
+  ];
+  const reunida = proyectar(RIBERAS, undefined, 's1', sentados);
+  const opcionesDeReunion = opcionesDeArcade(RIBERAS, reunida, 's1');
+  const { opciones: opcionesJugando } = laProyeccionDeVerdad();
+
+  comprobar(
+    'con el campo puesto, manda el campo: «empezada: true» aunque las opciones aún ofrezcan empezar',
+    haEmpezado({ empezada: true, opciones: opcionesDeReunion }) &&
+      !haEmpezado({ empezada: false, opciones: opcionesJugando }),
+  );
+  comprobar(
+    'sin el campo, una mesa cuyo juego ofrece empezar no ha empezado',
+    opcionesDeReunion.length > 0 && !haEmpezado({ opciones: opcionesDeReunion }),
+    opcionesDeReunion.map((o) => o.id),
+  );
+  comprobar(
+    'y sin el campo y sin esa opción —o sin lista siquiera— se contesta que sí, que es caer al tablero de siempre',
+    haEmpezado({ opciones: opcionesJugando }) && haEmpezado({}) && !haEmpezado(null),
+    opcionesJugando.map((o) => o.id),
+  );
+
+  paso('El muelle se pinta sólo a quien lo tiene, y sólo hasta zarpar');
+
+  const orilla = { vioLaReunion: false, zarpado: false };
+  const trasLaReunion = { vioLaReunion: true, zarpado: false };
+  const zarpado = { vioLaReunion: true, zarpado: true };
+  comprobar(
+    'un arcade sin muelle no lo pinta nunca, en ninguna fase: los demás no cambian ni un píxel',
+    (['fuera', 'yendo', 'dentro'] as const).every(
+      (f) =>
+        !tocaElMuelle(false, f, false, orilla) &&
+        !tocaElMuelle(false, f, true, trasLaReunion) &&
+        !tocaElMuelle(false, f, false, trasLaReunion),
+    ),
+  );
+  comprobar(
+    'con muelle: en la orilla y mientras la mesa se reúne, se pinta',
+    tocaElMuelle(true, 'fuera', false, orilla) &&
+      tocaElMuelle(true, 'yendo', false, orilla) &&
+      tocaElMuelle(true, 'dentro', false, orilla),
+  );
+  comprobar(
+    'al llegar «empezada» delante de uno se sigue pintando —la coreografía— y al desembarcar ya no',
+    tocaElMuelle(true, 'dentro', true, trasLaReunion) && !tocaElMuelle(true, 'dentro', true, zarpado),
+  );
+  comprobar(
+    'y quien vuelve a una mesa que ya jugaba va directo al tablero, sin coreografía',
+    !tocaElMuelle(true, 'dentro', true, orilla),
+  );
+  comprobar(
+    'Riberas tiene muelle y el resto de los instalados no',
+    tieneMuelle('riberas') && arcadesInstalados().filter((m) => tieneMuelle(m.id)).length === 1,
+    arcadesInstalados().filter((m) => tieneMuelle(m.id)).map((m) => m.id),
+  );
+
+  paso('El raíl del muelle existe entero sin el mundo, y en Node no se monta el Canvas');
+
+  /*
+   * ═══ POR QUÉ SE RENDERIZA EN NODE UN COMPONENTE CON UN `Canvas` DENTRO ═══
+   *
+   * Porque es la regla del §5 del diseño —«el HUD nunca depende del Canvas»—
+   * hecha comprobación: si el mundo no arranca, se abre, se entra y se reparte
+   * igual. Aquí no hay `window`, así que el `Canvas` no puede montarse (lo
+   * protege un `typeof window` en `muelle.tsx`); lo que se cuenta es que el raíl
+   * tiene todo lo demás. Y de paso, que ningún cambio futuro cuele el `Canvas`
+   * fuera de esa guarda: el día que pase, esto revienta en Node antes que en un
+   * navegador sin WebGL.
+   */
+  const riberas = elCatalogoQuePublicaElServidor().find((m) => m.id === 'riberas');
+  const tema = temaDelMuelle('riberas');
+  comprobar('Riberas está instalado y tiene tema de muelle', riberas !== undefined && tema !== undefined);
+  if (riberas === undefined || tema === undefined) return;
+
+  const enLaOrilla = renderToStaticMarkup(
+    <Muelle
+      manifiesto={riberas}
+      tema={tema}
+      mesa={unaMesa('fuera', null)}
+      silla=""
+      codigoDeLaUrl="ABCDE"
+      zarpando={false}
+      alDesembarcar={() => undefined}
+    />,
+  );
+  const textoDeLaOrilla = palabrasDe(enLaOrilla);
+  comprobar('en la orilla no hay ningún <canvas>', !enLaOrilla.includes('<canvas'), enLaOrilla.slice(0, 300));
+  comprobar('pero sí el telón con el nombre del lugar', textoDeLaOrilla.includes(tema.lugar));
+  comprobar(
+    'y los campos del vestíbulo de siempre: abrir, sentarse y el código de la dirección puesto',
+    textoDeLaOrilla.includes('Abrir mesa') &&
+      textoDeLaOrilla.includes('Sentarse') &&
+      enLaOrilla.includes('value="ABCDE"'),
+  );
+  comprobar(
+    'y una figura elegida, que es una de las seis y se puede cambiar',
+    FIGURAS.some((f) => textoDeLaOrilla.includes(f.nombre)) && textoDeLaOrilla.includes('Cambiar'),
+  );
+  comprobar(
+    'los plazos que se ofrecen son los mismos que en la mesa de siempre',
+    PLAZOS.every((p) => textoDeLaOrilla.includes(p.rotulo)),
+  );
+
+  const vista: MesaVista = {
+    codigo: 'QWXYZ',
+    arcade: 'riberas',
+    rev: 3,
+    tic: 0,
+    terminada: false,
+    venceEn: null,
+    turnoDesde: 0,
+    asientos: [
+      { id: 's1', nombre: 'Ana', presente: true, figura: 'maga' },
+      { id: 's2', nombre: 'Bruno', presente: false },
+    ],
+    yo: 's1',
+    vista: reunida,
+    opciones: opcionesDeReunion,
+  };
+  const enElMuelle = renderToStaticMarkup(
+    <Muelle
+      manifiesto={riberas}
+      tema={tema}
+      mesa={unaMesa('dentro', vista)}
+      silla=""
+      codigoDeLaUrl=""
+      zarpando={false}
+      alDesembarcar={() => undefined}
+    />,
+  );
+  const textoDelMuelle = palabrasDe(enElMuelle);
+  comprobar('en el muelle tampoco hay <canvas>', !enElMuelle.includes('<canvas'));
+  comprobar(
+    'se ve el código y se puede copiar, y el enlace también',
+    textoDelMuelle.includes('QWXYZ') &&
+      textoDelMuelle.includes('Copiar código') &&
+      textoDelMuelle.includes('Copiar enlace'),
+  );
+  comprobar(
+    'los sentados salen con su nombre, quién soy yo, y un piloto por cabeza con el que falta apagado',
+    textoDelMuelle.includes('Ana (tú)') &&
+      textoDelMuelle.includes('Bruno') &&
+      enElMuelle.split('class="piloto').length - 1 === 2 &&
+      enElMuelle.split('piloto-vivo').length - 1 === 1,
+  );
+  comprobar(
+    'la opción de empezar sale con el rótulo y la ayuda que escribió el juego, y ninguna otra palabra de cosecha propia como movimiento',
+    opcionesDeReunion.every((o) => textoDelMuelle.includes(o.rotulo) && textoDelMuelle.includes(o.ayuda)) &&
+      enElMuelle.split('class="opcion opcion-zarpar"').length - 1 === 1,
+  );
+  comprobar(
+    'y se puede levantar uno, tirar la mesa y cambiar de aventurero',
+    textoDelMuelle.includes('Levantarse') &&
+      textoDelMuelle.includes('Tirar la mesa') &&
+      textoDelMuelle.includes('Cambiar de aventurero'),
+  );
+  comprobar(
+    'la figura de un asiento se pinta por su nombre, y la del que no eligió es la de serie',
+    textoDelMuelle.includes('La Maga') && FIGURAS.filter((f) => textoDelMuelle.includes(f.nombre)).length >= 1,
+  );
+}
+
+// ---------------------------------------------------------------------------
 
 elCatalogoNoMiente();
 noSePintaDeMas();
 laPausaCabe();
 loQueLaPantallaDecideSola();
 lasDirecciones();
+elMuelle();
 
 console.log('');
 if (fallos.length === 0) {
@@ -831,7 +1040,8 @@ if (fallos.length === 0) {
       '  De los demás dice por qué no, y cada negativa dice la SUYA: solo la que de verdad se\n' +
       '  juega en la app manda a la app. Y sus dos muebles no pintan ni una palabra, ni una pieza\n' +
       '  ni un movimiento que no viniera dentro de la proyección: comprobado renderizando los\n' +
-      '  componentes de verdad contra una partida de verdad.\n' +
+      '  componentes de verdad contra una partida de verdad. Y el Muelle se pinta sólo al arcade\n' +
+      '  que lo tiene y sólo hasta zarpar, con su raíl entero sin necesidad de un Canvas.\n' +
       '\n  Lo que esto NO prueba: que el reparto de los cuatro muebles entre propios y genéricos\n' +
       '  sea el del §7 —es una decisión de producto y no se deriva del contrato—, ni que la ruta\n' +
       '  del catálogo mande de verdad publicaOpciones: aquí no se levanta ningún servidor.',

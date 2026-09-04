@@ -1018,3 +1018,300 @@ code {
   font-family: var(--letra-dato);
   font-weight: 700;
 }
+
+/* --- El muelle ----------------------------------------------------------- */
+
+/*
+ * ═══ LA ESCENA DETRÁS, EL RAÍL DELANTE, Y NINGUNO SABE DEL OTRO ═══
+ *
+ * El muelle son dos capas: la escena en tres dimensiones a pantalla completa
+ * (`.muelle-escena`, absoluta, detrás) y una rejilla hermana de
+ * `.tablero-y-panel` con las MISMAS medidas —lo que quede, y 22 rem— cuya
+ * primera columna está vacía a propósito (`.muelle-hueco`): es el sitio por el
+ * que se ve el mundo. La rejilla no atrapa el ratón salvo en el raíl, para que
+ * pulsar la escena llegue a la escena (sirve para saltar la coreografía de
+ * zarpar). Es lo que pide el §5 del diseño: el vestíbulo de siempre, y el mundo
+ * ya vivo detrás.
+ *
+ * ═══ VIDRIO, NO MATERIA ═══
+ *
+ * Los paneles del raíl van sobre la escena, y una teja opaca la taparía justo
+ * donde más se mira. Se hacen translúcidos con `--vidrio` —`--teja` al 78 %,
+ * declarado aquí y no en `:root` porque sólo existe encima de la escena— y con
+ * un desenfoque detrás, que es lo que hace que un panel parezca vidrio y no un
+ * agujero. El filo de un píxel sigue siendo lo que lo separa del fondo.
+ *
+ * ═══ EL ACENTO, SÓLO DONDE EL §5 LO PERMITE ═══
+ *
+ * Cuatro sitios: el botón que trae la opción de empezar (`.opcion-zarpar`), el
+ * piloto de presencia encendido (`.piloto-vivo`), la figura elegida
+ * (`.figura-elegida`, `.figura-nombre`) y el «copiado». Todo lo demás son los
+ * grises de siempre; ni el código, que se copia y no se pulsa.
+ *
+ * ═══ Y EN UNA VENTANA ESTRECHA, LA ESCENA ARRIBA Y EL RAÍL DEBAJO ═══
+ *
+ * Por debajo de 900 px el raíl a la derecha taparía la mitad del mundo. La
+ * escena pasa a ser un bloque de 46vh en el flujo y el raíl baja entero, sin
+ * vidrio que haga falta: ya no hay nada debajo.
+ */
+.muelle {
+  --vidrio: rgba(18, 22, 29, 0.78);
+  position: relative;
+  min-height: calc(100vh - 4.4rem);
+  overflow: hidden;
+  background: var(--suelo);
+}
+
+.muelle-escena {
+  position: absolute;
+  inset: 0;
+  background: var(--suelo);
+}
+
+.muelle-escena canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/*
+ * El telón: `--suelo` con el nombre del lugar, hasta que la escena avisa de que
+ * pintó su primer fotograma. Si el mundo no arranca, se queda y dice qué faltó
+ * en letra chica; el raíl sigue funcionando encima.
+ */
+.muelle-telon {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  text-align: center;
+  padding: 2rem;
+  background: var(--suelo);
+}
+
+.muelle-lugar {
+  margin: 0 0 0.5rem;
+  font-size: 1.1rem;
+  font-weight: 800;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--tenue);
+}
+
+.muelle-telon .letra-chica {
+  margin: 0 auto;
+  max-width: 44ch;
+}
+
+/* Lo que faltó cuando el mundo sí arrancó: abajo a la izquierda, sin tapar nada. */
+.muelle-falta {
+  position: absolute;
+  left: 2.5rem;
+  bottom: 1.25rem;
+  margin: 0;
+  padding: 0.35rem 0.7rem;
+  background: var(--vidrio);
+  border: 1px solid var(--filo);
+  border-radius: var(--radio-mando);
+}
+
+.muelle-hoja {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 22rem;
+  gap: 2rem;
+  align-items: start;
+  max-width: 92rem;
+  margin: 0 auto;
+  padding: 2rem 2.5rem 4rem;
+  pointer-events: none;
+}
+
+.muelle-hueco {
+  pointer-events: none;
+}
+
+.muelle-rail {
+  pointer-events: auto;
+}
+
+.muelle-rail .panel {
+  background: var(--vidrio);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+/* Cada estado del raíl es una columna de paneles; escondido, no ocupa sitio. */
+.muelle-tramo {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.muelle-tramo[hidden] {
+  display: none;
+}
+
+/* «Se reparte el delta» mientras zarpan, encima del mundo, sin acento: es un rótulo. */
+.muelle-zarpando {
+  margin: 0.5rem 0 0;
+  font-family: var(--letra-dato);
+  font-size: var(--letra-minima);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--tenue);
+}
+
+/* Los botones del raíl van a lo ancho: en 22 rem no cabe una fila de ellos. */
+.muelle-rail .opcion {
+  width: 100%;
+  min-width: 0;
+}
+
+.muelle-rail .opcion-corta {
+  width: auto;
+  min-height: 2.25rem;
+  padding: 0.4rem 0.8rem;
+}
+
+.muelle-rail .opciones {
+  flex-direction: column;
+  flex-wrap: nowrap;
+}
+
+.muelle-rail .opciones li {
+  width: 100%;
+}
+
+/* La figura en la orilla: nombre y nota a la izquierda, «Cambiar» a la derecha. */
+.muelle-figura {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.figura-nombre {
+  color: var(--acento);
+}
+
+/* La figura elegida se distingue por el FILO, que es como esta hoja dice «esto está vivo». */
+.figura-elegida {
+  border-color: var(--acento);
+  box-shadow: 0 0 20px -8px var(--halo);
+}
+
+.figura-elegida .opcion-rotulo {
+  color: var(--acento);
+}
+
+.muelle-copias {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0.6rem 0 0.4rem;
+}
+
+.copiado {
+  min-height: 1.4em;
+  margin: 0 0 0.6rem;
+}
+
+/* «Copiado»: uno de los cuatro sitios con acento del raíl. Sólo mientras dura. */
+.copiado-vivo {
+  color: var(--acento);
+}
+
+/*
+ * El piloto de presencia: el mismo punto que enciende «se juega aquí» en la
+ * tarjeta, con la misma pareja encendido/apagado. Quien no está sigue sentado
+ * —es cosmético, ver `MesaVista.asientos`— y por eso su renglón no se apaga.
+ */
+.muelle-sentados li {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.3rem 0;
+}
+
+.piloto {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px var(--filo-vivo);
+}
+
+.piloto-vivo {
+  background: var(--acento);
+  box-shadow: 0 0 7px var(--halo), 0 0 16px var(--halo);
+}
+
+.sentado-nombre {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sentado-figura {
+  flex: none;
+  font-family: var(--letra-dato);
+  font-size: var(--letra-minima);
+  letter-spacing: 0.04em;
+  color: var(--tenue);
+}
+
+/*
+ * EL BOTÓN DE ZARPAR: el único con acento del raíl. Rótulo y ayuda tal cual los
+ * escribe el juego; el color dice que es lo que se está esperando.
+ */
+.opcion-zarpar {
+  border-color: var(--acento);
+  box-shadow: 0 0 22px -8px var(--halo);
+}
+
+.opcion-zarpar .opcion-rotulo,
+.opcion-zarpar .opcion-ayuda {
+  color: var(--acento);
+}
+
+.muelle-espera {
+  margin: 0;
+  font-style: italic;
+}
+
+@media (max-width: 900px) {
+  .muelle {
+    display: flex;
+    flex-direction: column;
+    overflow: visible;
+  }
+
+  .muelle-escena {
+    position: relative;
+    flex: none;
+    height: 46vh;
+  }
+
+  .muelle-falta {
+    left: 1rem;
+    bottom: 0.75rem;
+  }
+
+  .muelle-hoja {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 1.25rem 1.25rem 3rem;
+  }
+
+  .muelle-rail {
+    position: static;
+  }
+
+  .muelle-rail .panel {
+    background: var(--teja);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}

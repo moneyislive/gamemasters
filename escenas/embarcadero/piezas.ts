@@ -26,7 +26,8 @@
  * El pack trae el muelle, el barco, la bandera y el estandarte en cuatro colores,
  * y las cuatro variantes son la misma geometría con otras UV. Aquí entra SÓLO la
  * azul, más una máscara por vértice (`_TINTE`, 0 o 1) que dice qué vértices son
- * «del color». La máscara la deriva el compilador comparando el color horneado
+ * «del color» (en el barco y el estandarte, todos: ver `PIEZAS_TENIDAS_ENTERAS`).
+ * La máscara la deriva el compilador comparando el color horneado
  * de la variante azul con el de la roja: donde difieren, es tinte. Al cargar, la
  * escena pinta esos vértices del color del asiento — cualquier color, no sólo los
  * cuatro del pack, que es lo que hace falta para que el quinto y el sexto asiento
@@ -160,6 +161,32 @@ export const PIEZAS_QUE_SE_TINEN: readonly NombreDePieza[] = [
   PIEZA.bandera,
   PIEZA.estandarte,
 ];
+
+/**
+ * LAS QUE SE TIÑEN ENTERAS, medido al compilar y no supuesto.
+ *
+ * El muelle y la bandera son piezas con un poco de color: 44 vértices de 1.709 y
+ * 44 de 68. El barco y el estandarte son las «unidades» `_full` del pack: fichas
+ * pintadas ENTERAS dentro de una sola celda del atlas, con un degradado de unos
+ * ochenta tonos del propio azul que es lo que les da volumen. Comparadas con la
+ * variante roja difieren en TODOS sus vértices, así que su máscara sale toda a 255
+ * y eso es lo correcto, no un fallo del compilador.
+ *
+ * La consecuencia la paga quien tiñe (`tinte.ts`): en estas dos piezas no se puede
+ * sustituir el color por el del asiento en plano, porque se llevaría por delante el
+ * sombreado horneado y el barco saldría sin volumen. Hay que conservar la
+ * luminancia relativa de cada vértice respecto del azul medio del pack y aplicarla
+ * al color nuevo. `verify:embarcadero-modelos` exige que estas dos no tengan ningún
+ * 0 en la máscara y que las otras dos tengan de los dos valores.
+ */
+export const PIEZAS_TENIDAS_ENTERAS: readonly NombreDePieza[] = [PIEZA.barco, PIEZA.estandarte];
+
+/**
+ * EL AZUL MEDIO DEL PACK en sRGB: la referencia contra la que se mide la
+ * luminancia de un vértice teñible para conservar su sombreado al cambiarle el
+ * color. Medido sobre la celda del azul del atlas, y usado sólo por `tinte.ts`.
+ */
+export const AZUL_DEL_PACK: readonly [number, number, number] = [37, 125, 188];
 
 /** La tabla entera: lo que compila `compilar-embarcadero.ts`, en este orden. */
 export const PIEZAS_DEL_EMBARCADERO: readonly PiezaDelEmbarcadero[] = [

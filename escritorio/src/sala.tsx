@@ -20,9 +20,12 @@ import type { MouseEvent as ClicDeReact } from 'react';
 import { Catalogo, usarElCatalogo } from './catalogo';
 import type { ElCatalogo } from './catalogo';
 import { Formulario } from './formulario';
+import { haEmpezado } from './empezada';
 import { usarMesaDeArcade } from './mesa';
-import type { LaMesa } from './mesa';
+import type { FaseDeLaMesa, LaMesa } from './mesa';
+import { Muelle } from './muelle';
 import { dondeSeJuega } from './muebles';
+import { temaDelMuelle, tieneMuelle } from '../../escenas/embarcadero/tema';
 import type { ArcadeDelCatalogo } from './muebles';
 import { opcionesSueltas, queSePinta } from './plan';
 import type { Opcion } from '../../shared/arcade';
@@ -135,6 +138,43 @@ function sufijoDeSilla(silla: string): string {
 // Un arcade concreto
 // ---------------------------------------------------------------------------
 
+/**
+ * LO QUE EL MUELLE NECESITA RECORDAR ENTRE DOS SONDEOS.
+ *
+ * `vioLaReunion`: esta pantalla ha visto la mesa reuniéndose. Es lo que separa
+ * «acaban de repartir delante de mí» —toca la coreografía de zarpar— de «vuelvo
+ * a una mesa que ya jugaba» —al tablero sin más, §6.6—. `zarpado`: la
+ * coreografía ya terminó o se saltó, y desde entonces se pinta el tablero.
+ */
+export interface Travesia {
+  vioLaReunion: boolean;
+  zarpado: boolean;
+}
+
+const EN_LA_ORILLA: Travesia = { vioLaReunion: false, zarpado: false };
+
+/**
+ * ¿SE PINTA EL MUELLE O LA MESA DE SIEMPRE? Función pura, y por eso comprobable.
+ *
+ * Un arcade sin muelle contesta que no en todos los casos: es la promesa de que
+ * los demás arcades no cambian ni un píxel. Con muelle, se pinta mientras no se
+ * está dentro (la orilla) y mientras la mesa se reúne; y con la partida
+ * empezada, SÓLO si esta pantalla vio la reunión y todavía no ha zarpado.
+ * Equivocarse hacia el muelle esconde una partida en marcha; hacia la mesa,
+ * pierde una animación. Por eso el tablero gana en cuanto hay duda.
+ */
+export function tocaElMuelle(
+  conMuelle: boolean,
+  fase: FaseDeLaMesa,
+  empezada: boolean,
+  travesia: Travesia,
+): boolean {
+  if (!conMuelle) return false;
+  if (fase !== 'dentro') return true;
+  if (!empezada) return true;
+  return travesia.vioLaReunion && !travesia.zarpado;
+}
+
 function ElArcade({ donde, catalogo }: { donde: Donde; catalogo: ElCatalogo }): JSX.Element {
   const arcade = donde.que === 'mesa' ? donde.arcade : '';
   const silla = donde.silla;
@@ -150,6 +190,32 @@ function ElArcade({ donde, catalogo }: { donde: Donde; catalogo: ElCatalogo }): 
    * exactamente lo que se quiere que pase cuanto antes.
    */
   const mesa = usarMesaDeArcade(arcade, silla);
+
+  /*
+   * ═══ LA TRAVESÍA VIVE AQUÍ, AL LADO DE LA MESA, Y POR LA MISMA REGLA ═══
+   *
+   * Es estado del arcade y no del `Muelle`: el `Muelle` se desmonta al pintar el
+   * tablero, y lo que hay que recordar es precisamente que ya se pintó. Y son
+   * ganchos, así que van ANTES de cualquier `return`, aunque este arcade no tenga
+   * muelle: en ese caso el efecto no hace nada y `tocaElMuelle` contesta que no.
+   *
+   * Se rehace en cuanto se deja de estar dentro —levantarse, tirar, un 404 del
+   * sondeo—: la siguiente mesa que se abra empieza en la orilla, sin heredar el
+   * «ya zarpé» de la anterior.
+   */
+  const [travesia, ponerTravesia] = useState<Travesia>(EN_LA_ORILLA);
+  const empezada = mesa.fase === 'dentro' && mesa.mesa !== null && haEmpezado(mesa.mesa);
+  const reunida = mesa.fase === 'dentro' && mesa.mesa !== null && !empezada;
+  useEffect(() => {
+    if (mesa.fase !== 'dentro') {
+      ponerTravesia((t) => (t.vioLaReunion || t.zarpado ? EN_LA_ORILLA : t));
+      return;
+    }
+    if (reunida) ponerTravesia((t) => (t.vioLaReunion ? t : { vioLaReunion: true, zarpado: false }));
+  }, [mesa.fase, reunida]);
+  const alDesembarcar = useCallback(() => {
+    ponerTravesia((t) => (t.zarpado ? t : { ...t, zarpado: true }));
+  }, []);
 
   if (catalogo.estado === 'pidiendo') {
     return (
@@ -200,6 +266,30 @@ function ElArcade({ donde, catalogo }: { donde: Donde; catalogo: ElCatalogo }): 
           <p>{puerta.porque}</p>
         </div>
       </main>
+    );
+  }
+
+  /*
+   * ═══ EL MUELLE, SÓLO PARA QUIEN LO TIENE Y SÓLO HASTA ZARPAR ═══
+   *
+   * Quién tiene muelle lo dice `escenas/embarcadero/tema.ts` y no el manifiesto
+   * (§1.4). Se pinta EN LUGAR de `LaMesaPuesta` y sobre el mismo `mesa` —el
+   * gancho es el mismo, no se recarga nada—, y cuando `empezada` llega en la
+   * vista el muelle hace su coreografía, avisa con `alDesembarcar`, y esta misma
+   * pantalla pasa a pintar el tablero de siempre.
+   */
+  const tema = temaDelMuelle(manifiesto.id);
+  if (tema !== undefined && tocaElMuelle(tieneMuelle(manifiesto.id), mesa.fase, empezada, travesia)) {
+    return (
+      <Muelle
+        manifiesto={manifiesto}
+        tema={tema}
+        mesa={mesa}
+        silla={silla}
+        codigoDeLaUrl={codigoDeLaUrl}
+        zarpando={empezada}
+        alDesembarcar={alDesembarcar}
+      />
     );
   }
 

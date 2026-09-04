@@ -39,44 +39,15 @@
  *
  * ═══ LA TEXTURA SE HORNEA A COLOR POR VÉRTICE, Y POR QUÉ ═══
  *
- * Cada personaje del pack trae UNA textura PNG empotrada en el binario. En el
- * móvil eso no se puede cargar: `GLTFLoader` saca los bytes, construye un `Blob`,
- * le pide a `URL.createObjectURL` una dirección y se la da a un `<img>` — y en
- * Hermes no hay ni `Blob` con dirección, ni `<img>`, ni decodificador de PNG. La
- * historia entera, comprobada en el código de three, está en
- * `app/src/tres/texturas-nativas.ts`. Y tampoco hay WASM, así que no vale meter
- * un decodificador.
- *
- * Así que la textura se aplica AQUÍ, una vez, al compilar: para cada vértice se
- * mira su UV, se muestrea el PNG en ese punto y el color resultante se guarda en
- * el atributo `COLOR_0`. El material sale sin textura y con el color base blanco,
- * de modo que lo que se pinta es el color del vértice tal cual; `GLTFLoader`
- * enciende `vertexColors` él solo cuando la geometría trae `COLOR_0`.
- *
- * Se pierde poco porque las texturas de KayKit no son fotos: son PALETAS de
- * celdas planas, y cada cara del modelo cae entera dentro de una celda. Un color
- * por vértice pinta exactamente lo mismo que la textura, salvo en el borde de
- * una celda si un vértice cayera justo encima — y el muestreo es bilineal para
- * que eso, si pasa, dé un tono intermedio y no una cara del color equivocado.
- * Las UV se envuelven (REPEAT), como marca el material del pack.
- *
- * Dos detalles que no son de gusto:
- *
- *   · El PNG está en sRGB y glTF define `COLOR_0` LINEAL. Se linealiza cada
- *     téxel antes de interpolar —que es lo que hace la GPU con una textura sRGB—
- *     y se guarda el resultado lineal. Guardar el sRGB tal cual daría personajes
- *     lavados, con el gamma aplicado dos veces.
- *   · `COLOR_0` se escribe como VEC3 de BYTES SIN SIGNO NORMALIZADOS y no como
- *     flotantes: 4 bytes por vértice (3 más el relleno de alineación) contra 12.
- *     Con 5.000 a 8.000 vértices por personaje son 40 a 60 kB de diferencia —y
- *     la exploradora, que es la más pesada, no cabría en 450 kB con flotantes—.
- *     El coste es cuantizar un valor lineal a 256 escalones, que sólo se nota en
- *     los negros más profundos: hasta seis pasos de sRGB, medido (entre 4,7 y
- *     6,3 según el personaje), que es la diferencia entre un negro y otro negro.
- *     El compilador lo mide y lo imprime cada vez.
- *
- * Y sin textura, las UV son bytes muertos que viajarían a cada móvil para no
- * leerse nunca: `TEXCOORD_0` se quita.
+ * Cada personaje del pack trae UNA textura PNG empotrada en el binario, y en el
+ * móvil eso no se puede cargar (Hermes no tiene ni `<img>` ni decodificador de
+ * PNG; ver `app/src/tres/texturas-nativas.ts`). Así que la textura se aplica AQUÍ,
+ * una vez, al compilar: cada vértice se queda con el color que la textura tenía en
+ * su UV, en `COLOR_0`, y el fichero sale sin textura, sin UV y con el material en
+ * blanco. La maquinaria —el muestreo bilineal con envoltura, la curva sRGB → lineal,
+ * los bytes normalizados en vez de flotantes y lo que se pierde al cuantizar— vive
+ * en `hornear.ts`, que comparte con el compilador del embarcadero; su cabecera
+ * cuenta cada decisión. Este compilador imprime el desvío que aquélla mide.
  *
  * ═══ LOS NOMBRES DE LOS HUESOS Y LO QUE HACE `GLTFLoader` CON ELLOS ═══
  *
@@ -107,50 +78,18 @@
  *     npm run verify:aventureros -w escenas
  */
 import { NodeIO, PropertyType } from '@gltf-transform/core';
-import type { Accessor, Animation, Document, Node, Primitive } from '@gltf-transform/core';
+import type { Accessor, Animation, Document, Node } from '@gltf-transform/core';
 import { dedup, mergeDocuments, prune, resample } from '@gltf-transform/functions';
 import fs from 'node:fs';
-import { createRequire } from 'node:module';
 import path from 'node:path';
 import { ALTURA_DE_UNA_PERSONA, enPersonas } from '../escala';
-
-/*
- * `pngjs` DECODIFICA EL PNG, y se carga así por tres motivos.
- *
- * Es JavaScript puro —ni binario nativo ni WASM—, que es lo que hace que este guion
- * corra en cualquier máquina que tenga Node, sin compilar nada. La 3.4 no trae
- * tipos ni hay `@types/pngjs` en el árbol, así que se trae con `createRequire` y se
- * tipa aquí lo único que se usa: `PNG.sync.read`, que devuelve ancho, alto y los
- * píxeles en RGBA de 8 bits, fila a fila desde arriba — el mismo origen que las UV
- * de glTF.
- *
- * Y EL TERCER MOTIVO ES UNA MULETA, dicha como tal. `pngjs` está declarado en
- * `escenas/package.json` y en el `package-lock.json` de la raíz, y `npm install` lo
- * deja en `node_modules/` de la raíz, que es donde el primer `require` lo encuentra.
- * Pero la app —que no es un workspace— ya trae exactamente esa versión colgando de
- * `expo-splash-screen`, y el día que se escribió esto un `npm install` de la raíz
- * habría reordenado además los `node_modules` de tres workspaces con un servidor
- * de desarrollo levantado encima. Así que si la raíz no lo tiene, se coge el de la
- * app. Cuando alguien corra `npm install`, la muleta deja de usarse sola.
- */
-type PngDecodificado = { width: number; height: number; data: Buffer };
-type ModuloPng = { PNG: { sync: { read(bytes: Buffer): PngDecodificado } } };
-function cargaPngjs(): ModuloPng {
-  const requiere = createRequire(import.meta.url);
-  try {
-    return requiere('pngjs') as ModuloPng;
-  } catch {
-    const desdeLaApp = createRequire(path.join(RAIZ, 'app/package.json'));
-    return desdeLaApp('pngjs') as ModuloPng;
-  }
-}
+import { desnudaElMaterial, horneaLaPrimitiva, pngDeLaTextura, rendirse } from './hornear';
 
 const RAIZ = path.resolve(import.meta.dirname ?? __dirname, '..', '..');
 const PACK = path.join(RAIZ, 'arte/kaykit/adventurers/KayKit_Adventurers_2.0_FREE');
 const PERSONAJES_DEL_PACK = path.join(PACK, 'Characters/gltf');
 const ANIMACIONES_DEL_PACK = path.join(PACK, 'Animations/gltf/Rig_Medium');
 const SALIDA = path.join(RAIZ, 'escenas/modelos/aventureros');
-const { PNG } = cargaPngjs();
 
 /** El nodo raíz del esqueleto, tal como lo llama el pack. */
 const RIG = 'Rig_Medium';
@@ -201,108 +140,6 @@ const CLIPS: ReadonlyArray<{ nombre: string; clip: string; fuente: Fuente }> = [
   { nombre: 'salto', clip: 'Jump_Full_Short', fuente: 'MovementBasic' },
   { nombre: 't-pose', clip: 'T-Pose', fuente: 'General' },
 ];
-
-function rendirse(motivo: string): never {
-  console.error(`\n${motivo}\n\nNo se compila a medias.`);
-  process.exit(2);
-}
-
-// ---------------------------------------------------------------------------
-// El muestreo de la textura
-// ---------------------------------------------------------------------------
-
-/**
- * sRGB → lineal, tabulado para los 256 valores de un byte.
- *
- * Es la curva de la norma, con su tramo recto abajo, y no la aproximación
- * `x^2.2`: la diferencia es pequeña pero es exactamente la que separa «el mismo
- * color que la textura» de «casi el mismo».
- */
-const A_LINEAL: readonly number[] = Array.from({ length: 256 }, (_, i) => {
-  const c = i / 255;
-  return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
-});
-
-/** lineal → sRGB, sólo para medir cuánto se pierde al cuantizar. */
-function aSrgb(lineal: number): number {
-  const c = lineal <= 0.0031308 ? lineal * 12.92 : 1.055 * lineal ** (1 / 2.4) - 0.055;
-  return c * 255;
-}
-
-/**
- * Muestrea el PNG en (u, v) con interpolación bilineal y envoltura REPEAT, y
- * devuelve el color LINEAL en [0, 1].
- *
- * Los téxeles se linealizan ANTES de interpolar, que es lo que hace la GPU con una
- * textura declarada sRGB. El `- 0,5` es el centro del téxel: la UV (0,5, 0,5) de una
- * textura de 2×2 cae justo entre los cuatro y no encima del segundo.
- */
-function muestrea(png: PngDecodificado, u: number, v: number, salida: number[]): void {
-  const { width: W, height: H, data } = png;
-  const x = u * W - 0.5;
-  const y = v * H - 0.5;
-  const x0 = Math.floor(x);
-  const y0 = Math.floor(y);
-  const fx = x - x0;
-  const fy = y - y0;
-  const envuelveX = (i: number): number => ((i % W) + W) % W;
-  const envuelveY = (j: number): number => ((j % H) + H) % H;
-  const i00 = (envuelveY(y0) * W + envuelveX(x0)) * 4;
-  const i10 = (envuelveY(y0) * W + envuelveX(x0 + 1)) * 4;
-  const i01 = (envuelveY(y0 + 1) * W + envuelveX(x0)) * 4;
-  const i11 = (envuelveY(y0 + 1) * W + envuelveX(x0 + 1)) * 4;
-  for (let c = 0; c < 3; c++) {
-    const c00 = A_LINEAL[data[i00 + c] as number] as number;
-    const c10 = A_LINEAL[data[i10 + c] as number] as number;
-    const c01 = A_LINEAL[data[i01 + c] as number] as number;
-    const c11 = A_LINEAL[data[i11 + c] as number] as number;
-    salida[c] =
-      c00 * (1 - fx) * (1 - fy) + c10 * fx * (1 - fy) + c01 * (1 - fx) * fy + c11 * fx * fy;
-  }
-}
-
-/**
- * Hornea la textura en `COLOR_0` de una primitiva y quita sus UV.
- *
- * Devuelve el peor desvío, en pasos de sRGB, entre el color muestreado y el que
- * queda tras cuantizarlo a un byte lineal — la medida de lo que cuesta guardar
- * bytes y no flotantes.
- */
-function horneaLaPrimitiva(doc: Document, prim: Primitive, png: PngDecodificado, nombre: string): number {
-  const uv = prim.getAttribute('TEXCOORD_0');
-  const pos = prim.getAttribute('POSITION');
-  if (uv === null || pos === null) rendirse(`La primitiva «${nombre}» no trae UV o posiciones: no hay nada que hornear.`);
-  if (prim.getAttribute('COLOR_0') !== null) rendirse(`La primitiva «${nombre}» ya trae COLOR_0: este pack no lo traía, algo ha cambiado.`);
-
-  const n = uv.getCount();
-  const bytes = new Uint8Array(n * 3);
-  const st = [0, 0];
-  const color = [0, 0, 0];
-  let peor = 0;
-  for (let i = 0; i < n; i++) {
-    uv.getElement(i, st);
-    muestrea(png, st[0] as number, st[1] as number, color);
-    for (let c = 0; c < 3; c++) {
-      const lineal = color[c] as number;
-      const byte = Math.max(0, Math.min(255, Math.round(lineal * 255)));
-      bytes[i * 3 + c] = byte;
-      peor = Math.max(peor, Math.abs(aSrgb(byte / 255) - aSrgb(lineal)));
-    }
-  }
-
-  const bufer = doc.getRoot().listBuffers()[0];
-  if (bufer === undefined) rendirse('El documento no tiene búfer: no se puede escribir el color.');
-  const colores: Accessor = doc
-    .createAccessor(`${nombre}_COLOR_0`)
-    .setType('VEC3')
-    .setArray(bytes)
-    .setNormalized(true)
-    .setBuffer(bufer);
-  prim.setAttribute('COLOR_0', colores);
-  /* Sin textura, las UV no las lee nadie: fuera. `prune` tira el accesor huérfano. */
-  prim.setAttribute('TEXCOORD_0', null);
-  return peor;
-}
 
 // ---------------------------------------------------------------------------
 // Los personajes
@@ -358,15 +195,7 @@ async function compilaPersonaje(
   if (materiales.length !== 1 || material === undefined) {
     rendirse(`«${personaje.fichero}» trae ${materiales.length} materiales y el horneado supone uno.`);
   }
-  const textura = material.getBaseColorTexture();
-  const imagen = textura?.getImage();
-  if (textura === null || imagen === null || imagen === undefined) {
-    rendirse(`«${personaje.fichero}» no trae textura de color base: no hay nada que hornear.`);
-  }
-  if (textura.getMimeType() !== 'image/png') {
-    rendirse(`La textura de «${personaje.fichero}» es ${textura.getMimeType()} y aquí sólo se decodifica PNG.`);
-  }
-  const png = PNG.sync.read(Buffer.from(imagen));
+  const png = pngDeLaTextura(material.getBaseColorTexture(), personaje.fichero);
 
   let vertices = 0;
   let triangulos = 0;
@@ -391,13 +220,8 @@ async function compilaPersonaje(
     }
   }
 
-  /*
-   * El material se queda con TODO lo demás del pack —rugosidad, metalicidad, doble
-   * cara— y pierde sólo la textura. El color base va a blanco porque multiplica al
-   * color del vértice: cualquier otro tono ensuciaría los seis por igual.
-   */
-  material.setBaseColorTexture(null).setBaseColorFactor([1, 1, 1, 1]);
-  textura.dispose();
+  /* Sin textura y en blanco, para que mande el vértice. Ver `hornear.ts`. */
+  desnudaElMaterial(material);
 
   await doc.transform(prune());
 
