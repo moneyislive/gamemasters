@@ -3,23 +3,39 @@
  *
  * ═══ LAS TRES DECISIONES QUE LA HACEN DE PC Y NO UNA APP ESTIRADA ═══
  *
- * 1. LA REJILLA NO ESTIRA LAS TARJETAS. Las columnas son de ancho FIJO
- *    (`repeat(auto-fill, 21rem)`), así que un monitor ancho enseña MÁS tarjetas,
- *    no tarjetas más anchas. Ese es exactamente el síntoma de una app de móvil
- *    llevada a un navegador: una columna de tarjetas de un metro de largo con un
- *    renglón de texto dentro.
+ * 1. LA REJILLA NO ESTIRA LAS TARJETAS. Las columnas son de ancho FIJO —21rem—
+ *    mientras quepan, así que un monitor ancho enseña MÁS tarjetas, no tarjetas
+ *    más anchas. Ese es exactamente el síntoma de una app de móvil llevada a un
+ *    navegador: una columna de tarjetas de un metro de largo con un renglón de
+ *    texto dentro.
  *
- * 2. EL TEXTO ES PARA UN MONITOR, NO PARA UNA MANO. La base es 17 px con
- *    interlineado ancho y los párrafos tienen `max-width` en `ch`: una línea de
- *    ciento veinte caracteres es legible en un teléfono a treinta centímetros y
- *    es un ladrillo a setenta.
+ *    LO QUE SE HA CORREGIDO, Y ES LA MITAD QUE FALTABA: una pista fija no tiene
+ *    suelo. Con `repeat(auto-fill, 21rem)` la columna medía 357 px SIEMPRE, y a
+ *    400 px de ancho de documento —una ventana de 800×600 con el zoom al 200 %—
+ *    se salía por 42 px; a 320, por 122. WCAG 1.4.10 exige que a 320 px CSS no
+ *    haya barra horizontal. Ahora la pista es `minmax(min(21rem, 100%), 21rem)`:
+ *    exactamente 21rem mientras el hueco dé para 21rem, y el hueco entero cuando
+ *    no. La decisión de arriba se conserva entera y deja de tener un borde por el
+ *    que se cae.
+ *
+ * 2. EL TEXTO ES PARA UN MONITOR, NO PARA UNA MANO. La base es 106,25 % —los 17 px
+ *    de siempre cuando el navegador viene con sus 16— con interlineado ancho y
+ *    `max-width` en `ch`: una línea de ciento veinte caracteres es legible en un
+ *    teléfono a treinta centímetros y es un ladrillo a setenta.
+ *
+ *    Y VA EN PORCENTAJE Y NO EN PÍXELES a propósito: con `font-size: 17px` en la
+ *    raíz, la preferencia de tamaño de letra del navegador —Configuración →
+ *    Apariencia → Tamaño de fuente— no hacía absolutamente nada, y como toda esta
+ *    hoja está en `rem`, quedaba anulada para el cliente entero. En porcentaje, la
+ *    proporción es la misma y la preferencia vuelve a mandar.
  *
  * 3. HAY RATÓN, ASÍ QUE HAY `hover`. Lo que se puede pulsar se dice ANTES de
  *    pulsarlo —el cursor cambia, la pieza del tablero se ilumina— y eso es
  *    información que en una pantalla táctil sencillamente no existe. Y hay
- *    `:focus-visible` en todo lo pulsable, porque quien tiene teclado navega con
- *    el tabulador y un foco invisible es una pantalla que no se puede usar sin
- *    ratón.
+ *    `:focus-visible` en todo lo pulsable, PIEZAS DEL TABLERO INCLUIDAS, porque
+ *    quien tiene teclado navega con el tabulador y un foco invisible es una
+ *    pantalla que no se puede usar sin ratón. Aquí faltaba justo en el tablero:
+ *    `hover` encendía la pieza y el teclado no encendía nada.
  *
  * ═══ Y LA IDENTIDAD, QUE YA NO ES «VERDE DE FONDO, NEÓN ENCIMA» ═══
  *
@@ -36,19 +52,36 @@
  *     acento repartido en veinte detalles se apaga; concentrado en un plano
  *     grande, brilla. Fuera de la placa, el acento aparece SÓLO donde significa
  *     «esto está vivo o se puede tocar»: un enlace, el foco, el borde de una
- *     tarjeta bajo el ratón, la tecla de un atajo, las muescas encendidas del
- *     raíl y el piloto de «se juega aquí».
+ *     tarjeta bajo el ratón, la tecla de un atajo, el botón primario, las muescas
+ *     encendidas del raíl y el piloto de «se juega aquí».
  *   · EL ORNAMENTO CUENTA ALGO: el raíl de muescas dice el aforo antes de leer
- *     una palabra. Ver `.aforo`, más abajo.
+ *     una palabra. Ver `.aforo`, más abajo — y leer ahí lo que este pilar sigue
+ *     debiendo, que es marcado y no estilo.
  *
  * ═══ SIGUEN SIENDO DOS TABLAS Y NO UNA ═══
  *
  * La misma tabla existe en `app/src/arcade/muebles.ts`, y no se comparte el
  * fichero: compartir la hoja de estilo sería la primera costura por la que el
  * escritorio y el móvil se vuelven la misma cosa. Lo que se comparte es la
- * DECISIÓN —los catorce colores, los radios, la anatomía de la ficha, la cuenta
- * de aforo—, no el fichero. Esto no es del taller de veladas: no se toma nada de
+ * DECISIÓN, no el fichero. Esto no es del taller de veladas: no se toma nada de
  * allí, ni su tema, ni sus tipos, ni sus componentes.
+ *
+ * QUÉ COINCIDE HOY, DICHO CON LA LISTA DELANTE Y NO DE MEMORIA. Aquí ponía que se
+ * compartían «los catorce colores, los radios, la anatomía de la ficha, la cuenta
+ * de aforo», y de las cuatro sólo la primera era cierta:
+ *
+ *   · LOS CATORCE COLORES: sí, uno a uno con `SALA`.
+ *   · LOS CUATRO TEMAS: sí, desde ahora. Antes no había ninguno — ver la tabla.
+ *   · LOS TRES ESTADOS DE BOTÓN: sí, desde ahora. Antes había uno.
+ *   · LOS RADIOS: sí, desde ahora. Faltaba el 20 de `RADIO.tarjeta` y la tarjeta
+ *     usaba el 14 de panel.
+ *   · LA CUENTA DE AFORO: las MEDIDAS sí, desde ahora —tres de sus cuatro números
+ *     divergían—. El raíl PINTADO no: las reglas están listas y el marcado que las
+ *     monta vive en `catalogo.tsx`, que es otro fichero. Está dicho en `.aforo`.
+ *   · LA ANATOMÍA DE LA FICHA: NO, y no es un olvido pendiente de un rato. Aquí es
+ *     una rejilla apaisada de 357 px y allí es un retrato de 252×392 en carrusel,
+ *     con portada, pastilla de estado y luz de esquina. Es la regla 7 de la casa y
+ *     este cliente no la cumple; cambiarla es rehacer `catalogo.tsx` entero.
  *
  * Y hay un sitio donde las dos tablas dicen lo mismo y se usan distinto, a
  * propósito y dicho aquí para que no parezca un despiste: `--cifra`. Ver su
@@ -80,16 +113,22 @@
   /* El texto secundario: lo que acompaña y no se lee primero. */
   --tenue: #8c94a5;
   /*
-   * Los rótulos pequeños y las cifras de apoyo — y AQUÍ NO PINTA TEXTO.
+   * EL VALOR ESTÁ PORQUE LAS DOS TABLAS COMPARTEN LOS CATORCE COLORES. EN ESTE
+   * CLIENTE NO PINTA NADA, y conviene que se lea aquí y no que se descubra:
    *
-   * Sobre `--teja` da 3,2:1, que es el mismo contraste que tenía el turquesa
-   * apagado de la Sala anterior (3,11:1) y que era su peor flaqueza medible.
-   * Reintroducirlo en un cliente donde la letra pequeña se mira a setenta
-   * centímetros sería cambiarle el tono al mismo fallo. Así que aquí `--cifra`
-   * pinta GRÁFICOS —las muescas apagadas del raíl, donde 3:1 es el mínimo que
-   * corresponde y se cumple— y todo rótulo que haya que LEER va en `--tenue`,
-   * que da 6:1. El valor es el de la tabla compartida; el reparto es de este
-   * cliente, que es justo lo que significa tener dos tablas.
+   *   · Como TINTA da 3,11:1 sobre `--teja`, que es el mismo contraste que tenía
+   *     el turquesa apagado de la Sala anterior y que era su peor flaqueza
+   *     medible. Todo rótulo que haya que LEER va en `--tenue`, que da 6,50 sobre
+   *     el suelo y 5,94 sobre la teja.
+   *   · Como GRÁFICO lo tuvo la muesca apagada del raíl, y se le quitó: al 34 % la
+   *     apagada se separa de su fondo por 1,80 sobre el acento en ámbar, o sea que
+   *     desaparece — y son las apagadas las que dibujan el LARGO, que es lo único
+   *     que el raíl informa. Ahora va en `--muesca-fria`, blanco al 70 %, que es
+   *     la corrección que la app ya había medido.
+   *
+   * O sea que el reparto sigue siendo de este cliente, que es justo lo que
+   * significa tener dos tablas; lo que ha cambiado es que ya no le queda ningún
+   * píxel.
    */
   --cifra: rgba(255, 255, 255, 0.34);
   /* El blanco de énfasis: sobre la placa de acento, y las cifras grandes. */
@@ -97,27 +136,35 @@
 
   /* ══════ LOS TRES QUE SÍ SE TIÑEN ══════ */
 
-  /* El color que brilla. Vive en la placa del nombre, en el piloto y en el filo de lo pulsable. */
+  /*
+   * VIOLETA ES EL VALOR POR DEFECTO Y NO EL ÚNICO. Aquí había tres literales
+   * violeta y un comentario que decía que «cambiando estos tres se repinta la Sala
+   * entera de ámbar, de verde o de carmesí»: eso describía una EDICIÓN A MANO como
+   * si fuera la funcionalidad. No había ni un `data-tema`, ni un `setProperty`, ni
+   * nada que reescribiera estos tres valores en ningún fichero del cliente — o sea
+   * que nadie había visto nunca esta Sala en otro tema, y por eso nadie había
+   * medido los otros tres.
+   *
+   * Y eso importa porque LA TABLA DE CUATRO ES LO QUE OBLIGA A MEDIR LOS CUATRO.
+   * El fallo que la casa ha corregido tres veces —blanco sobre el acento vivo: 5,01
+   * bien en violeta, 1,98:1 en ámbar— entra siempre por el mismo sitio, que es
+   * defender una decisión con el número del violeta. Los cuatro bloques de abajo
+   * son lo que hace que ese argumento ya no se pueda escribir.
+   */
   --acento: #a855f7;
   /* Su fondo, para el degradado de la placa. */
   --acento-hondo: #6d28d9;
   /* El mismo color casi transparente: resplandores y auras. */
   --halo: rgba(168, 85, 247, 0.2);
 
-  /*
-   * Cambiando estos tres se repinta la Sala entera de ámbar, de verde o de
-   * carmesí, y NINGÚN otro valor de esta hoja hay que tocar. Es la prueba de que
-   * lo que la sostiene es el gris frío y el filo de un píxel, no el violeta: si
-   * repintarla exigiera tocar más de tres líneas, sería que el violeta estaba
-   * haciendo de estructura. Por eso no hay ni un solo `rgba()` del acento suelto
-   * más abajo — el único que existe es `--halo`, y está aquí.
-   */
-
   /* ══════ Y UNO QUE NO ES NINGUNA DE LAS DOS COSAS ══════ */
 
   /*
    * Lo que quema y lo que se acaba. NO se tiñe con el tema: si se tiñera, el
-   * aviso diría lo mismo que la placa del nombre y dejaría de avisar.
+   * aviso diría lo mismo que la placa del nombre y dejaría de avisar. Con el tema
+   * en ÁMBAR este naranja se le parece, y se aguanta porque no coinciden nunca en
+   * la misma pantalla —la placa es de la Sala y la alarma es de dentro de una
+   * partida—; el día que coincidan hay que resolverlo, no ignorarlo.
    */
   --alarma: #ff7a45;
 
@@ -127,27 +174,105 @@
    * Una hoja de estilo no puede importar `conAlfa`, que es lo que hace la app
    * para no repetir un color con otra transparencia. El equivalente honrado en
    * CSS es declarar el derivado UNA vez y aquí, que es donde va todo valor de
-   * color. Los dos que hacen falta salen de colores que no se tiñen nunca —el
-   * negro de una sombra y `--alarma`—, así que ninguno rompe la promesa de los
-   * tres de arriba.
+   * color. TODOS salen de colores que no se tiñen nunca —el negro, el blanco, el
+   * suelo y `--alarma`—, así que ninguno rompe la promesa de los tres de arriba.
    */
   --sombra: rgba(0, 0, 0, 0.85);
   --alarma-velo: rgba(255, 122, 69, 0.09);
+
+  /*
+   * EL VELO DE LA PORTADA: `--suelo` al 38 %, y no es decoración.
+   *
+   * Es la pieza que la app escribió entera (`VeloDeLaPortada`) y que aquí faltaba.
+   * Sin él, el blanco sobre el extremo hondo del degradado da 6,57 en violeta pero
+   * 4,64 en ámbar y en verde: pasa el mínimo de 4,5 por CATORCE CENTÉSIMAS, y
+   * cualquier cosa que lo roce —un `opacity` en un contenedor, una animación de
+   * entrada, un modo de ahorro que atenúe la pantalla— lo rompe sin que ninguna
+   * comprobación se entere, porque en este cliente no hay ninguna que mire esto.
+   *
+   * MEDIDO CON EL VELO PUESTO, blanco sobre hondo + velo: 10,65 violeta · 8,51
+   * ámbar · 8,46 verde · 11,65 carmesí. Y con el halo del nombre encima en su
+   * punto más claro, el peor de los cuatro sigue en 7,44.
+   *
+   * Y es la pieza que deja la placa PREPARADA PARA LA FOTO: el día que aquí entre
+   * una imagen del juego, todos los números medidos contra el degradado dejan de
+   * valer y lo único que sigue valiendo es esto — se sube el 0,38 y ya está.
+   */
+  --velo: rgba(8, 10, 14, 0.38);
+  --velo-nada: rgba(8, 10, 14, 0);
+
+  /*
+   * EL ARO DE UN PILOTO APAGADO: blanco al 55 %, que es el `pilotoFrio` de la app.
+   *
+   * Estuvo en `--filo-vivo` —blanco al 14 %—, que es exactamente el valor que la
+   * app documenta como «no se ve» al contar por qué existe `piezas.tsx`: da 1,46:1
+   * sobre `--pared`, con un mínimo de 3:1 para un elemento no textual. Al 55 % da
+   * 6,24. Es el mismo fallo que allí, corregido con el mismo número.
+   */
+  --aro-frio: rgba(255, 255, 255, 0.55);
+
+  /*
+   * EL FILO DE UN CONTROL DE FORMULARIO: blanco al 45 %.
+   *
+   * WCAG 1.4.11 pide 3:1 para el CONTORNO de un control, y aquí no lo daba ni el
+   * relleno ni el borde: `--suelo` dentro de un panel de `--teja` se recorta por
+   * 1,09:1, y `--filo-vivo` compuesto encima, por 1,30. O sea que en el vestíbulo
+   * no se distinguía dónde había que escribir: la única pista era el texto de
+   * ejemplo, que desaparece al teclear la primera letra.
+   *
+   * Al 45 % el borde da 4,10 contra el panel y 4,48 contra el relleno del propio
+   * campo: recorta por los dos lados, que es lo que hace que una caja se lea como
+   * una caja. Es blanco con alfa, como los otros dos filos, así que el mismo valor
+   * vale sobre el suelo y sobre la teja sin declarar dos.
+   */
+  --filo-de-control: rgba(255, 255, 255, 0.45);
 
   /* ══════ LOS REDONDEOS. Pocos y con un trabajo cada uno. ══════ */
 
   /* Una ficha de máquina, un panel, el lienzo del tablero. */
   --radio-ficha: 14px;
+  /*
+   * UNA TARJETA DE LA SALA, Y ES MÁS REDONDA QUE UN PANEL A PROPÓSITO. Son los 20
+   * de `RADIO.tarjeta`, que la casa copió de la tarjeta de velada del carrusel
+   * porque las dos viven a un dedo de distancia y ahí un radio distinto no se lee
+   * como dos familias sino como un descuido. Aquí faltaba, y la tarjeta usaba el 14
+   * de panel: eran dos radios donde la casa tiene tres.
+   */
+  --radio-tarjeta: 20px;
   /* Un botón, una pastilla, un campo, la tecla de un atajo. */
   --radio-mando: 8px;
 
   /* ══════ LA CUENTA DE AFORO ══════ */
 
+  /*
+   * LOS CINCO NÚMEROS SON LOS DE `CUENTA_DE_AFORO`, uno a uno. Divergían tres de
+   * cuatro —hueco 19 contra 13, alta 16 contra 15, radio 2 contra 1— que es
+   * exactamente el fallo de «dos tablas» que la cabecera de este fichero dice estar
+   * administrando, cometido dentro de la propia tabla.
+   *
+   * EL RADIO ES 1 Y NO 2, y está medido allí: con 2, una muesca apagada —3 de
+   * ancho por 7 de alto— sale redondeada hasta parecer un punto, y el raíl deja de
+   * leerse como una cuenta de rayas para leerse como una fila de lunares.
+   *
+   * EL HUECO ES 13 porque con 22 un aforo de doce medía 278 y se salía de una
+   * tarjeta de 252; con 13 mide 179 y cabe. Aquí la tarjeta es de 357 y cabría
+   * igual con 19, pero dos números para la misma cosa es lo que se pasa la vida
+   * divergiendo: el raíl más largo de la Sala mide lo mismo en los dos clientes.
+   */
   --muesca-grosor: 3px;
-  /* La diferencia entre estos dos altos es lo que de verdad se lee. */
-  --muesca-alta: 16px;
+  /* La diferencia entre estos dos altos es lo que de verdad se lee, nunca el alfa. */
+  --muesca-alta: 15px;
   --muesca-baja: 7px;
-  --muesca-hueco: 19px;
+  --muesca-hueco: 13px;
+  --muesca-radio: 1px;
+  /*
+   * LA APAGADA VA AL 70 % DE BLANCO. Estuvo en `--cifra` —34 %—, que sobre la teja
+   * da 3,11 y pasa raspando, pero sobre el acento vivo de una portada da entre 1,29
+   * y 1,64: desaparece. Al 70 % da 9,24 sobre la teja y aguanta los tres fondos
+   * donde este raíl puede acabar viviendo, que es la razón por la que la app lo
+   * subió. La distinción encendida/apagada la llevan los 15 px contra los 7.
+   */
+  --muesca-fria: rgba(255, 255, 255, 0.7);
 
   /* ══════ LAS LETRAS ══════ */
 
@@ -169,11 +294,18 @@
   --letra-dato: 'Cascadia Mono', Consolas, ui-monospace, monospace;
 
   /*
-   * EL SUELO DEL TAMAÑO DE LETRA. Nada baja de 13 px, y con la base en 17 px eso
-   * son 0.78rem. Está escrito como constante para que al ajustar un rótulo se
-   * vea contra qué se está ajustando.
+   * EL SUELO DEL TAMAÑO DE LETRA, Y AHORA ES UN SUELO DE VERDAD.
+   *
+   * Era `0.78rem`, que con la raíz clavada en 17 px daba 13,26 y cumplía. Pero la
+   * raíz ya no está clavada —va en porcentaje para que la preferencia del
+   * navegador sirva de algo—, y `0.78rem` de una raíz de 16 son 12,48: todo el
+   * fichero se habría metido por debajo del mínimo sin que nada avisara.
+   *
+   * Con `max()` el 13 es un número absoluto y el 0,78 es la proporción: quien
+   * amplía la letra ve crecer esto con todo lo demás, y quien la reduce se para
+   * en 13. Nada de esta hoja baja de ahí.
    */
-  --letra-minima: 0.78rem;
+  --letra-minima: max(13px, 0.78rem);
 
   /*
    * ══════ Y UNA DECLARACIÓN QUE NO ES UN COLOR PERO PINTA ══════
@@ -187,18 +319,68 @@
   color-scheme: dark;
 }
 
+/*
+ * ═══ LOS CUATRO TEMAS ═══
+ *
+ * Son los de `TEMAS_DE_SALA`, valor a valor. Sólo se mueven tres de los catorce
+ * colores, y que la tabla sea tan corta ES la prueba de que la identidad no
+ * depende del color: si repintar la Sala entera exigiera tocar más de tres cosas,
+ * sería que el violeta estaba haciendo de estructura.
+ *
+ * EL SELECTOR NO LLEVA `:root` a propósito. Así el atributo puede ir en el `<html>`
+ * —que es lo que hará quien guarde una preferencia— o en el `.sala` de una pantalla
+ * suelta, sin que esta hoja tenga que decidirlo. Como `[data-tema]` y `:root` pesan
+ * lo mismo (0,1,0), estos bloques van DESPUÉS y por eso ganan.
+ *
+ * Y el violeta está declarado dos veces —arriba sin atributo y aquí con él— porque
+ * son dos cosas distintas: arriba es «lo que se ve si nadie ha elegido», aquí es
+ * «lo que se ve si alguien ha elegido violeta». Sin la segunda, `data-tema="violeta"`
+ * heredaría el tema anterior en cuanto alguien cambie el valor por defecto.
+ */
+[data-tema='violeta'] {
+  --acento: #a855f7;
+  --acento-hondo: #6d28d9;
+  --halo: rgba(168, 85, 247, 0.2);
+}
+
+[data-tema='ambar'] {
+  --acento: #f59e0b;
+  --acento-hondo: #b45309;
+  --halo: rgba(245, 158, 11, 0.2);
+}
+
+[data-tema='verde'] {
+  --acento: #22c55e;
+  --acento-hondo: #15803d;
+  --halo: rgba(34, 197, 94, 0.2);
+}
+
+[data-tema='carmesi'] {
+  --acento: #f43f5e;
+  --acento-hondo: #9f1239;
+  --halo: rgba(244, 63, 94, 0.2);
+}
+
 * {
   box-sizing: border-box;
 }
 
-html,
+/*
+ * LA RAÍZ EN PORCENTAJE Y EL CUERPO EN `rem`, y no las dos en porcentaje: dos
+ * declaraciones de `106.25%` se multiplican —17 px pasarían a 18,06— y ése es el
+ * error clásico de mover esto de píxeles a porcentaje.
+ */
+html {
+  font-size: 106.25%;
+}
+
 body {
   margin: 0;
   padding: 0;
   background: var(--suelo);
   color: var(--palabra);
   font-family: var(--letra);
-  font-size: 17px;
+  font-size: 1rem;
   line-height: 1.6;
 }
 
@@ -219,11 +401,38 @@ code {
   background: var(--teja-alta);
   border-radius: 4px;
   padding: 0.1em 0.35em;
+  overflow-wrap: anywhere;
 }
 
 :focus-visible {
   outline: 2px solid var(--acento);
   outline-offset: 3px;
+}
+
+/*
+ * ═══ QUIEN HA PEDIDO QUE LAS COSAS NO SE MUEVAN ═══
+ *
+ * `prefers-reduced-motion` no es una preferencia estética: hay quien se marea. La
+ * app lo respeta con `useMenosMovimiento` y esta hoja no lo respetaba en ningún
+ * sitio, teniendo transiciones en la tarjeta, en el botón y en la cabecera, y un
+ * `translateY(-2px)` al pasar el ratón.
+ *
+ * No se apaga el CAMBIO —el borde sigue encendiéndose, que es la información— se
+ * apaga el viaje hasta él.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .tarjeta-jugable:hover {
+    transform: none;
+  }
 }
 
 /* --- El armazón ---------------------------------------------------------- */
@@ -240,11 +449,18 @@ code {
     var(--suelo);
 }
 
+/*
+ * EL RELLENO LATERAL CEDE ANTES QUE EL CONTENIDO. Los 2,5rem de cada lado son 85 px
+ * de los 320 que WCAG 1.4.10 pone como suelo: más de una cuarta parte del ancho
+ * gastada en margen justo cuando no sobra ninguno. Con `clamp` valen 2,5rem desde
+ * los ~1060 px de ventana y bajan a 1rem cuando el hueco aprieta.
+ */
 .cabecera {
   display: flex;
   align-items: baseline;
+  flex-wrap: wrap;
   gap: 1rem;
-  padding: 1rem 2.5rem;
+  padding: 1rem clamp(1rem, 4vw, 2.5rem);
   background: var(--pared);
   border-bottom: 1px solid var(--filo);
 }
@@ -283,7 +499,7 @@ code {
 .dentro {
   max-width: 92rem;
   margin: 0 auto;
-  padding: 2rem 2.5rem 4rem;
+  padding: 2rem clamp(1rem, 4vw, 2.5rem) 4rem;
 }
 
 .titulo {
@@ -293,6 +509,7 @@ code {
   text-transform: uppercase;
   color: var(--palabra);
   margin: 0 0 0.25rem;
+  overflow-wrap: break-word;
 }
 
 .entradilla,
@@ -305,10 +522,23 @@ code {
   margin: 0 0 2rem;
 }
 
+/*
+ * `overflow-wrap` porque por aquí sale el ENLACE ENTERO de la mesa —origen, ruta,
+ * identificador del arcade y código— dentro de un raíl de 22rem. `.ficha dd` ya lo
+ * llevaba; aquí faltaba, y con un dominio largo la URL asomaba por el borde del
+ * panel. `anywhere` y no `break-word` para el enlace: una dirección no tiene
+ * espacios donde partirse.
+ */
 .letra-chica {
   font-size: 0.9rem;
   color: var(--tenue);
   max-width: 68ch;
+  overflow-wrap: break-word;
+}
+
+.letra-chica a,
+.panel a {
+  overflow-wrap: anywhere;
 }
 
 /*
@@ -322,6 +552,10 @@ code {
  * izquierda y el velo— y el texto se queda en `--palabra`, que es lo que hay que
  * leer. `AvisoPuesto` ya sabe de dónde viene cada aviso; el día que ese origen
  * llegue al marcado, esta regla se puede partir en dos de verdad.
+ *
+ * Y LO QUE ESTA REGLA NO PUEDE COMPRAR: que el aviso se ANUNCIE. Interrumpe sólo
+ * en lo visual, así que quien no lo esté mirando no se entera de que se acabó el
+ * tiempo. Eso es `role="alert"` en el marcado de `sala.tsx`, no un color.
  */
 .aviso {
   border-left: 3px solid var(--alarma);
@@ -335,9 +569,23 @@ code {
 
 /* --- El catálogo --------------------------------------------------------- */
 
+/*
+ * LA PISTA ES FIJA MIENTRAS QUEPA Y NUNCA MÁS ANCHA QUE EL HUECO.
+ *
+ * `minmax(min(21rem, 100%), 21rem)` se lee así: el máximo es siempre 21rem, y el
+ * mínimo es 21rem cuando el contenedor da para 21rem y el contenedor entero cuando
+ * no. O sea que por encima de ~442 px de documento se comporta EXACTAMENTE igual
+ * que la pista fija que había —357 px clavados, un monitor ancho enseña más
+ * tarjetas y no tarjetas más gordas— y por debajo se encoge en vez de salirse.
+ *
+ * MEDIDO: útil = ancho − relleno. A 1920 caben 4 columnas, a 1280 caben 3, a 1024
+ * caben 2, a 800 cabe 1 con hueco de sobra. A 400 —una ventana de 800×600 al 200 %
+ * de zoom— la pista antigua medía 357 en 315 útiles y se salía por 42 px; a 320 se
+ * salía por 122. Ahora la columna vale 286 y 286, y no hay barra horizontal.
+ */
 .rejilla {
   display: grid;
-  grid-template-columns: repeat(auto-fill, 21rem);
+  grid-template-columns: repeat(auto-fill, minmax(min(21rem, 100%), 21rem));
   justify-content: start;
   gap: 1.25rem;
 }
@@ -353,16 +601,46 @@ code {
  *
  * `overflow: hidden` es lo que hace que la placa respete el redondeo sin tener
  * que redondearla otra vez por su cuenta.
+ *
+ * ═══ EL ALTO MÍNIMO ES 19rem, Y ES LA CUENTA DE LAS TARJETAS FANTASMA ═══
+ *
+ * Estaba en 15rem —255 px— y la tarjeta fantasma no declara alto propio: heredaba
+ * ese mínimo y su contenido sólo suma 120,7, así que medía 255 clavados. Una
+ * tarjeta de verdad es la suma de cinco franjas: 276,10 la más corta, 319,40 la
+ * típica y 387,15 la de gancho largo. O sea que al llegar el catálogo cada fila
+ * crecía DE GOLPE entre 21 y 132 px y todo lo de abajo bajaba — exactamente el
+ * tirón que el comentario de `catalogo.tsx` dice que las fantasma existen para no
+ * tener.
+ *
+ * Con 19rem —323 px— la fantasma y la tarjeta típica miden lo mismo, y lo único
+ * que puede empujar es una fila con un gancho de tres líneas, que salta 64 en vez
+ * de 132. Subirlo hasta 387 quitaría el salto entero a cambio de reservar un
+ * palmo de vacío debajo de cada tarjeta corta, que se ve siempre y no sólo al
+ * cargar.
+ *
+ * Y ESTE NÚMERO CADUCA EL DÍA QUE EL RAÍL SE MONTE. Las tres cifras de arriba son
+ * de la tarjeta de HOY, que empieza por la placa; `.aforo` añade 36 px —0,85rem de
+ * relleno arriba, 15 de muesca, 0,4rem abajo y el filo— así que en cuanto
+ * `catalogo.tsx` lo pinte pasan a 312 · 355 · 423 y esto hay que volver a medirlo.
+ * Se deja dicho aquí porque es la clase de número que nadie vuelve a mirar.
  */
 .tarjeta {
   display: flex;
   flex-direction: column;
   background: var(--teja);
   border: 1px solid var(--filo);
-  border-radius: var(--radio-ficha);
+  border-radius: var(--radio-tarjeta);
   overflow: hidden;
   padding: 0;
-  min-height: 15rem;
+  /*
+   * ESTE NÚMERO CADUCÓ EL DÍA QUE EL RAÍL SE MONTÓ, y la propia hoja lo había
+   * dejado avisado. Con el raíl puesto la tarjeta típica mide 355 px y la fantasma
+   * medía 323 (19rem), así que al llegar el catálogo la fila daba un salto de unos
+   * 32 px: la pantalla se movía sola justo cuando alguien acababa de posar la
+   * mirada. 21rem son 357, que es el alto de una tarjeta con raíl y tres datos.
+   */
+  min-height: 21rem;
+  min-width: 0;
   text-decoration: none;
   color: inherit;
 }
@@ -379,17 +657,29 @@ code {
  * Viene de una orla de bombillas de feria y se quedó sin el disfraz al
  * modernizarla: la cuenta es lo que valía, la bombilla era la época.
  *
- * EL MARCADO QUE ESTO ESPERA, y que hoy NO EXISTE porque vive en `catalogo.tsx`
- * y ese fichero no es de esta tarea: dentro de `.tarjeta`, antes del nombre, un
- * `<span class="aforo">` con un `<i class="muesca">` por cada `jugadores.maximo`
- * y `class="muesca muesca-viva"` en los primeros `jugadores.minimo`. Mientras no
- * lo haya, esta regla no pinta nada y la ficha empieza por la placa; no sobra
- * ninguna otra parte de la anatomía.
+ * ═══ Y HOY NO SE PINTA, QUE ES LA DEUDA DE ESTE FICHERO ═══
  *
- * Y envuelve en vez de recortar: con un aforo largo, una segunda fila enseña
- * todas las muescas y una tercera de más leería mal la longitud, pero un raíl
- * cortado por `overflow` diría un aforo que no es. Un ornamento que cuenta no
- * puede contar mal.
+ * Estas tres reglas no las lleva ni un elemento: la cabecera vende el raíl como
+ * uno de los tres pilares de la identidad del cliente y media Sala está sin su
+ * ornamento. No es una regla muerta que se pueda borrar —es la que falta por
+ * enchufar— así que se deja LISTA Y MEDIDA, y el marcado es de `catalogo.tsx`:
+ *
+ *     <span class="aforo" role="img"
+ *           aria-label="Aforo: de 2 a 6 personas">
+ *       <i class="muesca muesca-viva" /> …tantas como `jugadores.minimo`
+ *       <i class="muesca" />            …hasta `jugadores.maximo`
+ *     </span>
+ *
+ * dentro de `.tarjeta` y antes del nombre. La etiqueta hablada NO es opcional y
+ * NO es la fórmula genérica: con `minimo === maximo` se dice «Aforo: 1 persona»,
+ * porque «de uno a uno jugadores» es lo que un lector de pantalla leía en las dos
+ * máquinas de un solo jugador, que son dos de las cinco.
+ *
+ * Y ENVUELVE EN VEZ DE RECORTAR: con un aforo largo, una segunda fila enseña todas
+ * las muescas, pero un raíl cortado por `overflow` diría un aforo que no es. Un
+ * ornamento que cuenta no puede contar mal. La app resuelve lo mismo encogiendo el
+ * hueco porque allí el raíl vive dentro de una portada de alto fijo; aquí la ficha
+ * puede crecer, así que envuelve.
  */
 .aforo {
   display: flex;
@@ -405,8 +695,8 @@ code {
   flex: none;
   width: var(--muesca-grosor);
   height: var(--muesca-baja);
-  border-radius: 2px;
-  background: var(--cifra);
+  border-radius: var(--muesca-radio);
+  background: var(--muesca-fria);
 }
 
 .muesca-viva {
@@ -420,15 +710,11 @@ code {
  *
  * La placa es el nombre Y el gancho, y en el marcado son dos hermanos sin nada
  * que los envuelva. El degradado se reparte entre los dos y la costura no se ve
- * porque la mitad de abajo ARRANCA en `--acento`, que es exactamente el color en
- * el que termina la de arriba. El resultado es un solo plano que se hunde hacia
- * `--acento-hondo`, igual que la maqueta, sin pedir un `<div>` que no existe.
+ * porque la mitad de abajo ARRANCA en `--acento-hondo`, que es exactamente el
+ * color en el que termina la de arriba. El resultado es un solo plano que se
+ * hunde, igual que la maqueta, sin pedir un `<div>` que no existe.
  *
- * El resplandor de la esquina es `--halo`, o sea el mismo acento: no es un brillo
- * de material, es la luz del propio color.
- */
-/*
- * EL NOMBRE NO SE APOYA EN EL ACENTO VIVO, Y ESO NO ES OPCIONAL.
+ * ═══ EL NOMBRE NO SE APOYA EN EL ACENTO VIVO, Y ESO NO ES OPCIONAL ═══
  *
  * Aquí ponía `var(--acento)` plano, con el argumento de que el blanco sobre él da
  * 3,6:1 y que para un titular de 800 el mínimo son 3:1. Es cierto EN VIOLETA y
@@ -439,18 +725,32 @@ code {
  * La franja viva se conserva —es la decisión de que el color viva en un sitio y
  * sea grande— pero va ENCIMA del texto y no debajo: el degradado toca fondo a los
  * 2,3rem y el nombre empieza a los 2,4rem, así que TODO el texto de la placa se
- * apoya en `--acento-hondo`, donde el blanco da 4,64:1 en el peor de los cuatro
- * temas. Las paradas van en rem y no en porcentaje a propósito: un porcentaje
- * depende del alto del elemento, y el alto depende de si el nombre ocupa una
- * línea o dos.
+ * apoya en `--acento-hondo`. Las paradas van en rem y no en porcentaje a
+ * propósito: un porcentaje depende del alto del elemento, y el alto depende de si
+ * el nombre ocupa una línea o dos.
  *
- * Es el mismo sitio al que llega la app por otro camino: allí la placa tiene alto
- * mínimo y el texto va pegado abajo con `flex-end`.
+ * ═══ Y EL ORDEN DE LAS CAPAS, QUE ESTABA AL REVÉS ═══
+ *
+ * En CSS la PRIMERA capa de `background` es la de ARRIBA. El halo estaba primero,
+ * o sea encima del degradado, o sea aclarando justo lo que sostiene al texto:
+ * bajaba el blanco de 6,57 a 6,48 en violeta y de 4,64 a 4,54 en ámbar y en verde,
+ * y a 4,40 con el nombre a dos líneas. Empujaba al lado malo del mínimo el único
+ * número que ya iba justo.
+ *
+ * Ahora el orden es VELO, HALO, DEGRADADO, que es el mismo de la app: la luz de la
+ * esquina se conserva —un campo de acento sin radial es una mancha— y el velo va
+ * por encima de ella, así que el peor caso de los cuatro temas con el halo a plena
+ * potencia queda en 7,44 en vez de en 4,40.
+ *
+ * El velo empieza transparente y llega a pleno a los 2,4rem, o sea justo donde
+ * empieza el texto: la franja de acento VIVO de arriba se queda intacta y sigue
+ * brillando, que es lo que se estaba protegiendo.
  */
 .nombre-del-arcade {
   margin: 0;
   padding: 2.4rem 1.1rem 0;
   background:
+    linear-gradient(180deg, var(--velo-nada) 0, var(--velo-nada) 1.1rem, var(--velo) 2.4rem),
     radial-gradient(120% 190% at 12% -30%, var(--halo) 0%, transparent 66%),
     linear-gradient(
       180deg,
@@ -464,70 +764,91 @@ code {
   line-height: 1.15;
   letter-spacing: 0.06em;
   text-transform: uppercase;
+  overflow-wrap: break-word;
 }
 
 /*
  * EL GANCHO YA NACE EN EL HONDO. Antes arrancaba en `--acento` y se hundía en el
  * primer 40 % del párrafo, que en violeta bastaba y en ámbar y en verde no: su
  * primera línea caía sobre una mezcla a medio camino. Ahora el color viene ya
- * hundido desde el nombre, así que aquí es plano y no hay costura: los dos
- * hermanos comparten el mismo `--acento-hondo`.
+ * hundido desde el nombre, así que aquí es plano y no hay costura.
+ *
+ * Y lleva el VELO entero encima, sin degradar, porque aquí ya no queda nada de
+ * acento vivo que proteger: es todo texto. Blanco sobre hondo pelado da 4,64 en
+ * ámbar y en verde —catorce centésimas de margen— y con el velo, 8,51 y 8,46.
+ * A 0,95rem el gancho es texto normal y le toca 4,5, no el 3 de un titular.
  */
 .gancho {
   margin: 0;
   padding: 0.5rem 1.1rem 1.05rem;
-  background: var(--acento-hondo);
+  background: linear-gradient(var(--velo), var(--velo)), var(--acento-hondo);
   color: var(--blanco);
   font-size: 0.95rem;
   line-height: 1.45;
+  overflow-wrap: break-word;
 }
 
 /* Los tres datos, cada uno con su rótulo encima, en la franja levantada. */
-.ficha {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
+/*
+ * ═══ LA LÍNEA DE DATOS, QUE ERA UNA TABLA DE TRES COLUMNAS ═══
+ *
+ * Aquí había un `<dl>` en `grid-template-columns: repeat(3, 1fr)` con las tres
+ * celdas de JUGADORES · MESA · MUEBLE, y se rompía por la misma razón por la que
+ * la app retiró la suya: la columna útil mide 89,4 px y las palabras no caben.
+ * Se veía en pantalla —«FORMULARIO» partido en «FORMULARI / O» en la celda del
+ * mueble— y el propio comentario de la celda de al lado admitía que «PERSONAS»
+ * tampoco entraba, y por eso decía «2 a 6» en vez de la frase entera.
+ *
+ * Una tabla que se rompe es peor que una frase que se lee. Los mismos datos van
+ * ahora en dos renglones, exactamente como en la tarjeta de la app: primero
+ * cuántos caben y a qué ritmo va, y debajo, en letra menuda, dónde corre la
+ * partida y si esconde algo.
+ *
+ * ═══ Y EL MUEBLE YA NO SE ENSEÑA CRUDO ═══
+ *
+ * Decía «formulario», «lienzo», «tablero»: el identificador interno del mueble,
+ * que a quien juega no le dice nada y a «LA FRENTE» le ponía encima una palabra
+ * que describe cómo está hecha la pantalla y no a qué se juega. No se pierde
+ * ningún dato: la tarjeta ya trae debajo la frase que SÍ es para quien juega
+ * —`MUEBLES[…].loQueEs`, «Botones y listas. La plataforma pregunta al juego…»—
+ * y ésa se queda.
+ *
+ * Este cambio no lo podía hacer ninguno de los dos ficheros por su cuenta: la
+ * hoja no podía tocar el marcado y el marcado no podía tocar la hoja. Es la
+ * clase de arreglo que se queda sin hacer cuando cada uno mira su mitad.
+ */
+.datos-de-la-ficha {
   margin: 0;
-  padding: 0.7rem 0 0.75rem;
+  padding: 0.7rem 1.1rem 0;
   background: var(--teja-alta);
   border-top: 1px solid var(--filo);
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: var(--palabra);
+}
+
+/*
+ * La menuda va un escalón por debajo, y el escalón lo da el CUERPO y no una
+ * rebaja de alfa: `--tenue` entero sobre `--teja-alta` da 5,55:1, y bajarle la
+ * transparencia para «suavizar» es exactamente lo que la regla 6 prohíbe.
+ */
+.menudos-de-la-ficha {
+  margin: 0;
+  padding: 0.15rem 1.1rem 0.75rem;
+  background: var(--teja-alta);
   font-size: var(--letra-minima);
-}
-
-.ficha > div {
-  padding: 0 0.85rem;
-  min-width: 0;
-}
-
-.ficha > div + div {
-  border-left: 1px solid var(--filo);
-}
-
-.ficha dt {
-  font-family: var(--letra-dato);
-  font-size: var(--letra-minima);
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+  line-height: 1.45;
   color: var(--tenue);
 }
 
 /*
- * El VALOR va en el palo seco y no en mono, aunque el rótulo de encima sí lo
- * lleve: es lo que hace la maqueta, y la razón se ve en una columna de trescientos
- * píxeles partida en tres. «En el aparato» en monoespaciada no cabe en su celda y
- * se parte por la mitad; en palo seco entra. La mono se guarda para lo que de
- * verdad es una medida —los rótulos, el aforo, el código de la mesa—, y las
- * columnas las cuadra `tabular-nums`, que no cuesta ningún fichero.
+ * Y cuando no hay línea menuda, el relleno de abajo lo tiene que poner la de
+ * datos: si no, la franja se corta a ras del texto.
  */
-.ficha dd {
-  margin: 0.25rem 0 0;
-  font-size: 0.85rem;
-  font-weight: 600;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-  color: var(--palabra);
-  font-variant-numeric: tabular-nums;
-  overflow-wrap: break-word;
+.datos-de-la-ficha:last-of-type {
+  padding-bottom: 0.75rem;
 }
+
 
 /*
  * Las especificaciones menores: lo que es el mueble, dicho en letra de ficha
@@ -585,8 +906,13 @@ code {
 
 /*
  * «Se juega en la app»: informativo, no alarma. Va en `--tenue` y con el piloto
- * apagado —un aro de filo—, que es la misma diferencia que hay entre una máquina
+ * apagado —un aro—, que es la misma diferencia que hay entre una máquina
  * encendida y una que está ahí pero no se enciende aquí.
+ *
+ * El aro estuvo en `--filo-vivo`, blanco al 14 %: 1,46:1 contra su fondo, o sea
+ * que la mitad de las tarjetas del catálogo llevaban un punto que no estaba y el
+ * pie se leía como texto suelto sin viñeta. Ahora `--aro-frio`, blanco al 55 %:
+ * 6,24. Es el mismo número al que llegó la app.
  */
 .en-la-app {
   align-items: flex-start;
@@ -602,7 +928,7 @@ code {
   height: 6px;
   margin-top: 0.45rem;
   border-radius: 50%;
-  box-shadow: inset 0 0 0 1px var(--filo-vivo);
+  box-shadow: inset 0 0 0 1px var(--aro-frio);
 }
 
 /*
@@ -632,6 +958,9 @@ code {
  * Lo que se le quita es el ACENTO, y esa es toda la diferencia: la placa de color
  * es la marca de «esto se enciende aquí», así que una máquina que aquí no se
  * enciende se queda con la placa en gris. Dicho sin una palabra de más.
+ *
+ * Y se sustituye el `background` ENTERO, no una capa: así se van con él el velo y
+ * el halo, que sobre un gris no protegen nada y sólo lo ensuciarían.
  */
 .tarjeta-en-la-app {
   background: transparent;
@@ -655,7 +984,12 @@ code {
   background: transparent;
 }
 
-/* Las tarjetas fantasma: mismo tamaño, para que al llegar la lista nada salte. */
+/*
+ * Las tarjetas fantasma: MISMO TAMAÑO que las de verdad, que es lo que dice su
+ * comentario y lo que ahora hace, porque el `min-height` de `.tarjeta` ya no son
+ * 15rem sino los 19 medidos. Aquí sólo va el relleno, que la tarjeta de verdad no
+ * tiene porque lo ponen sus franjas.
+ */
 .tarjeta-fantasma {
   padding: 1.05rem 1.1rem;
   gap: 0.9rem;
@@ -702,10 +1036,35 @@ code {
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--palabra);
+  overflow-wrap: break-word;
 }
 
 /* --- Botones ------------------------------------------------------------- */
 
+/*
+ * ═══ LOS TRES ESTADOS DE UN BOTÓN, Y LOS TRES ESTÁN MEDIDOS ═══
+ *
+ * Aquí había UNO. `.opcion` es teja + tinta neutra + filo apagado, o sea el
+ * estado QUIETO de la casa, y se usaba como acción PRIMARIA en las cuatro
+ * pantallas que piden algo: «Abrir mesa», «Sentarse», «Volver a preguntar»,
+ * «Recargar». La consecuencia no es estética: en ninguna pantalla del cliente se
+ * ve qué se espera que pulses.
+ *
+ * PRIMARIO: relleno de `--acento` con tinta `--suelo`. Es la ÚNICA pareja sólida
+ * que pasa a la vez el 4,5:1 del texto y el 3:1 del recorte del relleno contra su
+ * fondo en los cuatro temas: 5,01 violeta / 9,22 ámbar / 8,69 verde / 5,40
+ * carmesí, y el relleno se recorta de la teja por 4,58 y de la pared por 4,85.
+ * Lo tentador —relleno de `--acento-hondo` con tinta blanca— se queda en 4,64 en
+ * dos de los cuatro, y blanco sobre el acento VIVO da 1,98 en ámbar: no es que
+ * pase raspando, es que no está.
+ *
+ * SECUNDARIO: sin relleno, texto en `--acento` sobre la teja —4,58 / 8,44 / 7,96
+ * / 4,94— y borde en `--acento` PLENO. Un borde de acento al 42 % se queda en
+ * 1,77 y deja de recortarse.
+ *
+ * QUIETO: teja lisa, filo apagado y tinta `--tenue`, que da 5,94 sobre la teja.
+ * Ver `:disabled` más abajo, que es donde está el argumento entero.
+ */
 .opciones {
   list-style: none;
   margin: 0;
@@ -715,53 +1074,217 @@ code {
   gap: 0.6rem;
 }
 
+/*
+ * `list-style: none` le quita a Safari + VoiceOver la semántica de lista —deja de
+ * anunciar «lista de 5 elementos»—, y eso aquí importa porque el número de
+ * opciones ES información: dice cuántas salidas tiene la mesa. Se devuelve con
+ * `role="list"` en el marcado, no desde aquí.
+ */
+.opciones > li {
+  min-width: 0;
+  max-width: 100%;
+}
+
+/*
+ * LA ANATOMÍA, que es lo único que comparten los tres estados: la caja, el hueco
+ * entre la tecla y el texto, el alto mínimo y el redondeo. Los COLORES los pone
+ * siempre una de las tres clases de estado — y el que queda aquí es el quieto,
+ * que es lo que un botón sin estado declarado tiene que parecer.
+ *
+ * El borde entra en el hueco en vez de sumarse por fuera: con `box-sizing:
+ * border-box` el píxel del filo se descuenta del relleno, así que el alto mínimo
+ * sigue siendo el que dice `min-height` y no uno más.
+ */
 .opcion {
   display: flex;
   align-items: center;
   gap: 0.7rem;
   min-width: 14rem;
+  max-width: 100%;
   min-height: 2.75rem;
   text-align: left;
-  background: var(--teja-alta);
-  color: var(--palabra);
+  background: var(--teja);
+  color: var(--tenue);
   border: 1px solid var(--filo);
   border-radius: var(--radio-mando);
-  /*
-   * El borde entra en el hueco en vez de sumarse por fuera: con `box-sizing:
-   * border-box` el píxel del filo se descuenta del relleno, así que el alto
-   * mínimo sigue siendo el que dice `min-height` y no uno más.
-   */
   padding: 0.7rem 1rem;
   font: inherit;
   cursor: pointer;
   transition:
+    background-color 0.12s,
     border-color 0.12s,
+    color 0.12s,
     box-shadow 0.12s;
 }
 
 /*
- * Al pasar por encima cambia el FILO y se enciende el halo; el fondo no se
- * mueve. Aclararlo dejaría la tecla del atajo —que va un escalón por debajo, en
- * `--teja`— del mismo color que el botón, y la tecla desaparecería justo cuando
- * el ratón está encima diciendo que se puede pulsar.
+ * EL ANCHO MÍNIMO CEDE ANTES QUE LA VENTANA. 14rem son 238 px, y por debajo de
+ * los 442 px de documento donde la rejilla ya se encoge, un botón de 238 dentro de
+ * un panel con relleno se sale. El mínimo existe para que dos botones seguidos no
+ * salgan de anchos distintos; cuando sólo cabe uno por línea, no sirve para nada.
  */
-.opcion:hover:not(:disabled) {
+@media (max-width: 26rem) {
+  .opcion {
+    min-width: 0;
+  }
+}
+
+/* ── PRIMARIO: lo que se espera que pulses. Uno por pantalla. ── */
+.opcion-primaria {
+  background: var(--acento);
+  color: var(--suelo);
+  border-color: var(--acento);
+  font-weight: 600;
+}
+
+.opcion-primaria:hover:not(:disabled) {
+  box-shadow: 0 0 26px -6px var(--halo);
+}
+
+/*
+ * La tecla del atajo dentro de un primario se invierte: sobre el acento no puede
+ * ir un fondo de `--teja` con tinta de acento —sería acento sobre acento— así que
+ * la tecla es el hueco oscuro y la tinta es el propio acento. `--suelo` recorta
+ * del acento por 5,01 en el peor tema, y el número dentro da los mismos 5,01.
+ */
+.opcion-primaria .atajo {
+  background: var(--suelo);
+  border-color: var(--suelo);
+  color: var(--acento);
+}
+
+/* ── SECUNDARIO: se puede pulsar, pero no es lo que se espera. ── */
+.opcion-secundaria {
+  background: transparent;
+  color: var(--acento);
+  border-color: var(--acento);
+}
+
+.opcion-secundaria:hover:not(:disabled) {
+  box-shadow: 0 0 20px -8px var(--halo);
+}
+
+/*
+ * LA TECLA DENTRO DE UN BOTÓN SECUNDARIO. `.atajo` se rellena de `--teja` para
+ * quedar un escalón por debajo del botón, y eso vale mientras el botón tenga
+ * fondo. Un secundario es TRANSPARENTE y vive dentro de un panel de `--teja`, así
+ * que la tecla quedaba a 1:1 contra lo que tiene detrás: dejaba de leerse como
+ * tecla y se quedaba en un número suelto.
+ *
+ * Se hunde al suelo, que es el mismo recurso que usa la tecla de un botón
+ * apagado: `--suelo` sobre un panel de `--teja` da el escalón, y el filo vivo lo
+ * remata.
+ */
+.opcion-secundaria .atajo {
+  background: var(--suelo);
+}
+
+/*
+ * ── QUIETO, y ES LA REGLA 3 DE LA CASA: UN APAGADO NUNCA CON `opacity` ──
+ *
+ * Aquí ponía `opacity: 0.45`, y no apagaba «un poco»: apagaba la LETRA. Medido
+ * componiendo el botón al 45 % sobre su fondo y el texto al 45 % sobre esa
+ * composición, dentro de un panel o fuera de él da lo mismo:
+ *
+ *     · `.opcion-rotulo` en `--palabra`: 14,60 → 4,01:1, por debajo del 4,5.
+ *     · `.opcion-ayuda` en `--tenue`:     5,67 → 2,19:1.
+ *     · `.atajo` en acento violeta:       4,58 → 1,87:1, o sea que el número que
+ *       dice qué tecla lo dispara desaparece del todo.
+ *     · Y en `.opcion-sobria`, con el fondo transparente, la ayuda cae a 2,16.
+ *
+ * O sea que un botón que no se puede pulsar TODAVÍA —el de abrir la mesa mientras
+ * hay una petición en vuelo, o «Pasar» mientras no toca— se quedaba con la
+ * etiqueta ilegible: ni qué hace, ni por qué no se puede.
+ *
+ * Se apaga con COLOR: teja lisa, filo apagado y tinta `--tenue`, que da 5,94 sobre
+ * la teja y mantiene el rótulo, la ayuda y el atajo LEÍBLES. La jerarquía entre
+ * rótulo y ayuda la lleva el peso, no el alfa, que es la regla 6.
+ *
+ * Y UN BOTÓN APAGADO PIERDE EL ACENTO, no lo atenúa: en esta Sala el acento
+ * significa «esto se puede tocar», y uno de acento que no se deja pulsar dice una
+ * cosa y hace otra. Por eso `:disabled` va DESPUÉS y pesa más (0,2,0 contra 0,1,0)
+ * que las dos clases de estado de arriba: el apagado gana siempre.
+ *
+ * El BORDE se queda en `--filo` —1,07 contra el panel— y es correcto: WCAG 1.4.11
+ * exime expresamente a los controles desactivados del 3:1 de contorno. Lo que no
+ * está exento es el TEXTO, y ése es el que se ha recuperado.
+ */
+.opcion:disabled,
+.opcion-quieta {
+  background: var(--teja);
+  color: var(--tenue);
+  border-color: var(--filo);
+  box-shadow: none;
+}
+
+/*
+ * El cursor va con las DOS formas de estar apagado, por lo mismo: `.opcion-quieta`
+ * está habilitada en el DOM y no responde, así que un cursor de mano encima es la
+ * misma promesa falsa que el borde de acento.
+ */
+.opcion:disabled,
+.opcion-quieta {
+  cursor: not-allowed;
+}
+
+/*
+ * El atajo de un botón apagado también pierde el acento, y se queda con el hueco
+ * de `--suelo` para no fundirse con el botón: `--tenue` sobre `--suelo` da 6,49.
+ */
+.opcion:disabled .atajo,
+.opcion-quieta .atajo {
+  background: var(--suelo);
+  border-color: var(--filo-vivo);
+  color: var(--tenue);
+}
+
+/*
+ * Al pasar por encima cambia el FILO y se enciende el halo; el fondo no se
+ * mueve. Aclararlo dejaría la tecla del atajo —que va un escalón por debajo— del
+ * mismo color que el botón, y la tecla desaparecería justo cuando el ratón está
+ * encima diciendo que se puede pulsar.
+ */
+.opcion:hover:not(:disabled):not(.opcion-quieta) {
   border-color: var(--acento);
   box-shadow: 0 0 20px -8px var(--halo);
 }
 
-.opcion:disabled {
-  cursor: not-allowed;
-  opacity: 0.45;
-}
+/*
+ * ═══ EL `:not(.opcion-quieta)` NO ES UN ADORNO: ES UN FALLO DE PESO ═══
+ *
+ * Esta regla pesa (0,3,0) y `.opcion-quieta` pesa (0,1,0), así que sin la
+ * exclusión GANA el hover: al pasar el ratón por encima de un botón que ignora
+ * el clic, el borde se encendía en acento y el halo se prendía. En esta Sala el
+ * acento significa «esto se puede tocar», así que el botón decía que sí con el
+ * color mientras no hacía nada al pulsarlo.
+ *
+ * `:disabled` no cubría el caso porque `.opcion-quieta` es la clase que se pone
+ * a un botón que SÍ está habilitado en el DOM y aun así no debe invitar —el
+ * mueble de formulario la usa para las opciones que el juego no ofrece ahora
+ * mismo—. Son dos maneras de estar apagado y la hoja sólo conocía una.
+ *
+ * Esto no lo podía arreglar ninguno de los dos ficheros por su cuenta: quien
+ * pinta el botón no puede tocar la hoja, y la hoja no sabía que existía esa
+ * clase hasta que el marcado la usó.
+ */
 
+/*
+ * `.opcion-sobria` ES EL SECUNDARIO DE ANTES DE QUE HUBIERA TABLA, y se queda
+ * viva porque hoy la llevan los dos botones de salir de la mesa. Lo que hacía era
+ * quitar el relleno y nada más, así que dejaba el texto en la tinta neutra: es un
+ * botón sin fondo, no un secundario. Quien lo toque, que lo cambie por
+ * `.opcion-secundaria` si es una acción, o lo deje aquí si de verdad quiere un
+ * botón que no llama.
+ */
 .opcion-sobria {
   background: transparent;
+  color: var(--palabra);
 }
 
 .opcion-texto {
   display: flex;
   flex-direction: column;
+  min-width: 0;
 }
 
 .opcion-rotulo {
@@ -770,6 +1293,17 @@ code {
 
 .opcion-ayuda {
   font-size: 0.82rem;
+  color: inherit;
+}
+
+/*
+ * La ayuda de un botón que SÍ se puede pulsar va un escalón por debajo del
+ * rótulo, y el escalón lo da el COLOR y no el alfa: `--tenue` sobre la teja da
+ * 5,94. En el quieto no hay escalón porque el rótulo ya está en `--tenue`, y en el
+ * primario tampoco porque bajar la tinta sobre el acento sería salirse del 4,5.
+ */
+.opcion-sobria .opcion-ayuda,
+.opcion-secundaria .opcion-ayuda {
   color: var(--tenue);
 }
 
@@ -779,9 +1313,15 @@ code {
  * de la placa.
  *
  * El fondo es `--teja`, un escalón por DEBAJO del botón que la lleva: además de
- * hundir la tecla, es lo que sube el acento de 4,4:1 a 4,6:1 y lo pone del lado
- * bueno del mínimo. Una tecla de 13,6 px es letra normal y no puede quedarse
- * corta por dos décimas.
+ * hundir la tecla, sube el acento de 4,37 a 4,58 y lo pone del lado bueno del
+ * mínimo. Una tecla de 13,6 px es letra normal y no puede quedarse corta por dos
+ * décimas.
+ *
+ * Y AHORA CON LOS CUATRO NÚMEROS, que es lo que faltaba: el salto de 4,4 a 4,6 que
+ * este comentario citaba era el del VIOLETA, y era el único que citaba. Los otros
+ * tres son 8,05 → 8,44 (ámbar), 7,58 → 7,96 (verde) y 4,71 → 4,94 (carmesí). La
+ * conclusión aguanta en los cuatro; lo que no aguantaba era el hábito de
+ * defenderla con uno.
  */
 .atajo {
   flex: none;
@@ -814,6 +1354,21 @@ code {
   margin: 0 0 0.6rem;
 }
 
+/*
+ * EL BLOQUE DE ACCIONES. `.formulario` envuelve las opciones en tres sitios
+ * —`formulario.tsx` dos veces y `retablo.tsx` una— y no tenía ni una declaración,
+ * así que debajo del tablero «Y además puedes» y su lista salían pegadas al lienzo
+ * sin margen. Era la única de las cuatro clases huérfanas del marcado con
+ * consecuencia visible.
+ */
+.formulario {
+  margin-top: 1.5rem;
+}
+
+.formulario + .formulario {
+  margin-top: 1rem;
+}
+
 /* --- La mesa ------------------------------------------------------------- */
 
 /*
@@ -835,12 +1390,57 @@ code {
   }
 }
 
+/*
+ * `min-width: 0` en la columna del mueble: un hijo de rejilla tiene el mínimo
+ * automático puesto en su contenido, así que un tablero ancho o una fila de
+ * botones larga ensanchan la columna y empujan el raíl fuera de la ventana. La
+ * pista ya dice `minmax(0, 1fr)`; esto es la otra mitad, y hace falta porque
+ * `.el-mueble` es quien tiene el contenido dentro.
+ */
+.el-mueble {
+  min-width: 0;
+}
+
+/*
+ * ═══ EL RAÍL SE ANCLA, PERO NO A COSTA DE ESCONDER SU FINAL ═══
+ *
+ * `position: sticky` con `top` y sin techo significa que, en cuanto el raíl es más
+ * alto que la ventana, se ancla por ARRIBA y su parte de abajo queda bajo el
+ * pliegue durante TODO el recorrido de la página: no hay forma de llegar a ella.
+ *
+ * MEDIDO con la raíz en 17: panel «La mesa» ≈540 (relleno 34 + rótulo 31 + código
+ * grande 59,8 + tres párrafos + la lista de asientos) + hueco 17 + crónica 337 +
+ * hueco 17 + dos botones ≈147 ≈ 1075 px. Con `top: 1rem` en una ventana de 600
+ * quedan 583: sobresalen ≈492, que son exactamente «Levantarse de la mesa» y
+ * «Tirar la mesa». O sea que a 1280×600 se podía jugar la partida entera sin
+ * encontrar cómo salir, y «Tirar la mesa» es el botón que `sala.tsx` explica que
+ * no existía y que se acaba de añadir.
+ *
+ * El techo más el desplazamiento propio lo arreglan por los dos caminos: con ratón
+ * se rueda dentro del raíl, y con teclado el tabulador lleva el foco a un botón que
+ * está fuera de la vista y el navegador lo trae solo — que es la razón por la que
+ * esto se puede hacer aquí y la crónica, que no tiene nada enfocable dentro,
+ * necesita además un `tabIndex` en el marcado.
+ *
+ * En una columna el ancla no significa nada, así que se quita entera.
+ */
 .rail {
   display: flex;
   flex-direction: column;
   gap: 1rem;
   position: sticky;
   top: 1rem;
+  max-height: calc(100vh - 2rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+@media (max-width: 60rem) {
+  .rail {
+    position: static;
+    max-height: none;
+    overflow: visible;
+  }
 }
 
 .panel {
@@ -848,6 +1448,7 @@ code {
   border: 1px solid var(--filo);
   border-radius: var(--radio-ficha);
   padding: 1rem 1.25rem;
+  min-width: 0;
 }
 
 .renglones {
@@ -859,6 +1460,7 @@ code {
 .renglones li {
   padding: 0.15rem 0;
   border-bottom: 1px solid var(--filo);
+  overflow-wrap: break-word;
 }
 
 .renglones li:last-child {
@@ -876,11 +1478,29 @@ code {
   font-weight: 700;
 }
 
+/*
+ * LA CRÓNICA ES UNA REGIÓN DESPLAZABLE, y una región desplazable que el teclado no
+ * alcanza es contenido escondido. A 0,9rem con el interlineado del cuerpo caben
+ * unos nueve renglones de los que haya; con la partida avanzada, el resto sólo se
+ * llega a leer con la rueda del ratón. Chrome hace focusables los contenedores
+ * desplazables desde la 127 y Firefox permite rodarlos, pero eso es suerte del
+ * navegador, no una decisión.
+ *
+ * Lo que esta hoja puede poner es el aviso de foco cuando alguien llegue; el
+ * `tabIndex={0}` y el nombre accesible los tiene que poner `sala.tsx`, porque un
+ * contenedor enfocable sin nombre se anuncia como «grupo» y no dice qué es.
+ */
 .cronica {
   max-height: 16rem;
   overflow-y: auto;
+  overscroll-behavior: contain;
   font-size: 0.9rem;
   color: var(--tenue);
+}
+
+.cronica:focus-visible {
+  outline: 2px solid var(--acento);
+  outline-offset: 2px;
 }
 
 /* La crónica llega de lo más nuevo a lo más viejo, así que lo último que ha
@@ -911,12 +1531,36 @@ code {
   max-width: 56rem;
 }
 
+/*
+ * `minmax(min(20rem, 100%), 1fr)` y no `minmax(20rem, 1fr)`: el mínimo de 20rem
+ * son 340 px, o sea que por debajo de 340 de hueco las dos columnas del vestíbulo
+ * se salían por la derecha igual que la rejilla. El `min()` hace que el suelo sea
+ * el hueco entero cuando el hueco es lo que manda.
+ */
 .dos-columnas {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(20rem, 100%), 1fr));
   gap: 1.25rem;
 }
 
+/*
+ * ═══ UN CAMPO QUE SE VE COMO UN CAMPO ═══
+ *
+ * WCAG 1.4.11 pide 3:1 para el contorno de un control de formulario, y aquí no lo
+ * daba ninguna de las dos cosas que podían darlo: el relleno `--suelo` dentro de un
+ * panel de `--teja` se recorta por 1,09:1, y el borde `--filo-vivo` compuesto
+ * encima, por 1,30. El texto de dentro sí pasaba —`--palabra` sobre `--suelo` da
+ * 16,74, y el ejemplo corregido de abajo 6,50—: lo que fallaba era LA CAJA.
+ *
+ * En la práctica eso quería decir que al abrir una mesa no se distinguía dónde
+ * había que escribir. La única pista era el texto de ejemplo —«Tu nombre»,
+ * «ABCDE»—, y ése desaparece al teclear la primera letra.
+ *
+ * Con `--filo-de-control` el borde recorta 4,10 contra el panel y 4,48 contra el
+ * relleno del propio campo, o sea por los dos lados. El relleno se queda en
+ * `--suelo` a propósito: es el hueco, y lo que lo hace legible como hueco ahora es
+ * el borde.
+ */
 .campo {
   display: block;
   width: 100%;
@@ -924,7 +1568,7 @@ code {
   padding: 0.6rem 0.8rem;
   background: var(--suelo);
   color: var(--palabra);
-  border: 1px solid var(--filo-vivo);
+  border: 1px solid var(--filo-de-control);
   border-radius: var(--radio-mando);
   font: inherit;
 }
@@ -963,15 +1607,46 @@ code {
 }
 
 /*
- * El tablero manda en el alto, y se le da todo el que quepa en la ventana. En un
- * teléfono se encaja por anchura porque la pantalla es estrecha y alta; en un
- * monitor, que es ancho y bajo, encajar por anchura deja el dibujo diminuto con
- * media pantalla en negro.
+ * ═══ EL TABLERO TIENE QUE CRECER CUANDO SE AMPLÍA LA PÁGINA ═══
+ *
+ * Aquí ponía `max-height: 62vh` con un comentario que decía que «se le da todo el
+ * alto que quepa en la ventana». Dos cosas iban mal a la vez:
+ *
+ *   · `vh` es un porcentaje de la VENTANA, y al ampliar la página la ventana
+ *     encoge en CSS exactamente en la misma proporción. Medido: en una ventana de
+ *     600 px de alto, 62vh son 372 px físicos; al 200 % de zoom son 186 px CSS,
+ *     que siguen siendo 372 físicos; al 400 %, 93 px CSS y otra vez 372. SIEMPRE
+ *     los mismos. O sea que quien no ve bien y amplía consigue que crezcan los
+ *     rótulos, los botones y la crónica, y que el tablero —lo único que hay que
+ *     mirar para jugar— se quede igual de grande y proporcionalmente más pequeño
+ *     cada vez.
+ *   · Y `max-height` sobre un `<svg>` con `width: 100%` y `viewBox` no da alto:
+ *     RECORTA. El alto lo decide la anchura por la relación de aspecto, así que
+ *     esto era «todo el ancho, con un techo», y cuando el techo muerde, `meet`
+ *     centra el dibujo y deja franjas vacías a los lados — que es el «media
+ *     pantalla en negro» que el comentario decía estar evitando.
+ *
+ * EL SUELO EN `rem` ES LO QUE ARREGLA EL ZOOM. Un `rem` son siempre 17 px CSS, así
+ * que al 200 % son 34 físicos: el tablero dobla como todo lo demás. El techo en
+ * `vh` se conserva con `max()` para que en una ventana alta el tablero pueda pasar
+ * de 24rem y aprovecharla. En una ventana de 600 al 100 % el tope son 408 px; al
+ * 200 %, los mismos 408 CSS, o sea 816 físicos.
+ *
+ * Y LAS FRANJAS SE QUITAN LIMITANDO EL ANCHO, no el alto: si el ancho nunca pasa de
+ * alto × razón, el techo no llega a morder y no hay nada que recortar. La razón la
+ * conoce el dato —es `vista.ancho / vista.alto` del encuadre— y la trae
+ * `--razon-del-tablero` desde `retablo.tsx`. Sin ella, el `999` deja el ancho
+ * libre y se recorta como antes: se degrada al comportamiento viejo en vez de
+ * romperse.
  */
 .lienzo-del-tablero {
+  --alto-del-tablero: max(24rem, 62vh);
   display: block;
   width: 100%;
-  max-height: 62vh;
+  height: auto;
+  max-height: var(--alto-del-tablero);
+  max-width: calc(var(--alto-del-tablero) * var(--razon-del-tablero, 999));
+  margin-inline: auto;
   background: var(--teja);
   border: 1px solid var(--filo);
   border-radius: var(--radio-ficha);
@@ -986,6 +1661,11 @@ code {
  * de las piezas los declara EL JUEGO en el dato: aclarar lo que ya hay respeta
  * su paleta, y pintar encima con `--acento` sería que el retablo opinara sobre
  * un juego que no conoce.
+ *
+ * `.pieza`, `.pieza-cara`, `.pieza-linea` y `.pieza-nudo` los pone `retablo.tsx` y
+ * esta hoja NO los declara, y es deliberado: son ganchos para poder señalar una
+ * clase de pieza desde fuera, y darles color aquí sería justamente opinar sobre la
+ * paleta del juego. Que estén sin regla no es un olvido.
  */
 .pieza-tocable {
   cursor: pointer;
@@ -995,23 +1675,73 @@ code {
   filter: brightness(1.35);
 }
 
+/*
+ * EL FOCO DE UNA PIEZA, QUE NO EXISTÍA. El `hover` encendía la pieza y el teclado
+ * no encendía nada: quien juega con el tabulador no sabía en cuál estaba. Lo único
+ * que quedaba era el `outline` universal, dibujado sobre un `<g>` de SVG, donde
+ * `outline` y `outline-offset` no se comportan como en un elemento HTML.
+ *
+ * Así que el foco hace lo MISMO que el ratón —encender la pieza, que es la
+ * información— y encima le pone un resplandor de acento que sí sigue la forma del
+ * dibujo, porque `drop-shadow` opera sobre el canal alfa y no sobre una caja. El
+ * acento recorta 5,01 / 9,22 / 8,69 / 5,40 sobre el suelo y 4,58 / 8,44 / 7,96 /
+ * 4,94 sobre la teja del lienzo: el problema nunca fue el color, era que no había
+ * regla.
+ */
+.pieza-tocable:focus-visible {
+  outline: none;
+  filter: brightness(1.35) drop-shadow(0 0 2px var(--acento))
+    drop-shadow(0 0 6px var(--acento));
+}
+
 .pieza-quieta {
   cursor: progress;
 }
 
+/*
+ * ═══ EL CUERPO DEL TEXTO DE UNA CARA NO ESTÁ EN PÍXELES, Y AHORA SE DICE ═══
+ *
+ * Ponía `font-size: 14px` dentro de un `<svg>` cuyo `viewBox` es el encuadre que
+ * declara el JUEGO (`plan.ts`, con el dato de `retablo.tsx`). Ese 14 no son 14
+ * píxeles de pantalla: son 14 UNIDADES DEL TABLERO, escaladas por el ancho del
+ * `<svg>` dividido entre `vista.ancho`. Medido con la columna del mueble a ~787 px:
+ * un encuadre de 787 unidades da 14 px reales, uno de 1600 da 6,9 y uno de 300 da
+ * 36,7. El mismo cliente, la misma ventana y dos arcades distintos.
+ *
+ * O sea que el mínimo de 13 px de la casa NO SE PUEDE CUMPLIR NI COMPROBAR desde
+ * aquí, porque el número que gobierna el cuerpo llega por el cable. Lo que esta
+ * hoja puede hacer es dejar de fingir que es un píxel: `--cuerpo-de-cara` es el
+ * contrato, y quien conoce la escala —`retablo.tsx`— es quien lo pone. El 14 de
+ * reserva conserva exactamente el comportamiento de hoy si nadie lo pone.
+ *
+ * ═══ Y LA GUARDA SOBRE EL DATO, QUE ESTO SÍ LO PUEDE COMPRAR EL CSS ═══
+ *
+ * El relleno de la cara lo elige el juego (`p.relleno`), y puede ser cualquier
+ * color: un juego que declare una cara clara dejaba este rótulo blanco ilegible y
+ * la hoja no tenía forma de saberlo. Con `paint-order: stroke fill` el trazo se
+ * pinta DEBAJO del relleno de la letra, o sea que cada glifo lleva su propio halo
+ * de `--suelo` y lo que se lee es `--palabra` sobre `--suelo`: 16,74:1 pase lo que
+ * pase debajo. El grosor va en `em` y no en unidades, para que el halo escale con
+ * la letra en vez de comérsela cuando el encuadre es pequeño.
+ */
 .texto-de-cara,
 .cifra-de-cara {
   fill: var(--palabra);
   font-family: var(--letra);
-  font-size: 14px;
+  font-size: var(--cuerpo-de-cara, 14px);
   pointer-events: none;
+  paint-order: stroke fill;
+  stroke: var(--suelo);
+  stroke-width: 0.22em;
+  stroke-linejoin: round;
 }
 
 /*
  * La cifra de una cara va en BLANCO y en mono: es una medida, y cae encima de un
  * relleno que ha elegido el juego y que puede ser cualquier color. El blanco de
- * énfasis es el único que aguanta sobre todos ellos; el acento, además de no
- * significar nada aquí, chocaría con la paleta del juego de turno.
+ * énfasis con el halo de `--suelo` detrás da 17,73:1 sobre cualquier fondo que el
+ * juego declare, que es la razón por la que el acento no vale aquí: además de no
+ * significar nada, chocaría con la paleta del juego de turno.
  */
 .cifra-de-cara {
   fill: var(--blanco);

@@ -41,6 +41,21 @@ import { fileURLToPath } from 'node:url';
 const AQUI = path.dirname(fileURLToPath(import.meta.url));
 const SRC = path.resolve(AQUI, '..');
 const APP = path.resolve(SRC, '..', 'app');
+/*
+ * ═══ Y SÍ, ESTE COMPROBADOR VIVE EN `app/` Y LEE `escritorio/` ═══
+ *
+ * Cruzar de espacio de trabajo no es bonito, y aquí es exactamente lo que hay
+ * que hacer: la Sala tiene DOS clientes, y lo que este fichero comprueba es que
+ * una corrección hecha en uno llegue al otro. Un comprobador por cliente no
+ * podría afirmar eso ni una sola vez — que es justo por lo que las dos tablas
+ * de la muesca llevaban meses divergiendo sin que nada se pusiera rojo.
+ *
+ * La alternativa era duplicarlo, y entonces habría dos comprobadores de
+ * consistencia que podrían divergir entre sí. Se elige el feo que funciona.
+ */
+const RAIZ = path.resolve(SRC, '..', '..');
+const ESCRITORIO = path.join(RAIZ, 'escritorio', 'src');
+const HOJA = path.join(ESCRITORIO, 'estilo.css');
 
 const fallos = [];
 let cuantas = 0;
@@ -231,6 +246,203 @@ paso('Ningún texto de la Sala baja del mínimo de la casa');
   );
 }
 
+// ═══════════════════ Y AHORA EL CLIENTE DE ESCRITORIO ═══════════════════
+
+/**
+ * Trocea una hoja de estilo en reglas `selector { cuerpo }`. Se salta lo que
+ * lleve llaves anidadas —`@media`, `@supports`— por la misma razón que arriba:
+ * mirar menos y no equivocarse.
+ */
+function reglasDe(css) {
+  const fuera = [];
+  const patron = /([^{}]+)\{([^{}]*)\}/g;
+  let m;
+  while ((m = patron.exec(css)) !== null) {
+    /*
+     * El selector se limpia de comentarios antes de guardarlo. Sin esto arrastra
+     * todo el bloque de prosa que va encima —esta hoja los tiene largos— y un
+     * mensaje de fallo sale con treinta renglones de explicacion delante del
+     * nombre de la clase, que es la forma mas segura de que nadie lo lea.
+     */
+    const selector = m[1].replace(/\/\*[\s\S]*?\*\//g, ' ').trim().split(/\s{2,}/).pop().trim();
+    fuera.push({ selector, cuerpo: m[2], donde: linea(css, m.index) });
+  }
+  return fuera;
+}
+
+paso('El escritorio tampoco apaga con opacidad');
+{
+  /*
+   * La misma regla que arriba, del otro lado del producto. Y no es teórica: al
+   * escribirse esto, `.opcion:disabled { opacity: 0.45 }` dejaba el rótulo de
+   * «Abrir mesa» en 3,91:1 y su ayuda en 2,15:1 — mientras el argumento en
+   * contra llevaba semanas escrito en la app y este fichero no lo miraba.
+   */
+  const css = readFileSync(HOJA, 'utf8');
+  const APAGADO = /(:disabled|\[disabled\]|apagad[oa]|quiet[oa]|inactiv[oa])/i;
+  const malos = reglasDe(css)
+    .filter((r) => APAGADO.test(r.selector) && /\bopacity\s*:/.test(r.cuerpo))
+    .map((r) => `estilo.css:${r.donde} (${r.selector})`);
+  comprobar(
+    'ninguna regla de estado apagado del escritorio usa `opacity`',
+    malos.length === 0,
+    malos.length === 0
+      ? 'se apagan con color, igual que en la app'
+      : `${malos.join(', ')} — apagar con opacidad apaga también la letra`,
+  );
+}
+
+paso('Ni el escritorio apoya el blanco en el acento vivo');
+{
+  /*
+   * El equivalente CSS de la pareja prohibida: un `background` de `--acento` con
+   * el `color` en cualquiera de los dos blancos de la tabla. `--acento-hondo` no
+   * cuenta, y por eso la expresión pide que el nombre acabe ahí.
+   */
+  const css = readFileSync(HOJA, 'utf8');
+  const malos = reglasDe(css)
+    .filter(
+      (r) =>
+        /*
+         * Sólo un relleno PLANO. Un `background` con un degradado que arranca en
+         * `--acento` y acaba en `--acento-hondo` es exactamente el patrón bueno
+         * —la placa del nombre lo hace, y su texto se apoya en el hondo con
+         * 6,57:1—, así que exigir que no haya ningún `gradient(` en el valor es
+         * lo que separa el fallo del acierto. Sin esa condición, esta regla
+         * marcaba en rojo la única placa que estaba bien hecha.
+         */
+        /background(?:-color)?\s*:(?![^;]*gradient\()[^;]*var\(\s*--acento\s*\)/.test(r.cuerpo) &&
+        /(^|;|\s)color\s*:[^;]*var\(\s*--(blanco|palabra)\s*\)/.test(r.cuerpo),
+    )
+    .map((r) => `estilo.css:${r.donde} (${r.selector})`);
+  comprobar(
+    'ninguna regla del escritorio pinta blanco sobre un relleno de `--acento`',
+    malos.length === 0,
+    malos.length === 0
+      ? 'sobre el acento vivo la tinta es `--suelo`'
+      : `${malos.join(', ')} — 1,98:1 en ámbar`,
+  );
+}
+
+paso('Los dos clientes cuentan el aforo con la misma regla');
+{
+  /*
+   * ═══ ESTA ES LA COMPROBACIÓN QUE JUSTIFICA TODO EL FICHERO ═══
+   *
+   * La Sala tiene dos tablas de medidas —`CUENTA_DE_AFORO` en la app y las
+   * `--muesca-*` en la hoja del escritorio— y llevaban divergiendo en tres de
+   * cuatro valores: hueco 19 contra 13, alta 16 contra 15, y la muesca apagada
+   * pintada con un blanco al 34 % que la app ya había medido y subido al 70 %.
+   *
+   * Ninguna prueba podía verlo, porque cada cliente se comprobaba solo. Un raíl
+   * que cuenta distinto en cada mitad del producto no es un detalle de estilo:
+   * es el mismo dato dicho de dos maneras.
+   */
+  const muebles = readFileSync(path.join(SRC, 'arcade', 'muebles.ts'), 'utf8');
+  const css = readFileSync(HOJA, 'utf8');
+
+  function deLaApp(clave) {
+    const m = new RegExp(`${clave}\\s*:\\s*([0-9]+(?:\\.[0-9]+)?)`).exec(muebles);
+    return m === null ? null : Number(m[1]);
+  }
+  function delEscritorio(clave) {
+    const m = new RegExp(`--muesca-${clave}\\s*:\\s*([0-9]+(?:\\.[0-9]+)?)px`).exec(css);
+    return m === null ? null : Number(m[1]);
+  }
+
+  const pares = [
+    ['grosor', 'grosor'],
+    ['altoEncendida', 'alta'],
+    ['altoApagada', 'baja'],
+    ['hueco', 'hueco'],
+  ];
+  const distintos = [];
+  for (const [enLaApp, enElEscritorio] of pares) {
+    const a = deLaApp(enLaApp);
+    const b = delEscritorio(enElEscritorio);
+    if (a === null || b === null) {
+      distintos.push(`${enLaApp}/${enElEscritorio}: no se ha podido leer (${a} / ${b})`);
+    } else if (a !== b) {
+      distintos.push(`${enLaApp} vale ${a} en la app y ${b} en el escritorio`);
+    }
+  }
+  comprobar(
+    'las cuatro medidas de la muesca son las mismas en los dos clientes',
+    distintos.length === 0,
+    distintos.length === 0
+      ? 'un raíl, una cuenta, aunque se pinte con dos tecnologías'
+      : distintos.join(' · '),
+  );
+}
+
+paso('Los cuatro temas existen en los dos clientes');
+{
+  /*
+   * No se comprueba la FORMA —cada cliente elige la suya: una tabla en
+   * TypeScript, bloques `[data-tema]` en CSS— sino que los cuatro acentos que la
+   * app declara estén escritos también en la hoja. Sin esto, el escritorio tiene
+   * un violeta literal y tres temas que nadie ha visto nunca, que es como llevaba
+   * desde que se inventaron.
+   */
+  const muebles = readFileSync(path.join(SRC, 'arcade', 'muebles.ts'), 'utf8');
+  const css = readFileSync(HOJA, 'utf8').toLowerCase();
+  const tabla = /TEMAS_DE_SALA\s*=\s*\{([\s\S]*?)\n\}/.exec(muebles);
+  const acentos = tabla === null ? [] : [...tabla[1].matchAll(/acento:\s*'(#[0-9a-fA-F]{6})'/g)].map((m) => m[1].toLowerCase());
+  const faltan = acentos.filter((c) => !css.includes(c));
+  comprobar(
+    'los acentos de los cuatro temas están también en la hoja del escritorio',
+    acentos.length >= 4 && faltan.length === 0,
+    acentos.length < 4
+      ? `sólo se han leído ${acentos.length} acentos de TEMAS_DE_SALA`
+      : faltan.length === 0
+        ? `${acentos.length} temas en los dos clientes`
+        : `faltan en el escritorio: ${faltan.join(', ')}`,
+  );
+}
+
+paso('Ni el escritorio baja del mínimo de la casa');
+{
+  /*
+   * La hoja declara su propio suelo —`--letra-minima`— y además rotula en `rem`
+   * con la raíz en 17 px, así que aquí hay dos maneras de bajar de 13: un `px`
+   * pequeño y un `rem` pequeño. Se miran las dos.
+   */
+  const css = readFileSync(HOJA, 'utf8');
+  const RAIZ_EN_PX = 17;
+  const malos = [];
+  for (const m of css.matchAll(/font-size\s*:\s*([0-9]+(?:\.[0-9]+)?)(px|rem)/g)) {
+    const px = m[2] === 'rem' ? Number(m[1]) * RAIZ_EN_PX : Number(m[1]);
+    if (px < 13) malos.push(`estilo.css:${linea(css, m.index)} (${m[1]}${m[2]} = ${px.toFixed(1)}px)`);
+  }
+  comprobar(
+    'ningún `font-size` de la hoja por debajo de 13 px',
+    malos.length === 0,
+    malos.length === 0 ? '13 es el suelo en los dos clientes' : malos.join(', '),
+  );
+}
+
+paso('El raíl de aforo se pinta también en el escritorio');
+{
+  /*
+   * Las reglas `.aforo` y `.muesca` llevaban escritas desde el rediseño y ningún
+   * `.tsx` las montaba: la firma de la Sala existía en la hoja y no en la
+   * pantalla. Un estilo huérfano no es código muerto inofensivo — es una promesa
+   * que el encabezado de la propia hoja hace y el producto no cumple.
+   */
+  const usadas = readdirSync(ESCRITORIO)
+    .filter((f) => f.endsWith('.tsx'))
+    .map((f) => readFileSync(path.join(ESCRITORIO, f), 'utf8'))
+    .join('\n');
+  const huerfanas = ['aforo', 'muesca'].filter((c) => !new RegExp(`["'\\s]${c}[\"'\\s]`).test(usadas));
+  comprobar(
+    'el raíl del escritorio lo monta alguien',
+    huerfanas.length === 0,
+    huerfanas.length === 0
+      ? 'la firma de la Sala está en las dos mitades del producto'
+      : `clases sin dueño: ${huerfanas.join(', ')} — declaradas en la hoja y en ninguna pantalla`,
+  );
+}
+
 // ---------------------------------------------------------------------------
 
 paso('Y el comprobador muerde: casos fabricados que tienen que ponerlo rojo');
@@ -303,6 +515,45 @@ paso('Y el comprobador muerde: casos fabricados que tienen que ponerlo rojo');
     'castigar la prosa enseña a no documentar, que es peor que la regla',
   );
 
+  const cssApagado = reglasDe('.opcion:disabled { cursor: not-allowed; opacity: 0.45; }');
+  comprobar(
+    'caza un `opacity` en una regla `:disabled` del CSS',
+    cssApagado.some((r) => /:disabled/.test(r.selector) && /\bopacity\s*:/.test(r.cuerpo)),
+    'si no, la mitad de escritorio del producto no está mirada',
+  );
+  const cssSano = reglasDe('.opcion:disabled { background: var(--teja); color: var(--tenue); }');
+  comprobar(
+    'y no se queja del apagado por color',
+    !cssSano.some((r) => /:disabled/.test(r.selector) && /\bopacity\s*:/.test(r.cuerpo)),
+    'un falso rojo se desactiva, y entonces la regla desaparece',
+  );
+  const cssPar = reglasDe('.boton { background: var(--acento); color: var(--blanco); }');
+  comprobar(
+    'caza el blanco sobre `--acento` en el CSS',
+    cssPar.some(
+      (r) =>
+        /background(?:-color)?\s*:(?![^;]*gradient\()[^;]*var\(\s*--acento\s*\)/.test(r.cuerpo) &&
+        /(^|;|\s)color\s*:[^;]*var\(\s*--(blanco|palabra)\s*\)/.test(r.cuerpo),
+    ),
+    'es la misma pareja, dicha en otra tecnología',
+  );
+  const cssHondo = reglasDe('.boton { background: var(--acento-hondo); color: var(--blanco); }');
+  comprobar(
+    'y no confunde `--acento-hondo` con `--acento`',
+    !cssHondo.some(
+      (r) =>
+        /background(?:-color)?\s*:(?![^;]*gradient\()[^;]*var\(\s*--acento\s*\)/.test(r.cuerpo) &&
+        /(^|;|\s)color\s*:[^;]*var\(\s*--(blanco|palabra)\s*\)/.test(r.cuerpo),
+    ),
+    'sobre el hondo el blanco pasa, y la regla no debe cazarlo',
+  );
+  const cssRem = [...'a { font-size: 0.7rem }'.matchAll(/font-size\s*:\s*([0-9]+(?:\.[0-9]+)?)(px|rem)/g)];
+  comprobar(
+    'caza un `rem` que en píxeles baja de 13',
+    cssRem.some((m) => (m[2] === 'rem' ? Number(m[1]) * 17 : Number(m[1])) < 13),
+    '0,7rem son 11,9px con la raíz en 17: el rem es la manera fácil de colarlo',
+  );
+
   const pequeno = 'algo: { fontSize: 9.5 }';
   comprobar(
     'caza un cuerpo por debajo de 13',
@@ -320,7 +571,9 @@ if (fallos.length > 0) {
 }
 
 console.log(
-  `\n✔ ${cuantas} comprobaciones. La gramática de la Sala se cumple en las siete pantallas: un\n` +
-    '  botón apagado se apaga con color y no con opacidad, el blanco no se apoya en el acento\n' +
-    '  vivo, el raíl de aforo se pinta en un solo sitio y ningún texto baja de 13.\n',
+  `\n✔ ${cuantas} comprobaciones. La gramática de la Sala se cumple en LOS DOS CLIENTES: un botón\n` +
+    '  apagado se apaga con color y no con opacidad, el blanco no se apoya en el acento vivo,\n' +
+    '  ningún texto baja de 13, el raíl se pinta en un solo sitio en la app y alguien lo monta en\n' +
+    '  el escritorio, las cuatro medidas de la muesca son las mismas en los dos, y los cuatro\n' +
+    '  temas existen en las dos tablas.\n',
 );

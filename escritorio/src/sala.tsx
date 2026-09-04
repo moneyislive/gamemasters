@@ -15,7 +15,7 @@
  * pantallas y una consulta, y una dependencia con su propio modelo mental sale
  * más cara que las veinte líneas.
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { MouseEvent as ClicDeReact } from 'react';
 import { Catalogo, usarElCatalogo } from './catalogo';
 import type { ElCatalogo } from './catalogo';
@@ -109,6 +109,22 @@ export function Sala(): JSX.Element {
 
       {donde.que === 'catalogo' ? (
         <main className="dentro">
+          {/*
+            ═══ EL PRIMER ENCABEZADO DEL DOCUMENTO ERA UN `<h2>` DE TARJETA ═══
+
+            En esta pantalla no había ningún `<h1>`: el nombre de la casa es un
+            `<a>` dentro del `<header>`, así que el primer encabezado del
+            documento eran los `<h2>` de las tarjetas. Navegar por encabezados
+            —que es como se recorre una página con lector de pantalla— empezaba
+            por la mitad y en el nivel 2. Eran 3 de las 5 pantallas que pinta
+            este fichero; la mesa sí tiene el suyo, o sea que además el árbol era
+            inconsistente entre pantallas del mismo cliente.
+
+            Y dice «Las máquinas» y no «Sala de Arcade» a propósito: el rótulo de
+            la casa ya está dos centímetros más arriba en la cabecera, y un
+            encabezado que repite el que tiene encima no orienta a nadie.
+          */}
+          <h1 className="titulo">Las máquinas</h1>
           <p className="entradilla">
             Lo que hay instalado en este servidor. Aquí mismo se juegan los que la plataforma
             sabe pintar con lo que el propio juego declara; los demás salen en la lista igual, y
@@ -152,9 +168,16 @@ function ElArcade({ donde, catalogo }: { donde: Donde; catalogo: ElCatalogo }): 
   const mesa = usarMesaDeArcade(arcade, silla);
 
   if (catalogo.estado === 'pidiendo') {
+    /*
+     * `aria-busy` en el CONTENEDOR y `aria-hidden` en la tarjeta, que es lo que
+     * ya hacía su gemela de `catalogo.tsx`. Aquí las dos marcas estaban en el
+     * mismo elemento, así que un lector de pantalla anunciaba las dos rayas
+     * vacías como si fueran contenido: dos renglones sin texto en la única
+     * pantalla donde todavía no se sabe nada.
+     */
     return (
-      <main className="dentro">
-        <div className="tarjeta tarjeta-fantasma" aria-busy="true">
+      <main className="dentro" aria-busy="true">
+        <div className="tarjeta tarjeta-fantasma" aria-hidden="true">
           <span className="raya raya-larga" />
           <span className="raya" />
         </div>
@@ -162,10 +185,16 @@ function ElArcade({ donde, catalogo }: { donde: Donde; catalogo: ElCatalogo }): 
     );
   }
   if (catalogo.estado === 'sin-servidor') {
+    /*
+      El encabezado sale del panel y sube a `<h1>`: es el título de la pantalla,
+      no un apartado dentro de ella. Va con `.titulo` —el mismo que usa la mesa—
+      y no con el `<h2>` de `.sin-servidor`, para que las cinco pantallas de este
+      fichero tengan el mismo árbol de encabezados.
+    */
     return (
       <main className="dentro">
+        <h1 className="titulo">No se ha podido hablar con el servidor</h1>
         <div className="sin-servidor">
-          <h2>No se ha podido hablar con el servidor</h2>
           <p>{catalogo.porque}</p>
         </div>
       </main>
@@ -174,12 +203,19 @@ function ElArcade({ donde, catalogo }: { donde: Donde; catalogo: ElCatalogo }): 
 
   const manifiesto = catalogo.arcades.find((a) => a.id === arcade);
   if (manifiesto === undefined) {
+    /*
+      El `<h1>` es corto y la frase entera se queda en el panel: `.titulo` son 2
+      rem en CAJA ALTA, y una frase de cincuenta caracteres con un identificador
+      dentro no se lee ahí —se descifra, que es lo mismo que esta hoja dice de
+      `loQueEs` en mayúsculas—. El título dice qué ha pasado y el cuerpo, con qué.
+    */
     return (
       <main className="dentro">
+        <h1 className="titulo">Ese arcade no está aquí</h1>
         <div className="sin-servidor">
-          <h2>Aquí no hay ningún arcade que se llame «{arcade}»</h2>
+          <p>Este servidor no tiene ningún arcade que se llame «{arcade}».</p>
           <p className="letra-chica">
-            Este servidor tiene instalados: {catalogo.arcades.map((a) => a.id).join(', ')}.
+            Tiene instalados: {catalogo.arcades.map((a) => a.id).join(', ')}.
           </p>
         </div>
       </main>
@@ -195,8 +231,8 @@ function ElArcade({ donde, catalogo }: { donde: Donde; catalogo: ElCatalogo }): 
      */
     return (
       <main className="dentro">
+        <h1 className="titulo">{manifiesto.nombre}</h1>
         <div className="sin-servidor">
-          <h2>{manifiesto.nombre}</h2>
           <p>{puerta.porque}</p>
         </div>
       </main>
@@ -257,6 +293,44 @@ export const PLAZOS: Array<{ rotulo: string; segundos: number | undefined; ayuda
   { rotulo: 'Sin prisa', segundos: 0, ayuda: 'Sin plazo: el turno no se pasa solo nunca.' },
 ];
 
+/** Un aforo que se puede creer: los dos números y su relación. */
+export interface Aforo {
+  minimo: number;
+  maximo: number;
+}
+
+/**
+ * EL AFORO, LEÍDO COMO LO QUE DE VERDAD ES: `unknown`.
+ *
+ * `manifiesto.jugadores.minimo` se leía a pelo, y ese manifiesto sale de
+ * `catalogo.arcades`, que es `datos.arcades as ArcadeDelCatalogo[]`
+ * (`catalogo.tsx`): del cuerpo de la respuesta sólo se comprobó que fuera un
+ * array, y de su contenido NADA. Un manifiesto sin `jugadores` —un servidor más
+ * nuevo, un arcade entrado por `ARCADES_EXTERNOS` mal escrito— lanzaba un
+ * TypeError durante el render, y la consecuencia está escrita en la guarda de
+ * `opciones` de `LaMesaPuesta`: `RedDeSeguridad` cambia la página en blanco por
+ * una pantalla que dice que algo se rompió, pero sigue siendo LA SALA ENTERA
+ * caída por una mesa.
+ *
+ * Son las mismas siete comprobaciones que `leerAforo` en `app/app/index.tsx`
+ * —objeto, los dos tipos, finitud, `maximo >= 1`, `minimo >= 0`, `minimo <=
+ * maximo`— y la misma doctrina: lo que no venga bien no se pinta, y la pantalla
+ * sale igual. Aquí lo único que cuelga de esto es un renglón de ayuda, así que
+ * sin aforo se dice lo que se sabe y no se inventa un número.
+ */
+export function leerAforo(ficha: unknown): Aforo | null {
+  const a: unknown = (ficha as { jugadores?: unknown } | null | undefined)?.jugadores;
+  if (typeof a !== 'object' || a === null) return null;
+  const min: unknown = (a as { minimo?: unknown }).minimo;
+  const max: unknown = (a as { maximo?: unknown }).maximo;
+  if (typeof min !== 'number' || typeof max !== 'number') return null;
+  if (!Number.isFinite(min) || !Number.isFinite(max)) return null;
+  const minimo = Math.round(min);
+  const maximo = Math.round(max);
+  if (maximo < 1 || minimo < 0 || minimo > maximo) return null;
+  return { minimo, maximo };
+}
+
 function LaMesaPuesta({
   manifiesto,
   mesa,
@@ -268,17 +342,53 @@ function LaMesaPuesta({
   silla: string;
   codigoDeLaUrl: string;
 }): JSX.Element {
+  /*
+   * ═══ AL SENTARSE, EL FOCO SE VA DETRÁS DE LA PANTALLA ═══
+   *
+   * Cuando `fase` pasa a 'dentro' el vestíbulo entero se desmonta y aparece la
+   * mesa. El elemento que tenía el foco —«Sentarse» o «Abrir mesa»— deja de
+   * existir, así que el foco se cae a `<body>`: con teclado hay que volver a
+   * tabular desde el principio de la página, y con lector de pantalla no se
+   * anuncia nada. Era el momento más importante de esta pantalla y el único sin
+   * ninguna señal: en las 645 líneas que tenía este fichero no había ni un `ref`
+   * ni un `focus()`.
+   *
+   * Se lleva el foco al título de la mesa, que es el primer elemento del
+   * contenido nuevo: se anuncia el encabezado —o sea a qué se está jugando— y el
+   * tabulador sigue desde ahí, no desde la cabecera. No se le roba el foco a
+   * nadie, porque quien lo tenía se acaba de desmontar; y sólo se hace en el
+   * CAMBIO de fuera a dentro, para que un repintado del sondeo no vuelva a
+   * mover el foco cada vez que otro juega.
+   */
+  const tituloDeLaMesa = useRef<HTMLHeadingElement | null>(null);
+  const estabaDentro = useRef(false);
+  const dentro = mesa.fase === 'dentro' && mesa.mesa !== null;
+  useEffect(() => {
+    if (dentro && !estabaDentro.current) tituloDeLaMesa.current?.focus();
+    estabaDentro.current = dentro;
+  }, [dentro]);
+
   if (mesa.fase !== 'dentro' || mesa.mesa === null) {
     return (
       <main className="dentro">
         <h1 className="titulo">{manifiesto.nombre}</h1>
         <p className="entradilla">{manifiesto.gancho}</p>
-        {mesa.aviso.length > 0 ? <p className="aviso">{mesa.aviso}</p> : null}
-        <Vestibulo
-          mesa={mesa}
-          codigoDeLaUrl={codigoDeLaUrl}
-          minimo={manifiesto.jugadores.minimo}
-        />
+        {/*
+          `role="alert"` porque el aviso INTERRUMPE, y hasta ahora sólo
+          interrumpía en lo visual: la hoja de estilo pone la regla de `--alarma`
+          y el velo, y ahí se acababa. Por aquí pasan «Esa mesa ya no existe: la
+          han tirado o ha caducado», «Se ha perdido la mesa … Reintentando» y
+          «Ese asiento ya no vale» —cambios que ocurren SIN que nadie toque nada,
+          los trae el sondeo—, así que quien no esté mirando no se entera de
+          ninguno. La app pone aquí `alert` + `assertive`; en HTML `role="alert"`
+          ya implica `aria-live="assertive"`.
+        */}
+        {mesa.aviso.length > 0 ? (
+          <p className="aviso" role="alert">
+            {mesa.aviso}
+          </p>
+        ) : null}
+        <Vestibulo mesa={mesa} codigoDeLaUrl={codigoDeLaUrl} aforo={leerAforo(manifiesto)} />
       </main>
     );
   }
@@ -313,8 +423,20 @@ function LaMesaPuesta({
     <main className="dentro mesa-puesta">
       <div className="tablero-y-panel">
         <section className="el-mueble">
-          <h1 className="titulo">{manifiesto.nombre}</h1>
-          {mesa.aviso.length > 0 ? <p className="aviso">{mesa.aviso}</p> : null}
+          {/*
+            `tabIndex={-1}` no lo mete en el orden de tabulación: sólo lo hace
+            capaz de recibir el foco que le lleva el efecto de arriba al
+            sentarse. El aviso de foco lo pone `:focus-visible`, que la hoja ya
+            tiene medido en los cuatro temas.
+          */}
+          <h1 className="titulo" tabIndex={-1} ref={tituloDeLaMesa}>
+            {manifiesto.nombre}
+          </h1>
+          {mesa.aviso.length > 0 ? (
+            <p className="aviso" role="alert">
+              {mesa.aviso}
+            </p>
+          ) : null}
 
           {pintado.que === 'tablero' ? (
             <>
@@ -350,11 +472,34 @@ function LaMesaPuesta({
           )}
         </section>
 
-        <aside className="rail">
+        {/*
+          UN PUNTO DE REFERENCIA SIN NOMBRE NO SIRVE DE PUNTO DE REFERENCIA. Un
+          `<aside>` es un `complementary` en la lista de regiones que ofrece un
+          lector de pantalla, y sin nombre se anuncia «complementario» a secas:
+          aquí dentro están el código de la mesa, quién está sentado, lo que ha
+          pasado y las dos salidas, o sea todo lo que no es el tablero.
+        */}
+        <aside className="rail" aria-label="El carril de la mesa">
           <LaFicha mesa={puesta} silla={silla} />
           {pintado.que === 'tablero' ? <Paneles tablero={pintado.tablero} /> : null}
           <LaCronica mesa={mesa} />
-          <button type="button" className="opcion opcion-sobria" onClick={mesa.salir}>
+          {/*
+            ═══ LAS DOS SALIDAS, Y SÓLO UNA SE DESTACA ═══
+
+            «Levantarse» pasa a secundario —texto y borde en acento, sin
+            relleno—, que es la primera vez que este cliente pinta un botón que
+            se recorta de su fondo: el `.opcion` de antes era `--teja-alta` sobre
+            `--suelo`, o sea 1,15:1 contra el 3:1 que pide WCAG 1.4.11, y el
+            borde de `--filo` compuesto encima, 1,23. En secundario el acento
+            recorta 5,01 violeta / 9,22 ámbar / 8,69 verde / 5,40 carmesí sobre
+            el suelo, y son las cifras de los CUATRO temas, no las del violeta.
+
+            «Tirar la mesa» se queda en `.opcion-sobria` A PROPÓSITO: es la única
+            acción de esta pantalla que se lleva por delante la partida de los
+            demás, y destacarla sería invitar a pulsarla. Si se destaca una, esa
+            no.
+          */}
+          <button type="button" className="opcion opcion-secundaria" onClick={mesa.salir}>
             <span className="opcion-texto">
               <span className="opcion-rotulo">Levantarse de la mesa</span>
               <span className="opcion-ayuda">Se olvida el asiento en este navegador.</span>
@@ -427,14 +572,27 @@ function FormularioSiHayAlgo({
 function Vestibulo({
   mesa,
   codigoDeLaUrl,
-  minimo,
+  aforo,
 }: {
   mesa: LaMesa;
   codigoDeLaUrl: string;
-  minimo: number;
+  aforo: Aforo | null;
 }): JSX.Element {
   const [nombre, ponerNombre] = useState('');
   const [codigo, ponerCodigo] = useState(codigoDeLaUrl);
+  /*
+   * EL CÓDIGO DE LA BARRA SE VUELVE A LEER SI CAMBIA. `useState(codigoDeLaUrl)`
+   * toma la semilla y después ignora el prop, mientras que `codigoDeLaUrl` sí se
+   * recalcula en cada `popstate` (ver `Sala`). Hoy no se llega a romper —el único
+   * camino que cambiaría el `?codigo=` sin desmontar esto sería un enlace interno
+   * con código, y el que hay es absoluto y ni siquiera lo intercepta
+   * `alPulsarUnEnlace`—, pero es una trampa puesta: el día que alguien añada un
+   * `/sala/<arcade>?codigo=…` dentro de la Sala, el campo se quedaría con el
+   * código viejo sin dar ningún error.
+   */
+  useEffect(() => {
+    ponerCodigo(codigoDeLaUrl);
+  }, [codigoDeLaUrl]);
   /*
    * Se guarda EL ÍNDICE y no los segundos, y no es un capricho: los dos valores
    * de los extremos de la lista son `undefined` —«manda el servidor»— y `0`
@@ -453,11 +611,24 @@ function Vestibulo({
           Es lo que ven los demás en la mesa. No es una cuenta: no hay correo ni contraseña, y
           muere con la partida.
         </p>
+        {/*
+          ═══ EL TEXTO DE EJEMPLO NO ES UNA ETIQUETA ═══
+
+          Ninguno de los dos campos de esta pantalla tenía `<label>`, `aria-label`
+          ni `aria-labelledby`: sólo `placeholder`. Un lector de pantalla lee el
+          texto de ejemplo SÓLO mientras el campo está vacío; en cuanto se teclea
+          la primera letra lee el valor y no queda nada que diga en cuál de los
+          dos se está. Y son dos campos en la misma pantalla, que es el caso peor.
+          El `<select>` de al lado ya llevaba el suyo, o sea que no era una
+          política del fichero: era un descuido en dos de tres. Es la misma
+          corrección que la app ya pagó en sus dos campos de mesa.
+        */}
         <input
           className="campo"
           value={nombre}
           maxLength={24}
           placeholder="Tu nombre"
+          aria-label="Tu nombre en la mesa"
           onChange={(e) => {
             ponerNombre(e.target.value);
           }}
@@ -467,9 +638,15 @@ function Vestibulo({
       <div className="dos-columnas">
         <section className="panel">
           <h2 className="rotulo-de-panel">Abrir una mesa</h2>
+          {/*
+            SIN AFORO CREÍBLE NO SE DICE UN NÚMERO. `leerAforo` devuelve `null`
+            cuando el manifiesto no trae `jugadores` en condiciones, y entonces
+            se cuenta lo que sí se sabe —que sale un código— en vez de escribir
+            «Hacen falta undefined para empezar».
+          */}
           <p className="letra-chica">
-            {minimo > 1
-              ? `Hacen falta ${String(minimo)} para empezar: al abrir sale un código que se pasa a los demás.`
+            {aforo !== null && aforo.minimo > 1
+              ? `Hacen falta ${String(aforo.minimo)} para empezar: al abrir sale un código que se pasa a los demás.`
               : 'Sale un código por si quieres que se siente alguien más.'}
           </p>
           <select
@@ -492,9 +669,28 @@ function Vestibulo({
             ha llegado. «Un día» y «Sin prisa» no se distinguen por el rótulo.
           */}
           {plazo === undefined ? null : <p className="letra-chica">{plazo.ayuda}</p>}
+          {/*
+            ═══ ESTE ES EL BOTÓN QUE SE ESPERA QUE PULSES, Y AHORA LO PARECE ═══
+
+            «Abrir mesa» y «Sentarse» se pintaban con `.opcion` a secas, que es
+            el estado QUIETO de la casa —teja lisa, tinta `--tenue`, filo
+            apagado— usado como acción primaria: el relleno se recortaba del
+            fondo por 1,15:1 y el borde por 1,23, con un mínimo de 3:1 (WCAG
+            1.4.11), y fallaba IGUAL en los cuatro temas porque está construido
+            sólo con neutros. En primario el relleno es de acento con tinta
+            `--suelo`: 5,01 violeta / 9,22 ámbar / 8,69 verde / 5,40 carmesí para
+            el texto, y el relleno se recorta 4,58 de la teja y 4,85 de la pared.
+
+            Son dos primarios en la misma pantalla y no uno, porque son los dos
+            caminos del vestíbulo y viven en paneles distintos: quien abre mesa y
+            quien llega con un código no están haciendo la misma pantalla.
+
+            El apagado lo sigue llevando `:disabled`, que pesa más que esta clase
+            y se lleva el acento entero con él en vez de atenuarlo.
+          */}
           <button
             type="button"
-            className="opcion"
+            className="opcion opcion-primaria"
             disabled={mesa.quieto}
             onClick={() => {
               mesa.abrir(nombre.trim(), plazo?.segundos);
@@ -514,6 +710,7 @@ function Vestibulo({
             value={codigo}
             maxLength={8}
             placeholder="ABCDE"
+            aria-label="Código de la mesa"
             onChange={(e) => {
               ponerCodigo(e.target.value.toUpperCase());
             }}
@@ -524,7 +721,7 @@ function Vestibulo({
           />
           <button
             type="button"
-            className="opcion"
+            className="opcion opcion-primaria"
             disabled={mesa.quieto || codigo.trim().length === 0}
             onClick={() => {
               mesa.entrar(codigo, nombre.trim());
@@ -540,6 +737,85 @@ function Vestibulo({
   );
 }
 
+/**
+ * ═══ LO QUE LLEGA POR EL CABLE, LEÍDO COMO LO QUE ES ═══
+ *
+ * `MesaVista` describe lo que el servidor PROMETE, no lo que llega: la respuesta
+ * se lee con `(await r.json()) as { mesa: MesaVista; … }` (`mesa.ts:374`) y con
+ * `as { mesa?: MesaVista }` al recuperar el asiento (`mesa.ts:258`), o sea sin
+ * una sola validación. `LaFicha` hacía cinco lecturas a pelo sobre eso, y no
+ * fallan igual:
+ *
+ *   · `asientos.map` y `nombre.length` LANZAN, y eso no se lleva por delante la
+ *     mesa: se lleva la Sala entera. Es exactamente el fallo que este cliente ya
+ *     pagó una vez —«bastó con quitarle el campo `opciones` a la respuesta de
+ *     una mesa para que un `.length` sobre `undefined` se la llevara»— y que el
+ *     `?? []` de `LaMesaPuesta` resuelve en uno de los tres sitios que lo
+ *     necesitaban.
+ *   · `codigo`, `rev` y `venceEn` no lanzan: MIENTEN. Sin código, el enlace que
+ *     se le pasa a quien falta lleva escrito «undefined» y alguien lo pega en un
+ *     chat; sin `rev`, el panel dice «Revisión undefined»; y con un `venceEn` que
+ *     no sea número ni `null`, el `!== null` lo dejaba pasar, la resta daba `NaN`
+ *     y `cuantoQueda` —que no tiene rama para `NaN`: `NaN <= 0`, `NaN < 60000` y
+ *     las demás salen todas falsas— contestaba «quedan NaN días».
+ *
+ * Las tres funciones de abajo son la misma doctrina que `leerAforo`: lo que no
+ * venga bien no se pinta, y el panel sale igual.
+ */
+function cadenaDelCable(v: unknown): string | null {
+  return typeof v === 'string' && v.length > 0 ? v : null;
+}
+
+function numeroDelCable(v: unknown): number | null {
+  return typeof v === 'number' && Number.isFinite(v) ? v : null;
+}
+
+/** Un asiento que se puede pintar. `presente` en `null` es «no se sabe». */
+interface AsientoPintable {
+  id: string;
+  nombre: string;
+  presente: boolean | null;
+}
+
+function asientosDelCable(v: unknown): AsientoPintable[] {
+  if (!Array.isArray(v)) return [];
+  const salen: AsientoPintable[] = [];
+  for (const cual of v as unknown[]) {
+    if (typeof cual !== 'object' || cual === null) continue;
+    const id = cadenaDelCable((cual as { id?: unknown }).id);
+    if (id === null) continue;
+    const presente: unknown = (cual as { presente?: unknown }).presente;
+    salen.push({
+      id,
+      nombre: cadenaDelCable((cual as { nombre?: unknown }).nombre) ?? '',
+      /*
+       * Y `presente` distingue TRES casos y no dos: si no viene un booleano no se
+       * escribe «— fuera», porque eso sería afirmar que alguien se ha ido cuando
+       * lo único que pasa es que el servidor no lo ha dicho.
+       */
+      presente: typeof presente === 'boolean' ? presente : null,
+    });
+  }
+  return salen;
+}
+
+/**
+ * LA SIGUIENTE SILLA, QUE TIENE QUE SER UNA LETRA.
+ *
+ * `silla` sale de `?silla=` —o sea de la barra de direcciones— y aquí se hacía
+ * `String.fromCharCode(silla.charCodeAt(0) + 1)` sin mirar qué era: con
+ * `?silla=z` el enlace ofrecido era `?silla={`, y con `?silla=casa` ofrecía
+ * `?silla=d`, que además puede chocar con una ventana «d» que ya exista y
+ * quitarle la llave — que es justo el problema que este mecanismo existe para
+ * evitar. El comentario decía «la siguiente letra basta», y no siempre era una
+ * letra.
+ */
+function laSillaSiguiente(silla: string): string {
+  const s = silla.trim().toLowerCase();
+  if (/^[a-y]$/.test(s)) return String.fromCharCode(s.charCodeAt(0) + 1);
+  return s === 'b' ? 'c' : 'b';
+}
+
 /** El código, quién está y cuánto falta. Lo que se mira de reojo. */
 function LaFicha({
   mesa,
@@ -548,13 +824,22 @@ function LaFicha({
   mesa: NonNullable<LaMesa['mesa']>;
   silla: string;
 }): JSX.Element {
+  const codigo = cadenaDelCable(mesa.codigo);
+  const arcade = cadenaDelCable(mesa.arcade);
+  const revision = numeroDelCable(mesa.rev);
+  const vence = numeroDelCable(mesa.venceEn);
+  const terminada = mesa.terminada === true;
+  const asientos = asientosDelCable(mesa.asientos);
+
   /*
    * La cuenta atrás se repinta sola cada segundo, y solo mientras hay algo que
    * contar: sin plazo o con la mesa terminada no hay reloj, y un `setInterval`
    * eterno en una mesa acabada es una pestaña que no deja dormir al portátil.
+   * Con la guarda, «algo que contar» pasa a ser un número de verdad: un `venceEn`
+   * roto no arranca un reloj que sólo puede contar `NaN`.
    */
   const [, latir] = useState(0);
-  const hayReloj = mesa.venceEn !== null && !mesa.terminada;
+  const hayReloj = vence !== null && !terminada;
   useEffect(() => {
     if (!hayReloj) return;
     const t = setInterval(() => {
@@ -570,8 +855,14 @@ function LaFicha({
    * la silla es de este navegador —el cajón del bolsillo donde vive esta llave—
    * y mandársela a otra persona sería mandarle el nombre de un cajón suyo, que
    * es lo único de todo esto que no significa nada fuera de aquí.
+   *
+   * Y sin código o sin arcade NO HAY ENLACE, en vez de un enlace con «undefined»
+   * dentro: lo que se copia a un chat tiene que llevar a la mesa o no existir.
    */
-  const enlaceParaLosDemas = `${window.location.origin}${BASE}/${encodeURIComponent(mesa.arcade)}?codigo=${mesa.codigo}`;
+  const enlaceParaLosDemas =
+    codigo === null || arcade === null
+      ? null
+      : `${window.location.origin}${BASE}/${encodeURIComponent(arcade)}?codigo=${encodeURIComponent(codigo)}`;
   /* La silla propia se enseña aparte, para saber en qué ventana se está. */
   const enQueSilla = silla.length > 0 ? `silla «${silla}»` : '';
   /*
@@ -588,43 +879,86 @@ function LaFicha({
    * vuelve sentado en la silla de otro. La siguiente letra basta —son cajones,
    * no asientos: el asiento lo da el servidor—.
    */
-  const siguienteSilla = silla.length === 0 ? 'b' : String.fromCharCode(silla.charCodeAt(0) + 1);
-  const otraVentana = `${enlaceParaLosDemas}&silla=${encodeURIComponent(siguienteSilla)}`;
+  const siguienteSilla = laSillaSiguiente(silla);
+  const otraVentana =
+    enlaceParaLosDemas === null
+      ? null
+      : `${enlaceParaLosDemas}&silla=${encodeURIComponent(siguienteSilla)}`;
+
+  /*
+   * ═══ EL ESTADO PRIMERO Y EL CONTADOR INTERNO DETRÁS ═══
+   *
+   * Este renglón decía «Revisión 47 · partida terminada»: un número que no
+   * significa nada para quien juega —`mesa.rev` es el contador de revisiones del
+   * servidor, que la app no enseña en ninguna pantalla— delante de lo único que
+   * cambia qué hacer con la mesa. Se le da la vuelta, y lo que no se sepa no se
+   * dice: sin `rev` creíble no hay «Revisión», y con un `venceEn` que no es ni
+   * número ni `null` no se afirma «sin plazo», que sería inventar una respuesta.
+   */
+  const cola: string[] = [];
+  if (!terminada) {
+    if (vence !== null) cola.push(cuantoQueda(vence - Date.now()));
+    else if (mesa.venceEn === null) cola.push('sin plazo');
+  }
+  if (enQueSilla.length > 0) cola.push(enQueSilla);
+  if (revision !== null) cola.push(`Revisión ${String(revision)}`);
 
   return (
     <section className="panel">
       <h2 className="rotulo-de-panel">La mesa</h2>
-      <p className="codigo-grande">{mesa.codigo}</p>
-      <p className="letra-chica">
-        Pásale esto a quien falte, o el enlace entero:{' '}
-        <a href={enlaceParaLosDemas}>{enlaceParaLosDemas}</a>
-      </p>
-      <p className="letra-chica">
-        ¿Pruebas tú solo desde este mismo navegador?{' '}
-        <a href={otraVentana} target="_blank" rel="noreferrer">
-          Abre otra ventana en la silla «{siguienteSilla}»
-        </a>{' '}
-        — dos pestañas comparten el bolsillo, y sin esto la segunda te quita el
-        asiento de la primera.
-      </p>
-      <ul className="renglones">
-        {mesa.asientos.map((a) => (
+      {codigo === null ? (
+        <p className="letra-chica">
+          Este servidor no ha dicho el código de esta mesa, así que no hay nada que pasarle a
+          quien falte.
+        </p>
+      ) : (
+        <p className="codigo-grande">{codigo}</p>
+      )}
+      {enlaceParaLosDemas === null || otraVentana === null ? null : (
+        <>
+          <p className="letra-chica">
+            Pásale esto a quien falte, o el enlace entero:{' '}
+            <a href={enlaceParaLosDemas}>{enlaceParaLosDemas}</a>
+          </p>
+          <p className="letra-chica">
+            ¿Pruebas tú solo desde este mismo navegador?{' '}
+            <a href={otraVentana} target="_blank" rel="noreferrer">
+              Abre otra ventana en la silla «{siguienteSilla}»
+            </a>{' '}
+            — dos pestañas comparten el bolsillo, y sin esto la segunda te quita el
+            asiento de la primera.
+          </p>
+        </>
+      )}
+      {/*
+        `role="list"` porque `.renglones` lleva `list-style: none`, y eso le quita
+        a Safari + VoiceOver la semántica de lista: deja de anunciar «lista de 4
+        elementos», que aquí es el dato —cuántos hay sentados—.
+      */}
+      <ul className="renglones" role="list">
+        {asientos.map((a) => (
           <li key={a.id} className={a.id === mesa.yo ? 'yo' : undefined}>
             {a.nombre.length > 0 ? a.nombre : a.id}
             {a.id === mesa.yo ? ' (tú)' : ''}
-            {a.presente ? '' : ' — fuera'}
+            {a.presente === false ? ' — fuera' : ''}
           </li>
         ))}
       </ul>
-      <p className="letra-chica">
-        {enQueSilla.length > 0 ? `${enQueSilla} · ` : ''}
-        Revisión {mesa.rev}
-        {mesa.terminada
-          ? ' · partida terminada'
-          : mesa.venceEn === null
-            ? ' · sin plazo'
-            : ` · ${cuantoQueda(mesa.venceEn - Date.now())}`}
-      </p>
+      {/*
+        ═══ QUE SE ACABE LA PARTIDA SE OYE ═══
+
+        Va en su propio renglón y con `role="status"`: al aparecer se anuncia
+        una vez, que es lo que hace falta, mientras que poner la región viva en
+        el renglón de abajo sería anunciar la cuenta atrás CADA SEGUNDO. Y va
+        delante del contador interno porque es lo que decide si hay algo que
+        hacer con esta mesa.
+      */}
+      {terminada ? (
+        <p className="letra-chica" role="status">
+          <strong>La partida ha terminado.</strong>
+        </p>
+      ) : null}
+      {cola.length === 0 ? null : <p className="letra-chica">{cola.join(' · ')}</p>}
     </section>
   );
 }
@@ -635,7 +969,23 @@ function LaCronica({ mesa }: { mesa: LaMesa }): JSX.Element | null {
   return (
     <section className="panel">
       <h2 className="rotulo-de-panel">Lo que ha pasado</h2>
-      <ul className="renglones cronica">
+      {/*
+        ═══ UNA REGIÓN QUE SE DESPLAZA Y QUE EL TECLADO NO ALCANZA ES CONTENIDO ESCONDIDO ═══
+
+        `.cronica` es una caja de 16rem con `overflow-y: auto`: a 0,9rem caben
+        unos nueve renglones de los hasta 40 que guarda `mesa.ts`, y el resto sólo
+        se llegaba a leer con la rueda del ratón. La hoja de estilo ya pone el
+        aviso de foco —`.cronica:focus-visible`— y dice que el `tabIndex` y el
+        nombre los tiene que poner este fichero, porque un contenedor enfocable
+        sin nombre se anuncia «grupo» y no dice qué es.
+      */}
+      <ul
+        className="renglones cronica"
+        tabIndex={0}
+        role="group"
+        aria-label="Lo que ha pasado"
+        aria-live="polite"
+      >
         {mesa.cronica.map((a, i) => (
           <li key={`${String(i)}:${a.clave}`}>{a.texto}</li>
         ))}
