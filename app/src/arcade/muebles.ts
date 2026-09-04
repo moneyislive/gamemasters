@@ -432,7 +432,14 @@ export const LETRA = {
    * abierto, que es lo que hace de cartel sin condensada.
    */
   rotulo: { fontWeight: '800', letterSpacing: 1.4, textTransform: 'uppercase' },
-  /** Los rótulos pequeños: AFORO, SEDE, RITMO, y las especificaciones. */
+  /**
+   * Los rótulos pequeños y las cápsulas: la pastilla de estado de la portada y los
+   * rótulos de las pantallas de dentro de partida.
+   *
+   * Decía «AFORO, SEDE, RITMO», que eran las tres columnas de la tabla que la
+   * tarjeta de la Sala tuvo hasta que pasó a retrato. Esos tres datos siguen
+   * estando, pero ahora son una frase en el pie y van en `cuerpo`.
+   */
   rotuloChico: { fontWeight: '600', letterSpacing: 1.6, textTransform: 'uppercase' },
   /** El gancho y las frases que se leen de cerca. */
   cuerpo: { fontWeight: '500', letterSpacing: 0 },
@@ -469,17 +476,76 @@ export const CUENTA_DE_AFORO = {
   /** Ancho de cada muesca. */
   grosor: 3,
   /** Alto de una encendida y de una apagada: la diferencia es la que se lee. */
-  altoEncendida: 16,
+  altoEncendida: 15,
   altoApagada: 7,
-  /** Separación entre muescas en la ficha destacada y en las de la hilera. */
-  huecoDestacada: 22,
-  huecoHilera: 19,
+  /*
+   * SEPARACIÓN ENTRE MUESCAS. Era 22, y son 13 desde que el raíl se metió DENTRO
+   * de la portada de la tarjeta: ahí dispone de los 210 útiles de una tarjeta de
+   * 252 y no del ancho entero de una ficha de 378. Con 22, un aforo de doce medía
+   * 278 y se salía; con 13 mide 179 y cabe con holgura.
+   *
+   * ES UNA SOLA Y NO DOS. Había `huecoDestacada` y `huecoHilera` porque la Sala
+   * era una pila con la primera tarjeta más grande. En un carrusel todas las
+   * tarjetas miden lo mismo, así que dos valores serían dos nombres para el
+   * mismo número esperando a divergir.
+   *
+   * Lo que NO cede sigue siendo el número de muescas —el raíl cuenta o no sirve
+   * para nada—, que es la regla que gobierna `huecoDelRail`.
+   */
+  hueco: 13,
 } as const;
 
 /** Los redondeos de la Sala. Pocos y con un trabajo cada uno. */
+/**
+ * ═══ LOS TRES ESTADOS DE UN BOTÓN, Y LOS TRES ESTÁN MEDIDOS ═══
+ *
+ * Había cuatro maneras distintas de pintar un botón en esta Sala, y dos de ellas
+ * fallaban el contraste en dos de los cuatro temas. Esta tabla existe para que la
+ * quinta no se invente.
+ *
+ * PRIMARIO: relleno de `acento` con tinta `suelo`. Es la ÚNICA pareja sólida que
+ * pasa a la vez el 4,5:1 del texto y el 3:1 del recorte del relleno contra la teja
+ * en los cuatro temas: 5,01 en violeta, 9,22 en ámbar, 8,69 en verde y 5,40 en
+ * carmesí. Lo que había —relleno de `acentoHondo` con tinta blanca— se queda en
+ * 4,64 en ámbar y en verde, y el comentario que lo defendía citaba únicamente el
+ * 6,4 del violeta. Y blanco sobre el acento VIVO, que es lo que pintan hoy La
+ * Frente y el lienzo, da 1,98 en ámbar: no es que pase raspando, es que no está.
+ *
+ * SECUNDARIO: sin relleno, con el texto en `acento` sobre la teja —4,58 / 8,44 /
+ * 7,96 / 4,94— y el borde en `acento` PLENO. Un borde de acento al 42 % se queda
+ * en 1,77 y deja de recortarse; si se quiere un borde discreto, `filoVivo`, pero
+ * entonces quien tiene que pasar el 3:1 es el texto.
+ *
+ * QUIETO: y esto es lo importante, PORQUE UN BOTÓN APAGADO NO SE PINTA CON
+ * `opacity`. Apagar con opacidad apaga también la etiqueta: medido, una ayuda en
+ * `tenue` dentro de un botón con `opacity: 0.5` cae de 5,95 a 2,32. Se apaga con
+ * COLOR —la teja lisa, el filo apagado y el rótulo en `tenue`—, que mantiene los
+ * 5,95. El argumento estaba escrito y razonado en `retablo.tsx`, y el fichero de
+ * al lado lo seguía haciendo mal en dos sitios: por eso vive aquí ahora.
+ *
+ * Y un botón apagado PIERDE EL ACENTO, no lo atenúa. En esta Sala el acento
+ * significa «esto se puede tocar»; uno de acento que no se deja pulsar dice una
+ * cosa y hace otra.
+ */
+export const BOTON = {
+  primario: { fondo: SALA.acento, tinta: SALA.suelo, borde: SALA.acento },
+  secundario: { fondo: 'transparent', tinta: SALA.acento, borde: SALA.acento },
+  quieto: { fondo: SALA.teja, tinta: SALA.tenue, borde: SALA.filo },
+} as const;
+
 export const RADIO = {
-  /** Una ficha de máquina. */
+  /** Una ficha de máquina: un panel de dentro de una partida. */
   ficha: 14,
+  /*
+   * UNA TARJETA DE LA SALA, Y ES MÁS REDONDA QUE UN PANEL A PROPÓSITO.
+   *
+   * Son los 20 de la tarjeta de velada del carrusel de la portada, copiados a
+   * conciencia: las dos viven en la misma pantalla, a un dedo de distancia, y
+   * ahí un radio distinto no se lee como dos familias sino como un descuido.
+   * Los paneles de DENTRO de una partida siguen en 14 porque nadie los ve al
+   * lado de una velada.
+   */
+  tarjeta: 20,
   /** Un botón, una pastilla, el marcador. */
   mando: 8,
 } as const;

@@ -51,10 +51,15 @@
  *   · LA PLACA DE COLOR DE LA SALA ES, AQUÍ, LA PEONZA. El diseño manda que el
  *     acento viva en UN SOLO SITIO Y GRANDE; en una ficha eso es la placa del
  *     nombre y en esta pantalla es el objeto que ocupa media pantalla y es el
- *     juego entero. Por eso todo lo de abajo —panel, rótulos, muescas apagadas—
- *     es gris frío, y el acento sólo vuelve a aparecer en las tres cosas que la
- *     tabla le reserva: el piloto de «esto está vivo», las muescas encendidas y
- *     el filo del único botón.
+ *     juego entero. Por eso todo lo de abajo —panel, rótulos, raíl— es gris frío,
+ *     y el acento sólo vuelve a aparecer en DOS sitios: el piloto de «esto está
+ *     vivo» y el filo del botón que empuja. El de salir no lo lleva, y por eso
+ *     mismo: aquí el acento dice «esto es lo que has venido a hacer».
+ *
+ *     Eran TRES. La tercera eran las muescas encendidas del raíl, y se cayó
+ *     midiendo: ver el raíl más abajo. El acento no se ha ido de la pantalla por
+ *     gusto de simetría —el argumento de arriba sigue en pie— sino porque en ese
+ *     sitio concreto hacía que el medidor se leyera al revés.
  *
  *   · EL MISMO VIOLETA ILUMINADO NO ES EL MISMO VIOLETA. `SALA.acento` plano se
  *     ve tal cual; puesto en un `MeshStandardMaterial` sólo lo da la cara que
@@ -80,9 +85,27 @@
  * máquina. Aquí dentro esa cuenta no dice nada: el aforo de La Peonza es 1–1 y una
  * sola muesca es un adorno mudo, que es exactamente la clase de ornamento que el
  * diseño rechaza. Así que se conserva la GRAMÁTICA —el grosor, los dos altos y el
- * hueco salen de `CUENTA_DE_AFORO`, sin copiar un número— y se le da lo único que
+ * hueco salen de `MUESCA` y de las dos medidas que `piezas.tsx` exporta con ella,
+ * sin copiar un número— y se le da lo único que
  * de verdad se mueve en esta pantalla: el giro. Diez muescas, una por cada diez
  * por ciento.
+ *
+ * ═══ Y POR ESO NO ES `RailDeAforo` DE `piezas.tsx`, QUE ES LA PREGUNTA OBVIA ═══
+ *
+ * Aquella pieza existe para que las tres copias del raíl de aforo dejen de
+ * separarse, y ésta NO es una cuarta copia: es otro instrumento con la misma
+ * gramática. `RailDeAforo` recibe `{minimo, maximo}` y se anuncia con
+ * `accessibilityRole="image"` y la etiqueta «Aforo: de N a M jugadores». Pasarle
+ * el giro haría que un lector de pantalla dijera que esta peonza admite de tres a
+ * diez jugadores —falso— y costaría además el `progressbar` con valor vivo de aquí
+ * abajo, que es lo único de esta pantalla que la revisión dio por bien resuelto.
+ *
+ * Lo que SÍ se ha traído de la pieza es la FORMA entera: `MUESCA` exporta el
+ * grosor, los dos altos, el radio y los cuatro colores, así que este medidor y el
+ * raíl de aforo son el mismo objeto físico con dos significados. Es lo que impide
+ * que vuelva a pasar lo de antes: la corrección de la apagada —del 14 % al 70 %,
+ * porque al 14 se separa de su fondo por 1,53:1— tendría otra vez dos sitios
+ * adonde llegar si cada instrumento declarase sus colores.
  *
  * ═══ LO QUE FALTA ANTES DE PROMETER 3D EN PRODUCCIÓN, DICHO AQUÍ ═══
  *
@@ -96,20 +119,24 @@
 import { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { router } from 'expo-router';
 import * as THREE from 'three';
 import { Canvas } from '../tres/Lienzo';
 import {
   EMPUJAR,
   estaGirando,
   GIRO_MAXIMO,
+  MANIFIESTO_PEONZA,
   partidaNuevaDeLaPeonza,
   PEONZA,
   VUELTA,
 } from '../../../shared/arcade/juegos';
 import type { EstadoDeLaPeonza } from '../../../shared/arcade/juegos';
+import { usarMarco } from '../marco';
 import { conAlfa } from '../tema';
 import { usarArcadeLocal } from './local';
-import { CUENTA_DE_AFORO, LETRA, RADIO, SALA } from './muebles';
+import { LETRA, RADIO, SALA } from './muebles';
+import { ALTO_DE_MUESCAS, HUECO_DE_MUESCAS, MUESCA } from './piezas';
 
 /**
  * La semilla, aunque este juego no use el azar.
@@ -145,6 +172,28 @@ const estiloDelBoton = ({ pressed }: { pressed: boolean }) => [
 ];
 
 export default function EscenaDeLaPeonza(): JSX.Element {
+  /*
+   * ═══ EL SUELO DEL PANEL LO DICE EL APARATO, Y NO UN 22 ESCRITO A MANO ═══
+   *
+   * Aquí había `marginBottom: 22` en el botón con un comentario que decía que ese
+   * número existía justamente para que la barra de gestos no se comiera el único
+   * mando de la pantalla. No llegaba: la raya del iPhone reserva 34 pt en vertical
+   * —21 en horizontal— y 22 se queda doce por debajo. El botón se veía entero y el
+   * toque en su franja de abajo se lo llevaba el sistema, que es peor que no verlo.
+   *
+   * `usarMarco` estaba montado desde hace tiempo —`SafeAreaProvider` cuelga de
+   * `app/app/_layout.tsx`— y NINGUNA pantalla del grupo `(arcade)` preguntaba por
+   * él. El comprobador que vigila esto sólo mira la portada, el avatar y la cuenta,
+   * así que el verde no cubría nada de aquí.
+   *
+   * El mínimo se pasa en 22 y no en los 8 por defecto para no PERDER aire en los
+   * móviles sin raya, que informan de cero: allí sigue habiendo exactamente los 22
+   * de antes, y donde hay barra se abre hasta lo que el aparato pida. El mínimo de
+   * arriba no se usa —el lienzo llega al borde a propósito, como el mundo 3D de la
+   * portada— y por eso va a cero en vez de reservar doce píxeles que nadie mira.
+   */
+  const { abajo: aireAbajo } = usarMarco(0, 22);
+
   const mesa = usarArcadeLocal<EstadoDeLaPeonza>({
     arcade: PEONZA,
     partidaNueva: partidaNuevaDeLaPeonza,
@@ -202,9 +251,39 @@ export default function EscenaDeLaPeonza(): JSX.Element {
     [],
   );
 
+  /*
+   * El suelo del panel va en `useMemo` por lo mismo que la geometría: a treinta
+   * fotogramas por segundo, un array y un objeto nuevos por repintado son basura
+   * que recoger sin que nadie los haya pedido. Depende del aparato, así que no
+   * puede vivir en la tabla de estilos, pero cambia una vez por rotación de
+   * pantalla y no treinta veces por segundo.
+   */
+  const estiloDelPanel = useMemo(
+    () => [estilos.panel, { paddingBottom: aireAbajo }],
+    [aireAbajo],
+  );
+
   return (
     <View style={estilos.todo}>
-      <View style={estilos.escena}>
+      {/*
+       * ═══ DOS TERCIOS DE PANTALLA NO PUEDEN SER UN HUECO MUDO ═══
+       *
+       * El lienzo es la jugada entera y no tenía ni rol ni nombre: con un lector
+       * de pantalla, todo lo de arriba del panel no existía. Se nombra el GRUPO y
+       * no el `Canvas` a propósito —dentro hay además el halo, que es decoración—
+       * y con `accessible` los dos se leen como un solo elemento.
+       *
+       * La etiqueta dice el ESTADO y no el porcentaje, aunque el porcentaje esté a
+       * mano: la cifra exacta ya la lleva el `progressbar` de aquí abajo con valor
+       * vivo, y repetirla aquí obligaría a oírla dos veces por recorrido y montaría
+       * una cadena nueva en cada uno de los treinta fotogramas por segundo.
+       */}
+      <View
+        style={estilos.escena}
+        accessible
+        accessibilityRole="image"
+        accessibilityLabel={girando ? 'La peonza, girando' : 'La peonza, parada'}
+      >
         <Canvas style={estilos.lienzo} camera={{ position: [0, 1.6, 3], fov: 45 }}>
           <ambientLight intensity={0.6} />
           <directionalLight position={[3, 5, 2]} intensity={1.1} />
@@ -230,9 +309,15 @@ export default function EscenaDeLaPeonza(): JSX.Element {
         />
       </View>
 
-      <View style={estilos.panel}>
+      <View style={estiloDelPanel}>
         <View style={estilos.cabecera}>
-          <Text style={estilos.nombre}>LA PEONZA</Text>
+          {/*
+           * El nombre sale del MANIFIESTO y ya no escrito a mano. Estaba duplicado
+           * aquí y en la espera de `escena.tsx`, o sea que renombrar la máquina en
+           * su manifiesto la dejaba con dos nombres y ningún error a la vista. Es
+           * lo que ya hace la espera de El Arcade con `MANIFIESTO_EL_ARCADE.nombre`.
+           */}
+          <Text style={estilos.nombre}>{MANIFIESTO_PEONZA.nombre}</Text>
           <Text style={estilos.recuento}>{mesa.estado.empujones} empujones</Text>
         </View>
 
@@ -240,7 +325,22 @@ export default function EscenaDeLaPeonza(): JSX.Element {
           <View style={estilos.estado}>
             <View style={estilos.estadoIzquierda}>
               <View style={[estilos.piloto, girando ? estilos.pilotoVivo : estilos.pilotoFrio]} />
-              <Text style={estilos.estadoRotulo}>{girando ? 'GIRANDO' : 'PARADA · EMPÚJALA'}</Text>
+              {/*
+               * `accessibilityLiveRegion` AQUÍ Y NO EN LA FILA ENTERA, que es la
+               * diferencia entre avisar y ser ruido: este rótulo cambia dos veces
+               * por giro —al empujar y al pararse—, mientras que el porcentaje de al
+               * lado cambia treinta veces por segundo. Puesto en la fila, Android
+               * leería una cifra nueva en voz alta cada 33 ms hasta que la peonza
+               * parase.
+               *
+               * Es sólo de Android; iOS no tiene región viva y su forma —
+               * `announceForAccessibility`— es imperativa y no cabe aquí sin un
+               * efecto que vigile el estado. Queda dicho: en iOS el cambio sigue sin
+               * anunciarse solo.
+               */}
+              <Text style={estilos.estadoRotulo} accessibilityLiveRegion="polite">
+                {girando ? 'GIRANDO' : 'PARADA · EMPÚJALA'}
+              </Text>
             </View>
             <Text style={estilos.porCiento}>{porCiento} %</Text>
           </View>
@@ -259,7 +359,11 @@ export default function EscenaDeLaPeonza(): JSX.Element {
             {MUESCAS.map((indice) => (
               <View
                 key={indice}
-                style={[estilos.muesca, indice < encendidas ? estilos.muescaEncendida : estilos.muescaApagada]}
+                style={[
+                  MUESCA.base,
+                  indice < encendidas ? MUESCA.alta : MUESCA.baja,
+                  indice < encendidas ? MUESCA.viva : MUESCA.fria,
+                ]}
               />
             ))}
           </View>
@@ -270,8 +374,29 @@ export default function EscenaDeLaPeonza(): JSX.Element {
           style={estiloDelBoton}
           accessibilityRole="button"
           accessibilityLabel="Empujar la peonza"
+          /* Qué va a pasar, porque el resultado no se anuncia solo en iOS. */
+          accessibilityHint="Acelera el giro. El porcentaje de encima dice cuánto queda."
         >
           <Text style={estilos.botonRotulo}>EMPUJAR</Text>
+        </Pressable>
+
+        {/*
+         * ═══ LA SALIDA, QUE NO ESTABA ═══
+         *
+         * La pila del grupo monta con `headerShown: false` —`app/app/(arcade)/
+         * _layout.tsx`— así que de esta pantalla sólo se salía con el gesto del
+         * sistema, con el botón físico de Android o con el atrás del navegador. Los
+         * tres arcades hermanos pintan esta misma pastilla de filo, con estos mismos
+         * 44 y este mismo `RADIO.mando`; aquí no hay nada que inventar, sólo que
+         * faltaba.
+         */}
+        <Pressable
+          onPress={() => router.back()}
+          style={estilos.salir}
+          accessibilityRole="button"
+          accessibilityLabel="Volver a la portada"
+        >
+          <Text style={estilos.salirTexto}>Volver</Text>
         </Pressable>
       </View>
     </View>
@@ -295,6 +420,11 @@ const estilos = StyleSheet.create({
    * —por abajo se apoya en el borde de la pantalla— y separada del suelo por un
    * filo de un píxel. No hay sombra ni bisel: la elevación se dice con el cambio
    * de superficie, que es la primera decisión del diseño.
+   *
+   * Se apoya en el borde de la pantalla pero NO mete nada debajo de la barra de
+   * gestos: el `paddingBottom` se lo pone el componente con lo que diga el aparato.
+   * Va en el panel y no en el botón porque lo que tiene que respetar el borde es
+   * todo lo que se toca, y ahora abajo hay dos mandos y no uno.
    */
   panel: {
     backgroundColor: SALA.teja,
@@ -306,6 +436,25 @@ const estilos = StyleSheet.create({
     overflow: 'hidden',
   },
 
+  /*
+   * ═══ `flexShrink: 1` EN LOS DOS, Y NO ES UN ADORNO DE LAYOUT ═══
+   *
+   * En React Native el `flexShrink` por defecto es 0 —al revés que en la web—, así
+   * que dos textos en una fila `space-between` no se encogen ni se reparten: se
+   * salen. Y esta fila vive dentro de un panel con `overflow: 'hidden'`, o sea que
+   * lo que se sale no asoma: se corta a media palabra, sin aviso.
+   *
+   * Con la ampliación de letra del sistema la fila crece y se pasa a partir de
+   * ~115 % en una pantalla de 320 dp y de ~145 % en una de 375. Con esto, en vez de
+   * cortarse, los dos textos parten renglón y la fila crece hacia abajo — que aquí
+   * se puede porque ni la cabecera ni el panel tienen alto fijo: el `flex: 1` de la
+   * escena cede sitio y el lienzo se hace más bajo.
+   *
+   * Y por eso mismo NO lleva `maxFontSizeMultiplier`: el tope de la tarjeta de la
+   * portada existe porque aquella portada es una caja de 228 clavados. Aquí no hay
+   * ninguna, así que capar la letra sería quitarle al usuario lo que ha pedido a
+   * cambio de nada.
+   */
   cabecera: {
     flexDirection: 'row',
     alignItems: 'baseline',
@@ -320,15 +469,31 @@ const estilos = StyleSheet.create({
    * propia la voz de cartel la ponen entera el peso, la caja alta y el tracking de
    * `LETRA.rotulo`.
    */
-  nombre: { color: SALA.palabra, fontSize: 15, ...LETRA.rotulo },
+  nombre: { color: SALA.palabra, fontSize: 15, ...LETRA.rotulo, flexShrink: 1 },
   /*
-   * La cuenta de empujones es dato de apoyo, no titular: `cifra`. Va con las
-   * columnas cuadradas de `LETRA.dato` para que no baile al pasar de 9 a 10, y con
-   * la caja alta de un rótulo pequeño.
+   * ═══ LA CUENTA DE EMPUJONES ES DATO DE APOYO, PERO ES TEXTO ═══
+   *
+   * Iba en `SALA.cifra` —blanco al 34 %— y eso sobre la teja compone rgb(99,101,106)
+   * y da 3,11:1. El mínimo de un texto que hay que leer es 4,5:1, y éste es
+   * precisamente el dato que contesta si el botón ha hecho algo. `SALA.tenue` en el
+   * mismo sitio da 5,95:1 y es el color que la casa reserva a lo que acompaña.
+   *
+   * La jerarquía no se pierde: la da el CUERPO —13 contra los 15 del nombre— y la
+   * caja alta, que es como la resuelve el pie de la tarjeta de la portada. Bajarla
+   * con alfa es lo que trajo el 3,11.
+   *
+   * Los tres colores son neutros, así que el 3,11 y el 5,95 son idénticos en
+   * violeta, ámbar, verde y carmesí: esto no lo arreglaba ningún tema.
+   *
+   * Con esto `SALA.cifra` ya no se usa en este fichero ni como texto ni como trazo.
+   * Su docstring en `muebles.ts` sigue prometiéndolo para «los rótulos pequeños y
+   * las cifras de apoyo», y no da para eso sobre ninguna de las superficies de esta
+   * Sala; queda dicho aquí porque aquella tabla es de otro.
    */
   recuento: {
-    color: SALA.cifra,
+    color: SALA.tenue,
     fontSize: 13,
+    flexShrink: 1,
     ...LETRA.rotuloChico,
     /*
      * `LETRA.dato` es `as const` y su `fontVariant` sale de sólo lectura; el tipo
@@ -353,61 +518,100 @@ const estilos = StyleSheet.create({
     paddingTop: 12,
     paddingBottom: 13,
   },
+  /* El `flexShrink` de los dos lados: el porqué está en `cabecera`, aquí arriba. */
   estado: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
-  estadoIzquierda: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  estadoIzquierda: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1 },
 
   piloto: { width: 6, height: 6, borderRadius: 3 },
-  /* Viva: acento macizo. Es una de las tres cosas a las que el diseño se lo reserva. */
+  /* Viva: acento macizo. Es una de las dos cosas a las que el diseño se lo reserva. */
   pilotoVivo: { backgroundColor: SALA.acento },
   /*
-   * Parada: el mismo punto en hueco, con un aro de `cifra`. No se apaga con un gris
-   * más oscuro sino con la AUSENCIA de relleno, que es lo que se lee de un vistazo.
+   * Parada: el mismo punto en hueco. No se apaga con un gris más oscuro sino con la
+   * AUSENCIA de relleno, que es lo que se lee de un vistazo.
+   *
+   * El aro era `SALA.cifra` y da 3,11:1 sobre la teja alta: pasa el 3:1 de elemento
+   * no textual por once centésimas, y en un aro de UN píxel alrededor de un punto de
+   * seis, once centésimas no son margen. Blanco al 55 % —lo que la tarjeta de la
+   * portada puso en este mismo sitio— da 6,01:1.
    */
-  pilotoFrio: { borderWidth: 1, borderColor: SALA.cifra },
+  pilotoFrio: { borderWidth: 1, borderColor: conAlfa(SALA.blanco, 0.55) },
 
   /* Trece es el mínimo de la Sala, y este rótulo es de los que se leen de lejos. */
-  estadoRotulo: { color: SALA.tenue, fontSize: 13, ...LETRA.rotuloChico },
+  estadoRotulo: { color: SALA.tenue, fontSize: 13, flexShrink: 1, ...LETRA.rotuloChico },
   /* La cifra sí es énfasis —es LO que está pasando—, y por eso va en blanco. */
   porCiento: { color: SALA.blanco, fontSize: 13, ...LETRA.dato, fontVariant: [...LETRA.dato.fontVariant] },
 
   /*
-   * El raíl: las muescas se apoyan en una línea, como en la Sala. Alto, grosor,
-   * los dos altos de muesca y el hueco salen de `CUENTA_DE_AFORO`; lo único que
-   * cambia es qué cuenta.
+   * ═══ EL ALTO SALE DE LA TABLA, Y LA LÍNEA DE APOYO SE HA IDO ═══
+   *
+   * El comentario que había aquí decía que el alto, el grosor, los dos altos de
+   * muesca y el hueco salían de `CUENTA_DE_AFORO`. Tres de las cuatro cosas sí; el
+   * ALTO no: la tabla dice 15 y aquí ponía 19 escrito a mano, heredado —junto con el
+   * radio 2 y la apagada en `filoVivo`— de la espera de El Arcade, que conserva el
+   * raíl anterior entero. Ahora sale de la tabla y la frase es verdad.
+   *
+   * Y las muescas ya no se apoyan en ninguna línea. Era `SALA.filo` —blanco al
+   * 7,5 %— sobre `tejaAlta`: 1,23:1, o sea que no estaba. Un carril invisible no es
+   * un carril discreto; y el raíl de la Sala —`RailDeAforo`, en `piezas.tsx`— no
+   * lleva ninguno, así que esto era una tercera divergencia y no una decisión.
    */
   rail: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    height: 19,
+    height: ALTO_DE_MUESCAS,
     marginTop: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: SALA.filo,
-    gap: CUENTA_DE_AFORO.huecoHilera,
+    gap: HUECO_DE_MUESCAS,
   },
-  muesca: { width: CUENTA_DE_AFORO.grosor, borderRadius: 2 },
-  muescaEncendida: { height: CUENTA_DE_AFORO.altoEncendida, backgroundColor: SALA.acento },
-  /* Apagada no es invisible: es un trazo, y un trazo es `filoVivo`. */
-  muescaApagada: { height: CUENTA_DE_AFORO.altoApagada, backgroundColor: SALA.filoVivo },
+  /*
+   * ═══ LA TINTA ES BLANCA EN LAS DOS, Y LA DIFERENCIA LA LLEVA EL ALTO ═══
+   *
+   * Aquí la apagada era `SALA.filoVivo` —blanco al 14 %— y el comentario decía
+   * «apagada no es invisible: es un trazo, y un trazo es `filoVivo`». Medido sobre
+   * su fondo real dice lo contrario: compone rgb(55,59,66) sobre `tejaAlta`
+   * rgb(22,27,35) y da 1,53:1, contra el 3:1 que pide un elemento no textual. A
+   * media distancia entre el mínimo y el 1,0 que es no estar dibujado.
+   *
+   * Y no es un matiz, porque LAS APAGADAS SON LAS QUE DIBUJAN EL LARGO: con la
+   * peonza parada desaparecían las diez a la vez y no quedaba nada donde el 100 %
+   * había enseñado un medidor, mientras el `accessibilityValue` seguía diciendo 0 %.
+   * O sea que el medidor sólo existía cuando estaba lleno. Al 70 % da 8,89:1.
+   * Los dos colores son neutros: el 1,53 era idéntico en los cuatro temas.
+   *
+   * La ENCENDIDA pierde el acento, y eso es lo segundo que cambia. En acento pasaba
+   * de sobra —4,37 en violeta, 8,05 en ámbar, 7,58 en verde, 4,71 en carmesí— pero
+   * junto a una apagada al 70 % (8,89) el violeta y el carmesí dejaban el medidor
+   * AL REVÉS: las muescas «off» más luminosas que las «on». Por eso la regla de la
+   * casa es que la distinción la lleve sólo la ALTURA —15 contra 7— y la tinta sea
+   * una sola, elegida por el fondo donde cae. Sobre la teja alta, blanca.
+   */
+  /*
+   * Y LOS TRES ESTILOS DE LA MUESCA YA NO SE DECLARAN AQUÍ: son `MUESCA.base`,
+   * `MUESCA.alta` + `MUESCA.viva` y `MUESCA.baja` + `MUESCA.fria`, de `piezas.tsx`.
+   * Todo lo que dice el párrafo de arriba sigue siendo cierto; lo que cambia es que
+   * ahora hay UN sitio donde cambiarlo.
+   */
 
   /*
-   * El único mando de la pantalla. El acento entra aquí como FILO y no como campo:
+   * El mando que juega —el otro sólo sale—. El acento entra aquí como FILO y no como campo:
    * el campo de color grande ya lo ocupa la peonza, y dos planos de acento en la
    * misma pantalla se roban el uno al otro. El relleno es un blanco al 4 %, lo
    * justo para que el botón sea una superficie y no un dibujo.
    *
-   * Los 44 del dedo salen exactos y con el borde DESCONTADO del hueco: 12 + 1 de
-   * borde + 18 de línea + 1 + 12. Ignorar el borde daría 46 y el número dejaría de
-   * significar nada.
+   * Los 44 del dedo los garantiza `minHeight` y nada más. Aquí había una cuenta
+   * —«12 + 1 de borde + 18 de línea + 1 + 12»— que suma 44 y era cierta, pero sólo
+   * a escala de letra 1: el 18 era un `lineHeight` fijo y el 15 de al lado un
+   * `fontSize` que la ampliación del sistema multiplica, así que la igualdad se
+   * rompía en cuanto alguien subía el tamaño de letra —y entonces la línea se
+   * quedaba corta para su propio texto—. Describía una coincidencia como si fuera
+   * una restricción. El `lineHeight` se ha ido con ella.
+   *
+   * El aire de abajo ya no es un número de aquí: lo pone `usarMarco`, y el porqué
+   * está en la cabecera del componente.
    */
   boton: {
     minHeight: 44,
     marginHorizontal: 16,
     marginTop: 14,
-    /*
-     * Más aire abajo que arriba: en un móvil sin marco la barra de gestos se come
-     * los últimos píxeles, y este botón es lo único que se puede tocar.
-     */
-    marginBottom: 22,
     paddingVertical: 12,
     paddingHorizontal: 20,
     alignItems: 'center',
@@ -418,13 +622,38 @@ const estilos = StyleSheet.create({
     backgroundColor: conAlfa(SALA.blanco, 0.04),
   },
   /*
-   * Al pulsar, el acento se derrama del filo al plano. Es la respuesta al dedo
-   * dicha con el color que ya significa «esto se puede tocar», sin inventar otro.
+   * Al pulsar, el relleno pasa de blanco al 4 % a acento al 18 %, y lo que cambia es
+   * el TONO y casi nada el brillo: rgb(27,31,38) contra rgb(45,33,68) son 1,12:1 de
+   * luminancia en violeta, 1,26 en ámbar, 1,25 en verde y 1,10 en carmesí.
+   *
+   * Aquí ponía que «el acento se derrama del filo al plano», y eso promete un
+   * derrame que el píxel no entrega: de un gris neutro a un morado apagado se nota,
+   * pero el brillo es lo que sobrevive al sol y a los ojos cansados, y el brillo casi
+   * no se mueve. No es incumplimiento —un estado de pulsado no tiene mínimo— pero la
+   * frase no se sostenía y el número sí, así que queda el número: quien quiera que
+   * este botón conteste MÁS al dedo tiene que mover la luminancia, no el tono.
    */
   botonPulsado: { backgroundColor: conAlfa(SALA.acento, 0.18) },
+  /* Sobre el filo de acento el texto va en `blanco` de énfasis. */
+  botonRotulo: { color: SALA.blanco, fontSize: 15, ...LETRA.rotulo },
+
   /*
-   * Sobre el filo de acento el texto va en `blanco` de énfasis, y la línea de 18
-   * no es decorativa: es la que hace que la cuenta de los 44 cuadre.
+   * LA SALIDA: la misma pastilla de filo que los tres arcades hermanos —44 de alto,
+   * `RADIO.mando`, borde `SALA.filo` y rótulo en `tenue`, que da 5,95:1 sobre la
+   * teja—. Va centrada y sin acento a propósito: en esta Sala el acento significa
+   * «esto es lo que has venido a hacer», y salir no lo es.
    */
-  botonRotulo: { color: SALA.blanco, fontSize: 15, lineHeight: 18, ...LETRA.rotulo },
+  salir: {
+    minHeight: 44,
+    alignSelf: 'center',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 10,
+    paddingVertical: 7,
+    paddingHorizontal: 15,
+    borderRadius: RADIO.mando,
+    borderWidth: 1,
+    borderColor: SALA.filo,
+  },
+  salirTexto: { color: SALA.tenue, fontSize: 15, ...LETRA.cuerpo },
 });

@@ -219,6 +219,29 @@ const BATERIA = [
    * mienta sobre por qué no se puede jugar, o que un icono que este binario no
    * conozca deje la portada en blanco.
    */
+  /*
+   * ═══ LA QUE VIGILA QUE UNA CORRECCIÓN LLEGUE A LOS SEIS FICHEROS ═══
+   *
+   * No comprueba estética, que es lo que parece por el nombre. Comprueba cuatro
+   * parejas de color y de forma que YA han fallado en esta Sala, y que fallan en
+   * silencio porque ninguna prueba de este repositorio mira píxeles.
+   *
+   * Existe por un patrón medido: el raíl de aforo estaba escrito TRES veces, se
+   * midió que sus muescas apagadas se separaban de su fondo por 1,80:1 —o sea que
+   * desaparecían, y son las que dibujan el largo—, y la corrección llegó a UNA de
+   * las tres. Lo mismo con apagar un botón con `opacity`: un fichero dedica ocho
+   * renglones a explicar por qué no se hace y el de al lado lo hacía en dos sitios.
+   *
+   * Corre con `node` pelado en medio segundo y no levanta nada.
+   */
+  {
+    nombre: 'gramática · sala',
+    donde: 'app',
+    guion: 'verify:gramatica',
+    porque:
+      'una corrección de contraste hecha en una pantalla de la Sala llega a las siete: ningún botón apagado se apaga con `opacity` —que apaga también la letra y deja una ayuda en 2,32:1—, ningún texto blanco se apoya en el acento vivo —1,98:1 en ámbar—, el raíl de aforo se pinta en un solo sitio y ningún cuerpo baja de 13',
+  },
+
   {
     nombre: 'sala · móvil',
     donde: 'app',
