@@ -1349,7 +1349,16 @@ code {
  * cede alto: 52vh.
  *
  * `touch-action: none` es lo que permite arrastrar para girar en una pantalla
- * táctil de PC sin que el navegador se lleve el gesto para desplazar la página.
+ * táctil de PC sin que el navegador se lleve el gesto para desplazar la página. Y
+ * como también le quita al navegador su PROPIO pellizco, el pellizco de acercar lo
+ * pone `riberas-en-tres.tsx` a mano: sin las dos cosas, en una tableta el delta se
+ * giraba y no se acercaba de ninguna manera.
+ *
+ * De este recuadro —y no del `<canvas>`— cuelga el oyente de la rueda, porque el
+ * botón de volver es hermano del lienzo y no hijo suyo: ver `RECUADRO_DEL_LIENZO`
+ * en `riberas-en-tres.tsx`. O sea que esta clase tiene un lector además del
+ * navegador, y renombrarla sin más deja la rueda sin `preventDefault`.
+ *
  * `overflow: hidden` es lo que hace que el `<canvas>` respete el redondeo.
  *
  * ═══ SIN ACENTO ═══
@@ -1421,6 +1430,67 @@ code {
 .riberas-telon .letra-chica {
   margin: 0 auto;
   max-width: 44ch;
+}
+
+/*
+ * ═══ LA SALIDA DEL ACERCAMIENTO ═══
+ *
+ * El delta se puede acercar hasta ver las casas una por una, y la mirada se puede
+ * llevar hasta el borde del tablero. Un zoom así sin vuelta atrás ATRAPA: uno se
+ * mete en una esquina, pierde de vista lo demás y no sabe cómo volver. Por eso hay
+ * un botón, y por eso está SOBRE EL LIENZO, que es adonde uno está mirando justo
+ * cuando se pierde — no en el raíl, al que habría que ir a buscarlo.
+ *
+ * Sólo se pinta cuando hay algo a lo que volver: lo decide `estaComoAlPrincipio` en
+ * `riberas-en-tres.tsx`. Que aparezca y desaparezca ES la información.
+ *
+ * Es un botón de la Sala y se comporta como los demás —el FILO se enciende bajo el
+ * ratón y el fondo no se mueve; el `:focus-visible` de la cabecera le vale tal cual—.
+ * Sin acento en reposo: el acento aparece sólo donde significa «esto se puede tocar»,
+ * y aquí eso es el ratón encima y el foco.
+ *
+ * ═══ Y REPOSA EN `--filo`, COMO TODOS, Y MIDE LO QUE MIDEN TODOS ═══
+ *
+ * Reposaba en `--filo-vivo`, que es el filo de las cosas encendidas: al lado de la
+ * `.opcion` se leía como si estuviera resaltado sin estarlo, y la Sala tiene una sola
+ * gramática —se reposa en `--filo` y se enciende al pasar el ratón—. Un botón que la
+ * rompe no da error: se lee como que la Sala está mal ajustada.
+ *
+ * Y le faltaba el `min-height` de la casa. Con este relleno salía en unos 36 px de
+ * alto contra los 44 de `2.75rem` que mide cualquier otro botón, o sea por debajo del
+ * área pulsable mínima. En un ratón eso no se nota; con el dedo —y ahora el delta se
+ * pellizca con el dedo— es la salida del acercamiento la que falla al pulsarla, que es
+ * justo el botón que no puede fallar. `box-sizing: border-box` es global, así que el
+ * píxel del filo se descuenta del relleno y el alto mínimo sigue siendo el que dice.
+ *
+ * Arriba a la DERECHA, que es la esquina libre: la barra de construir y la mano
+ * viven abajo, dentro del lienzo y pegadas a la cámara, y el aviso del tablero va
+ * fuera, encima.
+ */
+.riberas-volver {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
+  background: var(--teja-alta);
+  color: var(--palabra);
+  border: 1px solid var(--filo);
+  border-radius: var(--radio-mando);
+  padding: 0.5rem 0.9rem;
+  font: inherit;
+  font-size: var(--letra-minima);
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    border-color 0.12s,
+    box-shadow 0.12s;
+}
+
+.riberas-volver:hover {
+  border-color: var(--acento);
+  box-shadow: 0 0 20px -8px var(--halo);
 }
 
 /*

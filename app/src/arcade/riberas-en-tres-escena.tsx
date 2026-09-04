@@ -26,6 +26,30 @@
  * que esta pantalla pinta con sus manos es el lienzo, el telón mientras el modelo
  * llega, la nota del respaldo y la hoja de «¿a quién?».
  *
+ * ═══ EL TABLERO SE MIRA DE CERCA, Y ESO SON TRES COSAS Y NO UNA ═══
+ *
+ * Se entra viendo el delta entero desde el aire y se puede llegar hasta media
+ * comarca llenando la pantalla. Eso pide tres piezas que sólo sirven juntas:
+ * ACERCARSE (el pellizco, y la rueda donde hay ratón), MOVER LA MIRADA (dos dedos
+ * paseando —o el botón secundario—, porque acercarse siempre al centro deja el borde
+ * del delta sin poder verse nunca) y VOLVER (un botón que se ve, arriba a la
+ * IZQUIERDA, sólo mientras haga falta). Sin la tercera, las otras dos son una trampa:
+ * quien se pierde en una esquina no tiene salida.
+ *
+ * Y el ratón no es un extra: mientras `EL_DELTA_SE_VE_AQUI` sea sólo la web, el ratón
+ * es la ÚNICA mano que llega a este tablero. Quién escucha la rueda y por qué está en
+ * `mirador-tactil.ts`; aquí lo único que se hace es darle el nodo del lienzo.
+ *
+ * Las cuentas no están aquí. La `Cercania` la lleva `mirador-tactil.ts` en una
+ * referencia y la aritmética entera es de `escenas/acercar.ts`, medida en Node por
+ * `verify:escena`. Esta pantalla sólo compone —`ojoYMira`— y pinta el botón.
+ *
+ * Y LA CÁMARA NO SE RECOLOCA CUANDO CAMBIA LA REVISIÓN DE LA MESA. El acercamiento
+ * vive en una referencia que nadie de aquí toca, así que quien está mirando una
+ * esquina de cerca se queda donde estaba aunque otro juegue. Una cámara que salta
+ * con cada jugada ajena marea y hace imposible construir; es el mismo criterio que
+ * el de soltar lo cogido, sólo que al contrario, y por eso se dice.
+ *
  * ═══ EL RESPALDO NO ES OPCIONAL ═══
  *
  * Si el modelo no llega —sin cobertura, un servidor viejo que no sirve `.glb`, un
@@ -103,6 +127,14 @@ import type {
  */
 import { semillaDelCodigo } from '../../../shared/mecanicas/semilla';
 import { Delta, encuadreDelDelta } from '../../../escenas/delta';
+/*
+ * LAS DOS MITADES DE LA CÁMARA, Y NINGUNA SE ESCRIBE AQUÍ. `camara.ts` dice desde
+ * qué rumbo y qué altura se mira; `acercar.ts`, cuánto se acerca y adónde. Esta
+ * pantalla sólo las junta con `ojoYMira`, que es la forma que aquel fichero
+ * documenta y que su comprobador ejercita con los topes puestos.
+ */
+import { ojoYMira } from '../../../escenas/acercar';
+import type { Cercania } from '../../../escenas/acercar';
 import { ojoDelMirador } from '../../../escenas/camara';
 import type { Mirador } from '../../../escenas/camara';
 import { catalogoDeModelos } from '../../../escenas/modelos';
@@ -490,7 +522,6 @@ function LaMesaEnTres({
     const { width, height } = e.nativeEvent.layout;
     ponerMedida({ ancho: width, alto: height });
   }, []);
-  const { gesto, mirador, acercamiento, laInterfazSeLoQueda } = usarMiradorTactil(medida);
 
   /* ─── De la vista a la escena, todo por `riberas-en-tres.ts` ─── */
 
@@ -553,6 +584,24 @@ function LaMesaEnTres({
     () => (datos === null ? null : encuadreDelDelta(datos.islas.map((i) => i.hex))),
     [datos],
   );
+
+  /*
+   * EL GESTO VA DETRÁS DEL ENCUADRE PORQUE NECESITA EL ALCANCE, y no al revés.
+   * Pasear la mirada se mide en pantallas de MUNDO —cruzar el lienzo con dos dedos
+   * mueve una pantalla de delta, de cerca y de lejos—, así que `arrastrandoLaMirada`
+   * pide el radio del delta. Mientras no hay islas repartidas todavía no hay radio:
+   * va un cero, que `acercar.ts` acota solo. Sigue siendo un gancho sin condiciones
+   * y por delante de todos los `return`, que es la regla que lee `verify:app`.
+   */
+  const {
+    gesto,
+    apuntarElLienzo,
+    mirador,
+    cercania,
+    seHaMovido,
+    verElTableroEntero,
+    laInterfazSeLoQueda,
+  } = usarMiradorTactil(medida, encuadre?.alcance ?? 0);
 
   /* ─── Lo que se toca, traducido al movimiento que se manda ─── */
 
@@ -764,9 +813,17 @@ function LaMesaEnTres({
             */}
             <View
               style={estilos.lienzo}
+              /*
+                EL NODO DEL LIENZO, para la rueda del ratón. En la web es el elemento
+                del documento donde se apuntan `wheel` y el arrastre con el botón
+                secundario; en nativo se guarda y no se usa. Va aquí y no en la caja de
+                fuera porque la rueda tiene que pararse encima DEL TABLERO y no encima
+                de la hoja de «¿a quién?», que sí se desplaza si algún día crece.
+              */
+              ref={apuntarElLienzo}
               onLayout={medir}
               accessible
-              accessibilityLabel="El delta de Riberas en tres dimensiones. Arrastra para girarlo y pellizca para acercarlo."
+              accessibilityLabel="El delta de Riberas en tres dimensiones. Arrastra con un dedo para girarlo, pellizca para acercarlo y mueve dos dedos para recorrerlo."
             >
               <Canvas
                 style={estilos.lienzo}
@@ -790,7 +847,7 @@ function LaMesaEnTres({
               >
                 <color attach="background" args={[COLOR_DEL_CIELO]} />
                 <fog attach="fog" args={[COLOR_DEL_CIELO, alcance * 2.6, alcance * 7.5]} />
-                <Ojo mirador={mirador} acercamiento={acercamiento} alcance={alcance} />
+                <Ojo mirador={mirador} cercania={cercania} alcance={alcance} />
                 <Delta
                   datos={datos}
                   modelos={catalogo.modelos}
@@ -823,6 +880,40 @@ function LaMesaEnTres({
           </View>
         ) : null}
 
+        {/*
+          LA SALIDA DEL ACERCAMIENTO, Y POR QUÉ ES UN BOTÓN Y NO UN GESTO.
+          Quien se acerca a una esquina del delta y pasea la mirada acaba, tarde o
+          temprano, sin saber dónde está: eso es lo que separa un zoom de una
+          trampa. Volver tiene que ser algo que SE VE, no un pellizco al revés que
+          hay que adivinar ni una tecla que en un móvil no existe.
+
+          Sólo cuando hace falta: `seHaMovido` es falso mientras se esté como al
+          llegar, y entonces un botón para volver a donde ya estás sería ruido
+          encima del tablero. Y va aquí fuera del `GestureDetector`, hermano del
+          lienzo y no hijo: así se lleva su propio toque sin quitárselo a la escena
+          —un `Pressable` sólo atiende lo que cae encima de él— y queda fuera del
+          `accessible` que agrupa el lienzo, para que el lector de pantalla lo
+          anuncie como lo que es.
+
+          EL RÓTULO SE VE CORTO Y SE OYE ENTERO. En pantalla pone «Tablero entero»,
+          que es lo que hace falta leer con el tablero delante; el nombre accesible
+          sigue siendo la frase completa, y contiene al rótulo palabra por palabra,
+          que es lo que pide poder decirlo en voz alta para pulsarlo. Lo que se gana
+          son unos sesenta puntos de ancho, y ese ancho es cuadrado de tablero que
+          deja de poder tocarse: ver la cabecera del estilo.
+        */}
+        {catalogo.que === 'listo' && seHaMovido ? (
+          <Pressable
+            style={estilos.volver}
+            onPress={verElTableroEntero}
+            accessibilityRole="button"
+            accessibilityLabel="Ver el tablero entero"
+            accessibilityHint="Vuelve a mirar el delta completo desde el aire, sin cambiar el ángulo"
+          >
+            <Text style={estilos.volverRotulo}>Tablero entero</Text>
+          </Pressable>
+        ) : null}
+
         {aQuien !== null ? <HojaDeAQuien posibles={aQuien} alElegir={alElegirAQuien} alDejarlo={soltarTodo} /> : null}
       </View>
 
@@ -848,7 +939,21 @@ function LaMesaEnTres({
 // ---------------------------------------------------------------------------
 
 /**
- * El ojo, cada fotograma: el `Mirador` del gesto, la pinza y la proporción del lienzo.
+ * El ojo, cada fotograma: el `Mirador` del gesto, la `Cercania` y la proporción del
+ * lienzo.
+ *
+ * ═══ NO SE MIRA AL ORIGEN, Y ÉSA ES LA MITAD DEL ENCARGO ═══
+ *
+ * Aquí había un `lookAt(0, 0, 0)`: se mirara desde donde se mirara, se miraba al
+ * centro del delta. Con eso, acercarse es acercarse SIEMPRE a lo mismo y el borde de
+ * la comarca del canto no se puede ver de cerca de ninguna manera. `ojoYMira` mueve
+ * las dos cosas a la vez —el ojo y el punto al que apunta— y devuelve las dos, así
+ * que la cámara mira a `mira` y no al origen.
+ *
+ * La composición es la que documenta `escenas/acercar.ts`: `ojoDelMirador` se pasa
+ * como función, y la distancia que recibe ya lleva el acercamiento aplicado. Aquí no
+ * se multiplica, no se acota y no se suma nada: si hiciera falta una cuenta más, es
+ * una petición para aquel fichero —que la mide en Node— y no una línea de aquí.
  *
  * ═══ LA ÚNICA CORRECCIÓN DE RETRATO ES LA DE `escenas/camara.ts` ═══
  *
@@ -869,33 +974,46 @@ function LaMesaEnTres({
  * La niebla se mueve con el ojo. En el banco empieza a 2,6 alcances de una cámara
  * que está a 1,77; si aquí el ojo se aleja para que quepa el retrato y la niebla se
  * quedara donde estaba, el lado lejano del delta saldría blanqueado hasta el color
- * del cielo, que es exactamente el fallo que el banco corrigió una vez. La distancia
- * real del ojo al centro es el módulo de su posición, y es la que se usa.
+ * del cielo, que es exactamente el fallo que el banco corrigió una vez.
+ *
+ * ═══ Y LA NIEBLA SE MIDE DEL OJO AL PUNTO DE MIRA, NO DEL OJO AL ORIGEN ═══
+ *
+ * Aquí se medía con el módulo de la posición del ojo, y eso SÓLO vale mirando al
+ * centro. En cuanto la mirada se aparta —que es la mitad del encargo— el ojo se va
+ * con ella: a media comarca del canto, su módulo desde el origen es casi el radio
+ * del delta aunque esté a tres palmos de lo que mira, y la niebla empezaría por
+ * detrás de todo. Lo que gobierna la niebla es lo lejos que está lo que se está
+ * MIRANDO, así que la distancia se toma del ojo a `mira`, y la mide `three` con su
+ * propia geometría: no es una cuenta de cámara escrita a mano.
  */
 function Ojo({
   mirador,
-  acercamiento,
+  cercania,
   alcance,
 }: {
   mirador: { readonly current: Mirador };
-  acercamiento: { readonly current: number };
+  cercania: { readonly current: Cercania };
   alcance: number;
 }): null {
   const camara = useThree((s) => s.camera) as THREE.PerspectiveCamera;
   const tamano = useThree((s) => s.size);
   const escena = useThree((s) => s.scene);
+  /* Un solo vector, reaprovechado: sesenta veces por segundo, no se fabrica basura. */
+  const alQueMira = useMemo(() => new THREE.Vector3(), []);
 
   useFrame(() => {
     const m = mirador.current;
     /* Antes de la primera medida el lienzo puede venir a cero: un cero aquí es un `NaN` en la cámara. */
     const proporcion = tamano.width / Math.max(1, tamano.height);
-    const [x, y, z] = ojoDelMirador(m, alcance * acercamiento.current, proporcion);
-    camara.position.set(x, y, z);
-    camara.lookAt(0, 0, 0);
+    const { ojo, mira } = ojoYMira(cercania.current, alcance, (d) =>
+      ojoDelMirador(m, d, proporcion),
+    );
+    camara.position.set(...ojo);
+    camara.lookAt(...mira);
 
     const niebla = escena.fog;
     if (niebla instanceof THREE.Fog) {
-      const distancia = Math.hypot(x, y, z);
+      const distancia = camara.position.distanceTo(alQueMira.set(...mira));
       niebla.near = distancia + alcance * 0.85;
       niebla.far = distancia + alcance * 5.7;
     }
@@ -1005,6 +1123,70 @@ const estilos = StyleSheet.create({
     paddingTop: 10,
     textAlign: 'center',
   },
+  /*
+   * EL BOTÓN DE VOLVER AL TABLERO ENTERO: cromo sobre el lienzo, arriba y a la
+   * IZQUIERDA. Que es la única esquina de las cuatro que la propia interfaz no usa.
+   *
+   * ═══ ESTUVO ARRIBA A LA DERECHA, Y AHÍ SE COMÍA LA MANO ═══
+   *
+   * LA MANO —la baraja de `escenas/baraja.ts`— vive pegada al borde DERECHO, repartida
+   * en vertical y centrada, y crece hacia arriba y hacia abajo con cada carta. Sus dos
+   * pasos son 0,20 y 0,62 altos de carta, y cuando ya no cabe se aprieta hasta ocupar
+   * el 92 % del alto del lienzo: en ese tope la carta de arriba llega a 0,04 del alto,
+   * o sea a 14 px en un lienzo de 360 y a 20 px en uno de 490. El botón ocupa de 12 a
+   * 56 (12 de margen y 44 de alto, el mínimo de dedo). O sea que una mano llena queda
+   * SIEMPRE por debajo del botón, y no hace falta que esté llena: medido con los pasos
+   * de la baraja, trece cartas repartidas entre los cinco bienes suben la de arriba a
+   * 42,8 px en un lienzo de 360, que ya está dentro. Y esa carta es justo la que hay
+   * que arrastrar para proponer un trueque.
+   *
+   * ═══ Y ABAJO A LA DERECHA TAMPOCO ESTÁ LIBRE, AUNQUE LO PAREZCA ═══
+   *
+   * La barra de construir está abajo y centrada, pero mide lo suyo: con las tres piezas
+   * de Riberas y un lienzo de 390×490 ocupa 222 px de ancho —84 libres a cada lado— y
+   * va de 44 a 108 px del canto de abajo. Un botón en esa esquina se le mete por debajo
+   * en una franja de unos doce puntos de alto, y ahí lo que se pierde es tocar una
+   * pieza. Abajo a la izquierda, lo mismo por simetría. Arriba a la izquierda no hay
+   * nada: la mano y las áreas de trueque son del lado derecho —las áreas empiezan a
+   * 169 px del canto derecho en un lienzo de 490, y este botón acaba a 167 px del canto
+   * IZQUIERDO— y la hoja de «¿a quién?» es de abajo.
+   *
+   * ═══ EL CUADRADO QUE TAPA NO DESAPARECE, SE MUEVE ═══
+   *
+   * Acercado del todo el delta llega de borde a borde, así que este rectángulo es
+   * tablero que deja de poder tocarse: un anillo que caiga debajo no se pulsa. Eso le
+   * pasa a cualquier cromo encima de una escena y no se arregla cambiándolo de sitio;
+   * lo que se elige es qué esquina cuesta menos. Se acorta el rótulo para que el
+   * rectángulo sea el menor posible, y el anillo que quede debajo se saca girando o
+   * paseando la mirada, que son dos gestos que ya existen. Un botón que se moviera solo
+   * para no tapar nada sería peor: no se sabría nunca dónde está.
+   *
+   * ═══ POR QUÉ NO LLEVA EL ACENTO ═══
+   *
+   * Porque no es la acción de la partida. En esta Sala el acento significa «esto es
+   * lo que hay que tocar», y un botón de acento permanente encima del tablero
+   * competiría cada segundo con las piezas y los anillos, que sí lo son. Lleva la
+   * misma teja y el mismo contorno que la hoja —blanco al 40 %— porque son la misma
+   * clase de cosa: cromo de la pantalla encima de una escena.
+   *
+   * Y LLEVA FONDO OPACO A PROPÓSITO. Debajo hay cielo, agua y relieve, o sea un
+   * fondo que cambia de color con el ángulo: un rótulo suelto sobre eso no tiene
+   * contraste que se pueda medir. Sobre la teja, el blanco de énfasis da de sobra.
+   * Los 44 de alto son el mínimo de dedo de la casa.
+   */
+  volver: {
+    position: 'absolute',
+    top: 12,
+    left: 12,
+    minHeight: 44,
+    justifyContent: 'center',
+    paddingHorizontal: 14,
+    borderRadius: RADIO.mando,
+    borderWidth: 1,
+    borderColor: conAlfa(SALA.blanco, 0.4),
+    backgroundColor: SALA.teja,
+  },
+  volverRotulo: { ...LETRA.rotuloChico, color: SALA.blanco, fontSize: 13 },
   /*
    * LA HOJA: una ficha sobre el lienzo, pegada abajo. Teja con el contorno que se
    * ve —blanco al 40 %, 3,63 sobre la teja—, porque aquí sí se dibuja una caja.

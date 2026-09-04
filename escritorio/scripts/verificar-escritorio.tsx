@@ -49,6 +49,7 @@
  * dice quién tiene el pincel. Lo que sí se compra es que la tabla los tenga a los
  * CUATRO, que es donde se rompe sola con el tiempo.
  */
+import { readFileSync } from 'node:fs';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { arcadesInstalados, avanzar, hayOpciones, opcionesDeArcade, proyectar } from '../../shared/arcade';
 import type { ContextoMovimiento, ManifiestoDeArcade, Opcion } from '../../shared/arcade';
@@ -1323,6 +1324,272 @@ function riberasEnTres(): void {
 }
 
 // ---------------------------------------------------------------------------
+// 7 · El acercamiento del delta: lo único de este cliente que no se puede renderizar
+// ---------------------------------------------------------------------------
+
+/**
+ * QUE EL ZOOM DEL TABLERO SIGA SIENDO EL DE `escenas/acercar.ts`.
+ *
+ * ═══ POR QUÉ ESTO SE MIRA EN EL TEXTO Y NO RENDERIZANDO ═══
+ *
+ * Todo lo demás de este comprobador renderiza componentes de verdad, que es lo único
+ * que compra algo. La cámara no se puede: vive dentro de un `useFrame`, o sea dentro
+ * de un `Canvas`, o sea dentro de un WebGL que en Node no existe. Renderizar
+ * `RiberasEnTres` aquí devuelve el telón y ni una línea de cámara.
+ *
+ * Así que lo que se compra es lo otro, y es lo que de verdad se rompe: que la cuenta
+ * siga estando DONDE SE PUEDE MEDIR. `escenas/acercar.ts` tiene sus veinticuatro
+ * comprobaciones en `verify:escena` —los topes de cerca y de lejos, el tope de lo que
+ * se puede apartar la mirada, la altura mínima del ojo— y todas valen cero el día que
+ * alguien resuelva un ajuste escribiendo un seno aquí. Eso no da error, se ve bien en
+ * la captura del día, y deja el cliente con una cámara propia que nadie mide.
+ *
+ * Y de paso se atan las tres cosas que en pantalla se rompen en silencio:
+ *
+ *   1. QUE SE ENTRE VIENDO EL TABLERO ENTERO. Arrancar en otro acercamiento se ve
+ *      como «el tablero sale mal encuadrado», no como un valor inicial cambiado.
+ *   2. QUE LA RUEDA NO SE LA LLEVE LA PÁGINA. Sin `preventDefault` sobre un oyente
+ *      NO pasivo, el navegador desplaza la Sala mientras uno cree estar acercándose.
+ *      Es el fallo clásico de todo zoom en un lienzo, y el síntoma —una página que se
+ *      mueve sola— no señala nunca al zoom.
+ *   3. QUE UNA JUGADA AJENA NO RECOLOQUE LA CÁMARA. El sondeo trae una revisión nueva
+ *      cada pocos segundos; si el efecto de la revisión tocara el acercamiento, quien
+ *      está mirando una esquina de cerca saltaría al aire cada vez que otro construye.
+ *      Aquí se lee ese efecto y se exige que la cámara no aparezca dentro.
+ *   4. QUE CON EL DEDO TAMBIÉN SE JUEGUE. Ningún juego de esta casa es sólo para PC, y
+ *      con pantalla táctil no hay rueda, ni botón derecho, ni Mayúsculas: el delta se
+ *      giraba y no había manera de acercarlo. Ese fallo no da error tampoco: en un
+ *      monitor está todo bien.
+ *   5. QUE UN GESTO NO SE CONVIERTA EN OTRO A MEDIA CARRERA. Un segundo botón apretado
+ *      encima de un desplazamiento se lee como que el tablero pega un bandazo solo.
+ *
+ * Y que haya SALIDA, que es lo que separa un zoom bueno de uno que atrapa: un botón
+ * de la Sala, con rótulo, que sólo se enseña cuando no se está como al principio — y
+ * vestido y medido como los demás botones de la Sala, que de eso se miran los VALORES
+ * y no sólo que la regla exista.
+ */
+function elAcercamientoDelDelta(): void {
+  paso('El acercamiento del delta: la rueda, la mirada, y una salida siempre visible');
+
+  const fuente = readFileSync(new URL('../src/riberas-en-tres.tsx', import.meta.url), 'utf8');
+  const hoja = readFileSync(new URL('../src/estilo.css', import.meta.url), 'utf8');
+
+  comprobar(
+    'el ojo y el punto de mira salen de `ojoYMira`, y la cámara mira ADONDE dice, no al centro del mundo',
+    fuente.includes('ojoYMira(') &&
+      /camera\.lookAt\(\s*\.\.\.mira\s*\)/.test(fuente) &&
+      !/camera\.lookAt\(\s*0\s*,/.test(fuente),
+  );
+  comprobar(
+    'y la dirección la sigue poniendo `ojoDelMirador`, que es lo que ata el giro al acercamiento',
+    /ojoYMira\([\s\S]{0,300}?ojoDelMirador\(/.test(fuente),
+  );
+  comprobar(
+    'se entra viendo el tablero entero: el acercamiento arranca en CERCANIA_DE_SALIDA',
+    /useRef<Cercania>\(CERCANIA_DE_SALIDA\)/.test(fuente),
+  );
+  comprobar(
+    'la rueda acerca con `acercando` y le quita el gesto a la página: `preventDefault` sobre un oyente no pasivo',
+    /const rueda = \(e: WheelEvent\)[\s\S]{0,300}?preventDefault\(\)[\s\S]{0,300}?acercando\(/.test(fuente) &&
+      /addEventListener\('wheel',[^;]*\{\s*passive:\s*false\s*\}\)/.test(fuente),
+  );
+  /*
+   * ═══ Y ESE OYENTE VA EN EL RECUADRO, NO EN EL `<canvas>` ═══
+   *
+   * El botón de volver es HERMANO del lienzo dentro de `.riberas-lienzo`, no hijo suyo.
+   * Con el oyente colgado del lienzo, la rueda encima del botón no pasaba por ningún
+   * `preventDefault` y la Sala entera se desplazaba — justo en el sitio al que va el
+   * ratón para salir del acercamiento, y con el mismo síntoma que no señala nunca al
+   * zoom. En la ventana tampoco puede ir: girar la rueda leyendo el formulario de abajo
+   * acercaría el delta.
+   */
+  comprobar(
+    'y ese oyente va sobre el RECUADRO —lienzo y botón dentro— y no en el `<canvas>` ni en la ventana',
+    /recuadro\.addEventListener\('wheel'/.test(fuente) &&
+      !/lienzo\.addEventListener\('wheel'/.test(fuente) &&
+      !/window\.addEventListener\('wheel'/.test(fuente),
+  );
+  comprobar(
+    'y el recuadro se busca por la MISMA clase que pinta el JSX, no por una copia suelta',
+    (fuente.match(/RECUADRO_DEL_LIENZO/g) ?? []).length >= 3 && /\.closest<HTMLElement>\(/.test(fuente),
+    (fuente.match(/RECUADRO_DEL_LIENZO/g) ?? []).length,
+  );
+  /*
+   * ═══ LOS TRES MODOS DE LA RUEDA VALEN LO MISMO ═══
+   *
+   * Esto convertía el modo línea a píxeles a dieciséis por línea, y Firefox manda TRES
+   * líneas por muesca: cuarenta y ocho píxeles, o sea media muesca. El zoom iba a la
+   * mitad de velocidad en Firefox y a velocidad entera en todo lo demás, que es de esas
+   * diferencias que se achacan al ordenador y no se miden nunca.
+   */
+  comprobar(
+    'la rueda en modo línea cuenta las líneas de Firefox: tres son una muesca, no media',
+    /LINEAS_POR_MUESCA = 3/.test(fuente) &&
+      /deltaMode === 1[\s\S]{0,120}?deltaY \/ LINEAS_POR_MUESCA/.test(fuente) &&
+      !fuente.includes('PIXELES_POR_LINEA'),
+  );
+  comprobar(
+    'el arrastre secundario mueve la mirada con `arrastrandoLaMirada`, y el primario sigue girando con `tirandoDelMirador`',
+    fuente.includes('arrastrandoLaMirada(') && fuente.includes('tirandoDelMirador('),
+  );
+
+  /*
+   * ═══ Y CON EL DEDO, QUE EN ESTA CASA NINGÚN JUEGO ES SÓLO PARA PC ═══
+   *
+   * Con pantalla táctil o lápiz no hay `wheel`, no hay botón derecho y no hay
+   * Mayúsculas: el delta se giraba y nada más, no había forma de acercarlo ni de
+   * recorrerlo, y el botón de volver no aparecía NUNCA porque nada llamaba a
+   * `alAcercarse`. Y el navegador tampoco lo suplía: `touch-action: none` le había
+   * quitado ya su propio pellizco, que es lo que hace que las dos cosas vayan juntas.
+   *
+   * Un gesto no se puede renderizar en Node, así que lo que se compra es lo mismo que
+   * de la rueda: que los dos dedos entren por las funciones de `escenas/acercar.ts`
+   * —medidas en `verify:escena`— y no por una cuenta escrita en el cliente.
+   */
+  /* `[^}]*` y no `[\s\S]*?`: con lo segundo el bloque empezaba en el primer `import {` del fichero. */
+  const importaDeAcercar = /import \{([^}]*)\} from '\.\.\/\.\.\/escenas\/acercar';/.exec(fuente)?.[1] ?? '';
+  comprobar(
+    'con dos dedos se acerca, y la escala del pellizco la convierte `pellizcando`',
+    importaDeAcercar.includes('pellizcando') && /pellizcando\(/.test(fuente),
+    importaDeAcercar,
+  );
+  comprobar(
+    'se lleva la cuenta de los punteros apoyados, que es lo que distingue dos dedos de dos botones del ratón',
+    /new Map<number, \{ x: number; y: number \}>\(\)/.test(fuente) &&
+      /apoyados\.set\(e\.pointerId/.test(fuente) &&
+      /apoyados\.delete\(e\.pointerId\)/.test(fuente),
+  );
+  comprobar(
+    'y el paseo del punto medio de los dos dedos sale del mismo `arrastrandoLaMirada` que el botón derecho',
+    /pellizco !== null[\s\S]{0,800}?arrastrandoLaMirada\(/.test(fuente),
+  );
+  comprobar(
+    'el pellizco guarda el acercamiento y la separación DE PARTIDA: separar y volver a juntar deja el tablero donde estaba',
+    /alEmpezar: cercania\.current\.factor/.test(fuente) &&
+      /pellizcando\(paseada, pellizco\.alEmpezar, dos\.separacion \/ pellizco\.separacion\)/.test(fuente),
+  );
+
+  /*
+   * ═══ UN GESTO CADA VEZ ═══
+   *
+   * `baja` no miraba si ya había un arrastre en marcha, así que apretar el izquierdo en
+   * mitad de un desplazamiento con el derecho cambiaba el gesto a girar a media carrera;
+   * y `suelta` limpiaba con el otro botón todavía apretado. Ninguna de las dos da error:
+   * las dos se ven como que el tablero pega un bandazo solo.
+   */
+  const bajaEntera = /const baja = \(e: PointerEvent\)[\s\S]*?\n {4}\};/.exec(fuente)?.[0] ?? '';
+  comprobar(
+    'quien empezó un arrastre se lo queda: un segundo botón no le cambia el gesto a media carrera',
+    /if \(desde !== null\) return;/.test(bajaEntera),
+    bajaEntera.slice(0, 200),
+  );
+  const sueltaEntera = /const suelta = \(e: PointerEvent\)[\s\S]*?\n {4}\};/.exec(fuente)?.[0] ?? '';
+  comprobar(
+    'y no se termina mientras quede un botón apretado',
+    /e\.buttons !== 0/.test(sueltaEntera),
+    sueltaEntera.slice(0, 300),
+  );
+  comprobar(
+    'y ese arrastre no abre el menú del navegador encima del delta',
+    /addEventListener\('contextmenu'/.test(fuente),
+  );
+  comprobar(
+    'coger de la barra y coger una carta siguen siendo suyos: se pregunta a `esDeLaInterfaz` antes de quedarse el gesto',
+    /esDeLaInterfaz\(e\)/.test(fuente),
+  );
+  comprobar(
+    'hay salida, y es un botón de la Sala con su rótulo, que devuelve `comoAlPrincipio()`',
+    fuente.includes("'Ver el tablero entero'") &&
+      fuente.includes('comoAlPrincipio()') &&
+      fuente.includes('className="riberas-volver"'),
+  );
+  comprobar(
+    'y sólo se enseña cuando hace falta: lo decide `estaComoAlPrincipio`',
+    fuente.includes('estaComoAlPrincipio(') && /alPrincipio \? null :/.test(fuente),
+  );
+  comprobar(
+    'el botón y la cámara comparten UN acercamiento, o el botón apagaría un zoom que no es el que se ve',
+    /<CamaraAerea[^/]*cercania=\{cercania\}/.test(fuente),
+  );
+  /*
+   * ═══ Y VESTIDO COMO LOS DEMÁS, MIRANDO LOS VALORES Y NO SÓLO QUE LA REGLA EXISTA ═══
+   *
+   * Que hubiera una regla `.riberas-volver` no compraba nada: la había, y reposaba en
+   * `--filo-vivo` cuando todo botón de la Sala reposa en `--filo` y sólo enciende el
+   * filo bajo el ratón, y le faltaba el alto mínimo pulsable —salía en unos 36 px contra
+   * los 44 de la casa—. Las dos cosas se ven perfectas en una captura y las dos se
+   * pagan con el dedo, que es con lo que ahora se pellizca el delta.
+   *
+   * El alto no se escribe aquí: se saca de `.opcion`, que es el botón de referencia. Así
+   * el día que la casa cambie de medida no queda un botón con la vieja.
+   */
+  const reglaDelVolver = /\.riberas-volver\s*\{([^}]*)\}/.exec(hoja)?.[1] ?? '';
+  const reglaDeOpcion = /\.opcion\s*\{([^}]*)\}/.exec(hoja)?.[1] ?? '';
+  const altoDeLaCasa = /min-height:\s*([\d.]+rem)/.exec(reglaDeOpcion)?.[1];
+  comprobar(
+    'los botones de la Sala declaran un alto mínimo pulsable, que es de donde sale el de éste',
+    altoDeLaCasa !== undefined,
+    reglaDeOpcion,
+  );
+  comprobar(
+    'el botón de volver existe, se enciende bajo el ratón y hereda el foco visible',
+    reglaDelVolver.length > 0 &&
+      /\.riberas-volver:hover\s*\{[^}]*border-color:\s*var\(--acento\)/.test(hoja) &&
+      /:focus-visible\s*\{/.test(hoja),
+  );
+  comprobar(
+    'y reposa en el filo de siempre, no en el de las cosas encendidas',
+    /border:\s*1px solid var\(--filo\)\s*;/.test(reglaDelVolver) && !reglaDelVolver.includes('--filo-vivo'),
+    reglaDelVolver,
+  );
+  comprobar(
+    'y mide lo que mide cualquier botón de la casa: la salida del acercamiento no puede fallarse con el dedo',
+    altoDeLaCasa !== undefined &&
+      new RegExp(`min-height:\\s*${altoDeLaCasa.replace(/\./g, '\\.')}\\s*;`).test(reglaDelVolver),
+    { volver: reglaDelVolver, casa: altoDeLaCasa },
+  );
+  comprobar(
+    'y el recuadro le sigue quitando al navegador su propio pellizco, que es lo que obliga a poner el nuestro',
+    /\.riberas-lienzo\s*\{[^}]*touch-action:\s*none/.test(hoja),
+  );
+
+  /*
+   * LA JUGADA AJENA NO MUEVE LA CÁMARA. Se recorta el efecto que corre al cambiar la
+   * revisión —el que suelta lo que se tiene en la mano— y se exige que ahí dentro no
+   * se nombre ni el acercamiento ni el mirador.
+   */
+  const marcaDeLaRevision = '}, [puesta.rev]);';
+  comprobar('hay un efecto que corre al cambiar la revisión de la mesa', fuente.includes(marcaDeLaRevision));
+  const hastaLaRevision = fuente.slice(0, fuente.indexOf(marcaDeLaRevision));
+  const alCambiarLaRevision = hastaLaRevision.slice(hastaLaRevision.lastIndexOf('useEffect('));
+  comprobar(
+    'y suelta la mano SIN recolocar la cámara: quien mira una esquina de cerca se queda donde estaba',
+    fuente.includes(marcaDeLaRevision) && !/[Cc]ercania|mirador|camara|Camara/.test(alCambiarLaRevision),
+    alCambiarLaRevision.slice(0, 300),
+  );
+
+  /*
+   * Y NINGUNA CUENTA DE CÁMARA ESCRITA A MANO. La trigonometría y las potencias del
+   * acercamiento viven en `escenas/`, que es donde `verify:escena` las mide. Lo único
+   * que aquí se calcula son píxeles de pantalla —la zona muerta del arrastre— y la
+   * traducción de las unidades de la rueda a pasos, que no es una cuenta de cámara
+   * sino de un suceso del navegador.
+   */
+  const trigonometria = /Math\.(sin|cos|tan|atan2?|pow)\s*\(/.exec(fuente);
+  comprobar(
+    'ninguna cuenta de cámara escrita a mano: ni un seno, ni un coseno, ni una potencia en el cliente',
+    trigonometria === null,
+    trigonometria?.[0],
+  );
+  const distanciaAMano = /Math\.hypot\([^()]*,[^(),]*,[^()]*\)/.exec(fuente);
+  comprobar(
+    'ni la distancia del ojo medida a mano: la niebla se mide entre el ojo y el punto de mira, con `three`',
+    distanciaAMano === null && fuente.includes('camera.position.distanceTo('),
+    distanciaAMano?.[0],
+  );
+}
+
+// ---------------------------------------------------------------------------
 
 elCatalogoNoMiente();
 noSePintaDeMas();
@@ -1331,6 +1598,7 @@ loQueLaPantallaDecideSola();
 lasDirecciones();
 elMuelle();
 riberasEnTres();
+elAcercamientoDelDelta();
 
 console.log('');
 if (fallos.length === 0) {
@@ -1347,9 +1615,19 @@ if (fallos.length === 0) {
       '  delta en tres dimensiones de Riberas enseña cada movimiento exactamente una vez entre\n' +
       '  la barra, la mano y sus botones, también sin Canvas; con cinco colonos cae al retablo\n' +
       '  de siempre diciendo por qué, y su semilla es la misma que la de la cala del muelle.\n' +
+      '  Y su tablero se acerca con la rueda, con dos dedos, y se recorre con el arrastre\n' +
+      '  secundario o con el punto medio del pellizco, sin que una sola cuenta de cámara viva en\n' +
+      '  el cliente: se entra viendo el delta entero, la rueda no se la lleva la página —tampoco\n' +
+      '  encima del botón de volver, que por eso el oyente cuelga del recuadro— y vale lo mismo\n' +
+      '  en los tres modos de rueda, un gesto empezado no se lo queda otro botón, una jugada\n' +
+      '  ajena no recoloca la vista, y siempre hay un botón para volver a verlo entero, vestido\n' +
+      '  y medido como el resto de los botones de la Sala.\n' +
       '\n  Lo que esto NO prueba: que el reparto de los cuatro muebles entre propios y genéricos\n' +
       '  sea el del §7 —es una decisión de producto y no se deriva del contrato—, ni que la ruta\n' +
-      '  del catálogo mande de verdad publicaOpciones: aquí no se levanta ningún servidor.',
+      '  del catálogo mande de verdad publicaOpciones: aquí no se levanta ningún servidor. Ni\n' +
+      '  cómo se VE el acercamiento: la cámara vive dentro de un Canvas y en Node no hay WebGL,\n' +
+      '  así que de ella se compra que la aritmética siga en `escenas/acercar.ts`, donde\n' +
+      '  `verify:escena` la mide, y no que el delta se vea bonito de cerca.',
   );
   process.exit(0);
 }

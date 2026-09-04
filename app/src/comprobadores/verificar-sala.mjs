@@ -574,10 +574,22 @@ paso('La pantalla de Riberas en tres dimensiones no sabe reglas y no bombea');
     !/factorQueEncaja\(|const LIMITE\b|LIMITE\.|const contorno\b|contorno=\{|contorno:\s*readonly|\.project\(/.test(escena),
     'la única corrección de retrato es `alejarseParaQueQuepa` dentro de `ojoDelMirador`',
   );
+  /*
+   * ESTA COMPROBACIÓN CAMBIÓ DE FORMA CUANDO LLEGÓ EL ACERCAMIENTO, y no de fondo.
+   * Pedía ver `ojoDelMirador(m, alcance * acercamiento.current, proporcion)`, que
+   * era la llamada de cuando el acercamiento era un número suelto y se miraba
+   * siempre al centro. Ahora la distancia la reparte `ojoYMira` —es su argumento— y
+   * `ojoDelMirador` entra dentro como función. Lo que hay que seguir comprando es
+   * exactamente lo de antes: que la PROPORCIÓN del lienzo llega hasta ahí, porque
+   * sin ella la corrección de retrato de `camara.ts` queda muerta y el delta se sale
+   * por los lados en un móvil.
+   */
   comprobar(
-    'y `Ojo` pasa la proporción del lienzo a `ojoDelMirador`',
-    /ojoDelMirador\(\s*m,\s*alcance \* acercamiento\.current,\s*proporcion\s*\)/.test(escena),
-    'sin el tercer argumento la corrección de `camara.ts` queda muerta',
+    'y `Ojo` compone `ojoYMira` con `ojoDelMirador`, pasándole la proporción del lienzo',
+    /ojoYMira\(\s*cercania\.current,\s*alcance,\s*\(d\)\s*=>\s*ojoDelMirador\(m, d, proporcion\)/.test(
+      escena,
+    ),
+    'sin la proporción la corrección de `camara.ts` queda muerta',
   );
 
   /* La semilla y la ruta de modelos son las compartidas, no copias. */
@@ -617,6 +629,274 @@ paso('La pantalla de Riberas en tres dimensiones no sabe reglas y no bombea');
     'y donde no se monta no se piden los dos megas del modelo',
     /usarCatalogoDelTablero\(EL_DELTA_SE_VE_AQUI\)/.test(escena) &&
       /if \(!hazFalta\) return undefined;/.test(escena),
+  );
+}
+
+paso('El delta se puede mirar de cerca, recorrer, y siempre se puede volver');
+{
+  /*
+   * ═══ LO QUE SE COMPRA AQUÍ, Y POR QUÉ NINGÚN OTRO COMPROBADOR LO COMPRA ═══
+   *
+   * La aritmética de acercarse y de pasear la mirada vive en `escenas/acercar.ts` y
+   * la miden veinticuatro comprobaciones de `verify:escena`, con sus topes. Lo que
+   * aquellas no pueden ver es si el CLIENTE la usa: `tsc` da por bueno un pellizco
+   * que multiplique un factor a mano, un `lookAt(0, 0, 0)` que ignore el punto de
+   * mira, o un acercamiento sin ninguna forma de deshacerse. Los tres compilan, los
+   * tres pasan los tipos, y los tres se ven sólo con un móvil en la mano.
+   *
+   * Y son exactamente los tres fallos que ya estaban escritos en este fichero antes
+   * de la fase: el acercamiento era un `number` con sus dos topes copiados en la
+   * app, la cámara miraba siempre al origen —así que acercarse era acercarse
+   * siempre al centro del delta— y la niebla se medía con el módulo de la posición
+   * del ojo, que sólo vale mirando al centro.
+   */
+  const escena = leer(path.join(SRC, 'arcade', 'riberas-en-tres-escena.tsx'));
+  const tactil = leer(path.join(SRC, 'arcade', 'mirador-tactil.ts'));
+
+  /*
+   * ═══ TODA REGLA DE PROHIBICIÓN MIRA EL CÓDIGO, NUNCA EL FICHERO ENTERO ═══
+   *
+   * Es la misma corrección que ya se pagó en `verify:gramatica` con la tabla del raíl,
+   * y aquí se pagó otra vez: la cabecera de `Ojo` CUENTA que allí hubo un
+   * `lookAt(0, 0, 0)` y por qué se fue, que es documentación correcta, y la primera
+   * versión de aquella regla se ponía roja por ella. Una regla que castiga HABLAR de
+   * algo enseña a no hablar de ello, y en esta casa las cabeceras cuentan los fallos
+   * que se arreglaron: la regla que las persigue las borra.
+   *
+   * Se filtra una vez, aquí arriba, y lo usan TODAS las prohibiciones de esta sección
+   * —dos de ellas seguían mirando el crudo—. Sale en dos formas porque hacen falta las
+   * dos: la lista, para poder decir en qué línea; y el texto pegado, para las reglas
+   * que buscan una forma repartida en varias líneas.
+   */
+  const soloCodigo = (texto) => texto.split('\n').filter((l) => !/^\s*(\*|\/\/|\/\*)/.test(l));
+  const codigoDeLaEscena = soloCodigo(escena);
+  const codigoDelGesto = soloCodigo(tactil);
+  const escenaSinComentarios = codigoDeLaEscena.join('\n');
+  const gestoSinComentarios = codigoDelGesto.join('\n');
+
+  /* ─── La cámara mira adonde se mira, y no al origen ─── */
+
+  comprobar(
+    '`Ojo` saca el ojo Y el punto de mira de `ojoYMira`',
+    /const \{ ojo, mira \} = ojoYMira\(/.test(escena),
+    'con la posición sola no hay adónde mirar: se vuelve al centro del delta',
+  );
+  comprobar(
+    'y la cámara apunta a ese punto de mira',
+    /camara\.lookAt\(\.\.\.mira\)/.test(escena) && /camara\.position\.set\(\.\.\.ojo\)/.test(escena),
+  );
+  comprobar(
+    'y NO queda ningún `lookAt(0, 0, 0)`, que es lo que dejaba el borde del delta sin poder mirarse',
+    !codigoDeLaEscena.some((l) => /lookAt\(\s*0\s*,\s*0\s*,\s*0\s*\)/.test(l)),
+    'mirando siempre al origen, acercarse es acercarse siempre a lo mismo',
+  );
+  comprobar(
+    'la niebla se mide del ojo al punto de MIRA y no del ojo al origen',
+    /\.distanceTo\([^;]*mira/.test(escena),
+    'con el módulo de la posición, mirar de cerca una esquina metía la niebla por detrás de todo',
+  );
+
+  /* ─── Los dos dedos: uno acerca, dos pasean ─── */
+
+  comprobar(
+    'el pellizco acerca con `pellizcando` de `acercar.ts`',
+    /cercania\.current = pellizcando\(cercania\.current, factorAlEmpezar\.current, e\.scale\)/.test(
+      tactil,
+    ),
+  );
+  /*
+   * EL `minPointers(2)` SE LE PIDE AL PASEO Y NO AL FICHERO. Buscarlo suelto daba por
+   * bueno cualquier gesto que lo llevara —y ahora hay tres—, de modo que el día que el
+   * paseo lo perdiera se pelearía con el giro de un dedo sin que esto se enterase.
+   */
+  comprobar(
+    'y el gesto de DOS DEDOS mueve la mirada con `arrastrandoLaMirada`',
+    /const paseo = Gesture\.Pan\(\)[\s\S]{0,160}?\.minPointers\(2\)/.test(gestoSinComentarios) &&
+      /cercania\.current = arrastrandoLaMirada\(/.test(gestoSinComentarios),
+    'sin esto sólo se puede acercar al centro, y la comarca del canto no se ve nunca de cerca',
+  );
+  comprobar(
+    'y le da el rumbo, el alcance y el tamaño del lienzo, que es lo que aquella función pide',
+    /arrastrandoLaMirada\([\s\S]{0,300}?mirador\.current\.rumbo,[\s\S]{0,200}?cuantoMundo\.current,[\s\S]{0,80}?pantalla\.current/.test(
+      tactil,
+    ),
+    'sin el rumbo, arrastrar mueve el mapa en diagonal en cuanto el tablero está girado',
+  );
+
+  /* ─── Y EN LA WEB, QUE ES DONDE ESTO SE JUEGA HOY, CON EL RATÓN ─── */
+
+  /*
+   * ═══ LAS REGLAS DE ARRIBA ESTABAN TODAS VERDES SOBRE ALGO QUE NO LLEGABA A NADIE ═══
+   *
+   * El pellizco y el paseo exigen DOS PUNTEROS de verdad, y la única plataforma donde
+   * esta pantalla monta el delta es la web (`EL_DELTA_SE_VE_AQUI`), o sea un navegador
+   * de escritorio con un ratón o un panel táctil: uno da un puntero, el otro manda
+   * `wheel` con `ctrlKey`, y ninguno da dos. Con las nueve comprobaciones anteriores en
+   * verde, quien abría Riberas podía girar el tablero y nada más — ni acercarse, ni
+   * mirar un borde, ni ver aparecer el botón de volver, que sólo sale cuando algo ha
+   * movido la cercanía. Un acercamiento medido, comprobado y sin ninguna forma de
+   * llegar a él.
+   *
+   * Así que aquí se comprueba la mano que de verdad hay delante. Las cuentas siguen
+   * siendo de `acercar.ts`: lo único que este cliente traduce son las unidades de la
+   * rueda, que el navegador no manda en ninguna.
+   */
+  comprobar(
+    'en la web la RUEDA acerca, que es la única mano que hoy llega a este tablero',
+    /addEventListener\('wheel'/.test(gestoSinComentarios) &&
+      /cercania\.current = acercando\(/.test(gestoSinComentarios),
+    'sin rueda, en la única plataforma donde el delta se monta no se puede acercar de ninguna manera',
+  );
+  comprobar(
+    'y se apunta con `{ passive: false }` y para el suceso, o la Sala se desplaza al acercarse',
+    /addEventListener\('wheel',[\s\S]{0,80}\{ passive: false \}/.test(gestoSinComentarios) &&
+      /const rueda = \(e: WheelEvent\): void => \{\s*\n\s*e\.preventDefault\(\);/.test(
+        gestoSinComentarios,
+      ),
+    'un oyente pasivo no puede quitarle la rueda al navegador, y la página se va hacia abajo',
+  );
+  comprobar(
+    'y se descuelga: el lienzo aparece y desaparece con el respaldo, y los oyentes van con él',
+    /removeEventListener\('wheel'/.test(gestoSinComentarios) &&
+      /removeEventListener\('pointermove'/.test(gestoSinComentarios),
+    'oyentes que se acumulan en cada montaje acercan el doble, el triple, y no se ve por qué',
+  );
+  comprobar(
+    'y los tres modos de la rueda se traducen a lo mismo (Firefox la manda en LÍNEAS)',
+    /deltaMode === 1/.test(gestoSinComentarios) && /deltaMode === 2/.test(gestoSinComentarios),
+    'tres líneas leídas como tres píxeles son un zoom que no se mueve',
+  );
+  comprobar(
+    'el paseo de la mirada también existe con ratón: botón secundario o Mayúsculas',
+    /e\.button === 2 \|\| e\.shiftKey/.test(gestoSinComentarios),
+    'sólo con rueda se acerca siempre al centro, y el borde del delta sigue sin poder mirarse',
+  );
+  comprobar(
+    'y no se pelea con el giro: mientras el ratón pasea, el `Pan` de un puntero se falla',
+    /elRatonPasea\.value = pasea/.test(gestoSinComentarios) &&
+      /if \(deLaInterfaz\.value \|\| elRatonPasea\.value\)/.test(gestoSinComentarios),
+    'el mismo arrastre girando el tablero y moviendo la mirada a la vez es un bandazo',
+  );
+  comprobar(
+    'y la pantalla le da el nodo del lienzo, que es donde se escucha',
+    /ref=\{apuntarElLienzo\}/.test(escenaSinComentarios),
+    'sin el nodo no hay dónde apuntarse: en React Native Web el `onWheel` del `View` no basta',
+  );
+
+  /* ─── La salida, que es lo que separa un zoom de una trampa ─── */
+
+  /*
+   * EL RÓTULO SE VE CORTO Y SE OYE ENTERO. Lo escrito es «Tablero entero» porque este
+   * botón está ENCIMA del tablero y cada punto de ancho es un cuadrado que deja de
+   * poder tocarse; el nombre accesible sigue siendo la frase entera —lo comprueba la
+   * regla de accesibilidad de tres más abajo— y contiene al rótulo palabra por palabra,
+   * que es lo que hace falta para poder pedirlo en voz alta.
+   */
+  comprobar(
+    'hay un botón de la Sala con el rótulo «Tablero entero»',
+    /<Text style=\{estilos\.volverRotulo\}>Tablero entero<\/Text>/.test(escena),
+    'una tecla escondida no existe en un móvil, y volver tiene que poder verse',
+  );
+  /*
+   * ═══ Y NO VIVE EN EL BORDE DE LA MANO ═══
+   *
+   * La baraja de `escenas/baraja.ts` está pegada al canto DERECHO y crece hacia arriba:
+   * apretada al tope, la carta de arriba llega a 0,04 del alto del lienzo —14 px en uno
+   * de 360— y este botón ocupa de 12 a 56. O sea que estando arriba a la derecha tapaba
+   * la carta que hay que arrastrar para proponer un trueque. La cuenta entera, con los
+   * pasos de la baraja y con la barra de construir, está en la cabecera del estilo.
+   */
+  const estiloDelBoton = /\n  volver: \{([\s\S]*?)\n  \},/.exec(escena)?.[1] ?? '';
+  comprobar(
+    'y no está en la esquina de la mano: se ancla a la izquierda y no a la derecha',
+    /left:/.test(estiloDelBoton) && !/right:/.test(estiloDelBoton),
+    'con trece cartas la baraja ya se le mete debajo, y con la mano llena siempre',
+  );
+  comprobar(
+    'y devuelve la vista con `verElTableroEntero`, que es `comoAlPrincipio()`',
+    /onPress=\{verElTableroEntero\}/.test(escena) &&
+      /cercania\.current = comoAlPrincipio\(\)/.test(tactil),
+  );
+  comprobar(
+    'y sólo se enseña cuando hace falta, mirando `estaComoAlPrincipio`',
+    /seHaMovido \?/.test(escena) && /!estaComoAlPrincipio\(cercania\.current\)/.test(tactil),
+    'un botón para volver a donde ya estás es ruido encima del tablero',
+  );
+  comprobar(
+    'y es accesible: papel de botón y etiqueta propia',
+    /accessibilityRole="button"[\s\S]{0,160}accessibilityLabel="Ver el tablero entero"/.test(escena),
+  );
+  /*
+   * El aviso a React va por el CAMBIO y no por fotograma: si `seHaMovido` se
+   * anunciara en cada `onUpdate`, la mesa entera —barra, turno, crónica— se
+   * repintaría sesenta veces por segundo mientras dura un pellizco.
+   */
+  comprobar(
+    'y el aviso a React sólo salta cuando cambia, no en cada fotograma',
+    /if \(ahora === seLeDijo\.current\) return;/.test(tactil),
+    'sesenta repintados por segundo de la mesa entera para no cambiar nada',
+  );
+
+  /* ─── Y ninguna cuenta de cámara vive en el cliente ─── */
+
+  /*
+   * LA REGLA ES LA DE LA CABECERA DE `acercar.ts`: una cuenta que vive en un fichero
+   * con `three` o con React dentro no se puede comprobar en Node, hay que abrirla en
+   * un aparato y mirar. Así que aquí no se escribe ninguna: cada valor nuevo de la
+   * cercanía tiene que salir de llamar a una función de `acercar.ts`.
+   *
+   * No se persigue cualquier número: la niebla lleva sus factores de alcance y eso
+   * es atmósfera, no cámara. Lo que se persigue es la ARITMÉTICA de la cámara.
+   */
+  const asignaciones = [
+    ...gestoSinComentarios.matchAll(/cercania\.current\s*=\s*([A-Za-z_]\w*)\s*\(/g),
+  ].map((m) => m[1]);
+  const DE_ACERCAR = new Set(['acercando', 'pellizcando', 'arrastrandoLaMirada', 'comoAlPrincipio']);
+  const forasteras = asignaciones.filter((f) => !DE_ACERCAR.has(f));
+  const todasLasAsignaciones = (gestoSinComentarios.match(/cercania\.current\s*=[^=]/g) ?? []).length;
+  comprobar(
+    'cada valor nuevo de la cercanía sale de una función de `acercar.ts`',
+    asignaciones.length >= 3 && forasteras.length === 0 && todasLasAsignaciones === asignaciones.length,
+    forasteras.length > 0
+      ? `de fuera de \`acercar.ts\`: ${forasteras.join(', ')}`
+      : `${String(asignaciones.length)} asignaciones, ${String(todasLasAsignaciones)} en total`,
+  );
+  comprobar(
+    'y la cercanía se importa de `escenas/acercar.ts`, no se declara aquí',
+    /from '\.\.\/\.\.\/\.\.\/escenas\/acercar'/.test(tactil) &&
+      !codigoDelGesto.some((l) => /ACERCAMIENTO_(MINIMO|MAXIMO)/.test(l)),
+    'los topes estuvieron copiados aquí (0,55 y 1,25) y eran más cortos que los medidos',
+  );
+  comprobar(
+    'ninguna potencia ni ningún módulo en la pantalla: la cámara no se calcula aquí',
+    !codigoDeLaEscena.some((l) => /Math\.pow\(|Math\.hypot\(/.test(l)),
+    'el módulo de la posición del ojo era la niebla vieja, y sólo valía mirando al centro',
+  );
+  const modulos = codigoDelGesto.filter((l) => /Math\.hypot\(/.test(l));
+  comprobar(
+    'y el único módulo del gesto es la zona muerta del dedo, en píxeles de pantalla',
+    modulos.length === 1 && /MINIMO_PARA_GIRAR/.test(modulos[0] ?? ''),
+    modulos,
+  );
+  comprobar(
+    'ninguna potencia en el gesto tampoco',
+    !codigoDelGesto.some((l) => /Math\.pow\(/.test(l)),
+    'el paso del acercamiento es multiplicativo y esa potencia es de `acercar.ts`',
+  );
+
+  /*
+   * ═══ Y LA CÁMARA NO SE RECOLOCA CUANDO JUEGA OTRO ═══
+   *
+   * La pantalla suelta lo cogido en cada revisión de la mesa —los anillos rancios
+   * son una mentira—, y la tentación de al lado es soltar también la cámara. No:
+   * quien está mirando una esquina de cerca se queda donde estaba aunque otro
+   * juegue. Una cámara que salta con cada jugada ajena marea y hace imposible
+   * construir. Se compra tocando la única forma que hay de moverla desde aquí.
+   */
+  comprobar(
+    'la pantalla no escribe nunca la cercanía: la cámara no salta con la revisión de la mesa',
+    !codigoDeLaEscena.some((l) => /cercania\.current\s*=[^=]/.test(l)),
+    'la revisión cambia con cada jugada de cualquiera, y recolocar ahí es marear a quien construye',
   );
 }
 
