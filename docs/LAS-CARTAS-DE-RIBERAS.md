@@ -17,12 +17,13 @@ lo que faltaba para eso.
 
 ## 1. Las decisiones que no se pueden deshacer después
 
-1. **Los nombres son de Riberas, no del juego del que viene la mecánica.** Ni
-   «caballero» ni «monopolio» ni «año de la abundancia»: eso es el vocabulario de
-   otro juego, y este tiene el suyo desde el primer día (limo, junco, sal, piedra,
-   grano; chozas, torres, veredas; el Vado Largo). Además, el nombre comercial está
-   en la lista negra de `server/scripts/marcas-registradas.ts` y `verify:procedencia`
-   lo vigila. Las cinco familias se llaman **La Guardia**, **El Año Bueno**, **El
+1. **Los nombres son de Riberas, no del juego del que viene la mecánica.** El
+   vocabulario de aquel es suyo, y éste tiene el propio desde el primer día (limo,
+   junco, sal, piedra, grano; chozas, torres, veredas; el Vado Largo). Y no es sólo
+   coherencia: uno de los nombres de aquellas cartas está en la lista negra de
+   `server/scripts/marcas-registradas.ts` —es a la vez una marca y una palabra de
+   economía—, así que escribirlo en el código pondría rojo `verify:procedencia`, y
+   con razón. Las cinco familias se llaman **La Guardia**, **El Año Bueno**, **El
    Acaparamiento**, **Las Dos Veredas** y los cinco **títulos** (Molino, Cantera,
    Torreón, Faro, Huerto).
 
