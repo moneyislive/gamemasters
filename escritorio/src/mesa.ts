@@ -197,7 +197,45 @@ function ruta(cola: string): string {
  */
 const salidasDeEstaPestana = new Set<string>();
 
-export function usarMesaDeArcade(arcade: string, silla: string): LaMesa {
+/**
+ * ¿SE VUELVE SOLO AL ASIENTO GUARDADO? Es una decisión, así que se escribe aparte y
+ * se comprueba; el efecto que la usa sólo obedece.
+ *
+ * ═══ UN ENLACE A OTRA MESA MANDA SOBRE EL ASIENTO GUARDADO ═══
+ *
+ * «Te paso el enlace» es como entra casi todo el mundo, y no funcionaba para quien
+ * ya tuviera un asiento vivo en este arcade: el navegador lo devolvía a SU mesa
+ * vieja —sin decir nada, porque desde su punto de vista hacía lo correcto— y el
+ * enlace parecía roto. Con dos pruebas seguidas en el mismo PC pasa siempre, y
+ * pasó: medido en producción el 4-sep-2026, pidiendo `?codigo=27VCR` y saliendo
+ * en la mesa `9ZK36`.
+ *
+ * Entre las dos intenciones gana la de AHORA. Y el asiento viejo NO se borra —esa
+ * es la regla 1, y sigue entera: sólo el servidor puede negar un asiento—, así que
+ * quitando el código de la barra se vuelve a él.
+ *
+ * Sin código en la dirección no cambia nada: quien abre `/sala/riberas` a secas
+ * está diciendo «llévame a lo mío», y a lo suyo va.
+ */
+export function seVuelveSoloAlSitio(caso: {
+  codigoGuardado: string;
+  /** El código que pide la dirección, o cadena vacía si no pide ninguno. */
+  codigoPedido: string;
+  /** Si uno se levantó de esa misma mesa en esta pestaña. */
+  seLevantoAqui: boolean;
+}): boolean {
+  /* De la mesa de la que uno acaba de levantarse no se vuelve solo. */
+  if (caso.seLevantoAqui) return false;
+  /* La dirección nombra otra mesa: manda ella. */
+  if (caso.codigoPedido.length > 0 && caso.codigoPedido !== caso.codigoGuardado) return false;
+  return true;
+}
+
+/**
+ * @param codigoPedido El código que trae la dirección (`?codigo=ABCDE`), si lo trae.
+ *   Ver «un enlace a otra mesa manda sobre el asiento guardado», más abajo.
+ */
+export function usarMesaDeArcade(arcade: string, silla: string, codigoPedido = ''): LaMesa {
   const [fase, ponerFase] = useState<FaseDeLaMesa>('fuera');
   const [mesa, ponerMesa] = useState<MesaVista | null>(null);
   const [aviso, ponerAviso] = useState<AvisoPuesto>(SIN_AVISO);
@@ -260,10 +298,17 @@ export function usarMesaDeArcade(arcade: string, silla: string): LaMesa {
 
   useEffect(() => {
     const sitio = elSitioGuardado(arcade, silla);
-    /* De la mesa de la que uno acaba de levantarse no se vuelve solo. */
-    if (sitio !== null && salidasDeEstaPestana.has(`${arcade}:${silla}:${sitio.codigo}`)) return;
     if (sitio === null) return;
     if (codigo.current !== null) return;
+    if (
+      !seVuelveSoloAlSitio({
+        codigoGuardado: sitio.codigo,
+        codigoPedido,
+        seLevantoAqui: salidasDeEstaPestana.has(`${arcade}:${silla}:${sitio.codigo}`),
+      })
+    ) {
+      return;
+    }
 
     ponerFase('yendo');
     void (async () => {
@@ -326,7 +371,7 @@ export function usarMesaDeArcade(arcade: string, silla: string): LaMesa {
         ponerFase('fuera');
       }
     })();
-  }, [arcade, silla]);
+  }, [arcade, silla, codigoPedido]);
 
   // -------------------------------------------------------------------------
   // El sondeo

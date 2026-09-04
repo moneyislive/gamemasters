@@ -66,7 +66,7 @@ import { canonico } from '../../shared/mecanicas/canonico';
 import { CICLO_MAXIMO_MS, pausaAntesDeVolverAPreguntar, TOPE_DE_PAUSA_MS, VENTANA_DE_PRESENCIA } from '../src/relojes';
 import { Retablo } from '../src/retablo';
 import { loQuePide, PLAZOS, tocaElMuelle } from '../src/sala';
-import { loQueQuedaTrasElSondeo, SIN_AVISO } from '../src/mesa';
+import { loQueQuedaTrasElSondeo, seVuelveSoloAlSitio, SIN_AVISO } from '../src/mesa';
 import type { LaMesa, MesaVista } from '../src/mesa';
 import { loQueSeDiceDeUnFallo } from '../src/red-de-seguridad';
 import { haEmpezado } from '../src/empezada';
@@ -839,6 +839,34 @@ function lasDirecciones(): void {
     'y la silla, que es lo que permite dos ventanas en la misma mesa',
     conSilla.silla === 'b',
     conSilla,
+  );
+
+  /*
+   * ═══ Y A QUÉ MESA SE VA CUANDO DOS COSAS PIDEN COSAS DISTINTAS ═══
+   *
+   * El enlace de una mesa y el asiento guardado de otra pueden llegar a la vez, y
+   * hasta el 4-sep-2026 ganaba siempre el guardado: medido en producción, pidiendo
+   * `?codigo=27VCR` se salía en la mesa `9ZK36`, sin un solo aviso. Quien recibe un
+   * enlace no tiene forma de entender eso, y con dos pruebas seguidas en el mismo
+   * navegador pasa siempre.
+   */
+  comprobar(
+    'sin código en la dirección se vuelve solo al asiento guardado',
+    seVuelveSoloAlSitio({ codigoGuardado: 'ABCDE', codigoPedido: '', seLevantoAqui: false }),
+  );
+  comprobar(
+    'y con el código de la mesa en la que ya se está, también',
+    seVuelveSoloAlSitio({ codigoGuardado: 'ABCDE', codigoPedido: 'ABCDE', seLevantoAqui: false }),
+  );
+  comprobar(
+    'pero un enlace a OTRA mesa manda sobre el asiento guardado',
+    !seVuelveSoloAlSitio({ codigoGuardado: 'ABCDE', codigoPedido: 'ZZZZZ', seLevantoAqui: false }),
+    'sin esto, quien ya tiene asiento en este arcade no entra por enlace a ninguna otra mesa',
+  );
+  comprobar(
+    'y de la mesa de la que uno acaba de levantarse no se vuelve solo, pida lo que pida la dirección',
+    !seVuelveSoloAlSitio({ codigoGuardado: 'ABCDE', codigoPedido: '', seLevantoAqui: true }) &&
+      !seVuelveSoloAlSitio({ codigoGuardado: 'ABCDE', codigoPedido: 'ABCDE', seLevantoAqui: true }),
   );
 }
 

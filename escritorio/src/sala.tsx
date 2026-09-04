@@ -195,7 +195,7 @@ function ElArcade({ donde, catalogo }: { donde: Donde; catalogo: ElCatalogo }): 
    * nada al servidor salvo el intento de volver al asiento guardado, que es
    * exactamente lo que se quiere que pase cuanto antes.
    */
-  const mesa = usarMesaDeArcade(arcade, silla);
+  const mesa = usarMesaDeArcade(arcade, silla, codigoDeLaUrl);
 
   /*
    * ═══ LA TRAVESÍA VIVE AQUÍ, AL LADO DE LA MESA, Y POR LA MISMA REGLA ═══
