@@ -32,8 +32,10 @@ import {
   mallaDeRadio,
   puntoDeVertice,
   verticeEntre,
+  verticesDe,
 } from '../../shared/mecanicas/malla-hexagonal';
-import type { Hex } from '../../shared/mecanicas/malla-hexagonal';
+import type { Hex, LlaveDeVertice } from '../../shared/mecanicas/malla-hexagonal';
+import type { Colocando } from '../../escenas/sitios';
 import { Delta, encuadreDelDelta, RADIO_DE_COMARCA } from '../../escenas/delta';
 import { crearRelieve } from '../../escenas/relieve';
 import type { Relieve } from '../../escenas/relieve';
@@ -267,6 +269,9 @@ const BOTON = {
   cursor: 'pointer',
 } as const;
 
+/** Los cincuenta y cuatro vértices del tablero, para el banco. El juego los traerá él. */
+const todosLosVertices: LlaveDeVertice[] = verticesDe(mallaDeRadio(2)) as LlaveDeVertice[];
+
 function Banco(): JSX.Element {
   /*
    * LA SEMILLA, a mano y a la vista.
@@ -311,6 +316,19 @@ function Banco(): JSX.Element {
    */
   const [obras, ponerObras] = useState<PiezaEn3D[]>([]);
   const conObras = useMemo(() => ({ ...datos, piezas: obras }), [datos, obras]);
+
+  /*
+   * QUÉ SE ESTÁ COLOCANDO, y de dónde salen los sitios legales.
+   *
+   * Aquí salen de una regla de mentira —los vértices que aún no tienen obra— porque
+   * este es el banco de pruebas y el juego de verdad todavía no existe. Cuando exista,
+   * esta lista vendrá del servidor y lo demás no cambia: la escena ya no opina.
+   */
+  const [colocando, ponerColocando] = useState<Colocando | null>(null);
+  const libres = useMemo(
+    () => todosLosVertices.filter((v) => !obras.some((o) => o.vertice === v)),
+    [obras],
+  );
 
   /* Los seis vértices de la comarca central, que es donde mira la cámara. */
   const sitios = useMemo(() => {
@@ -413,7 +431,23 @@ function Banco(): JSX.Element {
         />
         {modelos === null ? null : (
           <>
-            <Delta datos={conObras} modelos={modelos} semilla={semilla} />
+            <Delta
+              datos={conObras}
+              modelos={modelos}
+              semilla={semilla}
+              colocando={colocando}
+              onElegirSitio={(sitio) => {
+                ponerObras((antes) => [
+                  ...antes,
+                  {
+                    vertice: sitio.llave as LlaveDeVertice,
+                    clase: 'poblado',
+                    color: COLORES[antes.length % COLORES.length] as ColorDeJugador,
+                  },
+                ]);
+                ponerColocando(null);
+              }}
+            />
             <Testigo
               x={RADIO_DE_TESELA * 2}
               z={RADIO_DE_TESELA * 2}
@@ -459,6 +493,17 @@ function Banco(): JSX.Element {
           </>
         )}
         <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            onClick={() =>
+              ponerColocando((antes) =>
+                antes === null ? { clase: 'vertice', donde: libres } : null,
+              )
+            }
+            style={BOTON}
+          >
+            {colocando === null ? `Colocar poblado (${String(libres.length)})` : 'Dejarlo'}
+          </button>
           <button type="button" onClick={fundar} style={BOTON}>
             Fundar poblado
           </button>

@@ -69,7 +69,7 @@
  * WebGL— y un componente que asuma DOM aquí sale negro en el móvil sin un error en
  * ninguna consola. Sólo mallas, materiales y luces.
  */
-import { useLayoutEffect, useMemo, useRef } from 'react';
+import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 /*
  * `useFrame` es del NÚCLEO de r3f, no de `drei`, así que vale en los dos clientes:
@@ -85,7 +85,14 @@ import {
   verticesDeArista,
 } from '../shared/mecanicas/malla-hexagonal';
 import type { Hex, Punto } from '../shared/mecanicas/malla-hexagonal';
-import { ESCALA_DEL_PACK, ESCALON, LAMINA, RADIO_DE_COMARCA, RADIO_DE_TESELA } from './escala';
+import {
+  ALTURA_DE_UNA_PERSONA,
+  ESCALA_DEL_PACK,
+  ESCALON,
+  LAMINA,
+  RADIO_DE_COMARCA,
+  RADIO_DE_TESELA,
+} from './escala';
 import {
   CELDA_DE_LA_NIEVE,
   desplazamientoDeCelda,
@@ -106,11 +113,24 @@ import type { Relieve, Subtesela } from './relieve';
 import { apuntaLosLados, piezaDeCauce, piezaDeSenda, teselasDeUnCamino } from './sendas';
 import { CAUCE, CUERPO, HONDO, piezaDeOrilla } from './aguas';
 import { CELDA_DE_LA_ARENA } from './paleta';
+import { sitiosDelTablero, sitiosPermitidos } from './sitios';
+import type { Colocando, Sitio } from './sitios';
 import type { CaminoEn3D, DeltaEn3D, IslaEn3D, PiezaEn3D } from './tipos';
 
 export { RADIO_DE_COMARCA, RADIO_DE_TESELA, ESCALON };
 
 const COLOR_DEL_NUMERO = '#efe6cd';
+/**
+ * EL VERDE DE LAS SEÑALES DE COLOCAR.
+ *
+ * Chillón a propósito, y no es capricho de gusto: el anillo compite contra hierba
+ * (`#8fae55`), bosque (`#3f6b45`), arena (`#e3d5a6`), roca (`#7d8590`) y agua
+ * (`#257ebc`). Un verde razonable se pierde justo en los dos verdes del tablero, que
+ * son la mitad de la superficie. Éste tiene el tono cerca de la hierba pero el triple
+ * de saturación y casi todo el brillo, así que no se confunde con nada de lo que hay
+ * debajo — y va en material básico, sin luz, para que tampoco se apague en sombra.
+ */
+const COLOR_DE_LA_SENAL = '#39ff14';
 const COLOR_DEL_PUNTO = '#2a2118';
 
 /** El plano de la malla puesto en el mundo: la `y` del tablero es la `z`. */
@@ -484,14 +504,176 @@ function tramosEntre(a: Punto, b: Punto, relieve: Relieve, alto: number): Puesta
  * partidas, ni de turnos, ni de quién mira: eso lo decide quien lo monta, que es
  * distinto en cada cliente.
  */
+/**
+ * LA SEÑAL DE UN SITIO DONDE SE PUEDE PONER ALGO: un anillo en el suelo.
+ *
+ * ═══ AQUÍ HUBO UNA FLECHA, Y SOBRABA ═══
+ *
+ * La primera versión ponía una flecha de verdad —cono y asta— flotando sobre cada
+ * sitio, con el anillo debajo como apoyo. Puesta en pantalla, el anillo hacía todo el
+ * trabajo y la flecha estorbaba: cincuenta y cuatro astas flotando sobre el tablero lo
+ * convierten en un alfiletero y tapan justo el terreno que hay que juzgar antes de
+ * elegir dónde fundar.
+ *
+ * Así que queda el anillo solo. Es la lección de siempre en un tablero mirado desde
+ * arriba: lo que se lee a plomo es lo que está PEGADO AL SUELO. Una flecha vertical se
+ * ve de punta.
+ *
+ * ═══ MIDE LO MISMO EN PANTALLA, ESTÉ CERCA O LEJOS ═══
+ *
+ * Esto no es un adorno, es lo que la hace existir. La vista de tablero mira el mundo
+ * desde seiscientas setenta unidades, y un anillo del tamaño de una tesela a esa
+ * distancia ocupa unos pocos píxeles. La primera versión no llevaba esta cuenta y la
+ * captura salió idéntica a la de antes: se dibujaba, costaba sus llamadas y no se veía.
+ *
+ * Un marcador no es un objeto del mundo: es un cartel, y tiene que medir lo mismo en la
+ * pantalla desde el aire y desde el suelo, como la chincheta de un mapa. La cuenta sale
+ * de la cámara y no de una constante ajustada a ojo: a distancia `d`, un lente de campo
+ * `fov` abarca `2·d·tan(fov/2)` de alto, así que para ocupar una fracción `f` de la
+ * pantalla hay que medir `2·d·tan(fov/2)·f`.
+ *
+ * Y se acota por los dos lados: pegada al suelo la cuenta pide un anillo de una unidad,
+ * que es una china; y desde muy lejos pediría uno que se come tres comarcas.
+ *
+ * ═══ LA ZONA DE AGARRE ES INVISIBLE Y MÁS GRANDE QUE EL ANILLO ═══
+ *
+ * Apuntar con el dedo a un anillo de veinte píxeles en un móvil no es jugar, es
+ * puntería. Quien recibe el toque es un cilindro invisible que crece con el anillo.
+ *
+ * Y aquí hay una trampa del motor que conviene dejar escrita: `visible={false}` NO quita
+ * el objeto del trazado de rayos —sigue siendo pinchable, que es justo lo que se quiere
+ * aquí— mientras que `raycast={null}` revienta al primer rayo porque el motor la llama
+ * sin comprobar. Lo que sí lo desactiva es `raycast={() => null}`.
+ */
+function Senal({
+  sitio,
+  color,
+  elegida,
+  onElegir,
+}: {
+  sitio: Sitio;
+  color: string;
+  elegida: boolean;
+  onElegir: (sitio: Sitio) => void;
+}): JSX.Element {
+  const anillo = useRef<THREE.Mesh>(null);
+  const agarre = useRef<THREE.Mesh>(null);
+  const [encima, setEncima] = useState(false);
+
+  /*
+   * El latido va por reloj y no por estado: cambiar un estado de React sesenta veces por
+   * segundo por cada una de las cincuenta y cuatro señales repinta el árbol entero
+   * sesenta veces por segundo. Aquí se tocan la matriz y la opacidad, y no se repinta
+   * nada.
+   */
+  useFrame((estado) => {
+    const camara = estado.camera as THREE.PerspectiveCamera;
+    const dx = camara.position.x - sitio.punto.x;
+    const dy = camara.position.y - sitio.altura;
+    const dz = camara.position.z - sitio.punto.y;
+    const lejos = Math.sqrt(dx * dx + dy * dy + dz * dz);
+    const campo = ((camara.isPerspectiveCamera ? camara.fov : 45) * Math.PI) / 180;
+    const quiere = (2 * lejos * Math.tan(campo / 2) * PARTE_DE_PANTALLA) / RADIO_DE_TESELA;
+    const talla = Math.min(Math.max(quiere, 0.7), 6) * (encima || elegida ? 1.25 : 1);
+
+    const a = anillo.current;
+    if (a !== null) {
+      a.scale.setScalar(talla);
+      const m = a.material as THREE.MeshBasicMaterial;
+      const t = estado.clock.elapsedTime;
+      const desfase = sitio.punto.x * 0.07 + sitio.punto.y * 0.05;
+      m.opacity =
+        (encima || elegida ? 0.95 : 0.7) + Math.sin(t * 2.4 + desfase) * LATIDO_DE_LA_SENAL;
+    }
+    const g = agarre.current;
+    if (g !== null) g.scale.setScalar(talla);
+  });
+
+  return (
+    <group position={[sitio.punto.x, sitio.altura, sitio.punto.y]}>
+      {/*
+       * LA ZONA DE AGARRE: se dibuja, pero no escribe ni un píxel.
+       *
+       * `visible={false}` NO sirve aquí, y esto costó una prueba en pantalla. En `three`
+       * a secas, el trazado de rayos no mira `visible` y un objeto invisible sigue
+       * siendo pinchable — pero el sistema de eventos de r3f SÍ lo mira, y descarta los
+       * impactos sobre objetos invisibles antes de repartirlos. Con `visible={false}` el
+       * cilindro estaba ahí, el rayo lo tocaba, y el clic no llegaba nunca.
+       *
+       * Lo que sí funciona es `colorWrite={false}`: la malla existe, se recorre, recibe
+       * el rayo y r3f la considera visible, pero el pintor no escribe color. Y sin
+       * `depthWrite`, para que tampoco tape lo que tiene detrás.
+       *
+       * Y la otra mitad del refrán, por si alguien va a desactivar el rayo en otro sitio:
+       * `raycast={null}` revienta al primer rayo porque el motor la llama sin comprobar.
+       * Lo que lo desactiva es `raycast={() => null}`.
+       */}
+      <mesh
+        ref={agarre}
+        position={[0, ALTO_DE_AGARRE / 2, 0]}
+        onPointerOver={(e) => {
+          e.stopPropagation();
+          setEncima(true);
+        }}
+        onPointerOut={() => setEncima(false)}
+        onClick={(e) => {
+          e.stopPropagation();
+          onElegir(sitio);
+        }}
+      >
+        <cylinderGeometry args={[RADIO_DE_TESELA, RADIO_DE_TESELA, ALTO_DE_AGARRE, 8]} />
+        <meshBasicMaterial colorWrite={false} depthWrite={false} />
+      </mesh>
+      {/*
+       * Va sin profundidad —ni escritura ni prueba— y de los dos lados: así no lo tapa el
+       * canto de la tesela de al lado cuando el sitio cae en una ladera, ni desaparece
+       * mirándolo desde debajo del suelo en la vista de tierra.
+       */}
+      <mesh
+        ref={anillo}
+        position={[0, ALTURA_DE_UNA_PERSONA * 0.12, 0]}
+        rotation={[-Math.PI / 2, 0, 0]}
+        renderOrder={2}
+      >
+        <ringGeometry args={[RADIO_DE_TESELA * 0.4, RADIO_DE_TESELA * 0.78, 28]} />
+        <meshBasicMaterial
+          color={color}
+          transparent
+          opacity={0.7}
+          depthWrite={false}
+          depthTest={false}
+          side={THREE.DoubleSide}
+        />
+      </mesh>
+    </group>
+  );
+}
+
+/** Lo alto que es el cilindro invisible que recibe el toque, antes de escalarlo. */
+const ALTO_DE_AGARRE = ALTURA_DE_UNA_PERSONA * 2;
+/** Cuánto sube y baja la opacidad del anillo. Lo justo para que se note vivo. */
+const LATIDO_DE_LA_SENAL = 0.18;
+/** Qué parte del alto de la pantalla ocupa una señal, mire desde donde mire la cámara. */
+const PARTE_DE_PANTALLA = 0.035;
+
 export function Delta({
   datos,
   modelos,
   semilla = 0,
+  colocando = null,
+  onElegirSitio,
 }: {
   datos: DeltaEn3D;
   modelos: CatalogoDeModelos;
   semilla?: number;
+  /**
+   * Lo que se está colocando ahora mismo, o `null` si no se está colocando nada.
+   *
+   * Los sitios legales llegan DE FUERA: la escena no los calcula. Ver `sitios.ts`.
+   */
+  colocando?: Colocando | null;
+  /** Aviso de que alguien ha pulsado una flecha. La escena no decide qué pasa después. */
+  onElegirSitio?: (sitio: Sitio) => void;
 }): JSX.Element {
   /**
    * Cada modelo, aplanado una vez a geometría + material para poder instanciarlo.
@@ -978,6 +1160,17 @@ export function Delta({
     [largoDelTramo],
   );
 
+  /**
+   * LOS SITIOS DEL TABLERO, con su altura ya resuelta.
+   *
+   * Se calculan una vez por tablero y no cada vez que se empieza a colocar: son ciento
+   * cuarenta y cinco consultas de altura y no cambian mientras el relieve sea el mismo.
+   */
+  const sitios = useMemo(
+    () => sitiosDelTablero(datos.islas.map((i) => i.hex), (p) => relieve.alturaEn(p)),
+    [datos.islas, relieve],
+  );
+
   const alcance = useMemo(() => {
     let mayor = RADIO_DE_COMARCA;
     for (const isla of datos.islas) {
@@ -991,6 +1184,25 @@ export function Delta({
     <group>
       <Luces alcance={alcance} />
       <Mar alcance={alcance} agua={aplanados.get(MODELO.agua)} />
+
+      {/*
+       * LAS SEÑALES DE COLOCAR, que sólo existen mientras se coloca.
+       *
+       * No hay cincuenta y cuatro objetos invisibles esperando por si acaso: se montan
+       * al empezar a colocar y se desmontan al terminar. Con la lista vacía no se monta
+       * ninguna, que es lo que tiene que pasar cuando el juego dice que no se puede
+       * poner nada en ningún sitio — y se ve, en vez de dejar al jugador probando.
+       */}
+      {colocando !== null &&
+        sitiosPermitidos(sitios, colocando).map((sitio) => (
+          <Senal
+            key={`senal:${sitio.clase}:${sitio.llave}`}
+            sitio={sitio}
+            color={COLOR_DE_LA_SENAL}
+            elegida={false}
+            onElegir={(s) => onElegirSitio?.(s)}
+          />
+        ))}
 
       {[...plan.suelo].map(([llave, puestas]) => {
         const partes = llave.split('|');
