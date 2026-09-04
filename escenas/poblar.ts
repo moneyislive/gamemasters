@@ -70,6 +70,20 @@ const RADIO_DE_LA_PLAZA = 2;
  */
 const HABITABLE = 0.42;
 
+/**
+ * QUÉ PARTE DEL PUEBLO SE EDIFICA DE VERDAD.
+ *
+ * Multiplica la probabilidad de que una tesela habitable lleve edificio. Con 1 el
+ * caserío salía como estaba medido abajo —una de cada tres teselas en el umbral,
+ * cinco de cada seis en la mejor vega— y el delta entero pasaba de tres millones
+ * de triángulos: los edificios son, con diferencia, los modelos más caros del pack,
+ * y un pueblo apretado en cada comarca hacía que el mundo pareciera una urbanización
+ * continua y no un delta con aldeas. A la mitad (4-sep-2026, pedido por Miguel) el
+ * paisaje respira, se distingue el campo del pueblo, y la escena pesa menos donde
+ * más duele, que es el móvil. Se toca aquí y en ningún otro sitio.
+ */
+const LO_EDIFICADO = 0.5;
+
 /** Lo que llena una tesela de campo, y lo que se le esparce por encima. */
 interface Campo {
   /** Modelos que ocupan la tesela entera. Van centrados y girados a sesenta grados. */
@@ -472,7 +486,7 @@ function puebloEn(tesela: Subtesela, terreno: string): Puesto[] {
    * pueblos tendrían la misma densidad y se verían como sellos repetidos.
    */
   const empuje = Math.min(1, (tesela.habitabilidad - HABITABLE) * 4);
-  if (fraccion(q, r, CANAL.hayCasa) > 0.34 + empuje * 0.5) return salida;
+  if (fraccion(q, r, CANAL.hayCasa) > (0.34 + empuje * 0.5) * LO_EDIFICADO) return salida;
 
   /* Una de cada cinco casas es el edificio del oficio de la comarca. */
   const oficio = deLaTabla(OFICIO, terreno);
