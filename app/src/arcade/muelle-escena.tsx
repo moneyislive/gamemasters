@@ -58,6 +58,8 @@ import { figuraConCuenta, figuraDeEstreno, guardarFigura } from './figura';
 import { HojaDelMuelle } from './hoja-del-muelle';
 import { usarMesaDeArcade } from './mesa';
 import { LETRA, rutaDelMueble, SALA } from './muebles';
+/* La misma cara que pone la Sala cuando algo no se puede jugar. Una, no dos. */
+import { NoHayNada } from './pintar';
 
 /** Cuánto se espera a la coreografía de zarpar antes de irse igual, en ms. */
 const TOPE_DE_ZARPAR_MS = 3500;
@@ -82,14 +84,25 @@ const FUNDIDO_MS = 600;
 const UMBRAL_MS = 22;
 const FOTOGRAMAS_QUE_SE_MIRAN = 120;
 
-export function juzgarCalidad(muestrasMs: readonly number[]): Calidad | null {
+/** Una muestra de `alMedir`: la media de ms del último segundo y cuántos fotogramas cubre. */
+export interface MuestraDelHilo {
+  readonly ms: number;
+  readonly fotogramas: number;
+}
+
+export function juzgarCalidad(muestras: readonly MuestraDelHilo[]): Calidad | null {
   let fotogramas = 0;
   let tiempo = 0;
-  for (const ms of muestrasMs) {
-    if (!(ms > 0)) continue;
-    const cubre = 1000 / ms;
+  for (const m of muestras) {
+    if (!(m.ms > 0)) continue;
+    /*
+     * La escena dice cuántos fotogramas cubre cada media; si no lo dice —un
+     * andamio, una versión vieja— se estima desde los ms, que es lo que se hacía
+     * antes de que el contrato lo trajera.
+     */
+    const cubre = m.fotogramas > 0 ? m.fotogramas : 1000 / m.ms;
     fotogramas += cubre;
-    tiempo += ms * cubre;
+    tiempo += m.ms * cubre;
   }
   if (fotogramas < FOTOGRAMAS_QUE_SE_MIRAN) return null;
   return tiempo / fotogramas > UMBRAL_MS ? 'sobria' : 'plena';
@@ -141,7 +154,7 @@ function ElMuelleDe({ manifiesto, tema }: { manifiesto: ManifiestoDeArcade; tema
   const eligioAMano = useRef(false);
   /* De qué asiento se adoptó ya la figura del servidor, para hacerlo una sola vez. */
   const adoptadaDe = useRef<string | null>(null);
-  const muestras = useRef<number[]>([]);
+  const muestras = useRef<MuestraDelHilo[]>([]);
   const calidadJuzgada = useRef(false);
 
   const empezada = mesa.mesa !== null && haEmpezado(mesa.mesa);
@@ -235,9 +248,9 @@ function ElMuelleDe({ manifiesto, tema }: { manifiesto: ManifiestoDeArcade; tema
     return r.arrayBuffer();
   }, []);
 
-  const alMedir = useCallback((medidaDelHilo: { triangulos: number; llamadas: number; ms: number }) => {
+  const alMedir = useCallback((medidaDelHilo: MuestraDelHilo & { triangulos: number; llamadas: number }) => {
     if (Platform.OS !== 'android' || calidadJuzgada.current) return;
-    muestras.current.push(medidaDelHilo.ms);
+    muestras.current.push({ ms: medidaDelHilo.ms, fotogramas: medidaDelHilo.fotogramas });
     const veredicto = juzgarCalidad(muestras.current);
     if (veredicto === null) return;
     calidadJuzgada.current = true;
@@ -352,20 +365,6 @@ function ElMuelleDe({ manifiesto, tema }: { manifiesto: ManifiestoDeArcade; tema
   );
 }
 
-/**
- * Lo que se enseña cuando no hay nada que pintar. Misma forma que la de
- * `pintar.tsx`, que no la exporta: título en `palabra` —el acento no aparece
- * cuando algo está roto— y el mensaje que dice QUÉ pasa.
- */
-function NoHayNada({ que }: { que: string }): JSX.Element {
-  return (
-    <View style={estilos.centro}>
-      <Text style={estilos.titulo}>LA SALA DE ARCADE</Text>
-      <Text style={estilos.texto}>{que}</Text>
-    </View>
-  );
-}
-
 /* Las cuatro capas ocupan el mismo rectángulo: el del contenedor que se mide. */
 const TODA_LA_PANTALLA = { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 } as const;
 
@@ -384,21 +383,4 @@ const estilos = StyleSheet.create({
   espera: { ...LETRA.cuerpo, color: SALA.tenue, fontSize: 15, lineHeight: 22, textAlign: 'center' },
   /* La capa que salta la coreografía: encima de todo y sin pintar nada. */
   saltar: { ...TODA_LA_PANTALLA },
-  centro: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 28,
-    gap: 16,
-    backgroundColor: SALA.suelo,
-  },
-  titulo: { ...LETRA.rotulo, color: SALA.palabra, fontSize: 18 },
-  texto: {
-    ...LETRA.cuerpo,
-    color: SALA.palabra,
-    fontSize: 16,
-    lineHeight: 24,
-    textAlign: 'center',
-    maxWidth: 360,
-  },
 });

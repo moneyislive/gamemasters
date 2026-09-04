@@ -60,23 +60,11 @@ import type { TemaDelMuelle } from '../../../escenas/embarcadero/tema';
 import { opcionDeEmpezar } from './empezada';
 import type { LaMesa } from './mesa';
 import { CUENTA_DE_AFORO, LETRA, RADIO, SALA } from './muebles';
+/* La misma tabla que ofrece el tablero en línea: un solo sitio para los dos. */
+import { PLAZOS } from './plazos';
 
 /** Cuántas letras tiene un código de mesa. Las casillas son tantas como esto. */
 const LETRAS_DEL_CODIGO = 5;
-
-/**
- * LOS PLAZOS QUE SE OFRECEN AL ABRIR. Es una COPIA de la tabla de
- * `tablero-en-linea.tsx`, y se dice: aquella no se exporta y ese fichero no era de
- * esta entrega. El día que se exporte, ésta se borra y se importa. Mientras
- * tanto, si cambia una tiene que cambiar la otra — y `verify:sala` no lo mira.
- */
-const PLAZOS: Array<{ rotulo: string; segundos: number | undefined; ayuda: string }> = [
-  { rotulo: 'Como venga', segundos: undefined, ayuda: 'El plazo por defecto del servidor.' },
-  { rotulo: 'Un rato', segundos: 10 * 60, ayuda: 'Diez minutos por turno. Para jugar del tirón.' },
-  { rotulo: 'Un día', segundos: 24 * 60 * 60, ayuda: 'Veinticuatro horas por turno. La Larga.' },
-  { rotulo: 'Tres días', segundos: 3 * 24 * 60 * 60, ayuda: 'Para una partida de la semana entera.' },
-  { rotulo: 'Sin prisa', segundos: 0, ayuda: 'Sin plazo: el turno no se pasa solo nunca.' },
-];
 
 export interface PropsDeLaHoja {
   /** El identificador del arcade: va en el enlace que se comparte. */

@@ -98,13 +98,13 @@ import { Retablo } from './retablo';
  *
  * Va el último a propósito: es el caso raro, y quien lo elige sabe lo que elige.
  */
-const PLAZOS: Array<{ rotulo: string; segundos: number | undefined; ayuda: string }> = [
-  { rotulo: 'Como venga', segundos: undefined, ayuda: 'El plazo por defecto del servidor.' },
-  { rotulo: 'Un rato', segundos: 10 * 60, ayuda: 'Diez minutos por turno. Para jugar del tirón.' },
-  { rotulo: 'Un día', segundos: 24 * 60 * 60, ayuda: 'Veinticuatro horas por turno. La Larga.' },
-  { rotulo: 'Tres días', segundos: 3 * 24 * 60 * 60, ayuda: 'Para una partida de la semana entera.' },
-  { rotulo: 'Sin prisa', segundos: 0, ayuda: 'Sin plazo: el turno no se pasa solo nunca.' },
-];
+/*
+ * LA TABLA VIVE EN `plazos.ts` DESDE QUE LA PIDE TAMBIÉN EL MUELLE. Estaba aquí, y
+ * la hoja del Muelle nació con una copia; dos copias de «qué clase de partida se
+ * puede abrir» son dos respuestas que se separan solas. El razonamiento de los
+ * cinco botones sigue escrito en la cabecera de aquel fichero.
+ */
+import { PLAZOS } from './plazos';
 
 /*
  * LOS DOS RÓTULOS DE TIEMPO SE FUERON A `relojes.ts`, con su porqué entero.

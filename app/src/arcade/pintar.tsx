@@ -129,8 +129,14 @@ export function PintarEnElMueble({ mueble }: { mueble: MuebleDeArcade }): JSX.El
   return <Pintar />;
 }
 
-/** Lo que se enseña cuando no hay nada que pintar. Dice QUÉ pasa, no «vaya». */
-function NoHayNada({ que }: { que: string }): JSX.Element {
+/**
+ * Lo que se enseña cuando no hay nada que pintar. Dice QUÉ pasa, no «vaya».
+ *
+ * Exportada porque la pantalla del Muelle tiene los mismos callejones sin salida
+ * —dirección incompleta, arcade desconocido, arcade sin muelle— y nació con una
+ * copia de esto. La cara que la Sala pone cuando algo no se puede jugar es UNA.
+ */
+export function NoHayNada({ que }: { que: string }): JSX.Element {
   return (
     <View style={estilos.centro}>
       <Text style={estilos.titulo}>LA SALA DE ARCADE</Text>
