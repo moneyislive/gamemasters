@@ -200,6 +200,17 @@ export const MODELO = {
   bienGrano: 'bien-grano',
 } as const;
 
+/**
+ * EL MODELO DE UN BIEN, para la carta de la mano.
+ *
+ * Los cinco vienen de Resource Bits y ya están compilados: un tronco, un montón de
+ * ladrillos, pepitas de hierro, un fardo de tela y un palé de grano. La carta enseña la
+ * pieza de verdad y no un icono dibujado, por lo mismo que la barra de construir.
+ */
+export function modeloDeBien(bien: string): string {
+  return `bien-${bien}`;
+}
+
 /** Los cuatro colores de jugador que trae el pack, en el orden en que se reparten. */
 export const COLORES_DE_JUGADOR: readonly ColorDeJugador[] = ['blue', 'red', 'green', 'yellow'];
 

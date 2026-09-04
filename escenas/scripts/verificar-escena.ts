@@ -36,21 +36,54 @@ import {
   verticesDeArista,
 } from '../../shared/mecanicas/malla-hexagonal';
 import type { Punto } from '../../shared/mecanicas/malla-hexagonal';
-import { COLUMNAS_DEL_ATLAS, FILAS_DEL_ATLAS, PALETA, puntosDeLaCifra } from '../paleta';
+import {
+  COLUMNA_DEL_COLOR,
+  COLUMNAS_DEL_ATLAS,
+  FILAS_DEL_ATLAS,
+  PALETA,
+  puntosDeLaCifra,
+} from '../paleta';
 import {
   NOMBRE_QUE_SOBREVIVE,
   nombresEnElGlb,
   PIEZAS_DE_COLOR,
   todosLosNombres,
+  COLORES_DE_JUGADOR,
 } from '../nombres';
 import { cuantasFormasDeCauce, cuantasFormasDeCruce, ladoHaciaElVecino } from '../sendas';
 import { hexesDeVertice, vecino, verticesDeHex } from '../../shared/mecanicas/malla-hexagonal';
 import { CAUCE, CUERPO, piezaDeOrilla } from '../aguas';
 import { piezasDeAsentamiento } from '../asentamiento';
 import { sitiosDelTablero, sitiosPermitidos } from '../sitios';
+import {
+  ALTURA_DE_SALIDA,
+  esDeLaInterfaz,
+  loCogeLaInterfaz,
+  ALTURA_MAXIMA,
+  ALTURA_MINIMA,
+  MINIMO_PARA_GIRAR,
+  MIRADOR_DE_SALIDA,
+  ojoDelMirador,
+  tirandoDelMirador,
+} from '../camara';
 import { dentroDelHueco, huecosDeLaBarra, loQueSeVe } from '../barra';
+import {
+  areasDeTrueque,
+  enLaZonaDeLaMano,
+  huecosDeLaBaraja,
+  loQueSeVeEnLaBaraja,
+  manoPorGrupos,
+} from '../baraja';
+import { cuantosTriangulos, geometriaDeContornos } from '../formas';
+import {
+  CAJA_DEL_PUENTE,
+  LARGO_DEL_TRAMO,
+  puenteEntre,
+  SUPERFICIE_DEL_CAMINO,
+} from '../puente';
+import { BIENES_CON_ICONO, CONTORNOS_DEL_BIEN } from '../iconos';
 import { MODELO, modeloDePieza } from '../modelos';
-import { RADIO_DE_COMARCA, RADIO_DE_TESELA } from '../escala';
+import { ESCALON, RADIO_DE_COMARCA, RADIO_DE_TESELA } from '../escala';
 import { laMarinaDelMundo } from '../marina';
 import { crearRelieve, hexDePunto } from '../relieve';
 import fs from 'node:fs';
@@ -366,11 +399,40 @@ paso('La paleta no deja ningún terreno sin color');
       conColor.length === 0,
       conColor,
     );
-    const derivadas = todosLosNombres().filter((n) => !nombresEnElGlb().includes(n));
+    /*
+     * ESTE COMPROBADOR NO PODÍA FALLAR, Y ESTUVO ASÍ DESDE QUE SE ESCRIBIÓ.
+     *
+     * Decía: «las que se fabrican moviendo UV son las siete piezas por cuatro colores», y
+     * comparaba `derivadas.length` con `PIEZAS_DE_COLOR.length * 4`. Pero `derivadas` sale
+     * de restarle a `todosLosNombres()` los que están en el `.glb`, y `todosLosNombres()`
+     * se CONSTRUYE como esa misma multiplicación (`nombres.ts:296-302`). Los dos lados eran
+     * el mismo número escrito de dos maneras: sólo podía saltar si los colores dejaran de
+     * ser cuatro. Vigilaba una constante creyendo que vigilaba una derivación.
+     *
+     * Lo que sí puede romperse son estas dos cosas, y ninguna la miraba nadie:
+     */
+    const sinBase = PIEZAS_DE_COLOR.filter((pieza) => !dentro.has(pieza));
     comprobar(
-      'las que se fabrican moviendo UV son las siete piezas por cuatro colores',
-      derivadas.length === PIEZAS_DE_COLOR.length * 4,
-      { derivadas: derivadas.length, esperadas: PIEZAS_DE_COLOR.length * 4 },
+      'toda pieza que se pinta por color tiene su malla base dentro del .glb',
+      sinBase.length === 0,
+      sinBase,
+    );
+    /*
+     * Y que los colores del código sean EXACTAMENTE las columnas que el atlas tiene.
+     *
+     * Un color de más no revienta: `desplazamientoDeColor` cae al azul por defecto
+     * (`paleta.ts:185`) y las piezas de ese jugador salen azules, iguales que las de otro,
+     * sin un error en ninguna consola. Y hay motivo para que pase: el motor de Riberas
+     * admite SEIS colonos y aquí sólo hay cuatro columnas.
+     */
+    const sinColumna = COLORES_DE_JUGADOR.filter((c) => COLUMNA_DEL_COLOR[c] === undefined);
+    const sinColor = Object.keys(COLUMNA_DEL_COLOR).filter(
+      (c) => !(COLORES_DE_JUGADOR as readonly string[]).includes(c),
+    );
+    comprobar(
+      'cada color de jugador tiene su columna en el atlas, y no sobra ninguna',
+      sinColumna.length === 0 && sinColor.length === 0,
+      { sinColumna, sinColor },
     );
 
     const mancillados = [...dentro].filter((n) => !NOMBRE_QUE_SOBREVIVE.test(n));
@@ -560,6 +622,192 @@ paso('El mundo cubre los cincuenta y cuatro vértices donde se construye');
     'y el relieve lo declara él mismo, para que no haya que venir a contarlo',
     declarados === 0,
     { declarados },
+  );
+}
+
+// ---------------------------------------------------------------------------
+
+/**
+ * LA BARAJA DEL LATERAL: que quepa, que asome y que el iman reparta.
+ *
+ * De las tres piezas de interfaz esta es la que mas puede romperse en silencio, porque
+ * su gracia esta en una CURVA y una curva mal puesta sigue dibujando algo. El iman tiene
+ * que tirar mas de la carta señalada que de sus vecinas y mas de las vecinas que de las
+ * lejanas: si tirara igual de todas seria como no tenerlo, y si tirara solo de una se
+ * leeria como un interruptor. Eso se comprueba con numeros o no se comprueba.
+ *
+ * Y lo otro que se mira es lo aburrido: que con una carta y con veinte la mano siga
+ * cabiendo en el alto de la pantalla, y que en reposo asome de todas una franja — si no
+ * asoma nada, no hay nada que coger.
+ */
+paso('La mano se agrupa por bien, cabe, asoma y el imán reparte');
+{
+  const CAMPO = (45 * Math.PI) / 180;
+  const PANTALLAS: Array<[string, number]> = [
+    ['monitor', 16 / 9],
+    ['móvil de pie', 9 / 19.5],
+  ];
+  const BIENES = ['madera', 'ladrillo', 'lana', 'grano', 'mineral'];
+  const manoDe = (cuantas: number): Array<{ id: string; bien: string }> =>
+    Array.from({ length: cuantas }, (_, i) => ({
+      id: `c${String(i)}`,
+      /* A propósito desordenada: el reparto tiene que agruparla él. */
+      bien: BIENES[(i * 3 + (i % 2)) % BIENES.length] ?? 'madera',
+    }));
+
+  const malas: string[] = [];
+  for (const [nombre, proporcion] of PANTALLAS) {
+    const { alto, ancho } = loQueSeVeEnLaBaraja(CAMPO, proporcion);
+    for (const cuantas of [1, 3, 7, 14, 20]) {
+      const puestas = huecosDeLaBaraja(manoDe(cuantas), CAMPO, proporcion, null);
+      if (puestas.length !== cuantas) {
+        malas.push(`${nombre}/${String(cuantas)}: salen ${String(puestas.length)}`);
+      }
+      for (const c of puestas) {
+        if (Math.abs(c.hueco.y) + c.hueco.alto / 2 > alto / 2 + 1e-9) {
+          malas.push(`${nombre}/${String(cuantas)}: se sale por arriba o por abajo`);
+        }
+        /* Y de todas asoma algo: el borde izquierdo cae dentro de la pantalla. */
+        if (c.hueco.x - c.hueco.ancho / 2 >= ancho / 2 - 1e-9) {
+          malas.push(`${nombre}/${String(cuantas)}: una carta no asoma nada`);
+        }
+      }
+    }
+  }
+  comprobar('la mano cabe y asoma con una carta y con veinte', malas.length === 0, malas.slice(0, 4));
+
+  /*
+   * AGRUPADA POR BIEN, que es lo que la hace legible de un vistazo.
+   *
+   * Se comprueban las tres cosas que hacen que un grupo SEA un grupo: que las cartas
+   * iguales salgan seguidas, que dos manos con el mismo contenido salgan idénticas
+   * aunque hayan llegado en distinto orden, y que el salto entre grupos se vea —si el
+   * hueco entre dos bienes fuera igual que el de dentro, estarían agrupadas en los
+   * números y no en la pantalla, que es donde importa.
+   */
+  const revuelta = manoDe(11);
+  const puestas = huecosDeLaBaraja(revuelta, CAMPO, 16 / 9, null);
+  const seguidas = puestas.map((c) => c.carta.bien);
+  const vistos = new Set<string>();
+  let cortadas = 0;
+  for (let i = 0; i < seguidas.length; i++) {
+    const bien = seguidas[i] as string;
+    if (i > 0 && seguidas[i - 1] !== bien && vistos.has(bien)) cortadas++;
+    vistos.add(bien);
+  }
+  comprobar('las cartas del mismo bien salen seguidas', cortadas === 0, { cortadas, seguidas });
+
+  const alReves = [...revuelta].reverse();
+  comprobar(
+    'y dos manos con las mismas cartas salen iguales aunque lleguen en otro orden',
+    JSON.stringify(manoPorGrupos(revuelta).map((c) => c.bien)) ===
+      JSON.stringify(manoPorGrupos(alReves).map((c) => c.bien)),
+  );
+
+  let dentro = Infinity;
+  let entre = 0;
+  for (let i = 1; i < puestas.length; i++) {
+    const salto = Math.abs((puestas[i] as (typeof puestas)[number]).hueco.y -
+      (puestas[i - 1] as (typeof puestas)[number]).hueco.y);
+    if ((puestas[i] as (typeof puestas)[number]).abreGrupo) entre = Math.max(entre, salto);
+    else dentro = Math.min(dentro, salto);
+  }
+  comprobar(
+    'y el salto entre grupos se ve: al menos el doble que el de dentro',
+    entre > dentro * 2,
+    { dentro: Number(dentro.toFixed(4)), entre: Number(entre.toFixed(4)) },
+  );
+
+  /*
+   * EL ORDEN DE DIBUJO, que es lo que arregló el icono suelto de la carta de al lado.
+   *
+   * Las cartas se solapan y están todas a la misma distancia, así que sin un orden
+   * escrito el pintor elige el que quiere. Se exige que sea ESTRICTAMENTE creciente y con
+   * hueco suficiente para las tres capas de cada carta: si dos cartas compartieran número,
+   * volvería a decidir el azar.
+   */
+  let malOrden = 0;
+  for (let i = 1; i < puestas.length; i++) {
+    const a = (puestas[i - 1] as (typeof puestas)[number]).hueco.orden;
+    const b = (puestas[i] as (typeof puestas)[number]).hueco.orden;
+    if (b - a < 3) malOrden++;
+  }
+  comprobar(
+    'cada carta tiene su propio orden de dibujo, con sitio para sus tres capas',
+    malOrden === 0,
+    { pares: malOrden },
+  );
+
+  /* El imán, medido sobre una mano de nueve apuntando a la del medio. */
+  const nueve = manoDe(9);
+  const quieta = huecosDeLaBaraja(nueve, CAMPO, 16 / 9, null);
+  const centro = quieta[4];
+  const tirada =
+    centro === undefined ? [] : huecosDeLaBaraja(nueve, CAMPO, 16 / 9, centro.hueco.y);
+  const sale = (i: number): number => {
+    const a = quieta[i];
+    const b = tirada[i];
+    return a === undefined || b === undefined ? 0 : a.hueco.x - b.hueco.x;
+  };
+  comprobar(
+    'el imán tira más de la carta señalada que de sus vecinas, y de éstas más que de las lejanas',
+    sale(4) > sale(3) && sale(3) > sale(2) && sale(2) > sale(1) && sale(1) > sale(0),
+    [0, 1, 2, 3, 4].map((i) => Number(sale(i).toFixed(4))),
+  );
+  comprobar(
+    'y con el cursor fuera de la mano no tira de ninguna',
+    quieta.every((c) => c.hueco.iman === 0),
+  );
+  comprobar(
+    'la mano despierta al acercarse por el borde derecho y no en el centro',
+    enLaZonaDeLaMano(1.4, CAMPO, 16 / 9) && !enLaZonaDeLaMano(0, CAMPO, 16 / 9),
+  );
+
+  /* Las áreas de trueque: una por bien, sin pisarse y dentro de la pantalla. */
+  const { alto } = loQueSeVeEnLaBaraja(CAMPO, 16 / 9);
+  const areas = areasDeTrueque(5, CAMPO, 16 / 9);
+  let pisan = 0;
+  for (let i = 0; i < areas.length; i++) {
+    const a = areas[i];
+    if (a === undefined) continue;
+    if (Math.abs(a.y) + a.alto / 2 > alto / 2 + 1e-9) pisan++;
+    for (let j = i + 1; j < areas.length; j++) {
+      const b = areas[j];
+      if (b !== undefined && Math.abs(a.y - b.y) < (a.alto + b.alto) / 2 - 1e-9) pisan++;
+    }
+  }
+  comprobar('las cinco áreas de trueque caben y no se pisan', areas.length === 5 && pisan === 0, {
+    areas: areas.length,
+    pisan,
+  });
+  comprobar('y sin bienes que pedir no hay ni un área', areasDeTrueque(0, CAMPO, 16 / 9).length === 0);
+
+  /* Y los cinco bienes tienen icono, y ninguno sale vacío al convertirlo a triángulos. */
+  const sinIcono = ['madera', 'ladrillo', 'lana', 'grano', 'mineral'].filter(
+    (b) => !BIENES_CON_ICONO.includes(b),
+  );
+  comprobar('los cinco bienes tienen icono compilado', sinIcono.length === 0, sinIcono);
+
+  const rotos: string[] = [];
+  for (const bien of BIENES_CON_ICONO) {
+    const g = geometriaDeContornos(CONTORNOS_DEL_BIEN[bien] ?? []);
+    if (g === null) {
+      rotos.push(`${bien}: no da geometría`);
+      continue;
+    }
+    const caja = g.boundingBox;
+    if (caja === null) {
+      rotos.push(`${bien}: sin caja`);
+      continue;
+    }
+    const lado = Math.max(caja.max.x - caja.min.x, caja.max.y - caja.min.y);
+    if (Math.abs(lado - 1) > 1e-6) rotos.push(`${bien}: lado ${lado.toFixed(3)} y no 1`);
+    if (cuantosTriangulos(g) < 8) rotos.push(`${bien}: sólo ${String(cuantosTriangulos(g))} triángulos`);
+  }
+  comprobar(
+    'y los cinco se convierten en triángulos, encajados en el mismo cuadrado',
+    rotos.length === 0,
+    rotos,
   );
 }
 
@@ -883,6 +1131,350 @@ paso('Lo que hay en el agua sigue las reglas del agua');
   comprobar('y la misma semilla sigue dando la misma marina', unaVez === otraVez);
 }
 
+paso('La camara se mira quieta, se gira arrastrando y no se cuela por ningun lado');
+{
+  const ALCANCE = 100;
+
+  /*
+   * LA VISTA DE SALIDA ES LA MISMA QUE HABIA.
+   *
+   * La camara estaba escrita como dos distancias —1,35 de lado, 1,15 de alto— y ahora
+   * esta escrita como un angulo. Es la misma vista, y esto lo dice: si algun dia alguien
+   * toca el angulo de salida creyendo que ajusta un detalle, aqui se entera de que ha
+   * movido el encuadre con el que se ha decidido toda la escala del mundo.
+   */
+  const salida = ojoDelMirador(MIRADOR_DE_SALIDA, ALCANCE);
+  comprobar(
+    'la vista de salida es exactamente la de antes: 1,35 de lado y 1,15 de alto',
+    Math.abs(Math.hypot(salida[0], salida[2]) - ALCANCE * 1.35) < 1e-9 &&
+      Math.abs(salida[1] - ALCANCE * 1.15) < 1e-9,
+    salida.map((v) => Number(v.toFixed(4))),
+  );
+
+  /*
+   * INCLINAR ES INCLINAR, NO ACERCARSE.
+   *
+   * Es la razon entera de que el mirador sea un angulo y no dos distancias. Con dos
+   * distancias, subir la camara la alejaba del centro y el tablero se encogia: en pantalla
+   * eso no se lee como inclinar la vista sino como un zoom que nadie ha pedido.
+   */
+  const alturas = [ALTURA_MINIMA, ALTURA_DE_SALIDA, (ALTURA_MINIMA + ALTURA_MAXIMA) / 2, ALTURA_MAXIMA];
+  const lejos = alturas.map((altura) => {
+    const [x, y, z] = ojoDelMirador({ rumbo: 1.1, altura }, ALCANCE);
+    return Math.hypot(x, y, z);
+  });
+  comprobar(
+    'inclinar la vista no acerca ni aleja: la distancia al centro no cambia',
+    lejos.every((d) => Math.abs(d - lejos[0]!) < 1e-9),
+    lejos.map((d) => Number(d.toFixed(6))),
+  );
+
+  /*
+   * NI BAJO EL SUELO NI POR EL POLO, por mucho que se tire.
+   *
+   * Se tira cien pantallas enteras hacia cada lado, que es mas de lo que nadie hara. Por
+   * abajo, el ojo tiene que seguir por encima del suelo; por arriba, tiene que quedarse
+   * CORTO del polo: justo en el polo el ojo mira en la direccion de su propio «arriba» y
+   * `lookAt` no tiene con que orientar la imagen, asi que pega un giro brusco al cruzarlo.
+   */
+  const PANTALLA = { ancho: 1600, alto: 900 };
+  let abajo = MIRADOR_DE_SALIDA;
+  let arriba = MIRADOR_DE_SALIDA;
+  for (let i = 0; i < 100; i++) {
+    abajo = tirandoDelMirador(abajo, 0, -PANTALLA.alto, PANTALLA);
+    arriba = tirandoDelMirador(arriba, 0, PANTALLA.alto, PANTALLA);
+  }
+  const ojoAbajo = ojoDelMirador(abajo, ALCANCE);
+  comprobar(
+    'por mucho que se tire, la camara no se mete bajo el suelo ni cruza el polo',
+    ojoAbajo[1] > 0 &&
+      abajo.altura >= ALTURA_MINIMA - 1e-12 &&
+      arriba.altura <= ALTURA_MAXIMA + 1e-12 &&
+      ALTURA_MAXIMA < Math.PI / 2,
+    {
+      abajo: Number(((abajo.altura * 180) / Math.PI).toFixed(1)),
+      arriba: Number(((arriba.altura * 180) / Math.PI).toFixed(1)),
+    },
+  );
+
+  /*
+   * EL SENTIDO: SE AGARRA EL MUNDO, NO LA CAMARA.
+   *
+   * Arrastrar a la derecha lleva el tablero a la derecha, asi que el OJO se va a la
+   * izquierda. Es el gesto de girar un plano encima de la mesa. Con el signo al reves se
+   * siente roto y nadie sabe decir por que, asi que el signo se escribe aqui y no se
+   * discute mas.
+   */
+  const derecha = tirandoDelMirador(MIRADOR_DE_SALIDA, 200, 0, PANTALLA);
+  comprobar(
+    'arrastrar a la derecha lleva el tablero a la derecha, o sea el ojo a la izquierda',
+    derecha.rumbo < MIRADOR_DE_SALIDA.rumbo,
+    { antes: MIRADOR_DE_SALIDA.rumbo, despues: Number(derecha.rumbo.toFixed(4)) },
+  );
+
+  /*
+   * UN ARRASTRE Y SU CONTRARIO DEVUELVEN AL MISMO SITIO.
+   *
+   * Sin esto, el temblor de la mano —que va y viene— arrastraria la camara poco a poco
+   * hacia un lado, y al cabo de un rato el tablero estaria girado sin que nadie lo haya
+   * girado. Se prueba a media altura, lejos de los topes: contra un tope no vuelve, y eso
+   * esta bien, porque un tope es justamente lo que no deja seguir.
+   */
+  const medio = { rumbo: 0.6, altura: (ALTURA_MINIMA + ALTURA_MAXIMA) / 2 };
+  const ida = tirandoDelMirador(medio, 137, 61, PANTALLA);
+  const vuelta = tirandoDelMirador(ida, -137, -61, PANTALLA);
+  comprobar(
+    'un arrastre y el mismo al reves dejan la camara donde estaba',
+    Math.abs(vuelta.rumbo - medio.rumbo) < 1e-12 && Math.abs(vuelta.altura - medio.altura) < 1e-12,
+    { rumbo: vuelta.rumbo - medio.rumbo, altura: vuelta.altura - medio.altura },
+  );
+
+  /*
+   * Y EL GESTO VALE LO MISMO EN CUALQUIER PANTALLA.
+   *
+   * Si el giro fuese por pixel, cruzar la pantalla con el dedo daria media vuelta en un
+   * monitor y un cuarto en un movil: el mismo juego se sentiria distinto en cada sitio.
+   * Cruzarla de lado a lado tiene que ser siempre lo mismo.
+   */
+  const MONITOR = { ancho: 2560, alto: 1440 };
+  const MOVIL = { ancho: 390, alto: 844 };
+  const enMonitor = tirandoDelMirador(medio, MONITOR.ancho / 2, 0, MONITOR).rumbo;
+  const enMovil = tirandoDelMirador(medio, MOVIL.ancho / 2, 0, MOVIL).rumbo;
+  comprobar(
+    'media pantalla de arrastre gira lo mismo en un monitor que en un movil',
+    Math.abs(enMonitor - enMovil) < 1e-12,
+    { monitor: Number(enMonitor.toFixed(6)), movil: Number(enMovil.toFixed(6)) },
+  );
+
+  /*
+   * Y HAY ZONA MUERTA, que es lo que separa «he hecho clic» de «estoy girando».
+   *
+   * Ademas de evitar que un clic mueva el mundo un pelo, es lo que cierra el hueco de un
+   * fotograma entre coger una carta y que la camara se entere: hasta que el puntero no se
+   * ha ido de ahi, no hay giro.
+   */
+  comprobar(
+    'hay zona muerta antes de empezar a girar, y es de varios pixeles',
+    MINIMO_PARA_GIRAR >= 3 && MINIMO_PARA_GIRAR <= 12,
+    { pixeles: MINIMO_PARA_GIRAR },
+  );
+
+  /*
+   * LA MARCA DE «ESTO SE LO QUEDA LA INTERFAZ» ES POR SUCESO, NO UN BANDERIN.
+   *
+   * Se comprueban las tres cosas de golpe porque son la misma: que por defecto el gesto es
+   * de la camara —si no, el tablero dejaria de girar del todo—, que marcar uno lo marca, y
+   * sobre todo que marcar uno NO marca el siguiente.
+   *
+   * Ese ultimo es el que importa. Con un banderin compartido, marcarlo al coger una carta
+   * y olvidarse de bajarlo deja el tablero clavado para siempre, y el sintoma —«ya no gira,
+   * pero antes giraba»— aparece mucho despues de la carta que lo causo. Con la marca puesta
+   * en el propio suceso no hay nada que bajar: cuando el navegador tira el suceso, se va.
+   */
+  const primero = {};
+  const segundo = {};
+  loCogeLaInterfaz(primero);
+  comprobar(
+    'la marca de la interfaz va en cada suceso y no se queda puesta para el siguiente',
+    !esDeLaInterfaz(segundo) && esDeLaInterfaz(primero) && !esDeLaInterfaz({}),
+  );
+}
+
+paso('Un puente cubre su arista, salva lo que tiene debajo y encaja con el camino');
+{
+  const CUESTA = 0.14;
+  const llano = (): number => 12;
+  const cuesta = (q: { x: number; y: number }): number => 12 + q.x * CUESTA;
+  const cerro = (q: { x: number; y: number }): number => {
+    /* Un cerro en mitad del vano: lo que la primera version atravesaba por dentro. */
+    const t = q.x / RADIO_DE_COMARCA;
+    return 12 + Math.max(0, 1 - Math.abs(t - 0.5) * 6) * ESCALON * 2;
+  };
+
+  const A = { x: 0, y: 0 };
+  const B = { x: RADIO_DE_COMARCA, y: 0 };
+
+  /*
+   * CUBRE LA ARISTA ENTERA Y SIN DEFORMAR NADA.
+   *
+   * Las dos mitades importan y son distintas. Que cubra: un puente que se queda corto deja
+   * un vacio justo donde uno pisa. Y que no deforme: la alternativa —estirar los tramos
+   * hasta que cuadren— daba un 9% de mas en cada barandilla, medido, y una barandilla
+   * estirada se nota porque el ojo conoce su forma.
+   */
+  const p = puenteEntre(A, B, llano);
+  const primero = p.tramos[0];
+  const ultimo = p.tramos[p.tramos.length - 1];
+  /*
+   * Se mide la SOMBRA del tramo, no su largo. Un tramo en cuesta es mas largo que el trozo
+   * de arista que cubre, y compararlo con la arista da un desajuste que parece un hueco y
+   * no lo es: la primera version de esta comprobacion fallo por eso, con ocho milesimas de
+   * sobra que eran exactamente la cuesta de los dos tramos de punta.
+   */
+  const sombra = (t: (typeof p.tramos)[number]): number => t.largo * Math.cos(t.inclinacion);
+  comprobar(
+    'el puente empieza en un vertice y acaba en el otro, sin dejar hueco',
+    primero !== undefined &&
+      ultimo !== undefined &&
+      Math.abs(primero.x - sombra(primero) / 2) < 1e-9 &&
+      Math.abs(ultimo.x + sombra(ultimo) / 2 - RADIO_DE_COMARCA) < 1e-9,
+    {
+      empieza: primero === undefined ? null : primero.x - sombra(primero) / 2,
+      acaba: ultimo === undefined ? null : ultimo.x + sombra(ultimo) / 2,
+      arista: RADIO_DE_COMARCA,
+    },
+  );
+  /*
+   * NINGUN TRAMO SE ESTIRA MAS DE LO QUE SU CUESTA EXIGE, y esto es lo que se queria
+   * comprobar de verdad.
+   *
+   * La primera version pedia largo EXACTO en llano, y fallo — enseñando algo que no se
+   * habia pensado: en llano la calzada tampoco es plana. Se arquea, porque el aire que se
+   * le exige sobre el suelo (media persona) es mayor que lo que sobresale un camino, asi
+   * que las juntas de en medio suben y las puntas se quedan clavadas al camino. Es un
+   * puente arqueado, que es lo que es un puente.
+   *
+   * Lo que NO puede pasar es que un tramo se estire por otra razon. Su largo tiene que ser
+   * exactamente el del modelo dividido por el coseno de su cuesta: ni un milimetro mas.
+   */
+  comprobar(
+    'ningun tramo se estira mas de lo que su propia cuesta exige',
+    p.tramos.every(
+      (t) => Math.abs(t.largo - LARGO_DEL_TRAMO / Math.cos(t.inclinacion)) < 1e-9,
+    ),
+    p.tramos.map((t) => Number((t.largo / LARGO_DEL_TRAMO).toFixed(4))),
+  );
+  /*
+   * Y EN LLANO EL ARCO ES SUAVE. Cinco grados de tope, y el numero tiene sentido:
+   *
+   * en llano el arco sube 0,72 unidades —un cuarto de persona— y toda esa subida se hace en
+   * el primer tramo, que sale a 3,2 grados. Eso es una rampa de carretera, se sube andando
+   * sin pensarlo y en pantalla se lee como un puente arqueado. El tope esta puesto para que
+   * salte si alguien sube el aire bajo la calzada sin darse cuenta de que lo que sube con
+   * el es la cuesta de las puntas.
+   */
+  comprobar(
+    'y en llano el arco es suave, no una rampa',
+    p.tramos.every((t) => Math.abs(t.inclinacion) < (5 * Math.PI) / 180),
+    p.tramos.map((t) => Number(((t.inclinacion * 180) / Math.PI).toFixed(2))),
+  );
+  comprobar(
+    'y hay un estandarte en cada junta: uno menos que tramos',
+    p.tramos.length >= 2 && p.estandartes.length === p.tramos.length - 1,
+    { tramos: p.tramos.length, estandartes: p.estandartes.length },
+  );
+
+  /*
+   * NO SE ENTIERRA EN UN CERRO, que es el fallo que se vio en pantalla: NINGUN puente
+   * aparecia, y al medirlo la calzada recta quedaba bajo tierra en el 23% de las aristas,
+   * hasta ocho personas y media de hondo.
+   *
+   * Se mide la calzada de VERDAD —cada tramo, punto a punto y con su cuesta— y no la recta
+   * entre las puntas: medir la recta fue justo lo que dejo pasar el fallo la primera vez.
+   * Los tramos de PUNTA se excluyen a proposito y esta escrito por que: sus extremos estan
+   * clavados a la altura del camino para que el puente encaje a la entrada y a la salida, y
+   * donde el terreno sube a pico contra el vertice eso no es un puente sino una ladera.
+   */
+  const hundeElMedio = (suelo: (q: { x: number; y: number }) => number): number => {
+    const puente = puenteEntre(A, B, suelo);
+    let peor = 0;
+    puente.tramos.forEach((t, i) => {
+      if (i === 0 || i === puente.tramos.length - 1) return;
+      for (let k = 0; k <= 8; k++) {
+        const u = (k / 8 - 0.5) * t.largo * Math.cos(t.inclinacion);
+        const y = t.y + Math.tan(t.inclinacion) * u;
+        peor = Math.max(peor, suelo({ x: t.x + Math.cos(t.giro) * u, y: t.z }) - y);
+      }
+    });
+    return peor;
+  };
+  comprobar(
+    'con un cerro en medio, ningun tramo de en medio queda bajo tierra',
+    hundeElMedio(cerro) <= 0,
+    { hundido: Number(hundeElMedio(cerro).toFixed(3)) },
+  );
+  /* Y el cerro tiene que ser de verdad, o lo de arriba pasa por no haber nada que salvar. */
+  comprobar(
+    'y el cerro de la prueba levanta de verdad el terreno, o no se estaba probando nada',
+    cerro({ x: RADIO_DE_COMARCA / 2, y: 0 }) - cerro({ x: 0, y: 0 }) > ESCALON,
+    Number((cerro({ x: RADIO_DE_COMARCA / 2, y: 0 }) - cerro({ x: 0, y: 0 })).toFixed(2)),
+  );
+
+  /*
+   * LAS PUNTAS ENCAJAN CON EL CAMINO, que es lo que se pidio con «que encajen tanto en
+   * entrada como en salida».
+   *
+   * La cota de la punta se compara con la superficie del camino sobre el suelo de ESE
+   * vertice. Escrita a mano en los dos sitios coincidiria hoy y dejaria de coincidir el dia
+   * que alguien suba el camino un pelo, sin que nadie relacione una cosa con la otra.
+   */
+  const enCuesta = puenteEntre(A, B, cuesta);
+  comprobar(
+    'las dos puntas de la calzada caen a la altura de la superficie del camino',
+    Math.abs(enCuesta.cotas[0] - (cuesta(A) + SUPERFICIE_DEL_CAMINO)) < 1e-9 &&
+      Math.abs(enCuesta.cotas[1] - (cuesta(B) + SUPERFICIE_DEL_CAMINO)) < 1e-9,
+    enCuesta.cotas.map((c) => Number(c.toFixed(4))),
+  );
+
+  /*
+   * Y DOS PUENTES QUE COMPARTEN VERTICE SE ENCUENTRAN, sin hablarse.
+   *
+   * Es lo que hace que una cadena de puentes sea una cadena y no una fila de trozos con
+   * escalones. Sale gratis de que la cota de la punta dependa SOLO del suelo de su vertice:
+   * si dependiera del terreno de en medio, dos puentes que llegan al mismo sitio desde
+   * lados distintos llegarian a alturas distintas.
+   */
+  const C = { x: RADIO_DE_COMARCA * 2, y: RADIO_DE_COMARCA * 0.5 };
+  const otro = puenteEntre(B, C, cuesta);
+  comprobar(
+    'dos puentes que comparten un vertice llegan a el a la misma altura',
+    Math.abs(enCuesta.cotas[1] - otro.cotas[0]) < 1e-9,
+    { uno: enCuesta.cotas[1], otro: otro.cotas[0] },
+  );
+
+  /*
+   * LA OBRA SE LEVANTA POR ORDEN Y LLEGA AL FINAL.
+   *
+   * Que llegue al final no es obvio: con un redondeo mal puesto, un puente se queda para
+   * siempre a falta del ultimo tramo y nadie lo nota hasta que alguien mira de cerca.
+   */
+  const cuantos = p.tramos.length;
+  const crece = [0, 0.25, 0.5, 0.75, 1].map((a) => puenteEntre(A, B, llano, a).tramos.length);
+  comprobar(
+    'la obra empieza vacia, crece sin saltar hacia atras y acaba entera',
+    crece[0] === 0 &&
+      crece[crece.length - 1] === cuantos &&
+      crece.every((n, i) => i === 0 || n >= (crece[i - 1] as number)),
+    crece,
+  );
+  comprobar(
+    'y los tramos que ya estan puestos no se mueven al aparecer el siguiente',
+    (() => {
+      const mitad = puenteEntre(A, B, llano, 0.5);
+      return mitad.tramos.every((t, i) => {
+        const suyo = p.tramos[i];
+        return suyo !== undefined && Math.abs(t.x - suyo.x) < 1e-9 && Math.abs(t.y - suyo.y) < 1e-9;
+      });
+    })(),
+  );
+
+  /*
+   * Y LA MEDIDA DEL MODELO ES LA QUE HAY DENTRO DEL FICHERO.
+   *
+   * `CAJA_DEL_PUENTE` decide cuantos tramos caben en una arista. Si un dia entra otro
+   * modelo de puente con otro tamano, todo el reparto se hace con la medida del anterior y
+   * el puente sale con huecos o solapado — sin un error en ninguna consola. Esto lo ata al
+   * binario compilado, que es el unico sitio donde esa medida es un hecho.
+   */
+  comprobar(
+    'la caja del puente que usa el reparto es la que trae el .glb',
+    Math.abs(CAJA_DEL_PUENTE.largo - 1.924) < 0.002 &&
+      Math.abs(CAJA_DEL_PUENTE.ancho - 1.333) < 0.002 &&
+      Math.abs(CAJA_DEL_PUENTE.alto - 1.25) < 0.002,
+    CAJA_DEL_PUENTE,
+  );
+}
+
 // ---------------------------------------------------------------------------
 
 console.log('');
@@ -903,7 +1495,7 @@ if (fallos.length > 0) {
  * a veintitrés: durante ese tiempo el guion podía morirse en la novena sin que nadie se
  * enterara. Un guardia desfasado no guarda nada.
  */
-const COMPROBACIONES_ESCRITAS = 42;
+const COMPROBACIONES_ESCRITAS = 74;
 if (hechas < COMPROBACIONES_ESCRITAS) {
   console.error(
     `Solo se han hecho ${hechas} de las ${COMPROBACIONES_ESCRITAS} comprobaciones que ` +

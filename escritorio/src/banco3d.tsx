@@ -35,8 +35,23 @@ import {
   verticeEntre,
   verticesDe,
 } from '../../shared/mecanicas/malla-hexagonal';
-import type { Hex, LlaveDeVertice } from '../../shared/mecanicas/malla-hexagonal';
+import type { Hex, LlaveDeArista, LlaveDeVertice } from '../../shared/mecanicas/malla-hexagonal';
+import {
+  aristasDeVertice,
+  verticesDeArista,
+  verticesVecinos,
+} from '../../shared/mecanicas/malla-hexagonal';
+import type { ObraPosible } from '../../shared/arcade/juegos/riberas-en-3d';
+import { obraPosible, vistaDePrueba } from '../../shared/arcade/juegos/riberas-en-3d';
 import type { Colocando } from '../../escenas/sitios';
+import type { Mirador } from '../../escenas/camara';
+import {
+  esDeLaInterfaz,
+  MINIMO_PARA_GIRAR,
+  MIRADOR_DE_SALIDA,
+  ojoDelMirador,
+  tirandoDelMirador,
+} from '../../escenas/camara';
 import { Delta, encuadreDelDelta, RADIO_DE_COMARCA } from '../../escenas/delta';
 import { crearRelieve } from '../../escenas/relieve';
 import type { Relieve } from '../../escenas/relieve';
@@ -53,7 +68,7 @@ import {
   RADIO_DE_TESELA,
   segundosAndando,
 } from '../../escenas/escala';
-import type { ColorDeJugador, DeltaEn3D, PiezaEn3D } from '../../escenas/tipos';
+import type { CaminoEn3D, ColorDeJugador, DeltaEn3D, PiezaEn3D } from '../../escenas/tipos';
 import tableroGlb from '../../escenas/modelos/tablero.glb?url';
 import './estilo.css';
 
@@ -167,31 +182,92 @@ type Vista = 'aire' | 'suelo';
 function Camara({
   vista,
   alcance,
-  quieta,
+  girando,
   relieve,
   mirandoA,
   alAndar,
 }: {
   vista: Vista;
   alcance: number;
-  quieta: boolean;
+  /** Si da vueltas sola. Por defecto NO: el tablero se mira quieto y se gira arrastrando. */
+  girando: boolean;
   relieve: Relieve;
   mirandoA: { x: number; y: number };
   alAndar: (segundos: number) => void;
 }): null {
-  const { camera } = useThree();
-  const angulo = useRef(0.6);
+  const { camera, gl } = useThree();
+  const mirador = useRef<Mirador>(MIRADOR_DE_SALIDA);
   const anduvo = useRef(0);
+
+  /*
+   * EL TABLERO SE GIRA ARRASTRANDO.
+   *
+   * El mirador va por `ref` y no por estado: son sesenta cambios por segundo mientras se
+   * arrastra, y pasarlos por React repintaría la escena entera sesenta veces por segundo
+   * para mover una cámara. La aritmética está en `escenas/camara.ts`, donde se puede
+   * medir; aquí sólo se escuchan los sucesos del ratón.
+   *
+   * TODO se escucha en la VENTANA, y son dos razones distintas:
+   *
+   *   · El pulsar, porque así la cámara llega siempre DESPUÉS de la escena —el suceso baja
+   *     al lienzo, lo atiende la escena y luego sube— y puede mirar si una carta o una
+   *     pieza ya se lo ha quedado. Eso lo garantiza la norma del navegador; el orden en
+   *     que se apuntan los oyentes, no.
+   *   · Mover y soltar, para que soltar FUERA del lienzo también termine el arrastre. Si
+   *     no, se sale por el borde, se suelta, se vuelve a entrar y el tablero sigue pegado
+   *     al ratón sin que nadie esté pulsando nada.
+   */
+  useEffect(() => {
+    const lienzo = gl.domElement;
+    /* Desde dónde se pulsó, y si ya se ha pasado la zona muerta. */
+    let desde: { x: number; y: number } | null = null;
+    let gira = false;
+
+    const baja = (e: PointerEvent): void => {
+      if (e.target !== lienzo) return;
+      if (esDeLaInterfaz(e)) return;
+      desde = { x: e.clientX, y: e.clientY };
+      gira = false;
+    };
+    const mueve = (e: PointerEvent): void => {
+      if (desde === null) return;
+      if (!gira) {
+        if (Math.hypot(e.clientX - desde.x, e.clientY - desde.y) < MINIMO_PARA_GIRAR) return;
+        gira = true;
+      }
+      mirador.current = tirandoDelMirador(
+        mirador.current,
+        e.clientX - desde.x,
+        e.clientY - desde.y,
+        { ancho: lienzo.clientWidth, alto: lienzo.clientHeight },
+      );
+      desde = { x: e.clientX, y: e.clientY };
+    };
+    const suelta = (): void => {
+      desde = null;
+      gira = false;
+    };
+
+    window.addEventListener('pointerdown', baja);
+    window.addEventListener('pointermove', mueve);
+    window.addEventListener('pointerup', suelta);
+    window.addEventListener('pointercancel', suelta);
+    return () => {
+      window.removeEventListener('pointerdown', baja);
+      window.removeEventListener('pointermove', mueve);
+      window.removeEventListener('pointerup', suelta);
+      window.removeEventListener('pointercancel', suelta);
+    };
+  }, [gl]);
 
   useFrame((_, delta) => {
     if (vista === 'aire') {
-      if (!quieta) angulo.current += delta * 0.18;
-      const a = angulo.current;
-      camera.position.set(
-        Math.sin(a) * alcance * 1.35,
-        alcance * 1.15,
-        Math.cos(a) * alcance * 1.35,
-      );
+      /* Sólo da la vuelta sola si se pide: para ENSEÑAR el generador sigue siendo lo mejor. */
+      if (girando) {
+        mirador.current = { ...mirador.current, rumbo: mirador.current.rumbo + delta * 0.18 };
+      }
+      const [x, y, z] = ojoDelMirador(mirador.current, alcance);
+      camera.position.set(x, y, z);
       camera.lookAt(0, 0, 0);
       return;
     }
@@ -211,7 +287,7 @@ function Camara({
      * referencia de escala que ninguna vista aérea da: si el muro tapa el horizonte,
      * es que el muro mide lo que tiene que medir.
      */
-    if (!quieta) anduvo.current += delta * PASO_POR_SEGUNDO;
+    if (girando) anduvo.current += delta * PASO_POR_SEGUNDO;
     alAndar(anduvo.current / PASO_POR_SEGUNDO);
     const ojos = ALTURA_DE_UNA_PERSONA * 0.9;
     const vuelta = anduvo.current / 26;
@@ -280,6 +356,85 @@ const todosLosVertices: LlaveDeVertice[] = verticesDe(mallaDeRadio(2)) as LlaveD
 /** Y sus setenta y dos aristas, que es donde van los puentes y los caminos. */
 const todasLasAristas: string[] = aristasDe(mallaDeRadio(2));
 
+const COLORES: readonly ColorDeJugador[] = ['red', 'blue', 'yellow', 'green'];
+
+/** Sólo para pintar el borde del botón de turno. No entra en ninguna regla. */
+const COLOR_EN_PANTALLA: Record<ColorDeJugador, string> = {
+  red: '#e0533d',
+  blue: '#3d8be0',
+  yellow: '#e0b83d',
+  green: '#4fbf7a',
+};
+
+/**
+ * LA APERTURA YA HECHA: cada jugador con su poblado y su camino.
+ *
+ * ═══ POR QUÉ EL BANCO EMPIEZA CON ALGO PUESTO, SI ANTES EMPEZABA VIRGEN ═══
+ *
+ * Porque las reglas de verdad no dejan fundar en el vacío. Fuera de la colocación
+ * inicial, un poblado tiene que colgar de un camino TUYO; con el tablero pelado no hay
+ * ni un sitio legal para nadie, y la barra saldría entera apagada.
+ *
+ * Se podría fingir la fase de colocación —poblado gratis, sin camino— pero esa fase tiene
+ * sus propias reglas (una vereda obligatoria pegada a lo recién fundado, la serpentina que
+ * va y vuelve) y fingirlas aquí sería volver a inventar reglas, que es de lo que venimos.
+ * Así que el banco juega SIEMPRE en `jugando`, con la apertura ya dada. Lo que el banco
+ * NO prueba, y queda dicho: la serpentina.
+ *
+ * ═══ SE CALCULA, NO SE ESCRIBE A MANO ═══
+ *
+ * Dos vértices elegidos a dedo pueden violar la regla de distancia sin que nadie lo note,
+ * y entonces el banco arranca con una posición ilegal y todo lo que se mire desde ahí es
+ * mentira. Aquí se busca el primer vértice libre y separado para cada jugador, que es la
+ * misma condición que exige el juego.
+ */
+function aperturaDePrueba(): { piezas: PiezaEn3D[]; caminos: CaminoEn3D[] } {
+  const piezas: PiezaEn3D[] = [];
+  const caminos: CaminoEn3D[] = [];
+  const puestos: string[] = [];
+  /*
+   * De dentro hacia fuera, y no por orden de lista: la cámara mira al centro, y una
+   * apertura en el borde del tablero deja el banco sin nada que mirar. Se ordena por
+   * distancia al origen, que es donde apunta `lookAt`.
+   */
+  const porCercania = [...todosLosVertices].sort((a, b) => {
+    const pa = puntoDeVertice(a, RADIO_DE_COMARCA);
+    const pb = puntoDeVertice(b, RADIO_DE_COMARCA);
+    return Math.hypot(pa.x, pa.y) - Math.hypot(pb.x, pb.y);
+  });
+  for (const color of COLORES.slice(0, 2)) {
+    const sitio = porCercania.find(
+      (v) => !puestos.includes(v) && !verticesVecinos(v).some((n) => puestos.includes(n)),
+    );
+    if (sitio === undefined) continue;
+    puestos.push(sitio);
+    piezas.push({ vertice: sitio, clase: 'poblado', color });
+    /*
+     * DOS caminos en cadena, y el segundo no sobra.
+     *
+     * Con uno solo no hay ni un sitio legal donde fundar, y no por un fallo: el otro
+     * extremo de ese camino está a UNA arista de tu propio poblado, y la regla de
+     * distancia lo prohíbe. Es correcto y es lo que pasa en la partida de verdad —hay que
+     * tender dos veredas antes de poder fundar— pero un banco que arranca sin un solo
+     * sitio marcado no deja mirar lo que se viene a mirar.
+     */
+    let punta = sitio;
+    for (let paso = 0; paso < 2; paso++) {
+      const salida = aristasDeVertice(punta).find(
+        (a) => todasLasAristas.includes(a) && !caminos.some((c) => c.arista === a),
+      );
+      if (salida === undefined) break;
+      caminos.push({ arista: salida, color });
+      const siguiente = verticesDeArista(salida).find(
+        (v) => v !== punta && todosLosVertices.includes(v as LlaveDeVertice),
+      );
+      if (siguiente === undefined) break;
+      punta = siguiente as LlaveDeVertice;
+    }
+  }
+  return { piezas, caminos };
+}
+
 function Banco(): JSX.Element {
   /*
    * LA SEMILLA, a mano y a la vista.
@@ -310,7 +465,11 @@ function Banco(): JSX.Element {
   );
   const alcance = encuadre.alcance;
   const [vista, ponerVista] = useState<Vista>('aire');
-  const [quieta, ponerQuieta] = useState(false);
+  /*
+   * Arranca QUIETO. El botón se queda para la vuelta de presentación, que para enseñar de
+   * un tirón lo que genera el mundo sigue siendo lo mejor que hay.
+   */
+  const [girando, ponerGirando] = useState(false);
   const [dibujo, ponerDibujo] = useState({ triangulos: 0, llamadas: 0 });
   const [andado, ponerAndado] = useState(0);
 
@@ -322,8 +481,21 @@ function Banco(): JSX.Element {
    * si la animación se lee como una construcción o como un parpadeo — y si al
    * mejorar a ciudad el caserío desaparece y la fortaleza se levanta en su sitio.
    */
-  const [obras, ponerObras] = useState<PiezaEn3D[]>([]);
-  const conObras = useMemo(() => ({ ...datos, piezas: obras }), [datos, obras]);
+  const [obras, ponerObras] = useState<PiezaEn3D[]>(() => aperturaDePrueba().piezas);
+  const [caminos, ponerCaminos] = useState<CaminoEn3D[]>(() => aperturaDePrueba().caminos);
+  const conObras = useMemo(
+    () => ({ ...datos, piezas: obras, caminos }),
+    [datos, obras, caminos],
+  );
+
+  /*
+   * QUIÉN JUEGA. Un botón, y hace falta para poder MIRAR las tres reglas.
+   *
+   * «El castillo sólo sobre poblados tuyos» no se puede ver con un solo jugador: habría
+   * que creerse que los que no salen son de otro. Cambiando de jugador se ve que la misma
+   * partida marca sitios distintos según quién mire, que es la regla en persona.
+   */
+  const [quienJuega, ponerQuienJuega] = useState<ColorDeJugador>('red');
 
   /*
    * QUÉ SE ESTÁ COLOCANDO, y de dónde salen los sitios legales.
@@ -334,6 +506,23 @@ function Banco(): JSX.Element {
    */
   const [colocando, ponerColocando] = useState<Colocando | null>(null);
   const [tomada, ponerTomada] = useState<string | null>(null);
+  const [cogida, ponerCogida] = useState<string | null>(null);
+  const [trueque, ponerTrueque] = useState<string | null>(null);
+
+  /*
+   * UNA MANO DE MENTIRA PARA EL BANCO.
+   *
+   * Once cartas repartidas entre los cinco bienes, que es una mano de catan a mitad de
+   * partida: suficientes para que se solapen y el iman tenga trabajo. En la partida de
+   * verdad esto llega del servidor.
+   */
+  const mano = useMemo(() => {
+    const BIENES = ['madera', 'ladrillo', 'mineral', 'lana', 'grano'];
+    return Array.from({ length: 11 }, (_, i) => ({
+      id: `c${String(i)}`,
+      bien: BIENES[(i * 3 + (i % 2)) % BIENES.length] as string,
+    }));
+  }, []);
 
   /*
    * LA BARRA DEL BANCO, con una regla de mentira.
@@ -342,29 +531,89 @@ function Banco(): JSX.Element {
    * partida de verdad lo dirá el juego mirando lo que el jugador puede pagar, y esto no
    * cambia: la escena ya enseña apagado lo que no está disponible.
    */
-  const barra = useMemo(
-    () => [
-      { id: 'poblado', modelo: modeloDePieza('poblado', 'red'), disponible: true },
-      { id: 'ciudad', modelo: modeloDePieza('ciudad', 'red'), disponible: true },
-      { id: 'puente', modelo: MODELO.puente, disponible: true },
-      { id: 'torre', modelo: modeloDeTorre('red'), disponible: false },
-    ],
-    [],
+  /*
+   * LA VISTA DE RIBERAS QUE MIRA EL BANCO, y por qué esto sustituyó a dos listas.
+   *
+   * ═══ LO QUE HABÍA, Y LO QUE SE VEÍA EN PANTALLA ═══
+   *
+   * Había dos reglas de mentira escritas aquí: `libres` —los vértices sin obra— y
+   * `aristasLibres` —todas las aristas, sin filtrar nada—. Con eso, agarrar el castillo
+   * ofrecía plantarlo en mitad del campo, la casa se ofrecía pegada a otra casa, y el
+   * puente cabía en cualquier sitio. Y soltases donde soltases se construía un poblado,
+   * porque quien montaba la obra no miraba qué se había agarrado.
+   *
+   * La escena no tuvo nunca la culpa: `escenas/sitios.ts` dice que la legalidad llega de
+   * fuera y que la escena no opina, y hacía exactamente eso. Quien mentía era esto.
+   *
+   * ═══ AHORA SE PREGUNTA, Y SE PREGUNTA A QUIEN SABE ═══
+   *
+   * `obraPosible` reparte por piezas lo que devuelve `opcionesDeRiberas`, que es la MISMA
+   * lista que el reductor exige por su portillo antes de aceptar un movimiento. No hay una
+   * sola regla de catán escrita en este fichero ni en `escenas/`: la distancia, el camino
+   * propio y la ciudad-sobre-poblado-propio salen de `riberas.ts`, donde ya estaban
+   * escritas y probadas.
+   *
+   * ═══ LO QUE SÍ SE FINGE, DICHO CLARO ═══
+   *
+   * El ESTADO, no las reglas: qué hay construido, de quién, y un almacén con de todo para
+   * que el coste no tape lo que se quiere mirar.
+   */
+  const vistaDelJuego = useMemo(
+    () =>
+      vistaDePrueba(
+        datos.islas.map((i) => i.hex),
+        COLORES.map((color) => ({
+          asiento: color,
+          color,
+          chozas: obras
+            .filter((o) => o.color === color && o.clase === 'poblado')
+            .map((o) => o.vertice),
+          torres: obras
+            .filter((o) => o.color === color && o.clase === 'ciudad')
+            .map((o) => o.vertice),
+          veredas: caminos.filter((c) => c.color === color).map((c) => c.arista),
+        })),
+        quienJuega,
+      ),
+    [datos.islas, obras, caminos, quienJuega],
   );
-  const libres = useMemo(
-    () => todosLosVertices.filter((v) => !obras.some((o) => o.vertice === v)),
-    [obras],
+
+  /** Lo que se puede levantar con cada pieza de la barra, según las reglas de verdad. */
+  const dondeCabe = useMemo(
+    () => ({
+      poblado: obraPosible(vistaDelJuego, quienJuega, 'choza'),
+      ciudad: obraPosible(vistaDelJuego, quienJuega, 'torre'),
+      puente: obraPosible(vistaDelJuego, quienJuega, 'vereda'),
+    }),
+    [vistaDelJuego, quienJuega],
   );
 
   /*
-   * Y LAS ARISTAS, que el puente no va en un vértice.
+   * LA BARRA. Ya no hay ninguna regla de mentira aquí: «disponible» es que HAYA sitio.
    *
-   * Se vio probando: pasarle al puente la lista de vértices lo dejaba con CERO anillos,
-   * porque la escena filtra por clase de sitio y ninguna llave de vértice es una arista.
-   * La escena hizo lo correcto —no inventó nada— y quien decía tonterías era esta regla
-   * de mentira del banco.
+   * Y sale apagado muy a menudo, que es lo correcto y lo que antes no pasaba nunca: al
+   * empezar, el castillo está apagado porque tienes un poblado sin ciudad que levantar
+   * encima —no, espera: lo tienes—; el que sale apagado de verdad es cuando cambias de
+   * jugador a uno que no ha construido nada. Un botón que siempre se puede pulsar no
+   * informa de nada.
    */
-  const aristasLibres = useMemo(() => todasLasAristas, []);
+  const barra = useMemo(
+    () => [
+      {
+        id: 'poblado',
+        modelo: modeloDePieza('poblado', quienJuega),
+        disponible: dondeCabe.poblado.sitios.length > 0,
+      },
+      {
+        id: 'ciudad',
+        modelo: modeloDePieza('ciudad', quienJuega),
+        disponible: dondeCabe.ciudad.sitios.length > 0,
+      },
+      { id: 'puente', modelo: MODELO.puente, disponible: dondeCabe.puente.sitios.length > 0 },
+      { id: 'torre', modelo: modeloDeTorre(quienJuega), disponible: false },
+    ],
+    [dondeCabe, quienJuega],
+  );
 
   /* Los seis vértices de la comarca central, que es donde mira la cámara. */
   const sitios = useMemo(() => {
@@ -382,41 +631,68 @@ function Banco(): JSX.Element {
     );
   }, []);
 
-  const COLORES: readonly ColorDeJugador[] = ['red', 'blue', 'yellow', 'green'];
-
   /* Dónde mira la vista de suelo: el primer vértice de la lista, haya obra o no. */
-  const puntoDeObra = useMemo(
-    () => puntoDeVertice(sitios[0] as string, RADIO_DE_COMARCA),
-    [sitios],
-  );
+  /*
+   * ADÓNDE MIRA LA VISTA DE SUELO: al puente, si hay alguno.
+   *
+   * Miraba a un vértice fijo de la comarca central, y para juzgar la escala de un poblado
+   * valía. Para juzgar un PUENTE no: un puente mide una arista entera —treinta personas— y
+   * el sitio desde donde se ve si está bien tendido es a media arista, no en una punta.
+   * Además es lo único que se puede mirar de cerca para saber si la calzada encaja con el
+   * camino o deja un escalón, que es la pregunta que trae aquí.
+   */
+  const puntoDeObra = useMemo(() => {
+    const primero = caminos[0];
+    if (primero !== undefined) {
+      const [a, b] = verticesDeArista(primero.arista);
+      if (a !== undefined && b !== undefined) {
+        const pa = puntoDeVertice(a, RADIO_DE_COMARCA);
+        const pb = puntoDeVertice(b, RADIO_DE_COMARCA);
+        return { x: (pa.x + pb.x) / 2, y: (pa.y + pb.y) / 2 };
+      }
+    }
+    return puntoDeVertice(sitios[0] as string, RADIO_DE_COMARCA);
+  }, [caminos, sitios]);
 
+  /*
+   * LOS ATAJOS DEL PANEL, que ahora tampoco inventan.
+   *
+   * Fundaban y mejoraban donde les parecía —el primer vértice de una lista, el primer
+   * poblado que encontraran— sin mirar si era legal. Ahora usan el PRIMER SITIO LEGAL de
+   * la misma lista que usan los anillos, así que un atajo no puede montar una posición
+   * que el juego no habría permitido. Si no hay ninguno, no hacen nada.
+   */
   function fundar(): void {
-    ponerObras((antes) => {
-      const sitio = sitios[antes.length % sitios.length];
-      if (sitio === undefined || antes.length >= sitios.length) return antes;
-      return [
-        ...antes,
-        {
-          vertice: sitio,
-          clase: 'poblado',
-          color: COLORES[antes.length % COLORES.length] as ColorDeJugador,
-        },
-      ];
-    });
+    const donde = dondeCabe.poblado.sitios[0];
+    if (donde === undefined) return;
+    ponerObras((antes) => [
+      ...antes,
+      { vertice: donde.llave as LlaveDeVertice, clase: 'poblado', color: quienJuega },
+    ]);
   }
 
   function mejorar(): void {
-    ponerObras((antes) => {
-      const i = antes.findIndex((o) => o.clase === 'poblado');
-      if (i < 0) return antes;
-      const copia = antes.slice();
-      copia[i] = { ...(antes[i] as PiezaEn3D), clase: 'ciudad' };
-      return copia;
-    });
+    const donde = dondeCabe.ciudad.sitios[0];
+    if (donde === undefined) return;
+    ponerObras((antes) =>
+      antes.map((o) => (o.vertice === donde.llave ? { ...o, clase: 'ciudad' as const } : o)),
+    );
   }
 
+  function tender(): void {
+    const donde = dondeCabe.puente.sitios[0];
+    if (donde === undefined) return;
+    ponerCaminos((antes) => [
+      ...antes,
+      { arista: donde.llave as LlaveDeArista, color: quienJuega },
+    ]);
+  }
+
+  /* Derribar vuelve a la APERTURA, no al vacío: sin nada puesto no hay nada legal. */
   function derribar(): void {
-    ponerObras([]);
+    const limpio = aperturaDePrueba();
+    ponerObras(limpio.piezas);
+    ponerCaminos(limpio.caminos);
   }
 
   return (
@@ -453,7 +729,7 @@ function Banco(): JSX.Element {
         <Camara
           vista={vista}
           alcance={alcance}
-          quieta={quieta}
+          girando={girando}
           relieve={relieve}
           mirandoA={puntoDeObra}
           alAndar={(s) => {
@@ -473,24 +749,64 @@ function Banco(): JSX.Element {
               semilla={semilla}
               colocando={colocando}
               barra={barra}
+              mano={mano}
+              cogida={cogida}
+              onCogerCarta={(c) => ponerCogida((antes) => (antes === c.id ? null : c.id))}
+              seCambianPor={
+                cogida === null
+                  ? []
+                  : ['madera', 'ladrillo', 'mineral', 'lana', 'grano'].filter(
+                      (b) => b !== mano.find((c) => c.id === cogida)?.bien,
+                    )
+              }
+              onProponerTrueque={(bien) => {
+                const doy = mano.find((c) => c.id === cogida)?.bien ?? '?';
+                ponerTrueque(`${doy} por ${bien}`);
+                ponerCogida(null);
+              }}
               tomada={tomada}
               onTomarDeLaBarra={(id) => {
+                /*
+                 * LA CLASE NO SE ESCRIBE: SE DEDUCE DE LAS LLAVES.
+                 *
+                 * Antes se escribía a mano —«si es el puente, aristas; si no, vértices»— y
+                 * ése fue el fallo que dejó al puente con cero anillos el día que se le
+                 * pasó la lista equivocada: el par (clase, llaves) puede no cuadrar, y
+                 * cuando no cuadra la escena filtra bien y no sale nada, sin un error en
+                 * ninguna consola. `obraPosible` saca la clase del prefijo de las propias
+                 * llaves, así que ese desajuste ya no se puede escribir.
+                 */
+                const cual = dondeCabe[id as keyof typeof dondeCabe] as ObraPosible | undefined;
+                if (cual === undefined || cual.clase === null) return;
                 ponerTomada(id);
-                ponerColocando(
-                  id === 'puente'
-                    ? { clase: 'arista', donde: aristasLibres }
-                    : { clase: 'vertice', donde: libres },
-                );
+                ponerColocando({ clase: cual.clase, donde: cual.sitios.map((x) => x.llave) });
               }}
               onElegirSitio={(sitio) => {
-                ponerObras((antes) => [
-                  ...antes,
-                  {
-                    vertice: sitio.llave as LlaveDeVertice,
-                    clase: 'poblado',
-                    color: COLORES[antes.length % COLORES.length] as ColorDeJugador,
-                  },
-                ]);
+                /*
+                 * QUÉ SE LEVANTA LO DICE LA PIEZA AGARRADA, no el sitio.
+                 *
+                 * Antes esto plantaba SIEMPRE un poblado, agarrases lo que agarrases. Se
+                 * vio en el acto —«sólo se construye un poblado»— y era esta línea: el
+                 * sitio que montaba la obra no miraba `tomada`.
+                 */
+                if (tomada === 'poblado') {
+                  ponerObras((antes) => [
+                    ...antes,
+                    { vertice: sitio.llave as LlaveDeVertice, clase: 'poblado', color: quienJuega },
+                  ]);
+                } else if (tomada === 'ciudad') {
+                  /* La ciudad SUSTITUYE al poblado: no se planta una segunda pieza encima. */
+                  ponerObras((antes) =>
+                    antes.map((o) =>
+                      o.vertice === sitio.llave ? { ...o, clase: 'ciudad' as const } : o,
+                    ),
+                  );
+                } else if (tomada === 'puente') {
+                  ponerCaminos((antes) => [
+                    ...antes,
+                    { arista: sitio.llave as LlaveDeArista, color: quienJuega },
+                  ]);
+                }
                 ponerColocando(null);
                 ponerTomada(null);
               }}
@@ -538,6 +854,19 @@ function Banco(): JSX.Element {
               {dibujo.triangulos.toLocaleString('es-ES')} triángulos · {dibujo.llamadas} llamadas de
               dibujo
             </div>
+            {/*
+              * LO QUE LAS REGLAS PERMITEN AHORA MISMO, en números.
+              *
+              * Un anillo verde en el tablero se ve, pero contarlos a ojo entre tres millones
+              * de triángulos no se puede — y la pregunta que importa al mirar este banco es
+              * justamente cuántos sitios hay y si cambian al cambiar de jugador. Esto lo
+              * dice, y sale de la MISMA lista que pinta los anillos, así que no puede
+              * discrepar de lo que se ve.
+              */}
+            <div style={{ color: '#9fe6b8' }}>
+              {quienJuega} puede: poblado {dondeCabe.poblado.sitios.length} · ciudad{' '}
+              {dondeCabe.ciudad.sitios.length} · puente {dondeCabe.puente.sitios.length}
+            </div>
             {vista === 'suelo' ? (
               <div>
                 Andando: {andado} s de los{' '}
@@ -550,15 +879,42 @@ function Banco(): JSX.Element {
           <button
             type="button"
             onClick={() =>
-              ponerColocando((antes) =>
-                antes === null ? { clase: 'vertice', donde: libres } : null,
-              )
+              ponerColocando((antes) => {
+                if (antes !== null) return null;
+                if (dondeCabe.poblado.clase === null) return null;
+                ponerTomada('poblado');
+                return {
+                  clase: dondeCabe.poblado.clase,
+                  donde: dondeCabe.poblado.sitios.map((x) => x.llave),
+                };
+              })
             }
             style={BOTON}
           >
-            {colocando === null ? `Colocar poblado (${String(libres.length)})` : 'Dejarlo'}
+            {colocando === null
+              ? `Colocar poblado (${String(dondeCabe.poblado.sitios.length)})`
+              : 'Dejarlo'}
           </button>
-          <button type="button" onClick={fundar} style={BOTON}>
+          {trueque !== null && (
+          <div style={{ color: '#9fe6b8', marginBottom: 8 }}>Trueque propuesto: {trueque}</div>
+        )}
+        <button
+          type="button"
+          onClick={() => {
+            ponerQuienJuega(
+              (q) => COLORES[(COLORES.indexOf(q) + 1) % COLORES.length] as ColorDeJugador,
+            );
+            ponerColocando(null);
+            ponerTomada(null);
+          }}
+          style={{ ...BOTON, borderColor: COLOR_EN_PANTALLA[quienJuega] }}
+        >
+          Juega: {quienJuega}
+        </button>
+        <button type="button" onClick={tender} style={BOTON}>
+          Tender puente
+        </button>
+        <button type="button" onClick={fundar} style={BOTON}>
             Fundar poblado
           </button>
           <button type="button" onClick={mejorar} style={BOTON}>
@@ -591,11 +947,11 @@ function Banco(): JSX.Element {
           <button
             type="button"
             onClick={() => {
-              ponerQuieta((q) => !q);
+              ponerGirando((g) => !g);
             }}
             style={BOTON}
           >
-            {quieta ? 'Seguir' : 'Parar'}
+            {girando ? 'Parar' : 'Dar una vuelta'}
           </button>
         </div>
       </div>
