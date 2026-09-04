@@ -213,7 +213,7 @@ const estilos = StyleSheet.create({
   rail: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    gap: CUENTA_DE_AFORO.huecoDestacada,
+    gap: CUENTA_DE_AFORO.hueco,
     height: 19,
     borderBottomWidth: 1,
     borderBottomColor: SALA.filo,

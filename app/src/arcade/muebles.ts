@@ -386,7 +386,14 @@ export const LETRA = {
    * abierto, que es lo que hace de cartel sin condensada.
    */
   rotulo: { fontWeight: '800', letterSpacing: 1.4, textTransform: 'uppercase' },
-  /** Los rótulos pequeños: AFORO, SEDE, RITMO, y las especificaciones. */
+  /**
+   * Los rótulos pequeños y las cápsulas: la pastilla de estado de la portada y los
+   * rótulos de las pantallas de dentro de partida.
+   *
+   * Decía «AFORO, SEDE, RITMO», que eran las tres columnas de la tabla que la
+   * tarjeta de la Sala tuvo hasta que pasó a retrato. Esos tres datos siguen
+   * estando, pero ahora son una frase en el pie y van en `cuerpo`.
+   */
   rotuloChico: { fontWeight: '600', letterSpacing: 1.6, textTransform: 'uppercase' },
   /** El gancho y las frases que se leen de cerca. */
   cuerpo: { fontWeight: '500', letterSpacing: 0 },
@@ -423,17 +430,39 @@ export const CUENTA_DE_AFORO = {
   /** Ancho de cada muesca. */
   grosor: 3,
   /** Alto de una encendida y de una apagada: la diferencia es la que se lee. */
-  altoEncendida: 16,
+  altoEncendida: 15,
   altoApagada: 7,
-  /** Separación entre muescas en la ficha destacada y en las de la hilera. */
-  huecoDestacada: 22,
-  huecoHilera: 19,
+  /*
+   * SEPARACIÓN ENTRE MUESCAS. Era 22, y son 13 desde que el raíl se metió DENTRO
+   * de la portada de la tarjeta: ahí dispone de los 210 útiles de una tarjeta de
+   * 252 y no del ancho entero de una ficha de 378. Con 22, un aforo de doce medía
+   * 278 y se salía; con 13 mide 179 y cabe con holgura.
+   *
+   * ES UNA SOLA Y NO DOS. Había `huecoDestacada` y `huecoHilera` porque la Sala
+   * era una pila con la primera tarjeta más grande. En un carrusel todas las
+   * tarjetas miden lo mismo, así que dos valores serían dos nombres para el
+   * mismo número esperando a divergir.
+   *
+   * Lo que NO cede sigue siendo el número de muescas —el raíl cuenta o no sirve
+   * para nada—, que es la regla que gobierna `huecoDelRail`.
+   */
+  hueco: 13,
 } as const;
 
 /** Los redondeos de la Sala. Pocos y con un trabajo cada uno. */
 export const RADIO = {
-  /** Una ficha de máquina. */
+  /** Una ficha de máquina: un panel de dentro de una partida. */
   ficha: 14,
+  /*
+   * UNA TARJETA DE LA SALA, Y ES MÁS REDONDA QUE UN PANEL A PROPÓSITO.
+   *
+   * Son los 20 de la tarjeta de velada del carrusel de la portada, copiados a
+   * conciencia: las dos viven en la misma pantalla, a un dedo de distancia, y
+   * ahí un radio distinto no se lee como dos familias sino como un descuido.
+   * Los paneles de DENTRO de una partida siguen en 14 porque nadie los ve al
+   * lado de una velada.
+   */
+  tarjeta: 20,
   /** Un botón, una pastilla, el marcador. */
   mando: 8,
 } as const;

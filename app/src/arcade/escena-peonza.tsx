@@ -382,7 +382,7 @@ const estilos = StyleSheet.create({
     marginTop: 12,
     borderBottomWidth: 1,
     borderBottomColor: SALA.filo,
-    gap: CUENTA_DE_AFORO.huecoHilera,
+    gap: CUENTA_DE_AFORO.hueco,
   },
   muesca: { width: CUENTA_DE_AFORO.grosor, borderRadius: 2 },
   muescaEncendida: { height: CUENTA_DE_AFORO.altoEncendida, backgroundColor: SALA.acento },
