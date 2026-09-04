@@ -49,6 +49,15 @@ import { CAUCE, CUERPO, piezaDeOrilla } from '../aguas';
 import { piezasDeAsentamiento } from '../asentamiento';
 import { sitiosDelTablero, sitiosPermitidos } from '../sitios';
 import { dentroDelHueco, huecosDeLaBarra, loQueSeVe } from '../barra';
+import {
+  areasDeTrueque,
+  enLaZonaDeLaMano,
+  huecosDeLaBaraja,
+  loQueSeVeEnLaBaraja,
+  manoPorGrupos,
+} from '../baraja';
+import { cuantosTriangulos, geometriaDeContornos } from '../formas';
+import { BIENES_CON_ICONO, CONTORNOS_DEL_BIEN } from '../iconos';
 import { MODELO, modeloDePieza } from '../modelos';
 import { RADIO_DE_COMARCA, RADIO_DE_TESELA } from '../escala';
 import { laMarinaDelMundo } from '../marina';
@@ -566,6 +575,192 @@ paso('El mundo cubre los cincuenta y cuatro vértices donde se construye');
 // ---------------------------------------------------------------------------
 
 /**
+ * LA BARAJA DEL LATERAL: que quepa, que asome y que el iman reparta.
+ *
+ * De las tres piezas de interfaz esta es la que mas puede romperse en silencio, porque
+ * su gracia esta en una CURVA y una curva mal puesta sigue dibujando algo. El iman tiene
+ * que tirar mas de la carta señalada que de sus vecinas y mas de las vecinas que de las
+ * lejanas: si tirara igual de todas seria como no tenerlo, y si tirara solo de una se
+ * leeria como un interruptor. Eso se comprueba con numeros o no se comprueba.
+ *
+ * Y lo otro que se mira es lo aburrido: que con una carta y con veinte la mano siga
+ * cabiendo en el alto de la pantalla, y que en reposo asome de todas una franja — si no
+ * asoma nada, no hay nada que coger.
+ */
+paso('La mano se agrupa por bien, cabe, asoma y el imán reparte');
+{
+  const CAMPO = (45 * Math.PI) / 180;
+  const PANTALLAS: Array<[string, number]> = [
+    ['monitor', 16 / 9],
+    ['móvil de pie', 9 / 19.5],
+  ];
+  const BIENES = ['madera', 'ladrillo', 'lana', 'grano', 'mineral'];
+  const manoDe = (cuantas: number): Array<{ id: string; bien: string }> =>
+    Array.from({ length: cuantas }, (_, i) => ({
+      id: `c${String(i)}`,
+      /* A propósito desordenada: el reparto tiene que agruparla él. */
+      bien: BIENES[(i * 3 + (i % 2)) % BIENES.length] ?? 'madera',
+    }));
+
+  const malas: string[] = [];
+  for (const [nombre, proporcion] of PANTALLAS) {
+    const { alto, ancho } = loQueSeVeEnLaBaraja(CAMPO, proporcion);
+    for (const cuantas of [1, 3, 7, 14, 20]) {
+      const puestas = huecosDeLaBaraja(manoDe(cuantas), CAMPO, proporcion, null);
+      if (puestas.length !== cuantas) {
+        malas.push(`${nombre}/${String(cuantas)}: salen ${String(puestas.length)}`);
+      }
+      for (const c of puestas) {
+        if (Math.abs(c.hueco.y) + c.hueco.alto / 2 > alto / 2 + 1e-9) {
+          malas.push(`${nombre}/${String(cuantas)}: se sale por arriba o por abajo`);
+        }
+        /* Y de todas asoma algo: el borde izquierdo cae dentro de la pantalla. */
+        if (c.hueco.x - c.hueco.ancho / 2 >= ancho / 2 - 1e-9) {
+          malas.push(`${nombre}/${String(cuantas)}: una carta no asoma nada`);
+        }
+      }
+    }
+  }
+  comprobar('la mano cabe y asoma con una carta y con veinte', malas.length === 0, malas.slice(0, 4));
+
+  /*
+   * AGRUPADA POR BIEN, que es lo que la hace legible de un vistazo.
+   *
+   * Se comprueban las tres cosas que hacen que un grupo SEA un grupo: que las cartas
+   * iguales salgan seguidas, que dos manos con el mismo contenido salgan idénticas
+   * aunque hayan llegado en distinto orden, y que el salto entre grupos se vea —si el
+   * hueco entre dos bienes fuera igual que el de dentro, estarían agrupadas en los
+   * números y no en la pantalla, que es donde importa.
+   */
+  const revuelta = manoDe(11);
+  const puestas = huecosDeLaBaraja(revuelta, CAMPO, 16 / 9, null);
+  const seguidas = puestas.map((c) => c.carta.bien);
+  const vistos = new Set<string>();
+  let cortadas = 0;
+  for (let i = 0; i < seguidas.length; i++) {
+    const bien = seguidas[i] as string;
+    if (i > 0 && seguidas[i - 1] !== bien && vistos.has(bien)) cortadas++;
+    vistos.add(bien);
+  }
+  comprobar('las cartas del mismo bien salen seguidas', cortadas === 0, { cortadas, seguidas });
+
+  const alReves = [...revuelta].reverse();
+  comprobar(
+    'y dos manos con las mismas cartas salen iguales aunque lleguen en otro orden',
+    JSON.stringify(manoPorGrupos(revuelta).map((c) => c.bien)) ===
+      JSON.stringify(manoPorGrupos(alReves).map((c) => c.bien)),
+  );
+
+  let dentro = Infinity;
+  let entre = 0;
+  for (let i = 1; i < puestas.length; i++) {
+    const salto = Math.abs((puestas[i] as (typeof puestas)[number]).hueco.y -
+      (puestas[i - 1] as (typeof puestas)[number]).hueco.y);
+    if ((puestas[i] as (typeof puestas)[number]).abreGrupo) entre = Math.max(entre, salto);
+    else dentro = Math.min(dentro, salto);
+  }
+  comprobar(
+    'y el salto entre grupos se ve: al menos el doble que el de dentro',
+    entre > dentro * 2,
+    { dentro: Number(dentro.toFixed(4)), entre: Number(entre.toFixed(4)) },
+  );
+
+  /*
+   * EL ORDEN DE DIBUJO, que es lo que arregló el icono suelto de la carta de al lado.
+   *
+   * Las cartas se solapan y están todas a la misma distancia, así que sin un orden
+   * escrito el pintor elige el que quiere. Se exige que sea ESTRICTAMENTE creciente y con
+   * hueco suficiente para las tres capas de cada carta: si dos cartas compartieran número,
+   * volvería a decidir el azar.
+   */
+  let malOrden = 0;
+  for (let i = 1; i < puestas.length; i++) {
+    const a = (puestas[i - 1] as (typeof puestas)[number]).hueco.orden;
+    const b = (puestas[i] as (typeof puestas)[number]).hueco.orden;
+    if (b - a < 3) malOrden++;
+  }
+  comprobar(
+    'cada carta tiene su propio orden de dibujo, con sitio para sus tres capas',
+    malOrden === 0,
+    { pares: malOrden },
+  );
+
+  /* El imán, medido sobre una mano de nueve apuntando a la del medio. */
+  const nueve = manoDe(9);
+  const quieta = huecosDeLaBaraja(nueve, CAMPO, 16 / 9, null);
+  const centro = quieta[4];
+  const tirada =
+    centro === undefined ? [] : huecosDeLaBaraja(nueve, CAMPO, 16 / 9, centro.hueco.y);
+  const sale = (i: number): number => {
+    const a = quieta[i];
+    const b = tirada[i];
+    return a === undefined || b === undefined ? 0 : a.hueco.x - b.hueco.x;
+  };
+  comprobar(
+    'el imán tira más de la carta señalada que de sus vecinas, y de éstas más que de las lejanas',
+    sale(4) > sale(3) && sale(3) > sale(2) && sale(2) > sale(1) && sale(1) > sale(0),
+    [0, 1, 2, 3, 4].map((i) => Number(sale(i).toFixed(4))),
+  );
+  comprobar(
+    'y con el cursor fuera de la mano no tira de ninguna',
+    quieta.every((c) => c.hueco.iman === 0),
+  );
+  comprobar(
+    'la mano despierta al acercarse por el borde derecho y no en el centro',
+    enLaZonaDeLaMano(1.4, CAMPO, 16 / 9) && !enLaZonaDeLaMano(0, CAMPO, 16 / 9),
+  );
+
+  /* Las áreas de trueque: una por bien, sin pisarse y dentro de la pantalla. */
+  const { alto } = loQueSeVeEnLaBaraja(CAMPO, 16 / 9);
+  const areas = areasDeTrueque(5, CAMPO, 16 / 9);
+  let pisan = 0;
+  for (let i = 0; i < areas.length; i++) {
+    const a = areas[i];
+    if (a === undefined) continue;
+    if (Math.abs(a.y) + a.alto / 2 > alto / 2 + 1e-9) pisan++;
+    for (let j = i + 1; j < areas.length; j++) {
+      const b = areas[j];
+      if (b !== undefined && Math.abs(a.y - b.y) < (a.alto + b.alto) / 2 - 1e-9) pisan++;
+    }
+  }
+  comprobar('las cinco áreas de trueque caben y no se pisan', areas.length === 5 && pisan === 0, {
+    areas: areas.length,
+    pisan,
+  });
+  comprobar('y sin bienes que pedir no hay ni un área', areasDeTrueque(0, CAMPO, 16 / 9).length === 0);
+
+  /* Y los cinco bienes tienen icono, y ninguno sale vacío al convertirlo a triángulos. */
+  const sinIcono = ['madera', 'ladrillo', 'lana', 'grano', 'mineral'].filter(
+    (b) => !BIENES_CON_ICONO.includes(b),
+  );
+  comprobar('los cinco bienes tienen icono compilado', sinIcono.length === 0, sinIcono);
+
+  const rotos: string[] = [];
+  for (const bien of BIENES_CON_ICONO) {
+    const g = geometriaDeContornos(CONTORNOS_DEL_BIEN[bien] ?? []);
+    if (g === null) {
+      rotos.push(`${bien}: no da geometría`);
+      continue;
+    }
+    const caja = g.boundingBox;
+    if (caja === null) {
+      rotos.push(`${bien}: sin caja`);
+      continue;
+    }
+    const lado = Math.max(caja.max.x - caja.min.x, caja.max.y - caja.min.y);
+    if (Math.abs(lado - 1) > 1e-6) rotos.push(`${bien}: lado ${lado.toFixed(3)} y no 1`);
+    if (cuantosTriangulos(g) < 8) rotos.push(`${bien}: sólo ${String(cuantosTriangulos(g))} triángulos`);
+  }
+  comprobar(
+    'y los cinco se convierten en triángulos, encajados en el mismo cuadrado',
+    rotos.length === 0,
+    rotos,
+  );
+}
+
+// ---------------------------------------------------------------------------
+
+/**
  * LOS SITIOS Y LA BARRA: lo que se puede pulsar y lo que se puede coger.
  *
  * Son las dos listas de las que cuelga la interfaz de juego, y las dos se pueden contar
@@ -903,7 +1098,7 @@ if (fallos.length > 0) {
  * a veintitrés: durante ese tiempo el guion podía morirse en la novena sin que nadie se
  * enterara. Un guardia desfasado no guarda nada.
  */
-const COMPROBACIONES_ESCRITAS = 42;
+const COMPROBACIONES_ESCRITAS = 54;
 if (hechas < COMPROBACIONES_ESCRITAS) {
   console.error(
     `Solo se han hecho ${hechas} de las ${COMPROBACIONES_ESCRITAS} comprobaciones que ` +

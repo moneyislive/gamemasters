@@ -27,6 +27,7 @@ export {
   PIEZAS_DE_COLOR,
   NOMBRE_QUE_SOBREVIVE,
   modeloDeBandera,
+  modeloDeBien,
   modeloDeBarco,
   modeloDeMuelle,
   modeloDePieza,

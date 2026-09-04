@@ -334,6 +334,23 @@ function Banco(): JSX.Element {
    */
   const [colocando, ponerColocando] = useState<Colocando | null>(null);
   const [tomada, ponerTomada] = useState<string | null>(null);
+  const [cogida, ponerCogida] = useState<string | null>(null);
+  const [trueque, ponerTrueque] = useState<string | null>(null);
+
+  /*
+   * UNA MANO DE MENTIRA PARA EL BANCO.
+   *
+   * Once cartas repartidas entre los cinco bienes, que es una mano de catan a mitad de
+   * partida: suficientes para que se solapen y el iman tenga trabajo. En la partida de
+   * verdad esto llega del servidor.
+   */
+  const mano = useMemo(() => {
+    const BIENES = ['madera', 'ladrillo', 'mineral', 'lana', 'grano'];
+    return Array.from({ length: 11 }, (_, i) => ({
+      id: `c${String(i)}`,
+      bien: BIENES[(i * 3 + (i % 2)) % BIENES.length] as string,
+    }));
+  }, []);
 
   /*
    * LA BARRA DEL BANCO, con una regla de mentira.
@@ -473,6 +490,21 @@ function Banco(): JSX.Element {
               semilla={semilla}
               colocando={colocando}
               barra={barra}
+              mano={mano}
+              cogida={cogida}
+              onCogerCarta={(c) => ponerCogida((antes) => (antes === c.id ? null : c.id))}
+              seCambianPor={
+                cogida === null
+                  ? []
+                  : ['madera', 'ladrillo', 'mineral', 'lana', 'grano'].filter(
+                      (b) => b !== mano.find((c) => c.id === cogida)?.bien,
+                    )
+              }
+              onProponerTrueque={(bien) => {
+                const doy = mano.find((c) => c.id === cogida)?.bien ?? '?';
+                ponerTrueque(`${doy} por ${bien}`);
+                ponerCogida(null);
+              }}
               tomada={tomada}
               onTomarDeLaBarra={(id) => {
                 ponerTomada(id);
@@ -558,7 +590,10 @@ function Banco(): JSX.Element {
           >
             {colocando === null ? `Colocar poblado (${String(libres.length)})` : 'Dejarlo'}
           </button>
-          <button type="button" onClick={fundar} style={BOTON}>
+          {trueque !== null && (
+          <div style={{ color: '#9fe6b8', marginBottom: 8 }}>Trueque propuesto: {trueque}</div>
+        )}
+        <button type="button" onClick={fundar} style={BOTON}>
             Fundar poblado
           </button>
           <button type="button" onClick={mejorar} style={BOTON}>

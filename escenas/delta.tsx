@@ -95,6 +95,7 @@ import {
 } from './escala';
 import {
   CELDA_DE_LA_NIEVE,
+  colorDelBien,
   desplazamientoDeCelda,
   desplazamientoDeColor,
   esDeLaHierba,
@@ -102,7 +103,13 @@ import {
   puntosDeLaCifra,
   terrenoDe,
 } from './paleta';
-import { COLORES_DE_JUGADOR, MODELO, modeloDeMuelle, PIEZAS_DE_COLOR } from './modelos';
+import {
+  COLORES_DE_JUGADOR,
+  MODELO,
+  modeloDeBien,
+  modeloDeMuelle,
+  PIEZAS_DE_COLOR,
+} from './modelos';
 import { laMarinaDelMundo } from './marina';
 import type { CatalogoDeModelos } from './modelos';
 import { cuantoHaSalido, piezasDeAsentamiento } from './asentamiento';
@@ -113,8 +120,17 @@ import type { Relieve, Subtesela } from './relieve';
 import { apuntaLosLados, piezaDeCauce, piezaDeSenda, teselasDeUnCamino } from './sendas';
 import { CAUCE, CUERPO, HONDO, piezaDeOrilla } from './aguas';
 import { CELDA_DE_LA_ARENA } from './paleta';
+import { geometriaDeContornos } from './formas';
+import { CONTORNOS_DEL_BIEN } from './iconos';
 import { sitiosDelTablero, sitiosPermitidos } from './sitios';
 import { DISTANCIA_DE_LA_BARRA, huecosDeLaBarra } from './barra';
+import {
+  areasDeTrueque,
+  enLaZonaDeLaMano,
+  huecosDeLaBaraja,
+  loQueSeVeEnLaBaraja,
+} from './baraja';
+import type { CartaEnLaMano, HuecoDeCarta } from './baraja';
 import type { HuecoDeLaBarra, PiezaDeBarra } from './barra';
 import type { Colocando, Sitio } from './sitios';
 import type { CaminoEn3D, DeltaEn3D, IslaEn3D, PiezaEn3D } from './tipos';
@@ -133,6 +149,23 @@ const COLOR_DEL_NUMERO = '#efe6cd';
  * debajo — y va en material básico, sin luz, para que tampoco se apague en sombra.
  */
 const COLOR_DE_LA_SENAL = '#39ff14';
+
+/**
+ * EL ORDEN DE DIBUJO DE LAS CAPAS QUE VAN PEGADAS A LA CÁMARA.
+ *
+ * Están juntas y escritas de una vez porque son un mismo apilamiento y sólo se entienden
+ * en relación unas con otras. Sueltas por el fichero, cada número parece arbitrario y el
+ * día que dos se crucen nadie sabe cuál mover.
+ *
+ * De atrás adelante: el mundo, la barra de construir, la mano, y encima de todo las áreas
+ * de trueque — que sólo salen mientras se arrastra una carta y tienen que poder taparla.
+ *
+ * El hueco que se le deja a la mano no es capricho: cada carta gasta diez para sus tres
+ * capas y hasta trescientos más si el imán tira de ella, que es lo que la trae al frente.
+ */
+const ORDEN_DE_LA_BARRA = 1000;
+const ORDEN_DE_LAS_CARTAS = 1010;
+const ORDEN_DE_LAS_AREAS = 2000;
 const COLOR_DEL_PUNTO = '#2a2118';
 
 /** El plano de la malla puesto en el mundo: la `y` del tablero es la `z`. */
@@ -745,19 +778,7 @@ function PiezaEnLaBarra({
    * apoyadas y otras medio hundidas, y parece un fallo de dibujo cuando es un fallo de
    * suposición.
    */
-  const { talla, pies } = useMemo(() => {
-    let alto = 0;
-    let bajo = Infinity;
-    for (const m of mallas) {
-      m.geometria.computeBoundingBox();
-      const caja = m.geometria.boundingBox;
-      if (caja === null) continue;
-      alto = Math.max(alto, caja.max.y - caja.min.y);
-      bajo = Math.min(bajo, caja.min.y);
-    }
-    const t = alto > 0 ? (hueco.lado * 0.62) / alto : 1;
-    return { talla: t, pies: Number.isFinite(bajo) ? -bajo * t : 0 };
-  }, [mallas, hueco.lado]);
+  const encaje = useMemo(() => encajeEnUnCuadrado(mallas, hueco.lado * 0.62), [mallas, hueco.lado]);
 
   useFrame((estado) => {
     const g = grupo.current;
@@ -766,9 +787,11 @@ function PiezaEnLaBarra({
     g.rotation.y = t * 0.5;
     const crece = encima || tomada ? 1.18 : 1;
     const sube = encima || tomada ? hueco.lado * 0.12 : 0;
+    g.position.x = encaje.centro[0] * crece;
+    g.position.z = encaje.centro[2] * crece;
     g.position.y =
-      -hueco.lado * 0.34 + pies * crece + sube + (tomada ? Math.sin(t * 6) * hueco.lado * 0.03 : 0);
-    g.scale.setScalar(talla * crece);
+      encaje.centro[1] * crece + sube + (tomada ? Math.sin(t * 6) * hueco.lado * 0.03 : 0);
+    g.scale.setScalar(encaje.talla * crece);
   });
 
   return (
@@ -881,7 +904,7 @@ function Barra({
   );
 
   return (
-    <group ref={grupo} renderOrder={1000}>
+    <group ref={grupo} renderOrder={ORDEN_DE_LA_BARRA}>
       {/*
        * El testigo que borra la profundidad. No escribe color y no recibe rayos: sólo
        * está para que el pintor pase por él justo antes de la barra.
@@ -937,6 +960,441 @@ function Barra({
   );
 }
 
+/**
+ * CUANTO HAY QUE ESCALAR Y MOVER UN MODELO PARA QUE QUEPA CENTRADO EN UN CUADRADO.
+ *
+ * ═══ POR QUE NO BASTA CON MIRAR EL ALTO ═══
+ *
+ * La primera version escalaba por la ALTURA de la caja, y en pantalla las piezas salian
+ * de tamaños dispares: un fardo ancho y bajo se hacia enorme —su altura es pequeña, asi
+ * que la cuenta lo agrandaba hasta que su altura llenaba el hueco, y su anchura se salia
+ * por los lados— mientras que una torre alta y estrecha salia diminuta.
+ *
+ * Lo que hay que igualar no es una dimension: es la CAJA. Se escala por el lado mayor de
+ * las tres, y asi ninguna pieza se sale y todas ocupan aproximadamente lo mismo.
+ *
+ * ═══ Y POR QUE TAMBIEN HAY QUE MOVERLO ═══
+ *
+ * Porque los modelos del pack no tienen su origen en su centro ni en el mismo sitio unos
+ * que otros: unos lo tienen en la base, el puente por el medio, y alguno desplazado. Sin
+ * recentrar, dos piezas "del mismo tamaño" salen una arriba y otra abajo de su hueco.
+ *
+ * Devuelve el centro de la caja YA ESCALADO y con el signo cambiado, que es lo que hay
+ * que sumarle a la posicion para que la pieza quede centrada.
+ */
+function encajeEnUnCuadrado(
+  mallas: readonly Instanciable[] | undefined,
+  lado: number,
+): { talla: number; centro: [number, number, number] } {
+  if (mallas === undefined || mallas.length === 0) {
+    return { talla: 1, centro: [0, 0, 0] };
+  }
+  let minX = Infinity;
+  let minY = Infinity;
+  let minZ = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  let maxZ = -Infinity;
+  for (const m of mallas) {
+    m.geometria.computeBoundingBox();
+    const caja = m.geometria.boundingBox;
+    if (caja === null) continue;
+    minX = Math.min(minX, caja.min.x);
+    minY = Math.min(minY, caja.min.y);
+    minZ = Math.min(minZ, caja.min.z);
+    maxX = Math.max(maxX, caja.max.x);
+    maxY = Math.max(maxY, caja.max.y);
+    maxZ = Math.max(maxZ, caja.max.z);
+  }
+  if (!Number.isFinite(minX)) return { talla: 1, centro: [0, 0, 0] };
+
+  const mayor = Math.max(maxX - minX, maxY - minY, maxZ - minZ);
+  const talla = mayor > 0 ? lado / mayor : 1;
+  return {
+    talla,
+    centro: [
+      (-(minX + maxX) / 2) * talla,
+      (-(minY + maxY) / 2) * talla,
+      (-(minZ + maxZ) / 2) * talla,
+    ],
+  };
+}
+
+/**
+ * LA GEOMETRIA DE UNA CARTA: un rectangulo con las esquinas redondeadas.
+ *
+ * `planeGeometry` da un rectangulo de esquinas vivas, y un rectangulo de esquinas vivas
+ * no se lee como una carta: se lee como un panel. Las esquinas redondeadas son la
+ * diferencia entre "esto es un naipe" y "esto es un cuadro de interfaz", y cuestan ocho
+ * lineas de `Shape` del nucleo de three, sin `drei`, que aqui esta prohibido.
+ */
+function formaDeCarta(ancho: number, alto: number): THREE.ShapeGeometry {
+  const r = Math.min(ancho, alto) * 0.12;
+  const x = ancho / 2;
+  const y = alto / 2;
+  const forma = new THREE.Shape();
+  forma.moveTo(-x + r, -y);
+  forma.lineTo(x - r, -y);
+  forma.quadraticCurveTo(x, -y, x, -y + r);
+  forma.lineTo(x, y - r);
+  forma.quadraticCurveTo(x, y, x - r, y);
+  forma.lineTo(-x + r, y);
+  forma.quadraticCurveTo(-x, y, -x, y - r);
+  forma.lineTo(-x, -y + r);
+  forma.quadraticCurveTo(-x, -y, -x + r, -y);
+  return new THREE.ShapeGeometry(forma, 4);
+}
+
+/**
+ * UNA CARTA DE LA MANO.
+ *
+ * Se MUEVE hacia su sitio, no salta a el: el hueco que llega de `baraja.ts` es el
+ * DESTINO, y la carta se acerca un poco cada fotograma. Sin eso, mover el cursor un
+ * pixel teletransporta cinco cartas y el iman se lee como un parpadeo en vez de como
+ * una tela que se levanta.
+ *
+ * El suavizado va con el paso de tiempo y no con una fraccion fija por fotograma: a
+ * treinta imagenes por segundo una fraccion fija va la mitad de rapido que a sesenta, y
+ * la mano se sentiria pastosa justo en el aparato mas lento.
+ */
+function Carta({
+  carta,
+  hueco,
+  cogida,
+  onCoger,
+}: {
+  carta: CartaEnLaMano;
+  hueco: HuecoDeCarta;
+  cogida: boolean;
+  onCoger: (carta: CartaEnLaMano) => void;
+}): JSX.Element {
+  const grupo = useRef<THREE.Group>(null);
+  const [encima, setEncima] = useState(false);
+
+  const geometria = useMemo(
+    () => formaDeCarta(hueco.ancho, hueco.alto),
+    [hueco.ancho, hueco.alto],
+  );
+  const color = useMemo(() => colorDelBien(carta.bien), [carta.bien]);
+
+  /*
+   * EL BIEN, EN SILUETA PLANA Y NO EN MODELO.
+   *
+   * Antes esto ponía la pieza 3D del bien encima de la carta, y estaba mal por dos sitios.
+   * Uno de fondo: los modelos salían de Resource Bits, que es un pack INDUSTRIAL de
+   * ciencia ficción —barriles de combustible, lingotes de cobre— y el grano era
+   * literalmente un palé de madera cubierto. Y otro de forma: una carta es plana, y un
+   * objeto tridimensional encima de ella se lee como un objeto encima de una carta, no
+   * como el dibujo de la carta.
+   *
+   * La silueta llega ya normalizada a un cuadrado de lado uno desde `formas.ts`, así que
+   * aquí sólo hay que escalarla.
+   */
+  const icono = useMemo(
+    () => geometriaDeContornos(CONTORNOS_DEL_BIEN[carta.bien] ?? []),
+    [carta.bien],
+  );
+
+  useFrame((estado, delta) => {
+    const g = grupo.current;
+    if (g === null) return;
+    /*
+     * `1 - e^(-k*dt)` es la fraccion que hay que recorrer para que la constante de
+     * tiempo sea la misma a cualquier ritmo de imagenes. Con una fraccion fija, treinta
+     * fotogramas por segundo tardarian el doble que sesenta.
+     */
+    const cuanto = 1 - Math.exp(-16 * delta);
+    const destinoX = hueco.x - (encima || cogida ? hueco.ancho * 0.1 : 0);
+    g.position.x += (destinoX - g.position.x) * cuanto;
+    g.position.y += (hueco.y - g.position.y) * cuanto;
+    g.rotation.z += (hueco.giro - g.rotation.z) * cuanto;
+    const quiere = 1 + hueco.iman * 0.1 + (encima || cogida ? 0.08 : 0);
+    g.scale.x += (quiere - g.scale.x) * cuanto;
+    g.scale.y = g.scale.x;
+  });
+
+  /*
+   * EL ORDEN DE DIBUJO DE ESTA CARTA Y DE SUS TRES CAPAS.
+   *
+   * ═══ EL FALLO QUE ESTO ARREGLA ═══
+   *
+   * Antes el `renderOrder` estaba en el GRUPO, y en three el `renderOrder` de un grupo no
+   * baja a sus hijos: las tres mallas de cada carta salían con orden cero, todas a la
+   * misma distancia de la cámara, y el pintor las ordenaba como le venía. El resultado se
+   * veía: el icono de una carta dibujado ENCIMA de la carta de al lado, como si el dibujo
+   * no formara parte del naipe.
+   *
+   * No era un problema de capas mal puestas: era que no había capas. Ahora cada malla
+   * lleva su número, y las tres de una carta caben dentro del hueco de diez que le reserva
+   * `baraja.ts` — así ninguna puede colarse entre las de la carta vecina.
+   *
+   * Y se dibuja SIN probar la profundidad, a propósito: la mano es un montón de planos a
+   * la misma distancia, así que el único orden que vale es el que se escribe. Dejar que
+   * decida la profundidad es volver a dejar que decida el azar.
+   *
+   * La carta señalada por el imán salta al frente con un empujón grande: siempre por
+   * encima de toda la mano, para que se vea entera antes de cogerla.
+   */
+  const base =
+    ORDEN_DE_LAS_CARTAS + hueco.orden + Math.round(hueco.iman * 300) + (cogida ? 600 : 0);
+
+  return (
+    <group ref={grupo} position={[hueco.x, hueco.y, hueco.z]}>
+      {/* El borde claro, que es lo que separa una carta de la de detras al solaparse. */}
+      <mesh
+        geometry={geometria}
+        position={[0, 0, -0.002]}
+        scale={1.045}
+        renderOrder={base}
+        raycast={() => null}
+      >
+        <meshBasicMaterial
+          color={cogida ? COLOR_DE_LA_SENAL : '#f4ecd8'}
+          toneMapped={false}
+          depthTest={false}
+          depthWrite={false}
+        />
+      </mesh>
+      <mesh
+        geometry={geometria}
+        renderOrder={base + 1}
+        onPointerOver={(e) => {
+          e.stopPropagation();
+          setEncima(true);
+        }}
+        onPointerOut={() => setEncima(false)}
+        onPointerDown={(e) => {
+          e.stopPropagation();
+          onCoger(carta);
+        }}
+      >
+        <meshBasicMaterial
+          color={color}
+          toneMapped={false}
+          depthTest={false}
+          depthWrite={false}
+        />
+      </mesh>
+      {/*
+       * El bien, en la MITAD IZQUIERDA de la carta: es la que asoma cuando la mano esta
+       * en reposo. Puesto en el centro, la pieza quedaria fuera de la pantalla justo
+       * cuando hace falta para saber que carta es.
+       */}
+      {icono !== null && (
+        <mesh
+          geometry={icono}
+          position={[-hueco.ancho * 0.24, hueco.alto * 0.04, 0.01]}
+          scale={hueco.alto * 0.4}
+          renderOrder={base + 2}
+          raycast={() => null}
+        >
+          <meshBasicMaterial
+            color="#f7f1e2"
+            toneMapped={false}
+            depthTest={false}
+            depthWrite={false}
+          />
+        </mesh>
+      )}
+    </group>
+  );
+}
+
+/**
+ * UN AREA DE TRUEQUE: "sueltala aqui y pido esto".
+ *
+ * Solo existe mientras hay una carta cogida. Es la contrapartida exacta del anillo del
+ * tablero, y por la misma razon de fondo: la escena no sabe si el trueque es legal ni
+ * que se puede pedir. Recibe una lista de bienes de quien conoce las reglas, pinta un
+ * area por cada uno y avisa de cual se solto.
+ *
+ * Se dispara al SOLTAR, igual que el anillo, y por lo mismo: asi el gesto de arrastrar
+ * la carta hasta aqui y el de pulsar el area son el mismo camino de codigo.
+ */
+function AreaDeTrueque({
+  bien,
+  hueco,
+  onSoltar,
+}: {
+  bien: string;
+  hueco: HuecoDeCarta;
+  onSoltar: (bien: string) => void;
+}): JSX.Element {
+  const [encima, setEncima] = useState(false);
+  const geometria = useMemo(
+    () => formaDeCarta(hueco.ancho, hueco.alto),
+    [hueco.ancho, hueco.alto],
+  );
+  const color = useMemo(() => colorDelBien(bien), [bien]);
+
+  const icono = useMemo(() => geometriaDeContornos(CONTORNOS_DEL_BIEN[bien] ?? []), [bien]);
+
+  return (
+    <group position={[hueco.x, hueco.y, hueco.z]} scale={encima ? 1.1 : 1}>
+      <mesh
+        geometry={geometria}
+        renderOrder={ORDEN_DE_LAS_AREAS + 1}
+        onPointerOver={(e) => {
+          e.stopPropagation();
+          setEncima(true);
+        }}
+        onPointerOut={() => setEncima(false)}
+        onPointerUp={(e) => {
+          e.stopPropagation();
+          onSoltar(bien);
+        }}
+      >
+        <meshBasicMaterial
+          color={color}
+          transparent
+          opacity={encima ? 0.95 : 0.55}
+          toneMapped={false}
+          depthTest={false}
+          depthWrite={false}
+        />
+      </mesh>
+      {/* El borde, en verde cuando esta señalada: es el mismo idioma que el anillo. */}
+      <mesh
+        geometry={geometria}
+        position={[0, 0, -0.002]}
+        scale={1.06}
+        renderOrder={ORDEN_DE_LAS_AREAS}
+        raycast={() => null}
+      >
+        <meshBasicMaterial
+          color={encima ? COLOR_DE_LA_SENAL : '#0d1f1a'}
+          transparent
+          opacity={encima ? 1 : 0.6}
+          toneMapped={false}
+          depthTest={false}
+          depthWrite={false}
+        />
+      </mesh>
+      {icono !== null && (
+        <mesh
+          geometry={icono}
+          position={[0, 0, 0.01]}
+          scale={hueco.alto * 0.62}
+          renderOrder={ORDEN_DE_LAS_AREAS + 2}
+          raycast={() => null}
+        >
+          <meshBasicMaterial
+            color="#f7f1e2"
+            toneMapped={false}
+            depthTest={false}
+            depthWrite={false}
+          />
+        </mesh>
+      )}
+    </group>
+  );
+}
+
+/**
+ * LA MANO ENTERA, pegada a la camara por el borde derecho.
+ *
+ * El cursor se lee de `estado.pointer`, que r3f da normalizado de -1 a 1, y se convierte
+ * a coordenadas de camara con lo que se ve a la distancia de la baraja. Se hace asi y no
+ * con un plano invisible que reciba los eventos porque un plano taparia el tablero: la
+ * mano tiene que despertar al ACERCARSE, no al tocarla, y para eso hace falta saber
+ * donde esta el cursor aunque no este sobre nada de la mano.
+ *
+ * El orden de dibujo de cada carta lo decide su iman: la que el cursor senala se pone
+ * delante de sus vecinas. Sin eso, la carta que sale se dibujaria DEBAJO de la de al
+ * lado, que es el efecto contrario del que se busca.
+ */
+function Baraja({
+  mano,
+  aplanados,
+  cogida,
+  onCoger,
+  seCambianPor,
+  onProponer,
+}: {
+  mano: readonly CartaEnLaMano[];
+  aplanados: Map<string, Instanciable[]>;
+  cogida: string | null;
+  onCoger: (carta: CartaEnLaMano) => void;
+  seCambianPor: readonly string[];
+  onProponer: (bien: string) => void;
+}): JSX.Element {
+  const grupo = useRef<THREE.Group>(null);
+  const [forma, setForma] = useState({ campo: (45 * Math.PI) / 180, proporcion: 16 / 9 });
+  const [apunta, setApunta] = useState<number | null>(null);
+
+  useFrame((estado) => {
+    const g = grupo.current;
+    if (g === null) return;
+    g.position.copy(estado.camera.position);
+    g.quaternion.copy(estado.camera.quaternion);
+
+    const c = estado.camera as THREE.PerspectiveCamera;
+    const campo = ((c.isPerspectiveCamera ? c.fov : 45) * Math.PI) / 180;
+    const proporcion = estado.size.width / Math.max(1, estado.size.height);
+    if (Math.abs(campo - forma.campo) > 1e-6 || Math.abs(proporcion - forma.proporcion) > 1e-4) {
+      setForma({ campo, proporcion });
+    }
+
+    const { alto, ancho } = loQueSeVeEnLaBaraja(campo, proporcion);
+    const x = estado.pointer.x * (ancho / 2);
+    const y = estado.pointer.y * (alto / 2);
+    const cerca = enLaZonaDeLaMano(x, campo, proporcion) ? y : null;
+    if (cerca === null ? apunta !== null : apunta === null || Math.abs(cerca - apunta) > 1e-4) {
+      setApunta(cerca);
+    }
+  });
+
+  const colocadas = useMemo(
+    () => huecosDeLaBaraja(mano, forma.campo, forma.proporcion, apunta),
+    [mano, forma, apunta],
+  );
+
+  /*
+   * Las areas solo se calculan cuando hay una carta cogida. Con la lista vacia no sale
+   * ninguna, que es lo que tiene que pasar cuando el juego dice que no hay trueque
+   * posible — y se ve, en vez de dejar al jugador arrastrando la carta sin sitio donde
+   * soltarla.
+   */
+  const areas = useMemo(
+    () =>
+      cogida === null
+        ? []
+        : areasDeTrueque(seCambianPor.length, forma.campo, forma.proporcion),
+    [cogida, seCambianPor.length, forma],
+  );
+
+  return (
+    <group ref={grupo}>
+      <mesh renderOrder={1005} onBeforeRender={(gl) => gl.clearDepth()} raycast={() => null}>
+        <planeGeometry args={[0.001, 0.001]} />
+        <meshBasicMaterial colorWrite={false} depthWrite={false} />
+      </mesh>
+      <pointLight position={[0.9, 0, -1.2]} intensity={2.6} distance={3} decay={1.4} />
+      {areas.map((hueco, i) => {
+        const bien = seCambianPor[i];
+        if (bien === undefined) return null;
+        return (
+          <AreaDeTrueque
+            key={`trueque:${bien}`}
+            bien={bien}
+            hueco={hueco}
+            onSoltar={onProponer}
+          />
+        );
+      })}
+      {colocadas.map((c) => (
+        <Carta
+          key={`carta:${c.carta.id}`}
+          carta={c.carta}
+          hueco={c.hueco}
+          cogida={cogida === c.carta.id}
+          onCoger={onCoger}
+        />
+      ))}
+    </group>
+  );
+}
+
 export function Delta({
   datos,
   modelos,
@@ -946,6 +1404,11 @@ export function Delta({
   barra = [],
   tomada = null,
   onTomarDeLaBarra,
+  mano = [],
+  cogida = null,
+  onCogerCarta,
+  seCambianPor = [],
+  onProponerTrueque,
 }: {
   datos: DeltaEn3D;
   modelos: CatalogoDeModelos;
@@ -969,6 +1432,26 @@ export function Delta({
   tomada?: string | null;
   /** Aviso de que alguien ha cogido una pieza de la barra. */
   onTomarDeLaBarra?: (id: string) => void;
+  /**
+   * La mano de bienes del jugador, para la baraja del lateral. Vacia, no hay baraja.
+   *
+   * Llega ya resuelta: la escena no sabe cuantas cartas tiene nadie ni de quien es el
+   * turno. Es la misma frontera que los anillos y la barra.
+   */
+  mano?: readonly CartaEnLaMano[];
+  /** Cual esta cogida ahora mismo, para dibujarla levantada. */
+  cogida?: string | null;
+  /** Aviso de que alguien ha cogido una carta de la mano. */
+  onCogerCarta?: (carta: CartaEnLaMano) => void;
+  /**
+   * Por que bienes se puede cambiar la carta cogida. Sale de quien conoce las reglas.
+   *
+   * Vacia, no aparece ningun area: es la forma de decir "ahora no hay trueque posible"
+   * sin que la escena tenga que saber por que.
+   */
+  seCambianPor?: readonly string[];
+  /** Aviso de que se ha soltado la carta cogida sobre el area de un bien. */
+  onProponerTrueque?: (bien: string) => void;
 }): JSX.Element {
   /**
    * Cada modelo, aplanado una vez a geometría + material para poder instanciarlo.
@@ -1488,6 +1971,17 @@ export function Delta({
        * ninguna, que es lo que tiene que pasar cuando el juego dice que no se puede
        * poner nada en ningún sitio — y se ve, en vez de dejar al jugador probando.
        */}
+      {mano.length > 0 && (
+        <Baraja
+          mano={mano}
+          aplanados={aplanados}
+          cogida={cogida}
+          onCoger={(c) => onCogerCarta?.(c)}
+          seCambianPor={seCambianPor}
+          onProponer={(b) => onProponerTrueque?.(b)}
+        />
+      )}
+
       {barra.length > 0 && (
         <Barra
           piezas={barra}

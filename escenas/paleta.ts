@@ -248,6 +248,32 @@ export function terrenoDe(terreno: string): Terreno {
   return PALETA[terreno] ?? TERRENO_DESCONOCIDO;
 }
 
+/**
+ * DE QUÉ TERRENO SALE CADA BIEN, y por qué eso decide el color de su carta.
+ *
+ * La carta de madera es del color del bosque, la de ladrillo del color de la colina y
+ * la de mineral del de la montaña. No es una elección de arte: es la única forma de que
+ * mirar una carta y mirar el tablero cueste lo mismo. Quien ve una carta verde oscura y
+ * busca dónde se produce, encuentra un hexágono verde oscuro.
+ *
+ * Y por eso la tabla dice el TERRENO y no el color: si mañana se retoca el verde del
+ * bosque, la carta de madera se retoca con él. Dos sitios con el mismo color escrito a
+ * mano acaban discrepando; uno derivado del otro no puede.
+ */
+export const TERRENO_DEL_BIEN: Readonly<Record<string, string>> = {
+  madera: 'bosque',
+  ladrillo: 'colina',
+  mineral: 'montana',
+  lana: 'pradera',
+  grano: 'campo',
+};
+
+/** El color de la carta de un bien: el de su terreno. Uno desconocido sale de reserva. */
+export function colorDelBien(bien: string): string {
+  const terreno = TERRENO_DEL_BIEN[bien];
+  return terreno === undefined ? TERRENO_DESCONOCIDO.color : colorDeTerreno(terreno);
+}
+
 /** El color de un terreno, o el de reserva si esta versión no lo conoce. */
 export function colorDeTerreno(terreno: string): string {
   return terrenoDe(terreno).color;
