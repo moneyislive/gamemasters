@@ -59,7 +59,25 @@ export default function DisposicionDeLaSala(): JSX.Element {
     <Stack
       screenOptions={{
         headerShown: false,
-        contentStyle: { backgroundColor: SALA.fondo },
+        /*
+         * EL SUELO, Y NO NINGUNA DE LAS OTRAS TRES SUPERFICIES.
+         *
+         * La Sala apila cuatro planos —`suelo`, `pared`, `teja`, `tejaAlta`— y esto
+         * es el más hondo de los cuatro: lo que hay DEBAJO de todo lo que monte cada
+         * mueble. Se ve en los dos únicos huecos donde ninguna pantalla ha pintado
+         * todavía, y los dos importan: el instante del `fade` de aquí abajo, en que
+         * la que sale ya se ha ido y la que entra aún no está, y el margen que el
+         * sistema deja fuera del área segura. Con `pared` o con `teja` esos dos
+         * huecos saldrían un escalón MÁS CLAROS que el fondo de la pantalla que
+         * llevan detrás, y el grupo entero se leería como un panel levantado sobre
+         * nada. El suelo no tiene ese problema porque no está levantado sobre nada:
+         * es el fondo.
+         *
+         * Y va aquí, en el grupo, y no repetido en cada mueble, porque el color de
+         * fondo de una transición es propiedad de la PILA y no de ninguna de las dos
+         * pantallas que se cruzan en ella.
+         */
+        contentStyle: { backgroundColor: SALA.suelo },
         animation: 'fade',
       }}
     >

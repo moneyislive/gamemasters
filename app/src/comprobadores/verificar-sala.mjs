@@ -365,10 +365,35 @@ paso('La portada no puede reventar por un icono que no conoce');
     /ICONOS_DE_ARCADE_CONOCIDOS/.test(vitrina) && /ICONO_DE_ARCADE_POR_DEFECTO/.test(vitrina),
     'sin esto, un arcade de fuera con otro icono deja `undefined` en la tarjeta',
   );
+  /*
+   * ANTES ESTO EXIGÍA VER UN `ICONOS_DE_ARCADE[…] ??` EN LA PORTADA, y esa
+   * redacción caducó el día que la Sala estrenó identidad: la tarjeta nueva no
+   * pinta icono —lo que distingue una máquina de otra es el raíl del aforo— así
+   * que ya no indexa la tabla en ningún sitio.
+   *
+   * Pedir el guardia tal cual estaba obligaba a volver a poner un icono SOLO
+   * para que un comprobador lo viera, que es la peor razón que hay para escribir
+   * una línea. Pero borrar la comprobación tampoco valía: existe porque este
+   * agujero —`ICONOS_DE_ARCADE[loQueSea]` devolviendo `undefined`, React
+   * lanzando al pintar `<undefined />` y la portada entera en blanco— YA TUMBÓ
+   * esta pantalla una vez, y volvería a caber el día que alguien devuelva el
+   * icono a la ficha.
+   *
+   * Así que se afirma lo que de verdad hay que sostener, que es más fuerte que
+   * lo de antes y no menos: NINGUNA indexación de esa tabla puede quedarse sin
+   * respaldo. Con cero indexaciones se cumple por construcción; con una sin `??`
+   * esto se pone rojo igual que antes.
+   */
+  const indexaciones = portada.match(/ICONOS_DE_ARCADE\s*\[[^\]]+\]/g) ?? [];
+  const sinRespaldo = indexaciones.filter(
+    (uso) => !new RegExp(`${uso.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\?\\?`).test(portada),
+  );
   comprobar(
-    'y la tarjeta lleva además su propio respaldo',
-    /ICONOS_DE_ARCADE\[[^\]]+\]\s*\?\?/.test(portada),
-    'dos guardias para un agujero que el compilador no ve y que ya tumbó esta portada una vez',
+    'ninguna indexación de la tabla de iconos se queda sin respaldo en la portada',
+    sinRespaldo.length === 0,
+    sinRespaldo.length === 0
+      ? `${indexaciones.length} indexaciones, todas con respaldo`
+      : `sin \`??\`: ${sinRespaldo.join(', ')} — el agujero que ya tumbó esta portada una vez`,
   );
   comprobar(
     'la razón por la que no se puede jugar se pinta',

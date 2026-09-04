@@ -33,10 +33,21 @@
  * tarjeta apagada, y eso no es un fallo que arreglar: es lo que se decidió, y lo
  * que se ahorra es escribir un intérprete de escenas que saldría a medida del
  * primer juego que lo usara.
+ *
+ * ═══ Y POR QUÉ AQUÍ NO HAY UNA SOLA GOTA DE ACENTO ═══
+ *
+ * Esta envoltura pinta EXACTAMENTE una pantalla —la espera— y una espera no está
+ * viva ni se puede tocar, que es la única cosa que el acento de la Sala significa.
+ * Ponerle aquí la placa de color del nombre haría lo que el diseño prohíbe: repartir
+ * el acento en sitios que no lo ganan, hasta que en la ficha deje de gritar. Todo lo
+ * de este fichero es gris frío a propósito, y eso no es una pantalla a medio pintar.
+ *
+ * El color entra —si entra— con el juego: `escena-peonza.tsx` es quien pinta, y sus
+ * píxeles son suyos.
  */
 import { lazy, Suspense } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { SALA } from './muebles';
+import { LETRA, SALA } from './muebles';
 
 /**
  * El juego, traído sólo cuando hace falta.
@@ -73,8 +84,24 @@ const estilos = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 14,
-    backgroundColor: SALA.fondo,
+    /*
+     * El aire lateral es de legibilidad y no de gusto: sin él, la frase de espera
+     * llega a tocar los dos bordes en un móvil estrecho y se parte donde le da la
+     * gana. Aquí no hay ficha ni panel, así que el texto se apoya en el suelo
+     * directamente y el margen lo tiene que poner la pantalla.
+     */
+    paddingHorizontal: 24,
+    /* Es la pantalla entera, no una superficie dentro de otra: suelo, no teja. */
+    backgroundColor: SALA.suelo,
   },
-  rotulo: { color: SALA.neonTenue, fontSize: 13, fontWeight: '800', letterSpacing: 4 },
-  texto: { color: SALA.palabra, fontSize: 16, lineHeight: 24, textAlign: 'center' },
+  /*
+   * El nombre de la máquina hace aquí de rótulo pequeño y no de titular: lo que se
+   * lee es la frase de abajo. Por eso va en `tenue` —el gris que acompaña— y no en
+   * `palabra`, y por eso la caja alta y el tracking los pone `LETRA` en vez de
+   * escribirse a mano: sin familia propia, el peso y el tracking son TODA la voz
+   * del rótulo, y repartirla entre la tabla y este fichero es como se pierde.
+   */
+  rotulo: { color: SALA.tenue, fontSize: 13, ...LETRA.rotuloChico },
+  /* La frase que sí se lee, al tamaño en que se lee de cerca. */
+  texto: { color: SALA.palabra, fontSize: 16, lineHeight: 24, textAlign: 'center', ...LETRA.cuerpo },
 });

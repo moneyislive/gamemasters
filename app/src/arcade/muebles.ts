@@ -216,26 +216,224 @@ export function rutaDeArcade(manifiesto: ManifiestoDeArcade): Href {
 }
 
 /**
- * LOS COLORES DE LA SALA, y por qué no son los del tema de las veladas.
+ * LA SALA DE ARCADE, y por qué no se parece al taller ni a un panel de juegos.
  *
- * La portada separa las dos familias a propósito: una es alta y con retrato, la
- * otra ancha y plana, y el acento de la sala de arcade es este verde de neón. La
- * razón está escrita allí y es de producto: nadie puede confundir «una noche con
- * cinco amigos» con «un minuto de pie».
+ * ═══ DE DÓNDE SALE ESTO ═══
  *
- * Y hay una segunda razón, de arquitectura: `useTema()` devuelve el tema DE LA
- * VELADA QUE SE ESTÉ JUGANDO —lee el contexto de la partida— así que un arcade
- * pintado con él saldría verde fieltro durante una partida de CLUEDO y color arena
- * durante una de la Momia, según lo que hubiera abierto antes. Un minijuego que
- * cambia de color según la velada que tengas a medias es exactamente el tipo de
- * enredo que la separación de los dos motores existe para impedir.
+ * De una maqueta que se hizo, se miró y se eligió, y no de una idea escrita. Se
+ * probaron tres mundos —un salón recreativo de 1926, una vitrina de láminas
+ * grabadas y una sala de máquinas— y después tres GRADOS de modernización del
+ * que ganó. Éste es el grado de en medio, y el encargo era exacto: conservar la
+ * disposición de la información y el color que brilla, y quitar el disfraz de
+ * época.
+ *
+ * Antes de esto, la Sala llevaba siete colores escritos a mano —azul-negro
+ * #06110f, turquesa #5fd4c8, naranja— y ningún fichero del arcade importaba el
+ * tema de la casa. No se parecía al taller ni a nada: era el único sitio del
+ * producto sin sistema.
+ *
+ * ═══ LAS TRES DECISIONES QUE SOSTIENEN ESTO ═══
+ *
+ * 1. NO HAY MATERIA. Ni metal, ni textura, ni relieve, ni madera. Las
+ *    superficies se separan por un FILO de un píxel y por elevación, no por
+ *    material. Es lo que la aleja a la vez del taller —que es fieltro, caoba y
+ *    pan de oro— y del salón recreativo del que viene, que era latón y esmalte
+ *    y se veía «demasiado antiguo».
+ *
+ * 2. EL COLOR VIVE EN UN SOLO SITIO Y ES GRANDE. La placa del nombre es un
+ *    campo de acento saturado que ocupa media ficha. Todo lo demás es gris frío.
+ *    Un acento repartido en veinte detalles se apaga; concentrado en un plano
+ *    grande, brilla. La versión anterior de esta Sala hacía lo contrario y ésa
+ *    es la razón medible de que se leyera barata.
+ *
+ * 3. EL ORNAMENTO CUENTA ALGO. Ver `CUENTA_DE_AFORO` aquí abajo.
+ *
+ * ═══ EL ACENTO ES INTERCAMBIABLE, Y ESO ES ESTRUCTURA ═══
+ *
+ * Sólo tres de los trece colores se tiñen: `acento`, `acentoHondo` y `halo`.
+ * Los diez neutros no se enteran de que el tema cambia. La consecuencia es que
+ * la Sala se puede repintar entera de ámbar, de verde o de carmesí y sigue
+ * siendo la misma sala: lo que la sostiene es el gris frío, el filo de un píxel
+ * y la retícula, no el violeta.
+ *
+ * Hoy el tema es VIOLETA para todo el mundo. La tabla de abajo declara los
+ * cuatro porque el mecanismo es el que decide la forma del código, y dónde se
+ * guarda la preferencia de cada cual está sin decidir a propósito: es una
+ * pregunta de producto —¿un ajuste? ¿por aparato o por cuenta?— y no de pintura.
+ *
+ * ═══ Y SIGUE SIN USAR `useTema()` ═══
+ *
+ * Por lo de siempre, que no ha cambiado: `useTema()` devuelve el tema DE LA
+ * VELADA QUE SE ESTÉ JUGANDO. Un arcade pintado con él saldría verde fieltro
+ * durante una partida de CLUEDO y color arena durante una de la Momia, según lo
+ * que hubiera abierto antes.
  */
 export const SALA = {
-  fondo: '#06110f',
-  panel: '#0c1c19',
-  neon: '#5fd4c8',
-  neonTenue: '#2f6b64',
-  palabra: '#f2fbf9',
-  aviso: '#e8a04a',
-  fallo: '#d4636f',
+  /* ---------- Los diez neutros. No se tiñen nunca. ---------- */
+
+  /** El fondo de la pantalla. Frío y muy oscuro: el acento tiene que poder gritar encima. */
+  suelo: '#080A0E',
+  /** El fondo de una zona dentro de la pantalla, un escalón por encima del suelo. */
+  pared: '#0C0F14',
+  /** La superficie de una ficha o un panel. */
+  teja: '#12161D',
+  /** La franja levantada dentro de una ficha: la fila de datos, una cabecera. */
+  tejaAlta: '#161B23',
+  /**
+   * El filo: un píxel de blanco al 7,5 %.
+   *
+   * Es lo ÚNICO que separa una superficie de otra, y por eso va en la tabla y no
+   * escrito a mano en cada sitio. Blanco con alfa y no un gris opaco: así el
+   * mismo valor funciona sobre el suelo, sobre la teja y sobre la placa de
+   * acento sin tener que declarar tres.
+   */
+  filo: 'rgba(255, 255, 255, 0.075)',
+  /** El filo cuando tiene que verse: un borde enfocado, una separación que importa. */
+  filoVivo: 'rgba(255, 255, 255, 0.14)',
+  /** El texto normal. */
+  palabra: '#E9ECF2',
+  /** El texto secundario: lo que acompaña y no se lee primero. */
+  tenue: '#8C94A5',
+  /** Los rótulos pequeños y las cifras de apoyo. */
+  cifra: 'rgba(255, 255, 255, 0.34)',
+  /** El blanco de énfasis: sobre la placa de acento, y las cifras grandes. */
+  blanco: '#F4F6FA',
+
+  /* ---------- Los tres que sí se tiñen ---------- */
+
+  /** El color que brilla. Vive en la placa del nombre, en el piloto y en el filo de la acción. */
+  acento: '#A855F7',
+  /** Su fondo, para el degradado de la placa. */
+  acentoHondo: '#6D28D9',
+  /** El mismo color casi transparente: resplandores y auras. */
+  halo: 'rgba(168, 85, 247, 0.20)',
+
+  /* ---------- Y uno que no es ninguna de las dos cosas ---------- */
+
+  /**
+   * LO QUE QUEMA Y LO QUE SE ACABA: los últimos diez segundos de una ronda, y lo
+   * que te mata en El Arcade.
+   *
+   * NO se tiñe con el tema, y hay que saber por qué: si se tiñera, el aviso
+   * diría lo mismo que la placa del nombre y dejaría de avisar. Es fijo a costa
+   * de una incomodidad que conviene tener escrita: con el tema en ÁMBAR este
+   * naranja se le parece. Se aguanta porque los dos no coinciden nunca en la
+   * misma pantalla —la placa de acento es de la Sala y la alarma es de dentro de
+   * una partida—, y el día que coincidan habrá que resolverlo, no ignorarlo.
+   */
+  alarma: '#FF7A45',
+} as const;
+
+/**
+ * LOS CUATRO TEMAS. Sólo cambian tres valores; los diez neutros no se mueven.
+ *
+ * Que la tabla sea tan corta ES la prueba de que la identidad no depende del
+ * color: si repintar la Sala entera exigiera tocar más de tres cosas, sería que
+ * el violeta estaba haciendo de estructura.
+ */
+export const TEMAS_DE_SALA = {
+  violeta: { acento: '#A855F7', acentoHondo: '#6D28D9', halo: 'rgba(168, 85, 247, 0.20)' },
+  ambar: { acento: '#F59E0B', acentoHondo: '#B45309', halo: 'rgba(245, 158, 11, 0.20)' },
+  verde: { acento: '#22C55E', acentoHondo: '#15803D', halo: 'rgba(34, 197, 94, 0.20)' },
+  carmesi: { acento: '#F43F5E', acentoHondo: '#9F1239', halo: 'rgba(244, 63, 94, 0.20)' },
+} as const;
+
+export type TemaDeSala = keyof typeof TEMAS_DE_SALA;
+
+/** El que ve todo el mundo hoy, mientras no haya dónde guardar la preferencia. */
+export const TEMA_POR_DEFECTO: TemaDeSala = 'violeta';
+
+/**
+ * LAS LETRAS DE LA SALA: el palo seco del sistema, y no es una renuncia.
+ *
+ * ═══ LO QUE PEDÍA EL DISEÑO Y LO QUE HAY ═══
+ *
+ * La maqueta que se eligió rotula con Oswald —condensada, en mayúsculas, la
+ * letra del cartel— y pone los datos en IBM Plex Mono. Ninguna de las dos está
+ * instalada: la app sólo trae Cinzel y Cormorant Garamond, que son del taller de
+ * veladas y aquí no pintan nada. Nombrar una fuente que no existe no da error:
+ * cae en la del sistema en silencio, y entonces la tabla miente.
+ *
+ * Así que se usa lo que hay, y se dice.
+ *
+ * ═══ POR QUÉ NO ES UN APAÑO ═══
+ *
+ * Porque La Frente ya lo hacía por su cuenta y con un argumento que vale para
+ * toda la Sala: esa pantalla se lee a tres metros con el móvil apoyado en la
+ * frente de alguien, y el palo seco del sistema —que en cada aparato es la letra
+ * que mejor se ve en ese aparato— gana ahí a cualquier romana. Lo que aquí se
+ * hace es extender ese criterio a las otras cuatro máquinas en vez de tener una
+ * pantalla que juega con otras reglas.
+ *
+ * Y el trabajo que hacía la condensada lo hacen el PESO, la CAJA ALTA y el
+ * TRACKING, que es de donde sale de verdad la voz de un rótulo. Un nombre en
+ * mayúsculas, en 800, con tracking abierto, se lee como un cartel aunque la
+ * familia sea la del sistema.
+ *
+ * ═══ LO QUE COSTARÍA TENER LA VOZ COMPLETA ═══
+ *
+ * Tres paquetes de `@expo-google-fonts` —oswald, archivo, ibm-plex-mono— con dos
+ * pesos cada uno. Es la decisión que queda abierta, y la de los datos es la que
+ * más se notaría: una cifra en monoespaciada dice «esto es una medida» sin
+ * rotularlo, y además hace que las columnas de aforo y ritmo cuadren.
+ *
+ * MIENTRAS TANTO NO SE DECLARA NINGUNA `fontFamily` EN LA SALA. Sin entrada en
+ * esta tabla no hay forma de escribir una fuente que no existe.
+ */
+export const LETRA = {
+  /**
+   * El rótulo: nombres de máquina y cifras grandes. Caja alta y tracking
+   * abierto, que es lo que hace de cartel sin condensada.
+   */
+  rotulo: { fontWeight: '800', letterSpacing: 1.4, textTransform: 'uppercase' },
+  /** Los rótulos pequeños: AFORO, SEDE, RITMO, y las especificaciones. */
+  rotuloChico: { fontWeight: '600', letterSpacing: 1.6, textTransform: 'uppercase' },
+  /** El gancho y las frases que se leen de cerca. */
+  cuerpo: { fontWeight: '500', letterSpacing: 0 },
+  /**
+   * Los datos. Sin monoespaciada, lo que mantiene las columnas cuadradas es
+   * `fontVariant: ['tabular-nums']`, que sí está en React Native y no cuesta
+   * ningún fichero.
+   */
+  dato: { fontWeight: '600', letterSpacing: 0.4, fontVariant: ['tabular-nums'] },
+} as const;
+
+/**
+ * LA FIRMA DE LA SALA: el contador de aforo.
+ *
+ * Sobre cada máquina hay un raíl de muescas. Hay tantas como personas admite
+ * —`jugadores.maximo`— y están encendidas las que hacen falta para empezar
+ * —`jugadores.minimo`—. La Frente son doce muescas con dos encendidas, y es el
+ * raíl más largo de la Sala; La Ronda son cuatro y las cuatro encendidas, porque
+ * su mínimo es su máximo y sólo se juega llena; El Arcade y La Peonza son una
+ * sola.
+ *
+ * ═══ POR QUÉ ESTO Y NO UN ADORNO ═══
+ *
+ * Porque la longitud del raíl dice el aforo ANTES de leer una palabra, y porque
+ * puestas en fila las cinco máquinas se distinguen por él. Es ornamento que
+ * informa, que es la única clase de ornamento que sobrevive a que alguien añada
+ * un juego: el sexto arcade trae su aforo en el manifiesto y su raíl sale solo.
+ *
+ * Viene de una orla de bombillas de feria —la maqueta que se eligió las
+ * dibujaba con vidrio, casquillo y filamento— y se quedó sin el disfraz al
+ * modernizarla. La cuenta es lo que valía; la bombilla era la época.
+ */
+export const CUENTA_DE_AFORO = {
+  /** Ancho de cada muesca. */
+  grosor: 3,
+  /** Alto de una encendida y de una apagada: la diferencia es la que se lee. */
+  altoEncendida: 16,
+  altoApagada: 7,
+  /** Separación entre muescas en la ficha destacada y en las de la hilera. */
+  huecoDestacada: 22,
+  huecoHilera: 19,
+} as const;
+
+/** Los redondeos de la Sala. Pocos y con un trabajo cada uno. */
+export const RADIO = {
+  /** Una ficha de máquina. */
+  ficha: 14,
+  /** Un botón, una pastilla, el marcador. */
+  mando: 8,
 } as const;
