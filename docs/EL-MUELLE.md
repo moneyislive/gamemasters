@@ -95,8 +95,11 @@ persona mide 2,543; una tesela 6,315 de radio; una comarca 75,8):
 
 - **Primer plano (0 a 14 u):** la cabeza de un muelle de madera que sale de la
   playa. El aventurero local, de pie, entero, con un farol al lado (poste propio
-  con esfera emisiva y una `pointLight` cálida), barriles, cajas, un ancla, un
-  bote amarrado golpeando el pilote.
+  con esfera emisiva y una `pointLight` cálida) y su estandarte teñido; tres
+  trastos como mucho en las puntas de la plataforma —barril, caja, ancla— y
+  ninguno en el pasillo de la cámara, que en la primera versión los enseñaba
+  enormes; el bote amarrado al costado. Su barco está atracado A UN COSTADO del
+  cabo, paralelo al muelle: detrás de él tapaba la cala entera.
 - **Plano medio (14 a 90 u):** la cala. Un semicírculo de unas noventa teselas de
   pradera a nivel cero cerrado con `orilla-a…e`, juncos y nenúfares en los
   remansos; la playa con el varadero y dos botes; el caserío del embarque en una
@@ -149,12 +152,18 @@ pura y comprobable) y aplicada con `useFrame`. Toda pose es un OBJETIVO al que s
 llega por interpolación amortiguada; nunca se asigna en seco salvo el primer
 fotograma.
 
-- **Reposo:** dos poses —retrato (ojos a 2,15 u, a 7,5 u del local, FOV 55°) y
-  panorámico (a 9 u, FOV 38°, el local en el tercio izquierdo)— mezcladas por
-  relación de aspecto, para que una tableta caiga en medio y girarla no salte.
-  Encima, respiración: órbita de ±3° con periodo 23 s, altura ±0,08 u con 11 s,
-  travelling de 7,5 a 7,9 u con 40 s; el objetivo sigue con 0,25 s de retraso,
-  que es lo que da parallax entre el muelle, el caserío y las montañas.
+- **Reposo:** dos poses —retrato (ojos a 2,4 u, a 8,6 u del local, FOV 50°, el
+  local en el centro) y panorámico (sobre el eje del muelle a 9 u, girada 13° a
+  la derecha y 4° hacia abajo, FOV 32°, el local en el tercio izquierdo)—
+  mezcladas por relación de aspecto, para que una tableta caiga en medio y
+  girarla no salte. El panorámico se cerró de 38° a 32° y dejó de correrse a la
+  derecha porque, medido, con la cámara corrida el local se desplazaba 11° y los
+  amarres lejanos sólo 3° y el abanico entero se apilaba a su lado; con 32° los
+  seis pies quedan separados al menos un 6 % del ancho, que es lo que exige el
+  comprobador. Encima, respiración: órbita de ±3° con periodo 23 s, altura
+  ±0,08 u con 11 s, travelling de unas cuatro décimas con 40 s; el objetivo sigue
+  con 0,25 s de retraso, que es lo que da parallax entre el muelle, el caserío y
+  las montañas. La cámara retrocede 0,1 u por ocupado.
 - **La hoja del HUD manda.** `Ventana.franjaInferior` sube el objetivo para que
   el aventurero local quede ENTERO por encima de la hoja: nunca baja del 22 % del
   alto útil ni sale del encuadre. Se comprueba para 9:19,5, 3:4 y 16:9.
