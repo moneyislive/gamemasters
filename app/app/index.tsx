@@ -79,6 +79,12 @@ import { color, conAlfa, espacio, fuente, radio } from '../src/tema';
  * dejaría en blanco en web y lo que vigila un comprobador.
  */
 import { CUENTA_DE_AFORO, LETRA, RADIO, SALA } from '../src/arcade/muebles';
+import {
+  LuzDeEsquina,
+  PastillaDeEstado,
+  RailDeAforo,
+  VeloDeLaPortada,
+} from '../src/arcade/piezas';
 
 /*
  * TODOS los trofeos que puede haber, no solo los seis de la plataforma. La
@@ -890,240 +896,18 @@ function leerMarcador(ficha: ArcadeDelCatalogo | undefined): CifraDeLaFicha {
 }
 
 /**
- * LA FIRMA DE LA SALA: el raíl de muescas del aforo.
+ * ═══ EL RAÍL, LA PASTILLA, LA LUZ Y EL VELO VIVEN EN `piezas.tsx` ═══
  *
- * Tantas muescas como personas admite la máquina y encendidas las que hacen falta
- * para empezar. La Frente son doce con dos —el raíl más largo—, La Ronda cuatro y
- * las cuatro porque sólo se juega llena, El Arcade y La Peonza una sola. Puestas
- * en fila, las cinco se distinguen por la longitud del raíl antes de leer una
- * palabra: es ornamento que informa, que es el único que sobrevive a que alguien
- * añada un juego. Las medidas son de `CUENTA_DE_AFORO` y no de aquí.
+ * Estaban escritos aquí, y el raíl además estaba escrito otras dos veces —en la
+ * espera de El Arcade y en La Peonza—. Las tres copias se habían separado: aquí
+ * las muescas apagadas acabaron en blanco al 70 % después de medirlas, y las otras
+ * dos seguían en `SALA.filoVivo`, que es blanco al 14 % y no se ve. La corrección
+ * no llegó a las otras dos porque nada las ataba.
  *
- * ═══ EL HUECO SE ENCOGE, EL NÚMERO DE MUESCAS NO ═══
- *
- * Un arcade de fuera puede declarar el aforo que quiera, y con el hueco fijo un
- * aforo de veinte se saldría de la ficha por la derecha. Recortar muescas estaba
- * descartado: el raíl dejaría de contar, que es lo único que hace. Así que lo que
- * cede es la separación, y el raíl nunca pasa del largo del más largo que hay.
- *
- * Por encima de cuarenta no se dibuja nada. Cuarenta rayas no se cuentan de un
- * vistazo —dejan de ser una cuenta y pasan a ser una textura— y el aforo exacto
- * está en la primera línea del pie, con todas las letras: «2 a 12 personas». Ahí
- * es donde no engaña. (Decía «la celda de AFORO», que era la primera columna de
- * la tabla de tres que esta tarjeta tuvo y ya no tiene.)
+ * Así que las piezas que comparten la portada y las pantallas de dentro se han ido
+ * a `app/src/arcade/piezas.tsx` con su medida escrita al lado. Aquí queda lo que es
+ * de la tarjeta y de nadie más.
  */
-const TOPE_DEL_RAIL = 12;
-const MAS_MUESCAS_DE_LAS_QUE_SE_CUENTAN = 40;
-
-function huecoDelRail(muescas: number): number {
-  if (muescas <= 1) return 0;
-  const { grosor, hueco } = CUENTA_DE_AFORO;
-  const largoDelMasLargo = TOPE_DEL_RAIL * grosor + (TOPE_DEL_RAIL - 1) * hueco;
-  if (muescas <= TOPE_DEL_RAIL) return hueco;
-  return Math.max(2, (largoDelMasLargo - muescas * grosor) / (muescas - 1));
-}
-
-function RailDeAforo({
-  aforo,
-  viva,
-}: {
-  aforo: { minimo: number; maximo: number } | null;
-  viva: boolean;
-}): JSX.Element | null {
-  if (aforo === null || aforo.maximo > MAS_MUESCAS_DE_LAS_QUE_SE_CUENTAN) return null;
-  const hueco = huecoDelRail(aforo.maximo);
-  const encendidas = Math.min(aforo.minimo, aforo.maximo);
-  return (
-    <View
-      style={[estilos.rail, { gap: hueco }]}
-      accessibilityRole="image"
-      accessibilityLabel={`Aforo: de ${aforo.minimo} a ${aforo.maximo} jugadores`}
-    >
-      {Array.from({ length: aforo.maximo }, (_, i) => (
-        <View
-          key={i}
-          style={[
-            estilos.muesca,
-            i < encendidas ? estilos.muescaAlta : estilos.muescaBaja,
-            /*
-              ═══ LA TINTA DEL RAÍL ES BLANCA, Y LAS DOS ALTURAS SE MIDEN ═══
-
-              Estuvo en acento cuando el raíl flotaba sobre el suelo negro, y en
-              tinta OSCURA la tarde que se metió en una portada ancha. Aquí es
-              blanca, y el motivo es que ha cambiado de altura: en la tarjeta
-              retrato el raíl se apoya justo encima del nombre, y ahí la tinta
-              oscura ya no llega.
-
-              Medido sobre el fondo REAL de esa caja —degradado con el corte en el
-              40 %, más la luz de esquina, más el velo, las tres capas a la vez— la
-              tinta oscura da 2,03 en carmesí y 2,27 en violeta, y no aguanta el
-              3:1 de elemento no textual por encima de y=0,303. El raíl empieza en
-              y=0,404. En blanco entero, en cambio, da entre 4,66 y 7,24.
-
-              ═══ Y LA APAGADA VA AL 70 %, QUE ES LA CORRECCIÓN QUE FALTABA ═══
-
-              Estaba al 34 %, y ese número venía de medir sólo la ENCENDIDA y dar
-              el raíl por resuelto entero. Al 34 % la apagada se separa de su
-              propio fondo por 1,80 en ámbar y en verde: desaparece.
-
-              Y desaparecer no es «se ve menos». LAS APAGADAS SON LAS QUE DIBUJAN
-              EL LARGO, y el largo es lo único que hace que este adorno informe.
-              Con las diez apagadas de La Frente invisibles, La Frente (2 de 12) y
-              Riberas (2 de 6) se leen las dos como un raíl de dos, o sea iguales
-              entre sí y MÁS CORTAS que La Ronda, que enseña cuatro. El raíl no
-              informaría menos: ordenaría las máquinas al revés.
-
-              Al 70 % da entre 3,13 y 4,32 en los cuatro temas, y al 40 % en la
-              tarjeta apagada da 3,41. Y no se pierde la distinción encendida /
-              apagada, porque ésa nunca la llevó el alfa: la llevan los 15 píxeles
-              contra los 7 de `CUENTA_DE_AFORO`.
-            */
-            viva
-              ? i < encendidas
-                ? estilos.muescaViva
-                : estilos.muescaFria
-              : i < encendidas
-                ? estilos.muescaMuertaViva
-                : estilos.muescaMuertaFria,
-          ]}
-        />
-      ))}
-    </View>
-  );
-}
-
-/**
- * LA LUZ DE LA ESQUINA: lo que separa un color plano de un lugar.
- *
- * Está copiada de la tarjeta de velada del carrusel —mismo centro, mismo radio—
- * y es la mitad de la razón por la que aquella portada se lee como una portada.
- * Un campo de acento sin gradiente radial es una mancha; con la luz cargada
- * arriba a la izquierda es un sitio con una fuente de luz.
- *
- * El `id` lleva el del juego porque cinco degradados con el mismo identificador
- * en el mismo documento son UN degradado: en la web las cinco tarjetas se
- * quedarían con la luz de la primera. (El mismo fallo sigue vivo en la vela de
- * `carrusel3d.tsx:104`, que usa `id="llama"` fijo para todas las veladas de
- * sangre; no se toca aquí porque no es de esta pantalla.)
- */
-function LuzDeEsquina({ id }: { id: string }): JSX.Element {
-  return (
-    <Svg style={StyleSheet.absoluteFill} pointerEvents="none">
-      <Defs>
-        <RadialGradient id={`luz-arcade-${id}`} cx="22%" cy="12%" r="72%">
-          <Stop offset="0%" stopColor={SALA.blanco} stopOpacity={0.18} />
-          <Stop offset="100%" stopColor={SALA.blanco} stopOpacity={0} />
-        </RadialGradient>
-      </Defs>
-      <Rect x="0" y="0" width="100%" height="100%" fill={`url(#luz-arcade-${id})`} />
-    </Svg>
-  );
-}
-
-/**
- * ═══ EL VELO: LA CAPA QUE HACE LEGIBLE LO QUE HAYA DEBAJO ═══
- *
- * Un degradado de nada a `SALA.suelo` al 38 %, que empieza en el 26 % de la
- * portada y llega a pleno en el 72 %. Debajo del raíl, del nombre y del gancho.
- *
- * El 26 y no el 34 es lo que aguanta el caso peor: si un arcade trae un nombre
- * largo y se parte en dos renglones, el bloque de texto crece hacia arriba y el
- * nombre sube a y=0,377, donde el degradado todavía no ha llegado al hondo. Con
- * el velo empezando en el 34 % ese caso daba 4,63:1 en verde —pasa por trece
- * centésimas—; empezando en el 26 % da 5,12. Ninguno de los cinco nombres de hoy
- * se parte, así que esto es seguro para el que venga, no para los que hay.
- *
- * NO ES DECORACIÓN Y NO ES OPCIONAL. Sin él, el blanco sobre el extremo hondo del
- * degradado da 4,64:1 en ámbar y en verde: pasa el mínimo de 4,5 por catorce
- * centésimas, y cualquier cosa que lo roce —un `opacity` en un contenedor, una
- * animación de entrada, un modo de ahorro que atenúe la pantalla— lo rompe sin
- * que ninguna comprobación se entere. Con el velo, ese mismo peor caso sube a
- * 5,61, y el gancho a 7,33.
- *
- * (Esas dos cifras estuvieron en 5,86 y 7,38, que salían de un modelo que se
- * dejaba fuera la LUZ DE ESQUINA: el blanco al 18 % de ahí arriba aclara el fondo
- * y baja el contraste del texto blanco unas centésimas. Están medidas con las
- * tres capas puestas —degradado, luz y velo— y con el relleno definitivo de 20.)
- *
- * Y ES LA PIEZA QUE DEJA LA PORTADA PREPARADA PARA LA FOTO. El día que aquí entre
- * una imagen del juego, todos los números medidos contra el degradado dejan de
- * valer —una foto es un fondo arbitrario y ninguna comprobación automática lo va
- * a coger, porque el color deja de estar en la tabla—. Lo único que sigue
- * valiendo es esto: el velo se sube a 0,82 y el blanco vuelve a dar 11,20:1
- * incluso sobre una foto de nieve. La estructura ya está; ese día se cambia un
- * número, no la tarjeta.
- */
-const VELO_DE_LA_PORTADA = 0.38;
-
-function VeloDeLaPortada(): JSX.Element {
-  return (
-    <LinearGradient
-      colors={[conAlfa(SALA.suelo, 0), conAlfa(SALA.suelo, VELO_DE_LA_PORTADA)]}
-      locations={[0.26, 0.72]}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 0, y: 1 }}
-      style={StyleSheet.absoluteFill}
-      pointerEvents="none"
-    />
-  );
-}
-
-/**
- * ═══ LA PASTILLA DE LA PORTADA: UNA, Y ARRIBA DEL TODO ═══
- *
- * Va sobre un PLATO OSCURO y no sobre el acento desnudo, que es lo mismo que hace
- * el anillo del icono de la tarjeta de velada apoyándose en un `rgba(0,0,0,0.25)`.
- * Aquí no es adorno: la pastilla vive en la parte alta de la portada, donde el
- * degradado todavía es el acento VIVO, y el blanco sobre ese extremo da 3,66:1 en
- * violeta y 1,98:1 en ámbar. Sobre el plato —`SALA.suelo` al 78 %— da 12,82 en el
- * peor caso, y el propio plato se recorta del fondo entre 3,22 y 4,86.
- *
- * ═══ Y ES UNA SOLA PORQUE DOS NO CABEN, Y NO POR SITIO ═══
- *
- * Aquí hubo dos apiladas —marcador y estado—, y la de abajo no llegaba: a su
- * altura (y 47-69) el degradado ya ha virado al hondo y el velo ha empezado, así
- * que su plato se separaba del fondo por 2,56 en carmesí y 2,66 en violeta.
- *
- * Lo importante es que NO ERA UN PARÁMETRO MAL PUESTO. Con el plato SÓLIDO —alfa
- * 1, o sea `SALA.suelo` puro— el techo es 2,86 en carmesí; y subir el borde
- * tampoco: blanco al 75 % se queda en 1,76. Es un límite de la paleta: ahí abajo
- * no hay ningún oscuro que se recorte del hondo de esta sala. La única salida era
- * geométrica.
- *
- * Así que el marcador se ha ido al pie, y de paso recupera lo que le sobraba a la
- * cápsula: en la portada era un triángulo de 8×6 y una palabra —dos cápsulas
- * iguales de las que había que adivinar cuál era cuál—; abajo dice «Marcador:
- * Esquivadas, más alto» con todas las letras, en `tenue` sobre la teja, a 5,95:1.
- *//**
- * LA PASTILLA DE ESTADO: el «DISPONIBLE» de la tarjeta de velada, aquí.
- *
- * Es la pieza que faltaba para que las dos tarjetas se lean como hermanas. La de
- * velada compone su portada con dos objetos en la fila de arriba —el anillo del
- * icono a la izquierda y la insignia de disponibilidad a la derecha— y ésta no
- * tenía ninguno: un campo de color de 232 píxeles con el nombre abajo y nada
- * arriba, que es la definición de un cartel.
- *
- * El PILOTO se le mete dentro en vez de dejarlo en el pie. Es el mismo relleno o
- * aro de antes —lleno si se juega aquí y ahora, hueco si hay que pedir mesa— y
- * ahora está pegado a la palabra que explica lo que significa, en lugar de a
- * cuatro renglones de distancia.
- */
-function PastillaDeEstado({
-  texto,
-  encendido,
-}: {
-  texto: string;
-  encendido: boolean;
-}): JSX.Element {
-  return (
-    <View style={estilos.pastilla} accessible accessibilityLabel={texto}>
-      <View style={[estilos.piloto, encendido ? estilos.pilotoVivo : estilos.pilotoFrio]} />
-      <Text style={estilos.pastillaTexto} numberOfLines={1}>
-        {texto}
-      </Text>
-    </View>
-  );
-}
 
 /**
  * ═══ LA TARJETA DE UNA MÁQUINA, CONSTRUIDA SOBRE LA DE VELADA ═══
@@ -1348,7 +1132,7 @@ function TarjetaDeArcade({
           {/* El hueco de la portada: lo que apoya el texto abajo. Es el `flex: 1` de la de velada. */}
           <View style={estilos.hueco} />
 
-          <RailDeAforo aforo={aforo} viva={viva} />
+          <RailDeAforo aforo={aforo} viva={viva} estilo={estilos.railDeLaTarjeta} />
           {/*
             ═══ EL TOPE DE AMPLIACIÓN DE LETRA, QUE ES UNA CONCESIÓN Y SE DICE ═══
 
@@ -2203,83 +1987,20 @@ const estilos = StyleSheet.create({
    *
    * Las medidas son de `CUENTA_DE_AFORO`; el hueco lo calcula `huecoDelRail`.
    */
-  rail: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    height: CUENTA_DE_AFORO.altoEncendida,
-    marginBottom: 10,
-  },
   /*
-   * RADIO 1 Y NO 2. Con 2, una muesca apagada —3 de ancho por 7 de alto— sale
-   * redondeada hasta parecer un punto, y el raíl deja de leerse como una cuenta
-   * de rayas para leerse como una fila de lunares. La encendida, que mide 15, no
-   * lo notaba; la apagada lo era casi entera.
+   * EL RAÍL LO PINTA `piezas.tsx`; lo único que es de la tarjeta es el hueco que
+   * deja entre él y el nombre. Va aquí y no en la pieza porque en la espera de El
+   * Arcade el raíl no lleva nada debajo, y un margen metido en la pieza sería una
+   * decisión de esta pantalla cobrada a las otras dos.
    */
-  muesca: { width: CUENTA_DE_AFORO.grosor, borderRadius: 1 },
-  muescaAlta: { height: CUENTA_DE_AFORO.altoEncendida },
-  muescaBaja: { height: CUENTA_DE_AFORO.altoApagada },
-  muescaViva: { backgroundColor: SALA.blanco },
-  muescaFria: { backgroundColor: conAlfa(SALA.blanco, 0.7) },
-  muescaMuertaViva: { backgroundColor: conAlfa(SALA.blanco, 0.5) },
-  muescaMuertaFria: { backgroundColor: conAlfa(SALA.blanco, 0.4) },
+  railDeLaTarjeta: { marginBottom: 10 },
 
   /*
-   * ═══ LAS PASTILLAS, APILADAS Y A LA DERECHA ═══
-   *
-   * Ocupan la esquina que en la tarjeta de velada ocupa la insignia
-   * DISPONIBLE/MUY PRONTO, con su misma cápsula: `radio.redondo`, borde de un
-   * píxel y letra pequeña con tracking. De ahí sale esta composición.
-   *
-   * Van APILADAS y no en fila porque en la portada retrato no caben: el ancho
-   * útil es 210 y las dos de El Arcade —«Esquivadas» y «Se juega ya»— miden
-   * juntas 221 con sus platos.
-   *
-   * Y VAN SOBRE UN PLATO OSCURO, que es lo que la de velada no necesita: allí el
-   * campo es oscuro y el acento hace de tinta; aquí la pastilla vive en la parte
-   * ALTA de la portada, donde el degradado todavía es el acento VIVO, y el blanco
-   * sobre ese extremo da 3,66:1 en violeta y 1,98:1 en ámbar. Sobre el plato
-   * —`SALA.suelo` al 78 %— da entre 11 y 13 en los cuatro temas, y el propio plato
-   * se recorta del fondo con 3,49 en el peor, así que no flota.
-   *
-   * El 78 y no el 72: al 72 el recorte se quedaba en 3,01 sobre el violeta, o sea
-   * que pasaba el mínimo de 3,0 por una centésima.
+   * LAS PASTILLAS SE APILAN Y SE VAN A LA DERECHA. Ocupan la esquina que en la
+   * tarjeta de velada ocupa la insignia DISPONIBLE/MUY PRONTO, que es de donde
+   * sale esta composición. La cápsula en sí la pinta `piezas.tsx`.
    */
   pastillas: { alignItems: 'flex-end', gap: 6 },
-  pastilla: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    maxWidth: 172,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: radio.redondo,
-    borderWidth: FILO,
-    borderColor: conAlfa(SALA.blanco, 0.22),
-    backgroundColor: conAlfa(SALA.suelo, 0.78),
-  },
-  /*
-   * 13 Y NO 10, PORQUE ES LA REGLA DE ESTA CASA Y ESTABA ESCRITA ARRIBA.
-   *
-   * El bloque de tipografía de este mismo fichero dice que la maqueta rotula en
-   * 8,5 y 9 píxeles, que eso está por debajo del mínimo de texto de esta casa
-   * —13— y que lo que se conserva de la maqueta es la jerarquía, no los cuerpos.
-   * Esta pastilla se escribió a 10 copiando la insignia de la tarjeta de velada,
-   * que va a 9 en Cinzel: una serif con caja alta pequeña, que es otra letra y
-   * otra regla.
-   *
-   * A 13 sigue cabiendo con holgura: «No disponible», que es el rótulo más largo
-   * de los tres, mide 156 con su plato y el tope de la cápsula es 172.
-   */
-  pastillaTexto: { ...LETRA.rotuloChico, fontSize: 13, color: SALA.blanco, flexShrink: 1 },
-  /*
-   * EL PILOTO va DENTRO de la pastilla y no en el pie, que es donde estaba. Es el
-   * mismo relleno o aro de antes —lleno si se juega aquí y ahora, hueco si hay que
-   * pedir mesa— y ahora está pegado a la palabra que explica lo que significa, en
-   * lugar de a cuatro renglones de distancia.
-   */
-  piloto: { width: 6, height: 6, borderRadius: 3 },
-  pilotoVivo: { backgroundColor: SALA.acento },
-  pilotoFrio: { borderWidth: FILO, borderColor: conAlfa(SALA.blanco, 0.55) },
 
   /*
    * LA ESTANTERÍA SANGRA POR LOS DOS LADOS. `salaBanda` tiene 20 de margen y un

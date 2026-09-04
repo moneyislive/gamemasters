@@ -450,6 +450,43 @@ export const CUENTA_DE_AFORO = {
 } as const;
 
 /** Los redondeos de la Sala. Pocos y con un trabajo cada uno. */
+/**
+ * ═══ LOS TRES ESTADOS DE UN BOTÓN, Y LOS TRES ESTÁN MEDIDOS ═══
+ *
+ * Había cuatro maneras distintas de pintar un botón en esta Sala, y dos de ellas
+ * fallaban el contraste en dos de los cuatro temas. Esta tabla existe para que la
+ * quinta no se invente.
+ *
+ * PRIMARIO: relleno de `acento` con tinta `suelo`. Es la ÚNICA pareja sólida que
+ * pasa a la vez el 4,5:1 del texto y el 3:1 del recorte del relleno contra la teja
+ * en los cuatro temas: 5,01 en violeta, 9,22 en ámbar, 8,69 en verde y 5,40 en
+ * carmesí. Lo que había —relleno de `acentoHondo` con tinta blanca— se queda en
+ * 4,64 en ámbar y en verde, y el comentario que lo defendía citaba únicamente el
+ * 6,4 del violeta. Y blanco sobre el acento VIVO, que es lo que pintan hoy La
+ * Frente y el lienzo, da 1,98 en ámbar: no es que pase raspando, es que no está.
+ *
+ * SECUNDARIO: sin relleno, con el texto en `acento` sobre la teja —4,58 / 8,44 /
+ * 7,96 / 4,94— y el borde en `acento` PLENO. Un borde de acento al 42 % se queda
+ * en 1,77 y deja de recortarse; si se quiere un borde discreto, `filoVivo`, pero
+ * entonces quien tiene que pasar el 3:1 es el texto.
+ *
+ * QUIETO: y esto es lo importante, PORQUE UN BOTÓN APAGADO NO SE PINTA CON
+ * `opacity`. Apagar con opacidad apaga también la etiqueta: medido, una ayuda en
+ * `tenue` dentro de un botón con `opacity: 0.5` cae de 5,95 a 2,32. Se apaga con
+ * COLOR —la teja lisa, el filo apagado y el rótulo en `tenue`—, que mantiene los
+ * 5,95. El argumento estaba escrito y razonado en `retablo.tsx`, y el fichero de
+ * al lado lo seguía haciendo mal en dos sitios: por eso vive aquí ahora.
+ *
+ * Y un botón apagado PIERDE EL ACENTO, no lo atenúa. En esta Sala el acento
+ * significa «esto se puede tocar»; uno de acento que no se deja pulsar dice una
+ * cosa y hace otra.
+ */
+export const BOTON = {
+  primario: { fondo: SALA.acento, tinta: SALA.suelo, borde: SALA.acento },
+  secundario: { fondo: 'transparent', tinta: SALA.acento, borde: SALA.acento },
+  quieto: { fondo: SALA.teja, tinta: SALA.tenue, borde: SALA.filo },
+} as const;
+
 export const RADIO = {
   /** Una ficha de máquina: un panel de dentro de una partida. */
   ficha: 14,
