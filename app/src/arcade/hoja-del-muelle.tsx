@@ -59,7 +59,13 @@ import type { FiguraId } from '../../../escenas/embarcadero/figuras';
 import type { TemaDelMuelle } from '../../../escenas/embarcadero/tema';
 import { opcionDeEmpezar } from './empezada';
 import type { LaMesa } from './mesa';
-import { CUENTA_DE_AFORO, LETRA, RADIO, SALA } from './muebles';
+import { LETRA, RADIO, SALA } from './muebles';
+/*
+ * Las muescas del raíl salen de `piezas.tsx`, que es el ÚNICO sitio que conoce sus
+ * medidas: el raíl estuvo escrito tres veces en la Sala y sólo se corrigió una, y
+ * `verify:gramatica` no deja que vuelva a pasar.
+ */
+import { HUECO_DE_MUESCAS, MUESCA } from './piezas';
 /* La misma tabla que ofrece el tablero en línea: un solo sitio para los dos. */
 import { PLAZOS } from './plazos';
 
@@ -186,7 +192,9 @@ export function HojaDelMuelle(props: PropsDeLaHoja): JSX.Element {
  * En la Sala las muescas encendidas son el mínimo para empezar; en el Muelle hay
  * una mesa delante y lo que se está mirando es cuánta gente hay YA: encendidas las
  * sentadas, tantas muescas como caben. En la orilla, sin mesa, vuelve a decir lo
- * que dice en la Sala. Las medidas son de `CUENTA_DE_AFORO`, como en todas partes.
+ * que dice en la Sala. Las muescas son las de `piezas.tsx` —forma, alto y hueco—;
+ * aquí sólo se decide cuántas se encienden, que es lo único que el Muelle sabe y
+ * la Sala no.
  */
 function RailDeAforo({
   aforo,
@@ -201,11 +209,19 @@ function RailDeAforo({
       ? `Aforo: de ${String(aforo.minimo)} a ${String(aforo.maximo)} jugadores`
       : `${String(sentados)} de ${String(aforo.maximo)} sentados`;
   return (
-    <View style={estilos.rail} accessibilityRole="image" accessibilityLabel={etiqueta}>
+    <View
+      style={[estilos.rail, { gap: HUECO_DE_MUESCAS }]}
+      accessibilityRole="image"
+      accessibilityLabel={etiqueta}
+    >
       {Array.from({ length: aforo.maximo }, (_, i) => (
         <View
           key={i}
-          style={[estilos.muesca, i < encendidas ? estilos.muescaEncendida : estilos.muescaApagada]}
+          style={[
+            MUESCA.base,
+            i < encendidas ? MUESCA.alta : MUESCA.baja,
+            i < encendidas ? MUESCA.viva : MUESCA.fria,
+          ]}
         />
       ))}
     </View>
@@ -656,13 +672,9 @@ const estilos = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-end',
     height: 19,
-    gap: 6,
     borderBottomWidth: 1,
     borderBottomColor: SALA.filo,
   },
-  muesca: { width: CUENTA_DE_AFORO.grosor, borderRadius: 2 },
-  muescaEncendida: { height: CUENTA_DE_AFORO.altoEncendida, backgroundColor: SALA.acento },
-  muescaApagada: { height: CUENTA_DE_AFORO.altoApagada, backgroundColor: SALA.filoVivo },
 
   /* ---------- La hoja de abajo: vidrio teja del 36 % ---------- */
   hoja: {
@@ -729,7 +741,13 @@ const estilos = StyleSheet.create({
   },
   /* `acentoHondo` de campo y `acento` de filo: la placa de la maqueta, con 6,4:1 de contraste. */
   botonVivo: { backgroundColor: SALA.acentoHondo, borderColor: SALA.acento },
-  botonQuieto: { borderColor: SALA.filo, opacity: 0.5 },
+  /*
+   * Apagado CON COLOR y no con opacidad: la opacidad apaga también la letra de
+   * dentro y una ayuda en `tenue` cae de 5,95 a 2,32:1. Es la regla que
+   * `retablo.tsx` explica y `verify:gramatica` vigila. Teja y filo: un mando que no
+   * se puede tocar se lee como una superficie más, no como un fantasma.
+   */
+  botonQuieto: { borderColor: SALA.filo, backgroundColor: SALA.teja },
   botonRotulo: { ...LETRA.rotuloChico, color: SALA.palabra, fontSize: 15 },
   botonRotuloVivo: { color: SALA.blanco, fontWeight: '800' },
   botonAyuda: { ...LETRA.cuerpo, color: SALA.blanco, fontSize: 13, lineHeight: 18, textAlign: 'center', opacity: 0.85 },
