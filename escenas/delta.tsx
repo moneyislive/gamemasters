@@ -78,6 +78,34 @@ import * as THREE from 'three';
  * con la lista vacía NO hace, porque el compilador lo elide; ver `jsx-de-three.d.ts`.
  */
 import { useFrame } from '@react-three/fiber';
+
+/**
+ * ¿ESTE SUCESO NO ES DEL BOTÓN CON EL QUE SE JUEGA?
+ *
+ * ═══ POR QUÉ HACE FALTA PREGUNTARLO ═══
+ *
+ * Un `pointerdown` o un `pointerup` de r3f llega igual con el botón derecho, con el
+ * central o con el izquierdo: el motor de sucesos no mira cuál. Mientras el ratón
+ * sólo servía para señalar daba igual. Desde que el botón secundario DESPLAZA LA
+ * MIRADA por el tablero, deja de dar igual y pasa a ser un fallo que cambia la
+ * partida: apoyar el arrastre encima de la barra tomaba una pieza sin que nadie lo
+ * pidiera, y soltarlo sobre un anillo FUNDABA ALLÍ. Y no es un rincón raro: «cojo la
+ * casa y me acerco a mirar dónde la pongo» es exactamente el camino que se pidió.
+ *
+ * Así que las cuatro puertas por las que se juega —coger de la barra, coger de la
+ * mano, soltar en un anillo, soltar en un área de trueque— sólo las abre el botón
+ * primario. El toque de un dedo y el lápiz también son primario (botón 0), así que
+ * esto no le quita nada al móvil.
+ *
+ * Va ANTES de `loCogeLaInterfaz`, y ese orden es la mitad del arreglo: si se marcara
+ * el suceso como «de la interfaz» y luego se descartara, la cámara lo vería marcado y
+ * tampoco desplazaría — o sea que el gesto no haría nada en toda la franja de abajo
+ * del lienzo, que es justo donde viven la barra y la mano.
+ */
+function noEsElPrimario(e: { nativeEvent: { button?: number } }): boolean {
+  const boton = e.nativeEvent.button;
+  return boton !== undefined && boton !== 0;
+}
 import {
   aristasDe,
   centroDeHex,
@@ -855,6 +883,7 @@ function Senal({
          * contrario de lo que hace falta.
          */
         onPointerUp={(e) => {
+          if (noEsElPrimario(e)) return;
           e.stopPropagation();
           onElegir(sitio);
         }}
@@ -1016,6 +1045,7 @@ function PiezaEnLaBarra({
         }}
         onPointerOut={() => setEncima(false)}
         onPointerDown={(e) => {
+          if (noEsElPrimario(e)) return;
           e.stopPropagation();
           loCogeLaInterfaz(e.nativeEvent);
           if (pieza.disponible) onTomar(pieza.id);
@@ -1363,6 +1393,7 @@ function Carta({
         }}
         onPointerOut={() => setEncima(false)}
         onPointerDown={(e) => {
+          if (noEsElPrimario(e)) return;
           e.stopPropagation();
           loCogeLaInterfaz(e.nativeEvent);
           onCoger(carta);
@@ -1440,6 +1471,7 @@ function AreaDeTrueque({
         }}
         onPointerOut={() => setEncima(false)}
         onPointerUp={(e) => {
+          if (noEsElPrimario(e)) return;
           e.stopPropagation();
           onSoltar(bien);
         }}
