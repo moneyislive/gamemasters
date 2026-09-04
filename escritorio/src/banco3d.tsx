@@ -266,7 +266,18 @@ function Camara({
       if (girando) {
         mirador.current = { ...mirador.current, rumbo: mirador.current.rumbo + delta * 0.18 };
       }
-      const [x, y, z] = ojoDelMirador(mirador.current, alcance);
+      /*
+       * La proporción de la pantalla entra aquí y no en el encuadre del tablero: lo que
+       * depende del aparato es dónde se pone el ojo, no lo grande que es el delta. En el
+       * escritorio esto vale uno y no cambia nada; en la app, que es vertical, es lo que
+       * impide que el tablero se salga por los lados.
+       */
+      const lienzo = gl.domElement;
+      const [x, y, z] = ojoDelMirador(
+        mirador.current,
+        alcance,
+        lienzo.clientHeight > 0 ? lienzo.clientWidth / lienzo.clientHeight : undefined,
+      );
       camera.position.set(x, y, z);
       camera.lookAt(0, 0, 0);
       return;

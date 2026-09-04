@@ -651,7 +651,16 @@ export function trazaLasAguas(mundo: MundoParaAguas): Aguas {
   const grupo = new Int32Array(n).fill(-1);
   const grupos: number[][] = [];
   for (let i = 0; i < n; i++) {
-    if ((w[i] as number) <= (h[i] as number) + 1e-9 || grupo[i] >= 0) continue;
+    /*
+     * `?? -1` Y NO UN `as number`, aunque el índice esté claramente dentro.
+     *
+     * Con `noUncheckedIndexedAccess` —que la app SÍ activa y este paquete no— leer un array
+     * tipado da `number | undefined`, y aquí había dos sitios que no compilaban. Un `as
+     * number` lo callaría, pero un `as` es una promesa que el compilador no puede
+     * comprobar; `?? -1` DICE qué hacer si no hay entrada, y resulta que lo que hay que
+     * hacer es exactamente eso: sin entrada, esa celda no está en ningún grupo.
+     */
+    if ((w[i] as number) <= (h[i] as number) + 1e-9 || (grupo[i] ?? -1) >= 0) continue;
     const cual = grupos.length;
     const bolsa: number[] = [];
     const pila = [i];
@@ -661,7 +670,7 @@ export function trazaLasAguas(mundo: MundoParaAguas): Aguas {
       bolsa.push(t);
       for (let k = 0; k < 6; k++) {
         const v = vecinos[t * 6 + k] as number;
-        if (v < 0 || grupo[v] >= 0) continue;
+        if (v < 0 || (grupo[v] ?? -1) >= 0) continue;
         if ((w[v] as number) <= (h[v] as number) + 1e-9) continue;
         /* Un lago es una lámina: todas sus celdas están a la misma cota. */
         if (Math.abs((w[v] as number) - (w[t] as number)) > 1e-6) continue;

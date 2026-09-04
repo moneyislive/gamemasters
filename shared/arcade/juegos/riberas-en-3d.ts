@@ -40,10 +40,25 @@
  * frontera se mantiene: esto habla de Riberas por un lado y devuelve llaves y cadenas por
  * el otro, y quien las junta es el cliente.
  */
+import type { CartaEnLaMano } from '../../../escenas/baraja';
+import type { ColorDeJugador, DeltaEn3D } from '../../../escenas/tipos';
 import type { LlaveDeArista, LlaveDeVertice } from '../../mecanicas/malla-hexagonal';
 import { claseDeLlave } from '../../mecanicas/malla-hexagonal';
 import type { Opcion } from '../opciones';
-import { ALZAR, FUNDAR, opcionesDeRiberas } from './riberas';
+import { ALZAR, bienDeLaFicha, FUNDAR, opcionesDeRiberas } from './riberas';
+
+/*
+ * ═══ POR QUÉ ESTE FICHERO IMPORTA TIPOS DE `escenas/` Y NO AL REVÉS ═══
+ *
+ * Sólo TIPOS, con `import type`, que se borra al compilar: no queda ni una dependencia en
+ * ejecución. `escenas/tipos.ts` es EL CONTRATO del tablero en tres dimensiones —dice él
+ * mismo que es un dato llano, sin `three` y sin React, para que lo pueda leer un
+ * comprobador de Node— y `escenas/baraja.ts` es el de la mano.
+ *
+ * Declararlos otra vez aquí sería duplicar un contrato, que es la forma más fácil de que
+ * dos mitades dejen de encajar sin que nadie lo note. La dirección de la flecha importa
+ * menos que el hecho de que haya UNA sola definición.
+ */
 
 /**
  * QUÉ SE PUEDE LEVANTAR. Son las tres piezas de Riberas, dichas con sus nombres.
@@ -217,4 +232,155 @@ function fichasDeSobra(): string[] {
     for (let i = 0; i < 8; i++) fichas.push(`p${String(i)}:${bien}`);
   }
   return fichas;
+}
+
+// ---------------------------------------------------------------------------
+// DE LA VISTA AL TABLERO: lo que la pantalla del juego necesita para no interpretar nada
+// ---------------------------------------------------------------------------
+
+/**
+ * LOS COLORES QUE EL TABLERO EN 3D SABE PINTAR, y son CUATRO.
+ *
+ * ═══ Y RIBERAS ADMITE SEIS COLONOS, QUE ES UN PROBLEMA DE VERDAD ═══
+ *
+ * Las construcciones de jugador no se tiñen: se elige la pieza del pack que ya viene
+ * pintada de ese color, y el atlas de KayKit tiene cuatro columnas de color de jugador.
+ * `MANIFIESTO_RIBERAS` admite de dos a seis.
+ *
+ * Así que una mesa de cinco o seis NO se puede pintar entera hoy, y lo peor que se puede
+ * hacer con eso es repartir los colores con un módulo: dos colonos saldrían del mismo
+ * color, sobre el mismo tablero, sin un error en ninguna parte — y la partida se vuelve
+ * injugable de una forma que nadie sabe explicar.
+ *
+ * Por eso hay `bastanColores`: quien monte la pantalla PREGUNTA antes, y si no bastan,
+ * enseña el tablero plano en vez de uno que miente. Es una respuesta pobre y es honrada.
+ * La buena —hornear el color al modelo y teñir al cargar— es otro trabajo.
+ */
+export const COLORES_EN_3D: readonly ColorDeJugador[] = ['red', 'blue', 'yellow', 'green'];
+
+/** Lo mínimo de la vista que hace falta aquí, sin repetir el tipo entero de Riberas. */
+interface ColonoLlano {
+  asiento?: unknown;
+  chozas?: unknown;
+  torres?: unknown;
+  veredas?: unknown;
+}
+
+function comoVistaLlana(
+  vista: unknown,
+): { colonos: ColonoLlano[]; islas: unknown[]; misFichas: unknown[] } | null {
+  if (typeof vista !== 'object' || vista === null) return null;
+  const v = vista as { desde?: unknown; colonos?: unknown; islas?: unknown; misFichas?: unknown };
+  if (v.desde !== 'riberas') return null;
+  if (!Array.isArray(v.colonos) || !Array.isArray(v.islas)) return null;
+  return {
+    colonos: v.colonos as ColonoLlano[],
+    islas: v.islas as unknown[],
+    misFichas: Array.isArray(v.misFichas) ? (v.misFichas as unknown[]) : [],
+  };
+}
+
+/** Si esta mesa cabe en los colores que el tablero 3D sabe pintar. */
+export function bastanColores(vista: unknown): boolean {
+  const v = comoVistaLlana(vista);
+  return v !== null && v.colonos.length <= COLORES_EN_3D.length;
+}
+
+function comoLlaves(x: unknown): string[] {
+  return Array.isArray(x) ? x.filter((v): v is string => typeof v === 'string') : [];
+}
+
+/**
+ * EL TABLERO EN TRES DIMENSIONES A PARTIR DE LA VISTA.
+ *
+ * ═══ POR QUÉ ESTO NO LO HACE LA PANTALLA ═══
+ *
+ * Porque entonces cada cliente —la app y el escritorio— tendría su propia lectura de la
+ * vista, y dos lecturas de lo mismo acaban divergiendo: una pinta las torres y la otra se
+ * olvida, o una reparte los colores por orden de asiento y la otra por orden de lista, y
+ * la misma partida se ve distinta en dos aparatos. Aquí se lee UNA vez.
+ *
+ * ═══ EL COLOR VA POR ORDEN DE ASIENTO, Y NO ES UN DETALLE ═══
+ *
+ * `colonos` se construye al empezar copiando los asientos en el orden en que se sentaron y
+ * ya no cambia, así que el índice ES el jugador. Repartir por otra cosa —por el color que
+ * trae la vista, por ejemplo— ataría el tablero 3D a la paleta del tablero plano, que son
+ * dos decisiones distintas que hoy coinciden.
+ *
+ * ═══ Y NO HAY LADRÓN ═══
+ *
+ * Riberas no lo tiene: su desgracia es el ESTIAJE, que no ocupa una comarca sino que corta
+ * la producción del turno. Así que `ladron` sale siempre `null`, y eso no es un hueco por
+ * rellenar: es que este juego no tiene esa pieza. Cuando el estiaje quiera verse, será
+ * otra cosa y tendrá su propio campo.
+ */
+export function deltaDeLaVista(vista: unknown): DeltaEn3D | null {
+  const v = comoVistaLlana(vista);
+  if (v === null) return null;
+
+  const islas = v.islas.flatMap((i) => {
+    if (typeof i !== 'object' || i === null) return [];
+    const isla = i as { hex?: unknown; terreno?: unknown; numero?: unknown };
+    const hex = isla.hex as { q?: unknown; r?: unknown } | undefined;
+    if (hex === undefined || typeof hex.q !== 'number' || typeof hex.r !== 'number') return [];
+    const numero = typeof isla.numero === 'number' ? isla.numero : 0;
+    return [
+      {
+        hex: { q: hex.q, r: hex.r },
+        terreno: typeof isla.terreno === 'string' ? isla.terreno : 'desconocido',
+        /* El cero de la duna NO es un número que salga con los dados: es «no rinde». */
+        cifra: numero === 0 ? null : numero,
+      },
+    ];
+  });
+
+  const piezas: DeltaEn3D['piezas'][number][] = [];
+  const caminos: DeltaEn3D['caminos'][number][] = [];
+  v.colonos.forEach((c, i) => {
+    const color = COLORES_EN_3D[i];
+    if (color === undefined) return;
+    for (const vertice of comoLlaves(c.chozas)) {
+      piezas.push({ vertice: vertice as LlaveDeVertice, clase: 'poblado', color });
+    }
+    for (const vertice of comoLlaves(c.torres)) {
+      piezas.push({ vertice: vertice as LlaveDeVertice, clase: 'ciudad', color });
+    }
+    for (const arista of comoLlaves(c.veredas)) {
+      caminos.push({ arista: arista as LlaveDeArista, color });
+    }
+  });
+
+  return { islas, piezas, caminos, ladron: null };
+}
+
+/**
+ * LA MANO DE QUIEN MIRA, en cartas.
+ *
+ * ═══ LOS BIENES SALEN CON SUS NOMBRES, SIN TRADUCIR ═══
+ *
+ * `limo`, `junco`, `sal`, `piedra` y `grano`. Traducirlos aquí a la jerga del catán
+ * —madera, ladrillo, lana— sería meter entre el juego y su dibujo una tabla que nadie
+ * mantendría; y además el juego se llama Riberas: sus bienes se llaman como se llaman. Lo
+ * que tiene que adaptarse es el ARTE, no el vocabulario.
+ *
+ * (Hoy los iconos de las cartas son provisionales y están dibujados para el vocabulario
+ * del catán, así que hasta que llegue el arte propio de Riberas cuatro de los cinco no
+ * casan. Está dicho en `arte/game-icons/LEEME.md`, y es una razón más para sustituirlos.)
+ *
+ * ═══ EL IDENTIFICADOR ES LA FICHA, Y NO SALE DE AQUÍ ═══
+ *
+ * `misFichas` es MI almacén: la proyección ya se encarga de que el ajeno no viaje. Usar la
+ * ficha como identificador da una llave estable —la carta no salta de sitio al repintar—
+ * sin inventar un contador que habría que sincronizar. OJO y queda escrito: esto vale para
+ * una llave de React, NO para un identificador de opción; ahí un identificador con una
+ * ficha dentro publicaría un secreto, y eso lo prohíbe el §5 bis.
+ */
+export function manoDeLaVista(vista: unknown): CartaEnLaMano[] {
+  const v = comoVistaLlana(vista);
+  if (v === null) return [];
+  return v.misFichas.flatMap((f) => {
+    if (typeof f !== 'string') return [];
+    const bien = bienDeLaFicha(f);
+    return bien === null ? [] : [{ id: f, bien }];
+  });
 }

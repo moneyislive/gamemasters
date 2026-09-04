@@ -127,16 +127,53 @@ export const MIRADOR_DE_SALIDA: Mirador = {
 };
 
 /**
+ * CUÁNTO HAY QUE ALEJARSE PARA QUE EL TABLERO QUEPA EN ESTA PANTALLA.
+ *
+ * ═══ POR QUÉ ESTO VIVE EN LA CÁMARA Y NO EN EL ENCUADRE DEL TABLERO ═══
+ *
+ * `encuadreDelDelta` mide el MUNDO: dice lo grande que es el delta, y ese número también
+ * gobierna la niebla y la caja de las sombras. Meterle la proporción de pantalla haría que
+ * al girar un móvil cambiara el alcance de la niebla, que no tiene nada que ver con la
+ * pantalla. Lo que depende del aparato es dónde se pone el OJO, y eso es esto.
+ *
+ * ═══ LA CUENTA ═══
+ *
+ * El campo de visión que declara una cámara es el VERTICAL; el horizontal sale de
+ * multiplicarlo por la proporción. En apaisado sobra ancho y manda el alto, así que no hay
+ * que hacer nada. En RETRATO —la app es vertical— el que se queda corto es el ancho, y hay
+ * que alejarse en la misma proporción o el tablero se sale por los lados.
+ *
+ * ═══ Y LA REFERENCIA ES 16:9, NO «CUADRADO» ═══
+ *
+ * El primer intento usaba `1/proporcion`, que devuelve el ancho de una pantalla CUADRADA.
+ * Y al medirlo se quedaba corto: en un móvil de 9:19,5 daba 146,9 de ancho visible cuando
+ * el tablero pide 200. El encuadre de salida no se eligió en una pantalla cuadrada sino en
+ * una de 16:9 —ahí sobran 261—, así que la referencia tiene que ser ésa.
+ *
+ * Con `16/9 ÷ proporcion` cualquier pantalla ve exactamente el mismo ancho de mundo que un
+ * monitor. Y no se acerca nunca en las más anchas que la referencia: en una ultrapanorámica
+ * sobra ancho, y acercarse por eso recortaría el alto.
+ */
+export const PROPORCION_DE_REFERENCIA = 16 / 9;
+
+export function alejarseParaQueQuepa(proporcion: number): number {
+  const suya = Math.max(0.05, proporcion);
+  return suya >= PROPORCION_DE_REFERENCIA ? 1 : PROPORCION_DE_REFERENCIA / suya;
+}
+
+/**
  * Dónde va el ojo, en coordenadas del mundo, mirando al centro del tablero.
  *
  * La distancia al centro sale de `LEJANIA` y no depende de la altura, que es lo que hace
- * que inclinar sea inclinar y no acercarse.
+ * que inclinar sea inclinar y no acercarse. `proporcion` es ancho/alto de la pantalla; sin
+ * ella se supone apaisado, que es lo que hacía antes de que existiera la app.
  */
 export function ojoDelMirador(
   mirador: Mirador,
   alcance: number,
+  proporcion = PROPORCION_DE_REFERENCIA,
 ): readonly [number, number, number] {
-  const radio = alcance * LEJANIA;
+  const radio = alcance * LEJANIA * alejarseParaQueQuepa(proporcion);
   const llano = Math.cos(mirador.altura) * radio;
   return [Math.sin(mirador.rumbo) * llano, Math.sin(mirador.altura) * radio, Math.cos(mirador.rumbo) * llano];
 }
