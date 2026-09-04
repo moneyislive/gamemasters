@@ -56,6 +56,7 @@ import { CAUCE, CUERPO, piezaDeOrilla } from '../aguas';
 import { piezasDeAsentamiento } from '../asentamiento';
 import { sitiosDelTablero, sitiosPermitidos } from '../sitios';
 import {
+  alejarseParaQueQuepa,
   ALTURA_DE_SALIDA,
   esDeLaInterfaz,
   loCogeLaInterfaz,
@@ -1260,6 +1261,49 @@ paso('La camara se mira quieta, se gira arrastrando y no se cuela por ningun lad
   );
 
   /*
+   * EL TABLERO CABE EN UN MOVIL DE PIE, que es donde se va a jugar de verdad.
+   *
+   * El campo de vision que declara una camara es el VERTICAL; el horizontal sale de
+   * multiplicarlo por la proporcion. En apaisado sobra ancho y no hay nada que hacer, y por
+   * eso esto no se noto antes: el banco es apaisado. En retrato el que se queda corto es el
+   * ancho, y sin alejarse el tablero se sale por los lados — en un movil de 9:19,5, mas del
+   * doble de lo que cabe.
+   *
+   * Se comprueba lo que importa: que en apaisado NO cambie nada (o esto habria movido la
+   * camara del escritorio de rebote) y que en retrato el ancho visible siga dando para el
+   * tablero entero.
+   */
+  const CAMPO_VERTICAL = (45 * Math.PI) / 180;
+  const RADIO = 100;
+  const anchoQueSeVe = (proporcion: number): number => {
+    const [x, y, z] = ojoDelMirador(MIRADOR_DE_SALIDA, RADIO, proporcion);
+    const lejos = Math.hypot(x, y, z);
+    return 2 * lejos * Math.tan(CAMPO_VERTICAL / 2) * proporcion;
+  };
+  comprobar(
+    'en la pantalla de referencia y en las mas anchas, la camara no se mueve',
+    Math.abs(alejarseParaQueQuepa(16 / 9) - 1) < 1e-12 &&
+      Math.abs(alejarseParaQueQuepa(21 / 9) - 1) < 1e-12,
+    { referencia: alejarseParaQueQuepa(16 / 9), ultrapanoramica: alejarseParaQueQuepa(21 / 9) },
+  );
+  comprobar(
+    'y toda pantalla mas estrecha ve el MISMO ancho de mundo que un monitor',
+    [1, 4 / 3, 3 / 4, 9 / 16, 9 / 19.5].every(
+      (pr) => Math.abs(anchoQueSeVe(pr) - anchoQueSeVe(16 / 9)) < 1e-9,
+    ),
+    [1, 4 / 3, 9 / 19.5].map((pr) => Number(anchoQueSeVe(pr).toFixed(2))),
+  );
+  comprobar(
+    'y en un movil de pie el tablero entero sigue cabiendo de ancho',
+    anchoQueSeVe(9 / 19.5) > 2 * RADIO,
+    {
+      cabe: Number(anchoQueSeVe(9 / 19.5).toFixed(1)),
+      hacenFalta: 2 * RADIO,
+      sinCorregir: Number((anchoQueSeVe(9 / 19.5) * (9 / 19.5)).toFixed(1)),
+    },
+  );
+
+  /*
    * LA MARCA DE «ESTO SE LO QUEDA LA INTERFAZ» ES POR SUCESO, NO UN BANDERIN.
    *
    * Se comprueban las tres cosas de golpe porque son la misma: que por defecto el gesto es
@@ -1495,7 +1539,7 @@ if (fallos.length > 0) {
  * a veintitrés: durante ese tiempo el guion podía morirse en la novena sin que nadie se
  * enterara. Un guardia desfasado no guarda nada.
  */
-const COMPROBACIONES_ESCRITAS = 74;
+const COMPROBACIONES_ESCRITAS = 77;
 if (hechas < COMPROBACIONES_ESCRITAS) {
   console.error(
     `Solo se han hecho ${hechas} de las ${COMPROBACIONES_ESCRITAS} comprobaciones que ` +
