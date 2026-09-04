@@ -574,6 +574,19 @@ export interface Account {
    * también a todos los jugadores de todas las campañas en curso.
    */
   sesionesValidasDesde?: string;
+  /**
+   * LA FIGURA: qué aventurero te representa en los lobbies de la Sala de Arcade.
+   *
+   * Es un identificador corto y OPACO para el servidor —`caballero`, `maga`—: la
+   * lista de los que existen vive en `escenas/`, que es quien los dibuja, y el
+   * servidor no la conoce ni la necesita. Aquí sólo se guarda lo que la persona
+   * eligió, para que le siga de un aparato a otro: sin esto, la elección vivía
+   * en el aparato y cambiar de móvil era volver a ser el aventurero de serie.
+   *
+   * No es el avatar de las veladas (`app/src/avatar.ts`, la figura dibujada o el
+   * modelo esculpido): aquél es un retrato y éste es un personaje que anda.
+   */
+  figura?: string;
 }
 
 // ---------------------------------------------------------------------------

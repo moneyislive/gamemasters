@@ -365,10 +365,35 @@ paso('La portada no puede reventar por un icono que no conoce');
     /ICONOS_DE_ARCADE_CONOCIDOS/.test(vitrina) && /ICONO_DE_ARCADE_POR_DEFECTO/.test(vitrina),
     'sin esto, un arcade de fuera con otro icono deja `undefined` en la tarjeta',
   );
+  /*
+   * ANTES ESTO EXIGÍA VER UN `ICONOS_DE_ARCADE[…] ??` EN LA PORTADA, y esa
+   * redacción caducó el día que la Sala estrenó identidad: la tarjeta nueva no
+   * pinta icono —lo que distingue una máquina de otra es el raíl del aforo— así
+   * que ya no indexa la tabla en ningún sitio.
+   *
+   * Pedir el guardia tal cual estaba obligaba a volver a poner un icono SOLO
+   * para que un comprobador lo viera, que es la peor razón que hay para escribir
+   * una línea. Pero borrar la comprobación tampoco valía: existe porque este
+   * agujero —`ICONOS_DE_ARCADE[loQueSea]` devolviendo `undefined`, React
+   * lanzando al pintar `<undefined />` y la portada entera en blanco— YA TUMBÓ
+   * esta pantalla una vez, y volvería a caber el día que alguien devuelva el
+   * icono a la ficha.
+   *
+   * Así que se afirma lo que de verdad hay que sostener, que es más fuerte que
+   * lo de antes y no menos: NINGUNA indexación de esa tabla puede quedarse sin
+   * respaldo. Con cero indexaciones se cumple por construcción; con una sin `??`
+   * esto se pone rojo igual que antes.
+   */
+  const indexaciones = portada.match(/ICONOS_DE_ARCADE\s*\[[^\]]+\]/g) ?? [];
+  const sinRespaldo = indexaciones.filter(
+    (uso) => !new RegExp(`${uso.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\?\\?`).test(portada),
+  );
   comprobar(
-    'y la tarjeta lleva además su propio respaldo',
-    /ICONOS_DE_ARCADE\[[^\]]+\]\s*\?\?/.test(portada),
-    'dos guardias para un agujero que el compilador no ve y que ya tumbó esta portada una vez',
+    'ninguna indexación de la tabla de iconos se queda sin respaldo en la portada',
+    sinRespaldo.length === 0,
+    sinRespaldo.length === 0
+      ? `${indexaciones.length} indexaciones, todas con respaldo`
+      : `sin \`??\`: ${sinRespaldo.join(', ')} — el agujero que ya tumbó esta portada una vez`,
   );
   comprobar(
     'la razón por la que no se puede jugar se pinta',
@@ -379,6 +404,219 @@ paso('La portada no puede reventar por un icono que no conoce');
     'y la portada pide el catálogo por la puerta de la casa',
     /pedirCatalogoDeArcade/.test(portada),
     'una dirección escrita a mano se salta la elección de servidor',
+  );
+}
+
+paso('La Sala manda al Muelle a quien lo tiene, y al mueble a quien no');
+{
+  /*
+   * ═══ `rutaDeArcade` YA NO ES UNA LÍNEA, Y HAY QUE LEERLA ═══
+   *
+   * Desde el Muelle, la tarjeta de un arcade con lobby en tres dimensiones lleva
+   * a `/muelle?arcade=…` y NO al mueble que declara su manifiesto; el mueble no
+   * cambia —Riberas sigue siendo `tablero`— y al zarpar es el propio Muelle quien
+   * navega con `rutaDelMueble`. Quién tiene muelle lo dice
+   * `escenas/embarcadero/tema.ts`, no el manifiesto (sellado).
+   *
+   * Lo que se compra aquí es que las dos puertas sigan siendo dos y en el orden
+   * bueno: que la Sala navegue con `rutaDeArcade`, que `rutaDeArcade` pregunte a
+   * `tieneMuelle` Y a la sede antes de mandar al Muelle, y que `rutaDelMueble`
+   * siga siendo la del mueble a secas. Un día alguien «simplifica» y la tarjeta
+   * de Riberas vuelve a abrir el tablero vacío sin pasar por el embarcadero.
+   */
+  const muebles = leer(path.join(SRC, 'arcade', 'muebles.ts'));
+  const vitrina = leer(path.join(SRC, 'vitrina.ts'));
+  const escena = leer(path.join(SRC, 'arcade', 'muelle-escena.tsx'));
+
+  comprobar('`muebles.ts` importa `tieneMuelle` del tema del embarcadero', /import \{ tieneMuelle \} from '\.\.\/\.\.\/\.\.\/escenas\/embarcadero\/tema'/.test(muebles));
+  comprobar(
+    '`rutaDeArcade` manda al Muelle sólo con muelle Y con sede en el servidor',
+    /sede === 'servidor' && tieneMuelle\(manifiesto\.id\)[\s\S]{0,120}pathname: '\/muelle'/.test(muebles),
+    'sin la sede, un arcade de aparato con tema iría a un lobby sin mesa',
+  );
+  comprobar(
+    'y en otro caso cae a `rutaDelMueble`, que es lo que hacía antes',
+    /return rutaDelMueble\(manifiesto\);/.test(muebles) &&
+      /export function rutaDelMueble[\s\S]{0,200}MUEBLES\[manifiesto\.mueble\]\.ruta/.test(muebles),
+  );
+  comprobar('la Sala sigue navegando con `rutaDeArcade` y no con la del mueble', /rutaDeArcade\(m\)/.test(vitrina) && !/rutaDelMueble/.test(vitrina));
+  comprobar('y el Muelle zarpa con `rutaDelMueble`, nunca con `rutaDeArcade`', /router\.replace\(rutaDelMueble\(manifiesto\)\)/.test(escena) && !/rutaDeArcade/.test(escena), 'con `rutaDeArcade` zarparía hacia sí mismo');
+  comprobar(
+    '`/muelle` está en la unión de rutas del grupo, para que el tipado de rutas la conozca',
+    /RutaDeMueble = [^;]*'\/muelle'/.test(muebles),
+  );
+  comprobar(
+    'y la pila de `(arcade)` declara la pantalla `muelle` fuera del `Record` de muebles',
+    /<Stack\.Screen name="muelle" \/>/.test(leer(path.join(APP, '(arcade)', '_layout.tsx'))),
+  );
+}
+
+paso('Si la mesa ha empezado se sabe sin abrir la vista del juego');
+{
+  /*
+   * `empezada.ts` no importa nada, así que se EJECUTA: los tres casos que el
+   * encargo pide —el campo viene `true`, viene `false`, y no viene pero el juego
+   * ofrece la opción de empezar— más los bordes que la propia función documenta.
+   * El Muelle decide con esto si monta el lienzo y cuándo zarpa; una inferencia
+   * mal hecha manda a la gente al tablero antes de repartir.
+   */
+  const { haEmpezado, opcionDeEmpezar } = await cargarModuloTs(path.join(SRC, 'arcade', 'empezada.ts'));
+  const empezar = { id: 'empezar', tipo: 'riberas:empezar', carga: {}, rotulo: 'Repartir el delta', ayuda: '' };
+  const otra = { id: 'fundar:0', tipo: 'riberas:fundar', carga: { vertice: 0 }, rotulo: 'Fundar', ayuda: '' };
+
+  comprobar('si viene `true`, ha empezado', haEmpezado({ empezada: true, opciones: [empezar] }) === true);
+  comprobar('si viene `false`, no ha empezado aunque no ofrezca nada', haEmpezado({ empezada: false, opciones: [] }) === false);
+  comprobar(
+    'si no viene y el juego ofrece empezar, NO ha empezado',
+    haEmpezado({ opciones: [empezar] }) === false,
+  );
+  comprobar('si no viene y ofrece otras cosas, sí ha empezado', haEmpezado({ opciones: [otra] }) === true);
+  comprobar('sin mesa no ha empezado nada', haEmpezado(null) === false && haEmpezado(undefined) === false);
+  comprobar('una mesa terminada no se reúne', haEmpezado({ terminada: true, opciones: [empezar] }) === true);
+  comprobar(
+    'la opción de empezar se reconoce por el `id` o por el último tramo del `tipo`',
+    opcionDeEmpezar([otra, { ...empezar, id: 'x' }])?.tipo === 'riberas:empezar' &&
+      opcionDeEmpezar([{ ...empezar, tipo: 'otro:arrancar' }])?.id === 'empezar' &&
+      opcionDeEmpezar([otra]) === undefined,
+  );
+  comprobar(
+    'y el Muelle y la hoja preguntan por esta puerta y no leen `empezada` a pelo',
+    /haEmpezado\(mesa\.mesa\)/.test(leer(path.join(SRC, 'arcade', 'muelle-escena.tsx'))) &&
+      /opcionDeEmpezar\(/.test(leer(path.join(SRC, 'arcade', 'hoja-del-muelle.tsx'))) &&
+      !/\.empezada\b/.test(leer(path.join(SRC, 'arcade', 'muelle-escena.tsx'))),
+  );
+}
+
+paso('La cámara de Riberas en tres dimensiones se puede mover con el dedo');
+{
+  /*
+   * ═══ EL FALLO QUE ESTO VIGILA NO SE VE EN NINGÚN COMPROBADOR DE TIPOS ═══
+   *
+   * Un `Gesture.Pan()` con `manualActivation(true)` tiene que llamar a
+   * `estado.activate()` / `estado.fail()` él mismo, y esas dos SÓLO hacen algo
+   * desde un worklet: en el hilo de JavaScript, `setGestureState` de Reanimated
+   * avisa por consola y no cambia nada, así que el gesto se queda en `BEGAN` para
+   * siempre. Con `.runOnJS(true)` en ese mismo gesto compila, no avisa en tipos, y
+   * la cámara no gira en iOS ni en Android. Pasó en `mirador-tactil.ts`: se
+   * copió el `runOnJS(true)` de `entrada.ts`, que sí puede llevarlo porque no
+   * activa nada a mano.
+   *
+   * Se mira cada CADENA de gesto por separado —de un `Gesture.` al siguiente— y no
+   * el fichero entero, porque en el mismo fichero conviven un arrastre worklet y
+   * una pinza en JS, y las dos están bien.
+   */
+  const carpeta = path.join(SRC, 'arcade');
+  const ficheros = fs.readdirSync(carpeta).filter((f) => /\.tsx?$/.test(f));
+  const conActivacionManualEnJs = [];
+  for (const f of ficheros) {
+    const texto = leer(path.join(carpeta, f));
+    const cadenas = texto.split(/(?=Gesture\.)/g).slice(1);
+    for (const cadena of cadenas) {
+      if (/manualActivation\(/.test(cadena) && /runOnJS\(\s*true\s*\)/.test(cadena)) {
+        conActivacionManualEnJs.push(f);
+      }
+    }
+  }
+  comprobar(
+    'ningún gesto de `app/src/arcade` con `manualActivation(` lleva `runOnJS(true)`',
+    conActivacionManualEnJs.length === 0,
+    conActivacionManualEnJs,
+  );
+
+  const tactil = leer(path.join(SRC, 'arcade', 'mirador-tactil.ts'));
+  comprobar(
+    '`mirador-tactil.ts` guarda lo que cruza de hilo en `useSharedValue`',
+    /useSharedValue/.test(tactil) && /from 'react-native-reanimated'/.test(tactil),
+    'una referencia de React no se ve desde el worklet: el gesto entraría y la cámara no se movería',
+  );
+  comprobar(
+    'y el arrastre con activación manual decide con `estado.activate()` y `estado.fail()`',
+    /manualActivation\(true\)/.test(tactil) && /estado\.activate\(\)/.test(tactil) && /estado\.fail\(\)/.test(tactil),
+  );
+  comprobar(
+    'y vuelve a JavaScript sólo para mover el mirador, con `runOnJS(mover)`',
+    /runOnJS\(mover\)\(/.test(tactil),
+  );
+}
+
+paso('La pantalla de Riberas en tres dimensiones no sabe reglas y no bombea');
+{
+  const escena = leer(path.join(SRC, 'arcade', 'riberas-en-tres-escena.tsx'));
+
+  /*
+   * `tableroEnTres` devuelve `null` también con cinco o seis colonos aunque haya
+   * islas (el atlas sólo trae cuatro colores). Una pantalla que decida «se está
+   * reuniendo la mesa» sólo con `datos === null` enseña a una mesa de cinco
+   * empezada decenas de botones y ningún tablero. Tiene que preguntar a
+   * `seVeEnTres` y caer al retablo.
+   */
+  comprobar(
+    'la escena importa `seVeEnTres` de la traducción compartida',
+    /import \{[^}]*\bseVeEnTres\b[^}]*\} from '\.\.\/\.\.\/\.\.\/shared\/arcade\/juegos\/riberas-en-tres'/.test(escena),
+  );
+  comprobar('y lo usa para decidir la rama, no sólo lo importa', /seVeEnTres\(laVista\)/.test(escena));
+  comprobar(
+    'y con más de cuatro lo dice en la nota del respaldo',
+    /Sois más de cuatro/.test(escena),
+  );
+
+  /*
+   * La corrección de retrato es UNA y vive en `escenas/camara.ts`: proyectar
+   * esquinas con `three` y ajustar a límites asimétricos daba un factor de 2,18 en
+   * apaisado y bombeaba al inclinar. Si vuelve, vuelve el bombeo.
+   */
+  /*
+   * Se buscan los IDENTIFICADORES —declaración, prop o argumento— y no la palabra
+   * suelta: «contorno» es también castellano corriente en los comentarios de la hoja.
+   */
+  comprobar(
+    'no queda ningún encuadre por proyección en la pantalla',
+    !/factorQueEncaja\(|const LIMITE\b|LIMITE\.|const contorno\b|contorno=\{|contorno:\s*readonly|\.project\(/.test(escena),
+    'la única corrección de retrato es `alejarseParaQueQuepa` dentro de `ojoDelMirador`',
+  );
+  comprobar(
+    'y `Ojo` pasa la proporción del lienzo a `ojoDelMirador`',
+    /ojoDelMirador\(\s*m,\s*alcance \* acercamiento\.current,\s*proporcion\s*\)/.test(escena),
+    'sin el tercer argumento la corrección de `camara.ts` queda muerta',
+  );
+
+  /* La semilla y la ruta de modelos son las compartidas, no copias. */
+  comprobar(
+    'la semilla del delta es la de `shared/mecanicas/semilla.ts`, sin copia local',
+    /from '\.\.\/\.\.\/\.\.\/shared\/mecanicas\/semilla'/.test(escena) && !/0x811c_9dc5/.test(escena),
+  );
+  comprobar(
+    'y la ruta del tablero sale de `escenas/ruta-de-modelos.ts`, no de las figuras del embarcadero',
+    /from '\.\.\/\.\.\/\.\.\/escenas\/ruta-de-modelos'/.test(escena) && !/from '[^']*embarcadero\/figuras'/.test(escena),
+  );
+
+  /* Las islas se firman por contenido para que la escena no reconstruya el mundo en cada sondeo. */
+  comprobar(
+    'las islas se reutilizan por firma de contenido entre revisiones',
+    /islasVistas/.test(escena) && /antes\.firma === firma \? antes\.islas : crudo\.islas/.test(escena),
+    'sin la firma, cada sondeo recalcula relieve, red y plan y los resube a la GPU',
+  );
+
+  /*
+   * EL DELTA NO SE MONTA DONDE SALDRÍA GRIS, y el modelo no se pide siquiera.
+   *
+   * `tablero.glb` lleva la textura empotrada y Hermes no la decodifica: en nativo
+   * `texturas-nativas.ts` la sustituye por blanco para que la carga no reviente, y
+   * el tablero llega sin un solo color. Un delta gris no es una versión más pobre;
+   * es un tablero donde no se distingue una salina de un cantil. Estas dos
+   * comprobaciones son las que hay que ver caer el día que el modelo se hornee a
+   * color por vértice y se borre la constante.
+   */
+  comprobar(
+    'el delta sólo se monta donde se ve con color (`EL_DELTA_SE_VE_AQUI`)',
+    /const EL_DELTA_SE_VE_AQUI = Platform\.OS === 'web'/.test(escena) &&
+      /if \(!EL_DELTA_SE_VE_AQUI \|\| datos === null/.test(escena),
+    'sin esto, en el móvil se pinta un tablero sin colores en vez del retablo',
+  );
+  comprobar(
+    'y donde no se monta no se piden los dos megas del modelo',
+    /usarCatalogoDelTablero\(EL_DELTA_SE_VE_AQUI\)/.test(escena) &&
+      /if \(!hazFalta\) return undefined;/.test(escena),
   );
 }
 

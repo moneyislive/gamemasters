@@ -42,8 +42,9 @@ import Animated, {
   useSharedValue,
   withRepeat,
   withTiming,
+  type SharedValue,
 } from 'react-native-reanimated';
-import Svg, { Circle, Path } from 'react-native-svg';
+import Svg, { Circle, Defs, Path, RadialGradient, Rect, Stop } from 'react-native-svg';
 import * as api from '../src/api';
 import { usePartida } from '../src/estado';
 import { usarMarco } from '../src/marco';
@@ -57,10 +58,33 @@ import { Latido, Pulsable, useMenosMovimiento } from '../src/vivo';
 import { arcadesDeEsteBinario, laSala, veladas } from '../src/vitrina';
 import type { Minijuego } from '../src/vitrina';
 import { loQueLlega, queSeEnsena } from '../src/arcade/del-servidor';
-import type { EstadoDelCatalogo } from '../src/arcade/del-servidor';
-import { ICONO_DE_ARCADE_POR_DEFECTO, ICONOS_DE_ARCADE } from '../src/iconos';
+import type { ArcadeDelCatalogo, EstadoDelCatalogo } from '../src/arcade/del-servidor';
 import { todosLosTrofeos } from '../../shared/juegos';
-import { color, espacio, fuente, radio } from '../src/tema';
+import { color, conAlfa, espacio, fuente, radio } from '../src/tema';
+/*
+ * LA TABLA DE LA SALA, y ni un color de la Sala escrito fuera de ella.
+ *
+ * Esta pantalla llevaba el turquesa de la Sala a mano —`#5fd4c8`, el
+ * `rgba(95,212,200,…)` de sus filos y, lo peor, sufijos de alfa concatenados a la
+ * cadena del acento (`paleta.acento + 'a6'`)—. El compilador no delataba nada de
+ * eso: son cadenas, y una cadena de más o de menos sólo se ve mirando la pantalla.
+ *
+ * Y no es sólo higiene. La Sala se repinta entera cambiando tres valores de
+ * `TEMAS_DE_SALA`; cada literal escrito aquí es un sitio que NO se enteraría de
+ * ese cambio, así que la primera vez que alguien probara el ámbar la portada se
+ * quedaría con la única tarjeta turquesa del producto.
+ *
+ * `muebles.ts` no importa nada en ejecución —sólo tipos de `expo-router` y del
+ * contrato— así que no arrastra Skia al grafo de la portada, que es lo que la
+ * dejaría en blanco en web y lo que vigila un comprobador.
+ */
+import { LETRA, RADIO, SALA } from '../src/arcade/muebles';
+import {
+  LuzDeEsquina,
+  PastillaDeEstado,
+  RailDeAforo,
+  VeloDeLaPortada,
+} from '../src/arcade/piezas';
 
 /*
  * TODOS los trofeos que puede haber, no solo los seis de la plataforma. La
@@ -279,6 +303,31 @@ export default function Portada(): JSX.Element {
     arcadesDeEsteBinario(),
   );
   const sala = laSala(arcadesDeLaSala);
+  /*
+   * ═══ Y EL MANIFIESTO VIAJA AL LADO DE LA TARJETA ═══
+   *
+   * `laSala` devuelve lo que hace falta para DECIDIR —nombre, gancho, ruta y la
+   * razón cuando no hay ruta—, y la tarjeta pinta además lo que el juego DECLARA:
+   * el aforo del raíl, la sede, el ritmo, si esconde algo y qué cifra publica. Eso
+   * vive en el manifiesto y no en `Minijuego`.
+   *
+   * El MUEBLE se lee y no se pinta, y conviene que quede dicho porque aquí ponía
+   * que sí. Llegó a ser el antetítulo de la tarjeta durante una tarde, y se quitó
+   * al ver la pantalla: los valores reales son «tablero», «lienzo», «escena» y
+   * «formulario», y ese último encima de «LA FRENTE» —póntelo en la frente, todos
+   * lo ven menos tú— no dice el género del juego, dice cómo está hecha la
+   * pantalla. Sigue decidiendo si la tarjeta se puede tocar, que es su trabajo.
+   *
+   * Se lleva en un índice por `id` y no fiándose de que las dos listas vayan en el
+   * mismo orden: hoy `laSala` es un `.map` y van, pero eso es un detalle de otro
+   * fichero y el día que deje de serlo el fallo sería mudo —cada ficha con el aforo
+   * de la de al lado— que es exactamente la clase de error que nadie ve en un
+   * diff. `queSeEnsena` ya fusiona por `id`, así que aquí no hay repetidos.
+   *
+   * Ampliar `Minijuego` con estos seis campos habría sido lo otro razonable, y no
+   * se hace porque `vitrina.ts` es de otro y esto se pinta con lo que ya hay.
+   */
+  const fichasPorId = new Map(arcadesDeLaSala.map((m) => [m.id, m] as const));
   /*
    * El mundo 3D llega al borde a propósito —meterle margen dejaría una franja
    * negra que rompe la profundidad— pero la botonera de encima SÍ tiene que
@@ -582,30 +631,55 @@ export default function Portada(): JSX.Element {
           como relleno era vender mal lo que hay.
 
           Y la regla de la cabecera de este fichero sigue mandando: nada de lo que
-          se enseña es mentira. Antes no había ninguno y se decía; ahora hay uno y
-          se enseña ese uno, con su gancho y su tarjeta. El día que la Sala se
-          quede vacía —un reparto de servidor sin arcades— vuelve a salir el aviso
-          de que no hay nada, en vez de un hueco.
+          se enseña es mentira. Antes no había ninguno y se decía; hoy son cinco
+          —aquí ponía «uno», y se quedó viejo— y sale cada uno con su gancho y su
+          ficha. El día que la Sala se quede vacía —un reparto de servidor sin
+          arcades— vuelve a salir el aviso de que no hay nada, en vez de un hueco.
         */}
-        <View style={estilos.seccion}>
-          <Titular
-            texto="La sala de arcade"
-            nota="Juegos para ahora mismo: se abre y se juega, sin montar nada."
-            acento="#5fd4c8"
-          />
+        {/*
+          ═══ Y LA SALA TIENE SU PROPIO SUELO, QUE ES POR DONDE EMPIEZA ═══
+
+          No es una sección más de la portada: es la puerta al otro mundo, y el
+          resto de esta pantalla es fieltro verde, caoba y oro. La banda de
+          `SALA.suelo` con un filo arriba y otro abajo es lo que hace que las
+          fichas se lean como una sala y no como cinco cajas sueltas sobre la
+          mesa del taller — y es lo mismo que hace la pila de `(arcade)/`, que
+          pinta ese mismo suelo detrás de todos sus muebles.
+
+          Va a sangre —los márgenes se meten dentro— porque un suelo con margen
+          es un panel, y un panel vuelve a ser una sección de la portada.
+
+          Y la cabecera es de la Sala y no el `Titular` de la casa: aquél rotula
+          con Cinzel y en oro, que son las letras del taller. Aquí manda el palo
+          seco del sistema, y el peso, la caja alta y el tracking hacen de cartel.
+        */}
+        <View style={estilos.salaBanda}>
+          <CabeceraDeSala cuantas={sala.length} />
           {sala.length === 0 ? (
-            <View style={estilos.arcade}>
-              <View style={estilos.arcadeNeon} />
-              <Text style={estilos.arcadeTitulo}>Cableándose…</Text>
-              <Text style={estilos.arcadeCuerpo}>
+            <View style={estilos.salaVacia}>
+              <Text style={estilos.salaVaciaTitulo}>Cableándose…</Text>
+              <Text style={estilos.salaVaciaCuerpo}>
                 Este servidor no trae ninguna máquina instalada todavía. Vuelve pronto.
               </Text>
             </View>
           ) : (
-            <View style={{ gap: espacio.md }}>
-              {sala.map((minijuego) => (
-                <TarjetaDeArcade key={minijuego.id} minijuego={minijuego} />
-              ))}
+            /*
+              ═══ UNA ESTANTERÍA Y NO UNA PILA ═══
+
+              Aquí había cinco tarjetas a lo ancho de la columna, apiladas, con la
+              primera más grande para dar por dónde empezar a mirar. Se cambió
+              porque el problema no era el orden sino el FORMATO: a 378 de ancho,
+              una portada casi cuadrada con el nombre abajo se lee como un banner
+              y no como una tarjeta, y encima quedaba a tres dedos de la estantería
+              de veladas, que hace lo contrario y se ve bien.
+
+              Así que la Sala se hojea igual que el taller. Y con eso desaparece
+              también la destacada: cinco tarjetas iguales en un carrusel no
+              necesitan una que abra la fila, porque la que abre es siempre la que
+              está en el centro.
+            */
+            <View style={{ gap: espacio.lg }}>
+              <CarruselDeMaquinas maquinas={sala} fichas={fichasPorId} anchoPantalla={width} />
               {/*
                 ═══ Y SI EL SERVIDOR NO CONTESTÓ, SE DICE DEBAJO ═══
 
@@ -625,6 +699,12 @@ export default function Portada(): JSX.Element {
                       Éstos vienen dentro de la app. No se ha podido preguntar a este servidor
                       si tiene alguno más instalado.
                     </Text>
+                    {/*
+                      EL ÚNICO ACENTO DE ESTE AVISO ES LA PALABRA QUE SE PUEDE
+                      TOCAR. El texto es informativo —«no hay red» no quema y no
+                      mata—, así que va en `tenue`; «Reintentar» sí se pulsa, y
+                      ahí es donde el acento significa algo.
+                    */}
                     <Text style={estilos.salaSinRedAccion}>Reintentar ›</Text>
                   </View>
                 </Pulsable>
@@ -748,33 +828,164 @@ export default function Portada(): JSX.Element {
 // ---------------------------------------------------------------------------
 
 /**
- * LA TARJETA DE UN ARCADE. Ancha y plana, y esa forma es la mitad del mensaje.
+ * ═══ LO QUE LLEGA POR EL CABLE NO ESTÁ COMPROBADO, Y ESTAS CUATRO LO COMPRUEBAN ═══
  *
- * Las veladas son altas y con retrato porque prometen una noche; éstas son anchas
- * y planas porque prometen ahora mismo. Nadie puede tocar una creyendo que va a
- * jugar y encontrarse con que necesita cinco amigos y una cena, ni al revés.
+ * `loQueLlega` valida CUATRO campos —`id`, `nombre`, `gancho`, `mueble` y `sede`—
+ * y lo dice: los demás no los tocaba esta pantalla, y validarlos allí era copiar a
+ * mano `problemasDelManifiesto` y quedarse desincronizado con él.
  *
- * `gancho` y no `lema`: son dos cosas distintas y el contrato del arcade las
- * separa a propósito. El lema de una velada es literatura para un dosier impreso;
- * el gancho es la línea que hace que alguien toque la tarjeta, de pie y con prisa.
+ * La anatomía nueva SÍ los toca. El raíl cuenta `jugadores.maximo`, la fila de
+ * datos dice el ritmo, la línea de menores dice si esconde algo y la pastilla dice
+ * qué cifra publica — o sea que un servidor con un manifiesto a medias mete aquí
+ * `undefined` donde TypeScript promete un número, y desreferenciar `jugadores.maximo`
+ * de un `undefined` lanza durante el render. Esta pantalla no tiene `ErrorBoundary`:
+ * el throw desmonta la raíz y deja la portada en blanco PARA TODOS LOS JUEGOS.
+ *
+ * Así que se lee cada campo como lo que de verdad es —`unknown`— y lo que no venga
+ * bien no se pinta. Una ficha sin raíl es un juego que sale; una excepción es la
+ * app que no abre. Es la misma doctrina que ya sostiene el resto de este camino.
+ *
+ * Y va aquí y no en `loQueLlega` porque son dos preguntas distintas: allí se decide
+ * si una tarjeta EXISTE, y aquí si un adorno se puede dibujar. Un arcade al que le
+ * falte el `tickHz` se juega igual.
  */
-function TarjetaDeArcade({ minijuego }: { minijuego: Minijuego }): JSX.Element {
-  /*
-   * ═══ EL `??` NO SOBRA AUNQUE EL COMPILADOR DIGA QUE SÍ ═══
-   *
-   * `laSala` ya normaliza el icono contra los que este binario trae, así que en
-   * teoría aquí siempre hay función. Se deja el respaldo igualmente porque lo que
-   * hay al otro lado de este índice es una tabla de UNA sola clave alimentada con
-   * un campo que escribe otro repositorio, y el precio de equivocarse no es una
-   * tarjeta fea: `<undefined />` lanza durante el render, esta pantalla no tiene
-   * `ErrorBoundary`, y el throw desmonta la raíz. Pantalla en blanco, para todos
-   * los juegos y sin mensaje.
-   *
-   * Dos guardias para el mismo agujero es exactamente lo que merece un agujero
-   * que el compilador no ve —`noUncheckedIndexedAccess` no marca los `Record` de
-   * clave finita— y que ya tumbó esta portada una vez.
-   */
-  const Icono = ICONOS_DE_ARCADE[minijuego.icono] ?? ICONOS_DE_ARCADE[ICONO_DE_ARCADE_POR_DEFECTO];
+function leerAforo(ficha: ArcadeDelCatalogo | undefined): { minimo: number; maximo: number } | null {
+  const a: unknown = ficha?.jugadores;
+  if (typeof a !== 'object' || a === null) return null;
+  const min: unknown = (a as { minimo?: unknown }).minimo;
+  const max: unknown = (a as { maximo?: unknown }).maximo;
+  if (typeof min !== 'number' || typeof max !== 'number') return null;
+  if (!Number.isFinite(min) || !Number.isFinite(max)) return null;
+  const minimo = Math.round(min);
+  const maximo = Math.round(max);
+  if (maximo < 1 || minimo < 0 || minimo > maximo) return null;
+  return { minimo, maximo };
+}
+
+/** El ritmo. `0` no es «sin dato»: es un juego por turnos, y son cosas distintas. */
+function leerRitmo(ficha: ArcadeDelCatalogo | undefined): string {
+  const hz: unknown = ficha?.tickHz;
+  if (typeof hz !== 'number' || !Number.isFinite(hz) || hz < 0) return '—';
+  return hz === 0 ? 'Por turnos' : `${hz} por segundo`;
+}
+
+/**
+ * QUÉ CIFRA PUBLICA, en las tres respuestas que la ficha sabe pintar.
+ *
+ * `sin-decir` no es lo mismo que `ninguno`, y por eso son tres y no dos: `ninguno`
+ * es una palabra que alguien escribió a propósito en su manifiesto —la línea de
+ * menores puede decir «sin marcador» con todas las letras— y `sin-decir` es un
+ * manifiesto que llegó roto, del que esta ficha no puede afirmar nada. Fundirlos
+ * haría que la app inventara una renuncia que el juego no ha firmado.
+ */
+type CifraDeLaFicha =
+  | { estado: 'sin-decir' }
+  | { estado: 'ninguno' }
+  | { estado: 'cifra'; rotulo: string; sentido: 'mas-alto' | 'mas-bajo' };
+
+function leerMarcador(ficha: ArcadeDelCatalogo | undefined): CifraDeLaFicha {
+  const m: unknown = ficha?.marcador;
+  if (typeof m !== 'object' || m === null) return { estado: 'sin-decir' };
+  const tipo: unknown = (m as { tipo?: unknown }).tipo;
+  if (tipo === 'ninguno') return { estado: 'ninguno' };
+  if (tipo !== 'cifra') return { estado: 'sin-decir' };
+  const rotulo: unknown = (m as { rotulo?: unknown }).rotulo;
+  if (typeof rotulo !== 'string' || rotulo.length === 0) return { estado: 'sin-decir' };
+  const sentido: unknown = (m as { sentido?: unknown }).sentido;
+  return { estado: 'cifra', rotulo, sentido: sentido === 'mas-bajo' ? 'mas-bajo' : 'mas-alto' };
+}
+
+/**
+ * ═══ EL RAÍL, LA PASTILLA, LA LUZ Y EL VELO VIVEN EN `piezas.tsx` ═══
+ *
+ * Estaban escritos aquí, y el raíl además estaba escrito otras dos veces —en la
+ * espera de El Arcade y en La Peonza—. Las tres copias se habían separado: aquí
+ * las muescas apagadas acabaron en blanco al 70 % después de medirlas, y las otras
+ * dos seguían en `SALA.filoVivo`, que es blanco al 14 % y no se ve. La corrección
+ * no llegó a las otras dos porque nada las ataba.
+ *
+ * Así que las piezas que comparten la portada y las pantallas de dentro se han ido
+ * a `app/src/arcade/piezas.tsx` con su medida escrita al lado. Aquí queda lo que es
+ * de la tarjeta y de nadie más.
+ */
+
+/**
+ * ═══ LA TARJETA DE UNA MÁQUINA, CONSTRUIDA SOBRE LA DE VELADA ═══
+ *
+ * No es una tarjeta de arcade retocada para parecerse a la de velada: es el
+ * esqueleto de la tarjeta de velada —`TarjetaMundo`, en `app/src/carrusel3d.tsx`—
+ * con la piel violeta de la Sala encima. Ése fue el encargo, con estas palabras:
+ * partir de un layout que ya está bien en proporción y modificarlo, en vez de
+ * seguir adaptando uno que no lo estaba.
+ *
+ * LO QUE SE COPIA DE ELLA, con su medida:
+ *
+ *   · el formato: 252 de ancho por un alto fijo, retrato, en carrusel horizontal
+ *     — y no una caja a lo ancho de la columna, que era el fallo de raíz: a 378
+ *     de ancho una portada casi cuadrada con el título abajo se lee como un
+ *     banner, no como una tarjeta;
+ *   · el radio de 20 y el borde de 1 teñido del acento (allí `${acento}66`, o sea
+ *     el 40 %; aquí `conAlfa(SALA.acento, 0.42)`);
+ *   · el relleno de 20 por los cuatro lados, y con él la única vertical de la que
+ *     cuelga todo;
+ *   · la composición: fila alta con la insignia de estado a la derecha, un
+ *     separador `flex: 1` que empuja el texto contra el suelo, y la cascada
+ *     nombre → gancho apoyada abajo;
+ *   · la escora del carrusel, que es la firma del movimiento de la estantería de
+ *     arriba: perspectiva 900, giro de ±16°, escala 0,9 y caída de 14.
+ *
+ * LO QUE NO SE COPIA, Y POR QUÉ:
+ *
+ *   · EL COLOR. Allí es un campo oscuro con el acento de tinta; aquí es un campo
+ *     de acento con la tinta blanca. Son dos familias del mismo mueble, que era
+ *     lo pedido: distinto al taller, pero conviviendo con él.
+ *   · EL DESVANECIDO DE LAS VECINAS. La de velada baja las de los lados a
+ *     `opacity: 0.62`. Aquí no, y no es un olvido: el blanco de esta portada pasa
+ *     el mínimo de contraste con 5,61:1 gracias al velo, y un 0,62 encima se lo
+ *     come entero. La escala y el giro ya dicen cuál es la del centro.
+ *   · EL PASO. `PASO` es una constante de módulo que importa `fondos-sala.tsx`
+ *     para saber en qué velada está el fondo 3D. Esta tarjeta declara el suyo
+ *     —hoy vale lo mismo, 266— porque compartir el símbolo haría que cambiar el
+ *     ancho de una estantería desincronizara los fondos de la otra sin ningún
+ *     error a la vista.
+ *   · EL `scrollX`. El del carrusel de veladas no es una posición: es el índice
+ *     de velada que leen el fondo 3D, el avatar y el rótulo «estás en». Éste
+ *     tiene el suyo y no lo comparte con nadie.
+ *   · EL ICONO. `ICONOS_DE_ARCADE` tiene hoy una sola entrada, así que el anillo
+ *     que la de velada lleva arriba a la izquierda enseñaría el mismo mando cinco
+ *     veces. Ese hueco se queda libre, que además es donde irá la foto.
+ *
+ * ═══ EL PIE OSCURO, QUE ES LO QUE ELLA NO TIENE ═══
+ *
+ * La de velada mete sus datos y su llamada DENTRO del campo, separados por un
+ * filete. Aquí van en una franja propia sobre `SALA.teja`, porque el encargo pide
+ * abajo «más datos y botones de acción» y porque una llamada de texto sobre el
+ * acento no se puede: medido, el acento sobre su propio hondo no llega ni a 2:1.
+ * En la franja oscura, en cambio, el botón puede ser un botón de verdad.
+ *
+ * ═══ EL ACENTO ES EL DE LA SALA, Y NO EL DE LA PALETA DE CADA JUEGO ═══
+ *
+ * `minijuego.paleta` ya no existe. No es un descuido: esa paleta no la declaraba
+ * el juego en su manifiesto —era una tabla indexada por `id`, con un turquesa
+ * para todo el que no estuviera— y pintar cinco portadas de cinco colores
+ * desharía la decisión que sostiene la identidad. La Sala se repinta entera de
+ * ámbar, de verde o de carmesí cambiando tres valores.
+ *
+ * `gancho` y no `lema`: el lema de una velada es literatura para un dosier
+ * impreso; el gancho es la línea que hace que alguien toque la tarjeta, de pie y
+ * con prisa. El contrato del arcade los separa a propósito.
+ */
+function TarjetaDeArcade({
+  minijuego,
+  ficha,
+  indice,
+  desplazamiento,
+}: {
+  minijuego: Minijuego;
+  ficha: ArcadeDelCatalogo | undefined;
+  indice: number;
+  desplazamiento: SharedValue<number>;
+}): JSX.Element {
   /*
    * Sin ruta, la tarjeta no es pulsable y lo dice. Pasa cuando el arcade declara
    * un mueble que esta versión de la app no sabe pintar: el registro es de
@@ -782,69 +993,387 @@ function TarjetaDeArcade({ minijuego }: { minijuego: Minijuego }): JSX.Element {
    * tocarla sería exactamente el fallo mudo que esta portada tiene prohibido.
    */
   const ruta = minijuego.ruta;
-  const sePuedeJugar = ruta !== null;
+  const viva = ruta !== null;
+
+  const aforo = leerAforo(ficha);
+  const cifra = leerMarcador(ficha);
+  const enElServidor = ficha?.sede === 'servidor';
+
+  /*
+   * LA LÍNEA DE DATOS. Es la tabla de tres columnas que tenía la tarjeta ancha,
+   * dicha en una frase: aquella tabla se rompía —«RITMO / POR / TURNOS» partido
+   * en tres renglones de una columna de 126— y una tabla que se rompe es peor que
+   * una frase que se lee. El orden es el de la de velada: primero cuántos caben,
+   * después a qué ritmo va.
+   */
+  const datos: string[] = [];
+  if (aforo !== null) {
+    datos.push(
+      aforo.minimo === aforo.maximo
+        ? `${aforo.maximo} ${aforo.maximo === 1 ? 'persona' : 'personas'}`
+        : `${aforo.minimo} a ${aforo.maximo} personas`,
+    );
+  } else if (ficha !== undefined) {
+    /*
+     * SIN AFORO, SE DICE QUE NO SE SABE. Aquí se imprimía «Aforo —», que es lo que
+     * quedaba de la tabla de tres columnas: allí el guion tenía sentido porque
+     * estaba debajo de un rótulo que decía AFORO. Suelto en una frase, un guion no
+     * es una respuesta, y este renglón sólo puede darse cuando el manifiesto trajo
+     * `jugadores` roto o ausente — que es justo el caso en el que hay que decir que
+     * no se sabe, y no dibujar una raya.
+     */
+    datos.push('Aforo sin declarar');
+  }
+  const ritmo = leerRitmo(ficha);
+  if (ritmo !== '—') datos.push(ritmo);
+
+  /*
+   * EL MARCADOR, DICHO Y NO INSINUADO. Estuvo arriba, en una cápsula con un
+   * triángulo de 8×6 al lado del rótulo, y tenía dos problemas: el plato de esa
+   * segunda cápsula no se recortaba del fondo a esa altura (2,56 en carmesí, y no
+   * hay alfa que lo arregle), y el triángulo solo dejaba «▲ ESQUIVADAS», que hay
+   * que adivinar. Aquí abajo cabe la frase entera y no hace falta adivinar nada.
+   */
+  const marcador =
+    cifra.estado === 'cifra'
+      ? `Marcador: ${cifra.rotulo}, ${cifra.sentido === 'mas-alto' ? 'más alto' : 'más bajo'}`
+      : null;
+
+  /*
+   * ═══ LAS ESPECIFICACIONES MENORES ═══
+   *
+   *   · LA SEDE va aquí y no en la línea de datos: allí dejaba la frase en dos
+   *     renglones con «aparato» solo en el segundo, y además la está diciendo la
+   *     pastilla de arriba —«Pide mesa» ES estar en el servidor—. Abajo no
+   *     compite, y es donde alguien busca si esto necesita red.
+   *   · SÓLO SE JUEGA LLENA gana siempre que sea cierto, porque cambia lo que hay
+   *     que hacer: La Ronda con tres personas no empieza. Es el único de todos
+   *     que puede dejarte esperando.
+   *   · SIN MARCADOR sólo cuando el juego ha dicho `ninguno` con esa palabra. Si
+   *     el manifiesto vino roto no se dice nada: inventar una renuncia que el
+   *     juego no ha firmado es peor que callarse.
+   *   · Y CUANDO HAY CIFRA no se dice aquí, porque ya lo está diciendo la pastilla
+   *     de la portada, arriba y con su sentido.
+   */
+  const soloLlena = aforo !== null && aforo.minimo === aforo.maximo && aforo.maximo > 1;
+  const menores: string[] = [];
+  if (ficha !== undefined) menores.push(enElServidor ? 'En el servidor' : 'En este aparato');
+  if (typeof ficha?.secretos === 'boolean') {
+    menores.push(ficha.secretos ? 'con secretos' : 'sin secretos');
+  }
+  if (soloLlena) menores.push('sólo se juega llena');
+  else if (cifra.estado === 'ninguno') menores.push('sin marcador');
+
+  /*
+   * EL PILOTO SE ENCIENDE CUANDO SE PUEDE JUGAR AHORA MISMO Y SIN NADIE MÁS. Un
+   * arcade de servidor no está apagado: está esperando mesa, que es otra cosa y
+   * por eso el piloto es un aro frío y no una luz roja.
+   */
+  const estado = !viva ? 'No disponible' : enElServidor ? 'Pide mesa' : 'Se juega ya';
+
+  /*
+   * LA ESCORA. Copiada de `TarjetaMundo` (carrusel3d.tsx:146-160) con los mismos
+   * números, menos la opacidad. Se copia y no se comparte porque compartirla
+   * obligaría a compartir `PASO`, que es justo lo que no puede pasar.
+   */
+  const escora = useAnimatedStyle(() => {
+    const centro = indice * PASO_MAQUINA;
+    const entrada = [centro - PASO_MAQUINA, centro, centro + PASO_MAQUINA];
+    return {
+      transform: [
+        // La perspectiva primero: sin ella, rotateY sólo encoge, no gira.
+        { perspective: 900 },
+        { rotateY: `${interpolate(desplazamiento.value, entrada, [16, 0, -16], 'clamp')}deg` },
+        { scale: interpolate(desplazamiento.value, entrada, [0.9, 1, 0.9], 'clamp') },
+        { translateY: interpolate(desplazamiento.value, entrada, [14, 0, 14], 'clamp') },
+      ],
+    };
+  });
 
   const cuerpo = (
-    <View
-      style={[
-        estilos.arcade,
-        { borderColor: minijuego.paleta.acento + (sePuedeJugar ? '66' : '22') },
-      ]}
-    >
-      <View
-        style={[
-          estilos.arcadeNeon,
-          { backgroundColor: minijuego.paleta.acento + (sePuedeJugar ? 'a6' : '33') },
-        ]}
-      />
-      <View style={estilos.arcadeFila}>
-        <Icono size={30} color={minijuego.paleta.acento + (sePuedeJugar ? '' : '66')} />
-        <View style={{ flex: 1 }}>
+    <View style={[estilos.maquina, viva && { borderColor: conAlfa(SALA.acento, 0.42) }]}>
+      {/*
+        LA PORTADA. El orden de las capas es el que deja sitio a la foto: primero
+        iría la imagen, luego el degradado, luego la luz, luego el velo, y el
+        contenido encima de todo. Hoy la imagen no está y el degradado hace de
+        fondo; el día que esté, se mete debajo y no se mueve nada más.
+      */}
+      <View style={estilos.portada}>
+        <LinearGradient
+          colors={viva ? [SALA.acento, SALA.acentoHondo] : [SALA.tejaAlta, SALA.teja]}
+          /*
+           * VERTICAL Y CON EL CORTE EN EL 40 %, y las dos cosas son contraste.
+           *
+           * La tarjeta ancha lo tenía en diagonal —`end={{x: 0.45, y: 1}}`— y eso
+           * al estrechar a 252 se vuelve un fallo: la esquina de arriba a la
+           * derecha pasa a caer en t≈0,52, que en ámbar y en verde es exactamente
+           * la banda donde ni el blanco ni la tinta oscura llegan a 4,5:1. En
+           * vertical, la altura de un elemento determina su fondo y se puede
+           * medir; en diagonal depende también de dónde caiga a lo ancho.
+           *
+           * Y el corte sube del 62 % al 40 % para que el bloque de texto se apoye
+           * en hondo del todo y no en una mezcla a medio camino, que es lo que
+           * dejaba el nombre en 4,64:1 —catorce centésimas por encima del mínimo—
+           * en dos de los cuatro temas.
+           */
+          locations={[0, 0.4]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 0, y: 1 }}
+          style={StyleSheet.absoluteFill}
+        />
+        {viva && <LuzDeEsquina id={minijuego.id} />}
+        <VeloDeLaPortada />
+
+        <View style={estilos.portadaDentro}>
+          <View style={estilos.pastillas}>
+            <PastillaDeEstado texto={estado} encendido={viva && !enElServidor} />
+          </View>
+
+          {/* El hueco de la portada: lo que apoya el texto abajo. Es el `flex: 1` de la de velada. */}
+          <View style={estilos.hueco} />
+
+          <RailDeAforo aforo={aforo} viva={viva} estilo={estilos.railDeLaTarjeta} />
+          {/*
+            ═══ EL TOPE DE AMPLIACIÓN DE LETRA, QUE ES UNA CONCESIÓN Y SE DICE ═══
+
+            La portada es una caja de alto FIJO —228— y `overflow: 'hidden'`, así
+            que el texto que no quepa no se reajusta: se corta. Con la ampliación
+            de letra del sistema al 200 % —«Texto más grande» de iOS, «Tamaño de
+            fuente» de Android— el nombre y el gancho suman 89 + 88·m píxeles, y a
+            m=2 eso es 265 contra 228 disponibles.
+
+            El tope está calculado, no elegido a ojo: cabe hasta m=1,58, y se pone
+            1,5 para no depender del redondeo. Es una limitación real —quien use
+            el sistema por encima del 150 % ve esta tarjeta más pequeña de lo que
+            ha pedido— y la alternativa era peor: dejar que se corte el gancho a
+            mitad de palabra sin que nada avise.
+
+            El PIE no lo lleva, y a propósito: allí el texto puede crecer porque lo
+            único que hay debajo es el botón, que se queda pegado al suelo con su
+            `marginTop: 'auto'`.
+          */}
           <Text
-            style={[
-              estilos.arcadeTitulo,
-              { color: minijuego.paleta.acento + (sePuedeJugar ? '' : '99') },
-            ]}
+            style={[estilos.nombre, !viva && estilos.tintaApagada]}
+            numberOfLines={2}
+            maxFontSizeMultiplier={1.5}
           >
             {minijuego.nombre}
           </Text>
-          <Text style={estilos.arcadeCuerpo}>{minijuego.gancho}</Text>
-          {/*
-            ═══ LA RAZÓN, EN SU PROPIO RENGLÓN Y CADA UNA LA SUYA ═══
-
-            Aquí había una sola frase pegada al gancho: «— esta versión de la app
-            todavía no sabe pintarlo». Servía cuando la Sala sólo listaba lo que
-            venía dentro, porque entonces era el único motivo posible. Desde que
-            se lista también lo del SERVIDOR hay cuatro, y esa frase es falsa en
-            tres: un juego puede faltar porque el mueble es desconocido, porque
-            sus píxeles viven en otro binario, porque no hay ni mesa ni reglas
-            aquí, o porque el juego no publica nada que pintar. Quien las lee hace
-            algo distinto con cada una —actualizar, esperar, o nada—, y darle la
-            equivocada es mandarle a hacer algo que no sirve.
-
-            Va en renglón aparte y no pegada al gancho porque son dos voces: el
-            gancho lo escribió el juego para atraer, y esto lo escribe la app para
-            explicar. Juntas se leen como si el juego se disculpara.
-          */}
-          {minijuego.porque !== null && (
-            <Text style={estilos.arcadeMotivo}>{minijuego.porque}</Text>
-          )}
+          <Text
+            style={[estilos.gancho, !viva && estilos.ganchoApagado]}
+            numberOfLines={3}
+            maxFontSizeMultiplier={1.5}
+          >
+            {minijuego.gancho}
+          </Text>
         </View>
-        {sePuedeJugar && (
-          <Text style={[estilos.arcadeFlecha, { color: minijuego.paleta.acento }]}>›</Text>
+      </View>
+
+      <View style={estilos.pie}>
+        {datos.length > 0 && (
+          <Text style={estilos.datos} numberOfLines={2}>
+            {datos.join(' · ')}
+          </Text>
+        )}
+        {marcador !== null && (
+          <Text style={estilos.menores} numberOfLines={1}>
+            {marcador}
+          </Text>
+        )}
+        {/*
+          ═══ EN UNA TARJETA APAGADA, LA LÍNEA MENUDA CEDE SU SITIO ═══
+
+          Cuando no se puede jugar, lo que hay que leer es POR QUÉ, y esa razón
+          puede medir 161 caracteres —seis las hay, y la más larga es ésa—. Con la
+          línea menuda delante sólo quedaban cuatro renglones para la razón y se
+          cortaba a mitad de frase; sin ella caben seis de sobra, porque además no
+          hay botón que alimentar.
+
+          Y lo que se cede es lo que menos importa en ese caso: dónde vive la
+          máquina y si guarda secretos son datos de una partida que aquí no se va
+          a poder empezar.
+        */}
+        {viva && menores.length > 0 && (
+          <Text style={estilos.menores} numberOfLines={2}>
+            {menores.join(' · ')}
+          </Text>
+        )}
+        {/*
+          ═══ LA RAZÓN, EN SU PROPIO RENGLÓN Y CADA UNA LA SUYA ═══
+
+          Aquí había una sola frase para todos los casos: «esta versión de la app
+          todavía no sabe pintarlo». Servía cuando la Sala sólo listaba lo que
+          venía dentro, porque entonces era el único motivo posible. Desde que se
+          lista también lo del SERVIDOR hay cuatro, y esa frase es falsa en tres:
+          un juego puede faltar porque el mueble es desconocido, porque sus
+          píxeles viven en otro binario, porque no hay ni mesa ni reglas aquí, o
+          porque el juego no publica nada que pintar. Quien las lee hace algo
+          distinto con cada una —actualizar, esperar, o nada—, y darle la
+          equivocada es mandarle a hacer algo que no sirve.
+
+          Cuatro renglones y no dos: en una tarjeta apagada no hay botón, así que
+          este texto hereda su sitio. La más larga de las seis razones mide 161
+          caracteres, que a este cuerpo son cuatro renglones justos.
+
+          Y no lleva color de fallo: la Sala no tiene ninguno. Un juego que no se
+          pinta aquí no es un error, es una máquina que no está instalada en este
+          mueble, así que se dice en `tenue` y en cursiva —voz de la casa— y no en
+          la alarma, que está reservada a lo que se acaba y a lo que mata dentro
+          de una partida.
+        */}
+        {minijuego.porque !== null && (
+          <Text style={estilos.motivo} numberOfLines={6}>
+            {minijuego.porque}
+          </Text>
+        )}
+        {viva && (
+          /*
+            EL BOTÓN VA RELLENO DE ACENTO CON TINTA OSCURA, y es la única pareja
+            sólida que pasa en los cuatro temas a la vez: 5,01 en violeta, 9,22 en
+            ámbar, 8,69 en verde y 5,40 en carmesí. En blanco se caería a 1,98 en
+            ámbar, que es el mismo fallo que ya costó una corrección en la placa.
+            Y el relleno se recorta de la teja del pie con 4,58 en el peor caso.
+
+            No es pulsable por su cuenta: la tarjeta entera ya es el botón —el
+            `Pulsable` de abajo le pone `accessibilityRole="button"`— y un control
+            dentro de otro control es un conflicto de gestos y una parada de
+            tabulador de más que dice lo mismo. Por eso va oculto a accesibilidad:
+            se ve, se pulsa con el resto de la tarjeta, y no se anuncia dos veces.
+          */
+          <View
+            style={estilos.boton}
+            /*
+              LAS TRES PROPIEDADES, PORQUE CADA UNA SIRVE EN UN SITIO.
+              `importantForAccessibility` sólo existe en Android; iOS necesita
+              `accessibilityElementsHidden`, y react-native-web descarta las dos y
+              sólo entiende `aria-hidden`. Con una sola, el botón se anunciaba
+              aparte en las otras dos plataformas y el lector leía «Echar una» a
+              continuación de la etiqueta de la tarjeta, que ya dice lo mismo.
+            */
+            importantForAccessibility="no-hide-descendants"
+            accessibilityElementsHidden
+            aria-hidden
+          >
+            <Text style={estilos.botonTexto}>Echar una</Text>
+            <Svg width={7} height={11} viewBox="0 0 7 11">
+              <Path
+                d="M1.2 1.2 L5.4 5.5 L1.2 9.8"
+                stroke={SALA.suelo}
+                strokeWidth={1.8}
+                fill="none"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </Svg>
+          </View>
         )}
       </View>
     </View>
   );
 
-  if (ruta === null) return cuerpo;
   return (
-    <Pulsable
-      onPress={() => router.push(ruta)}
-      accessibilityLabel={`Jugar a ${minijuego.nombre}`}
+    <Animated.View style={escora}>
+      {ruta === null ? (
+        cuerpo
+      ) : (
+        <Pulsable
+          onPress={() => router.push(ruta)}
+          /*
+            EL ESTADO VA EN LA ETIQUETA, y no sólo en la pastilla. La pastilla vive
+            dentro del `Pulsable`, que es un único elemento accesible: su texto no
+            se anuncia por separado. Sin esto, con lector de pantalla se oía «Jugar
+            a La Ronda, botón» y nunca «Pide mesa» — o sea, se perdía la diferencia
+            entre poder jugar ahora y tener que esperar mesa, que es exactamente lo
+            que la pastilla existe para decir.
+          */
+          accessibilityLabel={`Jugar a ${minijuego.nombre}. ${estado}. ${minijuego.gancho}`}
+        >
+          {cuerpo}
+        </Pulsable>
+      )}
+    </Animated.View>
+  );
+}
+
+/**
+ * LA ESTANTERÍA DE MÁQUINAS: el mismo carrusel que el de las veladas.
+ *
+ * Mismo centrado —la del medio queda en el eje de la pantalla y las vecinas
+ * asoman escoradas—, mismo imantado y mismo hueco. Lo que NO comparte con aquél
+ * es el valor de desplazamiento: allí ese número es el índice de velada del que
+ * cuelgan el fondo 3D, el giro del avatar y el rótulo «estás en», y enchufarle
+ * una segunda barra los movería a todos.
+ *
+ * EN LA WEB NO IMANTA, y conviene saberlo antes de que parezca un fallo:
+ * `react-native-web` no implementa `snapToInterval` —lo único que traduce a
+ * `scroll-snap` de CSS es `pagingEnabled`, que pagina por pantallas enteras y no
+ * por tarjetas—, así que en el navegador ruedan libres. Es exactamente lo que ya
+ * hace el carrusel de veladas desde el primer día, o sea que las dos estanterías
+ * se comportan igual, que era la idea.
+ */
+function CarruselDeMaquinas({
+  maquinas,
+  fichas,
+  anchoPantalla,
+}: {
+  maquinas: Minijuego[];
+  fichas: Map<string, ArcadeDelCatalogo>;
+  anchoPantalla: number;
+}): JSX.Element {
+  const desplazamiento = useSharedValue(0);
+  const alScroll = useAnimatedScrollHandler((e) => {
+    desplazamiento.value = e.contentOffset.x;
+  });
+  const margen = Math.max((anchoPantalla - ANCHO_MAQUINA) / 2, espacio.lg);
+
+  return (
+    <Animated.ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      decelerationRate="fast"
+      snapToInterval={PASO_MAQUINA}
+      onScroll={alScroll}
+      scrollEventThrottle={16}
+      style={estilos.estanteria}
+      contentContainerStyle={{
+        paddingHorizontal: margen,
+        paddingVertical: espacio.sm,
+        gap: HUECO_MAQUINA,
+      }}
     >
-      {cuerpo}
-    </Pulsable>
+      {maquinas.map((maquina, i) => (
+        <TarjetaDeArcade
+          key={maquina.id}
+          minijuego={maquina}
+          ficha={fichas.get(maquina.id)}
+          indice={i}
+          desplazamiento={desplazamiento}
+        />
+      ))}
+    </Animated.ScrollView>
+  );
+}
+
+/**
+ * LA CABECERA DE LA SALA: cómo se llama, cuántas máquinas hay y qué son.
+ *
+ * El recuento va en cifra de dos dígitos porque es un letrero de sala y no una
+ * frase, y porque así no baila de ancho cuando entre la sexta máquina.
+ */
+function CabeceraDeSala({ cuantas }: { cuantas: number }): JSX.Element {
+  return (
+    <View style={{ marginBottom: espacio.lg }}>
+      <View style={estilos.salaCabeceraFila}>
+        <Text style={estilos.salaTitulo}>La sala de arcade</Text>
+        <Text style={estilos.salaRecuento}>
+          {String(cuantas).padStart(2, '0')} {cuantas === 1 ? 'máquina' : 'máquinas'}
+        </Text>
+      </View>
+      <Text style={estilos.salaSubtitulo}>
+        Juegos para ahora mismo: se abre y se juega, sin montar nada.
+      </Text>
+      <View style={estilos.salaFilete} />
+    </View>
   );
 }
 
@@ -1080,6 +1609,67 @@ function LaurelDeRango(): JSX.Element {
 }
 
 // ---------------------------------------------------------------------------
+
+/**
+ * EL FILO DE LA SALA: un píxel, y OCUPA SITIO.
+ *
+ * No hay materia en esta sala —ni metal, ni textura, ni relieve, ni sombra de
+ * objeto físico—, así que lo único que separa una superficie de otra es este
+ * borde de un píxel y la elevación. Va como constante y no escrito en cada estilo
+ * porque el día que deje de ser uno tiene que dejar de serlo en los once sitios a
+ * la vez; el COLOR es `SALA.filo` y vive en la tabla.
+ *
+ * Y de aquí sale el hueco de abajo. En React Native un borde empuja el contenido
+ * hacia dentro, así que una tarjeta con borde de 1 y `padding: 20` deja el texto a
+ * 21 del canto, y las DOS superficies de la ficha —portada y pie— dejarían de
+ * alinear entre sí y con la tarjeta de velada de la misma pantalla. Se resta del
+ * hueco en vez de ignorarlo.
+ *
+ * Eran dos huecos —uno ancho para la placa y otro estrecho para las tres franjas
+ * de datos— y ha quedado uno solo porque las tres franjas ya no existen. Un único
+ * margen para toda la tarjeta es también lo que hace la de velada, y es la mitad
+ * de la razón por la que aquélla se lee aplomada: todo cuelga de la misma vertical.
+ */
+const FILO = 1;
+/**
+ * EL MARGEN DE LA TARJETA. Son los `espacio.lg` —20— de la tarjeta de velada, y
+ * van SIN descontar el filo.
+ *
+ * Estuvo en `espacio.lg - FILO`, con el argumento de que en React Native el borde
+ * empuja el contenido hacia dentro y hay que compensarlo. Es cierto, pero aquí
+ * hacía justo lo contrario de lo que pretendía: la de velada lleva borde de 1 Y
+ * relleno de 20, o sea el texto a 21 del canto; descontando el filo, aquí quedaba
+ * a 20. La compensación tenía sentido cuando esta ficha tenía cuatro franjas que
+ * alinear con un raíl que iba por fuera; con dos superficies y todo dentro, lo que
+ * hay que igualar es la otra tarjeta.
+ */
+const HUECO = espacio.lg;
+
+/**
+ * ═══ LAS MEDIDAS DE UNA MÁQUINA, QUE SON LAS DE UNA VELADA ═══
+ *
+ * `ANCHO_MAQUINA` es el `ANCHO_MUNDO` de `carrusel3d.tsx` copiado a mano, y tiene
+ * que seguir siéndolo: las dos estanterías se ven a la vez en esta pantalla y un
+ * ancho distinto se lee como un descuido, no como dos familias.
+ *
+ * El ALTO sí difiere —392 contra 340— y es porque esta tarjeta tiene una franja
+ * que aquélla no: la de velada mete sus datos y su llamada dentro del campo de
+ * color, y aquí el encargo pide abajo un pie oscuro con más datos y un botón.
+ * De los 392: 228 de portada, 162 de pie y 2 de filo.
+ *
+ * Y `PASO_MAQUINA` se declara aquí en vez de importar `PASO`. Hoy valen lo mismo,
+ * 266, y aun así no pueden ser el mismo símbolo: `PASO` lo importa
+ * `fondos-sala.tsx` para saber en qué velada está el fondo 3D, así que cambiar el
+ * ancho de ESTA estantería desincronizaría los fondos de la OTRA, sin ningún
+ * error y sin nada que lo delate en pantalla salvo que el fondo se queda a medio
+ * camino. Dos constantes con el mismo valor y motivos distintos son dos
+ * constantes.
+ */
+const ANCHO_MAQUINA = 252;
+const ALTO_PORTADA = 228;
+const ALTO_MAQUINA = 392;
+const HUECO_MAQUINA = espacio.md;
+const PASO_MAQUINA = ANCHO_MAQUINA + HUECO_MAQUINA;
 
 const estilos = StyleSheet.create({
   raiz: { flex: 1, backgroundColor: '#050d09' },
@@ -1317,78 +1907,251 @@ const estilos = StyleSheet.create({
     paddingBottom: espacio.md,
   },
 
-  arcade: {
-    borderRadius: radio.lg,
-    borderWidth: 1,
-    borderColor: 'rgba(95,212,200,0.4)',
-    backgroundColor: 'rgba(10,32,30,0.55)',
-    padding: espacio.lg,
-    overflow: 'hidden',
-  },
-  arcadeNeon: {
-    position: 'absolute',
-    top: 0,
-    left: espacio.lg,
-    right: espacio.lg,
-    height: 2,
-    borderRadius: 2,
-    backgroundColor: 'rgba(95,212,200,0.65)',
-  },
-  arcadeFila: { flexDirection: 'row', alignItems: 'center', gap: espacio.md },
-  arcadeFlecha: { fontSize: 26, opacity: 0.8 },
-  arcadeTitulo: { fontFamily: fuente.titulo, fontSize: 17, color: '#5fd4c8', letterSpacing: 1 },
-  arcadeCuerpo: {
-    fontFamily: fuente.cuerpo,
-    fontSize: 15.5,
-    lineHeight: 22,
-    color: color.pergaminoTenue,
-    opacity: 0.8,
-    marginTop: 6,
-  },
-  /*
-   * LA RAZÓN por la que un arcade no se puede jugar aquí. Más pequeña que el
-   * gancho y con menos luz, porque no compite con él: el gancho es el juego y
-   * esto es una nota al pie sobre este teléfono. En cursiva por lo mismo que en
-   * la Sala de escritorio — se lee como voz de la casa y no del juego.
+  /* ═══════════════════ LA SALA DE ARCADE ═══════════════════
+   *
+   * NI UNA `fontFamily` EN TODO ESTE BLOQUE, y es a propósito. La app sólo trae
+   * Cinzel y Cormorant, que son las letras del taller de veladas; la Sala usa el
+   * palo seco DEL SISTEMA —que en cada aparato es el que mejor se lee en ese
+   * aparato— y el trabajo de cartel lo hacen el peso, la caja alta y el tracking
+   * de `LETRA`. Nombrar una fuente que no está instalada no da error: cae en la
+   * del sistema en silencio, y entonces la tabla miente.
+   *
+   * LOS TAMAÑOS NO SON LOS DE LA MAQUETA AL PIE DE LA LETRA, y conviene decir por
+   * qué. La maqueta rotula en 8,5 y 9 píxeles, que es lo normal en una lámina de
+   * diseño y está por debajo del mínimo de texto de esta casa, que es 13. Lo que
+   * se conserva es la JERARQUÍA —el nombre manda, el gancho acompaña, los rótulos
+   * son la letra pequeña— subiendo el escalón más bajo a 13 y escalando el resto
+   * para que las proporciones aguanten. Un rótulo ilegible no es sobrio, es un
+   * rótulo que no está.
    */
-  arcadeMotivo: {
-    fontFamily: fuente.cuerpo,
-    fontSize: 13.5,
-    lineHeight: 19,
-    fontStyle: 'italic',
-    color: color.pergaminoTenue,
-    opacity: 0.55,
-    marginTop: 8,
-  },
-  /*
-   * El aviso de que no se pudo preguntar al servidor. Va con el mismo verde de la
-   * Sala pero SIN el neón de arriba: no es una máquina más de la fila, es una
-   * nota sobre la fila. Con borde discontinuo, que es como esta casa dice
-   * «esto no es contenido, es un estado».
-   */
-  salaSinRed: {
-    borderRadius: radio.lg,
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    borderColor: 'rgba(95,212,200,0.28)',
-    paddingVertical: espacio.md,
+
+  salaBanda: {
+    marginTop: espacio.xl,
+    paddingTop: espacio.xl,
+    paddingBottom: espacio.xl,
     paddingHorizontal: espacio.lg,
+    backgroundColor: SALA.suelo,
+    borderTopWidth: FILO,
+    borderBottomWidth: FILO,
+    borderColor: SALA.filo,
+  },
+  salaCabeceraFila: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    gap: espacio.md,
+  },
+  salaTitulo: { ...LETRA.rotulo, fontSize: 15, color: SALA.palabra },
+  salaRecuento: { ...LETRA.rotuloChico, fontSize: 13, color: SALA.cifra },
+  salaSubtitulo: {
+    ...LETRA.cuerpo,
+    fontSize: 15,
+    lineHeight: 21,
+    color: SALA.tenue,
+    marginTop: espacio.sm,
+  },
+  /* A sangre: el filete cruza la banda entera, que es lo que la cierra por arriba. */
+  salaFilete: {
+    height: FILO,
+    backgroundColor: SALA.filo,
+    marginTop: espacio.md,
+    marginHorizontal: -espacio.lg,
+  },
+
+  /*
+   * LA SALA VACÍA. Sin acento: no hay nada vivo que señalar.
+   *
+   * `RADIO.tarjeta` y no `RADIO.ficha`: esta caja ocupa el sitio de las tarjetas
+   * y se mira desde la misma distancia, así que el radio de un panel de dentro de
+   * partida —14— la dejaba con una esquina distinta de todo lo que la rodea.
+   */
+  salaVacia: {
+    borderRadius: RADIO.tarjeta,
+    borderWidth: FILO,
+    borderColor: SALA.filo,
+    backgroundColor: SALA.teja,
+    padding: espacio.lg - FILO,
     gap: 6,
   },
-  salaSinRedTexto: {
-    fontFamily: fuente.cuerpo,
-    fontSize: 13.5,
+  salaVaciaTitulo: { ...LETRA.rotulo, fontSize: 20, color: SALA.palabra },
+  salaVaciaCuerpo: { ...LETRA.cuerpo, fontSize: 15, lineHeight: 21, color: SALA.tenue },
+
+  /*
+   * EL RAÍL DEL AFORO, que vive en la portada justo encima del nombre.
+   *
+   * Ése es el sitio que en la tarjeta de velada ocupa el GÉNERO —«misterio y
+   * deducción»—, y el raíl hace aquí su papel: es el escalón pequeño que abre la
+   * cascada de texto. Con una diferencia a favor: el género es una etiqueta y el
+   * raíl es un dato. Doce muescas, cuatro, una — las cinco máquinas se distinguen
+   * por el largo del raíl antes de leer una palabra.
+   *
+   * Las medidas y el hueco los pone `piezas.tsx`, que es donde vive el raíl.
+   */
+  /*
+   * EL RAÍL LO PINTA `piezas.tsx`; lo único que es de la tarjeta es el hueco que
+   * deja entre él y el nombre. Va aquí y no en la pieza porque en la espera de El
+   * Arcade el raíl no lleva nada debajo, y un margen metido en la pieza sería una
+   * decisión de esta pantalla cobrada a las otras dos.
+   */
+  railDeLaTarjeta: { marginBottom: 10 },
+
+  /*
+   * LAS PASTILLAS SE APILAN Y SE VAN A LA DERECHA. Ocupan la esquina que en la
+   * tarjeta de velada ocupa la insignia DISPONIBLE/MUY PRONTO, que es de donde
+   * sale esta composición. La cápsula en sí la pinta `piezas.tsx`.
+   */
+  pastillas: { alignItems: 'flex-end', gap: 6 },
+
+  /*
+   * LA ESTANTERÍA SANGRA POR LOS DOS LADOS. `salaBanda` tiene 20 de margen y un
+   * carrusel con margen no es un carrusel: las tarjetas se cortarían contra un
+   * canto invisible en vez de salirse por el borde de la pantalla. El mismo
+   * truco que ya usa `salaFilete` aquí al lado.
+   */
+  estanteria: { marginHorizontal: -espacio.lg },
+
+  /*
+   * LA TARJETA. Radio 20 y borde teñido del acento: los dos son los de la
+   * tarjeta de velada —allí el borde es `${paleta.acento}66`, o sea el 40 %—. En
+   * una máquina que no se puede jugar el borde vuelve a `SALA.filo`, porque el
+   * acento en esta sala significa una sola cosa y no puede decirla en una ficha
+   * apagada.
+   */
+  maquina: {
+    width: ANCHO_MAQUINA,
+    height: ALTO_MAQUINA,
+    borderRadius: RADIO.tarjeta,
+    borderWidth: FILO,
+    borderColor: SALA.filo,
+    backgroundColor: SALA.teja,
+    overflow: 'hidden',
+  },
+
+  /*
+   * LA PORTADA: el único sitio donde vive el color, y ocupa casi dos tercios de
+   * la tarjeta. Lo que había antes de todo esto hacía justo lo contrario —un filo
+   * turquesa, un neón turquesa, un icono turquesa, un título turquesa y una
+   * flecha turquesa— y ésa es la razón medible de que se leyera barata: un acento
+   * repartido en veinte detalles se apaga; concentrado en un plano grande, brilla.
+   *
+   * `overflow: 'hidden'` porque dentro van cuatro capas absolutas —y una quinta
+   * el día de la foto— y ninguna puede asomar por el pie.
+   */
+  /*
+   * EL FILO DE ABAJO ES PARA LA TARJETA APAGADA. En una viva no hace falta: entre
+   * el hondo del acento y la teja del pie hay un escalón de color que separa solo.
+   * En una apagada la portada acaba en `SALA.teja` y el pie ES `SALA.teja`, o sea
+   * 1,04:1 — la tarjeta se queda en una losa lisa de 252×392 con texto encima y no
+   * se distingue dónde acaba la portada. Un píxel de `SALA.filo` lo resuelve, y en
+   * la viva se pierde bajo el acento sin molestar.
+   */
+  portada: {
+    height: ALTO_PORTADA,
+    overflow: 'hidden',
+    borderBottomWidth: FILO,
+    borderBottomColor: SALA.filo,
+  },
+  portadaDentro: { flex: 1, padding: HUECO },
+  hueco: { flex: 1 },
+
+  /*
+   * EL BLOQUE DE TEXTO. Los cuerpos salen de la tarjeta de velada bajados un
+   * escalón: allí el nombre va a 30/36 en Cinzel, una serif estrecha; aquí a
+   * 26/31 en el palo seco del sistema a peso 800 y en caja alta, que a igualdad
+   * de cuerpo ocupa bastante más. Medido, «LA FRENTE» a 26 mide 167 de los 210
+   * útiles; a 30 se iría a 193 y cualquier nombre de diez letras se partiría.
+   *
+   * Los dos van a BLANCO ENTERO. Sobre el hondo con el velo encima y la luz de
+   * esquina contada, el peor de los cuatro temas da 5,61 para el nombre y 7,33
+   * para el gancho; con un 90 % de opacidad se quedarían en 4,6 y 5,9, y el margen
+   * es justo lo que hace que esto siga pasando el día que alguien meta una
+   * animación de entrada.
+   */
+  nombre: { ...LETRA.rotulo, fontSize: 26, lineHeight: 31, color: SALA.blanco },
+  gancho: {
+    ...LETRA.cuerpo,
+    fontSize: 14.5,
     lineHeight: 19,
-    color: color.pergaminoTenue,
-    opacity: 0.6,
+    color: SALA.blanco,
+    marginTop: 4,
   },
-  salaSinRedAccion: {
-    fontFamily: fuente.titulo,
+  /* En una ficha apagada la portada es gris, así que la tinta deja de ser blanca. */
+  tintaApagada: { color: SALA.palabra },
+  ganchoApagado: { color: SALA.tenue },
+
+  /*
+   * EL PIE OSCURO. Ocupa lo que sobra —162 de los 392— y ordena de arriba abajo:
+   * los datos, la letra menuda, y el botón pegado al suelo con `marginTop: 'auto'`.
+   * Ese `auto` es lo que mantiene el botón en la misma línea en las cinco tarjetas
+   * aunque una tenga dos renglones de datos y otra uno.
+   */
+  pie: { flex: 1, paddingHorizontal: HUECO, paddingTop: 13, paddingBottom: 16, gap: 3 },
+  /*
+   * 13,5 Y SEPARADOR ESTRECHO. La línea más larga de las cinco máquinas es «2 a 12
+   * personas · 10 por segundo»: a 14 y con el separador de dos espacios medía 224
+   * de los 210 útiles y partía dejando «segundo» solo en el segundo renglón. A
+   * 13,5 y con ` · ` cabe en uno. La de velada resuelve lo mismo con menos texto
+   * —«4 a 12 personas · Una noche», 27 caracteres contra 32— y por eso puede
+   * permitirse 14,5.
+   */
+  datos: { ...LETRA.cuerpo, fontSize: 13.5, lineHeight: 19, color: SALA.tenue },
+  /*
+   * LA LÍNEA MENUDA EN CAJA BAJA, y no en las versalitas con tracking que llevaba.
+   * El pie tenía cuatro voces —frase, versalitas, cursiva y versalitas de acento—
+   * donde la tarjeta de velada tiene dos, y un pie con cuatro tipografías se lee
+   * como una ficha técnica por mucho que las cajas hayan desaparecido. La
+   * jerarquía la da el escalón de cuerpo —12,5 contra 14— y no una rebaja de
+   * alfa: `tenue` entero da 5,95 sobre la teja, y al 85 % se quedaría en 4,64.
+   */
+  /*
+   * 13 Y NO 12,5. La regla de esta casa es que ningún texto baja de 13, y estas dos
+   * líneas del pie la rompían por medio punto: se escribieron buscando un escalón
+   * por debajo de la de datos, y el escalón ya lo daba el 14 contra el 13. Medio
+   * punto de cuerpo no compra jerarquía; sólo compra un renglón peor de leer.
+   */
+  menores: { ...LETRA.cuerpo, fontSize: 13, lineHeight: 18, color: SALA.tenue },
+  motivo: {
+    ...LETRA.cuerpo,
     fontSize: 13,
-    letterSpacing: 1,
-    color: '#5fd4c8',
-    opacity: 0.9,
+    lineHeight: 18,
+    fontStyle: 'italic',
+    color: SALA.tenue,
   },
+
+  /*
+   * EL BOTÓN. Relleno de acento con tinta `SALA.suelo`: los números y el porqué
+   * están donde se pinta. Alto 42, que pasa del mínimo de 44 de área táctil sólo
+   * porque el área táctil de verdad es la tarjeta entera, de 252 por 392.
+   */
+  boton: {
+    marginTop: 'auto',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    height: 42,
+    borderRadius: RADIO.mando,
+    backgroundColor: SALA.acento,
+  },
+  botonTexto: { ...LETRA.rotulo, fontSize: 14, color: SALA.suelo },
+
+  /*
+   * El aviso de que no se pudo preguntar al servidor. Con borde discontinuo, que
+   * es como esta casa dice «esto no es contenido, es un estado», y sin acento
+   * salvo en la palabra que se pulsa.
+   */
+  salaSinRed: {
+    /* Mismo radio que las tarjetas: está tres píxeles debajo de ellas, en la misma banda. */
+    borderRadius: RADIO.tarjeta,
+    borderWidth: FILO,
+    borderStyle: 'dashed',
+    borderColor: SALA.filo,
+    paddingVertical: espacio.md,
+    paddingHorizontal: espacio.lg - FILO,
+    gap: 8,
+  },
+  salaSinRedTexto: { ...LETRA.cuerpo, fontSize: 15, lineHeight: 21, color: SALA.tenue },
+  salaSinRedAccion: { ...LETRA.rotuloChico, fontSize: 13, color: SALA.acento },
 
   vitrina: {
     borderRadius: radio.lg,

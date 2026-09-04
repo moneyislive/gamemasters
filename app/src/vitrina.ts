@@ -117,7 +117,6 @@ export interface Minijuego {
   nombre: string;
   gancho: string;
   icono: IconoDeArcade;
-  paleta: Paleta;
   /**
    * Adónde lleva la tarjeta. `null` si esta app no sabe pintar su mueble.
    *
@@ -267,25 +266,33 @@ export function veladas(): Velada[] {
   });
 }
 
-/**
- * Cómo se pinta cada arcade instalado.
+/*
+ * AQUÍ VIVÍA `PALETAS_DE_ARCADE`, Y SE HA IDO CON LA IDENTIDAD NUEVA DE LA SALA.
  *
- * Misma disciplina que `RETRATOS`: se mira por identificador y quien no esté en la
- * tabla se lleva la paleta por defecto en vez de romper la portada. Instalar un
- * juego nuevo no puede dejar la Sala en blanco.
+ * Era una tabla de un color por arcade, con la misma disciplina que `RETRATOS`:
+ * se miraba por identificador y quien no estuviera se llevaba el respaldo. Tenía
+ * UNA entrada —La Frente— cuyo acento era exactamente el mismo que el del
+ * respaldo, así que el mecanismo aparentaba diferenciar y no diferenciaba: las
+ * cinco máquinas salían del mismo turquesa por dos caminos distintos.
+ *
+ * Y con la Sala nueva no se puede quedar, ni siquiera repintada. Su diseño
+ * descansa en que EL COLOR VIVE EN UN SOLO SITIO Y ES GRANDE: la placa del
+ * nombre es un campo de acento y todo lo demás es gris frío. Cinco placas de
+ * cinco colores deshacen eso. Peor: el acento de la Sala es intercambiable
+ * —`TEMAS_DE_SALA` en `arcade/muebles.ts`— y una tabla de colores por juego
+ * dejaría el tema elegido en mentira, porque habría fichas que no se enterarían
+ * de que la Sala es ahora de ámbar.
+ *
+ * Lo que aquella tabla quería garantizar SIGUE GARANTIZADO, y mejor: su propio
+ * comentario decía que «la tarjeta y lo que se abre al tocarla tienen que ser
+ * del mismo color». Ahora lo son porque las dos leen `SALA.acento`, en vez de
+ * porque alguien se acordara de escribir el mismo hexadecimal en dos sitios.
+ *
+ * Lo que distingue una máquina de otra en la Sala nueva no es el color: es el
+ * RAÍL DEL AFORO —tantas muescas como personas admite, encendidas las que hacen
+ * falta para empezar—, que además no hay que mantener, porque sale del
+ * manifiesto del juego.
  */
-const PALETAS_DE_ARCADE: Record<string, Paleta> = {
-  /*
-   * La Frente lleva el verde de neón de la Sala, que es el acento con el que la
-   * portada separa esta familia de la otra. Ver `app/src/arcade/muebles.ts`, donde
-   * viven los mismos colores para la pantalla del juego: la tarjeta y lo que se
-   * abre al tocarla tienen que ser del mismo color, que es la regla que este
-   * fichero ya aplicaba a las veladas.
-   */
-  frente: { acento: '#5fd4c8', fondo: ['#0c1c19', '#06110f'] },
-};
-
-const PALETA_DE_ARCADE_POR_DEFECTO: Paleta = { acento: '#5fd4c8', fondo: ['#12232b', '#060c0f'] };
 
 /**
  * LOS ARCADES INSTALADOS. Ya no devuelve `[]`.
@@ -357,7 +364,6 @@ export function laSala(catalogo: readonly ArcadeDelCatalogo[]): Minijuego[] {
       icono: (ICONOS_DE_ARCADE_CONOCIDOS as readonly string[]).includes(m.icono)
         ? m.icono
         : ICONO_DE_ARCADE_POR_DEFECTO,
-      paleta: PALETAS_DE_ARCADE[m.id] ?? PALETA_DE_ARCADE_POR_DEFECTO,
       ruta: donde.aqui ? rutaDeArcade(m) : null,
       porque: donde.aqui ? null : donde.porque,
     };

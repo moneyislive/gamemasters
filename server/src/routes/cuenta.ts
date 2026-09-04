@@ -486,8 +486,62 @@ router.get('/cuenta/yo', async (req, res) => {
       email: cuenta.email,
       taller: admitidoEnElTaller(cuenta),
       via: (cuenta.identidades ?? []).map((i) => i.proveedor),
+      /* `null` y no ausente: quien pregunta distingue «no ha elegido» de «servidor viejo». */
+      figura: cuenta.figura ?? null,
     },
   });
+});
+
+/**
+ * LA FIGURA DE LA CUENTA: el aventurero que te representa en los lobbies de la Sala.
+ *
+ * ═══ POR QUÉ SE GUARDA EN LA CUENTA Y NO SÓLO EN EL APARATO ═══
+ *
+ * La elección vive también en el aparato —igual que el avatar de las veladas— y
+ * eso basta para quien juega sin cuenta. Con cuenta, lo que se compra aquí es que
+ * la elección te SIGA: cambiar de móvil, o abrir la web, no te devuelve al
+ * aventurero de serie. Es exactamente para lo que existe una cuenta en esta casa:
+ * lo que sobrevive al teléfono.
+ *
+ * ═══ LA FORMA ES LA MISMA QUE EXIGE LA MESA, COPIADA Y NO IMPORTADA ═══
+ *
+ * `server/src/arcade/mesas.ts` exige a la figura de un asiento esta misma forma:
+ * de 1 a 32 caracteres, minúsculas, dígitos y guiones entre medias. Se copia en
+ * vez de importarse porque este fichero es del lado de las cuentas y aquél es el
+ * núcleo del arcade, y los dos motores no se conocen. Que exijan lo mismo es una
+ * decisión y no una dependencia; si un día divergieran, el síntoma sería benigno
+ * —una figura que la cuenta guarda y la mesa rechaza al sentarse— y lo diría la
+ * mesa con su 400, no un fallo mudo.
+ *
+ * El servidor NO comprueba que la figura exista: la lista de aventureros vive en
+ * `escenas/`, que es quien los dibuja, y un cliente que reciba una que no conoce
+ * enseña la de serie. Es la misma regla con la que la portada trata un icono de
+ * arcade desconocido.
+ */
+const FORMA_DE_FIGURA = /^[a-z0-9]+(?:[-_][a-z0-9]+)*$/;
+const LARGO_MAXIMO_DE_FIGURA = 32;
+
+router.put('/cuenta/figura', async (req, res) => {
+  const cuenta = await cuentaDe(req, res);
+  if (!cuenta) return;
+
+  const figura: unknown = req.body?.figura;
+  if (
+    typeof figura !== 'string' ||
+    figura.length === 0 ||
+    figura.length > LARGO_MAXIMO_DE_FIGURA ||
+    !FORMA_DE_FIGURA.test(figura)
+  ) {
+    res.status(400).json({
+      error:
+        `La figura tiene que ser de 1 a ${String(LARGO_MAXIMO_DE_FIGURA)} caracteres, sólo ` +
+        'minúsculas, dígitos y guiones entre medias.',
+    });
+    return;
+  }
+
+  const guardada = await getStore().saveAccount({ ...cuenta, figura });
+  res.json({ figura: guardada.figura ?? figura });
 });
 
 /**

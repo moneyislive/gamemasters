@@ -21,23 +21,170 @@
  *    el tabulador y un foco invisible es una pantalla que no se puede usar sin
  *    ratón.
  *
- * Los colores son los de la Sala: verde de fondo, neón encima. No se toma nada
- * del taller —ni su tema, ni sus tipos, ni sus componentes—: esto es de la
- * familia del arcade y no de la de las veladas, y compartir la hoja de estilo
- * sería la primera costura por la que las dos cosas se vuelven una.
+ * ═══ Y LA IDENTIDAD, QUE YA NO ES «VERDE DE FONDO, NEÓN ENCIMA» ═══
+ *
+ * Esa frase estaba aquí escrita y describía siete colores inventados en este
+ * fichero —#06110f, #5fd4c8, un naranja— que no salían de ninguna parte. La Sala
+ * de Arcade tiene desde ahora una identidad elegida mirando maquetas, y se
+ * sostiene sobre tres cosas:
+ *
+ *   · NO HAY MATERIA. Ni metal, ni textura, ni relieve, ni sombra de objeto
+ *     físico. Lo que separa una superficie de otra es un FILO de un píxel
+ *     (`--filo`) y una elevación mínima, no un cambio de material.
+ *   · EL COLOR VIVE EN UN SOLO SITIO Y ES GRANDE: la placa del nombre de cada
+ *     máquina es un campo de acento saturado, y todo lo demás es gris frío. Un
+ *     acento repartido en veinte detalles se apaga; concentrado en un plano
+ *     grande, brilla. Fuera de la placa, el acento aparece SÓLO donde significa
+ *     «esto está vivo o se puede tocar»: un enlace, el foco, el borde de una
+ *     tarjeta bajo el ratón, la tecla de un atajo, las muescas encendidas del
+ *     raíl y el piloto de «se juega aquí».
+ *   · EL ORNAMENTO CUENTA ALGO: el raíl de muescas dice el aforo antes de leer
+ *     una palabra. Ver `.aforo`, más abajo.
+ *
+ * ═══ SIGUEN SIENDO DOS TABLAS Y NO UNA ═══
+ *
+ * La misma tabla existe en `app/src/arcade/muebles.ts`, y no se comparte el
+ * fichero: compartir la hoja de estilo sería la primera costura por la que el
+ * escritorio y el móvil se vuelven la misma cosa. Lo que se comparte es la
+ * DECISIÓN —los catorce colores, los radios, la anatomía de la ficha, la cuenta
+ * de aforo—, no el fichero. Esto no es del taller de veladas: no se toma nada de
+ * allí, ni su tema, ni sus tipos, ni sus componentes.
+ *
+ * Y hay un sitio donde las dos tablas dicen lo mismo y se usan distinto, a
+ * propósito y dicho aquí para que no parezca un despiste: `--cifra`. Ver su
+ * comentario en la tabla.
  */
 
 :root {
-  --fondo: #06110f;
-  --panel: #0c1c19;
-  --panel-alto: #102723;
-  --neon: #5fd4c8;
-  --neon-tenue: #2f6b64;
-  --palabra: #f2fbf9;
-  --palabra-tenue: #9dbdb8;
-  --aviso: #e8a04a;
-  --fallo: #d4636f;
-  --radio: 10px;
+  /* ══════ LOS DIEZ NEUTROS. No se tiñen nunca. ══════ */
+
+  /* El fondo de la pantalla. Frío y muy oscuro: el acento tiene que poder gritar encima. */
+  --suelo: #080a0e;
+  /* El fondo de una zona dentro de la pantalla, un escalón por encima del suelo. */
+  --pared: #0c0f14;
+  /* La superficie de una ficha o un panel. */
+  --teja: #12161d;
+  /* La franja levantada dentro de una ficha: la fila de datos, una cabecera. */
+  --teja-alta: #161b23;
+  /*
+   * El filo: un píxel de blanco al 7,5 %. Es lo ÚNICO que separa una superficie
+   * de otra. Blanco con alfa y no un gris opaco, para que el mismo valor
+   * funcione sobre el suelo, sobre la teja y sobre la placa de acento sin tener
+   * que declarar tres.
+   */
+  --filo: rgba(255, 255, 255, 0.075);
+  /* El filo cuando tiene que verse: un borde enfocado, una separación que importa. */
+  --filo-vivo: rgba(255, 255, 255, 0.14);
+  /* El texto normal. */
+  --palabra: #e9ecf2;
+  /* El texto secundario: lo que acompaña y no se lee primero. */
+  --tenue: #8c94a5;
+  /*
+   * Los rótulos pequeños y las cifras de apoyo — y AQUÍ NO PINTA TEXTO.
+   *
+   * Sobre `--teja` da 3,2:1, que es el mismo contraste que tenía el turquesa
+   * apagado de la Sala anterior (3,11:1) y que era su peor flaqueza medible.
+   * Reintroducirlo en un cliente donde la letra pequeña se mira a setenta
+   * centímetros sería cambiarle el tono al mismo fallo. Así que aquí `--cifra`
+   * pinta GRÁFICOS —las muescas apagadas del raíl, donde 3:1 es el mínimo que
+   * corresponde y se cumple— y todo rótulo que haya que LEER va en `--tenue`,
+   * que da 6:1. El valor es el de la tabla compartida; el reparto es de este
+   * cliente, que es justo lo que significa tener dos tablas.
+   */
+  --cifra: rgba(255, 255, 255, 0.34);
+  /* El blanco de énfasis: sobre la placa de acento, y las cifras grandes. */
+  --blanco: #f4f6fa;
+
+  /* ══════ LOS TRES QUE SÍ SE TIÑEN ══════ */
+
+  /* El color que brilla. Vive en la placa del nombre, en el piloto y en el filo de lo pulsable. */
+  --acento: #a855f7;
+  /* Su fondo, para el degradado de la placa. */
+  --acento-hondo: #6d28d9;
+  /* El mismo color casi transparente: resplandores y auras. */
+  --halo: rgba(168, 85, 247, 0.2);
+
+  /*
+   * Cambiando estos tres se repinta la Sala entera de ámbar, de verde o de
+   * carmesí, y NINGÚN otro valor de esta hoja hay que tocar. Es la prueba de que
+   * lo que la sostiene es el gris frío y el filo de un píxel, no el violeta: si
+   * repintarla exigiera tocar más de tres líneas, sería que el violeta estaba
+   * haciendo de estructura. Por eso no hay ni un solo `rgba()` del acento suelto
+   * más abajo — el único que existe es `--halo`, y está aquí.
+   */
+
+  /* ══════ Y UNO QUE NO ES NINGUNA DE LAS DOS COSAS ══════ */
+
+  /*
+   * Lo que quema y lo que se acaba. NO se tiñe con el tema: si se tiñera, el
+   * aviso diría lo mismo que la placa del nombre y dejaría de avisar.
+   */
+  --alarma: #ff7a45;
+
+  /* ══════ LO QUE SÓLO EXISTE AQUÍ ══════ */
+
+  /*
+   * Una hoja de estilo no puede importar `conAlfa`, que es lo que hace la app
+   * para no repetir un color con otra transparencia. El equivalente honrado en
+   * CSS es declarar el derivado UNA vez y aquí, que es donde va todo valor de
+   * color. Los dos que hacen falta salen de colores que no se tiñen nunca —el
+   * negro de una sombra y `--alarma`—, así que ninguno rompe la promesa de los
+   * tres de arriba.
+   */
+  --sombra: rgba(0, 0, 0, 0.85);
+  --alarma-velo: rgba(255, 122, 69, 0.09);
+
+  /* ══════ LOS REDONDEOS. Pocos y con un trabajo cada uno. ══════ */
+
+  /* Una ficha de máquina, un panel, el lienzo del tablero. */
+  --radio-ficha: 14px;
+  /* Un botón, una pastilla, un campo, la tecla de un atajo. */
+  --radio-mando: 8px;
+
+  /* ══════ LA CUENTA DE AFORO ══════ */
+
+  --muesca-grosor: 3px;
+  /* La diferencia entre estos dos altos es lo que de verdad se lee. */
+  --muesca-alta: 16px;
+  --muesca-baja: 7px;
+  --muesca-hueco: 19px;
+
+  /* ══════ LAS LETRAS ══════ */
+
+  /*
+   * NINGUNA FAMILIA NUEVA, y ninguna que haya que descargar. La maqueta rotula
+   * con Oswald y pone los datos en IBM Plex Mono; no está instalada ninguna de
+   * las dos, y nombrar una fuente que no existe no da error: cae en la del
+   * sistema en silencio, y entonces la tabla miente. Así que se usa el palo seco
+   * del sistema y el trabajo de la condensada lo hacen el PESO, la CAJA ALTA y
+   * el TRACKING, que es de donde sale de verdad la voz de un rótulo.
+   *
+   * La monoespaciada sí es la del sistema y ya estaba en este fichero, así que
+   * aquí los datos SÍ van en mono — que es lo que pedía la maqueta y lo que la
+   * app no puede tener sin empaquetar tres fuentes. Una cifra en monoespaciada
+   * dice «esto es una medida» sin rotularlo, y además cuadra las columnas de
+   * aforo y ritmo. Es la clase de diferencia que justifica que sean dos tablas.
+   */
+  --letra: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --letra-dato: 'Cascadia Mono', Consolas, ui-monospace, monospace;
+
+  /*
+   * EL SUELO DEL TAMAÑO DE LETRA. Nada baja de 13 px, y con la base en 17 px eso
+   * son 0.78rem. Está escrito como constante para que al ajustar un rótulo se
+   * vea contra qué se está ajustando.
+   */
+  --letra-minima: 0.78rem;
+
+  /*
+   * ══════ Y UNA DECLARACIÓN QUE NO ES UN COLOR PERO PINTA ══════
+   *
+   * Lo que el navegador dibuja por su cuenta —la lista desplegada de un
+   * `<select>`, el cursor de un campo, las barras de la crónica— no lee esta
+   * tabla: lee `color-scheme`. Sin esto, el desplegable de los plazos sale con
+   * fondo blanco encima de una Sala negra, que es el único sitio del cliente
+   * donde el sistema puede contradecir a la hoja de estilo.
+   */
+  color-scheme: dark;
 }
 
 * {
@@ -48,32 +195,49 @@ html,
 body {
   margin: 0;
   padding: 0;
-  background: var(--fondo);
+  background: var(--suelo);
   color: var(--palabra);
-  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  font-family: var(--letra);
   font-size: 17px;
   line-height: 1.6;
 }
 
+/* Un enlace se puede pulsar, y eso es exactamente lo que el acento significa. */
 a {
-  color: var(--neon);
+  color: var(--acento);
 }
 
+/*
+ * `code` NO lleva acento: un trozo de ruta escrito dentro de una frase no se
+ * puede pulsar, y teñirlo de lo mismo que un enlace es prometer un clic que no
+ * existe. Se distingue por la letra y por una pastilla levantada.
+ */
 code {
-  font-family: 'Cascadia Mono', Consolas, monospace;
+  font-family: var(--letra-dato);
   font-size: 0.9em;
-  color: var(--neon);
+  color: var(--palabra);
+  background: var(--teja-alta);
+  border-radius: 4px;
+  padding: 0.1em 0.35em;
 }
 
 :focus-visible {
-  outline: 2px solid var(--neon);
+  outline: 2px solid var(--acento);
   outline-offset: 3px;
 }
 
 /* --- El armazón ---------------------------------------------------------- */
 
+/*
+ * El resplandor de arriba es NEUTRO —`--pared` sobre `--suelo`— y no del acento:
+ * es la luz de la sala, y teñirla sería empezar a repartir el color que tiene
+ * que estar concentrado en las placas.
+ */
 .sala {
   min-height: 100vh;
+  background:
+    radial-gradient(70% 34% at 50% 0%, var(--pared) 0%, transparent 72%),
+    var(--suelo);
 }
 
 .cabecera {
@@ -81,19 +245,34 @@ code {
   align-items: baseline;
   gap: 1rem;
   padding: 1rem 2.5rem;
-  border-bottom: 1px solid var(--neon-tenue);
+  background: var(--pared);
+  border-bottom: 1px solid var(--filo);
 }
 
+/*
+ * El nombre de la casa es un TÍTULO y va en `--palabra`, aunque además sea un
+ * enlace. El acento aparece cuando el ratón lo señala, que es cuando de verdad
+ * está diciendo «esto se puede pulsar».
+ */
 .vuelta {
   font-size: 1.1rem;
+  font-weight: 800;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   text-decoration: none;
+  color: var(--palabra);
+  transition: color 0.12s;
+}
+
+.vuelta:hover {
+  color: var(--acento);
 }
 
 .silla {
-  color: var(--palabra-tenue);
-  font-size: 0.9rem;
+  color: var(--tenue);
+  font-family: var(--letra-dato);
+  font-size: var(--letra-minima);
+  letter-spacing: 0.08em;
 }
 
 /*
@@ -109,6 +288,10 @@ code {
 
 .titulo {
   font-size: 2rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--palabra);
   margin: 0 0 0.25rem;
 }
 
@@ -118,23 +301,35 @@ code {
 }
 
 .entradilla {
-  color: var(--palabra-tenue);
+  color: var(--tenue);
   margin: 0 0 2rem;
 }
 
 .letra-chica {
   font-size: 0.9rem;
-  color: var(--palabra-tenue);
+  color: var(--tenue);
   max-width: 68ch;
 }
 
+/*
+ * EL AVISO, Y POR QUÉ LA REGLA ES DE `--alarma` Y LA LETRA NO.
+ *
+ * Por aquí pasan dos cosas distintas —«el plazo se acaba», que es alarma, y «no
+ * se ha podido hablar con el servidor», que es informativo— y desde CSS no hay
+ * forma de distinguirlas: `mesa.aviso` llega como una cadena pelada. Pintarlo
+ * todo de alarma haría gritar a lo rutinario; pintarlo todo de `--tenue`
+ * apagaría lo que interrumpe. Así que interrumpe el CANAL —la regla de la
+ * izquierda y el velo— y el texto se queda en `--palabra`, que es lo que hay que
+ * leer. `AvisoPuesto` ya sabe de dónde viene cada aviso; el día que ese origen
+ * llegue al marcado, esta regla se puede partir en dos de verdad.
+ */
 .aviso {
-  border-left: 3px solid var(--aviso);
-  background: rgba(232, 160, 74, 0.08);
-  color: var(--aviso);
+  border-left: 3px solid var(--alarma);
+  background: var(--alarma-velo);
+  color: var(--palabra);
   padding: 0.6rem 1rem;
   margin: 0 0 1rem;
-  border-radius: 0 var(--radio) var(--radio) 0;
+  border-radius: 0 var(--radio-mando) var(--radio-mando) 0;
   max-width: 70ch;
 }
 
@@ -147,26 +342,285 @@ code {
   gap: 1.25rem;
 }
 
+/*
+ * ═══ LA ANATOMÍA DE UNA MÁQUINA ═══
+ *
+ * De arriba abajo, y siempre la misma: el RAÍL de aforo, la PLACA de acento con
+ * el nombre y el gancho, la fila de TRES DATOS, las ESPECIFICACIONES menores y
+ * el PIE con el estado. La ficha no tiene relleno propio: cada franja pone el
+ * suyo y se separan con un filo de un píxel, que es lo que sustituye al material
+ * que ya no hay.
+ *
+ * `overflow: hidden` es lo que hace que la placa respete el redondeo sin tener
+ * que redondearla otra vez por su cuenta.
+ */
 .tarjeta {
-  display: block;
-  background: var(--panel);
-  border: 1px solid var(--neon-tenue);
-  border-radius: var(--radio);
-  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  background: var(--teja);
+  border: 1px solid var(--filo);
+  border-radius: var(--radio-ficha);
+  overflow: hidden;
+  padding: 0;
   min-height: 15rem;
   text-decoration: none;
   color: inherit;
 }
 
+/*
+ * ═══ EL RAÍL DE AFORO: la firma de la Sala ═══
+ *
+ * Hay tantas muescas como personas admite la máquina y están encendidas las que
+ * hacen falta para empezar. La longitud del raíl dice el aforo ANTES de leer una
+ * palabra, y puestas en fila las máquinas se distinguen por él. Es ornamento que
+ * informa, que es la única clase que sobrevive a que alguien añada un juego: el
+ * sexto arcade trae su aforo en el manifiesto y su raíl sale solo.
+ *
+ * Viene de una orla de bombillas de feria y se quedó sin el disfraz al
+ * modernizarla: la cuenta es lo que valía, la bombilla era la época.
+ *
+ * EL MARCADO QUE ESTO ESPERA, y que hoy NO EXISTE porque vive en `catalogo.tsx`
+ * y ese fichero no es de esta tarea: dentro de `.tarjeta`, antes del nombre, un
+ * `<span class="aforo">` con un `<i class="muesca">` por cada `jugadores.maximo`
+ * y `class="muesca muesca-viva"` en los primeros `jugadores.minimo`. Mientras no
+ * lo haya, esta regla no pinta nada y la ficha empieza por la placa; no sobra
+ * ninguna otra parte de la anatomía.
+ *
+ * Y envuelve en vez de recortar: con un aforo largo, una segunda fila enseña
+ * todas las muescas y una tercera de más leería mal la longitud, pero un raíl
+ * cortado por `overflow` diría un aforo que no es. Un ornamento que cuenta no
+ * puede contar mal.
+ */
+.aforo {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 4px var(--muesca-hueco);
+  padding: 0.85rem 1.1rem 0.4rem;
+  border-bottom: 1px solid var(--filo);
+}
+
+.muesca {
+  display: block;
+  flex: none;
+  width: var(--muesca-grosor);
+  height: var(--muesca-baja);
+  border-radius: 2px;
+  background: var(--cifra);
+}
+
+.muesca-viva {
+  height: var(--muesca-alta);
+  background: var(--acento);
+  box-shadow: 0 0 8px var(--halo), 0 0 20px var(--halo);
+}
+
+/*
+ * ═══ LA PLACA: el campo de color, y por qué son dos elementos ═══
+ *
+ * La placa es el nombre Y el gancho, y en el marcado son dos hermanos sin nada
+ * que los envuelva. El degradado se reparte entre los dos y la costura no se ve
+ * porque la mitad de abajo ARRANCA en `--acento`, que es exactamente el color en
+ * el que termina la de arriba. El resultado es un solo plano que se hunde hacia
+ * `--acento-hondo`, igual que la maqueta, sin pedir un `<div>` que no existe.
+ *
+ * El resplandor de la esquina es `--halo`, o sea el mismo acento: no es un brillo
+ * de material, es la luz del propio color.
+ */
+/*
+ * EL NOMBRE NO SE APOYA EN EL ACENTO VIVO, Y ESO NO ES OPCIONAL.
+ *
+ * Aquí ponía `var(--acento)` plano, con el argumento de que el blanco sobre él da
+ * 3,6:1 y que para un titular de 800 el mínimo son 3:1. Es cierto EN VIOLETA y
+ * sólo en violeta: medido en los cuatro temas, el blanco sobre el acento da
+ * 1,98:1 en ámbar y 2,11:1 en verde. Eso no es un titular flojo, es un titular
+ * que no se lee, y el tema es cosa de quien juega.
+ *
+ * La franja viva se conserva —es la decisión de que el color viva en un sitio y
+ * sea grande— pero va ENCIMA del texto y no debajo: el degradado toca fondo a los
+ * 2,3rem y el nombre empieza a los 2,4rem, así que TODO el texto de la placa se
+ * apoya en `--acento-hondo`, donde el blanco da 4,64:1 en el peor de los cuatro
+ * temas. Las paradas van en rem y no en porcentaje a propósito: un porcentaje
+ * depende del alto del elemento, y el alto depende de si el nombre ocupa una
+ * línea o dos.
+ *
+ * Es el mismo sitio al que llega la app por otro camino: allí la placa tiene alto
+ * mínimo y el texto va pegado abajo con `flex-end`.
+ */
+.nombre-del-arcade {
+  margin: 0;
+  padding: 2.4rem 1.1rem 0;
+  background:
+    radial-gradient(120% 190% at 12% -30%, var(--halo) 0%, transparent 66%),
+    linear-gradient(
+      180deg,
+      var(--acento) 0,
+      var(--acento) 1.1rem,
+      var(--acento-hondo) 2.3rem
+    );
+  color: var(--blanco);
+  font-size: 1.25rem;
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/*
+ * EL GANCHO YA NACE EN EL HONDO. Antes arrancaba en `--acento` y se hundía en el
+ * primer 40 % del párrafo, que en violeta bastaba y en ámbar y en verde no: su
+ * primera línea caía sobre una mezcla a medio camino. Ahora el color viene ya
+ * hundido desde el nombre, así que aquí es plano y no hay costura: los dos
+ * hermanos comparten el mismo `--acento-hondo`.
+ */
+.gancho {
+  margin: 0;
+  padding: 0.5rem 1.1rem 1.05rem;
+  background: var(--acento-hondo);
+  color: var(--blanco);
+  font-size: 0.95rem;
+  line-height: 1.45;
+}
+
+/* Los tres datos, cada uno con su rótulo encima, en la franja levantada. */
+.ficha {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  margin: 0;
+  padding: 0.7rem 0 0.75rem;
+  background: var(--teja-alta);
+  border-top: 1px solid var(--filo);
+  font-size: var(--letra-minima);
+}
+
+.ficha > div {
+  padding: 0 0.85rem;
+  min-width: 0;
+}
+
+.ficha > div + div {
+  border-left: 1px solid var(--filo);
+}
+
+.ficha dt {
+  font-family: var(--letra-dato);
+  font-size: var(--letra-minima);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--tenue);
+}
+
+/*
+ * El VALOR va en el palo seco y no en mono, aunque el rótulo de encima sí lo
+ * lleve: es lo que hace la maqueta, y la razón se ve en una columna de trescientos
+ * píxeles partida en tres. «En el aparato» en monoespaciada no cabe en su celda y
+ * se parte por la mitad; en palo seco entra. La mono se guarda para lo que de
+ * verdad es una medida —los rótulos, el aforo, el código de la mesa—, y las
+ * columnas las cuadra `tabular-nums`, que no cuesta ningún fichero.
+ */
+.ficha dd {
+  margin: 0.25rem 0 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--palabra);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: break-word;
+}
+
+/*
+ * Las especificaciones menores: lo que es el mueble, dicho en letra de ficha
+ * técnica. En mono y con tracking, pero SIN caja alta — la maqueta las escribe
+ * en mayúsculas porque allí son tres palabras, y aquí `loQueEs` es una frase
+ * entera: una frase larga en mayúsculas no se lee, se descifra.
+ */
+.tarjeta .letra-chica {
+  margin: 0;
+  max-width: none;
+  padding: 0.6rem 1.1rem 0.7rem;
+  border-top: 1px solid var(--filo);
+  font-family: var(--letra-dato);
+  font-size: var(--letra-minima);
+  line-height: 1.5;
+  letter-spacing: 0.04em;
+  color: var(--tenue);
+}
+
+/*
+ * EL PIE. `margin-top: auto` lo pega al fondo de la ficha, así que en una fila de
+ * la rejilla todos los pies quedan a la misma altura aunque los ganchos midan
+ * distinto. Y va sobre `--pared`, un escalón por DEBAJO de la teja: es un zócalo,
+ * no otra franja levantada.
+ */
+.a-jugar,
+.en-la-app {
+  display: flex;
+  gap: 0.65rem;
+  margin: auto 0 0;
+  padding: 0.7rem 1.1rem 0.75rem;
+  border-top: 1px solid var(--filo);
+  background: var(--pared);
+}
+
+/* «Se juega aquí»: pulsable, o sea acento, con su piloto encendido. */
+.a-jugar {
+  align-items: center;
+  color: var(--acento);
+  font-size: var(--letra-minima);
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.a-jugar::before {
+  content: '';
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--acento);
+  box-shadow: 0 0 7px var(--halo), 0 0 16px var(--halo);
+}
+
+/*
+ * «Se juega en la app»: informativo, no alarma. Va en `--tenue` y con el piloto
+ * apagado —un aro de filo—, que es la misma diferencia que hay entre una máquina
+ * encendida y una que está ahí pero no se enciende aquí.
+ */
+.en-la-app {
+  align-items: flex-start;
+  color: var(--tenue);
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+
+.en-la-app::before {
+  content: '';
+  flex: none;
+  width: 6px;
+  height: 6px;
+  margin-top: 0.45rem;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px var(--filo-vivo);
+}
+
+/*
+ * HAY RATÓN: la tarjeta dice que se puede pulsar antes de pulsarla. El acento
+ * aparece sólo mientras el ratón está encima —es estado, no adorno— y la
+ * elevación la hace la sombra, no un material.
+ */
 .tarjeta-jugable {
   transition:
     border-color 0.12s,
+    box-shadow 0.12s,
     transform 0.12s;
 }
 
 .tarjeta-jugable:hover {
-  border-color: var(--neon);
+  border-color: var(--acento);
   transform: translateY(-2px);
+  box-shadow: 0 22px 38px -26px var(--sombra), 0 0 22px -8px var(--halo);
 }
 
 /*
@@ -174,68 +628,46 @@ code {
  * sigue siendo legible: quien tiene ese arcade en el móvil tiene que reconocerlo
  * aquí. Nada de `display: none` y nada de `opacity: .3`, que es esconder con
  * otro nombre.
+ *
+ * Lo que se le quita es el ACENTO, y esa es toda la diferencia: la placa de color
+ * es la marca de «esto se enciende aquí», así que una máquina que aquí no se
+ * enciende se queda con la placa en gris. Dicho sin una palabra de más.
  */
 .tarjeta-en-la-app {
   background: transparent;
   border-style: dashed;
-  color: var(--palabra-tenue);
+  border-color: var(--filo-vivo);
 }
 
-.nombre-del-arcade {
-  font-size: 1.3rem;
-  margin: 0 0 0.4rem;
+.tarjeta-en-la-app .nombre-del-arcade {
+  background: var(--teja);
+  color: var(--palabra);
 }
 
-.gancho {
-  margin: 0 0 1rem;
-  color: var(--palabra-tenue);
+.tarjeta-en-la-app .gancho {
+  background: var(--teja);
+  color: var(--tenue);
 }
 
-.ficha {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0 1.5rem;
-  margin: 0 0 0.75rem;
-  font-size: 0.85rem;
-}
-
-.ficha dt {
-  color: var(--neon-tenue);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  font-size: 0.72rem;
-}
-
-.ficha dd {
-  margin: 0;
-}
-
-.a-jugar {
-  margin: 1rem 0 0;
-  color: var(--neon);
-  font-weight: 600;
-}
-
-.en-la-app {
-  margin: 1rem 0 0;
-  padding-top: 0.75rem;
-  border-top: 1px dashed var(--neon-tenue);
-  color: var(--aviso);
-  font-size: 0.9rem;
+.tarjeta-en-la-app .ficha,
+.tarjeta-en-la-app .a-jugar,
+.tarjeta-en-la-app .en-la-app {
+  background: transparent;
 }
 
 /* Las tarjetas fantasma: mismo tamaño, para que al llegar la lista nada salte. */
 .tarjeta-fantasma {
+  padding: 1.05rem 1.1rem;
+  gap: 0.9rem;
   border-style: solid;
-  border-color: rgba(95, 212, 200, 0.15);
+  border-color: var(--filo);
 }
 
 .raya {
   display: block;
   height: 0.9rem;
-  margin-bottom: 0.9rem;
   border-radius: 4px;
-  background: rgba(95, 212, 200, 0.09);
+  background: var(--teja-alta);
   width: 70%;
 }
 
@@ -248,17 +680,28 @@ code {
   width: 40%;
 }
 
+/*
+ * NO HAY COLOR DE FALLO, y no es un olvido: un servidor que no contesta no es una
+ * emergencia con luces rojas, es una pantalla que tiene que decir lo que sabe.
+ * El borde va en filo —el mismo que separa todo lo demás— y el texto en gris.
+ * `--alarma` se guarda para lo que de verdad se acaba o mata dentro de una
+ * partida; gastarla aquí la dejaría sin significado justo donde hace falta.
+ */
 .sin-servidor {
   max-width: 60ch;
-  border: 1px solid var(--fallo);
-  border-radius: var(--radio);
+  background: var(--teja);
+  border: 1px solid var(--filo-vivo);
+  border-radius: var(--radio-ficha);
   padding: 1.5rem;
-  background: rgba(212, 99, 111, 0.06);
 }
 
 .sin-servidor h2 {
   margin-top: 0;
-  color: var(--fallo);
+  font-size: 1.3rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--palabra);
 }
 
 /* --- Botones ------------------------------------------------------------- */
@@ -277,20 +720,34 @@ code {
   align-items: center;
   gap: 0.7rem;
   min-width: 14rem;
+  min-height: 2.75rem;
   text-align: left;
-  background: var(--panel-alto);
+  background: var(--teja-alta);
   color: var(--palabra);
-  border: 1px solid var(--neon-tenue);
-  border-radius: var(--radio);
+  border: 1px solid var(--filo);
+  border-radius: var(--radio-mando);
+  /*
+   * El borde entra en el hueco en vez de sumarse por fuera: con `box-sizing:
+   * border-box` el píxel del filo se descuenta del relleno, así que el alto
+   * mínimo sigue siendo el que dice `min-height` y no uno más.
+   */
   padding: 0.7rem 1rem;
   font: inherit;
   cursor: pointer;
-  transition: border-color 0.12s, background 0.12s;
+  transition:
+    border-color 0.12s,
+    box-shadow 0.12s;
 }
 
+/*
+ * Al pasar por encima cambia el FILO y se enciende el halo; el fondo no se
+ * mueve. Aclararlo dejaría la tecla del atajo —que va un escalón por debajo, en
+ * `--teja`— del mismo color que el botón, y la tecla desaparecería justo cuando
+ * el ratón está encima diciendo que se puede pulsar.
+ */
 .opcion:hover:not(:disabled) {
-  border-color: var(--neon);
-  background: #143430;
+  border-color: var(--acento);
+  box-shadow: 0 0 20px -8px var(--halo);
 }
 
 .opcion:disabled {
@@ -313,35 +770,47 @@ code {
 
 .opcion-ayuda {
   font-size: 0.82rem;
-  color: var(--palabra-tenue);
+  color: var(--tenue);
 }
 
-/* El número del atajo, con pinta de tecla porque es una tecla. */
+/*
+ * El número del atajo, con pinta de tecla porque es una tecla — y en acento
+ * porque pulsarla hace algo, que es la única cosa que el acento significa fuera
+ * de la placa.
+ *
+ * El fondo es `--teja`, un escalón por DEBAJO del botón que la lleva: además de
+ * hundir la tecla, es lo que sube el acento de 4,4:1 a 4,6:1 y lo pone del lado
+ * bueno del mínimo. Una tecla de 13,6 px es letra normal y no puede quedarse
+ * corta por dos décimas.
+ */
 .atajo {
   flex: none;
   display: grid;
   place-items: center;
   width: 1.6rem;
   height: 1.6rem;
-  border: 1px solid var(--neon-tenue);
+  background: var(--teja);
+  border: 1px solid var(--filo-vivo);
   border-bottom-width: 2px;
   border-radius: 5px;
-  font-family: 'Cascadia Mono', Consolas, monospace;
+  font-family: var(--letra-dato);
   font-size: 0.8rem;
-  color: var(--neon);
+  color: var(--acento);
 }
 
 .nada-que-hacer {
-  color: var(--palabra-tenue);
+  color: var(--tenue);
   font-style: italic;
   max-width: 62ch;
 }
 
 .rotulo-de-panel {
-  font-size: 0.78rem;
+  font-family: var(--letra-dato);
+  font-size: var(--letra-minima);
+  font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.12em;
-  color: var(--neon-tenue);
+  letter-spacing: 0.14em;
+  color: var(--tenue);
   margin: 0 0 0.6rem;
 }
 
@@ -375,9 +844,9 @@ code {
 }
 
 .panel {
-  background: var(--panel);
-  border: 1px solid var(--neon-tenue);
-  border-radius: var(--radio);
+  background: var(--teja);
+  border: 1px solid var(--filo);
+  border-radius: var(--radio-ficha);
   padding: 1rem 1.25rem;
 }
 
@@ -389,30 +858,49 @@ code {
 
 .renglones li {
   padding: 0.15rem 0;
-  border-bottom: 1px solid rgba(95, 212, 200, 0.08);
+  border-bottom: 1px solid var(--filo);
 }
 
 .renglones li:last-child {
   border-bottom: none;
 }
 
+/*
+ * Quién eres tú en la lista va en BLANCO y no en acento. La maqueta reserva el
+ * acento para de quién es el turno —lo que está vivo ahora mismo— y marca al
+ * propio con una pastilla gris: saber cuál eres es identidad, no estado, y si
+ * las dos cosas se pintan igual la mesa deja de decir a quién le toca.
+ */
 .renglones .yo {
-  color: var(--neon);
-  font-weight: 600;
+  color: var(--blanco);
+  font-weight: 700;
 }
 
 .cronica {
   max-height: 16rem;
   overflow-y: auto;
   font-size: 0.9rem;
-  color: var(--palabra-tenue);
+  color: var(--tenue);
 }
 
+/* La crónica llega de lo más nuevo a lo más viejo, así que lo último que ha
+   pasado es el primer renglón, y se lee entero. */
+.cronica li:first-child {
+  color: var(--palabra);
+}
+
+/*
+ * El código de la mesa es una CIFRA GRANDE, y para eso está `--blanco`. No lleva
+ * acento aunque sea lo más importante del panel: no se pulsa, se copia, y el
+ * acento aquí prometería un botón.
+ */
 .codigo-grande {
-  font-family: 'Cascadia Mono', Consolas, monospace;
+  font-family: var(--letra-dato);
   font-size: 2.2rem;
+  font-weight: 700;
   letter-spacing: 0.28em;
-  color: var(--neon);
+  color: var(--blanco);
+  font-variant-numeric: tabular-nums;
   margin: 0;
 }
 
@@ -434,15 +922,29 @@ code {
   width: 100%;
   margin: 0 0 0.8rem;
   padding: 0.6rem 0.8rem;
-  background: var(--fondo);
+  background: var(--suelo);
   color: var(--palabra);
-  border: 1px solid var(--neon-tenue);
-  border-radius: var(--radio);
+  border: 1px solid var(--filo-vivo);
+  border-radius: var(--radio-mando);
   font: inherit;
 }
 
+.campo:hover {
+  border-color: var(--acento);
+}
+
+/*
+ * El texto de ejemplo tiene color propio. El que pone el navegador es el del
+ * campo a media opacidad, y sobre `--suelo` eso deja «ABCDE» y «Tu nombre» por
+ * debajo del mínimo: son la única pista de qué se escribe en cada casilla.
+ */
+.campo::placeholder {
+  color: var(--tenue);
+  opacity: 1;
+}
+
 .campo-codigo {
-  font-family: 'Cascadia Mono', Consolas, monospace;
+  font-family: var(--letra-dato);
   font-size: 1.4rem;
   letter-spacing: 0.24em;
   text-transform: uppercase;
@@ -470,11 +972,21 @@ code {
   display: block;
   width: 100%;
   max-height: 62vh;
-  background: var(--panel);
-  border: 1px solid var(--neon-tenue);
-  border-radius: var(--radio);
+  background: var(--teja);
+  border: 1px solid var(--filo);
+  border-radius: var(--radio-ficha);
 }
 
+/*
+ * ═══ AQUÍ EL ESCRITORIO PINTA DISTINTO QUE EL MÓVIL, Y ES A PROPÓSITO ═══
+ *
+ * Lo tocable se dice con el CURSOR y con el brillo al pasar por encima, que es
+ * información que en una pantalla táctil no existe; allí hay que decirlo con un
+ * borde permanente. Y `brightness` en vez de un color propio porque los colores
+ * de las piezas los declara EL JUEGO en el dato: aclarar lo que ya hay respeta
+ * su paleta, y pintar encima con `--acento` sería que el retablo opinara sobre
+ * un juego que no conoce.
+ */
 .pieza-tocable {
   cursor: pointer;
 }
@@ -490,12 +1002,443 @@ code {
 .texto-de-cara,
 .cifra-de-cara {
   fill: var(--palabra);
-  font-family: 'Segoe UI', system-ui, sans-serif;
+  font-family: var(--letra);
   font-size: 14px;
   pointer-events: none;
 }
 
+/*
+ * La cifra de una cara va en BLANCO y en mono: es una medida, y cae encima de un
+ * relleno que ha elegido el juego y que puede ser cualquier color. El blanco de
+ * énfasis es el único que aguanta sobre todos ellos; el acento, además de no
+ * significar nada aquí, chocaría con la paleta del juego de turno.
+ */
 .cifra-de-cara {
-  fill: var(--neon);
+  fill: var(--blanco);
+  font-family: var(--letra-dato);
   font-weight: 700;
+}
+
+/* --- El muelle ----------------------------------------------------------- */
+
+/*
+ * ═══ LA ESCENA DETRÁS, EL RAÍL DELANTE, Y NINGUNO SABE DEL OTRO ═══
+ *
+ * El muelle son dos capas: la escena en tres dimensiones a pantalla completa
+ * (`.muelle-escena`, absoluta, detrás) y una rejilla hermana de
+ * `.tablero-y-panel` con las MISMAS medidas —lo que quede, y 22 rem— cuya
+ * primera columna está vacía a propósito (`.muelle-hueco`): es el sitio por el
+ * que se ve el mundo. La rejilla no atrapa el ratón salvo en el raíl, para que
+ * pulsar la escena llegue a la escena (sirve para saltar la coreografía de
+ * zarpar). Es lo que pide el §5 del diseño: el vestíbulo de siempre, y el mundo
+ * ya vivo detrás.
+ *
+ * ═══ VIDRIO, NO MATERIA ═══
+ *
+ * Los paneles del raíl van sobre la escena, y una teja opaca la taparía justo
+ * donde más se mira. Se hacen translúcidos con `--vidrio` —`--teja` al 78 %,
+ * declarado aquí y no en `:root` porque sólo existe encima de la escena— y con
+ * un desenfoque detrás, que es lo que hace que un panel parezca vidrio y no un
+ * agujero. El filo de un píxel sigue siendo lo que lo separa del fondo.
+ *
+ * ═══ EL ACENTO, SÓLO DONDE EL §5 LO PERMITE ═══
+ *
+ * Cuatro sitios: el botón que trae la opción de empezar (`.opcion-zarpar`), el
+ * piloto de presencia encendido (`.piloto-vivo`), la figura elegida
+ * (`.figura-elegida`, `.figura-nombre`) y el «copiado». Todo lo demás son los
+ * grises de siempre; ni el código, que se copia y no se pulsa.
+ *
+ * ═══ Y EN UNA VENTANA ESTRECHA, LA ESCENA ARRIBA Y EL RAÍL DEBAJO ═══
+ *
+ * Por debajo de 900 px el raíl a la derecha taparía la mitad del mundo. La
+ * escena pasa a ser un bloque de 46vh en el flujo y el raíl baja entero, sin
+ * vidrio que haga falta: ya no hay nada debajo.
+ */
+.muelle {
+  --vidrio: rgba(18, 22, 29, 0.78);
+  position: relative;
+  min-height: calc(100vh - 4.4rem);
+  overflow: hidden;
+  background: var(--suelo);
+}
+
+.muelle-escena {
+  position: absolute;
+  inset: 0;
+  background: var(--suelo);
+}
+
+.muelle-escena canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/*
+ * El telón: `--suelo` con el nombre del lugar, hasta que la escena avisa de que
+ * pintó su primer fotograma. Si el mundo no arranca, se queda y dice qué faltó
+ * en letra chica; el raíl sigue funcionando encima.
+ */
+.muelle-telon {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  text-align: center;
+  padding: 2rem;
+  background: var(--suelo);
+}
+
+.muelle-lugar {
+  margin: 0 0 0.5rem;
+  font-size: 1.1rem;
+  font-weight: 800;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--tenue);
+}
+
+.muelle-telon .letra-chica {
+  margin: 0 auto;
+  max-width: 44ch;
+}
+
+/* Lo que faltó cuando el mundo sí arrancó: abajo a la izquierda, sin tapar nada. */
+.muelle-falta {
+  position: absolute;
+  left: 2.5rem;
+  bottom: 1.25rem;
+  margin: 0;
+  padding: 0.35rem 0.7rem;
+  background: var(--vidrio);
+  border: 1px solid var(--filo);
+  border-radius: var(--radio-mando);
+}
+
+.muelle-hoja {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 22rem;
+  gap: 2rem;
+  align-items: start;
+  max-width: 92rem;
+  margin: 0 auto;
+  padding: 2rem 2.5rem 4rem;
+  pointer-events: none;
+}
+
+.muelle-hueco {
+  pointer-events: none;
+}
+
+/*
+ * EL RAÍL SE DESPLAZA SOLO, Y EL MUNDO SE QUEDA QUIETO DETRÁS.
+ *
+ * `.muelle` recorta lo que sobresale para que la escena no ensanche la página,
+ * y con eso el raíl —tres paneles y sus botones— se quedaba sin fondo en una
+ * ventana baja: el botón de «Sentarse» caía justo debajo del borde y no había
+ * rueda que llegara a él. Medido en una ventana de 900 px de alto. El raíl toma
+ * como techo el alto de la ventana menos la cabecera y el aire de la hoja, y
+ * desplaza lo suyo; la escena no se mueve, que es lo que se quiere de un fondo.
+ */
+.muelle-rail {
+  pointer-events: auto;
+  max-height: calc(100vh - 4.4rem - 6rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  padding-right: 0.25rem;
+}
+
+.muelle-rail .panel {
+  background: var(--vidrio);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+/* Cada estado del raíl es una columna de paneles; escondido, no ocupa sitio. */
+.muelle-tramo {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.muelle-tramo[hidden] {
+  display: none;
+}
+
+/* «Se reparte el delta» mientras zarpan, encima del mundo, sin acento: es un rótulo. */
+.muelle-zarpando {
+  margin: 0.5rem 0 0;
+  font-family: var(--letra-dato);
+  font-size: var(--letra-minima);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--tenue);
+}
+
+/* Los botones del raíl van a lo ancho: en 22 rem no cabe una fila de ellos. */
+.muelle-rail .opcion {
+  width: 100%;
+  min-width: 0;
+}
+
+.muelle-rail .opcion-corta {
+  width: auto;
+  min-height: 2.25rem;
+  padding: 0.4rem 0.8rem;
+}
+
+.muelle-rail .opciones {
+  flex-direction: column;
+  flex-wrap: nowrap;
+}
+
+.muelle-rail .opciones li {
+  width: 100%;
+}
+
+/* La figura en la orilla: nombre y nota a la izquierda, «Cambiar» a la derecha. */
+.muelle-figura {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.figura-nombre {
+  color: var(--acento);
+}
+
+/* La figura elegida se distingue por el FILO, que es como esta hoja dice «esto está vivo». */
+.figura-elegida {
+  border-color: var(--acento);
+  box-shadow: 0 0 20px -8px var(--halo);
+}
+
+.figura-elegida .opcion-rotulo {
+  color: var(--acento);
+}
+
+.muelle-copias {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0.6rem 0 0.4rem;
+}
+
+.copiado {
+  min-height: 1.4em;
+  margin: 0 0 0.6rem;
+}
+
+/* «Copiado»: uno de los cuatro sitios con acento del raíl. Sólo mientras dura. */
+.copiado-vivo {
+  color: var(--acento);
+}
+
+/*
+ * El piloto de presencia: el mismo punto que enciende «se juega aquí» en la
+ * tarjeta, con la misma pareja encendido/apagado. Quien no está sigue sentado
+ * —es cosmético, ver `MesaVista.asientos`— y por eso su renglón no se apaga.
+ */
+.muelle-sentados li {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.3rem 0;
+}
+
+.piloto {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px var(--filo-vivo);
+}
+
+.piloto-vivo {
+  background: var(--acento);
+  box-shadow: 0 0 7px var(--halo), 0 0 16px var(--halo);
+}
+
+.sentado-nombre {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sentado-figura {
+  flex: none;
+  font-family: var(--letra-dato);
+  font-size: var(--letra-minima);
+  letter-spacing: 0.04em;
+  color: var(--tenue);
+}
+
+/*
+ * EL BOTÓN DE ZARPAR: el único con acento del raíl. Rótulo y ayuda tal cual los
+ * escribe el juego; el color dice que es lo que se está esperando.
+ */
+.opcion-zarpar {
+  border-color: var(--acento);
+  box-shadow: 0 0 22px -8px var(--halo);
+}
+
+.opcion-zarpar .opcion-rotulo,
+.opcion-zarpar .opcion-ayuda {
+  color: var(--acento);
+}
+
+.muelle-espera {
+  margin: 0;
+  font-style: italic;
+}
+
+@media (max-width: 900px) {
+  .muelle {
+    display: flex;
+    flex-direction: column;
+    overflow: visible;
+  }
+
+  .muelle-escena {
+    position: relative;
+    flex: none;
+    height: 46vh;
+  }
+
+  .muelle-falta {
+    left: 1rem;
+    bottom: 0.75rem;
+  }
+
+  .muelle-hoja {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 1.25rem 1.25rem 3rem;
+  }
+
+  .muelle-rail {
+    position: static;
+    /* Debajo de la escena ya no hay nada que tapar: desplaza la página, no el raíl. */
+    max-height: none;
+    overflow-y: visible;
+    padding-right: 0;
+  }
+
+  .muelle-rail .panel {
+    background: var(--teja);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+
+/* --- Riberas en tres dimensiones ----------------------------------------- */
+
+/*
+ * ═══ EL LIENZO OCUPA LA COLUMNA DEL MUEBLE, Y MANDA EN EL ALTO ═══
+ *
+ * Es el sitio exacto del `lienzo-del-tablero` SVG, con la misma anatomía —teja,
+ * filo de un píxel, el redondeo de ficha— y la misma decisión de alto: en un
+ * monitor, ancho y bajo, encajar por anchura deja el mundo pequeño con media
+ * pantalla vacía. 62vh con un suelo de 420 px, para que en una ventana baja la
+ * barra de construir y la mano —que viven DENTRO del lienzo, pegadas a la cámara—
+ * no se queden sin sitio. Bajo 900 px de ancho el raíl baja debajo y el lienzo
+ * cede alto: 52vh.
+ *
+ * `touch-action: none` es lo que permite arrastrar para girar en una pantalla
+ * táctil de PC sin que el navegador se lleve el gesto para desplazar la página.
+ * `overflow: hidden` es lo que hace que el `<canvas>` respete el redondeo.
+ *
+ * ═══ SIN ACENTO ═══
+ *
+ * El mundo trae sus propios colores y las señales de colocar tienen el suyo, así
+ * que aquí el acento aparece SÓLO donde la Sala lo pone siempre: el foco, el filo
+ * de los botones bajo el ratón y la tecla del atajo. El lienzo no lo lleva ni al
+ * pasar por encima: no es un botón, es el mundo.
+ */
+.riberas-en-tres {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.riberas-lienzo {
+  position: relative;
+  width: 100%;
+  height: 62vh;
+  min-height: 420px;
+  background: var(--teja);
+  border: 1px solid var(--filo);
+  border-radius: var(--radio-ficha);
+  overflow: hidden;
+  touch-action: none;
+}
+
+.riberas-lienzo canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: grab;
+}
+
+.riberas-lienzo canvas:active {
+  cursor: grabbing;
+}
+
+/* Con una petición en vuelo no se coge ni se suelta nada, y el cursor lo dice, como en el retablo. */
+.riberas-lienzo-quieto canvas {
+  cursor: progress;
+}
+
+/*
+ * El telón: `--suelo` con el nombre del juego hasta que el modelo llega. Es el
+ * mismo telón que el del muelle, en la misma letra: quien viene de zarpar no ve
+ * cambiar de sitio nada.
+ */
+.riberas-telon {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  text-align: center;
+  padding: 2rem;
+  background: var(--suelo);
+}
+
+.riberas-nombre {
+  margin: 0 0 0.5rem;
+  font-size: 1.1rem;
+  font-weight: 800;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--tenue);
+}
+
+.riberas-telon .letra-chica {
+  margin: 0 auto;
+  max-width: 44ch;
+}
+
+/*
+ * Por qué se está jugando sobre el SVG. Va ENCIMA del retablo y en gris, sin
+ * `--alarma`: no se ha perdido nada, la mesa está entera; sólo falta el mundo.
+ */
+.riberas-sin-mundo {
+  margin: 0 0 0.75rem;
+}
+
+/* El menú de a quién se le propone: los botones de siempre, a lo ancho del mueble. */
+.riberas-a-quien .opciones {
+  flex-direction: column;
+  flex-wrap: nowrap;
+}
+
+@media (max-width: 900px) {
+  .riberas-lienzo {
+    height: 52vh;
+  }
 }

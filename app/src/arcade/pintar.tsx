@@ -33,7 +33,7 @@ import type { MuebleDeArcade } from '../../../shared/arcade';
  * encontraría el registro vacío.
  */
 import '../../../shared/arcade/juegos';
-import { MUEBLES, SALA } from './muebles';
+import { LETRA, MUEBLES, SALA } from './muebles';
 import { quienPinta, quienPintaElMueble } from './pintados';
 
 /** Pinta el arcade que pida la ruta, si este mueble es el suyo y se sabe pintar. */
@@ -129,8 +129,14 @@ export function PintarEnElMueble({ mueble }: { mueble: MuebleDeArcade }): JSX.El
   return <Pintar />;
 }
 
-/** Lo que se enseña cuando no hay nada que pintar. Dice QUÉ pasa, no «vaya». */
-function NoHayNada({ que }: { que: string }): JSX.Element {
+/**
+ * Lo que se enseña cuando no hay nada que pintar. Dice QUÉ pasa, no «vaya».
+ *
+ * Exportada porque la pantalla del Muelle tiene los mismos callejones sin salida
+ * —dirección incompleta, arcade desconocido, arcade sin muelle— y nació con una
+ * copia de esto. La cara que la Sala pone cuando algo no se puede jugar es UNA.
+ */
+export function NoHayNada({ que }: { que: string }): JSX.Element {
   return (
     <View style={estilos.centro}>
       <Text style={estilos.titulo}>LA SALA DE ARCADE</Text>
@@ -139,6 +145,21 @@ function NoHayNada({ que }: { que: string }): JSX.Element {
   );
 }
 
+/*
+ * ═══ TRES COLORES, Y EL DE EN MEDIO DECIDE QUÉ SIGNIFICA EL ACENTO ═══
+ *
+ * Esta pantalla no es UNA pantalla: `/formulario`, `/tablero`, `/lienzo` y
+ * `/escena` montan las cuatro este mismo componente, y por él salen los cinco
+ * callejones sin salida de la Sala —dirección incompleta, mueble cambiado, arcade
+ * desconocido, mueble sin píxeles—. Lo que se pinte aquí es, por tanto, la cara
+ * que la Sala pone SIEMPRE que algo no se puede jugar.
+ *
+ * Por eso el título deja de ser el color vivo. En la Sala el acento quiere decir
+ * «esto está vivo o se puede tocar»; aquí no hay nada que tocar, y encenderlo en
+ * los cuatro muebles a la vez le enseñaría al ojo que el color saturado de la casa
+ * aparece cuando algo está roto. El acento se gastaría en el peor sitio posible.
+ * Un título es un rótulo: `palabra`.
+ */
 const estilos = StyleSheet.create({
   centro: {
     flex: 1,
@@ -146,8 +167,28 @@ const estilos = StyleSheet.create({
     justifyContent: 'center',
     padding: 28,
     gap: 16,
-    backgroundColor: SALA.fondo,
+    /* Ocupa la pantalla entera y no es un panel dentro de nada: suelo, no teja. */
+    backgroundColor: SALA.suelo,
   },
-  titulo: { color: SALA.neon, fontSize: 18, fontWeight: '800', letterSpacing: 4 },
-  texto: { color: SALA.palabra, fontSize: 16, lineHeight: 24, textAlign: 'center', maxWidth: 360 },
+  /*
+   * El peso, la caja alta y el tracking salen de `LETRA` y no escritos a mano, que
+   * es lo único que hace de rótulo cuando no se declara ninguna `fontFamily`. El
+   * `letterSpacing: 4` de antes era el doble largo que el de cualquier rótulo de la
+   * Sala: separaba tanto las letras que el nombre de la casa no se leía como una
+   * palabra.
+   */
+  titulo: { ...LETRA.rotulo, color: SALA.palabra, fontSize: 18 },
+  /*
+   * El mensaje se queda en `palabra` y no baja a `tenue`. Es texto de error, sí,
+   * pero es lo ÚNICO que hay aquí y lo único que dice qué ha pasado: apagarlo
+   * convertiría la pantalla en el «vaya» que la cabecera de este fichero prohíbe.
+   */
+  texto: {
+    ...LETRA.cuerpo,
+    color: SALA.palabra,
+    fontSize: 16,
+    lineHeight: 24,
+    textAlign: 'center',
+    maxWidth: 360,
+  },
 });

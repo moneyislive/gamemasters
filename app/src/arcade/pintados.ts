@@ -51,6 +51,7 @@ import { ElArcade } from './arcade';
 import { LaPeonza } from './escena';
 import { LaFrente } from './frente';
 import { MUEBLES } from './muebles';
+import { ElTableroEnTres } from './riberas-en-tres';
 import { ElTableroEnLinea } from './tablero-en-linea';
 
 /**
@@ -108,19 +109,24 @@ export const LOS_QUE_PINTA: Record<ArcadeId, ComponentType> = {
   [FRENTE]: LaFrente,
   [EL_ARCADE]: ElArcade,
   /*
-   * RIBERAS SIGUE AQUÍ, Y AHORA ES UN ATAJO Y NO UNA CONDICIÓN.
+   * RIBERAS TIENE PINTOR PROPIO, Y SIGUE SIENDO UN JUEGO DE MUEBLE GENÉRICO.
    *
-   * `ElTableroEnLinea` no sabe que es Riberas: lee el arcade de la ruta, se sienta
-   * a una mesa, saca el tablero declarado de la vista y lo pinta. Esta línea decía
-   * «Riberas está entre los que este binario deja jugar», y esa segunda mitad de
-   * la pregunta ya no la hace `seSabePintar` para los muebles genéricos — ver
-   * `LOS_MUEBLES_GENERICOS`, que es lo que la fase 5 vino a desbloquear.
+   * Esta fila fue `ElTableroEnLinea` —un atajo, no una condición: el mueble
+   * genérico pintaba Riberas sin saber que era Riberas—. Ahora es el tablero en
+   * tres dimensiones, y las dos cosas que había que no romper siguen enteras:
    *
-   * Se deja escrita porque sigue siendo verdad y porque es la que decide para los
-   * juegos de mueble PROPIO, y borrarla obligaría a que `PintarEnElMueble`
-   * resolviera dos tablas en distinto orden según el mueble.
+   *   · Riberas sigue con `mueble: 'tablero'`, su vista no cambia y un arcade de
+   *     FUERA con tablero sigue pintándose con `LOS_MUEBLES_GENERICOS.tablero`, que
+   *     es `ElTableroEnLinea` y no esto. El pintor propio sólo gana para este `id`,
+   *     que es exactamente lo que `quienPinta` protege para La Frente.
+   *   · Y el `Retablo` SVG no se va: es lo que esta misma pantalla pinta si el
+   *     modelo no llega, para que la partida se pueda jugar pase lo que pase.
+   *
+   * Lo que sabe de Riberas no está en el componente: está en
+   * `shared/arcade/juegos/riberas-en-tres.ts`, la traducción única entre la vista
+   * y la escena, sin una regla del juego dentro.
    */
-  [RIBERAS]: ElTableroEnLinea,
+  [RIBERAS]: ElTableroEnTres,
   /*
    * LA PEONZA, que es la puerta del mueble `escena` de la fase 5 y no un
    * juego-prueba. Va aquí y no en `LOS_MUEBLES_GENERICOS` porque `escena` es un
