@@ -57,12 +57,40 @@ const DESTINO = path.join(RAIZ, 'escenas', 'iconos.ts');
  * dos porque son dos vocabularios distintos: el día que el arte nuevo llame `trigo.svg`
  * al grano, se cambia aquí y nada más.
  */
+/**
+ * LOS BIENES SON LOS DE RIBERAS, que es el juego que hay.
+ *
+ * ═══ POR QUÉ SE CAMBIÓ EL VOCABULARIO ═══
+ *
+ * Estaban con los nombres del catán —madera, ladrillo, lana, grano, mineral— porque el
+ * arte se eligió antes de conectar el tablero con el motor. Los bienes de Riberas son
+ * otros: limo, junco, sal, piedra y grano.
+ *
+ * La alternativa era traducir entre los dos vocabularios en el camino del juego al dibujo,
+ * y hubo una propuesta concreta de hacerlo. No sale: esa tabla emparejaba `sal` con `lana`,
+ * y en un juego de trueques mirar tu mano y ver una OVEJA cuando lo que tienes es sal no es
+ * un provisional cosmético — es enseñar un bien que no tienes, justo en la pantalla con la
+ * que se decide qué ofrecer. Un dibujo ausente se lee como «falta el dibujo»; un dibujo
+ * equivocado se lee como otra cosa.
+ *
+ * Así que el vocabulario no se traduce en ningún sitio: se dibuja el que hay.
+ *
+ * ═══ Y `SAL` SE QUEDA SIN ICONO A PROPÓSITO ═══
+ *
+ * De los cinco iconos provisionales, cuatro tienen una lectura defendible para un bien de
+ * Riberas —los terrones de barro para el limo de la marisma, el haz de tallos para el junco
+ * del carrizal, la piedra del cantil y la gavilla de la vega—. Ninguno significa sal, y la
+ * oveja que sobra menos que ninguno.
+ *
+ * La carta de sal sale con su color y sin dibujo, que es lo honrado: se ve que falta. La
+ * escena ya lo aguanta —un bien sin contornos no pinta icono, no revienta— y esto es una
+ * razón más para el arte propio, que es lo que de verdad lo arregla.
+ */
 const BIENES: ReadonlyArray<{ bien: string; fichero: string }> = [
-  { bien: 'madera', fichero: 'wood-pile.svg' },
-  { bien: 'ladrillo', fichero: 'brick-pile.svg' },
-  { bien: 'lana', fichero: 'sheep.svg' },
+  { bien: 'limo', fichero: 'brick-pile.svg' },
+  { bien: 'junco', fichero: 'wood-pile.svg' },
+  { bien: 'piedra', fichero: 'stone-pile.svg' },
   { bien: 'grano', fichero: 'grain-bundle.svg' },
-  { bien: 'mineral', fichero: 'stone-pile.svg' },
 ];
 
 /** El lienzo que se espera. Si un icono trae otro, se dice en vez de escalarlo a ciegas. */

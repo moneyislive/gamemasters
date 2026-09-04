@@ -37,11 +37,14 @@ import {
 } from '../../shared/mecanicas/malla-hexagonal';
 import type { Punto } from '../../shared/mecanicas/malla-hexagonal';
 import {
+  colorDelBien,
+  colorDeTerreno,
   COLUMNA_DEL_COLOR,
   COLUMNAS_DEL_ATLAS,
   FILAS_DEL_ATLAS,
   PALETA,
   puntosDeLaCifra,
+  TERRENO_DEL_BIEN,
 } from '../paleta';
 import {
   NOMBRE_QUE_SOBREVIVE,
@@ -783,11 +786,59 @@ paso('La mano se agrupa por bien, cabe, asoma y el imán reparte');
   });
   comprobar('y sin bienes que pedir no hay ni un área', areasDeTrueque(0, CAMPO, 16 / 9).length === 0);
 
-  /* Y los cinco bienes tienen icono, y ninguno sale vacío al convertirlo a triángulos. */
-  const sinIcono = ['madera', 'ladrillo', 'lana', 'grano', 'mineral'].filter(
+  /*
+   * LOS BIENES SON LOS DE RIBERAS, Y CADA CARTA TIENE EL COLOR DE SU TIERRA.
+   *
+   * Lo que se vigila aquí es que no vuelva a haber DOS vocabularios. Los hubo: el tablero
+   * hablaba de madera y ladrillo mientras el juego reparte limo y junco, y el remiendo
+   * natural —traducir en el camino— llegó a proponerse emparejando `sal` con `lana`. Una
+   * carta de sal dibujada como una oveja no es un provisional: es enseñar un bien que no se
+   * tiene, en la pantalla con la que se decide qué ofrecer.
+   *
+   * El color NO se comprueba contra una lista de colores sino contra el de su terreno: si
+   * alguien renombra un terreno, la carta caería al color de reserva y se vería igual de
+   * gris que cualquier otra, sin un error en ninguna parte.
+   */
+  const BIENES_DE_RIBERAS = ['limo', 'junco', 'sal', 'piedra', 'grano'];
+  const sinTierra = BIENES_DE_RIBERAS.filter((b) => TERRENO_DEL_BIEN[b] === undefined);
+  comprobar('los cinco bienes de Riberas saben de qué tierra salen', sinTierra.length === 0, sinTierra);
+  const sobra = Object.keys(TERRENO_DEL_BIEN).filter((b) => !BIENES_DE_RIBERAS.includes(b));
+  comprobar(
+    'y no queda ni un bien de otro vocabulario en la tabla',
+    sobra.length === 0,
+    sobra,
+  );
+  const sinColor = BIENES_DE_RIBERAS.filter(
+    (b) => colorDelBien(b) === colorDeTerreno('un terreno que no existe'),
+  );
+  comprobar(
+    'y cada carta saca un color de verdad de su terreno, no el de reserva',
+    sinColor.length === 0,
+    sinColor.map((b) => `${b}: ${String(TERRENO_DEL_BIEN[b])}`),
+  );
+
+  /*
+   * LOS ICONOS: cuatro sí, y `sal` NO, y eso último se afirma a propósito.
+   *
+   * De los cinco iconos provisionales ninguno significa sal, así que su carta sale con
+   * color y sin dibujo — se ve que falta. Esta comprobación existe para que nadie «lo
+   * arregle» emparejándole la oveja que sobra: si aparece un icono para `sal`, tiene que
+   * ser porque alguien lo ha dibujado, y entonces esta línea se cambia a mano.
+   */
+  const sinIcono = ['limo', 'junco', 'piedra', 'grano'].filter(
     (b) => !BIENES_CON_ICONO.includes(b),
   );
-  comprobar('los cinco bienes tienen icono compilado', sinIcono.length === 0, sinIcono);
+  comprobar('los cuatro bienes con arte provisional tienen icono compilado', sinIcono.length === 0, sinIcono);
+  comprobar(
+    'y `sal` sigue SIN icono, porque ninguno de los provisionales significa sal',
+    !BIENES_CON_ICONO.includes('sal'),
+    BIENES_CON_ICONO,
+  );
+  comprobar(
+    'y no se ha colado ningún icono de un bien que el juego no reparte',
+    BIENES_CON_ICONO.every((b) => BIENES_DE_RIBERAS.includes(b)),
+    BIENES_CON_ICONO,
+  );
 
   const rotos: string[] = [];
   for (const bien of BIENES_CON_ICONO) {
@@ -1539,7 +1590,7 @@ if (fallos.length > 0) {
  * a veintitrés: durante ese tiempo el guion podía morirse en la novena sin que nadie se
  * enterara. Un guardia desfasado no guarda nada.
  */
-const COMPROBACIONES_ESCRITAS = 77;
+const COMPROBACIONES_ESCRITAS = 82;
 if (hechas < COMPROBACIONES_ESCRITAS) {
   console.error(
     `Solo se han hecho ${hechas} de las ${COMPROBACIONES_ESCRITAS} comprobaciones que ` +
