@@ -153,6 +153,34 @@ const ALTO_MINIMO_DEL_LIENZO = 360;
 const NOTA_DE_MAS_DE_CUATRO =
   'Sois más de cuatro: el delta en tres dimensiones sólo sabe pintar cuatro colores todavía. Se juega sobre el tablero de siempre.';
 
+/**
+ * DÓNDE SE ENSEÑA EL DELTA HOY: EN LA WEB SÍ, EN EL MÓVIL NATIVO TODAVÍA NO.
+ *
+ * ═══ Y NO ES UNA PREFERENCIA, ES QUE SALDRÍA GRIS ═══
+ *
+ * `tablero.glb` lleva la textura EMPOTRADA, y todo su aspecto —el color de cada
+ * bioma, el color de cada jugador— vive en las UV de ese atlas. Hermes no
+ * decodifica un PNG empotrado, así que en iOS y en Android `texturas-nativas.ts`
+ * lo sustituye por blanco para que la carga no reviente entera: la geometría
+ * llega, y llega SIN UN SOLO COLOR. Un delta gris no es una versión más pobre
+ * del tablero; es un tablero en el que no se distingue una salina de un cantil,
+ * o sea uno que no se puede jugar.
+ *
+ * Así que hasta que el modelo se hornee a color por vértice —como ya está
+ * `embarcadero.glb`, ver `docs/EL-MUELLE.md` §1.5— el móvil juega sobre el
+ * retablo de siempre, que es completo y legible. Y no se pide el modelo siquiera:
+ * son dos megas de datos de nadie por una escena que no se va a montar.
+ *
+ * EL DÍA DEL HORNEADO SE BORRA ESTA CONSTANTE Y NADA MÁS. No hay ninguna otra
+ * diferencia entre las dos plataformas en este fichero: la escena, los gestos y
+ * la traducción son los mismos.
+ */
+const EL_DELTA_SE_VE_AQUI = Platform.OS === 'web';
+
+/** Lo que se dice en el móvil, sin prometer una fecha y sin llamarlo error. */
+const NOTA_DEL_MOVIL =
+  'El delta en tres dimensiones todavía se ve sólo en la web. Aquí se juega sobre el tablero de siempre, que es la misma partida.';
+
 // ---------------------------------------------------------------------------
 // El catálogo de modelos: una vez por app
 // ---------------------------------------------------------------------------
@@ -203,9 +231,15 @@ type EstadoDelCatalogo =
   | { readonly que: 'listo'; readonly modelos: CatalogoDeModelos }
   | { readonly que: 'fallo'; readonly porque: string };
 
-function usarCatalogoDelTablero(): EstadoDelCatalogo {
+/**
+ * El catálogo, y sólo SI HACE FALTA: con el delta apagado (móvil) no se piden dos
+ * megas para una escena que no se monta. El gancho se llama siempre —las reglas de
+ * los ganchos—; lo que se condiciona es la petición.
+ */
+function usarCatalogoDelTablero(hazFalta: boolean): EstadoDelCatalogo {
   const [estado, ponerEstado] = useState<EstadoDelCatalogo>({ que: 'llegando' });
   useEffect(() => {
+    if (!hazFalta) return undefined;
     let vivo = true;
     catalogoDelTablero().then(
       (modelos) => {
@@ -218,7 +252,7 @@ function usarCatalogoDelTablero(): EstadoDelCatalogo {
     return () => {
       vivo = false;
     };
-  }, []);
+  }, [hazFalta]);
   return estado;
 }
 
@@ -423,7 +457,7 @@ function LaMesaEnTres({
   arriba: number;
   abajo: number;
 }): JSX.Element {
-  const catalogo = usarCatalogoDelTablero();
+  const catalogo = usarCatalogoDelTablero(EL_DELTA_SE_VE_AQUI);
   const { height: altoDeLaPantalla } = useWindowDimensions();
   const altoDelLienzo = Math.max(ALTO_MINIMO_DEL_LIENZO, Math.round(altoDeLaPantalla * PARTE_DEL_ALTO));
 
@@ -648,21 +682,28 @@ function LaMesaEnTres({
 
   /* ─── Sin delta que pintar: o la mesa se reúne, o sois más de cuatro ─── */
 
-  if (datos === null || encuadre === null) {
+  if (!EL_DELTA_SE_VE_AQUI || datos === null || encuadre === null) {
     /*
-     * `tableroEnTres` devuelve `null` por DOS motivos que no se parecen en nada:
-     * islas vacías —la mesa se está reuniendo— y una mesa de cinco o seis colonos
-     * con las islas ya repartidas, que `seVeEnTres` rechaza porque el atlas sólo
-     * tiene cuatro colores. Decidir sólo con `datos === null` enseñaba a una mesa
-     * de cinco empezada decenas de botones «Fundar aquí» y ningún tablero. Con
-     * islas se juega SIEMPRE sobre algo: aquí, sobre el retablo.
+     * AQUÍ NO SE PINTA EL DELTA POR TRES MOTIVOS QUE NO SE PARECEN EN NADA, y los
+     * tres acaban en el mismo sitio con distinta frase:
+     *
+     *   · estamos en el móvil, donde el modelo saldría gris (`EL_DELTA_SE_VE_AQUI`);
+     *   · las islas no están repartidas todavía y la mesa se está reuniendo;
+     *   · hay cinco o seis colonos y el atlas sólo trae cuatro colores de jugador,
+     *     así que `tableroEnTres` devuelve `null` AUNQUE HAYA ISLAS.
+     *
+     * Decidir sólo con `datos === null` enseñaba a una mesa de cinco ya empezada
+     * decenas de botones «Fundar aquí» y ningún tablero. Con islas se juega SIEMPRE
+     * sobre algo: aquí, sobre el retablo.
      */
     const hayIslas = esVistaQueSePinta(laVista) && laVista.islas.length > 0;
     if (hayIslas) {
       return respaldoSobreElRetablo(
-        seVeEnTres(laVista)
-          ? 'El delta en tres dimensiones no ha podido leer esta mesa. Se juega sobre el tablero de siempre.'
-          : NOTA_DE_MAS_DE_CUATRO,
+        !EL_DELTA_SE_VE_AQUI
+          ? NOTA_DEL_MOVIL
+          : seVeEnTres(laVista)
+            ? 'El delta en tres dimensiones no ha podido leer esta mesa. Se juega sobre el tablero de siempre.'
+            : NOTA_DE_MAS_DE_CUATRO,
       );
     }
     return (

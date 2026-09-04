@@ -596,6 +596,28 @@ paso('La pantalla de Riberas en tres dimensiones no sabe reglas y no bombea');
     /islasVistas/.test(escena) && /antes\.firma === firma \? antes\.islas : crudo\.islas/.test(escena),
     'sin la firma, cada sondeo recalcula relieve, red y plan y los resube a la GPU',
   );
+
+  /*
+   * EL DELTA NO SE MONTA DONDE SALDRÍA GRIS, y el modelo no se pide siquiera.
+   *
+   * `tablero.glb` lleva la textura empotrada y Hermes no la decodifica: en nativo
+   * `texturas-nativas.ts` la sustituye por blanco para que la carga no reviente, y
+   * el tablero llega sin un solo color. Un delta gris no es una versión más pobre;
+   * es un tablero donde no se distingue una salina de un cantil. Estas dos
+   * comprobaciones son las que hay que ver caer el día que el modelo se hornee a
+   * color por vértice y se borre la constante.
+   */
+  comprobar(
+    'el delta sólo se monta donde se ve con color (`EL_DELTA_SE_VE_AQUI`)',
+    /const EL_DELTA_SE_VE_AQUI = Platform\.OS === 'web'/.test(escena) &&
+      /if \(!EL_DELTA_SE_VE_AQUI \|\| datos === null/.test(escena),
+    'sin esto, en el móvil se pinta un tablero sin colores en vez del retablo',
+  );
+  comprobar(
+    'y donde no se monta no se piden los dos megas del modelo',
+    /usarCatalogoDelTablero\(EL_DELTA_SE_VE_AQUI\)/.test(escena) &&
+      /if \(!hazFalta\) return undefined;/.test(escena),
+  );
 }
 
 // ---------------------------------------------------------------------------
