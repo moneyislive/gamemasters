@@ -174,13 +174,27 @@ function servir(res: Response, raiz: string, fichero: string): void {
   );
 }
 
-/** El tablero del lobby. Uno solo, con nombre fijo. */
+/** El tablero. Uno solo, con nombre fijo. */
 router.get('/arcade/modelos/tablero.glb', (_req, res) => {
   if (carpeta === undefined) {
     faltaLaCarpeta(res);
     return;
   }
   servir(res, carpeta, 'tablero.glb');
+});
+
+/**
+ * El embarcadero: las piezas del lobby, con el color horneado. Nombre fijo
+ * también, y ruta propia y no un comodín sobre la carpeta: lo que se puede pedir
+ * por HTTP es exactamente lo que se ha decidido servir, fichero a fichero. Ver
+ * `escenas/embarcadero/piezas.ts` para qué hay dentro y por qué no es el tablero.
+ */
+router.get('/arcade/modelos/embarcadero.glb', (_req, res) => {
+  if (carpeta === undefined) {
+    faltaLaCarpeta(res);
+    return;
+  }
+  servir(res, carpeta, 'embarcadero.glb');
 });
 
 /**

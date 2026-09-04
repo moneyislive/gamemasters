@@ -618,6 +618,27 @@ const BATERIA = [
     porque:
       'los seis aventureros compilados llevan el mismo rig de veintitrés huesos, el color horneado en cada vértice y ninguna textura que Hermes no sepa abrir; miden lo que mide una persona en `escala.ts`; y cada pista de los doce clips de `animaciones.glb` encuentra su hueso en cada personaje con el nombre que GLTFLoader deja al cargar',
   },
+  /*
+   * EL EMBARCADERO SON DOS COMPROBADORES Y NO UNO, por la misma razón que el
+   * tablero separa `verify:escena` de mirar el `.glb`: uno abre el fichero
+   * compilado y el otro hace aritmética. Si se fundieran, un `.glb` que faltara
+   * dejaría sin correr la comprobación de la cala y la cámara, que no lo
+   * necesitan para nada. El diseño entero está en `docs/EL-MUELLE.md`.
+   */
+  {
+    nombre: 'embarcadero · modelos',
+    donde: 'escenas',
+    guion: 'verify:embarcadero-modelos',
+    porque:
+      'el `.glb` del lobby trae exactamente las piezas que `piezas.ts` declara, todas con el color horneado y ninguna con textura, las que se tiñen llevan su máscara de tinte y ninguna es plana, y el conjunto que una escena llena pone en pantalla cabe en el presupuesto de un móvil',
+  },
+  {
+    nombre: 'embarcadero · cala y cámara',
+    donde: 'escenas',
+    guion: 'verify:embarcadero',
+    porque:
+      'la cala que se genera con el código de la mesa es la misma para los seis aparatos, sus seis amarres caen sobre agua y no se solapan, la cámara deja al aventurero local entero y encima de la hoja del HUD en retrato, en tableta y en panorámico, la máquina de estados de los aventureros no se queda nunca en T-pose, y la paleta de colonos es la de Riberas',
+  },
   {
     nombre: 'escritorio honrado',
     donde: 'escritorio',
