@@ -37,6 +37,14 @@ import {
 } from '../../shared/mecanicas/malla-hexagonal';
 import type { Hex, LlaveDeVertice } from '../../shared/mecanicas/malla-hexagonal';
 import type { Colocando } from '../../escenas/sitios';
+import type { Mirador } from '../../escenas/camara';
+import {
+  esDeLaInterfaz,
+  MINIMO_PARA_GIRAR,
+  MIRADOR_DE_SALIDA,
+  ojoDelMirador,
+  tirandoDelMirador,
+} from '../../escenas/camara';
 import { Delta, encuadreDelDelta, RADIO_DE_COMARCA } from '../../escenas/delta';
 import { crearRelieve } from '../../escenas/relieve';
 import type { Relieve } from '../../escenas/relieve';
@@ -167,31 +175,92 @@ type Vista = 'aire' | 'suelo';
 function Camara({
   vista,
   alcance,
-  quieta,
+  girando,
   relieve,
   mirandoA,
   alAndar,
 }: {
   vista: Vista;
   alcance: number;
-  quieta: boolean;
+  /** Si da vueltas sola. Por defecto NO: el tablero se mira quieto y se gira arrastrando. */
+  girando: boolean;
   relieve: Relieve;
   mirandoA: { x: number; y: number };
   alAndar: (segundos: number) => void;
 }): null {
-  const { camera } = useThree();
-  const angulo = useRef(0.6);
+  const { camera, gl } = useThree();
+  const mirador = useRef<Mirador>(MIRADOR_DE_SALIDA);
   const anduvo = useRef(0);
+
+  /*
+   * EL TABLERO SE GIRA ARRASTRANDO.
+   *
+   * El mirador va por `ref` y no por estado: son sesenta cambios por segundo mientras se
+   * arrastra, y pasarlos por React repintaría la escena entera sesenta veces por segundo
+   * para mover una cámara. La aritmética está en `escenas/camara.ts`, donde se puede
+   * medir; aquí sólo se escuchan los sucesos del ratón.
+   *
+   * TODO se escucha en la VENTANA, y son dos razones distintas:
+   *
+   *   · El pulsar, porque así la cámara llega siempre DESPUÉS de la escena —el suceso baja
+   *     al lienzo, lo atiende la escena y luego sube— y puede mirar si una carta o una
+   *     pieza ya se lo ha quedado. Eso lo garantiza la norma del navegador; el orden en
+   *     que se apuntan los oyentes, no.
+   *   · Mover y soltar, para que soltar FUERA del lienzo también termine el arrastre. Si
+   *     no, se sale por el borde, se suelta, se vuelve a entrar y el tablero sigue pegado
+   *     al ratón sin que nadie esté pulsando nada.
+   */
+  useEffect(() => {
+    const lienzo = gl.domElement;
+    /* Desde dónde se pulsó, y si ya se ha pasado la zona muerta. */
+    let desde: { x: number; y: number } | null = null;
+    let gira = false;
+
+    const baja = (e: PointerEvent): void => {
+      if (e.target !== lienzo) return;
+      if (esDeLaInterfaz(e)) return;
+      desde = { x: e.clientX, y: e.clientY };
+      gira = false;
+    };
+    const mueve = (e: PointerEvent): void => {
+      if (desde === null) return;
+      if (!gira) {
+        if (Math.hypot(e.clientX - desde.x, e.clientY - desde.y) < MINIMO_PARA_GIRAR) return;
+        gira = true;
+      }
+      mirador.current = tirandoDelMirador(
+        mirador.current,
+        e.clientX - desde.x,
+        e.clientY - desde.y,
+        { ancho: lienzo.clientWidth, alto: lienzo.clientHeight },
+      );
+      desde = { x: e.clientX, y: e.clientY };
+    };
+    const suelta = (): void => {
+      desde = null;
+      gira = false;
+    };
+
+    window.addEventListener('pointerdown', baja);
+    window.addEventListener('pointermove', mueve);
+    window.addEventListener('pointerup', suelta);
+    window.addEventListener('pointercancel', suelta);
+    return () => {
+      window.removeEventListener('pointerdown', baja);
+      window.removeEventListener('pointermove', mueve);
+      window.removeEventListener('pointerup', suelta);
+      window.removeEventListener('pointercancel', suelta);
+    };
+  }, [gl]);
 
   useFrame((_, delta) => {
     if (vista === 'aire') {
-      if (!quieta) angulo.current += delta * 0.18;
-      const a = angulo.current;
-      camera.position.set(
-        Math.sin(a) * alcance * 1.35,
-        alcance * 1.15,
-        Math.cos(a) * alcance * 1.35,
-      );
+      /* Sólo da la vuelta sola si se pide: para ENSEÑAR el generador sigue siendo lo mejor. */
+      if (girando) {
+        mirador.current = { ...mirador.current, rumbo: mirador.current.rumbo + delta * 0.18 };
+      }
+      const [x, y, z] = ojoDelMirador(mirador.current, alcance);
+      camera.position.set(x, y, z);
       camera.lookAt(0, 0, 0);
       return;
     }
@@ -211,7 +280,7 @@ function Camara({
      * referencia de escala que ninguna vista aérea da: si el muro tapa el horizonte,
      * es que el muro mide lo que tiene que medir.
      */
-    if (!quieta) anduvo.current += delta * PASO_POR_SEGUNDO;
+    if (girando) anduvo.current += delta * PASO_POR_SEGUNDO;
     alAndar(anduvo.current / PASO_POR_SEGUNDO);
     const ojos = ALTURA_DE_UNA_PERSONA * 0.9;
     const vuelta = anduvo.current / 26;
@@ -310,7 +379,11 @@ function Banco(): JSX.Element {
   );
   const alcance = encuadre.alcance;
   const [vista, ponerVista] = useState<Vista>('aire');
-  const [quieta, ponerQuieta] = useState(false);
+  /*
+   * Arranca QUIETO. El botón se queda para la vuelta de presentación, que para enseñar de
+   * un tirón lo que genera el mundo sigue siendo lo mejor que hay.
+   */
+  const [girando, ponerGirando] = useState(false);
   const [dibujo, ponerDibujo] = useState({ triangulos: 0, llamadas: 0 });
   const [andado, ponerAndado] = useState(0);
 
@@ -470,7 +543,7 @@ function Banco(): JSX.Element {
         <Camara
           vista={vista}
           alcance={alcance}
-          quieta={quieta}
+          girando={girando}
           relieve={relieve}
           mirandoA={puntoDeObra}
           alAndar={(s) => {
@@ -626,11 +699,11 @@ function Banco(): JSX.Element {
           <button
             type="button"
             onClick={() => {
-              ponerQuieta((q) => !q);
+              ponerGirando((g) => !g);
             }}
             style={BOTON}
           >
-            {quieta ? 'Seguir' : 'Parar'}
+            {girando ? 'Parar' : 'Dar una vuelta'}
           </button>
         </div>
       </div>

@@ -131,6 +131,12 @@ import {
   loQueSeVeEnLaBaraja,
 } from './baraja';
 import type { CartaEnLaMano, HuecoDeCarta } from './baraja';
+/*
+ * `stopPropagation` sólo para a los objetos de DETRÁS dentro de la escena; la cámara
+ * escucha fuera y no se entera. `loCogeLaInterfaz` es lo que se lo dice, y tiene que ir en
+ * los dos sitios donde la interfaz empieza un arrastre: la barra y la mano.
+ */
+import { loCogeLaInterfaz } from './camara';
 import type { HuecoDeLaBarra, PiezaDeBarra } from './barra';
 import type { Colocando, Sitio } from './sitios';
 import type { CaminoEn3D, DeltaEn3D, IslaEn3D, PiezaEn3D } from './tipos';
@@ -741,6 +747,22 @@ const LATIDO_DE_LA_SENAL = 0.18;
 const PARTE_DE_PANTALLA = 0.035;
 
 /**
+ * CÓMO SE ENSEÑA UNA PIEZA EN LA BARRA: quieta, y de tres cuartos.
+ *
+ * Giraban despacio sobre sí mismas, con la idea de que girando se les ve la forma entera.
+ * En pantalla es al revés: son cuatro cosas moviéndose en el borde del ojo mientras se
+ * mira el tablero, cada una en su fase, y lo que se está mirando es el tablero. Un
+ * escaparate no gira. Además, de un modelo que gira no se aprende la silueta, que es
+ * justamente lo que hay que reconocer de un vistazo para cogerlo.
+ *
+ * Quietas, pero NO de frente: de frente una casa es un cuadrado con un triángulo encima y
+ * podría ser cualquier cosa. Un cuarto de vuelta largo enseña a la vez el frente y un
+ * costado, que es como se fotografía una maqueta y lo que hace que un tejado se lea como
+ * un tejado.
+ */
+const GIRO_DE_LA_VITRINA = Math.PI * 0.22;
+
+/**
  * UNA PIEZA PUESTA EN SU HUECO DE LA BARRA.
  *
  * Se escala para que quepa en el hueco sea del tamaño que sea: el castillo mide 3,98 del
@@ -784,7 +806,6 @@ function PiezaEnLaBarra({
     const g = grupo.current;
     if (g === null) return;
     const t = estado.clock.elapsedTime;
-    g.rotation.y = t * 0.5;
     const crece = encima || tomada ? 1.18 : 1;
     const sube = encima || tomada ? hueco.lado * 0.12 : 0;
     g.position.x = encaje.centro[0] * crece;
@@ -795,7 +816,7 @@ function PiezaEnLaBarra({
   });
 
   return (
-    <group position={[hueco.x, hueco.y, hueco.z]}>
+    <group position={[hueco.x, hueco.y, hueco.z]} rotation={[0, GIRO_DE_LA_VITRINA, 0]}>
       {/*
        * EL ASA ES LA CASILLA ENTERA, y esto costó una prueba en pantalla.
        *
@@ -819,6 +840,7 @@ function PiezaEnLaBarra({
         onPointerOut={() => setEncima(false)}
         onPointerDown={(e) => {
           e.stopPropagation();
+          loCogeLaInterfaz(e.nativeEvent);
           if (pieza.disponible) onTomar(pieza.id);
         }}
       >
@@ -1165,6 +1187,7 @@ function Carta({
         onPointerOut={() => setEncima(false)}
         onPointerDown={(e) => {
           e.stopPropagation();
+          loCogeLaInterfaz(e.nativeEvent);
           onCoger(carta);
         }}
       >

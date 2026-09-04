@@ -48,6 +48,17 @@ import { hexesDeVertice, vecino, verticesDeHex } from '../../shared/mecanicas/ma
 import { CAUCE, CUERPO, piezaDeOrilla } from '../aguas';
 import { piezasDeAsentamiento } from '../asentamiento';
 import { sitiosDelTablero, sitiosPermitidos } from '../sitios';
+import {
+  ALTURA_DE_SALIDA,
+  esDeLaInterfaz,
+  loCogeLaInterfaz,
+  ALTURA_MAXIMA,
+  ALTURA_MINIMA,
+  MINIMO_PARA_GIRAR,
+  MIRADOR_DE_SALIDA,
+  ojoDelMirador,
+  tirandoDelMirador,
+} from '../camara';
 import { dentroDelHueco, huecosDeLaBarra, loQueSeVe } from '../barra';
 import {
   areasDeTrueque,
@@ -1078,6 +1089,155 @@ paso('Lo que hay en el agua sigue las reglas del agua');
   comprobar('y la misma semilla sigue dando la misma marina', unaVez === otraVez);
 }
 
+paso('La camara se mira quieta, se gira arrastrando y no se cuela por ningun lado');
+{
+  const ALCANCE = 100;
+
+  /*
+   * LA VISTA DE SALIDA ES LA MISMA QUE HABIA.
+   *
+   * La camara estaba escrita como dos distancias —1,35 de lado, 1,15 de alto— y ahora
+   * esta escrita como un angulo. Es la misma vista, y esto lo dice: si algun dia alguien
+   * toca el angulo de salida creyendo que ajusta un detalle, aqui se entera de que ha
+   * movido el encuadre con el que se ha decidido toda la escala del mundo.
+   */
+  const salida = ojoDelMirador(MIRADOR_DE_SALIDA, ALCANCE);
+  comprobar(
+    'la vista de salida es exactamente la de antes: 1,35 de lado y 1,15 de alto',
+    Math.abs(Math.hypot(salida[0], salida[2]) - ALCANCE * 1.35) < 1e-9 &&
+      Math.abs(salida[1] - ALCANCE * 1.15) < 1e-9,
+    salida.map((v) => Number(v.toFixed(4))),
+  );
+
+  /*
+   * INCLINAR ES INCLINAR, NO ACERCARSE.
+   *
+   * Es la razon entera de que el mirador sea un angulo y no dos distancias. Con dos
+   * distancias, subir la camara la alejaba del centro y el tablero se encogia: en pantalla
+   * eso no se lee como inclinar la vista sino como un zoom que nadie ha pedido.
+   */
+  const alturas = [ALTURA_MINIMA, ALTURA_DE_SALIDA, (ALTURA_MINIMA + ALTURA_MAXIMA) / 2, ALTURA_MAXIMA];
+  const lejos = alturas.map((altura) => {
+    const [x, y, z] = ojoDelMirador({ rumbo: 1.1, altura }, ALCANCE);
+    return Math.hypot(x, y, z);
+  });
+  comprobar(
+    'inclinar la vista no acerca ni aleja: la distancia al centro no cambia',
+    lejos.every((d) => Math.abs(d - lejos[0]!) < 1e-9),
+    lejos.map((d) => Number(d.toFixed(6))),
+  );
+
+  /*
+   * NI BAJO EL SUELO NI POR EL POLO, por mucho que se tire.
+   *
+   * Se tira cien pantallas enteras hacia cada lado, que es mas de lo que nadie hara. Por
+   * abajo, el ojo tiene que seguir por encima del suelo; por arriba, tiene que quedarse
+   * CORTO del polo: justo en el polo el ojo mira en la direccion de su propio «arriba» y
+   * `lookAt` no tiene con que orientar la imagen, asi que pega un giro brusco al cruzarlo.
+   */
+  const PANTALLA = { ancho: 1600, alto: 900 };
+  let abajo = MIRADOR_DE_SALIDA;
+  let arriba = MIRADOR_DE_SALIDA;
+  for (let i = 0; i < 100; i++) {
+    abajo = tirandoDelMirador(abajo, 0, -PANTALLA.alto, PANTALLA);
+    arriba = tirandoDelMirador(arriba, 0, PANTALLA.alto, PANTALLA);
+  }
+  const ojoAbajo = ojoDelMirador(abajo, ALCANCE);
+  comprobar(
+    'por mucho que se tire, la camara no se mete bajo el suelo ni cruza el polo',
+    ojoAbajo[1] > 0 &&
+      abajo.altura >= ALTURA_MINIMA - 1e-12 &&
+      arriba.altura <= ALTURA_MAXIMA + 1e-12 &&
+      ALTURA_MAXIMA < Math.PI / 2,
+    {
+      abajo: Number(((abajo.altura * 180) / Math.PI).toFixed(1)),
+      arriba: Number(((arriba.altura * 180) / Math.PI).toFixed(1)),
+    },
+  );
+
+  /*
+   * EL SENTIDO: SE AGARRA EL MUNDO, NO LA CAMARA.
+   *
+   * Arrastrar a la derecha lleva el tablero a la derecha, asi que el OJO se va a la
+   * izquierda. Es el gesto de girar un plano encima de la mesa. Con el signo al reves se
+   * siente roto y nadie sabe decir por que, asi que el signo se escribe aqui y no se
+   * discute mas.
+   */
+  const derecha = tirandoDelMirador(MIRADOR_DE_SALIDA, 200, 0, PANTALLA);
+  comprobar(
+    'arrastrar a la derecha lleva el tablero a la derecha, o sea el ojo a la izquierda',
+    derecha.rumbo < MIRADOR_DE_SALIDA.rumbo,
+    { antes: MIRADOR_DE_SALIDA.rumbo, despues: Number(derecha.rumbo.toFixed(4)) },
+  );
+
+  /*
+   * UN ARRASTRE Y SU CONTRARIO DEVUELVEN AL MISMO SITIO.
+   *
+   * Sin esto, el temblor de la mano —que va y viene— arrastraria la camara poco a poco
+   * hacia un lado, y al cabo de un rato el tablero estaria girado sin que nadie lo haya
+   * girado. Se prueba a media altura, lejos de los topes: contra un tope no vuelve, y eso
+   * esta bien, porque un tope es justamente lo que no deja seguir.
+   */
+  const medio = { rumbo: 0.6, altura: (ALTURA_MINIMA + ALTURA_MAXIMA) / 2 };
+  const ida = tirandoDelMirador(medio, 137, 61, PANTALLA);
+  const vuelta = tirandoDelMirador(ida, -137, -61, PANTALLA);
+  comprobar(
+    'un arrastre y el mismo al reves dejan la camara donde estaba',
+    Math.abs(vuelta.rumbo - medio.rumbo) < 1e-12 && Math.abs(vuelta.altura - medio.altura) < 1e-12,
+    { rumbo: vuelta.rumbo - medio.rumbo, altura: vuelta.altura - medio.altura },
+  );
+
+  /*
+   * Y EL GESTO VALE LO MISMO EN CUALQUIER PANTALLA.
+   *
+   * Si el giro fuese por pixel, cruzar la pantalla con el dedo daria media vuelta en un
+   * monitor y un cuarto en un movil: el mismo juego se sentiria distinto en cada sitio.
+   * Cruzarla de lado a lado tiene que ser siempre lo mismo.
+   */
+  const MONITOR = { ancho: 2560, alto: 1440 };
+  const MOVIL = { ancho: 390, alto: 844 };
+  const enMonitor = tirandoDelMirador(medio, MONITOR.ancho / 2, 0, MONITOR).rumbo;
+  const enMovil = tirandoDelMirador(medio, MOVIL.ancho / 2, 0, MOVIL).rumbo;
+  comprobar(
+    'media pantalla de arrastre gira lo mismo en un monitor que en un movil',
+    Math.abs(enMonitor - enMovil) < 1e-12,
+    { monitor: Number(enMonitor.toFixed(6)), movil: Number(enMovil.toFixed(6)) },
+  );
+
+  /*
+   * Y HAY ZONA MUERTA, que es lo que separa «he hecho clic» de «estoy girando».
+   *
+   * Ademas de evitar que un clic mueva el mundo un pelo, es lo que cierra el hueco de un
+   * fotograma entre coger una carta y que la camara se entere: hasta que el puntero no se
+   * ha ido de ahi, no hay giro.
+   */
+  comprobar(
+    'hay zona muerta antes de empezar a girar, y es de varios pixeles',
+    MINIMO_PARA_GIRAR >= 3 && MINIMO_PARA_GIRAR <= 12,
+    { pixeles: MINIMO_PARA_GIRAR },
+  );
+
+  /*
+   * LA MARCA DE «ESTO SE LO QUEDA LA INTERFAZ» ES POR SUCESO, NO UN BANDERIN.
+   *
+   * Se comprueban las tres cosas de golpe porque son la misma: que por defecto el gesto es
+   * de la camara —si no, el tablero dejaria de girar del todo—, que marcar uno lo marca, y
+   * sobre todo que marcar uno NO marca el siguiente.
+   *
+   * Ese ultimo es el que importa. Con un banderin compartido, marcarlo al coger una carta
+   * y olvidarse de bajarlo deja el tablero clavado para siempre, y el sintoma —«ya no gira,
+   * pero antes giraba»— aparece mucho despues de la carta que lo causo. Con la marca puesta
+   * en el propio suceso no hay nada que bajar: cuando el navegador tira el suceso, se va.
+   */
+  const primero = {};
+  const segundo = {};
+  loCogeLaInterfaz(primero);
+  comprobar(
+    'la marca de la interfaz va en cada suceso y no se queda puesta para el siguiente',
+    !esDeLaInterfaz(segundo) && esDeLaInterfaz(primero) && !esDeLaInterfaz({}),
+  );
+}
+
 // ---------------------------------------------------------------------------
 
 console.log('');
@@ -1098,7 +1258,7 @@ if (fallos.length > 0) {
  * a veintitrés: durante ese tiempo el guion podía morirse en la novena sin que nadie se
  * enterara. Un guardia desfasado no guarda nada.
  */
-const COMPROBACIONES_ESCRITAS = 54;
+const COMPROBACIONES_ESCRITAS = 62;
 if (hechas < COMPROBACIONES_ESCRITAS) {
   console.error(
     `Solo se han hecho ${hechas} de las ${COMPROBACIONES_ESCRITAS} comprobaciones que ` +
