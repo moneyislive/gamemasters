@@ -84,7 +84,7 @@ import {
   puntoDeVertice,
   verticesDeArista,
 } from '../shared/mecanicas/malla-hexagonal';
-import type { Hex, Punto } from '../shared/mecanicas/malla-hexagonal';
+import type { Hex, LlaveDeArista, Punto } from '../shared/mecanicas/malla-hexagonal';
 import {
   ALTURA_DE_UNA_PERSONA,
   ESCALA_DEL_PACK,
@@ -106,6 +106,7 @@ import {
 import {
   COLORES_DE_JUGADOR,
   MODELO,
+  modeloDeBandera,
   modeloDeBien,
   modeloDeMuelle,
   PIEZAS_DE_COLOR,
@@ -137,9 +138,10 @@ import type { CartaEnLaMano, HuecoDeCarta } from './baraja';
  * los dos sitios donde la interfaz empieza un arrastre: la barra y la mano.
  */
 import { loCogeLaInterfaz } from './camara';
+import { CAJA_DEL_PUENTE, LARGO_DEL_TRAMO, puenteEntre } from './puente';
 import type { HuecoDeLaBarra, PiezaDeBarra } from './barra';
 import type { Colocando, Sitio } from './sitios';
-import type { CaminoEn3D, DeltaEn3D, IslaEn3D, PiezaEn3D } from './tipos';
+import type { CaminoEn3D, ColorDeJugador, DeltaEn3D, IslaEn3D, PiezaEn3D } from './tipos';
 
 export { RADIO_DE_COMARCA, RADIO_DE_TESELA, ESCALON };
 
@@ -253,6 +255,18 @@ interface Puesta {
   posicion: THREE.Vector3;
   giro: number;
   escala: THREE.Vector3;
+  /**
+   * PENDIENTE, en radianes, y opcional porque casi nada la tiene.
+   *
+   * Casi todo lo que se planta en este mundo está de pie: un árbol, una casa, un barco. Lo
+   * que se INCLINA es lo que sube una cuesta, y hasta que hubo puentes no había nada así.
+   * Sin esto, un tramo de puente entre dos juntas a distinta altura se plantaba horizontal
+   * y dejaba un escalón en cada junta.
+   *
+   * Se aplica DESPUÉS del giro y sobre el eje que ya está girado, que es lo que hace que
+   * «hacia adelante» signifique a lo largo del tramo y no a lo largo de un eje del mundo.
+   */
+  inclinacion?: number;
 }
 
 /** Una copia a escala uniforme del pack, que es el caso de casi todo. */
@@ -288,9 +302,25 @@ function Copias({
     if (m === null) return;
     const matriz = new THREE.Matrix4();
     const giro = new THREE.Quaternion();
+    const cuesta = new THREE.Quaternion();
     const eje = new THREE.Vector3(0, 1, 0);
+    const traves = new THREE.Vector3(1, 0, 0);
     puestas.forEach((p, i) => {
       giro.setFromAxisAngle(eje, p.giro);
+      if (p.inclinacion !== undefined && p.inclinacion !== 0) {
+        /*
+         * LA CUESTA GIRA ALREDEDOR DEL EJE X LOCAL, y eso ata esto al puente.
+         *
+         * Lo que se inclina son tramos de puente, cuyo modelo tiene el eje largo en Z (se
+         * midió: 1,333 x 1,250 x 1,924). Con el largo en Z, el eje transversal —sobre el
+         * que se bascula para subir una cuesta— es la X local.
+         *
+         * El signo va cambiado porque una rotación positiva alrededor de +X manda +Z hacia
+         * abajo. Con el signo al derecho, todos los puentes bajarían cuesta arriba.
+         */
+        cuesta.setFromAxisAngle(traves, -p.inclinacion);
+        giro.multiply(cuesta);
+      }
       matriz.compose(p.posicion, giro, p.escala);
       m.setMatrixAt(i, matriz);
     });
@@ -545,6 +575,153 @@ function tramosEntre(a: Punto, b: Punto, relieve: Relieve, alto: number): Puesta
  * partidas, ni de turnos, ni de quién mira: eso lo decide quien lo monta, que es
  * distinto en cada cliente.
  */
+/**
+ * UN PUENTE DE JUGADOR SOBRE UNA ARISTA: varios tramos y un estandarte en cada junta.
+ *
+ * ═══ POR QUÉ ESTO SUSTITUYÓ A LA CADENA DE CAJAS ═══
+ *
+ * Un camino de jugador se dibujaba con diez cajas apoyadas en el suelo, cada una a la cota
+ * que hubiera bajo su centro. Como raya funciona; como OBRA no dice nada: no se distingue
+ * de un sendero del terreno, no se ve de quién es sin acercarse, y en una ladera serpentea
+ * porque cada caja busca su suelo por su cuenta.
+ *
+ * Ahora es lo que es: una obra. Tramos del modelo del pack, sin deformar, con la calzada
+ * RECTA de punta a punta —que es la diferencia entre un puente y un camino— y un estandarte
+ * del color del jugador en cada junta, alto para que se lea desde el aire.
+ *
+ * ═══ LA ANIMACIÓN VA POR RELOJ Y NO POR ESTADO ═══
+ *
+ * `useFrame` mueve el objeto de `three` directamente, como todo lo que se anima en esta
+ * escena. Pasar por estado de React sesenta veces por segundo repintaría el mundo entero
+ * para levantar un tramo.
+ *
+ * Cuándo empezó la obra se guarda en un `ref` la primera vez que se pinta este puente. Al
+ * cargar un tablero con puentes ya hechos, todos empiezan a la vez y se levantan a la vez,
+ * que es lo correcto: no son obras nuevas, es el mundo que ya estaba.
+ */
+const SEGUNDOS_DE_OBRA = 1.1;
+
+function PuenteDeJugador({
+  arista,
+  color,
+  relieve,
+  aplanados,
+}: {
+  arista: string;
+  color: string;
+  relieve: Relieve;
+  aplanados: ReadonlyMap<string, Instanciable[]>;
+}): JSX.Element | null {
+  const empezo = useRef<number | null>(null);
+  const [avance, ponerAvance] = useState(0);
+
+  const [a, b] = useMemo(() => verticesDeArista(arista as LlaveDeArista), [arista]);
+
+  const entero = useMemo(() => {
+    if (a === undefined || b === undefined) return null;
+    return puenteEntre(
+      puntoDeVertice(a, RADIO_DE_COMARCA),
+      puntoDeVertice(b, RADIO_DE_COMARCA),
+      (q: Punto) => relieve.alturaEn(q),
+    );
+  }, [a, b, relieve]);
+
+  /*
+   * EL AVANCE PASA POR ESTADO, y aquí eso es lo correcto aunque en esta escena casi nunca
+   * lo sea. Lo que cambia no es DÓNDE está cada tramo —eso no se mueve— sino CUÁNTOS hay, y
+   * eso cambia seis veces en toda la obra, no sesenta veces por segundo. Repintar seis veces
+   * para levantar un puente es exactamente lo que hay que repintar.
+   */
+  useFrame((estado) => {
+    if (entero === null || avance >= 1) return;
+    if (empezo.current === null) empezo.current = estado.clock.elapsedTime;
+    const va = (estado.clock.elapsedTime - empezo.current) / SEGUNDOS_DE_OBRA;
+    const cuantos = entero.tramos.length;
+    const escalonado = Math.min(1, Math.ceil(Math.max(0, va) * cuantos) / cuantos);
+    if (escalonado !== avance) ponerAvance(escalonado);
+  });
+
+  const puesto = useMemo(() => {
+    if (a === undefined || b === undefined) return null;
+    return puenteEntre(
+      puntoDeVertice(a, RADIO_DE_COMARCA),
+      puntoDeVertice(b, RADIO_DE_COMARCA),
+      (q: Punto) => relieve.alturaEn(q),
+      avance,
+    );
+  }, [a, b, relieve, avance]);
+
+  /*
+   * EL TRAMO SE ESCALA UNIFORME. `LARGO_DEL_TRAMO` ya es el largo del modelo llevado a la
+   * escala del mundo, así que el factor va igual en los tres ejes: estirar sólo el eje
+   * largo daría una calzada con las barandillas aplastadas.
+   */
+  const puestasDeTramo = useMemo(() => {
+    if (puesto === null) return [];
+    const talla = LARGO_DEL_TRAMO / CAJA_DEL_PUENTE.largo;
+    return puesto.tramos.map((t) => ({
+      posicion: new THREE.Vector3(t.x, t.y, t.z),
+      /*
+       * EL CUARTO DE VUELTA QUE FALTABA, y era lo que tenía los puentes atravesados.
+       *
+       * `giro` sigue la convención de esta escena, que viene de los caminos: con giro cero,
+       * lo largo apunta a +X. Pero el modelo del puente tiene su eje largo en Z —medido en
+       * el `.glb`: 1,333 de ancho, 1,250 de alto, 1,924 de largo—, así que plantado tal cual
+       * quedaba CRUZADO sobre la arista. Seis arcos de piedra puestos de través a lo largo
+       * de una arista no se leen como un puente ni como nada: parecen escombros, y por eso
+       * costó tanto verlos en pantalla.
+       *
+       * Un cuarto de vuelta lleva la Z local a donde la convención pone la X.
+       */
+      giro: t.giro + Math.PI / 2,
+      inclinacion: t.inclinacion,
+      /*
+       * Y el eje que se estira es el LARGO —la Z—, no la X. Un tramo en cuesta cubre más
+       * distancia que su sombra; estirando los tres ejes por igual, el puente saldría con
+       * las barandillas más altas cuanto más empinado.
+       */
+      escala: new THREE.Vector3(talla, talla, (talla * t.largo) / LARGO_DEL_TRAMO),
+    }));
+  }, [puesto]);
+
+  const puestasDeBandera = useMemo(() => {
+    if (puesto === null) return [];
+    const talla = ALTURA_DE_UNA_PERSONA * 2.2;
+    return puesto.estandartes.map((e) => ({
+      posicion: new THREE.Vector3(e.x, e.y + e.alto, e.z),
+      giro: e.giro,
+      escala: new THREE.Vector3(talla, talla, talla),
+    }));
+  }, [puesto]);
+
+  const tramo = aplanados.get(MODELO.puente);
+  const bandera = aplanados.get(modeloDeBandera(color as ColorDeJugador));
+  if (puesto === null || tramo === undefined) return null;
+
+  return (
+    <group>
+      <Modelo mallas={tramo} puestas={puestasDeTramo} />
+      {bandera !== undefined && <Modelo mallas={bandera} puestas={puestasDeBandera} />}
+      {/*
+        * LAS ASTAS. Geometría propia y no un modelo del pack, y no por capricho: ningún
+        * mástil del pack mide tres personas y media, y estirar uno que mide dos tercios
+        * daría un palo cinco veces más grueso de lo que debe. Un cilindro es un cilindro a
+        * cualquier altura.
+        */}
+      {puesto.estandartes.map((e, i) => (
+        <mesh key={`asta:${arista}:${String(i)}`} position={[e.x, e.y + e.alto / 2, e.z]} castShadow>
+          <cylinderGeometry args={[GRUESO_DEL_ASTA, GRUESO_DEL_ASTA, e.alto, 6]} />
+          <meshStandardMaterial color={COLOR_DEL_ASTA} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
+/** El asta del estandarte: madera oscura, delgada, y del grosor de un brazo. */
+const GRUESO_DEL_ASTA = ALTURA_DE_UNA_PERSONA * 0.055;
+const COLOR_DEL_ASTA = '#5a4632';
+
 /**
  * LA SEÑAL DE UN SITIO DONDE SE PUEDE PONER ALGO: un anillo en el suelo.
  *
@@ -1936,30 +2113,7 @@ export function Delta({
     return comoElPack(centro.x, relieve.alturaEn(centro), centro.y, 0, 3);
   }, [datos.ladron, relieve]);
 
-  const caminos = useMemo(() => {
-    const tabla = new Map<string, Puesta[]>();
-    for (const c of datos.caminos) {
-      const [a, b] = verticesDeArista(c.arista);
-      if (a === undefined || b === undefined) continue;
-      const lista = tabla.get(c.color) ?? [];
-      lista.push(
-        ...tramosEntre(
-          puntoDeVertice(a, RADIO_DE_COMARCA),
-          puntoDeVertice(b, RADIO_DE_COMARCA),
-          relieve,
-          0.3,
-        ),
-      );
-      tabla.set(c.color, lista);
-    }
-    return tabla;
-  }, [datos.caminos, relieve]);
 
-  const largoDelTramo = RADIO_DE_COMARCA / TRAMOS_DE_SENDA;
-  const geometriaDelCamino = useMemo(
-    () => new THREE.BoxGeometry(largoDelTramo * 0.9, ESCALON * 0.09, RADIO_DE_TESELA * 0.34),
-    [largoDelTramo],
-  );
 
   /**
    * LOS SITIOS DEL TABLERO, con su altura ya resuelta.
@@ -2063,14 +2217,21 @@ export function Delta({
 
       {ladron === null ? null : <Ladron mallas={aplanados.get(MODELO.tienda)} puesta={ladron} />}
 
-      {[...caminos].map(([color, puestas]) => (
-        <Copias
-          key={`camino:${color}`}
-          malla={{
-            geometria: geometriaDelCamino,
-            material: new THREE.MeshStandardMaterial({ color, roughness: 0.9 }),
-          }}
-          puestas={puestas}
+      {/*
+        * LOS PUENTES DE LOS JUGADORES. Uno por arista construida.
+        *
+        * No se agrupan por color en una sola llamada de dibujo como se hacía con las
+        * cajas, y es a propósito: cada puente tiene su propia obra —empieza cuando
+        * aparece y se levanta tramo a tramo—, así que necesita su propio componente para
+        * llevar su reloj. Son unas pocas decenas por partida, no miles.
+        */}
+      {datos.caminos.map((c) => (
+        <PuenteDeJugador
+          key={`puente:${c.arista}`}
+          arista={c.arista}
+          color={c.color}
+          relieve={relieve}
+          aplanados={aplanados}
         />
       ))}
     </group>

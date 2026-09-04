@@ -151,6 +151,8 @@ function motivoDe(estado: EstadoDeRiberas, movimiento: Movimiento, ctx: Contexto
   return aplicarConMotivo(reglasDeRiberas, estado, movimiento, ctx).motivo;
 }
 
+import { obraPosible, vistaDePrueba } from '../../shared/arcade/juegos/riberas-en-3d';
+
 let hechas = 0;
 const fallos: string[] = [];
 
@@ -1124,8 +1126,284 @@ paso('Y el árbitro sigue sin saber nada de este juego');
 }
 
 // ---------------------------------------------------------------------------
+paso('El tablero en 3D marca lo que dicen las reglas, y nada mas');
+// ---------------------------------------------------------------------------
 
-console.log('');
+/*
+ * QUE SE VIGILA AQUI, Y POR QUE HACE FALTA.
+ *
+ * El tablero en tres dimensiones marcaba lo mismo agarrases lo que agarrases: todos los
+ * vertices libres. Asi, el castillo se ofrecia en mitad del campo cuando solo puede subir
+ * sobre un poblado PROPIO, y la casa se ofrecia pegada a otra casa cuando la regla de
+ * distancia lo prohibe. `riberas-en-3d.ts` lo arreglo repartiendo por piezas lo que
+ * devuelve `opcionesDeRiberas` en vez de inventarse listas; esto impide que vuelva a
+ * inventarlas.
+ *
+ * Se vigila EL ADAPTADOR, no las reglas: las reglas ya tienen sus comprobaciones mas
+ * arriba, y volver a derivarlas aqui a partir de su propia salida no probaria nada.
+ */
+{
+  const hexes = mallaDeRadio(2);
+  const delTablero = new Set<string>(verticesDe(hexes));
+
+  /* YO: una choza con una CADENA de veredas que se aleja. TU: una choza pegada a la mia. */
+  const miChoza = verticeDeHex({ q: 0, r: 0 }, 0);
+  const misVeredas: string[] = [];
+  const pisados: string[] = [miChoza];
+  let punta = miChoza;
+  for (let i = 0; i < 3; i++) {
+    const salida = aristasDeVertice(punta).find((a) => {
+      if (misVeredas.includes(a)) return false;
+      const otro = verticesDeArista(a).find((v) => v !== punta);
+      return otro !== undefined && !pisados.includes(otro) && delTablero.has(otro);
+    });
+    if (salida === undefined) break;
+    misVeredas.push(salida);
+    const siguiente = verticesDeArista(salida).find((v) => v !== punta);
+    if (siguiente === undefined) break;
+    punta = siguiente;
+    pisados.push(punta);
+  }
+  const tuChoza = verticesVecinos(miChoza).find((v) => delTablero.has(v));
+
+  /*
+   * EL ESTADO DE PRUEBA TIENE QUE PODER FALLAR, y esto se afirma ANTES que nada.
+   *
+   * «Ningun anillo cae sobre una choza ajena» se cumple solo si HAY una choza ajena. Sin
+   * esta linea, una partida de un colono haria pasar la comprobacion sin comprobar nada,
+   * que es la peor clase de verde: el que dice que se miro.
+   */
+  comprobar(
+    'el estado de prueba tiene con que fallar: choza ajena, cadena propia y tablero entero',
+    tuChoza !== undefined && misVeredas.length === 3 && delTablero.size === 54,
+    { ajena: tuChoza, veredas: misVeredas.length, vertices: delTablero.size },
+  );
+
+  const vista3d = vistaDePrueba(
+    hexes,
+    [
+      { asiento: 'yo', color: '#3d8be0', chozas: [miChoza], torres: [], veredas: misVeredas },
+      {
+        asiento: 'tu',
+        color: '#e0533d',
+        chozas: tuChoza === undefined ? [] : [tuChoza],
+        torres: [],
+        veredas: [],
+      },
+      { asiento: 'nadie', color: '#e0b83d', chozas: [], torres: [], veredas: [] },
+    ],
+    'yo',
+  );
+
+  const choza = obraPosible(vista3d, 'yo', 'choza');
+  const torre = obraPosible(vista3d, 'yo', 'torre');
+  const vereda = obraPosible(vista3d, 'yo', 'vereda');
+
+  comprobar(
+    'la ciudad solo se marca sobre poblados PROPIOS, nunca sobre los ajenos',
+    torre.sitios.length === 1 &&
+      torre.sitios[0]?.llave === miChoza &&
+      !torre.sitios.some((x) => x.llave === tuChoza),
+    { sitios: torre.sitios.map((x) => x.llave), mia: miChoza, ajena: tuChoza },
+  );
+
+  /* Se exige que la lista NO este vacia antes de mirarla: con cero, lo de abajo pasa solo. */
+  comprobar(
+    'hay al menos un sitio donde fundar, o lo de abajo no prueba nada',
+    choza.sitios.length > 0,
+    choza.sitios.length,
+  );
+  comprobar(
+    'ningun poblado se marca a una arista de otro poblado, sea de quien sea',
+    choza.sitios.every(
+      (x) => !verticesVecinos(x.llave).some((n) => n === miChoza || n === tuChoza),
+    ),
+    choza.sitios.map((x) => x.llave),
+  );
+  comprobar(
+    'y todo poblado que se marca cuelga de un camino propio',
+    choza.sitios.every((x) => aristasDeVertice(x.llave).some((a) => misVeredas.includes(a))),
+    choza.sitios.map((x) => x.llave),
+  );
+  comprobar(
+    'ningun puente se marca sobre una arista ya ocupada',
+    vereda.sitios.length > 0 && vereda.sitios.every((x) => !misVeredas.includes(x.llave)),
+    { sitios: vereda.sitios.length },
+  );
+
+  /*
+   * LA CLASE SALE DE LA LLAVE, y por eso no puede desajustarse.
+   *
+   * El fallo que esto vuelve imposible ya ocurrio: al puente se le paso la lista de
+   * VERTICES y salieron cero anillos, sin un error en ninguna consola, porque la escena
+   * filtra por clase y ninguna llave de vertice es una arista. La escena hizo lo correcto;
+   * quien mentia era el par (clase, llaves) que le pasaron montado a mano.
+   */
+  comprobar(
+    'la clase que sale cuadra siempre con las llaves que la acompanan',
+    choza.clase === 'vertice' &&
+      torre.clase === 'vertice' &&
+      vereda.clase === 'arista' &&
+      choza.sitios.every((x) => x.llave.startsWith('v:')) &&
+      vereda.sitios.every((x) => x.llave.startsWith('a:')),
+    { choza: choza.clase, torre: torre.clase, vereda: vereda.clase },
+  );
+
+  /*
+   * QUIEN NO HA CONSTRUIDO NADA NO PUEDE CONSTRUIR NADA, ni siquiera la ciudad.
+   *
+   * Es la queja del usuario vista del reves: antes, con el tablero pelado, el castillo le
+   * ofrecia los cincuenta y cuatro vertices.
+   */
+  const PIEZAS = ['choza', 'torre', 'vereda'] as const;
+  comprobar(
+    'quien no ha construido nada no tiene ni un sitio marcado',
+    PIEZAS.every((pieza) => obraPosible(vista3d, 'nadie', pieza).sitios.length === 0),
+    PIEZAS.map((pieza) => `${pieza}:${String(obraPosible(vista3d, 'nadie', pieza).sitios.length)}`),
+  );
+
+  /*
+   * EL ADAPTADOR NO INVENTA NI PIERDE.
+   *
+   * Se cuenta por un camino DISTINTO —el `id` de la opcion, que es texto de presentacion—
+   * y se exige el mismo numero que repartiendo por tipo y carga. Si el reparto se dejara
+   * una opcion o colara una de otro sitio, los dos numeros se separarian.
+   */
+  const todas = opcionesDeRiberas(vista3d, 'yo');
+  const porId = {
+    choza: todas.filter((o) => o.id.startsWith('fundar:')).length,
+    torre: todas.filter((o) => o.id.startsWith('torre:')).length,
+    vereda: todas.filter((o) => o.id.startsWith('vereda:')).length,
+  };
+  comprobar(
+    'el adaptador reparte todas las opciones de obra y ninguna de mas',
+    porId.choza === choza.sitios.length &&
+      porId.torre === torre.sitios.length &&
+      porId.vereda === vereda.sitios.length,
+    {
+      porId,
+      repartido: {
+        choza: choza.sitios.length,
+        torre: torre.sitios.length,
+        vereda: vereda.sitios.length,
+      },
+    },
+  );
+}
+
+/*
+ * Y LO QUE CONVIERTE TODO LO ANTERIOR DE PROMESA EN HECHO: que el reductor las acepte.
+ *
+ * Todo lo de arriba mira LISTAS. Ninguna comprobacion sobre listas puede descartar el
+ * fallo que de verdad se ve jugando: un anillo verde que no hace nada porque el juego
+ * rechaza el movimiento. Aqui se coge una partida de verdad —la que este guion ya ha
+ * jugado con el arbitro delante— y se le pasa al reductor la carga EXACTA que el adaptador
+ * entrega para cada marca.
+ *
+ * Se mira el MOTIVO y no si el estado cambio. Comprobar la identidad del objeto pasaria
+ * siempre el dia que el reductor devolviera una copia igual al rechazar, y entonces esta
+ * comprobacion —la mas cara de escribir— seria la mas facil de engañar.
+ */
+{
+  /*
+   * LA PARTIDA SE MONTA CON EL ESCENARIO QUE ESTE GUION YA SABE MONTAR.
+   *
+   * El primer intento preguntaba sobre la mesa que quedaba viva de mas arriba, y recibia
+   * CERO marcas: ese turno esta sin tirar los dados y sin almacen, y sin las dos cosas no
+   * se puede construir nada. Sin el guardia de «o lo de abajo no prueba nada», esta
+   * comprobacion habria salido VERDE anunciando que el reductor acepta todas las marcas
+   * sin haber probado ni una. Es exactamente el verde que dice que se miro.
+   *
+   * `escenarioDeTrueque` deja una partida de verdad en `jugando`, con los dados tirados y
+   * con almacen — que es donde esta un jugador cuando agarra una pieza de la barra.
+   */
+  const DOS_AQUI = ['A', 'B'];
+  /* Almacén de sobra para las tres piezas: la torre sola pide tres piedras y dos granos. */
+  const rico = escenarioDeTrueque(
+    [
+      'limo', 'limo', 'junco', 'junco', 'sal', 'sal',
+      'piedra', 'piedra', 'piedra', 'piedra', 'grano', 'grano', 'grano',
+    ],
+    ['limo'],
+  );
+  const suya = proyectarRiberas(rico, 'A');
+  const marcas = (['choza', 'torre', 'vereda'] as const).flatMap((pieza) =>
+    obraPosible(suya, 'A', pieza).sitios,
+  );
+  comprobar(
+    'el tablero le ensena al menos una marca, o lo de abajo no prueba nada',
+    marcas.length > 0,
+    marcas.length,
+  );
+  const rechazadas = marcas.filter(
+    (m) =>
+      motivoDe(
+        rico,
+        { tipo: m.movimiento.tipo, carga: m.movimiento.carga } as Movimiento,
+        ctxDe('A', DOS_AQUI),
+      ) !== null,
+  );
+  comprobar(
+    'y el reductor acepta TODAS las marcas que el tablero ensena: ni un anillo muerto',
+    rechazadas.length === 0,
+    rechazadas.slice(0, 3).map(
+      (m) =>
+        `${m.llave}: ${String(
+          motivoDe(
+            rico,
+            { tipo: m.movimiento.tipo, carga: m.movimiento.carga } as Movimiento,
+            ctxDe('A', DOS_AQUI),
+          ),
+        )}`,
+    ),
+  );
+
+  /*
+   * Y AL REVES, que es la otra mitad y la que de verdad muerde: lo que el tablero NO marca,
+   * el reductor lo RECHAZA.
+   *
+   * Sin esto, un adaptador que devolviera todos los vertices del tablero pasaria la
+   * comprobacion de arriba en cuanto unos pocos fueran legales. Se toman los vertices que
+   * NO estan marcados para la ciudad y se exige que el reductor los rechace uno por uno.
+   */
+  const marcadosParaCiudad = new Set(obraPosible(suya, 'A', 'torre').sitios.map((m) => m.llave));
+  const sinMarcar = verticesDe(mallaDeRadio(2)).filter((v) => !marcadosParaCiudad.has(v));
+  const coladas = sinMarcar.filter(
+    (v) =>
+      motivoDe(
+        rico,
+        { tipo: ALZAR, carga: { que: 'torre', donde: v } } as Movimiento,
+        ctxDe('A', DOS_AQUI),
+      ) === null,
+  );
+  comprobar(
+    'y lo que el tablero NO marca para la ciudad, el reductor lo rechaza',
+    marcadosParaCiudad.size > 0 && sinMarcar.length > 0 && coladas.length === 0,
+    { marcados: marcadosParaCiudad.size, sinMarcar: sinMarcar.length, coladas: coladas.slice(0, 3) },
+  );
+}
+
+/**
+ * EL GUARDIA DE «NO SE HAN HECHO TODAS», que este guion no tenia.
+ *
+ * Lo tiene `escenas/scripts/verificar-escena.ts` desde hace tiempo y aqui faltaba, y la
+ * diferencia importa: sin el, un bloque cuyo bucle itere CERO veces —porque la partida no
+ * llego al estado interesante— sale en verde con la lista de aciertos mas corta. Nadie
+ * mira la longitud de una lista de aciertos; todo el mundo mira el color.
+ *
+ * El numero va a mano y hay que subirlo al anadir comprobaciones. Ese es el precio, y es
+ * barato al lado de un verde que no ha comprobado nada.
+ */
+const COMPROBACIONES_ESCRITAS = 154;
+if (hechas < COMPROBACIONES_ESCRITAS) {
+  console.error(
+    `Solo se han hecho ${hechas} de las ${COMPROBACIONES_ESCRITAS} comprobaciones que ` +
+      'tiene escritas este guion: se ha caido por el camino sin decirlo. ' +
+      'Si has anadido comprobaciones nuevas, sube el numero.',
+  );
+  process.exit(2);
+}
+
 if (fallos.length === 0) {
   console.log(
     `✔ ${hechas} comprobaciones. El mismo vértice tiene una sola llave por los tres caminos, ninguna\n` +

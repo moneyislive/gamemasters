@@ -36,12 +36,19 @@ import {
   verticesDeArista,
 } from '../../shared/mecanicas/malla-hexagonal';
 import type { Punto } from '../../shared/mecanicas/malla-hexagonal';
-import { COLUMNAS_DEL_ATLAS, FILAS_DEL_ATLAS, PALETA, puntosDeLaCifra } from '../paleta';
+import {
+  COLUMNA_DEL_COLOR,
+  COLUMNAS_DEL_ATLAS,
+  FILAS_DEL_ATLAS,
+  PALETA,
+  puntosDeLaCifra,
+} from '../paleta';
 import {
   NOMBRE_QUE_SOBREVIVE,
   nombresEnElGlb,
   PIEZAS_DE_COLOR,
   todosLosNombres,
+  COLORES_DE_JUGADOR,
 } from '../nombres';
 import { cuantasFormasDeCauce, cuantasFormasDeCruce, ladoHaciaElVecino } from '../sendas';
 import { hexesDeVertice, vecino, verticesDeHex } from '../../shared/mecanicas/malla-hexagonal';
@@ -68,9 +75,15 @@ import {
   manoPorGrupos,
 } from '../baraja';
 import { cuantosTriangulos, geometriaDeContornos } from '../formas';
+import {
+  CAJA_DEL_PUENTE,
+  LARGO_DEL_TRAMO,
+  puenteEntre,
+  SUPERFICIE_DEL_CAMINO,
+} from '../puente';
 import { BIENES_CON_ICONO, CONTORNOS_DEL_BIEN } from '../iconos';
 import { MODELO, modeloDePieza } from '../modelos';
-import { RADIO_DE_COMARCA, RADIO_DE_TESELA } from '../escala';
+import { ESCALON, RADIO_DE_COMARCA, RADIO_DE_TESELA } from '../escala';
 import { laMarinaDelMundo } from '../marina';
 import { crearRelieve, hexDePunto } from '../relieve';
 import fs from 'node:fs';
@@ -386,11 +399,40 @@ paso('La paleta no deja ningún terreno sin color');
       conColor.length === 0,
       conColor,
     );
-    const derivadas = todosLosNombres().filter((n) => !nombresEnElGlb().includes(n));
+    /*
+     * ESTE COMPROBADOR NO PODÍA FALLAR, Y ESTUVO ASÍ DESDE QUE SE ESCRIBIÓ.
+     *
+     * Decía: «las que se fabrican moviendo UV son las siete piezas por cuatro colores», y
+     * comparaba `derivadas.length` con `PIEZAS_DE_COLOR.length * 4`. Pero `derivadas` sale
+     * de restarle a `todosLosNombres()` los que están en el `.glb`, y `todosLosNombres()`
+     * se CONSTRUYE como esa misma multiplicación (`nombres.ts:296-302`). Los dos lados eran
+     * el mismo número escrito de dos maneras: sólo podía saltar si los colores dejaran de
+     * ser cuatro. Vigilaba una constante creyendo que vigilaba una derivación.
+     *
+     * Lo que sí puede romperse son estas dos cosas, y ninguna la miraba nadie:
+     */
+    const sinBase = PIEZAS_DE_COLOR.filter((pieza) => !dentro.has(pieza));
     comprobar(
-      'las que se fabrican moviendo UV son las siete piezas por cuatro colores',
-      derivadas.length === PIEZAS_DE_COLOR.length * 4,
-      { derivadas: derivadas.length, esperadas: PIEZAS_DE_COLOR.length * 4 },
+      'toda pieza que se pinta por color tiene su malla base dentro del .glb',
+      sinBase.length === 0,
+      sinBase,
+    );
+    /*
+     * Y que los colores del código sean EXACTAMENTE las columnas que el atlas tiene.
+     *
+     * Un color de más no revienta: `desplazamientoDeColor` cae al azul por defecto
+     * (`paleta.ts:185`) y las piezas de ese jugador salen azules, iguales que las de otro,
+     * sin un error en ninguna consola. Y hay motivo para que pase: el motor de Riberas
+     * admite SEIS colonos y aquí sólo hay cuatro columnas.
+     */
+    const sinColumna = COLORES_DE_JUGADOR.filter((c) => COLUMNA_DEL_COLOR[c] === undefined);
+    const sinColor = Object.keys(COLUMNA_DEL_COLOR).filter(
+      (c) => !(COLORES_DE_JUGADOR as readonly string[]).includes(c),
+    );
+    comprobar(
+      'cada color de jugador tiene su columna en el atlas, y no sobra ninguna',
+      sinColumna.length === 0 && sinColor.length === 0,
+      { sinColumna, sinColor },
     );
 
     const mancillados = [...dentro].filter((n) => !NOMBRE_QUE_SOBREVIVE.test(n));
@@ -1238,6 +1280,201 @@ paso('La camara se mira quieta, se gira arrastrando y no se cuela por ningun lad
   );
 }
 
+paso('Un puente cubre su arista, salva lo que tiene debajo y encaja con el camino');
+{
+  const CUESTA = 0.14;
+  const llano = (): number => 12;
+  const cuesta = (q: { x: number; y: number }): number => 12 + q.x * CUESTA;
+  const cerro = (q: { x: number; y: number }): number => {
+    /* Un cerro en mitad del vano: lo que la primera version atravesaba por dentro. */
+    const t = q.x / RADIO_DE_COMARCA;
+    return 12 + Math.max(0, 1 - Math.abs(t - 0.5) * 6) * ESCALON * 2;
+  };
+
+  const A = { x: 0, y: 0 };
+  const B = { x: RADIO_DE_COMARCA, y: 0 };
+
+  /*
+   * CUBRE LA ARISTA ENTERA Y SIN DEFORMAR NADA.
+   *
+   * Las dos mitades importan y son distintas. Que cubra: un puente que se queda corto deja
+   * un vacio justo donde uno pisa. Y que no deforme: la alternativa —estirar los tramos
+   * hasta que cuadren— daba un 9% de mas en cada barandilla, medido, y una barandilla
+   * estirada se nota porque el ojo conoce su forma.
+   */
+  const p = puenteEntre(A, B, llano);
+  const primero = p.tramos[0];
+  const ultimo = p.tramos[p.tramos.length - 1];
+  /*
+   * Se mide la SOMBRA del tramo, no su largo. Un tramo en cuesta es mas largo que el trozo
+   * de arista que cubre, y compararlo con la arista da un desajuste que parece un hueco y
+   * no lo es: la primera version de esta comprobacion fallo por eso, con ocho milesimas de
+   * sobra que eran exactamente la cuesta de los dos tramos de punta.
+   */
+  const sombra = (t: (typeof p.tramos)[number]): number => t.largo * Math.cos(t.inclinacion);
+  comprobar(
+    'el puente empieza en un vertice y acaba en el otro, sin dejar hueco',
+    primero !== undefined &&
+      ultimo !== undefined &&
+      Math.abs(primero.x - sombra(primero) / 2) < 1e-9 &&
+      Math.abs(ultimo.x + sombra(ultimo) / 2 - RADIO_DE_COMARCA) < 1e-9,
+    {
+      empieza: primero === undefined ? null : primero.x - sombra(primero) / 2,
+      acaba: ultimo === undefined ? null : ultimo.x + sombra(ultimo) / 2,
+      arista: RADIO_DE_COMARCA,
+    },
+  );
+  /*
+   * NINGUN TRAMO SE ESTIRA MAS DE LO QUE SU CUESTA EXIGE, y esto es lo que se queria
+   * comprobar de verdad.
+   *
+   * La primera version pedia largo EXACTO en llano, y fallo — enseñando algo que no se
+   * habia pensado: en llano la calzada tampoco es plana. Se arquea, porque el aire que se
+   * le exige sobre el suelo (media persona) es mayor que lo que sobresale un camino, asi
+   * que las juntas de en medio suben y las puntas se quedan clavadas al camino. Es un
+   * puente arqueado, que es lo que es un puente.
+   *
+   * Lo que NO puede pasar es que un tramo se estire por otra razon. Su largo tiene que ser
+   * exactamente el del modelo dividido por el coseno de su cuesta: ni un milimetro mas.
+   */
+  comprobar(
+    'ningun tramo se estira mas de lo que su propia cuesta exige',
+    p.tramos.every(
+      (t) => Math.abs(t.largo - LARGO_DEL_TRAMO / Math.cos(t.inclinacion)) < 1e-9,
+    ),
+    p.tramos.map((t) => Number((t.largo / LARGO_DEL_TRAMO).toFixed(4))),
+  );
+  /*
+   * Y EN LLANO EL ARCO ES SUAVE. Cinco grados de tope, y el numero tiene sentido:
+   *
+   * en llano el arco sube 0,72 unidades —un cuarto de persona— y toda esa subida se hace en
+   * el primer tramo, que sale a 3,2 grados. Eso es una rampa de carretera, se sube andando
+   * sin pensarlo y en pantalla se lee como un puente arqueado. El tope esta puesto para que
+   * salte si alguien sube el aire bajo la calzada sin darse cuenta de que lo que sube con
+   * el es la cuesta de las puntas.
+   */
+  comprobar(
+    'y en llano el arco es suave, no una rampa',
+    p.tramos.every((t) => Math.abs(t.inclinacion) < (5 * Math.PI) / 180),
+    p.tramos.map((t) => Number(((t.inclinacion * 180) / Math.PI).toFixed(2))),
+  );
+  comprobar(
+    'y hay un estandarte en cada junta: uno menos que tramos',
+    p.tramos.length >= 2 && p.estandartes.length === p.tramos.length - 1,
+    { tramos: p.tramos.length, estandartes: p.estandartes.length },
+  );
+
+  /*
+   * NO SE ENTIERRA EN UN CERRO, que es el fallo que se vio en pantalla: NINGUN puente
+   * aparecia, y al medirlo la calzada recta quedaba bajo tierra en el 23% de las aristas,
+   * hasta ocho personas y media de hondo.
+   *
+   * Se mide la calzada de VERDAD —cada tramo, punto a punto y con su cuesta— y no la recta
+   * entre las puntas: medir la recta fue justo lo que dejo pasar el fallo la primera vez.
+   * Los tramos de PUNTA se excluyen a proposito y esta escrito por que: sus extremos estan
+   * clavados a la altura del camino para que el puente encaje a la entrada y a la salida, y
+   * donde el terreno sube a pico contra el vertice eso no es un puente sino una ladera.
+   */
+  const hundeElMedio = (suelo: (q: { x: number; y: number }) => number): number => {
+    const puente = puenteEntre(A, B, suelo);
+    let peor = 0;
+    puente.tramos.forEach((t, i) => {
+      if (i === 0 || i === puente.tramos.length - 1) return;
+      for (let k = 0; k <= 8; k++) {
+        const u = (k / 8 - 0.5) * t.largo * Math.cos(t.inclinacion);
+        const y = t.y + Math.tan(t.inclinacion) * u;
+        peor = Math.max(peor, suelo({ x: t.x + Math.cos(t.giro) * u, y: t.z }) - y);
+      }
+    });
+    return peor;
+  };
+  comprobar(
+    'con un cerro en medio, ningun tramo de en medio queda bajo tierra',
+    hundeElMedio(cerro) <= 0,
+    { hundido: Number(hundeElMedio(cerro).toFixed(3)) },
+  );
+  /* Y el cerro tiene que ser de verdad, o lo de arriba pasa por no haber nada que salvar. */
+  comprobar(
+    'y el cerro de la prueba levanta de verdad el terreno, o no se estaba probando nada',
+    cerro({ x: RADIO_DE_COMARCA / 2, y: 0 }) - cerro({ x: 0, y: 0 }) > ESCALON,
+    Number((cerro({ x: RADIO_DE_COMARCA / 2, y: 0 }) - cerro({ x: 0, y: 0 })).toFixed(2)),
+  );
+
+  /*
+   * LAS PUNTAS ENCAJAN CON EL CAMINO, que es lo que se pidio con «que encajen tanto en
+   * entrada como en salida».
+   *
+   * La cota de la punta se compara con la superficie del camino sobre el suelo de ESE
+   * vertice. Escrita a mano en los dos sitios coincidiria hoy y dejaria de coincidir el dia
+   * que alguien suba el camino un pelo, sin que nadie relacione una cosa con la otra.
+   */
+  const enCuesta = puenteEntre(A, B, cuesta);
+  comprobar(
+    'las dos puntas de la calzada caen a la altura de la superficie del camino',
+    Math.abs(enCuesta.cotas[0] - (cuesta(A) + SUPERFICIE_DEL_CAMINO)) < 1e-9 &&
+      Math.abs(enCuesta.cotas[1] - (cuesta(B) + SUPERFICIE_DEL_CAMINO)) < 1e-9,
+    enCuesta.cotas.map((c) => Number(c.toFixed(4))),
+  );
+
+  /*
+   * Y DOS PUENTES QUE COMPARTEN VERTICE SE ENCUENTRAN, sin hablarse.
+   *
+   * Es lo que hace que una cadena de puentes sea una cadena y no una fila de trozos con
+   * escalones. Sale gratis de que la cota de la punta dependa SOLO del suelo de su vertice:
+   * si dependiera del terreno de en medio, dos puentes que llegan al mismo sitio desde
+   * lados distintos llegarian a alturas distintas.
+   */
+  const C = { x: RADIO_DE_COMARCA * 2, y: RADIO_DE_COMARCA * 0.5 };
+  const otro = puenteEntre(B, C, cuesta);
+  comprobar(
+    'dos puentes que comparten un vertice llegan a el a la misma altura',
+    Math.abs(enCuesta.cotas[1] - otro.cotas[0]) < 1e-9,
+    { uno: enCuesta.cotas[1], otro: otro.cotas[0] },
+  );
+
+  /*
+   * LA OBRA SE LEVANTA POR ORDEN Y LLEGA AL FINAL.
+   *
+   * Que llegue al final no es obvio: con un redondeo mal puesto, un puente se queda para
+   * siempre a falta del ultimo tramo y nadie lo nota hasta que alguien mira de cerca.
+   */
+  const cuantos = p.tramos.length;
+  const crece = [0, 0.25, 0.5, 0.75, 1].map((a) => puenteEntre(A, B, llano, a).tramos.length);
+  comprobar(
+    'la obra empieza vacia, crece sin saltar hacia atras y acaba entera',
+    crece[0] === 0 &&
+      crece[crece.length - 1] === cuantos &&
+      crece.every((n, i) => i === 0 || n >= (crece[i - 1] as number)),
+    crece,
+  );
+  comprobar(
+    'y los tramos que ya estan puestos no se mueven al aparecer el siguiente',
+    (() => {
+      const mitad = puenteEntre(A, B, llano, 0.5);
+      return mitad.tramos.every((t, i) => {
+        const suyo = p.tramos[i];
+        return suyo !== undefined && Math.abs(t.x - suyo.x) < 1e-9 && Math.abs(t.y - suyo.y) < 1e-9;
+      });
+    })(),
+  );
+
+  /*
+   * Y LA MEDIDA DEL MODELO ES LA QUE HAY DENTRO DEL FICHERO.
+   *
+   * `CAJA_DEL_PUENTE` decide cuantos tramos caben en una arista. Si un dia entra otro
+   * modelo de puente con otro tamano, todo el reparto se hace con la medida del anterior y
+   * el puente sale con huecos o solapado — sin un error en ninguna consola. Esto lo ata al
+   * binario compilado, que es el unico sitio donde esa medida es un hecho.
+   */
+  comprobar(
+    'la caja del puente que usa el reparto es la que trae el .glb',
+    Math.abs(CAJA_DEL_PUENTE.largo - 1.924) < 0.002 &&
+      Math.abs(CAJA_DEL_PUENTE.ancho - 1.333) < 0.002 &&
+      Math.abs(CAJA_DEL_PUENTE.alto - 1.25) < 0.002,
+    CAJA_DEL_PUENTE,
+  );
+}
+
 // ---------------------------------------------------------------------------
 
 console.log('');
@@ -1258,7 +1495,7 @@ if (fallos.length > 0) {
  * a veintitrés: durante ese tiempo el guion podía morirse en la novena sin que nadie se
  * enterara. Un guardia desfasado no guarda nada.
  */
-const COMPROBACIONES_ESCRITAS = 62;
+const COMPROBACIONES_ESCRITAS = 74;
 if (hechas < COMPROBACIONES_ESCRITAS) {
   console.error(
     `Solo se han hecho ${hechas} de las ${COMPROBACIONES_ESCRITAS} comprobaciones que ` +

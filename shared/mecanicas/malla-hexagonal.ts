@@ -209,6 +209,29 @@ export function aristaDeHex(h: Hex, k: number): LlaveDeArista {
   return `a:${llaveDeConjunto([h, vecino(h, k + 1)])}`;
 }
 
+/**
+ * QUÉ CLASE DE SITIO NOMBRA ESTA LLAVE, mirándola.
+ *
+ * ═══ POR QUÉ SE DEDUCE Y NO VIAJA APARTE ═══
+ *
+ * Porque una llave YA dice lo que es: las de vértice empiezan por `v:` y las de arista
+ * por `a:`. Cuando la clase viaja al lado de la lista, existe el estado «clase que no
+ * cuadra con las llaves» — y ese estado no es teórico: ya pasó una vez, cuando al puente
+ * se le pasó la lista de vértices y salieron CERO anillos, sin un error en ninguna
+ * consola. La escena hizo lo correcto y quien mentía era quien montó el par.
+ *
+ * Deduciéndola, ese fallo deja de estar vigilado y pasa a ser inexpresable, que es mejor:
+ * un comprobador avisa cuando algo se rompe; una imposibilidad no deja que se rompa.
+ *
+ * Devuelve `null` para lo que no es ninguna de las dos, que es lo honrado: una llave de
+ * comarca —`q,r`— no lleva prefijo, y confundirla con un vértice sería peor que no saber.
+ */
+export function claseDeLlave(llave: string): 'vertice' | 'arista' | null {
+  if (llave.startsWith('v:')) return 'vertice';
+  if (llave.startsWith('a:')) return 'arista';
+  return null;
+}
+
 /** La arista entre dos hexágonos vecinos, dicha por los dos. */
 export function aristaEntre(a: Hex, b: Hex): LlaveDeArista {
   return `a:${llaveDeConjunto([a, b])}`;
