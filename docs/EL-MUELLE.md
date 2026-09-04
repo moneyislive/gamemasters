@@ -65,8 +65,14 @@ amanecer sobre el muelle sea el amanecer sobre el delta.
 6. **El color de asiento es la paleta de Riberas, por orden de llegada.** Seis
    colores (`tema.ts`), los mismos y en el mismo orden que el tablero SVG del
    juego, para que quien llegue al tablero se reconozca. El tablero 3D usa hoy
-   los cuatro del pack por orden; cuando se integren, la decisión del quinto y
-   el sexto se toma UNA vez y en un solo sitio. No se elige color: se deriva.
+   los cuatro colores del atlas por orden de asiento (`COLORES_EN_3D`, repartidos
+   en `deltaDeLaVista`), y la decisión del quinto y el sexto está tomada UNA vez
+   y en un solo sitio, `shared/arcade/juegos/riberas-en-tres.ts`: con cinco o
+   seis colonos `seVeEnTres` es falso y los dos clientes pintan el tablero SVG
+   de siempre, hasta que `tablero.glb` se hornee a color por vértice y se tiña
+   al cargar como el embarcadero. Nunca con un módulo: dos colonos del mismo
+   color es una partida injugable sin ningún error a la vista. No se elige
+   color: se deriva.
 7. **`escenas/embarcadero/` es agnóstico de plataforma.** Sólo `three`, React y
    el núcleo de r3f (`useFrame`, `useThree`). Ni `drei`, ni DOM, ni Expo, ni
    `fetch`: los bytes entran por una función `traer` que inyecta cada cliente. El
@@ -245,7 +251,13 @@ presencia, la figura elegida y «copiado». Todo lo demás, grises fríos.
    siempre → en la siguiente lectura llega `empezada: true` → coreografía de
    zarpar → la app navega al mueble del manifiesto (`router.replace`), el
    escritorio pinta el tablero en la misma pantalla. La pantalla de juego
-   recupera el asiento del bolsillo, como hoy.
+   recupera el asiento del bolsillo, como hoy. Para Riberas esa pantalla es el
+   PINTOR PROPIO en tres dimensiones (`app/src/arcade/riberas-en-tres*.tsx`,
+   `escritorio/src/riberas-en-tres.tsx`) sobre `<Delta>` de `escenas/delta.tsx`;
+   lo que sabe del juego lo lee de `shared/arcade/juegos/riberas-en-tres.ts`, y
+   cae al tablero SVG si el modelo no llega, si el `Canvas` revienta o si la mesa
+   no cabe en los colores (`seVeEnTres`). Quién tiene tablero en tres lo decide
+   la Sala por el arcade (`RIBERAS`), no por tener muelle.
 6. Volver con la mesa YA empezada (bolsillo) → no se monta el muelle: se va
    directo al juego.
 7. Recargar en medio → se vuelve al muelle con todos ya sentados, naciendo
@@ -260,9 +272,16 @@ presencia, la figura elegida y «copiado». Todo lo demás, grises fríos.
 | | `cargar.ts`, `tinte.ts`, `agua.ts`, `cielo.ts`, `aventurero.tsx`, `Embarcadero.tsx` | La escena |
 | `escenas/scripts/` | `hornear.ts`, `compilar-embarcadero.ts`, `verificar-embarcadero-modelos.ts`, `verificar-embarcadero.ts` | Compilación y comprobadores |
 | `escenas/modelos/` | `embarcadero.glb` | El compilado, versionado |
+| `escenas/` | `ruta-de-modelos.ts` | La ruta de los modelos, sin tablas detrás: la importan los dos clientes |
+| `shared/arcade/` | `semilla.ts` | LA semilla de una mesa (FNV-1a en mayúsculas): la cala del Muelle y el delta de Riberas la comparten para que un código dé un solo mundo en todos los aparatos |
+| `shared/arcade/juegos/` | `riberas-en-tres.ts` | La ÚNICA traducción de la vista de Riberas a la escena: barra, anillos con su movimiento, opciones fuera del tablero, trueques por carta, `seVeEnTres`. Se apoya en `riberas-en-3d.ts` (`deltaDeLaVista`, `obraPosible`) |
+| `server/scripts/` | `verificar-riberas-en-tres.ts` | Su comprobador, con una mesa real del árbitro (`verify:riberas-en-tres`, en la batería tras Riberas) |
 | `escritorio/` | `lobby3d.html`, `src/banco-lobby.tsx`, `src/banco-lobby.css` | El banco de pruebas con asientos simulados |
 | | `src/muelle.tsx`, `src/sala.tsx`, `src/mesa.ts`, `src/estilo.css` | El lobby en la Sala web |
+| | `src/riberas-en-tres.tsx` | La partida de Riberas en tres dimensiones en la Sala web (pintor propio; respaldo SVG) |
 | `app/` | `app/(arcade)/muelle.tsx`, `app/(arcade)/_layout.tsx`, `src/arcade/muelle.tsx`, `src/arcade/muelle-escena.tsx`, `src/arcade/figura.ts`, `src/arcade/mesa.ts`, `src/arcade/muebles.ts` | El lobby en la app |
+| | `src/arcade/traer.ts` | La única función que pide modelos en la app (espera la sesión guardada y pide al servidor elegido) |
+| | `src/arcade/riberas-en-tres.tsx`, `src/arcade/riberas-en-tres-escena.tsx`, `src/arcade/mirador-tactil.ts` | La partida de Riberas en tres dimensiones en la app: pintor propio en `LOS_QUE_PINTA[RIBERAS]`, con el gesto de girar como worklet |
 | `server/` | hecho: `mesas.ts`, `routes/arcade.ts`, `routes/modelos.ts`, `routes/cuenta.ts` | El contrato |
 
 ## 8. Cómo se mira y cómo se comprueba
