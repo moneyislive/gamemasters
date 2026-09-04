@@ -487,6 +487,117 @@ paso('Si la mesa ha empezado se sabe sin abrir la vista del juego');
   );
 }
 
+paso('La cámara de Riberas en tres dimensiones se puede mover con el dedo');
+{
+  /*
+   * ═══ EL FALLO QUE ESTO VIGILA NO SE VE EN NINGÚN COMPROBADOR DE TIPOS ═══
+   *
+   * Un `Gesture.Pan()` con `manualActivation(true)` tiene que llamar a
+   * `estado.activate()` / `estado.fail()` él mismo, y esas dos SÓLO hacen algo
+   * desde un worklet: en el hilo de JavaScript, `setGestureState` de Reanimated
+   * avisa por consola y no cambia nada, así que el gesto se queda en `BEGAN` para
+   * siempre. Con `.runOnJS(true)` en ese mismo gesto compila, no avisa en tipos, y
+   * la cámara no gira en iOS ni en Android. Pasó en `mirador-tactil.ts`: se
+   * copió el `runOnJS(true)` de `entrada.ts`, que sí puede llevarlo porque no
+   * activa nada a mano.
+   *
+   * Se mira cada CADENA de gesto por separado —de un `Gesture.` al siguiente— y no
+   * el fichero entero, porque en el mismo fichero conviven un arrastre worklet y
+   * una pinza en JS, y las dos están bien.
+   */
+  const carpeta = path.join(SRC, 'arcade');
+  const ficheros = fs.readdirSync(carpeta).filter((f) => /\.tsx?$/.test(f));
+  const conActivacionManualEnJs = [];
+  for (const f of ficheros) {
+    const texto = leer(path.join(carpeta, f));
+    const cadenas = texto.split(/(?=Gesture\.)/g).slice(1);
+    for (const cadena of cadenas) {
+      if (/manualActivation\(/.test(cadena) && /runOnJS\(\s*true\s*\)/.test(cadena)) {
+        conActivacionManualEnJs.push(f);
+      }
+    }
+  }
+  comprobar(
+    'ningún gesto de `app/src/arcade` con `manualActivation(` lleva `runOnJS(true)`',
+    conActivacionManualEnJs.length === 0,
+    conActivacionManualEnJs,
+  );
+
+  const tactil = leer(path.join(SRC, 'arcade', 'mirador-tactil.ts'));
+  comprobar(
+    '`mirador-tactil.ts` guarda lo que cruza de hilo en `useSharedValue`',
+    /useSharedValue/.test(tactil) && /from 'react-native-reanimated'/.test(tactil),
+    'una referencia de React no se ve desde el worklet: el gesto entraría y la cámara no se movería',
+  );
+  comprobar(
+    'y el arrastre con activación manual decide con `estado.activate()` y `estado.fail()`',
+    /manualActivation\(true\)/.test(tactil) && /estado\.activate\(\)/.test(tactil) && /estado\.fail\(\)/.test(tactil),
+  );
+  comprobar(
+    'y vuelve a JavaScript sólo para mover el mirador, con `runOnJS(mover)`',
+    /runOnJS\(mover\)\(/.test(tactil),
+  );
+}
+
+paso('La pantalla de Riberas en tres dimensiones no sabe reglas y no bombea');
+{
+  const escena = leer(path.join(SRC, 'arcade', 'riberas-en-tres-escena.tsx'));
+
+  /*
+   * `tableroEnTres` devuelve `null` también con cinco o seis colonos aunque haya
+   * islas (el atlas sólo trae cuatro colores). Una pantalla que decida «se está
+   * reuniendo la mesa» sólo con `datos === null` enseña a una mesa de cinco
+   * empezada decenas de botones y ningún tablero. Tiene que preguntar a
+   * `seVeEnTres` y caer al retablo.
+   */
+  comprobar(
+    'la escena importa `seVeEnTres` de la traducción compartida',
+    /import \{[^}]*\bseVeEnTres\b[^}]*\} from '\.\.\/\.\.\/\.\.\/shared\/arcade\/juegos\/riberas-en-tres'/.test(escena),
+  );
+  comprobar('y lo usa para decidir la rama, no sólo lo importa', /seVeEnTres\(laVista\)/.test(escena));
+  comprobar(
+    'y con más de cuatro lo dice en la nota del respaldo',
+    /Sois más de cuatro/.test(escena),
+  );
+
+  /*
+   * La corrección de retrato es UNA y vive en `escenas/camara.ts`: proyectar
+   * esquinas con `three` y ajustar a límites asimétricos daba un factor de 2,18 en
+   * apaisado y bombeaba al inclinar. Si vuelve, vuelve el bombeo.
+   */
+  /*
+   * Se buscan los IDENTIFICADORES —declaración, prop o argumento— y no la palabra
+   * suelta: «contorno» es también castellano corriente en los comentarios de la hoja.
+   */
+  comprobar(
+    'no queda ningún encuadre por proyección en la pantalla',
+    !/factorQueEncaja\(|const LIMITE\b|LIMITE\.|const contorno\b|contorno=\{|contorno:\s*readonly|\.project\(/.test(escena),
+    'la única corrección de retrato es `alejarseParaQueQuepa` dentro de `ojoDelMirador`',
+  );
+  comprobar(
+    'y `Ojo` pasa la proporción del lienzo a `ojoDelMirador`',
+    /ojoDelMirador\(\s*m,\s*alcance \* acercamiento\.current,\s*proporcion\s*\)/.test(escena),
+    'sin el tercer argumento la corrección de `camara.ts` queda muerta',
+  );
+
+  /* La semilla y la ruta de modelos son las compartidas, no copias. */
+  comprobar(
+    'la semilla del delta es la de `shared/arcade/semilla.ts`, sin copia local',
+    /from '\.\.\/\.\.\/\.\.\/shared\/arcade\/semilla'/.test(escena) && !/0x811c_9dc5/.test(escena),
+  );
+  comprobar(
+    'y la ruta del tablero sale de `escenas/ruta-de-modelos.ts`, no de las figuras del embarcadero',
+    /from '\.\.\/\.\.\/\.\.\/escenas\/ruta-de-modelos'/.test(escena) && !/from '[^']*embarcadero\/figuras'/.test(escena),
+  );
+
+  /* Las islas se firman por contenido para que la escena no reconstruya el mundo en cada sondeo. */
+  comprobar(
+    'las islas se reutilizan por firma de contenido entre revisiones',
+    /islasVistas/.test(escena) && /antes\.firma === firma \? antes\.islas : crudo\.islas/.test(escena),
+    'sin la firma, cada sondeo recalcula relieve, red y plan y los resube a la GPU',
+  );
+}
+
 // ---------------------------------------------------------------------------
 
 if (fallos.length > 0) {

@@ -28,14 +28,16 @@
  * este fichero sólo le pasa props y recibe avisos. Lo que es de HUD vive en
  * `hoja-del-muelle.tsx`.
  *
- * ═══ EL `Canvas` SALE DE `../tres/Lienzo`, Y `traer` ES UN `fetch` DE AQUÍ ═══
+ * ═══ EL `Canvas` SALE DE `../tres/Lienzo`, Y `traer` ES UN `fetch` DE LA APP ═══
  *
  * La regla del §7 de siempre: el contexto de dibujo lo crea `Lienzo`, que tiene
- * su gemelo `.native.tsx`. Y los bytes de los `.glb` los pide ESTE fichero —la
- * escena no puede hacer `fetch`, es agnóstica de plataforma— contra
- * `servidorActual()`, esperando antes a `cargarSesionGuardada()` por la misma
- * carrera que cuenta `mesa.ts`: sin esperar, el primer modelo se pediría al
- * servidor compilado por defecto y no al elegido en los ajustes.
+ * su gemelo `.native.tsx`. Y los bytes de los `.glb` los pide LA APP —la escena
+ * no puede hacer `fetch`, es agnóstica de plataforma— con `traer` de `./traer.ts`,
+ * que espera a `cargarSesionGuardada()` antes de preguntar a `servidorActual()`.
+ * Vivía aquí a nivel de módulo; se fue a su fichero el día que el tablero de
+ * Riberas en tres dimensiones pasó a pedir modelos por la misma ruta, porque dos
+ * copias de esa función son dos cachés de cargadores que no se conocen. El porqué
+ * entero está en su cabecera.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -46,7 +48,7 @@ import type { ManifiestoDeArcade } from '../../../shared/arcade';
 /* Instala los arcades del binario, por si se llega aquí por enlace directo. Ver `pintar.tsx`. */
 import '../../../shared/arcade/juegos';
 import { Embarcadero } from '../../../escenas/embarcadero/Embarcadero';
-import type { Calidad, MesaEnElMuelle, Traer, Ventana } from '../../../escenas/embarcadero/tipos';
+import type { Calidad, MesaEnElMuelle, Ventana } from '../../../escenas/embarcadero/tipos';
 /*
  * Sólo la constante del mapeo tonal: el `Canvas` sigue entrando por `tres/Lienzo`,
  * que es lo que la regla del §7 protege. Ver `escena-peonza.tsx`, que hace lo mismo
@@ -57,7 +59,6 @@ import { esFigura } from '../../../escenas/embarcadero/figuras';
 import type { FiguraId } from '../../../escenas/embarcadero/figuras';
 import { temaDelMuelle } from '../../../escenas/embarcadero/tema';
 import type { TemaDelMuelle } from '../../../escenas/embarcadero/tema';
-import { cargarSesionGuardada, servidorActual } from '../api';
 import { Canvas } from '../tres/Lienzo';
 import { haEmpezado } from './empezada';
 import { figuraConCuenta, figuraDeEstreno, guardarFigura } from './figura';
@@ -66,29 +67,15 @@ import { usarMesaDeArcade } from './mesa';
 import { LETRA, rutaDelMueble, SALA } from './muebles';
 /* La misma cara que pone la Sala cuando algo no se puede jugar. Una, no dos. */
 import { NoHayNada } from './pintar';
+/*
+ * LA FUNCIÓN QUE PIDE LOS MODELOS ES UNA PARA TODA LA APP, y por eso no está aquí:
+ * `cargadorPara` cachea un cargador por función, y dos pantallas con dos copias
+ * serían dos cachés. Ver la cabecera de `traer.ts`.
+ */
+import { traer } from './traer';
 
 /** Cuánto se espera a la coreografía de zarpar antes de irse igual, en ms. */
 const TOPE_DE_ZARPAR_MS = 3500;
-
-/**
- * CÓMO SE PIDEN LOS BYTES DE UN MODELO, y por qué está FUERA del componente.
- *
- * `cargadorPara` de la escena cachea un cargador por función `traer`: si la
- * función fuera una por instancia de pantalla, cada visita al Muelle desde la
- * portada estrenaría un cargador y volvería a bajar el embarcadero (1,7 MB), las
- * animaciones y las figuras — y en nativo `fetch` no tiene caché de disco de
- * serie. Una sola función para toda la app es una sola caché para toda la app.
- *
- * No depende de nada de la pantalla: la dirección del servidor y la lectura de
- * la sesión guardada son globales de `api.ts`, y se espera a la segunda por lo
- * mismo que en `mesa.ts`: antes de leerla, `servidorActual()` es media respuesta.
- */
-const traer: Traer = async (ruta) => {
-  await cargarSesionGuardada();
-  const r = await fetch(`${servidorActual()}${ruta}`);
-  if (!r.ok) throw new Error(`el servidor contestó ${String(r.status)} al pedir ${ruta}`);
-  return r.arrayBuffer();
-};
 
 /** Lo que tarda el telón en fundirse cuando el mundo ya está, en ms. */
 const FUNDIDO_MS = 600;

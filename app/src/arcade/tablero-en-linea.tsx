@@ -1470,3 +1470,24 @@ const estilos = StyleSheet.create({
   opcionRotuloQuieto: { color: BOTON.quieto.tinta },
   opcionAyuda: { ...LETRA.cuerpo, color: SALA.tenue, fontSize: 13, lineHeight: 18 },
 });
+
+/*
+ * ═══ LO QUE EL PINTOR PROPIO DE RIBERAS REUTILIZA DE AQUÍ, Y POR QUÉ SE EXPORTA ═══
+ *
+ * `riberas-en-tres-escena.tsx` pinta la misma mesa que esta pantalla —barra, línea
+ * del turno, aviso, opciones sueltas y crónica— y en vez del `Retablo` pone un
+ * lienzo de tres dimensiones. Todo lo que no es el lienzo es ESTA pantalla, y
+ * copiarlo allí sería estrenar la segunda copia de la barra de la mesa: la primera
+ * ya se separó sola una vez, y está contado en la cabecera de `BarraDeLaMesa`.
+ *
+ * Los estilos van con las piezas por lo mismo: el vestíbulo de abrir o entrar que
+ * aquel fichero pinta cuando no hay mesa usa estos campos, estos chips y este
+ * botón, y un vestíbulo con OTRO contorno de campo a un toque de distancia se lee
+ * como un descuido antes que como otra pantalla. Se exporta la tabla entera y no
+ * seis entradas sueltas para que la siguiente que haga falta no obligue a volver
+ * aquí.
+ *
+ * Nada de lo de arriba cambia: esta pantalla sigue siendo el mueble genérico, y
+ * sigue sin saber a qué se juega.
+ */
+export { BarraDeLaMesa, LineaDelTurno, LasOpciones, LaCronica, ElAviso, estilos as ESTILOS_DE_LA_MESA };

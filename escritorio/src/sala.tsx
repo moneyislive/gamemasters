@@ -29,9 +29,15 @@ import { temaDelMuelle, tieneMuelle } from '../../escenas/embarcadero/tema';
 import type { ArcadeDelCatalogo } from './muebles';
 import { opcionesSueltas, queSePinta } from './plan';
 import type { Opcion } from '../../shared/arcade';
+/*
+ * De `riberas.ts` y no del índice de `juegos/`: el índice INSTALA todos los arcades
+ * al cargarse, y eso es cosa del servidor. Aquí sólo hace falta el nombre.
+ */
+import { RIBERAS } from '../../shared/arcade/juegos/riberas';
 import type { MovimientoDeclarado } from '../../shared/mecanicas/tablero-declarado';
 import { cuantoQueda } from './relojes';
 import { AccionesDelTablero, Paneles, Retablo } from './retablo';
+import { RiberasEnTres } from './riberas-en-tres';
 
 /** La acera de este cliente dentro del servicio. Ver `vite.config.ts`. */
 export const BASE = '/sala';
@@ -406,7 +412,30 @@ function LaMesaPuesta({
           <h1 className="titulo">{manifiesto.nombre}</h1>
           {mesa.aviso.length > 0 ? <p className="aviso">{mesa.aviso}</p> : null}
 
-          {pintado.que === 'tablero' ? (
+          {pintado.que === 'tablero' && manifiesto.id === RIBERAS ? (
+            /*
+             * ═══ EL PINTOR PROPIO, PARA QUIEN LO TIENE ═══
+             *
+             * Quién tiene tablero en tres dimensiones lo dice EL ARCADE, no la
+             * tabla de temas del muelle. La primera versión preguntaba a
+             * `tieneMuelle`, y eso ataba el lobby al pintor: el día que otro
+             * arcade estrenase muelle sin tener delta, la Sala le habría montado
+             * el pintor de Riberas encima de un tablero que no es el suyo. Se
+             * decide por lo que HAY —`queSePinta` ya dijo tablero— y por QUIÉN
+             * es, con el identificador que publica `shared/`. Trae su propio
+             * formulario de lo que el tablero no enseña; `Paneles` sigue en el
+             * raíl porque la vista sigue trayendo el tablero declarado. Y si el
+             * mundo no arranca, o la mesa no cabe en sus colores, él mismo decide
+             * caer al retablo de siempre. Los demás arcades no cambian ni un píxel.
+             */
+            <RiberasEnTres
+              manifiesto={manifiesto}
+              mesa={mesa}
+              puesta={puesta}
+              tablero={pintado.tablero}
+              opciones={pintado.opciones}
+            />
+          ) : pintado.que === 'tablero' ? (
             <>
               <Retablo tablero={pintado.tablero} alTocar={mesa.mover} quieto={mesa.quieto} />
               <AccionesDelTablero
