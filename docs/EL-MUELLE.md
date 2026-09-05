@@ -54,9 +54,15 @@ amanecer sobre el muelle sea el amanecer sobre el delta.
    mueble propio) y los binarios ya publicados. Quién tiene muelle lo dice
    `escenas/embarcadero/tema.ts`, no el manifiesto (sellado).
 5. **El lobby tiene su propio `.glb` con el color horneado.** `tablero.glb`
-   lleva la textura empotrada y pinta biomas y colores moviendo las UV; en el
-   móvil Hermes no decodifica ese PNG (ver `app/src/tres/texturas-nativas.ts`) y
-   saldría gris. `embarcadero.glb` se compila desde el mismo pack con `COLOR_0`
+   lleva la textura empotrada y pinta biomas y colores MOVIENDO las UV; Hermes
+   no decodifica ese PNG, y por eso el móvil lo recibe COMPILADO A BYTES y no
+   horneado: un color fijado en el vértice dejaría sin efecto ese desplazamiento
+   de UV, que es todo el tintado del tablero. La tabla es
+   `escenas/atlas-del-tablero.ts` (generada por
+   `escenas/scripts/compilar-atlas-del-tablero.ts`) y la monta como `DataTexture`
+   el complemento `texturasDelTablero` de `app/src/tres/texturas-nativas.ts`. El
+   embarcadero no tiñe moviendo UV, así que sí se hornea:
+   `embarcadero.glb` se compila desde el mismo pack con `COLOR_0`
    por vértice, como los aventureros, y las piezas de color de jugador entran
    UNA vez con una máscara `_TINTE` que la escena pinta del color del asiento.
    El barco y el estandarte del pack son fichas pintadas enteras, así que su
@@ -74,16 +80,26 @@ amanecer sobre el muelle sea el amanecer sobre el delta.
    color es una partida injugable sin ningún error a la vista. No se elige
    color: se deriva.
 
-   Y HAY UNA SEGUNDA CONSECUENCIA DEL MISMO MODELO SIN HORNEAR, más grande: en
-   la APP NATIVA el delta no se pinta NUNCA, ni con dos colonos. `tablero.glb`
-   lleva la textura empotrada, Hermes no la decodifica, y `texturas-nativas.ts`
-   la sustituye por blanco para que la carga no reviente entera: el tablero
-   llegaría sin un solo color, y uno donde no se distingue una salina de un
-   cantil no es una versión más pobre, es uno que no se puede jugar. Así que en
-   iOS y Android se juega sobre el retablo —y ni se pide el modelo—, con la
-   constante `EL_DELTA_SE_VE_AQUI` de `riberas-en-tres-escena.tsx` como único
-   interruptor. En la web se cumple lo del párrafo de arriba tal cual. El día del
-   horneado se borra esa constante y las dos notas sobran a la vez.
+   HUBO UNA SEGUNDA CONSECUENCIA DEL MISMO MODELO, más grande, y ya no la hay.
+   Hasta el 5 de septiembre de 2026 en la APP NATIVA el delta no se pintaba
+   NUNCA, ni con dos colonos: `tablero.glb` lleva la textura empotrada, Hermes
+   no la decodifica, y `texturas-nativas.ts` la sustituía por blanco para que la
+   carga no reventara entera; el tablero llegaba sin un solo color, y uno donde
+   no se distingue una salina de un cantil no es una versión más pobre, es uno
+   que no se puede jugar. Así que en iOS y Android se jugaba sobre el retablo
+   —y ni se pedía el modelo—, con la constante `EL_DELTA_SE_VE_AQUI` de
+   `riberas-en-tres-escena.tsx` como único interruptor. El día llegó SIN
+   hornear: el atlas se compiló offline a una tabla de bytes (decisión 5; ocho
+   colores por fila porque las treinta y dos celdas del pack son planas en
+   horizontal, medido píxel a píxel, y el móvil la ensancha al cargar a los
+   mismos 1.024 × 1.024 téxeles que decodifica el navegador), el complemento
+   `texturasDelTablero` la monta como `DataTexture` con el `flipY`, el espacio
+   sRGB y los filtros que `GLTFLoader` habría puesto, y la constante y su nota se
+   borraron. `verify:atlas-del-tablero` compara la tabla con el PNG píxel a
+   píxel y llama al complemento en Node; `verify:sala` vigila que ninguna
+   decisión por `Platform.OS` vuelva a mandar al retablo. Lo del párrafo de
+   arriba —cuatro colores, y el quinto y el sexto sobre el SVG— sigue tal cual en
+   los dos clientes.
 7. **`escenas/embarcadero/` es agnóstico de plataforma.** Sólo `three`, React y
    el núcleo de r3f (`useFrame`, `useThree`). Ni `drei`, ni DOM, ni Expo, ni
    `fetch`: los bytes entran por una función `traer` que inyecta cada cliente. El

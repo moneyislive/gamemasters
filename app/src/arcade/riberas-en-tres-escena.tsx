@@ -36,9 +36,10 @@
  * IZQUIERDA, sólo mientras haga falta). Sin la tercera, las otras dos son una trampa:
  * quien se pierde en una esquina no tiene salida.
  *
- * Y el ratón no es un extra: mientras `EL_DELTA_SE_VE_AQUI` sea sólo la web, el ratón
- * es la ÚNICA mano que llega a este tablero. Quién escucha la rueda y por qué está en
- * `mirador-tactil.ts`; aquí lo único que se hace es darle el nodo del lienzo.
+ * Y el ratón no es un extra: en la web es la ÚNICA mano que llega a este tablero, y
+ * mientras el delta se montó sólo en la web fue la única en todas partes. Quién escucha
+ * la rueda y por qué está en `mirador-tactil.ts`; aquí lo único que se hace es darle el
+ * nodo del lienzo.
  *
  * Las cuentas no están aquí. La `Cercania` la lleva `mirador-tactil.ts` en una
  * referencia y la aritmética entera es de `escenas/acercar.ts`, medida en Node por
@@ -87,15 +88,22 @@
  * el mazo es parte del juego (§1.3 de `docs/LAS-CARTAS-DE-RIBERAS.md`) y quien va
  * ganando en secreto es lo que hace que las últimas rondas se jueguen distinto (§6).
  *
- * ═══ Y EL MÓVIL NATIVO VERÁ EL TABLERO GRIS HASTA QUE SE HORNEE ═══
+ * ═══ Y EL MÓVIL NATIVO VE EL MISMO DELTA QUE LA WEB, DESDE QUE EL ATLAS SE COMPILÓ ═══
  *
- * `tablero.glb` lleva hoy la textura EMPOTRADA, y Hermes no decodifica ese PNG. En
- * el navegador se ve bien; en iOS y Android el complemento `texturasLisas` pone
- * una textura blanca de un píxel para que la carga no reviente entera —que es lo
- * que pasaba con los avatares, y costó días— y las piezas salen con su forma y sin
- * su pintura. No es lo prometido y se dice: la solución es hornear el color a
- * vértice como ya hace `embarcadero.glb` (quinta decisión de `docs/EL-MUELLE.md`),
- * y eso es trabajo de quien compila el modelo, no de esta pantalla.
+ * `tablero.glb` lleva la textura EMPOTRADA, y Hermes no decodifica ese PNG. Durante
+ * meses en iOS y Android el complemento `texturasLisas` ponía una textura blanca de un
+ * píxel para que la carga no reventara entera —que es lo que pasaba con los avatares,
+ * y costó días—, la geometría llegaba sin un solo color y esta pantalla mandaba al
+ * móvil al retablo con una constante (`EL_DELTA_SE_VE_AQUI`, hoy borrada). No se
+ * arregló horneando el color a vértice como `embarcadero.glb`: el tablero pinta biomas
+ * y colores de jugador MOVIENDO las UV, y un color fijado en el vértice habría dejado
+ * ese tintado sin efecto. Se compiló el atlas a una tabla de bytes
+ * (`escenas/atlas-del-tablero.ts`, generado) y el complemento `texturasDelTablero` de
+ * `tres/texturas-nativas.ts` lo monta como `DataTexture` con los mismos téxeles que
+ * decodifica el navegador. Aquí no queda ninguna decisión por plataforma que mande al
+ * retablo: los respaldos que quedan son por fallo de carga, por más de cuatro colonos
+ * y por vista sin islas, y son los mismos en los dos clientes. La única diferencia que
+ * sigue es la de las sombras, y está en su línea.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -186,7 +194,10 @@ import type { CatalogoDeModelos } from '../../../escenas/modelos';
 import { rutaDelTablero } from '../../../escenas/ruta-de-modelos';
 import type { Sitio } from '../../../escenas/sitios';
 import { Canvas } from '../tres/Lienzo';
-import { decodificaImagenes, texturasLisas } from '../tres/texturas-nativas';
+import { decodificaImagenes, texturasDelTablero } from '../tres/texturas-nativas';
+import { apuntarFallo } from '../parte-de-fallos';
+import { Component } from 'react';
+import type { ErrorInfo, ReactNode } from 'react';
 import { conAlfa } from '../tema';
 import { usarMesaDeArcade } from './mesa';
 import type { MesaVista, OpcionDeMesa } from './mesa';
@@ -228,34 +239,6 @@ const ALTO_MINIMO_DEL_LIENZO = 360;
 const NOTA_DE_MAS_DE_CUATRO =
   'Sois más de cuatro: el delta en tres dimensiones sólo sabe pintar cuatro colores todavía. Se juega sobre el tablero de siempre.';
 
-/**
- * DÓNDE SE ENSEÑA EL DELTA HOY: EN LA WEB SÍ, EN EL MÓVIL NATIVO TODAVÍA NO.
- *
- * ═══ Y NO ES UNA PREFERENCIA, ES QUE SALDRÍA GRIS ═══
- *
- * `tablero.glb` lleva la textura EMPOTRADA, y todo su aspecto —el color de cada
- * bioma, el color de cada jugador— vive en las UV de ese atlas. Hermes no
- * decodifica un PNG empotrado, así que en iOS y en Android `texturas-nativas.ts`
- * lo sustituye por blanco para que la carga no reviente entera: la geometría
- * llega, y llega SIN UN SOLO COLOR. Un delta gris no es una versión más pobre
- * del tablero; es un tablero en el que no se distingue una salina de un cantil,
- * o sea uno que no se puede jugar.
- *
- * Así que hasta que el modelo se hornee a color por vértice —como ya está
- * `embarcadero.glb`, ver `docs/EL-MUELLE.md` §1.5— el móvil juega sobre el
- * retablo de siempre, que es completo y legible. Y no se pide el modelo siquiera:
- * son dos megas de datos de nadie por una escena que no se va a montar.
- *
- * EL DÍA DEL HORNEADO SE BORRA ESTA CONSTANTE Y NADA MÁS. No hay ninguna otra
- * diferencia entre las dos plataformas en este fichero: la escena, los gestos y
- * la traducción son los mismos.
- */
-const EL_DELTA_SE_VE_AQUI = Platform.OS === 'web';
-
-/** Lo que se dice en el móvil, sin prometer una fecha y sin llamarlo error. */
-const NOTA_DEL_MOVIL =
-  'El delta en tres dimensiones todavía se ve sólo en la web. Aquí se juega sobre el tablero de siempre, que es la misma partida.';
-
 // ---------------------------------------------------------------------------
 // El catálogo de modelos: una vez por app
 // ---------------------------------------------------------------------------
@@ -285,9 +268,13 @@ function catalogoDelTablero(): Promise<CatalogoDeModelos> {
        * SIN NAVEGADOR, LAS TEXTURAS EMPOTRADAS NO SE PUEDEN DECODIFICAR, y su fallo
        * se lleva por delante la carga ENTERA: ni la geometría se vería. El
        * complemento sólo se registra donde hace falta; en un navegador sustituiría
-       * las texturas de verdad por nada. Ver `tres/texturas-nativas.ts`.
+       * el atlas de verdad por su copia compilada, que es lo mismo pero por nada.
+       *
+       * Y ES EL DEL TABLERO, no el de los avatares: `texturasLisas` contesta con una
+       * textura blanca, que en este modelo es un delta sin un solo color. El del
+       * tablero contesta con el atlas compilado a bytes. Ver `tres/texturas-nativas.ts`.
        */
-      if (!decodificaImagenes()) cargador.register(texturasLisas);
+      if (!decodificaImagenes()) cargador.register(texturasDelTablero);
       const gltf = await new Promise<GLTF>((resolver, rechazar) => {
         cargador.parse(bytes, '', resolver, rechazar);
       });
@@ -307,14 +294,14 @@ type EstadoDelCatalogo =
   | { readonly que: 'fallo'; readonly porque: string };
 
 /**
- * El catálogo, y sólo SI HACE FALTA: con el delta apagado (móvil) no se piden dos
- * megas para una escena que no se monta. El gancho se llama siempre —las reglas de
- * los ganchos—; lo que se condiciona es la petición.
+ * El catálogo como estado de la pantalla. Se pide en cuanto se monta, en las dos
+ * plataformas: mientras el móvil jugaba sobre el retablo llevaba un parámetro para no
+ * pedir cuatro megas por una escena que no se montaba, y con el atlas compilado esa
+ * distinción se fue con la constante que la sostenía.
  */
-function usarCatalogoDelTablero(hazFalta: boolean): EstadoDelCatalogo {
+function usarCatalogoDelTablero(): EstadoDelCatalogo {
   const [estado, ponerEstado] = useState<EstadoDelCatalogo>({ que: 'llegando' });
   useEffect(() => {
-    if (!hazFalta) return undefined;
     let vivo = true;
     catalogoDelTablero().then(
       (modelos) => {
@@ -327,7 +314,7 @@ function usarCatalogoDelTablero(hazFalta: boolean): EstadoDelCatalogo {
     return () => {
       vivo = false;
     };
-  }, [hazFalta]);
+  }, []);
   return estado;
 }
 
@@ -517,6 +504,43 @@ type LaMesa = ReturnType<typeof usarMesaDeArcade>;
  * hooks —el catálogo, el gesto, lo cogido— no queden detrás de los `return` de
  * arriba, que es la regla que `verify:app` lee con el árbol de TypeScript.
  */
+/**
+ * LA RED BAJO EL LIENZO: si el delta revienta al PINTAR, se juega sobre el retablo.
+ *
+ * Los tres respaldos de la pantalla —modelo que no llega, más de cuatro colonos, vista
+ * sin islas— se deciden ANTES de montar el `Canvas`. Lo que ninguno recoge es un fallo
+ * dentro del propio lienzo: una textura que expo-gl no quiere, un sombreador que no
+ * compila en esa GPU, un modelo que se queda sin memoria. La primera vez que el tablero
+ * 3D se monta en un teléfono real es la víspera de una partida, y ahí un `throw` en el
+ * render no puede costar la partida: se apunta —el parte de fallos lo enseñará al
+ * volver a abrir, con su motivo— y la mesa sigue sobre el tablero de siempre.
+ *
+ * Es una clase porque React no da otra forma de recoger un `throw` de render, y avisa
+ * hacia arriba en vez de pintar ella el respaldo porque el respaldo necesita la vista, las
+ * opciones y la crónica, que viven en la pantalla.
+ */
+class RedDelLienzo extends Component<
+  { readonly alCaer: (motivo: string) => void; readonly children: ReactNode },
+  { readonly cayo: boolean }
+> {
+  override state: { readonly cayo: boolean } = { cayo: false };
+
+  static getDerivedStateFromError(): { cayo: boolean } {
+    return { cayo: true };
+  }
+
+  override componentDidCatch(error: unknown, info: ErrorInfo): void {
+    const e = error instanceof Error ? error : new Error(String(error));
+    e.stack = `${e.stack ?? ''}\n— en el lienzo —${info.componentStack ?? ''}`;
+    apuntarFallo(e, 'render', false);
+    this.props.alCaer(e.message);
+  }
+
+  override render(): ReactNode {
+    return this.state.cayo ? null : this.props.children;
+  }
+}
+
 function LaMesaEnTres({
   mesa,
   vista,
@@ -532,7 +556,9 @@ function LaMesaEnTres({
   arriba: number;
   abajo: number;
 }): JSX.Element {
-  const catalogo = usarCatalogoDelTablero(EL_DELTA_SE_VE_AQUI);
+  const catalogo = usarCatalogoDelTablero();
+  /* Si el lienzo cayó una vez en este aparato, esta pantalla no vuelve a montarlo. */
+  const [elLienzoCayo, ponerElLienzoCayo] = useState<string | null>(null);
   const { height: altoDeLaPantalla } = useWindowDimensions();
   const altoDelLienzo = Math.max(ALTO_MINIMO_DEL_LIENZO, Math.round(altoDeLaPantalla * PARTE_DEL_ALTO));
 
@@ -925,8 +951,10 @@ function LaMesaEnTres({
         <ElAviso texto={mesa.aviso} />
         {/*
           EL MARCADOR TAMBIÉN AQUÍ, y no es una copia por comodidad: ésta es la rama
-          que hoy ve TODO EL MÓVIL (`EL_DELTA_SE_VE_AQUI`), o sea que un marcador que
-          sólo saliera con el delta no lo vería nadie que juegue desde el teléfono.
+          que ve una mesa de cinco o seis durante la partida entera, y la que ve
+          cualquiera al que el modelo no le llegue; un marcador que sólo saliera con el
+          delta los dejaría a todos sin saber quién va ganando. (Y durante meses fue
+          la rama que veía TODO el móvil, hasta que el atlas se compiló para él.)
         */}
         <ElMarcador marcador={marcador} />
         {/*
@@ -954,15 +982,19 @@ function LaMesaEnTres({
 
   /* ─── Sin delta que pintar: o la mesa se reúne, o sois más de cuatro ─── */
 
-  if (!EL_DELTA_SE_VE_AQUI || datos === null || encuadre === null) {
+  if (datos === null || encuadre === null) {
     /*
-     * AQUÍ NO SE PINTA EL DELTA POR TRES MOTIVOS QUE NO SE PARECEN EN NADA, y los
-     * tres acaban en el mismo sitio con distinta frase:
+     * AQUÍ NO SE PINTA EL DELTA POR DOS MOTIVOS QUE NO SE PARECEN EN NADA, y los
+     * dos acaban en el mismo sitio con distinta frase:
      *
-     *   · estamos en el móvil, donde el modelo saldría gris (`EL_DELTA_SE_VE_AQUI`);
      *   · las islas no están repartidas todavía y la mesa se está reuniendo;
      *   · hay cinco o seis colonos y el atlas sólo trae cuatro colores de jugador,
      *     así que `tableroEnTres` devuelve `null` AUNQUE HAYA ISLAS.
+     *
+     * Hubo un tercero —estar en el móvil, donde el modelo salía gris— y se fue el día
+     * que el atlas se compiló para él (ver la cabecera). NINGUNA DECISIÓN DE ESTA RAMA
+     * MIRA LA PLATAFORMA, y `verify:sala` lo vigila: las dos plataformas juegan sobre
+     * lo mismo por los mismos motivos.
      *
      * Decidir sólo con `datos === null` enseñaba a una mesa de cinco ya empezada
      * decenas de botones «Fundar aquí» y ningún tablero. Con islas se juega SIEMPRE
@@ -971,11 +1003,9 @@ function LaMesaEnTres({
     const hayIslas = esVistaQueSePinta(laVista) && laVista.islas.length > 0;
     if (hayIslas) {
       return respaldoSobreElRetablo(
-        !EL_DELTA_SE_VE_AQUI
-          ? NOTA_DEL_MOVIL
-          : seVeEnTres(laVista)
-            ? 'El delta en tres dimensiones no ha podido leer esta mesa. Se juega sobre el tablero de siempre.'
-            : NOTA_DE_MAS_DE_CUATRO,
+        seVeEnTres(laVista)
+          ? 'El delta en tres dimensiones no ha podido leer esta mesa. Se juega sobre el tablero de siempre.'
+          : NOTA_DE_MAS_DE_CUATRO,
       );
     }
     /*
@@ -1009,6 +1039,11 @@ function LaMesaEnTres({
     );
   }
 
+  if (elLienzoCayo !== null) {
+    return respaldoSobreElRetablo(
+      `El delta en tres dimensiones ha fallado en este aparato (${elLienzoCayo}). Se juega sobre el tablero de siempre.`,
+    );
+  }
   if (catalogo.que === 'fallo') {
     return respaldoSobreElRetablo(
       `El delta en tres dimensiones no ha llegado (${catalogo.porque}). Se juega sobre el tablero de siempre.`,
@@ -1042,6 +1077,7 @@ function LaMesaEnTres({
 
       <View style={[estilos.cajaDelLienzo, { height: altoDelLienzo }]}>
         {catalogo.que === 'listo' ? (
+          <RedDelLienzo alCaer={ponerElLienzoCayo}>
           <GestureDetector gesture={gesto}>
             {/*
               LA ETIQUETA VA EN LA VISTA QUE SÓLO ENVUELVE EL `Canvas`, y no en la
@@ -1111,6 +1147,7 @@ function LaMesaEnTres({
               </Canvas>
             </View>
           </GestureDetector>
+          </RedDelLienzo>
         ) : null}
 
         {/*

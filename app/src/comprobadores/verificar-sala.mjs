@@ -610,25 +610,68 @@ paso('La pantalla de Riberas en tres dimensiones no sabe reglas y no bombea');
   );
 
   /*
-   * EL DELTA NO SE MONTA DONDE SALDRÍA GRIS, y el modelo no se pide siquiera.
+   * EL DELTA SE MONTA EN LAS DOS PLATAFORMAS, Y NINGUNA DECISIÓN POR `Platform.OS`
+   * MANDA AL RETABLO.
    *
-   * `tablero.glb` lleva la textura empotrada y Hermes no la decodifica: en nativo
-   * `texturas-nativas.ts` la sustituye por blanco para que la carga no reviente, y
-   * el tablero llega sin un solo color. Un delta gris no es una versión más pobre;
-   * es un tablero donde no se distingue una salina de un cantil. Estas dos
-   * comprobaciones son las que hay que ver caer el día que el modelo se hornee a
-   * color por vértice y se borre la constante.
+   * Durante meses aquí había dos comprobaciones del revés: que existiera
+   * `EL_DELTA_SE_VE_AQUI = Platform.OS === 'web'` y que el móvil no pidiera el modelo,
+   * porque Hermes no decodifica el PNG empotrado de `tablero.glb` y el delta llegaba
+   * sin un solo color. El 5-9-2026 el atlas se compiló a bytes
+   * (`escenas/atlas-del-tablero.ts`) y el complemento `texturasDelTablero` lo monta
+   * como `DataTexture`: la constante se borró y aquellas dos cayeron, como estaba
+   * escrito que caerían. Las de ahora vigilan que no vuelva por la puerta de atrás:
+   * un `Platform.OS` que decidiera si se pinta el delta dejaría al teléfono en dos
+   * dimensiones sin que nada se pusiera rojo, y un `register(texturasLisas)` lo
+   * dejaría gris.
    */
+  const codigoDeLaPantalla = escena.split('\n').filter((l) => !/^\s*(\*|\/\/|\/\*)/.test(l));
+  const lineasConPlataforma = codigoDeLaPantalla.filter((l) => /Platform\.OS/.test(l));
   comprobar(
-    'el delta sólo se monta donde se ve con color (`EL_DELTA_SE_VE_AQUI`)',
-    /const EL_DELTA_SE_VE_AQUI = Platform\.OS === 'web'/.test(escena) &&
-      /if \(!EL_DELTA_SE_VE_AQUI \|\| datos === null/.test(escena),
-    'sin esto, en el móvil se pinta un tablero sin colores en vez del retablo',
+    'en el código de la escena `Platform.OS` sólo decide las sombras, nunca si se pinta el delta',
+    lineasConPlataforma.length > 0 &&
+      lineasConPlataforma.every((l) => /shadows=/.test(l)) &&
+      !/EL_DELTA_SE_VE_AQUI|NOTA_DEL_MOVIL/.test(codigoDeLaPantalla.join('\n')),
+    lineasConPlataforma.map((l) => l.trim()),
+  );
+
+  /*
+   * LA RED BAJO EL LIENZO. Los tres respaldos de la pantalla se deciden ANTES de montar
+   * el Canvas; un throw DENTRO del lienzo —una textura que expo-gl no quiere, un
+   * sombreador que no compila en esa GPU— no lo recoge ninguno, y en producción cierra
+   * la app. La primera vez que el delta 3D se monta en un teléfono real es la víspera de
+   * una partida: si el lienzo cae, se apunta el motivo (el parte de fallos lo enseña al
+   * volver a abrir) y se sigue jugando sobre el retablo. Se exige que el Canvas vaya
+   * dentro de la red, que la red apunte, y que la pantalla tenga la rama que cae al
+   * retablo: quitar cualquiera de las tres deja al teléfono sin partida.
+   */
+  const dondeLaRed = codigoDeLaPantalla.join('\n');
+  const abreLaRed = dondeLaRed.indexOf('<RedDelLienzo alCaer={ponerElLienzoCayo}>');
+  const elCanvas = dondeLaRed.indexOf('<Canvas');
+  const cierraLaRed = dondeLaRed.indexOf('</RedDelLienzo>');
+  comprobar(
+    'el Canvas del delta va dentro de la red que cae al retablo si el lienzo revienta al pintar',
+    abreLaRed >= 0 && elCanvas > abreLaRed && cierraLaRed > elCanvas,
+    { abreLaRed, elCanvas, cierraLaRed },
   );
   comprobar(
-    'y donde no se monta no se piden los dos megas del modelo',
-    /usarCatalogoDelTablero\(EL_DELTA_SE_VE_AQUI\)/.test(escena) &&
-      /if \(!hazFalta\) return undefined;/.test(escena),
+    'y la red apunta el fallo antes de caer, para que el parte lo cuente al volver a abrir',
+    /class RedDelLienzo[\s\S]*?apuntarFallo\([^)]*'render'/.test(dondeLaRed) &&
+      /if \(elLienzoCayo !== null\)[\s\S]*?respaldoSobreElRetablo\(/.test(dondeLaRed),
+  );
+  comprobar(
+    'la rama del respaldo decide sólo por islas y por colonos, y el fallo de carga sigue teniendo la suya',
+    /if \(datos === null \|\| encuadre === null\) \{/.test(escena) &&
+      /seVeEnTres\(laVista\)\s*\?\s*'El delta/.test(escena) &&
+      /NOTA_DE_MAS_DE_CUATRO,/.test(escena) &&
+      /if \(catalogo\.que === 'fallo'\) \{/.test(escena),
+    'sin `seVeEnTres` una mesa de cinco vería el delta con dos colonos del mismo color',
+  );
+  comprobar(
+    'y donde el motor no decodifica imágenes se registra el atlas compilado del tablero, no la blanca de los avatares',
+    /if \(!decodificaImagenes\(\)\) cargador\.register\(texturasDelTablero\)/.test(escena) &&
+      !/register\(texturasLisas\)/.test(escena) &&
+      /usarCatalogoDelTablero\(\)/.test(escena),
+    'con `texturasLisas` el delta llega al teléfono sin un solo color',
   );
 }
 
@@ -728,9 +771,10 @@ paso('El delta se puede mirar de cerca, recorrer, y siempre se puede volver');
   /*
    * ═══ LAS REGLAS DE ARRIBA ESTABAN TODAS VERDES SOBRE ALGO QUE NO LLEGABA A NADIE ═══
    *
-   * El pellizco y el paseo exigen DOS PUNTEROS de verdad, y la única plataforma donde
-   * esta pantalla monta el delta es la web (`EL_DELTA_SE_VE_AQUI`), o sea un navegador
-   * de escritorio con un ratón o un panel táctil: uno da un puntero, el otro manda
+   * El pellizco y el paseo exigen DOS PUNTEROS de verdad, y durante meses la única
+   * plataforma donde esta pantalla montaba el delta fue la web (hasta que el atlas se
+   * compiló para el móvil, el 5-9-2026), o sea un navegador de escritorio con un ratón
+   * o un panel táctil: uno da un puntero, el otro manda
    * `wheel` con `ctrlKey`, y ninguno da dos. Con las nueve comprobaciones anteriores en
    * verde, quien abría Riberas podía girar el tablero y nada más — ni acercarse, ni
    * mirar un borde, ni ver aparecer el botón de volver, que sólo sale cuando algo ha
@@ -1231,7 +1275,7 @@ paso('El mazo de Riberas se juega desde la app, y en las DOS ramas');
  * Con el número escrito, salir con menos es un fallo ruidoso. Va a mano y se sube al
  * añadir comprobaciones; un guardia desfasado no guarda nada.
  */
-const COMPROBACIONES_ESCRITAS = 132;
+const COMPROBACIONES_ESCRITAS = 135;
 if (cuantas < COMPROBACIONES_ESCRITAS) {
   console.error(
     `Solo se han hecho ${cuantas} de las ${COMPROBACIONES_ESCRITAS} comprobaciones que ` +

@@ -863,6 +863,18 @@ for (const pantalla of ['index.tsx', 'avatar.tsx', 'cuenta.tsx']) {
     /if \(!decodificaImagenes\(\)\)/.test(escena),
     'el relevo se registraria siempre y quitaria las texturas tambien en la web',
   );
+  /*
+   * Y ES EL RELEVO BLANCO, NO EL ATLAS DEL TABLERO. Desde el 5-9-2026
+   * `texturas-nativas.ts` tiene un segundo complemento, `texturasDelTablero`, que
+   * contesta con el atlas compilado de `tablero.glb` para que el delta se vea con
+   * color en el telefono. En un avatar de Tripo ese atlas pintaria al personaje
+   * de hexagonos de hierba: el avatar sigue con `texturasLisas`, y esto lo vigila.
+   */
+  comprobar(
+    'el avatar registra `texturasLisas`, el relevo blanco, y no el atlas del tablero',
+    /cargador\.register\(texturasLisas\)/.test(escena) && !/texturasDelTablero/.test(escena),
+    'con el atlas del tablero un personaje de Tripo saldria pintado de hexagonos',
+  );
 }
 
 // ---------------------------------------------------------------------------

@@ -109,11 +109,12 @@
  * sólo se le avisa EN EL CAMBIO —al salir de la vista de salida y al volver a ella—,
  * que son dos repintados por viaje y no dos por fotograma.
  *
- * ═══ Y AQUÍ TAMBIÉN ESTÁ EL RATÓN, PORQUE HOY ES LA ÚNICA MANO QUE TOCA ESTO ═══
+ * ═══ Y AQUÍ TAMBIÉN ESTÁ EL RATÓN, PORQUE DURANTE MESES FUE LA ÚNICA MANO QUE TOCÓ ESTO ═══
  *
  * Este fichero se escribió para el dedo, y durante un tiempo entero fue mentira que
- * sirviera: la pantalla de Riberas sólo monta el delta donde `EL_DELTA_SE_VE_AQUI` es
- * cierto, y eso es HOY la web y sólo la web —el `.glb` saldría gris en nativo—. O sea
+ * sirviera: la pantalla de Riberas sólo montaba el delta en la web —el `.glb` salía
+ * gris en nativo hasta que el atlas se compiló para el móvil, ver
+ * `tres/texturas-nativas.ts`—. O sea
  * que quien abría Riberas lo abría en un navegador de escritorio, con un ratón o con
  * un panel táctil, y ninguna de las dos cosas da dos punteros: el pellizco es un
  * `Pinch` y el paseo un `Pan().minPointers(2)`, los dos exigen dos dedos DE VERDAD, y

@@ -653,6 +653,24 @@ const BATERIA = [
       '`escenas/iconos.ts` es byte a byte lo que `compilar-iconos.ts` produce: los dibujos de los bienes, las cartas y las cifras que se pintan son los que el guion dibuja hoy, y no una versión de antes de que alguien moviera un punto sin recompilar',
   },
   /*
+   * ═══ EL ATLAS DEL TABLERO, COMPILADO PARA EL MÓVIL ═══
+   *
+   * `verify:escena` mide el agua y las celdas sobre el PNG empotrado en el `.glb`;
+   * lo que no puede saber es si la TABLA que el teléfono pinta en su lugar —Hermes
+   * no decodifica ese PNG, y hasta que se compiló la app jugaba en dos dimensiones—
+   * sigue siendo ese PNG. Va detrás de los iconos porque es el mismo trato: un
+   * fichero generado que se recompila a un temporal y se compara byte a byte; y
+   * además se ensancha con el código de la app y se compara píxel a píxel con la
+   * imagen, y se llama al complemento que lo monta con un analizador de mentira.
+   */
+  {
+    nombre: 'atlas del tablero',
+    donde: 'escenas',
+    guion: 'verify:atlas-del-tablero',
+    porque:
+      '`escenas/atlas-del-tablero.ts` es byte a byte lo que `compilar-atlas-del-tablero.ts` produce desde `tablero.glb`, ensanchado es el PNG del atlas píxel a píxel, los colores medidos de la paleta salen de él, y el complemento que lo monta en el móvil lo hace con el `flipY`, el espacio sRGB y los filtros que `GLTFLoader` habría puesto; sin esto el teléfono jugaría sobre un delta con los colores de otra versión, o gris, sin que nada se pusiera rojo',
+  },
+  /*
    * ═══ LOS AVENTUREROS, Y POR QUÉ ÉSTE VA DETRÁS DE LA ESCENA ═══
    *
    * Porque mide contra ella: la altura de un personaje se contrasta con
