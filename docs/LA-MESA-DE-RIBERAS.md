@@ -4,16 +4,23 @@
 > las decisiones y su porqué. Se escribió el 5 de septiembre de 2026, sobre la rama
 > `lobby-catan`, a partir de lo que Miguel pidió por escrito: ver el juego en pantalla
 > completa, una mesa de madera abajo con las piezas encima, un dado que vibra y se
-> tira tocándolo, y poder recoger la mesa. Es la quinta versión: la primera pasó por
+> tira tocándolo, y poder recoger la mesa. Es la sexta versión: la primera pasó por
 > una revisión adversaria que volvió a medir cada número con el código real; la
 > segunda por otra que leyó el orden de dibujo con el ordenador de `three` de verdad,
 > buscó quién apagaba los dados fuera de turno y proyectó los 54 vértices con la cámara
 > inclinada; la tercera por una que metió en ese ordenador el árbol de `delta.tsx` con
 > sus grupos anidados tal como están; y la cuarta por una que montó encima lo que la
 > fase 2 añade y encontró el testigo de la Baraja borrando la profundidad a mitad de la
-> mesa. Esta quinta recoge, además, las siete decisiones que Miguel tomó la noche del 5
-> de septiembre sobre las dudas que el §10 le hacía: ya no hay dudas para él en este
-> documento; están en el §1, cada una con su porqué y sus consecuencias medidas. Lo
+> mesa. La quinta recogió las siete decisiones que Miguel tomó la noche del 5 de
+> septiembre sobre las dudas que el §10 le hacía: ya no hay dudas para él en este
+> documento; están en el §1, cada una con su porqué y sus consecuencias medidas. Y esa
+> quinta pasó por una revisión que volvió a correr los guiones del cajón y encontró un
+> número (los 131 puntos del nombre, §1.11) que ningún guion imprimía: esta sexta lo
+> hace salir de su guion, decide qué se recorta en la ficha del cajón y en qué orden,
+> pone el cajón abierto donde de verdad cae (sobre la barra), quita a la cabecera de la
+> web un alto que no tiene, separa por nombre los dos insets que el documento mezclaba,
+> y recoge lo que Miguel señaló después: que el pack KayKit Board Game Bits trae dados
+> modelados, y el D6 pasa a ser la malla de los dados con su regla de color (§5.1). Lo
 > que las revisiones encontraron está cerrado aquí, con su medida, o abierto en el §10
 > con su dueño. Ningún número de aquí es una opinión: cada uno sale de un guion de
 > medida corrido sobre `huecosDeLaBarra`, `huecosDeLaBaraja`, `huecosDeLasCartas`,
@@ -286,15 +293,21 @@ dados o uno) está dentro de la decisión 3, y las otras seis son las decisiones
     §2.2 no cambia.
 
     El cajón mide LO QUE LA CINTA —`anchoDeLaCinta(ancho, alto)`: el tercio en apaisado,
-    el 40 % de pie— y cuelga de ella hasta el canto de abajo menos el inset. Por eso
-    el cajón abierto no toca el tercio de ninguna de las dos manos: su aire a la carta
-    más cercana es el MISMO que el de la cinta, porque las manos se extienden en `x`
-    igual arriba que abajo —138 y 155 puntos en el SE, 202 y 221 en un Android de 360,
-    219 y 240 en un iPhone 14, 15,6 y 26,5 en 390×845 de pie (`medir-cajon.ts`, §2, las
-    mismas cifras que `medir-cinta-central.ts`)—. Las cartas siguen tocables fuera de
-    él; se cierra tocando la ficha de mis puntos otra vez o fuera de él, y mientras
-    está abierto es modal para el lector (`accessibilityViewIsModal`, como
-    `HojaDeAQuien`).
+    el 40 % de pie— y cuelga de ella hasta el canto de abajo menos el inset de abajo.
+    Por eso el cajón abierto no toca el tercio de ninguna de las dos manos: su aire a
+    la carta más cercana es el MISMO que el de la cinta, porque las manos se extienden
+    en `x` igual arriba que abajo —138 y 155 puntos en el SE, 202 y 221 en un Android
+    de 360, 219 y 240 en un iPhone 14, 15,6 y 26,5 en 390×845 de pie (`medir-cajon.ts`,
+    §2, las mismas cifras que `medir-cinta-central.ts`)—. Lo que SÍ hay debajo del
+    tercio central abajo es la barra: el cajón abierto se pone sobre ella (los dos
+    huecos centrales enteros en todos los lienzos, los cuatro enteros en 780×360,
+    844×390, 932×430 y 1920×900, y el 75 % de los dos extremos en el SE y en el
+    monitor a 1080) y no sobre los dados colgados, que quedan fuera de él en todos los
+    apaisados (0 % tapados; `revisar-cajon-sobre-la-barra.ts`). Es un cajón modal: se
+    abre para leer y se cierra para jugar, y con él abierto no se construye. Las
+    cartas siguen tocables fuera de él; se cierra tocando la ficha de mis puntos otra
+    vez o fuera de él, y mientras está abierto es modal para el lector
+    (`accessibilityViewIsModal`, como `HojaDeAQuien`).
 
     Dentro, en este orden, y cada renglón mide **44 puntos**: el marcador —una ficha por
     colono sentado, hasta seis, en el orden del marcador del juego, la mía con el
@@ -303,51 +316,102 @@ dados o uno) está dentro de la decisión 3, y las otras seis son las decisiones
     crece lo que haga falta. Lo fijo con seis colonos son **352 puntos** (264 + 44 + 44),
     y el cajón se desplaza en vertical (`ScrollView` en la app, `overflow-y: auto` en
     el escritorio) cuando no cabe. La ficha de 44 son: el raíl de 4 (el `fichaRail` de
-    hoy), dos renglones de 13 px a 17 de interlineado —el nombre, y «N chozas · M
-    torres · vado L», recortados con puntos suspensivos—, y a la derecha los puntos a
+    hoy), dos renglones de 13 px a 17 de interlineado —el nombre, y «vado L · N chozas
+    · M torres», recortados con puntos suspensivos—, y a la derecha los puntos a
     17 px con el «+N» tenue en la mía; lo que se oye es la frase entera de
     `FichaDelColono` más «N chozas y M torres», palabra por palabra. Lo que hoy pinta
     `FichaDelColono` en cuatro renglones de 13 no cabe seis veces en 276 puntos, y por
     eso la ficha del cajón es esta y no aquélla; cartas, guardias y títulos se oyen y
     están en la frase, no en el renglón. Medido en cada lienzo de la lista, con el
-    inset de abajo de los aparatos que lo tienen (21 en los iPhone con muesca
-    apaisados, 20 en el iPad; `medir-cajon.ts`, §1):
+    inset de abajo de los aparatos que lo tienen (el indicador de inicio: 21 en los
+    iPhone con muesca apaisados, 20 en el iPad; `medir-cajon.ts`, §1). Ese inset de
+    abajo y la muesca lateral son DOS datos y en este documento llevan dos nombres: el
+    «inset de abajo» (21/21/20) resta alto al cajón y entra en el comprobador; la
+    «muesca» (24 en el Android con recorte, 47 en el iPhone 14, 59 en el Pro Max;
+    `medir-dados-por-lienzo.ts`) resta ancho útil a los dados colgados (§3, §4.4) y no
+    entra, porque la escena no la conoce y no debe (§4.4):
 
     | Lienzo | Cajón (ancho × alto útil) | Lo fijo (352) | Lo que se ve al abrirlo |
     |---|---|---|---|
     | 568×320 (SE apaisado) | 189 × 276 | 76 fuera | **las seis fichas enteras** y 12 pt de la línea de la mesa |
     | 667×375 (SE 2/3) | 222 × 331 | 21 fuera | las seis, la línea de la mesa y 23 pt de los botones |
     | 780×360 (Android) | 260 × 316 | 36 fuera | las seis, la línea de la mesa y 8 pt de los botones |
-    | 844×390 (iPhone 14, inset 21) | 281 × 325 | 27 fuera | las seis, la línea de la mesa y 17 pt de los botones |
-    | 932×430 (Pro Max, inset 21) | 311 × 365 | cabe | todo lo fijo y 13 pt de crónica |
+    | 844×390 (iPhone 14, inset de abajo 21) | 281 × 325 | 27 fuera | las seis, la línea de la mesa y 17 pt de los botones |
+    | 932×430 (Pro Max, inset de abajo 21) | 311 × 365 | cabe | todo lo fijo y 13 pt de crónica |
     | 1024×768 (tableta) | 341 × 724 | cabe | todo lo fijo y 372 pt de crónica |
-    | 1180×820 (iPad, inset 20) | 393 × 756 | cabe | todo lo fijo y 404 pt de crónica |
+    | 1180×820 (iPad, inset de abajo 20) | 393 × 756 | cabe | todo lo fijo y 404 pt de crónica |
     | 1920×1080 y 1920×900 | 640 × 1036 / 856 | cabe | todo lo fijo y 684 / 504 pt de crónica |
     | 320×360 (de pie) | 128 × 316 | 36 fuera | las seis, la línea de la mesa y 8 pt de los botones |
     | 360×490 / 390×490 | 144 / 156 × 446 | cabe | todo lo fijo y 94 pt de crónica |
     | 390×845 | 156 × 801 | cabe | todo lo fijo y 449 pt de crónica |
     | 768×640 / 768×1024 | 256 × 596 / 307 × 980 | cabe | todo lo fijo y 244 / 628 pt de crónica |
 
-    O sea: en los apaisados de 320 y 360 de alto (y en el iPhone 14 con su inset, y en
-    el SE 2) el cajón entero NO cabe y se desplaza, pero **las seis fichas caben
-    enteras en todos los lienzos de la lista** —el peor es el SE, 264 de 276, con 12
-    puntos de la línea siguiente asomando, que es la señal de que hay más abajo—. Por
-    eso el marcador va el primero y no el código de la mesa: lo que se abre para mirar
-    es el marcador; el código se dicta una vez al empezar. Con menos de seis, el
-    marcador mide `N · 44` y lo demás sube. Lo que queda para el nombre en el ancho
-    del SE son unos 131 puntos (17 letras a 13 px) y 70 en el 320×360 de pie; a qué
-    largo se recorta cada nombre con la fuente de la casa se mide en el banco, como la
-    frase (fase 5), y se deja escrito. Es la misma ficha en la app y en el escritorio:
-    el raíl del escritorio pasa a ser este cajón, con sus tres secciones en este orden
-    y `MarcadorDeRiberas` pintando la ficha de 44 en vez de sus renglones de hoy.
+    O sea: en los apaisados de 320 y 360 de alto (y en el iPhone 14 con su inset de
+    abajo, y en el SE 2) el cajón entero NO cabe y se desplaza, pero **las seis fichas
+    caben enteras en todos los lienzos de la lista** —el peor es el SE, 264 de 276, con
+    12 puntos de la línea siguiente asomando, que es la señal de que hay más abajo—.
+    Por eso el marcador va el primero y no el código de la mesa: lo que se abre para
+    mirar es el marcador; el código se dicta una vez al empezar. Con menos de seis, el
+    marcador mide `N · 44` y lo demás sube.
+
+    **Lo que cabe en cada renglón, y qué se recorta.** Lo fijo de la ficha en
+    horizontal son 58 puntos (el raíl de 4, el relleno de 2×10, los puntos a la derecha
+    a 17 px con su «+N», unos 26, y 8 de aire), así que a los dos renglones les quedan
+    **131 puntos en el SE** (189 − 58) y **70 en el 320×360 de pie** (128 − 58): 17 y 9
+    letras de nombre a 13 px, 164 en el SE 2, 202 en un Android de 360, 223 en un
+    iPhone 14, 283 en la tableta (`medir-cajon.ts`, §3; el §3 anterior de ese guion
+    sumaba 86 de fijo porque ponía las chozas AL LADO del nombre, y daba 103 y 42, que
+    no eran los de esta ficha). El nombre no es lo que se recorta: un nombre de la Sala
+    cabe en 17 letras en cualquier apaisado. Lo que se recorta es el **SEGUNDO
+    renglón**: lo más largo que puede salir, «vado 12 · 5 chozas · 4 torres» (cinco
+    chozas, cuatro torres y un vado de dos cifras), mide unos **170 px** a 13 px con
+    los anchos medios de una sans (`medir-cajon.ts`, §4), cabe entero desde el Android
+    de 360 (202) y en todos los apaisados de ahí arriba, y se corta en el SE («vado 12
+    · 5 chozas ·…»), en el SE 2 («vado 12 · 5 chozas · 4 tor…») y en los teléfonos de
+    pie («vado 12 ·…» en 320×360, «vado 12 · 5 cho…» en 390 de ancho; la tableta de pie,
+    768×1024, tiene 249 y cabe). Por eso **el vado va el PRIMERO**, y no las chozas como
+    decía la quinta versión: es el dato que cambia de mano y el único de los tres que
+    el tablero no enseña sin contar veredas (las chozas
+    y las torres están en el delta con el color de su colono, y la torre es la pieza
+    más grande), así que donde el renglón se corta lo que se pierde es lo que ya se ve.
+    Con las chozas primero, el SE enseñaba «5 chozas · 4 torres ·…» y el vado no se veía
+    nunca en los dos lienzos más pequeños. Se midió también partirlo en tres renglones
+    de 13 (`medir-cajon.ts`, §5: 3 · 13 = 39, 5 de aire), que en el SE enseñaría «5
+    chozas · 4 torres» y «vado 12» enteros, y se descarta: es interlineado 1,0 contra
+    los 17 de la casa, y en los teléfonos de pie se corta igual (70–98 puntos para
+    114). De pie es la forma secundaria (§2.2) y ahí el renglón queda en «vado 12 ·…»,
+    que es el dato que importa; la frase entera se oye. El ancho exacto con la fuente
+    de la casa, y a qué largo se recorta cada nombre, se miden en el banco (fase 5) y
+    se dejan escritos; lo
+    que se decide aquí es el orden y lo que se sacrifica. Es la misma ficha en la app y
+    en el escritorio: el raíl del escritorio pasa a ser este cajón, con sus tres
+    secciones en este orden y `MarcadorDeRiberas` pintando la ficha de 44 en vez de sus
+    renglones de hoy.
 
 12. **En la web SE QUEDA la cabecera de la Sala.** (Decisión 3.) Es una línea y es la
     navegación del sitio; nada de pantalla completa de navegador por ahora, ni botón
-    para pedirla. `.riberas-lienzo` mide `calc(100vh − alto de la cabecera)`, y lo que
-    mide la cabecera se lee de una variable de `estilo.css`, no se escribe dos veces.
+    para pedirla. Y el alto de la cabecera NO se escribe en ningún sitio, porque hoy
+    no lo tiene: `.cabecera` (`estilo.css` 458–466) es un `flex` con `flex-wrap: wrap`,
+    `gap: 1rem` y `padding: 1rem clamp(1rem, 4vw, 2.5rem)`, sin `height`, sin
+    `min-height` y sin variable; lo que mide depende de la letra y de si el título y
+    los enlaces caben en una fila o se parten en dos. La quinta versión decía
+    «`calc(100vh − alto de la cabecera)` leído de una variable», y esa variable no
+    existe: habría que fijarle un alto (y con él romper el `flex-wrap`, o dejar un
+    hueco cuando se parte) y escribir el número dos veces. Se elige lo otro: **la página
+    con el delta es una COLUMNA FLEX**. `.sala` ya mide `min-height: 100vh` (`estilo.css`
+    445) y envuelve la cabecera (`sala.tsx` 111–112); con la clase modificadora del
+    §2.1 pasa a `display: flex; flex-direction: column`, la cabecera se queda con su
+    alto natural, y la cadena hasta el recuadro (`.tablero-y-panel` en una columna y
+    `.riberas-lienzo`) lleva `flex: 1; min-height: 0`, de modo que el lienzo se queda
+    con lo que sobra mida la cabecera lo que mida, en una fila o en dos, sin que nadie
+    lo calcule. Los `62vh` y el `min-height: 420px` de hoy (`estilo.css` 2108) se van
+    con la clase. `clientWidth/clientHeight` del recuadro (`riberas-en-tres.tsx` 499 y
+    656) siguen dando el lienzo real, que es lo que `huecosDeLaMesa` recibe.
     Consecuencia para las medidas: **los lienzos de la lista son lienzos, no ventanas**;
-    una ventana de 1920×1080 con una cabecera de 48 px es un lienzo de 1920×1032 (asa de
-    144,5 puntos, colgado, y todo lo demás igual), y el comprobador mide lienzos.
+    una ventana de 1920×1080 con una cabecera que midiera 48 px sería un lienzo de
+    1920×1032 (asa de 144,5 puntos, colgado, y todo lo demás igual). Ese 48 es
+    ILUSTRATIVO, no medido: la cabecera se mide en el banco en la fase 5, con la fuente
+    de la casa y en una fila y en dos, y el comprobador mide lienzos, no ventanas.
 
 13. **La pantalla se queda ENCENDIDA toda la partida en la app.** (Decisión 4.)
     `activateKeepAwakeAsync` al montar la rama del delta y `deactivateKeepAwake` al
@@ -406,7 +470,8 @@ dados o uno) está dentro de la decisión 3, y las otras seis son las decisiones
     puede decir en números: con el alto mandando, el colgado cabe cuando
     `ancho/alto ≥ 1,316` —el 4:3 de la tableta (1,333) es el más justo de la lista, y el
     768×640 (1,200) es el primero que pasa al quinto—; el asa colgada llega a 44 desde
-    **315 puntos de alto** (557×314 da 44,0; 561×316, 44,2), así que cualquier teléfono
+    **315 puntos de alto** (557×314 da 43,96, aún bajo 44, y el guion lo marca «BAJO
+    44»; 561×316 da 44,2; `medir-dados-por-lienzo.ts`, §4), así que cualquier teléfono
     apaisado de 320 o más va colgado y en regla; y de pie el quinto llega a 44 desde
     **375 puntos de ancho** (375×845 da 44,0), así que por debajo de eso —los 320 y 360
     de la lista— no hay dados y TIRAR está en la cinta. En ningún lienzo de la lista con
@@ -414,7 +479,8 @@ dados o uno) está dentro de la decisión 3, y las otras seis son las decisiones
     las mismas constantes que pintan (`ARISTA_DEL_DADO = 0,52`, `PUNTO_DEL_DADO = 0,18`).
     Lo que el 0,52 mueve en el resto del documento está movido: el techo del salto
     (§1.2, 0,24 lados), el centro del cubo (§5.1, `cota + 0,26`), los tamaños del §5.1 y
-    los triángulos, que no cambian (los puntos son los mismos 21 por dado).
+    los triángulos del respaldo, que no cambian (los puntos son los mismos 21 por dado;
+    los del D6 del pack se cuentan con el fichero delante, §5.1).
 
 16. **La mesa recogida SALE SOLA cuando pasa a tocarme, salvo con una carta cogida.**
     (Decisión 7.) Como dice el §6: recoger es para mirar, y cuando hay que actuar la
@@ -429,9 +495,10 @@ dados o uno) está dentro de la decisión 3, y las otras seis son las decisiones
 ### 2.1. Qué se va y qué se queda
 
 **Escritorio.** Cuando `RiberasEnTres` pinta el delta, `.tablero-y-panel` pasa a una
-sola columna (una clase modificadora; hoy ya lo hace sola bajo 60 rem) y
-`.riberas-lienzo` mide `calc(100vh - alto de la cabecera)`. La cabecera de la Sala se
-queda: es una línea y es la navegación del sitio (decisión 12 del §1). El raíl no
+sola columna (una clase modificadora; hoy ya lo hace sola bajo 60 rem) y la página es
+una columna flex en la que `.riberas-lienzo` se queda con lo que la cabecera deja
+(`flex: 1; min-height: 0`; decisión 12: la cabecera no tiene alto que restar). La
+cabecera de la Sala se queda: es una línea y es la navegación del sitio. El raíl no
 desaparece: se pliega en un cajón que se abre desde la cinta (§2.2) por encima de la
 escena, con lo que ya tiene (`LaFicha`, `LaCronica`, levantarse, tirar la mesa) y con
 el marcador el primero, en fichas de 44 hechas para seis (decisión 11). No se
@@ -503,16 +570,19 @@ Lo que cabe en la línea, de izquierda a derecha:
   decía lo mismo con menos.
 - **«≡»** (44×44), que desde la decisión 11 es **la ficha de mis puntos** —mi raíl de
   color y mi cifra, «≡» a secas para un mirón—: abre el cajón, que es donde vive lo que
-  no cabe en 189 puntos, con el marcador de seis el primero (§1.11): el
-  código de la mesa en acento (lo único que se dicta por teléfono, cabecera de
-  `BarraDeLaMesa`), el marcador completo (una `FichaDelColono` por colono, con su
-  raíl de color, nombre, puntos, chozas y torres como números —`c.chozas.length` y
+  no cabe en 189 puntos, en el orden del §1.11 y con sus renglones de 44: primero el
+  marcador, la ficha de 44 de cada colono (el raíl de color, el nombre, «vado L · N
+  chozas · M torres», y los puntos a la derecha con el «+N» en tenue en la mía si
+  `puntosConLoOculto` difiere de `puntos`); después la línea de la mesa, con el código
+  en acento (lo único que se dicta por teléfono, cabecera de `BarraDeLaMesa`) y el
+  mazo que queda con su número; después los botones, levantarse y tirar la mesa; y al
+  final la crónica. Chozas y torres son números —`c.chozas.length` y
   `c.torres.length` de `ColonoVisto`, `riberas.ts` 3053–3054: contar es proyección de lo
-  público, no una regla; los puentes no se cuentan, como pidió Miguel—, «+N» en tenue en
-  la mía si `puntosConLoOculto` difiere de `puntos`, y la frase que se oye es la de
-  `FichaDelColono`, palabra por palabra, más «N chozas y M torres»), el mazo que queda
-  con su número, la crónica, levantarse y tirar la mesa. El cajón es el `HojaDeAQuien`
-  de siempre en la app y el raíl de siempre en el escritorio.
+  público, no una regla; los puentes no se cuentan, como pidió Miguel—. La ficha del
+  cajón NO es `FichaDelColono` (sus cuatro renglones no caben seis veces, §1.11); lo
+  que se hereda de `FichaDelColono` es la frase que se oye, palabra por palabra, más
+  «N chozas y M torres». El cajón es el `HojaDeAQuien` de siempre en la app y el raíl
+  de siempre en el escritorio.
 
 Hay DOS cosas distintas que se llaman «segunda línea», y se separan aquí con lo que
 cada una suma de alto:
@@ -991,18 +1061,141 @@ libre de la mano de bienes quieta, sin despertar la mano del mazo, y que en 320�
 
 ### 5.1. Forma y tamaño
 
-Dos `BoxGeometry` de **`0,52 lados` de arista** (`ARISTA_DEL_DADO`; era 0,46 hasta la
-decisión 15) con un hueco de `0,08 lados` entre ellos —el par mide 1,12 lados y deja
-`AIRE` (0,24) a cada lado del asa de 1,6—, color `COLOR_DEL_NUMERO` (`#efe6cd`, el
-crema de los discos de las fichas del tablero) y los puntos en `COLOR_DEL_PUNTO`
-(`#2a2118`, el de sus cifras): los dados y las fichas son del mismo juego. Los 21
-puntos de cada dado son círculos de 10 segmentos con un diámetro del **18 % de la
-arista** (`PUNTO_DEL_DADO`), pegados a las caras y fundidos en una geometría: 12 + 210
-triángulos y 2 llamadas por dado, 444 y 4 llamadas los dos (`medir-triangulos.ts`,
+**La malla es el D6 de KayKit Board Game Bits; todo lo demás se queda.** Miguel
+señaló que el pack [Board Game Bits](https://kaylousberg.itch.io/board-game-bits) de
+la misma casa que los otros cuatro (CC0, versión gratuita de 35 MB, «75+ modelos» en
+OBJ, FBX y GLTF) trae dados modelados: D4, D6, D8 y D20. Lo que se sabe de él es lo
+que dice su página, leída el 6 de septiembre de 2026: «la mayoría de las piezas usan
+un único atlas de gradiente de 1024×1024» PERO «las cartas y los dados llevan texturas
+individuales». El pack no está en el disco todavía (ni en `arte/kaykit/`), y por eso
+lo que sigue es una decisión con su regla y una lista de lo que se mide con el fichero
+delante (§9), no una medida.
+
+Se queda como está: **dos** dados (decisión 3), la arista de **`0,52 lados`**
+(`ARISTA_DEL_DADO`; era 0,46 hasta la decisión 15) con un hueco de `0,08 lados` entre
+ellos —el par mide 1,12 lados y deja `AIRE` (0,24) a cada lado del asa de 1,6—, el
+punto del **18 % de la arista** (`PUNTO_DEL_DADO`) y el mínimo legible de 22 y 4
+puntos (decisión 15), el asa ÚNICA e invisible, la cota (el centro del cubo en
+`cota + 0,26 lados`), el salto de 0,2 (en lo alto el dado llega a `hueco.y + 0,24 ·
+lado`, bajo el asa, §1.2), la máquina del §5.3 y el tapete del §2.2. Lo único que
+cambia es de dónde sale la geometría del cubo con sus puntos.
+
+**La escala.** Los packs de KayKit no vienen a la escala del tablero (la casa del
+pack hexagonal mide 0,93 y la escena la sube con `ESCALA_DEL_PACK`, `escala.ts` 113;
+el caballero de Adventurers mide 2,543 y ésa es la unidad de las personas), y los dos
+compiladores de la casa NO escalan al compilar: `compilar-embarcadero.ts` lo dice en
+su cabecera («no se escala nada; es la escena la que aplica `ESCALA_DEL_PACK`») y
+`compilar-aventureros.ts` MIDE la caja envolvente sobre las posiciones (`getMin` /
+`getMax` de `POSITION`, 200–220) y se niega si el caballero se aparta más del 5 % de
+`ALTURA_DE_UNA_PERSONA` (458–473). El dado sigue ese camino: `compilar-dados.ts` mide
+la caja envolvente del D6 en los tres ejes, exige que sea un cubo (los tres iguales al
+1 %), la contrasta con **`ARISTA_DEL_D6_EN_EL_PACK`**, una constante de
+`escenas/dados.ts` escrita con el número medido la primera vez (como
+`ALTURA_DE_LA_CASA_EN_EL_PACK` en `escala.ts`), y se niega si se aparta más del 1 %; y
+la escena escala el modelo con `ARISTA_DEL_DADO · lado / ARISTA_DEL_D6_EN_EL_PACK`,
+para que mida exactamente los 0,52 lados que `verify:escena` exige en puntos (§1.15).
+El fichero se queda a la unidad del pack, y el día que un dado y una tesela compartan
+`Canvas` no habrá dos escalas del mismo autor.
+
+**La pega del color, que decide la ruta de compilación y se resuelve midiendo el
+`.gltf`, no antes.** Hay dos caminos en la casa para que una textura de KayKit llegue
+al teléfono, donde `GLTFLoader` no puede abrir un PNG empotrado
+(`app/src/tres/texturas-nativas.ts`, cabecera), y el D6 va por uno u otro según dónde
+estén sus puntos:
+
+- **(a) Los puntos son GEOMETRÍA** (caras propias con las UV en una celda oscura de su
+  textura, o un segundo material): se hornea a `COLOR_0` con
+  `escenas/scripts/hornear.ts`, exactamente como los aventureros y el embarcadero,
+  muestreo bilineal, sRGB a lineal, un VEC4 de bytes por vértice, sin textura y sin
+  UV, material blanco con `vertexColors`. Cuesta 4 bytes por vértice y quita 8 de UV
+  (`medir-textura-del-dado.ts`, §3), funciona en el teléfono sin ningún complemento, y
+  el comprobador que lo vigila ya existe como modelo: `verificar-aventureros.ts`
+  (abre el compilado con `@gltf-transform` y con el `GLTFLoader` de verdad: `COLOR_0` en
+  todas las primitivas, ninguna textura ni imagen, ninguna UV, ningún atributo
+  entrelazado, un techo de kB, la medida contra `escala.ts`). `verify:dados` es ese
+  guion recortado a un fichero, con la arista en vez de la altura y una comprobación
+  más: que tras hornear hay al menos DOS colores distintos entre los vértices (el
+  cuerpo y los puntos), porque un D6 horneado de un solo color es un dado sin nada
+  que leer, y no daría error.
+- **(b) Los puntos están PINTADOS en la textura individual del dado** (el cuerpo es
+  una caja de 24 vértices, 8 esquinas por 3 caras, y cada cara entera cae en una
+  región de la textura con el punto dibujado dentro): el horneado por vértice los
+  BORRA, porque una cara son cuatro vértices y cuatro vértices son un color plano. El
+  otro camino es el del atlas del tablero: `compilar-atlas-del-tablero.ts` compila el
+  PNG a una tabla RGB en base64 dentro de un `.ts` (`escenas/atlas-del-tablero.ts`) y
+  `texturasDelTablero` la levanta como `DataTexture` al arrancar con el `flipY`, el
+  espacio sRGB y los filtros que el cargador no pone; `verificar-atlas-del-tablero.ts`
+  recompila a un temporal y compara byte a byte, ensancha la tabla con el código de la
+  app y la compara con el PNG píxel a píxel, y llama al complemento en Node con un
+  analizador de mentira. Pero ese compilador guarda UN color por fila y columna porque
+  el atlas es plano por columnas (8 × 1.024 × RGB = 24 kB, 32 kB en base64), y se NIEGA
+  a compilar una imagen que no lo sea; una textura con puntos redondos no lo es, así que
+  habría que ampliarlo a resolución completa, y eso pesa (`medir-textura-del-dado.ts`,
+  §1): **una textura de 256² RGB son 192 kB crudos y 256 kB en base64, ocho veces la
+  tabla del atlas; una de 512², 768 kB y 1 MB**. Los dos dados procedimentales del
+  respaldo ocupan **16 kB en memoria** (posición, normal e índice, contados con `three`,
+  §2 del mismo guion) y **0 en disco**, porque son código. La regla que pidió Miguel
+  era «si pesa más que el propio modelo procedimental con sus 21 puntos, gana el
+  respaldo», y la cuenta está hecha antes de abrir el fichero: la tabla más pequeña
+  pesa dieciséis veces los dos dados. **Por (b) gana el respaldo**, y no se escribe ni
+  el compilador ni el complemento para ese caso. Habría un tercer camino a medias
+  (hornear el cuerpo del pack a un color y ponerle encima nuestros 21 puntos), y se
+  descarta escrito: es el respaldo con otra caja, y dos geometrías del mismo dado son
+  dos cuentas de triángulos.
+
+Así que lo ÚNICO que el fichero decide es si los puntos son geometría. Se sabe en dos
+minutos con `@gltf-transform`: el número de vértices y de primitivas del D6, y si
+tras hornear hay más de un color. Si lo son, el D6 del pack es la malla; si no, la
+malla es el respaldo de abajo, y la fase 3 no espera a nadie.
+
+**El respaldo, que se queda escrito y vivo.** Dos `BoxGeometry` de `ARISTA_DEL_DADO`,
+color `COLOR_DEL_NUMERO` (`#efe6cd`, el crema de los discos de las fichas del tablero)
+y los puntos en `COLOR_DEL_PUNTO` (`#2a2118`, el de sus cifras): los dados y las fichas
+son del mismo juego. Los 21 puntos de cada dado son círculos de 10 segmentos con un
+diámetro del 18 % de la arista, pegados a las caras y fundidos en una geometría: 12 +
+210 triángulos y 2 llamadas por dado, 444 y 4 llamadas los dos (`medir-triangulos.ts`,
 §C; el tamaño no cambia la cuenta). Sin aristas redondeadas: a 3 segmentos costarían
-108 triángulos cada uno y a 23 puntos no se ven. Se apoyan en la tapa: el centro del
-cubo queda en `cota + 0,26 lados`, y en lo alto del salto de 0,2 el dado llega a
-`hueco.y + 0,24 · lado`, bajo el asa (§1.2).
+108 triángulos cada uno y a 23 puntos no se ven. Es lo que `Dados` pinta cuando el
+catálogo no trae `dado` (`modelos.get(MODELO.dado) === undefined`: el pack no valió,
+o `dados.glb` no llegó), de modo que no es código muerto y la ruta de compilación no
+puede bloquear la fase 3. **Los 444 triángulos pasan a ser el presupuesto del
+respaldo**, `TRIANGULOS_DE_LOS_DADOS` en `presupuesto-del-delta.ts`; el del modelo se
+mide con el fichero delante y tiene el mismo techo: `TOPE_DE_LA_MESA` (3.600) deja 130
+de margen con la tapa a 240 segmentos (§7), así que **los dos dados del pack pueden
+costar hasta 574 triángulos (287 por dado) sin mover el tope**; si el D6 cuesta más,
+`TRIANGULOS_DE_LOS_DADOS` se reescribe con el número medido y `TOPE_DE_LA_MESA` con
+su cuenta, no a ojo, y `verify:escena` lo sigue contando.
+
+**Dónde vive, y cómo llega a las dos pantallas.** El pack se descomprime en
+`arte/kaykit/board-game-bits/KayKit_BoardGameBits_1.0_FREE/`, la convención del
+`arte/README.md` (una carpeta por pack con el zip tal cual dentro), fuera de git por
+`arte/kaykit/` en `.gitignore`. El compilado es **`escenas/modelos/dados.glb`**, un
+fichero APARTE de `tablero.glb`: el tablero pesa 4,3 MB y se cachea por promesa en las
+dos pantallas (`catalogoDelTablero` en la app, `traerElCatalogo` en el escritorio); un
+dado de unos kB no debe obligar a recargar ni a recompilar el tablero, ni a pasar por
+`compilar-modelos.ts`, que exige que lo que entra sea exactamente lo que
+`nombresEnElGlb()` pide. Dentro va UN nodo, `dado`, con un nombre que pasa
+`NOMBRE_QUE_SOBREVIVE` (`nombres.ts`: minúsculas, sin punto ni dos puntos, porque
+`GLTFLoader` los borra al cargar), y `MODELO.dado` lo nombra desde `nombres.ts` como
+a las demás piezas. La ruta que sigue es la del tablero, leída en el código: los
+`.glb` NO pasan por Metro (en `app/metro.config.js` no hay ningún `assetExts` ni
+resolutor para `.glb`; lo que hay es `watchFolders` para `escenas/` y la copia única de
+`three` y `react`), sino por HTTP desde el servidor, `RUTA_DE_MODELOS =
+'/api/arcade/modelos'` (`escenas/ruta-de-modelos.ts`), que `server/src/routes/modelos.ts`
+sirve fichero a fichero con una ruta FIJA por modelo y no un comodín sobre la carpeta
+(`/arcade/modelos/tablero.glb`, `/arcade/modelos/embarcadero.glb`,
+`/arcade/modelos/aventureros/:fichero` con lista blanca). Así que `dados.glb` gana su
+ruta fija `/arcade/modelos/dados.glb` al lado de las otras, `ruta-de-modelos.ts` gana
+`rutaDeLosDados()`, y cada pantalla lo pide como pide el tablero y a la vez que él
+(`Promise.all`): en el escritorio `fetch` relativo más `GLTFLoader.parseAsync`
+(`riberas-en-tres.tsx` 329–335); en la app `traer` más `cargador.parse`, registrando
+`texturasDelTablero` cuando `!decodificaImagenes()` (`riberas-en-tres-escena.tsx`
+262–280), que con un `.glb` horneado no tiene nada que sustituir. El catálogo que
+recibe `<Delta>` (`modelos: CatalogoDeModelos`, un `ReadonlyMap` que
+`catalogoDeModelos` construye con los hijos directos de la escena) es la UNIÓN de los
+dos ficheros, con `dado` dentro; si `dados.glb` falla y `tablero.glb` no, el mapa va
+sin `dado` y `Dados` pinta el respaldo. Y como los demás modelos, se escala al
+instanciar, no al compilar.
 
 En pantalla cada dado mide **23,3 puntos en el SE apaisado**, 26,2 en un Android de
 360, 28,4 en un iPhone 14, 31,3 en un Pro Max, 55,9 en una tableta y 78,6 en un
@@ -1198,7 +1391,8 @@ comparado con lo único que hoy tiene cota:
 | La barra hoy: poblado 1.011 + ciudad 5.659 + puente 604 (leídos del `.glb`), 4 zócalos × 24, 4 asas × 12, placa 2, naipe (filo, cuerpo, icono de 16) | ≈ 7.450 | ≈ 16 |
 | Tapa horizontal 96×6 (679 vértices), sin canto | 1.152 | 1 |
 | Tapa a 240×6 (monitor) | 2.880 | 1 |
-| Dos dados (12 + 210 cada uno, puntos fundidos) | 444 | 4 |
+| Dos dados, el respaldo procedimental (12 + 210 cada uno, puntos fundidos): es `TRIANGULOS_DE_LOS_DADOS` | 444 | 4 |
+| Dos dados, el D6 del pack (`dados.glb`, §5.1) | por medir con el fichero; techo: 574 los dos (444 + los 130 de margen del tope) sin mover `TOPE_DE_LA_MESA` | 1 o 2 por dado, según traiga uno o dos materiales; se cuenta al compilar |
 | Asa de los dados | 12 | 1 |
 | Tapete del turno | 2 | 1 |
 | Seis sombras de contacto fundidas | 120 | 1 |
@@ -1211,7 +1405,13 @@ La mesa entera cuesta entre el 7,5 % y el 14,9 % del mar en triángulos (el 5,8 
 `pointLight` no es una llamada pero sí coste por fragmento en todo material
 iluminado; sigue habiendo dos (barra y baraja), ninguna nueva. `TOPE_DE_LA_MESA =
 3_600` en `presupuesto-del-delta.ts`, con `triangulosDeLaMesa(segmentos)` al lado
-para que el número salga de la misma cuenta en la escena y en el comprobador.
+para que el número salga de la misma cuenta en la escena y en el comprobador. Los
+totales de la tabla son los del respaldo; con el D6 del pack el total se mueve en lo
+que el modelo se aparte de 444, y `verify:dados` cuenta los triángulos del `.glb`
+contra `TRIANGULOS_DE_LOS_DADOS`, que es la constante que `triangulosDeLaMesa` ya
+suma: si el pack cuesta más, la constante se reescribe con el número medido, la cuenta
+del tope se rehace con ella, y el margen de 130 dice hasta dónde (574 los dos dados)
+sin tocar el tope. Un modelo que pese menos de 444 no da nada que hacer.
 
 **Texto en el lienzo:** una cifra compilada cuesta de 8 (el «4») a 160 (el «8»)
 triángulos, 60 de media, y una llamada. Un marcador de cuatro colonos con dos cifras
@@ -1230,23 +1430,29 @@ Las líneas de `delta.tsx` que cita este documento son las del commit `c9faef3`;
 | `escenas/barra.ts` | `PARTE_DEL_ALTO` 0,14; `SUELO_DEL_TOQUE = 44` exportado (el mismo número en la escena y en el comprobador); `huecosDeLaMesa(cuantos, campo, proporcion, altoEnPuntos)` con los tres peldaños; la cota de la tapa como función del hueco; la cabecera de `ANCHO_MAXIMO` reescrita |
 | `escenas/mesa.ts` (NUEVO en la fase 1, sin `three`) | `vetaDelTablon`, los dos colores medidos del atlas, la conversión a lineal, el número de segmentos por ancho en puntos, la Z de los bordes |
 | `escenas/tablon.ts` (NUEVO en la fase 2, CON `three` y sin React) | La tapa con su veta por vértice, las seis sombras fundidas y el tapete, como geometrías sueltas que `verify:escena` construye con el `three` de verdad y cuenta contra `triangulosDeLaMesa`; `delta.tsx` las llama y el comprobador lo afirma sobre su texto. Es lo que la fase 2, en curso mientras se escribe esto, está poniendo ahí: si al aterrizar se llama de otra forma, gana el código |
-| `escenas/dados.ts` (NUEVO, sin `three`) | `paresDeLaSuma`, `repartoDeLaTirada(suma, sello, semilla)`, `sacudida(t)`, `faseDeLosDados` con `rechazado`, `RODAR_MINIMO`, `ASENTAR`, `TOPE_SIN_RESPUESTA`; y las dos medidas del dado, `ARISTA_DEL_DADO = 0,52` y `PUNTO_DEL_DADO = 0,18`, con `DADO_MINIMO = 22` y `PUNTO_MINIMO = 4` al lado, para que la escena y el comprobador lean la misma (§1.15). `selloDeLaTirada` NO está aquí: vive en `shared/…/riberas-en-tres.ts` al lado de `dadosEnTres`, que es quien lo calcula, y el sello ya viaja hecho en `DadosEnTres` (§5.2) |
-| `escenas/presupuesto-del-delta.ts` | `SEGMENTOS_DE_LA_MESA` (mín, máx, puntos por segmento), `triangulosDeLaMesa`, `TOPE_DE_LA_MESA` |
+| `escenas/dados.ts` (NUEVO, sin `three`) | `paresDeLaSuma`, `repartoDeLaTirada(suma, sello, semilla)`, `sacudida(t)`, `faseDeLosDados` con `rechazado`, `RODAR_MINIMO`, `ASENTAR`, `TOPE_SIN_RESPUESTA`; y las dos medidas del dado, `ARISTA_DEL_DADO = 0,52` y `PUNTO_DEL_DADO = 0,18`, con `DADO_MINIMO = 22` y `PUNTO_MINIMO = 4` al lado, para que la escena y el comprobador lean la misma (§1.15); y `ARISTA_DEL_D6_EN_EL_PACK`, la arista del D6 de KayKit medida al compilar la primera vez, que la escena divide para escalarlo y el compilador contrasta (§5.1). `selloDeLaTirada` NO está aquí: vive en `shared/…/riberas-en-tres.ts` al lado de `dadosEnTres`, que es quien lo calcula, y el sello ya viaja hecho en `DadosEnTres` (§5.2) |
+| `escenas/presupuesto-del-delta.ts` | `SEGMENTOS_DE_LA_MESA` (mín, máx, puntos por segmento), `triangulosDeLaMesa`, `TOPE_DE_LA_MESA`; `TRIANGULOS_DE_LOS_DADOS` pasa a exportarse: es el presupuesto del respaldo (444) y el techo que `verify:dados` aplica al `.glb` (§5.1, §7) |
+| `escenas/nombres.ts` | `MODELO.dado`, el nombre del único nodo de `dados.glb`, que pasa `NOMBRE_QUE_SOBREVIVE` como los demás |
+| `escenas/ruta-de-modelos.ts` | `rutaDeLosDados()` al lado de `rutaDelTablero()`: `${RUTA_DE_MODELOS}/dados.glb` |
+| `escenas/scripts/compilar-dados.ts` (NUEVO) y `escenas/scripts/verificar-dados.ts` (NUEVO), `compilar:dados` y `verify:dados` en `escenas/package.json` | El compilador lee el D6 del pack con el `NodeIO` de `escritorDeGlb()` (atributos separados, como los otros dos), mide la caja envolvente en los tres ejes y la contrasta con `ARISTA_DEL_D6_EN_EL_PACK`, decide por el número de vértices y de colores si los puntos son geometría (si no, se niega y lo dice: gana el respaldo), hornea con `horneaLaPrimitiva` y `desnudaElMaterial`, renombra el nodo a `MODELO.dado` y escribe `escenas/modelos/dados.glb` sin escalar. El comprobador es `verificar-aventureros.ts` recortado a un fichero: `@gltf-transform` y el `GLTFLoader` de verdad, `COLOR_0` en todas las primitivas, ninguna textura, imagen ni UV, ningún atributo entrelazado, al menos dos colores distintos, la arista al 1 % de la constante, los triángulos por dos bajo `TRIANGULOS_DE_LOS_DADOS`, y un techo de kB escrito con el fichero delante (§5.1) |
+| `escenas/modelos/dados.glb` (NUEVO, versionado como `tablero.glb`) | El D6 horneado, un nodo `dado`, a la unidad del pack |
+| `server/src/routes/modelos.ts` | La ruta fija `/arcade/modelos/dados.glb`, gemela de la de `embarcadero.glb`: nombre fijo, sin comodín |
+| `arte/README.md` | La fila del pack Board Game Bits en la tabla, la carpeta `arte/kaykit/board-game-bits/`, y de qué salen los dados |
 | `escenas/cartas.ts` | SÓLO las dos frases que citan el techo de la placa (26 y 408), dos veces: en la fase 1 la placa con 0,14 (`−0,240·alto`), en la fase 2 el asa y el bote (`−0,273·alto`, §1.2); ninguna constante |
 | `escenas/baraja.ts` | Nada |
 | `escenas/cinta.ts` (NUEVO, sin `three`) | `anchoDeLaCinta(ancho, alto)`: el tercio en apaisado, el 40 % de pie (§2.2) |
-| `escenas/delta.tsx` | `Barra` → tapa horizontal, sombras, tapete, pila; `Dados` hermano de `PiezaEnLaBarra`, que sólo empuja `tocado` si `disponible`; entradas `dados`, `onPulsarLosDados`, `mesaRecogida` de `<Delta>`, opcionales como las otras; la constante de su capa en los diez `<group>` de la tabla del §4.1 —`ORDEN_DE_LA_BARRA` en los cuatro de `PiezaEnLaBarra` y `MazoEnLaBarra` (1138, 1180, 1276, 1303), `ORDEN_DE_LAS_CARTAS` en `Baraja` (1875) y `Carta` (1647), `ORDEN_DE_LAS_AREAS` en `AreaDeTrueque` (1740), `ORDEN_DE_LAS_CARTAS_DEL_MAZO` en `ManoDelMazo` (2259) y `CartaDelMazoEnLaMano` (1981), `ORDEN_DE_LAS_CASILLAS` en `Casilla` (2102)—, el testigo de la barra a −1 y **el testigo de la `Baraja` (1876) QUITADO**, los tres en el mismo empujón (§4.1); los `<group>` de `Dados` con `ORDEN_DE_LA_BARRA`; el color de reposo del zócalo de `#c8b48a` a `#683b2e` y el de «encima» a `#7f4837` (1173, §1.14); `huecosDeLaMesa` sólo con `dados !== null` y `huecosDeLaBarra` como hoy si no (§4.4); la cabecera de `ORDEN_DE_LA_BARRA`, la de `Barra` y el comentario de la carta (1626–1630) reescritos, éste sin `<group` literal a principio de línea |
-| `escenas/scripts/verificar-escena.ts` | Los lienzos apaisados y 768×1024; los tres peldaños de los dados; la mesa contra las manos; el reparto por sello; la veta; el tope; la línea de «tres y cuatro» reescrita; «la mano del mazo no invade la zona de la barra» contra `0,52·lado` en la fase 2; los ocho grupos de dentro más `Baraja` y `ManoDelMazo` con la constante de su capa y el testigo a −1 (texto, §4.1, con la regla de «la primera línea que empieza por `<group`»; los exteriores solos no prueban nada); que el único `clearDepth` de `delta.tsx` es el de la barra (texto, fase 2); los grupos de `Dados` (fase 3) y de la pila (fase 7) con `ORDEN_DE_LA_BARRA`; que donde hay dados el dado no baja de 22 puntos ni el punto de 4, con `ARISTA_DEL_DADO` y `PUNTO_DEL_DADO` (fase 3, §1.15); que `huecosDeLaMesa` sólo se pide con `dados !== null` (texto, §4.4); el vértice más alto bajo la cinta al salir; la cinta apaisada y de pie contra las manos; que seis fichas de 44 caben bajo la cinta en todos los lienzos (`6 · 44 ≤ alto − 44 − inset`, §1.11) |
+| `escenas/delta.tsx` | `Barra` → tapa horizontal, sombras, tapete, pila; `Dados` hermano de `PiezaEnLaBarra`, que sólo empuja `tocado` si `disponible`; entradas `dados`, `onPulsarLosDados`, `mesaRecogida` de `<Delta>`, opcionales como las otras; la constante de su capa en los diez `<group>` de la tabla del §4.1 —`ORDEN_DE_LA_BARRA` en los cuatro de `PiezaEnLaBarra` y `MazoEnLaBarra` (1138, 1180, 1276, 1303), `ORDEN_DE_LAS_CARTAS` en `Baraja` (1875) y `Carta` (1647), `ORDEN_DE_LAS_AREAS` en `AreaDeTrueque` (1740), `ORDEN_DE_LAS_CARTAS_DEL_MAZO` en `ManoDelMazo` (2259) y `CartaDelMazoEnLaMano` (1981), `ORDEN_DE_LAS_CASILLAS` en `Casilla` (2102)—, el testigo de la barra a −1 y **el testigo de la `Baraja` (1876) QUITADO**, los tres en el mismo empujón (§4.1); los `<group>` de `Dados` con `ORDEN_DE_LA_BARRA`; el color de reposo del zócalo de `#c8b48a` a `#683b2e` y el de «encima» a `#7f4837` (1173, §1.14); `huecosDeLaMesa` sólo con `dados !== null` y `huecosDeLaBarra` como hoy si no (§4.4); `Dados` busca `MODELO.dado` en el catálogo, lo escala con `ARISTA_DEL_DADO · lado / ARISTA_DEL_D6_EN_EL_PACK` y pinta el respaldo procedimental si no está (§5.1); la cabecera de `ORDEN_DE_LA_BARRA`, la de `Barra` y el comentario de la carta (1626–1630) reescritos, éste sin `<group` literal a principio de línea |
+| `escenas/scripts/verificar-escena.ts` | Los lienzos apaisados y 768×1024; los tres peldaños de los dados; la mesa contra las manos; el reparto por sello; la veta; el tope; la línea de «tres y cuatro» reescrita; «la mano del mazo no invade la zona de la barra» contra `0,52·lado` en la fase 2; los ocho grupos de dentro más `Baraja` y `ManoDelMazo` con la constante de su capa y el testigo a −1 (texto, §4.1, con la regla de «la primera línea que empieza por `<group`»; los exteriores solos no prueban nada); que el único `clearDepth` de `delta.tsx` es el de la barra (texto, fase 2); los grupos de `Dados` (fase 3) y de la pila (fase 7) con `ORDEN_DE_LA_BARRA`; que donde hay dados el dado no baja de 22 puntos ni el punto de 4, con `ARISTA_DEL_DADO` y `PUNTO_DEL_DADO` (fase 3, §1.15); que `huecosDeLaMesa` sólo se pide con `dados !== null` (texto, §4.4); el vértice más alto bajo la cinta al salir; la cinta apaisada y de pie contra las manos; que seis fichas de 44 caben bajo la cinta en todos los lienzos (`6 · 44 ≤ alto − 44 − insetDeAbajo`, §1.11). Para eso la lista `LIENZOS` de la fase 5 gana una CUARTA columna, el inset de abajo: 0 en todos salvo 844×390 → 21, 932×430 → 21 y 1180×820 → 20 (`medir-cajon.ts`, §1); hoy las dos listas `LIENZOS` del comprobador (la de la barra y la de la tapa) son `Array<[string, number, number]>`, sin inset, y la muesca lateral (24/47/59, §3 y §4.4) es OTRO dato que no entra en ninguna lista, porque la escena no la conoce; que `Dados` lee `MODELO.dado` y tiene el respaldo (texto, §5.1) |
 | `shared/arcade/juegos/riberas-en-tres.ts` | `tirado`, `ultimaTirada`, `turnosAbiertos` en `VistaQueSePinta` (y los dos comentarios de `comprada`, 51–53 y 170–175, reescritos: §1.3); `dadosEnTres` (`null` fuera de `jugando`), `opcionesFueraDeLaMesa`, `chozas`/`torres` en `ColonoEnElMarcador` |
 | `server/scripts/verificar-riberas-en-tres.ts` | Que TIRAR se cae del formulario sólo con dados; que `porTirar` sigue a las opciones enteras; que `dadosEnTres` es `null` fuera de `jugando`; que las cuentas de chozas y torres cuadran con la vista |
 | `app/src/arcade/mesa.ts`, `escritorio/src/mesa.ts` | `mover` devuelve `'hecho' \| 'rechazado' \| 'sin-red'`, con el `return` temprano resuelto a `'rechazado'` (tabla del §5.3) |
 | `app/src/arcade/local.ts` | `volverAlRetrato()`; `usarElAparatoQuieto` lo usa al desmontar; `usarApaisado` al lado, y `usarLaPantallaEncendida` con `activateKeepAwakeAsync` / `deactivateKeepAwake` como el juego local (378–381; §1.13) |
-| `app/src/arcade/riberas-en-tres-escena.tsx`, `app/src/arcade/hud-de-la-mesa.tsx` (NUEVO) | La rama del delta a pantalla completa; la cinta del tercio central con la ficha de mis puntos en el sitio del «≡»; el cajón del ancho de la cinta con el marcador de seis en fichas de 44, la línea de la mesa, los botones y la crónica, desplazable (§1.11); barra de estado oculta; cartel de girar; la acción accesible `tirar` |
-| `escritorio/src/riberas-en-tres.tsx`, `escritorio/src/sala.tsx`, `escritorio/src/estilo.css` | La misma cinta en DOM con la ficha de mis puntos; el raíl como cajón del ancho de la cinta, con el marcador el primero y `MarcadorDeRiberas` pintando la ficha de 44; `.riberas-lienzo` a `calc(100vh − alto de la cabecera)` con la cabecera de la Sala en su sitio (§1.12); el botón de tirar para tecnologías de apoyo |
+| `app/src/arcade/riberas-en-tres-escena.tsx`, `app/src/arcade/hud-de-la-mesa.tsx` (NUEVO) | La rama del delta a pantalla completa; la cinta del tercio central con la ficha de mis puntos en el sitio del «≡»; el cajón del ancho de la cinta con el marcador de seis en fichas de 44 («vado L · N chozas · M torres» en el segundo renglón), la línea de la mesa, los botones y la crónica, desplazable (§1.11); barra de estado oculta; cartel de girar; la acción accesible `tirar`; `catalogoDelTablero` pide `dados.glb` a la vez que el tablero y une los dos catálogos (§5.1) |
+| `escritorio/src/riberas-en-tres.tsx`, `escritorio/src/sala.tsx`, `escritorio/src/estilo.css` | La misma cinta en DOM con la ficha de mis puntos; el raíl como cajón del ancho de la cinta, con el marcador el primero y `MarcadorDeRiberas` pintando la ficha de 44; la página como columna flex con `.riberas-lienzo { flex: 1; min-height: 0 }` y la cabecera de la Sala en su sitio, sin variable de alto (§1.12); el botón de tirar para tecnologías de apoyo; `traerElCatalogo` con los dos ficheros (§5.1) |
 
 ## 9. Cómo se midió
 
-Veintiún guiones en el scratchpad de la sesión, que importan el código real. De la
+Veintitrés guiones en el scratchpad de la sesión, que importan el código real. De la
 primera pasada: `medir-lienzos.ts` (huecos, manos y franjas en catorce lienzos con el
 0,13 de hoy), `medir-dados-hueco.ts` (el hueco de los dados colgado y como quinto),
 `medir-con-014.ts` (las mismas cuentas con `PARTE_DEL_ALTO` a 0,14: reproduce la
@@ -1287,10 +1493,34 @@ transparentes de la mesa). De la quinta, para las decisiones de Miguel:
 0,52, el peldaño de cada uno, y los tres umbrales: la proporción del colgado, el alto
 en que el asa colgada llega a 44 y el ancho en que llega el quinto) y `medir-cajon.ts`
 (el cajón del ancho de la cinta con seis fichas de 44 en cada lienzo, con el inset de
-abajo, qué asoma al abrirlo, y su aire a las dos manos). Donde un número de aquí viene
-del 0,13 se dice; los del 0,14 son los que valen. Lo que se afirma en este documento se
-convierte en comprobaciones de `verify:escena` en la fase 1: el guion de la sesión se
-tira, el comprobador se queda.
+abajo, qué asoma al abrirlo, y su aire a las dos manos). De la sexta, tras la quinta
+revisión: `revisar-cajon-sobre-la-barra.ts` (cuánto de cada hueco de la barra y del
+asa de los dados colgados queda bajo el cajón abierto, en los quince lienzos; es lo que
+puso la frase de la barra en el §1.11), los §3 a §5 de `medir-cajon.ts` REESCRITOS con
+la ficha del §1.11 (dos renglones y 58 de fijo, no 86: lo que queda para cada renglón,
+lo que se ve del segundo en cada lienzo con el vado primero, con las chozas primero y
+partido en tres, y el alto de dos renglones a 17 frente a tres a 13; el §3 anterior
+imprimía 103 y 42 y el documento decía 131 y 70 sin guion detrás) y
+`medir-textura-del-dado.ts` (lo que pesa una textura del dado compilada a tabla en
+base64 a 256², 512² y 1024² frente a los 8×1024 del atlas, lo que pesan en memoria los
+dos dados procedimentales con `three`, y lo que añade `COLOR_0` a un D6 horneado por
+vértice: es lo que decide la ruta (b) del §5.1 antes de tener el fichero). Donde un
+número de aquí viene del 0,13 se dice; los del 0,14 son los que valen. Lo que se afirma
+en este documento se convierte en comprobaciones de `verify:escena` en la fase 1: el
+guion de la sesión se tira, el comprobador se queda.
+
+**Lo que se medirá con el pack Board Game Bits delante**, en cuanto Miguel lo deje en
+`arte/kaykit/board-game-bits/` o dé permiso para bajarlo (nadie lo baja por su cuenta),
+con un guion del scratchpad primero y con `compilar-dados.ts` después, y se escribe
+aquí con el número: la arista de la caja envolvente del D6 en los tres ejes (`getMin` /
+`getMax` de `POSITION`), que es lo que pasa a `ARISTA_DEL_D6_EN_EL_PACK`; sus
+triángulos y vértices, y cuántas primitivas y materiales trae (una o dos llamadas por
+dado, §7); si los puntos son GEOMETRÍA o están PINTADOS (el número de vértices, 24 es
+una caja pelada, y cuántos colores distintos quedan tras hornear); el tamaño y el
+nombre de su textura individual, y si por casualidad fuera plana por columnas; los kB
+del `.glb` compilado, que fijan el techo de `verify:dados`; y los triángulos por dos
+contra los 444 del respaldo y los 574 del margen del tope (§5.1). Hasta entonces el
+§5.1 es una regla con las dos salidas escritas, no una medida.
 
 ## 10. Lo que NO entra, y las decisiones abiertas con dueño
 
@@ -1308,15 +1538,16 @@ lo que aquí se dice):
 | Qué | Lo que hay decidido | Quién la cierra |
 |---|---|---|
 | La Z del borde delantero de la tapa | `−(−cota / tan(campo/2))`: donde cruza el canto de abajo (−1,649 en apaisado). Si en el banco la madera se ve corta por delante, se alarga hacia la cámara, nunca hacia atrás | Fase 2, en `banco3d.html` |
-| Dados en los lienzos de pie | Regla de los tres peldaños del §4.4, con los umbrales de la decisión 15: quinto desde 375 puntos de ancho (390 sí, 360 y 320 no). Si la app un día pinta el delta de pie en 360 de ancho, no hay dados y TIRAR está en la cinta | Fase 3, medido por `verify:escena` |
-| Cuándo la frase pasa a dos líneas dentro de los 44 y cuándo a puntos suspensivos; y a qué largo se recorta el nombre en la ficha de 44 del cajón | La frase no hace crecer la cinta (§2.2): dos líneas de 17 caben en 44. El hueco está medido (`ancho/3 − 88`: 101–552 puntos apaisado; 40–219 de pie al 40 %), y el de la ficha también (131 puntos para los dos renglones en el SE, 70 en 320×360; §1.11); el ancho del texto con la fuente de la casa no se mide en Node | Fase 5, en el banco, y se dejan escritos la letra, el interlineado y el número |
+| Cuándo la frase pasa a dos líneas dentro de los 44 y cuándo a puntos suspensivos; y a qué ancho exacto se recorta el segundo renglón de la ficha de 44 del cajón | La frase no hace crecer la cinta (§2.2): dos líneas de 17 caben en 44. El hueco está medido (`ancho/3 − 88`: 101–552 puntos apaisado; 40–219 de pie al 40 %), y el de la ficha también (131 puntos para cada renglón en el SE, 164 en el SE 2, 70 en 320×360; `medir-cajon.ts`, §3). Lo que se recorta en el SE, en el SE 2 y en los teléfonos de pie es el SEGUNDO renglón, no el nombre, y el orden ya está decidido (el vado primero, §1.11); el ancho del texto con la fuente de la casa no se mide en Node | Fase 5, en el banco, y se dejan escritos la letra, el interlineado y el número |
 | La línea de botones sobre el vértice lejano | Bajo la primera línea, en el tercio central; tapa el vértice más lejano en los teléfonos apaisados al salir (63–84 puntos) y se saca con 7–37 puntos de arrastre (§2.2). La alternativa medida es a la derecha del tercio, en los 155 (SE) – 240 (iPhone 14) puntos de aire hasta la mano de bienes | Fase 5, en el banco; si se mueve, se vuelve a medir contra la mano de bienes abierta |
 | El tono exacto del posavasos y de su «encima» | `#683b2e` y `#7f4837`, la celda oscura del atlas al 70 % y al 85 % (§1.14); se afina en el banco, de madera y sin salir del atlas | Fase 2, en `banco3d.html` |
 | La coexistencia de los dos bloqueos de orientación | No coexisten (`LOS_QUE_PINTA` pinta un arcade), los dos vuelven por `volverAlRetrato()`, y se prueba entrando y saliendo en el aparato | Fase 6 |
 
-Dos filas que había aquí se han ido porque ya están decididas: el testigo de la
-`Baraja` (está medido, no «si en el banco se ve»: se quita en la fase 2, §4.1) y la
-carta cogida cuando la mesa sale sola (Miguel la cerró: decisión 16). Y las siete
+Tres filas que había aquí se han ido porque ya están decididas: el testigo de la
+`Baraja` (está medido, no «si en el banco se ve»: se quita en la fase 2, §4.1), la
+carta cogida cuando la mesa sale sola (Miguel la cerró: decisión 16) y los dados en los
+lienzos de pie (ya decidida: la decisión 15 y el §4.4, quinto desde 375 puntos de
+ancho, sin dados en 320 y 360; la fase 3 la mide en `verify:escena`). Y las siete
 **dudas para Miguel** que cerraban este apartado las resolvió él la noche del 5 de
 septiembre de 2026; están en el §1 —la primera dentro de la decisión 3, las demás en
 las decisiones 11 a 16— con lo que cada una obliga a medir ya medido. No queda ninguna
@@ -1366,7 +1597,7 @@ depende de la siguiente.
    sobre la madera son decisiones que un comprobador no puede juzgar. Lo del anillo de
    una señal sobre la tapa ya no se mira ahí: está medido y el testigo que lo causaba
    se va; lo que quede de anillo sin profundidad es lo preexistente de la nota del §4.1.
-3. **Los dados.** `Dados` en la escena —dos cubos de `ARISTA_DEL_DADO` (0,52 lados) con
+3. **Los dados.** `Dados` en la escena —dos dados de `ARISTA_DEL_DADO` (0,52 lados) con
    los puntos al 18 %, todo `<group>` suyo con `ORDEN_DE_LA_BARRA` y `verify:escena`
    leyéndolo por texto tras `function Dados(` (§4.1), y exigiendo dado de 22 y punto de 4
    donde hay dados (§1.15)—, con `disponible` como única llave del toque y
@@ -1377,18 +1608,39 @@ depende de la siguiente.
    `mesa.ts` con el `return` temprano resuelto a `'rechazado'` y el `switch`
    exhaustivo en la pantalla (§5.3); la acción accesible; y el botón TIRAR se cae de la
    cinta donde hay dados. Primero en el escritorio, que es donde el delta se ve hoy.
+   La MALLA, en este orden y sin que lo segundo espere a lo primero: el respaldo
+   procedimental (la caja con los 21 puntos, §5.1) entra con `Dados` y es lo que se
+   pinta mientras no haya `dado` en el catálogo; y en cuanto el pack Board Game Bits
+   esté en `arte/kaykit/board-game-bits/`, se mide lo del §9 con un guion, se decide
+   por el número de vértices y de colores si los puntos son geometría, y si lo son se
+   escriben `compilar-dados.ts` y `verificar-dados.ts` (con `hornear.ts`, la caja
+   envolvente contra `ARISTA_DEL_D6_EN_EL_PACK`, el techo de `TRIANGULOS_DE_LOS_DADOS`),
+   se versiona `escenas/modelos/dados.glb`, se abre su ruta fija en
+   `server/src/routes/modelos.ts` y `rutaDeLosDados()`, y las dos pantallas lo piden a
+   la vez que el tablero y unen los catálogos; `verify:dados` entra en `npm run
+   verificar` al lado de `verify:aventureros`. Si los puntos están pintados, gana el
+   respaldo y no se escribe nada de esto (§5.1, ruta (b), medida en
+   `medir-textura-del-dado.ts`). El D6 se mira en el banco antes de empujar: que los
+   puntos se lean a 23 puntos en el SE es una decisión que un comprobador no juzga.
 4. **Recoger la mesa.** El botón, la bajada, `soltarTodo`, la vuelta sola al tocarme
    con la espera si hay una carta cogida.
 5. **Pantalla completa en el escritorio.** La cinta del tercio central (y del 40 % de
    pie) con `anchoDeLaCinta` en `escenas/cinta.ts` y la ficha de mis puntos en el sitio
    del «≡»; el cajón del ancho de la cinta con el marcador de SEIS el primero, en fichas
-   de 44 (chozas y torres), la línea de la mesa, los botones y la crónica, desplazable
-   (§1.11); el lienzo a `calc(100vh − cabecera)`, con la cabecera de la Sala en su sitio
-   (§1.12); la letra y el interlineado con que la frase cabe a dos líneas en 44, el
-   ancho al que se recorta y el largo al que se recorta el nombre en la ficha, medidos
-   en el banco y escritos; y dónde va la línea de botones (§10). En `verify:escena`,
-   tres comprobaciones nuevas: que seis fichas de 44 caben bajo la cinta en todos los
-   lienzos de la lista con su inset (`264 ≤ alto − 44 − inset`; el SE deja 12); que al
+   de 44 («vado L · N chozas · M torres» en el segundo renglón), la línea de la mesa,
+   los botones y la crónica, desplazable (§1.11); la página como columna flex con
+   `.riberas-lienzo { flex: 1; min-height: 0 }` y la cabecera de la Sala en su sitio
+   con su alto natural (§1.12: no hay variable de alto que restar, y en el banco se mide
+   lo que la cabecera mide en una fila y en dos para dejar de llamar ilustrativo al 48);
+   la letra y el interlineado con que la frase cabe a dos líneas en 44, el ancho al que
+   se recorta, y el ancho exacto al que se recorta el segundo renglón de la ficha
+   (el orden ya está decidido, §1.11), medidos en el banco y escritos; y dónde va la
+   línea de botones (§10). En `verify:escena`, tres comprobaciones nuevas: que seis
+   fichas de 44 caben bajo la cinta en todos los lienzos de la lista con su inset de
+   abajo (`264 ≤ alto − 44 − insetDeAbajo`; el SE deja 12), para lo que la lista
+   `LIENZOS` de esta fase gana una cuarta columna con ese inset (0 salvo 844×390 → 21,
+   932×430 → 21, 1180×820 → 20; hoy las dos listas son `[string, number, number]` sin
+   él, y la muesca lateral de los dados es otro dato que no entra, §1.11); que al
    mirador de salida ningún vértice de los 54 cae bajo
    la cinta (a menos de 44 puntos del canto de arriba dentro de la banda de la cinta)
    en ninguno de los lienzos, con la cámara de verdad (`ojoYMira` sobre

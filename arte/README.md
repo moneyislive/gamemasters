@@ -6,7 +6,7 @@ Este fichero es la receta para rehacerlo.
 
 ## Qué hay que bajarse
 
-Cuatro packs de [Kay Lousberg](https://kaylousberg.com), todos con licencia **CC0**
+Cinco packs de [Kay Lousberg](https://kaylousberg.com), todos con licencia **CC0**
 (`License.txt` dentro de cada uno). CC0 significa dominio público: se pueden usar en
 proyectos personales, educativos y comerciales, sin obligación de citar. Citarle no es
 obligatorio y se hace igual, que para eso está el `NOTICE`.
@@ -17,6 +17,14 @@ obligatorio y se hace igual, que para eso está el `NOTICE`.
 | `arte/kaykit/hexagon-extra/` | KayKit Medieval Hexagon Pack 1.0 **EXTRA** | el mismo, comprando el EXTRA |
 | `arte/kaykit/adventurers/` | KayKit Adventurers 2.0 FREE | [itch.io](https://kaylousberg.itch.io/kaykit-adventurers) |
 | `arte/kaykit/resource-bits/` | KayKit Resource Bits 1.0 FREE | [itch.io](https://kaylousberg.itch.io/resource-bits) |
+| `arte/kaykit/board-game-bits/` | KayKit Board Game Bits 1.0 FREE | [itch.io](https://kaylousberg.itch.io/board-game-bits) |
+
+De Board Game Bits sale una sola cosa: el D6 que son los dados de la mesa de Riberas
+(`docs/LA-MESA-DE-RIBERAS.md` §5.1), compilado a `escenas/modelos/dados.glb` con
+`escenas/scripts/compilar-dados.ts`, aparte del tablero. Es el único pack cuyas piezas
+llevan texturas individuales además del atlas (las cartas y los dados, según su
+página), y por eso ese compilador se niega si los puntos del dado no son geometría:
+horneados a vértice desaparecerían, y entonces la mesa pinta su dado procedimental.
 
 El EXTRA se paga (unos 10 €) y **hace falta**: de ahí salen los barcos, los muelles, las
 teselas de río y de costa, las variantes de camino y las texturas de bioma. Sin él, el
