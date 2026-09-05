@@ -26,8 +26,17 @@ import { ProveedorPartida } from '../src/estado';
 import { TelonDeAvisos } from '../src/avisos';
 import { FranjaDeConexion } from '../src/conexion';
 import { useTema } from '../src/tema-juego';
+import { CazaFallos, UltimoFallo, armarElParteDeFallos } from '../src/parte-de-fallos';
 
 void SplashScreen.preventAutoHideAsync();
+
+/*
+ * EL PARTE DE FALLOS SE ARMA AQUÍ, antes de que exista ninguna pantalla: un error que
+ * cierre la app tiene que quedar apuntado aunque ocurra en el primer render. Ver
+ * `src/parte-de-fallos.tsx` para el fallo que motivó esto (la 1.3.0 se cerraba al abrir
+ * Riberas sin decir por qué).
+ */
+armarElParteDeFallos();
 
 export default function Raiz(): JSX.Element | null {
   const [cinzel, errorCinzel] = useCinzel({ Cinzel_600SemiBold, Cinzel_700Bold });
@@ -72,9 +81,12 @@ export default function Raiz(): JSX.Element | null {
       <SafeAreaProvider>
         <ProveedorPartida>
           <StatusBar style="light" />
-          <PilaDePantallas />
+          <CazaFallos>
+            <PilaDePantallas />
+          </CazaFallos>
           <FranjaDeConexion />
           <TelonDeAvisos />
+          <UltimoFallo />
         </ProveedorPartida>
       </SafeAreaProvider>
     </GestureHandlerRootView>
