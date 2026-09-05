@@ -948,11 +948,26 @@ paso('El mazo de Riberas se juega desde la app, y en las DOS ramas');
 
   /* ─── La mano llega a la escena, y llega traducida ─── */
 
+  /*
+   * LA MANO SALE COMPUESTA, Y ESA COMPOSICIÓN NO PUEDE VOLVER AL CLIENTE.
+   *
+   * Era `cartasEnTres(laVista, opciones)` a secas, y con eso la franja de la izquierda
+   * enseñaba las cartas del mazo y NADA MÁS: quien ganaba El Vado Largo se llevaba los dos
+   * puntos y no veía aparecer nada en su mano. `laManoDeLaIzquierda` pega los premios
+   * delante, y vive en `shared/` para que las dos pantallas no puedan discrepar.
+   *
+   * Se prohíbe además `cartasEnTres` a secas en esta línea, y eso es lo que compra de
+   * verdad: volver a la llamada de antes deja una pantalla que compila, pasa los tipos y
+   * pierde otra vez los premios sin que se caiga ni un comprobador de reglas.
+   */
+  const manoDeLaEscena =
+    /const cartasDelMazo = useMemo\(([\s\S]*?)\n  \);/.exec(escenaSinComentarios)?.[1] ?? '';
   comprobar(
-    'la mano del mazo sale de `cartasEnTres` y se le da a `<Delta>`',
-    /const cartasDelMazo = useMemo\(\(\) => cartasEnTres\(laVista, opciones\)/.test(escena) &&
+    'la mano de la izquierda sale COMPUESTA (`laManoDeLaIzquierda`) y se le da a `<Delta>`',
+    /laManoDeLaIzquierda\(laVista, opciones, yo\)/.test(manoDeLaEscena) &&
+      !/cartasEnTres\(/.test(manoDeLaEscena) &&
       /cartasDelMazo=\{cartasDelMazo\}/.test(escena),
-    'sin esto la franja de la izquierda no se pinta y las cartas no existen en la pantalla',
+    'con `cartasEnTres` a secas la franja pinta las cartas y pierde los dos premios, y nada falla',
   );
   comprobar(
     'y con ella los tres avisos que la escena da: coger, jugar y revelar',
@@ -987,11 +1002,11 @@ paso('El mazo de Riberas se juega desde la app, y en las DOS ramas');
     'la exclusión tiene que valer en las dos direcciones o no es una exclusión',
   );
   comprobar(
-    'y al cambiar la revisión de la mesa se suelta TAMBIÉN el naipe y la hoja abierta',
+    'y al cambiar la revisión de la mesa se suelta TAMBIÉN el naipe y LAS TRES hojas abiertas',
     /ponerCogidaDelMazo\(null\);/.test(escenaSinComentarios) &&
-      /ponerComoJugarla\(null\);\n  \}, \[\]\);/.test(escenaSinComentarios) &&
+      /ponerComoJugarla\(null\);\n    ponerComprando\(null\);\n  \}, \[\]\);/.test(escenaSinComentarios) &&
       /\}, \[vista\.rev, soltarTodo\]\);/.test(escenaSinComentarios),
-    'una hoja de «¿a quién le robas?» abierta con las opciones de antes manda un movimiento muerto',
+    'una hoja abierta —«¿a quién le robas?», «¿compras una carta?»— con las opciones de antes manda un movimiento muerto',
   );
 
   /* ─── Jugar: se pregunta sólo cuando hay que elegir, y viaja la opción entera ─── */
@@ -1041,14 +1056,74 @@ paso('El mazo de Riberas se juega desde la app, y en las DOS ramas');
     'quince botones de 44 miden casi ochocientos puntos y la caja del lienzo mide 360',
   );
 
-  /* ─── Comprar, que no es de la mano ─── */
+  /* ─── Comprar: ya no es un botón, es el cuarto hueco de la barra ─── */
 
+  /*
+   * AQUÍ SE EXIGÍA LO CONTRARIO, Y SE HA DADO LA VUELTA.
+   *
+   * La regla vieja decía «COMPRAR no se filtra con la mano y su botón sigue diciendo lo
+   * que cuesta», y era verdad mientras el único sitio donde se ofrecía era el pie. Ahora
+   * hay un cuarto hueco en la barra con un naipe tapado que se pulsa, así que dejar
+   * también el botón sería ofrecer el mismo movimiento dos veces en la misma pantalla.
+   *
+   * No se borra: se le da la vuelta y se le añade la mitad que faltaba. Lo que hay que
+   * impedir ahora son dos cosas a la vez —que salga dos veces con delta, y que no salga
+   * NINGUNA sobre el respaldo— y las dos las ata el mismo dato: `opcionesFueraDeLaBarra`
+   * recibe EL MAZO y no un interruptor, así que el botón desaparece exactamente donde el
+   * naipe aparece.
+   */
   comprobar(
-    'COMPRAR no se filtra con la mano y su botón sigue diciendo lo que cuesta',
-    /opcionesFueraDeLaMano\(opcionesFueraDelTablero\(opciones\)\)/.test(escenaSinComentarios) &&
-      !codigoDeLaEscena.some((l) => /\bCOMPRAR\b|riberas:comprar/.test(l)) &&
-      /\{o\.ayuda\}/.test(mueble),
-    'comprar no cuelga de ningún naipe: su único sitio es el botón, y el coste va en su ayuda',
+    'COMPRAR se cae del pie con `opcionesFueraDeLaBarra`, y pasándole EL MAZO, no un interruptor',
+    /opcionesFueraDeLaBarra\(opcionesFueraDeLaMano\(opcionesFueraDelTablero\(opciones\)\), mazo\)/.test(
+      escenaSinComentarios,
+    ),
+    'con un `true` escrito a mano, el botón y el naipe se separan el día que uno de los dos cambie',
+  );
+  comprobar(
+    'el cuarto hueco se lo pide a las reglas: `mazoEnLaBarra`, y ni rastro del coste de la carta',
+    /const mazo = useMemo\(/.test(escenaSinComentarios) &&
+      /mazoEnLaBarra\(laVista, yo, opciones\)/.test(escenaSinComentarios) &&
+      !/COSTE_DE_LA_CARTA/.test(escena),
+    'recalcular el coste en el cliente es la fuga contra la que existe `riberas-en-tres.ts`',
+  );
+  comprobar(
+    'y se lo pasa a la escena por su entrada propia, con el aviso de pulsación',
+    /mazo=\{mazo\}/.test(escena) && /onPulsarElMazo=\{alPulsarElMazo\}/.test(escena),
+    'sin las dos entradas la barra sigue teniendo tres huecos y nadie se entera',
+  );
+  comprobar(
+    'el nombre del movimiento sigue sin escribirse en la pantalla: se pide por `comprarEnTres`',
+    /comprarEnTres\(opciones\)/.test(escenaSinComentarios) &&
+      !codigoDeLaEscena.some((l) => /\bCOMPRAR\b|riberas:comprar/.test(l)),
+    'colgar un movimiento de su identificador escrito a mano es colgarlo de un rótulo',
+  );
+  comprobar(
+    'y en el móvil `laInterfazSeLoQueda()` va LA PRIMERA, antes de mirar si se puede',
+    /const alPulsarElMazo = useCallback\(\(\) => \{\n    laInterfazSeLoQueda\(\);/.test(escenaSinComentarios),
+    'el WeakSet de camara.ts no puede casar los dos sucesos en nativo: sin esta línea el giro le roba el dedo',
+  );
+  comprobar(
+    'y se CONFIRMA siempre, aunque la opción sea única: pulsar el mazo abre la hoja y no manda nada',
+    /ponerComprando\(comprar\);\n  \}, \[laInterfazSeLoQueda, mesa\.quieto, opciones\]\);/.test(
+      escenaSinComentarios,
+    ) && !/const alPulsarElMazo = useCallback\(\(\) => \{[\s\S]*?mesa\.mover\([\s\S]*?\n  \}, \[laInterfazSeLoQueda/.test(escenaSinComentarios),
+    'el naipe vive en la franja de abajo, donde el pulgar ya está: un roce gastaría tres bienes que no vuelven',
+  );
+  comprobar(
+    'la hoja de comprar va FUERA del GestureDetector, hermana de las otras dos',
+    /<HojaDeComprar/.test(escena) &&
+      escena.indexOf('</GestureDetector>') < escena.indexOf('<HojaDeComprar'),
+    'un Pressable dentro del detector le pelea el toque al giro del tablero',
+  );
+  comprobar(
+    'y no redacta ni una palabra de la jugada: rótulo y ayuda son los del juego',
+    /\{comprar\.rotulo\}/.test(escena) && /\{comprar\.ayuda\}/.test(escena),
+    'lo que cuesta una carta y cuántas quedan son reglas de Riberas, no texto de esta pantalla',
+  );
+  comprobar(
+    'y el botón del mueble sigue diciendo su ayuda, que es lo que salva al respaldo',
+    /\{o\.ayuda\}/.test(mueble),
+    'sobre el retablo comprar sigue siendo un botón, y su coste va en la ayuda',
   );
 
   /* ─── El respaldo: donde no hay franja, las cartas son botones ─── */
@@ -1099,6 +1174,39 @@ paso('El mazo de Riberas se juega desde la app, y en las DOS ramas');
     'lo que no está en la vista no se puede pintar, ni con un valor por defecto',
   );
   /*
+   * ═══ Y CUÁNTO MIDE LA CADENA DE CADA UNO, CON EL MÍNIMO SACADO DE LA REGLA ═══
+   *
+   * La cinta nombraba «Vado largo» a quien ya lo tenía y callaba con todos los demás. A
+   * Miguel, que encadenó veredas y no vio el premio, esa cinta no le decía nada. Ahora
+   * cada ficha lleva su cifra y, cuando el premio no es suyo, cuántas hacen falta.
+   *
+   * Lo que se persigue aquí es la FRASE ESCRITA A MANO. La primera versión de la ficha la
+   * escribía ella —«vado N de M»— y mentía en el peor caso: al segundo que llegaba a cinco
+   * le decía «vado 5 de 5», con cero puntos de premio, porque el premio sólo se mueve a
+   * quien SUPERA al dueño. Ahora la escribe `shared/` con sus tres estados (`renglonDelVado`
+   * la que se ve, `loQueSeOyeDelVado` la que se oye) y la ficha recibe el MARCADOR entero,
+   * que es lo que hace falta para saber de quién es el premio. Un cinco o un «de» escritos
+   * aquí serían una segunda copia de la bifurcación, y la copia es la que vuelve a mentir.
+   */
+  comprobar(
+    'cada ficha dice cuánto mide su cadena, y la frase la escribe `shared/` (`renglonDelVado`), no la ficha',
+    /const suVado = renglonDelVado\(colono, marcador\);/.test(escena) &&
+      /<Text style=\{estilos\.fichaPie\}>\{suVado\}<\/Text>/.test(escena),
+    'una frase escrita aquí tiene dos estados; la del vado tiene tres, y el tercero es el que decía «vado 5 de 5»',
+  );
+  comprobar(
+    'y la que se OYE también: el `accessibilityLabel` la compone con `loQueSeOyeDelVado`',
+    /loQueSeOyeDelVado\(colono, marcador\),/.test(escena) && !codigoDeLaEscena.some((l) => /su cadena mide/.test(l)),
+    'la frase que se oía decía «de las 5» a quien ya tenía cinco, igual que la que se veía',
+  );
+  comprobar(
+    'la ficha recibe el marcador entero, y ni el cinco ni el «de» se escriben en la pantalla',
+    /<FichaDelColono key=\{c\.asiento\} colono=\{c\} marcador=\{marcador\} \/>/.test(escena) &&
+      !codigoDeLaEscena.some((l) => /vado\b[^\n]*\bde (5|\$\{)/.test(l)) &&
+      !codigoDeLaEscena.some((l) => /`vado \$\{/.test(l)),
+    'un cinco escrito aquí y otro en el escritorio se separan el día que la regla cambie',
+  );
+  /*
    * EL MARCADOR NO FLOTA SOBRE EL LIENZO. Acercado del todo el delta llega de borde a
    * borde, así que todo cromo encima es tablero que deja de poder tocarse —la cabecera
    * del botón de volver tiene la cuenta entera—. El marcador se mira ANTES de decidir,
@@ -1113,6 +1221,25 @@ paso('El mazo de Riberas se juega desde la app, y en las DOS ramas');
 }
 
 // ---------------------------------------------------------------------------
+
+/**
+ * EL GUARDIA DE «NO SE HAN HECHO TODAS», el mismo que llevan el servidor y la escena.
+ *
+ * Este guion no lo tuvo nunca, y la fase que metió aquí las comprobaciones del empate del
+ * Vado en la ficha del móvil lo dejó dicho: un bloque borrado, o un guion que se cae a la
+ * mitad, termina con código cero y una lista corta de aciertos, y eso se lee como verde.
+ * Con el número escrito, salir con menos es un fallo ruidoso. Va a mano y se sube al
+ * añadir comprobaciones; un guardia desfasado no guarda nada.
+ */
+const COMPROBACIONES_ESCRITAS = 132;
+if (cuantas < COMPROBACIONES_ESCRITAS) {
+  console.error(
+    `Solo se han hecho ${cuantas} de las ${COMPROBACIONES_ESCRITAS} comprobaciones que ` +
+      'tiene escritas este guion: se ha caído por el camino sin decirlo. ' +
+      'Si has añadido comprobaciones nuevas, sube el número.',
+  );
+  process.exit(2);
+}
 
 if (fallos.length > 0) {
   console.error(`\n✘ ${fallos.length} de ${cuantas} comprobaciones han fallado:\n`);

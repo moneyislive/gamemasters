@@ -28,7 +28,7 @@
  *     centésimas de holgura, y no vale «mirarlo en pantalla» porque la barra se encoge
  *     con el ancho y el caso malo es el monitor, donde es más alta.
  *
- *     Y la barra ocupa hasta `0,82` del ANCHO, centrada, así que en un móvil de pie pasa
+ *     Y la barra ocupa hasta `0,70` del ANCHO, centrada, así que en un móvil de pie pasa
  *     por debajo de esta franja de lado a lado. Separarse de ella es un asunto de ALTURA,
  *     no de anchura: por eso hay piso y no hay margen lateral contra la barra.
  *
@@ -86,9 +86,9 @@
 export interface CartaDelMazo {
   /** Único y estable dentro de la mano: sirve de llave al pintar. */
   readonly id: string;
-  /** 'guardia' | 'anobueno' | 'acaparamiento' | 'dosveredas' | 'titulo'. */
+  /** En Riberas: 'guardia', 'anobueno', 'acaparamiento', 'dosveredas', 'titulo' y las dos de premio. */
   readonly familia: string;
-  /** El nombre del icono: 'guardia', 'molino', 'faro'… */
+  /** El nombre del icono: 'guardia', 'molino', 'faro', 'vado'… */
   readonly dibujo: string;
   /** Lo que se lee: «La Guardia», «El Faro»… */
   readonly nombre: string;
@@ -96,6 +96,26 @@ export interface CartaDelMazo {
   readonly sePuedeJugar: boolean;
   /** Sólo los títulos, y sólo en tu turno. */
   readonly sePuedeRevelar: boolean;
+  /**
+   * ESTE NAIPE NO SE JUEGA: SE TIENE. Y por eso NO se apaga.
+   *
+   * ═══ EL FALLO QUE ESTA BANDERA COMPRA ═══
+   *
+   * `apagada` es «ni se puede jugar ni se puede revelar», y con esa sola frase un premio
+   * —El Vado Largo, La Mayor Guardia— saldría apagado SIEMPRE: en todos los turnos y para
+   * quien lo tiene. Y apagado significa una cosa muy concreta en esta mano: «ahora no, más
+   * tarde». Un naipe al que no le llega nunca el turno, pintado igual que el que sí le
+   * llega el turno que viene, se lee como una carta estropeada — y el encargo entero era
+   * que el premio SE VIERA.
+   *
+   * Va en el naipe y no se deduce de la familia porque la escena no sabe qué familias son
+   * premios: la familia es vocabulario de CADA juego —lo dice el campo de arriba— y una
+   * lista de nombres escrita aquí se quedaría vieja el día que llegue el segundo juego con
+   * mano de cartas. Quien manda el naipe sí lo sabe.
+   *
+   * Opcional para que las nueve del mazo no tengan que escribirla: lo normal es una carta.
+   */
+  readonly esPremio?: boolean;
 }
 
 /**
@@ -165,6 +185,10 @@ export interface CartaDelMazoColocada {
    * Que siga viéndose es una regla del juego, no una cortesía: saber que tienes tres
    * guardias guardadas para el turno que viene es parte de lo que se juega, y una mano
    * que esconde lo que ahora no sirve obliga a acordarse de memoria.
+   *
+   * UN PREMIO NUNCA SE APAGA, y es la única excepción. Ver `esPremio` en `CartaDelMazo`:
+   * apagado quiere decir «ahora no, más tarde», y a un premio no le llega nunca ese más
+   * tarde porque no hay nada que jugar con él.
    */
   apagada: boolean;
 }
@@ -197,8 +221,24 @@ export interface CasillaDeLaMano {
  *
  * Una familia que no esté en la lista va al final en vez de desaparecer: la escena no es
  * quién para decidir que una carta de otro juego no existe.
+ *
+ * ═══ LOS PREMIOS VAN ARRIBA DEL TODO, Y NO ES UN CAPRICHO ═══
+ *
+ * La mano se reparte de arriba abajo y sus CASILLAS —donde se sueltan las cartas para
+ * jugarlas o revelarlas— viven en el PIE de la franja. O sea que lo que se arrastra
+ * conviene tenerlo cerca del pie, y lo que no se arrastra nunca, lejos. Un premio no se
+ * arrastra jamás: no abre ninguna casilla (ver `puertasDeLaCarta`). Puesto abajo se
+ * cruzaría en el camino de cada jugada del turno.
+ *
+ * Y son DOS familias y no una sola de «premios», que era lo primero que salía: dos naipes
+ * de la misma familia se solapan a `PASO_DENTRO_DEL_GRUPO` y del de abajo sólo asoma un
+ * canto. De los cinco títulos eso está bien —son cinco de lo mismo y lo que interesa es
+ * cuántos hay—; de los dos premios no, porque son dos cosas distintas y cada una se lee
+ * por su dibujo. Separadas en dos familias las reparte `PASO_ENTRE_GRUPOS` y se ven las dos.
  */
 export const ORDEN_DE_LAS_FAMILIAS: readonly string[] = [
+  'vado',
+  'mayorguardia',
   'guardia',
   'anobueno',
   'acaparamiento',
@@ -226,8 +266,27 @@ export const FAMILIA_DE_LOS_TITULOS = 'titulo';
  * Son tonos apagados y distintos entre sí a propósito: la carta que se lee es la del
  * dibujo, y el color sólo tiene que decir «esta pila y aquélla no son lo mismo» cuando la
  * mano está en reposo y de cada carta asoma un canto.
+ *
+ * ═══ LOS DOS PREMIOS SON LOS DOS ÚNICOS VIVOS, Y ESO ES LA SEÑAL ═══
+ *
+ * En reposo, de un naipe asoma un canto y del canto sólo se ve el COLOR: el dibujo está
+ * fuera de la pantalla hasta que el imán lo saca. Así que la pregunta «¿esto es una carta
+ * o es un premio?» tiene que responderla el color solo, y responderla de un vistazo — que
+ * es lo que no hace un séptimo tono apagado en una fila de tonos apagados.
+ *
+ * La señal es la SATURACIÓN, no el tono: las cinco del mazo están todas por debajo del
+ * 0,55 y los dos premios por encima del 0,60, y `verify:escena` lo exige así en vez de
+ * comparar dos códigos de color a mano. Buscar el tono libre no valía: la paleta de las
+ * cinco ya recorre marrón, oliva, morado, azul y ocre, y cualquier séptimo apagado cae al
+ * lado de alguno de ellos.
+ *
+ * Verde vivo y rojo vivo, y no dos matices del mismo, porque los dos premios se tienen a
+ * la vez con toda naturalidad —quien encadena veredas suele ser quien juega guardias— y
+ * dos cantos parecidos, uno junto al otro, se leen como una pila de dos.
  */
 export const COLOR_DE_LA_FAMILIA: Readonly<Record<string, string>> = {
+  vado: '#1a8a3c',
+  mayorguardia: '#c2261c',
   guardia: '#7d4a3a',
   anobueno: '#6f7a3c',
   acaparamiento: '#6a4a72',
@@ -549,7 +608,8 @@ export function huecosDeLasCartas(
       carta,
       abreGrupo,
       enElGrupo: cuantasDe.get(carta.familia) ?? 1,
-      apagada: !carta.sePuedeJugar && !carta.sePuedeRevelar,
+      /* El premio no se apaga nunca: no le llega el turno porque no hay nada que jugar. */
+      apagada: carta.esPremio !== true && !carta.sePuedeJugar && !carta.sePuedeRevelar,
       hueco: {
         /* Espejo del de la baraja: allí se resta del borde derecho, aquí se suma al izquierdo. */
         x: franja.izquierda + anchoDeCarta * (asoma - 0.5),
@@ -587,9 +647,15 @@ export function huecosDeLasCartas(
  * de revelar por mucho que el juego mande `sePuedeRevelar` en `true`. Eso último es un
  * cinturón contra un fallo del otro lado: revelar una guardia no es una jugada mal
  * dibujada, es una carta que se enseña y ya no se puede desenseñar.
+ *
+ * Y el segundo cinturón, del mismo cuero: UN PREMIO NO ABRE NINGUNA PUERTA, por mucho que
+ * llegue con una bandera puesta. No hay movimiento que mandar con El Vado Largo —el premio
+ * es derivado, se gana solo y se pierde solo—, así que una casilla abierta debajo de él es
+ * un sitio donde soltar algo que no va a pasar nada, y eso se siente como que la pantalla
+ * se ha colgado.
  */
 export function puertasDeLaCarta(carta: CartaDelMazo | null): ClaseDeCasilla[] {
-  if (carta === null) return [];
+  if (carta === null || carta.esPremio === true) return [];
   const puertas: ClaseDeCasilla[] = [];
   if (carta.familia === FAMILIA_DE_LOS_TITULOS && carta.sePuedeRevelar) puertas.push('revelar');
   if (carta.familia !== FAMILIA_DE_LOS_TITULOS && carta.sePuedeJugar) puertas.push('jugar');

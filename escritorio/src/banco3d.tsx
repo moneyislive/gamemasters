@@ -761,6 +761,10 @@ function Banco(): JSX.Element {
               semilla={semilla}
               colocando={colocando}
               barra={barra}
+              /* El cuarto hueco de la barra: el naipe del mazo. Encendido siempre en el banco, que es
+                 el unico sitio donde se puede mirar de cerca sin montar una partida. */
+              mazo={{ disponible: true }}
+              onPulsarElMazo={() => console.log("[banco] mazo pulsado")}
               mano={mano}
               cogida={cogida}
               onCogerCarta={(c) => ponerCogida((antes) => (antes === c.id ? null : c.id))}

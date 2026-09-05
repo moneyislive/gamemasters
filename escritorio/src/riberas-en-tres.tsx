@@ -213,14 +213,18 @@ import type { Opcion } from '../../shared/arcade';
 import {
   barraEnTres,
   bienesQueSeCambianPor,
-  cartasEnTres,
   colocandoEnTres,
+  comprarEnTres,
   jugadasDeLaCarta,
+  laManoDeLaIzquierda,
   jugadaSinPreguntar,
   manoEnTres,
   marcadorEnTres,
+  mazoEnLaBarra,
+  opcionesFueraDeLaBarra,
   opcionesFueraDeLaMano,
   opcionesFueraDelTablero,
+  renglonDelVado,
   revelarDe,
   seVeEnTres,
   tableroEnTres,
@@ -296,6 +300,13 @@ const LO_QUE_SE_PREGUNTA: Readonly<Record<ClaseDeJugada, string>> = {
 
 /** El título del menú de siempre: a quién se le propone un trueque. */
 const A_QUIEN_SE_LO_PROPONES = 'A quién se lo propones';
+
+/**
+ * EL TÍTULO DEL MENÚ DE COMPRAR. Encabezado de la Sala, como los otros dos: lo que CUESTA
+ * y cuántas quedan no se escribe aquí —llega en el rótulo y en la ayuda de la opción, que
+ * las redacta el juego—, y por eso esta línea no nombra ni un bien.
+ */
+const COMPRAR_UNA_CARTA = 'Comprar una carta';
 
 /** El rótulo del panel del marcador en el raíl. Chrome de la Sala, no una palabra del juego. */
 const TITULO_DEL_MARCADOR = 'El marcador';
@@ -759,27 +770,57 @@ export function RiberasEnTres({ manifiesto, mesa, puesta, tablero, opciones }: L
   }, [vista]);
   const mano = useMemo(() => manoEnTres(vista), [vista]);
   /*
+   * EL CUARTO HUECO DE LA BARRA: el mazo. `quieto` lo apaga como a las tres piezas y por
+   * lo mismo —con una petición en vuelo, el movimiento que se mandara ahora saldría con la
+   * revisión vieja—. Apagado y NO quitado: la barra reparte centrado, y un hueco que va y
+   * viene corre las otras tres piezas de sitio en cada jugada.
+   *
+   * Va antes que los botones porque los botones ya dependen de él: ver justo debajo.
+   */
+  const mazo = useMemo(() => {
+    const suyo = mazoEnLaBarra(vista, yo, opciones);
+    return suyo === null || !quieto ? suyo : { disponible: false };
+  }, [vista, yo, opciones, quieto]);
+  /*
    * LOS BOTONES SON LOS QUE NO ENSEÑA NI EL TABLERO NI NINGUNA DE LAS DOS MANOS.
    *
    * Las dos criban se componen, y en este orden da igual porque las dos son filtros.
    * `opcionesFueraDeLaMano` hace falta desde que esta pantalla pinta el mazo: sin ella,
    * jugar una guardia saldría a la vez como naipe y como botón, y con catorce guardias en
-   * el mazo eso es una lista de botones tan larga como la mano. Comprar NO se cae por
-   * ella —no cuelga de ningún naipe— y sigue siendo un botón, que es su único sitio.
+   * el mazo eso es una lista de botones tan larga como la mano.
+   *
+   * Y LA TERCERA CRIBA ES NUEVA: comprar tampoco es un botón desde que la barra tiene el
+   * cuarto hueco. `opcionesFueraDeLaBarra` lo quita, pero SÓLO cuando el hueco existe de
+   * verdad —por eso recibe `mazo` y no un `true`—: en el respaldo, en la vista de un mirón
+   * y en una mesa de más de cuatro colonos no hay barra, y allí el botón es la única
+   * manera de comprar una carta en toda la partida.
    */
-  const fuera = useMemo(() => opcionesFueraDeLaMano(opcionesFueraDelTablero(opciones)), [opciones]);
+  const fuera = useMemo(
+    () => opcionesFueraDeLaBarra(opcionesFueraDeLaMano(opcionesFueraDelTablero(opciones)), mazo),
+    [opciones, mazo],
+  );
   /*
-   * LA MANO DEL MAZO, y apagada entera mientras haya una petición en vuelo.
+   * LA MANO DE LA IZQUIERDA: mis premios y mis cartas del mazo, apagada entera mientras
+   * haya una petición en vuelo.
    *
    * Es el mismo trato que recibe la barra dos bloques más abajo y por el mismo motivo:
    * con `quieto` puesto el movimiento que se mandara ahora saldría con la revisión vieja.
    * Las cartas NO desaparecen —eso es una regla del juego, ver `apagada` en
    * `escenas/cartas.ts`—: se apagan, que es lo que la escena sabe pintar.
+   *
+   * Y EL APAGÓN NO TOCA A LOS PREMIOS. Apagar es «ahora no, espera a que conteste el
+   * servidor», y un premio no espera a nada: no hay movimiento en vuelo que pueda
+   * cambiarlo desde esta pantalla. Apagarlo con lo demás lo haría parpadear en cada
+   * jugada, que es la manera de que se lea como un naipe roto. `esPremio` viaja intacto,
+   * así que la escena lo sigue pintando encendido aunque las dos banderas estén en `false`.
    */
   const cartasDelMazo = useMemo(() => {
-    const cartas = cartasEnTres(vista, opciones);
-    return quieto ? cartas.map((c) => ({ ...c, sePuedeJugar: false, sePuedeRevelar: false })) : cartas;
-  }, [vista, opciones, quieto]);
+    const mano = laManoDeLaIzquierda(vista, opciones, yo);
+    if (!quieto) return mano;
+    return mano.map((c) =>
+      c.esPremio === true ? c : { ...c, sePuedeJugar: false, sePuedeRevelar: false },
+    );
+  }, [vista, opciones, yo, quieto]);
 
   // -------------------------------------------------------------------------
   // Lo que se tiene en la mano
@@ -933,6 +974,37 @@ export function RiberasEnTres({ manifiesto, mesa, puesta, tablero, opciones }: L
     },
     [quieto, vista, opciones, mover],
   );
+
+  /**
+   * SE HA PULSADO EL NAIPE DEL MAZO: se pregunta, SIEMPRE.
+   *
+   * ═══ OJO, ESTO SE APARTA A PROPÓSITO DE LA REGLA DE LA CASA ═══
+   *
+   * `jugadaSinPreguntar` y `truequesPosibles` llevan escrito lo contrario: si sale una
+   * sola manera, se manda sin preguntar. Comprar ofrece siempre exactamente una, así que
+   * por esa regla iría derecha al servidor sin un solo diálogo. Y NO ES LO QUE SE QUIERE.
+   *
+   * Aquellas dos se disparan al SOLTAR algo encima de una casilla —un gesto largo, con
+   * puntería, del que nadie sale por descuido—; ésta se dispara al TOCAR un naipe que vive
+   * pegado a las tres piezas de construir, en la franja de abajo donde el pulgar ya está.
+   * Un roce gastaría sal, piedra y grano, y comprar no se deshace.
+   *
+   * Así que aquí se confirma aunque la opción sea única. Quien lea esto y lo vea como una
+   * incoherencia que «arreglar»: no lo es, y el día que se «arregle» el fallo será una
+   * compra que nadie pidió.
+   *
+   * El menú lleva la opción del juego tal cual —su rótulo dice lo que cuesta y su ayuda
+   * cuántas quedan— y el «Dejarlo» que `ElijeUna` pone siempre. Aquí no se redacta nada.
+   */
+  const alPulsarElMazo = useCallback(() => {
+    if (quieto) return;
+    const comprar = comprarEnTres(opciones);
+    if (comprar === null) return;
+    ponerTomada(null);
+    ponerCogida(null);
+    ponerCartaDelMazo(null);
+    ponerPreguntando({ titulo: COMPRAR_UNA_CARTA, opciones: [comprar] });
+  }, [quieto, opciones]);
 
   /*
    * AL SOLTAR UN TÍTULO EN LA CASILLA DE REVELAR. Revelar no pide destinatario ni bienes,
@@ -1095,6 +1167,8 @@ export function RiberasEnTres({ manifiesto, mesa, puesta, tablero, opciones }: L
                   barra={barra}
                   tomada={tomada}
                   onTomarDeLaBarra={alTomarDeLaBarra}
+                  mazo={mazo}
+                  onPulsarElMazo={alPulsarElMazo}
                   mano={mano}
                   cogida={cogida}
                   onCogerCarta={alCogerCarta}
@@ -1152,7 +1226,8 @@ export function RiberasEnTres({ manifiesto, mesa, puesta, tablero, opciones }: L
       {/*
         Y debajo, lo que el tablero NO enseña ya: tirar, pasar, aceptar, rechazar,
         empezar. Fundar y alzar los ofrece la barra con sus anillos; ofrecer un
-        trueque lo ofrece la mano. Cada movimiento se enseña exactamente una vez.
+        trueque lo ofrece la mano; COMPRAR lo ofrece el cuarto hueco de la barra.
+        Cada movimiento se enseña exactamente una vez.
 
         Se calla SÓLO si el tablero está enseñando algo y aquí no queda nada: con
         una barra encendida, «no hay nada que puedas hacer» sería mentira. Y si el
@@ -1257,12 +1332,23 @@ function ElijeUna({
  * Y sólo aparece el segundo número CUANDO ES DISTINTO: «3 ptos y 3 contándote lo oculto»
  * no informa de nada y se lee como si hubiera algo escondido.
  *
+ * ═══ Y DESDE EL 5-SEP-2026, CUÁNTO MIDE LA CADENA DE CADA UNO ═══
+ *
+ * El renglón decía «El Vado Largo» a quien ya lo tenía y NADA a los demás, y ése era medio
+ * fallo de Miguel: encadenó veredas, se quedó sin premio, y la pantalla no tenía una cifra
+ * que le dijera por qué. Se lee «vado 3 de 5» —o «El Vado Largo, 6 veredas» cuando ya es
+ * suyo—, y el 5 no está escrito aquí: viene en `vadoMinimo`, que es `VADO_MINIMO`.
+ *
+ * Sale para TODOS y no sólo para mí, aunque sea una cifra más por renglón, porque el juego
+ * de este premio es la carrera: saber que el de al lado va por cuatro es lo que hace que
+ * trazar la quinta corra prisa. Y es público — la vista se lo manda a todo el mundo.
+ *
  * ═══ AQUÍ NO SE CUENTA NADA ═══
  *
- * Ni los puntos, ni quién tiene el Vado Largo, ni quién La Mayor Guardia. Todo sale de
- * `marcadorEnTres`, que lo lee de la vista. `null` cuando la vista no es de Riberas, y
- * entonces el raíl no pinta nada — que es lo correcto: un marcador vacío se lee como
- * «vais todos a cero».
+ * Ni los puntos, ni quién tiene el Vado Largo, ni quién La Mayor Guardia, ni cuánto mide
+ * ninguna cadena. Todo sale de `marcadorEnTres`, que lo lee de la vista. `null` cuando la
+ * vista no es de Riberas, y entonces el raíl no pinta nada — que es lo correcto: un
+ * marcador vacío se lee como «vais todos a cero».
  */
 export function MarcadorDeRiberas({ vista }: { vista: unknown }): JSX.Element | null {
   const marcador = marcadorEnTres(vista);
@@ -1292,7 +1378,22 @@ export function MarcadorDeRiberas({ vista }: { vista: unknown }): JSX.Element | 
               <span className="letra-chica lo-del-colono">
                 {c.cartas} {c.cartas === 1 ? 'carta' : 'cartas'} · {c.guardias}{' '}
                 {c.guardias === 1 ? 'guardia' : 'guardias'}
-                {c.tieneElVado ? ' · El Vado Largo' : ''}
+                {/*
+                  CUÁNTO MIDE SU CADENA, SIEMPRE, Y NO SÓLO CUANDO YA GANÓ EL PREMIO.
+                  Es la línea que le habría contestado a Miguel: encadenó cinco veredas,
+                  no le salió el premio, y en toda la pantalla no había un número que
+                  dijera cuánto contaba el JUEGO —que no era lo que él contaba en el
+                  tablero, porque el vecino le cortaba el paso—.
+
+                  LA FRASE NO SE ESCRIBE AQUÍ: la escribe `renglonDelVado`, en `shared/`,
+                  y tiene TRES ramas y no dos. La primera versión de este renglón decía
+                  «vado cinco de cinco» al segundo que llegaba a cinco —cadena de cinco, cero
+                  puntos de premio, porque el premio sólo se mueve a quien SUPERA— y eso
+                  se lee como «ya está». La app pinta y lee en voz alta la misma frase, y
+                  el cinco sigue siendo `vadoMinimo`: es `VADO_MINIMO`, la regla.
+                */}
+                {' · '}
+                {renglonDelVado(c, marcador)}
                 {c.tieneLaMayorGuardia ? ' · La Mayor Guardia' : ''}
                 {c.titulos.length > 0 ? ` · ${c.titulos.join(', ')}` : ''}
               </span>

@@ -64,7 +64,18 @@ import { aplanaTrazo, simplificaContorno } from './aplana-trazo';
 
 const RAIZ = path.resolve(import.meta.dirname ?? __dirname, '..', '..');
 const ORIGEN = path.join(RAIZ, 'arte', 'game-icons');
-const DESTINO = path.join(RAIZ, 'escenas', 'iconos.ts');
+/**
+ * A DÓNDE SE ESCRIBE. Por defecto encima de `escenas/iconos.ts`, que es lo que se quiere al
+ * compilar. Con `--a <ruta>` se escribe AHÍ y no se toca el bueno: lo usa
+ * `verify:iconos`, que recompila a un fichero temporal y lo compara byte a byte con el que
+ * está en el árbol. Sin esa puerta, la única manera de comprobar la sincronía sería
+ * sobrescribir el fichero que se está comprobando.
+ */
+const DESTINO = (() => {
+  const i = process.argv.indexOf('--a');
+  const ruta = i >= 0 ? process.argv[i + 1] : undefined;
+  return ruta === undefined ? path.join(RAIZ, 'escenas', 'iconos.ts') : path.resolve(ruta);
+})();
 
 /**
  * LOS CINCO BIENES Y EL FICHERO DE CADA UNO.
@@ -393,6 +404,34 @@ function travesano(
     [der - margen, y + grosor / 2],
     [izq + margen, y + grosor / 2],
   ];
+}
+
+/**
+ * UN ESCUDO: hombros rectos arriba y un flanco que baja en punta.
+ *
+ * Sale como función y no como una lista de puntos escrita tres veces porque de los dos
+ * premios uno son TRES escudos, y tres listas a mano se separan a la primera corrección:
+ * bastaría mover un punto en uno para que el del medio dejara de ser el mismo escudo más
+ * grande y pasara a ser otra forma. Aquí los tres salen de la misma cuenta y sólo cambian
+ * de tamaño, que es lo que hace que se lean como tres de lo mismo.
+ *
+ * El flanco es media elipse y no dos rectas: en punta de dos rectas, a tamaño de carta el
+ * escudo se lee como un diamante, que es exactamente la silueta del otro premio.
+ */
+function escudo(cx: number, arriba: number, ancho: number, alto: number): Punto[] {
+  const medio = ancho / 2;
+  /* Dónde acaban los hombros rectos y empieza el flanco. */
+  const hombro = arriba + alto * 0.42;
+  const flanco = alto - alto * 0.42;
+  const puntos: Punto[] = [
+    [cx - medio, arriba],
+    [cx + medio, arriba],
+  ];
+  for (let i = 0; i <= 10; i++) {
+    const a = (Math.PI * i) / 10;
+    puntos.push([cx + medio * Math.cos(a), hombro + flanco * Math.sin(a)]);
+  }
+  return puntos;
 }
 
 // ---------------------------------------------------------------------------
@@ -890,6 +929,181 @@ const CARTAS: readonly Dibujo[] = [
       ]),
     ],
   },
+
+  /*
+   * ═══ Y AQUÍ EMPIEZAN LOS DOS QUE NO SON CARTAS: LOS PREMIOS ═══
+   *
+   * El Vado Largo y La Mayor Guardia no están en el mazo y no se compran: se TIENEN, y se
+   * pierden cuando otro te adelanta. Pero se pintan como naipe en la misma mano —ver
+   * `premiosEnTres` en `shared/arcade/juegos/riberas-en-tres.ts`— porque un premio que sólo
+   * sale como una línea de texto en el marcador no se ve: Miguel encadenó cinco veredas, se
+   * llevó los dos puntos, y contó que «no le aparece la carta».
+   *
+   * Van en esta misma tabla y no en otra aparte porque quien pinta un naipe busca su dibujo
+   * en un solo sitio (`CONTORNOS_DE_LA_CARTA`), y una segunda tabla obligaría a la escena a
+   * saber de premios para elegir en cuál mirar — que es justo lo que no sabe.
+   *
+   * SE DISTINGUEN DE LAS NUEVE POR DOS COSAS A LA VEZ, y hacen falta las dos: por el COLOR
+   * de su familia, que es lo único que se ve cuando la mano está en reposo y de cada carta
+   * asoma un canto (ver `COLOR_DE_LA_FAMILIA` en `escenas/cartas.ts`: las nueve son tonos
+   * apagados y estos dos son vivos), y por la SILUETA, que es lo que llega cuando el naipe
+   * se levanta. Una sola de las dos no basta: el color no se lee levantado —el dibujo lo
+   * tapa casi entero— y la silueta no se lee en reposo.
+   */
+
+  /*
+   * EL VADO LARGO: cinco losas de paso en zigzag sobre dos líneas de agua.
+   *
+   * CINCO, y son las cinco de `VADO_MINIMO`. No es un adorno: la cadena que da el premio
+   * mide cinco veredas, y contar cinco piedras es lo mismo que se cuenta en el tablero.
+   *
+   * Losas y no un camino de una pieza porque un camino largo es un rectángulo tumbado, y un
+   * rectángulo tumbado no se distingue de nada a tamaño de carta. Cinco bultos separados sí:
+   * la silueta es discontinua, y ninguna de las nueve lo es.
+   *
+   * Y en zigzag y no en arco a propósito: en arco quedaba un rosario de bultos sobre una
+   * curva, que es la mitad de arriba de El Año Bueno —su cesta lleva tres redondeles en
+   * arco—. El zigzag las separa de un vistazo, y además es lo que hace una hilera de piedras
+   * de paso de verdad.
+   *
+   * Las dos líneas de agua van DEBAJO y no cruzando las losas. Cruzándolas, el agua y la
+   * piedra son del mismo crema y se funden en una mancha; debajo se leen como el vado.
+   */
+  {
+    carta: 'vado',
+    que: 'Cinco losas de paso en zigzag sobre dos líneas de agua.',
+    contornos: [
+      macizo(circulo(76, 300, 44, 4)),
+      macizo(circulo(166, 240, 44, 4)),
+      macizo(circulo(256, 300, 44, 4)),
+      macizo(circulo(346, 240, 44, 4)),
+      macizo(circulo(436, 300, 44, 4)),
+      trazo(
+        [
+          [86, 400],
+          [172, 388],
+          [258, 400],
+          [344, 388],
+          [430, 400],
+        ],
+        22,
+      ),
+      trazo(
+        [
+          [126, 452],
+          [212, 440],
+          [298, 452],
+          [384, 440],
+        ],
+        22,
+      ),
+    ],
+  },
+
+  /*
+   * LA MAYOR GUARDIA: tres escudos en fila, el del medio más alto y con un galón hueco.
+   *
+   * TRES, y son las tres de `GUARDIA_MINIMA`, por lo mismo que las cinco losas del vado.
+   *
+   * Escudos y no yelmos: el yelmo ya es La Guardia, la carta que se juega, y las dos cosas
+   * van a estar en la misma mano a la vez —quien tiene el premio es justamente quien más
+   * guardias ha jugado, y suele tener alguna más guardada—. Dos yelmos de tamaños distintos
+   * en la misma mano es la peor confusión posible: parecen la misma carta repetida.
+   *
+   * El del medio más alto y más ancho, que es lo que convierte «tres escudos» en «el mayor»
+   * sin una sola letra. El galón se vacía en el del medio y sólo en él: en los tres, a este
+   * tamaño, se leerían como tres bultos con ruido.
+   */
+  {
+    carta: 'mayorguardia',
+    que: 'Tres escudos en fila, el del medio más alto y con un galón hueco.',
+    contornos: [
+      macizo(escudo(104, 180, 124, 210)),
+      macizo(escudo(408, 180, 124, 210)),
+      macizo(escudo(256, 120, 140, 250)),
+      hueco([
+        [206, 196],
+        [256, 222],
+        [306, 196],
+        [306, 224],
+        [256, 250],
+        [206, 224],
+      ]),
+    ],
+  },
+
+  /*
+   * ═══ Y EL DUODÉCIMO, QUE NO ES NI CARTA NI PREMIO: EL MAZO DE LA BARRA ═══
+   *
+   * `comprarcarta` no se pinta nunca en la mano de la izquierda. Es la cara del CUARTO
+   * HUECO DE LA BARRA DE CONSTRUIR, el que se pulsa para comprar una carta, y vive en
+   * este mismo mapa por la misma razón que los dos premios: quien pinta un naipe busca su
+   * dibujo en un solo sitio (`CONTORNOS_DE_LA_CARTA`), y `escenas/delta.tsx` no tiene otro
+   * en el que mirar.
+   *
+   * ═══ POR QUÉ NO SE REUTILIZA EL DEL MOLINO NI NINGÚN OTRO ═══
+   *
+   * Porque los once de arriba dicen QUÉ CARTA ES, y éste tiene que decir UNA ACCIÓN. El
+   * molino puesto en la barra prometería «El Molino», que es una de las cinco cartas que
+   * pueden salir y no la que va a salir: sería enseñar el premio de la rifa en el boleto.
+   * Lo que se compra es una carta TAPADA, y el dibujo tiene que decir eso.
+   *
+   * ═══ QUÉ SE VE, Y POR QUÉ ASÍ ═══
+   *
+   * Un mazo visto de canto —tres losas apiladas y descuadradas, como una pila de naipes
+   * que nadie ha igualado— y encima una cruz grande. La cruz es lo que convierte «hay un
+   * mazo» en «coge una más», y no lleva ni una letra, que es lo que hace falta: este
+   * dibujo se ve en cuatro idiomas y a ciento diez píxeles.
+   *
+   * NADA SE SOLAPA, y es a propósito y no casualidad: `toShapes` decide qué contorno es
+   * agujero de qué forma mirando quién contiene a quién, y dos macizos superpuestos son la
+   * manera de que uno desaparezca sin un error en ninguna parte —ver la revisión que
+   * cuenta los contornos aprovechados—. Los tres del mazo se separan por su hueco de aire
+   * y la cruz se queda por encima del más alto sin tocarlo.
+   *
+   * Y NO HAY AGUJEROS: es el único de los doce sin detalle vaciado. No le hace falta —la
+   * silueta ya son cuatro formas grandes y ninguna se parece a las otras once— y meterlo
+   * sería detalle fino en el dibujo que más pequeño se ve de todos, porque la barra encoge
+   * en un móvil de pie y la mano no.
+   */
+  {
+    carta: 'comprarcarta',
+    que: 'Un mazo de tres naipes apilados de canto y, encima, una cruz de coger otro.',
+    contornos: (() => {
+      /* Una losa del mazo: su centro y su medida, que se repiten tres veces descuadradas. */
+      const losa = (cx: number, cy: number): Punto[] => [
+        [cx - 130, cy - 26],
+        [cx + 130, cy - 26],
+        [cx + 130, cy + 26],
+        [cx - 130, cy + 26],
+      ];
+      /* La cruz, en dos brazos que se cruzan escritos como un solo contorno de doce puntos. */
+      const brazo = 96;
+      const grueso = 28;
+      const cx = 256;
+      const cy = 128;
+      const cruz: Punto[] = [
+        [cx - grueso, cy - brazo],
+        [cx + grueso, cy - brazo],
+        [cx + grueso, cy - grueso],
+        [cx + brazo, cy - grueso],
+        [cx + brazo, cy + grueso],
+        [cx + grueso, cy + grueso],
+        [cx + grueso, cy + brazo],
+        [cx - grueso, cy + brazo],
+        [cx - grueso, cy + grueso],
+        [cx - brazo, cy + grueso],
+        [cx - brazo, cy - grueso],
+        [cx - grueso, cy - grueso],
+      ];
+      return [
+        macizo(losa(256, 402)),
+        macizo(losa(276, 330)),
+        macizo(losa(246, 258)),
+        macizo(cruz),
+      ];
+    })(),
+  },
 ];
 
 /*
@@ -1072,8 +1286,164 @@ function revisa(dibujo: Dibujo): { contornos: number; puntos: number; triangulos
   return { contornos: contornos.length, puntos, triangulos };
 }
 
+
+// ---------------------------------------------------------------------------
+
+/**
+ * LAS CIFRAS DE LAS FICHAS: del 2 al 12 sin el 7, dibujadas en contornos como todo lo demás.
+ *
+ * ═══ POR QUÉ UN NÚMERO SE DIBUJA A MANO EN VEZ DE ESCRIBIRSE ═══
+ *
+ * Porque no hay con qué escribirlo. Un texto en tres dimensiones pide una fuente —cargada
+ * por red o empaquetada, y rasterizada por un trabajador que `expo-gl` no tiene— o un
+ * lienzo del navegador, y la app no tiene DOM: es la misma pared contra la que ya chocó el
+ * mar cuando quiso leer un píxel de una textura. Los iconos de los bienes y de las cartas
+ * la esquivaron convirtiendo el arte en CÓDIGO, listas de puntos que sólo hay que
+ * enhebrar, y las cifras entran por esa misma puerta. Once dibujos más, del mismo tipo,
+ * con las mismas reglas y el mismo comprobador.
+ *
+ * ═══ ONCE CIFRAS ENTERAS, Y NO DIEZ GUARISMOS ═══
+ *
+ * Se podría haber dibujado cada guarismo una vez y componer el «12» con un «1» y un «2».
+ * No se hace, y la razón es la normalización: `geometriaDeContornos` encaja cada dibujo
+ * por su lado mayor en un cuadrado de lado uno, así que un «1» suelto saldría tan ancho
+ * como un «8», y un «12» compuesto de dos piezas normalizadas por separado tendría los dos
+ * guarismos de tamaños distintos. Dibujando la cifra entera —los dos guarismos en el mismo
+ * lienzo, con su aire entre ellos— la escena la pide por su nombre, la escala una vez, y
+ * el «6» y el «12» salen a la misma altura sobre la misma ficha. Once entradas, con la
+ * llave que la escena pide: `String(cifra)`.
+ *
+ * Los guarismos sí se comparten por dentro: cada uno es una función de su caja, y el «1»
+ * del «11» y el del «12» son el mismo trazo en dos sitios. Lo que se emite es la cifra.
+ *
+ * ═══ LO QUE SE VE ═══
+ *
+ * Cintas de 64 de grosor en las de un guarismo y 56 en las de dos, sobre una caja de 400
+ * de alto: son las más gordas de todo el fichero, y es porque el disco de la ficha mide
+ * doce unidades de radio y se mira desde la altura de juego, donde un trazo de carta
+ * desaparecería. El 6 y el 8 no se distinguen aquí: van del mismo crema oscuro que el
+ * resto, y es la ESCENA la que los pinta en rojo, porque el color es suyo y el dibujo
+ * no tiene por qué saber qué dos números salen más.
+ */
+
+/** Una elipse cerrada, para los anillos del 0, del 6, del 8 y del 9. */
+function elipse(cx: number, cy: number, rx: number, ry: number, lados: number): Punto[] {
+  const puntos: Punto[] = [];
+  for (let i = 0; i < lados; i++) {
+    const a = (2 * Math.PI * i) / lados;
+    puntos.push([cx + rx * Math.cos(a), cy - ry * Math.sin(a)]);
+  }
+  return puntos;
+}
+
+/** Un anillo: la elipse maciza y su hueco. Dos contornos, y el hueco enrollado al revés. */
+function anillo(cx: number, cy: number, rx: number, ry: number, grosor: number): number[][] {
+  return [macizo(elipse(cx, cy, rx, ry, 40)), hueco(elipse(cx, cy, rx - grosor, ry - grosor, 40))];
+}
+
+/** La caja de todo guarismo: 400 de alto. El ancho lo pone quien lo coloca. */
+const ALTO_DEL_GUARISMO = 400;
+
+type Guarismo = (x: number, y: number, ancho: number, grosor: number) => number[][];
+
+/**
+ * LOS DIEZ GUARISMOS, cada uno en su caja de `ancho × 400` con el origen arriba a la
+ * izquierda. Ninguno se emite suelto: se emiten las cifras de abajo.
+ */
+const GUARISMOS: Readonly<Record<string, Guarismo>> = {
+  '0': (x, y, w, g) => anillo(x + w / 2, y + ALTO_DEL_GUARISMO / 2, w / 2, ALTO_DEL_GUARISMO / 2, g),
+  /* Con bandera y con pie, para que no sea un palo: encajado por el lado mayor, un palo
+     sale tan ancho como un ocho. */
+  '1': (x, y, w, g) => [
+    trazo([[x + w * 0.22, y + g * 0.9], [x + w * 0.62, y + g / 2], [x + w * 0.62, y + ALTO_DEL_GUARISMO - g / 2]], g),
+    trazo([[x + w * 0.16, y + ALTO_DEL_GUARISMO - g / 2], [x + w * 0.96, y + ALTO_DEL_GUARISMO - g / 2]], g),
+  ],
+  /* El arco y la diagonal en un trazo y la base en otro: el codo de abajo a la izquierda es
+     tan cerrado que el inglete disparaba una púa fuera del número. */
+  '2': (x, y, w, g) => [
+    trazo([...arco(x + w / 2, y + w / 2, w / 2 - g / 2, 190, -40, 12), [x + g / 2, y + ALTO_DEL_GUARISMO - g / 2]], g),
+    trazo([[x + g / 2, y + ALTO_DEL_GUARISMO - g / 2], [x + w - g / 2, y + ALTO_DEL_GUARISMO - g / 2]], g),
+  ],
+  '3': (x, y, w, g) => {
+    const r = ALTO_DEL_GUARISMO / 4 - g / 4;
+    return [
+      trazo([[x + g / 2, y + g / 2], ...arco(x + w / 2, y + r + g / 2, r, 90, -90, 10)], g),
+      trazo([...arco(x + w / 2, y + ALTO_DEL_GUARISMO - r - g / 2, r, 90, -90, 10), [x + g / 2, y + ALTO_DEL_GUARISMO - g / 2]], g),
+    ];
+  },
+  /* Con sólo dos cintas se queda en seis triángulos, por debajo del trato de ocho. El pie
+     se lo da un tercer trazo, que además lo asienta como al 1. */
+  '4': (x, y, w, g) => [
+    trazo([[x + w * 0.72, y + g / 2], [x + g / 2, y + ALTO_DEL_GUARISMO * 0.66], [x + w - g / 2, y + ALTO_DEL_GUARISMO * 0.66]], g),
+    trazo([[x + w * 0.72, y + g / 2], [x + w * 0.72, y + ALTO_DEL_GUARISMO - g / 2]], g),
+    trazo([[x + w * 0.5, y + ALTO_DEL_GUARISMO - g / 2], [x + w * 0.94, y + ALTO_DEL_GUARISMO - g / 2]], g),
+  ],
+  '5': (x, y, w, g) => {
+    const r = ALTO_DEL_GUARISMO * 0.31;
+    return [
+      trazo([[x + w - g / 2, y + g / 2], [x + g / 2, y + g / 2], [x + g / 2, y + ALTO_DEL_GUARISMO * 0.46]], g),
+      trazo([[x + g / 2, y + ALTO_DEL_GUARISMO * 0.46], ...arco(x + w / 2, y + ALTO_DEL_GUARISMO - r - g / 2, r, 100, -88, 12), [x + g / 2, y + ALTO_DEL_GUARISMO - g / 2]], g),
+    ];
+  },
+  /* El rabo es un arco cuyo punto más alto cae justo en el techo de la caja, ni un pelo
+     más arriba: la primera versión se salía del lienzo por doce unidades. */
+  '6': (x, y, w, g) => {
+    const r = ALTO_DEL_GUARISMO * 0.29;
+    const cy = y + ALTO_DEL_GUARISMO - r - g / 2;
+    return [
+      ...anillo(x + w / 2, cy, w / 2, r + g / 2, g),
+      trazo([...arco(x + w * 0.5 + 20, y + w * 0.5 + 10, w * 0.5 - g / 2 + 10, 70, 178, 8), [x + g / 2 + 4, cy]], g),
+    ];
+  },
+  '8': (x, y, w, g) => {
+    const ra = ALTO_DEL_GUARISMO * 0.24;
+    const rb = ALTO_DEL_GUARISMO * 0.29;
+    return [
+      ...anillo(x + w / 2, y + ra + g / 2 - 4, w * 0.44, ra, g),
+      ...anillo(x + w / 2, y + ALTO_DEL_GUARISMO - rb - g / 2 + 4, w / 2, rb, g),
+    ];
+  },
+  /* El espejo del 6: el punto más bajo del rabo cae justo en el suelo de la caja. */
+  '9': (x, y, w, g) => {
+    const r = ALTO_DEL_GUARISMO * 0.29;
+    const cy = y + r + g / 2;
+    return [
+      ...anillo(x + w / 2, cy, w / 2, r + g / 2, g),
+      trazo([[x + w - g / 2 - 4, cy], ...arco(x + w * 0.5 - 20, y + ALTO_DEL_GUARISMO - w * 0.5 - 10, w * 0.5 - g / 2 + 10, -2, -110, 8)], g),
+    ];
+  },
+};
+
+function guarismo(cual: string, x0: number, ancho: number, grosor: number): number[][] {
+  const dibuja = GUARISMOS[cual];
+  if (dibuja === undefined) {
+    console.error(`No hay guarismo para «${cual}».`);
+    process.exit(2);
+  }
+  return dibuja(x0, (LIENZO - ALTO_DEL_GUARISMO) / 2, ancho, grosor);
+}
+
+/**
+ * UNA CIFRA ENTERA en el lienzo: un guarismo en una caja de 300 centrada, o dos en cajas
+ * de 214 con 40 de aire, que es lo que deja al «12» a la misma altura que al «6».
+ */
+function cifra(n: number): Dibujo {
+  const texto = String(n);
+  const contornos =
+    texto.length === 1
+      ? guarismo(texto, (LIENZO - 300) / 2, 300, 64)
+      : [
+          ...guarismo(texto[0] as string, (LIENZO - (2 * 214 + 40)) / 2, 214, 56),
+          ...guarismo(texto[1] as string, (LIENZO - (2 * 214 + 40)) / 2 + 214 + 40, 214, 56),
+        ];
+  return { carta: texto, que: `La cifra ${texto}, como se lee en la ficha de la comarca.`, contornos };
+}
+
+/** Las once que salen en un delta: las de `NUMEROS_DE_LAS_ISLAS`, sin el siete. */
+const CIFRAS: readonly Dibujo[] = [2, 3, 4, 5, 6, 8, 9, 10, 11, 12].map(cifra);
+
 const revisiones = new Map<string, ReturnType<typeof revisa>>();
-for (const dibujo of [...CARTAS, SAL]) {
+for (const dibujo of [...CARTAS, SAL, ...CIFRAS]) {
   if (revisiones.has(dibujo.carta)) {
     console.error(`Hay dos dibujos con la llave ${dibujo.carta}.`);
     process.exit(2);
@@ -1103,6 +1473,10 @@ const cuerpo = [
   ...iconos.map((i) => `  ${i.bien}: [\n${i.contornos.map(comoTira).join('\n')}\n  ],`),
   `  /** ${SAL.que} */\n  ${SAL.carta}: [\n${SAL.contornos.map(comoTira).join('\n')}\n  ],`,
 ].join('\n');
+
+const cuerpoDeLasCifras = CIFRAS.map(
+  (d) => `  /** ${d.que} */\n  '${d.carta}': [\n${d.contornos.map(comoTira).join('\n')}\n  ],`,
+).join('\n');
 
 const cuerpoDeLasCartas = CARTAS.map(
   (d) =>
@@ -1160,28 +1534,55 @@ ${cuerpo}
 export const BIENES_CON_ICONO: readonly string[] = Object.keys(CONTORNOS_DEL_BIEN);
 
 /**
- * LOS DIBUJOS DE LAS NUEVE CARTAS DEL MAZO, por su familia.
+ * LOS DIBUJOS DE LOS NAIPES DE RIBERAS: las nueve cartas del mazo y los DOS PREMIOS.
  *
- * Las llaves son las familias de \`docs/LAS-CARTAS-DE-RIBERAS.md\`: las cuatro que se
- * juegan y los cinco títulos, que valen un punto cada uno y sólo se distinguen por el
- * dibujo — de ahí que sean cinco y no uno repetido cinco veces.
+ * Las nueve primeras llaves son las familias de \`docs/LAS-CARTAS-DE-RIBERAS.md\`: las
+ * cuatro que se juegan y los cinco títulos, que valen un punto cada uno y sólo se
+ * distinguen por el dibujo — de ahí que sean cinco y no uno repetido cinco veces.
  *
- * Se pintan igual que los bienes: crema plano sobre el color de la carta, encajados por su
- * lado mayor en un cuadrado de lado uno. Quien los coloque no tiene que saber nada más.
+ * Las tres últimas NO son cartas del mazo, y no son lo mismo entre sí. \`vado\` y
+ * \`mayorguardia\` son los PREMIOS, que no están en el mazo y no se compran: se pintan como
+ * naipe en la misma mano. \`comprarcarta\` no se pinta en ninguna mano — es la cara del
+ * cuarto hueco de la BARRA DE CONSTRUIR, el que se pulsa para comprar.
+ *
+ * Las tres viven en el mismo mapa por lo mismo: quien pinta un naipe busca su dibujo en un
+ * solo sitio, y una segunda tabla obligaría a la escena a saber de premios y de barras para
+ * elegir en cuál mirar.
+ *
+ * Se pintan igual que los bienes: crema plano sobre el color de la familia, encajados por
+ * su lado mayor en un cuadrado de lado uno. Quien los coloque no tiene que saber nada más.
  */
 export const CONTORNOS_DE_LA_CARTA: Readonly<Record<string, readonly (readonly number[])[]>> = {
 ${cuerpoDeLasCartas}
 };
 
-/** Las cartas que tienen dibujo. Sirve para comprobar que no falta ninguna. */
+/** Los naipes que tienen dibujo, cartas y premios. Sirve para comprobar que no falta ninguno. */
 export const CARTAS_CON_ICONO: readonly string[] = Object.keys(CONTORNOS_DE_LA_CARTA);
+
+/**
+ * LAS CIFRAS DE LAS FICHAS, del 2 al 12 sin el 7, con la llave \`String(cifra)\`.
+ *
+ * Están dibujadas en el compilador como las cartas, y por la misma razón que todo lo
+ * demás de este fichero: no hay fuente ni lienzo del navegador en la app, así que un
+ * número que se quiera ver en tres dimensiones tiene que ser un contorno. Cada entrada es
+ * la cifra ENTERA —el «12» trae sus dos guarismos en el mismo lienzo— para que la escena la
+ * escale una vez y todas salgan a la misma altura sobre la misma ficha.
+ *
+ * Van del mismo color que los puntos de la ficha; el 6 y el 8 los pinta en rojo la escena.
+ */
+export const CONTORNOS_DE_LA_CIFRA: Readonly<Record<string, readonly (readonly number[])[]>> = {
+${cuerpoDeLasCifras}
+};
+
+/** Las cifras que tienen dibujo. Sirve para comprobar que están las once de un delta. */
+export const CIFRAS_CON_ICONO: readonly string[] = Object.keys(CONTORNOS_DE_LA_CIFRA);
 `;
 
 fs.writeFileSync(DESTINO, salida, 'utf8');
 
 const kb = (salida.length / 1024).toFixed(1);
 console.log(
-  `\n  ${String(iconos.length + 1)} bienes + ${String(CARTAS.length)} cartas · ${kb} kB en ` +
+  `\n  ${String(iconos.length + 1)} bienes + ${String(CARTAS.length)} cartas + ${String(CIFRAS.length)} cifras · ${kb} kB en ` +
     `${path.relative(RAIZ, DESTINO)}`,
 );
 for (const i of iconos) {

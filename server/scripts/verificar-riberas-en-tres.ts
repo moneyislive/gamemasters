@@ -35,6 +35,15 @@
  * están declarados dos veces —a un lado y a otro— y encajan por estructura; esto es
  * lo que hace que el día que uno cambie, esto ni compile.
  *
+ * ═══ Y EN ESA MISMA MANO VAN LOS DOS PREMIOS, QUE NO SON CARTAS ═══
+ *
+ * El Vado Largo y La Mayor Guardia se pintan como naipe junto a las cartas del mazo (§8
+ * bis) y llegan por una puerta distinta: `premiosEnTres`. La razón es de seguridad y no de
+ * estilo —las cartas son secretas y los premios son públicos—, así que aquí no basta con
+ * comprobar que el naipe SALE: se comprueba además que no ha entrado por `misCartas`, que
+ * no aparece entre los secretos que declara `loSecretoDeRiberas`, que el juego no ofrece
+ * ninguna manera de jugarlo, y que la escena no le abre casilla ni lo pinta apagado.
+ *
  * ═══ LAS VACUNAS ═══
  *
  * Cada bloque comprueba también que la traducción SE VE FALLAR: una vista que no
@@ -45,6 +54,7 @@
 import { abrirMesa, jugar } from '../src/arcade/arbitro';
 import type { Mesa } from '../src/arcade/arbitro';
 import { aristaDeHex, verticeDeHex } from '../../shared/mecanicas/malla-hexagonal';
+import type { LlaveDeArista } from '../../shared/mecanicas/malla-hexagonal';
 import '../../shared/arcade/juegos';
 import {
   ACAPARAMIENTO,
@@ -63,11 +73,15 @@ import {
   OFRECER,
   opcionesDeRiberas,
   PASAR,
+  largoDelVado,
+  loSecretoDeRiberas,
   proyectarRiberas,
+  recalcularElVado,
   recalcularLaGuardia,
   REVELAR,
   RIBERAS,
   TIRAR,
+  VADO_MINIMO,
 } from '../../shared/arcade/juegos';
 import type {
   Bien,
@@ -85,15 +99,22 @@ import {
   cartasEnTres,
   colocandoEnTres,
   comprarEnTres,
+  estadoDelVado,
   esVistaQueSePinta,
   jugadaSinPreguntar,
   jugadasDeLaCarta,
+  laManoDeLaIzquierda,
+  loQueSeOyeDelVado,
   manoEnTres,
   marcadorEnTres,
+  mazoEnLaBarra,
   meToca,
+  opcionesFueraDeLaBarra,
   opcionesFueraDeLaMano,
   opcionesFueraDelTablero,
   paresDelAnoBueno,
+  premiosEnTres,
+  renglonDelVado,
   retratoDeLaCarta,
   revelarDe,
   seVeEnTres,
@@ -112,12 +133,21 @@ import { COLORES_EN_3D } from '../../shared/arcade/juegos/riberas-en-3d';
  * en «hay un contorno llamado `faro`», que es la afirmación que importa.
  */
 import {
+  colorDeLaFamilia,
+  COLOR_SIN_FAMILIA,
   FAMILIA_DE_LOS_TITULOS,
   huecosDeLasCartas,
   ORDEN_DE_LAS_FAMILIAS,
   puertasDeLaCarta,
 } from '../../escenas/cartas';
 import type { CartaDelMazo } from '../../escenas/cartas';
+/*
+ * Y LA BARRA, por lo mismo: el cuarto hueco no se mide con un reparto escrito aquí sino con
+ * el de verdad, y su dibujo se pide por el nombre que usa la escena y no por una cadena
+ * copiada — una cadena copiada dejaría el comprobador verde vigilando un dibujo que ya no
+ * pide nadie.
+ */
+import { DIBUJO_DEL_MAZO, huecosDeLaBarra } from '../../escenas/barra';
 import { CONTORNOS_DE_LA_CARTA } from '../../escenas/iconos';
 
 let hechas = 0;
@@ -144,6 +174,7 @@ const TRES = ['A', 'B', 'C'] as const;
   comprobar('a nadie le toca mientras se reúne la mesa', meToca(vista) === false);
   comprobar('la barra está entera apagada antes de empezar', barraEnTres(vista, 'A').every((p) => !p.disponible), barraEnTres(vista, 'A'));
   comprobar('y coger una pieza no da anillo', colocandoEnTres(vista, 'A', 'poblado') === null);
+  comprobar('y no hay hueco de mazo mientras se reúne la mesa: `null`, no apagado', mazoEnLaBarra(vista, 'A', opciones) === null, mazoEnLaBarra(vista, 'A', opciones));
   const sueltas = opcionesFueraDelTablero(opciones);
   comprobar('empezar sale como botón, fuera del tablero', sueltas.some((o) => o.tipo === EMPEZAR_RIBERAS), sueltas.map((o) => o.id));
   comprobar('y no se pierde ninguna opción por el camino (todas son de fuera)', sueltas.length === opciones.length);
@@ -187,6 +218,20 @@ const TRES = ['A', 'B', 'C'] as const;
   );
   comprobar('B, que no tiene el turno, tiene la barra apagada', barraEnTres(vistaB, 'B').every((p) => !p.disponible));
   comprobar('un mirón sin asiento no tiene barra', barraEnTres(vistaA, null).length === 0);
+
+  /*
+   * ═══ EL CUARTO HUECO NO EXISTE EN LA COLOCACIÓN ═══
+   *
+   * `mazoEnLaBarra` no miraba `momento` y aquí salía `{ disponible: false }`: un cuarto
+   * hueco apagado que se llevaba un cuarto del ancho y encogía las tres piezas de fundar y
+   * trazar, en la única fase en que la barra es lo único que se usa. Y lo vendía como «hoy
+   * no se pulsa» siendo «no existe la jugada»: la propia cabecera de la función distingue
+   * los dos casos y éste era de los primeros disfrazado de los segundos. La barra tiene
+   * TRES, y el pie no pierde nada porque en esta fase no hay COMPRAR que devolver.
+   */
+  comprobar('en la colocación NO hay hueco de mazo: `null`, no apagado — comprar no es una jugada de esta fase', mazoEnLaBarra(vistaA, 'A', opcionesA) === null && barraA.length === 3, mazoEnLaBarra(vistaA, 'A', opcionesA));
+  comprobar('tampoco lo tiene B, que ni siquiera tiene el turno', mazoEnLaBarra(vistaB, 'B', opcionesDeRiberas(vistaB, 'B')) === null);
+  comprobar('y sin hueco el pie se queda con todas sus opciones, entre las que no hay ninguna compra', opcionesFueraDeLaBarra(opcionesA, null).length === opcionesA.length && !opcionesA.some((o) => o.tipo === COMPRAR), opcionesA.map((o) => o.tipo));
 
   /* El anillo de fundar es, sitio por sitio, lo que FUNDAR ofrece. */
   const fundares = opcionesA.filter((o) => o.tipo === FUNDAR);
@@ -389,12 +434,18 @@ function escenarioDeTrueque(deA: readonly Bien[], deB: readonly Bien[]): EstadoD
  *
  * `turnosAbiertos` arranca en uno: una carta con el sello 0 es de un turno anterior y
  * se puede jugar; una con el sello 1 es de hoy y no.
+ *
+ * `veredas` da a un colono una CADENA en vez de su vereda suelta, y existe por una sola
+ * razón: sin ella no hay manera de montar aquí a un dueño del Vado Largo, y hasta hoy
+ * este fichero sólo sabía afirmar que el premio estaba VACANTE. Un premio que sólo se ha
+ * comprobado vacante es un premio del que no se ha comprobado nada.
  */
 function escenarioDeMazo(monta: {
   bienes: readonly (readonly Bien[])[];
   mazo?: readonly CartaDeRiberas[];
   manos?: readonly (readonly CartaEnMano[])[];
   guardias?: readonly number[];
+  veredas?: readonly (readonly LlaveDeArista[] | undefined)[];
 }): EstadoDeRiberas {
   const asientos = ['A', 'B', 'C'].slice(0, monta.bienes.length);
   const abierta = abrirMesa({ id: 'RIB-3D-M', arcade: RIBERAS, semilla: 31, asientos });
@@ -422,11 +473,16 @@ function escenarioDeMazo(monta: {
       mano: [...(monta.manos?.[i] ?? [])].map((m) => ({ ...m })),
       guardias: monta.guardias?.[i] ?? 0,
       chozas: [verticeDeHex({ q: i * 2 - 2, r: 0 }, 0)],
-      veredas: [aristaDeHex({ q: i * 2 - 2, r: 0 }, 0)],
+      veredas: [...(monta.veredas?.[i] ?? [aristaDeHex({ q: i * 2 - 2, r: 0 }, 0)])],
     })),
   };
-  /* El premio es derivado: se recalcula, no se escribe. Es la regla, no un campo. */
-  return { ...puesto, guardia: recalcularLaGuardia(puesto) };
+  /*
+   * LOS DOS PREMIOS SON DERIVADOS: se recalculan, no se escriben. Son la regla, no un
+   * campo, y escribirlos a mano aquí sería montar una mesa que el juego nunca produciría
+   * —un dueño del Vado sin cadena— y comprobar contra ella.
+   */
+  const conGuardia: EstadoDeRiberas = { ...puesto, guardia: recalcularLaGuardia(puesto) };
+  return { ...conGuardia, vado: recalcularElVado(conGuardia) };
 }
 
 /** Una mesa de verdad puesta sobre un estado montado, para jugar con el árbitro. */
@@ -454,6 +510,8 @@ const laCarta = (cartas: readonly CartaDelMazoEnTres[], id: string): CartaDelMaz
 /** Un lienzo cualquiera para pedirle a la escena el reparto de verdad. */
 const CAMPO = 0.8;
 const PROPORCION = 16 / 9;
+/* Y el campo de verdad de los dos clientes, que montan la cámara con `fov: 45`. */
+const CAMPO_DE_LA_BARRA = (45 * Math.PI) / 180;
 
 /* ═══ 4. LA COMPRADA HOY NO SE JUEGA HOY: LA REGLA, JUGADA ENTERA ═══ */
 {
@@ -714,6 +772,167 @@ const PROPORCION = 16 / 9;
   );
 }
 
+/*
+ * ═══ 8 BIS. LOS DOS PREMIOS SE VEN COMO NAIPE, Y NO PASAN POR `misCartas` ═══
+ *
+ * ═══ EL FALLO, CONTADO POR QUIEN LO SUFRIÓ ═══
+ *
+ * Miguel encadenó cinco veredas y dijo: «no le otorga la carta de constructor de caminos».
+ * Se la otorgaba: el premio saltaba solo y los dos puntos entraban. Lo que no pasaba es que
+ * SE VIERA — el Vado Largo salía como una línea de texto en el marcador y en ninguna parte
+ * más, y en la mano de la izquierda, que es donde se mira lo que uno tiene, no había nada.
+ *
+ * ═══ Y LA TRAMPA QUE TIENE ARREGLARLO ═══
+ *
+ * Lo primero que sale es meter el premio en `misCartas` y dejar que `cartasEnTres` lo
+ * pinte. Eso convierte un dato PÚBLICO —quién tiene el Vado lo sabe la mesa entera— en un
+ * pasajero del campo SECRETO, que es el que no viaja a nadie más. Por eso el premio sale
+ * por una puerta hermana, `premiosEnTres`, y por eso aquí se comprueban las dos cosas: que
+ * el naipe está, y que no ha entrado por la puerta que no era.
+ *
+ * A tiene una cadena de CINCO veredas de verdad —los cinco lados de una isla— y B tres
+ * guardias jugadas, así que los dos premios tienen dueño y C no tiene ninguno. Los dos son
+ * derivados: los recalcula `escenarioDeMazo` con las funciones del juego, no se escriben.
+ */
+{
+  const LA_ISLA = { q: -2, r: 0 };
+  const CADENA = [0, 1, 2, 3, 4].map((k) => aristaDeHex(LA_ISLA, k));
+  const estado = escenarioDeMazo({
+    bienes: [['limo'], ['junco'], []],
+    manos: [[{ carta: 'c1:guardia', comprada: 0 }], [], []],
+    guardias: [0, 3, 0],
+    /* Sólo A cambia: los otros dos se quedan con su vereda suelta de siempre. */
+    veredas: [CADENA],
+  });
+
+  /* EL ESCENARIO TIENE QUE VALER: sin dueño de los dos premios, todo lo de abajo pasa solo. */
+  comprobar(
+    'A tiene una cadena de cinco y el Vado Largo es suyo: el premio salió de la regla',
+    largoDelVado(estado.colonos[0]?.veredas ?? [], []) === VADO_MINIMO && estado.vado.de === 'A',
+    { largo: largoDelVado(estado.colonos[0]?.veredas ?? [], []), vado: estado.vado },
+  );
+  comprobar('y La Mayor Guardia es de B, para que los dos premios sean de dueños distintos', estado.guardia.de === 'B');
+
+  const vistaA = proyectarRiberas(estado, 'A');
+  const opcionesA = opcionesDeRiberas(vistaA, 'A');
+  const premiosDeA = premiosEnTres(vistaA, 'A');
+  comprobar('A tiene UN naipe de premio: el Vado Largo, y no el otro', premiosDeA.length === 1 && premiosDeA[0]?.nombre === 'El Vado Largo', premiosDeA.map((p) => p.nombre));
+  comprobar('B tiene el suyo, y es el otro', canonico(premiosEnTres(vistaA, 'B').map((p) => p.nombre)) === canonico(['La Mayor Guardia']));
+  comprobar('y C no tiene ninguno: un premio vacante no se reparte al primero de la lista', premiosEnTres(vistaA, 'C').length === 0);
+  comprobar('un mirón sin asiento tampoco pide premios', premiosEnTres(vistaA, null).length === 0);
+  comprobar('ni una vista que no es de Riberas', premiosEnTres({ desde: 'frente' }, 'A').length === 0 && premiosEnTres(null, 'A').length === 0);
+
+  /*
+   * SE PIDEN DESDE LA VISTA DE CUALQUIERA, y eso es la prueba de que son públicos: la mano
+   * de cartas de otro no se puede pedir por ninguna puerta, y su premio sí — porque no hay
+   * nada que tapar. Si algún día esto empieza a devolver vacío desde la vista ajena, es que
+   * el premio se ha mudado a un campo secreto.
+   */
+  const vistaC = proyectarRiberas(estado, 'C');
+  comprobar('desde la vista de C se ve el premio de A igual que desde la de A', canonico(premiosEnTres(vistaC, 'A')) === canonico(premiosDeA), premiosEnTres(vistaC, 'A'));
+  comprobar('mientras que la mano de cartas de A desde la vista de C está vacía: eso sí es secreto', cartasEnTres(vistaC, opcionesDeRiberas(vistaC, 'C')).length === 0 && cartasEnTres(vistaA, opcionesA).length === 1);
+
+  /*
+   * ═══ Y `laManoDeLaIzquierda` OBEDECE A `quien` EN LAS DOS MITADES ═══
+   *
+   * Obedecía sólo en una: los premios eran los de `quien` y las cartas eran siempre las de
+   * `misCartas`, o sea las del que mira. Pedir desde la vista de A la mano de B devolvía los
+   * premios de B pegados a las cartas de A. No es fuga —eran cartas mías— pero es la firma
+   * que los dos clientes llaman, prometiendo lo que no cumplía.
+   */
+  const manoDeBDesdeA = laManoDeLaIzquierda(vistaA, opcionesA, 'B');
+  comprobar('pedida desde la vista de A, la mano de B son SUS premios y ni una carta', manoDeBDesdeA.every((n) => n.esPremio === true) && canonico(manoDeBDesdeA) === canonico(premiosEnTres(vistaA, 'B')) && manoDeBDesdeA.length === 1, manoDeBDesdeA.map((n) => n.nombre));
+  comprobar('la de A desde su propia vista lleva su premio Y su carta', laManoDeLaIzquierda(vistaA, opcionesA, 'A').length === premiosDeA.length + cartasEnTres(vistaA, opcionesA).length && laManoDeLaIzquierda(vistaA, opcionesA, 'A').some((n) => n.esPremio !== true));
+  comprobar('y la de nadie (`null`) está vacía, aunque la vista tenga cartas', laManoDeLaIzquierda(vistaA, opcionesA, null).length === 0);
+
+  /* ── EL PREMIO NO ES UNA CARTA, Y SE COMPRUEBA POR LOS TRES CAMINOS ── */
+  comprobar(
+    'el naipe de premio NO sale por `cartasEnTres`: no está en `misCartas`',
+    cartasEnTres(vistaA, opcionesA).every((c) => c.esPremio !== true && c.familia !== 'vado'),
+    cartasEnTres(vistaA, opcionesA).map((c) => c.familia),
+  );
+  comprobar(
+    'ni la vista de A lleva el premio dentro de `misCartas`, que es el campo que no viaja',
+    canonico(vistaA.misCartas).includes('vado') === false && canonico(vistaA.misCartas).includes('premio') === false,
+    vistaA.misCartas,
+  );
+  const secretos = loSecretoDeRiberas(estado).filter((s): s is string => typeof s === 'string');
+  comprobar('hay secretos que buscar, o esto no probaría nada', secretos.length > 0, secretos.length);
+  comprobar(
+    'y NINGÚN naipe de premio es un secreto declarado: un premio es público, y lo secreto no se pinta',
+    premiosDeA.every((p) => !secretos.includes(p.id) && !secretos.some((s) => p.id.includes(s))),
+    { premios: premiosDeA.map((p) => p.id) },
+  );
+
+  /* ── NO SE PUEDE JUGAR, Y ESO LO DICEN A LA VEZ LA TRADUCCIÓN Y LA ESCENA ── */
+  const elNaipe = premiosDeA[0];
+  comprobar('el naipe de premio no se puede ni jugar ni revelar, y lo dice él mismo', elNaipe?.sePuedeJugar === false && elNaipe?.sePuedeRevelar === false && elNaipe?.esPremio === true, elNaipe);
+  comprobar(
+    'y el juego no ofrece ni una sola manera de jugarlo ni de revelarlo',
+    jugadasDeLaCarta(vistaA, opcionesA, elNaipe?.id ?? '').length === 0 &&
+      jugadaSinPreguntar(vistaA, opcionesA, elNaipe?.id ?? '') === null &&
+      revelarDe(opcionesA, elNaipe?.id ?? '') === null,
+  );
+  comprobar(
+    'la ESCENA tampoco le abre ninguna casilla donde soltarlo',
+    puertasDeLaCarta(elNaipe ?? null).length === 0,
+    puertasDeLaCarta(elNaipe ?? null),
+  );
+
+  /* ── Y ESTÁ EN LA MANO, REPARTIDO CON LAS CARTAS Y SIN APAGARSE ── */
+  const laMano = laManoDeLaIzquierda(vistaA, opcionesA, 'A');
+  comprobar(
+    'la mano de la izquierda son los premios MÁS las cartas, sin perder ni duplicar ninguna',
+    laMano.length === premiosDeA.length + cartasEnTres(vistaA, opcionesA).length &&
+      new Set(laMano.map((c) => c.id)).size === laMano.length,
+    laMano.map((c) => c.id),
+  );
+  const colocada = huecosDeLasCartas(laMano, (45 * Math.PI) / 180, 16 / 9, null);
+  comprobar('y la escena de verdad la reparte entera: un hueco por naipe', colocada.length === laMano.length);
+  comprobar(
+    'el premio NO sale apagado, aunque no se pueda jugar: apagado querría decir «hoy no»',
+    colocada.find((c) => c.carta.id === elNaipe?.id)?.apagada === false,
+    colocada.map((c) => `${c.carta.id}:${String(c.apagada)}`),
+  );
+  comprobar(
+    'y va arriba del todo, lejos de las casillas del pie que nunca va a usar',
+    colocada[0]?.carta.id === elNaipe?.id,
+    colocada.map((c) => c.carta.id),
+  );
+
+  /* ── LA CARA: familia propia, color vivo y dibujo que existe ── */
+  comprobar('su familia es una que la escena reparte, y no la de los títulos', ORDEN_DE_LAS_FAMILIAS.includes(elNaipe?.familia ?? '') && elNaipe?.familia !== FAMILIA_DE_LOS_TITULOS);
+  comprobar(
+    'y NO es la familia `guardia` de la carta que se juega: el premio no es una guardia más',
+    premiosEnTres(vistaA, 'B')[0]?.familia === 'mayorguardia',
+    premiosEnTres(vistaA, 'B')[0]?.familia,
+  );
+  const dosPremios = [...premiosDeA, ...premiosEnTres(vistaA, 'B')];
+  const contornosDePremio = Object.keys(CONTORNOS_DE_LA_CARTA);
+  comprobar('los dos dibujos de premio existen en los iconos de la escena', dosPremios.every((p) => contornosDePremio.includes(p.dibujo)), { pide: dosPremios.map((p) => p.dibujo), hay: contornosDePremio });
+  comprobar('y ninguno toma prestado el dibujo de una carta del mazo', dosPremios.every((p) => CLASES_DE_CARTA.every((clase) => retratoDeLaCarta(clase)?.dibujo !== p.dibujo)), dosPremios.map((p) => p.dibujo));
+  comprobar('los dos tienen color propio, y ninguno es el de reserva', new Set(dosPremios.map((p) => colorDeLaFamilia(p.familia))).size === 2 && dosPremios.every((p) => colorDeLaFamilia(p.familia) !== COLOR_SIN_FAMILIA), dosPremios.map((p) => colorDeLaFamilia(p.familia)));
+  comprobar('sus nombres se leen y son los del juego', canonico(dosPremios.map((p) => p.nombre)) === canonico(['El Vado Largo', 'La Mayor Guardia']));
+  comprobar(
+    'y su `id` no puede chocar con el seudónimo de una carta, porque lleva dos puntos dentro',
+    dosPremios.every((p) => p.id.includes(':')) &&
+      cartasEnTres(vistaA, opcionesA).every((c) => !c.id.includes(':')),
+    { premios: dosPremios.map((p) => p.id), cartas: cartasEnTres(vistaA, opcionesA).map((c) => c.id) },
+  );
+
+  /* ── Y EL PREMIO SE VA CUANDO SE VA: no es un naipe que se queda pegado ── */
+  const sinCadena: EstadoDeRiberas = {
+    ...estado,
+    colonos: estado.colonos.map((c) => (c.asiento === 'A' ? { ...c, veredas: [aristaDeHex(LA_ISLA, 0)] } : c)),
+  };
+  const cortada: EstadoDeRiberas = { ...sinCadena, vado: recalcularElVado(sinCadena) };
+  comprobar(
+    'sin cadena, el Vado queda vacante y el naipe DESAPARECE de la mano de A',
+    cortada.vado.de === null && premiosEnTres(proyectarRiberas(cortada, 'A'), 'A').length === 0,
+    cortada.vado,
+  );
+}
+
 /* ═══ 8. EL MARCADOR: lo público de todos, y lo oculto sólo mío ═══ */
 {
   const estado = escenarioDeMazo({
@@ -748,6 +967,18 @@ const PROPORCION = 16 / 9;
   comprobar('y cuántas guardias ha jugado también', mio?.guardias === 3 && otro?.guardias === 1);
   comprobar('con tres jugadas y más que nadie, La Mayor Guardia es de A', marcador?.mayorGuardia === 'A' && mio?.tieneLaMayorGuardia === true && otro?.tieneLaMayorGuardia === false);
   comprobar('el Vado Largo sigue vacante, y vacante es `null`', marcador?.vado === null && marcador?.colonos.every((c) => !c.tieneElVado) === true);
+
+  /*
+   * ── CUÁNTO MIDE LA CADENA DE CADA UNO, QUE ES LO QUE NO SE DECÍA ──
+   *
+   * `ColonoVisto.vado` lo publica `proyectarRiberas` desde que el premio existe y no lo
+   * pintaba NADIE. Eso era la otra mitad del fallo de Miguel: sin premio y sin una cifra
+   * que dijera cuánto contaba el juego, no había manera de saber si faltaban veredas o si
+   * el vecino le estaba cortando el paso. Vacante o no, el número sale para TODOS —es la
+   * carrera lo que se juega—, y el mínimo viene de la regla y no de un cinco escrito a mano.
+   */
+  comprobar('el marcador trae el largo de la cadena de cada colono, con una vereda cada uno', marcador?.colonos.every((c) => c.vado === 1) === true, marcador?.colonos.map((c) => c.vado));
+  comprobar('y dice cuántas hacen falta, sacándolo de la regla y no de un número escrito a mano', marcador?.vadoMinimo === VADO_MINIMO && (marcador?.vadoMinimo ?? 0) > 1);
   comprobar('quedan las cartas del mazo que dice la vista', marcador?.mazo === estado.mazo.length && (marcador?.mazo ?? 0) > 0, marcador?.mazo);
   comprobar('nadie ha revelado nada todavía', marcador?.colonos.every((c) => c.titulos.length === 0) === true);
   comprobar('y los títulos ocultos de otro no salen por ninguna parte', canonico(marcador).includes('molino') === false && canonico(marcador).includes('Molino') === false);
@@ -769,6 +1000,108 @@ const PROPORCION = 16 / 9;
   comprobar('revelado, el título sale en el marcador de todos, con su nombre', canonico(bAhora?.titulos) === canonico(['El Molino']), bAhora?.titulos);
   comprobar('y sus puntos públicos suben, que es lo que significa revelar', (bAhora?.puntos ?? 0) > (otro?.puntos ?? 0));
   comprobar('pero sigue sin decir cuántos me quedan a mí sin revelar', despues?.colonos.find((c) => c.asiento === 'B')?.puntosConLoOculto === null);
+
+  /*
+   * ── Y UN MARCADOR CON DUEÑO DEL VADO, QUE ES EL QUE FALTABA ──
+   *
+   * De este premio sólo se afirmaba que estaba VACANTE, y un premio comprobado sólo vacante
+   * es un premio del que no se ha comprobado nada: la mitad de las frases del marcador —el
+   * dueño, su bandera, el largo de su cadena— no las tocaba ninguna comprobación. Aquí A
+   * encadena las cinco y se mira lo que la pantalla va a leer.
+   */
+  const LA_ISLA_DEL_VADO = { q: -2, r: 0 };
+  const conVado = escenarioDeMazo({
+    bienes: [['limo'], ['junco'], []],
+    guardias: [3, 1, 0],
+    veredas: [[0, 1, 2, 3, 4].map((k) => aristaDeHex(LA_ISLA_DEL_VADO, k))],
+  });
+  const conPremio = marcadorEnTres(proyectarRiberas(conVado, 'A'));
+  const aConVado = conPremio?.colonos.find((c) => c.asiento === 'A');
+  const bSinVado = conPremio?.colonos.find((c) => c.asiento === 'B');
+  comprobar('el Vado Largo tiene dueño, y es quien encadenó las cinco', conPremio?.vado === 'A' && aConVado?.tieneElVado === true, conPremio?.vado);
+  comprobar('y sólo él: la bandera no se le pone a la mesa entera', conPremio?.colonos.filter((c) => c.tieneElVado).length === 1);
+  comprobar('su renglón dice cuánto mide la cadena, y son las cinco del mínimo', aConVado?.vado === VADO_MINIMO, aConVado?.vado);
+  comprobar('y el de al lado dice la suya, que es más corta: el número sale para todos, no sólo para el dueño', bSinVado?.vado === 1 && bSinVado?.tieneElVado === false, bSinVado?.vado);
+  comprobar('con los dos puntos del premio dentro, sus puntos públicos son más que los del otro', (aConVado?.puntos ?? 0) > (bSinVado?.puntos ?? 0), { a: aConVado?.puntos, b: bSinVado?.puntos });
+  comprobar('y los dos premios pueden ser de dueños distintos a la vez', conPremio?.mayorGuardia === 'A' || conPremio?.mayorGuardia === 'B');
+
+  /*
+   * ═══ LA FRASE DEL RENGLÓN NACE AQUÍ, Y SUS TRES ESTADOS ═══
+   *
+   * Con el escenario de arriba: A tiene el premio y B una vereda. Lo que se comprueba es
+   * el TEXTO, porque el texto es lo que se lee — y lo que mintió.
+   */
+  if (conPremio !== null && aConVado !== undefined && bSinVado !== undefined) {
+    comprobar('a quien tiene el premio se le dice «El Vado Largo» y cuánto mide, sin el «de 5» que ya pasó', renglonDelVado(aConVado, conPremio).startsWith('El Vado Largo, 5') && !renglonDelVado(aConVado, conPremio).includes(' de '), renglonDelVado(aConVado, conPremio));
+    comprobar('a quien va corto se le dice cuánto lleva y cuánto hace falta: «vado 1 de 5»', renglonDelVado(bSinVado, conPremio) === `vado 1 de ${String(VADO_MINIMO)}` && estadoDelVado(bSinVado, conPremio).clase === 'corta', renglonDelVado(bSinVado, conPremio));
+    comprobar('y la frase que se oye dice lo mismo, con el mínimo dentro', loQueSeOyeDelVado(bSinVado, conPremio).includes(`de las ${String(VADO_MINIMO)}`) && loQueSeOyeDelVado(aConVado, conPremio).includes('es suyo'), { b: loQueSeOyeDelVado(bSinVado, conPremio), a: loQueSeOyeDelVado(aConVado, conPremio) });
+  }
+
+  /*
+   * ═══ EL EMPATE, QUE ES DONDE LA FRASE MENTÍA ═══
+   *
+   * `recalcularElVado` sólo mueve el premio a quien SUPERA estrictamente al dueño. O sea
+   * que el segundo en llegar a cinco tiene cadena de cinco, cero puntos de premio y —con
+   * la frase vieja— un renglón que decía «vado 5 de 5», que se lee como «ya está». Es la
+   * misma mitad del fallo de Miguel (la pantalla que no explica por qué no hay premio)
+   * escrita en la línea que se añadió para explicarlo, y ningún comprobador la miraba.
+   *
+   * Se monta en DOS pasos y no en uno, porque así es como pasa en la mesa: A llega antes
+   * y se lleva el premio; luego B llega a lo mismo y el premio no se mueve.
+   */
+  const LA_ISLA_DE_B = { q: 0, r: 0 };
+  const bTambienLlega: EstadoDeRiberas = {
+    ...conVado,
+    colonos: conVado.colonos.map((c, i) => (i === 1 ? { ...c, veredas: [0, 1, 2, 3, 4].map((k) => aristaDeHex(LA_ISLA_DE_B, k)) } : c)),
+  };
+  const empatado: EstadoDeRiberas = { ...bTambienLlega, vado: recalcularElVado(bTambienLlega) };
+  const marcadorEmpatado = marcadorEnTres(proyectarRiberas(empatado, 'B'));
+  const aQueLlegoAntes = marcadorEmpatado?.colonos.find((c) => c.asiento === 'A');
+  const bQueLlegoDespues = marcadorEmpatado?.colonos.find((c) => c.asiento === 'B');
+  comprobar('B llega a las cinco y el premio NO se mueve: sigue siendo de A, que llegó antes', empatado.vado.de === 'A' && bQueLlegoDespues?.vado === VADO_MINIMO && bQueLlegoDespues?.tieneElVado === false, { vado: empatado.vado, b: bQueLlegoDespues?.vado });
+  if (marcadorEmpatado !== null && aQueLlegoAntes !== undefined && bQueLlegoDespues !== undefined) {
+    const deB = renglonDelVado(bQueLlegoDespues, marcadorEmpatado);
+    const oidoDeB = loQueSeOyeDelVado(bQueLlegoDespues, marcadorEmpatado);
+    const estadoDeB = estadoDelVado(bQueLlegoDespues, marcadorEmpatado);
+    comprobar('el estado de B es «llega», con A de dueño: ni corta ni premio', estadoDeB.clase === 'llega' && estadoDeB.dueño === aQueLlegoAntes, estadoDeB.clase);
+    comprobar('y su renglón NO dice «vado 5 de 5»: eso se lee como «ya está», y no está', !deB.includes(`de ${String(VADO_MINIMO)}`) && !/\bde \d/.test(deB), deB);
+    comprobar('dice de quién es el premio, por su nombre, y que llegó antes', deB.includes(aQueLlegoAntes.nombre) && deB.includes('llegó antes') && deB.startsWith(`vado ${String(VADO_MINIMO)}`), deB);
+    comprobar('la frase que se oye tampoco dice «de las 5», y nombra al dueño', !oidoDeB.includes(`de las ${String(VADO_MINIMO)}`) && oidoDeB.includes(aQueLlegoAntes.nombre) && oidoDeB.includes('superar'), oidoDeB);
+    comprobar('y a A, que lo tiene, se le sigue diciendo «El Vado Largo»', renglonDelVado(aQueLlegoAntes, marcadorEmpatado).startsWith('El Vado Largo'), renglonDelVado(aQueLlegoAntes, marcadorEmpatado));
+  }
+
+  /* Y si el dueño mide MÁS, se dice con cuánto: es lo que hay que superar. */
+  const aConSeis: EstadoDeRiberas = {
+    ...bTambienLlega,
+    colonos: bTambienLlega.colonos.map((c, i) => (i === 0 ? { ...c, veredas: [...c.veredas, aristaDeHex(LA_ISLA_DEL_VADO, 5)] } : c)),
+  };
+  const conSeis: EstadoDeRiberas = { ...aConSeis, vado: recalcularElVado(aConSeis) };
+  const marcadorConSeis = marcadorEnTres(proyectarRiberas(conSeis, 'B'));
+  const bContraSeis = marcadorConSeis?.colonos.find((c) => c.asiento === 'B');
+  comprobar(
+    'con A en seis, a B se le dice «lo tiene A con 6»: la cifra que hay que superar',
+    marcadorConSeis !== null && bContraSeis !== undefined && conSeis.vado.largo === VADO_MINIMO + 1 && renglonDelVado(bContraSeis, marcadorConSeis).endsWith(`con ${String(VADO_MINIMO + 1)}`),
+    marcadorConSeis === null || bContraSeis === undefined ? conSeis.vado : renglonDelVado(bContraSeis, marcadorConSeis),
+  );
+
+  /*
+   * Y EL EMPATE DESDE VACANTE: los dos llegan a la vez y `recalcularElVado` no se lo da a
+   * ninguno. Es el único caso en que una cadena llega y no hay dueño a quien nombrar, y la
+   * frase tiene que decir eso y no «de 5».
+   */
+  const losDosALaVez = escenarioDeMazo({
+    bienes: [['limo'], ['junco'], []],
+    veredas: [[0, 1, 2, 3, 4].map((k) => aristaDeHex(LA_ISLA_DEL_VADO, k)), [0, 1, 2, 3, 4].map((k) => aristaDeHex(LA_ISLA_DE_B, k))],
+  });
+  const marcadorVacante = marcadorEnTres(proyectarRiberas(losDosALaVez, 'A'));
+  const aVacante = marcadorVacante?.colonos.find((c) => c.asiento === 'A');
+  comprobar('los dos a cinco desde vacante: nadie se lo lleva, y los dos miden cinco', losDosALaVez.vado.de === null && marcadorVacante?.colonos.filter((c) => c.vado === VADO_MINIMO).length === 2, { vado: losDosALaVez.vado, largos: marcadorVacante?.colonos.map((c) => c.vado) });
+  if (marcadorVacante !== null && aVacante !== undefined) {
+    const deA = renglonDelVado(aVacante, marcadorVacante);
+    const estadoDeA = estadoDelVado(aVacante, marcadorVacante);
+    comprobar('y el renglón dice «empatado y sin dueño», no «vado 5 de 5»', deA === `vado ${String(VADO_MINIMO)}, empatado y sin dueño` && estadoDeA.clase === 'llega' && estadoDeA.dueño === null, deA);
+    comprobar('y la frase que se oye dice que el premio queda sin dueño hasta que alguien supere', loQueSeOyeDelVado(aVacante, marcadorVacante).includes('sin dueño') && loQueSeOyeDelVado(aVacante, marcadorVacante).includes('supere'), loQueSeOyeDelVado(aVacante, marcadorVacante));
+  }
 }
 
 /* ═══ 9. LAS NUEVE CARAS SON LAS DE LA ESCENA, Y NI UNA MÁS ═══ */
@@ -820,18 +1153,34 @@ const PROPORCION = 16 / 9;
 
   const enElTablero = opciones.filter((o) => o.tipo === FUNDAR || o.tipo === ALZAR || o.tipo === OFRECER).length;
   const enLaMano = opciones.filter((o) => TIPOS_QUE_PINTA_LA_MANO.includes(o.tipo)).length;
-  const sueltas = opcionesFueraDeLaMano(opcionesFueraDelTablero(opciones));
+  /*
+   * LA CUENTA TIENE CUATRO SUMANDOS DESDE ESTE ENCARGO, Y NO TRES.
+   *
+   * Aquí se exigía por escrito «COMPRAR SIGUE SIENDO UN BOTÓN: no es una carta de la mano
+   * y no hay mazo que pulsar», y era verdad mientras el único sitio donde se ofrecía era
+   * el pie. Ahora hay mazo que pulsar: el cuarto hueco de la barra. La comprobación no se
+   * borra, se DA LA VUELTA — y se le añade la mitad que faltaba, que es que sin hueco de
+   * mazo el botón tiene que volver, porque es lo único que salva al respaldo SVG.
+   */
+  const elMazo = mazoEnLaBarra(vista, 'A', opciones);
+  const sueltas = opcionesFueraDeLaBarra(opcionesFueraDeLaMano(opcionesFueraDelTablero(opciones)), elMazo);
+  const porElMazo = elMazo === null ? 0 : opciones.filter((o) => o.tipo === COMPRAR).length;
   comprobar('hay cartas que pintar y obra que ofrecer, o esto no comprobaría nada', enLaMano > 0 && enElTablero > 0, { enLaMano, enElTablero });
+  comprobar('y hay hueco de mazo con una compra dentro, o el cuarto sumando sería cero', elMazo !== null && porElMazo === 1, { elMazo, porElMazo });
   comprobar(
-    'lo del tablero, lo de la mano y los botones suman las opciones: ni una dos veces, ni una perdida',
-    sueltas.length + enElTablero + enLaMano === opciones.length,
-    { sueltas: sueltas.length, enElTablero, enLaMano, todas: opciones.length },
+    'lo del tablero, lo de la mano, el hueco del mazo y los botones suman las opciones: ni una dos veces, ni una perdida',
+    sueltas.length + enElTablero + enLaMano + porElMazo === opciones.length,
+    { sueltas: sueltas.length, enElTablero, enLaMano, porElMazo, todas: opciones.length },
   );
   comprobar('ningún botón es de los que pinta la mano', sueltas.every((o) => !TIPOS_QUE_PINTA_LA_MANO.includes(o.tipo)), sueltas.map((o) => o.id));
   comprobar(
-    'COMPRAR SIGUE SIENDO UN BOTÓN: no es una carta de la mano y no hay mazo que pulsar',
-    sueltas.some((o) => o.tipo === COMPRAR) && comprarEnTres(sueltas) !== null,
+    'COMPRAR YA NO ES UN BOTÓN: lo ofrece el cuarto hueco de la barra, y una vez es una vez',
+    !sueltas.some((o) => o.tipo === COMPRAR) && comprarEnTres(sueltas) === null,
     sueltas.map((o) => o.id),
+  );
+  comprobar(
+    'pero SIN hueco de mazo vuelve al pie, que es lo único que salva al respaldo y al mirón',
+    opcionesFueraDeLaBarra(opcionesFueraDeLaMano(opcionesFueraDelTablero(opciones)), null).some((o) => o.tipo === COMPRAR),
   );
   comprobar('y pasar también', sueltas.some((o) => o.tipo === PASAR));
   comprobar(
@@ -840,6 +1189,146 @@ const PROPORCION = 16 / 9;
   );
   comprobar('los cuatro que gastan la jugada del turno y revelar son los que pinta la mano', canonico([...TIPOS_QUE_PINTA_LA_MANO].sort()) === canonico([ACAPARAMIENTO, ANO_BUENO, DOS_VEREDAS, GUARDIA, REVELAR].sort()), TIPOS_QUE_PINTA_LA_MANO);
   comprobar('y comprar no está entre ellos', !TIPOS_QUE_PINTA_LA_MANO.includes(COMPRAR));
+}
+
+/* ═══ 10 BIS. COMPRAR SE PULSA EN LA BARRA, Y LA CARTA APARECE A LA IZQUIERDA ═══ */
+
+/*
+ * ═══ QUÉ COMPRA ESTE BLOQUE ═══
+ *
+ * Miguel pidió «un modelo de carta a la derecha del de puentes, que al pincharlo pregunte
+ * si compro —sólo si tengo los recursos— y que al confirmar me salga la carta en la
+ * izquierda». Eso son cuatro afirmaciones y aquí se miden las cuatro con números:
+ *
+ *  1. HAY CUARTO HUECO, y sale de las reglas: `comprarEnTres(opciones) !== null`, ni una
+ *     segunda cuenta del coste. Se prueba quitándole los bienes y viendo que se apaga solo.
+ *  2. APAGADO NO ES «NO ESTÁ». Sin bienes el hueco SIGUE, apagado. Un hueco que aparece y
+ *     desaparece corre las otras tres piezas de sitio en cada jugada, porque la barra
+ *     reparte centrado — y eso se lee como un fallo de dibujo, no como una regla.
+ *  3. EL BOTÓN SE CAE EXACTAMENTE DONDE EL NAIPE APARECE, y en ningún sitio más. Lo ata
+ *     que `opcionesFueraDeLaBarra` reciba EL MAZO y no un interruptor suelto.
+ *  4. Y LA COMPRADA SALE A LA IZQUIERDA SOLA, sin que nadie la mueva: la mano es
+ *     `laManoDeLaIzquierda`, que cuelga de `misCartas`, y `misCartas` la llena el árbitro
+ *     al aceptar la compra. Se juega la compra POR LA PUERTA DE SIEMPRE y se cuenta antes
+ *     y después.
+ */
+{
+  const DOS = ['A', 'B'];
+  const rico = escenarioDeMazo({
+    bienes: [['sal', 'piedra', 'grano'], ['limo']],
+    mazo: ['c1:guardia', 'c2:faro'],
+  });
+  let partida = mesaSobre('RIB-MAZO-BARRA', rico, DOS);
+  const vista = vistaEn(partida, 'A');
+  const opciones = opcionesEn(partida, 'A');
+
+  /* ── 1. EL HUECO, Y DE DÓNDE SALE QUE ESTÉ ENCENDIDO ── */
+  comprobar('el juego ofrece comprar en este escenario, o nada de lo de abajo mediría', comprarEnTres(opciones) !== null, opciones.map((o) => o.id));
+  const mazo = mazoEnLaBarra(vista, 'A', opciones);
+  comprobar('a un colono sentado se le pinta el cuarto hueco, y hoy se puede pulsar', mazo !== null && mazo.disponible === true, mazo);
+  comprobar(
+    'y su `disponible` es exactamente lo que dicen las reglas, no una cuenta nueva del coste',
+    mazo?.disponible === (comprarEnTres(opciones) !== null),
+  );
+
+  /* ── 2. SIN BIENES SE APAGA, PERO NO DESAPARECE ── */
+  const pobre = mesaSobre('RIB-MAZO-POBRE', escenarioDeMazo({ bienes: [['limo'], ['limo']], mazo: ['c1:guardia'] }), DOS);
+  const mazoPobre = mazoEnLaBarra(vistaEn(pobre, 'A'), 'A', opcionesEn(pobre, 'A'));
+  comprobar('sin sal, piedra y grano el juego no ofrece comprar', comprarEnTres(opcionesEn(pobre, 'A')) === null);
+  comprobar(
+    'y el hueco SIGUE ESTANDO, apagado: no aparece y desaparece según la mano',
+    mazoPobre !== null && mazoPobre.disponible === false,
+    mazoPobre,
+  );
+  comprobar('la barra de al lado sigue siendo la misma de tres piezas', barraEnTres(vistaEn(pobre, 'A'), 'A').length === 3);
+
+  /* ── Y CON EL MAZO AGOTADO TAMPOCO: es la otra mitad de «sólo si se puede» ── */
+  const seco = mesaSobre('RIB-MAZO-SECO', escenarioDeMazo({ bienes: [['sal', 'piedra', 'grano'], ['limo']], mazo: [] }), DOS);
+  comprobar('con el mazo vacío el juego no ofrece comprar, aunque sobren bienes', comprarEnTres(opcionesEn(seco, 'A')) === null);
+  comprobar(
+    'y el hueco sale apagado por ese motivo también, sin que el cliente sepa cuál de los dos es',
+    mazoEnLaBarra(vistaEn(seco, 'A'), 'A', opcionesEn(seco, 'A'))?.disponible === false,
+  );
+
+  /* ── 3. QUIEN NO TIENE BARRA NO TIENE HUECO, Y POR ESO CONSERVA EL BOTÓN ── */
+  comprobar('un mirón no tiene hueco de mazo', mazoEnLaBarra(vista, null, opciones) === null);
+  comprobar('ni lo tiene un asiento que no está en la mesa', mazoEnLaBarra(vista, 'Z', opciones) === null);
+  const conNaipe = opcionesFueraDeLaBarra(opcionesFueraDeLaMano(opcionesFueraDelTablero(opciones)), mazo);
+  const sinNaipe = opcionesFueraDeLaBarra(opcionesFueraDeLaMano(opcionesFueraDelTablero(opciones)), null);
+  comprobar('con hueco de mazo, comprar deja de ser botón', !conNaipe.some((o) => o.tipo === COMPRAR), conNaipe.map((o) => o.id));
+  comprobar('sin hueco de mazo, comprar sigue siendo botón', sinNaipe.some((o) => o.tipo === COMPRAR), sinNaipe.map((o) => o.id));
+  comprobar(
+    'y no se lleva por delante ningún otro movimiento: cae comprar y sólo comprar',
+    sinNaipe.length === conNaipe.length + 1 &&
+      canonico(sinNaipe.filter((o) => o.tipo !== COMPRAR).map((o) => o.id)) === canonico(conNaipe.map((o) => o.id)),
+    { con: conNaipe.map((o) => o.id), sin: sinNaipe.map((o) => o.id) },
+  );
+  comprobar(
+    'un hueco APAGADO tampoco devuelve el botón: apagado no es «no está», y ofrecerlo dos veces sería peor',
+    !opcionesFueraDeLaBarra(opcionesFueraDeLaMano(opcionesFueraDelTablero(opciones)), { disponible: false }).some(
+      (o) => o.tipo === COMPRAR,
+    ),
+  );
+
+  /* ── 4. EL CUARTO HUECO EN LA BARRA DE VERDAD, Y VA EL ÚLTIMO ── */
+  const piezas = barraEnTres(vista, 'A');
+  comprobar('la barra trae las tres obras, y el mazo es el cuarto', piezas.length === 3 && mazo !== null, piezas.map((p) => p.id));
+  const tres = huecosDeLaBarra(3, CAMPO_DE_LA_BARRA, PROPORCION);
+  const cuatro = huecosDeLaBarra(4, CAMPO_DE_LA_BARRA, PROPORCION);
+  comprobar('pedidos cuatro salen cuatro, todos del mismo lado', cuatro.length === 4 && new Set(cuatro.map((h) => h.lado)).size === 1);
+  comprobar(
+    'y el del mazo es el ÚLTIMO, el de más a la derecha: lo que se construye va junto',
+    cuatro.every((h, i) => i === 0 || h.x > (cuatro[i - 1]?.x ?? 0)),
+    cuatro.map((h) => Number(h.x.toFixed(4))),
+  );
+  comprobar(
+    'LA BARRA ESTÁ CENTRADA: el cuarto no se añade a la derecha, corre los tres a la izquierda',
+    (cuatro[0]?.x ?? 0) < (tres[0]?.x ?? 0) &&
+      (cuatro[1]?.x ?? 0) < (tres[1]?.x ?? 0) &&
+      (cuatro[2]?.x ?? 0) < (tres[2]?.x ?? 0) &&
+      Math.abs((cuatro[0]?.x ?? 0) + (cuatro[3]?.x ?? 0)) < 1e-9,
+    { tres: tres.map((h) => Number(h.x.toFixed(4))), cuatro: cuatro.map((h) => Number(h.x.toFixed(4))) },
+  );
+
+  /* ── EL DIBUJO EXISTE, Y NO ES EL DE NINGÚN NAIPE ── */
+  const dibujos = Object.keys(CONTORNOS_DE_LA_CARTA);
+  comprobar('el dibujo del mazo existe en los iconos de la escena', dibujos.includes(DIBUJO_DEL_MAZO), dibujos);
+  comprobar(
+    'y no es prestado de ninguna carta: un molino en la barra prometería El Molino, que es una de las cinco que pueden salir',
+    CLASES_DE_CARTA.every((clase) => retratoDeLaCarta(clase)?.dibujo !== DIBUJO_DEL_MAZO),
+  );
+  comprobar(
+    'ni de ninguno de los dos premios',
+    premiosEnTres(vista, 'A').every((x) => x.dibujo !== DIBUJO_DEL_MAZO) &&
+      premiosEnTres(vista, 'B').every((x) => x.dibujo !== DIBUJO_DEL_MAZO),
+  );
+
+  /* ── 5. Y LA COMPRADA APARECE A LA IZQUIERDA SOLA ── */
+  const antes = laManoDeLaIzquierda(vista, opciones, 'A');
+  comprobar('antes de comprar, la mano de la izquierda de A está vacía', antes.length === 0, antes.map((c) => c.id));
+  partida = mover(partida, 'A', comprarEnTres(opciones) as Opcion);
+  const vistaDespues = vistaEn(partida, 'A');
+  const opcionesDespues = opcionesEn(partida, 'A');
+  const despues = laManoDeLaIzquierda(vistaDespues, opcionesDespues, 'A');
+  comprobar(
+    'y después trae exactamente un naipe más: de 0 a 1, sin que nadie lo mueva de sitio',
+    despues.length === antes.length + 1,
+    { antes: antes.length, despues: despues.length },
+  );
+  comprobar('que es la carta que tocaba, con su cara entera', despues[0]?.id === 'c1' && despues[0]?.familia === 'guardia' && despues[0]?.nombre === 'La Guardia', despues[0]);
+  const enLaFranja = huecosDeLasCartas(despues, CAMPO, PROPORCION, null);
+  comprobar('la escena de verdad le da su hueco: uno por naipe', enLaFranja.length === despues.length);
+  comprobar(
+    'y ese hueco cae en la mitad IZQUIERDA de la pantalla, que es donde Miguel la pidió',
+    (enLaFranja[0]?.hueco.x ?? 0) < 0,
+    enLaFranja.map((c) => Number(c.hueco.x.toFixed(4))),
+  );
+  comprobar(
+    'y el cuarto hueco se apaga SOLO: los tres bienes se han ido con la compra',
+    mazoEnLaBarra(vistaDespues, 'A', opcionesDespues)?.disponible === false,
+    mazoEnLaBarra(vistaDespues, 'A', opcionesDespues),
+  );
+  comprobar('y el mazo del marcador ha bajado una: se compró de verdad', marcadorEnTres(vistaDespues)?.mazo === 1, marcadorEnTres(vistaDespues)?.mazo);
 }
 
 /* ═══ 11. CUANDO NO CABEN LOS COLORES, NO SE PINTA UN TABLERO QUE MIENTE ═══ */
@@ -862,6 +1351,7 @@ const PROPORCION = 16 / 9;
   comprobar('ni tiene barra, mano ni turno', barraEnTres(ajena, 'A').length === 0 && manoEnTres(ajena).length === 0 && meToca(ajena) === false);
   comprobar('ni trueques', bienesQueSeCambianPor(ajena, [], 'junco').length === 0 && truequesPosibles(ajena, [], 'junco', 'sal').length === 0);
   comprobar('ni mano del mazo, ni jugadas, ni marcador', cartasEnTres(ajena, []).length === 0 && jugadasDeLaCarta(ajena, [], 'c1').length === 0 && marcadorEnTres(ajena) === null);
+  comprobar('ni premios, ni mano de la izquierda', premiosEnTres(ajena, 'A').length === 0 && laManoDeLaIzquierda(ajena, [], 'A').length === 0);
   comprobar('`null` y `undefined` tampoco', tableroEnTres(null) === null && tableroEnTres(undefined) === null && marcadorEnTres(null) === null);
   const rota = { desde: 'riberas', momento: 'jugando', colonos: [], islas: [], misFichas: ['sinbien', 'b1:', ':grano', 'b2:sal'] };
   comprobar('una ficha sin la forma `serie:bien` se salta en vez de romper la mano', manoEnTres(rota).map((c) => c.bien).join(',') === 'grano,sal', manoEnTres(rota));
@@ -874,8 +1364,10 @@ const PROPORCION = 16 / 9;
    */
   const sinMazo = { desde: 'riberas', momento: 'jugando', colonos: [{ asiento: 'A', nombre: 'Ana', color: 'rojo' }], islas: [], turnoDe: 'A', yo: 'A' };
   comprobar('una vista sin mazo no tiene mano de cartas, y no revienta', cartasEnTres(sinMazo, []).length === 0);
+  comprobar('ni premios: una vista sin `vado` ni `guardia` no le regala uno a nadie', premiosEnTres(sinMazo, 'A').length === 0 && laManoDeLaIzquierda(sinMazo, [], 'A').length === 0);
   const pobre = marcadorEnTres(sinMazo);
   comprobar('y su marcador sale con ceros y sin premios, que es la verdad', pobre?.mazo === 0 && pobre?.vado === null && pobre?.mayorGuardia === null, pobre);
+  comprobar('con la cadena a cero, que es la verdad y no un hueco, y el mínimo de la regla igual', pobre?.colonos[0]?.vado === 0 && pobre?.vadoMinimo === VADO_MINIMO, { vado: pobre?.colonos[0]?.vado, minimo: pobre?.vadoMinimo });
   comprobar('con el colono que hay, sin cartas ni guardias ni títulos', pobre?.colonos.length === 1 && pobre?.colonos[0]?.cartas === 0 && pobre?.colonos[0]?.guardias === 0 && canonico(pobre?.colonos[0]?.titulos) === canonico([]));
   comprobar('y con mis puntos ocultos igualados a los públicos, no inventados', pobre?.colonos[0]?.puntosConLoOculto === 0 && pobre?.colonos[0]?.puntos === 0);
 
@@ -896,7 +1388,7 @@ const PROPORCION = 16 / 9;
 }
 
 /* ═══ EL RECUENTO, PARA QUE NO SE VACÍE SIN QUE NADIE LO NOTE ═══ */
-const MINIMO = 145;
+const MINIMO = 268;
 if (hechas < MINIMO) {
   console.log(`✘ este comprobador debería hacer al menos ${MINIMO} comprobaciones y ha hecho ${hechas}: alguien ha borrado un bloque`);
   process.exit(2);

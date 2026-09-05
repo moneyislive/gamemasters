@@ -636,6 +636,23 @@ const BATERIA = [
       'la escena 3D y la malla hexagonal dicen lo mismo: cada vértice cae en la esquina exacta de su isla y no cerca, cada camino va de vértice a vértice y mide un radio, y los puntos de cada número son las formas de sacarlo con dos dados. Lo que NO prueba, y hay que decirlo, es que se vea bien: eso exige ojos y un aparato de verdad',
   },
   /*
+   * ═══ LOS ICONOS COMPILADOS, Y POR QUÉ NO BASTA CON EL DE ARRIBA ═══
+   *
+   * `verify:escena` comprueba que cada dibujo que la escena pide EXISTE en
+   * `escenas/iconos.ts` y da triángulos. Lo que no puede saber es si ese
+   * fichero es lo que `compilar-iconos.ts` produce hoy: un punto movido en el
+   * guion sin recompilar deja dos verdades separadas y todo en verde, y la
+   * que se pinta es la vieja. Éste recompila a un temporal y compara bytes;
+   * no cuenta nada a mano, así que sigue valiendo cuando el guion crezca.
+   */
+  {
+    nombre: 'iconos compilados',
+    donde: 'escenas',
+    guion: 'verify:iconos',
+    porque:
+      '`escenas/iconos.ts` es byte a byte lo que `compilar-iconos.ts` produce: los dibujos de los bienes, las cartas y las cifras que se pintan son los que el guion dibuja hoy, y no una versión de antes de que alguien moviera un punto sin recompilar',
+  },
+  /*
    * ═══ LOS AVENTUREROS, Y POR QUÉ ÉSTE VA DETRÁS DE LA ESCENA ═══
    *
    * Porque mide contra ella: la altura de un personaje se contrasta con

@@ -45,6 +45,40 @@ export interface PiezaDeBarra {
   disponible: boolean;
 }
 
+/**
+ * EL MAZO EN LA BARRA: el hueco que no lleva una pieza del pack sino una carta.
+ *
+ * Es una interfaz de una sola bandera y va APARTE de `PiezaDeBarra`, no como una variante
+ * suya, porque no es una pieza: no tiene `modelo`. El `.glb` trae ciento veintidós nodos
+ * raíz y ninguno es una carta —está medido—, así que este hueco se dibuja con la misma
+ * forma recortada que los naipes de la mano y no con una malla del catálogo. Si compartiera
+ * tipo con `PiezaDeBarra` habría que inventarle un nombre de modelo que no existe, y en
+ * esta escena un modelo que no existe no da error: DESAPARECE (ver `delta.tsx`, el `return
+ * null` de la barra), que es el fallo silencioso que ya costó una vez que no salieran ni
+ * árboles ni montañas.
+ *
+ * `disponible` la decide el JUEGO igual que en las piezas —«¿me llega el coste, queda mazo
+ * y me toca?»— y la barra lo enseña apagado sin saber por qué.
+ */
+export interface MazoDeLaBarra {
+  /** Si se puede comprar ahora mismo. Si no, sale apagado y no se pulsa. */
+  disponible: boolean;
+}
+
+/**
+ * EL NOMBRE DEL DIBUJO QUE LLEVA ESE NAIPE, y por qué está aquí y no dentro de la escena.
+ *
+ * Lo pide `delta.tsx` a `CONTORNOS_DE_LA_CARTA` y lo persigue `verify:riberas-en-tres` para
+ * afirmar que existe y que no es prestado de ninguna carta del mazo. Escrito dos veces
+ * —una en la escena y otra en el comprobador— el día que cambie cambiaría una sola, y el
+ * comprobador seguiría verde vigilando un dibujo que ya no pide nadie. Escrito aquí es el
+ * mismo dato.
+ *
+ * Un dibujo que no exista no revienta: sale un naipe de color plano. Por eso hace falta que
+ * alguien lo pida por su nombre.
+ */
+export const DIBUJO_DEL_MAZO = 'comprarcarta';
+
 /** Un hueco de la barra, en coordenadas de la cámara. */
 export interface HuecoDeLaBarra {
   /** A la derecha del centro de la pantalla, en unidades de mundo a la distancia de la barra. */
@@ -83,8 +117,25 @@ const AIRE = 0.24;
  * entero con aire.
  */
 const DESDE_EL_SUELO = 0.155;
-/** Y cuánto ancho de pantalla puede ocupar la barra entera como mucho. */
-const ANCHO_MAXIMO = 0.82;
+/**
+ * Y CUÁNTO ANCHO DE PANTALLA PUEDE OCUPAR LA BARRA ENTERA COMO MUCHO.
+ *
+ * Estaba en 0,82 y con el cuarto hueco —el naipe del mazo— la barra se metía DEBAJO de la
+ * baraja de bienes en los lienzos de móvil de la app (360 y 390 de ancho por 490 de alto):
+ * las dos viven en el mismo plano, a dos unidades de la cámara, con las cartas delante, y
+ * donde se solapan la carta gana el rayo y ese trozo del asa del naipe no se puede pulsar,
+ * sin un error en ninguna parte. Con tres huecos no pasaba porque la barra era un 36 %
+ * más estrecha. Cuando manda el ancho, el borde derecho de la barra cae siempre en
+ * `ANCHO_MAXIMO / 2` del ancho visible, tenga tres huecos o cuatro. Con 0,70 queda a la
+ * izquierda de la mano de bienes abierta por el imán en todos esos lienzos —por poco en el
+ * de 360— y el asa del hueco sigue por encima de los 44 puntos de toque: 53 en el de 360,
+ * y en el más bajo (320×360) sigue mandando el alto, así que el cuarto hueco no cuesta
+ * nada. Con 0,68 ese lienzo pasaba a mandar por el ancho y el hueco encogía siete
+ * décimas de punto. Lo mide `verify:escena` («el hueco del mazo queda libre de las
+ * cartas de bienes»), que es lo que se puso rojo. En un monitor no cambia nada: ahí
+ * manda el alto.
+ */
+const ANCHO_MAXIMO = 0.70;
 
 /**
  * LOS HUECOS DE LA BARRA, repartidos y ya encogidos si hace falta.
@@ -96,6 +147,19 @@ const ANCHO_MAXIMO = 0.82;
  *
  * Con cero piezas devuelve la lista vacía en vez de dividir por cero, que es el caso
  * real del turno de otro.
+ *
+ * ═══ LA BARRA ESTÁ CENTRADA, ASÍ QUE UN HUECO MÁS NO SE AÑADE: LO MUEVE TODO ═══
+ *
+ * `primero` sale de repartir el ancho total a los dos lados del cero, o sea que pedir un
+ * cuarto hueco NO deja los tres de antes donde estaban y pone uno a la derecha: corre los
+ * tres a la izquierda y mete el nuevo al final. Medido, en monitor: de x = -0,267 / 0 /
+ * +0,267 a -0,401 / -0,134 / +0,134 / +0,401.
+ *
+ * Se deja escrito porque es exactamente lo que se ve al jugar —«se me han movido las
+ * piezas»— y no es un fallo: una barra centrada que crece por un lado dejaría de estar
+ * centrada, y en un móvil de pie el pulgar llega mucho mejor al medio que al borde
+ * derecho. La alternativa —anclar los tres viejos y crecer hacia fuera— empuja el hueco
+ * nuevo justo a la esquina peor de alcanzar.
  */
 export function huecosDeLaBarra(
   cuantos: number,

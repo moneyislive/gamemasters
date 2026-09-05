@@ -11,7 +11,7 @@
  * fallo sería SILENCIOSO — lo que no se cae, no lanza y no se ve hasta que
  * alguien lleva media partida.
  *
- * Son ocho cosas y las ocho tienen esa forma:
+ * Son nueve cosas y las nueve tienen esa forma:
  *
  *  1. LA CANONICALIZACIÓN. Un vértice de una malla hexagonal tiene TRES nombres y
  *     una arista DOS. Si no se normalizan, la regla de distancia dirá que está
@@ -45,6 +45,14 @@
  *     sí, ninguno se traga las piezas de un colono y ninguna pareja de islas sale de
  *     la misma celda del atlas — que es lo que decide el tablero de tres dimensiones
  *     y lo que ninguna de las tres primeras podía ver.
+ *  9. QUE LOS DOS JUECES DE LA VEREDA CORTEN EN EL MISMO SITIO. Éste llegó por la
+ *     peor puerta de todas —lo sufrió Miguel en una partida— y con las ocho
+ *     anteriores en verde: se podía trazar SALIENDO del vértice donde otro tenía
+ *     choza, el juego la cobraba y la pintaba, y el premio, que sí corta ahí,
+ *     contaba la cadena partida. Cinco veredas pagadas y Vado de tres. Se
+ *     comprueba como regla y no como caso: para cualquier cadena y cualquier
+ *     choza en medio, lo que el juego DEJA CONSTRUIR y lo que el Vado CUENTA dan
+ *     el mismo número — y llegar a la puerta del vecino sigue siendo legal.
  *
  * ═══ Y LAS VACUNAS, QUE NO SON ADORNO ═══
  *
@@ -79,6 +87,7 @@ import {
   aristaDeHex,
   aristasDe,
   aristasDeVertice,
+  aristaTocaVertice,
   hexesDeVertice,
   llaveDeHex,
   mallaDeRadio,
@@ -624,6 +633,432 @@ function caminoDeCinco(hex: Hex): string[] {
     'quien tiene el Vado Largo suma dos puntos por él',
     puntosDe(conPremio, conPremio.colonos[0] as Colono) ===
       puntosDe({ ...conPremio, vado: { de: null, largo: 0 } }, conPremio.colonos[0] as Colono) + 2,
+  );
+}
+
+// ---------------------------------------------------------------------------
+paso('La casa del vecino corta el paso: una vereda puede LLEGAR, no SALIR');
+// ---------------------------------------------------------------------------
+
+/*
+ * ═══ ESTO ES LO QUE LE PASÓ A MIGUEL JUGANDO, Y ESTABA EN VERDE ═══
+ *
+ * El juego dejaba trazar una vereda SALIENDO del vértice donde otro colono tiene
+ * choza o torre. La cobraba, la pintaba pegada, y el premio —que sí corta ahí—
+ * contaba la cadena partida: cinco puentes seguidos, Vado Largo de tres, ningún
+ * punto y ni una línea que lo explicara.
+ *
+ * Y las doscientas noventa y seis comprobaciones de este fichero estaban verdes
+ * con el fallo delante, por dos motivos que hay que apuntar porque se repiten:
+ *
+ *   · El bloque del Vado Largo de arriba MONTA las cadenas a mano —`{...c,
+ *     veredas: camino}`— y sólo prueba la aritmética del premio. Nunca pasa por la
+ *     puerta que decide dónde se puede construir, así que no podía ver que las
+ *     dos puertas dijeran cosas distintas.
+ *   · Y no había ninguna comprobación que CRUZARA las dos cuentas. Cada una era
+ *     correcta por su lado; lo que estaba mal era que no fueran la misma.
+ *
+ * Así que aquí se afirman tres cosas, y la tercera es la que compra de verdad:
+ *
+ *   1. Que la vereda que SALE del vértice de otro ni se ofrece ni se acepta.
+ *   2. Que la que LLEGA a él sigue ofreciéndose y entrando — que es la mitad que
+ *      no cambia, y la que un arreglo de más se llevaría por delante.
+ *   3. Que LO QUE EL JUEGO DEJA CONSTRUIR Y LO QUE EL VADO CUENTA NO PUEDEN
+ *      DISCREPAR. Ésa es la regla; el resto son ejemplos suyos.
+ */
+
+/** La isla sobre la que se pasea. Sus seis esquinas y sus seis lados, en orden. */
+const LA_RUEDA: Hex = { q: 0, r: 0 };
+
+/**
+ * LA ESQUINA `k` Y EL LADO `k`, con la relación que los ata: el lado `k` va de la
+ * esquina `k` a la `k+1`. Todo este bloque cuelga de eso, así que se comprueba
+ * abajo en vez de darse por sabido — si la malla cambiara ese orden, los
+ * escenarios de aquí seguirían corriendo y dejarían de significar lo que dicen.
+ */
+const nudoDe = (k: number): LlaveDeVertice => verticeDeHex(LA_RUEDA, k);
+const tramoDe = (k: number): string => aristaDeHex(LA_RUEDA, k);
+
+/**
+ * UN ESCENARIO PARA TRAZAR: A con su choza, B con la suya, y bienes de sobra.
+ *
+ * Se monta el estado en vez de jugar la colocación entera porque lo que hay que
+ * fijar es la GEOMETRÍA —dónde cae la choza de B respecto de la cadena de A— y una
+ * colocación de verdad la reparte el azar. A cambio, cada escenario comprueba
+ * antes que las dos chozas están a distancia legal entre sí: un montaje que el
+ * juego nunca produciría no demuestra nada sobre el juego.
+ */
+function escenarioDeTrazado(chozaDeA: LlaveDeVertice, chozaDeB: LlaveDeVertice): EstadoDeRiberas {
+  const base = escenarioDeVado();
+  let serie = 1;
+  const paraDoceVeredas: Ficha[] = [];
+  for (let i = 0; i < TOPE_DE_PIEZAS.vereda; i++) {
+    paraDoceVeredas.push(`p${serie++}:junco` as Ficha, `p${serie++}:limo` as Ficha);
+  }
+  return {
+    ...base,
+    momento: 'jugando',
+    paso: base.colonos.length * 2,
+    faltaVereda: false,
+    ultimaChoza: null,
+    turno: 0,
+    tirado: true,
+    ultimaTirada: 8,
+    turnosAbiertos: 1,
+    cartaJugada: false,
+    veredasGratis: 0,
+    siguienteFicha: 800,
+    colonos: base.colonos.map((c, i) =>
+      i === 0
+        ? { ...c, almacen: paraDoceVeredas, chozas: [chozaDeA], torres: [], veredas: [] }
+        : { ...c, almacen: [], chozas: [chozaDeB], torres: [], veredas: [] },
+    ),
+  };
+}
+
+/** El contexto de A en una mesa de dos. `ctxDe` nace más abajo y aquí haría falta antes. */
+const SOY_A = { quien: 'A', azar: 1, tic: 0, asientos: ['A', 'B'] as readonly string[] };
+
+/** Trazar la vereda `donde` como A, por la misma puerta que usa la plataforma. */
+function trazaA(estado: EstadoDeRiberas, donde: string): EstadoDeRiberas {
+  return avanzarRiberas(estado, { tipo: ALZAR, carga: { que: 'vereda', donde } }, SOY_A);
+}
+
+/** ¿Se le ofrece a A trazar esta vereda? Se mira sobre la vista, que es lo que ve el dedo. */
+function seOfreceTrazar(estado: EstadoDeRiberas, donde: string): boolean {
+  return ofrecidasA(estado, 'A').some(
+    (o) => o.tipo === ALZAR && canonico(o.carga ?? null) === canonico({ que: 'vereda', donde }),
+  );
+}
+
+{
+  /* La geometría de la que cuelga todo lo demás, dicha en voz alta. */
+  for (let k = 0; k < 6; k++) {
+    const extremos = verticesDeArista(tramoDe(k));
+    comprobar(
+      `el lado ${String(k)} de la isla va de la esquina ${String(k)} a la ${String((k + 1) % 6)}`,
+      extremos.includes(nudoDe(k)) && extremos.includes(nudoDe(k + 1)),
+      { lado: k, extremos },
+    );
+  }
+}
+
+{
+  /*
+   * ═══ EL CASO EXACTO: B TIENE CHOZA EN LA ESQUINA 3 ═══
+   *
+   * A sale de la esquina 0 y va lado a lado. Los tres primeros son suyos —el
+   * tercero LLEGA a la puerta de B, y eso es legal—. El cuarto SALDRÍA de esa
+   * puerta, y ahí se acaba el camino.
+   */
+  const bloqueo = nudoDe(3);
+  const inicial = escenarioDeTrazado(nudoDe(0), bloqueo);
+  comprobar(
+    'las dos chozas del escenario están a distancia legal: es un tablero posible',
+    !verticesVecinos(nudoDe(0)).includes(bloqueo),
+    verticesVecinos(nudoDe(0)),
+  );
+
+  let estado = inicial;
+  for (const k of [0, 1, 2]) {
+    const antes = estado;
+    comprobar(`el lado ${String(k)} se le ofrece a A`, seOfreceTrazar(antes, tramoDe(k)));
+    estado = trazaA(antes, tramoDe(k));
+    comprobar(`y el lado ${String(k)} entra`, estado !== antes && (estado.colonos[0] as Colono).veredas.includes(tramoDe(k)));
+  }
+  const mias = (estado.colonos[0] as Colono).veredas;
+  comprobar('A tiene tres veredas seguidas y la tercera LLEGA a la choza de B', mias.length === 3 && aristaTocaVertice(tramoDe(2), bloqueo), mias);
+
+  /*
+   * LA MITAD QUE NO CAMBIA, DICHA APARTE. Llegar a la puerta del vecino es legal y
+   * tiene que seguir siéndolo: si esto se pusiera rojo, el arreglo se habría
+   * pasado de frenada y habría inventado una regla que el juego no tiene.
+   */
+  comprobar('llegar al vértice de otro es legal: la vereda que acaba ahí entró y se ofreció', mias.includes(tramoDe(2)));
+
+  /* Y LA MITAD QUE SE ARREGLA. */
+  comprobar('salir del vértice de otro NO se ofrece', !seOfreceTrazar(estado, tramoDe(3)));
+  comprobar(
+    'y mandada a mano, el reductor la devuelve sin tocar nada',
+    trazaA(estado, tramoDe(3)) === estado,
+  );
+  comprobar(
+    'el portillo del §5 bis y el reductor dicen lo mismo: ni ofrecida ni aceptada',
+    !seOfreceTrazar(estado, tramoDe(3)) && trazaA(estado, tramoDe(3)) === estado,
+  );
+  comprobar(
+    'ni la de más allá, que tampoco engancha con nada suyo por un vértice libre',
+    !seOfreceTrazar(estado, tramoDe(4)) && trazaA(estado, tramoDe(4)) === estado,
+  );
+
+  /* Y las dos cuentas coinciden: tres construidas, tres contadas. */
+  comprobar(
+    'lo construido y lo que cuenta el Vado coinciden: tres y tres',
+    largoDelVado(mias, [bloqueo]) === mias.length,
+    { puestas: mias.length, vado: largoDelVado(mias, [bloqueo]) },
+  );
+}
+
+{
+  /*
+   * ═══ LA REGLA, Y NO LA LISTA ═══
+   *
+   * Para una cadena cualquiera y con la choza de B en cualquier esquina, lo que el
+   * juego deja construir y lo que el Vado cuenta tienen que dar EL MISMO NÚMERO.
+   * Es la afirmación que habría cazado el fallo sin saber nada de él: no dice
+   * dónde está el corte, dice que los dos jueces cortan en el mismo sitio.
+   *
+   * Se recorren las esquinas 2, 3 y 4. La 1 se queda fuera a propósito: está
+   * pegada a la esquina 0, donde vive la choza de A, y la regla de distancia no
+   * deja que las dos existan a la vez. Un escenario imposible mediría un juego que
+   * no es éste.
+   */
+  const cadena = caminoDeCinco(LA_RUEDA);
+  const discrepancias: string[] = [];
+  let casos = 0;
+  let vecesQueElJuegoDijoQueNo = 0;
+
+  for (const k of [2, 3, 4]) {
+    const bloqueo = nudoDe(k);
+    comprobar(
+      `la choza de B en la esquina ${String(k)} está a distancia legal de la de A`,
+      !verticesVecinos(nudoDe(0)).includes(bloqueo),
+    );
+    let estado = escenarioDeTrazado(nudoDe(0), bloqueo);
+    for (const arista of cadena) {
+      const antes = estado;
+      estado = trazaA(antes, arista);
+      if (estado === antes) {
+        vecesQueElJuegoDijoQueNo++;
+        continue;
+      }
+      const suyas = (estado.colonos[0] as Colono).veredas;
+      const largo = largoDelVado(suyas, [bloqueo]);
+      if (largo !== suyas.length) {
+        discrepancias.push(`esquina ${String(k)}: construidas ${String(suyas.length)}, vado ${String(largo)}`);
+      }
+    }
+    const suyas = (estado.colonos[0] as Colono).veredas;
+    comprobar(
+      `con la choza de B en la esquina ${String(k)}, A construye exactamente ${String(k)} veredas`,
+      suyas.length === k,
+      suyas,
+    );
+    casos++;
+  }
+
+  comprobar('las tres esquinas se han recorrido de verdad', casos === 3, casos);
+  comprobar(
+    'y el juego dijo que no alguna vez: si no, este bucle no habría probado nada',
+    vecesQueElJuegoDijoQueNo > 0,
+    vecesQueElJuegoDijoQueNo,
+  );
+  comprobar(
+    'lo que el juego deja construir y lo que el Vado cuenta nunca discrepan',
+    discrepancias.length === 0,
+    discrepancias,
+  );
+
+  /* Y sin nadie en medio, la cadena entera: cinco construidas y cinco contadas. */
+  {
+    let estado = escenarioDeTrazado(nudoDe(0), verticeDeHex({ q: 2, r: 0 }, 0));
+    for (const arista of cadena) estado = trazaA(estado, arista);
+    const suyas = (estado.colonos[0] as Colono).veredas;
+    comprobar('sin nadie en medio se construyen las cinco', suyas.length === 5, suyas.length);
+    comprobar('y el Vado cuenta las cinco', largoDelVado(suyas, []) === 5, largoDelVado(suyas, []));
+  }
+
+  /*
+   * ═══ LAS VACUNAS. LA PRIMERA ES EL FALLO DE VERDAD, TAL COMO ERA ═══
+   *
+   * El juez de antes preguntaba sólo «¿toca esta arista algo mío?». Con él, las
+   * cinco se ponían y el Vado contaba tres: ésa es la discrepancia que se jugó, y
+   * ésta es la línea que se pone roja el día que alguien vuelva a quitar el corte.
+   */
+  const pegabaAntes = (
+    suyas: readonly string[],
+    chozas: readonly LlaveDeVertice[],
+    arista: string,
+  ): boolean => {
+    for (const v of verticesDeArista(arista)) {
+      if (chozas.includes(v)) return true;
+      for (const otra of aristasDeVertice(v)) {
+        if (suyas.includes(otra)) return true;
+      }
+    }
+    return false;
+  };
+
+  const bloqueo = nudoDe(3);
+  const alaAntigua: string[] = [];
+  for (const arista of cadena) {
+    if (!pegabaAntes(alaAntigua, [nudoDe(0)], arista)) continue;
+    alaAntigua.push(arista);
+  }
+  comprobar(
+    'se ve fallar: con el juez de antes se ponían las cinco y el Vado contaba tres',
+    alaAntigua.length === 5 && largoDelVado(alaAntigua, [bloqueo]) === 3,
+    { puestas: alaAntigua.length, vado: largoDelVado(alaAntigua, [bloqueo]) },
+  );
+
+  /*
+   * Y LA VACUNA DEL OTRO LADO, que es la que protege la mitad que no cambia: un
+   * corte que mirase LOS DOS extremos —«esta arista no puede tocar nada de otro»—
+   * también dejaría las dos cuentas cuadradas, y sería un juego distinto. Se ve
+   * fallar porque perdería la vereda que sólo LLEGA.
+   */
+  const cortabaLosDosCabos = (
+    suyas: readonly string[],
+    chozas: readonly LlaveDeVertice[],
+    arista: string,
+  ): boolean => {
+    if (verticesDeArista(arista).includes(bloqueo)) return false;
+    return pegabaAntes(suyas, chozas, arista);
+  };
+  comprobar(
+    'se ve fallar: cortando por los dos cabos se perdería la vereda que sólo LLEGA',
+    !cortabaLosDosCabos([tramoDe(0), tramoDe(1)], [nudoDe(0)], tramoDe(2)),
+  );
+}
+
+{
+  /*
+   * ═══ CINCO VEREDAS POR LA PUERTA DE VERDAD, Y EL PREMIO SE MUEVE SOLO ═══
+   *
+   * Todo el bloque del Vado Largo de arriba monta las cadenas a mano. Ésta es la
+   * única que las TRAZA —con el árbitro, con `opciones()` delante y con el estado
+   * saliendo del reductor— y afirma que al acabar `estado.vado` y `puntosDe` han
+   * cambiado sin que este guion los toque. Sin ella, el premio podía estar
+   * perfectamente calculado por una función que nadie llamara al trazar.
+   */
+  const inicial = escenarioDeTrazado(nudoDe(0), verticeDeHex({ q: 2, r: 0 }, 0));
+  comprobar('A empieza sin Vado y con un solo punto, el de su choza', inicial.vado.de === null && puntosDe(inicial, inicial.colonos[0] as Colono) === 1, inicial.vado);
+
+  let m = mesaSobre('RIB-VADO-PUERTA', inicial, ['A', 'B']);
+  let trazadas = 0;
+  for (let k = 0; k < 5; k++) {
+    const quiere = opcionesEn(m, 'A').find(
+      (o) => o.tipo === ALZAR && canonico(o.carga ?? null) === canonico({ que: 'vereda', donde: tramoDe(k) }),
+    );
+    comprobar(`el árbitro le ofrece a A el lado ${String(k)}`, quiere !== undefined);
+    if (quiere === undefined) break;
+    m = mover(m, 'A', quiere as Opcion);
+    trazadas++;
+  }
+  const e = estadoDe(m);
+  comprobar('las cinco se trazan por el árbitro', trazadas === 5 && (e.colonos[0] as Colono).veredas.length === 5, trazadas);
+  comprobar(
+    'y el Vado Largo se mueve SOLO: pasa a ser de A y mide cinco, que es el mínimo',
+    e.vado.de === 'A' && e.vado.largo === VADO_MINIMO,
+    e.vado,
+  );
+  comprobar(
+    'y los puntos suben de uno a tres sin que nadie los sume a mano',
+    puntosDe(e, e.colonos[0] as Colono) === 3,
+    puntosDe(e, e.colonos[0] as Colono),
+  );
+  comprobar(
+    'y la vista lo cuenta igual: el vado público de A también mide cinco',
+    proyectarRiberas(e, 'A').colonos[0]?.vado === 5,
+    proyectarRiberas(e, 'A').colonos[0]?.vado,
+  );
+}
+
+{
+  /*
+   * ═══ EL JUEZ DEL REDUCTOR, QUE POR LA PUERTA NORMAL NO SE VE ═══
+   *
+   * El corte vive en dos sitios —`pegaConLoMio`, que decide si la vereda entra, y
+   * `pegaConLoSuyo`, que decide si se ofrece— y hay que arreglar los dos. Pero
+   * medido: si sólo se rompe el del reductor, NINGUNA comprobación de las de
+   * arriba se pone roja, y no porque estén mal escritas. Es el portillo del §5
+   * bis: el reductor le pregunta primero a `opciones()` si eso se ofrecía, y con
+   * la vista entera nada mal formado llega hasta las guardas de `trazar`. O sea
+   * que por la puerta normal el segundo juez es invisible.
+   *
+   * Hay UNA rendija por la que sí se ve, y es ésta: `hayDondeTrazar` —que usa el
+   * juez del reductor— decide si el crédito de Las Dos Veredas sigue vivo después
+   * de poner la primera, y esa decisión NO pasa por el portillo. Si el reductor
+   * cree que quedan sitios donde la vista no ofrece ninguno, el crédito se queda
+   * encendido, `opciones()` corta el turno entero mientras quede crédito, y al
+   * colono no se le ofrece NADA: ni trazar, ni pasar. La mesa se para y no se cae.
+   *
+   * Así que se monta una caja: A encerrado con veredas de B por todos lados menos
+   * un hueco, y con la choza de B cerrándole el único camino que le quedaría si el
+   * corte no estuviera. Pone la vereda gratis en el hueco, se queda sin sitio, y
+   * el crédito TIENE que apagarse solo.
+   */
+  const v0 = nudoDe(0);
+  const v3 = nudoDe(3);
+  const deA = [tramoDe(0), tramoDe(1), tramoDe(2)];
+
+  /** Todas las aristas que tocan alguno de estos vértices, sin repetir. */
+  const alrededorDe = (nudos: readonly LlaveDeVertice[]): string[] => {
+    const salida: string[] = [];
+    for (const nudo of nudos) {
+      for (const arista of aristasDeVertice(nudo)) {
+        if (!salida.includes(arista)) salida.push(arista);
+      }
+    }
+    return salida;
+  };
+
+  const elHueco = aristasDeVertice(nudoDe(2)).find((a) => !deA.includes(a)) as string;
+  const alFinalDelHueco = verticesDeArista(elHueco).find((x) => x !== nudoDe(2)) as LlaveDeVertice;
+  const deB = [
+    ...alrededorDe([v0, nudoDe(1), nudoDe(2)]).filter((a) => !deA.includes(a) && a !== elHueco),
+    ...aristasDeVertice(alFinalDelHueco).filter((a) => a !== elHueco),
+  ];
+
+  const enElDelta = aristasDe(DELTA);
+  comprobar('la caja se dibuja entera dentro del delta', [...deA, ...deB, elHueco].every((a) => enElDelta.includes(a)), [...deA, ...deB, elHueco].filter((a) => !enElDelta.includes(a)));
+  comprobar('y B no necesita más veredas de las que tiene', deB.length <= TOPE_DE_PIEZAS.vereda, deB.length);
+  comprobar('la choza de B sigue a distancia legal de la de A', !verticesVecinos(v0).includes(v3));
+
+  const caja = escenarioDeMazo({
+    bienes: [[], []],
+    manos: [[{ carta: 'c1:dos-veredas', comprada: 0 }], []],
+  });
+  const encerrado: EstadoDeRiberas = {
+    ...caja,
+    colonos: caja.colonos.map((c, i) =>
+      i === 0
+        ? { ...c, chozas: [v0], torres: [], veredas: [...deA] }
+        : { ...c, chozas: [v3], torres: [], veredas: [...deB] },
+    ),
+  };
+
+  comprobar('A no tiene bienes, así que sin la carta no se le ofrece ninguna vereda', ofrecidasA(encerrado, 'A').every((o) => o.tipo !== ALZAR));
+  const laCarta = ofrecidasA(encerrado, 'A').find((o) => o.tipo === DOS_VEREDAS);
+  comprobar('Las Dos Veredas se le ofrece: le queda un hueco', laCarta !== undefined);
+
+  let enCaja = mesaSobre('RIB-CAJA', encerrado, ['A', 'B']);
+  enCaja = mover(enCaja, 'A', laCarta as Opcion);
+  const gratis = opcionesEn(enCaja, 'A').filter((o) => o.tipo === ALZAR);
+  comprobar('y con el crédito abierto se le ofrece exactamente el hueco, y nada más', gratis.length === 1 && canonico(gratis[0]?.carga ?? null) === canonico({ que: 'vereda', donde: elHueco }), gratis.map((o) => o.id));
+
+  enCaja = mover(enCaja, 'A', gratis[0] as Opcion);
+  const cerrada = estadoDe(enCaja);
+  comprobar('la vereda gratis entra en el hueco', (cerrada.colonos[0] as Colono).veredas.includes(elHueco));
+  /*
+   * LAS DOS AFIRMACIONES QUE MUERDEN. La primera es el juez del reductor dicho en
+   * voz alta; la segunda es la consecuencia que se juega, y es la que nadie
+   * depuraría: una mesa parada sin un error.
+   */
+  comprobar(
+    'sin sitio donde ir, el crédito de la carta se apaga solo aunque quedara una',
+    cerrada.veredasGratis === 0,
+    cerrada.veredasGratis,
+  );
+  comprobar(
+    'y a A se le vuelve a ofrecer el turno entero: la mesa no se queda parada',
+    opcionesEn(enCaja, 'A').length > 0,
+    opcionesEn(enCaja, 'A').map((o) => o.id),
+  );
+  comprobar(
+    'la caja está bien cerrada: lo único que le quedaría a A es salir del vértice de B',
+    aristasDeVertice(v3).filter((a) => !deA.includes(a) && !deB.includes(a) && a !== elHueco).length === 2,
+    aristasDeVertice(v3),
   );
 }
 
@@ -2697,7 +3132,7 @@ paso('Cada isla se ve del bien que da, y los dos tableros cuentan lo mismo');
  * El numero va a mano y hay que subirlo al anadir comprobaciones. Ese es el precio, y es
  * barato al lado de un verde que no ha comprobado nada.
  */
-const COMPROBACIONES_ESCRITAS = 296;
+const COMPROBACIONES_ESCRITAS = 349;
 if (hechas < COMPROBACIONES_ESCRITAS) {
   console.error(
     `Solo se han hecho ${hechas} de las ${COMPROBACIONES_ESCRITAS} comprobaciones que ` +
@@ -2713,6 +3148,9 @@ if (fallos.length === 0) {
       '  choza toca a otra, la serpentina va y vuelve, el Vado Largo se rompe cuando un vecino planta\n' +
       '  una choza en medio, un trueque caduca solo, y quien no tiene el turno contesta — mientras el\n' +
       '  reductor rechaza lo que `opciones()` no ofreció y sigue validando lo que sí.\n' +
+      '  Y una vereda puede LLEGAR al vértice donde otro tiene casa, pero no SALIR de él: lo que el\n' +
+      '  juego deja construir y lo que el Vado cuenta dan el mismo número, que es la regla que faltaba\n' +
+      '  y por la que Miguel puso cinco puentes seguidos sin premio y sin explicación.\n' +
       '  Y el mazo: veinticinco cartas barajadas una vez con la semilla de la mesa, una carta que no se\n' +
       '  juega el turno que se compra, una por turno, la guardia que roba a ciegas, el acaparamiento que\n' +
       '  se lleva todos los de un bien y ninguno más, las dos veredas que son dos, y un título que sólo\n' +

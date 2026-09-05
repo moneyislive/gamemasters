@@ -55,7 +55,13 @@ import { arcadesInstalados, avanzar, hayOpciones, opcionesDeArcade, proyectar } 
 import type { ContextoMovimiento, ManifiestoDeArcade, Opcion } from '../../shared/arcade';
 import { MUEBLES_DEL_CONTRATO } from '../../shared/arcade/tipos';
 import '../../shared/arcade/juegos';
-import { EMPEZAR_RIBERAS, recalcularLaGuardia, RIBERAS } from '../../shared/arcade/juegos';
+import {
+  EMPEZAR_RIBERAS,
+  recalcularElVado,
+  recalcularLaGuardia,
+  RIBERAS,
+  VADO_MINIMO,
+} from '../../shared/arcade/juegos';
 import type { Bien, CartaEnMano, EstadoDeRiberas, Ficha } from '../../shared/arcade/juegos';
 import { aristaDeHex, verticeDeHex } from '../../shared/mecanicas/malla-hexagonal';
 import { tableroDeLaVista } from '../../shared/mecanicas/tablero-declarado';
@@ -86,6 +92,8 @@ import {
   jugadasDeLaCarta,
   manoEnTres,
   marcadorEnTres,
+  mazoEnLaBarra,
+  opcionesFueraDeLaBarra,
   opcionesFueraDeLaMano,
   opcionesFueraDelTablero,
   PIEZAS_DE_LA_BARRA,
@@ -1642,7 +1650,16 @@ const MI_MANO_DE_PRUEBA: readonly CartaEnMano[] = [
  * preguntar, así que el menú de elegir —lo que este encargo estrena— no se abriría nunca.
  * Con tres hay dos víctimas y hay que preguntar.
  */
-function laProyeccionConMazo(cuantosAsientos = 3): {
+function laProyeccionConMazo(
+  cuantosAsientos = 3,
+  /*
+   * `empateDelVado`: además, YO llego a las cinco DESPUÉS de que el tercero se haya
+   * llevado el premio. Se monta en dos pasos porque así pasa en la mesa: el premio ya
+   * tiene dueño cuando el segundo llega, y `recalcularElVado` no se lo mueve a quien
+   * iguala. Es el estado en que el raíl decía «vado 5 de 5» a quien no tenía nada.
+   */
+  { empateDelVado = false }: { empateDelVado?: boolean } = {},
+): {
   vista: unknown;
   opciones: readonly Opcion[];
   sentados: { asiento: string; nombre: string }[];
@@ -1681,11 +1698,36 @@ function laProyeccionConMazo(cuantosAsientos = 3): {
       /* Y un título REVELADO, que es público y tiene que salir con su nombre en el marcador. */
       titulos: i === 1 ? ['molino'] : [],
       chozas: [verticeDeHex({ q: i * 2 - 2, r: 0 }, 0)],
-      veredas: [aristaDeHex({ q: i * 2 - 2, r: 0 }, 0)],
+      /*
+       * AL TERCERO SE LE DA UNA CADENA DE CINCO, Y HACE FALTA.
+       *
+       * Con una vereda suelta cada uno, el Vado Largo quedaba VACANTE en todo el fichero,
+       * y la comprobación que dice «los dos premios salen con su nombre» medía uno solo:
+       * el otro pasaba en verde porque no había nada que enseñar. Cinco veredas seguidas
+       * —los cinco lados de una isla— es el mínimo de la regla, así que aquí hay dueño.
+       *
+       * Se le dan al TERCERO y no al segundo a propósito: el segundo ya tiene La Mayor
+       * Guardia, y con los dos premios en el mismo renglón un texto que buscara sólo uno
+       * seguiría pasando. Repartidos, el raíl tiene que nombrar a los dos por separado.
+       */
+      veredas:
+        i === 2
+          ? [0, 1, 2, 3, 4].map((k) => aristaDeHex({ q: i * 2 - 2, r: 0 }, k))
+          : [aristaDeHex({ q: i * 2 - 2, r: 0 }, 0)],
     })),
   };
-  /* El premio es DERIVADO: se recalcula, no se escribe. Es la regla, y vive en `shared/`. */
-  const estado: EstadoDeRiberas = { ...puesto, guardia: recalcularLaGuardia(puesto) };
+  /* Los premios son DERIVADOS: se recalculan, no se escriben. Es la regla, y vive en `shared/`. */
+  const conGuardia: EstadoDeRiberas = { ...puesto, guardia: recalcularLaGuardia(puesto) };
+  const conDueno: EstadoDeRiberas = { ...conGuardia, vado: recalcularElVado(conGuardia) };
+  const yoTambienLlego: EstadoDeRiberas = empateDelVado
+    ? {
+        ...conDueno,
+        colonos: conDueno.colonos.map((c, i) =>
+          i === 0 ? { ...c, veredas: [0, 1, 2, 3, 4].map((k) => aristaDeHex({ q: -2, r: 0 }, k)) } : c,
+        ),
+      }
+    : conDueno;
+  const estado: EstadoDeRiberas = empateDelVado ? { ...yoTambienLlego, vado: recalcularElVado(yoTambienLlego) } : conDueno;
   const vista = proyectar(RIBERAS, estado, 's1', sentados);
   return { vista, opciones: opcionesDeArcade(RIBERAS, vista, 's1'), sentados };
 }
@@ -1775,14 +1817,33 @@ function elMazoEnLaPantalla(): void {
   /*
    * ═══ CADA MOVIMIENTO UNA VEZ, CON EL MAZO DENTRO ═══
    *
-   * `opcionesFueraDeLaMano(opcionesFueraDelTablero(o))` es lo que el cliente pinta como
-   * botones, y aquí se exige que sea EXACTAMENTE eso: ni una carta de más, ni comprar de
-   * menos. Comprar es el caso que se escapa al escribirlo deprisa —es del mazo pero no
-   * cuelga de ningún naipe— y sin él no habría manera de comprar en toda la partida.
+   * `opcionesFueraDeLaBarra(opcionesFueraDeLaMano(opcionesFueraDelTablero(o)), mazo)` es lo
+   * que el cliente pinta como botones, y aquí se exige que sea EXACTAMENTE eso: ni una
+   * carta de más, ni comprar de menos.
+   *
+   * ═══ COMPRAR CAMBIÓ DE SITIO, Y ESTA COMPROBACIÓN CAMBIÓ CON ÉL ═══
+   *
+   * Hasta este encargo aquí se exigía LO CONTRARIO —«pero COMPRAR sí, que es la única del
+   * mazo que no cuelga de un naipe y no tiene otro sitio»— y era verdad: el único sitio
+   * donde se ofrecía era un botón de texto en el pie. Ahora hay un cuarto hueco en la
+   * barra con un naipe tapado que se pulsa, así que el botón sobra: dejarlo sería ofrecer
+   * el mismo movimiento dos veces en la misma pantalla, que es la regla que este bloque
+   * entero existe para vigilar.
+   *
+   * La comprobación vieja NO se ha borrado: se ha dado la vuelta. Se sigue exigiendo que
+   * comprar se pueda alcanzar —abajo, por el mazo de la barra— y se exige además que su
+   * rótulo NO aparezca en el texto de la pantalla. Borrarla habría dejado el hueco por el
+   * que comprar puede desaparecer entero sin que nada se ponga rojo.
    */
-  const fuera = opcionesFueraDeLaMano(opcionesFueraDelTablero(opciones));
+  const mazo = mazoEnLaBarra(vista, 's1', opciones);
+  comprobar(
+    'a quien juega con delta se le pinta el cuarto hueco de la barra, y hoy se puede comprar',
+    mazo !== null && mazo.disponible,
+    mazo,
+  );
+  const fuera = opcionesFueraDeLaBarra(opcionesFueraDeLaMano(opcionesFueraDelTablero(opciones)), mazo);
   const botones = html.split('class="opcion-rotulo"').length - 1;
-  comprobar('salen como botón exactamente las que no enseña ni el tablero ni ninguna de las dos manos', botones === fuera.length, {
+  comprobar('salen como botón exactamente las que no enseña ni el tablero ni ninguna de las dos manos ni la barra', botones === fuera.length, {
     botones,
     fuera: fuera.map((o) => o.id),
   });
@@ -1792,10 +1853,59 @@ function elMazoEnLaPantalla(): void {
     comprobar(`«${o.rotulo}» no sale como botón: lo enseña la mano del mazo`, !texto.includes(o.rotulo), o.id);
   }
   const comprar = comprarEnTres(opciones);
+  comprobar('el juego ofrece comprar, o las dos de abajo no medirían nada', comprar !== null, comprar?.id);
   comprobar(
-    'pero COMPRAR sí, que es la única del mazo que no cuelga de un naipe y no tiene otro sitio',
-    comprar !== null && texto.includes(comprar.rotulo),
-    comprar?.rotulo,
+    'y COMPRAR TAMPOCO sale ya como botón: lo ofrece el cuarto hueco de la barra, y una vez es una vez',
+    comprar !== null && !texto.includes(comprar.rotulo) && !fuera.some((o) => o.tipo === comprar.tipo),
+    { rotulo: comprar?.rotulo, enElTexto: comprar !== null && texto.includes(comprar.rotulo) },
+  );
+  /*
+   * Y LA MITAD QUE SALVA AL RESPALDO. Sin hueco de mazo el botón tiene que quedarse: es el
+   * único sitio donde se puede comprar en el retablo SVG, en la vista de un mirón y en una
+   * mesa de más de cuatro colonos. Se pide aquí, con el mismo escenario, para que la
+   * pregunta sea sobre el filtro y no sobre el montaje.
+   */
+  comprobar(
+    'pero sin hueco de mazo el botón de comprar SIGUE, que es lo que salva al respaldo',
+    opcionesFueraDeLaBarra(opcionesFueraDeLaMano(opcionesFueraDelTablero(opciones)), null).some(
+      (o) => o.tipo === comprar?.tipo,
+    ),
+  );
+  /*
+   * EL CLIENTE NO SE INVENTA EL «SE PUEDE COMPRAR»: se lo pregunta a las reglas. Se lee el
+   * fuente porque lo que hay que impedir es que alguien vuelva a mirar los bienes de la
+   * mano contra un coste copiado, y eso, escrito, seguiría dando el mismo `true` hoy.
+   */
+  const fuenteDelCliente = readFileSync(new URL('../src/riberas-en-tres.tsx', import.meta.url), 'utf8');
+  comprobar(
+    'el cuarto hueco se lo pide a las reglas y no recalcula el coste: `mazoEnLaBarra`, y ni rastro del coste de la carta',
+    /mazoEnLaBarra\(vista, yo, opciones\)/.test(fuenteDelCliente) &&
+      !/COSTE_DE_LA_CARTA/.test(fuenteDelCliente),
+  );
+  comprobar(
+    'y el botón se quita con `opcionesFueraDeLaBarra` pasándole EL MAZO, no un interruptor suelto',
+    /opcionesFueraDeLaBarra\(\s*opcionesFueraDeLaMano\(opcionesFueraDelTablero\(opciones\)\), mazo\)/.test(
+      fuenteDelCliente,
+    ),
+  );
+  /*
+   * Y SE CONFIRMA SIEMPRE, aunque la opción sea única. Es lo contrario de lo que hacen el
+   * trueque y la jugada de una carta —`jugadaSinPreguntar` manda sin preguntar cuando sale
+   * una sola— y está desviado a propósito: comprar se pulsa en la franja de abajo donde el
+   * pulgar ya está apoyado, y un roce gasta tres bienes que no vuelven. Se comprueba que el
+   * manejador ABRE el menú y que no manda nada por su cuenta, porque «arreglar» esa
+   * incoherencia es exactamente lo que haría el siguiente que pase por aquí.
+   */
+  const elManejador = fuenteDelCliente.slice(
+    fuenteDelCliente.indexOf('const alPulsarElMazo'),
+    fuenteDelCliente.indexOf('}, [quieto, opciones]);', fuenteDelCliente.indexOf('const alPulsarElMazo')),
+  );
+  comprobar(
+    'pulsar el mazo ABRE la confirmación y no manda el movimiento, aunque la opción sea única',
+    elManejador.length > 0 &&
+      elManejador.includes('ponerPreguntando({ titulo: COMPRAR_UNA_CARTA') &&
+      !elManejador.includes('mover('),
+    { mide: elManejador.length },
   );
 
   /* Y no se pierde ni una: barra, mano de bienes, mano del mazo o botón. */
@@ -1822,9 +1932,26 @@ function elMazoEnLaPantalla(): void {
     if (revelar !== null) porElMazo.add(canonico({ tipo: revelar.tipo, carga: revelar.carga }));
   }
   comprobar('la mano del mazo ofrece algo, o el camino de las cartas no se habría recorrido', porElMazo.size > 0, porElMazo.size);
-  const alcanzables = new Set([...porLaBarra, ...porLaMano, ...porElMazo, ...fuera.map((o) => canonico({ tipo: o.tipo, carga: o.carga }))]);
+  /*
+   * LA QUINTA PUERTA, NUEVA: el cuarto hueco de la barra. Comprar salía por el botón hasta
+   * este encargo y ahora sale por aquí; cuando se quitó del pie, esta comprobación se puso
+   * roja ella sola con `["comprar"]`, que es justo su trabajo. Se anota la puerta donde
+   * está, no se le perdona el movimiento.
+   */
+  const porElMazoDeLaBarra = new Set<string>();
+  if (mazo !== null && mazo.disponible && comprar !== null) {
+    porElMazoDeLaBarra.add(canonico({ tipo: comprar.tipo, carga: comprar.carga }));
+  }
+  comprobar('el cuarto hueco de la barra ofrece algo, o esa puerta sería decorativa', porElMazoDeLaBarra.size === 1, [...porElMazoDeLaBarra]);
+  const alcanzables = new Set([
+    ...porLaBarra,
+    ...porElMazoDeLaBarra,
+    ...porLaMano,
+    ...porElMazo,
+    ...fuera.map((o) => canonico({ tipo: o.tipo, carga: o.carga })),
+  ]);
   comprobar(
-    'y no se pierde ni una: todo lo que ofreció el juego sale por la barra, por una de las dos manos o por un botón',
+    'y no se pierde ni una: todo lo que ofreció el juego sale por la barra, por su cuarto hueco, por una de las dos manos o por un botón',
     opciones.every((o) => alcanzables.has(canonico({ tipo: o.tipo, carga: o.carga }))),
     opciones.filter((o) => !alcanzables.has(canonico({ tipo: o.tipo, carga: o.carga }))).map((o) => o.id),
   );
@@ -1859,6 +1986,21 @@ function elMazoEnLaPantalla(): void {
   );
   const textoDeCinco = palabrasDe(htmlDeCinco);
   comprobar('se juega sobre el retablo SVG', htmlDeCinco.includes('<svg'));
+  /*
+   * Y COMPRAR SIGUE SIENDO UN BOTÓN AQUÍ, que es la mitad muda del encargo del cuarto
+   * hueco. Sobre el retablo no hay barra ninguna, así que si el filtro se hubiera escrito
+   * incondicional —quitar COMPRAR siempre— en una mesa de cinco no habría manera de
+   * comprar una carta en toda la tarde, sin un error en ninguna parte. Se pide por su
+   * rótulo, renderizado, y no por el filtro: el filtro ya está comprobado arriba, lo que
+   * falta es que ESTA rama no lo aplique.
+   */
+  const comprarDeCinco = comprarEnTres(cinco.opciones);
+  comprobar('al de cinco se le ofrece comprar, o esto no comprobaría nada', comprarDeCinco !== null, comprarDeCinco?.id);
+  comprobar(
+    'y sobre el retablo COMPRAR sale como botón: allí no hay barra donde pulsar un naipe',
+    comprarDeCinco !== null && textoDeCinco.includes(comprarDeCinco.rotulo),
+    comprarDeCinco?.rotulo,
+  );
   for (const o of deLaManoDeCinco) {
     comprobar(`sobre el retablo, «${o.rotulo}» SÍ sale como botón: allí no hay mano`, textoDeCinco.includes(o.rotulo), o.id);
   }
@@ -1919,7 +2061,75 @@ function elMazoEnLaPantalla(): void {
     marcador.colonos.filter((c) => !c.soyYo).every((c) => c.puntosConLoOculto === null) &&
       enElRail.split('puntos-ocultos').length - 1 === 1,
   );
-  comprobar('los dos premios salen con su nombre en el renglón de quien los tiene', marcador.mayorGuardia === 's2' && textoDelRail.includes('La Mayor Guardia'));
+  /*
+   * ═══ LOS DOS PREMIOS, Y AHORA LOS DOS TIENEN DUEÑO ═══
+   *
+   * Esto medía UNO: el Vado Largo estaba vacante en el escenario, así que la mitad de la
+   * frase pasaba en verde por no tener nada que enseñar. Con la cadena de cinco del §
+   * `laProyeccionConMazo` los dos premios están repartidos entre dos colonos distintos, y
+   * el raíl tiene que nombrar a cada uno en su renglón.
+   */
+  comprobar('los dos premios tienen dueño, y son dos colonos distintos', marcador.mayorGuardia === 's2' && marcador.vado === 's3', { guardia: marcador.mayorGuardia, vado: marcador.vado });
+  comprobar('los dos premios salen con su nombre en el renglón de quien los tiene', textoDelRail.includes('La Mayor Guardia') && textoDelRail.includes('El Vado Largo'));
+  comprobar('y ninguno se le pone a la mesa entera: uno cada uno', marcador.colonos.filter((c) => c.tieneElVado).length === 1 && marcador.colonos.filter((c) => c.tieneLaMayorGuardia).length === 1);
+
+  /*
+   * ═══ Y CUÁNTO MIDE LA CADENA DE CADA UNO ═══
+   *
+   * Es la cifra que le habría contestado a Miguel: encadenó veredas, no le salió el premio,
+   * y el raíl no decía ni cuánto medía su cadena ni cuánto hacía falta. Sale para TODOS —el
+   * premio es una carrera— y el mínimo viene de `VADO_MINIMO`, no escrito en el cliente.
+   */
+  const conVado = marcador.colonos.find((c) => c.tieneElVado);
+  const sinVado = marcador.colonos.find((c) => !c.tieneElVado);
+  comprobar('el marcador trae el largo de la cadena de cada colono', marcador.colonos.every((c) => typeof c.vado === 'number') && conVado?.vado === VADO_MINIMO && sinVado?.vado === 1, marcador.colonos.map((c) => c.vado));
+  comprobar('y el mínimo sale de la regla, no de un cinco escrito en el cliente', marcador.vadoMinimo === VADO_MINIMO);
+  comprobar(
+    'a quien NO lo tiene se le dice cuánto lleva y cuánto hace falta: «vado 1 de 5»',
+    textoDelRail.includes(`vado ${String(sinVado?.vado ?? 0)} de ${String(marcador.vadoMinimo)}`),
+    textoDelRail,
+  );
+  comprobar(
+    'y a quien SÍ lo tiene se le dice cuánto mide la suya, sin el «de 5» que ya pasó',
+    textoDelRail.includes(`El Vado Largo, ${String(conVado?.vado ?? 0)} veredas`) &&
+      !textoDelRail.includes(`vado ${String(conVado?.vado ?? 0)} de ${String(marcador.vadoMinimo)}`),
+    textoDelRail,
+  );
+
+  /*
+   * ═══ Y EL EMPATE: LA CADENA LLEGA Y EL PREMIO ES DE OTRO ═══
+   *
+   * Es donde la frase mentía. `recalcularElVado` sólo mueve el premio a quien SUPERA al
+   * dueño, así que el segundo que llega a cinco tiene cadena de cinco, cero puntos y —con
+   * el renglón viejo— un «vado 5 de 5» que se lee como «ya está». Es la misma mitad del
+   * fallo de Miguel (la pantalla que no explica por qué no hay premio) en la línea que se
+   * añadió para explicarlo. Aquí soy YO quien llega tarde, y se mira el TEXTO del raíl.
+   */
+  const { vista: vistaEmpatada } = laProyeccionConMazo(3, { empateDelVado: true });
+  const marcadorEmpatado = marcadorEnTres(vistaEmpatada);
+  const railEmpatado = palabrasDe(renderToStaticMarkup(<MarcadorDeRiberas vista={vistaEmpatada} />));
+  const yoEmpatado = marcadorEmpatado?.colonos.find((c) => c.soyYo);
+  const duenoDelVado = marcadorEmpatado?.colonos.find((c) => c.tieneElVado);
+  comprobar(
+    'en el empate, mi cadena llega al mínimo y el premio sigue siendo del tercero, que llegó antes',
+    yoEmpatado?.vado === VADO_MINIMO && yoEmpatado.tieneElVado === false && duenoDelVado?.asiento === 's3' && duenoDelVado.vado === VADO_MINIMO,
+    { yo: yoEmpatado?.vado, dueno: duenoDelVado?.asiento },
+  );
+  comprobar(
+    'y mi renglón NO dice «vado 5 de 5»: se lee como «ya está», y no está',
+    !railEmpatado.includes(`vado ${String(VADO_MINIMO)} de ${String(VADO_MINIMO)}`),
+    railEmpatado,
+  );
+  comprobar(
+    'dice de quién es el premio, por su nombre, y que llegó antes',
+    duenoDelVado !== undefined && railEmpatado.includes(`vado ${String(VADO_MINIMO)}, lo tiene ${duenoDelVado.nombre}, que llegó antes`),
+    railEmpatado,
+  );
+  comprobar(
+    'y «El Vado Largo» sale UNA vez en todo el raíl: en el renglón del dueño, no en el mío',
+    railEmpatado.split('El Vado Largo,').length - 1 === 1,
+    railEmpatado,
+  );
   comprobar('los títulos revelados salen con su nombre de Riberas, que ya son públicos', textoDelRail.includes('El Molino'));
   comprobar('y se dice cuántas cartas quedan en el mazo, que es información de la mesa', marcador.mazo > 0 && textoDelRail.includes(`Quedan ${String(marcador.mazo)} cartas en el mazo`), marcador.mazo);
   comprobar('una vista que no es de Riberas no pinta un marcador vacío: no pinta nada', renderToStaticMarkup(<MarcadorDeRiberas vista={{ desde: 'otro' }} />) === '');
@@ -1943,6 +2153,51 @@ function elMazoEnLaPantalla(): void {
       fuente,
     ),
   );
+  /*
+   * LA MANO QUE LLEGA A `<Delta>` ES LA COMPUESTA, Y AQUÍ SE LEE DEL FICHERO PORQUE NO HAY
+   * OTRA MANERA: vive dentro del `Canvas`, y en Node no hay `Canvas`.
+   *
+   * Lo que se compra es que este cliente no vuelva a llamar a `cartasEnTres` a secas para
+   * la mano. Si lo hiciera, la pantalla volvería exactamente al fallo de Miguel —el premio
+   * ganado que no aparece por ninguna parte— y ni un solo comprobador se pondría rojo: las
+   * cartas seguirían saliendo, el marcador seguiría nombrando el premio, y lo único que
+   * faltaría sería el naipe. La composición vive en `shared/` justamente para eso.
+   */
+  const laMano = /const cartasDelMazo = useMemo\([\s\S]*?\n {2}\);/.exec(fuente)?.[0] ?? '';
+  comprobar(
+    'la mano que llega a la escena es la COMPUESTA en `shared/`: premios y cartas, no sólo cartas',
+    laMano.includes('laManoDeLaIzquierda(') && !laMano.includes('cartasEnTres('),
+    laMano.slice(0, 400),
+  );
+  /*
+   * Y EL CINCO DEL VADO NO SE ESCRIBE AQUÍ: SE PIDE.
+   *
+   * La comprobación del raíl de más arriba mira el TEXTO renderizado, y ese texto sale
+   * idéntico escribiendo el cinco a mano: con el escenario de hoy `marcador.vadoMinimo`
+   * vale cinco y un literal también. O sea que allí las dos cosas no se distinguen, y la
+   * diferencia es justo la que importa el día que la regla cambie — ese día la pantalla
+   * seguiría prometiendo cinco veredas para un premio que ya pide otra cosa, sin que se
+   * cayera nada. Aquí se mira el CÓDIGO y no el fichero entero, porque las cabeceras de
+   * esta pantalla nombran `VADO_MINIMO` a propósito y una regla que castigue documentar
+   * algo enseña a no documentarlo.
+   */
+  const codigoDelCliente = fuente
+    .split('\n')
+    .filter((l) => !/^\s*(\*|\/\/|\/\*|\{\/\*)/.test(l))
+    .join('\n');
+  comprobar(
+    'la frase del Vado la escribe `shared/` (`renglonDelVado`) y el raíl no escribe ni el cinco ni el «de»',
+    codigoDelCliente.includes('renglonDelVado(') &&
+      !/\bvado \$\{/.test(codigoDelCliente) &&
+      !/\bvado \d/.test(codigoDelCliente),
+    'una frase escrita aquí es una segunda copia de una bifurcación de tres ramas, y la copia es la que vuelve a decir «de 5» a secas',
+  );
+  comprobar(
+    'y el apagón por petición en vuelo NO toca a los premios: apagar es «espera», y un premio no espera',
+    laMano.includes('esPremio'),
+    laMano.slice(0, 400),
+  );
+
   const alCoger = /const alCogerCartaDelMazo = useCallback\([\s\S]*?\n {2}\);/.exec(fuente)?.[0] ?? '';
   comprobar(
     'coger un naipe suelta el bien cogido y la pieza de la barra: dos gestos ofrecidos a la vez son uno equivocado',
@@ -1997,6 +2252,25 @@ elAcercamientoDelDelta();
 elMazoEnLaPantalla();
 
 console.log('');
+/**
+ * EL GUARDIA DE «NO SE HAN HECHO TODAS», el mismo que llevan el servidor y la escena.
+ *
+ * Este guion no lo tuvo nunca, y la fase que metió aquí las comprobaciones del empate del
+ * Vado —las que compran el grave de «vado 5 de 5»— lo dejó dicho: un bloque borrado, o un
+ * guion que se cae a la mitad, termina con código cero y una lista corta de aciertos, y
+ * eso se lee como verde. Con el número escrito, salir con menos es un fallo ruidoso. Va a
+ * mano y se sube al añadir comprobaciones; un guardia desfasado no guarda nada.
+ */
+const COMPROBACIONES_ESCRITAS = 380;
+if (hechas < COMPROBACIONES_ESCRITAS) {
+  console.error(
+    `Solo se han hecho ${String(hechas)} de las ${String(COMPROBACIONES_ESCRITAS)} comprobaciones que ` +
+      'tiene escritas este guion: se ha caído por el camino sin decirlo. ' +
+      'Si has añadido comprobaciones nuevas, sube el número.',
+  );
+  process.exit(2);
+}
+
 if (fallos.length === 0) {
   console.log(
     `✔ ${String(hechas)} comprobaciones. El escritorio enseña TODOS los arcades instalados y deja\n` +
@@ -2021,9 +2295,12 @@ if (fallos.length === 0) {
       '\n  Y el MAZO: sus movimientos los enseña la mano de cartas y no salen además como\n' +
       '  botón —comprar sí, que no cuelga de ningún naipe—, ninguno se pierde entre la barra,\n' +
       '  las dos manos y los botones, y sobre el retablo de cinco colonos, donde no hay mano,\n' +
-      '  vuelven a salir sueltos para que allí también se pueda jugar. El marcador del raíl\n' +
+      '  vuelven a salir sueltos para que allí también se pueda jugar. Y la mano que llega a la\n' +
+      '  escena es la COMPUESTA: los dos premios delante de las cartas, para que el Vado Largo\n' +
+      '  ganado se VEA y no sólo se nombre. El marcador del raíl\n' +
       '  nombra a todos los colonos con su color, distingue el tuyo y saca tus puntos ocultos\n' +
-      '  como un segundo número que no se le inventa a nadie más, y dice cuántas cartas quedan.\n' +
+      '  como un segundo número que no se le inventa a nadie más, dice cuántas cartas quedan, y\n' +
+      '  dice cuánto mide la cadena de veredas de cada uno con el mínimo sacado de la regla.\n' +
       '  Y lo que la escena no hace sola lo hace el cliente: coger un naipe suelta el bien y la\n' +
       '  pieza, cogerlo otra vez lo suelta, y una jugada ajena suelta la mano entera.\n' +
       '\n  Lo que esto NO prueba: que el reparto de los cuatro muebles entre propios y genéricos\n' +

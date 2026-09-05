@@ -70,10 +70,17 @@
  * silencioso contra el que la traducción partió aquel filtro en dos, y está escrito
  * en la cabecera de `opcionesFueraDelTablero`.
  *
- * COMPRAR no es de la mano y no se filtra en ninguna de las dos: no hay naipe que
- * arrastrar —la carta todavía no es tuya— y su único sitio es el botón. Lo que
- * cuesta y cuántas quedan lo dice el juego en la ayuda del propio botón, así que
- * aquí no se redacta.
+ * COMPRAR NO ES DE LA MANO —no hay naipe que arrastrar, la carta todavía no es tuya—
+ * pero desde este encargo TAMPOCO ES UN BOTÓN cuando hay delta: es el CUARTO HUECO DE
+ * LA BARRA, un naipe tapado que se pulsa y abre una confirmación. Se cae del pie por
+ * `opcionesFueraDeLaBarra`, que recibe el mazo y no un interruptor, así que el botón
+ * desaparece exactamente donde el naipe aparece.
+ *
+ * Y por eso mismo SOBRE EL RESPALDO SIGUE SIENDO UN BOTÓN, sin una línea que lo diga
+ * dos veces: allí no hay barra, `mazoEnLaBarra` no llega a preguntarse nada porque el
+ * respaldo no compone ninguno de los tres filtros, y comprar sale como el resto. Lo que
+ * cuesta y cuántas quedan lo dice el juego en el rótulo y la ayuda, las dos veces, así
+ * que aquí no se redacta.
  *
  * Y EL MARCADOR SE VE SIEMPRE, con el cromo de la mesa y no encima del lienzo: los
  * puntos públicos de cada colono, lo que sólo cuento yo, y cuánto mazo queda. Contar
@@ -123,15 +130,20 @@ import { opcionesSueltas, tableroDeLaVista } from '../../../shared/mecanicas/tab
 import {
   barraEnTres,
   bienesQueSeCambianPor,
-  cartasEnTres,
   colocandoEnTres,
+  comprarEnTres,
   esVistaQueSePinta,
   jugadaSinPreguntar,
   jugadasDeLaCarta,
+  laManoDeLaIzquierda,
+  loQueSeOyeDelVado,
   manoEnTres,
   marcadorEnTres,
+  mazoEnLaBarra,
+  opcionesFueraDeLaBarra,
   opcionesFueraDeLaMano,
   opcionesFueraDelTablero,
+  renglonDelVado,
   revelarDe,
   seVeEnTres,
   tableroEnTres,
@@ -548,6 +560,8 @@ function LaMesaEnTres({
   const [cogidaDelMazo, ponerCogidaDelMazo] = useState<string | null>(null);
   const [aQuien, ponerAQuien] = useState<readonly TruequePosible<OpcionDeMesa>[] | null>(null);
   const [comoJugarla, ponerComoJugarla] = useState<LaCartaYSusJugadas | null>(null);
+  /* La opción de comprar que se está confirmando. La ENTERA, no un `true`: ver `alPulsarElMazo`. */
+  const [comprando, ponerComprando] = useState<OpcionDeMesa | null>(null);
   const soltarTodo = useCallback(() => {
     ponerTomada(null);
     ponerColocando(null);
@@ -555,6 +569,7 @@ function LaMesaEnTres({
     ponerCogidaDelMazo(null);
     ponerAQuien(null);
     ponerComoJugarla(null);
+    ponerComprando(null);
   }, []);
   useEffect(() => {
     soltarTodo();
@@ -613,18 +628,42 @@ function LaMesaEnTres({
         : bienesQueSeCambianPor(laVista, opciones, cartaCogida.bien),
     [laVista, opciones, cartaCogida],
   );
-  const cartasDelMazo = useMemo(() => cartasEnTres(laVista, opciones), [laVista, opciones]);
+  /*
+   * LA MANO DE LA IZQUIERDA: mis premios delante y mis cartas del mazo detrás, compuesta
+   * en `shared/` y no aquí. Si cada cliente la compusiera, el día que uno de los dos se
+   * olvidara de los premios el fallo sería justo el que se estaba arreglando —el premio
+   * que no aparece— pero sólo en una de las dos pantallas.
+   */
+  const cartasDelMazo = useMemo(
+    () => laManoDeLaIzquierda(laVista, opciones, yo),
+    [laVista, opciones, yo],
+  );
   const marcador = useMemo(() => marcadorEnTres(laVista), [laVista]);
   /*
-   * LOS BOTONES DEL PIE CUANDO LA MANO SE PINTA: los dos filtros compuestos, y en
-   * ese orden da igual porque los dos son filtros. Lo que queda es tirar, pasar,
-   * contestar tratos, empezar y COMPRAR, que no es de la mano. Esta composición vale
-   * sólo para la rama del delta; el respaldo usa las opciones sin tocar, y por qué
-   * está en la cabecera del fichero.
+   * EL CUARTO HUECO DE LA BARRA: el mazo. Apagado con algo en vuelo, igual que las tres
+   * piezas; apagado y no quitado, porque la barra reparte CENTRADO y un hueco que va y
+   * viene corre las otras tres de sitio en cada jugada.
+   */
+  const mazo = useMemo(() => {
+    const suyo = mazoEnLaBarra(laVista, yo, opciones);
+    return suyo === null || !mesa.quieto ? suyo : { disponible: false };
+  }, [laVista, yo, opciones, mesa.quieto]);
+  /*
+   * LOS BOTONES DEL PIE CUANDO LA MANO SE PINTA: los TRES filtros compuestos, y en ese
+   * orden da igual porque los tres son filtros. Lo que queda es tirar, pasar, contestar
+   * tratos y empezar.
+   *
+   * COMPRAR YA NO ESTÁ, y es lo único que cambia respecto de ayer: se ofrece pulsando el
+   * naipe del mazo en la barra, y dejarlo además como botón sería ofrecer el mismo
+   * movimiento dos veces en la misma pantalla. Se cae por `opcionesFueraDeLaBarra`, que
+   * recibe EL MAZO y no un interruptor: donde no hay hueco de mazo el botón se queda, y
+   * eso es exactamente lo que salva al RESPALDO —que no tiene barra ninguna— de quedarse
+   * sin manera de comprar en toda la partida. Esta composición vale sólo para la rama del
+   * delta; el respaldo usa las opciones sin tocar, y por qué está en la cabecera.
    */
   const fueraDelTablero = useMemo(
-    () => opcionesFueraDeLaMano(opcionesFueraDelTablero(opciones)),
-    [opciones],
+    () => opcionesFueraDeLaBarra(opcionesFueraDeLaMano(opcionesFueraDelTablero(opciones)), mazo),
+    [opciones, mazo],
   );
 
   /*
@@ -780,6 +819,55 @@ function LaMesaEnTres({
     },
     [mesa, laVista, opciones],
   );
+
+  /**
+   * SE HA PULSADO EL NAIPE DEL MAZO: se pregunta, SIEMPRE.
+   *
+   * ═══ OJO, ESTO SE APARTA A PROPÓSITO DE LA REGLA DE LA CASA ═══
+   *
+   * `jugadaSinPreguntar` y `truequesPosibles` llevan escrito lo contrario, y está dicho
+   * dos funciones más arriba: si sale una sola manera, se manda sin preguntar. Comprar
+   * ofrece siempre exactamente una, así que por esa regla iría derecha al servidor sin un
+   * solo diálogo. Y NO ES LO QUE SE QUIERE.
+   *
+   * Aquellas dos se disparan al SOLTAR algo encima de una casilla —un gesto largo, con
+   * puntería, del que nadie sale por descuido—; ésta se dispara al TOCAR un naipe que vive
+   * pegado a las tres piezas de construir, abajo, donde el pulgar ya está apoyado para
+   * girar el tablero. Un roce gastaría sal, piedra y grano, y comprar no se deshace.
+   *
+   * Así que aquí se confirma aunque la opción sea única. Quien lea esto y lo vea como una
+   * incoherencia que «arreglar»: no lo es, y el día que se «arregle» el fallo será una
+   * compra que nadie pidió.
+   *
+   * `laInterfazSeLoQueda()` va LA PRIMERA, igual que al coger una pieza o un naipe: en el
+   * móvil el `WeakSet` de `escenas/camara.ts` no puede casar los dos sucesos —la escena ve
+   * el toque de React Native y el gesto el de `gesture-handler`— y esto es lo único que
+   * impide que el giro le robe el dedo. Ver `mirador-tactil.ts`.
+   */
+  const alPulsarElMazo = useCallback(() => {
+    laInterfazSeLoQueda();
+    if (mesa.quieto) return;
+    const comprar = comprarEnTres(opciones);
+    if (comprar === null) return;
+    /* Pulsar el mazo suelta las dos manos: no puede haber dos preguntas abiertas. */
+    ponerTomada(null);
+    ponerColocando(null);
+    ponerCogida(null);
+    ponerCogidaDelMazo(null);
+    ponerComprando(comprar);
+  }, [laInterfazSeLoQueda, mesa.quieto, opciones]);
+
+  /**
+   * SE HA CONFIRMADO LA COMPRA. Se manda la opción ENTERA que dio el juego, como en las
+   * otras dos hojas: montar aquí un `{ tipo, carga }` escribiría la forma del movimiento
+   * en un segundo sitio, y el segundo no lo comprueba nadie.
+   */
+  const alConfirmarLaCompra = useCallback(() => {
+    const comprar = comprando;
+    ponerComprando(null);
+    if (mesa.quieto || comprar === null) return;
+    mesa.mover({ tipo: comprar.tipo, carga: comprar.carga });
+  }, [mesa, comprando]);
 
   const alElegirJugada = useCallback(
     (j: JugadaDeCarta<OpcionDeMesa>) => {
@@ -1007,6 +1095,8 @@ function LaMesaEnTres({
                   barra={barra}
                   tomada={tomada}
                   onTomarDeLaBarra={alTomarDeLaBarra}
+                  mazo={mazo}
+                  onPulsarElMazo={alPulsarElMazo}
                   mano={mano}
                   cogida={cogida}
                   onCogerCarta={alCogerCarta}
@@ -1083,6 +1173,19 @@ function LaMesaEnTres({
             carta={comoJugarla.carta}
             jugadas={comoJugarla.jugadas}
             alElegir={alElegirJugada}
+            alDejarlo={soltarTodo}
+          />
+        ) : null}
+
+        {/*
+          Y LA TERCERA, la de confirmar la compra. Va aquí, hermana de las otras dos y
+          FUERA del `GestureDetector`, por la misma razón que ellas: un `Pressable` dentro
+          del detector le pelea el toque al giro del tablero.
+        */}
+        {comprando !== null ? (
+          <HojaDeComprar
+            comprar={comprando}
+            alConfirmar={alConfirmarLaCompra}
             alDejarlo={soltarTodo}
           />
         ) : null}
@@ -1340,6 +1443,65 @@ function HojaDeLaCarta({
 }
 
 // ---------------------------------------------------------------------------
+// La hoja de «¿compras una carta?»
+// ---------------------------------------------------------------------------
+
+/**
+ * CONFIRMAR LA COMPRA, con la misma hoja pequeña que las otras dos.
+ *
+ * ═══ POR QUÉ HAY HOJA SI SÓLO HAY UNA OPCIÓN ═══
+ *
+ * Porque no se pregunta CUÁL, se pregunta SI. Las otras dos hojas sólo salen cuando hay
+ * más de una manera —con una sola, `jugadaSinPreguntar` la manda derecha— y aquí es al
+ * revés a propósito: comprar se ofrece pulsando un naipe que vive en la barra de abajo,
+ * pegado a las tres piezas de construir y justo donde el pulgar se apoya para girar el
+ * tablero. Un roce gasta sal, piedra y grano, y comprar no se deshace. Está contado entero
+ * en `alPulsarElMazo`, y NO es un despiste que alguien deba alinear con la otra regla.
+ *
+ * ═══ Y NO SE REDACTA NI UNA PALABRA DE LA JUGADA ═══
+ *
+ * El rótulo del botón es `opcion.rotulo` y debajo va `opcion.ayuda`, tal cual, como en
+ * `LasOpciones`: lo que cuesta una carta y cuántas quedan son reglas de Riberas y las
+ * escribe el juego. Esta pantalla no sabe qué es la sal. Lo único de la casa es el
+ * encabezado y el «Dejarlo», que son cromo de la Sala igual que en las otras dos hojas.
+ */
+function HojaDeComprar({
+  comprar,
+  alConfirmar,
+  alDejarlo,
+}: {
+  comprar: OpcionDeMesa;
+  alConfirmar: () => void;
+  alDejarlo: () => void;
+}): JSX.Element {
+  return (
+    <View style={estilos.hoja} accessibilityViewIsModal>
+      <Text style={estilos.hojaRotulo}>¿Compras una carta?</Text>
+      {comprar.ayuda.length > 0 ? (
+        <Text style={estilos.hojaTexto}>{comprar.ayuda}</Text>
+      ) : null}
+      <Pressable
+        style={estilos.hojaBoton}
+        onPress={alConfirmar}
+        accessibilityRole="button"
+        accessibilityLabel={comprar.rotulo}
+        accessibilityHint={comprar.ayuda.length > 0 ? comprar.ayuda : undefined}
+      >
+        <Text style={estilos.hojaBotonRotulo}>{comprar.rotulo}</Text>
+      </Pressable>
+      <Pressable
+        style={estilos.hojaDejarlo}
+        onPress={alDejarlo}
+        accessibilityRole="button"
+        accessibilityLabel="Dejarlo, sin comprar nada"
+      >
+        <Text style={estilos.hojaDejarloRotulo}>Dejarlo</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // El marcador
 // ---------------------------------------------------------------------------
 
@@ -1394,20 +1556,45 @@ function ElMarcador({ marcador }: { marcador: MarcadorEnTres | null }): JSX.Elem
         <Text style={estilos.mazoCifra}>{marcador.mazo}</Text>
       </View>
       {marcador.colonos.map((c) => (
-        <FichaDelColono key={c.asiento} colono={c} />
+        <FichaDelColono key={c.asiento} colono={c} marcador={marcador} />
       ))}
     </ScrollView>
   );
 }
 
-/** Un colono en la cinta: su color, sus puntos y lo que se le ve del mazo. */
-function FichaDelColono({ colono }: { colono: ColonoEnElMarcador }): JSX.Element {
+/**
+ * Un colono en la cinta: su color, sus puntos y lo que se le ve del mazo.
+ *
+ * ═══ Y CUÁNTO MIDE SU CADENA DE VEREDAS, QUE ES LO QUE FALTABA ═══
+ *
+ * La cinta nombraba «Vado largo» a quien ya lo tenía y callaba con todos los demás. A
+ * quien encadena veredas y no ve el premio, esa cinta no le dice nada — y menos aún
+ * cuando el juego cuenta menos veredas que las que se ven puestas, que es lo que pasa
+ * cuando el vecino le corta el paso. Con la cifra del juego a la vista se puede comparar
+ * con el tablero.
+ *
+ * LA FRASE LA ESCRIBE `shared/` —`renglonDelVado` la que se ve, `loQueSeOyeDelVado` la
+ * que se oye— y tiene TRES ramas. La primera versión de esta ficha decía «vado 5 de 5» al
+ * segundo que llegaba a cinco: cadena de cinco, cero puntos, porque el premio sólo se
+ * mueve a quien SUPERA al dueño; y «de 5» se lee como «ya está». Con la frase en un solo
+ * sitio, el raíl del escritorio, esta ficha y su `accessibilityLabel` no pueden separarse,
+ * y el mínimo sigue siendo `vadoMinimo` del marcador: `VADO_MINIMO`, no un cinco escrito.
+ */
+function FichaDelColono({
+  colono,
+  marcador,
+}: {
+  colono: ColonoEnElMarcador;
+  marcador: MarcadorEnTres;
+}): JSX.Element {
   const oculto = colono.puntosConLoOculto;
   const soloMios = oculto === null ? 0 : oculto - colono.puntos;
+  /* El Vado no va aqui: lo dice ya el renglon de `renglonDelVado`, con su largo, y ponerlo
+     tambien en el rotulo de premios lo repetia dos veces en la cinta y dos en lo que se oye. */
   const premios = [
-    colono.tieneElVado ? 'Vado largo' : null,
     colono.tieneLaMayorGuardia ? 'Mayor guardia' : null,
   ].filter((p): p is string => p !== null);
+  const suVado = renglonDelVado(colono, marcador);
 
   /*
    * LA FRASE QUE SE OYE ES LA ENTERA, y la que se ve son cuatro renglones cortos. Es
@@ -1421,6 +1608,7 @@ function FichaDelColono({ colono }: { colono: ColonoEnElMarcador }): JSX.Element
     soloMios > 0 ? `y ${String(soloMios)} más que sólo cuentas tú` : null,
     `${String(colono.cartas)} cartas en la mano`,
     `${String(colono.guardias)} guardias jugadas`,
+    loQueSeOyeDelVado(colono, marcador),
     colono.titulos.length > 0 ? `ha revelado ${colono.titulos.join(', ')}` : null,
     premios.length > 0 ? `tiene ${premios.join(' y ')}` : null,
   ]
@@ -1452,6 +1640,7 @@ function FichaDelColono({ colono }: { colono: ColonoEnElMarcador }): JSX.Element
         <Text style={estilos.fichaPie}>
           {`${String(colono.cartas)} cartas · ${String(colono.guardias)} guardias`}
         </Text>
+        <Text style={estilos.fichaPie}>{suVado}</Text>
         {colono.titulos.length > 0 ? (
           <Text style={estilos.fichaPie} numberOfLines={2}>
             {colono.titulos.join(' · ')}

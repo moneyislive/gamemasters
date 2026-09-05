@@ -85,7 +85,7 @@ import {
   ojoDelMirador,
   tirandoDelMirador,
 } from '../camara';
-import { dentroDelHueco, huecosDeLaBarra, loQueSeVe } from '../barra';
+import { DIBUJO_DEL_MAZO, dentroDelHueco, huecosDeLaBarra, loQueSeVe } from '../barra';
 import {
   areasDeTrueque,
   enLaZonaDeLaMano,
@@ -115,7 +115,14 @@ import {
   puenteEntre,
   SUPERFICIE_DEL_CAMINO,
 } from '../puente';
-import { BIENES_CON_ICONO, CONTORNOS_DE_LA_CARTA, CONTORNOS_DEL_BIEN } from '../iconos';
+import {
+  BIENES_CON_ICONO,
+  CARTAS_CON_ICONO,
+  CIFRAS_CON_ICONO,
+  CONTORNOS_DE_LA_CARTA,
+  CONTORNOS_DE_LA_CIFRA,
+  CONTORNOS_DEL_BIEN,
+} from '../iconos';
 import { MODELO, modeloDePieza } from '../modelos';
 import { ESCALON, RADIO_DE_COMARCA, RADIO_DE_TESELA } from '../escala';
 import { MAR_ADENTRO_DE_LOS_BARCOS, laMarinaDelMundo } from '../marina';
@@ -1832,8 +1839,19 @@ paso('La mano del mazo se agrupa por familias, cabe a la izquierda y no pisa a n
       ),
     );
 
-  /** La mano más gorda que el mazo del §2 permite tener a la vez. */
+  /**
+   * LA MANO MÁS GORDA QUE SE PUEDE TENER A LA VEZ: el mazo entero del §2 —25 naipes en
+   * cinco familias— MÁS LOS DOS PREMIOS, que desde que existen van en la misma mano y en
+   * dos familias suyas (`vado` y `mayorguardia`, las dos primeras de
+   * `ORDEN_DE_LAS_FAMILIAS`). Son 27 en SIETE familias, y las tres comprobaciones que
+   * cuelgan de esto —que quepa en su franja, que no pise la barra, que no pise la mano de
+   * bienes— sólo miden el caso peor si los premios están dentro: cada familia nueva abre
+   * un hueco entre grupos, que es justo lo que más ancho come. Sin ellos medían 25 y su
+   * cabecera decía «la más gorda».
+   */
   const manoEntera = (): CartaDelMazo[] => [
+    { ...naipe('premio:vado', 'vado', false, false), esPremio: true },
+    { ...naipe('premio:guardia', 'mayorguardia', false, false), esPremio: true },
     ...Array.from({ length: 14 }, (_, i) => naipe(`g${String(i)}`, 'guardia')),
     ...Array.from({ length: 2 }, (_, i) => naipe(`a${String(i)}`, 'anobueno')),
     ...Array.from({ length: 2 }, (_, i) => naipe(`c${String(i)}`, 'acaparamiento')),
@@ -1842,6 +1860,13 @@ paso('La mano del mazo se agrupa por familias, cabe a la izquierda y no pisa a n
       naipe(`t${String(i)}`, FAMILIA_DE_LOS_TITULOS, false, true),
     ),
   ];
+  comprobar(
+    'la mano más gorda de las medidas lleva los dos premios: 27 naipes en las siete familias',
+    manoEntera().length === 27 &&
+      new Set(manoEntera().map((c) => c.familia)).size === ORDEN_DE_LAS_FAMILIAS.length &&
+      manoEntera().filter((c) => c.esPremio === true).length === 2,
+    { naipes: manoEntera().length, familias: [...new Set(manoEntera().map((c) => c.familia))] },
+  );
 
   /* Todo lo que esta mano llega a dibujar: las cartas quietas, tiradas por el imán, y las
    * dos casillas. Se mide TODO junto contra los vecinos, porque un vecino no distingue si
@@ -2181,6 +2206,66 @@ paso('La mano del mazo se agrupa por familias, cabe a la izquierda y no pisa a n
     conGuardada.map((c) => `${c.carta.id}:${String(c.apagada)}`),
   );
 
+  /*
+   * ── EL NAIPE QUE NO SE JUEGA: EL PREMIO ──
+   *
+   * Un premio llega con las dos banderas en `false` —no hay movimiento que mandar con él,
+   * ni hoy ni nunca— y con `esPremio` puesto. Sin esa tercera bandera cae de lleno en la
+   * frase de `apagada` y sale grisáceo en todas las partidas y para su dueño, que es la
+   * manera exacta de que un premio ganado se lea como una carta estropeada.
+   *
+   * Y no abre casilla: no hay dónde soltarlo, así que no se enciende ningún sitio donde
+   * soltarlo. Una casilla abierta debajo de algo que no va a pasar es peor que ninguna.
+   *
+   * Se comprueban las dos cosas por separado a propósito. `esPremio` toca dos frases muy
+   * distintas —el apagón, en `huecosDeLasCartas`, y las puertas, en `puertasDeLaCarta`— y
+   * quien arregle una sin la otra tiene que ver caerse la que no arregló.
+   */
+  const elVado: CartaDelMazo = {
+    id: 'premio:vado',
+    familia: 'vado',
+    dibujo: 'vado',
+    nombre: 'El Vado Largo',
+    sePuedeJugar: false,
+    sePuedeRevelar: false,
+    esPremio: true,
+  };
+  const conPremio = huecosDeLasCartas([unaGuardia, guardada, elVado], CAMPO, 16 / 9, null);
+  comprobar(
+    'un premio NO se apaga aunque no se pueda ni jugar ni revelar: no espera a ningún turno',
+    conPremio.length === 3 &&
+      conPremio.find((c) => c.carta.id === 'premio:vado')?.apagada === false,
+    conPremio.map((c) => `${c.carta.id}:${String(c.apagada)}`),
+  );
+  comprobar(
+    'y la carta guardada de al lado SÍ sigue apagándose: la excepción es sólo del premio',
+    conPremio.find((c) => c.carta.id === 'h')?.apagada === true,
+  );
+  comprobar(
+    'un premio no abre ninguna casilla: no hay dónde soltarlo',
+    puertasDeLaCarta(elVado).length === 0,
+    puertasDeLaCarta(elVado),
+  );
+  comprobar(
+    'ni aunque llegue con las banderas puestas, que es el cinturón contra el otro lado',
+    puertasDeLaCarta({ ...elVado, sePuedeJugar: true, sePuedeRevelar: true }).length === 0 &&
+      puertasDeLaCarta({ ...elVado, familia: FAMILIA_DE_LOS_TITULOS, sePuedeRevelar: true })
+        .length === 0,
+  );
+  /*
+   * Y SE REPARTE ARRIBA DEL TODO, que es lo que compra el sitio de `vado` en
+   * `ORDEN_DE_LAS_FAMILIAS`: las casillas viven en el PIE de la franja, así que el naipe
+   * que nunca se arrastra tiene que estar lejos de ellas y no cruzarse en el camino de
+   * cada jugada. Se le mete desordenado —el último de la lista— para que sea el reparto
+   * quien lo suba y no el orden con que se escribió.
+   */
+  comprobar(
+    'el premio se reparte ARRIBA del todo, lejos de las casillas que nunca va a usar',
+    conPremio[0]?.carta.id === 'premio:vado' &&
+      (conPremio[0]?.hueco.y ?? 0) > (conPremio[1]?.hueco.y ?? 0),
+    conPremio.map((c) => `${c.carta.id}@${c.hueco.y.toFixed(3)}`),
+  );
+
   /* ── Las casillas: en el pie de la franja, sin pisarse y sin llegar a las cartas ── */
   const malasCasillas: string[] = [];
   for (const [nombre, prop] of PANTALLAS) {
@@ -2216,14 +2301,14 @@ paso('La mano del mazo se agrupa por familias, cabe a la izquierda y no pisa a n
   /*
    * ── LOS COLORES DE LAS FAMILIAS ──
    *
-   * Cinco familias, cinco colores, y ninguno igual a otro ni al de reserva. Sin dibujo
-   * compilado todavía, el color es LO ÚNICO que distingue una pila de otra en reposo: dos
-   * familias del mismo tono serían dos montones idénticos en la pantalla con la que se
-   * decide qué jugar.
+   * Una familia, un color, y ninguno igual a otro ni al de reserva. En reposo de un naipe
+   * asoma un canto y del canto sólo se ve el color —el dibujo está fuera de la pantalla
+   * hasta que el imán lo saca—, así que dos familias del mismo tono son dos montones
+   * idénticos en la pantalla con la que se decide qué jugar.
    */
   const colores = ORDEN_DE_LAS_FAMILIAS.map((f) => colorDeLaFamilia(f));
   comprobar(
-    'las cinco familias tienen color propio, distinto entre sí y distinto al de reserva',
+    'cada familia tiene color propio, distinto entre sí y distinto al de reserva',
     new Set(colores).size === ORDEN_DE_LAS_FAMILIAS.length &&
       colores.every((c) => c !== COLOR_SIN_FAMILIA),
     colores,
@@ -2234,7 +2319,56 @@ paso('La mano del mazo se agrupa por familias, cabe a la izquierda y no pisa a n
   );
 
   /*
-   * ── LOS NUEVE DIBUJOS QUE LA MANO PUEDE PEDIR ──
+   * ── Y LA SEÑAL QUE SEPARA UN PREMIO DE UNA CARTA: LA SATURACIÓN ──
+   *
+   * «Distinto de las otras seis» no basta para lo que hace falta aquí. La pregunta que se
+   * responde mirando el canto de un naipe no es «¿cuál de las siete es?» sino «¿esto es
+   * una carta del mazo o es un premio?», y ésa la contesta un rasgo COMPARTIDO por los dos
+   * premios y por ninguna de las cinco del mazo. Es la saturación: las cinco del mazo son
+   * tonos apagados y los dos premios son vivos.
+   *
+   * Se mide y no se comparan dos códigos de color escritos aquí, porque un comprobador que
+   * repita la tabla no comprueba la tabla: la copia. Así, quien apague un premio para que
+   * «pegue mejor con los demás» se entera de que acaba de borrar la señal.
+   *
+   * El hueco entre 0,55 y 0,60 está a propósito: sin él, ajustar un color un punto pondría
+   * rojo el comprobador sin que nada se leyera distinto.
+   */
+  const saturacion = (hex: string): number => {
+    const n = parseInt(hex.slice(1), 16);
+    const r = ((n >> 16) & 255) / 255;
+    const g = ((n >> 8) & 255) / 255;
+    const b = (n & 255) / 255;
+    const alto = Math.max(r, g, b);
+    const bajo = Math.min(r, g, b);
+    if (alto === bajo) return 0;
+    const luz = (alto + bajo) / 2;
+    return luz > 0.5 ? (alto - bajo) / (2 - alto - bajo) : (alto - bajo) / (alto + bajo);
+  };
+  const PREMIOS = ['vado', 'mayorguardia'];
+  const DEL_MAZO = ORDEN_DE_LAS_FAMILIAS.filter((f) => !PREMIOS.includes(f));
+  comprobar(
+    'las dos familias de premio están en el reparto de la mano, o no saldrían',
+    PREMIOS.every((f) => ORDEN_DE_LAS_FAMILIAS.includes(f)) && DEL_MAZO.length === 5,
+    { premios: PREMIOS, delMazo: DEL_MAZO },
+  );
+  comprobar(
+    'las cinco del mazo son tonos APAGADOS: ninguna pasa de 0,55 de saturación',
+    DEL_MAZO.every((f) => saturacion(colorDeLaFamilia(f)) <= 0.55),
+    DEL_MAZO.map((f) => `${f}:${saturacion(colorDeLaFamilia(f)).toFixed(2)}`),
+  );
+  comprobar(
+    'y los dos premios son los dos únicos VIVOS: por encima de 0,60, que es la señal',
+    PREMIOS.every((f) => saturacion(colorDeLaFamilia(f)) >= 0.6),
+    PREMIOS.map((f) => `${f}:${saturacion(colorDeLaFamilia(f)).toFixed(2)}`),
+  );
+  comprobar(
+    'y los dos premios no son dos matices del mismo: se tienen a la vez y son dos cantos',
+    colorDeLaFamilia('vado') !== colorDeLaFamilia('mayorguardia'),
+  );
+
+  /*
+   * ── LOS ONCE DIBUJOS QUE LA MANO PUEDE PEDIR: NUEVE CARTAS Y DOS PREMIOS ──
    *
    * `delta.tsx` busca el dibujo de una carta en `CONTORNOS_DE_LA_CARTA`, y una búsqueda
    * fallida NO revienta: devuelve contornos vacíos, `geometriaDeContornos` da `null`, y la
@@ -2246,6 +2380,12 @@ paso('La mano del mazo se agrupa por familias, cabe a la izquierda y no pisa a n
    * Así que se pide aquí lo que pide la mano, con los mismos nombres, y se exige que salga
    * geometría de verdad. Que no falte ninguno es cosa del compilador de iconos; que la
    * mano los ENCUENTRE es cosa de esta escena, y esto es lo segundo.
+   *
+   * Los dos últimos —`vado` y `mayorguardia`— no son cartas del mazo sino los PREMIOS, y
+   * se piden por la misma puerta porque se pintan como naipe en la misma mano. Un premio
+   * sin contorno no revienta tampoco: sale un naipe de color plano, y un naipe de color
+   * plano en la mano de quien acaba de ganar el Vado Largo es exactamente el fallo que
+   * este encargo venía a arreglar, con otra cara.
    */
   const DIBUJOS_DE_LAS_CARTAS = [
     'guardia',
@@ -2257,6 +2397,9 @@ paso('La mano del mazo se agrupa por familias, cabe a la izquierda y no pisa a n
     'torreon',
     'faro',
     'huerto',
+    /* Y los dos premios, que se pintan como naipe en la misma mano y con la misma cuenta. */
+    'vado',
+    'mayorguardia',
   ];
   const mudas: string[] = [];
   for (const dibujo of DIBUJOS_DE_LAS_CARTAS) {
@@ -2277,7 +2420,7 @@ paso('La mano del mazo se agrupa por familias, cabe a la izquierda y no pisa a n
     }
   }
   comprobar(
-    'los nueve dibujos que la mano del mazo puede pedir los encuentra y dan triángulos',
+    'los once dibujos que la mano de la izquierda puede pedir los encuentra y dan triángulos',
     mudas.length === 0,
     mudas,
   );
@@ -2285,6 +2428,82 @@ paso('La mano del mazo se agrupa por familias, cabe a la izquierda y no pisa a n
     'y ninguno de ellos se busca por error en la tabla de los bienes',
     DIBUJOS_DE_LAS_CARTAS.every((d) => !BIENES_CON_ICONO.includes(d)),
     DIBUJOS_DE_LAS_CARTAS.filter((d) => BIENES_CON_ICONO.includes(d)),
+  );
+
+  /*
+   * ── LAS CIFRAS DE LAS FICHAS: LAS ONCE, Y QUE LA FICHA LAS PINTE ──
+   *
+   * La ficha de la comarca llevó durante toda una partida los puntos de probabilidad y
+   * NINGUNA cifra: la cabecera de `Numero` prometía «la cifra marcada» y el código no la
+   * marcaba, y Miguel jugó contando puntos. No se puede escribir un número en la escena
+   * —no hay fuente ni lienzo en la app— así que la cifra es un contorno más, dibujado en
+   * el compilador de iconos y pedido por `String(cifra)`.
+   *
+   * Y una búsqueda fallida no revienta: devuelve contornos vacíos, la geometría es `null` y
+   * la ficha sale con los puntos y sin número, o sea EXACTAMENTE como estaba. Es el fallo
+   * más silencioso posible, porque su síntoma es el estado anterior. Por eso se piden aquí
+   * las once que salen en un delta —las de `NUMEROS_DE_LAS_ISLAS`, sin el siete— con la
+   * misma llave que usa la ficha, y se exige geometría de verdad y del tamaño normalizado.
+   */
+  const CIFRAS_DE_UN_DELTA = [2, 3, 4, 5, 6, 8, 9, 10, 11, 12].map(String);
+  const cifrasMudas: string[] = [];
+  for (const cifra of CIFRAS_DE_UN_DELTA) {
+    const g = geometriaDeContornos(CONTORNOS_DE_LA_CIFRA[cifra] ?? []);
+    if (g === null) {
+      cifrasMudas.push(`${cifra}: la ficha no la encuentra`);
+      continue;
+    }
+    const caja = g.boundingBox;
+    const lado = caja === null ? 0 : Math.max(caja.max.x - caja.min.x, caja.max.y - caja.min.y);
+    if (Math.abs(lado - 1) > 1e-6) cifrasMudas.push(`${cifra}: lado ${lado.toFixed(3)} y no 1`);
+    if (cuantosTriangulos(g) < 8) cifrasMudas.push(`${cifra}: sólo ${String(cuantosTriangulos(g))} triángulos`);
+    g.dispose();
+  }
+  comprobar(
+    'las once cifras que salen en un delta tienen dibujo, dan triángulos y llegan normalizadas',
+    cifrasMudas.length === 0,
+    cifrasMudas,
+  );
+  comprobar(
+    'y no hay cifras de más ni de menos en la tabla: las que se dibujan son las que se juegan',
+    CIFRAS_CON_ICONO.length === CIFRAS_DE_UN_DELTA.length &&
+      CIFRAS_DE_UN_DELTA.every((c) => CIFRAS_CON_ICONO.includes(c)),
+    { enLaTabla: CIFRAS_CON_ICONO, enElJuego: CIFRAS_DE_UN_DELTA },
+  );
+  comprobar(
+    'y ninguna llave de cifra choca con una carta ni con un bien: son tres tablas y tres puertas',
+    CIFRAS_CON_ICONO.every((c) => !CARTAS_CON_ICONO.includes(c) && !BIENES_CON_ICONO.includes(c)),
+  );
+
+  /*
+   * QUE LA FICHA LO LEA. Una tabla con lector es un dato; sin lector es adorno, y el día
+   * que alguien «limpie» la línea de `Numero` la ficha vuelve a salir sin número sin que
+   * nada se ponga rojo. Y que el seis y el ocho vayan en su rojo: es como se imprime la
+   * ficha del juego de mesa, y la razón está en la cabecera de la constante.
+   */
+  const fuenteDeLaFicha = fs.readFileSync(
+    path.join(import.meta.dirname ?? __dirname, '..', 'delta.tsx'),
+    'utf8',
+  );
+  const empiezaNumero = fuenteDeLaFicha.indexOf('function Numero(');
+  const acabaNumero = fuenteDeLaFicha.indexOf('\n}\n', empiezaNumero);
+  const cuerpoDeNumero = fuenteDeLaFicha.slice(empiezaNumero, acabaNumero);
+  comprobar(
+    'la ficha pide su cifra a la tabla por «String(cifra)», que es la llave con la que se compiló',
+    empiezaNumero >= 0 && cuerpoDeNumero.includes('CONTORNOS_DE_LA_CIFRA[String(cifra)]'),
+  );
+  const calientes = /const CIFRAS_CALIENTES: readonly number\[\] = \[([^\]]*)\];/.exec(fuenteDeLaFicha);
+  const numerosCalientes = (calientes?.[1] ?? '')
+    .split(',')
+    .map((s) => Number(s.trim()))
+    .filter((n) => Number.isFinite(n));
+  comprobar(
+    'y el seis y el ocho —los dos que más salen, y sólo ellos— van en el rojo de la ficha',
+    numerosCalientes.length === 2 &&
+      numerosCalientes.includes(6) &&
+      numerosCalientes.includes(8) &&
+      cuerpoDeNumero.includes('COLOR_DE_LA_CIFRA_CALIENTE'),
+    { numerosCalientes, loUsaNumero: cuerpoDeNumero.includes('COLOR_DE_LA_CIFRA_CALIENTE') },
   );
 }
 
@@ -2391,6 +2610,273 @@ paso('Los sitios se pueden contar y la barra cabe en cualquier pantalla');
   );
 
   comprobar('con cero piezas no hay barra', huecosDeLaBarra(0, CAMPO, 16 / 9).length === 0);
+
+  /*
+   * ═══ EL CUARTO HUECO: EL MAZO ═══
+   *
+   * La barra de Riberas tenía tres piezas —choza, torre, vereda— y ahora lleva un cuarto
+   * hueco con un naipe tapado: el que se pulsa para comprar. `huecosDeLaBarra` ya sabía
+   * repartir de uno a diez, así que aquí no se estrena aritmética; lo que se estrena es
+   * que ALGUIEN PIDA CUATRO, y hay tres cosas que medir por eso.
+   */
+
+  /*
+   * ── 1. LA BARRA ESTÁ CENTRADA, Y EL CUARTO NO SE AÑADE: LO MUEVE TODO ──
+   *
+   * Es lo que se ve al jugar y lo que hay que dejar escrito con números: pedir un hueco
+   * más NO deja los tres de antes donde estaban. Los corre a la izquierda y mete el nuevo
+   * al final, porque el reparto sale de repartir el ancho a los dos lados del cero.
+   *
+   * Se comprueba, y no sólo se cuenta, porque el arreglo «natural» el día que alguien se
+   * queje —anclar los tres viejos y crecer hacia fuera— rompe la simetría y empuja el
+   * hueco nuevo justo a la esquina peor de alcanzar con el pulgar.
+   */
+  for (const [nombre, proporcion] of PANTALLAS) {
+    const deTres = huecosDeLaBarra(3, CAMPO, proporcion);
+    const deCuatro = huecosDeLaBarra(4, CAMPO, proporcion);
+    comprobar(
+      `en ${nombre}, el cuarto hueco corre los tres de antes a la izquierda y no se añade a la derecha`,
+      deCuatro.length === 4 &&
+        deTres.every((h, i) => (deCuatro[i]?.x ?? 0) < h.x) &&
+        Math.abs((deCuatro[0]?.x ?? 0) + (deCuatro[3]?.x ?? 0)) < 1e-9,
+      {
+        tres: deTres.map((h) => Number(h.x.toFixed(4))),
+        cuatro: deCuatro.map((h) => Number(h.x.toFixed(4))),
+      },
+    );
+    comprobar(
+      `y en ${nombre} el último es el de más a la derecha, que es donde va el mazo`,
+      deCuatro.every((h, i) => i === 0 || h.x > (deCuatro[i - 1]?.x ?? 0)),
+      deCuatro.map((h) => Number(h.x.toFixed(4))),
+    );
+  }
+
+  /*
+   * ── 2. Y CON CUATRO LAS PIEZAS ENCOGEN, PERO NO EN TODAS LAS PANTALLAS ──
+   *
+   * En un monitor el lado lo manda el ALTO y cuatro caben igual de grandes que tres: el
+   * lado no cambia ni un milímetro. En un móvil de pie lo manda el ANCHO y encogen. Las
+   * dos cosas son correctas y conviene tenerlas escritas, porque «se me han hecho más
+   * pequeñas las piezas» es una queja que sólo tiene sentido en una de las dos.
+   */
+  const cuatroEnMonitor = huecosDeLaBarra(4, CAMPO, 16 / 9)[0]?.lado ?? 0;
+  const tresEnMonitor = huecosDeLaBarra(3, CAMPO, 16 / 9)[0]?.lado ?? 0;
+  const cuatroEnMovil = huecosDeLaBarra(4, CAMPO, 9 / 19.5)[0]?.lado ?? 0;
+  const tresEnMovil = huecosDeLaBarra(3, CAMPO, 9 / 19.5)[0]?.lado ?? 0;
+  comprobar(
+    'en un monitor el cuarto hueco no encoge nada: ahí manda el alto y sobra ancho',
+    Math.abs(cuatroEnMonitor - tresEnMonitor) < 1e-9,
+    { tres: Number(tresEnMonitor.toFixed(4)), cuatro: Number(cuatroEnMonitor.toFixed(4)) },
+  );
+  comprobar(
+    'y en un móvil de pie sí encogen, que es lo que hace que quepan en vez de amontonarse',
+    cuatroEnMovil < tresEnMovil,
+    { tres: Number(tresEnMovil.toFixed(4)), cuatro: Number(cuatroEnMovil.toFixed(4)) },
+  );
+
+  /*
+   * ── 3. Y SIGUEN SIENDO TOCABLES: EL SUELO DE 44 PUNTOS ──
+   *
+   * Esta es la que de verdad podía salir mal. El asa de un hueco mide un lado por un lado,
+   * y la casa tiene escrito en cuatro sitios que nada que se toque baja de 44 puntos.
+   * Cuatro huecos en vez de tres es un 26 % menos de lado allí donde manda el ancho, y si
+   * eso cruzara el suelo el encargo estaría entregando una barra que en un teléfono
+   * estrecho no se puede pulsar — sin un error en ninguna parte, porque el hueco seguiría
+   * dibujándose perfecto.
+   *
+   * LA CUENTA. Un hueco mide `lado` unidades de mundo a la distancia de la barra, y a esa
+   * distancia la cámara ve `alto` unidades en toda la altura del lienzo. Así que en
+   * puntos de pantalla mide `lado / alto * altoDelLienzoEnPuntos`. No hace falta saber la
+   * densidad del aparato: los 44 son puntos, no píxeles físicos, y `alto` sale de la misma
+   * `loQueSeVe` que usa el reparto.
+   *
+   * LAS MEDIDAS SON LAS DEL LIENZO Y NO LAS DE LA PANTALLA, y esa distinción es la mitad
+   * del asunto: en la app el delta vive en una franja —`PARTE_DEL_ALTO` del alto, con un
+   * suelo de 360 puntos— con el marcador encima y los botones debajo. El caso peor no es
+   * el móvil más estrecho sino el lienzo más BAJO, porque cuando manda el alto el lado se
+   * lleva un 13 % de él y nada más.
+   *
+   * Los tamaños de abajo son los de la app (`ALTO_MINIMO_DEL_LIENZO` = 360 y
+   * `PARTE_DEL_ALTO` = 0,58 en `app/src/arcade/riberas-en-tres-escena.tsx`) aplicados a
+   * los teléfonos más pequeños que se admiten, más el caso de pantalla completa.
+   */
+  const LIENZOS: Array<[string, number, number]> = [
+    ['móvil estrecho, lienzo al mínimo', 320, 360],
+    ['móvil pequeño', 360, 490],
+    ['móvil corriente', 390, 490],
+    ['móvil de pie, lienzo entero', 390, 845],
+    ['tableta', 768, 640],
+    ['monitor', 1920, 900],
+  ];
+  const SUELO_DEL_TOQUE = 44;
+  const chicos: string[] = [];
+  const medidos: string[] = [];
+  for (const [nombre, ancho, alto] of LIENZOS) {
+    const visto = loQueSeVe(CAMPO, ancho / alto);
+    const hueco = huecosDeLaBarra(4, CAMPO, ancho / alto)[0];
+    if (hueco === undefined) {
+      chicos.push(`${nombre}: no hay hueco`);
+      continue;
+    }
+    const enPuntos = (hueco.lado / visto.alto) * alto;
+    medidos.push(`${nombre}: ${enPuntos.toFixed(1)}`);
+    if (enPuntos < SUELO_DEL_TOQUE) {
+      chicos.push(`${nombre}: ${enPuntos.toFixed(1)} puntos, y el suelo son ${String(SUELO_DEL_TOQUE)}`);
+    }
+  }
+  comprobar(
+    'con cuatro huecos, el asa de cada uno sigue por encima de los 44 puntos de toque en todos los lienzos',
+    chicos.length === 0,
+    { medidos, chicos },
+  );
+  /*
+   * Y el mismo suelo con tres, para que se vea CUÁNTO se ha gastado. Sin esta línea, el
+   * día que alguien pida un quinto hueco no habría con qué comparar y el margen que queda
+   * habría que volver a averiguarlo.
+   */
+  const conTres = (() => {
+    const visto = loQueSeVe(CAMPO, 320 / 360);
+    return ((huecosDeLaBarra(3, CAMPO, 320 / 360)[0]?.lado ?? 0) / visto.alto) * 360;
+  })();
+  const conCuatro = (() => {
+    const visto = loQueSeVe(CAMPO, 320 / 360);
+    return ((huecosDeLaBarra(4, CAMPO, 320 / 360)[0]?.lado ?? 0) / visto.alto) * 360;
+  })();
+  comprobar(
+    'y en el lienzo peor el cuarto hueco no gasta margen: ahí manda el alto, así que tres y cuatro miden lo mismo',
+    Math.abs(conTres - conCuatro) < 1e-6 && conCuatro >= SUELO_DEL_TOQUE,
+    { tres: Number(conTres.toFixed(1)), cuatro: Number(conCuatro.toFixed(1)), suelo: SUELO_DEL_TOQUE },
+  );
+
+  /*
+   * ── 3b. Y EL CUARTO HUECO NO SE METE DEBAJO DE LA BARAJA DE BIENES ──
+   *
+   * La barra y la baraja viven en el MISMO plano (`DISTANCIA_DE_LA_BARRA` =
+   * `DISTANCIA_DE_LA_BARAJA` = 2), con las cartas de bienes delante. Donde se solapan, la
+   * carta gana el rayo y ese trozo del asa del naipe no se puede pulsar — sin un error en
+   * ninguna parte, porque el naipe se sigue dibujando entero. Con tres huecos el borde
+   * derecho de la barra quedaba en +0,3748 (lienzos de 490 puntos de alto); con cuatro y el
+   * ancho de entonces (0,82) se iba a +0,5083, un 36 % más ancha, y NADIE medía la barra
+   * contra la mano de bienes: la comprobación de arriba («la mano del mazo no invade la
+   * zona de la barra») mide la OTRA mano, la de la izquierda.
+   *
+   * Se miden dos cosas distintas, porque un toque y un ratón no encuentran lo mismo:
+   *   · las cartas QUIETAS son lo que encuentra un toque —el imán sigue al puntero en el
+   *     `useFrame`, y el rayo de la pulsación sale antes de que la mano se abra—; ahí el
+   *     hueco del mazo tiene que quedar libre en TODOS los lienzos;
+   *   · con el imán a tope —un ratón que pasa por encima— las cartas asoman más, y en el
+   *     lienzo entero de un móvil de pie ya pisaban la vereda con TRES huecos: eso no lo
+   *     estrenó el cuarto y no se arregla con la anchura de la barra (habría que bajar de
+   *     los 44 puntos de toque de arriba). Ahí lo que se exige es que el cuarto hueco no
+   *     meta la barra debajo de la baraja en ningún lienzo donde con tres no estaba.
+   *
+   * Las áreas de trueque se miden y se ENSEÑAN en el detalle, pero no se exigen: sólo
+   * existen mientras se arrastra un bien, y con el puntero ocupado en el arrastre no hay
+   * pulsación posible sobre la barra; con tres huecos ya cruzaban la barra en todos los
+   * lienzos de móvil, porque su columna nace mucho más adentro que las cartas.
+   *
+   * Salió rojo de verdad —en los tres lienzos de 490 con la mano abierta, y en el lienzo
+   * entero con las cartas quietas— y lo barato fue bajar `ANCHO_MAXIMO` en `barra.ts`: NO
+   * mover el naipe, que está donde se pidió, ni bajar el asa de los 44 puntos.
+   */
+  const MANO_DE_BIENES_ENTERA = Array.from({ length: 14 }, (_, i) => ({
+    id: `b${String(i)}`,
+    bien: ['limo', 'junco', 'sal', 'piedra', 'grano'][i % 5] as string,
+  }));
+  type Caja = { x: number; y: number; ancho: number; alto: number };
+  const seTocan = (a: Caja, b: Caja): boolean =>
+    Math.abs(a.x - b.x) < (a.ancho + b.ancho) / 2 - 1e-9 && Math.abs(a.y - b.y) < (a.alto + b.alto) / 2 - 1e-9;
+  const cajaDelUltimoHueco = (cuantos: number, prop: number): Caja | null => {
+    const h = huecosDeLaBarra(cuantos, CAMPO, prop)[cuantos - 1];
+    return h === undefined ? null : { x: h.x, y: h.y, ancho: h.lado, alto: h.lado };
+  };
+  const bajoLasQuietas: string[] = [];
+  const nuevosBajoElIman: string[] = [];
+  const medidasDeLaBaraja: string[] = [];
+  for (const [nombre, ancho, alto] of LIENZOS) {
+    const prop = ancho / alto;
+    const ultimoDeTres = cajaDelUltimoHueco(3, prop);
+    const ultimoDeCuatro = cajaDelUltimoHueco(4, prop);
+    if (ultimoDeTres === null || ultimoDeCuatro === null) {
+      bajoLasQuietas.push(`${nombre}: no hay hueco que medir`);
+      continue;
+    }
+    const quietas: Caja[] = huecosDeLaBaraja(MANO_DE_BIENES_ENTERA, CAMPO, prop, null).map((c) => c.hueco);
+    const abiertas: Caja[] = quietas.flatMap((q) =>
+      huecosDeLaBaraja(MANO_DE_BIENES_ENTERA, CAMPO, prop, q.y).map((c) => c.hueco),
+    );
+    const areas: Caja[] = areasDeTrueque(5, CAMPO, prop);
+    const pisaQuietas = quietas.some((c) => seTocan(c, ultimoDeCuatro));
+    const pisabaAbiertasConTres = abiertas.some((c) => seTocan(c, ultimoDeTres));
+    const pisaAbiertasConCuatro = abiertas.some((c) => seTocan(c, ultimoDeCuatro));
+    const cruzanLasAreas = areas.some((a) => seTocan(a, ultimoDeCuatro));
+    const canto = (cajas: Caja[]): string => Math.min(...cajas.map((c) => c.x - c.ancho / 2)).toFixed(4);
+    medidasDeLaBaraja.push(
+      `${nombre}: la barra llega a ${(ultimoDeCuatro.x + ultimoDeCuatro.ancho / 2).toFixed(4)}; los bienes quietos empiezan en ${canto(quietas)} y abiertos en ${canto(abiertas)}` +
+        (pisabaAbiertasConTres ? ' (con tres ya se pisaban abiertos)' : '') +
+        (cruzanLasAreas ? ' (las áreas de trueque cruzan la barra)' : ''),
+    );
+    if (pisaQuietas) bajoLasQuietas.push(`${nombre}: el hueco del mazo queda debajo de una carta de bienes quieta`);
+    if (pisaAbiertasConCuatro && !pisabaAbiertasConTres) nuevosBajoElIman.push(`${nombre}: con tres la barra no pisaba la mano abierta y con cuatro sí`);
+  }
+  comprobar(
+    'el hueco del mazo queda libre de las cartas de bienes QUIETAS —lo que encuentra un toque— en todos los lienzos',
+    bajoLasQuietas.length === 0,
+    { bajoLasQuietas, medidasDeLaBaraja },
+  );
+  comprobar(
+    'y con la mano abierta por el imán, el cuarto hueco no mete la barra debajo de la baraja en ningún lienzo donde con tres no estaba',
+    nuevosBajoElIman.length === 0,
+    { nuevosBajoElIman, medidasDeLaBaraja },
+  );
+
+  /*
+   * ── 4. Y EL DIBUJO DEL NAIPE DEL MAZO, QUE SE PIDE POR SU NOMBRE ──
+   *
+   * `DIBUJO_DEL_MAZO` vive en `barra.ts` para que la escena y los comprobadores pidan el
+   * mismo. Si no estuviera compilado no reventaría nada: saldría un naipe de color plano
+   * en la barra, que es el fallo silencioso de siempre.
+   */
+  const delMazo = geometriaDeContornos(CONTORNOS_DE_LA_CARTA[DIBUJO_DEL_MAZO] ?? []);
+  comprobar(
+    'el dibujo del naipe del mazo existe y da triángulos, como los once de la mano',
+    delMazo !== null && cuantosTriangulos(delMazo) >= 8,
+    { dibujo: DIBUJO_DEL_MAZO, triangulos: delMazo === null ? 0 : cuantosTriangulos(delMazo) },
+  );
+  /*
+   * ── 5. Y QUE LA BARRA PIDA UN REPARTO SOLO, CON EL MAZO EL ÚLTIMO ──
+   *
+   * Esto se lee del FUENTE y no del resultado, porque el resultado no lo distingue: los
+   * números de arriba salen de `huecosDeLaBarra` y saldrían iguales si quien pinta pidiera
+   * tres huecos para las piezas y otro aparte para el naipe. Y esa segunda manera es la
+   * que rompe: dos repartos separados dejan el naipe fuera de la aritmética centrada, o
+   * sea encima de la tercera pieza en cuanto la pantalla estreche.
+   *
+   * Se piden dos cosas: que el reparto se pida UNA vez con la suma, y que el hueco del
+   * naipe sea el de índice `piezas.length`, o sea el último. Puesto el primero, el naipe
+   * caería a la izquierda de la choza, que es lo contrario de lo que se pidió.
+   */
+  const fuenteDeLaBarra = fs.readFileSync(
+    path.join(import.meta.dirname ?? __dirname, '..', 'delta.tsx'),
+    'utf8',
+  );
+  comprobar(
+    'la barra pide UN reparto con las piezas y el mazo juntos, no dos pegados',
+    /const cuantos = piezas\.length \+ \(mazo === null \? 0 : 1\);/.test(fuenteDeLaBarra) &&
+      /huecosDeLaBarra\(cuantos, forma\.campo, forma\.proporcion\)/.test(fuenteDeLaBarra),
+  );
+  comprobar(
+    'y el hueco del naipe es el ÚLTIMO de ese reparto, a la derecha de la vereda',
+    /huecos\[piezas\.length\]/.test(fuenteDeLaBarra),
+  );
+
+  comprobar(
+    'y NO es el de ninguna carta de la mano: un molino en la barra prometería El Molino',
+    !['guardia', 'anobueno', 'acaparamiento', 'dosveredas', 'molino', 'cantera', 'torreon', 'faro', 'huerto', 'vado', 'mayorguardia'].includes(
+      DIBUJO_DEL_MAZO,
+    ),
+    DIBUJO_DEL_MAZO,
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -3245,7 +3731,7 @@ if (fallos.length > 0) {
  * a veintitrés: durante ese tiempo el guion podía morirse en la novena sin que nadie se
  * enterara. Un guardia desfasado no guarda nada.
  */
-const COMPROBACIONES_ESCRITAS = 216;
+const COMPROBACIONES_ESCRITAS = 247;
 if (hechas < COMPROBACIONES_ESCRITAS) {
   console.error(
     `Solo se han hecho ${hechas} de las ${COMPROBACIONES_ESCRITAS} comprobaciones que ` +

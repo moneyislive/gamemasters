@@ -1694,7 +1694,9 @@ function alzar(
  * TRAZA UNA VEREDA.
  *
  * Durante la colocación es GRATIS y tiene que pegarse a la choza recién fundada.
- * Después se paga y tiene que pegarse a algo propio: una vereda o una choza.
+ * Después se paga y tiene que pegarse a algo propio —una vereda o una choza— por
+ * un vértice que no tenga pieza de otro encima: se puede llegar a la puerta del
+ * vecino, no salir de ella. Ver `pegaConLoMio`.
  *
  * ═══ Y HAY UN TERCER CASO, QUE ES LAS DOS VEREDAS ═══
  *
@@ -1769,11 +1771,32 @@ function hayDondeTrazar(estado: EstadoDeRiberas, yo: number): boolean {
   return false;
 }
 
-/** ¿Toca esta arista algo mío —una vereda o una choza— por alguno de sus extremos? */
+/**
+ * ¿ENGANCHA ESTA ARISTA CON ALGO MÍO POR UN VÉRTICE DEL QUE PUEDA SALIR?
+ *
+ * Una vereda mía puede LLEGAR al vértice donde otro colono tiene choza o torre,
+ * pero no SALIR de él: la casa ajena corta el paso. Así que el extremo por el que
+ * la arista nueva engancha con lo mío tiene que estar limpio de piezas ajenas; el
+ * OTRO extremo puede ser lo que sea, y por eso llegar sigue siendo legal.
+ *
+ * ═══ LA MITAD QUE FALTABA, Y LO QUE COSTÓ QUE FALTARA ═══
+ *
+ * Esto preguntaba sólo «¿toca algo mío?». Con eso el juego dejaba trazar saliendo
+ * del vértice de otro, cobraba la vereda y la pintaba pegada — y el premio, que sí
+ * corta ahí, contaba la cadena rota. Miguel puso cinco veredas seguidas y el Vado
+ * Largo le dijo tres, sin un mensaje que lo explicara: la pieza se paga, se ve, y
+ * no sirve.
+ *
+ * El corte es `bloqueadosPara`, EL MISMO que usa el premio, y no una cuenta
+ * parecida escrita al lado. Dos jueces que casi siempre coinciden es la peor clase
+ * de fallo, y éste fue exactamente eso durante toda una partida.
+ */
 function pegaConLoMio(estado: EstadoDeRiberas, yo: number, arista: LlaveDeArista): boolean {
   const mio = estado.colonos[yo];
   if (mio === undefined) return false;
+  const bloqueados = bloqueadosPara(estado.colonos, mio.asiento);
   for (const v of verticesDeArista(arista)) {
+    if (bloqueados.includes(v)) continue;
     if (mio.chozas.includes(v) || mio.torres.includes(v)) return true;
     for (const otra of aristasDeVertice(v)) {
       if (mio.veredas.includes(otra)) return true;
@@ -2721,12 +2744,46 @@ function extender(
   return mejor;
 }
 
-/** Los vértices donde OTRO tiene algo. Son los que cortan el paso. */
-function bloqueadosPara(estado: EstadoDeRiberas, yo: number): LlaveDeVertice[] {
+/**
+ * QUIEN TENGA PIEZAS DE VÉRTICE SIRVE PARA ESTA CUENTA: el colono del estado y el
+ * de la vista, que son dos tipos distintos con los mismos campos públicos.
+ *
+ * Se declara lo MÍNIMO a propósito. Pedir `Colono` aquí obligaría a la vista a
+ * escribir su propia versión del corte, y ése es justo el camino por el que el
+ * corte acabó existiendo en un solo sitio. Ver `bloqueadosPara`.
+ */
+interface ConPiezasDeVertice {
+  asiento: AsientoId;
+  chozas: readonly LlaveDeVertice[];
+  torres: readonly LlaveDeVertice[];
+}
+
+/**
+ * LOS VÉRTICES DONDE OTRO TIENE ALGO. Son los que cortan el paso, y el corte tiene
+ * que ser EL MISMO en los tres sitios que lo miran.
+ *
+ * ═══ POR QUÉ RECIBE UNA LISTA Y NO EL ESTADO, Y QUÉ COSTÓ ═══
+ *
+ * Esta cuenta la necesitan tres jueces: el premio (`recalcularElVado`), el
+ * reductor que deja o no trazar (`pegaConLoMio`) y la vista que ofrece los sitios
+ * (`pegaConLoSuyo`). Los dos primeros miran el estado; el tercero mira la vista.
+ * Ésa fue la excusa con la que el corte se escribió una sola vez —para el premio—
+ * y no para los otros dos, y el resultado se jugó: se podía trazar una vereda
+ * SALIENDO del vértice donde otro tenía choza, el juego la cobraba y la pintaba
+ * pegada, y luego el premio SÍ cortaba ahí. Cinco veredas pagadas, Vado de tres,
+ * y ni una línea que lo explicara.
+ *
+ * Así que recibe lo mínimo que las dos formas comparten y la llaman los tres.
+ * Escribir aquí al lado una segunda cuenta «igual pero sobre la vista» es reabrir
+ * el mismo agujero con otro nombre.
+ */
+function bloqueadosPara(
+  colonos: readonly ConPiezasDeVertice[],
+  yo: AsientoId,
+): LlaveDeVertice[] {
   const bloqueados: LlaveDeVertice[] = [];
-  for (let i = 0; i < estado.colonos.length; i++) {
-    if (i === yo) continue;
-    const c = estado.colonos[i] as Colono;
+  for (const c of colonos) {
+    if (c.asiento === yo) continue;
     for (const v of c.chozas) bloqueados.push(v);
     for (const v of c.torres) bloqueados.push(v);
   }
@@ -2757,7 +2814,7 @@ export function recalcularElVado(estado: EstadoDeRiberas): Vado {
   const largos: number[] = [];
   for (let i = 0; i < estado.colonos.length; i++) {
     const c = estado.colonos[i] as Colono;
-    largos.push(largoDelVado(c.veredas, bloqueadosPara(estado, i)));
+    largos.push(largoDelVado(c.veredas, bloqueadosPara(estado.colonos, c.asiento)));
   }
 
   const iActual = estado.vado.de === null ? -1 : indiceDelAsiento(estado, estado.vado.de);
@@ -3109,12 +3166,10 @@ function loQueSeVe(
   const mio =
     quien === ESPECTADOR ? undefined : estado.colonos.find((c) => c.asiento === quien);
 
-  const bloqueadosDe = (i: number): LlaveDeVertice[] => bloqueadosPara(estado, i);
-
   return {
     desde: 'riberas',
     momento: estado.momento,
-    colonos: estado.colonos.map((c, i) => ({
+    colonos: estado.colonos.map((c) => ({
       asiento: c.asiento,
       nombre: comoSeLlama(sentados, c.asiento),
       color: c.color,
@@ -3123,7 +3178,7 @@ function loQueSeVe(
       torres: [...c.torres],
       veredas: [...c.veredas],
       puntos: puntosDe(estado, c),
-      vado: largoDelVado(c.veredas, bloqueadosDe(i)),
+      vado: largoDelVado(c.veredas, bloqueadosPara(estado.colonos, c.asiento)),
       /* CUÁNTAS, no cuáles: la mano es de su dueño y el montón se ve desde fuera. */
       cartas: c.mano.length,
       guardias: c.guardias,
@@ -3824,9 +3879,32 @@ function aristaTomada(v: VistaSinTablero, arista: LlaveDeArista): boolean {
   return false;
 }
 
-/** ¿Pega esta arista con algo de este colono? Igual que `pegaConLoMio`, sobre la vista. */
+/**
+ * ¿ENGANCHA ESTA ARISTA CON ALGO SUYO POR UN VÉRTICE DEL QUE PUEDA SALIR?
+ *
+ * Es `pegaConLoMio` sobre la vista, línea por línea y con el MISMO corte: la
+ * choza ajena impide salir del vértice, no llegar a él.
+ *
+ * Y la aritmética tiene que ser la misma, no parecida — pero que nadie deduzca de
+ * ahí que con arreglar una de las dos basta. Medido, rompiéndolas por separado:
+ *
+ *   · Sin el corte AQUÍ, el tablero pinta el anillo, el dedo lo toca y la vereda
+ *     ENTRA, porque el portillo del §5 bis le pregunta precisamente a esta
+ *     función qué se ofrecía.
+ *   · Sin el corte ALLÍ no se ve casi nada, porque ese mismo portillo tapa las
+ *     guardas de `trazar` — salvo por una rendija: `hayDondeTrazar` usa el juez
+ *     del reductor para decidir si el crédito de Las Dos Veredas sigue vivo, y
+ *     esa decisión no pasa por el portillo. Un reductor más laxo que la vista
+ *     deja el crédito encendido donde no hay dónde ponerlo, `opciones()` corta el
+ *     turno entero mientras quede crédito, y al colono deja de ofrecérsele nada:
+ *     la mesa se para sin caerse.
+ *
+ * Las dos mitades entran a la vez o no entra ninguna.
+ */
 function pegaConLoSuyo(v: VistaSinTablero, mio: ColonoVisto, arista: LlaveDeArista): boolean {
+  const bloqueados = bloqueadosPara(v.colonos, mio.asiento);
   for (const vertice of verticesDeArista(arista)) {
+    if (bloqueados.includes(vertice)) continue;
     if (mio.chozas.includes(vertice) || mio.torres.includes(vertice)) return true;
     for (const otra of aristasDeVertice(vertice)) {
       if (mio.veredas.includes(otra)) return true;

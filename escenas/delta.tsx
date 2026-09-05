@@ -152,9 +152,9 @@ import { apuntaLosLados, piezaDeCauce, piezaDeSenda, teselasDeUnCamino } from '.
 import { CAUCE, CUERPO, HONDO, piezaDeOrilla } from './aguas';
 import { CELDA_DE_LA_ARENA } from './paleta';
 import { geometriaDeContornos } from './formas';
-import { CONTORNOS_DE_LA_CARTA, CONTORNOS_DEL_BIEN } from './iconos';
+import { CONTORNOS_DE_LA_CARTA, CONTORNOS_DE_LA_CIFRA, CONTORNOS_DEL_BIEN } from './iconos';
 import { sitiosDelTablero, sitiosPermitidos } from './sitios';
-import { DISTANCIA_DE_LA_BARRA, huecosDeLaBarra } from './barra';
+import { DIBUJO_DEL_MAZO, DISTANCIA_DE_LA_BARRA, huecosDeLaBarra } from './barra';
 import {
   areasDeTrueque,
   enLaZonaDeLaMano,
@@ -182,7 +182,7 @@ import type {
  */
 import { loCogeLaInterfaz } from './camara';
 import { CAJA_DEL_PUENTE, LARGO_DEL_TRAMO, puenteEntre } from './puente';
-import type { HuecoDeLaBarra, PiezaDeBarra } from './barra';
+import type { HuecoDeLaBarra, MazoDeLaBarra, PiezaDeBarra } from './barra';
 import type { Colocando, Sitio } from './sitios';
 import type { CaminoEn3D, ColorDeJugador, DeltaEn3D, IslaEn3D, PiezaEn3D } from './tipos';
 
@@ -233,6 +233,20 @@ const ORDEN_DE_LAS_CASILLAS = 4000;
 const COLOR_DEL_PUNTO = '#2a2118';
 
 /**
+ * EL ROJO DEL SEIS Y DEL OCHO.
+ *
+ * Son los dos números que más salen —cinco formas de sacarlos con dos dados, contra una
+ * del dos y del doce— y el juego de mesa los imprime en rojo para que quien mira el
+ * tablero vea de un vistazo dónde está la tierra buena. Aquí también, y por lo mismo: la
+ * ficha ya lleva los puntos de probabilidad, pero los puntos se cuentan y el rojo se ve.
+ *
+ * Es un rojo de tinta, no el de las señales: sobre el crema de la ficha tiene que leerse
+ * como número impreso y no como una alarma.
+ */
+const COLOR_DE_LA_CIFRA_CALIENTE = '#a3262a';
+const CIFRAS_CALIENTES: readonly number[] = [6, 8];
+
+/**
  * DE DÓNDE SALE EL DIBUJO DE UNA CARTA DEL MAZO, Y POR QUÉ ESTA LÍNEA ESTÁ SUELTA.
  *
  * Los nueve dibujos que pide el §6 de `docs/LAS-CARTAS-DE-RIBERAS.md` —las cuatro familias
@@ -252,6 +266,12 @@ const COLOR_DEL_PUNTO = '#2a2118';
  */
 const CONTORNOS_DEL_DIBUJO: Readonly<Record<string, readonly (readonly number[])[]>> =
   CONTORNOS_DE_LA_CARTA;
+
+/*
+ * El dibujo del mazo de la barra sale de la MISMA tabla y no es una carta: `comprarcarta`
+ * no lo pide ninguna mano, lo pide el cuarto hueco de la barra de construir. Su nombre vive
+ * en `barra.ts` —`DIBUJO_DEL_MAZO`— para que la escena y el comprobador pidan el mismo.
+ */
 
 /** El plano de la malla puesto en el mundo: la `y` del tablero es la `z`. */
 function alMundo(p: Punto, altura: number): [number, number, number] {
@@ -460,6 +480,23 @@ function Modelo({
  * deja despejadas las siete teselas del centro para que ningún pueblo le crezca
  * encima — es la única concesión que el paisaje le hace a la geometría del tablero,
  * y se hace porque sin el número no se puede jugar.
+ *
+ * ═══ LA CIFRA ESTUVO PROMETIDA Y NO PINTADA ═══
+ *
+ * Esta cabecera decía «con la cifra marcada» y el disco llevaba sólo los puntos de
+ * probabilidad: Miguel jugó una partida entera contando puntos para saber qué número
+ * tocaba. La cifra no se puede ESCRIBIR aquí —no hay fuente ni lienzo en la app— así que
+ * se dibuja como los iconos: un contorno de `CONTORNOS_DE_LA_CIFRA`, dibujado en el
+ * compilador, enhebrado por `geometriaDeContornos` y escalado a la ficha. Va encima del
+ * centro y los puntos debajo, que es como está impresa la ficha del juego de mesa.
+ *
+ * Llega normalizada a un cuadrado de lado uno por su lado MAYOR, que en una cifra es el
+ * alto: la escala ES la altura que se quiere, y el «12» sale igual de alto que el «6»
+ * porque se dibujó entero en su lienzo y no como dos guarismos pegados.
+ *
+ * Va a 0,96 del radio del disco y desplazada 0,17 hacia arriba: con eso el borde de abajo
+ * de la cifra queda a 0,31 y la fila de puntos empieza a 0,39, o sea que no se tocan, y
+ * el «12» —que es el más ancho, 1,12 radios— cabe entero dentro del disco a esa altura.
  */
 function Numero({
   centro,
@@ -472,12 +509,27 @@ function Numero({
 }): JSX.Element {
   const puntos = puntosDeLaCifra(cifra);
   const disco = RADIO_DE_TESELA * 1.9;
+  const guarismos = useMemo(() => geometriaDeContornos(CONTORNOS_DE_LA_CIFRA[String(cifra)] ?? []), [cifra]);
+  /* Es nuestra y no del catálogo: se suelta al desmontar. */
+  useEffect(() => () => guarismos?.dispose(), [guarismos]);
+  const caliente = CIFRAS_CALIENTES.includes(cifra);
   return (
     <group position={alMundo(centro, altura + 0.08)}>
       <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
         <circleGeometry args={[disco, 44]} />
         <meshStandardMaterial color={COLOR_DEL_NUMERO} roughness={0.85} />
       </mesh>
+      {guarismos !== null && (
+        <mesh
+          geometry={guarismos}
+          position={[0, 0.05, -disco * 0.17]}
+          rotation={[-Math.PI / 2, 0, 0]}
+          scale={disco * 0.96}
+          raycast={() => null}
+        >
+          <meshBasicMaterial color={caliente ? COLOR_DE_LA_CIFRA_CALIENTE : COLOR_DEL_PUNTO} />
+        </mesh>
+      )}
       {Array.from({ length: puntos }, (_, i) => (
         <mesh
           key={i}
@@ -1140,6 +1192,148 @@ function PiezaEnLaBarra({
 }
 
 /**
+ * EL COLOR DEL MAZO EN LA BARRA, y por qué no es ninguno de los siete de la mano.
+ *
+ * Las siete familias de `escenas/cartas.ts` significan «esta carta es de esta clase», y
+ * este naipe no es de ninguna clase: es la carta TAPADA que va a salir. Pintarlo del color
+ * de una familia sería prometer cuál toca. Un azul de pizarra que no está en la paleta de
+ * la mano dice «reverso», que es lo que es.
+ */
+const COLOR_DEL_MAZO_EN_LA_BARRA = '#2f4858';
+/** El filo claro del naipe, el mismo crema que separa dos cartas de la mano al solaparse. */
+const COLOR_DEL_FILO_DE_LA_CARTA = '#f4ecd8';
+/** Qué parte del hueco ocupa el naipe de alto. El mismo 0,62 con el que encajan las piezas. */
+const ALTO_DEL_NAIPE_EN_LA_BARRA = 0.62;
+/** Y su proporción: un naipe es más alto que ancho, o se lee como una baldosa. */
+const ANCHO_DEL_NAIPE_EN_LA_BARRA = 0.66;
+
+/**
+ * EL MAZO EN SU HUECO DE LA BARRA: el naipe que se pulsa para comprar una carta.
+ *
+ * ═══ POR QUÉ ES HERMANO DE `PiezaEnLaBarra` Y NO UNA RAMA DENTRO DE ELLA ═══
+ *
+ * Porque `PiezaEnLaBarra` EXIGE `mallas` del catálogo, y de una carta no hay malla: el
+ * `.glb` trae ciento veintidós nodos raíz y ninguno es carta, pergamino ni cartel — está
+ * medido. Meter aquí una rama `if (esCarta)` obligaría a que el tipo llevara un `modelo`
+ * que no existe, y en esta escena una pieza con modelo inexistente no revienta: no se
+ * dibuja, y nadie se entera (ver el `return null` de `Barra`).
+ *
+ * Así que se dibuja como los naipes de la mano —`formaDeCarta` + filo + icono por
+ * `geometriaDeContornos`, igual que `CartaDelMazoEnLaMano`— y se comporta como una pieza de
+ * la barra: mismo asa invisible, mismo zócalo, mismo giro de vitrina.
+ *
+ * ═══ LO QUE SE COPIA DE `PiezaEnLaBarra`, Y NO ES ADORNO ═══
+ *
+ *  · EL ASA ES LA CASILLA ENTERA y es invisible por `colorWrite={false}`, NUNCA por
+ *    `visible={false}`: r3f descarta de sus sucesos los objetos invisibles y un asa
+ *    invisible de esa otra manera no recibiría ni un toque.
+ *  · El orden `noEsElPrimario` → `stopPropagation` → `loCogeLaInterfaz`, en ese orden
+ *    exacto. Al revés, el suceso quedaría marcado como «de la interfaz» y luego
+ *    descartado, y entonces la cámara tampoco lo movería: el gesto no haría NADA en toda
+ *    la franja de abajo.
+ *  · El dibujo con `raycast={() => null}`, para que el hueco entre el naipe y su filo no
+ *    deje pasar el dedo al tablero de detrás.
+ *
+ * ═══ Y NO SE «COGE»: SE PULSA ═══
+ *
+ * Una choza se coge y se lleva a un anillo; una carta no tiene dónde soltarse. Así que
+ * aquí no hay estado `tomada` ni flotación: se pulsa, la escena avisa, y quien monta el
+ * cliente decide qué pasa después —que hoy es abrir la confirmación—. La escena no sabe
+ * que esto es comprar.
+ */
+function MazoEnLaBarra({
+  mazo,
+  hueco,
+  onPulsar,
+}: {
+  mazo: MazoDeLaBarra;
+  hueco: HuecoDeLaBarra;
+  onPulsar: () => void;
+}): JSX.Element {
+  const grupo = useRef<THREE.Group>(null);
+  const [encima, setEncima] = useState(false);
+
+  const alto = hueco.lado * ALTO_DEL_NAIPE_EN_LA_BARRA;
+  const ancho = alto * ANCHO_DEL_NAIPE_EN_LA_BARRA;
+  const geometria = useMemo(() => formaDeCarta(ancho, alto), [ancho, alto]);
+  const icono = useMemo(
+    () => geometriaDeContornos(CONTORNOS_DEL_DIBUJO[DIBUJO_DEL_MAZO] ?? []),
+    [],
+  );
+
+  /* Crece al pasar por encima, como las piezas, y por lo mismo: dice que se puede pulsar. */
+  useFrame(() => {
+    const g = grupo.current;
+    if (g === null) return;
+    const crece = encima && mazo.disponible ? 1.18 : 1;
+    g.scale.setScalar(crece);
+  });
+
+  /* Apagado NO es invisible: se sigue leyendo qué es, sólo que no llama. */
+  const cuerpo = mazo.disponible ? 1 : 0.34;
+
+  return (
+    <group position={[hueco.x, hueco.y, hueco.z]} rotation={[0, GIRO_DE_LA_VITRINA, 0]}>
+      <mesh
+        onPointerOver={(e) => {
+          e.stopPropagation();
+          setEncima(true);
+        }}
+        onPointerOut={() => setEncima(false)}
+        onPointerDown={(e) => {
+          if (noEsElPrimario(e)) return;
+          e.stopPropagation();
+          loCogeLaInterfaz(e.nativeEvent);
+          if (mazo.disponible) onPulsar();
+        }}
+      >
+        <boxGeometry args={[hueco.lado, hueco.lado, hueco.lado * 0.8]} />
+        <meshBasicMaterial colorWrite={false} depthWrite={false} />
+      </mesh>
+      {/* El mismo zócalo que las piezas, que es lo que dice a la vez «esto es de la barra» y «esto está apagado». */}
+      <mesh position={[0, -hueco.lado * 0.42, 0]} raycast={() => null}>
+        <cylinderGeometry args={[hueco.lado * 0.46, hueco.lado * 0.5, hueco.lado * 0.12, 6]} />
+        <meshStandardMaterial
+          color={encima && mazo.disponible ? '#f0e3c2' : '#c8b48a'}
+          transparent
+          opacity={mazo.disponible ? 0.92 : 0.3}
+          roughness={0.7}
+        />
+      </mesh>
+      <group ref={grupo}>
+        {/* El filo claro, que es lo que separa el naipe del fondo de la barra. */}
+        <mesh geometry={geometria} position={[0, 0, -0.002]} scale={1.06} raycast={() => null}>
+          <meshBasicMaterial
+            color={COLOR_DEL_FILO_DE_LA_CARTA}
+            transparent
+            opacity={mazo.disponible ? 1 : 0.45}
+            toneMapped={false}
+          />
+        </mesh>
+        <mesh geometry={geometria} raycast={() => null}>
+          <meshBasicMaterial
+            color={COLOR_DEL_MAZO_EN_LA_BARRA}
+            transparent
+            opacity={cuerpo}
+            toneMapped={false}
+          />
+        </mesh>
+        {icono !== null && (
+          <mesh
+            geometry={icono}
+            position={[0, 0, 0.004]}
+            scale={alto * 0.5}
+            raycast={() => null}
+          >
+            <meshBasicMaterial color="#f7f1e2" transparent opacity={cuerpo} toneMapped={false} />
+          </mesh>
+        )}
+      </group>
+    </group>
+  );
+}
+
+/**
  * LA BARRA DE ABAJO, pegada a la cámara.
  *
  * ═══ CÓMO SE PEGA, SIN TOCAR EL ÁRBOL DE LA ESCENA ═══
@@ -1162,14 +1356,18 @@ function PiezaEnLaBarra({
  */
 function Barra({
   piezas,
+  mazo,
   aplanados,
   tomada,
   onTomar,
+  onPulsarElMazo,
 }: {
   piezas: readonly PiezaDeBarra[];
+  mazo: MazoDeLaBarra | null;
   aplanados: Map<string, Instanciable[]>;
   tomada: string | null;
   onTomar: (id: string) => void;
+  onPulsarElMazo: () => void;
 }): JSX.Element {
   const grupo = useRef<THREE.Group>(null);
   const [forma, setForma] = useState({ campo: (45 * Math.PI) / 180, proporcion: 16 / 9 });
@@ -1188,10 +1386,24 @@ function Barra({
     }
   });
 
+  /*
+   * EL MAZO CUENTA COMO UN HUECO MÁS, Y VA EL ÚLTIMO.
+   *
+   * Se pide el reparto de una sola vez con las piezas y el mazo juntos —no dos repartos
+   * pegados— porque `huecosDeLaBarra` reparte CENTRADO: un cuarto hueco no se añade a la
+   * derecha, corre los tres de antes a la izquierda y encoge el lado si hace falta. Dos
+   * cuentas separadas dejarían el naipe fuera de esa aritmética, o sea pisando la tercera
+   * pieza en cuanto la pantalla estrechara. Ver la cabecera de `barra.ts`.
+   *
+   * El último, y no el primero, porque lo que se construye va junto: choza, torre, vereda,
+   * y aparte lo que se compra.
+   */
+  const cuantos = piezas.length + (mazo === null ? 0 : 1);
   const huecos = useMemo(
-    () => huecosDeLaBarra(piezas.length, forma.campo, forma.proporcion),
-    [piezas.length, forma],
+    () => huecosDeLaBarra(cuantos, forma.campo, forma.proporcion),
+    [cuantos, forma],
   );
+  const huecoDelMazo = mazo === null ? undefined : huecos[piezas.length];
 
   return (
     <group ref={grupo} renderOrder={ORDEN_DE_LA_BARRA}>
@@ -1246,6 +1458,9 @@ function Barra({
           />
         );
       })}
+      {mazo !== null && huecoDelMazo !== undefined && (
+        <MazoEnLaBarra mazo={mazo} hueco={huecoDelMazo} onPulsar={onPulsarElMazo} />
+      )}
     </group>
   );
 }
@@ -2075,6 +2290,8 @@ export function Delta({
   barra = [],
   tomada = null,
   onTomarDeLaBarra,
+  mazo = null,
+  onPulsarElMazo,
   mano = [],
   cogida = null,
   onCogerCarta,
@@ -2108,6 +2325,27 @@ export function Delta({
   tomada?: string | null;
   /** Aviso de que alguien ha cogido una pieza de la barra. */
   onTomarDeLaBarra?: (id: string) => void;
+  /**
+   * EL HUECO DEL MAZO, al final de la barra. `null` o sin poner, la barra no lo pinta.
+   *
+   * Es un naipe y no una pieza —no hay modelo de carta en el `.glb`— y por eso llega por su
+   * propia entrada en vez de dentro de `barra`. Lo único que trae es si se puede pulsar
+   * ahora, que lo decide el juego: LA ESCENA NO SABE QUE ESTO ES COMPRAR. Aquí es «el hueco
+   * de la barra que no lleva pieza», igual que un anillo es «un sitio» y no «fundar».
+   *
+   * Opcional como las otras trece, y por lo mismo: este `<Delta>` lo montan la app, el
+   * cliente de escritorio y el banco de pruebas, y una entrada obligatoria deja los tres
+   * rotos hasta que llegue quien la rellene.
+   */
+  mazo?: MazoDeLaBarra | null;
+  /**
+   * Aviso de que alguien ha pulsado el naipe del mazo. Sólo llega si estaba disponible.
+   *
+   * No hay nada que «coger»: no se lleva a ningún sitio, así que esto no es el hermano de
+   * `onTomarDeLaBarra` sino el de una pulsación seca. Qué pasa después —preguntar, mandar
+   * el movimiento, no hacer nada— lo decide quien monta el cliente.
+   */
+  onPulsarElMazo?: () => void;
   /**
    * La mano de bienes del jugador, para la baraja del lateral. Vacia, no hay baraja.
    *
@@ -2698,12 +2936,20 @@ export function Delta({
         />
       )}
 
-      {barra.length > 0 && (
+      {/*
+        * Y la barra, con el hueco del mazo al final si lo hay. Se monta cuando hay ALGO que
+        * enseñar —piezas, el mazo, o las dos cosas—, y no sólo cuando hay piezas: un
+        * `barra.length > 0` a secas dejaría sin naipe a quien pudiera comprar y no
+        * construir, que es media partida de cualquiera.
+        */}
+      {(barra.length > 0 || mazo !== null) && (
         <Barra
           piezas={barra}
+          mazo={mazo}
           aplanados={aplanados}
           tomada={tomada}
           onTomar={(id) => onTomarDeLaBarra?.(id)}
+          onPulsarElMazo={() => onPulsarElMazo?.()}
         />
       )}
 

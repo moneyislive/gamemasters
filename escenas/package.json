@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "verify:escena": "tsx scripts/verificar-escena.ts",
+    "verify:iconos": "tsx scripts/verificar-iconos.ts",
+    "compilar:iconos": "tsx scripts/compilar-iconos.ts",
     "verify:aventureros": "tsx scripts/verificar-aventureros.ts",
     "compilar:modelos": "tsx scripts/compilar-modelos.ts",
     "compilar:aventureros": "tsx scripts/compilar-aventureros.ts",

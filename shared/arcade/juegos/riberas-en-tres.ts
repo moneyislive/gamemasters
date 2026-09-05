@@ -26,7 +26,16 @@
  * qué modelo), el ANILLO con el movimiento de cada sitio para mandarlo tal cual al
  * soltar, las OPCIONES que no se tocan en el tablero (tirar, pasar, contestar), los
  * TRUEQUES por carta (qué se puede pedir a cambio, a quién), la MANO DEL MAZO con
- * sus jugadas, y el MARCADOR. Nada de esto se duplica en los clientes.
+ * sus jugadas, los NAIPES DE PREMIO que van en esa misma mano, y el MARCADOR. Nada de
+ * esto se duplica en los clientes.
+ *
+ * ═══ Y LOS PREMIOS VAN EN LA MANO SIN PASAR POR `misCartas` ═══
+ *
+ * El Vado Largo y La Mayor Guardia se ven como naipe en la mano de la izquierda, junto a
+ * las cartas del mazo, pero salen por una puerta HERMANA —`premiosEnTres`— y no por
+ * `cartasEnTres`. La razón está entera en la cabecera de esa función y se resume en una
+ * línea: las cartas son SECRETAS y los premios son PÚBLICOS, y las dos cosas no pueden
+ * viajar por el mismo campo del cable sin que una de las dos deje de ser lo que es.
  *
  * ═══ Y LO DEL MAZO SE TRADUCE IGUAL QUE LO DEMÁS: PREGUNTANDO ═══
  *
@@ -93,6 +102,7 @@ import {
   OFRECER,
   REVELAR,
   seudonimoDeLaCarta,
+  VADO_MINIMO,
 } from './riberas';
 import type { ClaseDeCarta } from './riberas';
 import { bastanColores, COLORES_EN_3D, deltaDeLaVista, manoDeLaVista, obraPosible } from './riberas-en-3d';
@@ -132,6 +142,17 @@ interface ColonoEnLaVista {
   readonly guardias?: number;
   /** Los títulos que ha revelado. Públicos, y un punto cada uno. */
   readonly titulos?: readonly string[];
+  /**
+   * CUÁNTO MIDE SU CADENA DE VEREDAS MÁS LARGA. Público, y lo publica `proyectarRiberas`.
+   *
+   * Es el número con el que se compara `VADO_MINIMO`, y hasta hoy no lo pintaba NADIE.
+   * Ése era el segundo fallo de Miguel: encadenó veredas, no se llevó el premio, y en toda
+   * la pantalla no había una sola cifra que le dijera cuánto medía su cadena ni cuánto le
+   * faltaba. Con el vecino cortándole el paso —ver `bloqueadosPara` en `riberas.ts`— la
+   * cuenta del juego y la cuenta de quien mira el tablero no coinciden, y sin este número
+   * la diferencia no se puede ni preguntar.
+   */
+  readonly vado?: number;
 }
 
 interface VistaQueSePinta {
@@ -201,6 +222,19 @@ export interface PiezaDeLaBarraEnTres {
   readonly modelo: string;
   readonly disponible: boolean;
   readonly pieza: PiezaDeObra;
+}
+
+/**
+ * LA MISMA FORMA QUE `MazoDeLaBarra` de `escenas/barra.ts`: el cuarto hueco de la barra.
+ *
+ * Una sola bandera, y a propósito. La escena no tiene que saber qué cuesta una carta ni
+ * cuántas quedan: `COSTE_DE_LA_CARTA` vive en las reglas y republicarlo en el cliente es
+ * exactamente la fuga contra la que existe este fichero entero. Lo que cuesta y cuántas
+ * quedan lo dice el juego en el rótulo y la ayuda de la opción, y eso se lee en la
+ * confirmación, escrito por quien conoce las reglas.
+ */
+export interface MazoEnLaBarraEnTres {
+  readonly disponible: boolean;
 }
 
 /** La misma forma que `Colocando` de `escenas/sitios.ts`, más el movimiento de cada sitio. */
@@ -287,6 +321,53 @@ export function barraEnTres(vista: unknown, quien: AsientoId | null): PiezaDeLaB
     modelo: id === 'puente' ? 'puente' : `${id}-${color}`,
     disponible: obraPosible(vista, quien, pieza).sitios.length > 0,
   }));
+}
+
+/**
+ * EL CUARTO HUECO DE LA BARRA: el mazo, o `null` si esta pantalla no lo pinta.
+ *
+ * ═══ QUIÉN DECIDE QUE SE PUEDE COMPRAR, Y POR QUÉ NO SE VUELVE A CALCULAR AQUÍ ═══
+ *
+ * `comprarEnTres(opciones) !== null`, y nada más. Esa opción la ofrece el juego cuando le
+ * llega el coste, queda mazo y le toca: las tres cosas a la vez y ya juzgadas por quien
+ * conoce las reglas. Recalcularlo aquí —mirar los bienes de la mano contra un
+ * `COSTE_DE_LA_CARTA` copiado— sería escribir una SEGUNDA cuenta de lo mismo, y la segunda
+ * se separa siempre de la primera. Es la misma frontera que `barraEnTres`, que tampoco
+ * mira bienes: pregunta si hay sitios ofrecidos.
+ *
+ * ═══ Y `null` NO ES LO MISMO QUE «apagado» ═══
+ *
+ * `null` es «aquí no hay hueco de mazo»: un mirón, o un colono al que no le llega color y
+ * que por eso tampoco tiene barra (ver `seVeEnTres`). En esas pantallas la carta no se
+ * pinta y —esto es lo que ata el nudo— el botón de comprar del pie TIENE que seguir ahí:
+ * ver `opcionesFueraDeLaBarra`, que es quien lo quita y sólo lo quita cuando este hueco
+ * existe de verdad.
+ *
+ * `{ disponible: false }` es otra cosa: el hueco está, se ve, y hoy no se puede pulsar. Es
+ * lo que hay que enseñar cuando faltan bienes — un hueco que aparece y desaparece según la
+ * mano obliga a acordarse de que existía, y una barra que cambia de tres a cuatro piezas se
+ * recoloca entera, porque reparte CENTRADO.
+ *
+ * ═══ Y FUERA DE `jugando` TAMPOCO HAY HUECO ═══
+ *
+ * Esto no miraba `momento`, y durante TODA la colocación pintaba el cuarto hueco apagado:
+ * se llevaba un cuarto del ancho y encogía las tres piezas de fundar y trazar en la única
+ * fase en que la barra es lo único que se usa. Y lo vendía como lo segundo —«lo tiene y
+ * hoy no se pulsa»— siendo lo primero: comprar en la colocación no es que no llegue el
+ * coste, es que NO EXISTE la jugada, igual que mientras se reúne la mesa o cuando ya ha
+ * terminado. Un hueco apagado promete que un día se encenderá; éste no iba a encenderse
+ * hasta otra fase entera. Con `null` el botón de comprar vuelve al pie por
+ * `opcionesFueraDeLaBarra`, y en esas fases no hay COMPRAR que devolver de todas formas.
+ */
+export function mazoEnLaBarra<O extends OpcionQueLlega>(
+  vista: unknown,
+  quien: AsientoId | null,
+  opciones: readonly O[],
+): MazoEnLaBarraEnTres | null {
+  if (!esVistaQueSePinta(vista) || quien === null) return null;
+  if (vista.momento !== 'jugando') return null;
+  if (colorDePiezaDelColono(indiceDelColono(vista, quien)) === null) return null;
+  return { disponible: comprarEnTres(opciones) !== null };
 }
 
 /**
@@ -419,12 +500,18 @@ export interface CartaDelMazoEnTres {
   readonly id: string;
   /** `guardia` | `anobueno` | `acaparamiento` | `dosveredas` | `titulo`. */
   readonly familia: string;
-  /** Una de las nueve llaves de `CONTORNOS_DE_LA_CARTA`. */
+  /** Una de las llaves de `CONTORNOS_DE_LA_CARTA`. */
   readonly dibujo: string;
   /** Lo que se lee: «La Guardia», «El Faro»… */
   readonly nombre: string;
   readonly sePuedeJugar: boolean;
   readonly sePuedeRevelar: boolean;
+  /**
+   * NO SE JUEGA: SE TIENE. Falso —ausente— en las nueve del mazo; sólo lo ponen los
+   * premios, que salen por `premiosEnTres`. Es lo que evita que la escena los pinte
+   * apagados por no poder jugarse nunca; ver `esPremio` en `escenas/cartas.ts`.
+   */
+  readonly esPremio?: boolean;
 }
 
 /** Cómo se enseña una clase de carta: a qué grupo va, qué dibujo lleva y cómo se lee. */
@@ -575,6 +662,114 @@ export function cartasEnTres<O extends OpcionQueLlega>(
     });
   }
   return cartas;
+}
+
+// ---------------------------------------------------------------------------
+// LOS PREMIOS: la otra mitad de la mano, y no salen de `misCartas`
+// ---------------------------------------------------------------------------
+
+/**
+ * LOS DOS PREMIOS, CON SU CARA DE NAIPE.
+ *
+ * Se llaman `vado` y `mayorguardia` y son familias SUYAS, distintas de la familia
+ * `guardia` de la carta que se juega. Que no compartan nombre no es una precaución
+ * ociosa: si el premio fuera de la familia `guardia`, la escena lo agruparía con las
+ * guardias de la mano y lo pintaría del mismo color, o sea que el premio se leería como
+ * una guardia más — y las guardias son justo lo que hay que contar para saber si el
+ * premio se va a mover.
+ */
+const RETRATO_DEL_PREMIO = {
+  vado: { familia: 'vado', dibujo: 'vado', nombre: 'El Vado Largo' },
+  guardia: { familia: 'mayorguardia', dibujo: 'mayorguardia', nombre: 'La Mayor Guardia' },
+} as const;
+
+/**
+ * EL PREFIJO DE LOS DOS NAIPES DE PREMIO, y por qué lleva dos puntos dentro.
+ *
+ * El `id` de un naipe tiene que ser único dentro de la mano, y en esa mano ya viven los
+ * seudónimos de las cartas del mazo. Un seudónimo NUNCA lleva dos puntos —`seudonimoDeLaCarta`
+ * devuelve justo lo que hay antes de ellos—, así que con este prefijo la colisión no es
+ * improbable: es imposible. Con `vado` a secas bastaría con que alguien llamara `vado` a una
+ * carta para que la mano tuviera dos naipes con la misma llave y React pintara uno.
+ */
+const PREFIJO_DEL_PREMIO = 'premio:';
+
+/**
+ * LOS NAIPES DE PREMIO DE UN COLONO: El Vado Largo y La Mayor Guardia, los que tenga.
+ *
+ * ═══ POR QUÉ ESTO NO ESTÁ DENTRO DE `cartasEnTres` ═══
+ *
+ * Porque un premio NO es una carta y meterlo donde están las cartas obligaría a mentir en
+ * el único sitio donde no se puede. `cartasEnTres` recorre `vista.misCartas`, que es el
+ * campo SECRETO: no viaja a nadie más que a su dueño, y todo el fichero está escrito
+ * alrededor de eso. Un premio es PÚBLICO —quién tiene el Vado lo sabe la mesa entera, y de
+ * hecho es la mitad de lo que se está jugando— y sale de `vista.vado` y `vista.guardia`,
+ * que sí van a todos. Metido en `misCartas` habría que empezar por mandarlo por el cable
+ * dentro del campo secreto, y ahí `verify:mesa` tendría razón en ponerse rojo.
+ *
+ * De ahí que ésta reciba `quien` y `cartasEnTres` no: la mano de cartas es la de quien mira
+ * y no se puede pedir la de otro; los premios de cualquiera se pueden pedir desde la vista
+ * de cualquiera, porque no hay nada que tapar. Un mirón sin asiento no pide ninguno — no es
+ * secreto, es que no es de nadie.
+ *
+ * ═══ Y NINGUNO LLEVA `sePuedeJugar` ═══
+ *
+ * Los dos salen con las dos banderas en `false` y con `esPremio` puesto, y las tres cosas
+ * dicen lo mismo por tres caminos: no hay ningún movimiento que mandar con un premio. No se
+ * juega, no se revela y no se pierde por voluntad de nadie — se gana solo cuando la cadena
+ * llega a cinco o las guardias a tres, y se va solo cuando otro te adelanta. `esPremio` es
+ * lo que además impide que la escena lo pinte APAGADO por no poder jugarse: ver la
+ * cabecera de ese campo en `escenas/cartas.ts`.
+ */
+export function premiosEnTres(vista: unknown, quien: AsientoId | null): CartaDelMazoEnTres[] {
+  if (!esVistaQueSePinta(vista) || quien === null) return [];
+  const naipes: CartaDelMazoEnTres[] = [];
+  const conCara = (llave: keyof typeof RETRATO_DEL_PREMIO): CartaDelMazoEnTres => {
+    const cara = RETRATO_DEL_PREMIO[llave];
+    return {
+      id: `${PREFIJO_DEL_PREMIO}${llave}`,
+      familia: cara.familia,
+      dibujo: cara.dibujo,
+      nombre: cara.nombre,
+      sePuedeJugar: false,
+      sePuedeRevelar: false,
+      esPremio: true,
+    };
+  };
+  if ((vista.vado?.de ?? null) === quien) naipes.push(conCara('vado'));
+  if ((vista.guardia?.de ?? null) === quien) naipes.push(conCara('guardia'));
+  return naipes;
+}
+
+/**
+ * LA MANO ENTERA DE LA IZQUIERDA: los premios primero y las cartas del mazo detrás.
+ *
+ * Sale nombrada, aunque sean dos llamadas y un `...`, por lo que pasó la última vez que
+ * una composición de dos listas se dejó a cada cliente: la app y el escritorio pintan la
+ * MISMA mano, y si uno de los dos se olvida de los premios el fallo es exactamente el que
+ * se está arreglando —el premio que no aparece— sólo que en una pantalla de las dos, que es
+ * la clase de fallo que tarda meses en contarse.
+ *
+ * El orden de aquí da igual para el reparto —`huecosDeLasCartas` reordena por familias— y
+ * se escribe con los premios delante de todas formas, para que quien lea esta línea vea el
+ * mismo orden que va a ver en pantalla.
+ *
+ * ═══ `quien` MANDA EN LAS DOS MITADES ═══
+ *
+ * La firma prometía la mano de `quien` y la cumplía a medias: los premios eran los suyos y
+ * las cartas eran siempre `misCartas`, o sea las de quien MIRA. Pedir la mano de otro
+ * devolvía sus premios pegados a mis cartas. No es una fuga —las cartas ya eran mías— pero
+ * es una firma que miente, en la función que los dos clientes llaman. Las cartas sólo salen
+ * cuando `quien` es el dueño de la vista; la mano de otro son sus premios y nada más, que
+ * es exactamente lo que la vista sabe de él.
+ */
+export function laManoDeLaIzquierda<O extends OpcionQueLlega>(
+  vista: unknown,
+  opciones: readonly O[],
+  quien: AsientoId | null,
+): CartaDelMazoEnTres[] {
+  const esElDueno = esVistaQueSePinta(vista) && quien !== null && vista.yo === quien;
+  return [...premiosEnTres(vista, quien), ...(esElDueno ? cartasEnTres(vista, opciones) : [])];
 }
 
 /**
@@ -753,6 +948,36 @@ export function opcionesFueraDeLaMano<O extends OpcionQueLlega>(opciones: readon
   return opciones.filter((o) => !TIPOS_QUE_PINTA_LA_MANO.includes(o.tipo));
 }
 
+/**
+ * LAS OPCIONES QUE TAMPOCO PINTA LA BARRA: se cae COMPRAR, y sólo si hay hueco de mazo.
+ *
+ * ═══ EL FALLO QUE EVITA, Y EL FALLO CONTRARIO QUE TAMBIÉN EVITA ═══
+ *
+ * Desde que la barra tiene un cuarto hueco, comprar se ofrece PULSANDO EL NAIPE. Si además
+ * siguiera saliendo como botón de texto en el pie, la misma pantalla ofrecería lo mismo dos
+ * veces y se rompería la regla de la casa —cada movimiento se enseña exactamente una vez—
+ * que `verificar-escritorio` y `verificar-riberas-en-tres` cuentan con los dedos.
+ *
+ * Y el fallo contrario es peor, porque es mudo: donde NO hay barra —el respaldo SVG del
+ * móvil, un mirón, una mesa de más de cuatro colonos— quitar el botón deja una partida en la
+ * que no hay manera de comprar una carta en toda la tarde, sin un error en ninguna parte. Es
+ * el mismo fallo silencioso que partió `opcionesFueraDelTablero` en dos.
+ *
+ * Por eso esta función NO recibe un interruptor que el cliente pueda poner mal: recibe EL
+ * MAZO, el mismo objeto que se le pasa a `<Delta>`. El botón desaparece exactamente cuando
+ * el naipe existe, porque son el mismo dato. Un `boolean` suelto, o un filtro sin condición,
+ * dejarían las dos mitades libres de separarse — que es lo que siempre acaba pasando.
+ *
+ * Se compone con las otras dos —`opcionesFueraDeLaBarra(opcionesFueraDeLaMano(
+ * opcionesFueraDelTablero(o)), mazo)`— y el orden da igual: las tres son filtros.
+ */
+export function opcionesFueraDeLaBarra<O extends OpcionQueLlega>(
+  opciones: readonly O[],
+  mazo: MazoEnLaBarraEnTres | null,
+): O[] {
+  return mazo === null ? [...opciones] : opciones.filter((o) => o.tipo !== COMPRAR);
+}
+
 // ---------------------------------------------------------------------------
 // EL MARCADOR: lo que se ve de cada colono, y lo que sólo cuento yo
 // ---------------------------------------------------------------------------
@@ -785,6 +1010,19 @@ export interface ColonoEnElMarcador {
   readonly titulos: readonly string[];
   readonly tieneElVado: boolean;
   readonly tieneLaMayorGuardia: boolean;
+  /**
+   * CUÁNTO MIDE SU CADENA DE VEREDAS, la tenga el premio o no.
+   *
+   * Es lo que faltaba por decir. El marcador sabía nombrar al dueño del Vado Largo y no
+   * sabía decir cuánto medía la cadena de nadie, así que a quien encadenaba veredas sin
+   * llegar —o llegando por su cuenta y no por la del juego, que es lo que pasa cuando el
+   * vecino le corta el paso— la pantalla no le decía absolutamente nada. Con este número y
+   * `vadoMinimo` al lado, «vado 3 de 5» es una frase que se puede leer en voz alta y
+   * discutir mirando el tablero.
+   *
+   * Cero para quien no tenga ninguna vereda, que es la verdad y no un hueco.
+   */
+  readonly vado: number;
 }
 
 /** El marcador entero, con los dos premios y lo que queda de mazo. */
@@ -796,6 +1034,15 @@ export interface MarcadorEnTres {
   readonly vado: AsientoId | null;
   /** De quién es La Mayor Guardia, o `null` si está vacante. */
   readonly mayorGuardia: AsientoId | null;
+  /**
+   * CUÁNTAS VEREDAS SEGUIDAS HACEN FALTA PARA EL VADO LARGO.
+   *
+   * Sale por aquí y no se escribe en cada cliente porque es UNA regla del juego: es
+   * `VADO_MINIMO`, la misma constante que usa `recalcularElVado`. Un cinco escrito a mano
+   * en el raíl del escritorio y otro en la cinta de la app es la manera segura de que el
+   * día que la regla cambie las dos pantallas sigan prometiendo la vieja.
+   */
+  readonly vadoMinimo: number;
 }
 
 /**
@@ -818,6 +1065,7 @@ export function marcadorEnTres(vista: unknown): MarcadorEnTres | null {
     mazo: vista.mazo ?? 0,
     vado: delVado,
     mayorGuardia: deLaGuardia,
+    vadoMinimo: VADO_MINIMO,
     colonos: vista.colonos.map((c) => {
       const soyYo = yo !== null && c.asiento === yo;
       const puntos = c.puntos ?? 0;
@@ -833,7 +1081,87 @@ export function marcadorEnTres(vista: unknown): MarcadorEnTres | null {
         titulos: (c.titulos ?? []).map((t) => retratoDeLaCarta(t)?.nombre ?? t),
         tieneElVado: delVado !== null && c.asiento === delVado,
         tieneLaMayorGuardia: deLaGuardia !== null && c.asiento === deLaGuardia,
+        /* Su cadena más larga, tal como la cuenta el juego. Aquí no se cuenta nada. */
+        vado: c.vado ?? 0,
       };
     }),
   };
+}
+
+/**
+ * EN QUÉ ESTADO ESTÁ LA CADENA DE UN COLONO RESPECTO AL VADO LARGO: tres, y no dos.
+ *
+ * ═══ EL FALLO QUE HABÍA, EN LA LÍNEA QUE SE AÑADIÓ PARA ARREGLAR OTRO ═══
+ *
+ * «vado N de M» se escribió para que a quien encadena veredas sin ver el premio la
+ * pantalla le dijera cuánto cuenta el juego. Y mentía en el peor sitio: `recalcularElVado`
+ * sólo mueve el premio a quien SUPERA estrictamente al dueño, así que el segundo que
+ * llega a cinco tiene cadena de cinco, cero puntos de premio y un renglón que decía
+ * «vado 5 de 5» — que se lee como «ya está». Es la otra mitad del fallo de Miguel —la
+ * pantalla que no explica por qué no hay premio— escrita en la frase que se añadió para
+ * explicarlo.
+ *
+ * Los tres estados:
+ *   · `corta`: por debajo del mínimo. Lo que se dice es cuánto falta.
+ *   · `llega`: al mínimo o más, y SIN el premio. Aquí `dueño` es quien lo tiene —hay que
+ *     superarlo, no igualarlo— o `null` si nadie lo tiene, que es el único caso en que
+ *     una cadena llega y el premio queda vacante: dos que igualan el máximo desde
+ *     vacante, y `recalcularElVado` no se lo da a ninguno.
+ *   · `premio`: lo tiene.
+ *
+ * Sale de aquí, y las frases también (`renglonDelVado`, `loQueSeOyeDelVado`), porque son
+ * DOS clientes y una frase que se oye: el raíl del escritorio, la ficha de la app y su
+ * `accessibilityLabel`. Tres copias de una bifurcación de tres ramas es la manera segura
+ * de que una de las tres vuelva a decir «de 5» a secas.
+ */
+export type EstadoDelVado =
+  | { readonly clase: 'corta' }
+  | { readonly clase: 'llega'; readonly dueño: ColonoEnElMarcador | null }
+  | { readonly clase: 'premio' };
+
+export function estadoDelVado(colono: ColonoEnElMarcador, marcador: MarcadorEnTres): EstadoDelVado {
+  if (colono.tieneElVado) return { clase: 'premio' };
+  if (colono.vado < marcador.vadoMinimo) return { clase: 'corta' };
+  return { clase: 'llega', dueño: marcador.colonos.find((c) => c.tieneElVado) ?? null };
+}
+
+/**
+ * LA FRASE CORTA DE LA CADENA, la que se pinta en el renglón del colono.
+ *
+ * Con el premio, «El Vado Largo, 6 veredas». Sin llegar, «vado 3 de 5». Y llegando sin
+ * premio se dice POR QUÉ no hay premio, que es lo que faltaba: de quién es y con cuánto
+ * —«vado 5, lo tiene Ada con 6»—, que llegó antes si mide lo mismo —hay que superarlo—,
+ * o que está empatado y sin dueño. El mínimo es `vadoMinimo`, la regla, no un cinco.
+ */
+export function renglonDelVado(colono: ColonoEnElMarcador, marcador: MarcadorEnTres): string {
+  const estado = estadoDelVado(colono, marcador);
+  const largo = String(colono.vado);
+  if (estado.clase === 'premio') return `El Vado Largo, ${largo} ${colono.vado === 1 ? 'vereda' : 'veredas'}`;
+  if (estado.clase === 'corta') return `vado ${largo} de ${String(marcador.vadoMinimo)}`;
+  if (estado.dueño === null) return `vado ${largo}, empatado y sin dueño`;
+  if (estado.dueño.vado > colono.vado) return `vado ${largo}, lo tiene ${estado.dueño.nombre} con ${String(estado.dueño.vado)}`;
+  return `vado ${largo}, lo tiene ${estado.dueño.nombre}, que llegó antes`;
+}
+
+/**
+ * LA MISMA FRASE, ENTERA, para leerla en voz alta: es la del `accessibilityLabel` de la
+ * ficha de la app. Un lector de pantalla no ve un renglón corto al lado de un nombre; lee
+ * una fila detrás de otra, y «vado 5» suelto son dos datos sin verbo. Tiene los mismos
+ * tres estados que `renglonDelVado`, y por la misma razón: la frase que se oía decía «de
+ * las 5» a quien ya tenía cinco, igual que la que se veía.
+ */
+export function loQueSeOyeDelVado(colono: ColonoEnElMarcador, marcador: MarcadorEnTres): string {
+  const estado = estadoDelVado(colono, marcador);
+  const largo = String(colono.vado);
+  const veredas = colono.vado === 1 ? 'vereda' : 'veredas';
+  if (estado.clase === 'premio') return `su cadena mide ${largo} ${veredas} y el Vado Largo es suyo`;
+  if (estado.clase === 'corta') {
+    return `su cadena mide ${largo} de las ${String(marcador.vadoMinimo)} veredas del Vado Largo`;
+  }
+  const llega = `su cadena mide ${largo} ${veredas} y llega al Vado Largo, pero`;
+  if (estado.dueño === null) return `${llega} está empatada y el premio queda sin dueño hasta que alguien la supere`;
+  if (estado.dueño.vado > colono.vado) {
+    return `${llega} lo tiene ${estado.dueño.nombre} con ${String(estado.dueño.vado)}: hay que superarle`;
+  }
+  return `${llega} lo tiene ${estado.dueño.nombre}, que llegó antes: hay que superarle`;
 }
