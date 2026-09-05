@@ -474,44 +474,94 @@ milímetro.** Con su Z, en coordenadas de la cámara (`medir-tapa-horizontal.ts`
   con las piezas encima **tapa menos tablero que la placa**.
 - **Las cartas de bienes** pisan la tapa vista: sus pies quietos quedan a 33,3 puntos
   del canto en el SE, a 40,6 en un iPhone 14 y a 112,3 en un monitor, entre 3 y 12
-  puntos por debajo del borde trasero de la tapa. Y aquí la segunda versión decía una
-  cosa falsa —«se dibujan encima, 1010 contra 1000»— que hay que deshacer con el
-  ordenador de `three` en la mano (`medir-orden-de-dibujo.ts`, que mete la escena en
-  el `WebGLRenderLists` real y la ordena):
+  puntos por debajo del borde trasero de la tapa. Y aquí la segunda Y la tercera
+  versión decían cosas falsas —«se dibujan encima, 1010 contra 1000», y después «con el
+  `renderOrder` en los grupos de las dos manos, cero fallos»— que hay que deshacer con
+  el ordenador de `three` en la mano y con el ÁRBOL DE VERDAD de `delta.tsx`
+  (`medir-orden-con-el-arbol-real.ts`, que monta cada grupo anidado tal como está en el
+  fichero, lo mete en el `WebGLRenderLists` real de `three` 0.185.1 y lo ordena con su
+  `sort`):
 
   1. `three` ordena primero por `groupOrder` y sólo después por `renderOrder`
-     (`painterSortStable`, `WebGLRenderLists.js` 1–27), y un `Group` con `renderOrder`
-     pone ese número como `groupOrder` a TODO lo que cuelga de él
-     (`WebGLRenderer.js` 1839–1841). El grupo `Barra` lleva
-     `renderOrder={ORDEN_DE_LA_BARRA}`; los grupos de `Baraja` (1875) y `ManoDelMazo`
-     (2259) no llevan ninguno. Así que hoy todo lo de la barra tiene `groupOrder`
-     1000 y todo lo de las manos 0, y el 1010 de cada carta sólo ordena DENTRO del 0.
+     (`painterSortStable`, `WebGLRenderLists.js` 1–27; la de transparentes, 31–57, igual
+     en esos dos primeros escalones). Y **el `groupOrder` de una malla es el
+     `renderOrder` del `Group` MÁS CERCANO que tiene encima**, no el del más exterior:
+     `projectObject` hace `if (object.isGroup) groupOrder = object.renderOrder` en CADA
+     grupo que atraviesa (`WebGLRenderer.js` 1839–1841), así que un grupo anidado sin
+     número devuelve a 0 todo lo que cuelga de él. Esto es lo que la tercera vuelta no
+     miró: en `delta.tsx` cada pieza, naipe, carta, área y casilla vive en un `<group>`
+     PROPIO —`PiezaEnLaBarra` (1138, y dentro otro, 1180, con el modelo),
+     `MazoEnLaBarra` (1276 y 1303), `Carta` (1647), `AreaDeTrueque` (1740),
+     `CartaDelMazoEnLaMano` (1981), `Casilla` (2102)—, y ninguno lleva número. Del grupo
+     `Barra` (1409, `renderOrder={ORDEN_DE_LA_BARRA}`) cuelgan DIRECTAMENTE sólo el
+     testigo (1414) y la placa (1434); del de `Baraja` (1875), sólo su testigo (1876);
+     del de `ManoDelMazo` (2259), nada. Un número puesto en el grupo exterior no le
+     llega a ninguna carta ni a ninguna pieza.
   2. Y las dos manos no están en la misma pasada: `three` pinta primero todos los
      opacos, luego los transmisivos, luego los transparentes (`renderScene`,
      1959–1961). Las cartas de bienes son OPACAS —su `meshBasicMaterial` no lleva
      `transparent`, 1656–1671— y las del mazo transparentes. La placa de hoy es
-     transparente (`opacity 0,42`).
+     transparente (`opacity 0,42`), los zócalos y el naipe del mazo también, y los
+     modelos de las piezas opacos.
 
-  Medido, el orden de hoy es: mundo → testigo y cartas de bienes (g0) → piezas de la
-  barra (g1000) → su testigo (999, DESPUÉS de sus piezas) ‖ anillo → áreas → cartas del
-  mazo (g0) → placa y zócalos (g1000). O sea que la placa ya se pinta DESPUÉS de los
-  pies de las cartas de bienes y los tiñe al 42 %: «es lo que ya pasaba» era verdad a
-  medias. Con una TAPA OPACA en el grupo `Barra` sin tocar nada más, la tapa (opaca,
-  g1000) se pinta después de las cartas (opacas, g0) y les TAPA los pies, 3–12 puntos
-  en todos los apaisados. La decisión, lo más barato y sin tocar `baraja.ts` ni
-  `cartas.ts`, en `delta.tsx`:
+  **Medido, el orden de HOY** (caso A de la tabla de abajo) no es «la barra en 1000 y
+  las manos en 0»: sólo el testigo y la placa son `g1000`. Opacos: mundo → asas, piezas
+  de la barra y asa del mazo (`g0 r0`, CON EL MUNDO) → testigo de la baraja (`g0 r1005`)
+  → cartas de bienes (`g0 r1010+`) → icono de las áreas (2002) → icono de las casillas
+  (4002) → testigo de la barra (`g1000 r999`, el ÚLTIMO opaco). Transparentes: zócalos y
+  naipe (`g0 r0`) → anillo de las señales (`r2`) → áreas (2000+) → cartas del mazo
+  (3000+) → casillas (4000+) → placa (`g1000 r0`, la última de todo). O sea: la placa ya
+  se pinta DESPUÉS de los pies de las cartas de bienes Y después de sus propios zócalos
+  y naipe, y los tiñe todos al 42 %; y el borrado de profundidad que la cabecera de
+  `Barra` (1346–1355) promete «justo antes de dibujarla» llega cuando las piezas ya
+  están pintadas contra la profundidad del mundo —sólo alcanza a los zócalos, al naipe
+  y a la placa—. Con una TAPA OPACA en el grupo `Barra` sin tocar nada más (caso B), la
+  tapa (`g1000 r0`) se pinta después de las cartas (`g0`) y les TAPA los pies, 3–12
+  puntos en todos los apaisados. Y con la regla de la tercera vuelta —número en los
+  grupos de `Baraja` y `ManoDelMazo`, testigo a −1— (caso C) pasa lo mismo y algo peor:
+  las piezas siguen en `g0`, se pintan con el mundo, el testigo borra la profundidad
+  DESPUÉS de ellas y la tapa, que viene detrás, las pisa donde las tiene encima; y el
+  testigo de la baraja, que sí recibe el número, pasa a pintarse después de sus cartas.
 
-  - El `<group>` de `Baraja` lleva `renderOrder={ORDEN_DE_LAS_CARTAS}` y el de
-    `ManoDelMazo` `renderOrder={ORDEN_DE_LAS_CARTAS_DEL_MAZO}`. Con eso, en las DOS
-    pasadas, todo lo de la barra (1000) va antes que todo lo de los bienes (1010) y
-    esto antes que todo lo del mazo (3000); dentro de cada grupo el `renderOrder` de
-    cada malla sigue mandando como hoy: el testigo de la baraja (1005) antes que sus
-    cartas, las áreas (2000+) después de la carta cogida, las casillas (4000+) después
-    de las cartas del mazo. Medido en el guion: cero fallos.
-  - El testigo de la barra pasa de `renderOrder={999}` a `{-1}`: dentro del grupo
-    1000, 999 va DESPUÉS de las piezas y de la tapa (que tienen 0), así que hoy borra
-    la profundidad cuando ya no sirve; con −1 va primero, que es lo que su comentario
-    dice que hace.
+  La decisión, sin tocar `baraja.ts` ni `cartas.ts`, en `delta.tsx`:
+
+  - **La regla entera:** cada capa pegada a la cámara tiene su constante
+    (`ORDEN_DE_LA_BARRA`, `ORDEN_DE_LAS_CARTAS`, `ORDEN_DE_LAS_AREAS`,
+    `ORDEN_DE_LAS_CARTAS_DEL_MAZO`, `ORDEN_DE_LAS_CASILLAS`), y **TODO `<group>` que
+    tenga mallas debajo lleva la constante de su capa como `renderOrder`**, porque el
+    grupo que cuenta es el más cercano a la malla; el `renderOrder` de cada malla sigue
+    ordenando DENTRO de su capa, como hoy. Los grupos que reciben número:
+
+    | Grupo | `escenas/delta.tsx` | `renderOrder` | Qué cuelga directamente de él |
+    |---|---|---|---|
+    | `Barra` | 1409 | `ORDEN_DE_LA_BARRA` (ya lo lleva) | testigo, placa → tapa, luz |
+    | `PiezaEnLaBarra`, exterior | 1138 | `ORDEN_DE_LA_BARRA` | asa, zócalo |
+    | `PiezaEnLaBarra`, interior (`ref={grupo}`) | 1180 | `ORDEN_DE_LA_BARRA` | las mallas del modelo |
+    | `MazoEnLaBarra`, exterior | 1276 | `ORDEN_DE_LA_BARRA` | asa, zócalo |
+    | `MazoEnLaBarra`, interior (`ref={grupo}`) | 1303 | `ORDEN_DE_LA_BARRA` | filo, cuerpo e icono del naipe |
+    | `Baraja` | 1875 | `ORDEN_DE_LAS_CARTAS` | su testigo (1876), que sin esto se queda en `g0` (caso H) |
+    | `Carta` | 1647 | `ORDEN_DE_LAS_CARTAS` | borde, cuerpo, icono |
+    | `AreaDeTrueque` | 1740 | `ORDEN_DE_LAS_AREAS` | cuerpo, borde, icono |
+    | `ManoDelMazo` | 2259 | `ORDEN_DE_LAS_CARTAS_DEL_MAZO` | nada hoy: sin él el resultado es el mismo (caso G); se pone para que el grupo de cada mano diga su capa y una malla que mañana cuelgue directa caiga en ella |
+    | `CartaDelMazoEnLaMano` | 1981 | `ORDEN_DE_LAS_CARTAS_DEL_MAZO` | borde, cuerpo, icono |
+    | `Casilla` | 2102 | `ORDEN_DE_LAS_CASILLAS` | cuerpo, borde, icono |
+
+    Los `Dados` y la tapa, las sombras, el tapete y la pila de la mesa (fases 2, 3 y 7)
+    nacen ya con la regla: todo `<group>` suyo lleva `ORDEN_DE_LA_BARRA`. Con esto, en
+    las DOS pasadas, todo lo de la barra (1000) va antes que todo lo de los bienes
+    (1010), esto antes que las áreas (2000) —por el grupo, no por la cuenta de la malla:
+    con once o más cartas en la mano, una carta cogida con el imán a tope pasa de 2002
+    (1010 + 100 + 300 + 600 = 2010) y hoy se pintaría sobre las áreas—, y todo eso
+    antes que la mano del mazo (3000) y sus casillas (4000). Medido con el árbol real
+    (caso D): cero fallos.
+  - **El testigo de la barra pasa de `renderOrder={999}` a `{-1}`, y SÓLO sirve con lo
+    anterior.** Dentro del grupo 1000, 999 va después de las piezas y de la tapa (que
+    tienen 0), así que borra la profundidad cuando ya no sirve (caso E: los diez grupos
+    numerados y el testigo en 999, y el borrado sigue llegando después de la tapa y de
+    las piezas). Y a −1 SIN `ORDEN_DE_LA_BARRA` en los grupos de las piezas (caso F) es
+    lo peor de todo: piezas (`g0`, con el mundo) → borrado → tapa, y la tapa pisa las
+    piezas que tiene encima. El −1 y el número en los cuatro grupos de la barra van en
+    el mismo empujón o no van.
   - La tapa lleva `raycast={() => null}` y no escribe nada que las cartas miren
     (`depthTest={false}` en ellas): no les quita ni un toque ni un píxel.
   - Lo TRANSPARENTE de la mesa —zócalos, tapete, sombras de contacto— se pinta en la
@@ -520,14 +570,47 @@ milímetro.** Con su Z, en coordenadas de la cámara (`medir-tapa-horizontal.ts`
     zócalos y las sombras viven dentro de los huecos y el tapete bajo los dados, y
     «el hueco del mazo queda libre de las cartas de bienes» ya lo mide `verify:escena`.
     La pila del mazo (fase 7) es opaca por lo mismo.
-  - La regla del apilamiento que encabeza `ORDEN_DE_LA_BARRA` (delta.tsx 204–219) se
-    completa con esto: «cada capa pegada a la cámara es un grupo con su
-    `renderOrder`, y el número de la malla ordena dentro del grupo». El comentario de
-    la carta (1626–1630: «el `renderOrder` de un grupo no baja a sus hijos») se
-    corrige: no baja como `renderOrder`, baja como `groupOrder`, y manda más.
-  - `verify:escena` no puede correr el pintor, pero ya lee `delta.tsx` como texto
-    (433, 1529, 2484): en la fase 2 afirma que los tres grupos declaran su
-    `renderOrder` con su constante y que el testigo de la barra va a −1.
+  - Tres comentarios se reescriben con la regla: la cabecera de `ORDEN_DE_LA_BARRA`
+    (204–216) —«cada capa es un número, y lo lleva TODO grupo con mallas debajo, porque
+    el pintor mira el grupo más cercano»—; el de la carta (1626–1630: «el `renderOrder`
+    de un grupo no baja a sus hijos»): no baja como `renderOrder`, baja como
+    `groupOrder`, manda más, y sólo baja desde el grupo más cercano; y la cabecera de
+    `Barra` (1346–1355), que hasta este empujón promete un borrado que llega tarde.
+  - `verify:escena` no puede correr el pintor, pero ya lee `delta.tsx` como texto (hoy
+    en 458, 1554, 2509 y 3040): en la fase 2 afirma que el PRIMER `<group` que sigue a
+    cada una de estas seis firmas —`function PiezaEnLaBarra(`, `function
+    MazoEnLaBarra(`, `function Carta(`, `function AreaDeTrueque(`, `function
+    CartaDelMazoEnLaMano(`, `function Casilla(`—, y en las dos primeras también el
+    segundo, el del `ref={grupo}`, lleva `renderOrder={` con la constante de su capa
+    (ocho grupos); que el de `Baraja` y el de `ManoDelMazo` también; y que el testigo de
+    la barra va a `-1`. Mirar sólo los grupos exteriores es afirmar el caso C, que está
+    medido roto: el comprobador cuenta los ocho de dentro o no cuenta nada.
+
+  La tabla del guion, con las ocho formas que se midieron (✗ = un fallo del juez del
+  guion: algo de una capa de detrás pintado después de algo de una capa de delante, la
+  tapa o la placa después de los pies de las cartas, o el borrado después de lo que
+  tenía que proteger):
+
+  | Caso | Qué lleva número | Testigo | Resultado |
+  |---|---|---|---|
+  | A. Hoy | sólo `Barra` (con la placa) | 999 | ✗ la placa tiñe los pies de las cartas, los zócalos y el naipe; ✗ el borrado llega después de las piezas |
+  | B. Hoy + tapa opaca | sólo `Barra` | 999 | ✗ **la tapa tapa los pies de las cartas**; ✗ borrado después de las piezas y de la tapa |
+  | C. Tercera vuelta | `Barra`, `Baraja`, `ManoDelMazo` | −1 | ✗ **la tapa tapa los pies**; ✗ **piezas → borrado → tapa: la tapa pisa las piezas**; ✗ el testigo de la baraja va detrás de sus cartas |
+  | D. **La decisión** | los ocho de dentro + `Baraja` + `ManoDelMazo` | −1 | **sin fallos** |
+  | E. Los diez, testigo viejo | los diez | 999 | ✗ borrado después de las piezas y de la tapa |
+  | F. Sólo las manos | `Baraja`, `Carta`, `AreaDeTrueque`, `ManoDelMazo`, `CartaDelMazoEnLaMano`, `Casilla` | −1 | ✗ **la tapa pisa las piezas** |
+  | G. Sin `ManoDelMazo` | los ocho + `Baraja` | −1 | sin fallos (del exterior del mazo no cuelga ninguna malla) |
+  | H. Sin `Baraja` | los ocho + `ManoDelMazo` | −1 | ✗ el testigo de la baraja (`g0 r1005`) se pinta antes que la barra, fuera de su capa |
+
+  Y una cosa que la medida enseña y que aquí no se decide: el testigo de la `Baraja`
+  (1876) borra la profundidad DESPUÉS de la tapa y de las piezas —va en la pasada de
+  opacos, con 1005— y antes de la pasada de transparentes, así que, con la mano de
+  bienes montada, el anillo de una señal (`g0 r2`, transparente) y los propios zócalos
+  se pintan sin profundidad sobre la madera y las piezas donde se crucen en pantalla.
+  Hoy ya pasa con las piezas, y la placa, que iba la última, lo tapaba en parte. Es un
+  borrado sin objeto —todo lo de esa mano va con `depthTest={false}`, que es lo que la
+  cabecera de `ManoDelMazo` (2179–2185) dice de la suya para no tenerlo—. Va a la tabla
+  de decisiones abiertas del §10.
 
 Se quita la placa, y con ella se queda sin objeto la comprobación de `verify:escena`
 «la mano del mazo no invade la zona de la barra de construir» (2045–2071), que mide
@@ -649,6 +732,22 @@ escena —`huecosDeLaMesa(...).dados !== null`— antes de llamar a `dadosEnTres
 las dos llaman a la misma función con la misma medida no pueden discrepar: si la
 escena no pinta dados, la pantalla no quita el botón.
 
+**Y la escena sólo pide `huecosDeLaMesa` cuando recibe `dados !== null`.** Con
+`dados === null` —la colocación, un mirón, un lienzo del tercer peldaño, o una pantalla
+que todavía no pasa la entrada— `Barra` sigue en `huecosDeLaBarra(cuantos,
+forma.campo, forma.proporcion)` como hoy (`delta.tsx` 1403), y no se mueve ni un
+hueco. No es un atajo: `huecosDeLaMesa` decide con el alto en puntos si hay sitio para
+un cuarto o un quinto hueco, y donde cae el quinto (390×490, 390×845, las tabletas)
+las piezas se corren y encogen para hacerle sitio; pedírselo con `dados === null`
+reservaría en la colocación de pie un hueco para unos dados que no existen, y las
+piezas se moverían otra vez al empezar a jugar. La regla es: sin dados, el
+reparto de siempre; con dados, `huecosDeLaMesa(...).piezas` para las piezas y
+`.dados` para su hueco, y `cuantos` se cuenta igual en las dos ramas. `verify:escena`
+lo afirma en la fase 3 sobre el texto de `delta.tsx`, donde ya lee la llamada de la
+barra (hoy 3040–3060): que `huecosDeLaBarra(cuantos, forma.campo, forma.proporcion)`
+sigue ahí, y que la llamada a `huecosDeLaMesa` está detrás de un `dados !== null` (o
+de un `dados === null ? … : …`).
+
 **`cuantos` es 4, y por qué siempre 4 cuando hay dados.** La escena cuenta
 `piezas.length + (mazo === null ? 0 : 1)` (`delta.tsx` 1401) y la pantalla tiene que
 contar EXACTAMENTE igual —`barraEnTres(...).length + (mazoEnLaBarra(...) === null ? 0 :
@@ -761,16 +860,16 @@ llama a `onPulsarLosDados` y empuja `tocado`, y la pantalla manda la opción TIR
 `mesa.mover`, la misma puerta que el botón. La escena no sabe que eso es tirar: es «el
 hueco que se pulsa», como el naipe del mazo.
 
-`mover` cambia de firma en las dos `mesa.ts`: hoy es `(movimiento) => void` con un
-`void (async () => {...})()` dentro; pasa a devolver esa misma promesa, resuelta a
-`'hecho' | 'rechazado' | 'sin-red'` con lo que el cuerpo ya sabe. La tabla entera, sin
-dejarse ninguna salida del cuerpo:
+`mover` cambia de firma en las dos `mesa.ts`: era `(movimiento) => void` con un
+`void (async () => {...})()` dentro; devuelve esa misma promesa, resuelta a
+`'hecho' | 'rechazado' | 'sin-red'` con lo que el cuerpo ya sabe (la fase 1 ya lo
+escribió, y gana). La tabla entera, sin dejarse ninguna salida del cuerpo:
 
-| Salida de `mover` (`app/src/arcade/mesa.ts` 704–799, `escritorio/src/mesa.ts` 676–741) | Resuelve |
+| Salida de `mover` (`app/src/arcade/mesa.ts` desde 719, `escritorio/src/mesa.ts` desde 691) | Resuelve |
 |---|---|
-| El `return` temprano —`if (donde === null \|\| rev === undefined) return;` (707–709 / 679–681)—: sin código de mesa o sin `rev`, no se manda nada | `'rechazado'` (la mesa está igual que estaba; nada rodó por el cable) |
-| `r.ok` y `rev` subió | `'hecho'` |
-| `seIgnoro` (`r.ok` con el mismo `rev`) o `!r.ok` | `'rechazado'` |
+| El `return` temprano —`if (donde === null \|\| rev === undefined) return 'rechazado';` (725 / 697)—: sin código de mesa o sin `rev`, no se manda nada | `'rechazado'` (la mesa está igual que estaba; nada rodó por el cable) |
+| `r.ok`, `rev` subió y el juego no dijo nada | `'hecho'` |
+| `!r.ok`; o `seIgnoro` (`r.ok` con el mismo `rev`); o **el juego devolvió un motivo** —`r.ok` con `datos.mesa.motivo`, `loQueDijoElJuego.length > 0`: un rechazo con palabras, que la mesa ya enseña como aviso— | `'rechazado'`. Es una sola línea: `return !r.ok \|\| seIgnoro \|\| loQueDijoElJuego.length > 0 ? 'rechazado' : 'hecho'` (812 / 754) |
 | El `catch` | `'sin-red'` |
 
 Nadie más la lee: los demás sitios siguen llamándola sin `await`. La pantalla
@@ -806,12 +905,18 @@ guarda el par `anterior` al que vuelve si la tirada no llega.)
   `mesa.aviso` («Ese movimiento no se ha podido hacer ahora mismo…», que ya existe);
   los dados no inventan un error.
 - Llega una vista con una TIRADA NUEVA → en `rodando`, se fija el objetivo y se pasa
-  a `asentando` en `max(desde + 0,6, ahora)`; en `quieta` (la tirada es de otro, o
-  la mía llegó sin que yo tocara —dos pestañas—), se pasa a `rodando(ahora,
-  objetivo)`.
+  a `asentando` en `max(desde + 0,6, ahora)` (si ese instante ya llegó, a `asentando`
+  en el acto); en `quieta` Y en `asentando` —la tirada es de otro, o la mía llegó sin
+  que yo tocara (dos pestañas), o son dos tiradas seguidas en menos de 0,35 s y la
+  segunda entra con la primera aún asentándose— se pasa a `rodando(ahora, objetivo)`
+  con `anterior` = el par que se estaba enseñando (`parQueSeEnsena(fase)`: en
+  `asentando`, el par al que iba). Es lo que hace `escenas/dados.ts` (200–216), y
+  gana.
 - Tirada nueva es: `tirado` pasa de falso a verdadero; o `tirado` es verdadero y
   cambia el `sello` o `ultimaTirada` respecto de la última vista (dos movimientos
-  entre dos vueltas del sondeo). Si el `sello` cambia con `tirado` falso, la tirada
+  entre dos vueltas del sondeo). La PRIMERA vista nunca lo es: al montar o al
+  recargar, lo que hay en la mesa es noticia vieja y se enseña en reposo
+  (`traeTiradaNueva`, 165–168). Si el `sello` cambia con `tirado` falso, la tirada
   del turno anterior se perdió entre sondeos: se enseña el par nuevo en reposo, sin
   animar, porque ya es noticia vieja.
 - El par lo da `repartoDeLaTirada(suma, sello, semilla)` con el sello de la decisión
@@ -904,8 +1009,8 @@ compila ninguna cifra nueva.
 | `escenas/cartas.ts` | SÓLO las dos frases que citan el techo de la placa (26 y 408), dos veces: en la fase 1 la placa con 0,14 (`−0,240·alto`), en la fase 2 el asa y el bote (`−0,273·alto`, §1.2); ninguna constante |
 | `escenas/baraja.ts` | Nada |
 | `escenas/cinta.ts` (NUEVO, sin `three`) | `anchoDeLaCinta(ancho, alto)`: el tercio en apaisado, el 40 % de pie (§2.2) |
-| `escenas/delta.tsx` | `Barra` → tapa horizontal, sombras, tapete, pila; `Dados` hermano de `PiezaEnLaBarra`, que sólo empuja `tocado` si `disponible`; entradas `dados`, `onPulsarLosDados`, `mesaRecogida` de `<Delta>`, opcionales como las otras; `renderOrder` en los `<group>` de `Baraja` y `ManoDelMazo` y el testigo de la barra a −1 (§4.1); la cabecera de `ORDEN_DE_LA_BARRA` y el comentario de la carta (1626–1630) reescritos |
-| `escenas/scripts/verificar-escena.ts` | Los lienzos apaisados y 768×1024; los tres peldaños de los dados; la mesa contra las manos; el reparto por sello; la veta; el tope; la línea de «tres y cuatro» reescrita; «la mano del mazo no invade la zona de la barra» contra `0,52·lado` en la fase 2; los tres grupos con su `renderOrder` (texto); el vértice más alto bajo la cinta al salir; la cinta apaisada y de pie contra las manos |
+| `escenas/delta.tsx` | `Barra` → tapa horizontal, sombras, tapete, pila; `Dados` hermano de `PiezaEnLaBarra`, que sólo empuja `tocado` si `disponible`; entradas `dados`, `onPulsarLosDados`, `mesaRecogida` de `<Delta>`, opcionales como las otras; la constante de su capa en los diez `<group>` de la tabla del §4.1 —`ORDEN_DE_LA_BARRA` en los cuatro de `PiezaEnLaBarra` y `MazoEnLaBarra` (1138, 1180, 1276, 1303), `ORDEN_DE_LAS_CARTAS` en `Baraja` (1875) y `Carta` (1647), `ORDEN_DE_LAS_AREAS` en `AreaDeTrueque` (1740), `ORDEN_DE_LAS_CARTAS_DEL_MAZO` en `ManoDelMazo` (2259) y `CartaDelMazoEnLaMano` (1981), `ORDEN_DE_LAS_CASILLAS` en `Casilla` (2102)— y el testigo de la barra a −1 en el mismo empujón; `huecosDeLaMesa` sólo con `dados !== null` y `huecosDeLaBarra` como hoy si no (§4.4); la cabecera de `ORDEN_DE_LA_BARRA`, la de `Barra` y el comentario de la carta (1626–1630) reescritos |
+| `escenas/scripts/verificar-escena.ts` | Los lienzos apaisados y 768×1024; los tres peldaños de los dados; la mesa contra las manos; el reparto por sello; la veta; el tope; la línea de «tres y cuatro» reescrita; «la mano del mazo no invade la zona de la barra» contra `0,52·lado` en la fase 2; los ocho grupos de dentro más `Baraja` y `ManoDelMazo` con la constante de su capa y el testigo a −1 (texto, §4.1; los exteriores solos no prueban nada); que `huecosDeLaMesa` sólo se pide con `dados !== null` (texto, §4.4); el vértice más alto bajo la cinta al salir; la cinta apaisada y de pie contra las manos |
 | `shared/arcade/juegos/riberas-en-tres.ts` | `tirado`, `ultimaTirada`, `turnosAbiertos` en `VistaQueSePinta` (y los dos comentarios de `comprada`, 51–53 y 170–175, reescritos: §1.3); `dadosEnTres` (`null` fuera de `jugando`), `opcionesFueraDeLaMesa`, `chozas`/`torres` en `ColonoEnElMarcador` |
 | `server/scripts/verificar-riberas-en-tres.ts` | Que TIRAR se cae del formulario sólo con dados; que `porTirar` sigue a las opciones enteras; que `dadosEnTres` es `null` fuera de `jugando`; que las cuentas de chozas y torres cuadran con la vista |
 | `app/src/arcade/mesa.ts`, `escritorio/src/mesa.ts` | `mover` devuelve `'hecho' \| 'rechazado' \| 'sin-red'`, con el `return` temprano resuelto a `'rechazado'` (tabla del §5.3) |
@@ -915,7 +1020,7 @@ compila ninguna cifra nueva.
 
 ## 9. Cómo se midió
 
-Diecisiete guiones en el scratchpad de la sesión, que importan el código real. De la
+Dieciocho guiones en el scratchpad de la sesión, que importan el código real. De la
 primera pasada: `medir-lienzos.ts` (huecos, manos y franjas en catorce lienzos con el
 0,13 de hoy), `medir-dados-hueco.ts` (el hueco de los dados colgado y como quinto),
 `medir-con-014.ts` (las mismas cuentas con `PARTE_DEL_ALTO` a 0,14: reproduce la
@@ -934,13 +1039,19 @@ el fallo del sello por asiento reproducido) y `medir-veta.ts` (dominio, tablones
 rangos y contraste). De la tercera, tras la segunda revisión:
 `medir-orden-de-dibujo.ts` (la escena de las capas pegadas a la cámara metida en el
 `WebGLRenderLists` de `three` 0.185.1 y ordenada con su `sort`, hoy y con los grupos
-numerados), `medir-techos.ts` (placa, naipe, asa, pieza señalada y tomada, dado en
+numerados; ponía las mallas sueltas en tres grupos, y por eso daba cero fallos donde
+el árbol real da dos: lo sustituye el de la cuarta), `medir-techos.ts` (placa, naipe,
+asa, pieza señalada y tomada, dado en
 salto, con 0,13 y 0,14 y en los lienzos de pie), `medir-colgado-con-tres.ts` (los tres
 peldaños con `cuantos` 3 y 4), `medir-cinta-de-pie.ts` (la cinta al tercio, 40, 45 y
 50 % contra las manos abiertas en los lienzos de pie), `medir-borde-lejano.ts` (los 54
 vértices y el borde del delta proyectados con `ojoYMira` al salir y a 82°, en todos
 los rumbos) y `medir-sacar-el-vertice.ts` (cuántos grados y cuántos puntos de
-arrastre sacan el vértice de debajo de 44 y de 88). Donde un número de aquí viene del
+arrastre sacan el vértice de debajo de 44 y de 88). De la cuarta, tras la tercera
+revisión: `medir-orden-con-el-arbol-real.ts` (el árbol de `delta.tsx` con sus grupos
+anidados tal como están en el fichero, metido en el `WebGLRenderLists` de `three`
+0.185.1: las ocho formas de la tabla del §4.1, y el juez que las califica). Donde un
+número de aquí viene del
 0,13 se dice; los del 0,14 son los que valen. Lo que se afirma en este documento se convierte en comprobaciones de
 `verify:escena` en la fase 1: el guion de la sesión se tira, el comprobador se queda.
 
@@ -964,6 +1075,7 @@ lo que aquí se dice):
 | Una carta cogida cuando la mesa sale sola | No sale: espera a que se suelte (§6). La alternativa —soltar y sacar— rompe el gesto | Fase 4 |
 | Cuándo la frase pasa a dos líneas dentro de los 44 y cuándo a puntos suspensivos | La frase no hace crecer la cinta (§2.2): dos líneas de 17 caben en 44. El hueco está medido (`ancho/3 − 88`: 101–552 puntos apaisado; 40–219 de pie al 40 %); el ancho del texto con la fuente de la casa no se mide en Node | Fase 5, en el banco, y se dejan escritos la letra, el interlineado y el número |
 | La línea de botones sobre el vértice lejano | Bajo la primera línea, en el tercio central; tapa el vértice más lejano en los teléfonos apaisados al salir (63–84 puntos) y se saca con 7–37 puntos de arrastre (§2.2). La alternativa medida es a la derecha del tercio, en los 155 (SE) – 240 (iPhone 14) puntos de aire hasta la mano de bienes | Fase 5, en el banco; si se mueve, se vuelve a medir contra la mano de bienes abierta |
+| El testigo de la `Baraja` (`delta.tsx` 1876) | Borra la profundidad después de la tapa y de las piezas y antes de los transparentes (§4.1): con la mano de bienes montada, el anillo de una señal y los zócalos se pintan sin profundidad sobre la madera donde se crucen en pantalla. Hoy ya pasa con las piezas. Es un borrado sin objeto —esa mano va con `depthTest={false}`—; si en el banco se ve, se quita el testigo, que está en `delta.tsx` y no en `baraja.ts` | Fase 2, en `banco3d.html`, después de mirar los pies de las cartas |
 | La coexistencia de los dos bloqueos de orientación | No coexisten (`LOS_QUE_PINTA` pinta un arcade), los dos vuelven por `volverAlRetrato()`, y se prueba entrando y saliendo en el aparato | Fase 6 |
 
 **Dudas que sólo puede resolver él.** Cada una con sus dos opciones y lo que cuesta cada
@@ -1023,19 +1135,24 @@ depende de la siguiente.
 2. **La mesa de madera.** El tablón horizontal sustituye a la placa; sombras de
    contacto; tapete del turno; tope de triángulos. Y el orden de dibujo del §4.1, en
    el mismo empujón que la tapa, porque sin él la tapa opaca esconde los pies de las
-   cartas de bienes: `renderOrder` en los `<group>` de `Baraja` y `ManoDelMazo`, el
-   testigo de la barra a −1, la cabecera de `ORDEN_DE_LA_BARRA` y el comentario de la
-   carta reescritos, y en `verify:escena` el texto que afirma los tres grupos. Con la
+   cartas de bienes: la constante de su capa en los diez `<group>` de la tabla del §4.1
+   —los ocho de dentro, que son los que el pintor mira, más `Baraja` y `ManoDelMazo`—,
+   el testigo de la barra a −1 EN EL MISMO EMPUJÓN que esos números (solo, es el caso
+   F: la tapa pisa las piezas), las tres cabeceras reescritas, y en `verify:escena` el
+   texto que afirma los ocho de dentro, no los exteriores. Con la
    placa fuera, «la mano del mazo no invade la zona de la barra» pasa a medir
    `hueco.y + 0,52·lado` en los huecos de las piezas y en el de los dados, y las dos
    frases de `cartas.ts` pasan a hablar del asa y del bote (`−0,273·alto`, §1.2). Sin
    dados: se sigue tirando con el botón. Se mira en el banco `escritorio/banco3d.html`
    (entrada `escritorio3d` de `launch.json`) antes de empujar: la Z del borde
-   delantero, la junta entre tablones, el contraste 1,60:1 y que los pies de las
-   cartas de bienes se vean sobre la madera son decisiones que un comprobador no
-   puede juzgar.
+   delantero, la junta entre tablones, el contraste 1,60:1, que los pies de las
+   cartas de bienes se vean sobre la madera y que ningún anillo ni zócalo se pinte
+   sobre ella con la mano de bienes montada (el testigo de la `Baraja`, §10) son
+   decisiones que un comprobador no puede juzgar.
 3. **Los dados.** `Dados` en la escena, con `disponible` como única llave del toque y
-   de la vibración; `dadosEnTres` (`null` fuera de `jugando`) y
+   de la vibración, y la barra pidiendo `huecosDeLaMesa` SÓLO con `dados !== null`
+   —con `null` sigue en `huecosDeLaBarra` como hoy— y `verify:escena` afirmándolo
+   (§4.4); `dadosEnTres` (`null` fuera de `jugando`) y
    `opcionesFueraDeLaMesa` en `shared/`; `mover` devolviendo su resultado en las dos
    `mesa.ts` con el `return` temprano resuelto a `'rechazado'` y el `switch`
    exhaustivo en la pantalla (§5.3); la acción accesible; y el botón TIRAR se cae de la
