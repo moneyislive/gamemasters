@@ -56,10 +56,34 @@ function paqueteDe(especificador) {
   return especificador.startsWith('@') ? trozos.slice(0, 2).join('/') : trozos[0];
 }
 
+/*
+ * ═══ LA REGLA ES «TODO LO QUE NO SEA node_modules DE LA APP», Y LA COMPARACIÓN VA NORMALIZADA ═══
+ *
+ * La primera versión de esto sólo reescribía los imports cuyo origen empezara por
+ * `escenas/` o `shared/`, comparando cadenas con `path.sep`. Se vio fallar de dos maneras
+ * que no se ven en el escritorio:
+ *
+ *   · La comparación dependía de la FORMA de la ruta: con barras invertidas casaba y con
+ *     barras normales no, y Metro no promete una u otra. En cuanto no casa, el fichero de
+ *     `escenas/` resuelve `three` hacia arriba y se lleva la copia de la raíz del monorepo.
+ *   · Y aunque case, cualquier paquete resuelto desde la raíz que importe `three` tampoco
+ *     está en `escenas/` ni en `shared/`: se lleva la copia de la raíz igual.
+ *
+ * Dos copias de `three` no fallan al empaquetar ni al arrancar: fallan en el primer
+ * `position={vector}`. Fiber sólo copia un vector si `value.constructor` es SU `Vector3`;
+ * si es el de la otra copia lo asigna a pelo y `position` es de sólo lectura. En el
+ * teléfono eso fue «Cannot assign to read-only property 'position'» al abrir el Muelle, y
+ * la app cerrada. Por eso ahora la pregunta es la contraria: ¿viene este import de DENTRO
+ * de los node_modules de la app? Si no, se resuelve como si viniera de la app. Y las rutas
+ * se comparan normalizadas —barras normales y sin distinguir mayúsculas en Windows—.
+ */
+const nodeModulesDeLaApp = normaliza(path.resolve(raizApp, 'node_modules')) + '/';
+function normaliza(ruta) {
+  const conBarras = String(ruta).replace(/\\/g, '/');
+  return process.platform === 'win32' ? conBarras.toLowerCase() : conBarras;
+}
 function vieneDeFuera(fichero) {
-  return (
-    fichero.startsWith(raizShared + path.sep) || fichero.startsWith(raizEscenas + path.sep)
-  );
+  return !normaliza(fichero).startsWith(nodeModulesDeLaApp);
 }
 
 const resolverAnterior = config.resolver.resolveRequest;
@@ -68,6 +92,12 @@ function resolverComoAntes(context, moduleName, platform) {
     ? resolverAnterior(context, moduleName, platform)
     : context.resolveRequest(context, moduleName, platform);
 }
+
+/* La segunda red: si a pesar de todo Metro busca uno de los ÚNICOS por su cuenta, que lo
+   encuentre en la app y no en la raíz. */
+config.resolver.extraNodeModules = Object.fromEntries(
+  [...UNICOS].map((paquete) => [paquete, path.resolve(raizApp, 'node_modules', paquete)]),
+);
 
 config.resolver.resolveRequest = (context, moduleName, platform) => {
   const paquete = paqueteDe(moduleName);

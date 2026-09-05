@@ -531,7 +531,10 @@ function LaCala({ mundo }: { mundo: Mundo }): JSX.Element {
       ))}
       {mundo.aspas === null ? null : (
         <group matrix={mundo.aspas.matrizDelMolino} matrixAutoUpdate={false}>
-          <mesh ref={aspas} position={mundo.aspas.posicion} geometry={mundo.aspas.geometria} material={mundo.aspas.material} />
+          {/* La posicion va como TERNA y no como Vector3: fiber solo copia un vector si es de SU copia
+              de three; si es de otra lo asigna a pelo, y «position» es de solo lectura. Con una terna
+              hace «set», venga de donde venga. Es lo que cerro la app en el telefono. */}
+          <mesh ref={aspas} position={[mundo.aspas.posicion.x, mundo.aspas.posicion.y, mundo.aspas.posicion.z]} geometry={mundo.aspas.geometria} material={mundo.aspas.material} />
         </group>
       )}
     </group>
