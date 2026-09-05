@@ -394,6 +394,50 @@ paso('La paleta no deja ningún terreno sin color');
       t.celda[1] >= FILAS_DEL_ATLAS,
   );
   comprobar('y todas las celdas del atlas caen dentro del atlas', celdaMala.length === 0, celdaMala);
+
+  /*
+   * EL TINTE DEL SUELO: que exista, que sea sensato y sobre todo QUE ALGUIEN LO LEA.
+   *
+   * Es un campo opcional, y los campos opcionales se quedan huérfanos: alguien limpia
+   * una línea de `delta.tsx` y el dato sigue aquí, con su cabecera y todo, sin que nada
+   * cambie en pantalla ni se ponga rojo. Por eso lo que se comprueba no es sólo el
+   * número sino que el tablero de tres dimensiones lo lea y lo aplique.
+   *
+   * Y que llegue al terreno de Riberas por composición y no por copia: el cantil lo tiene
+   * porque ES la montaña, no porque alguien lo escribiera dos veces.
+   */
+  const conTinte = Object.entries(PALETA).filter(([, terreno]) => terreno.tinte !== undefined);
+  comprobar(
+    'algún terreno oscurece su suelo, porque su bioma pone piedras del mismo gris encima',
+    conTinte.length > 0,
+    conTinte.map(([nombre, terreno]) => `${nombre}: ${String(terreno.tinte)}`),
+  );
+  comprobar(
+    'y el tinte quita luz sin apagar el bioma: no baja de un tercio',
+    conTinte.every(([, terreno]) => (terreno.tinte as number) >= 0.35 && (terreno.tinte as number) < 1),
+    conTinte.map(([nombre, terreno]) => `${nombre}: ${String(terreno.tinte)}`),
+  );
+  comprobar(
+    'el cantil hereda el de la montaña por composición, no por una copia que pueda discrepar',
+    PALETA['cantil'] === PALETA['montana'] && PALETA['cantil']?.tinte === PALETA['montana']?.tinte,
+    { cantil: PALETA['cantil']?.tinte, montana: PALETA['montana']?.tinte },
+  );
+
+  const fuenteDelTablero = fs.readFileSync(
+    path.join(import.meta.dirname ?? __dirname, '..', 'delta.tsx'),
+    'utf8',
+  );
+  comprobar(
+    'y el tablero de tres dimensiones lo lee y clona el material: si no, el dato sería adorno',
+    fuenteDelTablero.includes('terrenoDe(terreno).tinte') &&
+      fuenteDelTablero.includes('conMenosLuz(base.material, tinte)') &&
+      fuenteDelTablero.includes('material.dispose()'),
+    {
+      loLee: fuenteDelTablero.includes('terrenoDe(terreno).tinte'),
+      loAplica: fuenteDelTablero.includes('conMenosLuz(base.material, tinte)'),
+      loSuelta: fuenteDelTablero.includes('material.dispose()'),
+    },
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -3201,7 +3245,7 @@ if (fallos.length > 0) {
  * a veintitrés: durante ese tiempo el guion podía morirse en la novena sin que nadie se
  * enterara. Un guardia desfasado no guarda nada.
  */
-const COMPROBACIONES_ESCRITAS = 212;
+const COMPROBACIONES_ESCRITAS = 216;
 if (hechas < COMPROBACIONES_ESCRITAS) {
   console.error(
     `Solo se han hecho ${hechas} de las ${COMPROBACIONES_ESCRITAS} comprobaciones que ` +

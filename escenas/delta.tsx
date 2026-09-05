@@ -301,6 +301,23 @@ interface Instanciable {
 }
 
 /**
+ * EL MISMO MATERIAL DEL CATÁLOGO, CON MENOS LUZ.
+ *
+ * Se clona en vez de tocar el del catálogo por lo de siempre: ese material lo comparten
+ * todas las piezas del pack, y bajarle el color en el sitio oscurecería el mundo entero.
+ * El clon comparte la TEXTURA —`clone` copia la referencia, no la imagen—, así que esto
+ * no cuesta memoria de atlas; cuesta un material más, y el que lo crea lo suelta.
+ *
+ * Multiplica en lugar de asignar: si el material del pack trajera ya un color propio, se
+ * respeta y se le quita luz encima. Asignar un gris se lo comería.
+ */
+function conMenosLuz(material: THREE.Material, tinte: number): THREE.Material {
+  const clon = material.clone() as THREE.Material & { color?: THREE.Color };
+  clon.color?.multiplyScalar(tinte);
+  return clon;
+}
+
+/**
  * APLANA UN MODELO A SUS MALLAS.
  *
  * Devuelve TODAS, no la primera. Seis modelos del pack traen dos o tres —el molino
@@ -2550,6 +2567,8 @@ export function Delta({
    */
   const suelos = useMemo(() => {
     const tabla = new Map<string, Instanciable>();
+    /* Los que se tintan son NUESTROS y no del catálogo: hay que soltarlos al desmontar. */
+    const propios: THREE.Material[] = [];
     for (const llave of plan.suelo.keys()) {
       const partes = llave.split('|');
       const pieza = String(partes[1]);
@@ -2591,10 +2610,25 @@ export function Delta({
         }
         uv.needsUpdate = true;
       }
-      tabla.set(propio, { geometria, material: base.material });
+      const tinte = terreno === 'agua' || terreno === 'nieve' || terreno === 'ribera'
+        ? undefined
+        : terrenoDe(terreno).tinte;
+      let material = base.material;
+      if (tinte !== undefined && tinte !== 1) {
+        material = conMenosLuz(base.material, tinte);
+        propios.push(material);
+      }
+      tabla.set(propio, { geometria, material });
     }
-    return tabla;
+    return { tabla, propios };
   }, [aplanados, plan]);
+
+  useEffect(
+    () => () => {
+      for (const material of suelos.propios) material.dispose();
+    },
+    [suelos],
+  );
 
   /** El ladrón: una tienda plantada en la plaza de la comarca que ocupa. */
   const ladron = useMemo(() => {
@@ -2686,7 +2720,7 @@ export function Delta({
 
       {[...plan.suelo].map(([llave, puestas]) => {
         const partes = llave.split('|');
-        const malla = suelos.get(`${String(partes[1])}|${String(partes[2])}`);
+        const malla = suelos.tabla.get(`${String(partes[1])}|${String(partes[2])}`);
         return malla === undefined ? null : (
           <Copias key={`suelo:${llave}`} malla={malla} puestas={puestas} />
         );

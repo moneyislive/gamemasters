@@ -192,6 +192,24 @@ export interface Terreno {
   color: string;
   /** La celda del atlas de la que sale el suelo de este bioma. */
   celda: CeldaDelAtlas;
+  /**
+   * CUÁNTA LUZ SE LE DEJA AL SUELO, entre cero y uno. Sin poner, uno: la tesela tal y
+   * como viene del pack, que es lo que llevan cinco de los seis.
+   *
+   * Existe por un bioma concreto y por un problema que sólo se ve jugando: el suelo del
+   * CANTIL sale de la misma mancha gris del atlas que las piedras que se le ponen
+   * encima, así que las rocas desaparecían contra su propio suelo. No es un problema de
+   * paleta —el gris es el que le toca, y cambiarlo lo apartaría del bien que rinde— sino
+   * de que dos cosas del mismo color están una encima de la otra.
+   *
+   * Se resuelve donde está el problema: oscureciendo el SUELO —casi la mitad de la luz— y dejando la roca
+   * como está, que es lo que hace que se despegue. Multiplica el color del material, así
+   * que no repinta la textura ni inventa un tono nuevo: es la misma piedra con menos luz.
+   *
+   * Sólo lo lee el tablero de tres dimensiones. En el plano no hay nada encima de nada,
+   * así que ahí no hay contraste que arreglar y `color` manda solo.
+   */
+  tinte?: number;
 }
 
 /**
@@ -245,7 +263,7 @@ const CLASICOS = {
   pradera: { color: '#8fae55', celda: [0, 2] },
   campo: { color: '#d9b04a', celda: [3, 1] },
   colina: { color: '#be5e2f', celda: [2, 1] },
-  montana: { color: '#7d8590', celda: [2, 2] },
+  montana: { color: '#7d8590', celda: [2, 2], tinte: 0.55 },
   desierto: { color: '#e3d5a6', celda: [4, 2] },
 } satisfies Record<string, Terreno>;
 
