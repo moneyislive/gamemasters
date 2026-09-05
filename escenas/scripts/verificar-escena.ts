@@ -2269,6 +2269,79 @@ paso('Un puente cubre su arista, salva lo que tiene debajo y encaja con el camin
 }
 
 // ---------------------------------------------------------------------------
+// EL DIBUJO DE UNA CARTA CAE DONDE SE VE
+//
+// Las dos manos asoman por el canto: la mayor parte de cada carta está FUERA de la
+// pantalla, y su centro también. El dibujo se colocaba a un cuarto de ancho del centro
+// HACIA FUERA, o sea más lejos todavía del borde: medido en las tres proporciones,
+// caía fuera de la pantalla en las seis manos. Se pintaba, costaba sus triángulos, y
+// no lo veía nadie — y lo que se veía de la carta era su margen vacío.
+//
+// Esto se mide, no se mira: en un lienzo estrecho la diferencia es de milímetros y en
+// pantalla parece que el dibujo «está un poco a un lado».
+// ---------------------------------------------------------------------------
+{
+  const CAMPO_DE_PRUEBA = (45 * Math.PI) / 180;
+  const MANO_DE_BIENES = [
+    { id: 'b1', bien: 'junco' },
+    { id: 'b2', bien: 'junco' },
+    { id: 'b3', bien: 'limo' },
+    { id: 'b4', bien: 'sal' },
+  ] as const;
+  const UNA_DEL_MAZO = [
+    { id: 'c1', familia: 'guardia', dibujo: 'guardia', nombre: 'La Guardia', sePuedeJugar: true, sePuedeRevelar: false },
+  ] as const;
+
+  for (const [comoSeLlama, proporcion] of [
+    ['un monitor', 16 / 9],
+    ['la columna de la Sala', 625 / 418],
+    ['un móvil de pie', 9 / 19.5],
+  ] as const) {
+    const { ancho } = loQueSeVeEnLaBaraja(CAMPO_DE_PRUEBA, proporcion);
+
+    /* La mano de bienes vive pegada al borde DERECHO. */
+    {
+      const puestas = huecosDeLaBaraja(MANO_DE_BIENES as never, CAMPO_DE_PRUEBA, proporcion, null);
+      for (const { hueco } of puestas) {
+        const dibujo = hueco.x + hueco.ancho * hueco.dibujo;
+        const bordeDeLaCarta = hueco.x - hueco.ancho / 2;
+        comprobar(
+          `el dibujo de un bien cae dentro de la pantalla en ${comoSeLlama}`,
+          dibujo < ancho / 2 && dibujo > bordeDeLaCarta,
+          { dibujo, borde: ancho / 2 },
+        );
+        comprobar(
+          `y en el medio de lo que asoma de la carta, en ${comoSeLlama}`,
+          Math.abs(dibujo - (bordeDeLaCarta + ancho / 2) / 2) < hueco.ancho * 0.02,
+          { dibujo, medioDeLoQueSeVe: (bordeDeLaCarta + ancho / 2) / 2 },
+        );
+      }
+    }
+
+    /* Y la del mazo, pegada al borde IZQUIERDO. */
+    const familias = manoDelMazoPorFamilias(UNA_DEL_MAZO as never);
+    for (const { hueco } of huecosDeLasCartas(familias, CAMPO_DE_PRUEBA, proporcion, null)) {
+      const dibujo = hueco.x + hueco.ancho * hueco.dibujo;
+      const bordeDeLaCarta = hueco.x + hueco.ancho / 2;
+      comprobar(
+        `el dibujo de una carta del mazo cae dentro de la pantalla en ${comoSeLlama}`,
+        dibujo > -ancho / 2 && dibujo < bordeDeLaCarta,
+        { dibujo, borde: -ancho / 2 },
+      );
+      comprobar(
+        `y en el medio de lo que asoma, en ${comoSeLlama}`,
+        Math.abs(dibujo - (bordeDeLaCarta + -ancho / 2) / 2) < hueco.ancho * 0.02,
+        { dibujo, medioDeLoQueSeVe: (bordeDeLaCarta - ancho / 2) / 2 },
+      );
+    }
+  }
+
+  /* Y lo que NO asoma por ningún canto lleva su dibujo en el medio, sin desplazar. */
+  for (const hueco of areasDeTrueque(2, CAMPO_DE_PRUEBA, 16 / 9)) {
+    comprobar('un área de trueque lleva su dibujo centrado', hueco.dibujo === 0);
+  }
+}
+// ---------------------------------------------------------------------------
 
 console.log('');
 if (fallos.length > 0) {
@@ -2288,7 +2361,7 @@ if (fallos.length > 0) {
  * a veintitrés: durante ese tiempo el guion podía morirse en la novena sin que nadie se
  * enterara. Un guardia desfasado no guarda nada.
  */
-const COMPROBACIONES_ESCRITAS = 130;
+const COMPROBACIONES_ESCRITAS = 162;
 if (hechas < COMPROBACIONES_ESCRITAS) {
   console.error(
     `Solo se han hecho ${hechas} de las ${COMPROBACIONES_ESCRITAS} comprobaciones que ` +

@@ -53,6 +53,25 @@ export interface HuecoDeCarta {
    */
   iman: number;
   /**
+   * DÓNDE VA EL DIBUJO DENTRO DE LA CARTA, en fracción de su ancho y con signo.
+   *
+   * ═══ EL FALLO QUE ESTO ARREGLA, Y ESTABA EN LAS DOS MANOS ═══
+   *
+   * Una carta de la mano asoma por el canto: la mayor parte de ella está FUERA de la
+   * pantalla, y su centro también. El dibujo se colocaba a un cuarto de ancho del
+   * centro de la carta… hacia fuera, o sea todavía más lejos del borde. Medido en las
+   * tres proporciones —monitor, la columna de la Sala y un móvil de pie—: el dibujo
+   * caía FUERA DE LA PANTALLA en las seis, y lo que se veía de la carta era su margen
+   * vacío. Se pintaba, costaba sus triángulos, y no lo veía nadie.
+   *
+   * Así que el sitio del dibujo lo dice el reparto, que es quien sabe cuánto asoma
+   * cada carta AHORA —el imán la saca más cuando se apunta— y hacia qué lado está el
+   * borde. Es el centro de la parte visible: `asoma/2 − 0,5` anchos hacia dentro.
+   * Sale del hueco y no de una constante en el pintor porque cambia con el imán en
+   * cada fotograma, y porque así se puede comprobar en Node sin abrir un navegador.
+   */
+  dibujo: number;
+  /**
    * EN QUÉ ORDEN SE PINTA, y por qué esto viaja con el hueco.
    *
    * Las cartas se solapan y están todas a la misma distancia de la cámara, así que el
@@ -112,10 +131,16 @@ const ANCHO_SOBRE_ALTO = 0.7;
 /**
  * CUÁNTO ASOMA UNA CARTA EN REPOSO, en fracción de su ancho.
  *
- * Poco más de un tercio. Con la mitad justa la mano ocupa demasiado y compite con el
- * tablero; con menos de un tercio no queda franja que agarrar ni se distingue el bien.
+ * Algo más de la mitad. Empezó en poco más de un tercio, y con eso la carta enseñaba
+ * una tira estrecha en la que no cabía su dibujo: se veía el margen del naipe y nada
+ * más. Se subió mirándolo en pantalla (5-sep-2026, a petición de Miguel): con esto se
+ * lee de qué bien es sin tener que apuntarla, y sigue cortada por el canto —que es lo
+ * que hace que se lea como una mano y no como una fila de fichas—.
+ *
+ * Por encima de 0,7 deja de parecer una mano sostenida y empieza a comer tablero, que
+ * es lo que el número original quería evitar y sigue siendo verdad.
  */
-const ASOMA_QUIETA = 0.36;
+const ASOMA_QUIETA = 0.55;
 /** Y cuánto asoma la carta a la que apunta el cursor, con el imán a tope. */
 const ASOMA_TIRADA = 1.02;
 
@@ -277,6 +302,8 @@ export function huecosDeLaBaraja(
       enElGrupo: cuantasDe.get(carta.bien) ?? 1,
       hueco: {
         x: ancho / 2 + anchoDeCarta * (0.5 - asoma),
+        /* Hacia DENTRO: lo que se ve de esta carta queda a su izquierda. Ver `dibujo`. */
+        dibujo: asoma / 2 - 0.5,
         y,
         /*
          * Cada carta un pelo más cerca que la anterior. No decide nada por sí solo —el
@@ -331,6 +358,8 @@ export function areasDeTrueque(
       alto: altoDeArea,
       giro: 0,
       iman: 0,
+      /* Un área no asoma por el canto: está entera dentro, y su dibujo va al medio. */
+      dibujo: 0,
       /* Todas al mismo nivel: no se solapan entre sí, así que no hay nada que ordenar. */
       orden: 0,
     });

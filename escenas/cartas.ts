@@ -119,6 +119,25 @@ export interface HuecoDeCartaDelMazo {
   /** Cuánto tira el imán de esta carta, de 0 a 1. */
   iman: number;
   /**
+   * DÓNDE VA EL DIBUJO DENTRO DE LA CARTA, en fracción de su ancho y con signo.
+   *
+   * ═══ EL FALLO QUE ESTO ARREGLA, Y ESTABA EN LAS DOS MANOS ═══
+   *
+   * Una carta de la mano asoma por el canto: la mayor parte de ella está FUERA de la
+   * pantalla, y su centro también. El dibujo se colocaba a un cuarto de ancho del
+   * centro de la carta… hacia fuera, o sea todavía más lejos del borde. Medido en las
+   * tres proporciones —monitor, la columna de la Sala y un móvil de pie—: el dibujo
+   * caía FUERA DE LA PANTALLA en las seis, y lo que se veía de la carta era su margen
+   * vacío. Se pintaba, costaba sus triángulos, y no lo veía nadie.
+   *
+   * Así que el sitio del dibujo lo dice el reparto, que es quien sabe cuánto asoma
+   * cada carta AHORA —el imán la saca más cuando se apunta— y hacia qué lado está el
+   * borde. Es el centro de la parte visible: `asoma/2 − 0,5` anchos hacia dentro.
+   * Sale del hueco y no de una constante en el pintor porque cambia con el imán en
+   * cada fotograma, y porque así se puede comprobar en Node sin abrir un navegador.
+   */
+  dibujo: number;
+  /**
    * EN QUÉ ORDEN SE PINTA.
    *
    * Las cartas se solapan y están TODAS a la misma distancia de la cámara, así que el
@@ -242,12 +261,14 @@ const ANCHO_SOBRE_ALTO = 0.7;
 /**
  * CUÁNTO ASOMA UNA CARTA EN REPOSO, en fracción de su ancho.
  *
- * Casi la mitad, un punto más que la mano de bienes. La diferencia tiene motivo: un bien
- * se reconoce por el COLOR de su carta y estas cinco familias se reconocen por el DIBUJO,
- * que ocupa el centro. Asomando un tercio se vería el color y no el dibujo, que es como
- * no ver nada.
+ * Seis décimas, un poco más que la mano de bienes. La diferencia tiene motivo: un bien
+ * se reconoce por el COLOR de su carta y estas cinco familias se reconocen por el DIBUJO.
+ * Asomando un tercio se vería el color y no el dibujo, que es como no ver nada.
+ *
+ * Subió de 0,46 el 5-sep-2026 mirándolo en pantalla, a la vez que la mano de bienes y por
+ * lo mismo: con lo de antes, el dibujo no llegaba a la parte visible del naipe.
  */
-const ASOMA_QUIETA = 0.46;
+const ASOMA_QUIETA = 0.6;
 /** Y cuánto asoma la carta a la que apunta el cursor, con el imán a tope. */
 const ASOMA_TIRADA = 1;
 
@@ -532,6 +553,8 @@ export function huecosDeLasCartas(
       hueco: {
         /* Espejo del de la baraja: allí se resta del borde derecho, aquí se suma al izquierdo. */
         x: franja.izquierda + anchoDeCarta * (asoma - 0.5),
+        /* Hacia DENTRO: lo que se ve de esta carta queda a su derecha. Ver `dibujo`. */
+        dibujo: 0.5 - asoma / 2,
         y,
         /*
          * Cada carta un pelo más cerca que la anterior. No decide nada por sí solo —el
@@ -639,6 +662,8 @@ export function casillasDeLaMano(
       x,
       y: primera + i * paso,
       z: -DISTANCIA_DE_LAS_CARTAS,
+      /* Una casilla no asoma por el canto: está entera dentro, y su dibujo va al medio. */
+      dibujo: 0,
       ancho: anchoDeCasilla,
       alto: altoDeCasilla,
       giro: 0,

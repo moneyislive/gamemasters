@@ -1461,7 +1461,7 @@ function Carta({
       {icono !== null && (
         <mesh
           geometry={icono}
-          position={[-hueco.ancho * 0.24, hueco.alto * 0.04, 0.01]}
+          position={[hueco.ancho * hueco.dibujo, hueco.alto * 0.04, 0.01]}
           scale={hueco.alto * 0.4}
           renderOrder={base + 2}
           raycast={() => null}
@@ -1804,7 +1804,7 @@ function CartaDelMazoEnLaMano({
       {icono !== null && (
         <mesh
           geometry={icono}
-          position={[hueco.ancho * 0.24, hueco.alto * 0.04, 0.01]}
+          position={[hueco.ancho * hueco.dibujo, hueco.alto * 0.04, 0.01]}
           scale={hueco.alto * 0.4}
           renderOrder={base + 2}
           raycast={() => null}
