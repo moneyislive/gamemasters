@@ -69,7 +69,7 @@
  * WebGL— y un componente que asuma DOM aquí sale negro en el móvil sin un error en
  * ninguna consola. Sólo mallas, materiales y luces.
  */
-import { useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 /*
  * `useFrame` es del NÚCLEO de r3f, no de `drei`, así que vale en los dos clientes:
@@ -146,6 +146,8 @@ import { queVaEn } from './poblar';
 import { fraccion } from './revoltijo';
 import { crearRelieve, hexDePunto } from './relieve';
 import type { Relieve, Subtesela } from './relieve';
+import { contornoDelDelta, geometriaDelMar } from './costa';
+import { LAS_LUCES_DEL_DELTA, materialDeLaMarea } from './marea';
 import { apuntaLosLados, piezaDeCauce, piezaDeSenda, teselasDeUnCamino } from './sendas';
 import { CAUCE, CUERPO, HONDO, piezaDeOrilla } from './aguas';
 import { CELDA_DE_LA_ARENA } from './paleta';
@@ -474,7 +476,7 @@ function Numero({
 }
 
 /**
- * EL MAR SE PINTA CON EL TÉXEL DEL PACK, NO CON UN AZUL PARECIDO.
+ * EL MAR DEL DELTA: un disco de anillos con la costa dentro y un sombreador encima.
  *
  * ═══ LA COTA ═══
  *
@@ -487,80 +489,67 @@ function Numero({
  * —el modelo va de -1 a -0,2 y no tiene NADA por encima—, así que el mar va a
  * `0·ESCALON + LAMINA`, que es exactamente la lámina de una tesela de agua a nivel
  * cero. Coincide, y por eso la playa de una costa del borde entra en el mar sin
- * escalón.
+ * escalón. Y por eso también el oleaje se apaga PEGADO a la costa: una cresta ahí
+ * asomaría por encima de la playa y por debajo de la lámina de las teselas de agua,
+ * que son geometría fija y no ondulan.
  *
- * ═══ EL COLOR, QUE ES LO QUE FALTABA ═══
+ * ═══ EL COLOR, QUE ES LO QUE NO SE PODÍA PERDER ═══
  *
- * La cota ya casaba y el mar seguía sin leerse como mar: era `#1d6a8e`, un azul
- * elegido a ojo, y el agua del pack es `#257ebc`. Dos azules que en una carta de
- * colores pasarían por el mismo se convierten en una COSTURA cuando están a la misma
- * altura y pegados — el río llegaba al mar y cambiaba de color justo en la playa.
+ * El mar fue `#1d6a8e`, un azul elegido a ojo, y el agua del pack es otro. Dos azules
+ * que en una carta de colores pasarían por el mismo se convierten en una COSTURA
+ * cuando están a la misma altura y pegados: el río llegaba al mar y cambiaba de color
+ * justo en la playa. Se arregló haciendo que el disco USARA el material del pack
+ * clonado, con la textura fijada en el téxel de la cara de arriba de `tesela-agua`
+ * —`repeat` a cero deja la UV constante en `offset`—, o sea el mismo píxel de la misma
+ * imagen con la misma rugosidad bajo las mismas luces.
  *
- * Y aunque se acertara el hex, no bastaría: el material del pack trae su rugosidad y
- * su textura, y dos materiales distintos con el mismo color base se sombrean distinto
- * bajo la misma luz. Así que el mar no IMITA el agua del pack: usa su material,
- * clonado, con la textura fijada en el téxel de su cara de arriba —`repeat` a cero
- * deja la UV constante en `offset`, así que todo el disco muestrea ese punto y sólo
- * ése—. Es literalmente el mismo píxel de la misma imagen con la misma rugosidad. No
- * hay dos azules que puedan separarse, porque no hay dos.
+ * Un sombreador propio se sale de ese camino, y volver a él es la mitad del trabajo de
+ * `marea.ts`: allí están el téxel medido, la irradiancia de estas tres luces rehecha a
+ * mano y la misma GGX del material del pack. Aquí sólo hay que saber una cosa: si el
+ * mar en calma deja de verse igual que los lagos del tablero, el sitio donde mirar es
+ * ese fichero y no éste.
  *
- * La UV no está escrita aquí: se LEE de la geometría compilada. Si mañana el pack
- * cambia su tesela de agua, el mar cambia con ella sin que nadie se acuerde de esto.
+ * ═══ Y POR QUÉ YA NO ES UN `circleGeometry` ═══
  *
- * Sigue siendo un disco y no un anillo: por debajo del tablero no se ve, y un anillo
- * costaría un agujero que hay que hacer coincidir con el contorno dentado del mundo.
+ * `docs/EL-MAR-DE-RIBERAS.md` §1.3. Un abanico de ochenta y cuatro triángulos pone
+ * todos sus vértices en el borde y uno en el centro: no hay dónde interpolar la
+ * distancia a la costa ni dónde levantar una ola. `costa.ts` lo sustituye por anillos
+ * —densos en el aro donde vive la costa, sueltos hacia el horizonte— con esa distancia
+ * en cada vértice. Sigue siendo un disco entero y no una rosca: por debajo del tablero
+ * no se ve, y un agujero habría que hacerlo coincidir con el contorno dentado del
+ * mundo.
+ *
+ * La geometría viene YA en el plano XZ, así que no lleva la rotación de `-PI/2` que
+ * necesitaba el `circleGeometry`. Con ella puesta el disco se pondría de canto.
  */
-function uvDeLaCaraDeArriba(g: THREE.BufferGeometry): { u: number; v: number } | null {
-  const pos = g.getAttribute('position') as THREE.BufferAttribute | undefined;
-  const uv = g.getAttribute('uv') as THREE.BufferAttribute | undefined;
-  if (pos === undefined || uv === undefined) return null;
+function Mar({ alcance, relieve }: { alcance: number; relieve: Relieve }): JSX.Element {
+  /*
+   * EL CONTORNO Y EL DISCO SE CALCULAN UNA VEZ POR MUNDO, y no es gratis: unos setenta
+   * y cinco milisegundos entre trazar la costa y medir doce mil vértices contra ella.
+   * Se paga al montar el mundo —donde ya se pagan cosas mayores, como levantar el
+   * relieve— y no vuelve a pagarse: el delta no se mueve durante la partida, así que la
+   * dependencia es el relieve y nada más.
+   */
+  const geometria = useMemo(
+    () => geometriaDelMar(contornoDelDelta(relieve.todas()), alcance),
+    [relieve, alcance],
+  );
+  const material = useMemo(() => materialDeLaMarea(), []);
+  /* Los dos son nuestros y no del catálogo: se sueltan al desmontar, como en el muelle. */
+  useEffect(() => () => geometria.dispose(), [geometria]);
+  useEffect(() => () => material.dispose(), [material]);
 
-  let alto = -Infinity;
-  for (let i = 0; i < pos.count; i++) alto = Math.max(alto, pos.getY(i));
+  /*
+   * EL TIEMPO ES EL RELOJ DE LA ESCENA, y se escribe directamente en el uniform.
+   *
+   * No pasa por estado de React a propósito: son sesenta escrituras por segundo, y
+   * cada una que cruzara el estado repintaría el mundo entero —dos mil teselas
+   * instanciadas— para mover un número dentro de un material.
+   */
+  useFrame((estado) => {
+    material.uniforms.tiempo.value = estado.clock.elapsedTime;
+  });
 
-  let u = 0;
-  let v = 0;
-  let cuantos = 0;
-  for (let i = 0; i < pos.count; i++) {
-    if (pos.getY(i) < alto - 1e-4) continue;
-    u += uv.getX(i);
-    v += uv.getY(i);
-    cuantos++;
-  }
-  return cuantos > 0 ? { u: u / cuantos, v: v / cuantos } : null;
-}
-
-function Mar({
-  alcance,
-  agua,
-}: {
-  alcance: number;
-  agua: readonly Instanciable[] | undefined;
-}): JSX.Element {
-  const material = useMemo(() => {
-    const pieza = agua?.[0];
-    if (pieza === undefined) return null;
-    const punto = uvDeLaCaraDeArriba(pieza.geometria);
-    if (punto === null) return null;
-
-    const copia = (pieza.material as THREE.MeshStandardMaterial).clone();
-    const mapa = copia.map;
-    if (mapa === null) return copia;
-    /*
-     * Se clona también la TEXTURA, y no sólo el material: `offset` y `repeat` viven en
-     * ella, así que tocarlos sobre la compartida movería las UV de las dos mil teselas
-     * del suelo. Es el mismo fallo que el del desplazamiento de bioma, un piso más
-     * abajo.
-     */
-    const suya = mapa.clone();
-    suya.repeat.set(0, 0);
-    suya.offset.set(punto.u, punto.v);
-    suya.needsUpdate = true;
-    copia.map = suya;
-    return copia;
-  }, [agua]);
-
-  if (material === null) return <group />;
   /*
    * EL MAR NO RECIBE SOMBRA, Y NO ES UN DESCUIDO.
    *
@@ -574,11 +563,7 @@ function Mar({
    * veces el área deja el tablero —que es lo que se mira— con las sombras dentadas. Y
    * en mar abierto no hay nada que proyecte sombra que merezca la pena.
    */
-  return (
-    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, LAMINA, 0]} material={material}>
-      <circleGeometry args={[alcance * 6, 84]} />
-    </mesh>
-  );
+  return <mesh position={[0, LAMINA, 0]} geometry={geometria} material={material} />;
 }
 
 /**
@@ -592,16 +577,28 @@ function Mar({
  * La cámara de sombras se dimensiona con el alcance y no con un número fijo: a esta
  * escala, un volumen de sombra pensado para un tablero de mesa deja el noventa por
  * ciento del mundo sin sombras y nadie sabe por qué.
+ *
+ * ═══ LOS COLORES Y LAS INTENSIDADES NO ESTÁN AQUÍ, Y ESO ES A PROPÓSITO ═══
+ *
+ * El mar no es un material del motor: es un sombreador escrito a mano que tiene que
+ * rehacer por su cuenta la cuenta de la luz para no separarse del agua de los lagos,
+ * que sí la reciben del motor (ver `marea.ts`). O sea que estos cinco números los
+ * necesitan dos sitios, y dos listas de números que TIENEN que coincidir acaban no
+ * coincidiendo: se cambia el sol aquí, nadie se acuerda del mar, y el delta aparece con
+ * dos aguas de distinto tono sin que nada proteste. Se declaran una vez en `marea.ts`
+ * y los lee quien los necesite.
  */
 function Luces({ alcance }: { alcance: number }): JSX.Element {
+  const { ambiente, cielo, sol } = LAS_LUCES_DEL_DELTA;
+  const [rx, ry, rz] = sol.rumbo;
   return (
     <>
-      <ambientLight intensity={0.55} color="#cfe0f0" />
-      <hemisphereLight args={['#eaf4ff', '#54613f', 0.6]} />
+      <ambientLight intensity={ambiente.intensidad} color={ambiente.color} />
+      <hemisphereLight args={[cielo.arriba, cielo.abajo, cielo.intensidad]} />
       <directionalLight
-        position={[alcance * 0.55, alcance * 1.2, alcance * 0.4]}
-        intensity={2}
-        color="#fff3dd"
+        position={[alcance * rx, alcance * ry, alcance * rz]}
+        intensity={sol.intensidad}
+        color={sol.color}
         castShadow
         shadow-mapSize-width={2048}
         shadow-mapSize-height={2048}
@@ -2631,7 +2628,7 @@ export function Delta({
   return (
     <group>
       <Luces alcance={alcance} />
-      <Mar alcance={alcance} agua={aplanados.get(MODELO.agua)} />
+      <Mar alcance={alcance} relieve={relieve} />
 
       {/*
        * LAS SEÑALES DE COLOCAR, que sólo existen mientras se coloca.

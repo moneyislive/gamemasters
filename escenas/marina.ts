@@ -154,6 +154,21 @@ const MAR_ADENTRO_MINIMO = 2.1;
 const MAR_ADENTRO_MAXIMO = 5.4;
 
 /**
+ * HASTA DÓNDE SE VA EL BARCO MÁS LEJANO, en unidades de mundo: cincuenta y nueve.
+ *
+ * Se publica porque el mar lo necesita. `marea.ts` pone sus olas POR FUERA de la flota
+ * —eso se decidió mirando la pantalla: olas entre los barcos y la playa no se leen como
+ * mar abierto, se leen como suciedad— y la única forma de que eso siga siendo verdad el
+ * día que alguien acerque o aleje los barcos es que las dos cosas salgan del mismo
+ * número. Si se toca `MAR_ADENTRO_MAXIMO`, la corona de olas se mueve sola.
+ *
+ * Es la distancia al CENTRO de la tesela de costa, así que a la orilla real hay algo
+ * menos: media tesela, según por dónde muerda el contorno. Como la corona empieza aquí
+ * y no antes, ese margen juega a favor.
+ */
+export const MAR_ADENTRO_DE_LOS_BARCOS = MAR_ADENTRO_MAXIMO * PASO;
+
+/**
  * QUÉ PARTE DE LA ORILLA SE CUBRE DE VEGETACIÓN.
  *
  * Una de cada tres celdas de borde, no todas. Un cuerpo de agua con juncos en los

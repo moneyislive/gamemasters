@@ -30,12 +30,6 @@ la otra agua.
    luz: si al terminar el mar en calma se ve distinto del de antes, está mal.
 
 2. **La distancia a la costa se calcula en la CPU, una vez, y viaja en el vértice.**
-
-   Y NO sirve la que ya hay. `aguas.ts` calcula `dOrilla` —y `relieve.ts` la pasea
-   hasta `Subtesela.aOrilla`— pero mide **desde el agua hacia tierra adentro**, que es
-   lo contrario de lo que la espuma necesita; es entera, en pasos de celda de casi once
-   unidades; y sólo cubre las subteselas del tablero, no el mar de fuera, que es donde
-   vive el disco. Además hoy no la lee nadie. Se deja como está.
    No se calcula en el sombreador. Dos razones, y la segunda es la que manda:
    - El contorno del delta es dentado —diecinueve comarcas hexagonales— y aproximarlo
      con un hexágono grande dejaría la espuma despegada de la costa media comarca.
@@ -45,6 +39,12 @@ la otra agua.
 
    Se calcula al montar el mundo, que es cuando ya se conocen las comarcas, y no
    cambia durante la partida: el delta no se mueve.
+
+   Y NO sirve la que ya hay. `aguas.ts` calcula `dOrilla` —y `relieve.ts` la pasea
+   hasta `Subtesela.aOrilla`— pero mide **desde el agua hacia tierra adentro**, que es
+   lo contrario de lo que la espuma necesita; es entera, en pasos de celda de casi
+   once unidades; y sólo cubre las subteselas del tablero, no el mar de fuera, que es
+   donde vive el disco. Además hoy no la lee nadie. Se deja como está.
 
 3. **El disco del mar deja de ser un abanico y pasa a ser anillos.** `circleGeometry`
    pone todos sus vértices en el borde y uno en el centro: no hay dónde interpolar
@@ -63,7 +63,22 @@ la otra agua.
    se apaga antes de llegar a donde se pone una choza. Es la misma regla que ya
    gobierna la franja de borde de las comarcas en `poblar.ts`.
 
-6. **Se paga en píxeles, así que se mide.** El mar cubre la pantalla entera detrás del
+6. **La ola no levanta nada mientras haya tablero encima.** El disco pasa POR DEBAJO del
+   tablero hasta el centro y vive en `LAMINA`, que es exactamente la cota de la lámina de
+   una tesela de agua del pack a nivel cero —decisión buena: así el río llega al mar sin
+   escalón—. Pero la distancia a la costa es POSITIVA sobre los ríos y estuarios de
+   dentro, porque la inundación los marca como mar, así que una envolvente que sólo mire
+   esa distancia levanta el disco por encima de teselas que son geometría fija. Medido
+   antes de cerrarlo: asomaba 0,19, y estaba a la cota exacta el resto del tiempo, que es
+   donde aparece el parpadeo de profundidad. `SOMBRA_DEL_TABLERO` lo apaga, y
+   `verify:escena` cruza los vértices del disco con las subteselas del tablero y exige
+   cero espuma y cero subida en los 44.592 que tienen tesela encima.
+
+7. **Las olas rompen por fuera de la flota, y ese número no se escribe dos veces.**
+   `marina.ts` publica hasta dónde navega el barco más lejano y `marea.ts` empieza ahí su
+   corona. Si alguien acerca los barcos, la espuma se acerca con ellos.
+
+8. **Se paga en píxeles, así que se mide.** El mar cubre la pantalla entera detrás del
    tablero: cada línea del fragmento se ejecuta millones de veces, y los anillos
    cuestan triángulos.
 
@@ -75,27 +90,75 @@ la otra agua.
    añade el mar nuevo, escrito y comprobado, para que el día que alguien suba los
    anillos se vea el precio en vez de descubrirlo en un móvil.
 
-## 2. Las cuatro cosas, y en qué orden importan
+## 2. Lo que hay, después de mirarlo en pantalla
 
-Todas salen de UN número por vértice: **la distancia a la costa**, en unidades de
-mundo, negativa dentro de tierra y positiva en el agua.
+Este apartado se reescribió el mismo día, viendo el mar correr. Lo proyectado eran cuatro
+cosas colgadas todas de la distancia a la costa; lo que quedó son dos, y ninguna de las
+dos cuelga sólo de ahí.
 
-1. **La orilla que se moja y se seca.** Una banda estrecha de espuma pegada al
-   contorno, cuyo ancho respira con el tiempo. Es lo que más devuelve por lo que
-   cuesta: sin ella, el corte entre tierra y agua es una línea de tijera.
+### 2.1. Las olas: parches sueltos en una corona, y por qué no son anillos
 
-2. **La rompiente.** Dos o tres líneas de espuma paralelas a la costa que nacen mar
-   adentro, avanzan hacia ella y se deshacen al llegar. Es la misma banda de arriba
-   desplazada en el tiempo, así que sale casi gratis.
+Es lo único que se ve, y costó tres versiones:
 
-3. **Las olas con cresta, a cierta distancia y de altura variable.** Lo que pidió
-   Miguel. Levantan el vértice de verdad —no es un dibujo— con la altura modulada
-   por dos cosas: la distancia a la costa (cero pegadas a tierra, máximo en la franja
-   de rompiente, y suave en mar abierto) y un ruido lento que hace que unas sean más
-   altas que otras. Sin ese ruido, un oleaje perfecto se lee como una chapa ondulada.
+- **La primera** dibujó la espuma con un seno sobre la distancia a la costa, que es lo
+  que se hace normalmente. Salieron **anillos concéntricos, como las ondas de un
+  estanque**. Y el fallo no era de afinado sino de qué variable se estaba usando: el
+  campo de distancias de un delta casi redondo tiene curvas de nivel casi circulares, así
+  que cualquier cosa dibujada sobre él sale en anillos por mucho que se le tuerza la fase.
+- **La segunda** llevó la espuma a coordenadas de mundo. Se acabaron los anillos, pero
+  entonces **las olas iban todas en la misma dirección** —un tren de fondo tiene una
+  sola— y, con el umbral fijo, las manchas medían todas lo mismo: veinticinco manchas de
+  las cuales veintitrés de cincuenta y dos unidades. Rayas puestas con regla.
+- **La tercera**, que es la que está, junta las dos. La cresta SÍ cuelga de la distancia
+  a la costa —por eso las olas son paralelas a la orilla y avanzan hacia ella, que es
+  como rompe el mar de verdad— y lo que impide que sean anillos son tres cosas a la vez:
+  el paso varía entre 36 y 75 unidades según el punto, la línea va torcida por dos senos
+  del mundo, y un **campo de parches** la recorta en tramos.
 
-4. **El vaivén sobre la arena.** El avance y retroceso de (1) sobre las teselas de
-   playa, con su propio ritmo, más lento que el rizo.
+Ese campo (`CAMPO_DE_LAS_OLAS`) son tres senos cruzados de 55, 29 y 18 unidades cortados
+por un umbral que **otro tren, mucho más largo, sube y baja**: donde el mar está picado
+el corte baja y pasa una ola ancha, y donde está liso sólo asoman las cimas y quedan
+motas sueltas. De ahí sale la variedad de tamaño, y se mide en Node sobre la misma tabla
+de la que se escribe el GLSL: **de 3 a 22 unidades de diámetro, mediana 13**, unas 270
+manchas. Con umbral fijo eran todas iguales; con éste, no.
+
+Y no rompen por todo el mar sino en una **corona anclada a los barcos**: empieza justo
+donde acaba de navegar el más lejano —59 unidades; el número sale de `marina.ts`, no de
+aquí—, rompe entera a 100 y se ha ido a 248. Entre los barcos y la playa no hay espuma
+porque ahí no se lee como oleaje sino como suciedad en el agua; en el horizonte tampoco,
+porque los anillos del disco pasan a medir más que la propia mota y la espuma parpadea de
+un fotograma a otro.
+
+### 2.2. La altura: dos escalas, cada una donde su malla llega
+
+La ola levanta el vértice de verdad, y la amplitud la modula el tren LARGO del mismo
+campo, no las motas. La razón es de muestreo y no de gusto: los anillos del disco van a
+un radio de tesela en el aro de la costa, o sea tres vértices por longitud de onda de una
+mota, justo en el límite de Nyquist, y por fuera del aro crecen un 18 % por vuelta y ya no
+llegan. Colgar la altura de ahí da un mar que tiembla. El fragmento sí puede con el
+detalle, porque resuelve por píxel. **Una tabla, dos lectores, cada uno con la escala que
+aguanta.**
+
+Y la amplitud vale cero mientras haya tablero encima, por la decisión 6 del §1.
+
+### 2.3. La orilla que se moja: escrita, APAGADA y comentada
+
+Se hizo —una banda de espuma pegada al contorno cuyo ancho respira con un vaivén más
+lento que el rizo— y **no vale**: en pantalla salen manchas y arañazos blancos pegados a
+la tierra. Está comentada línea a línea en `marea.ts`, no borrada, con las dos sospechas
+escritas para quien la retome:
+
+1. **La distancia viaja interpolada entre vértices.** En el aro de la costa los anillos
+   van a un radio de tesela y los sectores a seis: una banda de seis unidades de ancho se
+   dibuja con un vértice de margen, así que donde el contorno hace un diente la banda se
+   corta o se ensancha de golpe. Las olas de §2.1 no lo sufren porque miden decenas de
+   unidades; la orilla sí.
+2. **El signo dentro de las bocas de río.** El contorno sube por los estuarios, así que
+   la banda se pinta a los dos lados de un cauce de una tesela de ancho, y eso se lee como
+   una mancha y no como una orilla.
+
+El contrato que protegía —que la espuma no pase de `ESPUMA_TIERRA_ADENTRO` hacia tierra—
+sigue en pie y sigue comprobado.
 
 ## 3. Dónde vive cada cosa
 

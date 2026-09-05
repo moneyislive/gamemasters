@@ -118,10 +118,50 @@ import {
 import { BIENES_CON_ICONO, CONTORNOS_DE_LA_CARTA, CONTORNOS_DEL_BIEN } from '../iconos';
 import { MODELO, modeloDePieza } from '../modelos';
 import { ESCALON, RADIO_DE_COMARCA, RADIO_DE_TESELA } from '../escala';
-import { laMarinaDelMundo } from '../marina';
+import { MAR_ADENTRO_DE_LOS_BARCOS, laMarinaDelMundo } from '../marina';
 import { crearRelieve, hexDePunto } from '../relieve';
+import { contornoDelDelta, distanciaALaCosta, geometriaDelMar } from '../costa';
+import type { Segmento } from '../costa';
+import {
+  ALCANCE_DEL_DELTA,
+  ESPUMA_TIERRA_ADENTRO,
+  RADIO_EXTERIOR_DE_LA_COSTA,
+  RADIO_INTERIOR_DE_LA_COSTA,
+  SECTORES_DEL_MAR,
+  TOPE_DEL_MAR,
+  TRIANGULOS_DEL_MAR,
+  radiosDelMar,
+  triangulosDelMar,
+} from '../presupuesto-del-delta';
 import fs from 'node:fs';
 import path from 'node:path';
+import * as THREE from 'three';
+import { NodeIO } from '@gltf-transform/core';
+import type { Node, Primitive } from '@gltf-transform/core';
+/*
+ * LAS MISMAS FUNCIONES CON LAS QUE SE HORNEAN LOS MODELOS, y no una copia de ellas.
+ *
+ * `muestrea` linealiza los téxeles ANTES de interpolar, que es lo que hace la GPU con
+ * una textura declarada sRGB; escrita otra vez aquí «como se hace normalmente» daría un
+ * color parecido y este comprobador estaría midiendo su propio error.
+ */
+import { muestrea, pngDeLaTextura } from './hornear';
+import {
+  ALTURA_DE_LA_OLA,
+  COLOR_DEL_AGUA_DEL_PACK,
+  CORONA_DE_LAS_OLAS,
+  GLSL_DE_LA_MAREA,
+  espumaPosibleEn,
+  loQueSubeEn,
+  SOMBRA_DEL_TABLERO,
+  TRENES_DE_LAS_OLAS,
+  ZONAS_DE_LAS_OLAS,
+  olaEn,
+  zonaEn,
+  LAMIDO_DE_LA_ORILLA,
+  PLUMA_DE_LA_ORILLA,
+  materialDeLaMarea,
+} from '../marea';
 
 let hechas = 0;
 const fallos: string[] = [];
@@ -656,6 +696,808 @@ paso('El mundo cubre los cincuenta y cuatro vértices donde se construye');
     'y el relieve lo declara él mismo, para que no haya que venir a contarlo',
     declarados === 0,
     { declarados },
+  );
+}
+
+// ---------------------------------------------------------------------------
+
+/**
+ * LA COSTA DEL DELTA: el contorno, la distancia con signo y el disco de anillos.
+ *
+ * ═══ POR QUÉ ESTO SE COMPRUEBA AQUÍ Y NO MIRANDO EL MAR ═══
+ *
+ * `docs/EL-MAR-DE-RIBERAS.md` §1.2 puso la cuenta en la CPU justamente para poder
+ * ejercitarla en Node. Si la distancia a la costa viviera en el sombreador, el único
+ * modo de saber si está bien sería abrir un navegador y juzgar a ojo si la espuma cae
+ * donde la orilla — y a vista de pájaro, media comarca de error parece perspectiva.
+ * Aquí es un número: se sabe, no se opina.
+ *
+ * ═══ LO QUE CADA COMPROBACIÓN COMPRA ═══
+ *
+ * Las tres primeras son sobre el CONTORNO: que exista, que se cierre y que esté hecho
+ * de lados de subtesela. Un contorno con puntas sueltas no se ve raro en pantalla —la
+ * espuma sigue saliendo—, se ve como una costa con un mordisco.
+ *
+ * Las cuatro siguientes son sobre el CAMPO de distancia, y son las que atrapan el
+ * fallo clásico: el signo del revés. Con el signo cambiado la espuma sale tierra
+ * adentro y el mar abierto queda liso, y es un error de un carácter.
+ *
+ * Y la que de verdad importa para jugar es la de los cincuenta y cuatro vértices: si
+ * un día el generador dejara un río lamiendo un poblado, la espuma se metería en la
+ * plaza, y esta línea lo diría antes de que nadie lo viera.
+ */
+paso('La costa del delta: el contorno, la distancia con signo y el disco de anillos');
+{
+  const TERRENOS_DE_LA_COSTA = [
+    'bosque', 'bosque', 'bosque', 'bosque', 'pradera', 'pradera', 'pradera', 'pradera',
+    'campo', 'campo', 'campo', 'campo', 'colina', 'colina', 'colina',
+    'montana', 'montana', 'montana', 'desierto',
+  ];
+  const hexes = mallaDeRadio(2);
+  const islas = hexes.map((hex, i) => ({
+    hex,
+    terreno: TERRENOS_DE_LA_COSTA[i % TERRENOS_DE_LA_COSTA.length] ?? 'pradera',
+  }));
+  const verticesDelJuego = [...new Set(hexes.flatMap((h) => verticesDeHex(h)))];
+  const SEMILLAS_DE_LA_COSTA = 8;
+  const radios = radiosDelMar();
+
+  /**
+   * LA FUERZA BRUTA, escrita aquí a propósito y sin llamar a `costa.ts`.
+   *
+   * `distanciaALaCosta` busca por una rejilla de cubos y se salta la mayoría de los
+   * segmentos. Eso es lo que hace que montar el mundo cueste milisegundos en vez de
+   * décimas de segundo, y es también donde se puede colar un fallo que sólo aparece en
+   * unos pocos puntos —un anillo de más o de menos en el criterio de parada— y que en
+   * pantalla se leería como una mancha de espuma en mitad del mar. Contra eso sólo
+   * vale la otra implementación: mirarlos todos, que no tiene dónde equivocarse.
+   */
+  const aPelo = (x: number, z: number, segmentos: readonly Segmento[]): number => {
+    let mejor = Infinity;
+    for (const s of segmentos) {
+      const dx = s.bx - s.ax;
+      const dz = s.bz - s.az;
+      const largo = dx * dx + dz * dz;
+      let u = largo > 0 ? ((x - s.ax) * dx + (z - s.az) * dz) / largo : 0;
+      u = u < 0 ? 0 : u > 1 ? 1 : u;
+      const qx = s.ax + u * dx - x;
+      const qz = s.az + u * dz - z;
+      mejor = Math.min(mejor, qx * qx + qz * qz);
+    }
+    return Math.sqrt(mejor);
+  };
+
+  let segmentosMinimos = Infinity;
+  let puntasSueltas = 0;
+  let ladosQueNoMidenUnaTesela = 0;
+  let enElCentroLaMenosNegativa = -Infinity;
+  let enElMarLaMenosPositiva = Infinity;
+  let enElContornoLoMasLejosDeCero = 0;
+  let retrocesosAlAlejarse = 0;
+  let desvioDeLaRejilla = 0;
+  let holguraDeLosVertices = Infinity;
+  let verticesQueElTerrenoDiceMar = 0;
+
+  for (let semilla = 0; semilla < SEMILLAS_DE_LA_COSTA; semilla++) {
+    const contorno = contornoDelDelta(crearRelieve(islas, semilla).todas());
+    const { segmentos } = contorno;
+    segmentosMinimos = Math.min(segmentosMinimos, segmentos.length);
+
+    /*
+     * QUE EL CONTORNO SE CIERRE. Cada punta de cada segmento tiene que ser también la
+     * punta de otro: el borde de un conjunto de celdas es una curva cerrada, así que
+     * ningún extremo puede quedarse solo. Se comparan los dobles TAL CUAL, sin
+     * holgura, y eso se puede hacer porque las esquinas se piden por su llave
+     * canónica: las dos celdas que comparten un punto lo calculan con los mismos bits,
+     * no por dos caminos que dan casi lo mismo.
+     */
+    const grado = new Map<string, number>();
+    for (const s of segmentos) {
+      for (const punta of [`${String(s.ax)}|${String(s.az)}`, `${String(s.bx)}|${String(s.bz)}`]) {
+        grado.set(punta, (grado.get(punta) ?? 0) + 1);
+      }
+      const largo = Math.hypot(s.bx - s.ax, s.bz - s.az);
+      if (Math.abs(largo - RADIO_DE_TESELA) > 1e-6) ladosQueNoMidenUnaTesela++;
+    }
+    for (const cuantas of grado.values()) if (cuantas < 2) puntasSueltas++;
+
+    /* Dentro, fuera y encima: los tres sitios donde el signo se puede caer. */
+    enElCentroLaMenosNegativa = Math.max(
+      enElCentroLaMenosNegativa,
+      distanciaALaCosta({ x: 0, z: 0 }, contorno),
+    );
+    for (let a = 0; a < 32; a++) {
+      const angulo = (a / 32) * Math.PI * 2;
+      const lejos = ALCANCE_DEL_DELTA * 5;
+      enElMarLaMenosPositiva = Math.min(
+        enElMarLaMenosPositiva,
+        distanciaALaCosta({ x: Math.cos(angulo) * lejos, z: Math.sin(angulo) * lejos }, contorno),
+      );
+    }
+    for (const s of segmentos) {
+      const medio = distanciaALaCosta({ x: (s.ax + s.bx) / 2, z: (s.az + s.bz) / 2 }, contorno);
+      enElContornoLoMasLejosDeCero = Math.max(enElContornoLoMasLejosDeCero, Math.abs(medio));
+    }
+
+    /*
+     * QUE CREZCA AL ALEJARSE, y por qué se empieza más allá del delta y no en el
+     * origen. Fuera del círculo que encierra toda la costa el crecimiento es un
+     * teorema: la distancia a cada segmento por separado es convexa a lo largo del
+     * rayo y tiene su mínimo antes de ese círculo, así que de ahí en adelante todas
+     * crecen, y el mínimo de funciones crecientes crece. Dentro NO lo es, y no por un
+     * fallo: el contorno sube por los estuarios hasta el centro del tablero, y un rayo
+     * que cruza un río sale del agua y vuelve a entrar. Exigir monotonía ahí sería
+     * exigir que el delta no tuviera ríos.
+     */
+    for (let a = 0; a < 24; a++) {
+      const angulo = (a / 24) * Math.PI * 2;
+      let anterior = -Infinity;
+      for (let t = ALCANCE_DEL_DELTA * 1.1; t <= ALCANCE_DEL_DELTA * 6; t += 20) {
+        const d = distanciaALaCosta({ x: Math.cos(angulo) * t, z: Math.sin(angulo) * t }, contorno);
+        if (d <= anterior) retrocesosAlAlejarse++;
+        anterior = d;
+      }
+    }
+
+    /* La rejilla contra la fuerza bruta, en vértices del disco de verdad. */
+    for (const r of radios) {
+      for (let s = 0; s < SECTORES_DEL_MAR; s += 7) {
+        const angulo = (s / SECTORES_DEL_MAR) * Math.PI * 2;
+        const x = Math.cos(angulo) * r;
+        const z = Math.sin(angulo) * r;
+        const conRejilla = Math.abs(distanciaALaCosta({ x, z }, contorno));
+        desvioDeLaRejilla = Math.max(desvioDeLaRejilla, Math.abs(conRejilla - aPelo(x, z, segmentos)));
+      }
+    }
+
+    /*
+     * LOS CINCUENTA Y CUATRO SITIOS DONDE SE CONSTRUYE. `relieve.ts` garantiza que la
+     * subtesela de cada vértice y su anillo de seis son tierra; de ahí sale, sin medir
+     * nada, que el contorno no puede pasar a menos de DOS radios de tesela de ninguno
+     * de ellos. Se mide de todas formas: un invariante que no se mide es una promesa, y
+     * ésta es la que le deja sitio a la espuma para apagarse antes de la choza.
+     */
+    for (const v of verticesDelJuego) {
+      const p = puntoDeVertice(v, RADIO_DE_COMARCA);
+      const donde = { x: p.x, z: p.y };
+      if (contorno.esMar(donde)) verticesQueElTerrenoDiceMar++;
+      holguraDeLosVertices = Math.min(holguraDeLosVertices, -distanciaALaCosta(donde, contorno));
+    }
+  }
+
+  comprobar(
+    'el contorno de un delta de verdad trae cientos de segmentos, no cero',
+    segmentosMinimos > 400,
+    { segmentosMinimos },
+  );
+  comprobar(
+    'y se cierra: ninguna punta de segmento se queda sola',
+    puntasSueltas === 0,
+    { puntasSueltas },
+  );
+  comprobar(
+    'y cada tramo es un lado de subtesela, ni una diagonal ni medio lado',
+    ladosQueNoMidenUnaTesela === 0,
+    { ladosQueNoMidenUnaTesela },
+  );
+  comprobar(
+    'la distancia es NEGATIVA en el centro del tablero',
+    enElCentroLaMenosNegativa < 0,
+    { laMenosNegativa: enElCentroLaMenosNegativa },
+  );
+  comprobar(
+    'y POSITIVA a cinco alcances, en las treinta y dos direcciones',
+    enElMarLaMenosPositiva > 0,
+    { laMenosPositiva: enElMarLaMenosPositiva },
+  );
+  comprobar(
+    'y cero encima del propio contorno, que es donde cambia de signo',
+    enElContornoLoMasLejosDeCero < 1e-6,
+    { loMasLejosDeCero: enElContornoLoMasLejosDeCero },
+  );
+  comprobar(
+    'y crece sin volverse atrás al alejarse por una recta que sale del delta',
+    retrocesosAlAlejarse === 0,
+    { retrocesosAlAlejarse },
+  );
+  comprobar(
+    'la rejilla del contorno dice lo mismo que mirar los novecientos segmentos',
+    desvioDeLaRejilla < 1e-9,
+    { desvioDeLaRejilla },
+  );
+  comprobar(
+    'en los 54 vértices donde se construye, el terreno dice tierra y la distancia también',
+    verticesQueElTerrenoDiceMar === 0 && holguraDeLosVertices > 0,
+    { verticesQueElTerrenoDiceMar, holguraDeLosVertices },
+  );
+  comprobar(
+    'y la costa les queda a dos radios de tesela por lo menos, como promete el anillo de siete',
+    holguraDeLosVertices >= 2 * RADIO_DE_TESELA - HOLGURA,
+    { holguraDeLosVertices, minimo: 2 * RADIO_DE_TESELA },
+  );
+  comprobar(
+    'así que la espuma declarada se apaga con media tesela de margen por lo menos',
+    holguraDeLosVertices > ESPUMA_TIERRA_ADENTRO + RADIO_DE_TESELA / 2,
+    { holguraDeLosVertices, espuma: ESPUMA_TIERRA_ADENTRO },
+  );
+
+  /*
+   * EL DISCO. Lo que se mide aquí no es que se vea bien —eso pide un aparato— sino que
+   * los anillos estén DONDE SE DIJO. El reparto es la decisión de todo esto: con los
+   * anillos repartidos como en el muelle, geométricos desde el centro, el aro de la
+   * costa recibiría saltos de setenta unidades y la espuma saldría en cuñas; y el
+   * síntoma es de los que se le achacan al sombreador durante una tarde entera.
+   */
+  const contornoDeMuestra = contornoDelDelta(crearRelieve(islas, 3).todas());
+  const disco = geometriaDelMar(contornoDeMuestra);
+  const sitios = disco.getAttribute('position');
+  const aLaCosta = disco.getAttribute('costa');
+  const dentroDelAro = RADIO_INTERIOR_DE_LA_COSTA * ALCANCE_DEL_DELTA;
+  const fueraDelAro = RADIO_EXTERIOR_DE_LA_COSTA * ALCANCE_DEL_DELTA;
+
+  let saltoMayorEnLaCosta = 0;
+  let saltoMenorEnElHorizonte = Infinity;
+  for (let i = 1; i < radios.length; i++) {
+    const antes = radios[i - 1] as number;
+    const ahora = radios[i] as number;
+    if (antes >= dentroDelAro - HOLGURA && ahora <= fueraDelAro + HOLGURA) {
+      saltoMayorEnLaCosta = Math.max(saltoMayorEnLaCosta, ahora - antes);
+    } else if (antes >= fueraDelAro - HOLGURA) {
+      saltoMenorEnElHorizonte = Math.min(saltoMenorEnElHorizonte, ahora - antes);
+    }
+  }
+
+  let masAdentro = 0;
+  let desvioDelAtributo = 0;
+  for (let i = 0; i < sitios.count; i++) {
+    masAdentro = Math.min(masAdentro, aLaCosta.getX(i));
+    if (i % 11 !== 0) continue;
+    const esperado = distanciaALaCosta({ x: sitios.getX(i), z: sitios.getZ(i) }, contornoDeMuestra);
+    desvioDelAtributo = Math.max(desvioDelAtributo, Math.abs(esperado - aLaCosta.getX(i)));
+  }
+
+  comprobar(
+    'los anillos son más densos en la costa que en el horizonte, y por un orden de magnitud',
+    saltoMayorEnLaCosta * 10 < saltoMenorEnElHorizonte,
+    { saltoMayorEnLaCosta, saltoMenorEnElHorizonte },
+  );
+  comprobar(
+    'y el aro fino se abre por fuera de la costa de verdad, no por dentro',
+    fueraDelAro > 347 && dentroDelAro < 269,
+    { fueraDelAro, dentroDelAro },
+  );
+  comprobar(
+    'ningún vértice del disco se mete bajo el tablero más de un alcance',
+    masAdentro > -ALCANCE_DEL_DELTA,
+    { masAdentro, alcance: ALCANCE_DEL_DELTA },
+  );
+
+  /*
+   * ═══ EL DISCO NO PUEDE ASOMAR POR ENCIMA DE LOS RÍOS DEL TABLERO ═══
+   *
+   * Esto es lo que la comprobación de aquí arriba PARECE que dice y no dice. El disco
+   * pasa por debajo del tablero hasta el centro y vive en `LAMINA`, que es EXACTAMENTE la
+   * cota de la lámina de una tesela de agua del pack a nivel cero —así se quiso, para que
+   * el río llegue al mar sin escalón—. Y la inundación de `costa.ts` marca como MAR toda
+   * el agua conectada con el exterior, o sea todos los ríos y estuarios: sobre ellos la
+   * distancia a la costa es POSITIVA. De modo que cualquier envolvente que sólo mire esa
+   * distancia enciende la espuma y levanta el agua encima de teselas que son geometría
+   * fija y no ondulan. Se midió antes de arreglarlo: el disco asomaba 0,19 sobre el agua
+   * del pack, y a la cota exacta el resto del tiempo, que es donde aparece el parpadeo.
+   *
+   * Leyendo el GLSL esto no se ve: hace falta cruzar los vértices del disco con las
+   * subteselas del tablero, que es lo que se hace aquí. Cuatro semillas, todos los
+   * vértices, y cota superior de las dos cosas. Cero es cero pase lo que pase con el reloj.
+   */
+  let bajoElTablero = 0;
+  let laMasEspumaDebajo = 0;
+  let loQueMasSubeDebajo = 0;
+  let laCostaMasGrandeDebajo = 0;
+  for (let semilla = 0; semilla < 4; semilla++) {
+    const celdasDelMundo = crearRelieve(islas, semilla).todas();
+    const hayTablero = new Set(celdasDelMundo.map((t) => `${String(t.sub.q)},${String(t.sub.r)}`));
+    const suContorno = contornoDelDelta(celdasDelMundo);
+    const suDisco = geometriaDelMar(suContorno);
+    const donde = suDisco.getAttribute('position');
+    const cuanto = suDisco.getAttribute('costa');
+    for (let i = 0; i < donde.count; i++) {
+      const h = hexDePunto({ x: donde.getX(i), y: donde.getZ(i) }, RADIO_DE_TESELA);
+      if (!hayTablero.has(`${String(h.q)},${String(h.r)}`)) continue;
+      const c = cuanto.getX(i);
+      bajoElTablero++;
+      laCostaMasGrandeDebajo = Math.max(laCostaMasGrandeDebajo, c);
+      laMasEspumaDebajo = Math.max(laMasEspumaDebajo, espumaPosibleEn(c));
+      loQueMasSubeDebajo = Math.max(loQueMasSubeDebajo, loQueSubeEn(c));
+    }
+  }
+
+  comprobar(
+    'hay decenas de miles de vértices del disco con tablero encima, o sea que esto mide algo',
+    bajoElTablero > 10_000,
+    { bajoElTablero },
+  );
+  comprobar(
+    'y ni uno de ellos recibe espuma: la corona empieza mucho más lejos que el agua de dentro',
+    laMasEspumaDebajo === 0,
+    { laMasEspumaDebajo, laCostaMasGrandeDebajo, laCoronaEmpiezaEn: CORONA_DE_LAS_OLAS.desde },
+  );
+  comprobar(
+    'y ni uno se levanta, así que el disco no asoma por encima de los ríos del tablero',
+    loQueMasSubeDebajo === 0,
+    { loQueMasSubeDebajo, laCostaMasGrandeDebajo, SOMBRA_DEL_TABLERO },
+  );
+  comprobar(
+    'el disco lleva una distancia a la costa por cada vértice',
+    aLaCosta.count === sitios.count && sitios.count === radios.length * SECTORES_DEL_MAR,
+    { costa: aLaCosta.count, vertices: sitios.count },
+  );
+  /*
+   * LA HOLGURA DE ESTA, que no es la de las demás y conviene decir por qué.
+   *
+   * Aquí se comparan dos cosas que NO se calcularon en el mismo sitio del plano: la
+   * geometría midió la distancia sobre las coordenadas de doble precisión, y esto la
+   * vuelve a medir sobre las que quedaron guardadas en el `float` del atributo de
+   * posición. A dos mil unidades del origen, un `float` ya redondea la posición un par
+   * de diezmilésimas, y la distancia hereda ese error entero porque su pendiente es
+   * uno. Una milésima deja pasar eso y sigue cazando cualquier fallo de verdad, que se
+   * mide en unidades y no en diezmilésimas.
+   */
+  comprobar(
+    'y cada una es la que dice la función, hasta donde llega un «float»',
+    desvioDelAtributo < 1e-3,
+    { desvioDelAtributo },
+  );
+  comprobar(
+    'el disco cuesta los triángulos que el presupuesto tiene escritos',
+    triangulosDelMar() === TRIANGULOS_DEL_MAR,
+    { contados: triangulosDelMar(), escritos: TRIANGULOS_DEL_MAR },
+  );
+  comprobar(
+    'y la geometría dibuja exactamente ésos, ni uno más',
+    (disco.getIndex()?.count ?? 0) / 3 === TRIANGULOS_DEL_MAR,
+    { dibujados: (disco.getIndex()?.count ?? 0) / 3 },
+  );
+  comprobar(
+    'y el mar no se pasa del tope que el delta se ha puesto',
+    TRIANGULOS_DEL_MAR <= TOPE_DEL_MAR,
+    { TRIANGULOS_DEL_MAR, TOPE_DEL_MAR },
+  );
+}
+
+// ---------------------------------------------------------------------------
+
+/**
+ * EL SOMBREADOR DEL MAR: lo que se puede comprobar de un GLSL sin encender una GPU.
+ *
+ * ═══ QUÉ SE PUEDE Y QUÉ NO ═══
+ *
+ * Que la espuma se vea bonita no lo dice esto: eso pide un ojo delante de una pantalla.
+ * Lo que sí se puede decir en Node, y son justo los fallos que cuestan una tarde
+ * entera, es esto:
+ *
+ *   · QUE EL TEXTO COMPILE EN LOS DOS SITIOS. `escenas/embarcadero/agua.ts` dejó
+ *     escrita la restricción y aquí se hace cumplir: sin derivadas, sin extensiones,
+ *     sin texturas y con la precisión declarada. Una `fwidth` colada en el fragmento
+ *     funciona en el navegador del que la escribió y deja el mar NEGRO en la mitad de
+ *     los teléfonos, sin un error en ninguna consola —el programa no enlaza y `three`
+ *     se queda con el material por defecto—.
+ *   · QUE EL FRAGMENTO REMATE COMO LOS DEL MOTOR. Sin `tonemapping_fragment` y
+ *     `colorspace_fragment` el color se escribe lineal sobre un lienzo sRGB: el mar
+ *     sale más oscuro que el resto y con la costura a la vista, que es exactamente lo
+ *     que este trabajo venía a quitar. Y la niebla, después de los dos.
+ *   · QUE LOS UNIFORMS DEL MATERIAL Y LOS DEL TEXTO SEAN LOS MISMOS. Uno que el GLSL
+ *     pide y el material no pone vale cero y apaga su efecto en silencio; uno que el
+ *     material pone y nadie lee es una perilla que no gira, y alguien la girará.
+ *   · QUE EL COLOR DEL AGUA SIGA SIENDO EL DEL PACK. Es la promesa del §1.1 del
+ *     documento, y la única que no se puede cumplir leyendo la textura en marcha:
+ *     sacar un píxel de una textura cargada pide un lienzo y la app no tiene DOM. Se
+ *     mide aquí, sobre `tablero.glb` y su atlas, con las mismas funciones con las que
+ *     se hornean los modelos.
+ */
+paso('El sombreador del mar: sus uniforms, su GLSL y el color que promete no cambiar');
+{
+  const material = materialDeLaMarea();
+  const { vertice, fragmento } = GLSL_DE_LA_MAREA;
+  const texto = `${vertice}\n${fragmento}`;
+
+  /*
+   * LAS PROHIBIDAS. `texture2D` y `sampler2D` entran en la lista aunque no sean un
+   * problema de plataforma: el color del mar tiene que venir por un uniform medido y
+   * no por una textura, que es lo que permite comprobarlo aquí abajo.
+   */
+  const prohibidas = ['dFdx', 'dFdy', 'fwidth', '#extension', 'sampler2D', 'texture2D', 'textureCube'];
+  const coladas = prohibidas.filter((p) => texto.includes(p));
+  comprobar('el GLSL del mar no usa derivadas, extensiones ni texturas', coladas.length === 0, coladas);
+
+  const primeraLinea = (glsl: string): string =>
+    glsl.split('\n').map((l) => l.trim()).filter((l) => l.length > 0)[0] ?? '';
+  comprobar(
+    'y los dos sombreadores declaran la precisión en su primera línea',
+    primeraLinea(vertice) === 'precision mediump float;' &&
+      primeraLinea(fragmento) === 'precision mediump float;',
+    { vertice: primeraLinea(vertice), fragmento: primeraLinea(fragmento) },
+  );
+
+  const includes = fragmento
+    .split('\n')
+    .map((l) => l.trim())
+    .filter((l) => l.startsWith('#include'));
+  const remate = includes.slice(-3).join(' ');
+  comprobar(
+    'el fragmento remata con el tono, el espacio de color y la niebla, y en ese orden',
+    remate === '#include <tonemapping_fragment> #include <colorspace_fragment> #include <fog_fragment>',
+    remate,
+  );
+  comprobar(
+    'y el material pide la niebla del motor, que es la del resto de la escena',
+    material.fog && material.uniforms.fogColor !== undefined,
+    { fog: material.fog, tieneUniformes: material.uniforms.fogColor !== undefined },
+  );
+
+  comprobar(
+    'el vértice lee el atributo que «costa.ts» escribe, y con ese nombre',
+    vertice.includes('attribute float costa;'),
+  );
+
+  /*
+   * Y EL VÉRTICE TAMBIÉN TIENE SU REMATE, que es el que nadie mira hasta que falla.
+   *
+   * El trozo «fog_pars_fragment» del motor declara un «varying» que el fragmento LEE, y
+   * quien lo ESCRIBE es «fog_vertex», que lee a su vez una variable llamada «mvPosition».
+   * Si alguien quita uno de los dos «include» o renombra esa variable, el programa NO
+   * ENLAZA: «three» se queda con el material por defecto y el mar sale liso y blanco sin
+   * un error en ninguna consola. Es el mismo modo de fallo silencioso que las derivadas.
+   */
+  comprobar(
+    'el vértice lleva los dos trozos de niebla del motor y la variable de la que leen',
+    vertice.includes('#include <fog_pars_vertex>') &&
+      vertice.includes('#include <fog_vertex>') &&
+      /vec4\s+mvPosition/.test(vertice) &&
+      vertice.indexOf('vec4 mvPosition') < vertice.indexOf('#include <fog_vertex>'),
+    {
+      pars: vertice.includes('#include <fog_pars_vertex>'),
+      vertex: vertice.includes('#include <fog_vertex>'),
+      mvPosition: /vec4\s+mvPosition/.test(vertice),
+    },
+  );
+
+  /*
+   * LOS UNIFORMS, LOS DOS SENTIDOS. Los de la niebla los declara el trozo del motor y
+   * no nuestro texto, así que se descuentan de un lado: si se contaran, este
+   * comprobador pediría que los escribiéramos a mano, que es justo lo que no se hace.
+   */
+  const DE_LA_NIEBLA = new Set(['fogColor', 'fogDensity', 'fogNear', 'fogFar']);
+  const pedidos = new Set<string>();
+  for (const m of texto.matchAll(/^uniform\s+\w+\s+(\w+)\s*;/gm)) pedidos.add(m[1] as string);
+  const puestos = new Set(Object.keys(material.uniforms));
+  const sinPoner = [...pedidos].filter((u) => !puestos.has(u));
+  const sinLeer = [...puestos].filter((u) => !pedidos.has(u) && !DE_LA_NIEBLA.has(u));
+  comprobar('cada uniform que el GLSL pide está puesto en el material', sinPoner.length === 0, sinPoner);
+  comprobar('y ninguno de los del material se queda sin leer', sinLeer.length === 0, sinLeer);
+
+  /*
+   * EL CONTRATO DE LA ESPUMA, que es el que protege dónde se construye.
+   *
+   * `presupuesto-del-delta.ts` promete que la espuma no pasa de `ESPUMA_TIERRA_ADENTRO`
+   * hacia tierra, y el bloque de la costa de más arriba mide que los 54 vértices de
+   * juego quedan al menos a dos radios de tesela. Aquí se cierra el otro extremo: que
+   * el sombreador reciba ESE margen, que sus dos fracciones no lo desborden y que
+   * remate con el corte en seco, para que la promesa no dependa del afinado.
+   */
+  comprobar(
+    'la banda de espuma no puede lamer más allá del margen escrito en el presupuesto',
+    LAMIDO_DE_LA_ORILLA + PLUMA_DE_LA_ORILLA <= 1 + HOLGURA,
+    { LAMIDO_DE_LA_ORILLA, PLUMA_DE_LA_ORILLA },
+  );
+  comprobar(
+    'y el sombreador recibe ese margen y no otro',
+    material.uniforms.orilla.value === ESPUMA_TIERRA_ADENTRO,
+    { enElMaterial: material.uniforms.orilla.value, ESPUMA_TIERRA_ADENTRO },
+  );
+  comprobar(
+    'y corta en seco a esa distancia, pase lo que pase con los números de arriba',
+    fragmento.includes('blanco *= step(-orilla, vCosta);'),
+  );
+
+  /*
+   * LA OLA NO PUEDE CONFUNDIRSE CON EL TERRENO. Los dos senos suman 1,62 amplitudes, y
+   * eso tiene que quedar muy por debajo de un escalón de terraza: una cresta tan alta
+   * como un escalón deja de leerse como agua y se lee como una duna.
+   *
+   * Y que se apague pegada a tierra no es un número sino la forma de la envolvente: el
+   * `smoothstep` arranca en cero exacto, así que en la orilla la amplitud es cero y las
+   * teselas de agua del tablero —que son geometría fija y no ondulan— no se despegan
+   * del mar que tienen al lado.
+   */
+  comprobar(
+    'la cresta más alta se queda muy por debajo de un escalón de terraza',
+    ALTURA_DE_LA_OLA * 1.62 < ESCALON / 3,
+    { cresta: ALTURA_DE_LA_OLA * 1.62, ESCALON },
+  );
+  comprobar(
+    'y la ola vale cero mientras haya tablero encima, por la forma de la envolvente',
+    vertice.includes(`smoothstep(${SOMBRA_DEL_TABLERO.toFixed(1)}, rompiente * 0.8, costa)`),
+    { SOMBRA_DEL_TABLERO },
+  );
+
+  /*
+   * ═══ LAS OLAS SON MOTAS SUELTAS, Y ESO SÍ SE PUEDE MEDIR ═══
+   *
+   * Lo que se ve o no se ve pide un ojo delante de una pantalla, pero esto no: el campo
+   * que decide dónde hay ola está en TypeScript —`olaEn`, con la misma tabla de la que se
+   * escribe el GLSL—, así que se puede recorrer un cuadro de mar, marcar dónde hay ola y
+   * contar las manchas como componentes conexas. Y hace falta, porque este trozo ya se ha
+   * torcido dos veces de formas que la batería no habría visto:
+   *
+   *   · La primera versión pintaba la espuma con un seno sobre la DISTANCIA A LA COSTA.
+   *     Ese campo es casi circular, así que salían anillos concéntricos como los de un
+   *     estanque. Contra eso está la regla de que la fase no puede salir de `vCosta` sola.
+   *   · La segunda repartía manchas por todo el mar con un corte fijo, y salieron
+   *     veinticinco manchas de las cuales veintitrés medían lo mismo: rayas iguales
+   *     puestas con regla. Contra eso están el rango y la variedad de aquí abajo.
+   *
+   * El rango —de tres a veinticinco unidades— no es una preferencia estética suelta: es lo
+   * que se midió en pantalla que se lee como oleaje y no como arañazos sobre el agua.
+   */
+  const PASO_DE_LA_MUESTRA = 3;
+  const LADO_DE_LA_MUESTRA = 160;
+  const diametros: number[] = [];
+  let marConOla = 0;
+  let casillas = 0;
+  for (const cuando of [0, 47]) {
+    const hayOla: boolean[][] = [];
+    for (let i = 0; i < LADO_DE_LA_MUESTRA; i++) {
+      hayOla[i] = [];
+      for (let j = 0; j < LADO_DE_LA_MUESTRA; j++) {
+        const v =
+          olaEn(
+            (i - LADO_DE_LA_MUESTRA / 2) * PASO_DE_LA_MUESTRA,
+            (j - LADO_DE_LA_MUESTRA / 2) * PASO_DE_LA_MUESTRA,
+            cuando,
+          ) > 0.5;
+        hayOla[i]![j] = v;
+        casillas++;
+        if (v) marConOla++;
+      }
+    }
+    const visto = hayOla.map((fila) => fila.map(() => false));
+    for (let i = 0; i < LADO_DE_LA_MUESTRA; i++)
+      for (let j = 0; j < LADO_DE_LA_MUESTRA; j++) {
+        if (!hayOla[i]![j] || visto[i]![j]) continue;
+        let cuantas = 0;
+        let tocaElBorde = false;
+        const pila: [number, number][] = [[i, j]];
+        visto[i]![j] = true;
+        while (pila.length > 0) {
+          const [a, b] = pila.pop() as [number, number];
+          cuantas++;
+          if (a === 0 || b === 0 || a === LADO_DE_LA_MUESTRA - 1 || b === LADO_DE_LA_MUESTRA - 1) {
+            tocaElBorde = true;
+          }
+          for (const [da, db] of [
+            [1, 0],
+            [-1, 0],
+            [0, 1],
+            [0, -1],
+          ] as const) {
+            const p = a + da;
+            const q = b + db;
+            if (p < 0 || q < 0 || p >= LADO_DE_LA_MUESTRA || q >= LADO_DE_LA_MUESTRA) continue;
+            if (hayOla[p]![q] && !visto[p]![q]) {
+              visto[p]![q] = true;
+              pila.push([p, q]);
+            }
+          }
+        }
+        /* Las que tocan el borde del cuadro están cortadas: su diámetro no es el suyo. */
+        if (tocaElBorde) continue;
+        diametros.push(2 * Math.sqrt((cuantas * PASO_DE_LA_MUESTRA ** 2) / Math.PI));
+      }
+  }
+  diametros.sort((a, b) => a - b);
+  const laMayor = diametros[diametros.length - 1] ?? 0;
+  const laMenor = diametros[0] ?? 0;
+  const laMediana = diametros[Math.floor(diametros.length / 2)] ?? 0;
+
+  comprobar(
+    'el mar se llena de motas de ola, ni cuatro ni un manto: cientos de manchas sueltas',
+    diametros.length > 100,
+    { manchas: diametros.length },
+  );
+  comprobar(
+    'y ninguna pasa de veinticinco unidades, que es donde dejan de leerse como olas',
+    laMayor < 25,
+    { laMayor, laMediana },
+  );
+  comprobar(
+    'y las hay pequeñas de verdad, hasta las tres unidades',
+    laMenor < 5,
+    { laMenor },
+  );
+  comprobar(
+    'y su tamaño varía: de la más pequeña a la más grande hay al menos el triple',
+    laMayor > laMenor * 3,
+    { laMenor, laMayor },
+  );
+  comprobar(
+    'el mar picado ocupa una parte del agua, no toda: entre el tres y el veinte por ciento',
+    marConOla / casillas > 0.03 && marConOla / casillas < 0.2,
+    { fraccion: marConOla / casillas },
+  );
+
+  /*
+   * QUE LA ESPUMA NO SALGA DE LA DISTANCIA A LA COSTA SOLA, que es lo que hacía anillos.
+   *
+   * La cresta SÍ tiene que colgar de `vCosta` —así es como las olas van hacia la orilla en
+   * vez de en una sola dirección— pero no puede ser lo único que decida su fase: si el
+   * seno no lleva además algo del punto del mundo, sus crestas son las curvas de nivel de
+   * un campo casi circular, o sea anillos concéntricos alrededor del delta.
+   */
+  const laFaseDeLaCresta = /float fase =([\s\S]*?);/.exec(fragmento)?.[1] ?? '';
+  comprobar(
+    'la fase de la cresta cuelga de la costa, que es lo que la manda hacia la orilla',
+    laFaseDeLaCresta.includes('vCosta'),
+    laFaseDeLaCresta,
+  );
+  comprobar(
+    'pero nunca de la costa SOLA: sin el punto del mundo dentro, saldrían anillos',
+    laFaseDeLaCresta.includes('vPosicionMundo'),
+    laFaseDeLaCresta,
+  );
+
+  /*
+   * Y QUE EL VÉRTICE NO USE EL CAMPO CORTO. Sus anillos miden un radio de tesela y las
+   * motas dieciocho unidades: tres vértices por longitud de onda, justo en el límite, y
+   * por fuera del aro los anillos crecen un dieciocho por ciento por vuelta y ya no
+   * llegan. Colgar la ALTURA de ahí da un mar que tiembla. El fragmento sí puede: resuelve
+   * por píxel. Cada uno con la escala que su malla aguanta, de la misma tabla.
+   */
+  comprobar(
+    'el vértice mueve el agua con las zonas largas y no con las motas, que no resolvería',
+    vertice.includes('zonas(mundo.xz, tiempo)') && !vertice.includes('olas(mundo.xz'),
+    { usaZonas: vertice.includes('zonas(mundo.xz, tiempo)'), usaMotas: vertice.includes('olas(mundo.xz') },
+  );
+  comprobar(
+    'y las zonas son mucho más largas que las motas: al menos cuatro veces',
+    (() => {
+      const largo = (k: readonly [number, number]): number => (2 * Math.PI) / Math.hypot(k[0], k[1]);
+      const laMasLargaDeLasMotas = Math.max(...TRENES_DE_LAS_OLAS.map((tren) => largo(tren.k)));
+      return largo(ZONAS_DE_LAS_OLAS.k) > laMasLargaDeLasMotas * 4;
+    })(),
+    {
+      zonas: (2 * Math.PI) / Math.hypot(ZONAS_DE_LAS_OLAS.k[0], ZONAS_DE_LAS_OLAS.k[1]),
+      motas: TRENES_DE_LAS_OLAS.map((tren) => (2 * Math.PI) / Math.hypot(tren.k[0], tren.k[1])),
+    },
+  );
+
+  /*
+   * LAS OLAS ROMPEN POR FUERA DE LA FLOTA, y ése es el ancla de toda la corona: entre los
+   * barcos fondeados y la playa no puede haber espuma, porque ahí no se lee como oleaje
+   * sino como suciedad en el agua. El número sale de `marina.ts` y no de aquí, así que el
+   * día que alguien acerque los barcos esto lo dice.
+   */
+  comprobar(
+    'la espuma empieza por fuera del barco que más se aleja, y no antes',
+    CORONA_DE_LAS_OLAS.desde >= MAR_ADENTRO_DE_LOS_BARCOS,
+    { laCoronaEmpiezaEn: CORONA_DE_LAS_OLAS.desde, elBarcoMasLejano: MAR_ADENTRO_DE_LOS_BARCOS },
+  );
+  comprobar(
+    'y hay mar picado de sobra entre donde empieza y donde se apaga',
+    CORONA_DE_LAS_OLAS.hasta > CORONA_DE_LAS_OLAS.desde * 3 &&
+      CORONA_DE_LAS_OLAS.llena > CORONA_DE_LAS_OLAS.desde &&
+      CORONA_DE_LAS_OLAS.calma > CORONA_DE_LAS_OLAS.llena,
+    CORONA_DE_LAS_OLAS,
+  );
+  comprobar(
+    'y una ola sube y baja donde uno se quede quieto mirando, en menos de tres minutos',
+    (() => {
+      const serie: number[] = [];
+      for (let s = 0; s < 180; s += 2) serie.push(olaEn(40, -70, s));
+      const subidas = serie.filter((v, i) => v > 0.5 && (serie[i - 1] ?? 0) <= 0.5).length;
+      return subidas >= 2 && Math.min(...serie) < 0.05;
+    })(),
+  );
+
+  /*
+   * EL COLOR DEL AGUA DEL PACK, VUELTO A MEDIR.
+   *
+   * Se rehace exactamente lo que hacía el disco de antes: se busca la UV media de las
+   * esquinas ALTAS de la tesela de agua —su cara de arriba— y se muestrea ahí el atlas.
+   * Se compara en pasos de sRGB y no en lineal, porque un paso de sRGB es la unidad en
+   * la que se nota: medio paso no lo ve nadie y dos ya son otro azul.
+   */
+  const io = new NodeIO();
+  const tablero = await io.read(
+    path.join(import.meta.dirname ?? __dirname, '..', 'modelos', 'tablero.glb'),
+  );
+  const raiz = tablero.getRoot().listNodes().find((n) => n.getName() === MODELO.agua);
+  const primitivas: Primitive[] = [];
+  const bajarPorLaMalla = (n: Node): void => {
+    for (const p of n.getMesh()?.listPrimitives() ?? []) primitivas.push(p);
+    for (const h of n.listChildren()) bajarPorLaMalla(h);
+  };
+  if (raiz !== undefined) bajarPorLaMalla(raiz);
+  comprobar('la tesela de agua sigue estando en el .glb y con una sola malla', primitivas.length === 1, {
+    nodo: MODELO.agua,
+    primitivas: primitivas.length,
+  });
+
+  const prim = primitivas[0];
+  const posiciones = prim?.getAttribute('POSITION') ?? null;
+  const uvs = prim?.getAttribute('TEXCOORD_0') ?? null;
+  if (prim !== undefined && posiciones !== null && uvs !== null) {
+    const punto = [0, 0, 0];
+    const st = [0, 0];
+    let alto = -Infinity;
+    for (let i = 0; i < posiciones.getCount(); i++) {
+      posiciones.getElement(i, punto);
+      alto = Math.max(alto, punto[1] as number);
+    }
+    let u = 0;
+    let v = 0;
+    let cuantos = 0;
+    for (let i = 0; i < posiciones.getCount(); i++) {
+      posiciones.getElement(i, punto);
+      if ((punto[1] as number) < alto - 1e-4) continue;
+      uvs.getElement(i, st);
+      u += st[0] as number;
+      v += st[1] as number;
+      cuantos++;
+    }
+    const png = pngDeLaTextura(prim.getMaterial()?.getBaseColorTexture() ?? null, MODELO.agua);
+    const medido = [0, 0, 0];
+    muestrea(png, u / cuantos, v / cuantos, medido);
+    /* El mismo camino que recorre el uniform: de hex sRGB a lineal, como hace `three`. */
+    const escrito = new THREE.Color(COLOR_DEL_AGUA_DEL_PACK);
+    const aSrgb = (l: number): number =>
+      (l <= 0.0031308 ? l * 12.92 : 1.055 * l ** (1 / 2.4) - 0.055) * 255;
+    const desvio = Math.max(
+      Math.abs(aSrgb(medido[0] as number) - aSrgb(escrito.r)),
+      Math.abs(aSrgb(medido[1] as number) - aSrgb(escrito.g)),
+      Math.abs(aSrgb(medido[2] as number) - aSrgb(escrito.b)),
+    );
+    const enHex = `#${medido
+      .map((c) => Math.round(Math.max(0, Math.min(255, aSrgb(c)))).toString(16).padStart(2, '0'))
+      .join('')}`;
+    comprobar(
+      'el color de partida del mar es el téxel del agua del pack, medido y no elegido',
+      cuantos > 0 && desvio < 1,
+      { escrito: COLOR_DEL_AGUA_DEL_PACK, medido: enHex, desvioEnPasosDeSrgb: desvio },
+    );
+  }
+
+  /*
+   * Y QUE LAS LUCES SEAN UNAS SOLAS.
+   *
+   * El mar no lo ilumina el motor: `marea.ts` rehace la cuenta a mano con estos mismos
+   * colores. Si `Luces` volviera a escribirlos, cambiar el sol dejaría el mar iluminado
+   * como ayer y el delta saldría con dos aguas de distinto tono sin que nada proteste.
+   * Se comprueba sobre el TEXTO del componente porque es donde puede reaparecer un
+   * color escrito a mano.
+   */
+  const fuenteDelDelta = fs.readFileSync(
+    path.join(import.meta.dirname ?? __dirname, '..', 'delta.tsx'),
+    'utf8',
+  );
+  const dondeEmpieza = fuenteDelDelta.indexOf('function Luces(');
+  /*
+   * SE CORTA POR EL CIERRE DEL COMPONENTE Y NO POR UN NÚMERO DE CARACTERES.
+   *
+   * Antes esto leía una ventana de 900 y el componente medía 811: quedaban 89 de margen.
+   * Añadirle una cuarta luz o dos líneas de comentario empujaba el final fuera de la
+   * ventana, y entonces el «no hay ningún #rrggbb aquí dentro» dejaba de mirar la cola sin
+   * que nada se pusiera rojo. Un comprobador que se muere en silencio es peor que no
+   * tenerlo, porque además da confianza.
+   */
+  const cierreDeLuces = fuenteDelDelta.indexOf('\n}\n', dondeEmpieza);
+  const cuerpoDeLuces = fuenteDelDelta.slice(dondeEmpieza, cierreDeLuces + 3);
+  comprobar(
+    'el componente Luces saca sus colores de donde los saca el mar, y no los reescribe',
+    dondeEmpieza >= 0 &&
+      cierreDeLuces > dondeEmpieza &&
+      cuerpoDeLuces.includes('LAS_LUCES_DEL_DELTA') &&
+      !/#[0-9a-f]{6}/i.test(cuerpoDeLuces),
+    { tieneLaConstante: cuerpoDeLuces.includes('LAS_LUCES_DEL_DELTA'), mide: cuerpoDeLuces.length },
   );
 }
 
@@ -2359,7 +3201,7 @@ if (fallos.length > 0) {
  * a veintitrés: durante ese tiempo el guion podía morirse en la novena sin que nadie se
  * enterara. Un guardia desfasado no guarda nada.
  */
-const COMPROBACIONES_ESCRITAS = 162;
+const COMPROBACIONES_ESCRITAS = 212;
 if (hechas < COMPROBACIONES_ESCRITAS) {
   console.error(
     `Solo se han hecho ${hechas} de las ${COMPROBACIONES_ESCRITAS} comprobaciones que ` +
