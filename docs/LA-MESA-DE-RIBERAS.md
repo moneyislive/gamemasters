@@ -4,13 +4,16 @@
 > las decisiones y su porqué. Se escribió el 5 de septiembre de 2026, sobre la rama
 > `lobby-catan`, a partir de lo que Miguel pidió por escrito: ver el juego en pantalla
 > completa, una mesa de madera abajo con las piezas encima, un dado que vibra y se
-> tira tocándolo, y poder recoger la mesa. Es la segunda versión: la primera pasó por
-> una revisión adversaria que volvió a medir cada número con el código real, y lo que
-> encontró está cerrado aquí, con su medida, o abierto en el §10 con su dueño. Ningún
-> número de aquí es una opinión: cada uno sale de un guion de medida corrido sobre
-> `huecosDeLaBarra`, `huecosDeLaBaraja`, `huecosDeLasCartas`, `franjaDeLasCartas`,
-> `ojoDelMirador`, `revoltijo`, `fbm` y el atlas del pack, o de una línea del código
-> citada con su fichero. Los guiones se listan en el §9.
+> tira tocándolo, y poder recoger la mesa. Es la tercera versión: la primera pasó por
+> una revisión adversaria que volvió a medir cada número con el código real, y la
+> segunda por otra que leyó el orden de dibujo con el ordenador de `three` de verdad,
+> buscó quién apagaba los dados fuera de turno y proyectó los 54 vértices con la cámara
+> inclinada. Lo que encontraron está cerrado aquí, con su medida, o abierto en el §10
+> con su dueño. Ningún número de aquí es una opinión: cada uno sale de un guion de
+> medida corrido sobre `huecosDeLaBarra`, `huecosDeLaBaraja`, `huecosDeLasCartas`,
+> `franjaDeLasCartas`, `ojoDelMirador`, `ojoYMira`, `WebGLRenderLists`, `revoltijo`,
+> `fbm` y el atlas del pack, o de una línea del código citada con su fichero. Los
+> guiones se listan en el §9.
 
 ## 0. Qué hay hoy, y qué se pierde al quitar los paneles
 
@@ -23,7 +26,7 @@ esto, con nombre y fichero:
 |---|---|---|
 | El código de la mesa, quién está sentado, salir, tirar la mesa | `LaFicha` y los dos botones del `<aside class="rail">` de `sala.tsx` (22 rem, `tablero-y-panel`) | `BarraDeLaMesa` de `tablero-en-linea.tsx`, con `paddingTop: arriba + 14` |
 | De quién es el turno | (dentro de `LaFicha`) | `LineaDelTurno` |
-| La frase del juego («Te toca: tira los dados.», «Turno de Ana: está por tirar.») | `<p class="aviso-del-tablero">` sobre el lienzo, texto de `avisoDe` en `riberas.ts` (4174–4193) | el mismo `aviso` dentro del retablo; en la rama del delta no se pinta hoy |
+| La frase del juego («Te toca: tira los dados.», «Turno de Ana: está por tirar.») | `<p class="aviso-del-tablero">` ENCIMA del recuadro del lienzo, en flujo —un párrafo con margen, `riberas-en-tres.tsx` 1138 y `estilo.css` 1603, no un vidrio sobre la escena—, texto de `avisoDe` en `riberas.ts` (4174–4193) | el mismo `aviso` dentro del retablo; en la rama del delta no se pinta hoy |
 | El marcador: puntos, cartas, guardias, el Vado con su largo, la Guardia, títulos, el mazo que queda | `MarcadorDeRiberas` en el raíl | `ElMarcador`, una cinta horizontal de `FichaDelColono` entre el aviso y el lienzo |
 | Tirar, pasar, aceptar, rechazar, contestar, empezar | `<Formulario>` bajo el lienzo, con `opcionesFueraDeLaBarra(opcionesFueraDeLaMano(opcionesFueraDelTablero(o)), mazo)` (línea 799) | `LasOpciones` en el `ScrollView` del pie, misma composición (línea 691) |
 | La crónica | `LaCronica` en el raíl | `LaCronica` en el pie |
@@ -68,11 +71,21 @@ cinta chocan con las manos, es la mesa o la cinta la que se aparta (§2.2, §4.1
    quietas (0,641); la línea de `verify:escena` que afirma «tres y cuatro miden lo
    mismo en el lienzo peor» deja de ser verdad (0,2320 con tres, 0,2184 con cuatro:
    `medir-con-014.ts`) y se reescribe para exigir sólo el suelo, que es lo que
-   protegía. Y deja falsos dos comentarios que la fase 1 reescribe: la cabecera de
-   `ANCHO_MAXIMO` en `barra.ts` («en el más bajo (320×360) sigue mandando el alto») y
-   las dos menciones de `cartas.ts` al techo de la placa —la cabecera («el techo de la
-   barra NUNCA pasa de −0,2475·alto», línea 26) y la nota de `PISO_DE_LA_FRANJA` (línea
-   408)—, que hablan de una placa que la fase 2 quita.
+   protegía. Y deja falsos tres comentarios: la cabecera de `ANCHO_MAXIMO` en
+   `barra.ts` («en el más bajo (320×360) sigue mandando el alto») y las dos menciones
+   de `cartas.ts` al techo de la placa —la cabecera («el techo de la barra NUNCA pasa
+   de −0,2475·alto», línea 26) y la nota de `PISO_DE_LA_FRANJA` (línea 408)—. Los de
+   `cartas.ts` se reescriben DOS veces, porque miden contra lo que hay: en la fase 1 la
+   placa sigue y su techo con 0,14 es `hueco.y + 0,75·lado = −0,240·alto` (el 26,0 %
+   del alto desde abajo; holgura de 0,040 al piso de `−0,20`); en la fase 2 la placa se
+   va y lo más alto de la mesa pasa a ser el ASA —la caja invisible de un lado, `hueco.y
+   + 0,5·lado = −0,275·alto`, el 22,5 %— y, un pelo por encima, la pieza tomada en lo
+   alto de su bote: `0,62·1,18/2 + 0,12 + 0,03 = 0,516` lados (`delta.tsx` 1122 y
+   1128–1133), `−0,273·alto`, el 22,7 %, que asoma 0,7 puntos sobre el asa en 320 de
+   alto y 2,4 en 1.080 (`medir-techos.ts`). NO el techo del naipe (0,31 lados, 19,8 %),
+   que decía la segunda versión: el naipe está por debajo del asa. La holgura al piso de
+   la mano del mazo queda en 0,073 del alto. Y el hueco de los dados no sube más: el dado
+   en lo alto de su salto llega a `cota + 0,46 + 0,20 = hueco.y + 0,18·lado`, el 18,0 %.
 
 3. **Los dados son DOS, con puntos, y la suma la parte el cliente de forma
    determinista, sellada por TURNO.** El servidor sólo publica `ultimaTirada`, la suma
@@ -115,6 +128,18 @@ cinta chocan con las manos, es la mesa o la cinta la que se aparta (§2.2, §4.1
    DECLARAN en `VistaQueSePinta` (opcionales, como `mazo`) para que `dadosEnTres` pueda
    leerlos sin `as`. Se sella en `verify:escena` que cada par suma lo que debe, que
    ninguna cara sale de 1..6, y que el sello no cambia con `rev`.
+
+   Declarar `turnosAbiertos` va contra dos comentarios del propio
+   `riberas-en-tres.ts`: la cabecera (51–53, «compararlo con `turnosAbiertos` sea una
+   línea: esa línea es la regla §1.4») y la nota de `misCartas` (170–175, «mientras no
+   esté escrito, nadie puede compararlo con `turnosAbiertos`»). Los dos protegen lo
+   mismo —que una carta comprada no se juegue hoy— y lo protegen por el lado que sigue
+   cerrado: `comprada` NO se declara, ni ahora ni en este encargo, y sin `comprada`
+   escrito no hay con qué comparar `turnosAbiertos` aunque esté. `turnosAbiertos` entra
+   SÓLO como sello de los dados y lo lee sólo `dadosEnTres`. La fase 1 reescribe esos
+   dos comentarios para que digan eso —la salvaguarda es que `comprada` no esté, no que
+   `turnosAbiertos` no esté— en vez de quedarse afirmando algo que la línea de abajo
+   desmiente.
 
 4. **El toque del dado manda `riberas:tirar` por la misma puerta que el botón, y el
    botón desaparece sólo donde hay dado.** Igual que `opcionesFueraDeLaBarra` quita
@@ -184,7 +209,8 @@ cinta chocan con las manos, es la mesa o la cinta la que se aparta (§2.2, §4.1
    844×390; la de bienes con catorce, a 33,3 y 40,6 (`medir-cinta-central.ts`). Una
    cinta de 44 puntos de lado a lado tapa la carta de arriba de las DOS manos en todos
    los apaisados, y son cartas que se arrastran. Por eso la cinta ocupa sólo el tercio
-   central del ancho (§2.2), donde no hay ninguna carta a menos de 29 puntos. Lo que SÍ
+   central del ancho en apaisado (§2.2), donde no hay ninguna carta a menos de 138
+   puntos, y el 40 % de pie, donde no la hay a menos de 15,6. Lo que SÍ
    va dentro del lienzo es lo que se puede medir sin leer: el color del turno bajo los
    dados, el grosor del mazo, y los propios dados.
 
@@ -276,15 +302,28 @@ lado, no toca ningún inset). Por qué el tercio y no el ancho entero está medi
 El «aire» se mide contra el canto interior de la carta más cercana con la mano
 ABIERTA por el imán (la mano del mazo con cinco cartas y la de bienes con catorce, que
 es lo que mide `verify:escena`), y contra `franjaDeLasCartas().derecha`, lo que quede
-más adentro. En ningún lienzo baja de 29 puntos. Y debajo del tercio central, en los
-44 puntos de arriba, no hay nada que se toque: al mirador de salida, el borde lejano
-del delta cae a 61 puntos del canto de arriba en el SE, a 69–82 en los teléfonos, a
-172–206 en tabletas y monitores (`ojoDelMirador` proyectado con la cámara de 45°), y
-ese borde es costa —donde se construye está tierra adentro: los 54 vértices tienen su
-tesela y su anillo de seis en tierra, `presupuesto-del-delta.ts`, cabecera de
-`ESPUMA_TIERRA_ADENTRO`—. Un vértice que alguien lleve debajo de la cinta inclinando
-la cámara se saca arrastrando 44 puntos, que es lo que ya pasa hoy con
-`aviso-del-tablero` sobre el lienzo del escritorio.
+más adentro. En ningún lienzo apaisado baja de 138 puntos; de pie, ver más abajo.
+
+Y lo que queda debajo del tercio central, medido con los 54 vértices de verdad
+(`verticesDe(mallaDeRadio(2))` y `puntoDeVertice`, como `sitios.ts`) proyectados con
+la cámara real (`ojoYMira` + `ojoDelMirador`, sin acercar, recorriendo el rumbo entero;
+`medir-borde-lejano.ts`). La segunda versión decía que el borde lejano «es costa»: no
+lo es. `ALCANCE_DEL_DELTA` es el radio del vértice más lejano —el centro de la comarca
+más lejana más un radio, cabecera de `presupuesto-del-delta.ts`—, así que el borde
+lejano del delta ES la fila de vértices de fuera, donde se construye; la costa empieza
+dos teselas más allá. Al mirador de salida (40,4°) el vértice más alto en pantalla cae
+bajo el tercio central a **63 puntos del canto en el SE, 71 en un Android de 360, 74 en
+el SE 2, 77 en un iPhone 14, 84 en un Pro Max, 195–212 en tabletas y monitores**, con o
+sin relieve (dos escalones de altura lo suben 4–6 puntos). O sea: la primera línea de
+44 no tapa ningún vértice en ningún lienzo al salir, y eso lo mide `verify:escena`
+(fase 5). A `ALTURA_MAXIMA` (82°, `camara.ts` 55) la cosa cambia y hay que decirlo: en
+los cinco teléfonos apaisados la fila lejana se sale del lienzo POR ARRIBA (−35 a −48
+puntos), que es cosa de la cámara y no de la cinta; en la tableta 4:3 (1024×768) el
+vértice más alto queda a 26 puntos del canto —bajo la cinta— y en el iPad a −1; en los
+monitores, fuera (−100 y −120). Sacarlo de debajo de la cinta en la tableta cuesta
+inclinar 5,5°, que son 47 puntos de arrastre (`(dy / alto) · π/2`, `camara.ts` 65 y
+203; `medir-sacar-el-vertice.ts`). Es el único lienzo con un vértice bajo la primera
+línea, y sólo en el tope de la inclinación.
 
 Lo que cabe en la línea, de izquierda a derecha:
 
@@ -307,18 +346,50 @@ Lo que cabe en la línea, de izquierda a derecha:
   con su número, la crónica, levantarse y tirar la mesa. El cajón es el `HojaDeAQuien`
   de siempre en la app y el raíl de siempre en el escritorio.
 
-Una **segunda línea de 44 puntos**, en el mismo tercio y sólo cuando hay botones
-sueltos tras `opcionesFueraDeLaMesa` (pasar, aceptar, rechazar, contestar, empezar),
-con el rótulo del juego tal cual, como `LasOpciones`. A 88 puntos del canto la cinta
-sigue sin tocar ninguna carta (las manos no se acercan al centro), pero SÍ pisa el
-borde lejano del delta al mirador de salida en los teléfonos apaisados (61–82 puntos):
-es costa y no se toca, y sólo mientras haya un botón que pulsar. Si el marcador acaba
-en la cinta (duda 2 del §10), es una tercera línea, y a 132 puntos ya se tapa tablero
-en todos los teléfonos: por eso no se decide aquí.
+Hay DOS cosas distintas que se llaman «segunda línea», y se separan aquí con lo que
+cada una suma de alto:
 
-Dónde se pliega la frase a dos líneas no se puede medir en Node: los anchos de texto
-dependen de la fuente. El umbral es «el texto medido no cabe en `ancho/3 − 88`», se
-fija en el banco y es una decisión abierta con dueño (§10).
+- **La frase plegada.** La frase NO hace crecer la cinta: si no cabe en una línea, pasa
+  a dos líneas de texto DENTRO de los mismos 44 puntos (letra de 13–14 px con
+  interlineado de 17: dos líneas son 34 y quedan 10 de aire), y si tampoco cabe así,
+  puntos suspensivos. Suma **0**. Lo que no se puede medir en Node es el ancho de texto
+  de cada frase con la fuente de la casa: a qué ancho pasa de una línea a dos, y a cuál
+  a los puntos suspensivos, se fija en el banco y es una decisión abierta con dueño
+  (§10). Lo que sí está medido es el hueco: `ancho/3 − 88` son 101 puntos en el SE,
+  172 en un Android de 360, 193 en un iPhone 14, 223 en un Pro Max, 253 en la tableta,
+  552 en el monitor.
+- **Los botones sueltos.** Una línea más de 44 puntos, en el mismo tercio y sólo cuando
+  hay botones tras `opcionesFueraDeLaMesa` (pasar, aceptar, rechazar, contestar,
+  empezar), con el rótulo del juego tal cual, como `LasOpciones`. Suma **44**.
+
+La suma máxima es por tanto **88 puntos** (132 si el marcador acaba en la cinta, duda 2
+del §10). A 88 la cinta sigue sin tocar ninguna carta (las manos no se acercan al
+centro), pero SÍ tapa el vértice más lejano al mirador de salida en los cinco
+teléfonos apaisados (63–84 puntos, medidos arriba), y hay que decirlo con todas las
+letras porque PASAR está durante todo el turno: mientras haya un botón, el vértice de
+la fila de fuera que cae en el tercio central está debajo de él. Sacarlo cuesta
+inclinar la cámara 1,5° en un Pro Max y 10,5° en el SE, que son **7, 17, 23, 26 y 37
+puntos de arrastre** (Pro Max, iPhone 14, SE 2, Android, SE; `medir-sacar-el-vertice.ts`),
+menos que el propio alto de la línea. En tabletas y monitores no tapa nada (195–212).
+Es una molestia medida y pequeña; la alternativa —los botones a la derecha del tercio,
+en el aire entre la cinta y la mano de bienes, que son 155 puntos en el SE y 240 en un
+iPhone 14— se mira en el banco en la fase 5 y queda anotada en el §10.
+
+**De pie** (`ancho < alto`: la web en un móvil sin girar, o una tableta de pie) el
+tercio no da para nada: tras «‹» y «≡» quedan **42 puntos** para la frase en 390×845 y
+**19** en 320×360, o sea puntos suspensivos siempre. Así que de pie la cinta ocupa el
+**40 % del ancho**, y es 40 y no 50 por las manos, que de pie suben hasta arriba: al 50 %
+la cinta PISA la carta de arriba de la mano del mazo abierta en 390×845 (3,9 puntos
+por dentro de su canto); al 45 % le deja 5,8, que no es un margen; al 40 % deja 15,6 al
+mazo y 26,5 a los bienes en 390×845, 29–38 y 55–65 en los demás teléfonos, 66 y 121 en
+la tableta de pie (`medir-cinta-de-pie.ts`). La frase gana con eso 40 puntos en 320×360,
+56 en 360×490, 68 en 390 de ancho y 219 en la tableta de pie: en los teléfonos sigue
+recortada casi siempre, y es lo esperado —de pie es la forma secundaria: la app bloquea
+el apaisado y en la web está el cartel de girar (§3)—; la frase entera está en la
+región viva y en el cajón. Las dos fracciones (`1/3` apaisado, `0,40` de pie) viven en
+una función pura, `anchoDeLaCinta(ancho, alto)` en `escenas/cinta.ts` (sin `three`),
+que las dos pantallas llaman y `verify:escena` mide contra las dos manos abiertas en
+todos los lienzos (fase 5): la cinta que se pinta es la que se mide.
 
 **Dentro del lienzo** vuelven dos datos, medidos y no leídos:
 
@@ -396,20 +467,80 @@ milímetro.** Con su Z, en coordenadas de la cámara (`medir-tapa-horizontal.ts`
   redondea a **1,08** para que las esquinas traseras nunca asomen.
 - **Lo que ocupa en pantalla:** de la tapa se ve, desde el canto de abajo, hasta el
   borde trasero proyectado: 36,7 puntos en el SE, 44,7 en un iPhone 14, 123,8 en un
-  monitor a 1080 —el 11,5 % del alto en todos los apaisados, 11,7 %–13,5 % de pie—. Las
-  piezas suben hasta el techo del naipe, el 19,8 %. La placa de `#0d1f1a` que
+  monitor a 1080 —el 11,5 % del alto en todos los apaisados, 11,7 %–13,5 % de pie—. Lo
+  más alto de la mesa es el asa (el 22,5 % del alto) y la pieza tomada en lo alto de
+  su bote (22,7 %; §1.2); el naipe se queda en el 19,8 %. La placa de `#0d1f1a` que
   sustituye mide 1,5 lados centrada en el hueco: del 5 % al 26 % del alto. La mesa
   con las piezas encima **tapa menos tablero que la placa**.
 - **Las cartas de bienes** pisan la tapa vista: sus pies quietos quedan a 33,3 puntos
-  del canto en el SE, a 40,6 en un iPhone 14 y a 112,3 en un monitor, entre 3 y 11
-  puntos por debajo del borde trasero de la tapa. No importa: se dibujan encima
-  (`ORDEN_DE_LAS_CARTAS` 1010 y su propio borrado de profundidad a 1005, contra el
-  1000 de `ORDEN_DE_LA_BARRA`) y la tapa lleva `raycast={() => null}`, así que no
-  les quita ni un toque. Es lo que ya pasaba con la placa.
+  del canto en el SE, a 40,6 en un iPhone 14 y a 112,3 en un monitor, entre 3 y 12
+  puntos por debajo del borde trasero de la tapa. Y aquí la segunda versión decía una
+  cosa falsa —«se dibujan encima, 1010 contra 1000»— que hay que deshacer con el
+  ordenador de `three` en la mano (`medir-orden-de-dibujo.ts`, que mete la escena en
+  el `WebGLRenderLists` real y la ordena):
 
-Se quita la placa. Se queda la `pointLight` de `[0.4, 0.6, -1.2]` con su alcance de
-3: es lo que ilumina lo que gira con la cámara, y como está por encima de la cota
-ilumina también la tapa horizontal. Los zócalos hexagonales se quedan como
+  1. `three` ordena primero por `groupOrder` y sólo después por `renderOrder`
+     (`painterSortStable`, `WebGLRenderLists.js` 1–27), y un `Group` con `renderOrder`
+     pone ese número como `groupOrder` a TODO lo que cuelga de él
+     (`WebGLRenderer.js` 1839–1841). El grupo `Barra` lleva
+     `renderOrder={ORDEN_DE_LA_BARRA}`; los grupos de `Baraja` (1875) y `ManoDelMazo`
+     (2259) no llevan ninguno. Así que hoy todo lo de la barra tiene `groupOrder`
+     1000 y todo lo de las manos 0, y el 1010 de cada carta sólo ordena DENTRO del 0.
+  2. Y las dos manos no están en la misma pasada: `three` pinta primero todos los
+     opacos, luego los transmisivos, luego los transparentes (`renderScene`,
+     1959–1961). Las cartas de bienes son OPACAS —su `meshBasicMaterial` no lleva
+     `transparent`, 1656–1671— y las del mazo transparentes. La placa de hoy es
+     transparente (`opacity 0,42`).
+
+  Medido, el orden de hoy es: mundo → testigo y cartas de bienes (g0) → piezas de la
+  barra (g1000) → su testigo (999, DESPUÉS de sus piezas) ‖ anillo → áreas → cartas del
+  mazo (g0) → placa y zócalos (g1000). O sea que la placa ya se pinta DESPUÉS de los
+  pies de las cartas de bienes y los tiñe al 42 %: «es lo que ya pasaba» era verdad a
+  medias. Con una TAPA OPACA en el grupo `Barra` sin tocar nada más, la tapa (opaca,
+  g1000) se pinta después de las cartas (opacas, g0) y les TAPA los pies, 3–12 puntos
+  en todos los apaisados. La decisión, lo más barato y sin tocar `baraja.ts` ni
+  `cartas.ts`, en `delta.tsx`:
+
+  - El `<group>` de `Baraja` lleva `renderOrder={ORDEN_DE_LAS_CARTAS}` y el de
+    `ManoDelMazo` `renderOrder={ORDEN_DE_LAS_CARTAS_DEL_MAZO}`. Con eso, en las DOS
+    pasadas, todo lo de la barra (1000) va antes que todo lo de los bienes (1010) y
+    esto antes que todo lo del mazo (3000); dentro de cada grupo el `renderOrder` de
+    cada malla sigue mandando como hoy: el testigo de la baraja (1005) antes que sus
+    cartas, las áreas (2000+) después de la carta cogida, las casillas (4000+) después
+    de las cartas del mazo. Medido en el guion: cero fallos.
+  - El testigo de la barra pasa de `renderOrder={999}` a `{-1}`: dentro del grupo
+    1000, 999 va DESPUÉS de las piezas y de la tapa (que tienen 0), así que hoy borra
+    la profundidad cuando ya no sirve; con −1 va primero, que es lo que su comentario
+    dice que hace.
+  - La tapa lleva `raycast={() => null}` y no escribe nada que las cartas miren
+    (`depthTest={false}` en ellas): no les quita ni un toque ni un píxel.
+  - Lo TRANSPARENTE de la mesa —zócalos, tapete, sombras de contacto— se pinta en la
+    pasada de transparentes, después de las cartas opacas, haga lo que haga el
+    `groupOrder`; por eso nada transparente de la mesa puede llegar a una carta: los
+    zócalos y las sombras viven dentro de los huecos y el tapete bajo los dados, y
+    «el hueco del mazo queda libre de las cartas de bienes» ya lo mide `verify:escena`.
+    La pila del mazo (fase 7) es opaca por lo mismo.
+  - La regla del apilamiento que encabeza `ORDEN_DE_LA_BARRA` (delta.tsx 204–219) se
+    completa con esto: «cada capa pegada a la cámara es un grupo con su
+    `renderOrder`, y el número de la malla ordena dentro del grupo». El comentario de
+    la carta (1626–1630: «el `renderOrder` de un grupo no baja a sus hijos») se
+    corrige: no baja como `renderOrder`, baja como `groupOrder`, y manda más.
+  - `verify:escena` no puede correr el pintor, pero ya lee `delta.tsx` como texto
+    (433, 1529, 2484): en la fase 2 afirma que los tres grupos declaran su
+    `renderOrder` con su constante y que el testigo de la barra va a −1.
+
+Se quita la placa, y con ella se queda sin objeto la comprobación de `verify:escena`
+«la mano del mazo no invade la zona de la barra de construir» (2045–2071), que mide
+`hueco.y + hueco.lado · 0,75` —la placa— para una a seis piezas: sin placa seguiría
+verde vigilando nada. En la fase 1 sigue midiendo la placa (con 0,14 da `−0,240`); en
+la fase 2 se reescribe contra lo que de verdad hay: el techo de la mesa,
+`hueco.y + 0,52 · lado` —el asa (0,5) más el bote de la pieza tomada (0,516),
+redondeado hacia arriba—, aplicado a los huecos de las piezas Y al de los dados, que
+tiene el mismo `y` y el mismo alto de un lado y cuyo dado en salto se queda en 0,18.
+Es `−0,272·alto` con el alto mandando: 0,072 de holgura al piso de `−0,20`. Se queda
+la `pointLight` de `[0.4, 0.6, -1.2]` con su alcance de 3: es lo que ilumina lo que
+gira con la cámara, y como está por encima de la cota ilumina también la tapa
+horizontal. Los zócalos hexagonales se quedan como
 posavasos: llevan la información de «apagada» (opacidad 0,3) y la de «tomada»
 (verde), y un posavasos sobre una mesa es una cosa normal. Ver la duda 5.
 
@@ -516,7 +647,25 @@ La regla es «cabe o no cabe, y llega a 44 o no», nunca la proporción, para qu
 lienzo raro no caiga en la forma equivocada. La pantalla pregunta lo mismo que la
 escena —`huecosDeLaMesa(...).dados !== null`— antes de llamar a `dadosEnTres`, y como
 las dos llaman a la misma función con la misma medida no pueden discrepar: si la
-escena no pinta dados, la pantalla no quita el botón. `verify:escena` mide las tres
+escena no pinta dados, la pantalla no quita el botón.
+
+**`cuantos` es 4, y por qué siempre 4 cuando hay dados.** La escena cuenta
+`piezas.length + (mazo === null ? 0 : 1)` (`delta.tsx` 1401) y la pantalla tiene que
+contar EXACTAMENTE igual —`barraEnTres(...).length + (mazoEnLaBarra(...) === null ? 0 :
+1)`— para pedir el mismo reparto. En `jugando`, para un colono con color, es 4 sin
+excepción: `barraEnTres` devuelve las tres `PIEZAS_DE_LA_BARRA` en cuanto hay color,
+dentro y fuera de turno (314–324; fuera de turno salen apagadas, no ausentes), y
+`mazoEnLaBarra` no es `null` en `jugando` con color (362–371). Fuera de `jugando` el
+mazo es `null` y son 3, y ahí NO hay dados: `dadosEnTres` devuelve `null` fuera de
+`momento === 'jugando'`, por lo mismo que `mazoEnLaBarra` (cabecera 351–360: durante la
+colocación no existe la jugada, y un hueco apagado toda una fase promete algo que no
+llega). Todas las medidas del colgado usan 4 y valen; la de 3 se hizo igual
+(`medir-colgado-con-tres.ts`) por si algún día se quieren dados en la colocación: con 3
+el colgado cae más adentro, `x ∈ [−0,830, −0,459]`, con 124–191 puntos libres tras la
+muesca en los teléfonos, cabe en la tableta de 768×640 (63) y en los lienzos de pie
+pasaría a cuarto hueco con 47,5 puntos en 320×360 y 53,4 en 360×490 —donde con 4 no
+hay dados—: un lienzo que tuviera dados en la colocación y los perdiera al empezar a
+jugar. Otra razón para no pintarlos ahí. `verify:escena` mide las tres
 formas en los seis lienzos de hoy más 768×1024 y los ocho apaisados (568×320, 667×375,
 780×360, 844×390, 932×430, 1024×768, 1180×820, 1920×1080), con la misma exigencia que
 el hueco del mazo: 44 puntos de asa en TODAS las piezas y en los dados cuando los hay,
@@ -549,36 +698,56 @@ misma comprobación de 44 lo cubre. Ver la duda 6.
 
 `dadosEnTres(vista, quien, opciones)` en `shared/arcade/juegos/riberas-en-tres.ts`,
 sin `three` y sin importar valores de `escenas/` (hoy sólo importa tipos de ahí, y
-sigue así), devuelve `null` si esta pantalla no pinta dados (mirón, más de cuatro,
-respaldo) y si no:
+sigue así), devuelve `null` si esta pantalla no pinta dados —mirón, más de cuatro,
+respaldo, y `momento !== 'jugando'` (§4.4)— y si no:
 
 ```
-{ suma: ultimaTirada, tirado, turnosAbiertos, de: turnoDe, colorDelTurno,
-  porTirar: meToca(vista) && hay una opción TIRAR en `opciones` }
+DadosEnTres = { porTirar: meToca(vista) && yo === quien && hay TIRAR en `opciones`,
+                disponible: porTirar,
+                sello: selloDeLaTirada(turnosAbiertos, tirado),   // §1.3
+                ultimaTirada, tirado }
 ```
 
-La pantalla lo compone así, y el orden es la decisión 4:
+(Es la forma que ya tiene el código de la fase 1, `riberas-en-tres.ts` 1033–1077, y
+gana: el sello viaja ya calculado, y `de`/`colorDelTurno` NO van aquí; el tapete lee
+`turnoDe` y su color de la vista, como el marcador.) La pantalla lo compone así, y el
+orden es la decisión 4:
 
 ```
 const sitio  = huecosDeLaMesa(cuantos, CAMPO, ancho / alto, alto).dados !== null;
 const dados  = sitio ? dadosEnTres(vista, yo, opciones) : null;   // opciones ENTERAS
 const cinta  = opcionesFueraDeLaMesa(opcionesFueraDeLaBarra(...), dados);
+const hueco  = dados && { ...dados, disponible: dados.disponible && !mesa.quieto };
 ```
 
 `porTirar` sale de la lista de opciones, no de rehacer la regla: es lo mismo que hace
-`mazoEnLaBarra` con COMPRAR. `quieto` lo apaga la pantalla, como a la barra
-(`mesa.quieto ? { ...disponible: false }`).
+`mazoEnLaBarra` con COMPRAR. Y **`disponible` es la ÚNICA bandera que la escena mira
+para dejar tocar y para vibrar**, como `MazoDeLaBarra.disponible`: `dadosEnTres` la
+pone a `porTirar`, la pantalla la apaga con `quieto` mientras una petición vuela, y la
+escena no sabe por qué está apagada. La segunda versión no
+la tenía y dejaba un agujero: un colono FUERA de turno tiene dados (`dadosEnTres` no
+es `null` para él: los demás ven la tirada) con `porTirar = false`; tocaba el asa, la
+escena empujaba `tocado`, la máquina pasaba a `rodando` sin objetivo, no había TIRAR
+que mandar —o el servidor lo rechazaba— y sin `rechazado` rodaban 6 s. Con
+`disponible` falso el asa NO empuja `tocado` ni llama a `onPulsarLosDados`: el toque
+llega al asa (sigue `stopPropagation`, para que no gire el tablero por debajo, como una
+pieza apagada de la barra) y ahí se acaba.
 
-- **Reposo:** los dos dados quietos enseñando el último par. Con `ultimaTirada = 0`
-  (antes de la primera tirada) enseñan 1 y 1 sin tapete.
-- **Me toca y falta tirar** (`porTirar && !quieto`): VIBRAN. Patrón de 1,6 s:
+- **Reposo, apagado** (`disponible` falso: no me toca, ya tiré, o `quieto`): los dos
+  dados quietos enseñando el último par, a todo color —la tirada es de todos y se lee
+  desde todos los asientos, así que no se atenúan como una pieza apagada—, sobre el
+  tapete del color de `turnoDe`, sin vibrar y sin responder al toque. El hueco de los
+  dados no lleva zócalo: no hay nada que «encender». Con `ultimaTirada = 0` (antes de
+  la primera tirada) enseñan 1 y 1 sin tapete.
+- **Me toca y falta tirar** (`disponible`): VIBRAN. Patrón de 1,6 s:
   sacudida de 0,36 s a 8 Hz con envolvente senoidal, y el resto quietos; se mueven
   el 21 % del tiempo, diez avisos en dieciséis segundos (`medir-dado.ts`). Amplitud:
   3 % del lado en traslación —1,35 puntos en el SE, 1,6 en un iPhone 14, 4,5 en un
   monitor a 1080 (`medir-con-014.ts`)— y 4° de giro. Es un temblor que se ve en el
   rabillo del ojo y no un bote: la barra ya enseñó que «cuatro cosas moviéndose en el
   borde del ojo mientras se mira el tablero» molestan (`GIRO_DE_LA_VITRINA`). A nadie
-  más le vibra nada: `meToca` es falso para los demás. Con `quieto` no vibra.
+  más le vibra nada: `disponible` es falso para los demás, y la vibración lee esa
+  misma bandera y ninguna otra.
 - **Rodando:** giro sobre dos ejes con velocidad decreciente y un salto de `0,2 lados`
   que cae; mínimo 0,6 s.
 - **Asentando:** interpolación amortiguada del cuaternión al que enseña la cara
@@ -587,30 +756,50 @@ const cinta  = opcionesFueraDeLaMesa(opcionesFueraDeLaBarra(...), dados);
 ### 5.3. El toque y la máquina
 
 Tocar el asa —primario, `stopPropagation`, `loCogeLaInterfaz`, y en la app
-`laInterfazSeLoQueda()` como hace `alTomarDeLaBarra`— llama a `onPulsarLosDados`, y
-la pantalla manda la opción TIRAR por `mesa.mover`, la misma puerta que el botón. La
-escena no sabe que eso es tirar: es «el hueco que se pulsa», como el naipe del mazo.
+`laInterfazSeLoQueda()` como hace `alTomarDeLaBarra`— y SÓLO si `disponible` (§5.2)
+llama a `onPulsarLosDados` y empuja `tocado`, y la pantalla manda la opción TIRAR por
+`mesa.mover`, la misma puerta que el botón. La escena no sabe que eso es tirar: es «el
+hueco que se pulsa», como el naipe del mazo.
 
 `mover` cambia de firma en las dos `mesa.ts`: hoy es `(movimiento) => void` con un
 `void (async () => {...})()` dentro; pasa a devolver esa misma promesa, resuelta a
-`'hecho' | 'rechazado' | 'sin-red'` con lo que el cuerpo ya sabe —`seIgnoro` o
-`!r.ok` es `'rechazado'`, el `catch` es `'sin-red'`—. Nadie más la lee: los demás
-sitios siguen llamándola sin `await`. La pantalla hace `mover(TIRAR).then((r) => { if
-(r !== 'hecho') sucesos.current.push('rechazado'); })`, y el `useFrame` de los dados
-vacía esa cola en su primer `tic`.
+`'hecho' | 'rechazado' | 'sin-red'` con lo que el cuerpo ya sabe. La tabla entera, sin
+dejarse ninguna salida del cuerpo:
+
+| Salida de `mover` (`app/src/arcade/mesa.ts` 704–799, `escritorio/src/mesa.ts` 676–741) | Resuelve |
+|---|---|
+| El `return` temprano —`if (donde === null \|\| rev === undefined) return;` (707–709 / 679–681)—: sin código de mesa o sin `rev`, no se manda nada | `'rechazado'` (la mesa está igual que estaba; nada rodó por el cable) |
+| `r.ok` y `rev` subió | `'hecho'` |
+| `seIgnoro` (`r.ok` con el mismo `rev`) o `!r.ok` | `'rechazado'` |
+| El `catch` | `'sin-red'` |
+
+Nadie más la lee: los demás sitios siguen llamándola sin `await`. La pantalla
+comprueba los tres valores EXHAUSTIVAMENTE —un `switch` sin `default` sobre el tipo
+de unión, de modo que un cuarto valor el día de mañana no compile—: `'hecho'` no
+empuja nada (la vista traerá la tirada); `'rechazado'` y `'sin-red'` empujan
+`rechazado` a la cola de la máquina, porque en los dos casos la mesa no cambió y no
+va a llegar ninguna tirada mía. El `useFrame` de los dados vacía esa cola en su
+primer `tic`. Los 6 s de la máquina (más abajo) quedan para la única salida que no
+está en la tabla: una petición que no vuelve nunca, ni bien ni mal ni con error.
 
 La máquina vive en `escenas/dados.ts`, pura, con el reloj inyectado, como `gestos.ts`
 del Muelle, y se comprueba en Node:
 
 ```
 faseDeLosDados(estado, suceso, ahora) → estado
-sucesos: 'tocado' | { vista: { suma, tirado, turnosAbiertos, de } } | 'rechazado' | 'tic'
-estados: quieta(par) | rodando(desde, objetivo?) | asentando(desde, par)
+sucesos: { que: 'tocado' } | { que: 'vista', vista: { tirado, ultimaTirada, sello } }
+       | { que: 'rechazado' } | { que: 'tic' }
+estados: quieta(par) | rodando(desde, objetivo | null, anterior) | asentando(desde, par)
 ```
+
+(La forma es la del código de la fase 1, `escenas/dados.ts` 91–143: la máquina no lee
+`turnosAbiertos` a secas, recibe el `sello` ya calculado por `dadosEnTres`, y `rodando`
+guarda el par `anterior` al que vuelve si la tirada no llega.)
 
 - `tocado` en `quieta` → `rodando(ahora, null)`. En cualquier otro estado, nada: el
   segundo toque de un doble toque no arranca nada, y como la pantalla pone `quieto`
-  mientras la petición vuela, el asa tampoco lo manda.
+  mientras la petición vuela, `disponible` cae y el asa tampoco lo manda. Y `tocado`
+  sólo lo empuja un asa `disponible`: fuera de turno no llega nunca a la máquina.
 - `rechazado` en `rodando` sin objetivo → `quieta(par anterior)` en el acto. En
   cualquier otro estado, nada (si ya hay objetivo es que la vista trajo la tirada,
   que es de otro o de mi otra pestaña, y se asienta en ella). Lo que falló lo dice
@@ -621,15 +810,16 @@ estados: quieta(par) | rodando(desde, objetivo?) | asentando(desde, par)
   la mía llegó sin que yo tocara —dos pestañas—), se pasa a `rodando(ahora,
   objetivo)`.
 - Tirada nueva es: `tirado` pasa de falso a verdadero; o `tirado` es verdadero y
-  cambia `turnosAbiertos` o `suma` respecto de la última vista (dos movimientos entre
-  dos vueltas del sondeo). Si `turnosAbiertos` cambia con `tirado` falso, la tirada
+  cambia el `sello` o `ultimaTirada` respecto de la última vista (dos movimientos
+  entre dos vueltas del sondeo). Si el `sello` cambia con `tirado` falso, la tirada
   del turno anterior se perdió entre sondeos: se enseña el par nuevo en reposo, sin
   animar, porque ya es noticia vieja.
 - El par lo da `repartoDeLaTirada(suma, sello, semilla)` con el sello de la decisión
   3. No hay ningún caso en que un aparato vea otro par que sus vecinos: el sello sale
   de tres números que viajan en la vista o se derivan del código de la mesa.
 - `rodando` sin objetivo más de 6 s → `quieta(par anterior)`. Ya sólo pasa cuando la
-  red no ha contestado ni bien ni mal.
+  petición no ha vuelto ni bien, ni mal, ni con error: `'sin-red'` también empuja
+  `rechazado` (tabla del §5.3), así que un fallo de red que se sabe corta en el acto.
 - Cada `tic` es un `useFrame`: escribe posición y cuaternión de las dos mallas. Nada
   cruza el estado de React.
 
@@ -707,24 +897,25 @@ compila ninguna cifra nueva.
 
 | Fichero | Qué |
 |---|---|
-| `escenas/barra.ts` | `PARTE_DEL_ALTO` 0,14; `huecosDeLaMesa(cuantos, campo, proporcion, altoEnPuntos)` con los tres peldaños; la cota de la tapa como función del hueco; la cabecera de `ANCHO_MAXIMO` reescrita |
+| `escenas/barra.ts` | `PARTE_DEL_ALTO` 0,14; `SUELO_DEL_TOQUE = 44` exportado (el mismo número en la escena y en el comprobador); `huecosDeLaMesa(cuantos, campo, proporcion, altoEnPuntos)` con los tres peldaños; la cota de la tapa como función del hueco; la cabecera de `ANCHO_MAXIMO` reescrita |
 | `escenas/mesa.ts` (NUEVO, sin `three`) | `vetaDelTablon`, los dos colores medidos del atlas, la conversión a lineal, el número de segmentos por ancho en puntos, la Z de los bordes |
-| `escenas/dados.ts` (NUEVO, sin `three`) | `repartoDeLaTirada(suma, sello, semilla)`, `selloDeLaTirada(turnosAbiertos, tirado)`, `sacudida(t)`, `faseDeLosDados` con `rechazado` |
+| `escenas/dados.ts` (NUEVO, sin `three`) | `paresDeLaSuma`, `repartoDeLaTirada(suma, sello, semilla)`, `sacudida(t)`, `faseDeLosDados` con `rechazado`, `RODAR_MINIMO`, `ASENTAR`, `TOPE_SIN_RESPUESTA`. `selloDeLaTirada` NO está aquí: vive en `shared/…/riberas-en-tres.ts` al lado de `dadosEnTres`, que es quien lo calcula, y el sello ya viaja hecho en `DadosEnTres` (§5.2) |
 | `escenas/presupuesto-del-delta.ts` | `SEGMENTOS_DE_LA_MESA` (mín, máx, puntos por segmento), `triangulosDeLaMesa`, `TOPE_DE_LA_MESA` |
-| `escenas/cartas.ts` | SÓLO las dos frases que citan el techo de la placa (26 y 408); ninguna constante |
+| `escenas/cartas.ts` | SÓLO las dos frases que citan el techo de la placa (26 y 408), dos veces: en la fase 1 la placa con 0,14 (`−0,240·alto`), en la fase 2 el asa y el bote (`−0,273·alto`, §1.2); ninguna constante |
 | `escenas/baraja.ts` | Nada |
-| `escenas/delta.tsx` | `Barra` → tapa horizontal, sombras, tapete, pila; `Dados` hermano de `PiezaEnLaBarra`; entradas `dados`, `onPulsarLosDados`, `mesaRecogida` de `<Delta>`, opcionales como las otras |
-| `escenas/scripts/verificar-escena.ts` | Los lienzos apaisados y 768×1024; los tres peldaños de los dados; la mesa contra las manos; el reparto por sello; la veta; el tope; la línea de «tres y cuatro» reescrita |
-| `shared/arcade/juegos/riberas-en-tres.ts` | `tirado`, `ultimaTirada`, `turnosAbiertos` en `VistaQueSePinta`; `dadosEnTres`, `opcionesFueraDeLaMesa`, `chozas`/`torres` en `ColonoEnElMarcador` |
-| `server/scripts/verificar-riberas-en-tres.ts` | Que TIRAR se cae del formulario sólo con dados; que `porTirar` sigue a las opciones enteras; que las cuentas de chozas y torres cuadran con la vista |
-| `app/src/arcade/mesa.ts`, `escritorio/src/mesa.ts` | `mover` devuelve `'hecho' \| 'rechazado' \| 'sin-red'` |
+| `escenas/cinta.ts` (NUEVO, sin `three`) | `anchoDeLaCinta(ancho, alto)`: el tercio en apaisado, el 40 % de pie (§2.2) |
+| `escenas/delta.tsx` | `Barra` → tapa horizontal, sombras, tapete, pila; `Dados` hermano de `PiezaEnLaBarra`, que sólo empuja `tocado` si `disponible`; entradas `dados`, `onPulsarLosDados`, `mesaRecogida` de `<Delta>`, opcionales como las otras; `renderOrder` en los `<group>` de `Baraja` y `ManoDelMazo` y el testigo de la barra a −1 (§4.1); la cabecera de `ORDEN_DE_LA_BARRA` y el comentario de la carta (1626–1630) reescritos |
+| `escenas/scripts/verificar-escena.ts` | Los lienzos apaisados y 768×1024; los tres peldaños de los dados; la mesa contra las manos; el reparto por sello; la veta; el tope; la línea de «tres y cuatro» reescrita; «la mano del mazo no invade la zona de la barra» contra `0,52·lado` en la fase 2; los tres grupos con su `renderOrder` (texto); el vértice más alto bajo la cinta al salir; la cinta apaisada y de pie contra las manos |
+| `shared/arcade/juegos/riberas-en-tres.ts` | `tirado`, `ultimaTirada`, `turnosAbiertos` en `VistaQueSePinta` (y los dos comentarios de `comprada`, 51–53 y 170–175, reescritos: §1.3); `dadosEnTres` (`null` fuera de `jugando`), `opcionesFueraDeLaMesa`, `chozas`/`torres` en `ColonoEnElMarcador` |
+| `server/scripts/verificar-riberas-en-tres.ts` | Que TIRAR se cae del formulario sólo con dados; que `porTirar` sigue a las opciones enteras; que `dadosEnTres` es `null` fuera de `jugando`; que las cuentas de chozas y torres cuadran con la vista |
+| `app/src/arcade/mesa.ts`, `escritorio/src/mesa.ts` | `mover` devuelve `'hecho' \| 'rechazado' \| 'sin-red'`, con el `return` temprano resuelto a `'rechazado'` (tabla del §5.3) |
 | `app/src/arcade/local.ts` | `volverAlRetrato()`; `usarElAparatoQuieto` lo usa al desmontar; `usarApaisado` al lado |
 | `app/src/arcade/riberas-en-tres-escena.tsx`, `app/src/arcade/hud-de-la-mesa.tsx` (NUEVO) | La rama del delta a pantalla completa; la cinta del tercio central y el cajón; barra de estado oculta; cartel de girar; la acción accesible `tirar` |
 | `escritorio/src/riberas-en-tres.tsx`, `escritorio/src/sala.tsx`, `escritorio/src/estilo.css` | La misma cinta en DOM; el raíl como cajón; `.riberas-lienzo` a toda la altura; el botón de tirar para tecnologías de apoyo |
 
 ## 9. Cómo se midió
 
-Once guiones en el scratchpad de la sesión, que importan el código real. De la
+Diecisiete guiones en el scratchpad de la sesión, que importan el código real. De la
 primera pasada: `medir-lienzos.ts` (huecos, manos y franjas en catorce lienzos con el
 0,13 de hoy), `medir-dados-hueco.ts` (el hueco de los dados colgado y como quinto),
 `medir-con-014.ts` (las mismas cuentas con `PARTE_DEL_ALTO` a 0,14: reproduce la
@@ -740,8 +931,17 @@ peldaños de los dados en quince lienzos), `medir-cinta-central.ts` (el tercio c
 contra las dos manos abiertas y contra el borde lejano del delta proyectado con la
 cámara), `medir-reparto-por-turno.ts` (el sello por turno, mil turnos, la recarga, y
 el fallo del sello por asiento reproducido) y `medir-veta.ts` (dominio, tablones,
-rangos y contraste). Donde un número de aquí viene del 0,13 se dice; los del 0,14 son
-los que valen. Lo que se afirma en este documento se convierte en comprobaciones de
+rangos y contraste). De la tercera, tras la segunda revisión:
+`medir-orden-de-dibujo.ts` (la escena de las capas pegadas a la cámara metida en el
+`WebGLRenderLists` de `three` 0.185.1 y ordenada con su `sort`, hoy y con los grupos
+numerados), `medir-techos.ts` (placa, naipe, asa, pieza señalada y tomada, dado en
+salto, con 0,13 y 0,14 y en los lienzos de pie), `medir-colgado-con-tres.ts` (los tres
+peldaños con `cuantos` 3 y 4), `medir-cinta-de-pie.ts` (la cinta al tercio, 40, 45 y
+50 % contra las manos abiertas en los lienzos de pie), `medir-borde-lejano.ts` (los 54
+vértices y el borde del delta proyectados con `ojoYMira` al salir y a 82°, en todos
+los rumbos) y `medir-sacar-el-vertice.ts` (cuántos grados y cuántos puntos de
+arrastre sacan el vértice de debajo de 44 y de 88). Donde un número de aquí viene del
+0,13 se dice; los del 0,14 son los que valen. Lo que se afirma en este documento se convierte en comprobaciones de
 `verify:escena` en la fase 1: el guion de la sesión se tira, el comprobador se queda.
 
 ## 10. Lo que NO entra, las decisiones abiertas con dueño, y las dudas para Miguel
@@ -762,7 +962,8 @@ lo que aquí se dice):
 | La Z del borde delantero de la tapa | `−(−cota / tan(campo/2))`: donde cruza el canto de abajo (−1,649 en apaisado). Si en el banco la madera se ve corta por delante, se alarga hacia la cámara, nunca hacia atrás | Fase 2, en `banco3d.html` |
 | Dados en los lienzos de pie | Regla de los tres peldaños del §4.4: 390 de ancho sí, 360 y 320 no. Si la app un día pinta el delta de pie en 360 de ancho, no hay dados y TIRAR está en la cinta | Fase 3, medido por `verify:escena` |
 | Una carta cogida cuando la mesa sale sola | No sale: espera a que se suelte (§6). La alternativa —soltar y sacar— rompe el gesto | Fase 4 |
-| El umbral de la segunda línea de la frase | «El texto medido no cabe en `ancho/3 − 88`»; los anchos de fuente no se miden en Node | Fase 5, en el banco, y se deja escrito el número |
+| Cuándo la frase pasa a dos líneas dentro de los 44 y cuándo a puntos suspensivos | La frase no hace crecer la cinta (§2.2): dos líneas de 17 caben en 44. El hueco está medido (`ancho/3 − 88`: 101–552 puntos apaisado; 40–219 de pie al 40 %); el ancho del texto con la fuente de la casa no se mide en Node | Fase 5, en el banco, y se dejan escritos la letra, el interlineado y el número |
+| La línea de botones sobre el vértice lejano | Bajo la primera línea, en el tercio central; tapa el vértice más lejano en los teléfonos apaisados al salir (63–84 puntos) y se saca con 7–37 puntos de arrastre (§2.2). La alternativa medida es a la derecha del tercio, en los 155 (SE) – 240 (iPhone 14) puntos de aire hasta la mano de bienes | Fase 5, en el banco; si se mueve, se vuelve a medir contra la mano de bienes abierta |
 | La coexistencia de los dos bloqueos de orientación | No coexisten (`LOS_QUE_PINTA` pinta un arcade), los dos vuelven por `volverAlRetrato()`, y se prueba entrando y saliendo en el aparato | Fase 6 |
 
 **Dudas que sólo puede resolver él.** Cada una con sus dos opciones y lo que cuesta cada
@@ -807,27 +1008,54 @@ depende de la siguiente.
    `selloDeLaTirada`, `repartoDeLaTirada` y `faseDeLosDados` con `rechazado`;
    `vetaDelTablon`; los lienzos apaisados y 768×1024 y las comprobaciones nuevas en
    `verify:escena`; la línea de «tres y cuatro miden lo mismo» reescrita para exigir
-   sólo el suelo. Y los tres comentarios que el 0,14 deja falsos, reescritos: la
-   cabecera de `ANCHO_MAXIMO` en `barra.ts` («en el más bajo (320×360) sigue mandando
-   el alto»: ya no), y en `cartas.ts` la cabecera (línea 26, «el techo de la barra
-   NUNCA pasa de −0,2475·alto») y la nota de `PISO_DE_LA_FRANJA` (línea 408), que
-   miden contra una placa que la fase 2 quita: pasan a medir contra el techo del
-   naipe (`hueco.y + 0,31 · lado`, el 19,8 % del alto). Lo visible: el hueco un 8 %
-   mayor y, en 320×360, la barra un poco más ancha.
+   sólo el suelo. Y los comentarios que el 0,14 y los dados dejan falsos, reescritos
+   con lo que hay EN ESTA FASE: la cabecera de `ANCHO_MAXIMO` en `barra.ts` («en el
+   más bajo (320×360) sigue mandando el alto»: ya no); en `cartas.ts` la cabecera
+   (línea 26, «el techo de la barra NUNCA pasa de −0,2475·alto») y la nota de
+   `PISO_DE_LA_FRANJA` (línea 408), que en esta fase siguen midiendo la PLACA, que
+   sigue ahí, y pasan a decir `−0,240·alto` (el 26,0 %, holgura 0,040; §1.2) —del
+   asa y del naipe no se habla hasta que la placa se vaya, en la fase 2—; y en
+   `riberas-en-tres.ts` los dos comentarios de `comprada` (51–53 y 170–175), que
+   dejan de decir que `turnosAbiertos` no está escrito y pasan a decir que la
+   salvaguarda es que `comprada` no lo esté (§1.3). La comprobación «la mano del mazo
+   no invade la zona de la barra» se queda como está en esta fase: la placa sigue.
+   Lo visible: el hueco un 8 % mayor y, en 320×360, la barra un poco más ancha.
 2. **La mesa de madera.** El tablón horizontal sustituye a la placa; sombras de
-   contacto; tapete del turno; tope de triángulos. Sin dados: se sigue tirando con el
-   botón. Se mira en el banco `escritorio/banco3d.html` (entrada `escritorio3d` de
-   `launch.json`) antes de empujar: la Z del borde delantero, la junta entre tablones
-   y el contraste 1,60:1 son decisiones que un comprobador no puede juzgar.
-3. **Los dados.** `Dados` en la escena, `dadosEnTres` y `opcionesFueraDeLaMesa` en
-   `shared/`, `mover` devolviendo su resultado en las dos `mesa.ts`, la acción
-   accesible, y el botón TIRAR se cae de la cinta donde hay dados. Primero en el
-   escritorio, que es donde el delta se ve hoy.
+   contacto; tapete del turno; tope de triángulos. Y el orden de dibujo del §4.1, en
+   el mismo empujón que la tapa, porque sin él la tapa opaca esconde los pies de las
+   cartas de bienes: `renderOrder` en los `<group>` de `Baraja` y `ManoDelMazo`, el
+   testigo de la barra a −1, la cabecera de `ORDEN_DE_LA_BARRA` y el comentario de la
+   carta reescritos, y en `verify:escena` el texto que afirma los tres grupos. Con la
+   placa fuera, «la mano del mazo no invade la zona de la barra» pasa a medir
+   `hueco.y + 0,52·lado` en los huecos de las piezas y en el de los dados, y las dos
+   frases de `cartas.ts` pasan a hablar del asa y del bote (`−0,273·alto`, §1.2). Sin
+   dados: se sigue tirando con el botón. Se mira en el banco `escritorio/banco3d.html`
+   (entrada `escritorio3d` de `launch.json`) antes de empujar: la Z del borde
+   delantero, la junta entre tablones, el contraste 1,60:1 y que los pies de las
+   cartas de bienes se vean sobre la madera son decisiones que un comprobador no
+   puede juzgar.
+3. **Los dados.** `Dados` en la escena, con `disponible` como única llave del toque y
+   de la vibración; `dadosEnTres` (`null` fuera de `jugando`) y
+   `opcionesFueraDeLaMesa` en `shared/`; `mover` devolviendo su resultado en las dos
+   `mesa.ts` con el `return` temprano resuelto a `'rechazado'` y el `switch`
+   exhaustivo en la pantalla (§5.3); la acción accesible; y el botón TIRAR se cae de la
+   cinta donde hay dados. Primero en el escritorio, que es donde el delta se ve hoy.
 4. **Recoger la mesa.** El botón, la bajada, `soltarTodo`, la vuelta sola al tocarme
    con la espera si hay una carta cogida.
-5. **Pantalla completa en el escritorio.** La cinta del tercio central, el cajón con el
-   marcador (chozas y torres), el lienzo a toda la altura, el umbral de la segunda
-   línea medido y escrito.
+5. **Pantalla completa en el escritorio.** La cinta del tercio central (y del 40 % de
+   pie) con `anchoDeLaCinta` en `escenas/cinta.ts`, el cajón con el marcador (chozas y
+   torres), el lienzo a toda la altura, la letra y el interlineado con que la frase
+   cabe a dos líneas en 44 y el ancho al que se recorta, medidos en el banco y
+   escritos; y dónde va la línea de botones (§10). En `verify:escena`, dos
+   comprobaciones nuevas: que al mirador de salida ningún vértice de los 54 cae bajo
+   la cinta (a menos de 44 puntos del canto de arriba dentro de la banda de la cinta)
+   en ninguno de los lienzos, con la cámara de verdad (`ojoYMira` sobre
+   `ojoDelMirador`, sin acercar) y recorriendo el rumbo entero —hoy el peor es el SE,
+   63—; y que la cinta, con el ancho que devuelve `anchoDeLaCinta`, deja al menos 15
+   puntos hasta la carta de arriba de cada mano abierta en todos los lienzos (hoy
+   15,6 en 390×845). El caso de 82° se deja escrito en el comprobador como dato, no
+   como exigencia: la tableta 4:3 a 26 puntos es la cámara en su tope, y se sale con
+   47 de arrastre.
 6. **Apaisado y pantalla completa en la app.** `usarApaisado` y `volverAlRetrato()` en
    los dos ganchos, la barra de estado, el cartel, la cinta en React Native, la
    pantalla encendida. Esta fase espera a que el atlas nativo del tablero entre en
