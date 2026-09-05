@@ -48,9 +48,14 @@
  * de fallo, la que sólo se ve el día que discrepan.
  *
  * Por eso `misCartas` se lee SÓLO para saber qué cartas tengo y de qué clase son.
- * Su campo `comprada` no se mira ni una vez, aunque esté ahí y aunque compararlo
- * con `turnosAbiertos` sea una línea: esa línea es la regla §1.4, y la regla vive
- * en `riberas.ts`.
+ * Su campo `comprada` no se mira ni una vez, y NO SE DECLARA en `VistaQueSePinta`,
+ * aunque esté ahí y aunque compararlo con `turnosAbiertos` sea una línea: esa línea
+ * es la regla §1.4, y la regla vive en `riberas.ts`. `turnosAbiertos` SÍ se declara
+ * desde que hay dados, y entra SÓLO como sello de la tirada (`selloDeLaTirada`,
+ * `dadosEnTres`): es el número que hace que los cuatro aparatos partan la misma suma
+ * en el mismo par y que el par no cambie a mitad de turno. Lo que sigue protegiendo la
+ * regla es que `comprada` no está escrito: sin él no hay con qué compararlo, y
+ * `verify:riberas-en-tres` lo afirma leyendo este fichero.
  *
  * ═══ POR QUÉ SÓLO SE IMPORTAN TIPOS DE `escenas/` ═══
  *
@@ -102,6 +107,7 @@ import {
   OFRECER,
   REVELAR,
   seudonimoDeLaCarta,
+  TIRAR,
   VADO_MINIMO,
 } from './riberas';
 import type { ClaseDeCarta } from './riberas';
@@ -167,11 +173,25 @@ interface VistaQueSePinta {
    * MI MANO DEL MAZO, y de cada carta se lee UNA cosa: su identificador.
    *
    * De ahí salen el seudónimo —lo único suyo que se puede publicar— y la clase. El
-   * sello `comprada` que también viaja NO se declara aquí, y es deliberado: mientras
-   * no esté escrito, nadie puede compararlo con `turnosAbiertos` y reescribir sin
-   * querer la regla de que una carta comprada no se juega hoy. Ver la cabecera.
+   * sello `comprada` que también viaja NO se declara aquí, y es deliberado: aunque
+   * `turnosAbiertos` ya esté declarado más abajo para los dados, mientras `comprada` no
+   * esté escrito nadie puede compararlos y reescribir sin querer la regla de que una
+   * carta comprada no se juega hoy. Ver la cabecera.
    */
   readonly misCartas?: readonly { readonly carta?: unknown }[];
+  /**
+   * LO DE LOS DADOS, y para qué se lee cada campo. Opcionales, como `mazo`: una vista
+   * de antes de que existieran se pinta igual, sin dados.
+   *
+   *   · `tirado` y `ultimaTirada` dicen qué enseñar: la suma, y si es de este turno.
+   *   · `turnosAbiertos` entra SÓLO como sello del reparto (`selloDeLaTirada`), para
+   *     que la suma se parta en el mismo par en todos los aparatos y no cambie a mitad
+   *     de turno. Aquí no se compara con nada más, y `comprada` sigue sin declararse
+   *     por eso mismo.
+   */
+  readonly tirado?: boolean;
+  readonly ultimaTirada?: number;
+  readonly turnosAbiertos?: number;
   /** MIS puntos con los títulos sin revelar dentro. Sólo míos. */
   readonly misPuntos?: number;
   /** Cuántas cartas quedan por comprar. Público: un mazo se cuenta. */
@@ -976,6 +996,100 @@ export function opcionesFueraDeLaBarra<O extends OpcionQueLlega>(
   mazo: MazoEnLaBarraEnTres | null,
 ): O[] {
   return mazo === null ? [...opciones] : opciones.filter((o) => o.tipo !== COMPRAR);
+}
+
+// ---------------------------------------------------------------------------
+// LOS DADOS: qué enseñan, y el sello con el que se parte la suma
+// ---------------------------------------------------------------------------
+
+/**
+ * EL SELLO DE LA TIRADA QUE SE ENSEÑA: el turno en que se tiró.
+ *
+ * El servidor publica la SUMA y no las dos caras, y el par lo parte el cliente de forma
+ * determinista con `(suma, sello, semilla)` (`escenas/dados.ts`). El sello tiene que ser
+ * estable dentro del turno, distinto cada turno e igual en los cuatro aparatos y tras
+ * recargar; `turnosAbiertos` lo es —sólo sube, y sube al pasar el turno— y con `tirado`
+ * falso la tirada que se enseña es la del turno ANTERIOR, así que lleva su sello. Ni
+ * `rev` (sube con cada movimiento: el par cambiaría al pasar una carta) ni el asiento
+ * (cada colono enseñaría siempre el mismo par para la misma suma).
+ *
+ * Es la ÚNICA lectura de `turnosAbiertos` de este fichero, y no se compara con nada.
+ */
+export function selloDeLaTirada(turnosAbiertos: number, tirado: boolean): number {
+  return turnosAbiertos - (tirado ? 0 : 1);
+}
+
+/**
+ * LOS DADOS DE LA MESA tal como los pinta la escena, o `null` si esta pantalla no los
+ * pinta. Sin `three` y sin importar valores de `escenas/`.
+ *
+ *   · `porTirar`: me toca y el juego ofrece TIRAR. Sale de la lista de opciones, no de
+ *     rehacer la regla —es lo mismo que hace `mazoEnLaBarra` con COMPRAR—.
+ *   · `disponible`: si el asa se puede pulsar. Aquí es `porTirar`; el `quieto` de la
+ *     petición en vuelo lo apaga la pantalla, como a la barra.
+ *   · `sello`, `ultimaTirada`, `tirado`: lo que la máquina de `escenas/dados.ts` necesita
+ *     para saber qué par enseñar y si la tirada es nueva.
+ */
+export interface DadosEnTres {
+  readonly porTirar: boolean;
+  readonly disponible: boolean;
+  readonly sello: number;
+  readonly ultimaTirada: number;
+  readonly tirado: boolean;
+}
+
+/**
+ * ═══ `null` EN LOS MISMOS SITIOS QUE `mazoEnLaBarra`, Y POR LO MISMO ═══
+ *
+ * Un mirón, un asiento que no está en la mesa, una mesa de más de cuatro colonos (que se
+ * juega sobre el retablo) y cualquier momento que no sea `jugando` no tienen dados; y
+ * donde no hay dados el botón TIRAR se QUEDA (`opcionesFueraDeLaMesa`), porque es lo único
+ * que salva al respaldo y al mirón de una partida en la que nadie puede tirar. Un hueco
+ * apagado prometería que un día se enciende; en la colocación no hay tirada que esperar.
+ *
+ * ═══ RECIBE LAS OPCIONES ENTERAS, ANTES DE NINGÚN FILTRO ═══
+ *
+ * El orden es el de `mazoEnLaBarra`: primero esto, con la lista completa, y después
+ * `opcionesFueraDeLaMesa` quita TIRAR de lo que va a los botones. Al revés, `porTirar`
+ * sería siempre falso y los dados no avisarían nunca de que toca tirar.
+ *
+ * La pantalla pregunta ANTES si hay sitio —`huecosDeLaMesa(...).dados !== null`— y sólo
+ * entonces llama aquí: en los lienzos donde los dados no caben tampoco hay dados, y el
+ * botón se queda.
+ */
+export function dadosEnTres<O extends OpcionQueLlega>(
+  vista: unknown,
+  quien: AsientoId | null,
+  opciones: readonly O[],
+): DadosEnTres | null {
+  if (!esVistaQueSePinta(vista) || quien === null) return null;
+  if (vista.momento !== 'jugando' || !bastanColores(vista)) return null;
+  if (colorDePiezaDelColono(indiceDelColono(vista, quien)) === null) return null;
+  const porTirar = meToca(vista) && vista.yo === quien && opciones.some((o) => o.tipo === TIRAR);
+  const tirado = vista.tirado ?? false;
+  return {
+    porTirar,
+    disponible: porTirar,
+    sello: selloDeLaTirada(vista.turnosAbiertos ?? 0, tirado),
+    ultimaTirada: vista.ultimaTirada ?? 0,
+    tirado,
+  };
+}
+
+/**
+ * LAS OPCIONES QUE TAMPOCO PINTA LA MESA: se cae TIRAR, y sólo si hay dados.
+ *
+ * El mismo patrón que `opcionesFueraDeLaBarra` con el mazo, y por el mismo par de fallos:
+ * con dados y botón la pantalla ofrecería tirar dos veces; sin dados y sin botón —el
+ * respaldo, un mirón, un lienzo donde no caben— nadie podría tirar en toda la tarde, sin
+ * un error en ninguna parte. Por eso recibe LOS DADOS, el mismo objeto que se le da a la
+ * escena, y no un interruptor: el botón desaparece exactamente cuando el asa existe.
+ */
+export function opcionesFueraDeLaMesa<O extends OpcionQueLlega>(
+  opciones: readonly O[],
+  dados: DadosEnTres | null,
+): O[] {
+  return dados === null ? [...opciones] : opciones.filter((o) => o.tipo !== TIRAR);
 }
 
 // ---------------------------------------------------------------------------

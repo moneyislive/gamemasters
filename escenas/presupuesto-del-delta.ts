@@ -193,3 +193,64 @@ export const TRIANGULOS_DEL_MAR = 23_328;
  * 41.000 y se comería el margen de la escena entera sin que nadie lo hubiera pesado.
  */
 export const TOPE_DEL_MAR = 24_000;
+
+// ---------------------------------------------------------------------------
+// LA MESA: el segundo número del delta con tope, escrito al lado del del mar
+// ---------------------------------------------------------------------------
+
+/**
+ * CUÁNTOS SEGMENTOS TIENE LA TAPA A LO LARGO, según el ancho del lienzo EN PUNTOS.
+ *
+ * La resolución de la veta es la de los vértices: con 96 segmentos un segmento mide 5,9
+ * puntos en 568 de ancho, 8,8 en 844 y 20 en 1.920. Veinte puntos interpolados se ven
+ * blandos en un monitor, así que los segmentos se escalan con el ancho —uno cada
+ * `puntosPorSegmento`— acotados entre un mínimo (por debajo la veta es una mancha) y un
+ * máximo, que es lo que el tope de abajo cubre. Aquí y no en `mesa.ts` porque es lo que
+ * decide el precio, y el precio se lee en este fichero.
+ */
+export const SEGMENTOS_DE_LA_MESA = { minimo: 64, maximo: 240, puntosPorSegmento: 8 } as const;
+/** Cuántas filas a lo ancho: dos por tablón. */
+export const FILAS_DE_LA_MESA = 6;
+
+export function segmentosDeLaMesa(anchoEnPuntos: number): number {
+  const pedidos = Math.round(anchoEnPuntos / SEGMENTOS_DE_LA_MESA.puntosPorSegmento);
+  return Math.min(SEGMENTOS_DE_LA_MESA.maximo, Math.max(SEGMENTOS_DE_LA_MESA.minimo, pedidos));
+}
+
+/**
+ * LO QUE CUESTA LA MESA ENTERA, con la tapa a `segmentos`: `12 · segmentos + 590`.
+ *
+ * Sumando por pieza, medido con `three` en Node:
+ *   · la tapa: `2 · segmentos · FILAS_DE_LA_MESA` triángulos, sin canto (su frente queda
+ *     fuera del lienzo);
+ *   · dos dados: 12 del cubo + 210 de los veintiún puntos fundidos, cada uno → 444;
+ *   · el asa de los dados, una caja invisible → 12;
+ *   · el tapete del turno → 2;
+ *   · seis sombras de contacto de 20 segmentos fundidas en una geometría → 120;
+ *   · la pila del mazo, una caja escalada → 12.
+ *
+ * Son 1.742 con 96 segmentos y 3.470 con 240: el 7,5 % y el 14,9 % del mar. Es UN total,
+ * el mismo aquí y en el comprobador, para que el número salga de la misma cuenta.
+ */
+const TRIANGULOS_DE_LOS_DADOS = 2 * (12 + 21 * 10);
+const TRIANGULOS_DEL_ASA_DE_LOS_DADOS = 12;
+const TRIANGULOS_DEL_TAPETE = 2;
+const TRIANGULOS_DE_LAS_SOMBRAS = 6 * 20;
+const TRIANGULOS_DE_LA_PILA = 12;
+export const TRIANGULOS_FIJOS_DE_LA_MESA =
+  TRIANGULOS_DE_LOS_DADOS +
+  TRIANGULOS_DEL_ASA_DE_LOS_DADOS +
+  TRIANGULOS_DEL_TAPETE +
+  TRIANGULOS_DE_LAS_SOMBRAS +
+  TRIANGULOS_DE_LA_PILA;
+
+export function triangulosDeLaMesa(segmentos: number): number {
+  return 2 * segmentos * FILAS_DE_LA_MESA + TRIANGULOS_FIJOS_DE_LA_MESA;
+}
+
+/**
+ * EL TOPE DE LA MESA, por lo mismo que el del mar: un recuento sin tope es un dato y con
+ * tope es una decisión. El día que alguien suba los segmentos para ver la veta más fina lo
+ * descubrirá aquí y no en un móvil. Con el máximo de segmentos quedan 130 de margen.
+ */
+export const TOPE_DE_LA_MESA = 3_600;

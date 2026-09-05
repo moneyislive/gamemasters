@@ -126,6 +126,13 @@ export type FaseDeLaMesa =
   /** Sentados, con llave y sondeando. */
   | 'dentro';
 
+/**
+ * CÓMO ACABÓ UN MOVIMIENTO, dicho con lo que `mover` ya distingue para escribir el aviso.
+ * `'rechazado'` es «la mesa está igual que estaba» (o el servidor dijo que no);
+ * `'sin-red'` es que no hubo respuesta que leer.
+ */
+export type ResultadoDelMovimiento = 'hecho' | 'rechazado' | 'sin-red';
+
 export interface LaMesa {
   fase: FaseDeLaMesa;
   mesa: MesaVista | null;
@@ -145,7 +152,15 @@ export interface LaMesa {
   /** `figura` viaja con el alta si se da, y es el aspecto de MI asiento desde el primer sondeo de los demás. */
   abrir: (nombre: string, plazoSegundos?: number, figura?: string) => void;
   entrar: (codigo: string, nombre: string, figura?: string) => void;
-  mover: (movimiento: MovimientoDeclarado) => void;
+  /**
+   * MOVER DEVUELVE CÓMO ACABÓ, con lo que el cuerpo ya calculaba: `'rechazado'` si la
+   * mesa volvió igual (`seIgnoro`, o un motivo del juego) o el servidor dijo que no,
+   * `'sin-red'` si no contestó. Nadie de hoy lo lee —los botones lo llaman sin `await` y
+   * la mesa se repinta sola—; existe para los dados de la mesa, que ruedan al tocarlos y
+   * necesitan saber EN EL ACTO que la tirada que esperan no va a llegar, en vez de rodar
+   * seis segundos por un doble toque.
+   */
+  mover: (movimiento: MovimientoDeclarado) => Promise<ResultadoDelMovimiento>;
   /**
    * Cambiar el aspecto de mi asiento con la mesa ya abierta. Ver su implementación:
    * no es un movimiento y no pasa por el reductor.
@@ -674,11 +689,12 @@ export function usarMesaDeArcade(arcade: string, silla: string, codigoPedido = '
   // -------------------------------------------------------------------------
 
   const mover = useCallback(
-    (movimiento: MovimientoDeclarado) => {
-      void (async () => {
+    (movimiento: MovimientoDeclarado): Promise<ResultadoDelMovimiento> =>
+      (async (): Promise<ResultadoDelMovimiento> => {
         const donde = codigo.current;
         const rev = mesa?.rev;
-        if (donde === null || rev === undefined) return;
+        /* Sin mesa o sin revisión no se manda nada: para quien pregunte, es un rechazo. */
+        if (donde === null || rev === undefined) return 'rechazado';
         ponerQuieto(true);
         try {
           const r = await fetch(ruta(`/mesas/${donde}/movimientos`), {
@@ -730,13 +746,19 @@ export function usarMesaDeArcade(arcade: string, silla: string, codigoPedido = '
              */
             de: 'tu-jugada',
           });
+          /*
+           * Y SE DEVUELVE LO MISMO QUE SE ACABA DE DECIDIR PARA EL AVISO, sin una segunda
+           * lectura de la respuesta: un motivo sólo viene de un rechazo, y una mesa que
+           * vuelve con la misma revisión es un rechazo mudo.
+           */
+          return !r.ok || seIgnoro || loQueDijoElJuego.length > 0 ? 'rechazado' : 'hecho';
         } catch (error) {
           ponerAviso({ texto: `No ha salido el movimiento: ${textoDelFallo(error)}`, de: 'tu-jugada' });
+          return 'sin-red';
         } finally {
           ponerQuieto(false);
         }
-      })();
-    },
+      })(),
     [mesa?.rev, cabeceras],
   );
 

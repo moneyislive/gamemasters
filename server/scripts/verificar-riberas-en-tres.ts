@@ -51,6 +51,7 @@
  * tiene barra, una pieza que no se puede poner devuelve `null` en vez de un
  * anillo sin sitios, y la mano de otro no se puede pedir por ninguna puerta.
  */
+import { readFileSync } from 'node:fs';
 import { abrirMesa, jugar } from '../src/arcade/arbitro';
 import type { Mesa } from '../src/arcade/arbitro';
 import { aristaDeHex, verticeDeHex } from '../../shared/mecanicas/malla-hexagonal';
@@ -99,6 +100,7 @@ import {
   cartasEnTres,
   colocandoEnTres,
   comprarEnTres,
+  dadosEnTres,
   estadoDelVado,
   esVistaQueSePinta,
   jugadaSinPreguntar,
@@ -111,12 +113,14 @@ import {
   meToca,
   opcionesFueraDeLaBarra,
   opcionesFueraDeLaMano,
+  opcionesFueraDeLaMesa,
   opcionesFueraDelTablero,
   paresDelAnoBueno,
   premiosEnTres,
   renglonDelVado,
   retratoDeLaCarta,
   revelarDe,
+  selloDeLaTirada,
   seVeEnTres,
   tableroEnTres,
   TIPOS_QUE_PINTA_LA_MANO,
@@ -1387,8 +1391,103 @@ const CAMPO_DE_LA_BARRA = (45 * Math.PI) / 180;
   comprobar('y sin opciones no hay nada que revelar ni que comprar', revelarDe([], 'c2') === null && comprarEnTres([]) === null);
 }
 
+/* ═══ 13. LOS DADOS: TIRAR SE OFRECE UNA VEZ, EL SELLO ES EL TURNO, Y `comprada` SIGUE SIN ESCRIBIRSE ═══ */
+
+/*
+ * ═══ QUÉ COMPRA ESTE BLOQUE ═══
+ *
+ * Los dados de la mesa de madera (`docs/LA-MESA-DE-RIBERAS.md` §5) son el mazo otra vez:
+ * un hueco de la escena que ofrece un movimiento —TIRAR— que hasta hoy era sólo un botón.
+ * Los fallos son los mismos que con COMPRAR, y se miden igual:
+ *
+ *  1. EL ORDEN DE LOS FILTROS. `dadosEnTres` tiene que recibir las opciones ENTERAS y
+ *     `opcionesFueraDeLaMesa` filtrar DESPUÉS; al revés `porTirar` sería siempre falso y
+ *     los dados no avisarían nunca de que toca tirar. Se prueba en los dos órdenes.
+ *  2. FUERA DE TURNO NO SE PUEDE PULSAR: `disponible` falso para quien no tiene el turno,
+ *     aunque vea los dados (los ve todo el mundo: la tirada es pública).
+ *  3. EN LA COLOCACIÓN, EN LA REUNIÓN, PARA UN MIRÓN Y CON CINCO COLONOS: `null`, no
+ *     apagado. Donde no hay dados el botón se queda, que es lo que salva al respaldo.
+ *  4. TIRAR SE OFRECE EXACTAMENTE UNA VEZ sumando lo de la mesa y lo de los botones.
+ *  5. EL SELLO es `turnosAbiertos − (tirado ? 0 : 1)`: el turno en que se tiró.
+ *  6. Y `turnosAbiertos` entra en `VistaQueSePinta` SÓLO como sello: `comprada` sigue sin
+ *     declararse, y el código de la traducción no lo lee ni una vez. Es lo que protege
+ *     la regla de «una carta comprada no se juega hoy», y se afirma leyendo el fichero.
+ */
+{
+  const conTirada = escenarioDeMazo({ bienes: [['sal', 'piedra', 'grano'], ['limo'], []], mazo: ['c1:guardia'] });
+  const porTirar: EstadoDeRiberas = { ...conTirada, tirado: false };
+  const mesaPorTirar = mesaSobre('RIB-DADOS-1', porTirar, TRES);
+  const mesaTirada = mesaSobre('RIB-DADOS-2', conTirada, TRES);
+
+  /* ── 1. EL ORDEN ── */
+  const vista = vistaEn(mesaPorTirar, 'A');
+  const opciones = opcionesEn(mesaPorTirar, 'A');
+  comprobar('el juego ofrece TIRAR a quien tiene el turno y no ha tirado, o nada de lo de abajo mediría', opciones.some((o) => o.tipo === TIRAR), opciones.map((o) => o.tipo));
+  const dados = dadosEnTres(vista, 'A', opciones);
+  comprobar('con las opciones ENTERAS, los dados saben que toca tirar: `porTirar` y `disponible` encendidos', dados !== null && dados.porTirar && dados.disponible, dados);
+  comprobar('y traen lo que la máquina necesita: sin tirar, con la última suma, y el sello del turno anterior (1 − 1 = 0)', dados?.tirado === false && dados?.ultimaTirada === 8 && dados?.sello === 0, dados);
+  const alReves = dadosEnTres(vista, 'A', opcionesFueraDeLaMesa(opciones, dados));
+  comprobar(
+    'AL REVÉS —filtrar antes de preguntar— `porTirar` sale falso: por eso `dadosEnTres` va primero, como `mazoEnLaBarra`',
+    alReves !== null && !alReves.porTirar && dados?.porTirar === true,
+    { bien: dados?.porTirar, alReves: alReves?.porTirar },
+  );
+
+  /* ── 2. FUERA DE TURNO ── */
+  const dadosDeB = dadosEnTres(vistaEn(mesaPorTirar, 'B'), 'B', opcionesEn(mesaPorTirar, 'B'));
+  comprobar('B ve los dados —la tirada es pública— pero no le toca: `disponible` falso', dadosDeB !== null && !dadosDeB.porTirar && !dadosDeB.disponible, dadosDeB);
+  comprobar('y ve el mismo sello y la misma suma que A: los dos van a partir la suma en el mismo par', dadosDeB?.sello === dados?.sello && dadosDeB?.ultimaTirada === dados?.ultimaTirada);
+  const yaTirados = dadosEnTres(vistaEn(mesaTirada, 'A'), 'A', opcionesEn(mesaTirada, 'A'));
+  comprobar('con la tirada hecha, A sigue viendo los dados, apagados, con el sello de ESTE turno (1)', yaTirados !== null && !yaTirados.porTirar && yaTirados.tirado && yaTirados.sello === 1, yaTirados);
+  comprobar('el sello: turno 5 tirado y turno 6 sin tirar dan 5; turno 6 tirado da 6', selloDeLaTirada(5, true) === 5 && selloDeLaTirada(6, false) === 5 && selloDeLaTirada(6, true) === 6);
+
+  /* ── 3. DÓNDE NO HAY DADOS ── */
+  comprobar('un mirón no tiene dados', dadosEnTres(vista, null, opciones) === null);
+  comprobar('ni un asiento que no está en la mesa', dadosEnTres(vista, 'Z', opciones) === null);
+  const reunida = abrirMesa({ id: 'RIB-DADOS-R', arcade: RIBERAS, semilla: 11, asientos: [...TRES] });
+  comprobar('mientras se reúne la mesa no hay dados: `null`', dadosEnTres(proyectarRiberas(estadoDe(reunida), 'A'), 'A', opcionesDeRiberas(proyectarRiberas(estadoDe(reunida), 'A'), 'A')) === null);
+  const colocando = jugar(reunida, { quien: 'A', rev: reunida.rev, movimiento: { tipo: EMPEZAR_RIBERAS, carga: {} } });
+  const vistaColocando = proyectarRiberas(estadoDe(colocando), 'A');
+  comprobar('en la colocación tampoco: no es que no toque tirar, es que no existe la jugada', vistaColocando.momento !== 'jugando' && dadosEnTres(vistaColocando, 'A', opcionesDeRiberas(vistaColocando, 'A')) === null, vistaColocando.momento);
+  const cinco = abrirMesa({ id: 'RIB-DADOS-5', arcade: RIBERAS, semilla: 3, asientos: ['A', 'B', 'C', 'D', 'E'] });
+  const cincoEmpezada = jugar(cinco, { quien: 'A', rev: cinco.rev, movimiento: { tipo: EMPEZAR_RIBERAS, carga: {} } });
+  const cincoJugando: EstadoDeRiberas = { ...estadoDe(cincoEmpezada), momento: 'jugando', tirado: false, turnosAbiertos: 1 };
+  const vistaDeCinco = proyectarRiberas(cincoJugando, 'A');
+  comprobar('con cinco colonos no hay dados para nadie: esa mesa se juega sobre el retablo y tira con el botón', !seVeEnTres(vistaDeCinco) && dadosEnTres(vistaDeCinco, 'A', opcionesDeRiberas(vistaDeCinco, 'A')) === null);
+
+  /* ── 4. UNA VEZ ── */
+  const mazo = mazoEnLaBarra(vista, 'A', opciones);
+  const botones = opcionesFueraDeLaMesa(opcionesFueraDeLaBarra(opcionesFueraDeLaMano(opcionesFueraDelTablero(opciones)), mazo), dados);
+  const botonesSinDados = opcionesFueraDeLaMesa(opcionesFueraDeLaBarra(opcionesFueraDeLaMano(opcionesFueraDelTablero(opciones)), mazo), null);
+  const enLaMesa = dados !== null && dados.porTirar ? 1 : 0;
+  comprobar('con dados, TIRAR se cae de los botones y se ofrece en la mesa: una vez', enLaMesa + botones.filter((o) => o.tipo === TIRAR).length === 1 && enLaMesa === 1, botones.map((o) => o.id));
+  comprobar('sin dados, TIRAR vuelve a los botones: también una vez', botonesSinDados.filter((o) => o.tipo === TIRAR).length === 1);
+  comprobar(
+    'y `opcionesFueraDeLaMesa` no se lleva nada más: cae TIRAR y sólo TIRAR',
+    botonesSinDados.length === botones.length + 1 && canonico(botonesSinDados.filter((o) => o.tipo !== TIRAR).map((o) => o.id)) === canonico(botones.map((o) => o.id)),
+    { con: botones.map((o) => o.id), sin: botonesSinDados.map((o) => o.id) },
+  );
+  comprobar('unos dados apagados (ya tirados) tampoco devuelven el botón: apagado no es «no está»', !opcionesFueraDeLaMesa(opciones, yaTirados).some((o) => o.tipo === TIRAR));
+
+  /* ── 6. `comprada` SIGUE SIN ESCRIBIRSE ── */
+  const fuente = readFileSync(new URL('../../shared/arcade/juegos/riberas-en-tres.ts', import.meta.url), 'utf8');
+  const soloCodigo = (texto: string): string[] => texto.split('\n').filter((l) => !/^\s*(\*|\/\/|\/\*)/.test(l));
+  const interfaz = /interface VistaQueSePinta \{([\s\S]*?)\n\}/.exec(fuente)?.[1] ?? '';
+  const codigoDeLaInterfaz = soloCodigo(interfaz).join('\n');
+  comprobar('se sabe leer `VistaQueSePinta`, o lo de abajo no miraría nada', interfaz.length > 0 && /readonly misCartas\?:/.test(codigoDeLaInterfaz));
+  comprobar(
+    '`tirado`, `ultimaTirada` y `turnosAbiertos` están declarados, opcionales, para que los dados los lean sin `as`',
+    /readonly tirado\?: boolean;/.test(codigoDeLaInterfaz) && /readonly ultimaTirada\?: number;/.test(codigoDeLaInterfaz) && /readonly turnosAbiertos\?: number;/.test(codigoDeLaInterfaz),
+  );
+  comprobar('y `comprada` NO: sin él nadie puede compararlo con `turnosAbiertos` y reescribir la regla de «comprada hoy no se juega hoy»', !/\bcomprada\b/.test(codigoDeLaInterfaz));
+  const codigo = soloCodigo(fuente).join('\n');
+  comprobar('el código de la traducción no lee `comprada` ni una vez', !/\.comprada\b/.test(codigo) && !/\bcomprada\b\s*[<>=!]/.test(codigo));
+  const lecturas = codigo.match(/vista\.turnosAbiertos/g) ?? [];
+  comprobar('y lee `vista.turnosAbiertos` exactamente una vez, dentro de `dadosEnTres`, como sello', lecturas.length === 1 && /selloDeLaTirada\(vista\.turnosAbiertos \?\? 0, tirado\)/.test(codigo), lecturas.length);
+}
+
 /* ═══ EL RECUENTO, PARA QUE NO SE VACÍE SIN QUE NADIE LO NOTE ═══ */
-const MINIMO = 268;
+const MINIMO = 290;
 if (hechas < MINIMO) {
   console.log(`✘ este comprobador debería hacer al menos ${MINIMO} comprobaciones y ha hecho ${hechas}: alguien ha borrado un bloque`);
   process.exit(2);

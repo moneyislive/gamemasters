@@ -23,8 +23,8 @@
  *   · `barra.ts` — la barra de construir, ABAJO Y CENTRADA. Su placa de fondo es lo más
  *     alto que tiene: el centro de la barra flota a `0,155` del alto sobre el canto de
  *     abajo (`DESDE_EL_SUELO`) y la placa mide `1,5` lados de alto, con el lado topado en
- *     `0,13` del alto (`PARTE_DEL_ALTO`). O sea que el techo de la barra NUNCA pasa de
- *     `-0,2475·alto`. Por eso el PISO de esta franja está en `-0,20·alto`: casi cinco
+ *     `0,14` del alto (`PARTE_DEL_ALTO`). O sea que el techo de la barra NUNCA pasa de
+ *     `-0,240·alto`. Por eso el PISO de esta franja está en `-0,20·alto`: cuatro
  *     centésimas de holgura, y no vale «mirarlo en pantalla» porque la barra se encoge
  *     con el ancho y el caso malo es el monitor, donde es más alta.
  *
@@ -405,9 +405,9 @@ const FRANJA_EN_CARTAS = 2;
  *     tres centésimas de aire. Arriba a la izquierda no hay nada más.
  *   · `SUELO_DE_LAS_CARTAS` a `0`: las cartas viven en la mitad de arriba. Debajo van sus
  *     casillas, y una casilla tapada por la mano que la usa no sirve de nada.
- *   · `PISO_DE_LA_FRANJA` a `-0,20`: el techo de la placa de la barra está en `-0,2475`
- *     como mucho (ver la cabecera). Casi cinco centésimas de holgura, que a esta distancia
- *     son más que el alto de media carta.
+ *   · `PISO_DE_LA_FRANJA` a `-0,20`: el techo de la placa de la barra está en `-0,240`
+ *     como mucho (ver la cabecera). Cuatro centésimas de holgura, que a esta distancia
+ *     son más que un tercio del alto de una carta.
  */
 const TECHO_DE_LAS_CARTAS = 0.47;
 const SUELO_DE_LAS_CARTAS = 0;

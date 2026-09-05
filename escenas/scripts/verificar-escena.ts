@@ -85,7 +85,27 @@ import {
   ojoDelMirador,
   tirandoDelMirador,
 } from '../camara';
-import { DIBUJO_DEL_MAZO, dentroDelHueco, huecosDeLaBarra, loQueSeVe } from '../barra';
+import { DIBUJO_DEL_MAZO, SUELO_DEL_TOQUE, dentroDelHueco, huecosDeLaBarra, huecosDeLaMesa, loQueSeVe } from '../barra';
+import {
+  ASENTAR,
+  RODAR_MINIMO,
+  TOPE_SIN_RESPUESTA,
+  dadosEnReposo,
+  faseDeLosDados,
+  paresDeLaSuma,
+  parQueSeEnsena,
+  repartoDeLaTirada,
+} from '../dados';
+import type { EstadoDeLosDados, SucesoDeLosDados } from '../dados';
+import {
+  MADERA_CLARA_EN_EL_ATLAS,
+  MADERA_OSCURA_EN_EL_ATLAS,
+  TABLONES,
+  coloresDeLaMadera,
+  contraste,
+  vetaDelTablon,
+} from '../mesa';
+import { semillaDelCodigo } from '../../shared/mecanicas/semilla';
 import {
   areasDeTrueque,
   enLaZonaDeLaMano,
@@ -123,6 +143,7 @@ import {
   CONTORNOS_DE_LA_CIFRA,
   CONTORNOS_DEL_BIEN,
 } from '../iconos';
+import { selloDeLaTirada } from '../../shared/arcade/juegos/riberas-en-tres';
 import { MODELO, modeloDePieza } from '../modelos';
 import { ESCALON, RADIO_DE_COMARCA, RADIO_DE_TESELA } from '../escala';
 import { MAR_ADENTRO_DE_LOS_BARCOS, laMarinaDelMundo } from '../marina';
@@ -135,9 +156,13 @@ import {
   RADIO_EXTERIOR_DE_LA_COSTA,
   RADIO_INTERIOR_DE_LA_COSTA,
   SECTORES_DEL_MAR,
+  SEGMENTOS_DE_LA_MESA,
+  TOPE_DE_LA_MESA,
   TOPE_DEL_MAR,
   TRIANGULOS_DEL_MAR,
   radiosDelMar,
+  segmentosDeLaMesa,
+  triangulosDeLaMesa,
   triangulosDelMar,
 } from '../presupuesto-del-delta';
 import fs from 'node:fs';
@@ -2694,11 +2719,16 @@ paso('Los sitios se pueden contar y la barra cabe en cualquier pantalla');
    * del asunto: en la app el delta vive en una franja —`PARTE_DEL_ALTO` del alto, con un
    * suelo de 360 puntos— con el marcador encima y los botones debajo. El caso peor no es
    * el móvil más estrecho sino el lienzo más BAJO, porque cuando manda el alto el lado se
-   * lleva un 13 % de él y nada más.
+   * lleva un 14 % de él y nada más.
    *
    * Los tamaños de abajo son los de la app (`ALTO_MINIMO_DEL_LIENZO` = 360 y
    * `PARTE_DEL_ALTO` = 0,58 en `app/src/arcade/riberas-en-tres-escena.tsx`) aplicados a
-   * los teléfonos más pequeños que se admiten, más el caso de pantalla completa.
+   * los teléfonos más pequeños que se admiten, más el caso de pantalla completa, una
+   * tableta con el navegador de pie, y los OCHO APAISADOS reales: el iPhone SE de primera
+   * generación (568×320) fue el que descubrió que con `PARTE_DEL_ALTO` a 0,13 el asa medía
+   * 41,6 puntos; con 0,14 mide 44,8. Los apaisados son la pantalla completa de la mesa en
+   * la app (`docs/LA-MESA-DE-RIBERAS.md` §3) y sin ellos aquí el suelo estaba vigilado sólo
+   * de pie.
    */
   const LIENZOS: Array<[string, number, number]> = [
     ['móvil estrecho, lienzo al mínimo', 320, 360],
@@ -2706,9 +2736,23 @@ paso('Los sitios se pueden contar y la barra cabe en cualquier pantalla');
     ['móvil corriente', 390, 490],
     ['móvil de pie, lienzo entero', 390, 845],
     ['tableta', 768, 640],
+    ['tableta con el navegador de pie', 768, 1024],
     ['monitor', 1920, 900],
+    ['apaisado SE 1ª', 568, 320],
+    ['apaisado SE 2ª/3ª', 667, 375],
+    ['apaisado Android de 360', 780, 360],
+    ['apaisado iPhone 14', 844, 390],
+    ['apaisado Pro Max', 932, 430],
+    ['apaisado tableta 4:3', 1024, 768],
+    ['apaisado iPad Air', 1180, 820],
+    ['apaisado monitor 1080', 1920, 1080],
   ];
-  const SUELO_DEL_TOQUE = 44;
+  /*
+   * El suelo lo exporta `barra.ts` porque `huecosDeLaMesa` decide con él; aquí se afirma
+   * que sigue siendo el de la casa —los cinco `minHeight: 44` de `tablero-en-linea.tsx`—
+   * para que nadie lo baje desde la barra para hacer caber unos dados.
+   */
+  comprobar('el suelo de toque que usa la barra es el de la casa: 44 puntos', SUELO_DEL_TOQUE === 44, SUELO_DEL_TOQUE);
   const chicos: string[] = [];
   const medidos: string[] = [];
   for (const [nombre, ancho, alto] of LIENZOS) {
@@ -2733,6 +2777,13 @@ paso('Los sitios se pueden contar y la barra cabe en cualquier pantalla');
    * Y el mismo suelo con tres, para que se vea CUÁNTO se ha gastado. Sin esta línea, el
    * día que alguien pida un quinto hueco no habría con qué comparar y el margen que queda
    * habría que volver a averiguarlo.
+   *
+   * Esta línea exigía que «tres y cuatro midan lo mismo» porque con `PARTE_DEL_ALTO` a
+   * 0,13 en 320×360 mandaba el alto. Con 0,14 ya no: ahí manda el ANCHO y el cuarto hueco
+   * cuesta tres puntos (50,4 con tres, 47,5 con cuatro). Lo que aquella igualdad protegía
+   * era el SUELO, y eso es lo único que se exige ahora, de los dos: pedir que midan lo
+   * mismo habría obligado a dejar el asa en 41,6 puntos en el apaisado del SE para
+   * conservar una igualdad que no compraba nada.
    */
   const conTres = (() => {
     const visto = loQueSeVe(CAMPO, 320 / 360);
@@ -2743,8 +2794,8 @@ paso('Los sitios se pueden contar y la barra cabe en cualquier pantalla');
     return ((huecosDeLaBarra(4, CAMPO, 320 / 360)[0]?.lado ?? 0) / visto.alto) * 360;
   })();
   comprobar(
-    'y en el lienzo peor el cuarto hueco no gasta margen: ahí manda el alto, así que tres y cuatro miden lo mismo',
-    Math.abs(conTres - conCuatro) < 1e-6 && conCuatro >= SUELO_DEL_TOQUE,
+    'y en el lienzo peor tanto tres como cuatro huecos llegan al suelo: ahí ya manda el ancho y el cuarto cuesta, pero no cruza los 44',
+    conTres >= SUELO_DEL_TOQUE && conCuatro >= SUELO_DEL_TOQUE && conCuatro <= conTres,
     { tres: Number(conTres.toFixed(1)), cuatro: Number(conCuatro.toFixed(1)), suelo: SUELO_DEL_TOQUE },
   );
 
@@ -2828,6 +2879,136 @@ paso('Los sitios se pueden contar y la barra cabe en cualquier pantalla');
     'y con la mano abierta por el imán, el cuarto hueco no mete la barra debajo de la baraja en ningún lienzo donde con tres no estaba',
     nuevosBajoElIman.length === 0,
     { nuevosBajoElIman, medidasDeLaBaraja },
+  );
+
+  /*
+   * ── 3c. LOS DADOS: LOS TRES PELDAÑOS DE `huecosDeLaMesa`, LIENZO A LIENZO ──
+   *
+   * `huecosDeLaMesa` decide dónde van los dados con una regla de tres peldaños —colgado a
+   * la izquierda si cabe; si no, quinto hueco si el asa de cinco llega al suelo; si no,
+   * sin dados— y la decisión es «cabe o no cabe, llega a 44 o no», nunca la proporción.
+   * Aquí se afirma EN QUÉ LIENZO PASA CADA COSA, porque un comprobador que sólo dijera
+   * «hay dados o no» dejaría pasar el fallo que importa: unos dados que caben en el
+   * monitor y desaparecen del iPhone sin que nadie sepa por qué. Y se afirma con las
+   * mismas exigencias que el hueco del mazo: 44 puntos de asa en TODAS las piezas y en los
+   * dados cuando los hay, libre de la mano de bienes quieta, y sin despertar la mano del
+   * mazo (el techo de los dados por debajo del piso de su franja).
+   *
+   * Las medidas escritas son las del diseño (`docs/LA-MESA-DE-RIBERAS.md` §4.4) y se
+   * exigen con una décima de margen: si la barra cambia, esto dice cuánto.
+   */
+  type Peldano = 'colgado' | 'quinto' | null;
+  const PELDANO_ESPERADO: Record<string, { forma: Peldano; asa?: number }> = {
+    'móvil estrecho, lienzo al mínimo': { forma: null, asa: 47.5 },
+    'móvil pequeño': { forma: null, asa: 53.4 },
+    'móvil corriente': { forma: 'quinto', asa: 45.8 },
+    'móvil de pie, lienzo entero': { forma: 'quinto', asa: 45.8 },
+    tableta: { forma: 'quinto', asa: 89.6 },
+    'tableta con el navegador de pie': { forma: 'quinto', asa: 90.2 },
+    monitor: { forma: 'colgado' },
+    'apaisado SE 1ª': { forma: 'colgado', asa: 44.8 },
+    'apaisado SE 2ª/3ª': { forma: 'colgado' },
+    'apaisado Android de 360': { forma: 'colgado' },
+    'apaisado iPhone 14': { forma: 'colgado' },
+    'apaisado Pro Max': { forma: 'colgado' },
+    'apaisado tableta 4:3': { forma: 'colgado' },
+    'apaisado iPad Air': { forma: 'colgado' },
+    'apaisado monitor 1080': { forma: 'colgado' },
+  };
+  const malosDeLaMesa: string[] = [];
+  const medidasDeLaMesa: string[] = [];
+  for (const [nombre, ancho, alto] of LIENZOS) {
+    const prop = ancho / alto;
+    const visto = loQueSeVe(CAMPO, prop);
+    const enPuntos = (u: number): number => (u / visto.alto) * alto;
+    const mesa = huecosDeLaMesa(4, CAMPO, prop, alto);
+    const esperado = PELDANO_ESPERADO[nombre];
+    const forma: Peldano = mesa.dados === null ? null : mesa.dados.forma;
+    const asa = enPuntos(mesa.piezas[0]?.lado ?? 0);
+    medidasDeLaMesa.push(`${nombre}: ${forma ?? 'sin dados'}, piezas de ${asa.toFixed(1)} puntos`);
+    if (esperado === undefined) {
+      malosDeLaMesa.push(`${nombre}: no está en la tabla de peldaños esperados`);
+      continue;
+    }
+    if (forma !== esperado.forma) malosDeLaMesa.push(`${nombre}: se esperaba ${esperado.forma ?? 'sin dados'} y sale ${forma ?? 'sin dados'}`);
+    if (esperado.asa !== undefined && Math.abs(asa - esperado.asa) > 0.1) {
+      malosDeLaMesa.push(`${nombre}: las piezas miden ${asa.toFixed(1)} y el diseño dice ${String(esperado.asa)}`);
+    }
+    if (mesa.piezas.length !== 4) malosDeLaMesa.push(`${nombre}: salen ${String(mesa.piezas.length)} piezas en vez de 4`);
+    for (const p of mesa.piezas) {
+      if (enPuntos(p.lado) < SUELO_DEL_TOQUE - 1e-9) malosDeLaMesa.push(`${nombre}: una pieza baja a ${enPuntos(p.lado).toFixed(1)} puntos`);
+    }
+    const deCuatro = huecosDeLaBarra(4, CAMPO, prop);
+    const deCinco = huecosDeLaBarra(5, CAMPO, prop);
+    const iguales = (a: typeof deCuatro, b: typeof deCuatro): boolean =>
+      a.length === b.length && a.every((h, i) => Math.abs(h.x - (b[i]?.x ?? NaN)) < 1e-12 && Math.abs(h.lado - (b[i]?.lado ?? NaN)) < 1e-12);
+    if (mesa.dados === null || mesa.dados.forma === 'colgado') {
+      if (!iguales(mesa.piezas, deCuatro)) malosDeLaMesa.push(`${nombre}: sin quinto hueco las piezas tenían que ser las de siempre, y se han movido`);
+    } else if (!iguales(mesa.piezas, deCinco.slice(1))) {
+      malosDeLaMesa.push(`${nombre}: como quinto hueco las piezas tenían que ser los otros cuatro del reparto de cinco`);
+    }
+    const dados = mesa.dados;
+    if (dados === null) {
+      /* Sin dados porque el quinto no llegaba: que sea verdad, y no un atajo. */
+      const quinto = enPuntos(deCinco[0]?.lado ?? 0);
+      if (quinto >= SUELO_DEL_TOQUE) malosDeLaMesa.push(`${nombre}: no hay dados y sin embargo el quinto hueco mediría ${quinto.toFixed(1)}`);
+      continue;
+    }
+    if (enPuntos(dados.alto) < SUELO_DEL_TOQUE - 1e-9) malosDeLaMesa.push(`${nombre}: el asa de los dados mide ${enPuntos(dados.alto).toFixed(1)} puntos`);
+    const izquierdaDeLosDados = dados.x - dados.ancho / 2;
+    const derechaDeLosDados = dados.x + dados.ancho / 2;
+    if (izquierdaDeLosDados - -visto.ancho / 2 < 0.5 * dados.lado - 1e-9) {
+      malosDeLaMesa.push(`${nombre}: los dados quedan a menos de medio lado del canto izquierdo`);
+    }
+    const primera = mesa.piezas[0];
+    if (primera !== undefined && derechaDeLosDados > primera.x - primera.lado / 2 - 0.2 * primera.lado + 1e-9) {
+      malosDeLaMesa.push(`${nombre}: los dados pisan (o casi) la primera pieza`);
+    }
+    if (dados.forma === 'colgado' && Math.abs(dados.ancho - 1.6 * dados.lado) > 1e-9) {
+      malosDeLaMesa.push(`${nombre}: el asa colgada no mide 1,6 lados`);
+    }
+    const cajaDeLosDados: Caja = { x: dados.x, y: dados.y, ancho: dados.ancho, alto: dados.alto };
+    if (huecosDeLaBaraja(MANO_DE_BIENES_ENTERA, CAMPO, prop, null).some((c) => seTocan(c.hueco, cajaDeLosDados))) {
+      malosDeLaMesa.push(`${nombre}: los dados quedan debajo de una carta de bienes quieta`);
+    }
+    const franja = franjaDeLasCartas(CAMPO, prop);
+    if (dados.y + dados.alto / 2 >= franja.piso - 1e-9) {
+      malosDeLaMesa.push(`${nombre}: el techo de los dados (${(dados.y + dados.alto / 2).toFixed(3)}) despierta la mano del mazo (piso ${franja.piso.toFixed(3)})`);
+    }
+  }
+  comprobar(
+    'los dados caen en el peldaño que dice el diseño en cada lienzo: colgados en los apaisados y el monitor, quinto hueco de pie en 390 y en las tabletas, y sin dados en 320×360 y 360×490',
+    malosDeLaMesa.length === 0,
+    { malosDeLaMesa, medidasDeLaMesa },
+  );
+  comprobar(
+    'y en los dos lienzos sin dados las piezas no encogen: se quedan en los 47,5 y 53,4 puntos de siempre',
+    ['móvil estrecho, lienzo al mínimo', 'móvil pequeño'].every((n) => medidasDeLaMesa.some((m) => m.startsWith(`${n}: sin dados`))),
+    medidasDeLaMesa.filter((m) => m.includes('sin dados')),
+  );
+  /*
+   * Con el `cuantos` REAL de la colocación —tres, sin mazo— la misma regla vale, y las
+   * piezas siguen siendo las de `huecosDeLaBarra(3)` allí donde los dados cuelgan. Es lo
+   * que la escena va a pedir en esa fase aunque `dadosEnTres` no le dé dados que pintar.
+   */
+  const conTresApaisado = huecosDeLaMesa(3, CAMPO, 844 / 390, 390);
+  const tresDeSiempre = huecosDeLaBarra(3, CAMPO, 844 / 390);
+  comprobar(
+    'con tres huecos en apaisado los dados también cuelgan y las tres piezas son las de siempre',
+    conTresApaisado.dados?.forma === 'colgado' &&
+      conTresApaisado.piezas.length === 3 &&
+      conTresApaisado.piezas.every((h, i) => Math.abs(h.x - (tresDeSiempre[i]?.x ?? NaN)) < 1e-12),
+    { dados: conTresApaisado.dados?.forma, piezas: conTresApaisado.piezas.map((h) => Number(h.x.toFixed(4))) },
+  );
+  comprobar('y con cero huecos no hay mesa: ni piezas ni dados', huecosDeLaMesa(0, CAMPO, 16 / 9, 900).dados === null && huecosDeLaMesa(0, CAMPO, 16 / 9, 900).piezas.length === 0);
+  /*
+   * La regla es de suelo y no de proporción: el mismo lienzo apaisado con la mitad de
+   * puntos de alto se queda sin quinto hueco aunque su forma no haya cambiado. Si alguien
+   * la reescribe mirando `proporcion >= 1`, esto se pone rojo.
+   */
+  comprobar(
+    'el segundo peldaño mira los puntos y no la forma: 390×490 con la mitad de puntos ya no tiene dados',
+    huecosDeLaMesa(4, CAMPO, 390 / 490, 490).dados?.forma === 'quinto' && huecosDeLaMesa(4, CAMPO, 390 / 490, 245).dados === null,
   );
 
   /*
@@ -3713,6 +3894,239 @@ paso('Un puente cubre su arista, salva lo que tiene debajo y encaja con el camin
 }
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+
+/**
+ * LOS DADOS Y LA MESA DE MADERA: lo que se puede afirmar antes de pintar nada.
+ *
+ * ═══ QUÉ SE COMPRA ═══
+ *
+ * Tres cosas de `docs/LA-MESA-DE-RIBERAS.md` que un ojo no puede juzgar y un guion sí:
+ *
+ *   1. EL REPARTO de la suma en dos caras es determinista, suma lo que debe, no saca
+ *      ninguna cara de 1..6, y su sello es el TURNO: estable dentro del turno, distinto
+ *      cada turno, igual tras recargar. Si alguien lo sellara con `rev` el par cambiaría
+ *      al pasar una carta; con el asiento, cada colono vería siempre el mismo par.
+ *   2. LA MÁQUINA de la animación espera al servidor, termina en SU número, rueda al
+ *      menos 0,6 s aunque la respuesta llegue antes, se asienta en 0,35 s, y un rechazo
+ *      la corta en el acto en vez de dejarla seis segundos esperando una tirada que no
+ *      va a llegar. Se recorre con series de sucesos y un reloj inyectado.
+ *   3. LA VETA está en [0, 1] —es lo que `mezcla` necesita—, los dos colores se leen del
+ *      atlas del pack y siguen siendo la madera medida, y su contraste es 1,6:1. Y la
+ *      mesa entera tiene tope de triángulos, como el mar.
+ */
+paso('Los dados se reparten por turno, ruedan hasta que el servidor contesta, y la mesa tiene veta y tope');
+{
+  /* ── 1. EL REPARTO ── */
+  const semilla = semillaDelCodigo('QWXYZ');
+  const malosDelReparto: string[] = [];
+  for (let suma = 2; suma <= 12; suma++) {
+    for (let sello = 0; sello < 200; sello++) {
+      const [a, b] = repartoDeLaTirada(suma, sello, semilla);
+      if (a + b !== suma) malosDelReparto.push(`${String(suma)}/${String(sello)}: ${String(a)}+${String(b)}`);
+      if (a < 1 || a > 6 || b < 1 || b > 6) malosDelReparto.push(`${String(suma)}/${String(sello)}: una cara fuera de 1..6`);
+    }
+  }
+  comprobar('cada par suma lo que debe y ninguna cara sale de 1..6, para las once sumas y doscientos turnos', malosDelReparto.length === 0, malosDelReparto.slice(0, 4));
+  comprobar('el 7 tiene seis pares y el 2 y el 12 uno; el 0 de antes de la primera tirada no tiene ninguno y sale 1 y 1', paresDeLaSuma(7).length === 6 && paresDeLaSuma(2).length === 1 && paresDeLaSuma(12).length === 1 && paresDeLaSuma(0).length === 0 && repartoDeLaTirada(0, 3, semilla).join('+') === '1+1');
+  comprobar(
+    'el mismo (suma, sello, semilla) da el mismo par en dos llamadas: no hay azar en el aparato',
+    repartoDeLaTirada(9, 17, semilla).join('+') === repartoDeLaTirada(9, 17, semilla).join('+'),
+  );
+  /*
+   * El sello es el turno, y el turno no cambia con `rev`: aquí no entra `rev` en la firma,
+   * así que lo que se afirma es la tabla del diseño con vistas de verdad: turno 5 tirado
+   * y turno 6 sin tirar enseñan la MISMA tirada con el MISMO sello (5), y turno 6 tirado
+   * es otro sello (6). La función que lo calcula vive en `shared/` y aquí se reproduce su
+   * definición de una línea para no arrastrar Riberas a la escena.
+   */
+  /* Contra la funcion de VERDAD de shared, no contra una copia escrita aqui: una lambda gemela
+     no puede caer por ningun cambio del codigo y solo suma al recuento. */
+  comprobar(
+    'el sello del turno 5 tirado y el del turno 6 sin tirar son el mismo: se enseña la tirada del 5',
+    selloDeLaTirada(5, true) === selloDeLaTirada(6, false) && selloDeLaTirada(5, true) === 5,
+    { tirado5: selloDeLaTirada(5, true), sinTirar6: selloDeLaTirada(6, false) },
+  );
+  comprobar(
+    'y el del turno 6 tirado es otro: cambia el sello, cambia el par',
+    selloDeLaTirada(6, true) === 6 && selloDeLaTirada(6, true) !== selloDeLaTirada(6, false),
+  );
+  /* Mil turnos: los seis pares del 7 salen todos, y ninguno acapara. */
+  const cuenta = new Map<string, number>();
+  for (let turno = 1; turno <= 1000; turno++) {
+    const k = repartoDeLaTirada(7, turno, semilla).join('+');
+    cuenta.set(k, (cuenta.get(k) ?? 0) + 1);
+  }
+  comprobar(
+    'en mil turnos el 7 saca sus seis pares, cada uno más de cien veces: dados que no están trucados a la vista',
+    cuenta.size === 6 && [...cuenta.values()].every((n) => n > 100),
+    Object.fromEntries(cuenta),
+  );
+  comprobar(
+    'y otra mesa (otra semilla) no reparte igual: el par depende del código de la mesa',
+    Array.from({ length: 50 }, (_, t) => repartoDeLaTirada(7, t, semillaDelCodigo('ABCDE')).join('+')).join(' ') !==
+      Array.from({ length: 50 }, (_, t) => repartoDeLaTirada(7, t, semilla).join('+')).join(' '),
+  );
+
+  /* ── 2. LA MÁQUINA ── */
+  const vista = (tirado: boolean, ultimaTirada: number, sello: number): SucesoDeLosDados => ({ que: 'vista', vista: { tirado, ultimaTirada, sello } });
+  const TOCADO: SucesoDeLosDados = { que: 'tocado' };
+  const TIC: SucesoDeLosDados = { que: 'tic' };
+  const RECHAZADO: SucesoDeLosDados = { que: 'rechazado' };
+  /* Una serie de (instante, suceso) desde el reposo, con una vista previa ya vista. */
+  const recorre = (serie: Array<[number, SucesoDeLosDados]>, desde?: EstadoDeLosDados): EstadoDeLosDados =>
+    serie.reduce((e, [t, s]) => faseDeLosDados(e, s, t), desde ?? faseDeLosDados(dadosEnReposo(semilla), vista(false, 7, 4), 0));
+  const enReposoConLaVieja = recorre([]);
+  const parViejo = repartoDeLaTirada(7, 4, semilla);
+  const parNuevo = repartoDeLaTirada(9, 5, semilla);
+  comprobar('la primera vista se enseña en reposo, sin animar: es noticia vieja', enReposoConLaVieja.fase.fase === 'quieta' && parQueSeEnsena(enReposoConLaVieja.fase).join('+') === parViejo.join('+'));
+  /* El caso que de verdad importa —recargar a mitad de turno, con la tirada ya HECHA— es el que
+     la de arriba no recorre: alli «tirado» es falso y la maquina no anima por eso, no porque
+     sea la primera vista. Aqui la primera vista trae «tirado» y tiene que salir quieta igual. */
+  const recargada = faseDeLosDados(dadosEnReposo(semilla), vista(true, 9, 5), 0);
+  comprobar(
+    'recargar a mitad de turno, con la tirada hecha, enseña ese par en reposo: tampoco se anima',
+    recargada.fase.fase === 'quieta' && parQueSeEnsena(recargada.fase).join('+') === parNuevo.join('+'),
+    { fase: recargada.fase.fase, par: parQueSeEnsena(recargada.fase) },
+  );
+  comprobar('tocar en reposo arranca a rodar SIN objetivo: el cliente no sortea nada', (() => { const e = recorre([[0, TOCADO]]); return e.fase.fase === 'rodando' && e.fase.objetivo === null && e.fase.desde === 0; })());
+  comprobar('un segundo toque mientras rueda no hace nada', JSON.stringify(recorre([[0, TOCADO], [0.1, TOCADO]])) === JSON.stringify(recorre([[0, TOCADO]])));
+
+  /*
+   * LA TABLA DE LLEGADAS: la vista con la tirada llega a los 0,2 / 0,6 / 1,4 / 3,0 s y
+   * los dados se asientan a los 0,95 / 0,95 / 1,75 / 3,35 s. Se recorre con tics cada
+   * 0,05 s y se mira en qué instante pasa cada fase.
+   */
+  const asentamientos: string[] = [];
+  for (const [llegaEn, quietaEn] of [[0.2, 0.95], [0.6, 0.95], [1.4, 1.75], [3.0, 3.35]] as const) {
+    let e = recorre([[0, TOCADO]]);
+    let empiezaAAsentar: number | null = null;
+    let seQueda: number | null = null;
+    for (let paso = 1; paso <= 100; paso++) {
+      const t = Number((paso * 0.05).toFixed(2));
+      if (Math.abs(t - llegaEn) < 1e-9) e = faseDeLosDados(e, vista(true, 9, 5), t);
+      e = faseDeLosDados(e, TIC, t);
+      if (empiezaAAsentar === null && e.fase.fase === 'asentando') empiezaAAsentar = e.fase.desde;
+      if (seQueda === null && e.fase.fase === 'quieta') seQueda = t;
+    }
+    const parFinal = parQueSeEnsena(e.fase).join('+');
+    const bien =
+      empiezaAAsentar !== null &&
+      Math.abs(empiezaAAsentar - Math.max(RODAR_MINIMO, llegaEn)) < 1e-9 &&
+      seQueda !== null &&
+      Math.abs(seQueda - quietaEn) < 0.05 + 1e-9 &&
+      parFinal === parNuevo.join('+');
+    asentamientos.push(`llega a ${llegaEn.toFixed(1)} → asienta desde ${String(empiezaAAsentar)} y queda quieta a ${String(seQueda)} en ${parFinal}${bien ? '' : ' ✗'}`);
+    if (!bien) asentamientos.push('✗');
+  }
+  comprobar(
+    'la vista que llega a 0,2 / 0,6 / 1,4 / 3,0 s asienta desde 0,6 / 0,6 / 1,4 / 3,0 y deja los dados quietos a 0,95 / 0,95 / 1,75 / 3,35, en el par del servidor',
+    !asentamientos.includes('✗') && Math.abs(RODAR_MINIMO - 0.6) < 1e-9 && Math.abs(ASENTAR - 0.35) < 1e-9,
+    asentamientos,
+  );
+  comprobar(
+    'un rechazo mientras rueda sin objetivo devuelve los dados al par anterior EN EL ACTO',
+    (() => { const e = recorre([[0, TOCADO], [0.3, RECHAZADO]]); return e.fase.fase === 'quieta' && parQueSeEnsena(e.fase).join('+') === parViejo.join('+'); })(),
+  );
+  comprobar(
+    'pero un rechazo cuando ya hay objetivo no hace nada: la tirada llegó (de otro, o de mi otra pestaña) y se asienta en ella',
+    (() => { const e = recorre([[0, TOCADO], [0.2, vista(true, 9, 5)], [0.3, RECHAZADO]]); return e.fase.fase === 'rodando' && e.fase.objetivo !== null; })(),
+  );
+  comprobar(
+    'y un rechazo en reposo tampoco',
+    JSON.stringify(recorre([[0, RECHAZADO]])) === JSON.stringify(enReposoConLaVieja),
+  );
+  comprobar(
+    'sin respuesta ninguna, los dados se rinden a los seis segundos y no antes: a 5,9 ruedan, a 6,0 vuelven al par anterior',
+    (() => {
+      const a = recorre([[0, TOCADO], [5.9, TIC]]);
+      const b = recorre([[0, TOCADO], [6.0, TIC]]);
+      return a.fase.fase === 'rodando' && b.fase.fase === 'quieta' && parQueSeEnsena(b.fase).join('+') === parViejo.join('+') && Math.abs(TOPE_SIN_RESPUESTA - 6) < 1e-9;
+    })(),
+  );
+  comprobar(
+    'la tirada de OTRO arranca la animación desde el reposo: rueda 0,6 y se asienta 0,35 en su par',
+    (() => {
+      const rodando = recorre([[10, vista(true, 9, 5)]]);
+      const asentando = faseDeLosDados(rodando, TIC, 10.6);
+      const quieta = faseDeLosDados(asentando, TIC, 10.95);
+      /* Y lo que el pintor de la fase 3 va a leer: rodando CON objetivo enseña ya el par al que va;
+         un toque sin respuesta enseña el de antes. Sin esto, «parQueSeEnsena» podria devolver el
+         par viejo en esa rama y nada se pondria rojo hasta verlo en pantalla. */
+      const soloTocado = recorre([[0, TOCADO]]);
+      return rodando.fase.fase === 'rodando' && rodando.fase.objetivo !== null &&
+        parQueSeEnsena(rodando.fase).join('+') === parNuevo.join('+') &&
+        parQueSeEnsena(soloTocado.fase).join('+') === parViejo.join('+') &&
+        asentando.fase.fase === 'asentando' && quieta.fase.fase === 'quieta' && parQueSeEnsena(quieta.fase).join('+') === parNuevo.join('+');
+    })(),
+  );
+  comprobar(
+    'la misma vista dos veces (el sondeo) no arranca nada: el sello no cambia dentro del turno',
+    JSON.stringify(recorre([[1, vista(true, 9, 5)], [1.6, TIC], [2, TIC], [3, vista(true, 9, 5)]]).fase) === JSON.stringify(recorre([[1, vista(true, 9, 5)], [1.6, TIC], [2, TIC]]).fase),
+  );
+  comprobar(
+    'abrirse el turno siguiente sin tirar (mismo sello, tirado a falso) tampoco mueve los dados',
+    (() => { const e = recorre([[1, vista(true, 9, 5)], [1.6, TIC], [2, TIC], [3, vista(false, 9, 5)]]); return e.fase.fase === 'quieta' && parQueSeEnsena(e.fase).join('+') === parNuevo.join('+'); })(),
+  );
+  comprobar(
+    'y una tirada que se perdió entre sondeos (cambia el sello con tirado a falso) se enseña en reposo, sin animar',
+    (() => { const e = recorre([[3, vista(false, 11, 6)]]); return e.fase.fase === 'quieta' && parQueSeEnsena(e.fase).join('+') === repartoDeLaTirada(11, 6, semilla).join('+'); })(),
+  );
+  comprobar(
+    'dos movimientos entre dos vueltas del sondeo (cambia el sello con tirado a verdadero) sí son tirada nueva',
+    (() => { const e = recorre([[1, vista(true, 9, 5)], [1.6, TIC], [2, TIC], [20, vista(true, 9, 6)]]); return e.fase.fase === 'rodando'; })(),
+  );
+  comprobar('la transición no toca el estado que recibe', (() => { const antes = recorre([[0, TOCADO]]); const copia = JSON.stringify(antes); faseDeLosDados(antes, vista(true, 9, 5), 0.2); faseDeLosDados(antes, TIC, 7); return JSON.stringify(antes) === copia; })());
+
+  /* ── 3. LA VETA Y LOS COLORES ── */
+  const fueraDeRango: string[] = [];
+  const rangos: string[] = [];
+  for (const segmentos of [64, 96, 240]) {
+    const v = vetaDelTablon(segmentos, 6);
+    if (v.length !== (segmentos + 1) * 7) fueraDeRango.push(`${String(segmentos)}: ${String(v.length)} valores`);
+    let min = 1;
+    let max = 0;
+    for (const x of v) {
+      if (!(x >= 0 && x <= 1)) fueraDeRango.push(`${String(segmentos)}: ${String(x)}`);
+      min = Math.min(min, x);
+      max = Math.max(max, x);
+    }
+    rangos.push(`${String(segmentos)}: [${min.toFixed(3)}, ${max.toFixed(3)}]`);
+    if (max - min < 0.4) fueraDeRango.push(`${String(segmentos)}: la veta sólo recorre ${(max - min).toFixed(3)}, no se vería`);
+  }
+  comprobar('la veta está en [0, 1] con 64, 96 y 240 segmentos, un valor por vértice, y recorre al menos cuatro décimas', fueraDeRango.length === 0, { fueraDeRango: fueraDeRango.slice(0, 4), rangos });
+  const conNoventaYSeis = vetaDelTablon(96, 6);
+  const fila = (j: number): number[] => Array.from(conNoventaYSeis.subarray(j * 97, (j + 1) * 97));
+  comprobar(
+    'los tres tablones no repiten la misma veta: las filas centrales de cada uno son distintas',
+    TABLONES === 3 && fila(1).join() !== fila(3).join() && fila(3).join() !== fila(5).join(),
+  );
+  const { oscura, clara } = coloresDeLaMadera();
+  const hex = (c: readonly [number, number, number]): string => `#${c.map((n) => n.toString(16).padStart(2, '0')).join('')}`;
+  comprobar(
+    'los dos colores de la madera se leen del atlas del pack y siguen siendo los medidos sobre las piezas de madera: #94533f y #b97756',
+    hex(oscura) === '#94533f' && hex(clara) === '#b97756',
+    { oscura: hex(oscura), clara: hex(clara), celdas: { oscura: MADERA_OSCURA_EN_EL_ATLAS, clara: MADERA_CLARA_EN_EL_ATLAS } },
+  );
+  comprobar(
+    'y su contraste es 1,6:1, a cinco centésimas: madera que se lee como madera sin competir con las piezas',
+    Math.abs(contraste(clara, oscura) - 1.6) <= 0.05,
+    { contraste: Number(contraste(clara, oscura).toFixed(3)) },
+  );
+
+  /* ── 4. EL TOPE ── */
+  comprobar('la mesa cuesta 12 · segmentos + 590: 1.742 con 96 y 3.470 con 240', triangulosDeLaMesa(96) === 1742 && triangulosDeLaMesa(240) === 3470 && triangulosDeLaMesa(64) === 12 * 64 + 590);
+  comprobar(
+    'los segmentos siguen al ancho en puntos, uno cada ocho, acotados entre 64 y 240',
+    segmentosDeLaMesa(568) === 71 && segmentosDeLaMesa(1920) === 240 && segmentosDeLaMesa(100) === 64 && segmentosDeLaMesa(8000) === SEGMENTOS_DE_LA_MESA.maximo,
+  );
+  comprobar(
+    'y con el máximo de segmentos la mesa no se pasa de su tope, que a su vez es una fracción del mar',
+    triangulosDeLaMesa(SEGMENTOS_DE_LA_MESA.maximo) <= TOPE_DE_LA_MESA && TOPE_DE_LA_MESA < TRIANGULOS_DEL_MAR / 6,
+    { mesa: triangulosDeLaMesa(SEGMENTOS_DE_LA_MESA.maximo), TOPE_DE_LA_MESA, mar: TRIANGULOS_DEL_MAR },
+  );
+}
+
 console.log('');
 if (fallos.length > 0) {
   console.log(`${fallos.length} de ${hechas} comprobaciones han fallado:\n`);
@@ -3731,7 +4145,7 @@ if (fallos.length > 0) {
  * a veintitrés: durante ese tiempo el guion podía morirse en la novena sin que nadie se
  * enterara. Un guardia desfasado no guarda nada.
  */
-const COMPROBACIONES_ESCRITAS = 247;
+const COMPROBACIONES_ESCRITAS = 282;
 if (hechas < COMPROBACIONES_ESCRITAS) {
   console.error(
     `Solo se han hecho ${hechas} de las ${COMPROBACIONES_ESCRITAS} comprobaciones que ` +

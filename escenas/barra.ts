@@ -104,8 +104,27 @@ export interface HuecoDeLaBarra {
  */
 export const DISTANCIA_DE_LA_BARRA = 2;
 
-/** Qué parte del alto de la pantalla ocupa un hueco, cuando caben todos holgados. */
-const PARTE_DEL_ALTO = 0.13;
+/**
+ * QUÉ PARTE DEL ALTO DE LA PANTALLA OCUPA UN HUECO, cuando caben todos holgados.
+ *
+ * Estaba en 0,13 y en APAISADO el asa caía bajo el suelo de toque: en un lienzo de 320
+ * puntos de alto —el iPhone SE de primera generación girado, y cualquier Android de 320
+ * dp de ancho girado— un hueco medía `0,13 · 320 = 41,6` puntos, y la casa tiene escrito
+ * que nada que se toque baja de 44 (`SUELO_DEL_TOQUE`). Con 0,14 salen 44,8. Es la única
+ * constante de aquí que cambia con la mesa, y su efecto colateral está medido: en el
+ * lienzo de 320×360 pasa a mandar el ANCHO (47,5 puntos, sigue sobre 44) y la barra llega
+ * a `x = 0,515`, aún a la izquierda de las cartas de bienes quietas (0,641). Lo mide
+ * `verify:escena` en los lienzos de pie y en los ocho apaisados.
+ */
+const PARTE_DEL_ALTO = 0.14;
+/**
+ * EL SUELO DE TOQUE DE LA CASA, en puntos: nada que se pulse mide menos.
+ *
+ * Está aquí y no sólo en el comprobador porque `huecosDeLaMesa` decide con él si los
+ * dados caben como quinto hueco. Escrito dos veces, el día que la casa lo suba cambiaría
+ * uno y la mesa seguiría dando dados de 44 en un lienzo que ya exige 48.
+ */
+export const SUELO_DEL_TOQUE = 44;
 /** Cuánto aire queda entre dos huecos, en fracción de hueco. */
 const AIRE = 0.24;
 /**
@@ -128,12 +147,14 @@ const DESDE_EL_SUELO = 0.155;
  * más estrecha. Cuando manda el ancho, el borde derecho de la barra cae siempre en
  * `ANCHO_MAXIMO / 2` del ancho visible, tenga tres huecos o cuatro. Con 0,70 queda a la
  * izquierda de la mano de bienes abierta por el imán en todos esos lienzos —por poco en el
- * de 360— y el asa del hueco sigue por encima de los 44 puntos de toque: 53 en el de 360,
- * y en el más bajo (320×360) sigue mandando el alto, así que el cuarto hueco no cuesta
- * nada. Con 0,68 ese lienzo pasaba a mandar por el ancho y el hueco encogía siete
- * décimas de punto. Lo mide `verify:escena` («el hueco del mazo queda libre de las
- * cartas de bienes»), que es lo que se puso rojo. En un monitor no cambia nada: ahí
- * manda el alto.
+ * de 360— y el asa del hueco sigue por encima de los 44 puntos de toque: 53 en el de 360.
+ * En el más bajo (320×360) manda el ANCHO desde que `PARTE_DEL_ALTO` subió a 0,14: con
+ * tres huecos el lado es 0,2320 —lo que da el alto— y con cuatro 0,2184 —lo que cabe en
+ * el 70 % del ancho—, 47,5 puntos, aún sobre el suelo. Así que ahí el cuarto hueco SÍ
+ * cuesta —tres puntos de asa— y lo que `verify:escena` exige en ese lienzo ya no es que
+ * tres y cuatro midan lo mismo sino que los dos lleguen a 44. Lo mide también «el hueco
+ * del mazo queda libre de las cartas de bienes», que es lo que se puso rojo con 0,82. En
+ * un monitor no cambia nada: ahí manda el alto.
  */
 const ANCHO_MAXIMO = 0.70;
 
@@ -189,6 +210,114 @@ export function huecosDeLaBarra(
     huecos.push({ x: primero + i * paso, y, z: -DISTANCIA_DE_LA_BARRA, lado });
   }
   return huecos;
+}
+
+/**
+ * EL HUECO DE LOS DADOS: un asa para los dos, y de dónde ha salido.
+ *
+ * `ancho` y `alto` van aparte porque colgado a la izquierda el asa es más ancha que alta
+ * —1,6 lados por 1— y como quinto hueco es cuadrada; `lado` es el del reparto al que
+ * pertenece, que es lo que escala los dados (0,46 lados cada uno). `forma` dice cuál de
+ * los dos peldaños se ha aplicado, para que un comprobador pueda afirmar en qué lienzo
+ * pasa cada cosa y no sólo que «hay dados».
+ */
+export interface HuecoDeLosDados {
+  x: number;
+  y: number;
+  z: number;
+  ancho: number;
+  alto: number;
+  lado: number;
+  forma: 'colgado' | 'quinto';
+}
+
+/** Cuánto mide el asa de los dados colgada, en lados del reparto. Los dos cubos y su aire. */
+export const ANCHO_DEL_ASA_DE_LOS_DADOS = 1.6;
+/** Cuánto aire se exige entre el asa colgada y el canto izquierdo, en lados. */
+const AIRE_HASTA_EL_CANTO = 0.5;
+
+/**
+ * LOS HUECOS DE LA MESA: los de las piezas, y dónde van los dados si van.
+ *
+ * ═══ POR QUÉ NO ES `huecosDeLaBarra(cuantos + 1)` Y YA ═══
+ *
+ * Porque los dados no son una pieza más. Una pieza más ENCOGE a las demás donde manda el
+ * ancho —el reparto es centrado y se aprieta— y en un lienzo de 320 de alto eso baja el
+ * asa de las piezas por debajo del suelo de toque para meter un hueco que, además, no
+ * llegaría al suelo él tampoco. Así que la regla es de TRES PELDAÑOS, en este orden, y
+ * es «cabe o no cabe, llega a 44 o no», nunca la proporción de la pantalla, para que un
+ * lienzo raro no caiga en la forma equivocada:
+ *
+ *   1. COLGADO a la izquierda del reparto de siempre, con un paso de aire (`AIRE · lado`)
+ *      entre su borde derecho y el primer hueco, SIEMPRE QUE QUEPA con medio lado de aire
+ *      hasta el canto izquierdo. `piezas` es `huecosDeLaBarra(cuantos, …)` tal cual: las
+ *      piezas no se mueven un milímetro. Es lo que pasa en todos los apaisados, donde el
+ *      alto manda y sobra ancho.
+ *   2. Como QUINTO hueco del reparto centrado —el primero por la izquierda— cuando el
+ *      colgado no cabe Y el asa de ese reparto sigue en o por encima del suelo de toque.
+ *      `piezas` son los demás huecos de `huecosDeLaBarra(cuantos + 1, …)`: se corren un
+ *      poco a la izquierda y encogen, por lo mismo que dice la cabecera de
+ *      `huecosDeLaBarra`. Es lo que pasa de pie en 390 de ancho y en las tabletas.
+ *   3. `dados: null` cuando ni el colgado cabe ni el quinto llega al suelo. Las piezas no
+ *      encogen, y TIRAR se queda como botón fuera del lienzo: cada movimiento
+ *      exactamente una vez, nadie sin tirar. Pasa en 320×360 y en 360×490.
+ *
+ * ═══ POR QUÉ RECIBE EL ALTO EN PUNTOS ═══
+ *
+ * El suelo de 44 es en PUNTOS de pantalla y el reparto sólo sabe de unidades de mundo.
+ * Quien pinta lo tiene (`estado.size.height`, que la barra ya lee para la proporción) y
+ * las dos pantallas también, y las dos preguntan lo mismo que la escena —`dados !== null`—
+ * antes de quitar el botón: como llaman a la misma función con la misma medida no pueden
+ * discrepar. Si la escena no pinta dados, la pantalla no quita el botón.
+ *
+ * `cuantos` es el número REAL de huecos de la barra —las piezas más el mazo si lo hay: tres
+ * en la colocación, cuatro jugando—, no un cuatro escrito aquí, porque el sitio que queda
+ * a la izquierda depende de cuántos hay. Con cero no hay barra y no hay mesa.
+ */
+export function huecosDeLaMesa(
+  cuantos: number,
+  campo: number,
+  proporcion: number,
+  altoEnPuntos: number,
+): { piezas: HuecoDeLaBarra[]; dados: HuecoDeLosDados | null } {
+  const piezas = huecosDeLaBarra(cuantos, campo, proporcion);
+  const primero = piezas[0];
+  if (primero === undefined) return { piezas, dados: null };
+
+  const { alto, ancho } = loQueSeVe(campo, proporcion);
+  const enPuntos = (lado: number): number => (lado / alto) * altoEnPuntos;
+
+  /* 1. Colgado: su borde derecho a un paso de aire del primer hueco. */
+  const lado = primero.lado;
+  const derecha = primero.x - lado / 2 - AIRE * lado;
+  const izquierda = derecha - ANCHO_DEL_ASA_DE_LOS_DADOS * lado;
+  if (izquierda - -ancho / 2 >= AIRE_HASTA_EL_CANTO * lado - 1e-9) {
+    return {
+      piezas,
+      dados: {
+        x: (izquierda + derecha) / 2,
+        y: primero.y,
+        z: primero.z,
+        ancho: ANCHO_DEL_ASA_DE_LOS_DADOS * lado,
+        alto: lado,
+        lado,
+        forma: 'colgado',
+      },
+    };
+  }
+
+  /* 2. Quinto hueco, sólo si el reparto apretado sigue sobre el suelo de toque. */
+  const conUnoMas = huecosDeLaBarra(cuantos + 1, campo, proporcion);
+  const quinto = conUnoMas[0];
+  if (quinto !== undefined && enPuntos(quinto.lado) >= SUELO_DEL_TOQUE - 1e-9) {
+    return {
+      piezas: conUnoMas.slice(1),
+      dados: { x: quinto.x, y: quinto.y, z: quinto.z, ancho: quinto.lado, alto: quinto.lado, lado: quinto.lado, forma: 'quinto' },
+    };
+  }
+
+  /* 3. Sin dados: las piezas se quedan como estaban y el botón sigue fuera. */
+  return { piezas, dados: null };
 }
 
 /**

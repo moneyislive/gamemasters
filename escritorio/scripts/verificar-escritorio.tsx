@@ -76,7 +76,7 @@ import { CICLO_MAXIMO_MS, pausaAntesDeVolverAPreguntar, TOPE_DE_PAUSA_MS, VENTAN
 import { Retablo } from '../src/retablo';
 import { loQuePide, PLAZOS, tocaElMuelle } from '../src/sala';
 import { loQueQuedaTrasElSondeo, seVuelveSoloAlSitio, SIN_AVISO } from '../src/mesa';
-import type { LaMesa, MesaVista } from '../src/mesa';
+import type { LaMesa, MesaVista, ResultadoDelMovimiento } from '../src/mesa';
 import { loQueSeDiceDeUnFallo } from '../src/red-de-seguridad';
 import { haEmpezado } from '../src/empezada';
 import { Muelle } from '../src/muelle';
@@ -906,7 +906,8 @@ function unaMesa(fase: LaMesa['fase'], vista: MesaVista | null): LaMesa {
     quieto: false,
     abrir: nada,
     entrar: nada,
-    mover: nada,
+    /* `mover` devuelve cómo acabó desde la mesa de madera; una mesa de mentira siempre acierta. */
+    mover: () => Promise.resolve<ResultadoDelMovimiento>('hecho'),
     vestir: nada,
     salir: nada,
     tirar: nada,
@@ -1774,6 +1775,46 @@ function mesaPuestaDe(sentados: readonly { asiento: string; nombre: string }[], 
  * escena de verdad. Aquí se compra lo que es de ESTE cliente: qué le llega a `<Delta>`,
  * qué sale como botón y qué pinta el raíl.
  */
+/**
+ * `mover` DEVUELVE CÓMO ACABÓ, y lo devuelve con lo que ya calculaba.
+ *
+ * Los dados de la mesa de madera (`docs/LA-MESA-DE-RIBERAS.md` §5.3) ruedan al tocarlos
+ * sin saber el número, y tienen que enterarse EN EL ACTO de que la tirada no va a llegar
+ * —un doble toque, una revisión rancia— en vez de rodar seis segundos. La pantalla ya sabía
+ * distinguirlo para escribir el aviso (`seIgnoro`, `r.ok`, el `catch`); lo que se exige
+ * aquí es que esa misma decisión SALGA de `mover` como `'hecho' | 'rechazado' | 'sin-red'`,
+ * sin una segunda lectura de la respuesta, y que el `catch` sea `'sin-red'` y no un
+ * rechazo: un rechazo es «la mesa dijo que no», y sin red no dijo nada.
+ *
+ * Se lee el fuente porque el gancho no se puede ejecutar aquí sin red ni React montado, y
+ * porque lo que se afirma es de FORMA: qué se devuelve en cada rama.
+ */
+function elResultadoDeMover(): void {
+  paso('Mover devuelve cómo acabó: hecho, rechazado o sin red, con lo que ya sabía');
+  const fuente = readFileSync(new URL('../src/mesa.ts', import.meta.url), 'utf8');
+  const soloCodigo = (texto: string): string => texto.split('\n').filter((l) => !/^\s*(\*|\/\/|\/\*)/.test(l)).join('\n');
+  const codigo = soloCodigo(fuente);
+  comprobar(
+    'el tipo está escrito con sus tres valores y nada más',
+    /export type ResultadoDelMovimiento = 'hecho' \| 'rechazado' \| 'sin-red';/.test(codigo),
+  );
+  comprobar(
+    'y `mover` lo promete en el contrato de la mesa',
+    /mover: \(movimiento: MovimientoDeclarado\) => Promise<ResultadoDelMovimiento>;/.test(codigo),
+  );
+  const cuerpo = /const mover = useCallback\(([\s\S]*?)\n    \[mesa\?\.rev, cabeceras\],/.exec(codigo)?.[1] ?? '';
+  comprobar('se sabe leer el cuerpo de `mover`', cuerpo.length > 0 && /await fetch\(/.test(cuerpo));
+  comprobar('ya no tira la promesa al suelo con `void (async`: la devuelve', !/void \(async/.test(cuerpo) && /\(async \(\): Promise<ResultadoDelMovimiento> =>/.test(cuerpo));
+  comprobar('sin mesa o sin revisión no se manda nada y se contesta `rechazado`', /if \(donde === null \|\| rev === undefined\) return 'rechazado';/.test(cuerpo));
+  comprobar(
+    'una respuesta correcta es `hecho` salvo que la mesa volviera igual (`seIgnoro`) o el juego dijera por qué; un error del servidor es `rechazado`',
+    /return !r\.ok \|\| seIgnoro \|\| loQueDijoElJuego\.length > 0 \? 'rechazado' : 'hecho';/.test(cuerpo),
+  );
+  const enElCatch = /catch \(error\) \{([\s\S]*?)\} finally/.exec(cuerpo)?.[1] ?? '';
+  comprobar('y el `catch` —no hubo respuesta que leer— es `sin-red`, no un rechazo', /return 'sin-red';/.test(enElCatch) && !/'rechazado'/.test(enElCatch));
+  comprobar('el `finally` sigue soltando `quieto` en las tres ramas', /finally \{\s*ponerQuieto\(false\);/.test(cuerpo));
+}
+
 function elMazoEnLaPantalla(): void {
   paso('El mazo: lo enseña la mano, no los botones, y el respaldo lo sigue pudiendo jugar');
 
@@ -2250,6 +2291,7 @@ elMuelle();
 riberasEnTres();
 elAcercamientoDelDelta();
 elMazoEnLaPantalla();
+elResultadoDeMover();
 
 console.log('');
 /**
@@ -2261,7 +2303,7 @@ console.log('');
  * eso se lee como verde. Con el número escrito, salir con menos es un fallo ruidoso. Va a
  * mano y se sube al añadir comprobaciones; un guardia desfasado no guarda nada.
  */
-const COMPROBACIONES_ESCRITAS = 380;
+const COMPROBACIONES_ESCRITAS = 388;
 if (hechas < COMPROBACIONES_ESCRITAS) {
   console.error(
     `Solo se han hecho ${String(hechas)} de las ${String(COMPROBACIONES_ESCRITAS)} comprobaciones que ` +
