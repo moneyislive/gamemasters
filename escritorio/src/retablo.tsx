@@ -395,18 +395,22 @@ function figuraDe(
      * Era `stroke={p.borde}` a tres unidades en vez de una: el MISMO color, un
      * poco más gordo. Con el borde que declara Riberas (#1d1f26) eso son 0,44 px
      * contra 1,33 px de una raya que además se recorta de sus propios rellenos
-     * por 2,78 (marisma), 3,07 (cantil) y 3,93 (duna) — tres de los seis
-     * terrenos por debajo del 3:1. Se tiraba un ocho y el hexágono que producía
-     * lo decía con eso.
+     * por 2,66 (carrizal), 3,71 (marisma) y 4,21 (cantil) — el más bajo de los
+     * seis por debajo del 3:1. Se tiraba un ocho y el hexágono que producía lo
+     * decía con eso.
      *
      * Ahora es acento, que es lo único que en esta Sala significa «mira aquí», y
      * con un halo de `--suelo` debajo. Dos colores porque NINGÚN color fijo puede
      * prometer contraste contra un relleno que declara un juego que no
-     * conocemos: el acento contra los seis terrenos da entre 1,01 (carmesí sobre
-     * carrizal: literalmente el mismo color) y 2,76. El halo sí: `--suelo` se
-     * recorta de los seis por 3,35 a 7,11, y el acento se recorta del halo por
-     * 5,01 / 9,22 / 8,69 / 5,40 en los cuatro temas. Se ve el borde por dentro o
-     * por fuera, pero se ve.
+     * conocemos: el acento contra los seis terrenos da entre 1,01 (violeta sobre
+     * cantil: literalmente el mismo color) y 2,88. El halo sí: `--suelo` se
+     * recorta de los seis por 3,21 (carrizal) a 13,96 (duna), y el acento se
+     * recorta del halo por 5,01 / 9,22 / 8,69 / 5,40 en los cuatro temas. Se ve
+     * el borde por dentro o por fuera, pero se ve.
+     *
+     * (Las cifras contra los rellenos están vueltas a medir después de repintar
+     * cada isla del color del bien que produce. Que el reparto de números cambie
+     * y la conclusión no es justo lo que sostiene el diseño de dos colores.)
      *
      * Va en `style` y no en el atributo `stroke` porque `var()` no se sustituye
      * dentro de un atributo de presentación; en una declaración CSS, sí.

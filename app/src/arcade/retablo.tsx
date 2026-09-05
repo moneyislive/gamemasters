@@ -175,9 +175,15 @@ function enUnidades(px: number, escala: number): number {
  * misma razón: debajo hay un color que esta pantalla NO controla.
  *
  * Medido, componiendo el alfa en sRGB sobre los seis terrenos de Riberas, el blanco
- * sobre este plato da entre 13,4:1 (vega #b09a3f, el más claro) y 15,5:1 (marisma
- * #3f6d5a). Sin él, sobre esos mismos rellenos daba entre 2,57 y 5,47, o sea que
- * cuatro de los seis no llegaban al 4,5 que pide un texto de 13 px.
+ * sobre este plato da entre 11,0:1 (duna #e6d8ae, el más claro) y 15,6:1 (carrizal
+ * #346d3d). Sin él, sobre esos mismos rellenos daba entre 1,31 y 5,71, o sea que
+ * CINCO de los seis no llegaban al 4,5 que pide un texto de 13 px.
+ *
+ * (Los seis hexadecimales cambiaron al repintar cada isla del color del bien que
+ * produce —ver `COLOR_DEL_TERRENO` en `shared/arcade/juegos/riberas.ts`— y estas
+ * cifras están vueltas a medir con los de ahora. El plato aguantó el cambio sin
+ * tocarlo, que era lo que había que comprobar: son rellenos que esta pantalla no
+ * elige y volverán a cambiar.)
  *
  * El 78 y no otro número: es el del plato de la pastilla, ya medido para que el
  * propio plato se recorte de lo que tenga debajo (3,14 en el peor de los cuatro
@@ -917,12 +923,17 @@ function nombreParaElLector(
  *
  * El acento decía «esto está destacado» dibujado DIRECTAMENTE sobre el relleno del
  * juego, y no se recortaba de nada. Medido, componiendo luminancias WCAG contra los
- * seis terrenos de Riberas —marisma #3f6d5a, carrizal #6d8f3f, salina #8f8a6d,
- * cantil #6a6a72, vega #b09a3f, duna #8a7a5c— y contra el nudo libre #5a6070:
- * violeta 1,06-1,59 · carmesí 1,01-1,71 · verde 1,22-2,76 · ámbar 1,30-2,93. El
+ * seis terrenos de Riberas —carrizal #346d3d, marisma #c05a2c, salina #9dc257,
+ * cantil #78828d, vega #e3b53a, duna #e6d8ae— y contra el nudo libre #5a6070:
+ * violeta 1,01-2,79 · carmesí 1,06-2,59 · verde 1,12-2,76 · ámbar 1,05-2,93. El
  * mínimo de un elemento no textual es 3:1 y NINGUNA de las 28 combinaciones llega.
- * Con el tema en carmesí, un carrizal destacado daba 1,01:1 contra su propio
- * relleno: literalmente no se veía que estuviera destacado.
+ * Con el tema en violeta, un cantil destacado da 1,01:1 contra su propio relleno:
+ * literalmente no se ve que esté destacado.
+ *
+ * Y esa lista de seis colores ya se ha reescrito una vez —al repintar cada isla del
+ * color del bien que produce— sin que el peor caso se moviera de «ninguna llega»,
+ * que es precisamente el argumento de abajo: no se está midiendo un arte concreto,
+ * se está midiendo que no hay arte que salve un color fijo.
  *
  * Y el comentario que lo defendía —«el contorno cae entre el relleno del juego y lo
  * que hay debajo, que es terreno de la Sala»— no era cierto: un trazo de SVG va
@@ -940,8 +951,9 @@ function nombreParaElLector(
  * Aquí los dos colores son `SALA.acento` y `SALA.suelo`, que es la pareja que esta
  * casa ya tiene medida para el botón primario: 5,01 en violeta, 9,22 en ámbar, 8,69
  * en verde y 5,40 en carmesí. Y de propina, el halo oscuro sí se recorta de los
- * terrenos de Riberas —3,17 en el peor (el nudo libre) y 7,12 en la vega—, o sea que
- * en la práctica se ven los dos bordes y no uno.
+ * terrenos de Riberas —3,15 en el peor (el nudo libre), 3,21 en el más apurado de
+ * los seis (el carrizal) y 13,96 en la duna—, o sea que en la práctica se ven los
+ * dos bordes y no uno.
  *
  * El halo va DEBAJO y más ancho, así que de él sólo asoma `TRAZO.halo` a cada lado:
  * lo que se lee sigue siendo una línea de acento, con una sombra fina.

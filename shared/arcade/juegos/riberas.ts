@@ -209,8 +209,26 @@ export const BIENES: readonly Bien[] = ['limo', 'junco', 'sal', 'piedra', 'grano
 /** Lo que hay en cada isla. `duna` es la que no rinde nada. */
 export type Terreno = 'marisma' | 'carrizal' | 'salina' | 'cantil' | 'vega' | 'duna';
 
-/** Qué da cada terreno, o `null` si no da nada. */
-const RINDE: Record<Terreno, Bien | null> = {
+/**
+ * QUÉ DA CADA TERRENO, o `null` si no da nada.
+ *
+ * ═══ POR QUÉ ESTO SE EXPORTA, SI NADIE DE FUERA REPARTE BIENES ═══
+ *
+ * Porque hay OTRA tabla que depende de ésta y no puede importarla. `escenas/paleta.ts`
+ * decide de qué color y de qué celda del atlas se pinta cada isla, y esa decisión sale de
+ * lo que la isla produce: el carrizal se ve como el bosque porque su junco es la madera, la
+ * marisma como la colina porque su limo es el ladrillo. La escena no puede preguntárselo a
+ * las reglas —sería el dibujo importando el juego— así que lo repite, y una tabla repetida
+ * es una tabla que se desincroniza en silencio.
+ *
+ * Ya pasó: la escena pintó los seis terrenos por su NOMBRE en vez de por su bien, y las
+ * cartas salieron de un color y sus islas de otro. Nada falló.
+ *
+ * Así que esto sale por la puerta para que `verify:riberas` pueda contrastar las dos: qué
+ * rinde cada terreno aquí, y de qué color se pinta allí. Es lectura, no reparto — quien
+ * quiera dar bienes sigue teniendo que pasar por el reductor.
+ */
+export const RINDE: Record<Terreno, Bien | null> = {
   marisma: 'limo',
   carrizal: 'junco',
   salina: 'sal',
@@ -229,14 +247,89 @@ const NOMBRE_DEL_TERRENO: Record<Terreno, string> = {
   duna: 'Duna',
 };
 
-/** De qué color se pinta cada terreno. Sólo pintado: no entra en ninguna regla. */
+/**
+ * DE QUÉ COLOR SE PINTA CADA TERRENO EN EL TABLERO PLANO. Sólo pintado: ninguna regla.
+ *
+ * ═══ CADA ISLA SE PINTA DEL BIEN QUE DA, NO DE LO QUE SUENA SU NOMBRE ═══
+ *
+ * Aquí había seis colores elegidos por el nombre: la marisma verde azulada porque las
+ * marismas son agua estancada, la salina parda porque la sal se seca al sol, el carrizal
+ * verde medio porque el carrizo es hierba. Uno a uno se defendían; juntos mentían.
+ *
+ * La marisma da limo, que es el LADRILLO de este juego, y salía del mismo verde que el
+ * carrizal, que da junco, que es la MADERA. O sea que las dos islas que dan los dos bienes
+ * que más se truecan se parecían entre sí y no se parecían a sus cartas. Ese fallo no se
+ * cae ni se reporta: se juega mal un rato y se abandona la partida sin saber por qué costaba
+ * leer el tablero.
+ *
+ * Así que el color sale del BIEN: el carrizal es el verde oscuro del bosque, la marisma el
+ * ladrillo cocido de la arcilla, la salina el verde claro de la pradera —donde otros juegos
+ * ponen lana—, la vega el dorado del sembrado, el cantil el gris de la montaña y la duna la
+ * arena del desierto, porque como el desierto no da nada.
+ *
+ * ═══ Y POR QUÉ LA VEGA YA NO ES EL AMARILLO QUE APETECÍA, NI LA MARISMA EL SUYO ═══
+ *
+ * Porque estos seis rellenos no compiten sólo entre ellos: encima de cada isla se pintan
+ * las CHOZAS, las TORRES y las VEREDAS de quien las tiene, y esas se pintan con el color
+ * de su dueño —`COLORES_DE_COLONO`, cuarenta líneas más abajo en este mismo fichero— y un
+ * filo de un píxel que no promete nada. Una pieza del color de la isla que pisa no se ve.
+ *
+ * Pasó, y con el amarillo: la vega estaba en `#e3b53a` y el tercer colono es `#e0b83d`. Son
+ * 2,9 CIE76 —el umbral de «se nota si están pegados» ronda 2— así que en cualquier partida
+ * de tres o más, las piezas de quien jugara en amarillo DESAPARECÍAN sobre las islas de
+ * vega. Lo mismo, más flojo, con la marisma `#c05a2c` contra el rojo `#e0533d`: 16,5.
+ *
+ * Y no se cazaba, porque lo único que se vigilaba era que dos ISLAS no se confundieran
+ * entre sí — nunca que una isla se comiera una PIEZA. Así que los dos rellenos se movieron
+ * fuera del alcance de los seis colores de colono y, sobre todo, se escribió la regla que
+ * faltaba: `verify:riberas` exige ahora una distancia mínima entre cada uno de estos seis
+ * y cada uno de aquellos seis. Hoy el par más apretado son 27,0 (vega contra el oro) sobre
+ * un mínimo de 20; antes eran 2,9.
+ *
+ * Los colonos NO se tocaron a propósito: `escenas/embarcadero/tema.ts` los repite para las
+ * barcas del Muelle y `verify:embarcadero` los contrasta, así que mover un colono es mover
+ * dos ficheros y una comprobación ajena. Mover el relleno es mover una línea de aquí.
+ *
+ * ═══ POR QUÉ NO SON LOS MISMOS HEXADECIMALES QUE `escenas/paleta.ts` ═══
+ *
+ * Porque el otro tablero no es plano. En tres dimensiones el color lo pone la textura del
+ * pack con su degradado, y encima hay relieve, sombras, árboles y agua: dos verdes vecinos
+ * se separan solos. Aquí no hay más que polígonos pegados con un borde de un píxel, y encima
+ * piezas de colonos encima de los polígonos, así que cada uno de estos seis se retoca por lo
+ * que le pide ESTA superficie: los dos verdes se abren más el uno del otro, y la vega y la
+ * marisma bajan y se desaturan para salir de debajo de las piezas.
+ *
+ * Lo que NO puede cambiar es cuál es cuál. La regla que lo sujeta está escrita como
+ * comprobación en `server/scripts/verificar-riberas.ts`, y es ésta: el color plano de cada
+ * terreno tiene que estar MÁS CERCA del color que `paleta.ts` le da a ese mismo terreno que
+ * del de cualquier otro de los seis. Eso permite el retoque y prohíbe el cambio de historia.
+ * Y de propina se mide que los seis se distingan entre sí, que es el fallo que se vio.
+ *
+ * ═══ Y POR QUÉ EL VERDE DEL CARRIZAL NO ES MÁS OSCURO, QUE APETECÍA ═══
+ *
+ * Porque hay un tercer interesado en estos seis colores que no está en este fichero: el
+ * realce de la casilla que acaba de producir, que en los dos clientes es una raya de acento
+ * con un halo de `--suelo` (#080a0e) debajo. Ese halo es lo único que promete verse contra
+ * un relleno que la Sala no elige, y para prometerlo tiene que recortarse del relleno por
+ * 3:1. Un carrizal a #2f6138 —que se probó, y se veía mejor como bosque— deja el halo en
+ * 2,72 y rompe esa promesa justo en la isla que más veces se destaca. A #346d3d da 3,21.
+ *
+ * O sea que el suelo de este verde no es de gusto: es el contraste. Está medido en la
+ * cabecera del realce de `app/src/arcade/retablo.tsx` y en la de `escritorio/src/retablo.tsx`.
+ */
 const COLOR_DEL_TERRENO: Record<Terreno, string> = {
-  marisma: '#3f6d5a',
-  carrizal: '#6d8f3f',
-  salina: '#8f8a6d',
-  cantil: '#6a6a72',
-  vega: '#b09a3f',
-  duna: '#8a7a5c',
+  /* Verde oscuro de bosque: el junco es la madera. */
+  carrizal: '#346d3d',
+  /* Ladrillo cocido: el limo es el ladrillo. Bajado del rojo del primer colono. */
+  marisma: '#9d4f25',
+  /* Verde claro de pradera: donde otros juegos ponen lana, aquí hay sal. */
+  salina: '#9dc257',
+  /* Trigo maduro: sembrado, y no el amarillo del tercer colono. */
+  vega: '#b89a55',
+  /* Gris de montaña. */
+  cantil: '#78828d',
+  /* Arena: la duna no da nada, como no da nada el desierto. */
+  duna: '#e6d8ae',
 };
 
 /**

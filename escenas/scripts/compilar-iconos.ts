@@ -91,16 +91,22 @@ const DESTINO = path.join(RAIZ, 'escenas', 'iconos.ts');
  *
  * Así que el vocabulario no se traduce en ningún sitio: se dibuja el que hay.
  *
- * ═══ Y `SAL` SE QUEDA SIN ICONO A PROPÓSITO ═══
+ * ═══ Y `SAL` NO SALE DE NINGÚN `.svg`, PORQUE NO HABÍA NINGUNO QUE SIRVIERA ═══
  *
  * De los cinco iconos provisionales, cuatro tienen una lectura defendible para un bien de
  * Riberas —los terrones de barro para el limo de la marisma, el haz de tallos para el junco
  * del carrizal, la piedra del cantil y la gavilla de la vega—. Ninguno significa sal, y la
  * oveja que sobra menos que ninguno.
  *
- * La carta de sal sale con su color y sin dibujo, que es lo honrado: se ve que falta. La
- * escena ya lo aguanta —un bien sin contornos no pinta icono, no revienta— y esto es una
- * razón más para el arte propio, que es lo que de verdad lo arregla.
+ * Así que la sal se dibujó aquí, en coordenadas, igual que las nueve cartas del mazo: sus
+ * eras de evaporación están más abajo, en `SAL`. Estuvo dibujada y APAGADA una temporada
+ * —fuera del mapa de los bienes— mientras se decidía si una sal de la casa entre cuatro
+ * dibujos ajenos cantaba más que la carta muda. Se ha encendido, y el motivo es que las dos
+ * cosas no se leen igual: la mezcla de manos se lee como cuatro provisionales esperando al
+ * arte propio, y la carta sin dibujo se lee como un fallo del programa. Quien jugaba
+ * preguntó por qué la sal no tenía icono, que es exactamente la pregunta que no debía costar.
+ *
+ * Por eso esta lista tiene CUATRO entradas y los bienes con icono son CINCO.
  */
 const BIENES: ReadonlyArray<{ bien: string; fichero: string }> = [
   { bien: 'limo', fichero: 'brick-pile.svg' },
@@ -887,28 +893,36 @@ const CARTAS: readonly Dibujo[] = [
 ];
 
 /*
- * LA SAL, DIBUJADA Y APARCADA A UN LADO. Léase entero antes de moverla.
+ * LA SAL, EL QUINTO BIEN, Y EL ÚNICO DE LA CASA. Léase entero antes de moverla.
  *
- * De los cinco bienes de Riberas, `sal` es el único sin dibujo, y no por descuido: el
- * icono que le tocaba era una oveja de otro juego, y enseñar un bien que no se tiene en la
- * pantalla con la que se decide qué ofrecer es peor que no enseñar nada. Está contado en
- * `arte/game-icons/LEEME.md` y afirmado en `escenas/scripts/verificar-escena.ts`, que hoy
- * comprueba que `sal` NO tiene icono.
+ * De los cinco bienes de Riberas, `sal` es el único que no viene de un `.svg`, y no por
+ * descuido: el icono ajeno que le tocaba era una oveja de otro juego, y enseñar un bien que
+ * no se tiene en la pantalla con la que se decide qué ofrecer es peor que no enseñar nada.
+ * Así que se dibujó aquí —cuatro eras de evaporación en perspectiva y el montón recogido—,
+ * con las mismas herramientas que las nueve cartas del mazo y por el mismo motivo: un dibujo
+ * escrito en coordenadas, con su cabecera contando qué se ve, no tiene dudas de procedencia.
  *
- * Aquí queda dibujada —eras de evaporación y un montón—, pero FUERA de `CONTORNOS_DEL_BIEN`
- * a propósito. Meterla en el mapa sin más pone la batería en rojo, porque esa comprobación
- * está escrita para que activar la sal sea una decisión de alguien y no un efecto lateral
- * de recompilar. Son dos pasos y hay que darlos juntos:
+ * ═══ ESTUVO APAGADA, Y CONVIENE SABER POR QUÉ SE ENCENDIÓ ═══
  *
- *   1. Mover esta entrada al mapa de los bienes (una línea aquí).
- *   2. Cambiar en `verificar-escena.ts` la comprobación «y `sal` sigue SIN icono» por la
- *      contraria, que es lo que su propio comentario pide que se haga a mano.
+ * Vivió una temporada fuera de `CONTORNOS_DEL_BIEN`, dibujada pero sin repartir, para que
+ * activarla fuera la decisión de alguien y no un efecto lateral de recompilar. El argumento
+ * para dejarla apagada era que una sal de la casa entre cuatro de Delapouite son cinco
+ * iconos de dos manos distintas, que es lo que `arte/game-icons/LEEME.md` avisa que más se
+ * nota.
  *
- * Y hay una tercera cosa que no es opcional: los otros cuatro bienes siguen siendo arte
- * ajeno y provisional. Una sal de la casa entre cuatro de Delapouite son cinco iconos de
- * dos manos distintas, que es justo lo que `LEEME.md` avisa que se nota más que ninguna
- * otra cosa. Esto está listo para el día que se dibujen los otros cuatro, no para adelantar
- * uno solo.
+ * Se encendió porque el otro platillo pesa más: la mezcla de manos se lee como cuatro
+ * provisionales a medio sustituir, y la carta sin dibujo se lee como un fallo del programa.
+ * Quien jugaba preguntó por la carta muda, no por el cambio de trazo.
+ *
+ * Lo que NO cambia con esto: los otros cuatro siguen siendo arte ajeno y provisional, y su
+ * condición para quedarse sigue estando en `LEEME.md`. Esto adelanta uno de los cinco; no
+ * cierra el encargo.
+ *
+ * ═══ Y SIGUE HABIENDO UN SEGUNDO PASO QUE ESTE FICHERO NO PUEDE DAR ═══
+ *
+ * `escenas/scripts/verificar-escena.ts` afirma «y `sal` sigue SIN icono». Mientras esa línea
+ * no diga lo contrario, la batería queda en rojo por esta decisión — que es exactamente para
+ * lo que se escribió. Se cambia a mano, allí.
  */
 const SAL: Dibujo = {
   carta: 'sal',
@@ -1073,19 +1087,27 @@ function comoTira(contorno: readonly number[]): string {
   return `    [${contorno.join(',')}],`;
 }
 
-const cuerpo = iconos
-  .map(
-    (i) =>
-      `  ${i.bien}: [\n${i.contornos.map(comoTira).join('\n')}\n  ],`,
-  )
-  .join('\n');
+/*
+ * LOS CINCO BIENES EN UN SOLO MAPA, y los cuatro de `.svg` van DELANTE a propósito.
+ *
+ * `BIENES_CON_ICONO` sale de `Object.keys` de este mapa, o sea que este orden es el que
+ * alguien va a leer al mirar la lista. Los cuatro provisionales primero y la sal al final
+ * deja a la vista de un vistazo cuántos siguen siendo arte prestado — que es la cuenta que
+ * `arte/game-icons/LEEME.md` pide no perder de vista.
+ *
+ * Y la sal lleva su `/** ... *\/` con lo que se ve, como las cartas, porque un dibujo hecho
+ * en coordenadas no tiene fichero de origen que consultar: lo que se ve se cuenta aquí o no
+ * se cuenta en ninguna parte.
+ */
+const cuerpo = [
+  ...iconos.map((i) => `  ${i.bien}: [\n${i.contornos.map(comoTira).join('\n')}\n  ],`),
+  `  /** ${SAL.que} */\n  ${SAL.carta}: [\n${SAL.contornos.map(comoTira).join('\n')}\n  ],`,
+].join('\n');
 
 const cuerpoDeLasCartas = CARTAS.map(
   (d) =>
     `  /** ${d.que} */\n  ${d.carta}: [\n${d.contornos.map(comoTira).join('\n')}\n  ],`,
 ).join('\n');
-
-const cuerpoDeLaSal = SAL.contornos.map(comoTira).join('\n');
 
 const salida = `/**
  * LOS ICONOS DE RIBERAS: los bienes y las cartas del mazo, en contornos de puntos.
@@ -1098,9 +1120,12 @@ const salida = `/**
  *
  * Los dos mapas tienen orígenes distintos, y conviene saber cuál se está tocando:
  *
- *  · \`CONTORNOS_DEL_BIEN\` sale de los \`.svg\` de \`arte/game-icons/\`. Es arte AJENO y
- *    PROVISIONAL —de Delapouite, game-icons.net, CC BY 3.0— y su condición para quedarse
- *    está en \`arte/game-icons/LEEME.md\`.
+ *  · \`CONTORNOS_DEL_BIEN\` es de dos manos, y hay que saberlo antes de tocarlo. Los cuatro
+ *    primeros —limo, junco, piedra, grano— salen de los \`.svg\` de \`arte/game-icons/\`: arte
+ *    AJENO y PROVISIONAL, de Delapouite, game-icons.net, CC BY 3.0, con su condición para
+ *    quedarse escrita en \`arte/game-icons/LEEME.md\`. La sal, la última, NO: está dibujada
+ *    en coordenadas dentro del compilador, como las cartas, porque ninguno de los iconos
+ *    ajenos significaba sal.
  *  · \`CONTORNOS_DE_LA_CARTA\` no sale de ningún fichero: está dibujado en coordenadas
  *    dentro del compilador, que es su original. Es de la casa.
  *
@@ -1120,7 +1145,13 @@ const salida = `/**
 /** El lienzo cuadrado en el que están dibujados todos. */
 export const LIENZO_DEL_ICONO = ${String(LIENZO)};
 
-/** Los contornos de cada bien, ya sin el rectángulo de fondo y ya aplanados. */
+/**
+ * Los contornos de cada bien, ya sin el rectángulo de fondo y ya aplanados.
+ *
+ * Los cuatro primeros vienen de \`.svg\` ajenos; \`sal\` está dibujada en el compilador y es
+ * de la casa. Se reparten por el mismo mapa a propósito: quien pinta una carta no tiene por
+ * qué saber de dónde salió el trazo.
+ */
 export const CONTORNOS_DEL_BIEN: Readonly<Record<string, readonly (readonly number[])[]>> = {
 ${cuerpo}
 };
@@ -1144,33 +1175,13 @@ ${cuerpoDeLasCartas}
 
 /** Las cartas que tienen dibujo. Sirve para comprobar que no falta ninguna. */
 export const CARTAS_CON_ICONO: readonly string[] = Object.keys(CONTORNOS_DE_LA_CARTA);
-
-/**
- * LA SAL, DIBUJADA Y FUERA DEL MAPA DE LOS BIENES A PROPÓSITO.
- *
- * ${SAL.que}
- *
- * \`sal\` es el único bien sin icono, y no por descuido: el provisional que le tocaba era
- * una oveja de otro juego, y enseñar un bien que no se tiene en la pantalla con la que se
- * decide qué ofrecer es peor que no enseñar nada. Está contado en
- * \`arte/game-icons/LEEME.md\` y afirmado en \`escenas/scripts/verificar-escena.ts\`, que
- * hoy comprueba que \`sal\` NO tiene icono.
- *
- * Así que aquí está dibujada pero NO en \`CONTORNOS_DEL_BIEN\`: meterla sin más pone la
- * batería en rojo, porque esa comprobación está escrita para que activar la sal sea una
- * decisión de alguien y no un efecto lateral de recompilar. Los pasos, y hay que darlos
- * juntos, están en el compilador, encima de este dibujo.
- */
-export const CONTORNOS_DE_LA_SAL: readonly (readonly number[])[] = [
-${cuerpoDeLaSal}
-];
 `;
 
 fs.writeFileSync(DESTINO, salida, 'utf8');
 
 const kb = (salida.length / 1024).toFixed(1);
 console.log(
-  `\n  ${String(iconos.length)} bienes + ${String(CARTAS.length)} cartas · ${kb} kB en ` +
+  `\n  ${String(iconos.length + 1)} bienes + ${String(CARTAS.length)} cartas · ${kb} kB en ` +
     `${path.relative(RAIZ, DESTINO)}`,
 );
 for (const i of iconos) {
@@ -1183,6 +1194,6 @@ for (const [carta, medida] of revisiones) {
   console.log(
     `    ${carta.padEnd(14)} ${String(medida.contornos).padStart(2)} contorno(s) · ` +
       `${String(medida.puntos)} puntos · ${String(medida.triangulos)} triángulos` +
-      `${carta === SAL.carta ? '   (dibujada, SIN activar)' : ''}`,
+      `${carta === SAL.carta ? '   (bien, dibujada en casa)' : ''}`,
   );
 }

@@ -98,7 +98,7 @@ que no tienes, justo en la pantalla con la que se decide qué ofrecer.
 entero y su licencia va con él, no porque haga falta.
 
 Cuando llegue el arte propio: son **cinco** dibujos con los nombres de Riberas, y el
-quinto —la sal— es el que hoy no existe.
+quinto —la sal— ya está hecho y ya se pinta. Faltan cuatro.
 
 ## De dónde sale cada dibujo
 
@@ -109,7 +109,7 @@ puede pintar, para que nadie tenga que deducirlo abriendo `escenas/iconos.ts`:
 |---|---|---|---|
 | `limo`, `junco`, `piedra`, `grano` | Delapouite, game-icons.net | CC BY 3.0, **con atribución pendiente** | los `.svg` de esta carpeta |
 | Las nueve cartas del mazo | de la casa, dibujadas para Riberas | ninguna, es nuestro | `escenas/scripts/compilar-iconos.ts` |
-| `sal` | de la casa, dibujada y **sin activar** | ninguna, es nuestro | `escenas/scripts/compilar-iconos.ts` |
+| `sal` | de la casa, dibujada para Riberas | ninguna, es nuestro | `escenas/scripts/compilar-iconos.ts` |
 
 Los nueve dibujos de las cartas se escribieron en coordenadas y no como `.svg` a
 propósito, y el porqué está en la cabecera del compilador: un `.svg` suelto en una
@@ -118,24 +118,37 @@ estos cinco iconos ajenos llevan meses camino de producción sin su aviso. Un di
 escrito en código, con su cabecera al lado contando qué se ve y por qué, no admite esa
 duda.
 
-Son diez: nueve para el mazo y uno más, la sal, que es el bien que se quedó sin dibujo.
+Son diez: nueve para el mazo y uno más, la sal, que es el bien para el que no había ningún
+`.svg` que sirviera. Dibujo tiene —está aquí abajo, y encendida—: lo que no tenía era un
+original ajeno del que salir, como salen los otros cuatro.
 
-### La sal: dibujada, y por qué sigue apagada
+### La sal: encendida, y qué se decidió al encenderla
 
-Está dibujada —cuatro eras de evaporación en perspectiva y el montón recogido delante—,
-pero **fuera de `CONTORNOS_DEL_BIEN`**, en su propia constante `CONTORNOS_DE_LA_SAL`. Se
-puede ver, no se pinta. No es un olvido; son tres cosas:
+Está dibujada —cuatro eras de evaporación en perspectiva y el montón recogido delante— y
+ya reparte: vive **dentro de `CONTORNOS_DEL_BIEN`**, la última de los cinco, después de
+los cuatro que vienen de `.svg`.
 
-1. `escenas/scripts/verificar-escena.ts` **afirma hoy que la sal no tiene icono**, y esa
-   línea existe para que nadie «arregle» la sal emparejándole la oveja. Meter la sal en
-   el mapa sin cambiarla pone la batería en rojo.
-2. Encenderla son dos pasos y hay que darlos juntos: mover la entrada al mapa de los
-   bienes (una línea en el compilador) y dar la vuelta a esa comprobación, que es lo que
-   su propio comentario pide que se haga a mano.
-3. Y hay un motivo de arte que pesa más que los dos anteriores. Los otros cuatro bienes
-   siguen siendo de Delapouite. Una sal de la casa entre cuatro ajenos son **cinco iconos
-   de dos manos distintas** en la misma fila de la pantalla, que es justo lo que este
-   fichero avisa arriba que se nota más que ninguna otra cosa. La sal está lista para el
-   día en que se dibujen los otros cuatro; no para adelantar uno solo.
+Estuvo una temporada dibujada y **apagada**, fuera de ese mapa, para que encenderla fuera
+la decisión de alguien y no un efecto lateral de recompilar. El argumento para dejarla
+apagada era de arte y no era malo: una sal de la casa entre cuatro de Delapouite son
+**cinco iconos de dos manos distintas** en la misma fila de la pantalla, que es justo lo
+que este fichero avisa arriba que se nota más que ninguna otra cosa.
 
-Con eso, la deuda de esta carpeta queda dicha entera: **faltan cuatro**, no cinco.
+Se encendió porque el otro platillo pesa más. Las dos cosas no se leen igual: la mezcla
+de trazos se lee como cuatro provisionales a medio sustituir —que es exactamente lo que
+son—, y una carta sin dibujo se lee como un fallo del programa. Quien jugaba preguntó por
+la carta muda, no por el cambio de mano.
+
+Encenderla son **dos pasos y hay que darlos juntos**, y el segundo no lo puede dar el
+compilador:
+
+1. Mover la entrada al mapa de los bienes, que es una línea en
+   `escenas/scripts/compilar-iconos.ts` y regenerar `escenas/iconos.ts`. Hecho.
+2. Dar la vuelta en `escenas/scripts/verificar-escena.ts` a la comprobación «y `sal`
+   sigue SIN icono», que es lo que su propio comentario pide que se haga a mano. Mientras
+   esa línea siga diciendo lo contrario, la batería queda en rojo — que es para lo que se
+   escribió.
+
+Lo que esto NO cambia: los otros cuatro siguen siendo arte ajeno y provisional, y su
+condición para quedarse es la misma. La deuda de esta carpeta sigue dicha entera:
+**faltan cuatro**, no cinco.

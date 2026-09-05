@@ -9,9 +9,12 @@
  *
  * Los dos mapas tienen orígenes distintos, y conviene saber cuál se está tocando:
  *
- *  · `CONTORNOS_DEL_BIEN` sale de los `.svg` de `arte/game-icons/`. Es arte AJENO y
- *    PROVISIONAL —de Delapouite, game-icons.net, CC BY 3.0— y su condición para quedarse
- *    está en `arte/game-icons/LEEME.md`.
+ *  · `CONTORNOS_DEL_BIEN` es de dos manos, y hay que saberlo antes de tocarlo. Los cuatro
+ *    primeros —limo, junco, piedra, grano— salen de los `.svg` de `arte/game-icons/`: arte
+ *    AJENO y PROVISIONAL, de Delapouite, game-icons.net, CC BY 3.0, con su condición para
+ *    quedarse escrita en `arte/game-icons/LEEME.md`. La sal, la última, NO: está dibujada
+ *    en coordenadas dentro del compilador, como las cartas, porque ninguno de los iconos
+ *    ajenos significaba sal.
  *  · `CONTORNOS_DE_LA_CARTA` no sale de ningún fichero: está dibujado en coordenadas
  *    dentro del compilador, que es su original. Es de la casa.
  *
@@ -31,7 +34,13 @@
 /** El lienzo cuadrado en el que están dibujados todos. */
 export const LIENZO_DEL_ICONO = 512;
 
-/** Los contornos de cada bien, ya sin el rectángulo de fondo y ya aplanados. */
+/**
+ * Los contornos de cada bien, ya sin el rectángulo de fondo y ya aplanados.
+ *
+ * Los cuatro primeros vienen de `.svg` ajenos; `sal` está dibujada en el compilador y es
+ * de la casa. Se reparten por el mismo mapa a propósito: quien pinta una carta no tiene por
+ * qué saber de dónde salió el trazo.
+ */
 export const CONTORNOS_DEL_BIEN: Readonly<Record<string, readonly (readonly number[])[]>> = {
   limo: [
     [234,85.3,170.6,106.4,334.3,160.9,397.7,139.8,234,85.3],
@@ -126,6 +135,14 @@ export const CONTORNOS_DEL_BIEN: Readonly<Record<string, readonly (readonly numb
     [169.9,366.9,170.6,375.8,173.6,385,178.8,394.1,186.4,403.1,222.7,397.9,259.2,396.3,277.5,397.1,295.6,399,313.7,402,331.5,406.3,339.4,398.6,344.8,390.3,347.9,381.4,349.3,371.7,327.7,366.7,305.4,362.9,282.8,360.5,260,359.3,237.1,359.4,214.4,360.7,191.9,363.2,169.9,366.9],
     [254.3,414.2,227.3,415.5,228.6,474.7,224,446.7,217.4,416.5,199.4,419,206.6,451.6,211.4,481.1,228.6,479,228.4,487.4,246.4,487.8,246.7,466.6,259.4,466.4,259.8,489.4,277.8,488.6,277.6,452.9,279.8,415.2,254.3,414.2],
     [296.4,417.1,293.6,449.2,294.3,480.4,312.3,478.8,311.7,450.2,314.3,420.4,296.4,417.1],
+  ],
+  /** Cuatro eras de evaporación en perspectiva y, delante, el montón recogido. */
+  sal: [
+    [176,168,250,168,246,214,166,214],
+    [262,168,336,168,346,214,266,214],
+    [156,228,248,228,242,286,140,286],
+    [264,228,356,228,372,286,270,286],
+    [256,318,362,444,150,444],
   ],
 };
 
@@ -224,27 +241,3 @@ export const CONTORNOS_DE_LA_CARTA: Readonly<Record<string, readonly (readonly n
 
 /** Las cartas que tienen dibujo. Sirve para comprobar que no falta ninguna. */
 export const CARTAS_CON_ICONO: readonly string[] = Object.keys(CONTORNOS_DE_LA_CARTA);
-
-/**
- * LA SAL, DIBUJADA Y FUERA DEL MAPA DE LOS BIENES A PROPÓSITO.
- *
- * Cuatro eras de evaporación en perspectiva y, delante, el montón recogido.
- *
- * `sal` es el único bien sin icono, y no por descuido: el provisional que le tocaba era
- * una oveja de otro juego, y enseñar un bien que no se tiene en la pantalla con la que se
- * decide qué ofrecer es peor que no enseñar nada. Está contado en
- * `arte/game-icons/LEEME.md` y afirmado en `escenas/scripts/verificar-escena.ts`, que
- * hoy comprueba que `sal` NO tiene icono.
- *
- * Así que aquí está dibujada pero NO en `CONTORNOS_DEL_BIEN`: meterla sin más pone la
- * batería en rojo, porque esa comprobación está escrita para que activar la sal sea una
- * decisión de alguien y no un efecto lateral de recompilar. Los pasos, y hay que darlos
- * juntos, están en el compilador, encima de este dibujo.
- */
-export const CONTORNOS_DE_LA_SAL: readonly (readonly number[])[] = [
-    [176,168,250,168,246,214,166,214],
-    [262,168,336,168,346,214,266,214],
-    [156,228,248,228,242,286,140,286],
-    [264,228,356,228,372,286,270,286],
-    [256,318,362,444,150,444],
-];

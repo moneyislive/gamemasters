@@ -11,7 +11,7 @@
  * fallo sería SILENCIOSO — lo que no se cae, no lanza y no se ve hasta que
  * alguien lleva media partida.
  *
- * Son siete cosas y las siete tienen esa forma:
+ * Son ocho cosas y las ocho tienen esa forma:
  *
  *  1. LA CANONICALIZACIÓN. Un vértice de una malla hexagonal tiene TRES nombres y
  *     una arista DOS. Si no se normalizan, la regla de distancia dirá que está
@@ -36,6 +36,15 @@
  *     se sortea al comprar en vez de barajarse al empezar da partidas distintas con
  *     el mismo diario — ése no rompe el juego, rompe `reejecutarEn` y con él el
  *     motor entero.
+ *  8. DE QUÉ COLOR SE VE CADA ISLA, que llegó el último y por la peor puerta: se
+ *     descubrió jugando. Es el fallo más silencioso de todos porque el programa
+ *     funciona perfectamente — las cartas salen del color que les toca según una
+ *     tabla que sencillamente decía otra cosa que el tablero. Se comprueba como
+ *     regla y no como lista: cada isla se ve como el terreno que da su mismo bien,
+ *     el plano y la carta cuentan lo mismo, los seis del plano se distinguen entre
+ *     sí, ninguno se traga las piezas de un colono y ninguna pareja de islas sale de
+ *     la misma celda del atlas — que es lo que decide el tablero de tres dimensiones
+ *     y lo que ninguna de las tres primeras podía ver.
  *
  * ═══ Y LAS VACUNAS, QUE NO SON ADORNO ═══
  *
@@ -113,11 +122,35 @@ import {
   recalcularElVado,
   recalcularLaGuardia,
   RIBERAS,
+  tableroDeRiberas,
   TIRAR,
   VADO_MINIMO,
   VEREDAS_DE_LA_CARTA,
   TOPE_DE_PIEZAS,
 } from '../../shared/arcade/juegos';
+/*
+ * `RINDE` NO SALE POR LA PUERTA COMÚN, y se pide aquí por su nombre entero.
+ *
+ * `shared/arcade/juegos/index.ts` es la puerta por la que los muebles genéricos conocen a
+ * los juegos, y ahí dentro un nombre como `RINDE` no dice de quién es —La Ronda también
+ * reparte cosas—. Lo que este bloque necesita es una tabla concreta de un juego concreto,
+ * así que se pide donde vive, igual que `riberas-en-3d` unas líneas más abajo.
+ */
+import { RINDE } from '../../shared/arcade/juegos/riberas';
+/*
+ * Y LA PALETA DE LA ESCENA, que es la mitad que hay que contrastar.
+ *
+ * `escenas/paleta.ts` es aritmética y datos: sin `three`, sin React y sin JSX —por eso está
+ * fuera de `delta.tsx`, y lo cuenta su propia cabecera— así que un guion de Node la puede
+ * abrir. Es el mismo permiso con el que `verify:riberas-en-tres` abre `escenas/cartas.ts`.
+ */
+import {
+  colorDelBien,
+  colorDeTerreno,
+  terrenoDe,
+  TERRENO_DEL_BIEN,
+} from '../../escenas/paleta';
+import type { Terreno as TerrenoPintado } from '../../escenas/paleta';
 import type {
   Bien,
   CartaDeRiberas,
@@ -2144,6 +2177,515 @@ paso('Una partida guardada ANTES del mazo se sigue abriendo');
     );
   }
 }
+// ---------------------------------------------------------------------------
+paso('Cada isla se ve del bien que da, y los dos tableros cuentan lo mismo');
+// ---------------------------------------------------------------------------
+
+/*
+ * ═══ EL FALLO QUE ESTE BLOQUE COMPRA, Y CÓMO SE VEÍA ═══
+ *
+ * Riberas tiene DOS tableros: el de tres dimensiones, que pinta `escenas/`, y el plano en
+ * SVG que declara `tableroDeRiberas` aquí abajo y que es el que se juega en el móvil y
+ * cuando el otro no arranca. Y tiene una tercera superficie que sale del mismo sitio: el
+ * color de las cartas de la mano, que `escenas/paleta.ts` deriva del terreno.
+ *
+ * Al unificar el vocabulario al de Riberas, las tres se pintaron por el NOMBRE del terreno
+ * en vez de por el BIEN que produce. Una marisma verdosa porque las marismas son agua
+ * estancada, una salina blanquecina porque la sal se seca al sol. Cada decisión, por
+ * separado, defendible; juntas, ilegibles: la carta de junco —la madera de este juego—
+ * salía verde claro y la de sal blanquecina, mientras el tablero pintaba de verde tanto el
+ * carrizal como la marisma, que es la que da el ladrillo.
+ *
+ * Nada se cayó. Ningún comprobador se puso rojo: `verify:escena` miraba que los doce
+ * terrenos TUVIERAN color y que la celda cayera dentro del atlas, que es exactamente el
+ * verde que no dice nada sobre si el color es el que toca. Se descubrió jugando.
+ *
+ * ═══ QUÉ SE AFIRMA AQUÍ, Y POR QUÉ SON REGLAS Y NO UNA LISTA DE SEIS COLORES ═══
+ *
+ * Una lista de seis colores esperados se actualiza con el fallo dentro: quien retoca un
+ * verde retoca la lista, y el comprobador felicita al cambio que acaba de romper la
+ * lectura. Así que se afirman CINCO REGLAS que sobreviven a cualquier retoque:
+ *
+ *  1. Que cada terreno de Riberas se ve como el terreno del vocabulario clásico que rinde
+ *     SU MISMO BIEN. La correspondencia no se copia de la paleta: sale de `RINDE`, que es
+ *     la regla de verdad. Si mañana la marisma pasara a rendir junco, esto exigiría que la
+ *     marisma se pintase de bosque.
+ *  2. Que el color plano de cada isla está MÁS CERCA del color que la paleta le da a ESE
+ *     terreno —el de su CARTA— que del que le da a cualquiera de los otros cinco. No se
+ *     exige el mismo hexadecimal —el plano necesita más contraste entre polígonos vecinos,
+ *     y está razonado donde vive la tabla— pero sí que quien mire una carta y busque su
+ *     isla la encuentre.
+ *  3. Que los seis colores del plano se distinguen entre sí, y del borde que declaran las
+ *     propias caras y del suelo de la Sala, por una distancia medida. El fallo que se vio
+ *     era literalmente dos terrenos que se parecían demasiado.
+ *  4. Que ninguna isla se COME UNA PIEZA: cada relleno se separa de los seis colores con
+ *     los que se pintan chozas, torres y veredas. Ésta faltaba, y por eso las piezas del
+ *     colono amarillo desaparecían sobre la vega con las tres primeras en verde.
+ *  5. Que dos islas no salen de la MISMA CELDA DEL ATLAS, que es lo único que decide el
+ *     aspecto de un hexágono en el tablero de tres dimensiones. Ésta también faltaba, y su
+ *     ausencia dejó pasar en verde un arreglo del tablero plano que hizo indistinguibles la
+ *     salina y la vega en el otro.
+ *
+ * Y las cinco se ven fallar: cada una se vuelve a correr con los datos de ANTES, que están
+ * copiados aquí para eso. Una comprobación que sólo se ha ejecutado con los datos buenos no
+ * se ha visto fallar nunca — y las dos últimas existen precisamente porque las tres
+ * primeras pasaban en verde con el fallo delante.
+ */
+{
+  /*
+   * LA DISTANCIA SE MIDE EN CIELAB Y NO EN RGB, y no es refinamiento.
+   *
+   * En RGB, `#3f6d5a` y `#6d8f3f` —el verde azulado de la marisma de antes y el verde del
+   * carrizal— están a 68 unidades, más lejos que muchos pares que sí se distinguen. El ojo
+   * los ve casi iguales porque el verde pesa el doble que el rojo y seis veces más que el
+   * azul, y RGB no lo sabe. CIE76 es la fórmula más simple que sí: se convierte a un
+   * espacio donde una unidad de distancia es aproximadamente una unidad de «se nota», y se
+   * mide en línea recta. No es perfecta —CIEDE2000 lo hace mejor con azules saturados— pero
+   * el umbral que hace falta aquí es grueso y no vale la pena la aritmética de la otra.
+   */
+  function aLab(hex: string): [number, number, number] {
+    const canal = (i: number): number => parseInt(hex.slice(1 + i * 2, 3 + i * 2), 16) / 255;
+    const lineal = (c: number): number => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+    const r = lineal(canal(0));
+    const v = lineal(canal(1));
+    const a = lineal(canal(2));
+    /* D65, el blanco de referencia de sRGB. */
+    const x = (r * 0.4124 + v * 0.3576 + a * 0.1805) / 0.95047;
+    const y = r * 0.2126 + v * 0.7152 + a * 0.0722;
+    const z = (r * 0.0193 + v * 0.1192 + a * 0.9505) / 1.08883;
+    const f = (t: number): number => (t > 0.008856 ? Math.cbrt(t) : 7.787 * t + 16 / 116);
+    return [116 * f(y) - 16, 500 * (f(x) - f(y)), 200 * (f(y) - f(z))];
+  }
+  function distancia(uno: string, otro: string): number {
+    const a = aLab(uno);
+    const b = aLab(otro);
+    return Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+  }
+
+  /*
+   * De qué terreno del vocabulario clásico sale cada bien de Riberas, DICHO AQUÍ.
+   *
+   * Es la traducción entre los dos vocabularios y es el único dato de este bloque que se
+   * escribe a mano: el junco es la madera, el limo el ladrillo, la sal ocupa el sitio de la
+   * lana, el grano es el grano y la piedra el mineral. Se escribe aquí, y no se importa de
+   * la paleta, porque un comprobador que lea su respuesta del fichero que comprueba no
+   * comprueba nada. Éste es el segundo testigo.
+   */
+  const CLASICO_QUE_DA_LO_MISMO: Readonly<Record<string, string>> = {
+    junco: 'bosque',
+    limo: 'colina',
+    sal: 'pradera',
+    grano: 'campo',
+    piedra: 'montana',
+  };
+
+  /* Y el que no rinde nada se ve como el que no rinde nada. */
+  const SIN_BIEN = 'desierto';
+
+  function desparejados(comoSeVe: (terreno: string) => TerrenoPintado): string[] {
+    const malos: string[] = [];
+    for (const [terreno, bien] of Object.entries(RINDE)) {
+      const clasico = bien === null ? SIN_BIEN : CLASICO_QUE_DA_LO_MISMO[bien];
+      if (clasico === undefined) {
+        malos.push(`${terreno} rinde ${bien}, que no tiene terreno clásico en esta tabla`);
+        continue;
+      }
+      const aqui = comoSeVe(terreno);
+      const alli = terrenoDe(clasico);
+      if (aqui.color !== alli.color) malos.push(`${terreno} ${aqui.color} != ${clasico} ${alli.color}`);
+      if (aqui.celda[0] !== alli.celda[0] || aqui.celda[1] !== alli.celda[1]) {
+        malos.push(`${terreno} celda ${aqui.celda.join(',')} != ${clasico} ${alli.celda.join(',')}`);
+      }
+    }
+    return malos;
+  }
+
+  comprobar('los seis terrenos de Riberas rinden lo que rinden y no se ha perdido ninguno', Object.keys(RINDE).length === 6, Object.keys(RINDE));
+  comprobar(
+    'cada terreno se ve —color y celda— como el terreno clásico que da su mismo bien',
+    desparejados(terrenoDe).length === 0,
+    desparejados(terrenoDe),
+  );
+
+  /*
+   * LA VACUNA: los seis de ANTES, tal como estaban escritos, tienen que fallar esto.
+   *
+   * Sin esto, la comprobación de arriba diría lo mismo si `RINDE` se quedara vacía o si
+   * `terrenoDe` devolviera siempre el terreno de reserva.
+   */
+  const COMO_ESTABAN: Readonly<Record<string, TerrenoPintado>> = {
+    marisma: { color: '#6a7f4f', celda: [7, 1] },
+    carrizal: { color: '#93a15a', celda: [4, 1] },
+    salina: { color: '#d8cfa8', celda: [5, 2] },
+    cantil: { color: '#8a8f96', celda: [3, 0] },
+    vega: { color: '#c8a44e', celda: [0, 2] },
+    duna: { color: '#e2d3a8', celda: [3, 2] },
+  };
+  const fallosDeAntes = desparejados((t) => COMO_ESTABAN[t] ?? terrenoDe(t));
+  comprobar(
+    'y se ve fallar: la paleta de antes desparejaba los seis',
+    fallosDeAntes.length >= 6,
+    fallosDeAntes,
+  );
+
+  /*
+   * QUE LA ESCENA DIGA DE VERDAD LO QUE DICEN LAS REGLAS.
+   *
+   * `TERRENO_DEL_BIEN` es `RINDE` copiada a mano en `escenas/paleta.ts`, porque la escena
+   * no puede importar las reglas. Su propia cabecera avisa de la consecuencia —«si un día
+   * cambia qué rinde una marisma, esto no se entera»— y hasta ahora nadie las comparaba
+   * valor a valor: sólo que las cinco llaves estuvieran.
+   */
+  const invertida: string[] = [];
+  for (const [terreno, bien] of Object.entries(RINDE)) {
+    if (bien === null) continue;
+    if (TERRENO_DEL_BIEN[bien] !== terreno) invertida.push(`${bien}: la escena dice ${String(TERRENO_DEL_BIEN[bien])} y las reglas ${terreno}`);
+  }
+  comprobar('la tabla de bienes de la escena es `RINDE` del derecho', invertida.length === 0, invertida);
+  comprobar(
+    'y no le sobra ningún bien que este juego no reparta',
+    Object.keys(TERRENO_DEL_BIEN).length === Object.values(RINDE).filter((b) => b !== null).length,
+    Object.keys(TERRENO_DEL_BIEN),
+  );
+
+  /*
+   * LAS CINCO CARTAS DE LA MANO, una a una y con el color dicho en palabras.
+   *
+   * El color de una carta sale del terreno de su bien, así que arreglar la paleta las
+   * arregla solas — y por eso conviene que estén escritas: esto es lo que se miró jugando y
+   * lo que hay que poder volver a mirar sin abrir una ventana.
+   */
+  const CARTAS_QUE_SE_MIRAN: ReadonlyArray<readonly [string, string, string]> = [
+    ['junco', 'bosque', 'verde oscuro'],
+    ['limo', 'colina', 'arcilla rojiza'],
+    ['sal', 'pradera', 'verde claro'],
+    ['grano', 'campo', 'amarillo de sembrado'],
+    ['piedra', 'montana', 'gris'],
+  ];
+  for (const [bien, clasico, comoSeLlama] of CARTAS_QUE_SE_MIRAN) {
+    comprobar(
+      `la carta de ${bien} sale ${comoSeLlama}, que es el color de ${clasico}`,
+      colorDelBien(bien) === colorDeTerreno(clasico),
+      { carta: colorDelBien(bien), terreno: colorDeTerreno(clasico) },
+    );
+  }
+
+  /* ═══ Y AHORA EL TABLERO PLANO, SACADO DE UNA PARTIDA DE VERDAD ═══ */
+
+  /*
+   * Se pide por la misma puerta por la que lo pide el móvil —`tableroDeRiberas` sobre una
+   * vista proyectada— y no leyendo la tabla de colores. Así lo que se mide es lo que se ve:
+   * si mañana alguien pinta las islas desde otro sitio, esto lo sigue mirando.
+   */
+  const repartido = avanzarRiberas(undefined, { tipo: EMPEZAR_RIBERAS, carga: {} }, { quien: 'A', azar: 31, tic: 0, asientos: ['A', 'B'] });
+  const caras = tableroDeRiberas(proyectarRiberas(repartido, 'A'), 'A').caras;
+  const enElPlano = new Map<string, string>();
+  for (const cara of caras) enElPlano.set(cara.rotulo.toLowerCase(), cara.relleno);
+
+  comprobar(
+    'el delta repartido enseña los seis terrenos, o lo de abajo no mira nada',
+    Object.keys(RINDE).every((t) => enElPlano.has(t)) && enElPlano.size === 6,
+    [...enElPlano.entries()],
+  );
+
+  /*
+   * REGLA 2: cada color plano está más cerca del COLOR QUE LA PALETA LE DA A SU TERRENO que
+   * del que le da a cualquier otro. Es un argmin y no un umbral: permite retocar el tono todo
+   * lo que haga falta y prohíbe cambiar de qué terreno se está hablando.
+   *
+   * ═══ QUÉ MIDE ESTO EXACTAMENTE, QUE NO ES EL TABLERO DE TRES DIMENSIONES ═══
+   *
+   * Aquí ponía «más cerca del color en tres dimensiones de SU terreno», y era falso de una
+   * forma cara. `colorDeTerreno` devuelve el campo `color` de `escenas/paleta.ts`, y ese
+   * campo NO llega a ninguna tesela: en el mundo, el aspecto de un hexágono lo decide
+   * únicamente su CELDA del atlas —`delta.tsx` clona la tesela de hierba y le mueve las UV—
+   * y nadie lee `color` para pintar suelo. Donde `color` sí se usa es en la CARTA de un bien
+   * (`colorDelBien`) y como reserva cuando no hay textura.
+   *
+   * O sea que esta regla contrasta el tablero plano contra las CARTAS, que es una cosa buena
+   * y necesaria —son las dos superficies entre las que hay que poder mirar—, pero no dice
+   * absolutamente nada del tablero de tres dimensiones. Y esa confusión ya costó: la colisión
+   * de celdas entre la salina y la vega pasó por debajo en verde, con esta regla informando
+   * de treinta y tres unidades de separación entre dos hexágonos que en pantalla eran el
+   * mismo píxel. Quien de verdad mira el mundo es la REGLA 5, aquí abajo.
+   */
+  function seConfundeCon(plano: Map<string, string>): string[] {
+    const confundidos: string[] = [];
+    for (const [terreno, color] of plano) {
+      let masCerca = terreno;
+      let minimo = Infinity;
+      for (const otro of plano.keys()) {
+        const d = distancia(color, colorDeTerreno(otro));
+        if (d < minimo) {
+          minimo = d;
+          masCerca = otro;
+        }
+      }
+      if (masCerca !== terreno) confundidos.push(`el ${terreno} del plano se parece más al ${masCerca} de la escena`);
+    }
+    return confundidos;
+  }
+  comprobar(
+    'en el plano, cada isla se parece a su propio terreno del tablero en tres dimensiones',
+    seConfundeCon(enElPlano).length === 0,
+    seConfundeCon(enElPlano),
+  );
+
+  /*
+   * REGLA 3: y los seis se distinguen entre sí. El umbral son 25 unidades de CIE76 — muy por
+   * encima del «se nota si están pegados», que ronda 2, y por debajo de lo que hay hoy, que
+   * es 37. El hueco es a propósito: esto no es para afinar el arte, es para que dos terrenos
+   * no vuelvan a acabar del mismo color sin que nadie lo vea.
+   */
+  const CUANTO_SE_TIENEN_QUE_SEPARAR = 25;
+  function demasiadoParecidos(plano: Map<string, string>): string[] {
+    const juntos: string[] = [];
+    const llaves = [...plano.keys()];
+    for (let i = 0; i < llaves.length; i++) {
+      for (let j = i + 1; j < llaves.length; j++) {
+        const uno = llaves[i] as string;
+        const otro = llaves[j] as string;
+        const d = distancia(plano.get(uno) as string, plano.get(otro) as string);
+        if (d < CUANTO_SE_TIENEN_QUE_SEPARAR) juntos.push(`${uno}/${otro}: ${d.toFixed(1)}`);
+      }
+    }
+    return juntos;
+  }
+  comprobar(
+    'y los seis colores del tablero plano se distinguen entre sí',
+    demasiadoParecidos(enElPlano).length === 0,
+    demasiadoParecidos(enElPlano),
+  );
+
+  /*
+   * LAS DOS VACUNAS DEL PLANO, con los seis colores que Miguel vio en la pantalla.
+   *
+   * El verde azulado de la marisma —que da el ladrillo— cae del lado del carrizal y del
+   * bosque, y la salina parda cae del lado de la duna. Los dos son exactamente el fallo que
+   * se reportó, y con estas dos líneas queda escrito que las reglas de arriba lo cazan.
+   */
+  const PLANO_DE_ANTES = new Map<string, string>([
+    ['marisma', '#3f6d5a'],
+    ['carrizal', '#6d8f3f'],
+    ['salina', '#8f8a6d'],
+    ['cantil', '#6a6a72'],
+    ['vega', '#b09a3f'],
+    ['duna', '#8a7a5c'],
+  ]);
+  comprobar(
+    'se ve fallar: el tablero plano de antes confundía islas con terrenos que no eran',
+    seConfundeCon(PLANO_DE_ANTES).length > 0,
+    seConfundeCon(PLANO_DE_ANTES),
+  );
+  comprobar(
+    'y se ve fallar la otra: el de antes tenía colores que no se separaban',
+    demasiadoParecidos(PLANO_DE_ANTES).length > 0,
+    demasiadoParecidos(PLANO_DE_ANTES),
+  );
+
+  /*
+   * ═══ REGLA 3 BIS: NI DEL BORDE QUE LA PROPIA CARA DECLARA, NI DEL SUELO DE LA SALA ═══
+   *
+   * La regla de arriba mide los seis rellenos ENTRE SÍ y ahí se para, y es el mismo hueco de
+   * vigilancia que este bloque entero existe para tapar: un relleno también tiene detrás el
+   * suelo de la Sala y encima el trazo con el que se dibuja su propio contorno, y un terreno
+   * que se funda con cualquiera de los dos deja de ser un hexágono y pasa a ser un agujero.
+   * Hoy pasan de sobra —42,2 el más apretado contra el borde, 51,5 contra el suelo— y por eso
+   * conviene escribirlo ahora: es barato mientras nadie lo esté rompiendo.
+   *
+   * El borde NO se escribe aquí como literal: se lee de `caras[0].borde`, que es el que la
+   * cara declara y el que el mueble pinta. Con un literal, el día que Riberas cambie su
+   * contorno esta comprobación seguiría verde midiendo un color que ya no existe — que es
+   * exactamente la forma del fallo que el resto del bloque persigue.
+   */
+  const bordeDeclarado = caras[0]?.borde ?? '';
+  comprobar(
+    'las caras declaran el borde con el que se dibujan, y es un color leíble',
+    /^#[0-9a-f]{6}$/i.test(bordeDeclarado),
+    bordeDeclarado,
+  );
+  comprobar(
+    'y las diecinueve declaran el mismo, o «el borde» no significaría nada',
+    caras.length === 19 && caras.every((c) => c.borde === bordeDeclarado),
+    [...new Set(caras.map((c) => c.borde))],
+  );
+
+  /*
+   * El suelo de la Sala SÍ va como literal, y es una decisión distinta: `--suelo` es una
+   * variable de CSS de los dos clientes y este guion no tiene hoja de estilos que abrir. Va
+   * escrito con su procedencia —`escritorio/src/estilo.css`, `--suelo: #080a0e`— y es la
+   * misma copia que ya lleva la cabecera de `COLOR_DEL_TERRENO`.
+   */
+  const SUELO_DE_LA_SALA = '#080a0e';
+  function seFundeConElFondo(plano: Map<string, string>): string[] {
+    const fundidos: string[] = [];
+    for (const [terreno, color] of plano) {
+      const alBorde = distancia(color, bordeDeclarado);
+      if (alBorde < CUANTO_SE_TIENEN_QUE_SEPARAR) fundidos.push(`${terreno}/borde: ${alBorde.toFixed(1)}`);
+      const alSuelo = distancia(color, SUELO_DE_LA_SALA);
+      if (alSuelo < CUANTO_SE_TIENEN_QUE_SEPARAR) fundidos.push(`${terreno}/suelo: ${alSuelo.toFixed(1)}`);
+    }
+    return fundidos;
+  }
+  comprobar(
+    'ninguna isla se funde con su propio borde ni con el suelo de la Sala',
+    seFundeConElFondo(enElPlano).length === 0,
+    seFundeConElFondo(enElPlano),
+  );
+  /*
+   * LA VACUNA: un terreno pintado del color de su propio contorno tiene que caer. Sin ella,
+   * `seFundeConElFondo` diría lo mismo si `bordeDeclarado` llegara vacío y `distancia`
+   * devolviera `NaN` —que no es menor que nada, así que la lista saldría vacía y la
+   * comprobación de arriba pasaría en verde sin haber comparado un solo par.
+   */
+  const PLANO_CON_UNA_ISLA_INVISIBLE = new Map(enElPlano);
+  PLANO_CON_UNA_ISLA_INVISIBLE.set('cantil', bordeDeclarado);
+  comprobar(
+    'se ve fallar: una isla pintada del color de su contorno no es un hexágono',
+    seFundeConElFondo(PLANO_CON_UNA_ISLA_INVISIBLE).some((f) => f.startsWith('cantil/borde')),
+    seFundeConElFondo(PLANO_CON_UNA_ISLA_INVISIBLE),
+  );
+
+  /*
+   * ═══ REGLA 4: UNA ISLA NO PUEDE COMERSE UNA PIEZA. ES LA QUE FALTABA ═══
+   *
+   * Todo lo de arriba vigila que dos ISLAS no se confundan entre sí. Ninguna vigilaba lo
+   * otro que pasa sobre un tablero: que encima de cada isla se pintan las CHOZAS, las TORRES
+   * y las VEREDAS de quien las tiene, y ésas van del color de su dueño con un filo de un
+   * píxel que no promete contraste contra nada.
+   *
+   * Y ya había pasado. La vega estaba en `#e3b53a`; el tercer color de colono es `#e0b83d`.
+   * Son 2,9 CIE76 —«se nota si están pegados» ronda 2— así que en cualquier partida de tres
+   * o más, las piezas de quien jugara en amarillo desaparecían sobre las islas de vega. Con
+   * la marisma y el rojo pasaba lo mismo más flojo: 16,5. Las dos tablas viven en el mismo
+   * fichero, a cuarenta líneas la una de la otra, y nadie las había comparado nunca.
+   *
+   * El umbral son 20 y no 25 como el de isla-contra-isla, y el hueco tiene su motivo: los
+   * seis colores de colono están repartidos por toda la rueda a propósito —para que se
+   * distingan ENTRE ELLOS— así que encierran a los seis rellenos por todos los lados a la
+   * vez, y pedir 25 obligaría a llevarse la vega a un naranja de señal que ya no es un
+   * sembrado. Con 20 el par más apretado de hoy son 27,0 y sigue habiendo margen de retoque.
+   *
+   * Los colores de las piezas se piden por la puerta por la que se pintan —una mesa de SEIS,
+   * proyectada, leyendo `colonos[i].color`— y no leyendo la tabla: así lo que se mide es lo
+   * que ve quien juega, y una mesa que repartiera mal los colores se cazaría aquí.
+   */
+  const SEIS = ['A', 'B', 'C', 'D', 'E', 'F'];
+  const conSeis = avanzarRiberas(undefined, { tipo: EMPEZAR_RIBERAS, carga: {} }, { quien: 'A', azar: 77, tic: 0, asientos: SEIS });
+  const coloresDePieza = (
+    proyectarRiberas(conSeis, 'A') as unknown as { colonos: { color: string }[] }
+  ).colonos.map((c) => c.color);
+  comprobar(
+    'una mesa de seis reparte seis colores de pieza distintos, o lo de abajo mira de menos',
+    coloresDePieza.length === 6 && new Set(coloresDePieza).size === 6,
+    coloresDePieza,
+  );
+
+  const CUANTO_SE_SEPARA_DE_UNA_PIEZA = 20;
+  function seComeUnaPieza(plano: Map<string, string>, piezas: readonly string[]): string[] {
+    const comidas: string[] = [];
+    for (const [terreno, color] of plano) {
+      for (const pieza of piezas) {
+        const cuanto = distancia(color, pieza);
+        if (cuanto < CUANTO_SE_SEPARA_DE_UNA_PIEZA) comidas.push(`${terreno} ${color} se come al colono ${pieza}: ${cuanto.toFixed(1)}`);
+      }
+    }
+    return comidas;
+  }
+  comprobar(
+    'ninguna isla se come las piezas de ningún colono',
+    seComeUnaPieza(enElPlano, coloresDePieza).length === 0,
+    seComeUnaPieza(enElPlano, coloresDePieza),
+  );
+
+  /*
+   * LA VACUNA, con los dos rellenos de ANTES y los colonos de HOY: los que Miguel tenía
+   * delante. Tiene que caer, y tiene que caer por los dos sitios que se reportaron — no basta
+   * con que la lista no esté vacía, porque una lista con un solo par sería verde para una
+   * regla que sólo mirase el amarillo.
+   */
+  const PLANO_ANTES_DE_APARTAR_LAS_PIEZAS = new Map(enElPlano);
+  PLANO_ANTES_DE_APARTAR_LAS_PIEZAS.set('vega', '#e3b53a');
+  PLANO_ANTES_DE_APARTAR_LAS_PIEZAS.set('marisma', '#c05a2c');
+  const loQueSeComia = seComeUnaPieza(PLANO_ANTES_DE_APARTAR_LAS_PIEZAS, coloresDePieza);
+  comprobar(
+    'se ve fallar: la vega de antes era el amarillo del tercer colono',
+    loQueSeComia.some((f) => f.startsWith('vega')),
+    loQueSeComia,
+  );
+  comprobar(
+    'y también la marisma contra el rojo del primero, que es el mismo fallo más flojo',
+    loQueSeComia.some((f) => f.startsWith('marisma')),
+    loQueSeComia,
+  );
+
+  /*
+   * ═══ REGLA 5: DOS ISLAS NO SON LA MISMA TESELA. ES LO QUE DE VERDAD DECIDE EL MUNDO ═══
+   *
+   * Lo que hace que un hexágono se vea de un color en tres dimensiones NO es ningún
+   * hexadecimal: es a qué CELDA del atlas apuntan las UV de su suelo. `delta.tsx` clona la
+   * tesela de hierba del pack y le suma el desplazamiento hasta la celda del bioma, y no lee
+   * `color` para ninguna tesela ni planta nada por terreno. Así que dos terrenos con la misma
+   * celda son, literalmente, el mismo píxel — y las reglas 1 a 3, que sólo miran colores, no
+   * pueden verlo.
+   *
+   * No es hipotético. Al emparejar cada terreno de Riberas con el clásico que rinde su mismo
+   * bien, el campo se quedó con la celda de la hierba —la misma que la pradera— y con eso la
+   * SALINA y la VEGA pasaron a ser indistinguibles en el mundo, después de que la salina
+   * llevara toda su vida con celda propia. El tablero plano se arregló y el otro se rompió,
+   * en verde y en el mismo cambio.
+   *
+   * ═══ Y POR QUÉ LA DUNA NO NECESITA EXCEPCIÓN, AUNQUE COMPARTA ARENA ═══
+   *
+   * La duna sale de la celda (4,2), que es exactamente la misma mancha de la que salen las
+   * riberas de los ríos y las playas de los lagos: está medido en `CELDA_DE_LA_ARENA`, y es
+   * a propósito —una playa y una duna del mismo delta tienen que ser la misma arena, no dos
+   * beiges que casi casan. Pero eso NO es dos terrenos de Riberas compartiendo celda: la
+   * ribera no es un terreno, es un adorno del relieve, y no lleva número ni rinde nada. Esta
+   * regla mira los seis de `RINDE` y sólo ésos, así que no hay excepción que escribir.
+   */
+  function sonLaMismaTesela(celdaDe: (terreno: string) => readonly [number, number]): string[] {
+    const dueno = new Map<string, string>();
+    const chocan: string[] = [];
+    for (const terreno of Object.keys(RINDE)) {
+      const celda = celdaDe(terreno);
+      const llave = `${String(celda[0])},${String(celda[1])}`;
+      const antes = dueno.get(llave);
+      if (antes === undefined) dueno.set(llave, terreno);
+      else chocan.push(`${antes} y ${terreno} son la misma tesela: celda ${llave}`);
+    }
+    return chocan;
+  }
+  const comoSeVeElMundo = (terreno: string): readonly [number, number] => terrenoDe(terreno).celda;
+  comprobar(
+    'en el tablero de tres dimensiones, dos islas nunca salen de la misma celda del atlas',
+    sonLaMismaTesela(comoSeVeElMundo).length === 0,
+    sonLaMismaTesela(comoSeVeElMundo),
+  );
+  comprobar(
+    'y las seis celdas caen dentro del atlas de ocho por cuatro del pack',
+    Object.keys(RINDE).every((t) => {
+      const [columna, fila] = comoSeVeElMundo(t);
+      return Number.isInteger(columna) && Number.isInteger(fila) && columna >= 0 && columna < 8 && fila >= 0 && fila < 4;
+    }),
+    Object.keys(RINDE).map((t) => `${t} ${comoSeVeElMundo(t).join(',')}`),
+  );
+  /*
+   * LA VACUNA: el reparto de celdas de ANTES, con el campo —y por tanto la vega— en la celda
+   * de la hierba, que es la de la pradera y por tanto la de la salina. Es el fallo exacto que
+   * pasó en verde, y esta línea es la única de todo el fichero que se pone roja si alguien lo
+   * repite.
+   */
+  const CELDA_DE_LA_HIERBA_MEDIDA: readonly [number, number] = [0, 2];
+  const comoSeVeiaAntes = (terreno: string): readonly [number, number] =>
+    terreno === 'vega' ? CELDA_DE_LA_HIERBA_MEDIDA : terrenoDe(terreno).celda;
+  comprobar(
+    'se ve fallar: con la vega en la celda de la hierba, salina y vega eran el mismo píxel',
+    sonLaMismaTesela(comoSeVeiaAntes).some((f) => f.includes('salina') && f.includes('vega')),
+    sonLaMismaTesela(comoSeVeiaAntes),
+  );
+}
+
 /**
  * EL GUARDIA DE «NO SE HAN HECHO TODAS», que este guion no tenia.
  *
@@ -2155,7 +2697,7 @@ paso('Una partida guardada ANTES del mazo se sigue abriendo');
  * El numero va a mano y hay que subirlo al anadir comprobaciones. Ese es el precio, y es
  * barato al lado de un verde que no ha comprobado nada.
  */
-const COMPROBACIONES_ESCRITAS = 269;
+const COMPROBACIONES_ESCRITAS = 296;
 if (hechas < COMPROBACIONES_ESCRITAS) {
   console.error(
     `Solo se han hecho ${hechas} de las ${COMPROBACIONES_ESCRITAS} comprobaciones que ` +
@@ -2174,7 +2716,12 @@ if (fallos.length === 0) {
       '  Y el mazo: veinticinco cartas barajadas una vez con la semilla de la mesa, una carta que no se\n' +
       '  juega el turno que se compra, una por turno, la guardia que roba a ciegas, el acaparamiento que\n' +
       '  se lleva todos los de un bien y ninguno más, las dos veredas que son dos, y un título que sólo\n' +
-      '  suma en público cuando se enseña — con La Mayor Guardia al tercero y sólo si se supera.',
+      '  suma en público cuando se enseña — con La Mayor Guardia al tercero y sólo si se supera.\n' +
+      '  Y cada isla se ve del bien que da: el carrizal como el bosque porque su junco es la madera, la\n' +
+      '  marisma como la colina porque su limo es el ladrillo — en el tablero plano, en el de tres\n' +
+      '  dimensiones y en la carta, con los seis colores del plano separados lo bastante para no\n' +
+      '  confundirse entre ellos, para no tragarse las piezas de ningún colono y para que no haya dos\n' +
+      '  islas que salgan de la misma celda del atlas, que es lo que de verdad decide el mundo.',
   );
   process.exit(0);
 }

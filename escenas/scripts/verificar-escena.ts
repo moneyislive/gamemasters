@@ -855,13 +855,11 @@ paso('La mano se agrupa por bien, cabe, asoma y el imán reparte');
    * arregle» emparejándole la oveja que sobra: si aparece un icono para `sal`, tiene que
    * ser porque alguien lo ha dibujado, y entonces esta línea se cambia a mano.
    */
-  const sinIcono = ['limo', 'junco', 'piedra', 'grano'].filter(
-    (b) => !BIENES_CON_ICONO.includes(b),
-  );
-  comprobar('los cuatro bienes con arte provisional tienen icono compilado', sinIcono.length === 0, sinIcono);
+  const sinIcono = BIENES_DE_RIBERAS.filter((b) => !BIENES_CON_ICONO.includes(b));
+  comprobar('los cinco bienes de Riberas tienen icono compilado', sinIcono.length === 0, sinIcono);
   comprobar(
-    'y `sal` sigue SIN icono, porque ninguno de los provisionales significa sal',
-    !BIENES_CON_ICONO.includes('sal'),
+    'y la sal el suyo, dibujado en casa, que es el que faltaba',
+    BIENES_CON_ICONO.includes('sal'),
     BIENES_CON_ICONO,
   );
   comprobar(

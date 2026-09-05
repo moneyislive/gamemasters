@@ -195,6 +195,107 @@ export interface Terreno {
 }
 
 /**
+ * LOS TERRENOS DEL VOCABULARIO CLÁSICO, que son de donde sale todo lo demás.
+ *
+ * La celda de cada uno sale del bien que produce, que es como los reconoce quien
+ * juega: la arcilla es la mancha de barro del atlas, la piedra la gris, el desierto
+ * la de arena. El bosque es el verde oscuro y la pradera el verde claro de la
+ * hierba, que es la tesela por defecto del pack.
+ *
+ * ═══ EL CAMPO TUVO LA CELDA DE LA HIERBA, Y ERAN DOS TESELAS IGUALES ═══
+ *
+ * El campo apuntaba a la (0,2), la misma que la pradera, y aquí abajo se justificaba
+ * con que en el mundo los distinguen «los sembrados de encima». Eso es falso y se
+ * comprueba abriendo `delta.tsx`: la ÚNICA cosa que ese fichero lee de esta tabla es
+ * `terrenoDe(terreno).celda` —una sola vez, al clonar la geometría de cada tesela—, no
+ * planta nada por terreno y no mira `color` para ninguna tesela. O sea que dos terrenos
+ * con la misma celda son el mismo píxel, y como los seis de Riberas se componen de
+ * éstos, la SALINA y la VEGA salían indistinguibles en el tablero de tres dimensiones.
+ *
+ * Antes de emparejar los vocabularios la salina tenía celda propia y sí se distinguía:
+ * el arreglo del tablero plano rompió el otro sin que nada se pusiera rojo.
+ *
+ * Así que el campo se lleva la (3,1), que está medida contra el atlas del pack igual
+ * que todas las demás: `#d19846` de media, un dorado de sembrado, a 33,6 CIE76 de la
+ * hierba. Encaja con el campo mejor que la hierba porque lo que el campo rinde es
+ * GRANO, y la mancha verde es pasto. La regla que impide que esto vuelva a pasar es
+ * una comprobación —dos terrenos de Riberas no comparten celda— y vive en
+ * `server/scripts/verificar-riberas.ts`, no en un comentario.
+ *
+ * ═══ EL ROJIZO DE LA COLINA NO ES EL DE SU CELDA, Y ESO ES A PROPÓSITO ═══
+ *
+ * La celda de la arcilla es la (2,1), y medida da un marrón: `#b27052` en la franja
+ * clara, `#7d3d2c` en la oscura, `#995842` de media — el mismo tono exacto que la
+ * madera de la (6,0). En tres dimensiones eso da igual, porque ahí el color lo pone
+ * la textura y lo único que decide esta tabla es a qué celda apuntan las UV.
+ *
+ * Pero en el tablero PLANO y en la CARTA no hay textura: hay este hexadecimal y
+ * nada más, y un ladrillo marrón al lado de una duna de arena se lee como dos
+ * tierras del mismo barro. Así que el color plano se lleva al terracota que el pack
+ * sí tiene medido —la celda (7,0), `#be5e2f` de media, `#f17b36` arriba—, que es el
+ * naranja con el que están pintados sus tejados y su cerámica.
+ *
+ * O sea: la celda sigue siendo la del barro, porque el suelo del mundo es de barro;
+ * el color plano es el del ladrillo cocido, porque lo que la carta enseña es el bien
+ * y no el suelo. Distancia al amarillo de la vega y a la arena de la duna: se mide,
+ * y la mide `verify:riberas`.
+ */
+const CLASICOS = {
+  bosque: { color: '#3f6b45', celda: [1, 2] },
+  pradera: { color: '#8fae55', celda: [0, 2] },
+  campo: { color: '#d9b04a', celda: [3, 1] },
+  colina: { color: '#be5e2f', celda: [2, 1] },
+  montana: { color: '#7d8590', celda: [2, 2] },
+  desierto: { color: '#e3d5a6', celda: [4, 2] },
+} satisfies Record<string, Terreno>;
+
+/**
+ * QUÉ TERRENO CLÁSICO ES CADA TERRENO DE RIBERAS: EL QUE PRODUCE SU MISMO BIEN.
+ *
+ * ═══ EL FALLO QUE ESTA TABLA REPARA, Y CÓMO SE VEÍA ═══
+ *
+ * Los seis de Riberas tenían aquí su propia fila, con celda y color elegidos por el
+ * NOMBRE del terreno: una marisma verdosa porque las marismas son verdes, una salina
+ * blanquecina porque la sal es blanca, un carrizal verde medio porque el carrizo es
+ * hierba alta. Cada fila, por separado, era defendible.
+ *
+ * Juntas eran ilegibles. La carta de junco —que es la madera de este juego— salía
+ * verde claro y la de sal blanquecina, mientras el tablero pintaba el bosque de otro
+ * verde y la marisma de un tercero; y quien miraba una carta verde clara y buscaba
+ * dónde se produce encontraba dos hexágonos verdes que no eran ése. El vocabulario se
+ * había unificado al de Riberas y el dibujo se quedó pintando por sinónimos.
+ *
+ * ═══ POR QUÉ ES UNA TABLA DE PAREJAS Y NO SEIS FILAS MÁS ═══
+ *
+ * Porque lo que hay que decir no es «de qué color es una marisma», sino «una marisma
+ * ES la colina de este juego» — rinde limo, que es el ladrillo. Escrito como seis
+ * filas de color, mañana alguien retoca el verde del bosque y el carrizal se queda
+ * atrás sin que falle nada. Escrito como pareja, no puede pasar: el color y la celda
+ * del carrizal SON los del bosque, la misma referencia y no una copia.
+ *
+ * La correspondencia sale de `RINDE` en `shared/arcade/juegos/riberas.ts`, dicha aquí
+ * como está dicha `TERRENO_DEL_BIEN` y por el mismo motivo: `escenas/` no puede
+ * importar las reglas. Y como está dicha dos veces, hay quien lo vigile —
+ * `verify:riberas` compara esta tabla contra `RINDE` de verdad, terreno a terreno.
+ */
+export const CLASICO_DEL_TERRENO_DE_RIBERAS: Readonly<
+  Record<string, keyof typeof CLASICOS>
+> = {
+  /* carrizal rinde junco, que es la madera: bosque. */
+  carrizal: 'bosque',
+  /* marisma rinde limo, que es el ladrillo: colina. */
+  marisma: 'colina',
+  /* salina rinde sal, donde otros juegos ponen lana: pradera. */
+  salina: 'pradera',
+  /* vega rinde grano: campo. */
+  vega: 'campo',
+  /* cantil rinde piedra: montaña. */
+  cantil: 'montana',
+  /* duna no rinde nada, como el desierto no rinde nada: desierto. */
+  duna: 'desierto',
+};
+
+/**
  * CADA TERRENO, y qué pasa con uno que no conozcamos.
  *
  * Un juego trae los terrenos que quiera y esta tabla no puede conocerlos todos. Lo
@@ -206,32 +307,32 @@ export interface Terreno {
  *
  * ═══ POR QUÉ EL COLOR Y LA CELDA NO SON LO MISMO ═══
  *
- * El campo y la pradera comparten suelo —los dos son hierba, y lo que los distingue
- * en el mundo son los sembrados de encima— pero en el tablero PLANO tienen que
- * verse distintos, porque ahí no hay sembrados que mirar: sólo hay un polígono de
- * un color. Por eso son dos campos y no uno.
+ * Porque los pinta gente distinta. La CELDA es lo único que decide el aspecto de un
+ * hexágono en tres dimensiones: `delta.tsx` clona la tesela de hierba y le mueve las
+ * UV a esa celda, y ni lee `color` ni planta nada encima. El COLOR es lo único que
+ * hay en el tablero plano y en la carta de un bien, donde no hay textura ninguna.
+ *
+ * Así que un terreno necesita las dos cosas y las dos tienen que separarlo de los
+ * demás por su cuenta: dos terrenos con la misma celda son el mismo píxel en el
+ * mundo aunque sus hexadecimales disten treinta unidades, y dos con el mismo color
+ * son el mismo polígono en el plano aunque sus celdas estén en filas distintas. Ésa
+ * es exactamente la trampa por la que el campo y la pradera compartieron la celda de
+ * la hierba una temporada — ver arriba, en `CLASICOS`.
+ *
+ * ═══ Y POR QUÉ LOS DE RIBERAS NO ESTÁN ESCRITOS ═══
+ *
+ * Porque no son terrenos distintos: son los mismos vistos desde otro juego. Se
+ * componen aquí a partir de `CLASICO_DEL_TERRENO_DE_RIBERAS`, así que `PALETA` tiene
+ * doce llaves pero seis verdades, y no hay forma de que la marisma y la colina se
+ * separen sin que alguien borre una línea a propósito.
  */
 export const PALETA: Readonly<Record<string, Terreno>> = {
-  /* Los seis de Riberas. */
-  marisma: { color: '#6a7f4f', celda: [7, 1] },
-  carrizal: { color: '#93a15a', celda: [4, 1] },
-  salina: { color: '#d8cfa8', celda: [5, 2] },
-  cantil: { color: '#8a8f96', celda: [3, 0] },
-  vega: { color: '#c8a44e', celda: [0, 2] },
-  duna: { color: '#e2d3a8', celda: [3, 2] },
-
-  /*
-   * Y los del catán. La celda de cada uno sale del bien que produce, que es como
-   * los reconoce quien juega: la arcilla es la mancha de barro del atlas, la piedra
-   * la gris, el desierto la de arena. El bosque es el verde oscuro y la pradera el
-   * verde claro de la hierba, que es la tesela por defecto del pack.
-   */
-  bosque: { color: '#3f6b45', celda: [1, 2] },
-  pradera: { color: '#8fae55', celda: [0, 2] },
-  campo: { color: '#d9b04a', celda: [0, 2] },
-  colina: { color: '#b1653c', celda: [2, 1] },
-  montana: { color: '#7d8590', celda: [2, 2] },
-  desierto: { color: '#e3d5a6', celda: [4, 2] },
+  ...CLASICOS,
+  ...Object.fromEntries(
+    Object.entries(CLASICO_DEL_TERRENO_DE_RIBERAS).map(
+      ([deRiberas, clasico]) => [deRiberas, CLASICOS[clasico]] as const,
+    ),
+  ),
 };
 
 /**
@@ -249,19 +350,11 @@ export function terrenoDe(terreno: string): Terreno {
 }
 
 /**
- * DE QUÉ TERRENO SALE CADA BIEN, y por qué eso decide el color de su carta.
- *
- * La carta de madera es del color del bosque, la de ladrillo del color de la colina y
- * la de mineral del de la montaña. No es una elección de arte: es la única forma de que
- * mirar una carta y mirar el tablero cueste lo mismo. Quien ve una carta verde oscura y
- * busca dónde se produce, encuentra un hexágono verde oscuro.
- *
- * Y por eso la tabla dice el TERRENO y no el color: si mañana se retoca el verde del
- * bosque, la carta de madera se retoca con él. Dos sitios con el mismo color escrito a
- * mano acaban discrepando; uno derivado del otro no puede.
- */
-/**
  * DE QUÉ TERRENO SALE CADA BIEN. Sirve para darle a la carta el color de su tierra.
+ *
+ * La tabla dice el TERRENO y no el color, y ésa es la mitad que importa: si mañana se
+ * retoca el verde del bosque, la carta de junco se retoca con él. Dos sitios con el
+ * mismo color escrito a mano acaban discrepando; uno derivado del otro no puede.
  *
  * Son los cinco de Riberas, y la tabla no se inventa: es `RINDE` de `riberas.ts` dicha
  * aquí. Estaban los del catán —madera, ladrillo, lana— de cuando el tablero todavía no
