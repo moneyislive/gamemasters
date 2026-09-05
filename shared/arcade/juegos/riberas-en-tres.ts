@@ -24,9 +24,24 @@
  * `bastanColores`) y dice dónde cabe cada obra (`obraPosible`). Lo que falta para
  * que una pantalla juegue es lo que hay aquí: la BARRA (qué pieza se enciende y con
  * qué modelo), el ANILLO con el movimiento de cada sitio para mandarlo tal cual al
- * soltar, las OPCIONES que no se tocan en el tablero (tirar, pasar, contestar), y
- * los TRUEQUES por carta (qué se puede pedir a cambio, a quién). Nada de esto se
- * duplica en los clientes.
+ * soltar, las OPCIONES que no se tocan en el tablero (tirar, pasar, contestar), los
+ * TRUEQUES por carta (qué se puede pedir a cambio, a quién), la MANO DEL MAZO con
+ * sus jugadas, y el MARCADOR. Nada de esto se duplica en los clientes.
+ *
+ * ═══ Y LO DEL MAZO SE TRADUCE IGUAL QUE LO DEMÁS: PREGUNTANDO ═══
+ *
+ * Una carta de la mano lleva dos banderas —`sePuedeJugar` y `sePuedeRevelar`— que
+ * son la respuesta a «¿lo permiten las reglas AHORA?», y esa respuesta la da el
+ * juego con la lista de opciones que ya ofrece. Aquí no se vuelve a mirar si la
+ * carta se compró hoy, ni si ya se jugó otra, ni si queda mazo: todo eso está
+ * escrito y probado en `opcionesDelMazo` de `riberas.ts`, y una segunda lectura de
+ * las mismas reglas sería un segundo juez que casi siempre coincide — la peor clase
+ * de fallo, la que sólo se ve el día que discrepan.
+ *
+ * Por eso `misCartas` se lee SÓLO para saber qué cartas tengo y de qué clase son.
+ * Su campo `comprada` no se mira ni una vez, aunque esté ahí y aunque compararlo
+ * con `turnosAbiertos` sea una línea: esa línea es la regla §1.4, y la regla vive
+ * en `riberas.ts`.
  *
  * ═══ POR QUÉ SÓLO SE IMPORTAN TIPOS DE `escenas/` ═══
  *
@@ -66,7 +81,20 @@
 import type { ColorDeJugador, DeltaEn3D } from '../../../escenas/tipos';
 import type { Hex, LlaveDeArista, LlaveDeVertice } from '../../mecanicas/malla-hexagonal';
 import type { AsientoId } from '../tipos';
-import { ALZAR, FUNDAR, OFRECER } from './riberas';
+import {
+  ACAPARAMIENTO,
+  ALZAR,
+  ANO_BUENO,
+  claseDeLaCarta,
+  COMPRAR,
+  DOS_VEREDAS,
+  FUNDAR,
+  GUARDIA,
+  OFRECER,
+  REVELAR,
+  seudonimoDeLaCarta,
+} from './riberas';
+import type { ClaseDeCarta } from './riberas';
 import { bastanColores, COLORES_EN_3D, deltaDeLaVista, manoDeLaVista, obraPosible } from './riberas-en-3d';
 import type { PiezaDeObra, SitioDeObra } from './riberas-en-3d';
 
@@ -86,6 +114,24 @@ interface ColonoEnLaVista {
   readonly chozas: readonly LlaveDeVertice[];
   readonly torres: readonly LlaveDeVertice[];
   readonly veredas: readonly LlaveDeArista[];
+  /*
+   * LO DEL MAZO VA OPCIONAL, Y ESO NO ES DEJADEZ.
+   *
+   * `esVistaQueSePinta` mira cuatro campos y ninguno de éstos, a propósito: por aquí
+   * pasan vistas que no los traen y que son legítimas. La del banco de pruebas
+   * (`vistaDePrueba` de `riberas-en-3d.ts`) no tiene mazo porque prueba anillos, y
+   * una partida guardada antes de que el mazo existiera se rellena con «no hay mazo»
+   * (`comoSiSiempreHubieraHabidoMazo`). Exigirlos aquí dejaría de pintar el tablero
+   * entero por no saber cuántas cartas tiene nadie, que es lo de menos.
+   */
+  /** Sus puntos PÚBLICOS: los títulos sin revelar no están aquí. */
+  readonly puntos?: number;
+  /** CUÁNTAS cartas tiene en la mano. El número, no cuáles. */
+  readonly cartas?: number;
+  /** Cuántas guardias ha jugado. Público: es lo que hace ver venir el premio. */
+  readonly guardias?: number;
+  /** Los títulos que ha revelado. Públicos, y un punto cada uno. */
+  readonly titulos?: readonly string[];
 }
 
 interface VistaQueSePinta {
@@ -96,6 +142,23 @@ interface VistaQueSePinta {
   readonly turnoDe: AsientoId | null;
   readonly yo: AsientoId | null;
   readonly misFichas?: readonly string[];
+  /**
+   * MI MANO DEL MAZO, y de cada carta se lee UNA cosa: su identificador.
+   *
+   * De ahí salen el seudónimo —lo único suyo que se puede publicar— y la clase. El
+   * sello `comprada` que también viaja NO se declara aquí, y es deliberado: mientras
+   * no esté escrito, nadie puede compararlo con `turnosAbiertos` y reescribir sin
+   * querer la regla de que una carta comprada no se juega hoy. Ver la cabecera.
+   */
+  readonly misCartas?: readonly { readonly carta?: unknown }[];
+  /** MIS puntos con los títulos sin revelar dentro. Sólo míos. */
+  readonly misPuntos?: number;
+  /** Cuántas cartas quedan por comprar. Público: un mazo se cuenta. */
+  readonly mazo?: number;
+  /** El Vado Largo: de quién es y cuánto mide. Público entero. */
+  readonly vado?: { readonly de?: AsientoId | null; readonly largo?: number };
+  /** La Mayor Guardia: de quién es y con cuántas. Público entero. */
+  readonly guardia?: { readonly de?: AsientoId | null; readonly cuantas?: number };
 }
 
 /** ¿Es esto una vista de Riberas con lo que hace falta para pintarla? */
@@ -264,6 +327,14 @@ export interface OpcionQueLlega {
  *
  * Es la misma regla que `opcionesSueltas` aplica al tablero SVG: cada movimiento se
  * enseña exactamente una vez.
+ *
+ * LAS DEL MAZO NO SE QUITAN AQUÍ, y hay una función aparte para eso
+ * (`opcionesFueraDeLaMano`). Quitarlas de ésta habría sido más limpio y habría
+ * dejado un cliente que todavía no pinta la mano de cartas SIN NINGUNA manera de
+ * jugarlas: las cartas desaparecerían de la pantalla sin un error en ninguna parte,
+ * que es exactamente el fallo silencioso contra el que existe este fichero. Se
+ * componen —`opcionesFueraDeLaMano(opcionesFueraDelTablero(o))`— el día que la
+ * pantalla enseña la mano, y ese día lo decide la pantalla.
  */
 export function opcionesFueraDelTablero<O extends OpcionQueLlega>(opciones: readonly O[]): O[] {
   return opciones.filter((o) => o.tipo !== FUNDAR && o.tipo !== ALZAR && o.tipo !== OFRECER);
@@ -327,4 +398,442 @@ export function truequesPosibles<O extends OpcionQueLlega>(vista: unknown, opcio
 /** ¿Me toca a mí? `false` para quien mira sin jugar o mientras se reúne la mesa. */
 export function meToca(vista: unknown): boolean {
   return esVistaQueSePinta(vista) && vista.yo !== null && vista.turnoDe === vista.yo;
+}
+
+// ---------------------------------------------------------------------------
+// EL MAZO: la mano de cartas y lo que se puede hacer con cada una
+// ---------------------------------------------------------------------------
+
+/**
+ * LA MISMA FORMA QUE `CartaDelMazo` de `escenas/cartas.ts`.
+ *
+ * Se declara aquí y no se importa, como `CartaEnTres` y `PiezaDeLaBarraEnTres`, por
+ * lo que dice la cabecera del fichero: encajan por estructura. Que sigan encajando no
+ * se deja a la buena voluntad — `verify:riberas-en-tres` mete lo que sale de aquí en
+ * `huecosDeLasCartas` y en `puertasDeLaCarta`, que son las funciones de la escena de
+ * verdad, así que el día que uno de los dos lados cambie un campo, el comprobador ni
+ * siquiera compila.
+ */
+export interface CartaDelMazoEnTres {
+  /** El SEUDÓNIMO de la carta (`c7`), que es lo único suyo que se puede publicar. */
+  readonly id: string;
+  /** `guardia` | `anobueno` | `acaparamiento` | `dosveredas` | `titulo`. */
+  readonly familia: string;
+  /** Una de las nueve llaves de `CONTORNOS_DE_LA_CARTA`. */
+  readonly dibujo: string;
+  /** Lo que se lee: «La Guardia», «El Faro»… */
+  readonly nombre: string;
+  readonly sePuedeJugar: boolean;
+  readonly sePuedeRevelar: boolean;
+}
+
+/** Cómo se enseña una clase de carta: a qué grupo va, qué dibujo lleva y cómo se lee. */
+export interface RetratoDeLaCarta {
+  readonly familia: string;
+  readonly dibujo: string;
+  readonly nombre: string;
+}
+
+/**
+ * LAS NUEVE CLASES, CON SU CARA. Una fila por clase y ni una regla dentro.
+ *
+ * ═══ POR QUÉ ESTA TABLA ESTÁ AQUÍ Y NO EN `riberas.ts` ═══
+ *
+ * Porque las tres columnas son de PRESENTACIÓN y ninguna es del juego. `familia` es
+ * cómo agrupa la mano de la escena —cinco montones, con los cinco títulos en uno—,
+ * `dibujo` es la llave de un contorno de `escenas/iconos.ts`, y `nombre` es lo que se
+ * lee en un naipe. Las reglas no distinguen a El Faro de El Huerto ni por asomo: para
+ * ellas son la misma carta con dos seriales.
+ *
+ * Y son tres columnas y no una cuenta: `ano-bueno` se dibuja con `anobueno` y
+ * `dos-veredas` con `dosveredas`, así que un `clase.replace('-', '')` habría dado la
+ * respuesta correcta hoy y una llave inventada el día que alguien añada una carta con
+ * guion en el nombre. Una tabla se pone roja; una cuenta se equivoca en silencio.
+ *
+ * ═══ Y POR QUÉ ES `Record<ClaseDeCarta, …>` Y NO UN DICCIONARIO SUELTO ═══
+ *
+ * Para que el compilador exija las nueve. Una carta nueva en `CLASES_DE_CARTA` sin
+ * fila aquí no compila, en vez de salir a la mano sin dibujo y sin nombre. El
+ * comprobador afirma además lo contrario —que no sobra ninguna— porque eso el
+ * compilador no lo mira.
+ */
+const RETRATO_DE_LA_CARTA: Readonly<Record<ClaseDeCarta, RetratoDeLaCarta>> = {
+  guardia: { familia: 'guardia', dibujo: 'guardia', nombre: 'La Guardia' },
+  'ano-bueno': { familia: 'anobueno', dibujo: 'anobueno', nombre: 'El Año Bueno' },
+  acaparamiento: { familia: 'acaparamiento', dibujo: 'acaparamiento', nombre: 'El Acaparamiento' },
+  'dos-veredas': { familia: 'dosveredas', dibujo: 'dosveredas', nombre: 'Las Dos Veredas' },
+  molino: { familia: 'titulo', dibujo: 'molino', nombre: 'El Molino' },
+  cantera: { familia: 'titulo', dibujo: 'cantera', nombre: 'La Cantera' },
+  torreon: { familia: 'titulo', dibujo: 'torreon', nombre: 'El Torreón' },
+  faro: { familia: 'titulo', dibujo: 'faro', nombre: 'El Faro' },
+  huerto: { familia: 'titulo', dibujo: 'huerto', nombre: 'El Huerto' },
+};
+
+/**
+ * LA CARA DE UNA CLASE DE CARTA, o `null` si no es ninguna de las nueve.
+ *
+ * Recibe `string` y no `ClaseDeCarta` a propósito: quien pregunta suele venir de una
+ * cadena que llegó por el cable —el título revelado de otro colono, por ejemplo—, y
+ * obligarle a afirmar el tipo antes de preguntar sería pedirle que se fíe.
+ */
+export function retratoDeLaCarta(clase: string): RetratoDeLaCarta | null {
+  return (RETRATO_DE_LA_CARTA as Readonly<Record<string, RetratoDeLaCarta>>)[clase] ?? null;
+}
+
+/** Las cuatro maneras de JUGAR una carta. Los títulos no están: se revelan. */
+export type ClaseDeJugada = 'guardia' | 'anobueno' | 'acaparamiento' | 'dosveredas';
+
+/**
+ * DE QUÉ JUGADA HABLA CADA TIPO DE MOVIMIENTO.
+ *
+ * Se mira el TIPO y nunca el `id`, por lo mismo que `piezaDeLaOpcion` en
+ * `riberas-en-3d.ts`: el `id` es texto para las listas y cambiarlo es una decisión de
+ * presentación que nadie espera que rompa nada.
+ *
+ * Las cuatro etiquetas coinciden con las cuatro familias no-título del retrato, y la
+ * coincidencia no es casual ni se deja al azar: el comprobador exige que la jugada de
+ * una carta lleve la misma etiqueta que la familia con que esa carta se pinta, que es
+ * lo que permite a la pantalla decidir qué preguntar mirando el naipe.
+ */
+const CLASE_DE_LA_JUGADA: Readonly<Record<string, ClaseDeJugada>> = {
+  [GUARDIA]: 'guardia',
+  [ANO_BUENO]: 'anobueno',
+  [ACAPARAMIENTO]: 'acaparamiento',
+  [DOS_VEREDAS]: 'dosveredas',
+};
+
+/** Los cuatro movimientos que GASTAN la jugada del turno. Revelar no está: no la gasta. */
+export const TIPOS_QUE_JUEGAN_CARTA: readonly string[] = Object.keys(CLASE_DE_LA_JUGADA);
+
+/**
+ * LO QUE PINTA LA MANO DEL MAZO, y por tanto lo que no puede salir además como botón.
+ *
+ * Comprar NO está, y es la única del mazo que falta: comprar no es una carta de la
+ * mano —no hay nada que arrastrar— y en la escena no hay mazo que pulsar, así que su
+ * botón es el único sitio donde existe. Meterla aquí la haría desaparecer.
+ */
+export const TIPOS_QUE_PINTA_LA_MANO: readonly string[] = [...TIPOS_QUE_JUEGAN_CARTA, REVELAR];
+
+/** El seudónimo que lleva dentro la carga de un movimiento del mazo, si lo lleva. */
+function cartaDeLaCarga(carga: unknown): string | null {
+  if (typeof carga !== 'object' || carga === null) return null;
+  const suyo = (carga as Record<string, unknown>)['carta'];
+  return typeof suyo === 'string' ? suyo : null;
+}
+
+/**
+ * MI MANO DEL MAZO, tal como la pinta la escena.
+ *
+ * ═══ LAS DOS BANDERAS SALEN DE LAS OPCIONES, Y DE NADA MÁS ═══
+ *
+ * `sePuedeJugar` es «hay ahora mismo una opción de jugar ESTA carta», y
+ * `sePuedeRevelar` lo mismo con revelar. No se mira el turno, ni el sello de compra,
+ * ni si ya se jugó otra: si el juego no la ofrece, es `false`, y punto. Es la misma
+ * decisión que toma `barraEnTres` con `disponible`, y por el mismo motivo — dos
+ * jueces que casi siempre coinciden acaban ofreciendo un naipe encendido que el
+ * servidor rechaza.
+ *
+ * Salen TODAS las cartas, también las apagadas: que se vean las tres guardias que
+ * no puedo jugar hoy es una regla del juego y no una cortesía (ver `apagada` en
+ * `escenas/cartas.ts`). Y salen en el orden en que están en la mano; agruparlas por
+ * familias es cosa de la escena, que ya lo hace y lo hace igual para todos.
+ *
+ * Vacía para quien mira sin jugar: `misCartas` no viaja a nadie más.
+ */
+export function cartasEnTres<O extends OpcionQueLlega>(
+  vista: unknown,
+  opciones: readonly O[],
+): CartaDelMazoEnTres[] {
+  if (!esVistaQueSePinta(vista)) return [];
+
+  const seJuegan = new Set<string>();
+  const seRevelan = new Set<string>();
+  for (const o of opciones) {
+    const suyo = cartaDeLaCarga(o.carga);
+    if (suyo === null) continue;
+    if (o.tipo === REVELAR) seRevelan.add(suyo);
+    else if (CLASE_DE_LA_JUGADA[o.tipo] !== undefined) seJuegan.add(suyo);
+  }
+
+  const cartas: CartaDelMazoEnTres[] = [];
+  for (const enMano of vista.misCartas ?? []) {
+    const cruda = enMano?.carta;
+    if (typeof cruda !== 'string') continue;
+    const clase = claseDeLaCarta(cruda);
+    if (clase === null) continue;
+    const retrato = retratoDeLaCarta(clase);
+    if (retrato === null) continue;
+    /* El seudónimo y NUNCA la carta entera: la carta es secreta y el `id` se publica. */
+    const id = seudonimoDeLaCarta(cruda);
+    cartas.push({
+      id,
+      familia: retrato.familia,
+      dibujo: retrato.dibujo,
+      nombre: retrato.nombre,
+      sePuedeJugar: seJuegan.has(id),
+      sePuedeRevelar: seRevelan.has(id),
+    });
+  }
+  return cartas;
+}
+
+/**
+ * UNA MANERA DE JUGAR UNA CARTA, con lo que hay que preguntar ya resuelto y la opción
+ * entera dentro para mandarla tal cual.
+ *
+ * Es el mismo trato que `SitioDeObra` le da a una obra y `TruequePosible` a una
+ * oferta: viaja el MOVIMIENTO, no sus piezas. Si sólo viajara «a quién» o «qué
+ * bienes», la pantalla tendría que volver a montar `{ tipo, carga }` y la forma del
+ * movimiento estaría escrita en dos sitios — y el segundo no se comprueba nunca.
+ */
+export interface JugadaDeCarta<O extends OpcionQueLlega = OpcionQueLlega> {
+  readonly clase: ClaseDeJugada;
+  /** El seudónimo de la carta que se juega. El mismo `id` que lleva el naipe. */
+  readonly carta: string;
+  /** A quién se le roba. Sólo La Guardia; `null` en las demás. */
+  readonly a: AsientoId | null;
+  /** Cómo se llama ése, para poder preguntar por su nombre y no por su asiento. */
+  readonly nombre: string;
+  /** Dos para El Año Bueno, uno para El Acaparamiento, ninguno para las demás. */
+  readonly bienes: readonly string[];
+  /** Lo que el juego escribe en el botón. Se usa tal cual: aquí no se redacta nada. */
+  readonly rotulo: string;
+  readonly opcion: O;
+}
+
+/** Los bienes que pide una carga, vengan en `bienes` (dos) o en `bien` (uno). */
+function bienesDeLaCarga(carga: Record<string, unknown>): string[] {
+  const varios = carga['bienes'];
+  if (Array.isArray(varios)) return varios.filter((b): b is string => typeof b === 'string');
+  const uno = carga['bien'];
+  return typeof uno === 'string' ? [uno] : [];
+}
+
+/**
+ * TODAS LAS MANERAS DE JUGAR ESTA CARTA que el juego ofrece ahora mismo.
+ *
+ * Una sola para Las Dos Veredas, una por colono al que se pueda robar para La
+ * Guardia, quince pares para El Año Bueno y cinco bienes para El Acaparamiento. La
+ * lista sale vacía si la carta no se puede jugar, que es la misma respuesta que da
+ * `sePuedeJugar` y sale de la misma sitio: no hay dos cuentas.
+ *
+ * `carta` es el seudónimo, o sea el `id` del naipe que la escena acaba de soltar en
+ * la casilla. La pantalla no tiene que traducir nada para preguntar.
+ */
+export function jugadasDeLaCarta<O extends OpcionQueLlega>(
+  vista: unknown,
+  opciones: readonly O[],
+  carta: string,
+): JugadaDeCarta<O>[] {
+  if (!esVistaQueSePinta(vista)) return [];
+  const lista: JugadaDeCarta<O>[] = [];
+  for (const o of opciones) {
+    if (cartaDeLaCarga(o.carga) !== carta) continue;
+    const clase = CLASE_DE_LA_JUGADA[o.tipo];
+    if (clase === undefined) continue;
+    const carga = o.carga as Record<string, unknown>;
+    const cual = carga['a'];
+    const a = typeof cual === 'string' ? cual : null;
+    lista.push({
+      clase,
+      carta,
+      a,
+      nombre: a === null ? '' : (vista.colonos.find((c) => c.asiento === a)?.nombre ?? a),
+      bienes: bienesDeLaCarga(carga),
+      rotulo: o.rotulo,
+      opcion: o,
+    });
+  }
+  return lista;
+}
+
+/**
+ * A QUIÉN SE LE PUEDE ROBAR con esta guardia: exactamente los colonos que el juego
+ * ofrece, ni uno más.
+ *
+ * Y son menos que «todos los demás», que es lo que una pantalla escribiría sola: a
+ * quien no tiene ni un bien no se le roba, y eso lo decide `opcionesDelMazo` mirando
+ * un número que sí es público. Escrita aquí, esa resta se olvidaría el día que
+ * cambiara — y la mesa vería un botón para robarle a quien no tiene nada.
+ */
+export function aQuienSeLeRoba<O extends OpcionQueLlega>(
+  vista: unknown,
+  opciones: readonly O[],
+  carta: string,
+): JugadaDeCarta<O>[] {
+  return jugadasDeLaCarta(vista, opciones, carta).filter((j) => j.clase === 'guardia');
+}
+
+/**
+ * QUÉ PARES SE PUEDEN PEDIR con este año bueno.
+ *
+ * Sin repetir: `sal y grano` y `grano y sal` son la misma jugada y el juego la ofrece
+ * una vez. Los pares de dos iguales SÍ están, que es media gracia de la carta. El
+ * orden de dentro de cada par es el de `BIENES` y va tal cual en la carga; que la
+ * pantalla no lo toque es justo el motivo de que viaje la opción entera.
+ */
+export function paresDelAnoBueno<O extends OpcionQueLlega>(
+  vista: unknown,
+  opciones: readonly O[],
+  carta: string,
+): JugadaDeCarta<O>[] {
+  return jugadasDeLaCarta(vista, opciones, carta).filter((j) => j.clase === 'anobueno');
+}
+
+/**
+ * QUÉ BIENES SE PUEDEN ACAPARAR con esta carta.
+ *
+ * Salen los cinco aunque no los tenga nadie, y eso NO es un descuido que arreglar
+ * aquí: filtrarlos por lo que los demás tienen publicaría sus almacenes en una lista
+ * de botones. Está escrito y razonado en `opcionesDelMazo`, y aquí sólo se respeta.
+ */
+export function bienesQueSeAcaparan<O extends OpcionQueLlega>(
+  vista: unknown,
+  opciones: readonly O[],
+  carta: string,
+): JugadaDeCarta<O>[] {
+  return jugadasDeLaCarta(vista, opciones, carta).filter((j) => j.clase === 'acaparamiento');
+}
+
+/**
+ * LA JUGADA QUE NO HAY QUE PREGUNTAR: la única que hay, o `null` si hay que elegir.
+ *
+ * Las Dos Veredas siempre cae aquí —no pide nada—, y La Guardia también cuando queda
+ * un solo colono al que robar, que en una mesa de dos es siempre. Es el mismo trato
+ * que `truequesPosibles` pide para las ofertas y está escrito allí: si sale una sola,
+ * se manda sin preguntar; si salen varias, se pregunta.
+ *
+ * Con cero devuelve `null` igual que con dos, y así tiene que ser: «no se puede» y
+ * «hay que elegir» comparten respuesta porque en los dos casos la pantalla NO manda
+ * nada por su cuenta.
+ */
+export function jugadaSinPreguntar<O extends OpcionQueLlega>(
+  vista: unknown,
+  opciones: readonly O[],
+  carta: string,
+): JugadaDeCarta<O> | null {
+  const todas = jugadasDeLaCarta(vista, opciones, carta);
+  return todas.length === 1 ? (todas[0] ?? null) : null;
+}
+
+/**
+ * LA OPCIÓN DE REVELAR ESTE TÍTULO, o `null`.
+ *
+ * No hace falta la vista: revelar no pide destinatario ni bienes, así que la opción
+ * entera ES la respuesta. Y no se comprueba aquí que la carta sea un título — lo
+ * comprueba el juego al no ofrecer `REVELAR` de nada más, y la escena lo comprueba
+ * otra vez en `puertasDeLaCarta`, que no abre la casilla de revelar a una carta que
+ * no sea de la familia de los títulos por mucho que llegue la bandera en `true`.
+ */
+export function revelarDe<O extends OpcionQueLlega>(opciones: readonly O[], carta: string): O | null {
+  return opciones.find((o) => o.tipo === REVELAR && cartaDeLaCarga(o.carga) === carta) ?? null;
+}
+
+/**
+ * LA OPCIÓN DE COMPRAR UNA CARTA, o `null` si ahora no se puede.
+ *
+ * Sale nombrada aunque sea un `find` de una línea, por lo mismo que `manoEnTres`: es
+ * el único movimiento del mazo que no cuelga de un naipe, y sin un nombre acabaría
+ * buscándose por el `id` `'comprar'` dentro de cada cliente — que es colgar un
+ * movimiento de un rótulo.
+ */
+export function comprarEnTres<O extends OpcionQueLlega>(opciones: readonly O[]): O | null {
+  return opciones.find((o) => o.tipo === COMPRAR) ?? null;
+}
+
+/**
+ * LAS OPCIONES QUE NO PINTA LA MANO DEL MAZO.
+ *
+ * Se compone con `opcionesFueraDelTablero` —y en ese orden da igual, las dos son
+ * filtros— para sacar los botones de una pantalla que ya enseña la mano: lo que queda
+ * es tirar, pasar, contestar tratos, empezar y comprar. Ver por qué son dos funciones
+ * y no una en la cabecera de `opcionesFueraDelTablero`.
+ */
+export function opcionesFueraDeLaMano<O extends OpcionQueLlega>(opciones: readonly O[]): O[] {
+  return opciones.filter((o) => !TIPOS_QUE_PINTA_LA_MANO.includes(o.tipo));
+}
+
+// ---------------------------------------------------------------------------
+// EL MARCADOR: lo que se ve de cada colono, y lo que sólo cuento yo
+// ---------------------------------------------------------------------------
+
+/** Un colono en el marcador: lo suyo público, y lo mío oculto sólo si soy yo. */
+export interface ColonoEnElMarcador {
+  readonly asiento: AsientoId;
+  readonly nombre: string;
+  readonly color: string;
+  /** Sus puntos PÚBLICOS. Es lo que ve la mesa entera, yo incluido. */
+  readonly puntos: number;
+  /**
+   * MIS PUNTOS CON LOS TÍTULOS SIN REVELAR DENTRO, y `null` para todos los demás.
+   *
+   * `null` y no «los públicos otra vez», que es lo que se escribe sin pensar: con el
+   * mismo número en los dos campos, una pantalla que quiera distinguir «lo que se ve»
+   * de «lo que sólo cuento yo» no puede, y acaba enseñando a los demás un segundo
+   * número inventado. `null` dice «de éste no lo sé», que es la verdad.
+   *
+   * Y sale de `misPuntos`, que la proyección no le manda a nadie más. Aquí no se suman
+   * títulos ocultos: no están en la vista, y ése es el punto.
+   */
+  readonly puntosConLoOculto: number | null;
+  readonly soyYo: boolean;
+  /** Cuántas cartas guarda. El número, no cuáles. */
+  readonly cartas: number;
+  /** Cuántas guardias ha jugado. Es lo que hace ver venir La Mayor Guardia. */
+  readonly guardias: number;
+  /** Los títulos que ha revelado, con su nombre de Riberas: «El Faro»… */
+  readonly titulos: readonly string[];
+  readonly tieneElVado: boolean;
+  readonly tieneLaMayorGuardia: boolean;
+}
+
+/** El marcador entero, con los dos premios y lo que queda de mazo. */
+export interface MarcadorEnTres {
+  readonly colonos: readonly ColonoEnElMarcador[];
+  /** Cuántas cartas quedan por comprar. Contar el mazo es parte del juego (§1.3). */
+  readonly mazo: number;
+  /** De quién es el Vado Largo, o `null` si está vacante. */
+  readonly vado: AsientoId | null;
+  /** De quién es La Mayor Guardia, o `null` si está vacante. */
+  readonly mayorGuardia: AsientoId | null;
+}
+
+/**
+ * EL MARCADOR QUE SE ENSEÑA SIEMPRE, según el §5 del diseño.
+ *
+ * `null` si la vista no es de Riberas. Vacante quiere decir vacante: los dos premios
+ * salen `null` mientras nadie llegue al mínimo, y no del primero de la lista.
+ *
+ * Los títulos ajenos salen con su nombre porque ya son públicos —revelados—, y ahí no
+ * hay nada que tapar. Lo que no sale por ninguna parte es cuántos títulos SIN revelar
+ * tiene otro: eso no está en la vista, y por eso no se puede escribir aquí ni por
+ * descuido.
+ */
+export function marcadorEnTres(vista: unknown): MarcadorEnTres | null {
+  if (!esVistaQueSePinta(vista)) return null;
+  const yo = vista.yo;
+  const delVado = vista.vado?.de ?? null;
+  const deLaGuardia = vista.guardia?.de ?? null;
+  return {
+    mazo: vista.mazo ?? 0,
+    vado: delVado,
+    mayorGuardia: deLaGuardia,
+    colonos: vista.colonos.map((c) => {
+      const soyYo = yo !== null && c.asiento === yo;
+      const puntos = c.puntos ?? 0;
+      return {
+        asiento: c.asiento,
+        nombre: c.nombre,
+        color: c.color,
+        puntos,
+        soyYo,
+        puntosConLoOculto: soyYo ? (vista.misPuntos ?? puntos) : null,
+        cartas: c.cartas ?? 0,
+        guardias: c.guardias ?? 0,
+        titulos: (c.titulos ?? []).map((t) => retratoDeLaCarta(t)?.nombre ?? t),
+        tieneElVado: delVado !== null && c.asiento === delVado,
+        tieneLaMayorGuardia: deLaGuardia !== null && c.asiento === deLaGuardia,
+      };
+    }),
+  };
 }

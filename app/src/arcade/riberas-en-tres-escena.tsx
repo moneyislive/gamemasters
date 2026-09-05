@@ -58,6 +58,28 @@
  * pase: una pantalla de partida que depende de que baje un fichero de varios
  * megabytes no es una pantalla de partida, es una demostración.
  *
+ * ═══ Y EL MAZO SE PUEDE JUGAR EN LAS DOS RAMAS, QUE ES LA MITAD DEL ENCARGO ═══
+ *
+ * Con el delta montado, la mano de cartas es la franja de la izquierda de
+ * `escenas/cartas.ts`: se coge un naipe, se arrastra a una casilla y se juega o se
+ * revela. Sobre el RESPALDO no hay franja ninguna —el retablo es un SVG plano— y las
+ * mismas jugadas salen como botones del tablero declarado, con su rótulo y su ayuda.
+ * Por eso `opcionesFueraDeLaMano` se compone SÓLO en la rama del delta: aplicarlo
+ * también al respaldo dejaría al móvil con las cartas en la mano y sin ninguna
+ * manera de jugarlas, sin un error en ninguna parte. Es exactamente el fallo
+ * silencioso contra el que la traducción partió aquel filtro en dos, y está escrito
+ * en la cabecera de `opcionesFueraDelTablero`.
+ *
+ * COMPRAR no es de la mano y no se filtra en ninguna de las dos: no hay naipe que
+ * arrastrar —la carta todavía no es tuya— y su único sitio es el botón. Lo que
+ * cuesta y cuántas quedan lo dice el juego en la ayuda del propio botón, así que
+ * aquí no se redacta.
+ *
+ * Y EL MARCADOR SE VE SIEMPRE, con el cromo de la mesa y no encima del lienzo: los
+ * puntos públicos de cada colono, lo que sólo cuento yo, y cuánto mazo queda. Contar
+ * el mazo es parte del juego (§1.3 de `docs/LAS-CARTAS-DE-RIBERAS.md`) y quien va
+ * ganando en secreto es lo que hace que las últimas rondas se jueguen distinto (§6).
+ *
  * ═══ Y EL MÓVIL NATIVO VERÁ EL TABLERO GRIS HASTA QUE SE HORNEE ═══
  *
  * `tablero.glb` lleva hoy la textura EMPOTRADA, y Hermes no decodifica ese PNG. En
@@ -101,17 +123,28 @@ import { opcionesSueltas, tableroDeLaVista } from '../../../shared/mecanicas/tab
 import {
   barraEnTres,
   bienesQueSeCambianPor,
+  cartasEnTres,
   colocandoEnTres,
   esVistaQueSePinta,
+  jugadaSinPreguntar,
+  jugadasDeLaCarta,
   manoEnTres,
+  marcadorEnTres,
+  opcionesFueraDeLaMano,
   opcionesFueraDelTablero,
+  revelarDe,
   seVeEnTres,
   tableroEnTres,
   truequesPosibles,
 } from '../../../shared/arcade/juegos/riberas-en-tres';
 import type {
+  CartaDelMazoEnTres,
+  ClaseDeJugada,
   ColocandoEnTres,
+  ColonoEnElMarcador,
   IdDeLaBarra,
+  JugadaDeCarta,
+  MarcadorEnTres,
   TableroEnTres,
   TruequePosible,
 } from '../../../shared/arcade/juegos/riberas-en-tres';
@@ -495,21 +528,33 @@ function LaMesaEnTres({
    * ═══ LO COGIDO VIVE AQUÍ, Y SE SUELTA CUANDO CAMBIA LA MESA ═══
    *
    * `tomada` y `colocando` son la pieza de la barra que se lleva en la mano y los
-   * sitios donde las reglas dejan soltarla; `cogida` es la carta de la mano. Nada
-   * de esto es estado del juego —es dónde tiene el dedo la persona— y por eso vive
-   * en la pantalla y no viaja. Y en cuanto la revisión de la mesa cambia se suelta
-   * todo: los sitios que valían con la revisión anterior pueden no valer con ésta,
-   * y una pieza en la mano con anillos rancios es una mentira con forma de anillo.
+   * sitios donde las reglas dejan soltarla; `cogida` es la carta de bienes y
+   * `cogidaDelMazo` el naipe del mazo. Nada de esto es estado del juego —es dónde
+   * tiene el dedo la persona— y por eso vive en la pantalla y no viaja. Y en cuanto
+   * la revisión de la mesa cambia se suelta todo: los sitios que valían con la
+   * revisión anterior pueden no valer con ésta, y una pieza en la mano con anillos
+   * rancios es una mentira con forma de anillo. Con las cartas es lo mismo y peor:
+   * una jugada que se preguntó con las opciones de antes se manda con una opción que
+   * el servidor ya no ofrece.
+   *
+   * LAS DOS MANOS NO PUEDEN ESTAR COGIDAS A LA VEZ, y eso lo sostiene esta pantalla
+   * y no la geometría: `escenas/cartas.ts` mide su franja contra las áreas de trueque
+   * dando por hecho que coger un naipe suelta el bien y al revés, y lo deja dicho.
+   * Cada uno de los tres manejadores de coger suelta lo de los otros dos.
    */
   const [tomada, ponerTomada] = useState<IdDeLaBarra | null>(null);
   const [colocando, ponerColocando] = useState<ColocandoEnTres | null>(null);
   const [cogida, ponerCogida] = useState<string | null>(null);
+  const [cogidaDelMazo, ponerCogidaDelMazo] = useState<string | null>(null);
   const [aQuien, ponerAQuien] = useState<readonly TruequePosible<OpcionDeMesa>[] | null>(null);
+  const [comoJugarla, ponerComoJugarla] = useState<LaCartaYSusJugadas | null>(null);
   const soltarTodo = useCallback(() => {
     ponerTomada(null);
     ponerColocando(null);
     ponerCogida(null);
+    ponerCogidaDelMazo(null);
     ponerAQuien(null);
+    ponerComoJugarla(null);
   }, []);
   useEffect(() => {
     soltarTodo();
@@ -568,7 +613,19 @@ function LaMesaEnTres({
         : bienesQueSeCambianPor(laVista, opciones, cartaCogida.bien),
     [laVista, opciones, cartaCogida],
   );
-  const fueraDelTablero = useMemo(() => opcionesFueraDelTablero(opciones), [opciones]);
+  const cartasDelMazo = useMemo(() => cartasEnTres(laVista, opciones), [laVista, opciones]);
+  const marcador = useMemo(() => marcadorEnTres(laVista), [laVista]);
+  /*
+   * LOS BOTONES DEL PIE CUANDO LA MANO SE PINTA: los dos filtros compuestos, y en
+   * ese orden da igual porque los dos son filtros. Lo que queda es tirar, pasar,
+   * contestar tratos, empezar y COMPRAR, que no es de la mano. Esta composición vale
+   * sólo para la rama del delta; el respaldo usa las opciones sin tocar, y por qué
+   * está en la cabecera del fichero.
+   */
+  const fueraDelTablero = useMemo(
+    () => opcionesFueraDeLaMano(opcionesFueraDelTablero(opciones)),
+    [opciones],
+  );
 
   /*
    * EL ENCUADRE mide el MUNDO —lo grande que es el delta— y sólo se recalcula cuando
@@ -616,6 +673,7 @@ function LaMesaEnTres({
       const que = colocandoEnTres(laVista, yo, pieza.id);
       if (que === null) return;
       ponerCogida(null);
+      ponerCogidaDelMazo(null);
       ponerTomada(pieza.id);
       ponerColocando(que);
     },
@@ -641,6 +699,7 @@ function LaMesaEnTres({
       if (mesa.quieto) return;
       ponerTomada(null);
       ponerColocando(null);
+      ponerCogidaDelMazo(null);
       ponerCogida((antes) => (antes === carta.id ? null : carta.id));
     },
     [laInterfazSeLoQueda, mesa.quieto],
@@ -678,6 +737,80 @@ function LaMesaEnTres({
     [mesa],
   );
 
+  /* ─── Y lo mismo con el mazo: coger, jugar, revelar ─── */
+
+  const alCogerCartaDelMazo = useCallback(
+    (carta: { id: string }) => {
+      laInterfazSeLoQueda();
+      if (mesa.quieto) return;
+      /* Coger un naipe suelta la pieza de la barra y el bien: las dos manos son una. */
+      ponerTomada(null);
+      ponerColocando(null);
+      ponerCogida(null);
+      ponerCogidaDelMazo((antes) => (antes === carta.id ? null : carta.id));
+    },
+    [laInterfazSeLoQueda, mesa.quieto],
+  );
+
+  /**
+   * SE HA SOLTADO UN NAIPE EN LA CASILLA DE JUGAR.
+   *
+   * Si sólo hay una manera de jugarlo se manda sin preguntar —Las Dos Veredas
+   * siempre, y La Guardia en una mesa de dos, donde no hay a quién elegir—; si hay
+   * varias se abre la hoja. Es el mismo trato que la traducción pide para las ofertas
+   * y está escrito en `jugadaSinPreguntar`: con una sola, mandar; con varias,
+   * preguntar; con ninguna, no mandar nada por nuestra cuenta.
+   *
+   * Y lo que viaja es la OPCIÓN ENTERA que dio el juego. Aquí no se monta un
+   * `{ tipo, carga }` con el seudónimo y el bien: montarlo escribiría la forma del
+   * movimiento en un segundo sitio, y el segundo no lo comprueba nadie.
+   */
+  const alJugarCarta = useCallback(
+    (carta: CartaDelMazoEnTres) => {
+      if (mesa.quieto) return;
+      const sola = jugadaSinPreguntar(laVista, opciones, carta.id);
+      if (sola !== null) {
+        ponerCogidaDelMazo(null);
+        mesa.mover({ tipo: sola.opcion.tipo, carga: sola.opcion.carga });
+        return;
+      }
+      const todas = jugadasDeLaCarta(laVista, opciones, carta.id);
+      if (todas.length === 0) return;
+      ponerComoJugarla({ carta, jugadas: todas });
+    },
+    [mesa, laVista, opciones],
+  );
+
+  const alElegirJugada = useCallback(
+    (j: JugadaDeCarta<OpcionDeMesa>) => {
+      ponerComoJugarla(null);
+      ponerCogidaDelMazo(null);
+      if (mesa.quieto) return;
+      mesa.mover({ tipo: j.opcion.tipo, carga: j.opcion.carga });
+    },
+    [mesa],
+  );
+
+  /**
+   * SE HA SOLTADO UN TÍTULO EN LA CASILLA DE REVELAR.
+   *
+   * Revelar no pregunta nada —no tiene destinatario ni bienes—, así que no hay hoja:
+   * la opción entera ES la respuesta. Que la carta sea de verdad un título lo
+   * comprueban las reglas al no ofrecer `REVELAR` de nada más y la escena otra vez en
+   * `puertasDeLaCarta`, que no abre esta casilla a lo que no sea un título. Aquí,
+   * tercer cinturón: sin opción no se manda nada.
+   */
+  const alRevelarCarta = useCallback(
+    (carta: CartaDelMazoEnTres) => {
+      if (mesa.quieto) return;
+      const revelar = revelarDe(opciones, carta.id);
+      if (revelar === null) return;
+      ponerCogidaDelMazo(null);
+      mesa.mover({ tipo: revelar.tipo, carga: revelar.carga });
+    },
+    [mesa, opciones],
+  );
+
   /* ─── El respaldo: el retablo SVG de siempre, y por qué ─── */
 
   /*
@@ -702,6 +835,12 @@ function LaMesaEnTres({
         />
         <LineaDelTurno mesa={vista} nombres={nombres} />
         <ElAviso texto={mesa.aviso} />
+        {/*
+          EL MARCADOR TAMBIÉN AQUÍ, y no es una copia por comodidad: ésta es la rama
+          que hoy ve TODO EL MÓVIL (`EL_DELTA_SE_VE_AQUI`), o sea que un marcador que
+          sólo saliera con el delta no lo vería nadie que juegue desde el teléfono.
+        */}
+        <ElMarcador marcador={marcador} />
         {/*
           LA NOTA DEL RESPALDO, en tenue y no en alarma: no es un peligro, es un
           cambio de pincel. Dice el motivo porque «no se ha podido» sin motivo
@@ -751,6 +890,13 @@ function LaMesaEnTres({
             : NOTA_DE_MAS_DE_CUATRO,
       );
     }
+    /*
+     * Y AQUÍ NO VA EL MARCADOR, a sabiendas: sin islas repartidas no hay partida que
+     * marcar. Todos a cero puntos, el mazo entero y ni una carta en ninguna mano es
+     * una cinta que ocupa un alto para no decir nada, justo en la pantalla donde lo
+     * único que importa es quién falta por sentarse. Sale en cuanto hay tablero, que
+     * es en las otras dos ramas.
+     */
     return (
       <View style={estilos.todo}>
         <BarraDeLaMesa
@@ -797,6 +943,14 @@ function LaMesaEnTres({
       />
       <LineaDelTurno mesa={vista} nombres={nombres} />
       <ElAviso texto={mesa.aviso} />
+      {/*
+        EL MARCADOR VA CON EL CROMO DE LA MESA Y NO ENCIMA DEL LIENZO. Es lo que se
+        mira ANTES de decidir —quién va ganando, cuánto mazo queda—, no mientras se
+        arrastra una pieza, y un panel flotante sobre el delta taparía tablero que se
+        toca justo cuando hace falta tocarlo. El lienzo mide lo mismo que antes: esta
+        franja se lleva su alto del pie, que es el que cede.
+      */}
+      <ElMarcador marcador={marcador} />
 
       <View style={[estilos.cajaDelLienzo, { height: altoDelLienzo }]}>
         {catalogo.que === 'listo' ? (
@@ -858,6 +1012,11 @@ function LaMesaEnTres({
                   onCogerCarta={alCogerCarta}
                   seCambianPor={seCambianPor}
                   onProponerTrueque={alProponerTrueque}
+                  cartasDelMazo={cartasDelMazo}
+                  cartaDelMazoCogida={cogidaDelMazo}
+                  onCogerCartaDelMazo={alCogerCartaDelMazo}
+                  onJugarCarta={alJugarCarta}
+                  onRevelarCarta={alRevelarCarta}
                 />
               </Canvas>
             </View>
@@ -911,6 +1070,22 @@ function LaMesaEnTres({
         ) : null}
 
         {aQuien !== null ? <HojaDeAQuien posibles={aQuien} alElegir={alElegirAQuien} alDejarlo={soltarTodo} /> : null}
+
+        {/*
+          LAS DOS HOJAS NO SALEN JUNTAS JAMÁS, porque para abrir una hay que haber
+          cogido algo de una mano y coger de una suelta la otra. Se escriben una
+          detrás de otra y no en un `if/else` para que el día que eso deje de ser
+          verdad —una hoja nueva, otra mano— se vea el solape en pantalla en vez de
+          que una de las dos desaparezca en silencio.
+        */}
+        {comoJugarla !== null ? (
+          <HojaDeLaCarta
+            carta={comoJugarla.carta}
+            jugadas={comoJugarla.jugadas}
+            alElegir={alElegirJugada}
+            alDejarlo={soltarTodo}
+          />
+        ) : null}
       </View>
 
       {/*
@@ -1074,6 +1249,223 @@ function HojaDeAQuien({
 }
 
 // ---------------------------------------------------------------------------
+// La hoja de «¿cómo la juegas?»
+// ---------------------------------------------------------------------------
+
+/** El naipe que se acaba de soltar en la casilla de jugar, y las maneras que hay. */
+interface LaCartaYSusJugadas {
+  readonly carta: CartaDelMazoEnTres;
+  readonly jugadas: readonly JugadaDeCarta<OpcionDeMesa>[];
+}
+
+/**
+ * LO QUE FALTA POR DECIR DE UNA CARTA, y son tres preguntas distintas.
+ *
+ * La guardia pide a quién se le roba, el año bueno qué dos bienes se cogen y el
+ * acaparamiento cuál se pide. Las Dos Veredas no pide nada y por eso nunca llega
+ * aquí: `jugadaSinPreguntar` la manda sola.
+ *
+ * La tabla está aquí y no en la traducción porque estas cuatro frases son de esta
+ * pantalla: son el encabezado de una hoja, no una regla. Lo que sí es del juego —el
+ * rótulo de cada botón— llega en `JugadaDeCarta.rotulo` y se pinta tal cual.
+ *
+ * La cuarta entrada existe para que el compilador exija las cuatro clases: si mañana
+ * `ClaseDeJugada` crece, esto no compila en vez de enseñar una hoja sin pregunta.
+ */
+const PREGUNTA_DE_LA_JUGADA: Readonly<Record<ClaseDeJugada, string>> = {
+  guardia: '¿A quién le robas?',
+  anobueno: '¿Qué dos bienes coges?',
+  acaparamiento: '¿Qué bien pides?',
+  dosveredas: '¿Cómo la juegas?',
+};
+
+/**
+ * CÓMO SE JUEGA ESTA CARTA, cuando hay más de una manera.
+ *
+ * La misma hoja pequeña que la de «¿a quién?» y con sus mismos estilos, porque es la
+ * misma clase de cosa: una pregunta de un toque que no puede llevarse el tablero de
+ * delante. Lo que cambia es que la lista SE DESPLAZA, y hace falta: El Año Bueno
+ * ofrece quince pares —los quince del §2 del diseño— y quince botones de 44 no caben
+ * en ninguna pantalla de móvil. Sin el tope, los últimos pares quedarían recortados
+ * por el `overflow: hidden` de la caja del lienzo y no habría manera de llegar a
+ * ellos: una carta a la que le faltan jugadas y ni un error en ninguna parte.
+ */
+function HojaDeLaCarta({
+  carta,
+  jugadas,
+  alElegir,
+  alDejarlo,
+}: {
+  carta: CartaDelMazoEnTres;
+  jugadas: readonly JugadaDeCarta<OpcionDeMesa>[];
+  alElegir: (j: JugadaDeCarta<OpcionDeMesa>) => void;
+  alDejarlo: () => void;
+}): JSX.Element {
+  const clase = jugadas[0]?.clase;
+  return (
+    <View style={estilos.hoja} accessibilityViewIsModal>
+      <Text style={estilos.hojaRotulo}>
+        {clase === undefined ? '¿Cómo la juegas?' : PREGUNTA_DE_LA_JUGADA[clase]}
+      </Text>
+      <Text style={estilos.hojaTexto}>{carta.nombre}</Text>
+      <ScrollView style={estilos.hojaLista} contentContainerStyle={estilos.hojaListaDentro}>
+        {jugadas.map((j) => (
+          /*
+            EL RÓTULO ES EL DEL JUEGO, TAL CUAL, como en `LasOpciones`: esta pantalla
+            no sabe cómo se llama un bien ni cómo se lee un par, y redactarlo aquí
+            sería escribir vocabulario de Riberas en el cliente.
+          */
+          <Pressable
+            key={j.opcion.id}
+            style={estilos.hojaBoton}
+            onPress={() => alElegir(j)}
+            accessibilityRole="button"
+            accessibilityLabel={j.rotulo}
+            accessibilityHint={j.opcion.ayuda.length > 0 ? j.opcion.ayuda : undefined}
+          >
+            <Text style={estilos.hojaBotonRotulo}>{j.rotulo}</Text>
+          </Pressable>
+        ))}
+      </ScrollView>
+      <Pressable
+        style={estilos.hojaDejarlo}
+        onPress={alDejarlo}
+        accessibilityRole="button"
+        accessibilityLabel="Dejarlo, sin jugar la carta"
+      >
+        <Text style={estilos.hojaDejarloRotulo}>Dejarlo</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// El marcador
+// ---------------------------------------------------------------------------
+
+/**
+ * LOS PUNTOS DE CADA COLONO Y LO QUE QUEDA DE MAZO, que el §4 y el §5 del diseño
+ * mandan que se vean SIEMPRE.
+ *
+ * ═══ EL NÚMERO GRANDE SIGNIFICA LO MISMO EN LAS CUATRO FICHAS ═══
+ *
+ * Es el PÚBLICO, el de todos, el mío incluido. Poner en mi ficha el total con los
+ * títulos ocultos dentro habría sido más halagador y habría hecho que dos números en
+ * la misma fila, del mismo tamaño y en la misma columna, significaran cosas
+ * distintas: los demás lo compararían con el suyo y estarían comparando peras con
+ * manzanas. Lo que sólo cuento yo va DEBAJO y en otra letra, sumando desde el
+ * público, que es como se lee «voy por catorce, y dos no los sabe nadie».
+ *
+ * Y sólo aparece cuando hay algo que decir: sin títulos guardados,
+ * `puntosConLoOculto` vale lo mismo que `puntos` y ahí no hay ningún secreto que
+ * anunciar. La traducción manda `null` en las fichas ajenas —«de éste no lo sé»— y
+ * por eso aquí no hay manera de escribir un segundo número de otro ni por descuido.
+ *
+ * ═══ Y SE DESPLAZA A LO ANCHO, QUE ES LO QUE NO SE COME EL LIENZO ═══
+ *
+ * Cuatro colonos y el mazo no caben en el ancho de un móvil de pie sin encoger cada
+ * ficha hasta que la cifra deje de leerse. En columna cabrían, pero cinco filas por
+ * encima del tablero son un tercio de la pantalla; una cinta que se recorre con el
+ * dedo cuesta un alto y ninguno más. Las fichas no se reordenan nunca —van por
+ * asiento— para que la propia se busque por el sitio y no leyendo los nombres.
+ */
+function ElMarcador({ marcador }: { marcador: MarcadorEnTres | null }): JSX.Element | null {
+  if (marcador === null || marcador.colonos.length === 0) return null;
+  return (
+    <ScrollView
+      horizontal
+      style={estilos.marcador}
+      contentContainerStyle={estilos.marcadorFila}
+      showsHorizontalScrollIndicator={false}
+    >
+      {/*
+        EL MAZO VA EL PRIMERO Y SIEMPRE EN EL MISMO SITIO. Es lo único de esta cinta
+        que no es de nadie, y contarlo es parte del juego: quedan tres cartas, ya no
+        puede salir un título. Puesto al final se iría fuera de la pantalla en cuanto
+        se sentara el cuarto colono, que es justo cuando más se cuenta.
+      */}
+      <View
+        style={estilos.mazo}
+        accessible
+        accessibilityRole="text"
+        accessibilityLabel={`Quedan ${String(marcador.mazo)} cartas en el mazo`}
+      >
+        <Text style={estilos.marcadorRotulo}>Mazo</Text>
+        <Text style={estilos.mazoCifra}>{marcador.mazo}</Text>
+      </View>
+      {marcador.colonos.map((c) => (
+        <FichaDelColono key={c.asiento} colono={c} />
+      ))}
+    </ScrollView>
+  );
+}
+
+/** Un colono en la cinta: su color, sus puntos y lo que se le ve del mazo. */
+function FichaDelColono({ colono }: { colono: ColonoEnElMarcador }): JSX.Element {
+  const oculto = colono.puntosConLoOculto;
+  const soloMios = oculto === null ? 0 : oculto - colono.puntos;
+  const premios = [
+    colono.tieneElVado ? 'Vado largo' : null,
+    colono.tieneLaMayorGuardia ? 'Mayor guardia' : null,
+  ].filter((p): p is string => p !== null);
+
+  /*
+   * LA FRASE QUE SE OYE ES LA ENTERA, y la que se ve son cuatro renglones cortos. Es
+   * la misma decisión que la línea del turno deja escrita: un lector de pantalla no
+   * ve una ficha, lee una fila detrás de otra, y «Ada · 4 · 3 cartas» suena a tres
+   * datos sueltos. Lo que se pinta no cambia; lo que se oye se compone aquí.
+   */
+  const dicho = [
+    `${colono.nombre}${colono.soyYo ? ', tú' : ''}`,
+    `${String(colono.puntos)} puntos a la vista`,
+    soloMios > 0 ? `y ${String(soloMios)} más que sólo cuentas tú` : null,
+    `${String(colono.cartas)} cartas en la mano`,
+    `${String(colono.guardias)} guardias jugadas`,
+    colono.titulos.length > 0 ? `ha revelado ${colono.titulos.join(', ')}` : null,
+    premios.length > 0 ? `tiene ${premios.join(' y ')}` : null,
+  ]
+    .filter((t): t is string => t !== null)
+    .join('. ');
+
+  return (
+    <View
+      style={[estilos.ficha, colono.soyYo ? estilos.fichaMia : null]}
+      accessible
+      accessibilityRole="text"
+      accessibilityLabel={dicho}
+    >
+      {/*
+        EL RAÍL LLEVA EL COLOR DEL COLONO, que es el mismo con el que sus piezas están
+        puestas en el tablero. No es un color inventado ni uno de la Sala: viene en la
+        vista, y es lo que hace que esta ficha y aquella choza sean de la misma
+        persona sin leer un nombre.
+      */}
+      <View style={[estilos.fichaRail, { backgroundColor: colono.color }]} />
+      <View style={estilos.fichaCuerpo}>
+        <Text style={estilos.fichaNombre} numberOfLines={1}>
+          {colono.soyYo ? `${colono.nombre} (tú)` : colono.nombre}
+        </Text>
+        <Text style={estilos.fichaPuntos}>{colono.puntos}</Text>
+        {soloMios > 0 ? (
+          <Text style={estilos.fichaOculto}>{`+${String(soloMios)} sólo tuyos`}</Text>
+        ) : null}
+        <Text style={estilos.fichaPie}>
+          {`${String(colono.cartas)} cartas · ${String(colono.guardias)} guardias`}
+        </Text>
+        {colono.titulos.length > 0 ? (
+          <Text style={estilos.fichaPie} numberOfLines={2}>
+            {colono.titulos.join(' · ')}
+          </Text>
+        ) : null}
+        {premios.length > 0 ? (
+          <Text style={estilos.fichaPremio}>{premios.join(' · ')}</Text>
+        ) : null}
+      </View>
+    </View>
+  );
+}
+
+// ---------------------------------------------------------------------------
 
 /*
  * Sólo lo que esta pantalla pinta con sus manos: el lienzo, el telón, la nota del
@@ -1212,6 +1604,87 @@ const estilos = StyleSheet.create({
     backgroundColor: SALA.tejaAlta,
   },
   hojaBotonRotulo: { ...LETRA.rotulo, textTransform: 'none', color: SALA.blanco, fontSize: 16 },
+  /*
+   * LA LISTA DE LA HOJA SE DESPLAZA, y el tope está medido contra la hoja entera. El
+   * Año Bueno ofrece quince pares: quince botones de 44 más su hueco son casi
+   * ochocientos puntos, y la caja del lienzo mide 360 en el peor caso. Con 220 caben
+   * cuatro botones a la vista y el resto se baja con el dedo, y la hoja completa
+   * —pregunta, nombre de la carta, lista y «Dejarlo»— se queda en unos 330.
+   */
+  hojaLista: { flexGrow: 0, flexShrink: 1, maxHeight: 220 },
+  hojaListaDentro: { gap: 8 },
   hojaDejarlo: { minHeight: 44, justifyContent: 'center', alignItems: 'center' },
   hojaDejarloRotulo: { ...LETRA.rotuloChico, color: SALA.tenue, fontSize: 13 },
+  /*
+   * ═══ LA CINTA DEL MARCADOR ═══
+   *
+   * `flexGrow: 0` escrito a mano, como el pie: dentro de una columna un `ScrollView`
+   * pide todo lo que queda, y esta cinta tiene que medir lo que miden sus fichas y ni
+   * un punto más — lo que se lleve de alto se lo quita al lienzo, que es lo que se ha
+   * venido a mirar. Y `flexShrink: 0` para que no sea ella la que ceda cuando la
+   * pantalla se quede corta: una ficha aplastada deja de decir el número.
+   */
+  marcador: { flexGrow: 0, flexShrink: 0 },
+  marcadorFila: { gap: 8, paddingHorizontal: 16, paddingTop: 10, alignItems: 'flex-start' },
+  marcadorRotulo: { ...LETRA.rotuloChico, color: SALA.tenue, fontSize: 13 },
+  /* El mazo: la misma teja que una ficha, sin raíl, porque no es de nadie. */
+  mazo: {
+    minWidth: 76,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    gap: 2,
+    borderRadius: RADIO.ficha,
+    borderWidth: 1,
+    borderColor: SALA.filo,
+    backgroundColor: SALA.teja,
+  },
+  /*
+   * LAS CIFRAS EN `LETRA.dato`, con la copia del `fontVariant` que ese tipo exige:
+   * la tabla es `as const` y su lista sale de sólo lectura, que no encaja en el
+   * `TextStyle` de React Native. Es la misma línea que ya llevan `escena-peonza.tsx`
+   * y `retablo.tsx`, y sin ella `StyleSheet.create` deja de inferir la hoja ENTERA.
+   */
+  mazoCifra: {
+    ...LETRA.dato,
+    fontVariant: [...LETRA.dato.fontVariant],
+    color: SALA.palabra,
+    fontSize: 22,
+  },
+  /*
+   * ANCHO TOPADO POR LOS DOS LADOS, como la franja de las cartas y por lo mismo: el
+   * mínimo para que la cifra y el pie quepan sin partirse, y el máximo para que un
+   * nombre largo no se lleve la cinta entera y deje al resto de colonos fuera de la
+   * pantalla. Lo que sobra del nombre se corta con `numberOfLines`, que es lo que se
+   * puede perder sin perder ningún dato: el color del raíl ya dice de quién es.
+   */
+  ficha: {
+    flexDirection: 'row',
+    minWidth: 132,
+    maxWidth: 200,
+    borderRadius: RADIO.ficha,
+    borderWidth: 1,
+    borderColor: SALA.filo,
+    backgroundColor: SALA.teja,
+    overflow: 'hidden',
+  },
+  /*
+   * LA MÍA SE DISTINGUE POR EL CONTORNO Y POR EL «(TÚ)», y no por el acento: en esta
+   * Sala el acento quiere decir «esto es lo que hay que tocar», y una ficha del
+   * marcador no se toca nunca. El contorno es el mismo blanco al 40 % de la hoja
+   * —3,63 sobre la teja—, que es el que sí se ve; `filoVivo` se queda en 1,42:1 y eso
+   * no es un contorno apagado, es ninguno.
+   */
+  fichaMia: { borderColor: conAlfa(SALA.blanco, 0.4), backgroundColor: SALA.tejaAlta },
+  fichaRail: { width: 4 },
+  fichaCuerpo: { flex: 1, paddingHorizontal: 10, paddingVertical: 8, gap: 2 },
+  fichaNombre: { ...LETRA.rotuloChico, color: SALA.tenue, fontSize: 13 },
+  fichaPuntos: {
+    ...LETRA.dato,
+    fontVariant: [...LETRA.dato.fontVariant],
+    color: SALA.blanco,
+    fontSize: 22,
+  },
+  fichaOculto: { ...LETRA.cuerpo, color: SALA.palabra, fontSize: 13 },
+  fichaPie: { ...LETRA.cuerpo, color: SALA.tenue, fontSize: 13 },
+  fichaPremio: { ...LETRA.rotuloChico, color: SALA.palabra, fontSize: 13 },
 });

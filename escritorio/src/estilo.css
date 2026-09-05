@@ -2231,10 +2231,100 @@ code {
   margin: 0 0 0.75rem;
 }
 
-/* El menú de a quién se le propone: los botones de siempre, a lo ancho del mueble. */
-.riberas-a-quien .opciones {
+/*
+ * EL MENÚ DE ELEGIR —a quién se le propone el trato, a quién le roba la guardia, qué dos
+ * bienes coge el año bueno—: los botones de siempre, en columna y a lo ancho del mueble.
+ *
+ * En columna y no en fila porque lo que se lee es el RÓTULO ENTERO, y los del año bueno
+ * son quince y dicen dos bienes cada uno: en fila se cortan y hay que adivinar cuál es
+ * cuál. Se llamaba `.riberas-a-quien` cuando la única pregunta era el trueque.
+ */
+.riberas-elige .opciones {
   flex-direction: column;
   flex-wrap: nowrap;
+}
+
+/*
+ * ═══ EL MARCADOR DEL RAÍL ═══
+ *
+ * Es un `.panel` como los que declara el juego —mismo fondo, mismo filo, mismo rótulo—
+ * porque está entre ellos y una caja distinta al lado se lee como si fuera de otra
+ * pantalla. Lo único suyo es la rejilla de dentro.
+ *
+ * Tres columnas: la MOTA de color, el nombre —que se lleva lo que quede— y los puntos
+ * pegados a la derecha, con la línea chica de debajo cruzando las tres. Se alinean los
+ * puntos a la derecha para poder compararlos de un vistazo sin leer los nombres, que es
+ * exactamente para lo que se mira un marcador.
+ */
+.riberas-marcador .renglones {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.colono-del-marcador {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 0.1rem 0.5rem;
+}
+
+/*
+ * LA MOTA DEL COLOR DEL COLONO. Es el MISMO color con el que sus casas se pintan en el
+ * delta y en el retablo, y ése es todo su trabajo: unir el nombre del marcador con las
+ * piezas del tablero sin que nadie tenga que preguntar de quién es la casa azul.
+ *
+ * `aria-hidden` en el marcado y ni una palabra de texto: quien no ve el color no pierde
+ * nada, porque el nombre está al lado. Un color no puede ser la única forma de saber
+ * algo (WCAG 1.4.1), y aquí no lo es.
+ */
+.mota-de-color {
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 50%;
+  border: 1px solid var(--filo);
+  align-self: center;
+}
+
+.nombre-del-colono {
+  min-width: 0;
+  font-weight: 600;
+}
+
+/* El renglón de quien mira, en la letra de la casa y con su nombre destacado. */
+.soy-yo .nombre-del-colono {
+  color: var(--acento);
+}
+
+.puntos-del-colono {
+  justify-self: end;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+ * LOS PUNTOS QUE SÓLO CUENTAS TÚ, en la letra chica y en `--tenue`: se distinguen de los
+ * públicos sin gritar. Que sean OTRO número y no el mismo es la información —§1.6 del
+ * diseño—, y que se vean más flojos es lo que dice cuál de los dos ve la mesa.
+ */
+.puntos-ocultos {
+  font-size: var(--letra-minima);
+  font-weight: 400;
+  color: var(--tenue);
+}
+
+/* Cartas, guardias, premios y títulos revelados: la línea de debajo, cruzando las tres columnas. */
+.lo-del-colono {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--tenue);
+}
+
+/* Cuántas quedan por comprar. Separada por un filo: no es de ningún colono. */
+.queda-mazo {
+  margin: 0.75rem 0 0;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--filo);
 }
 
 @media (max-width: 900px) {

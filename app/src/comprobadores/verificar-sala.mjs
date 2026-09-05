@@ -900,6 +900,218 @@ paso('El delta se puede mirar de cerca, recorrer, y siempre se puede volver');
   );
 }
 
+paso('El mazo de Riberas se juega desde la app, y en las DOS ramas');
+{
+  /*
+   * ═══ QUÉ SE COMPRA AQUÍ, Y POR QUÉ NO LO COMPRA `verify:riberas-en-tres` ═══
+   *
+   * Las reglas del mazo son de `shared/arcade/juegos/riberas.ts` y las miden 270
+   * comprobaciones; la traducción de la vista a lo que se pinta es de
+   * `riberas-en-tres.ts` y la mide su propio guion con partidas de verdad. Ninguno de
+   * los dos puede ver lo que esta pantalla hace con lo que le dan, y ahí caben los
+   * fallos que compilan, pasan los tipos y sólo se ven jugando:
+   *
+   *   · pintar la mano de cartas Y dejar además los mismos movimientos como botones,
+   *     o al revés — quitarlos de los botones en la rama que NO pinta la mano, que es
+   *     la que hoy ve todo el móvil, y dejar las cartas sin ninguna manera de jugarse;
+   *   · montar `{ tipo, carga }` a mano con el seudónimo y el bien, en vez de mandar
+   *     la opción entera que dio el juego: la forma del movimiento pasa a estar
+   *     escrita en dos sitios y el segundo no lo comprueba nadie;
+   *   · tener las dos manos cogidas a la vez, que es lo que `escenas/cartas.ts` da por
+   *     imposible para medir la separación de su franja contra las áreas de trueque;
+   *   · preguntar a quién se le roba con las opciones de la revisión anterior;
+   *   · enseñar en el marcador un segundo número de otro colono, que es información
+   *     que no está en la vista de nadie.
+   */
+  const escena = leer(path.join(SRC, 'arcade', 'riberas-en-tres-escena.tsx'));
+  const mueble = leer(path.join(SRC, 'arcade', 'tablero-en-linea.tsx'));
+  /*
+   * La misma regla que la sección de arriba y por lo mismo: toda prohibición mira el
+   * CÓDIGO y nunca el fichero entero. Las cabeceras de esta pantalla cuentan los
+   * fallos que evita —nombran `carga`, nombran COMPRAR— y una regla que castigue
+   * hablar de algo enseña a no documentarlo.
+   */
+  const soloCodigo = (texto) => texto.split('\n').filter((l) => !/^\s*(\*|\/\/|\/\*)/.test(l));
+  const codigoDeLaEscena = soloCodigo(escena);
+  const escenaSinComentarios = codigoDeLaEscena.join('\n');
+
+  /* El cuerpo del respaldo, para poder afirmar cosas SÓLO de esa rama. */
+  const respaldo =
+    /const respaldoSobreElRetablo = \(nota: string\): JSX\.Element => \{([\s\S]*?)\n  \};/.exec(
+      escena,
+    )?.[1] ?? '';
+  comprobar(
+    'se sabe leer la rama del respaldo, que es la que hoy ve todo el móvil',
+    respaldo.length > 0 && /<Retablo/.test(respaldo),
+    'sin este trozo, las tres reglas de abajo no estarían mirando nada',
+  );
+
+  /* ─── La mano llega a la escena, y llega traducida ─── */
+
+  comprobar(
+    'la mano del mazo sale de `cartasEnTres` y se le da a `<Delta>`',
+    /const cartasDelMazo = useMemo\(\(\) => cartasEnTres\(laVista, opciones\)/.test(escena) &&
+      /cartasDelMazo=\{cartasDelMazo\}/.test(escena),
+    'sin esto la franja de la izquierda no se pinta y las cartas no existen en la pantalla',
+  );
+  comprobar(
+    'y con ella los tres avisos que la escena da: coger, jugar y revelar',
+    /onCogerCartaDelMazo=\{alCogerCartaDelMazo\}/.test(escena) &&
+      /onJugarCarta=\{alJugarCarta\}/.test(escena) &&
+      /onRevelarCarta=\{alRevelarCarta\}/.test(escena) &&
+      /cartaDelMazoCogida=\{cogidaDelMazo\}/.test(escena),
+    'una mano que se pinta y no avisa de nada es un dibujo de una mano',
+  );
+
+  /* ─── Las dos manos no pueden estar cogidas a la vez ─── */
+
+  /*
+   * NO ES COSMÉTICA: `escenas/cartas.ts` mide la franja de las cartas contra la
+   * columna de áreas de trueque dando por hecho que las dos manos se excluyen, y lo
+   * deja dicho —«esa exclusión la sostiene el cliente, no la geometría»—. Si las dos
+   * pueden estar cogidas, las áreas y las casillas se pisan en un móvil de pie.
+   */
+  const cogerDelMazo = /const alCogerCartaDelMazo = useCallback\(([\s\S]*?)\n  \);/.exec(escena)?.[1] ?? '';
+  const cogerBien = /const alCogerCarta = useCallback\(([\s\S]*?)\n  \);/.exec(escena)?.[1] ?? '';
+  const tomarDeLaBarra = /const alTomarDeLaBarra = useCallback\(([\s\S]*?)\n  \);/.exec(escena)?.[1] ?? '';
+  comprobar(
+    'coger un naipe del mazo suelta el bien y la pieza de la barra',
+    /ponerCogida\(null\)/.test(cogerDelMazo) &&
+      /ponerTomada\(null\)/.test(cogerDelMazo) &&
+      /ponerColocando\(null\)/.test(cogerDelMazo),
+    'las dos manos cogidas a la vez pisan las áreas de trueque con las casillas de la mano',
+  );
+  comprobar(
+    'y coger un bien —o una pieza— suelta el naipe, que es la vuelta de lo mismo',
+    /ponerCogidaDelMazo\(null\)/.test(cogerBien) && /ponerCogidaDelMazo\(null\)/.test(tomarDeLaBarra),
+    'la exclusión tiene que valer en las dos direcciones o no es una exclusión',
+  );
+  comprobar(
+    'y al cambiar la revisión de la mesa se suelta TAMBIÉN el naipe y la hoja abierta',
+    /ponerCogidaDelMazo\(null\);/.test(escenaSinComentarios) &&
+      /ponerComoJugarla\(null\);\n  \}, \[\]\);/.test(escenaSinComentarios) &&
+      /\}, \[vista\.rev, soltarTodo\]\);/.test(escenaSinComentarios),
+    'una hoja de «¿a quién le robas?» abierta con las opciones de antes manda un movimiento muerto',
+  );
+
+  /* ─── Jugar: se pregunta sólo cuando hay que elegir, y viaja la opción entera ─── */
+
+  comprobar(
+    'con una sola manera de jugarla se manda sin preguntar (`jugadaSinPreguntar`)',
+    /const sola = jugadaSinPreguntar\(laVista, opciones, carta\.id\);/.test(escena),
+    'preguntar «¿a quién?» en una mesa de dos, donde no hay a quién elegir, es un toque de más por carta',
+  );
+  comprobar(
+    'y con varias se abre la hoja con TODAS las que ofrece el juego',
+    /const todas = jugadasDeLaCarta\(laVista, opciones, carta\.id\);/.test(escena) &&
+      /<HojaDeLaCarta/.test(escena),
+    'la guardia pide a quién, el año bueno dos bienes y el acaparamiento uno: sin hoja no se pueden jugar',
+  );
+  /*
+   * LO QUE VIAJA ES LA OPCIÓN ENTERA. Es la misma frontera que `SitioDeObra` con una
+   * obra y `TruequePosible` con una oferta, y está escrita en `JugadaDeCarta`: si el
+   * cliente montara la carga, la forma del movimiento —`{ carta, a }`, `{ carta,
+   * bienes }`— quedaría escrita aquí además de en las reglas, y esta copia no la
+   * comprueba nadie. Se persigue cualquier carga fabricada en esta pantalla.
+   */
+  comprobar(
+    'el movimiento que se manda es el que dio el juego, sin montar ninguna carga aquí',
+    /mesa\.mover\(\{ tipo: sola\.opcion\.tipo, carga: sola\.opcion\.carga \}\)/.test(escena) &&
+      /mesa\.mover\(\{ tipo: j\.opcion\.tipo, carga: j\.opcion\.carga \}\)/.test(escena) &&
+      !codigoDeLaEscena.some((l) => /carga:\s*\{/.test(l)),
+    'una carga montada en el cliente es la forma del movimiento escrita en un segundo sitio',
+  );
+  comprobar(
+    'revelar un título sale de `revelarDe`, y sin opción no se manda nada',
+    /const revelar = revelarDe\(opciones, carta\.id\);/.test(escena) &&
+      /if \(revelar === null\) return;/.test(escena),
+    'revelar no se puede deshacer: una carta enseñada ya no se desenseña',
+  );
+  /*
+   * La hoja del Año Bueno lleva QUINCE botones —los quince pares del §2 del diseño—,
+   * y quince de 44 no caben en la caja del lienzo, que en el peor caso mide 360. Sin
+   * el desplazamiento los últimos pares quedan recortados por el `overflow: hidden` y
+   * no hay manera de llegar a ellos: una carta a la que le faltan jugadas y ni un
+   * error en ninguna parte.
+   */
+  comprobar(
+    'y la lista de la hoja se desplaza, que es lo que hace jugables los quince pares del año bueno',
+    /<ScrollView style=\{estilos\.hojaLista\}/.test(escena) &&
+      /hojaLista: \{[^}]*maxHeight:/.test(escena),
+    'quince botones de 44 miden casi ochocientos puntos y la caja del lienzo mide 360',
+  );
+
+  /* ─── Comprar, que no es de la mano ─── */
+
+  comprobar(
+    'COMPRAR no se filtra con la mano y su botón sigue diciendo lo que cuesta',
+    /opcionesFueraDeLaMano\(opcionesFueraDelTablero\(opciones\)\)/.test(escenaSinComentarios) &&
+      !codigoDeLaEscena.some((l) => /\bCOMPRAR\b|riberas:comprar/.test(l)) &&
+      /\{o\.ayuda\}/.test(mueble),
+    'comprar no cuelga de ningún naipe: su único sitio es el botón, y el coste va en su ayuda',
+  );
+
+  /* ─── El respaldo: donde no hay franja, las cartas son botones ─── */
+
+  comprobar(
+    'el respaldo NO quita las opciones de la mano: ahí las cartas se juegan por botón',
+    respaldo.length > 0 &&
+      !/opcionesFueraDeLaMano/.test(respaldo) &&
+      /opcionesSueltas\(tablero, opciones\)/.test(respaldo),
+    'sobre el retablo no hay mano que pintar: quitarlas dejaría el móvil con cartas y sin jugarlas',
+  );
+  comprobar(
+    'y el marcador se ve también ahí, que es la rama que hoy ve todo el móvil',
+    /<ElMarcador marcador=\{marcador\} \/>/.test(respaldo),
+    'un marcador que sólo saliera con el delta no lo vería nadie que juegue desde el teléfono',
+  );
+
+  /* ─── El marcador ─── */
+
+  comprobar(
+    'el marcador sale de `marcadorEnTres` y se pinta en las dos ramas',
+    /const marcador = useMemo\(\(\) => marcadorEnTres\(laVista\), \[laVista\]\);/.test(escena) &&
+      (escena.match(/<ElMarcador marcador=\{marcador\} \/>/g) ?? []).length === 2,
+    'los puntos de cada colono y lo que queda de mazo se ven SIEMPRE (§4 y §5 del diseño)',
+  );
+  /*
+   * EL NÚMERO GRANDE ES EL PÚBLICO EN LAS CUATRO FICHAS. Poner el total con lo oculto
+   * en la propia haría que dos números de la misma fila y del mismo tamaño
+   * significaran cosas distintas. Lo que sólo cuento yo va debajo, sumando desde el
+   * público, y sólo cuando hay algo que decir.
+   */
+  comprobar(
+    'la cifra grande es la PÚBLICA, y lo oculto va aparte y sumando desde ella',
+    /<Text style=\{estilos\.fichaPuntos\}>\{colono\.puntos\}<\/Text>/.test(escena) &&
+      /const soloMios = oculto === null \? 0 : oculto - colono\.puntos;/.test(escena) &&
+      /soloMios > 0 \?/.test(escena),
+    'con el total en la mía, comparar mi cifra con la de al lado es comparar dos cosas distintas',
+  );
+  /*
+   * Y NO SE INVENTA UN SEGUNDO NÚMERO DE OTRO. `puntosConLoOculto` viene `null` en las
+   * fichas ajenas y eso quiere decir «de éste no lo sé»; un `?? colono.puntos` lo
+   * convertiría en un dato, y la pantalla enseñaría a los demás una cifra secreta que
+   * no existe. Se persigue el respaldo, que es la única forma de que pase.
+   */
+  comprobar(
+    'y de los demás no se enseña ningún total oculto: `null` es «no lo sé», no un cero',
+    !codigoDeLaEscena.some((l) => /puntosConLoOculto\s*\?\?/.test(l)),
+    'lo que no está en la vista no se puede pintar, ni con un valor por defecto',
+  );
+  /*
+   * EL MARCADOR NO FLOTA SOBRE EL LIENZO. Acercado del todo el delta llega de borde a
+   * borde, así que todo cromo encima es tablero que deja de poder tocarse —la cabecera
+   * del botón de volver tiene la cuenta entera—. El marcador se mira ANTES de decidir,
+   * no mientras se arrastra una pieza, así que vive con el cromo de la mesa.
+   */
+  const estiloDelMarcador = /\n  marcador: \{([\s\S]*?)\n  \},/.exec(escena)?.[1] ?? '';
+  comprobar(
+    'y no se pone encima del lienzo: la cinta va en la columna, no flotando',
+    estiloDelMarcador.length > 0 && !/position:/.test(estiloDelMarcador),
+    'todo lo que flota sobre el delta es tablero que deja de poder tocarse',
+  );
+}
+
 // ---------------------------------------------------------------------------
 
 if (fallos.length > 0) {

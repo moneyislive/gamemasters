@@ -130,6 +130,41 @@
  * entero», que devuelve `comoAlPrincipio()`. Sólo se enseña cuando hace falta
  * —`estaComoAlPrincipio` es falso—: un botón que siempre está no informa de nada.
  *
+ * ═══ EL MAZO: DOS MANOS EN EL MISMO LIENZO, Y UNA SOLA COSA COGIDA ═══
+ *
+ * A la derecha va la mano de BIENES —lo que se gasta— y a la izquierda la del MAZO
+ * —lo que se guarda—: son dos manos distintas y las pinta `escenas/cartas.ts`. Aquí
+ * sólo se recogen las tres pulsaciones que la escena avisa (coger, jugar, revelar) y
+ * se manda el movimiento que la traducción ya trae montado.
+ *
+ * LO QUE ESTE FICHERO TIENE QUE HACER Y LA ESCENA NO HACE, dicho porque no da error
+ * ninguna de las tres veces que se olvida:
+ *
+ *   1. COGER UNA CARTA SUELTA EL BIEN COGIDO, Y AL REVÉS. La escena avisa de cada
+ *      pulsación por su lado y no sabe que la otra mano existe. Sin esto se quedan
+ *      las dos levantadas a la vez, con el área de trueque abierta y las casillas del
+ *      mazo abiertas encima: dos gestos distintos ofrecidos al mismo tiempo, y el
+ *      siguiente clic hace el que no era.
+ *   2. COGER LA MISMA OTRA VEZ LA SUELTA. También lo dice el contrato de `<Delta>`, y
+ *      también es cosa de quien monta: sin ello no hay forma de arrepentirse.
+ *   3. AL CAMBIAR LA REVISIÓN SE SUELTA TODO. Ya se hacía con la barra y la mano de
+ *      bienes; la carta del mazo entra en el mismo efecto y por el mismo motivo — una
+ *      carta cogida mirando la mesa anterior puede haberse jugado ya.
+ *
+ * ═══ Y CUANDO JUGAR UNA CARTA PIDE ELEGIR, SE PREGUNTA ═══
+ *
+ * La Guardia pide a quién se le roba y El Año Bueno qué dos bienes se cogen: son
+ * varias opciones distintas para la misma carta, y el naipe soltado en la casilla no
+ * dice cuál. Se pregunta con el MISMO menú que ya preguntaba a quién se le propone un
+ * trueque —el de abajo—, porque es la misma pregunta con otro título: el juego escribe
+ * los rótulos y aquí no se redacta ni una palabra sobre la jugada.
+ *
+ * Las cuentas no están aquí: `jugadasDeLaCarta` da todas las maneras y
+ * `jugadaSinPreguntar` dice si hay UNA sola. Con una se manda; con ninguna no se manda
+ * nada, que es lo mismo que hace el trueque. Escribir aquí «si es guardia, pregunta a
+ * quién» sería una regla en el cliente, y el día que a quien no tiene bienes dejara de
+ * poder robársele, este fichero seguiría ofreciéndolo.
+ *
  * ═══ LO QUE LA REVISIÓN DE LA MESA NO TOCA ═══
  *
  * La cámara. Al cambiar `rev` se suelta lo que se tenía en la mano —ver más
@@ -178,14 +213,24 @@ import type { Opcion } from '../../shared/arcade';
 import {
   barraEnTres,
   bienesQueSeCambianPor,
+  cartasEnTres,
   colocandoEnTres,
+  jugadasDeLaCarta,
+  jugadaSinPreguntar,
   manoEnTres,
+  marcadorEnTres,
+  opcionesFueraDeLaMano,
   opcionesFueraDelTablero,
+  revelarDe,
   seVeEnTres,
   tableroEnTres,
   truequesPosibles,
 } from '../../shared/arcade/juegos/riberas-en-tres';
-import type { IdDeLaBarra, TableroEnTres, TruequePosible } from '../../shared/arcade/juegos/riberas-en-tres';
+import type {
+  ClaseDeJugada,
+  IdDeLaBarra,
+  TableroEnTres,
+} from '../../shared/arcade/juegos/riberas-en-tres';
 import { semillaDelCodigo } from '../../shared/mecanicas/semilla';
 import type { TableroDeclarado } from '../../shared/mecanicas/tablero-declarado';
 import { Formulario } from './formulario';
@@ -227,6 +272,33 @@ const VOLVER_AL_TABLERO_ENTERO = 'Ver el tablero entero';
  * colgada del lienzo otra vez y sin un solo error: la Sala volvería a desplazarse sola.
  */
 const RECUADRO_DEL_LIENZO = 'riberas-lienzo';
+
+/**
+ * LOS TÍTULOS DEL MENÚ, uno por pregunta, y ni una palabra más de cosecha propia.
+ *
+ * Lo que va DENTRO de cada botón lo escribió el juego —`opcion.rotulo` y `opcion.ayuda`,
+ * que ya nombran al colono o los dos bienes—; esto es sólo el encabezado, y es chrome de
+ * la Sala igual que «Lo que puedes hacer». Se elige por la CLASE de la jugada, que la
+ * traducción garantiza igual a la familia con que se pinta el naipe, y no por el tipo del
+ * movimiento: el tipo es del contrato del juego y colgar de él un texto de pantalla es lo
+ * que ata una hoja de estilo a un reductor.
+ *
+ * `dosveredas` está en la tabla porque el tipo la exige entera, y no porque se espere ver
+ * su menú: esa carta ofrece una sola jugada y se manda sin preguntar. Si algún día
+ * ofreciera dos, saldría un menú con título en vez de un hueco.
+ */
+const LO_QUE_SE_PREGUNTA: Readonly<Record<ClaseDeJugada, string>> = {
+  guardia: 'A quién le quitas un bien',
+  anobueno: 'Qué dos bienes coges',
+  acaparamiento: 'Qué bien pides',
+  dosveredas: 'Cómo la juegas',
+};
+
+/** El título del menú de siempre: a quién se le propone un trueque. */
+const A_QUIEN_SE_LO_PROPONES = 'A quién se lo propones';
+
+/** El rótulo del panel del marcador en el raíl. Chrome de la Sala, no una palabra del juego. */
+const TITULO_DEL_MARCADOR = 'El marcador';
 
 // ---------------------------------------------------------------------------
 // El catálogo de modelos, una vez por pestaña
@@ -641,9 +713,19 @@ export interface LoQueVeRiberas {
   opciones: readonly Opcion[];
 }
 
-/** A quién se le propone el trueque cuando el juego permite ofrecérselo a varios. */
-interface PreguntandoAQuien {
-  trueques: readonly TruequePosible<Opcion>[];
+/**
+ * LO QUE SE PREGUNTA CUANDO UN GESTO ADMITE VARIAS RESPUESTAS.
+ *
+ * Nació para el trueque —a quién se le propone— y ahora lo comparten las cartas: a quién
+ * le roba La Guardia, qué dos bienes coge El Año Bueno, qué bien pide El Acaparamiento.
+ * Es UN tipo y no cuatro porque la pregunta es siempre la misma: aquí están las opciones
+ * que el juego ofrece, elige una. Guardar en vez de la opción entera el destinatario o el
+ * par de bienes obligaría a volver a montar el movimiento al elegir, y la forma del
+ * movimiento estaría escrita en un sitio que nadie comprueba.
+ */
+interface Preguntando {
+  titulo: string;
+  opciones: readonly Opcion[];
 }
 
 export function RiberasEnTres({ manifiesto, mesa, puesta, tablero, opciones }: LoQueVeRiberas): JSX.Element {
@@ -676,7 +758,28 @@ export function RiberasEnTres({ manifiesto, mesa, puesta, tablero, opciones }: L
     return { ...crudo, islas };
   }, [vista]);
   const mano = useMemo(() => manoEnTres(vista), [vista]);
-  const fuera = useMemo(() => opcionesFueraDelTablero(opciones), [opciones]);
+  /*
+   * LOS BOTONES SON LOS QUE NO ENSEÑA NI EL TABLERO NI NINGUNA DE LAS DOS MANOS.
+   *
+   * Las dos criban se componen, y en este orden da igual porque las dos son filtros.
+   * `opcionesFueraDeLaMano` hace falta desde que esta pantalla pinta el mazo: sin ella,
+   * jugar una guardia saldría a la vez como naipe y como botón, y con catorce guardias en
+   * el mazo eso es una lista de botones tan larga como la mano. Comprar NO se cae por
+   * ella —no cuelga de ningún naipe— y sigue siendo un botón, que es su único sitio.
+   */
+  const fuera = useMemo(() => opcionesFueraDeLaMano(opcionesFueraDelTablero(opciones)), [opciones]);
+  /*
+   * LA MANO DEL MAZO, y apagada entera mientras haya una petición en vuelo.
+   *
+   * Es el mismo trato que recibe la barra dos bloques más abajo y por el mismo motivo:
+   * con `quieto` puesto el movimiento que se mandara ahora saldría con la revisión vieja.
+   * Las cartas NO desaparecen —eso es una regla del juego, ver `apagada` en
+   * `escenas/cartas.ts`—: se apagan, que es lo que la escena sabe pintar.
+   */
+  const cartasDelMazo = useMemo(() => {
+    const cartas = cartasEnTres(vista, opciones);
+    return quieto ? cartas.map((c) => ({ ...c, sePuedeJugar: false, sePuedeRevelar: false })) : cartas;
+  }, [vista, opciones, quieto]);
 
   // -------------------------------------------------------------------------
   // Lo que se tiene en la mano
@@ -684,7 +787,9 @@ export function RiberasEnTres({ manifiesto, mesa, puesta, tablero, opciones }: L
 
   const [tomada, ponerTomada] = useState<IdDeLaBarra | null>(null);
   const [cogida, ponerCogida] = useState<string | null>(null);
-  const [preguntando, ponerPreguntando] = useState<PreguntandoAQuien | null>(null);
+  /** El naipe del mazo levantado, por su seudónimo. Nunca la carta entera: es secreta. */
+  const [cartaDelMazo, ponerCartaDelMazo] = useState<string | null>(null);
+  const [preguntando, ponerPreguntando] = useState<Preguntando | null>(null);
 
   /*
    * AL CAMBIAR LA REVISIÓN SE SUELTA TODO. Lo que se tenía agarrado se agarró
@@ -695,6 +800,7 @@ export function RiberasEnTres({ manifiesto, mesa, puesta, tablero, opciones }: L
   useEffect(() => {
     ponerTomada(null);
     ponerCogida(null);
+    ponerCartaDelMazo(null);
     ponerPreguntando(null);
   }, [puesta.rev]);
 
@@ -723,6 +829,7 @@ export function RiberasEnTres({ manifiesto, mesa, puesta, tablero, opciones }: L
     (id: string) => {
       if (quieto) return;
       ponerCogida(null);
+      ponerCartaDelMazo(null);
       ponerTomada((antes) => (antes === id ? null : (id as IdDeLaBarra)));
     },
     [quieto],
@@ -743,6 +850,7 @@ export function RiberasEnTres({ manifiesto, mesa, puesta, tablero, opciones }: L
     (carta: { id: string }) => {
       if (quieto) return;
       ponerTomada(null);
+      ponerCartaDelMazo(null);
       ponerPreguntando(null);
       ponerCogida((antes) => (antes === carta.id ? null : carta.id));
     },
@@ -767,9 +875,79 @@ export function RiberasEnTres({ manifiesto, mesa, puesta, tablero, opciones }: L
         mover({ tipo: unico.opcion.tipo, carga: unico.opcion.carga });
         return;
       }
-      if (posibles.length > 1) ponerPreguntando({ trueques: posibles });
+      if (posibles.length > 1) {
+        ponerPreguntando({ titulo: A_QUIEN_SE_LO_PROPONES, opciones: posibles.map((t) => t.opcion) });
+      }
     },
     [quieto, cartaCogida, vista, opciones, mover],
+  );
+
+  // -------------------------------------------------------------------------
+  // El mazo: coger, jugar y revelar
+  // -------------------------------------------------------------------------
+
+  /*
+   * COGER UN NAIPE SUELTA TODO LO DEMÁS, y cogerlo dos veces lo suelta a él.
+   *
+   * Las tres cosas las hace quien monta el cliente y no la escena: `<Delta>` avisa de la
+   * pulsación y nada más. Sin la primera línea se quedan levantados a la vez un bien y
+   * una carta, con el área de trueque abierta y las casillas del mazo abiertas encima.
+   */
+  const alCogerCartaDelMazo = useCallback(
+    (carta: { id: string }) => {
+      if (quieto) return;
+      ponerTomada(null);
+      ponerCogida(null);
+      ponerPreguntando(null);
+      ponerCartaDelMazo((antes) => (antes === carta.id ? null : carta.id));
+    },
+    [quieto],
+  );
+
+  /*
+   * AL SOLTAR UN NAIPE EN LA CASILLA DE JUGAR: una sola manera, se manda; varias, se
+   * pregunta. Es exactamente el mismo trato que el trueque, y sale de la misma cuenta —
+   * `jugadaSinPreguntar`, que devuelve `null` tanto con cero como con dos, porque en los
+   * dos casos esta pantalla NO manda nada por su cuenta.
+   *
+   * El título del menú se elige por la clase de la jugada y no por la familia del naipe:
+   * son la misma palabra —lo exige el comprobador de la traducción— y la clase es la que
+   * viene con las opciones que se van a enseñar.
+   */
+  const alJugarCarta = useCallback(
+    (carta: { id: string }) => {
+      if (quieto) return;
+      ponerCartaDelMazo(null);
+      const unica = jugadaSinPreguntar(vista, opciones, carta.id);
+      if (unica !== null) {
+        mover({ tipo: unica.opcion.tipo, carga: unica.opcion.carga });
+        return;
+      }
+      const todas = jugadasDeLaCarta(vista, opciones, carta.id);
+      const primera = todas[0];
+      if (primera === undefined) return;
+      ponerPreguntando({
+        titulo: LO_QUE_SE_PREGUNTA[primera.clase],
+        opciones: todas.map((j) => j.opcion),
+      });
+    },
+    [quieto, vista, opciones, mover],
+  );
+
+  /*
+   * AL SOLTAR UN TÍTULO EN LA CASILLA DE REVELAR. Revelar no pide destinatario ni bienes,
+   * así que la opción entera ES la respuesta y no hay nada que preguntar. Y no se
+   * comprueba aquí que la carta sea un título: no lo ofrece el juego para nada más, y la
+   * escena no abre esa casilla a quien no es de la familia de los títulos.
+   */
+  const alRevelarCarta = useCallback(
+    (carta: { id: string }) => {
+      if (quieto) return;
+      ponerCartaDelMazo(null);
+      const revelar = revelarDe(opciones, carta.id);
+      if (revelar !== null) mover({ tipo: revelar.tipo, carga: revelar.carga });
+    },
+    [quieto, opciones, mover],
   );
 
   // -------------------------------------------------------------------------
@@ -922,6 +1100,11 @@ export function RiberasEnTres({ manifiesto, mesa, puesta, tablero, opciones }: L
                   onCogerCarta={alCogerCarta}
                   seCambianPor={seCambianPor}
                   onProponerTrueque={alProponerTrueque}
+                  cartasDelMazo={cartasDelMazo}
+                  cartaDelMazoCogida={cartaDelMazo}
+                  onCogerCartaDelMazo={alCogerCartaDelMazo}
+                  onJugarCarta={alJugarCarta}
+                  onRevelarCarta={alRevelarCarta}
                 />
               </Canvas>
             </LimiteDelMundo>
@@ -952,12 +1135,13 @@ export function RiberasEnTres({ manifiesto, mesa, puesta, tablero, opciones }: L
       </div>
 
       {preguntando !== null ? (
-        <AQuien
-          trueques={preguntando.trueques}
+        <ElijeUna
+          titulo={preguntando.titulo}
+          opciones={preguntando.opciones}
           quieto={quieto}
-          alElegir={(t) => {
+          alElegir={(o) => {
             ponerPreguntando(null);
-            mover({ tipo: t.opcion.tipo, carga: t.opcion.carga });
+            mover({ tipo: o.tipo, carga: o.carga });
           }}
           alDejarlo={() => {
             ponerPreguntando(null);
@@ -983,43 +1167,55 @@ export function RiberasEnTres({ manifiesto, mesa, puesta, tablero, opciones }: L
 }
 
 // ---------------------------------------------------------------------------
-// A quién se le propone
+// El menú de elegir: a quién, o cuál
 // ---------------------------------------------------------------------------
 
 /**
- * El menú pequeño de destinatarios. Rótulo y ayuda son los que escribió el juego en
- * cada opción de ofrecer —ya nombran a quién—, así que aquí no se inventa ni una
- * palabra sobre el trato: sólo el título y la salida.
+ * EL MENÚ PEQUEÑO DE UNA PREGUNTA. Rótulo y ayuda son los que escribió el juego en cada
+ * opción —ya nombran a quién se le propone el trato, a quién le roba la guardia o qué
+ * dos bienes coge el año bueno—, así que aquí no se inventa ni una palabra sobre la
+ * jugada: sólo el título, que llega de fuera, y la salida.
+ *
+ * Es UN componente para las cuatro preguntas y no cuatro casi iguales. La primera
+ * versión sólo sabía de trueques y llevaba el título escrito dentro; con las cartas
+ * habría hecho falta copiarlo tres veces, y tres copias de un menú son tres sitios donde
+ * el día que el botón de «Dejarlo» cambie sólo cambiará uno.
+ *
+ * `Dejarlo` NO va deshabilitado con `quieto`: cerrar el menú no manda nada, y dejar sin
+ * salida a quien lo abrió mientras una petición viaja es encerrarlo delante de una lista
+ * de botones apagados.
  */
-function AQuien({
-  trueques,
+function ElijeUna({
+  titulo,
+  opciones,
   quieto,
   alElegir,
   alDejarlo,
 }: {
-  trueques: readonly TruequePosible<Opcion>[];
+  titulo: string;
+  opciones: readonly Opcion[];
   quieto: boolean;
-  alElegir: (t: TruequePosible<Opcion>) => void;
+  alElegir: (o: Opcion) => void;
   alDejarlo: () => void;
 }): JSX.Element {
   return (
-    <div className="formulario riberas-a-quien">
-      <h2 className="rotulo-de-panel">A quién se lo propones</h2>
+    <div className="formulario riberas-elige">
+      <h2 className="rotulo-de-panel">{titulo}</h2>
       <ul className="opciones">
-        {trueques.map((t) => (
-          <li key={t.opcion.id}>
+        {opciones.map((o) => (
+          <li key={o.id}>
             <button
               type="button"
               className="opcion"
               disabled={quieto}
-              title={t.opcion.ayuda}
+              title={o.ayuda}
               onClick={() => {
-                alElegir(t);
+                alElegir(o);
               }}
             >
               <span className="opcion-texto">
-                <span className="opcion-rotulo">{t.opcion.rotulo}</span>
-                {t.opcion.ayuda.length > 0 ? <span className="opcion-ayuda">{t.opcion.ayuda}</span> : null}
+                <span className="opcion-rotulo">{o.rotulo}</span>
+                {o.ayuda.length > 0 ? <span className="opcion-ayuda">{o.ayuda}</span> : null}
               </span>
             </button>
           </li>
@@ -1033,5 +1229,86 @@ function AQuien({
         </li>
       </ul>
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// El marcador, en el raíl
+// ---------------------------------------------------------------------------
+
+/**
+ * EL MARCADOR DE LA MESA, y por qué es un panel del raíl y no una esquina del lienzo.
+ *
+ * Porque se mira CONSTANTEMENTE y sin dejar de jugar: cuántos puntos lleva cada cual, de
+ * quién son los dos premios y cuántas cartas quedan por comprar son las cuatro cosas que
+ * deciden si esta jugada vale la pena. Encima del lienzo taparía tablero justo mientras
+ * se decide dónde construir; en el raíl vive al lado de los paneles que el juego ya
+ * declara, con su misma forma —`.panel` y `.rotulo-de-panel`— y su mismo sitio.
+ *
+ * ═══ LO OCULTO SE DISTINGUE, Y ESO ES MEDIO JUEGO ═══
+ *
+ * Los títulos suman en secreto para su dueño (§1.6 del diseño). La vista te dice TUS
+ * puntos con lo oculto dentro y a los demás sólo los públicos, así que en tu renglón hay
+ * DOS números y en el de los demás uno. Se escriben aparte —«y N contándote lo oculto»— y
+ * no sumados en el mismo sitio: con un solo número, el mismo renglón diría una cifra
+ * distinta en cada pantalla y nadie podría hablar del marcador en voz alta. Es la misma
+ * decisión que ya toma `panelesDe` en las reglas, y se toma igual aquí a propósito.
+ *
+ * Y sólo aparece el segundo número CUANDO ES DISTINTO: «3 ptos y 3 contándote lo oculto»
+ * no informa de nada y se lee como si hubiera algo escondido.
+ *
+ * ═══ AQUÍ NO SE CUENTA NADA ═══
+ *
+ * Ni los puntos, ni quién tiene el Vado Largo, ni quién La Mayor Guardia. Todo sale de
+ * `marcadorEnTres`, que lo lee de la vista. `null` cuando la vista no es de Riberas, y
+ * entonces el raíl no pinta nada — que es lo correcto: un marcador vacío se lee como
+ * «vais todos a cero».
+ */
+export function MarcadorDeRiberas({ vista }: { vista: unknown }): JSX.Element | null {
+  const marcador = marcadorEnTres(vista);
+  if (marcador === null) return null;
+  return (
+    <section className="panel riberas-marcador">
+      <h2 className="rotulo-de-panel">{TITULO_DEL_MARCADOR}</h2>
+      <ul className="renglones" role="list">
+        {marcador.colonos.map((c) => {
+          const oculto = c.puntosConLoOculto !== null && c.puntosConLoOculto !== c.puntos;
+          return (
+            <li key={c.asiento} className={c.soyYo ? 'colono-del-marcador soy-yo' : 'colono-del-marcador'}>
+              <span className="mota-de-color" style={{ background: c.color }} aria-hidden="true" />
+              <span className="nombre-del-colono">
+                {c.nombre}
+                {c.soyYo ? ' (tú)' : ''}
+              </span>
+              <span className="puntos-del-colono">
+                {c.puntos} {c.puntos === 1 ? 'pto' : 'ptos'}
+                {oculto ? (
+                  <span className="puntos-ocultos">
+                    {' '}
+                    y {c.puntosConLoOculto} contándote lo oculto
+                  </span>
+                ) : null}
+              </span>
+              <span className="letra-chica lo-del-colono">
+                {c.cartas} {c.cartas === 1 ? 'carta' : 'cartas'} · {c.guardias}{' '}
+                {c.guardias === 1 ? 'guardia' : 'guardias'}
+                {c.tieneElVado ? ' · El Vado Largo' : ''}
+                {c.tieneLaMayorGuardia ? ' · La Mayor Guardia' : ''}
+                {c.titulos.length > 0 ? ` · ${c.titulos.join(', ')}` : ''}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+      {/*
+        CUÁNTAS QUEDAN, que es información pública del juego y parte de lo que se juega:
+        un mazo que se puede contar deja saber que ya no puede salir un título (§1.3).
+      */}
+      <p className="letra-chica queda-mazo">
+        {marcador.mazo === 0
+          ? 'No queda ninguna carta en el mazo.'
+          : `Quedan ${marcador.mazo} ${marcador.mazo === 1 ? 'carta' : 'cartas'} en el mazo.`}
+      </p>
+    </section>
   );
 }

@@ -55,7 +55,9 @@ import { arcadesInstalados, avanzar, hayOpciones, opcionesDeArcade, proyectar } 
 import type { ContextoMovimiento, ManifiestoDeArcade, Opcion } from '../../shared/arcade';
 import { MUEBLES_DEL_CONTRATO } from '../../shared/arcade/tipos';
 import '../../shared/arcade/juegos';
-import { EMPEZAR_RIBERAS, RIBERAS } from '../../shared/arcade/juegos';
+import { EMPEZAR_RIBERAS, recalcularLaGuardia, RIBERAS } from '../../shared/arcade/juegos';
+import type { Bien, CartaEnMano, EstadoDeRiberas, Ficha } from '../../shared/arcade/juegos';
+import { aristaDeHex, verticeDeHex } from '../../shared/mecanicas/malla-hexagonal';
 import { tableroDeLaVista } from '../../shared/mecanicas/tablero-declarado';
 import type { TableroDeclarado } from '../../shared/mecanicas/tablero-declarado';
 import { Tarjeta } from '../src/catalogo';
@@ -75,15 +77,22 @@ import { Muelle } from '../src/muelle';
 import { temaDelMuelle, tieneMuelle } from '../../escenas/embarcadero/tema';
 import { FIGURAS } from '../../escenas/embarcadero/figuras';
 import { semillaDeCodigo } from '../../escenas/embarcadero/cala';
-import { RiberasEnTres } from '../src/riberas-en-tres';
+import { MarcadorDeRiberas, RiberasEnTres } from '../src/riberas-en-tres';
 import {
   bienesQueSeCambianPor,
+  cartasEnTres,
   colocandoEnTres,
+  comprarEnTres,
+  jugadasDeLaCarta,
   manoEnTres,
+  marcadorEnTres,
+  opcionesFueraDeLaMano,
   opcionesFueraDelTablero,
   PIEZAS_DE_LA_BARRA,
+  revelarDe,
   seVeEnTres,
   tableroEnTres,
+  TIPOS_QUE_PINTA_LA_MANO,
   truequesPosibles,
 } from '../../shared/arcade/juegos/riberas-en-tres';
 import { semillaDelCodigo } from '../../shared/mecanicas/semilla';
@@ -1146,7 +1155,7 @@ function riberasEnTres(): void {
    * CADA MOVIMIENTO UNA VEZ. Lo que sale como botón es exactamente lo que queda fuera
    * del tablero; y lo que queda dentro tiene que poder salir por la barra o por la mano.
    */
-  const fuera = opcionesFueraDelTablero(opciones);
+  const fuera = opcionesFueraDeLaMano(opcionesFueraDelTablero(opciones));
   const botones = html.split('class="opcion-rotulo"').length - 1;
   comprobar(
     'salen como botón exactamente las opciones que el tablero no enseña',
@@ -1589,6 +1598,393 @@ function elAcercamientoDelDelta(): void {
 }
 
 // ---------------------------------------------------------------------------
+// 8 · El mazo en la pantalla del escritorio
+// ---------------------------------------------------------------------------
+
+/**
+ * MI MANO DEL MAZO PARA LAS PRUEBAS: una de cada familia, un título, y una comprada HOY.
+ *
+ * La sexta es la que compra la mitad del bloque: `comprada: 1` con `turnosAbiertos: 1` es
+ * una carta de este mismo turno, que las reglas no dejan jugar (§1.4 del diseño). Tiene
+ * que salir en la mano y salir APAGADA — que se vea y no se pueda jugar—, y una mano de
+ * prueba sin ninguna así dejaría ese camino sin recorrer.
+ */
+const MI_MANO_DE_PRUEBA: readonly CartaEnMano[] = [
+  { carta: 'c1:guardia', comprada: 0 },
+  { carta: 'c2:faro', comprada: 0 },
+  { carta: 'c3:ano-bueno', comprada: 0 },
+  { carta: 'c4:acaparamiento', comprada: 0 },
+  { carta: 'c5:dos-veredas', comprada: 0 },
+  { carta: 'c6:guardia', comprada: 1 },
+];
+
+/**
+ * UNA PARTIDA DE RIBERAS CON MAZO Y MANOS PUESTAS, hermana de `laProyeccionDeVerdad`.
+ *
+ * ═══ POR QUÉ SE MONTA EL ESTADO Y NO SE JUEGA HASTA AQUÍ ═══
+ *
+ * Llegar a tener cinco cartas en la mano jugando exige comprar cinco veces, y comprar
+ * exige tirar los dados y cobrar sal, piedra y grano tres veces cada uno: el azar no es
+ * cosa de un comprobador, y un guion que dependiera de él fallaría un día de cada diez
+ * sin que nadie hubiera tocado nada. Es la misma decisión que ya toma el escenario del
+ * trueque en `verify:riberas-en-tres`, y por el mismo motivo.
+ *
+ * LO QUE SE PONE A MANO NO ES NINGUNA REGLA. El delta, los colores y el orden de los
+ * colonos salen de un `EMPEZAR` de verdad por la puerta de siempre; lo que se escribe
+ * encima son bienes, manos y guardias jugadas. Quién puede jugar qué lo sigue diciendo
+ * `opcionesDeArcade`, que es lo mismo que le pregunta la mesa de producción.
+ *
+ * Cada colono recibe una choza y una vereda propias porque Las Dos Veredas sólo se
+ * ofrecen si queda un sitio donde alzarlas: sin nada puesto, esa carta saldría apagada y
+ * el camino entero pasaría de largo sin comprobar nada.
+ *
+ * TRES ASIENTOS y no dos: con dos, La Guardia tiene una sola víctima y se manda sin
+ * preguntar, así que el menú de elegir —lo que este encargo estrena— no se abriría nunca.
+ * Con tres hay dos víctimas y hay que preguntar.
+ */
+function laProyeccionConMazo(cuantosAsientos = 3): {
+  vista: unknown;
+  opciones: readonly Opcion[];
+  sentados: { asiento: string; nombre: string }[];
+} {
+  const sentados = sentadosDePrueba(cuantosAsientos);
+  const asientos = sentados.map((s) => s.asiento);
+  const ctx: ContextoMovimiento = { quien: 's1', azar: 987_654, tic: 0, asientos };
+  const base = avanzar(RIBERAS, undefined, { tipo: EMPEZAR_RIBERAS, carga: {} }, ctx) as EstadoDeRiberas;
+
+  let serie = 1;
+  const fichasDe = (bienes: readonly Bien[]): Ficha[] => bienes.map((b) => `b${String(serie++)}:${b}` as Ficha);
+  /* Sal, piedra y grano para mí: es lo que cuesta una carta, y sin ello no habría COMPRAR. */
+  const MIS_BIENES: readonly Bien[] = ['sal', 'piedra', 'grano', 'junco', 'limo'];
+  /* Y algo para los demás, o a quien no tiene nada no se le puede robar y no habría a quién elegir. */
+  const LOS_SUYOS: readonly Bien[] = ['junco', 'limo'];
+
+  const puesto: EstadoDeRiberas = {
+    ...base,
+    momento: 'jugando',
+    paso: base.colonos.length * 2,
+    faltaVereda: false,
+    ultimaChoza: null,
+    turno: 0,
+    tirado: true,
+    ultimaTirada: 8,
+    turnosAbiertos: 1,
+    cartaJugada: false,
+    veredasGratis: 0,
+    siguienteFicha: 500,
+    colonos: base.colonos.map((c, i) => ({
+      ...c,
+      almacen: fichasDe(i === 0 ? MIS_BIENES : LOS_SUYOS),
+      mano: i === 0 ? MI_MANO_DE_PRUEBA.map((m) => ({ ...m })) : [],
+      /* Tres guardias jugadas para el segundo: es el mínimo del premio, y así hay premio que enseñar. */
+      guardias: i === 1 ? 3 : 0,
+      /* Y un título REVELADO, que es público y tiene que salir con su nombre en el marcador. */
+      titulos: i === 1 ? ['molino'] : [],
+      chozas: [verticeDeHex({ q: i * 2 - 2, r: 0 }, 0)],
+      veredas: [aristaDeHex({ q: i * 2 - 2, r: 0 }, 0)],
+    })),
+  };
+  /* El premio es DERIVADO: se recalcula, no se escribe. Es la regla, y vive en `shared/`. */
+  const estado: EstadoDeRiberas = { ...puesto, guardia: recalcularLaGuardia(puesto) };
+  const vista = proyectar(RIBERAS, estado, 's1', sentados);
+  return { vista, opciones: opcionesDeArcade(RIBERAS, vista, 's1'), sentados };
+}
+
+/** La mesa puesta que necesita el pintor, con los asientos de un escenario. */
+function mesaPuestaDe(sentados: readonly { asiento: string; nombre: string }[], vista: unknown, opciones: readonly Opcion[]): MesaVista {
+  return {
+    codigo: 'QWXYZ',
+    arcade: 'riberas',
+    rev: 11,
+    tic: 0,
+    terminada: false,
+    venceEn: null,
+    turnoDesde: 0,
+    asientos: sentados.map((s) => ({ id: s.asiento, nombre: s.nombre, presente: true })),
+    yo: 's1',
+    vista,
+    opciones,
+  };
+}
+
+/**
+ * EL MAZO EN LA PANTALLA: que la mano lo enseñe, que no salga además como botón, y que
+ * el respaldo lo siga pudiendo jugar.
+ *
+ * ═══ LAS TRES COSAS QUE AQUÍ SE ROMPEN EN SILENCIO ═══
+ *
+ *   1. QUE UNA CARTA SALGA DOS VECES. Desde que la mano del mazo se pinta, jugar una
+ *      guardia sale por el naipe; si además siguiera saliendo como botón, la lista de
+ *      abajo tendría una entrada por carta y por víctima —con catorce guardias en el
+ *      mazo, decenas— y las dos harían lo mismo. Se ve como una pantalla desordenada, no
+ *      como un filtro que falta. Se compra con `opcionesFueraDeLaMano`, compuesta.
+ *   2. QUE UNA CARTA NO SALGA POR NINGÚN LADO. Es el mismo fallo por el otro extremo, y
+ *      es peor: quitarlas de los botones sin pintar la mano deja las cartas sin ninguna
+ *      manera de jugarse, y tampoco da error. Por eso se exige que TODA opción del juego
+ *      se pueda alcanzar por la barra, por una de las dos manos o por un botón.
+ *   3. QUE EL RESPALDO SE QUEDE SIN MAZO. Con más de cuatro colonos —o sin modelo— se
+ *      juega sobre el retablo SVG, que no tiene mano de cartas: allí los movimientos del
+ *      mazo tienen que salir como botones sueltos. Es la mesa de cinco, y es la que nadie
+ *      abre para mirar.
+ *
+ * Y la mano en sí —qué naipe se enciende y con qué dibujo— NO se comprueba aquí: eso es
+ * de la traducción y de `escenas/cartas.ts`, y lo mide `verify:riberas-en-tres` con la
+ * escena de verdad. Aquí se compra lo que es de ESTE cliente: qué le llega a `<Delta>`,
+ * qué sale como botón y qué pinta el raíl.
+ */
+function elMazoEnLaPantalla(): void {
+  paso('El mazo: lo enseña la mano, no los botones, y el respaldo lo sigue pudiendo jugar');
+
+  const riberas = elCatalogoQuePublicaElServidor().find((m) => m.id === 'riberas');
+  comprobar('Riberas está instalado', riberas !== undefined);
+  if (riberas === undefined) return;
+
+  const { vista, opciones, sentados } = laProyeccionConMazo();
+  const tablero = tableroDeLaVista(vista);
+  comprobar('el escenario con mazo trae tablero declarado y delta que cabe en el lienzo', tablero !== null && tableroEnTres(vista) !== null && seVeEnTres(vista));
+  if (tablero === null) return;
+
+  /*
+   * EL ESCENARIO TIENE QUE VALER, o todo lo de abajo pasaría en verde sin mirar nada.
+   * Son las cuatro cosas que hacen falta: mano, una carta apagada, una jugada que hay que
+   * preguntar y una compra en pie.
+   */
+  const cartas = cartasEnTres(vista, opciones);
+  comprobar('mi mano trae las seis cartas montadas', cartas.length === MI_MANO_DE_PRUEBA.length, cartas.map((c) => c.id));
+  comprobar(
+    'y hay al menos una encendida y al menos una apagada: la comprada hoy no se juega hoy',
+    cartas.some((c) => c.sePuedeJugar || c.sePuedeRevelar) && cartas.some((c) => !c.sePuedeJugar && !c.sePuedeRevelar),
+    cartas.map((c) => [c.id, c.sePuedeJugar, c.sePuedeRevelar]),
+  );
+  const laGuardia = cartas.find((c) => c.familia === 'guardia' && c.sePuedeJugar);
+  comprobar(
+    'la guardia de un turno anterior ofrece MÁS DE UNA víctima: hay que preguntar, y el menú se abre',
+    laGuardia !== undefined && jugadasDeLaCarta(vista, opciones, laGuardia.id).length > 1,
+    laGuardia === undefined ? null : jugadasDeLaCarta(vista, opciones, laGuardia.id).map((j) => j.a),
+  );
+  const elTitulo = cartas.find((c) => c.sePuedeRevelar);
+  comprobar('y el título se puede revelar, que es la otra casilla', elTitulo !== undefined && revelarDe(opciones, elTitulo.id) !== null);
+  comprobar('y con sal, piedra y grano se puede comprar', comprarEnTres(opciones) !== null);
+
+  const puesta = mesaPuestaDe(sentados, vista, opciones);
+  const html = renderToStaticMarkup(
+    <RiberasEnTres manifiesto={riberas} mesa={unaMesa('dentro', puesta)} puesta={puesta} tablero={tablero} opciones={opciones} />,
+  );
+  const texto = palabrasDe(html);
+
+  /*
+   * ═══ CADA MOVIMIENTO UNA VEZ, CON EL MAZO DENTRO ═══
+   *
+   * `opcionesFueraDeLaMano(opcionesFueraDelTablero(o))` es lo que el cliente pinta como
+   * botones, y aquí se exige que sea EXACTAMENTE eso: ni una carta de más, ni comprar de
+   * menos. Comprar es el caso que se escapa al escribirlo deprisa —es del mazo pero no
+   * cuelga de ningún naipe— y sin él no habría manera de comprar en toda la partida.
+   */
+  const fuera = opcionesFueraDeLaMano(opcionesFueraDelTablero(opciones));
+  const botones = html.split('class="opcion-rotulo"').length - 1;
+  comprobar('salen como botón exactamente las que no enseña ni el tablero ni ninguna de las dos manos', botones === fuera.length, {
+    botones,
+    fuera: fuera.map((o) => o.id),
+  });
+  const deLaMano = opciones.filter((o) => TIPOS_QUE_PINTA_LA_MANO.includes(o.tipo));
+  comprobar('el juego ofrece movimientos del mazo, o esto no comprobaría nada', deLaMano.length > 0, deLaMano.length);
+  for (const o of deLaMano) {
+    comprobar(`«${o.rotulo}» no sale como botón: lo enseña la mano del mazo`, !texto.includes(o.rotulo), o.id);
+  }
+  const comprar = comprarEnTres(opciones);
+  comprobar(
+    'pero COMPRAR sí, que es la única del mazo que no cuelga de un naipe y no tiene otro sitio',
+    comprar !== null && texto.includes(comprar.rotulo),
+    comprar?.rotulo,
+  );
+
+  /* Y no se pierde ni una: barra, mano de bienes, mano del mazo o botón. */
+  const porLaBarra = new Set<string>();
+  for (const { id } of PIEZAS_DE_LA_BARRA) {
+    const colocando = colocandoEnTres(vista, 's1', id);
+    if (colocando === null) continue;
+    for (const m of colocando.movimientos.values()) porLaBarra.add(canonico(m));
+  }
+  const porLaMano = new Set<string>();
+  for (const carta of manoEnTres(vista)) {
+    for (const quiero of bienesQueSeCambianPor(vista, opciones, carta.bien)) {
+      for (const t of truequesPosibles(vista, opciones, carta.bien, quiero)) {
+        porLaMano.add(canonico({ tipo: t.opcion.tipo, carga: t.opcion.carga }));
+      }
+    }
+  }
+  const porElMazo = new Set<string>();
+  for (const carta of cartas) {
+    for (const j of jugadasDeLaCarta(vista, opciones, carta.id)) {
+      porElMazo.add(canonico({ tipo: j.opcion.tipo, carga: j.opcion.carga }));
+    }
+    const revelar = revelarDe(opciones, carta.id);
+    if (revelar !== null) porElMazo.add(canonico({ tipo: revelar.tipo, carga: revelar.carga }));
+  }
+  comprobar('la mano del mazo ofrece algo, o el camino de las cartas no se habría recorrido', porElMazo.size > 0, porElMazo.size);
+  const alcanzables = new Set([...porLaBarra, ...porLaMano, ...porElMazo, ...fuera.map((o) => canonico({ tipo: o.tipo, carga: o.carga }))]);
+  comprobar(
+    'y no se pierde ni una: todo lo que ofreció el juego sale por la barra, por una de las dos manos o por un botón',
+    opciones.every((o) => alcanzables.has(canonico({ tipo: o.tipo, carga: o.carga }))),
+    opciones.filter((o) => !alcanzables.has(canonico({ tipo: o.tipo, carga: o.carga }))).map((o) => o.id),
+  );
+
+  /*
+   * ═══ EL RESPALDO SIGUE ENTERO, Y CON MAZO ═══
+   *
+   * Con cinco colonos no hay lienzo —el atlas trae cuatro colores— y se juega sobre el
+   * retablo SVG, que no tiene mano de cartas. Allí los movimientos del mazo salen como
+   * botones sueltos, que es lo que `AccionesDelTablero` pinta del tablero declarado. Si
+   * el filtro de la mano se hubiera aplicado también a esta rama, con cinco en la mesa no
+   * habría manera de jugar una sola carta — y nadie abre una mesa de cinco para mirar.
+   */
+  paso('Y con cinco colonos, sobre el retablo, el mazo se sigue pudiendo jugar');
+
+  const cinco = laProyeccionConMazo(5);
+  const tableroDeCinco = tableroDeLaVista(cinco.vista);
+  comprobar('la mesa de cinco con mazo trae tablero declarado y no cabe en tres dimensiones', tableroDeCinco !== null && !seVeEnTres(cinco.vista));
+  if (tableroDeCinco === null) return;
+  const deLaManoDeCinco = cinco.opciones.filter((o) => TIPOS_QUE_PINTA_LA_MANO.includes(o.tipo));
+  comprobar('y el juego le ofrece movimientos del mazo', deLaManoDeCinco.length > 0, deLaManoDeCinco.length);
+
+  const puestaDeCinco = mesaPuestaDe(cinco.sentados, cinco.vista, cinco.opciones);
+  const htmlDeCinco = renderToStaticMarkup(
+    <RiberasEnTres
+      manifiesto={riberas}
+      mesa={unaMesa('dentro', puestaDeCinco)}
+      puesta={puestaDeCinco}
+      tablero={tableroDeCinco}
+      opciones={cinco.opciones}
+    />,
+  );
+  const textoDeCinco = palabrasDe(htmlDeCinco);
+  comprobar('se juega sobre el retablo SVG', htmlDeCinco.includes('<svg'));
+  for (const o of deLaManoDeCinco) {
+    comprobar(`sobre el retablo, «${o.rotulo}» SÍ sale como botón: allí no hay mano`, textoDeCinco.includes(o.rotulo), o.id);
+  }
+  comprobar(
+    'y allí tampoco se pierde ni una: el retablo más sus botones sueltos cubren todo lo que ofrece el juego',
+    (() => {
+      const sueltas = opcionesSueltas(tableroDeCinco, cinco.opciones);
+      const enElDibujo = new Set<string>();
+      for (const c of tableroDeCinco.caras) if (c.toque !== null) enElDibujo.add(canonico({ tipo: c.toque.tipo, carga: c.toque.carga }));
+      for (const l of tableroDeCinco.lineas) if (l.toque !== null) enElDibujo.add(canonico({ tipo: l.toque.tipo, carga: l.toque.carga }));
+      for (const n of tableroDeCinco.nudos) if (n.toque !== null) enElDibujo.add(canonico({ tipo: n.toque.tipo, carga: n.toque.carga }));
+      for (const a of tableroDeCinco.acciones) enElDibujo.add(canonico({ tipo: a.toque.tipo, carga: a.toque.carga }));
+      const todo = new Set([...enElDibujo, ...sueltas.map((o) => canonico({ tipo: o.tipo, carga: o.carga }))]);
+      return cinco.opciones.every((o) => todo.has(canonico({ tipo: o.tipo, carga: o.carga })));
+    })(),
+  );
+
+  /*
+   * ═══ EL MARCADOR DEL RAÍL ═══
+   *
+   * Lo que se compra aquí es lo que se ve mal si falta: que estén TODOS los colonos, que
+   * el mío se distinga, que mis puntos ocultos salgan como un SEGUNDO número —y sólo
+   * cuando de verdad hay algo oculto—, que los de los demás no traigan ninguno inventado,
+   * y que se diga cuántas cartas quedan.
+   *
+   * El segundo número de los demás es el fallo caro: si `puntosConLoOculto` se rellenara
+   * con los públicos «para no dejarlo vacío», la pantalla enseñaría a cada colono un
+   * número secreto que no sabe, y nadie lo notaría porque coincidiría con el público.
+   */
+  paso('El marcador del raíl: todos los colonos, lo tuyo distinguido, y lo que queda de mazo');
+
+  const marcador = marcadorEnTres(vista);
+  comprobar('la traducción da marcador', marcador !== null);
+  if (marcador === null) return;
+  const enElRail = renderToStaticMarkup(<MarcadorDeRiberas vista={vista} />);
+  const textoDelRail = palabrasDe(enElRail);
+  comprobar('es un panel del raíl, con la forma de los que ya hay', enElRail.includes('class="panel riberas-marcador"') && enElRail.includes('rotulo-de-panel'));
+  for (const c of marcador.colonos) {
+    comprobar(`«${c.nombre}» sale en el marcador`, textoDelRail.includes(c.nombre));
+  }
+  comprobar('el mío se distingue, y con su color de las piezas del tablero', textoDelRail.includes('(tú)') && marcador.colonos.every((c) => enElRail.includes(c.color)));
+  const yoEnElMarcador = marcador.colonos.find((c) => c.soyYo);
+  comprobar(
+    'tengo un título sin revelar, o el número de lo oculto no se probaría',
+    yoEnElMarcador !== undefined && yoEnElMarcador.puntosConLoOculto !== null && yoEnElMarcador.puntosConLoOculto > yoEnElMarcador.puntos,
+    { publicos: yoEnElMarcador?.puntos, conLoOculto: yoEnElMarcador?.puntosConLoOculto },
+  );
+  comprobar(
+    'y sale como un SEGUNDO número, dicho de quién es, no sumado al público',
+    yoEnElMarcador !== undefined &&
+      enElRail.includes('puntos-ocultos') &&
+      textoDelRail.includes(`${String(yoEnElMarcador.puntos)} pto`) &&
+      textoDelRail.includes(`y ${String(yoEnElMarcador.puntosConLoOculto ?? 0)} contándote lo oculto`),
+    textoDelRail,
+  );
+  comprobar(
+    'de los demás no se inventa ninguno: `puntosConLoOculto` es null y sólo hay un «contándote» en toda la lista',
+    marcador.colonos.filter((c) => !c.soyYo).every((c) => c.puntosConLoOculto === null) &&
+      enElRail.split('puntos-ocultos').length - 1 === 1,
+  );
+  comprobar('los dos premios salen con su nombre en el renglón de quien los tiene', marcador.mayorGuardia === 's2' && textoDelRail.includes('La Mayor Guardia'));
+  comprobar('los títulos revelados salen con su nombre de Riberas, que ya son públicos', textoDelRail.includes('El Molino'));
+  comprobar('y se dice cuántas cartas quedan en el mazo, que es información de la mesa', marcador.mazo > 0 && textoDelRail.includes(`Quedan ${String(marcador.mazo)} cartas en el mazo`), marcador.mazo);
+  comprobar('una vista que no es de Riberas no pinta un marcador vacío: no pinta nada', renderToStaticMarkup(<MarcadorDeRiberas vista={{ desde: 'otro' }} />) === '');
+
+  /*
+   * ═══ Y LO QUE NO SE PUEDE RENDERIZAR EN NODE ═══
+   *
+   * La mano del mazo vive dentro del `Canvas`, así que en Node no existe: aquí sale el
+   * telón. Lo que sí se puede leer es el fichero, y es donde se rompen las tres cosas que
+   * la escena NO hace por sí sola —lo dice el contrato de `<Delta>`: avisa de la
+   * pulsación y nada más—. Ninguna de las tres da error y las tres se sienten como que
+   * «la pantalla se lía»: dos cosas cogidas a la vez, una carta que no se suelta, o una
+   * carta que sigue en la mano después de que otro haya jugado.
+   */
+  paso('Y lo que la escena no hace sola: soltar la otra mano, soltarse a sí misma, y soltarlo todo al cambiar la mesa');
+
+  const fuente = readFileSync(new URL('../src/riberas-en-tres.tsx', import.meta.url), 'utf8');
+  comprobar(
+    'las cinco entradas del mazo llegan a `<Delta>`: sin ellas se pinta como antes y nadie se entera',
+    /<Delta[\s\S]*?cartasDelMazo=\{cartasDelMazo\}[\s\S]*?cartaDelMazoCogida=\{cartaDelMazo\}[\s\S]*?onCogerCartaDelMazo=\{alCogerCartaDelMazo\}[\s\S]*?onJugarCarta=\{alJugarCarta\}[\s\S]*?onRevelarCarta=\{alRevelarCarta\}/.test(
+      fuente,
+    ),
+  );
+  const alCoger = /const alCogerCartaDelMazo = useCallback\([\s\S]*?\n {2}\);/.exec(fuente)?.[0] ?? '';
+  comprobar(
+    'coger un naipe suelta el bien cogido y la pieza de la barra: dos gestos ofrecidos a la vez son uno equivocado',
+    alCoger.includes('ponerCogida(null)') && alCoger.includes('ponerTomada(null)'),
+    alCoger.slice(0, 300),
+  );
+  comprobar(
+    'y cogerlo dos veces lo suelta, que es la única forma de arrepentirse',
+    /ponerCartaDelMazo\(\(antes\) => \(antes === carta\.id \? null : carta\.id\)\)/.test(alCoger),
+    alCoger.slice(0, 300),
+  );
+  const alCogerBien = /const alCogerCarta = useCallback\([\s\S]*?\n {2}\);/.exec(fuente)?.[0] ?? '';
+  comprobar(
+    'y al revés también: coger un bien suelta el naipe del mazo',
+    alCogerBien.includes('ponerCartaDelMazo(null)'),
+    alCogerBien.slice(0, 300),
+  );
+  comprobar('y coger una pieza de la barra suelta las dos manos', /const alTomarDeLaBarra = useCallback\([\s\S]*?ponerCartaDelMazo\(null\)/.test(fuente));
+  const marcaDeLaRevision = '}, [puesta.rev]);';
+  const hastaLaRevision = fuente.slice(0, fuente.indexOf(marcaDeLaRevision));
+  const alCambiarLaRevision = hastaLaRevision.slice(hastaLaRevision.lastIndexOf('useEffect('));
+  comprobar(
+    'al cambiar la revisión se suelta también el naipe: pudo jugarlo otro mientras estaba levantado',
+    alCambiarLaRevision.includes('ponerCartaDelMazo(null)'),
+    alCambiarLaRevision.slice(0, 300),
+  );
+  /*
+   * Y NINGUNA REGLA ESCRITA AQUÍ. El movimiento que se manda sale SIEMPRE de una opción
+   * que dio el juego —`.opcion.tipo` o el `revelar` de `revelarDe`—, nunca de un tipo
+   * escrito a mano. Un `'riberas:guardia'` en este fichero es una regla en el cliente: el
+   * día que la carga cambie de forma, la pantalla mandaría movimientos que el servidor
+   * rechaza en silencio.
+   */
+  const tipoAMano = /['"]riberas:[a-z-]+['"]/.exec(fuente);
+  comprobar('ni un tipo de movimiento escrito a mano: todo sale de la opción que dio el juego', tipoAMano === null, tipoAMano?.[0]);
+  comprobar(
+    'y a quién se le roba o qué bienes se cogen lo decide `jugadasDeLaCarta`, no un `if` sobre la familia',
+    fuente.includes('jugadaSinPreguntar(') && fuente.includes('jugadasDeLaCarta(') && !/familia === '/.test(fuente),
+  );
+}
+
+// ---------------------------------------------------------------------------
 
 elCatalogoNoMiente();
 noSePintaDeMas();
@@ -1598,6 +1994,7 @@ lasDirecciones();
 elMuelle();
 riberasEnTres();
 elAcercamientoDelDelta();
+elMazoEnLaPantalla();
 
 console.log('');
 if (fallos.length === 0) {
@@ -1621,12 +2018,22 @@ if (fallos.length === 0) {
       '  en los tres modos de rueda, un gesto empezado no se lo queda otro botón, una jugada\n' +
       '  ajena no recoloca la vista, y siempre hay un botón para volver a verlo entero, vestido\n' +
       '  y medido como el resto de los botones de la Sala.\n' +
+      '\n  Y el MAZO: sus movimientos los enseña la mano de cartas y no salen además como\n' +
+      '  botón —comprar sí, que no cuelga de ningún naipe—, ninguno se pierde entre la barra,\n' +
+      '  las dos manos y los botones, y sobre el retablo de cinco colonos, donde no hay mano,\n' +
+      '  vuelven a salir sueltos para que allí también se pueda jugar. El marcador del raíl\n' +
+      '  nombra a todos los colonos con su color, distingue el tuyo y saca tus puntos ocultos\n' +
+      '  como un segundo número que no se le inventa a nadie más, y dice cuántas cartas quedan.\n' +
+      '  Y lo que la escena no hace sola lo hace el cliente: coger un naipe suelta el bien y la\n' +
+      '  pieza, cogerlo otra vez lo suelta, y una jugada ajena suelta la mano entera.\n' +
       '\n  Lo que esto NO prueba: que el reparto de los cuatro muebles entre propios y genéricos\n' +
       '  sea el del §7 —es una decisión de producto y no se deriva del contrato—, ni que la ruta\n' +
       '  del catálogo mande de verdad publicaOpciones: aquí no se levanta ningún servidor. Ni\n' +
       '  cómo se VE el acercamiento: la cámara vive dentro de un Canvas y en Node no hay WebGL,\n' +
       '  así que de ella se compra que la aritmética siga en `escenas/acercar.ts`, donde\n' +
-      '  `verify:escena` la mide, y no que el delta se vea bonito de cerca.',
+      '  `verify:escena` la mide, y no que el delta se vea bonito de cerca. Ni cómo se REPARTE\n' +
+      '  la mano de cartas —vive dentro del mismo Canvas—: eso lo mide `verify:riberas-en-tres`\n' +
+      '  contra `escenas/cartas.ts`, y aquí sólo se compra lo que le llega a `<Delta>`.',
   );
   process.exit(0);
 }

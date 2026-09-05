@@ -37,7 +37,7 @@ import { RIBERAS } from '../../shared/arcade/juegos/riberas';
 import type { MovimientoDeclarado } from '../../shared/mecanicas/tablero-declarado';
 import { cuantoQueda } from './relojes';
 import { AccionesDelTablero, Paneles, Retablo } from './retablo';
-import { RiberasEnTres } from './riberas-en-tres';
+import { MarcadorDeRiberas, RiberasEnTres } from './riberas-en-tres';
 
 /** La acera de este cliente dentro del servicio. Ver `vite.config.ts`. */
 export const BASE = '/sala';
@@ -600,6 +600,24 @@ function LaMesaPuesta({
         */}
         <aside className="rail" aria-label="El carril de la mesa">
           <LaFicha mesa={puesta} silla={silla} />
+          {/*
+            ═══ EL MARCADOR DE RIBERAS, ANTES DE LOS PANELES QUE DECLARA EL JUEGO ═══
+
+            Se decide por QUIÉN es —el mismo identificador que arriba— y no por si hay
+            tablero en tres dimensiones: el marcador se mira igual cuando la mesa cae al
+            retablo SVG, y ahí es donde más falta hace, porque el respaldo pinta los
+            movimientos del mazo como botones sueltos y no dice de nadie cuántos puntos
+            lleva. Él mismo devuelve `null` si la vista no es de Riberas.
+
+            Va DELANTE de `Paneles` y no en su lugar: los paneles son texto que declara el
+            juego y que leen todos los clientes por igual —«Lo mío», «Mis cartas», los dos
+            premios—, y quitarlos aquí dejaría a este cliente enseñando menos que el de al
+            lado. Lo que este marcador añade es lo que un renglón de texto no puede: el
+            color de cada colono, quién eres tú, y tus puntos ocultos marcados como tuyos.
+          */}
+          {pintado.que === 'tablero' && manifiesto.id === RIBERAS ? (
+            <MarcadorDeRiberas vista={puesta.vista} />
+          ) : null}
           {pintado.que === 'tablero' ? <Paneles tablero={pintado.tablero} /> : null}
           <LaCronica mesa={mesa} />
           {/*
