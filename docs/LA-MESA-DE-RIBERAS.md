@@ -4,7 +4,7 @@
 > las decisiones y su porqué. Se escribió el 5 de septiembre de 2026, sobre la rama
 > `lobby-catan`, a partir de lo que Miguel pidió por escrito: ver el juego en pantalla
 > completa, una mesa de madera abajo con las piezas encima, un dado que vibra y se
-> tira tocándolo, y poder recoger la mesa. Es la octava versión. Las siete anteriores,
+> tira tocándolo, y poder recoger la mesa. Es la novena versión. Las ocho anteriores,
 > en una línea cada una: la primera pasó por una revisión adversaria que volvió a medir
 > cada número con el código real; la segunda por otra que leyó el orden de dibujo con
 > el ordenador de `three` de verdad, buscó quién apagaba los dados fuera de turno y
@@ -13,12 +13,14 @@
 > encima lo que la fase 2 añade; la quinta recogió las siete decisiones que Miguel
 > tomó la noche del 5 de septiembre (están en el §1, cada una con su porqué y sus
 > consecuencias medidas); la sexta hizo salir de su guion los puntos del cajón
-> (§1.11) y recogió el D6 de KayKit Board Game Bits como malla de los dados (§5.1); y
+> (§1.11) y recogió el D6 de KayKit Board Game Bits como malla de los dados (§5.1);
 > la séptima fue la primera escrita con la fase 2 aterrizada (`4287809`: la mesa de
 > madera), donde se descubrió que los dos «testigos» de borrado de profundidad nunca
-> corrieron y que la tapa tenía que PARAR el toque (§4.1).
+> corrieron y que la tapa tenía que PARAR el toque (§4.1); y la octava fue la primera
+> escrita con la fase 3 aterrizada (`b216fbc`), y contó lo que la fase 3 hizo distinto
+> de lo decidido y por qué.
 >
-> Esta octava está escrita CON LA FASE 3 ATERRIZADA (commit `b216fbc`: los dos dados
+> La octava se escribió CON LA FASE 3 ATERRIZADA (commit `b216fbc`: los dos dados
 > del pack sobre la mesa, con su máquina y su compilador; la fase 1 lo estaba en
 > `8371080` y la fase 2 en `4287809`). La regla es la misma que en la séptima: donde
 > la fase 3 hizo otra cosa que la que aquí se había decidido, gana el código, y el
@@ -37,8 +39,8 @@
 > (§5.2); el botón de apoyo del escritorio existe mientras existen los dados y se apaga
 > con `aria-disabled`, nunca con `disabled` (§1.4); y el mecanismo de carga de
 > `dados.glb` con el que la séptima se contradecía está escrito con los nombres del
-> código (§5.1). Los siete hallazgos que la séptima revisión dejó abiertos están
-> cerrados aquí: los dos graves (el mecanismo de `dados.glb`, §5.1 y §8; la fase 1
+> código (§5.1). Los siete hallazgos que la séptima revisión dejó abiertos quedaron
+> cerrados en ella: los dos graves (el mecanismo de `dados.glb`, §5.1 y §8; la fase 1
 > contada como pendiente cuando estaba hecha, §11) y los cinco menores (§4.2, §4.1 dos
 > veces, §4.4 y el comentario de `tapaDeLaMesa`, que sigue diciendo «unos 2,3» y queda
 > apuntado para la fase 4, §11). Ningún número de aquí es una opinión: cada uno sale
@@ -48,6 +50,18 @@
 > `revoltijo`, `fbm`, el atlas del pack y el propio `D6_A.gltf`, o de un comprobador
 > que se nombra, o de una línea del código citada con su fichero. Los guiones se listan
 > en el §9. Las líneas que se citan son las del commit `b216fbc` (§8).
+>
+> Esta novena es la pasada de medida que la revisión de la octava pidió, y no cambia
+> ninguna decisión: una docena larga de citas de línea seguían en las posiciones de
+> `4287809` (`delta.tsx` corrido unas 31 líneas; las dos `mesa.ts` y `shared`, unas 16
+> y 36) y se han vuelto a medir contra `b216fbc`, y para que no vuelva a pasar hay un
+> guion que saca TODAS las citas del documento y las coteja con el código
+> (`comprobar-citas-de-linea.ts`, §9); el peso de `dados.glb` es 19.812 bytes, no
+> 19.476 (§5.1); no existe un `D6_C.gltf` sin color, y los cuatro `D6_C_*` se midieron
+> con el horno de verdad: los cuatro se niegan, por tres ramas del compilador (§5.1); lo
+> más alto que baja al recoger la mesa es el asa, no el naipe (§6); y la fase 4 lleva
+> los nombres del escritorio, que no son los de la app: `cogida` y `cartaDelMazo`, y
+> sin `soltarTodo` (§6, §8, §11).
 
 ## 0. Qué hay hoy, y qué se pierde al quitar los paneles
 
@@ -62,7 +76,7 @@ esto, con nombre y fichero:
 | De quién es el turno | (dentro de `LaFicha`) | `LineaDelTurno` |
 | La frase del juego («Te toca: tira los dados.», «Turno de Ana: está por tirar.») | `<p class="aviso-del-tablero">` ENCIMA del recuadro del lienzo, en flujo —un párrafo con margen, `riberas-en-tres.tsx` 1253 y `estilo.css` 1603, no un vidrio sobre la escena—, texto de `avisoDe` en `riberas.ts` (4174–4193) | el mismo `aviso` dentro del retablo; en la rama del delta no se pinta hoy |
 | El marcador: puntos, cartas, guardias, el Vado con su largo, la Guardia, títulos, el mazo que queda | `MarcadorDeRiberas` en el raíl | `ElMarcador`, una cinta horizontal de `FichaDelColono` entre el aviso y el lienzo |
-| Tirar, pasar, aceptar, rechazar, contestar, empezar | `<Formulario>` bajo el lienzo, con `opcionesFueraDeLaMesa(opcionesFueraDeLaBarra(opcionesFueraDeLaMano(opcionesFueraDelTablero(o)), mazo), dados)` (líneas 845 y 955; desde la fase 3 TIRAR se cae donde hay dados, §1.4) | `LasOpciones` en el `ScrollView` del pie, misma composición (752 y 779) |
+| Tirar, pasar, aceptar, rechazar, contestar, empezar | `<Formulario>` bajo el lienzo, con `opcionesFueraDeLaMesa(opcionesFueraDeLaBarra(opcionesFueraDeLaMano(opcionesFueraDelTablero(o)), mazo), dados)` (`riberas-en-tres.tsx` 845 y 955; desde la fase 3 TIRAR se cae donde hay dados, §1.4) | `LasOpciones` en el `ScrollView` del pie, misma composición (`riberas-en-tres-escena.tsx` 752 y 779) |
 | La crónica | `LaCronica` en el raíl | `LaCronica` en el pie |
 
 El lienzo del escritorio mide `62vh` con un mínimo de 420 px (`estilo.css`,
@@ -113,7 +127,8 @@ dados o uno) está dentro de la decisión 3, y las otras seis son las decisiones
    protegía. Y deja falsos tres comentarios: la cabecera de `ANCHO_MAXIMO` en
    `barra.ts` («en el más bajo (320×360) sigue mandando el alto») y las dos menciones
    de `cartas.ts` al techo de la placa —la cabecera («el techo de la barra NUNCA pasa
-   de −0,2475·alto», línea 26) y la nota de `PISO_DE_LA_FRANJA` (línea 408)—. Los de
+   de −0,2475·alto», hoy reescrita en 27–28 con −0,273) y la nota de `PISO_DE_LA_FRANJA`
+   (líneas 411–413)—. Los de
    `cartas.ts` se reescriben DOS veces, porque miden contra lo que hay: en la fase 1 la
    placa sigue y su techo con 0,14 es `hueco.y + 0,75·lado = −0,240·alto` (el 26,0 %
    del alto desde abajo; holgura de 0,040 al piso de `−0,20`); en la fase 2 la placa se
@@ -154,7 +169,7 @@ dados o uno) está dentro de la decisión 3, y las otras seis son las decisiones
 
    `turnosAbiertos` es público y viaja en la vista (`riberas.ts` 3113 y 3203; el
    comprobador de campos públicos de `verificar-mesa.ts` 1837 lo lista con `tirado`,
-   `turnoDe` y `ultimaTirada`), sólo sube, y sube al pasar el turno (línea 2620), así
+   `turnoDe` y `ultimaTirada`), sólo sube, y sube al pasar el turno (`riberas.ts` 2620), así
    que con `tirado` falso la tirada que se enseña es la del turno anterior y lleva su
    sello. Es estable durante el turno, distinto cada turno, igual en los cuatro
    aparatos y tras recargar —la tabla de `medir-reparto-por-turno.ts` lo recorre: turno
@@ -224,16 +239,16 @@ dados o uno) está dentro de la decisión 3, y las otras seis son las decisiones
    el acto.** El cliente no sortea nada: al tocar, los dados ruedan sin objetivo;
    cuando la vista trae `tirado: true` con `ultimaTirada`, se asientan en el par de la
    decisión 3. Ruedan al menos 0,6 s aunque la respuesta llegue antes —la propia
-   petición vuelve con la mesa entera, `mover` en `app/src/arcade/mesa.ts` 704 y en
-   `escritorio/src/mesa.ts` 676, y suele tardar menos— y se asientan en 0,35 s más; si
+   petición vuelve con la mesa entera, `mover` en `app/src/arcade/mesa.ts` 720 y en
+   `escritorio/src/mesa.ts` 692, y suele tardar menos— y se asientan en 0,35 s más; si
    la vista tarda, siguen rodando hasta que llega (`medir-dado.ts`, tabla de llegadas
    a 0,2 / 0,6 / 1,4 / 3,0 s). Y los demás VEN la tirada: el suceso que arranca la
    animación no es «yo pulsé» sino «la vista cambió», así que la misma máquina corre
    en los cuatro aparatos con la vista que les trae el sondeo largo. Lo que la primera
    versión no tenía es el rechazo: un `riberas:tirar` rechazado —`rev` vieja, doble
    toque, pestaña sin el turno— vuelve como `200` con la misma mesa y el mismo `rev`, y
-   las dos pantallas YA lo saben en el acto (`seIgnoro`, `escritorio/src/mesa.ts` 717,
-   `app/src/arcade/mesa.ts` 781). Con sólo `tocado | vista | tic`, los dados rodarían
+   las dos pantallas YA lo saben en el acto (`seIgnoro`, `escritorio/src/mesa.ts` 733,
+   `app/src/arcade/mesa.ts` 797). Con sólo `tocado | vista | tic`, los dados rodarían
    6 s esperando una tirada que no va a llegar, y un doble toque es lo primero que va a
    pasar. Así que `mover` DEVUELVE lo que ya calcula —`'hecho' | 'rechazado' |
    'sin-red'`— (fase 1, `8371080`), la pantalla le devuelve esa promesa a la escena
@@ -491,7 +506,7 @@ dados o uno) está dentro de la decisión 3, y las otras seis son las decisiones
     «cogida», y de madera más oscura para que no parezcan pegatinas.** (Decisión 5.)
     La geometría no cambia: el cilindro de seis lados de `0,12 · lado` de alto (24
     triángulos), que desde la fase 2 se pinta con los tres números de `ZOCALO` de
-    `barra.ts` (centro 0,42, alto 0,12, radio 0,5; `delta.tsx` 1191–1193 y 1321–1323) y
+    `barra.ts` (centro 0,42, alto 0,12, radio 0,5; `delta.tsx` 1222–1224 y 1352–1354) y
     no con números sueltos, porque la cota de la tapa sale de esos mismos tres
     (`cotaDeLaTapa`); la opacidad 0,3 apagada y 0,92 disponible, y el verde de
     `COLOR_DE_LA_SENAL` cuando está tomada. Lo que cambia es el color de reposo: era
@@ -573,7 +588,8 @@ dados o uno) está dentro de la decisión 3, y las otras seis son las decisiones
 16. **La mesa recogida SALE SOLA cuando pasa a tocarme, salvo con una carta cogida.**
     (Decisión 7.) Como dice el §6: recoger es para mirar, y cuando hay que actuar la
     mesa vuelve; si la recojo en mi propio turno se queda hasta que yo diga; y si en el
-    instante de salir hay una carta en la mano (`cogida` o `cogidaDelMazo`), la salida
+    instante de salir hay una carta en la mano (`cogida` o `cogidaDelMazo` en la app;
+    `cogida` o `cartaDelMazo` en el escritorio), la salida
     espera a que se suelte o se coloque, porque una mesa que sube debajo de un arrastre
     cambia lo que hay bajo el dedo a mitad de gesto. Deja de ser una decisión abierta de
     la fase 4: es ésta.
@@ -786,7 +802,7 @@ todos los lienzos (fase 5): la cinta que se pinta es la que se mide.
 
 La primera versión inclinaba la tapa 22° hacia la cámara y afirmaba a la vez que «las
 piezas no se mueven». No pueden ser verdad las dos: el asa mide 0,8 lados de fondo
-(el `boxGeometry` de `PiezaEnLaBarra` y de `MazoEnLaBarra`, `delta.tsx` 1187 y 1317) y
+(el `boxGeometry` de `PiezaEnLaBarra` y de `MazoEnLaBarra`, `delta.tsx` 1218 y 1348) y
 el zócalo es un cilindro de 0,12 lados de alto (`ZOCALO.alto`, `barra.ts`); un plano a
 22° sube `tan 22° · 0,4 = 0,162` lados a media profundidad del asa, más que el zócalo
 entero. Se elige **(a): la tapa es horizontal, a la cota de la cara de abajo del
@@ -873,10 +889,10 @@ fase 2, `rev4-tapa-holgura.ts`):
      número puesto en el grupo exterior no le llega a ninguna carta ni a ninguna pieza.
   2. Las dos manos no están en la misma pasada: `three` pinta primero todos los
      opacos, luego los transmisivos, luego los transparentes (`renderScene`,
-     1959–1961). Las cartas de bienes son OPACAS (su `meshBasicMaterial` no lleva
-     `transparent`) y las del mazo transparentes. La placa de antes era transparente
-     (`opacity 0,42`), los zócalos y el naipe del mazo lo son, y los modelos de las
-     piezas y la tapa son opacos.
+     `WebGLRenderer.js` 1959–1961). Las cartas de bienes son OPACAS (su
+     `meshBasicMaterial` no lleva `transparent`) y las del mazo transparentes. La placa de
+     antes era transparente (`opacity 0,42`), los zócalos y el naipe del mazo lo son, y
+     los modelos de las piezas y la tapa son opacos.
   3. **`projectObject` PODA por frustum antes de meter nada en la lista, y a lo que no
      está en la lista no se le llama `onBeforeRender`.** Los dos «testigos» de borrado
      de profundidad que este documento razonó durante cuatro versiones (un plano de
@@ -1024,10 +1040,11 @@ fase 2, `rev4-tapa-holgura.ts`):
   - Los comentarios reescritos con la regla: la cabecera de las capas (ahora la de
     `capas.ts`: «cada capa es un número, y lo lleva TODO grupo con mallas debajo, porque
     el pintor mira el grupo más cercano», y «el orden es lo único que separa la mesa del
-    mundo: no hay borrado de profundidad»); el de la carta (`delta.tsx` 1852–1856: lo
-    que baja de un grupo es el `groupOrder`, manda más, y sólo baja desde el grupo más
-    cercano); la cabecera de `Barra` (1365–1466), que cuenta la tapa, el orden, el
-    límite conocido y la madera para el toque; y la de `ManoDelMazo` (2402–2438), que
+    mundo: no hay borrado de profundidad»); el de la carta (`delta.tsx`
+    2153–2172, y la frase en 2168–2172: lo que baja de un grupo es el `groupOrder`, manda
+    más, y sólo baja desde el grupo más cercano); la cabecera de `Barra` (1396–1505), que
+    cuenta la tapa, el orden, el límite conocido y la madera para el toque; y la de
+    `ManoDelMazo` (2718–2754), que
     dice por qué no lleva ni luz ni testigo.
   - `verify:escena` no puede correr el pintor de verdad, pero hace dos cosas. La
     primera, leer `delta.tsx` como texto: afirma que el PRIMER `<group` que sigue a cada
@@ -1084,7 +1101,7 @@ fase 2, `rev4-tapa-holgura.ts`):
   anillo SÍ conserva la profundidad del mundo: se pinta el primero de los transparentes
   (`g0 r2`, antes que la mesa) contra la profundidad que dejaron los opacos del mundo, y
   una montaña delante lo esconde, que es exactamente lo que el comentario de `Senal`
-  (`delta.tsx` 980) quiere al apagar sólo el `depthWrite` «para que tampoco tape lo que
+  (`delta.tsx` 1011) quiere al apagar sólo el `depthWrite` «para que tampoco tape lo que
   tiene detrás» (`rev3-orden-y-toque.ts`: «el anillo de la señal (mundo, g0) va ANTES
   que la mesa en la pasada de transparentes: conserva la profundidad del mundo»).
 
@@ -1196,11 +1213,11 @@ Es el mismo disco de contacto que llevan los aventureros del Muelle.
 Recibe el alto del lienzo en PUNTOS porque el suelo de 44 es en puntos y el reparto
 de `huecosDeLaBarra` sólo sabe de unidades; la escena lo tiene (`estado.size.height`,
 que la `Barra` ya lee para la proporción) y las dos pantallas también (`medida` del
-`onLayout` en la app, 659–660; el `ResizeObserver` de `medirElRecuadro` en el
-escritorio, 927–944). `dados` es un hueco de `1 lado` de alto y de un ancho que depende
-del peldaño: `1,6 lados` colgado y, como quinto, `max(lado, ANCHO_DEL_PAR_DE_DADOS ·
-lado) = 1,12 lados` (desde la vuelta 3b de la fase 3; hasta entonces era un lado, y el
-par no cabía). La regla es de tres peldaños, en este orden:
+`onLayout` en la app, `riberas-en-tres-escena.tsx` 659–660; el `ResizeObserver` de
+`medirElRecuadro` en el escritorio, `riberas-en-tres.tsx` 927–944). `dados` es un hueco
+de `1 lado` de alto y de un ancho que depende del peldaño: `1,6 lados` colgado y, como
+quinto, `max(lado, ANCHO_DEL_PAR_DE_DADOS · lado) = 1,12 lados` (desde la vuelta 3b de la
+fase 3; hasta entonces era un lado, y el par no cabía). La regla es de tres peldaños, en este orden:
 
 1. **Colgado a la IZQUIERDA del reparto de cuatro,** con un paso de aire
    (`AIRE · lado`) entre su borde derecho y el primer hueco, SIEMPRE QUE QUEPA con
@@ -1313,11 +1330,13 @@ lleva la llave y el `<mesh>` del tapete la pregunta». La vacuna E16 (volver a `
 contar EXACTAMENTE igual —`barraEnTres(...).length + (mazoEnLaBarra(...) === null ? 0 :
 1)`— para pedir el mismo reparto. En `jugando`, para un colono con color, es 4 sin
 excepción: `barraEnTres` devuelve las tres `PIEZAS_DE_LA_BARRA` en cuanto hay color,
-dentro y fuera de turno (314–324; fuera de turno salen apagadas, no ausentes), y
-`mazoEnLaBarra` no es `null` en `jugando` con color (362–371). Fuera de `jugando` el
+dentro y fuera de turno (`riberas-en-tres.ts` 350–360; fuera de turno salen apagadas, no
+ausentes), y
+`mazoEnLaBarra` no es `null` en `jugando` con color (398–410; el `momento !==
+'jugando'` en 404). Fuera de `jugando` el
 mazo es `null` y son 3, y ahí NO hay dados: `dadosEnTres` devuelve `null` fuera de
 `momento === 'jugando'` (`riberas-en-tres.ts` 1092), por lo mismo que `mazoEnLaBarra`
-(cabecera 351–360: durante la colocación no existe la jugada, y un hueco apagado toda
+(cabecera 372–397: durante la colocación no existe la jugada, y un hueco apagado toda
 una fase promete algo que no llega). Con tres huecos los cuatro móviles caerían en
 quinto con el canto a 0,891 lados (la revisión de la vuelta 3b lo midió), y no se
 pinta: la pantalla no pasa dados. Todas las medidas del colgado usan 4 y valen; la de 3 se hizo igual
@@ -1354,7 +1373,7 @@ después el propio `compilar-dados.ts`; §9):
 |---|---|---|---|
 | **`D6_A.gltf`** | 521 / 662, UNA primitiva, un material («boardgame»), con UV y sin `COLOR_0` | el ATLAS compartido del pack, `boardgame_bits_texture.png` (1024², 35 kB) | GEOMETRÍA: 21 puntos de 9 vértices cada uno (189 vértices de punto, 332 de cuerpo), cada punto en una celda oscura del atlas; bajo los vértices dos colores dominantes, el cuerpo `228,232,234` y el punto `68,68,68`, más un degradado (37 tonos en total) |
 | `D6_B.gltf` | 501 / 740 | el mismo atlas | geometría, cuerpo OSCURO con hoyuelos: 84 vértices de punto con la normal mirando a otra cara que la de su posición |
-| `D6_C.gltf` (y sus colores) | 120 / 188 | textura individual `dice_*.png` de 1024² y 150 a 175 kB | NÚMEROS PINTADOS: horneado, el vértice más oscuro tiene 0,276 de luminancia; no hay punto de geometría |
+| `D6_C_blue`, `D6_C_green`, `D6_C_red` y `D6_C_yellow.gltf` (no hay un `D6_C.gltf` sin color) | 120 / 188 | textura individual `dice_*.png` de 1024² y 150 a 175 kB | NÚMEROS PINTADOS, sin punto de geometría. Horneados con el horno de verdad (`rev6-medir-d6-con-el-horno.ts`, §9), el compilador niega los cuatro, y a cada uno por una rama: el azul no tiene ningún vértice oscuro (el más oscuro, 0,276: «gana el respaldo; no se compila»); el rojo los tiene TODOS oscuros (los 120 bajo 0,25, el más claro en 0,207: «no hay cuerpo que pintar»); el verde tiene 48 oscuros con el más claro en 0,226, que no deja el factor 2 al umbral; el amarillo ninguno oscuro (0,521) |
 | `D4`, `D8`, `D20` | | textura individual | números pintados |
 
 Caja del `D6_A`: `0,7500 × 0,7500 × 0,7500`, centrada (centro en `0,0003, 0, 0`), y las
@@ -1416,16 +1435,18 @@ iba por uno u otro según dónde estuvieran sus puntos:
   0,584 y 0,94, sin nada en medio; el compilador exige un factor 2 de hueco a cada
   lado del umbral (`HOLGURA_DEL_UMBRAL`) y se NIEGA si no lo hay, si ningún vértice es
   oscuro (puntos pintados: «gana el respaldo procedimental; no se compila», que es lo
-  que dice con el `D6_C`) o si todos lo son. El degradado se aplana a propósito: una
-  cara, un color, y el sombreado lo pone la luz de la escena, como en las fichas. Sin
-  textura y sin UV (`desnudaElMaterial`, `dedup` y `prune`), material blanco con
+  que dice con el `D6_C_blue`, el de la vacuna V7) o si todos lo son; los cuatro
+  `D6_C_*` caen, cada uno por una rama (la fila del `D6_C` de la tabla de arriba). El
+  degradado se aplana a propósito: una cara, un color, y el sombreado lo pone la luz de
+  la escena, como en las fichas. Sin textura y sin UV (`desnudaElMaterial`, `dedup` y
+  `prune`), material blanco con
   `vertexColors` y metal 0, un solo búfer, y el nodo, la malla y el material renombrados
   a `MODELO.dado`. Y **sin `weld`**, al revés que los otros dos compiladores: tras
   aplanar el color, doce vértices que sólo se distinguían por el tono del degradado
   quedan idénticos y `weld` los fundiría (521 → 509, medido); se ahorrarían 336 bytes y
   la cuenta del fichero dejaría de ser la del pack que se midió, que es la que
   `verify:dados` exige para que una recompilación con otro D6 se vea en el número. Sale
-  `escenas/modelos/dados.glb`, **19,3 kB** (19.476 bytes). Cuesta 4 bytes por vértice y
+  `escenas/modelos/dados.glb`, **19,3 kB** (19.812 bytes). Cuesta 4 bytes por vértice y
   quita 8 de UV (`medir-textura-del-dado.ts`, §3), y funciona en el teléfono sin
   ningún complemento: la app lo abre con un `GLTFLoader` pelado, sin
   `texturasDelTablero`, porque no hay textura que sustituir.
@@ -1468,10 +1489,10 @@ iba por uno u otro según dónde estuvieran sus puntos:
   entrelazado, los mismos 521/662, y la caja de 0,75 con `Box3`. Las vacunas de la fase
   3 lo vieron caer con la tabla editada a mano, con otro `.glb` en su sitio, con un
   color cambiado sin recompilar, con un tercer color en un vértice, con las UV
-  devueltas, con dos nodos, entrelazado, con `weld`, sin remapear, con el `D6_C`, con el
+  devueltas, con dos nodos, entrelazado, con `weld`, sin remapear, con el `D6_C_blue`, con el
   `D6_B` y con la arista escrita a 0,8 (`vacunas-fase3.py`, §9).
 - **(b) Los puntos están PINTADOS en la textura individual del dado**, que es el camino
-  que NO se tomó y que sigue escrito para el `D6_C` y los D4, D8 y D20 (el cuerpo es
+  que NO se tomó y que sigue escrito para los cuatro `D6_C_*` y los D4, D8 y D20 (el cuerpo es
   una caja de 24 vértices, 8 esquinas por 3 caras, y cada cara entera cae en una
   región de la textura con el punto dibujado dentro): el horneado por vértice los
   BORRA, porque una cara son cuatro vértices y cuatro vértices son un color plano. El
@@ -1491,7 +1512,7 @@ iba por uno u otro según dónde estuvieran sus puntos:
   §2 del mismo guion) y **0 en disco**, porque son código. La regla que pidió Miguel
   era «si pesa más que el propio modelo procedimental con sus 21 puntos, gana el
   respaldo», y la cuenta está hecha antes de abrir el fichero: la tabla más pequeña
-  pesa dieciséis veces los dos dados. **Por (b) gana el respaldo** (y por eso el `D6_C` y
+  pesa dieciséis veces los dos dados. **Por (b) gana el respaldo** (y por eso los `D6_C_*` y
   los demás se descartan), y no se escribe ni el compilador ni el complemento para ese
   caso. Habría un tercer camino a medias
   (hornear el cuerpo del pack a un color y ponerle encima nuestros 21 puntos), y se
@@ -1590,13 +1611,15 @@ el banco, y es esto:
    traerUnGlb(RUTA_DEL_TABLERO))` y `traerLosDados = recordada(() =>
    traerUnGlb(RUTA_DE_LOS_DADOS))` (368–369; `traerUnGlb` es `fetch` relativo más
    `GLTFLoader.parseAsync`, para que un 404 se lea como «contestó 404» y no como un
-   `ProgressEvent` mudo). En la app, la misma `recordada` (280–291) construye
+   `ProgressEvent` mudo). En la app, la misma `recordada` (`riberas-en-tres-escena.tsx`
+   279–291) construye
    `tableroPrometido` (301–316, con el registro de `texturasDelTablero` cuando
    `!decodificaImagenes()`, que `verify:sala` exige literal) y `dadosPrometidos`
    (323–326, con un `GLTFLoader` pelado: el D6 va horneado y no hay textura que
    sustituir).
 2. **La unión, con el fallo del dado tragado ANTES de juntar.** `traerElCatalogo()` en
-   el escritorio (381–388) y `catalogoDelTablero()` en la app (337–344) hacen lo mismo:
+   el escritorio (`riberas-en-tres.tsx` 381–388) y `catalogoDelTablero()` en la app
+   (`riberas-en-tres-escena.tsx` 337–344) hacen lo mismo:
    `Promise.all([tablero, dados])` donde `dados` es `traerLosDados().catch(() => null)`
    (con un `console.warn`: «Los dados no han llegado (…): se pintan los del respaldo»,
    porque un respaldo mudo es un fallo que nadie ve), y `.then(([delTablero,
@@ -1857,7 +1880,9 @@ turno, ruedan hasta que el servidor contesta…»). Lo que se miró en el banco 
   146 en un iPhone 14, y el botón acaba a 44.
 - **Qué baja:** el grupo `Barra` entero —tapa, zócalos, piezas, naipe o pila, dados,
   tapete, sombras—, `alto/2 + hueco.y + 0,5 lados` hacia abajo: 0,37 unidades, 88
-  puntos en un iPhone 14, hasta que el punto más alto (el naipe) queda bajo el canto.
+  puntos en un iPhone 14, hasta que el punto más alto (el asa, a 0,5 lados sobre el
+  centro del hueco, §1.2; la pieza tomada en lo alto de su bote, 0,516, no cuenta,
+  porque recoger suelta lo cogido; el naipe se queda en 0,31) queda bajo el canto.
   Objetivo más interpolación amortiguada en el `useFrame` del grupo, 0,28 s; al
   llegar, `visible = false`, que además saca sus asas de los sucesos de r3f. Lo que la
   fase 3 le deja a ésta: `Dados` vive DENTRO de `Barra` (hermano de `PiezaEnLaBarra` y
@@ -1871,9 +1896,17 @@ turno, ruedan hasta que el servidor contesta…»). Lo que se miró en el banco 
   montado. La entrada `mesaRecogida` de `<Delta>` no existe todavía.
 - **Qué NO baja:** las dos manos. No están sobre la mesa —una mano de cartas se
   sostiene— y en apaisado viven en los costados, que no es lo que se quiere despejar.
-  Recoger la mesa suelta lo cogido (`soltarTodo`, `riberas-en-tres-escena.tsx` 646):
-  una pieza en la mano con la barra fuera de la pantalla no tiene a dónde volver. La
-  bajada medida: 72 puntos en el SE, 88 en un iPhone 14, 243 en un monitor a 1080
+  Recoger la mesa suelta lo cogido (en la app, `soltarTodo`, `riberas-en-tres-escena.tsx`
+  646: pone a `null` la tomada, lo que se coloca, `cogida`, `cogidaDelMazo`, `aQuien`,
+  `comoJugarla` y `comprando`, siete estados): una pieza en la mano con la barra fuera de la pantalla no tiene a
+  dónde volver. En el escritorio NO hay `soltarTodo`: `ponerCogida(null)` está escrito
+  seis veces (`riberas-en-tres.tsx` 889, 967, 987, 1028, 1056 y 1119) y el naipe del
+  mazo tiene su propio estado, `cartaDelMazo` (878; `cartaDelMazoCogida={cartaDelMazo}`
+  en 1325); lo más parecido es el efecto de `rev` (887–892), que pone a `null` la
+  tomada, `cogida`, `cartaDelMazo` y `preguntando` (cuatro llamadas: soltar por ahí
+  suelta también la pregunta abierta). La fase 4 elige: o le escribe un `soltarTodo` que
+  recoja esas seis llamadas, o la bajada suelta con las cuatro llamadas que ya hace ese
+  efecto. La bajada medida: 72 puntos en el SE, 88 en un iPhone 14, 243 en un monitor a 1080
   (`medir-tapa-horizontal.ts`).
 - **Las áreas de toque:** se van con el grupo; un rayo desde un puntero dentro del
   lienzo no cruza geometría que está por debajo del canto, y con `visible = false`
@@ -1884,11 +1917,13 @@ turno, ruedan hasta que el servidor contesta…»). Lo que se miró en el banco 
   Miguel): recoger es para mirar, y cuando
   hay que actuar la mesa vuelve. Si la recojo en mi propio turno, se queda recogida
   hasta que yo diga. **Con algo cogido no sale sola:** si en ese instante hay una
-  carta en la mano (`cogida` o `cogidaDelMazo`; una pieza de la barra no puede
-  estarlo, la mesa recogida no tiene de dónde cogerla), la salida espera a que se
-  suelte o se coloque. Una mesa que sube debajo de un arrastre cambiaría lo que hay
-  bajo el dedo a mitad de gesto. Como la pantalla ya suelta todo al cambiar `rev`
-  (línea 656), la espera dura lo que dure el gesto.
+  carta en la mano (en la app `cogida` o `cogidaDelMazo`, `riberas-en-tres-escena.tsx`
+  640–641; en el escritorio `cogida` o `cartaDelMazo`, `riberas-en-tres.tsx` 876 y 878;
+  una pieza de la barra no puede estarlo, la mesa recogida no tiene de dónde cogerla), la
+  salida espera a que se suelte o se coloque. Una mesa que sube debajo de un arrastre
+  cambiaría lo que hay bajo el dedo a mitad de gesto. Como la pantalla ya suelta todo al
+  cambiar `rev` (`riberas-en-tres-escena.tsx` 656; en el escritorio, `riberas-en-tres.tsx`
+  887–892), la espera dura lo que dure el gesto.
 - **La cámara** no cambia (§1.9).
 
 ## 7. El presupuesto
@@ -1945,8 +1980,10 @@ compila ninguna cifra nueva.
 
 Las líneas que cita este documento (de `delta.tsx`, de las dos pantallas, de `shared`
 y de las dos `mesa.ts`) son las del commit `b216fbc` (la fase 3 aterrizada); las de la
-séptima versión eran de `4287809` y las de la sexta de `c9faef3`, y ya no valen. Donde
-se puede se cita por NOMBRE de función o de constante, y los comprobadores se citan por
+séptima versión eran de `4287809` y las de la sexta de `c9faef3`, y ya no valen; la
+octava dejó una docena larga en las de `4287809` sin verlo, y desde la novena se cotejan
+TODAS con `comprobar-citas-de-linea.ts` (§9) antes de cerrar una pasada. Donde se puede
+se cita por NOMBRE de función o de constante, y los comprobadores se citan por
 el nombre de sus comprobaciones y nunca por línea. Cada fila dice qué está HECHO y en
 qué fase (`8371080` la 1, `4287809` la 2, `b216fbc` la 3) y qué queda pendiente y de
 qué fase; nada de lo que ya existe se manda escribir.
@@ -1981,13 +2018,13 @@ qué fase; nada de lo que ya existe se manda escribir.
 | `server/scripts/verificar-riberas-en-tres.ts` | HECHO (fases 1 a 3): que TIRAR se cae del formulario sólo con dados; que `porTirar` sigue a las opciones enteras y al revés sale falso; que `dadosEnTres` es `null` fuera de `jugando`; que las cuentas de chozas y torres cuadran con la vista; que `turnoEnTres` devuelve el color del asiento de `turnoDe`; que `tirarEnTres` devuelve la opción entera y `null` con la tirada hecha. 295 comprobaciones, `MINIMO` 293 |
 | `app/src/arcade/mesa.ts`, `escritorio/src/mesa.ts` | HECHO (fase 1): `mover` devuelve `ResultadoDelMovimiento = 'hecho' \| 'rechazado' \| 'sin-red'`, con el `return` temprano resuelto a `'rechazado'` (tabla del §5.3) |
 | `app/src/arcade/local.ts` | Pendiente (fase 6): `volverAlRetrato()`; `usarElAparatoQuieto` lo usa al desmontar; `usarApaisado` al lado, y `usarLaPantallaEncendida` con `activateKeepAwakeAsync` / `deactivateKeepAwake` como el juego local (378–381; §1.13) |
-| `app/src/arcade/riberas-en-tres-escena.tsx`, `app/src/arcade/hud-de-la-mesa.tsx` (NUEVO, fase 6) | HECHO (fase 2): `turnoDe = useMemo(() => turnoEnTres(laVista), [laVista])` y `<Delta turnoDe={turnoDe}>`. HECHO (fase 3): `recordada`, `tableroPrometido` y `dadosPrometidos`, `catalogoDelTablero()` con el `catch` a `null` antes del `Promise.all` y `unirCatalogos` (§5.1); `CAMPO_DE_LA_CAMARA` 45°; `haySitioParaLosDados` con `huecosDeLaMesa` y `medida` del `onLayout`; `dados` de `dadosEnTres` con las opciones enteras y `mesa.quieto` apagándolos; `fueraDelTablero = opcionesFueraDeLaMesa(fueraDeLaBarra, dados)`; `alPulsarLosDados` con `laInterfazSeLoQueda()` la primera y `tirarEnTres`; `<Delta dados onPulsarLosDados>`; `accessibilityActions` `tirar` con `onAccessibilityAction` en la vista del `Canvas` (§1.4). `verify:sala` lo exige (152 comprobaciones, guardia 152). Pendiente (fase 6): la rama del delta a pantalla completa; la cinta del tercio central con la ficha de mis puntos en el sitio del «≡»; el cajón del ancho de la cinta con el marcador de seis en fichas de 44 («vado L · N chozas · M torres» en el segundo renglón), la línea de la mesa, los botones y la crónica, desplazable (§1.11); barra de estado oculta; cartel de girar |
-| `escritorio/src/riberas-en-tres.tsx`, `escritorio/src/sala.tsx`, `escritorio/src/estilo.css` | HECHO (fase 2): `turnoDe = useMemo(() => turnoEnTres(vista), [vista])` y `<Delta turnoDe={turnoDe}>`. HECHO (fase 3): `recordada`, `traerUnGlb`, `traerElTablero` y `traerLosDados`, `traerElCatalogo()` con el `catch` a `null` antes del `Promise.all` y `unirCatalogos` (§5.1); `CAMPO_DE_LA_CAMARA` 45°; el `ResizeObserver` de `medirElRecuadro` sobre el recuadro y el estado `lienzo`; `haySitioParaLosDados`, `dados`, `fuera = opcionesFueraDeLaMesa(fueraDeLaBarra, dados)`, `alPulsarLosDados` con `tirarEnTres`; `<Delta dados onPulsarLosDados>`; el botón `.riberas-solo-apoyo` «Tirar los dados» montado con `dados !== null`, `aria-disabled`, sin `disabled` (§1.4), y su regla en `estilo.css`. `verify:escritorio` lo exige (400 comprobaciones, guardia 400). Pendiente (fase 5): la misma cinta en DOM con la ficha de mis puntos; el raíl como cajón del ancho de la cinta, con el marcador el primero y `MarcadorDeRiberas` pintando la ficha de 44; la página como columna flex con la cadena de cuatro eslabones (`.sala` → `.tablero-y-panel` → `.riberas-en-tres` → `.riberas-lienzo`, cada uno con `flex: 1; min-height: 0`; §1.12), el aviso en la cinta y la cabecera de la Sala en su sitio, sin variable de alto |
+| `app/src/arcade/riberas-en-tres-escena.tsx`, `app/src/arcade/hud-de-la-mesa.tsx` (NUEVO, fase 6) | HECHO (fase 2): `turnoDe = useMemo(() => turnoEnTres(laVista), [laVista])` y `<Delta turnoDe={turnoDe}>`. HECHO (fase 3): `recordada`, `tableroPrometido` y `dadosPrometidos`, `catalogoDelTablero()` con el `catch` a `null` antes del `Promise.all` y `unirCatalogos` (§5.1); `CAMPO_DE_LA_CAMARA` 45°; `haySitioParaLosDados` con `huecosDeLaMesa` y `medida` del `onLayout`; `dados` de `dadosEnTres` con las opciones enteras y `mesa.quieto` apagándolos; `fueraDelTablero = opcionesFueraDeLaMesa(fueraDeLaBarra, dados)`; `alPulsarLosDados` con `laInterfazSeLoQueda()` la primera y `tirarEnTres`; `<Delta dados onPulsarLosDados>`; `accessibilityActions` `tirar` con `onAccessibilityAction` en la vista del `Canvas` (§1.4). `verify:sala` lo exige (152 comprobaciones, guardia 152). Pendiente (fase 4): el botón «Recoger la mesa» y su estado, la vuelta sola al tocarme con la espera mirando `cogida` y `cogidaDelMazo` (`riberas-en-tres-escena.tsx` 640–641), y `soltarTodo` (`riberas-en-tres-escena.tsx` 646) al recoger (§6). Pendiente (fase 6): la rama del delta a pantalla completa; la cinta del tercio central con la ficha de mis puntos en el sitio del «≡»; el cajón del ancho de la cinta con el marcador de seis en fichas de 44 («vado L · N chozas · M torres» en el segundo renglón), la línea de la mesa, los botones y la crónica, desplazable (§1.11); barra de estado oculta; cartel de girar |
+| `escritorio/src/riberas-en-tres.tsx`, `escritorio/src/sala.tsx`, `escritorio/src/estilo.css` | HECHO (fase 2): `turnoDe = useMemo(() => turnoEnTres(vista), [vista])` y `<Delta turnoDe={turnoDe}>`. HECHO (fase 3): `recordada`, `traerUnGlb`, `traerElTablero` y `traerLosDados`, `traerElCatalogo()` con el `catch` a `null` antes del `Promise.all` y `unirCatalogos` (§5.1); `CAMPO_DE_LA_CAMARA` 45°; el `ResizeObserver` de `medirElRecuadro` sobre el recuadro y el estado `lienzo`; `haySitioParaLosDados`, `dados`, `fuera = opcionesFueraDeLaMesa(fueraDeLaBarra, dados)`, `alPulsarLosDados` con `tirarEnTres`; `<Delta dados onPulsarLosDados>`; el botón `.riberas-solo-apoyo` «Tirar los dados» montado con `dados !== null`, `aria-disabled`, sin `disabled` (§1.4), y su regla en `estilo.css`. `verify:escritorio` lo exige (400 comprobaciones, guardia 400). Pendiente (fase 4): el botón «Sacar la mesa» y su estado; la espera de la vuelta sola mira `cogida` (`riberas-en-tres.tsx` 876) y `cartaDelMazo` (878), que aquí NO se llaman como en la app; y no hay `soltarTodo`: o se escribe uno que recoja los seis `ponerCogida(null)` (889, 967, 987, 1028, 1056 y 1119) o la bajada suelta con lo que ya hace el efecto de `rev` (887–892, cuatro llamadas; §6). Pendiente (fase 5): la misma cinta en DOM con la ficha de mis puntos; el raíl como cajón del ancho de la cinta, con el marcador el primero y `MarcadorDeRiberas` pintando la ficha de 44; la página como columna flex con la cadena de cuatro eslabones (`.sala` → `.tablero-y-panel` → `.riberas-en-tres` → `.riberas-lienzo`, cada uno con `flex: 1; min-height: 0`; §1.12), el aviso en la cinta y la cabecera de la Sala en su sitio, sin variable de alto |
 | `escritorio/src/banco3d.tsx` | HECHO (fase 3): `useCatalogo` carga los dos ficheros con `loadAsync` y el mismo `catch` a `null` antes de unir; los dados de mentira (`dadosDelBanco`, `simularLaTirada`): «Me toca tirar» enciende `disponible`, «Tirar» hace de servidor (a los 400 ms llega otra suma y otro sello), «Rechazar: sí/no» hace que la próxima pulsación vuelva `rechazado`, y el rótulo «suma · sello»; `<Delta dados onPulsarLosDados>` con el mismo simulador |
 
 ## 9. Cómo se midió
 
-Treinta y un guiones en el scratchpad de la sesión, que importan el código real. De la
+Treinta y tres guiones en el scratchpad de la sesión, que importan el código real. De la
 primera pasada: `medir-lienzos.ts` (huecos, manos y franjas en catorce lienzos con el
 0,13 de hoy), `medir-dados-hueco.ts` (el hueco de los dados colgado y como quinto),
 `medir-con-014.ts` (las mismas cuentas con `PARTE_DEL_ALTO` a 0,14: reproduce la
@@ -2066,8 +2103,8 @@ el pack en el disco: `medir-d6-del-pack.ts` (los D4, D6, D8 y D20 del pack en `.
 con `NodeIO` y `pngjs`: vértices, triángulos, primitivas, materiales, texturas y su
 tamaño, caja envolvente, si hay UV y `COLOR_0`, y cuántos colores distintos hay bajo
 las UV de cada uno: es lo que separó el `D6_A` y el `D6_B`, con el atlas y dos colores
-dominantes bajo los vértices, del `D6_C` y los demás, con su textura individual de
-números pintados; la tabla del §5.1), y un guion temporal dentro de
+dominantes bajo los vértices, de los cuatro `D6_C_*` y los demás, con su textura
+individual de números pintados; la tabla del §5.1), y un guion temporal dentro de
 `escenas/scripts/` (borrado al acabar) que horneó el `D6_A` con el `hornear.ts` de
 verdad y midió lo que el compilador escribe en sus cabeceras: las dos nubes de
 luminancia (0,02..0,059 y 0,584..0,94), los 37 tonos, cero triángulos mixtos, nueve
@@ -2084,7 +2121,31 @@ apuntados, y la restauración byte a byte por md5 (`vacunas-fase3.txt` y los
 la fase escribió. Para la octava, `rev5-quinto-y-dado.ts` (el quinto hueco tal como
 aterrizó: asa, piezas, dado y punto en puntos, el aire del dado derecho al primer zócalo
 y el canto al asa en los quince lienzos; la tabla del §4.4) y `rev2-vertices-bajo-la-tapa-2.ts`
-vuelto a correr para el dato a 82° del §4.1. Donde un número de aquí viene del 0,13 se
+vuelto a correr para el dato a 82° del §4.1. Para la novena, dos más:
+`rev6-medir-d6-con-el-horno.ts` (los cuatro `D6_C_*` del pack horneados con el
+`hornear.ts` de verdad y clasificados con el umbral de 0,25 y el factor 2 del
+compilador: vértices oscuros, punto más claro, cuerpo más oscuro y el más oscuro de
+todos, por color; la fila del `D6_C` de la tabla del §5.1, donde los cuatro se niegan
+por tres ramas: azul y amarillo sin ningún vértice oscuro, el rojo con todos oscuros, el
+verde por el factor 2 del umbral) y `comprobar-citas-de-linea.ts` (el metro de las citas de línea de ESTE
+documento: saca todas las que tienen la forma de un nombre de fichero seguido de un
+número o de un rango, la palabra «línea» o «líneas» seguida de números, o un paréntesis
+con números apoyado en el último fichero nombrado en el mismo párrafo o en la misma
+fila de tabla; resuelve el nombre contra el árbol de `b216fbc` con `git ls-tree`,
+imprime la línea citada con `git show`, y marca DUDOSA la cita cuya línea o rango no
+contiene ninguna palabra de la frase que la rodea, ni identificador entre acentos
+graves ni palabra de cinco letras o más). En la novena sacó 405 citas: 138 con alguna
+palabra de la frase en su línea, 75 DUDOSAS, 27 que apuntan más allá del final del
+fichero, 34 números entre paréntesis sin fichero cerca y 131 a guiones del scratchpad
+o a ficheros de `three`, que no viven en el commit y no se comprueban. Las DUDOSAS y las
+que apuntan más allá del final se repasaron una a una: son números que no son líneas
+(lienzos, capas, umbrales, cuentas de comprobaciones, píxeles, códigos HTTP) o citas
+buenas cuya frase no repite ninguna palabra de su línea, y las que estaban corridas son
+las que esta pasada corrigió. El guion no escribe nada, se corre con
+`node_modules/.bin/tsx` desde el worktree, y es un metro, no un comprobador: una DUDOSA
+puede ser buena y una buena puede haber acertado por una palabra genérica, así que la
+salida se lee ENTERA; cada pasada que toque una línea del código o una cita del
+documento lo corre antes de cerrar. Donde un número de aquí viene del 0,13 se
 dice; los del 0,14 son los que valen. Lo que se afirma en este documento se convierte
 en comprobaciones de `verify:escena` en la fase que lo hace: el guion de la sesión se
 tira, el comprobador se queda (los `rev2-*` y `rev3-*` ya lo son: el orden con la poda,
@@ -2237,8 +2298,12 @@ depende de la siguiente.
    banco existe para verlo), el respaldo en pantalla (se construye y se cuenta, pero
    nadie ha quitado `dados.glb` y mirado), y los puntos a 23 puntos en un SE de verdad
    (§10, Miguel). Y lo que esta fase le deja a la 4, abajo.
-4. **Recoger la mesa. La siguiente.** El botón, la bajada, `soltarTodo`, la vuelta sola
-   al tocarme con la espera si hay una carta cogida, tal como está escrito en el §6. Más
+4. **Recoger la mesa. La siguiente.** El botón, la bajada, soltar lo cogido (`soltarTodo`
+   en la app; en el escritorio no existe: o se escribe uno recogiendo los seis
+   `ponerCogida(null)` o la bajada suelta con lo que ya hace el efecto de `rev`), la
+   vuelta sola al tocarme con la espera si hay una carta cogida (`cogida` o
+   `cogidaDelMazo` en la app, `cogida` o `cartaDelMazo` en el escritorio), tal como está
+   escrito en el §6. Más
    lo que las fases 2 y 3 le dejan: `Dados` vive dentro de `Barra` con su máquina en
    refs, así que hay que ELEGIR si al recoger se desmonta (la máquina vuelve a reposo y
    una tirada que llegue recogida se enseña en reposo al subir, sin animar) o se mueve
