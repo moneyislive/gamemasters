@@ -36,6 +36,38 @@
 > global de las **nueve** fases de los tres encargos (§15.0) y la etiqueta de tanda y de
 > reejecución de cada número medido (§11).
 >
+> **Cuarta versión, y es la primera que se escribe con el código delante: LA FASE 1
+> ATERRIZÓ, en `958962a`.** Lo que hace esta pasada es dejar de contar la fase 1 como un
+> plan y contarla como lo que hay, con lo que trajo y con los recuentos medidos al
+> aterrizar (`verify:riberas` 423, `verify:mesa` 2.915 con **32 sietes jugados de
+> verdad**, `verify:riberas-en-tres` 343, `verify:escritorio` 458; batería 76 de 76 en
+> verde). Van escritas aparte las **seis decisiones que este documento no terminaba de
+> decir** y que se decidieron al escribir el código (§1 bis), y las **tres cosas que
+> cambiaron respecto a lo escrito**, que son lo más importante de la vuelta:
+>
+> (a) **El filo no bastaba, y estaba medido con la cinta equivocada** (§6.3, §9.2 y
+> §12.14). Este documento defendía el turquesa con 42,1 de CIE76 contra los rellenos, y
+> esa cuenta contesta a otra pregunta: «¿se confunden dos rellenos puestos al lado?». La
+> de un TRAZO sobre el relleno que lo rodea es 3:1 de luminancia, que esta casa ya tiene
+> escrita en `app/src/arcade/retablo.tsx`. Medido, el turquesa da 1,1:1 sobre la salina,
+> 1,3:1 sobre la duna donde el estiaje nace y 1,4:1 sobre la vega. Y no hay color que lo
+> arregle solo. La salida es que la isla seca se pinta **en penumbra**, que es un área y
+> no un filo; el filo se queda como refuerzo.
+>
+> (b) **El tablero de tres dimensiones YA LO DIBUJA, y eso no era la fase 4** (§9.1,
+> §12.7 y §15.1). El componente que planta la tienda, su sitio sobre el relieve y el
+> modelo estaban escritos desde hacía tiempo, y lo único que llegaba era `null`. Se
+> adelantó porque sin ello, en una mesa de dos a cuatro colonos (que son las que se juegan
+> de verdad, porque el retablo sólo entra con cinco o seis), un siete habría secado una
+> isla sin que se viera cuál. Lo que sigue siendo de la fase 4 es SOLTAR la pieza sobre
+> una comarca.
+>
+> (c) **Tres arreglos de comprobación**, que salieron al ver caer las nuevas (§12.15).
+>
+> Y una nota que afecta a los otros dos documentos: **el bucle de Riberas de
+> `verificar-mesa.ts` ya no se atasca** (`3942556`), así que la regla del estiaje sí se
+> ejercita ahí. Eso cambia lo que el §13 decía sobre los dos testigos, y está reescrito.
+>
 > Y empieza revocando una decisión escrita. Riberas no tiene ladrón a propósito: está
 > dicho en la constante `ESTIAJE` de `shared/arcade/juegos/riberas.ts` («cuando el dado
 > saca siete el agua baja y las islas no producen. Y no pasa nada más»), en la cabecera
@@ -51,15 +83,24 @@
 > importa el motor de verdad y juega partidas a ciegas con `opcionesDeRiberas`, de una
 > lectura de los `.gltf` del pack con sus accesores, o de un comprobador que se nombra.
 > Los guiones están listados en el §11, viven en el scratchpad de la sesión y no
-> escriben nada. Este encargo es de diseño: aquí no se ha tocado ni una línea de código.
+> escriben nada. Este encargo sigue siendo de diseño: al escribir esta cuarta versión no
+> se ha tocado ni una línea de código, y lo que se cuenta de la fase 1 se ha leído del
+> que ya está confirmado en `958962a`. Los recuentos de comprobadores de esta versión
+> son los de ese commit y están en el §11.3.
 > **Y cada número lleva ahora dos etiquetas y no una: de qué tanda es, y si su guion se
 > reejecutó o no.** El §11.2 dice cuáles se volvieron a correr en la tercera vuelta, cuáles
 > se quedan sin reejecutar y por qué el reparo de fondo no se arregla reejecutando.
 
-## 0. Qué hay hoy al sacar un siete, y qué se pierde con ello
+## 0. Qué había al sacar un siete, y qué se perdía con ello
 
-`tirarLosDados` gasta dos tiradas de `enteroEntre`, suma, y si la suma es siete devuelve
-el estado con `ultimaTirada: 7` y nada más. La rama entera es una línea:
+> **Esto es el ANTES, y se queda escrito en pasado porque es lo que sostiene todo lo
+> demás.** Desde `958962a` un siete hace lo que dice el §15.1 fase 1. Lo que sigue es el
+> estado del código hasta ese commit y el argumento que lo movió, y no se borra por lo
+> mismo que no se borra la revocación: quien lea esto dentro de un año tiene derecho a
+> saber por qué la regla entró.
+
+`tirarLosDados` gastaba dos tiradas de `enteroEntre`, sumaba, y si la suma era siete devolvía
+el estado con `ultimaTirada: 7` y nada más. La rama entera era una línea:
 
 ```
 if (suma === ESTIAJE) return conLaTirada;
@@ -292,6 +333,95 @@ correcto **mientras no hubiera pieza**. Deja de serlo en cuanto la hay.
     `acciones` y nada más, así que las dos listas que se eligen son las dos que el bucle
     ya lee. El §2.5 lo mide, con la sorpresa que salió al medirlo.
 
+## 1 bis. Las seis decisiones que este documento no terminaba de decir
+
+Están tomadas, están en `958962a` y cada una lleva su porqué escrito en el código. Van
+aquí porque son exactamente las que un agente distinto habría resuelto de otra manera, y
+porque la que las lea después no debería tener que reconstruirlas del diff.
+
+**1. El nombre y el sitio del reductor, y por dónde NO pasa.** La rama del `switch` de
+`avanzarRiberas` llama a **`moverElEstiaje`**, que mira el turno y la bandera y nada más;
+la mudanza de verdad vive en **`conElEstiajeEn`**, que es la parte que comparten el
+movimiento y el reloj y que por eso no mira ni turno ni bandera (`yo: -1` cuando quien
+mueve es el tic). Y lo que no se deduce de sus hermanas es cómo termina: `fundar` y
+`alzar` acaban en `puedeHaberGanado(conElVado(...))` porque una choza mueve el premio de
+recorrido y los puntos, y `jugarLaGuardia` en `puedeHaberGanado(conLaGuardia(...))` porque
+La Mayor Guardia da un punto. **Esto no pasa por ninguno de los tres**, y es la misma
+decisión que ya llevaba escrita `jugarElAnoBueno`: mover el estiaje y robar cambian de
+sitio UNA FICHA y nada más. Llamarlos «por simetría» sería recalcular en cada siete dos
+premios que no se pueden haber movido, y sobre todo sería escribir que esto puede acabar
+una partida, que no puede. Y hay una guarda que este documento no pedía y que hizo falta:
+**`pasarTurno` también corta con `estiajePorMover`**, porque sin ella la bandera cruzaría
+a `siguienteTurno` y el destino pendiente se le ofrecería al siguiente, que no ha sacado
+ningún siete. Por eso `siguienteTurno` **no** la apaga «por limpieza»: apagarla ahí
+convertiría saltarse la regla en la salida silenciosa de este caso.
+
+**2. Adónde mueve `venceElPlazo`, y qué pasa después.** A la **primera isla legal del
+orden canónico** (el de `mallaDeRadio`, que es el de `estado.islas`) saltando la de ahora,
+que es la misma regla de `colocarPorElAusente` y por la misma razón, aquí más fuerte
+todavía: elegir al azar gastaría una tirada de `estado.azar`, y entonces dos ejecuciones
+del mismo diario con distinto número de plazos vencidos dejarían el acumulador en sitios
+distintos y `reejecutarEn` dejaría de valer. **Y después pasa el turno**, con el mismo
+`siguienteTurno` de siempre, porque lo que un plazo vencido significa en `'jugando'` ya
+era «pasa el turno»; dejarlo abierto le regalaría a quien no está un plazo entero más para
+el resto de su turno, que es justo lo que el tic existe para no hacer. Y **no se roba**:
+robar sí gasta azar y además elegiría víctima por quien no está, así que se mueve con `a:
+null`, que es el caso que la propia regla ya tenía escrito para las islas vacías. Lo hace
+`moverPorElAusente`, y el comprobador lo mira entero: que la bandera se apaga, que va al
+primer sitio legal, que el azar no se mueve, que nadie pierde una ficha, que el turno
+avanza, y que **al siguiente se le ofrece tirar y no mover el estiaje de otro**.
+
+**3. Por dónde se corta `elRobo`, y qué se queda en la guardia.** En `jugarLaGuardia`
+convivían cinco cosas: el sorteo, el traslado de la ficha, `sinLaCarta`, `guardias + 1` y
+`conLaGuardia`. **Bajan las dos primeras y sólo ellas.** Las tres últimas son DE LA CARTA
+y no del robo, y si bajaran, mover el estiaje gastaría una carta que nadie jugó y subiría
+un premio que nadie ganó. `elRobo` comprueba lo que es del robo (que la víctima existe,
+que no soy yo, y que le queda algo) y **devuelve `null` y no un estado**, para que cada
+quien decida qué significa: para la guardia, `null` es un movimiento ilegal; para el
+estiaje, «no robar» ni siquiera llega ahí, porque viaja como `a: null`. Lo que NO
+comprueba es nada del sitio ni de la carta: que la víctima tenga pieza en la isla lo mira
+`conElEstiajeEn` con `tienePiezaEn`, y que la carta se pueda jugar lo sigue mirando la
+guardia. Cada regla, en la función que la tiene.
+
+**4. El relleno de las mesas guardadas es LA DUNA, y no nulo.** Es la única de las altas
+de `comoSiSiempreHubieraHabidoMazo` que **no** se rellena con el valor vacío, y la razón
+es de reglas: con `estiaje: null` una mesa escrita ayer se reabre con la pieza en ninguna
+parte, no hay isla bloqueada, y **los destinos que ofrece `opcionesDelEstiaje` pasan a ser
+DIECINUEVE en vez de dieciocho**, porque la lista se hace quitando la isla de ahora y no
+habría ninguna que quitar. O sea que el relleno vacío cambiaría una regla del juego a
+mitad de partida. Se rellena con lo que habría habido si la pieza hubiera existido desde
+el principio y nadie la hubiera movido, y la duna se encuentra por `RINDE[terreno] ===
+null` (`laDuna`) y no por su nombre, que es la misma regla con la que se reparte. La
+guarda es `=== undefined` y **no** `=== null`, porque `null` es un valor legítimo de este
+campo (la mesa que aún se reúne) y confundirlos volvería a poner la pieza en la duna cada
+vez que se proyecta una mesa sin delta. Y el descarte queda ejecutado y no escrito en un
+comentario: el comprobador monta a mano el relleno vacío y **exige que salgan diecinueve**.
+
+**5. El color del filo.** `BORDE_DEL_ESTIAJE = '#2ad0e0'`. Un color del juego y **no «el
+acento»**, por dos razones que no se pueden esquivar: `CaraDeTablero.borde` es una cadena
+que los dos clientes meten CRUDA en el trazo (`stroke={cara.borde}` en el retablo de la
+app, que es SVG nativo y no resuelve variables de CSS: un `var(--acento)` ahí se pinta
+como nada), y aunque las resolviera, esta casa tiene **un acento por tema**, así que el
+mismo tablero declararía tres bordes distintos según quién lo mire y ninguna comprobación
+podría decir cuál es el bueno. Se elige como se eligió el de cada terreno: que se separe
+de todo lo que va a tener al lado. Y el hueco de la rueda es uno solo, porque los seis
+rellenos y los seis colores de colono ocupan enteros los cálidos y los verdes. Lo que esta
+cuarta versión corrige es **qué demuestra ese 42,1**, y está en el §12.14: demuestra que
+el filo no se confunde con ningún relleno, no que se vea encima de él.
+
+**6. El `aria-label`, partido en dos baterías, y la partición es la mitad de la
+comprobación.** `verify:riberas` no importa nada de `escritorio/`: no puede pintar un SVG
+ni leer un `aria-label`. Así que allí se mira **lo que es del juego** (que la cara ofrecida
+sale del tablero declarado con su `rotulo` y su `cifra` dentro del dato, y que la isla
+ocupada rotula `· estiaje` y no lleva `toque`), y en `verify:escritorio`, en el paso nuevo
+`elEstiajeSeOye`, **lo que es del mueble**: que esas dos palabras acaban dentro del nombre
+del botón, que ninguna cara se anuncia con el tipo del movimiento ni con su llave, y que
+el texto que se esconde para no decirlo dos veces **sólo se esconde donde hay botón que lo
+diga**. Con sus dos vacunas, que son las que lo hacen morder: la isla donde ESTÁ la pieza
+conserva su texto visible y sin `aria-hidden` (es la única de las diecinueve, y es
+justamente la que hay que encontrar), y **con ninguna cara tocable no se esconde ni un
+texto**, que es lo que se habría caído si el retablo escondiera siempre.
+
 ## 2. El descarte: la fase donde actúan varios, en un motor por turnos
 
 ### 2.1. Qué se puede hacer hoy sin tener el turno, y por dónde entra esto
@@ -514,7 +644,19 @@ las tres semillas **no salió ni un siete**, y con tres tiradas era lo más prob
 siete a 6 de 36 (`medir11.mts`), que ninguna de tres tiradas sea un siete tiene una
 probabilidad del 58 %.
 
-De ahí salen tres consecuencias, y las tres hay que escribirlas:
+> **CADUCADO, y se queda por lo que enseña.** Todo lo de arriba era cierto hasta
+> `3942556`. Desde ese commit el bucle **juega tres partidas enteras hasta el ganador**,
+> eligiendo por familias y sorteando dentro de cada una, y con la fase 1 encima atraviesa
+> **32 sietes** y los resuelve (§11.3, §12.11). Las tres consecuencias de abajo, que se
+> escribieron contra el bucle viejo, quedan como estaban con su fecha: la primera sigue
+> siendo la medida buena de lo que cuesta un descarte, la segunda **ya no vale** (la fase
+> 1 sí puede prometer que `verify:mesa` juega el estiaje, y lo promete), y la tercera se
+> cumplió.
+>
+> Lo único que hay que retener del bucle nuevo para lo que queda: sigue preguntándole **a
+> uno**, y por eso la fase 5 sigue haciendo falta (§13).
+
+De ahí salían tres consecuencias, y las tres hay que escribirlas:
 
 - **El descarte no se puede comer la ventana de cuarenta vueltas, porque la ventana no
   llega.** La preocupación era razonable y la medida la contesta: con la política del
@@ -556,8 +698,12 @@ conduciéndose solo cuando por fin llegue a un siete:
   `toque`, así que un descarte en un panel no lo puede pulsar ni el bucle ni un lector de
   pantalla. Y como en `'descartando'` no hay ninguna otra opción, ni contestar trueques
   por el §2.2, ni construir, ni tirar, `nudos`, `lineas` y `caras` salen sin
-  toque y `acciones` sólo lleva los descartes: el bucle coge uno a la primera. **Con esta
-  decisión, `verificar-mesa.ts` no se toca en ninguna de las cinco fases.**
+  toque y `acciones` sólo lleva los descartes: el bucle coge uno a la primera. **Y esto
+  sigue en pie para el descarte, pero la promesa que había aquí, «`verificar-mesa.ts` no se
+  toca en ninguna de las cinco fases», ya se rompió en la fase 1 y por otra puerta**: no
+  por dónde vive el toque, sino porque con el estiaje por mover **no hay ninguna otra
+  opción**, y una lista de familias que no incluya `riberas:estiaje` deja al bucle sin
+  jugada en el primer siete. Está contado en el §12.11.
 - Mover el estiaje va por `caras[].toque` y no por `acciones` (§9.2), y por la misma
   razón sigue siendo alcanzable: `caras` es la tercera lista que recorre
   `unToqueDelTablero`.
@@ -849,16 +995,20 @@ Miguel tiene toda la razón y el código le da la razón por escrito:
 
 ### 6.3. Cómo se ve la duna, con el estiaje y sin él
 
-**En tres dimensiones.** Dos piezas, y las dos baratas:
+**En tres dimensiones.** Dos piezas, y las dos baratas. **De las dos, la segunda entró en
+la fase 1 y la primera sigue pendiente**, y el reparto no es caprichoso: la tienda es lo
+único sin lo cual un siete secaba una isla sin que se viera cuál, y el posavasos de la
+duna es lo que le faltaba a la duna desde antes de que la pieza existiera.
 
-- La duna gana un **posavasos sin cifra y sin puntos**: el mismo disco crema de `Numero`,
+- **PENDIENTE, fase 4.** La duna gana un **posavasos sin cifra y sin puntos**: el mismo disco crema de `Numero`,
   `circleGeometry(RADIO_DE_TESELA * 1,9, 44)`, **44 triángulos**, una llamada de dibujo,
   sin los guarismos y sin los círculos de probabilidad. Con él, la duna se lee como una
   casilla del tablero (que es lo que Miguel echó en falta) y sigue sin decir un número
   que no tiene (que es lo correcto).
-- El estiaje se pinta con `MODELO.tienda`, que **ya está compilado** en `tablero.glb` y
-  que **ya lo pinta** el componente `Ladron` de `delta.tsx` con `talla 3` sobre el centro
-  de la comarca. Medido en el `.gltf` del pack (`arte/kaykit/hexagon-extra/.../decoration/props/tent.gltf`):
+- **HECHO en la fase 1.** El estiaje se pinta con `MODELO.tienda`, que **ya está compilado** en `tablero.glb` y
+  que **ya lo pintaba** el componente de `delta.tsx` con `talla 3` sobre el centro
+  de la comarca. Lo único que faltaba era que le llegara una comarca y no `null`, y eso
+  es lo que hace ahora `deltaDeLaVista` leyendo `vista.estiaje` con `hexDeLlave`. Medido en el `.gltf` del pack (`arte/kaykit/hexagon-extra/.../decoration/props/tent.gltf`):
   **86 triángulos, una primitiva, un material**, caja de 0,516 en los tres ejes. A `talla
   3` eso son **8,47 unidades de mundo**, o sea 1,67 veces la casa de un colono
   (`ALTURA_DE_UNA_CASA` = 5,09) y 3,33 personas: se lee desde la vista de tablero sin
@@ -875,17 +1025,95 @@ Miguel tiene toda la razón y el código le da la razón por escrito:
   el 0,56 % de los 23.328 del mar (`TRIANGULOS_DEL_MAR`) y menos del 3 % del tope de la
   mesa (`TOPE_DE_LA_MESA` = 4.500).
 
-**En dos dimensiones.** Nada nuevo en el mueble genérico: los tres campos que hacen falta
-ya existen en `CaraDeTablero`.
+**En dos dimensiones.** Nada nuevo en el mueble genérico: los campos que hacen falta
+ya existen en `CaraDeTablero`. **HECHO en la fase 1**, con un cambio de fondo respecto a
+lo que las tres primeras versiones decían, que va entero en el §6.4.
 
 - La isla donde está el estiaje escribe en su `rotulo` el terreno y la palabra: `vega ·
   estiaje`. Es el único texto que un lector de pantalla saca de una cara que no se toca,
   y `textoDeCara` lo dice en su cabecera.
-- Su `borde` pasa del `#1d1f26` de todas al acento, que es lo que se ve sin leer.
+- **Su `relleno` se va a la PENUMBRA**, a la mitad de luz, y eso es lo que se ve sin leer.
+  Aquí ponía que lo que se ve es el borde en el acento, y **las dos mitades de esa frase
+  eran falsas**: ni es el borde lo que se ve, ni puede ser «el acento». El §6.4 lo cuenta
+  con las medidas delante.
+- Su `borde` pasa del `#1d1f26` de todas al `#2ad0e0` del estiaje. **Acompaña**, porque no
+  cuesta nada, y no es lo que sostiene la información.
 - Su `cifra` **no cambia**: la isla bloqueada sigue enseñando su número, porque saber qué
   número está bloqueado es la mitad de la información.
 - La duna sigue con `cifra: ''`, y eso ahora tiene una explicación en pantalla: encima de
   ella hay una pieza.
+
+### 6.4. El filo no bastaba, y la medida que lo defendía contestaba a otra pregunta
+
+**Esto es lo que cambió al escribir el código, y es el cambio de fondo de esta cuarta
+versión.** Las tres primeras defendían el filo turquesa con una cifra correcta puesta en
+el sitio equivocado, y con ella el aviso «sin leer» no se veía en la mitad larga del
+tablero.
+
+**La cinta que se usó, y la que hacía falta.** El 42,1 de CIE76 al relleno más cercano
+contesta a «¿se confunden dos rellenos puestos uno al lado del otro?», que es exactamente
+para lo que `verify:riberas` usa esa cuenta con los seis terrenos. La pregunta de un
+**trazo fino sobre el relleno que lo rodea** es otra, y esta casa ya la tiene contestada y
+escrita en `app/src/arcade/retablo.tsx`: el mínimo de un elemento no textual es **3:1 de
+luminancia**, y allí está dicho con todas las letras que ningún color fijo puede prometer
+3:1 contra un relleno que declara un arcade. Medido el turquesa contra los seis:
+
+| Relleno | Luminancia contra el filo | ¿Llega a 3:1? |
+|---|---|---|
+| salina `#9dc257` | **1,09:1** | no |
+| duna `#e6d8ae`, donde el estiaje NACE | **1,32:1** | no |
+| vega `#b89a55` | **1,44:1** | no |
+| cantil `#78828d` | **2,08:1** | no |
+| marisma `#9d4f25` | 3,13:1 | sí |
+| carrizal `#346d3d` | 3,29:1 | sí |
+
+O sea que el filo solo no decía nada en **cuatro de las seis islas**, y entre ellas la
+duna, que es donde la pieza empieza toda partida. (La cabecera de `BORDE_DEL_ESTIAJE`
+dice «tres de las seis» porque enumera los tres peores y deja fuera el cantil, que a
+2,08:1 tampoco llega; el §12.14 lo anota, porque lo que hay que arreglar ahí es la cifra
+del comentario y no la del código.)
+
+**Y no hay color que lo arregle solo.** Cualquiera que contraste 3:1 con los seis rellenos
+a la vez es casi negro, y entonces deja de distinguirse de `BORDE_DE_LA_ISLA`, que ya es
+casi negro. Y el contrato de `CaraDeTablero` no tiene ni grosor de trazo ni doble trazo,
+así que no hay por dónde comprar el contraste que al color le falta. Un filo más gordo o
+un halo claro debajo serían campos nuevos en un mueble genérico, y eso es otro encargo.
+
+**La salida: lo que se ve es el ÁREA.** `PENUMBRA_DEL_ESTIAJE = 0,5`, y la función
+`enPenumbra` (exportada a propósito, para que el comprobador la mida) multiplica los tres
+canales del relleno de la isla ocupada. Es la única isla oscura de un tablero de colores
+medios, se encuentra de un vistazo, y dice lo que pasa sin traducir nada: el estiaje es el
+agua que se retiró, y lo que queda es la isla en sombra.
+
+**Por qué la mitad, y no más ni menos, medido sobre los seis rellenos:**
+
+| Multiplicador | CIE76 de su propio color, el peor de los seis | CIE76 del borde de la isla, el peor |
+|---|---|---|
+| 0,35 | 35,3 | **7,5**: la cara se lee como un trazo gordo |
+| 0,40 | 31,9 | 10,0 |
+| **0,50** | **26,3** | **15,6** |
+| 0,55 | **23,8**: por debajo del mínimo | 18,6 |
+| 0,60 | 21,1 | 21,1 |
+
+El umbral de la segunda columna es el que `verify:riberas` ya exige entre **dos rellenos
+cualesquiera** para que no se confundan, 25: o sea que la isla seca se distingue de sí
+misma tanto como dos terrenos distintos entre sí. La ventana que cumple las dos cosas es
+de 0,40 a 0,50, y se coge el techo, porque más abajo se ve mejor pero se acerca al filo.
+En luminancia la penumbra da **2,11:1** en el peor de los seis (el carrizal), que **no**
+alcanza el 3:1 de un elemento no textual, y por eso esto tampoco viaja solo: van con él el
+rótulo `· estiaje`, que es la mitad que lee un lector de pantalla, y el filo, que ahora
+refuerza en vez de sostener.
+
+**Las tres comprobaciones que trae, en `verify:riberas`:** que la isla del estiaje se
+pinta en penumbra y **se separa de su propio color tanto como dos terrenos distintos**;
+que **no se va tan abajo** que la cara se lea como un filo, midiéndola contra el borde de
+la isla; y que **sólo ella**, o sea que las otras dieciocho se pintan con el color de su
+terreno. Y las dos vacunas que las hacen morder: la del filo contra los seis rellenos se
+escribe **con su fallo al lado** (un filo del color de la duna no se vería sobre la duna,
+y esa línea tiene que salir falsa, porque si no un `enElPlano` vacío o un `NaN` darían
+verde), y el filo se mide además contra los seis colores de colono, que es el mismo par de
+superficies: las chozas se pintan encima de la isla ocupada, y un filo del color de un
+colono le borraría las suyas justo el turno en que hay que mirarla.
 
 ## 7. El estado, la vista y los secretos
 
@@ -941,7 +1169,11 @@ desaparecen.
 
 **En `riberas-en-3d.ts`,** `deltaDeLaVista` deja de devolver `ladron: null` y devuelve la
 comarca donde está la pieza, leyéndola de la vista con `hexDeLlave`. Ése es el fichero
-donde vive hoy el nombre y por tanto el fichero donde se cambia.
+donde vive hoy el nombre y por tanto el fichero donde se cambia. **HECHO en la fase 1**, y
+con una pieza más que no estaba escrita aquí: `comoVistaLlana`, que es la que normaliza lo
+que le llega, también normaliza el estiaje (`typeof v.estiaje === 'string' ? v.estiaje :
+null`), porque una vista guardada de antes de la pieza no lo trae y entonces no hay comarca
+seca. Es la misma decisión que `comoVista` toma en `riberas.ts`, y por la misma razón.
 
 ## 8. El nombre
 
@@ -974,15 +1206,25 @@ Lo que se propone, con nombre y sitio:
 | `riberas.ts`, el estado y la vista | (no existe) | `estiaje: LlaveDeHex \| null` |
 | `riberas.ts`, el movimiento | (no existe) | `MOVER_EL_ESTIAJE = 'riberas:estiaje'` |
 | `riberas.ts`, el descarte | (no existe) | `DESCARTAR = 'riberas:descartar'` |
-| `riberas-en-3d.ts` | `ladron: null` | lo lee de la vista |
-| `escenas/tipos.ts`, contrato genérico | `ladron: Hex \| null` | `bloqueada: Hex \| null` |
-| `delta.tsx`, el componente | `Ladron` | `Estiaje` |
+| `riberas-en-3d.ts` | `ladron: null` | lo lee de la vista. **HECHO** |
+| `escenas/tipos.ts`, contrato genérico | `ladron: Hex \| null` | **`seca: Hex \| null`**, y no `bloqueada`. **HECHO** |
+| `delta.tsx`, el componente | `Ladron` | **`LaComarcaSeca`**, y no `Estiaje`. **HECHO** |
 | `nombres.ts` | `MODELO.tienda` | **no cambia**: es el nombre del modelo, no el de la regla |
 
-`bloqueada` y no `estiaje` en `escenas/tipos.ts` a propósito: ese fichero dice de sí mismo
+No `estiaje` en `escenas/tipos.ts` a propósito: ese fichero dice de sí mismo
 que el vocabulario de terrenos es de cada juego y que por eso `terreno` es una cadena
-libre. Lo mismo vale aquí: el contrato dice **qué comarca no rinde**, y cómo se llame la
-pieza que lo causa es cosa del juego.
+libre. Lo mismo vale aquí: el contrato dice **qué le pasa a la comarca**, y cómo se llame
+la pieza que lo causa es cosa del juego.
+
+**Y las dos filas de arriba salieron con otro nombre del que este documento proponía, por
+el mismo argumento llevado un paso más lejos.** El documento pedía `bloqueada` y el
+componente `Estiaje`; el código escribió **`seca`** y **`LaComarcaSeca`**. `bloqueada` es
+una palabra de reglas (dice que algo está prohibido) y lo que el contrato de escena puede
+saber es lo que le PASA a la comarca, no por qué; y `Estiaje` habría metido en
+`escenas/delta.tsx`, que es tan genérico como `tipos.ts`, el nombre que le da un juego a
+su pieza. Los dos nombres nuevos dicen lo mismo desde el lado del que mira: la escena
+planta ahí una tienda y no sabe de quién es. Gana el código, y se anota aquí para que la
+próxima persona que busque `bloqueada` no la encuentre y crea que falta.
 
 Lo que se tumba, y por qué se deja escrito: llamarla `ladron` en el código y «El estiaje»
 en pantalla. Es la solución de menos trabajo y es la peor de todas, porque deja el
@@ -995,6 +1237,32 @@ buscara por el nombre del pack, cambiar de pack sería tocar la escena entera»)
 ## 9. Los dos clientes
 
 ### 9.1. El tablero en tres dimensiones: elegir la isla
+
+> **DE ESTO, LA MITAD ENTRÓ EN LA FASE 1 Y NO ERA LA FASE 4.** Lo que hay desde
+> `958962a`: el campo del contrato (`seca`), `deltaDeLaVista` leyéndolo de la vista con
+> `hexDeLlave`, y la tienda plantada sobre el relieve de la comarca que está seca. **Se
+> VE dónde está el estiaje.** Lo que sigue siendo de la fase 4 es lo que sigue debajo:
+> `sitiosDelEstiaje`, el `Colocando` de clase `'comarca'` y una `Senal` por isla, o sea
+> **soltar la pieza**; hasta entonces se mueve desde los botones, que los hay siempre.
+>
+> **Por qué se adelantó, dicho con la mesa delante.** `COLORES_EN_3D` tiene cuatro
+> colores, así que el tablero de tres dimensiones existe **de dos a cuatro colonos**, que
+> son las mesas que se juegan de verdad; el retablo sólo entra con cinco o seis. Dejar el
+> dibujo para la fase 4 habría dejado esas mesas con un siete que seca una isla **sin que
+> se vea cuál**, y con la única pista de dieciocho rótulos de botón. Soltar la pieza, en
+> cambio, es comodidad: el botón ya mueve. Ésa es la línea por la que se partió, y no la
+> de «el 3D va al final».
+>
+> **Y hay un bloque de comprobación nuevo que cubre justamente esa ventana**, el 12 bis de
+> `verify:riberas-en-tres`: con el estiaje por mover, el juego ofrece los dieciocho
+> destinos y ninguna otra cosa salvo revelar; los dieciocho **llegan enteros a los
+> botones**, así que la mesa no se queda parada; cada uno con su rótulo, que dice a qué
+> isla va; y `obrasPosibles` devuelve sus tres piezas **con cero sitios y sin clase**, o
+> sea que ninguna de las opciones nuevas se cuela en la barra de obra haciéndose pasar por
+> una obra. Con su vacuna: en un turno normal, los sitios del tablero **sí** se caen de los
+> botones, que es lo que demuestra que el filtro filtra. Sin ese bloque, el día que alguien
+> tocara `opcionesFueraDeLaMesa` o `obraPosible` esa mesa se quedaría parada con la bandera
+> encendida y no se caería nada.
 
 **No hay mecanismo nuevo, y ésa es la mejor noticia del documento.** `escenas/sitios.ts`
 declara tres clases de sitio desde que se escribió: `'vertice' | 'arista' | 'comarca'`.
@@ -1211,12 +1479,16 @@ que hay que encontrar.
 | El robo, una sola vez | `shared/arcade/juegos/riberas.ts` | extraído de `jugarLaGuardia` |
 | Qué pasa al vencer el plazo | `shared/arcade/juegos/riberas.ts` | `venceElPlazo` |
 | El plazo de pared | `server/src/arcade/mesas.ts` | `plazoSegundos`, `empiezaTurnoNuevo` |
-| La comarca que no rinde, en la escena | `escenas/tipos.ts` | `DeltaEn3D.bloqueada` |
+| La comarca que no rinde, en la escena | `escenas/tipos.ts` | `DeltaEn3D.seca` (el documento proponía `bloqueada`; §8) |
 | Cómo llega a la escena | `shared/arcade/juegos/riberas-en-3d.ts` | `deltaDeLaVista` |
 | Dónde se puede soltar | `shared/arcade/juegos/riberas-en-3d.ts` | `sitiosDelEstiaje` |
 | Los sitios de comarca | `escenas/sitios.ts` | `sitiosDelTablero().comarcas`, ya escrito |
 | El anillo y el agarre | `escenas/delta.tsx` | `Senal`, sin cambios |
-| La pieza | `escenas/delta.tsx` | `Estiaje` (hoy `Ladron`), `MODELO.tienda` |
+| La pieza | `escenas/delta.tsx` | `LaComarcaSeca` (antes `Ladron`; el documento proponía `Estiaje`, §8), `MODELO.tienda` |
+| El filo y la penumbra de la isla seca | `shared/arcade/juegos/riberas.ts` | `BORDE_DEL_ESTIAJE`, `PENUMBRA_DEL_ESTIAJE`, `enPenumbra`, `BORDE_DE_LA_ISLA` (§6.4) |
+| La preposición del rótulo | `shared/arcade/juegos/riberas.ts` | `A_LA_ISLA`, `laIslaEnPalabras` |
+| Que no se pasa el turno con el estiaje por mover | `shared/arcade/juegos/riberas.ts` | `pasarTurno`, la guarda (§1 bis, 1) |
+| Que una partida terminada no debe un movimiento | `shared/arcade/juegos/riberas.ts` | `puedeHaberGanado`, `estiajePorMover: false` (§12.15) |
 | El posavasos de la duna | `escenas/delta.tsx` | dentro de `Numero`, sin cifra |
 | La isla tocable en el retablo | `shared/arcade/juegos/riberas.ts` | `tableroDeRiberas`, `caras[].toque` |
 
@@ -1391,7 +1663,9 @@ function repartos(topes, k) {
 del §11.0. Se quedan **de la segunda vuelta, sin reejecutar**, con su tanda dicha donde se
 citan, y con el mismo reparo de fondo: viven en el scratchpad.
 
-**Comprobadores corridos para escribir esto:** `verify:riberas`, verde, **349
+**Comprobadores corridos para escribir esto. CADUCADOS TODOS: los vivos están en el
+§11.3**, y se quedan aquí porque son el «antes» de la tabla de allí y porque el párrafo
+que sigue explica por qué se tomaron así. `verify:riberas`, verde, **349
 comprobaciones**. Los recuentos de los demás se citan como los deja escritos
 `docs/LA-MESA-DE-RIBERAS.md` §11 con la fase 3 aterrizada: `verify:mesa` 856,
 `verify:escena` 335, `verify:escritorio` 400, `verify:sala` 152,
@@ -1413,11 +1687,53 @@ ellos, que es cosa de mirar y no de contar; y qué movimientos son exactamente l
 mil que devuelven el mismo estado (se sabe cuántos, no cuáles, y el §15 lista los motivos
 que se esperan sin haberlos confirmado uno a uno).
 
+### 11.3. Los recuentos de la cuarta vuelta, que son los del código y no los de un guion
+
+Éstos no salen de ningún guion del scratchpad: **salen de los comprobadores de la casa
+corridos sobre `958962a`**, que es la diferencia que el §11.2 pedía a gritos, y por eso son
+los únicos números de este documento que cualquiera puede volver a sacar mañana con
+`npm run verificar`.
+
+| Comprobador | Antes | Al aterrizar la fase 1 |
+|---|---|---|
+| `verify:riberas` | 349 (§11.1, tercera vuelta) | **423** |
+| `verify:mesa` | 856 antes de `3942556`, **2.539** después | **2.915**, con **32 sietes jugados de verdad** |
+| `verify:riberas-en-tres` | 295 | **343** |
+| `verify:escritorio` | 400 | **458** |
+| La batería `npm run verificar` | 76 comprobadores | **76 de 76 en verde** |
+
+Dos lecturas de esta tabla, y las dos importan más que los números:
+
+- **El 2.915 con 32 sietes es lo que la fase 1 no podía prometer y ahora sí.** El §2.5 y
+  el §15.1 decían, con razón, que `verify:mesa` no era testigo de nada de esto porque su
+  bucle no llegaba a ningún siete. Llega, y los cuenta. Lo que eso cambia está en el §13.
+- **Y `verify:riberas` sube 74 comprobaciones sin que ninguna se pierda**, que es lo que
+  hay que mirar cuando un bloque nuevo entra en un comprobador viejo: el bloque del
+  estiaje se juega hasta un siete de verdad con el árbitro delante, no se monta a mano, y
+  lo dice él mismo en su primera línea (que el siete SALE), para que el día que dejara de
+  salir no fuera el silencio quien lo contara.
+
 ## 12. Lo que choca con lo escrito
 
 Esto es lo caro de revocar una decisión en esta casa: hay comentarios que la defienden, y
 un comentario que defiende lo contrario de lo que hace el código es peor que no tener
 comentario. Van uno a uno, con el fichero, lo que dice y por qué cambia.
+
+> **Y desde la cuarta versión, con el estado de cada uno delante.** Los diez primeros
+> (1 a 10) están **REESCRITOS en `958962a`**, y no borrados: cada uno conserva lo que
+> ponía, en voz alta, con la premisa marcada como revocada y el porqué debajo, que es la
+> forma que esta casa le da a una decisión que se cae. El 11 lo arregló otro empujón,
+> `3942556`, y ya no es un encargo abierto. El 13 está hecho. **El 12 sigue pendiente**:
+> las dos líneas de `docs/LAS-CARTAS-DE-RIBERAS.md` siguen diciendo que Riberas no tiene
+> ladrón y que el siete no hace nada todavía, y son las únicas dos frases de todo el árbol
+> que la fase 1 dejó falsas sin tocar. Se anotan aquí como lo que son: deuda, y de un
+> documento que es la fuente de las decisiones del mazo.
+>
+> Y se añaden cuatro apartados que esta versión trae: el 14, que es un número de este
+> documento que estaba puesto en el sitio equivocado; el 15, los tres arreglos de
+> comprobación; el 16, dos comprobaciones viejas que la fase 1 puso rojas por motivos que
+> no tenían nada que ver con lo que ellas miran; y el 17, la palabra que no terminó de
+> desaparecer.
 
 1. **`riberas.ts`, la constante `ESTIAJE`.** «Cuando el dado saca siete el agua baja y las
    islas no producen. Y no pasa nada más: ni se roba, ni se descarta, ni se mueve ninguna
@@ -1466,8 +1782,11 @@ comentario. Van uno a uno, con el fichero, lo que dice y por qué cambia.
 
 8. **`escenas/tipos.ts`.** `/** Dónde está el ladrón, o `null` si no hay ninguno en el
    tablero. */ ladron: Hex | null;` en un contrato genérico de escena que dice de sí mismo
-   que no cierra el vocabulario de los juegos. Pasa a `bloqueada`, con el comentario
-   diciendo qué significa (esa comarca no rinde) y no quién la ocupa.
+   que no cierra el vocabulario de los juegos. **HECHO**, y con otro nombre del que este
+   documento pedía: pasa a **`seca`** y no a `bloqueada`, con el comentario diciendo qué le
+   pasa a la comarca (no rinde, y la escena planta ahí una tienda sin saber de quién es) y
+   no quién la ocupa. El porqué del cambio de nombre está en el §8, y el componente de
+   `escenas/delta.tsx` fue por el mismo camino: `LaComarcaSeca` y no `Estiaje`.
 
 9. **`escritorio/src/retablo.tsx`, la cabecera de `textoDeCara`.** «En una cara que no se
    toca, este texto es lo ÚNICO que un lector tiene del terreno: las diecinueve islas de
@@ -1515,15 +1834,31 @@ comentario. Van uno a uno, con el fichero, lo que dice y por qué cambia.
     apuntado tres veces: verde por no mirar. Ninguna fase de este documento lo arregla y
     ninguna lo empeora.
 
-    **Y esto ha dejado de ser un encargo por abrir: se está arreglando en paralelo.** Otro
-    agente está tocando `server/scripts/verificar-mesa.ts` en este mismo árbol mientras se
-    escribe esto, así que este documento **no cita ninguna línea suya y no la va a tocar**,
-    y el 856 de `verify:mesa` que cita el §11.1 es el de antes de ese arreglo. Lo que
-    cambia para nosotros es poco y hay que decirlo con precisión: si el bucle empieza a
-    llegar a los sietes, la fase 1 podrá prometer algo que hoy no puede (que `verify:mesa`
-    juegue el estiaje), y la ventana de cuarenta vueltas pasa a ser un número que hay que
-    mirar (§15.1, fase 2). Lo que **no** cambia es que la fase 5 sigue haciendo falta, y el
-    §13 dice por qué son dos cosas distintas y no una.
+    **Y ESTO YA NO ES UN ENCARGO POR ABRIR: ESTÁ ARREGLADO, en `3942556`**, y no por este
+    documento. El bucle ya no coge el primer toque que encuentra: elige por **familias
+    ordenadas por cuánto mueven la partida** y sortea dentro de la familia con el azar
+    sembrado de la plataforma, quien no tiene el turno contesta trueques (que es lo único
+    que el juego le ofrece y que el bucle viejo no ejercía nunca), y las ofertas llevan
+    tope. **Las tres partidas terminan con ganador** (342, 496 y 586 movimientos), se
+    tiran los dados 218 veces y salen 31 sietes. Y con la fase 1 encima son **32 sietes y
+    2.915 comprobaciones** (§11.3). Lo que cambió para nosotros: la fase 1 **sí** puede
+    prometer que `verify:mesa` juega el estiaje, la ventana de cuarenta vueltas dejó de
+    existir, y el 856 que este documento citaba está doblemente caducado. Lo que **no**
+    cambia es que la fase 5 sigue haciendo falta, y el §13 dice por qué son dos cosas
+    distintas y no una.
+
+    **Y la fase 1 sí tuvo que tocar ese fichero, contra lo que las tres primeras versiones
+    prometían, por una razón que no existía cuando lo prometieron.** El §14 decía «no se
+    toca `verificar-mesa.ts`», y era cierto mientras el bucle no llegara a ningún siete.
+    Llegando, se cortaba: con el estiaje por mover **no se ofrece ninguna otra cosa** hasta
+    que la pieza se mueva, así que sin una familia para `riberas:estiaje` el bucle se
+    quedaba sin jugada la primera vez que salía un siete (medido: las tres semillas se
+    cortaron en las vueltas 26, 27 y 40, con «el tablero no ofrece nada en jugando»). Son
+    dos líneas, una constante y una familia, más el campo nuevo en la lista de campos de la
+    vista. Y no es un remiendo para que el comprobador pase: es que **la política de ese
+    bucle dejó de ser completa el día que el siete empezó a hacer algo**, que es
+    exactamente lo mismo que le pasó al paso «Una partida entera» de `verificar-riberas.ts`
+    (§15.1, fase 1).
 
 12. **`docs/LAS-CARTAS-DE-RIBERAS.md`, §1.7 y la línea del §7.** «La Guardia roba, y no
     mueve a nadie... **Riberas no tiene ladrón**» y «Ladrón y estiaje: el siete no hace
@@ -1537,51 +1872,146 @@ comentario. Van uno a uno, con el fichero, lo que dice y por qué cambia.
     bloque, que hoy afirma que con siete no pasa nada: una comprobación escrita contra la
     regla vieja que se pone verde con la nueva sin tocarla no es una comprobación que haya
     aguantado el cambio, es una que no estaba mirando. Es exactamente la lección que dejó
-    escrita `VADO_MINIMO` al pasar de cuatro a cinco.
+    escrita `VADO_MINIMO` al pasar de cuatro a cinco. **HECHO**: se quedó lo que era
+    verdad, se cayó lo que afirmaba que con siete no pasa nada, y el bloque nuevo se juega
+    hasta un siete de verdad en vez de montarlo a mano.
+
+14. **ESTE DOCUMENTO, el 42,1 de CIE76 del filo.** Es la única entrada de esta lista que
+    no es un comentario del código sino **de aquí**, y va con las otras porque el modo de
+    fallo es el mismo: una cifra correcta citada para sostener algo que no sostiene. El
+    42,1 dice que el turquesa no se confunde con ningún relleno; no dice que se VEA encima
+    de él, que es lo que un filo tiene que hacer, y para eso el mínimo de esta casa son 3:1
+    de luminancia. Está corregido en el §6.4, con la tabla de los seis delante. Y queda una
+    cifra por corregir, ésta ya en el código: la cabecera de `BORDE_DEL_ESTIAJE` dice que el
+    aviso «no se veía en **tres** de las seis islas» y enumera la salina, la duna y la vega,
+    pero **el cantil tampoco llega** (2,08:1 contra 3:1). Son cuatro. No cambia ninguna
+    decisión, porque el filo dejó de sostener la información igualmente, y por eso se anota
+    como deuda de comentario y no como fallo. Pero es exactamente la clase de número que
+    esta casa no deja redondeado, y el apartado 10 de aquí arriba existe por lo mismo.
+
+15. **Tres arreglos de COMPROBACIÓN, que salieron al ver caer las nuevas.** Los tres son
+    del mismo género y conviene leerlos juntos, porque los tres son casos de una
+    comprobación que pasaba por una razón que no era la suya:
+
+    - **Una partida terminada apaga el estiaje pendiente.** Se puede llegar a
+      `puedeHaberGanado` con la bandera encendida, porque lo único que el corte del estiaje
+      sigue ofreciendo es **revelar un título**, y un título revelado puede dar el octavo
+      punto. Sin la línea, el estado final quedaba diciendo «alguien tiene que mover» para
+      siempre, y esa invariante es justo la que `venceElPlazo` lee para saber si hay algo
+      pendiente. Se arregla en el propio `puedeHaberGanado`, que es donde la partida se
+      cierra, y no en la rama del estiaje, que no puede saber que alguien acaba de ganar.
+    - **La del robo dejaba de ser cierta con una sola ficha.** Decía que el robo gasta
+      siempre una tirada de azar, y `enteroEntre` con el mismo mínimo y el mismo máximo
+      devuelve el azar intacto: a quien le queda una sola ficha no se le sortea nada. La
+      afirmación pasa a ser «el robo de un almacén **con dos o más** gasta una tirada», con
+      la frase diciendo por qué, para que nadie lea ahí una propiedad universal que no lo
+      es.
+    - **La que compraba que mover no pregunta por la victoria pasaba con el fallo
+      delante.** Comparaba `vado`, `guardia` y `ganadores` antes y después de mover, y de
+      los tres sólo los dos primeros cambiarían si la rama llamara a `conElVado` o a
+      `conLaGuardia`. El tercero no: `puedeHaberGanado` sólo escribe en `ganadores` cuando
+      alguien llega a los ocho puntos, **y en ese escenario nadie estaba cerca**. O sea que
+      envolver `moverElEstiaje` en `puedeHaberGanado` «por simetría con sus hermanas» habría
+      dejado la comprobación verde. Ahora se le pone a alguien la victoria delante, con
+      títulos suficientes para los ocho puntos, y se exige que mover **no** la declare.
+
+16. **Y dos comprobaciones viejas que la fase 1 puso rojas sin que ningún color cambiara.**
+    Las dos son del bloque de la paleta de `verificar-riberas.ts`, y las dos merecen
+    quedarse escritas porque son el mismo acoplamiento por dos puertas distintas:
+
+    - Preguntaba **de qué terreno es cada cara leyendo su `rotulo`**, que funcionaba
+      mientras el rótulo de una isla fuera siempre y sólo el nombre de su terreno. Desde el
+      estiaje la ocupada rotula `Duna · estiaje`, el mapa perdía una entrada y las tres
+      comprobaciones de color se ponían rojas diciendo cosas como «el duna del plano se
+      parece más al cantil de la escena». Ahora se pregunta por el **`id`** de la cara, que
+      es la llave de su isla y que no pinta nadie.
+    - Y pedía el tablero **con el estiaje puesto**, así que recogía la duna a media luz. Lo
+      que ese bloque mide es LA PALETA (que los seis terrenos se distinguen entre sí y de
+      los colonos), y eso no depende de dónde esté una pieza: ahora se le pide a una vista
+      con `estiaje: null`, que es exactamente lo que trae una mesa guardada de antes. La
+      penumbra se mide aparte, en su propio bloque, porque es otra pregunta. Y por lo mismo
+      la línea de «las **diecinueve** caras declaran el mismo borde» pasa a ser «las
+      **dieciocho** que no tienen el estiaje», con una tercera que exige que la que lo tiene
+      declare otro.
+
+17. **Y la palabra «ladrón» sigue viva en un sitio, que es el que nadie mira.** El §8 pedía
+    que `ladron` desapareciera del vocabulario de la casa, y desapareció de donde importa:
+    del juego, del contrato de la escena, del componente que la pinta, del banco y de todos
+    los rótulos que alguien lee jugando. Lo que queda es dentro del bloque de la guardia de
+    `server/scripts/verificar-riberas.ts`: una variable local `ladron` y cuatro rótulos de
+    comprobación que dicen «el ladrón gana una ficha», «está ahora en el del ladrón». Es
+    deuda menor y se anota por dos razones: porque un rótulo de comprobación **sí se lee**,
+    sale por pantalla cada vez que el comprobador corre, y porque ese bloque es justo el que
+    la **fase 3** va a tocar, así que ahí es donde toca arreglarlo y no en un barrido aparte.
+    (El `ladron` de `verificar-segundo-juego.ts` no cuenta: es el eje de personas de otro
+    juego, donde la palabra significa lo que significa.)
 
 ## 13. Para Miguel
 
 Seis cosas, con una recomendación cada una. Las cuatro primeras son de reglas y de
-pantalla; las dos últimas salieron al medir para éste y no se pueden dejar sin decir. **De
-esas dos, una ya no es una decisión tuya: el bucle de `verify:mesa` se está arreglando
-mientras lees esto**, así que lo que queda ahí es entender qué cambia y qué no, y sigue
-abajo con las cuatro diferencias delante.
+pantalla; las dos últimas salieron al medir para éste y no se pueden dejar sin decir.
+
+> **QUÉ QUEDA VIVO DE ESTE APARTADO EN LA CUARTA VERSIÓN.** La fase 1 se empujó con las
+> cuatro recomendaciones de arriba puestas, que es lo que había que hacer con un
+> documento revisado tres veces: **tres de las cuatro están ya en el código y ninguna es
+> difícil de deshacer si no te convence** (la columna de en medio dice cuánto cuesta cada
+> una), y la tercera es de la fase 2, que no ha entrado. De las dos de abajo, **la del
+> bucle de `verify:mesa` ya no es nada tuyo: está arreglada** en `3942556`, y las cifras
+> están medidas y puestas. La que sigue abierta y que hay que pedir aparte es la de los
+> **dos colores que le faltan al 3D**.
 
 | Qué hay que decidir | Recomendación | Por qué |
 |---|---|---|
-| **Cómo se llama la pieza** | **El estiaje**, en pantalla y en el código, y `ladron` desaparece del vocabulario | La palabra ya está en el juego y explica el bloqueo, que es la mitad que «ladrón» no explica. Y el nombre de la caja original en los rótulos es andar hacia atrás en lo que la cabecera de `riberas.ts` defiende (§8) |
-| **El siete de la casilla de la duna** | **No se le pone número**, y a cambio se le pone posavasos y pieza | Con dos dados el siete sale 6 veces de 36 y el dos 1: una isla con siete rendiría seis veces más que la peor. Y el siete es la suma que activa la pieza, así que esa isla produciría el turno en que nadie produce. Lo que falta no es un número, es que se vea la pieza (§6) |
-| **Cuánto se espera al que no descarta** | **El plazo de la mesa, y luego se descarta por él**, tirando sus fichas más viejas y por todos a la vez | No se inventa un reloj dentro del juego, que un reductor puro no puede mirar. Y drenando de uno en uno, una partida larga costaría hasta seis días por un siete (§2.4) |
-| **La pieza que se pinta** | **La tienda del pack**, que ya está compilada y ya se pinta | 86 triángulos, una llamada de dibujo, 8,47 de mundo (1,67 casas): se lee desde la vista de tablero. El bote varado cuenta mejor la historia del agua que baja y mide 1,97 de alto: desde 670 unidades es una mancha. Si aun así lo prefieres, se cambia en una línea y se mide en el banco (§6.3) |
+| **Cómo se llama la pieza** · **PUESTO en `958962a`** | **El estiaje**, en pantalla y en el código, y `ladron` desaparece del vocabulario | La palabra ya está en el juego y explica el bloqueo, que es la mitad que «ladrón» no explica. Y el nombre de la caja original en los rótulos es andar hacia atrás en lo que la cabecera de `riberas.ts` defiende (§8). Deshacerlo hoy es un renombrado y no un rediseño, y está casi entero: no queda ni un `ladron` en el juego, en la escena ni en los rótulos, y el contrato genérico dice `seca`, que no es de nadie. Lo que queda son cuatro rótulos de comprobación y una variable local en el bloque de la guardia de `verificar-riberas.ts` (§12.17) |
+| **El siete de la casilla de la duna** · **PUESTO** | **No se le pone número**, y a cambio se le pone posavasos y pieza | Con dos dados el siete sale 6 veces de 36 y el dos 1: una isla con siete rendiría seis veces más que la peor. Y el siete es la suma que activa la pieza, así que esa isla produciría el turno en que nadie produce. Lo que falta no es un número, es que se vea la pieza (§6). **La pieza ya se ve; el posavasos sigue pendiente, en la fase 4** |
+| **Cuánto se espera al que no descarta** · **DE LA FASE 2, sin entrar** | **El plazo de la mesa, y luego se descarta por él**, tirando sus fichas más viejas y por todos a la vez | No se inventa un reloj dentro del juego, que un reductor puro no puede mirar. Y drenando de uno en uno, una partida larga costaría hasta seis días por un siete (§2.4). Lo que la fase 1 sí dejó puesto es la otra mitad del mismo tic: con el estiaje por mover, un plazo vencido mueve por el ausente y pasa el turno (§1 bis, 2) |
+| **La pieza que se pinta** · **PUESTA, y ya se ve en pantalla** | **La tienda del pack**, que ya está compilada y ya se pinta | 86 triángulos, una llamada de dibujo, 8,47 de mundo (1,67 casas): se lee desde la vista de tablero. El bote varado cuenta mejor la historia del agua que baja y mide 1,97 de alto: desde 670 unidades es una mancha. Si aun así lo prefieres, **sigue siendo una línea**: `MODELO.tienda` en `delta.tsx`, y se mide en el banco (§6.3) |
 
 Y las dos que son encargos aparte, y que hay que pedir aparte o no se harán:
 
 | Qué salió al medir | Recomendación | Por qué importa aquí |
 |---|---|---|
 | **El 3D sólo sabe pintar cuatro colores** (`COLORES_EN_3D`, y `bastanColores` manda al retablo con cinco), pero la mesa admite seis (`MANIFIESTO_RIBERAS.jugadores`) | **Pedirlo como encargo propio**: dos colores más en el atlas de piezas | Hoy, en una mesa de cinco o seis, el retablo es la ÚNICA pantalla que hay, y por eso todo lo de este documento tiene su forma en el retablo desde la fase 1 (§9.2). De paso: el §1.11 de `docs/LA-MESA-DE-RIBERAS.md` diseñó el cajón del marcador «hecho para SEIS», y ese cajón hoy no se puede abrir nunca, porque con seis no hay mesa de tres dimensiones |
-| **El bucle de Riberas de `verify:mesa` se atasca proponiendo trueques**: 26 de sus 40 vueltas son `ofrecer`, y sólo se tira los dados una vez por semilla (§12.11, `medir7.mts`) | **Ya no hay nada que pedir: se está arreglando en paralelo**, en `server/scripts/verificar-mesa.ts` y en este mismo árbol. Lo que sí queda por decidir es lo de la fila de abajo | Cuando ese bucle llegue a los sietes, la fase 1 podrá prometer que `verify:mesa` juega el estiaje, que hoy no puede prometer, y la ventana de cuarenta vueltas pasa a ser un número que mirar (§15.1, fase 2) |
+| **El bucle de Riberas de `verify:mesa` se atascaba proponiendo trueques**: 26 de sus 40 vueltas eran `ofrecer`, y sólo se tiraba los dados una vez por semilla (§12.11, `medir7.mts`) | **ARREGLADO, y no por este documento**: `3942556`. Ya no hay nada que pedir | Ahora **juega tres partidas enteras hasta el ganador** (342, 496 y 586 movimientos), eligiendo por familias y sorteando dentro de cada una, y quien no tiene el turno contesta trueques. Sale de 856 comprobaciones a 2.539, y con la fase 1 encima a **2.915 con 32 sietes jugados**. Lo que eso cambia para nosotros está justo debajo |
 | **Aun con ese bucle arreglado, ¿hace falta la fase 5?** | **Sí, y no es una cautela: son dos cosas distintas** | Van abajo, por su nombre |
+
+**Lo que ese arreglo cambió para este documento, dicho antes que nada porque es la nota
+que la cuarta versión trae.** Tres cosas, y las tres se han cobrado ya:
+
+- **La fase 1 puede prometer lo que no podía.** El §2.5 y la fase 1 decían, con razón, que
+  `verify:mesa` no era testigo de nada de esto y que lo único que se le podía pedir era un
+  «no he roto nada». Ahora su bucle **atraviesa 32 sietes de verdad** y los resuelve, así
+  que la regla del estiaje sí se ejercita ahí: para que el bucle no se cortara hubo que
+  darle una familia propia a `riberas:estiaje`, y su comentario deja escrito lo que pasaba
+  sin ella (las tres semillas se cortaron en las vueltas 26, 27 y 40 con «el tablero no
+  ofrece nada en jugando»). O sea que ese bucle **no** es un testigo pasivo del estiaje: es
+  uno que se cae si la regla deja de ofrecer destino.
+- **La ventana de cuarenta vueltas dejó de ser un número de nadie**, porque ya no hay
+  ventana: se juega hasta el ganador. Lo que la fase 2 tenía que mirar (§15.1) se queda
+  como medida escrita y no como encargo.
+- **Y el 856 de `verify:mesa` que este documento citaba está doblemente caducado.** Pasó a
+  2.539 con aquel arreglo y a 2.915 con la fase 1. Los recuentos vivos están en el §11.3.
 
 **Por qué la fase 5 sigue haciendo falta aunque ese bucle juegue, dicho con las cuatro
 diferencias delante.** No es que uno sea la versión pobre del otro: miden cosas distintas y
-ninguno de los dos cubre lo del otro.
+ninguno de los dos cubre lo del otro. **Y esta tabla ya no habla de un futuro: el bucle
+está arreglado y sigue sin poder hacer lo de la derecha.**
 
 | | El bucle de `verify:mesa`, ya arreglado | La fase 5, el jugador ciego |
 |---|---|---|
 | **Qué prueba** | Que **la plataforma** conduce una mesa: que el árbitro acepta, que la revisión sube, que el diario se escribe y se relee, que la vista se proyecta | Que **el juego** se puede jugar: que nunca falta una opción, que ninguna miente y que la partida se acaba |
-| **De dónde saca el movimiento** | Del **tablero declarado**, con `unToqueDelTablero`, que recorre `nudos`, `lineas`, `caras` y `acciones` y devuelve **el primero** que encuentra | De `opciones()` **completa**, la unión de lo que se le ofrece a cada sentado, eligiendo **uniformemente** |
-| **A quién le pregunta** | A `turnoDe` del espectador: **a uno** | A **todos** los sentados, que es la única forma de ver un descarte de tres a la vez o un `ACEPTAR` |
-| **Cuánto juega** | Cuarenta vueltas por semilla, tres semillas: una ventana, no una partida | Hasta 5.000 pasos, de dos a seis colonos, y una segunda tanda de mil partidas con el almacén lleno |
+| **De dónde saca el movimiento** | Del **tablero declarado**, con `unToqueDelTablero`, que recorre `nudos`, `lineas`, `caras` y `acciones`; ahora elige por **familias ordenadas** y sortea dentro de la familia, en vez de coger el primero que encuentra | De `opciones()` **completa**, la unión de lo que se le ofrece a cada sentado, eligiendo **uniformemente** |
+| **A quién le pregunta** | A `turnoDe` del espectador: **a uno** (quien no tiene el turno sólo contesta trueques) | A **todos** los sentados, que es la única forma de ver un descarte de tres a la vez o un `ACEPTAR` |
+| **Cuánto juega** | Tres partidas enteras hasta el ganador, tres semillas | Hasta 5.000 pasos, de dos a seis colonos, y una segunda tanda de mil partidas con el almacén lleno |
 
-Lo que se ve leyendo la tabla es que **el primero elige siempre lo mismo**: coge el primer
-toque que encuentra en un orden fijo, y por eso se atascó en `ofrecer` durante cuarenta
-vueltas sin ponerse rojo. Arreglado, dejará de atascarse; seguirá cogiendo **uno** por
-vuelta, en un orden, preguntándole a **uno**. Las tres afirmaciones que sostienen este
-documento —que ninguna partida se queda sin opciones para nadie, que ninguna opción
+Lo que se ve leyendo la tabla es que **el arreglo curó la tercera fila a medias y no tocó
+la tercera columna de problemas**: el bucle ya no se atasca y ya llega al final, pero sigue
+cogiendo **uno** por vuelta y preguntándole a **uno**. Las tres afirmaciones que sostienen
+este documento (que ninguna partida se queda sin opciones para nadie, que ninguna opción
 ofrecida devuelve el mismo estado sin motivo, y que ningún almacén pasa de siete después de
-un siete— no se pueden hacer desde ahí, y no por falta de vueltas: por falta de **quiénes**
-y de **cuáles**. Un descarte de tres colonos a la vez no lo ve nadie que pregunte por un
-solo asiento.
+un siete) no se pueden hacer desde ahí, y ya no por falta de vueltas: por falta de
+**quiénes** y de **cuáles**. Un descarte de tres colonos a la vez no lo ve nadie que
+pregunte por un solo asiento, y eso es exactamente lo que la fase 2 va a traer.
 
 Y una cosa que **no** es una decisión y conviene que sepas: las otras dos peticiones de tu
 mensaje (el trueque de varios bienes y varias unidades con aceptación confirmada, y la
@@ -1606,14 +2036,19 @@ para que no se cuelen por la puerta de atrás:
   Sería inventar en `shared/mecanicas/` una forma de turno que hoy no tiene ningún juego, y
   es exactamente lo que el §5.3 del diseño prohíbe. El precio de no hacerlo está dicho en
   el §9.1: al segundo de la cola no le llega aviso al móvil hasta que le toque.
-- **Tocar `verificar-mesa.ts`.** Con el descarte en `acciones` y el destino en `caras`, su
-  bucle sigue conduciéndose solo (§2.5). Y ahora hay una segunda razón, más dura, para no
-  tocarlo: **otro agente lo está arreglando en este mismo árbol** (§12.11), así que ninguna
-  fase de aquí escribe en ese fichero ni cita una línea suya.
-- **Subir la ventana de cuarenta vueltas de ese bucle.** Medido, no compraría nada
-  mientras el bucle no llegue a un siete, y llegar a los sietes es exactamente lo que ese
-  arreglo en paralelo va a cambiar; cuando lo haya cambiado, el número pasa a ser suyo y no
-  de aquí (§15.1, fase 2).
+- ~~**Tocar `verificar-mesa.ts`.**~~ **ESTA SE CAYÓ EN LA FASE 1, y hay que decirlo aquí
+  porque es la única promesa de este apartado que se rompió.** El argumento («con el
+  descarte en `acciones` y el destino en `caras`, su bucle se conduce solo») era correcto y
+  seguía siendo correcto; lo que no se vio es que el bucle elige por **familias**, y una
+  regla que no ofrece ninguna otra cosa deja sin jugada a quien no tenga familia para ella.
+  Son dos líneas y el campo nuevo en la lista de campos de la vista. Lo que se conserva del
+  espíritu de esta prohibición es que **ninguna fase de aquí reescribe ese bucle**: la
+  fase 1 le añadió lo que necesitaba para no cortarse, y nada más (§12.11).
+- **Subir la ventana de cuarenta vueltas de ese bucle.** No entra, y ahora por una razón
+  mejor: **esa ventana ya no existe**. Desde `3942556` el bucle juega hasta el ganador
+  (§12.11), así que no hay número que subir. Lo que la fase 2 tenía que mirar aquí se
+  queda como medida escrita: un siete cuesta unas seis vueltas con la política uniforme a
+  tres colonos, y veinte en el peor descarte de la tanda de dos colonos.
 
 ## 15. El orden, en fases que se empujan una a una
 
@@ -1629,7 +2064,7 @@ El orden completo es éste:
 
 | # | Fase | De quién |
 |---|---|---|
-| 1 | **La pieza, con su bloqueo y su robo** | **Mía, fase 1** |
+| 1 | **La pieza, con su bloqueo y su robo. HECHA en `958962a`** | **Mía, fase 1** |
 | 2 | **El descarte del siete** | **Mía, fase 2** |
 | 3 | El texto de las cartas y su comprobador, sin nada en pantalla | Cartas, fase 1 |
 | 4 | La mano por clases en el retablo | Cartas, fase 2 |
@@ -1643,6 +2078,22 @@ Y **la fase 4 de aquí** (el tablero en tres dimensiones) **cabe donde quepa**, 
 depende de ella; no está en la lista por eso y no por olvido. Es la misma tabla que escribe
 `docs/LAS-CARTAS-SE-EXPLICAN.md` en su apartado del orden, y está copiada a propósito: un
 orden que sólo viva en uno de los tres documentos es un orden que el que empuja no lee.
+
+> **¿CAMBIA EL ORDEN DE LAS NUEVE POR LO QUE SE ADELANTÓ? NO, Y CONVIENE DECIR POR QUÉ NO,
+> QUE ES LO QUE SE PODRÍA LEER MAL.** Lo que la fase 1 se llevó por delante es **la mitad
+> de la fase 4**, y la fase 4 es justamente la única que **no tiene sitio en esta tabla**.
+> O sea que lo adelantado salió del único cajón cuyo movimiento no mueve nada: nadie
+> dependía de la fase 4 antes, nadie depende de ella ahora, y su mitad restante (soltar la
+> pieza sobre una comarca) sigue sin bloquear a nadie. Las ocho filas de arriba se quedan
+> donde estaban, con las mismas dependencias y por las mismas razones: **mi 3 sigue detrás
+> de la fase 1 de las cartas**, porque la vacuna que ese cambio de regla pone roja no
+> existe antes; y **la 6 sigue delante de la 7**, porque el trueque cuelga por su nombre de
+> mi fase 5.
+>
+> Lo que sí cambia, y no es de orden sino de tamaño: **la fase 4 mide ahora la mitad**, y
+> la 1 midió más de lo que este documento le había puesto. Eso hay que anotarlo aquí y no
+> sólo en la lista de fases, porque quien planifique por el número de fases y no por lo que
+> cada una contiene se llevaría la sorpresa al revés.
 
 **Léase la tabla y no la numeración de aquí abajo.** Mis cinco fases están numeradas 1 a 5
 por lo que cuesta cada una, no por el orden en que se empujan: en el calendario de verdad
@@ -1705,7 +2156,7 @@ una sin sorpresas:
 | 1. La pieza, el bloqueo y el robo | Nada. Es la primera de todo el trabajo | Ni de las cartas, ni del trueque, ni del 3D |
 | 2. El descarte | De la fase 1 (`estiaje` en el estado, y el momento al que se vuelve) | Del trueque, salvo por la regla de que en `'descartando'` no se contesta (§2.2), que se escribe aquí y no allí |
 | 3. La guardia mueve | De la fase 1 (el robo extraído), de la 2 (para poder afirmar que la guardia **no** llena `descartes`) y **de la fase 1 de las cartas**, que es la que deja escrita la vacuna que este cambio de regla pone roja | Del trueque |
-| 4. El tablero en tres dimensiones | De la 1 y de la 2 | Y **nadie depende de ella**: con cinco o seis colonos no existe (§9.2) |
+| 4. El tablero en tres dimensiones. **Media hecha en la 1** | De la 1 (que ya se llevó el dibujo) y de la 2 | Y **nadie depende de ella**: con cinco o seis colonos no existe (§9.2). Lo que le queda es soltar la pieza, y el botón ya mueve |
 | 5. El jugador ciego | De la 1, la 2 y la 3, porque es quien las juega todas | De la 4 |
 
 ### 15.1. Las fases
@@ -1715,65 +2166,108 @@ de ellas, lo del retablo va DENTRO y no después**: en una mesa de cinco o seis 
 es la única pantalla que hay (§9.2), así que una fase que dejara el retablo para luego
 dejaría el juego sin jugar en esas mesas.
 
-1. **La pieza, el bloqueo y el robo. Sin descarte.** El renombrado a `SUMA_DEL_ESTIAJE`;
-   `estiaje` y `estiajePorMover` en el estado y en la vista, con su relleno en
-   `comoSiSiempreHubieraHabidoMazo` y su normalización en `comoVista`; el estiaje naciendo
-   en la duna en `repartirElDelta`; la línea de `repartirLaCosecha`; el movimiento
-   `MOVER_EL_ESTIAJE` con su carga `{ donde, a }` y su `id` `estiaje:${donde}:${a ?? 'nadie'}`
-   (§1, decisión 5); el robo extraído de `jugarLaGuardia`
-   y llamado desde los dos sitios; **`opcionesDeTurno` cortando con `estiajePorMover` JUSTO
-   DESPUÉS de `if (v.turnoDe !== quien) return opciones;` y ANTES del `if (!v.tirado)`,
-   sin ofrecer `TIRAR` mientras el corte esté activo, con la guarda hermana en
-   `tirarLosDados`** (§3 bis); `venceElPlazo` moviendo por el ausente sin robar y sin
-   gastar azar; y el aviso con la rama de `estiajePorMover`.
+1. **La pieza, el bloqueo y el robo. Sin descarte. HECHA en `958962a`.**
 
-   **Y LA LÍNEA QUE ENCIENDE LA BANDERA, que es la que hacía que esta fase entera no
-   sirviera para nada.** Va aquí, con su sitio, porque las dos versiones anteriores pedían
-   la guarda de `tirarLosDados` y **no pedían lo que la guarda vigila**. En
-   `tirarLosDados`, donde hoy está
+   **Lo que trajo, en `shared/arcade/juegos/riberas.ts` y con la misma forma que hoy tiene
+   el código.** El renombrado de `ESTIAJE` a `SUMA_DEL_ESTIAJE`, que iba el primero porque
+   hacerlo después obliga a hacerlo dos veces. `estiaje: LlaveDeHex | null` y
+   `estiajePorMover: boolean` en `EstadoDeRiberas`, en `VistaDeRiberas` y en `loQueSeVe`,
+   los dos públicos y ninguno en `loSecretoDeRiberas`. `laDuna(islas)`, que busca por
+   `RINDE[terreno] === null` y no por el nombre. El estiaje naciendo ahí en
+   `repartirElDelta`. El relleno de `comoSiSiempreHubieraHabidoMazo` **en la duna y no en
+   nulo**, con la guarda por `=== undefined` (§1 bis, 4), y la normalización de `comoVista`.
+   El `continue` de `repartirLaCosecha`, después del número y antes de `RINDE`. El
+   movimiento `MOVER_EL_ESTIAJE = 'riberas:estiaje'` con su carga `{ donde, a }` y su `id`
+   `estiaje:${donde}:${a ?? 'nadie'}`, leídos con `dondeDeLaCarga` y `campoDeTexto`, que ya
+   existían. `elRobo` extraído de `jugarLaGuardia` y llamado desde las dos puertas, con la
+   carta quedándose lo que es de la carta (§1 bis, 3). `moverElEstiaje` y `conElEstiajeEn`
+   (§1 bis, 1). `opcionesDelEstiaje`, con `piezaSuyaEn` y con `A_LA_ISLA` y
+   `laIslaEnPalabras`, que es una pieza que este documento no tenía: la preposición y el
+   artículo van en la tabla porque dos de los seis terrenos son masculinos, así que un `a
+   la` fijo escribe «a la cantil» y un `a ${el}` escribe «a el carrizal», y ésta es la casa
+   donde los rótulos se leen en voz alta. El corte de `opcionesDeTurno` justo después del
+   `if` del turno y **antes** del bloque de tirar, sin ofrecer `TIRAR` (§3 bis), con la
+   guarda hermana en `tirarLosDados`. **Y una guarda que este documento no pedía y que hizo
+   falta: `pasarTurno` también corta**, o la bandera cruzaría al turno siguiente (§1 bis,
+   1). `venceElPlazo` con `moverPorElAusente`, sin robar y sin gastar azar, y pasando el
+   turno después (§1 bis, 2). La rama del aviso, **delante** de la de tirar. La ayuda de
+   `TIRAR`, que ahora cuenta lo que pasa con un siete. Y `MOVER_EL_ESTIAJE` exportado en
+   `shared/arcade/juegos/index.ts`.
 
-   ```
-   if (suma === ESTIAJE) return conLaTirada;
-   ```
-
-   se devuelve **además** `estiajePorMover: true`:
+   **LA LÍNEA QUE ENCIENDE LA BANDERA**, que es de la que cuelga todo:
 
    ```
    if (suma === SUMA_DEL_ESTIAJE) return { ...conLaTirada, estiajePorMover: true };
    ```
 
-   Sin esa línea, esta fase se puede empujar entera —la pieza, la vista, el bloqueo, los
-   dieciocho destinos, el corte de `opcionesDeTurno`, la guarda del reductor, las dieciocho
-   caras tocables y el comprobador— y **sale verde con un estiaje que no se activa jamás**:
-   el siete sigue sin hacer nada, exactamente como hoy, y todo lo demás es código que nadie
-   ejecuta. Es el peor de los verdes, porque parece hecho. **Su vacuna, y va en esta misma
-   fase:** quitar `estiajePorMover: true` tiene que poner **rojo el bloque entero del
-   estiaje** de `verify:riberas`, no una comprobación suelta; si al quitarla sigue verde,
-   ninguna de las comprobaciones de abajo estaba mirando la partida, estaban mirando estados
-   montados a mano. Y en la **fase 2**, la misma línea gana su segunda mitad: `descartes`
-   lleno con quien tenga más de siete fichas (§2.2), que es lo que reparte el trabajo entre
-   los dos momentos.
-   **En el retablo, en esta misma fase y no después:** el mapa `primeraDelEstiaje` al lado
-   de `porSitio`, que es de donde cada cara saca su movimiento (§9.2); el `toque` en las
-   dieciocho caras del tablero declarado y **la exclusión de `acciones` de esas dieciocho**
-   (si se metieran, la lista de botones pasaría de un máximo medido de 36 a 54), dejando en
-   `acciones` **sólo las víctimas de más**, que son de cero a cinco; el `rotulo` `vega ·
-   estiaje` y el `borde` en acento de la isla ocupada; y la cabecera de `textoDeCara`
-   reescrita (§12.9). Con eso, una mesa de seis juega el estiaje entero desde esta fase.
-   **Comprobadores:** `verify:riberas` gana el bloque del estiaje (mover es obligatorio y a
-   otra isla; la isla del estiaje no rinde; sólo se roba a quien tiene pieza ahí y algo en
-   la mano; el tic mueve sin gastar azar; **hay dieciocho caras con `toque` y ninguna es la
-   de ahora**; **el `aria-label` de una cara ofrecida lleva su terreno y su cifra**) **con
-   su vacuna cada uno**: quitar el `continue` de `repartirLaCosecha` tiene que poner rojo
-   algo, quitar la comprobación de «a otra isla» también, y una cara que no se ofrece tiene
-   que seguir con su texto visible.
-   **Lo que NO se promete:** que `verify:mesa` vigile nada de esto. Se promete que su bucle
-   se sigue conduciendo solo **sin tocar `verificar-mesa.ts`**, que es un «no he roto nada»
-   (§2.5) y no un «esto está vigilado». Y el recuento con el que comparar es **el que ese
-   comprobador tenga cuando esta fase se empuje, y no el 856 de aquí**: ese fichero se está
-   arreglando en paralelo (§12.11), así que el 856 es de antes y citarlo como promesa sería
-   pedirle a esta fase que no cambie un número que no es suyo. Quien vigila es la fase 5.
-   **Lo visible:** al sacar un siete hay que mover, y una isla deja de rendir.
+   Sin ella, esta fase se puede empujar entera (la pieza, la vista, el bloqueo, los
+   dieciocho destinos, el corte, la guarda del reductor, las dieciocho caras tocables y el
+   comprobador) y **sale verde con un estiaje que no se activa jamás**. Es el peor de los
+   verdes, porque parece hecho. **Su vacuna aterrizó como forma y no como línea suelta**, y
+   eso es mejor de lo que este documento pedía: el bloque del estiaje de `verify:riberas`
+   **se juega hasta un siete de verdad con el árbitro delante**, no se monta con un estado
+   escrito a mano, y su primera comprobación es que el siete SALE, con el número de tiradas
+   que costó; así, quitar esa línea no pone roja una comprobación, sino el bloque entero.
+
+   **En el retablo, en esta misma fase.** `primeraDelEstiaje` al lado de `porSitio`,
+   con su mismo contrato de «la primera gana» y sin tocar `porSitio`, porque la llave con
+   la que una cara encuentra su movimiento es la isla y no el `id`. El `toque` en las
+   dieciocho caras y **la exclusión de `acciones` de esas dieciocho**, dejando ahí sólo las
+   víctimas de más. El `rotulo` `· estiaje` de la ocupada. **Y el relleno EN PENUMBRA, que
+   es lo que cambió**: aquí ponía «el borde en acento», y las dos mitades de esa frase eran
+   falsas (§6.4). La cabecera de `textoDeCara` reescrita, sin tocar una línea de código
+   debajo (§12.9).
+
+   **En el tablero de tres dimensiones, que era de la fase 4 y se adelantó** (§9.1): el
+   campo del contrato pasa de `ladron` a **`seca`** en `escenas/tipos.ts`, el componente de
+   `escenas/delta.tsx` de `Ladron` a **`LaComarcaSeca`**, `deltaDeLaVista` lo lee de la
+   vista con `hexDeLlave` y `comoVistaLlana` lo normaliza, y `banco3d.tsx` lo llama por su
+   nombre nuevo. Lo que **no** entró y sigue en la fase 4: `sitiosDelEstiaje`, la señal por
+   comarca y el posavasos de la duna.
+
+   **Comprobadores al aterrizar** (§11.3): `verify:riberas` **423**, `verify:mesa`
+   **2.915** con **32 sietes jugados**, `verify:riberas-en-tres` **343**,
+   `verify:escritorio` **458**; batería **76 de 76 en verde**. Lo que ganó cada uno:
+
+   - **`verify:riberas`**, el bloque «EL ESTIAJE: la pieza, el bloqueo, el robo y el
+     reloj», jugado y no montado. Que el siete enciende la bandera; que mientras haya que
+     mover no se ofrece `TIRAR` ni `PASAR` ni construir ni trocar ni comprar, y que a los
+     otros dos no se les ofrece nada; que `TIRAR` y `PASAR` mandados a mano devuelven el
+     mismo objeto; que los destinos son dieciocho **y son exactamente ésos**; que quedarse
+     donde está y un destino que no es isla devuelven el mismo objeto; **quién puede ser
+     víctima, calculado como regla para cada isla y contrastado con la lista**, y no como
+     caso de esta semilla; que la ficha viaja entera **con su número de serie**; que nadie
+     más gana ni pierde; que el turno sigue siendo suyo; que no se mueve ningún premio, con
+     la victoria puesta delante (§12.15); el caso sin víctima, que mueve igual y no gasta
+     azar; el retablo, con sus dieciocho caras tocables y la ocupada con su texto entero; el
+     bloqueo **con una tirada fabricada**, midiendo que la isla deja de rendir exactamente
+     lo suyo y que las demás de ese número siguen rindiendo; el reloj entero; la mesa
+     guardada de ayer, **con la vacuna de los diecinueve destinos ejecutada**; y la vista de
+     ayer, que no apaga el juego. Más el bloque de la penumbra y del filo (§6.4).
+   - **`verify:escritorio`**, el paso `elEstiajeSeOye` (§1 bis, 6).
+   - **`verify:riberas-en-tres`**, el bloque 12 bis, que cubre la ventana entre esta fase y
+     la 4 (§9.1).
+   - **`verify:mesa`**, la familia `estiaje` en su bucle y los dos campos nuevos en la lista
+     de campos de la vista (§12.11).
+
+   **Y lo que esta fase le hizo a lo que ya había, que es la parte que no estaba escrita.**
+   Tres comprobadores conducían partidas con una política fija, y **una política fija dejó
+   de ser completa el día que el siete empezó a hacer algo**: el paso «Una partida entera»
+   de `verificar-riberas.ts`, el bucle de `verificar-mesa.ts` y dos turnos escritos a mano
+   en `verificar-riberas-en-tres.ts` se quedaban sin jugada una de cada seis tiradas. Los
+   tres ganaron el estiaje **el primero** de su orden, no para que pasaran, sino porque un
+   siete no se resuelve hasta que alguien mueve la pieza. Y en `verificar-riberas.ts`,
+   `ctxDe` pasó de `const` con una flecha a función declarada, para poder llamarla desde el
+   bloque nuevo, que va arriba.
+
+   **Lo que esta fase promete y lo que no.** Promete lo de arriba, y **ya sí promete que
+   `verify:mesa` juega el estiaje**, que las tres primeras versiones decían con razón que
+   no podía prometer (§12.11). No promete que nada de esto esté vigilado **desde la lista
+   completa y para todos los sentados**: eso es la fase 5, y sigue haciendo falta (§13).
+
+   **Lo visible:** al sacar un siete hay que mover, una isla deja de rendir, se ve cuál (en
+   penumbra en el retablo, con una tienda plantada en el tablero de tres dimensiones), y a
+   quien tiene algo puesto ahí se le quita una ficha.
 
 2. **El descarte.** El momento `'descartando'`, `descartes` en el estado y en la vista, **la
    rama nueva `if (v.momento === 'descartando') return opcionesDeDescarte(v, quien);` en
@@ -1798,13 +2292,19 @@ dejaría el juego sin jugar en esas mesas.
    partida atraviesa un siete con manos grandes y sigue, con el recuento de revisiones
    delante para que el verde no sea por conjunto vacío. `verify:larga` gana una vuelta con
    un siete y un plazo vencido en medio.
-   **Y la ventana de `verify:mesa`:** esta fase **no la toca**, y ahora por dos razones. La
-   medida sigue diciendo lo mismo (§2.5): un siete costaría unas seis vueltas de cuarenta
-   con la política uniforme a tres colonos, y el bucle de hoy no llega a ningún siete, así
-   que subir el 40 no compraría nada. Y la segunda es que **ese fichero se está arreglando
-   en paralelo** (§12.11), así que la ventana es suya y no de aquí; cuando su bucle llegue a
-   los sietes, los números que hay que mirar están medidos y quedan escritos para quien los
-   necesite: **seis vueltas por siete, y veinte en el peor descarte** de la tanda de dos
+   **Lo que hereda de la fase 1, y que ya no hay que escribir aquí:** `estiaje` y
+   `estiajePorMover` en el estado y en la vista con su relleno y su normalización; el
+   momento al que se vuelve; el `id` con el bien dentro, que es la misma forma que ya usa
+   el destino con su víctima; y sobre todo **la línea del siete**, que en esta fase gana su
+   segunda mitad: `descartes` lleno con quien tenga más de siete fichas y `faltan:
+   Math.floor(almacen.length / 2)`, congelado en ese instante.
+   **Y la ventana de `verify:mesa`: ya no existe.** Esta fase no tiene número que subir,
+   porque desde `3942556` el bucle juega hasta el ganador (§12.11). Lo que sí hereda es una
+   pregunta nueva y mejor: ese bucle **atraviesa 32 sietes**, así que en cuanto el descarte
+   entre, los atravesará descartando, y hay que mirar que su política de familias sepa
+   elegir un `riberas:descartar` (con el descarte en `acciones`, lo sabe: §2.5). Los números
+   medidos se quedan escritos para quien los necesite: **unas seis vueltas por siete** con
+   la política uniforme a tres colonos, y **veinte en el peor descarte** de la tanda de dos
    colonos (`medir6.mts`).
    **Lo visible:** con más de siete fichas, un siete duele.
 
@@ -1821,20 +2321,49 @@ dejaría el juego sin jugar en esas mesas.
    tirada de siete, descarte y segundo robo, comprobando que el segundo robo funciona, que
    `guardias` sube una sola vez y que La Mayor Guardia se recalcula una sola vez; y que La
    Mayor Guardia sigue cambiando de dueño sólo por superación estricta.
+   **Lo que hereda de la fase 1, y es más de lo que este documento le había puesto:** el
+   robo ya está extraído en `elRobo` y llamado desde las dos puertas, así que esta fase **no
+   toca el robo**; el corte de `opcionesDeTurno` ya está en su sitio, antes del bloque de
+   tirar y no donde corta `veredasGratis`, que es exactamente lo que esta fase necesitaba y
+   la razón por la que se escribió allí ya (su comentario lo dice, nombrando esta fase); y
+   la rama del aviso ya va **delante** de la de tirar, por lo mismo. O sea que de las tres
+   cosas que esta fase pedía de fontanería, las tres están puestas, y lo que le queda es la
+   regla: quitar el `!estado.tirado` y ofrecer la carta por el camino de antes de tirar,
+   **las dos mitades a la vez**.
+   **Y lo que sigue igual: esta fase depende de la fase 1 de las cartas**, que es la que
+   deja escrita la vacuna que este cambio de regla pone roja
+   (`docs/LAS-CARTAS-SE-EXPLICAN.md`). Sin ella el cambio entra con el texto viejo y toda la
+   batería en verde. Por eso va en el quinto sitio del orden global y no en el tercero.
    **Lo visible:** catorce cartas de veinticinco pasan a valer lo que valen.
 
-4. **El tablero en tres dimensiones.** `bloqueada` en `escenas/tipos.ts`, `deltaDeLaVista`
-   devolviéndola, `sitiosDelEstiaje` en `riberas-en-3d.ts`, el `Colocando` de clase
-   `'comarca'`, el componente renombrado a `Estiaje`, y el posavasos sin cifra de la duna.
-   **Comprobadores:** `verify:escena` cuenta los 130 triángulos nuevos, exige que la duna
+4. **El tablero en tres dimensiones. LA MITAD ENTRÓ EN LA FASE 1** (§9.1).
+   **Ya está:** el campo `seca` en `escenas/tipos.ts` (no `bloqueada`), `deltaDeLaVista`
+   devolviéndolo, el componente `LaComarcaSeca` (no `Estiaje`) plantando la tienda sobre el
+   relieve, y `banco3d.tsx` al día. **Se ve dónde está el estiaje.**
+   **Lo que queda:** `sitiosDelEstiaje` en `riberas-en-3d.ts`, el `Colocando` de clase
+   `'comarca'` con una `Senal` por isla, y el posavasos sin cifra de la duna. O sea,
+   **soltar la pieza**, y darle a la duna la casilla que le falta.
+   **Y un hueco que la fase 1 dejó abierto y que hay que cerrar aquí, dicho en voz alta
+   porque es la clase de cosa que se pierde:** la tienda **ya se pinta y nadie la cuenta**.
+   `verify:escena` no nombra `DeltaEn3D` en ninguna línea, así que no cubría `ladron` antes
+   y no cubre `seca` ahora; quien mira el campo es `verify:riberas-en-tres`, y mira el
+   CONTRATO (que al empezar la comarca seca es la duna, y que es la duna de verdad y no
+   cualquiera), no el dibujo. O sea que los 86 triángulos y la `talla 3` de la tienda están
+   medidos en este documento y en ninguna batería. **Es de esta fase cerrarlo**, y va con lo
+   demás.
+   **Comprobadores:** `verify:escena` cuenta los triángulos nuevos (44 del posavasos, y los
+   86 de la tienda, que se pintan desde la fase 1 sin que nadie los sume), exige que la duna
    lleve posavasos y no lleve cifra, y que las señales de comarca sean 18 y ninguna sea la
-   de ahora. Y en el banco (`escritorio/banco3d.html`, que ya trae un `ladron: { q: 0, r:
-   -2 }` escrito a mano en `banco3d.tsx`) se mira con ojos: que la tienda se lee a 23
-   puntos, que los dieciocho anillos no se pisan en el lienzo más pequeño, y que la pieza
-   no tapa el número de su isla.
-   **Lo visible:** se ve dónde está el estiaje y se mueve con el dedo. Pero **sólo hasta
-   cuatro colonos**: con cinco o seis se sigue jugando en el retablo, que ya lo tenía todo
-   desde la fase 1 (§9.2 y §13).
+   de ahora. Y lo que ya vigila el bloque
+   12 bis de `verify:riberas-en-tres` (que con el estiaje por mover los dieciocho destinos
+   llegan a los botones y que `obrasPosibles` no se inventa un sitio de comarca) **pasa a
+   ser su vacuna**: el día que las señales existan, esa afirmación tiene que seguir siendo
+   verdad o el botón se habrá quedado sin reserva. En el banco (`escritorio/banco3d.html`)
+   se mira con ojos: que la tienda se lee a 23 puntos, que los dieciocho anillos no se pisan
+   en el lienzo más pequeño, y que la pieza no tapa el número de su isla.
+   **Lo visible:** se mueve con el dedo, en vez de con un botón. Y **sólo hasta cuatro
+   colonos**: con cinco o seis se sigue jugando en el retablo, que ya lo tiene todo desde la
+   fase 1 (§9.2 y §13).
 
 5. **EL JUGADOR CIEGO. El comprobador que hoy no existe y que hace falta más que ninguno.**
 
@@ -1845,13 +2374,27 @@ dejaría el juego sin jugar en esas mesas.
    mueve no es quien tiene el turno «de verdad». Los otros dos documentos citan esta fase
    por su nombre y apoyan las suyas en ella.
 
-   **Qué vigila que hoy no vigila nadie.** Medido y no supuesto (§2.5): `jugar:fondo` juega
-   los cuatro juegos de la SALA por su manifiesto y no toca ningún arcade; y el único sitio
-   que juega Riberas entera (el paso «Una partida entera, con el árbitro, y reejecutada» de
-   `verificar-riberas.ts`) elige con una preferencia fija (tirar, torre, fundar, vereda,
-   pasar) que **nunca ofrece un trueque, nunca acepta uno y nunca compra una carta**. O sea
-   que hoy nada comprueba que lo nuevo sea jugable **desde la lista**, que es la única
-   forma en que un cliente lo va a jugar.
+   **Lo que hereda de las tres primeras, y lo que la cuarta versión le quita de encima.**
+   De la fase 1 hereda la regla entera y, sobre todo, **un segundo testigo que ya no es
+   ninguno de los dos que este documento contaba**: el bucle de `verify:mesa` juega tres
+   partidas hasta el ganador y atraviesa 32 sietes (§12.11), así que la afirmación «hoy
+   nadie juega esto» ya no vale tal cual y hay que decirlo con precisión, porque de esa
+   frase colgaba media justificación de esta fase. Lo que **sigue** sin vigilar nadie es lo
+   de la tabla del §13: la lista **completa** y **todos** los sentados. Un descarte de tres
+   colonos a la vez no lo ve quien pregunta por un solo asiento, y eso no lo arregla jugar
+   más partidas.
+
+   **Qué vigila que no vigila nadie.** Medido y no supuesto (§2.5): `jugar:fondo` juega
+   los cuatro juegos de la SALA por su manifiesto y no toca ningún arcade. Y los dos sitios
+   que hoy juegan Riberas entera eligen los dos **con una política escrita**, que es
+   justamente lo que esta fase no hace: el paso «Una partida entera, con el árbitro, y
+   reejecutada» de `verificar-riberas.ts` va con una preferencia fija (estiaje, tirar,
+   torre, fundar, vereda, pasar) que **nunca ofrece un trueque, nunca acepta uno y nunca
+   compra una carta**; y el bucle de `verificar-mesa.ts`, desde `3942556`, elige por
+   familias ordenadas y sortea dentro de la familia, que es mucho mejor y **sigue siendo
+   una política, y sigue preguntándole a uno**. O sea que nada comprueba que lo nuevo sea
+   jugable **desde la lista completa y para todos los sentados**, que es la única forma en
+   que un cliente lo va a jugar.
 
    **Qué es.** Partidas eligiendo **uniformemente de `opciones()` completa** (la unión de
    lo que se le ofrece a cada sentado, no sólo al del turno), de dos a seis colonos, en la
