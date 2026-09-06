@@ -183,7 +183,7 @@
  * de cada una, y la de la semilla ya no pasaba a mayúsculas.
  */
 import { Component, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { ReactNode, RefObject } from 'react';
+import type { CSSProperties, ReactNode, RefObject } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { ACESFilmicToneMapping, Fog, Vector3 } from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
@@ -236,13 +236,18 @@ import {
   turnoEnTres,
 } from '../../shared/arcade/juegos/riberas-en-tres';
 import type {
+  CartaDelMazoEnTres,
   ClaseDeJugada,
   DadosEnTres,
+  ExplicacionDeLaCarta,
   IdDeLaBarra,
   TableroEnTres,
 } from '../../shared/arcade/juegos/riberas-en-tres';
 /* El sitio de los dados se decide con la misma función que la escena: ver `haySitioParaLosDados`. */
-import { huecosDeLaMesa } from '../../escenas/barra';
+import { ASA_DEL_HUECO, huecosDeLaMesa, loQueSeVe } from '../../escenas/barra';
+/* Y el del cartel, con las manos de verdad y no con números copiados: ver `elCartelQueCabe`. */
+import { franjaDeLasCartas, loQueSeVeEnLasCartas } from '../../escenas/cartas';
+import { huecosDeLaBaraja, loQueSeVeEnLaBaraja } from '../../escenas/baraja';
 import { semillaDelCodigo } from '../../shared/mecanicas/semilla';
 import type { TableroDeclarado } from '../../shared/mecanicas/tablero-declarado';
 import { Formulario } from './formulario';
@@ -304,6 +309,299 @@ const RECUADRO_DEL_LIENZO = 'riberas-lienzo';
  * preguntar a `huecosDeLaMesa` si caben los dados, y tiene que ser el mismo número.
  */
 const CAMPO_DE_LA_CAMARA = (45 * Math.PI) / 180;
+
+// ---------------------------------------------------------------------------
+// El cartel que explica el naipe: dónde cabe y cuánto cabe
+// ---------------------------------------------------------------------------
+
+/**
+ * ═══ LA RAÍZ DE ESTA CASA VALE 17 PUNTOS, Y ESE DATO YA SE ESCRIBIÓ MAL UNA VEZ ═══
+ *
+ * `estilo.css` abre con `html { font-size: 106.25%; }` y su propia cabecera dice por qué:
+ * «los 17 px de siempre cuando el navegador viene con sus 16», y va en porcentaje para no
+ * anular la preferencia de tamaño de letra del navegador. El diseño de este cartel
+ * (`docs/LAS-CARTAS-SE-EXPLICAN.md`) escribió «0,82 rem sobre 16, o sea 13 puntos» y sobre
+ * esos 13 levantó sus dos tablas de letra: con el rem malo salían 27 letras por renglón
+ * donde hay 25 y renglones de 18 donde son de 19, o sea que el sitio quedaba SOBRESTIMADO
+ * por los dos lados y una frase de tres renglones pasaba por una de dos.
+ *
+ * Se escribe aquí, una vez, y de aquí sale todo lo demás. Si alguien toca la raíz de la
+ * hoja sin tocar esto, `verify:escritorio` lo dice: afirma que las dos cifras coinciden.
+ */
+const RAIZ_DE_LA_CASA = 17;
+/**
+ * ═══ Y ESOS 17 SON EL SUELO, NO LA MEDIDA: LA DE VERDAD SE LE PIDE AL NAVEGADOR ═══
+ *
+ * `106.25 %` va en porcentaje justamente para que la preferencia de tamaño de letra del
+ * navegador siga mandando (lo dice el punto 2 de la cabecera de `estilo.css`). O sea que
+ * quien la tenga en «muy grande» pinta el cartel con una letra bastante mayor que 13,94
+ * puntos, mientras el alto máximo que esta pantalla calcula seguía saliendo de un 17
+ * clavado, y con `overflow: hidden` el último renglón se corta SIN NINGUNA SEÑAL, que es
+ * lo único que la cabecera de `elCartelQueCabe` promete no hacer nunca.
+ *
+ * Así que la raíz se mide donde se mide el lienzo, y el 17 se queda como lo que es: el
+ * valor con el que se compone la hoja y el que vale en Node, donde no hay `document` y
+ * donde los dos comprobadores miden. `verify:escritorio` sigue afirmando que ese número y
+ * el `106.25 %` de la hoja dicen lo mismo.
+ */
+function raizDelNavegador(): number {
+  if (typeof document === 'undefined' || typeof getComputedStyle !== 'function') return RAIZ_DE_LA_CASA;
+  const medida = Number.parseFloat(getComputedStyle(document.documentElement).fontSize);
+  return Number.isFinite(medida) && medida > 0 ? medida : RAIZ_DE_LA_CASA;
+}
+/** El cuerpo de `.opcion-ayuda`, que es la letra con la que se pinta el cartel: `0.82rem`. */
+const CUERPO_SOBRE_LA_RAIZ = 0.82;
+/**
+ * EL ANCHO DE UNA LETRA, en partes del cuerpo. El 0,6, que es el único ancho de letra que
+ * esta casa tiene escrito (`tamanoDeTexto`, `app/src/arcade/retablo.tsx`). No es la
+ * medida de una fuente concreta y no pretende serlo: es la regla con la que se decide
+ * cuántas frases ENTERAS caben, y para eso lo que hace falta es que las dos pantallas y
+ * los dos comprobadores usen el mismo número.
+ */
+const ANCHO_SOBRE_EL_CUERPO = 0.6;
+/** El renglón: `ceil(cuerpo · 1,35)`, el mismo interlineado con el que se pinta. */
+const RENGLON_SOBRE_EL_CUERPO = 1.35;
+/** Doce puntos de margen por lado, dentro de la caja. Los mismos arriba, abajo y a los lados. */
+const MARGEN_DEL_CARTEL = 12;
+/** Y ocho puntos de aire entre el pie del cartel y el techo del asa de la barra. */
+const AIRE_SOBRE_EL_ASA = 8;
+
+/** Dónde va el cartel y qué frases caben dentro, todo en puntos de pantalla. */
+export interface CartelAlPie {
+  /** Desde el canto izquierdo del lienzo hasta el suyo. */
+  izquierda: number;
+  /** Desde el canto derecho del lienzo hasta el suyo, que es lo que pide `right` en CSS. */
+  derecha: number;
+  /** Desde el canto de abajo del lienzo, que es lo que pide `bottom`. */
+  abajo: number;
+  /** Lo más alto que puede llegar a ser sin comerse el tablero: la mitad del alto libre. */
+  caja: number;
+  /** Las frases ENTERAS que caben, en su orden. Nunca una a medias. */
+  frases: readonly string[];
+}
+
+/** Envolver con avaricia, que es como envuelve un párrafo: cuántos renglones ocupa. */
+function renglonesDeLaFrase(frase: string, letrasPorLinea: number): number {
+  if (letrasPorLinea <= 0) return Number.POSITIVE_INFINITY;
+  let lineas = 1;
+  let usado = 0;
+  for (const palabra of frase.split(' ')) {
+    if (palabra.length > letrasPorLinea) return Number.POSITIVE_INFINITY;
+    if (usado === 0) usado = palabra.length;
+    else if (usado + 1 + palabra.length <= letrasPorLinea) usado += 1 + palabra.length;
+    else {
+      lineas++;
+      usado = palabra.length;
+    }
+  }
+  return lineas;
+}
+
+/**
+ * DÓNDE CABE EL CARTEL DE UN NAIPE, Y CUÁNTAS DE SUS TRES FRASES ENTRAN HOY.
+ *
+ * ═══ LA BANDA NO SE DIBUJA A OJO: SE LE PREGUNTA A LAS TRES MANOS ═══
+ *
+ * El cartel va pegado al canto de abajo, entre el canto derecho de la franja de las cartas
+ * y el canto izquierdo de la mano de bienes, y por encima del asa de la barra. Los tres
+ * cantos salen de las MISMAS funciones que la escena usa para repartir —`franjaDeLasCartas`,
+ * `huecosDeLaBaraja` y `huecosDeLaMesa`—, exactamente como `haySitioParaLosDados` le
+ * pregunta a `huecosDeLaMesa` si caben los dados. Copiar aquí un porcentaje sería tener dos
+ * repartos: el día que la franja se ensanche, el cartel se quedaría encima de la mano.
+ *
+ * ═══ Y EL PRESUPUESTO SE CUENTA EN RENGLONES, NO EN CARACTERES ═══
+ *
+ * Con la banda sale el ancho de renglón (letras por línea), con el alto sale cuántos
+ * renglones hay, y con las dos cosas se envuelve cada frase y se van metiendo ENTERAS
+ * mientras quepan. No se corta ninguna por la mitad ni se ponen puntos suspensivos: media
+ * frase de ayuda es peor que ninguna. Con dos frases se leen «qué hace» y «qué consigues»;
+ * con una, «qué hace», que es la que Miguel nombró primero. Las que no se pintan se oyen
+ * igual: están las tres, siempre, en la lista `.riberas-solo-apoyo`.
+ *
+ * Medido con las manos de verdad en los dieciséis lienzos de `LIENZOS` (`verify:escritorio`).
+ *
+ * ═══ Y CUÁL ES EL PEOR LIENZO DE ESTE CLIENTE, QUE NO ES EL PEOR DE LA LISTA ═══
+ *
+ * La lista se comparte con el móvil y por eso empieza por 320×360, donde caben DOS frases:
+ * el renglón da 25 letras, cada frase ocupa dos y hay cinco renglones para seis. PERO ESE
+ * LIENZO AQUÍ NO SE PUEDE DAR. `.riberas-lienzo` lleva `min-height: 420px`, así que los
+ * cinco lienzos bajos de la lista (320×360 y los cuatro apaisados de menos de 420 de alto,
+ * entre ellos el 844×390, que se había colado en la cuenta anterior) no existen en el
+ * escritorio. La forma que sí se da y que la lista no tenía es la contraria: ESTRECHA Y ALTA.
+ *
+ * El peor de este cliente es 288×420, y sale de sumas y no de una corazonada: WCAG 1.4.10
+ * pone el suelo del documento en 320 puntos (lo dice el punto 1 de la cabecera de
+ * `estilo.css`, que ya arregló la rejilla por eso), `.dentro` se lleva `clamp(1rem, 4vw,
+ * 2.5rem)` por lado, a 320 manda el mínimo de 17 puntos, y el recuadro es el 100 % de lo que
+ * queda, o sea 286; se mide con 288 por dejar el margen del lado seguro. De alto, los 420
+ * del `min-height`, que es el suelo. Ahí el renglón cabe 20 letras y hay 7 renglones, así
+ * que las frases de dos renglones pasan a tres y se pintan DOS. En los otros diez que este
+ * cliente sí puede dar caben las tres.
+ *
+ * Esos dos números —cinco bajos y diez con las tres— NO se escriben a mano: `verify:escritorio`
+ * los saca de `LIENZOS` y del `min-height` de la hoja y exige que esta cabecera los diga con
+ * esas mismas palabras. Ya se desfasaron una vez, y una cuenta escrita para que el siguiente
+ * no tenga que medir es justo la que no puede estar mal.
+ *
+ * ═══ Y QUÉ PASA EN EL EXTREMO DE LA PREFERENCIA DE LETRA: EL CARTEL DESAPARECE ═══
+ *
+ * La raíz se le pide al navegador (`raizDelNavegador`), así que quien tenga la letra en «muy
+ * grande» mide con bastante más de 17. Medido con las ONCE frases de verdad, y no con frases
+ * cortas de mentira, que es lo que este comprobador hacía y por lo que el extremo no se veía:
+ *
+ *   · en 288×420, con raíz 20 se pintan DOS en todos los naipes, con 24 UNA, y a partir de
+ *     unos 27 empiezan a salir naipes SIN CARTEL; con 34 no se pinta ninguno;
+ *   · en 320×360 el corte llega antes: con 20 ya hay naipes de UNA frase, y con 34, ninguno.
+ *
+ * O sea que el usuario para el que se hizo el respeto a la preferencia es el que se queda sin
+ * cartel. Y eso está bien, y es lo que esta función promete: antes ninguno que uno cortado a
+ * la mitad sin avisar. Lo que lo hace aceptable es que EL TEXTO NO SE PIERDE: la lista
+ * `.riberas-solo-apoyo` se pinta desde `cartasDelMazo` y no mira `cartel` ni una vez, así que
+ * las tres frases de los once naipes siguen ahí, con o sin cartel, y siguen siendo lo que oye
+ * quien no puede pasar el cursor por un lienzo. Las dos mitades las compra `verify:escritorio`.
+ *
+ * ═══ DOS COSAS QUE TODAVÍA NO EXISTEN Y QUE LE COMEN LA BANDA POR ARRIBA ═══
+ *
+ * Quien las escriba tiene que hacerlas convivir con esto, y por eso quedan dichas aquí con
+ * su número y no en un documento:
+ *
+ *   · LA CINTA DEL TERCIO CENTRAL (fase 5 de `docs/LA-MESA-DE-RIBERAS.md`, §2.2): el
+ *     renglón del aviso son 44 puntos y la línea de botones otros 44, «la suma máxima es
+ *     por tanto 88». Hoy no hay ninguna dentro del recuadro —el aviso del tablero se pinta
+ *     ENCIMA de él, no dentro—, así que el alto libre llega hasta el techo del lienzo. El
+ *     día que la cinta baje, se le resta al alto libre ANTES de partirlo por la mitad, y lo
+ *     que pasa está medido: en 320×360 se queda en UNA frase y en el SE apaisado en dos.
+ *     Los otros trece no pierden nada.
+ *   · EL PREGÓN DEL TRUEQUE (`docs/EL-TRUEQUE-DE-RIBERAS.md`), que cuelga de esa misma
+ *     cinta hasta cuatro tiras de 44. La regla que aquel diseño y éste comparten es de
+ *     EXCLUSIÓN y no de reparto: con el pregón abierto el cartel NO se pinta. **No está
+ *     escrita, y es a propósito**: el pregón no existe todavía en este árbol, y una
+ *     condición sobre un estado que nadie crea es una condición que ningún comprobador
+ *     puede poner roja —se quedaría de adorno hasta que alguien la borrara por muerta—.
+ *     Los números para quien la escriba: con la cinta a 88 y las cuatro propuestas
+ *     colgando, al cartel le quedan −24 puntos de banda en el SE apaisado y 8 en 320×360,
+ *     y necesita 43 de caja para existir. No es que quepa apretado: no queda banda.
+ *
+ * ═══ LO QUE SE MIDE QUIETO, Y CUÁNTO COSTARÍA NO HACERLO ═══
+ *
+ * La mano de bienes se mide QUIETA —`apunta` a `null`, sin áreas de trueque—, que es lo
+ * que dice el diseño: mientras hay cartel hay un naipe cogido, y coger un naipe suelta el
+ * bien y cierra las áreas (`alCogerCartaDelMazo`). Medido lo que eso cuesta en el peor
+ * caso: con el cursor sobre la mano de bienes sus cartas asoman 17,5 puntos más hacia
+ * dentro en 320×360 (15,6 en el SE apaisado), o sea que el cartel taparía esa uña de
+ * naipe. No come el toque —no recibe punteros— y sólo pasa mientras el cursor está en la
+ * mano contraria a la que se está leyendo.
+ *
+ * Y con cuántos huecos de barra: con los de VERDAD (`cuantosHuecos`), no con un cuatro
+ * escrito aquí, por lo mismo que `huecosDeLaMesa` lo pide — el asa sube cuando hay menos
+ * piezas, y un cartel medido contra cuatro se metería dentro del asa de una barra de tres.
+ *
+ * Devuelve `null` cuando no hay ni un renglón: entonces no se pinta nada, que es mejor que
+ * pintar una caja vacía encima del tablero.
+ */
+export function elCartelQueCabe(
+  lienzo: { ancho: number; alto: number },
+  cuantosHuecos: number,
+  explicacion: ExplicacionDeLaCarta,
+  raiz: number = RAIZ_DE_LA_CASA,
+): CartelAlPie | null {
+  if (lienzo.ancho <= 0 || lienzo.alto <= 0) return null;
+  const proporcion = lienzo.ancho / lienzo.alto;
+  /* La letra con la que esto se va a pintar de verdad: ver `raizDelNavegador`. */
+  const cuerpo = CUERPO_SOBRE_LA_RAIZ * raiz;
+  const anchoPorLetra = cuerpo * ANCHO_SOBRE_EL_CUERPO;
+  const renglonDelCartel = Math.ceil(cuerpo * RENGLON_SOBRE_EL_CUERPO);
+
+  /* A la izquierda, el canto derecho de la franja de las cartas, en puntos. */
+  const vistoEnLasCartas = loQueSeVeEnLasCartas(CAMPO_DE_LA_CAMARA, proporcion);
+  const franja = franjaDeLasCartas(CAMPO_DE_LA_CAMARA, proporcion);
+  const izquierda = ((franja.derecha + vistoEnLasCartas.ancho / 2) / vistoEnLasCartas.ancho) * lienzo.ancho;
+
+  /*
+   * A la derecha, el canto izquierdo de la mano de bienes quieta. Da igual cuántos bienes
+   * haya —está medido: el canto es el mismo con uno que con treinta, porque las cartas se
+   * apilan a lo alto y no a lo ancho—, así que se pide con una sola y no con una mano de
+   * mentira de catorce que habría que explicar.
+   */
+  const vistoEnLaBaraja = loQueSeVeEnLaBaraja(CAMPO_DE_LA_CAMARA, proporcion);
+  const bienes = huecosDeLaBaraja([{ id: 'medida', bien: 'limo' }], CAMPO_DE_LA_CAMARA, proporcion, null);
+  const primero = bienes[0];
+  if (primero === undefined) return null;
+  const cantoDeLosBienes = primero.hueco.x - primero.hueco.ancho / 2;
+  const derechaEnPuntos =
+    ((cantoDeLosBienes + vistoEnLaBaraja.ancho / 2) / vistoEnLaBaraja.ancho) * lienzo.ancho;
+  const derecha = lienzo.ancho - derechaEnPuntos;
+
+  /* Y abajo, el techo del asa de la barra menos el aire. Sin barra, el canto del lienzo. */
+  const { piezas } = huecosDeLaMesa(cuantosHuecos, CAMPO_DE_LA_CAMARA, proporcion, lienzo.alto);
+  const hueco = piezas[0];
+  const vistoEnLaBarra = loQueSeVe(CAMPO_DE_LA_CAMARA, proporcion);
+  const techoDelAsa =
+    hueco === undefined
+      ? lienzo.alto
+      : ((vistoEnLaBarra.alto / 2 - (hueco.y + (hueco.lado / 2) * ASA_DEL_HUECO.alto)) / vistoEnLaBarra.alto) *
+        lienzo.alto;
+
+  const banda = derechaEnPuntos - izquierda;
+  const letrasPorLinea = Math.floor((banda - 2 * MARGEN_DEL_CARTEL) / anchoPorLetra);
+  /*
+   * EL ALTO LIBRE va del techo del recuadro al techo del asa menos el aire, y LA CAJA es su
+   * mitad: un cartel que se comiera toda la banda taparía media pantalla de tablero justo
+   * en el lienzo donde menos tablero hay.
+   */
+  const altoLibre = techoDelAsa - AIRE_SOBRE_EL_ASA;
+  const caja = altoLibre / 2;
+  const renglones = Math.floor((caja - 2 * MARGEN_DEL_CARTEL) / renglonDelCartel);
+  if (renglones <= 0 || letrasPorLinea <= 0) return null;
+
+  const frases: string[] = [];
+  let usados = 0;
+  for (const frase of [explicacion.hace, explicacion.consigues, explicacion.usas]) {
+    const pide = renglonesDeLaFrase(frase, letrasPorLinea);
+    if (usados + pide > renglones) break;
+    usados += pide;
+    frases.push(frase);
+  }
+  if (frases.length === 0) return null;
+
+  return {
+    izquierda,
+    derecha,
+    abajo: lienzo.alto - (techoDelAsa - AIRE_SOBRE_EL_ASA),
+    caja,
+    frases,
+  };
+}
+
+/**
+ * LAS CUATRO MEDIDAS, TRADUCIDAS A LAS CUATRO PROPIEDADES QUE EL NAVEGADOR ENTIENDE.
+ *
+ * ═══ POR QUÉ ESTO ES UNA FUNCIÓN Y NO CUATRO LÍNEAS DENTRO DEL JSX ═══
+ *
+ * Porque ahí no las vigilaba nadie. `elCartelQueCabe` mide `izquierda`, `derecha`, `abajo`
+ * y `caja` con muchísimo cuidado y `verify:escritorio` las contrasta contra las tres manos
+ * de la escena en cada lienzo; lo que NADA ataba era cuál de las cuatro acababa en `left`
+ * y cuál en `right`. Intercambiadas, la batería seguía en 439 y en verde con el cartel
+ * puesto encima de la mano que estaba explicando: la aritmética medida y el estilo
+ * pintado eran dos cosas que nunca se encontraban.
+ *
+ * Sacada aquí, es una función pura que se puede LLAMAR desde Node con cuatro números
+ * distintos y mirar qué sale, que es lo que hace la vacuna. Cambiar dos de sitio se pone
+ * rojo en la comprobación, no en la pantalla de alguien.
+ *
+ * Con `null` devuelve `undefined`, no un objeto vacío, para que el `<p>` no lleve un
+ * `style` que no dice nada: sin cartel manda entera la regla de la hoja, que es la que le
+ * quita fondo, filo y relleno cuando está vacío.
+ */
+export function elEstiloDelCartel(cartel: CartelAlPie | null): CSSProperties | undefined {
+  if (cartel === null) return undefined;
+  return {
+    left: `${String(Math.round(cartel.izquierda))}px`,
+    right: `${String(Math.round(cartel.derecha))}px`,
+    bottom: `${String(Math.round(cartel.abajo))}px`,
+    maxHeight: `${String(Math.round(cartel.caja))}px`,
+  };
+}
 
 /**
  * LOS TÍTULOS DEL MENÚ, uno por pregunta, y ni una palabra más de cosecha propia.
@@ -921,6 +1219,16 @@ export function RiberasEnTres({ manifiesto, mesa, puesta, tablero, opciones }: L
   const [cogida, ponerCogida] = useState<string | null>(null);
   /** El naipe del mazo levantado, por su seudónimo. Nunca la carta entera: es secreta. */
   const [cartaDelMazo, ponerCartaDelMazo] = useState<string | null>(null);
+  /**
+   * EL NAIPE QUE EL CURSOR SEÑALA, que NO es el que está cogido.
+   *
+   * Sale de la escena por `onSenalarCartaDelMazo`, que cuelga de los `onPointerOver` y
+   * `onPointerOut` que cada naipe ya tenía. No entra en `soltarTodo` y no debe entrar: no
+   * es algo que se tenga en la mano, es dónde está el ratón, y una jugada ajena no mueve
+   * el cursor de sitio. Con dedo esto vale `null` siempre y no falta: allí el cartel
+   * cuelga de `cartaDelMazo`, que es un estado que ya existía.
+   */
+  const [naipeSenalado, ponerNaipeSenalado] = useState<string | null>(null);
   const [preguntando, ponerPreguntando] = useState<Preguntando | null>(null);
 
   /**
@@ -1039,6 +1347,19 @@ export function RiberasEnTres({ manifiesto, mesa, puesta, tablero, opciones }: L
    * vuelo no se tira.
    */
   const [lienzo, ponerLienzo] = useState({ ancho: 0, alto: 0 });
+  /*
+   * Y LA RAÍZ DE LA LETRA SE MIDE AQUÍ MISMO, en el mismo latido que el lienzo.
+   *
+   * No es un tercer observador: el cartel se pinta en `rem` y el alto máximo que le
+   * calculamos va en puntos, así que las dos medidas tienen que venir del mismo momento o
+   * el último renglón se corta en silencio (ver `raizDelNavegador`). Se observa además la
+   * RAÍZ DEL DOCUMENTO, porque cambiar la preferencia de tamaño de letra del navegador no
+   * cambia el tamaño de este recuadro (es `100 %` de ancho y `62vh` de alto) y sin eso la
+   * medida nueva no llegaría hasta el siguiente redimensionado de la ventana. Los dos
+   * `useState` se plantan solos si el número no cambió, así que un observador de más no
+   * cuesta ni un repintado.
+   */
+  const [raizDeLaLetra, ponerRaizDeLaLetra] = useState(RAIZ_DE_LA_CASA);
   const medirElRecuadro = useCallback((recuadro: HTMLDivElement | null) => {
     if (recuadro === null || typeof ResizeObserver === 'undefined') return;
     const mide = (): void => {
@@ -1047,10 +1368,15 @@ export function RiberasEnTres({ manifiesto, mesa, puesta, tablero, opciones }: L
         const alto = recuadro.clientHeight;
         return antes.ancho === ancho && antes.alto === alto ? antes : { ancho, alto };
       });
+      ponerRaizDeLaLetra((antes) => {
+        const ahora = raizDelNavegador();
+        return antes === ahora ? antes : ahora;
+      });
     };
     mide();
     const observador = new ResizeObserver(mide);
     observador.observe(recuadro);
+    if (typeof document !== 'undefined') observador.observe(document.documentElement);
     /* Los `ref` de función no tienen limpieza: se suelta en el efecto de abajo. */
     observadorDelRecuadro.current = observador;
   }, []);
@@ -1066,6 +1392,43 @@ export function RiberasEnTres({ manifiesto, mesa, puesta, tablero, opciones }: L
     const suyos = dadosEnTres(vista, yo, opciones);
     return suyos === null || !quieto ? suyos : { ...suyos, disponible: false };
   }, [haySitioParaLosDados, vista, yo, opciones, quieto]);
+
+  /*
+   * ═══ QUÉ NAIPE SE ESTÁ EXPLICANDO, Y LA PRECEDENCIA EN UNA LÍNEA ═══
+   *
+   * Si hay carta COGIDA, el cartel es el suyo, aunque el cursor pase por otra. Al revés el
+   * cartel cambiaría bajo el dedo que está a punto de soltar el naipe en la casilla, que es
+   * el momento en que más importa que diga la verdad.
+   *
+   * Y se busca por seudónimo en la mano de VERDAD en vez de guardarse la carta entera. No
+   * es un rodeo: un naipe se juega y desaparece sin que llegue ningún `onPointerOut` —el
+   * componente se desmonta y ya está—, así que el seudónimo señalado puede quedarse
+   * apuntando a una carta que ya no está en la mano. Buscándolo, esa carta no tiene cartel
+   * y el cartel se va solo; guardándola, se quedaría en pantalla explicando un naipe que ya
+   * no existe.
+   */
+  const naipeExplicado = useMemo((): CartaDelMazoEnTres | null => {
+    const cual = cartaDelMazo ?? naipeSenalado;
+    if (cual === null) return null;
+    return cartasDelMazo.find((c) => c.id === cual) ?? null;
+  }, [cartaDelMazo, naipeSenalado, cartasDelMazo]);
+  /*
+   * Y DÓNDE CABE, con las manos de verdad y con los huecos de barra de verdad: los mismos
+   * `cuantos` que deciden si hay dados dos bloques más arriba. Ver `elCartelQueCabe`, que
+   * es donde vive la aritmética y donde `verify:escritorio` la mide lienzo a lienzo.
+   *
+   * CON LA MESA RECOGIDA SON CERO HUECOS, y no los de la barra que no está en pantalla. El
+   * pie del cartel se apoya en el techo del ASA, y con la mesa abajo no hay asa: medido
+   * contra cuatro huecos, el cartel se quedaba flotando el alto de una barra por encima del
+   * canto justo cuando la mesa se ha recogido para ver MÁS tablero. No tapaba nada —de ahí
+   * que se pasara— pero dejaba un hueco raro y desperdiciaba media banda: con cero, el
+   * cartel baja al canto y le caben las tres frases en sitios donde antes cabían dos.
+   */
+  const cartel = useMemo((): CartelAlPie | null => {
+    if (naipeExplicado === null) return null;
+    const cuantos = mesaRecogida ? 0 : barra.length + (mazo === null ? 0 : 1);
+    return elCartelQueCabe(lienzo, cuantos, naipeExplicado.explicacion, raizDeLaLetra);
+  }, [naipeExplicado, lienzo, barra.length, mazo, mesaRecogida, raizDeLaLetra]);
   /*
    * TIRAR VUELVE AL PIE MIENTRAS LA MESA ESTÁ RECOGIDA, y es el agujero gordo del §6.
    *
@@ -1188,6 +1551,18 @@ export function RiberasEnTres({ manifiesto, mesa, puesta, tablero, opciones }: L
     },
     [quieto],
   );
+
+  /*
+   * SEÑALAR NO ES COGER, Y POR ESO ESTE MANEJADOR NO HACE NADA MÁS.
+   *
+   * No suelta el bien, no cierra el menú, no mira `quieto` y no manda nada: pasar el ratón
+   * por encima de un naipe no es una jugada, y el día que empiece a soltar cosas será una.
+   * Con `quieto` puesto el cartel se sigue leyendo, que es justo cuando hace falta: la mano
+   * está apagada y la explicación de la carta apagada es la mitad del encargo.
+   */
+  const alSenalarCartaDelMazo = useCallback((carta: { id: string } | null) => {
+    ponerNaipeSenalado(carta === null ? null : carta.id);
+  }, []);
 
   /*
    * AL SOLTAR UN NAIPE EN LA CASILLA DE JUGAR: una sola manera, se manda; varias, se
@@ -1456,6 +1831,7 @@ export function RiberasEnTres({ manifiesto, mesa, puesta, tablero, opciones }: L
                   onCogerCartaDelMazo={alCogerCartaDelMazo}
                   onJugarCarta={alJugarCarta}
                   onRevelarCarta={alRevelarCarta}
+                  onSenalarCartaDelMazo={alSenalarCartaDelMazo}
                 />
               </Canvas>
             </LimiteDelMundo>
@@ -1507,6 +1883,47 @@ export function RiberasEnTres({ manifiesto, mesa, puesta, tablero, opciones }: L
                 {mesaRecogida ? '▲' : '▼'}
               </button>
             ) : null}
+            {/*
+              EL CARTEL QUE EXPLICA EL NAIPE (`docs/LAS-CARTAS-SE-EXPLICAN.md`, fase 3).
+
+              Es INTERFAZ POR ENCIMA DEL LIENZO y no un objeto de la escena, y eso está
+              medido: dentro de la escena no hay una sola letra —sólo contornos compilados
+              de cifras y dibujos— y escribir la frase más larga con ellos costaría 8.520
+              triángulos contra un tope de mesa de 4.500. O sea que no es una preferencia:
+              es que no cabe. Aquí es un `<p>` hermano del `<canvas>`, igual que el botón
+              de volver y el de recoger.
+
+              NO RECIBE UN SOLO PUNTERO, y sin excepción: `pointer-events: none` en su
+              regla de la hoja, ni `onClick` ni `tabIndex` aquí. Vive al pie, encima del
+              delta, y un rectángulo que se tragara los toques del tablero sería un cartel
+              que impide construir donde tapa. Se cierra soltando la carta —el segundo
+              toque, que es lo que ya hace `alCogerCartaDelMazo`— o apartando el cursor.
+
+              ESTÁ SIEMPRE EN EL ÁRBOL, vacío cuando no hay nada que decir, y eso es lo que
+              hace que se OIGA: una región `aria-live` que se monta a la vez que su texto no
+              se anuncia en la mayoría de los lectores, porque el lector no vigila lo que
+              todavía no existía. Vacío no se ve —`:empty` en la hoja le quita fondo, filo y
+              relleno— y no ocupa nada.
+
+              CADA FRASE EN SU RENGLÓN, y por eso son `<span>` en bloque y no un párrafo
+              corrido: el presupuesto de `elCartelQueCabe` cuenta los renglones de cada
+              frase por separado, y un párrafo corrido pintaría otra cosa que la que se
+              midió. Las que no caben no se recortan: no se pintan, y se oyen enteras en la
+              lista de apoyo de abajo.
+            */}
+            <p
+              className="riberas-cartel"
+              aria-live="polite"
+              style={elEstiloDelCartel(cartel)}
+            >
+              {cartel === null
+                ? null
+                : cartel.frases.map((frase) => (
+                    <span key={frase} className="riberas-cartel-frase">
+                      {frase}
+                    </span>
+                  ))}
+            </p>
           </>
         ) : (
           /* El telón: `--suelo` con el nombre del juego hasta que el modelo llega. */
@@ -1515,6 +1932,43 @@ export function RiberasEnTres({ manifiesto, mesa, puesta, tablero, opciones }: L
             <p className="letra-chica">Se levanta el delta.</p>
           </div>
         )}
+        {/*
+          LAS EXPLICACIONES DE MI MANO, ENTERAS, PARA QUIEN NO PUEDE SEÑALAR.
+
+          Aquí ponía «LAS ONCE», y once son las CLASES de naipe que el juego sabe explicar
+          (las nueve del mazo y los dos premios), no las filas que esta lista pinta. Lo que
+          se pinta es MI MANO: de cero naipes a los que tenga, con los títulos repetidos si
+          tengo dos y sin una sola línea de las clases que no me han tocado. Que sea así
+          está bien, porque una lista de todas las clases sería el manual del juego leído en
+          voz alta cada vez y además publicaría qué cartas existen antes de que salgan; lo
+          que estaba mal era el rótulo, que prometía un número fijo. `verify:escritorio`
+          cuenta las filas contra la mano de una partida de verdad, no contra el once.
+
+          No se puede pasar el cursor por un naipe de un lienzo, así que quien navega con
+          lector de pantalla necesita otra puerta: es la misma que la fase de los dados
+          inventó para tirar, una lista dentro del recuadro que `estilo.css` saca de la
+          vista con `clip-path` y NUNCA con `display: none`, que los lectores saltan.
+
+          Aquí van LAS TRES frases de cada naipe, siempre, caiga lo que caiga en el cartel:
+          lo que se oye no depende de cuánto sitio quede en la banda. Y va el nombre, que
+          en el lienzo no se ve nunca —dentro de la escena no hay letras— y es lo único que
+          distingue a un título de otro.
+
+          Y ESTÁ FUERA DEL `conMundo`, a propósito y no por descuido: no necesita mundo
+          ninguno. Mientras el modelo se descarga, la mano ya existe en la vista y sus
+          explicaciones ya son verdad; y de paso esto se puede RENDERIZAR en Node, que es
+          lo que permite que `verify:escritorio` cuente las filas contra la mano de una
+          partida de verdad en vez de creerse el fuente.
+        */}
+        {cartasDelMazo.length > 0 ? (
+          <ul className="riberas-solo-apoyo">
+            {cartasDelMazo.map((c) => (
+              <li key={`explica:${c.id}`}>
+                {`${c.nombre}. ${c.explicacion.hace} ${c.explicacion.consigues} ${c.explicacion.usas}`}
+              </li>
+            ))}
+          </ul>
+        ) : null}
       </div>
 
       {preguntando !== null ? (

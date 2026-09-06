@@ -69,7 +69,7 @@
  * WebGL— y un componente que asuma DOM aquí sale negro en el móvil sin un error en
  * ninguna consola. Sólo mallas, materiales y luces.
  */
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 /*
  * `useFrame` es del NÚCLEO de r3f, no de `drei`, así que vale en los dos clientes:
@@ -2654,10 +2654,21 @@ function CartaDelMazoEnLaMano({
   colocada,
   cogida,
   onCoger,
+  onSenalar,
 }: {
   colocada: CartaDelMazoColocada;
   cogida: boolean;
   onCoger: (carta: CartaDelMazo) => void;
+  /**
+   * SE HA ENTRADO O SE HA SALIDO DE ESTE NAIPE, para quien quiera explicarlo fuera.
+   *
+   * Va con la carta también al SALIR, y no con un `null`, porque r3f no promete el orden
+   * de los dos avisos al pasar de un naipe al de al lado: si la salida del viejo llega
+   * después de la entrada del nuevo, un `null` a secas borraría el aviso recién dado. Con
+   * la carta dentro, quien recibe puede desechar la salida que no le toca — y lo hace
+   * `ManoDelMazo`, que es quien sabe cuál es la señalada de todas.
+   */
+  onSenalar: (carta: CartaDelMazo, dentro: boolean) => void;
 }): JSX.Element {
   const grupo = useRef<THREE.Group>(null);
   const [encima, setEncima] = useState(false);
@@ -2728,11 +2739,25 @@ function CartaDelMazoEnLaMano({
       <mesh
         geometry={geometria}
         renderOrder={base + 1}
+        /*
+         * LOS DOS DE SIEMPRE, CON UN AVISO MÁS DENTRO Y NINGÚN MANEJADOR NUEVO.
+         *
+         * El cartel que explica la carta (fase 3 de `docs/LAS-CARTAS-SE-EXPLICAN.md`) se
+         * pide con el mismo gesto que ya levantaba el naipe: no hay un `onPointerMove`
+         * nuevo, ni un toque largo, ni un plano invisible que recoja el cursor. El aviso
+         * sale del MISMO rayo que `onPointerDown`, así que el naipe que se explica y el
+         * que se cogería no pueden discrepar aunque las cartas se solapen — que se
+         * solapan, y se dibujan sin probar la profundidad.
+         */
         onPointerOver={(e) => {
           e.stopPropagation();
           setEncima(true);
+          onSenalar(carta, true);
         }}
-        onPointerOut={() => setEncima(false)}
+        onPointerOut={() => {
+          setEncima(false);
+          onSenalar(carta, false);
+        }}
         /*
          * SÓLO EL BOTÓN PRIMARIO, igual que las cuatro puertas que ya había. Sin esto,
          * apoyar el arrastre de la cámara con el botón derecho encima de la mano cogería
@@ -2936,12 +2961,20 @@ function ManoDelMazo({
   onCoger,
   onJugar,
   onRevelar,
+  onSenalar,
 }: {
   cartas: readonly CartaDelMazo[];
   cogida: string | null;
   onCoger: (carta: CartaDelMazo) => void;
   onJugar: (carta: CartaDelMazo) => void;
   onRevelar: (carta: CartaDelMazo) => void;
+  /**
+   * QUÉ NAIPE ESTÁ SEÑALADO AHORA MISMO, o `null` si ninguno. Sale de los `onPointerOver`
+   * y `onPointerOut` que cada carta ya tenía. La escena no pinta el aviso: no sabe
+   * escribir una letra (ver la cabecera de `explicacion` en `cartas.ts`) y quien lo pinta
+   * es el cliente, encima del lienzo.
+   */
+  onSenalar: (carta: CartaDelMazo | null) => void;
 }): JSX.Element {
   const grupo = useRef<THREE.Group>(null);
   const [forma, setForma] = useState({ campo: (45 * Math.PI) / 180, proporcion: 16 / 9 });
@@ -2991,6 +3024,42 @@ function ManoDelMazo({
     [laCogida, forma],
   );
 
+  /*
+   * ═══ QUIÉN ESTÁ SEÑALADO, Y POR QUÉ ESO NO LO PUEDE DECIR CADA CARTA SOLA ═══
+   *
+   * Cada naipe sabe si el cursor está sobre él, y ya lo sabía: es su `encima`. Lo que no
+   * sabe es si el aviso que manda al SALIR todavía vale, porque al pasar de un naipe al de
+   * al lado llegan dos avisos y r3f no promete cuál primero. Con la salida por detrás de la
+   * entrada, un `onSenalar(null)` a secas apagaría el cartel del naipe al que el cursor
+   * ACABA de llegar, y el cartel parpadearía al recorrer la mano — que es justo el gesto
+   * con el que se lee.
+   *
+   * Así que la señalada se apunta aquí, por su seudónimo, y una salida que no sea la de la
+   * apuntada se tira. Va en una `ref` y no en un estado a propósito: no pinta nada de esta
+   * mano —el levantarse de la carta lo sigue haciendo su `encima` local— y un estado aquí
+   * sería un render de la mano entera por cada cruce de cursor.
+   *
+   * Y NO SE AVISA AL DESMONTARSE. Si la carta se juega mientras está señalada no llega
+   * ninguna salida, y quien recibe el aviso se queda con un seudónimo que ya no está en la
+   * mano; eso lo resuelve él buscándolo en la lista, que es lo único que no miente. Un
+   * `useEffect` de limpieza aquí no arreglaría nada y añadiría un aviso durante el
+   * desmontaje.
+   */
+  const laSenalada = useRef<string | null>(null);
+  const avisarDeLaSenalada = useCallback(
+    (carta: CartaDelMazo, dentro: boolean) => {
+      if (dentro) {
+        laSenalada.current = carta.id;
+        onSenalar(carta);
+        return;
+      }
+      if (laSenalada.current !== carta.id) return;
+      laSenalada.current = null;
+      onSenalar(null);
+    },
+    [onSenalar],
+  );
+
   return (
     <group ref={grupo} renderOrder={ORDEN_DE_LAS_CARTAS_DEL_MAZO}>
       {casillas.map((casilla) => (
@@ -3011,6 +3080,7 @@ function ManoDelMazo({
           colocada={c}
           cogida={cogida === c.carta.id}
           onCoger={onCoger}
+          onSenalar={avisarDeLaSenalada}
         />
       ))}
     </group>
@@ -3042,6 +3112,7 @@ export function Delta({
   onCogerCartaDelMazo,
   onJugarCarta,
   onRevelarCarta,
+  onSenalarCartaDelMazo,
 }: {
   datos: DeltaEn3D;
   modelos: CatalogoDeModelos;
@@ -3192,6 +3263,19 @@ export function Delta({
   onJugarCarta?: (carta: CartaDelMazo) => void;
   /** Aviso de que la carta cogida —un título— se ha soltado sobre la casilla de revelar. */
   onRevelarCarta?: (carta: CartaDelMazo) => void;
+  /**
+   * QUÉ NAIPE SEÑALA EL CURSOR, o `null` al salir de la mano. Para el cartel que lo
+   * explica, que se pinta FUERA del lienzo (`docs/LAS-CARTAS-SE-EXPLICAN.md`, decisión 3).
+   *
+   * Sale de los `onPointerOver` y `onPointerOut` que cada naipe ya tenía, así que no
+   * cuesta un manejador nuevo ni le roba nada al toque que coge la carta. Sin quien lo
+   * escuche no pasa nada: la escena se pinta exactamente igual, como con las otras cinco
+   * entradas de la mano.
+   *
+   * Con DEDO esto no llega nunca —no hay «encima» en una pantalla táctil— y no hace
+   * falta: allí el cartel cuelga de `cartaDelMazoCogida`, que es un estado que ya existe.
+   */
+  onSenalarCartaDelMazo?: (carta: CartaDelMazo | null) => void;
 }): JSX.Element {
   /**
    * Cada modelo, aplanado una vez a geometría + material para poder instanciarlo.
@@ -3728,6 +3812,7 @@ export function Delta({
           onCoger={(c) => onCogerCartaDelMazo?.(c)}
           onJugar={(c) => onJugarCarta?.(c)}
           onRevelar={(c) => onRevelarCarta?.(c)}
+          onSenalar={(c) => onSenalarCartaDelMazo?.(c)}
         />
       )}
 

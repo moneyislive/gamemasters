@@ -52,9 +52,9 @@
  * anillo sin sitios, y la mano de otro no se puede pedir por ninguna puerta.
  */
 import { readFileSync } from 'node:fs';
-import { abrirMesa, jugar } from '../src/arcade/arbitro';
+import { abrirMesa, avanzarElReloj, jugar } from '../src/arcade/arbitro';
 import type { Mesa } from '../src/arcade/arbitro';
-import { aristaDeHex, verticeDeHex } from '../../shared/mecanicas/malla-hexagonal';
+import { aristaDeHex, verticeDeHex, verticesDeArista } from '../../shared/mecanicas/malla-hexagonal';
 import type { LlaveDeArista } from '../../shared/mecanicas/malla-hexagonal';
 import '../../shared/arcade/juegos';
 import {
@@ -62,6 +62,7 @@ import {
   ALZAR,
   ANO_BUENO,
   BIENES,
+  BIENES_DEL_ANO_BUENO,
   bienDeLaFicha,
   claseDeLaCarta,
   CLASES_DE_CARTA,
@@ -71,7 +72,12 @@ import {
   esTitulo,
   FUNDAR,
   GUARDIA,
+  GUARDIA_MINIMA,
   OFRECER,
+  PUNTOS_DEL_TITULO,
+  PUNTOS_DEL_VADO,
+  PUNTOS_DE_LA_GUARDIA,
+  VEREDAS_DE_LA_CARTA,
   opcionesDeRiberas,
   PASAR,
   largoDelVado,
@@ -97,10 +103,12 @@ import {
   barraEnTres,
   bienesQueSeAcaparan,
   bienesQueSeCambianPor,
+  cardinal,
   cartasEnTres,
   colocandoEnTres,
   comprarEnTres,
   dadosEnTres,
+  enCabeza,
   estadoDelVado,
   esVistaQueSePinta,
   jugadaSinPreguntar,
@@ -116,6 +124,7 @@ import {
   opcionesFueraDeLaMesa,
   opcionesFueraDelTablero,
   paresDelAnoBueno,
+  plural,
   premiosEnTres,
   renglonDelVado,
   retratoDeLaCarta,
@@ -129,7 +138,7 @@ import {
   turnoEnTres,
   colorDePiezaDelColono,
 } from '../../shared/arcade/juegos/riberas-en-tres';
-import type { CartaDelMazoEnTres } from '../../shared/arcade/juegos/riberas-en-tres';
+import type { CartaDelMazoEnTres, ExplicacionDeLaCarta } from '../../shared/arcade/juegos/riberas-en-tres';
 import { COLORES_EN_3D } from '../../shared/arcade/juegos/riberas-en-3d';
 /*
  * LA ESCENA DE VERDAD, Y NO UNA COPIA DE SUS NÚMEROS.
@@ -143,11 +152,20 @@ import {
   colorDeLaFamilia,
   COLOR_SIN_FAMILIA,
   FAMILIA_DE_LOS_TITULOS,
+  franjaDeLasCartas,
   huecosDeLasCartas,
+  loQueSeVeEnLasCartas,
   ORDEN_DE_LAS_FAMILIAS,
   puertasDeLaCarta,
 } from '../../escenas/cartas';
 import type { CartaDelMazo } from '../../escenas/cartas';
+/*
+ * Y LA MANO DE BIENES, que aquí sirve para UNA cosa sola: saber por dónde se acaba la
+ * banda libre del pie del lienzo, que es la que decide cuántas letras caben en un renglón
+ * del cartel. Se pide a la escena de verdad, y no se copia el número medido, para que el
+ * día que la mano de bienes se mueva el presupuesto de las frases se mueva con ella.
+ */
+import { huecosDeLaBaraja, loQueSeVeEnLaBaraja } from '../../escenas/baraja';
 /*
  * Y LA BARRA, por lo mismo: el cuarto hueco no se mide con un reparto escrito aquí sino con
  * el de verdad, y su dibujo se pide por el nombre que usa la escena y no por una cadena
@@ -1156,6 +1174,802 @@ const CAMPO_DE_LA_BARRA = (45 * Math.PI) / 180;
   comprobar('y están en la voz del juego', canonico(caras.map((c) => c.cara?.nombre)).includes('La Guardia') && canonico(caras.map((c) => c.cara?.nombre)).includes('El Faro'));
 }
 
+/* ═══ 9 BIS. LOS ONCE NAIPES SE EXPLICAN, Y EL TEXTO NO SE DESPEGA DE LA REGLA ═══ */
+/*
+ * QUÉ SE ARREGLA AQUÍ, EN UNA FRASE DE MIGUEL: «los usuarios no saben qué hace cada
+ * carta, qué consiguen, ni cómo la tienen que usar».
+ *
+ * Hasta hoy la única explicación de una carta era la `ayuda` de su OPCIÓN, y tenía tres
+ * agujeros: sólo existe si la carta se puede jugar AHORA —o sea que la carta que acabas
+ * de comprar, que es justo la que no conoces, se dibuja apagada y muda—, está escrita para
+ * la jugada y no para la carta, y los DOS PREMIOS no tienen opción ninguna y por tanto no
+ * tienen ayuda ninguna. Son once naipes en la misma mano, no nueve.
+ *
+ * Este bloque es la fase 1 de `docs/LAS-CARTAS-SE-EXPLICAN.md`: el texto existe, viaja
+ * dentro del naipe y está vigilado. Todavía no se ve en ninguna pantalla.
+ */
+{
+  /* ── EL PRESUPUESTO NO SE ESCRIBE A MANO: SE LE PREGUNTA A LA ESCENA ──
+   *
+   * El cartel de la fase 3 va al pie del lienzo, en la banda que queda entre la mano de
+   * cartas y la mano de bienes, y el lienzo más estrecho de los quince de `verify:escena`
+   * (320×360, un móvil con el lienzo al mínimo) es el que decide cuántas letras entran en
+   * un renglón. La banda se mide con `franjaDeLasCartas` y `huecosDeLaBaraja` de VERDAD,
+   * con la mano de bienes quieta —legítimo: mientras hay cartel hay un naipe cogido, y
+   * coger un naipe suelta el bien—, y de ahí sale el ancho.
+   *
+   * La aritmética entera, para que quien la toque sepa qué pantalla está gastando:
+   * doce puntos de margen por lado; el cuerpo de `.opcion-ayuda` es `0.82rem` y LA RAÍZ DE
+   * ESTA CASA VALE 17 PUNTOS —`estilo.css` abre con `html { font-size: 106.25%; }`, y su
+   * cabecera dice que son «los 17 px de siempre»—, o sea 13,94; y el ancho por letra es el
+   * 0,6 del cuerpo, que es el único ancho de letra que la casa tiene escrito
+   * (`tamanoDeTexto`, `app/src/arcade/retablo.tsx`).
+   *
+   * Este número salió 27 cuando se dio por hecho que el rem valía 16, y con 27 una frase
+   * de 51 caracteres parecía caber en dos renglones cuando ocupa tres. Un comprobador con
+   * el ancho equivocado es un comprobador verde que no vigila nada.
+   */
+  const LIENZO_PEOR = { ancho: 320, alto: 360 };
+  const PROP_PEOR = LIENZO_PEOR.ancho / LIENZO_PEOR.alto;
+  const MARGEN_DEL_CARTEL = 12;
+  const RAIZ_DE_LA_CASA = 17;
+  const CUERPO_DE_LA_AYUDA = 0.82 * RAIZ_DE_LA_CASA;
+  const ANCHO_POR_LETRA = CUERPO_DE_LA_AYUDA * 0.6;
+  const RENGLONES_DE_UNA_FRASE = 2;
+
+  const laBandaLibre = ((): number => {
+    const visto = loQueSeVeEnLasCartas(CAMPO_DE_LA_BARRA, PROP_PEOR);
+    const franja = franjaDeLasCartas(CAMPO_DE_LA_BARRA, PROP_PEOR);
+    const enPuntos = (x: number, ancho: number): number => ((x + ancho / 2) / ancho) * LIENZO_PEOR.ancho;
+    const vistoBienes = loQueSeVeEnLaBaraja(CAMPO_DE_LA_BARRA, PROP_PEOR);
+    const manoDeBienes = Array.from({ length: 14 }, (_, i) => ({
+      id: `b${String(i)}`,
+      bien: (BIENES[i % BIENES.length] ?? 'limo') as string,
+    }));
+    const bienes = huecosDeLaBaraja(manoDeBienes, CAMPO_DE_LA_BARRA, PROP_PEOR, null);
+    const cantoDeLosBienes = Math.min(...bienes.map((c) => c.hueco.x - c.hueco.ancho / 2));
+    return enPuntos(cantoDeLosBienes, vistoBienes.ancho) - enPuntos(franja.derecha, visto.ancho);
+  })();
+  const LETRAS_POR_LINEA = Math.floor((laBandaLibre - 2 * MARGEN_DEL_CARTEL) / ANCHO_POR_LETRA);
+  comprobar(
+    'la banda del pie del lienzo peor se mide con la escena y da sitio para leer: veinticinco letras por renglón',
+    laBandaLibre > 200 && LETRAS_POR_LINEA === 25,
+    { banda: Number(laBandaLibre.toFixed(1)), letras: LETRAS_POR_LINEA, anchoPorLetra: Number(ANCHO_POR_LETRA.toFixed(2)) },
+  );
+
+  /** Envolver con avaricia, que es como envuelve un párrafo: cuántos renglones ocupa. */
+  const renglonesDe = (frase: string): number => {
+    let lineas = 1;
+    let usado = 0;
+    for (const palabra of frase.split(' ')) {
+      if (palabra.length > LETRAS_POR_LINEA) return Number.POSITIVE_INFINITY;
+      if (usado === 0) usado = palabra.length;
+      else if (usado + 1 + palabra.length <= LETRAS_POR_LINEA) usado += 1 + palabra.length;
+      else {
+        lineas++;
+        usado = palabra.length;
+      }
+    }
+    return lineas;
+  };
+
+  /* ── LOS ONCE NAIPES, POR LAS DOS PUERTAS POR LAS QUE LLEGAN A LA MANO ── */
+  const LA_ISLA_DEL_VADO = { q: -2, r: 0 };
+  const CADENA_DE_CINCO = [0, 1, 2, 3, 4].map((k) => aristaDeHex(LA_ISLA_DEL_VADO, k));
+  const conLosDosPremios = escenarioDeMazo({
+    bienes: [['limo'], ['junco'], ['sal']],
+    guardias: [GUARDIA_MINIMA, 0, 0],
+    veredas: [CADENA_DE_CINCO],
+  });
+  const vistaDelDueno = proyectarRiberas(conLosDosPremios, 'A');
+  const losDosPremios = premiosEnTres(vistaDelDueno, 'A');
+  comprobar(
+    'A tiene LOS DOS premios en la mano, o lo de abajo no miraría los naipes que nadie explica',
+    losDosPremios.length === 2 && conLosDosPremios.vado.de === 'A' && conLosDosPremios.guardia.de === 'A',
+    { premios: losDosPremios.map((p) => p.nombre), vado: conLosDosPremios.vado.de, guardia: conLosDosPremios.guardia.de },
+  );
+
+  const losNueveJuegos = CLASES_DE_CARTA.map((clase) => ({ clase, texto: retratoDeLaCarta(clase)?.explicacion }));
+  const lasVeintiuna = [
+    ...losNueveJuegos.map((j) => j.texto),
+    ...losDosPremios.map((p) => p.explicacion),
+  ];
+
+  /* 1. LAS ONCE FILAS ESTÁN Y NINGUNA ESTÁ VACÍA.
+   *
+   * El compilador ya exige las nueve filas por el `Record<ClaseDeCarta, …>`; lo que el
+   * compilador no mira es que una frase esté en blanco, y una carta sin texto es la que
+   * nadie mira hasta que un jugador la compra. */
+  comprobar(
+    'las nueve clases y los dos premios traen sus tres frases, y ninguna en blanco',
+    lasVeintiuna.length === 11 &&
+      lasVeintiuna.every((t) => (t?.hace ?? '').trim().length > 0 && (t?.consigues ?? '').trim().length > 0 && (t?.usas ?? '').trim().length > 0),
+    lasVeintiuna.map((t) => [t?.hace.length, t?.consigues.length, t?.usas.length]),
+  );
+
+  /* 3. NINGUNA SE REPITE DONDE NO DEBE, Y LOS CINCO TÍTULOS SÍ COMPARTEN.
+   *
+   * Que los cinco títulos digan lo mismo se AFIRMA, no se tolera: lo dice la cabecera de
+   * `ClaseDeCarta` («cuestan lo mismo, valen lo mismo y hacen lo mismo»), y si un día un
+   * título deja de compartirlo será porque alguien lo decidió y tuvo que tirar esta línea. */
+  const delTitulo = canonico(retratoDeLaCarta('faro')?.explicacion);
+  comprobar(
+    'los cinco títulos comparten palabra por palabra sus tres frases',
+    losNueveJuegos.filter((j) => esTitulo(j.clase)).every((j) => canonico(j.texto) === delTitulo) &&
+      losNueveJuegos.filter((j) => esTitulo(j.clase)).length === 5,
+    losNueveJuegos.filter((j) => esTitulo(j.clase)).map((j) => j.clase),
+  );
+  /*
+   * ═══ Y CADA JUEGO DE FRASES VIAJA CON EL NOMBRE DE SU NAIPE ═══
+   *
+   * No es adorno para los detalles de un fallo: las redes de números de más abajo dejaban
+   * de valer justamente por perder este dato. Con las veintiuna frases en un montón sin
+   * dueño, «tres» estaba permitido en cualquiera de ellas porque `GUARDIA_MINIMA` vale
+   * tres, y «cinco» en cualquiera porque `VADO_MINIMO` vale cinco. Un permiso que se
+   * concede a todo el mundo no vigila a nadie.
+   */
+  const losSieteConNombre: Array<[string, ExplicacionDeLaCarta | undefined]> = [
+    ...losNueveJuegos.filter((j) => !esTitulo(j.clase)).map((j): [string, ExplicacionDeLaCarta | undefined] => [retratoDeLaCarta(j.clase)?.nombre ?? j.clase, j.texto]),
+    ['los títulos', retratoDeLaCarta('faro')?.explicacion],
+    ...losDosPremios.map((p): [string, ExplicacionDeLaCarta | undefined] => [p.nombre, p.explicacion]),
+  ];
+  const losSieteJuegos = losSieteConNombre.map(([, texto]) => texto);
+  comprobar(
+    'y los siete juegos de frases —las cuatro que se juegan, el de los títulos y los dos premios— son distintos entre sí',
+    losSieteJuegos.length === 7 && new Set(losSieteJuegos.map((t) => canonico(t))).size === 7,
+    losSieteJuegos.map((t) => t?.hace),
+  );
+
+  /* 4. EL PRESUPUESTO SE CUMPLE, Y SE CUENTA EN RENGLONES.
+   *
+   * El tope viejo era de caracteres —145 las tres juntas— y dejó pasar dos frases que
+   * ocupaban TRES renglones: una de 52 y otra de 51, las dos cómodas dentro del tope. Un
+   * tope en caracteres no ve dónde cae el corte. El de 46 caracteres se conserva como
+   * segunda red y no como la principal. */
+  const lasVeintiunaConNaipe: Array<[string, 'hace' | 'consigues' | 'usas', string]> = losSieteConNombre.flatMap(
+    ([naipe, t]): Array<[string, 'hace' | 'consigues' | 'usas', string]> => [
+      [naipe, 'hace', t?.hace ?? ''],
+      [naipe, 'consigues', t?.consigues ?? ''],
+      [naipe, 'usas', t?.usas ?? ''],
+    ],
+  );
+  const todasLasFrases = lasVeintiunaConNaipe.map(([, , frase]) => frase);
+  const gordas = todasLasFrases.filter((f) => renglonesDe(f) > RENGLONES_DE_UNA_FRASE);
+  comprobar(
+    'las veintiuna frases caben en dos renglones del lienzo peor: se enseñan enteras o no se enseñan',
+    todasLasFrases.length === 21 && gordas.length === 0,
+    gordas.map((f) => `${f} (${String(renglonesDe(f))} renglones)`),
+  );
+  const largas = todasLasFrases.filter((f) => f.length > 46);
+  comprobar('y ninguna pasa de 46 caracteres, que es la red de debajo', largas.length === 0, largas);
+
+  /* LOS NÚMEROS SALEN DE LAS CONSTANTES Y NO DE LOS DEDOS DE NADIE.
+   *
+   * Se afirma leyendo la fuente, porque desde fuera una frase compuesta con plantilla y
+   * una escrita a mano se leen igual — y es el día que alguien toque la constante cuando
+   * se nota la diferencia.
+   *
+   * ═══ Y SE LEE EL CÓDIGO, NO LOS COMENTARIOS, PORQUE SI NO NO MIRA NADA ═══
+   *
+   * Escrito sobre el fichero entero, esta comprobación se quedaba VERDE con la frase
+   * cambiada a mano: la cabecera de `EXPLICACION_DEL_TITULO` cita `${VEREDAS_DE_LA_CARTA}`
+   * como ejemplo, y el `includes` la encontraba ahí. Se vio rompiéndola a propósito. Un
+   * comprobador que se conforma con una cita en un comentario es un comprobador verde que
+   * vigila la prosa: el mismo filtro roto que ya está escrito en la memoria de esta casa.
+   * Por eso se quitan las líneas de comentario primero, igual que hace `soloCodigo` en el
+   * último bloque de este fichero. */
+  {
+    const fuente = readFileSync(new URL('../../shared/arcade/juegos/riberas-en-tres.ts', import.meta.url), 'utf8')
+      .split('\n')
+      .filter((l) => !/^\s*(\*|\/\/|\/\*)/.test(l))
+      .join('\n');
+    const conPlantilla: Array<[string, string]> = [
+      ['BIENES_DEL_ANO_BUENO', 'El Año Bueno'],
+      ['VEREDAS_DE_LA_CARTA', 'Las Dos Veredas'],
+      ['PUNTOS_DEL_TITULO', 'los títulos'],
+      ['VADO_MINIMO', 'El Vado Largo'],
+      ['PUNTOS_DEL_VADO', 'El Vado Largo'],
+      ['GUARDIA_MINIMA', 'La Mayor Guardia'],
+      ['PUNTOS_DE_LA_GUARDIA', 'La Mayor Guardia'],
+    ];
+    const sinPlantilla = conPlantilla.filter(([constante]) => !fuente.includes(`\${${constante}}`));
+    comprobar(
+      'las siete cifras de las frases entran por plantilla desde `riberas.ts`: el día que una constante cambie, cambia el texto',
+      sinPlantilla.length === 0,
+      sinPlantilla.map(([constante, naipe]) => `${constante} (${naipe})`),
+    );
+    /*
+     * ═══ LAS CIFRAS QUE SE LEEN SON LAS DE SU NAIPE, Y NINGUNA OTRA ═══
+     *
+     * El tope de antes eximía a mano las dos frases de premio (`/^(2 puntos|1 punto)/`), o
+     * sea que el DOS y el UNO de los premios eran precisamente los dos números que nadie
+     * miraba. Se quitó la exención y se puso en su sitio el juego entero de las siete
+     * constantes —y eso autorizaba de más por el otro lado—: con un solo montón de valores,
+     * el 3 de `GUARDIA_MINIMA` daba permiso para escribir un 3 en cualquiera de las
+     * veintiuna frases, también en las que no hablan de guardias. Un permiso que vale para
+     * todos los naipes no vigila ninguno.
+     *
+     * Así que cada naipe trae LAS SUYAS y ninguna más. Esta tabla es la parte que hay que
+     * mantener a mano —qué regla nombra cada naipe es una decisión y no se deduce de nada—,
+     * y por eso se afirma además que está completa: un naipe nuevo sin fila aquí pone esto
+     * rojo en vez de colarse con permiso para escribir cualquier número.
+     */
+    const CONSTANTES_DEL_NAIPE: ReadonlyArray<[string, readonly number[]]> = [
+      ['La Guardia', []],
+      ['El Año Bueno', [BIENES_DEL_ANO_BUENO]],
+      ['El Acaparamiento', []],
+      ['Las Dos Veredas', [VEREDAS_DE_LA_CARTA]],
+      ['los títulos', [PUNTOS_DEL_TITULO]],
+      ['El Vado Largo', [VADO_MINIMO, PUNTOS_DEL_VADO]],
+      ['La Mayor Guardia', [GUARDIA_MINIMA, PUNTOS_DE_LA_GUARDIA]],
+    ];
+    const susNumeros = new Map<string, readonly number[]>(CONSTANTES_DEL_NAIPE);
+    const sinFila = losSieteConNombre.map(([naipe]) => naipe).filter((naipe) => !susNumeros.has(naipe));
+    comprobar(
+      'la tabla de qué números puede nombrar cada naipe cubre los siete y ni uno más: un naipe nuevo sin fila no hereda el permiso de otro',
+      susNumeros.size === 7 && sinFila.length === 0,
+      { sinFila, filas: [...susNumeros.keys()] },
+    );
+    const cifrasAjenas = lasVeintiunaConNaipe.flatMap(([naipe, campo, f]) => {
+      const suyas = new Set((susNumeros.get(naipe) ?? []).map((n) => String(n)));
+      return (f.match(/\d+/g) ?? []).filter((c) => !suyas.has(c)).map((c) => `${c} en ${naipe}.${campo}: «${f}»`);
+    });
+    comprobar(
+      'y las cifras que se leen en cada frase son las de las constantes de SU naipe, sin una sola exención escrita a mano',
+      cifrasAjenas.length === 0,
+      cifrasAjenas,
+    );
+
+    /*
+     * ═══ Y LOS NÚMEROS ESCRITOS CON LETRAS, IGUAL: ÉSA ERA LA MITAD QUE NADIE VIGILABA ═══
+     *
+     * «Dos bienes que no le quitas a nadie» y «Dos pasos del Vado Largo» llevaban el dos a
+     * mano, y las concordancias («Vale 1 punto», «2 puntos») también. La cabecera prometía
+     * «el día que una constante cambie, cambia el texto» y eso sólo cubría la cifra: un
+     * `VEREDAS_DE_LA_CARTA` a tres dejaba «Abres 3 veredas» y «Dos pasos» peleándose dentro
+     * del MISMO naipe, las dos frases perfectamente legibles.
+     *
+     * Se compone con las mismas funciones que compone el texto (`cardinal` y `plural`,
+     * importadas de donde viven) y se exige la pareja entera: la palabra Y el nombre que
+     * concuerda. Cambiar una constante sin tocar la frase pone ROJO su naipe, que es
+     * exactamente lo que se pide de esto.
+     */
+    /*
+     * ═══ Y LAS DOS FUNCIONES SE PINCHAN CONTRA PALABRAS ESCRITAS A MANO ═══
+     *
+     * Las parejas de aquí abajo se COMPONEN con `cardinal` y `plural`, o sea con las mismas
+     * dos funciones con que se compone el texto que van a juzgar. Las dos orillas de la
+     * afirmación salían del mismo sitio: el día que `cardinal(2)` devolviera otra palabra, el
+     * naipe cambiaría, la expectativa cambiaría con él y esto seguiría verde. Una
+     * comprobación cuyas dos mitades comparten fuente no mira nada.
+     *
+     * Así que la TABLA se clava aquí, con las palabras escritas a mano en este fichero y una
+     * sola vez. Con el clavo puesto, lo de abajo sí compra algo: tocar `CARDINALES` o
+     * `plural` pone rojo este renglón antes de que nadie mire una frase.
+     */
+    const LA_TABLA_A_MANO: ReadonlyArray<[number, string]> = [
+      [0, 'cero'],
+      [1, 'un'],
+      [2, 'dos'],
+      [3, 'tres'],
+      [4, 'cuatro'],
+      [5, 'cinco'],
+    ];
+    const malDichos = LA_TABLA_A_MANO.filter(([n, palabra]) => cardinal(n) !== palabra);
+    comprobar(
+      'la tabla de cardinales dice cero, un, dos, tres, cuatro y cinco —escrito a mano aquí— y el plural concuerda: sin este clavo, lo de abajo se compone consigo mismo',
+      malDichos.length === 0 &&
+        plural(1, 'punto', 'puntos') === 'punto' &&
+        plural(2, 'punto', 'puntos') === 'puntos' &&
+        plural(0, 'punto', 'puntos') === 'puntos' &&
+        enCabeza('dos') === 'Dos',
+      {
+        malDichos: malDichos.map(([n, palabra]) => `cardinal(${String(n)}) da «${cardinal(n)}» y no «${palabra}»`),
+        uno: plural(1, 'punto', 'puntos'),
+        dos: plural(2, 'punto', 'puntos'),
+        cero: plural(0, 'punto', 'puntos'),
+        enCabeza: enCabeza('dos'),
+      },
+    );
+    const lasParejas: Array<[string, string, string]> = [
+      ['El Año Bueno', 'consigues', `${cardinal(BIENES_DEL_ANO_BUENO).charAt(0).toUpperCase()}${cardinal(BIENES_DEL_ANO_BUENO).slice(1)} ${plural(BIENES_DEL_ANO_BUENO, 'bien', 'bienes')}`],
+      ['El Año Bueno', 'hace', `${String(BIENES_DEL_ANO_BUENO)} ${plural(BIENES_DEL_ANO_BUENO, 'bien', 'bienes')}`],
+      ['Las Dos Veredas', 'consigues', `${cardinal(VEREDAS_DE_LA_CARTA).charAt(0).toUpperCase()}${cardinal(VEREDAS_DE_LA_CARTA).slice(1)} ${plural(VEREDAS_DE_LA_CARTA, 'paso', 'pasos')}`],
+      ['Las Dos Veredas', 'hace', `${String(VEREDAS_DE_LA_CARTA)} ${plural(VEREDAS_DE_LA_CARTA, 'vereda', 'veredas')}`],
+      ['los títulos', 'hace', `${String(PUNTOS_DEL_TITULO)} ${plural(PUNTOS_DEL_TITULO, 'punto', 'puntos')}`],
+      ['El Vado Largo', 'consigues', `${String(PUNTOS_DEL_VADO)} ${plural(PUNTOS_DEL_VADO, 'punto', 'puntos')}`],
+      ['La Mayor Guardia', 'consigues', `${String(PUNTOS_DE_LA_GUARDIA)} ${plural(PUNTOS_DE_LA_GUARDIA, 'punto', 'puntos')}`],
+    ];
+    const porNombre = new Map<string, { readonly hace: string; readonly consigues: string; readonly usas: string } | undefined>([
+      ['El Año Bueno', retratoDeLaCarta('ano-bueno')?.explicacion],
+      ['Las Dos Veredas', retratoDeLaCarta('dos-veredas')?.explicacion],
+      ['los títulos', retratoDeLaCarta('faro')?.explicacion],
+      ['El Vado Largo', losDosPremios.find((p) => p.nombre === 'El Vado Largo')?.explicacion],
+      ['La Mayor Guardia', losDosPremios.find((p) => p.nombre === 'La Mayor Guardia')?.explicacion],
+    ]);
+    /*
+     * SE MIRA LA PALABRA ENTERA Y NO UN TROZO. Con un `includes` a secas, «1 puntos»
+     * escrito a mano pasaba en verde por llevar «1 punto» dentro, y ése es exactamente el
+     * fallo de concordancia que esto viene a cazar. Se vio fallando así antes de cerrarlo.
+     */
+    const dicheEntero = (donde: string, dice: string): boolean =>
+      new RegExp(`(^|[^0-9A-Za-zÁÉÍÓÚÜÑáéíóúüñ])${dice}([^0-9A-Za-zÁÉÍÓÚÜÑáéíóúüñ]|$)`).test(donde);
+    const sinConcordar = lasParejas.filter(([naipe, campo, dice]) => !dicheEntero(porNombre.get(naipe)?.[campo as 'hace' | 'consigues'] ?? '', dice));
+    comprobar(
+      'la palabra del número y el plural que la acompaña también salen de la constante: cambiarla pone rojo el texto que la nombra con letras',
+      sinConcordar.length === 0 && porNombre.size === 5 && [...porNombre.values()].every((e) => e !== undefined),
+      sinConcordar.map(([naipe, campo, dice]) => `${naipe}.${campo} no dice «${dice}»: «${String(porNombre.get(naipe)?.[campo as 'hace' | 'consigues'])}»`),
+    );
+
+    /*
+     * Y LA RED DE DEBAJO: ningún cardinal escrito de dos para arriba que no valga lo que
+     * vale una constante. Las parejas de arriba vigilan los cuatro sitios donde HOY hay un
+     * número con letras; esto vigila el sitio donde alguien escriba el quinto.
+     */
+    const CARDINALES_ESCRITOS: readonly string[] = ['dos', 'tres', 'cuatro', 'cinco', 'seis', 'siete', 'ocho', 'nueve', 'diez', 'once', 'doce'];
+    const cardinalesAjenos = lasVeintiunaConNaipe.flatMap(([naipe, campo, f]) => {
+      const suyos = new Set((susNumeros.get(naipe) ?? []).map((n) => cardinal(n)));
+      return CARDINALES_ESCRITOS.filter(
+        (c) => new RegExp(`(^|[^a-záéíóúñ])${c}([^a-záéíóúñ]|$)`, 'i').test(f) && !suyos.has(c),
+      ).map((c) => `${c} en ${naipe}.${campo}: «${f}»`);
+    });
+    comprobar(
+      'y ningún número escrito con letras que no valga lo que vale una constante DE ESE NAIPE: el quinto que alguien escriba a mano se ve aquí',
+      cardinalesAjenos.length === 0,
+      cardinalesAjenos,
+    );
+  }
+
+  /* 5. NO SE DICE DOS VECES LO MISMO.
+   *
+   * Esta casa ya tropezó con eso: el `title` de `formulario.tsx` repetía la ayuda como
+   * descripción y se fue entero por «dos lecturas de la misma frase por botón». Así que
+   * ninguna de las veintiuna puede coincidir BYTE A BYTE con una `ayuda` del mazo o de
+   * revelar. Se recogen de una mesa de verdad, con las cuatro clases jugables y un título
+   * en la mano y con qué comprar, no de una lista escrita aquí. */
+  {
+    const conLasCuatro = escenarioDeMazo({
+      bienes: [['sal', 'piedra', 'grano'], ['limo'], ['junco']],
+      manos: [
+        [
+          { carta: 'c1:guardia', comprada: 0 },
+          { carta: 'c2:ano-bueno', comprada: 0 },
+          { carta: 'c3:acaparamiento', comprada: 0 },
+          { carta: 'c4:dos-veredas', comprada: 0 },
+          { carta: 'c5:faro', comprada: 0 },
+        ],
+        [],
+        [],
+      ],
+    });
+    const suyas = opcionesEn(mesaSobre('RIB-3D-AYUDAS', conLasCuatro, [...TRES]), 'A');
+    const delMazo = suyas.filter((o) => TIPOS_QUE_PINTA_LA_MANO.includes(o.tipo) || o.tipo === COMPRAR);
+    const clasesOfrecidas = new Set(delMazo.map((o) => o.tipo));
+    comprobar(
+      'la mesa ofrece las cuatro clases jugables, revelar y comprar, o esto no compararía nada',
+      [GUARDIA, ANO_BUENO, ACAPARAMIENTO, DOS_VEREDAS, REVELAR, COMPRAR].every((t) => clasesOfrecidas.has(t)),
+      [...clasesOfrecidas],
+    );
+    const ayudas = new Set(delMazo.map((o) => o.ayuda ?? ''));
+    const repetidas = todasLasFrases.filter((f) => ayudas.has(f));
+    comprobar(
+      'ninguna de las veintiuna frases repite byte a byte una `ayuda` del mazo: no se lee dos veces lo mismo',
+      repetidas.length === 0,
+      repetidas,
+    );
+  }
+
+  /* ── 6. LA VACUNA DE LA GUARDIA: SE LE PREGUNTA AL JUEGO, Y NO A UN CALENDARIO ──
+   *
+   * Es la comprobación más importante de este encargo, y está atada a una FASE y no a una
+   * fecha. Hoy una guardia sólo se puede jugar después de tirar —`jugarLaGuardia` empieza
+   * con `if (yo < 0 || !estado.tirado)`, y `opcionesDeRiberas` antes de tirar se va por su
+   * `return` con TIRAR y revelar y nada más—, así que su frase dice «Tras tirar».
+   *
+   * Con el estiaje, Miguel pidió por escrito que la guardia se pueda jugar «incluso antes
+   * de lanzar los dados». El día que la fase 3 de `docs/EL-LADRON-DE-RIBERAS.md` («La
+   * guardia mueve») quite ese `!estado.tirado`, esta comprobación se pone ROJA — y eso es
+   * lo que tiene que pasar. Ponerla verde otra vez es cambiar la fila de `RETRATO_DE_LA_CARTA`
+   * por las tres frases del estiaje. Sin ella, la regla cambiaría y el cartel seguiría
+   * explicando la de antes con toda la batería en verde, que es la clase de fallo que este
+   * repositorio tiene escrita como la peor. */
+  {
+    const conGuardiaVieja = escenarioDeMazo({
+      bienes: [['limo'], ['junco'], ['sal']],
+      manos: [[{ carta: 'c1:guardia', comprada: 0 }], [], []],
+    });
+    const antesDeTirar: EstadoDeRiberas = { ...conGuardiaVieja, tirado: false };
+    const guardiasAntes = opcionesEn(mesaSobre('RIB-3D-VAC-1', antesDeTirar, [...TRES]), 'A').filter((o) => o.tipo === GUARDIA);
+    const guardiasDespues = opcionesEn(mesaSobre('RIB-3D-VAC-2', conGuardiaVieja, [...TRES]), 'A').filter((o) => o.tipo === GUARDIA);
+
+    /* EL ESCENARIO TIENE QUE VALER: con los dados ya tirados la guardia SÍ se ofrece. Sin
+     * esta línea, una guardia que no se ofreciera nunca —mano vacía, víctimas sin bienes,
+     * carta comprada hoy— dejaría la vacuna verde sin haber preguntado nada. */
+    comprobar(
+      'la guardia de la mano se ofrece DESPUÉS de tirar, o la vacuna de abajo no estaría preguntando por la regla',
+      guardiasDespues.length > 0 && antesDeTirar.turno === 0 && antesDeTirar.tirado === false,
+      { despues: guardiasDespues.length, turno: antesDeTirar.turno },
+    );
+
+    const laOfreceAntesDeTirar = guardiasAntes.length > 0;
+    const suUsas = retratoDeLaCarta('guardia')?.explicacion.usas ?? '';
+    comprobar(
+      'el texto de la guardia dice «Tras tirar» si y sólo si el juego no la ofrece antes de tirar: el día que la fase del estiaje le dé la vuelta, esto se pone rojo',
+      suUsas.startsWith('Tras tirar') === !laOfreceAntesDeTirar,
+      { ofreceAntesDeTirar: laOfreceAntesDeTirar, usas: suUsas },
+    );
+    comprobar(
+      'y su «qué hace» cuenta la regla de hoy: roba, y no mueve nada por el tablero',
+      (retratoDeLaCarta('guardia')?.explicacion.hace ?? '').includes('quitas') && !canonico(retratoDeLaCarta('guardia')?.explicacion).includes('estiaje'),
+      retratoDeLaCarta('guardia')?.explicacion,
+    );
+
+    /*
+     * ═══ 6 bis. LAS OTRAS DOS PUERTAS, PREGUNTADAS IGUAL QUE LA PRIMERA ═══
+     *
+     * «Tras tirar» era UNA de las tres condiciones de `sePuedeJugarLaCarta` y la frase la
+     * decía como si fueran todas. Las otras dos (una carta al turno, y nunca la comprada
+     * hoy) se preguntan aquí de la misma manera: sobre una mesa de verdad, mirando si el
+     * juego ofrece la jugada, y exigiendo que la frase las diga si y sólo si el juego las
+     * impone. El día que el §1.4 o el §1.5 cambien, esto se pone rojo y volverlo verde es
+     * reescribir `USAS_DE_LA_JUGADA`.
+     *
+     * La ironía que hace grave esto: el naipe que un recién llegado mira primero es el que
+     * acaba de comprar, o sea justo el único que el texto le explicaba cómo jugar y el
+     * juego no le dejaba.
+     */
+    const laDeHoy = escenarioDeMazo({
+      bienes: [['limo'], ['junco'], ['sal']],
+      manos: [[{ carta: 'c1:acaparamiento', comprada: 1 }], [], []],
+    });
+    const ofreceLaDeHoy = opcionesEn(mesaSobre('RIB-3D-VAC-3', laDeHoy, [...TRES]), 'A').some((o) => o.tipo === ACAPARAMIENTO);
+    const laDeAyer = escenarioDeMazo({
+      bienes: [['limo'], ['junco'], ['sal']],
+      manos: [[{ carta: 'c1:acaparamiento', comprada: 0 }], [], []],
+    });
+    const ofreceLaDeAyer = opcionesEn(mesaSobre('RIB-3D-VAC-4', laDeAyer, [...TRES]), 'A').some((o) => o.tipo === ACAPARAMIENTO);
+    comprobar(
+      'el escenario vale: la MISMA carta se ofrece comprada ayer y no comprada hoy, o lo de abajo no estaría preguntando por la regla',
+      ofreceLaDeAyer && !ofreceLaDeHoy && laDeHoy.turnosAbiertos === 1,
+      { deAyer: ofreceLaDeAyer, deHoy: ofreceLaDeHoy, turnosAbiertos: laDeHoy.turnosAbiertos },
+    );
+    const conOtraYaJugada = escenarioDeMazo({
+      bienes: [['limo'], ['junco'], ['sal']],
+      manos: [[{ carta: 'c1:acaparamiento', comprada: 0 }], [], []],
+    });
+    const ofreceLaSegunda = opcionesEn(
+      mesaSobre('RIB-3D-VAC-5', { ...conOtraYaJugada, cartaJugada: true }, [...TRES]),
+      'A',
+    ).some((o) => o.tipo === ACAPARAMIENTO);
+    comprobar(
+      'y con una carta ya jugada este turno la segunda no se ofrece: la regla de «una al turno» existe de verdad',
+      !ofreceLaSegunda,
+    );
+    comprobar(
+      'las tres puertas están DICHAS en el «cómo se usa»: tras tirar, una al turno y la nueva no, y cada una si y sólo si el juego la impone',
+      suUsas.startsWith('Tras tirar') === !laOfreceAntesDeTirar &&
+        /una al turno/.test(suUsas) === !ofreceLaSegunda &&
+        /la nueva no/.test(suUsas) === !ofreceLaDeHoy,
+      { usas: suUsas, antesDeTirar: laOfreceAntesDeTirar, segunda: ofreceLaSegunda, deHoy: ofreceLaDeHoy },
+    );
+  }
+
+  /* ── 6 ter. CON UN TÍTULO SIN REVELAR NO SE GANA, Y AHORA EL NAIPE LO DICE ──
+   *
+   * El «qué consigues» de los cinco títulos decía «Ese punto: secreto tuyo hasta que la
+   * enseñes», y de ahí un recién llegado sale creyendo que guardarlo es gratis y que el
+   * punto ya cuenta. `puntosDe` dice lo contrario en su cabecera («CON UN TÍTULO SIN
+   * REVELAR NO SE GANA») y `puedeHaberGanado` cuenta `puntosDe` y no `puntosOcultosDe`.
+   *
+   * Así que no se lee la cabecera: SE JUEGA. Se monta un colono a un punto de ganar con un
+   * título en la mano, se comprueba que la partida NO se ha terminado, se revela por el
+   * árbitro y se comprueba que sí. Y con esa respuesta en la mano se le exige a la frase
+   * que hable de enseñar y de ganar. El día que el §1.6 cambie y los títulos ocultos
+   * cuenten, la primera mitad se pone roja antes que ninguna otra cosa. */
+  {
+    const casiOcho = escenarioDeMazo({
+      bienes: [['junco', 'limo'], ['junco'], ['sal']],
+      /*
+       * B TAMBIÉN LLEVA UN TÍTULO EN LA MANO, y no es adorno: sin él, «a B no se le ofrece
+       * revelar» sería verdad por no tener carta ninguna, y la comprobación de la puerta del
+       * turno propio no estaría preguntando nada. Con el título puesto, lo único que le falta
+       * a B es el turno.
+       */
+      manos: [[{ carta: 'c1:faro', comprada: 0 }], [{ carta: 'c2:huerto', comprada: 0 }], []],
+    });
+    /* Siete puntos en público: tres torres y una choza, más la que trae el escenario. */
+    const conSiete: EstadoDeRiberas = {
+      ...casiOcho,
+      colonos: casiOcho.colonos.map((c, i) =>
+        i !== 0
+          ? c
+          : {
+              ...c,
+              chozas: [verticeDeHex({ q: -2, r: 0 }, 0)],
+              torres: [verticeDeHex({ q: 0, r: 0 }, 0), verticeDeHex({ q: 2, r: 0 }, 0), verticeDeHex({ q: 0, r: 1 }, 0)],
+            },
+      ),
+    };
+    const mesaDelTitulo = mesaSobre('RIB-3D-TITULO', conSiete, [...TRES]);
+    const antesDeEnsenar = estadoDe(mesaDelTitulo);
+    const revelar = opcionesEn(mesaDelTitulo, 'A').find((o) => o.tipo === REVELAR);
+    /*
+     * SE HACE UN MOVIMIENTO QUE NO DA PUNTOS (una vereda vale cero) y NO se pregunta por el
+     * `momento` del estado montado a mano. Es la diferencia entre comprobar la regla y
+     * comprobar lo que uno mismo escribió: `puedeHaberGanado` sólo corre al final de un
+     * movimiento, así que un estado con `momento: 'jugando'` puesto por el escenario diría
+     * «jugando» aunque los títulos ocultos ganaran. Trazando, el juez habla.
+     */
+    const laVereda = opcionesEn(mesaDelTitulo, 'A').find(
+      (o) => o.tipo === ALZAR && (o.carga as { que?: unknown }).que === 'vereda',
+    );
+    const trasLaVereda = laVereda === undefined ? antesDeEnsenar : estadoDe(mover(mesaDelTitulo, 'A', laVereda));
+    const despues = revelar === undefined ? antesDeEnsenar : estadoDe(mover(mesaDelTitulo, 'A', revelar));
+    comprobar(
+      'con SIETE puntos en público y el octavo en un título sin revelar, un movimiento sin puntos NO acaba la partida: el título guardado no gana',
+      laVereda !== undefined && revelar !== undefined && trasLaVereda.momento === 'jugando' && trasLaVereda.ganadores.length === 0,
+      { momento: trasLaVereda.momento, ganadores: trasLaVereda.ganadores, hayVereda: laVereda !== undefined, hayRevelar: revelar !== undefined },
+    );
+    comprobar(
+      'y en cuanto se enseña, se acaba: ése es el punto que el naipe tiene que contar y el que decía que era secreto y ya estaba',
+      despues.momento === 'terminada' && despues.ganadores.includes('A'),
+      { momento: despues.momento, ganadores: despues.ganadores },
+    );
+    const suConsigues = retratoDeLaCarta('faro')?.explicacion.consigues ?? '';
+    comprobar(
+      'el «qué consigues» del título cuenta esa regla, enseñar y ganar, y no se queda en el secreto, que es lo que dejaba al lector peor de lo que estaba',
+      /enseñar|enseñas|enseñarla|enseñarlo/.test(suConsigues) && /gana|ganas|cuenta/.test(suConsigues),
+      suConsigues,
+    );
+
+    /*
+     * ═══ Y EL GESTO SUBE A ESA MISMA FRASE, PORQUE LA TERCERA NO SIEMPRE SE PINTA ═══
+     *
+     * El cómo se enseña vivía en el «cómo se usa», o sea en la frase que en los dos lienzos
+     * estrechos NO se lee: allí caben dos, y `verify:escritorio` lo mide contra las manos de
+     * la escena. Quedaba «sin enseñarla no ganas» sin decir en ningún sitio CÓMO se enseña,
+     * que es el mismo delito de nombrar una condición y callar la que hace falta para
+     * cumplirla, girado. Así que la frase que SÍ se pinta lleva la regla y el gesto.
+     */
+    comprobar(
+      'y lleva además el GESTO, porque ésta es la frase que se pinta en los dos lienzos estrechos donde sólo caben dos',
+      /suéltala/i.test(suConsigues) && /hueco/i.test(suConsigues),
+      suConsigues,
+    );
+
+    /*
+     * ═══ Y EL «CÓMO SE USA» QUE QUEDA LIBRE NOMBRA SU PUERTA, QUE NO ES LA DE LAS OTRAS ═══
+     *
+     * `revelarUnTitulo` empieza por `elTurnoEsDe` y ahí se le acaban las condiciones: ni
+     * mira `tirado`, ni `cartaJugada`, ni el sello de compra. O sea que un título no espera
+     * a los dados como esperan las cuatro que se juegan, y su frase no puede empezar por
+     * «Tras tirar». Las tres mitades se le preguntan a la mesa y no a esta cabecera: que se
+     * ofrezca ANTES de tirar, que NO se le ofrezca a quien tiene un título y no el turno, y
+     * que enseñarlo deje `cartaJugada` en falso. El día que revelar cueste la jugada o exija
+     * los dados, esto se pone rojo y volverlo verde es reescribir la frase.
+     */
+    const sinTirar = mesaSobre('RIB-3D-TITULO-SIN-TIRAR', { ...conSiete, tirado: false }, [...TRES]);
+    const revelarAntesDeTirar = opcionesEn(sinTirar, 'A').some((o) => o.tipo === REVELAR);
+    const seLoOfrecenAB = opcionesEn(mesaDelTitulo, 'B').some((o) => o.tipo === REVELAR);
+    comprobar(
+      'a B, que tiene un título en la mano y no tiene el turno, NO se le ofrece revelar: la única puerta del título es el turno propio',
+      !seLoOfrecenAB && (conSiete.colonos[1]?.mano.length ?? 0) === 1,
+      { seLoOfrecenAB, manoDeB: conSiete.colonos[1]?.mano },
+    );
+    comprobar(
+      'y en el turno propio se ofrece también ANTES de tirar, y enseñarlo no gasta la jugada: las dos cosas que el «cómo se usa» promete',
+      revelarAntesDeTirar && despues.cartaJugada === false,
+      { antesDeTirar: revelarAntesDeTirar, cartaJugada: despues.cartaJugada },
+    );
+    const suUsas = retratoDeLaCarta('faro')?.explicacion.usas ?? '';
+    comprobar(
+      'así que su frase dice el turno propio y que no gasta la jugada, y NO dice «Tras tirar», que es lo que dicen las cuatro que sí esperan a los dados',
+      /en tu turno/i.test(suUsas) &&
+        /no gasta la jugada/i.test(suUsas) &&
+        /tras tirar/i.test(suUsas) === !revelarAntesDeTirar,
+      { usas: suUsas, antesDeTirar: revelarAntesDeTirar },
+    );
+  }
+
+  /* ── 6 quater. EL VADO SE PIERDE DE DOS MANERAS, Y EL NAIPE SÓLO CONTABA UNA ──
+   *
+   * «2 puntos mientras nadie te supere» es MEDIA regla. La cabecera de `recalcularElVado`
+   * tiene la otra escrita en mayúsculas —«Si el dueño baja del mínimo, porque alguien le
+   * partió la cadena con una choza, el premio queda VACANTE»— y el código la cumple: el
+   * `sigueSiendoSuyo` exige `largoActual >= VADO_MINIMO`. O sea que el Vado se pierde sin
+   * que nadie te supere, y quien leía el naipe no tenía manera de enterarse: se le van dos
+   * puntos por una choza ajena que ni siquiera es una vereda.
+   *
+   * Así que no se lee la cabecera: SE JUEGA. Se monta al dueño con su cadena de cinco y con
+   * La Mayor Guardia, se le parte la cadena por el vértice de en medio con una choza de B,
+   * se hace un movimiento por el árbitro para que hable el reductor, y se exige que el Vado
+   * quede VACANTE y que La Mayor Guardia siga siendo suya. Lo segundo es la otra mitad:
+   * `recalcularLaGuardia` es la misma función con el mismo `sigueSiendoSuya`, pero lo que
+   * cuenta —`c.guardias`— sólo sube, así que esa rama no se puede dar y su frase tiene razón
+   * al contar UNA sola manera. El día que una de las dos reglas cambie, se pone roja la
+   * frase que dejó de ser verdad y no la otra. */
+  {
+    const conCadenaYGuardia = escenarioDeMazo({
+      bienes: [['junco', 'limo'], ['sal'], ['grano']],
+      guardias: [GUARDIA_MINIMA, 0, 0],
+      veredas: [CADENA_DE_CINCO],
+    });
+    comprobar(
+      'A tiene el Vado con su cadena entera y también La Mayor Guardia, o lo de abajo no le quitaría nada a nadie',
+      conCadenaYGuardia.vado.de === 'A' &&
+        conCadenaYGuardia.vado.largo >= VADO_MINIMO &&
+        conCadenaYGuardia.guardia.de === 'A',
+      { vado: conCadenaYGuardia.vado, guardia: conCadenaYGuardia.guardia },
+    );
+    /* El vértice de en medio: el que comparten la segunda arista de la cadena y la tercera. */
+    const deLaTercera = new Set(verticesDeArista(CADENA_DE_CINCO[2] as LlaveDeArista));
+    const corte = verticesDeArista(CADENA_DE_CINCO[1] as LlaveDeArista).find((v) => deLaTercera.has(v));
+    const partida: EstadoDeRiberas =
+      corte === undefined
+        ? conCadenaYGuardia
+        : {
+            ...conCadenaYGuardia,
+            colonos: conCadenaYGuardia.colonos.map((c, i) => (i !== 1 ? c : { ...c, chozas: [...c.chozas, corte] })),
+          };
+    comprobar(
+      'la choza de B le parte la cadena a A: su vado más largo baja del mínimo, y ni B ni C llegan a él ni de lejos',
+      corte !== undefined &&
+        largoDelVado(partida.colonos[0]?.veredas ?? [], [corte]) < VADO_MINIMO &&
+        partida.colonos.slice(1).every((c) => c.veredas.length < VADO_MINIMO),
+      {
+        corte,
+        largoDeA: corte === undefined ? null : largoDelVado(partida.colonos[0]?.veredas ?? [], [corte]),
+        losDemas: partida.colonos.slice(1).map((c) => c.veredas.length),
+      },
+    );
+    const mesaDelCorte = mesaSobre('RIB-3D-CORTE', partida, [...TRES]);
+    const otraVereda = opcionesEn(mesaDelCorte, 'A').find(
+      (o) => o.tipo === ALZAR && (o.carga as { que?: unknown }).que === 'vereda',
+    );
+    const trasElCorte = otraVereda === undefined ? partida : estadoDe(mover(mesaDelCorte, 'A', otraVereda));
+    comprobar(
+      'y en el primer movimiento el premio queda VACANTE sin que nadie le haya superado: se pierde por una choza ajena',
+      otraVereda !== undefined && trasElCorte.vado.de === null,
+      { vado: trasElCorte.vado, hayVereda: otraVereda !== undefined },
+    );
+    comprobar(
+      'y La Mayor Guardia NO se le va con esa misma choza: sus guardias no bajan, así que ese premio sólo se pierde de una manera',
+      trasElCorte.guardia.de === 'A',
+      trasElCorte.guardia,
+    );
+    const consiguesDelVado = losDosPremios.find((p) => p.nombre === 'El Vado Largo')?.explicacion.consigues ?? '';
+    const consiguesDeLaGuardia = losDosPremios.find((p) => p.nombre === 'La Mayor Guardia')?.explicacion.consigues ?? '';
+    comprobar(
+      'el naipe del Vado cuenta LAS DOS maneras de perderlo —que te superen y que te corten—, que es lo que el reductor acaba de hacer',
+      /super/i.test(consiguesDelVado) && /cort/i.test(consiguesDelVado),
+      consiguesDelVado,
+    );
+    comprobar(
+      'y el de La Mayor Guardia sigue contando UNA sola, porque una sola tiene: añadirle el corte ahí sería mentir del otro lado',
+      /super/i.test(consiguesDeLaGuardia) && !/cort/i.test(consiguesDeLaGuardia),
+      consiguesDeLaGuardia,
+    );
+  }
+
+  /* ── 6 quinquies. LAS DOS VEREDAS PROMETEN DOS Y EL JUEGO PUEDE DAR UNA, EN SILENCIO ──
+   *
+   * `jugarLasDosVeredas` no pone ni una vereda: deja `veredasGratis` en dos y las veredas se
+   * alzan después, una a una. El crédito muere por dos caminos que el código tiene escritos
+   * —`trazar` lo apaga si la primera se comió el último hueco, y `siguienteTurno` lo pone a
+   * cero al pasar—, y el comentario de este segundo lo reconoce por escrito: «nadie que mire
+   * el tablero sabría que existe». La decisión es buena; lo que no podía quedarse es que
+   * tampoco se dijera. En la pantalla no hay contador hasta que YA hay crédito (la `ayuda`
+   * de alzar), así que el naipe es el único sitio donde el plazo se lee ANTES de gastar la
+   * carta.
+   *
+   * Se juega entero sobre una mesa de verdad: se juega la carta, se pone UNA, se pasa, y se
+   * exige que el crédito haya muerto. */
+  {
+    const conLaCarta = escenarioDeMazo({
+      bienes: [['limo'], ['junco'], ['sal']],
+      manos: [[{ carta: 'c1:dos-veredas', comprada: 0 }], [], []],
+    });
+    const mesaDeLasVeredas = mesaSobre('RIB-3D-VEREDAS', conLaCarta, [...TRES]);
+    const jugarla = opcionesEn(mesaDeLasVeredas, 'A').find((o) => o.tipo === DOS_VEREDAS);
+    const conCredito = jugarla === undefined ? mesaDeLasVeredas : mover(mesaDeLasVeredas, 'A', jugarla);
+    const veredasDe = (e: EstadoDeRiberas): number => e.colonos[0]?.veredas.length ?? 0;
+    comprobar(
+      'jugar Las Dos Veredas no pone ni una vereda: deja el crédito en dos y el tablero como estaba',
+      jugarla !== undefined &&
+        estadoDe(conCredito).veredasGratis === VEREDAS_DE_LA_CARTA &&
+        veredasDe(estadoDe(conCredito)) === veredasDe(conLaCarta),
+      { gratis: estadoDe(conCredito).veredasGratis, antes: veredasDe(conLaCarta), despues: veredasDe(estadoDe(conCredito)) },
+    );
+    const primeraVereda = opcionesEn(conCredito, 'A').find(
+      (o) => o.tipo === ALZAR && (o.carga as { que?: unknown }).que === 'vereda',
+    );
+    const conUna = primeraVereda === undefined ? conCredito : mover(conCredito, 'A', primeraVereda);
+    comprobar(
+      'con la primera puesta queda UNA de crédito, y es ésa la que se puede perder sin que nadie lo vea',
+      primeraVereda !== undefined &&
+        estadoDe(conUna).veredasGratis === VEREDAS_DE_LA_CARTA - 1 &&
+        veredasDe(estadoDe(conUna)) === veredasDe(conLaCarta) + 1,
+      { gratis: estadoDe(conUna).veredasGratis, veredas: veredasDe(estadoDe(conUna)) },
+    );
+    /*
+     * ═══ Y AQUÍ EL CÓDIGO DICE UNA COSA Y LAS OPCIONES OTRA, ASÍ QUE SE PREGUNTA ═══
+     *
+     * El comentario de `siguienteTurno` dice «quien juega Las Dos Veredas y luego pasa sin
+     * poner la segunda la pierde». Pasar A PROPÓSITO no se puede: con crédito vivo,
+     * `opcionesDeRiberas` se va por su `if (v.veredasGratis > 0)` con las veredas y revelar
+     * y nada más, así que PASAR no se ofrece. Lo que sí acaba el turno es EL PLAZO —un tic
+     * por `avanzarElReloj`, que es `venceElPlazo` y de ahí `siguienteTurno`—, y ahí el
+     * crédito muere sin que nadie haya tocado nada. Ésa es la pérdida silenciosa de verdad,
+     * y es la que se juega aquí: las dos mitades, que no se puede soltar a mano y que el
+     * reloj sí se lo lleva.
+     */
+    const conCreditoOfrece = opcionesEn(conUna, 'A');
+    comprobar(
+      'con el crédito vivo no se puede pasar a propósito: el juego sólo ofrece veredas y revelar, así que la segunda no se suelta, se pierde',
+      !conCreditoOfrece.some((o) => o.tipo === PASAR) &&
+        conCreditoOfrece.length > 0 &&
+        conCreditoOfrece.every((o) => o.tipo === ALZAR || o.tipo === REVELAR),
+      [...new Set(conCreditoOfrece.map((o) => o.tipo))],
+    );
+    const trasElPlazo = estadoDe(avanzarElReloj(conUna));
+    comprobar(
+      'y cuando vence el plazo el crédito MUERE con el turno: la carta prometía dos y el turno ha dado una, sin un aviso',
+      trasElPlazo.veredasGratis === 0 &&
+        veredasDe(trasElPlazo) === veredasDe(conLaCarta) + 1 &&
+        trasElPlazo.turno !== estadoDe(conUna).turno,
+      { gratis: trasElPlazo.veredasGratis, veredas: veredasDe(trasElPlazo), turno: trasElPlazo.turno },
+    );
+    const suHace = retratoDeLaCarta('dos-veredas')?.explicacion.hace ?? '';
+    comprobar(
+      'así que el naipe dice el PLAZO, que es lo único que separa «abres dos» de una promesa que el juego no siempre cumple',
+      /este turno/i.test(suHace),
+      suHace,
+    );
+  }
+
+  /* ── Y EL TEXTO LLEGA AL NAIPE, QUE ES PARA LO QUE ESTÁ ──
+   *
+   * Los once naipes de la mano, por las dos puertas, con la explicación dentro; y lo que
+   * sale de la traducción entra en la escena de verdad, donde el campo es el mismo por
+   * estructura. Sin esta línea el texto existiría en una tabla que no lo pide nadie. */
+  {
+    const conManoYPremios = escenarioDeMazo({
+      bienes: [['limo'], ['junco'], ['sal']],
+      guardias: [GUARDIA_MINIMA, 0, 0],
+      manos: [
+        [
+          { carta: 'c1:guardia', comprada: 0 },
+          { carta: 'c2:faro', comprada: 0 },
+        ],
+        [],
+        [],
+      ],
+      veredas: [CADENA_DE_CINCO],
+    });
+    const mesa = mesaSobre('RIB-3D-EXPL', conManoYPremios, [...TRES]);
+    const laMano = laManoDeLaIzquierda(vistaEn(mesa, 'A'), opcionesEn(mesa, 'A'), 'A');
+    comprobar(
+      'la mano lleva las cartas y los dos premios, y TODOS traen sus tres frases',
+      laMano.length === 4 && laMano.every((c) => c.explicacion.hace.length > 0 && c.explicacion.consigues.length > 0 && c.explicacion.usas.length > 0),
+      laMano.map((c) => `${c.nombre}: ${c.explicacion.hace}`),
+    );
+    comprobar(
+      'el naipe del premio explica lo que nadie explicaba: aparece solo, no se juega, y ahora dice por qué',
+      laMano.find((c) => c.esPremio === true)?.explicacion.usas.startsWith('Nada') === true,
+      laMano.filter((c) => c.esPremio === true).map((c) => c.explicacion.usas),
+    );
+    /* Y ENTRA EN LA ESCENA DE VERDAD sin traducir nada: los dos contratos encajan por
+     * estructura, así que si un lado cambia el campo esto ni compila. */
+    const comoLaEscenaLoRecibe: readonly CartaDelMazo[] = laMano;
+    const repartida = huecosDeLasCartas(comoLaEscenaLoRecibe, CAMPO_DE_LA_BARRA, PROPORCION, null);
+    comprobar(
+      'la escena reparte esos mismos naipes y el texto sigue dentro de cada uno al salir del reparto',
+      repartida.length === laMano.length && repartida.every((c) => (c.carta.explicacion?.usas ?? '').length > 0),
+      repartida.map((c) => c.carta.explicacion?.usas),
+    );
+  }
+}
+
 /* ═══ 10. CADA MOVIMIENTO SE ENSEÑA UNA VEZ: NI DOS BOTONES NI NINGUNO ═══ */
 {
   const estado = escenarioDeMazo({
@@ -1508,7 +2322,7 @@ const CAMPO_DE_LA_BARRA = (45 * Math.PI) / 180;
 }
 
 /* ═══ EL RECUENTO, PARA QUE NO SE VACÍE SIN QUE NADIE LO NOTE ═══ */
-const MINIMO = 293;
+const MINIMO = 330;
 if (hechas < MINIMO) {
   console.log(`✘ este comprobador debería hacer al menos ${MINIMO} comprobaciones y ha hecho ${hechas}: alguien ha borrado un bloque`);
   process.exit(2);

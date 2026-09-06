@@ -3804,7 +3804,7 @@ function opcionesDelMazo(v: VistaSinTablero, mio: ColonoVisto): Opcion[] {
       tipo: DOS_VEREDAS,
       carga: { carta: suyo },
       rotulo: `${como}`,
-      ayuda: `Alzas ${VEREDAS_DE_LA_CARTA} veredas sin pagarlas, una detrás de otra.`,
+      ayuda: `Alzas ${VEREDAS_DE_LA_CARTA} veredas sin pagarlas, este turno o las pierdes.`,
     });
   }
 

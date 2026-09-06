@@ -2293,11 +2293,18 @@ code {
 }
 
 /*
- * Un mando SÓLO para tecnologías de apoyo: fuera de la vista y del flujo, pero en el árbol
- * y enfocable. Es el «tirar los dados» de la mesa cuando el botón de texto se ha ido al
- * asa del lienzo: un dado que sólo se puede tocar con el ratón sería el primer movimiento
- * del juego inaccesible. No `display: none` ni `visibility: hidden`: los lectores lo
- * saltan.
+ * SÓLO para tecnologías de apoyo: fuera de la vista y del flujo, pero en el árbol y —si es
+ * un mando— enfocable. No `display: none` ni `visibility: hidden`: los lectores lo saltan.
+ *
+ * La llevan dos cosas del lienzo de Riberas, y las dos por el mismo motivo —dentro del
+ * `<canvas>` no se oye nada: tiene UN `accessibilityLabel` para toda la escena—:
+ *
+ *   1. EL BOTÓN DE TIRAR, de cuando el de texto se fue al asa del lienzo: un dado que sólo
+ *      se puede tocar con el ratón sería el primer movimiento del juego inaccesible.
+ *   2. LA LISTA DE LAS EXPLICACIONES DE LOS NAIPES. No se puede pasar el cursor por encima
+ *      de una carta de un lienzo, así que quien navega con lector necesita otra puerta a lo
+ *      que el cartel enseña. Ahí van las TRES frases de cada naipe siempre, quepan o no en
+ *      la banda: lo que se oye no depende del sitio que quede en pantalla.
  */
 .riberas-solo-apoyo {
   position: absolute;
@@ -2310,6 +2317,81 @@ code {
   clip-path: inset(50%);
   border: 0;
   white-space: nowrap;
+}
+
+/*
+ * ═══ EL CARTEL QUE EXPLICA EL NAIPE SEÑALADO ═══
+ *
+ * Interfaz POR ENCIMA del lienzo, no un objeto de la escena: dentro de la escena no hay una
+ * sola letra —sólo contornos compilados de cifras y de dibujos— y escribir ahí la frase más
+ * larga costaría 8.520 triángulos contra un tope de mesa de 4.500. El porqué entero y las
+ * medidas, en `docs/LAS-CARTAS-SE-EXPLICAN.md`.
+ *
+ * ═══ LOS CUATRO NÚMEROS DE SITIO NO ESTÁN AQUÍ, Y ES LA DECISIÓN ═══
+ *
+ * `left`, `right`, `bottom` y `max-height` los pone `elCartelQueCabe` en cada render, y
+ * salen de las MISMAS funciones con las que la escena reparte las tres manos
+ * (`franjaDeLasCartas`, `huecosDeLaBaraja`, `huecosDeLaMesa`). Escritos aquí como
+ * porcentajes serían un segundo reparto: el día que la franja de las cartas se ensanche, el
+ * cartel se quedaría encima de la mano sin que nada se pusiera rojo. Lo que sí vive aquí es
+ * lo que no depende del lienzo: la letra, el relleno y el cromo.
+ *
+ * `padding: 12px` y `line-height: 1.35` NO son decoración: son las dos entradas del
+ * presupuesto de renglones (doce puntos de margen por lado, renglón de `ceil(cuerpo ·
+ * 1,35)`). Y el cuerpo es el de `.opcion-ayuda`, `0.82rem`. Tocar cualquiera de los tres
+ * sin tocar `elCartelQueCabe` descuadra la cuenta, y `verify:escritorio` afirma que dicen
+ * lo mismo.
+ *
+ * CON LA RAÍZ DE ESTA CASA (`106.25 %`, o sea 17 cuando el navegador viene con sus 16) eso
+ * son 13,94 puntos de cuerpo y renglones de 19. Pero esos 17 son un SUELO y no la medida:
+ * el porcentaje está aquí justamente para que la preferencia de tamaño de letra del
+ * navegador siga mandando (punto 2 de la cabecera de esta hoja), así que quien la tenga en
+ * grande pinta con una letra mayor. `elCartelQueCabe` no da por hecho el 17: el cliente le
+ * pasa la raíz que `getComputedStyle` dice de verdad, porque si no el `overflow: hidden` de
+ * aquí abajo se comería el último renglón sin ninguna señal.
+ *
+ * EL FILO VA EN `box-shadow` Y NO EN `border` a propósito: con `box-sizing: border-box` un
+ * borde entra dentro del `max-height` medido, y dos píxeles de borde se comen el último
+ * renglón de la frase que sí cabía. Una sombra no ocupa layout.
+ *
+ * ═══ NO RECIBE UN SOLO PUNTERO ═══
+ *
+ * `pointer-events: none`, siempre y sin botón de cerrar. El cartel vive al pie, encima del
+ * delta, y la única manera de que una ayuda no cambie el juego es que no sea pulsable: un
+ * rectángulo opaco ahí sería un cartel que impide construir donde tapa. Se cierra soltando
+ * la carta o apartando el cursor.
+ *
+ * ═══ Y VACÍO NO SE VE, PERO SIGUE EN EL ÁRBOL ═══
+ *
+ * El `<p>` está siempre montado porque es una región `aria-live`: una que aparece a la vez
+ * que su texto no se anuncia —el lector no vigila lo que no existía—. Vacío se le quitan
+ * fondo, filo y relleno, así que no deja una caja fantasma sobre el tablero.
+ */
+.riberas-cartel {
+  position: absolute;
+  margin: 0;
+  padding: 12px;
+  overflow: hidden;
+  background: var(--teja-alta);
+  color: var(--palabra);
+  border-radius: var(--radio-mando);
+  box-shadow:
+    0 0 0 1px var(--filo),
+    0 14px 30px -18px var(--sombra);
+  font-size: 0.82rem;
+  line-height: 1.35;
+  pointer-events: none;
+}
+
+/* Cada frase en su renglón: es como está medido el presupuesto, y como se lee. */
+.riberas-cartel-frase {
+  display: block;
+}
+
+.riberas-cartel:empty {
+  padding: 0;
+  background: none;
+  box-shadow: none;
 }
 
 /*

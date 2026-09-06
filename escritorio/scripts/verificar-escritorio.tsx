@@ -56,6 +56,7 @@ import type { ContextoMovimiento, ManifiestoDeArcade, Opcion } from '../../share
 import { MUEBLES_DEL_CONTRATO } from '../../shared/arcade/tipos';
 import '../../shared/arcade/juegos';
 import {
+  CLASES_DE_CARTA,
   EMPEZAR_RIBERAS,
   recalcularElVado,
   recalcularLaGuardia,
@@ -85,13 +86,30 @@ import { FIGURAS } from '../../escenas/embarcadero/figuras';
 import { semillaDeCodigo } from '../../escenas/embarcadero/cala';
 /* El sitio del mando de recoger lo dice la escena, no esta hoja: ver `escenas/mesa.ts`. */
 import { MANDO_DE_RECOGER } from '../../escenas/mesa';
-import { MarcadorDeRiberas, RiberasEnTres } from '../src/riberas-en-tres';
+/*
+ * Y el sitio del cartel de las cartas tampoco se copia: se mide contra lo que la escena
+ * PINTA de verdad —los naipes del mazo, las cartas de bienes y el asa de la barra— y no
+ * contra la misma fórmula escrita otra vez aquí. Ver `elCartelDeLaCarta`.
+ */
+import { huecosDeLasCartas, loQueSeVeEnLasCartas } from '../../escenas/cartas';
+import { huecosDeLaBaraja, loQueSeVeEnLaBaraja } from '../../escenas/baraja';
+import { ASA_DEL_HUECO, huecosDeLaMesa, loQueSeVe } from '../../escenas/barra';
+import { elCartelQueCabe, elEstiloDelCartel, MarcadorDeRiberas, RiberasEnTres } from '../src/riberas-en-tres';
+/*
+ * Y de la traducción, la palabra de un número —la misma con la que se escriben las frases de
+ * los naipes— y el retrato de una clase de carta, que es de donde salen LAS ONCE
+ * explicaciones que hay: las nueve clases y los dos premios. No se sacan de una mano de una
+ * partida, que trae las que le tocaron y no todas.
+ */
+import { cardinal, retratoDeLaCarta } from '../../shared/arcade/juegos/riberas-en-tres';
+import type { ExplicacionDeLaCarta } from '../../shared/arcade/juegos/riberas-en-tres';
 import {
   bienesQueSeCambianPor,
   cartasEnTres,
   colocandoEnTres,
   comprarEnTres,
   jugadasDeLaCarta,
+  laManoDeLaIzquierda,
   manoEnTres,
   marcadorEnTres,
   mazoEnLaBarra,
@@ -1862,7 +1880,21 @@ function elMazoEnLaPantalla(): void {
   const html = renderToStaticMarkup(
     <RiberasEnTres manifiesto={riberas} mesa={unaMesa('dentro', puesta)} puesta={puesta} tablero={tablero} opciones={opciones} />,
   );
-  const texto = palabrasDe(html);
+  /*
+   * ═══ EL TEXTO DE LA PANTALLA, SIN LA LISTA DE APOYO, Y HAY QUE DECIR POR QUÉ ═══
+   *
+   * Lo que este bloque pregunta es qué se OFRECE, y lo pregunta por el rótulo de cada
+   * opción: «esta jugada no sale además como botón». La lista `.riberas-solo-apoyo` que el
+   * cartel de las cartas metió dentro del recuadro no ofrece nada —no tiene un solo botón
+   * ni un solo movimiento: es el nombre de cada naipe y sus tres frases, para quien no
+   * puede pasar el cursor por un lienzo—, pero NOMBRA las cartas, y el rótulo de jugar Las
+   * Dos Veredas es exactamente «Las Dos Veredas». Buscando en el texto entero, esa
+   * comprobación se ponía roja por una frase que no es un botón; buscando en el texto sin
+   * ella, sigue comprando lo que compraba. La cuenta de botones de más abajo no cambia: ésa
+   * va por `class="opcion-rotulo"`, que la lista no lleva.
+   */
+  const htmlSinLaListaDeApoyo = html.replace(/<ul class="riberas-solo-apoyo">[\s\S]*?<\/ul>/g, ' ');
+  const texto = palabrasDe(htmlSinLaListaDeApoyo);
 
   /*
    * ═══ CADA MOVIMIENTO UNA VEZ, CON EL MAZO DENTRO ═══
@@ -2385,7 +2417,7 @@ function losDadosEnLaPantalla(): void {
     .join('\n');
   comprobar(
     'el sitio de los dados se decide con `huecosDeLaMesa` de `escenas/barra.ts` (la misma función que la escena) con el campo de 45° del Canvas y el alto del lienzo EN PUNTOS',
-    /import \{ huecosDeLaMesa \} from '\.\.\/\.\.\/escenas\/barra';/.test(fuente) &&
+    /import \{[^}]*\bhuecosDeLaMesa\b[^}]*\} from '\.\.\/\.\.\/escenas\/barra';/.test(fuente) &&
       /const CAMPO_DE_LA_CAMARA = \(45 \* Math\.PI\) \/ 180;/.test(codigo) &&
       /fov: 45/.test(codigo) &&
       /huecosDeLaMesa\(cuantos, CAMPO_DE_LA_CAMARA, lienzo\.ancho \/ lienzo\.alto, lienzo\.alto\)\.dados !== null/.test(codigo),
@@ -2429,6 +2461,16 @@ function losDadosEnLaPantalla(): void {
    * `mover` pone `quieto`, `disponible` cae a falso, y un botón que se desmonta con el foco
    * dentro manda el foco al body. Y se apaga con `aria-disabled`, no con `disabled`: un botón
    * `disabled` deja de ser enfocable y el navegador le quita el foco igual.
+   *
+   * ═══ Y POR QUÉ AQUÍ SE CUENTAN BOTONES Y NO USOS DE LA CLASE ═══
+   *
+   * Esto exigía que `className="riberas-solo-apoyo"` saliera EXACTAMENTE una vez, y lo que
+   * quería decir era «hay un solo botón de tirar»: dos botones iguales son dos puertas al
+   * mismo movimiento, que es la regla que este fichero entero vigila. La clase, en cambio,
+   * es la de «fuera de la vista pero en el árbol» y la usa todo lo que hay que oír sin ver
+   * el lienzo — desde el cartel de las cartas, la lista de las once explicaciones también.
+   * Contada así, la comprobación se ponía roja por una lista de texto que no ofrece ningún
+   * movimiento, y arreglarla habría sido borrar el guardia del botón. Se cuenta el BOTÓN.
    */
   const alrededorDelBoton = codigo.slice(codigo.indexOf('className="riberas-solo-apoyo"') - 200, codigo.indexOf('className="riberas-solo-apoyo"') + 300);
   comprobar(
@@ -2437,7 +2479,7 @@ function losDadosEnLaPantalla(): void {
       !/dados\.disponible \? \(/.test(alrededorDelBoton) &&
       !/\sdisabled=/.test(alrededorDelBoton) &&
       /aria-disabled=\{!dados\.disponible\}/.test(alrededorDelBoton) &&
-      (codigo.match(/className="riberas-solo-apoyo"/g) ?? []).length === 1,
+      (codigo.match(/<button\s+type="button"\s+className="riberas-solo-apoyo"/g) ?? []).length === 1,
   );
 }
 
@@ -2569,6 +2611,613 @@ function recogerLaMesa(): void {
   );
 }
 
+/**
+ * EL CARTEL QUE EXPLICA EL NAIPE (`docs/LAS-CARTAS-SE-EXPLICAN.md`, fase 3).
+ *
+ * ═══ LOS SEIS FALLOS QUE ESTO COMPRA, Y NINGUNO SE VE EN PANTALLA ═══
+ *
+ *   1. QUE EL CARTEL TAPE LO QUE HAY DEBAJO. Vive al pie del lienzo, entre la mano de
+ *      cartas y la de bienes y encima del asa de la barra, y su sitio no es un porcentaje:
+ *      sale de las mismas funciones con que la escena reparte esas tres cosas. Un
+ *      porcentaje copiado se queda quieto el día que la franja se ensanche, y entonces el
+ *      cartel se pinta encima de la mano SIN QUE NADA FALLE: se ve raro y ya está. Aquí se
+ *      mide contra lo que la escena PINTA —los naipes, las cartas de bienes y el asa— y no
+ *      contra la misma fórmula escrita otra vez, que probaría que dos copias coinciden.
+ *   2. QUE SE RECORTE UNA FRASE POR LA MITAD. En el lienzo más estrecho no caben las tres,
+ *      y la regla es enseñar las que quepan ENTERAS. Media frase de ayuda es peor que
+ *      ninguna, y unos puntos suspensivos se leen como que la ayuda está rota.
+ *   3. QUE LA CUENTA DE RENGLONES SE DESPEGUE DE LA HOJA. El presupuesto sale de tres
+ *      números que están en `estilo.css` —la raíz de la casa, el cuerpo de la letra y el
+ *      interlineado— y de un relleno de doce puntos. Escritos dos veces, un día dicen
+ *      cosas distintas y el cartel se recorta solo en el teléfono de quien más lo
+ *      necesita. Este documento ya escribió «0,82 rem sobre 16» una vez.
+ *   4. QUE EL CARTEL SE COMA UN TOQUE. Es interfaz por encima del lienzo y no puede
+ *      recibir un solo puntero: un rectángulo opaco al pie del delta que atrapara el ratón
+ *      sería un cartel que impide construir donde tapa, y eso es cambiar el juego por una
+ *      ayuda.
+ *   5. QUE EL GESTO CUESTE UN MANEJADOR NUEVO. El aviso sale de los `onPointerOver` y
+ *      `onPointerOut` que cada naipe ya tenía; si alguien lo cambia por un plano que
+ *      recoja el cursor, el tablero deja de recibir los toques donde ese plano esté.
+ *   6. QUE LO QUE NO CABE NO SE OIGA. Las tres frases de los once naipes están siempre en
+ *      la lista de apoyo, quepa lo que quepa en la banda, y eso se comprueba renderizando
+ *      de verdad contra una partida de verdad.
+ *
+ * Lo que esto NO compra, dicho antes de que alguien se fíe de más: cómo SE VE. El cartel
+ * vive encima de un `<canvas>` y en Node no hay WebGL. Que 13,94 puntos se lean en un SE
+ * de verdad, y que el cartel apareciendo y desapareciendo con el cursor no moleste, se
+ * miran con ojos y en un aparato.
+ */
+/**
+ * LO QUE MIDIÓ EL BLOQUE DEL CARTEL, PARA QUE EL RESUMEN DEL FINAL NO LO ESCRIBA A MANO.
+ *
+ * El resumen decía «quince lienzos» cuando son dieciséis y «sólo el móvil estrecho se queda
+ * en dos» cuando son dos, así que quien leía la salida VERDE se llevaba la idea de que en el
+ * escritorio caben siempre las tres. Un resumen desfasado es peor que ninguno: se lee como
+ * una afirmación comprobada. Ahora se compone con la lista y con las claves medidas.
+ */
+const loQueMidioElCartel: { lienzos: number; conLasTres: number; losEstrechos: string[] } = {
+  lienzos: 0,
+  conLasTres: 0,
+  losEstrechos: [],
+};
+
+function elCartelDeLaCarta(): void {
+  paso('El cartel de la carta: cabe donde no tapa, se recorta por frases enteras, no come punteros y lo que no cabe se oye');
+
+  const fuente = readFileSync(new URL('../src/riberas-en-tres.tsx', import.meta.url), 'utf8');
+  const hoja = readFileSync(new URL('../src/estilo.css', import.meta.url), 'utf8');
+  const fuenteDelDelta = readFileSync(new URL('../../escenas/delta.tsx', import.meta.url), 'utf8');
+  /*
+   * EL FILTRO DE COMENTARIOS DE ESTE BLOQUE QUITA TAMBIÉN LOS DE JSX, y no es un capricho:
+   * el de los demás bloques (`filter` por líneas que empiezan por `*`) deja dentro la PROSA
+   * de un `{/* … *\/}`, porque sus líneas empiezan por letra. Con ese filtro, una
+   * comprobación que exija «esta palabra NO está en el código» pasa en verde por tener la
+   * palabra escrita en un comentario de dos párrafos más arriba — que es exactamente el
+   * verde falso que la fase 1 de este encargo se encontró en su propio comprobador.
+   */
+  const soloCodigo = (texto: string): string =>
+    texto
+      .replace(/\{\/\*[\s\S]*?\*\/\}/g, ' ')
+      .replace(/\/\*[\s\S]*?\*\//g, ' ')
+      .replace(/^\s*\/\/.*$/gm, ' ');
+  const codigo = soloCodigo(fuente);
+  const codigoDelDelta = soloCodigo(fuenteDelDelta);
+  /*
+   * Tres frases cualesquiera, para las comprobaciones que miden SITIO y no texto: dónde cae
+   * el pie y cuánta caja hay no dependen de lo que ponga el naipe. Las de verdad, las once
+   * de la partida, entran en el bloque 3, que es el que sí mide qué frases caben.
+   */
+  const EXPLICACION_DE_PRUEBA = { hace: 'Una frase de medir.', consigues: 'Otra frase de medir.', usas: 'Y la tercera de medir.' };
+
+  // ── 1. El sitio sale de la escena, no de un porcentaje copiado ──
+
+  comprobar(
+    'el sitio del cartel se le pide a las tres manos de la escena: la franja de las cartas, la mano de bienes y el asa de la barra',
+    /import \{ ASA_DEL_HUECO, huecosDeLaMesa, loQueSeVe \} from '\.\.\/\.\.\/escenas\/barra';/.test(fuente) &&
+      /import \{ franjaDeLasCartas, loQueSeVeEnLasCartas \} from '\.\.\/\.\.\/escenas\/cartas';/.test(fuente) &&
+      /import \{ huecosDeLaBaraja, loQueSeVeEnLaBaraja \} from '\.\.\/\.\.\/escenas\/baraja';/.test(fuente) &&
+      /franjaDeLasCartas\(CAMPO_DE_LA_CAMARA, proporcion\)/.test(codigo) &&
+      /huecosDeLaBaraja\(\[\{ id: 'medida', bien: 'limo' \}\], CAMPO_DE_LA_CAMARA, proporcion, null\)/.test(codigo) &&
+      /huecosDeLaMesa\(cuantosHuecos, CAMPO_DE_LA_CAMARA, proporcion, lienzo\.alto\)/.test(codigo),
+  );
+  comprobar(
+    'y con los huecos de barra de VERDAD —los mismos que deciden si caben los dados—, no con un cuatro escrito en el cliente',
+    /const cuantos = mesaRecogida \? 0 : barra\.length \+ \(mazo === null \? 0 : 1\);\s*return elCartelQueCabe\(lienzo, cuantos, naipeExplicado\.explicacion, raizDeLaLetra\);/.test(codigo),
+  );
+  /*
+   * ═══ Y CON LA MESA RECOGIDA, CERO HUECOS: NO HAY ASA EN LA QUE APOYARSE ═══
+   *
+   * El pie del cartel se apoya en el techo del ASA de la barra. Con la mesa abajo no hay
+   * barra en pantalla, y medido contra sus cuatro huecos el cartel se quedaba flotando el
+   * alto de una barra entera por encima del canto, justo cuando la mesa se ha recogido
+   * para ver MÁS tablero. No tapaba nada, y por eso llevaba ahí sin que nadie lo viera.
+   *
+   * Las dos mitades se compran juntas: que el cliente pase cero, y que pasar cero HAGA
+   * algo. Lo segundo se mide llamando a la función con las dos cuentas y exigiendo que el
+   * pie baje al aire de ocho puntos y que la banda crezca.
+   */
+  {
+    const conBarra = elCartelQueCabe({ ancho: 288, alto: 420 }, 4, EXPLICACION_DE_PRUEBA);
+    const recogida = elCartelQueCabe({ ancho: 288, alto: 420 }, 0, EXPLICACION_DE_PRUEBA);
+    comprobar(
+      'con la mesa recogida el cartel baja al canto (cero huecos, ocho puntos de aire) en vez de flotar el alto de una barra que no está en pantalla',
+      conBarra !== null &&
+        recogida !== null &&
+        Math.round(recogida.abajo) === 8 &&
+        conBarra.abajo > recogida.abajo + 40 &&
+        recogida.caja > conBarra.caja,
+      { conBarra: conBarra === null ? null : Math.round(conBarra.abajo), recogida: recogida === null ? null : Math.round(recogida.abajo) },
+    );
+  }
+
+  // ── 2. La letra y el relleno son los de la hoja, con la raíz de esta casa ──
+
+  /*
+   * LOS TRES NÚMEROS DEL PRESUPUESTO SE LEEN DE `estilo.css` Y SE COMPARAN CON EL CLIENTE.
+   *
+   * No se comprueba «que el cliente diga 17»: se saca la raíz de la hoja —`106.25 %` sobre
+   * los 16 del navegador— y se exige que dé lo mismo. Con el `font-size` de la raíz tocado
+   * y el cliente quieto, el cartel se mediría con una letra que no es la que se pinta.
+   */
+  const porcentajeDeLaRaiz = Number(/html \{[^}]*font-size:\s*([\d.]+)%/.exec(hoja)?.[1] ?? '0');
+  const reglaDelCartel = /\.riberas-cartel \{([^}]*)\}/.exec(hoja)?.[1] ?? '';
+  const cuerpoDelCartel = Number(/font-size:\s*([\d.]+)rem/.exec(reglaDelCartel)?.[1] ?? '0');
+  const rellenoDelCartel = Number(/padding:\s*(\d+)px/.exec(reglaDelCartel)?.[1] ?? '0');
+  const interlineadoDelCartel = Number(/line-height:\s*([\d.]+)/.exec(reglaDelCartel)?.[1] ?? '0');
+  comprobar(
+    'la raíz de esta casa vale 17 puntos y sale de la hoja (`106.25 %` sobre los 16 del navegador), no de un 16 dado por hecho',
+    porcentajeDeLaRaiz > 0 && Math.abs((porcentajeDeLaRaiz / 100) * 16 - 17) < 1e-9 && /const RAIZ_DE_LA_CASA = 17;/.test(codigo),
+    { porcentajeDeLaRaiz, da: (porcentajeDeLaRaiz / 100) * 16 },
+  );
+  comprobar(
+    'y los tres números del presupuesto son los que la hoja pinta: cuerpo 0,82 rem, doce puntos de relleno e interlineado 1,35',
+    cuerpoDelCartel === 0.82 &&
+      rellenoDelCartel === 12 &&
+      interlineadoDelCartel === 1.35 &&
+      /const CUERPO_SOBRE_LA_RAIZ = 0\.82;/.test(codigo) &&
+      /const MARGEN_DEL_CARTEL = 12;/.test(codigo) &&
+      /const RENGLON_SOBRE_EL_CUERPO = 1\.35;/.test(codigo) &&
+      /const cuerpo = CUERPO_SOBRE_LA_RAIZ \* raiz;/.test(codigo) &&
+      /const renglonDelCartel = Math\.ceil\(cuerpo \* RENGLON_SOBRE_EL_CUERPO\);/.test(codigo),
+    { cuerpoDelCartel, rellenoDelCartel, interlineadoDelCartel },
+  );
+  /*
+   * ═══ Y LOS 17 SON EL SUELO, NO LA MEDIDA: LA RAÍZ DE VERDAD SE LE PIDE AL NAVEGADOR ═══
+   *
+   * `106.25 %` va en porcentaje para que la preferencia de tamaño de letra del navegador
+   * siga mandando (lo dice el punto 2 de la cabecera de la hoja), así que quien la tenga en
+   * grande pinta el cartel con una letra bastante mayor que 13,94 puntos mientras el alto
+   * máximo que el cliente calculaba salía de un 17 clavado a mano. Con `overflow: hidden`
+   * eso corta el último renglón SIN NINGUNA SEÑAL, que es lo único que la cabecera de
+   * `elCartelQueCabe` promete no hacer nunca.
+   *
+   * Se compran las dos mitades. La primera, aquí: que el cliente MIDA la raíz y se la pase a
+   * la cuenta. La segunda —que la cuenta CAMBIE con ella— baja al bloque 3 ter, y baja por
+   * una razón: aquí se medía con TRES FRASES DE MENTIRA cortas, y con frases cortas el
+   * extremo no se ve. Con las once de verdad, la letra en «muy grande» no deja el cartel en
+   * menos frases: lo deja SIN PINTAR. Eso hay que medirlo con los naipes de la partida, que
+   * es lo que hay del bloque 3 en adelante.
+   */
+  comprobar(
+    'la raíz se le pide al navegador (`getComputedStyle` sobre la raíz del documento) y el 17 se queda de suelo para Node, donde no hay `document`',
+    /function raizDelNavegador\(\): number \{/.test(codigo) &&
+      /getComputedStyle\(document\.documentElement\)\.fontSize/.test(codigo) &&
+      /typeof document === 'undefined'[\s\S]{0,80}return RAIZ_DE_LA_CASA;/.test(codigo) &&
+      /const \[raizDeLaLetra, ponerRaizDeLaLetra\] = useState\(RAIZ_DE_LA_CASA\);/.test(codigo) &&
+      /ponerRaizDeLaLetra\(\(antes\) => \{\s*const ahora = raizDelNavegador\(\);/.test(codigo) &&
+      /observador\.observe\(document\.documentElement\);/.test(codigo),
+  );
+  comprobar(
+    'el filo va en `box-shadow` y NO en `border`: con `box-sizing: border-box` un borde entra en el `max-height` medido y se come el último renglón',
+    /box-shadow:/.test(reglaDelCartel) && !/(^|;)\s*border:/.test(reglaDelCartel),
+    reglaDelCartel.replace(/\s+/g, ' ').slice(0, 200),
+  );
+
+  // ── 3. Dónde cae de verdad, en los quince lienzos, contra lo que la escena pinta ──
+
+  const riberas = elCatalogoQuePublicaElServidor().find((m) => m.id === 'riberas');
+  comprobar('Riberas está instalado', riberas !== undefined);
+  if (riberas === undefined) return;
+  const { vista, opciones, sentados } = laProyeccionConMazo();
+  const laMano = laManoDeLaIzquierda(vista, opciones, 's1');
+  comprobar(
+    'la mano de la izquierda trae naipes con sus tres frases, o lo de abajo no mediría nada',
+    laMano.length > 0 && laMano.every((c) => c.explicacion.hace.length > 0 && c.explicacion.consigues.length > 0 && c.explicacion.usas.length > 0),
+    laMano.map((c) => c.nombre),
+  );
+  /*
+   * Y LOS DOS PREMIOS, que hasta este encargo no los explicaba nadie. No son míos en este
+   * escenario —La Mayor Guardia es del segundo y El Vado Largo del tercero—, así que se
+   * piden por su dueño, que es para lo que `laManoDeLaIzquierda` recibe `quien`.
+   */
+  const losPremios = [...laManoDeLaIzquierda(vista, opciones, 's2'), ...laManoDeLaIzquierda(vista, opciones, 's3')];
+  comprobar(
+    'y los dos premios, que aparecen solos y no se juegan, también traen las suyas',
+    losPremios.length === 2 && losPremios.every((c) => c.esPremio === true && c.explicacion.usas.startsWith('Nada')),
+    losPremios.map((c) => [c.nombre, c.explicacion.usas]),
+  );
+
+  /*
+   * ═══ Y EL LIENZO QUE ESTE CLIENTE SÍ PUEDE DAR, QUE NO ESTABA EN LA LISTA ═══
+   *
+   * La lista de abajo se comparte con el móvil y por eso la abre 320×360. En el ESCRITORIO
+   * ese lienzo no existe: `.riberas-lienzo` lleva `min-height: 420px`, así que los cuatro
+   * lienzos de menos de 420 de alto (320×360 y los tres apaisados chicos, incluidos los dos
+   * que el informe llamaba «los que deciden») no se pueden dar aquí, y se medían de todas
+   * formas mientras la forma que SÍ se da no se medía ninguna vez.
+   *
+   * Esa forma es la contraria: ESTRECHA Y ALTA. 288 de ancho sale de sumar: el suelo de
+   * documento de WCAG 1.4.10 son 320 puntos (es el arreglo que ya está escrito en el punto
+   * 1 de la cabecera de `estilo.css`), `.dentro` se lleva `clamp(1rem, 4vw, 2.5rem)` por
+   * lado y a 320 manda el mínimo, 17 puntos, así que al recuadro le quedan 286; se mide con
+   * 288 por caer del lado seguro. De alto, los 420 del `min-height`. Ahí el renglón cabe 20
+   * letras contra las 25 del móvil, y ése es el presupuesto de verdad de este cliente.
+   */
+  const LIENZOS: Array<[string, number, number]> = [
+    ['escritorio estrecho, el peor de este cliente', 288, 420],
+    ['móvil estrecho, lienzo al mínimo', 320, 360],
+    ['móvil pequeño', 360, 490],
+    ['móvil corriente', 390, 490],
+    ['móvil de pie, lienzo entero', 390, 845],
+    ['tableta', 768, 640],
+    ['tableta con el navegador de pie', 768, 1024],
+    ['monitor', 1920, 900],
+    ['apaisado SE 1ª', 568, 320],
+    ['apaisado SE 2ª/3ª', 667, 375],
+    ['apaisado Android de 360', 780, 360],
+    ['apaisado iPhone 14', 844, 390],
+    ['apaisado Pro Max', 932, 430],
+    ['apaisado tableta 4:3', 1024, 768],
+    ['apaisado iPad Air', 1180, 820],
+    ['apaisado monitor 1080', 1920, 1080],
+  ];
+  const CAMPO = (45 * Math.PI) / 180;
+  /* Los cuatro huecos de una partida en marcha: vereda, choza, torre y el naipe del mazo. */
+  const HUECOS = 4;
+
+  const solapes: string[] = [];
+  const recortes: string[] = [];
+  const frasesPorLienzo = new Map<string, number>();
+  for (const [nombre, ancho, alto] of LIENZOS) {
+    const proporcion = ancho / alto;
+    /*
+     * CONTRA LO QUE LA ESCENA PINTA, no contra la misma cuenta. La carta más saliente de la
+     * mano del mazo se mide CON el empujón que le da estar señalada o cogida (un décimo de
+     * su ancho hacia dentro, `CartaDelMazoEnLaMano`), que es justo el estado en que hay
+     * cartel; y la mano de bienes, quieta, que es lo que hay mientras se lee un naipe.
+     */
+    const vistoEnLasCartas = loQueSeVeEnLasCartas(CAMPO, proporcion);
+    const naipes = huecosDeLasCartas(laMano, CAMPO, proporcion, null);
+    const cantoDeLosNaipes = Math.max(
+      ...naipes.map((c) => ((c.hueco.x + c.hueco.ancho * 0.1 + c.hueco.ancho / 2 + vistoEnLasCartas.ancho / 2) / vistoEnLasCartas.ancho) * ancho),
+    );
+    const vistoEnLaBaraja = loQueSeVeEnLaBaraja(CAMPO, proporcion);
+    const bienes = huecosDeLaBaraja([{ id: 'b1', bien: 'limo' }], CAMPO, proporcion, null);
+    const cantoDeLosBienes = Math.min(
+      ...bienes.map((c) => ((c.hueco.x - c.hueco.ancho / 2 + vistoEnLaBaraja.ancho / 2) / vistoEnLaBaraja.ancho) * ancho),
+    );
+    const vistoEnLaBarra = loQueSeVe(CAMPO, proporcion);
+    const primerHueco = huecosDeLaMesa(HUECOS, CAMPO, proporcion, alto).piezas[0];
+    const techoDelAsa =
+      primerHueco === undefined
+        ? alto
+        : ((vistoEnLaBarra.alto / 2 - (primerHueco.y + (primerHueco.lado / 2) * ASA_DEL_HUECO.alto)) / vistoEnLaBarra.alto) * alto;
+
+    for (const naipe of [...laMano, ...losPremios]) {
+      const cartel = elCartelQueCabe({ ancho, alto }, HUECOS, naipe.explicacion);
+      if (cartel === null) {
+        solapes.push(`${nombre}: no cabe ningún cartel`);
+        continue;
+      }
+      const suDerecha = ancho - cartel.derecha;
+      const suPie = alto - cartel.abajo;
+      const suTecho = suPie - cartel.caja;
+      if (cartel.izquierda < cantoDeLosNaipes - 1e-6) solapes.push(`${nombre}: tapa un naipe (${cartel.izquierda.toFixed(1)} < ${cantoDeLosNaipes.toFixed(1)})`);
+      if (suDerecha > cantoDeLosBienes + 1e-6) solapes.push(`${nombre}: tapa la mano de bienes (${suDerecha.toFixed(1)} > ${cantoDeLosBienes.toFixed(1)})`);
+      if (suPie > techoDelAsa - 8 + 1e-6) solapes.push(`${nombre}: se mete en el asa (${suPie.toFixed(1)} > ${(techoDelAsa - 8).toFixed(1)})`);
+      if (suTecho < 0) solapes.push(`${nombre}: se sale por arriba (${suTecho.toFixed(1)})`);
+
+      const enteras = [naipe.explicacion.hace, naipe.explicacion.consigues, naipe.explicacion.usas];
+      const esPrefijo = cartel.frases.every((f, i) => f === enteras[i]);
+      if (!esPrefijo || cartel.frases.length === 0) recortes.push(`${nombre} · ${naipe.nombre}: ${cartel.frases.join(' | ')}`);
+      const menos = frasesPorLienzo.get(nombre);
+      if (menos === undefined || cartel.frases.length < menos) frasesPorLienzo.set(nombre, cartel.frases.length);
+    }
+  }
+
+  comprobar(
+    'en los dieciséis lienzos el cartel cae al pie SIN tapar un naipe del mazo, ni la mano de bienes, ni el asa de la barra, ni salirse por arriba',
+    solapes.length === 0,
+    solapes.slice(0, 6),
+  );
+  comprobar(
+    'y lo que enseña son SIEMPRE frases enteras del naipe y en su orden: nunca media, nunca unos puntos suspensivos',
+    recortes.length === 0,
+    recortes.slice(0, 6),
+  );
+  /*
+   * ═══ EL PRESUPUESTO SE DEGRADA SOLO, Y HOY YA SE VE ═══
+   *
+   * Catorce lienzos con las tres frases y DOS en los dos estrechos, cada uno estrecho de
+   * una manera distinta: 320×360 es el móvil con el lienzo al mínimo (25 letras por
+   * renglón, dos por frase y cinco renglones para las seis que piden las tres), y 288×420
+   * es el peor que ESTE cliente puede dar (20 letras por renglón, así que cada frase pasa a
+   * tres y hay siete). No son números inventados para que la comprobación pase: son los que
+   * salen de las manos de la escena, y si alguien ensancha la franja de las cartas o sube
+   * el cuerpo de la letra, este renglón se mueve y esto se pone rojo con el lienzo que
+   * cambió escrito al lado.
+   */
+  const conMenosDeTres = [...frasesPorLienzo.entries()].filter(([, cuantas]) => cuantas < 3);
+  comprobar(
+    'las tres frases caben en catorce de los dieciséis lienzos, y en los dos estrechos (320×360 y el 288×420 de este cliente) caben DOS',
+    frasesPorLienzo.size === 16 &&
+      conMenosDeTres.length === 2 &&
+      conMenosDeTres.every(([, cuantas]) => cuantas === 2) &&
+      conMenosDeTres.some(([nombre]) => nombre === 'móvil estrecho, lienzo al mínimo') &&
+      conMenosDeTres.some(([nombre]) => nombre === 'escritorio estrecho, el peor de este cliente'),
+    [...frasesPorLienzo.entries()],
+  );
+  comprobar(
+    'y con el lienzo todavía sin medir —cero por cero, el primer render— no se pinta ningún cartel en vez de uno con la cuenta rota',
+    elCartelQueCabe({ ancho: 0, alto: 0 }, HUECOS, laMano[0]?.explicacion ?? { hace: 'a', consigues: 'b', usas: 'c' }) === null,
+  );
+
+  /*
+   * ═══ 3 bis. LAS DOS CUENTAS DE LA CABECERA SALEN DE LA MEDIDA, NO DE LOS DEDOS DE NADIE ═══
+   *
+   * La cabecera de `elCartelQueCabe` escribe cuántos lienzos de la lista NO se pueden dar en
+   * el escritorio y cuántos de los que sí llevan las tres frases, y los escribe para que el
+   * siguiente no tenga que medir. Estaban mal las dos: decía cuatro bajos (son cinco — el
+   * 844×390 tiene 390 de alto contra el `min-height: 420px`) y doce con las tres (son diez).
+   * Una cuenta escrita para ahorrarle la medida al siguiente es justo la que no puede estar
+   * mal, así que se ata: el `min-height` se lee de la hoja, los lienzos se cuentan de
+   * `LIENZOS`, y se exige que la cabecera diga ESOS números con letras.
+   */
+  const minAltoDelLienzo = Number(/\.riberas-lienzo \{[^}]*min-height:\s*(\d+)px/.exec(hoja)?.[1] ?? '0');
+  const losBajos = LIENZOS.filter(([, , alto]) => alto < minAltoDelLienzo);
+  const losDables = LIENZOS.filter(([, , alto]) => alto >= minAltoDelLienzo);
+  const dablesConLasTres = losDables.filter(([nombre]) => frasesPorLienzo.get(nombre) === 3);
+  comprobar(
+    'la cabecera dice cuántos lienzos bajos no se pueden dar aquí y cuántos de los que sí llevan las tres, y los dos números salen del `min-height` de la hoja y de la lista',
+    minAltoDelLienzo > 0 &&
+      losBajos.length > 0 &&
+      new RegExp(`${cardinal(losBajos.length)} lienzos bajos`).test(fuente) &&
+      new RegExp(`otros ${cardinal(dablesConLasTres.length)} que este`).test(fuente),
+    {
+      minAltoDelLienzo,
+      bajos: losBajos.map(([nombre, ancho, alto]) => `${nombre} ${String(ancho)}×${String(alto)}`),
+      conLasTres: dablesConLasTres.length,
+    },
+  );
+
+  /*
+   * ═══ 3 ter. LA PREFERENCIA DE LETRA GRANDE, MEDIDA CON LAS FRASES DE VERDAD ═══
+   *
+   * La mitad de arriba compra que la raíz se MIDA; ésta compra que entre en la cuenta, y se
+   * mide con los naipes de la partida y no con tres frases cortas de mentira. La diferencia
+   * no es de estilo: con frases de mentira el extremo se veía como «caben menos», y con las
+   * de verdad lo que pasa es que el cartel DEJA DE PINTARSE. Medido en los dos lienzos
+   * estrechos, subiendo la raíz: nunca caben más frases con la letra más grande, y en el
+   * extremo no se pinta ninguno.
+   *
+   * Y eso es lo prometido, no un fallo: la cabecera de `elCartelQueCabe` dice que antes
+   * ninguno que uno cortado a la mitad sin avisar. Lo que lo hace aceptable es la segunda
+   * mitad, que se compra aquí al lado: el texto no se pierde con el cartel, porque la lista
+   * de apoyo se pinta desde `cartasDelMazo` y no mira `cartel` ni una vez.
+   */
+  {
+    /*
+     * LAS ONCE EXPLICACIONES: las nueve clases —por su retrato, que es donde viven— y los dos
+     * premios de la partida. No la mano de este escenario, que trae las cartas que le tocaron
+     * y dejaría fuera justo la que peor cabe.
+     */
+    const losOnce: ExplicacionDeLaCarta[] = [
+      ...CLASES_DE_CARTA.map((clase) => retratoDeLaCarta(clase)?.explicacion).filter(
+        (e): e is ExplicacionDeLaCarta => e !== undefined,
+      ),
+      ...losPremios.map((p) => p.explicacion),
+    ];
+    const LA_ESCALERA = [17, 20, 24, 27, 30, 34];
+    const LOS_ESTRECHOS: Array<[string, number, number]> = [
+      ['288×420', 288, 420],
+      ['320×360', 320, 360],
+    ];
+    const crecieron: string[] = [];
+    const alExtremo: string[] = [];
+    const laDegradacion: string[] = [];
+    for (const [nombre, ancho, alto] of LOS_ESTRECHOS) {
+      let antes = Number.POSITIVE_INFINITY;
+      for (const raiz of LA_ESCALERA) {
+        const cuantas = losOnce.map((e) => elCartelQueCabe({ ancho, alto }, HUECOS, e, raiz)?.frases.length ?? 0);
+        const masQueCabe = Math.max(...cuantas);
+        if (masQueCabe > antes) crecieron.push(`${nombre}: con raíz ${String(raiz)} caben ${String(masQueCabe)} y con la anterior ${String(antes)}`);
+        antes = masQueCabe;
+        laDegradacion.push(`${nombre}@${String(raiz)}=${String(masQueCabe)}`);
+        if (raiz === 34 && masQueCabe > 0) alExtremo.push(`${nombre}: con la letra al doble todavía se pinta cartel`);
+      }
+    }
+    comprobar(
+      'con las ONCE frases de verdad, subir la raíz no hace caber MÁS: la letra grande del navegador entra en la cuenta y degrada el cartel frase a frase',
+      crecieron.length === 0 && losOnce.length === 11,
+      { crecieron, naipes: losOnce.length, degradacion: laDegradacion },
+    );
+    comprobar(
+      'y en el extremo (la raíz al doble) el cartel NO se pinta en ninguno de los dos lienzos estrechos: `null`, que es lo prometido, y no un último renglón cortado en silencio',
+      alExtremo.length === 0,
+      alExtremo,
+    );
+    const dondeEmpiezaLaLista = codigo.indexOf('<ul className="riberas-solo-apoyo">');
+    const laListaEnElJsx = dondeEmpiezaLaLista < 0 ? '' : codigo.slice(dondeEmpiezaLaLista, dondeEmpiezaLaLista + 400);
+    comprobar(
+      'y sin cartel el texto NO se pierde: la lista de apoyo se pinta desde `cartasDelMazo` y no mira `cartel` ni una vez, así que las tres frases siguen ahí',
+      laListaEnElJsx.length > 0 && /cartasDelMazo\.map/.test(laListaEnElJsx) && !/cartel/.test(laListaEnElJsx),
+      laListaEnElJsx.replace(/\s+/g, ' ').slice(0, 200),
+    );
+  }
+
+  /* Y lo medido se le pasa al resumen del final, para que no lo escriba a mano. Ver `loQueMidioElCartel`. */
+  loQueMidioElCartel.lienzos = LIENZOS.length;
+  loQueMidioElCartel.conLasTres = [...frasesPorLienzo.values()].filter((cuantas) => cuantas === 3).length;
+  loQueMidioElCartel.losEstrechos = LIENZOS.filter(([nombre]) => (frasesPorLienzo.get(nombre) ?? 3) < 3).map(
+    ([, ancho, alto]) => `${String(ancho)}×${String(alto)}`,
+  );
+
+  /*
+   * ═══ 3 bis. Y LA ARITMÉTICA MEDIDA LLEGA AL ESTILO QUE SE PINTA, PAREJA A PAREJA ═══
+   *
+   * Todo lo de arriba mide `izquierda`, `derecha`, `abajo` y `caja` con muchísimo cuidado y
+   * NADA ataba esos cuatro números a las cuatro propiedades que el navegador recibe.
+   * Intercambiar `izquierda` y `derecha` en el JSX dejaba la batería entera en verde con el
+   * cartel puesto encima de la mano que está explicando: la cuenta medida y el estilo
+   * pintado eran dos cosas que no se encontraban en ninguna comprobación.
+   *
+   * Ya no se leen con una expresión regular sobre el JSX, que es lo que había: la traducción
+   * vive en `elEstiloDelCartel`, una función pura y exportada, y aquí se LLAMA con cuatro
+   * números distintos entre sí (11, 22, 33 y 44) para mirar en cuál acabó cada uno. Dos de
+   * ellos cambiados de sitio se ven aquí y no en la pantalla de nadie. Se pide además, con
+   * el fuente, que el `<p>` no escriba ninguna de las cuatro por su cuenta.
+   *
+   * Y el RECORRIDO en el orden de las frases: se pintan las que trae `cartel.frases`, en su
+   * orden, sin volverlas del revés ni ordenarlas ni recortarlas. El orden es el que el
+   * bloque de arriba comprueba que es prefijo del naipe («hace», «consigues», «usas»), o sea
+   * que darle la vuelta aquí pintaría el final de la explicación y se callaría el principio.
+   */
+  {
+    const estilo = elEstiloDelCartel({ izquierda: 11, derecha: 22, abajo: 33, caja: 44, frases: [] });
+    const sinCartel = elEstiloDelCartel(null);
+    comprobar(
+      'las cuatro medidas caen cada una en su propiedad: `izquierda` en `left`, `derecha` en `right`, `abajo` en `bottom` y `caja` en `max-height`',
+      estilo?.left === '11px' && estilo.right === '22px' && estilo.bottom === '33px' && estilo.maxHeight === '44px' && sinCartel === undefined,
+      estilo,
+    );
+    const elParrafo = codigo.slice(codigo.indexOf('className="riberas-cartel"'), codigo.indexOf('className="riberas-cartel"') + 500);
+    comprobar(
+      'y el `<p>` no escribe ninguna de las cuatro por su cuenta: le pasa entero lo que devuelve `elEstiloDelCartel`, que es lo que se acaba de medir',
+      /style=\{elEstiloDelCartel\(cartel\)\}/.test(elParrafo) && !/left:|right:|bottom:|maxHeight:/.test(elParrafo),
+      elParrafo.replace(/\s+/g, ' ').slice(0, 220),
+    );
+    comprobar(
+      'el recorrido va por `cartel.frases` en su orden, sin darle la vuelta ni ordenarlo ni recortarlo: al revés se pintaría el final y se callaría el principio',
+      /cartel\.frases\.map\(\(frase\) => \(\s*<span key=\{frase\} className="riberas-cartel-frase">\s*\{frase\}\s*<\/span>\s*\)\)/.test(codigo) &&
+        !/cartel\.frases\.(reverse|sort|slice|filter|toReversed|toSorted)/.test(codigo),
+    );
+  }
+
+  // ── 4. El gesto: los dos manejadores que ya existían, y ninguno nuevo ──
+
+  const laCartaEnLaMano = codigoDelDelta.slice(
+    codigoDelDelta.indexOf('function CartaDelMazoEnLaMano('),
+    codigoDelDelta.indexOf('function Casilla('),
+  );
+  comprobar(
+    'el aviso de la carta señalada cuelga de los `onPointerOver` y `onPointerOut` que el naipe YA tenía',
+    laCartaEnLaMano.length > 0 &&
+      /onPointerOver=\{\(e\) => \{\s*e\.stopPropagation\(\);\s*setEncima\(true\);\s*onSenalar\(carta, true\);\s*\}\}/.test(laCartaEnLaMano) &&
+      /onPointerOut=\{\(\) => \{\s*setEncima\(false\);\s*onSenalar\(carta, false\);\s*\}\}/.test(laCartaEnLaMano),
+    { mide: laCartaEnLaMano.length },
+  );
+  comprobar(
+    'y no cuesta un manejador nuevo: el naipe sigue teniendo exactamente tres —entrar, salir y pulsar— y ninguno que persiga el cursor',
+    (laCartaEnLaMano.match(/onPointer[A-Z][a-zA-Z]*=/g) ?? []).join(',') === 'onPointerOver=,onPointerOut=,onPointerDown=',
+    laCartaEnLaMano.match(/onPointer[A-Z][a-zA-Z]*=/g) ?? [],
+  );
+  comprobar(
+    'ni le roba nada al toque que coge la carta: el `onPointerDown` sigue haciendo lo mismo que hacía y nada más',
+    /onPointerDown=\{\(e\) => \{\s*if \(noEsElPrimario\(e\)\) return;\s*e\.stopPropagation\(\);\s*loCogeLaInterfaz\(e\.nativeEvent\);\s*onCoger\(carta\);\s*\}\}/.test(laCartaEnLaMano) &&
+      !/onSenalar/.test(/onPointerDown=\{[\s\S]*?\n        \}\}/.exec(laCartaEnLaMano)?.[0] ?? ''),
+  );
+  const laMano3D = codigoDelDelta.slice(
+    codigoDelDelta.indexOf('function ManoDelMazo('),
+    codigoDelDelta.indexOf('export function Delta('),
+  );
+  comprobar(
+    'y una SALIDA que llega tarde no apaga el cartel del naipe al que el cursor acaba de llegar: la señalada se apunta y la salida ajena se tira',
+    laMano3D.length > 0 &&
+      /const laSenalada = useRef<string \| null>\(null\);/.test(laMano3D) &&
+      /if \(laSenalada\.current !== carta\.id\) return;/.test(laMano3D) &&
+      /onSenalar=\{avisarDeLaSenalada\}/.test(laMano3D),
+    { mide: laMano3D.length },
+  );
+  comprobar(
+    'la entrada nueva de `<Delta>` es opcional —sin quien la escuche la escena se pinta igual— y el cliente la cablea',
+    /onSenalarCartaDelMazo\?: \(carta: CartaDelMazo \| null\) => void;/.test(fuenteDelDelta) &&
+      /onSenalar=\{\(c\) => onSenalarCartaDelMazo\?\.\(c\)\}/.test(codigoDelDelta) &&
+      /<Delta[\s\S]*?onSenalarCartaDelMazo=\{alSenalarCartaDelMazo\}[\s\S]*?\/>/.test(fuente),
+  );
+
+  // ── 5. La precedencia, y que señalar no juega ──
+
+  comprobar(
+    'si hay carta COGIDA el cartel es el suyo aunque el cursor pase por otra: al revés cambiaría bajo el dedo que va a soltarla en la casilla',
+    /const cual = cartaDelMazo \?\? naipeSenalado;/.test(codigo),
+  );
+  comprobar(
+    'y el naipe se busca en la mano de VERDAD, así que una carta jugada se lleva su cartel: guardándola entera se quedaría explicando lo que ya no está',
+    /return cartasDelMazo\.find\(\(c\) => c\.id === cual\) \?\? null;/.test(codigo),
+  );
+  const alSenalar = /const alSenalarCartaDelMazo = useCallback\(\(carta: \{ id: string \} \| null\) => \{([\s\S]*?)\n  \}, \[\]\);/.exec(codigo)?.[1] ?? '';
+  comprobar(
+    'señalar NO es jugar: el manejador sólo apunta el seudónimo —ni manda un movimiento, ni suelta el bien, ni cierra el menú, ni mira `quieto`—',
+    alSenalar.length > 0 &&
+      /ponerNaipeSenalado\(/.test(alSenalar) &&
+      !/mover\(|ponerCogida|ponerTomada|ponerPreguntando|quieto/.test(alSenalar),
+    alSenalar.trim(),
+  );
+  comprobar(
+    'y el estado del cursor NO entra en `soltarTodo`: una jugada ajena no mueve el ratón de sitio',
+    /const soltarTodo = useCallback\(\(\) => \{[\s\S]*?\}, \[\]\);/.test(codigo) &&
+      !/ponerNaipeSenalado/.test(/const soltarTodo = useCallback\(\(\) => \{([\s\S]*?)\}, \[\]\);/.exec(codigo)?.[1] ?? ''),
+  );
+
+  // ── 6. El cartel no come punteros, y no es un objeto de la escena ──
+
+  comprobar(
+    'no recibe un solo puntero: `pointer-events: none` en su regla, y ni `onClick` ni `tabIndex` en el elemento',
+    /pointer-events: none;/.test(reglaDelCartel) &&
+      !/onClick|tabIndex/.test(codigo.slice(codigo.indexOf('className="riberas-cartel"'), codigo.indexOf('className="riberas-cartel"') + 700)),
+  );
+  comprobar(
+    'es interfaz POR ENCIMA del lienzo y no un objeto del mundo: va dentro del recuadro y FUERA del `<Canvas>`, como los dos botones que ya viven ahí',
+    codigo.indexOf('className="riberas-cartel"') > codigo.indexOf('</Canvas>') &&
+      codigo.indexOf('className="riberas-cartel"') < codigo.indexOf('riberas-telon'),
+  );
+  comprobar(
+    'y se anuncia al aparecer: el `<p>` está SIEMPRE montado con `aria-live="polite"` —una región que nace con su texto no la lee nadie— y vacío no deja caja',
+    /<p\s+className="riberas-cartel"\s+aria-live="polite"/.test(codigo) &&
+      !/cartel !== null \? \(\s*<p/.test(codigo) &&
+      /\.riberas-cartel:empty \{[^}]*padding: 0;[^}]*\}/.test(hoja),
+  );
+
+  // ── 7. Lo que no cabe se oye, y eso se renderiza de verdad ──
+
+  const puesta = mesaPuestaDe(sentados, vista, opciones);
+  const tablero = tableroDeLaVista(vista);
+  comprobar('el escenario trae tablero declarado', tablero !== null);
+  if (tablero === null) return;
+  const html = renderToStaticMarkup(
+    <RiberasEnTres manifiesto={riberas} mesa={unaMesa('dentro', puesta)} puesta={puesta} tablero={tablero} opciones={opciones} />,
+  );
+  const laLista = /<ul class="riberas-solo-apoyo">([\s\S]*?)<\/ul>/.exec(html)?.[1] ?? '';
+  const filas = laLista.split('<li>').length - 1;
+  comprobar(
+    'la lista de apoyo trae UNA fila por naipe de la mano, ni una menos: es la única puerta de quien no puede pasar el cursor por un lienzo',
+    laLista.length > 0 && filas === laMano.length,
+    { filas, naipes: laMano.length },
+  );
+  const texto = palabrasDe(laLista);
+  const sinDecir = laMano.filter(
+    (c) =>
+      !texto.includes(c.nombre) ||
+      !texto.includes(c.explicacion.hace) ||
+      !texto.includes(c.explicacion.consigues) ||
+      !texto.includes(c.explicacion.usas),
+  );
+  comprobar(
+    'y de cada uno se oyen su nombre —que en el lienzo no se ve nunca— y LAS TRES frases, quepan o no en el cartel',
+    sinDecir.length === 0,
+    sinDecir.map((c) => c.nombre),
+  );
+  comprobar(
+    'la lista está fuera del `conMundo`: mientras el modelo se descarga la mano ya existe y sus explicaciones ya son verdad',
+    html.includes('riberas-telon') && laLista.length > 0,
+  );
+
+  // ── 8. La llave del pregón no está escrita, y eso es a propósito ──
+
+  /*
+   * El §1.9 del diseño dice que el cartel no se pinta mientras el pregón del trueque está
+   * abierto, y esa condición NO está escrita: el pregón no existe todavía en este árbol.
+   * Una condición sobre un estado que nadie crea es una condición que ningún comprobador
+   * puede poner roja —se quedaría de adorno hasta que alguien la borrara por muerta—, así
+   * que queda ANOTADA con sus números para quien haga el trueque. Las dos mitades se piden
+   * juntas: que no esté en el código, y que sí esté dicha con los números.
+   */
+  comprobar(
+    'la llave que apaga el cartel con el pregón abierto NO está escrita —el pregón no existe— pero queda anotada con sus números para quien lo haga',
+    !/pregón|pregon/i.test(codigo) && /pregón/i.test(fuente) && /−24/.test(fuente) && /43 de caja/.test(fuente),
+  );
+}
+
 // ---------------------------------------------------------------------------
 
 elCatalogoNoMiente();
@@ -2584,6 +3233,7 @@ elResultadoDeMover();
 losDadosLleganAparte();
 losDadosEnLaPantalla();
 recogerLaMesa();
+elCartelDeLaCarta();
 
 console.log('');
 /**
@@ -2595,7 +3245,7 @@ console.log('');
  * eso se lee como verde. Con el número escrito, salir con menos es un fallo ruidoso. Va a
  * mano y se sube al añadir comprobaciones; un guardia desfasado no guarda nada.
  */
-const COMPROBACIONES_ESCRITAS = 410;
+const COMPROBACIONES_ESCRITAS = 448;
 if (hechas < COMPROBACIONES_ESCRITAS) {
   console.error(
     `Solo se han hecho ${String(hechas)} de las ${String(COMPROBACIONES_ESCRITAS)} comprobaciones que ` +
@@ -2637,6 +3287,17 @@ if (fallos.length === 0) {
       '  dice cuánto mide la cadena de veredas de cada uno con el mínimo sacado de la regla.\n' +
       '  Y lo que la escena no hace sola lo hace el cliente: coger un naipe suelta el bien y la\n' +
       '  pieza, cogerlo otra vez lo suelta, y una jugada ajena suelta la mano entera.\n' +
+      '\n  Y EL CARTEL QUE EXPLICA EL NAIPE: cae al pie del lienzo sin tapar un naipe del mazo, ni\n' +
+      `  la mano de bienes, ni el asa de la barra en ninguno de los ${String(loQueMidioElCartel.lienzos)} lienzos medidos —contra\n` +
+      '  lo que la escena PINTA y no contra la misma fórmula copiada—; enseña frases ENTERAS y en\n' +
+      `  su orden, las tres en ${String(loQueMidioElCartel.conLasTres)} de ellos y DOS en los ${String(loQueMidioElCartel.losEstrechos.length)} estrechos (${loQueMidioElCartel.losEstrechos.join(' y ')}),\n` +
+      '  con la letra y el relleno leídos de la hoja y no dados por hechos; con la preferencia de\n' +
+      '  letra del navegador en grande se degrada frase a frase y en el extremo no se pinta, que\n' +
+      '  es lo prometido, y ahí el texto sigue vivo en la lista de apoyo; sale de los dos\n' +
+      '  manejadores que el naipe ya tenía, sin robarle nada al toque que lo coge y sin apagarse\n' +
+      '  al cruzar de una carta a la de al lado; no recibe un solo puntero; y lo que no cabe se\n' +
+      '  oye igual, con el nombre y las tres frases de cada naipe en la lista de apoyo, contadas\n' +
+      '  sobre el HTML de verdad.\n' +
       '\n  Lo que esto NO prueba: que el reparto de los cuatro muebles entre propios y genéricos\n' +
       '  sea el del §7 —es una decisión de producto y no se deriva del contrato—, ni que la ruta\n' +
       '  del catálogo mande de verdad publicaOpciones: aquí no se levanta ningún servidor. Ni\n' +

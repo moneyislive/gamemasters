@@ -100,16 +100,22 @@ import {
   ACAPARAMIENTO,
   ALZAR,
   ANO_BUENO,
+  BIENES_DEL_ANO_BUENO,
   claseDeLaCarta,
   COMPRAR,
   DOS_VEREDAS,
   FUNDAR,
   GUARDIA,
+  GUARDIA_MINIMA,
   OFRECER,
+  PUNTOS_DE_LA_GUARDIA,
+  PUNTOS_DEL_TITULO,
+  PUNTOS_DEL_VADO,
   REVELAR,
   seudonimoDeLaCarta,
   TIRAR,
   VADO_MINIMO,
+  VEREDAS_DE_LA_CARTA,
 } from './riberas';
 import type { ClaseDeCarta } from './riberas';
 import { bastanColores, COLORES_EN_3D, deltaDeLaVista, manoDeLaVista, obraPosible } from './riberas-en-3d';
@@ -548,6 +554,34 @@ export interface CartaDelMazoEnTres {
    * apagados por no poder jugarse nunca; ver `esPremio` en `escenas/cartas.ts`.
    */
   readonly esPremio?: boolean;
+  /**
+   * LAS TRES FRASES QUE EXPLICAN EL NAIPE, y viajan DENTRO de él.
+   *
+   * No es un mapa que la pantalla consulte por la clase, y no puede serlo: la clase de
+   * una carta es SECRETA y lo que sale de aquí es su seudónimo. Quien pinta el naipe
+   * tiene el texto en la mano sin preguntar nada, igual que tiene `nombre` y `dibujo`.
+   */
+  readonly explicacion: ExplicacionDeLaCarta;
+}
+
+/**
+ * LO QUE MIGUEL PIDIÓ, EN TRES COLUMNAS: qué hace, qué consigues, cómo se usa.
+ *
+ * Son tres campos y no un párrafo porque el sitio de la pantalla se acaba y hay que
+ * poder soltar el final: al pie del lienzo más estrecho, con la cinta del tercio central
+ * en sus dos líneas, sólo cabe UNA de las tres (medido: §5.1 de
+ * `docs/LAS-CARTAS-SE-EXPLICAN.md`). Con un párrafo la única manera de recortar sería
+ * cortarlo por la mitad, y media frase de ayuda es peor que ninguna.
+ *
+ * El orden de los campos ES el orden en que se enseñan, y es el que Miguel dijo.
+ */
+export interface ExplicacionDeLaCarta {
+  /** Qué pasa cuando la juegas. */
+  readonly hace: string;
+  /** Para qué te sirve: lo que te llevas. */
+  readonly consigues: string;
+  /** Cuándo y con qué gesto. */
+  readonly usas: string;
 }
 
 /** Cómo se enseña una clase de carta: a qué grupo va, qué dibujo lleva y cómo se lee. */
@@ -555,20 +589,160 @@ export interface RetratoDeLaCarta {
   readonly familia: string;
   readonly dibujo: string;
   readonly nombre: string;
+  readonly explicacion: ExplicacionDeLaCarta;
 }
 
 /**
- * LAS NUEVE CLASES, CON SU CARA. Una fila por clase y ni una regla dentro.
+ * ═══ LA CIFRA NO BASTA: LA PALABRA Y EL PLURAL TAMBIÉN SALEN DE LA CONSTANTE ═══
+ *
+ * `${BIENES_DEL_ANO_BUENO}` ya ponía el DOS del «qué hace». Lo que se quedaba fuera era
+ * la mitad de la frase que habla del mismo número sin escribirlo con cifra: «Dos bienes»,
+ * «Dos pasos», «Vale 1 punto» y «2 puntos». La palabra escrita a mano y la concordancia
+ * escrita a mano son exactamente el mismo fallo que la cifra escrita a mano. El día que
+ * alguien suba `VEREDAS_DE_LA_CARTA` a tres, «Abres 3 veredas» y «Dos pasos» se
+ * contradicen dentro del mismo naipe, y no hay comprobador que pille una mentira en
+ * castellano: se lee igual de bien y dice otra cosa.
+ *
+ * Así que la palabra sale de `cardinal`, el plural de `plural` y la mayúscula de cabeza
+ * de `enCabeza`. Son tres líneas y compran una vacuna: `verify:riberas-en-tres` compone
+ * las mismas palabras desde las constantes y exige que las frases las lleven, así que
+ * tocar una constante sin tocar nada más pone ROJO el texto que la nombra con letras.
+ */
+const CARDINALES: readonly string[] = ['cero', 'un', 'dos', 'tres', 'cuatro', 'cinco', 'seis', 'siete', 'ocho', 'nueve', 'diez', 'once', 'doce'];
+
+/** El número escrito con letras, y con cifra en cuanto se sale de la tabla. */
+export function cardinal(n: number): string {
+  return CARDINALES[n] ?? String(n);
+}
+
+/** La forma que le toca al nombre según el número que lo acompaña. */
+export function plural(n: number, uno: string, varios: string): string {
+  return n === 1 ? uno : varios;
+}
+
+/** Con la primera letra en alta, para cuando la palabra abre la frase. */
+export function enCabeza(texto: string): string {
+  return texto.charAt(0).toUpperCase() + texto.slice(1);
+}
+
+/**
+ * ═══ LOS NÚMEROS DE LAS FRASES NO SE ESCRIBEN A MANO, Y ÉSE ES EL PUNTO ═══
+ *
+ * Las siete constantes salen de `riberas.ts`, que es donde vive la regla, y entran en la
+ * frase por plantilla — exactamente como `opcionesDelMazo` compone hoy su ayuda con
+ * `${VEREDAS_DE_LA_CARTA}`. Un texto que diga «dos veredas» con letras es un texto que
+ * miente el día que alguien toque la constante, y no hay comprobador que pille una
+ * mentira escrita en castellano: se leería igual de bien y diría otra cosa.
+ *
+ * `BIENES_DEL_ANO_BUENO` y `VEREDAS_DE_LA_CARTA` valen dos los dos y son dos constantes
+ * a propósito (lo dice la cabecera de la primera). Aquí se citan por separado por lo
+ * mismo: el día que una de las dos cambie, sólo cambia su frase.
+ *
+ * ═══ Y EL «QUÉ CONSIGUES» DE UN TÍTULO CUENTA LA REGLA QUE DECIDE LA PARTIDA ═══
+ *
+ * Decía «Ese punto: secreto tuyo hasta que la enseñes», y eso deja a un recién llegado
+ * peor de lo que estaba: se entiende que guardar el título es gratis y que el punto ya
+ * cuenta. El código dice lo contrario con todas las letras: la cabecera de `puntosDe` en
+ * `riberas.ts` reza «CON UN TÍTULO SIN REVELAR NO SE GANA», y `puedeHaberGanado` cuenta
+ * `puntosDe` y no `puntosOcultosDe`. Así que la frase que se pinta cuando sólo cabe una
+ * mitad tiene que ser ésa. El secreto se conserva, que es el §1.6 y cambia cómo se juegan
+ * las últimas rondas, pero deja de ser lo único que se dice.
+ *
+ * ═══ Y EL «CÓMO SE USA» NO NOMBRA UN MANDO QUE NO EXISTE ═══
+ *
+ * Decía «Suéltala en REVELAR». En la escena no hay ningún rótulo que ponga REVELAR: lo
+ * que sale al coger la carta es UN hueco con el dibujo del propio naipe dentro
+ * (`casillasDeLaMano`, y `puertasDeLaCarta` garantiza que nunca son dos a la vez, porque
+ * un título se revela y no se juega). Quien leyera aquel texto buscaría un botón que no
+ * está en ninguna parte, así que se dice el GESTO y el sitio, no un nombre.
+ *
+ * ═══ Y EL GESTO SUBE A LA SEGUNDA FRASE, PORQUE LA TERCERA NO SIEMPRE SE PINTA ═══
+ *
+ * El gesto vivía en el «cómo se usa», o sea en la frase que en los dos lienzos estrechos
+ * NO se lee: allí caben dos (ver la cabecera de `elCartelQueCabe`), así que quedaba «sin
+ * enseñarla no ganas» sin decir en ningún sitio CÓMO se enseña. Es el mismo delito del
+ * párrafo de arriba girado —nombrar una condición y callar la que hace falta para
+ * cumplirla—, y la cura es la misma: la frase que sí se pinta dice la regla Y el gesto.
+ *
+ * Y el «cómo se usa» que queda libre nombra su PUERTA, que es lo que no decía. La de un
+ * título no es la de las otras cuatro: `revelarUnTitulo` empieza por `elTurnoEsDe` y ahí
+ * se acaban sus condiciones —ni mira `tirado`, ni `cartaJugada`, ni el sello de compra—,
+ * y su cabecera lo dice con todas las letras («se ofrece SIEMPRE en el turno propio, antes
+ * de tirar y después»), porque quien tenga el octavo punto en un título tiene que poder
+ * enseñarlo para ganar. De ahí «En tu turno, y no gasta la jugada», y de ahí que
+ * `verify:riberas-en-tres` le pregunte esas dos cosas a una mesa de verdad en vez de
+ * creerse esta línea.
+ */
+const EXPLICACION_DEL_TITULO: ExplicacionDeLaCarta = {
+  hace: `No se juega: se tiene. Vale ${PUNTOS_DEL_TITULO} ${plural(PUNTOS_DEL_TITULO, 'punto', 'puntos')}.`,
+  consigues: 'Sin enseñarla no ganas: suéltala en su hueco.',
+  usas: 'En tu turno, y no gasta la jugada.',
+};
+
+/**
+ * ═══ LAS TRES PUERTAS DE UNA CARTA QUE SE JUEGA, Y LAS TRES ESTÁN DICHAS ═══
+ *
+ * Las cuatro frases decían «Tras tirar, suéltala en JUGAR y di a quién», y eso nombra UNA
+ * de las tres condiciones como si fuera la condición entera. `sePuedeJugarLaCarta` tiene
+ * las otras dos escritas seguidas (`if (estado.cartaJugada) return false;` y
+ * `return enMano.comprada < estado.turnosAbiertos;`), y `opcionesDelMazo` repite el mismo
+ * corte sobre la vista. La ironía es la que hace grave el asunto: la carta que un recién
+ * llegado mira primero es justo la que acaba de comprar, o sea la única que el texto le
+ * explicaba cómo jugar y el juego no le dejaba.
+ *
+ * Así que aquí van las tres: DESPUÉS DE TIRAR, UNA AL TURNO y LA NUEVA NO. Medido contra
+ * el presupuesto del lienzo peor (25 letras por renglón, dos renglones por frase): 45
+ * caracteres y dos renglones. Cabe, y por eso no hace falta el desvío que se estudió:
+ * colgarlas del «cómo se usa» de la carta de comprar, que no existe porque comprar no es
+ * un naipe de la mano y su única voz es la `ayuda` que le redacta `opcionesDelMazo`. Esa
+ * ayuda sigue diciendo lo suyo («no se juega hasta tu turno siguiente») y ahora el naipe
+ * lo dice también, que es donde se lee cuando se coge la carta.
+ *
+ * ═══ UNA SOLA FRASE PARA LAS CUATRO, POR LO MISMO QUE LOS CINCO TÍTULOS ═══
+ *
+ * Las cuatro colas de antes («di a quién», «di cuáles», «di cuál pides», «trázalas»)
+ * repetían lo que su propio «qué hace» ya dice («a quien elijas», «iguales o no», «pides
+ * un bien»), y a cambio ocupaban el sitio de las dos puertas que faltaban. Cuatro copias
+ * de la misma regla son cuatro sitios donde corregir una errata y tres donde olvidarla.
+ * El GESTO se dice sin nombrar mando ninguno: se suelta en el hueco que sale al coger la
+ * carta, que es lo que hay (ver la cabecera de `EXPLICACION_DEL_TITULO`).
+ *
+ * El «Tras tirar» de cabeza es lo que la vacuna de `verify:riberas-en-tres` contrasta
+ * contra lo que el juego responde en una mesa de verdad.
+ */
+const USAS_DE_LA_JUGADA = 'Tras tirar, suelta una al turno; la nueva no.';
+
+/**
+ * LAS NUEVE CLASES, CON SU CARA Y CON LO QUE SE EXPLICA DE ELLAS.
+ *
+ * ═══ AQUÍ HAY UNA PARÁFRASIS DE LAS REGLAS, Y HAY QUE DECIRLO ═══
+ *
+ * Esta tabla decía «una fila por clase y ni una regla dentro», y con las tres frases de
+ * `explicacion` eso ya no es toda la verdad: lo que hace una guardia está CONTADO aquí,
+ * en castellano. La regla sigue viviendo en `riberas.ts` —`jugarLaGuardia` es la que
+ * decide, y esta tabla no la mira ni una vez—; lo que hay aquí son palabras sobre ella.
+ *
+ * Que la paráfrasis no se despegue de la regla no se deja a la buena voluntad, porque la
+ * clase de fallo que trae es la peor de todas: un texto que sigue explicando la regla del
+ * año pasado se lee perfectamente y no rompe nada. Dos defensas, y son las dos:
+ *
+ *   · los NÚMEROS salen de las constantes de `riberas.ts` por plantilla, no de los dedos
+ *     de nadie (ver la cabecera de `EXPLICACION_DEL_TITULO`);
+ *   · y la VACUNA DE LA GUARDIA de `verify:riberas-en-tres` le PREGUNTA al juego, sobre
+ *     una mesa de verdad, si ofrece jugar una guardia antes de tirar, y exige que la
+ *     frase «cómo se usa» diga «Tras tirar» si y sólo si no la ofrece. El día que la fase
+ *     3 de `docs/EL-LADRON-DE-RIBERAS.md` quite el `!estado.tirado` de `jugarLaGuardia`,
+ *     esa comprobación se pone ROJA, y volverla verde es cambiar esta fila.
  *
  * ═══ POR QUÉ ESTA TABLA ESTÁ AQUÍ Y NO EN `riberas.ts` ═══
  *
- * Porque las tres columnas son de PRESENTACIÓN y ninguna es del juego. `familia` es
+ * Porque las columnas son de PRESENTACIÓN y ninguna es del juego. `familia` es
  * cómo agrupa la mano de la escena —cinco montones, con los cinco títulos en uno—,
  * `dibujo` es la llave de un contorno de `escenas/iconos.ts`, y `nombre` es lo que se
  * lee en un naipe. Las reglas no distinguen a El Faro de El Huerto ni por asomo: para
  * ellas son la misma carta con dos seriales.
  *
- * Y son tres columnas y no una cuenta: `ano-bueno` se dibuja con `anobueno` y
+ * Y son columnas y no una cuenta: `ano-bueno` se dibuja con `anobueno` y
  * `dos-veredas` con `dosveredas`, así que un `clase.replace('-', '')` habría dado la
  * respuesta correcta hoy y una llave inventada el día que alguien añada una carta con
  * guion en el nombre. Una tabla se pone roja; una cuenta se equivoca en silencio.
@@ -581,15 +755,108 @@ export interface RetratoDeLaCarta {
  * compilador no lo mira.
  */
 const RETRATO_DE_LA_CARTA: Readonly<Record<ClaseDeCarta, RetratoDeLaCarta>> = {
-  guardia: { familia: 'guardia', dibujo: 'guardia', nombre: 'La Guardia' },
-  'ano-bueno': { familia: 'anobueno', dibujo: 'anobueno', nombre: 'El Año Bueno' },
-  acaparamiento: { familia: 'acaparamiento', dibujo: 'acaparamiento', nombre: 'El Acaparamiento' },
-  'dos-veredas': { familia: 'dosveredas', dibujo: 'dosveredas', nombre: 'Las Dos Veredas' },
-  molino: { familia: 'titulo', dibujo: 'molino', nombre: 'El Molino' },
-  cantera: { familia: 'titulo', dibujo: 'cantera', nombre: 'La Cantera' },
-  torreon: { familia: 'titulo', dibujo: 'torreon', nombre: 'El Torreón' },
-  faro: { familia: 'titulo', dibujo: 'faro', nombre: 'El Faro' },
-  huerto: { familia: 'titulo', dibujo: 'huerto', nombre: 'El Huerto' },
+  guardia: {
+    familia: 'guardia',
+    dibujo: 'guardia',
+    nombre: 'La Guardia',
+    /*
+     * LA GUARDIA DE HOY, con la regla de hoy: roba sin mover nada, y sólo después de
+     * tirar. Lo segundo no lo decide esta tabla — lo decide `jugarLaGuardia`, que empieza
+     * con `if (yo < 0 || !estado.tirado)`, y `opcionesDeRiberas`, que antes de tirar se va
+     * por su `return` con TIRAR y revelar y nada más. El «Tras tirar» con que abre
+     * `USAS_DE_LA_JUGADA` es lo que la vacuna de `verify:riberas-en-tres` contrasta contra
+     * esa respuesta; las otras dos puertas que esa misma frase dice (una al turno y la
+     * nueva no) salen de `sePuedeJugarLaCarta`, y su cabecera está aquí al lado.
+     *
+     * Cuando entre el estiaje, las tres frases se SUSTITUYEN por las de la fase 5 de
+     * `docs/LAS-CARTAS-SE-EXPLICAN.md` («Mueves el estiaje y robas a quien tenga allí»),
+     * no se suman.
+     */
+    explicacion: {
+      hace: 'Le quitas un bien al azar a quien elijas.',
+      consigues: 'Ese bien, y una muesca para La Mayor Guardia.',
+      usas: USAS_DE_LA_JUGADA,
+    },
+  },
+  'ano-bueno': {
+    familia: 'anobueno',
+    dibujo: 'anobueno',
+    nombre: 'El Año Bueno',
+    explicacion: {
+      hace: `Coges ${BIENES_DEL_ANO_BUENO} ${plural(BIENES_DEL_ANO_BUENO, 'bien', 'bienes')} del arcón, iguales o no.`,
+      consigues: `${enCabeza(cardinal(BIENES_DEL_ANO_BUENO))} ${plural(BIENES_DEL_ANO_BUENO, 'bien', 'bienes')} que no le quitas a nadie.`,
+      usas: USAS_DE_LA_JUGADA,
+    },
+  },
+  acaparamiento: {
+    familia: 'acaparamiento',
+    dibujo: 'acaparamiento',
+    nombre: 'El Acaparamiento',
+    /*
+     * «DE LOS DEMÁS», Y NO «DE LAS OTRAS MANOS», QUE ES OTRA COSA EN ESTA CASA.
+     *
+     * `mano` aquí es la de CARTAS —`CartaEnMano[]` en `riberas.ts`, y la mano del mazo es
+     * justo el sitio donde este naipe se está leyendo—, así que «todo ese bien de las otras
+     * manos» invitaba a entender que El Acaparamiento le quita CARTAS a los demás. Lo que
+     * se lleva es del `almacen`, y el reductor no toca una sola mano ajena. Se dice sin el
+     * sustantivo, que es lo barato y lo que no se puede leer al revés.
+     */
+    explicacion: {
+      hace: 'Pides un bien y todos te dan los que tengan.',
+      consigues: 'Todo ese bien de los demás, o nada.',
+      usas: USAS_DE_LA_JUGADA,
+    },
+  },
+  'dos-veredas': {
+    familia: 'dosveredas',
+    dibujo: 'dosveredas',
+    nombre: 'Las Dos Veredas',
+    /*
+     * ═══ EL PLAZO VA DENTRO, PORQUE ES EL ÚNICO SITIO DONDE SE PUEDE DECIR ═══
+     *
+     * Este naipe promete DOS y el juego puede dar UNA sin avisar. `jugarLasDosVeredas` no
+     * pone ninguna vereda: deja `veredasGratis` en dos y las veredas se alzan después, una
+     * a una. Y el crédito se apaga por dos caminos que el código tiene escritos: `trazar`
+     * lo pone a cero si la primera se comió el último hueco, y `siguienteTurno` lo pone a
+     * cero al acabar el turno, con su propio comentario diciendo que «quien juega Las Dos
+     * Veredas y luego pasa sin poner la segunda la pierde, y nadie que mire el tablero
+     * sabría que existe».
+     *
+     * Ese segundo camino no se recorre a voluntad, y conviene saberlo: con crédito vivo
+     * `opcionesDeRiberas` se va por su `if (v.veredasGratis > 0)` con las veredas y revelar
+     * y nada más, así que PASAR ni se ofrece. Lo que sí acaba el turno es EL PLAZO, y ahí
+     * la segunda se va sin que nadie haya tocado nada. O sea que el «nadie sabría que
+     * existe» es todavía más cierto de lo que su comentario dice.
+     *
+     * La decisión es buena; lo que no puede quedarse es que tampoco se diga. En la pantalla
+     * no hay contador —lo que hay es la `ayuda` de la opción de alzar, que sólo aparece
+     * cuando YA hay crédito—, así que el plazo se dice en los DOS sitios que se leen antes
+     * de que sea tarde: aquí, al coger el naipe, y en la `ayuda` de la opción que gasta la
+     * carta (`DOS_VEREDAS` en `riberas.ts`), que es el último texto que se lee antes de
+     * quedarse con el crédito en la mano. De ahí «este turno o nada», y de ahí que la vacuna lo juegue
+     * en una mesa de verdad: se juega la carta, se pone UNA, vence el plazo y se exige que
+     * el crédito haya muerto.
+     */
+    explicacion: {
+      hace: `Abres ${VEREDAS_DE_LA_CARTA} ${plural(VEREDAS_DE_LA_CARTA, 'vereda', 'veredas')} gratis; este turno o nada.`,
+      consigues: `${enCabeza(cardinal(VEREDAS_DE_LA_CARTA))} ${plural(VEREDAS_DE_LA_CARTA, 'paso', 'pasos')} del Vado Largo, o sitio de choza.`,
+      usas: USAS_DE_LA_JUGADA,
+    },
+  },
+  /*
+   * LOS CINCO TÍTULOS COMPARTEN EL OBJETO, y no cinco copias iguales.
+   *
+   * Lo dice la cabecera de `ClaseDeCarta`: «cuestan lo mismo, valen lo mismo y hacen lo
+   * mismo». Cinco copias iguales son cinco sitios donde corregir una errata, y el fallo
+   * sería el de siempre — cuatro corregidas y una no, en la carta que menos sale. Que sean
+   * el MISMO objeto lo afirma el comprobador; si un día un título deja de compartirlo será
+   * porque alguien lo decidió y le tocó tirar esta línea.
+   */
+  molino: { familia: 'titulo', dibujo: 'molino', nombre: 'El Molino', explicacion: EXPLICACION_DEL_TITULO },
+  cantera: { familia: 'titulo', dibujo: 'cantera', nombre: 'La Cantera', explicacion: EXPLICACION_DEL_TITULO },
+  torreon: { familia: 'titulo', dibujo: 'torreon', nombre: 'El Torreón', explicacion: EXPLICACION_DEL_TITULO },
+  faro: { familia: 'titulo', dibujo: 'faro', nombre: 'El Faro', explicacion: EXPLICACION_DEL_TITULO },
+  huerto: { familia: 'titulo', dibujo: 'huerto', nombre: 'El Huerto', explicacion: EXPLICACION_DEL_TITULO },
 };
 
 /**
@@ -693,6 +960,7 @@ export function cartasEnTres<O extends OpcionQueLlega>(
       familia: retrato.familia,
       dibujo: retrato.dibujo,
       nombre: retrato.nombre,
+      explicacion: retrato.explicacion,
       sePuedeJugar: seJuegan.has(id),
       sePuedeRevelar: seRevelan.has(id),
     });
@@ -714,10 +982,56 @@ export function cartasEnTres<O extends OpcionQueLlega>(
  * una guardia más — y las guardias son justo lo que hay que contar para saber si el
  * premio se va a mover.
  */
-const RETRATO_DEL_PREMIO = {
-  vado: { familia: 'vado', dibujo: 'vado', nombre: 'El Vado Largo' },
-  guardia: { familia: 'mayorguardia', dibujo: 'mayorguardia', nombre: 'La Mayor Guardia' },
-} as const;
+const RETRATO_DEL_PREMIO: Readonly<Record<'vado' | 'guardia', RetratoDeLaCarta>> = {
+  /*
+   * LOS DOS PREMIOS TAMBIÉN SE EXPLICAN, y son los que más falta hacía: aparecen SOLOS en
+   * la mano, sin que nadie los pida, no se pueden coger para nada y no tienen opción
+   * ninguna — o sea que hasta hoy no había ni una `ayuda` que dijera qué son. Quien ve por
+   * primera vez un naipe con un vado dibujado no tiene forma de averiguarlo jugando.
+   *
+   * Su «cómo se usa» empieza por «Nada» a propósito: es la respuesta, y no un hueco. Estos
+   * dos naipes no se sueltan en ninguna casilla.
+   *
+   * ═══ Y LOS DOS NO SE PIERDEN IGUAL, ASÍ QUE NO LO DICEN IGUAL ═══
+   *
+   * El «qué consigues» de los dos decía «mientras nadie te supere», y en uno de los dos eso
+   * es MEDIA regla. `recalcularElVado` tiene la otra escrita en mayúsculas en su cabecera:
+   * «Si el dueño baja del mínimo, porque alguien le partió la cadena con una choza, el
+   * premio queda VACANTE», y el código la cumple —el `sigueSiendoSuyo` exige `largoActual
+   * >= VADO_MINIMO`—. O sea que el Vado se pierde sin que nadie te supere, y quien leía el
+   * naipe no tenía manera de saberlo: se le va el premio, y con él dos puntos, por una
+   * choza ajena que ni siquiera es una vereda.
+   *
+   * `recalcularLaGuardia` es la misma función con otra cuenta dentro y tiene el mismo
+   * `sigueSiendoSuya`, PERO ahí la rama no se puede dar: lo que cuenta es `c.guardias`, que
+   * sólo sube (`jugarLaGuardia` la incrementa y nada la baja), así que una vez alcanzado el
+   * mínimo no se baja de él. Por eso su frase se queda como estaba, y no por descuido: es
+   * la verdad de su premio. Las dos cosas se juegan en la misma mesa en
+   * `verify:riberas-en-tres` — se le parte la cadena al dueño y se exige que el Vado quede
+   * vacante Y que La Mayor Guardia siga siendo suya—, para que el día que una de las dos
+   * reglas cambie sea la frase la que se ponga roja.
+   */
+  vado: {
+    familia: 'vado',
+    dibujo: 'vado',
+    nombre: 'El Vado Largo',
+    explicacion: {
+      hace: `Lo tiene quien encadena más veredas, desde ${VADO_MINIMO}.`,
+      consigues: `${PUNTOS_DEL_VADO} ${plural(PUNTOS_DEL_VADO, 'punto', 'puntos')}, hasta que te superen o te corten.`,
+      usas: 'Nada: se gana trazando veredas y se va solo.',
+    },
+  },
+  guardia: {
+    familia: 'mayorguardia',
+    dibujo: 'mayorguardia',
+    nombre: 'La Mayor Guardia',
+    explicacion: {
+      hace: `La tiene quien más guardias juega, desde ${GUARDIA_MINIMA}.`,
+      consigues: `${PUNTOS_DE_LA_GUARDIA} ${plural(PUNTOS_DE_LA_GUARDIA, 'punto', 'puntos')} mientras nadie te supere.`,
+      usas: 'Nada: se gana jugando guardias y se va sola.',
+    },
+  },
+};
 
 /**
  * EL PREFIJO DE LOS DOS NAIPES DE PREMIO, y por qué lleva dos puntos dentro.
@@ -767,6 +1081,7 @@ export function premiosEnTres(vista: unknown, quien: AsientoId | null): CartaDel
       familia: cara.familia,
       dibujo: cara.dibujo,
       nombre: cara.nombre,
+      explicacion: cara.explicacion,
       sePuedeJugar: false,
       sePuedeRevelar: false,
       esPremio: true,

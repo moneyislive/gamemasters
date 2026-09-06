@@ -191,9 +191,13 @@ export function arbolDeLaMesa(lienzo: LienzoDelModelo): { escena: THREE.Scene; c
     g.add(malla('mazo:casilla icono', cuadrito(), basicoSinProfundidad(), ORDEN_DE_LAS_CASILLAS + 2, [0, 0, 0.01]));
     manoDelMazo.add(g);
   }
+  /* El texto del naipe va vacío aquí a propósito: este guion dibuja el ÁRBOL de la escena
+   * y la escena no escribe una letra — la explicación la pinta el cliente por encima del
+   * lienzo, así que no cuelga ningún nodo de aquí. */
+  const sinExplicar = { hace: '', consigues: '', usas: '' };
   const cartasDelMazo = [
-    { id: 'm0', familia: 'guardia', dibujo: 'guardia', nombre: 'La Guardia', sePuedeJugar: true, sePuedeRevelar: false },
-    { id: 'm1', familia: 'titulo', dibujo: 'faro', nombre: 'El Faro', sePuedeJugar: false, sePuedeRevelar: true },
+    { id: 'm0', familia: 'guardia', dibujo: 'guardia', nombre: 'La Guardia', sePuedeJugar: true, sePuedeRevelar: false, explicacion: sinExplicar },
+    { id: 'm1', familia: 'titulo', dibujo: 'faro', nombre: 'El Faro', sePuedeJugar: false, sePuedeRevelar: true, explicacion: sinExplicar },
   ];
   for (const [i, colocada] of huecosDeLasCartas(cartasDelMazo, campo, proporcion, null).entries()) {
     const h = colocada.hueco;

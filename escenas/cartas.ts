@@ -119,6 +119,53 @@ export interface CartaDelMazo {
    * Opcional para que las nueve del mazo no tengan que escribirla: lo normal es una carta.
    */
   readonly esPremio?: boolean;
+  /**
+   * LAS TRES FRASES QUE EXPLICAN EL NAIPE, para quien las quiera pintar FUERA del lienzo.
+   *
+   * ═══ LA ESCENA NO LAS ESCRIBE, Y NO PUEDE ═══
+   *
+   * Dentro de la escena no hay una sola letra, y no es un descuido: lo único con que aquí
+   * se sabe escribir son contornos compilados (`CONTORNOS_DE_LA_CIFRA`,
+   * `CONTORNOS_DE_LA_CARTA`, `CONTORNOS_DEL_BIEN`), donde hay cifras y dibujos y ninguna
+   * letra. Está medido en `docs/LAS-CARTAS-SE-EXPLICAN.md` §1: la frase más larga saldría
+   * por 8.520 triángulos contra un `TOPE_DE_LA_MESA` de 4.500. O sea que el texto viaja
+   * DENTRO del naipe para que el CLIENTE lo pinte encima del `<canvas>`, y la escena lo
+   * lleva sin mirarlo, igual que lleva `nombre`. Ver también la cabecera de
+   * `PASO_DENTRO_DEL_GRUPO`, más abajo, que dice lo mismo desde el otro lado.
+   *
+   * ═══ Y POR QUÉ NO ES OPCIONAL, QUE ES LO PRIMERO QUE SE PROBÓ ═══
+   *
+   * `esPremio` es opcional y aquí la tentación era la misma: este fichero no sabe que
+   * existe Riberas, y exigir tres frases para repartir un naipe parece pedirle a un juego
+   * futuro que escriba su ayuda antes de poder pintar una mano. NO SE PUEDE. Este contrato
+   * está declarado DOS VECES —aquí y en `CartaDelMazoEnTres` de
+   * `shared/arcade/juegos/riberas-en-tres.ts`— y encaja por estructura, que es lo único
+   * que los ata; en la traducción el campo es obligatorio, porque los once naipes de
+   * Riberas lo llevan siempre. Con un `?` sólo de este lado los dos tipos dejan de encajar
+   * en la dirección que importa: los manejadores del cliente reciben `CartaDelMazoEnTres`
+   * y la escena los pide como `(carta: CartaDelMazo) => void`, y un parámetro que promete
+   * tres frases no puede aceptar un naipe que quizá no las traiga.
+   *
+   * No es una deducción: se escribió opcional, y `npm run typecheck` de la app cayó en
+   * `onJugarCarta` y `onRevelarCarta` con «Type 'undefined' is not assignable to type
+   * 'ExplicacionDeLaCarta'». Un juego futuro sin nada que explicar escribe tres cadenas
+   * vacías y se acabó; lo que no puede es que las dos declaraciones digan cosas distintas.
+   */
+  readonly explicacion: ExplicacionDelNaipe;
+}
+
+/**
+ * QUÉ HACE, QUÉ CONSIGUES Y CÓMO SE USA. Tres campos y no un párrafo, porque el sitio de
+ * la pantalla se acaba y hay que poder soltar el final entero en vez de cortar una frase
+ * por la mitad: media frase de ayuda es peor que ninguna.
+ *
+ * La escena no lee ninguno de los tres: los transporta. Quien los pinta es el cliente,
+ * fuera del lienzo.
+ */
+export interface ExplicacionDelNaipe {
+  readonly hace: string;
+  readonly consigues: string;
+  readonly usas: string;
 }
 
 /**

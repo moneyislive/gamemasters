@@ -197,7 +197,7 @@ import {
   pasoDentroDelGrupo,
   puertasDeLaCarta,
 } from '../cartas';
-import type { CartaDelMazo } from '../cartas';
+import type { CartaDelMazo, ExplicacionDelNaipe } from '../cartas';
 import { cuantosTriangulos, geometriaDeContornos } from '../formas';
 import {
   CAJA_DEL_PUENTE,
@@ -295,6 +295,18 @@ function paso(titulo: string): void {
  * un desplazamiento de verdad y no salta por redondeo.
  */
 const HOLGURA = 1e-9;
+
+/**
+ * LAS TRES FRASES DE UN NAIPE DE MENTIRA, para los bloques que miden GEOMETRÍA.
+ *
+ * `CartaDelMazo` lleva `explicacion` desde que las cartas se explican, y este guion reparte
+ * manos de hasta veintisiete naipes para ver dónde caen: lo que mide es el sitio, y el
+ * texto no entra en ninguna cuenta —la escena no escribe una letra, ver la cabecera de ese
+ * campo—. Una constante compartida y no tres cadenas por naipe para que quede claro que es
+ * relleno y que nadie está afirmando nada sobre lo que dice. Quien vigila las frases de
+ * verdad es `verify:riberas-en-tres`, sobre una mesa con el árbitro.
+ */
+const SIN_EXPLICAR: ExplicacionDelNaipe = { hace: '', consigues: '', usas: '' };
 
 const RADIO = 1;
 const DELTA = mallaDeRadio(2);
@@ -1963,6 +1975,9 @@ paso('La mano del mazo se agrupa por familias, cabe a la izquierda y no pisa a n
     nombre: id,
     sePuedeJugar: jugar,
     sePuedeRevelar: revelar,
+    /* El texto que el cliente pintará FUERA del lienzo. La escena lo transporta y no lo
+     * mira: aquí se pone porque el contrato lo pide, y este bloque mide geometría. */
+    explicacion: SIN_EXPLICAR,
   });
 
   /** Una mano a propósito desordenada: el reparto tiene que agruparla él. */
@@ -2383,6 +2398,7 @@ paso('La mano del mazo se agrupa por familias, cabe a la izquierda y no pisa a n
     sePuedeJugar: false,
     sePuedeRevelar: false,
     esPremio: true,
+    explicacion: SIN_EXPLICAR,
   };
   const conPremio = huecosDeLasCartas([unaGuardia, guardada, elVado], CAMPO, 16 / 9, null);
   comprobar(
@@ -4024,7 +4040,7 @@ paso('Un puente cubre su arista, salva lo que tiene debajo y encaja con el camin
     { id: 'b4', bien: 'sal' },
   ] as const;
   const UNA_DEL_MAZO = [
-    { id: 'c1', familia: 'guardia', dibujo: 'guardia', nombre: 'La Guardia', sePuedeJugar: true, sePuedeRevelar: false },
+    { id: 'c1', familia: 'guardia', dibujo: 'guardia', nombre: 'La Guardia', sePuedeJugar: true, sePuedeRevelar: false, explicacion: SIN_EXPLICAR },
   ] as const;
 
   for (const [comoSeLlama, proporcion] of [
