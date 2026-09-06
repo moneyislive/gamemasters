@@ -594,6 +594,34 @@ dados o uno) está dentro de la decisión 3, y las otras seis son las decisiones
     cambia lo que hay bajo el dedo a mitad de gesto. Deja de ser una decisión abierta de
     la fase 4: es ésta.
 
+17. **Los bienes de los DEMÁS no se llevan a la pantalla completa. Los trueques, sí:
+    las propuestas y los que se cierran.** Decidido por Miguel el 7 de septiembre de
+    2026, sobre el inventario de lo que hoy vive fuera del lienzo.
+
+    El inventario encontró tres datos que sólo existen en los seis paneles declarados de
+    `Paneles` y que ningún otro mueble dice: mis bienes por clase («Lo mío»: limo, junco,
+    sal, piedra y grano con su cifra, que en la escena son cartas sin número), **los
+    bienes de cada colono** (el panel «La mesa» dice «…, B bienes, …») y las propuestas de
+    trueque (el panel «Trueques», que es lo único que hoy las enseña). De los tres, el de
+    en medio se cae.
+
+    Lo que eso ahorra, y por eso se escribe aquí y no en una lista de pendientes:
+    `ColonoEnElMarcador` NO gana el campo `bienes`, así que la fase del contrato sube
+    `chozas` y `torres` y para. Contar los bienes ajenos es público en la familia de la
+    que viene este juego —las cartas se tienen en la mano y se ven—, pero en una pantalla
+    es un renglón por colono que nadie mira dos veces, y en una mesa de seis son seis
+    renglones. Lo que sí decide una partida es qué se está ofreciendo y qué se cerró, y
+    eso es lo que se queda.
+
+    Y «los trueques» son las dos mitades: las propuestas VIVAS con su aceptar y su
+    rechazar —que Miguel puso como requisito de esta pantalla, con la aceptación
+    confirmada para que no se acepte por equivocación— y los que YA se cerraron, que es
+    lo que el panel «Trueques» enseña hoy leyendo `v.tratos` con su `EstadoDelTrato`
+    (`propuesta`, `aceptada`, `rechazada`, `caducada`) y que `TRATOS_QUE_SE_RECUERDAN`
+    limita a ocho. Un trueque cerrado que nadie ve es una partida que nadie puede
+    seguir: quien vuelve al tablero después de dos turnos no sabe quién le dio qué a
+    quién.
+
 ## 2. La pantalla completa
 
 ### 2.1. Qué se va y qué se queda
