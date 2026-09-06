@@ -46,9 +46,42 @@
 > tablón» es **el pregón** desde la segunda pasada de `docs/EL-TRUEQUE-DE-RIBERAS.md`
 > (§10.8 de aquí dice por qué se renombró allí, y por qué no era cosmético).
 >
-> Este documento no escribe una sola línea de código.
+> **CUARTA PASADA, Y ES LA DEL ATERRIZAJE. LAS TRES PRIMERAS NO ESCRIBIERON UNA LÍNEA DE
+> CÓDIGO; ÉSTA CUENTA EL QUE SE ESCRIBIÓ.** Las fases 1 y 2 están confirmadas en `85f28c6`
+> —el texto con su comprobador, y el cartel en el escritorio—, con tres vueltas y tres
+> revisores distintos encima. Esta pasada no diseña nada nuevo: pone el documento a decir
+> lo que hay en el árbol, y trae de vuelta lo que salió al escribirlo. Tres cosas cambian
+> de sitio:
+>
+>   · **El §2 deja de ser el sitio donde se decide el texto.** Seis de sus ocho filas
+>     mentían en la columna de «cómo se usa» —las cuatro que se juegan y las dos que la
+>     tercera vuelta ya había tocado—, porque los naipes cambiaron esa columna entera por
+>     una sola frase compartida. Se copia una última vez, con las veintiuna frases leídas
+>     del fichero, y se cierra en pasado: el porqué está en el §2.0.
+>   · **Entra el §2 bis, «las cinco reglas que el juego no contaba», que es lo más valioso
+>     que salió del encargo** y no estaba en ninguna parte. Al escribir las once
+>     explicaciones, tres revisores encontraron cinco textos que prometían lo que Riberas
+>     no cumple, y cada uno destapó una regla que hasta ese día sólo vivía en la cabeza de
+>     quien la escribió. Son reglas del JUEGO y no de este encargo: el documento del ladrón
+>     y el del trueque también tienen que conocerlas.
+>   · **Y entra el §9 bis, «lo que se hizo distinto de lo escrito»**, con los siete sitios
+>     donde el código no siguió a este documento y por qué —el peor lienzo de este cliente
+>     entre ellos, que no es ninguno de los que aquí se midieron—. El §5.1 y el §5.3 se
+>     quedan como tablas de DISEÑO, previas y fechadas; el número de hoy se lee en el
+>     §9 bis y, antes que ahí, en `elCartelQueCabe` y en `verify:escritorio`.
+>
+> Los dos recuentos de esta pasada, corridos en este árbol el 6-sep-2026 sobre `85f28c6`
+> limpio, con el código de salida mirado y no la última línea: **`verify:riberas-en-tres`
+> 337 comprobaciones, salida 0**; **`verify:escritorio` 448 comprobaciones, salida 0**.
 
-## 0. Qué hay hoy, y qué no sabe quien abre Riberas por primera vez
+## 0. Qué había antes, y qué no sabía quien abría Riberas por primera vez
+
+> **Este §0 describe `6372bc7`, o sea antes de las fases 1 y 2.** Se queda porque es el
+> planteamiento del encargo y porque tres de sus cuatro agujeros siguen abiertos en alguna
+> pantalla. Lo que cambió en `85f28c6`: en el escritorio, los once naipes llevan sus tres
+> frases y hay cartel al pie del lienzo, así que el primer agujero y el tercero están
+> cerrados **ahí**. En la app siguen los dos (fase 3), y **el cuarto —el retablo, que en las
+> mesas de cinco y seis es la única pantalla— sigue entero** (fase 4).
 
 La mano de la izquierda es la de las cartas del mazo. La coloca `huecosDeLasCartas`
 (`escenas/cartas.ts`), la pinta `ManoDelMazo` con una `CartaDelMazoEnLaMano` por naipe
@@ -194,82 +227,117 @@ la segunda del §12 y no la última.
     la fase del retablo se deja para el final, se queda para siempre detrás de las tres del
     3D, que es exactamente lo que pasó con la primera vuelta de este documento.
 
+    **Y es la única de las diez que no se cumplió.** El cartel del escritorio aterrizó
+    primero, y con eso el retablo quedó detrás del trueque entero. No se retira la decisión
+    —el argumento es el mismo y sigue siendo bueno—: se anota que una decisión escrita en un
+    documento no empuja una fase, y que la única defensa que este encargo tiene contra que se
+    olvide es que alguien la lea aquí (§11, primera fila; §12.0).
+
 ## 2. Los once naipes, con sus tres frases
+
+### 2.0. Esta tabla se cierra aquí, y en pasado
+
+**La decisión es de esta cuarta pasada y va delante, porque manda sobre lo que viene
+debajo.** Lo que sigue es una FOTO de cómo quedaron las veintiuna frases en `85f28c6`,
+leídas del fichero el 6-sep-2026. No es «las frases»: es «cómo quedaron ese día». La
+diferencia no es de estilo, y el precio de no haberla hecho antes está contado:
+
+- **Seis de las ocho filas que esta tabla tenía mentían al empezar la pasada.** Las cuatro
+  que se juegan —La Guardia, El Año Bueno, El Acaparamiento y Las Dos Veredas— llevaban un
+  «cómo se usa» que hoy no existe en ninguna parte: «Tras tirar, suéltala en JUGAR y di a
+  quién», «… y di cuáles», «… y di cuál pides», «… y trázalas». Los cinco títulos mentían en
+  las dos columnas de la derecha, y El Vado Largo en la de en medio. Las dos que se salvaban
+  eran La Mayor Guardia y la guardia con el estiaje, que no ha aterrizado.
+  Las cuatro colas se fueron **enteras** y las sustituye una sola frase compartida,
+  `USAS_DE_LA_JUGADA`, y el porqué está en el §2 bis, regla (b): repetían lo que su propio
+  «qué hace» ya decía, y a cambio ocupaban el sitio de dos puertas que el juego impone y que
+  ningún texto contaba. Seis mentiras en una tabla de ocho filas, y ninguna se veía
+  leyéndola: para verlas hay que abrir el fichero, que es exactamente el argumento.
+- **El texto vive hoy en UN sitio y con la batería encima.** `RETRATO_DE_LA_CARTA`,
+  `RETRATO_DEL_PREMIO` y `EXPLICACION_DEL_TITULO` en
+  `shared/arcade/juegos/riberas-en-tres.ts`, con las siete constantes componiéndolo y con
+  las vacunas de `verify:riberas-en-tres` preguntándole a una mesa de verdad si lo que la
+  frase promete es lo que el reductor hace. Esta tabla no tiene ni una comprobación encima,
+  y no la puede tener: un documento no se compila.
+- **Así que una copia en presente es un sitio más donde desfasarse, y una copia fechada no
+  lo es.** Un renglón que dice «hoy la guardia dice X» se pudre; uno que dice «en `85f28c6`
+  la guardia decía X» es verdad para siempre. De aquí en adelante este documento **nombra**
+  las tres constantes y no las copia; quien quiera el texto de hoy lo lee de ahí, que es
+  además el único sitio donde puede estar seguro de que lo es.
+
+Lo que el §2 sigue aportando, y por eso no se borra entero, es lo que la tabla no dice: **el
+porqué de cada frase**, que está en los párrafos de más abajo y en las cabeceras del fichero,
+y **la forma del presupuesto** (renglones y no caracteres), que es la decisión 6 y la que
+tres vueltas seguidas se equivocaron en calcular.
+
+### 2.1. Las veintiuna frases, como quedaron en `85f28c6`
 
 Las tres columnas son las tres cosas que Miguel pidió, en su orden: **qué hace**, **qué
 consigues**, **cómo se usa**. En el idioma de Riberas, sin jerga de reglas, sin nombrar un
 tipo de movimiento y sin decir «desarrollo», «caballero» ni «monopolio».
 
-Los cinco títulos comparten las tres frases, y eso no es pereza: es lo que dice el propio
-código («Los cinco TÍTULOS son una sola familia con cinco caras: cuestan lo mismo, valen lo
-mismo y hacen lo mismo», cabecera de `ClaseDeCarta`). Lo que los distingue es el dibujo y el
-nombre, y ésos ya son distintos.
+Son **veintiuna frases distintas en siete juegos de tres** —las cuatro clases que se juegan,
+uno para los cinco títulos y los dos premios—, repartidas en treinta y tres campos porque los
+cinco títulos comparten los suyos. Y de esas veintiuna sólo hay **dieciocho cadenas
+distintas**, porque las cuatro que se juegan comparten `USAS_DE_LA_JUGADA` palabra por
+palabra: es una constante y no cuatro copias, por lo mismo que los cinco títulos comparten el
+objeto entero. Cuatro copias de la misma regla son cuatro sitios donde corregir una errata y
+tres donde olvidarla.
 
 | Naipe | Qué hace | Qué consigues | Cómo se usa |
 |---|---|---|---|
-| **La Guardia** (hoy) | Le quitas un bien al azar a quien elijas. | Ese bien, y una muesca para La Mayor Guardia. | Tras tirar, suéltala en JUGAR y di a quién. |
-| **La Guardia** (con el estiaje) | Mueves el estiaje y robas a quien tenga allí. | Un bien suyo, y muesca para La Mayor Guardia. | Suéltala en JUGAR, antes o después de tirar. |
-| **El Año Bueno** | Coges 2 bienes del arcón, iguales o no. | Dos bienes que no le quitas a nadie. | Tras tirar, suéltala en JUGAR y di cuáles. |
-| **El Acaparamiento** | Pides un bien y todos te dan los que tengan. | Todo ese bien de las otras manos, o nada. | Tras tirar, suéltala en JUGAR y di cuál pides. |
-| **Las Dos Veredas** | Abres 2 veredas sin pagarlas. | Dos pasos del Vado Largo, o sitio de choza. | Tras tirar, suéltala en JUGAR y trázalas. |
-| **El Molino, La Cantera, El Torreón, El Faro, El Huerto** | No se juega: se tiene. Vale 1 punto. | Ese punto: secreto tuyo hasta que la enseñes. | Suéltala en REVELAR; no gasta la jugada. |
-| **El Vado Largo** (premio) | Lo tiene quien encadena más veredas, desde 5. | 2 puntos mientras nadie te supere. | Nada: se gana trazando veredas y se va solo. |
+| **La Guardia** | Le quitas un bien al azar a quien elijas. | Ese bien, y una muesca para La Mayor Guardia. | Tras tirar, suelta una al turno; la nueva no. |
+| **El Año Bueno** | Coges 2 bienes del arcón, iguales o no. | Dos bienes que no le quitas a nadie. | Tras tirar, suelta una al turno; la nueva no. |
+| **El Acaparamiento** | Pides un bien y todos te dan los que tengan. | Todo ese bien de los demás, o nada. | Tras tirar, suelta una al turno; la nueva no. |
+| **Las Dos Veredas** | Abres 2 veredas gratis; este turno o nada. | Dos pasos del Vado Largo, o sitio de choza. | Tras tirar, suelta una al turno; la nueva no. |
+| **El Molino, La Cantera, El Torreón, El Faro, El Huerto** | No se juega: se tiene. Vale 1 punto. | Sin enseñarla no ganas: suéltala en su hueco. | En tu turno, y no gasta la jugada. |
+| **El Vado Largo** (premio) | Lo tiene quien encadena más veredas, desde 5. | 2 puntos, hasta que te superen o te corten. | Nada: se gana trazando veredas y se va solo. |
 | **La Mayor Guardia** (premio) | La tiene quien más guardias juega, desde 3. | 1 punto mientras nadie te supere. | Nada: se gana jugando guardias y se va sola. |
 
-Y lo que cada frase mide, con las tildes puestas y contado por `textos-con-tildes.mjs`. La
-columna que manda es la última: cuántos RENGLONES ocupa cada frase envuelta con avaricia a
-**25 letras por línea**, que es lo que da el lienzo más estrecho de los quince con el rem de
-esta casa en 17 puntos (§5.1). La segunda vuelta ponía ahí 27, que salían de un rem de 16.
+Y la de la guardia CON EL ESTIAJE, que es la fase que queda y **sustituye** a la de arriba,
+no se suma: «Mueves el estiaje y robas a quien tenga allí» / «Un bien suyo, y muesca para La
+Mayor Guardia» / y un «cómo se usa» que la vacuna decidirá, porque la fase que la dispara es
+la que le quita el «Tras tirar» (§7.6 y §12).
 
-| Naipe | Hace | Consigues | Usas | Las tres seguidas | Bytes | Renglones a 25 (h+c+u) |
-|---|---|---|---|---|---|---|
-| La Guardia (hoy) | 41 | 45 | 43 | 131 | 133 | 2+2+2 = 6 |
-| La Guardia (con el estiaje) | 45 | 45 | 44 | 136 | 139 | 2+2+2 = 6 |
-| El Año Bueno | 39 | 36 | 42 | 119 | 122 | 2+2+2 = 6 |
-| El Acaparamiento | 44 | 41 | 46 | 133 | 135 | 2+2+2 = 6 |
-| Las Dos Veredas | 29 | 43 | 41 | 115 | 117 | 2+2+2 = 6 |
-| Los cinco títulos | 36 | 45 | 40 | 123 | 125 | 2+2+2 = 6 |
-| El Vado Largo | 45 | 34 | 44 | 125 | 126 | 2+2+2 = 6 |
-| La Mayor Guardia | 43 | 33 | 44 | 122 | 123 | 2+2+2 = 6 |
+Y lo que cada frase mide, con las tildes puestas y contado sobre las cadenas de `85f28c6`.
+Las dos columnas de renglones son las dos que el cartel usa de verdad: **25 letras por línea**
+es el peor lienzo de la lista compartida con el móvil (320×360) y **20** es el peor que este
+cliente puede dar (288×420, §9 bis).
 
-Las veinticuatro frases ocupan **exactamente dos renglones** a 25 letras y **uno** a partir
-de 46, y ninguna pasa de 46 caracteres. Ésa es la forma del presupuesto (decisión 6): no
+| Naipe | Hace | Consigues | Usas | Las tres seguidas | Bytes | Renglones a 25 | Renglones a 20 |
+|---|---|---|---|---|---|---|---|
+| La Guardia | 41 | 45 | 45 | 133 | 133 | 2+2+2 = 6 | 2+3+3 = 8 |
+| El Año Bueno | 39 | 36 | 45 | 122 | 123 | 2+2+2 = 6 | 2+2+3 = 7 |
+| El Acaparamiento | 44 | 35 | 45 | 126 | 127 | 2+2+2 = 6 | 3+2+3 = 8 |
+| Las Dos Veredas | 42 | 43 | 45 | 132 | 132 | 2+2+2 = 6 | 3+3+3 = 9 |
+| Los cinco títulos | 36 | 45 | 34 | 117 | 119 | 2+2+2 = 6 | 2+3+2 = 7 |
+| El Vado Largo | 45 | 43 | 44 | 134 | 135 | 2+2+2 = 6 | 3+3+3 = 9 |
+| La Mayor Guardia | 43 | 33 | 44 | 122 | 123 | 2+2+2 = 6 | 3+2+3 = 8 |
+
+Las veintiuna ocupan **exactamente dos renglones** a 25 letras, y **ninguna pasa de 45
+caracteres**. A 20 letras se van a dos o a tres, que es por lo que en el 288×420 del
+escritorio caben DOS frases y no tres. Ésa es la forma del presupuesto (decisión 6): no
 «cuántas letras», sino «cuántos renglones en el lienzo peor», porque el cartel se corta por
 renglones y no por letras. La columna «las tres seguidas» cuenta los dos espacios que las
-unen, y es la que se usa en el §3 para pesar el cable.
+unen, y es la que se usó en el §3 para pesar el cable.
 
-**Y una segunda frase que hubo que reescribir, por el mismo motivo que la primera y con el
-otro error debajo.** La de «qué consigues» de los cinco títulos decía «Ese punto: sólo lo
-cuentas tú hasta que lo enseñes»: 51 caracteres, que cabían de sobra en cualquier tope de
-caracteres y que a **25** letras por línea ocupaban **TRES** renglones. A 27 —el ancho falso
-que salía del rem de 16— ocupaban dos, y por eso pasó la segunda vuelta entera sin que nadie
-la viera. Queda «Ese punto: secreto tuyo hasta que la enseñes»: 45 caracteres y dos
-renglones, como las otras veintitrés. Es la misma clase de fallo que la frase de la guardia
-del párrafo de más abajo, y las dos juntas son el argumento de la decisión 6: en este
-documento el presupuesto en caracteres ya ha mentido dos veces, y el de renglones ninguna
-—siempre que el ancho del renglón esté medido con el rem que la casa tiene de verdad.
+**Las tres vueltas de diseño reescribieron cuatro frases, y las cuatro veces por lo mismo:
+un tope en caracteres no ve dónde cae el corte.** «Un bien al azar, y una muesca para La
+Mayor Guardia» medía 52 y cabía de sobra en el tope viejo de 55, y ocupaba TRES renglones.
+«Ese punto: sólo lo cuentas tú hasta que lo enseñes» medía 51, cabía en cualquier tope de
+caracteres, y ocupaba TRES renglones a 25 letras —a 27, el ancho falso que salía del rem de
+16, ocupaba dos, y por eso pasó una vuelta entera sin que nadie la viera—. Y «Mueves al
+ladrón» nombraba una pieza que **no se llama así en pantalla**: la decisión 10 de
+`docs/EL-LADRON-DE-RIBERAS.md` la llama EL ESTIAJE, y deja `ladron` fuera del vocabulario de
+Riberas por lo mismo que `limo` no es `madera`. Las tres correcciones aguantan en `85f28c6`.
 
-**Veinticuatro aquí, veintiuna en el código, y la cuenta hay que darla.** La tabla de arriba
-tiene ocho filas porque la guardia sale dos veces, una por cada regla; en
-`RETRATO_DE_LA_CARTA` y `RETRATO_DEL_PREMIO` hay a la vez **siete juegos de tres, o sea
-veintiuna frases distintas** (las cuatro clases que se juegan, uno para los cinco títulos, y
-los dos premios), repartidas en treinta y tres campos porque los cinco títulos comparten los
-suyos. Las tres de la guardia con el estiaje **sustituyen** a las tres de hoy, no se suman:
-entran en la fase 5 (§12).
-
-**Y una frase que la primera vuelta escribió mal, con la palabra que no es.** Decía «Mueves
-al ladrón y robas a quien tenga allí», y la pieza **no se llama así en pantalla**: la
-decisión 10 de `docs/EL-LADRON-DE-RIBERAS.md` la llama EL ESTIAJE en pantalla y `estiaje`
-en el código, y deja `ladron` fuera del vocabulario de Riberas por lo mismo que `limo` no es
-`madera`. Con «el estiaje» la frase mide 45 en vez de 44 y sigue en dos renglones. La otra
-que cambió es la de «qué consigues» de esa misma fila: «Un bien al azar, y una muesca para
-La Mayor Guardia» medía 52 caracteres, cabía de sobra en el tope viejo de 55 y ocupaba
-**TRES** renglones ya a 27 letras. Queda «Un bien suyo, y muesca para La Mayor Guardia»: 45
-y dos renglones, como todas las demás. La segunda vuelta escribió aquí que aquél era «el
-único sitio del documento donde el presupuesto en caracteres mentía», y no lo era: con el
-ancho de renglón bien medido —25 letras y no 27, §5.1— mentía en un segundo sitio, el de
-los cinco títulos, que es el párrafo de más arriba. Un tope en caracteres no falla una vez:
-falla cada vez que el corte cae donde no se miró.
+**Y al escribir el código, las once explicaciones se volvieron a tocar, y esta vez no por la
+medida sino por la regla.** Las cinco frases que prometían lo que Riberas no cumple están en
+el §2 bis, con lo que cada una destapó. Se dice aquí para que nadie lea la tabla del §2.1
+como si fuera la del diseño con las erratas quitadas: **seis de sus siete filas dicen otra
+cosa que la primera vuelta**, y ninguna de esas seis cambió por sitio ni por tildes. La
+única que no se movió ni una letra es La Mayor Guardia, y tampoco fue por descuido: es la
+regla (e), y hay una comprobación que exige que siga sin moverse.
 
 **Los números de las frases no se escriben a mano.** `2 bienes` es `BIENES_DEL_ANO_BUENO`,
 `2 veredas` es `VEREDAS_DE_LA_CARTA`, `desde 5` es `VADO_MINIMO`, `desde 3` es
@@ -282,11 +350,152 @@ veredas» con letras es un texto que miente el día que alguien toque la constan
 `BIENES_DEL_ANO_BUENO` lleva escrito en su propia cabecera por qué esa coincidencia con
 `VEREDAS_DE_LA_CARTA` es casualidad y no debe compartirse.
 
+**Y la CIFRA no era la mitad del problema: era la mitad barata.** Eso lo descubrió el
+código, y está en el §9 bis. «Dos bienes», «Dos pasos», «Vale 1 punto» y «2 puntos» hablan
+del mismo número sin escribirlo con cifra, y la palabra escrita a mano y la concordancia
+escrita a mano son exactamente el mismo fallo que la cifra escrita a mano: el día que
+alguien suba `VEREDAS_DE_LA_CARTA` a tres, «Abres 3 veredas» y «Dos pasos» se contradicen
+dentro del mismo naipe y las dos se leen igual de bien. Así que la palabra sale de
+`cardinal`, el plural de `plural` y la mayúscula de cabeza de `enCabeza`, las tres
+exportadas al lado de la tabla.
+
 **Lo que las frases NO dicen, y por qué.** No dicen lo que cuesta comprar una carta (eso lo
 dice el rótulo y la ayuda de COMPRAR, que ya los escribe `opcionesDelMazo` con
 `listar(COSTE_DE_LA_CARTA)`), no dicen cuántas hay de cada clase en el mazo (`BOLSA_DE_CARTAS`
 es información que se cuenta jugando, y publicarla en un cartel cambia el juego) y no dicen
 con cuántos puntos se gana (`PUNTOS_PARA_GANAR` es del juego, no de la carta).
+
+## 2 bis. Las cinco reglas que el juego no contaba
+
+**Esto es lo más valioso que salió del encargo, y no lo diseñó nadie: apareció al tener que
+escribir once frases cortas y verdaderas.** Tres revisores, en tres vueltas sobre el código,
+encontraron cinco textos que prometían lo que Riberas no cumple. Cada uno destapó una regla
+que el juego SÍ tiene, que el reductor SÍ aplica, y que hasta ese día no estaba escrita en
+ninguna pantalla ni en ningún documento: sólo en la cabeza de quien la escribió y en el
+cuerpo de una función.
+
+Y son reglas del JUEGO, no de este encargo. `docs/EL-LADRON-DE-RIBERAS.md` y
+`docs/EL-TRUEQUE-DE-RIBERAS.md` tocan las cinco: la (b) manda sobre cuándo se puede jugar la
+guardia que el estiaje mueve, la (c) sobre lo que una choza le hace al Vado, la (d) sobre lo
+que un turno que se acaba se lleva por delante, y la (a) sobre qué significa ir ganando.
+Ninguna de las cinco se puede tocar creyendo que se está tocando texto.
+
+Las cinco están JUGADAS y no leídas: cada una tiene en `verify:riberas-en-tres` una mesa de
+verdad que hace el movimiento y le pregunta al reductor, y sólo con esa respuesta en la mano
+se le exige algo a la frase. La diferencia es la que separa comprobar la regla de comprobar
+lo que uno mismo escribió.
+
+### (a) Un título sin revelar NO puntúa para ganar
+
+**Dónde está la regla.** `puntosDe` (`riberas.ts`) suma piezas, premios y títulos
+**revelados**, y su cabecera lo dice en mayúsculas: «CON UN TÍTULO SIN REVELAR NO SE GANA».
+Los ocultos los cuenta `puntosOcultosDe`, que entra en la vista sólo por `misPuntos` y no le
+llega a nadie más. Y `puedeHaberGanado` cuenta `puntosDe`, nunca `puntosOcultosDe`.
+
+**Qué prometía el texto.** «Ese punto: secreto tuyo hasta que la enseñes». De ahí un recién
+llegado sale creyendo que guardar el título es gratis y que el punto ya cuenta, o sea peor
+de lo que estaba: es el §1.6 del diseño contado por la mitad que no decide la partida.
+
+**Qué se hizo.** El «qué consigues» de los cinco títulos pasa a «Sin enseñarla no ganas:
+suéltala en su hueco». Lleva la regla Y el gesto, y eso no es adorno: es la frase que se
+pinta en los dos lienzos estrechos, donde la tercera no se lee (§9 bis).
+
+**Cómo se comprueba.** Se monta un colono con SIETE puntos en público y el octavo en un
+título en la mano, se hace un movimiento que no da puntos (una vereda vale cero) y se exige
+que la partida siga «jugando» y sin ganadores; luego se revela por el árbitro y se exige que
+termine y que el ganador sea él. No se mira el `momento` del estado montado a mano, porque
+`puedeHaberGanado` sólo corre al final de un movimiento: trazando, habla el juez.
+
+### (b) Sólo se juega UNA carta por turno, y la comprada hoy no se juega hoy
+
+**Dónde está la regla.** `sePuedeJugarLaCarta` (`riberas.ts`) son dos líneas y son dos
+puertas: `if (estado.cartaJugada) return false;` y `return enMano.comprada <
+estado.turnosAbiertos;`. `opcionesDelMazo` repite el mismo corte sobre la vista, y su
+cabecera explica que ahí es donde muerden —el portillo para el movimiento antes de llegar al
+reductor—.
+
+**Qué prometía el texto.** «Tras tirar, suéltala en JUGAR y di a quién», y sus tres
+hermanas. Eso nombra UNA de las tres condiciones como si fuera la condición entera. **Y la
+ironía es la que lo hace grave: la carta que un recién llegado mira primero es justo la que
+acaba de comprar**, o sea la única que el texto le explicaba cómo jugar y el juego no le
+dejaba. Se dibuja apagada y muda, y el cartel le contaba cómo soltarla.
+
+**Qué se hizo.** Las cuatro colas («di a quién», «di cuáles», «di cuál pides», «trázalas»)
+repetían lo que su propio «qué hace» ya decía, así que se van y dejan sitio a las dos puertas
+que faltaban. Queda **una sola frase compartida por las cuatro**, `USAS_DE_LA_JUGADA`: «Tras
+tirar, suelta una al turno; la nueva no.» Cuarenta y cinco caracteres, dos renglones. Y el
+gesto se dice sin nombrar mando ninguno, por lo que cuenta el §9 bis.
+
+**Cómo se comprueba.** Las tres puertas, con tres mesas: la misma carta comprada ayer se
+ofrece y comprada hoy no; con `cartaJugada` puesto la segunda no se ofrece; y antes de tirar
+tampoco. Y entonces se exige que la frase diga cada una **si y sólo si** el juego la impone.
+
+### (c) El Vado Largo queda VACANTE también si te cortan la cadena
+
+**Dónde está la regla.** La cabecera de `recalcularElVado` la tiene escrita en mayúsculas:
+«Si el dueño baja del mínimo —porque alguien le partió la cadena con una choza— el premio
+queda VACANTE y se reparte de nuevo». Y el código la cumple: `sigueSiendoSuyo` exige
+`largoActual >= VADO_MINIMO`, y `largoDelVado` cuenta con los vértices bloqueados por las
+piezas ajenas.
+
+**Qué prometía el texto.** «2 puntos mientras nadie te supere», que es MEDIA regla. Se te va
+el premio, y con él dos puntos, por una choza ajena que ni siquiera es una vereda, y quien
+leía el naipe no tenía manera de enterarse.
+
+**Qué se hizo.** «2 puntos, hasta que te superen o te corten.»
+
+**Cómo se comprueba.** No se lee la cabecera: se juega. Se monta al dueño con su cadena de
+cinco, se le parte por el vértice de en medio con una choza de otro, se hace un movimiento
+para que hable el reductor, y se exige que el Vado quede vacante sin que nadie le haya
+superado. Con eso contestado, se le exige a la frase que nombre las dos maneras.
+
+### (d) El crédito de Las Dos Veredas caduca al acabar el turno, y es invisible
+
+**Dónde está la regla, y quién la reconoce.** `jugarLasDosVeredas` no pone ni una vereda:
+deja `veredasGratis` en dos y las veredas se alzan después, una a una. El crédito muere por
+dos caminos escritos: `trazar` lo apaga si la primera se comió el último hueco, y
+`siguienteTurno` lo pone a cero al acabar el turno. **El propio comentario de
+`siguienteTurno` admite que es invisible**: «quien juega Las Dos Veredas y luego pasa sin
+poner la segunda la pierde, porque la alternativa convierte una carta en un crédito que hay
+que recordar, y nadie que mire el tablero sabría que existe».
+
+**Y hay un matiz que sólo se ve preguntando, y que hace la regla peor de lo que su comentario
+dice.** Pasar A PROPÓSITO no se puede: con crédito vivo, `opcionesDeRiberas` se va por su
+`if (v.veredasGratis > 0)` con las veredas y revelar y nada más, así que PASAR ni se ofrece.
+Lo que sí acaba el turno es EL PLAZO, y ahí la segunda se va sin que nadie haya tocado nada.
+O sea que el «nadie sabría que existe» es todavía más cierto de lo que su comentario dice.
+
+**Qué prometía el texto.** «Abres 2 veredas sin pagarlas». El naipe promete dos y el juego
+puede dar una, en silencio. En la pantalla no hay contador: lo que hay es la `ayuda` de la
+opción de alzar, que sólo aparece cuando YA hay crédito.
+
+**Qué se hizo.** «Abres 2 veredas gratis; este turno o nada.» El plazo se dice en los dos
+sitios que se leen ANTES de que sea tarde: el naipe, al cogerlo, y la `ayuda` de la opción
+que gasta la carta, que es el último texto antes de quedarse con el crédito en la mano.
+
+**Cómo se comprueba.** Se juega entero: se juega la carta y se exige que el tablero quede
+como estaba con el crédito en dos; se pone UNA y queda una; se pregunta a las opciones y no
+hay PASAR; se avanza el reloj hasta que vence el plazo y se exige que el crédito haya muerto
+con el turno.
+
+### (e) La Mayor Guardia NO se puede perder por bajar, y su texto cuenta una sola manera a propósito
+
+**Dónde está la regla.** `recalcularLaGuardia` es línea a línea la misma función que
+`recalcularElVado` con otra cuenta dentro, y tiene el mismo `sigueSiendoSuya`. Pero la rama
+del vacante **no se puede dar**: lo que cuenta es `c.guardias`, que sólo sube —`jugarLaGuardia`
+la incrementa y nada la baja—, así que una vez alcanzado el mínimo no se baja de él.
+
+**Por qué esto es un hallazgo y no una ausencia.** Es la única de las cinco donde el texto se
+queda como estaba, y hacía falta saber por qué. Con la (c) recién descubierta, lo natural es
+copiarle el arreglo al premio hermano: «hasta que te superen o te corten» en los dos. Sería
+mentir del otro lado. Que las dos frases digan cosas distintas es la verdad de cada premio, y
+sin este párrafo el siguiente que las lea las «arregla».
+
+**Cómo se comprueba.** En la MISMA mesa de la (c): con la choza que le parte la cadena al
+dueño se exige a la vez que el Vado quede vacante **y que La Mayor Guardia siga siendo suya**;
+y luego se le exige a la frase del Vado que nombre el corte y a la de La Mayor Guardia que
+**no** lo nombre. El día que una de las dos reglas cambie, se pone roja la frase que dejó de
+ser verdad y no la otra.
 
 ## 3. De dónde sale el texto, y por qué no viaja en la vista
 
@@ -406,6 +615,17 @@ El cartel y el toque no pueden discrepar.
 ## 5. Qué forma tiene, y dónde cabe
 
 ### 5.1. En tres dimensiones: una franja al pie del lienzo
+
+> **ESTA SECCIÓN ES DE DISEÑO, Y ES PREVIA AL CÓDIGO. Se conserva fechada y no se actualiza.**
+> Todo lo de aquí abajo se midió antes de escribir `elCartelQueCabe`, sobre `6372bc7` y con
+> guiones que no están en el repositorio. Lo que aterrizó mide lo mismo pero con la escena
+> dentro del cliente y con dos entradas que este documento no tenía: **la lista son
+> dieciséis lienzos y no quince**, porque el peor que este cliente puede dar es **288×420** y
+> aquí no estaba (§9 bis, punto 6); y **la raíz de la letra se le pide al navegador** en vez
+> de valer 17 (§9 bis, punto 5). Ni la cinta del tercio central ni el pregón existen todavía
+> en el árbol, así que las dos columnas de cinta de la tabla siguen siendo lo que eran: un
+> presupuesto para cuando bajen. El número de hoy vive en `elCartelQueCabe` y lo mide
+> `verify:escritorio` contra las tres manos de la escena en cada uno de los dieciséis.
 
 El cartel es interfaz por encima del `<canvas>`, no un objeto de la escena (decisión 3).
 En el escritorio cabe dentro de `RECUADRO_DEL_LIENZO`, que ya es el sitio: la regla
@@ -532,8 +752,15 @@ ya existe y ya recibe `string`; y el gesto es un botón, que es el gesto del ret
 `MANIFIESTO_RIBERAS.jugadores` llega a seis y `COLORES_EN_3D` tiene cuatro colores, así que
 `bastanColores` manda al `Retablo` en cuanto se sientan cinco (§0). O sea que **todo lo
 medido en el §5.1 (la banda, los renglones, las frases enteras, el pleito con el pregón) no
-llega a una sola mesa de cinco o seis colonos**, y esta media página sí. Por eso es la fase
-2 del §12, delante de las dos del cartel en el lienzo, y no la última.
+llega a una sola mesa de cinco o seis colonos**, y esta media página sí. Por eso este
+documento la puso de fase 2, delante de las dos del cartel en el lienzo.
+
+**Y no salió así: es la fase 4 y está sin escribir.** El cartel del escritorio se empujó
+antes, y con eso esta media página quedó detrás del trueque entero, que es justo el sitio del
+que este párrafo la había sacado. El argumento no ha cambiado ni un número —`COLORES_EN_3D`
+sigue teniendo cuatro colores—, así que lo que hay que leer aquí es lo que hoy es verdad:
+**una mesa de seis colonos no ve ninguna explicación de ninguna carta**, y el texto que le
+serviría está escrito, compuesto y vigilado desde `85f28c6`.
 
 **La medida del retablo, que aquí es corta y por eso hay que darla igual.** La fila es un
 botón, o sea un renglón de 44 como todos los del retablo, con el nombre de la clase, la
@@ -556,6 +783,12 @@ ese cajón no se puede ver con seis nunca, porque con seis se juega en el retabl
 aprenda a pintar seis colores es un encargo propio y sube a Miguel como tal (§11).
 
 ### 5.3. El pregón del trueque y el cartel: se miden juntos, y no caben
+
+> **También de diseño y previa, y de las tres tablas es la que más aguanta**, porque su
+> conclusión no se pierde por poco: la más holgada de sus siete filas se queda en 26 de los
+> 43 puntos de caja que hacen falta. Los números están hoy en la cabecera de
+> `elCartelQueCabe`, para quien escriba la llave; la llave no está escrita, y el §9 bis punto
+> 8 dice por qué.
 
 El pregón de `docs/EL-TRUEQUE-DE-RIBERAS.md` cuelga de la cinta hacia abajo, mide lo que la
 cinta de ancho y enseña una tira de **44 puntos por propuesta viva**, hasta **cuatro** (su
@@ -636,12 +869,18 @@ Tres reglas, y la tercera es la que evita el fallo:
 
 ## 7. Los comprobadores
 
-Del uno al seis van en `verify:riberas-en-tres`, que hoy hace 295 comprobaciones con
-`MINIMO = 293` (corrido otra vez en este árbol en la segunda vuelta, 6-sep-2026, con el
-código de salida mirado y no la última línea: 0). Ese comprobador ya mete lo que sale de la
-traducción en `huecosDeLasCartas` y en `puertasDeLaCarta` de la escena de verdad, así que es
-el sitio. El siete y el ocho van donde vive cada pantalla. El nueve no lo escribe este
+Del uno al seis van en `verify:riberas-en-tres`, que hace **337** comprobaciones sobre
+`85f28c6` (corrido en este árbol el 6-sep-2026, con el código de salida mirado y no la última
+línea: 0). Ese comprobador ya mete lo que sale de la traducción en `huecosDeLasCartas` y en
+`puertasDeLaCarta` de la escena de verdad, así que es el sitio. El siete y el ocho van donde
+vive cada pantalla: `verify:escritorio` hace **448**, salida 0. El nueve no lo escribe este
 documento y por eso está el último: se apoya en una fase de otro.
+
+**Y las seis de aquí abajo se quedaron cortas, que es lo que hay que decir de una lista de
+comprobaciones escrita antes del código.** Lo que aterrizó son éstas más las cinco vacunas
+del §2 bis, que no son de texto: montan una mesa, hacen un movimiento y le preguntan al
+reductor. La lista sigue aquí porque es la que explica POR QUÉ hay comprobador en cada sitio;
+la cuenta de lo que hay está arriba.
 
 1. **Las once filas están y ninguna está vacía.** Se recorre `CLASES_DE_CARTA` y se piden las
    dos filas de premio; para cada una, las tres frases existen y ninguna tiene longitud cero.
@@ -653,9 +892,9 @@ documento y por eso está el último: se apoya en una fase de otro.
    de frases distintos entre sí y distintos de los dos premios. Los cinco títulos comparten
    el suyo, y eso se AFIRMA (los cinco iguales), no se tolera: si un día un título deja de
    compartirlo será porque alguien lo decidió, no porque se le escapó.
-4. **El presupuesto se cumple, y se cuenta en RENGLONES.** Cada una de las veinticuatro
+4. **El presupuesto se cumple, y se cuenta en RENGLONES.** Cada una de las veintiuna
    frases, ya compuesta con sus constantes dentro, envuelta con avaricia a **25 letras por
-   línea** cabe en **dos renglones**, y ninguna pasa de 46 caracteres. Las 25 letras no son
+   línea** cabe en **dos renglones**. Las 25 letras no son
    un número escrito a mano en el comprobador: son las del lienzo más estrecho de `LIENZOS`,
    y van con su porqué al lado (§5.1) para que quien las toque sepa qué pantalla está
    gastando. Y con el porqué va la aritmética entera —banda de 241, doce de margen por lado,
@@ -682,17 +921,23 @@ documento y por eso está el último: se apoya en una fase de otro.
    regla vieja con toda la batería en verde, que es la clase de fallo que este repositorio ya
    tiene escrita como la peor.
 7. **El cartel no come punteros, y no se pinta con el pregón abierto.** En
-   `verify:escritorio`, que hace 400 comprobaciones: la regla del cartel en `estilo.css` lleva
-   `pointer-events: none` y el elemento no tiene ni `onClick` ni `tabindex`. En la app, el
-   equivalente sobre `pointerEvents="none"`. Y la decisión 9: que el cartel se monte con una
-   condición que incluye «no hay pregón», leída por texto como se leen hoy las demás llaves de
-   esas dos pantallas. Es la decisión 5 y la 9, y sin comprobador las dos se pierden en el
-   primer retoque.
+   `verify:escritorio` (**448** con la fase 2 dentro; 400 cuando esto se escribió, aunque
+   entre medias hay otro encargo que también le añadió y la resta no vale, §9): la regla del
+   cartel en `estilo.css` lleva `pointer-events: none` y el elemento no
+   tiene ni `onClick` ni `tabindex`. En la app, el equivalente sobre `pointerEvents="none"`.
+   Y la decisión 9: que el cartel se monte con una condición que incluye «no hay pregón».
+   **De esas dos mitades, la primera está y la segunda NO, a propósito**: la llave del pregón
+   no se escribe hasta que el pregón exista, porque una condición sobre un estado que nadie
+   crea no la puede poner roja ningún comprobador (§9 bis, punto 8). Lo que sí compró la fase
+   2, y este documento no había pedido, es que la aritmética medida llegue al estilo pintado:
+   `elEstiloDelCartel` se LLAMA con cuatro números distintos y se mira en cuál acabó cada uno
+   (§9 bis, punto 4).
 8. **El retablo explica las once clases, no menos.** En `verify:escritorio` y en
    `verify:sala`, que es donde vive cada pantalla: que el marcador monta una fila por
    clase de `misCartas` con `retratoDeLaCarta`, que las dos de premio salen cuando son
-   mías, y que el texto que pinta es el de la tabla y no una copia. Es la fase 2, y es la
-   única forma que llega a las mesas de cinco y seis (§5.2).
+   mías, y que el texto que pinta es el de la tabla y no una copia. **Es la fase 4 y sigue
+   sin escribirse**, aunque este documento la había puesto de segunda; es la única forma que
+   llega a las mesas de cinco y seis (§5.2, §12.0).
 9. **El que este encargo NO puede dar por hecho, y la primera vuelta dio.** Aquí decía que
    `jugar:fondo` ya cubre esto por construcción. Es falso dos veces. `jugar:fondo` juega los
    juegos de la SALA declarados en el manifiesto (`juegosInstalados` de `shared/juegos`) y no
@@ -715,15 +960,17 @@ documento y por eso está el último: se apoya en una fase de otro.
 | Las nueve clases y sus reglas | `shared/arcade/juegos/riberas.ts`: `ClaseDeCarta`, `CLASES_DE_CARTA`, `TITULOS`, `BOLSA_DE_CARTAS`, `jugarLaGuardia`, `jugarElAnoBueno`, `jugarElAcaparamiento`, `jugarLasDosVeredas`, `revelarUnTitulo`, `sePuedeJugarLaCarta` | Nada |
 | Las siete constantes de los números de las frases | El mismo fichero: `BIENES_DEL_ANO_BUENO`, `VEREDAS_DE_LA_CARTA`, `VADO_MINIMO`, `GUARDIA_MINIMA`, `PUNTOS_DEL_VADO`, `PUNTOS_DE_LA_GUARDIA`, `PUNTOS_DEL_TITULO` | Se leen |
 | La `ayuda` de cada opción | El mismo fichero: `opcionesDelMazo` y `opcionesDeRevelar` | Nada |
-| **Las veintiuna frases** | `shared/arcade/juegos/riberas-en-tres.ts`: `RetratoDeLaCarta`, `RETRATO_DE_LA_CARTA`, `RETRATO_DEL_PREMIO` | Tres columnas nuevas |
-| El naipe que llega a la escena | El mismo fichero: `CartaDelMazoEnTres`, `cartasEnTres`, `premiosEnTres`, `laManoDeLaIzquierda` | Un campo nuevo |
-| El contrato del naipe en la escena | `escenas/cartas.ts`: `CartaDelMazo` | Un campo `readonly` |
+| **Las veintiuna frases** | `shared/arcade/juegos/riberas-en-tres.ts`: `ExplicacionDeLaCarta`, `EXPLICACION_DEL_TITULO`, `USAS_DE_LA_JUGADA`, `RETRATO_DE_LA_CARTA`, `RETRATO_DEL_PREMIO`, y `cardinal`, `plural` y `enCabeza` | **HECHO** (fase 1) |
+| El naipe que llega a la escena | El mismo fichero: `CartaDelMazoEnTres`, `cartasEnTres`, `premiosEnTres`, `laManoDeLaIzquierda` | **HECHO**: un campo nuevo |
+| El contrato del naipe en la escena | `escenas/cartas.ts`: `CartaDelMazo` | **HECHO**: un campo `readonly` |
 | El reparto y el imán de la mano | `escenas/cartas.ts`: `huecosDeLasCartas`, `franjaDeLasCartas`, `puertasDeLaCarta`, `casillasDeLaMano` | Nada |
-| El aviso de la carta señalada | `escenas/delta.tsx`: `CartaDelMazoEnLaMano` (sus `onPointerOver` y `onPointerOut`), `ManoDelMazo`, `Delta` | Una entrada nueva, `onSenalar` |
-| El estado de la carta cogida | `escritorio/src/riberas-en-tres.tsx`: `cartaDelMazo`, `alCogerCartaDelMazo`. `app/src/arcade/riberas-en-tres-escena.tsx`: `cogidaDelMazo`, `alCogerCartaDelMazo`, `soltarTodo` | Se lee |
-| El cartel | Dentro de `RECUADRO_DEL_LIENZO` en el escritorio, con su regla en `estilo.css` junto a `.riberas-lienzo` y `.riberas-solo-apoyo`. Dentro de la vista del `Canvas` en la app | Nuevo |
-| La mano por clases del retablo | `escritorio/src/riberas-en-tres.tsx` (`MarcadorDeRiberas`) y `app/src/arcade/riberas-en-tres-escena.tsx` (`ElMarcador`, `FichaDelColono`) | Nuevo, **fase 2**: es la única forma que llega a las mesas de cinco y seis (§5.2) |
-| La llave que apaga el cartel con el pregón abierto | Las dos mismas pantallas, junto al estado del pregón que trae `docs/EL-TRUEQUE-DE-RIBERAS.md` | Una condición, fases 3 y 4 (decisión 9) |
+| El aviso de la carta señalada | `escenas/delta.tsx`: `CartaDelMazoEnLaMano` (sus `onPointerOver` y `onPointerOut`), `ManoDelMazo`, `Delta` | **HECHO**: una entrada nueva, `onSenalar` |
+| El estado de la carta cogida | `escritorio/src/riberas-en-tres.tsx`: `cartaDelMazo`, `alCogerCartaDelMazo`. `app/src/arcade/riberas-en-tres-escena.tsx`: `cogidaDelMazo`, `alCogerCartaDelMazo`, `soltarTodo` | **HECHO** en el escritorio; se lee en la app en la fase 3 |
+| **El sitio del cartel y su estilo** | `escritorio/src/riberas-en-tres.tsx`: `elCartelQueCabe`, `elEstiloDelCartel`, `raizDelNavegador`, `RAIZ_DE_LA_CASA` | **HECHO** (fase 2), y las dos primeras son puras y exportadas para que la fase 3 no las vuelva a escribir |
+| El cartel | Dentro de `RECUADRO_DEL_LIENZO` en el escritorio, con su regla `.riberas-cartel` en `estilo.css` junto a `.riberas-lienzo` y `.riberas-solo-apoyo`. Dentro de la vista del `Canvas` en la app | **HECHO** en el escritorio; **fase 3** en la app |
+| La mano por clases del retablo | `escritorio/src/riberas-en-tres.tsx` (`MarcadorDeRiberas`) y `app/src/arcade/riberas-en-tres-escena.tsx` (`ElMarcador`, `FichaDelColono`) | Nuevo, **fase 4**: es la única forma que llega a las mesas de cinco y seis (§5.2) |
+| La llave que apaga el cartel con el pregón abierto | Las dos mismas pantallas, junto al estado del pregón que trae `docs/EL-TRUEQUE-DE-RIBERAS.md` | Una condición, **detrás del trueque**, y a propósito no escrita todavía (§9 bis, punto 8) |
+| La puerta que explique los premios a quien NO los tiene | Por decidir; el candidato es el marcador, donde vive `renglonDelVado` | Fase futura sin forma (§12.1) |
 
 ## 9. Cómo se midió
 
@@ -742,13 +989,30 @@ código. Si una fase quiere conservarlos, los del lienzo van a `escenas/` junto 
 | `textos-con-tildes.mjs` | Lo que miden, lo que pesan y **cuántos renglones ocupan a 25 letras** las veinticuatro frases | `Buffer.byteLength` y un envolvedor avaricioso, sobre las frases del §2 |
 
 Comprobadores corridos en este árbol el 6-sep-2026, con su código de salida mirado y no su
-última línea: `verify:riberas-en-tres` 295 comprobaciones, salida 0 (vuelto a correr en la
-segunda vuelta y sigue en 295); `verify:escena` 346 comprobaciones, salida 0. El segundo
-número se mueve, y hay que decir cómo se sacó: se corrió con la fase 4 de la mesa ya a medio
-escribir en el árbol (otro agente estaba tocando `escenas/delta.tsx`,
-`escenas/scripts/verificar-escena.ts` y las dos pantallas), así que 346 no es la cuenta de
-`6372bc7` limpio y quien lea esto tiene que volver a contarla antes de usarla como
-referencia.
+última línea. **Antes del encargo, sobre `6372bc7`:** `verify:riberas-en-tres` 295
+comprobaciones, salida 0 (vuelto a correr en la segunda vuelta y sigue en 295);
+`verify:escena` 346 comprobaciones, salida 0. Del segundo hay que decir cómo se sacó: se
+corrió con la fase 4 de la mesa ya a medio escribir en el árbol (otro agente estaba tocando
+`escenas/delta.tsx`, `escenas/scripts/verificar-escena.ts` y las dos pantallas), así que 346
+no es la cuenta de `6372bc7` limpio y quien lea esto tiene que volver a contarla antes de
+usarla como referencia.
+
+**Y después, sobre `85f28c6` limpio y con las fases 1 y 2 dentro:**
+`verify:riberas-en-tres` **337**, salida 0; `verify:escritorio` **448**, salida 0. Los dos se
+corrieron en un árbol sin nada a medio escribir —`git status` vacío, y las dos salidas están
+fechadas nueve minutos antes de que el primer fichero de la fase 1 del estiaje se tocara en
+este árbol—, así que estos dos sí se pueden usar como referencia. **Quien los vuelva a correr
+más tarde, que mire antes su `git status`:** en cuanto la fase 1 del estiaje entre aquí,
+`shared/arcade/juegos/riberas.ts` deja de ser el de `85f28c6` y las dos cuentas dejan de ser
+comparables con éstas. Es el mismo cuidado que el §9 se tuvo que tener con `verify:escena` en
+la primera vuelta, y por el mismo motivo.
+
+**Y la resta no se hace, a propósito.** Entre `6372bc7` y `85f28c6` hay otro commit que toca
+los mismos dos comprobadores (la fase 4 de la mesa), así que 337 − 295 no son «las
+comprobaciones que trajo este encargo» y decirlo sería inventarse un número. Lo que sí se
+puede decir sin restar nada es de qué son las que trajo: las cinco vacunas del §2 bis, la red
+de las constantes del §9 bis, y el cartel medido contra las tres manos de la escena en los
+dieciséis lienzos.
 
 Los guiones de medida, en cambio, sí son de código limpio, y en la segunda vuelta se
 comprobó fichero a fichero: de los que leen (`escenas/cartas.ts`, `escenas/baraja.ts`,
@@ -772,6 +1036,122 @@ está escrito en las viñetas del §5.1 precisamente para que se pueda rehacer s
 la única garantía que este documento puede dar de un número. Quien conserve alguno, que
 conserve éste: es el que ata las tablas a `estilo.css`, y el que se habría puesto rojo el
 día que alguien escribió «sobre 16».
+
+## 9 bis. Lo que se hizo distinto de lo escrito, y por qué
+
+Ocho sitios donde el código de `85f28c6` no siguió a este documento. Todos están leídos del
+árbol y no de aquí. **Gana el código**, así que lo que sigue no es una lista de desviaciones
+a corregir: es el documento poniéndose al día.
+
+**1. El texto viaja dentro del naipe, y las tres frases son tres campos y no un párrafo.**
+Esto sí era el diseño (decisiones 1 y 2), y lo que cambió es que el campo tiene tipo propio:
+`ExplicacionDeLaCarta`, con `hace`, `consigues` y `usas`, exportada al lado de
+`RetratoDeLaCarta`. **Y el orden de los campos ES el orden en que se enseñan**, que es lo que
+lo hace tres campos: con un párrafo, la única forma de recortar en el lienzo estrecho sería
+cortarlo por la mitad, y media frase de ayuda es peor que ninguna. El texto de los cinco
+títulos vive además en una constante suya, `EXPLICACION_DEL_TITULO`, y los cinco comparten el
+MISMO objeto: cinco copias iguales son cinco sitios donde corregir una errata y uno donde
+olvidarla, en la carta que menos sale.
+
+**2. Las cifras no bastaban: la palabra y el plural también salen de la constante.** El
+documento escribió que los números entran por plantilla, y eso sólo cubría el DÍGITO. «Dos
+bienes», «Dos pasos», «Vale 1 punto» y «2 puntos» hablan del mismo número con letras, y una
+palabra escrita a mano miente igual que una cifra escrita a mano: con `VEREDAS_DE_LA_CARTA`
+a tres, «Abres 3 veredas» y «Dos pasos» se pelean dentro del mismo naipe y las dos se leen
+perfectamente. Así que se añadieron tres funciones puras y exportadas —`cardinal` (el número
+con letras), `plural` (la concordancia) y `enCabeza` (la mayúscula de apertura)— y las frases
+se componen con ellas. No hay comprobador que pille una mentira escrita en castellano; esto
+la convierte en un rojo.
+
+**3. Y la red que vigila esas tres funciones se clava contra palabras escritas A MANO en el
+comprobador. Es un hallazgo de método y merece su párrafo.** La comprobación natural es
+componer la expectativa con `cardinal` y `plural`, o sea con las mismas dos funciones con las
+que se compone el texto que va a juzgar. **Escrita así no mira nada:** las dos orillas de la
+afirmación salen del mismo sitio, y el día que `cardinal(2)` devolviera otra palabra, el
+naipe cambiaría, la expectativa cambiaría con él y la comprobación seguiría verde. Una
+comprobación cuyas dos mitades comparten fuente es una comprobación que se compone consigo
+misma. Así que en `verify:riberas-en-tres` hay una tabla clavada a mano —`[0, 'cero']`,
+`[1, 'un']`, `[2, 'dos']`, y hasta cinco— y una sola vez; con ese clavo puesto, todo lo que
+cuelga de ella sí compra algo, y tocar `CARDINALES` o `plural` pone rojo ese renglón antes de
+que nadie mire una frase. La misma idea, girada, está en la tabla de qué constantes puede
+nombrar cada naipe: se mantiene a mano porque qué regla nombra cada naipe es una decisión y
+no se deduce de nada, y se afirma además que está completa, para que un naipe nuevo sin fila
+se ponga rojo en vez de heredar el permiso de otro.
+
+**4. El estilo del cartel sale de una función pura que el comprobador LLAMA, y no de una
+expresión regular sobre el JSX.** El documento midió `izquierda`, `derecha`, `abajo` y `caja`
+con muchísimo cuidado y no ató ninguna de las cuatro a la propiedad que el navegador recibe.
+Intercambiadas, la batería seguía entera en verde con el cartel puesto encima de la mano que
+estaba explicando: la aritmética medida y el estilo pintado eran dos cosas que no se
+encontraban en ninguna comprobación. La traducción vive ahora en `elEstiloDelCartel`, pura y
+exportada, y el comprobador la llama con cuatro números distintos entre sí para mirar en cuál
+acabó cada uno. Dos cambiados de sitio se ven ahí y no en la pantalla de alguien. Y con
+`null` devuelve `undefined` y no un objeto vacío, para que el `<p>` no lleve un `style` que
+no dice nada.
+
+**5. La raíz de la letra se le pide al navegador, y el 17 se queda de suelo.** La tercera
+vuelta arregló el rem —vale 17 y no 16— y clavó el 17. Está mal por el otro lado: `106.25 %`
+va en porcentaje **justamente** para que la preferencia de tamaño de letra del navegador siga
+mandando, así que quien la tenga en grande pinta con bastante más de 13,94 puntos de cuerpo
+mientras el alto máximo se calculaba con un 17 escrito a mano. Con el `overflow: hidden` del
+cartel, eso corta el último renglón SIN NINGUNA SEÑAL, que es lo único que la función promete
+no hacer nunca. Ahora `raizDelNavegador` la mide con `getComputedStyle` sobre la raíz del
+documento y la observa, `elCartelQueCabe` la recibe por parámetro, y `RAIZ_DE_LA_CASA = 17`
+es sólo el respaldo para Node, donde no hay `document`. El comprobador no pregunta «¿dice
+17?»: saca el porcentaje de `estilo.css` y exige que dé lo mismo.
+
+**6. El peor lienzo de ESTE cliente es 288×420, y no está en la lista que este documento
+midió.** El §5.1 midió quince lienzos, y esa lista se comparte con el móvil: por eso la abre
+320×360, y por eso los dos casos «que deciden» eran ése y el SE apaisado. **En el escritorio
+ninguno de los dos se puede dar.** `.riberas-lienzo` lleva `min-height: 420px`, así que los
+**cinco** lienzos de la lista con menos de 420 de alto —320×360, 568×320, 667×375, 780×360 y
+844×390— no existen aquí, y se medían de todas formas mientras la forma que sí se da no se
+medía ni una vez. Esa forma es la contraria: **estrecha y alta**. El 288 sale de sumas y no
+de una corazonada: WCAG 1.4.10 pone el suelo del documento en 320 puntos, `.dentro` se lleva
+`clamp(1rem, 4vw, 2.5rem)` por lado y a 320 manda el mínimo de 17, así que al recuadro le
+quedan 286 y se mide con 288 por caer del lado seguro; de alto, los 420 del `min-height`. Ahí
+el renglón cabe **20 letras** contra las 25 del móvil, las frases de dos renglones pasan a
+tres, hay siete renglones y se pintan **DOS** frases. Ése es el presupuesto de verdad de este
+cliente, y por eso el §2.1 trae ahora las dos columnas.
+
+La lista del comprobador son hoy **dieciséis** lienzos, los quince de aquí más ése. Las tres
+frases caben en **catorce**, y en los dos estrechos —320×360 y 288×420, cada uno estrecho de
+una manera distinta— caben **dos**. Y los dos números que la cabecera de `elCartelQueCabe`
+escribe para ahorrarle la medida al siguiente (cinco lienzos bajos, diez de los dables con las
+tres) **no están escritos a mano**: el comprobador los saca del `min-height` de la hoja y de
+la lista, y exige que la cabecera los diga con esas palabras. Ya se desfasaron una vez.
+
+Y una tercera medida que este documento no tenía: **con la mesa recogida no hay asa en la que
+apoyarse.** El pie del cartel se apoya en el techo del ASA de la barra, y con la mesa abajo no
+hay barra en pantalla; medido contra sus cuatro huecos, el cartel se quedaba flotando el alto
+de una barra entera por encima del canto, justo cuando la mesa se ha recogido para ver MÁS
+tablero. No tapaba nada, y por eso llevaba ahí sin que nadie lo viera. El cliente le pasa los
+huecos de VERDAD —los mismos que deciden si caben los dados—, no un cuatro escrito a mano.
+
+**7. Con la letra muy grande el cartel deja de pintarse, y el texto sobrevive en la lista de
+apoyo.** Ésta es la consecuencia del punto 5 y hay que decirla entera, porque suena a fallo y
+es lo prometido. Medido con las ONCE frases de verdad y no con tres cortas de mentira —que es
+la diferencia entre ver «caben menos» y ver lo que pasa—: en 288×420, con la raíz en 20 se
+pintan dos frases en todos los naipes, con 24 una, hacia 27 empiezan a salir naipes SIN
+CARTEL, y con 34 no se pinta ninguno; en 320×360 el corte llega antes. **O sea que el usuario
+para el que se hizo el respeto a la preferencia es el que se queda sin cartel.** Y está bien:
+antes ninguno que uno cortado a la mitad sin avisar. Lo que lo hace aceptable es la otra
+mitad, y se compra en el mismo sitio: **la lista `.riberas-solo-apoyo` se pinta desde
+`cartasDelMazo` y no mira el cartel ni una vez**, así que las tres frases de los once naipes
+siguen ahí, con cartel o sin él, y siguen siendo lo que oye quien no puede pasar el cursor por
+un lienzo. Las dos mitades tienen comprobación.
+
+**8. La llave que apaga el cartel con el pregón abierto NO está escrita, y es a propósito.**
+El §7.7 la pedía en la fase del escritorio y el §12 decía que «mientras el pregón no exista, la
+condición se escribe igual y sale siempre verdadera; no es una espera». El código dice lo
+contrario, y tiene razón: el pregón no existe todavía en este árbol, y **una condición sobre
+un estado que nadie crea es una condición que ningún comprobador puede poner roja** —se
+quedaría de adorno hasta que alguien la borrara por muerta—. Así que la decisión 9 se queda
+escrita en la cabecera de `elCartelQueCabe`, con sus números para quien la escriba (−24 puntos
+de banda en el SE apaisado y 8 en 320×360 con la cinta a 88 y las cuatro propuestas colgando,
+contra los 43 de caja que el cartel necesita para existir), y entra con el trueque. Lo mismo
+la cinta del tercio central, que tampoco existe: hoy el alto libre llega hasta el techo del
+recuadro, y el día que la cinta baje se le resta ANTES de partirlo por la mitad.
 
 ## 10. Lo que choca con lo ya escrito
 
@@ -905,24 +1285,52 @@ la décima son de este mismo documento, en su primera y en su segunda vuelta.
 
 ## 11. Lo que le toca decidir a Miguel
 
+**Las tres primeras filas eran de la fase 2, y la fase 2 ya está empujada.** Se quedan
+porque explican por qué el cartel se degrada como se degrada, pero lo que hay que contestar
+hoy son las cuatro últimas, que son nuevas de esta pasada.
+
 | Qué | La recomendación, y por qué |
 |---|---|
+| **NUEVA, y es la que más gente deja fuera: la mano por clases del retablo ha caído al octavo puesto de nueve.** | **Hay que subirla, y es corta.** Este documento la puso de segunda con un argumento que no ha cambiado: `COLORES_EN_3D` tiene **cuatro** colores y `MANIFIESTO_RIBERAS.jugadores` llega a seis, así que **en una mesa de cinco o de seis el retablo es la única pantalla que existe**, y ésta es la única fase de todo el encargo que llega a ella. Al aterrizar antes el cartel del escritorio, quedó detrás del trueque entero, y nada la empuja ni depende de ella. Traducido: **hoy las mesas de cinco y seis colonos siguen sin ver una sola explicación de una carta**, con el texto escrito, vigilado y a una función de distancia (`retratoDeLaCarta`, que ya existe y ya recibe `string`) |
+| **NUEVA: los dos naipes de premio sólo los ve quien ya los tiene, así que se explican tarde.** | **Es una fase propia y su forma está por decidir** (§12.1). `premiosEnTres` devuelve el naipe sólo al dueño, y las dos pantallas piden la mano de uno mismo, así que las frases de El Vado Largo y de La Mayor Guardia le cuentan cómo se gana el premio a quien ya lo ganó. El texto no hay que escribirlo —ya está, y con vacuna—; lo que falta es una puerta. El candidato es el marcador, donde `renglonDelVado` ya le dice «vado 1 de 5» a quien va corto, y que es además el único sitio que sirve también en el retablo. No hacer nada es defendible y se dice |
+| **NUEVA, y de aviso: la vacuna de la guardia se pondrá ROJA a propósito, y con la fase concreta.** | El «cómo se usa» de la guardia empieza hoy por «Tras tirar», y hay una comprobación que ata esa frase a que el juego no la ofrezca antes. **La fase que le da la vuelta es la 3 de `docs/EL-LADRON-DE-RIBERAS.md`, «La guardia mueve»**, que es la que quita el `!estado.tirado` de `jugarLaGuardia`. El día que se empuje, esa comprobación se pone roja, y eso es lo que se compró. No es «el día que aterrice»: es esa fase, con su número, y volver a verde es mi fase 5. **Y hay un detalle que hay que mirar antes:** el «Tras tirar» vive en `USAS_DE_LA_JUGADA`, una constante que comparten las cuatro cartas que se juegan, y las otras tres SÍ siguen esperando a los dados |
+| **NUEVA, y no cuesta pantalla: quien tiene la letra del navegador en «muy grande» se queda sin cartel.** | **Se deja así, y hay que saberlo.** Medido con las once frases de verdad: hacia una raíz de 27 empiezan a salir naipes sin cartel, y con 34 no se pinta ninguno (§9 bis, punto 7). Es lo prometido —antes ninguno que uno cortado a la mitad sin avisar— y lo que lo hace aceptable es que **el texto no se pierde**: la lista de apoyo se pinta desde la mano y no mira el cartel ni una vez, así que las tres frases de los once naipes siguen ahí y se siguen oyendo. La ironía conviene decirla igual: el usuario para el que se hizo el respeto a la preferencia es el que se queda sin la caja |
 | ¿El cartel al pie del lienzo, o pegado al naipe? | **Al pie.** Pegado al naipe no cabe en los cuatro lienzos de pie, y en 390×845 el aire es de menos cuatro puntos (§5.1). Al pie cabe en los quince. Cuesta que el texto quede lejos de la carta: en el SE apaisado, unos 240 puntos de recorrido de ojo |
 | **La que hay que contestar: con la cinta a 88, en 320×360 sólo cabe UNA frase.** ¿Se deja así? | **Sí, y no se toca nada más.** Los números, medidos con las dos cintas y con el rem de esta casa en 17 (§5.1): con la cinta en una línea salen 4 renglones y **dos** frases; con la de dos líneas, 3 renglones y **una**. En el SE apaisado se pasa de tres frases a dos. Los otros trece lienzos siguen con las tres con las dos cintas. Se deja así porque las alternativas son peores y están medidas: bajar el cuerpo mete una frase más pero cae por debajo del suelo de letra de la casa, que `retablo.tsx` sube a 13 puntos a propósito y que aquí ya vamos justos por arriba con 13,94; y quitarle el tope de la mitad del alto libre a la caja tapa media pantalla de tablero en el lienzo donde menos tablero hay. La frase que se ve es «qué hace», que es la que Miguel nombró primero; las otras se oyen igual y están en la lista de apoyo. Lo que NO se hace es recortar con puntos suspensivos: media frase de ayuda es peor que ninguna |
 | **NUEVA, y es de aviso y no de decisión: esta respuesta ya no tiene margen.** | La segunda vuelta contestaba lo mismo pero con las cuentas de un rem de 16, que daba 5 renglones donde hay 4 y 27 letras por línea donde hay 25. La recomendación aguanta con los números buenos (§10.10), pero el caso de 320×360 con la cinta corta pasa a caber **exacto**: cuatro renglones para dos frases de dos, sin uno de sobra. Traducido: **cualquier cosa que le quite un renglón a esa banda deja ese teléfono en una sola frase con las dos cintas.** Lo dice aquí y no en el §5.1 porque es lo que hay que recordar cuando el estiaje pida un aviso más |
 | ¿Y qué pasa cuando el pregón del trueque está abierto? | **El cartel no se pinta, y desde la hoja se puede pedir igual** (decisión 9). No es una preferencia: con las cuatro propuestas colgando de una cinta de 88, en el SE apaisado quedan **−24 puntos** de banda y en 320×360 **8**, y el cartel necesita **43** para existir (§5.3). El mueble se llama **el pregón** en los dos documentos desde la segunda pasada del otro (§10.8), y los dos miden contra el techo del asa y dan **264 contra 248** en el SE apaisado (§10.6) |
-| ¿Los dos premios llevan cartel? | **Sí.** Son dos naipes de la misma mano que aparecen solos, que no se pueden jugar y que nadie ha explicado nunca. Son 2 de los 11 y cuestan 4 filas de tabla |
-| ¿El retablo gana «mi mano» en el marcador? | **Sí, y en la fase 2, delante de las dos del cartel en el lienzo.** La primera vuelta lo puso el último y como opcional, y estaba mal: `COLORES_EN_3D` tiene **cuatro** colores y `MANIFIESTO_RIBERAS.jugadores` llega a seis, así que en una mesa de cinco o seis el retablo es la ÚNICA pantalla (§0, §5.2). Dejarlo para el final es decidir que las mesas grandes no reciben este encargo |
+| ¿Los dos premios llevan cartel? | **Contestada y HECHA:** sí. Son dos naipes de la misma mano que aparecen solos, que no se pueden jugar y que nadie había explicado nunca. Lo que la fase 1 destapó al escribirlo es que sólo los ve su dueño, y eso es la fila nueva de más arriba |
+| ¿El retablo gana «mi mano» en el marcador? | **Sí. Sigue sin hacerse, y es la primera fila de esta tabla.** Se deja el renglón para que se vea que la respuesta no ha cambiado desde la primera vuelta: lo que cambió es el sitio en la cola (§12.0) |
 | **NUEVA, y no es de este documento:** que el 3D aprenda a pintar seis colores | **Es un encargo propio y va aparte.** Se apunta aquí porque desde este documento se ve la contradicción entera: el §1.11 de `docs/LA-MESA-DE-RIBERAS.md` diseñó el cajón del marcador para SEIS fichas, y hoy con seis se juega en el retablo, así que ese cajón de seis no se puede ver nunca |
-| ¿La guardia con dos textos? | **Sí, y con el comprobador que los ata a la regla y a una fase concreta.** El texto de hoy entra en la fase 1; el otro entra con la **fase 3 de `docs/EL-LADRON-DE-RIBERAS.md`, «La guardia mueve»**, que es la que quita el `!estado.tirado` de `jugarLaGuardia`. Esa fase pone roja la vacuna del §7.6 el día que se empuje, y volverla verde es cambiar una fila de tabla. Hasta entonces el comprobador se pone rojo si alguien lo adelanta |
-| Lo que hay que mirar con ojos, y no puede medir nadie | Si el cartel al pie estorba al construir en la fila de abajo del delta (no come punteros, pero tapa); si **13,94 puntos** se leen en un SE de verdad; y si el cartel apareciendo y desapareciendo con el cursor por la mano molesta. En el banco `escritorio/banco3d.html` y, para lo tercero, en un teléfono |
+| ¿La guardia con dos textos? | **Contestada:** sí, con el comprobador que los ata a la regla y a una fase concreta. El de hoy entró en la fase 1; el otro entra con «La guardia mueve». El detalle nuevo está en la fila de aviso de más arriba |
+| Lo que hay que mirar con ojos, y no puede medir nadie | Si el cartel al pie estorba al construir en la fila de abajo del delta (no come punteros, pero tapa); si **13,94 puntos** se leen en un SE de verdad; y si el cartel apareciendo y desapareciendo con el cursor por la mano molesta. En el banco `escritorio/banco3d.html` y, para lo tercero, en un teléfono. **Nada de esto se ha mirado todavía con ojos**: la fase 2 está verde en 448 comprobaciones y eso no es lo mismo |
 
 ## 12. El orden, en fases que se empujan una a una
 
-Cada fase deja el juego entero y verde. Ninguna depende de la siguiente, y las cuatro
-primeras se pueden parar en cualquier punto sin dejar nada roto. Lo que sí tiene un orden
-que no se puede elegir es el de los TRES encargos juntos, y son nueve fases: la tabla de
-más abajo.
+### 12.0. Dónde va esto hoy: las fases 1 y 2 están HECHAS
+
+**Confirmadas en `85f28c6`, con tres vueltas y tres revisores distintos.** Lo que trajeron:
+
+| Fase | Qué dejó hecho | Con qué cuenta |
+|---|---|---|
+| **1. El texto y su comprobador, sin nada en pantalla** | `ExplicacionDeLaCarta`, las veintiuna frases en `RETRATO_DE_LA_CARTA`, `RETRATO_DEL_PREMIO` y `EXPLICACION_DEL_TITULO`, compuestas con las siete constantes y con `cardinal`, `plural` y `enCabeza`; el campo en `CartaDelMazoEnTres` y en `CartaDelMazo`; `cartasEnTres` y `premiosEnTres` rellenándolo. Y las cinco reglas del §2 bis, jugadas en mesas de verdad | **`verify:riberas-en-tres` 337**, salida 0 |
+| **2. El cartel en el escritorio** | `elCartelQueCabe` y `elEstiloDelCartel`, puras y exportadas; `raizDelNavegador`; el `<p class="riberas-cartel">` dentro del recuadro con `pointer-events: none` y `aria-live="polite"`; y la lista `.riberas-solo-apoyo` con los once naipes y sus tres frases | **`verify:escritorio` 448**, salida 0 |
+
+**Y la fase 2 que aterrizó no es la que este documento había puesto de segunda.** Aquí la
+segunda era la mano por clases del retablo, con un argumento que sigue siendo bueno y que
+esta pasada no retira: `COLORES_EN_3D` tiene cuatro colores y
+`MANIFIESTO_RIBERAS.jugadores` llega a seis, así que **en una mesa de cinco o de seis el
+retablo es la única pantalla que existe** y es la única fase que llega a ellas. Al empujarse
+antes el cartel del escritorio, esa fase ha caído a la cuarta, que es exactamente donde la
+primera vuelta la había puesto y donde esta misma sección argumentó que no debía estar. Se
+dice sin adornarlo: **hoy las mesas de cinco y seis colonos siguen sin ver una sola
+explicación de una carta**, y lo seguirán mientras esa fase no se empuje.
+
+**Quedan la 3 y la 4, y la 5 la dispara otro.** El orden y el porqué, abajo.
+
+Cada fase deja el juego entero y verde. Ninguna depende de la siguiente, y se pueden parar
+en cualquier punto sin dejar nada roto. Lo que sí tiene un orden que no se puede elegir es
+el de los TRES encargos juntos: la tabla de más abajo.
 
 **Dónde va este encargo entre los tres, y de qué depende.** Este documento va **el segundo
 de los tres**: **después de las fases 1 y 2 de `docs/EL-LADRON-DE-RIBERAS.md`** (la pieza con
@@ -942,28 +1350,35 @@ seguido al pie de la letra el orden que la segunda vuelta escribía llevaba a em
 trueque entero antes de que existiera la fase que lo vigila. Éste es el orden entero, con
 las mías señaladas:
 
-| # | Fase | De quién |
-|---|---|---|
-| 1 | La pieza, con su bloqueo y su robo | Estiaje, fase 1 |
-| 2 | El descarte del siete | Estiaje, fase 2 |
-| 3 | **El texto y su comprobador, sin nada en pantalla** | **Mía, fase 1** |
-| 4 | **La mano por clases en el retablo** | **Mía, fase 2** |
-| 5 | La guardia mueve, **junto con** mi fase 5 (la guardia con el estiaje) | Estiaje, fase 3 + **mía, fase 5** |
-| 6 | Las mil partidas (el jugador ciego y uniforme) | Estiaje, fase 5 |
-| 7 | El trueque entero | Trueque, sus fases |
-| 8 | **El cartel en el escritorio** | **Mía, fase 3** |
-| 9 | **El cartel en la app** | **Mía, fase 4** |
+| # | Fase | De quién | Estado |
+|---|---|---|---|
+| 1 | La pieza, con su bloqueo y su robo | Estiaje, fase 1 | En marcha en otro árbol |
+| 2 | El descarte del siete | Estiaje, fase 2 | Pendiente |
+| 3 | **El texto y su comprobador, sin nada en pantalla** | **Mía, fase 1** | **HECHA (`85f28c6`)** |
+| 4 | **El cartel en el escritorio** | **Mía, fase 2** | **HECHA (`85f28c6`)** |
+| 5 | La guardia mueve, **junto con** mi fase 5 (la guardia con el estiaje) | Estiaje, fase 3 + **mía, fase 5** | Pendiente |
+| 6 | Las mil partidas (el jugador ciego y uniforme) | Estiaje, fase 5 | Pendiente |
+| 7 | El trueque entero | Trueque, sus fases | Pendiente |
+| 8 | **La mano por clases en el retablo** | **Mía, fase 4** | Pendiente |
+| 9 | **El cartel en la app** | **Mía, fase 3** | Pendiente |
+
+**Las dos primeras mías se adelantaron a las dos del estiaje, y eso no rompió nada porque no
+tocan una regla.** Lo que sí se movió, y hay que leerlo en la tabla y no en la numeración, es
+el sitio del retablo: bajó del cuarto puesto al octavo. Ahí no hay nada que lo empuje ni nada
+que dependa de él, así que si alguien no lo pide se queda para siempre detrás del trueque
+entero. **Es la única de mis fases que llega a las mesas de cinco y de seis** (§5.2), y por
+eso sube a Miguel otra vez en el §11.
 
 Y la fase 4 del estiaje (la que aquel documento deja suelta) **cabe donde quepa**, porque
 nadie depende de ella; no está en la lista por eso y no por olvido.
 
-**Léase la tabla y no la numeración de más abajo.** Mis cinco fases están numeradas 1 a 5
-por lo que cuesta cada una y por lo que deja hecha, no por el orden en que se empujan: en el
-calendario de verdad **mi fase 5 va antes que mi 3 y que mi 4**, porque la dispara la fase 3
-del estiaje (§7.6) y ésa cae en el quinto sitio. Las mías siguen sin depender unas de otras
-—cada una deja el juego entero y verde—, pero la 5 no espera a la 3 ni a la 4, y quien las
-empuje en el orden en que están escritas se encontrará la vacuna de la guardia en rojo
-desde el día que aterrice «La guardia mueve».
+**Léase la tabla y no la numeración de más abajo.** Mis fases están numeradas por lo que
+cuesta cada una y por lo que deja hecha, no por el orden en que se empujan: en el calendario
+de verdad **mi fase 5 va antes que mi 3 y que mi 4**, porque la dispara la fase 3 del estiaje
+(§7.6) y ésa cae en el quinto sitio. Las mías siguen sin depender unas de otras —cada una
+deja el juego entero y verde—, pero la 5 no espera a nadie: quien empuje en el orden en que
+están escritas se encontrará la vacuna de la guardia en rojo desde el día que aterrice «La
+guardia mueve».
 
 **De qué dependo yo, y quién depende de mí.** Lo primero, en concreto:
 
@@ -972,52 +1387,47 @@ desde el día que aterrice «La guardia mueve».
   y se apoya en él; hasta que exista, que lo del mazo sea jugable desde la lista no lo
   vigila nadie, y eso hay que decirlo aunque este encargo no añada ni un movimiento.
 - De la fase 3 del estiaje, «La guardia mueve», que es la que dispara la fase 5 de aquí.
-- Del pregón del trueque, sólo para la llave que lo apaga (decisión 9): mientras el pregón
-  no exista, la condición se escribe igual y sale siempre verdadera. No es una espera. Pero
-  **mis fases 3 y 4 van detrás del trueque entero** en la lista de arriba, y no por
-  capricho: la llave es una condición sobre un estado que sólo el trueque crea, y escribirla
-  contra un estado que todavía no existe es escribir una condición que ningún comprobador
-  puede poner roja (§7.7).
+- Del pregón del trueque, sólo para la llave que lo apaga (decisión 9). **Aquí decía que
+  «mientras el pregón no exista, la condición se escribe igual y sale siempre verdadera; no
+  es una espera», y el código no le hizo caso, con razón** (§9 bis, punto 8): la condición no
+  se escribe hasta que exista el estado, porque si no ningún comprobador la puede poner roja.
+  Lo que sí es cierto es la consecuencia: **mi fase 3 va detrás del trueque entero** en la
+  lista de arriba, y por eso mismo.
 
 Y quién depende de mí, que es más corto y hay que decirlo igual:
 
-- **La fase 3 del estiaje depende de mi fase 1**, y no al revés como parecería. El día que
-  «La guardia mueve» quite el `!estado.tirado` de `jugarLaGuardia`, la vacuna del §7.6 se
-  pone roja; si mi fase 1 no está empujada, esa vacuna no existe y el cambio de regla entra
-  con el texto viejo y toda la batería en verde. Por eso mi fase 1 va **antes** que la 3 del
-  estiaje en la lista, aunque este encargo vaya «el segundo de los tres».
-- **Nadie más depende de mí.** Las fases 2, 3 y 4 de aquí no las espera ningún otro
-  documento: son pantalla, y ni añaden un movimiento ni tocan una regla.
+- **La fase 3 del estiaje depende de mi fase 1, que ya está empujada.** El día que «La
+  guardia mueve» quite el `!estado.tirado` de `jugarLaGuardia`, la vacuna del §7.6 se pone
+  roja; si mi fase 1 no estuviera, esa vacuna no existiría y el cambio de regla entraría con
+  el texto viejo y toda la batería en verde. Está: es una de las 337.
+- **Nadie más depende de mí.** Las fases 3 y 4 de aquí no las espera ningún otro documento:
+  son pantalla, y ni añaden un movimiento ni tocan una regla.
 
-1. **El texto y su comprobador. Sin nada en pantalla.** Las tres columnas en
-   `RetratoDeLaCarta`, las veintiuna frases en `RETRATO_DE_LA_CARTA` y `RETRATO_DEL_PREMIO`
-   compuestas con las siete constantes, el campo en `CartaDelMazoEnTres` y en `CartaDelMazo`,
-   `cartasEnTres` y `premiosEnTres` rellenándolo, y las seis comprobaciones del §7 en
-   `verify:riberas-en-tres` (la 6, la vacuna de la guardia, con el texto de HOY). Al acabar,
-   el texto existe, viaja al naipe, está vigilado y no se ve. Es la fase que hace que las
-   otras cuatro sean cortas.
-2. **La mano por clases en el retablo.** La fila nueva del marcador en las dos pantallas, con
-   `retratoDeLaCarta` y `manoDelMazoPorFamilias`, y los dos premios; y la comprobación del
-   §7.8. **Va aquí, y no la última, y es la corrección de la primera vuelta:** con cinco o seis
-   colonos el retablo es la única pantalla que existe (`COLORES_EN_3D` tiene cuatro colores,
-   §0), así que ésta es la única fase de todo el documento que llega a esas mesas. Poniéndola
-   detrás de las dos del lienzo, un empujón que se pare a medias deja sin explicación
-   justamente a las partidas más grandes. Y es corta: los datos ya están en la vista y
-   `retratoDeLaCarta` ya existe.
-3. **El cartel en el escritorio.** La entrada `onSenalar` en `ManoDelMazo` y en `Delta`,
-   cableada desde los `onPointerOver` y `onPointerOut` que ya existen; el estado en
-   `riberas-en-tres.tsx`, que es el de la carta cogida (`cartaDelMazo`) con la señalada como
-   respaldo y la precedencia del §4; el cartel dentro de `RECUADRO_DEL_LIENZO` con su regla
-   en `estilo.css`, `pointer-events: none` y `aria-live="polite"`; la llave que lo apaga con
-   el pregón abierto (decisión 9); y la lista `.riberas-solo-apoyo` con una fila por naipe.
-   Las comprobaciones del §7.7 en `verify:escritorio`. Es la fase que contesta la frase que
-   Miguel dijo, literal.
-4. **El cartel en la app.** Lo mismo con `cogidaDelMazo`, dentro de la vista del `Canvas`,
+1. ~~**El texto y su comprobador. Sin nada en pantalla.**~~ **HECHA en `85f28c6`** (§12.0).
+   Al acabar, el texto existe, viaja al naipe, está vigilado y no se ve. Es la fase que hizo
+   cortas a las demás, y la que destapó las cinco reglas del §2 bis.
+2. ~~**El cartel en el escritorio.**~~ **HECHA en `85f28c6`** (§12.0). La entrada `onSenalar`
+   en `ManoDelMazo` y en `Delta`, cableada desde los `onPointerOver` y `onPointerOut` que ya
+   existían; el estado de la carta cogida con la señalada como respaldo y la precedencia del
+   §4; el cartel dentro del recuadro con `pointer-events: none` y `aria-live="polite"`; y la
+   lista de apoyo con una fila por naipe. Es la fase que contesta la frase que Miguel dijo,
+   literal. Lo que NO lleva y era del guion: la llave del pregón (§9 bis, punto 8).
+3. **El cartel en la app.** Lo mismo con `cogidaDelMazo`, dentro de la vista del `Canvas`,
    con `pointerEvents="none"` y `accessibilityLiveRegion="polite"`, y las filas `accessible`.
-   Se prueba EN EL APARATO, porque el panel del navegador no pulsa igual que un dedo: coger un
-   naipe apagado y leer el cartel, soltarlo con el segundo toque, y comprobar que un toque
-   sobre el sitio del cartel construye en el delta que hay debajo. Y se mira con la cinta en
-   dos líneas, que es cuando sólo cabe una frase (§5.1).
+   La aritmética **no se vuelve a escribir**: `elCartelQueCabe` es una función pura y la app
+   la puede llamar igual, sólo que con SU peor lienzo, que no es el de aquí —el escritorio
+   tiene el suelo de 420 puntos del `min-height` y la app no lo tiene, así que allí sí valen
+   los lienzos bajos de la lista y el peor vuelve a ser 320×360 (§9 bis, punto 6)—. Se prueba
+   EN EL APARATO, porque el panel del navegador no pulsa igual que un dedo: coger un naipe
+   apagado y leer el cartel, soltarlo con el segundo toque, y comprobar que un toque sobre el
+   sitio del cartel construye en el delta que hay debajo. Y se mira con la letra del sistema
+   en grande, que es donde el cartel se queda en una frase o en ninguna (§9 bis, punto 7).
+4. **La mano por clases en el retablo.** La fila nueva del marcador en las dos pantallas, con
+   `retratoDeLaCarta` y `manoDelMazoPorFamilias`, y los dos premios; y la comprobación del
+   §7.8. **Es corta, y es la única que llega a las mesas de cinco y de seis.** Los datos ya
+   están en la vista y `retratoDeLaCarta` ya existe y ya recibe `string`. El §12.0 dice cómo
+   llegó a ser la cuarta cuando este documento la había puesto de segunda; el argumento no ha
+   cambiado, sólo el sitio.
 5. **La guardia con el estiaje: se empuja CON la fase 3 de
    `docs/EL-LADRON-DE-RIBERAS.md`, no después de «el día que aterrice».** Una fila de tabla y
    una comprobación que cambia de sentido. La fase 3 de aquel documento («La guardia mueve»)
@@ -1025,4 +1435,46 @@ Y quién depende de mí, que es más corto y hay que decirlo igual:
    ofrezca antes de tirar; en cuanto se empuje, la vacuna del §7.6 se pone **roja**, porque
    preguntará al juego y le contestará que sí mientras el texto sigue diciendo «Tras tirar».
    O sea que esta fase no espera a nadie: la dispara aquélla, y si no se hace, la batería no
-   pasa. No se adelanta tampoco, por el mismo motivo y en el otro sentido.
+   pasa. No se adelanta tampoco, por el mismo motivo y en el otro sentido. Y ya no es sólo la
+   guardia: **`USAS_DE_LA_JUGADA` es una constante que comparten las cuatro cartas que se
+   juegan**, así que quien la toque para quitarle el «Tras tirar» se lo quita también a El
+   Año Bueno, a El Acaparamiento y a Las Dos Veredas, que siguen esperando a los dados. La
+   vacuna del §7.6 pregunta por la guardia; las otras dos puertas de esa misma frase («una al
+   turno» y «la nueva no») las preguntan otras dos comprobaciones sobre El Acaparamiento, así
+   que sacar la guardia de la constante compartida no deja a nadie sin vigilar.
+
+### 12.1. Y una fase más, que se dejó escrita y no se hizo: los premios se explican tarde
+
+**Los dos naipes de premio SÓLO los ve quien ya los tiene.** No es una omisión de la fase 1:
+`premiosEnTres` recibe `quien` y devuelve un naipe **sólo si el premio es de ese asiento**
+(`if ((vista.vado?.de ?? null) === quien)`), y en las dos pantallas ese `quien` es el propio
+jugador, porque la mano de la izquierda es la de uno. Así que hoy pasa esto: **las frases de
+El Vado Largo y de La Mayor Guardia explican cómo se gana el premio a quien ya lo ganó.**
+
+El §0 decía que estos dos naipes eran los que más falta hacían porque «aparecen solos, sin
+que nadie los pida, y nadie los ha explicado nunca», y eso sigue siendo verdad —el día que
+aparecen, ahora hay cartel—. Lo que no es verdad es que el cartel llegue a tiempo: quien está
+trazando su cuarta vereda, que es exactamente quien necesita saber que a la quinta pasa algo,
+no tiene ningún naipe que señalar. Y la frase que le serviría está escrita, compuesta con
+`VADO_MINIMO`, y no la ve.
+
+**Que se expliquen ANTES de tenerlos es otra fase, y su forma está por decidir.** Se deja
+apuntada aquí y no se resuelve, porque las salidas que se ven no son equivalentes y ninguna
+es gratis:
+
+- **Devolver el naipe apagado a quien no lo tiene** es lo barato de escribir —`premiosEnTres`
+  ya recibe la vista entera— y lo caro de todo lo demás: mete dos naipes más en una mano que
+  ya se reparte por imán, y `esPremio` existe precisamente para que un premio NO se pinte
+  apagado (cabecera de ese campo en `escenas/cartas.ts`). O sea que habría que decidir qué
+  quiere decir un premio de otro dibujado en mi mano, y eso es una regla de pantalla nueva.
+- **Colgarlo del marcador**, donde el renglón del vado ya dice «vado 1 de 5» a quien va corto
+  (`renglonDelVado`). Ahí ya hay un sitio que habla del premio a quien no lo tiene, y ahí ya
+  se sabe cuánto le falta. Es el candidato natural, y es además el único que sirve en el
+  retablo.
+- **No hacer nada y aceptarlo**, con el argumento de que un premio que no se puede pedir no
+  es una jugada que haya que explicar. Es defendible y hay que decirlo, porque las otras dos
+  cuestan pantalla.
+
+Lo que sí está decidido es que **no se resuelve escribiendo un texto nuevo**: las dos frases
+ya existen, ya están compuestas con las constantes y ya tienen vacuna encima. Lo que falta es
+una PUERTA, y por eso esto es una fase y no una errata.
