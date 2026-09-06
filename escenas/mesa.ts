@@ -37,9 +37,78 @@
  * cambio de veta y no como una ranura, que pediría vértices duplicados. `fbm` devuelve
  * entre 0 y 1, así que la veta también, y `mezcla` la lleva a un color entre los dos.
  */
-import { COLUMNAS_DE_LA_TABLA } from './atlas-del-tablero';
+import { ALTO_DEL_ATLAS, COLUMNAS_DE_LA_TABLA } from './atlas-del-tablero';
+import { DISTANCIA_DE_LA_BARRA, cotaDeLaTapa, loQueSeVe } from './barra';
+import type { HuecoDeLaBarra } from './barra';
+import { CELDA_DEL_JUGADOR, COLUMNA_DEL_COLOR, FILAS_DEL_ATLAS } from './paleta';
 import { fbm } from './ruido';
 import { tablaDelAtlas } from './texeles-del-atlas';
+
+// ---------------------------------------------------------------------------
+// Dónde está la tapa: la cota, los dos bordes y el ancho
+// ---------------------------------------------------------------------------
+
+/**
+ * CUÁNTA MADERA ASOMA POR DETRÁS DEL ZÓCALO, en lados: el borde trasero de la tapa cae a
+ * `DISTANCIA_DE_LA_BARRA + 0,6·lado` de la cámara, un décimo de lado por detrás del radio
+ * del zócalo (0,5). Menos, y el posavasos quedaría al filo; más, y la mesa tapa tablero
+ * que no hace falta tapar. En apaisado, `z = −2,139`.
+ */
+export const TRAS_EL_ZOCALO = 0.6;
+/**
+ * EL ANCHO DE LA TAPA, en anchos visibles a la distancia de la barra. El borde trasero
+ * está más lejos que la barra y la cámara ve más ancho ahí: el factor exacto es
+ * `(2 + 0,6·lado) / 2`, entre 1,034 y 1,070 según el lienzo; se redondea a 1,08 para que
+ * las esquinas traseras no asomen en ninguno.
+ */
+export const ANCHO_DE_MAS_DE_LA_TAPA = 1.08;
+/**
+ * CUÁNTO SE ALARGA EL BORDE DELANTERO HACIA LA CÁMARA, en unidades, más allá del punto
+ * exacto donde la tapa cruza el canto de abajo del lienzo. La decisión abierta del diseño
+ * (§10) dice: si se ve corta por delante se alarga hacia la cámara, nunca hacia atrás. Un
+ * décimo de unidad deja el frente a 1,5 de la cámara —el plano cercano de las tres
+ * cámaras está en 0,5— y garantiza que ni un redondeo del campo deja una línea de mundo
+ * bajo la madera en la última fila de píxeles.
+ */
+export const HOLGURA_DELANTERA_DE_LA_TAPA = 0.1;
+
+/** La tapa de la mesa en coordenadas de la cámara: el plano horizontal que se pinta. */
+export interface TapaDeLaMesa {
+  /** La altura: la cara de abajo del zócalo (`cotaDeLaTapa`). Negativa, bajo el centro. */
+  cota: number;
+  /** El borde lejano, negativo: detrás del zócalo. */
+  zTrasero: number;
+  /** El borde cercano, negativo y mayor que `zTrasero`: por fuera del canto de abajo. */
+  zDelantero: number;
+  /** `(zTrasero + zDelantero) / 2`: donde se coloca el centro del plano. */
+  centroZ: number;
+  /** `zDelantero − zTrasero`: el fondo del plano. */
+  fondo: number;
+  ancho: number;
+}
+
+/**
+ * LA TAPA HORIZONTAL A LA COTA DEL ZÓCALO, medida y no elegida.
+ *
+ * El borde delantero es donde el plano `y = cota` cruza el canto de abajo del lienzo,
+ * `z = cota / tan(campo/2)` (`−1,649` en todos los apaisados), más la holgura hacia la
+ * cámara. Es lo que hace que la mesa no flote: su frente queda FUERA del lienzo, como una
+ * mesa mirada desde la silla, y por eso no lleva canto. El fondo resultante es de unos 2,3
+ * lados. Todo sale del hueco y de la cámara; nada de aquí se escribe a mano en la escena.
+ */
+export function tapaDeLaMesa(hueco: HuecoDeLaBarra, campo: number, proporcion: number): TapaDeLaMesa {
+  const cota = cotaDeLaTapa(hueco);
+  const zTrasero = -(DISTANCIA_DE_LA_BARRA + TRAS_EL_ZOCALO * hueco.lado);
+  const zDelantero = cota / Math.tan(campo / 2) + HOLGURA_DELANTERA_DE_LA_TAPA;
+  return {
+    cota,
+    zTrasero,
+    zDelantero,
+    centroZ: (zTrasero + zDelantero) / 2,
+    fondo: zDelantero - zTrasero,
+    ancho: loQueSeVe(campo, proporcion).ancho * ANCHO_DE_MAS_DE_LA_TAPA,
+  };
+}
 
 /** El canal del ruido de la veta. Fijo: la mesa es la misma en todas las mesas. */
 export const CANAL_DE_LA_VETA = 7_001;
@@ -128,6 +197,71 @@ export function coloresDeLaMadera(): { oscura: ColorEnBytes; clara: ColorEnBytes
     oscura: colorDelAtlas(MADERA_OSCURA_EN_EL_ATLAS.columna, MADERA_OSCURA_EN_EL_ATLAS.fila),
     clara: colorDelAtlas(MADERA_CLARA_EN_EL_ATLAS.columna, MADERA_CLARA_EN_EL_ATLAS.fila),
   };
+}
+
+/**
+ * EL POSAVASOS: la MISMA celda oscura del atlas, oscurecida, y no otro material.
+ *
+ * ═══ EL FALLO QUE ESTO ARREGLA ═══
+ *
+ * Los zócalos hexagonales eran de paja clara —`#c8b48a` en reposo, `#f0e3c2` bajo el
+ * puntero—, dos hexadecimales sueltos en `delta.tsx` de cuando debajo había una placa
+ * oscura al 42 %. Sobre una tapa de `#94533f`–`#b97756` esa paja se lee como una
+ * PEGATINA: más clara que la veta más clara y de otro palo. La decisión 14 del §1 de
+ * `docs/LA-MESA-DE-RIBERAS.md` los quiere de madera MÁS OSCURA que la tapa: un trozo más
+ * oscuro de la misma madera, no otro material.
+ *
+ * ═══ DE DÓNDE SALE CADA UNO, Y POR QUÉ EL 70 % Y EL 85 % ═══
+ *
+ * De la celda oscura del atlas (`MADERA_OSCURA_EN_EL_ATLAS`, la misma fila que la veta),
+ * multiplicada canal a canal en sRGB. Al 70 % en REPOSO: es lo que da 1,6:1 de contraste
+ * de luminancia relativa contra la veta MÁS OSCURA de la tapa —la propia celda, con la
+ * veta a cero— y 2,6:1 contra la más clara, del orden del contraste de la veta consigo
+ * misma (1,6:1): se lee como madera oscura sobre madera, no como un agujero ni como una
+ * pegatina. Bajo el puntero, al 85 %: un paso más claro del mismo palo, que sigue por
+ * debajo de la veta más oscura y dice «esto responde» sin cambiar de material. Los dos
+ * salen de aquí y no de `delta.tsx` para que `verify:escena` mida el contraste con el
+ * mismo número que se pinta, y para que si el pack cambia su atlas el posavasos cambie
+ * con la tapa. «Tomada» sigue con el verde de la señal y «apagada» con su opacidad: eso
+ * es información, no color de madera.
+ */
+export const POSAVASOS_SOBRE_LA_MADERA_OSCURA = { reposo: 0.7, encima: 0.85 } as const;
+
+/** Un color en bytes multiplicado por un factor, canal a canal, sin salirse de 0..255. */
+export function oscurecido(color: ColorEnBytes, factor: number): ColorEnBytes {
+  const canal = (n: number): number => Math.max(0, Math.min(255, Math.round(n * factor)));
+  return [canal(color[0]), canal(color[1]), canal(color[2])];
+}
+
+/** Los dos colores del posavasos, leídos del atlas y oscurecidos. */
+export function coloresDelPosavasos(): { reposo: ColorEnBytes; encima: ColorEnBytes } {
+  const { oscura } = coloresDeLaMadera();
+  return {
+    reposo: oscurecido(oscura, POSAVASOS_SOBRE_LA_MADERA_OSCURA.reposo),
+    encima: oscurecido(oscura, POSAVASOS_SOBRE_LA_MADERA_OSCURA.encima),
+  };
+}
+
+/**
+ * EL COLOR DE UN COLONO, leído de la MISMA celda del atlas que tiñe sus chozas.
+ *
+ * El tapete del turno tiene que ser «el color de ese colono, el mismo de sus chozas», y
+ * las chozas no llevan un hexadecimal: apuntan con sus UV a la celda del jugador del atlas
+ * (`CELDA_DEL_JUGADOR`, corrida a la columna de su color por `desplazamientoDeColor`). Así
+ * que el tapete se lee de ahí, en la fila del medio de esa celda —la celda lleva un
+ * degradado vertical y el medio es el tono que más superficie de choza cubre—: azul
+ * `#257ebc`, rojo `#d22227`, amarillo `#f9aa4e`, verde `#008454`. Un color desconocido
+ * sale azul, como en `desplazamientoDeColor`: un dato de fuera no deja la mesa en negro.
+ */
+export function colorDelColono(color: string): ColorEnBytes {
+  const columna = COLUMNA_DEL_COLOR[color] ?? COLUMNA_DEL_COLOR['blue'] ?? 0;
+  const fila = Math.floor((CELDA_DEL_JUGADOR[1] + 0.5) * (ALTO_DEL_ATLAS / FILAS_DEL_ATLAS));
+  return colorDelAtlas(columna, fila);
+}
+
+/** `#rrggbb` de un color en bytes, para dárselo a un material. */
+export function hexDe(color: ColorEnBytes): string {
+  return `#${color.map((n) => Math.round(n).toString(16).padStart(2, '0')).join('')}`;
 }
 
 /**

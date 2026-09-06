@@ -125,6 +125,8 @@ import {
   tableroEnTres,
   TIPOS_QUE_PINTA_LA_MANO,
   truequesPosibles,
+  turnoEnTres,
+  colorDePiezaDelColono,
 } from '../../shared/arcade/juegos/riberas-en-tres';
 import type { CartaDelMazoEnTres } from '../../shared/arcade/juegos/riberas-en-tres';
 import { COLORES_EN_3D } from '../../shared/arcade/juegos/riberas-en-3d';
@@ -953,6 +955,20 @@ const CAMPO_DE_LA_BARRA = (45 * Math.PI) / 180;
   });
   const marcador = marcadorEnTres(proyectarRiberas(estado, 'A'));
   comprobar('hay marcador, con un colono por asiento', marcador !== null && marcador.colonos.length === 3, marcador?.colonos.length);
+  /*
+   * EL COLOR DEL TURNO PARA EL TAPETE: el del colono al que le toca, con el MISMO reparto
+   * que sus piezas en la barra, y `null` fuera de Riberas. Hasta esta fase ninguna pantalla
+   * lo pasaba a `<Delta>` y la mesa salía sin tapete en la partida.
+   */
+  const vistaConTurnoDeB = proyectarRiberas({ ...estado, turno: 1 }, 'A');
+  comprobar(
+    'el tapete es del colono al que le toca: en el turno de A sale el color de la primera pieza de A, en el de B el de B, y fuera de Riberas `null`',
+    turnoEnTres(proyectarRiberas(estado, 'A')) === COLORES_EN_3D[0] &&
+      turnoEnTres(vistaConTurnoDeB) === COLORES_EN_3D[1] &&
+      turnoEnTres(proyectarRiberas(estado, 'A')) === colorDePiezaDelColono(0) &&
+      turnoEnTres({ desde: 'otro' }) === null,
+    { enElDeA: turnoEnTres(proyectarRiberas(estado, 'A')), enElDeB: turnoEnTres(vistaConTurnoDeB) },
+  );
 
   const mio = marcador?.colonos.find((c) => c.asiento === 'A');
   const otro = marcador?.colonos.find((c) => c.asiento === 'B');
@@ -1487,7 +1503,7 @@ const CAMPO_DE_LA_BARRA = (45 * Math.PI) / 180;
 }
 
 /* ═══ EL RECUENTO, PARA QUE NO SE VACÍE SIN QUE NADIE LO NOTE ═══ */
-const MINIMO = 290;
+const MINIMO = 291;
 if (hechas < MINIMO) {
   console.log(`✘ este comprobador debería hacer al menos ${MINIMO} comprobaciones y ha hecho ${hechas}: alguien ha borrado un bloque`);
   process.exit(2);

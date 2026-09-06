@@ -2195,6 +2195,17 @@ function elMazoEnLaPantalla(): void {
     ),
   );
   /*
+   * EL TAPETE DEL TURNO LLEGA A `<Delta>`. La entrada es opcional y sin ella no se cae
+   * nada: la mesa se pintaba sin tapete en la partida y con tapete sólo en el banco, que sí
+   * lo pasaba. Se exige que salga de `turnoEnTres(vista)` —el color del turno compuesto en
+   * `shared/`, el mismo reparto que las chozas— y no de un color escrito aquí.
+   */
+  comprobar(
+    'y el tapete del turno también: `<Delta>` recibe `turnoDe={turnoDe}` y `turnoDe` sale de `turnoEnTres(vista)`',
+    /<Delta[\s\S]*?turnoDe=\{turnoDe\}[\s\S]*?\/>/.test(fuente) &&
+      /const turnoDe = useMemo\(\(\) => turnoEnTres\(vista\), \[vista\]\);/.test(fuente),
+  );
+  /*
    * LA MANO QUE LLEGA A `<Delta>` ES LA COMPUESTA, Y AQUÍ SE LEE DEL FICHERO PORQUE NO HAY
    * OTRA MANERA: vive dentro del `Canvas`, y en Node no hay `Canvas`.
    *
@@ -2303,7 +2314,7 @@ console.log('');
  * eso se lee como verde. Con el número escrito, salir con menos es un fallo ruidoso. Va a
  * mano y se sube al añadir comprobaciones; un guardia desfasado no guarda nada.
  */
-const COMPROBACIONES_ESCRITAS = 388;
+const COMPROBACIONES_ESCRITAS = 389;
 if (hechas < COMPROBACIONES_ESCRITAS) {
   console.error(
     `Solo se han hecho ${String(hechas)} de las ${String(COMPROBACIONES_ESCRITAS)} comprobaciones que ` +

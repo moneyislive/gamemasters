@@ -20,13 +20,16 @@
  * la cámara a la MISMA distancia (2), así que sus cuentas son comparables sin proyectar
  * nada. Los números de aquí abajo salen de medirse contra ellas:
  *
- *   · `barra.ts` — la barra de construir, ABAJO Y CENTRADA. Su placa de fondo es lo más
- *     alto que tiene: el centro de la barra flota a `0,155` del alto sobre el canto de
- *     abajo (`DESDE_EL_SUELO`) y la placa mide `1,5` lados de alto, con el lado topado en
- *     `0,14` del alto (`PARTE_DEL_ALTO`). O sea que el techo de la barra NUNCA pasa de
- *     `-0,240·alto`. Por eso el PISO de esta franja está en `-0,20·alto`: cuatro
- *     centésimas de holgura, y no vale «mirarlo en pantalla» porque la barra se encoge
- *     con el ancho y el caso malo es el monitor, donde es más alta.
+ *   · `barra.ts` — la mesa con la barra de construir, ABAJO Y CENTRADA. Lo más alto que
+ *     tiene es el ASA de cada hueco —la caja invisible de un lado, medio lado sobre el
+ *     centro— y, un pelo por encima, la pieza tomada en lo alto de su bote (0,516 lados):
+ *     el centro de la barra flota a `0,155` del alto sobre el canto de abajo
+ *     (`DESDE_EL_SUELO`) con el lado topado en `0,14` del alto (`PARTE_DEL_ALTO`). O sea
+ *     que el techo de la mesa NUNCA pasa de `-0,273·alto` (el 22,7 % desde abajo; el asa
+ *     sola, `-0,275`). La tapa de madera queda por DEBAJO de los huecos y no cuenta. Por
+ *     eso el PISO de esta franja está en `-0,20·alto`: siete centésimas de holgura, y no
+ *     vale «mirarlo en pantalla» porque la barra se encoge con el ancho y el caso malo es
+ *     el monitor, donde es más alta.
  *
  *     Y la barra ocupa hasta `0,70` del ANCHO, centrada, así que en un móvil de pie pasa
  *     por debajo de esta franja de lado a lado. Separarse de ella es un asunto de ALTURA,
@@ -405,9 +408,9 @@ const FRANJA_EN_CARTAS = 2;
  *     tres centésimas de aire. Arriba a la izquierda no hay nada más.
  *   · `SUELO_DE_LAS_CARTAS` a `0`: las cartas viven en la mitad de arriba. Debajo van sus
  *     casillas, y una casilla tapada por la mano que la usa no sirve de nada.
- *   · `PISO_DE_LA_FRANJA` a `-0,20`: el techo de la placa de la barra está en `-0,240`
- *     como mucho (ver la cabecera). Cuatro centésimas de holgura, que a esta distancia
- *     son más que un tercio del alto de una carta.
+ *   · `PISO_DE_LA_FRANJA` a `-0,20`: el techo de la mesa —el asa de un hueco y el bote de
+ *     la pieza tomada— está en `-0,273` como mucho (ver la cabecera). Siete centésimas de
+ *     holgura, que a esta distancia son más de la mitad del alto de una carta.
  */
 const TECHO_DE_LAS_CARTAS = 0.47;
 const SUELO_DE_LAS_CARTAS = 0;

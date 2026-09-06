@@ -229,6 +229,7 @@ import {
   seVeEnTres,
   tableroEnTres,
   truequesPosibles,
+  turnoEnTres,
 } from '../../shared/arcade/juegos/riberas-en-tres';
 import type {
   ClaseDeJugada,
@@ -855,6 +856,12 @@ export function RiberasEnTres({ manifiesto, mesa, puesta, tablero, opciones }: L
     () => barraEnTres(vista, yo).map((p) => (quieto ? { ...p, disponible: false } : p)),
     [vista, yo, quieto],
   );
+  /*
+   * EL TAPETE DEL TURNO: el color de quien juega, leído de la vista por `shared/`. Sin
+   * esto la mesa salía sin tapete en la partida —la entrada de `<Delta>` es opcional y no
+   * se caía nada— y con él sólo en el banco.
+   */
+  const turnoDe = useMemo(() => turnoEnTres(vista), [vista]);
   const colocando = useMemo(
     () => (tomada === null ? null : colocandoEnTres(vista, yo, tomada)),
     [vista, yo, tomada],
@@ -1169,6 +1176,7 @@ export function RiberasEnTres({ manifiesto, mesa, puesta, tablero, opciones }: L
                   onTomarDeLaBarra={alTomarDeLaBarra}
                   mazo={mazo}
                   onPulsarElMazo={alPulsarElMazo}
+                  turnoDe={turnoDe}
                   mano={mano}
                   cogida={cogida}
                   onCogerCarta={alCogerCarta}

@@ -78,6 +78,7 @@ import * as THREE from 'three';
  * con la lista vacía NO hace, porque el compilador lo elide; ver `jsx-de-three.d.ts`.
  */
 import { useFrame } from '@react-three/fiber';
+import type { ThreeEvent } from '@react-three/fiber';
 
 /**
  * ¿ESTE SUCESO NO ES DEL BOTÓN CON EL QUE SE JUEGA?
@@ -154,7 +155,27 @@ import { CELDA_DE_LA_ARENA } from './paleta';
 import { geometriaDeContornos } from './formas';
 import { CONTORNOS_DE_LA_CARTA, CONTORNOS_DE_LA_CIFRA, CONTORNOS_DEL_BIEN } from './iconos';
 import { sitiosDelTablero, sitiosPermitidos } from './sitios';
-import { DIBUJO_DEL_MAZO, DISTANCIA_DE_LA_BARRA, huecosDeLaBarra } from './barra';
+import { DIBUJO_DEL_MAZO, ZOCALO, huecosDeLaBarra, huecosDeLaMesa } from './barra';
+import { colorDelColono, coloresDelPosavasos, hexDe, tapaDeLaMesa } from './mesa';
+import {
+  ORDEN_DE_LA_BARRA,
+  ORDEN_DE_LAS_AREAS,
+  ORDEN_DE_LAS_CARTAS,
+  ORDEN_DE_LAS_CARTAS_DEL_MAZO,
+  ORDEN_DE_LAS_CASILLAS,
+} from './capas';
+import { FILAS_DE_LA_MESA, segmentosDeLaMesa } from './presupuesto-del-delta';
+import {
+  FONDO_DEL_TAPETE,
+  OPACIDAD_DEL_TAPETE,
+  RADIO_DE_LA_SOMBRA,
+  RUGOSIDAD_DE_LA_MADERA,
+  SOBRE_LA_TAPA,
+  geometriaDeLaTapa,
+  geometriaDeLasSombras,
+  geometriaDelTapete,
+  maderaEnLineal,
+} from './tablon';
 import {
   areasDeTrueque,
   enLaZonaDeLaMano,
@@ -201,36 +222,31 @@ const COLOR_DEL_NUMERO = '#efe6cd';
  */
 const COLOR_DE_LA_SENAL = '#39ff14';
 
-/**
- * EL ORDEN DE DIBUJO DE LAS CAPAS QUE VAN PEGADAS A LA CÁMARA.
- *
- * Están juntas y escritas de una vez porque son un mismo apilamiento y sólo se entienden
- * en relación unas con otras. Sueltas por el fichero, cada número parece arbitrario y el
- * día que dos se crucen nadie sabe cuál mover.
- *
- * De atrás adelante: el mundo, la barra de construir, la mano, y encima de todo las áreas
- * de trueque — que sólo salen mientras se arrastra una carta y tienen que poder taparla.
- *
- * El hueco que se le deja a la mano no es capricho: cada carta gasta diez para sus tres
- * capas y hasta trescientos más si el imán tira de ella, que es lo que la trae al frente.
+/*
+ * EL ORDEN DE DIBUJO DE LAS CAPAS QUE VAN PEGADAS A LA CÁMARA vive en `capas.ts`, sin
+ * `three` ni React, para que el modelo del árbol de `scripts/arbol-de-la-mesa.ts` y
+ * `verify:escena` importen EL MISMO número que se pinta aquí y no una copia. De atrás
+ * adelante: el mundo, la mesa con la barra de construir, la mano de bienes, y encima las
+ * áreas de trueque; la mano del mazo y sus casillas en un tramo propio. La regla —cada
+ * capa es un número y lo lleva TODO grupo con mallas debajo— y por qué la mesa no borra la
+ * profundidad están en su cabecera.
  */
-const ORDEN_DE_LA_BARRA = 1000;
-const ORDEN_DE_LAS_CARTAS = 1010;
-const ORDEN_DE_LAS_AREAS = 2000;
-/**
- * Y LA MANO DEL MAZO, EN UN TRAMO PROPIO Y SIN TOCAR EL DE LOS BIENES.
- *
- * Va por encima de todo lo anterior aunque no lo necesite: las dos manos están en lados
- * opuestos del lienzo y `verify:escena` exige que no se rocen, así que sus órdenes de
- * dibujo no pueden pelearse ni queriendo. El tramo aparte es para el día que alguien
- * mueva una de las dos — que se cruce en la pantalla no debe además cruzarse aquí.
- *
- * El hueco que se le deja a las cartas del mazo es el mismo que el de los bienes: diez por
- * carta para sus capas, más lo que el imán y el estar cogida les suman.
- */
-const ORDEN_DE_LAS_CARTAS_DEL_MAZO = 3000;
-const ORDEN_DE_LAS_CASILLAS = 4000;
 const COLOR_DEL_PUNTO = '#2a2118';
+
+/**
+ * LOS DOS COLORES DEL POSAVASOS, leídos del atlas UNA vez al cargar el módulo.
+ *
+ * Madera más oscura que la tapa (`coloresDelPosavasos`, `mesa.ts`: la celda oscura del
+ * atlas al 70 % en reposo y al 85 % bajo el puntero) y no la paja clara que había, que
+ * sobre la madera se leía como una pegatina. Se convierten a `#rrggbb` aquí, de una vez,
+ * porque el material los quiere como cadena y `three` los pasa a lineal él solo; la veta
+ * de la tapa ya va en lineal en el vértice, así que los dos acaban en el mismo espacio.
+ * Ningún hexadecimal de posavasos se escribe en este fichero: `verify:escena` lo afirma.
+ */
+const POSAVASOS = (() => {
+  const { reposo, encima } = coloresDelPosavasos();
+  return { reposo: hexDe(reposo), encima: hexDe(encima) };
+})();
 
 /**
  * EL ROJO DEL SEIS Y DEL OCHO.
@@ -1135,7 +1151,11 @@ function PiezaEnLaBarra({
   });
 
   return (
-    <group position={[hueco.x, hueco.y, hueco.z]} rotation={[0, GIRO_DE_LA_VITRINA, 0]}>
+    <group
+      position={[hueco.x, hueco.y, hueco.z]}
+      rotation={[0, GIRO_DE_LA_VITRINA, 0]}
+      renderOrder={ORDEN_DE_LA_BARRA}
+    >
       {/*
        * EL ASA ES LA CASILLA ENTERA, y esto costó una prueba en pantalla.
        *
@@ -1167,17 +1187,20 @@ function PiezaEnLaBarra({
         <boxGeometry args={[hueco.lado, hueco.lado, hueco.lado * 0.8]} />
         <meshBasicMaterial colorWrite={false} depthWrite={false} />
       </mesh>
-      {/* El zócalo, que ya sólo es adorno: le da sitio a la pieza y dice si está apagada. */}
-      <mesh position={[0, -hueco.lado * 0.42, 0]} raycast={() => null}>
-        <cylinderGeometry args={[hueco.lado * 0.46, hueco.lado * 0.5, hueco.lado * 0.12, 6]} />
+      {/* El posavasos, que ya sólo es adorno: le da sitio a la pieza y dice si está apagada o tomada. */}
+      <mesh position={[0, -hueco.lado * ZOCALO.centro, 0]} raycast={() => null}>
+        <cylinderGeometry
+          args={[hueco.lado * 0.46, hueco.lado * ZOCALO.radio, hueco.lado * ZOCALO.alto, 6]}
+        />
         <meshStandardMaterial
-          color={tomada ? COLOR_DE_LA_SENAL : encima ? '#f0e3c2' : '#c8b48a'}
+          color={tomada ? COLOR_DE_LA_SENAL : encima ? POSAVASOS.encima : POSAVASOS.reposo}
           transparent
           opacity={pieza.disponible ? 0.92 : 0.3}
           roughness={0.7}
         />
       </mesh>
-      <group ref={grupo}>
+      {/* También con la constante: es el grupo más cercano a las mallas del modelo, y es el que el pintor mira. */}
+      <group ref={grupo} renderOrder={ORDEN_DE_LA_BARRA}>
         {mallas.map((m, i) => (
           <mesh
             key={`barra:${pieza.id}:${String(i)}`}
@@ -1273,7 +1296,11 @@ function MazoEnLaBarra({
   const cuerpo = mazo.disponible ? 1 : 0.34;
 
   return (
-    <group position={[hueco.x, hueco.y, hueco.z]} rotation={[0, GIRO_DE_LA_VITRINA, 0]}>
+    <group
+      position={[hueco.x, hueco.y, hueco.z]}
+      rotation={[0, GIRO_DE_LA_VITRINA, 0]}
+      renderOrder={ORDEN_DE_LA_BARRA}
+    >
       <mesh
         onPointerOver={(e) => {
           e.stopPropagation();
@@ -1290,18 +1317,20 @@ function MazoEnLaBarra({
         <boxGeometry args={[hueco.lado, hueco.lado, hueco.lado * 0.8]} />
         <meshBasicMaterial colorWrite={false} depthWrite={false} />
       </mesh>
-      {/* El mismo zócalo que las piezas, que es lo que dice a la vez «esto es de la barra» y «esto está apagado». */}
-      <mesh position={[0, -hueco.lado * 0.42, 0]} raycast={() => null}>
-        <cylinderGeometry args={[hueco.lado * 0.46, hueco.lado * 0.5, hueco.lado * 0.12, 6]} />
+      {/* El mismo posavasos que las piezas, que es lo que dice a la vez «esto es de la barra» y «esto está apagado». */}
+      <mesh position={[0, -hueco.lado * ZOCALO.centro, 0]} raycast={() => null}>
+        <cylinderGeometry
+          args={[hueco.lado * 0.46, hueco.lado * ZOCALO.radio, hueco.lado * ZOCALO.alto, 6]}
+        />
         <meshStandardMaterial
-          color={encima && mazo.disponible ? '#f0e3c2' : '#c8b48a'}
+          color={encima && mazo.disponible ? POSAVASOS.encima : POSAVASOS.reposo}
           transparent
           opacity={mazo.disponible ? 0.92 : 0.3}
           roughness={0.7}
         />
       </mesh>
-      <group ref={grupo}>
-        {/* El filo claro, que es lo que separa el naipe del fondo de la barra. */}
+      <group ref={grupo} renderOrder={ORDEN_DE_LA_BARRA}>
+        {/* El filo claro, que es lo que separa el naipe de la madera de la mesa. */}
         <mesh geometry={geometria} position={[0, 0, -0.002]} scale={1.06} raycast={() => null}>
           <meshBasicMaterial
             color={COLOR_DEL_FILO_DE_LA_CARTA}
@@ -1334,7 +1363,8 @@ function MazoEnLaBarra({
 }
 
 /**
- * LA BARRA DE ABAJO, pegada a la cámara.
+ * LA MESA DE ABAJO, pegada a la cámara: un tablón de madera y, encima, los huecos de la
+ * barra de construir.
  *
  * ═══ CÓMO SE PEGA, SIN TOCAR EL ÁRBOL DE LA ESCENA ═══
  *
@@ -1343,22 +1373,103 @@ function MazoEnLaBarra({
  * pero sin moverlo de sitio en el árbol, que en r3f obliga a manipular el objeto de la
  * cámara a mano y a acordarse de descolgarlo.
  *
- * ═══ Y POR QUÉ SE BORRA LA PROFUNDIDAD ANTES ═══
+ * ═══ LA TAPA ES UN TABLÓN HORIZONTAL A LA COTA DEL ZÓCALO, Y NADA SE MUEVE ═══
  *
- * La barra vive a dos unidades de la cámara y en la vista de tablero nada del mundo se
- * le acerca. Pero en la vista de tierra la cámara camina entre árboles, y un tronco a
- * unidad y media taparía media barra. Se borra el buffer de profundidad justo antes de
- * dibujarla: a partir de ahí la barra se dibuja sobre todo lo demás, pero SIN perder su
- * propia profundidad, así que un castillo sigue tapándose a sí mismo como debe.
+ * Sustituye a la placa oscura al 42 % que había aquí, que teñía los pies de las cartas de
+ * bienes y sus propios zócalos. Es un `PlaneGeometry` tumbado a la cara de ABAJO de los
+ * zócalos (`cotaDeLaTapa`), con el borde trasero un décimo de lado por detrás de ellos y
+ * el delantero POR FUERA del canto de abajo del lienzo (`tapaDeLaMesa`, `mesa.ts`): una
+ * mesa mirada desde la silla, sin canto que pintar. Las piezas, los zócalos y las asas
+ * están donde estaban: la tapa se puso debajo de ellos y no al revés, y por eso es
+ * horizontal —inclinada hacia la cámara subiría más que el zócalo a media profundidad del
+ * asa—. La madera es color POR VÉRTICE —la veta de `vetaDelTablon` entre los dos colores
+ * leídos del atlas— sobre un `MeshStandardMaterial` blanco: ni PNG (el móvil no lo carga)
+ * ni sombreador (nadie lo iluminaría, y se vería con otra luz que las piezas). Sin mapa
+ * de sombras: el móvil no lo tiene y la barra nunca lo recibió; el apoyo de cada pieza lo
+ * dice una sombra de contacto —un disco con el alfa en el vértice— y las de todos los
+ * huecos van fundidas en UNA geometría. Los posavasos hexagonales se quedan sobre la
+ * madera: llevan «apagada» y «tomada», y un posavasos sobre una mesa es una cosa normal.
  *
- * Poner `depthTest={false}` en los materiales daría el mismo «va delante» y rompería eso
- * otro: las caras de atrás del castillo se dibujarían encima de las de delante.
+ * ═══ EL ORDEN DE DIBUJO: TODO LO DE LA MESA EN SU CAPA, Y NADA MÁS ═══
+ *
+ * `three` ordena primero por el `renderOrder` del grupo MÁS CERCANO a cada malla y sólo
+ * después por el de la malla (cabecera de `capas.ts`). Por eso la constante no va sólo
+ * en este grupo: va en los dos de cada `PiezaEnLaBarra` y en los dos de `MazoEnLaBarra`,
+ * que son los que tienen las mallas debajo. Sin eso las piezas se pintarían con el mundo
+ * (capa 0) y la tapa —que sí va en 1000— después de ellas, y les pisaría los pies donde
+ * las tiene encima. Con los cuatro numerados, la tapa opaca va ANTES que las cartas de
+ * bienes (1010), así que no les tapa los pies; y como no escribe nada que ellas miren
+ * (van con `depthTest={false}`), tampoco les quita un píxel.
+ *
+ * Lo que separa la mesa del mundo es SÓLO ese orden más la profundidad del mundo, que
+ * casi nunca llega a las 2 unidades donde vive la mesa: la cámara no baja de 12° y el ojo
+ * va a 12 unidades o más SOBRE EL AGUA (`ALTURA_MINIMA_DEL_OJO`), no sobre el terreno. En
+ * una montaña de siete u ocho escalones (27–44 unidades de techo) y acercado al máximo, el
+ * ojo puede meterse en la roca y entonces la mesa se entierra con él: medido en 3–35 de
+ * 1080 posturas a 12° según la semilla, y nunca al mirador de salida (el ojo va a 389).
+ * Es el precio aceptado de no hacer una segunda pasada de render. Aquí
+ * hubo un «testigo» —un plano de 0,001 con `onBeforeRender → gl.clearDepth()`— que NUNCA
+ * borró nada, ni a 999 ni a −1: colgaba del origen de este grupo, que copia la posición de
+ * la cámara en cada fotograma, o sea EN EL OJO, detrás del plano cercano (0,5), y
+ * `projectObject` lo podaba por frustum antes de meterlo en la lista de dibujo; a lo que
+ * no está en la lista no se le llama `onBeforeRender`. La escena se veía igual con él y
+ * sin él porque la profundidad la ganaba la tapa sola. Se quitó, y con él el de la
+ * `Baraja`, que estaba igual de podado. Que nadie vuelva a poner uno creyendo que hace
+ * algo: si algún día hace falta borrar profundidad para la mesa, es una segunda pasada de
+ * render (`createPortal` + `gl.render` con `autoClear` a mano), no un testigo.
+ *
+ * ═══ LA MADERA PARA EL TOQUE, Y A TODO ═══
+ *
+ * Con la cámara del mirador de salida quedan bajo el borde trasero de la tapa tres
+ * vértices y cinco aristas del tablero en los apaisados, dos y tres en las tabletas 4:3
+ * (`verify:escena` los cuenta): están escondidos y se sacan arrastrando la cámara. Pero
+ * en r3f sólo se lanzan rayos contra los objetos QUE TIENEN manejadores
+ * (`state.internal.interaction`), así que una tapa sin manejador —con o sin
+ * `raycast={() => null}`— es transparente al dedo y el asa de un vértice escondido
+ * seguía recibiendo el toque: se colocaba una choza tocando madera. La tapa lleva por eso
+ * `onPointerDown`, `onPointerUp` y `onPointerMove` que paran la propagación: es el
+ * impacto más cercano de todo lo que hay detrás, y r3f reparte de cerca a lejos.
+ *
+ * Paran a TODO lo de detrás, sin excepción. Hubo una —dejar pasar si detrás había
+ * interfaz de mano, por los pies de las cartas de bienes y la columna de áreas— y se quitó
+ * al medirla: con cuatro áreas (las máximas: cinco bienes menos el que se da) el fondo de
+ * la columna queda en −0,698 del lienzo, por ENCIMA del borde trasero de la tapa (−0,771)
+ * en los quince lienzos; y de los pies de las cartas quietas, sólo en los lienzos de pie
+ * hay uno o dos puntos de filo donde la madera es el primer impacto. Una excepción que
+ * protegía dos puntos y que ninguna comprobación medía era la misma clase de cosa que el
+ * testigo. Las asas de la barra están POR ENCIMA de la tapa y llegan siempre antes que
+ * ella; el mundo, detrás, se para. Y lleva también `onPointerOver`/`onPointerOut`: sólo
+ * con ellos entra en la lista de «hovered» de r3f, y sólo entonces su parada manda
+ * `pointerout` a lo que había crecido detrás: un anillo de señal que quedó grande no se
+ * queda grande bajo la madera.
+ *
+ * Y ninguno de los dos arrastres depende de que la madera deje pasar rayos. La cámara
+ * escucha `pointerdown/move/up` en la VENTANA (escritorio) o en `gesture-handler` (app),
+ * fuera de r3f, y sólo se aparta si la interfaz marcó el suceso con `loCogeLaInterfaz`
+ * (o `laInterfazSeLoQueda` en la app): la tapa NO lo marca, así que arrastrar desde la
+ * madera sigue girando el tablero, que es justo como se sacan los sitios escondidos. Las
+ * cartas no se arrastran con un plano de arrastre ni con captura de puntero: se cogen con
+ * `onPointerDown` sobre la carta, la mano sigue al cursor leyendo `estado.pointer` en
+ * `useFrame` (que r3f actualiza sin trazar rayos), y se sueltan con `onPointerUp` sobre
+ * un área, una casilla o un anillo. La tapa sólo interviene si el dedo baja o sube sobre
+ * la madera, y ahí deja pasar a la mano y para al tablero, que es lo que se quiere.
+ *
+ * ═══ EL TAPETE Y EL SITIO DE LOS DADOS, SIN DADOS TODAVÍA ═══
+ *
+ * `tapete` es el color del colono al que le toca; con él se pinta un rectángulo al 55 %
+ * sobre la madera, bajo el sitio que `huecosDeLaMesa` reserva a los dados. Los dados
+ * llegan en la fase 3 del diseño, y hasta entonces el reparto de las piezas sigue siendo
+ * el de `huecosDeLaBarra`, sin mover un hueco: el tapete sólo se pinta cuando el sitio de
+ * los dados es el COLGADO a la izquierda, que es el único que existe sin tocar a las
+ * piezas (§4.4 del diseño). Cuando lleguen los dados, la llave del reparto pasa a ser
+ * `dados !== null`, y el tapete va bajo `.dados`, sea colgado o quinto.
  */
 function Barra({
   piezas,
   mazo,
   aplanados,
   tomada,
+  tapete,
   onTomar,
   onPulsarElMazo,
 }: {
@@ -1366,11 +1477,23 @@ function Barra({
   mazo: MazoDeLaBarra | null;
   aplanados: Map<string, Instanciable[]>;
   tomada: string | null;
+  /** El color del colono al que le toca, o `null` si no se pinta tapete. */
+  tapete: ColorDeJugador | null;
   onTomar: (id: string) => void;
   onPulsarElMazo: () => void;
 }): JSX.Element {
   const grupo = useRef<THREE.Group>(null);
-  const [forma, setForma] = useState({ campo: (45 * Math.PI) / 180, proporcion: 16 / 9 });
+  /*
+   * El ancho y el alto van en PUNTOS y hacen falta aparte de la proporción: los segmentos
+   * de la tapa se escalan con el ancho (uno cada ocho puntos) y el sitio de los dados se
+   * decide con el alto (el suelo de 44 es en puntos).
+   */
+  const [forma, setForma] = useState({
+    campo: (45 * Math.PI) / 180,
+    proporcion: 16 / 9,
+    ancho: 1280,
+    alto: 720,
+  });
 
   useFrame((estado) => {
     const g = grupo.current;
@@ -1380,9 +1503,16 @@ function Barra({
 
     const c = estado.camera as THREE.PerspectiveCamera;
     const campo = ((c.isPerspectiveCamera ? c.fov : 45) * Math.PI) / 180;
-    const proporcion = estado.size.width / Math.max(1, estado.size.height);
-    if (Math.abs(campo - forma.campo) > 1e-6 || Math.abs(proporcion - forma.proporcion) > 1e-4) {
-      setForma({ campo, proporcion });
+    const ancho = estado.size.width;
+    const alto = Math.max(1, estado.size.height);
+    const proporcion = ancho / alto;
+    if (
+      Math.abs(campo - forma.campo) > 1e-6 ||
+      Math.abs(proporcion - forma.proporcion) > 1e-4 ||
+      ancho !== forma.ancho ||
+      alto !== forma.alto
+    ) {
+      setForma({ campo, proporcion, ancho, alto });
     }
   });
 
@@ -1404,45 +1534,131 @@ function Barra({
     [cuantos, forma],
   );
   const huecoDelMazo = mazo === null ? undefined : huecos[piezas.length];
+  const primero: HuecoDeLaBarra | undefined = huecos[0];
+
+  /*
+   * LA TAPA, medida del primer hueco y de la cámara, y su geometría con la veta dentro.
+   *
+   * Los segmentos siguen al ancho en puntos (`segmentosDeLaMesa`), así que la geometría se
+   * rehace al cambiar el tamaño del lienzo, y la anterior se tira: es la más grande de la
+   * mesa (hasta 240 × 6) y r3f no libera lo que llega por `geometry={…}`.
+   */
+  const tapa = useMemo(
+    () => (primero === undefined ? null : tapaDeLaMesa(primero, forma.campo, forma.proporcion)),
+    [primero, forma],
+  );
+  const segmentos = segmentosDeLaMesa(forma.ancho);
+  const madera = useMemo(() => maderaEnLineal(), []);
+  const geometriaDelTablon = useMemo(
+    () =>
+      tapa === null
+        ? null
+        : geometriaDeLaTapa(segmentos, FILAS_DE_LA_MESA, tapa.ancho, tapa.fondo, madera),
+    [tapa, segmentos, madera],
+  );
+  useEffect(() => () => geometriaDelTablon?.dispose(), [geometriaDelTablon]);
+
+  /* Una sombra de contacto por hueco, todas en una geometría: una llamada. */
+  const sombras = useMemo(
+    () =>
+      huecos.length === 0
+        ? null
+        : geometriaDeLasSombras(
+            huecos.map((h) => ({ x: h.x, z: h.z, radio: h.lado * RADIO_DE_LA_SOMBRA })),
+          ),
+    [huecos],
+  );
+  useEffect(() => () => sombras?.dispose(), [sombras]);
+
+  /* El sitio de los dados, sólo si es el colgado (ver la cabecera), y el tapete encima. */
+  const hayTapete = tapete !== null;
+  const sitioDeLosDados = useMemo(() => {
+    if (!hayTapete) return null;
+    const { dados } = huecosDeLaMesa(cuantos, forma.campo, forma.proporcion, forma.alto);
+    return dados !== null && dados.forma === 'colgado' ? dados : null;
+  }, [hayTapete, cuantos, forma]);
+  const colorDelTapete = useMemo(
+    () => (tapete === null ? null : hexDe(colorDelColono(tapete))),
+    [tapete],
+  );
+  const geometriaDelTapeteDelTurno = useMemo(
+    () =>
+      sitioDeLosDados === null
+        ? null
+        : geometriaDelTapete(sitioDeLosDados.ancho, sitioDeLosDados.lado * FONDO_DEL_TAPETE),
+    [sitioDeLosDados],
+  );
+  useEffect(() => () => geometriaDelTapeteDelTurno?.dispose(), [geometriaDelTapeteDelTurno]);
+
+  /*
+   * La tapa para el toque a todo lo que tiene detrás (ver la cabecera). No marca el
+   * suceso con `loCogeLaInterfaz`: arrastrar desde la madera gira el tablero. La salida no
+   * hace nada: está para que r3f cuente la tapa entre los «hovered».
+   */
+  const paraElToque = (e: ThreeEvent<PointerEvent>): void => {
+    e.stopPropagation();
+  };
+  const nadaAlSalir = (): void => {
+    /* sólo para entrar en la lista de «hovered» */
+  };
 
   return (
     <group ref={grupo} renderOrder={ORDEN_DE_LA_BARRA}>
       {/*
-       * El testigo que borra la profundidad. No escribe color y no recibe rayos: sólo
-       * está para que el pintor pase por él justo antes de la barra.
-       */}
-      <mesh renderOrder={999} onBeforeRender={(gl) => gl.clearDepth()} raycast={() => null}>
-        <planeGeometry args={[0.001, 0.001]} />
-        <meshBasicMaterial colorWrite={false} depthWrite={false} />
-      </mesh>
-      {/*
-       * Su propia luz, y con alcance corto. La barra gira con la cámara, así que con la
-       * luz del mundo se le apagarían las piezas cada vez que el jugador diera media
-       * vuelta al tablero. Con `distance` a tres unidades no llega al mundo y no lo
-       * altera.
+       * Su propia luz, y con alcance corto. La mesa gira con la cámara, así que con la luz
+       * del mundo se le apagarían las piezas cada vez que el jugador diera media vuelta al
+       * tablero. Con `distance` a tres unidades no llega al mundo y no lo altera. Se queda
+       * con la tapa por lo mismo: está por encima de la cota, así que ilumina también la
+       * madera horizontal, y es la única luz que la madera recibe igual mire donde mire la
+       * cámara.
        */}
       <pointLight position={[0.4, 0.6, -1.2]} intensity={3.5} distance={3} decay={1.4} />
       {/*
-       * EL FONDO DE LA BARRA, y por qué hace falta aunque no se «vea» nada en él.
+       * EL TABLÓN, y por qué hace falta aunque no se «vea» nada en él.
        *
-       * Sin él, cuatro modelos flotando en la parte de abajo se leen como cuatro
-       * edificios más del tablero, sólo que muy grandes y en primer plano. El fondo los
-       * separa del mundo: dice «esto es tuyo, no es paisaje». Es el mismo trabajo que
-       * hace el marco de un cuadro y por eso es tan tenue — se nota si falta, no si está.
+       * Sin él, cuatro modelos flotando en la parte de abajo se leen como cuatro edificios
+       * más del tablero, sólo que muy grandes y en primer plano. La mesa los separa del
+       * mundo: dice «esto es tuyo, no es paisaje». Opaco, y PARA el toque a todo lo que
+       * tiene detrás —el asa de un vértice escondido bajo la madera— (ver la cabecera). El
+       * rayo contra sus triángulos (hasta 240 × 6 × 2) sólo se traza en los sucesos del
+       * puntero, no por fotograma.
        */}
-      {huecos.length > 0 && (
-        <mesh position={[0, (huecos[0] as HuecoDeLaBarra).y, -DISTANCIA_DE_LA_BARRA - 0.02]} raycast={() => null}>
-          <planeGeometry
-            args={[
-              (huecos[huecos.length - 1] as HuecoDeLaBarra).x -
-                (huecos[0] as HuecoDeLaBarra).x +
-                (huecos[0] as HuecoDeLaBarra).lado * 1.7,
-              (huecos[0] as HuecoDeLaBarra).lado * 1.5,
-            ]}
-          />
-          <meshBasicMaterial color="#0d1f1a" transparent opacity={0.42} depthWrite={false} />
+      {tapa !== null && geometriaDelTablon !== null && (
+        <mesh
+          position={[0, tapa.cota, tapa.centroZ]}
+          geometry={geometriaDelTablon}
+          onPointerDown={paraElToque}
+          onPointerUp={paraElToque}
+          onPointerMove={paraElToque}
+          onPointerOver={paraElToque}
+          onPointerOut={nadaAlSalir}
+        >
+          <meshStandardMaterial vertexColors roughness={RUGOSIDAD_DE_LA_MADERA} />
         </mesh>
       )}
+      {/* Las sombras de contacto: negras con el alfa en el vértice, un pelo sobre la tapa. */}
+      {tapa !== null && sombras !== null && (
+        <mesh position={[0, tapa.cota + SOBRE_LA_TAPA, 0]} geometry={sombras} raycast={() => null}>
+          <meshBasicMaterial vertexColors transparent depthWrite={false} />
+        </mesh>
+      )}
+      {tapa !== null &&
+        sitioDeLosDados !== null &&
+        geometriaDelTapeteDelTurno !== null &&
+        colorDelTapete !== null && (
+          <mesh
+            position={[sitioDeLosDados.x, tapa.cota + SOBRE_LA_TAPA, sitioDeLosDados.z]}
+            geometry={geometriaDelTapeteDelTurno}
+            raycast={() => null}
+          >
+            <meshBasicMaterial
+              color={colorDelTapete}
+              transparent
+              opacity={OPACIDAD_DEL_TAPETE}
+              depthWrite={false}
+            />
+          </mesh>
+        )}
       {piezas.map((pieza, i) => {
         const hueco = huecos[i];
         const mallas = aplanados.get(pieza.modelo);
@@ -1623,15 +1839,21 @@ function Carta({
    *
    * ═══ EL FALLO QUE ESTO ARREGLA ═══
    *
-   * Antes el `renderOrder` estaba en el GRUPO, y en three el `renderOrder` de un grupo no
-   * baja a sus hijos: las tres mallas de cada carta salían con orden cero, todas a la
-   * misma distancia de la cámara, y el pintor las ordenaba como le venía. El resultado se
-   * veía: el icono de una carta dibujado ENCIMA de la carta de al lado, como si el dibujo
-   * no formara parte del naipe.
+   * Antes el `renderOrder` estaba SÓLO en el grupo de la carta, y el de un grupo no baja a
+   * sus hijos como `renderOrder`: las tres mallas de cada carta salían con orden cero,
+   * todas a la misma distancia de la cámara, y el pintor las ordenaba como le venía. El
+   * resultado se veía: el icono de una carta dibujado ENCIMA de la carta de al lado, como
+   * si el dibujo no formara parte del naipe.
    *
    * No era un problema de capas mal puestas: era que no había capas. Ahora cada malla
    * lleva su número, y las tres de una carta caben dentro del hueco de diez que le reserva
    * `baraja.ts` — así ninguna puede colarse entre las de la carta vecina.
+   *
+   * Y el grupo de la carta lleva ADEMÁS `ORDEN_DE_LAS_CARTAS`, porque lo que sí baja de un
+   * grupo es el `groupOrder`, que manda MÁS que el de la malla, y baja sólo desde el grupo
+   * más cercano: sin él, las tres mallas quedarían en la capa 0 con el mundo, y la tapa de
+   * la mesa (1000) se pintaría después y les taparía los pies (cabecera de `capas.ts`).
+   * El número de la malla ordena dentro de la capa; el del grupo, la capa.
    *
    * Y se dibuja SIN probar la profundidad, a propósito: la mano es un montón de planos a
    * la misma distancia, así que el único orden que vale es el que se escribe. Dejar que
@@ -1644,7 +1866,7 @@ function Carta({
     ORDEN_DE_LAS_CARTAS + hueco.orden + Math.round(hueco.iman * 300) + (cogida ? 600 : 0);
 
   return (
-    <group ref={grupo} position={[hueco.x, hueco.y, hueco.z]}>
+    <group ref={grupo} position={[hueco.x, hueco.y, hueco.z]} renderOrder={ORDEN_DE_LAS_CARTAS}>
       {/* El borde claro, que es lo que separa una carta de la de detras al solaparse. */}
       <mesh
         geometry={geometria}
@@ -1737,7 +1959,11 @@ function AreaDeTrueque({
   const icono = useMemo(() => geometriaDeContornos(CONTORNOS_DEL_BIEN[bien] ?? []), [bien]);
 
   return (
-    <group position={[hueco.x, hueco.y, hueco.z]} scale={encima ? 1.1 : 1}>
+    <group
+      position={[hueco.x, hueco.y, hueco.z]}
+      scale={encima ? 1.1 : 1}
+      renderOrder={ORDEN_DE_LAS_AREAS}
+    >
       <mesh
         geometry={geometria}
         renderOrder={ORDEN_DE_LAS_AREAS + 1}
@@ -1872,11 +2098,16 @@ function Baraja({
   );
 
   return (
-    <group ref={grupo}>
-      <mesh renderOrder={1005} onBeforeRender={(gl) => gl.clearDepth()} raycast={() => null}>
-        <planeGeometry args={[0.001, 0.001]} />
-        <meshBasicMaterial colorWrite={false} depthWrite={false} />
-      </mesh>
+    <group ref={grupo} renderOrder={ORDEN_DE_LAS_CARTAS}>
+      {/*
+       * SIN testigo que borre la profundidad, y no es un olvido: todo lo de esta mano se
+       * dibuja con `depthTest={false}`, así que no hay nada que borrar. El que hubo aquí
+       * —un plano de 0,001 en el origen de este grupo, que copia la posición de la cámara—
+       * estaba EN EL OJO, detrás del plano cercano, y `projectObject` lo podaba por frustum:
+       * su `onBeforeRender` no se llamó nunca, como tampoco el de la barra. En `escenas/`
+       * ya no queda ningún `clearDepth`, y `verify:escena` lo afirma (cabecera de
+       * `capas.ts`).
+       */}
       <pointLight position={[0.9, 0, -1.2]} intensity={2.6} distance={3} decay={1.4} />
       {areas.map((hueco, i) => {
         const bien = seCambianPor[i];
@@ -1978,7 +2209,11 @@ function CartaDelMazoEnLaMano({
   const cuerpo = apagada ? 0.38 : 1;
 
   return (
-    <group ref={grupo} position={[hueco.x, hueco.y, hueco.z]}>
+    <group
+      ref={grupo}
+      position={[hueco.x, hueco.y, hueco.z]}
+      renderOrder={ORDEN_DE_LAS_CARTAS_DEL_MAZO}
+    >
       {/* El borde claro, que es lo que separa una carta de la de detrás al solaparse. */}
       <mesh
         geometry={geometria}
@@ -2099,7 +2334,11 @@ function Casilla({
   );
 
   return (
-    <group position={[hueco.x, hueco.y, hueco.z]} scale={encima ? 1.1 : 1}>
+    <group
+      position={[hueco.x, hueco.y, hueco.z]}
+      scale={encima ? 1.1 : 1}
+      renderOrder={ORDEN_DE_LAS_CASILLAS}
+    >
       <mesh
         geometry={geometria}
         renderOrder={ORDEN_DE_LAS_CASILLAS + 1}
@@ -2180,8 +2419,11 @@ function Casilla({
  * propósito. Luz no, porque aquí todo es `meshBasicMaterial` y un material básico no la
  * mira: la de la mano de bienes es de cuando sus cartas llevaban piezas en tres
  * dimensiones encima. Y borrado de profundidad tampoco, porque todo esto se dibuja con
- * `depthTest={false}` y el orden lo manda `renderOrder`: no queda nada que borrar, y un
- * `clearDepth` más por fotograma es un cambio de estado a cambio de nada.
+ * `depthTest={false}` y el orden lo manda `renderOrder`: no queda nada que borrar. Ya no
+ * hay ningún `clearDepth` en `escenas/`: los dos testigos que hubo —el de la barra y el de
+ * la baraja— colgaban del origen de un grupo pegado a la cámara, o sea en el ojo, y la
+ * poda por frustum los dejaba fuera de la lista de dibujo sin que nadie lo notara
+ * (cabecera de `capas.ts`).
  *
  * ═══ EL CURSOR SE LEE, NO SE ATRAPA ═══
  *
@@ -2256,7 +2498,7 @@ function ManoDelMazo({
   );
 
   return (
-    <group ref={grupo}>
+    <group ref={grupo} renderOrder={ORDEN_DE_LAS_CARTAS_DEL_MAZO}>
       {casillas.map((casilla) => (
         <Casilla
           key={`casilla:${casilla.clase}`}
@@ -2292,6 +2534,7 @@ export function Delta({
   onTomarDeLaBarra,
   mazo = null,
   onPulsarElMazo,
+  turnoDe = null,
   mano = [],
   cogida = null,
   onCogerCarta,
@@ -2346,6 +2589,17 @@ export function Delta({
    * el movimiento, no hacer nada— lo decide quien monta el cliente.
    */
   onPulsarElMazo?: () => void;
+  /**
+   * EL COLOR DEL COLONO AL QUE LE TOCA, para el tapete de la mesa. `null` o sin poner, no
+   * hay tapete.
+   *
+   * Es el único dato del turno que entra en el lienzo, y entra como color y no como nombre
+   * porque dentro no hay letras: el tapete se lee como se lee una choza, por su color. La
+   * escena no sabe de quién es el turno ni si es el mío; quien monta el cliente lee
+   * `turnoDe` de la vista y le da el color de ese colono, el mismo de sus chozas. Va bajo
+   * el sitio de los dados, que hoy está vacío: los dados llegan en la fase 3 del diseño.
+   */
+  turnoDe?: ColorDeJugador | null;
   /**
    * La mano de bienes del jugador, para la baraja del lateral. Vacia, no hay baraja.
    *
@@ -2948,6 +3202,7 @@ export function Delta({
           mazo={mazo}
           aplanados={aplanados}
           tomada={tomada}
+          tapete={turnoDe}
           onTomar={(id) => onTomarDeLaBarra?.(id)}
           onPulsarElMazo={() => onPulsarElMazo?.()}
         />

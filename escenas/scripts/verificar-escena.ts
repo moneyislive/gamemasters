@@ -85,7 +85,27 @@ import {
   ojoDelMirador,
   tirandoDelMirador,
 } from '../camara';
-import { DIBUJO_DEL_MAZO, SUELO_DEL_TOQUE, dentroDelHueco, huecosDeLaBarra, huecosDeLaMesa, loQueSeVe } from '../barra';
+import {
+  DIBUJO_DEL_MAZO,
+  DISTANCIA_DE_LA_BARRA,
+  SUELO_DEL_TOQUE,
+  ZOCALO,
+  cotaDeLaTapa,
+  dentroDelHueco,
+  huecosDeLaBarra,
+  huecosDeLaMesa,
+  loQueSeVe,
+} from '../barra';
+import {
+  ALFA_DE_LA_SOMBRA,
+  RADIO_DE_LA_SOMBRA,
+  SEGMENTOS_DE_LA_SOMBRA,
+  geometriaDeLaTapa,
+  geometriaDeLasSombras,
+  geometriaDelTapete,
+  maderaEnLineal,
+  triangulosDe,
+} from '../tablon';
 import {
   ASENTAR,
   RODAR_MINIMO,
@@ -98,11 +118,22 @@ import {
 } from '../dados';
 import type { EstadoDeLosDados, SucesoDeLosDados } from '../dados';
 import {
+  ANCHO_DE_MAS_DE_LA_TAPA,
+  HOLGURA_DELANTERA_DE_LA_TAPA,
   MADERA_CLARA_EN_EL_ATLAS,
   MADERA_OSCURA_EN_EL_ATLAS,
+  POSAVASOS_SOBRE_LA_MADERA_OSCURA,
   TABLONES,
+  TRAS_EL_ZOCALO,
+  aLineal,
+  colorDelColono,
   coloresDeLaMadera,
+  coloresDelPosavasos,
   contraste,
+  hexDe,
+  luminancia,
+  mezcla,
+  tapaDeLaMesa,
   vetaDelTablon,
 } from '../mesa';
 import { semillaDelCodigo } from '../../shared/mecanicas/semilla';
@@ -145,7 +176,9 @@ import {
 } from '../iconos';
 import { selloDeLaTirada } from '../../shared/arcade/juegos/riberas-en-tres';
 import { MODELO, modeloDePieza } from '../modelos';
-import { ESCALON, RADIO_DE_COMARCA, RADIO_DE_TESELA } from '../escala';
+import { ALTURA_DE_UNA_PERSONA, ESCALON, RADIO_DE_COMARCA, RADIO_DE_TESELA } from '../escala';
+import { ORDEN_DE_LA_BARRA, ORDEN_DE_LAS_CARTAS } from '../capas';
+import { fallosDelOrden, ordenDeDibujoDeLaMesa } from './arbol-de-la-mesa';
 import { MAR_ADENTRO_DE_LOS_BARCOS, laMarinaDelMundo } from '../marina';
 import { crearRelieve, hexDePunto } from '../relieve';
 import { contornoDelDelta, distanciaALaCosta, geometriaDelMar } from '../costa';
@@ -153,6 +186,7 @@ import type { Segmento } from '../costa';
 import {
   ALCANCE_DEL_DELTA,
   ESPUMA_TIERRA_ADENTRO,
+  FILAS_DE_LA_MESA,
   RADIO_EXTERIOR_DE_LA_COSTA,
   RADIO_INTERIOR_DE_LA_COSTA,
   SECTORES_DEL_MAR,
@@ -221,6 +255,39 @@ const HOLGURA = 1e-9;
 
 const RADIO = 1;
 const DELTA = mallaDeRadio(2);
+
+/**
+ * LOS LIENZOS EN LOS QUE SE MIDE TODO LO QUE DEPENDE DE LA PANTALLA, en puntos: ancho y
+ * alto de verdad, no sólo la proporción, porque el suelo de toque (44) y los segmentos de
+ * la tapa se deciden en puntos. UNA lista para todos los bloques del guion: hubo dos
+ * copias iguales, y dos copias son la manera de que un lienzo nuevo entre en una y no en
+ * la otra.
+ *
+ * Los tamaños son los de la app (`ALTO_MINIMO_DEL_LIENZO` = 360 y `PARTE_DEL_ALTO` = 0,58
+ * en `app/src/arcade/riberas-en-tres-escena.tsx`) aplicados a los teléfonos más pequeños
+ * que se admiten, más el caso de pantalla completa, una tableta con el navegador de pie,
+ * y los OCHO APAISADOS reales: el iPhone SE de primera generación (568×320) fue el que
+ * descubrió que con `PARTE_DEL_ALTO` a 0,13 el asa medía 41,6 puntos; con 0,14 mide 44,8.
+ * Los apaisados son la pantalla completa de la mesa en la app
+ * (`docs/LA-MESA-DE-RIBERAS.md` §3) y sin ellos el suelo estaba vigilado sólo de pie.
+ */
+const LIENZOS: Array<[string, number, number]> = [
+  ['móvil estrecho, lienzo al mínimo', 320, 360],
+  ['móvil pequeño', 360, 490],
+  ['móvil corriente', 390, 490],
+  ['móvil de pie, lienzo entero', 390, 845],
+  ['tableta', 768, 640],
+  ['tableta con el navegador de pie', 768, 1024],
+  ['monitor', 1920, 900],
+  ['apaisado SE 1ª', 568, 320],
+  ['apaisado SE 2ª/3ª', 667, 375],
+  ['apaisado Android de 360', 780, 360],
+  ['apaisado iPhone 14', 844, 390],
+  ['apaisado Pro Max', 932, 430],
+  ['apaisado tableta 4:3', 1024, 768],
+  ['apaisado iPad Air', 1180, 820],
+  ['apaisado monitor 1080', 1920, 1080],
+];
 
 // ---------------------------------------------------------------------------
 paso('Cada vértice cae en la esquina de su hexágono, y no cerca');
@@ -2070,18 +2137,37 @@ paso('La mano del mazo se agrupa por familias, cabe a la izquierda y no pisa a n
   /*
    * ── NO PISA A LA BARRA ──
    *
-   * La barra vive abajo y centrada, y lo más alto que tiene es su placa de fondo: el centro
-   * de sus huecos más tres cuartos de lado. Se prueban de una a seis piezas porque el lado
-   * depende de cuántas hay, y en un monitor la barra corta —que es la más alta— es la que
-   * más sube.
+   * La mesa vive abajo y centrada, y lo más alto que tiene ya NO es una placa: la placa se
+   * fue con la tapa de madera, que queda por debajo de los huecos. Lo más alto es el ASA de
+   * cada hueco —medio lado sobre su centro— y, un pelo por encima, la pieza tomada en lo
+   * alto de su bote (0,516 lados: `0,62·1,18/2 + 0,12 + 0,03`); se mide contra `0,52·lado`,
+   * redondeado hacia arriba. Antes se medía `0,75·lado`, la placa, y sin placa habría
+   * seguido verde vigilando nada. Se prueban de una a seis piezas porque el lado depende
+   * de cuántas hay, y en un monitor la barra corta —que es la más alta— es la que más sube;
+   * y también el hueco de los dados, que tiene el mismo `y` y un lado de alto, y cuyo dado
+   * en lo alto de su salto se queda en 0,24 lados (arista 0,52).
+   *
+   * Se recorre la lista `LIENZOS` con el ALTO REAL de cada uno, no dos proporciones con un
+   * alto de 900 escrito a mano: `huecosDeLaMesa` decide con el alto en puntos si los dados
+   * cuelgan a la izquierda, van de quinto hueco o no caben, y con 900 puntos un móvil de
+   * 490 de alto «tenía» dados que en el aparato no tiene. Donde no hay sitio de dados, el
+   * techo lo ponen las piezas solas, que es lo que hay en pantalla.
    */
+  const TECHO_DE_LA_MESA_EN_LADOS = 0.52;
   const pisanLaBarra: string[] = [];
-  for (const [nombre, prop] of PANTALLAS) {
+  const conDados: string[] = [];
+  for (const [nombre, anchoPt, altoPt] of LIENZOS) {
+    const prop = anchoPt / altoPt;
     let techoDeLaBarra = -Infinity;
     for (let piezas = 1; piezas <= 6; piezas++) {
       const hueco = huecosDeLaBarra(piezas, CAMPO, prop)[0];
       if (hueco === undefined) continue;
-      techoDeLaBarra = Math.max(techoDeLaBarra, hueco.y + hueco.lado * 0.75);
+      techoDeLaBarra = Math.max(techoDeLaBarra, hueco.y + hueco.lado * TECHO_DE_LA_MESA_EN_LADOS);
+    }
+    const dados = huecosDeLaMesa(4, CAMPO, prop, altoPt).dados;
+    if (dados !== null) {
+      conDados.push(nombre);
+      techoDeLaBarra = Math.max(techoDeLaBarra, dados.y + dados.alto * TECHO_DE_LA_MESA_EN_LADOS);
     }
     for (const caja of todoLoQueOcupa(manoEntera(), prop)) {
       if (caja.y - caja.alto / 2 < techoDeLaBarra + 1e-9) {
@@ -2090,9 +2176,9 @@ paso('La mano del mazo se agrupa por familias, cabe a la izquierda y no pisa a n
     }
   }
   comprobar(
-    'la mano del mazo no invade la zona de la barra de construir',
-    pisanLaBarra.length === 0,
-    pisanLaBarra.slice(0, 2),
+    'la mano del mazo no invade la zona de la barra de construir, en los quince lienzos con su alto real —y entre los medidos hay lienzos con dados y sin ellos—',
+    pisanLaBarra.length === 0 && conDados.length > 0 && conDados.length < LIENZOS.length,
+    { pisan: pisanLaBarra.slice(0, 2), conDados: conDados.length, lienzos: LIENZOS.length },
   );
 
   /*
@@ -2721,32 +2807,10 @@ paso('Los sitios se pueden contar y la barra cabe en cualquier pantalla');
    * el móvil más estrecho sino el lienzo más BAJO, porque cuando manda el alto el lado se
    * lleva un 14 % de él y nada más.
    *
-   * Los tamaños de abajo son los de la app (`ALTO_MINIMO_DEL_LIENZO` = 360 y
-   * `PARTE_DEL_ALTO` = 0,58 en `app/src/arcade/riberas-en-tres-escena.tsx`) aplicados a
-   * los teléfonos más pequeños que se admiten, más el caso de pantalla completa, una
-   * tableta con el navegador de pie, y los OCHO APAISADOS reales: el iPhone SE de primera
-   * generación (568×320) fue el que descubrió que con `PARTE_DEL_ALTO` a 0,13 el asa medía
-   * 41,6 puntos; con 0,14 mide 44,8. Los apaisados son la pantalla completa de la mesa en
-   * la app (`docs/LA-MESA-DE-RIBERAS.md` §3) y sin ellos aquí el suelo estaba vigilado sólo
-   * de pie.
+   * Los tamaños son los de la lista `LIENZOS` de la cabecera del guion, común a todos los
+   * bloques: los de la app en los teléfonos más pequeños que se admiten, la pantalla
+   * completa, una tableta con el navegador de pie y los ocho apaisados reales.
    */
-  const LIENZOS: Array<[string, number, number]> = [
-    ['móvil estrecho, lienzo al mínimo', 320, 360],
-    ['móvil pequeño', 360, 490],
-    ['móvil corriente', 390, 490],
-    ['móvil de pie, lienzo entero', 390, 845],
-    ['tableta', 768, 640],
-    ['tableta con el navegador de pie', 768, 1024],
-    ['monitor', 1920, 900],
-    ['apaisado SE 1ª', 568, 320],
-    ['apaisado SE 2ª/3ª', 667, 375],
-    ['apaisado Android de 360', 780, 360],
-    ['apaisado iPhone 14', 844, 390],
-    ['apaisado Pro Max', 932, 430],
-    ['apaisado tableta 4:3', 1024, 768],
-    ['apaisado iPad Air', 1180, 820],
-    ['apaisado monitor 1080', 1920, 1080],
-  ];
   /*
    * El suelo lo exporta `barra.ts` porque `huecosDeLaMesa` decide con él; aquí se afirma
    * que sigue siendo el de la casa —los cinco `minHeight: 44` de `tablero-en-linea.tsx`—
@@ -4127,6 +4191,469 @@ paso('Los dados se reparten por turno, ruedan hasta que el servidor contesta, y 
   );
 }
 
+// ---------------------------------------------------------------------------
+
+/**
+ * LA TAPA DE LA MESA: horizontal a la cota del zócalo, con la veta del atlas en el
+ * vértice, dentro del tope, y pintada en el orden que la deja bajo las cartas.
+ *
+ * ═══ LO QUE SE PINTA ES LO QUE SE CUENTA ═══
+ *
+ * `triangulosDeLaMesa` promete `12 · segmentos + 590`. Aquí no se repite la cuenta: se
+ * construyen las geometrías de verdad con `three` —la tapa, las sombras fundidas, el
+ * tapete, y las de los dados y la pila que llegan después— y se cuentan sus índices. Y se
+ * afirma sobre el texto de `delta.tsx` que el componente llama a ESAS funciones con los
+ * segmentos que salen del ancho: si mañana alguien construye la tapa a mano dentro del
+ * componente, el tope deja de vigilar lo que se pinta y esto se pone rojo.
+ *
+ * ═══ EL ORDEN DE DIBUJO SE LEE EN LOS GRUPOS DE DENTRO, Y ADEMÁS SE MIDE ═══
+ *
+ * `three` toma el `groupOrder` del grupo MÁS CERCANO a cada malla, así que numerar los
+ * grupos exteriores de las manos no prueba nada: medido con el ordenador de `three` sobre
+ * el árbol real, con sólo los exteriores la tapa opaca tapa los pies de las cartas de
+ * bienes y las piezas se pintan con el mundo. Se leen los OCHO grupos de dentro —el primer
+ * `<group` tras cada firma y, en la barra, también el segundo— más `Baraja` y
+ * `ManoDelMazo`. Leer texto compra la FORMA del árbol y nada más, así que además se monta
+ * el modelo del árbol de `arbol-de-la-mesa.ts` —las constantes de `capas.ts` y las
+ * posiciones de verdad— y se ordena con el `WebGLRenderLists` de `three` con la poda por
+ * frustum puesta, en los quince lienzos. La poda es lo que descubrió que los dos testigos
+ * de `clearDepth` de `delta.tsx` no corrieron NUNCA (estaban en el ojo de la cámara), y
+ * por eso aquí se afirma que en `escenas/` no queda ninguno.
+ *
+ * ═══ LA MADERA PARA EL TOQUE, Y LO QUE ESCONDE AL SALIR ESTÁ CONTADO ═══
+ *
+ * En r3f sólo reciben rayos los objetos con manejadores: una tapa sin ellos es transparente
+ * al dedo y el asa de un vértice escondido bajo la madera se pulsa a ciegas. Se afirma que
+ * la tapa lleva los tres manejadores que paran el toque y que sólo dejan pasar a la
+ * interfaz de las manos; y se cuentan, con la cámara real del mirador de salida, los
+ * sitios que quedan bajo su borde trasero en cada lienzo, contra cifras ACEPTADAS.
+ */
+paso('La tapa de la mesa: a la cota del zócalo, con la veta del atlas, dentro del tope y bajo las cartas');
+{
+  const CAMPO = (45 * Math.PI) / 180;
+  /* La lista `LIENZOS` es la de la cabecera del guion, común a todos los bloques. */
+
+  /* ── 1. LA GEOMETRÍA, CONTADA CON `three` ── */
+  const madera = maderaEnLineal();
+  const seisSombras = geometriaDeLasSombras(
+    Array.from({ length: 6 }, (_, i) => ({ x: i, z: -2, radio: 0.1 })),
+  );
+  const tapete = geometriaDelTapete(0.3, 0.15);
+  /* Lo que la fase 3 y la 7 añaden, con las mismas primitivas que el presupuesto declara. */
+  const dosDados = 2 * (triangulosDe(new THREE.BoxGeometry(1, 1, 1)) + 21 * triangulosDe(new THREE.CircleGeometry(0.09, 10)));
+  const asaYPila = 2 * triangulosDe(new THREE.BoxGeometry(1, 1, 1));
+  const cuadran: string[] = [];
+  for (const segmentos of [SEGMENTOS_DE_LA_MESA.minimo, 96, segmentosDeLaMesa(844), SEGMENTOS_DE_LA_MESA.maximo]) {
+    const tapa = geometriaDeLaTapa(segmentos, FILAS_DE_LA_MESA, 3, 0.5, madera);
+    const pintados = triangulosDe(tapa) + triangulosDe(seisSombras) + triangulosDe(tapete) + dosDados + asaYPila;
+    if (pintados !== triangulosDeLaMesa(segmentos)) cuadran.push(`${String(segmentos)}: pinta ${String(pintados)}, promete ${String(triangulosDeLaMesa(segmentos))}`);
+    if (triangulosDe(tapa) !== 2 * segmentos * FILAS_DE_LA_MESA) cuadran.push(`${String(segmentos)}: la tapa tiene ${String(triangulosDe(tapa))} triángulos`);
+  }
+  comprobar(
+    'triangulosDeLaMesa es lo que pintan las geometrías de verdad: tapa + seis sombras + tapete + dos dados + asa + pila, con 64, 96, 106 y 240 segmentos',
+    cuadran.length === 0,
+    cuadran,
+  );
+  comprobar(
+    'las seis sombras fundidas son 120 triángulos en UNA geometría, el tapete dos, y con los segmentos del monitor la mesa sigue bajo su tope',
+    triangulosDe(seisSombras) === 6 * SEGMENTOS_DE_LA_SOMBRA && triangulosDe(tapete) === 2 && triangulosDeLaMesa(segmentosDeLaMesa(1920)) <= TOPE_DE_LA_MESA,
+    { sombras: triangulosDe(seisSombras), tapete: triangulosDe(tapete), monitor: triangulosDeLaMesa(segmentosDeLaMesa(1920)) },
+  );
+
+  /* La veta va en el vértice, en lineal, entre las dos maderas del atlas. */
+  const tapa96 = geometriaDeLaTapa(96, FILAS_DE_LA_MESA, 3, 0.5, madera);
+  const color = tapa96.getAttribute('color');
+  const veta96 = vetaDelTablon(96, FILAS_DE_LA_MESA);
+  const { oscura, clara } = coloresDeLaMadera();
+  const coloresMal: string[] = [];
+  for (let k = 0; k < color.count; k += 97) {
+    const esperado = mezcla(aLineal(oscura), aLineal(clara), veta96[k] ?? 0);
+    const dado = [color.getX(k), color.getY(k), color.getZ(k)];
+    if (dado.some((c, i) => Math.abs(c - (esperado[i] ?? -1)) > 1e-6)) coloresMal.push(`vértice ${String(k)}: ${dado.map((c) => c.toFixed(4)).join(',')} ≠ ${esperado.map((c) => c.toFixed(4)).join(',')}`);
+  }
+  comprobar(
+    'la tapa lleva el color EN EL VÉRTICE, tres componentes, un vértice por valor de la veta, y cada uno es la mezcla en lineal de las dos maderas del atlas',
+    color.itemSize === 3 && color.count === veta96.length && color.count === 97 * (FILAS_DE_LA_MESA + 1) && coloresMal.length === 0,
+    { itemSize: color.itemSize, count: color.count, mal: coloresMal.slice(0, 2) },
+  );
+  const posicion = tapa96.getAttribute('position');
+  const normal = tapa96.getAttribute('normal');
+  comprobar(
+    'y está TUMBADA: todos los vértices a y = 0 con la normal hacia arriba, y la fila 0 de la veta es el borde LEJANO (z negativa)',
+    Array.from({ length: posicion.count }, (_, k) => k).every((k) => Math.abs(posicion.getY(k)) < 1e-9 && Math.abs(normal.getY(k) - 1) < 1e-9) &&
+      posicion.getZ(0) < 0 && posicion.getZ(posicion.count - 1) > 0,
+    { y0: posicion.getY(0), z0: posicion.getZ(0), zUltimo: posicion.getZ(posicion.count - 1) },
+  );
+  const alfa = seisSombras.getAttribute('color');
+  comprobar(
+    'las sombras llevan el alfa en el vértice —cuatro componentes—, 0,35 en el centro y 0 en el borde, y son negras',
+    alfa.itemSize === 4 &&
+      /* Con la holgura de un `Float32`: 0,35 se guarda como 0,3499999. */
+      Math.abs(alfa.getW(0) - ALFA_DE_LA_SOMBRA) < 1e-6 && alfa.getW(1) === 0 && alfa.getW(SEGMENTOS_DE_LA_SOMBRA) === 0 &&
+      Math.abs(alfa.getW(SEGMENTOS_DE_LA_SOMBRA + 1) - ALFA_DE_LA_SOMBRA) < 1e-6 &&
+      alfa.getX(0) === 0 && alfa.getY(0) === 0 && alfa.getZ(0) === 0,
+    { itemSize: alfa.itemSize, centro: alfa.getW(0), borde: alfa.getW(1) },
+  );
+
+  /* ── 2. LA COTA Y LOS BORDES, LIENZO A LIENZO ── */
+  const fueraDeSitio: string[] = [];
+  const enPantalla: string[] = [];
+  const pisadas: string[] = [];
+  const MANO_DE_CATORCE = Array.from({ length: 14 }, (_, i) => ({
+    id: `b${String(i)}`,
+    bien: ['limo', 'junco', 'sal', 'piedra', 'grano'][i % 5] as string,
+  }));
+  for (const [nombre, anchoPt, altoPt] of LIENZOS) {
+    const prop = anchoPt / altoPt;
+    const hueco = huecosDeLaBarra(4, CAMPO, prop)[0];
+    if (hueco === undefined) { fueraDeSitio.push(`${nombre}: sin hueco`); continue; }
+    const tapa = tapaDeLaMesa(hueco, CAMPO, prop);
+    const t = Math.tan(CAMPO / 2);
+    const vista = loQueSeVe(CAMPO, prop);
+    const ppu = altoPt / vista.alto;
+    const caraDeAbajoDelZocalo = hueco.y - (ZOCALO.centro + ZOCALO.alto / 2) * hueco.lado;
+    if (Math.abs(tapa.cota - cotaDeLaTapa(hueco)) > 1e-12 || tapa.cota > caraDeAbajoDelZocalo + 1e-12) fueraDeSitio.push(`${nombre}: la tapa (${tapa.cota.toFixed(4)}) sube por encima de la cara de abajo del zócalo (${caraDeAbajoDelZocalo.toFixed(4)})`);
+    if (Math.abs(tapa.zTrasero + (DISTANCIA_DE_LA_BARRA + TRAS_EL_ZOCALO * hueco.lado)) > 1e-12) fueraDeSitio.push(`${nombre}: borde trasero en ${tapa.zTrasero.toFixed(4)}`);
+    /* El frente proyecta POR DEBAJO del canto de abajo (y normalizada ≤ −1): la mesa no flota. */
+    const frenteExacto = tapa.zDelantero - HOLGURA_DELANTERA_DE_LA_TAPA;
+    const yDelFrenteExacto = tapa.cota / (-frenteExacto * t);
+    const yDelFrente = tapa.cota / (-tapa.zDelantero * t);
+    if (Math.abs(yDelFrenteExacto + 1) > 1e-9 || yDelFrente > -1) fueraDeSitio.push(`${nombre}: el frente proyecta en ${yDelFrente.toFixed(4)}`);
+    if (!(tapa.zTrasero < tapa.zDelantero && tapa.zDelantero < -1)) fueraDeSitio.push(`${nombre}: bordes ${tapa.zTrasero.toFixed(3)}..${tapa.zDelantero.toFixed(3)}`);
+    /* El ancho cubre lo que la cámara ve en el borde trasero, que está más lejos que la barra. */
+    const anchoEnElBordeTrasero = vista.ancho * (-tapa.zTrasero / DISTANCIA_DE_LA_BARRA);
+    if (tapa.ancho < anchoEnElBordeTrasero || Math.abs(tapa.ancho - vista.ancho * ANCHO_DE_MAS_DE_LA_TAPA) > 1e-9) fueraDeSitio.push(`${nombre}: ancho ${tapa.ancho.toFixed(3)} y el borde trasero pide ${anchoEnElBordeTrasero.toFixed(3)}`);
+    /* Lo que ocupa en pantalla: del canto de abajo al borde trasero proyectado. */
+    const yTrasero = tapa.cota / (-tapa.zTrasero * t);
+    const parte = (1 + yTrasero) / 2;
+    const puntos = parte * altoPt;
+    enPantalla.push(`${nombre}: ${(parte * 100).toFixed(1)} % = ${puntos.toFixed(1)} pt`);
+    if (parte > 0.14) fueraDeSitio.push(`${nombre}: la tapa ocupa el ${(parte * 100).toFixed(1)} % del alto`);
+    if (anchoPt > altoPt && Math.abs(parte - 0.115) > 0.003) fueraDeSitio.push(`${nombre}: apaisado y la tapa ocupa el ${(parte * 100).toFixed(1)} %, no el 11,5 %`);
+    /* Y las cartas de bienes quietas PISAN la tapa vista en los apaisados: por eso importa el orden. */
+    if (anchoPt > altoPt) {
+      const quietas = huecosDeLaBaraja(MANO_DE_CATORCE, CAMPO, prop, null).map((c) => c.hueco);
+      const pie = Math.min(...quietas.map((q) => q.y - q.alto / 2));
+      const piePt = (pie + vista.alto / 2) * ppu;
+      const cuanto = puntos - piePt;
+      pisadas.push(`${nombre}: ${cuanto.toFixed(1)} pt`);
+      if (!(cuanto >= 3 && cuanto <= 12)) fueraDeSitio.push(`${nombre}: los pies de las cartas quedan ${cuanto.toFixed(1)} pt bajo el borde trasero, y el diseño dice de 3 a 12`);
+    }
+  }
+  comprobar(
+    'la tapa está a la cota exacta de la cara de abajo del zócalo, con el borde trasero a 0,6 lados tras la barra y el frente FUERA del canto de abajo, en los quince lienzos',
+    fueraDeSitio.length === 0,
+    fueraDeSitio.slice(0, 3),
+  );
+  comprobar(
+    'y ocupa el 11,5 % del alto en todos los apaisados —36,7 pt en el SE, 44,7 en un iPhone 14, 123,8 en un monitor a 1080— y nunca más del 14 %',
+    enPantalla.some((l) => l.startsWith('apaisado SE 1ª') && /36\.[67] pt/.test(l)) &&
+      enPantalla.some((l) => l.startsWith('apaisado iPhone 14') && /44\.[678] pt/.test(l)) &&
+      enPantalla.some((l) => l.startsWith('apaisado monitor 1080') && /123\.[789] pt/.test(l)),
+    enPantalla,
+  );
+  comprobar(
+    'las cartas de bienes quietas pisan la tapa vista entre 3 y 12 puntos en los diez lienzos apaisados: sin el orden de dibujo, la tapa opaca les taparía los pies',
+    pisadas.length === LIENZOS.filter(([, a, b]) => a > b).length && pisadas.length === 10 && fueraDeSitio.every((f) => !f.includes('pies')),
+    pisadas,
+  );
+
+  /* ── 3. LOS COLORES: la madera y el tapete salen del atlas ── */
+  const hexDelColono = (c: string): string => hexDe(colorDelColono(c));
+  comprobar(
+    'el tapete de cada colono se lee de la celda del jugador del atlas, la misma de sus chozas: azul #257ebc, rojo #d22227, amarillo #f9aa4e, verde #008454, y un color desconocido sale azul',
+    hexDelColono('blue') === '#257ebc' && hexDelColono('red') === '#d22227' && hexDelColono('yellow') === '#f9aa4e' && hexDelColono('green') === '#008454' && hexDelColono('morado') === '#257ebc',
+    { blue: hexDelColono('blue'), red: hexDelColono('red'), yellow: hexDelColono('yellow'), green: hexDelColono('green') },
+  );
+
+  /* ── 4. EL TEXTO DE `delta.tsx`: los diez grupos, el testigo, un solo borrado, y que pinta lo contado ── */
+  const fuente = fs.readFileSync(path.join(import.meta.dirname ?? __dirname, '..', 'delta.tsx'), 'utf8');
+  /*
+   * Las etiquetas `<group` pueden ocupar varias líneas: se toma desde la primera línea que
+   * EMPIEZA por `<group` tras la firma hasta el `>` que CIERRA la etiqueta. Un comentario
+   * que cite la constante no cuenta porque no empieza por `<group`.
+   *
+   * «El que cierra la etiqueta», no el primer `>`: un atributo puede llevar una función
+   * flecha —`onPointerOver={(e) => …}`, `raycast={() => null}`— y su `=>` cortaría la
+   * etiqueta a medias, dejando fuera un `renderOrder` que sí está y poniendo esto rojo por
+   * nada (o, peor, verde por leer sólo la mitad). Se salta lo que va entre llaves y entre
+   * comillas, y se para en el primer `>` a nivel cero.
+   */
+  const etiquetaDesde = (texto: string, inicio: number): string | null => {
+    let llaves = 0;
+    let comilla: string | null = null;
+    for (let k = inicio; k < texto.length; k++) {
+      const c = texto[k] as string;
+      if (comilla !== null) {
+        if (c === comilla) comilla = null;
+        continue;
+      }
+      if (c === '"' || c === "'" || c === '`') comilla = c;
+      else if (c === '{') llaves++;
+      else if (c === '}') llaves--;
+      else if (c === '>' && llaves === 0) return texto.slice(inicio, k + 1);
+    }
+    return null;
+  };
+  const gruposTras = (firma: string, cuantos: number): string[] => {
+    const desde = fuente.indexOf(firma);
+    if (desde < 0) return [];
+    const salida: string[] = [];
+    const re = /^[ \t]*<group\b/gm;
+    re.lastIndex = desde;
+    let m: RegExpExecArray | null;
+    while (salida.length < cuantos && (m = re.exec(fuente)) !== null) {
+      const etiqueta = etiquetaDesde(fuente, m.index);
+      if (etiqueta === null) break;
+      salida.push(etiqueta);
+      re.lastIndex = m.index + etiqueta.length;
+    }
+    return salida;
+  };
+  comprobar(
+    'la lectura de una etiqueta <group llega hasta el > que la CIERRA, saltando el => de una función flecha entre llaves',
+    etiquetaDesde('<group a={(e) => e.x} renderOrder={X}>\n<mesh />', 0) === '<group a={(e) => e.x} renderOrder={X}>' &&
+      etiquetaDesde('<group\n  raycast={() => null}\n  renderOrder={Y}\n>', 0)?.includes('renderOrder={Y}') === true,
+  );
+  const conOrden = (etiqueta: string | undefined, constante: string): boolean =>
+    etiqueta !== undefined && new RegExp(`renderOrder=\\{${constante}\\}`).test(etiqueta);
+  const gruposMal: string[] = [];
+  const exige = (firma: string, constante: string, cuantos: 1 | 2): void => {
+    const grupos = gruposTras(firma, cuantos);
+    for (let i = 0; i < cuantos; i++) {
+      if (!conOrden(grupos[i], constante)) gruposMal.push(`${firma} grupo ${String(i + 1)}: ${(grupos[i] ?? '(no hay)').replace(/\s+/g, ' ').slice(0, 90)}`);
+    }
+  };
+  exige('function PiezaEnLaBarra(', 'ORDEN_DE_LA_BARRA', 2);
+  exige('function MazoEnLaBarra(', 'ORDEN_DE_LA_BARRA', 2);
+  exige('function Carta(', 'ORDEN_DE_LAS_CARTAS', 1);
+  exige('function AreaDeTrueque(', 'ORDEN_DE_LAS_AREAS', 1);
+  exige('function CartaDelMazoEnLaMano(', 'ORDEN_DE_LAS_CARTAS_DEL_MAZO', 1);
+  exige('function Casilla(', 'ORDEN_DE_LAS_CASILLAS', 1);
+  comprobar(
+    'los OCHO grupos de dentro llevan la constante de su capa: los dos de PiezaEnLaBarra y los dos de MazoEnLaBarra (barra), Carta (cartas), AreaDeTrueque (áreas), CartaDelMazoEnLaMano (cartas del mazo) y Casilla (casillas)',
+    gruposMal.length === 0,
+    gruposMal,
+  );
+  const exteriores: string[] = [];
+  exige('function Baraja(', 'ORDEN_DE_LAS_CARTAS', 1);
+  exige('function ManoDelMazo(', 'ORDEN_DE_LAS_CARTAS_DEL_MAZO', 1);
+  exige('function Barra(', 'ORDEN_DE_LA_BARRA', 1);
+  for (const g of gruposMal.filter((g) => /^function (Baraja|ManoDelMazo|Barra)\(/.test(g))) exteriores.push(g);
+  comprobar(
+    'y también los tres exteriores: Baraja con la de las cartas, ManoDelMazo con la de las cartas del mazo, Barra con la de la barra',
+    exteriores.length === 0,
+    exteriores,
+  );
+  /*
+   * ── NINGÚN BORRADO DE PROFUNDIDAD EN `escenas/`, Y NINGÚN `onBeforeRender` QUE TOQUE `gl` ──
+   *
+   * Hubo dos testigos con `onBeforeRender → gl.clearDepth()` y ninguno corrió jamás: iban
+   * en el origen de un grupo pegado a la cámara —en el ojo, detrás del plano cercano— y
+   * `projectObject` los podaba por frustum antes de la lista de dibujo. La escena se veía
+   * igual con ellos y sin ellos. Se mira sólo el CÓDIGO, no los comentarios: las cabeceras
+   * cuentan el fallo con su nombre, y una regla que castigue nombrarlo enseña a no
+   * documentarlo.
+   */
+  const raizDeEscenas = path.join(import.meta.dirname ?? __dirname, '..');
+  const soloCodigo = (texto: string): string =>
+    texto.split('\n').filter((l) => !/^\s*(\*|\/\/|\/\*|\{\/\*)/.test(l)).join('\n');
+  const ficherosDeEscenas = (carpeta: string): string[] =>
+    fs.readdirSync(carpeta, { withFileTypes: true }).flatMap((entrada) => {
+      if (entrada.isDirectory()) {
+        return ['node_modules', 'scripts', 'modelos'].includes(entrada.name) ? [] : ficherosDeEscenas(path.join(carpeta, entrada.name));
+      }
+      return /\.(ts|tsx)$/.test(entrada.name) ? [path.join(carpeta, entrada.name)] : [];
+    });
+  const conBorrado = ficherosDeEscenas(raizDeEscenas).filter((f) => /\bclearDepth\(/.test(soloCodigo(fs.readFileSync(f, 'utf8'))));
+  comprobar(
+    'NO hay ningún clearDepth( en el código de escenas/: los dos testigos que hubo estaban en el ojo de la cámara, podados por frustum, y nunca borraron nada; la mesa se apoya en la profundidad del mundo y en el orden',
+    conBorrado.length === 0,
+    conBorrado.map((f) => path.relative(raizDeEscenas, f)),
+  );
+  const antesDePintar = soloCodigo(fuente).match(/onBeforeRender=\{[^}]*\}/g) ?? [];
+  const tocanGl = antesDePintar.filter((m) => /\(\s*(\w+)\b[^)]*\)\s*=>\s*[\s\S]*\b\1\./.test(m));
+  comprobar(
+    'y ningún onBeforeRender de delta.tsx toca el renderer que recibe: un borrado escondido ahí no se ve fallar, sólo se ve no hacer nada',
+    tocanGl.length === 0 && !/renderOrder=\{-1\}/.test(fuente) && !/renderOrder=\{999\}/.test(fuente),
+    tocanGl,
+  );
+
+  /*
+   * ── EL ORDEN, MEDIDO CON EL PINTOR DE `three` Y EL MODELO DEL ÁRBOL ──
+   *
+   * `arbol-de-la-mesa.ts` monta el árbol con las constantes de `capas.ts` y las posiciones
+   * reales y lo pasa por el `WebGLRenderLists` de `three` 0.185.1 con la poda por frustum,
+   * en cada lienzo. Es lo que la lectura de texto no puede comprar: que con esos números
+   * el pintor haga lo que se quiere, y que nada de la mesa se quede fuera de la lista.
+   */
+  const ordenes = LIENZOS.map(([nombre, anchoPt, altoPt]) => ({ nombre, orden: ordenDeDibujoDeLaMesa({ ancho: anchoPt, alto: altoPt }) }));
+  const fallosDeOrden = ordenes.flatMap(({ nombre, orden }) => fallosDelOrden(orden).map((f) => `${nombre}: ${f}`));
+  comprobar(
+    'ordenado con el WebGLRenderLists de three con las posiciones reales y la poda por frustum, en los quince lienzos: la tapa y las piezas (capa de la barra) antes que las cartas de bienes, nada de la mesa después de nada de las manos en ninguna pasada, sombras y tapete entre los transparentes, y NADA de la mesa podado',
+    fallosDeOrden.length === 0,
+    fallosDeOrden.slice(0, 4),
+  );
+  const modeloDelIPhone = ordenes.find((o) => o.nombre === 'apaisado iPhone 14')?.orden;
+  const tiene = (fragmento: string): boolean => modeloDelIPhone?.lineas.some((l) => l.includes(fragmento)) === true;
+  comprobar(
+    'y el modelo tiene lo que dice tener —tapa, sombras, tapete, tres piezas, naipe, cartas de bienes, áreas, cartas del mazo y casilla— con las capas de capas.ts y nada podado en el iPhone 14',
+    tiene('barra:TAPA') && tiene('barra:SOMBRAS') && tiene('barra:TAPETE') && tiene('barra:PIEZA modelo 2') && tiene('barra:naipe cuerpo') &&
+      tiene('baraja:carta 4 cuerpo') && tiene('baraja:área 1 cuerpo') && tiene('mazo:carta 1 cuerpo') && tiene('mazo:casilla cuerpo') &&
+      tiene(`[g${String(ORDEN_DE_LA_BARRA)} `) && tiene(`[g${String(ORDEN_DE_LAS_CARTAS)} `) && modeloDelIPhone?.podados.length === 0,
+    { lineas: modeloDelIPhone?.lineas.length, podados: modeloDelIPhone?.podados },
+  );
+
+  /*
+   * ── LA TAPA PARA EL TOQUE, A TODO ──
+   *
+   * En r3f sólo se lanzan rayos contra los objetos QUE TIENEN manejadores, así que
+   * `raycast={() => null}` en la tapa no hacía nada y quitarlo tampoco: el asa de un
+   * vértice escondido bajo la madera recibía el toque y se fundaba tocando madera. La tapa
+   * lleva los cinco manejadores y para SIEMPRE la propagación: la excepción «salvo si detrás
+   * hay interfaz de mano» se midió y no protegía nada (las áreas no bajan a la madera con
+   * cuatro, y los pies de las cartas sólo en uno o dos puntos de filo de pie), así que se
+   * exige que NO exista. `onPointerOver`/`onPointerOut` van porque sólo con ellos la tapa
+   * entra en la lista de «hovered» de r3f y su parada encoge lo que había crecido detrás.
+   * Y NO marcan el suceso para la cámara: arrastrar desde la madera sigue girando el mundo,
+   * que es como se sacan los sitios escondidos.
+   */
+  const etiquetaDeLaTapa = etiquetaDesde(fuente, fuente.search(/<mesh\s+position=\{\[0, tapa\.cota, tapa\.centroZ\]\}/)) ?? '';
+  const cuerpoDeParaElToque = /const paraElToque = \(e: ThreeEvent<PointerEvent>\): void => \{([\s\S]*?)\n  \};/.exec(fuente)?.[1] ?? '';
+  comprobar(
+    'la tapa PARA el toque a todo: onPointerDown/Up/Move/Over/Out con paraElToque, que corta SIEMPRE la propagación (sin la excepción por interfaz detrás, que medida no protegía nada), sin raycast nulo y sin marcar el suceso para la cámara',
+    /onPointerDown=\{paraElToque\}/.test(etiquetaDeLaTapa) &&
+      /onPointerUp=\{paraElToque\}/.test(etiquetaDeLaTapa) &&
+      /onPointerMove=\{paraElToque\}/.test(etiquetaDeLaTapa) &&
+      /onPointerOver=\{paraElToque\}/.test(etiquetaDeLaTapa) &&
+      /onPointerOut=\{/.test(etiquetaDeLaTapa) &&
+      !/raycast/.test(etiquetaDeLaTapa) &&
+      cuerpoDeParaElToque.trim() === 'e.stopPropagation();' &&
+      !/hayInterfazDetras/.test(fuente),
+    { etiqueta: etiquetaDeLaTapa.replace(/\s+/g, ' ').slice(0, 160), cuerpo: cuerpoDeParaElToque.trim() },
+  );
+
+  /*
+   * ── LO QUE LA TAPA ESCONDE AL SALIR, CONTADO CONTRA CIFRAS ACEPTADAS ──
+   *
+   * Con la cámara del mirador de salida (`ojoDelMirador`, sin acercar) se proyectan los
+   * cincuenta y cuatro vértices, las setenta y dos aristas y las diecinueve comarcas y se
+   * cuentan los que caen bajo el borde trasero proyectado de la tapa. SON CIFRAS ACEPTADAS,
+   * NO UN IDEAL: en los apaisados y en el monitor quedan tres vértices (dos con su anillo
+   * entero) y cinco aristas; en las tabletas, dos y tres; de pie, ninguno. Se aceptan
+   * porque se sacan arrastrando la cámara y porque, con la tapa parando el toque, no se
+   * pulsan a ciegas. Si alguna cifra sube, la tapa ha crecido hacia atrás (`TRAS_EL_ZOCALO`,
+   * `ANCHO_DE_MAS_DE_LA_TAPA`) o el mirador de salida ha bajado, y eso se decide, no se
+   * hereda. Miguel puede cambiar esta decisión viéndolo en el banco: entonces se cambian
+   * estos números, con su porqué.
+   */
+  const TERRENOS_DE_LA_MESA = [
+    'bosque', 'bosque', 'bosque', 'bosque', 'pradera', 'pradera', 'pradera', 'pradera',
+    'campo', 'campo', 'campo', 'campo', 'colina', 'colina', 'colina',
+    'montana', 'montana', 'montana', 'desierto',
+  ];
+  const hexesDeLaMesa = mallaDeRadio(2);
+  const islasDeLaMesa = hexesDeLaMesa.map((hex, i) => ({ hex, terreno: TERRENOS_DE_LA_MESA[i % TERRENOS_DE_LA_MESA.length] ?? 'pradera' }));
+  const relieveDeLaMesa = crearRelieve(islasDeLaMesa, 3);
+  const sitiosDeLaMesa = sitiosDelTablero(hexesDeLaMesa, (p) => relieveDeLaMesa.alturaEn(p));
+  const ALTO_DEL_ANILLO = ALTURA_DE_UNA_PERSONA * 2.5;
+  const ACEPTADOS = { apaisado: { vertices: 3, aristas: 5 }, tableta: { vertices: 2, aristas: 3 }, dePie: { vertices: 0, aristas: 0 } } as const;
+  const escondidos: string[] = [];
+  const porEncimaDeLoAceptado: string[] = [];
+  const proyectado = new THREE.Vector3();
+  for (const [nombre, anchoPt, altoPt] of LIENZOS) {
+    const prop = anchoPt / altoPt;
+    const camara = new THREE.PerspectiveCamera(45, prop, 0.5, ALCANCE_DEL_DELTA * 8);
+    camara.position.set(...ojoDelMirador(MIRADOR_DE_SALIDA, ALCANCE_DEL_DELTA, prop));
+    camara.lookAt(0, 0, 0);
+    camara.updateMatrixWorld();
+    camara.updateProjectionMatrix();
+    const hueco = huecosDeLaBarra(4, CAMPO, prop)[0];
+    if (hueco === undefined) continue;
+    const tapa = tapaDeLaMesa(hueco, CAMPO, prop);
+    const yTrasero = tapa.cota / (-tapa.zTrasero * Math.tan(CAMPO / 2));
+    const bajoLaTapa = (x: number, y: number, z: number): boolean => {
+      proyectado.set(x, y, z).project(camara);
+      return Math.abs(proyectado.x) <= 1 && proyectado.y >= -1 && proyectado.y < yTrasero;
+    };
+    const vertices = sitiosDeLaMesa.vertices.filter((s) => bajoLaTapa(s.punto.x, s.altura, s.punto.y)).length;
+    const anillos = sitiosDeLaMesa.vertices.filter((s) => bajoLaTapa(s.punto.x, s.altura + ALTO_DEL_ANILLO, s.punto.y)).length;
+    const aristas = sitiosDeLaMesa.aristas.filter((s) => bajoLaTapa(s.punto.x, s.altura, s.punto.y)).length;
+    const comarcas = sitiosDeLaMesa.comarcas.filter((s) => bajoLaTapa(s.punto.x, s.altura, s.punto.y)).length;
+    const tope = prop <= 1 ? ACEPTADOS.dePie : prop >= 1.5 ? ACEPTADOS.apaisado : ACEPTADOS.tableta;
+    escondidos.push(`${nombre}: ${String(vertices)} vértices (${String(anillos)} con su anillo), ${String(aristas)} aristas, ${String(comarcas)} comarcas`);
+    if (vertices > tope.vertices || aristas > tope.aristas || comarcas > 0) {
+      porEncimaDeLoAceptado.push(`${nombre}: ${String(vertices)} vértices y ${String(aristas)} aristas bajo la tapa, aceptados ${String(tope.vertices)} y ${String(tope.aristas)}; comarcas ${String(comarcas)}`);
+    }
+  }
+  comprobar(
+    'al mirador de salida la tapa esconde como mucho lo ACEPTADO: 3 vértices y 5 aristas en los apaisados y el monitor, 2 y 3 en las tabletas, ninguno de pie, y ninguna comarca; se sacan arrastrando y con la tapa parando el toque no se pulsan a ciegas',
+    porEncimaDeLoAceptado.length === 0 && escondidos.some((l) => l.startsWith('apaisado iPhone 14: 3 vértices')) && escondidos.some((l) => l.startsWith('móvil de pie, lienzo entero: 0 vértices')),
+    porEncimaDeLoAceptado.length > 0 ? porEncimaDeLoAceptado : escondidos,
+  );
+
+  /*
+   * ── LOS POSAVASOS: madera más oscura que la tapa, leída del atlas ──
+   *
+   * Eran paja clara (`#c8b48a`) sobre la madera, y se leían como pegatinas. Salen de
+   * `coloresDelPosavasos` (`mesa.ts`): la celda oscura del atlas al 70 % en reposo y al
+   * 85 % bajo el puntero. Se mide con la luminancia relativa lo que el diseño pide (§1.14):
+   * más oscuro que la veta más oscura, y con contraste suficiente para no fundirse con ella.
+   */
+  const posavasos = coloresDelPosavasos();
+  const vetaMasOscura = coloresDeLaMadera().oscura;
+  comprobar(
+    'el posavasos en reposo es MÁS OSCURO que la veta más oscura de la tapa y contrasta con ella al menos 1,5:1 —madera oscura sobre madera, ni pegatina ni agujero—, y bajo el puntero es un paso más claro que sigue por debajo de la veta',
+    luminancia(posavasos.reposo) < luminancia(vetaMasOscura) &&
+      contraste(posavasos.reposo, vetaMasOscura) >= 1.5 &&
+      luminancia(posavasos.encima) > luminancia(posavasos.reposo) &&
+      luminancia(posavasos.encima) < luminancia(vetaMasOscura),
+    { reposo: hexDe(posavasos.reposo), encima: hexDe(posavasos.encima), veta: hexDe(vetaMasOscura), contraste: Number(contraste(posavasos.reposo, vetaMasOscura).toFixed(3)) },
+  );
+  comprobar(
+    'y salen del atlas y no de un hexadecimal suelto: la celda oscura al 70 % y al 85 %, y delta.tsx pinta los dos zócalos con POSAVASOS.reposo / POSAVASOS.encima de coloresDelPosavasos, sin rastro de la paja clara',
+    POSAVASOS_SOBRE_LA_MADERA_OSCURA.reposo === 0.7 &&
+      POSAVASOS_SOBRE_LA_MADERA_OSCURA.encima === 0.85 &&
+      /coloresDelPosavasos\(\)/.test(fuente) &&
+      (fuente.match(/POSAVASOS\.encima : POSAVASOS\.reposo/g) ?? []).length === 2 &&
+      !/#c8b48a|#f0e3c2/i.test(soloCodigo(fuente)),
+  );
+
+  comprobar(
+    'la Barra pinta la tapa con las geometrías contadas —geometriaDeLaTapa con segmentosDeLaMesa(ancho) y FILAS_DE_LA_MESA, geometriaDeLasSombras, geometriaDelTapete— y la coloca con tapaDeLaMesa del primer hueco',
+    /geometriaDeLaTapa\(segmentos, FILAS_DE_LA_MESA, tapa\.ancho, tapa\.fondo, madera\)/.test(fuente) &&
+      /const segmentos = segmentosDeLaMesa\(forma\.ancho\);/.test(fuente) &&
+      /geometriaDeLasSombras\(/.test(fuente) &&
+      /geometriaDelTapete\(sitioDeLosDados\.ancho/.test(fuente) &&
+      /tapaDeLaMesa\(primero, forma\.campo, forma\.proporcion\)/.test(fuente) &&
+      /position=\{\[0, tapa\.cota, tapa\.centroZ\]\}\s+geometry=\{geometriaDelTablon\}/.test(fuente),
+  );
+  comprobar(
+    'la madera es MeshStandardMaterial blanco con vertexColors —ni textura ni ShaderMaterial— y la placa de #0d1f1a al 42 % ya no está',
+    /<meshStandardMaterial vertexColors roughness=\{RUGOSIDAD_DE_LA_MADERA\} \/>/.test(fuente) &&
+      !/opacity=\{0\.42\}/.test(fuente) &&
+      !/shaderMaterial|ShaderMaterial|useTexture|TextureLoader/.test(fuente.slice(fuente.indexOf('function Barra('), fuente.indexOf('function encajeEnUnCuadrado'))),
+  );
+  comprobar(
+    'los zócalos se pintan con ZOCALO de barra.ts —centro, radio y alto— en las piezas y en el mazo, y no con números sueltos: la cota de la tapa sale de los mismos',
+    (fuente.match(/-hueco\.lado \* ZOCALO\.centro/g) ?? []).length === 2 &&
+      (fuente.match(/hueco\.lado \* ZOCALO\.radio, hueco\.lado \* ZOCALO\.alto/g) ?? []).length === 2 &&
+      !/hueco\.lado \* 0\.42/.test(fuente) &&
+      Math.abs(ZOCALO.centro + ZOCALO.alto / 2 - 0.48) < 1e-12,
+  );
+  comprobar(
+    'sin dados, el reparto de las piezas sigue siendo huecosDeLaBarra y el tapete sólo se pinta bajo el sitio COLGADO de huecosDeLaMesa: ninguna pieza se mueve en esta fase',
+    /huecosDeLaBarra\(cuantos, forma\.campo, forma\.proporcion\)/.test(fuente) &&
+      /dados !== null && dados\.forma === 'colgado' \? dados : null/.test(fuente) &&
+      /colorDelColono\(tapete\)/.test(fuente) &&
+      !/turnoDe.*#[0-9a-f]{6}/i.test(fuente),
+  );
+  comprobar(
+    'la sombra de cada hueco tiene el radio del zócalo más lo que asoma, y va un pelo sobre la tapa',
+    RADIO_DE_LA_SOMBRA > ZOCALO.radio && RADIO_DE_LA_SOMBRA <= 0.7 && /radio: h\.lado \* RADIO_DE_LA_SOMBRA/.test(fuente) && /tapa\.cota \+ SOBRE_LA_TAPA/.test(fuente),
+  );
+}
+
 console.log('');
 if (fallos.length > 0) {
   console.log(`${fallos.length} de ${hechas} comprobaciones han fallado:\n`);
@@ -4145,7 +4672,7 @@ if (fallos.length > 0) {
  * a veintitrés: durante ese tiempo el guion podía morirse en la novena sin que nadie se
  * enterara. Un guardia desfasado no guarda nada.
  */
-const COMPROBACIONES_ESCRITAS = 282;
+const COMPROBACIONES_ESCRITAS = 307;
 if (hechas < COMPROBACIONES_ESCRITAS) {
   console.error(
     `Solo se han hecho ${hechas} de las ${COMPROBACIONES_ESCRITAS} comprobaciones que ` +

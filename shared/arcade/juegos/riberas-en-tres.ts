@@ -294,6 +294,21 @@ export function colorDePiezaDelColono(i: number): ColorDeJugador | null {
 }
 
 /**
+ * EL COLOR DEL COLONO AL QUE LE TOCA, para el tapete de la mesa; `null` si no hay turno
+ * (la mesa se reúne, la vista no es de Riberas) o si a ese colono no le llega color.
+ *
+ * Es el MISMO reparto que pinta sus chozas y sus piezas en la barra
+ * —`colorDePiezaDelColono` sobre el índice del asiento de `turnoDe`— y sale de aquí y no
+ * de cada pantalla porque hasta hoy NINGUNA pasaba `turnoDe` a `<Delta>`: la mesa se veía
+ * sin tapete en la partida y con él sólo en el banco, y nadie lo notó porque la entrada es
+ * opcional. Compuesto en `shared/`, las dos pantallas no pueden discrepar.
+ */
+export function turnoEnTres(vista: unknown): ColorDeJugador | null {
+  if (!esVistaQueSePinta(vista)) return null;
+  return colorDePiezaDelColono(indiceDelColono(vista, vista.turnoDe));
+}
+
+/**
  * EL TABLERO EN TRES DIMENSIONES que sale de la vista, o `null` si todavía no hay
  * delta (mientras se reúne la mesa), si la vista no es de Riberas, o si la mesa no
  * cabe en los colores del tablero (`seVeEnTres`). En los tres casos el cliente no

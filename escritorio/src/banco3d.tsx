@@ -765,6 +765,10 @@ function Banco(): JSX.Element {
                  el unico sitio donde se puede mirar de cerca sin montar una partida. */
               mazo={{ disponible: true }}
               onPulsarElMazo={() => console.log("[banco] mazo pulsado")}
+              /* El tapete del turno sobre la mesa: del color de quien juega en el banco, que
+                 cambia con el botón de turno. Sin esto la mesa se vería sin tapete y no se
+                 podría juzgar su color contra la madera. */
+              turnoDe={quienJuega}
               mano={mano}
               cogida={cogida}
               onCogerCarta={(c) => ponerCogida((antes) => (antes === c.id ? null : c.id))}

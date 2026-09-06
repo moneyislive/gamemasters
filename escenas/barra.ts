@@ -321,6 +321,40 @@ export function huecosDeLaMesa(
 }
 
 /**
+ * EL ZÓCALO DE CADA HUECO, en lados del hueco: dónde está centrado, cuánto mide de alto y
+ * de radio. Es el posavasos hexagonal que llevan las piezas y el naipe del mazo.
+ *
+ * ═══ POR QUÉ ESTOS TRES NÚMEROS VIVEN AQUÍ Y NO SÓLO DONDE SE PINTAN ═══
+ *
+ * Porque la TAPA de la mesa apoya en la cara de abajo del zócalo (`cotaDeLaTapa`), y esa
+ * cota se mide en Node sin abrir una ventana. Si el zócalo se escribiera con números
+ * sueltos en `delta.tsx` y la cota con otros aquí, el día que alguien bajara el zócalo un
+ * pelo la mesa se quedaría flotando por debajo de él, o atravesándolo, y ningún guion lo
+ * diría. Quien pinta lee ESTOS tres y `verify:escena` afirma sobre el texto de `delta.tsx`
+ * que los lee de aquí.
+ */
+export const ZOCALO = {
+  /** Cuánto queda su centro por debajo del centro del hueco. */
+  centro: 0.42,
+  alto: 0.12,
+  /** El radio de la cara de abajo; la de arriba es un poco más estrecha (0,46). */
+  radio: 0.5,
+} as const;
+
+/**
+ * A QUÉ ALTURA VA LA TAPA DE LA MESA: la cara de ABAJO del zócalo, y ni un pelo más.
+ *
+ * La tapa es horizontal y a esta cota, y no inclinada hacia la cámara, porque el asa mide
+ * 0,8 lados de fondo y un plano a 22° subiría 0,16 lados a media profundidad del asa —más
+ * que el zócalo entero—: no se puede inclinar la tapa y afirmar a la vez que las piezas no
+ * se mueven. Con la tapa aquí no se mueve ninguna: `hueco.y − 0,48·lado`. En los apaisados
+ * cae a `−0,683` (el 8,8 % del alto desde el canto de abajo).
+ */
+export function cotaDeLaTapa(hueco: HuecoDeLaBarra): number {
+  return hueco.y - (ZOCALO.centro + ZOCALO.alto / 2) * hueco.lado;
+}
+
+/**
  * ¿CAE ESTE PUNTO DE PANTALLA DENTRO DE UN HUECO?
  *
  * No la usa quien dibuja —para eso están los eventos del motor, que trazan un rayo de

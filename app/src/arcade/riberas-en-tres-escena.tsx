@@ -156,6 +156,7 @@ import {
   seVeEnTres,
   tableroEnTres,
   truequesPosibles,
+  turnoEnTres,
 } from '../../../shared/arcade/juegos/riberas-en-tres';
 import type {
   CartaDelMazoEnTres,
@@ -666,6 +667,12 @@ function LaMesaEnTres({
   );
   const marcador = useMemo(() => marcadorEnTres(laVista), [laVista]);
   /*
+   * EL TAPETE DEL TURNO: el color de quien juega, leído de la vista por `shared/`. Sin
+   * esto la mesa salía sin tapete en la partida —la entrada de `<Delta>` es opcional y no
+   * se caía nada— y con él sólo en el banco.
+   */
+  const turnoDe = useMemo(() => turnoEnTres(laVista), [laVista]);
+  /*
    * EL CUARTO HUECO DE LA BARRA: el mazo. Apagado con algo en vuelo, igual que las tres
    * piezas; apagado y no quitado, porque la barra reparte CENTRADO y un hueco que va y
    * viene corre las otras tres de sitio en cada jugada.
@@ -1133,6 +1140,7 @@ function LaMesaEnTres({
                   onTomarDeLaBarra={alTomarDeLaBarra}
                   mazo={mazo}
                   onPulsarElMazo={alPulsarElMazo}
+                  turnoDe={turnoDe}
                   mano={mano}
                   cogida={cogida}
                   onCogerCarta={alCogerCarta}

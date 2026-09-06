@@ -1021,6 +1021,18 @@ paso('El mazo de Riberas se juega desde la app, y en las DOS ramas');
       /cartaDelMazoCogida=\{cogidaDelMazo\}/.test(escena),
     'una mano que se pinta y no avisa de nada es un dibujo de una mano',
   );
+  /*
+   * EL TAPETE DEL TURNO LLEGA A `<Delta>`. La entrada es opcional y sin ella no se cae
+   * nada: la mesa se pintaba sin tapete en la partida y con tapete sólo en el banco del
+   * escritorio. Se exige que salga de `turnoEnTres(laVista)` —el color del turno compuesto
+   * en `shared/`, el mismo reparto que las chozas— y no de un color escrito en la pantalla.
+   */
+  comprobar(
+    'y el tapete del turno también: `<Delta>` recibe `turnoDe={turnoDe}` y `turnoDe` sale de `turnoEnTres(laVista)`',
+    /<Delta[\s\S]*?turnoDe=\{turnoDe\}[\s\S]*?\/>/.test(escena) &&
+      /const turnoDe = useMemo\(\(\) => turnoEnTres\(laVista\), \[laVista\]\);/.test(escenaSinComentarios),
+    'sin esto la mesa sale sin tapete en la partida y nada falla',
+  );
 
   /* ─── Las dos manos no pueden estar cogidas a la vez ─── */
 
@@ -1306,7 +1318,7 @@ paso('Mover devuelve cómo acabó: hecho, rechazado o sin red, con lo que ya sab
  * Con el número escrito, salir con menos es un fallo ruidoso. Va a mano y se sube al
  * añadir comprobaciones; un guardia desfasado no guarda nada.
  */
-const COMPROBACIONES_ESCRITAS = 143;
+const COMPROBACIONES_ESCRITAS = 144;
 if (cuantas < COMPROBACIONES_ESCRITAS) {
   console.error(
     `Solo se han hecho ${cuantas} de las ${COMPROBACIONES_ESCRITAS} comprobaciones que ` +
