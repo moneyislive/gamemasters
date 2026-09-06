@@ -83,6 +83,8 @@ import { Muelle } from '../src/muelle';
 import { temaDelMuelle, tieneMuelle } from '../../escenas/embarcadero/tema';
 import { FIGURAS } from '../../escenas/embarcadero/figuras';
 import { semillaDeCodigo } from '../../escenas/embarcadero/cala';
+/* El sitio del mando de recoger lo dice la escena, no esta hoja: ver `escenas/mesa.ts`. */
+import { MANDO_DE_RECOGER } from '../../escenas/mesa';
 import { MarcadorDeRiberas, RiberasEnTres } from '../src/riberas-en-tres';
 import {
   bienesQueSeCambianPor,
@@ -1575,10 +1577,17 @@ function elAcercamientoDelDelta(): void {
    * revisión —el que suelta lo que se tiene en la mano— y se exige que ahí dentro no
    * se nombre ni el acercamiento ni el mirador.
    */
-  const marcaDeLaRevision = '}, [puesta.rev]);';
+  const marcaDeLaRevision = '}, [puesta.rev, soltarTodo]);';
   comprobar('hay un efecto que corre al cambiar la revisión de la mesa', fuente.includes(marcaDeLaRevision));
+  /*
+   * Desde la fase 4 el efecto no suelta a mano: llama a `soltarTodo`, que es lo que también
+   * llama recoger la mesa. Así que lo que hay que mirar es el efecto Y la función, porque
+   * una cuenta de cámara escondida en cualquiera de los dos movería la vista igual.
+   */
   const hastaLaRevision = fuente.slice(0, fuente.indexOf(marcaDeLaRevision));
-  const alCambiarLaRevision = hastaLaRevision.slice(hastaLaRevision.lastIndexOf('useEffect('));
+  const alCambiarLaRevision =
+    hastaLaRevision.slice(hastaLaRevision.lastIndexOf('useEffect(')) +
+    (/const soltarTodo = useCallback\([\s\S]*?\n {2}\}, \[\]\);/.exec(fuente)?.[0] ?? '');
   comprobar(
     'y suelta la mano SIN recolocar la cámara: quien mira una esquina de cerca se queda donde estaba',
     fuente.includes(marcaDeLaRevision) && !/[Cc]ercania|mirador|camara|Camara/.test(alCambiarLaRevision),
@@ -1923,9 +1932,16 @@ function elMazoEnLaPantalla(): void {
     /mazoEnLaBarra\(vista, yo, opciones\)/.test(fuenteDelCliente) &&
       !/COSTE_DE_LA_CARTA/.test(fuenteDelCliente),
   );
+  /*
+   * Y EL MAZO SIGUE SIENDO EL MAZO, no un interruptor. Desde la fase 4 lo que se le pasa es
+   * `mesaRecogida ? null : mazo`, que es EL MISMO OBJETO cuando la mesa está puesta y el
+   * mismo `null` que en el respaldo cuando está recogida: en los dos casos «el botón
+   * desaparece exactamente cuando el naipe se puede pulsar». Lo que sigue prohibido es un
+   * `boolean` suelto o un filtro sin condición.
+   */
   comprobar(
     'y el botón se quita con `opcionesFueraDeLaBarra` pasándole EL MAZO, no un interruptor suelto',
-    /opcionesFueraDeLaBarra\(\s*opcionesFueraDeLaMano\(opcionesFueraDelTablero\(opciones\)\), mazo\)/.test(
+    /opcionesFueraDeLaBarra\(\s*opcionesFueraDeLaMano\(opcionesFueraDelTablero\(opciones\)\), mesaRecogida \? null : mazo\)/.test(
       fuenteDelCliente,
     ),
   );
@@ -2268,13 +2284,29 @@ function elMazoEnLaPantalla(): void {
     alCogerBien.slice(0, 300),
   );
   comprobar('y coger una pieza de la barra suelta las dos manos', /const alTomarDeLaBarra = useCallback\([\s\S]*?ponerCartaDelMazo\(null\)/.test(fuente));
-  const marcaDeLaRevision = '}, [puesta.rev]);';
-  const hastaLaRevision = fuente.slice(0, fuente.indexOf(marcaDeLaRevision));
-  const alCambiarLaRevision = hastaLaRevision.slice(hastaLaRevision.lastIndexOf('useEffect('));
+  /*
+   * SOLTARLO TODO TIENE UN NOMBRE, Y LOS DOS SITIOS QUE SUELTAN LLAMAN AL MISMO.
+   *
+   * Esta pantalla no lo tenía: el cambio de revisión soltaba con cuatro llamadas escritas a
+   * mano. Desde que recoger la mesa también suelta, son DOS sitios que tienen que soltar lo
+   * mismo, y dos listas iguales escritas aparte se separan el día que llegue un quinto
+   * estado que se pueda tener en la mano. Se exige el nombre, sus cuatro llamadas —incluida
+   * la del naipe, que pudo jugarlo otro mientras estaba levantado, y la de `preguntando`,
+   * que es una pregunta SOBRE lo que se soltaba— y que el efecto de la revisión no haga
+   * otra cosa que llamarlo.
+   */
+  const soltarTodoDelCliente = /const soltarTodo = useCallback\([\s\S]*?\n {2}\}, \[\]\);/.exec(fuente)?.[0] ?? '';
   comprobar(
-    'al cambiar la revisión se suelta también el naipe: pudo jugarlo otro mientras estaba levantado',
-    alCambiarLaRevision.includes('ponerCartaDelMazo(null)'),
-    alCambiarLaRevision.slice(0, 300),
+    'el escritorio tiene un `soltarTodo` con las cuatro: la pieza, el bien, el naipe y la pregunta abierta',
+    soltarTodoDelCliente.includes('ponerTomada(null)') &&
+      soltarTodoDelCliente.includes('ponerCogida(null)') &&
+      soltarTodoDelCliente.includes('ponerCartaDelMazo(null)') &&
+      soltarTodoDelCliente.includes('ponerPreguntando(null)'),
+    soltarTodoDelCliente.slice(0, 300),
+  );
+  comprobar(
+    'y al cambiar la revisión se suelta POR AHÍ, no con cuatro llamadas escritas otra vez',
+    /useEffect\(\(\) => \{\s*soltarTodo\(\);\s*\}, \[puesta\.rev, soltarTodo\]\);/.test(fuente),
   );
   /*
    * Y NINGUNA REGLA ESCRITA AQUÍ. El movimiento que se manda sale SIEMPRE de una opción
@@ -2370,8 +2402,8 @@ function losDadosEnLaPantalla(): void {
   );
   comprobar(
     'TIRAR se cae de los botones con `opcionesFueraDeLaMesa` pasándole LOS DADOS (no un interruptor) y DESPUÉS de los tres filtros de siempre',
-    /const fuera = useMemo\(\(\) => opcionesFueraDeLaMesa\(fueraDeLaBarra, dados\), \[fueraDeLaBarra, dados\]\);/.test(codigo) &&
-      /const fueraDeLaBarra = useMemo\(\s+\(\) => opcionesFueraDeLaBarra\(opcionesFueraDeLaMano\(opcionesFueraDelTablero\(opciones\)\), mazo\)/.test(codigo),
+    /const fuera = useMemo\(\s+\(\) => opcionesFueraDeLaMesa\(fueraDeLaBarra, mesaRecogida \? null : dados\),/.test(codigo) &&
+      /const fueraDeLaBarra = useMemo\(\s+\(\) => opcionesFueraDeLaBarra\(opcionesFueraDeLaMano\(opcionesFueraDelTablero\(opciones\)\), mesaRecogida \? null : mazo\)/.test(codigo),
   );
   comprobar(
     'la escena recibe `dados={dados}` y `onPulsarLosDados={alPulsarLosDados}`',
@@ -2409,6 +2441,134 @@ function losDadosEnLaPantalla(): void {
   );
 }
 
+/**
+ * RECOGER LA MESA EN EL ESCRITORIO (§6 del diseño, fase 4).
+ *
+ * ═══ LO QUE ESTO IMPIDE, QUE SON CUATRO PARTIDAS ROTAS EN SILENCIO ═══
+ *
+ *   1. LA PARTIDA PARADA. Con la mesa recogida no hay dados que pulsar ni naipe del mazo, y
+ *      `opcionesFueraDeLaMesa` / `opcionesFueraDeLaBarra` los siguen quitando de los botones
+ *      mientras la escena los reciba. El §6 deja recoger la mesa EN MI PROPIO TURNO y la
+ *      deja recogida hasta que yo diga: sin devolver TIRAR y COMPRAR al pie, quien recoja
+ *      antes de tirar se queda sin poder tirar y sin ningún error en ninguna parte.
+ *   2. LAS PIEZAS QUE SE MUEVEN AL RECOGER. La misma tentación arreglaría lo de arriba
+ *      pasándole `null` a `<Delta>`, y ésas son las llaves del reparto (`dados !== null` el
+ *      quinto hueco, `mazo` el cuarto): la barra se repartiría de otra manera al bajar y
+ *      volvería distinta al subir.
+ *   3. LA CARTA QUE SE QUEDA PEGADA AL CURSOR con la barra fuera de la pantalla, sin nada
+ *      debajo donde soltarla.
+ *   4. LA MESA QUE SUBE A MITAD DE ARRASTRE. La vuelta sola al pasar a tocarme tiene que
+ *      esperar a que la mano quede vacía, o cambia lo que hay bajo el cursor a mitad de
+ *      gesto.
+ *
+ * Se lee el fuente y la hoja porque todo esto vive dentro del `Canvas` o encima de él, y en
+ * Node no hay `Canvas`; el aspecto se mira en el banco.
+ */
+function recogerLaMesa(): void {
+  paso('Recoger la mesa: suelta lo cogido, devuelve tirar y comprar al pie, y vuelve sola al tocarme salvo con algo en la mano');
+
+  const fuente = readFileSync(new URL('../src/riberas-en-tres.tsx', import.meta.url), 'utf8');
+  const hoja = readFileSync(new URL('../src/estilo.css', import.meta.url), 'utf8');
+  const codigo = fuente
+    .split('\n')
+    .filter((l) => !/^\s*(\*|\/\/|\/\*|\{\/\*)/.test(l))
+    .join('\n');
+
+  comprobar(
+    'el estado vive en la pantalla y no se guarda: un `useState` a secas, y `<Delta>` lo recibe entero',
+    /const \[mesaRecogida, ponerMesaRecogida\] = useState\(false\);/.test(codigo) &&
+      /<Delta[\s\S]*?mesaRecogida=\{mesaRecogida\}/.test(fuente) &&
+      !/mesaRecogida/.test(codigo.slice(0, codigo.indexOf('const [mesaRecogida'))),
+  );
+  comprobar(
+    'recoger SUELTA lo cogido —por el mismo `soltarTodo` que el cambio de revisión— y sacar no suelta nada',
+    /const alRecogerLaMesa = useCallback\(\(\) => \{\s*if \(!mesaRecogida\) soltarTodo\(\);\s*ponerMesaRecogida\(!mesaRecogida\);\s*\}, \[mesaRecogida, soltarTodo\]\);/.test(codigo),
+  );
+  /*
+   * TIRAR Y COMPRAR VUELVEN AL PIE, y a `<Delta>` le siguen llegando enteros. Las dos
+   * mitades se compran juntas a propósito: cada una sin la otra es uno de los dos fallos.
+   */
+  comprobar(
+    'con la mesa recogida, TIRAR y COMPRAR vuelven a los botones: la cinta se compone con `null` en los dos filtros que la mesa se lleva',
+    /opcionesFueraDeLaMesa\(fueraDeLaBarra, mesaRecogida \? null : dados\)/.test(codigo) &&
+      /opcionesFueraDeLaBarra\(opcionesFueraDeLaMano\(opcionesFueraDelTablero\(opciones\)\), mesaRecogida \? null : mazo\)/.test(codigo),
+  );
+  comprobar(
+    'y la ESCENA sigue recibiendo `dados` y `mazo` sin tocar: son la llave del quinto y del cuarto hueco, y con `null` las piezas se moverían al recoger',
+    /<Delta[\s\S]*?mazo=\{mazo\}[\s\S]*?dados=\{dados\}[\s\S]*?\/>/.test(fuente) &&
+      !/<Delta[\s\S]*?(dados|mazo)=\{mesaRecogida/.test(fuente),
+  );
+  /*
+   * LA VUELTA SOLA ES EL FLANCO Y NO EL VALOR. Con el valor, recoger la mesa en mi propio
+   * turno la sacaría en el render siguiente y no habría manera de mirar el tablero mientras
+   * me toca; o sea, la mitad de para lo que sirve recogerla.
+   */
+  const laVuelta = /const meTocaAhora = meToca\(vista\);[\s\S]*?\}, \[meTocaAhora, cogida, cartaDelMazo\]\);/.exec(codigo)?.[0] ?? '';
+  comprobar(
+    'la mesa sale sola cuando `meToca` pasa de falso a verdadero (el FLANCO, con `meToca` de shared) y no cada vez que me toca',
+    laVuelta.length > 0 &&
+      /if \(meTocaAhora && !meTocabaAntes\.current\) laSalidaEspera\.current = true;/.test(laVuelta) &&
+      /meTocabaAntes\.current = meTocaAhora;/.test(laVuelta) &&
+      /import \{[\s\S]*?\bmeToca,/.test(fuente),
+    laVuelta.slice(0, 300),
+  );
+  comprobar(
+    'y con una carta en la mano —el bien o el naipe— la salida ESPERA: una mesa que sube bajo un arrastre cambia lo que hay bajo el cursor a mitad de gesto',
+    /if \(cogida !== null \|\| cartaDelMazo !== null\) return;\s*laSalidaEspera\.current = false;\s*ponerMesaRecogida\(false\);/.test(laVuelta),
+    laVuelta.slice(-300),
+  );
+  /*
+   * EL BOTÓN. Fuera del `Canvas`, ARRIBA A LA DERECHA y debajo del de volver, cuadrado de
+   * 44 con 12 de margen y con su mismo cromo.
+   *
+   * ═══ POR QUÉ NO ESTÁ ABAJO, QUE ES DONDE ESTUVO ═══
+   *
+   * Porque abajo se comía una esquina del asa de la choza y nadie lo veía. El sitio se
+   * había medido tratando el asa como un rectángulo en el plano de la barra —canto
+   * izquierdo en 48 puntos en 320×360— y el asa es una caja de 0,8 lados de fondo girada
+   * 39,6°: su cara cercana se proyecta a 41,2. Y no es cosa de la esquina izquierda: la
+   * barra está centrada, así que deja los mismos 41,2 puntos a los dos lados y un botón de
+   * 44 no cabe en ninguna de las dos. `verify:escena` mide la silueta proyectada de todas
+   * las asas contra el cuadrado del mando en los quince lienzos; aquí sólo se compra que la
+   * hoja de estilo diga los mismos tres números que `MANDO_DE_RECOGER` (`escenas/mesa.ts`),
+   * en rem, porque un botón medido allí y colocado con otros números aquí no está medido.
+   */
+  const enRem = (puntos: number): string => `${String(puntos / 16)}rem`;
+  comprobar(
+    'el botón de recoger existe sólo donde hay mesa que recoger (la misma condición con la que `<Delta>` monta la barra) y dice qué hace con todas sus letras',
+    /\{barra\.length > 0 \|\| mazo !== null \? \(\s*<button[\s\S]*?className="riberas-recoger"[\s\S]*?onClick=\{alRecogerLaMesa\}[\s\S]*?aria-label=\{mesaRecogida \? SACAR_LA_MESA : RECOGER_LA_MESA\}/.test(codigo) &&
+      /const RECOGER_LA_MESA = 'Recoger la mesa';/.test(fuente) &&
+      /const SACAR_LA_MESA = 'Sacar la mesa';/.test(fuente),
+  );
+  const reglaDelRecoger = /\.riberas-recoger\s*\{([^}]*)\}/.exec(hoja)?.[1] ?? '';
+  const reglaDelVolverEnTres = /\.riberas-volver\s*\{([^}]*)\}/.exec(hoja)?.[1] ?? '';
+  comprobar(
+    'y está arriba a la derecha, cuadrado del lado que dice `MANDO_DE_RECOGER` (2,75rem) con su margen (0,75rem) y bajado su `bajoElOtroMando` entero (a 4rem), con el cromo de `.riberas-volver`: teja alta, filo en reposo y acento al pasar el ratón',
+    reglaDelRecoger.includes(`top: ${enRem(MANDO_DE_RECOGER.margen + MANDO_DE_RECOGER.bajoElOtroMando)};`) &&
+      reglaDelRecoger.includes(`right: ${enRem(MANDO_DE_RECOGER.margen)};`) &&
+      reglaDelRecoger.includes(`width: ${enRem(MANDO_DE_RECOGER.lado)};`) &&
+      reglaDelRecoger.includes(`height: ${enRem(MANDO_DE_RECOGER.lado)};`) &&
+      !/bottom:|left:/.test(reglaDelRecoger) &&
+      /background: var\(--teja-alta\);/.test(reglaDelRecoger) &&
+      /border: 1px solid var\(--filo\);/.test(reglaDelRecoger) &&
+      /\.riberas-recoger:hover \{[\s\S]*?border-color: var\(--acento\);[\s\S]*?\}/.test(hoja),
+    reglaDelRecoger.replace(/\s+/g, ' ').slice(0, 200),
+  );
+  /*
+   * Y QUE LOS DOS NO SE SOLAPEN NO SE MIDE EN PÍXELES DE RÓTULO: se apilan. El de volver
+   * arranca en su margen y mide `2.75rem` de mínimo de dedo; éste arranca por debajo de los
+   * dos. Con eso da igual lo que crezca el rótulo de arriba.
+   */
+  comprobar(
+    'el de recoger empieza por debajo de donde acaba el de volver, así que los dos mandos del lienzo no pueden solaparse por mucho que crezca el rótulo de arriba',
+    /top: 0\.75rem;/.test(reglaDelVolverEnTres) &&
+      /min-height: 2\.75rem;/.test(reglaDelVolverEnTres) &&
+      /right: 0\.75rem;/.test(reglaDelVolverEnTres) &&
+      MANDO_DE_RECOGER.margen + MANDO_DE_RECOGER.bajoElOtroMando >= 12 + 44,
+    { volver: reglaDelVolverEnTres.replace(/\s+/g, ' ').slice(0, 120) },
+  );
+}
+
 // ---------------------------------------------------------------------------
 
 elCatalogoNoMiente();
@@ -2423,6 +2583,7 @@ elMazoEnLaPantalla();
 elResultadoDeMover();
 losDadosLleganAparte();
 losDadosEnLaPantalla();
+recogerLaMesa();
 
 console.log('');
 /**
@@ -2434,7 +2595,7 @@ console.log('');
  * eso se lee como verde. Con el número escrito, salir con menos es un fallo ruidoso. Va a
  * mano y se sube al añadir comprobaciones; un guardia desfasado no guarda nada.
  */
-const COMPROBACIONES_ESCRITAS = 400;
+const COMPROBACIONES_ESCRITAS = 410;
 if (hechas < COMPROBACIONES_ESCRITAS) {
   console.error(
     `Solo se han hecho ${String(hechas)} de las ${String(COMPROBACIONES_ESCRITAS)} comprobaciones que ` +

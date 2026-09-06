@@ -87,20 +87,25 @@ import {
 } from '../camara';
 import {
   ANCHO_DEL_ASA_DE_LOS_DADOS,
+  ASA_DEL_HUECO,
   DIBUJO_DEL_MAZO,
   DISTANCIA_DE_LA_BARRA,
+  GIRO_DE_LA_VITRINA,
   SUELO_DEL_TOQUE,
   ZOCALO,
   cotaDeLaTapa,
   dentroDelHueco,
+  fondoDelAsaGirada,
   huecosDeLaBarra,
   huecosDeLaMesa,
   loQueSeVe,
 } from '../barra';
 import {
   ALFA_DE_LA_SOMBRA,
+  FONDO_DEL_TAPETE,
   RADIO_DE_LA_SOMBRA,
   SEGMENTOS_DE_LA_SOMBRA,
+  SOBRE_LA_TAPA,
   geometriaDeLaTapa,
   geometriaDeLasSombras,
   geometriaDelTapete,
@@ -136,6 +141,7 @@ import {
   saltoDelDado,
   sucesoDelResultado,
 } from '../dados';
+import type { HuecoDeLaBarra } from '../barra';
 import type { EstadoDeLosDados, ResultadoDelToque, SucesoDeLosDados } from '../dados';
 import {
   SEGMENTOS_DEL_PUNTO,
@@ -147,14 +153,18 @@ import {
 } from '../cubo-del-dado';
 import { CARA_DEL_VALOR, NORMAL_DEL_VALOR } from '../caras-del-dado';
 import {
+  AMORTIGUACION_DE_LA_MESA,
   ANCHO_DE_MAS_DE_LA_TAPA,
   HOLGURA_DELANTERA_DE_LA_TAPA,
+  LO_QUE_QUEDA_AL_LLEGAR,
   MADERA_CLARA_EN_EL_ATLAS,
   MADERA_OSCURA_EN_EL_ATLAS,
   POSAVASOS_SOBRE_LA_MADERA_OSCURA,
   TABLONES,
+  MANDO_DE_RECOGER,
   TRAS_EL_ZOCALO,
   aLineal,
+  bajadaDeLaMesa,
   colorDelColono,
   coloresDeLaMadera,
   coloresDelPosavasos,
@@ -232,6 +242,7 @@ import {
   triangulosDelMar,
 } from '../presupuesto-del-delta';
 import fs from 'node:fs';
+import { createRequire } from 'node:module';
 import path from 'node:path';
 import * as THREE from 'three';
 import { NodeIO } from '@gltf-transform/core';
@@ -5010,8 +5021,8 @@ paso('La tapa de la mesa: a la cota del zócalo, con la veta del atlas, dentro d
       !/porTirar/.test(soloCodigo(fuente)),
   );
   comprobar(
-    'el asa de los dados es UNA, de 1,6 lados por 1, invisible por colorWrite y nunca por visible, con stopPropagation y loCogeLaInterfaz antes de mirar disponible; los cubos no reciben rayos',
-    /<boxGeometry args=\{\[sitio\.ancho, sitio\.alto, lado \* 0\.8\]\} \/>\s+<meshBasicMaterial colorWrite=\{false\} depthWrite=\{false\} \/>/.test(trozoDeDados) &&
+    'el asa de los dados es UNA, de 1,6 lados por 1, con el fondo que dice `ASA_DEL_HUECO` y no un 0,8 suelto, invisible por colorWrite, con stopPropagation y loCogeLaInterfaz antes de mirar disponible; los cubos no reciben rayos',
+    /<boxGeometry args=\{\[sitio\.ancho, sitio\.alto, lado \* ASA_DEL_HUECO\.fondo\]\} \/>\s+<meshBasicMaterial colorWrite=\{false\} depthWrite=\{false\} \/>/.test(trozoDeDados) &&
       !/visible=\{false\}/.test(trozoDeDados) &&
       /e\.stopPropagation\(\);\s+loCogeLaInterfaz\(e\.nativeEvent\);\s+if \(!dados\.disponible\) return;/.test(sinComentariosDeDados) &&
       (trozoDeDados.match(/raycast=\{\(\) => null\}/g) ?? []).length === 3,
@@ -5057,6 +5068,617 @@ paso('La tapa de la mesa: a la cota del zócalo, con la veta del atlas, dentro d
   );
 }
 
+// ---------------------------------------------------------------------------
+paso('Recoger la mesa: la bajada tapa el asa PROYECTADA en los quince lienzos, el mando no roba toque a ninguna, y abajo no se monta nada');
+// ---------------------------------------------------------------------------
+
+/**
+ * LA FASE 4 (§6): QUÉ SE COMPRA AQUÍ Y QUÉ NO.
+ *
+ * Se compra la ARITMÉTICA —cuánto baja, qué queda por encima del canto después de bajar, y
+ * dónde cabe el mando de recoger sin robarle toque a la mesa— en los quince lienzos, y la
+ * FORMA del código que la usa. Lo que NO se compra es que se vea bien bajar: para eso está
+ * el banco (`escritorio/banco3d.html`, mandos «Recoger / Sacar la mesa» y «Ahora te toca»).
+ *
+ * ═══ TODO SE PROYECTA CON LA CÁMARA, Y ÉSE ES EL ARREGLO ═══
+ *
+ * La primera versión de este bloque medía con una regla de tres plana sobre el alto visible
+ * A LA DISTANCIA DE LA BARRA, o sea tratando cada cosa como un PUNTO en el plano `z = −2`.
+ * Y la mesa no es plana: el asa es una caja de `0,8` lados de fondo girada 39,6°, los dados
+ * son cubos que giran y la tapa llega hasta `z = −2 − 0,6·lado`. La cara trasera de una
+ * caja se ve MÁS ARRIBA que su centro y la cercana MÁS ABAJO Y MÁS A LOS LADOS, así que con
+ * la cuenta plana este bloque salía verde con el techo del asa entre 10,8 y 36,6 puntos por
+ * encima del canto y con el mando de recoger comiéndose la esquina de un asa. Aquí ahora se
+ * proyectan los OCHO vértices de cada caja y las CUATRO esquinas de cada plano, como ya
+ * hacía la única línea que estaba bien: la del borde trasero de la tapa.
+ *
+ * ═══ LOS CUATRO FALLOS QUE ESTO CAZA ═══
+ *
+ *   1. Que la bajada se quede corta y asome el filo de un asa por el canto. Una mesa medio
+ *      recogida no se lee como una mesa recogida: se lee como algo roto. Y las asas están
+ *      montadas y vivas durante los 0,28 s que dura, así que no basta con desmontarlas.
+ *   2. Que el mando de recoger se coma un trozo de asa. El mando está SIEMPRE, así que ese
+ *      estorbo no aparecería al recoger sino todo el rato, y en silencio: la choza
+ *      simplemente no se cogería desde esa esquina.
+ *   3. Que la mesa baje pero siga viva. `visible` NO la saca de los sucesos —ni r3f ni
+ *      `three` lo miran, y aquí se lee del paquete instalado—, así que lo que tiene que
+ *      pasar es que no se MONTE nada.
+ *   4. Que alguien vuelva a la cuenta plana. Las dos comprobaciones que la cazan están
+ *      escritas al revés a propósito: exigen que la cuenta proyectada sea MAYOR que la
+ *      plana y que el rincón de abajo NO dé para el mando, que son las dos cosas que la
+ *      cuenta plana negaba.
+ */
+{
+  const CAMPO = (45 * Math.PI) / 180;
+  /* La lista `LIENZOS` es la de la cabecera del guion, común a todos los bloques. */
+  const fuente = fs.readFileSync(path.join(import.meta.dirname ?? __dirname, '..', 'delta.tsx'), 'utf8');
+  const soloCodigo = (texto: string): string =>
+    texto.split('\n').filter((l) => !/^\s*(\*|\/\/|\/\*|\{\/\*)/.test(l)).join('\n');
+  const codigo = soloCodigo(fuente);
+
+  /* ── 0. LO QUE EL MOTOR DICE DE VERDAD SOBRE `visible` ── */
+
+  /*
+   * LA PREMISA DE LA FASE 4 ERA FALSA, Y ESTO NO LA DEJA VOLVER.
+   *
+   * `delta.tsx` afirmaba en cuatro sitios que «r3f descarta de sus sucesos los objetos
+   * invisibles». Se leyó el paquete instalado y no es cierto: el `intersect` de
+   * `@react-three/fiber` recorre `state.internal.interaction` —donde entra toda malla con
+   * manejadores y `raycast !== null`, sin mirar `visible`— y traza con
+   * `state.raycaster.intersectObject(obj, true)`; y el `Raycaster` de `three` sólo filtra
+   * por `layers` antes de llamar a `object.raycast`. Con esa creencia, apagar el grupo
+   * dejaba las asas cogiendo toques bajo el canto.
+   *
+   * Se lee del disco y no se copia la conclusión: el día que r3f empiece a mirar `visible`
+   * —que sería una buena noticia— esto se pone rojo y hay que reescribir las cabeceras que
+   * hoy dicen que no lo mira. Si el fichero no está, es un fallo y no un salto: un
+   * comprobador que se salta lo que no encuentra se lee como verde.
+   */
+  const pedir = createRequire(import.meta.url);
+  const leerDelMotor = (): { fiber: string; raycaster: string; malla: string } | null => {
+    try {
+      const dist = path.dirname(pedir.resolve('@react-three/fiber'));
+      const sucesos = fs.readdirSync(dist).find((n) => /^events-.*\.cjs\.dev\.js$/.test(n));
+      /* `three` no exporta su `package.json`, así que la raíz se saca de su `build/`. */
+      const raiz = path.dirname(path.dirname(pedir.resolve('three')));
+      if (sucesos === undefined) return null;
+      return {
+        fiber: fs.readFileSync(path.join(dist, sucesos), 'utf8'),
+        raycaster: fs.readFileSync(path.join(raiz, 'src', 'core', 'Raycaster.js'), 'utf8'),
+        malla: fs.readFileSync(path.join(raiz, 'src', 'objects', 'Mesh.js'), 'utf8'),
+      };
+    } catch {
+      return null;
+    }
+  };
+  const motor = leerDelMotor();
+  const trozoDelIntersect =
+    motor === null ? '' : motor.fiber.slice(motor.fiber.indexOf('function intersect(event, filter)'), motor.fiber.indexOf('// Collect events'));
+  comprobar(
+    'ni la tubería de sucesos de @react-three/fiber ni el Raycaster de three miran `object.visible`: apagar un grupo NO le quita los rayos, y por eso la mesa recogida se DESMONTA en vez de apagarse',
+    motor !== null &&
+      trozoDelIntersect.length > 200 &&
+      !/visible/.test(trozoDelIntersect) &&
+      /state\.raycaster\.intersectObject\(obj, true\)/.test(trozoDelIntersect) &&
+      /instance\.eventCount && object\.raycast !== null/.test(motor.fiber) &&
+      !/visible/.test(motor.raycaster) &&
+      !/visible/.test(motor.malla),
+    motor === null ? 'no se ha podido leer el motor de node_modules' : { largoDelIntersect: trozoDelIntersect.length },
+  );
+
+  /* ── 1. LA BAJADA: nada del grupo queda sobre el canto, proyectado de verdad ── */
+
+  /*
+   * LAS DOS FORMAS QUE HAY EN LA MESA, en puntos de mundo y en coordenadas de la cámara.
+   * Una caja da ocho vértices y un plano cuatro esquinas; los dos se proyectan igual.
+   */
+  const verticesDeLaCaja = (
+    centro: readonly [number, number, number],
+    medias: readonly [number, number, number],
+    giro: number,
+  ): Array<[number, number, number]> => {
+    const sen = Math.sin(giro);
+    const cos = Math.cos(giro);
+    const salida: Array<[number, number, number]> = [];
+    for (const sx of [-1, 1]) {
+      for (const sy of [-1, 1]) {
+        for (const sz of [-1, 1]) {
+          const x = sx * medias[0];
+          const z = sz * medias[2];
+          salida.push([centro[0] + x * cos + z * sen, centro[1] + sy * medias[1], centro[2] + (-x * sen + z * cos)]);
+        }
+      }
+    }
+    return salida;
+  };
+  /* Un plano horizontal es una caja de media altura cero: sus cuatro esquinas salen solas. */
+  const esquinasDelPlano = (
+    centro: readonly [number, number, number],
+    medias: readonly [number, number],
+    giro = 0,
+  ): Array<[number, number, number]> => verticesDeLaCaja(centro, [medias[0], 0, medias[1]], giro);
+  /* Cuánto queda un punto POR ENCIMA del canto de abajo, en puntos. Negativo: ya no se ve. */
+  const sobreElCanto = (p: readonly [number, number, number], bajada: number, altoPt: number): number =>
+    ((1 + (p[1] - bajada) / (-p[2] * Math.tan(CAMPO / 2))) / 2) * altoPt;
+  /* Y dónde cae en la pantalla, desde la esquina de abajo a la izquierda, en puntos. */
+  const enPantalla = (p: readonly [number, number, number], anchoPt: number, altoPt: number): [number, number] => {
+    const t = Math.tan(CAMPO / 2);
+    return [
+      ((1 + p[0] / (-p[2] * t * (anchoPt / altoPt))) / 2) * anchoPt,
+      ((1 + p[1] / (-p[2] * t)) / 2) * altoPt,
+    ];
+  };
+
+  /*
+   * LAS CIFRAS SE LEEN DE LA ESCENA, no se copian aquí: el naipe y la pieza, de sus
+   * constantes en `delta.tsx`; las asas, de que su `boxGeometry` pide `ASA_DEL_HUECO` a
+   * `barra.ts` —la misma tabla que usa `bajadaDeLaMesa`—; el giro, de que las dos vitrinas
+   * usan `GIRO_DE_LA_VITRINA` importado de allí; y el dado, de las constantes de `dados.ts`.
+   * Copiadas, esto seguiría verde con el naipe asomando.
+   */
+  /*
+   * Se NIEGA si el ancla no aparece, y no devuelve NaN.
+   *
+   * Devolvia NaN, y NaN no rompe nada: toda comparacion con el sale falsa, asi que la
+   * comprobacion de que no asoma nada por el canto seguia VERDE midiendo con nada. Un
+   * renombre inocente en la escena dejaba ciego al guion sin ponerlo rojo, que es
+   * exactamente lo que estas seis anclas existen para evitar.
+   */
+  const numeroDe = (patron: RegExp): number => {
+    const hallado = patron.exec(fuente)?.[1];
+    if (hallado === undefined) {
+      throw new Error(
+        `verificar-escena: la escena ya no dice ${String(patron)}, asi que el numero que se leia de ahi no existe.`,
+      );
+    }
+    return Number(hallado);
+  };
+  const altoDelNaipe = numeroDe(/const ALTO_DEL_NAIPE_EN_LA_BARRA = ([0-9.]+);/);
+  const anchoDelNaipe = numeroDe(/const ANCHO_DEL_NAIPE_EN_LA_BARRA = ([0-9.]+);/);
+  const parteDelHueco = numeroDe(/encajeEnUnCuadrado\(mallas, hueco\.lado \* ([0-9.]+)\)/);
+  const creceConElRaton = numeroDe(/const crece = encima \|\| tomada \? ([0-9.]+) : 1;/);
+  const subeConElRaton = numeroDe(/const sube = encima \|\| tomada \? hueco\.lado \* ([0-9.]+) : 0;/);
+  /* El filo del naipe es una malla aparte con `scale`, y es la que manda: agranda el naipe. */
+  const filoDelNaipe = numeroDe(/<mesh geometry=\{naipe\} position=\{\[0, 0, -0\.002\]\} scale=\{([0-9.]+)\}/);
+  const asaDeUnHueco =
+    (codigo.match(
+      /<boxGeometry\s+args=\{\[\s*hueco\.lado \* ASA_DEL_HUECO\.ancho,\s*hueco\.lado \* ASA_DEL_HUECO\.alto,\s*hueco\.lado \* ASA_DEL_HUECO\.fondo,\s*\]\}\s*\/>/g,
+    ) ?? []).length === 2;
+  const asaDeLosDados = /<boxGeometry args=\{\[sitio\.ancho, sitio\.alto, lado \* ASA_DEL_HUECO\.fondo\]\} \/>/.test(codigo);
+  const giroDeLaVitrina = (codigo.match(/rotation=\{\[0, GIRO_DE_LA_VITRINA, 0\]\}/g) ?? []).length === 2;
+  const desdeLaBarra = /^\s*GIRO_DE_LA_VITRINA,$/m.test(fuente.slice(fuente.indexOf('} from \'./barra\';') - 400, fuente.indexOf('} from \'./barra\';')));
+  comprobar(
+    'las dos asas y las dos vitrinas leen `ASA_DEL_HUECO` y `GIRO_DE_LA_VITRINA` de `barra.ts` —los mismos números con los que `bajadaDeLaMesa` mide—, y la pieza y el naipe traen los suyos escritos',
+    asaDeUnHueco &&
+      asaDeLosDados &&
+      giroDeLaVitrina &&
+      desdeLaBarra &&
+      [altoDelNaipe, anchoDelNaipe, parteDelHueco, creceConElRaton, subeConElRaton].every((n) => Number.isFinite(n)),
+    { asaDeUnHueco, asaDeLosDados, giroDeLaVitrina, desdeLaBarra, parteDelHueco, creceConElRaton, subeConElRaton },
+  );
+
+  /*
+   * TODO LO QUE HAY EN EL GRUPO QUE BAJA, lienzo a lienzo, como cajas y planos de mundo.
+   * Está la pieza con el ratón encima —`crece` y `sube`, que es la postura más alta que se
+   * puede tener sin coger nada— porque el modelo NO estaba en la lista de antes y el día que
+   * un modelo del pack crezca esto tiene que ponerse rojo. La pieza TOMADA no está: recoger
+   * la mesa suelta lo cogido.
+   */
+  const piezasDeLaMesa = (
+    anchoPt: number,
+    altoPt: number,
+  ): { hueco: HuecoDeLaBarra; partes: Array<[string, Array<[number, number, number]>]> } | null => {
+    const proporcion = anchoPt / altoPt;
+    const mesa = huecosDeLaMesa(4, CAMPO, proporcion, altoPt);
+    const primero = mesa.piezas[0];
+    if (primero === undefined) return null;
+    const partes: Array<[string, Array<[number, number, number]>]> = [];
+    for (const [i, h] of mesa.piezas.entries()) {
+      const medias: [number, number, number] = [
+        (ASA_DEL_HUECO.ancho / 2) * h.lado,
+        (ASA_DEL_HUECO.alto / 2) * h.lado,
+        (ASA_DEL_HUECO.fondo / 2) * h.lado,
+      ];
+      partes.push([`el asa del hueco ${String(i)}`, verticesDeLaCaja([h.x, h.y, h.z], medias, GIRO_DE_LA_VITRINA)]);
+      const media = (parteDelHueco / 2) * creceConElRaton * h.lado;
+      partes.push([
+        `el modelo del hueco ${String(i)} con el ratón encima`,
+        verticesDeLaCaja([h.x, h.y + subeConElRaton * h.lado, h.z], [media, media, media], GIRO_DE_LA_VITRINA),
+      ]);
+      partes.push([
+        `el zócalo del hueco ${String(i)}`,
+        /* El zócalo vive DENTRO del grupo girado de la vitrina: sin el giro se proyecta un 41 % más estrecho de lo que es. */
+        verticesDeLaCaja([h.x, h.y - ZOCALO.centro * h.lado, h.z], [ZOCALO.radio * h.lado, (ZOCALO.alto / 2) * h.lado, ZOCALO.radio * h.lado], GIRO_DE_LA_VITRINA),
+      ]);
+    }
+    const delMazo = mesa.piezas[mesa.piezas.length - 1];
+    if (delMazo !== undefined) {
+      /* Con el filo, que es la malla más grande de las dos y la que asoma primero. */
+      const alto = delMazo.lado * altoDelNaipe * filoDelNaipe;
+      partes.push([
+        'el naipe del mazo con su filo',
+        verticesDeLaCaja([delMazo.x, delMazo.y, delMazo.z], [(alto * anchoDelNaipe) / 2, alto / 2, 0], GIRO_DE_LA_VITRINA),
+      ]);
+    }
+    const tapa = tapaDeLaMesa(primero, CAMPO, proporcion);
+    partes.push([
+      'la tapa',
+      esquinasDelPlano([0, tapa.cota, tapa.centroZ], [tapa.ancho / 2, tapa.fondo / 2]),
+    ]);
+    for (const [i, h] of mesa.piezas.entries()) {
+      partes.push([
+        `la sombra del hueco ${String(i)}`,
+        esquinasDelPlano([h.x, tapa.cota + SOBRE_LA_TAPA, h.z], [RADIO_DE_LA_SOMBRA * h.lado, RADIO_DE_LA_SOMBRA * h.lado]),
+      ]);
+    }
+    if (mesa.dados !== null) {
+      const d = mesa.dados;
+      partes.push([
+        'el asa de los dados',
+        verticesDeLaCaja([d.x, d.y, d.z], [d.ancho / 2, d.alto / 2, (ASA_DEL_HUECO.fondo / 2) * d.lado], 0),
+      ]);
+      partes.push([
+        'el tapete del turno',
+        esquinasDelPlano([d.x, tapa.cota + SOBRE_LA_TAPA, d.z], [d.ancho / 2, (d.lado * FONDO_DEL_TAPETE) / 2]),
+      ]);
+      /* El cubo gira, así que lo que asoma es su esfera de media diagonal, arriba y hacia acá. */
+      const media = ((ARISTA_DEL_DADO * Math.sqrt(3)) / 2) * d.lado;
+      for (const i of [0, 1] as const) {
+        partes.push([
+          `el dado ${String(i)} en lo alto del salto`,
+          verticesDeLaCaja(
+            [
+              d.x + centroDelDado(i) * d.lado,
+              cotaDeLaTapa(primero) + (CENTRO_DEL_DADO_SOBRE_LA_TAPA + SALTO_DEL_DADO) * d.lado,
+              d.z,
+            ],
+            [media, media, media],
+            0,
+          ),
+        ]);
+        partes.push([
+          `la sombra del dado ${String(i)}`,
+          esquinasDelPlano(
+            [d.x + centroDelDado(i) * d.lado, tapa.cota + SOBRE_LA_TAPA, d.z],
+            [RADIO_DE_LA_SOMBRA_DEL_DADO * d.lado, RADIO_DE_LA_SOMBRA_DEL_DADO * d.lado],
+          ),
+        ]);
+      }
+    }
+    return { hueco: primero, partes };
+  };
+
+  const asomando: string[] = [];
+  const enPuntos: Record<string, number> = {};
+  const loQueGanaALaPlana: number[] = [];
+  const loQueAsomabaConLaPlana: number[] = [];
+  for (const [nombre, anchoPt, altoPt] of LIENZOS) {
+    const proporcion = anchoPt / altoPt;
+    const { alto } = loQueSeVe(CAMPO, proporcion);
+    const puntosPorUnidad = altoPt / alto;
+    const mesa = piezasDeLaMesa(anchoPt, altoPt);
+    if (mesa === null) {
+      asomando.push(`${nombre}: sin huecos`);
+      continue;
+    }
+    const bajada = bajadaDeLaMesa(mesa.hueco, CAMPO, proporcion);
+    enPuntos[nombre] = bajada * puntosPorUnidad;
+    /* La cuenta plana de antes: el asa como un punto en el plano de la barra. */
+    const plana = alto / 2 + mesa.hueco.y + mesa.hueco.lado / 2;
+    loQueGanaALaPlana.push((bajada - plana) * puntosPorUnidad);
+    let peorConLaPlana = -Infinity;
+    for (const [que, vertices] of mesa.partes) {
+      for (const v of vertices) {
+        const queda = sobreElCanto(v, bajada, altoPt);
+        if (queda > 1e-6) asomando.push(`${nombre}: ${que} asoma ${queda.toFixed(2)} pt`);
+        peorConLaPlana = Math.max(peorConLaPlana, sobreElCanto(v, plana, altoPt));
+      }
+    }
+    loQueAsomabaConLaPlana.push(peorConLaPlana);
+  }
+  comprobar(
+    'con la mesa recogida no asoma NADA por el canto de abajo en ninguno de los quince lienzos: proyectados con la cámara los ocho vértices de cada caja —asas, modelos con el ratón encima, dados saltando— y las cuatro esquinas de cada plano —tapa, sombras, tapete—',
+    asomando.length === 0,
+    asomando.slice(0, 4),
+  );
+  /*
+   * Y LA CUENTA PLANA SE QUEDABA CORTA, escrito al revés a propósito: si alguien vuelve a
+   * `alto/2 + hueco.y + 0,5·lado` estas dos cifras se van a cero y esto se pone rojo. Medido:
+   * la proyectada baja entre 11,6 y 39,3 puntos más, y con la plana el asa se quedaba entre
+   * 10,8 y 36,6 puntos por encima del canto.
+   */
+  const menosQueGana = Math.min(...loQueGanaALaPlana);
+  const masQueGana = Math.max(...loQueGanaALaPlana);
+  const menosQueAsomaba = Math.min(...loQueAsomabaConLaPlana);
+  const masQueAsomaba = Math.max(...loQueAsomabaConLaPlana);
+  comprobar(
+    'la bajada proyectada baja de 11,6 a 39,3 puntos MÁS que la cuenta plana que había, y con la plana el techo del asa se quedaba de 10,8 a 36,6 puntos por encima del canto: el fallo era de verdad y no vuelve sin ponerse rojo',
+    Math.abs(menosQueGana - 11.63) <= 0.1 &&
+      Math.abs(masQueGana - 39.26) <= 0.1 &&
+      Math.abs(menosQueAsomaba - 10.85) <= 0.1 &&
+      Math.abs(masQueAsomaba - 36.6) <= 0.1,
+    {
+      gana: `${menosQueGana.toFixed(2)} a ${masQueGana.toFixed(2)} pt`,
+      asomaba: `${menosQueAsomaba.toFixed(2)} a ${masQueAsomaba.toFixed(2)} pt`,
+    },
+  );
+  /*
+   * Y LAS TRES CIFRAS DEL §6, para que el documento y el código no se separen. Eran 72, 88 y
+   * 243 puntos con la cuenta plana; con el asa proyectada de verdad son 84, 102 y 282, y el
+   * §6 hay que corregirlo con ellas. Se comprueban con un punto de holgura, que es menos de
+   * lo que se ve.
+   */
+  const comoDiceElDiseno: Array<[string, number]> = [
+    ['apaisado SE 1ª', 84],
+    ['apaisado iPhone 14', 102],
+    ['apaisado monitor 1080', 282],
+  ];
+  comprobar(
+    'y la bajada mide lo que tiene que decir el §6 con el asa proyectada: 84 puntos en el SE apaisado, 102 en un iPhone 14 y 282 en un monitor a 1080',
+    comoDiceElDiseno.every(([nombre, puntos]) => Math.abs((enPuntos[nombre] ?? 0) - puntos) <= 1),
+    comoDiceElDiseno.map(([nombre]) => `${nombre}: ${(enPuntos[nombre] ?? 0).toFixed(1)} pt`),
+  );
+
+  /* ── 2. EL MANDO DE RECOGER: dónde cabe y dónde no, con la caja proyectada ── */
+
+  /*
+   * ¿SE CORTAN DOS CONVEXOS? Eje separador sobre las normales de los dos. Hace falta porque
+   * la silueta de una caja girada es un HEXÁGONO, no un rectángulo: medir con su caja
+   * envolvente diría que el mando pisa el asa donde no la pisa, y esto tiene que decidir un
+   * sitio, no asustar.
+   */
+  const seCortan = (a: ReadonlyArray<[number, number]>, b: ReadonlyArray<[number, number]>): boolean => {
+    for (const poli of [a, b]) {
+      for (let i = 0; i < poli.length; i++) {
+        const p = poli[i] as [number, number];
+        const q = poli[(i + 1) % poli.length] as [number, number];
+        const eje: [number, number] = [-(q[1] - p[1]), q[0] - p[0]];
+        let a0 = Infinity;
+        let a1 = -Infinity;
+        let b0 = Infinity;
+        let b1 = -Infinity;
+        for (const v of a) {
+          const d = v[0] * eje[0] + v[1] * eje[1];
+          a0 = Math.min(a0, d);
+          a1 = Math.max(a1, d);
+        }
+        for (const v of b) {
+          const d = v[0] * eje[0] + v[1] * eje[1];
+          b0 = Math.min(b0, d);
+          b1 = Math.max(b1, d);
+        }
+        if (a1 <= b0 + 1e-9 || b1 <= a0 + 1e-9) return false;
+      }
+    }
+    return true;
+  };
+  /* El casco convexo de una nube de puntos de pantalla, en orden (Andrew). */
+  const casco = (puntos: ReadonlyArray<[number, number]>): Array<[number, number]> => {
+    const p = [...puntos].sort((u, v) => u[0] - v[0] || u[1] - v[1]);
+    const cruz = (o: [number, number], u: [number, number], v: [number, number]): number =>
+      (u[0] - o[0]) * (v[1] - o[1]) - (u[1] - o[1]) * (v[0] - o[0]);
+    const media = (orden: Array<[number, number]>): Array<[number, number]> => {
+      const pila: Array<[number, number]> = [];
+      for (const q of orden) {
+        while (pila.length >= 2 && cruz(pila[pila.length - 2] as [number, number], pila[pila.length - 1] as [number, number], q) <= 0) pila.pop();
+        pila.push(q);
+      }
+      pila.pop();
+      return pila;
+    };
+    return [...media(p), ...media([...p].reverse())];
+  };
+  /* La silueta en pantalla de cada asa del lienzo: lo único que el mando no puede tocar. */
+  const siluetasDeLasAsas = (anchoPt: number, altoPt: number): Array<[string, Array<[number, number]>]> => {
+    const mesa = piezasDeLaMesa(anchoPt, altoPt);
+    if (mesa === null) return [];
+    return mesa.partes
+      .filter(([que]) => que.startsWith('el asa'))
+      .map(([que, vertices]) => [que, casco(vertices.map((v) => enPantalla(v, anchoPt, altoPt)))] as [string, Array<[number, number]>]);
+  };
+  const cuadrado = (x: number, y: number, lado: number): Array<[number, number]> => [
+    [x, y],
+    [x + lado, y],
+    [x + lado, y + lado],
+    [x, y + lado],
+  ];
+
+  /*
+   * PRIMERO, POR QUÉ EL MANDO NO ESTÁ ABAJO. La barra está CENTRADA y ocupa el 70 % del
+   * ancho, así que deja lo mismo a los dos lados; con la silueta proyectada el cuadrado más
+   * grande que cabe en el rincón de abajo con 4 de margen es de 37,2 puntos en 320×360, por
+   * debajo del suelo de 44. Con la cuenta PLANA salían 48 —y ahí estuvo el mando, comiéndose
+   * la esquina del asa de la choza—, así que esta comprobación es exactamente la que la
+   * cuenta plana negaba: si alguien vuelve a medir con el rectángulo del plano, se cae.
+   */
+  const MARGEN_DE_ANTES = 4;
+  const cabeAbajo = (anchoPt: number, altoPt: number, margen: number): number => {
+    const siluetas = siluetasDeLasAsas(anchoPt, altoPt).map(([, s]) => s);
+    for (let lado = 120; lado >= 0; lado -= 0.1) {
+      if (!siluetas.some((s) => seCortan(s, cuadrado(margen, margen, lado)))) return lado;
+    }
+    return 0;
+  };
+  const libreAbajo = cabeAbajo(320, 360, MARGEN_DE_ANTES);
+  const conLaPlana = (((): number => {
+    const proporcion = 320 / 360;
+    const { alto, ancho } = loQueSeVe(CAMPO, proporcion);
+    const h = huecosDeLaMesa(4, CAMPO, proporcion, 360).piezas[0];
+    if (h === undefined) return 0;
+    const puntosPorUnidad = 360 / alto;
+    return (
+      Math.max((h.x - h.lado / 2 + ancho / 2) * puntosPorUnidad, (h.y - h.lado / 2 + alto / 2) * puntosPorUnidad) -
+      MARGEN_DE_ANTES
+    );
+  })());
+  comprobar(
+    'abajo NO cabe: con la silueta proyectada del asa, el cuadrado libre en el rincón de abajo a la izquierda de 320×360 es de 37,2 puntos con 4 de margen, por debajo del suelo de toque; con el rectángulo plano salían 44 y por eso el mando estuvo ahí comiéndose la esquina de la choza',
+    Math.abs(libreAbajo - 37.2) <= 0.2 &&
+      libreAbajo < SUELO_DEL_TOQUE &&
+      conLaPlana >= SUELO_DEL_TOQUE,
+    { proyectada: libreAbajo.toFixed(1), plana: conLaPlana.toFixed(1), suelo: SUELO_DEL_TOQUE },
+  );
+
+  /*
+   * Y AHORA, DONDE ESTÁ. El mando vive arriba, debajo del otro mando del lienzo, con
+   * `MANDO_DE_RECOGER` (`mesa.ts`) diciendo el lado, el margen y cuánto baja. Se prueba por
+   * los DOS lados —izquierda como la app, derecha como el escritorio, que cada uno hereda la
+   * esquina de su mando de volver— y contra la silueta de TODAS las asas, no sólo la primera.
+   * Devuélvelo abajo a la izquierda y esto se cae en 320×360.
+   */
+  const pisados: string[] = [];
+  const holguras: string[] = [];
+  for (const [nombre, anchoPt, altoPt] of LIENZOS) {
+    const siluetas = siluetasDeLasAsas(anchoPt, altoPt);
+    if (siluetas.length === 0) {
+      pisados.push(`${nombre}: sin asas que medir`);
+      continue;
+    }
+    const arriba = altoPt - MANDO_DE_RECOGER.margen - MANDO_DE_RECOGER.bajoElOtroMando - MANDO_DE_RECOGER.lado;
+    for (const [lado, x] of [
+      ['izquierda', MANDO_DE_RECOGER.margen],
+      ['derecha', anchoPt - MANDO_DE_RECOGER.margen - MANDO_DE_RECOGER.lado],
+    ] as const) {
+      const mando = cuadrado(x, arriba, MANDO_DE_RECOGER.lado);
+      for (const [que, silueta] of siluetas) {
+        if (seCortan(silueta, mando)) pisados.push(`${nombre} (${lado}): el mando pisa ${que}`);
+      }
+    }
+    let masAlta = -Infinity;
+    for (const [, silueta] of siluetas) for (const v of silueta) masAlta = Math.max(masAlta, v[1]);
+    holguras.push(`${nombre}: ${(arriba - masAlta).toFixed(1)}`);
+  }
+  comprobar(
+    'el mando de recoger (44 cuadrado, 12 de margen, 52 por debajo del otro mando) no roba ni un punto de la silueta de ninguna asa en ninguno de los quince lienzos, ni pegado a la izquierda ni pegado a la derecha',
+    pisados.length === 0,
+    pisados.slice(0, 4),
+  );
+  /*
+   * Y CUÁNTO SOBRA POR ABAJO, que es lo que hace que arriba sea sitio y no suerte: el asa más
+   * alta de los quince se queda 134 puntos por debajo del canto de abajo del mando en el peor
+   * lienzo (el SE apaisado, que es el más bajo). Se exige que el peor pase de cien: si un día
+   * la barra sube o el mando baja, esto avisa antes de que se toquen.
+   */
+  const laMenorHolgura = Math.min(...holguras.map((h) => Number(h.split(': ')[1])));
+  comprobar(
+    'y arriba sobra sitio de verdad: entre el canto de abajo del mando y el asa más alta quedan 134 puntos en el peor de los quince, no un pelo',
+    Math.abs(laMenorHolgura - 134) <= 1.5 && laMenorHolgura > 100,
+    holguras,
+  );
+  /*
+   * QUE LOS DOS MANDOS NO SE SOLAPEN NO SE MIDE EN PÍXELES DE RÓTULO: se apilan. El de
+   * volver mide 44 de alto como mínimo (el suelo de toque) y arranca en `margen`; éste
+   * arranca en `margen + bajoElOtroMando`. Con `bajoElOtroMando` = 52 quedan ocho puntos de
+   * aire y no hay ancho que medir, que es justo lo que se quería: «Tablero entero» cambia de
+   * ancho con el rótulo y el escritorio tiene otro texto.
+   */
+  comprobar(
+    '«Recoger la mesa» va DEBAJO del otro mando del lienzo y no en la esquina de al lado: baja su alto entero más un dedo de aire, así que no hay ancho de rótulo que medir y los dos no pueden solaparse',
+    MANDO_DE_RECOGER.bajoElOtroMando >= SUELO_DEL_TOQUE + 4 &&
+      MANDO_DE_RECOGER.bajoElOtroMando - SUELO_DEL_TOQUE === 8 &&
+      MANDO_DE_RECOGER.lado === SUELO_DEL_TOQUE &&
+      MANDO_DE_RECOGER.margen === 12,
+    MANDO_DE_RECOGER,
+  );
+
+  /* ── 3. LA FORMA DEL CÓDIGO: el grupo de dentro, la llegada, y el desmonte entero ── */
+
+  const trozoDeLaBarra = soloCodigo(fuente.slice(fuente.indexOf('function Barra('), fuente.indexOf('function Dados(')));
+  comprobar(
+    '`Barra` recibe `recogida` y lo que baja es un grupo de DENTRO: el de fuera copia la cámara cada fotograma y le pisaría la posición',
+    /recogida: boolean;/.test(trozoDeLaBarra) &&
+      /const laQueBaja = useRef<THREE\.Group>\(null\);/.test(trozoDeLaBarra) &&
+      /<group ref=\{grupo\} renderOrder=\{ORDEN_DE_LA_BARRA\}>\s*<group ref=\{laQueBaja\} renderOrder=\{ORDEN_DE_LA_BARRA\}>/.test(trozoDeLaBarra) &&
+      /g\.position\.copy\(estado\.camera\.position\);/.test(trozoDeLaBarra),
+  );
+  /*
+   * EL DESMONTE ENTERO, QUE ES LO QUE LA FASE 4 PEDÍA Y NO ESTABA.
+   *
+   * `visible` no saca nada de la lista de interacción de r3f (bloque 0 de aquí), así que lo
+   * que hay que comprobar es que con `escondida` no se MONTE nada de la mesa. Se cuenta por
+   * texto: todo lo que puede recibir un suceso dentro de `Barra` —la tapa, que desde la fase
+   * 2b para el toque al tablero; las piezas; el naipe; los dados— tiene que estar DENTRO del
+   * `{!escondida && (<>…</>)}` y no puede haber ni un manejador de puntero fuera de él.
+   * Vuelve a montar cualquiera de los cuatro fuera del guardia y esto se cae.
+   */
+  const abreElGuardia = trozoDeLaBarra.indexOf('{!escondida && (');
+  const cierraElGuardia = trozoDeLaBarra.indexOf('</>', abreElGuardia);
+  const dentroDelGuardia =
+    abreElGuardia < 0 || cierraElGuardia < 0 ? '' : trozoDeLaBarra.slice(abreElGuardia, cierraElGuardia);
+  const jsxDeLaBarra = trozoDeLaBarra.slice(trozoDeLaBarra.indexOf('  return ('));
+  const cuantos = (texto: string, patron: RegExp): number => (texto.match(patron) ?? []).length;
+  const loQueRecibeToques: Array<[string, RegExp]> = [
+    ['la tapa', /onPointerDown=\{paraElToque\}/g],
+    ['las piezas', /<PiezaEnLaBarra/g],
+    ['el naipe del mazo', /<MazoEnLaBarra/g],
+    ['los dados', /<Dados/g],
+  ];
+  const fuera = loQueRecibeToques.filter(
+    ([, patron]) => cuantos(jsxDeLaBarra, patron) !== 1 || cuantos(dentroDelGuardia, patron) !== 1,
+  );
+  comprobar(
+    'con `escondida` la mesa no MONTA nada: la tapa, las piezas, el naipe y los dados viven todos dentro del `{!escondida && (<>…</>)}`, y no queda ni un manejador de puntero fuera de él —apagar con `visible` no le quitaba los rayos a ninguno—',
+    dentroDelGuardia.length > 200 &&
+      fuera.length === 0 &&
+      cuantos(jsxDeLaBarra, /onPointer[A-Za-z]+=/g) === cuantos(dentroDelGuardia, /onPointer[A-Za-z]+=/g) &&
+      !/visible=\{/.test(jsxDeLaBarra),
+    { fuera: fuera.map(([que]) => que), manejadores: cuantos(jsxDeLaBarra, /onPointer[A-Za-z]+=/g) },
+  );
+  /*
+   * Y LAS GEOMETRÍAS CARAS NO SE REHACEN AL RECOGER. El desmonte tira lo que cuelgue de los
+   * hijos, así que los `useMemo` que hacen geometría tienen que vivir en `Barra`, por encima
+   * del guardia: la tapa, las sombras, el tapete y las DOS del naipe del mazo, que estaban
+   * dentro de `MazoEnLaBarra` y se habrían rehecho —y filtrado, porque nadie las tiraba— en
+   * cada ida y vuelta. `MazoEnLaBarra` las recibe hechas y no llama a `formaDeCarta`.
+   */
+  const trozoDelMazo = soloCodigo(fuente.slice(fuente.indexOf('function MazoEnLaBarra('), fuente.indexOf('function Barra(')));
+  comprobar(
+    'las geometrías caras de la mesa se hacen en `Barra`, por encima del desmonte, y se tiran con un efecto: la tapa, las sombras, el tapete y las dos del naipe del mazo, que ahora llegan hechas al hijo',
+    ['geometriaDelTablon', 'sombras', 'geometriaDelTapeteDelTurno', 'naipeDelMazo', 'iconoDelMazo'].every((que) =>
+      trozoDeLaBarra.includes(`useEffect(() => () => ${que}?.dispose()`),
+    ) &&
+      /const naipeDelMazo = useMemo\(/.test(trozoDeLaBarra) &&
+      /<MazoEnLaBarra[\s\S]*?naipe=\{naipeDelMazo\}[\s\S]*?icono=\{iconoDelMazo\}/.test(trozoDeLaBarra) &&
+      !/formaDeCarta\(/.test(trozoDelMazo) &&
+      !/geometriaDeContornos\(/.test(trozoDelMazo),
+  );
+  comprobar(
+    'cuánto baja lo dice `bajadaDeLaMesa` de `mesa.ts` —la misma función que este guion mide— y no un número escrito en la escena, y se llega con la amortiguación de la casa',
+    /const bajada = primero === undefined \? 0 : bajadaDeLaMesa\(primero, forma\.campo, forma\.proporcion\);/.test(trozoDeLaBarra) &&
+      /const objetivo = recogida \? -bajada : 0;/.test(trozoDeLaBarra) &&
+      /g\.position\.y \+= \(objetivo - g\.position\.y\) \* \(1 - Math\.exp\(-AMORTIGUACION_DE_LA_MESA \* delta\)\);/.test(trozoDeLaBarra) &&
+      /LO_QUE_QUEDA_AL_LLEGAR \* Math\.max\(bajada, 1e-6\)/.test(trozoDeLaBarra),
+  );
+  /*
+   * LA CONSTANTE DE TIEMPO ES LA QUE PIDE EL §6: 0,28 s. Con `1 − e^(−k·t)`, recorrer el
+   * 99 % —que es lo que aquí se llama llegar— tarda `ln(1/0,01)/k`. Con `k = 16` salen
+   * 0,288 s. Se comprueba la CUENTA y no el 16, para que el día que alguien cambie el 16 el
+   * guion diga si sigue cumpliendo el diseño o no.
+   */
+  comprobar(
+    'y tarda los 0,28 s del §6 en llegar: con la k de la amortiguación, el 99 % de la bajada sale en 0,288 s',
+    Math.abs(Math.log(1 / LO_QUE_QUEDA_AL_LLEGAR) / AMORTIGUACION_DE_LA_MESA - 0.28) <= 0.02,
+    Math.log(1 / LO_QUE_QUEDA_AL_LLEGAR) / AMORTIGUACION_DE_LA_MESA,
+  );
+  comprobar(
+    'al llegar abajo se enciende `escondida` y con él se desmonta la mesa entera, dados incluidos: un solo estado y un solo sitio donde se enciende',
+    /if \(recogida && llegada && !escondida\) ponerEscondida\(true\);/.test(trozoDeLaBarra) &&
+      (trozoDeLaBarra.match(/ponerEscondida\(/g) ?? []).length === 2 &&
+      (trozoDeLaBarra.match(/!escondida/g) ?? []).length === 2,
+  );
+  comprobar(
+    'y se montan AL EMPEZAR A SUBIR, no al llegar arriba: el efecto de `recogida` apaga `escondida` en el mismo commit en que la entrada cambia',
+    /useEffect\(\(\) => \{\s*if \(!recogida\) ponerEscondida\(false\);\s*\}, \[recogida\]\);/.test(trozoDeLaBarra),
+  );
+  comprobar(
+    '`<Delta>` gana `mesaRecogida` opcional y se la pasa a la barra sin tocar `dados` ni `mazo`: son la llave del reparto y con `null` las piezas se moverían al recoger',
+    /mesaRecogida = false,/.test(soloCodigo(fuente)) &&
+      /mesaRecogida\?: boolean;/.test(fuente) &&
+      /<Barra[\s\S]*?dados=\{dados\}[\s\S]*?recogida=\{mesaRecogida\}/.test(fuente) &&
+      /<Barra[\s\S]*?mazo=\{mazo\}/.test(fuente),
+  );
+}
+
 console.log('');
 if (fallos.length > 0) {
   console.log(`${fallos.length} de ${hechas} comprobaciones han fallado:\n`);
@@ -5075,7 +5697,7 @@ if (fallos.length > 0) {
  * a veintitrés: durante ese tiempo el guion podía morirse en la novena sin que nadie se
  * enterara. Un guardia desfasado no guarda nada.
  */
-const COMPROBACIONES_ESCRITAS = 335;
+const COMPROBACIONES_ESCRITAS = 352;
 if (hechas < COMPROBACIONES_ESCRITAS) {
   console.error(
     `Solo se han hecho ${hechas} de las ${COMPROBACIONES_ESCRITAS} comprobaciones que ` +

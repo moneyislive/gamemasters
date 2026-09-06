@@ -2224,6 +2224,75 @@ code {
 }
 
 /*
+ * ═══ RECOGER LA MESA ═══
+ *
+ * El mismo botón que el de arriba —teja alta, filo en reposo, acento al pasar el ratón, el
+ * `:focus-visible` de la cabecera, `2.75rem` de mínimo de dedo— en la esquina de ENFRENTE y
+ * cuadrado. Es cromo de la Sala sobre el lienzo, no un objeto del mundo: un objeto del
+ * mundo tendría que quedarse fuera del grupo que baja para poder seguir pulsándose, y
+ * entonces ya no sería de la mesa.
+ *
+ * ═══ ESTUVO ABAJO A LA IZQUIERDA Y AHÍ SE COMÍA UNA ESQUINA DE LA CHOZA ═══
+ *
+ * Estuvo abajo, que es donde está la mesa que recoge, cuadrado de `2.75rem` con `0.25rem`
+ * de margen, y el sitio se dio por medido: el canto izquierdo del asa de la primera pieza
+ * caía en `x = 48` en 320×360 y el botón acababa en 48. Pero esos 48 salían de medir el asa
+ * como un RECTÁNGULO en el plano de la barra, y el asa es una caja de 0,8 lados de fondo
+ * girada 39,6°: su cara CERCANA se proyecta más a la izquierda y más abajo. Proyectada de
+ * verdad, la silueta del asa deja ahí un cuadrado libre de 37,2 puntos en 320×360, así que
+ * el botón opaco se comía unos 7 × 27 puntos de la esquina de abajo a la izquierda del asa
+ * de la choza. Y no sólo con la mesa recogida: el botón está SIEMPRE, o sea que ese trozo
+ * de choza no se podía coger en toda la partida y nada lo decía.
+ *
+ * ═══ Y ABAJO NO CABE EN NINGUNA ESQUINA ═══
+ *
+ * La barra está CENTRADA y ocupa el 70 % del ancho, así que deja lo mismo a los dos lados:
+ * en 320×360 la silueta del asa llega a 41,2 puntos de los dos cantos, y 41,2 < 44. Bajar
+ * el margen a cero tampoco alcanza y encoger el botón por debajo de 44 está prohibido.
+ * Entre dos asas hay once puntos y bajo ellas veintiuno. Así que sube ARRIBA A LA DERECHA,
+ * la esquina que este cliente ya usa para el cromo del lienzo, DEBAJO de `.riberas-volver`:
+ * `0.75rem` de margen más el alto entero de aquél (`2.75rem`) más un dedo de aire
+ * (`0.5rem`), o sea `4rem`. Apilados no hay ancho de rótulo que medir y no pueden
+ * solaparse, y como los dos son condicionales éste no se mueve aparezca o no el otro: un
+ * mando que cambia de sitio se pulsa mal, y éste es el que apaga la mesa. Arriba, el asa
+ * más alta de los quince lienzos se queda 134 puntos por debajo del canto de abajo del
+ * botón en el peor de ellos. Los tres números —44 de lado, 12 de margen, 52 de bajada—
+ * viven en `MANDO_DE_RECOGER` (`escenas/mesa.ts`), y `verify:escena` mide con ellos contra
+ * la silueta proyectada de todas las asas mientras `verify:escritorio` afirma que esta
+ * regla dice lo mismo.
+ *
+ * `line-height: 1` y la rejilla centrada porque el contenido es un glifo y no una palabra:
+ * sin eso la flecha se descuelga del centro del cuadrado.
+ */
+.riberas-recoger {
+  position: absolute;
+  top: 4rem;
+  right: 0.75rem;
+  display: grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  background: var(--teja-alta);
+  color: var(--palabra);
+  border: 1px solid var(--filo);
+  border-radius: var(--radio-mando);
+  padding: 0;
+  font: inherit;
+  font-size: var(--letra-minima);
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    border-color 0.12s,
+    box-shadow 0.12s;
+}
+
+.riberas-recoger:hover {
+  border-color: var(--acento);
+  box-shadow: 0 0 20px -8px var(--halo);
+}
+
+/*
  * Un mando SÓLO para tecnologías de apoyo: fuera de la vista y del flujo, pero en el árbol
  * y enfocable. Es el «tirar los dados» de la mesa cuando el botón de texto se ha ido al
  * asa del lienzo: un dado que sólo se puede tocar con el ratón sería el primer movimiento

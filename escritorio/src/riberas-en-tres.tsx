@@ -222,6 +222,7 @@ import {
   manoEnTres,
   marcadorEnTres,
   mazoEnLaBarra,
+  meToca,
   opcionesFueraDeLaBarra,
   opcionesFueraDeLaMano,
   opcionesFueraDeLaMesa,
@@ -274,6 +275,18 @@ const TITULO_DE_LO_QUE_SE_HACE = 'Lo que puedes hacer';
  * perdido en una esquina del delta necesita leer la salida, no adivinarla.
  */
 const VOLVER_AL_TABLERO_ENTERO = 'Ver el tablero entero';
+
+/**
+ * LAS DOS CARAS DEL BOTÓN DE LA MESA, con todas sus letras aunque en pantalla se vea una
+ * flecha: es lo que oye quien no ve el lienzo, y lo que se lee al posar el ratón.
+ *
+ * Chrome de la Sala como los dos de arriba: no nombran nada del juego —«la mesa» es el
+ * mueble de la pantalla, no una regla de Riberas—, así que pueden escribirse aquí. Y son
+ * dos frases y no una con un «alternar»: el nombre de un botón dice lo que va a pasar al
+ * pulsarlo, no lo que el botón es.
+ */
+const RECOGER_LA_MESA = 'Recoger la mesa';
+const SACAR_LA_MESA = 'Sacar la mesa';
 
 /**
  * EL RECUADRO DEL MUNDO, con su nombre escrito UNA vez.
@@ -827,6 +840,18 @@ export function RiberasEnTres({ manifiesto, mesa, puesta, tablero, opciones }: L
     const suyo = mazoEnLaBarra(vista, yo, opciones);
     return suyo === null || !quieto ? suyo : { disponible: false };
   }, [vista, yo, opciones, quieto]);
+
+  /*
+   * ═══ LA MESA RECOGIDA (§6 del diseño) ═══
+   *
+   * Vive en la pantalla como lo cogido, y por lo mismo: es dónde está mirando la persona,
+   * no estado del juego. NO SE GUARDA —partida nueva, mesa puesta—, así que es un
+   * `useState` a secas y no algo que viaje en la vista ni en el almacén.
+   *
+   * Va aquí arriba, antes que los botones, porque los botones dependen de ella: con la mesa
+   * recogida vuelven al pie TIRAR y COMPRAR. Ver justo debajo.
+   */
+  const [mesaRecogida, ponerMesaRecogida] = useState(false);
   /*
    * LOS BOTONES SON LOS QUE NO ENSEÑA NI EL TABLERO NI NINGUNA DE LAS DOS MANOS.
    *
@@ -840,10 +865,30 @@ export function RiberasEnTres({ manifiesto, mesa, puesta, tablero, opciones }: L
    * verdad —por eso recibe `mazo` y no un `true`—: en el respaldo, en la vista de un mirón
    * y en una mesa de más de cuatro colonos no hay barra, y allí el botón es la única
    * manera de comprar una carta en toda la partida.
+   *
+   * ═══ Y CON LA MESA RECOGIDA EL BOTÓN VUELVE, QUE ES EL MISMO FALLO OTRA VEZ ═══
+   *
+   * El naipe del mazo baja con la mesa: con ella recogida no hay naipe que pulsar. Si el
+   * botón siguiera fuera porque «el hueco existe», comprar se quedaría sin ninguna puerta,
+   * que es exactamente el fallo silencioso del respaldo, sólo que aquí la barra no falta:
+   * está bajo el canto. Por eso se le pasa `null` mientras está recogida. La regla de la
+   * casa se sigue cumpliendo —cada movimiento exactamente una vez— porque el botón sólo
+   * vuelve cuando el naipe se ha ido.
+   *
+   * A `<Delta>` se le sigue pasando `mazo` ENTERO: es la llave del cuarto hueco del
+   * reparto, y con `null` las piezas se repartirían de tres, o sea que se moverían al
+   * recoger y otra vez al sacar. Lo que se recoge tiene que volver igual.
+   *
+   * FUNDAR, ALZAR y OFRECER no vuelven, y no es un olvido: `opcionesFueraDelTablero` los
+   * quita sin mirar nada porque los pinta el TABLERO, así que no hay botón suyo que
+   * devolver. Con la mesa recogida no se puede coger una pieza, cierto, pero eso sólo pasa
+   * en mi propio turno —la mesa sale sola cuando pasa a tocarme— y sacarla es un clic en el
+   * mismo botón que la recogió. Tirar y comprar son distintos porque son justo los dos que
+   * podrían pillarme con la mesa recogida por mi propia mano.
    */
   const fueraDeLaBarra = useMemo(
-    () => opcionesFueraDeLaBarra(opcionesFueraDeLaMano(opcionesFueraDelTablero(opciones)), mazo),
-    [opciones, mazo],
+    () => opcionesFueraDeLaBarra(opcionesFueraDeLaMano(opcionesFueraDelTablero(opciones)), mesaRecogida ? null : mazo),
+    [opciones, mazo, mesaRecogida],
   );
   /*
    * LA MANO DE LA IZQUIERDA: mis premios y mis cartas del mazo, apagada entera mientras
@@ -878,6 +923,36 @@ export function RiberasEnTres({ manifiesto, mesa, puesta, tablero, opciones }: L
   const [cartaDelMazo, ponerCartaDelMazo] = useState<string | null>(null);
   const [preguntando, ponerPreguntando] = useState<Preguntando | null>(null);
 
+  /**
+   * SOLTARLO TODO: la pieza, el bien, el naipe y la pregunta abierta.
+   *
+   * ═══ POR QUÉ EXISTE, Y POR QUÉ ESTAS CUATRO Y NO OTRAS ═══
+   *
+   * Esta pantalla no lo tenía y la de la app sí (`soltarTodo`, siete estados). Con dos
+   * sitios que tienen que soltar lo mismo —el cambio de revisión y recoger la mesa— y sin
+   * un nombre para «lo mismo», las dos listas se separan el día que llegue un quinto
+   * estado que se pueda tener en la mano: una lo soltaría y la otra no, y el fallo sería
+   * una carta pegada al cursor sin nada debajo.
+   *
+   * `preguntando` ENTRA, y no por simetría con la app sino por lo que es: el menú pequeño
+   * que se abre al soltar una carta sobre un bien, al soltar un naipe en jugar o al pulsar
+   * el naipe del mazo. Es una pregunta SOBRE algo que se tenía cogido; soltar lo cogido y
+   * dejar la pregunta abierta deja un menú preguntando a quién le propongo un trueque que
+   * ya no está en mi mano. Es lo mismo que hacen en la app las tres hojas —`aQuien`,
+   * `comoJugarla` y `comprando`—, que están dentro de su `soltarTodo`.
+   *
+   * Los otros `ponerCogida(null)` sueltos que quedan en el fichero NO se recogen aquí a
+   * propósito: son los tres manejadores de COGER, y cada uno suelta sólo a sus hermanos
+   * incompatibles (coger un naipe suelta el bien y la pieza) mientras deja en pie lo que el
+   * gesto no toca. Llamar a éste desde ellos cerraría un menú que nadie pidió cerrar.
+   */
+  const soltarTodo = useCallback(() => {
+    ponerTomada(null);
+    ponerCogida(null);
+    ponerCartaDelMazo(null);
+    ponerPreguntando(null);
+  }, []);
+
   /*
    * AL CAMBIAR LA REVISIÓN SE SUELTA TODO. Lo que se tenía agarrado se agarró
    * mirando la mesa anterior: los sitios legales de esa pieza pueden haber dejado
@@ -885,11 +960,50 @@ export function RiberasEnTres({ manifiesto, mesa, puesta, tablero, opciones }: L
    * sería ofrecer soltarlo donde la mesa nueva ya no lo admite.
    */
   useEffect(() => {
-    ponerTomada(null);
-    ponerCogida(null);
-    ponerCartaDelMazo(null);
-    ponerPreguntando(null);
-  }, [puesta.rev]);
+    soltarTodo();
+  }, [puesta.rev, soltarTodo]);
+
+  /*
+   * RECOGER SUELTA LO COGIDO, y sacar no suelta nada. Una pieza en la mano con la barra
+   * fuera de la pantalla no tiene a dónde volver, y un menú abierto sobre un naipe que
+   * acaba de irse bajo el canto pregunta por algo que ya no se ve. Al subir no se pierde
+   * nada, así que no hay nada que soltar.
+   */
+  const alRecogerLaMesa = useCallback(() => {
+    if (!mesaRecogida) soltarTodo();
+    ponerMesaRecogida(!mesaRecogida);
+  }, [mesaRecogida, soltarTodo]);
+
+  /*
+   * ═══ LA MESA SALE SOLA AL PASAR A TOCARME, Y ESPERA SI HAY ALGO EN LA MANO ═══
+   *
+   * Decisión 16 del §1, cerrada por Miguel: recoger es para MIRAR, y cuando hay que actuar
+   * la mesa vuelve. Es el FLANCO —`meToca` de falso a verdadero— y no el valor: con el
+   * valor, recoger la mesa en mi propio turno la sacaría en el render siguiente y no habría
+   * manera de mirar el tablero mientras me toca.
+   *
+   * Y NO SALE CON UNA CARTA EN LA MANO. Una mesa que sube por debajo de un arrastre cambia
+   * lo que hay bajo el cursor a mitad de gesto: la carta que se llevaba a un área acabaría
+   * soltada sobre una pieza de la barra que no estaba ahí cuando el botón bajó. El flanco
+   * se APUNTA y la salida espera a que la mano quede vacía. Una pieza de la barra no puede
+   * estarlo: con la mesa recogida no hay de dónde cogerla.
+   *
+   * Los dos apuntes van en REFS y no en estados porque no pintan nada y un estado de más
+   * aquí es un render de más por vuelta del sondeo. El efecto se despierta igual: `cogida`
+   * y `cartaDelMazo` sí son estados y están en sus dependencias. Y como la pantalla suelta
+   * todo al cambiar `rev`, la espera dura lo que dure el gesto.
+   */
+  const meTocaAhora = meToca(vista);
+  const meTocabaAntes = useRef(false);
+  const laSalidaEspera = useRef(false);
+  useEffect(() => {
+    if (meTocaAhora && !meTocabaAntes.current) laSalidaEspera.current = true;
+    meTocabaAntes.current = meTocaAhora;
+    if (!laSalidaEspera.current) return;
+    if (cogida !== null || cartaDelMazo !== null) return;
+    laSalidaEspera.current = false;
+    ponerMesaRecogida(false);
+  }, [meTocaAhora, cogida, cartaDelMazo]);
 
   /*
    * La barra y lo que se está colocando se DERIVAN de la vista en cada render, no se
@@ -952,23 +1066,38 @@ export function RiberasEnTres({ manifiesto, mesa, puesta, tablero, opciones }: L
     const suyos = dadosEnTres(vista, yo, opciones);
     return suyos === null || !quieto ? suyos : { ...suyos, disponible: false };
   }, [haySitioParaLosDados, vista, yo, opciones, quieto]);
-  const fuera = useMemo(() => opcionesFueraDeLaMesa(fueraDeLaBarra, dados), [fueraDeLaBarra, dados]);
+  /*
+   * TIRAR VUELVE AL PIE MIENTRAS LA MESA ESTÁ RECOGIDA, y es el agujero gordo del §6.
+   *
+   * Con la mesa abajo NO HAY DADOS QUE TOCAR —se desmontan al llegar—, pero
+   * `opcionesFueraDeLaMesa` quita TIRAR de la lista en cuanto `dados` no es `null`. El §6
+   * deja recoger la mesa EN MI PROPIO TURNO y la deja recogida hasta que yo diga: sin esto,
+   * quien la recoja antes de tirar se queda sin poder tirar y sin nada que explique por
+   * qué, o sea la partida parada. Así que se compone con `null` mientras está recogida,
+   * igual que con el mazo de arriba.
+   *
+   * A `<Delta>` se le sigue pasando `dados` ENTERO: `dados !== null` es la llave del QUINTO
+   * hueco (§4.4) y con `null` las piezas se correrían al recoger y volverían al sacar.
+   */
+  const fuera = useMemo(
+    () => opcionesFueraDeLaMesa(fueraDeLaBarra, mesaRecogida ? null : dados),
+    [fueraDeLaBarra, dados, mesaRecogida],
+  );
   /*
    * AL PULSAR EL ASA DE LOS DADOS: se manda TIRAR por la misma puerta que el botón y se le
    * devuelve a la escena cómo acabó, que es lo que corta el rodar en el acto si la mesa no
    * cambió (§5.3). La escena sólo llama si `disponible`; aquí se vuelve a mirar `quieto` por
-   * la carrera entre el toque y la respuesta que acaba de llegar.
+   * la carrera entre el toque y la respuesta que acaba de llegar. Suelta lo mismo que el
+   * cambio de revisión, así que suelta POR EL MISMO SITIO: eran las cuatro llamadas de
+   * `soltarTodo` escritas otra vez.
    */
   const alPulsarLosDados = useCallback((): Promise<ResultadoDelMovimiento> => {
     if (quieto) return Promise.resolve('rechazado');
     const tirar = tirarEnTres(opciones);
     if (tirar === null) return Promise.resolve('rechazado');
-    ponerTomada(null);
-    ponerCogida(null);
-    ponerCartaDelMazo(null);
-    ponerPreguntando(null);
+    soltarTodo();
     return mover({ tipo: tirar.tipo, carga: tirar.carga });
-  }, [quieto, opciones, mover]);
+  }, [quieto, opciones, mover, soltarTodo]);
 
   const colocando = useMemo(
     () => (tomada === null ? null : colocandoEnTres(vista, yo, tomada)),
@@ -1316,6 +1445,7 @@ export function RiberasEnTres({ manifiesto, mesa, puesta, tablero, opciones }: L
                   turnoDe={turnoDe}
                   dados={dados}
                   onPulsarLosDados={alPulsarLosDados}
+                  mesaRecogida={mesaRecogida}
                   mano={mano}
                   cogida={cogida}
                   onCogerCarta={alCogerCarta}
@@ -1345,6 +1475,38 @@ export function RiberasEnTres({ manifiesto, mesa, puesta, tablero, opciones }: L
                 {VOLVER_AL_TABLERO_ENTERO}
               </button>
             )}
+            {/*
+              RECOGER LA MESA (§6). 44×44 arriba a la derecha, DEBAJO del botón de volver y
+              con su mismo cromo: es un botón de la Sala con su foco y su filo, no un objeto
+              del mundo. Un objeto del mundo tendría que quedarse FUERA del grupo que baja
+              para poder seguir pulsándolo, y entonces ya no sería «de la mesa». Y como
+              aquél, no le roba el gesto a la cámara: la cámara sólo atiende lo que empieza
+              sobre el propio `<canvas>`.
+
+              Estuvo abajo a la izquierda y se comía una esquina del asa de la choza en
+              320×360: el sitio se había medido con el asa como un rectángulo plano y el asa
+              es una caja girada que se proyecta más ancha. Abajo no cabe en ninguna de las
+              dos esquinas —la barra está centrada y deja 41 puntos a cada lado—, así que
+              sube y se apila. El porqué entero, con los números, en `.riberas-recoger`.
+
+              Sólo donde hay mesa que recoger: la misma condición con la que `<Delta>` monta
+              la barra. Un botón que promete recoger una mesa que no existe no hace nada.
+
+              EL RÓTULO ES UNA FLECHA Y EL NOMBRE VA EN `aria-label`: en 44 píxeles no cabe
+              «Recoger la mesa», y esos 44 son cuadrado de tablero que deja de pulsarse. La
+              flecha dice hacia dónde va la mesa; la etiqueta, qué se hace.
+            */}
+            {barra.length > 0 || mazo !== null ? (
+              <button
+                type="button"
+                className="riberas-recoger"
+                onClick={alRecogerLaMesa}
+                aria-label={mesaRecogida ? SACAR_LA_MESA : RECOGER_LA_MESA}
+                title={mesaRecogida ? SACAR_LA_MESA : RECOGER_LA_MESA}
+              >
+                {mesaRecogida ? '▲' : '▼'}
+              </button>
+            ) : null}
           </>
         ) : (
           /* El telón: `--suelo` con el nombre del juego hasta que el modelo llega. */

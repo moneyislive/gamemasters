@@ -27,9 +27,11 @@
  * partida la cámara no baja de 12° (`ALTURA_MINIMA`) y el ojo va a 12 unidades o más
  * SOBRE EL AGUA (`ALTURA_MINIMA_DEL_OJO`), así que el mundo casi nunca llega a las 2
  * unidades donde vive la mesa (`DISTANCIA_DE_LA_BARRA`). Casi: esa altura es sobre el
- * agua y no sobre el terreno, y en una montaña de siete u ocho escalones acercado al
+ * agua y no sobre el terreno, y en una montaña de CINCO A OCHO escalones acercado al
  * máximo el ojo puede meterse en la roca; entonces la mesa se entierra con él. Es el
- * precio aceptado de no hacer una segunda pasada de render, y está medido. Hubo dos «testigos» —un plano de 0,001
+ * precio aceptado de no hacer una segunda pasada de render, y está medido: aquí ponía
+ * «siete u ocho» y `rev3-ojo-montana.ts` contó 7, 8, 7, 5, 8 y 5 escalones en las seis
+ * semillas que recorre (0, 1, 2, 3, 7 y 11), o sea que las de cinco existen. Hubo dos «testigos» —un plano de 0,001
  * con `onBeforeRender → gl.clearDepth()`— y NINGUNO borró nunca nada: iban en el ORIGEN de
  * un grupo que copia la posición de la cámara en cada fotograma, o sea EN EL OJO, detrás
  * del plano cercano (0,5), y `projectObject` los podaba por frustum antes de meterlos en

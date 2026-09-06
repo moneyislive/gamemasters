@@ -155,8 +155,23 @@ import { CELDA_DE_LA_ARENA } from './paleta';
 import { geometriaDeContornos } from './formas';
 import { CONTORNOS_DE_LA_CARTA, CONTORNOS_DE_LA_CIFRA, CONTORNOS_DEL_BIEN } from './iconos';
 import { sitiosDelTablero, sitiosPermitidos } from './sitios';
-import { DIBUJO_DEL_MAZO, ZOCALO, huecosDeLaBarra, huecosDeLaMesa } from './barra';
-import { colorDelColono, coloresDelPosavasos, hexDe, tapaDeLaMesa } from './mesa';
+import {
+  ASA_DEL_HUECO,
+  DIBUJO_DEL_MAZO,
+  GIRO_DE_LA_VITRINA,
+  ZOCALO,
+  huecosDeLaBarra,
+  huecosDeLaMesa,
+} from './barra';
+import {
+  AMORTIGUACION_DE_LA_MESA,
+  LO_QUE_QUEDA_AL_LLEGAR,
+  bajadaDeLaMesa,
+  colorDelColono,
+  coloresDelPosavasos,
+  hexDe,
+  tapaDeLaMesa,
+} from './mesa';
 import {
   ORDEN_DE_LA_BARRA,
   ORDEN_DE_LAS_AREAS,
@@ -1000,15 +1015,21 @@ function Senal({
       {/*
        * LA ZONA DE AGARRE: se dibuja, pero no escribe ni un píxel.
        *
-       * `visible={false}` NO sirve aquí, y esto costó una prueba en pantalla. En `three`
-       * a secas, el trazado de rayos no mira `visible` y un objeto invisible sigue
-       * siendo pinchable — pero el sistema de eventos de r3f SÍ lo mira, y descarta los
-       * impactos sobre objetos invisibles antes de repartirlos. Con `visible={false}` el
-       * cilindro estaba ahí, el rayo lo tocaba, y el clic no llegaba nunca.
+       * Aquí ponía que «el sistema de eventos de r3f SÍ mira `visible` y descarta los
+       * impactos sobre objetos invisibles». ES FALSO, y leído en el paquete instalado:
+       * `@react-three/fiber` 9.7.0 mete en `internal.interaction` toda malla que tenga
+       * manejadores y `raycast !== null` —y ahí no mira `visible`— y luego traza con
+       * `state.raycaster.intersectObject(obj, true)` objeto por objeto; en todo el
+       * `intersect` de `dist/events-*.cjs.dev.js` no aparece `visible` ni una vez. Y
+       * `three` 0.185.1 tampoco: su `Raycaster.js` sólo filtra por `layers` antes de
+       * llamar a `object.raycast`, y `Mesh.js` no menciona `visible`. La cabecera de
+       * arriba, que dice justo lo contrario, es la que estaba en lo cierto.
        *
-       * Lo que sí funciona es `colorWrite={false}`: la malla existe, se recorre, recibe
-       * el rayo y r3f la considera visible, pero el pintor no escribe color. Y sin
-       * `depthWrite`, para que tampoco tape lo que tiene detrás.
+       * O sea que `visible={false}` también recibiría el toque. Se usa `colorWrite={false}`
+       * de todas formas, y ahora por su razón de verdad: la malla sigue en la lista de
+       * dibujo, así que su `renderOrder` sigue ordenando y `onBeforeRender` sigue
+       * llamándose, y no hay dos maneras distintas de tener una malla invisible en esta
+       * escena. Y sin `depthWrite`, para que tampoco tape lo que tiene detrás.
        *
        * Y la otra mitad del refrán, por si alguien va a desactivar el rayo en otro sitio:
        * `raycast={null}` revienta al primer rayo porque el motor la llama sin comprobar.
@@ -1113,22 +1134,6 @@ const LATIDO_DE_LA_SENAL = 0.18;
 const PARTE_DE_PANTALLA = 0.035;
 
 /**
- * CÓMO SE ENSEÑA UNA PIEZA EN LA BARRA: quieta, y de tres cuartos.
- *
- * Giraban despacio sobre sí mismas, con la idea de que girando se les ve la forma entera.
- * En pantalla es al revés: son cuatro cosas moviéndose en el borde del ojo mientras se
- * mira el tablero, cada una en su fase, y lo que se está mirando es el tablero. Un
- * escaparate no gira. Además, de un modelo que gira no se aprende la silueta, que es
- * justamente lo que hay que reconocer de un vistazo para cogerlo.
- *
- * Quietas, pero NO de frente: de frente una casa es un cuadrado con un triángulo encima y
- * podría ser cualquier cosa. Un cuarto de vuelta largo enseña a la vez el frente y un
- * costado, que es como se fotografía una maqueta y lo que hace que un tejado se lea como
- * un tejado.
- */
-const GIRO_DE_LA_VITRINA = Math.PI * 0.22;
-
-/**
  * UNA PIEZA PUESTA EN SU HUECO DE LA BARRA.
  *
  * Se escala para que quepa en el hueco sea del tamaño que sea: el castillo mide 3,98 del
@@ -1199,8 +1204,14 @@ function PiezaEnLaBarra({
        * zócalo dentro. Los modelos no reciben rayos —`raycast={() => null}`— para que un
        * hueco entre las almenas del castillo no deje pasar el dedo al tablero de detrás.
        *
-       * Invisible por `colorWrite`, no por `visible={false}`: r3f descarta de sus eventos
-       * los objetos invisibles, y con `visible={false}` el asa no recibiría nada.
+       * Invisible por `colorWrite`, no por `visible={false}`. Aquí ponía que «r3f descarta
+       * de sus eventos los objetos invisibles», y es FALSO: ni el `intersect` de
+       * `@react-three/fiber` 9.7.0 ni el `Raycaster` de `three` 0.185.1 miran `visible` en
+       * ninguna parte (ver la cabecera de `Senal`). Con `visible={false}` el asa
+       * SEGUIRÍA recibiendo toques; el motivo de `colorWrite={false}` es que la malla se
+       * queda en la lista de dibujo, con su `renderOrder`, y que en esta escena hay una
+       * sola manera de tener una malla invisible. Aquí daba igual porque el asa se pinta
+       * siempre, pero la misma frase escrita en la mesa que se recoge sí hacía daño.
        */}
       <mesh
         onPointerOver={(e) => {
@@ -1215,7 +1226,13 @@ function PiezaEnLaBarra({
           if (pieza.disponible) onTomar(pieza.id);
         }}
       >
-        <boxGeometry args={[hueco.lado, hueco.lado, hueco.lado * 0.8]} />
+        <boxGeometry
+          args={[
+            hueco.lado * ASA_DEL_HUECO.ancho,
+            hueco.lado * ASA_DEL_HUECO.alto,
+            hueco.lado * ASA_DEL_HUECO.fondo,
+          ]}
+        />
         <meshBasicMaterial colorWrite={false} depthWrite={false} />
       </mesh>
       {/* El posavasos, que ya sólo es adorno: le da sitio a la pieza y dice si está apagada o tomada. */}
@@ -1278,9 +1295,11 @@ const ANCHO_DEL_NAIPE_EN_LA_BARRA = 0.66;
  *
  * ═══ LO QUE SE COPIA DE `PiezaEnLaBarra`, Y NO ES ADORNO ═══
  *
- *  · EL ASA ES LA CASILLA ENTERA y es invisible por `colorWrite={false}`, NUNCA por
- *    `visible={false}`: r3f descarta de sus sucesos los objetos invisibles y un asa
- *    invisible de esa otra manera no recibiría ni un toque.
+ *  · EL ASA ES LA CASILLA ENTERA y es invisible por `colorWrite={false}`, como en
+ *    `PiezaEnLaBarra` y por lo mismo: se queda en la lista de dibujo con su `renderOrder`
+ *    y hay una sola manera de tener una malla invisible en esta escena. NO porque
+ *    `visible={false}` le quitara el toque —eso era una creencia falsa de este fichero, y
+ *    está desmentida en la cabecera de `Senal` leyendo el paquete instalado—.
  *  · El orden `noEsElPrimario` → `stopPropagation` → `loCogeLaInterfaz`, en ese orden
  *    exacto. Al revés, el suceso quedaría marcado como «de la interfaz» y luego
  *    descartado, y entonces la cámara tampoco lo movería: el gesto no haría NADA en toda
@@ -1298,22 +1317,26 @@ const ANCHO_DEL_NAIPE_EN_LA_BARRA = 0.66;
 function MazoEnLaBarra({
   mazo,
   hueco,
+  naipe,
+  icono,
   onPulsar,
 }: {
   mazo: MazoDeLaBarra;
   hueco: HuecoDeLaBarra;
+  /*
+   * LAS DOS GEOMETRÍAS LLEGAN HECHAS, y no se hacen aquí. Este componente se DESMONTA al
+   * recoger la mesa (`escondida` no monta nada), así que unos `useMemo` suyos las tirarían
+   * y las reharían en cada ida y vuelta. Viven en `Barra`, que no se desmonta, y ahí se
+   * tiran cuando cambia el hueco. Ver la cabecera de `Barra`.
+   */
+  naipe: THREE.ShapeGeometry;
+  icono: THREE.BufferGeometry | null;
   onPulsar: () => void;
 }): JSX.Element {
   const grupo = useRef<THREE.Group>(null);
   const [encima, setEncima] = useState(false);
 
   const alto = hueco.lado * ALTO_DEL_NAIPE_EN_LA_BARRA;
-  const ancho = alto * ANCHO_DEL_NAIPE_EN_LA_BARRA;
-  const geometria = useMemo(() => formaDeCarta(ancho, alto), [ancho, alto]);
-  const icono = useMemo(
-    () => geometriaDeContornos(CONTORNOS_DEL_DIBUJO[DIBUJO_DEL_MAZO] ?? []),
-    [],
-  );
 
   /* Crece al pasar por encima, como las piezas, y por lo mismo: dice que se puede pulsar. */
   useFrame(() => {
@@ -1345,7 +1368,13 @@ function MazoEnLaBarra({
           if (mazo.disponible) onPulsar();
         }}
       >
-        <boxGeometry args={[hueco.lado, hueco.lado, hueco.lado * 0.8]} />
+        <boxGeometry
+          args={[
+            hueco.lado * ASA_DEL_HUECO.ancho,
+            hueco.lado * ASA_DEL_HUECO.alto,
+            hueco.lado * ASA_DEL_HUECO.fondo,
+          ]}
+        />
         <meshBasicMaterial colorWrite={false} depthWrite={false} />
       </mesh>
       {/* El mismo posavasos que las piezas, que es lo que dice a la vez «esto es de la barra» y «esto está apagado». */}
@@ -1362,7 +1391,7 @@ function MazoEnLaBarra({
       </mesh>
       <group ref={grupo} renderOrder={ORDEN_DE_LA_BARRA}>
         {/* El filo claro, que es lo que separa el naipe de la madera de la mesa. */}
-        <mesh geometry={geometria} position={[0, 0, -0.002]} scale={1.06} raycast={() => null}>
+        <mesh geometry={naipe} position={[0, 0, -0.002]} scale={1.06} raycast={() => null}>
           <meshBasicMaterial
             color={COLOR_DEL_FILO_DE_LA_CARTA}
             transparent
@@ -1370,7 +1399,7 @@ function MazoEnLaBarra({
             toneMapped={false}
           />
         </mesh>
-        <mesh geometry={geometria} raycast={() => null}>
+        <mesh geometry={naipe} raycast={() => null}>
           <meshBasicMaterial
             color={COLOR_DEL_MAZO_EN_LA_BARRA}
             transparent
@@ -1435,9 +1464,13 @@ function MazoEnLaBarra({
  * Lo que separa la mesa del mundo es SÓLO ese orden más la profundidad del mundo, que
  * casi nunca llega a las 2 unidades donde vive la mesa: la cámara no baja de 12° y el ojo
  * va a 12 unidades o más SOBRE EL AGUA (`ALTURA_MINIMA_DEL_OJO`), no sobre el terreno. En
- * una montaña de siete u ocho escalones (27–44 unidades de techo) y acercado al máximo, el
+ * una montaña de CINCO A OCHO escalones (27–44 unidades de techo) y acercado al máximo, el
  * ojo puede meterse en la roca y entonces la mesa se entierra con él: medido en 3–35 de
  * 1080 posturas a 12° según la semilla, y nunca al mirador de salida (el ojo va a 389).
+ * El «siete u ocho» que decía aquí era de antes de medirlo: `rev3-ojo-montana.ts` recorrió
+ * las seis semillas del guion y salieron 7, 8, 7, 5, 8 y 5 escalones (semillas 0, 1, 2, 3,
+ * 7 y 11), o sea que las montañas de cinco existen y son las que MENOS entierran la mesa
+ * (3 y 6 posturas de 1080). Quien lea la cifra tiene que poder fiarse del rango entero.
  * Es el precio aceptado de no hacer una segunda pasada de render. Aquí
  * hubo un «testigo» —un plano de 0,001 con `onBeforeRender → gl.clearDepth()`— que NUNCA
  * borró nada, ni a 999 ni a −1: colgaba del origen de este grupo, que copia la posición de
@@ -1502,6 +1535,65 @@ function MazoEnLaBarra({
  * sobre la madera bajo el sitio de los dados. Con dados y `ultimaTirada = 0` (antes de
  * la primera tirada) se APAGA: los dados enseñan 1 y 1 y no hay tirada que señalar
  * (§5.2). Sin dados no se sabe si se ha tirado, y se pinta en cuanto hay color.
+ *
+ * ═══ RECOGER LA MESA: UN GRUPO DE DENTRO QUE BAJA, Y POR QUÉ SON DOS Y NO UNO ═══
+ *
+ * El grupo de fuera COPIA la posición y el giro de la cámara en cada fotograma: es el
+ * marco pegado al ojo, y ahí no cabe una animación propia porque el `useFrame` la
+ * pisaría al fotograma siguiente. Así que lo que baja es un grupo de DENTRO, en
+ * coordenadas locales, y baja `bajadaDeLaMesa` (`mesa.ts`) —lo justo para que el VÉRTICE
+ * más alto y más lejano del asa, que es lo que manda, pase el canto de abajo—. Dentro va TODO lo que el grupo tenía: la tapa,
+ * las sombras, el tapete, las piezas, el naipe, los dados y también la luz corta de la
+ * mesa, que es suya y que iluminando desde arriba una mesa que ya no está sólo podría
+ * teñir el mundo.
+ *
+ * La interpolación es la amortiguada de la casa —`1 − e^(−16·dt)`, la misma constante que
+ * las cartas de la mano—, y no está elegida por gusto: con 16, recorrer el 99 % de la
+ * bajada tarda `ln(100)/16 = 0,288 s`, que son los 0,28 s que pide el §6. Al llegar (a
+ * menos del 1 % de la bajada) se pega al objetivo y se enciende `escondida`.
+ *
+ * ═══ `escondida` NO MONTA NADA, Y ÉSA ES LA CORRECCIÓN DE LA FASE 4 ═══
+ *
+ * Aquí ponía que apagar el grupo con `visible` «saca sus asas de los sucesos de r3f, porque
+ * r3f no traza rayos contra lo invisible». ES FALSO, y leído en el paquete instalado (la
+ * cabecera de `Senal` cita fichero por fichero): `@react-three/fiber` 9.7.0 guarda toda
+ * malla con manejadores en `internal.interaction` y le traza el rayo con
+ * `intersectObject(obj, true)` sin mirar `visible` ni una vez, y el `Raycaster` de `three`
+ * 0.185.1 sólo filtra por `layers`. Con la mesa «recogida» —bajada, apagada y sin dibujar—
+ * un clic a cuatro píxeles del canto de abajo, en la columna del naipe, imprimía «mazo
+ * pulsado»; y en la columna de la primera pieza cogía una choza que no estaba en pantalla
+ * y dejaba el tablero en modo colocar. Se cogía lo que no se veía.
+ *
+ * Así que `escondida` no apaga: DESMONTA. Todo lo de la mesa —piezas, naipe, dados, tapa,
+ * sombras, tapete y la luz corta— vive dentro de un `{!escondida && (…)}`, y lo que r3f
+ * no ha montado no está en su lista de interacción. La tapa entra en el desmonte como todo
+ * lo demás, y a propósito: desde la fase 2b lleva manejadores para parar el toque a lo que
+ * tiene detrás, y con la mesa recogida ese toque es del TABLERO. El grupo que baja se
+ * queda montado y vacío porque el `useFrame` de la bajada escribe en su `position`.
+ *
+ * Las geometrías caras NO se rehacen al recoger: los `useMemo` de la tapa, de las sombras,
+ * del tapete y de las dos del naipe del mazo viven en `Barra`, por ENCIMA del desmonte, y
+ * se les pasan hechas a quien las pinta. Sólo `Dados` rehace su respaldo, y eso ya estaba
+ * decidido abajo.
+ *
+ * Los dados se desmontan, y ES UNA DECISIÓN, tomada por Miguel en la fase 4. La otra
+ * posibilidad era mantenerlos montados bajo el canto y apagados con `visible`. La
+ * consecuencia de desmontarlos, escrita para que nadie la descubra con una partida
+ * delante: la máquina de `dados.ts` vuelve al REPOSO, así que una tirada que llegue con la
+ * mesa recogida NO se anima; al subir se enseña ya asentada, que es exactamente lo que
+ * `traeTiradaNueva` hace con la primera vista. La tirada no se pierde —el par se lee de
+ * `(suma, sello, semilla)`, que llegan en la vista—: lo que se pierde es el rodar. Se
+ * eligió así porque una animación que nadie ve no es una animación, y porque una máquina
+ * viva bajo el canto seguiría pidiendo sesenta fotogramas por segundo para mover dos cubos
+ * que están fuera de la pantalla.
+ *
+ * Y el CUÁNDO no es simétrico, a propósito: se desmonta AL LLEGAR ABAJO y no al empezar a
+ * bajar, para que la mesa se vea bajar; y se monta AL EMPEZAR A SUBIR y no al llegar
+ * arriba, para que esté desde el primer fotograma de la subida. Lo primero lo hace el
+ * `useFrame` al detectar la llegada; lo segundo, el efecto de `recogida`, que corre en el
+ * mismo commit en que la entrada cambia, o sea antes del fotograma siguiente. Durante esos
+ * 0,28 s las asas están montadas y vivas: por eso la bajada tiene que tapar de verdad el
+ * vértice más alto y más lejano del asa, y no sólo su centro (`bajadaDeLaMesa`).
  */
 function Barra({
   piezas,
@@ -1511,6 +1603,7 @@ function Barra({
   tapete,
   dados,
   semilla,
+  recogida,
   onTomar,
   onPulsarElMazo,
   onPulsarLosDados,
@@ -1525,11 +1618,16 @@ function Barra({
   dados: DadosDeLaMesa | null;
   /** La semilla de la mesa, con la que se parte la suma en dos caras. */
   semilla: number;
+  /** Con la mesa recogida el grupo de dentro baja bajo el canto y, al llegar, se apaga. */
+  recogida: boolean;
   onTomar: (id: string) => void;
   onPulsarElMazo: () => void;
   onPulsarLosDados: () => Promise<ResultadoDelToque>;
 }): JSX.Element {
   const grupo = useRef<THREE.Group>(null);
+  const laQueBaja = useRef<THREE.Group>(null);
+  /* Abajo del todo y apagada: apaga el grupo y desmonta los dados, ver la cabecera. */
+  const [escondida, ponerEscondida] = useState(false);
   /*
    * El ancho y el alto van en PUNTOS y hacen falta aparte de la proporción: los segmentos
    * de la tapa se escalan con el ancho (uno cada ocho puntos) y el sitio de los dados se
@@ -1592,6 +1690,36 @@ function Barra({
   );
   const huecoDelMazo = mazo === null ? undefined : huecos[piezas.length];
   const primero: HuecoDeLaBarra | undefined = huecos[0];
+
+  /*
+   * LA BAJADA DE RECOGER, y el fotograma en que la mesa deja de estar.
+   *
+   * Cuánto se baja lo dice `bajadaDeLaMesa` con el primer hueco y la cámara, y no un
+   * número escrito aquí: es lo que `verify:escena` mide en Node en los quince lienzos.
+   * Sin hueco no hay barra que bajar y el objetivo es cero.
+   *
+   * `laQueBaja` es el grupo de DENTRO (ver la cabecera): el de fuera lo pisa la cámara.
+   * Este `useFrame` va después del de la cámara y no dentro de él porque necesita el
+   * reparto, que se calcula entre los dos.
+   */
+  const bajada = primero === undefined ? 0 : bajadaDeLaMesa(primero, forma.campo, forma.proporcion);
+  useFrame((estado, delta) => {
+    const g = laQueBaja.current;
+    if (g === null) return;
+    const objetivo = recogida ? -bajada : 0;
+    g.position.y += (objetivo - g.position.y) * (1 - Math.exp(-AMORTIGUACION_DE_LA_MESA * delta));
+    const llegada = Math.abs(g.position.y - objetivo) <= LO_QUE_QUEDA_AL_LLEGAR * Math.max(bajada, 1e-6);
+    if (llegada) g.position.y = objetivo;
+    /*
+     * Sólo se ENCIENDE aquí. Apagarlo es cosa del efecto de `recogida`, que corre antes
+     * del fotograma siguiente: así los dados vuelven a estar montados desde el primero de
+     * la subida y no desde el segundo.
+     */
+    if (recogida && llegada && !escondida) ponerEscondida(true);
+  });
+  useEffect(() => {
+    if (!recogida) ponerEscondida(false);
+  }, [recogida]);
 
   /*
    * LA TAPA, medida del primer hueco y de la cámara, y su geometría con la veta dentro.
@@ -1662,6 +1790,28 @@ function Barra({
   useEffect(() => () => geometriaDelTapeteDelTurno?.dispose(), [geometriaDelTapeteDelTurno]);
 
   /*
+   * LAS DOS GEOMETRÍAS DEL NAIPE DEL MAZO, AQUÍ Y NO DENTRO DE `MazoEnLaBarra`.
+   *
+   * Vivían en dos `useMemo` del hijo, y con el desmonte de `escondida` eso las tiraba y las
+   * rehacía en cada recogida —y sin `dispose`, o sea sumando una `ShapeGeometry` y una
+   * geometría de contornos a la tarjeta por cada ida y vuelta—. Puestas aquí se hacen una
+   * vez por tamaño de hueco, como la tapa y las sombras, se tiran cuando el hueco cambia, y
+   * el hijo las recibe hechas. Es la forma que el desmonte obliga a tener, y es la misma
+   * que ya tenían las caras: la geometría se hace donde no se desmonta.
+   */
+  const altoDelNaipe = (huecoDelMazo?.lado ?? 0) * ALTO_DEL_NAIPE_EN_LA_BARRA;
+  const naipeDelMazo = useMemo(
+    () => (altoDelNaipe <= 0 ? null : formaDeCarta(altoDelNaipe * ANCHO_DEL_NAIPE_EN_LA_BARRA, altoDelNaipe)),
+    [altoDelNaipe],
+  );
+  useEffect(() => () => naipeDelMazo?.dispose(), [naipeDelMazo]);
+  const iconoDelMazo = useMemo(
+    () => geometriaDeContornos(CONTORNOS_DEL_DIBUJO[DIBUJO_DEL_MAZO] ?? []),
+    [],
+  );
+  useEffect(() => () => iconoDelMazo?.dispose(), [iconoDelMazo]);
+
+  /*
    * La tapa para el toque a todo lo que tiene detrás (ver la cabecera). No marca el
    * suceso con `loCogeLaInterfaz`: arrastrar desde la madera gira el tablero. La salida no
    * hace nada: está para que r3f cuente la tapa entre los «hovered».
@@ -1675,6 +1825,17 @@ function Barra({
 
   return (
     <group ref={grupo} renderOrder={ORDEN_DE_LA_BARRA}>
+      {/*
+       * EL GRUPO QUE BAJA AL RECOGER (ver la cabecera). Va DENTRO del que copia la cámara,
+       * porque a aquél le reescriben la posición sesenta veces por segundo. Con `escondida`
+       * no lleva NADA dentro: apagarlo con `visible` no le quitaba los rayos —ni r3f ni
+       * `three` miran `visible` para trazar—, y lo que no está montado no está en la lista
+       * de interacción de r3f. El grupo se queda, vacío, porque el `useFrame` de la bajada
+       * le escribe la `position`.
+       */}
+      <group ref={laQueBaja} renderOrder={ORDEN_DE_LA_BARRA}>
+      {!escondida && (
+      <>
       {/*
        * Su propia luz, y con alcance corto. La mesa gira con la cámara, así que con la luz
        * del mundo se le apagarían las piezas cada vez que el jugador diera media vuelta al
@@ -1746,10 +1907,22 @@ function Barra({
           />
         );
       })}
-      {mazo !== null && huecoDelMazo !== undefined && (
-        <MazoEnLaBarra mazo={mazo} hueco={huecoDelMazo} onPulsar={onPulsarElMazo} />
+      {mazo !== null && huecoDelMazo !== undefined && naipeDelMazo !== null && (
+        <MazoEnLaBarra
+          mazo={mazo}
+          hueco={huecoDelMazo}
+          naipe={naipeDelMazo}
+          icono={iconoDelMazo}
+          onPulsar={onPulsarElMazo}
+        />
       )}
-      {/* Los dos dados, sólo con dados Y con sitio: en un lienzo sin sitio la pantalla no los pasa, y si los pasara no habría dónde. */}
+      {/*
+       * Los dos dados, sólo con dados Y con sitio: en un lienzo sin sitio la pantalla no los
+       * pasa, y si los pasara no habría dónde. Con la mesa escondida no se monta nada de la
+       * mesa, dados incluidos, con lo que su máquina vuelve al reposo y una tirada que
+       * llegue mientras tanto se enseña asentada al subir, sin animar. Es la decisión de la
+       * fase 4 y está contada entera en la cabecera de `Barra`.
+       */}
       {dados !== null && tapa !== null && sitioDeLosDados !== null && (
         <Dados
           sitio={sitioDeLosDados}
@@ -1760,6 +1933,9 @@ function Barra({
           onPulsar={onPulsarLosDados}
         />
       )}
+      </>
+      )}
+      </group>
     </group>
   );
 }
@@ -1789,9 +1965,11 @@ function Barra({
  * ═══ EL ASA ES UNA PARA LOS DOS, E INVISIBLE POR `colorWrite` ═══
  *
  * `1,6 lados × 1 lado`, el mismo alto que un hueco de la barra, así que la misma
- * comprobación de 44 puntos la cubre. Invisible por `colorWrite={false}` y NUNCA por
- * `visible={false}`: r3f descarta de sus sucesos los objetos invisibles. Los dados no
- * reciben rayos: el hueco entre los dos no deja pasar el dedo al tablero de detrás.
+ * comprobación de 44 puntos la cubre. Invisible por `colorWrite={false}`, igual que las
+ * demás asas y por la misma razón de verdad —la malla se queda en la lista de dibujo—; y
+ * no porque `visible={false}` le quitara el toque, que es lo que este fichero creía y no
+ * es cierto (cabecera de `Senal`). Los dados no reciben rayos: el hueco entre los dos no
+ * deja pasar el dedo al tablero de detrás.
  *
  * ═══ EL MODELO Y EL RESPALDO ENSEÑAN EL MISMO NÚMERO ═══
  *
@@ -1960,7 +2138,7 @@ function Dados({
         }}
         onPointerDown={alTocar}
       >
-        <boxGeometry args={[sitio.ancho, sitio.alto, lado * 0.8]} />
+        <boxGeometry args={[sitio.ancho, sitio.alto, lado * ASA_DEL_HUECO.fondo]} />
         <meshBasicMaterial colorWrite={false} depthWrite={false} />
       </mesh>
       {([0, 1] as const).map((i) => (
@@ -2853,6 +3031,7 @@ export function Delta({
   turnoDe = null,
   dados = null,
   onPulsarLosDados,
+  mesaRecogida = false,
   mano = [],
   cogida = null,
   onCogerCarta,
@@ -2939,6 +3118,29 @@ export function Delta({
    * doble toque.
    */
   onPulsarLosDados?: () => Promise<ResultadoDelToque>;
+  /**
+   * LA MESA RECOGIDA: el grupo de la barra baja bajo el canto y, al llegar, se apaga.
+   *
+   * Sin poner es `false`, como las otras trece: este `<Delta>` lo montan la app, el cliente
+   * de escritorio y el banco, y una entrada obligatoria deja los tres rotos hasta que
+   * llegue quien la rellene.
+   *
+   * LA ESCENA NO SABE POR QUÉ SE RECOGE ni cuándo vuelve. Aquí es sólo «la mesa está
+   * abajo»; que se saque sola al pasar a tocarme, que espere si hay una carta en la mano y
+   * que recoger suelte lo cogido son decisiones de quien monta el cliente (§6 del diseño),
+   * la misma frontera que los anillos y la barra. Lo que la escena SÍ hace, porque es
+   * geometría suya, es bajar lo justo para que el asa pase el canto y apagar el grupo al
+   * llegar; y lo que se lleva por delante está en la cabecera de `Barra`: con la mesa
+   * recogida los dados se DESMONTAN, así que una tirada que llegue mientras tanto se enseña
+   * asentada al subir y no se anima.
+   *
+   * OJO A LAS OTRAS DOS ENTRADAS: `dados` y `mazo` siguen llegando enteros con la mesa
+   * recogida. Son la llave del reparto (`dados !== null` decide si hay quinto hueco; el
+   * mazo, si hay cuarto), y ponerlos a `null` para «apagarlos» movería las piezas al
+   * recoger y otra vez al sacar. Quitar TIRAR o COMPRAR de la cinta es cosa de la pantalla,
+   * no de esto.
+   */
+  mesaRecogida?: boolean;
   /**
    * La mano de bienes del jugador, para la baraja del lateral. Vacia, no hay baraja.
    *
@@ -3544,6 +3746,7 @@ export function Delta({
           tapete={turnoDe}
           dados={dados}
           semilla={semilla}
+          recogida={mesaRecogida}
           onTomar={(id) => onTomarDeLaBarra?.(id)}
           onPulsarElMazo={() => onPulsarElMazo?.()}
           /* Sin quien conteste, el toque no manda nada y la mesa no cambió: un rechazo. */

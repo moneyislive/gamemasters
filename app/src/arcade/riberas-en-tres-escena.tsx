@@ -149,6 +149,7 @@ import {
   manoEnTres,
   marcadorEnTres,
   mazoEnLaBarra,
+  meToca,
   opcionesFueraDeLaBarra,
   opcionesFueraDeLaMano,
   opcionesFueraDeLaMesa,
@@ -656,6 +657,23 @@ function LaMesaEnTres({
     soltarTodo();
   }, [vista.rev, soltarTodo]);
 
+  /*
+   * ═══ LA MESA RECOGIDA (§6 del diseño) ═══
+   *
+   * Vive aquí, con lo cogido, y por lo mismo: es dónde está mirando la persona, no estado
+   * del juego. NO SE GUARDA — partida nueva, mesa puesta—, y por eso es un `useState` a
+   * secas y no algo que viaje en la vista.
+   *
+   * Recoger SUELTA LO COGIDO. Una pieza en la mano con la barra fuera de la pantalla no
+   * tiene a dónde volver, y una hoja abierta sobre un naipe que ya no está en pantalla es
+   * una pregunta sobre nada. Sacarla no suelta nada: no se pierde nada al subir.
+   */
+  const [mesaRecogida, ponerMesaRecogida] = useState(false);
+  const alRecogerLaMesa = useCallback(() => {
+    if (!mesaRecogida) soltarTodo();
+    ponerMesaRecogida(!mesaRecogida);
+  }, [mesaRecogida, soltarTodo]);
+
   const [medida, ponerMedida] = useState({ ancho: 0, alto: 0 });
   const medir = useCallback((e: LayoutChangeEvent) => {
     const { width, height } = e.nativeEvent.layout;
@@ -747,10 +765,32 @@ function LaMesaEnTres({
    * eso es exactamente lo que salva al RESPALDO —que no tiene barra ninguna— de quedarse
    * sin manera de comprar en toda la partida. Esta composición vale sólo para la rama del
    * delta; el respaldo usa las opciones sin tocar, y por qué está en la cabecera.
+   *
+   * ═══ CON LA MESA RECOGIDA, COMPRAR VUELVE AL PIE ═══
+   *
+   * Y es el agujero que el §6 no vio. El naipe del mazo baja con la mesa, así que con ella
+   * recogida NO HAY NAIPE QUE PULSAR; si además el botón siguiera fuera del pie —porque el
+   * hueco «existe»—, comprar quedaría sin ninguna puerta. Es el mismo fallo silencioso que
+   * esta función evita en el respaldo, sólo que en vez de un lienzo sin barra es una barra
+   * bajo el canto. Así que aquí se le pasa `null` mientras la mesa está recogida: la regla
+   * de la casa —cada movimiento exactamente una vez— se sigue cumpliendo, porque cuando
+   * vuelve el botón se ha ido el naipe.
+   *
+   * PERO A `<Delta>` SE LE SIGUE PASANDO `mazo` ENTERO. El mazo es la llave del CUARTO
+   * hueco del reparto: con `null` la barra se repartiría de tres, o sea que las piezas se
+   * moverían al recoger y otra vez al sacar, y lo que se recoge tiene que volver igual.
+   *
+   * Lo que NO vuelve al pie son FUNDAR, ALZAR y OFRECER: `opcionesFueraDelTablero` los
+   * quita sin mirar nada, porque los pinta el TABLERO, y no hay botón suyo que devolver.
+   * Con la mesa recogida no se puede coger una pieza para fundar, cierto; pero eso sólo
+   * pasa en mi propio turno, donde recoger la mesa es una decisión mía, y sacarla es un
+   * toque en el mismo botón que la recogió. Tirar y comprar son distintos: la mesa vuelve
+   * SOLA cuando pasa a tocarme y esos dos son los movimientos que se me quedarían sin
+   * puerta si yo mismo la hubiera recogido antes.
    */
   const fueraDeLaBarra = useMemo(
-    () => opcionesFueraDeLaBarra(opcionesFueraDeLaMano(opcionesFueraDelTablero(opciones)), mazo),
-    [opciones, mazo],
+    () => opcionesFueraDeLaBarra(opcionesFueraDeLaMano(opcionesFueraDelTablero(opciones)), mesaRecogida ? null : mazo),
+    [opciones, mazo, mesaRecogida],
   );
   /*
    * ═══ LOS DADOS: SÓLO DONDE CABEN, Y EL BOTÓN DE TIRAR SE VA DONDE ESTÁN ═══
@@ -776,7 +816,56 @@ function LaMesaEnTres({
     const suyos = dadosEnTres(laVista, yo, opciones);
     return suyos === null || !mesa.quieto ? suyos : { ...suyos, disponible: false };
   }, [haySitioParaLosDados, laVista, yo, opciones, mesa.quieto]);
-  const fueraDelTablero = useMemo(() => opcionesFueraDeLaMesa(fueraDeLaBarra, dados), [fueraDeLaBarra, dados]);
+  /*
+   * TIRAR VUELVE AL PIE MIENTRAS LA MESA ESTÁ RECOGIDA, y es el agujero gordo del §6.
+   *
+   * Con la mesa abajo NO HAY DADOS QUE TOCAR —se desmontan al llegar—, pero
+   * `opcionesFueraDeLaMesa` quita TIRAR de la cinta en cuanto `dados` no es `null`. El §6
+   * deja recoger la mesa EN MI PROPIO TURNO y la deja recogida hasta que yo diga: sin esto,
+   * quien recoja la mesa antes de tirar se queda sin poder tirar y sin nada que explique por
+   * qué, que es la partida parada. Así que la cinta se compone con `null` mientras está
+   * recogida, exactamente igual que con el mazo de arriba.
+   *
+   * Y a `<Delta>` se le sigue pasando `dados` ENTERO, por lo mismo que el mazo: `dados !==
+   * null` es la llave del QUINTO hueco (§4.4), y con `null` las piezas se correrían al
+   * recoger y volverían al sacar. Se recoge la mesa, no se desmonta la barra.
+   */
+  const fueraDelTablero = useMemo(
+    () => opcionesFueraDeLaMesa(fueraDeLaBarra, mesaRecogida ? null : dados),
+    [fueraDeLaBarra, dados, mesaRecogida],
+  );
+
+  /*
+   * ═══ LA MESA SALE SOLA AL PASAR A TOCARME, Y ESPERA SI HAY ALGO EN LA MANO ═══
+   *
+   * Decisión 16 del §1, cerrada por Miguel: recoger es para MIRAR, y cuando hay que actuar
+   * la mesa vuelve. Es el FLANCO —`meToca` de falso a verdadero— y no el valor: si fuera el
+   * valor, recoger la mesa en mi propio turno la sacaría en el fotograma siguiente y no
+   * habría manera de mirar el tablero mientras me toca a mí.
+   *
+   * Y NO SALE CON UNA CARTA EN LA MANO. Una mesa que sube por debajo de un arrastre cambia
+   * lo que hay bajo el dedo a mitad de gesto: la carta que se llevaba a un área acaba
+   * soltada sobre una pieza de la barra que no estaba ahí cuando el dedo bajó. Así que el
+   * flanco se APUNTA y la salida espera a que la mano quede vacía. Una pieza de la barra no
+   * puede estarlo: con la mesa recogida no hay de dónde cogerla.
+   *
+   * Los dos apuntes van en REFS y no en estados porque no pintan nada —nadie ve «hay una
+   * salida pendiente»— y un estado de más aquí es un render de más por cada vuelta del
+   * sondeo. El efecto se despierta igual, porque `cogida` y `cogidaDelMazo` sí son estados
+   * y están en sus dependencias: soltar la carta vuelve a entrar aquí. Y como la pantalla
+   * suelta todo al cambiar `rev`, la espera dura lo que dure el gesto.
+   */
+  const meTocaAhora = meToca(laVista);
+  const meTocabaAntes = useRef(false);
+  const laSalidaEspera = useRef(false);
+  useEffect(() => {
+    if (meTocaAhora && !meTocabaAntes.current) laSalidaEspera.current = true;
+    meTocabaAntes.current = meTocaAhora;
+    if (!laSalidaEspera.current) return;
+    if (cogida !== null || cogidaDelMazo !== null) return;
+    laSalidaEspera.current = false;
+    ponerMesaRecogida(false);
+  }, [meTocaAhora, cogida, cogidaDelMazo]);
 
   /*
    * EL ENCUADRE mide el MUNDO —lo grande que es el delta— y sólo se recalcula cuando
@@ -1251,6 +1340,7 @@ function LaMesaEnTres({
                   turnoDe={turnoDe}
                   dados={dados}
                   onPulsarLosDados={alPulsarLosDados}
+                  mesaRecogida={mesaRecogida}
                   mano={mano}
                   cogida={cogida}
                   onCogerCarta={alCogerCarta}
@@ -1311,6 +1401,47 @@ function LaMesaEnTres({
             accessibilityHint="Vuelve a mirar el delta completo desde el aire, sin cambiar el ángulo"
           >
             <Text style={estilos.volverRotulo}>Tablero entero</Text>
+          </Pressable>
+        ) : null}
+
+        {/*
+          RECOGER LA MESA (§6). Arriba a la izquierda, 44×44, debajo de «Tablero entero» y
+          con su mismo cromo que
+          «Tablero entero» y por lo mismo: es un botón de la Sala con su foco, su filo y su
+          nombre accesible, no un objeto del mundo. Un objeto del mundo tendría que quedarse
+          FUERA del grupo que baja para poder seguir pulsándolo, y entonces ya no sería «de
+          la mesa».
+
+          Sólo donde hay mesa que recoger: la misma condición con la que `<Delta>` monta la
+          barra (piezas o mazo). Un botón que promete recoger una mesa que no existe no
+          hace nada, y lo que no hace nada tampoco explica por qué.
+
+          EL SITIO ESTÁ MEDIDO EN LOS QUINCE LIENZOS, y por eso va ARRIBA y no abajo. Estuvo
+          abajo a la izquierda con 4 de margen y ahí se comía una esquina del asa de la
+          choza: el hueco se había medido con el asa como un rectángulo plano, y el asa es
+          una caja girada que se proyecta más a la izquierda y más abajo. Abajo no cabe en
+          ninguna de las dos esquinas —la barra está centrada y deja 41 puntos a cada lado,
+          contra los 44 del suelo de toque—, así que sube y se apila debajo de «Tablero
+          entero», que ya vive en esta esquina. El porqué entero, con los números, en
+          `estilos.recogerLaMesa`.
+
+          EL RÓTULO ES UNA FLECHA Y EL NOMBRE VA ENTERO EN LA ETIQUETA: en 44 puntos no cabe
+          «Recoger la mesa», y esos 44 son cuadrado de tablero que deja de tocarse. La
+          flecha dice hacia dónde va la mesa; la etiqueta, qué se hace.
+        */}
+        {catalogo.que === 'listo' && (barra.length > 0 || mazo !== null) ? (
+          <Pressable
+            style={estilos.recogerLaMesa}
+            onPress={alRecogerLaMesa}
+            accessibilityRole="button"
+            accessibilityLabel={mesaRecogida ? 'Sacar la mesa' : 'Recoger la mesa'}
+            accessibilityHint={
+              mesaRecogida
+                ? 'Sube la barra de construir y los dados a su sitio'
+                : 'Baja la barra de construir y los dados para ver el tablero entero'
+            }
+          >
+            <Text style={estilos.recogerLaMesaRotulo}>{mesaRecogida ? '▲' : '▼'}</Text>
           </Pressable>
         ) : null}
 
@@ -1919,6 +2050,56 @@ const estilos = StyleSheet.create({
     backgroundColor: SALA.teja,
   },
   volverRotulo: { ...LETRA.rotuloChico, color: SALA.blanco, fontSize: 13 },
+  /*
+   * RECOGER LA MESA: el mismo cromo que `volver` —teja, contorno blanco al 40 %, radio de
+   * mando, sin acento— cuadrado de 44 y DEBAJO de él, en la misma esquina.
+   *
+   * ═══ ESTUVO ABAJO A LA IZQUIERDA Y AHÍ SE COMÍA UNA ESQUINA DE LA CHOZA ═══
+   *
+   * Estuvo abajo, que es donde está la mesa que recoge, con 4 de margen, y el sitio se dio
+   * por medido: el canto izquierdo del asa de la primera pieza caía en 48 puntos en 320×360
+   * y el botón acababa en 48. Pero esos 48 salían de medir el asa como un RECTÁNGULO en el
+   * plano de la barra, y el asa es una caja de 0,8 lados de fondo girada 39,6°: su cara
+   * CERCANA se proyecta más a la izquierda y más abajo. Proyectada de verdad deja ahí un
+   * cuadrado libre de 37,2 puntos, así que el botón opaco se comía unos 7 × 27 puntos de la
+   * esquina de abajo a la izquierda del asa de la choza. Y no sólo con la mesa recogida: el
+   * botón está SIEMPRE, o sea que ese trozo de choza no se podía coger en toda la partida y
+   * nada lo decía.
+   *
+   * ═══ Y ABAJO NO CABE EN NINGUNA ESQUINA ═══
+   *
+   * La barra está CENTRADA y ocupa el 70 % del ancho, así que deja lo mismo a los dos
+   * lados: en 320×360 la silueta del asa llega a 41,2 puntos de los dos cantos, y 41,2 < 44.
+   * Bajar el margen a cero tampoco alcanza y encoger el botón por debajo de 44 está
+   * prohibido. Entre dos asas hay once puntos y bajo ellas veintiuno. Así que sube ARRIBA A
+   * LA IZQUIERDA, la esquina que esta pantalla ya usa para el cromo del lienzo, DEBAJO de
+   * `volver`: su margen (12) más el alto entero de aquél (44) más un dedo de aire (8), o sea
+   * `top: 64`. Apilados no hay ancho de rótulo que medir y no pueden solaparse, y como los
+   * dos son condicionales éste no se mueve aparezca o no el otro: un mando que cambia de
+   * sitio se pulsa mal, y éste es el que apaga la mesa. Arriba, el asa más alta de los
+   * quince lienzos se queda 134 puntos por debajo del canto de abajo del botón en el peor de
+   * ellos. Los tres números viven en `MANDO_DE_RECOGER` (`escenas/mesa.ts`), `verify:escena`
+   * mide con ellos contra la silueta proyectada de todas las asas y `verify:sala` afirma que
+   * esta tabla dice lo mismo.
+   *
+   * Cuadrado y con la flecha centrada en los dos ejes: el rótulo es un glifo, así que no
+   * hay relleno horizontal que dé el ancho y hay que escribirlo. El `fontSize` es el de
+   * `volverRotulo` para que la flecha pese lo mismo que el rótulo de arriba.
+   */
+  recogerLaMesa: {
+    position: 'absolute',
+    top: 64,
+    left: 12,
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: RADIO.mando,
+    borderWidth: 1,
+    borderColor: conAlfa(SALA.blanco, 0.4),
+    backgroundColor: SALA.teja,
+  },
+  recogerLaMesaRotulo: { ...LETRA.rotuloChico, color: SALA.blanco, fontSize: 13 },
   /*
    * LA HOJA: una ficha sobre el lienzo, pegada abajo. Teja con el contorno que se
    * ve —blanco al 40 %, 3,63 sobre la teja—, porque aquí sí se dibuja una caja.

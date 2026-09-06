@@ -38,8 +38,15 @@
  * entre 0 y 1, así que la veta también, y `mezcla` la lleva a un color entre los dos.
  */
 import { ALTO_DEL_ATLAS, COLUMNAS_DE_LA_TABLA } from './atlas-del-tablero';
-import { DISTANCIA_DE_LA_BARRA, cotaDeLaTapa, loQueSeVe } from './barra';
+import {
+  ASA_DEL_HUECO,
+  DISTANCIA_DE_LA_BARRA,
+  cotaDeLaTapa,
+  fondoDelAsaGirada,
+  loQueSeVe,
+} from './barra';
 import type { HuecoDeLaBarra } from './barra';
+import { ARISTA_DEL_DADO, CENTRO_DEL_DADO_SOBRE_LA_TAPA, SALTO_DEL_DADO } from './dados';
 import { CELDA_DEL_JUGADOR, COLUMNA_DEL_COLOR, FILAS_DEL_ATLAS } from './paleta';
 import { fbm } from './ruido';
 import { tablaDelAtlas } from './texeles-del-atlas';
@@ -93,8 +100,13 @@ export interface TapaDeLaMesa {
  * El borde delantero es donde el plano `y = cota` cruza el canto de abajo del lienzo,
  * `z = cota / tan(campo/2)` (`−1,649` en todos los apaisados), más la holgura hacia la
  * cámara. Es lo que hace que la mesa no flote: su frente queda FUERA del lienzo, como una
- * mesa mirada desde la silla, y por eso no lleva canto. El fondo resultante es de unos 2,3
- * lados. Todo sale del hueco y de la cámara; nada de aquí se escribe a mano en la escena.
+ * mesa mirada desde la silla, y por eso no lleva canto. El fondo resultante es de 2,55
+ * lados —aquí ponía «unos 2,3», que era la cuenta de ANTES de que la tapa ganara la
+ * holgura delantera (`HOLGURA_DELANTERA_DE_LA_TAPA`), y `rev4-tapa-holgura.ts` lo midió:
+ * 2,545 en los nueve lienzos donde manda el alto, y más en los de pie, donde el lado
+ * encoge con el ancho (hasta 7,46 en 390×845). Una cifra vieja en una cabecera se lee
+ * como medida y se cita como medida—. Todo sale del hueco y de la cámara; nada de aquí se
+ * escribe a mano en la escena.
  */
 export function tapaDeLaMesa(hueco: HuecoDeLaBarra, campo: number, proporcion: number): TapaDeLaMesa {
   const cota = cotaDeLaTapa(hueco);
@@ -109,6 +121,157 @@ export function tapaDeLaMesa(hueco: HuecoDeLaBarra, campo: number, proporcion: n
     ancho: loQueSeVe(campo, proporcion).ancho * ANCHO_DE_MAS_DE_LA_TAPA,
   };
 }
+
+/**
+ * CUÁNTO BAJA LA MESA AL RECOGERLA, en unidades de mundo a la distancia de la barra.
+ *
+ * ═══ EL FALLO QUE ESTO ARREGLA: EL ASA NO ES UN PUNTO, ES UNA CAJA ═══
+ *
+ * Aquí ponía `alto/2 + hueco.y + 0,5·lado` y esta cabecera lo llamaba «la bajada exacta».
+ * No lo era: esa cuenta trata el asa como un PUNTO en el plano de la barra (`z = −2`), y
+ * el asa es una caja de `0,8` lados de fondo (`ASA_DEL_HUECO`) girada 39,6° sobre su eje
+ * vertical (`GIRO_DE_LA_VITRINA`), o sea `0,627` lados de media profundidad. Su cara
+ * trasera está más LEJOS, y a más distancia la cámara ve más alto: el mismo punto de
+ * mundo cae más arriba en la pantalla. Medido con la cámara de verdad en los quince
+ * lienzos, el techo del asa se quedaba entre 10,8 y 36,6 puntos POR ENCIMA del canto —11,5
+ * en 320×360, 13,2 en un iPhone 14, 36,6 en el monitor a 1080— con la mesa «recogida». Y
+ * durante los 0,28 s de la bajada las asas están montadas y vivas, así que no basta con
+ * desmontarlas al llegar: la promesa tiene que ser cierta además.
+ *
+ * ═══ LA CUENTA, ESCRITA ═══
+ *
+ * Un punto `(y, z)` de la mesa cae justo en el canto de abajo cuando `y = −(−z)·tan(campo/2)`.
+ * Como `alto = 2·D·tan(campo/2)` a la distancia de la barra, meterlo bajo el canto pide
+ * bajar `y + (alto/2)·(−z)/D`, que es lo que hace `hastaElCanto`. La bajada es el MÁXIMO
+ * de esa cuenta sobre los tres puntos que pueden mandar:
+ *
+ *   · EL VÉRTICE MÁS ALTO Y MÁS LEJANO DEL ASA: `hueco.y + ½·alto·lado` a `D + 0,627·lado`.
+ *     Manda en los quince.
+ *   · UN DADO EN LO ALTO DE SU SALTO: el cubo gira, así que lo que asoma es su esfera de
+ *     media diagonal (`ARISTA_DEL_DADO·√3/2`), arriba y hacia la cámara a la vez.
+ *   · EL BORDE TRASERO DE LA TAPA: lo más lejos de la cámara que hay en la mesa
+ *     (`D + 0,6·lado`), aunque viva bajo la cota.
+ *
+ * Lo que NO entra aquí, y por qué: el asa de los dados es una caja del mismo alto pero SIN
+ * girar (`0,4` lados de fondo contra `0,627`), así que el asa de un hueco la tapa siempre;
+ * el naipe del mazo llega a `0,33` lados con su filo (`0,31` la cara, y el filo la agranda un 6 %); la pieza con el ratón encima sube `0,12` y crece
+ * a `1,18`, lo que la deja en `0,486` lados de alto y `0,515` de fondo, o sea dentro del
+ * asa que la envuelve; y el tapete, las sombras y los zócalos viven bajo la cota. La pieza
+ * TOMADA tampoco cuenta: recoger la mesa suelta lo cogido. `verify:escena` proyecta los
+ * ocho vértices de cada caja y las cuatro esquinas de cada plano de TODAS ellas y exige
+ * que ninguna asome, así que el día que una crezca por encima del asa el guion se pone
+ * rojo y hay que meterla también aquí.
+ *
+ * Medido en los quince lienzos: 0,325 a 0,433 unidades, o sea 84 puntos en el SE apaisado,
+ * 102 en un iPhone 14 y 282 en un monitor a 1080 —entre 11,6 y 39,3 puntos más que la
+ * cuenta plana de antes—. Bajar de más no cuesta nada en pantalla: la mesa ya está fuera.
+ * Quedarse corto sí, y era lo que pasaba.
+ *
+ * Vive aquí y no en la escena porque es lo que el comprobador mide en Node sin abrir una
+ * ventana: con el número escrito a mano en `delta.tsx`, `verify:escena` estaría midiendo
+ * su propia copia y no lo que baja.
+ */
+export function bajadaDeLaMesa(hueco: HuecoDeLaBarra, campo: number, proporcion: number): number {
+  const { alto } = loQueSeVe(campo, proporcion);
+  /* Cuánto hay que bajar para dejar un punto a `distancia` de la cámara justo en el canto. */
+  const hastaElCanto = (y: number, distancia: number): number =>
+    y + (alto / 2) * (distancia / DISTANCIA_DE_LA_BARRA);
+  const lado = hueco.lado;
+
+  const asa = hastaElCanto(
+    hueco.y + (ASA_DEL_HUECO.alto / 2) * lado,
+    DISTANCIA_DE_LA_BARRA + fondoDelAsaGirada() * lado,
+  );
+  const mediaDiagonal = ((ARISTA_DEL_DADO * Math.sqrt(3)) / 2) * lado;
+  const dado = hastaElCanto(
+    cotaDeLaTapa(hueco) + (CENTRO_DEL_DADO_SOBRE_LA_TAPA + SALTO_DEL_DADO) * lado + mediaDiagonal,
+    DISTANCIA_DE_LA_BARRA + mediaDiagonal,
+  );
+  const tapa = tapaDeLaMesa(hueco, campo, proporcion);
+  const madera = hastaElCanto(tapa.cota, -tapa.zTrasero);
+
+  return Math.max(asa, dado, madera);
+}
+
+/**
+ * LO DEPRISA QUE LA MESA BAJA Y SUBE, en la `k` de `1 − e^(−k·dt)`.
+ *
+ * La misma constante de tiempo que llevan las cartas de la mano, y con ella la cuenta sale
+ * sola: recorrer el 99 % de la bajada —`LO_QUE_QUEDA_AL_LLEGAR`— tarda `ln(100)/16 =
+ * 0,288 s`, que son los 0,28 s que el §6 pide para recoger la mesa. No hay dos ritmos que
+ * ajustar por separado en esta escena y no hace falta un tercero.
+ *
+ * Vive aquí, con la bajada, y no suelta en `delta.tsx`, porque es lo que `verify:escena`
+ * comprueba contra los 0,28 s del diseño: con el número escrito en la escena, el guion
+ * estaría midiendo su propia copia.
+ */
+export const AMORTIGUACION_DE_LA_MESA = 16;
+
+/**
+ * A QUÉ FRACCIÓN DE LA BAJADA SE DA POR LLEGADA, y por qué no es cero.
+ *
+ * Una interpolación exponencial no llega nunca: se acerca. Con un cero, `visible` no se
+ * apagaría jamás y los dados seguirían montados bajo el canto para siempre, que es
+ * exactamente el estado que la fase 4 decidió NO tener. El uno por ciento de la bajada son
+ * 0,7 puntos en el SE apaisado y 2,4 en un monitor a 1080: por debajo de lo que se ve, y el
+ * asa está bajo el canto mucho antes.
+ */
+export const LO_QUE_QUEDA_AL_LLEGAR = 0.01;
+
+/**
+ * DÓNDE VA EL MANDO DE RECOGER LA MESA, en puntos de pantalla, y por qué YA NO VA ABAJO.
+ *
+ * ═══ EL FALLO QUE ESTO ARREGLA, Y QUE NO SE VEÍA ═══
+ *
+ * Estuvo abajo a la izquierda, cuadrado de 44 con 4 de margen, y el sitio se dio por
+ * medido: el canto izquierdo del asa de la primera pieza caía en `x = 48,0` en 320×360 y
+ * el mando acababa en 48. Pero esos 48 salían de tratar el asa como un RECTÁNGULO en el
+ * plano de la barra, y el asa es una caja de `0,8` lados de fondo girada 39,6°: su cara
+ * CERCANA está más cerca de la cámara, así que se proyecta más a la izquierda y más
+ * abajo. Proyectada de verdad, la silueta del asa deja en el rincón de abajo a la
+ * izquierda un cuadrado libre de 37,2 puntos en 320×360 y de 44,1 en 360×490 —contra los
+ * 48,0 y 54,0 de la cuenta plana—, así que un mando opaco de 44 se comía unos 7 × 27
+ * puntos de la esquina de abajo a la izquierda del asa de la choza. Y no sólo con la mesa
+ * recogida: el mando está SIEMPRE, o sea que ese trozo de choza no se podía coger en toda
+ * la partida, sin un error en ninguna parte.
+ *
+ * ═══ POR QUÉ ARRIBA, Y NO EN OTRO RINCÓN DE ABAJO ═══
+ *
+ * Porque abajo no cabe en ninguna esquina y está contado. La barra está CENTRADA y ocupa
+ * el 70 % del ancho, así que deja lo mismo a los dos lados: en 320×360 la silueta del asa
+ * llega a 41,2 puntos del canto izquierdo y a los mismos del derecho, y 41,2 < 44. Bajar
+ * el margen a cero tampoco alcanza, y encoger el mando por debajo de 44 está prohibido
+ * (`SUELO_DEL_TOQUE`). Entre las asas no hay hueco —`AIRE` son 0,24 lados, once puntos—, y
+ * bajo ellas quedan 21 puntos hasta el canto. Arriba, en cambio, el asa más alta de los
+ * quince lienzos se queda 242 puntos por debajo del canto de arriba (el SE apaisado, que
+ * es el peor), así que un mando que acabe a 108 del canto de arriba no le roba un punto a
+ * ninguna asa en ninguno.
+ *
+ * ═══ Y POR QUÉ DEBAJO DEL MANDO DE VOLVER, Y NO EN LA OTRA ESQUINA DE ARRIBA ═══
+ *
+ * Los dos clientes ya tienen un mando sobre el lienzo que no es un movimiento —«Tablero
+ * entero» en la app, arriba a la izquierda; «volver» en el escritorio, arriba a la
+ * derecha— y cada uno eligió su esquina por su cuenta. Poner éste en la esquina LIBRE
+ * daría dos sitios distintos y dos razones distintas; ponerlo DEBAJO del que ya hay da una
+ * sola regla —«el cromo de la Sala sobre el lienzo va en columna, en la esquina de arriba
+ * que su cliente ya usa»— y garantiza que los dos no se solapan jamás sin que nadie tenga
+ * que medir el ancho del rótulo. Va SIEMPRE a la misma altura, aparezca o no el de arriba
+ * (los dos son condicionales): un mando que cambia de sitio según lo que haya en pantalla
+ * se pulsa mal, y éste es el que apaga la mesa.
+ *
+ * `verify:escena` mide el cuadrado contra la silueta proyectada de todas las asas en los
+ * quince lienzos y por los DOS lados —izquierda como la app, derecha como el escritorio—;
+ * `verify:escritorio` y `verify:sala` afirman que la hoja de estilo y la tabla de estilos
+ * dicen estos mismos números.
+ */
+export const MANDO_DE_RECOGER = {
+  /** El lado del cuadrado: el suelo de toque de la casa, ni un punto menos. */
+  lado: 44,
+  /** Lo que separa el mando del canto de arriba y del canto de su lado. */
+  margen: 12,
+  /** Y lo que baja por debajo del otro mando: su alto (44) más un dedo de aire (8). */
+  bajoElOtroMando: 52,
+} as const;
 
 /** El canal del ruido de la veta. Fijo: la mesa es la misma en todas las mesas. */
 export const CANAL_DE_LA_VETA = 7_001;

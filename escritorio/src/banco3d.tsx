@@ -553,6 +553,23 @@ function Banco(): JSX.Element {
     sello: 0,
   });
   const [rechazaLaTirada, ponerRechazaLaTirada] = useState(false);
+
+  /*
+   * ═══ RECOGER LA MESA, Y LA VUELTA SOLA (§6) ═══
+   *
+   * Dos mandos, porque son dos cosas distintas y una de ellas no se puede provocar a mano
+   * en el banco. «Recoger / Sacar» mueve la entrada `mesaRecogida` de `<Delta>` y sirve
+   * para mirar la bajada: que baje el grupo ENTERO —tapa, zócalos, piezas, naipe, dados,
+   * tapete y sombras—, que no quede nada asomando por el canto y que al subir vuelva todo
+   * a su sitio, incluidos los dados con el par que tuvieran.
+   *
+   * «Ahora te toca» es la OTRA mitad, y aquí no hay servidor que la mande: en la partida la
+   * mesa sale sola cuando `meToca` pasa de falso a verdadero (decisión 16), y eso lo decide
+   * la pantalla, no la escena. Este mando hace de flanco y baja `mesaRecogida` para que se
+   * pueda ver la subida sin tocar el otro botón, que es el gesto de verdad. Sin él, la
+   * vuelta sola sólo se comprueba leyendo el código.
+   */
+  const [mesaRecogida, ponerMesaRecogida] = useState(false);
   const simularLaTirada = useCallback(
     (): Promise<ResultadoDelToque> =>
       new Promise((resuelve) => {
@@ -825,6 +842,8 @@ function Banco(): JSX.Element {
               /* Los dados de mentira: ver `dadosDelBanco`. El asa manda al mismo simulador que el botón «Tirar». */
               dados={dadosDelBanco}
               onPulsarLosDados={simularLaTirada}
+              /* La mesa recogida: ver los dos mandos de abajo. */
+              mesaRecogida={mesaRecogida}
               mano={mano}
               cogida={cogida}
               onCogerCarta={(c) => ponerCogida((antes) => (antes === c.id ? null : c.id))}
@@ -1035,6 +1054,30 @@ function Banco(): JSX.Element {
           </button>
           <span style={{ alignSelf: 'center', color: '#9fe6b8' }}>
             suma {dadosDelBanco.ultimaTirada} · sello {dadosDelBanco.sello}
+          </span>
+        </div>
+        {/* La mesa que se recoge: ver `mesaRecogida`. Lo que se mira es la bajada entera y la vuelta. */}
+        <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            onClick={() => {
+              ponerMesaRecogida((r) => !r);
+            }}
+            style={{ ...BOTON, borderColor: mesaRecogida ? '#9fe6b8' : undefined }}
+          >
+            {mesaRecogida ? 'Sacar la mesa' : 'Recoger la mesa'}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              ponerMesaRecogida(false);
+            }}
+            style={BOTON}
+          >
+            Ahora te toca
+          </button>
+          <span style={{ alignSelf: 'center', color: '#9fe6b8' }}>
+            mesa {mesaRecogida ? 'recogida' : 'puesta'}
           </span>
         </div>
         <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>

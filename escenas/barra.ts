@@ -380,6 +380,69 @@ export const ZOCALO = {
 } as const;
 
 /**
+ * EL ASA DE UN HUECO, en lados del hueco: la CAJA invisible que recibe el toque.
+ *
+ * ═══ POR QUÉ ESTOS TRES NÚMEROS SE HAN VENIDO AQUÍ DESDE `delta.tsx` ═══
+ *
+ * Porque el asa es lo más ALTO y lo más HONDO de la mesa, y las dos cosas se miden en
+ * Node: cuánto tiene que bajar la mesa para que el asa pase el canto de abajo
+ * (`bajadaDeLaMesa`, `mesa.ts`) y cuánto sitio deja el asa en el rincón de la pantalla
+ * para un mando. Mientras el `0,8` de fondo vivió sólo dentro del `<boxGeometry>` de
+ * `delta.tsx`, la bajada se calculó tratando el asa como un PUNTO en el plano de la barra
+ * —y el asa no es un punto: es una caja cuya cara trasera está más lejos, donde la cámara
+ * ve más alto— y por eso su techo se quedaba entre 10,8 y 36,6 puntos POR ENCIMA del canto
+ * con la mesa recogida. Escrito aquí, la escena y los dos comprobadores leen el mismo
+ * número y esa cuenta no se puede volver a hacer con otro.
+ */
+export const ASA_DEL_HUECO = {
+  /** A lo ancho: la casilla entera. */
+  ancho: 1,
+  /** A lo alto: la casilla entera, o sea medio lado sobre el centro del hueco. */
+  alto: 1,
+  /** Y de fondo, que es lo que la convierte en caja y lo que se olvidaba. */
+  fondo: 0.8,
+} as const;
+
+/**
+ * CÓMO SE ENSEÑA UNA PIEZA EN LA BARRA: quieta, y de tres cuartos.
+ *
+ * Giraban despacio sobre sí mismas, con la idea de que girando se les ve la forma entera.
+ * En pantalla es al revés: son cuatro cosas moviéndose en el borde del ojo mientras se
+ * mira el tablero, cada una en su fase, y lo que se está mirando es el tablero. Un
+ * escaparate no gira. Además, de un modelo que gira no se aprende la silueta, que es
+ * justamente lo que hay que reconocer de un vistazo para cogerlo.
+ *
+ * Quietas, pero NO de frente: de frente una casa es un cuadrado con un triángulo encima y
+ * podría ser cualquier cosa. Un cuarto de vuelta largo enseña a la vez el frente y un
+ * costado, que es como se fotografía una maqueta y lo que hace que un tejado se lea como
+ * un tejado.
+ *
+ * ═══ Y POR QUÉ ESTÁ AQUÍ Y NO SÓLO EN EL `rotation` QUE LO APLICA ═══
+ *
+ * Porque el giro se lo come el ASA con la pieza dentro, y una caja girada sobre su eje
+ * vertical asoma MÁS de lado y MÁS hacia la cámara que sin girar: con estos 39,6° la
+ * media profundidad del asa pasa de `0,40` lados a `0,5·|sen| + 0,4·|cos| = 0,627`. Eso
+ * es lo que decide la bajada de recoger y lo que decide si un mando de 44 puntos cabe en
+ * el rincón de abajo a la izquierda. Con el número sólo en `delta.tsx`, quien mide en
+ * Node medía una mesa sin girar que no existe.
+ */
+export const GIRO_DE_LA_VITRINA = Math.PI * 0.22;
+
+/**
+ * MEDIA PROFUNDIDAD DEL ASA YA GIRADA, en lados: de la cara trasera al centro del hueco.
+ *
+ * Es la mitad de la caja `ancho × fondo` proyectada sobre el eje que mira a la cámara
+ * después del giro de vitrina, `½·ancho·|sen| + ½·fondo·|cos|`. Sale como función y no
+ * como constante escrita para que cambiar `ASA_DEL_HUECO` o el giro la cambie sola.
+ */
+export function fondoDelAsaGirada(): number {
+  return (
+    (ASA_DEL_HUECO.ancho / 2) * Math.abs(Math.sin(GIRO_DE_LA_VITRINA)) +
+    (ASA_DEL_HUECO.fondo / 2) * Math.abs(Math.cos(GIRO_DE_LA_VITRINA))
+  );
+}
+
+/**
  * A QUÉ ALTURA VA LA TAPA DE LA MESA: la cara de ABAJO del zócalo, y ni un pelo más.
  *
  * La tapa es horizontal y a esta cota, y no inclinada hacia la cámara, porque el asa mide

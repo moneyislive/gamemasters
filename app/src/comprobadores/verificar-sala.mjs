@@ -1152,10 +1152,16 @@ paso('El mazo de Riberas se juega desde la app, y en las DOS ramas');
    * NINGUNA sobre el respaldo— y las dos las ata el mismo dato: `opcionesFueraDeLaBarra`
    * recibe EL MAZO y no un interruptor, así que el botón desaparece exactamente donde el
    * naipe aparece.
+   *
+   * Desde la fase 4 lo que se le pasa es `mesaRecogida ? null : mazo`, que sigue siendo EL
+   * MISMO OBJETO cuando la mesa está puesta y el mismo `null` que en el respaldo cuando está
+   * recogida: el naipe baja con la mesa, así que la regla —«el botón desaparece exactamente
+   * donde el naipe se puede pulsar»— se cumple igual. Lo prohibido sigue siendo un `boolean`
+   * suelto o un filtro sin condición.
    */
   comprobar(
     'COMPRAR se cae del pie con `opcionesFueraDeLaBarra`, y pasándole EL MAZO, no un interruptor',
-    /opcionesFueraDeLaBarra\(opcionesFueraDeLaMano\(opcionesFueraDelTablero\(opciones\)\), mazo\)/.test(
+    /opcionesFueraDeLaBarra\(opcionesFueraDeLaMano\(opcionesFueraDelTablero\(opciones\)\), mesaRecogida \? null : mazo\)/.test(
       escenaSinComentarios,
     ),
     'con un `true` escrito a mano, el botón y el naipe se separan el día que uno de los dos cambie',
@@ -1363,8 +1369,8 @@ paso('Los dados en la pantalla: donde caben, el botón de tirar se va con ellos,
   );
   comprobar(
     'TIRAR se cae del pie con `opcionesFueraDeLaMesa` pasándole LOS DADOS (no un interruptor) y DESPUÉS de los tres filtros de siempre',
-    /const fueraDelTablero = useMemo\(\(\) => opcionesFueraDeLaMesa\(fueraDeLaBarra, dados\), \[fueraDeLaBarra, dados\]\);/.test(codigo) &&
-      /const fueraDeLaBarra = useMemo\(\s+\(\) => opcionesFueraDeLaBarra\(opcionesFueraDeLaMano\(opcionesFueraDelTablero\(opciones\)\), mazo\)/.test(codigo),
+    /const fueraDelTablero = useMemo\(\s+\(\) => opcionesFueraDeLaMesa\(fueraDeLaBarra, mesaRecogida \? null : dados\),/.test(codigo) &&
+      /const fueraDeLaBarra = useMemo\(\s+\(\) => opcionesFueraDeLaBarra\(opcionesFueraDeLaMano\(opcionesFueraDelTablero\(opciones\)\), mesaRecogida \? null : mazo\)/.test(codigo),
   );
   comprobar(
     'la escena recibe `dados={dados}` y `onPulsarLosDados={alPulsarLosDados}`',
@@ -1387,6 +1393,126 @@ paso('Los dados en la pantalla: donde caben, el botón de tirar se va con ellos,
   );
 }
 
+/**
+ * RECOGER LA MESA EN LA APP (§6 del diseño, fase 4).
+ *
+ * ═══ LAS CUATRO PARTIDAS ROTAS EN SILENCIO QUE ESTO IMPIDE ═══
+ *
+ *   1. LA PARTIDA PARADA. Con la mesa recogida no hay dados que tocar ni naipe del mazo que
+ *      pulsar, y `opcionesFueraDeLaMesa` / `opcionesFueraDeLaBarra` los siguen quitando del
+ *      pie mientras la escena los reciba. El §6 deja recoger la mesa EN MI PROPIO TURNO y
+ *      la deja recogida hasta que yo diga: sin devolver TIRAR y COMPRAR al pie, quien
+ *      recoja antes de tirar se queda sin poder tirar y sin error en ninguna parte.
+ *   2. LAS PIEZAS QUE SE MUEVEN AL RECOGER, si alguien arregla lo anterior pasándole `null`
+ *      a `<Delta>`: `dados !== null` es la llave del quinto hueco y el mazo la del cuarto.
+ *   3. LA CARTA PEGADA AL DEDO con la barra fuera de la pantalla y nada debajo.
+ *   4. LA MESA QUE SUBE A MITAD DE ARRASTRE, si la vuelta sola no espera a que la mano
+ *      quede vacía.
+ *
+ * Se lee el fuente porque todo esto vive dentro del `Canvas` o encima de él, y aquí no hay
+ * `Canvas`; el aspecto se mira en el banco del escritorio, que monta el mismo `<Delta>`.
+ */
+paso('Recoger la mesa en la app: suelta lo cogido, devuelve tirar y comprar al pie, y vuelve sola al tocarme salvo con algo en la mano');
+{
+  const escena = leer(path.join(SRC, 'arcade', 'riberas-en-tres-escena.tsx'));
+  const codigo = escena.split('\n').filter((l) => !/^\s*(\*|\/\/|\/\*|\{\/\*)/.test(l)).join('\n');
+
+  comprobar(
+    'el estado vive en la pantalla y no se guarda: un `useState` a secas, y `<Delta>` lo recibe entero',
+    /const \[mesaRecogida, ponerMesaRecogida\] = useState\(false\);/.test(codigo) &&
+      /<Delta[\s\S]*?mesaRecogida=\{mesaRecogida\}/.test(escena),
+  );
+  comprobar(
+    'recoger SUELTA lo cogido —por el mismo `soltarTodo` de los siete estados que usa el cambio de revisión— y sacar no suelta nada',
+    /const alRecogerLaMesa = useCallback\(\(\) => \{\s*if \(!mesaRecogida\) soltarTodo\(\);\s*ponerMesaRecogida\(!mesaRecogida\);\s*\}, \[mesaRecogida, soltarTodo\]\);/.test(codigo),
+  );
+  comprobar(
+    'con la mesa recogida, TIRAR y COMPRAR vuelven al pie: la cinta se compone con `null` en los dos filtros que la mesa se lleva',
+    /opcionesFueraDeLaMesa\(fueraDeLaBarra, mesaRecogida \? null : dados\)/.test(codigo) &&
+      /opcionesFueraDeLaBarra\(opcionesFueraDeLaMano\(opcionesFueraDelTablero\(opciones\)\), mesaRecogida \? null : mazo\)/.test(codigo),
+  );
+  comprobar(
+    'y la ESCENA sigue recibiendo `dados` y `mazo` sin tocar: son la llave del quinto y del cuarto hueco, y con `null` las piezas se moverían al recoger',
+    /<Delta[\s\S]*?mazo=\{mazo\}[\s\S]*?dados=\{dados\}[\s\S]*?\/>/.test(escena) &&
+      !/<Delta[\s\S]*?(dados|mazo)=\{mesaRecogida/.test(escena),
+  );
+  const laVuelta = /const meTocaAhora = meToca\(laVista\);[\s\S]*?\}, \[meTocaAhora, cogida, cogidaDelMazo\]\);/.exec(codigo)?.[0] ?? '';
+  comprobar(
+    'la mesa sale sola cuando `meToca` pasa de falso a verdadero (el FLANCO, con `meToca` de shared) y no cada vez que me toca',
+    laVuelta.length > 0 &&
+      /if \(meTocaAhora && !meTocabaAntes\.current\) laSalidaEspera\.current = true;/.test(laVuelta) &&
+      /meTocabaAntes\.current = meTocaAhora;/.test(laVuelta) &&
+      /import \{[\s\S]*?\bmeToca,/.test(escena),
+    laVuelta.slice(0, 300),
+  );
+  comprobar(
+    'y con una carta en la mano —el bien o el naipe— la salida ESPERA: una mesa que sube bajo un arrastre cambia lo que hay bajo el dedo a mitad de gesto',
+    /if \(cogida !== null \|\| cogidaDelMazo !== null\) return;\s*laSalidaEspera\.current = false;\s*ponerMesaRecogida\(false\);/.test(laVuelta),
+    laVuelta.slice(-300),
+  );
+  /*
+   * EL BOTÓN. Fuera del `Canvas`, hermano del lienzo como el de «Tablero entero» —así se
+   * lleva su propio toque sin quitárselo a la escena y el lector de pantalla lo anuncia
+   * aparte—, cuadrado de 44 ARRIBA A LA IZQUIERDA y debajo de aquél.
+   *
+   * ═══ POR QUÉ NO ESTÁ ABAJO, QUE ES DONDE ESTUVO ═══
+   *
+   * Porque abajo se comía una esquina del asa de la choza y nadie lo veía. El sitio se
+   * había medido tratando el asa como un rectángulo en el plano de la barra —canto
+   * izquierdo en 48 puntos en 320×360— y el asa es una caja de 0,8 lados de fondo girada
+   * 39,6°: su cara cercana se proyecta a 41,2. Y no es cosa de la esquina izquierda: la
+   * barra está centrada, así que deja los mismos 41,2 puntos a los dos lados y un botón de
+   * 44 no cabe en ninguna de las dos. `verify:escena` mide la silueta proyectada de todas
+   * las asas contra el cuadrado del mando en los quince lienzos; aquí sólo se compra que
+   * esta tabla de estilos diga los mismos tres números.
+   *
+   * Y LOS TRES NÚMEROS SE LEEN DE `escenas/mesa.ts`, no se copian: un botón medido allí y
+   * colocado con otros números aquí no está medido. Este guion no puede importar TypeScript
+   * de la escena en cualquier orden, así que se leen del texto del fichero —que es
+   * exactamente lo que hace este guion con todo lo demás— y si la tabla deja de estar, esto
+   * se cae en vez de comparar contra `undefined`.
+   */
+  const mesaTs = leer(path.resolve(SRC, '..', '..', 'escenas', 'mesa.ts'));
+  const mando = /export const MANDO_DE_RECOGER = \{[\s\S]*?lado: (\d+),[\s\S]*?margen: (\d+),[\s\S]*?bajoElOtroMando: (\d+),/.exec(mesaTs);
+  comprobar(
+    '`MANDO_DE_RECOGER` sigue en `escenas/mesa.ts` con sus tres números: es de donde salen el sitio y el tamaño de este botón, y donde `verify:escena` los mide',
+    mando !== null && Number(mando[1]) === 44 && Number(mando[2]) === 12 && Number(mando[3]) === 52,
+    mando === null ? 'no está la tabla' : mando.slice(1, 4),
+  );
+  const ladoDelMando = Number(mando?.[1] ?? NaN);
+  const margenDelMando = Number(mando?.[2] ?? NaN);
+  const arribaDelMando = margenDelMando + Number(mando?.[3] ?? NaN);
+  comprobar(
+    'el botón de recoger existe sólo donde hay mesa que recoger (la misma condición con la que `<Delta>` monta la barra) y dice qué hace con todas sus letras',
+    /\{catalogo\.que === 'listo' && \(barra\.length > 0 \|\| mazo !== null\) \? \(\s*<Pressable[\s\S]*?style=\{estilos\.recogerLaMesa\}[\s\S]*?onPress=\{alRecogerLaMesa\}[\s\S]*?accessibilityRole="button"\s+accessibilityLabel=\{mesaRecogida \? 'Sacar la mesa' : 'Recoger la mesa'\}/.test(codigo),
+  );
+  const estiloDelRecoger = /recogerLaMesa: \{([^}]*)\},/.exec(codigo)?.[1] ?? '';
+  comprobar(
+    'y está arriba a la izquierda, cuadrado del lado que dice `MANDO_DE_RECOGER` con su margen y bajado su `bajoElOtroMando` entero, con el cromo de `volver`: teja, contorno blanco al 40 % y radio de mando',
+    estiloDelRecoger.includes(`top: ${arribaDelMando},`) &&
+      estiloDelRecoger.includes(`left: ${margenDelMando},`) &&
+      estiloDelRecoger.includes(`width: ${ladoDelMando},`) &&
+      estiloDelRecoger.includes(`height: ${ladoDelMando},`) &&
+      !/bottom:|right:/.test(estiloDelRecoger) &&
+      /borderRadius: RADIO\.mando,\s*borderWidth: 1,\s*borderColor: conAlfa\(SALA\.blanco, 0\.4\),\s*backgroundColor: SALA\.teja,/.test(estiloDelRecoger),
+    estiloDelRecoger.replace(/\s+/g, ' ').slice(0, 200),
+  );
+  /*
+   * Y QUE LOS DOS MANDOS NO SE SOLAPEN NO SE MIDE EN PÍXELES DE RÓTULO: se apilan. «Tablero
+   * entero» arranca en 12 y mide 44 de mínimo de dedo; éste arranca por debajo de los dos.
+   * Con eso da igual lo que crezca el rótulo de arriba, que es lo que se quería.
+   */
+  const estiloDelVolver = /[^A-Za-z]volver: \{([^}]*)\},/.exec(codigo)?.[1] ?? '';
+  comprobar(
+    'el de recoger empieza por debajo de donde acaba «Tablero entero», así que los dos mandos del lienzo no pueden solaparse por mucho que crezca el rótulo de arriba',
+    /top: 12,/.test(estiloDelVolver) &&
+      /left: 12,/.test(estiloDelVolver) &&
+      /minHeight: 44,/.test(estiloDelVolver) &&
+      arribaDelMando >= 12 + 44,
+    { volver: estiloDelVolver.replace(/\s+/g, ' ').slice(0, 120), recoge: arribaDelMando },
+  );
+}
+
 // ---------------------------------------------------------------------------
 
 /**
@@ -1398,7 +1524,7 @@ paso('Los dados en la pantalla: donde caben, el botón de tirar se va con ellos,
  * Con el número escrito, salir con menos es un fallo ruidoso. Va a mano y se sube al
  * añadir comprobaciones; un guardia desfasado no guarda nada.
  */
-const COMPROBACIONES_ESCRITAS = 152;
+const COMPROBACIONES_ESCRITAS = 162;
 if (cuantas < COMPROBACIONES_ESCRITAS) {
   console.error(
     `Solo se han hecho ${cuantas} de las ${COMPROBACIONES_ESCRITAS} comprobaciones que ` +
