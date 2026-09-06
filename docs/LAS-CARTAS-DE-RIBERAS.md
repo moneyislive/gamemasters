@@ -56,12 +56,21 @@ lo que faltaba para eso.
    hace que las últimas rondas se jueguen distinto. Ver §5 bis del contrato del
    arcade: lo secreto no viaja, ni siquiera dentro de un identificador de opción.
 
-7. **La Guardia roba, y no mueve a nadie.** En el juego del que viene la mecánica, el
-   caballero mueve al ladrón. **Riberas no tiene ladrón**: su desgracia es el
-   estiaje, que no ocupa una comarca sino que corta la producción del turno, y eso
-   está escrito desde el principio en `riberas-en-3d.ts` («`ladron` sale siempre
-   `null`, y eso no es un hueco por rellenar»). Así que la Guardia hace lo otro que
-   hacía el caballero: **le quitas un bien al azar a un colono que elijas**. Si no
+7. **La Guardia roba, y no mueve a nadie. REVOCADO el 6 de septiembre de 2026 por
+   Miguel, tras jugar una partida entera.** Lo que decía, y por qué se decidió así:
+   «en el juego del que viene la mecánica, el caballero mueve al ladrón. Riberas no
+   tiene ladrón: su desgracia es el estiaje, que no ocupa una comarca sino que corta
+   la producción del turno». Era una decisión de la fase en que había que demostrar
+   que el motor no sabía de qué juego hablaba, y el castigo por acumular era una
+   regla rica que aquello no necesitaba.
+
+   Lo que se vio jugando la tumbó: salen una docena de sietes por partida y los doce
+   no hacían nada, así que guardar no costaba y la Guardia significaba la mitad. El
+   estiaje pasó a ser también LA PIEZA (`docs/EL-LADRON-DE-RIBERAS.md`, fase 1 en el
+   commit 958962a): se posa en una isla, la seca y roba a un vecino. Y la Guardia
+   pasa a moverla, como el caballero del que viene. Lo que sigue siendo cierto de
+   este punto es lo que la carta le da a quien la juega: **un bien al azar de otro
+   colono**, sólo que ahora es el de la isla donde se planta la pieza. Si no
    tiene ninguno, no se ofrece robarle.
 
 8. **Dos premios, no uno, y con la misma regla.** Al Vado Largo se le suma **La
@@ -142,7 +151,10 @@ oscuro, sin acuarela—, que es además el que ya usan los bienes.
 
 ## 7. Lo que NO entra, a sabiendas
 
-- **Ladrón y estiaje**: el siete no hace nada todavía, y esto no lo cambia.
-- **Descartar con más de siete bienes**: es del mismo bloque que el ladrón.
+- ~~**Ladrón y estiaje**: el siete no hace nada todavía, y esto no lo cambia.~~ YA
+  ENTRÓ: el estiaje es una pieza desde el commit 958962a y el siete la mueve. Ver
+  `docs/EL-LADRON-DE-RIBERAS.md`.
+- **Descartar con más de siete bienes**: era del mismo bloque que el ladrón, y entra
+  con él, en la fase 2 de aquel documento.
 - **Puertos**: no están en el tablero ni en las reglas.
 - **Jugar una guardia antes de tirar**: §3.
