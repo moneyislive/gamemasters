@@ -4,40 +4,50 @@
 > las decisiones y su porqué. Se escribió el 5 de septiembre de 2026, sobre la rama
 > `lobby-catan`, a partir de lo que Miguel pidió por escrito: ver el juego en pantalla
 > completa, una mesa de madera abajo con las piezas encima, un dado que vibra y se
-> tira tocándolo, y poder recoger la mesa. Es la séptima versión: la primera pasó por
-> una revisión adversaria que volvió a medir cada número con el código real; la
-> segunda por otra que leyó el orden de dibujo con el ordenador de `three` de verdad,
-> buscó quién apagaba los dados fuera de turno y proyectó los 54 vértices con la cámara
-> inclinada; la tercera por una que metió en ese ordenador el árbol de `delta.tsx` con
-> sus grupos anidados tal como están; y la cuarta por una que montó encima lo que la
-> fase 2 añade. La quinta recogió las siete decisiones que Miguel tomó la noche del 5
-> de septiembre sobre las dudas que el §10 le hacía: ya no hay dudas para él en este
-> documento; están en el §1, cada una con su porqué y sus consecuencias medidas. La
-> sexta hizo salir de su guion los puntos del cajón (§1.11), puso el cajón abierto
-> sobre la barra, quitó a la cabecera de la web un alto que no tiene, separó por nombre
-> los dos insets, y recogió el D6 de KayKit Board Game Bits como malla de los dados
-> (§5.1). Y esta séptima es la primera escrita CON LA FASE 2 ATERRIZADA (commit
-> `4287809`: la mesa de madera está en el código). Donde la fase 2 hizo otra cosa que
-> la que aquí se había decidido, gana el código, y el documento cuenta lo que hay y
-> por qué cambió. Lo más gordo: los dos «testigos» de borrado de profundidad que
-> cuatro versiones razonaron con cuidado NO CORRIERON NUNCA (colgaban del ojo de la
-> cámara y la poda por frustum los dejaba fuera de la lista de dibujo), y se han
-> quitado los dos; la mesa se apoya en la profundidad del mundo y el orden lo
-> garantiza sólo el `groupOrder`, con un límite conocido y medido (§4.1); la tapa
-> lleva manejadores para PARAR el toque, porque el `raycast` nulo que se le daba no
-> hacía nada (§4.1); los sitios del tablero que quedan bajo la mesa al salir están
-> contados y aceptados (§4.1, §10); y los números que el código midió mejor que el
-> documento (los posavasos leídos del atlas, la holgura del frente de la tapa) son los
-> del código. La sexta revisión dejó además diez hallazgos sobre el texto, y están
-> cerrados aquí (el mecanismo con que `dados.glb` puede fallar sin tirar el tablero,
-> §5.1; la cadena flex entera de la web, §1.12; la regla de color del D6, §5.1). Lo
-> que las revisiones encontraron está cerrado aquí, con su medida, o abierto en el §10
-> con su dueño. Ningún número de aquí es una opinión: cada uno sale de un guion de
-> medida corrido sobre `huecosDeLaBarra`, `huecosDeLaBaraja`, `huecosDeLasCartas`,
-> `franjaDeLasCartas`, `tapaDeLaMesa`, `ojoDelMirador`, `ojoYMira`, `WebGLRenderLists`
-> con la poda por frustum, `revoltijo`, `fbm` y el atlas del pack, o de una línea del
-> código citada con su fichero. Los guiones se listan en el §9. Las líneas de
-> `delta.tsx` que se citan son las del commit `4287809` (§8).
+> tira tocándolo, y poder recoger la mesa. Es la octava versión. Las siete anteriores,
+> en una línea cada una: la primera pasó por una revisión adversaria que volvió a medir
+> cada número con el código real; la segunda por otra que leyó el orden de dibujo con
+> el ordenador de `three` de verdad, buscó quién apagaba los dados fuera de turno y
+> proyectó los 54 vértices con la cámara inclinada; la tercera metió en ese ordenador
+> el árbol de `delta.tsx` con sus grupos anidados tal como están; la cuarta montó
+> encima lo que la fase 2 añade; la quinta recogió las siete decisiones que Miguel
+> tomó la noche del 5 de septiembre (están en el §1, cada una con su porqué y sus
+> consecuencias medidas); la sexta hizo salir de su guion los puntos del cajón
+> (§1.11) y recogió el D6 de KayKit Board Game Bits como malla de los dados (§5.1); y
+> la séptima fue la primera escrita con la fase 2 aterrizada (`4287809`: la mesa de
+> madera), donde se descubrió que los dos «testigos» de borrado de profundidad nunca
+> corrieron y que la tapa tenía que PARAR el toque (§4.1).
+>
+> Esta octava está escrita CON LA FASE 3 ATERRIZADA (commit `b216fbc`: los dos dados
+> del pack sobre la mesa, con su máquina y su compilador; la fase 1 lo estaba en
+> `8371080` y la fase 2 en `4287809`). La regla es la misma que en la séptima: donde
+> la fase 3 hizo otra cosa que la que aquí se había decidido, gana el código, y el
+> documento cuenta lo que hay y por qué cambió. Lo que la fase 3 cambió respecto de la
+> séptima versión, en corto: el pack Board Game Bits está en el disco y MEDIDO, y el
+> D6_A lleva los puntos como geometría, así que la ruta que la séptima daba por menos
+> probable (hornear a vértice) es la que se tomó, con un paso más que nadie había
+> escrito: los dos colores se REMAPEAN a los de las fichas del tablero, y la cara que
+> enseña cada valor se MIDE contando puntos y se escribe en un fichero generado (§5.1);
+> el D6 cuesta 662 triángulos por dado, más del techo de 287 que la séptima fijaba,
+> y el presupuesto se rehízo con esa cuenta (`12 · seg + 1.470`, tope 4.500; §1.10,
+> §7); el quinto hueco ya NO es cuadrado, porque el par de 1,12 lados no cabía en él:
+> reserva el ancho del par y crece hacia la izquierda (§4.4); el `switch` exhaustivo
+> de la respuesta de `mover` vive en la escena y no en las pantallas (§5.3); rodar
+> parte de la última pose real del dado y no del par recalculado con el sello nuevo
+> (§5.2); el botón de apoyo del escritorio existe mientras existen los dados y se apaga
+> con `aria-disabled`, nunca con `disabled` (§1.4); y el mecanismo de carga de
+> `dados.glb` con el que la séptima se contradecía está escrito con los nombres del
+> código (§5.1). Los siete hallazgos que la séptima revisión dejó abiertos están
+> cerrados aquí: los dos graves (el mecanismo de `dados.glb`, §5.1 y §8; la fase 1
+> contada como pendiente cuando estaba hecha, §11) y los cinco menores (§4.2, §4.1 dos
+> veces, §4.4 y el comentario de `tapaDeLaMesa`, que sigue diciendo «unos 2,3» y queda
+> apuntado para la fase 4, §11). Ningún número de aquí es una opinión: cada uno sale
+> de un guion de medida corrido sobre `huecosDeLaBarra`, `huecosDeLaMesa`,
+> `huecosDeLaBaraja`, `huecosDeLasCartas`, `franjaDeLasCartas`, `tapaDeLaMesa`,
+> `ojoDelMirador`, `ojoYMira`, `WebGLRenderLists` con la poda por frustum,
+> `revoltijo`, `fbm`, el atlas del pack y el propio `D6_A.gltf`, o de un comprobador
+> que se nombra, o de una línea del código citada con su fichero. Los guiones se listan
+> en el §9. Las líneas que se citan son las del commit `b216fbc` (§8).
 
 ## 0. Qué hay hoy, y qué se pierde al quitar los paneles
 
@@ -50,9 +60,9 @@ esto, con nombre y fichero:
 |---|---|---|
 | El código de la mesa, quién está sentado, salir, tirar la mesa | `LaFicha` y los dos botones del `<aside class="rail">` de `sala.tsx` (22 rem, `tablero-y-panel`) | `BarraDeLaMesa` de `tablero-en-linea.tsx`, con `paddingTop: arriba + 14` |
 | De quién es el turno | (dentro de `LaFicha`) | `LineaDelTurno` |
-| La frase del juego («Te toca: tira los dados.», «Turno de Ana: está por tirar.») | `<p class="aviso-del-tablero">` ENCIMA del recuadro del lienzo, en flujo —un párrafo con margen, `riberas-en-tres.tsx` 1145 y `estilo.css` 1603, no un vidrio sobre la escena—, texto de `avisoDe` en `riberas.ts` (4174–4193) | el mismo `aviso` dentro del retablo; en la rama del delta no se pinta hoy |
+| La frase del juego («Te toca: tira los dados.», «Turno de Ana: está por tirar.») | `<p class="aviso-del-tablero">` ENCIMA del recuadro del lienzo, en flujo —un párrafo con margen, `riberas-en-tres.tsx` 1253 y `estilo.css` 1603, no un vidrio sobre la escena—, texto de `avisoDe` en `riberas.ts` (4174–4193) | el mismo `aviso` dentro del retablo; en la rama del delta no se pinta hoy |
 | El marcador: puntos, cartas, guardias, el Vado con su largo, la Guardia, títulos, el mazo que queda | `MarcadorDeRiberas` en el raíl | `ElMarcador`, una cinta horizontal de `FichaDelColono` entre el aviso y el lienzo |
-| Tirar, pasar, aceptar, rechazar, contestar, empezar | `<Formulario>` bajo el lienzo, con `opcionesFueraDeLaBarra(opcionesFueraDeLaMano(opcionesFueraDelTablero(o)), mazo)` (línea 799) | `LasOpciones` en el `ScrollView` del pie, misma composición (línea 691) |
+| Tirar, pasar, aceptar, rechazar, contestar, empezar | `<Formulario>` bajo el lienzo, con `opcionesFueraDeLaMesa(opcionesFueraDeLaBarra(opcionesFueraDeLaMano(opcionesFueraDelTablero(o)), mazo), dados)` (líneas 845 y 955; desde la fase 3 TIRAR se cae donde hay dados, §1.4) | `LasOpciones` en el `ScrollView` del pie, misma composición (752 y 779) |
 | La crónica | `LaCronica` en el raíl | `LaCronica` en el pie |
 
 El lienzo del escritorio mide `62vh` con un mínimo de 420 px (`estilo.css`,
@@ -110,7 +120,7 @@ dados o uno) está dentro de la decisión 3, y las otras seis son las decisiones
    va y lo más alto de la mesa pasa a ser el ASA —la caja invisible de un lado, `hueco.y
    + 0,5·lado = −0,275·alto`, el 22,5 %— y, un pelo por encima, la pieza tomada en lo
    alto de su bote: `0,62·1,18/2 + 0,12 + 0,03 = 0,516` lados (el `crece` de 1,18 de
-   `PiezaEnLaBarra`, `delta.tsx` 1144, y el bote de su `useFrame`), `−0,273·alto`, el 22,7 %, que asoma 0,7 puntos sobre el asa en 320 de
+   `PiezaEnLaBarra`, `delta.tsx` 1175, y el bote de su `useFrame`), `−0,273·alto`, el 22,7 %, que asoma 0,7 puntos sobre el asa en 320 de
    alto y 2,4 en 1.080 (`medir-techos.ts`). NO el techo del naipe (0,31 lados, 19,8 %),
    que decía la segunda versión: el naipe está por debajo del asa. La holgura al piso de
    la mano del mazo queda en 0,073 del alto. Y el hueco de los dados no sube más: el dado
@@ -168,10 +178,12 @@ dados o uno) está dentro de la decisión 3, y las otras seis son las decisiones
    mismo —que una carta comprada no se juegue hoy— y lo protegen por el lado que sigue
    cerrado: `comprada` NO se declara, ni ahora ni en este encargo, y sin `comprada`
    escrito no hay con qué comparar `turnosAbiertos` aunque esté. `turnosAbiertos` entra
-   SÓLO como sello de los dados y lo lee sólo `dadosEnTres`. La fase 1 reescribe esos
-   dos comentarios para que digan eso —la salvaguarda es que `comprada` no esté, no que
-   `turnosAbiertos` no esté— en vez de quedarse afirmando algo que la línea de abajo
-   desmiente.
+   SÓLO como sello de los dados y lo lee sólo `dadosEnTres` (`selloDeLaTirada`,
+   `riberas-en-tres.ts` 1034: «es la ÚNICA lectura de `turnosAbiertos` de este fichero,
+   y no se compara con nada»). La fase 1 (`8371080`) reescribió esos dos comentarios
+   para que digan eso (hoy 51–57 y 177–190: la salvaguarda es que `comprada` no esté,
+   no que `turnosAbiertos` no esté) en vez de dejarlos afirmando algo que la línea de
+   abajo desmentía.
 
 4. **El toque del dado manda `riberas:tirar` por la misma puerta que el botón, y el
    botón desaparece sólo donde hay dado.** Igual que `opcionesFueraDeLaBarra` quita
@@ -182,15 +194,31 @@ dados o uno) está dentro de la decisión 3, y las otras seis son las decisiones
    dados no vibrarían nunca. En el retablo, en una mesa de más de cuatro, para un mirón
    y en los lienzos donde los dados no caben (§4.4) no hay dados y el botón se queda:
    es la regla de «cada movimiento se enseña exactamente una vez» (cabecera de
-   `Formulario` en `riberas-en-tres.tsx`, línea 1230) aplicada sin dejar a nadie sin
+   `Formulario` en `riberas-en-tres.tsx`, línea 1377) aplicada sin dejar a nadie sin
    tirar. La entrada de la escena se llama `onPulsarLosDados`, no `onTirar`: en las
    dos pantallas `tirar` ya es TIRAR LA MESA (`mesa.tirar`). Y para quien juega con
-   lector de pantalla, la acción sigue existiendo aunque el botón no se vea: la vista
-   que envuelve el `Canvas` en la app —que ya lleva `accessible` y su
-   `accessibilityLabel` (línea 1107)— declara `accessibilityActions: [{ name: 'tirar'
-   }]`, y en el escritorio el recuadro `RECUADRO_DEL_LIENZO` lleva un botón sólo para
-   tecnologías de apoyo. Un dado que sólo se puede tocar con el dedo sería el primer
-   movimiento del juego inaccesible.
+   lector de pantalla, la acción sigue existiendo aunque el botón no se vea. Hecho en
+   la fase 3 (`b216fbc`), y con una decisión que la séptima versión no tenía: la vista
+   que envuelve el `Canvas` en la app, que ya llevaba `accessible` y su
+   `accessibilityLabel` (`riberas-en-tres-escena.tsx` 1204–1205), declara
+   `accessibilityActions={dados !== null ? [{ name: 'tirar', label: 'Tirar los dados' }]
+   : undefined}` y un `onAccessibilityAction` que sólo manda si `dados.disponible`
+   (1212–1215); y en el escritorio el recuadro `RECUADRO_DEL_LIENZO` lleva un botón
+   `.riberas-solo-apoyo` «Tirar los dados» (`riberas-en-tres.tsx` 1278–1289; la regla
+   de `estilo.css` lo saca de la vista con `clip-path: inset(50%)`, nunca con `display:
+   none`, que los lectores saltan). Ese botón EXISTE MIENTRAS EXISTEN LOS DADOS
+   (`dados !== null`), no sólo mientras se puede tirar, y se apaga con
+   `aria-disabled={!dados.disponible}` y el `onClick` cortado, SIN `disabled` nativo.
+   La vuelta 3b lo encontró: la primera escritura lo montaba con `dados.disponible`, y
+   al pulsarlo `mover` pone `quieto`, `disponible` cae, el botón que tiene el foco se
+   desmonta y el foco del lector cae al `body`. Y un `disabled` nativo es el mismo
+   fallo por otra puerta: un botón `disabled` deja de ser enfocable y el navegador le
+   quita el foco igual (la regla de recolocación del foco de HTML). `verify:escritorio`
+   lo exige con dos comprobaciones («tirar sigue al alcance de las tecnologías de
+   apoyo…» y «su existencia no depende de `disponible`: se monta con `dados !== null`,
+   se apaga con `aria-disabled` y nunca lleva `disabled`»); la app no tiene el problema
+   porque la acción vive en la vista del `Canvas`, que no se desmonta al tirar. Un dado
+   que sólo se puede tocar con el dedo sería el primer movimiento del juego inaccesible.
 
 5. **La animación espera al servidor, termina en SU número, y un rechazo la corta en
    el acto.** El cliente no sortea nada: al tocar, los dados ruedan sin objetivo;
@@ -208,7 +236,10 @@ dados o uno) está dentro de la decisión 3, y las otras seis son las decisiones
    `app/src/arcade/mesa.ts` 781). Con sólo `tocado | vista | tic`, los dados rodarían
    6 s esperando una tirada que no va a llegar, y un doble toque es lo primero que va a
    pasar. Así que `mover` DEVUELVE lo que ya calcula —`'hecho' | 'rechazado' |
-   'sin-red'`— y la pantalla se lo da a la máquina como suceso `rechazado` (§5.3). Los
+   'sin-red'`— (fase 1, `8371080`), la pantalla le devuelve esa promesa a la escena
+   por `onPulsarLosDados`, y es la ESCENA quien la traduce a suceso con
+   `sucesoDelResultado` (`escenas/dados.ts`: `hecho` no empuja nada; `rechazado` y
+   `sin-red` empujan `rechazado`), no la pantalla, como decía la séptima (§5.3). Los
    6 s quedan sólo para «la red no contestó». Nada de esto pasa por estado de React:
    la fase, el reloj y el par objetivo viven en refs y se leen en un `useFrame`, como
    el tiempo del mar en `Mar` («son sesenta escrituras por segundo»).
@@ -284,13 +315,20 @@ dados o uno) está dentro de la decisión 3, y las otras seis son las decisiones
    exactamente lo que se pide al recogerla.
 
 10. **La mesa tiene tope de triángulos, escrito al lado del del mar.** El delta sólo
-    tiene una cota, `TOPE_DEL_MAR` en `presupuesto-del-delta.ts`. Mesa, dados, asa,
-    tapete, sombras y pila suman **1.742** triángulos con la tapa a 96 segmentos y
-    **3.470** con la tapa a 240 (`medir-tapa-horizontal.ts`, con `three`): el 7,5 % y
-    el 14,9 % del mar. Es UN total, el mismo aquí y en la tabla del §7, y es lo que
-    devuelve `triangulosDeLaMesa(segmentos) = 12 · segmentos + 590`. Se declara
-    `TOPE_DE_LA_MESA = 3_600` y `verify:escena` lo cuenta; sin él, el día que alguien
-    suba los segmentos para ver la veta más fina lo descubrirá en un móvil.
+    tenía una cota, `TOPE_DEL_MAR` en `presupuesto-del-delta.ts`. Mesa, dados, asa,
+    tapete, sombras y pila suman **2.622** triángulos con la tapa a 96 segmentos y
+    **4.350** con la tapa a 240 (`verify:escena` lo construye con `three` y lo cuenta:
+    «`triangulosDeLaMesa` es lo que pintan las geometrías de verdad…»): el 11,2 % y el
+    18,6 % del mar. Es UN total, el mismo aquí y en la tabla del §7, y es lo que
+    devuelve `triangulosDeLaMesa(segmentos) = 12 · segmentos + 1.470`, donde los dados
+    entran por el MÁXIMO de sus dos cuentas (el D6 del pack, 1.324 los dos; el respaldo
+    procedimental, 444; §5.1). `TOPE_DE_LA_MESA = 4_500`, y `verify:escena` lo cuenta y
+    exige además que sea menos de la quinta parte del mar. Hasta la fase 3 eran
+    `12 · seg + 590`, 1.742 a 3.470 y un tope de 3.600 con el respaldo: el D6 del pack
+    cuesta 662 triángulos por dado, 880 más que el respaldo los dos, y el tope se rehízo
+    con esa cuenta y no a ojo (4.350 a 240 segmentos, 150 de margen; la cabecera de la
+    constante lo dice). Sin él, el día que alguien suba los segmentos para ver la veta
+    más fina lo descubrirá en un móvil.
 
 11. **El marcador va en el CAJÓN, no en la cinta, y el cajón está hecho para SEIS.**
     (Decisión 2 de Miguel.) La cinta se queda en una línea, y lo que se ve del marcador
@@ -417,7 +455,7 @@ dados o uno) está dentro de la decisión 3, y las otras seis son las decisiones
     eslabones, no dos.** La sexta versión nombraba `.tablero-y-panel` y `.riberas-lienzo`
     y se dejaba uno en medio: `.riberas-lienzo` no cuelga de `.tablero-y-panel`, cuelga
     del `<div class="riberas-en-tres">` que `RiberasEnTres` pinta (`riberas-en-tres.tsx`
-    1137), y ese `div` es hoy un `flex` en columna con `gap: 1rem` y `margin-bottom:
+    1245), y ese `div` es hoy un `flex` en columna con `gap: 1rem` y `margin-bottom:
     1.5rem` (`estilo.css` 2101–2106); y `.tablero-y-panel` no es una columna flex sino
     un `grid` con `align-items: start` (1380–1385; una sola columna bajo 60 rem,
     1388–1392), y un `start` no estira a nadie. La cadena entera, con lo que cada
@@ -429,11 +467,11 @@ dados o uno) está dentro de la decisión 3, y las otras seis son las decisiones
     min-height: 0` y pierde el `margin-bottom` → `.riberas-lienzo` lleva `flex: 1;
     min-height: 0`. Un eslabón sin `min-height: 0` es un eslabón que crece con su
     contenido, y el lienzo empujaría la página. Y el `<p class="aviso-del-tablero">`
-    que hoy va ENCIMA del recuadro, en flujo (`riberas-en-tres.tsx` 1145; `estilo.css`
+    que hoy va ENCIMA del recuadro, en flujo (`riberas-en-tres.tsx` 1253; `estilo.css`
     1603, con su margen), se va a la cinta (§2.2), para no restarle alto al lienzo. Los
     `62vh` y el `min-height: 420px` de hoy (`estilo.css` 2108–2112, y los `52vh` bajo 900
-    px, 2331–2335) se van con la clase. `clientWidth/clientHeight` del recuadro
-    (`riberas-en-tres.tsx` 500–501 y 657) siguen dando el lienzo real, que es lo que
+    px, 2351–2355) se van con la clase. `clientWidth/clientHeight` del recuadro
+    (`riberas-en-tres.tsx` 545–546 y 702) siguen dando el lienzo real, que es lo que
     `huecosDeLaMesa` recibe. Consecuencia para las medidas: **los lienzos de la lista
     son lienzos, no ventanas**; una ventana de 1920×1080 con una cabecera que midiera
     48 px sería un lienzo de 1920×1032 (asa de 144,5 puntos, colgado, y todo lo demás
@@ -482,7 +520,7 @@ dados o uno) está dentro de la decisión 3, y las otras seis son las decisiones
     (Decisión 6.) El suelo del toque ya estaba (44, §1.2). El mínimo legible del dado
     hay que escribirlo, y se escribe con una medida de la casa: **el punto del dado no
     baja de 4 puntos** —el grosor del raíl de color de `FichaDelColono` (`fichaRail:
-    { width: 4 }`, `riberas-en-tres-escena.tsx` 1904), la marca más fina que la Sala
+    { width: 4 }`, `riberas-en-tres-escena.tsx` 2022), la marca más fina que la Sala
     pide leer a distancia de brazo— y como el punto mide el 18 % de la arista, **la
     arista no baja de 22 puntos**. Con la arista de 0,46 lados de la cuarta vuelta el SE
     daba 20,6 puntos de dado y 3,7 de punto: bajo el mínimo con el asa en regla. El asa
@@ -516,12 +554,21 @@ dados o uno) está dentro de la decisión 3, y las otras seis son las decisiones
     apaisado de 320 o más va colgado y en regla; y de pie el quinto llega a 44 desde
     **375 puntos de ancho** (375×845 da 44,0), así que por debajo de eso —los 320 y 360
     de la lista— no hay dados y TIRAR está en la cinta. En ningún lienzo de la lista con
-    dados baja el dado de 22 ni el punto de 4; `verify:escena` lo exige en la fase 3 con
-    las mismas constantes que pintan (`ARISTA_DEL_DADO = 0,52`, `PUNTO_DEL_DADO = 0,18`).
-    Lo que el 0,52 mueve en el resto del documento está movido: el techo del salto
-    (§1.2, 0,24 lados), el centro del cubo (§5.1, `cota + 0,26`), los tamaños del §5.1 y
-    los triángulos del respaldo, que no cambian (los puntos son los mismos 21 por dado;
-    los del D6 del pack se cuentan con el fichero delante, §5.1).
+    dados baja el dado de 22 ni el punto de 4; `verify:escena` lo exige desde la fase 3
+    con las mismas constantes que pintan (`ARISTA_DEL_DADO = 0,52`, `PUNTO_DEL_DADO =
+    0,18`, `DADO_MINIMO = 22`, `PUNTO_MINIMO = 4`, todas en `escenas/dados.ts`; la
+    comprobación «en ningún lienzo con sitio el dado baja de 22 puntos ni el punto de 4»
+    exige además las cifras del SE y del 390 de pie y exactamente dos lienzos «sin
+    dados», y otra afirma los umbrales 561×316 / 557×314 / 375×845 / 374×845). La
+    columna «Asa» de la tabla es el ALTO del asa (el lado del reparto); su ancho es 1,6
+    lados colgada y, desde la vuelta 3b de la fase 3, `ANCHO_DEL_PAR_DE_DADOS = 1,12`
+    lados como quinto (51,3 pt en 390), porque con la arista de 0,52 el par ya no cabía
+    en un quinto de un lado (§4.4). `ANCHO_DEL_PAR_DE_DADOS` vive en `escenas/dados.ts`
+    junto a la arista y lo importa `barra.ts`. Lo que el 0,52 mueve en el resto del
+    documento está movido: el techo del salto (§1.2, 0,24 lados), el centro del cubo
+    (§5.1, `cota + 0,26`), los tamaños del §5.1, el ancho del quinto (§4.4) y los
+    triángulos del respaldo, que no cambian (los puntos son los mismos 21 por dado; los
+    del D6 del pack son 662 por dado, medidos, §5.1).
 
 16. **La mesa recogida SALE SOLA cuando pasa a tocarme, salvo con una carta cogida.**
     (Decisión 7.) Como dice el §6: recoger es para mirar, y cuando hay que actuar la
@@ -549,7 +596,7 @@ el marcador el primero, en fichas de 44 hechas para seis (decisión 11). No se
 reescribe su lógica; se cambia dónde está, el orden de sus tres secciones y el
 renglón con que `MarcadorDeRiberas` pinta cada colono. El `<Formulario>` de abajo se va del flujo
 y pasa a la cinta. El `<p class="aviso-del-tablero">` que va encima del recuadro
-(`riberas-en-tres.tsx` 1145) pasa a la misma cinta: en flujo le resta alto al lienzo.
+(`riberas-en-tres.tsx` 1253) pasa a la misma cinta: en flujo le resta alto al lienzo.
 
 **App.** `BarraDeLaMesa`, `LineaDelTurno`, `ElAviso`, `ElMarcador` y el `ScrollView`
 del pie salen del árbol en la rama del delta; el `Canvas` llena `estilos.todo`. La
@@ -687,7 +734,9 @@ todos los lienzos (fase 5): la cinta que se pinta es la que se mide.
   `#f9aa4e`, verde `#008454`; un color desconocido sale azul), y `turnoDe` llega a
   `<Delta>` desde `turnoEnTres(vista)` en `shared/`, compuesto una vez para las dos
   pantallas (§8). Hasta la fase 2 ninguna pantalla pasaba `turnoDe`, y el tapete sólo
-  se veía en el banco.
+  se veía en el banco. Desde la fase 3, con dados y `ultimaTirada = 0` (antes de la
+  primera tirada) se apaga (§5.2); sin dados se pinta en cuanto hay color, porque sin
+  dados la escena no sabe si se ha tirado.
 - **Cuánto mazo queda:** el naipe del cuarto hueco pasa a ser una pila de
   `marcador.mazo` cartas de 0,004 lados de grosor cada una: con las veinticinco
   mide 0,10 lados —5 puntos en un iPhone 14, 14 en un monitor—, y con tres casi
@@ -714,8 +763,9 @@ todos los lienzos (fase 5): la cinta que se pinta es la que se mide.
   navegador de pie), el mismo cartel se queda mientras dure esa proporción, porque
   ahí sí se sabe. La mesa se pinta en su forma de pie y **si hay dados o no lo decide
   la regla del §4.4, no el cartel**: en 390×490 y 390×845 hay dados con un asa de
-  45,8 puntos; en 320×360 y 360×490 no los hay, las piezas se quedan en 47,5 y 53,4
-  puntos y TIRAR sigue en la cinta (`medir-quinto-y-suelo.ts`). El cartel no es una
+  45,8 puntos de alto (y 51,3 de ancho, el par entero: §4.4); en 320×360 y 360×490 no
+  los hay, las piezas se quedan en 47,5 y 53,4 puntos y TIRAR sigue en la cinta
+  (`medir-quinto-y-suelo.ts`; `rev5-quinto-y-dado.ts` para la octava). El cartel no es una
   excusa para bajar de 44: la app pinta hoy el delta de pie, y lo que se pinta se
   mide.
 - **Lo que el sistema cambia:** con la barra de estado oculta, los insets que quedan
@@ -789,8 +839,11 @@ fase 2, `rev4-tapa-holgura.ts`):
   vértices (2 con su anillo entero) y 5 aristas en los cinco teléfonos apaisados y en
   los dos monitores; 2 vértices y 3 aristas en la tableta 4:3 y en el iPad (2 y 1 en la
   tableta de 768×640); 0 de pie; y ninguna comarca en ningún lienzo.** A
-  `ALTURA_MAXIMA` (82°), que es dato y no exigencia: 4 vértices, 6 aristas y 2 comarcas
-  en los apaisados. Se aceptan por dos razones: se sacan arrastrando la cámara (la tapa
+  `ALTURA_MAXIMA` (82°), que es dato y no exigencia: hasta 4 vértices, 6 aristas y 2
+  comarcas en los apaisados (4/5/2 en el SE; 4/6/2 en los demás teléfonos y en los
+  monitores; 4/4/1 en la tableta 4:3 y 4/5/1 en el iPad; 2/3/0 en la tableta de
+  768×640; 0 de pie; `rev2-vertices-bajo-la-tapa-2.ts`, vuelto a correr para la
+  octava). Se aceptan por dos razones: se sacan arrastrando la cámara (la tapa
   no marca el suceso para la cámara, ver más abajo), y con la tapa parando el toque no
   se pulsan a ciegas. `verify:escena` los cuenta contra esas cifras escritas
   (`ACEPTADOS`), y si alguna sube es que la tapa creció hacia atrás (`TRAS_EL_ZOCALO`,
@@ -855,24 +908,29 @@ fase 2, `rev4-tapa-holgura.ts`):
     **TODO `<group>` que tenga mallas debajo lleva la constante de su capa como
     `renderOrder`**, porque el grupo que cuenta es el más cercano a la malla; el
     `renderOrder` de cada malla sigue ordenando DENTRO de su capa. Los grupos que la
-    llevan (líneas de `delta.tsx` en `4287809`):
+    llevan (la línea de `escenas/delta.tsx` en `b216fbc` donde está escrito el
+    `renderOrder` de cada uno):
 
     | Grupo | `escenas/delta.tsx` | `renderOrder` | Qué cuelga directamente de él |
     |---|---|---|---|
-    | `Barra` | 1606 | `ORDEN_DE_LA_BARRA` | la luz, la tapa, las sombras, el tapete |
-    | `PiezaEnLaBarra`, exterior | 1154 | `ORDEN_DE_LA_BARRA` | asa, zócalo |
-    | `PiezaEnLaBarra`, interior (`ref={grupo}`) | 1203 | `ORDEN_DE_LA_BARRA` | las mallas del modelo |
-    | `MazoEnLaBarra`, exterior | 1299 | `ORDEN_DE_LA_BARRA` | asa, zócalo |
-    | `MazoEnLaBarra`, interior (`ref={grupo}`) | 1332 | `ORDEN_DE_LA_BARRA` | filo, cuerpo e icono del naipe |
-    | `Baraja` | 2101 | `ORDEN_DE_LAS_CARTAS` | sólo su luz: el testigo que colgaba de él se QUITÓ (nunca corrió); se numera para que el grupo de cada mano diga su capa |
-    | `Carta` | 1869 | `ORDEN_DE_LAS_CARTAS` | borde, cuerpo, icono |
-    | `AreaDeTrueque` | 1962 | `ORDEN_DE_LAS_AREAS` | cuerpo, borde, icono |
-    | `ManoDelMazo` | 2501 | `ORDEN_DE_LAS_CARTAS_DEL_MAZO` | nada: se pone para que el grupo de cada mano diga su capa y una malla que mañana cuelgue directa caiga en ella |
-    | `CartaDelMazoEnLaMano` | 2212 | `ORDEN_DE_LAS_CARTAS_DEL_MAZO` | borde, cuerpo, icono |
-    | `Casilla` | 2337 | `ORDEN_DE_LAS_CASILLAS` | cuerpo, borde, icono |
+    | `Barra` | 1677 | `ORDEN_DE_LA_BARRA` | la luz, la tapa, las sombras, el tapete |
+    | `PiezaEnLaBarra`, exterior | 1188 | `ORDEN_DE_LA_BARRA` | asa, zócalo |
+    | `PiezaEnLaBarra`, interior (`ref={grupo}`) | 1234 | `ORDEN_DE_LA_BARRA` | las mallas del modelo |
+    | `MazoEnLaBarra`, exterior | 1333 | `ORDEN_DE_LA_BARRA` | asa, zócalo |
+    | `MazoEnLaBarra`, interior (`ref={grupo}`) | 1363 | `ORDEN_DE_LA_BARRA` | filo, cuerpo e icono del naipe |
+    | `Dados`, el grupo del sitio (fase 3) | 1955 | `ORDEN_DE_LA_BARRA` | el asa única invisible |
+    | `Dados`, el grupo de cada cubo (`ref` a `cubos`; fase 3) | 1972 | `ORDEN_DE_LA_BARRA` | la malla del D6 del pack, o el cuerpo y los puntos del respaldo |
+    | `Baraja` | 2417 | `ORDEN_DE_LAS_CARTAS` | sólo su luz: el testigo que colgaba de él se QUITÓ (nunca corrió); se numera para que el grupo de cada mano diga su capa |
+    | `Carta` | 2185 | `ORDEN_DE_LAS_CARTAS` | borde, cuerpo, icono |
+    | `AreaDeTrueque` | 2281 | `ORDEN_DE_LAS_AREAS` | cuerpo, borde, icono |
+    | `ManoDelMazo` | 2817 | `ORDEN_DE_LAS_CARTAS_DEL_MAZO` | nada: se pone para que el grupo de cada mano diga su capa y una malla que mañana cuelgue directa caiga en ella |
+    | `CartaDelMazoEnLaMano` | 2531 | `ORDEN_DE_LAS_CARTAS_DEL_MAZO` | borde, cuerpo, icono |
+    | `Casilla` | 2656 | `ORDEN_DE_LAS_CASILLAS` | cuerpo, borde, icono |
 
-    Los `Dados` y la pila de la mesa (fases 3 y 7) nacen con la regla: todo `<group>`
-    suyo lleva `ORDEN_DE_LA_BARRA`. Con esto, en las DOS pasadas, todo lo de la barra
+    Los `Dados` nacieron con la regla en la fase 3 (los dos grupos de la tabla; el de
+    cada cubo lo lleva porque es el más cercano a la malla, y la vacuna E12 de la fase 3
+    lo vio caer en `verify:escena` al quitárselo), y la pila de la mesa (fase 7) nacerá
+    igual: todo `<group>` suyo lleva `ORDEN_DE_LA_BARRA`. Con esto, en las DOS pasadas, todo lo de la barra
     (1000) va antes que todo lo de los bienes (1010), esto antes que las áreas (2000),
     por el grupo y no por la cuenta de la malla (con once o más cartas en la mano, una
     carta cogida con el imán a tope pasa de 2002: 1010 + 100 + 300 + 600 = 2010; con el
@@ -883,7 +941,12 @@ fase 2, `rev4-tapa-holgura.ts`):
     señal) → `g1000` (tapa, piezas, asas) → `g1010` (cartas) → `g2000` → `g4000`, y
     transparentes `g0` (el anillo de la señal) → `g1000` (naipe, zócalos, tapete,
     sombras) → `g2000` → `g3000` → `g4000` (`rev2-orden-real.ts` imprime la lista
-    entera).
+    entera). Desde la fase 3 el asa de los dados y los dos cubos van OPACOS en `g1000`,
+    detrás de la tapa y antes de las asas y las piezas de la barra, en los trece lienzos
+    con sitio, y nada podado (`verify:escena`: «los dos dados se pintan OPACOS y antes
+    que las cartas de bienes en el iPhone 14, y también están (sin podar) en el quinto
+    hueco de un móvil de pie de 390»; `npx tsx escenas/scripts/arbol-de-la-mesa.ts`
+    imprime la lista con `barra:DADO 0` y `barra:DADO 1`).
   - **No hay borrado de profundidad, y no se sustituye.** Se quitan los dos testigos;
     no queda ningún `clearDepth(` en `escenas/`, y `verify:escena` lo afirma sobre el
     código (no sobre los comentarios, que cuentan el fallo con su nombre) y afirma
@@ -904,13 +967,16 @@ fase 2, `rev4-tapa-holgura.ts`):
     cámara no baja de 12° (`ALTURA_MINIMA`, `camara.ts` 54). Con el terreno sintético
     de dos escalones (10,9 unidades) el mundo no llega nunca a las 2 unidades donde vive
     la mesa: 0 de 864 posturas a 12° (3 acercamientos × 72 rumbos × 4 centros;
-    `rev3-colores-y-ojo.ts`, sección d). Pero en una montaña de siete u ocho escalones
+    `rev3-colores-y-ojo.ts`, sección d). Pero en una montaña de cinco a ocho escalones
     (27–44 unidades de techo) y acercado al máximo, el ojo puede meterse en la roca y
     la mesa se entierra con él: **de 3 a 35 de 1.080 posturas a 12° según la semilla**
-    (29, 11, 35, 6, 11 y 3 para las semillas 0, 1, 2, 3, 7 y 11; `rev3-ojo-montana.ts`,
-    sección e), y **nunca al mirador de salida**, donde el ojo va a 389. Es el precio
-    aceptado de no hacer la segunda pasada, y está escrito en la cabecera de `capas.ts`
-    y en la de `Barra`.
+    (29, 11, 35, 6, 11 y 3 para las semillas 0, 1, 2, 3, 7 y 11, cuyas montañas tienen
+    7, 8, 7, 5, 8 y 5 escalones: 38,3, 43,8, 38,3, 27,3, 43,8 y 27,3 unidades de techo;
+    `rev3-ojo-montana.ts`, sección e; la séptima decía «siete u ocho» y dos de las seis
+    semillas son de cinco), y **nunca al mirador de salida**, donde el ojo va a 389. Es
+    el precio aceptado de no hacer la segunda pasada, y está escrito en la cabecera de
+    `capas.ts` y en la de `Barra` (las dos dicen todavía «siete u ocho escalones»: es un
+    retoque de comentario para la fase 4, §11).
   - **La madera PARA el toque, a todo.** La sexta versión daba a la tapa un
     `raycast={() => null}` «para no quitar ni un toque a las cartas», y no hacía nada:
     en fiber 9.7 sólo se lanzan rayos contra los objetos QUE TIENEN manejadores
@@ -968,8 +1034,9 @@ fase 2, `rev4-tapa-holgura.ts`):
     una de estas seis firmas (`function PiezaEnLaBarra(`, `function MazoEnLaBarra(`,
     `function Carta(`, `function AreaDeTrueque(`, `function CartaDelMazoEnLaMano(`,
     `function Casilla(`), y en las dos primeras también el segundo, el del
-    `ref={grupo}`, lleva `renderOrder={` con la constante de su capa (ocho grupos), y
-    que los tres exteriores (`Baraja`, `ManoDelMazo`, `Barra`) también. La regla de
+    `ref={grupo}`, lleva `renderOrder={` con la constante de su capa (ocho grupos hasta
+    la fase 2; DIEZ desde la fase 3, con `function Dados(` y sus dos grupos), y que los
+    tres exteriores (`Baraja`, `ManoDelMazo`, `Barra`) también. La regla de
     lectura: **la primera línea que EMPIEZA (tras espacios) por `<group` después de la
     firma, y de ahí hasta el `>` que CIERRA la etiqueta, saltando lo que va entre llaves
     y entre comillas** (una etiqueta puede ocupar varias líneas y llevar una función
@@ -977,7 +1044,7 @@ fase 2, `rev4-tapa-holgura.ts`):
     `renderOrder` que sí está); un comentario que cite la constante no cuenta porque no
     empieza por `<group`, y el comentario de la carta no escribe `<group` literal al
     principio de una línea. Mirar sólo los grupos exteriores es afirmar el caso medido
-    roto: se cuentan los ocho de dentro o no se cuenta nada. La segunda cosa es medir:
+    roto: se cuentan los diez de dentro o no se cuenta nada. La segunda cosa es medir:
     **`escenas/scripts/arbol-de-la-mesa.ts`** monta un MODELO del árbol (no React: los
     grupos y las mallas con los mismos materiales, opacos o transparentes, con o sin
     prueba de profundidad, con o sin escritura de color) con las constantes IMPORTADAS
@@ -991,11 +1058,13 @@ fase 2, `rev4-tapa-holgura.ts`):
     podado; `verify:escena` lo corre en los quince lienzos. Suelto (`npx tsx
     escenas/scripts/arbol-de-la-mesa.ts`) imprime la lista ordenada del iPhone 14, que
     es lo que se mira cuando algo del orden se discute. El texto compra la FORMA del
-    árbol; el modelo, que con esa forma el pintor haga lo que se quiere. La misma
-    lectura por texto se extiende en la fase 3 a `function Dados(` (el primer `<group`
-    tras la firma y el segundo, el del `ref`, si lo hay) con `ORDEN_DE_LA_BARRA`, y en
-    la fase 7 a la pila del mazo si trae grupo propio; y los `Dados` entran también en
-    el modelo del árbol.
+    árbol; el modelo, que con esa forma el pintor haga lo que se quiere. Desde la fase 3
+    la lectura por texto cubre `function Dados(` (el primer `<group` tras la firma, el
+    del sitio, y el segundo, el del `ref` a `cubos`) con `ORDEN_DE_LA_BARRA`, y
+    `arbol-de-la-mesa.ts` monta la rama CON dados de `Barra` (`huecosDeLaMesa(4, …)`:
+    sus `.piezas`, y donde hay sitio el tapete, las seis sombras y el grupo `Dados` con
+    su asa invisible y un grupo por cubo con `barra:DADO 0/1` opacos); en la fase 7 se
+    extenderá a la pila del mazo si trae grupo propio.
 
   Lo que queda de las nueve formas que midieron la cuarta vuelta y la cuarta revisión
   sin poda, dicho con la poda puesta (`rev2-orden-real.ts`, `rev3-orden-y-toque.ts`):
@@ -1004,8 +1073,8 @@ fase 2, `rev4-tapa-holgura.ts`):
   |---|---|
   | Sólo `Barra` (era el caso A, con la placa; y el B, con la tapa) | ✗ la tapa opaca se pinta DESPUÉS de las cartas de bienes y les tapa los pies; las piezas, los zócalos y el naipe se pintan con el mundo (`g0`) |
   | Los exteriores (`Barra`, `Baraja`, `ManoDelMazo`), o sólo las manos (los casos C y F) | ✗ lo mismo: un número en el exterior no le llega a ninguna malla; las piezas quedan «fuera de su capa» |
-  | Los diez, con o sin `ManoDelMazo` (los casos D, G, I) | **sin fallos**, en los quince lienzos, y nada podado. Del exterior del mazo no cuelga ninguna malla; se numera por regla |
-  | Los diez, con el grupo interior de los `Dados` sin número (fase 3) | ✗ los cubos «fuera de su capa, se pintan con el mundo»: la vacuna que el juez ve |
+  | Los diez (los trece desde la fase 3), con o sin `ManoDelMazo` (los casos D, G, I) | **sin fallos**, en los quince lienzos, y nada podado. Del exterior del mazo no cuelga ninguna malla; se numera por regla |
+  | Los trece con el grupo de un cubo de los `Dados` sin número (la vacuna E12 de la fase 3) | ✗ los cubos «fuera de su capa, se pintan con el mundo»: la vacuna que el juez ve, y `verify:escena` la caza antes por texto («los DIEZ grupos de dentro llevan la constante de su capa…») |
   | Cualquiera de los anteriores con un testigo (los casos E y H, y la columna «Testigo» entera de las tablas anteriores) | el testigo sale en PODADOS y no cambia nada: esa columna era ficción |
 
   Nota que la sexta versión dejó al margen y que era FALSA: decía que «cualquier
@@ -1058,15 +1127,22 @@ téxeles; las piezas de madera apuntan a dos de ellas, y se han leído por sus U
 | `fence_wood_straight` | `#91513d` (260) | `#b97756` (170) |
 | `building_docks_blue` | `#995843` (1.085) | — |
 
-La tapa mezcla `#955541` y `#b97756` según una veta, `vetaDelTablon(segmentos, filas,
-tablon)`, función pura de `escenas/mesa.ts`:
+La tapa mezcla `#94533f` y `#b97756` según una veta, `vetaDelTablon(segmentos, filas,
+tablon)`, función pura de `escenas/mesa.ts`. Los dos colores no están escritos en el
+código: se LEEN de la tabla compilada del atlas con `coloresDeLaMadera()`, por las
+celdas `MADERA_OSCURA_EN_EL_ATLAS` (columna 6, fila 151: `#94533f` exacto) y
+`MADERA_CLARA_EN_EL_ATLAS` (columna 5, fila 93: `#b97756` exacto), y `verify:escena`
+afirma que siguen siendo los medidos sobre las piezas de madera («los dos colores de la
+madera se leen del atlas del pack y siguen siendo los medidos…: #94533f y #b97756»). La
+sexta y la séptima versión escribían `#955541` en esta frase y en el pseudocódigo de
+abajo: era el color medio de la tabla de arriba, no el de la celda, y gana la celda:
 
 ```
 x = i / segmentos ∈ [0, 1]   a lo largo del tablón (el ancho de la pantalla)
 y = j / filas     ∈ [0, 1]   a lo ancho del tablón (la profundidad, hacia la cámara)
 tablon = floor(j · 3 / filas) ∈ {0, 1, 2}   tres tablones de 0,7 lados de fondo
 veta(x, y, tablon) = fbm(x · 3 + tablon · 17,3, y · 22 + tablon · 5,1, 7_001, 3 octavas)
-color = mezcla(#955541, #b97756, veta)
+color = mezcla(#94533f, #b97756, veta)      los dos leídos del atlas, no escritos
 ```
 
 `fbm` es el de `escenas/ruido.ts` (devuelve entre 0 y 1); el canal 7.001 es fijo y los
@@ -1102,21 +1178,29 @@ discos van en UNA geometría, `geometriaDeLasSombras(centros)` en **`escenas/tab
 y se funden A MANO (abanicos indexados: un centro más veinte vértices de borde por
 disco, `segmentos` triángulos cada uno) y no con `mergeGeometries`, como decía la sexta
 versión: eso vive en `three/examples`, que la app no ha cargado nunca, y la fusión a
-mano son diez líneas. Hoy los centros son los huecos de la barra (cuatro en la
-partida: 80 triángulos, una llamada); en la fase 3 los dos dados se AÑADEN a la misma
-lista de centros (misma geometría, misma llamada), y el presupuesto ya cuenta los seis
-discos (120), que es lo que `verify:escena` construye y cuenta. Es el mismo disco de
-contacto que llevan los aventureros del Muelle.
+mano son diez líneas. Los centros son los huecos de la barra (cuatro en la partida) y,
+desde la fase 3, los dos dados AÑADIDOS a la misma lista, cada uno bajo su centro
+(`sitio.x + centroDelDado(i) · lado`) y con su propio radio,
+`RADIO_DE_LA_SOMBRA_DEL_DADO = 0,32` lados de `escenas/dados.ts`, no el 0,62 de los
+huecos: algo más que la media arista (0,26) para que asome por los cuatro lados del
+cubo, y algo más que la media distancia entre los dos centros (0,30) para que las dos
+sombras apenas se toquen. Seis discos, 120 triángulos, una geometría y una llamada, que
+es lo que `verify:escena` construye y cuenta, y sobre el texto de `delta.tsx` afirma
+que hay UNA llamada a `geometriaDeLasSombras(` y que los centros de los dados entran en
+ella con ese radio («las sombras de los dos dados se AÑADEN a la lista de centros…»).
+Es el mismo disco de contacto que llevan los aventureros del Muelle.
 
 ### 4.4. Los huecos: `huecosDeLaMesa`, y cuándo NO hay dados
 
 `huecosDeLaMesa(cuantos, campo, proporcion, altoEnPuntos)` devuelve `{ piezas, dados }`.
 Recibe el alto del lienzo en PUNTOS porque el suelo de 44 es en puntos y el reparto
 de `huecosDeLaBarra` sólo sabe de unidades; la escena lo tiene (`estado.size.height`,
-que la `Barra` ya lee para la proporción) y las dos pantallas también (`medida` en la
-app, línea 605; `clientWidth/clientHeight` en el escritorio, 500–501 y 657). `dados` es un
-hueco de `1,6 lados` de ancho por `1 lado` de alto, y la regla es de tres peldaños,
-en este orden:
+que la `Barra` ya lee para la proporción) y las dos pantallas también (`medida` del
+`onLayout` en la app, 659–660; el `ResizeObserver` de `medirElRecuadro` en el
+escritorio, 927–944). `dados` es un hueco de `1 lado` de alto y de un ancho que depende
+del peldaño: `1,6 lados` colgado y, como quinto, `max(lado, ANCHO_DEL_PAR_DE_DADOS ·
+lado) = 1,12 lados` (desde la vuelta 3b de la fase 3; hasta entonces era un lado, y el
+par no cabía). La regla es de tres peldaños, en este orden:
 
 1. **Colgado a la IZQUIERDA del reparto de cuatro,** con un paso de aire
    (`AIRE · lado`) entre su borde derecho y el primer hueco, SIEMPRE QUE QUEPA con
@@ -1131,20 +1215,68 @@ en este orden:
    cubre de sobra.
 2. **Como QUINTO hueco del reparto centrado,** el primero por la izquierda, cuando el
    colgado no cabe Y el asa de cinco sigue en o por encima de 44 puntos. `piezas` son
-   los otros cuatro de `huecosDeLaBarra(5, …)`. Pasa en 390×490 y 390×845 (asa de 45,8
-   puntos, las piezas bajan de 57,8 a 45,8), en la tableta de 768×640 (el colgado
-   habría quedado a 8 puntos del canto; asa de 89,6, las piezas no cambian porque
-   sigue mandando el alto) y en una tableta con el navegador de pie, 768×1024 (90,2).
-   Las piezas se corren un poco a la izquierda, y se deja escrito por lo mismo que la
-   cabecera de `huecosDeLaBarra`: una barra centrada que crece no se queda donde
-   estaba.
+   los otros cuatro de `huecosDeLaBarra(5, …)` (`.slice(1)`). Pasa en 390×490 y 390×845
+   (asa de 45,8 puntos de alto, las piezas bajan de 57,8 a 45,8), en la tableta de
+   768×640 (el colgado habría quedado a 8 puntos del canto; asa de 89,6, las piezas no
+   cambian porque sigue mandando el alto) y en una tableta con el navegador de pie,
+   768×1024 (90,2). Las piezas se corren un poco a la izquierda, y se deja escrito por
+   lo mismo que la cabecera de `huecosDeLaBarra`: una barra centrada que crece no se
+   queda donde estaba.
+
+   **El quinto NO es cuadrado, y por qué.** Hasta la sexta versión el par medía 1,00
+   lados (arista de 0,46) y cabía en un quinto de un lado; con la arista de 0,52 de la
+   decisión 15 el par mide 1,12 y la séptima no volvió a mirar el quinto. La revisión
+   de la fase 3 lo midió: en un asa y un tapete de un lado cada dado asomaba 0,06 lados
+   por fuera (2,7 puntos en 390×490 y 390×845, 5,4 en las tabletas), esos bordes no
+   recibían el toque (los cubos llevan `raycast` nulo: sólo el asa se pulsa) y el dado
+   derecho quedaba a 0,180 lados del zócalo de la primera pieza en vez del `AIRE` de
+   0,24. Encoger los dados rompía el §1.15 en 390 (`0,46 · 45,8 = 21` puntos). Así que
+   la vuelta 3b decidió, y `huecosDeLaMesa` lo hace: el quinto reserva para el asa y el
+   tapete `max(lado, ANCHO_DEL_PAR_DE_DADOS · lado)` y **crece hacia la IZQUIERDA**: su
+   borde derecho se queda donde estaba el del hueco de un lado (`quinto.x + lado / 2`,
+   a `AIRE` = 0,24 lados del zócalo de la primera pieza, el mismo aire que hay entre dos
+   huecos y el mismo que el colgado deja hasta la primera), y los 0,12 lados que faltan
+   salen del margen izquierdo. Los dados no encogen (23,8 puntos en 390 de pie), las
+   piezas siguen siendo `huecosDeLaBarra(5).slice(1)` sin moverse un milímetro respecto
+   de la fase 3, y el alto sigue en un lado. Medido con `huecosDeLaMesa(4, …)` en los
+   cuatro lienzos de quinto (`rev5-quinto-y-dado.ts`; la vuelta 3b midió lo mismo):
+
+   | Lienzo | Asa y tapete | Piezas | Dado derecho → primer zócalo | Canto → asa |
+   |---|---|---|---|---|
+   | 390×490 | 1,12 × 1 lados = 51,3 × 45,8 pt | 45,8 pt | 0,240 lados (11,0 pt) | 1,157 lados (53,0 pt) |
+   | 390×845 | 51,3 × 45,8 pt | 45,8 pt | 0,240 lados (11,0 pt) | 1,157 lados (53,0 pt) |
+   | 768×640 | 100,4 × 89,6 pt | 89,6 pt | 0,240 lados (21,5 pt) | 1,186 lados (106,2 pt) |
+   | 768×1024 | 101,0 × 90,2 pt | 90,2 pt | 0,240 lados (21,6 pt) | 1,157 lados (104,4 pt) |
+
+   El canto queda a más de un lado en los cuatro (el colgado exige medio). El colgado no
+   cambia: asa de 1,6 lados con 0,24 de aire dentro a cada lado del par y 0,48 lados
+   del dado derecho al primer zócalo. `verify:escena` lo afirma con una comprobación
+   nueva («el par cabe en el asa y en el tapete en los DOS peldaños, con su aire»: los
+   bordes del par dentro del asa en los trece lienzos con dados, aire ≥ 0,24 hasta la
+   primera pieza, y en el quinto que el ancho es el par y el borde derecho el del hueco
+   de un lado de `huecosDeLaBarra(5)`, con la cifra de 390 escrita: 1,157), y la
+   comprobación de los peldaños mide ahora el borde del DADO derecho (`dados.x +
+   centroDelDado(1) · lado + ARISTA_DEL_DADO · lado / 2`) y no el del asa, que era por
+   lo que no veía el desborde. Y como con quinto lo que se pinta es la barra de cinco,
+   que donde manda el alto es más ancha que la de cuatro (su borde derecho cae a 0,691
+   en 768×640 frente a 0,547), otra comprobación mide el mazo del reparto de cinco
+   contra las cartas de bienes quietas (30,2 pt de margen en 390×490, 9,7 en 390×845,
+   80,0 en 768×640, 56,1 en 768×1024) y contra la mano abierta por el imán allí donde
+   con cuatro no la pisaba. Un preexistente que se anota y no se exige: en 390×845 la
+   mano de bienes ABIERTA por el imán cruza el mazo de la barra 32 puntos, con tres,
+   cuatro y cinco huecos por igual (donde manda el ancho el borde derecho de la barra es
+   siempre 0,2676 del ancho visible), así que no lo estrena el quinto y el ancho de la
+   barra no lo arregla; sigue siendo un sitio donde un ratón que pase por encima roba el
+   rayo al naipe. La cabecera de `HuecoDeLosDados` en `barra.ts` cuenta el porqué
+   entero.
 3. **`dados = null`,** cuando ni el colgado cabe ni el quinto llega a 44. `piezas` es
    `huecosDeLaBarra(4, …)`, las piezas no encogen, y el botón TIRAR se queda en la
    cinta: cada movimiento exactamente una vez, nadie sin tirar (§1.4). Pasa en
    320×360 (el quinto daría 37,6; las piezas se quedan en 47,5) y en 360×490 (42,3;
-   se quedan en 53,4). Son dos de los seis lienzos de la lista `LIENZOS` de
-   `verify:escena` que hoy exigen 44 y dan 46,8 y 53,4 con 0,13: la mesa no puede
-   ponerlos rojos, y no los pone.
+   se quedan en 53,4). Son dos de los quince lienzos de `LIENZOS`; con 0,14 dan 47,5 y
+   53,4, por encima de los 44 que exige `verify:escena`: la mesa no puede ponerlos
+   rojos, y no los pone («en los dos lienzos sin dados las piezas no encogen: se quedan
+   en los 47,5 y 53,4 puntos de siempre»).
 
 La regla es «cabe o no cabe, y llega a 44 o no», nunca la proporción, para que un
 lienzo raro no caiga en la forma equivocada. La pantalla pregunta lo mismo que la
@@ -1153,41 +1285,42 @@ las dos llaman a la misma función con la misma medida no pueden discrepar: si l
 escena no pinta dados, la pantalla no quita el botón.
 
 **Y la escena sólo pide `huecosDeLaMesa` cuando hay algo que poner en su sitio de los
-dados.** Hoy (`4287809`, sin dados todavía) la llave es `tapete !== null`: con color de
-turno, `Barra` pide `huecosDeLaMesa(cuantos, forma.campo, forma.proporcion,
-forma.alto)` y usa SÓLO `.dados`, y sólo si `dados.forma === 'colgado'`, para poner el
-tapete; las piezas siguen SIEMPRE en `huecosDeLaBarra(cuantos, forma.campo,
-forma.proporcion)` (`delta.tsx` 1533), y no se mueve ni un hueco, porque el colgado es
-el único sitio de dados que existe sin tocar a las piezas. En la fase 3 la llave pasa a
-ser `dados !== null` (entrada nueva y opcional de `<Delta>`): con `dados === null` (la
-colocación, un mirón, un lienzo del tercer peldaño, o una pantalla que todavía no pasa
-la entrada) `Barra` se queda como hoy, y con dados pide `huecosDeLaMesa(...)`, usa
-`.piezas` para las piezas y `.dados` para el asa y el tapete, colgado o quinto. No es
-un atajo: `huecosDeLaMesa` decide con el alto en puntos si hay sitio para un cuarto o
-un quinto hueco, y donde cae el quinto (390×490, 390×845, las tabletas) las piezas se
-corren y encogen para hacerle sitio; pedírselo con `dados === null` reservaría en la
-colocación de pie un hueco para unos dados que no existen, y las piezas se moverían
-otra vez al empezar a jugar. La regla es: sin dados, el reparto de siempre; con dados,
-`huecosDeLaMesa(...).piezas` para las piezas y `.dados` para su hueco, y `cuantos` se
-cuenta igual en las dos ramas. `verify:escena` lo afirma hoy sobre el texto de
-`delta.tsx` con la comprobación «sin dados, el reparto de las piezas sigue siendo
-`huecosDeLaBarra` y el tapete sólo se pinta bajo el sitio COLGADO de `huecosDeLaMesa`»
-(que `huecosDeLaBarra(cuantos, forma.campo, forma.proporcion)` sigue ahí y que el
-tapete pasa por `dados !== null && dados.forma === 'colgado'`), y la fase 3 la
-reescribe: que la llamada con `.piezas` está detrás de un `dados !== null` (o de un
-`dados === null ? … : …`) y que sin dados sigue `huecosDeLaBarra`.
+dados: la llave es `dados !== null`.** Hecho en la fase 3 (`delta.tsx`, `Barra`,
+1584–1630): `const conDados = dados !== null`; con dados, `mesa = huecosDeLaMesa(cuantos,
+forma.campo, forma.proporcion, forma.alto)`, `huecos = mesa.piezas` y el sitio de los
+dados es `mesa.dados`, colgado o quinto; sin dados (la colocación, un mirón, un lienzo
+del tercer peldaño, o una pantalla que no pasa la entrada) `huecos =
+huecosDeLaBarra(cuantos, forma.campo, forma.proporcion)`, como en `4287809`, y el
+tapete sólo se pinta bajo el sitio COLGADO de `huecosDeLaMesa` (`sitio.forma ===
+'colgado' ? sitio : null`), porque el colgado es el único sitio de dados que existe sin
+tocar a las piezas. Hasta la fase 3 la llave era `tapete !== null`. No es un atajo:
+`huecosDeLaMesa` decide con el alto en puntos si hay sitio para un cuarto o un quinto
+hueco, y donde cae el quinto (390×490, 390×845, las tabletas) las piezas se corren y
+encogen para hacerle sitio; pedírselo con `dados === null` reservaría en la colocación
+de pie un hueco para unos dados que no existen, y las piezas se moverían otra vez al
+empezar a jugar. `cuantos` se cuenta igual en las dos ramas, y lo que cambia con la
+vista de los dados (la suma, el sello) no rehace el reparto: sólo importa si los hay.
+`verify:escena` lo afirma sobre el texto de `delta.tsx` con dos comprobaciones que
+sustituyen a la de la fase 2: «la llave del reparto es `dados !== null`: con dados
+`huecosDeLaMesa(cuantos, campo, proporcion, alto)` y sus `.piezas` y `.dados`; sin
+dados sigue `huecosDeLaBarra` y el tapete sólo bajo el sitio COLGADO» y «el tapete se
+apaga con `ultimaTirada = 0` (antes de la primera tirada) y sólo con dados: `hayTapete`
+lleva la llave y el `<mesh>` del tapete la pregunta». La vacuna E16 (volver a `tapete
+!== null`) la vio caer.
 
 **`cuantos` es 4, y por qué siempre 4 cuando hay dados.** La escena cuenta
-`piezas.length + (mazo === null ? 0 : 1)` (`delta.tsx` 1531) y la pantalla tiene que
+`piezas.length + (mazo === null ? 0 : 1)` (`delta.tsx` 1578) y la pantalla tiene que
 contar EXACTAMENTE igual —`barraEnTres(...).length + (mazoEnLaBarra(...) === null ? 0 :
 1)`— para pedir el mismo reparto. En `jugando`, para un colono con color, es 4 sin
 excepción: `barraEnTres` devuelve las tres `PIEZAS_DE_LA_BARRA` en cuanto hay color,
 dentro y fuera de turno (314–324; fuera de turno salen apagadas, no ausentes), y
 `mazoEnLaBarra` no es `null` en `jugando` con color (362–371). Fuera de `jugando` el
 mazo es `null` y son 3, y ahí NO hay dados: `dadosEnTres` devuelve `null` fuera de
-`momento === 'jugando'`, por lo mismo que `mazoEnLaBarra` (cabecera 351–360: durante la
-colocación no existe la jugada, y un hueco apagado toda una fase promete algo que no
-llega). Todas las medidas del colgado usan 4 y valen; la de 3 se hizo igual
+`momento === 'jugando'` (`riberas-en-tres.ts` 1092), por lo mismo que `mazoEnLaBarra`
+(cabecera 351–360: durante la colocación no existe la jugada, y un hueco apagado toda
+una fase promete algo que no llega). Con tres huecos los cuatro móviles caerían en
+quinto con el canto a 0,891 lados (la revisión de la vuelta 3b lo midió), y no se
+pinta: la pantalla no pasa dados. Todas las medidas del colgado usan 4 y valen; la de 3 se hizo igual
 (`medir-colgado-con-tres.ts`) por si algún día se quieren dados en la colocación: con 3
 el colgado cae más adentro, `x ∈ [−0,830, −0,459]`, con 124–191 puntos libres tras la
 muesca en los teléfonos, cabe en la tableta de 768×640 (63) y en los lienzos de pie
@@ -1197,31 +1330,49 @@ jugar. Otra razón para no pintarlos ahí. `verify:escena` mide las tres
 formas en los seis lienzos de hoy más 768×1024 y los ocho apaisados (568×320, 667×375,
 780×360, 844×390, 932×430, 1024×768, 1180×820, 1920×1080), con la misma exigencia que
 el hueco del mazo: 44 puntos de asa en TODAS las piezas y en los dados cuando los hay,
-libre de la mano de bienes quieta, sin despertar la mano del mazo, y que en 320×360 y
-360×490 `dados` sea `null`.
+libre de la mano de bienes quieta, sin despertar la mano del mazo, que en 320×360 y
+360×490 `dados` sea `null`, y desde la vuelta 3b que el par quepa en el asa en los dos
+peldaños y que el mazo del reparto de cinco quede libre (arriba).
 
 ## 5. Los dados
 
 ### 5.1. Forma y tamaño
 
-**La malla es el D6 de KayKit Board Game Bits; todo lo demás se queda.** Miguel
-señaló que el pack [Board Game Bits](https://kaylousberg.itch.io/board-game-bits) de
-la misma casa que los otros cuatro (CC0, versión gratuita de 35 MB, «75+ modelos» en
-OBJ, FBX y GLTF) trae dados modelados: D4, D6, D8 y D20. Lo que se sabe de él es lo
-que dice su página, leída el 6 de septiembre de 2026: «la mayoría de las piezas usan
-un único atlas de gradiente de 1024×1024» PERO «las cartas y los dados llevan texturas
-individuales». El pack no está en el disco todavía (ni en `arte/kaykit/`), y por eso
-lo que sigue es una decisión con su regla y una lista de lo que se mide con el fichero
-delante (§9), no una medida.
+**La malla es el `D6_A` de KayKit Board Game Bits, medido, horneado y con los colores
+de las fichas; todo lo demás se queda.** Miguel señaló que el pack [Board Game
+Bits](https://kaylousberg.itch.io/board-game-bits) de la misma casa que los otros
+cuatro (CC0, versión gratuita, «75+ modelos» en OBJ, FBX y GLTF) trae dados modelados:
+D4, D6, D8 y D20. Su página decía «la mayoría de las piezas usan un único atlas de
+gradiente de 1024×1024» PERO «las cartas y los dados llevan texturas individuales», y
+la séptima versión, sin el pack en el disco, tenía por más probable que los puntos
+estuvieran pintados. El pack está en
+`arte/kaykit/board-game-bits/KayKit_BoardGameBits_1.0_FREE/` desde la fase 3 y se midió
+con el fichero delante (`medir-d6-del-pack.ts` sobre los `.gltf` de `Assets/gltf`, y
+después el propio `compilar-dados.ts`; §9):
 
-Se queda como está: **dos** dados (decisión 3), la arista de **`0,52 lados`**
+| Fichero | Vértices / triángulos | Textura | Los puntos o los números |
+|---|---|---|---|
+| **`D6_A.gltf`** | 521 / 662, UNA primitiva, un material («boardgame»), con UV y sin `COLOR_0` | el ATLAS compartido del pack, `boardgame_bits_texture.png` (1024², 35 kB) | GEOMETRÍA: 21 puntos de 9 vértices cada uno (189 vértices de punto, 332 de cuerpo), cada punto en una celda oscura del atlas; bajo los vértices dos colores dominantes, el cuerpo `228,232,234` y el punto `68,68,68`, más un degradado (37 tonos en total) |
+| `D6_B.gltf` | 501 / 740 | el mismo atlas | geometría, cuerpo OSCURO con hoyuelos: 84 vértices de punto con la normal mirando a otra cara que la de su posición |
+| `D6_C.gltf` (y sus colores) | 120 / 188 | textura individual `dice_*.png` de 1024² y 150 a 175 kB | NÚMEROS PINTADOS: horneado, el vértice más oscuro tiene 0,276 de luminancia; no hay punto de geometría |
+| `D4`, `D8`, `D20` | | textura individual | números pintados |
+
+Caja del `D6_A`: `0,7500 × 0,7500 × 0,7500`, centrada (centro en `0,0003, 0, 0`), y las
+caras en reposo, contadas: `−z = 4, −x = 5, +y = 6, −y = 1, +x = 2, +z = 3`. Entre el A
+y el B gana el A porque los dados de esta mesa son claros con puntos oscuros, como las
+fichas; el C y los demás se descartan por la ruta (b) de abajo, que ya estaba escrita.
+
+Se queda como estaba: **dos** dados (decisión 3), la arista de **`0,52 lados`**
 (`ARISTA_DEL_DADO`; era 0,46 hasta la decisión 15) con un hueco de `0,08 lados` entre
-ellos —el par mide 1,12 lados y deja `AIRE` (0,24) a cada lado del asa de 1,6—, el
+ellos (`HUECO_ENTRE_DADOS`; el par mide `ANCHO_DEL_PAR_DE_DADOS = 1,12` lados y deja
+`AIRE` (0,24) a cada lado del asa colgada de 1,6, y llena el asa del quinto, §4.4), el
 punto del **18 % de la arista** (`PUNTO_DEL_DADO`) y el mínimo legible de 22 y 4
 puntos (decisión 15), el asa ÚNICA e invisible, la cota (el centro del cubo en
-`cota + 0,26 lados`), el salto de 0,2 (en lo alto el dado llega a `hueco.y + 0,24 ·
-lado`, bajo el asa, §1.2), la máquina del §5.3 y el tapete del §2.2. Lo único que
-cambia es de dónde sale la geometría del cubo con sus puntos.
+`cota + 0,26 lados`: `CENTRO_DEL_DADO_SOBRE_LA_TAPA`, media arista), el salto de 0,2
+(`SALTO_DEL_DADO`; en lo alto el dado llega a `hueco.y + 0,24 · lado`, bajo el asa,
+§1.2), la máquina del §5.3 y el tapete del §2.2. Todo eso vive en `escenas/dados.ts`,
+sin `three`. Lo que cambió es de dónde sale la geometría del cubo con sus puntos, y de
+qué color.
 
 **La escala.** Los packs de KayKit no vienen a la escala del tablero (la casa del
 pack hexagonal mide 0,93 y la escena la sube con `ESCALA_DEL_PACK`, `escala.ts` 113;
@@ -1230,37 +1381,97 @@ compiladores de la casa NO escalan al compilar: `compilar-embarcadero.ts` lo dic
 su cabecera («no se escala nada; es la escena la que aplica `ESCALA_DEL_PACK`») y
 `compilar-aventureros.ts` MIDE la caja envolvente sobre las posiciones (`getMin` /
 `getMax` de `POSITION`, 200–220) y se niega si el caballero se aparta más del 5 % de
-`ALTURA_DE_UNA_PERSONA` (458–473). El dado sigue ese camino: `compilar-dados.ts` mide
-la caja envolvente del D6 en los tres ejes, exige que sea un cubo (los tres iguales al
-1 %), la contrasta con **`ARISTA_DEL_D6_EN_EL_PACK`**, una constante de
-`escenas/dados.ts` escrita con el número medido la primera vez (como
-`ALTURA_DE_LA_CASA_EN_EL_PACK` en `escala.ts`), y se niega si se aparta más del 1 %; y
-la escena escala el modelo con `ARISTA_DEL_DADO · lado / ARISTA_DEL_D6_EN_EL_PACK`,
-para que mida exactamente los 0,52 lados que `verify:escena` exige en puntos (§1.15).
-El fichero se queda a la unidad del pack, y el día que un dado y una tesela compartan
-`Canvas` no habrá dos escalas del mismo autor.
+`ALTURA_DE_UNA_PERSONA` (458–473). El dado sigue ese camino: `compilar-dados.ts`
+(`exigeElCubo`) mide la caja envolvente del D6 en los tres ejes, exige que sea un cubo
+centrado en el origen (los tres lados y el centro al 1 %) y la contrasta con
+**`ARISTA_DEL_D6_EN_EL_PACK = 0,75`**, la constante de `escenas/dados.ts` escrita con
+el número medido (como `ALTURA_DE_LA_CASA_EN_EL_PACK` en `escala.ts`); `verify:dados`
+la vuelve a medir dos veces, con `@gltf-transform` y con el `Box3` de `three` sobre la
+escena cargada; y la escena escala el modelo con `ARISTA_DEL_DADO · lado /
+ARISTA_DEL_D6_EN_EL_PACK` (`escalaDelPack` en `Dados`, 0,6933 por lado), para que mida
+exactamente los 0,52 lados que `verify:escena` exige en puntos (§1.15; la vacuna E20,
+con el 0,75 escrito a mano en la escena, se vio caer). El fichero se queda a la unidad
+del pack, y el día que un dado y una tesela compartan `Canvas` no habrá dos escalas del
+mismo autor.
 
-**La pega del color, que decide la ruta de compilación y se resuelve midiendo el
-`.gltf`, no antes.** Hay dos caminos en la casa para que una textura de KayKit llegue
-al teléfono, donde `GLTFLoader` no puede abrir un PNG empotrado
-(`app/src/tres/texturas-nativas.ts`, cabecera), y el D6 va por uno u otro según dónde
-estén sus puntos:
+**La pega del color, que decidía la ruta de compilación, la resolvió el `.gltf`: los
+puntos del `D6_A` son geometría, y se fue por (a) con un paso más.** Hay dos caminos
+en la casa para que una textura de KayKit llegue al teléfono, donde `GLTFLoader` no
+puede abrir un PNG empotrado (`app/src/tres/texturas-nativas.ts`, cabecera), y el D6
+iba por uno u otro según dónde estuvieran sus puntos:
 
-- **(a) Los puntos son GEOMETRÍA** (caras propias con las UV en una celda oscura de su
-  textura, o un segundo material): se hornea a `COLOR_0` con
-  `escenas/scripts/hornear.ts`, exactamente como los aventureros y el embarcadero,
-  muestreo bilineal, sRGB a lineal, un VEC4 de bytes por vértice, sin textura y sin
-  UV, material blanco con `vertexColors`. Cuesta 4 bytes por vértice y quita 8 de UV
-  (`medir-textura-del-dado.ts`, §3), funciona en el teléfono sin ningún complemento, y
-  el comprobador que lo vigila ya existe como modelo: `verificar-aventureros.ts`
-  (abre el compilado con `@gltf-transform` y con el `GLTFLoader` de verdad: `COLOR_0` en
-  todas las primitivas, ninguna textura ni imagen, ninguna UV, ningún atributo
-  entrelazado, un techo de kB, la medida contra `escala.ts`). `verify:dados` es ese
-  guion recortado a un fichero, con la arista en vez de la altura y una comprobación
-  más: que tras hornear hay al menos DOS colores distintos entre los vértices (el
-  cuerpo y los puntos), porque un D6 horneado de un solo color es un dado sin nada
-  que leer, y no daría error.
-- **(b) Los puntos están PINTADOS en la textura individual del dado** (el cuerpo es
+- **(a) Los puntos son GEOMETRÍA.** Es lo que hay, y es lo que hace
+  `compilar-dados.ts` (`npm run compilar:dados -w escenas`): se hornea a `COLOR_0` con
+  `horneaLaPrimitiva` de `escenas/scripts/hornear.ts`, exactamente como los
+  aventureros y el embarcadero (muestreo bilineal, sRGB a lineal, un VEC4 de bytes por
+  vértice; peor desvío sRGB 1,6), y DESPUÉS se **remapea**, que la séptima no tenía:
+  el atlas pinta el dado de blanco azulado con un degradado (37 tonos bajo los 521
+  vértices), y los dados de esta mesa son del mismo juego que las fichas de número, así
+  que cada vértice se decide por su luminancia lineal (Rec. 709) contra
+  `UMBRAL_DE_LUMINANCIA = 0,25` y se pinta o del crema de los discos de las fichas,
+  `COLOR_DEL_NUMERO = #efe6cd` (bytes lineales `220,202,156`), o del color de sus
+  cifras, `COLOR_DEL_PUNTO = #2a2118` (`6,4,2`); los dos viven ahora en
+  `escenas/dados.ts` y `delta.tsx` los importa de ahí para las fichas y para el
+  respaldo. Medido: los puntos caen entre 0,02 y 0,059 de luminancia y el cuerpo entre
+  0,584 y 0,94, sin nada en medio; el compilador exige un factor 2 de hueco a cada
+  lado del umbral (`HOLGURA_DEL_UMBRAL`) y se NIEGA si no lo hay, si ningún vértice es
+  oscuro (puntos pintados: «gana el respaldo procedimental; no se compila», que es lo
+  que dice con el `D6_C`) o si todos lo son. El degradado se aplana a propósito: una
+  cara, un color, y el sombreado lo pone la luz de la escena, como en las fichas. Sin
+  textura y sin UV (`desnudaElMaterial`, `dedup` y `prune`), material blanco con
+  `vertexColors` y metal 0, un solo búfer, y el nodo, la malla y el material renombrados
+  a `MODELO.dado`. Y **sin `weld`**, al revés que los otros dos compiladores: tras
+  aplanar el color, doce vértices que sólo se distinguían por el tono del degradado
+  quedan idénticos y `weld` los fundiría (521 → 509, medido); se ahorrarían 336 bytes y
+  la cuenta del fichero dejaría de ser la del pack que se midió, que es la que
+  `verify:dados` exige para que una recompilación con otro D6 se vea en el número. Sale
+  `escenas/modelos/dados.glb`, **19,3 kB** (19.476 bytes). Cuesta 4 bytes por vértice y
+  quita 8 de UV (`medir-textura-del-dado.ts`, §3), y funciona en el teléfono sin
+  ningún complemento: la app lo abre con un `GLTFLoader` pelado, sin
+  `texturasDelTablero`, porque no hay textura que sustituir.
+
+  Y el segundo paso que nadie había escrito: **qué cara enseña cada valor se MIDE, no
+  se supone.** El pack no lo dice en ningún sitio, y suponer «el 1 mira a +y» es el
+  fallo sin error: el dado se asienta y enseña otro número. `caras-del-d6.ts`
+  (módulo compartido por el compilador y el comprobador, para que la comparación entre
+  los dos sea el fichero contra la realidad y no dos maneras de contar) agrupa los
+  vértices del color del punto por conexión (unión-hallazgo por aristas de triángulo:
+  ningún triángulo del `D6_A` mezcla los dos colores, porque los vértices de la costura
+  están duplicados en otra celda del atlas), asigna cada vértice a la cara del eje en
+  que su posición tiene mayor valor absoluto, exige que la NORMAL de cada vértice de
+  punto mire a esa misma cara (con el `D6_B` saltan 84: sus hoyuelos), cuenta los
+  grupos por cara y exige que sea un dado (`problemasDeUnDado`: seis caras con 1..6,
+  una vez cada valor, 21 en total, opuestas 7). Con eso escribe
+  **`escenas/caras-del-dado.ts`**, GENERADO y sin importaciones (`CARA_DEL_VALOR`
+  `{1: '-y', 2: '+x', 3: '+z', 4: '-z', 5: '-x', 6: '+y'}`, `NORMAL_DEL_VALOR` y
+  `normalDelValor()`), que la escena lee para orientar el dado al asentarse
+  (`cuaternionDelValor`, §5.2). La regla de las 21 islas de la sexta versión está
+  dentro (21 grupos en total), y es más exigente: la cuenta por cara es la que da la
+  tabla.
+
+  **`verify:dados`** (`npm run verify:dados -w escenas`; en `npm run verificar` como
+  «dados», detrás de «aventureros») vuelve a abrir el fichero DESDE FUERA y hace 27
+  comprobaciones con su guardia a 27: existe y pesa menos de 100 kB; un único nodo raíz
+  `MODELO.dado` que sobrevive a `GLTFLoader`, y ese nombre en `EN_DADOS_GLB` y fuera de
+  `nombresEnElGlb()`; una malla y una primitiva de triángulos indexados; `COLOR_0` como
+  VEC4 de bytes normalizados; sin UV, sin textura ni imagen; un material blanco sin
+  textura y sin metal; 521 vértices y 662 triángulos; la caja de 0,75 al 1 % centrada;
+  el color son EXACTAMENTE dos tonos (no «al menos dos», como decía la séptima: un
+  dado del blanco azulado del pack no daría error, y es un dado de otro juego), que
+  son los bytes lineales de `COLOR_DEL_NUMERO` y `COLOR_DEL_PUNTO` convertidos con la
+  curva sRGB escrita APARTE de `hornear.ts` (para no comprobar el horno contra sí
+  mismo), con el alfa a 255; 189 vértices de punto (21 × 9) y 332 de cuerpo; las
+  normales de punto en su cara; los invariantes de dado; `caras-del-dado.ts` BYTE A
+  BYTE igual a lo regenerado contando el fichero, y sus exportaciones coherentes valor
+  a valor; y lo que hace `three` al cargar: sin error, un solo hijo con su nombre antes
+  y después del saneado, `vertexColors` encendido y sin mapa, ningún atributo
+  entrelazado, los mismos 521/662, y la caja de 0,75 con `Box3`. Las vacunas de la fase
+  3 lo vieron caer con la tabla editada a mano, con otro `.glb` en su sitio, con un
+  color cambiado sin recompilar, con un tercer color en un vértice, con las UV
+  devueltas, con dos nodos, entrelazado, con `weld`, sin remapear, con el `D6_C`, con el
+  `D6_B` y con la arista escrita a 0,8 (`vacunas-fase3.py`, §9).
+- **(b) Los puntos están PINTADOS en la textura individual del dado**, que es el camino
+  que NO se tomó y que sigue escrito para el `D6_C` y los D4, D8 y D20 (el cuerpo es
   una caja de 24 vértices, 8 esquinas por 3 caras, y cada cara entera cae en una
   región de la textura con el punto dibujado dentro): el horneado por vértice los
   BORRA, porque una cara son cuatro vértices y cuatro vértices son un color plano. El
@@ -1280,121 +1491,149 @@ estén sus puntos:
   §2 del mismo guion) y **0 en disco**, porque son código. La regla que pidió Miguel
   era «si pesa más que el propio modelo procedimental con sus 21 puntos, gana el
   respaldo», y la cuenta está hecha antes de abrir el fichero: la tabla más pequeña
-  pesa dieciséis veces los dos dados. **Por (b) gana el respaldo**, y no se escribe ni
-  el compilador ni el complemento para ese caso. Habría un tercer camino a medias
+  pesa dieciséis veces los dos dados. **Por (b) gana el respaldo** (y por eso el `D6_C` y
+  los demás se descartan), y no se escribe ni el compilador ni el complemento para ese
+  caso. Habría un tercer camino a medias
   (hornear el cuerpo del pack a un color y ponerle encima nuestros 21 puntos), y se
   descarta escrito: es el respaldo con otra caja, y dos geometrías del mismo dado son
   dos cuentas de triángulos.
 
-Así que lo ÚNICO que el fichero decide es si los puntos son geometría. La sexta
-versión lo resolvía con «más de 24 vértices y al menos dos colores tras hornear», y no
-basta: un D6 con las aristas biseladas y los biseles en una celda oscura pasa esa regla
-sin un solo punto. La regla que vale cuenta PUNTOS: tras hornear, se toman los
-vértices del color oscuro (el que no es el del cuerpo), se agrupan por adyacencia en
-la malla, y tienen que salir **21 grupos conexos** (1 + 2 + … + 6), o, cara por cara,
-de 1 a 6 regiones oscuras con las seis cuentas distintas; un bisel oscuro es una tira
-que recorre la arista y no da 21 islas. Y hay que decirlo con la expectativa puesta
-donde toca: la textura individual del dado, que su página anuncia, es el indicio de la
-ruta (b), así que **la expectativa por defecto es el respaldo**, y si los puntos
-resultan geometría es una buena noticia que se comprueba, no un plan. Si lo son, el D6
-del pack es la malla; si no, la malla es el respaldo de abajo, y la fase 3 no espera a
-nadie. La mirada en el banco es la última palabra: que 21 islas pasen el comprobador no
-dice que se lean a 23 puntos.
+Así que lo ÚNICO que el fichero decidía era si los puntos eran geometría, y lo eran.
+La sexta versión lo resolvía con «más de 24 vértices y al menos dos colores tras
+hornear», y no bastaba: un D6 con las aristas biseladas y los biseles en una celda
+oscura pasa esa regla sin un solo punto. La regla que vale cuenta PUNTOS por cara
+(arriba: `caras-del-d6.ts`), y un bisel oscuro es una tira que recorre la arista y no
+da 21 islas ni 1..6 por cara. La séptima tenía la expectativa por defecto en el
+respaldo, por la textura individual que la página anuncia, y la buena noticia se
+comprobó en vez de planearse: el `D6_A` va con el atlas y sus puntos son 21 islas de
+nueve vértices. Lo que el comprobador no juzga sigue igual: que 21 islas pasen
+`verify:dados` no dice que se lean a 23 puntos, y eso es de ojos (§10).
 
-**El respaldo, que se queda escrito y vivo.** Dos `BoxGeometry` de `ARISTA_DEL_DADO`,
-color `COLOR_DEL_NUMERO` (`#efe6cd`, el crema de los discos de las fichas del tablero)
-y los puntos en `COLOR_DEL_PUNTO` (`#2a2118`, el de sus cifras): los dados y las fichas
-son del mismo juego. Los 21 puntos de cada dado son círculos de 10 segmentos con un
-diámetro del 18 % de la arista, pegados a las caras y fundidos en una geometría: 12 +
-210 triángulos y 2 llamadas por dado, 444 y 4 llamadas los dos (`medir-triangulos.ts`,
-§C; el tamaño no cambia la cuenta). Sin aristas redondeadas: a 3 segmentos costarían
-108 triángulos cada uno y a 23 puntos no se ven. Es lo que `Dados` pinta cuando el
-catálogo no trae `dado` (`modelos.get(MODELO.dado) === undefined`: el pack no valió,
-o `dados.glb` no llegó), de modo que no es código muerto y la ruta de compilación no
-puede bloquear la fase 3. **Los 444 triángulos son el presupuesto del RESPALDO y se
-quedan con nombre propio**, `TRIANGULOS_DEL_RESPALDO_DE_LOS_DADOS` en
-`presupuesto-del-delta.ts` (hoy es la `TRIANGULOS_DE_LOS_DADOS` privada de ese fichero,
-`2 · (12 + 21 · 10)`); el del modelo se mide con el fichero delante y va en otra
-constante, escrita con el número medido al compilar. Y **`triangulosDeLaMesa` suma el
-MÁXIMO de las dos cuentas**, no una u otra: la comprobación de la fase 2
-«`triangulosDeLaMesa` es lo que pintan las geometrías de verdad» construye HOY los dos
-dados del respaldo con `three` (una caja y 21 círculos de 10 segmentos cada uno) y
-exige igualdad exacta con la fórmula; si el D6 del pack costara más de 444 y la
-fórmula sumara sólo el modelo, esa comprobación se pondría roja sin que nada estuviera
-mal, y si sumara sólo el respaldo el tope dejaría de vigilar lo que se pinta cuando el
-pack está. Con el máximo, `verify:escena` cuenta el respaldo contra el máximo (menor o
-igual: verde por construcción cuando el modelo es el más caro) y `verify:dados` cuenta
-el `.glb` contra su constante. `TOPE_DE_LA_MESA` (3.600) deja 130 de margen con la tapa
-a 240 segmentos (§7), así que **los dos dados del pack pueden costar hasta 574
-triángulos (287 por dado) sin mover el tope**; si el D6 cuesta más, `TOPE_DE_LA_MESA`
-se rehace con su cuenta, no a ojo.
+**El respaldo, que se quedó escrito y vivo, en `escenas/cubo-del-dado.ts`.** Con
+`three` y sin React, suelto como las geometrías de `tablon.ts`, porque lo que se pinta
+tiene que poder CONTARSE (la séptima lo situaba dentro de `Dados`): una caja de
+`ARISTA_DEL_DADO` (`geometriaDelCuerpoDelDado`) en `COLOR_DEL_NUMERO` y los 21 puntos
+en `COLOR_DEL_PUNTO` (`geometriaDeLosPuntosDelDado`: discos de `SEGMENTOS_DEL_PUNTO =
+10` lados con diámetro `PUNTO_DEL_DADO · arista`, a `PASO_DE_LOS_PUNTOS = 0,27` aristas
+del centro de la cara y `PUNTO_SOBRE_LA_CARA = 0,004` aristas por fuera de ella,
+fundidos a mano en una geometría): 12 + 210 triángulos y 2 llamadas por dado, 444 y 4
+llamadas los dos (`verify:escena` los construye y los cuenta: «12 del cuerpo y 210 de
+los puntos por dado, 444 los dos, con el diámetro del punto al 18 % de la arista», y
+«el primer punto del respaldo mide de verdad 0,18 aristas de diámetro»). Sin aristas
+redondeadas: a 3 segmentos costarían 108 triángulos cada uno y a 23 puntos no se ven. Y
+con una regla que no es adorno: **cada valor va en la cara que dice `CARA_DEL_VALOR`,
+la del pack**, así que el cuaternión objetivo de un valor es EL MISMO para el modelo y
+para el respaldo y quien pinta no tiene dos tablas de caras que puedan discrepar
+(`verify:escena`: «el respaldo pone N puntos en la cara que enseña el N según
+caras-del-dado.ts»; la vacuna E6, con una tabla propia, cayó). Es lo que `Dados` pinta
+cuando el catálogo no trae `dado` (`aplanados.get(MODELO.dado) === undefined`:
+`dados.glb` no llegó, o un despliegue sin él), de modo que no es código muerto. **Los
+444 triángulos son el presupuesto del RESPALDO y tienen nombre propio**,
+`TRIANGULOS_DEL_RESPALDO_DE_LOS_DADOS` en `presupuesto-del-delta.ts`; el del modelo es
+`TRIANGULOS_DE_LOS_DADOS_DEL_PACK = 2 · 662 = 1.324`, medido al compilar; y
+`TRIANGULOS_DE_LOS_DADOS` es el MÁXIMO de los dos, que es lo que suma
+`triangulosDeLaMesa`. No una u otra: la comprobación «`triangulosDeLaMesa` es lo que
+pintan las geometrías de verdad» construye el respaldo con `three` Y cuenta el `.glb`
+con `NodeIO` (una primitiva de 662 por dado), exige cada uno contra su constante y el
+máximo contra la fórmula; si sumara sólo el modelo, el respaldo construido la pondría
+roja sin que nada estuviera mal, y si sumara sólo el respaldo el tope dejaría de
+vigilar lo que se pinta cuando el pack está (las vacunas E9 y E10 lo vieron caer por
+los dos lados). El D6 del pack cuesta tres veces el respaldo y 880 más que él los dos,
+más del techo de 574 (287 por dado) que la séptima dejaba bajo el tope de 3.600: como
+estaba escrito para ese caso, **`TOPE_DE_LA_MESA` se rehízo con la cuenta y no a ojo**,
+4.500 (`12 · 240 + 1.470 = 4.350`, 150 de margen; §1.10, §7).
 
-**Dónde vive, y cómo llega a las dos pantallas.** El pack se descomprime en
+**Dónde vive, y cómo llega a las dos pantallas.** El pack está descomprimido en
 `arte/kaykit/board-game-bits/KayKit_BoardGameBits_1.0_FREE/`, la convención del
-`arte/README.md` (una carpeta por pack con el zip tal cual dentro), fuera de git por
-`arte/kaykit/` en `.gitignore`. El compilado es **`escenas/modelos/dados.glb`**, un
-fichero APARTE de `tablero.glb`: el tablero pesa 4,3 MB y se cachea por promesa en las
-dos pantallas (`catalogoDelTablero` en la app, `traerElCatalogo` en el escritorio); un
-dado de unos kB no debe obligar a recargar ni a recompilar el tablero, ni a pasar por
-`compilar-modelos.ts`, que exige que lo que entra sea exactamente lo que
+`arte/README.md` (una carpeta por pack con el zip tal cual dentro; el README lleva su
+fila y de qué sale el dado), fuera de git por `arte/kaykit/` en `.gitignore`. El
+compilado es **`escenas/modelos/dados.glb`** (19,3 kB, versionado), un fichero APARTE
+de `tablero.glb`: el tablero pesa 4,3 MB y se cachea por promesa en las dos pantallas;
+un dado de unos kB no debe obligar a recargar ni a recompilar el tablero, ni a pasar
+por `compilar-modelos.ts`, que exige que lo que entra sea exactamente lo que
 `nombresEnElGlb()` pide. Dentro va UN nodo, `dado`, con un nombre que pasa
 `NOMBRE_QUE_SOBREVIVE` (`nombres.ts`: minúsculas, sin punto ni dos puntos, porque
-`GLTFLoader` los borra al cargar), y `MODELO.dado` lo nombra desde `nombres.ts` como
-a las demás piezas. La ruta que sigue es la del tablero, leída en el código: los
-`.glb` NO pasan por Metro (en `app/metro.config.js` no hay ningún `assetExts` ni
-resolutor para `.glb`; lo que hay es `watchFolders` para `escenas/` y la copia única de
-`three` y `react`), sino por HTTP desde el servidor, `RUTA_DE_MODELOS =
-'/api/arcade/modelos'` (`escenas/ruta-de-modelos.ts`), que `server/src/routes/modelos.ts`
-sirve fichero a fichero con una ruta FIJA por modelo y no un comodín sobre la carpeta
-(`/arcade/modelos/tablero.glb`, `/arcade/modelos/embarcadero.glb`,
-`/arcade/modelos/aventureros/:fichero` con lista blanca). Así que `dados.glb` gana su
-ruta fija `/arcade/modelos/dados.glb` al lado de las otras y `ruta-de-modelos.ts` gana
-`rutaDeLosDados()`.
+`GLTFLoader` los borra al cargar); `MODELO.dado` lo nombra desde `nombres.ts` como a
+las demás piezas, y **`EN_DADOS_GLB`** (el conjunto de los nombres de `MODELO` que
+viven en `dados.glb`) lo saca de `nombresEnElGlb()` y lo deja en `todosLosNombres()`:
+sin esa lista, meter el dado en `MODELO` habría hecho que `compilar-modelos.ts` se
+negara a compilar el tablero («el código pide `dado` y aquí no se compila») y que
+`verify:escena` marcara en rojo un `tablero.glb` correcto. La ruta que sigue es la del
+tablero, leída en el código: los `.glb` NO pasan por Metro (en `app/metro.config.js` no
+hay ningún `assetExts` ni resolutor para `.glb`; lo que hay es `watchFolders` para
+`escenas/` y la copia única de `three` y `react`), sino por HTTP desde el servidor,
+`RUTA_DE_MODELOS = '/api/arcade/modelos'` (`escenas/ruta-de-modelos.ts`), que
+`server/src/routes/modelos.ts` sirve fichero a fichero con una ruta FIJA por modelo y
+no un comodín sobre la carpeta. `dados.glb` tiene la suya,
+**`/arcade/modelos/dados.glb`**, gemela de la de `embarcadero.glb` (misma caché de una
+hora, mismo `model/gltf-binary`), y `ruta-de-modelos.ts` tiene `rutaDeLosDados()`;
+`verify:mesa` la cubre con tres comprobaciones sobre el servidor de verdad (existe en el
+repositorio; 200 con su tipo y su caché; los bytes del fichero real, que empiezan por
+«glTF» y pesan menos de 100 kB), y su guardia pasó de un suelo de 100 a
+`COMPROBACIONES_ESCRITAS = 856`.
 
-**El mecanismo con que se pide, y por qué NO es `Promise.all`.** La sexta versión
-decía que cada pantalla lo pide «a la vez que el tablero (`Promise.all`)» y, seis
-líneas después, que «si `dados.glb` falla y `tablero.glb` no, el mapa va sin `dado` y
-`Dados` pinta el respaldo». Las dos cosas no pueden ser verdad: `Promise.all` rechaza
-en cuanto UNA promesa falla, así que un 404 de `dados.glb` tiraría el catálogo entero,
-la app caería al respaldo SVG («El delta en tres dimensiones no ha llegado») y el
-escritorio se quedaría sin delta por un fichero de unos kB. Y es peor, porque las dos
-funciones cacheadas SUELTAN la promesa cuando falla (`traerElCatalogo`,
-`riberas-en-tres.tsx` 339–341: `promesa.catch(() => { if (catalogoEnCamino ===
-promesa) catalogoEnCamino = null; })`; `catalogoDelTablero`,
-`riberas-en-tres-escena.tsx` 285–287, igual), a propósito, para que un túnel de treinta
-segundos no condene la partida entera al respaldo: con los dos ficheros en la misma
-promesa, el fallo del dado obligaría a volver a bajar los 4,3 MB del tablero en el
-siguiente montaje. El mecanismo que cumple lo prometido es éste, en las dos pantallas:
+**El mecanismo con que se pide: dos escalones, con sus nombres.** Lo que hay que
+cumplir es esto: un 404 de `dados.glb` no puede tirar el tablero (con un `Promise.all` a
+secas la app caería al respaldo SVG y el escritorio se quedaría sin delta por un fichero
+de unos kB), no puede soltar la caché del tablero (las promesas cacheadas se SUELTAN
+cuando fallan, a propósito, para que un túnel de treinta segundos no condene la partida
+entera al respaldo: con los dos ficheros en la misma promesa, el fallo del dado
+obligaría a volver a bajar los 4,3 MB en el siguiente montaje), y el dado tiene que
+poder reintentarse solo. La séptima versión lo pedía en dos escalones y se contradecía
+al contarlo; el código de la fase 3 hace los dos escalones, en las dos pantallas y en
+el banco, y es esto:
 
-```
-tablero  = traer y parsear tablero.glb          // la promesa cacheada de hoy, sin tocar
-dados    = traer y parsear dados.glb
-             .catch(() => catálogo vacío)       // un fallo del dado RESUELVE, no rechaza
-catálogo = unión de los dos mapas               // con `dado` dentro si llegó
-```
+1. **Una promesa recordada POR FICHERO, que se suelta sólo si falla ESE fichero.** En el
+   escritorio, `recordada(traer)` (`riberas-en-tres.tsx` 340–351) devuelve una función
+   que guarda la promesa en `enCamino` y le cuelga un `catch` que la pone a `null` si
+   es la que falló; con ella se construyen `traerElTablero = recordada(() =>
+   traerUnGlb(RUTA_DEL_TABLERO))` y `traerLosDados = recordada(() =>
+   traerUnGlb(RUTA_DE_LOS_DADOS))` (368–369; `traerUnGlb` es `fetch` relativo más
+   `GLTFLoader.parseAsync`, para que un 404 se lea como «contestó 404» y no como un
+   `ProgressEvent` mudo). En la app, la misma `recordada` (280–291) construye
+   `tableroPrometido` (301–316, con el registro de `texturasDelTablero` cuando
+   `!decodificaImagenes()`, que `verify:sala` exige literal) y `dadosPrometidos`
+   (323–326, con un `GLTFLoader` pelado: el D6 va horneado y no hay textura que
+   sustituir).
+2. **La unión, con el fallo del dado tragado ANTES de juntar.** `traerElCatalogo()` en
+   el escritorio (381–388) y `catalogoDelTablero()` en la app (337–344) hacen lo mismo:
+   `Promise.all([tablero, dados])` donde `dados` es `traerLosDados().catch(() => null)`
+   (con un `console.warn`: «Los dados no han llegado (…): se pintan los del respaldo»,
+   porque un respaldo mudo es un fallo que nadie ve), y `.then(([delTablero,
+   deLosDados]) => unirCatalogos(delTablero, deLosDados))`. `unirCatalogos`
+   (`escenas/modelos.ts`) ignora los `null` y funde los mapas; si dos ficheros trajeran
+   el mismo nombre ganaría el último, y por eso `verify:dados` exige que el suyo traiga
+   un solo nodo con un nombre que el tablero no usa.
 
-Sólo el fallo del TABLERO rechaza la promesa cacheada y la suelta, como hoy; el de los
-dados se traga dentro de su propia petición (o, lo que es lo mismo escrito de otra
-forma, un `Promise.allSettled` de las dos en el que sólo el resultado del tablero
-puede rechazar), y esa petición se cachea APARTE, de modo que se reintenta sola en el
-siguiente montaje sin arrastrar al tablero. En el escritorio, `fetch` relativo más
-`GLTFLoader.parseAsync` (`riberas-en-tres.tsx` 329–343); en la app `traer` más
-`cargador.parse`, registrando `texturasDelTablero` cuando `!decodificaImagenes()`
-(`riberas-en-tres-escena.tsx` 263–289), que con un `.glb` horneado no tiene nada que
-sustituir. El catálogo que recibe `<Delta>` (`modelos: CatalogoDeModelos`, un
-`ReadonlyMap` que `catalogoDeModelos` construye con los hijos directos de la escena) es
-esa UNIÓN, con `dado` dentro si llegó; si no llegó, `Dados` pinta el respaldo y la
-partida no se entera. Y como los demás modelos, se escala al instanciar, no al
-compilar.
+Con eso el `Promise.all` sólo puede rechazar por el tablero, que es el único fallo que
+la pantalla enseña; la promesa del tablero no se suelta por un 404 del dado (la
+recordada de cada fichero sólo mira el suyo); y el dado se reintenta solo en el
+siguiente montaje, porque su promesa CRUDA sí rechaza y `recordada` la suelta, aunque
+la unión la haya tragado. El banco (`banco3d.tsx`, `useCatalogo`) carga los dos con
+`loadAsync` y el mismo `catch` a `null` antes del `Promise.all`, para enseñar
+exactamente lo que verá quien juegue si `dados.glb` no llega. `verify:escritorio` lo
+exige por texto («cada fichero tiene su promesa recordada por separado…», «el fallo de
+los dados no tira el tablero: su promesa lleva `.catch` a `null` antes del
+`Promise.all`, y los catálogos se unen», y que la ruta sale de `rutaDeLosDados()`) y
+`verify:sala` igual («con `Promise.all` a secas, un 404 de `dados.glb` deja al teléfono
+sin delta»); las vacunas con el `.catch` quitado cayeron en los dos. El catálogo que
+recibe `<Delta>` (`modelos: CatalogoDeModelos`, un `ReadonlyMap` que
+`catalogoDeModelos` construye con los hijos directos de la escena) es esa UNIÓN, con
+`dado` dentro si llegó, y `aplanados` de `Delta` recorre el catálogo entero, así que el
+dado entra sin lista aparte; si no llegó, `Dados` pinta el respaldo y la partida no se
+entera. Y como los demás modelos, se escala al instanciar, no al compilar.
 
 En pantalla cada dado mide **23,3 puntos en el SE apaisado**, 26,2 en un Android de
 360, 28,4 en un iPhone 14, 31,3 en un Pro Max, 55,9 en una tableta y 78,6 en un
 monitor a 1080, con puntos de 4,2 a 14,2; como quinto hueco de pie, 23,8 en 390 de
 ancho (`medir-dados-por-lienzo.ts`; la tabla entera y los umbrales, en la decisión 15).
-El asa es UNA para los dos —una caja invisible por `colorWrite`, nunca por `visible`—
-de `1,6 lados × 1 lado`: 87×55 puntos en un iPhone 14, 72×45 en el SE. Es el mismo
-alto de asa que un hueco de la barra, y por eso la misma comprobación de 44 lo cubre;
-la de legibilidad —dado de 22 y punto de 4— la añade la fase 3 al lado.
+El asa es UNA para los dos —una caja invisible por `colorWrite`, nunca por `visible`,
+porque r3f descarta de sus sucesos los objetos invisibles— de `1,6 lados × 1 lado`
+colgada (87×55 puntos en un iPhone 14, 72×45 en el SE) y de `1,12 × 1` como quinto
+(51,3×45,8 en 390; §4.4); los cubos no reciben rayos (`raycast` nulo), para que el
+hueco entre los dos no deje pasar el dedo al tablero. Es el mismo alto de asa que un
+hueco de la barra, y por eso la misma comprobación de 44 lo cubre; la de legibilidad
+(dado de 22 y punto de 4) va al lado desde la fase 3.
 
 ### 5.2. Qué dice cada estado
 
@@ -1410,20 +1649,32 @@ DadosEnTres = { porTirar: meToca(vista) && yo === quien && hay TIRAR en `opcione
                 ultimaTirada, tirado }
 ```
 
-(Es la forma que ya tiene el código de la fase 1, `riberas-en-tres.ts` 1033–1077, y
-gana: el sello viaja ya calculado, y `de`/`colorDelTurno` NO van aquí; el tapete lee
-`turnoDe` y su color de la vista, como el marcador.) La pantalla lo compone así, y el
-orden es la decisión 4:
+(Es la forma del código desde la fase 1, `riberas-en-tres.ts` 1034–1103: el sello viaja
+ya calculado, y `de`/`colorDelTurno` NO van aquí; el tapete lee `turnoDe` y su color de
+la vista, como el marcador. Desde la fase 3 `DadosEnTres` EXTIENDE `DadosDeLaMesa`, el
+contrato que `<Delta>` recibe, definido en `escenas/dados.ts` (`VistaDeLosDados` más
+`disponible`): la escena no importa nada de `shared/arcade`, `shared` ya importaba
+tipos de `escenas/`, y así un campo que la escena pida mañana no se puede olvidar en
+esta traducción sin que deje de compilar; `porTirar` es lo único de más y lo lee
+`opcionesFueraDeLaMesa`, no la escena.) La pantalla lo compone así, y el orden es la
+decisión 4 (`riberas-en-tres.tsx` 927–971; `riberas-en-tres-escena.tsx` 769–779 y
+945–952, con los nombres reales):
 
 ```
-const sitio  = huecosDeLaMesa(cuantos, CAMPO, ancho / alto, alto).dados !== null;
-const dados  = sitio ? dadosEnTres(vista, yo, opciones) : null;   // opciones ENTERAS
-const cinta  = opcionesFueraDeLaMesa(opcionesFueraDeLaBarra(...), dados);
-const hueco  = dados && { ...dados, disponible: dados.disponible && !mesa.quieto };
+haySitioParaLosDados = huecosDeLaMesa(cuantos, CAMPO_DE_LA_CAMARA, ancho / alto, alto).dados !== null
+dados = haySitioParaLosDados ? dadosEnTres(vista, yo, opciones) : null      // opciones ENTERAS
+        (y con `quieto`, { ...suyos, disponible: false })
+fuera = opcionesFueraDeLaMesa(fueraDeLaBarra, dados)                        // TIRAR se cae con dados
 ```
 
-`porTirar` sale de la lista de opciones, no de rehacer la regla: es lo mismo que hace
-`mazoEnLaBarra` con COMPRAR. Y **`disponible` es la ÚNICA bandera que la escena mira
+`cuantos` es `barra.length + (mazo === null ? 0 : 1)`, como en la escena;
+`CAMPO_DE_LA_CAMARA = 45°` está escrito en cada pantalla junto al `fov` del `Canvas` y
+los comprobadores lo exigen; y la medida del lienzo en puntos es un `ResizeObserver`
+sobre el recuadro (`medirElRecuadro`, estado `lienzo`) en el escritorio, que no tenía
+ninguna a nivel de pantalla, y `medida` del `onLayout` en la app. Sin medida (`lienzo`
+a 0) no hay dados y el botón se queda: degradación segura. `porTirar` sale de la lista
+de opciones, no de rehacer la regla: es lo mismo que hace `mazoEnLaBarra` con COMPRAR.
+Y **`disponible` es la ÚNICA bandera que la escena mira
 para dejar tocar y para vibrar**, como `MazoDeLaBarra.disponible`: `dadosEnTres` la
 pone a `porTirar`, la pantalla la apaga con `quieto` mientras una petición vuela, y la
 escena no sabe por qué está apagada. La segunda versión no
@@ -1440,9 +1691,15 @@ pieza apagada de la barra) y ahí se acaba.
   desde todos los asientos, así que no se atenúan como una pieza apagada—, sobre el
   tapete del color de `turnoDe`, sin vibrar y sin responder al toque. El hueco de los
   dados no lleva zócalo: no hay nada que «encender». Con `ultimaTirada = 0` (antes de
-  la primera tirada) enseñan 1 y 1 sin tapete; hoy, sin dados, el tapete se pinta en
-  cuanto `turnoDe` tiene color, también antes de la primera tirada, y apagarlo con
-  `ultimaTirada = 0` es de la fase 3 (§11).
+  la primera tirada) enseñan 1 y 1 (`repartoDeLaTirada` devuelve `[1, 1]` para una suma
+  que no se saca con dos dados) sin tapete: `tapeteApagado = dados !== null &&
+  dados.ultimaTirada === 0` en `Barra` (hecho en la fase 3; la vacuna E17 lo vio caer).
+  Sin dados el tapete se pinta en cuanto `turnoDe` tiene color, porque sin dados la
+  escena no sabe si se ha tirado. El giro libre alrededor de la vertical con el que
+  reposa cada dado es determinista: `giroDelDadoAsentado(indice, sello)`, el ángulo
+  áureo por sello y algo más de un cuarto de vuelta para el segundo dado, para que los
+  dos no salgan clavados iguales ni cada turno como el anterior, e igual en los cuatro
+  aparatos.
 - **Me toca y falta tirar** (`disponible`): VIBRAN. Patrón de 1,6 s:
   sacudida de 0,36 s a 8 Hz con envolvente senoidal, y el resto quietos; se mueven
   el 21 % del tiempo, diez avisos en dieciséis segundos (`medir-dado.ts`). Amplitud:
@@ -1452,39 +1709,80 @@ pieza apagada de la barra) y ahí se acaba.
   borde del ojo mientras se mira el tablero» molestan (`GIRO_DE_LA_VITRINA`). A nadie
   más le vibra nada: `disponible` es falso para los demás, y la vibración lee esa
   misma bandera y ninguna otra.
-- **Rodando:** giro sobre dos ejes con velocidad decreciente y un salto de `0,2 lados`
-  que cae; mínimo 0,6 s.
-- **Asentando:** interpolación amortiguada del cuaternión al que enseña la cara
-  objetivo, 0,35 s, con el rebote del `Asentamiento` (un seno al final).
+- **Rodando:** giro sobre dos ejes con velocidad decreciente (`anguloRodado`: arranca a
+  dos vueltas por segundo, `VELOCIDAD_DE_GIRO = 4π`, y frena como `1 / (1 + t /
+  FRENO_DEL_GIRO)` con el freno a 0,5, así que el ángulo crece como un logaritmo y no se
+  clava esperando al servidor: 4,95 rad a los 0,6 s, 16,1 rad a los 6 s del tope) y un
+  salto de `0,2 lados` (`saltoDelDado`: un arco que sube a mitad del rodar mínimo y
+  vuelve al suelo al cumplirse; si la respuesta tarda, el dado sigue girando en el
+  suelo sin volver a saltar); mínimo 0,6 s. **Rodar parte de la última pose real del
+  dado fuera de rodar** (el ref `enReposo` de `Dados`, copiado en cada fotograma de
+  «quieta» ANTES del temblor, y al final de cada fotograma de «asentando» por si otra
+  tirada llega a mitad del asentado), no del par anterior recalculado con el sello
+  visto: eso daba un cuarto o media vuelta seca sobre la vertical en el primer
+  fotograma, porque cuando la tirada de otro colono cambia la fase y el sello en el
+  mismo tic, el sello visto ya es el nuevo (la vuelta 3b lo encontró y lo arregló; la
+  copia en «asentando» la pidió su revisión). `verify:escena` lo afirma por texto
+  («rodar parte de la última pose real fuera de rodar (enReposo…) y no recalcula el
+  par anterior con el sello visto»).
+- **Asentando:** `slerp` desde el giro con el que el dado dejó de rodar (el ref
+  `alDejarDeRodar`, escrito en cada fotograma de «rodando») al cuaternión del valor,
+  con `avanceDelAsentado` (`1 − (1 − t)³` en 0,35 s, la misma curva que las piezas: sale
+  rápido y frena al llegar), y el rebote es de POSICIÓN, no del cuaternión:
+  `reboteDelDado`, un salto chico de `REBOTE_DEL_DADO = 0,04` lados con un seno en el
+  último tercio que acaba en el suelo. La séptima decía «con el rebote del
+  `Asentamiento`»; extrapolar un `slerp` más allá de 1 gira el dado hacia una cara que
+  no es y se ve como un dado que se lo piensa. El cuaternión del valor lo da
+  `cuaternionDelValor(valor, giro)` (`cubo-del-dado.ts`): lleva `NORMAL_DEL_VALOR` de la
+  cara del valor a +Y del mundo y gira `giro` alrededor de esa vertical; vale para el
+  modelo y para el respaldo porque los dos ponen cada valor en la misma cara, y
+  `valorQueMiraArriba` lo lee de vuelta (`verify:escena`: los seis valores y cuatro
+  giros, ida y vuelta; la revisión de la fase 3 giró además los 521 vértices del `.glb`
+  con esos cuaterniones y contó las islas oscuras que quedaban arriba: siempre `v`
+  arriba y `7 − v` abajo, 42 de 42).
 
 ### 5.3. El toque y la máquina
 
-Tocar el asa —primario, `stopPropagation`, `loCogeLaInterfaz`, y en la app
-`laInterfazSeLoQueda()` como hace `alTomarDeLaBarra`— y SÓLO si `disponible` (§5.2)
-llama a `onPulsarLosDados` y empuja `tocado`, y la pantalla manda la opción TIRAR por
-`mesa.mover`, la misma puerta que el botón. La escena no sabe que eso es tirar: es «el
-hueco que se pulsa», como el naipe del mazo.
+Tocar el asa (`alTocar` en `Dados`, `delta.tsx` 1942–1952: `noEsElPrimario` →
+`stopPropagation` → `loCogeLaInterfaz` → si `!dados.disponible` se acaba → `tocado` a la
+cola → `onPulsar()`) y la pantalla manda la opción TIRAR por `mesa.mover`, la misma
+puerta que el botón: `alPulsarLosDados` en las dos pantallas (`riberas-en-tres.tsx`
+962–971; `riberas-en-tres-escena.tsx` 945–952, donde `laInterfazSeLoQueda()` va LA
+PRIMERA, como en `alTomarDeLaBarra`, y va ANTES de `alPulsarElMazo` porque `verify:sala`
+lee que entre ese manejador y su cierre no se manda ningún movimiento) busca la opción
+con `tirarEnTres(opciones)` (`shared`, como `comprarEnTres`: la opción entera que dio el
+juego, con su `tipo` y su `carga`, y no un movimiento montado a mano; la vacuna S6 con
+`{ tipo: 'riberas:tirar', carga: {} }` escrito cayó), suelta lo cogido, y con `quieto` o
+sin TIRAR contesta `'rechazado'` sin mandar nada. La escena no sabe que eso es tirar:
+es «el hueco que se pulsa», como el naipe del mazo.
 
-`mover` cambia de firma en las dos `mesa.ts`: era `(movimiento) => void` con un
-`void (async () => {...})()` dentro; devuelve esa misma promesa, resuelta a
-`'hecho' | 'rechazado' | 'sin-red'` con lo que el cuerpo ya sabe (la fase 1 ya lo
-escribió, y gana). La tabla entera, sin dejarse ninguna salida del cuerpo:
+`mover` devuelve su promesa desde la fase 1 (`8371080`): era `(movimiento) => void`
+con un `void (async () => {...})()` dentro; devuelve esa misma promesa, resuelta a
+`ResultadoDelMovimiento = 'hecho' | 'rechazado' | 'sin-red'` con lo que el cuerpo ya
+sabe. La tabla entera, sin dejarse ninguna salida del cuerpo:
 
-| Salida de `mover` (`app/src/arcade/mesa.ts` desde 719, `escritorio/src/mesa.ts` desde 691) | Resuelve |
+| Salida de `mover` (`app/src/arcade/mesa.ts` desde 720, `escritorio/src/mesa.ts` desde 692) | Resuelve |
 |---|---|
 | El `return` temprano —`if (donde === null \|\| rev === undefined) return 'rechazado';` (725 / 697)—: sin código de mesa o sin `rev`, no se manda nada | `'rechazado'` (la mesa está igual que estaba; nada rodó por el cable) |
 | `r.ok`, `rev` subió y el juego no dijo nada | `'hecho'` |
 | `!r.ok`; o `seIgnoro` (`r.ok` con el mismo `rev`); o **el juego devolvió un motivo** —`r.ok` con `datos.mesa.motivo`, `loQueDijoElJuego.length > 0`: un rechazo con palabras, que la mesa ya enseña como aviso— | `'rechazado'`. Es una sola línea: `return !r.ok \|\| seIgnoro \|\| loQueDijoElJuego.length > 0 ? 'rechazado' : 'hecho'` (812 / 754) |
-| El `catch` | `'sin-red'` |
+| El `catch` (815 / 757) | `'sin-red'` |
 
-Nadie más la lee: los demás sitios siguen llamándola sin `await`. La pantalla
-comprueba los tres valores EXHAUSTIVAMENTE —un `switch` sin `default` sobre el tipo
-de unión, de modo que un cuarto valor el día de mañana no compile—: `'hecho'` no
+Nadie más la lee: los demás sitios siguen llamándola sin `await`. **Quien traduce los
+tres valores a suceso es la ESCENA, no la pantalla**, y es un cambio respecto de la
+séptima: la pantalla sólo DEVUELVE la promesa de `mover` por `onPulsarLosDados`
+(`() => Promise<ResultadoDelToque>`, con `ResultadoDelToque` escrito otra vez en
+`escenas/dados.ts` con los mismos tres valores, porque la escena no puede importar de
+un cliente: si `mover` gana un cuarto valor, la pantalla deja de compilar al pasárselo),
+y `Dados` la traduce con `sucesoDelResultado` (`escenas/dados.ts`), que es el `switch`
+sin `default` sobre la unión, de modo que un cuarto valor no compile: `'hecho'` no
 empuja nada (la vista traerá la tirada); `'rechazado'` y `'sin-red'` empujan
-`rechazado` a la cola de la máquina, porque en los dos casos la mesa no cambió y no
-va a llegar ninguna tirada mía. El `useFrame` de los dados vacía esa cola en su
-primer `tic`. Los 6 s de la máquina (más abajo) quedan para la única salida que no
-está en la tabla: una petición que no vuelve nunca, ni bien ni mal ni con error.
+`rechazado` a la cola de la máquina, porque en los dos casos la mesa no cambió y no va
+a llegar ninguna tirada mía (`verify:escena`: «la respuesta de mover se traduce a la
+máquina exhaustivamente…»; la vacuna E5, con `sin-red` sin empujar nada, cayó). El
+`useFrame` de los dados vacía esa cola, en orden y con el reloj de la escena, antes de
+cada `tic`. Los 6 s de la máquina (más abajo) quedan para la única salida que no está
+en la tabla: una petición que no vuelve nunca, ni bien ni mal ni con error.
 
 La máquina vive en `escenas/dados.ts`, pura, con el reloj inyectado, como `gestos.ts`
 del Muelle, y se comprueba en Node:
@@ -1496,9 +1794,10 @@ sucesos: { que: 'tocado' } | { que: 'vista', vista: { tirado, ultimaTirada, sell
 estados: quieta(par) | rodando(desde, objetivo | null, anterior) | asentando(desde, par)
 ```
 
-(La forma es la del código de la fase 1, `escenas/dados.ts` 91–143: la máquina no lee
-`turnosAbiertos` a secas, recibe el `sello` ya calculado por `dadosEnTres`, y `rodando`
-guarda el par `anterior` al que vuelve si la tirada no llega.)
+(La forma es la del código desde la fase 1, `escenas/dados.ts` 334–342 y 413–457: la
+máquina no lee `turnosAbiertos` a secas, recibe el `sello` ya calculado por
+`dadosEnTres`, y `rodando` guarda el par `anterior` al que vuelve si la tirada no llega,
+y con objetivo guarda `llegoEn`, el instante en que llegó.)
 
 - `tocado` en `quieta` → `rodando(ahora, null)`. En cualquier otro estado, nada: el
   segundo toque de un doble toque no arranca nada, y como la pantalla pone `quieto`
@@ -1515,13 +1814,13 @@ guarda el par `anterior` al que vuelve si la tirada no llega.)
   que yo tocara (dos pestañas), o son dos tiradas seguidas en menos de 0,35 s y la
   segunda entra con la primera aún asentándose— se pasa a `rodando(ahora, objetivo)`
   con `anterior` = el par que se estaba enseñando (`parQueSeEnsena(fase)`: en
-  `asentando`, el par al que iba). Es lo que hace `escenas/dados.ts` (200–216), y
+  `asentando`, el par al que iba). Es lo que hace `escenas/dados.ts` (426–443), y
   gana.
 - Tirada nueva es: `tirado` pasa de falso a verdadero; o `tirado` es verdadero y
   cambia el `sello` o `ultimaTirada` respecto de la última vista (dos movimientos
   entre dos vueltas del sondeo). La PRIMERA vista nunca lo es: al montar o al
   recargar, lo que hay en la mesa es noticia vieja y se enseña en reposo
-  (`traeTiradaNueva`, 165–168). Si el `sello` cambia con `tirado` falso, la tirada
+  (`traeTiradaNueva`, 391–394). Si el `sello` cambia con `tirado` falso, la tirada
   del turno anterior se perdió entre sondeos: se enseña el par nuevo en reposo, sin
   animar, porque ya es noticia vieja.
 - El par lo da `repartoDeLaTirada(suma, sello, semilla)` con el sello de la decisión
@@ -1530,11 +1829,21 @@ guarda el par `anterior` al que vuelve si la tirada no llega.)
 - `rodando` sin objetivo más de 6 s → `quieta(par anterior)`. Ya sólo pasa cuando la
   petición no ha vuelto ni bien, ni mal, ni con error: `'sin-red'` también empuja
   `rechazado` (tabla del §5.3), así que un fallo de red que se sabe corta en el acto.
-- Cada `tic` es un `useFrame`: escribe posición y cuaternión de las dos mallas. Nada
-  cruza el estado de React.
+- Cada `tic` es un `useFrame`: primero vacía la cola (`tocado`, `rechazado`, `vista`)
+  en orden con el mismo reloj, después el `tic`, y escribe posición y cuaternión de los
+  dos grupos de cubo. Nada cruza el estado de React: la máquina, la cola y los
+  cuaterniones viven en refs de `Dados`; la vista entra en la cola desde un `useEffect`
+  sobre `(tirado, ultimaTirada, sello)`, y otra semilla (otra mesa) vuelve la máquina al
+  reposo y la vista de ahora la coloca.
 
 La máquina no sabe cuántos dados hay: con los dos de la decisión 3 el `tic` escribe dos
-mallas y `repartoDeLaTirada` devuelve un par.
+grupos y `repartoDeLaTirada` devuelve un par. `verify:escena` la recorre en Node
+(«tocar en reposo arranca a rodar SIN objetivo», «la vista que llega a 0,2 / 0,6 / 1,4
+/ 3,0 s asienta desde 0,6 / 0,6 / 1,4 / 3,0…», «un rechazo mientras rueda sin objetivo
+devuelve los dados al par anterior EN EL ACTO», «sin respuesta ninguna, los dados se
+rinden a los seis segundos y no antes», y las demás del paso «Los dados se reparten por
+turno, ruedan hasta que el servidor contesta…»). Lo que se miró en el banco está en el
+§11 (fase 3).
 
 ## 6. Recoger la mesa
 
@@ -1550,10 +1859,19 @@ mallas y `repartoDeLaTirada` devuelve un par.
   tapete, sombras—, `alto/2 + hueco.y + 0,5 lados` hacia abajo: 0,37 unidades, 88
   puntos en un iPhone 14, hasta que el punto más alto (el naipe) queda bajo el canto.
   Objetivo más interpolación amortiguada en el `useFrame` del grupo, 0,28 s; al
-  llegar, `visible = false`, que además saca sus asas de los sucesos de r3f.
+  llegar, `visible = false`, que además saca sus asas de los sucesos de r3f. Lo que la
+  fase 3 le deja a ésta: `Dados` vive DENTRO de `Barra` (hermano de `PiezaEnLaBarra` y
+  `MazoEnLaBarra`, colocado en el sitio de los dados) y su máquina y su cola viven en
+  refs del componente. Si la fase 4 mueve el grupo y lo apaga con `visible`, la máquina
+  sigue viva y una tirada que llegue con la mesa recogida se asienta a ciegas; si la
+  desmonta, la máquina vuelve al reposo (`dadosEnReposo`) y esa tirada se enseña en
+  reposo al subir, sin animar, que es lo que `traeTiradaNueva` hace con la primera
+  vista. Las dos cosas son aceptables; lo que no vale es no elegir: si se quiere que
+  una tirada recibida con la mesa recogida se anime al subir, hay que mantener `Dados`
+  montado. La entrada `mesaRecogida` de `<Delta>` no existe todavía.
 - **Qué NO baja:** las dos manos. No están sobre la mesa —una mano de cartas se
   sostiene— y en apaisado viven en los costados, que no es lo que se quiere despejar.
-  Recoger la mesa suelta lo cogido (`soltarTodo`, `riberas-en-tres-escena.tsx` 592):
+  Recoger la mesa suelta lo cogido (`soltarTodo`, `riberas-en-tres-escena.tsx` 646):
   una pieza en la mano con la barra fuera de la pantalla no tiene a dónde volver. La
   bajada medida: 72 puntos en el SE, 88 en un iPhone 14, 243 en un monitor a 1080
   (`medir-tapa-horizontal.ts`).
@@ -1570,7 +1888,7 @@ mallas y `repartoDeLaTirada` devuelve un par.
   estarlo, la mesa recogida no tiene de dónde cogerla), la salida espera a que se
   suelte o se coloque. Una mesa que sube debajo de un arrastre cambiaría lo que hay
   bajo el dedo a mitad de gesto. Como la pantalla ya suelta todo al cambiar `rev`
-  (línea 602), la espera dura lo que dure el gesto.
+  (línea 656), la espera dura lo que dure el gesto.
 - **La cámara** no cambia (§1.9).
 
 ## 7. El presupuesto
@@ -1585,33 +1903,37 @@ tenía cota:
 | La barra de antes: poblado 1.011 + ciudad 5.659 + puente 604 (leídos del `.glb`), 4 zócalos × 24, 4 asas × 12, placa 2, naipe (filo, cuerpo, icono de 16) | ≈ 7.450 | ≈ 16 |
 | Tapa horizontal 96×6 (679 vértices), sin canto | 1.152 | 1 |
 | Tapa a 240×6 (monitor) | 2.880 | 1 |
-| Dos dados, el respaldo procedimental (12 + 210 cada uno, puntos fundidos): es `TRIANGULOS_DEL_RESPALDO_DE_LOS_DADOS` (hoy `TRIANGULOS_DE_LOS_DADOS`, privada) | 444 | 4 |
-| Dos dados, el D6 del pack (`dados.glb`, §5.1) | por medir con el fichero; techo: 574 los dos (444 + los 130 de margen del tope) sin mover `TOPE_DE_LA_MESA`; `triangulosDeLaMesa` suma el MÁXIMO entre esto y el respaldo | 1 o 2 por dado, según traiga uno o dos materiales; se cuenta al compilar |
-| Asa de los dados | 12 | 1 |
+| Dos dados, el D6 del pack (`dados.glb`, §5.1): `TRIANGULOS_DE_LOS_DADOS_DEL_PACK` | 1.324 (662 por dado, una primitiva cada uno, contados con `NodeIO` por `verify:escena` y exigidos exactos por `verify:dados`) | 2 (una por dado) |
+| Dos dados, el respaldo procedimental de `cubo-del-dado.ts` (12 + 210 cada uno, puntos fundidos): `TRIANGULOS_DEL_RESPALDO_DE_LOS_DADOS` | 444 | 4 |
+| Lo que entra en la cuenta: `TRIANGULOS_DE_LOS_DADOS = max(1.324, 444)` | 1.324 | |
+| Asa de los dados (una caja invisible por `colorWrite`) | 12 | 1 |
 | Tapete del turno | 2 | 1 |
-| Seis sombras de contacto fundidas (hoy cuatro en la partida, una por hueco; seis con los dados) | 120 | 1 |
-| Pila del mazo (una caja escalada) | 12 | 1 |
-| **Nuevo, total (= `triangulosDeLaMesa(seg)` = 12 · seg + 590)** | **1.742 – 3.470** | **+9, −1 de la placa** |
+| Seis sombras de contacto fundidas (cuatro huecos más dos dados, desde la fase 3) | 120 | 1 |
+| Pila del mazo (una caja escalada; fase 7, ya contada) | 12 | 1 |
+| **Nuevo, total (= `triangulosDeLaMesa(seg)` = 12 · seg + 1.470)** | **2.622 – 4.350** | **+7 con el pack (+9 con el respaldo), −1 de la placa** |
 | El mar (`TRIANGULOS_DEL_MAR`) | 23.328 | 1 |
 
-La mesa entera cuesta entre el 7,5 % y el 14,9 % del mar en triángulos (el 5,8 % con
-64 segmentos, el mínimo); en llamadas, la barra pasa de unas 16 a unas 24. La
-`pointLight` no es una llamada pero sí coste por fragmento en todo material
-iluminado; sigue habiendo dos (barra y baraja), ninguna nueva. `TOPE_DE_LA_MESA =
-3_600` en `presupuesto-del-delta.ts`, con `triangulosDeLaMesa(segmentos)` al lado
-para que el número salga de la misma cuenta en la escena y en el comprobador; la
-comprobación «`triangulosDeLaMesa` es lo que pintan las geometrías de verdad: tapa +
-seis sombras + tapete + dos dados + asa + pila, con 64, 96, 106 y 240 segmentos» lo
-afirma construyéndolas (las de la mesa, de `tablon.ts`; las de los dados y la pila,
-con las mismas primitivas que el presupuesto declara), y otra afirma sobre el texto de
-`delta.tsx` que `Barra` llama a ESAS funciones con `segmentosDeLaMesa(forma.ancho)` y
-`FILAS_DE_LA_MESA`. Los totales de la tabla son los del respaldo; con el D6 del pack,
-`triangulosDeLaMesa` suma el MÁXIMO de `TRIANGULOS_DEL_RESPALDO_DE_LOS_DADOS` (444) y
-la cuenta medida del modelo (§5.1), `verify:escena` cuenta contra ese máximo y
-`verify:dados` cuenta el `.glb` contra su constante; el margen de 130 dice hasta dónde
-(574 los dos dados) sin tocar el tope. Un modelo que pese menos de 444 no da nada que
-hacer. `verify:escena` hace hoy 307 comprobaciones, con el guardia de «no se han hecho
-todas» puesto a ese número.
+La mesa entera cuesta entre el 11,2 % y el 18,6 % del mar en triángulos (el 9,6 % con
+64 segmentos, el mínimo: 2.238); en llamadas, la barra pasa de unas 16 a unas 22 con el
+pack (24 con el respaldo). La `pointLight` no es una llamada pero sí coste por
+fragmento en todo material iluminado; sigue habiendo dos (barra y baraja), ninguna
+nueva. `TOPE_DE_LA_MESA = 4_500` en `presupuesto-del-delta.ts`, con
+`triangulosDeLaMesa(segmentos)` al lado para que el número salga de la misma cuenta en
+la escena y en el comprobador, y 150 de margen a 240 segmentos; hasta la fase 3 era
+3.600 con la cuenta del respaldo (`12 · seg + 590`, 1.742 a 3.470), y se rehízo con la
+del pack (§1.10). La comprobación «`triangulosDeLaMesa` es lo que pintan las geometrías
+de verdad: tapa + seis sombras + tapete + el máximo de los dos dados (respaldo
+construido, pack contado del glb) + asa + pila, con 64, 96, 106 y 240 segmentos» lo
+afirma construyéndolas (las de la mesa, de `tablon.ts`; las del respaldo, de
+`cubo-del-dado.ts`; el `.glb`, contado), otra afirma «los dos dados cuestan el MÁXIMO
+del respaldo (444) y del D6 del pack (1.324)», otra que el tope es menos de la quinta
+parte del mar (era la sexta parte: 4.500 supera 23.328 / 6 = 3.888, y el tope lo fijó
+la cuenta), y otra afirma sobre el texto de `delta.tsx` que `Barra` llama a ESAS
+funciones con `segmentosDeLaMesa(forma.ancho)` y `FILAS_DE_LA_MESA`. La escena pinta el
+pack o el respaldo, nunca los dos: en el banco, 2.000.500 triángulos y 1.279 llamadas
+en reposo con el tablero entero, 2.000.502 y 1.280 tras la primera tirada (el tapete).
+`verify:escena` hace hoy 335 comprobaciones, con el guardia de «no se han hecho todas»
+puesto a ese número (307 tras la fase 2, 332 tras la fase 3 y 335 tras la vuelta 3b).
 
 **Texto en el lienzo:** una cifra compilada cuesta de 8 (el «4») a 160 (el «8»)
 triángulos, 60 de media, y una llamada. Un marcador de cuatro colonos con dos cifras
@@ -1621,38 +1943,47 @@ compila ninguna cifra nueva.
 
 ## 8. Dónde vive cada cosa
 
-Las líneas de `delta.tsx` que cita este documento son las del commit `4287809` (la
-fase 2 aterrizada); las de la sexta versión eran de `c9faef3` y ya no valen. Donde se
-puede se cita por NOMBRE de función o de constante, y `verify:escena` se cita por el
-nombre de sus comprobaciones y nunca por línea. Lo que está HECHO en `4287809` va
-marcado; lo demás es lo que las fases siguientes ponen.
+Las líneas que cita este documento (de `delta.tsx`, de las dos pantallas, de `shared`
+y de las dos `mesa.ts`) son las del commit `b216fbc` (la fase 3 aterrizada); las de la
+séptima versión eran de `4287809` y las de la sexta de `c9faef3`, y ya no valen. Donde
+se puede se cita por NOMBRE de función o de constante, y los comprobadores se citan por
+el nombre de sus comprobaciones y nunca por línea. Cada fila dice qué está HECHO y en
+qué fase (`8371080` la 1, `4287809` la 2, `b216fbc` la 3) y qué queda pendiente y de
+qué fase; nada de lo que ya existe se manda escribir.
 
 | Fichero | Qué |
 |---|---|
-| `escenas/barra.ts` | HECHO: `PARTE_DEL_ALTO` 0,14; `SUELO_DEL_TOQUE = 44` exportado; `huecosDeLaMesa(cuantos, campo, proporcion, altoEnPuntos)` con los tres peldaños; `ZOCALO` (`centro` 0,42, `alto` 0,12, `radio` 0,5) y `cotaDeLaTapa(hueco)`, la cara de abajo del zócalo, aquí y no en `delta.tsx` para que quien pinta el zócalo y quien calcula la cota lean los mismos tres números; la cabecera de `ANCHO_MAXIMO` reescrita |
-| `escenas/mesa.ts` (sin `three`) | HECHO: `vetaDelTablon`, `coloresDeLaMadera` (los dos colores leídos del atlas), `aLineal`, `mezcla`; `tapaDeLaMesa(hueco, campo, proporcion)` con `TRAS_EL_ZOCALO` 0,6, `ANCHO_DE_MAS_DE_LA_TAPA` 1,08 y `HOLGURA_DELANTERA_DE_LA_TAPA` 0,1; `coloresDelPosavasos()` con `POSAVASOS_SOBRE_LA_MADERA_OSCURA = { reposo: 0,7, encima: 0,85 }` y `oscurecido`; `colorDelColono(color)`, leído de la celda del jugador del atlas; `hexDe` |
-| `escenas/tablon.ts` (CON `three`, sin React) | HECHO: `geometriaDeLaTapa(segmentos, filas, ancho, fondo, madera)` (un `PlaneGeometry` tumbado con la veta en el atributo `color`), `geometriaDeLasSombras(centros)` (los discos fundidos a mano, alfa en el vértice), `geometriaDelTapete(ancho, fondo)`, `triangulosDe(geometria)`, `maderaEnLineal`, y `SEGMENTOS_DE_LA_SOMBRA` 20, `ALFA_DE_LA_SOMBRA` 0,35, `RADIO_DE_LA_SOMBRA` 0,62, `SOBRE_LA_TAPA` 0,002, `RUGOSIDAD_DE_LA_MADERA` 0,8, `FONDO_DEL_TAPETE` 0,8, `OPACIDAD_DEL_TAPETE` 0,55. Sueltas para que `verify:escena` las construya y cuente |
-| `escenas/capas.ts` (sin `three`, sin React) | HECHO: las cinco constantes de capa, `ORDEN_DE_LA_BARRA` 1000, `ORDEN_DE_LAS_CARTAS` 1010, `ORDEN_DE_LAS_AREAS` 2000, `ORDEN_DE_LAS_CARTAS_DEL_MAZO` 3000, `ORDEN_DE_LAS_CASILLAS` 4000, que ya NO viven en `delta.tsx`; su cabecera cuenta la regla del grupo más cercano, que no hay borrado de profundidad, el límite conocido y por qué los testigos nunca corrieron |
-| `escenas/scripts/arbol-de-la-mesa.ts` | HECHO: el modelo del árbol de `delta.tsx` con las constantes de `capas.ts` y las posiciones importadas (`arbolDeLaMesa`), el pintor (`ordenDeDibujo`: el `projectObject` de `three` 0.185.1 con la poda por frustum y el `WebGLRenderLists` real) y el juez (`fallosDelOrden`); suelto imprime la lista del iPhone 14 |
-| `escenas/dados.ts` (NUEVO, sin `three`) | `paresDeLaSuma`, `repartoDeLaTirada(suma, sello, semilla)`, `sacudida(t)`, `faseDeLosDados` con `rechazado`, `RODAR_MINIMO`, `ASENTAR`, `TOPE_SIN_RESPUESTA`; y las dos medidas del dado, `ARISTA_DEL_DADO = 0,52` y `PUNTO_DEL_DADO = 0,18`, con `DADO_MINIMO = 22` y `PUNTO_MINIMO = 4` al lado, para que la escena y el comprobador lean la misma (§1.15); y `ARISTA_DEL_D6_EN_EL_PACK`, la arista del D6 de KayKit medida al compilar la primera vez (§5.1). `selloDeLaTirada` NO está aquí: vive en `shared/…/riberas-en-tres.ts` al lado de `dadosEnTres`, que es quien lo calcula (§5.2) |
-| `escenas/presupuesto-del-delta.ts` | HECHO: `SEGMENTOS_DE_LA_MESA` (mín 64, máx 240, 8 puntos por segmento), `FILAS_DE_LA_MESA` 6, `segmentosDeLaMesa(anchoEnPuntos)`, `triangulosDeLaMesa`, `TOPE_DE_LA_MESA` 3.600. Fase 3: la `TRIANGULOS_DE_LOS_DADOS` privada (444) pasa a exportarse como `TRIANGULOS_DEL_RESPALDO_DE_LOS_DADOS`, y `triangulosDeLaMesa` suma el máximo entre ella y la cuenta del modelo (§5.1, §7) |
-| `escenas/nombres.ts` | `MODELO.dado`, el nombre del único nodo de `dados.glb`, que pasa `NOMBRE_QUE_SOBREVIVE` como los demás |
-| `escenas/ruta-de-modelos.ts` | `rutaDeLosDados()` al lado de `rutaDelTablero()`: `${RUTA_DE_MODELOS}/dados.glb` |
-| `escenas/scripts/compilar-dados.ts` (NUEVO) y `escenas/scripts/verificar-dados.ts` (NUEVO), `compilar:dados` y `verify:dados` en `escenas/package.json` | El compilador lee el D6 del pack con el `NodeIO` de `escritorDeGlb()` (atributos separados, como los otros dos), mide la caja envolvente en los tres ejes y la contrasta con `ARISTA_DEL_D6_EN_EL_PACK`, decide si los puntos son geometría contando las 21 islas del color oscuro tras hornear (§5.1; si no salen, se niega y lo dice: gana el respaldo), hornea con `horneaLaPrimitiva` y `desnudaElMaterial`, renombra el nodo a `MODELO.dado` y escribe `escenas/modelos/dados.glb` sin escalar. El comprobador es `verificar-aventureros.ts` recortado a un fichero: `@gltf-transform` y el `GLTFLoader` de verdad, `COLOR_0` en todas las primitivas, ninguna textura, imagen ni UV, ningún atributo entrelazado, las 21 islas, la arista al 1 % de la constante, los triángulos por dos contra su constante, y un techo de kB escrito con el fichero delante |
-| `escenas/modelos/dados.glb` (NUEVO, versionado como `tablero.glb`) | El D6 horneado, un nodo `dado`, a la unidad del pack |
-| `server/src/routes/modelos.ts` | La ruta fija `/arcade/modelos/dados.glb`, gemela de la de `embarcadero.glb`: nombre fijo, sin comodín |
-| `arte/README.md` | La fila del pack Board Game Bits en la tabla, la carpeta `arte/kaykit/board-game-bits/`, y de qué salen los dados; la frase del atlas y las texturas, corregida en esta versión: el pack MEZCLA un atlas de gradiente con texturas individuales, y los aventureros van cada uno con la suya y sin atlas |
-| `escenas/cartas.ts` | HECHO: sólo las dos frases que citan el techo de la barra, que hablan ya del asa y del bote (`−0,273·alto`, §1.2); ninguna constante |
+| `escenas/barra.ts` | HECHO (fase 1): `PARTE_DEL_ALTO` 0,14; `SUELO_DEL_TOQUE = 44` exportado; `huecosDeLaMesa(cuantos, campo, proporcion, altoEnPuntos)` con los tres peldaños; la cabecera de `ANCHO_MAXIMO` reescrita. HECHO (fase 2): `ZOCALO` (`centro` 0,42, `alto` 0,12, `radio` 0,5) y `cotaDeLaTapa(hueco)`, la cara de abajo del zócalo, aquí y no en `delta.tsx` para que quien pinta el zócalo y quien calcula la cota lean los mismos tres números. HECHO (fase 3, vuelta 3b): importa `ANCHO_DEL_PAR_DE_DADOS` de `dados.ts` (sin ciclo: `dados.ts` sólo importa `revoltijo`); el quinto reserva `max(lado, ANCHO_DEL_PAR_DE_DADOS · lado)` y crece hacia la izquierda desde el borde derecho del hueco de un lado (§4.4); `HuecoDeLosDados` con `ancho`, `alto`, `lado` y `forma`, y su cabecera contando el porqué; `ANCHO_DEL_ASA_DE_LOS_DADOS = 1,6`. Pendiente: nada |
+| `escenas/mesa.ts` (sin `three`) | HECHO (fase 2): `vetaDelTablon`, `coloresDeLaMadera` (los dos colores leídos del atlas), `aLineal`, `mezcla`; `tapaDeLaMesa(hueco, campo, proporcion)` con `TRAS_EL_ZOCALO` 0,6, `ANCHO_DE_MAS_DE_LA_TAPA` 1,08 y `HOLGURA_DELANTERA_DE_LA_TAPA` 0,1; `coloresDelPosavasos()` con `POSAVASOS_SOBRE_LA_MADERA_OSCURA = { reposo: 0,7, encima: 0,85 }` y `oscurecido`; `colorDelColono(color)`, leído de la celda del jugador del atlas; `hexDe` |
+| `escenas/tablon.ts` (CON `three`, sin React) | HECHO (fase 2): `geometriaDeLaTapa(segmentos, filas, ancho, fondo, madera)` (un `PlaneGeometry` tumbado con la veta en el atributo `color`), `geometriaDeLasSombras(centros)` (los discos fundidos a mano, alfa en el vértice), `geometriaDelTapete(ancho, fondo)`, `triangulosDe(geometria)`, `maderaEnLineal`, y `SEGMENTOS_DE_LA_SOMBRA` 20, `ALFA_DE_LA_SOMBRA` 0,35, `RADIO_DE_LA_SOMBRA` 0,62, `SOBRE_LA_TAPA` 0,002, `RUGOSIDAD_DE_LA_MADERA` 0,8, `FONDO_DEL_TAPETE` 0,8, `OPACIDAD_DEL_TAPETE` 0,55. Sueltas para que `verify:escena` las construya y cuente |
+| `escenas/capas.ts` (sin `three`, sin React) | HECHO (fase 2): las cinco constantes de capa, `ORDEN_DE_LA_BARRA` 1000, `ORDEN_DE_LAS_CARTAS` 1010, `ORDEN_DE_LAS_AREAS` 2000, `ORDEN_DE_LAS_CARTAS_DEL_MAZO` 3000, `ORDEN_DE_LAS_CASILLAS` 4000, que ya NO viven en `delta.tsx`; su cabecera cuenta la regla del grupo más cercano, que no hay borrado de profundidad, el límite conocido y por qué los testigos nunca corrieron |
+| `escenas/scripts/arbol-de-la-mesa.ts` | HECHO (fase 2): el modelo del árbol de `delta.tsx` con las constantes de `capas.ts` y las posiciones importadas (`arbolDeLaMesa`), el pintor (`ordenDeDibujo`: el `projectObject` de `three` 0.185.1 con la poda por frustum y el `WebGLRenderLists` real) y el juez (`fallosDelOrden`); suelto imprime la lista del iPhone 14. HECHO (fase 3): la rama CON dados de `Barra` (`huecosDeLaMesa(4, …)`), el grupo `Dados` con su asa invisible y un grupo por cubo con `barra:DADO 0/1` opacos, las seis sombras con el radio del dado, y el tapete donde hay sitio (colgado o quinto) |
+| `escenas/dados.ts` (sin `three`) | HECHO (fase 1): `CANAL_DEL_REPARTO`, `paresDeLaSuma`, `repartoDeLaTirada(suma, sello, semilla)`, `VistaDeLosDados`, `FaseDeLosDados`, `EstadoDeLosDados`, `SucesoDeLosDados`, `dadosEnReposo`, `parQueSeEnsena`, `traeTiradaNueva`, `faseDeLosDados` con `rechazado`, `RODAR_MINIMO` 0,6, `ASENTAR` 0,35, `TOPE_SIN_RESPUESTA` 6. HECHO (fase 3): `ARISTA_DEL_D6_EN_EL_PACK = 0,75`; `COLOR_DEL_NUMERO` `#efe6cd` y `COLOR_DEL_PUNTO` `#2a2118` (antes en `delta.tsx`, que ahora los importa); `ARISTA_DEL_DADO` 0,52, `HUECO_ENTRE_DADOS` 0,08, `ANCHO_DEL_PAR_DE_DADOS` 1,12, `PUNTO_DEL_DADO` 0,18, `DADO_MINIMO` 22, `PUNTO_MINIMO` 4, `CENTRO_DEL_DADO_SOBRE_LA_TAPA` (media arista), `SALTO_DEL_DADO` 0,2, `RADIO_DE_LA_SOMBRA_DEL_DADO` 0,32, `centroDelDado(i)`; el contrato `DadosDeLaMesa` (lo que recibe `<Delta>`; `DadosEnTres` de `shared` lo extiende), `ResultadoDelToque` y `sucesoDelResultado` (el `switch` exhaustivo del §5.3); las curvas puras `SACUDIDA` y `sacudida(t)`, `saltoDelDado`, `anguloRodado` (`VELOCIDAD_DE_GIRO` 4π, `FRENO_DEL_GIRO` 0,5), `avanceDelAsentado`, `REBOTE_DEL_DADO` 0,04 y `reboteDelDado`, `giroDelDadoAsentado(indice, sello)`. `selloDeLaTirada` NO está aquí: vive en `shared/…/riberas-en-tres.ts` al lado de `dadosEnTres`, que es quien lo calcula (§5.2). Pendiente: nada |
+| `escenas/cubo-del-dado.ts` (CON `three`, sin React) | HECHO (fase 3): el respaldo procedimental suelto para poder construirse y contarse: `geometriaDelCuerpoDelDado(arista)`, `geometriaDeLosPuntosDelDado(arista)` con `SEGMENTOS_DEL_PUNTO` 10, `PASO_DE_LOS_PUNTOS` 0,27, `PUNTO_SOBRE_LA_CARA` 0,004, `PUNTOS_DEL_VALOR` y cada valor en la cara de `CARA_DEL_VALOR`; `cuaternionDelValor(valor, giro)` y `valorQueMiraArriba(cuaternion)` (§5.1, §5.2) |
+| `escenas/caras-del-dado.ts` (GENERADO por `compilar-dados.ts`, sin importaciones) | HECHO (fase 3): `CARA_DEL_VALOR` `{1: '-y', 2: '+x', 3: '+z', 4: '-z', 5: '-x', 6: '+y'}`, `NORMAL_DEL_VALOR`, `normalDelValor()`, y los tipos `CaraDelDado` y `ValorDelDado`. No se edita a mano: `verify:dados` lo regenera desde el `.glb` y lo compara byte a byte |
+| `escenas/scripts/caras-del-d6.ts` | HECHO (fase 3): la medida compartida por el compilador y el comprobador: `cuentaLosPuntos(prim, esPunto)` (unión-hallazgo por aristas de triángulo, cara por el eje de mayor valor absoluto, y cuántos vértices de punto tienen la normal en otra cara), `problemasDeUnDado` (1..6 una vez, 21, opuestas 7), `caraDeCadaValor`, `normalDeLaCara`, `textoDeCarasDelDado` (determinista; lanza si la cuenta no es un dado) |
+| `escenas/presupuesto-del-delta.ts` | HECHO (fase 2): `SEGMENTOS_DE_LA_MESA` (mín 64, máx 240, 8 puntos por segmento), `FILAS_DE_LA_MESA` 6, `segmentosDeLaMesa(anchoEnPuntos)`, `triangulosDeLaMesa`. HECHO (fase 3): `TRIANGULOS_DEL_RESPALDO_DE_LOS_DADOS` 444 exportada, `TRIANGULOS_DE_LOS_DADOS_DEL_PACK` 1.324, `TRIANGULOS_DE_LOS_DADOS` el máximo, `TRIANGULOS_FIJOS_DE_LA_MESA` 1.470, `triangulosDeLaMesa = 12 · seg + 1.470`, `TOPE_DE_LA_MESA` 4.500 con la cuenta en su cabecera (§1.10, §7) |
+| `escenas/nombres.ts` | HECHO (fase 3): `MODELO.dado = 'dado'`, que pasa `NOMBRE_QUE_SOBREVIVE`; `EN_DADOS_GLB`, los nombres de `MODELO` que viven en `dados.glb`; `nombresEnElGlb()` los excluye y `todosLosNombres()` los incluye (§5.1) |
+| `escenas/modelos.ts` | HECHO (fase 3): `unirCatalogos(...catalogos | null)`, la unión de los dos ficheros en un `CatalogoDeModelos`, con los `null` ignorados |
+| `escenas/ruta-de-modelos.ts` | HECHO (fase 3): `rutaDeLosDados()` al lado de `rutaDelTablero()`: `${RUTA_DE_MODELOS}/dados.glb` |
+| `escenas/scripts/compilar-dados.ts` y `escenas/scripts/verificar-dados.ts`, `compilar:dados` y `verify:dados` en `escenas/package.json`; `escenas/scripts/hornear.ts` | HECHO (fase 3). El compilador lee `D6_A.gltf` con el `NodeIO` de `escritorDeGlb()` (atributos separados), exige un solo nodo, malla, primitiva y material con `POSITION`, `NORMAL` y `TEXCOORD_0`, mide la caja y la contrasta con `ARISTA_DEL_D6_EN_EL_PACK` al 1 % (`exigeElCubo`), hornea con `horneaLaPrimitiva`, remapea por luminancia (`remapea`: umbral 0,25, factor 2 de hueco, o se niega), cuenta los puntos por cara con `caras-del-d6.ts` y exige un dado, renombra nodo, malla y material a `MODELO.dado`, `desnudaElMaterial`, `dedup` y `prune` SIN `weld`, un solo búfer, y escribe `dados.glb` y `caras-del-dado.ts` (§5.1). El comprobador: 27 comprobaciones con su guardia a 27 (la lista, en el §5.1). `hornear.ts` exporta `byteLinealDeSrgb` (misma curva y redondeo que el horno) para que el compilador escriba el crema y el oscuro en el mismo espacio que lo horneado; `verify:dados` NO la usa: escribe su propia curva |
+| `escenas/modelos/dados.glb` (versionado como `tablero.glb`) | HECHO (fase 3): el `D6_A` horneado y remapeado, un nodo `dado`, 521 vértices, 662 triángulos, a la unidad del pack, 19,3 kB |
+| `server/src/routes/modelos.ts` | HECHO (fase 3): la ruta fija `/arcade/modelos/dados.glb`, gemela de la de `embarcadero.glb`: nombre fijo, sin comodín, misma caché |
+| `server/scripts/verificar-mesa.ts` | HECHO (fase 3): tres comprobaciones de `dados.glb` sobre el servidor de verdad (existe en el repositorio; 200 con `model/gltf-binary` y `max-age=3600`; los bytes del fichero real, firma «glTF», menos de 100 kB), y el guardia de un suelo de 100 a `COMPROBACIONES_ESCRITAS = 856` |
+| `scripts/verificar-todo.mjs` | HECHO (fase 3): la entrada «dados» (`verify:dados` en `escenas`) detrás de «aventureros», con su porqué |
+| `arte/README.md` | HECHO (fase 3): la fila del pack Board Game Bits en la tabla, la carpeta `arte/kaykit/board-game-bits/`, de qué salen los dados y por qué el compilador se niega si los puntos no son geometría; la frase del atlas y las texturas corregida (el pack MEZCLA un atlas de gradiente con texturas individuales, y los aventureros van cada uno con la suya y sin atlas). La octava añade qué D6 entra y cuáles se descartan |
+| `escenas/cartas.ts` | HECHO (fases 1 y 2): sólo las dos frases que citan el techo de la barra, que hablan ya del asa y del bote (`−0,273·alto`, §1.2); ninguna constante |
 | `escenas/baraja.ts` | Nada |
-| `escenas/cinta.ts` (NUEVO, sin `three`) | `anchoDeLaCinta(ancho, alto)`: el tercio en apaisado, el 40 % de pie (§2.2) |
-| `escenas/delta.tsx` | HECHO en `4287809`: `Barra` (firma en 1467, cabecera 1365–1466) pinta la tapa con `tapaDeLaMesa` del primer hueco y `geometriaDeLaTapa(segmentos, FILAS_DE_LA_MESA, tapa.ancho, tapa.fondo, madera)`, las sombras con `geometriaDeLasSombras` de los huecos, el tapete con `geometriaDelTapete` bajo el sitio COLGADO de `huecosDeLaMesa` cuando `tapete !== null`, y la `pointLight` de siempre; la tapa lleva `onPointerDown/Up/Move/Over` con `paraElToque` (sólo `e.stopPropagation()`) y `onPointerOut` con `nadaAlSalir`; la constante de su capa, importada de `capas.ts`, en los once `<group>` de la tabla del §4.1 (1154, 1203, 1299, 1332, 1606, 1869, 1962, 2101, 2212, 2337, 2501); los DOS testigos QUITADOS y ningún `clearDepth`; los zócalos con `ZOCALO` (1191–1193, 1321–1323) y con `coloresDelPosavasos()` (247); la entrada `turnoDe` de `<Delta>` (2602), que `Barra` recibe como `tapete` (3205); la placa fuera; las cabeceras de `Barra`, de la carta (1852–1856) y de `ManoDelMazo` (2402–2438) reescritas. Fase 3: `Dados` hermano de `PiezaEnLaBarra`, que sólo empuja `tocado` si `disponible`; entradas `dados`, `onPulsarLosDados`, `mesaRecogida`, opcionales como las otras; la llave del reparto en `dados !== null` (§4.4); los `<group>` de `Dados` con `ORDEN_DE_LA_BARRA`; `Dados` busca `MODELO.dado` en el catálogo, lo escala con `ARISTA_DEL_DADO · lado / ARISTA_DEL_D6_EN_EL_PACK` y pinta el respaldo procedimental si no está (§5.1) |
-| `escenas/scripts/verificar-escena.ts` | HECHO: UNA lista `LIENZOS` (quince: los seis de siempre, 768×1024 y los ocho apaisados; `Array<[string, number, number]>` en la cabecera del guion) para todos los bloques; «la mano del mazo no invade la zona de la barra» contra `0,52·lado` con el alto real de cada lienzo; el paso «La tapa de la mesa: a la cota del zócalo, con la veta del atlas, dentro del tope y bajo las cartas»: la geometría contada con `three`, la cota y las Z en los quince lienzos, los pies de las cartas de 3 a 12 puntos bajo el borde trasero, los colores del tapete, los ocho grupos de dentro y los tres exteriores leídos por texto hasta el `>` que cierra la etiqueta, ningún `clearDepth(` en `escenas/` y ningún `onBeforeRender` que toque `gl`, el orden medido con `arbol-de-la-mesa.ts` en los quince lienzos, la tapa parando el toque, los sitios bajo la tapa contra `ACEPTADOS`, los posavasos leídos del atlas, y que `Barra` pinta lo contado; 307 comprobaciones. Fases 3 a 5: los grupos de `Dados` y de la pila; el dado de 22 y el punto de 4 con `ARISTA_DEL_DADO` y `PUNTO_DEL_DADO`; la llave `dados !== null` (§4.4); el vértice más alto bajo la cinta al salir; la cinta apaisada y de pie contra las manos; que seis fichas de 44 caben bajo la cinta con el inset de abajo, para lo que `LIENZOS` gana una CUARTA columna (0 salvo 844×390 → 21, 932×430 → 21 y 1180×820 → 20; `medir-cajon.ts`, §1; la muesca lateral es OTRO dato y no entra, porque la escena no la conoce); que `Dados` lee `MODELO.dado` y tiene el respaldo |
-| `shared/arcade/juegos/riberas-en-tres.ts` | HECHO: `turnoEnTres(vista)`, el color del colono al que le toca (`colorDePiezaDelColono` sobre el asiento de `turnoDe`; `null` sin turno o fuera de Riberas), compuesto una vez para las dos pantallas. Fase 3: `tirado`, `ultimaTirada`, `turnosAbiertos` en `VistaQueSePinta` (y los dos comentarios de `comprada` reescritos: §1.3); `dadosEnTres` (`null` fuera de `jugando`), `opcionesFueraDeLaMesa`, `chozas`/`torres` en `ColonoEnElMarcador` |
-| `server/scripts/verificar-riberas-en-tres.ts` | HECHO: que `turnoEnTres` devuelve el color del asiento de `turnoDe` y `null` fuera de Riberas (293 comprobaciones). Fase 3: que TIRAR se cae del formulario sólo con dados; que `porTirar` sigue a las opciones enteras; que `dadosEnTres` es `null` fuera de `jugando`; que las cuentas de chozas y torres cuadran con la vista |
-| `app/src/arcade/mesa.ts`, `escritorio/src/mesa.ts` | `mover` devuelve `'hecho' \| 'rechazado' \| 'sin-red'`, con el `return` temprano resuelto a `'rechazado'` (tabla del §5.3) |
-| `app/src/arcade/local.ts` | `volverAlRetrato()`; `usarElAparatoQuieto` lo usa al desmontar; `usarApaisado` al lado, y `usarLaPantallaEncendida` con `activateKeepAwakeAsync` / `deactivateKeepAwake` como el juego local (378–381; §1.13) |
-| `app/src/arcade/riberas-en-tres-escena.tsx`, `app/src/arcade/hud-de-la-mesa.tsx` (NUEVO) | HECHO: `turnoDe = useMemo(() => turnoEnTres(laVista), [laVista])` y `<Delta turnoDe={turnoDe}>` (`verify:sala` lo exige; 144 comprobaciones). Fases 3 y 6: la rama del delta a pantalla completa; la cinta del tercio central con la ficha de mis puntos en el sitio del «≡»; el cajón del ancho de la cinta con el marcador de seis en fichas de 44 («vado L · N chozas · M torres» en el segundo renglón), la línea de la mesa, los botones y la crónica, desplazable (§1.11); barra de estado oculta; cartel de girar; la acción accesible `tirar`; `dados.glb` pedido APARTE de `catalogoDelTablero`, con su propio `catch` a catálogo vacío y la unión después (§5.1: un 404 del dado no tira el tablero ni lo hace bajar otra vez) |
-| `escritorio/src/riberas-en-tres.tsx`, `escritorio/src/sala.tsx`, `escritorio/src/estilo.css` | HECHO: `turnoDe = useMemo(() => turnoEnTres(vista), [vista])` y `<Delta turnoDe={turnoDe}>` (`verify:escritorio` lo exige; 389 comprobaciones). Fases 3 y 5: la misma cinta en DOM con la ficha de mis puntos; el raíl como cajón del ancho de la cinta, con el marcador el primero y `MarcadorDeRiberas` pintando la ficha de 44; la página como columna flex con la cadena de cuatro eslabones (`.sala` → `.tablero-y-panel` → `.riberas-en-tres` → `.riberas-lienzo`, cada uno con `flex: 1; min-height: 0`; §1.12), el aviso en la cinta y la cabecera de la Sala en su sitio, sin variable de alto; el botón de tirar para tecnologías de apoyo; `dados.glb` pedido APARTE de `traerElCatalogo`, con su `catch` propio y la unión después (§5.1) |
+| `escenas/cinta.ts` (NUEVO, sin `three`) | Pendiente (fase 5): `anchoDeLaCinta(ancho, alto)`: el tercio en apaisado, el 40 % de pie (§2.2) |
+| `escenas/delta.tsx` | HECHO (fase 2, `4287809`): `Barra` (firma en 1506, cabecera 1396–1505) pinta la tapa con `tapaDeLaMesa` del primer hueco y `geometriaDeLaTapa(segmentos, FILAS_DE_LA_MESA, tapa.ancho, tapa.fondo, madera)`, las sombras con `geometriaDeLasSombras`, el tapete con `geometriaDelTapete`, y la `pointLight` de siempre; la tapa lleva `onPointerDown/Up/Move/Over` con `paraElToque` (sólo `e.stopPropagation()`) y `onPointerOut` con `nadaAlSalir`; los DOS testigos QUITADOS y ningún `clearDepth`; los zócalos con `ZOCALO` (1222–1224, 1352–1354) y con `coloresDelPosavasos()` (278); la entrada `turnoDe` de `<Delta>` (2920), que `Barra` recibe como `tapete` (3544); la placa fuera; las cabeceras de `Barra`, de la carta y de `ManoDelMazo` reescritas. HECHO (fase 3, `b216fbc`): la constante de su capa en los TRECE `<group>` de la tabla del §4.1 (los diez de dentro y los tres exteriores; líneas en la tabla); las entradas `dados?: DadosDeLaMesa | null` y `onPulsarLosDados?: () => Promise<ResultadoDelToque>` de `<Delta>`, opcionales, y `Barra` recibe `dados`, `semilla` y `onPulsarLosDados` (3545–3550: sin quien conteste, `Promise.resolve('rechazado')`); la llave del reparto en `dados !== null` (1584–1630, §4.4); `tapeteApagado` con `ultimaTirada === 0`; las sombras de los dados añadidas a la lista de centros (1636–1648); `function Dados(` (1803–1998): grupo del sitio y un grupo por cubo con `ORDEN_DE_LA_BARRA`, asa única invisible por `colorWrite`, `alTocar` con el orden del §5.3, la máquina, la cola y los cuaterniones en refs, `enReposo` y `alDejarDeRodar`, el D6 del pack (`aplanados.get(MODELO.dado)`, escalado con `escalaDelPack`) o el respaldo de `cubo-del-dado.ts`, con `raycast` nulo en los cubos; `COLOR_DEL_NUMERO` y `COLOR_DEL_PUNTO` importados de `dados.ts`. Pendiente (fase 4): la entrada `mesaRecogida` y la bajada del grupo (§6) |
+| `escenas/scripts/verificar-escena.ts` | HECHO (fases 1 y 2): UNA lista `LIENZOS` (quince: los seis de siempre, 768×1024 y los ocho apaisados; `Array<[string, number, number]>` en la cabecera del guion) para todos los bloques; el reparto por turno y la máquina recorridos en Node; «la mano del mazo no invade la zona de la barra» contra `0,52·lado` con el alto real de cada lienzo; el paso «La tapa de la mesa…»: la geometría contada con `three`, la cota y las Z en los quince lienzos, los pies de las cartas de 3 a 12 puntos bajo el borde trasero, los colores del tapete, los grupos leídos por texto hasta el `>` que cierra la etiqueta, ningún `clearDepth(` en `escenas/` y ningún `onBeforeRender` que toque `gl`, el orden medido con `arbol-de-la-mesa.ts` en los quince lienzos, la tapa parando el toque, los sitios bajo la tapa contra `ACEPTADOS`, los posavasos leídos del atlas, y que `Barra` pinta lo contado (307). HECHO (fase 3 y vuelta 3b, 335 con el guardia a 335): el presupuesto con el máximo y `12 · seg + 1.470`, el tope 4.500 bajo la quinta parte del mar, el `.glb` contado con `NodeIO` y el respaldo construido; las medidas del par, del salto y de la sombra del dado; las curvas (sacudida, salto, giro, asentado, rebote, giro libre) y `sucesoDelResultado`; `cuaternionDelValor` ida y vuelta y el respaldo con los puntos en las caras del pack; el mínimo legible en los quince lienzos y los cuatro umbrales; los DIEZ grupos de dentro con `function Dados(`; el modelo del árbol con `DADO 0/1` y el asa, nada podado, los dados opacos antes que las cartas y presentes en el quinto de 390; la llave `dados !== null`, el tapete apagado, `disponible` como única llave del toque y la sacudida, el asa por `colorWrite`, `MODELO.dado` más respaldo y `faseDeLosDados` única, las sombras añadidas, `enReposo`; «el par cabe en el asa y en el tapete en los DOS peldaños», la 3c por el borde del DADO, y el mazo del reparto de cinco. Pendiente (fases 4 y 5): los grupos de la pila; el vértice más alto bajo la cinta al salir; la cinta apaisada y de pie contra las manos; que seis fichas de 44 caben bajo la cinta con el inset de abajo, para lo que `LIENZOS` gana una CUARTA columna (0 salvo 844×390 → 21, 932×430 → 21 y 1180×820 → 20; `medir-cajon.ts`, §1; la muesca lateral es OTRO dato y no entra, porque la escena no la conoce) |
+| `shared/arcade/juegos/riberas-en-tres.ts` | HECHO (fase 1): `tirado`, `ultimaTirada`, `turnosAbiertos` en `VistaQueSePinta` (y los dos comentarios de `comprada` reescritos: §1.3); `selloDeLaTirada`, `dadosEnTres` (`null` fuera de `jugando`), `opcionesFueraDeLaMesa`, `chozas`/`torres` en `ColonoEnElMarcador`. HECHO (fase 2): `turnoEnTres(vista)`, el color del colono al que le toca. HECHO (fase 3): `DadosEnTres extends DadosDeLaMesa` (sólo el tipo, de `escenas/dados.ts`) y `tirarEnTres(opciones)`, la opción TIRAR entera o `null` (§5.2, §5.3). Pendiente: nada |
+| `server/scripts/verificar-riberas-en-tres.ts` | HECHO (fases 1 a 3): que TIRAR se cae del formulario sólo con dados; que `porTirar` sigue a las opciones enteras y al revés sale falso; que `dadosEnTres` es `null` fuera de `jugando`; que las cuentas de chozas y torres cuadran con la vista; que `turnoEnTres` devuelve el color del asiento de `turnoDe`; que `tirarEnTres` devuelve la opción entera y `null` con la tirada hecha. 295 comprobaciones, `MINIMO` 293 |
+| `app/src/arcade/mesa.ts`, `escritorio/src/mesa.ts` | HECHO (fase 1): `mover` devuelve `ResultadoDelMovimiento = 'hecho' \| 'rechazado' \| 'sin-red'`, con el `return` temprano resuelto a `'rechazado'` (tabla del §5.3) |
+| `app/src/arcade/local.ts` | Pendiente (fase 6): `volverAlRetrato()`; `usarElAparatoQuieto` lo usa al desmontar; `usarApaisado` al lado, y `usarLaPantallaEncendida` con `activateKeepAwakeAsync` / `deactivateKeepAwake` como el juego local (378–381; §1.13) |
+| `app/src/arcade/riberas-en-tres-escena.tsx`, `app/src/arcade/hud-de-la-mesa.tsx` (NUEVO, fase 6) | HECHO (fase 2): `turnoDe = useMemo(() => turnoEnTres(laVista), [laVista])` y `<Delta turnoDe={turnoDe}>`. HECHO (fase 3): `recordada`, `tableroPrometido` y `dadosPrometidos`, `catalogoDelTablero()` con el `catch` a `null` antes del `Promise.all` y `unirCatalogos` (§5.1); `CAMPO_DE_LA_CAMARA` 45°; `haySitioParaLosDados` con `huecosDeLaMesa` y `medida` del `onLayout`; `dados` de `dadosEnTres` con las opciones enteras y `mesa.quieto` apagándolos; `fueraDelTablero = opcionesFueraDeLaMesa(fueraDeLaBarra, dados)`; `alPulsarLosDados` con `laInterfazSeLoQueda()` la primera y `tirarEnTres`; `<Delta dados onPulsarLosDados>`; `accessibilityActions` `tirar` con `onAccessibilityAction` en la vista del `Canvas` (§1.4). `verify:sala` lo exige (152 comprobaciones, guardia 152). Pendiente (fase 6): la rama del delta a pantalla completa; la cinta del tercio central con la ficha de mis puntos en el sitio del «≡»; el cajón del ancho de la cinta con el marcador de seis en fichas de 44 («vado L · N chozas · M torres» en el segundo renglón), la línea de la mesa, los botones y la crónica, desplazable (§1.11); barra de estado oculta; cartel de girar |
+| `escritorio/src/riberas-en-tres.tsx`, `escritorio/src/sala.tsx`, `escritorio/src/estilo.css` | HECHO (fase 2): `turnoDe = useMemo(() => turnoEnTres(vista), [vista])` y `<Delta turnoDe={turnoDe}>`. HECHO (fase 3): `recordada`, `traerUnGlb`, `traerElTablero` y `traerLosDados`, `traerElCatalogo()` con el `catch` a `null` antes del `Promise.all` y `unirCatalogos` (§5.1); `CAMPO_DE_LA_CAMARA` 45°; el `ResizeObserver` de `medirElRecuadro` sobre el recuadro y el estado `lienzo`; `haySitioParaLosDados`, `dados`, `fuera = opcionesFueraDeLaMesa(fueraDeLaBarra, dados)`, `alPulsarLosDados` con `tirarEnTres`; `<Delta dados onPulsarLosDados>`; el botón `.riberas-solo-apoyo` «Tirar los dados» montado con `dados !== null`, `aria-disabled`, sin `disabled` (§1.4), y su regla en `estilo.css`. `verify:escritorio` lo exige (400 comprobaciones, guardia 400). Pendiente (fase 5): la misma cinta en DOM con la ficha de mis puntos; el raíl como cajón del ancho de la cinta, con el marcador el primero y `MarcadorDeRiberas` pintando la ficha de 44; la página como columna flex con la cadena de cuatro eslabones (`.sala` → `.tablero-y-panel` → `.riberas-en-tres` → `.riberas-lienzo`, cada uno con `flex: 1; min-height: 0`; §1.12), el aviso en la cinta y la cabecera de la Sala en su sitio, sin variable de alto |
+| `escritorio/src/banco3d.tsx` | HECHO (fase 3): `useCatalogo` carga los dos ficheros con `loadAsync` y el mismo `catch` a `null` antes de unir; los dados de mentira (`dadosDelBanco`, `simularLaTirada`): «Me toca tirar» enciende `disponible`, «Tirar» hace de servidor (a los 400 ms llega otra suma y otro sello), «Rechazar: sí/no» hace que la próxima pulsación vuelva `rechazado`, y el rótulo «suma · sello»; `<Delta dados onPulsarLosDados>` con el mismo simulador |
 
 ## 9. Cómo se midió
 
@@ -1730,25 +2061,48 @@ dos áreas contra el borde trasero de la tapa), y dos escritos para esta versió
 `rev4-tapa-holgura.ts` (las dos Z, el fondo en unidades y en lados y el ancho de
 `tapaDeLaMesa` con `HOLGURA_DELANTERA_DE_LA_TAPA`, en siete lienzos) y
 `rev4-areas-cuatro.ts` (el fondo de la columna de CUATRO áreas y el pie de las cartas
-quietas contra el borde trasero de la tapa, en los quince lienzos). Donde un número de
-aquí viene del 0,13 se dice; los del 0,14 son los que valen. Lo que se afirma en este
-documento se convierte en comprobaciones de `verify:escena` en la fase que lo hace: el
-guion de la sesión se tira, el comprobador se queda (los `rev2-*` y `rev3-*` ya lo son:
-el orden con la poda, los sitios bajo la tapa, la tapa parando el toque y los posavasos
-viven en el paso de la tapa de `verify:escena`).
+quietas contra el borde trasero de la tapa, en los quince lienzos). De la fase 3, con
+el pack en el disco: `medir-d6-del-pack.ts` (los D4, D6, D8 y D20 del pack en `.gltf`
+con `NodeIO` y `pngjs`: vértices, triángulos, primitivas, materiales, texturas y su
+tamaño, caja envolvente, si hay UV y `COLOR_0`, y cuántos colores distintos hay bajo
+las UV de cada uno: es lo que separó el `D6_A` y el `D6_B`, con el atlas y dos colores
+dominantes bajo los vértices, del `D6_C` y los demás, con su textura individual de
+números pintados; la tabla del §5.1), y un guion temporal dentro de
+`escenas/scripts/` (borrado al acabar) que horneó el `D6_A` con el `hornear.ts` de
+verdad y midió lo que el compilador escribe en sus cabeceras: las dos nubes de
+luminancia (0,02..0,059 y 0,584..0,94), los 37 tonos, cero triángulos mixtos, nueve
+vértices por punto con la normal de su cara, las caras `+x=2 −x=5 +y=6 −y=1 +z=3 −z=4`
+y los doce vértices que `weld` fundiría tras remapear. La fase 3 se midió además con
+sus propios comprobadores (las curvas, el mínimo legible, los umbrales, el orden con
+los dados: todo eso es `verify:escena`) y con `vacunas-fase3.py` en el scratchpad: 38
+roturas en la etapa 2 (E1 a E24 en `verify:escena`, D1 a D7 en `verify:escritorio`, S1
+a S6 en `verify:sala`, R1 en `verify:riberas-en-tres`) más las de la etapa 1 sobre
+`verify:dados` y el compilador, cada una con copia de seguridad, sustitución en el
+fichero real, el comprobador corrido, el código de salida y las líneas caídas
+apuntados, y la restauración byte a byte por md5 (`vacunas-fase3.txt` y los
+`vac-f3-*.log` guardan el resultado); `sin-rayas-fase3.py` quitó las rayas largas que
+la fase escribió. Para la octava, `rev5-quinto-y-dado.ts` (el quinto hueco tal como
+aterrizó: asa, piezas, dado y punto en puntos, el aire del dado derecho al primer zócalo
+y el canto al asa en los quince lienzos; la tabla del §4.4) y `rev2-vertices-bajo-la-tapa-2.ts`
+vuelto a correr para el dato a 82° del §4.1. Donde un número de aquí viene del 0,13 se
+dice; los del 0,14 son los que valen. Lo que se afirma en este documento se convierte
+en comprobaciones de `verify:escena` en la fase que lo hace: el guion de la sesión se
+tira, el comprobador se queda (los `rev2-*` y `rev3-*` ya lo son: el orden con la poda,
+los sitios bajo la tapa, la tapa parando el toque y los posavasos viven en el paso de
+la tapa de `verify:escena`; y lo que la fase 3 midió con guiones temporales vive en
+`verify:dados` y en el paso de los dados de `verify:escena`).
 
-**Lo que se medirá con el pack Board Game Bits delante**, en cuanto Miguel lo deje en
-`arte/kaykit/board-game-bits/` o dé permiso para bajarlo (nadie lo baja por su cuenta),
-con un guion del scratchpad primero y con `compilar-dados.ts` después, y se escribe
-aquí con el número: la arista de la caja envolvente del D6 en los tres ejes (`getMin` /
-`getMax` de `POSITION`), que es lo que pasa a `ARISTA_DEL_D6_EN_EL_PACK`; sus
-triángulos y vértices, y cuántas primitivas y materiales trae (una o dos llamadas por
-dado, §7); si los puntos son GEOMETRÍA o están PINTADOS (el número de vértices, 24 es
-una caja pelada, y cuántos colores distintos quedan tras hornear); el tamaño y el
-nombre de su textura individual, y si por casualidad fuera plana por columnas; los kB
-del `.glb` compilado, que fijan el techo de `verify:dados`; y los triángulos por dos
-contra los 444 del respaldo y los 574 del margen del tope (§5.1). Hasta entonces el
-§5.1 es una regla con las dos salidas escritas, no una medida.
+**Lo que se midió con el pack Board Game Bits delante**, que la séptima dejaba como
+lista: la arista de la caja envolvente del `D6_A` en los tres ejes, `0,7500` los tres,
+centrada, que es `ARISTA_DEL_D6_EN_EL_PACK`; 521 vértices y 662 triángulos en UNA
+primitiva con UN material (una llamada por dado, §7); los puntos son GEOMETRÍA (21
+islas de nueve vértices; 37 colores bajo las UV que se aplanan a dos); su textura es el
+atlas compartido, `boardgame_bits_texture.png` de 1024² y 35 kB (los D6 con números
+llevan `dice_*.png` de 1024² y 150 a 175 kB; ninguna es plana por columnas, y da
+igual, porque no hizo falta la tabla); el `.glb` compilado pesa 19,3 kB y el techo de
+`verify:dados` es 100 kB; y los triángulos por dos son 1.324, más que los 444 del
+respaldo y que los 574 del margen del tope de entonces, así que el tope se rehízo
+(§5.1, §7).
 
 ## 10. Lo que NO entra, y las decisiones abiertas con dueño
 
@@ -1769,6 +2123,7 @@ lo que aquí se dice):
 | Cuándo la frase pasa a dos líneas dentro de los 44 y cuándo a puntos suspensivos; y a qué ancho exacto se recorta el segundo renglón de la ficha de 44 del cajón | La frase no hace crecer la cinta (§2.2): dos líneas de 17 caben en 44. El hueco está medido (`ancho/3 − 88`: 101–552 puntos apaisado; 40–219 de pie al 40 %), y el de la ficha también (131 puntos para cada renglón en el SE, 164 en el SE 2, 70 en 320×360; `medir-cajon.ts`, §3). Lo que se recorta en el SE, en el SE 2 y en los teléfonos de pie es el SEGUNDO renglón, no el nombre, y el orden ya está decidido (el vado primero, §1.11); el ancho del texto con la fuente de la casa no se mide en Node | Fase 5, en el banco, y se dejan escritos la letra, el interlineado y el número |
 | La línea de botones sobre el vértice lejano | Bajo la primera línea, en el tercio central; tapa el vértice más lejano en los teléfonos apaisados al salir (63–84 puntos) y se saca con 7–37 puntos de arrastre (§2.2). La alternativa medida es a la derecha del tercio, en los 155 (SE) – 240 (iPhone 14) puntos de aire hasta la mano de bienes | Fase 5, en el banco; si se mueve, se vuelve a medir contra la mano de bienes abierta |
 | La coexistencia de los dos bloqueos de orientación | No coexisten (`LOS_QUE_PINTA` pinta un arcade), los dos vuelven por `volverAlRetrato()`, y se prueba entrando y saliendo en el aparato | Fase 6 |
+| El D6 del pack, a ojo: si los puntos se leen a 23 puntos en el SE, si el crema y el oscuro casan con las fichas sobre la madera, y si la sacudida de «me toca» molesta | Lo que un comprobador no juzga. Quien hizo la fase 3 lo miró en el banco en un panel de 800×369 (los dos D6 ruedan, se asientan en el par de la suma y el tapete aparece); a 23 puntos no lo ha mirado nadie. Si no se lee, lo que se toca es `PUNTO_DEL_DADO` (el 18 % del pack no se puede cambiar: los puntos son geometría) o el tono, no la arista, que la fija el §1.15; si molesta la sacudida, `SACUDIDA` (0,36 s a 8 Hz cada 1,6 s, 3 % y 4°) | **Miguel**, en el banco (`escritorio/banco3d.html`, «Me toca tirar» y tocar los dados) o en el aparato |
 
 Cinco filas que había aquí se han ido porque ya están decididas. Dos las cerró la
 fase 2 en `4287809`: la Z del borde delantero de la tapa (`HOLGURA_DELANTERA_DE_LA_TAPA
@@ -1777,34 +2132,46 @@ atlas al 70 % y al 85 %, `#683a2c` y `#7e4736`, medido y vigilado por `verify:es
 §1.14). Las otras tres: el testigo de la `Baraja` (ya no es que se quite: es que nunca
 corrió, y se han quitado los dos, §4.1), la carta cogida cuando la mesa sale sola
 (Miguel la cerró: decisión 16) y los dados en los lienzos de pie (decisión 15 y §4.4,
-quinto desde 375 puntos de ancho, sin dados en 320 y 360; la fase 3 la mide en
-`verify:escena`). Y las siete **dudas para Miguel** que cerraban este apartado las
-resolvió él la noche del 5 de septiembre de 2026; están en el §1 (la primera dentro de
-la decisión 3, las demás en las decisiones 11 a 16) con lo que cada una obliga a medir
-ya medido. Lo único que este documento le deja hoy es la primera fila de la tabla, y
-no es una pregunta: es una cifra aceptada que puede cambiar si la ve y no le gusta.
+quinto desde 375 puntos de ancho, sin dados en 320 y 360; la fase 3 lo mide en
+`verify:escena`). La fase 3 cerró además tres cosas que estaban abiertas fuera de esta
+tabla: la ruta del D6 (§5.1: geometría, ruta (a) con remapeo), si `turnoDe` viaja
+dentro de `DadosEnTres` o aparte (aparte, como entrada de `<Delta>`: el tapete es
+información que vale también en los lienzos sin dados, y `DadosEnTres` extiende
+`DadosDeLaMesa` sin él) y el ancho del quinto hueco (§4.4). Y las siete **dudas para
+Miguel** que cerraban este apartado las resolvió él la noche del 5 de septiembre de
+2026; están en el §1 (la primera dentro de la decisión 3, las demás en las decisiones
+11 a 16) con lo que cada una obliga a medir ya medido. Lo que este documento le deja
+hoy son la primera fila de la tabla, que es una cifra aceptada que puede cambiar si la
+ve y no le gusta, y la última, que es mirar.
 
 ## 11. El orden, en fases que se empujan una a una
 
 Miguel juega mañana con lo que hay. Cada fase deja el juego entero y verde; ninguna
 depende de la siguiente.
 
-1. **La aritmética.** `PARTE_DEL_ALTO` a 0,14; `huecosDeLaMesa` con sus tres peldaños;
-   `selloDeLaTirada`, `repartoDeLaTirada` y `faseDeLosDados` con `rechazado`;
-   `vetaDelTablon`; los lienzos apaisados y 768×1024 y las comprobaciones nuevas en
-   `verify:escena`; la línea de «tres y cuatro miden lo mismo» reescrita para exigir
-   sólo el suelo. Y los comentarios que el 0,14 y los dados dejan falsos, reescritos
-   con lo que hay EN ESTA FASE: la cabecera de `ANCHO_MAXIMO` en `barra.ts` («en el
-   más bajo (320×360) sigue mandando el alto»: ya no); en `cartas.ts` la cabecera
-   (línea 26, «el techo de la barra NUNCA pasa de −0,2475·alto») y la nota de
-   `PISO_DE_LA_FRANJA` (línea 408), que en esta fase siguen midiendo la PLACA, que
-   sigue ahí, y pasan a decir `−0,240·alto` (el 26,0 %, holgura 0,040; §1.2) —del
-   asa y del naipe no se habla hasta que la placa se vaya, en la fase 2—; y en
-   `riberas-en-tres.ts` los dos comentarios de `comprada` (51–53 y 170–175), que
-   dejan de decir que `turnosAbiertos` no está escrito y pasan a decir que la
-   salvaguarda es que `comprada` no lo esté (§1.3). La comprobación «la mano del mazo
-   no invade la zona de la barra» se queda como está en esta fase: la placa sigue.
-   Lo visible: el hueco un 8 % mayor y, en 320×360, la barra un poco más ancha.
+1. **La aritmética. HECHA en `8371080`.** Lo que trajo, con la misma forma que hoy
+   tiene el código: `PARTE_DEL_ALTO` a 0,14 y `SUELO_DEL_TOQUE` exportado;
+   `huecosDeLaMesa` con sus tres peldaños; en `escenas/dados.ts`, `paresDeLaSuma`,
+   `repartoDeLaTirada`, la máquina `faseDeLosDados` con `rechazado`, `dadosEnReposo`,
+   `parQueSeEnsena`, `traeTiradaNueva`, `RODAR_MINIMO`, `ASENTAR` y
+   `TOPE_SIN_RESPUESTA`; en `shared/…/riberas-en-tres.ts`, `tirado`, `ultimaTirada` y
+   `turnosAbiertos` en `VistaQueSePinta`, `selloDeLaTirada`, `dadosEnTres`,
+   `opcionesFueraDeLaMesa` y `chozas`/`torres` en `ColonoEnElMarcador`; `mover`
+   devolviendo `ResultadoDelMovimiento` en las dos `mesa.ts`; `vetaDelTablon`; los
+   lienzos apaisados y 768×1024 y las comprobaciones nuevas en `verify:escena` (el
+   reparto por turno, la máquina recorrida en Node, los peldaños); la línea de «tres y
+   cuatro miden lo mismo» reescrita para exigir sólo el suelo; `verify:riberas-en-tres`
+   probando que TIRAR se cae sólo con dados, que `porTirar` sigue a las opciones enteras
+   y que `dadosEnTres` es `null` fuera de `jugando`. Y los comentarios que el 0,14 y los
+   dados dejaban falsos, reescritos: la cabecera de `ANCHO_MAXIMO` en `barra.ts`; en
+   `cartas.ts` la cabecera y la nota de `PISO_DE_LA_FRANJA`, que en esa fase seguían
+   midiendo la PLACA y pasaron a `−0,240·alto` (la fase 2 los volvió a reescribir con
+   el asa y el bote, §1.2); y en `riberas-en-tres.ts` los dos comentarios de
+   `comprada`, que dejaron de decir que `turnosAbiertos` no está escrito y pasaron a
+   decir que la salvaguarda es que `comprada` no lo esté (§1.3). Lo visible: el hueco
+   un 8 % mayor y, en 320×360, la barra un poco más ancha. La séptima versión la contaba
+   como pendiente con su lista de encargos, y era un error del documento: estaba hecha
+   antes que la 2.
 2. **La mesa de madera. HECHA en `4287809`.** Lo que trajo: el tablón horizontal de
    `tablon.ts` en el sitio de la placa, con la veta por vértice y los dos colores del
    atlas; las sombras de contacto fundidas a mano; el tapete del turno bajo el sitio
@@ -1830,49 +2197,56 @@ depende de la siguiente.
    la choza cogida sin fundar nada, y arrastrar desde la madera girando el tablero. Lo
    que quedó para su dueño: los sitios bajo la mesa al salir (§10, Miguel). Y lo que el
    documento dejó atrás al aterrizar: el comentario de `tapaDeLaMesa` dice «unos 2,3
-   lados» de fondo y son 2,55 (`rev4-tapa-holgura.ts`); se corrige con la fase 3.
-3. **Los dados. La siguiente.** `Dados` en la escena (dos dados de `ARISTA_DEL_DADO`,
-   0,52 lados, con los puntos al 18 %, todo `<group>` suyo con `ORDEN_DE_LA_BARRA`, y
-   `verify:escena` leyéndolo por texto tras `function Dados(` y metiéndolo en el modelo
-   de `arbol-de-la-mesa.ts` (§4.1), y exigiendo dado de 22 y punto de 4 donde hay dados
-   (§1.15)), con `disponible` como única llave del toque y de la vibración. Lo que la
-   fase 2 dejó apuntado para ésta: la llave del reparto pasa a `dados !== null`
-   (entrada nueva y opcional de `<Delta>`): con dados, `huecosDeLaMesa(...).piezas` para
-   las piezas y `.dados` para el asa y el tapete, colgado o quinto; sin dados, lo de hoy
-   (`huecosDeLaBarra`, y el tapete sólo bajo el colgado); y se reescribe la comprobación
-   «sin dados, el reparto de las piezas sigue siendo `huecosDeLaBarra` y el tapete sólo
-   se pinta bajo el sitio COLGADO» (§4.4). `forma` de `Barra` ya trae `ancho` y `alto` en
-   puntos. La cota para apoyar los dados es `tapa.cota` (el centro del cubo en `cota +
-   0,26` lados con la arista de 0,52); las sombras de los dados se AÑADEN a la lista de
-   centros de `geometriaDeLasSombras` (misma geometría, una llamada; el presupuesto ya
-   cuenta 6 discos). `TRIANGULOS_DEL_RESPALDO_DE_LOS_DADOS` con nombre propio y
-   `triangulosDeLaMesa` sumando el máximo (§5.1, §7). El tapete se apaga con
-   `ultimaTirada = 0` (§5.2), que hoy no mira. Queda decidir al hacerla si `turnoDe`
-   viaja dentro de `DadosEnTres` o sigue aparte como entrada de `<Delta>`: hoy va aparte
-   y funciona sin dados; dentro de `DadosEnTres` desaparecería con ellos en los lienzos
-   sin sitio, y el tapete es información que vale también ahí. Después: `dadosEnTres`
-   (`null` fuera de `jugando`) y `opcionesFueraDeLaMesa` en `shared/`; `mover`
-   devolviendo su resultado en las dos `mesa.ts` con el `return` temprano resuelto a
-   `'rechazado'` y el `switch` exhaustivo en la pantalla (§5.3); la acción accesible; y
-   el botón TIRAR se cae de la cinta donde hay dados. Primero en el escritorio, que es
-   donde el delta se ve hoy. La MALLA, en este orden y sin que lo segundo espere a lo
-   primero: el respaldo procedimental (la caja con los 21 puntos, §5.1) entra con
-   `Dados`, es lo que se pinta mientras no haya `dado` en el catálogo, y es la
-   expectativa por defecto; y en cuanto el pack Board Game Bits esté en
-   `arte/kaykit/board-game-bits/`, se mide lo del §9 con un guion, se decide si los
-   puntos son geometría contando las 21 islas del color oscuro (§5.1), y si lo son se
-   escriben `compilar-dados.ts` y `verificar-dados.ts` (con `hornear.ts`, la caja
-   envolvente contra `ARISTA_DEL_D6_EN_EL_PACK`, los triángulos contra su constante), se
-   versiona `escenas/modelos/dados.glb`, se abre su ruta fija en
-   `server/src/routes/modelos.ts` y `rutaDeLosDados()`, y las dos pantallas lo piden
-   APARTE del tablero, con su `catch` propio a catálogo vacío y la unión después (§5.1:
-   nunca con `Promise.all`); `verify:dados` entra en `npm run verificar` al lado de
-   `verify:aventureros`. Si los puntos están pintados, gana el respaldo y no se escribe
-   nada de esto (§5.1, ruta (b), medida en `medir-textura-del-dado.ts`). El D6 se mira
-   en el banco antes de empujar: que los puntos se lean a 23 puntos en el SE es una
-   decisión que un comprobador no juzga.
-4. **Recoger la mesa.** El botón, la bajada, `soltarTodo`, la vuelta sola al tocarme
-   con la espera si hay una carta cogida.
+   lados» de fondo y son 2,55 (`rev4-tapa-holgura.ts`); la fase 3 no lo tocó
+   (`mesa.ts` 96 sigue diciendo «unos 2,3») y queda para la fase 4.
+3. **Los dados. HECHA en `b216fbc`** (con una vuelta 3b dentro, tras su revisión). Lo
+   que trajo, en el orden en que se hizo. El pack Board Game Bits en
+   `arte/kaykit/board-game-bits/`, medido (§5.1, §9): el `D6_A` con los puntos como
+   geometría, así que la ruta fue (a) y no el respaldo que la séptima esperaba;
+   `compilar-dados.ts` (hornea, REMAPEA a los dos colores de las fichas, mide la cara
+   de cada valor y escribe `caras-del-dado.ts`; sin `weld`), `caras-del-d6.ts`,
+   `verificar-dados.ts` (27) en la batería como «dados», `escenas/modelos/dados.glb`
+   (19,3 kB), `MODELO.dado` con `EN_DADOS_GLB`, `unirCatalogos`, `rutaDeLosDados()`, la
+   ruta fija del servidor con sus tres comprobaciones en `verify:mesa` (856), y la carga
+   en dos escalones en las dos pantallas y en el banco (§5.1). Después la escena:
+   `escenas/dados.ts` con las medidas, el contrato `DadosDeLaMesa`, `sucesoDelResultado`
+   y las curvas; `cubo-del-dado.ts` con el respaldo (cada valor en la cara del pack) y
+   `cuaternionDelValor`; el presupuesto con el máximo de las dos cuentas y el tope a
+   4.500; `Dados` en `delta.tsx` con la llave `dados !== null`, el tapete apagado con
+   `ultimaTirada = 0`, las sombras añadidas, todo `<group>` suyo con `ORDEN_DE_LA_BARRA`,
+   `disponible` como única llave del toque y de la vibración, y la máquina en refs;
+   `arbol-de-la-mesa.ts` con los dados; `DadosEnTres extends DadosDeLaMesa` y
+   `tirarEnTres` en `shared`; las dos pantallas midiendo el lienzo, pasando `dados` y
+   `onPulsarLosDados`, quitando TIRAR donde hay dados y con la acción accesible; el
+   banco con «Me toca tirar», «Tirar» y «Rechazar». `turnoDe` se quedó aparte, como
+   entrada de `<Delta>` (§10). La vuelta 3b, tras la revisión de la fase: el quinto del
+   ancho del par que crece a la izquierda (§4.4), rodar desde `enReposo` y no desde el
+   par recalculado con el sello visto (§5.2), la comprobación del mazo del reparto de
+   cinco, y el botón de apoyo montado con `dados !== null` y apagado con `aria-disabled`
+   (§1.4); y de su revisión, la copia de `enReposo` también al final de «asentando» y
+   la cifra del canto en la cabecera de `HuecoDeLosDados` (1,16 lados, no 1,22).
+   Comprobadores al aterrizar: `verify:escena` 335, `verify:escritorio` 400,
+   `verify:sala` 152, `verify:riberas-en-tres` 295 (`MINIMO` 293), `verify:dados` 27,
+   `verify:mesa` 856; batería 76 de 76 en verde. Lo que se miró en el banco
+   (`escritorio/banco3d.html`): los dos D6 del pack a la izquierda de las piezas, con el
+   crema y el oscuro de las fichas, y con suma 0 sin tapete; con «Me toca tirar»,
+   tocarlos manda la tirada, llega «suma 2 · sello 1», ruedan y se asientan en 1 y 1 con
+   el tapete rojo; «Tirar» sin turno (la tirada de otro) con suma 6 asienta en 2 y 4, y
+   con suma 11 en 5 y 6; `dados.glb` carga 200. Lo que NO se ha mirado con ojos: el
+   corte del rechazo (está en la máquina y en `verify:escena`, y el mando «Rechazar» del
+   banco existe para verlo), el respaldo en pantalla (se construye y se cuenta, pero
+   nadie ha quitado `dados.glb` y mirado), y los puntos a 23 puntos en un SE de verdad
+   (§10, Miguel). Y lo que esta fase le deja a la 4, abajo.
+4. **Recoger la mesa. La siguiente.** El botón, la bajada, `soltarTodo`, la vuelta sola
+   al tocarme con la espera si hay una carta cogida, tal como está escrito en el §6. Más
+   lo que las fases 2 y 3 le dejan: `Dados` vive dentro de `Barra` con su máquina en
+   refs, así que hay que ELEGIR si al recoger se desmonta (la máquina vuelve a reposo y
+   una tirada que llegue recogida se enseña en reposo al subir, sin animar) o se mueve
+   y se apaga con `visible` (la máquina sigue y la tirada se asienta a ciegas), y
+   escribirlo (§6); la entrada `mesaRecogida` de `<Delta>` no existe todavía; y tres
+   retoques de comentario que el código arrastra: el de `tapaDeLaMesa` en `mesa.ts`
+   («unos 2,3 lados» → 2,55, `rev4-tapa-holgura.ts`) y los de la cabecera de `capas.ts`
+   y de la de `Barra` («siete u ocho escalones» → de cinco a ocho, §4.1).
 5. **Pantalla completa en el escritorio.** La cinta del tercio central (y del 40 % de
    pie) con `anchoDeLaCinta` en `escenas/cinta.ts` y la ficha de mis puntos en el sitio
    del «≡»; el cajón del ancho de la cinta con el marcador de SEIS el primero, en fichas
@@ -1914,5 +2288,6 @@ depende de la siguiente.
    ladear el aparato), y lo mismo con un juego local de `usarElAparatoQuieto`
    (entrar, salir, ladear: el vestíbulo quieto).
 7. **La pila del mazo.** El naipe del cuarto hueco con su grosor; si trae grupo propio,
-   con `ORDEN_DE_LA_BARRA` y la misma lectura por texto de `verify:escena` (§4.1). Es un
-   adorno medido y va el último por eso.
+   con `ORDEN_DE_LA_BARRA` y la misma lectura por texto de `verify:escena` (§4.1). El
+   presupuesto ya cuenta sus 12 triángulos (§7). Es un adorno medido y va el último por
+   eso.

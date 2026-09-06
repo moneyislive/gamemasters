@@ -26,6 +26,10 @@ atlas de gradiente con texturas individuales (las cartas y los dados, según su
 página; los aventureros van cada uno con la suya y sin atlas), y por eso ese
 compilador se niega si los puntos del dado no son geometría:
 horneados a vértice desaparecerían, y entonces la mesa pinta su dado procedimental.
+Medido con el pack delante: entra `Assets/gltf/D6_A.gltf` (521 vértices, el atlas
+compartido y los 21 puntos como geometría), y se descartan el `D6_B` (cuerpo oscuro con
+hoyuelos), el `D6_C` y los D4, D8 y D20, que llevan los números pintados en una textura
+propia (`docs/LA-MESA-DE-RIBERAS.md` §5.1).
 
 El EXTRA se paga (unos 10 €) y **hace falta**: de ahí salen los barcos, los muelles, las
 teselas de río y de costa, las variantes de camino y las texturas de bioma. Sin él, el
