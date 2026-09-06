@@ -118,11 +118,25 @@ import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { canonico } from '../../shared/mecanicas/canonico';
+/*
+ * EL AZAR DE LA PLATAFORMA, Y NUNCA `Math.random`.
+ *
+ * El bucle que juega a Riberas aquí abajo elige entre lo que el tablero le ofrece,
+ * y elegir es sortear. Sorteando con `Math.random` este comprobador dejaría de ser
+ * reejecutable: dos ejecuciones jugarían dos partidas distintas, un rojo no se
+ * podría reproducir, y la comprobación de reejecución —que compara el estado final
+ * contra el que sale de reejecutar el diario— estaría comparando dos partidas que
+ * no son la misma. Se siembra con la semilla de la mesa, que está escrita ahí
+ * abajo y no cambia.
+ */
+import { enteroEntre, sembrar } from '../../shared/mecanicas/azar';
+import type { Azar } from '../../shared/mecanicas/azar';
 import {
   arcadesInstalados,
   ESPECTADOR,
   loSecretoDe,
   opcionesDeArcade,
+  reejecutarEn,
   registrarProyeccion,
   vistaDeAsiento,
   olvidarFinal,
@@ -301,28 +315,27 @@ const RIBERAS = 'riberas';
  * el estado de verdad con `loSecreto`, y por la red contra lo que de verdad viajó.
  */
 
+/** Un toque del tablero declarado: el movimiento que el mueble mandaría al pulsarlo. */
+interface Toque {
+  tipo: string;
+  carga: unknown;
+}
+
 /**
- * UN MOVIMIENTO QUE ESTE TABLERO OFRECE, sacado del TABLERO DECLARADO y no del
- * juego.
+ * TODOS LOS MOVIMIENTOS QUE ESTE TABLERO OFRECE, sacados del TABLERO DECLARADO y
+ * no del juego.
  *
  * Es a propósito, y es la misma doctrina que `deQuienEsElTurno` aquí abajo: este
  * comprobador dirige la partida como la dirige un cliente, leyendo lo que le
  * mandaron. Si tuviera que importar `opcionesDeRiberas` para saber qué se puede
  * hacer, estaría comprobando la implementación; leyendo el tablero comprueba además
  * que lo que VIAJA basta para jugar, que es media promesa del mueble genérico.
- *
- * `saltar` deja pasar los movimientos que ahora no interesan —el de pasar turno,
- * sobre todo, que si no se esquiva convierte la partida en una ronda de gente
- * pasando y no se coloca ni una pieza—.
  */
-function unToqueDelTablero(
-  vista: unknown,
-  saltar: (m: { tipo: string; carga: unknown }) => boolean = () => false,
-): { tipo: string; carga: unknown } | null {
+function toquesDelTablero(vista: unknown): Toque[] {
   const tablero = (vista as { tablero?: unknown }).tablero;
-  if (typeof tablero !== 'object' || tablero === null) return null;
+  if (typeof tablero !== 'object' || tablero === null) return [];
   const t = tablero as Record<string, unknown>;
-  const toques: Array<{ tipo: string; carga: unknown }> = [];
+  const toques: Toque[] = [];
   for (const lista of ['nudos', 'lineas', 'caras', 'acciones']) {
     const piezas = t[lista];
     if (!Array.isArray(piezas)) continue;
@@ -334,29 +347,185 @@ function unToqueDelTablero(
       toques.push({ tipo: m.tipo, carga: m.carga });
     }
   }
-  for (const m of toques) {
-    if (!saltar(m)) return m;
+  return toques;
+}
+
+/*
+ * ═══ EL BUCLE QUE NO JUGABA, Y POR QUÉ SU VERDE NO VALÍA NADA ═══
+ *
+ * Hasta aquí había una sola función —`unToqueDelTablero(vista, saltar)`— que
+ * devolvía EL PRIMER toque del tablero que no fuera «pasar». Es la política más
+ * corta que se puede escribir y es la peor: hace lo que diga el ORDEN de la lista.
+ *
+ * Medido reproduciendo su forma exacta, por semilla y en sus cuarenta vueltas:
+ *
+ *     1 empezar · 6 fundar · 6 alzar · UN tirar · VEINTISÉIS ofrecer
+ *     Tres tiradas en las tres semillas. CERO sietes. Ninguna partida terminaba.
+ *
+ * El motivo es de una línea: en cuanto se tira una vez, `tirado` pasa a `true` y
+ * `tirar` desaparece de las opciones; la primera que queda en `acciones` es
+ * `ofrecer`, que no gasta el turno ni cambia de quién es. El bucle se quedaba
+ * proponiendo trueques al mismo colono hasta agotar el presupuesto de vueltas, y
+ * las dos afirmaciones que había —`revisiones > 40` y `conFichas > revisiones / 2`—
+ * salían VERDES exactamente igual, porque proponer trueques también sube la
+ * revisión y también hay fichas repartidas mientras se propone. Un comprobador
+ * atascado que se felicita a sí mismo: el cuarto caso de esta casa.
+ *
+ * ═══ POLÍTICA O AZAR UNIFORME: POR QUÉ POLÍTICA, Y CUÁL ═══
+ *
+ * Un bucle que sortease uniformemente entre los toques del tablero cubre más
+ * caminos, pero en este juego no llega: en un turno cualquiera de media partida el
+ * tablero ofrece del orden de doscientos toques y la inmensa mayoría son
+ * `ofrecer:*` y `vereda:*`. El azar uniforme se comería el presupuesto proponiendo
+ * trueques —o sea, EL MISMO ATASCO que se está arreglando, sólo que más despacio y
+ * más difícil de leer—. Una política llega al final, aunque sólo por su camino.
+ *
+ * Así que política. Con dos condiciones, que son las que separan ésta de la que
+ * falló:
+ *
+ *   · NO ES «EL PRIMERO DE LA LISTA». Las jugadas se agrupan por FAMILIA y las
+ *     familias van ordenadas por cuánto mueven la partida — tirar antes que
+ *     construir, construir antes que trocar, trocar antes que pasar—. El orden en
+ *     que el juego devuelve sus opciones deja de decidir nada.
+ *   · DENTRO DE LA FAMILIA SE SORTEA, con el azar sembrado de la mesa. Si no, el
+ *     bucle fundaría siempre en el primer vértice del recorrido canónico y las
+ *     tres partidas serían tres veces el mismo camino.
+ *
+ * Y hay un tope de ofertas por turno (`TOPE_DE_OFERTAS`) porque proponer un trueque
+ * no gasta el turno: sin tope, la familia «ofrecer» vuelve a estar disponible en
+ * cuanto se resuelve la anterior y el bucle se atasca otra vez, por una puerta
+ * distinta. `pasar` es lo último y siempre está, que es lo que garantiza que el
+ * turno acaba.
+ */
+const TOPE_DE_OFERTAS = 2;
+
+/** Los movimientos de Riberas que este bucle nombra. Nada más que sus etiquetas. */
+const R = {
+  empezar: 'riberas:empezar',
+  fundar: 'riberas:fundar',
+  alzar: 'riberas:alzar',
+  tirar: 'riberas:tirar',
+  ofrecer: 'riberas:ofrecer',
+  aceptar: 'riberas:aceptar',
+  rechazar: 'riberas:rechazar',
+  pasar: 'riberas:pasar',
+  comprar: 'riberas:comprar',
+  revelar: 'riberas:revelar',
+} as const;
+
+/** ¿Es este toque un `alzar` de esta pieza? La pieza va dentro de la carga. */
+function alza(toque: Toque, que: string): boolean {
+  return toque.tipo === R.alzar && (toque.carga as { que?: unknown } | null)?.que === que;
+}
+
+/** Las cuatro cartas que se JUEGAN. Los títulos no se juegan: se revelan. */
+const CARTAS_QUE_SE_JUEGAN: readonly string[] = [
+  'riberas:guardia',
+  'riberas:ano-bueno',
+  'riberas:acaparamiento',
+  'riberas:dos-veredas',
+];
+
+/**
+ * LAS FAMILIAS, de la que más mueve la partida a la que menos.
+ *
+ * El nombre de cada una sale en el recuento del final, y ese recuento es lo que
+ * hace falsables las afirmaciones: sin él, «se juega de verdad» volvería a ser una
+ * frase. `ofrecer` y `pasar` NO están aquí: van aparte porque una tiene tope y la
+ * otra es la salida de emergencia.
+ */
+const FAMILIAS: ReadonlyArray<{ nombre: string; es: (t: Toque) => boolean }> = [
+  { nombre: 'empezar', es: (t) => t.tipo === R.empezar },
+  /* Tirar primero: es lo único que hace correr el reloj del juego y traer cosecha. */
+  { nombre: 'tirar', es: (t) => t.tipo === R.tirar },
+  { nombre: 'revelar', es: (t) => t.tipo === R.revelar },
+  { nombre: 'torre', es: (t) => alza(t, 'torre') },
+  { nombre: 'fundar', es: (t) => t.tipo === R.fundar },
+  { nombre: 'comprar', es: (t) => t.tipo === R.comprar },
+  { nombre: 'jugar-carta', es: (t) => CARTAS_QUE_SE_JUEGAN.includes(t.tipo) },
+  { nombre: 'vereda', es: (t) => alza(t, 'vereda') },
+];
+
+/**
+ * QUÉ JUGARÍA AQUÍ ESTE COLONO, leyendo su tablero y nada más.
+ *
+ * Devuelve también el azar avanzado, porque el azar de esta casa es un valor y no
+ * un objeto que muta: quien no encadene el devuelto sortea siempre lo mismo.
+ */
+function laJugadaDelTablero(
+  vista: unknown,
+  azar: Azar,
+  puedeOfrecer: boolean,
+): { jugada: Toque | null; familia: string; azar: Azar } {
+  const toques = toquesDelTablero(vista);
+  for (const familia of FAMILIAS) {
+    const cabe = toques.filter(familia.es);
+    if (cabe.length === 0) continue;
+    const tirada = enteroEntre(azar, 0, cabe.length - 1);
+    return { jugada: cabe[tirada.valor] as Toque, familia: familia.nombre, azar: tirada.azar };
   }
-  return toques[0] ?? null;
+  if (puedeOfrecer) {
+    const ofertas = toques.filter((t) => t.tipo === R.ofrecer);
+    if (ofertas.length > 0) {
+      const tirada = enteroEntre(azar, 0, ofertas.length - 1);
+      return { jugada: ofertas[tirada.valor] as Toque, familia: 'ofrecer', azar: tirada.azar };
+    }
+  }
+  const pasar = toques.find((t) => t.tipo === R.pasar);
+  if (pasar !== undefined) return { jugada: pasar, familia: 'pasar', azar };
+  return { jugada: null, familia: 'nada', azar };
 }
 
 /**
- * ¿Aparece este valor dentro de esta vista?
+ * QUÉ CONTESTA A UN TRUEQUE QUIEN NO TIENE EL TURNO.
  *
- * Se comparan las formas CANÓNICAS y no los objetos, por dos razones que van
- * juntas. La primera es que así vale para cualquier valor —una cadena, un
- * número, un objeto entero— sin escribir un comparador por forma. La segunda es
- * la que de verdad importa: lo que se busca es lo que VIAJARÍA, y lo que viaja
- * es texto. Comparando estructuras se podría dar por bueno un secreto que sale
- * dentro de otro campo con otro nombre.
+ * Está aparte del resto de la política por una razón que es la mitad del valor de
+ * este bucle: contestar es LO ÚNICO que este juego le ofrece a alguien que no le
+ * toca, y el bucle viejo no lo ejercía nunca porque sólo miraba el tablero de quien
+ * tenía el turno. Sin esto no se acepta un solo trueque, y `contestar` —donde vive
+ * el «sólo si» de verdad del §5 bis, el que valida contra el almacén del oferente,
+ * que no está en mi vista— no se recorría jamás.
  *
- * La forma canónica de una cadena lleva sus comillas, y eso arregla solo el
- * problema de los prefijos: `"oros-1"` no aparece dentro de `"oros-10"`, porque
- * la comilla de cierre no cuadra. Sin las comillas, media baraja daría falsos
- * positivos contra la otra media.
+ * Se acepta tres de cada cuatro veces y se rechaza una, sorteado: hacen falta los
+ * dos caminos, y aceptar siempre dejaría `contestar(…, false)` sin recorrer.
+ * Cuando no se puede aceptar —no tengo lo que se me pide, así que el juego no me
+ * ofrece más que rechazar— se rechaza, que es lo único que hay.
  */
-function aparece(secreto: unknown, vista: unknown): boolean {
-  return canonico(vista).includes(canonico(secreto));
+function laRespuestaAlTrueque(
+  vista: unknown,
+  azar: Azar,
+): { jugada: Toque | null; familia: string; azar: Azar } {
+  const toques = toquesDelTablero(vista);
+  const acepta = toques.filter((t) => t.tipo === R.aceptar);
+  const rechaza = toques.filter((t) => t.tipo === R.rechazar);
+  if (acepta.length === 0 && rechaza.length === 0) return { jugada: null, familia: 'nada', azar };
+  const dado = enteroEntre(azar, 0, 3);
+  const lista = dado.valor === 0 || acepta.length === 0 ? rechaza : acepta;
+  if (lista.length === 0) return { jugada: null, familia: 'nada', azar: dado.azar };
+  const cual = enteroEntre(dado.azar, 0, lista.length - 1);
+  const jugada = lista[cual.valor] as Toque;
+  return {
+    jugada,
+    familia: jugada.tipo === R.aceptar ? 'aceptar' : 'rechazar',
+    azar: cual.azar,
+  };
+}
+
+/** ¿Hay algún trueque esperando respuesta? Se lee de la vista pública. */
+function hayTruequeAbierto(espectador: unknown): boolean {
+  const tratos = (espectador as { tratos?: unknown }).tratos;
+  if (!Array.isArray(tratos)) return false;
+  return tratos.some((t) => (t as { estado?: unknown }).estado === 'propuesta');
+}
+
+/** Un contador de familias, que es lo que convierte «se juega» en un número. */
+function apuntar(cuenta: Map<string, number>, familia: string): void {
+  cuenta.set(familia, (cuenta.get(familia) ?? 0) + 1);
+}
+
+/** Cuántas veces salió esta familia. Cero si no salió ninguna. */
+function cuantas(cuenta: Map<string, number>, familia: string): number {
+  return cuenta.get(familia) ?? 0;
 }
 
 /**
@@ -364,6 +533,32 @@ function aparece(secreto: unknown, vista: unknown): boolean {
  *
  * Devuelve los reproches, vacío si todo bien. Para cada valor de `loSecreto`
  * cuenta en cuántas vistas DE ASIENTO aparece, y exige que no sea más de una.
+ *
+ * ═══ SE COMPARAN CADENAS CANÓNICAS, Y NO OBJETOS ═══
+ *
+ * Por dos razones que van juntas. La primera es que así vale para cualquier valor
+ * —una cadena, un número, un objeto entero— sin escribir un comparador por forma.
+ * La segunda es la que de verdad importa: lo que se busca es lo que VIAJARÍA, y lo
+ * que viaja es texto. Comparando estructuras se podría dar por bueno un secreto que
+ * sale dentro de otro campo con otro nombre.
+ *
+ * La forma canónica de una cadena lleva sus comillas, y eso arregla solo el
+ * problema de los prefijos: `"oros-1"` no aparece dentro de `"oros-10"`, porque la
+ * comilla de cierre no cuadra. Sin las comillas, media baraja daría falsos
+ * positivos contra la otra media.
+ *
+ * ═══ Y CADA COSA SE CANONIZA UNA VEZ, QUE NO ES UN ADORNO ═══
+ *
+ * Esto se escribió con un ayudante —`aparece(secreto, vista)`— que serializaba LA
+ * VISTA ENTERA una vez POR SECRETO. Con ciento cincuenta fichas repartidas, que es
+ * media partida de Riberas, eso son seiscientas serializaciones de un objeto que
+ * lleva el tablero dentro, en cada revisión.
+ *
+ * Mientras el bucle de Riberas se atascaba en cuarenta vueltas nadie lo notaba. Con
+ * el bucle que juega de verdad —tres partidas enteras, más de mil revisiones— ese
+ * cuadrado convierte un comprobador de veinticinco segundos en uno que nadie vuelve
+ * a correr, y un comprobador que no se corre no comprueba nada. La cuenta es la
+ * misma; lo único que cambió es que se saca fuera del bucle.
  *
  * `permitidoEnElEspectador` es lo que separa a La Frente de todos los demás y
  * está aquí como parámetro y no como excepción: la sala de La Frente es un
@@ -395,29 +590,30 @@ function reprochesDeSecretos(
    * conviene medirlo: una garantía «por construcción» que nadie comprueba es una
    * garantía que deja de serlo el día que alguien cambie la firma.
    */
-  const loQueSeLeManda = (quien: QuienMira): unknown => {
+  const loQueSeLeManda = (quien: QuienMira): string => {
     const vista = vistaDeAsiento(arcade, estado, quien);
-    return { vista, opciones: opcionesDeArcade(arcade, vista, quien) };
+    return canonico({ vista, opciones: opcionesDeArcade(arcade, vista, quien) });
   };
 
-  const vistas = new Map<QuienMira, unknown>();
+  const vistas = new Map<QuienMira, string>();
   for (const asiento of asientos) vistas.set(asiento, loQueSeLeManda(asiento));
   const delEspectador = loQueSeLeManda(ESPECTADOR);
 
   for (const secreto of secretos) {
+    const buscado = canonico(secreto);
     const donde: AsientoId[] = [];
     for (const asiento of asientos) {
-      if (aparece(secreto, vistas.get(asiento))) donde.push(asiento);
+      if ((vistas.get(asiento) as string).includes(buscado)) donde.push(asiento);
     }
     if (donde.length > 1) {
       reproches.push(
-        `${canonico(secreto).slice(0, 40)} aparece en la vista de ${donde.length} asientos ` +
+        `${buscado.slice(0, 40)} aparece en la vista de ${donde.length} asientos ` +
           `(${donde.join(', ')}) y solo puede aparecer en la de su dueño`,
       );
     }
-    if (!permitidoEnElEspectador && aparece(secreto, delEspectador)) {
+    if (!permitidoEnElEspectador && delEspectador.includes(buscado)) {
       reproches.push(
-        `${canonico(secreto).slice(0, 40)} aparece en la vista del ESPECTADOR, que no tiene asiento`,
+        `${buscado.slice(0, 40)} aparece en la vista del ESPECTADOR, que no tiene asiento`,
       );
     }
   }
@@ -530,7 +726,7 @@ for (const semilla of [1, 7, 12345, 987654321, 2 ** 31]) {
 }
 console.log(`  ${revisionesExaminadas} revisiones examinadas en cinco partidas`);
 
-paso('En proceso: Riberas, con su tablero dentro de la proyección');
+paso('En proceso: tres partidas ENTERAS de Riberas, con su tablero dentro de la proyección');
 
 /*
  * ═══ LA MITAD QUE FALTABA, Y QUÉ AÑADE SOBRE LA DE LA RONDA ═══
@@ -545,21 +741,176 @@ paso('En proceso: Riberas, con su tablero dentro de la proyección');
  * Se juega LEYENDO EL TABLERO, o sea como jugaría un cliente, y en cada revisión se
  * mira. La colocación es donde más piezas cambian de mano por movimiento, así que
  * es donde una fuga tiene más sitios por los que salir.
+ *
+ * ═══ Y AHORA SE JUEGA HASTA EL FINAL, QUE ES LO QUE ANTES NO PASABA ═══
+ *
+ * Este bloque llevaba un bucle de cuarenta vueltas que se quedaba en el primer
+ * turno proponiendo trueques —la cuenta exacta está en la cabecera de `FAMILIAS`,
+ * arriba— y sus dos afirmaciones salían verdes igual. O sea que la superficie más
+ * ancha que publica ningún juego de esta casa se vigilaba sobre trece movimientos
+ * de colocación, una tirada, y veintiséis botones de trueque. Nada de lo que la
+ * mitad interesante del juego mete en el tablero —las cartas de la mano, los
+ * títulos revelados, los rótulos de los trueques cerrados, la cosecha de un número
+ * que sale por sexta vez— llegaba a pintarse nunca.
+ *
+ * Ahora las tres partidas se juegan hasta que hay ganador, y lo que se afirma es
+ * una cuenta por familia de jugada: se puede leer, se puede desmentir, y el atasco
+ * la pone roja por cinco sitios distintos.
  */
 {
   const TRES: AsientoId[] = ['a-ana', 'a-bruno', 'a-carla'];
   let revisiones = 0;
   let conFichas = 0;
 
-  for (const semilla of [3, 77, 20260901]) {
+  /*
+   * EL PRESUPUESTO DE VUELTAS. La partida más larga de las tres semillas de aquí
+   * abajo gasta 586, así que esto es holgura y no un corte disimulado: si un día
+   * una partida se lo comiera entero, la afirmación «las tres partidas TERMINAN»
+   * se pondría roja en vez de dejarla a medias en silencio.
+   */
+  const TOPE_DE_VUELTAS = 1500;
+
+  interface Partida {
+    mesa: Mesa;
+    /** Cuántas veces salió cada familia de jugada. Es el recuento que se afirma. */
+    cuenta: Map<string, number>;
+    sietes: number;
+    vueltas: number;
+    /** Por qué se cortó antes de terminar, o `null` si acabó como debía. */
+    corte: string | null;
+  }
+
+  /**
+   * JUEGA UNA PARTIDA ENTERA DE RIBERAS, leyendo el tablero que baja.
+   *
+   * `trasCadaMovimiento` es lo que hace este bucle valer para dos cosas distintas
+   * sin duplicarlo: la primera pasada mira los secretos en cada revisión, y la
+   * segunda —la de la reejecución— no mira nada y sólo quiere el estado final.
+   */
+  const unaPartidaDeRiberas = (
+    semilla: number,
+    trasCadaMovimiento: (mesa: Mesa) => void,
+  ): Partida => {
     let mesa: Mesa = abrirMesa({
       id: `riberas-${semilla}`,
       arcade: RIBERAS,
       semilla,
       asientos: TRES,
     });
+    /* El azar del BUCLE, aparte del de la mesa y sembrado con la misma semilla. */
+    let azar: Azar = sembrar(semilla);
+    const cuenta = new Map<string, number>();
+    let sietes = 0;
+    let corte: string | null = null;
+    let ofertasDelTurno = 0;
+    let turnoContado = -1;
+    /*
+     * La tirada se lee en la vuelta SIGUIENTE y no justo después de tirar: la
+     * proyección de Riberas lleva el tablero dentro y calcularla cuesta, así que
+     * pedir una vista de más por movimiento es pedir mil de más por partida.
+     */
+    let faltaMirarLaTirada = false;
+    let vueltas = 0;
 
-    const revisar = (): void => {
+    for (; vueltas < TOPE_DE_VUELTAS; vueltas++) {
+      const espectador = vistaDeAsiento(RIBERAS, mesa.estado, ESPECTADOR) as {
+        turnoDe?: unknown;
+        momento?: unknown;
+        turnosAbiertos?: unknown;
+        ultimaTirada?: unknown;
+      };
+      if (espectador.momento === 'terminada') break;
+      if (faltaMirarLaTirada) {
+        faltaMirarLaTirada = false;
+        if (espectador.ultimaTirada === 7) sietes++;
+      }
+      if (espectador.turnosAbiertos !== turnoContado) {
+        turnoContado = espectador.turnosAbiertos as number;
+        ofertasDelTurno = 0;
+      }
+
+      /*
+       * PRIMERO, QUIEN NO TIENE EL TURNO. Contestar a un trueque es lo único que
+       * este juego le ofrece a alguien a quien no le toca, y mirarlo antes que el
+       * turno es lo que hace que los trueques se cierren en vez de acumularse hasta
+       * que caduquen solos al pasar.
+       */
+      let quien: AsientoId | null = null;
+      let jugada: Toque | null = null;
+      let familia = 'nada';
+      if (hayTruequeAbierto(espectador)) {
+        for (const asiento of TRES) {
+          if (asiento === espectador.turnoDe) continue;
+          const respuesta = laRespuestaAlTrueque(
+            vistaDeAsiento(RIBERAS, mesa.estado, asiento),
+            azar,
+          );
+          azar = respuesta.azar;
+          if (respuesta.jugada === null) continue;
+          quien = asiento;
+          jugada = respuesta.jugada;
+          familia = respuesta.familia;
+          break;
+        }
+      }
+
+      if (jugada === null) {
+        quien = (typeof espectador.turnoDe === 'string' ? espectador.turnoDe : TRES[0]) as AsientoId;
+        const elegida = laJugadaDelTablero(
+          vistaDeAsiento(RIBERAS, mesa.estado, quien),
+          azar,
+          ofertasDelTurno < TOPE_DE_OFERTAS,
+        );
+        azar = elegida.azar;
+        jugada = elegida.jugada;
+        familia = elegida.familia;
+        if (familia === 'ofrecer') ofertasDelTurno++;
+      }
+
+      if (jugada === null || quien === null) {
+        corte = `el tablero de ${String(espectador.turnoDe)} no ofrece nada en «${String(espectador.momento)}»`;
+        break;
+      }
+
+      const antes = mesa.estado;
+      const revAntes = mesa.rev;
+      mesa = jugar(mesa, { quien, movimiento: jugada, rev: mesa.rev });
+      /*
+       * ═══ UN BOTÓN MUDO ES UN FALLO, Y AQUÍ SE CAZA. MIRANDO EL ESTADO ═══
+       *
+       * El movimiento salió del propio tablero: si no cambia nada, el juego está
+       * ofreciendo algo que su reductor rechaza, que es el fallo que la cabecera de
+       * `opcionesDeTurno` describe como «una pieza encendida que no responde».
+       *
+       * Y se mira EL ESTADO y no la revisión, que es lo que ponía aquí y no podía
+       * funcionar nunca: `aplicarMovimiento` sube `rev` y escribe en el diario
+       * SIEMPRE, también cuando el reductor rechaza. Tiene que hacerlo —el diario es
+       * lo que se reejecuta—, así que la revisión no distingue nada y esta guarda
+       * llevaba de adorno desde que se escribió. La forma buena la dice el propio
+       * árbitro en la cabecera de `Jugado.motivo`: comparar `mesa.estado` con el de
+       * antes. Un rechazo devuelve EL MISMO OBJETO, así que basta la identidad.
+       */
+      if (mesa.estado === antes) {
+        corte = `botón mudo: ${jugada.tipo} de ${quien} no cambió nada en la revisión ${revAntes}`;
+        break;
+      }
+      if (jugada.tipo === R.tirar) faltaMirarLaTirada = true;
+      apuntar(cuenta, familia);
+      trasCadaMovimiento(mesa);
+    }
+
+    return { mesa, cuenta, sietes, vueltas, corte };
+  };
+
+  const total = new Map<string, number>();
+  let sietes = 0;
+  let terminadas = 0;
+  const cortes: string[] = [];
+  /* El diario de la primera semilla, para la comprobación de reejecución de abajo. */
+  let elDiarioDeLaTres = '';
+
+  for (const semilla of [3, 77, 20260901]) {
+    const revisar = (mesa: Mesa): void => {
       revisiones++;
       /*
        * Se cuenta cuántas revisiones tenían algo que esconder. Sin este recuento,
@@ -576,25 +927,105 @@ paso('En proceso: Riberas, con su tablero dentro de la proyección');
       );
     };
 
-    revisar();
-    for (let vuelta = 0; vuelta < 40; vuelta++) {
-      const espectador = vistaDeAsiento(RIBERAS, mesa.estado, ESPECTADOR) as {
-        turnoDe?: unknown;
-        momento?: unknown;
-      };
-      if (espectador.momento === 'terminada') break;
-      const quien = typeof espectador.turnoDe === 'string' ? espectador.turnoDe : TRES[0];
-      const suya = vistaDeAsiento(RIBERAS, mesa.estado, quien as AsientoId);
-      const movimiento = unToqueDelTablero(suya, (m) => m.tipo === 'riberas:pasar');
-      if (movimiento === null) break;
-      mesa = jugar(mesa, { quien: quien as AsientoId, movimiento, rev: mesa.rev });
-      revisar();
+    revisiones++;
+    const reprochesAlAbrir = reprochesDeSecretos(RIBERAS, undefined, TRES, false);
+    comprobar(
+      `Riberas, semilla ${semilla}, rev 0: ninguna ficha ajena en ninguna vista`,
+      reprochesAlAbrir.length === 0,
+      reprochesAlAbrir,
+    );
+
+    const partida = unaPartidaDeRiberas(semilla, revisar);
+    if (semilla === 3) elDiarioDeLaTres = canonico(partida.mesa.diario);
+    for (const [familia, veces] of partida.cuenta) {
+      total.set(familia, (total.get(familia) ?? 0) + veces);
     }
+    sietes += partida.sietes;
+    if (partida.corte !== null) cortes.push(`semilla ${semilla}: ${partida.corte}`);
+
+    const fin = vistaDeAsiento(RIBERAS, partida.mesa.estado, ESPECTADOR) as {
+      momento?: unknown;
+      ganadores?: unknown;
+    };
+    const acabo = fin.momento === 'terminada' && Array.isArray(fin.ganadores) && fin.ganadores.length > 0;
+    if (acabo) terminadas++;
+    comprobar(`Riberas, semilla ${semilla}: la partida TERMINA con ganador`, acabo, {
+      momento: fin.momento,
+      ganadores: fin.ganadores,
+      vueltas: partida.vueltas,
+      corte: partida.corte,
+    });
+
+    /*
+     * ═══ Y REEJECUTADA DA LO MISMO, QUE ES LA MITAD QUE SE COMPRA CON LA PUREZA ═══
+     *
+     * El diario y el estado inicial —aquí ninguno: la mesa se abre vacía y el juego
+     * construye lo suyo en `empezar`— bastan para reconstruir la partida byte a
+     * byte. Vale la pena decir qué caza esto que no cace `verify:riberas`, que ya
+     * reejecuta una partida suya: aquélla nace de un estado declarado a mano y con
+     * los almacenes llenos; ésta nace de una mesa vacía y pasa por CUATROCIENTAS
+     * tiradas de dados, dos docenas de compras del mazo y un centenar de trueques
+     * aceptados. Todo eso gasta azar, y el azar es lo primero que se desincroniza.
+     */
+    const otraVez = reejecutarEn(RIBERAS, undefined, partida.mesa.diario);
+    comprobar(
+      `Riberas, semilla ${semilla}: reejecutar el diario da exactamente el mismo estado`,
+      canonico(otraVez) === canonico(partida.mesa.estado),
+      { movimientos: partida.mesa.diario.length },
+    );
   }
+
+  comprobar('ninguna partida de Riberas se cortó a medias', cortes.length === 0, cortes);
+  comprobar('las tres partidas de Riberas terminan', terminadas === 3, { terminadas });
+
+  /*
+   * ═══ LO QUE SE AFIRMA AHORA, Y POR QUÉ ESTAS CIFRAS Y NO OTRAS ═══
+   *
+   * Las dos afirmaciones que había —«más de cuarenta revisiones» y «en la mayoría
+   * había fichas»— las cumplía un bucle que sólo sabía proponer trueques. Siguen
+   * abajo, porque miden algo real, pero ya no son lo único: cada una de éstas
+   * nombra un camino del juego que el atasco NO recorría, y todas caen si el bucle
+   * se vuelve a quedar dando vueltas en una sola familia.
+   *
+   * Los números son aproximadamente la mitad de lo medido —218 tiradas, 31 sietes,
+   * 18 compras, 12 cartas jugadas, 98 trueques aceptados, 107 piezas puestas— para
+   * que un cambio en las reglas que mueva el reparto no ponga rojo esto por unos
+   * pocos, y para que el atasco, que da CERO en cinco de las seis, lo ponga rojo
+   * entero.
+   */
+  comprobar('se tiran los dados muchas veces', cuantas(total, 'tirar') >= 120, {
+    tiradas: cuantas(total, 'tirar'),
+  });
+  comprobar('y salen SIETES, que es la tirada que no rinde a nadie', sietes >= 10, { sietes });
+  comprobar('se compran cartas del mazo', cuantas(total, 'comprar') >= 8, {
+    compras: cuantas(total, 'comprar'),
+  });
+  comprobar('y se juegan', cuantas(total, 'jugar-carta') >= 5, {
+    jugadas: cuantas(total, 'jugar-carta'),
+  });
+  comprobar(
+    'se ofrecen trueques y alguien los ACEPTA, que es lo único que se juega sin turno',
+    cuantas(total, 'ofrecer') >= 60 && cuantas(total, 'aceptar') >= 30,
+    { ofrecidos: cuantas(total, 'ofrecer'), aceptados: cuantas(total, 'aceptar') },
+  );
+  comprobar(
+    'y también se rechazan, que es el otro camino de `contestar`',
+    cuantas(total, 'rechazar') >= 30,
+    { rechazados: cuantas(total, 'rechazar') },
+  );
+  comprobar(
+    'se construye sobre el tablero: chozas, torres y veredas',
+    cuantas(total, 'fundar') + cuantas(total, 'torre') + cuantas(total, 'vereda') >= 60,
+    {
+      fundadas: cuantas(total, 'fundar'),
+      torres: cuantas(total, 'torre'),
+      veredas: cuantas(total, 'vereda'),
+    },
+  );
 
   comprobar(
     'se han jugado bastantes revisiones de Riberas como para que el verde signifique algo',
-    revisiones > 40,
+    revisiones > 800,
     { revisiones },
   );
   comprobar(
@@ -603,6 +1034,25 @@ paso('En proceso: Riberas, con su tablero dentro de la proyección');
     { conFichas, revisiones },
   );
   console.log(`  ${revisiones} revisiones de Riberas examinadas, ${conFichas} con fichas repartidas`);
+  console.log(
+    `  tres partidas enteras: ${[...total].sort().map(([f, n]) => `${n} ${f}`).join(' · ')} · ${sietes} sietes`,
+  );
+
+  /*
+   * ═══ Y EL BUCLE MISMO ES REEJECUTABLE, QUE NO ES LO MISMO QUE LO DE ARRIBA ═══
+   *
+   * Arriba se comprueba que el JUEGO reejecuta su diario. Aquí se comprueba que
+   * QUIEN LO DIRIGE no mete azar de fuera: se vuelve a jugar la semilla 3 desde
+   * cero y tiene que salir el mismo diario y el mismo estado. Con un `Math.random`
+   * o un `Date.now()` en la política, esta línea es la que se cae — y sin ella, un
+   * rojo de este fichero podría no reproducirse nunca.
+   */
+  const otraVezLaTres = unaPartidaDeRiberas(3, () => {});
+  comprobar(
+    'volver a jugar la semilla 3 con el mismo bucle da la MISMA partida',
+    canonico(otraVezLaTres.mesa.diario) === elDiarioDeLaTres,
+    { movimientos: otraVezLaTres.mesa.diario.length },
+  );
 
   /*
    * LA VACUNA, con la misma forma que la de La Ronda y por la misma razón: cero
@@ -1651,11 +2101,20 @@ try {
         : [];
       return [...fichas, ...cartas];
     };
+    /*
+     * LA ÚLTIMA VISTA DE CADA ASIENTO, tal y como bajó. Se guarda al mirar y no se
+     * vuelve a pedir: el bucle de abajo necesita el tablero de quien NO tiene el
+     * turno para saber si tiene un trueque que contestar, y pedirlo aparte serían
+     * dos peticiones más por movimiento para leer exactamente lo mismo que se acaba
+     * de leer en esta misma revisión.
+     */
+    const ultimaVistaR = new Map<string, unknown>();
     const mirarConTodosR = async (): Promise<void> => {
       for (const uno of genteR) {
         const r = await pedir(`/arcade/mesas/${codigoR}`, { llave: uno.llave });
         comprobar(`${uno.nombre} puede mirar la mesa de Riberas`, r.estado === 200, r.datos);
         const m = r.datos.mesa;
+        ultimaVistaR.set(uno.asiento, m.vista);
         viajado.push({
           rev: m.rev,
           quien: uno.asiento,
@@ -1712,40 +2171,135 @@ try {
     }
 
     /*
-     * Y AHORA SE JUEGA, leyendo el tablero que baja. Treinta movimientos bastan para
-     * pasar la colocación entera de tres colonos —seis chozas y seis veredas— y
-     * entrar en la partida, que es donde los almacenes ya tienen fichas dentro.
+     * ═══ Y AHORA SE JUEGA DE VERDAD, leyendo el tablero que baja ═══
+     *
+     * Este bucle tenía el mismo defecto que el de proceso —tomaba el primer toque
+     * que no fuera «pasar», o sea `ofrecer` en cuanto se había tirado una vez— y su
+     * afirmación, «doce movimientos», la cumplía con la colocación y dieciséis
+     * botones de trueque encadenados. Ahora usa la MISMA política que el de proceso
+     * (ver `FAMILIAS`), así que aquí también se tira, se cobra, se construye, se
+     * compra y se contestan trueques.
+     *
+     * Lo que NO se hace aquí es jugar hasta el ganador, y es a propósito: cada
+     * movimiento por el cable son siete peticiones —el espectador, el que mueve, el
+     * POST y las cuatro de `mirarConTodosR`— y una partida entera son dos mil
+     * cuatrocientas. Lo que esta mitad compra es LO QUE VIAJÓ, y para eso hacen
+     * falta bastantes revisiones con los almacenes llenos, no un ganador. El ganador
+     * lo compra la mitad en proceso, que es donde sale barato.
      */
-    let movimientosR = 0;
-    for (let i = 0; i < 30; i++) {
+    let azarR: Azar = sembrar(20260906);
+    const cuentaR = new Map<string, number>();
+    let cortadoR: string | null = null;
+    let ofertasDelTurnoR = 0;
+    let turnoContadoR = -1;
+
+    for (let i = 0; i < 90; i++) {
       const espectador = await pedir(`/arcade/mesas/${codigoR}`);
-      const vista = espectador.datos.mesa.vista as { turnoDe?: unknown; momento?: unknown };
+      const vista = espectador.datos.mesa.vista as {
+        turnoDe?: unknown;
+        momento?: unknown;
+        turnosAbiertos?: unknown;
+      };
       if (vista.momento === 'terminada') break;
-      const quien = typeof vista.turnoDe === 'string' ? vista.turnoDe : genteR[0]!.asiento;
+      const revAhora = espectador.datos.mesa.rev as number;
+      if (vista.turnosAbiertos !== turnoContadoR) {
+        turnoContadoR = vista.turnosAbiertos as number;
+        ofertasDelTurnoR = 0;
+      }
+
+      /* Primero quien NO tiene el turno, con la vista que ya bajó en esta revisión. */
+      let quien = typeof vista.turnoDe === 'string' ? vista.turnoDe : genteR[0]!.asiento;
+      let movimiento: Toque | null = null;
+      let familia = 'nada';
+      if (hayTruequeAbierto(vista)) {
+        for (const otro of genteR) {
+          if (otro.asiento === vista.turnoDe) continue;
+          const suya = ultimaVistaR.get(otro.asiento);
+          if (suya === undefined) continue;
+          const respuesta = laRespuestaAlTrueque(suya, azarR);
+          azarR = respuesta.azar;
+          if (respuesta.jugada === null) continue;
+          quien = otro.asiento;
+          movimiento = respuesta.jugada;
+          familia = respuesta.familia;
+          break;
+        }
+      }
+
       const suyo = genteR.find((g) => g.asiento === quien) ?? genteR[0]!;
-      const mia = await pedir(`/arcade/mesas/${codigoR}`, { llave: suyo.llave });
-      const movimiento = unToqueDelTablero(mia.datos.mesa.vista, (m) => m.tipo === 'riberas:pasar');
-      if (movimiento === null) break;
+      let revDelQueMueve = revAhora;
+      if (movimiento === null) {
+        const mia = await pedir(`/arcade/mesas/${codigoR}`, { llave: suyo.llave });
+        revDelQueMueve = mia.datos.mesa.rev as number;
+        const elegida = laJugadaDelTablero(
+          mia.datos.mesa.vista,
+          azarR,
+          ofertasDelTurnoR < TOPE_DE_OFERTAS,
+        );
+        azarR = elegida.azar;
+        movimiento = elegida.jugada;
+        familia = elegida.familia;
+        if (familia === 'ofrecer') ofertasDelTurnoR++;
+      }
+      if (movimiento === null) {
+        cortadoR = `el tablero de ${quien} no ofrece nada en «${String(vista.momento)}»`;
+        break;
+      }
+
       const r = await pedir(`/arcade/mesas/${codigoR}/movimientos`, {
         metodo: 'POST',
         llave: suyo.llave,
-        cuerpo: { rev: mia.datos.mesa.rev, tipo: movimiento.tipo, carga: movimiento.carga },
+        cuerpo: { rev: revDelQueMueve, tipo: movimiento.tipo, carga: movimiento.carga },
       });
-      if (r.estado !== 200) break;
+      if (r.estado !== 200) {
+        cortadoR = `el servidor contestó ${r.estado} a ${movimiento.tipo}`;
+        break;
+      }
       /*
        * Si la revisión no sube, el juego ignoró el movimiento — y como el
        * movimiento salió del propio tablero, eso sería un botón mudo. Se corta y la
-       * comprobación de abajo lo dice, en vez de girar treinta veces en vacío.
+       * comprobación de abajo lo dice, en vez de girar sesenta veces en vacío.
        */
-      if ((r.datos.mesa.rev as number) === (mia.datos.mesa.rev as number)) break;
-      movimientosR++;
+      if ((r.datos.mesa.rev as number) === revDelQueMueve) {
+        cortadoR = `botón mudo: ${movimiento.tipo} no movió la revisión ${revDelQueMueve}`;
+        break;
+      }
+      apuntar(cuentaR, familia);
       await mirarConTodosR();
     }
 
+    const movimientosR = [...cuentaR.values()].reduce((a, b) => a + b, 0);
+    comprobar('el juego de Riberas por HTTP no se cortó a medias', cortadoR === null, cortadoR);
     comprobar(
       'se juegan de verdad varios movimientos de Riberas por HTTP, sacados del tablero que bajó',
-      movimientosR >= 12,
+      movimientosR >= 60,
       { movimientosR },
+    );
+    /*
+     * ═══ Y NO TODOS DE LA MISMA FAMILIA, QUE ES LO QUE ANTES PASABA ═══
+     *
+     * Sin estas dos líneas, «sesenta movimientos» lo cumple otra vez un bucle
+     * atascado proponiendo trueques: son sesenta movimientos aceptados, con su
+     * revisión y todo. Lo que hace falta afirmar es que la partida AVANZA, y las
+     * tres cuentas que el atasco daba en cero o en uno son éstas.
+     *
+     * Los números son bajos aposta y no son los de la mitad en proceso: aquí la
+     * semilla LA ELIGE EL SERVIDOR al abrir la mesa, así que cada ejecución juega
+     * una partida distinta y una cifra ajustada sería un rojo intermitente — que en
+     * esta casa acaba en «vuelve a correrlo» y de ahí en un comprobador apagado.
+     */
+    comprobar(
+      'la partida por HTTP avanza: se tira los dados y se pasa el turno muchas veces',
+      cuantas(cuentaR, 'tirar') >= 8 && cuantas(cuentaR, 'pasar') >= 8,
+      Object.fromEntries(cuentaR),
+    );
+    comprobar(
+      'y alguien que NO tiene el turno contesta a un trueque por el cable',
+      cuantas(cuentaR, 'aceptar') + cuantas(cuentaR, 'rechazar') >= 4,
+      Object.fromEntries(cuentaR),
+    );
+    console.log(
+      `  por HTTP: ${[...cuentaR].sort().map(([f, n]) => `${n} ${f}`).join(' · ')}`,
     );
 
     /*
