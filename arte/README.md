@@ -21,9 +21,10 @@ obligatorio y se hace igual, que para eso está el `NOTICE`.
 
 De Board Game Bits sale una sola cosa: el D6 que son los dados de la mesa de Riberas
 (`docs/LA-MESA-DE-RIBERAS.md` §5.1), compilado a `escenas/modelos/dados.glb` con
-`escenas/scripts/compilar-dados.ts`, aparte del tablero. Es el único pack cuyas piezas
-llevan texturas individuales además del atlas (las cartas y los dados, según su
-página), y por eso ese compilador se niega si los puntos del dado no son geometría:
+`escenas/scripts/compilar-dados.ts`, aparte del tablero. Es el único pack que MEZCLA un
+atlas de gradiente con texturas individuales (las cartas y los dados, según su
+página; los aventureros van cada uno con la suya y sin atlas), y por eso ese
+compilador se niega si los puntos del dado no son geometría:
 horneados a vértice desaparecerían, y entonces la mesa pinta su dado procedimental.
 
 El EXTRA se paga (unos 10 €) y **hace falta**: de ahí salen los barcos, los muelles, las
