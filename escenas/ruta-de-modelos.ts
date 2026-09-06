@@ -21,3 +21,14 @@ export const RUTA_DE_MODELOS = '/api/arcade/modelos';
 export function rutaDelTablero(): string {
   return `${RUTA_DE_MODELOS}/tablero.glb`;
 }
+
+/**
+ * LOS DADOS DE LA MESA: el D6 de KayKit horneado, en su fichero de unos kB.
+ *
+ * Fichero aparte del tablero a propósito (ver `MODELO.dado` en `nombres.ts`), y las dos
+ * pantallas lo piden A LA VEZ que el tablero pero con su propia red: si éste no llega, el
+ * tablero se pinta igual y los dados salen del respaldo procedimental.
+ */
+export function rutaDeLosDados(): string {
+  return `${RUTA_DE_MODELOS}/dados.glb`;
+}

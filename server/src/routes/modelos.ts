@@ -3,8 +3,9 @@
  *
  * ═══ QUÉ ES ESTO Y QUÉ NO ES ═══
  *
- * Dos rutas que entregan ficheros `.glb` —el tablero y los aventureros del
- * lobby— y nada más. El servidor NO SABE QUÉ HAY DENTRO: no importa `three`
+ * Cuatro rutas que entregan ficheros `.glb` (el tablero, los dados y el
+ * embarcadero de Riberas, y los aventureros del lobby) y nada más. El servidor NO
+ * SABE QUÉ HAY DENTRO: no importa `three`
  * (`server/` no lo tiene), no importa nada de `escenas/`, no abre el fichero para
  * mirarlo. Sirve bytes con el tipo correcto y una caché razonable, como sirve el
  * empaquetado del escritorio en `/sala`, y por la misma razón: el arte vive en el
@@ -195,6 +196,20 @@ router.get('/arcade/modelos/embarcadero.glb', (_req, res) => {
     return;
   }
   servir(res, carpeta, 'embarcadero.glb');
+});
+
+/**
+ * Los dados de la mesa de Riberas: el D6 de KayKit horneado, unos kB. Fichero
+ * APARTE del tablero para que un dado no obligue a recargar cuatro megas y para que
+ * su fallo no tumbe el tablero (las pantallas lo piden con su propia red); ruta fija
+ * como las otras dos, por lo mismo. Ver `escenas/scripts/compilar-dados.ts`.
+ */
+router.get('/arcade/modelos/dados.glb', (_req, res) => {
+  if (carpeta === undefined) {
+    faltaLaCarpeta(res);
+    return;
+  }
+  servir(res, carpeta, 'dados.glb');
 });
 
 /**

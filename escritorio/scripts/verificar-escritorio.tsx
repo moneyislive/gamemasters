@@ -2291,6 +2291,124 @@ function elMazoEnLaPantalla(): void {
   );
 }
 
+/**
+ * LOS DADOS LLEGAN EN SU FICHERO Y SU FALLO NO TIRA EL TABLERO.
+ *
+ * `dados.glb` es el D6 de KayKit horneado, unos kB, y se pide a la vez que el tablero por
+ * la misma puerta (`rutaDeLosDados`, no una cadena escrita aquí). Lo que se rompe en
+ * silencio es la RED: un `Promise.all` a secas sobre las dos peticiones convierte un
+ * despliegue sin `dados.glb` en una Sala sin tablero, cuando la escena sabe pintar los
+ * dados del respaldo si el catálogo no trae `dado`. Se lee el fuente porque la carga vive
+ * en un efecto que en Node no corre, y se exige la forma exacta: la promesa de los dados
+ * con su propio `.catch` que resuelve a `null` ANTES del `Promise.all`, cada fichero con
+ * su promesa recordada por separado, y los dos catálogos unidos con `unirCatalogos`.
+ */
+function losDadosLleganAparte(): void {
+  paso('Los dados llegan en su fichero, a la vez que el tablero, y su fallo no lo tira');
+
+  const fuente = readFileSync(new URL('../src/riberas-en-tres.tsx', import.meta.url), 'utf8');
+  const codigo = fuente
+    .split('\n')
+    .filter((l) => !/^\s*(\*|\/\/|\/\*|\{\/\*)/.test(l))
+    .join('\n');
+  comprobar(
+    'los dados se piden por `rutaDeLosDados()` de `escenas/ruta-de-modelos.ts`, no por una cadena escrita aquí',
+    /const RUTA_DE_LOS_DADOS = rutaDeLosDados\(\);/.test(fuente) &&
+      /import \{[^}]*rutaDeLosDados[^}]*\} from '\.\.\/\.\.\/escenas\/ruta-de-modelos'/.test(fuente) &&
+      !/dados\.glb/.test(codigo),
+  );
+  comprobar(
+    'cada fichero tiene su promesa recordada por separado: el tablero que llegó no se vuelve a bajar por unos dados que no',
+    /const traerElTablero = recordada\(\(\) => traerUnGlb\(RUTA_DEL_TABLERO\)\);/.test(fuente) &&
+      /const traerLosDados = recordada\(\(\) => traerUnGlb\(RUTA_DE_LOS_DADOS\)\);/.test(fuente),
+  );
+  comprobar(
+    'y el fallo de los dados no tira el tablero: su promesa lleva `.catch` a `null` antes del `Promise.all`, y los catálogos se unen',
+    /const dados = traerLosDados\(\)\.catch\(\(fallo: unknown\): null => \{[\s\S]{0,300}?return null;[\s\S]{0,40}?\}\);/.test(fuente) &&
+      /Promise\.all\(\[tablero, dados\]\)\.then\(\(\[delTablero, deLosDados\]\) => unirCatalogos\(delTablero, deLosDados\)\)/.test(fuente) &&
+      !/Promise\.all\(\[[^\]]*(traerUnGlb|traerLosDados\(\)[^.])/.test(fuente),
+    'con `Promise.all` a secas, un 404 de `dados.glb` deja la Sala sin tablero',
+  );
+}
+
+/**
+ * LOS DADOS EN LA PANTALLA: sólo donde caben, con la misma pregunta que la escena, y el
+ * botón de tirar se va exactamente donde ellos están.
+ *
+ * Se lee el fuente porque el lienzo en Node mide cero y todo cae en «sin dados»: lo que hay
+ * que impedir es que la pantalla decida el sitio con OTRA función o con OTRA medida que la
+ * escena (entonces habría lienzos con dados y botón, o sin ninguno de los dos), que filtre
+ * TIRAR antes de preguntar a `dadosEnTres` (`porTirar` siempre falso, los dados no vibran
+ * nunca), que `quieto` no los apague, que el toque no devuelva a la escena cómo acabó, o que
+ * tirar quede sólo al alcance del ratón.
+ */
+function losDadosEnLaPantalla(): void {
+  paso('Los dados en la pantalla: donde caben, el botón de tirar se va con ellos, y el toque vuelve con su resultado');
+
+  const fuente = readFileSync(new URL('../src/riberas-en-tres.tsx', import.meta.url), 'utf8');
+  const hoja = readFileSync(new URL('../src/estilo.css', import.meta.url), 'utf8');
+  const codigo = fuente
+    .split('\n')
+    .filter((l) => !/^\s*(\*|\/\/|\/\*|\{\/\*)/.test(l))
+    .join('\n');
+  comprobar(
+    'el sitio de los dados se decide con `huecosDeLaMesa` de `escenas/barra.ts` (la misma función que la escena) con el campo de 45° del Canvas y el alto del lienzo EN PUNTOS',
+    /import \{ huecosDeLaMesa \} from '\.\.\/\.\.\/escenas\/barra';/.test(fuente) &&
+      /const CAMPO_DE_LA_CAMARA = \(45 \* Math\.PI\) \/ 180;/.test(codigo) &&
+      /fov: 45/.test(codigo) &&
+      /huecosDeLaMesa\(cuantos, CAMPO_DE_LA_CAMARA, lienzo\.ancho \/ lienzo\.alto, lienzo\.alto\)\.dados !== null/.test(codigo),
+  );
+  comprobar(
+    'y cuenta los huecos EXACTAMENTE como la escena (las piezas más el mazo si lo hay) y mide el recuadro del lienzo con un ResizeObserver',
+    /const cuantos = barra\.length \+ \(mazo === null \? 0 : 1\);/.test(codigo) &&
+      /new ResizeObserver\(mide\)/.test(codigo) &&
+      /ref=\{medirElRecuadro\}/.test(codigo),
+  );
+  comprobar(
+    'sin sitio no hay dados (`null`, no apagados); con sitio salen de `dadosEnTres` con las opciones ENTERAS y `quieto` sólo los apaga',
+    /if \(!haySitioParaLosDados\) return null;\s+const suyos = dadosEnTres\(vista, yo, opciones\);\s+return suyos === null \|\| !quieto \? suyos : \{ \.\.\.suyos, disponible: false \};/.test(codigo),
+  );
+  comprobar(
+    'TIRAR se cae de los botones con `opcionesFueraDeLaMesa` pasándole LOS DADOS (no un interruptor) y DESPUÉS de los tres filtros de siempre',
+    /const fuera = useMemo\(\(\) => opcionesFueraDeLaMesa\(fueraDeLaBarra, dados\), \[fueraDeLaBarra, dados\]\);/.test(codigo) &&
+      /const fueraDeLaBarra = useMemo\(\s+\(\) => opcionesFueraDeLaBarra\(opcionesFueraDeLaMano\(opcionesFueraDelTablero\(opciones\)\), mazo\)/.test(codigo),
+  );
+  comprobar(
+    'la escena recibe `dados={dados}` y `onPulsarLosDados={alPulsarLosDados}`',
+    /<Delta[\s\S]*?dados=\{dados\}\s+onPulsarLosDados=\{alPulsarLosDados\}[\s\S]*?\/>/.test(fuente),
+  );
+  const manejador = /const alPulsarLosDados = useCallback\(\(\): Promise<ResultadoDelMovimiento> => \{([\s\S]*?)\n  \}, \[/.exec(codigo)?.[1] ?? '';
+  comprobar(
+    'al pulsar el asa se manda la opción TIRAR que dio el juego (`tirarEnTres`) por `mover` y se DEVUELVE su promesa; sin opción o con la mesa quieta se contesta `rechazado` sin mandar nada',
+    manejador.length > 0 &&
+      /if \(quieto\) return Promise\.resolve\('rechazado'\);/.test(manejador) &&
+      /const tirar = tirarEnTres\(opciones\);\s+if \(tirar === null\) return Promise\.resolve\('rechazado'\);/.test(manejador) &&
+      /return mover\(\{ tipo: tirar\.tipo, carga: tirar\.carga \}\);/.test(manejador) &&
+      !/tipo: '/.test(manejador),
+  );
+  comprobar(
+    'y tirar sigue al alcance de las tecnologías de apoyo: un botón fuera de la vista, dentro del recuadro, que sólo manda si los dados están disponibles, con su regla en la hoja',
+    /\{dados !== null \? \(\s+<button\s+type="button"\s+className="riberas-solo-apoyo"\s+aria-disabled=\{!dados\.disponible\}\s+onClick=\{\(\) => \{\s+if \(dados\.disponible\) void alPulsarLosDados\(\);\s+\}\}\s*>\s+Tirar los dados\s+<\/button>/.test(codigo) &&
+      /\.riberas-solo-apoyo \{[\s\S]*?clip-path: inset\(50%\);[\s\S]*?\}/.test(hoja) &&
+      !/\.riberas-solo-apoyo \{[^}]*display: none/.test(hoja),
+  );
+  /*
+   * El botón existe mientras existen los dados, no sólo mientras se puede tirar: al pulsarlo
+   * `mover` pone `quieto`, `disponible` cae a falso, y un botón que se desmonta con el foco
+   * dentro manda el foco al body. Y se apaga con `aria-disabled`, no con `disabled`: un botón
+   * `disabled` deja de ser enfocable y el navegador le quita el foco igual.
+   */
+  const alrededorDelBoton = codigo.slice(codigo.indexOf('className="riberas-solo-apoyo"') - 200, codigo.indexOf('className="riberas-solo-apoyo"') + 300);
+  comprobar(
+    'su existencia no depende de `disponible`: se monta con `dados !== null`, se apaga con `aria-disabled` y nunca lleva `disabled`, para que el foco no caiga al body al tirar',
+    !/dados !== null && dados\.disponible \? \(/.test(codigo) &&
+      !/dados\.disponible \? \(/.test(alrededorDelBoton) &&
+      !/\sdisabled=/.test(alrededorDelBoton) &&
+      /aria-disabled=\{!dados\.disponible\}/.test(alrededorDelBoton) &&
+      (codigo.match(/className="riberas-solo-apoyo"/g) ?? []).length === 1,
+  );
+}
+
 // ---------------------------------------------------------------------------
 
 elCatalogoNoMiente();
@@ -2303,6 +2421,8 @@ riberasEnTres();
 elAcercamientoDelDelta();
 elMazoEnLaPantalla();
 elResultadoDeMover();
+losDadosLleganAparte();
+losDadosEnLaPantalla();
 
 console.log('');
 /**
@@ -2314,7 +2434,7 @@ console.log('');
  * eso se lee como verde. Con el número escrito, salir con menos es un fallo ruidoso. Va a
  * mano y se sube al añadir comprobaciones; un guardia desfasado no guarda nada.
  */
-const COMPROBACIONES_ESCRITAS = 389;
+const COMPROBACIONES_ESCRITAS = 400;
 if (hechas < COMPROBACIONES_ESCRITAS) {
   console.error(
     `Solo se han hecho ${String(hechas)} de las ${String(COMPROBACIONES_ESCRITAS)} comprobaciones que ` +

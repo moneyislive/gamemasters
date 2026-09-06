@@ -140,6 +140,7 @@ import {
   bienesQueSeCambianPor,
   colocandoEnTres,
   comprarEnTres,
+  dadosEnTres,
   esVistaQueSePinta,
   jugadaSinPreguntar,
   jugadasDeLaCarta,
@@ -150,11 +151,13 @@ import {
   mazoEnLaBarra,
   opcionesFueraDeLaBarra,
   opcionesFueraDeLaMano,
+  opcionesFueraDeLaMesa,
   opcionesFueraDelTablero,
   renglonDelVado,
   revelarDe,
   seVeEnTres,
   tableroEnTres,
+  tirarEnTres,
   truequesPosibles,
   turnoEnTres,
 } from '../../../shared/arcade/juegos/riberas-en-tres';
@@ -163,6 +166,7 @@ import type {
   ClaseDeJugada,
   ColocandoEnTres,
   ColonoEnElMarcador,
+  DadosEnTres,
   IdDeLaBarra,
   JugadaDeCarta,
   MarcadorEnTres,
@@ -189,10 +193,12 @@ import { ojoYMira } from '../../../escenas/acercar';
 import type { Cercania } from '../../../escenas/acercar';
 import { ojoDelMirador } from '../../../escenas/camara';
 import type { Mirador } from '../../../escenas/camara';
-import { catalogoDeModelos } from '../../../escenas/modelos';
+/* El sitio de los dados se decide con la misma función que la escena: ver `haySitioParaLosDados`. */
+import { huecosDeLaMesa } from '../../../escenas/barra';
+import { catalogoDeModelos, unirCatalogos } from '../../../escenas/modelos';
 import type { CatalogoDeModelos } from '../../../escenas/modelos';
-/* La ruta y nada más: importarla de las figuras del embarcadero arrastraba la tabla de aventureros. */
-import { rutaDelTablero } from '../../../escenas/ruta-de-modelos';
+/* Las rutas y nada más: importarlas de las figuras del embarcadero arrastraba la tabla de aventureros. */
+import { rutaDeLosDados, rutaDelTablero } from '../../../escenas/ruta-de-modelos';
 import type { Sitio } from '../../../escenas/sitios';
 import { Canvas } from '../tres/Lienzo';
 import { decodificaImagenes, texturasDelTablero } from '../tres/texturas-nativas';
@@ -201,7 +207,14 @@ import { Component } from 'react';
 import type { ErrorInfo, ReactNode } from 'react';
 import { conAlfa } from '../tema';
 import { usarMesaDeArcade } from './mesa';
-import type { MesaVista, OpcionDeMesa } from './mesa';
+import type { MesaVista, OpcionDeMesa, ResultadoDelMovimiento } from './mesa';
+
+/**
+ * EL CAMPO VERTICAL DE LA CÁMARA, en radianes: los 45° del `fov` del `Canvas` de la mesa.
+ * La escena lo lee de la cámara de verdad; esta pantalla lo necesita ANTES de montarla para
+ * preguntar a `huecosDeLaMesa` si caben los dados, y tiene que ser el mismo número.
+ */
+const CAMPO_DE_LA_CAMARA = (45 * Math.PI) / 180;
 import { usarMiradorTactil } from './mirador-tactil';
 import { LETRA, RADIO, SALA } from './muebles';
 import { Pantalla } from './piezas';
@@ -257,36 +270,77 @@ const NOTA_DE_MAS_DE_CUATRO =
  * La causa más probable de que no llegue es la cobertura del salón, y una caché que
  * recordara el fallo convertiría un túnel de treinta segundos en una partida entera
  * sobre el respaldo SVG hasta cerrar la app.
+ *
+ * SON DOS FICHEROS, CADA UNO CON SU PROMESA: el tablero (cuatro megas) y los dados
+ * (`dados.glb`, unos kB, el D6 de KayKit horneado). Separadas para que un tablero que
+ * llegó no se vuelva a bajar porque los dados no llegaran, y para que unos dados que
+ * fallaron se reintenten solos en la siguiente visita.
  */
-let catalogoPrometido: Promise<CatalogoDeModelos> | null = null;
-
-function catalogoDelTablero(): Promise<CatalogoDeModelos> {
-  if (catalogoPrometido === null) {
-    const promesa = (async (): Promise<CatalogoDeModelos> => {
-      const bytes = await traer(rutaDelTablero());
-      const cargador = new GLTFLoader();
-      /*
-       * SIN NAVEGADOR, LAS TEXTURAS EMPOTRADAS NO SE PUEDEN DECODIFICAR, y su fallo
-       * se lleva por delante la carga ENTERA: ni la geometría se vería. El
-       * complemento sólo se registra donde hace falta; en un navegador sustituiría
-       * el atlas de verdad por su copia compilada, que es lo mismo pero por nada.
-       *
-       * Y ES EL DEL TABLERO, no el de los avatares: `texturasLisas` contesta con una
-       * textura blanca, que en este modelo es un delta sin un solo color. El del
-       * tablero contesta con el atlas compilado a bytes. Ver `tres/texturas-nativas.ts`.
-       */
-      if (!decodificaImagenes()) cargador.register(texturasDelTablero);
-      const gltf = await new Promise<GLTF>((resolver, rechazar) => {
-        cargador.parse(bytes, '', resolver, rechazar);
+function recordada(traer: () => Promise<CatalogoDeModelos>): () => Promise<CatalogoDeModelos> {
+  let prometido: Promise<CatalogoDeModelos> | null = null;
+  return () => {
+    if (prometido === null) {
+      const promesa = traer();
+      prometido = promesa;
+      promesa.catch(() => {
+        if (prometido === promesa) prometido = null;
       });
-      return catalogoDeModelos(gltf.scene);
-    })();
-    catalogoPrometido = promesa;
-    promesa.catch(() => {
-      if (catalogoPrometido === promesa) catalogoPrometido = null;
-    });
-  }
-  return catalogoPrometido;
+    }
+    return prometido;
+  };
+}
+
+/** Abre unos bytes de `.glb` con un cargador ya preparado y devuelve su catálogo. */
+async function abreElGlb(bytes: ArrayBuffer, cargador: GLTFLoader): Promise<CatalogoDeModelos> {
+  const gltf = await new Promise<GLTF>((resolver, rechazar) => {
+    cargador.parse(bytes, '', resolver, rechazar);
+  });
+  return catalogoDeModelos(gltf.scene);
+}
+
+const tableroPrometido = recordada(async () => {
+  const bytes = await traer(rutaDelTablero());
+  const cargador = new GLTFLoader();
+  /*
+   * SIN NAVEGADOR, LAS TEXTURAS EMPOTRADAS NO SE PUEDEN DECODIFICAR, y su fallo
+   * se lleva por delante la carga ENTERA: ni la geometría se vería. El
+   * complemento sólo se registra donde hace falta; en un navegador sustituiría
+   * el atlas de verdad por su copia compilada, que es lo mismo pero por nada.
+   *
+   * Y ES EL DEL TABLERO, no el de los avatares: `texturasLisas` contesta con una
+   * textura blanca, que en este modelo es un delta sin un solo color. El del
+   * tablero contesta con el atlas compilado a bytes. Ver `tres/texturas-nativas.ts`.
+   */
+  if (!decodificaImagenes()) cargador.register(texturasDelTablero);
+  return abreElGlb(bytes, cargador);
+});
+
+/*
+ * Los dados van por HTTP como el tablero (los `.glb` no pasan por Metro) y SIN
+ * complemento de texturas: el D6 va horneado a color por vértice y no trae ninguna, así
+ * que en el teléfono no hay nada que sustituir.
+ */
+const dadosPrometidos = recordada(async () => {
+  const bytes = await traer(rutaDeLosDados());
+  return abreElGlb(bytes, new GLTFLoader());
+});
+
+/**
+ * EL CATÁLOGO ENTERO: tablero y dados pedidos A LA VEZ y unidos en un mapa.
+ *
+ * Con su propia red cada uno, y no un `Promise.all` a secas: un `dados.glb` que no llegue
+ * NO puede tirar el tablero. El fallo de los dados se convierte en «sin dado» (`null`),
+ * el catálogo sale sin `MODELO.dado` y `Dados` pinta el respaldo procedimental; se avisa
+ * por consola, porque un respaldo mudo es un fallo que nadie ve. Sólo el fallo del
+ * tablero rechaza la promesa, y es el que la pantalla enseña.
+ */
+function catalogoDelTablero(): Promise<CatalogoDeModelos> {
+  const tablero = tableroPrometido();
+  const dados = dadosPrometidos().catch((fallo: unknown): null => {
+    console.warn(`Los dados no han llegado (${textoDelFallo(fallo)}): se pintan los del respaldo.`);
+    return null;
+  });
+  return Promise.all([tablero, dados]).then(([delTablero, deLosDados]) => unirCatalogos(delTablero, deLosDados));
 }
 
 type EstadoDelCatalogo =
@@ -694,10 +748,35 @@ function LaMesaEnTres({
    * sin manera de comprar en toda la partida. Esta composición vale sólo para la rama del
    * delta; el respaldo usa las opciones sin tocar, y por qué está en la cabecera.
    */
-  const fueraDelTablero = useMemo(
+  const fueraDeLaBarra = useMemo(
     () => opcionesFueraDeLaBarra(opcionesFueraDeLaMano(opcionesFueraDelTablero(opciones)), mazo),
     [opciones, mazo],
   );
+  /*
+   * ═══ LOS DADOS: SÓLO DONDE CABEN, Y EL BOTÓN DE TIRAR SE VA DONDE ESTÁN ═══
+   *
+   * La escena decide con `huecosDeLaMesa` si hay sitio para los dados (colgados a la
+   * izquierda o como quinto hueco) y lo decide con el ALTO DEL LIENZO EN PUNTOS, porque el
+   * suelo de toque son 44 puntos. Esta pantalla hace LA MISMA pregunta con la misma medida
+   * (`medida`, la del `onLayout` del lienzo) antes de quitar el botón: si la escena no pinta
+   * dados, el botón se queda (320×360 y 360×490, §4.4 del diseño). Como las dos llaman a la
+   * misma función con la misma medida no pueden discrepar.
+   *
+   * Y el ORDEN es el del mazo: `dadosEnTres` recibe las opciones ENTERAS y
+   * `opcionesFueraDeLaMesa` filtra DESPUÉS; al revés `porTirar` sería siempre falso y los
+   * dados no vibrarían nunca. `quieto` los apaga como a la barra.
+   */
+  const haySitioParaLosDados = useMemo(() => {
+    if (medida.alto <= 0 || medida.ancho <= 0) return false;
+    const cuantos = barra.length + (mazo === null ? 0 : 1);
+    return huecosDeLaMesa(cuantos, CAMPO_DE_LA_CAMARA, medida.ancho / medida.alto, medida.alto).dados !== null;
+  }, [medida, barra.length, mazo]);
+  const dados = useMemo((): DadosEnTres | null => {
+    if (!haySitioParaLosDados) return null;
+    const suyos = dadosEnTres(laVista, yo, opciones);
+    return suyos === null || !mesa.quieto ? suyos : { ...suyos, disponible: false };
+  }, [haySitioParaLosDados, laVista, yo, opciones, mesa.quieto]);
+  const fueraDelTablero = useMemo(() => opcionesFueraDeLaMesa(fueraDeLaBarra, dados), [fueraDeLaBarra, dados]);
 
   /*
    * EL ENCUADRE mide el MUNDO —lo grande que es el delta— y sólo se recalcula cuando
@@ -852,6 +931,25 @@ function LaMesaEnTres({
     },
     [mesa, laVista, opciones],
   );
+
+  /*
+   * AL PULSAR EL ASA DE LOS DADOS: se manda TIRAR por la misma puerta que el botón y se le
+   * devuelve a la escena cómo acabó, que es lo que corta el rodar en el acto si la mesa no
+   * cambió (§5.3). `laInterfazSeLoQueda()` va LA PRIMERA, como al coger una pieza: es lo
+   * único que impide que el giro le robe el dedo. La escena sólo llama si `disponible`;
+   * aquí se vuelve a mirar `quieto` por la carrera entre el toque y la respuesta que acaba
+   * de llegar. No se pregunta nada: tirar no gasta nada y no se puede tirar mal. Va ANTES
+   * del mazo porque `verify:sala` lee que entre `alPulsarElMazo` y su cierre no se manda
+   * ningún movimiento, y un manejador que sí manda no puede colarse en ese trozo.
+   */
+  const alPulsarLosDados = useCallback((): Promise<ResultadoDelMovimiento> => {
+    laInterfazSeLoQueda();
+    if (mesa.quieto) return Promise.resolve('rechazado');
+    const tirar = tirarEnTres(opciones);
+    if (tirar === null) return Promise.resolve('rechazado');
+    soltarTodo();
+    return mesa.mover({ tipo: tirar.tipo, carga: tirar.carga });
+  }, [laInterfazSeLoQueda, mesa, opciones, soltarTodo]);
 
   /**
    * SE HA PULSADO EL NAIPE DEL MAZO: se pregunta, SIEMPRE.
@@ -1105,6 +1203,16 @@ function LaMesaEnTres({
               onLayout={medir}
               accessible
               accessibilityLabel="El delta de Riberas en tres dimensiones. Arrastra con un dedo para girarlo, pellizca para acercarlo y mueve dos dedos para recorrerlo."
+              /*
+               * TIRAR PARA QUIEN NO VE EL LIENZO. Donde hay dados el botón de tirar se ha
+               * ido del pie, y un dado que sólo se puede tocar con el dedo sería el primer
+               * movimiento del juego inaccesible: la acción existe mientras existan los dados
+               * y se ofrece por la misma puerta que el asa.
+               */
+              accessibilityActions={dados !== null ? [{ name: 'tirar', label: 'Tirar los dados' }] : undefined}
+              onAccessibilityAction={(e) => {
+                if (e.nativeEvent.actionName === 'tirar' && dados !== null && dados.disponible) void alPulsarLosDados();
+              }}
             >
               <Canvas
                 style={estilos.lienzo}
@@ -1141,6 +1249,8 @@ function LaMesaEnTres({
                   mazo={mazo}
                   onPulsarElMazo={alPulsarElMazo}
                   turnoDe={turnoDe}
+                  dados={dados}
+                  onPulsarLosDados={alPulsarLosDados}
                   mano={mano}
                   cogida={cogida}
                   onCogerCarta={alCogerCarta}

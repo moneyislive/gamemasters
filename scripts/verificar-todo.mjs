@@ -693,6 +693,24 @@ const BATERIA = [
       'los seis aventureros compilados llevan el mismo rig de veintitrés huesos, el color horneado en cada vértice y ninguna textura que Hermes no sepa abrir; miden lo que mide una persona en `escala.ts`; y cada pista de los doce clips de `animaciones.glb` encuentra su hueso en cada personaje con el nombre que GLTFLoader deja al cargar',
   },
   /*
+   * ═══ LOS DADOS, Y POR QUÉ NO BASTA CON `aventureros` ═══
+   *
+   * Es el mismo trato que los aventureros (un `.glb` horneado que el móvil tiene que
+   * abrir sin textura) sobre otro fichero, `escenas/modelos/dados.glb`, y con dos
+   * cosas que sólo éste puede vigilar: que el D6 del pack se compiló con EXACTAMENTE
+   * los dos colores de las fichas del tablero (un dado del blanco azulado del pack no
+   * da error: es un dado de otro juego), y que `escenas/caras-del-dado.ts`, la tabla
+   * generada de qué cara enseña cada número, sigue siendo lo que el fichero mide. Con
+   * esa tabla desfasada el dado se asienta y enseña OTRO número, sin un solo aviso.
+   */
+  {
+    nombre: 'dados',
+    donde: 'escenas',
+    guion: 'verify:dados',
+    porque:
+      '`dados.glb` trae un solo nodo `dado` con los 521 vértices y 662 triángulos del D6 de KayKit, la caja de 0,75 del pack, el color horneado en exactamente los dos tonos de las fichas y ninguna textura ni UV; carga con el GLTFLoader de verdad sin atributos entrelazados; y `caras-del-dado.ts` es byte a byte lo que se mide contando los puntos: 1..6, 21 en total, opuestas 7',
+  },
+  /*
    * EL EMBARCADERO SON DOS COMPROBADORES Y NO UNO, por la misma razón que el
    * tablero separa `verify:escena` de mirar el `.glb`: uno abre el fichero
    * compilado y el otro hace aritmética. Si se fundieran, un `.glb` que faltara

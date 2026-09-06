@@ -93,6 +93,7 @@
  * traducción entre los dos está en `PIEZAS_DE_LA_BARRA` y en ningún otro sitio.
  */
 import type { ColorDeJugador, DeltaEn3D } from '../../../escenas/tipos';
+import type { DadosDeLaMesa } from '../../../escenas/dados';
 import type { Hex, LlaveDeArista, LlaveDeVertice } from '../../mecanicas/malla-hexagonal';
 import type { AsientoId } from '../tipos';
 import {
@@ -1044,13 +1045,23 @@ export function selloDeLaTirada(turnosAbiertos: number, tirado: boolean): number
  *     petición en vuelo lo apaga la pantalla, como a la barra.
  *   · `sello`, `ultimaTirada`, `tirado`: lo que la máquina de `escenas/dados.ts` necesita
  *     para saber qué par enseñar y si la tirada es nueva.
+ *
+ * Extiende `DadosDeLaMesa`, el contrato que `<Delta>` recibe (sólo el tipo: la escena no
+ * importa nada de aquí), para que un campo que la escena pida mañana no se pueda olvidar
+ * en esta traducción sin que deje de compilar. `porTirar` es lo único de más, y lo lee
+ * `opcionesFueraDeLaMesa`, no la escena.
  */
-export interface DadosEnTres {
+export interface DadosEnTres extends DadosDeLaMesa {
   readonly porTirar: boolean;
-  readonly disponible: boolean;
-  readonly sello: number;
-  readonly ultimaTirada: number;
-  readonly tirado: boolean;
+}
+
+/**
+ * LA OPCIÓN DE TIRAR, entera, o `null` si el juego no la ofrece ahora. Como `comprarEnTres`:
+ * la pantalla manda la opción que dio el juego (su `tipo` y su `carga`) y no monta un
+ * movimiento a mano, que sería escribir su forma en un segundo sitio que nadie comprueba.
+ */
+export function tirarEnTres<O extends OpcionQueLlega>(opciones: readonly O[]): O | null {
+  return opciones.find((o) => o.tipo === TIRAR) ?? null;
 }
 
 /**

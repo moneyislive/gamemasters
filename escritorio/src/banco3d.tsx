@@ -22,7 +22,7 @@
  * Un reparto aleatorio haría bonita la captura y quitaría lo único que esto vale:
  * poder comparar dos ejecuciones y ver que ha cambiado lo que se tocó.
  */
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
@@ -60,6 +60,7 @@ import {
   MODELO,
   modeloDePieza,
   modeloDeTorre,
+  unirCatalogos,
 } from '../../escenas/modelos';
 import type { CatalogoDeModelos } from '../../escenas/modelos';
 import {
@@ -69,7 +70,10 @@ import {
   segundosAndando,
 } from '../../escenas/escala';
 import type { CaminoEn3D, ColorDeJugador, DeltaEn3D, PiezaEn3D } from '../../escenas/tipos';
+import type { DadosDeLaMesa, ResultadoDelToque } from '../../escenas/dados';
 import tableroGlb from '../../escenas/modelos/tablero.glb?url';
+/* Los dados, en su fichero aparte: el banco los pide como la partida, a la vez y con su propia red. */
+import dadosGlb from '../../escenas/modelos/dados.glb?url';
 import './estilo.css';
 
 /** El azul del cielo de mediodía, que es también el color al que se funde la niebla. */
@@ -135,6 +139,11 @@ function deltaDePrueba(): DeltaEn3D {
  * `cancelado` no es paranoia: si el componente se desmonta mientras el fichero
  * viaja —una recarga en caliente, sin ir más lejos— escribir el estado después es
  * un aviso de React y, peor, una referencia viva a una escena que ya no se dibuja.
+ *
+ * SON DOS FICHEROS Y UN SOLO CATÁLOGO, como en la partida: el tablero y los dados se
+ * piden a la vez, y el fallo de los dados se queda en un aviso y un catálogo sin
+ * `dado` (con el que `Dados` pinta el respaldo); sólo el fallo del tablero es error.
+ * Así el banco enseña exactamente lo que verá quien juegue si `dados.glb` no llega.
  */
 function useCatalogo(): { modelos: CatalogoDeModelos | null; error: string | null } {
   const [modelos, ponerModelos] = useState<CatalogoDeModelos | null>(null);
@@ -142,13 +151,20 @@ function useCatalogo(): { modelos: CatalogoDeModelos | null; error: string | nul
 
   useEffect(() => {
     let cancelado = false;
-    new GLTFLoader().load(
-      tableroGlb,
-      (gltf) => {
+    const cargador = new GLTFLoader();
+    const tablero = cargador.loadAsync(tableroGlb).then((gltf) => catalogoDeModelos(gltf.scene));
+    const dados = cargador
+      .loadAsync(dadosGlb)
+      .then((gltf) => catalogoDeModelos(gltf.scene))
+      .catch((fallo: unknown): null => {
+        console.warn(`Los dados no han llegado (${fallo instanceof Error ? fallo.message : String(fallo)}): se pintan los del respaldo.`);
+        return null;
+      });
+    Promise.all([tablero, dados]).then(
+      ([delTablero, deLosDados]) => {
         if (cancelado) return;
-        ponerModelos(catalogoDeModelos(gltf.scene));
+        ponerModelos(unirCatalogos(delTablero, deLosDados));
       },
-      undefined,
       (fallo: unknown) => {
         if (cancelado) return;
         ponerError(fallo instanceof Error ? fallo.message : String(fallo));
@@ -521,6 +537,43 @@ function Banco(): JSX.Element {
   const [trueque, ponerTrueque] = useState<string | null>(null);
 
   /*
+   * LOS DADOS DE MENTIRA, para mirarlos de cerca sin montar una partida.
+   *
+   * Tres mandos: «Me toca tirar» enciende `disponible` (vibran); «Tirar» hace de servidor
+   * (a los 400 ms llega una vista con otra suma y otro sello, que es lo que hace rodar y
+   * asentar, como la tirada de otro); y «Rechazar» hace que la próxima pulsación del asa
+   * vuelva con `rechazado` a los 400 ms, para ver el corte en el acto. El asa manda por
+   * `onPulsarLosDados`, que aquí es el mismo simulador. La semilla del banco parte la suma
+   * en el par, como en la partida.
+   */
+  const [dadosDelBanco, ponerDadosDelBanco] = useState<DadosDeLaMesa>({
+    disponible: false,
+    tirado: false,
+    ultimaTirada: 0,
+    sello: 0,
+  });
+  const [rechazaLaTirada, ponerRechazaLaTirada] = useState(false);
+  const simularLaTirada = useCallback(
+    (): Promise<ResultadoDelToque> =>
+      new Promise((resuelve) => {
+        setTimeout(() => {
+          if (rechazaLaTirada) {
+            resuelve('rechazado');
+            return;
+          }
+          ponerDadosDelBanco((d) => ({
+            disponible: false,
+            tirado: true,
+            ultimaTirada: 2 + Math.floor(Math.random() * 11),
+            sello: d.sello + 1,
+          }));
+          resuelve('hecho');
+        }, 400);
+      }),
+    [rechazaLaTirada],
+  );
+
+  /*
    * UNA MANO DE MENTIRA PARA EL BANCO.
    *
    * Once cartas repartidas entre los cinco bienes, que es una mano de catan a mitad de
@@ -769,6 +822,9 @@ function Banco(): JSX.Element {
                  cambia con el botón de turno. Sin esto la mesa se vería sin tapete y no se
                  podría juzgar su color contra la madera. */
               turnoDe={quienJuega}
+              /* Los dados de mentira: ver `dadosDelBanco`. El asa manda al mismo simulador que el botón «Tirar». */
+              dados={dadosDelBanco}
+              onPulsarLosDados={simularLaTirada}
               mano={mano}
               cogida={cogida}
               onCogerCarta={(c) => ponerCogida((antes) => (antes === c.id ? null : c.id))}
@@ -953,6 +1009,33 @@ function Banco(): JSX.Element {
           >
             Otro tablero
           </button>
+        </div>
+        {/* Los dados: ver `dadosDelBanco`. Lo que se mira es la vibración, el rodar, el asentado y el corte del rechazo. */}
+        <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            onClick={() => {
+              ponerDadosDelBanco((d) => ({ ...d, disponible: true, tirado: false }));
+            }}
+            style={BOTON}
+          >
+            Me toca tirar
+          </button>
+          <button type="button" onClick={() => void simularLaTirada()} style={BOTON}>
+            Tirar
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              ponerRechazaLaTirada((r) => !r);
+            }}
+            style={{ ...BOTON, borderColor: rechazaLaTirada ? '#ff8b7a' : undefined }}
+          >
+            {rechazaLaTirada ? 'Rechazar: sí' : 'Rechazar: no'}
+          </button>
+          <span style={{ alignSelf: 'center', color: '#9fe6b8' }}>
+            suma {dadosDelBanco.ultimaTirada} · sello {dadosDelBanco.sello}
+          </span>
         </div>
         <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
           <button

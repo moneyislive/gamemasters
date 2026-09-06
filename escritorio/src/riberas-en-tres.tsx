@@ -206,15 +206,16 @@ import {
   tirandoDelMirador,
 } from '../../escenas/camara';
 import { Delta, encuadreDelDelta } from '../../escenas/delta';
-import { catalogoDeModelos } from '../../escenas/modelos';
+import { catalogoDeModelos, unirCatalogos } from '../../escenas/modelos';
 import type { CatalogoDeModelos } from '../../escenas/modelos';
-import { rutaDelTablero } from '../../escenas/ruta-de-modelos';
+import { rutaDeLosDados, rutaDelTablero } from '../../escenas/ruta-de-modelos';
 import type { Opcion } from '../../shared/arcade';
 import {
   barraEnTres,
   bienesQueSeCambianPor,
   colocandoEnTres,
   comprarEnTres,
+  dadosEnTres,
   jugadasDeLaCarta,
   laManoDeLaIzquierda,
   jugadaSinPreguntar,
@@ -223,23 +224,28 @@ import {
   mazoEnLaBarra,
   opcionesFueraDeLaBarra,
   opcionesFueraDeLaMano,
+  opcionesFueraDeLaMesa,
   opcionesFueraDelTablero,
   renglonDelVado,
   revelarDe,
   seVeEnTres,
   tableroEnTres,
+  tirarEnTres,
   truequesPosibles,
   turnoEnTres,
 } from '../../shared/arcade/juegos/riberas-en-tres';
 import type {
   ClaseDeJugada,
+  DadosEnTres,
   IdDeLaBarra,
   TableroEnTres,
 } from '../../shared/arcade/juegos/riberas-en-tres';
+/* El sitio de los dados se decide con la misma función que la escena: ver `haySitioParaLosDados`. */
+import { huecosDeLaMesa } from '../../escenas/barra';
 import { semillaDelCodigo } from '../../shared/mecanicas/semilla';
 import type { TableroDeclarado } from '../../shared/mecanicas/tablero-declarado';
 import { Formulario } from './formulario';
-import type { LaMesa, MesaVista } from './mesa';
+import type { LaMesa, MesaVista, ResultadoDelMovimiento } from './mesa';
 import type { ArcadeDelCatalogo } from './muebles';
 import { opcionesSueltas } from './plan';
 import { loQueSeDiceDeUnFallo } from './red-de-seguridad';
@@ -251,6 +257,8 @@ import { AccionesDelTablero, Retablo } from './retablo';
  * proxy de Vite y en producción es el mismo Node que sirve esta página.
  */
 const RUTA_DEL_TABLERO = rutaDelTablero();
+/** Y los dados, en su fichero de unos kB, por la misma puerta. Ver `rutaDeLosDados`. */
+const RUTA_DE_LOS_DADOS = rutaDeLosDados();
 
 /** El azul del cielo de mediodía, que es también el color al que se funde la niebla. */
 const COLOR_DEL_CIELO = '#9ec9e2';
@@ -277,6 +285,12 @@ const VOLVER_AL_TABLERO_ENTERO = 'Ver el tablero entero';
  * colgada del lienzo otra vez y sin un solo error: la Sala volvería a desplazarse sola.
  */
 const RECUADRO_DEL_LIENZO = 'riberas-lienzo';
+/**
+ * EL CAMPO VERTICAL DE LA CÁMARA, en radianes: los 45° del `fov` del `Canvas` de abajo. La
+ * escena lo lee de la cámara de verdad; esta pantalla lo necesita ANTES de montarla para
+ * preguntar a `huecosDeLaMesa` si caben los dados, y tiene que ser el mismo número.
+ */
+const CAMPO_DE_LA_CAMARA = (45 * Math.PI) / 180;
 
 /**
  * LOS TÍTULOS DEL MENÚ, uno por pregunta, y ni una palabra más de cosecha propia.
@@ -316,30 +330,61 @@ const TITULO_DEL_MARCADOR = 'El marcador';
 // El catálogo de modelos, una vez por pestaña
 // ---------------------------------------------------------------------------
 
-let catalogoEnCamino: Promise<CatalogoDeModelos> | null = null;
+/**
+ * UNA PROMESA POR FICHERO Y POR PESTAÑA, que se suelta si falla para que el siguiente
+ * montaje lo intente otra vez. Ver la cabecera. Es una por fichero y no una para los
+ * dos porque el tablero y los dados fallan por separado: un tablero que llegó no se
+ * vuelve a bajar porque los dados no llegaran, y unos dados que fallaron se pueden
+ * reintentar solos en el siguiente montaje.
+ */
+function recordada(traer: () => Promise<CatalogoDeModelos>): () => Promise<CatalogoDeModelos> {
+  let enCamino: Promise<CatalogoDeModelos> | null = null;
+  return () => {
+    if (enCamino !== null) return enCamino;
+    const promesa = traer();
+    enCamino = promesa;
+    promesa.catch(() => {
+      if (enCamino === promesa) enCamino = null;
+    });
+    return promesa;
+  };
+}
 
 /**
- * Trae y parsea `tablero.glb`, y lo recuerda. Ver la cabecera: una promesa por
- * pestaña, y si falla se suelta para que el siguiente montaje lo intente otra vez.
+ * Trae y parsea un `.glb` y devuelve su catálogo.
  *
  * `GLTFLoader.parseAsync` sobre los bytes de un `fetch` relativo, y no `.load(url)`:
  * así el error de red se lee como lo que es —«contestó 404»— y no como un `ProgressEvent`
  * sin texto, que es lo que devuelve el cargador cuando la petición falla.
  */
+async function traerUnGlb(ruta: string): Promise<CatalogoDeModelos> {
+  const r = await fetch(ruta);
+  if (!r.ok) throw new Error(`${ruta} contestó ${String(r.status)}`);
+  const bytes = await r.arrayBuffer();
+  const gltf = await new GLTFLoader().parseAsync(bytes, '');
+  return catalogoDeModelos(gltf.scene);
+}
+
+const traerElTablero = recordada(() => traerUnGlb(RUTA_DEL_TABLERO));
+const traerLosDados = recordada(() => traerUnGlb(RUTA_DE_LOS_DADOS));
+
+/**
+ * EL CATÁLOGO ENTERO: el tablero y los dados, pedidos A LA VEZ y unidos en un mapa.
+ *
+ * Con su propia red cada uno, y no un `Promise.all` a secas sobre los dos ficheros: un
+ * `dados.glb` que no llegue (un despliegue sin él, un 404, un fichero roto) NO puede
+ * tirar el tablero, que pesa cuatro megas y ya está aquí. El fallo de los dados se
+ * convierte en «sin dado» (`null`), el catálogo sale sin `MODELO.dado` y `Dados` pinta
+ * el respaldo procedimental; se avisa por consola, porque un respaldo mudo es un fallo
+ * que nadie ve. Sólo el fallo del tablero rechaza la promesa.
+ */
 function traerElCatalogo(): Promise<CatalogoDeModelos> {
-  if (catalogoEnCamino !== null) return catalogoEnCamino;
-  const promesa = (async (): Promise<CatalogoDeModelos> => {
-    const r = await fetch(RUTA_DEL_TABLERO);
-    if (!r.ok) throw new Error(`${RUTA_DEL_TABLERO} contestó ${String(r.status)}`);
-    const bytes = await r.arrayBuffer();
-    const gltf = await new GLTFLoader().parseAsync(bytes, '');
-    return catalogoDeModelos(gltf.scene);
-  })();
-  catalogoEnCamino = promesa;
-  promesa.catch(() => {
-    if (catalogoEnCamino === promesa) catalogoEnCamino = null;
+  const tablero = traerElTablero();
+  const dados = traerLosDados().catch((fallo: unknown): null => {
+    console.warn(`Los dados no han llegado (${loQueSeDiceDeUnFallo(fallo)}): se pintan los del respaldo.`);
+    return null;
   });
-  return promesa;
+  return Promise.all([tablero, dados]).then(([delTablero, deLosDados]) => unirCatalogos(delTablero, deLosDados));
 }
 
 /**
@@ -796,7 +841,7 @@ export function RiberasEnTres({ manifiesto, mesa, puesta, tablero, opciones }: L
    * y en una mesa de más de cuatro colonos no hay barra, y allí el botón es la única
    * manera de comprar una carta en toda la partida.
    */
-  const fuera = useMemo(
+  const fueraDeLaBarra = useMemo(
     () => opcionesFueraDeLaBarra(opcionesFueraDeLaMano(opcionesFueraDelTablero(opciones)), mazo),
     [opciones, mazo],
   );
@@ -862,6 +907,69 @@ export function RiberasEnTres({ manifiesto, mesa, puesta, tablero, opciones }: L
    * se caía nada— y con él sólo en el banco.
    */
   const turnoDe = useMemo(() => turnoEnTres(vista), [vista]);
+
+  /*
+   * ═══ LOS DADOS: SÓLO DONDE CABEN, Y EL BOTÓN DE TIRAR SE VA DONDE ESTÁN ═══
+   *
+   * La escena decide con `huecosDeLaMesa` si hay sitio para los dados (colgados a la
+   * izquierda o como quinto hueco) y lo decide con el ALTO DEL LIENZO EN PUNTOS, porque el
+   * suelo de toque son 44 puntos. Esta pantalla hace LA MISMA pregunta con la misma medida
+   * antes de quitar el botón: si la escena no pinta dados, el botón se queda (320×360 y
+   * 360×490 de pie, §4.4 del diseño). Como las dos llaman a la misma función con la misma
+   * medida no pueden discrepar. El lienzo se mide con un `ResizeObserver` sobre el
+   * recuadro, que es lo que la cámara también toma por lienzo.
+   *
+   * Y el ORDEN es el del mazo: `dadosEnTres` recibe las opciones ENTERAS y
+   * `opcionesFueraDeLaMesa` filtra DESPUÉS; al revés `porTirar` sería siempre falso y los
+   * dados no vibrarían nunca. `quieto` los apaga como a la barra: con una petición en
+   * vuelo no se tira.
+   */
+  const [lienzo, ponerLienzo] = useState({ ancho: 0, alto: 0 });
+  const medirElRecuadro = useCallback((recuadro: HTMLDivElement | null) => {
+    if (recuadro === null || typeof ResizeObserver === 'undefined') return;
+    const mide = (): void => {
+      ponerLienzo((antes) => {
+        const ancho = recuadro.clientWidth;
+        const alto = recuadro.clientHeight;
+        return antes.ancho === ancho && antes.alto === alto ? antes : { ancho, alto };
+      });
+    };
+    mide();
+    const observador = new ResizeObserver(mide);
+    observador.observe(recuadro);
+    /* Los `ref` de función no tienen limpieza: se suelta en el efecto de abajo. */
+    observadorDelRecuadro.current = observador;
+  }, []);
+  const observadorDelRecuadro = useRef<ResizeObserver | null>(null);
+  useEffect(() => () => observadorDelRecuadro.current?.disconnect(), []);
+  const haySitioParaLosDados = useMemo(() => {
+    if (lienzo.alto <= 0 || lienzo.ancho <= 0) return false;
+    const cuantos = barra.length + (mazo === null ? 0 : 1);
+    return huecosDeLaMesa(cuantos, CAMPO_DE_LA_CAMARA, lienzo.ancho / lienzo.alto, lienzo.alto).dados !== null;
+  }, [lienzo, barra.length, mazo]);
+  const dados = useMemo((): DadosEnTres | null => {
+    if (!haySitioParaLosDados) return null;
+    const suyos = dadosEnTres(vista, yo, opciones);
+    return suyos === null || !quieto ? suyos : { ...suyos, disponible: false };
+  }, [haySitioParaLosDados, vista, yo, opciones, quieto]);
+  const fuera = useMemo(() => opcionesFueraDeLaMesa(fueraDeLaBarra, dados), [fueraDeLaBarra, dados]);
+  /*
+   * AL PULSAR EL ASA DE LOS DADOS: se manda TIRAR por la misma puerta que el botón y se le
+   * devuelve a la escena cómo acabó, que es lo que corta el rodar en el acto si la mesa no
+   * cambió (§5.3). La escena sólo llama si `disponible`; aquí se vuelve a mirar `quieto` por
+   * la carrera entre el toque y la respuesta que acaba de llegar.
+   */
+  const alPulsarLosDados = useCallback((): Promise<ResultadoDelMovimiento> => {
+    if (quieto) return Promise.resolve('rechazado');
+    const tirar = tirarEnTres(opciones);
+    if (tirar === null) return Promise.resolve('rechazado');
+    ponerTomada(null);
+    ponerCogida(null);
+    ponerCartaDelMazo(null);
+    ponerPreguntando(null);
+    return mover({ tipo: tirar.tipo, carga: tirar.carga });
+  }, [quieto, opciones, mover]);
+
   const colocando = useMemo(
     () => (tomada === null ? null : colocandoEnTres(vista, yo, tomada)),
     [vista, yo, tomada],
@@ -1147,9 +1255,38 @@ export function RiberasEnTres({ manifiesto, mesa, puesta, tablero, opciones }: L
       {/* La clase sale de la constante porque la cámara BUSCA este recuadro por ella: ver `RECUADRO_DEL_LIENZO`. */}
       <div
         className={quieto ? `${RECUADRO_DEL_LIENZO} riberas-lienzo-quieto` : RECUADRO_DEL_LIENZO}
+        ref={medirElRecuadro}
       >
         {conMundo ? (
           <>
+            {/*
+              TIRAR PARA QUIEN NO VE EL LIENZO. Donde hay dados el botón de tirar se ha ido
+              de la lista de abajo, y un dado que sólo se puede tocar con el ratón sería el
+              primer movimiento del juego inaccesible. Este botón sólo existe para las
+              tecnologías de apoyo (fuera de la vista, dentro del recuadro) y manda por la
+              misma puerta que el asa.
+
+              EXISTE MIENTRAS EXISTEN LOS DADOS, no sólo mientras se puede tirar: al
+              pulsarlo `mover` pone `quieto`, `disponible` cae a falso, y si el botón se
+              desmontara con el foco dentro el foco caería al body y el lector perdería el
+              sitio. Se apaga con `aria-disabled` y NO con `disabled`: un botón `disabled`
+              deja de ser enfocable y el navegador le quita el foco igual (la regla de
+              recolocación del foco de HTML), que es justo lo que se quería evitar. Pulsado
+              apagado no manda nada: `alPulsarLosDados` ya devuelve `rechazado` con `quieto`
+              o sin TIRAR entre las opciones, y aquí se corta antes.
+            */}
+            {dados !== null ? (
+              <button
+                type="button"
+                className="riberas-solo-apoyo"
+                aria-disabled={!dados.disponible}
+                onClick={() => {
+                  if (dados.disponible) void alPulsarLosDados();
+                }}
+              >
+                Tirar los dados
+              </button>
+            ) : null}
             <LimiteDelMundo alFallar={alFallarElLienzo}>
               <Canvas
                 shadows
@@ -1177,6 +1314,8 @@ export function RiberasEnTres({ manifiesto, mesa, puesta, tablero, opciones }: L
                   mazo={mazo}
                   onPulsarElMazo={alPulsarElMazo}
                   turnoDe={turnoDe}
+                  dados={dados}
+                  onPulsarLosDados={alPulsarLosDados}
                   mano={mano}
                   cogida={cogida}
                   onCogerCarta={alCogerCarta}

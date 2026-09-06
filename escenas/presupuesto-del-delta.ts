@@ -218,21 +218,37 @@ export function segmentosDeLaMesa(anchoEnPuntos: number): number {
 }
 
 /**
- * LO QUE CUESTA LA MESA ENTERA, con la tapa a `segmentos`: `12 · segmentos + 590`.
+ * LO QUE CUESTAN LOS DOS DADOS, y por qué son DOS números y se suma el MÁXIMO.
+ *
+ * `Dados` pinta el D6 de KayKit horneado (`escenas/modelos/dados.glb`) si el catálogo lo
+ * trae y el respaldo procedimental si no (`cubo-del-dado.ts`): una caja de 12 triángulos y
+ * veintiún puntos de diez lados fundidos, 222 por dado, 444 los dos. El D6 del pack cuesta
+ * 662 por dado (521 vértices, medido al compilar; `verify:dados` exige ese número exacto),
+ * 1.324 los dos: tres veces el respaldo. Si `triangulosDeLaMesa` sumara sólo el modelo, la
+ * comprobación que construye el respaldo con `three` se pondría roja sin que nada estuviera
+ * mal; si sumara sólo el respaldo, el tope dejaría de vigilar lo que se pinta cuando el
+ * pack está. Con el máximo, `verify:escena` cuenta el respaldo contra el máximo (menor o
+ * igual) y el `.glb` contra `TRIANGULOS_DE_LOS_DADOS_DEL_PACK` (igual).
+ */
+export const TRIANGULOS_DEL_RESPALDO_DE_LOS_DADOS = 2 * (12 + 21 * 10);
+export const TRIANGULOS_DE_LOS_DADOS_DEL_PACK = 2 * 662;
+export const TRIANGULOS_DE_LOS_DADOS = Math.max(TRIANGULOS_DEL_RESPALDO_DE_LOS_DADOS, TRIANGULOS_DE_LOS_DADOS_DEL_PACK);
+
+/**
+ * LO QUE CUESTA LA MESA ENTERA, con la tapa a `segmentos`: `12 · segmentos + 1.470`.
  *
  * Sumando por pieza, medido con `three` en Node:
  *   · la tapa: `2 · segmentos · FILAS_DE_LA_MESA` triángulos, sin canto (su frente queda
  *     fuera del lienzo);
- *   · dos dados: 12 del cubo + 210 de los veintiún puntos fundidos, cada uno → 444;
+ *   · dos dados: el máximo de arriba, 1.324 con el D6 del pack (444 con el respaldo);
  *   · el asa de los dados, una caja invisible → 12;
  *   · el tapete del turno → 2;
  *   · seis sombras de contacto de 20 segmentos fundidas en una geometría → 120;
  *   · la pila del mazo, una caja escalada → 12.
  *
- * Son 1.742 con 96 segmentos y 3.470 con 240: el 7,5 % y el 14,9 % del mar. Es UN total,
+ * Son 2.622 con 96 segmentos y 4.350 con 240: el 11,2 % y el 18,6 % del mar. Es UN total,
  * el mismo aquí y en el comprobador, para que el número salga de la misma cuenta.
  */
-const TRIANGULOS_DE_LOS_DADOS = 2 * (12 + 21 * 10);
 const TRIANGULOS_DEL_ASA_DE_LOS_DADOS = 12;
 const TRIANGULOS_DEL_TAPETE = 2;
 const TRIANGULOS_DE_LAS_SOMBRAS = 6 * 20;
@@ -251,6 +267,12 @@ export function triangulosDeLaMesa(segmentos: number): number {
 /**
  * EL TOPE DE LA MESA, por lo mismo que el del mar: un recuento sin tope es un dato y con
  * tope es una decisión. El día que alguien suba los segmentos para ver la veta más fina lo
- * descubrirá aquí y no en un móvil. Con el máximo de segmentos quedan 130 de margen.
+ * descubrirá aquí y no en un móvil.
+ *
+ * Era 3.600 con el respaldo (3.470 a 240 segmentos, 130 de margen). El D6 del pack cuesta
+ * 1.324 los dos (880 más que el respaldo), así que la cuenta con la tapa al máximo es
+ * `12 · 240 + 1.470 = 4.350`, y el tope se rehace con esa cuenta y no a ojo: 4.500, 150 de
+ * margen. Frente a los dos millones del tablero es nada; el tope está para que la mesa no
+ * crezca sin que nadie lo escriba.
  */
-export const TOPE_DE_LA_MESA = 3_600;
+export const TOPE_DE_LA_MESA = 4_500;

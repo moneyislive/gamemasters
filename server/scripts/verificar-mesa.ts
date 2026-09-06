@@ -2607,6 +2607,34 @@ try {
       condicional,
     );
 
+    /*
+     * LOS DADOS, POR SU RUTA FIJA. `dados.glb` es el D6 de KayKit horneado, unos kB,
+     * en un fichero aparte del tablero (ver `escenas/nombres.ts`, `MODELO.dado`). Se
+     * afirma lo mismo que del tablero y además que pesa lo que un dado y no lo que un
+     * tablero: si un día alguien lo compilara con la textura dentro, la ruta seguiría
+     * contestando 200 y el teléfono no lo abriría.
+     */
+    const ficheroDeLosDados = path.join(REPO, 'escenas', 'modelos', 'dados.glb');
+    comprobar('los dados existen en el repositorio: `escenas/modelos/dados.glb`', fs.existsSync(ficheroDeLosDados), ficheroDeLosDados);
+    const tamanoDeLosDados = fs.existsSync(ficheroDeLosDados) ? fs.statSync(ficheroDeLosDados).size : -1;
+    const dados = await fetch(`${BASE}/arcade/modelos/dados.glb`);
+    const bytesDeLosDados = new Uint8Array(await dados.arrayBuffer());
+    comprobar(
+      'GET /api/arcade/modelos/dados.glb contesta 200 con `model/gltf-binary` y la misma caché que el tablero',
+      dados.status === 200 &&
+        (dados.headers.get('content-type') ?? '').startsWith('model/gltf-binary') &&
+        /max-age=3600/.test(dados.headers.get('cache-control') ?? ''),
+      { estado: dados.status, tipo: dados.headers.get('content-type'), cache: dados.headers.get('cache-control') },
+    );
+    comprobar(
+      'y manda los bytes del fichero real, que empiezan por «glTF» y pesan menos de 100 kB',
+      bytesDeLosDados.length === tamanoDeLosDados &&
+        tamanoDeLosDados > 0 &&
+        tamanoDeLosDados < 100 * 1024 &&
+        bytesDeLosDados[0] === 0x67 && bytesDeLosDados[1] === 0x6c && bytesDeLosDados[2] === 0x54 && bytesDeLosDados[3] === 0x46,
+      { recibido: bytesDeLosDados.length, real: tamanoDeLosDados },
+    );
+
     for (const malo of [
       '..%2Ftablero.glb',
       '%2e%2e%2ftablero.glb',
@@ -3809,10 +3837,19 @@ if (fallos.length > 0) {
   console.log('');
 }
 
-if (hechas < 100) {
+/**
+ * EL GUARDIA DE «NO SE HAN HECHO TODAS». Era un suelo de cien («eso no es una mesa
+ * probada») y con cien de ochocientas un bloque entero podía caerse sin que nadie lo
+ * viera: el número va escrito, como en los demás comprobadores, y se sube al añadir
+ * comprobaciones. Medido dos veces seguidas antes de escribirlo.
+ */
+const COMPROBACIONES_ESCRITAS = 856;
+if (hechas < COMPROBACIONES_ESCRITAS) {
   console.error(
-    `Solo se han hecho ${hechas} comprobaciones. Eso no es una mesa probada: es un comprobador\n` +
-      'que se ha caído por el camino sin decirlo, o al que le han quitado la mitad del cuerpo.',
+    `Solo se han hecho ${hechas} de las ${COMPROBACIONES_ESCRITAS} comprobaciones que tiene escritas este guion. ` +
+      'Eso no es una mesa probada: es un comprobador\n' +
+      'que se ha caído por el camino sin decirlo, o al que le han quitado parte del cuerpo. ' +
+      'Si has añadido comprobaciones nuevas, sube el número.',
   );
   process.exit(2);
 }

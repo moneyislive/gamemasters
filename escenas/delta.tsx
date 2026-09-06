@@ -203,13 +203,45 @@ import type {
  */
 import { loCogeLaInterfaz } from './camara';
 import { CAJA_DEL_PUENTE, LARGO_DEL_TRAMO, puenteEntre } from './puente';
-import type { HuecoDeLaBarra, MazoDeLaBarra, PiezaDeBarra } from './barra';
+import type { HuecoDeLaBarra, HuecoDeLosDados, MazoDeLaBarra, PiezaDeBarra } from './barra';
+/*
+ * LOS DADOS: la máquina y las curvas viven en `dados.ts` sin `three` (se comprueban en
+ * Node con una serie de sucesos); el cuerpo del respaldo y el cuaternión de cada valor en
+ * `cubo-del-dado.ts` con `three` y sin React (se construyen y se cuentan). Aquí sólo se
+ * pregunta y se escribe posición y giro en cada fotograma.
+ */
+import {
+  ARISTA_DEL_D6_EN_EL_PACK,
+  ARISTA_DEL_DADO,
+  CENTRO_DEL_DADO_SOBRE_LA_TAPA,
+  RADIO_DE_LA_SOMBRA_DEL_DADO,
+  SACUDIDA,
+  anguloRodado,
+  avanceDelAsentado,
+  centroDelDado,
+  dadosEnReposo,
+  faseDeLosDados,
+  giroDelDadoAsentado,
+  reboteDelDado,
+  sacudida,
+  saltoDelDado,
+  sucesoDelResultado,
+} from './dados';
+import type { DadosDeLaMesa, EstadoDeLosDados, ParDeDados, ResultadoDelToque, SucesoDeLosDados } from './dados';
+import { cuaternionDelValor, geometriaDeLosPuntosDelDado, geometriaDelCuerpoDelDado } from './cubo-del-dado';
+import type { ValorDelDado } from './caras-del-dado';
 import type { Colocando, Sitio } from './sitios';
 import type { CaminoEn3D, ColorDeJugador, DeltaEn3D, IslaEn3D, PiezaEn3D } from './tipos';
 
 export { RADIO_DE_COMARCA, RADIO_DE_TESELA, ESCALON };
 
-const COLOR_DEL_NUMERO = '#efe6cd';
+/*
+ * EL CREMA DE LAS FICHAS Y EL COLOR DE SUS CIFRAS VIVEN EN `dados.ts`, sin `three`: son
+ * también los dos colores que `compilar-dados.ts` hornea en el D6 del pack, y con dos
+ * definiciones un cambio de tono dejaría los dados de otro juego que las fichas sin que
+ * nada se pusiera rojo.
+ */
+import { COLOR_DEL_NUMERO, COLOR_DEL_PUNTO } from './dados';
 /**
  * EL VERDE DE LAS SEÑALES DE COLOCAR.
  *
@@ -231,7 +263,6 @@ const COLOR_DE_LA_SENAL = '#39ff14';
  * capa es un número y lo lleva TODO grupo con mallas debajo— y por qué la mesa no borra la
  * profundidad están en su cabecera.
  */
-const COLOR_DEL_PUNTO = '#2a2118';
 
 /**
  * LOS DOS COLORES DEL POSAVASOS, leídos del atlas UNA vez al cargar el módulo.
@@ -1454,15 +1485,23 @@ function MazoEnLaBarra({
  * un área, una casilla o un anillo. La tapa sólo interviene si el dedo baja o sube sobre
  * la madera, y ahí deja pasar a la mano y para al tablero, que es lo que se quiere.
  *
- * ═══ EL TAPETE Y EL SITIO DE LOS DADOS, SIN DADOS TODAVÍA ═══
+ * ═══ LA LLAVE DEL REPARTO ES `dados !== null`, Y NO ES UN ATAJO ═══
+ *
+ * Sin dados (la colocación, un mirón, un lienzo del tercer peldaño, o una pantalla que no
+ * pasa la entrada) las piezas van donde siempre, `huecosDeLaBarra`, y el tapete del turno
+ * sólo se pinta bajo el sitio COLGADO de `huecosDeLaMesa`, que es el único que existe sin
+ * tocar a las piezas. Con dados se pide `huecosDeLaMesa(cuantos, campo, proporcion,
+ * alto)`: `.piezas` para las piezas y `.dados` para el asa y el tapete, sea colgado o
+ * quinto. `huecosDeLaMesa` decide con el alto EN PUNTOS si hay sitio para un quinto hueco,
+ * y donde cae el quinto (390 de pie, las tabletas) las piezas se corren y encogen para
+ * hacerle sitio; pedírselo sin dados reservaría en la colocación de pie un hueco para unos
+ * dados que no existen, y las piezas se moverían otra vez al empezar a jugar (§4.4 del
+ * diseño). `cuantos` se cuenta igual en las dos ramas.
  *
  * `tapete` es el color del colono al que le toca; con él se pinta un rectángulo al 55 %
- * sobre la madera, bajo el sitio que `huecosDeLaMesa` reserva a los dados. Los dados
- * llegan en la fase 3 del diseño, y hasta entonces el reparto de las piezas sigue siendo
- * el de `huecosDeLaBarra`, sin mover un hueco: el tapete sólo se pinta cuando el sitio de
- * los dados es el COLGADO a la izquierda, que es el único que existe sin tocar a las
- * piezas (§4.4 del diseño). Cuando lleguen los dados, la llave del reparto pasa a ser
- * `dados !== null`, y el tapete va bajo `.dados`, sea colgado o quinto.
+ * sobre la madera bajo el sitio de los dados. Con dados y `ultimaTirada = 0` (antes de
+ * la primera tirada) se APAGA: los dados enseñan 1 y 1 y no hay tirada que señalar
+ * (§5.2). Sin dados no se sabe si se ha tirado, y se pinta en cuanto hay color.
  */
 function Barra({
   piezas,
@@ -1470,8 +1509,11 @@ function Barra({
   aplanados,
   tomada,
   tapete,
+  dados,
+  semilla,
   onTomar,
   onPulsarElMazo,
+  onPulsarLosDados,
 }: {
   piezas: readonly PiezaDeBarra[];
   mazo: MazoDeLaBarra | null;
@@ -1479,8 +1521,13 @@ function Barra({
   tomada: string | null;
   /** El color del colono al que le toca, o `null` si no se pinta tapete. */
   tapete: ColorDeJugador | null;
+  /** Los dados de la mesa, o `null` si esta pantalla no los pinta: entonces no se reserva su sitio. */
+  dados: DadosDeLaMesa | null;
+  /** La semilla de la mesa, con la que se parte la suma en dos caras. */
+  semilla: number;
   onTomar: (id: string) => void;
   onPulsarElMazo: () => void;
+  onPulsarLosDados: () => Promise<ResultadoDelToque>;
 }): JSX.Element {
   const grupo = useRef<THREE.Group>(null);
   /*
@@ -1529,9 +1576,19 @@ function Barra({
    * y aparte lo que se compra.
    */
   const cuantos = piezas.length + (mazo === null ? 0 : 1);
+  /*
+   * LA LLAVE DEL REPARTO (ver la cabecera): con dados, la mesa entera; sin dados, la barra
+   * de siempre y ningún hueco reservado. Lo que cambia con la vista de los dados (la suma,
+   * el sello) no rehace el reparto: sólo importa si los hay.
+   */
+  const conDados = dados !== null;
+  const mesa = useMemo(
+    () => (conDados ? huecosDeLaMesa(cuantos, forma.campo, forma.proporcion, forma.alto) : null),
+    [conDados, cuantos, forma],
+  );
   const huecos = useMemo(
-    () => huecosDeLaBarra(cuantos, forma.campo, forma.proporcion),
-    [cuantos, forma],
+    () => (mesa === null ? huecosDeLaBarra(cuantos, forma.campo, forma.proporcion) : mesa.piezas),
+    [mesa, cuantos, forma],
   );
   const huecoDelMazo = mazo === null ? undefined : huecos[piezas.length];
   const primero: HuecoDeLaBarra | undefined = huecos[0];
@@ -1558,25 +1615,39 @@ function Barra({
   );
   useEffect(() => () => geometriaDelTablon?.dispose(), [geometriaDelTablon]);
 
-  /* Una sombra de contacto por hueco, todas en una geometría: una llamada. */
-  const sombras = useMemo(
-    () =>
-      huecos.length === 0
-        ? null
-        : geometriaDeLasSombras(
-            huecos.map((h) => ({ x: h.x, z: h.z, radio: h.lado * RADIO_DE_LA_SOMBRA })),
-          ),
-    [huecos],
-  );
+  /*
+   * EL SITIO DE LOS DADOS: con dados, el que da la mesa (colgado o quinto); sin dados, sólo
+   * el colgado y sólo para el tapete (ver la cabecera). Y el tapete se apaga con la suma a
+   * cero: antes de la primera tirada no hay nada que señalar.
+   */
+  const tapeteApagado = dados !== null && dados.ultimaTirada === 0;
+  const hayTapete = tapete !== null && !tapeteApagado;
+  const sitioDeLosDados = useMemo((): HuecoDeLosDados | null => {
+    if (mesa !== null) return mesa.dados;
+    if (!hayTapete) return null;
+    const { dados: sitio } = huecosDeLaMesa(cuantos, forma.campo, forma.proporcion, forma.alto);
+    return sitio !== null && sitio.forma === 'colgado' ? sitio : null;
+  }, [mesa, hayTapete, cuantos, forma]);
+
+  /*
+   * Una sombra de contacto por hueco, y las de los dos dados AÑADIDAS a la misma lista:
+   * todas en una geometría, una llamada. Los dados van bajo su sitio, cada uno a un lado.
+   */
+  const sombras = useMemo(() => {
+    const centros = huecos.map((h) => ({ x: h.x, z: h.z, radio: h.lado * RADIO_DE_LA_SOMBRA }));
+    if (conDados && sitioDeLosDados !== null) {
+      for (const i of [0, 1] as const) {
+        centros.push({
+          x: sitioDeLosDados.x + centroDelDado(i) * sitioDeLosDados.lado,
+          z: sitioDeLosDados.z,
+          radio: sitioDeLosDados.lado * RADIO_DE_LA_SOMBRA_DEL_DADO,
+        });
+      }
+    }
+    return centros.length === 0 ? null : geometriaDeLasSombras(centros);
+  }, [huecos, conDados, sitioDeLosDados]);
   useEffect(() => () => sombras?.dispose(), [sombras]);
 
-  /* El sitio de los dados, sólo si es el colgado (ver la cabecera), y el tapete encima. */
-  const hayTapete = tapete !== null;
-  const sitioDeLosDados = useMemo(() => {
-    if (!hayTapete) return null;
-    const { dados } = huecosDeLaMesa(cuantos, forma.campo, forma.proporcion, forma.alto);
-    return dados !== null && dados.forma === 'colgado' ? dados : null;
-  }, [hayTapete, cuantos, forma]);
   const colorDelTapete = useMemo(
     () => (tapete === null ? null : hexDe(colorDelColono(tapete))),
     [tapete],
@@ -1643,6 +1714,7 @@ function Barra({
         </mesh>
       )}
       {tapa !== null &&
+        hayTapete &&
         sitioDeLosDados !== null &&
         geometriaDelTapeteDelTurno !== null &&
         colorDelTapete !== null && (
@@ -1677,6 +1749,250 @@ function Barra({
       {mazo !== null && huecoDelMazo !== undefined && (
         <MazoEnLaBarra mazo={mazo} hueco={huecoDelMazo} onPulsar={onPulsarElMazo} />
       )}
+      {/* Los dos dados, sólo con dados Y con sitio: en un lienzo sin sitio la pantalla no los pasa, y si los pasara no habría dónde. */}
+      {dados !== null && tapa !== null && sitioDeLosDados !== null && (
+        <Dados
+          sitio={sitioDeLosDados}
+          cota={tapa.cota}
+          dados={dados}
+          semilla={semilla}
+          modelo={aplanados.get(MODELO.dado)}
+          onPulsar={onPulsarLosDados}
+        />
+      )}
+    </group>
+  );
+}
+
+/**
+ * LOS DOS DADOS SOBRE LA MESA: el D6 del pack o su respaldo, un asa única, y la máquina de
+ * `dados.ts` escribiendo posición y giro en cada fotograma.
+ *
+ * ═══ NADA DE ESTO PASA POR EL ESTADO DE REACT ═══
+ *
+ * La fase, el reloj y el par objetivo viven en refs y se leen en un `useFrame`, como el
+ * tiempo del mar: son sesenta escrituras por segundo. Los sucesos entran por una COLA
+ * (`tocado` desde el asa, `rechazado` desde la respuesta de `onPulsar`, `vista` cuando
+ * cambian `tirado`, `ultimaTirada` o `sello`) y el `useFrame` la vacía en orden con el
+ * reloj de la escena antes del `tic`. La máquina (`faseDeLosDados`) es la ÚNICA que decide
+ * la fase; aquí no hay un `if` de más.
+ *
+ * ═══ `disponible` ES LA ÚNICA LLAVE DEL TOQUE Y DE LA VIBRACIÓN ═══
+ *
+ * Como `MazoDeLaBarra.disponible`. Un colono fuera de turno tiene dados (los demás ven la
+ * tirada) con `disponible` falso: el toque llega al asa (sigue `stopPropagation`, para que
+ * no gire el tablero por debajo, como una pieza apagada) y ahí se acaba: ni `tocado` ni
+ * `onPulsar`. Sin esto, la máquina pasaba a `rodando` sin objetivo y sin nadie que la
+ * rechazara, y los dados rodaban seis segundos. Y a nadie más le vibra nada: la vibración
+ * lee esa misma bandera y ninguna otra.
+ *
+ * ═══ EL ASA ES UNA PARA LOS DOS, E INVISIBLE POR `colorWrite` ═══
+ *
+ * `1,6 lados × 1 lado`, el mismo alto que un hueco de la barra, así que la misma
+ * comprobación de 44 puntos la cubre. Invisible por `colorWrite={false}` y NUNCA por
+ * `visible={false}`: r3f descarta de sus sucesos los objetos invisibles. Los dados no
+ * reciben rayos: el hueco entre los dos no deja pasar el dedo al tablero de detrás.
+ *
+ * ═══ EL MODELO Y EL RESPALDO ENSEÑAN EL MISMO NÚMERO ═══
+ *
+ * El D6 del pack se escala con `ARISTA_DEL_DADO · lado / ARISTA_DEL_D6_EN_EL_PACK` y el
+ * respaldo se construye ya a `ARISTA_DEL_DADO · lado`; los dos ponen cada valor en la cara
+ * de `CARA_DEL_VALOR`, así que `cuaternionDelValor` vale para los dos y el dado se asienta
+ * en el número que salió venga de donde venga la malla.
+ */
+function Dados({
+  sitio,
+  cota,
+  dados,
+  semilla,
+  modelo,
+  onPulsar,
+}: {
+  sitio: HuecoDeLosDados;
+  /** La cota de la tapa en el grupo de la barra: los dados apoyan en ella. */
+  cota: number;
+  dados: DadosDeLaMesa;
+  semilla: number;
+  /** El D6 del pack aplanado, o `undefined` si `dados.glb` no llegó: entonces el respaldo. */
+  modelo: readonly Instanciable[] | undefined;
+  onPulsar: () => Promise<ResultadoDelToque>;
+}): JSX.Element {
+  const { lado } = sitio;
+  const arista = ARISTA_DEL_DADO * lado;
+  const cubos = useRef<[THREE.Group | null, THREE.Group | null]>([null, null]);
+  const maquina = useRef<EstadoDeLosDados>(dadosEnReposo(semilla));
+  const cola = useRef<SucesoDeLosDados[]>([]);
+  /* El giro con el que cada dado dejó de rodar: desde ahí se asienta hacia su valor. */
+  const alDejarDeRodar = useRef<[THREE.Quaternion, THREE.Quaternion]>([new THREE.Quaternion(), new THREE.Quaternion()]);
+  /*
+   * Y EL GIRO CON EL QUE CADA DADO ESTABA QUIETO: desde ahí arranca a rodar.
+   *
+   * Rodar partía de `cuaternionesDelPar(fase.anterior, selloVisto)`, y `selloVisto` es ya
+   * el sello NUEVO cuando la tirada de otro colono cambia la fase y el sello en el mismo
+   * tic: el primer fotograma de rodar pintaba el par anterior con el giro áureo del sello
+   * nuevo —un cuarto o media vuelta seca sobre la vertical— antes de acumular ángulo
+   * ninguno. Se guarda la pose de verdad en cada fotograma de «quieta» (sin el temblor) y
+   * rodar la toma de base; así no hay que recordar el sello del par anterior en la máquina.
+   */
+  const enReposo = useRef<[THREE.Quaternion, THREE.Quaternion]>([new THREE.Quaternion(), new THREE.Quaternion()]);
+
+  /* La vista entra por la cola: el `useFrame` la aplica con el reloj de la escena. */
+  const { tirado, ultimaTirada, sello, disponible } = dados;
+  const vistaActual = useRef({ tirado, ultimaTirada, sello });
+  vistaActual.current = { tirado, ultimaTirada, sello };
+  useEffect(() => {
+    cola.current.push({ que: 'vista', vista: { tirado, ultimaTirada, sello } });
+  }, [tirado, ultimaTirada, sello]);
+  /* Otra mesa es otra semilla: la máquina vuelve al reposo y la vista de ahora la coloca. */
+  useEffect(() => {
+    maquina.current = dadosEnReposo(semilla);
+    cola.current = [{ que: 'vista', vista: vistaActual.current }];
+  }, [semilla]);
+
+  /* El respaldo, a la arista de este lienzo; se tira al cambiar el lado, como la tapa. */
+  const respaldo = useMemo(
+    () => (modelo === undefined ? { cuerpo: geometriaDelCuerpoDelDado(arista), puntos: geometriaDeLosPuntosDelDado(arista) } : null),
+    [modelo, arista],
+  );
+  useEffect(
+    () => () => {
+      respaldo?.cuerpo.dispose();
+      respaldo?.puntos.dispose();
+    },
+    [respaldo],
+  );
+  const escalaDelPack = arista / ARISTA_DEL_D6_EN_EL_PACK;
+  /* El centro del cubo apoyado, en el grupo de los dados (que está en el centro del sitio). */
+  const reposoY = cota - sitio.y + CENTRO_DEL_DADO_SOBRE_LA_TAPA * lado;
+
+  /* Los dos cuaterniones objetivo, rehechos sólo cuando cambian el par o el sello. */
+  const objetivo = useRef<[THREE.Quaternion, THREE.Quaternion]>([new THREE.Quaternion(), new THREE.Quaternion()]);
+  const claveDelObjetivo = useRef('');
+  const rodar = useRef(new THREE.Quaternion());
+  const eulerDeRodar = useRef(new THREE.Euler());
+  const temblor = useRef(new THREE.Quaternion());
+  const ejeDelTemblor = useRef(new THREE.Vector3(0, 0, 1));
+  const cuaternionesDelPar = (par: ParDeDados, selloDelPar: number): void => {
+    const clave = `${String(par[0])},${String(par[1])}@${String(selloDelPar)}`;
+    if (clave === claveDelObjetivo.current) return;
+    claveDelObjetivo.current = clave;
+    for (const i of [0, 1] as const) {
+      const valor = Math.min(6, Math.max(1, Math.round(par[i]))) as ValorDelDado;
+      cuaternionDelValor(valor, giroDelDadoAsentado(i, selloDelPar), objetivo.current[i]);
+    }
+  };
+
+  useFrame((estado) => {
+    const t = estado.clock.elapsedTime;
+    /* Primero la cola, en orden, con el mismo reloj; después el tic. */
+    for (const suceso of cola.current) maquina.current = faseDeLosDados(maquina.current, suceso, t);
+    cola.current = [];
+    maquina.current = faseDeLosDados(maquina.current, { que: 'tic' }, t);
+    const { fase, vista } = maquina.current;
+    const selloVisto = vista?.sello ?? 0;
+
+    for (const i of [0, 1] as const) {
+      const g = cubos.current[i];
+      if (g === null) continue;
+      g.position.set(centroDelDado(i) * lado, reposoY, 0);
+
+      if (fase.fase === 'rodando') {
+        /*
+         * Gira sobre dos ejes con el ángulo decreciente y salta, desde la ÚLTIMA POSE REAL fuera
+         * de rodar (`enReposo`): la de quieta, o la de mitad de asentado si otra tirada llega
+         * antes de que termine. Recalcular el par anterior con el sello visto daba un cuarto de
+         * vuelta seca en el primer fotograma, porque ese sello ya era el nuevo.
+         */
+        const transcurrido = t - fase.desde;
+        const angulo = anguloRodado(transcurrido);
+        eulerDeRodar.current.set(angulo * (i === 0 ? 1 : 0.8), 0, angulo * (i === 0 ? 0.7 : -1));
+        rodar.current.setFromEuler(eulerDeRodar.current);
+        g.quaternion.copy(enReposo.current[i]).premultiply(rodar.current);
+        g.position.y += saltoDelDado(transcurrido) * lado;
+        /* Se guarda cada fotograma: el primero de «asentando» parte del último de «rodando». */
+        alDejarDeRodar.current[i].copy(g.quaternion);
+        continue;
+      }
+
+      if (fase.fase === 'asentando') {
+        /* Del giro con el que paró al del valor, con el rebote de posición al final. */
+        const transcurrido = t - fase.desde;
+        cuaternionesDelPar(fase.par, selloVisto);
+        g.quaternion.slerpQuaternions(alDejarDeRodar.current[i], objetivo.current[i], avanceDelAsentado(transcurrido));
+        /* Si otra tirada llega a mitad de asentado, rodar parte de ESTA pose, no de la de antes. */
+        enReposo.current[i].copy(g.quaternion);
+        g.position.y += reboteDelDado(transcurrido) * lado;
+        continue;
+      }
+
+      /* Quieta: el par, a todo color. Y SÓLO si `disponible`, el temblor de «me toca». */
+      cuaternionesDelPar(fase.par, selloVisto);
+      g.quaternion.copy(objetivo.current[i]);
+      enReposo.current[i].copy(g.quaternion);
+      alDejarDeRodar.current[i].copy(g.quaternion);
+      if (disponible) {
+        const s = sacudida(t + i * 0.05);
+        g.position.x += s * SACUDIDA.traslacion * lado;
+        temblor.current.setFromAxisAngle(ejeDelTemblor.current, s * SACUDIDA.giro);
+        g.quaternion.premultiply(temblor.current);
+      }
+    }
+  });
+
+  const alTocar = (e: ThreeEvent<PointerEvent>): void => {
+    if (noEsElPrimario(e)) return;
+    e.stopPropagation();
+    loCogeLaInterfaz(e.nativeEvent);
+    if (!dados.disponible) return;
+    cola.current.push({ que: 'tocado' });
+    void onPulsar().then((resultado) => {
+      const suceso = sucesoDelResultado(resultado);
+      if (suceso !== null) cola.current.push(suceso);
+    });
+  };
+
+  return (
+    <group position={[sitio.x, sitio.y, sitio.z]} renderOrder={ORDEN_DE_LA_BARRA}>
+      {/* El asa única, invisible por colorWrite: ver la cabecera. */}
+      <mesh
+        onPointerOver={(e) => {
+          e.stopPropagation();
+        }}
+        onPointerDown={alTocar}
+      >
+        <boxGeometry args={[sitio.ancho, sitio.alto, lado * 0.8]} />
+        <meshBasicMaterial colorWrite={false} depthWrite={false} />
+      </mesh>
+      {([0, 1] as const).map((i) => (
+        <group
+          key={`dado:${String(i)}`}
+          ref={(g) => {
+            cubos.current[i] = g;
+          }}
+          renderOrder={ORDEN_DE_LA_BARRA}
+        >
+          {modelo !== undefined ? (
+            modelo.map((m, k) => (
+              <mesh
+                key={`dado:${String(i)}:${String(k)}`}
+                geometry={m.geometria}
+                material={m.material}
+                scale={escalaDelPack}
+                raycast={() => null}
+              />
+            ))
+          ) : respaldo !== null ? (
+            <>
+              <mesh geometry={respaldo.cuerpo} raycast={() => null}>
+                <meshStandardMaterial color={COLOR_DEL_NUMERO} roughness={0.5} />
+              </mesh>
+              <mesh geometry={respaldo.puntos} raycast={() => null}>
+                <meshStandardMaterial color={COLOR_DEL_PUNTO} roughness={0.6} />
+              </mesh>
+            </>
+          ) : null}
+        </group>
+      ))}
     </group>
   );
 }
@@ -2535,6 +2851,8 @@ export function Delta({
   mazo = null,
   onPulsarElMazo,
   turnoDe = null,
+  dados = null,
+  onPulsarLosDados,
   mano = [],
   cogida = null,
   onCogerCarta,
@@ -2597,9 +2915,30 @@ export function Delta({
    * porque dentro no hay letras: el tapete se lee como se lee una choza, por su color. La
    * escena no sabe de quién es el turno ni si es el mío; quien monta el cliente lee
    * `turnoDe` de la vista y le da el color de ese colono, el mismo de sus chozas. Va bajo
-   * el sitio de los dados, que hoy está vacío: los dados llegan en la fase 3 del diseño.
+   * el sitio de los dados, y con dados se apaga hasta la primera tirada.
    */
   turnoDe?: ColorDeJugador | null;
+  /**
+   * LOS DADOS DE LA MESA. `null` o sin poner, no hay dados NI se reserva su sitio: las
+   * piezas van donde siempre. Es la llave del reparto (§4.4 del diseño), y por eso la
+   * pantalla sólo los pasa donde `huecosDeLaMesa` dice que caben.
+   *
+   * Lo que trae es la vista de la máquina (si se ha tirado, la suma y el sello del turno)
+   * y `disponible`, la ÚNICA bandera que decide si el asa se pulsa y si los dados vibran.
+   * LA ESCENA NO SABE QUE ESTO ES TIRAR: es «el hueco que se pulsa», como el naipe del
+   * mazo. Quién parte la suma en dos caras y por qué es el mismo par en los cuatro
+   * aparatos está en `dados.ts`.
+   */
+  dados?: DadosDeLaMesa | null;
+  /**
+   * Aviso de que alguien ha pulsado el asa de los dados, SÓLO si estaban disponibles.
+   *
+   * Devuelve cómo acabó el movimiento que la pantalla mandó: con `hecho` la escena espera a
+   * que la vista traiga la tirada; con `rechazado` o `sin-red` corta el rodar en el acto y
+   * los dados vuelven al par de antes. Sin la respuesta rodarían seis segundos por un
+   * doble toque.
+   */
+  onPulsarLosDados?: () => Promise<ResultadoDelToque>;
   /**
    * La mano de bienes del jugador, para la baraja del lateral. Vacia, no hay baraja.
    *
@@ -3203,8 +3542,12 @@ export function Delta({
           aplanados={aplanados}
           tomada={tomada}
           tapete={turnoDe}
+          dados={dados}
+          semilla={semilla}
           onTomar={(id) => onTomarDeLaBarra?.(id)}
           onPulsarElMazo={() => onPulsarElMazo?.()}
+          /* Sin quien conteste, el toque no manda nada y la mesa no cambió: un rechazo. */
+          onPulsarLosDados={() => onPulsarLosDados?.() ?? Promise.resolve('rechazado')}
         />
       )}
 

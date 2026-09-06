@@ -30,6 +30,9 @@
  * dibujo.
  */
 
+/* Lo que mide el par de dados de punta a punta: el quinto hueco se lo reserva entero. */
+import { ANCHO_DEL_PAR_DE_DADOS } from './dados';
+
 /**
  * UNA PIEZA DE LA BARRA: lo que se puede coger para ponerlo en el tablero.
  *
@@ -215,11 +218,31 @@ export function huecosDeLaBarra(
 /**
  * EL HUECO DE LOS DADOS: un asa para los dos, y de dónde ha salido.
  *
- * `ancho` y `alto` van aparte porque colgado a la izquierda el asa es más ancha que alta
- * —1,6 lados por 1— y como quinto hueco es cuadrada; `lado` es el del reparto al que
- * pertenece, que es lo que escala los dados (0,46 lados cada uno). `forma` dice cuál de
- * los dos peldaños se ha aplicado, para que un comprobador pueda afirmar en qué lienzo
- * pasa cada cosa y no sólo que «hay dados».
+ * `ancho` y `alto` van aparte porque el asa nunca es cuadrada: colgada a la izquierda mide
+ * 1,6 lados por 1, y como quinto hueco mide lo que el par, `ANCHO_DEL_PAR_DE_DADOS` lados
+ * (1,12) por 1. `lado` es el del reparto al que pertenece, que es lo que escala los dados
+ * (`ARISTA_DEL_DADO` lados cada uno). `forma` dice cuál de los dos peldaños se ha
+ * aplicado, para que un comprobador pueda afirmar en qué lienzo pasa cada cosa y no sólo
+ * que «hay dados».
+ *
+ * ═══ POR QUÉ EL QUINTO NO MIDE UN LADO ═══
+ *
+ * Lo midió, y con la arista de 0,46 el par (1,00 lados) cabía justo. La arista subió a 0,52
+ * por el mínimo legible (§1.15 de `docs/LA-MESA-DE-RIBERAS.md`: 22 puntos de dado, 4 de
+ * punto, y el SE apaisado daba 20,6 y 3,7) y el par pasó a `2 · 0,52 + 0,08 = 1,12` lados:
+ * en un asa y un tapete de un lado cada dado asomaba 0,06 lados —2,7 puntos en 390, 5,4 en
+ * las tabletas— por fuera del tapete y del asa, y ese borde no recibía el toque (los cubos
+ * llevan raycast nulo: sólo el asa se pulsa). Encoger los dados rompería el §1.15 en 390.
+ * Así que el quinto reserva el ancho del par, `max(lado, 1,12 · lado)`, y CRECE HACIA LA
+ * IZQUIERDA: su borde derecho se queda donde estaba el del hueco de un lado, a `AIRE`
+ * (0,24 lados) del zócalo de la primera pieza —el mismo aire que hay entre dos huecos, y
+ * el mismo que el colgado deja entre su asa y la primera—, y los 0,12 que faltan salen del
+ * margen izquierdo, donde en el peor lienzo de quinto (390 de ancho, manda el ancho) el
+ * asa sigue a 1,16 lados del canto (1,19 en 768×640): más del doble del medio lado que el
+ * colgado exige, y es la cifra que `verify:escena` afirma.
+ * Centrado en el hueco de un lado, el dado derecho quedaba a 0,18 lados de la primera
+ * pieza: el aire no cabía entero. Lo mide `verify:escena` («el par cabe en el asa y en el
+ * tapete en los DOS peldaños, con su aire») con la geometría de `huecosDeLaBarra(5)`.
  */
 export interface HuecoDeLosDados {
   x: number;
@@ -306,13 +329,28 @@ export function huecosDeLaMesa(
     };
   }
 
-  /* 2. Quinto hueco, sólo si el reparto apretado sigue sobre el suelo de toque. */
+  /*
+   * 2. Quinto hueco, sólo si el reparto apretado sigue sobre el suelo de toque. El asa mide
+   *    lo que el par y crece hacia la izquierda desde el borde derecho del hueco de un lado,
+   *    para que el aire hasta la primera pieza siga siendo `AIRE`: ver la cabecera de
+   *    `HuecoDeLosDados`.
+   */
   const conUnoMas = huecosDeLaBarra(cuantos + 1, campo, proporcion);
   const quinto = conUnoMas[0];
   if (quinto !== undefined && enPuntos(quinto.lado) >= SUELO_DEL_TOQUE - 1e-9) {
+    const anchoDelQuinto = Math.max(quinto.lado, ANCHO_DEL_PAR_DE_DADOS * quinto.lado);
+    const derechaDelQuinto = quinto.x + quinto.lado / 2;
     return {
       piezas: conUnoMas.slice(1),
-      dados: { x: quinto.x, y: quinto.y, z: quinto.z, ancho: quinto.lado, alto: quinto.lado, lado: quinto.lado, forma: 'quinto' },
+      dados: {
+        x: derechaDelQuinto - anchoDelQuinto / 2,
+        y: quinto.y,
+        z: quinto.z,
+        ancho: anchoDelQuinto,
+        alto: quinto.lado,
+        lado: quinto.lado,
+        forma: 'quinto',
+      },
     };
   }
 

@@ -86,6 +86,7 @@ import {
   tirandoDelMirador,
 } from '../camara';
 import {
+  ANCHO_DEL_ASA_DE_LOS_DADOS,
   DIBUJO_DEL_MAZO,
   DISTANCIA_DE_LA_BARRA,
   SUELO_DEL_TOQUE,
@@ -107,16 +108,44 @@ import {
   triangulosDe,
 } from '../tablon';
 import {
+  ARISTA_DEL_D6_EN_EL_PACK,
+  ANCHO_DEL_PAR_DE_DADOS,
+  ARISTA_DEL_DADO,
   ASENTAR,
+  CENTRO_DEL_DADO_SOBRE_LA_TAPA,
+  DADO_MINIMO,
+  HUECO_ENTRE_DADOS,
+  PUNTO_DEL_DADO,
+  PUNTO_MINIMO,
+  RADIO_DE_LA_SOMBRA_DEL_DADO,
   RODAR_MINIMO,
+  SACUDIDA,
+  SALTO_DEL_DADO,
   TOPE_SIN_RESPUESTA,
+  anguloRodado,
+  avanceDelAsentado,
+  centroDelDado,
   dadosEnReposo,
   faseDeLosDados,
+  giroDelDadoAsentado,
   paresDeLaSuma,
   parQueSeEnsena,
+  reboteDelDado,
   repartoDeLaTirada,
+  sacudida,
+  saltoDelDado,
+  sucesoDelResultado,
 } from '../dados';
-import type { EstadoDeLosDados, SucesoDeLosDados } from '../dados';
+import type { EstadoDeLosDados, ResultadoDelToque, SucesoDeLosDados } from '../dados';
+import {
+  SEGMENTOS_DEL_PUNTO,
+  VALORES_DEL_DADO,
+  cuaternionDelValor,
+  geometriaDeLosPuntosDelDado,
+  geometriaDelCuerpoDelDado,
+  valorQueMiraArriba,
+} from '../cubo-del-dado';
+import { CARA_DEL_VALOR, NORMAL_DEL_VALOR } from '../caras-del-dado';
 import {
   ANCHO_DE_MAS_DE_LA_TAPA,
   HOLGURA_DELANTERA_DE_LA_TAPA,
@@ -193,7 +222,10 @@ import {
   SEGMENTOS_DE_LA_MESA,
   TOPE_DE_LA_MESA,
   TOPE_DEL_MAR,
+  TRIANGULOS_DE_LOS_DADOS,
+  TRIANGULOS_DE_LOS_DADOS_DEL_PACK,
   TRIANGULOS_DEL_MAR,
+  TRIANGULOS_DEL_RESPALDO_DE_LOS_DADOS,
   radiosDelMar,
   segmentosDeLaMesa,
   triangulosDeLaMesa,
@@ -2981,6 +3013,10 @@ paso('Los sitios se pueden contar y la barra cabe en cualquier pantalla');
   };
   const malosDeLaMesa: string[] = [];
   const medidasDeLaMesa: string[] = [];
+  const malosDelPar: string[] = [];
+  const parEnElAsa: string[] = [];
+  const malosDelMazoDeCinco: string[] = [];
+  const medidasDelMazoDeCinco: string[] = [];
   for (const [nombre, ancho, alto] of LIENZOS) {
     const prop = ancho / alto;
     const visto = loQueSeVe(CAMPO, prop);
@@ -3025,11 +3061,71 @@ paso('Los sitios se pueden contar y la barra cabe en cualquier pantalla');
       malosDeLaMesa.push(`${nombre}: los dados quedan a menos de medio lado del canto izquierdo`);
     }
     const primera = mesa.piezas[0];
-    if (primera !== undefined && derechaDeLosDados > primera.x - primera.lado / 2 - 0.2 * primera.lado + 1e-9) {
+    /*
+     * Lo que puede pisar la primera pieza es el DADO, no el asa: el asa es invisible y los
+     * cubos no reciben rayos, así que un asa estrecha con los dados asomando por fuera
+     * pasaría esta medida y los dados se meterían en el zócalo de al lado. Se mide el borde
+     * derecho del dado derecho: `dados.x + centroDelDado(1) · lado + ARISTA_DEL_DADO · lado / 2`.
+     */
+    const bordeDerechoDelDado = dados.x + centroDelDado(1) * dados.lado + (ARISTA_DEL_DADO * dados.lado) / 2;
+    const bordeIzquierdoDelDado = dados.x + centroDelDado(0) * dados.lado - (ARISTA_DEL_DADO * dados.lado) / 2;
+    if (primera !== undefined && bordeDerechoDelDado > primera.x - primera.lado / 2 - 0.2 * primera.lado + 1e-9) {
       malosDeLaMesa.push(`${nombre}: los dados pisan (o casi) la primera pieza`);
     }
     if (dados.forma === 'colgado' && Math.abs(dados.ancho - 1.6 * dados.lado) > 1e-9) {
       malosDeLaMesa.push(`${nombre}: el asa colgada no mide 1,6 lados`);
+    }
+    /*
+     * El par cabe en el asa —y en el tapete, que mide `dados.ancho` igual— en los DOS
+     * peldaños, con el AIRE de la barra hasta la primera pieza. Como quinto hueco el asa mide
+     * el par (1,12 lados: la arista subió de 0,46 a 0,52 por el §1.15) y crece hacia la
+     * izquierda desde el borde derecho del hueco de un lado: se afirma ese borde con la
+     * geometría de `huecosDeLaBarra(5)`, y que a la izquierda sigue sobrando más de medio
+     * lado hasta el canto. Con el quinto a un lado los dados asomaban 0,06 lados por cada
+     * punta y el derecho quedaba a 0,18 de la primera pieza.
+     */
+    const asomaPorLaIzquierda = izquierdaDeLosDados - bordeIzquierdoDelDado;
+    const asomaPorLaDerecha = bordeDerechoDelDado - derechaDeLosDados;
+    const aireHastaLaPrimera = primera === undefined ? NaN : (primera.x - primera.lado / 2 - bordeDerechoDelDado) / dados.lado;
+    const bordeDelHuecoDeUnLado = dados.forma === 'quinto' ? (deCinco[0]?.x ?? NaN) + (deCinco[0]?.lado ?? NaN) / 2 : NaN;
+    parEnElAsa.push(
+      `${nombre}: ${dados.forma}, asa de ${(dados.ancho / dados.lado).toFixed(2)} lados (${enPuntos(dados.ancho).toFixed(1)} pt), par de ${enPuntos(ANCHO_DEL_PAR_DE_DADOS * dados.lado).toFixed(1)} pt, ` +
+        `aire hasta la primera pieza ${aireHastaLaPrimera.toFixed(3)} lados (${enPuntos(aireHastaLaPrimera * dados.lado).toFixed(1)} pt), hasta el canto ${((izquierdaDeLosDados - -visto.ancho / 2) / dados.lado).toFixed(3)} lados`,
+    );
+    if (asomaPorLaIzquierda > 1e-9 || asomaPorLaDerecha > 1e-9) {
+      malosDelPar.push(`${nombre}: el par asoma ${enPuntos(Math.max(asomaPorLaIzquierda, asomaPorLaDerecha)).toFixed(1)} pt fuera del asa de ${enPuntos(dados.ancho).toFixed(1)}`);
+    }
+    if (!(aireHastaLaPrimera >= 0.24 - 1e-9)) malosDelPar.push(`${nombre}: entre el dado derecho y la primera pieza quedan ${aireHastaLaPrimera.toFixed(3)} lados, no el AIRE de 0,24`);
+    if (dados.forma === 'quinto') {
+      if (Math.abs(dados.ancho - Math.max(dados.lado, ANCHO_DEL_PAR_DE_DADOS * dados.lado)) > 1e-9) malosDelPar.push(`${nombre}: el asa del quinto no mide el par`);
+      if (Math.abs(derechaDeLosDados - bordeDelHuecoDeUnLado) > 1e-9) malosDelPar.push(`${nombre}: el asa del quinto no crece hacia la izquierda desde el borde derecho del hueco de un lado`);
+    }
+    /*
+     * Y EL NAIPE DEL MAZO DEL REPARTO DE CINCO. «El hueco del mazo queda libre de las cartas
+     * de bienes» (arriba) mide `huecosDeLaBarra(4)`, pero con quinto lo que se pinta es
+     * `huecosDeLaBarra(5).slice(1)`, y donde manda el alto (las tabletas) esa barra es más
+     * ancha: su borde derecho cae a 0,691 en 768×640 frente a los 0,547 de la de cuatro. Se
+     * mide el último hueco de `mesa.piezas` —el mazo— contra las quietas, siempre; y contra
+     * las abiertas por el imán, allí donde con cuatro no se pisaban (en 390×845 la mano
+     * abierta cruza la barra desde los tres huecos, y el ancho de la barra no lo arregla).
+     */
+    if (dados.forma === 'quinto') {
+      const ultimo = mesa.piezas[mesa.piezas.length - 1];
+      const mazoDeCuatro = deCuatro[deCuatro.length - 1];
+      if (ultimo === undefined || mazoDeCuatro === undefined) {
+        malosDelMazoDeCinco.push(`${nombre}: no hay mazo que medir`);
+      } else {
+        const cajaDelMazo: Caja = { x: ultimo.x, y: ultimo.y, ancho: ultimo.lado, alto: ultimo.lado };
+        const cajaDeCuatro: Caja = { x: mazoDeCuatro.x, y: mazoDeCuatro.y, ancho: mazoDeCuatro.lado, alto: mazoDeCuatro.lado };
+        const quietas: Caja[] = huecosDeLaBaraja(MANO_DE_BIENES_ENTERA, CAMPO, prop, null).map((c) => c.hueco);
+        const abiertas: Caja[] = quietas.flatMap((q) => huecosDeLaBaraja(MANO_DE_BIENES_ENTERA, CAMPO, prop, q.y).map((c) => c.hueco));
+        const margen = Math.min(...quietas.map((c) => c.x - c.ancho / 2)) - (ultimo.x + ultimo.lado / 2);
+        medidasDelMazoDeCinco.push(`${nombre}: el mazo de cinco llega a ${(ultimo.x + ultimo.lado / 2).toFixed(4)} (el de cuatro a ${(mazoDeCuatro.x + mazoDeCuatro.lado / 2).toFixed(4)}), ${enPuntos(margen).toFixed(1)} pt antes de los bienes quietos`);
+        if (quietas.some((c) => seTocan(c, cajaDelMazo))) malosDelMazoDeCinco.push(`${nombre}: el mazo del reparto de cinco queda debajo de una carta de bienes quieta`);
+        if (abiertas.some((c) => seTocan(c, cajaDelMazo)) && !abiertas.some((c) => seTocan(c, cajaDeCuatro))) {
+          malosDelMazoDeCinco.push(`${nombre}: con cuatro el mazo no pisaba la mano abierta y con el quinto sí`);
+        }
+      }
     }
     const cajaDeLosDados: Caja = { x: dados.x, y: dados.y, ancho: dados.ancho, alto: dados.alto };
     if (huecosDeLaBaraja(MANO_DE_BIENES_ENTERA, CAMPO, prop, null).some((c) => seTocan(c.hueco, cajaDeLosDados))) {
@@ -3044,6 +3140,19 @@ paso('Los sitios se pueden contar y la barra cabe en cualquier pantalla');
     'los dados caen en el peldaño que dice el diseño en cada lienzo: colgados en los apaisados y el monitor, quinto hueco de pie en 390 y en las tabletas, y sin dados en 320×360 y 360×490',
     malosDeLaMesa.length === 0,
     { malosDeLaMesa, medidasDeLaMesa },
+  );
+  comprobar(
+    'el par cabe en el asa y en el tapete en los DOS peldaños, con su aire: como quinto el asa mide el par (1,12 lados, 51,3 pt en 390) y crece hacia la izquierda, con 0,24 lados hasta la primera pieza y más de un lado hasta el canto',
+    malosDelPar.length === 0 &&
+      parEnElAsa.length === LIENZOS.length - 2 &&
+      parEnElAsa.filter((m) => m.includes('quinto')).length === 4 &&
+      parEnElAsa.some((m) => m.startsWith('móvil corriente: quinto, asa de 1.12 lados (51.3 pt), par de 51.3 pt, aire hasta la primera pieza 0.240 lados (11.0 pt), hasta el canto 1.157 lados')),
+    { malosDelPar, parEnElAsa },
+  );
+  comprobar(
+    'y en los cuatro lienzos de quinto el naipe del mazo —el último de huecosDeLaBarra(5)— queda libre de las cartas de bienes quietas, y no pisa la mano abierta donde con cuatro no la pisaba',
+    malosDelMazoDeCinco.length === 0 && medidasDelMazoDeCinco.length === 4,
+    { malosDelMazoDeCinco, medidasDelMazoDeCinco },
   );
   comprobar(
     'y en los dos lienzos sin dados las piezas no encogen: se quedan en los 47,5 y 53,4 puntos de siempre',
@@ -4179,15 +4288,201 @@ paso('Los dados se reparten por turno, ruedan hasta que el servidor contesta, y 
   );
 
   /* ── 4. EL TOPE ── */
-  comprobar('la mesa cuesta 12 · segmentos + 590: 1.742 con 96 y 3.470 con 240', triangulosDeLaMesa(96) === 1742 && triangulosDeLaMesa(240) === 3470 && triangulosDeLaMesa(64) === 12 * 64 + 590);
+  comprobar(
+    'los dos dados cuestan el MÁXIMO del respaldo (444) y del D6 del pack (1.324): sumar sólo uno de los dos pondría rojo lo que se construye o dejaría el tope sin vigilar lo que se pinta',
+    TRIANGULOS_DEL_RESPALDO_DE_LOS_DADOS === 2 * (12 + 21 * SEGMENTOS_DEL_PUNTO) &&
+      TRIANGULOS_DE_LOS_DADOS_DEL_PACK === 2 * 662 &&
+      TRIANGULOS_DE_LOS_DADOS === Math.max(TRIANGULOS_DEL_RESPALDO_DE_LOS_DADOS, TRIANGULOS_DE_LOS_DADOS_DEL_PACK) &&
+      TRIANGULOS_DE_LOS_DADOS === 1324,
+    { respaldo: TRIANGULOS_DEL_RESPALDO_DE_LOS_DADOS, pack: TRIANGULOS_DE_LOS_DADOS_DEL_PACK, suma: TRIANGULOS_DE_LOS_DADOS },
+  );
+  comprobar('la mesa cuesta 12 · segmentos + 1.470: 2.622 con 96 y 4.350 con 240', triangulosDeLaMesa(96) === 2622 && triangulosDeLaMesa(240) === 4350 && triangulosDeLaMesa(64) === 12 * 64 + 1470);
   comprobar(
     'los segmentos siguen al ancho en puntos, uno cada ocho, acotados entre 64 y 240',
     segmentosDeLaMesa(568) === 71 && segmentosDeLaMesa(1920) === 240 && segmentosDeLaMesa(100) === 64 && segmentosDeLaMesa(8000) === SEGMENTOS_DE_LA_MESA.maximo,
   );
+  /* El tope subió de 3.600 a 4.500 con el D6 del pack; sigue por debajo de la quinta parte del mar. */
   comprobar(
-    'y con el máximo de segmentos la mesa no se pasa de su tope, que a su vez es una fracción del mar',
-    triangulosDeLaMesa(SEGMENTOS_DE_LA_MESA.maximo) <= TOPE_DE_LA_MESA && TOPE_DE_LA_MESA < TRIANGULOS_DEL_MAR / 6,
+    'y con el máximo de segmentos la mesa no se pasa de su tope (4.500, rehecho con la cuenta del pack), que a su vez es menos de la quinta parte del mar',
+    triangulosDeLaMesa(SEGMENTOS_DE_LA_MESA.maximo) <= TOPE_DE_LA_MESA && TOPE_DE_LA_MESA === 4_500 && TOPE_DE_LA_MESA < TRIANGULOS_DEL_MAR / 5,
     { mesa: triangulosDeLaMesa(SEGMENTOS_DE_LA_MESA.maximo), TOPE_DE_LA_MESA, mar: TRIANGULOS_DEL_MAR },
+  );
+
+  /* ── 5. LAS MEDIDAS DEL DADO: el par cabe en el asa, el salto queda bajo su techo ── */
+  const anchoDelPar = 2 * ARISTA_DEL_DADO + HUECO_ENTRE_DADOS;
+  comprobar(
+    'el par de dados mide 1,12 lados (2 · 0,52 + 0,08) y deja 0,24 lados de aire a cada lado del asa de 1,6: exactamente el AIRE de la barra',
+    Math.abs(ARISTA_DEL_DADO - 0.52) < 1e-12 &&
+      Math.abs(anchoDelPar - 1.12) < 1e-12 &&
+      Math.abs((ANCHO_DEL_ASA_DE_LOS_DADOS - anchoDelPar) / 2 - 0.24) < 1e-12 &&
+      Math.abs(centroDelDado(1) - centroDelDado(0) - (ARISTA_DEL_DADO + HUECO_ENTRE_DADOS)) < 1e-12 &&
+      centroDelDado(0) + centroDelDado(1) === 0,
+    { par: anchoDelPar, aire: (ANCHO_DEL_ASA_DE_LOS_DADOS - anchoDelPar) / 2 },
+  );
+  /* Del centro del hueco hacia abajo: la tapa a −0,48; el centro del cubo a −0,22; la cara de arriba en lo alto del salto a +0,24. */
+  const tapaDesdeElHueco = -(ZOCALO.centro + ZOCALO.alto / 2);
+  const techoEnElSalto = tapaDesdeElHueco + CENTRO_DEL_DADO_SOBRE_LA_TAPA + SALTO_DEL_DADO + ARISTA_DEL_DADO / 2;
+  comprobar(
+    'apoyado, el centro del cubo queda a media arista sobre la tapa (0,22 lados bajo el centro del hueco) y en lo alto del salto la cara de arriba llega a +0,24 lados, bajo el techo del asa (+0,5)',
+    Math.abs(CENTRO_DEL_DADO_SOBRE_LA_TAPA - ARISTA_DEL_DADO / 2) < 1e-12 &&
+      Math.abs(tapaDesdeElHueco + CENTRO_DEL_DADO_SOBRE_LA_TAPA - -0.22) < 1e-12 &&
+      Math.abs(techoEnElSalto - 0.24) < 1e-12 &&
+      techoEnElSalto < 0.5,
+    { centro: tapaDesdeElHueco + CENTRO_DEL_DADO_SOBRE_LA_TAPA, techo: techoEnElSalto },
+  );
+  comprobar(
+    'la sombra de cada dado asoma por sus cuatro lados (radio > media arista) y las dos apenas se tocan (radio < la distancia entre centros)',
+    RADIO_DE_LA_SOMBRA_DEL_DADO > ARISTA_DEL_DADO / 2 && RADIO_DE_LA_SOMBRA_DEL_DADO < ARISTA_DEL_DADO + HUECO_ENTRE_DADOS,
+    { radio: RADIO_DE_LA_SOMBRA_DEL_DADO },
+  );
+
+  /* ── 6. LAS CURVAS: la vibración, el salto, el giro, el asentado y el rebote ── */
+  const HZ = 60;
+  let activos = 0;
+  let maximaSacudida = 0;
+  for (let k = 0; k < HZ * 16; k++) {
+    const v = Math.abs(sacudida(k / HZ));
+    maximaSacudida = Math.max(maximaSacudida, v);
+    if (v > 0.01) activos++;
+  }
+  const parteActiva = activos / (HZ * 16);
+  comprobar(
+    'la vibración es el patrón medido: periodo 1,6 s, sacudida de 0,36 s a 8 Hz, los dados se mueven entre el 18 % y el 24 % del tiempo, nunca más de la amplitud 1, y 3 % del lado y 4° de amplitud',
+    SACUDIDA.periodo === 1.6 && SACUDIDA.dura === 0.36 && SACUDIDA.hercios === 8 &&
+      parteActiva >= 0.18 && parteActiva <= 0.24 && maximaSacudida <= 1 + 1e-9 && maximaSacudida > 0.8 &&
+      Math.abs(sacudida(0.5)) < 1e-12 && Math.abs(sacudida(1.6 + 0.1) - sacudida(0.1)) < 1e-9 &&
+      SACUDIDA.traslacion === 0.03 && Math.abs(SACUDIDA.giro - (4 * Math.PI) / 180) < 1e-12,
+    { parteActiva: Number(parteActiva.toFixed(3)), maximaSacudida: Number(maximaSacudida.toFixed(3)) },
+  );
+  const alturas = Array.from({ length: 61 }, (_, k) => saltoDelDado((k / 60) * RODAR_MINIMO));
+  comprobar(
+    'el salto de «rodando» arranca del suelo, llega a 0,2 lados a mitad del rodar mínimo, vuelve al suelo al cumplirse y no vuelve a saltar aunque el servidor tarde',
+    saltoDelDado(0) === 0 && Math.abs(saltoDelDado(RODAR_MINIMO / 2) - SALTO_DEL_DADO) < 1e-12 && saltoDelDado(RODAR_MINIMO) === 0 && saltoDelDado(RODAR_MINIMO * 3) === 0 &&
+      alturas.every((h) => h >= 0 && h <= SALTO_DEL_DADO + 1e-12) && SALTO_DEL_DADO === 0.2,
+  );
+  const angulos = [0.1, 0.3, 0.6, 1, 3, 6].map((t) => anguloRodado(t));
+  comprobar(
+    'el giro de «rodando» crece siempre y cada vez más despacio (velocidad decreciente): más de media vuelta a los 0,6 s y menos de tres vueltas a los 6 s del tope',
+    anguloRodado(0) === 0 &&
+      angulos.every((a, k) => k === 0 || a > (angulos[k - 1] ?? Infinity)) &&
+      anguloRodado(0.6) - anguloRodado(0.3) < anguloRodado(0.3) - anguloRodado(0) &&
+      anguloRodado(0.6) > Math.PI && anguloRodado(6) < 6 * Math.PI,
+    { a06: Number(anguloRodado(0.6).toFixed(2)), a6: Number(anguloRodado(6).toFixed(2)) },
+  );
+  const avances = Array.from({ length: 36 }, (_, k) => avanceDelAsentado((k / 35) * ASENTAR));
+  comprobar(
+    'el asentado va de 0 a 1 en 0,35 s sin volver atrás, sale rápido y frena al llegar, y el rebote de posición es un seno en el último tercio que acaba en el suelo',
+    avances[0] === 0 && avances[35] === 1 && avances.every((a, k) => k === 0 || a >= (avances[k - 1] ?? 2)) &&
+      avanceDelAsentado(ASENTAR / 2) > 0.8 && avanceDelAsentado(ASENTAR * 2) === 1 &&
+      reboteDelDado(0) === 0 && reboteDelDado(ASENTAR / 2) === 0 && reboteDelDado(ASENTAR) === 0 &&
+      reboteDelDado(ASENTAR * (5 / 6)) > 0.03 && reboteDelDado(ASENTAR * (5 / 6)) <= 0.04 + 1e-12,
+  );
+  const giros = Array.from({ length: 8 }, (_, sello) => giroDelDadoAsentado(0, sello));
+  comprobar(
+    'el giro libre del asentado es determinista, distinto para los dos dados y distinto entre turnos seguidos: los dados no salen clavados iguales ni cada turno como el anterior',
+    giroDelDadoAsentado(0, 5) === giroDelDadoAsentado(0, 5) &&
+      Math.abs(giroDelDadoAsentado(0, 5) - giroDelDadoAsentado(1, 5)) > 0.5 &&
+      giros.every((g, k) => k === 0 || Math.abs(g - (giros[k - 1] ?? 0)) > 0.3) &&
+      giros.every((g) => g >= 0 && g < 2 * Math.PI),
+    giros.map((g) => Number(g.toFixed(2))),
+  );
+  const tabla: Array<[ResultadoDelToque, SucesoDeLosDados | null]> = [
+    ['hecho', null],
+    ['rechazado', { que: 'rechazado' }],
+    ['sin-red', { que: 'rechazado' }],
+  ];
+  comprobar(
+    'la respuesta de mover se traduce a la máquina exhaustivamente: hecho no empuja nada (la vista traerá la tirada), rechazado y sin-red empujan rechazado',
+    tabla.every(([r, s]) => JSON.stringify(sucesoDelResultado(r)) === JSON.stringify(s)),
+  );
+
+  /* ── 7. EL CUBO: cada valor mira arriba con su cuaternión, y el respaldo pone los puntos en las caras del pack ── */
+  const idaYVuelta: string[] = [];
+  for (const valor of VALORES_DEL_DADO) {
+    for (const giro of [0, 0.7, 2.1, 4.4]) {
+      const q = cuaternionDelValor(valor, giro);
+      const arriba = new THREE.Vector3(...NORMAL_DEL_VALOR[valor]).applyQuaternion(q);
+      if (Math.abs(arriba.y - 1) > 1e-9 || valorQueMiraArriba(q) !== valor) idaYVuelta.push(`${String(valor)}@${String(giro)}: y=${arriba.y.toFixed(4)}, lee ${String(valorQueMiraArriba(q))}`);
+    }
+  }
+  comprobar('cuaternionDelValor deja la normal de la cara del valor mirando a +Y para los seis valores y cuatro giros, y valorQueMiraArriba lo lee de vuelta', idaYVuelta.length === 0, idaYVuelta.slice(0, 3));
+  comprobar(
+    'y el giro libre sólo gira alrededor de la vertical: con otro giro la misma cara sigue arriba pero el dado ya no está igual',
+    !cuaternionDelValor(3, 0).equals(cuaternionDelValor(3, 1)) && valorQueMiraArriba(cuaternionDelValor(3, 1)) === 3,
+  );
+  const puntos = geometriaDeLosPuntosDelDado(1);
+  const cuerpo = geometriaDelCuerpoDelDado(1);
+  const normalesDeLosPuntos = puntos.getAttribute('normal');
+  const porDisco = SEGMENTOS_DEL_PUNTO + 1;
+  const discosPorCara = new Map<string, number>();
+  for (let d = 0; d < normalesDeLosPuntos.count / porDisco; d++) {
+    const k = d * porDisco;
+    const n = [normalesDeLosPuntos.getX(k), normalesDeLosPuntos.getY(k), normalesDeLosPuntos.getZ(k)];
+    const eje = n.findIndex((c) => Math.abs(c) > 0.5);
+    const cara = `${(n[eje] ?? 0) > 0 ? '+' : '-'}${'xyz'[eje] ?? '?'}`;
+    discosPorCara.set(cara, (discosPorCara.get(cara) ?? 0) + 1);
+  }
+  const carasMal = VALORES_DEL_DADO.filter((v) => discosPorCara.get(CARA_DEL_VALOR[v]) !== v);
+  comprobar(
+    'el respaldo pone N puntos en la cara que enseña el N según caras-del-dado.ts (la del pack), 21 en total: el mismo cuaternión sirve para el modelo y para el respaldo',
+    carasMal.length === 0 && [...discosPorCara.values()].reduce((a, b) => a + b, 0) === 21 && discosPorCara.size === 6,
+    { porCara: Object.fromEntries(discosPorCara), mal: carasMal },
+  );
+  comprobar(
+    'y cuesta lo que promete el presupuesto: 12 del cuerpo y 210 de los puntos por dado, 444 los dos, con el diámetro del punto al 18 % de la arista',
+    triangulosDe(cuerpo) === 12 && triangulosDe(puntos) === 21 * SEGMENTOS_DEL_PUNTO && 2 * (triangulosDe(cuerpo) + triangulosDe(puntos)) === TRIANGULOS_DEL_RESPALDO_DE_LOS_DADOS && PUNTO_DEL_DADO === 0.18,
+  );
+  const posicionesDeLosPuntos = puntos.getAttribute('position');
+  let radioMedido = 0;
+  for (let k = 1; k <= SEGMENTOS_DEL_PUNTO; k++) {
+    const dx = posicionesDeLosPuntos.getX(k) - posicionesDeLosPuntos.getX(0);
+    const dy = posicionesDeLosPuntos.getY(k) - posicionesDeLosPuntos.getY(0);
+    const dz = posicionesDeLosPuntos.getZ(k) - posicionesDeLosPuntos.getZ(0);
+    radioMedido = Math.max(radioMedido, Math.hypot(dx, dy, dz));
+  }
+  comprobar('el primer punto del respaldo mide de verdad 0,18 aristas de diámetro y queda un pelo por fuera de su cara', Math.abs(radioMedido * 2 - PUNTO_DEL_DADO) < 1e-6 && Math.abs(Math.max(Math.abs(posicionesDeLosPuntos.getX(0)), Math.abs(posicionesDeLosPuntos.getY(0)), Math.abs(posicionesDeLosPuntos.getZ(0))) - 0.5) < 0.01, { diametro: radioMedido * 2 });
+  comprobar('el D6 del pack se escala con ARISTA_DEL_DADO · lado / ARISTA_DEL_D6_EN_EL_PACK, y el pack mide 0,75', ARISTA_DEL_D6_EN_EL_PACK === 0.75 && Math.abs((ARISTA_DEL_DADO * 1) / ARISTA_DEL_D6_EN_EL_PACK - 0.6933) < 1e-3);
+
+  /* ── 8. EL MÍNIMO LEGIBLE, en todos los lienzos con sitio, y los dos umbrales de la tabla ── */
+  const CAMPO_DE_LA_MESA = (45 * Math.PI) / 180;
+  const dadoEnPuntos = (ancho: number, alto: number): { forma: string; dado: number; punto: number; asa: number } | null => {
+    const prop = ancho / alto;
+    const visto = loQueSeVe(CAMPO_DE_LA_MESA, prop);
+    const { dados } = huecosDeLaMesa(4, CAMPO_DE_LA_MESA, prop, alto);
+    if (dados === null) return null;
+    const enPuntos = (u: number): number => (u / visto.alto) * alto;
+    const dado = enPuntos(ARISTA_DEL_DADO * dados.lado);
+    return { forma: dados.forma, dado, punto: dado * PUNTO_DEL_DADO, asa: enPuntos(dados.alto) };
+  };
+  const ilegibles: string[] = [];
+  const legibles: string[] = [];
+  for (const [nombre, ancho, alto] of LIENZOS) {
+    const m = dadoEnPuntos(ancho, alto);
+    if (m === null) {
+      legibles.push(`${nombre}: sin dados`);
+      continue;
+    }
+    legibles.push(`${nombre}: ${m.forma}, dado ${m.dado.toFixed(1)} pt, punto ${m.punto.toFixed(1)} pt`);
+    if (m.dado < DADO_MINIMO || m.punto < PUNTO_MINIMO) ilegibles.push(`${nombre}: dado ${m.dado.toFixed(1)} y punto ${m.punto.toFixed(1)}`);
+  }
+  comprobar(
+    'en ningún lienzo con sitio el dado baja de 22 puntos ni el punto de 4 (§1.15): 23,3 y 4,2 en el SE apaisado, 23,8 y 4,3 de pie en 390',
+    DADO_MINIMO === 22 && PUNTO_MINIMO === 4 && ilegibles.length === 0 &&
+      legibles.some((l) => l.startsWith('apaisado SE 1ª: colgado, dado 23.3 pt, punto 4.2 pt')) &&
+      legibles.some((l) => l.startsWith('móvil corriente: quinto, dado 23.8 pt, punto 4.3 pt')) &&
+      legibles.filter((l) => l.endsWith('sin dados')).length === 2,
+    ilegibles.length > 0 ? ilegibles : legibles,
+  );
+  const enElUmbralApaisado = dadoEnPuntos(561, 316);
+  const bajoElUmbralApaisado = dadoEnPuntos(557, 314);
+  const enElUmbralDePie = dadoEnPuntos(375, 845);
+  comprobar(
+    'los umbrales de la tabla: el asa colgada llega a 44 desde 315 puntos de alto (561×316 da 44,2 y 557×314 queda BAJO 44) y de pie el quinto llega desde 375 de ancho (375×845 da 44,0; 374×845 ya no tiene dados)',
+    enElUmbralApaisado?.forma === 'colgado' && enElUmbralApaisado.asa >= 44 && enElUmbralApaisado.dado >= DADO_MINIMO &&
+      bajoElUmbralApaisado?.forma === 'colgado' && bajoElUmbralApaisado.asa < 44 &&
+      enElUmbralDePie?.forma === 'quinto' && enElUmbralDePie.asa >= 44 && enElUmbralDePie.dado >= DADO_MINIMO &&
+      dadoEnPuntos(374, 845) === null,
+    { apaisado: enElUmbralApaisado, bajo: bajoElUmbralApaisado, dePie: enElUmbralDePie },
   );
 }
 
@@ -4239,8 +4534,17 @@ paso('La tapa de la mesa: a la cota del zócalo, con la veta del atlas, dentro d
     Array.from({ length: 6 }, (_, i) => ({ x: i, z: -2, radio: 0.1 })),
   );
   const tapete = geometriaDelTapete(0.3, 0.15);
-  /* Lo que la fase 3 y la 7 añaden, con las mismas primitivas que el presupuesto declara. */
-  const dosDados = 2 * (triangulosDe(new THREE.BoxGeometry(1, 1, 1)) + 21 * triangulosDe(new THREE.CircleGeometry(0.09, 10)));
+  /*
+   * Los dos dados, CONTADOS por los dos caminos: el respaldo construido con `cubo-del-dado.ts`
+   * y el D6 del pack leído de `dados.glb` con `@gltf-transform` (índices / 3 de su única
+   * primitiva, como cuenta `verify:dados`). La fórmula suma el MÁXIMO de los dos. La pila
+   * es de la fase 7, con la primitiva que el presupuesto declara.
+   */
+  const dosDadosDelRespaldo = 2 * (triangulosDe(geometriaDelCuerpoDelDado(1)) + triangulosDe(geometriaDeLosPuntosDelDado(1)));
+  const dadosGlb = await new NodeIO().read(path.join(import.meta.dirname ?? __dirname, '..', 'modelos', 'dados.glb'));
+  const primitivasDelDado = dadosGlb.getRoot().listMeshes().flatMap((m) => m.listPrimitives());
+  const dosDadosDelPack = 2 * primitivasDelDado.reduce((n, p) => n + (p.getIndices()?.getCount() ?? 0) / 3, 0);
+  const dosDados = Math.max(dosDadosDelRespaldo, dosDadosDelPack);
   const asaYPila = 2 * triangulosDe(new THREE.BoxGeometry(1, 1, 1));
   const cuadran: string[] = [];
   for (const segmentos of [SEGMENTOS_DE_LA_MESA.minimo, 96, segmentosDeLaMesa(844), SEGMENTOS_DE_LA_MESA.maximo]) {
@@ -4250,9 +4554,14 @@ paso('La tapa de la mesa: a la cota del zócalo, con la veta del atlas, dentro d
     if (triangulosDe(tapa) !== 2 * segmentos * FILAS_DE_LA_MESA) cuadran.push(`${String(segmentos)}: la tapa tiene ${String(triangulosDe(tapa))} triángulos`);
   }
   comprobar(
-    'triangulosDeLaMesa es lo que pintan las geometrías de verdad: tapa + seis sombras + tapete + dos dados + asa + pila, con 64, 96, 106 y 240 segmentos',
+    'triangulosDeLaMesa es lo que pintan las geometrías de verdad: tapa + seis sombras + tapete + el máximo de los dos dados (respaldo construido, pack contado del glb) + asa + pila, con 64, 96, 106 y 240 segmentos',
     cuadran.length === 0,
     cuadran,
+  );
+  comprobar(
+    'el respaldo construido son los 444 de TRIANGULOS_DEL_RESPALDO_DE_LOS_DADOS y el glb contado los 1.324 de TRIANGULOS_DE_LOS_DADOS_DEL_PACK, una sola primitiva por dado',
+    dosDadosDelRespaldo === TRIANGULOS_DEL_RESPALDO_DE_LOS_DADOS && dosDadosDelPack === TRIANGULOS_DE_LOS_DADOS_DEL_PACK && primitivasDelDado.length === 1 && dosDados === TRIANGULOS_DE_LOS_DADOS,
+    { respaldo: dosDadosDelRespaldo, pack: dosDadosDelPack, primitivas: primitivasDelDado.length },
   );
   comprobar(
     'las seis sombras fundidas son 120 triángulos en UNA geometría, el tapete dos, y con los segmentos del monitor la mesa sigue bajo su tope',
@@ -4426,12 +4735,14 @@ paso('La tapa de la mesa: a la cota del zócalo, con la veta del atlas, dentro d
   };
   exige('function PiezaEnLaBarra(', 'ORDEN_DE_LA_BARRA', 2);
   exige('function MazoEnLaBarra(', 'ORDEN_DE_LA_BARRA', 2);
+  /* Los dados: el grupo del asa y el grupo de cada cubo (el del `ref`, el que el pintor mira). */
+  exige('function Dados(', 'ORDEN_DE_LA_BARRA', 2);
   exige('function Carta(', 'ORDEN_DE_LAS_CARTAS', 1);
   exige('function AreaDeTrueque(', 'ORDEN_DE_LAS_AREAS', 1);
   exige('function CartaDelMazoEnLaMano(', 'ORDEN_DE_LAS_CARTAS_DEL_MAZO', 1);
   exige('function Casilla(', 'ORDEN_DE_LAS_CASILLAS', 1);
   comprobar(
-    'los OCHO grupos de dentro llevan la constante de su capa: los dos de PiezaEnLaBarra y los dos de MazoEnLaBarra (barra), Carta (cartas), AreaDeTrueque (áreas), CartaDelMazoEnLaMano (cartas del mazo) y Casilla (casillas)',
+    'los DIEZ grupos de dentro llevan la constante de su capa: los dos de PiezaEnLaBarra, los dos de MazoEnLaBarra y los dos de Dados (barra), Carta (cartas), AreaDeTrueque (áreas), CartaDelMazoEnLaMano (cartas del mazo) y Casilla (casillas)',
     gruposMal.length === 0,
     gruposMal,
   );
@@ -4497,11 +4808,23 @@ paso('La tapa de la mesa: a la cota del zócalo, con la veta del atlas, dentro d
   const modeloDelIPhone = ordenes.find((o) => o.nombre === 'apaisado iPhone 14')?.orden;
   const tiene = (fragmento: string): boolean => modeloDelIPhone?.lineas.some((l) => l.includes(fragmento)) === true;
   comprobar(
-    'y el modelo tiene lo que dice tener —tapa, sombras, tapete, tres piezas, naipe, cartas de bienes, áreas, cartas del mazo y casilla— con las capas de capas.ts y nada podado en el iPhone 14',
+    'y el modelo tiene lo que dice tener —tapa, sombras, tapete, tres piezas, naipe, los dos dados con su asa, cartas de bienes, áreas, cartas del mazo y casilla— con las capas de capas.ts y nada podado en el iPhone 14',
     tiene('barra:TAPA') && tiene('barra:SOMBRAS') && tiene('barra:TAPETE') && tiene('barra:PIEZA modelo 2') && tiene('barra:naipe cuerpo') &&
+      tiene('barra:DADO 0') && tiene('barra:DADO 1') && tiene('barra:asa de los dados') &&
       tiene('baraja:carta 4 cuerpo') && tiene('baraja:área 1 cuerpo') && tiene('mazo:carta 1 cuerpo') && tiene('mazo:casilla cuerpo') &&
       tiene(`[g${String(ORDEN_DE_LA_BARRA)} `) && tiene(`[g${String(ORDEN_DE_LAS_CARTAS)} `) && modeloDelIPhone?.podados.length === 0,
     { lineas: modeloDelIPhone?.lineas.length, podados: modeloDelIPhone?.podados },
+  );
+  /* Los dos cubos son opacos y van ANTES que las cartas de bienes, como las piezas; y en el quinto hueco (de pie en 390) también están. */
+  const lineasDelIPhone = modeloDelIPhone?.lineas ?? [];
+  const primeraCartaDelIPhone = lineasDelIPhone.findIndex((l) => l.includes(' baraja:carta'));
+  const dadosDelIPhone = lineasDelIPhone.map((l, k) => [l, k] as const).filter(([l]) => l.includes('barra:DADO'));
+  const modeloDePie = ordenes.find((o) => o.nombre === 'móvil corriente')?.orden;
+  comprobar(
+    'los dos dados se pintan OPACOS y antes que las cartas de bienes en el iPhone 14, y también están (sin podar) en el quinto hueco de un móvil de pie de 390',
+    dadosDelIPhone.length === 2 && dadosDelIPhone.every(([l, k]) => l.startsWith('OPACO') && k < primeraCartaDelIPhone) &&
+      modeloDePie?.lineas.filter((l) => l.includes('barra:DADO')).length === 2 && modeloDePie.podados.length === 0,
+    { dados: dadosDelIPhone.map(([l]) => l), dePie: modeloDePie?.lineas.filter((l) => l.includes('barra:DADO')) },
   );
 
   /*
@@ -4641,12 +4964,92 @@ paso('La tapa de la mesa: a la cota del zócalo, con la veta del atlas, dentro d
       !/hueco\.lado \* 0\.42/.test(fuente) &&
       Math.abs(ZOCALO.centro + ZOCALO.alto / 2 - 0.48) < 1e-12,
   );
+  /*
+   * ── LA LLAVE DEL REPARTO ES `dados !== null` (§4.4) ──
+   *
+   * Con dados, `huecosDeLaMesa(...).piezas` para las piezas y `.dados` para el asa y el
+   * tapete, colgado o quinto; sin dados, `huecosDeLaBarra` y el tapete sólo bajo el
+   * COLGADO. Se lee del texto porque el resultado no lo distingue: pedir la mesa sin dados
+   * reservaría en la colocación de pie un hueco para unos dados que no existen y las
+   * piezas se moverían al empezar a jugar.
+   */
   comprobar(
-    'sin dados, el reparto de las piezas sigue siendo huecosDeLaBarra y el tapete sólo se pinta bajo el sitio COLGADO de huecosDeLaMesa: ninguna pieza se mueve en esta fase',
-    /huecosDeLaBarra\(cuantos, forma\.campo, forma\.proporcion\)/.test(fuente) &&
-      /dados !== null && dados\.forma === 'colgado' \? dados : null/.test(fuente) &&
+    'la llave del reparto es dados !== null: con dados huecosDeLaMesa(cuantos, campo, proporcion, alto) y sus .piezas y .dados; sin dados sigue huecosDeLaBarra y el tapete sólo bajo el sitio COLGADO',
+    /const conDados = dados !== null;/.test(fuente) &&
+      /conDados \? huecosDeLaMesa\(cuantos, forma\.campo, forma\.proporcion, forma\.alto\) : null/.test(fuente) &&
+      /mesa === null \? huecosDeLaBarra\(cuantos, forma\.campo, forma\.proporcion\) : mesa\.piezas/.test(fuente) &&
+      /if \(mesa !== null\) return mesa\.dados;/.test(fuente) &&
+      /sitio !== null && sitio\.forma === 'colgado' \? sitio : null/.test(fuente) &&
       /colorDelColono\(tapete\)/.test(fuente) &&
       !/turnoDe.*#[0-9a-f]{6}/i.test(fuente),
+  );
+  comprobar(
+    'el tapete se apaga con ultimaTirada = 0 (antes de la primera tirada) y sólo con dados: hayTapete lleva la llave y el <mesh> del tapete la pregunta',
+    /const tapeteApagado = dados !== null && dados\.ultimaTirada === 0;/.test(fuente) &&
+      /const hayTapete = tapete !== null && !tapeteApagado;/.test(fuente) &&
+      /tapa !== null &&\s+hayTapete &&\s+sitioDeLosDados !== null &&/.test(fuente),
+  );
+  /*
+   * ── `Dados`: `disponible` es la ÚNICA llave, el asa por colorWrite, el modelo y el respaldo ──
+   *
+   * Se lee el trozo de `delta.tsx` que va de `function Dados(` al siguiente componente.
+   * Lo que se impide: que el toque o la vibración miren otra bandera (`porTirar`, el
+   * turno), que el asa se esconda con `visible={false}` (r3f no le daría el toque), y que
+   * `Dados` deje de buscar `MODELO.dado` o pierda el respaldo (sin `dados.glb` no habría
+   * dados y nada se pondría rojo).
+   */
+  const trozoDeDados = fuente.slice(fuente.indexOf('function Dados('), fuente.indexOf('function encajeEnUnCuadrado'));
+  const sinComentariosDeDados = soloCodigo(trozoDeDados);
+  comprobar(
+    'Dados existe y sólo empuja tocado y llama a onPulsar si dados.disponible; la vibración (sacudida) va dentro de if (disponible); y ni porTirar ni turno se leen en toda la escena',
+    trozoDeDados.length > 0 &&
+      /if \(!dados\.disponible\) return;\s+cola\.current\.push\(\{ que: 'tocado' \}\);\s+void onPulsar\(\)/.test(sinComentariosDeDados) &&
+      /if \(disponible\) \{\s+const s = sacudida\(/.test(sinComentariosDeDados) &&
+      (sinComentariosDeDados.match(/sacudida\(/g) ?? []).length === 1 &&
+      !/porTirar|meToca|turnoDe/.test(sinComentariosDeDados) &&
+      !/porTirar/.test(soloCodigo(fuente)),
+  );
+  comprobar(
+    'el asa de los dados es UNA, de 1,6 lados por 1, invisible por colorWrite y nunca por visible, con stopPropagation y loCogeLaInterfaz antes de mirar disponible; los cubos no reciben rayos',
+    /<boxGeometry args=\{\[sitio\.ancho, sitio\.alto, lado \* 0\.8\]\} \/>\s+<meshBasicMaterial colorWrite=\{false\} depthWrite=\{false\} \/>/.test(trozoDeDados) &&
+      !/visible=\{false\}/.test(trozoDeDados) &&
+      /e\.stopPropagation\(\);\s+loCogeLaInterfaz\(e\.nativeEvent\);\s+if \(!dados\.disponible\) return;/.test(sinComentariosDeDados) &&
+      (trozoDeDados.match(/raycast=\{\(\) => null\}/g) ?? []).length === 3,
+  );
+  comprobar(
+    'Dados busca MODELO.dado en el catálogo, lo escala con ARISTA_DEL_DADO · lado / ARISTA_DEL_D6_EN_EL_PACK y pinta el respaldo de cubo-del-dado.ts si no está; la máquina faseDeLosDados es la única que decide la fase',
+    /modelo=\{aplanados\.get\(MODELO\.dado\)\}/.test(fuente) &&
+      /const arista = ARISTA_DEL_DADO \* lado;/.test(trozoDeDados) &&
+      /const escalaDelPack = arista \/ ARISTA_DEL_D6_EN_EL_PACK;/.test(trozoDeDados) &&
+      /geometriaDelCuerpoDelDado\(arista\), puntos: geometriaDeLosPuntosDelDado\(arista\)/.test(trozoDeDados) &&
+      /cuaternionDelValor\(valor, giroDelDadoAsentado\(i, selloDelPar\)/.test(trozoDeDados) &&
+      (sinComentariosDeDados.match(/faseDeLosDados\(/g) ?? []).length === 2 &&
+      !/fase\.fase = |fase = \{ fase:/.test(sinComentariosDeDados),
+  );
+  /*
+   * Rodar arranca de la ÚLTIMA POSE REAL fuera de rodar, guardada en `enReposo`: en cada
+   * fotograma de «quieta» (antes del temblor) y en cada fotograma de «asentando» (la
+   * máquina encadena asentando → rodando cuando otra tirada llega en esos 0,35 s; sin la
+   * segunda copia el dado saltaba en seco a la pose de ANTES de la tirada anterior). No se
+   * recalcula el par anterior con el sello visto: ese sello ya es el nuevo cuando la tirada
+   * de otro cambia fase y sello en el mismo tic, y el primer fotograma de rodar daba un
+   * cuarto o media vuelta seca. El asentado sigue partiendo del último fotograma de rodar
+   * (`alDejarDeRodar`). Se exigen EXACTAMENTE dos copias, una en cada sitio.
+   */
+  comprobar(
+    'rodar parte de la última pose real fuera de rodar (enReposo: en quieta sin el temblor, y en asentando por si otra tirada encadena) y no recalcula el par anterior con el sello visto; el asentado sigue partiendo del último fotograma de rodar',
+    /if \(fase\.fase === 'rodando'\) \{[\s\S]*?g\.quaternion\.copy\(enReposo\.current\[i\]\)\.premultiply\(rodar\.current\);[\s\S]*?alDejarDeRodar\.current\[i\]\.copy\(g\.quaternion\);\s+continue;/.test(sinComentariosDeDados) &&
+      !/fase\.anterior/.test(sinComentariosDeDados) &&
+      /g\.quaternion\.copy\(objetivo\.current\[i\]\);\s+enReposo\.current\[i\]\.copy\(g\.quaternion\);\s+alDejarDeRodar\.current\[i\]\.copy\(g\.quaternion\);\s+if \(disponible\)/.test(sinComentariosDeDados) &&
+      (sinComentariosDeDados.match(/enReposo\.current\[i\]\.copy\(/g) ?? []).length === 2 &&
+      /slerpQuaternions\(alDejarDeRodar\.current\[i\], objetivo\.current\[i\], avanceDelAsentado\(transcurrido\)\);\s+enReposo\.current\[i\]\.copy\(g\.quaternion\);\s+g\.position\.y \+= reboteDelDado/.test(sinComentariosDeDados),
+  );
+  comprobar(
+    'las sombras de los dos dados se AÑADEN a la lista de centros de las sombras de los huecos: una geometría, una llamada, y su radio es RADIO_DE_LA_SOMBRA_DEL_DADO',
+    /centros\.push\(\{\s+x: sitioDeLosDados\.x \+ centroDelDado\(i\) \* sitioDeLosDados\.lado,/.test(fuente) &&
+      /radio: sitioDeLosDados\.lado \* RADIO_DE_LA_SOMBRA_DEL_DADO,/.test(fuente) &&
+      /geometriaDeLasSombras\(centros\)/.test(fuente) &&
+      (soloCodigo(fuente).match(/geometriaDeLasSombras\(/g) ?? []).length === 1,
   );
   comprobar(
     'la sombra de cada hueco tiene el radio del zócalo más lo que asoma, y va un pelo sobre la tapa',
@@ -4672,7 +5075,7 @@ if (fallos.length > 0) {
  * a veintitrés: durante ese tiempo el guion podía morirse en la novena sin que nadie se
  * enterara. Un guardia desfasado no guarda nada.
  */
-const COMPROBACIONES_ESCRITAS = 307;
+const COMPROBACIONES_ESCRITAS = 335;
 if (hechas < COMPROBACIONES_ESCRITAS) {
   console.error(
     `Solo se han hecho ${hechas} de las ${COMPROBACIONES_ESCRITAS} comprobaciones que ` +

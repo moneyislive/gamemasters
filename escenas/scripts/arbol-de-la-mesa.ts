@@ -11,9 +11,10 @@
  * `three` 0.185.1, que es quien decide el orden de dibujo en el navegador y en el móvil.
  *
  * Lo que NO se copia, se IMPORTA: las constantes de capa salen de `capas.ts` —las mismas
- * que pinta `delta.tsx`—, y las posiciones de `huecosDeLaBarra`, `tapaDeLaMesa`,
- * `huecosDeLaMesa`, `huecosDeLaBaraja`, `areasDeTrueque`, `huecosDeLasCartas` y
- * `casillasDeLaMano`, con la cámara del mirador de salida puesta con `ojoDelMirador`. Si
+ * que pinta `delta.tsx`—, y las posiciones de `huecosDeLaMesa` (la rama con dados de la
+ * barra: sus piezas, y el asa y los dos cubos donde hay sitio), `tapaDeLaMesa`,
+ * `huecosDeLaBaraja`, `areasDeTrueque`, `huecosDeLasCartas` y `casillasDeLaMano`, con la
+ * cámara del mirador de salida puesta con `ojoDelMirador`. Si
  * alguien mueve una constante o un hueco, este modelo se mueve con él. Lo que sí puede
  * quedarse atrás es la FORMA del árbol —qué grupo lleva número, qué malla es transparente—
  * y por eso `verify:escena` lee además los diez grupos de `delta.tsx` por texto: el texto
@@ -49,7 +50,8 @@ import {
   ORDEN_DE_LAS_CARTAS_DEL_MAZO,
   ORDEN_DE_LAS_CASILLAS,
 } from '../capas';
-import { ZOCALO, huecosDeLaBarra, huecosDeLaMesa } from '../barra';
+import { ZOCALO, huecosDeLaMesa } from '../barra';
+import { ARISTA_DEL_DADO, CENTRO_DEL_DADO_SOBRE_LA_TAPA, RADIO_DE_LA_SOMBRA_DEL_DADO, centroDelDado } from '../dados';
 import { tapaDeLaMesa } from '../mesa';
 import {
   FONDO_DEL_TAPETE,
@@ -121,8 +123,9 @@ const invisible = (): THREE.Material =>
 
 /**
  * EL ÁRBOL, tal como lo cuelga `delta.tsx` para un lienzo, con la cámara del mirador de
- * salida. Cuatro huecos en la barra (tres piezas y el mazo), cinco cartas de bienes con el
- * imán tirando de la segunda, dos áreas de trueque, dos cartas del mazo y una casilla.
+ * salida. Cuatro huecos en la barra (tres piezas y el mazo) y los dos dados con su asa donde
+ * caben, cinco cartas de bienes con el imán tirando de la segunda, dos áreas de trueque,
+ * dos cartas del mazo y una casilla.
  */
 export function arbolDeLaMesa(lienzo: LienzoDelModelo): { escena: THREE.Scene; camara: THREE.PerspectiveCamera } {
   const proporcion = lienzo.ancho / lienzo.alto;
@@ -203,9 +206,15 @@ export function arbolDeLaMesa(lienzo: LienzoDelModelo): { escena: THREE.Scene; c
   }
   raiz.add(manoDelMazo);
 
-  /* ── La mesa: tapa, sombras, tapete, tres piezas y el mazo ── */
+  /* ── La mesa: tapa, sombras, tapete, tres piezas, el mazo y los dados con su asa ── */
   const barra = pegadoALaCamara('Barra', ORDEN_DE_LA_BARRA);
-  const huecos = huecosDeLaBarra(4, campo, proporcion);
+  /*
+   * La rama CON dados de `Barra` (la llave `dados !== null`, §4.4): `.piezas` para las
+   * piezas y `.dados` para el asa, el tapete y los dos cubos, colgado o quinto. En los
+   * lienzos sin sitio (320×360, 360×490) `dados` es `null` y `.piezas` es `huecosDeLaBarra`.
+   */
+  const mesa = huecosDeLaMesa(4, campo, proporcion, lienzo.alto);
+  const huecos = mesa.piezas;
   const primero = huecos[0];
   if (primero !== undefined) {
     const tapa = tapaDeLaMesa(primero, campo, proporcion);
@@ -218,17 +227,23 @@ export function arbolDeLaMesa(lienzo: LienzoDelModelo): { escena: THREE.Scene; c
         [0, tapa.cota, tapa.centroZ],
       ),
     );
+    const { dados } = mesa;
+    const centros = huecos.map((h) => ({ x: h.x, z: h.z, radio: h.lado * RADIO_DE_LA_SOMBRA }));
+    if (dados !== null) {
+      for (const i of [0, 1] as const) {
+        centros.push({ x: dados.x + centroDelDado(i) * dados.lado, z: dados.z, radio: dados.lado * RADIO_DE_LA_SOMBRA_DEL_DADO });
+      }
+    }
     barra.add(
       malla(
         'barra:SOMBRAS',
-        geometriaDeLasSombras(huecos.map((h) => ({ x: h.x, z: h.z, radio: h.lado * RADIO_DE_LA_SOMBRA }))),
+        geometriaDeLasSombras(centros),
         new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, depthWrite: false }),
         0,
         [0, tapa.cota + SOBRE_LA_TAPA, 0],
       ),
     );
-    const { dados } = huecosDeLaMesa(4, campo, proporcion, lienzo.alto);
-    if (dados !== null && dados.forma === 'colgado') {
+    if (dados !== null) {
       barra.add(
         malla(
           'barra:TAPETE',
@@ -238,6 +253,17 @@ export function arbolDeLaMesa(lienzo: LienzoDelModelo): { escena: THREE.Scene; c
           [dados.x, tapa.cota + SOBRE_LA_TAPA, dados.z],
         ),
       );
+      /* El grupo de los dados con su asa única, y dentro un grupo por cubo, como en `Dados`. */
+      const grupoDeLosDados = grupo('Dados', ORDEN_DE_LA_BARRA, [dados.x, dados.y, dados.z]);
+      grupoDeLosDados.add(malla('barra:asa de los dados', new THREE.BoxGeometry(dados.ancho, dados.alto, dados.lado * 0.8), invisible()));
+      const arista = ARISTA_DEL_DADO * dados.lado;
+      const reposoY = tapa.cota - dados.y + CENTRO_DEL_DADO_SOBRE_LA_TAPA * dados.lado;
+      for (const i of [0, 1] as const) {
+        const cubo = grupo(`dado ${String(i)} ref={cubos}`, ORDEN_DE_LA_BARRA, [centroDelDado(i) * dados.lado, reposoY, 0]);
+        cubo.add(malla(`barra:DADO ${String(i)}`, new THREE.BoxGeometry(arista, arista, arista), opaco()));
+        grupoDeLosDados.add(cubo);
+      }
+      barra.add(grupoDeLosDados);
     }
   }
   for (const [i, h] of huecos.entries()) {

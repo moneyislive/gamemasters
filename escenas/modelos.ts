@@ -54,6 +54,25 @@ export function catalogoDeModelos(raiz: THREE.Object3D): CatalogoDeModelos {
 }
 
 /**
+ * LA UNIÓN DE VARIOS CATÁLOGOS, y por qué los que faltan se pasan como `null`.
+ *
+ * La escena recibe UN catálogo y busca en él el tablero y el dado, pero vienen de dos
+ * ficheros (`tablero.glb` y `dados.glb`) que se piden a la vez y pueden llegar o no por
+ * separado: el dado que no llega se pasa como `null` y el mapa sale sin `dado`, que es
+ * exactamente la señal con la que `Dados` pinta el respaldo procedimental. Si dos
+ * ficheros trajeran el mismo nombre ganaría el último, y por eso `verify:dados` exige que
+ * el suyo traiga un solo nodo con un nombre que el tablero no usa.
+ */
+export function unirCatalogos(...catalogos: ReadonlyArray<CatalogoDeModelos | null>): CatalogoDeModelos {
+  const union = new Map<string, THREE.Object3D>();
+  for (const catalogo of catalogos) {
+    if (catalogo === null) continue;
+    for (const [nombre, modelo] of catalogo) union.set(nombre, modelo);
+  }
+  return union;
+}
+
+/**
  * LA ALTURA REAL DE UN MODELO, medida sobre su geometría.
  *
  * `Box3.setFromObject` recorre las mallas de verdad, así que da la altura del

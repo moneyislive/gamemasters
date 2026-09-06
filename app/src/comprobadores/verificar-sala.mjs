@@ -673,6 +673,31 @@ paso('La pantalla de Riberas en tres dimensiones no sabe reglas y no bombea');
       /usarCatalogoDelTablero\(\)/.test(escena),
     'con `texturasLisas` el delta llega al teléfono sin un solo color',
   );
+
+  /*
+   * LOS DADOS LLEGAN EN SU FICHERO Y SU FALLO NO TIRA EL TABLERO.
+   *
+   * `dados.glb` es el D6 de KayKit horneado, unos kB, y se pide a la vez que el tablero
+   * por la misma puerta HTTP (`rutaDeLosDados`, no una cadena escrita aquí). Lo que se
+   * rompe en silencio es la RED: un `Promise.all` a secas sobre las dos peticiones
+   * convierte un despliegue sin `dados.glb` en una partida sin tablero, cuando la escena
+   * sabe pintar los dados del respaldo si el catálogo no trae `dado`. Se exige que la
+   * promesa de los dados lleve su propio `.catch` que resuelve a `null` ANTES de entrar
+   * en el `Promise.all`, y que los dos catálogos se unan con `unirCatalogos`.
+   */
+  comprobar(
+    'los dados se piden por `rutaDeLosDados()` de `escenas/ruta-de-modelos.ts`, a la vez que el tablero',
+    /rutaDeLosDados\(\)/.test(escena) &&
+      /import \{[^}]*rutaDeLosDados[^}]*\} from '\.\.\/\.\.\/\.\.\/escenas\/ruta-de-modelos'/.test(escena) &&
+      !/dados\.glb'/.test(codigoDeLaPantalla.join('\n')),
+  );
+  comprobar(
+    'y su fallo no tira el tablero: la promesa de los dados lleva su `.catch` a `null` antes del `Promise.all`, y los catálogos se unen',
+    /const dados = dadosPrometidos\(\)\.catch\(\(fallo: unknown\): null => \{[\s\S]{0,300}?return null;[\s\S]{0,40}?\}\);/.test(escena) &&
+      /Promise\.all\(\[tablero, dados\]\)\.then\(\(\[delTablero, deLosDados\]\) => unirCatalogos\(delTablero, deLosDados\)\)/.test(escena) &&
+      !/Promise\.all\(\[[^\]]*(rutaDelTablero|rutaDeLosDados|traer\()/.test(escena),
+    'con `Promise.all` a secas, un 404 de `dados.glb` deja al teléfono sin delta',
+  );
 }
 
 paso('El delta se puede mirar de cerca, recorrer, y siempre se puede volver');
@@ -1307,6 +1332,61 @@ paso('Mover devuelve cómo acabó: hecho, rechazado o sin red, con lo que ya sab
   comprobar('el `finally` sigue soltando `quieto` en las tres ramas', /finally \{\s*ponerQuieto\(false\);/.test(cuerpo));
 }
 
+/*
+ * LOS DADOS EN LA PANTALLA: sólo donde caben, con la misma pregunta que la escena, y el
+ * botón de tirar se va exactamente donde ellos están.
+ *
+ * Se lee el fuente porque en Node no hay lienzo que medir. Lo que hay que impedir es que la
+ * pantalla decida el sitio con OTRA función o con OTRA medida que la escena (lienzos con
+ * dados y botón, o sin ninguno de los dos), que filtre TIRAR antes de preguntar a
+ * `dadosEnTres` (`porTirar` siempre falso: los dados no vibran nunca), que `quieto` no los
+ * apague, que el toque no devuelva a la escena cómo acabó, o que en el móvil el giro le
+ * robe el dedo al asa (`laInterfazSeLoQueda()` la primera). Y que tirar quede sólo al
+ * alcance del dedo: la acción accesible existe mientras existan los dados.
+ */
+paso('Los dados en la pantalla: donde caben, el botón de tirar se va con ellos, y el toque vuelve con su resultado');
+{
+  const escena = leer(path.join(SRC, 'arcade', 'riberas-en-tres-escena.tsx'));
+  const codigo = escena.split('\n').filter((l) => !/^\s*(\*|\/\/|\/\*|\{\/\*)/.test(l)).join('\n');
+  comprobar(
+    'el sitio de los dados se decide con `huecosDeLaMesa` de `escenas/barra.ts` (la misma función que la escena) con el campo de 45° del Canvas y la medida del lienzo del `onLayout`',
+    /import \{ huecosDeLaMesa \} from '\.\.\/\.\.\/\.\.\/escenas\/barra';/.test(escena) &&
+      /const CAMPO_DE_LA_CAMARA = \(45 \* Math\.PI\) \/ 180;/.test(codigo) &&
+      /fov: 45/.test(codigo) &&
+      /huecosDeLaMesa\(cuantos, CAMPO_DE_LA_CAMARA, medida\.ancho \/ medida\.alto, medida\.alto\)\.dados !== null/.test(codigo) &&
+      /const cuantos = barra\.length \+ \(mazo === null \? 0 : 1\);/.test(codigo),
+    'con otra función u otra medida, habría lienzos con dados y botón, o sin ninguno de los dos',
+  );
+  comprobar(
+    'sin sitio no hay dados (`null`, no apagados); con sitio salen de `dadosEnTres` con las opciones ENTERAS y `quieto` sólo los apaga',
+    /if \(!haySitioParaLosDados\) return null;\s+const suyos = dadosEnTres\(laVista, yo, opciones\);\s+return suyos === null \|\| !mesa\.quieto \? suyos : \{ \.\.\.suyos, disponible: false \};/.test(codigo),
+  );
+  comprobar(
+    'TIRAR se cae del pie con `opcionesFueraDeLaMesa` pasándole LOS DADOS (no un interruptor) y DESPUÉS de los tres filtros de siempre',
+    /const fueraDelTablero = useMemo\(\(\) => opcionesFueraDeLaMesa\(fueraDeLaBarra, dados\), \[fueraDeLaBarra, dados\]\);/.test(codigo) &&
+      /const fueraDeLaBarra = useMemo\(\s+\(\) => opcionesFueraDeLaBarra\(opcionesFueraDeLaMano\(opcionesFueraDelTablero\(opciones\)\), mazo\)/.test(codigo),
+  );
+  comprobar(
+    'la escena recibe `dados={dados}` y `onPulsarLosDados={alPulsarLosDados}`',
+    /<Delta[\s\S]*?dados=\{dados\}\s+onPulsarLosDados=\{alPulsarLosDados\}[\s\S]*?\/>/.test(escena),
+  );
+  const manejador = /const alPulsarLosDados = useCallback\(\(\): Promise<ResultadoDelMovimiento> => \{([\s\S]*?)\n  \}, \[/.exec(codigo)?.[1] ?? '';
+  comprobar(
+    'al pulsar el asa, `laInterfazSeLoQueda()` va LA PRIMERA, se manda la opción TIRAR del juego (`tirarEnTres`) por `mesa.mover` devolviendo su promesa, y sin opción o quieto se contesta `rechazado`',
+    manejador.length > 0 &&
+      /^\s*laInterfazSeLoQueda\(\);/.test(manejador) &&
+      /if \(mesa\.quieto\) return Promise\.resolve\('rechazado'\);/.test(manejador) &&
+      /const tirar = tirarEnTres\(opciones\);\s+if \(tirar === null\) return Promise\.resolve\('rechazado'\);/.test(manejador) &&
+      /return mesa\.mover\(\{ tipo: tirar\.tipo, carga: tirar\.carga \}\);/.test(manejador) &&
+      !/tipo: '/.test(manejador),
+  );
+  comprobar(
+    'y la vista que envuelve el Canvas declara la acción accesible `tirar` mientras hay dados, y la atiende sólo si están disponibles',
+    /accessibilityActions=\{dados !== null \? \[\{ name: 'tirar', label: 'Tirar los dados' \}\] : undefined\}/.test(codigo) &&
+      /actionName === 'tirar' && dados !== null && dados\.disponible\) void alPulsarLosDados\(\);/.test(codigo),
+  );
+}
+
 // ---------------------------------------------------------------------------
 
 /**
@@ -1318,7 +1398,7 @@ paso('Mover devuelve cómo acabó: hecho, rechazado o sin red, con lo que ya sab
  * Con el número escrito, salir con menos es un fallo ruidoso. Va a mano y se sube al
  * añadir comprobaciones; un guardia desfasado no guarda nada.
  */
-const COMPROBACIONES_ESCRITAS = 144;
+const COMPROBACIONES_ESCRITAS = 152;
 if (cuantas < COMPROBACIONES_ESCRITAS) {
   console.error(
     `Solo se han hecho ${cuantas} de las ${COMPROBACIONES_ESCRITAS} comprobaciones que ` +

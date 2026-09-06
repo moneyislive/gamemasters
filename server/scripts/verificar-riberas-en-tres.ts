@@ -124,6 +124,7 @@ import {
   seVeEnTres,
   tableroEnTres,
   TIPOS_QUE_PINTA_LA_MANO,
+  tirarEnTres,
   truequesPosibles,
   turnoEnTres,
   colorDePiezaDelColono,
@@ -1442,6 +1443,10 @@ const CAMPO_DE_LA_BARRA = (45 * Math.PI) / 180;
   const dados = dadosEnTres(vista, 'A', opciones);
   comprobar('con las opciones ENTERAS, los dados saben que toca tirar: `porTirar` y `disponible` encendidos', dados !== null && dados.porTirar && dados.disponible, dados);
   comprobar('y traen lo que la máquina necesita: sin tirar, con la última suma, y el sello del turno anterior (1 − 1 = 0)', dados?.tirado === false && dados?.ultimaTirada === 8 && dados?.sello === 0, dados);
+  /* La opción que el asa manda: la del juego, entera, y `null` cuando ya no se ofrece. */
+  const tirar = tirarEnTres(opciones);
+  comprobar('`tirarEnTres` devuelve la opción TIRAR del juego, entera, con su tipo y su carga', tirar !== null && tirar.tipo === TIRAR && 'carga' in tirar, tirar?.id);
+  comprobar('y `null` con la tirada ya hecha: no hay TIRAR que mandar', tirarEnTres(opcionesEn(mesaTirada, 'A')) === null && tirarEnTres([]) === null);
   const alReves = dadosEnTres(vista, 'A', opcionesFueraDeLaMesa(opciones, dados));
   comprobar(
     'AL REVÉS —filtrar antes de preguntar— `porTirar` sale falso: por eso `dadosEnTres` va primero, como `mazoEnLaBarra`',
@@ -1503,7 +1508,7 @@ const CAMPO_DE_LA_BARRA = (45 * Math.PI) / 180;
 }
 
 /* ═══ EL RECUENTO, PARA QUE NO SE VACÍE SIN QUE NADIE LO NOTE ═══ */
-const MINIMO = 291;
+const MINIMO = 293;
 if (hechas < MINIMO) {
   console.log(`✘ este comprobador debería hacer al menos ${MINIMO} comprobaciones y ha hecho ${hechas}: alguien ha borrado un bloque`);
   process.exit(2);

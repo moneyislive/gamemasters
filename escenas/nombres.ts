@@ -198,7 +198,31 @@ export const MODELO = {
   bienMineral: 'bien-mineral',
   bienLana: 'bien-lana',
   bienGrano: 'bien-grano',
+
+  /*
+   * EL DADO, que NO está en `tablero.glb`: viene en `dados.glb`, un fichero aparte.
+   *
+   * Aparte porque el tablero pesa 4,3 MB y se cachea por promesa en las dos pantallas;
+   * un dado de unos kB no debe obligar a recompilarlo ni a recargarlo, y si su fichero
+   * no llega, la escena pinta el respaldo procedimental y la partida sigue. El catálogo
+   * que recibe la escena es la UNIÓN de los dos ficheros (`unirCatalogos`, `modelos.ts`),
+   * así que quien pinta lo busca por este nombre como a cualquier otra pieza. Ver
+   * `EN_DADOS_GLB` abajo: es lo que hace que `verify:escena` no se lo exija al tablero.
+   */
+  dado: 'dado',
 } as const;
+
+/**
+ * LOS NOMBRES DE `MODELO` QUE VIVEN EN `dados.glb` Y NO EN `tablero.glb`.
+ *
+ * `nombresEnElGlb()` es lo que `compilar-modelos.ts` exige compilar y lo que
+ * `verify:escena` exige encontrar dentro de `tablero.glb`, ni uno más ni uno menos. Sin
+ * esta lista, meter el dado en `MODELO` habría hecho que el compilador del tablero se
+ * negara a compilar («el código pide `dado` y aquí no se compila») y que el comprobador
+ * marcara en rojo un fichero correcto. Lo que hay aquí lo comprueba `verify:dados` en su
+ * propio fichero.
+ */
+export const EN_DADOS_GLB: ReadonlySet<string> = new Set([MODELO.dado]);
 
 /**
  * EL MODELO DE UN BIEN, para la carta de la mano.
@@ -275,26 +299,28 @@ export function modeloDeBarco(color: ColorDeJugador): string {
 }
 
 /**
- * TODOS los nombres que esta versión espera encontrar dentro del `.glb`.
+ * TODOS los nombres que esta versión espera encontrar dentro de `tablero.glb`.
  *
- * Los de la tabla más los que se componen por color. `verify:escena` los contrasta
- * uno a uno contra los nodos del fichero compilado, así que una pieza que falte o
- * que se llame de otra manera se cae en la batería y no en la pantalla de alguien.
+ * Los de la tabla (menos los que viven en `dados.glb`, ver `EN_DADOS_GLB`) más los que
+ * se componen por color. `verify:escena` los contrasta uno a uno contra los nodos del
+ * fichero compilado, así que una pieza que falte o que se llame de otra manera se cae
+ * en la batería y no en la pantalla de alguien.
  */
 export function nombresEnElGlb(): string[] {
-  return [...(Object.values(MODELO) as string[]), ...PIEZAS_DE_COLOR];
+  return [...(Object.values(MODELO) as string[]).filter((n) => !EN_DADOS_GLB.has(n)), ...PIEZAS_DE_COLOR];
 }
 
 /**
  * TODOS los nombres que el código puede pedirle al catálogo ya cargado.
  *
- * Los del fichero más las tres variantes de color que se fabrican encima de cada pieza
+ * Los del tablero, el dado de `dados.glb` (el catálogo que recibe la escena es la unión
+ * de los dos ficheros) y las tres variantes de color que se fabrican encima de cada pieza
  * base. La azul se pide por su nombre de color como las demás —`ciudad-blue`— aunque
  * sea la que viene en el fichero: quien pinta no tiene por qué saber cuál de los cuatro
  * colores resultó ser el original.
  */
 export function todosLosNombres(): string[] {
-  const salida = nombresEnElGlb();
+  const salida = [...nombresEnElGlb(), ...EN_DADOS_GLB];
   for (const pieza of PIEZAS_DE_COLOR) {
     for (const c of COLORES_DE_JUGADOR) salida.push(`${pieza}-${c}`);
   }

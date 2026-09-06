@@ -192,6 +192,18 @@ const A_LINEAL: readonly number[] = Array.from({ length: 256 }, (_, i) => {
   return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
 });
 
+/**
+ * EL BYTE LINEAL DE UN COMPONENTE sRGB, con la misma curva y el mismo redondeo que
+ * `horneaLaPrimitiva` aplica a lo que muestrea. Lo usa `compilar-dados.ts` para pintar
+ * un color escrito en hexadecimal (`#efe6cd`) en el mismo espacio en que quedan los
+ * demás vértices horneados; con otra conversión, el crema del dado sería «casi» el de
+ * las fichas, y ese «casi» no lo caza nadie.
+ */
+export function byteLinealDeSrgb(componente: number): number {
+  const lineal = A_LINEAL[Math.max(0, Math.min(255, Math.round(componente)))] as number;
+  return Math.max(0, Math.min(255, Math.round(lineal * 255)));
+}
+
 /** lineal → sRGB, sólo para medir cuánto se pierde al cuantizar. */
 function aSrgb(lineal: number): number {
   const c = lineal <= 0.0031308 ? lineal * 12.92 : 1.055 * lineal ** (1 / 2.4) - 0.055;

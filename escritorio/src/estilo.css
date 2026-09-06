@@ -2224,6 +2224,26 @@ code {
 }
 
 /*
+ * Un mando SÓLO para tecnologías de apoyo: fuera de la vista y del flujo, pero en el árbol
+ * y enfocable. Es el «tirar los dados» de la mesa cuando el botón de texto se ha ido al
+ * asa del lienzo: un dado que sólo se puede tocar con el ratón sería el primer movimiento
+ * del juego inaccesible. No `display: none` ni `visibility: hidden`: los lectores lo
+ * saltan.
+ */
+.riberas-solo-apoyo {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  border: 0;
+  white-space: nowrap;
+}
+
+/*
  * Por qué se está jugando sobre el SVG. Va ENCIMA del retablo y en gris, sin
  * `--alarma`: no se ha perdido nada, la mesa está entera; sólo falta el mundo.
  */
