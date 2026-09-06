@@ -686,6 +686,82 @@ function noSePintaDeMas(): void {
   );
 }
 
+/**
+ * ═══ EL ESTIAJE EN EL RETABLO: LO QUE SE OYE CUANDO UNA ISLA SE PUEDE TOCAR ═══
+ *
+ * Esto vive AQUÍ y no en `verify:riberas` a propósito, y la partición es la mitad de la
+ * comprobación: aquel comprobador no importa nada de `escritorio/` —no puede pintar un
+ * SVG ni leer un `aria-label`— así que allí se mira lo que es del juego (que la cara
+ * ofrecida SALE con su rótulo y su cifra dentro del dato) y aquí lo que es del mueble
+ * (que esas dos palabras acaban dentro del nombre del botón, y que el texto que se
+ * esconde para no decirlo dos veces sólo se esconde donde hay botón que lo diga).
+ *
+ * Lo que compra: `textoDeCara` esconde con `aria-hidden` el texto de una cara TOCABLE, y
+ * hasta esta fase NINGUNA isla de Riberas lo era —medido: cero caras con `toque` en
+ * 342.000 miradas—, así que ese camino no se había ejercitado nunca. Con el estiaje por
+ * mover son dieciocho de diecinueve, y si `nombreParaElLector` dejara de componer el
+ * nombre con `rotulo` y `cifra`, el mapa se quedaría mudo justo en el momento en que hay
+ * que elegir una isla — sin que nada se cayera y sin que nada se viera raro en pantalla.
+ */
+function elEstiajeSeOye(): void {
+  paso('Con el estiaje por mover, la isla que se puede tocar se oye con su nombre');
+
+  const { vista, opciones } = laProyeccionConMazo(3, { conElEstiajePorMover: true });
+  const tablero = tableroDeLaVista(vista);
+  comprobar('la proyección del turno del siete trae tablero', tablero !== null);
+  if (tablero === null) return;
+
+  const tocables = tablero.caras.filter((c) => c.toque !== null);
+  comprobar('con el estiaje por mover hay dieciocho islas tocables, que es lo que estrena este camino', tocables.length === 18, tocables.length);
+  comprobar('y hay exactamente una que no lo es: donde está la pieza', tablero.caras.length - tocables.length === 1);
+
+  const html = renderToStaticMarkup(<Retablo tablero={tablero} alTocar={() => undefined} quieto={false} />);
+  const nombres = [...html.matchAll(/aria-label="([^"]*)"/g)].map((m) => m[1] as string);
+
+  /*
+   * EL NOMBRE DE CADA CARA OFRECIDA LLEVA SU TERRENO Y SU CIFRA. Se compone igual que
+   * `nombreParaElLector`: rótulo y cifra separados por un espacio, y sin cifra la duna,
+   * que no tiene número porque no rinde. Se comprueban las dieciocho, no una.
+   */
+  const faltan = tocables
+    .map((c) => `${c.rotulo} ${c.cifra}`.trim())
+    .filter((nombre) => !nombres.includes(nombre));
+  comprobar('el `aria-label` de cada isla ofrecida lleva su terreno y su cifra dentro', faltan.length === 0, faltan);
+  comprobar(
+    'y ninguna se anuncia con el tipo del movimiento ni con su llave, que es lo que se oía antes',
+    !nombres.includes('estiaje') && !nombres.some((n) => /^-?\d+,-?\d+$/.test(n)),
+    nombres.filter((n) => /^-?\d+,-?\d+$/.test(n) || n === 'estiaje'),
+  );
+
+  /*
+   * LA VACUNA, y es la que sostiene la decisión de no tocar `textoDeCara`: una cara que
+   * NO se ofrece sigue con su texto visible y sin `aria-hidden`, porque ahí no hay
+   * ningún botón que lo diga. La única que queda así durante este momento es justo la
+   * isla donde ESTÁ el estiaje —mover es a otra—, que es la que hay que encontrar.
+   */
+  const laDelEstiaje = tablero.caras.find((c) => c.toque === null) as { rotulo: string; cifra: string };
+  comprobar('la isla donde está la pieza lo dice en su rótulo', laDelEstiaje.rotulo.includes('estiaje'), laDelEstiaje.rotulo);
+  comprobar(
+    'y como no se toca, su texto se lee entero en pantalla: el mapa no se queda mudo',
+    palabrasDe(html).includes(laDelEstiaje.rotulo),
+    laDelEstiaje.rotulo,
+  );
+  comprobar(
+    'se esconde exactamente el texto de las que sí se tocan, ni uno más',
+    (html.split('aria-hidden="true"').length - 1) === tocables.filter((c) => c.rotulo.length > 0 || c.cifra.length > 0).length,
+    { escondidos: html.split('aria-hidden="true"').length - 1, tocables: tocables.length },
+  );
+  /*
+   * Y LA OTRA MITAD: sin `toque`, no se esconde ninguno. Sin esta línea, «se esconden
+   * dieciocho» pasaría igual si el retablo escondiera SIEMPRE el texto, que es la
+   * conducta que dejaría el mapa mudo en cuanto una isla dejara de ofrecerse.
+   */
+  const mudo: TableroDeclarado = { ...tablero, caras: tablero.caras.map((c) => ({ ...c, toque: null })) };
+  const htmlMudo = renderToStaticMarkup(<Retablo tablero={mudo} alTocar={() => undefined} quieto={false} />);
+  comprobar('y sin ninguna cara tocable no se esconde ni un texto', !htmlMudo.includes('aria-hidden="true"'));
+  comprobar('y ninguna opción del estiaje se queda sin dónde pulsarse', opcionesSueltas(tablero, opciones).every((o) => o.tipo !== 'riberas:estiaje'), opcionesSueltas(tablero, opciones).map((o) => o.id));
+}
+
 function ordenDeCapa(clase: 'cara' | 'linea' | 'nudo'): number {
   return clase === 'cara' ? 0 : clase === 'linea' ? 1 : 2;
 }
@@ -1686,7 +1762,14 @@ function laProyeccionConMazo(
    * tiene dueño cuando el segundo llega, y `recalcularElVado` no se lo mueve a quien
    * iguala. Es el estado en que el raíl decía «vado 5 de 5» a quien no tenía nada.
    */
-  { empateDelVado = false }: { empateDelVado?: boolean } = {},
+  /*
+   * `conElEstiajePorMover`: además, la partida se queda en el instante siguiente a un
+   * siete, que es el único momento en que las caras del tablero llevan `toque`. Es un
+   * estado que en la mesa se alcanza tirando los dados; aquí se declara, porque lo que
+   * este fichero mira no es la regla —eso es `verify:riberas`— sino qué se OYE al
+   * pintarlo.
+   */
+  { empateDelVado = false, conElEstiajePorMover = false }: { empateDelVado?: boolean; conElEstiajePorMover?: boolean } = {},
 ): {
   vista: unknown;
   opciones: readonly Opcion[];
@@ -1755,7 +1838,10 @@ function laProyeccionConMazo(
         ),
       }
     : conDueno;
-  const estado: EstadoDeRiberas = empateDelVado ? { ...yoTambienLlego, vado: recalcularElVado(yoTambienLlego) } : conDueno;
+  const conElVado: EstadoDeRiberas = empateDelVado ? { ...yoTambienLlego, vado: recalcularElVado(yoTambienLlego) } : conDueno;
+  const estado: EstadoDeRiberas = conElEstiajePorMover
+    ? { ...conElVado, ultimaTirada: 7, estiajePorMover: true }
+    : conElVado;
   const vista = proyectar(RIBERAS, estado, 's1', sentados);
   return { vista, opciones: opcionesDeArcade(RIBERAS, vista, 's1'), sentados };
 }
@@ -3222,6 +3308,7 @@ function elCartelDeLaCarta(): void {
 
 elCatalogoNoMiente();
 noSePintaDeMas();
+elEstiajeSeOye();
 laPausaCabe();
 loQueLaPantallaDecideSola();
 lasDirecciones();

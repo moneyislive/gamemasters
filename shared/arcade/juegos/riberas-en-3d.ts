@@ -42,8 +42,8 @@
  */
 import type { CartaEnLaMano } from '../../../escenas/baraja';
 import type { ColorDeJugador, DeltaEn3D } from '../../../escenas/tipos';
-import type { LlaveDeArista, LlaveDeVertice } from '../../mecanicas/malla-hexagonal';
-import { claseDeLlave } from '../../mecanicas/malla-hexagonal';
+import type { LlaveDeArista, LlaveDeHex, LlaveDeVertice } from '../../mecanicas/malla-hexagonal';
+import { claseDeLlave, hexDeLlave } from '../../mecanicas/malla-hexagonal';
 import type { Opcion } from '../opciones';
 import { ALZAR, bienDeLaFicha, FUNDAR, opcionesDeRiberas } from './riberas';
 
@@ -268,15 +268,23 @@ interface ColonoLlano {
 
 function comoVistaLlana(
   vista: unknown,
-): { colonos: ColonoLlano[]; islas: unknown[]; misFichas: unknown[] } | null {
+): { colonos: ColonoLlano[]; islas: unknown[]; misFichas: unknown[]; estiaje: string | null } | null {
   if (typeof vista !== 'object' || vista === null) return null;
-  const v = vista as { desde?: unknown; colonos?: unknown; islas?: unknown; misFichas?: unknown };
+  const v = vista as {
+    desde?: unknown;
+    colonos?: unknown;
+    islas?: unknown;
+    misFichas?: unknown;
+    estiaje?: unknown;
+  };
   if (v.desde !== 'riberas') return null;
   if (!Array.isArray(v.colonos) || !Array.isArray(v.islas)) return null;
   return {
     colonos: v.colonos as ColonoLlano[],
     islas: v.islas as unknown[],
     misFichas: Array.isArray(v.misFichas) ? (v.misFichas as unknown[]) : [],
+    /* Una vista guardada de antes del estiaje no lo trae, y entonces no hay comarca seca. */
+    estiaje: typeof v.estiaje === 'string' ? v.estiaje : null,
   };
 }
 
@@ -307,12 +315,29 @@ function comoLlaves(x: unknown): string[] {
  * trae la vista, por ejemplo— ataría el tablero 3D a la paleta del tablero plano, que son
  * dos decisiones distintas que hoy coinciden.
  *
- * ═══ Y NO HAY LADRÓN ═══
+ * ═══ AQUÍ PONÍA «Y NO HAY LADRÓN», Y AHORA SÍ LO HAY ═══
  *
- * Riberas no lo tiene: su desgracia es el ESTIAJE, que no ocupa una comarca sino que corta
- * la producción del turno. Así que `ladron` sale siempre `null`, y eso no es un hueco por
- * rellenar: es que este juego no tiene esa pieza. Cuando el estiaje quiera verse, será
- * otra cosa y tendrá su propio campo.
+ * Ponía que Riberas no tiene esa pieza —que su desgracia es el ESTIAJE, que no ocupa una
+ * comarca sino que corta la producción del turno— y que por eso `ladron` sale siempre
+ * `null`, «y eso no es un hueco por rellenar». **La premisa está revocada** desde la fase
+ * 1 de `docs/EL-LADRON-DE-RIBERAS.md`: el estiaje ocupa una isla, la seca y se mueve.
+ *
+ * Y la última frase de aquel párrafo se cumplió al pie de la letra: «cuando el estiaje
+ * quiera verse, será otra cosa y tendrá su propio campo». Es otra cosa, se llama estiaje y
+ * su campo es `EstadoDeRiberas.estiaje`, que viaja público en la vista.
+ *
+ * Y el campo del contrato genérico ya no se llama `ladron` sino `seca`, porque un contrato
+ * de escena no puede llamar a las cosas por el nombre que les da un juego: dice lo que LE
+ * PASA a la comarca y no quién se lo hace. Se lee de la vista con `hexDeLlave` y la escena
+ * planta ahí la tienda que ya sabía plantar.
+ *
+ * LO QUE TODAVÍA NO ESTÁ, y por eso esto no cierra la fase 4: no se puede SOLTAR la pieza
+ * sobre una comarca, porque eso pide `sitiosDelEstiaje` y una señal de suelta por isla.
+ * Mover se hace desde los botones, que los hay siempre, y `verify:riberas-en-tres` lo
+ * afirma en su bloque 12 bis para que esa ventana no se juegue a ciegas. Lo que esta fase
+ * SÍ cierra es lo que no podía esperar: que al sacar un siete se VEA qué isla se secó. Sin
+ * eso, en una mesa de dos a cuatro colonos —que son las que se juegan de verdad— la única
+ * pista era el rótulo de dieciocho botones.
  */
 export function deltaDeLaVista(vista: unknown): DeltaEn3D | null {
   const v = comoVistaLlana(vista);
@@ -350,7 +375,8 @@ export function deltaDeLaVista(vista: unknown): DeltaEn3D | null {
     }
   });
 
-  return { islas, piezas, caminos, ladron: null };
+  /* La comarca del estiaje viaja como hexágono: la escena no conoce las llaves del juego. */
+  return { islas, piezas, caminos, seca: v.estiaje === null ? null : hexDeLlave(v.estiaje as LlaveDeHex) };
 }
 
 /**

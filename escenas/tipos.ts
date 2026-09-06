@@ -99,6 +99,15 @@ export interface DeltaEn3D {
   islas: readonly IslaEn3D[];
   piezas: readonly PiezaEn3D[];
   caminos: readonly CaminoEn3D[];
-  /** Dónde está el ladrón, o `null` si no hay ninguno en el tablero. */
-  ladron: Hex | null;
+  /**
+   * La comarca SECA, o `null` si no hay ninguna.
+   *
+   * Se llamaba `ladron` y salía siempre `null`, porque el juego que la iba a usar había
+   * decidido no tener esa pieza. Ahora la tiene, y no se llama así: en Riberas es EL
+   * ESTIAJE, la bajada del agua que se posa en una isla y la deja sin rendir. El contrato
+   * de la escena no puede llamarla por el nombre que le da un juego, así que el campo dice
+   * lo que LE PASA a la comarca y no quién se lo hace: la escena planta ahí una tienda y
+   * no sabe de quién es.
+   */
+  seca: Hex | null;
 }

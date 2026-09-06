@@ -553,10 +553,26 @@ const ALFA_TENUE = 0.45;
  * en una cara TOCABLE se anunciarían dos veces: una como nombre del botón y otra
  * como texto suelto, ahora que el texto ya no está dentro del grupo con
  * `role="button"` —que las podaba, porque `button` también tiene hijos
- * presentacionales—. Se esconde ahí y sólo ahí. En una cara que no se toca, este
- * texto es lo ÚNICO que un lector tiene del terreno: las diecinueve islas de
- * Riberas no llevan `toque`, así que esconderlo siempre habría dejado el mapa
- * mudo.
+ * presentacionales—. Se esconde ahí y sólo ahí.
+ *
+ * ═══ Y AQUÍ PONÍA UN PORQUÉ QUE HA DEJADO DE SER CIERTO ═══
+ *
+ * Ponía que en una cara que no se toca este texto es lo ÚNICO que un lector tiene
+ * del terreno, «porque las diecinueve islas de Riberas no llevan `toque`, así que
+ * esconderlo siempre habría dejado el mapa mudo». La premisa era cierta y estaba
+ * medida —cero caras con `toque` en 342.000 miradas— y dejó de serlo en el turno del
+ * siete: con el estiaje por mover, DIECIOCHO de las diecinueve llevan `toque` justo
+ * en el momento en que hay que elegir.
+ *
+ * Lo que NO cambia es la conducta, y por eso no se ha tocado ni una línea de código
+ * aquí abajo: quien pone el nombre de una cara escondida es `nombreParaElLector`, y
+ * su primer caso compone `rotulo` + `cifra`, así que la cara ofrecida se anuncia
+ * «Vega 9» y el mapa no se queda mudo. O sea que el `aria-hidden` sigue estando bien
+ * puesto, y lo que se reescribe es su porqué: el texto se esconde porque **el nombre
+ * del botón ya lleva el terreno y la cifra dentro**, y no porque nunca haya caras
+ * tocables. La que se queda con su texto visible durante ese momento es justo la
+ * isla donde ESTÁ el estiaje —mover es a otra, así que ésa no se toca—, que es la
+ * que hay que encontrar.
  */
 function textoDeCara(
   p: Extract<PiezaPintada, { clase: 'cara' }>,

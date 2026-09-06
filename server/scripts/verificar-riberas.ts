@@ -83,6 +83,14 @@ import type { Mesa } from '../src/arcade/arbitro';
 import { aplicar, aplicarConMotivo, hayOpciones, opcionesDeArcade, reejecutarEn } from '../../shared/arcade';
 import type { ContextoMovimiento, Movimiento } from '../../shared/arcade';
 import { canonico } from '../../shared/mecanicas/canonico';
+/*
+ * EL AZAR SE IMPORTA PARA PODER FABRICAR UNA TIRADA CONCRETA, y sólo para eso: el
+ * bloque del estiaje necesita que salga EL NÚMERO de una isla en particular, y
+ * esperarlo tirando dados sería un bucle que tarda lo que quiera. Se busca una
+ * semilla cuyas dos primeras tiradas sumen lo que hace falta y se le pone al estado,
+ * que es una forma legítima de empezar una partida y la que ya usa el árbitro.
+ */
+import { enteroEntre, sembrar } from '../../shared/mecanicas/azar';
 import {
   aristaDeHex,
   aristasDe,
@@ -121,6 +129,7 @@ import {
   GUARDIA_MINIMA,
   largoDelVado,
   loSecretoDeRiberas,
+  MOVER_EL_ESTIAJE,
   OFRECER,
   opcionesDeRiberas,
   PASAR,
@@ -500,11 +509,593 @@ paso('La producción por dados, y el estiaje');
   });
 
   /*
-   * EL ESTIAJE, forzado: con la suma siete no rinde nadie. Se comprueba
-   * llamando al reparto de la cosecha con siete a través de una tirada fabricada
-   * — se prepara un estado y se mira que las islas del siete no existan.
+   * NINGUNA ISLA LLEVA EL SIETE. Ésta sigue siendo verdad con la regla nueva y se
+   * queda tal cual: es la mitad aritmética de por qué el siete puede ser la suma que
+   * activa el estiaje sin que ninguna isla produzca en ese turno.
+   *
+   * Lo que aquí ponía además —que con siete no pasa nada— era una comprobación
+   * escrita contra la regla vieja, y la nueva la habría dejado en verde sin tocarla:
+   * exactamente la forma de comprobación que no está mirando. Lo que pasa hoy al
+   * sacar un siete está en el bloque de abajo, jugado y no montado a mano.
    */
   comprobar('ninguna isla lleva el siete, así que el estiaje no puede rendir', e.islas.every((i) => i.numero !== 7));
+  comprobar(
+    'y el estiaje nace en la duna, que es la que ya no rendía',
+    e.estiaje === llaveDeHex((e.islas.find((i) => i.terreno === 'duna') as { hex: Hex }).hex),
+    e.estiaje,
+  );
+}
+
+// ---------------------------------------------------------------------------
+paso('EL ESTIAJE: la pieza, el bloqueo, el robo y el reloj');
+// ---------------------------------------------------------------------------
+
+/*
+ * ═══ ESTE BLOQUE SE JUEGA, NO SE MONTA, Y ÉSA ES SU MITAD IMPORTANTE ═══
+ *
+ * Todo lo que sigue cuelga de una partida de verdad llevada hasta el primer siete con
+ * el árbitro delante, y no de un estado con `estiajePorMover: true` escrito a mano. La
+ * diferencia es la vacuna que pide el diseño: la línea de la que cuelga la regla
+ * entera es la de `tirarLosDados` que enciende la bandera al sacar siete, y TODO lo
+ * demás —la pieza, la vista, el bloqueo, los dieciocho destinos, el corte de
+ * `opciones()`, la guarda del reductor y las dieciocho caras tocables— se puede
+ * escribir entero y quedarse VERDE con un estiaje que no se activa jamás. Con estados
+ * montados a mano, quitar esa línea no pondría rojo nada.
+ *
+ * Y por eso la primera comprobación de todas es que el siete SALE: si un día dejara de
+ * salir en doscientas tiradas, lo de debajo pasaría a estar mirando el conjunto vacío,
+ * y conviene que sea esta línea la que lo diga y no el silencio.
+ */
+
+/** Tira los dados por quien tenga el turno, y devuelve la mesa. */
+function tirarPor(donde: Mesa, quien: string): Mesa {
+  return mover(donde, quien, opcionesEn(donde, quien).find((o) => o.tipo === TIRAR) as Opcion);
+}
+
+/**
+ * TIRA, Y SI SALE UN SIETE MUEVE EL ESTIAJE. Devuelve la mesa lista para seguir.
+ *
+ * Hace falta en todos los sitios de este fichero donde una partida escrita a mano tira
+ * y sigue jugando: desde esta fase, después de un siete no se ofrece ninguna otra cosa
+ * hasta que la pieza se mueva, así que un `find(PASAR)` detrás de un `TIRAR` sale
+ * `undefined` una de cada seis veces. Que eso ya no pase en silencio es justo lo que la
+ * regla nueva tiene que hacer.
+ */
+function tirarYResolverElEstiaje(donde: Mesa, quien: string): Mesa {
+  const tirada = tirarPor(donde, quien);
+  if (!estadoDe(tirada).estiajePorMover) return tirada;
+  const destino = opcionesEn(tirada, quien).find((o) => o.tipo === MOVER_EL_ESTIAJE);
+  /*
+   * Y SI NO HUBIERA NINGUNO, SE DICE Y NO SE REVIENTA. Con la bandera encendida y sin
+   * destinos, la mesa se queda parada para siempre: es el peor fallo que esta regla
+   * puede tener, y un guion que se cae con «no se puede leer 'tipo' de undefined» lo
+   * cuenta peor que una línea roja con su nombre.
+   */
+  comprobar('con el estiaje por mover siempre hay un destino que ofrecer, o la mesa se para', destino !== undefined);
+  return destino === undefined ? tirada : mover(tirada, quien, destino);
+}
+
+/** Las llaves de todas las islas del delta, en el orden canónico de la malla. */
+function llavesDeLasIslas(e: EstadoDeRiberas): string[] {
+  return e.islas.map((i) => llaveDeHex(i.hex));
+}
+
+/**
+ * LA SEMILLA CUYAS DOS PRIMERAS TIRADAS SUMAN ESTO.
+ *
+ * Es la única forma de mirar el bloqueo de verdad: hay que hacer que salga EL NÚMERO
+ * de una isla concreta, y esperarlo tirando dados sería un bucle que tarda lo que
+ * quiera. Ponerle una semilla al estado es una forma legítima de empezar —el árbitro
+ * la documenta— y deja la comparación en una línea.
+ */
+function semillaQueSaca(suma: number): number {
+  for (let semilla = 1; semilla < 20_000; semilla++) {
+    const uno = enteroEntre(sembrar(semilla), 1, 6);
+    const otro = enteroEntre(uno.azar, 1, 6);
+    if (uno.valor + otro.valor === suma) return semilla;
+  }
+  throw new Error(`ninguna semilla de las veinte mil primeras saca ${String(suma)}`);
+}
+
+/** La mesa parada en el instante del siete, y a quién le tocaba. */
+const elSiete = (() => {
+  let corriendo = mesaSobre('RIB-ESTIAJE', { ...estadoDe(mesa), tirado: false }, TRES);
+  let tiradas = 0;
+  while (tiradas < 200) {
+    const quien = (estadoDe(corriendo).colonos[estadoDe(corriendo).turno] as Colono).asiento;
+    corriendo = tirarPor(corriendo, quien);
+    tiradas++;
+    if (estadoDe(corriendo).ultimaTirada === 7) return { mesa: corriendo, quien, tiradas };
+    corriendo = mover(corriendo, quien, opcionesEn(corriendo, quien).find((o) => o.tipo === PASAR) as Opcion);
+  }
+  return { mesa: corriendo, quien: 'A', tiradas };
+})();
+
+{
+  const e = estadoDe(elSiete.mesa);
+  comprobar('jugando de verdad sale un siete, que es de lo que cuelga todo lo de abajo', e.ultimaTirada === 7, {
+    tiradas: elSiete.tiradas,
+  });
+  comprobar('y el siete ENCIENDE la bandera: hay que mover el estiaje', e.estiajePorMover === true);
+
+  const suyas = opcionesEn(elSiete.mesa, elSiete.quien);
+  comprobar('mientras haya que mover, no se ofrece TIRAR', suyas.every((o) => o.tipo !== TIRAR));
+  comprobar('ni PASAR: mover es obligatorio', suyas.every((o) => o.tipo !== PASAR));
+  comprobar(
+    'ni construir, ni trocar, ni comprar: sólo los destinos y revelar, que no es una jugada',
+    suyas.every((o) => o.tipo === MOVER_EL_ESTIAJE || o.tipo === REVELAR),
+    suyas.map((o) => o.tipo),
+  );
+  comprobar(
+    'y a los otros dos no se les ofrece nada',
+    TRES.filter((q) => q !== elSiete.quien).every((q) => opcionesEn(elSiete.mesa, q).length === 0),
+  );
+
+  /*
+   * ═══ LAS DOS MITADES DEL CORTE, Y CUÁL DE ELLAS MUERDE ═══
+   *
+   * La de arriba es la de `opciones()`; ésta es la del reductor, y las dos van juntas
+   * por lo que dice la cabecera de `sePuedeJugarLaCarta`. Lo que estas dos líneas
+   * afirman es que ni `TIRAR` ni `PASAR` cambian el estado con el estiaje por mover, que
+   * es lo que hace falta.
+   *
+   * Y lo que NO afirman, medido y no supuesto: cuál de las dos mitades lo impide.
+   * Quitando la guarda de `tirarLosDados` y dejando el corte de `opciones()`, este
+   * fichero sigue ENTERO EN VERDE, porque el portillo del §5 bis rechaza un `TIRAR` que
+   * no se ofreció antes de llegar al reductor. Es la misma sombra que la cabecera de
+   * `sePuedeJugarLaCarta` deja escrita para su copia, y la guarda se escribe igual por
+   * la misma razón: hay caminos que no pasan por el portillo —el reloj entra por uno— y
+   * quien lea la rama dentro de un año no debe tener que demostrar el teorema para saber
+   * que está a salvo. Al revés SÍ se ve: quitando el corte de `opciones()`, la mesa se
+   * queda parada con la bandera encendida y este guion se cae al pedirle TIRAR a quien
+   * ya no lo tiene.
+   */
+  comprobar(
+    'y si se manda TIRAR de todas formas, el reductor devuelve el mismo objeto',
+    avanzarRiberas(e, { tipo: TIRAR, carga: {} }, ctxDe(elSiete.quien, TRES)) === e,
+  );
+  comprobar(
+    'y PASAR tampoco: no se cierra el turno con el estiaje por mover',
+    avanzarRiberas(e, { tipo: PASAR, carga: {} }, ctxDe(elSiete.quien, TRES)) === e,
+  );
+
+  /* ── LOS DIECIOCHO DESTINOS ────────────────────────────────────────────── */
+
+  const destinos = suyas.filter((o) => o.tipo === MOVER_EL_ESTIAJE);
+  const islasOfrecidas = new Set(destinos.map((o) => (o.carga as { donde: string }).donde));
+  comprobar('los destinos son DIECIOCHO: las diecinueve islas menos la de ahora', islasOfrecidas.size === 18, islasOfrecidas.size);
+  comprobar(
+    'y son exactamente ésas: ninguna isla del delta se queda fuera',
+    canonico([...islasOfrecidas].sort()) === canonico(llavesDeLasIslas(e).filter((l) => l !== e.estiaje).sort()),
+  );
+  comprobar('la isla donde ESTÁ el estiaje no se ofrece: mover es a otra', !islasOfrecidas.has(e.estiaje as string));
+  /*
+   * ═══ Y NO ENTRA POR NINGUNA DE LAS DOS PUERTAS ═══
+   *
+   * Lo que estas dos líneas comprueban es que un movimiento así NO CAMBIA EL ESTADO,
+   * que es lo que hace falta. Lo que NO comprueban —y conviene decirlo, porque la
+   * tentación de leerlas al revés es grande— es la guarda que el reductor escribe por
+   * su cuenta: medido, quitando el `if (donde === estado.estiaje)` de `conElEstiajeEn`
+   * este fichero sigue entero en verde, porque el portillo del §5 bis rechaza antes de
+   * llegar ahí. Es exactamente el caso que la cabecera de `sePuedeJugarLaCarta` deja
+   * escrito para su copia: la guarda está a la sombra del portillo y se escribe igual,
+   * porque quien lea esa rama dentro de un año no debe tener que demostrar el teorema
+   * del portillo para saber que está a salvo, y porque hay un camino que no pasa por
+   * él —el reloj, que mueve por el ausente—.
+   */
+  comprobar(
+    'y quedarse donde está, mandado a mano, devuelve el mismo objeto',
+    avanzarRiberas(e, { tipo: MOVER_EL_ESTIAJE, carga: { donde: e.estiaje, a: null } }, ctxDe(elSiete.quien, TRES)) === e,
+  );
+  comprobar(
+    'y un destino que no es ninguna isla del delta, tampoco',
+    avanzarRiberas(e, { tipo: MOVER_EL_ESTIAJE, carga: { donde: '9,9', a: null } }, ctxDe(elSiete.quien, TRES)) === e,
+  );
+
+  /*
+   * ═══ A QUIÉN SE PUEDE ROBAR: COMO REGLA Y NO COMO CASO ═══
+   *
+   * Para CADA isla se calcula aquí quién tiene pieza en sus seis vértices y le queda
+   * algo, y se contrasta con lo que la lista ofrece. Así no depende de que esta semilla
+   * haya dejado a alguien en algún sitio: si la lista ofreciera una víctima de más o se
+   * dejara una, cae aquí. Las tres condiciones son públicas, así que las tres se
+   * comprueban en `opciones()` y ninguna necesita el «sólo si».
+   */
+  const deberian = new Map<string, string[]>();
+  for (const isla of e.islas) {
+    const llave = llaveDeHex(isla.hex);
+    if (llave === e.estiaje) continue;
+    const esquinas = verticesDeHex(isla.hex);
+    deberian.set(
+      llave,
+      e.colonos
+        .filter((c) => c.asiento !== elSiete.quien)
+        .filter((c) => c.almacen.length > 0)
+        .filter((c) => esquinas.some((v) => c.chozas.includes(v) || c.torres.includes(v)))
+        .map((c) => c.asiento),
+    );
+  }
+  const ofrecidasPorIsla = new Map<string, string[]>();
+  for (const o of destinos) {
+    const carga = o.carga as { donde: string; a: string | null };
+    const lista = ofrecidasPorIsla.get(carga.donde) ?? [];
+    if (carga.a !== null) lista.push(carga.a);
+    ofrecidasPorIsla.set(carga.donde, lista);
+  }
+  const desparejadas: string[] = [];
+  for (const [llave, quienes] of deberian) {
+    const dice = ofrecidasPorIsla.get(llave) ?? [];
+    if (canonico([...dice].sort()) !== canonico([...quienes].sort())) {
+      desparejadas.push(`${llave}: se ofrece ${JSON.stringify(dice)} y toca ${JSON.stringify(quienes)}`);
+    }
+  }
+  comprobar('sólo se roba a quien tiene pieza en esa isla y algo en la mano', desparejadas.length === 0, desparejadas);
+  comprobar(
+    'y hay al menos una isla con víctima, o lo de arriba no está mirando nada',
+    [...deberian.values()].some((q) => q.length > 0),
+    [...deberian.values()].filter((q) => q.length > 0).length,
+  );
+  comprobar(
+    'las islas sin nadie a quien robar se ofrecen igual, con el id acabado en :nadie',
+    [...deberian.entries()]
+      .filter(([, q]) => q.length === 0)
+      .every(([llave]) => destinos.some((o) => o.id === `estiaje:${llave}:nadie`)),
+  );
+  comprobar(
+    'y el id lleva la víctima dentro, así que dos víctimas de una isla son dos opciones distintas',
+    new Set(destinos.map((o) => o.id)).size === destinos.length,
+    { opciones: destinos.length, distintas: new Set(destinos.map((o) => o.id)).size },
+  );
+
+  /* ── EL ROBO, JUGADO ───────────────────────────────────────────────────── */
+
+  const conVictima = destinos.find((o) => (o.carga as { a: string | null }).a !== null);
+  comprobar('esta partida ofrece robarle a alguien de verdad', conVictima !== undefined, destinos.map((o) => o.id).slice(0, 4));
+  /*
+   * SE MIRA SI HAY OPCIÓN ANTES DE ABRIR EL BLOQUE, y no es una cautela de estilo: si
+   * la línea que enciende la bandera desapareciera, aquí no habría ni un destino y esto
+   * reventaría con «no se puede leer 'carga' de undefined». Un guion que se cae dice
+   * «error» y no dice CUÁNTAS reglas se han caído, y la cuenta es justamente lo que hay
+   * que poder leer el día que alguien quite esa línea: veintitantas rojas de golpe.
+   */
+  if (conVictima !== undefined) {
+    const aQuien = (conVictima.carga as { a: string }).a;
+    const yaMovido = mover(elSiete.mesa, elSiete.quien, conVictima);
+    const robado = estadoDe(yaMovido);
+    const almacenDe = (donde: EstadoDeRiberas, quien: string): readonly Ficha[] =>
+      (donde.colonos.find((c) => c.asiento === quien) as Colono).almacen;
+    comprobar('la pieza se mueve a la isla elegida', robado.estiaje === (conVictima.carga as { donde: string }).donde);
+    comprobar('y la bandera se apaga: no se mueve dos veces por un siete', robado.estiajePorMover === false);
+    comprobar(
+      'a la víctima le falta exactamente una ficha',
+      almacenDe(robado, aQuien).length === almacenDe(e, aQuien).length - 1,
+    );
+    comprobar(
+      'y a quien mueve le sobra exactamente una',
+      almacenDe(robado, elSiete.quien).length === almacenDe(e, elSiete.quien).length + 1,
+    );
+    /*
+     * LA MISMA FICHA, CON SU NÚMERO DE SERIE. Es lo que hace que `verify:mesa` pueda
+     * demostrar que un secreto cambió de manos: si el robo fabricara una ficha nueva
+     * del mismo bien, aquel comprobador vería aparecer un secreto y desaparecer otro,
+     * y las dos cosas por separado son legales.
+     */
+    const nueva = almacenDe(robado, elSiete.quien).filter((f) => !almacenDe(e, elSiete.quien).includes(f));
+    comprobar(
+      'y es LA MISMA ficha, con su número de serie: no se fabrica una del mismo bien',
+      nueva.length === 1 && almacenDe(e, aQuien).includes(nueva[0] as Ficha),
+      nueva,
+    );
+    /*
+   * UNA TIRADA, O NINGUNA SI A LA VÍCTIMA LE QUEDABA UNA SOLA FICHA: `enteroEntre` con el
+   * mismo mínimo y máximo devuelve el azar intacto, así que robar de un almacén de una no
+   * gasta nada. En este escenario la víctima tiene dos, y por eso se exige la tirada; la
+   * frase lo dice para que nadie lea aquí una propiedad universal que no lo es.
+   */
+  comprobar('el robo de un almacén con dos o más gasta una tirada de azar: es al azar y es reejecutable', robado.azar.tiradas === e.azar.tiradas + 1, {
+      antes: e.azar.tiradas,
+      ahora: robado.azar.tiradas,
+    });
+    comprobar(
+      'nadie más pierde ni gana nada',
+      robado.colonos
+        .filter((c) => c.asiento !== elSiete.quien && c.asiento !== aQuien)
+        .every((c) => c.almacen.length === almacenDe(e, c.asiento).length),
+    );
+    comprobar('el turno sigue siendo suyo: mover no lo cierra', robado.turno === e.turno && robado.tirado);
+    comprobar('y con el estiaje ya movido vuelve a haber turno de verdad: se puede pasar', opcionesEn(yaMovido, elSiete.quien).some((o) => o.tipo === PASAR));
+    /*
+     * Y NO SE MUEVE NINGÚN PREMIO. Ésta es la que ata la decisión de por dónde NO pasa
+     * esta rama: no llama a `conElVado`, ni a `conLaGuardia`, ni a `puedeHaberGanado`,
+     * porque robar cambia de sitio una ficha y nada más. Si algún día pasara por ellos,
+     * cae aquí y hay que venir a leer por qué se decidió que no.
+     */
+    comprobar(
+      'y no se mueve ningún premio ni ningún punto: robar no da puntos',
+      canonico({ vado: robado.vado, guardia: robado.guardia, ganadores: robado.ganadores }) ===
+        canonico({ vado: e.vado, guardia: e.guardia, ganadores: e.ganadores }),
+    );
+    /*
+     * Y LA MITAD QUE DE VERDAD MUERDE. La de arriba compara tres campos, y dos de ellos
+     * —`vado` y `guardia`— sí cambiarían si esta rama llamara a `conElVado` o a
+     * `conLaGuardia`. El tercero no: `puedeHaberGanado` sólo escribe en `ganadores` cuando
+     * alguien llega a los ocho puntos, y en este escenario nadie está cerca, así que
+     * envolver `moverElEstiaje` en `puedeHaberGanado` «por simetría con sus hermanas» 
+     * dejaría la comprobación de arriba verde. Aquí se le pone a alguien la victoria
+     * delante y se exige que mover NO la declare: los puntos no los mueve una ficha que
+     * cambia de isla, y quien tenga que ganar ganará en el movimiento que le dé el punto.
+     */
+    const conUnGanadorDelante = {
+      ...e,
+      colonos: e.colonos.map((c, i) =>
+        i === 0 ? { ...c, titulos: [...c.titulos, ...(['molino', 'cantera', 'torreon', 'faro', 'huerto', 'molino', 'cantera', 'torreon'] as const)] } : c,
+      ),
+    };
+    const trasMoverConLaVictoriaDelante = avanzarRiberas(
+      conUnGanadorDelante,
+      conVictima,
+      ctxDe(elSiete.quien, TRES),
+    );
+    comprobar(
+      'y mover con alguien que ya suma para ganar NO le declara ganador: esta rama no pregunta por la victoria',
+      trasMoverConLaVictoriaDelante.momento === 'jugando' && trasMoverConLaVictoriaDelante.ganadores.length === 0,
+      { momento: trasMoverConLaVictoriaDelante.momento, ganadores: trasMoverConLaVictoriaDelante.ganadores, puntos: puntosDe(conUnGanadorDelante, conUnGanadorDelante.colonos[0] as Colono) },
+    );
+
+    /* LA VACUNA DEL ROBO: a quien no tiene pieza en esa isla no se le puede robar. */
+    const sinNadie = [...deberian.entries()].find(([, q]) => q.length === 0);
+    if (sinNadie !== undefined) {
+      const ajeno = (e.colonos.find((c) => c.asiento !== elSiete.quien) as Colono).asiento;
+      comprobar(
+        'y robarle a alguien que no tiene nada en esa isla devuelve el mismo objeto',
+        avanzarRiberas(e, { tipo: MOVER_EL_ESTIAJE, carga: { donde: sinNadie[0], a: ajeno } }, ctxDe(elSiete.quien, TRES)) === e,
+        { isla: sinNadie[0], a: ajeno },
+      );
+    }
+  }
+
+  /* ── SIN VÍCTIMA: SE MUEVE Y NO SE ROBA ────────────────────────────────── */
+  const aSecas = destinos.find((o) => o.id.endsWith(':nadie'));
+  comprobar('hay al menos una isla donde no hay a quién robar', aSecas !== undefined);
+  if (aSecas !== undefined) {
+    const movido = estadoDe(mover(elSiete.mesa, elSiete.quien, aSecas));
+    comprobar(
+      'se mueve igual: mover es obligatorio aunque no haya botín',
+      movido.estiaje === (aSecas.carga as { donde: string }).donde && !movido.estiajePorMover,
+    );
+    comprobar('y sin robo no se gasta una tirada de azar', movido.azar.tiradas === e.azar.tiradas, {
+      antes: e.azar.tiradas,
+      ahora: movido.azar.tiradas,
+    });
+    comprobar(
+      'y nadie pierde una ficha',
+      movido.colonos.every((c) => c.almacen.length === (e.colonos.find((o) => o.asiento === c.asiento) as Colono).almacen.length),
+    );
+  }
+
+  /* ── EL RETABLO, QUE EN UNA MESA DE CINCO O SEIS ES LA ÚNICA PANTALLA ──── */
+  {
+    const declarado = tableroDeRiberas(proyectarRiberas(e, elSiete.quien), elSiete.quien);
+    const tocables = declarado.caras.filter((c) => c.toque !== null);
+    comprobar('el retablo enseña DIECIOCHO caras tocables, una por isla de destino', tocables.length === 18, tocables.length);
+    comprobar('y ninguna es la isla donde está el estiaje', tocables.every((c) => c.id !== e.estiaje));
+    comprobar('las diecinueve caras siguen ahí: no se esconde ninguna isla', declarado.caras.length === 19);
+    /*
+     * ═══ EL RÓTULO Y LA CIFRA DE UNA CARA OFRECIDA, QUE ES LA MITAD QUE SE OYE ═══
+     *
+     * El retablo del escritorio esconde con `aria-hidden` el texto de una cara TOCABLE
+     * para no decirlo dos veces, y quien pone entonces su nombre es `nombreParaElLector`,
+     * que lo compone con `rotulo` y `cifra`. O sea que una cara ofrecida sin rótulo se
+     * quedaría MUDA para quien no la ve. Que el nombre llegue de verdad al `aria-label`
+     * se comprueba donde vive ese retablo —`verify:escritorio`, que es quien lo puede
+     * pintar, y este fichero no importa nada de `escritorio/`—; aquí se comprueba lo que
+     * es del juego: que el dato sale con las dos palabras dentro.
+     */
+    comprobar('cada cara ofrecida trae su rótulo, que es lo único que un lector tiene', tocables.every((c) => c.rotulo.length > 0));
+    comprobar(
+      'y su cifra, salvo la duna, que no lleva número porque no rinde',
+      tocables.every((c) => {
+        const isla = e.islas.find((i) => llaveDeHex(i.hex) === c.id) as { numero: number };
+        return isla.numero === 0 ? c.cifra === '' : c.cifra === String(isla.numero);
+      }),
+    );
+    const laDelEstiaje = (declarado.caras.find((c) => c.id === e.estiaje) ?? {
+      rotulo: '',
+      borde: '',
+      toque: null,
+    }) as { rotulo: string; borde: string; toque: unknown };
+    comprobar('la isla ocupada lo dice en su rótulo, que es lo que no depende del color', laDelEstiaje.rotulo.endsWith(' · estiaje'), laDelEstiaje.rotulo);
+    comprobar('y no se toca, así que su texto se lee entero: es la que hay que encontrar', laDelEstiaje.toque === null);
+    comprobar(
+      'su filo es otro, y no el de las demás',
+      laDelEstiaje.borde !== (declarado.caras.find((c) => c.id !== e.estiaje) as { borde: string }).borde,
+      laDelEstiaje.borde,
+    );
+    /*
+     * LAS VÍCTIMAS DE MÁS SÍ BAJAN A `acciones`, Y SÓLO ELLAS. La primera opción de cada
+     * isla ya está en su cara; si bajaran las dieciocho, la lista de botones pasaría de
+     * un máximo medido de 36 a 54 en el turno del siete.
+     */
+    const botones = declarado.acciones.filter((a) => a.toque.tipo === MOVER_EL_ESTIAJE);
+    comprobar('a los botones sólo bajan las víctimas de más, no los dieciocho destinos', botones.length === destinos.length - 18, {
+      botones: botones.length,
+      destinos: destinos.length,
+    });
+    comprobar(
+      'y entre las caras y los botones están TODAS: ninguna opción legal se queda sin dónde pulsarse',
+      destinos.every(
+        (o) =>
+          botones.some((a) => a.id === o.id) ||
+          tocables.some(
+            (c) => canonico({ tipo: c.toque?.tipo, carga: c.toque?.carga }) === canonico({ tipo: o.tipo, carga: o.carga }),
+          ),
+      ),
+    );
+    comprobar('y el aviso dice lo que hay que hacer', declarado.aviso.includes('estiaje'), declarado.aviso);
+  }
+}
+
+/* ── EL BLOQUEO: LA ISLA CON EL ESTIAJE ENCIMA NO RINDE A NADIE ─────────── */
+
+/*
+ * ═══ CON UNA TIRADA FABRICADA, QUE ES LA ÚNICA FORMA DE MIRAR ESTO DE VERDAD ═══
+ *
+ * Se busca una isla que rinda y que alguien toque, se pone el estiaje encima y se le da
+ * al estado una semilla cuyas dos primeras tiradas suman SU número. Con eso la tirada
+ * siguiente es la de esa isla y la comparación es directa: con la pieza encima nadie
+ * cobra; sin ella, cobra quien la toca.
+ *
+ * La segunda mitad es la vacuna, y es la que hace que esto valga: sin ella, «nadie
+ * cobró» saldría verde también si la isla no fuera de nadie, si el número no hubiera
+ * salido, o si `repartirLaCosecha` hubiera dejado de repartir del todo.
+ */
+{
+  const base = { ...estadoDe(mesa), tirado: false, estiajePorMover: false };
+  const conDueno = base.islas.find(
+    (isla) =>
+      isla.numero !== 0 &&
+      base.colonos.some((c) => verticesDeHex(isla.hex).some((v) => c.chozas.includes(v) || c.torres.includes(v))),
+  );
+  comprobar('hay una isla que rinde y que alguien toca, o lo de abajo no mide nada', conDueno !== undefined);
+  const isla = conDueno as { hex: Hex; numero: number };
+  const llave = llaveDeHex(isla.hex);
+  const semilla = semillaQueSaca(isla.numero);
+  const quien = (base.colonos[base.turno] as Colono).asiento;
+  const cuantasTiene = (donde: EstadoDeRiberas): number[] => donde.colonos.map((c) => c.almacen.length);
+
+  const bloqueada: EstadoDeRiberas = { ...base, estiaje: llave, azar: sembrar(semilla) };
+  const libre: EstadoDeRiberas = { ...base, azar: sembrar(semilla) };
+  const conBloqueo = avanzarRiberas(bloqueada, { tipo: TIRAR, carga: {} }, ctxDe(quien, TRES));
+  const sinBloqueo = avanzarRiberas(libre, { tipo: TIRAR, carga: {} }, ctxDe(quien, TRES));
+
+  /*
+   * SE MIDE LA DIFERENCIA Y NO «NADIE COBRÓ», Y LA RAZÓN ES DEL TABLERO: los
+   * dieciocho números están repartidos por parejas —dos treses, dos cuatros…— así que
+   * con el número de la isla bloqueada casi siempre rinde OTRA isla, que es lo
+   * correcto y no tiene nada que ver con el estiaje. Lo que la regla dice es que deja
+   * de rendir UNA, así que lo que hay que medir es exactamente lo que esa una
+   * repartía: una ficha por choza y dos por torre en sus seis vértices.
+   */
+  const repartidas = (antes: EstadoDeRiberas, despues: EstadoDeRiberas): number =>
+    cuantasTiene(despues).reduce((a, b) => a + b, 0) - cuantasTiene(antes).reduce((a, b) => a + b, 0);
+  const loQueRendia = base.colonos.reduce(
+    (suma, c) =>
+      suma +
+      verticesDeHex(isla.hex).reduce(
+        (cuenta, v) => cuenta + (c.torres.includes(v) ? 2 : c.chozas.includes(v) ? 1 : 0),
+        0,
+      ),
+    0,
+  );
+
+  comprobar('la tirada fabricada saca el número de esa isla', conBloqueo.ultimaTirada === isla.numero, {
+    saca: conBloqueo.ultimaTirada,
+    isla: isla.numero,
+  });
+  comprobar('esa isla le rendía algo a alguien, o lo de abajo no mide nada', loQueRendia > 0, loQueRendia);
+  comprobar(
+    'con el estiaje encima, esa isla deja de rendir exactamente lo suyo',
+    repartidas(libre, sinBloqueo) - repartidas(bloqueada, conBloqueo) === loQueRendia,
+    { conBloqueo: repartidas(bloqueada, conBloqueo), sinBloqueo: repartidas(libre, sinBloqueo), suyo: loQueRendia },
+  );
+  comprobar(
+    'y se ve fallar: sin la pieza encima, ese mismo número sí reparte',
+    repartidas(libre, sinBloqueo) > 0,
+    repartidas(libre, sinBloqueo),
+  );
+  comprobar(
+    'las demás islas de ese número siguen rindiendo: se bloquea una isla, no un número',
+    repartidas(bloqueada, conBloqueo) === repartidas(libre, sinBloqueo) - loQueRendia,
+  );
+  comprobar('y bloquear no cambia el azar: se tiran los dos dados igual', conBloqueo.azar.tiradas === sinBloqueo.azar.tiradas);
+}
+
+/* ── EL RELOJ: SE MUEVE POR QUIEN NO ESTÁ ──────────────────────────────── */
+
+{
+  const e = estadoDe(elSiete.mesa);
+  const conElTic = avanzarRiberas(e, { tipo: 'arcade:tic', carga: {} }, { quien: null, azar: 0, tic: 1, asientos: TRES });
+  const primeraLegal = llavesDeLasIslas(e).find((l) => l !== e.estiaje) as string;
+  comprobar('al vencer el plazo se mueve por el ausente, y la mesa deja de estar parada', conElTic.estiajePorMover === false);
+  comprobar('y se mueve al PRIMER sitio legal del orden canónico, como la colocación', conElTic.estiaje === primeraLegal, {
+    fue: conElTic.estiaje,
+    tocaba: primeraLegal,
+  });
+  comprobar(
+    'sin gastar una tirada de azar: dos diarios con distintos plazos vencidos tienen que dar lo mismo',
+    conElTic.azar.tiradas === e.azar.tiradas,
+    { antes: e.azar.tiradas, ahora: conElTic.azar.tiradas },
+  );
+  comprobar(
+    'y sin robarle a nadie: el reloj no elige víctima',
+    canonico(conElTic.colonos.map((c) => c.almacen.length)) === canonico(e.colonos.map((c) => c.almacen.length)),
+  );
+  comprobar('y después pasa el turno, que es lo que un plazo vencido significa en «jugando»', conElTic.turno === (e.turno + 1) % e.colonos.length, {
+    antes: e.turno,
+    ahora: conElTic.turno,
+  });
+  /*
+   * Y AL SIGUIENTE NO LE TOCA MOVER NADA. Es el fallo que este tic evita: sin mover por
+   * el ausente, la bandera cruzaría al turno de otro y a quien no ha sacado ningún siete
+   * se le ofrecerían los dieciocho destinos.
+   */
+  const delSiguiente = (conElTic.colonos[conElTic.turno] as Colono).asiento;
+  const suyas = opcionesDeRiberas(proyectarRiberas(conElTic, delSiguiente), delSiguiente);
+  comprobar(
+    'y al siguiente se le ofrece tirar, no mover el estiaje de otro',
+    suyas.some((o) => o.tipo === TIRAR) && suyas.every((o) => o.tipo !== MOVER_EL_ESTIAJE),
+  );
+}
+
+/* ── UNA MESA GUARDADA ANTES DEL ESTIAJE SE ABRE CON LA PIEZA EN LA DUNA ── */
+
+/*
+ * Las mesas de Riberas se guardan en disco y una partida larga dura días, así que hay
+ * mesas escritas ayer sin estos dos campos. Se rellenan con «la pieza está en la duna» y
+ * NO con «no había estiaje», y la diferencia no es de gusto: con `null` la mesa se reabre
+ * sin ninguna isla bloqueada y los destinos pasan a ser DIECINUEVE, porque la lista se
+ * hace quitando la isla de ahora y no habría ninguna que quitar. O sea que el relleno
+ * vacío cambiaría una regla del juego a mitad de partida.
+ */
+{
+  const deAyer = { ...estadoDe(elSiete.mesa) } as Record<string, unknown>;
+  delete deAyer.estiaje;
+  delete deAyer.estiajePorMover;
+  const rellenada = comoSiSiempreHubieraHabidoMazo(deAyer as unknown as EstadoDeRiberas);
+  const laDuna = llaveDeHex((rellenada.islas.find((i) => i.terreno === 'duna') as { hex: Hex }).hex);
+  comprobar('una mesa de ayer se reabre con el estiaje en la duna, no en ninguna parte', rellenada.estiaje === laDuna, rellenada.estiaje);
+  comprobar('y sin nada pendiente de mover', rellenada.estiajePorMover === false);
+
+  const destinosDe = (donde: EstadoDeRiberas): number =>
+    new Set(
+      opcionesDeRiberas(proyectarRiberas({ ...donde, estiajePorMover: true }, elSiete.quien), elSiete.quien)
+        .filter((o) => o.tipo === MOVER_EL_ESTIAJE)
+        .map((o) => (o.carga as { donde: string }).donde),
+    ).size;
+  comprobar('y con la pieza puesta, los destinos siguen siendo dieciocho', destinosDe(rellenada) === 18, destinosDe(rellenada));
+  /*
+   * LA VACUNA: con el relleno vacío —que es la otra forma en que esto se podría haber
+   * escrito, y la que el diseño dejó dicha en dos sitios a la vez— serían diecinueve. Se
+   * monta a mano para que quede ejecutado qué se descartó, y no escrito en un comentario
+   * que nadie puede correr.
+   */
+  comprobar(
+    'se ve fallar: con el estiaje en NINGUNA parte, los destinos serían diecinueve',
+    destinosDe({ ...rellenada, estiaje: null }) === 19,
+    destinosDe({ ...rellenada, estiaje: null }),
+  );
+  comprobar('y a un estado que ya los tiene, el relleno no le hace una copia', comoSiSiempreHubieraHabidoMazo(rellenada) === rellenada);
+}
+
+/* ── UNA VISTA DE AYER NO APAGA EL JUEGO ───────────────────────────────── */
+
+{
+  const vistaDeAyer = { ...(proyectarRiberas(estadoDe(mesa), 'A') as unknown as Record<string, unknown>) };
+  delete vistaDeAyer.estiaje;
+  delete vistaDeAyer.estiajePorMover;
+  const suyas = opcionesDeRiberas(vistaDeAyer, 'A');
+  comprobar('una vista sin los campos del estiaje sigue ofreciendo el turno entero', suyas.length > 0, suyas.length);
+  comprobar('y no ofrece ninguna opción de estiaje, que es lo correcto: ahí no había pieza', suyas.every((o) => o.tipo !== MOVER_EL_ESTIAJE));
 }
 
 // ---------------------------------------------------------------------------
@@ -1090,12 +1681,20 @@ function escenarioDeTrueque(deA: readonly Bien[], deB: readonly Bien[]): EstadoD
   };
 }
 
-const ctxDe = (quien: string, asientos: readonly string[]): {
-  quien: string;
-  azar: number;
-  tic: number;
-  asientos: readonly string[];
-} => ({ quien, azar: 1, tic: 0, asientos });
+/**
+ * EL CONTEXTO DE UN MOVIMIENTO MANDADO A MANO.
+ *
+ * Era una `const` con una flecha dentro y ahora es una funcion declarada, que es lo
+ * unico que cambia: una `const` no existe hasta que se ejecuta su linea, y el bloque
+ * del estiaje —que va arriba, donde esta la partida de la que cuelga— la necesita
+ * antes. Declarada, se puede llamar desde cualquier sitio del fichero.
+ */
+function ctxDe(
+  quien: string,
+  asientos: readonly string[],
+): { quien: string; azar: number; tic: number; asientos: readonly string[] } {
+  return { quien, azar: 1, tic: 0, asientos };
+}
 
 {
   const DOS = ['A', 'B'];
@@ -1525,11 +2124,16 @@ const EL_TRIO = ['A', 'B', 'C'];
     ) === estadoDe(partida),
   );
 
-  /* Se juega el turno de B por la puerta de siempre: tirar y pasar. */
+  /*
+   * Se juega el turno de B por la puerta de siempre: tirar y pasar. Con
+   * `tirarYResolverElEstiaje`, que es la puerta de siempre desde que el siete mueve
+   * una pieza: una de cada seis tiradas deja el turno sin ninguna otra opción hasta
+   * que se mueva, y entonces el `find(PASAR)` de la línea siguiente sería `undefined`.
+   */
   partida = mover(partida, 'A', opcionesEn(partida, 'A').find((o) => o.tipo === PASAR) as Opcion);
-  partida = mover(partida, 'B', opcionesEn(partida, 'B').find((o) => o.tipo === TIRAR) as Opcion);
+  partida = tirarYResolverElEstiaje(partida, 'B');
   partida = mover(partida, 'B', opcionesEn(partida, 'B').find((o) => o.tipo === PASAR) as Opcion);
-  partida = mover(partida, 'A', opcionesEn(partida, 'A').find((o) => o.tipo === TIRAR) as Opcion);
+  partida = tirarYResolverElEstiaje(partida, 'A');
 
   const alTurnoSiguiente = opcionesEn(partida, 'A').filter((o) => o.tipo === GUARDIA);
   comprobar('y al turno siguiente sí se ofrece', alTurnoSiguiente.length > 0, opcionesEn(partida, 'A').map((o) => o.id).slice(0, 8));
@@ -2010,7 +2614,19 @@ paso('Una partida entera, con el árbitro, y reejecutada');
     const e = estadoDe(larga);
     const quien = (e.colonos[e.turno] as Colono).asiento;
     const lista = opcionesEn(larga, quien);
+    /*
+     * ═══ MOVER EL ESTIAJE VA LO PRIMERO, Y NO ES UNA PREFERENCIA ═══
+     *
+     * Es lo único que se ofrece cuando hay que moverlo: sin esta línea, una de cada
+     * seis tiradas de esta partida deja la lista sin `TIRAR`, sin `torre:`, sin
+     * `fundar:`, sin `vereda:` y sin `PASAR`, `elegida` sale `undefined`, el bucle
+     * rompe y la partida no llega al final. O sea que no se añade para que el
+     * comprobador pase: se añade porque la política de este bucle —tirar, torre,
+     * fundar, vereda, pasar— dejó de ser una política completa el día que el siete
+     * empezó a hacer algo.
+     */
     const elegida =
+      lista.find((o) => o.tipo === MOVER_EL_ESTIAJE) ??
       lista.find((o) => o.tipo === TIRAR) ??
       lista.find((o) => o.id.startsWith('torre:')) ??
       lista.find((o) => o.id.startsWith('fundar:')) ??
@@ -2813,9 +3429,35 @@ paso('Cada isla se ve del bien que da, y los dos tableros cuentan lo mismo');
    * si mañana alguien pinta las islas desde otro sitio, esto lo sigue mirando.
    */
   const repartido = avanzarRiberas(undefined, { tipo: EMPEZAR_RIBERAS, carga: {} }, { quien: 'A', azar: 31, tic: 0, asientos: ['A', 'B'] });
-  const caras = tableroDeRiberas(proyectarRiberas(repartido, 'A'), 'A').caras;
+  /*
+   * SIN ESTIAJE A PROPÓSITO, y esta línea es la segunda vez que este bloque se rompe por
+   * lo mismo. La isla que el estiaje tiene seca se pinta EN PENUMBRA (`PENUMBRA_DEL_ESTIAJE`
+   * en `riberas.ts`), y como nace en la duna, el mapa de abajo recogía la duna a media luz y
+   * las tres comprobaciones de color se ponían rojas sin que ningún color de la paleta
+   * hubiera cambiado: decían «el duna del plano se parece más al cantil de la escena».
+   *
+   * Lo que este bloque mide es LA PALETA —que los seis terrenos se distinguen entre sí y de
+   * los colonos—, y eso no depende de dónde esté una pieza. Así que se le pide el tablero a
+   * una vista con `estiaje: null`, que es exactamente lo que trae una mesa guardada de antes
+   * de que la pieza existiera. La penumbra se mide en su propio bloque, más abajo, que es
+   * otra pregunta: allí se comprueba que la isla seca se separa de sí misma.
+   */
+  const vistaSinEstiaje = { ...proyectarRiberas(repartido, 'A'), estiaje: null };
+  const caras = tableroDeRiberas(vistaSinEstiaje, 'A').caras;
+  /*
+   * DE QUÉ TERRENO ES CADA CARA SE PREGUNTA POR SU `id`, Y NO POR SU RÓTULO.
+   *
+   * Esto leía `cara.rotulo.toLowerCase()`, que funcionaba mientras el rótulo de una
+   * isla fuera siempre y sólo el nombre de su terreno. Desde el estiaje, la isla
+   * ocupada rotula «Duna · estiaje», así que el mapa perdía una entrada y las tres
+   * comprobaciones de color de abajo se ponían rojas sin que ningún color hubiera
+   * cambiado. El `id` de una cara es la llave de su isla y no la pinta nadie: es la
+   * llave con la que se pregunta.
+   */
+  const terrenoDeLaCara = new Map<string, string>();
+  for (const i of repartido.islas) terrenoDeLaCara.set(llaveDeHex(i.hex), i.terreno);
   const enElPlano = new Map<string, string>();
-  for (const cara of caras) enElPlano.set(cara.rotulo.toLowerCase(), cara.relleno);
+  for (const cara of caras) enElPlano.set(terrenoDeLaCara.get(cara.id) as string, cara.relleno);
 
   comprobar(
     'el delta repartido enseña los seis terrenos, o lo de abajo no mira nada',
@@ -2893,6 +3535,45 @@ paso('Cada isla se ve del bien que da, y los dos tableros cuentan lo mismo');
   );
 
   /*
+   * ═══ LA ISLA SECA SE VE PORQUE SE PINTA SECA ═══
+   *
+   * El filo de color no vale solo: un trazo fino pide 3:1 de luminancia contra lo que lo
+   * rodea —el mínimo que esta casa ya tiene escrito para un elemento no textual— y el
+   * turquesa da 1,1:1 sobre la salina y 1,3:1 sobre la duna, que es donde el estiaje nace.
+   * Lo que se ve es el ÁREA, así que se exige lo del área: que el relleno en penumbra se
+   * separe de su propio color TANTO COMO DOS TERRENOS DISTINTOS entre sí, o sea el mismo
+   * umbral que la comprobación de arriba; y que no se acerque tanto al filo como para que
+   * la cara se lea como un trazo gordo.
+   *
+   * Se pide por la misma puerta que todo lo demás: el tablero de una vista con el estiaje
+   * puesto, y no la constante.
+   */
+  const conEstiaje = tableroDeRiberas(proyectarRiberas(repartido, 'A'), 'A').caras;
+  const laSeca = conEstiaje.find((c) => c.id === repartido.estiaje) ?? null;
+  const laMismaSinEstiaje = caras.find((c) => c.id === repartido.estiaje) ?? null;
+  comprobar(
+    'la isla del estiaje se pinta en penumbra, y se separa de su propio color tanto como dos terrenos distintos',
+    laSeca !== null &&
+      laMismaSinEstiaje !== null &&
+      laSeca.relleno !== laMismaSinEstiaje.relleno &&
+      distancia(laSeca.relleno, laMismaSinEstiaje.relleno) >= CUANTO_SE_TIENEN_QUE_SEPARAR,
+    {
+      seca: laSeca?.relleno,
+      normal: laMismaSinEstiaje?.relleno,
+      separacion: laSeca !== null && laMismaSinEstiaje !== null ? Number(distancia(laSeca.relleno, laMismaSinEstiaje.relleno).toFixed(1)) : null,
+    },
+  );
+  comprobar(
+    'y no se va tan abajo que la cara se lea como un filo: se separa del borde de la isla',
+    laSeca !== null && distancia(laSeca.relleno, '#1d1f26') >= 10,
+    { seca: laSeca?.relleno, separacionDelFilo: laSeca === null ? null : Number(distancia(laSeca.relleno, '#1d1f26').toFixed(1)) },
+  );
+  comprobar(
+    'y sólo ella: las otras dieciocho se pintan con el color de su terreno',
+    conEstiaje.every((c) => c.id === repartido.estiaje || c.relleno === (caras.find((o) => o.id === c.id)?.relleno ?? null)),
+  );
+
+  /*
    * LAS DOS VACUNAS DEL PLANO, con los seis colores que Miguel vio en la pantalla.
    *
    * El verde azulado de la marisma —que da el ladrillo— cae del lado del carrizal y del
@@ -2933,16 +3614,69 @@ paso('Cada isla se ve del bien que da, y los dos tableros cuentan lo mismo');
    * contorno esta comprobación seguiría verde midiendo un color que ya no existe — que es
    * exactamente la forma del fallo que el resto del bloque persigue.
    */
-  const bordeDeclarado = caras[0]?.borde ?? '';
+  /*
+   * EL BORDE SE LEE DE UNA CARA QUE NO TENGA EL ESTIAJE, y esto ANTES leía `caras[0]`
+   * a secas y exigía que las diecinueve declararan el mismo. Las dos cosas dejaron de
+   * valer el día que la isla ocupada empezó a declarar su propio filo: el reparto pone
+   * el estiaje en la duna, y la duna puede ser la primera del recorrido.
+   *
+   * Sigue sin escribirse ningún literal: los dos bordes se leen de las caras, que es
+   * lo que el mueble pinta. Con un literal, el día que Riberas cambie su contorno esta
+   * comprobación seguiría verde midiendo un color que ya no existe.
+   *
+   * Y se leen de `conEstiaje` y no de `caras`, porque `caras` es ahora el tablero de una
+   * vista SIN la pieza —para que la paleta se mida sin penumbra, ver más arriba— y ahí no
+   * hay ninguna cara que declare el filo del estiaje.
+   */
+  const laDelEstiaje = conEstiaje.find((c) => c.id === repartido.estiaje) as { borde: string };
+  const sinEstiaje = conEstiaje.filter((c) => c.id !== repartido.estiaje);
+  const bordeDeclarado = sinEstiaje[0]?.borde ?? '';
+  const bordeDelEstiaje = laDelEstiaje.borde;
   comprobar(
     'las caras declaran el borde con el que se dibujan, y es un color leíble',
     /^#[0-9a-f]{6}$/i.test(bordeDeclarado),
     bordeDeclarado,
   );
   comprobar(
-    'y las diecinueve declaran el mismo, o «el borde» no significaría nada',
-    caras.length === 19 && caras.every((c) => c.borde === bordeDeclarado),
-    [...new Set(caras.map((c) => c.borde))],
+    'y las DIECIOCHO que no tienen el estiaje declaran el mismo, o «el borde» no significaría nada',
+    conEstiaje.length === 19 && sinEstiaje.length === 18 && sinEstiaje.every((c) => c.borde === bordeDeclarado),
+    [...new Set(sinEstiaje.map((c) => c.borde))],
+  );
+  comprobar(
+    'y la que lo tiene declara otro, que es lo que se ve sin leer',
+    /^#[0-9a-f]{6}$/i.test(bordeDelEstiaje) && bordeDelEstiaje !== bordeDeclarado,
+    bordeDelEstiaje,
+  );
+  /*
+   * ═══ Y EL FILO DEL ESTIAJE SE SEPARA DE LOS SEIS RELLENOS, COMO ELLOS ENTRE SÍ ═══
+   *
+   * Es la misma regla que la de abajo y por el mismo motivo: un filo que se funde con
+   * el relleno de la isla que rodea no marca nada, y la isla ocupada puede ser
+   * cualquiera de las seis. Se mide con el mismo umbral y se dice qué par es el más
+   * apretado, para que quien retoque el color sepa de cuánto margen dispone. Y no
+   * puede ser «el acento»: `borde` es una cadena que el retablo de la app mete cruda en
+   * el trazo de un SVG nativo, que no resuelve variables de CSS, y esta casa tiene un
+   * acento por tema.
+   */
+  const contraElEstiaje = [...enElPlano.entries()]
+    .map(([terreno, color]) => `${terreno}: ${distancia(color, bordeDelEstiaje).toFixed(1)}`)
+    .sort((a, b) => Number(a.split(': ')[1]) - Number(b.split(': ')[1]));
+  comprobar(
+    'el filo del estiaje se separa de los seis rellenos: se ve encima de cualquier isla',
+    [...enElPlano.values()].every((color) => distancia(color, bordeDelEstiaje) >= CUANTO_SE_TIENEN_QUE_SEPARAR),
+    contraElEstiaje,
+  );
+  /*
+   * LA VACUNA: la misma regla, con el filo puesto del color de la duna —que es donde el
+   * estiaje empieza toda partida— tiene que caer. Sin ella, «se separa de los seis»
+   * saldría verde también si `enElPlano` llegara vacío o si `distancia` devolviera
+   * `NaN`, que no es menor que nada.
+   */
+  comprobar(
+    'se ve fallar: un filo del color de la duna no se vería sobre la duna',
+    ![...enElPlano.values()].every(
+      (color) => distancia(color, enElPlano.get('duna') as string) >= CUANTO_SE_TIENEN_QUE_SEPARAR,
+    ),
   );
 
   /*
@@ -3031,6 +3765,19 @@ paso('Cada isla se ve del bien que da, y los dos tableros cuentan lo mismo');
     'ninguna isla se come las piezas de ningún colono',
     seComeUnaPieza(enElPlano, coloresDePieza).length === 0,
     seComeUnaPieza(enElPlano, coloresDePieza),
+  );
+  /*
+   * Y EL FILO DEL ESTIAJE TAMPOCO. Va aquí y no arriba con los otros dos porque los
+   * colores de las piezas se piden por la puerta por la que se pintan —una mesa de
+   * seis, proyectada— y eso se monta en este bloque. El filo se dibuja alrededor de
+   * la isla ocupada y las piezas se pintan encima de ella, así que si el filo fuera el
+   * color de un colono, sus chozas en esa isla desaparecerían justo el turno en que
+   * hay que mirarla.
+   */
+  comprobar(
+    'ni el filo del estiaje se come ninguna, que es el mismo par de superficies',
+    coloresDePieza.every((pieza) => distancia(pieza, bordeDelEstiaje) >= CUANTO_SE_SEPARA_DE_UNA_PIEZA),
+    coloresDePieza.map((pieza) => `${pieza}: ${distancia(pieza, bordeDelEstiaje).toFixed(1)}`),
   );
 
   /*
@@ -3155,6 +3902,12 @@ if (fallos.length === 0) {
       '  juega el turno que se compra, una por turno, la guardia que roba a ciegas, el acaparamiento que\n' +
       '  se lleva todos los de un bien y ninguno más, las dos veredas que son dos, y un título que sólo\n' +
       '  suma en público cuando se enseña — con La Mayor Guardia al tercero y sólo si se supera.\n' +
+      '  Y EL ESTIAJE: al sacar un siete hay que mover la pieza —a otra isla, y no se puede tirar ni\n' +
+      '  pasar hasta hacerlo—, la isla donde se posa deja de rendir exactamente lo que rendía, se le\n' +
+      '  roba una ficha entera con su número de serie a quien tenga algo puesto en ella, el reloj\n' +
+      '  mueve por quien no está sin gastar azar, y una mesa de ayer se reabre con la pieza en la duna.\n' +
+      '  Todo eso jugado hasta un siete de verdad y no montado a mano, que es lo único que se pone\n' +
+      '  rojo el día que la línea que enciende la bandera desaparezca.\n' +
       '  Y cada isla se ve del bien que da: el carrizal como el bosque porque su junco es la madera, la\n' +
       '  marisma como la colina porque su limo es el ladrillo — en el tablero plano, en el de tres\n' +
       '  dimensiones y en la carta, con los seis colores del plano separados lo bastante para no\n' +

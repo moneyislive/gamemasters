@@ -79,6 +79,7 @@ import {
   PUNTOS_DE_LA_GUARDIA,
   VEREDAS_DE_LA_CARTA,
   opcionesDeRiberas,
+  MOVER_EL_ESTIAJE,
   PASAR,
   largoDelVado,
   loSecretoDeRiberas,
@@ -139,7 +140,12 @@ import {
   colorDePiezaDelColono,
 } from '../../shared/arcade/juegos/riberas-en-tres';
 import type { CartaDelMazoEnTres, ExplicacionDeLaCarta } from '../../shared/arcade/juegos/riberas-en-tres';
-import { COLORES_EN_3D } from '../../shared/arcade/juegos/riberas-en-3d';
+/*
+ * Y `obrasPosibles`, que es la que enciende las tres piezas de la barra de obra del
+ * tablero de tres dimensiones. Se pide aquí, por su nombre entero, para poder afirmar qué
+ * hace —y qué NO hace— con el estiaje por mover. Ver el bloque 12 bis.
+ */
+import { COLORES_EN_3D, obrasPosibles } from '../../shared/arcade/juegos/riberas-en-3d';
 /*
  * LA ESCENA DE VERDAD, Y NO UNA COPIA DE SUS NÚMEROS.
  *
@@ -220,7 +226,22 @@ const TRES = ['A', 'B', 'C'] as const;
     tablero !== null && tablero.islas.filter((i) => i.cifra === null).length === 1 && tablero.islas.every((i) => i.cifra !== 0),
   );
   comprobar('las islas con cifra la llevan entre 2 y 12', tablero !== null && tablero.islas.every((i) => i.cifra === null || (i.cifra >= 2 && i.cifra <= 12)));
-  comprobar('no hay ladrón en Riberas', tablero?.ladron === null);
+  /*
+   * Aquí ponía «no hay ladrón en Riberas» y compraba que el campo saliera vacío para
+   * siempre. Ahora la pieza existe: al empezar no hay ninguna comarca seca porque el
+   * estiaje nace en la DUNA, que no rinde, y se exige que sea justo la duna y no otra —con
+   * cualquier isla valdría un `!== null` y no se vería el día que naciera donde no debe—.
+   */
+  const laDunaDelTablero = tablero?.islas.find((i) => i.cifra === null) ?? null;
+  comprobar(
+    'el estiaje empieza en la duna, que es la que no rinde, y la escena sabe cuál es',
+    tablero !== null &&
+      laDunaDelTablero !== null &&
+      tablero.seca !== null &&
+      tablero.seca.q === laDunaDelTablero.hex.q &&
+      tablero.seca.r === laDunaDelTablero.hex.r,
+    { seca: tablero?.seca, duna: laDunaDelTablero?.hex },
+  );
   comprobar('antes de fundar no hay piezas ni caminos', tablero !== null && tablero.piezas.length === 0 && tablero.caminos.length === 0);
 
   /* La serpentina empieza por A. */
@@ -521,6 +542,21 @@ function opcionesEn(mesa: Mesa, quien: string): readonly Opcion[] {
 }
 
 /** Manda un movimiento por el árbitro. */
+/**
+ * TIRA LOS DADOS Y, SI SALE UN SIETE, MUEVE EL ESTIAJE.
+ *
+ * Desde la fase 1 de `docs/EL-LADRON-DE-RIBERAS.md` un siete no deja hacer ninguna otra
+ * cosa hasta que la pieza se mueva, así que un `find(PASAR)` escrito detrás de un
+ * `TIRAR` sale `undefined` una de cada seis veces y este guion se cae con «no se puede
+ * leer 'tipo' de undefined». Se mueve al primer destino que se ofrezca: adónde va no le
+ * importa a nada de lo que este fichero mira, que son las cartas y la escena.
+ */
+function tirarYMoverElEstiaje(mesa: Mesa, quien: string): Mesa {
+  const tirada = mover(mesa, quien, opcionesEn(mesa, quien).find((o) => o.tipo === TIRAR) as Opcion);
+  const pendiente = opcionesEn(tirada, quien).find((o) => o.tipo === MOVER_EL_ESTIAJE);
+  return pendiente === undefined ? tirada : mover(tirada, quien, pendiente);
+}
+
 function mover(mesa: Mesa, quien: string, o: Opcion): Mesa {
   return jugar(mesa, { quien, rev: mesa.rev, movimiento: { tipo: o.tipo, carga: o.carga } });
 }
@@ -582,9 +618,9 @@ const CAMPO_DE_LA_BARRA = (45 * Math.PI) / 180;
 
   /* SE JUEGA EL TURNO DE B POR LA PUERTA DE SIEMPRE, y se vuelve a mirar. */
   partida = mover(partida, 'A', opcionesEn(partida, 'A').find((o) => o.tipo === PASAR) as Opcion);
-  partida = mover(partida, 'B', opcionesEn(partida, 'B').find((o) => o.tipo === TIRAR) as Opcion);
+  partida = tirarYMoverElEstiaje(partida, 'B');
   partida = mover(partida, 'B', opcionesEn(partida, 'B').find((o) => o.tipo === PASAR) as Opcion);
-  partida = mover(partida, 'A', opcionesEn(partida, 'A').find((o) => o.tipo === TIRAR) as Opcion);
+  partida = tirarYMoverElEstiaje(partida, 'A');
 
   const vistaA = vistaEn(partida, 'A');
   const opcionesA = opcionesEn(partida, 'A');
@@ -2220,6 +2256,81 @@ const CAMPO_DE_LA_BARRA = (45 * Math.PI) / 180;
   comprobar('de una mano con cartas rotas sale sólo la buena', salvadas.length === 1 && salvadas[0]?.id === 'c2', salvadas);
   comprobar('sin bandera ninguna, porque no hay opciones que la enciendan', salvadas[0]?.sePuedeJugar === false && salvadas[0]?.sePuedeRevelar === false);
   comprobar('y sin opciones no hay nada que revelar ni que comprar', revelarDe([], 'c2') === null && comprarEnTres([]) === null);
+}
+
+/* ═══ 12 bis. EL ESTIAJE POR MOVER: EN TRES DIMENSIONES TODAVÍA NO SE DIBUJA, Y SE JUEGA IGUAL ═══ */
+
+/*
+ * ═══ QUÉ COMPRA ESTE BLOQUE, Y POR QUÉ HACE FALTA AHORA Y NO EN LA FASE DEL DIBUJO ═══
+ *
+ * La fase 1 de `docs/EL-LADRON-DE-RIBERAS.md` trae la regla y el retablo; las señales de
+ * comarca sobre el tablero de tres dimensiones son la fase 4 y todavía no están. Entre
+ * las dos hay una ventana en la que una mesa de hasta CUATRO colonos —las que se juegan
+ * en tres dimensiones, porque `COLORES_EN_3D` tiene cuatro colores— saca un siete y tiene
+ * que poder moverlo con lo que ya hay. Esto afirma que puede, y afirma exactamente por
+ * dónde: por los BOTONES, que es la reserva que este cliente tiene para todo lo que la
+ * escena aún no sabe pintar.
+ *
+ * Si mañana alguien hiciera que `opcionesFueraDeLaMesa` se llevara lo que no reconoce, o
+ * que `obraPosible` se inventara una clase de sitio para una llave de comarca, esta mesa
+ * se quedaría PARADA con la bandera encendida: no hay ninguna otra opción hasta que se
+ * mueva. Y no se caería nada, que es la forma de fallo que este fichero persigue entero.
+ */
+{
+  const casiJugando = escenarioDeMazo({ bienes: [['limo'], ['limo'], []] });
+  const porMover: EstadoDeRiberas = { ...casiJugando, ultimaTirada: 7, estiajePorMover: true };
+  const mesaDelSiete = mesaSobre('RIB-3D-ESTIAJE', porMover, TRES);
+  const vista = vistaEn(mesaDelSiete, 'A');
+  const opciones = opcionesEn(mesaDelSiete, 'A');
+  const destinos = opciones.filter((o) => o.tipo === MOVER_EL_ESTIAJE);
+
+  comprobar('con el estiaje por mover, el juego ofrece los dieciocho destinos', new Set(destinos.map((o) => (o.carga as { donde: string }).donde)).size === 18, destinos.length);
+  comprobar('y ninguna otra cosa salvo revelar: no se tira, no se construye y no se pasa', opciones.every((o) => o.tipo === MOVER_EL_ESTIAJE || o.tipo === REVELAR), opciones.map((o) => o.tipo));
+
+  /*
+   * LA BARRA DE OBRA SE QUEDA VACÍA, Y ESO ES LO CORRECTO, NO UN FALLO.
+   *
+   * `obrasPosibles` es lo que enciende y apaga las tres piezas de la barra, y con el
+   * estiaje por mover no se puede levantar nada: no hay ni un sitio para ninguna de las
+   * tres. Lo que importa de esta línea es lo OTRO que dice: que ninguna de las dieciocho
+   * opciones nuevas se cuela ahí dentro haciéndose pasar por una obra. `piezaDeLaOpcion`
+   * mira el TIPO y la CARGA y no el `id`, así que un `riberas:estiaje` no es ninguna
+   * pieza; si mañana alguien lo interpretara por el `id` —que empieza por `estiaje:`, y se
+   * parece a `torre:` y a `vereda:`— la barra ofrecería soltar una torre sobre una comarca
+   * y `claseDeLlave` devolvería `null` para su llave, que es la forma de fallo que esa
+   * función deja escrita. La lista de sitios de comarca la traerá `sitiosDelEstiaje`, en
+   * la fase 4.
+   */
+  const obras = obrasPosibles(vista, 'A');
+  comprobar(
+    'con el estiaje por mover no se puede levantar ninguna pieza, y ninguna se inventa un sitio de comarca',
+    obras.length === 3 && obras.every((o) => o.sitios.length === 0 && o.clase === null),
+    obras.map((o) => `${o.pieza}: ${String(o.sitios.length)}`),
+  );
+
+  /*
+   * Y LOS DIECIOCHO LLEGAN ENTEROS A LOS BOTONES. Es la reserva que hace que la mesa de
+   * tres dimensiones se pueda jugar mientras la escena no dibuje las señales: se pintan
+   * como «Y además puedes», con su rótulo, que dice a qué isla van.
+   */
+  const fuera = opcionesFueraDeLaMesa(opcionesFueraDeLaBarra(opcionesFueraDeLaMano(opcionesFueraDelTablero(opciones)), null), null);
+  comprobar('y los dieciocho destinos llegan enteros a los botones: la mesa en tres dimensiones no se queda parada', fuera.filter((o) => o.tipo === MOVER_EL_ESTIAJE).length === destinos.length, {
+    botones: fuera.filter((o) => o.tipo === MOVER_EL_ESTIAJE).length,
+    destinos: destinos.length,
+  });
+  comprobar('cada uno con su rótulo, que es lo que dice a qué isla va', destinos.every((o) => o.rotulo.startsWith('Mover el estiaje')), destinos[0]?.rotulo);
+  /*
+   * LA VACUNA: los filtros de la escena se llevan lo que SÍ saben pintar. Con la misma
+   * lista de opciones de un turno normal, `opcionesFueraDelTablero` quita las de sitio, y
+   * eso es lo que demuestra que la línea de arriba no está diciendo «no filtra nada
+   * nunca».
+   */
+  const deUnTurnoNormal = opcionesEn(mesaSobre('RIB-3D-ESTIAJE-2', casiJugando, TRES), 'A');
+  comprobar(
+    'se ve fallar el filtro: en un turno normal, los sitios del tablero SÍ se caen de los botones',
+    opcionesFueraDelTablero(deUnTurnoNormal).length < deUnTurnoNormal.length,
+    { antes: deUnTurnoNormal.length, despues: opcionesFueraDelTablero(deUnTurnoNormal).length },
+  );
 }
 
 /* ═══ 13. LOS DADOS: TIRAR SE OFRECE UNA VEZ, EL SELLO ES EL TURNO, Y `comprada` SIGUE SIN ESCRIBIRSE ═══ */

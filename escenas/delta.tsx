@@ -3747,12 +3747,12 @@ export function Delta({
     [suelos],
   );
 
-  /** El ladrón: una tienda plantada en la plaza de la comarca que ocupa. */
-  const ladron = useMemo(() => {
-    if (datos.ladron === null) return null;
-    const centro = centroDeHex(datos.ladron, RADIO_DE_COMARCA);
+  /** La comarca seca: una tienda plantada en su plaza, para que se vea cuál no rinde. */
+  const seca = useMemo(() => {
+    if (datos.seca === null) return null;
+    const centro = centroDeHex(datos.seca, RADIO_DE_COMARCA);
     return comoElPack(centro.x, relieve.alturaEn(centro), centro.y, 0, 3);
-  }, [datos.ladron, relieve]);
+  }, [datos.seca, relieve]);
 
 
 
@@ -3886,7 +3886,7 @@ export function Delta({
         />
       ))}
 
-      {ladron === null ? null : <Ladron mallas={aplanados.get(MODELO.tienda)} puesta={ladron} />}
+      {seca === null ? null : <LaComarcaSeca mallas={aplanados.get(MODELO.tienda)} puesta={seca} />}
 
       {/*
         * LOS PUENTES DE LOS JUGADORES. Uno por arista construida.
@@ -3997,8 +3997,8 @@ function Asentamiento({
   );
 }
 
-/** El ladrón, aparte para no meter una función anónima dentro del JSX. */
-function Ladron({
+/** La tienda de la comarca seca, aparte para no meter una función anónima dentro del JSX. */
+function LaComarcaSeca({
   mallas,
   puesta,
 }: {

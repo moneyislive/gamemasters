@@ -405,6 +405,7 @@ const R = {
   fundar: 'riberas:fundar',
   alzar: 'riberas:alzar',
   tirar: 'riberas:tirar',
+  estiaje: 'riberas:estiaje',
   ofrecer: 'riberas:ofrecer',
   aceptar: 'riberas:aceptar',
   rechazar: 'riberas:rechazar',
@@ -436,6 +437,22 @@ const CARTAS_QUE_SE_JUEGAN: readonly string[] = [
  */
 const FAMILIAS: ReadonlyArray<{ nombre: string; es: (t: Toque) => boolean }> = [
   { nombre: 'empezar', es: (t) => t.tipo === R.empezar },
+  /*
+   * ═══ MOVER EL ESTIAJE VA LA PRIMERA, Y NO ES UNA PREFERENCIA: ES LA ÚNICA ═══
+   *
+   * Desde la fase 1 de `docs/EL-LADRON-DE-RIBERAS.md`, al sacar un siete no se ofrece
+   * NINGUNA otra cosa hasta que la pieza se mueva: ni tirar, ni construir, ni pasar. O
+   * sea que sin esta familia este bucle se queda sin jugada la primera vez que sale un
+   * siete y corta la partida —medido: las tres semillas se cortaron en la vuelta 26, 27
+   * y 40, con «el tablero no ofrece nada en jugando»—, que es exactamente el corte que
+   * este comprobador sabe decir en voz alta y por lo que dice el nombre de quien se
+   * quedó parado.
+   *
+   * Su sitio en la lista no decide nada —cuando aparece, no hay nada más que elegir—
+   * pero va la primera porque es lo que más mueve la partida: un siete no se resuelve
+   * hasta que alguien mueve la pieza.
+   */
+  { nombre: 'estiaje', es: (t) => t.tipo === R.estiaje },
   /* Tirar primero: es lo único que hace correr el reloj del juego y traer cosecha. */
   { nombre: 'tirar', es: (t) => t.tipo === R.tirar },
   { nombre: 'revelar', es: (t) => t.tipo === R.revelar },
@@ -2384,11 +2401,25 @@ try {
        *   · `guardia`, `cartaJugada`, `turnosAbiertos`, `veredasGratis` — públicos los
        *     cuatro: un premio derivado que todos ven venir, y tres cosas que pasaron en
        *     voz alta sobre la mesa.
+       *
+       * ═══ Y SE VOLVIÓ A PONER ROJA CON EL ESTIAJE. DOS CAMPOS, Y LOS DOS PÚBLICOS ═══
+       *
+       *   · `estiaje` — la LLAVE de la isla donde está la pieza. Se ve mirando el
+       *     tablero, igual que las chozas: no hay nada que tapar, y taparlo dejaría el
+       *     retablo sin poder decir qué isla está seca. Es una llave de hexágono
+       *     —`1,0`— y no lleva dentro ninguna ficha ni ninguna carta.
+       *   · `estiajePorMover` — un booleano que dice si falta moverla. Público por lo
+       *     mismo que `veredasGratis`: la mesa entera está esperando a que se mueva.
+       *
+       * Lo que la regla nueva mueve de secreto es la ficha robada, y ésa no entra por
+       * aquí: viaja dentro de `misFichas` del ladrón y desaparece de la del robado, que
+       * es justo lo que la búsqueda de secretos de este fichero comprueba una revisión
+       * sí y otra también.
        */
       comprobar(
         'y la vista de Riberas manda exactamente estos campos',
         campos ===
-          'cartaJugada,colonos,desde,faltaVereda,ganadores,guardia,islas,mazo,misCartas,misFichas,misPuntos,momento,paso,tablero,tirado,tratos,turnoDe,turnosAbiertos,ultimaChoza,ultimaTirada,vado,veredasGratis,yo',
+          'cartaJugada,colonos,desde,estiaje,estiajePorMover,faltaVereda,ganadores,guardia,islas,mazo,misCartas,misFichas,misPuntos,momento,paso,tablero,tirado,tratos,turnoDe,turnosAbiertos,ultimaChoza,ultimaTirada,vado,veredasGratis,yo',
         campos,
       );
     }

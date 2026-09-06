@@ -193,6 +193,7 @@ export {
   largoDelVado,
   loSecretoDeRiberas,
   MANIFIESTO_RIBERAS,
+  MOVER_EL_ESTIAJE,
   OFRECER,
   opcionesDeRiberas,
   partidaNueva as partidaNuevaDeRiberas,

@@ -124,7 +124,7 @@ function deltaDePrueba(): DeltaEn3D {
       { arista: aristaEntre(centro, sur), color: '#2f7fd0' },
       { arista: aristaEntre(centro, suroeste), color: '#e8b93c' },
     ],
-    ladron: { q: 0, r: -2 },
+    seca: { q: 0, r: -2 },
   };
 }
 
