@@ -148,6 +148,25 @@ export interface Puente {
   estandartes: EstandarteDelPuente[];
   /** La cota de la calzada en cada punta. Lo que tiene que cuadrar con el camino. */
   cotas: readonly [number, number];
+  /**
+   * EL PUNTO DE LA CALZADA A MITAD DE VANO, que es donde se le cuelga la marca de su dueño.
+   *
+   * ═══ POR QUÉ SALE DE AQUÍ Y NO SE CUENTA FUERA ═══
+   *
+   * Porque la calzada NO es la recta entre las dos puntas: es la polilínea por las juntas, que
+   * es lo que la hace pasar por encima de los cerros en vez de por dentro. Quien quisiera
+   * colgar algo de la mitad del puente y escribiera «la media de las dos cotas» lo pondría
+   * BAJO TIERRA en las mismas aristas en las que la primera versión enterraba el puente
+   * entero — medido sobre el delta de verdad, y está en la cabecera de este fichero.
+   *
+   * Así que la mitad se interpola sobre las juntas, que es la misma cota por la que pasa el
+   * tramo que hay ahí. `avance` no la toca: la marca de una vereda dice de quién es la vereda,
+   * y eso no cambia mientras se levanta la obra.
+   *
+   * `x` y `z` son las del mundo —el punto medio de la arista, que es el mismo que da
+   * `puntoDeArista`— y `y` es la altura.
+   */
+  medio: { x: number; y: number; z: number };
 }
 
 /**
@@ -256,6 +275,33 @@ export function puenteEntre(
     juntas.push(Math.max(recta, antes, despues));
   }
 
+  /*
+   * LA MITAD DE LA CALZADA, interpolada sobre las juntas y no sobre la recta de las puntas.
+   *
+   * Se busca el tramo dentro del cual cae la mitad del vano y se interpola entre sus dos
+   * juntas, que es exactamente la cota por la que pasa la calzada ahí. Las juntas van en orden
+   * creciente —la `i` está en `i·cabida/vano`, y la última en 1—, así que el bucle encuentra
+   * siempre uno; el valor de reserva es la punta de llegada, que es lo que vale si algún día
+   * `cuantos` bajara a cero.
+   */
+  const A_MITAD_DE_VANO = 0.5;
+  const dondeCaeLaJunta = (i: number): number => (i === cuantos ? 1 : (i * cabida) / vano);
+  let alturaEnElMedio = juntas[cuantos] as number;
+  for (let i = 0; i < cuantos; i++) {
+    const desde = dondeCaeLaJunta(i);
+    const hasta = dondeCaeLaJunta(i + 1);
+    if (A_MITAD_DE_VANO < desde || A_MITAD_DE_VANO > hasta) continue;
+    const cuanto = hasta === desde ? 0 : (A_MITAD_DE_VANO - desde) / (hasta - desde);
+    alturaEnElMedio =
+      (juntas[i] as number) + ((juntas[i + 1] as number) - (juntas[i] as number)) * cuanto;
+    break;
+  }
+  const medio = {
+    x: a.x + (b.x - a.x) * A_MITAD_DE_VANO,
+    y: alturaEnElMedio,
+    z: a.y + (b.y - a.y) * A_MITAD_DE_VANO,
+  };
+
   const puestos = Math.round(cuantos * Math.min(1, Math.max(0, avance)));
   const tramos: TramoDePuente[] = [];
   const estandartes: EstandarteDelPuente[] = [];
@@ -290,5 +336,5 @@ export function puenteEntre(
     }
   }
 
-  return { tramos, estandartes, cotas: [cotaA, cotaB] };
+  return { tramos, estandartes, cotas: [cotaA, cotaB], medio };
 }

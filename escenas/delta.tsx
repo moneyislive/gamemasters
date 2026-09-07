@@ -122,20 +122,16 @@ import {
   RADIO_DE_COMARCA,
   RADIO_DE_TESELA,
   ALTO_DEL_ZOCALO,
-  SUELO_DEL_ZOCALO,
   tallaDeUnaMarca,
-  TECHO_DEL_ZOCALO,
-  ZOCALO_EN_PANTALLA,
 } from './escala';
+import { tallaDelZocalo, Zocalo } from './zocalo';
 import {
   CELDA_DE_LA_NIEVE,
   colorDelBien,
-  colorLlanoDelJugador,
   desplazamientoDeCelda,
   desplazamientoDeColor,
   esDeLaHierba,
   esDelColorDelJugador,
-  FILO_DEL_ZOCALO,
   puntosDeLaCifra,
   terrenoDe,
 } from './paleta';
@@ -823,6 +819,7 @@ function PuenteDeJugador({
   aplanados: ReadonlyMap<string, Instanciable[]>;
 }): JSX.Element | null {
   const empezo = useRef<number | null>(null);
+  const zocalo = useRef<THREE.Group>(null);
   const [avance, ponerAvance] = useState(0);
 
   const [a, b] = useMemo(() => verticesDeArista(arista as LlaveDeArista), [arista]);
@@ -841,8 +838,19 @@ function PuenteDeJugador({
    * lo sea. Lo que cambia no es DÓNDE está cada tramo —eso no se mueve— sino CUÁNTOS hay, y
    * eso cambia seis veces en toda la obra, no sesenta veces por segundo. Repintar seis veces
    * para levantar un puente es exactamente lo que hay que repintar.
+   *
+   * Y EL ZÓCALO SE ESCALA ANTES DEL CORTE DE LA OBRA, que no es un detalle de estilo. La
+   * obra termina —`avance >= 1`— y a partir de ahí este `useFrame` no hacía nada; poniendo la
+   * talla del aro detrás de esa línea, la marca de la vereda se quedaría congelada al tamaño
+   * que tuviera el fotograma en que se acabó de construir y encogería con la distancia como
+   * cualquier objeto del mundo, que es exactamente el fallo que la talla de marca existe para
+   * no tener. Es el mismo orden que en `Asentamiento`, y por lo mismo.
    */
   useFrame((estado) => {
+    const z = zocalo.current;
+    if (z !== null && entero !== null) {
+      z.scale.setScalar(tallaDelZocalo(estado.camera, [entero.medio.x, entero.medio.y, entero.medio.z]));
+    }
     if (entero === null || avance >= 1) return;
     if (empezo.current === null) empezo.current = estado.clock.elapsedTime;
     const va = (estado.clock.elapsedTime - empezo.current) / SEGUNDOS_DE_OBRA;
@@ -906,12 +914,41 @@ function PuenteDeJugador({
 
   const tramo = aplanados.get(MODELO.puente);
   const bandera = aplanados.get(modeloDeBandera(color as ColorDeJugador));
-  if (puesto === null || tramo === undefined) return null;
+  if (puesto === null || entero === null || tramo === undefined) return null;
 
   return (
     <group>
       <Modelo mallas={tramo} puestas={puestasDeTramo} />
       {bandera !== undefined && <Modelo mallas={bandera} puestas={puestasDeBandera} />}
+      {/*
+        * ═══ LA MARCA DEL DUEÑO, EN MITAD DE LA VEREDA ═══
+        *
+        * EL FALLO, ENCONTRADO JUGANDO: el zócalo se puso a las chozas y a las torres y las
+        * veredas se quedaron sin nada. Un puente lleva el banderín del color en cada asta, y
+        * un banderín de dos tercios de persona no existe desde la vista de tablero: a esa
+        * distancia el asta entera es un píxel. Con lo cual una vereda propia se ve igual que
+        * un sendero del terreno — y el VADO LARGO, que es uno de los dos títulos de la
+        * partida, se juega contando cinco veredas seguidas.
+        *
+        * Es EL MISMO `Zocalo` que llevan las chozas, con la misma cuenta de marca de
+        * pantalla, y eso es la decisión: dos marcas distintas para «esto es mío» obligan al
+        * ojo a aprender dos cosas, y coinciden hasta el primer retoque.
+        *
+        * ═══ Y VA A LA ALTURA DE LA CALZADA, NO A LA DEL SUELO ═══
+        *
+        * `entero.medio` es el punto de la calzada a mitad de vano, interpolado sobre las
+        * juntas (`puente.ts`). Con la altura del terreno de debajo, el aro quedaría BAJO el
+        * puente en las aristas donde la calzada salva un cerro —hasta ocho personas y media
+        * de roca en la peor de este delta— y desde el aire lo taparía el propio tablero.
+        *
+        * Y no lleva el `avance` de la obra: la marca dice de quién es la vereda, y eso no
+        * cambia mientras se levanta.
+        */}
+      <Zocalo
+        color={color}
+        donde={[entero.medio.x, entero.medio.y + ALTO_DEL_ZOCALO, entero.medio.z]}
+        aro={zocalo}
+      />
       {/*
         * LAS ASTAS. Geometría propia y no un modelo del pack, y no por capricho: ningún
         * mástil del pack mide tres personas y media, y estirar uno que mide dos tercios
@@ -3984,24 +4021,15 @@ function Asentamiento({
     const transcurrido = estado.clock.elapsedTime - nacido.current;
     /*
      * EL ZÓCALO SE MIDE COMO UNA MARCA DE PANTALLA, con la misma cuenta que la señal de los
-     * sitios libres (`tallaDeUnaMarca`, `escala.ts`) y por la misma razón: desde la vista de
-     * tablero —a 574,6 unidades del asentamiento, medidas sobre el encuadre de verdad en
-     * `verify:escena`— un poblado ocupa el 1,27 % del alto de la pantalla, o sea once píxeles
-     * en una ventana de novecientos, y un aro del tamaño del mundo mediría lo mismo. Ver la
-     * cabecera de `ZOCALO_EN_PANTALLA`.
+     * sitios libres y por la misma razón: desde la vista de tablero —a 574,6 unidades del
+     * asentamiento, medidas sobre el encuadre de verdad en `verify:escena`— un poblado ocupa
+     * el 1,27 % del alto de la pantalla, o sea once píxeles en una ventana de novecientos, y
+     * un aro del tamaño del mundo mediría lo mismo. La cuenta es `tallaDelZocalo`
+     * (`zocalo.tsx`) y no está escrita aquí a propósito: de dentro de un `useFrame` no se
+     * mide, y la vereda hace exactamente lo mismo con ella.
      */
     const z = zocalo.current;
-    if (z !== null) {
-      const camara = estado.camera as THREE.PerspectiveCamera;
-      const dx = camara.position.x - punto.x;
-      const dy = camara.position.y - suelo;
-      const dz = camara.position.z - punto.y;
-      const lejos = Math.sqrt(dx * dx + dy * dy + dz * dz);
-      const campo = ((camara.isPerspectiveCamera ? camara.fov : 45) * Math.PI) / 180;
-      z.scale.setScalar(
-        tallaDeUnaMarca(lejos, campo, ZOCALO_EN_PANTALLA, SUELO_DEL_ZOCALO, TECHO_DEL_ZOCALO),
-      );
-    }
+    if (z !== null) z.scale.setScalar(tallaDelZocalo(estado.camera, [punto.x, suelo, punto.y]));
     for (let i = 0; i < partes.length; i++) {
       const g = grupos.current[i];
       const parte = partes[i];
@@ -4020,73 +4048,22 @@ function Asentamiento({
       {/*
         ═══ EL ZÓCALO: LO ÚNICO QUE EL DECORADO NO TIENE ═══
 
-        El fallo que tapa, medido jugando y no leyendo: en una partida entera nadie consiguió
-        señalar su propia choza. Con el encuadre de «Ver el tablero entero», el tablero recién
-        repartido y el mismo con SEIS chozas y SEIS veredas puestas salen indistinguibles.
+        El aro del color de su dueño, y la razón entera de que exista está en la cabecera de
+        `zocalo.tsx`: el tejado de una casa de adorno y el tejado del poblado de alguien son EL
+        MISMO TÉXEL del atlas, así que buscar el color propio entre el caserío es buscar una
+        casa roja entre casas rojas, y a la distancia de la vista de tablero una pieza mide
+        once píxeles.
 
-        Y no es que las piezas no se pinten: es que el tejado de una casa de adorno y el tejado
-        del poblado de alguien son EL MISMO TÉXEL del atlas —`poblar.ts` reparte casas de
-        tejado rojo, azul y amarillo por todas las comarcas, y ésos son tres de los cuatro
-        colores de jugador—. Los números están en `COLOR_LLANO_DEL_JUGADOR` (`paleta.ts`).
-        Buscar el color propio entre el caserío es buscar una casa roja entre casas rojas.
+        VIVE FUERA DE ESTE FICHERO, y eso es la mitad del arreglo. Aquí estuvo escrito a mano
+        dentro del JSX, y por eso se le pudo apagar el grupo entero con `verify:escena` y
+        `verify:escritorio` los dos en verde: dentro de un componente con `useFrame` no llega
+        ningún comprobador de Node. `Zocalo` no usa ningún gancho, así que se puede llamar como
+        una función y recorrer lo que devuelve — y eso es lo que `verify:escena` hace ahora.
 
-        Así que la pieza de jugador gana algo que el decorado no puede tener: un aro del color
-        de su dueño, pegado al suelo, que MIDE LO MISMO EN PANTALLA desde donde se mire. Desde
-        el aire eso es lo que se ve; de cerca es un zócalo discreto alrededor del asentamiento.
-
-        ═══ SE PARECE A `Senal` Y NO ES `Senal`, Y LAS DIFERENCIAS SON LA MITAD DEL DISEÑO ═══
-
-          · NO LATE y no responde al ratón. La señal dice «aquí PUEDES construir» y por eso
-            respira; el zócalo dice «esto YA es de alguien». Un aro que late sobre algo
-            construido invita a pulsarlo, y ahí no hay nada que pulsar.
-          · NO RECIBE RAYOS, y va escrito aunque HOY no haga falta. Hoy no hace falta porque
-            r3f sólo mete en su lista de trazado las mallas que tienen manejadores, y éstas no
-            tienen ninguno; el día que alguien le cuelgue un `onPointerUp` —para señalar la
-            pieza, pongamos— este aro pasaría a ocupar desde el aire más que la propia comarca
-            y se comería los toques de lo que tiene debajo. `raycast={() => null}` es lo que de
-            verdad lo desactiva: con `raycast={null}` el motor revienta al primer rayo, y
-            `visible={false}` NO lo quita del trazado — las dos cosas están medidas sobre el
-            paquete instalado en la cabecera de `Senal`.
-          · VA MÁS BAJO Y MÁS PEQUEÑO. La señal flota dos personas y media para no perderse
-            entre el follaje; el zócalo se apoya casi en el suelo porque tiene una pieza encima
-            que lo levanta visualmente, y ocupa menos pantalla porque hay uno por asentamiento
-            y puede haber cuarenta — al tamaño de una señal, cuarenta aros serían el tablero.
-
-        `depthWrite={false}` y `DoubleSide` como el de la señal, y por lo mismo: que no tape lo
-        que tiene detrás y que no desaparezca visto a ras de suelo.
+        Y lo monta también la VEREDA, en `PuenteDeJugador`, con la misma llamada: dos marcas
+        escritas en dos sitios coinciden hasta el primer retoque.
       */}
-      <group ref={zocalo} position={[0, ALTO_DEL_ZOCALO, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        {/*
-          EL FILO, DEBAJO Y UN POCO MÁS GRANDE. Sin él el aro no se ve, y no es una
-          suposición: el verde de jugador y la celda del bosque —que es la que pinta el
-          carrizal— están a CUATRO unidades de CIE76, o sea que son el mismo color. Los
-          números y la decisión entera, en `FILO_DEL_ZOCALO` (`paleta.ts`).
-
-          Va un poco por debajo en la pila de dibujo (`renderOrder`) y no en altura: dos
-          planos separados en el eje vertical se cruzarían al mirar desde el ras del suelo, y
-          el filo asomaría por delante del color en unos ángulos y por detrás en otros.
-        */}
-        <mesh renderOrder={1} raycast={() => null}>
-          <ringGeometry args={[RADIO_DE_TESELA * 0.55, RADIO_DE_TESELA * 1.07, 28]} />
-          <meshBasicMaterial
-            color={FILO_DEL_ZOCALO}
-            transparent
-            opacity={0.75}
-            depthWrite={false}
-            side={THREE.DoubleSide}
-          />
-        </mesh>
-        <mesh renderOrder={2} raycast={() => null}>
-          <ringGeometry args={[RADIO_DE_TESELA * 0.62, RADIO_DE_TESELA, 28]} />
-          <meshBasicMaterial
-            color={colorLlanoDelJugador(pieza.color)}
-            transparent
-            opacity={0.9}
-            depthWrite={false}
-            side={THREE.DoubleSide}
-          />
-        </mesh>
-      </group>
+      <Zocalo color={pieza.color} donde={[0, ALTO_DEL_ZOCALO, 0]} aro={zocalo} />
       {partes.map((parte, i) => {
         const mallas = aplanados.get(parte.modelo);
         if (mallas === undefined) return null;

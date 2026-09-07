@@ -4596,13 +4596,19 @@ function opcionesDeTurno(v: VistaSinTablero, quien: AsientoId): readonly Opcion[
  */
 function opcionesDelEstiaje(v: VistaSinTablero, mio: ColonoVisto): Opcion[] {
   const opciones: Opcion[] = [];
+  /*
+   * LOS NOMBRES SE SACAN DE LAS DIECINUEVE A LA VEZ, y no isla por isla dentro del
+   * bucle, porque nombrar una depende de las OTRAS: sólo se sabe si hace falta decir
+   * «del norte» mirando si hay otra que se llame igual. Ver `nombresDeLasIslas`.
+   */
+  const comoSeLlaman = nombresDeLasIslas(v.islas);
   for (const isla of v.islas) {
     const donde = llaveDeHex(isla.hex);
     if (donde === v.estiaje) continue;
     const victimas = v.colonos.filter(
       (c) => c.asiento !== mio.asiento && c.bienes > 0 && piezaSuyaEn(c, isla.hex),
     );
-    const comoSeLlama = laIslaEnPalabras(isla);
+    const comoSeLlama = comoSeLlaman.get(donde) ?? laIslaEnPalabras(isla);
     if (victimas.length === 0) {
       opciones.push({
         id: `estiaje:${donde}:nadie`,
@@ -4648,6 +4654,122 @@ const A_LA_ISLA: Record<Terreno, string> = {
 function laIslaEnPalabras(isla: Isla): string {
   const como = A_LA_ISLA[isla.terreno];
   return isla.numero === 0 ? como : `${como} ${String(isla.numero)}`;
+}
+
+/**
+ * ═══ Y CUANDO DOS ISLAS SE LLAMAN IGUAL, EL RUMBO LAS SEPARA ═══
+ *
+ * ═══ EL FALLO, MEDIDO JUGANDO Y NO LEYENDO ═══
+ *
+ * En la primera partida de verdad, al sacar un siete salieron diecinueve botones y DOS de
+ * ellos eran iguales en todo lo que se ve: el mismo glifo («10») dentro del cuadrado, el
+ * mismo terreno en la barra del pie, ningún filo —porque en ninguna de las dos había a
+ * quién robar— y, lo que de verdad cierra el caso, EL MISMO RÓTULO: «Mover el estiaje al
+ * cantil 10». Se pulsaba uno de los dos a ciegas, en una fase que es OBLIGATORIA.
+ *
+ * Y no es un caso raro: `NUMEROS_DE_LAS_ISLAS` reparte DOS de cada cifra salvo el dos y el
+ * doce, así que dos islas comparten número casi siempre; que además caigan sobre el mismo
+ * terreno es cuestión de la baraja, y con tres o cuatro islas por terreno pasa a menudo.
+ *
+ * ═══ POR QUÉ EL ARREGLO ESTÁ AQUÍ Y NO EN EL CUADRADO QUE LO PINTA ═══
+ *
+ * Porque el cuadrado del carril ya hace todo lo que puede —dice la cifra, pinta el terreno
+ * al pie y el filo de la víctima— y las dos islas siguen siendo iguales en las tres cosas.
+ * Lo único que puede separarlas es DÓNDE ESTÁN, y eso lo sabe el juego: tiene la llave del
+ * hexágono de cada una y sabe dónde cae respecto de las demás. El cuadrado no.
+ *
+ * ═══ EL RUMBO, Y POR QUÉ ES RELATIVO A LA OTRA Y NO AL CENTRO DEL DELTA ═══
+ *
+ * El rumbo absoluto no sirve: dos cantiles pueden estar los dos en el noreste del delta —
+ * (1,−1) y (2,−2) lo están— y entonces las dos se llamarían «del noreste» y no se habría
+ * arreglado nada. El rumbo que se pone es el de cada isla respecto al CENTRO DE LAS QUE SE
+ * LLAMAN COMO ELLA, así que las dos salen por fuerza en direcciones opuestas y nunca
+ * coinciden. Y se lee igual de bien: «el cantil 10 del norte» es, para quien mira el
+ * tablero, el más al norte de los dos cantiles 10, que es exactamente lo que hay que
+ * distinguir.
+ *
+ * El eje va como en el tablero: en las coordenadas de `centroDeHex` la `y` crece HACIA
+ * ABAJO —hacia el sur en el retablo plano, hacia la cámara en el delta 3D—, y por eso el
+ * norte es la `y` cambiada de signo.
+ *
+ * ═══ Y SE CUENTA SIN UN SOLO `atan2`, QUE NO ES UN CAPRICHO ═══
+ *
+ * La primera versión sacaba el ángulo con `Math.atan2` y lo partía en ocho. `verify:pureza`
+ * la tumbó, y tenía razón: las funciones trascendentales de `Math` están
+ * «implementation-approximated» en la especificación, así que V8 y Hermes devuelven últimos
+ * bits distintos — y esto vive en `shared/`, o sea que lo corren el servidor, el escritorio y
+ * el móvil. Un bit de diferencia justo en la frontera de un sector y dos jugadores de la misma
+ * mesa leerían «del norte» y «del sur» EN LA MISMA ISLA, que es peor que el fallo original.
+ *
+ * Lo que decide el sector es una comparación de pendientes, y ésa sale con lo que SÍ está
+ * fijado al bit por IEEE 754: multiplicar, comparar y `Math.sqrt`. La frontera entre «este» y
+ * «noreste» está a 22,5°, y la tangente de 22,5° es exactamente `√2 − 1`.
+ *
+ * ═══ Y CUÁNDO NO SE PONE NADA ═══
+ *
+ * Cuando el nombre ya es único, que es el caso corriente. Añadir «del norte» a la única
+ * vega 4 del delta sería ruido en un botón que ya distinguía, y estos rótulos se leen en
+ * voz alta.
+ *
+ * ═══ HASTA DÓNDE LLEGA, DICHO ANTES DE QUE LO DESCUBRA NADIE ═══
+ *
+ * Con el reparto de esta casa, un nombre lo comparten COMO MUCHO DOS islas —hay dos de
+ * cada cifra, y una sola duna—, y con dos el rumbo opuesto las separa siempre. Con tres o
+ * más el rumbo podría repetirse, y entonces esta función devolvería dos nombres iguales:
+ * es un tablero que este juego no reparte, y `verify:riberas` lo compra por los dos lados
+ * —que el reparto nunca ponga tres, y que sobre miles de repartos de verdad no salga ni un
+ * nombre repetido—.
+ */
+const TANGENTE_DE_VEINTIDOS_Y_MEDIO = Math.sqrt(2) - 1;
+
+/**
+ * EL RUMBO DE UN DESPLAZAMIENTO EN EL PLANO DEL TABLERO, en una de las ocho palabras.
+ *
+ * Un sector es «casi horizontal» cuando lo que sube cabe dentro de lo que avanza por la
+ * tangente de 22,5°, y «casi vertical» al revés. Lo que no es ninguna de las dos cosas es una
+ * diagonal, y ahí mandan los dos signos. Ocho sectores, ninguna función trascendental.
+ */
+function rumboDe(dx: number, dy: number): string {
+  const norte = -dy;
+  const aLoAncho = Math.abs(dx);
+  const aLoAlto = Math.abs(norte);
+  if (aLoAlto <= aLoAncho * TANGENTE_DE_VEINTIDOS_Y_MEDIO) return dx >= 0 ? 'del este' : 'del oeste';
+  if (aLoAncho <= aLoAlto * TANGENTE_DE_VEINTIDOS_Y_MEDIO) return norte >= 0 ? 'del norte' : 'del sur';
+  if (norte >= 0) return dx >= 0 ? 'del noreste' : 'del noroeste';
+  return dx >= 0 ? 'del sureste' : 'del suroeste';
+}
+
+/**
+ * CÓMO SE LLAMA CADA ISLA, por llave de hexágono y mirando a todas a la vez.
+ *
+ * Se exporta porque `verify:riberas` la mide sobre repartos de verdad, y porque es la
+ * respuesta a «¿cómo se llama esta isla?» que cualquier otro rótulo de este juego querría
+ * si algún día nombra una.
+ */
+export function nombresDeLasIslas(islas: readonly Isla[]): ReadonlyMap<LlaveDeHex, string> {
+  const porNombre = new Map<string, Isla[]>();
+  for (const isla of islas) {
+    const llano = laIslaEnPalabras(isla);
+    const juntas = porNombre.get(llano);
+    if (juntas === undefined) porNombre.set(llano, [isla]);
+    else juntas.push(isla);
+  }
+  const salida = new Map<LlaveDeHex, string>();
+  for (const [llano, juntas] of porNombre) {
+    if (juntas.length === 1) {
+      salida.set(llaveDeHex((juntas[0] as Isla).hex), llano);
+      continue;
+    }
+    /* El centro de las que se llaman igual. El tamaño da lo mismo: sólo se usa el ángulo. */
+    const centros = juntas.map((i) => centroDeHex(i.hex, 1));
+    const medioX = centros.reduce((s, c) => s + c.x, 0) / centros.length;
+    const medioY = centros.reduce((s, c) => s + c.y, 0) / centros.length;
+    juntas.forEach((isla, i) => {
+      const c = centros[i] as { x: number; y: number };
+      salida.set(llaveDeHex(isla.hex), `${llano} ${rumboDe(c.x - medioX, c.y - medioY)}`);
+    });
+  }
+  return salida;
 }
 
 /** ¿Tiene este colono, SEGÚN LA VISTA, choza o torre en algún vértice de esta isla? */

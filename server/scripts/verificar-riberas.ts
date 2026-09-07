@@ -96,6 +96,7 @@ import {
   aristasDe,
   aristasDeVertice,
   aristaTocaVertice,
+  centroDeHex,
   hexesDeVertice,
   llaveDeHex,
   mallaDeRadio,
@@ -131,6 +132,7 @@ import {
   largoDelVado,
   loSecretoDeRiberas,
   MOVER_EL_ESTIAJE,
+  nombresDeLasIslas,
   OFRECER,
   opcionesDeRiberas,
   PASAR,
@@ -177,6 +179,7 @@ import type {
   Colono,
   EstadoDeRiberas,
   Ficha,
+  Isla,
   Opcion,
 } from '../../shared/arcade/juegos';
 
@@ -4774,6 +4777,281 @@ paso('Cada isla se ve del bien que da, y los dos tableros cuentan lo mismo');
   );
 }
 
+// ---------------------------------------------------------------------------
+paso('Dos islas nunca se llaman igual, y el rumbo es lo que las separa');
+// ---------------------------------------------------------------------------
+
+/*
+ * ═══ EL FALLO, ENCONTRADO JUGANDO Y NO LEYENDO ═══
+ *
+ * Al sacar un siete salen diecinueve botones, y en la primera partida de verdad DOS de ellos
+ * eran iguales en todo lo que se ve: mismo glifo («10») dentro del cuadrado del carril, mismo
+ * terreno en la barra del pie, ningún filo —porque en ninguna de las dos había a quién
+ * robar— y el MISMO RÓTULO, «Mover el estiaje al cantil 10». Se pulsaba uno de los dos a
+ * ciegas, en una fase que es OBLIGATORIA: no se puede tirar ni pasar hasta mover.
+ *
+ * Que el `id` sea único no arregla nada: el `id` no se lee. Lo que se lee es el rótulo.
+ *
+ * ═══ QUÉ SE COMPRA AQUÍ, Y POR QUÉ SOBRE REPARTOS DE VERDAD ═══
+ *
+ * Un tablero montado a mano probaría que la función sabe poner «del norte» cuando se lo
+ * ponen delante. Lo que hay que saber es otra cosa: que en las partidas que este juego
+ * REPARTE no queda ni un nombre repetido. Así que se reparte el delta mil veces con el
+ * movimiento de verdad y se miran los diecinueve nombres de cada uno.
+ *
+ * Y las tres cosas se compran por separado, porque las tres se pueden romper solas:
+ *   1. que el caso EXISTA —si el reparto dejara de poner dos cifras iguales, todo lo demás
+ *      sería verde por vacío—,
+ *   2. que con el rumbo puesto no quede ningún nombre repetido,
+ *   3. y que SIN el rumbo los hubiera, que es la vacuna y es el fallo que se jugó.
+ */
+{
+  const REPARTOS = 1000;
+  const llanoDe = (isla: Isla): string =>
+    isla.numero === 0 ? String(isla.terreno) : `${String(isla.terreno)} ${String(isla.numero)}`;
+  let conParejaLlana = 0;
+  let masDeDosConElMismoLlano = 0;
+  const repetidosConRumbo: string[] = [];
+  const repetidosSinRumbo: string[] = [];
+  let repartosConRepeConRumbo = 0;
+  let repartosConRepeSinRumbo = 0;
+  for (let semilla = 0; semilla < REPARTOS; semilla++) {
+    const delta = avanzarRiberas(
+      undefined,
+      { tipo: EMPEZAR_RIBERAS, carga: {} },
+      { quien: 'A', azar: semilla, tic: 0, asientos: ['A', 'B'] },
+    );
+    const cuantasPorLlano = new Map<string, number>();
+    for (const isla of delta.islas) {
+      const llano = llanoDe(isla);
+      cuantasPorLlano.set(llano, (cuantasPorLlano.get(llano) ?? 0) + 1);
+    }
+    const masJuntas = [...cuantasPorLlano.values()].reduce((m, n) => Math.max(m, n), 0);
+    if (masJuntas > 1) conParejaLlana++;
+    if (masJuntas > 2) masDeDosConElMismoLlano++;
+    const conRumbo = [...nombresDeLasIslas(delta.islas).values()];
+    if (new Set(conRumbo).size !== conRumbo.length) {
+      repartosConRepeConRumbo++;
+      if (repetidosConRumbo.length < 3) repetidosConRumbo.push(`azar=${String(semilla)}: ${conRumbo.join(' / ')}`);
+    }
+    const sinRumbo = delta.islas.map(llanoDe);
+    if (new Set(sinRumbo).size !== sinRumbo.length) {
+      repartosConRepeSinRumbo++;
+      if (repetidosSinRumbo.length < 3) {
+        repetidosSinRumbo.push(`azar=${String(semilla)}: ${sinRumbo.filter((n, i) => sinRumbo.indexOf(n) !== i).join(', ')}`);
+      }
+    }
+  }
+  comprobar(
+    `el caso existe y es la norma: ${String(conParejaLlana)} de los ${String(REPARTOS)} repartos ponen dos islas del mismo terreno Y la misma cifra`,
+    conParejaLlana > REPARTOS / 2,
+    { conParejaLlana, de: REPARTOS },
+  );
+  comprobar(
+    'y nunca son TRES: el reparto lleva dos de cada cifra, que es lo que hace que un rumbo opuesto baste siempre',
+    masDeDosConElMismoLlano === 0,
+    { masDeDosConElMismoLlano },
+  );
+  comprobar(
+    `con el rumbo puesto no queda un solo nombre repetido en ${String(REPARTOS)} repartos: los diecinueve destinos de un siete se llaman los diecinueve distinto`,
+    repartosConRepeConRumbo === 0,
+    repetidosConRumbo,
+  );
+  comprobar(
+    `se ve fallar: sin el rumbo, ${String(repartosConRepeSinRumbo)} de los ${String(REPARTOS)} repartos dejan dos botones con el mismo rótulo en una fase obligatoria`,
+    repartosConRepeSinRumbo > 0,
+    repetidosSinRumbo,
+  );
+}
+
+/*
+ * ═══ Y AHORA POR LA PUERTA DE VERDAD: LOS RÓTULOS QUE EMITE `opciones()` ═══
+ *
+ * Lo de arriba mide la función que nombra. Esto mide lo que el jugador lee, que es otra cosa
+ * y es la que importa: se juega hasta un siete de verdad y se leen los rótulos de los
+ * destinos que salen. Dos destinos que van a ISLAS DISTINTAS tienen que llamarse distinto.
+ *
+ * La vara es «islas distintas» y no «todos distintos», y conviene decir por qué en vez de
+ * bajarla sin avisar: una isla con DOS víctimas emite dos opciones con el mismo rótulo y
+ * distinta ayuda, y eso es correcto —primero se elige adónde, y sólo ahí hay una segunda
+ * pregunta—. Lo que no puede pasar es que dos SITIOS del tablero se llamen igual.
+ */
+{
+  let turnos = 0;
+  let conSiete = 0;
+  const chocan: string[] = [];
+  const chocarianSinRumbo: string[] = [];
+  for (let semilla = 0; semilla < 60; semilla++) {
+    const delta = avanzarRiberas(
+      undefined,
+      { tipo: EMPEZAR_RIBERAS, carga: {} },
+      { quien: 'A', azar: semilla, tic: 0, asientos: ['A', 'B'] },
+    );
+    /*
+     * NO SE JUEGA LA PARTIDA ENTERA: se enciende la bandera del estiaje a mano sobre un
+     * reparto de VERDAD y se pide la lista. Lo que se mide aquí son los rótulos, y el camino
+     * por el que la bandera se enciende ya lo compran los bloques del siete y de la guardia.
+     */
+    const porMover: EstadoDeRiberas = { ...delta, momento: 'jugando', tirado: true, estiajePorMover: true };
+    const destinos = ofrecidasA(porMover, 'A').filter((o) => o.tipo === MOVER_EL_ESTIAJE);
+    if (destinos.length === 0) continue;
+    conSiete++;
+    const porIsla = new Map<string, string>();
+    for (const o of destinos) {
+      const donde = (o.carga as { donde: string }).donde;
+      const antes = porIsla.get(o.rotulo);
+      if (antes !== undefined && antes !== donde) chocan.push(`«${o.rotulo}» nombra a ${antes} y a ${donde}`);
+      porIsla.set(o.rotulo, donde);
+      turnos++;
+    }
+    const nombres = nombresDeLasIslas(delta.islas);
+    const sinRumbo = new Map<string, string>();
+    for (const isla of delta.islas) {
+      const llano = (nombres.get(llaveDeHex(isla.hex)) ?? '').replace(/ del [a-z]+$/u, '');
+      const antes = sinRumbo.get(llano);
+      const donde = llaveDeHex(isla.hex);
+      if (antes !== undefined && antes !== donde) chocarianSinRumbo.push(`«${llano}» ${antes} y ${donde}`);
+      sinRumbo.set(llano, donde);
+    }
+  }
+  comprobar(
+    `hay lista que mirar: ${String(conSiete)} repartos con el estiaje por mover y ${String(turnos)} destinos leídos`,
+    conSiete >= 50 && turnos > 800,
+    { conSiete, turnos },
+  );
+  comprobar(
+    'dos destinos que van a islas distintas se llaman distinto, en todos ellos',
+    chocan.length === 0,
+    chocan.slice(0, 5),
+  );
+  comprobar(
+    `se ve fallar: quitándole el rumbo al nombre, ${String(chocarianSinRumbo.length)} pares de islas distintas volverían a llamarse igual`,
+    chocarianSinRumbo.length > 0,
+    chocarianSinRumbo.slice(0, 5),
+  );
+  /*
+   * Y EL RUMBO NO SE PONE CUANDO NO HACE FALTA. Un «del norte» colgado de la única vega 4 del
+   * delta es ruido en un botón que ya distinguía, y estos rótulos se leen en voz alta.
+   */
+  const uno = avanzarRiberas(
+    undefined,
+    { tipo: EMPEZAR_RIBERAS, carga: {} },
+    { quien: 'A', azar: 3, tic: 0, asientos: ['A', 'B'] },
+  );
+  const nombres = nombresDeLasIslas(uno.islas);
+  const cuantasPorLlano = new Map<string, number>();
+  for (const isla of uno.islas) {
+    const llano = isla.numero === 0 ? String(isla.terreno) : `${String(isla.terreno)} ${String(isla.numero)}`;
+    cuantasPorLlano.set(llano, (cuantasPorLlano.get(llano) ?? 0) + 1);
+  }
+  const solitarias = uno.islas.filter((i) => (cuantasPorLlano.get(i.numero === 0 ? String(i.terreno) : `${String(i.terreno)} ${String(i.numero)}`) ?? 0) === 1);
+  comprobar(
+    'las islas cuyo nombre ya era único no llevan rumbo: sólo lo llevan las que lo comparten',
+    solitarias.length > 0 && solitarias.every((i) => !(nombres.get(llaveDeHex(i.hex)) ?? '').includes(' del ')),
+    solitarias.map((i) => nombres.get(llaveDeHex(i.hex))).slice(0, 6),
+  );
+  /*
+   * Y EL RUMBO DICE LA VERDAD, EN LOS OCHO SECTORES Y NO EN DOS.
+   *
+   * En las coordenadas del tablero la `y` crece hacia abajo, así que «norte» es la de `y`
+   * menor y «este» la de `x` mayor. Sin esto, una tabla de rumbos escrita al revés
+   * distinguiría igual de bien y mandaría a todo el mundo a mirar la isla contraria, en una
+   * fase que es OBLIGATORIA.
+   *
+   * ═══ Y POR QUÉ NO VALE BUSCAR LA PALABRA DENTRO DEL RÓTULO ═══
+   *
+   * Esto miraba si el rótulo contenía «norte», y con eso compraba DOS de los ocho sectores.
+   * «Noreste» y «noroeste» no contienen esa palabra —son `noreste` y `noroeste`, sin la `t`—,
+   * así que las seis islas que salen en diagonal o de lado no tenían quien las desmintiera.
+   * Medido: cambiando en `rumboDe` el este por el oeste, este guion salía en 0 con las 550 en
+   * verde y `verify:escritorio` en 0 con las 659, mientras seis rumbos de ocho apuntaban a la
+   * isla contraria.
+   *
+   * Se lee con una TABLA de los ocho sectores y no buscando palabras sueltas, por lo mismo: la
+   * tabla falla RUIDOSAMENTE si alguien inventa un rumbo nuevo —no está en `RUMBOS` y la
+   * pareja se apunta como al revés—, mientras que buscar una palabra que no existe se salta la
+   * pareja en silencio, que es exactamente lo que pasaba.
+   */
+  /** Qué exige cada una de las ocho palabras: signo de `x` y signo de «hacia el norte». */
+  const RUMBOS: ReadonlyMap<string, { este: number; norte: number }> = new Map([
+    ['del este', { este: 1, norte: 0 }],
+    ['del oeste', { este: -1, norte: 0 }],
+    ['del norte', { este: 0, norte: 1 }],
+    ['del sur', { este: 0, norte: -1 }],
+    ['del noreste', { este: 1, norte: 1 }],
+    ['del noroeste', { este: -1, norte: 1 }],
+    ['del sureste', { este: 1, norte: -1 }],
+    ['del suroeste', { este: -1, norte: -1 }],
+  ]);
+  const alReves: string[] = [];
+  /* Cuántas parejas con rumbo se han llegado a mirar: cero parejas es cero fallos, y se lee verde. */
+  let parejas = 0;
+  for (let semilla = 0; semilla < 200; semilla++) {
+    const delta = avanzarRiberas(
+      undefined,
+      { tipo: EMPEZAR_RIBERAS, carga: {} },
+      { quien: 'A', azar: semilla, tic: 0, asientos: ['A', 'B'] },
+    );
+    const conRumbo = nombresDeLasIslas(delta.islas);
+    const porLlano = new Map<string, Isla[]>();
+    for (const isla of delta.islas) {
+      const llano = (conRumbo.get(llaveDeHex(isla.hex)) ?? '').replace(/ del [a-z]+$/u, '');
+      const juntas = porLlano.get(llano);
+      if (juntas === undefined) porLlano.set(llano, [isla]);
+      else juntas.push(isla);
+    }
+    for (const [, juntas] of porLlano) {
+      if (juntas.length !== 2) continue;
+      const [una, otra] = juntas as [Isla, Isla];
+      const nombreUna = conRumbo.get(llaveDeHex(una.hex)) ?? '';
+      const nombreOtra = conRumbo.get(llaveDeHex(otra.hex)) ?? '';
+      const centroUna = centroDeHex(una.hex, 1);
+      const centroOtra = centroDeHex(otra.hex, 1);
+      /* Sin rumbo no hay nada que desmentir: son las que ya se llamaban distinto. */
+      if (!nombreUna.includes(' del ')) continue;
+      parejas++;
+      const exige = RUMBOS.get(nombreUna.slice(nombreUna.lastIndexOf('del ')));
+      if (exige === undefined) {
+        alReves.push(`azar=${String(semilla)}: rumbo que no está en la tabla: «${nombreUna}»`);
+        continue;
+      }
+      /* «Este» es `x` mayor; «norte» es `y` MENOR, que en este tablero es hacia arriba. */
+      const haciaElEste = Math.sign(centroUna.x - centroOtra.x);
+      const haciaElNorte = Math.sign(centroOtra.y - centroUna.y);
+      if (exige.este !== 0 && haciaElEste !== exige.este) {
+        alReves.push(
+          `azar=${String(semilla)}: «${nombreUna}» en x=${String(Math.round(centroUna.x))} y ` +
+            `«${nombreOtra}» en x=${String(Math.round(centroOtra.x))}`,
+        );
+        continue;
+      }
+      if (exige.norte !== 0 && haciaElNorte !== exige.norte) {
+        alReves.push(
+          `azar=${String(semilla)}: «${nombreUna}» en y=${String(Math.round(centroUna.y))} y ` +
+            `«${nombreOtra}» en y=${String(Math.round(centroOtra.y))}`,
+        );
+      }
+    }
+  }
+  comprobar(
+    'cada rumbo apunta al lado correcto —los ocho, y no sólo norte y sur— en doscientos repartos',
+    alReves.length === 0,
+    alReves.slice(0, 4),
+  );
+  /*
+   * Y QUE SE HAYAN MIRADO PAREJAS DE VERDAD. La de arriba dice «no hay ninguna al revés», y una
+   * lista vacía sale verde tanto si los doscientos repartos estaban bien como si el bucle no
+   * entró NUNCA —un `continue` de más, un rótulo que deja de llevar « del »—. Con 731 repartos
+   * de cada 1.000 llevando al menos una pareja, doscientos dan varios cientos; el listón se
+   * pone en 200, que es holgado por abajo y aun así imposible de pasar con el bucle muerto.
+   */
+  comprobar(
+    'y se han mirado parejas de verdad, que si no un cero es un verde vacío',
+    parejas > 200,
+    { parejas },
+  );
+}
+
 /**
  * EL GUARDIA DE «NO SE HAN HECHO TODAS», que este guion no tenia.
  *
@@ -4790,8 +5068,12 @@ paso('Cada isla se ve del bien que da, y los dos tableros cuentan lo mismo');
  * 541 saltaria EL antes de que se vieran las lineas rojas —que es lo contrario de lo que
  * hace falta para arreglar nada—. Medido con la vacuna que mas bloques apaga (la guardia
  * que no enciende el estiaje): 536 comprobaciones y 19 rojas. Once de margen.
+ *
+ * Con el bloque de los nombres de las islas son nueve mas, y ninguna de las nueve se salta
+ * por un bloque roto —no cuelgan de ninguna partida jugada, sino de repartos—, asi que el
+ * numero sube los nueve enteros: de 530 a 539, con el mismo margen de once.
  */
-const COMPROBACIONES_ESCRITAS = 530;
+const COMPROBACIONES_ESCRITAS = 539;
 if (hechas < COMPROBACIONES_ESCRITAS) {
   console.error(
     `Solo se han hecho ${hechas} de las ${COMPROBACIONES_ESCRITAS} comprobaciones que ` +

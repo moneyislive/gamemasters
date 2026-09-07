@@ -195,6 +195,7 @@ export {
   loSecretoDeRiberas,
   MANIFIESTO_RIBERAS,
   MOVER_EL_ESTIAJE,
+  nombresDeLasIslas,
   OFRECER,
   opcionesDeRiberas,
   partidaNueva as partidaNuevaDeRiberas,

@@ -1577,11 +1577,18 @@ export interface GlifoDelCarril {
  * 11,11,12`, o sea DOS de cada cifra salvo el dos y el doce. Así que en el carril puede
  * haber dos cuadrados con un «11». Por eso viaja también el TERRENO, que es lo que los
  * separa en el tablero: dos onces, uno sobre salina y otro sobre cantil, se ven distintos
- * allí y se ven distintos aquí. Y queda una ambigüedad que este fichero no puede cerrar
- * porque es del propio rótulo del juego: si las dos islas del mismo número son ADEMÁS del
- * mismo terreno, ni «Mover el estiaje a la salina 11» las distingue —medido: esa frase sale
- * dos veces en la partida de `verify:escritorio`—. Eso se arregla en el rótulo que emite
- * `opcionesDelEstiaje`, no en el cuadrado que lo pinta.
+ * allí y se ven distintos aquí.
+ *
+ * Y quedaba una ambigüedad que este fichero NO PODÍA CERRAR porque era del propio rótulo del
+ * juego: si las dos islas del mismo número son ADEMÁS del mismo terreno, ni «Mover el estiaje
+ * a la salina 11» las distinguía —y no era un caso raro: medido sobre tres mil repartos de
+ * verdad, 2.177 de ellos tienen al menos un par así—. Ya está cerrada, y donde tenía que
+ * estarlo: `nombresDeLasIslas` (`riberas.ts`) le pone el rumbo a las que comparten nombre —«a
+ * la salina 11 del norte» y «del sur»— porque el rumbo lo sabe quien tiene la llave del
+ * hexágono, no el cuadrado que lo pinta. Aquí no cambia nada: el glifo sigue siendo la cifra,
+ * y lo que separa esos dos cuadrados a la vista sigue siendo el sitio del tablero al que
+ * miran; lo que se gana es que el rótulo que se oye y el que sale al posar el ratón ya no
+ * dicen lo mismo para dos botones distintos.
  *
  * ═══ Y LA VÍCTIMA VA EN EL FILO, NO EN EL GLIFO ═══
  *

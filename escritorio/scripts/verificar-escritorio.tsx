@@ -5793,10 +5793,14 @@ function elCarrilDiceAdondeVa(): void {
    * Lo que se exige es que EL CUADRADO NO PIERDA NINGUNA DISTINCIÓN QUE EL RÓTULO TENGA: si
    * dos opciones se llaman distinto, sus cuadrados tienen que verse distintos. No se puede
    * exigir más, y conviene decir por qué en vez de bajar la vara sin avisar: el reparto pone
-   * DOS islas con la misma cifra, y cuando además son del mismo terreno el propio juego las
-   * llama igual —«Mover el estiaje a la salina 11» sale dos veces en esta misma partida—.
-   * Esa ambigüedad no la puede cerrar el cuadrado que lo pinta: está en `opcionesDelEstiaje`,
-   * que es quien escribe el rótulo, y queda apuntada allí y aquí.
+   * DOS islas con la misma cifra, y una isla puede tener DOS víctimas — y esas dos opciones
+   * comparten rótulo a propósito, porque primero se elige adónde y sólo después a quién.
+   *
+   * Lo que aquí ponía y ya no vale: «si las dos islas del mismo número son además del mismo
+   * terreno, el propio juego las llama igual, y eso no lo puede cerrar el cuadrado». Era
+   * cierto y estaba sin arreglar. Ya está cerrado donde tenía que estarlo —`nombresDeLasIslas`
+   * en `riberas.ts` le pone el rumbo a las que comparten nombre— y aquí abajo hay una línea
+   * que lo compra sobre la pantalla de verdad.
    */
   const porRotulo = new Map<string, string>();
   const pierden: string[] = [];
@@ -5941,6 +5945,49 @@ function elCarrilDiceAdondeVa(): void {
     'cada cuadrado sigue llevando su rótulo y su ayuda enteros en el árbol: lo pintado es un resumen, no un recorte del nombre',
     sinDecir.length === 0,
     sinDecir.slice(0, 3).map((o) => o.rotulo),
+  );
+  /*
+   * ═══ Y DOS CUADRADOS QUE APUNTAN A ISLAS DISTINTAS NO SE LLAMAN IGUAL ═══
+   *
+   * Éste es el que faltaba, y el fallo que lo trae se encontró jugando: en la primera partida
+   * de verdad, dos de los diecinueve destinos eran iguales en TODO lo que se ve —mismo glifo
+   * («10»), mismo terreno al pie, sin filo ninguno porque en ninguna de las dos había a quién
+   * robar— y encima con el MISMO RÓTULO, «Mover el estiaje al cantil 10». Se pulsaba uno de los
+   * dos a ciegas en una fase que es obligatoria.
+   *
+   * Se lee del HTML que sale y no de la lista de opciones, que es lo que separa esta línea de
+   * las de `verify:riberas`: allí se compra que el juego escriba nombres distintos, aquí que el
+   * carril los ENSEÑE — el `title` que sale al posar el ratón y el `riberas-carril-dicho` que es
+   * el nombre accesible del botón. Un rótulo perfecto que el carril recortara sería el mismo
+   * botón mudo de antes.
+   */
+  const islaDelTitulo = new Map<string, string>();
+  const gemelosDeVerdad: string[] = [];
+  for (const o of delEstiaje) {
+    const donde = (o.carga as { donde?: unknown }).donde;
+    if (typeof donde !== 'string') continue;
+    const antes = islaDelTitulo.get(o.rotulo);
+    if (antes !== undefined && antes !== donde) gemelosDeVerdad.push(`«${o.rotulo}» nombra a ${antes} y a ${donde}`);
+    islaDelTitulo.set(o.rotulo, donde);
+  }
+  comprobar(
+    'dos cuadrados que llevan a ISLAS DISTINTAS nunca se llaman igual: el rumbo separa a las dos que comparten terreno y cifra',
+    gemelosDeVerdad.length === 0,
+    gemelosDeVerdad,
+  );
+  /*
+   * Y QUE EL CARRIL LO ENSEÑE, no sólo que el juego lo escriba: los rumbos que el rótulo trae
+   * tienen que estar en el HTML, dentro del `title` de su botón y dentro del nombre accesible.
+   */
+  const conRumbo = delEstiaje.filter((o) => / del [a-z]+$/u.test(o.rotulo));
+  const noLlegan = conRumbo.filter((o) => {
+    const titulo = escapa(o.ayuda.length > 0 ? `${o.rotulo}. ${o.ayuda}` : o.rotulo);
+    return !porTitulo.has(titulo) || !dichos.includes(o.rotulo);
+  });
+  comprobar(
+    `hay ${String(conRumbo.length)} destinos con rumbo en esta mesa y los ${String(conRumbo.length)} llegan enteros al carril: en su \`title\` y en su nombre accesible`,
+    conRumbo.length > 0 && noLlegan.length === 0,
+    noLlegan.slice(0, 3).map((o) => o.rotulo),
   );
   comprobar(
     'y la víctima, que en pantalla es un color, se dice con su nombre en la ayuda: quien no vea colores lo lee igual',
@@ -6594,7 +6641,7 @@ console.log('');
  * lista tiene dieciocho formas y no dieciséis. Es el mismo criterio con el que
  * `verificar-riberas.ts` puso el suyo: medir el peor caso y dejar hueco debajo.
  */
-const COMPROBACIONES_ESCRITAS = 647;
+const COMPROBACIONES_ESCRITAS = 649;
 if (hechas < COMPROBACIONES_ESCRITAS) {
   console.error(
     `Solo se han hecho ${String(hechas)} de las ${String(COMPROBACIONES_ESCRITAS)} comprobaciones que ` +
