@@ -179,6 +179,98 @@ export const ESCALON = ALTURA_DE_LA_TESELA_EN_EL_PACK * ESCALA_DEL_PACK;
  */
 export const LAMINA = -0.2 * ESCALA_DEL_PACK;
 
+/**
+ * ═══ CUÁNTO TIENE QUE MEDIR UNA MARCA PARA QUE SE VEA IGUAL DESDE DONDE SEA ═══
+ *
+ * Una marca —un anillo de sitio libre, el zócalo de color de un asentamiento— NO es un
+ * objeto del mundo: es un cartel, y tiene que ocupar lo mismo en la PANTALLA esté la cámara
+ * pegada al suelo o a las 574,6 unidades desde las que se mira el delta entero, como la
+ * chincheta de un mapa.
+ *
+ * Sin esta cuenta pasa lo que ya pasó dos veces en este árbol, y las dos se vieron igual —no
+ * como un fallo, sino como que no había nada—:
+ *
+ *   · La primera versión de la señal de los sitios se dibujaba del tamaño de una tesela. A la
+ *     distancia de la vista de tablero eso son unos pocos píxeles: se dibujaba, costaba sus
+ *     llamadas, y la captura salía idéntica a la de antes.
+ *   · Y el caso que trae esto aquí: con el encuadre de «Ver el tablero entero», el tablero
+ *     recién repartido y el mismo tablero con SEIS chozas y SEIS veredas puestas son
+ *     indistinguibles a la vista. Medido en `verify:escena` sobre el `.glb` y sobre el
+ *     encuadre de verdad: un poblado mide 6,0 unidades de mundo y ocupa el 1,27 % del alto
+ *     de la pantalla, o sea once píxeles en una ventana de novecientos.
+ *
+ * LA CUENTA: a distancia `lejos`, una lente de campo `campo` abarca `2·lejos·tan(campo/2)` de
+ * alto, así que para ocupar la fracción `parte` de la pantalla hay que medir eso por `parte`.
+ * Se devuelve en múltiplos de `RADIO_DE_TESELA`, que es lo que quien pinta le pasa a `scale`.
+ *
+ * ═══ Y SE ACOTA POR LOS DOS LADOS, QUE ES LA MITAD QUE SE OLVIDA ═══
+ *
+ * Pegada al suelo la cuenta pide una marca de una unidad, que es una china; desde muy lejos
+ * pide una que se come tres comarcas. El suelo y el techo los pone quien pinta, porque no son
+ * lo mismo para una señal que hay que poder tocar con el dedo que para un zócalo que sólo hay
+ * que ver.
+ *
+ * ═══ POR QUÉ VIVE AQUÍ Y NO EN `delta.tsx` ═══
+ *
+ * Porque estaba allí, escrita a mano dentro de un `useFrame`, y de ahí no se puede medir: un
+ * comprobador de Node que quisiera afirmar que una marca se ve desde la vista de tablero
+ * tendría que abrir un contexto de dibujo. Aquí es aritmética, y `verify:escena` la llama con
+ * la distancia y el campo de VERDAD del encuadre del delta. Es la misma frontera que separa
+ * `paleta.ts` de `delta.tsx`, y la misma razón.
+ */
+export function tallaDeUnaMarca(
+  lejos: number,
+  campo: number,
+  parte: number,
+  suelo: number,
+  techo: number,
+): number {
+  /*
+   * Con datos imposibles se devuelve el SUELO y no cero: una marca minúscula sigue siendo una
+   * marca, y una marca de tamaño cero —o `NaN`, que es lo que da un `tan` de un campo roto—
+   * desaparece sin que nada falle, que es exactamente el fallo que esta función existe para
+   * no tener.
+   */
+  if (!Number.isFinite(lejos) || !Number.isFinite(campo) || lejos <= 0 || campo <= 0) return suelo;
+  const quiere = (2 * lejos * Math.tan(campo / 2) * parte) / RADIO_DE_TESELA;
+  if (!Number.isFinite(quiere)) return suelo;
+  return Math.min(Math.max(quiere, suelo), techo);
+}
+
+/**
+ * ═══ CUÁNTO OCUPA EL ZÓCALO DE UN ASENTAMIENTO EN LA PANTALLA ═══
+ *
+ * El zócalo es el aro del color de su dueño que llevan las piezas de jugador, y existe porque
+ * en una partida entera nadie consiguió encontrar su propia choza: el tejado de una casa de
+ * adorno y el tejado del poblado de alguien son EL MISMO TÉXEL del atlas, y a la distancia de
+ * la vista de tablero una pieza mide unos pocos píxeles. Lo pinta `delta.tsx`; los números
+ * viven aquí porque son los que `verify:escena` mide, y de un `useFrame` no se miden.
+ *
+ * La señal de un sitio libre ocupa el 3,5 % del alto, y hay como mucho cincuenta y cuatro
+ * mientras se está eligiendo dónde construir. El zócalo está SIEMPRE y en una partida entera
+ * hay hasta cuarenta asentamientos: al 3,5 % cada uno, la vista de tablero sería una alfombra
+ * de aros y el delta no se vería debajo. Al 2,2 %, en una ventana de 900 puntos de alto, un
+ * zócalo mide unos veinte píxeles de diámetro desde cualquier distancia — lo que hace falta
+ * para encontrarlo y no tanto como para taparlo.
+ *
+ * Y sus dos topes son distintos de los de la señal por los dos extremos: de cerca puede ser más
+ * pequeño, porque no hay que tocarlo con el dedo sino sólo verlo; y de lejos se le deja menos
+ * techo por lo mismo de arriba.
+ */
+export const ZOCALO_EN_PANTALLA = 0.022;
+export const SUELO_DEL_ZOCALO = 0.45;
+export const TECHO_DEL_ZOCALO = 3.5;
+
+/**
+ * A QUÉ ALTURA SE APOYA EL ZÓCALO SOBRE EL SUELO DE SU VÉRTICE.
+ *
+ * Media persona. No a cero: el suelo de un vértice es la cara de arriba de una tesela, y dos
+ * superficies en el mismo plano parpadean —se ve como un aro que se enciende y se apaga al
+ * girar la cámara, que es peor que no tenerlo—. Y no más alto, porque entonces deja de leerse
+ * como el suelo del asentamiento y pasa a ser un halo flotando a su alrededor.
+ */
+export const ALTO_DEL_ZOCALO = ALTURA_DE_UNA_PERSONA * 0.5;
+
 /** Cuántas personas de alto mide algo. Sirve para juzgar, y para comprobar. */
 export function enPersonas(altura: number): number {
   return altura / ALTURA_DE_UNA_PERSONA;

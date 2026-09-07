@@ -182,7 +182,7 @@
  * y `shared/mecanicas/semilla.ts`, que no arrastran ninguna tabla: aquí hubo una copia
  * de cada una, y la de la semilla ya no pasaba a mayúsculas.
  */
-import { Component, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Component, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode, RefObject } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { ACESFilmicToneMapping, Fog, Vector3 } from 'three';
@@ -205,7 +205,15 @@ import {
   ojoDelMirador,
   tirandoDelMirador,
 } from '../../escenas/camara';
+/* La cinta se mide con la MISMA función que la app y que `verify:escena`: ver `escenas/cinta.ts`. */
+import { altoDeLaCinta, BOTON_DE_LA_CINTA, loQueLlevaLaCinta } from '../../escenas/cinta';
 import { Delta, encuadreDelDelta } from '../../escenas/delta';
+/*
+ * DE QUÉ COLOR SE VE CADA TERRENO. La MISMA tabla que pinta el tablero plano y la que
+ * `verify:riberas` mide contra los seis colores de colono: el carril la usa para la barra de
+ * terreno de sus cuadrados, y una segunda tabla escrita aquí sería la que se quedara atrás.
+ */
+import { colorDeTerreno } from '../../escenas/paleta';
 import { catalogoDeModelos, unirCatalogos } from '../../escenas/modelos';
 import type { CatalogoDeModelos } from '../../escenas/modelos';
 import { rutaDeLosDados, rutaDelTablero } from '../../escenas/ruta-de-modelos';
@@ -216,9 +224,14 @@ import {
   colocandoEnTres,
   comprarEnTres,
   dadosEnTres,
+  elPregonEnTres,
+  elPregonSePliega,
+  elResumenDelPregon,
+  glifosDelCarril,
   jugadasDeLaCarta,
   laManoDeLaIzquierda,
   jugadaSinPreguntar,
+  loQueSeOyeDelVado,
   manoEnTres,
   marcadorEnTres,
   mazoEnLaBarra,
@@ -226,6 +239,7 @@ import {
   opcionesFueraDeLaBarra,
   opcionesFueraDeLaMano,
   opcionesFueraDeLaMesa,
+  opcionesFueraDelPregon,
   opcionesFueraDelTablero,
   renglonDelVado,
   revelarDe,
@@ -238,10 +252,15 @@ import {
 import type {
   CartaDelMazoEnTres,
   ClaseDeJugada,
+  ColonoEnElMarcador,
   DadosEnTres,
   ExplicacionDeLaCarta,
+  GlifoDelCarril,
   IdDeLaBarra,
+  MarcadorEnTres,
+  PregonEnTres,
   TableroEnTres,
+  TiraDelPregon,
 } from '../../shared/arcade/juegos/riberas-en-tres';
 /* El sitio de los dados se decide con la misma función que la escena: ver `haySitioParaLosDados`. */
 import { ASA_DEL_HUECO, huecosDeLaMesa, loQueSeVe } from '../../escenas/barra';
@@ -249,12 +268,19 @@ import { ASA_DEL_HUECO, huecosDeLaMesa, loQueSeVe } from '../../escenas/barra';
 import { franjaDeLasCartas, loQueSeVeEnLasCartas } from '../../escenas/cartas';
 import { huecosDeLaBaraja, loQueSeVeEnLaBaraja } from '../../escenas/baraja';
 import { semillaDelCodigo } from '../../shared/mecanicas/semilla';
-import type { TableroDeclarado } from '../../shared/mecanicas/tablero-declarado';
-import { Formulario } from './formulario';
+import type { MovimientoDeclarado, TableroDeclarado } from '../../shared/mecanicas/tablero-declarado';
+import { CON_ATAJO, Formulario, loQueSePuedePintar, usarLosAtajos } from './formulario';
 import type { LaMesa, MesaVista, ResultadoDelMovimiento } from './mesa';
 import type { ArcadeDelCatalogo } from './muebles';
 import { opcionesSueltas } from './plan';
 import { loQueSeDiceDeUnFallo } from './red-de-seguridad';
+import {
+  cuantoQueda,
+  cuantoQuedaEnLaCinta,
+  elPlazoAprieta,
+  LETRAS_DEL_RELOJ_DE_LA_CINTA,
+  msHastaQueCambieElRotulo,
+} from './relojes';
 import { AccionesDelTablero, Retablo } from './retablo';
 
 /**
@@ -303,6 +329,42 @@ const SACAR_LA_MESA = 'Sacar la mesa';
  * colgada del lienzo otra vez y sin un solo error: la Sala volvería a desplazarse sola.
  */
 const RECUADRO_DEL_LIENZO = 'riberas-lienzo';
+
+/**
+ * EL CAJÓN Y SU VELO, con el nombre escrito UNA vez cada uno, Y POR EL MISMO MOTIVO QUE EL
+ * RECUADRO: los busca la cámara.
+ *
+ * El oyente de la rueda cuelga del recuadro y llama a `preventDefault` SIEMPRE, que es lo
+ * que impide que la Sala se desplace mientras uno cree estar acercándose. Desde que dentro
+ * del recuadro hay un cajón que se desplaza por dentro, ese `preventDefault` se lo comía:
+ * girar la rueda sobre la crónica acercaba el delta detrás del cajón y la crónica no se
+ * movía un renglón. Así que la rueda mira DE QUIÉN es el suceso:
+ *
+ *   · dentro de una caja que se desplaza por dentro —el cajón, el CARRIL de la cinta y el
+ *     MENÚ de elegir—, no hace nada de nada —ni `preventDefault` ni acercamiento—, para
+ *     que el navegador la desplace como desplaza cualquier caja (`overscroll-behavior:
+ *     contain` en la hoja impide que al llegar al final la rueda se la lleve la mesa);
+ *   · sobre el velo, `preventDefault` y NADA MÁS: las dos cajas modales de este recuadro
+ *     son modales, y modal quiere decir que con ellas abiertas no se toca lo de debajo,
+ *     tampoco la cámara;
+ *   · en cualquier otro sitio del recuadro —el lienzo, el botón de volver, el de recoger,
+ *     la cinta— se acerca, que es lo que hacía antes.
+ *
+ * LAS CUATRO SE NOMBRAN JUNTAS Y NO UNA A UNA, y eso es lo que evita el fallo de la fase: el
+ * carril nació con dieciocho botones y `overflow-x: auto`, y con la rueda mirándole sólo al
+ * cajón, girarla encima del carril acercaba el delta y el carril no se movía —que es
+ * exactamente lo que le pasó a la crónica cuando el cajón era el que faltaba—. El PREGÓN es
+ * la cuarta y es la que más lo necesita: no es modal, así que se lee con el tablero vivo
+ * debajo, y sin nombrarla aquí girar la rueda sobre una propuesta acercaría el delta.
+ */
+const EL_CAJON = 'riberas-cajon';
+const EL_VELO = 'riberas-velo';
+const EL_CARRIL = 'riberas-carril';
+const EL_MENU = 'riberas-elige';
+const EL_PREGON = 'riberas-pregon';
+/** Las que se desplazan por dentro: la rueda es suya y no de la cámara. */
+const SE_DESPLAZAN_SOLAS = [EL_CAJON, EL_CARRIL, EL_MENU, EL_PREGON];
+
 /**
  * EL CAMPO VERTICAL DE LA CÁMARA, en radianes: los 45° del `fov` del `Canvas` de abajo. La
  * escena lo lee de la cámara de verdad; esta pantalla lo necesita ANTES de montarla para
@@ -328,7 +390,7 @@ const CAMPO_DE_LA_CAMARA = (45 * Math.PI) / 180;
  * Se escribe aquí, una vez, y de aquí sale todo lo demás. Si alguien toca la raíz de la
  * hoja sin tocar esto, `verify:escritorio` lo dice: afirma que las dos cifras coinciden.
  */
-const RAIZ_DE_LA_CASA = 17;
+export const RAIZ_DE_LA_CASA = 17;
 /**
  * ═══ Y ESOS 17 SON EL SUELO, NO LA MEDIDA: LA DE VERDAD SE LE PIDE AL NAVEGADOR ═══
  *
@@ -366,6 +428,153 @@ const MARGEN_DEL_CARTEL = 12;
 /** Y ocho puntos de aire entre el pie del cartel y el techo del asa de la barra. */
 const AIRE_SOBRE_EL_ASA = 8;
 
+/**
+ * ═══ OCHO LETRAS: EL SUELO DE LA FRASE DE LA CINTA, Y DE DÓNDE SALE ESE OCHO ═══
+ *
+ * La frase de la cinta es `tablero.aviso`, la única línea de estado de esta pantalla: dice
+ * de quién es el turno y en qué paso está («Te toca: tira los dados.», «Turno de Ana: está
+ * por tirar.»). Recortada con puntos suspensivos sigue sirviendo —el texto entero va en la
+ * región viva y se lee al posar el ratón—, pero por debajo de un puñado de letras deja de
+ * ser una frase recortada y pasa a ser una raya: con tres letras no se distingue «Te…» de
+ * «Tu…».
+ *
+ * Ocho es lo que hace falta para que se vea la primera PALABRA de las que el juego escribe
+ * ahí, que es la que distingue las ramas de `avisoDe`: «Te toca», «Turno de», «Coloca»,
+ * «Gana», «El delta». No es una medida de tipografía: es el suelo por debajo del cual esta
+ * pantalla prefiere dejar el «‹» fuera de la cinta antes que quedarse sin línea de estado.
+ * `loQueLlevaLaCinta` lo recibe en PUNTOS —ver su cabecera: en `escenas/` no hay letras— y
+ * este cliente se lo calcula con la raíz de VERDAD del navegador, la misma con la que se
+ * mide el cartel, para que la preferencia de tamaño de letra entre también en esta cuenta.
+ */
+const LETRAS_MINIMAS_DE_LA_FRASE = 8;
+
+/** Los puntos que ocupan esas ocho letras con la letra con la que la cinta las pinta. */
+export function huecoMinimoDeLaFrase(raiz: number): number {
+  return LETRAS_MINIMAS_DE_LA_FRASE * CUERPO_SOBRE_LA_RAIZ * raiz * ANCHO_SOBRE_EL_CUERPO;
+}
+
+/**
+ * ═══ Y EL LADO DE LOS BOTONES DE LA CINTA, QUE TAMPOCO SON 44 EN ESTA CASA ═══
+ *
+ * `BOTON_DE_LA_CINTA` vale 44, que es el suelo de toque en puntos y lo que mide en un
+ * cliente que pinte puntos. Esta casa no pinta puntos: escribe `2.75rem`, que es como
+ * escribe los 44 —`enRem(puntos) = puntos/16`, la misma cuenta con la que se escriben el
+ * lado y el margen de `MANDO_DE_RECOGER`—, y con la raíz de esta casa (`106.25 %`, o sea 17)
+ * eso son 46,75.
+ *
+ * MEDIDO en el navegador antes de escribir esto, en un lienzo de 522,6×130,2:
+ * `loQueLlevaLaCinta` decía que a la frase le quedaban 86,2 puntos y la caja pintada medía
+ * 80,5. No es un decimal: es que la cuenta hacía crecer la letra con la preferencia del
+ * navegador y NO hacía crecer los botones, así que el error se abre justo para quien tiene
+ * la letra grande, que es el que peor lo lleva. El reparto se le da ya en la unidad en que
+ * se pinta, y así los tres trozos de la cinta miden lo que la cuenta dice.
+ */
+const RAIZ_DE_UN_NAVEGADOR_DE_SERIE = 16;
+export function ladoDelBotonDeLaCinta(raiz: number): number {
+  return (BOTON_DE_LA_CINTA * raiz) / RAIZ_DE_UN_NAVEGADOR_DE_SERIE;
+}
+
+/**
+ * ═══ Y LO QUE SE LLEVA EL RELOJ, QUE ES EL CUARTO INQUILINO DE LA CINTA ═══
+ *
+ * Sale de la misma regla que las ocho letras de la frase —letras por cuerpo por ancho de
+ * letra— y con la misma raíz de verdad del navegador, porque es el mismo problema: si esta
+ * cuenta no crece con la preferencia de tamaño de letra, el reparto de la cinta miente justo
+ * para quien tiene la letra grande.
+ *
+ * Las letras no se escriben aquí: las dice `LETRAS_DEL_RELOJ_DE_LA_CINTA`, que vive al lado
+ * de la función que escribe el rótulo y que `verify:escritorio` barre por todo el eje del
+ * tiempo en vez de creérselas. Escribir un seis aquí sería tener dos números para lo mismo,
+ * y el que se quedaría atrás es éste.
+ *
+ * Y lleva su propio aire a la izquierda, que la hoja pinta: la cinta no tiene `gap` a
+ * propósito —todo lo que la regla añada sale del trozo de la frase sin que la cuenta se
+ * entere— así que el hueco entre el reloj y la frase se descuenta AQUÍ y no allí.
+ */
+const AIRE_TRAS_EL_RELOJ_EN_LETRAS = 0.75;
+export function huecoDelRelojDeLaCinta(raiz: number): number {
+  return (
+    (LETRAS_DEL_RELOJ_DE_LA_CINTA + AIRE_TRAS_EL_RELOJ_EN_LETRAS) *
+    CUERPO_SOBRE_LA_RAIZ *
+    raiz *
+    ANCHO_SOBRE_EL_CUERPO
+  );
+}
+
+/** Lo que la cinta pinta del plazo: el rótulo corto, la frase entera y si ya aprieta. */
+export interface ElRelojDeLaCinta {
+  readonly corto: string;
+  readonly entero: string;
+  readonly aprieta: boolean;
+}
+
+/**
+ * ═══ EL RELOJ DE LA CINTA, Y POR QUÉ NO LATE UNA VEZ POR SEGUNDO ═══
+ *
+ * `LaFicha` —el reloj del cajón, el único que había— se repinta con un `setInterval` de
+ * 1000 ms mientras hay plazo. Para una ficha dentro de un cajón cerrado eso ya era caro; en
+ * la CINTA es otra cosa: este componente pinta el delta entero, así que un latido por
+ * segundo es un render del tablero por segundo durante toda la partida, con la pestaña
+ * delante y sin que el rótulo cambie —en una mesa de «La Larga» el texto sólo tiene
+ * granularidad de horas—.
+ *
+ * `msHastaQueCambieElRotulo` existe en `relojes.ts` exactamente para esto, con el ejemplo
+ * escrito en su cabecera, y hasta hoy NO LO LLAMABA NADIE. Se llama aquí: una espera por
+ * cambio de texto en vez de una por segundo, `Infinity` cuando ya no va a cambiar nunca
+ * —plazo vencido o dato roto— y entonces no se programa nada. En el último minuto sigue
+ * dando 1000 ms o menos, así que la cuenta al segundo no se pierde donde importa.
+ *
+ * Devuelve `null` cuando NO HAY NADA QUE CONTAR, que son tres casos distintos y ninguno es
+ * un error: la mesa no tiene plazo (`venceEn === null`), la partida ya terminó, o el dato no
+ * llegó. Los dos primeros son mesas normales; el tercero se distingue del vencido en el
+ * rótulo, no aquí. Con `null` la cinta no pinta reloj y no le descuenta ni un punto a la
+ * frase, que es exactamente la cinta de antes.
+ */
+function usarElRelojDeLaCinta(venceEn: number | null, terminada: boolean): ElRelojDeLaCinta | null {
+  const hayReloj = venceEn !== null && !terminada;
+  /*
+   * EL LATIDO ES TAMBIÉN LA DEPENDENCIA, y esa es la mitad que se olvida: con un
+   * `setTimeout` en vez de un `setInterval` hay que volver a programar la siguiente espera
+   * DESPUÉS de cada repintado. Sin `latido` en la lista, el efecto se dispararía una sola
+   * vez y el reloj se quedaría clavado en el primer tramo — que se ve como un reloj parado,
+   * no como un fallo del temporizador.
+   */
+  const [latido, latir] = useState(0);
+  useEffect(() => {
+    if (!hayReloj || venceEn === null) return;
+    const espera = msHastaQueCambieElRotulo(venceEn - Date.now());
+    if (!Number.isFinite(espera)) return;
+    const t = setTimeout(() => {
+      latir((n) => n + 1);
+    }, espera);
+    return () => {
+      clearTimeout(t);
+    };
+  }, [hayReloj, venceEn, latido]);
+
+  if (!hayReloj || venceEn === null) return null;
+  const quedan = venceEn - Date.now();
+  return {
+    corto: cuantoQuedaEnLaCinta(quedan),
+    entero: cuantoQueda(quedan),
+    aprieta: elPlazoAprieta(quedan),
+  };
+}
+
+/**
+ * LOS RÓTULOS DE LA CINTA, con todas sus letras aunque en pantalla se vean dos glifos.
+ *
+ * Chrome de la Sala como los de arriba, y por lo mismo: «la mesa» y «el marcador» son
+ * muebles de la pantalla, no reglas de Riberas. El «‹» y el «≡» no se leen en voz alta —el
+ * nombre va en `aria-label`—, y el de la ficha lleva DENTRO mis puntos porque un lector no
+ * ve el número que hay pintado al lado del raíl de color.
+ */
+const SALIR_DE_LA_MESA = 'Volver a la Sala de Arcade';
+const ABRIR_EL_CAJON = 'Abre el marcador completo';
+const CERRAR_EL_CAJON = 'Cierra el marcador completo';
+/** El nombre del cajón, que es un `dialog` y sin nombre se anuncia «diálogo» a secas. */
+const EL_CARRIL_DE_LA_MESA = 'El carril de la mesa';
+
 /** Dónde va el cartel y qué frases caben dentro, todo en puntos de pantalla. */
 export interface CartelAlPie {
   /** Desde el canto izquierdo del lienzo hasta el suyo. */
@@ -398,6 +607,37 @@ function renglonesDeLaFrase(frase: string, letrasPorLinea: number): number {
 }
 
 /**
+ * A CUÁNTOS PUNTOS DEL CANTO DE ARRIBA ESTÁ EL TECHO DEL ASA DE LA BARRA.
+ *
+ * ═══ POR QUÉ ES UNA FUNCIÓN SUYA Y NO SEIS LÍNEAS DENTRO DEL CARTEL ═══
+ *
+ * Porque desde el pregón son DOS las cajas que se apoyan en esa raya: el cartel de un naipe
+ * crece hacia arriba desde ella, y el pregón cuelga de la cinta hasta ella. Copiada, la
+ * segunda copia se queda con el reparto viejo el día que la barra cambie de sitio, y lo que
+ * se ve entonces no es un error: es un pregón por encima de las piezas de construir.
+ *
+ * El asa vive DENTRO del lienzo y por encima del inset de abajo, así que aquí no se resta
+ * ningún inset —es el error que `docs/EL-TRUEQUE-DE-RIBERAS.md` §4.1 corrigió en tres
+ * lienzos—. Y se le pregunta a `huecosDeLaMesa` con los huecos de VERDAD, no con un cuatro
+ * escrito a mano: el asa sube cuando hay menos piezas. Sin barra ninguna, el canto de abajo.
+ */
+export function techoDelAsaEnPuntos(
+  lienzo: { ancho: number; alto: number },
+  cuantosHuecos: number,
+): number {
+  if (lienzo.ancho <= 0 || lienzo.alto <= 0) return 0;
+  const proporcion = lienzo.ancho / lienzo.alto;
+  const { piezas } = huecosDeLaMesa(cuantosHuecos, CAMPO_DE_LA_CAMARA, proporcion, lienzo.alto);
+  const hueco = piezas[0];
+  if (hueco === undefined) return lienzo.alto;
+  const vistoEnLaBarra = loQueSeVe(CAMPO_DE_LA_CAMARA, proporcion);
+  return (
+    ((vistoEnLaBarra.alto / 2 - (hueco.y + (hueco.lado / 2) * ASA_DEL_HUECO.alto)) / vistoEnLaBarra.alto) *
+    lienzo.alto
+  );
+}
+
+/**
  * DÓNDE CABE EL CARTEL DE UN NAIPE, Y CUÁNTAS DE SUS TRES FRASES ENTRAN HOY.
  *
  * ═══ LA BANDA NO SE DIBUJA A OJO: SE LE PREGUNTA A LAS TRES MANOS ═══
@@ -418,29 +658,40 @@ function renglonesDeLaFrase(frase: string, letrasPorLinea: number): number {
  * con una, «qué hace», que es la que Miguel nombró primero. Las que no se pintan se oyen
  * igual: están las tres, siempre, en la lista `.riberas-solo-apoyo`.
  *
- * Medido con las manos de verdad en los dieciséis lienzos de `LIENZOS` (`verify:escritorio`).
+ * Medido con las manos de verdad en los dieciocho lienzos de `LIENZOS` (`verify:escritorio`).
  *
- * ═══ Y CUÁL ES EL PEOR LIENZO DE ESTE CLIENTE, QUE NO ES EL PEOR DE LA LISTA ═══
+ * ═══ Y CUÁL ES EL LIENZO MÁS APRETADO DE ESTE CLIENTE: YA NO HAY SUELO DE ALTO ═══
  *
  * La lista se comparte con el móvil y por eso empieza por 320×360, donde caben DOS frases:
- * el renglón da 25 letras, cada frase ocupa dos y hay cinco renglones para seis. PERO ESE
- * LIENZO AQUÍ NO SE PUEDE DAR. `.riberas-lienzo` lleva `min-height: 420px`, así que los
- * cinco lienzos bajos de la lista (320×360 y los cuatro apaisados de menos de 420 de alto,
- * entre ellos el 844×390, que se había colado en la cuenta anterior) no existen en el
- * escritorio. La forma que sí se da y que la lista no tenía es la contraria: ESTRECHA Y ALTA.
+ * el renglón da 25 letras, cada frase ocupa dos y hay cinco renglones para seis. Ese lienzo
+ * aquí NO SE PODÍA DAR mientras `.riberas-lienzo` llevó un suelo de alto: ese número, y no
+ * la ventana, decidía lo bajo que podía llegar a ser el recuadro.
  *
- * El peor de este cliente es 288×420, y sale de sumas y no de una corazonada: WCAG 1.4.10
- * pone el suelo del documento en 320 puntos (lo dice el punto 1 de la cabecera de
- * `estilo.css`, que ya arregló la rejilla por eso), `.dentro` se lleva `clamp(1rem, 4vw,
- * 2.5rem)` por lado, a 320 manda el mínimo de 17 puntos, y el recuadro es el 100 % de lo que
- * queda, o sea 286; se mide con 288 por dejar el margen del lado seguro. De alto, los 420
- * del `min-height`, que es el suelo. Ahí el renglón cabe 20 letras y hay 7 renglones, así
- * que las frases de dos renglones pasan a tres y se pintan DOS. En los otros diez que este
- * cliente sí puede dar caben las tres.
+ * Ese suelo ya no está. Con la página de pie (la sección «La página de pie» de `estilo.css`)
+ * el recuadro vale la ventana entera menos la cabecera de la Sala, así que una ventana baja
+ * da un lienzo bajo DE VERDAD, y los dos que este cliente da en el extremo son 288×355 —con
+ * la cabecera en un renglón— y 288×317 —con la cabecera partida en dos—. Los 288 de ancho
+ * salen de sumas y no de una corazonada: WCAG 1.4.10 pone el suelo del documento en 320
+ * puntos (lo dice el punto 1 de la cabecera de `estilo.css`, que ya arregló la rejilla por
+ * eso), `.dentro` se lleva `clamp(1rem, 4vw, 2.5rem)` por lado, a 320 manda el mínimo de 17
+ * puntos, y el recuadro es el 100 % de lo que queda, o sea 286; se mide con 288 por dejar el
+ * margen del lado seguro. Ahí el renglón cabe 20 letras contra las 25 del móvil.
  *
- * Esos dos números —cinco bajos y diez con las tres— NO se escriben a mano: `verify:escritorio`
- * los saca de `LIENZOS` y del `min-height` de la hoja y exige que esta cabecera los diga con
- * esas mismas palabras. Ya se desfasaron una vez, y una cuenta escrita para que el siguiente
+ * Y EL ALTO DEL LIENZO NO MANDA TANTO COMO PARECE, que es lo que sorprende al leer la tabla:
+ * 288×355 y 288×317 dan LO MISMO —una frase— aunque se lleven 38 puntos, y el que da dos es
+ * 288×420. No es un error de medida. La banda del cartel no la marca el alto del lienzo: la
+ * marca el techo del asa de la barra, y el asa la reparte `huecosDeLaMesa` con el alto EN
+ * PUNTOS —los dados caben o no caben según ese número—, así que un lienzo más bajo puede
+ * dejar tanta banda libre como uno más alto. Antes de que la cinta existiera esos dos ni
+ * siquiera empataban: 317 daba DOS y 355 daba UNA, o sea que el más bajo daba más. Quien
+ * toque el reparto de la barra tiene que volver a mirar estas cifras.
+ *
+ * Con la cinta sola —un turno corriente, sin nada que el tablero no pinte— en 14 de los 18
+ * lienzos de la lista caben las tres frases. En los otros cuatro no: una en 288×355, una en
+ * 288×317, dos en 288×420 y dos en el 320×360 del móvil. Con el CARRIL puesto —el estiaje por
+ * mover, o el descarte— son 13 de los 18. Esos números NO se escriben a mano:
+ * `verify:escritorio` los saca de `LIENZOS` midiéndolos con las manos de la escena y exige que
+ * esta cabecera los diga. Ya se desfasaron una vez, y una cuenta escrita para que el siguiente
  * no tenga que medir es justo la que no puede estar mal.
  *
  * ═══ Y QUÉ PASA EN EL EXTREMO DE LA PREFERENCIA DE LETRA: EL CARTEL DESAPARECE ═══
@@ -460,27 +711,57 @@ function renglonesDeLaFrase(frase: string, letrasPorLinea: number): number {
  * las tres frases de los once naipes siguen ahí, con o sin cartel, y siguen siendo lo que oye
  * quien no puede pasar el cursor por un lienzo. Las dos mitades las compra `verify:escritorio`.
  *
- * ═══ DOS COSAS QUE TODAVÍA NO EXISTEN Y QUE LE COMEN LA BANDA POR ARRIBA ═══
+ * ═══ LO QUE LE COME LA BANDA POR ARRIBA: UNA COSA QUE YA ESTÁ Y OTRA QUE NO ═══
  *
- * Quien las escriba tiene que hacerlas convivir con esto, y por eso quedan dichas aquí con
- * su número y no en un documento:
+ *   · LA CINTA DEL TERCIO CENTRAL (§2.2) YA ESTÁ, y son 44 puntos pegados al canto de
+ *     ARRIBA del recuadro que se restan al alto libre ANTES de partirlo por la mitad (ver
+ *     `altoLibre`, aquí abajo). Aquí estuvo escrito lo que iba a costar, y la predicción
+ *     era ésta: «en 320×360 se queda en UNA frase y en el SE apaisado en dos; los otros
+ *     trece no pierden nada». MEDIDO, no fue eso: 320×360 se queda en DOS, el SE apaisado
+ *     no pierde ninguna, y el único de los dieciocho que baja un escalón es 288×317, de dos
+ *     a una. Queda escrito el fallo y no sólo la cifra buena, porque una cuenta hecha a ojo
+ *     que nadie vuelve a medir es la que después se cita como si fuera una medida.
  *
- *   · LA CINTA DEL TERCIO CENTRAL (fase 5 de `docs/LA-MESA-DE-RIBERAS.md`, §2.2): el
- *     renglón del aviso son 44 puntos y la línea de botones otros 44, «la suma máxima es
- *     por tanto 88». Hoy no hay ninguna dentro del recuadro —el aviso del tablero se pinta
- *     ENCIMA de él, no dentro—, así que el alto libre llega hasta el techo del lienzo. El
- *     día que la cinta baje, se le resta al alto libre ANTES de partirlo por la mitad, y lo
- *     que pasa está medido: en 320×360 se queda en UNA frase y en el SE apaisado en dos.
- *     Los otros trece no pierden nada.
- *   · EL PREGÓN DEL TRUEQUE (`docs/EL-TRUEQUE-DE-RIBERAS.md`), que cuelga de esa misma
- *     cinta hasta cuatro tiras de 44. La regla que aquel diseño y éste comparten es de
- *     EXCLUSIÓN y no de reparto: con el pregón abierto el cartel NO se pinta. **No está
- *     escrita, y es a propósito**: el pregón no existe todavía en este árbol, y una
- *     condición sobre un estado que nadie crea es una condición que ningún comprobador
- *     puede poner roja —se quedaría de adorno hasta que alguien la borrara por muerta—.
- *     Los números para quien la escriba: con la cinta a 88 y las cuatro propuestas
- *     colgando, al cartel le quedan −24 puntos de banda en el SE apaisado y 8 en 320×360,
- *     y necesita 43 de caja para existir. No es que quepa apretado: no queda banda.
+ *   · Y LA SEGUNDA TIRA, EL CARRIL DE LOS BOTONES SUELTOS, YA ESTÁ TAMBIÉN. Aquí ponía que
+ *     seguía «sin existir» y que quien se la llevara a la cinta tendría que sumar esos 44 y
+ *     volver a medir los dieciocho lienzos. Es lo que se ha hecho: el alto lo da
+ *     `altoDeLaCinta(conCarril)` en `escenas/cinta.ts` —44 sin carril, 88 con él— y entra por
+ *     la puerta de esta función, porque el carril SÓLO existe cuando el juego ofrece algo
+ *     que el tablero no pinta. Con el estiaje por mover son dieciocho botones y el carril
+ *     está; en un turno corriente `fuera` trae uno o ninguno.
+ *
+ *     LO QUE CUESTA, MEDIDO EN LOS DIECIOCHO LIENZOS Y NO PREDICHO: con la cinta sola caben
+ *     las tres frases en 14 de los 18; con el carril puesto, en 13 de los 18. Ese «uno»
+ *     de diferencia esconde más movimiento del que parece, y se escribe entero —uno se leería
+ *     como «casi no cuesta»—: de los cinco que se quedan cortos con el carril, CUATRO bajan
+ *     un escalón. El SE apaisado (568×320) pierde su primera frase y pasa de tres a dos, que
+ *     es justo el lienzo que con la cinta sola no perdía ninguna; 320×360 y 288×420 pasan de
+ *     dos a una; 288×355 se queda en la que ya tenía.
+ *
+ *     Y EL QUINTO SE QUEDA SIN CARTEL: en 288×317 —el lienzo más apretado de este cliente,
+ *     con la cabecera de la Sala partida en dos renglones— no cabe ni una frase entera y
+ *     esta función devuelve `null`. Eso NO es un fallo: es lo que promete su cabecera, antes
+ *     ninguno que uno cortado a la mitad sin avisar, y el texto no se pierde —las tres
+ *     frases de los once naipes siguen en la lista `.riberas-solo-apoyo`, que se pinta desde
+ *     `cartasDelMazo` y no mira `cartel` ni una vez—. Y sólo pasa MIENTRAS hay botones
+ *     sueltos: en cuanto el estiaje se mueve, el carril se va y el cartel vuelve.
+ *
+ *     Los dos números —catorce y trece— los saca `verify:escritorio` de medir `LIENZOS` con
+ *     las manos de la escena y exige que esta cabecera los diga: no están escritos a mano.
+ *   · Y EL PREGÓN DEL TRUEQUE (`docs/EL-TRUEQUE-DE-RIBERAS.md` §4.1) YA ESTÁ, y con él la
+ *     regla que aquel diseño y éste comparten, que es de EXCLUSIÓN y no de reparto: CON EL
+ *     PREGÓN PINTADO ESTA FUNCIÓN DEVUELVE `null`. Aquí ponía que no estaba escrita porque
+ *     el pregón no existía; ahora entra por la puerta como el carril, y lo que la hace
+ *     obligatoria en vez de opcional está medido: con la cinta a 88 y el cartel puesto, al
+ *     pregón le quedan 32 puntos en el SE apaisado —CERO tiras—, 48 en 320×360 y 74,8 en
+ *     288×420, o sea UNA en los dos mejores. Sin cartel son 3, 4 y 5. No es que las dos
+ *     cosas quepan apretadas: es que con el cartel no hay pregón, y el pregón es una
+ *     jugada que caduca al acabar el turno de quien la propuso.
+ *
+ *     Y NO COMPITEN DE VERDAD POR LA ATENCIÓN, que es lo que hace que la exclusión no
+ *     duela: el cartel se pide señalando un naipe PROPIO —un gesto de mi turno— y el pregón
+ *     existe justo cuando juega otro. Y desde la hoja de una propuesta el cartel vuelve a
+ *     caber entero, porque la hoja es modal y el pregón deja de estar pintado debajo.
  *
  * ═══ LO QUE SE MIDE QUIETO, Y CUÁNTO COSTARÍA NO HACERLO ═══
  *
@@ -504,7 +785,21 @@ export function elCartelQueCabe(
   cuantosHuecos: number,
   explicacion: ExplicacionDeLaCarta,
   raiz: number = RAIZ_DE_LA_CASA,
+  /*
+   * SI LA CINTA LLEVA HOY SU SEGUNDA TIRA. No es una preferencia: el carril existe cuando
+   * `fuera` trae algo, y entonces la caja opaca de arriba mide 88 puntos en vez de 44. Entra
+   * por la puerta y no se pregunta aquí dentro, porque quién tiene botones sueltos lo sabe el
+   * pintor y no esta cuenta.
+   */
+  conCarril = false,
+  /*
+   * Y SI EL PREGÓN DEL TRUEQUE ESTÁ PINTADO. Entra por la puerta como el carril y por lo
+   * mismo: quién tiene propuestas vivas lo sabe el pintor, no esta cuenta. Ver la cabecera:
+   * con el cartel puesto no queda banda para una sola tira en el peor lienzo.
+   */
+  conPregon = false,
 ): CartelAlPie | null {
+  if (conPregon) return null;
   if (lienzo.ancho <= 0 || lienzo.alto <= 0) return null;
   const proporcion = lienzo.ancho / lienzo.alto;
   /* La letra con la que esto se va a pintar de verdad: ver `raizDelNavegador`. */
@@ -533,23 +828,28 @@ export function elCartelQueCabe(
   const derecha = lienzo.ancho - derechaEnPuntos;
 
   /* Y abajo, el techo del asa de la barra menos el aire. Sin barra, el canto del lienzo. */
-  const { piezas } = huecosDeLaMesa(cuantosHuecos, CAMPO_DE_LA_CAMARA, proporcion, lienzo.alto);
-  const hueco = piezas[0];
-  const vistoEnLaBarra = loQueSeVe(CAMPO_DE_LA_CAMARA, proporcion);
-  const techoDelAsa =
-    hueco === undefined
-      ? lienzo.alto
-      : ((vistoEnLaBarra.alto / 2 - (hueco.y + (hueco.lado / 2) * ASA_DEL_HUECO.alto)) / vistoEnLaBarra.alto) *
-        lienzo.alto;
+  const techoDelAsa = techoDelAsaEnPuntos(lienzo, cuantosHuecos);
 
   const banda = derechaEnPuntos - izquierda;
   const letrasPorLinea = Math.floor((banda - 2 * MARGEN_DEL_CARTEL) / anchoPorLetra);
   /*
-   * EL ALTO LIBRE va del techo del recuadro al techo del asa menos el aire, y LA CAJA es su
+   * EL ALTO LIBRE va del PIE DE LA CINTA al techo del asa menos el aire, y LA CAJA es su
    * mitad: un cartel que se comiera toda la banda taparía media pantalla de tablero justo
    * en el lienzo donde menos tablero hay.
+   *
+   * LA CINTA SE RESTA ANTES DE PARTIR, y esto estuvo escrito como pendiente en esta misma
+   * cabecera antes de que la cinta existiera: son 44 puntos pegados al canto de ARRIBA del
+   * recuadro, dentro del mismo lienzo y encima del mismo tablero. Sin restarlos, el techo
+   * del cartel se metía debajo de la cinta en los lienzos bajos —el cartel se pinta con
+   * `bottom` y `max-height`, así que crecer hacia arriba es lo único que sabe hacer— y lo
+   * que se leía era media frase con una cinta de vidrio encima. Restado, lo que pasa está
+   * medido y escrito arriba: los estrechos bajan una frase y los demás no pierden ninguna.
+   *
+   * Y SON 44 O SON 88, según lleve carril o no: lo dice `altoDeLaCinta` y no un `* 2` escrito
+   * aquí, para que el día que la cinta cambie de alto haya un solo sitio que tocar y para que
+   * `verify:escena` pueda medir esa cuenta desde Node, donde no hay lienzo que mirar.
    */
-  const altoLibre = techoDelAsa - AIRE_SOBRE_EL_ASA;
+  const altoLibre = techoDelAsa - AIRE_SOBRE_EL_ASA - altoDeLaCinta(conCarril);
   const caja = altoLibre / 2;
   const renglones = Math.floor((caja - 2 * MARGEN_DEL_CARTEL) / renglonDelCartel);
   if (renglones <= 0 || letrasPorLinea <= 0) return null;
@@ -604,6 +904,406 @@ export function elEstiloDelCartel(cartel: CartelAlPie | null): CSSProperties | u
 }
 
 /**
+ * EL ANCHO DE LA CINTA Y EL DEL CAJÓN, TRADUCIDOS A LO QUE EL NAVEGADOR ENTIENDE.
+ *
+ * ═══ POR QUÉ SON DOS FUNCIONES Y NO DOS LÍNEAS DENTRO DEL JSX ═══
+ *
+ * Por lo mismo que `elEstiloDelCartel`, que nació del mismo fallo: `loQueLlevaLaCinta` mide
+ * con muchísimo cuidado y `verify:escena` lo contrasta contra las dos manos, y lo que NADA
+ * ataba era que ese número acabara de verdad en el `width` de la caja que se pinta. Sacadas
+ * aquí son dos funciones puras que se pueden llamar desde Node y mirar qué sale.
+ *
+ * Y SON DOS Y NO UNA aunque hoy digan lo mismo: son dos cajas distintas, y el día que una
+ * deje de medir lo que la otra —el pregón del trueque cuelga de esta misma cinta— quien lo
+ * escriba tiene dónde hacerlo sin tocar la del vecino.
+ *
+ * ═══ LO QUE AQUÍ YA NO ESTÁ: DÓNDE EMPIEZA EL CAJÓN ═══
+ *
+ * El cajón cuelga DEL PIE DE LA CINTA y no del canto de arriba del recuadro —con `top: 0`
+ * se metía debajo de la cinta, que es de vidrio, y el primer renglón del marcador se leía a
+ * través de la frase del turno—. Ese `top` estuvo aquí escrito como `ALTO_DE_LA_CINTA`
+ * píxeles, y estaba mal por 2,75 puntos: la cinta se pinta con el suelo de toque de la casa
+ * en `rem` (`2.75rem`, como cualquier botón de la Sala) y con la raíz de esta casa eso son
+ * 46,75 y no 44. O sea que el cajón se metía por debajo de la cinta justo lo que la
+ * preferencia de tamaño de letra del navegador la hiciera crecer, y con la letra en «muy
+ * grande» eso deja de ser un pelo. Vive en la hoja, en `rem`, pegado al alto de la cinta y
+ * en la misma unidad: así los dos crecen juntos y no hay dos números que cuadrar.
+ *
+ * Con el recuadro sin medir todavía (cero por cero, el primer render y también Node, donde
+ * no hay `ResizeObserver`) devuelven `undefined` y manda la hoja: un ancho de cero puntos no
+ * se ve como un error, se ve como que no hay cinta.
+ */
+export function elEstiloDeLaCinta(cinta: { ancho: number }): CSSProperties | undefined {
+  if (cinta.ancho <= 0) return undefined;
+  return { width: `${String(Math.round(cinta.ancho))}px` };
+}
+
+export function elEstiloDelCajon(cinta: { ancho: number }): CSSProperties | undefined {
+  if (cinta.ancho <= 0) return undefined;
+  return { width: `${String(Math.round(cinta.ancho))}px` };
+}
+
+/**
+ * ═══ EL PREGÓN: HASTA DÓNDE PUEDE COLGAR, Y POR QUÉ NO HASTA EL CANTO ═══
+ *
+ * El cajón cuelga hasta el canto de abajo porque es MODAL: con él abierto hay un velo por
+ * delante, la barra no recibe punteros y no hay nada debajo que pueda hacer falta. El
+ * pregón NO es modal —se lee mientras otro juega y por debajo se sigue girando el tablero,
+ * que es todo el motivo de que exista (§1.10 del trueque)—, así que si colgara hasta el
+ * canto taparía la barra de piezas y el naipe del mazo: cromo opaco encima de las cuatro
+ * cosas que se pulsan para jugar, y ni un error en ninguna parte.
+ *
+ * Se para donde se para el cartel de los naipes: en el techo del asa menos el mismo aire.
+ * Es la misma raya y la misma función (`techoDelAsaEnPuntos`), que es justo por lo que esa
+ * cuenta se sacó a un sitio con nombre.
+ *
+ * ═══ Y LA CINTA SE RESTA CON EL ALTO QUE SE PINTA, NO CON EL QUE SE MIDE EN NODE ═══
+ *
+ * `altoDeLaCinta` da 44 u 88, que son el suelo de toque en PUNTOS y lo que `elCartelQueCabe`
+ * resta. Aquí NO vale, y la diferencia importa: la hoja arranca el pregón en `2.75rem` o
+ * `5.5rem` —lo mismo que el cajón—, que con la raíz de esta casa son 46,75 y 93,5. Restando
+ * 44 el `max-height` sobraría 2,75 puntos por tira y el pregón acabaría metiéndose dentro
+ * del asa, y con la preferencia de letra del navegador en grande eso deja de ser un pelo. Se
+ * resta lo que la hoja pone, que es `ladoDelBotonDeLaCinta(raíz)` por tira.
+ *
+ * ═══ LO QUE SALE, MEDIDO EN LOS DIECIOCHO LIENZOS Y NO PREDICHO ═══
+ *
+ * Con la cinta sola caben CUATRO tiras en los dieciocho, y con el carril puesto TRES. Los
+ * peores son los mismos de siempre —288×355, 288×317, 320×360, 568×320 y 780×360—, y el
+ * mejor da dieciséis. Los dos números los saca `verify:escritorio` midiendo `LIENZOS` con las
+ * manos de la escena y exige que esta cabecera los diga: no están escritos a mano.
+ *
+ * Y HAY UNA TIRA DE DIFERENCIA CON LA TABLA DEL §4.1 DEL TRUEQUE, que da cinco donde aquí
+ * salen cuatro en 320×360. No es un error de ninguno de los dos: aquel modelo cuenta con
+ * tiras de 44 y resta una cinta de 44, y este cliente pinta las dos cosas en `rem`, o sea a
+ * 46,75 con la raíz de esta casa. Son 5,5 puntos de más por cada tira, y en un lienzo donde
+ * caben cuatro justas eso es exactamente una.
+ */
+export function elAltoDelPregon(
+  lienzo: { ancho: number; alto: number },
+  cuantosHuecos: number,
+  conCarril: boolean,
+  raiz: number = RAIZ_DE_LA_CASA,
+): number {
+  const techo = techoDelAsaEnPuntos(lienzo, cuantosHuecos);
+  if (techo <= 0) return 0;
+  const cinta = ladoDelBotonDeLaCinta(raiz) * (conCarril ? 2 : 1);
+  return Math.max(0, techo - AIRE_SOBRE_EL_ASA - cinta);
+}
+
+/**
+ * EL AIRE DE LA HOJA POR ARRIBA Y POR ABAJO (`padding: 0.5rem 0` en `.riberas-pregon`), en
+ * partes de la raíz. Escrito aquí para poder medir en Node lo que el pregón plegado ocupa.
+ */
+const AIRE_DEL_PREGON = 0.5;
+
+/**
+ * ═══ LO QUE OCUPA EL PREGÓN PLEGADO: SU AIRE Y UNA TIRA, Y NADA MÁS ═══
+ *
+ * Ésta es la cifra que arregla el agujero. `elAltoDelPregon` dice hasta dónde PUEDE colgar
+ * —el techo del asa— y en mi turno el pregón llegaba justo ahí: medido jugando, de y=159 a
+ * y≈540 de un recuadro de 857, o sea el 44 % de arriba del tablero, con los anillos de fundar
+ * debajo. Plegado son 63,75 puntos con la raíz de esta casa (8,5 de aire arriba, 8,5 abajo y
+ * los 46,75 de una tira), y eso en el mismo recuadro es el 7,4 %.
+ *
+ * NO es un `max-height` nuevo ni un segundo tope: el de `elAltoDelPregon` sigue siendo el
+ * único, y sigue mandando cuando el pregón está desplegado. Esto es lo que la caja MIDE
+ * cuando dentro sólo va la tira que resume, y existe para que `verify:escritorio` pueda
+ * comparar las dos alturas en los dieciocho lienzos en vez de creerse esta cabecera.
+ */
+export function altoDelPregonPlegado(raiz: number = RAIZ_DE_LA_CASA): number {
+  return 2 * AIRE_DEL_PREGON * raiz + ladoDelBotonDeLaCinta(raiz);
+}
+
+/**
+ * CUÁNTAS TIRAS SE VEN SIN DESPLAZAR EL PREGÓN. No decide nada —el pregón rueda por dentro
+ * y caben todas—: es la cifra con la que los comprobadores dicen en qué lienzos el pregón se
+ * lee de un vistazo y en cuáles hay que desplazarlo, que es el número que el diseño del
+ * trueque midió y que aquí se vuelve a medir con las manos de esta escena.
+ */
+export function cuantasTirasSeVen(altoDelPregon: number, raiz: number = RAIZ_DE_LA_CASA): number {
+  const tira = ladoDelBotonDeLaCinta(raiz);
+  if (!(altoDelPregon > 0) || !(tira > 0)) return 0;
+  return Math.floor(altoDelPregon / tira);
+}
+
+/**
+ * EL ANCHO Y EL TOPE DE ALTO DEL PREGÓN, traducidos a lo que el navegador entiende. Por lo
+ * mismo que `elEstiloDelCartel` y `elEstiloDeLaCinta`: lo que nada ataba era que el número
+ * medido acabara de verdad en la caja que se pinta. Sin lienzo medido, `undefined` y manda
+ * la hoja.
+ */
+export function elEstiloDelPregon(cinta: { ancho: number }, alto: number): CSSProperties | undefined {
+  if (cinta.ancho <= 0) return undefined;
+  const ancho = { width: `${String(Math.round(cinta.ancho))}px` };
+  return alto > 0 ? { ...ancho, maxHeight: `${String(Math.round(alto))}px` } : ancho;
+}
+
+/**
+ * EL MARGEN DE UNA TIRA, a cada lado. Son los mismos doce puntos con los que se rellena el
+ * cartel de un naipe (`MARGEN_DEL_CARTEL`), y se escribe aparte a propósito: son dos cajas
+ * distintas y compartir la constante ataría el día que una de las dos cambie de relleno.
+ */
+const MARGEN_DE_LA_TIRA = 12;
+/** El raíl de color de quien propone, y el aire entre él y las letras. */
+const RAIL_DE_LA_TIRA = 4;
+const HUECO_TRAS_EL_RAIL = 6;
+
+/**
+ * LOS PUNTOS QUE LE QUEDAN AL TEXTO DE UNA TIRA, ya quitados los márgenes y el raíl.
+ *
+ * De aquí sale la decisión de si en el renglón de estado cabe el nombre, y por eso es una
+ * función y no una resta escrita en el JSX: se puede llamar desde Node con el ancho de cada
+ * lienzo y mirar qué sale, que es lo que compra la regla del recorte.
+ *
+ * ═══ Y LO QUE NO CABE EN LOS ESTRECHOS ES LA OFERTA, QUE HAY QUE DECIRLO ═══
+ *
+ * MEDIDO en los dieciocho lienzos: la oferta entera —«1 junco → 1 limo», dieciséis letras—
+ * cabe en ONCE, y en los SIETE de pie más estrechos se recorta con puntos suspensivos. El
+ * diseño del trueque (§3.1) pinta la oferta con FICHAS de bien y ahí caben cuatro en el peor
+ * lienzo; el DOM la escribe con palabras, que ocupan bastante más, así que este cliente se
+ * queda corto antes que aquel modelo. No se arregla quitando la cifra —«junco → limo» son
+ * doce letras y sigue sin entrar en los 81,2 puntos de un lienzo de 288— y quitarla sería
+ * además perder el dato el día que la multiplicidad entre.
+ *
+ * Lo que lo hace aceptable es que la frase entera está en el árbol —`aria-label` y `title` de
+ * la tira— y se lee completa en la hoja, que es a un toque. Es la misma degradación que la
+ * frase de la cinta y la del cartel de un naipe, y por el mismo motivo: de pie es la forma
+ * secundaria de esta pantalla.
+ */
+export function huecoDeLaTira(anchoDeLaCinta: number): number {
+  return Math.max(0, anchoDeLaCinta - 2 * MARGEN_DE_LA_TIRA - RAIL_DE_LA_TIRA - HUECO_TRAS_EL_RAIL);
+}
+
+/** El triángulo del pliegue, al canto de la tira que resume, y el aire que se le deja. */
+const PLIEGUE_DE_LA_TIRA = 12;
+
+/**
+ * Y EL HUECO DE LA TIRA QUE RESUME, que es el de una tira menos el triángulo del pliegue.
+ *
+ * Se escribe aparte y no se le resta al otro: las tiras de trato NO llevan triángulo, y
+ * medirlas todas como si lo llevaran haría que el nombre de quien contestó se cayera antes de
+ * lo que se cae de verdad. Son dieciocho puntos, que en el lienzo de 288 son dos letras de
+ * las nueve y media que hay.
+ */
+export function huecoDeLaTiraQueResume(anchoDeLaCinta: number): number {
+  return Math.max(0, huecoDeLaTira(anchoDeLaCinta) - PLIEGUE_DE_LA_TIRA - HUECO_TRAS_EL_RAIL);
+}
+
+/**
+ * EL RENGLÓN DE ESTADO QUE CABE, CON NOMBRE O SIN ÉL, Y LA REGLA ES «SE RECORTA EL NOMBRE».
+ *
+ * ═══ POR QUÉ NO ES UN UMBRAL DE ANCHO ═══
+ *
+ * Por lo mismo que el «‹» de la cinta no se va por un umbral: lo que decide no es el ancho
+ * del lienzo sino si la FRASE cabe con la letra que este cliente pinta de verdad, que
+ * depende de la preferencia de tamaño del navegador. Un umbral en puntos deja fuera lienzos
+ * que sí pueden y deja dentro lienzos que no, y con la letra en grande se equivoca siempre.
+ *
+ * Y cuando no cabe se va EL NOMBRE y nunca el estado —«aceptada» antes que «la aceptó A…»—:
+ * saber que te la aceptaron importa más que saber quién, y el quién sigue entero en la frase
+ * que se oye y en la hoja. Es la regla escrita en `docs/EL-TRUEQUE-DE-RIBERAS.md` §3.2, y
+ * ahí sale de medir el peor lienzo: en 320×360 «la aceptó Ana» son trece letras y no entra.
+ *
+ * MEDIDO AQUÍ, con la letra de esta casa: el nombre cabe en CATORCE de los dieciocho lienzos,
+ * y se cae en los cuatro más estrechos —288×355, 288×317, 288×420 y 320×360—. Y se decide
+ * FRASE A FRASE y no lienzo a lienzo, que es lo que la regla pide: en el SE apaisado «la
+ * aceptó Ana» entra y «caducó sin respuesta», que son siete letras más, no.
+ *
+ * Y HAY UN SUELO POR DEBAJO DEL CUAL NI LA VERSIÓN CORTA CABE: en un lienzo de 288 el hueco
+ * son 81,2 puntos, o sea nueve letras y media, y «no puedes pagarlo» son diecisiete. Ahí se
+ * recorta con puntos suspensivos y no hay nada más que soltar, igual que la frase de la cinta
+ * en ese mismo lienzo. La frase entera sigue en el árbol y en la hoja.
+ */
+export function elEstadoQueCabe(
+  tira: { comoAnda: string; comoAndaSinNombre: string },
+  hueco: number,
+  raiz: number = RAIZ_DE_LA_CASA,
+): string {
+  const anchoPorLetra = CUERPO_SOBRE_LA_RAIZ * raiz * ANCHO_SOBRE_EL_CUERPO;
+  if (anchoPorLetra <= 0) return tira.comoAndaSinNombre;
+  return tira.comoAnda.length * anchoPorLetra <= hueco ? tira.comoAnda : tira.comoAndaSinNombre;
+}
+
+/**
+ * LA TRAMPA DE FOCO DE UN MODAL DEL LIENZO: `Escape` cierra y el tabulador da la vuelta.
+ *
+ * ═══ POR QUÉ ESTO ES UN GANCHO Y NO EL CUERPO DEL CAJÓN ═══
+ *
+ * Porque dentro del recuadro hay DOS cajas modales y no una: el cajón del marcador y el menú
+ * de elegir —«a quién se lo propones», «a quién le robas», «qué dos bienes coges»—. Las dos se
+ * pintan encima de un tablero donde un toque funda una choza, así que las dos necesitan lo
+ * mismo, y escribirlo dos veces es tener dos trampas que se separan el día que alguien
+ * arregle una: la que se queda rota es la que nadie estaba mirando. Escrito una vez, `Escape`
+ * y el tabulador valen igual en las dos, y `verify:escritorio` compra que las dos lo usan.
+ *
+ * LO QUE HACE, y las tres son cosas que un navegador NO hace solo con un `<div>`:
+ *
+ *   · al abrirse, el foco se va DENTRO de la caja. Sin esto, quien abre con teclado se queda
+ *     tabulando por detrás de un modal opaco;
+ *   · `Tab` sobre el último enfocable vuelve al primero y `Mayúsculas+Tab` sobre el primero
+ *     va al último. `aria-modal` se lo cuenta al lector de pantalla y no le quita el
+ *     tabulador a nadie: sin la vuelta, el foco se va a la cabecera de la Sala;
+ *   · `Escape` cierra, que es la salida que quien abrió con teclado espera encontrar.
+ *
+ * DEVOLVER EL FOCO AL CERRAR NO ES COSA DE AQUÍ, y no por descuido: la caja se DESMONTA al
+ * cerrarse y adónde vuelve el foco depende de quién la abrió —la ficha de mis puntos en un
+ * caso, el recuadro del lienzo en el otro, porque al menú lo abre un naipe del `<canvas>` y
+ * un `<canvas>` no recibe foco—. Lo hace cada `cerrar`, que es el que lo sabe.
+ *
+ * ═══ Y SE ROMPÍA SOLA EN CUANTO SE USABA. EL FALLO, JUGANDO Y NO LEYENDO ═══
+ *
+ * El oyente vivía EN LA CAJA (`suya.addEventListener('keydown', …)`), y un `keydown` sólo
+ * llega ahí si el foco está DENTRO. Basta pulsar una opción de «Lo que puedes hacer» para que
+ * deje de estarlo: la lista de opciones cambia con la jugada, el botón pulsado desaparece, y
+ * un elemento que se desmonta con el foco puesto lo suelta al `<body>`. Desde el `<body>` ni
+ * el tabulador da la vuelta ni `Escape` cierra: la trampa existía hasta el primer toque.
+ *
+ * Por eso ahora el oyente vive en `document` mientras la caja está abierta y `tecla` mira
+ * `caja.current` EN EL MOMENTO de la tecla, no el nodo que se capturó al armarla. Y hay
+ * RESCATE: un vigía mira los cambios de dentro de la caja y, si el foco se ha caído fuera,
+ * lo devuelve a la caja. Es el mismo patrón que el rescate del recuadro de `sala.tsx` —mirar
+ * quién tiene el foco justo cuando se lo llevan por delante—, aquí en pequeño.
+ *
+ * ═══ Y MANDA LA DE ARRIBA, QUE ES LO QUE UN OYENTE EN `document` SE LLEVA POR DELANTE ═══
+ *
+ * Con el oyente en la caja, la burbuja repartía sola: con el cajón abierto y el menú de
+ * elegir encima, un `Escape` sólo llegaba a la caja que tenía el foco dentro. En `document`
+ * llegan LAS DOS, y `Escape` cerraría el menú Y el cajón de un golpe. De ahí la pila:
+ * `armarUnaTrampa` apunta cada caja en el orden en que se abre y sólo actúa la de arriba.
+ */
+/**
+ * LAS TRAMPAS ARMADAS, en el orden en que se abrieron. Ver el porqué arriba.
+ *
+ * Es un array de módulo y no un estado de React a propósito: no decide qué se pinta, y las
+ * dos cajas que lo comparten no tienen un antepasado común al que colgárselo sin inventar un
+ * contexto para cuatro líneas. Se apunta con `armarUnaTrampa`, que devuelve cómo desarmarse.
+ */
+const LAS_TRAMPAS_ARMADAS: unknown[] = [];
+
+/**
+ * APUNTA UNA TRAMPA Y DEVUELVE CÓMO BORRARLA. Desarmar dos veces no hace nada, que es lo que
+ * pide un efecto de React en modo estricto (monta, desmonta y vuelve a montar).
+ */
+export function armarUnaTrampa(quien: unknown): () => void {
+  LAS_TRAMPAS_ARMADAS.push(quien);
+  let desarmada = false;
+  return () => {
+    if (desarmada) return;
+    desarmada = true;
+    const suPuesto = LAS_TRAMPAS_ARMADAS.lastIndexOf(quien);
+    if (suPuesto >= 0) LAS_TRAMPAS_ARMADAS.splice(suPuesto, 1);
+  };
+}
+
+/** ¿Manda ésta? Sólo la última que se armó, que es la que está encima. */
+export function mandaEstaTrampa(quien: unknown): boolean {
+  return LAS_TRAMPAS_ARMADAS.length > 0 && LAS_TRAMPAS_ARMADAS[LAS_TRAMPAS_ARMADAS.length - 1] === quien;
+}
+
+/**
+ * DÓNDE ESTÁ EL FOCO CUANDO LLEGA LA TECLA, visto desde la caja modal.
+ *
+ * `fuera` es el caso que costó tres turnos de partida: el navegador lo ha soltado al
+ * `<body>` porque el botón que lo tenía se desmontó. No es un caso raro ni un caso de
+ * teclado: pasa con el ratón, en la primera jugada, y hasta hoy dejaba la caja sin `Escape`.
+ */
+export type ElFocoDeLaTrampa = 'fuera' | 'la-caja' | 'el-unico' | 'el-primero' | 'el-ultimo' | 'dentro';
+
+/** Lo que la trampa hace con una tecla. `nada` quiere decir «déjasela al navegador». */
+export type LoQueHaceLaTrampa = 'nada' | 'cerrar' | 'al-primero' | 'al-ultimo' | 'a-la-caja';
+
+/**
+ * LA DECISIÓN DE LA TRAMPA, SIN NAVEGADOR, para que se pueda comprar llamándola.
+ *
+ * La comprobación de antes leía el CUERPO del oyente y buscaba dentro las palabras `Tab`,
+ * `shiftKey` y `Escape`. Pasaba en verde con la trampa rota delante, porque las palabras
+ * estaban escritas y el fallo era DÓNDE se enganchaba el oyente y qué pasaba con el foco
+ * caído: dos cosas que aquel texto no miraba. Partido así, el reparto se llama con una tabla
+ * —incluida la fila `fuera`, que es la del fallo— y el enganche se lee aparte.
+ *
+ * `Escape` cierra MIRE DONDE MIRE EL FOCO, y eso es la mitad del arreglo: es justo la tecla
+ * que se pulsa cuando uno ya no sabe dónde está.
+ */
+export function loQueHaceLaTrampa(
+  tecla: { key: string; shiftKey: boolean },
+  foco: ElFocoDeLaTrampa,
+  cuantosEnfocables: number,
+): LoQueHaceLaTrampa {
+  if (tecla.key === 'Escape') return 'cerrar';
+  if (tecla.key !== 'Tab') return 'nada';
+  /* Una caja sin nada que enfocar dentro se queda el tabulador ella misma. */
+  if (cuantosEnfocables === 0) return 'a-la-caja';
+  /* El foco caído al `body`: el tabulador entra en la caja en vez de irse a la Sala. */
+  if (foco === 'fuera') return tecla.shiftKey ? 'al-ultimo' : 'al-primero';
+  if (!tecla.shiftKey && (foco === 'el-ultimo' || foco === 'el-unico')) return 'al-primero';
+  if (tecla.shiftKey && (foco === 'el-primero' || foco === 'el-unico' || foco === 'la-caja')) return 'al-ultimo';
+  return 'nada';
+}
+
+function usarLaTrampaDeFoco(
+  abierto: boolean,
+  caja: RefObject<HTMLElement | null>,
+  cerrar: () => void,
+): void {
+  useEffect(() => {
+    if (!abierto) return;
+    const alArmar = caja.current;
+    if (alArmar === null) return;
+    alArmar.focus();
+    const desarmar = armarUnaTrampa(caja);
+    const enfocables = (dentro: HTMLElement): HTMLElement[] =>
+      [...dentro.querySelectorAll<HTMLElement>('a[href], button, input, select, textarea, [tabindex]')].filter(
+        (e) => !e.hasAttribute('disabled') && e.tabIndex >= 0,
+      );
+    const dondeEstaElFoco = (dentro: HTMLElement, lista: HTMLElement[]): ElFocoDeLaTrampa => {
+      const activo = document.activeElement;
+      if (activo === dentro) return 'la-caja';
+      if (activo === null || !dentro.contains(activo)) return 'fuera';
+      if (lista.length === 1 && activo === lista[0]) return 'el-unico';
+      if (activo === lista[0]) return 'el-primero';
+      if (activo === lista[lista.length - 1]) return 'el-ultimo';
+      return 'dentro';
+    };
+    const tecla = (e: KeyboardEvent): void => {
+      const dentro = caja.current;
+      if (dentro === null || !mandaEstaTrampa(caja)) return;
+      const lista = enfocables(dentro);
+      const hace = loQueHaceLaTrampa(e, dondeEstaElFoco(dentro, lista), lista.length);
+      if (hace === 'nada') return;
+      e.preventDefault();
+      if (hace === 'cerrar') cerrar();
+      else if (hace === 'a-la-caja') dentro.focus();
+      else (hace === 'al-primero' ? lista[0] : lista[lista.length - 1])?.focus();
+    };
+    /*
+     * EN `document` Y NO EN LA CAJA: ver la cabecera. Un oyente en la caja sólo oye lo que
+     * pasa con el foco dentro, y el foco se sale solo en cuanto una jugada cambia la lista de
+     * opciones. Con la pila, seguir aquí no le quita el `Escape` al menú que hay encima.
+     */
+    document.addEventListener('keydown', tecla);
+    /*
+     * EL RESCATE. Que el botón que tenía el foco se desmonte no avisa a nadie —el navegador
+     * no dispara `blur` al quitar de la página al que lo tenía—, así que se mira la caja por
+     * dentro: cada vez que cambia, si el foco se ha caído fuera, vuelve a la caja. Desde ahí
+     * el tabulador entra otra vez en el cajón, que es lo que se perdía.
+     */
+    const rescatar = (): void => {
+      const dentro = caja.current;
+      if (dentro === null || !mandaEstaTrampa(caja)) return;
+      if (dondeEstaElFoco(dentro, enfocables(dentro)) === 'fuera') dentro.focus();
+    };
+    const vigia = new MutationObserver(rescatar);
+    vigia.observe(alArmar, { childList: true, subtree: true });
+    return () => {
+      document.removeEventListener('keydown', tecla);
+      vigia.disconnect();
+      desarmar();
+    };
+  }, [abierto, caja, cerrar]);
+}
+
+/**
  * LOS TÍTULOS DEL MENÚ, uno por pregunta, y ni una palabra más de cosecha propia.
  *
  * Lo que va DENTRO de cada botón lo escribió el juego —`opcion.rotulo` y `opcion.ayuda`,
@@ -643,6 +1343,26 @@ const COMPRAR_UNA_CARTA = 'Comprar una carta';
 
 /** El rótulo del panel del marcador en el raíl. Chrome de la Sala, no una palabra del juego. */
 const TITULO_DEL_MARCADOR = 'El marcador';
+
+/**
+ * LOS RÓTULOS DEL PREGÓN. Chrome de la Sala: el juego no escribe ninguno, y por eso están
+ * aquí y no en `shared/` —lo que sí está allí son las frases de cada trato, que hablan de la
+ * partida—. Los tres bloques son las dos mitades de la decisión 17 y la mitad de en medio
+ * que el que propone no veía: lo vivo que me toca, lo vivo que ofrecí, y lo que ya se cerró.
+ */
+export const EL_PREGON_DE_LA_MESA = 'Los trueques de la mesa';
+const PARA_CONTESTAR = 'Para contestar';
+const LAS_MIAS = 'Tuyas';
+const LOS_CERRADOS = 'Trueques cerrados';
+/**
+ * LO QUE HACE UNA TIRA AL PULSARLA, y va en su nombre accesible porque LA TIRA NO LLEVA
+ * BOTONES: es lo que Miguel pidió —«la aceptación debe tener que confirmarse para que no se
+ * acepte por equivocación»— y además lo que hace que la oferta quepa. Medido en el diseño:
+ * con los dos botones de 44 al lado, a la oferta le quedan 77 puntos en el SE apaisado y 16
+ * en 320×360, o sea CERO fichas.
+ */
+const ABRIR_LA_HOJA = 'Toca para contestar';
+const ABRIR_LA_HOJA_SIN_CONTESTAR = 'Toca para verlo entero';
 
 // ---------------------------------------------------------------------------
 // El catálogo de modelos, una vez por pestaña
@@ -991,7 +1711,19 @@ function CamaraAerea({
      * apuntarse: `addEventListener('wheel', …)` es pasivo por omisión.
      */
     const rueda = (e: WheelEvent): void => {
+      /*
+       * DE QUIÉN ES ESTA RUEDA, que dentro del recuadro ya no es siempre de la cámara. Ver la
+       * cabecera de `EL_CAJON`: dentro de una caja que se desplaza sola —el cajón, el carril
+       * de la cinta o el menú de elegir— no se toca nada, ni siquiera se llama a
+       * `preventDefault`, para que el navegador la desplace como desplaza cualquier caja; y
+       * sobre el velo se llama a `preventDefault` y se para ahí, porque lo que hay abierto es
+       * modal y modal incluye la cámara. Sin la primera mitad, girar la rueda sobre la
+       * crónica acercaba el delta detrás del cajón y la crónica no se movía un renglón.
+       */
+      const donde = e.target instanceof Element ? e.target : null;
+      if (SE_DESPLAZAN_SOLAS.some((clase) => donde?.closest(`.${clase}`) != null)) return;
       e.preventDefault();
+      if (donde?.closest(`.${EL_VELO}`) != null) return;
       alAcercarse(acercando(cercania.current, pasosDeLaRueda(e)));
     };
     /* Sin esto, el primer arrastre con el botón derecho abre el menú del navegador encima del delta. */
@@ -1086,6 +1818,59 @@ export interface LoQueVeRiberas {
   /** El tablero declarado que trae la vista. Es lo que pinta el respaldo SVG. */
   tablero: TableroDeclarado;
   opciones: readonly Opcion[];
+  /**
+   * DÓNDE HA QUEDADO EL RECUADRO DEL LIENZO, para quien tenga que llevar el foco.
+   *
+   * Lo llama este pintor con el recuadro al montarlo y con `null` al soltarlo, y lo escucha
+   * `sala.tsx`. Hace falta avisar porque la decisión de si HAY lienzo se toma aquí dentro y
+   * en mitad del render —sin `.glb`, sin WebGL o con más colonos que colores esto cae al
+   * retablo SVG y no hay recuadro ninguno—, o sea que arriba no se puede saber.
+   *
+   * ═══ Y ES UN AVISO Y NO UN `ref` PELADO, POR UN CAMINO QUE SE MIDIÓ ═══
+   *
+   * El modelo tarda: mientras carga YA HAY recuadro —con su telón—, el foco aterriza ahí, y
+   * si el `.glb` acaba fallando el recuadro se desmonta CON EL FOCO DENTRO. Con un `ref`
+   * pelado eso termina con el foco en el `<body>` —medido en el banco, con la ruta del modelo
+   * rota a propósito— y quien juega con teclado tiene que volver a tabular desde la cabecera,
+   * que es exactamente el fallo que el efecto de la Sala existe para no tener. Avisando, la
+   * Sala se entera de que el recuadro se va y devuelve el foco al título, que en ese camino
+   * vuelve a verse.
+   *
+   * OPCIONAL porque el comprobador monta este pintor suelto para medirlo, sin ninguna Sala
+   * alrededor: exigirlo allí sería obligar a inventar un destino que nadie lee.
+   */
+  foco?: (recuadro: HTMLElement | null) => void;
+  /**
+   * EL RAÍL ENTERO, PARA METERLO EN EL CAJÓN.
+   *
+   * ═══ POR QUÉ VIENE MONTADO DE ARRIBA Y NO SE REESCRIBE AQUÍ ═══
+   *
+   * El cajón del §1.11 es «el raíl de siempre en el escritorio», y eso hay que tomárselo al
+   * pie de la letra: dentro van el marcador, la ficha de la mesa con su código y su reloj,
+   * los seis paneles que declara el juego, las dos salidas y la crónica — todo lo que la
+   * Sala ya monta y sabe montar, con sus estados y sus efectos. Escribir aquí una segunda
+   * versión de esas cinco cosas sería tener dos raíles: el que se ve con delta y el que se
+   * ve sin él, y el día que uno gane un dato el otro no lo tendría.
+   *
+   * Así que la Sala lo monta UNA vez y decide dónde vive: dentro del cajón mientras haya
+   * lienzo, y en su `<aside>` de siempre cuando este pintor cae al retablo. Quien le dice
+   * cuál de las dos cosas está pasando es el aviso de `foco` de aquí arriba, que ya existía.
+   *
+   * OPCIONAL por lo mismo que `foco`: el comprobador monta este pintor sin Sala alrededor
+   * en los bloques que miden otra cosa. La ficha de mis puntos sigue abriendo el cajón —es
+   * la puerta y no depende de lo que haya dentro—, y sin raíl lo que se abre está vacío;
+   * lo que NO puede pasar es que el cajón se pinte con un raíl a medias, porque la Sala lo
+   * monta entero o no lo monta.
+   */
+  elRail?: ReactNode;
+  /**
+   * ADÓNDE VA EL «‹» DE LA CINTA: la misma dirección que el rótulo de la cabecera.
+   *
+   * No se escribe aquí porque lleva dentro la silla de esta ventana (`?silla=`), que es un
+   * dato del bolsillo de este navegador y lo sabe la Sala. Sin él no se pinta el «‹», que
+   * es lo que pasa cuando este pintor se monta suelto para medirlo.
+   */
+  laSalida?: string;
 }
 
 /**
@@ -1103,7 +1888,16 @@ interface Preguntando {
   opciones: readonly Opcion[];
 }
 
-export function RiberasEnTres({ manifiesto, mesa, puesta, tablero, opciones }: LoQueVeRiberas): JSX.Element {
+export function RiberasEnTres({
+  manifiesto,
+  mesa,
+  puesta,
+  tablero,
+  opciones,
+  foco,
+  elRail,
+  laSalida,
+}: LoQueVeRiberas): JSX.Element {
   const { mover, quieto } = mesa;
   const vista = puesta.vista;
   const yo = puesta.yo;
@@ -1238,6 +2032,17 @@ export function RiberasEnTres({ manifiesto, mesa, puesta, tablero, opciones }: L
   const [naipeSenalado, ponerNaipeSenalado] = useState<string | null>(null);
   const [preguntando, ponerPreguntando] = useState<Preguntando | null>(null);
 
+  /*
+   * EL RECUADRO, GUARDADO, Y NO PARA MEDIRLO: PARA DEVOLVERLE EL FOCO.
+   *
+   * El menú de elegir lo abre un naipe del `<canvas>`, y un `<canvas>` no recibe foco: al
+   * cerrar el menú no hay «el botón que lo abrió» al que volver, como sí lo hay en el cajón.
+   * El destino es el recuadro, que para eso lleva `tabIndex={-1}`, `role="group"` y nombre —es
+   * el mismo sitio donde aterriza el foco al sentarse—. Sin esto, cerrar el menú suelta el
+   * foco al `<body>` y hay que tabular desde la cabecera de la Sala en cada carta que se juega.
+   */
+  const elRecuadro = useRef<HTMLDivElement | null>(null);
+
   /**
    * SOLTARLO TODO: la pieza, el bien, el naipe y la pregunta abierta.
    *
@@ -1266,6 +2071,25 @@ export function RiberasEnTres({ manifiesto, mesa, puesta, tablero, opciones }: L
     ponerCogida(null);
     ponerCartaDelMazo(null);
     ponerPreguntando(null);
+  }, []);
+
+  /*
+   * ═══ CERRAR EL MENÚ A MANO, QUE NO ES LO MISMO QUE SOLTARLO TODO ═══
+   *
+   * `soltarTodo` cierra la pregunta porque la mesa cambió debajo; esto la cierra porque quien
+   * jugaba la ha cerrado —eligiendo, con «Dejarlo» o con `Escape`— y por eso ADEMÁS devuelve
+   * el foco. El menú es modal desde que vive dentro del recuadro, y una caja modal que se
+   * desmonta con el foco dentro lo suelta al `<body>`: quien juega con teclado tendría que
+   * tabular desde la cabecera de la Sala cada vez que juega un naipe. Vuelve al RECUADRO y no
+   * a un botón, porque al menú lo abre un naipe del `<canvas>` y un `<canvas>` no recibe foco.
+   *
+   * No entra en `soltarTodo`: allí el menú se cierra sin que nadie lo haya pedido —una jugada
+   * ajena, la mesa recogida—, y mover el foco por algo que pasó en otra pantalla es robárselo
+   * a quien estaba escribiendo en otro sitio.
+   */
+  const cerrarElMenu = useCallback(() => {
+    ponerPreguntando(null);
+    elRecuadro.current?.focus();
   }, []);
 
   /*
@@ -1368,6 +2192,16 @@ export function RiberasEnTres({ manifiesto, mesa, puesta, tablero, opciones }: L
    */
   const [raizDeLaLetra, ponerRaizDeLaLetra] = useState(RAIZ_DE_LA_CASA);
   const medirElRecuadro = useCallback((recuadro: HTMLDivElement | null) => {
+    elRecuadro.current = recuadro;
+    /*
+     * PRIMERO SE AVISA DEL DESTINO DEL FOCO, Y ANTES DE LA GUARDA DE `ResizeObserver`.
+     * Detrás de ella el aviso se perdería exactamente donde más falta hace —un navegador
+     * viejo, una prueba en Node— y el foco volvería a caer al `body` al sentarse sin que nada
+     * fallara. Y se avisa también con `null`, que es cuando el recuadro SE VA: la Sala tiene
+     * que poder rescatar el foco si se lo lleva puesto, y no quedarse con el recuadro de una
+     * mesa de la que uno acaba de levantarse.
+     */
+    foco?.(recuadro);
     if (recuadro === null || typeof ResizeObserver === 'undefined') return;
     const mide = (): void => {
       ponerLienzo((antes) => {
@@ -1386,7 +2220,7 @@ export function RiberasEnTres({ manifiesto, mesa, puesta, tablero, opciones }: L
     if (typeof document !== 'undefined') observador.observe(document.documentElement);
     /* Los `ref` de función no tienen limpieza: se suelta en el efecto de abajo. */
     observadorDelRecuadro.current = observador;
-  }, []);
+  }, [foco]);
   const observadorDelRecuadro = useRef<ResizeObserver | null>(null);
   useEffect(() => () => observadorDelRecuadro.current?.disconnect(), []);
   const haySitioParaLosDados = useMemo(() => {
@@ -1399,6 +2233,59 @@ export function RiberasEnTres({ manifiesto, mesa, puesta, tablero, opciones }: L
     const suyos = dadosEnTres(vista, yo, opciones);
     return suyos === null || !quieto ? suyos : { ...suyos, disponible: false };
   }, [haySitioParaLosDados, vista, yo, opciones, quieto]);
+
+  /*
+   * TIRAR VUELVE AL PIE MIENTRAS LA MESA ESTÁ RECOGIDA, y es el agujero gordo del §6.
+   *
+   * Con la mesa abajo NO HAY DADOS QUE TOCAR —se desmontan al llegar—, pero
+   * `opcionesFueraDeLaMesa` quita TIRAR de la lista en cuanto `dados` no es `null`. El §6
+   * deja recoger la mesa EN MI PROPIO TURNO y la deja recogida hasta que yo diga: sin esto,
+   * quien la recoja antes de tirar se queda sin poder tirar y sin nada que explique por
+   * qué, o sea la partida parada. Así que se compone con `null` mientras está recogida,
+   * igual que con el mazo de arriba.
+   *
+   * A `<Delta>` se le sigue pasando `dados` ENTERO: `dados !== null` es la llave del QUINTO
+   * hueco (§4.4) y con `null` las piezas se correrían al recoger y volverían al sacar.
+   */
+  /*
+   * ═══ EL PREGÓN, Y RECIBE LAS OPCIONES ENTERAS, ANTES DE NINGÚN FILTRO ═══
+   *
+   * El mismo orden que `mazoEnLaBarra` con el mazo y `dadosEnTres` con los dados: primero
+   * esto, con la lista completa, y después `opcionesFueraDelPregon` quita ACEPTAR y RECHAZAR
+   * de lo que va a los botones. Al revés el pregón se quedaría sin los dos botones que cuelga
+   * de cada tira, que son justo lo que hay que pulsar.
+   *
+   * Y sale de `opciones` y no de `fueraDeLaBarra` por lo mismo: aquellas ya han pasado por
+   * tres cribas y una de ellas podría llevárselos mañana.
+   */
+  const pregon = useMemo(() => elPregonEnTres(vista, yo, opciones), [vista, yo, opciones]);
+  const fuera = useMemo(
+    () => opcionesFueraDelPregon(opcionesFueraDeLaMesa(fueraDeLaBarra, mesaRecogida ? null : dados), pregon),
+    [fueraDeLaBarra, dados, mesaRecogida, pregon],
+  );
+  /*
+   * ═══ QUÉ DICE CADA CUADRADO DEL CARRIL, Y POR QUÉ SE PREGUNTA SOBRE `fuera` ═══
+   *
+   * Sobre la lista YA CRIBADA y no sobre `opciones`, aunque la tabla sea por `id` y sobrar
+   * entradas no rompa nada: preguntarlo sobre la lista entera obligaría a recorrer las
+   * treinta y siete opciones de un turno cargado para pintar dos cuadrados, en cada render
+   * del delta. Lo que se pinta es lo que se pregunta.
+   *
+   * La traducción vive en `shared/arcade/juegos/riberas-en-tres.ts` y no aquí, como todo lo
+   * demás que este pintor lee de la vista: aquí no se sabe qué es un estiaje ni qué es una
+   * isla, y el día que la app pinte esta misma tira leerá la misma tabla.
+   */
+  const glifos = useMemo(() => glifosDelCarril(vista, fuera), [vista, fuera]);
+  /*
+   * ═══ Y SI HAY CARRIL, QUE ES LO QUE LA CINTA MIDE DISTINTO ═══
+   *
+   * El carril de la cinta —la segunda tira de 44 puntos con un botón cuadrado por opción
+   * suelta— existe exactamente cuando `fuera` trae algo. No es un ajuste: es lo que decide si
+   * la caja opaca de arriba mide 44 o 88, y de ahí sale la banda que le queda al cartel de los
+   * naipes. Se lee una vez y lo miran los dos sitios —la cuenta del cartel y el marcado—, para
+   * que no haya dos condiciones que puedan separarse.
+   */
+  const hayCarril = fuera.length > 0;
 
   /*
    * ═══ QUÉ NAIPE SE ESTÁ EXPLICANDO, Y LA PRECEDENCIA EN UNA LÍNEA ═══
@@ -1431,28 +2318,227 @@ export function RiberasEnTres({ manifiesto, mesa, puesta, tablero, opciones }: L
    * que se pasara— pero dejaba un hueco raro y desperdiciaba media banda: con cero, el
    * cartel baja al canto y le caben las tres frases en sitios donde antes cabían dos.
    */
+  const cuantosHuecosDeBarra = mesaRecogida ? 0 : barra.length + (mazo === null ? 0 : 1);
   const cartel = useMemo((): CartelAlPie | null => {
     if (naipeExplicado === null) return null;
-    const cuantos = mesaRecogida ? 0 : barra.length + (mazo === null ? 0 : 1);
-    return elCartelQueCabe(lienzo, cuantos, naipeExplicado.explicacion, raizDeLaLetra);
-  }, [naipeExplicado, lienzo, barra.length, mazo, mesaRecogida, raizDeLaLetra]);
+    return elCartelQueCabe(
+      lienzo,
+      cuantosHuecosDeBarra,
+      naipeExplicado.explicacion,
+      raizDeLaLetra,
+      hayCarril,
+      /*
+       * Y CON EL PREGÓN PINTADO NO HAY CARTEL. La regla de exclusión del §4.1 del trueque,
+       * en la única línea donde se puede escribir: medido, con la cinta a 88 y el cartel
+       * puesto al pregón le quedan 32 puntos en el SE apaisado, o sea CERO tiras. Las dos
+       * cosas no compiten de verdad por la atención —el cartel se pide señalando un naipe
+       * PROPIO, que es un gesto de mi turno, y el pregón existe justo cuando juega otro—.
+       *
+       * AQUÍ SE APARTA UN PELO DE LO QUE DICE EL §4.1, y es a propósito: allí se dice que
+       * con la HOJA de una propuesta abierta el cartel vuelve a caber, porque el pregón deja
+       * de estar pintado debajo. En este cliente la hoja lleva su VELO, que se come los
+       * punteros, así que con ella abierta no se puede señalar un naipe y no hay cartel que
+       * pedir. Devolverlo entonces sería pintar una caja que nadie ha pedido encima del
+       * tablero. El pregón se queda debajo del velo y el cartel, apagado.
+       */
+      pregon !== null,
+    );
+  }, [naipeExplicado, lienzo, cuantosHuecosDeBarra, raizDeLaLetra, hayCarril, pregon]);
+
+  // -------------------------------------------------------------------------
+  // La cinta de arriba y el cajón que cuelga de ella
+  // -------------------------------------------------------------------------
+
   /*
-   * TIRAR VUELVE AL PIE MIENTRAS LA MESA ESTÁ RECOGIDA, y es el agujero gordo del §6.
+   * ═══ EL RELOJ, ANTES QUE LA CINTA PORQUE LA CINTA LO DESCUENTA ═══
    *
-   * Con la mesa abajo NO HAY DADOS QUE TOCAR —se desmontan al llegar—, pero
-   * `opcionesFueraDeLaMesa` quita TIRAR de la lista en cuanto `dados` no es `null`. El §6
-   * deja recoger la mesa EN MI PROPIO TURNO y la deja recogida hasta que yo diga: sin esto,
-   * quien la recoja antes de tirar se queda sin poder tirar y sin nada que explique por
-   * qué, o sea la partida parada. Así que se compone con `null` mientras está recogida,
-   * igual que con el mazo de arriba.
-   *
-   * A `<Delta>` se le sigue pasando `dados` ENTERO: `dados !== null` es la llave del QUINTO
-   * hueco (§4.4) y con `null` las piezas se correrían al recoger y volverían al sacar.
+   * Es lo que faltaba y lo que hizo perder tres turnos: la línea de estado no decía NUNCA
+   * cuánto quedaba de turno, y la cuenta atrás vivía sólo dentro del cajón. Sale del plazo de
+   * la MESA —`venceEn` y `terminada`, que ya viajaban por el cable y que este pintor ya
+   * recibía en `puesta`— y no del juego: el plazo es de la mesa, y Riberas no sabe nada de
+   * él. Ver `usarElRelojDeLaCinta`.
    */
-  const fuera = useMemo(
-    () => opcionesFueraDeLaMesa(fueraDeLaBarra, mesaRecogida ? null : dados),
-    [fueraDeLaBarra, dados, mesaRecogida],
+  const elReloj = usarElRelojDeLaCinta(puesta.venceEn, puesta.terminada);
+  /*
+   * DE LO QUE EL REPARTO DEPENDE ES DE SI HAY RELOJ, NO DE LA HORA QUE ES.
+   *
+   * `elReloj` es un objeto nuevo en cada latido —cada segundo en el último minuto—, así que
+   * meterlo tal cual en la lista de abajo dejaría el `useMemo` sin memo: `laCinta` cambiaría de
+   * identidad una vez por segundo y arrastraría con ella el estilo de la cinta, el del carril,
+   * el del cajón y el del pregón, que la reciben por la puerta. El ancho de la cinta no depende
+   * de lo que el reloj DIGA, sólo de si lo hay.
+   */
+  const conReloj = elReloj !== null;
+
+  /*
+   * CUÁNTO ANCHO SE LLEVA LA CINTA Y QUÉ LE CABE, con la MISMA función que va a llamar la
+   * app y que `verify:escena` mide contra las dos manos: `escenas/cinta.ts`. Aquí no hay
+   * ninguna fracción escrita; lo único que este cliente pone son las TRES cosas que dependen
+   * de cómo pinta él y que `escenas/` no puede saber: cuánto ocupan ocho letras, cuánto mide
+   * un botón y cuánto se lleva el reloj, las tres con la raíz de VERDAD del navegador.
+   */
+  const laCinta = useMemo(
+    () =>
+      loQueLlevaLaCinta(
+        lienzo.ancho,
+        lienzo.alto,
+        huecoMinimoDeLaFrase(raizDeLaLetra),
+        ladoDelBotonDeLaCinta(raizDeLaLetra),
+        conReloj ? huecoDelRelojDeLaCinta(raizDeLaLetra) : 0,
+      ),
+    [lienzo, raizDeLaLetra, conReloj],
   );
+  /*
+   * EL MARCADOR, PARA LA FICHA DE MIS PUNTOS DE LA CINTA. Es la misma traducción que pinta
+   * el marcador del cajón, leída una vez: los puntos «a la vista» y mi color de las piezas
+   * del tablero. `null` con una vista que no es de Riberas, y entonces la ficha se queda en
+   * el «≡» pelado en vez de inventar un cero.
+   */
+  const marcador = useMemo(() => marcadorEnTres(vista), [vista]);
+  const yoEnElMarcador = useMemo(() => marcador?.colonos.find((c) => c.soyYo) ?? null, [marcador]);
+  /*
+   * LO QUE SÓLO CUENTO YO, y `null` cuando no hay nada que contar. Se saca aquí y no en el
+   * JSX porque lo miran DOS sitios de la misma ficha —el «+N» pintado y la frase que oye un
+   * lector— y dos condiciones escritas aparte se separan el día que alguien toque una: el
+   * caso malo es la que se queda diciendo «y 5 contándote lo oculto» cuando en pantalla ya no
+   * hay ningún «+N», o al revés.
+   *
+   * La cifra es la DIFERENCIA y no el total, igual que en el marcador del cajón: el total lo
+   * dice la frase que se oye entera, y el «+N» de la pantalla es lo que hay que sumarle al
+   * número público, que es el que ve la mesa.
+   */
+  const loOcultoDeLaFicha = useMemo(() => {
+    const con = yoEnElMarcador?.puntosConLoOculto;
+    if (yoEnElMarcador == null || con == null || con === yoEnElMarcador.puntos) return null;
+    return con - yoEnElMarcador.puntos;
+  }, [yoEnElMarcador]);
+
+  /*
+   * ═══ EL CAJÓN ES MODAL, Y ESO SON TRES COSAS Y NO UNA ═══
+   *
+   * Modal quiere decir, por orden de lo que cuesta olvidarlo: que un toque fuera SÓLO lo
+   * cierra y no pasa a nada de lo que hay debajo —ni al tablero, ni a las cartas, ni a la
+   * barra: quien cierra el cajón no quiere construir donde tenía el dedo—; que el foco no
+   * se sale de él mientras está abierto; y que al cerrarlo el foco vuelve a la ficha que lo
+   * abrió, no al `<body>`.
+   *
+   * Vive en un `useState` a secas y no viaja a ninguna parte: es dónde está mirando la
+   * persona, como la mesa recogida. Y NO se cierra al cambiar la revisión —no entra en
+   * `soltarTodo`—: el sondeo trae una mesa nueva cada pocos segundos, y un cajón que se
+   * cierra solo mientras se lee la crónica es peor que no tenerlo.
+   */
+  const [cajonAbierto, ponerCajonAbierto] = useState(false);
+  const laFichaDeMisPuntos = useRef<HTMLButtonElement | null>(null);
+  const elCajon = useRef<HTMLDivElement | null>(null);
+  const nombreDelCajon = useId();
+  const cerrarElCajon = useCallback(() => {
+    ponerCajonAbierto(false);
+    laFichaDeMisPuntos.current?.focus();
+  }, []);
+  /*
+   * AL ABRIRLO, EL FOCO SE VA DENTRO; y mientras está abierto, no sale. Lo hace la misma
+   * trampa que usa el menú de elegir, y por eso está escrita una sola vez: ver
+   * `usarLaTrampaDeFoco`. Sin ella, tabular desde la crónica se iba a la cabecera de la Sala
+   * con un cajón opaco puesto encima, o sea el foco en un sitio que no se ve.
+   */
+  usarLaTrampaDeFoco(cajonAbierto, elCajon, cerrarElCajon);
+
+  // -------------------------------------------------------------------------
+  // El pregón del trueque, y la hoja donde se confirma
+  // -------------------------------------------------------------------------
+
+  /*
+   * HASTA DÓNDE PUEDE COLGAR, y se para en la misma raya que el cartel: el techo del asa de
+   * la barra. El pregón NO es modal —por debajo se sigue girando el tablero, que es todo el
+   * motivo de que exista—, así que colgando hasta el canto taparía la barra de piezas y el
+   * naipe del mazo. Los huecos son los de VERDAD, los mismos que deciden si caben los dados.
+   */
+  const altoDelPregon = useMemo(
+    () => elAltoDelPregon(lienzo, cuantosHuecosDeBarra, hayCarril, raizDeLaLetra),
+    [lienzo, cuantosHuecosDeBarra, hayCarril, raizDeLaLetra],
+  );
+
+  /*
+   * ═══ QUÉ PROPUESTA TIENE LA HOJA ABIERTA, Y SE GUARDA EL SEUDÓNIMO Y NO LA TIRA ═══
+   *
+   * Es la misma razón por la que el cartel de un naipe busca la carta en la mano de verdad en
+   * vez de guardársela: la tira que se abrió puede dejar de ser la que era. Una propuesta
+   * viva se acepta, se aparta o caduca al pasar el turno, y `v.tratos` sólo recuerda las ocho
+   * últimas; guardando el objeto, la hoja se quedaría abierta ofreciendo «Aceptar» sobre un
+   * trato que el juego ya no ofrece, y ese botón viajaría con una opción que la mesa
+   * rechazaría sin decir por qué. Buscándolo por seudónimo, la hoja se convierte sola en
+   * lectura cuando el trato se cierra, y se cierra sola cuando el trato desaparece.
+   *
+   * Y NO ENTRA EN `soltarTodo`. Allí se suelta lo que se tiene EN LA MANO porque la mesa
+   * cambió debajo; una propuesta no se tiene en la mano, y el sondeo trae una revisión nueva
+   * cada vez que cualquiera juega: una hoja que se cerrara con cada jugada ajena sería
+   * imposible de leer justo en el turno de otro, que es cuando existe.
+   */
+  /*
+   * ═══ SI EL PREGÓN SE PLIEGA, Y SI ALGUIEN LO HA DESPLEGADO ═══
+   *
+   * `sePliega` no es de esta pantalla: lo dice `elPregonSePliega` con la vista, y quiere decir
+   * «aquí no hay nada que contestar» —que hoy es «es mi turno», por lo que está escrito en
+   * `shared/`—. `desplegado` sí lo es, y sólo lo es: es dónde está mirando quien juega, como
+   * el cajón y como la mesa recogida, y no viaja a ninguna parte.
+   *
+   * Y SE VUELVE A PLEGAR CUANDO DEJA DE PODER PLEGARSE, no con cada jugada. Quien lo abre en
+   * su turno lo tiene abierto ese turno entero —cerrárselo debajo en cada revisión del sondeo
+   * sería el cajón que se cierra solo, que ya está apuntado aquí como peor que no tenerlo—; y
+   * al llegar algo que contestar el pregón se pinta ENTERO por su cuenta y esto se apaga, para
+   * que el turno siguiente empiece plegado y no con media pantalla de tablero tapada.
+   */
+  const pregonSePliega = elPregonSePliega(pregon);
+  const [pregonDesplegado, ponerPregonDesplegado] = useState(false);
+  useEffect(() => {
+    if (!pregonSePliega) ponerPregonDesplegado(false);
+  }, [pregonSePliega]);
+  const [tratoAbierto, ponerTratoAbierto] = useState<string | null>(null);
+  const elPregonEnLaPantalla = useRef<HTMLDivElement | null>(null);
+  const laTiraAbierta = useMemo((): TiraDelPregon<Opcion> | null => {
+    if (tratoAbierto === null || pregon === null) return null;
+    return (
+      [...pregon.paraContestar, ...pregon.mias, ...pregon.cerrados].find((t) => t.id === tratoAbierto) ?? null
+    );
+  }, [tratoAbierto, pregon]);
+
+  /*
+   * AL CERRARLA, EL FOCO VUELVE A SU TIRA, y si la tira ya no está, al recuadro.
+   *
+   * Una caja modal que se desmonta con el foco dentro lo suelta al `<body>`, y desde ahí hay
+   * que tabular la cabecera entera de la Sala. El cajón vuelve a la ficha que lo abrió y el
+   * menú de elegir vuelve al recuadro —a él lo abre un naipe del `<canvas>`, que no recibe
+   * foco—; aquí SÍ hay botón al que volver, pero no es uno fijo: son tantos como propuestas.
+   * Se busca por el seudónimo dentro del pregón, que para eso cada tira lo lleva escrito.
+   *
+   * Y la tira puede haberse ido mientras la hoja estaba abierta —aceptarla la muda del bloque
+   * de contestar al de ya trocado, y ahí sigue estando; pero un noveno trato la echa de la
+   * lista—, así que el recuadro es el respaldo. Sin respaldo, el caso raro es el que suelta
+   * el foco al `body`.
+   */
+  const cerrarLaHoja = useCallback(() => {
+    const cual = tratoAbierto;
+    ponerTratoAbierto(null);
+    const suya =
+      cual === null
+        ? null
+        : elPregonEnLaPantalla.current?.querySelector<HTMLButtonElement>(`[data-trato="${cual}"]`);
+    if (suya != null) suya.focus();
+    else elRecuadro.current?.focus();
+  }, [tratoAbierto]);
+
+  /*
+   * Y SI EL TRATO DESAPARECE CON LA HOJA ABIERTA, la hoja se cierra sola. No es un caso
+   * inventado: el pregón entero se va en cuanto no queda una propuesta viva, o sea en cuanto
+   * pasa el turno de quien la hizo, y eso pasa cada pocos segundos por el sondeo. Sin esto la
+   * hoja se desmontaría con el foco dentro y lo soltaría al `<body>`.
+   */
+  useEffect(() => {
+    if (tratoAbierto === null || laTiraAbierta !== null) return;
+    ponerTratoAbierto(null);
+    elRecuadro.current?.focus();
+  }, [tratoAbierto, laTiraAbierta]);
+
   /*
    * AL PULSAR EL ASA DE LOS DADOS: se manda TIRAR por la misma puerta que el botón y se le
    * devuelve a la escena cómo acabó, que es lo que corta el rodar en el acto si la mesa no
@@ -1755,19 +2841,320 @@ export function RiberasEnTres({ manifiesto, mesa, puesta, tablero, opciones }: L
   return (
     <div className="riberas-en-tres">
       {/*
-        El aviso del tablero es del JUEGO —«te toca fundar», «espera a que tire
-        otro»— y viaja en el tablero declarado igual que antes. En el retablo lo
-        pinta el propio retablo; aquí, que no hay retablo, se pinta encima del
-        lienzo en el mismo sitio y con la misma letra. Perderlo sería perder la
-        única frase que dice en qué momento está la partida.
-      */}
-      {tablero.aviso.length > 0 ? <p className="aviso-del-tablero">{tablero.aviso}</p> : null}
+        ═══ AQUÍ IBA EL AVISO DEL TABLERO, Y NO SE HA PERDIDO: SE HA MUDADO ═══
 
+        El aviso del tablero es del JUEGO —«Te toca: tira los dados.», «Turno de Ana:
+        está por tirar.»— y viaja en el tablero declarado. Estaba aquí, en un
+        `<p class="aviso-del-tablero">` EN FLUJO por encima del recuadro, y eso son 29
+        puntos de alto más su hueco que se le restaban al tablero en todas las ventanas,
+        también en las que ya iban justas.
+
+        Ahora lo pinta la CINTA, dentro del recuadro y sin quitarle un punto de alto, con
+        la misma región viva (`aria-live="polite"`) que tenía el del retablo. No se pinta
+        en los dos sitios a propósito: dos regiones vivas con el mismo texto se anuncian
+        DOS VECES, y el aviso ya se anuncia solo cada vez que otro juega. En el camino del
+        respaldo el `<p>` sigue existiendo, porque allí lo pinta `Retablo` y allí no hay
+        cinta ninguna.
+      */}
       {/* La clase sale de la constante porque la cámara BUSCA este recuadro por ella: ver `RECUADRO_DEL_LIENZO`. */}
+      {/*
+        ═══ AQUÍ ATERRIZA EL FOCO AL SENTARSE, Y POR ESO LLEVA NOMBRE ═══
+
+        Con la página de pie el `<h1>` de la mesa sale del flujo, así que el destino del
+        efecto de `sala.tsx` se muda a este recuadro. `tabIndex={-1}` no lo mete en el orden
+        del tabulador: sólo lo hace capaz de recibir un foco que se le lleva.
+
+        Y con `aria-label`, porque un `<div>` enfocado y sin nombre se anuncia como nada:
+        quien acaba de sentarse oiría silencio en el único momento de esta pantalla que hay
+        que anunciar. El nombre lo pone el manifiesto —el mismo que decía el título— y no una
+        cadena escrita aquí, para que el día que un arcade se llame de otra manera esto no
+        siga nombrando a Riberas.
+      */}
       <div
         className={quieto ? `${RECUADRO_DEL_LIENZO} riberas-lienzo-quieto` : RECUADRO_DEL_LIENZO}
         ref={medirElRecuadro}
+        tabIndex={-1}
+        role="group"
+        aria-label={`${manifiesto.nombre}: la mesa en tres dimensiones`}
       >
+        {/*
+          ═══ LA CINTA DEL TERCIO CENTRAL (§2.2) ═══
+
+          Tres cosas en 44 puntos de alto: salir, la frase de estado y la puerta del cajón.
+          Va DENTRO del recuadro y encima del lienzo —no en flujo por encima de él—, que es
+          lo que hace que no le quite un punto de alto al tablero, y ocupa sólo el tercio
+          central del ancho porque a los lados están las dos manos y son cartas que se
+          arrastran (los números, en `escenas/cinta.ts`).
+
+          ═══ Y VA FUERA DE `conMundo`, A PROPÓSITO ═══
+
+          Como la lista de las explicaciones de abajo, y por lo mismo: no necesita mundo
+          ninguno. Mientras el modelo se descarga ya hay aviso que leer y ya hay marcador
+          que abrir —el telón tapa el tablero, no la partida—, y de paso esto se puede
+          RENDERIZAR en Node, que es lo que permite que `verify:escritorio` cuente la cinta
+          y el cajón contra una partida de verdad en vez de creerse el fuente.
+
+          ═══ EL «‹» NO SIEMPRE ESTÁ, Y ESA ES LA RAMA QUE EL DISEÑO NO TENÍA ═══
+
+          El §2.2 lo pone siempre porque su lienzo más estrecho es un teléfono de 320. Este
+          cliente da lienzos de 288 desde que la página se puso de pie, y ahí la cinta son
+          115,2 puntos: quitados los dos botones de 44 quedan 27,2, o sea TRES LETRAS de
+          frase. Ensancharla no lo arregla —el techo son 122,8 puntos, más allá se come los
+          15 de aire a la mano del mazo, y eso da cuatro—, así que se va uno de los tres, y
+          `loQueLlevaLaCinta` dice cuándo: cuando la frase no conserva sus ocho letras.
+
+          El que se va es el «‹», y en el escritorio no se muda a ninguna esquina: se queda
+          en la cabecera de la Sala, que en esta pantalla NO desaparece (§2.1, es la
+          navegación del sitio) y cuyo «Sala de Arcade» va exactamente al mismo sitio que
+          este botón. De los tres, se va el único que ya existe fuera del lienzo.
+
+          Y NO SE MUDA A UNA ESQUINA PORQUE NO HAY ESQUINA LIBRE, que es lo que se midió
+          antes de decidirlo: arriba a la izquierda, la carta de arriba de la mano del mazo
+          abierta llega a 49,7 puntos del canto en 288×317 y a 55,7 en 288×355, o sea por
+          encima de los 56 que pide un botón de 44 con sus 12 de margen —sería la esquina
+          del asa de la choza que `.riberas-recoger` ya se comió una vez—; arriba a la
+          derecha están «Ver el tablero entero» y «Recoger la mesa»; y abajo es de la barra.
+          `verify:escritorio` compra esa medida, para que el día que las manos se aparten
+          esto se vuelva a mirar en vez de quedarse escrito.
+        */}
+        <div
+          className={hayCarril ? 'riberas-cinta riberas-cinta-con-carril' : 'riberas-cinta'}
+          style={elEstiloDeLaCinta(laCinta)}
+        >
+          {laCinta.salidaDentro && laSalida !== undefined ? (
+            <a className="riberas-cinta-salir" href={laSalida} aria-label={SALIR_DE_LA_MESA} title={SALIR_DE_LA_MESA}>
+              <span aria-hidden="true">‹</span>
+            </a>
+          ) : null}
+          {/*
+            ═══ EL RELOJ, PEGADO AL CANTO Y DELANTE DE LA FRASE ═══
+
+            Lo que arregla está contado con números en `escenas/cinta.ts` y en
+            `usarElRelojDeLaCinta`: la cinta no decía NUNCA cuánto quedaba de turno, y con el
+            plazo de serie de 120 s la mesa jugó sola tres turnos.
+
+            VA DELANTE Y NO SE ENCOGE (`flex: 0 0 auto` en la hoja) porque de los cuatro
+            trozos de la cinta es el único que no se puede recortar: la frase cortada sigue
+            diciendo algo y sigue entera en el árbol, «12 mi…» no es un plazo más corto sino
+            otro número.
+
+            ═══ Y NO ES UNA SEGUNDA REGIÓN VIVA, QUE SERÍA PEOR QUE NO PONERLO ═══
+
+            La frase de al lado ya es `aria-live="polite"`. Un reloj vivo al lado suyo
+            anunciaría la cuenta atrás EN VOZ ALTA cada segundo durante el último minuto,
+            encima del aviso del juego y pisándolo. `role="timer"` es exactamente esto: una
+            región de tiempo que un lector encuentra y lee CUANDO QUIERE y que no se anuncia
+            sola (su `aria-live` implícito es `off`). El nombre lleva la frase entera —«quedan
+            47 s»—, que es la misma que pinta el cajón, para que lo que se oye no sea el
+            rótulo abreviado que sólo existe por falta de sitio.
+          */}
+          {elReloj === null ? null : (
+            <span
+              className={
+                elReloj.aprieta ? 'riberas-cinta-reloj riberas-cinta-reloj-aprieta' : 'riberas-cinta-reloj'
+              }
+              role="timer"
+              aria-label={elReloj.entero}
+              title={elReloj.entero}
+            >
+              <span aria-hidden="true">{elReloj.corto}</span>
+            </span>
+          )}
+          {/*
+            LA FRASE, RECORTADA EN PANTALLA Y ENTERA EN EL ÁRBOL. El recorte lo hace la hoja
+            con `text-overflow: ellipsis`; el texto completo sigue en el DOM, así que un
+            lector lo lee entero y el ratón lo ve al posarse (`title`). Está SIEMPRE en el
+            árbol, vacía cuando no hay nada que decir, por lo mismo que el cartel de los
+            naipes: una región viva que se monta a la vez que su texto no se anuncia.
+          */}
+          <p className="riberas-cinta-frase" aria-live="polite" title={tablero.aviso}>
+            {tablero.aviso}
+          </p>
+          {/*
+            ═══ LA FICHA DE MIS PUNTOS: el «≡» del §2.2, y la puerta del cajón ═══
+
+            Mi raíl de color, mi cifra pública y el «+N» de lo que sólo cuento yo, los tres a
+            la vista sin abrir nada (decisión 11). Es el único dato del marcador que se lee
+            sin abrir el cajón, y es la puerta del cajón: por eso es lo último que se iría de
+            la cinta y no se va nunca.
+
+            EL «+N» VA AQUÍ Y NO SÓLO DENTRO, y cabe por poco: la ficha mide el suelo de
+            toque y ni un punto más, porque su ancho sale del trozo que `loQueLlevaLaCinta`
+            le da a la frase. Con la letra de la casa, lo peor que puede escribirse ahí
+            —«12+5», dos dígitos públicos y uno oculto— ocupa 44,3 de los 46,75 que mide la
+            caja. La cuenta está en la hoja, al lado de las dos letras que la deciden, y
+            `verify:escritorio` la afirma: por eso la cifra pública se pinta un punto más
+            pequeña que el resto de la cinta. Si algún día no cupiera, `overflow: hidden` es
+            la red — antes recortar la cifra que descuadrar el reparto de la frase.
+
+            Y SON DOS NÚMEROS Y NO SU SUMA, como en el marcador del cajón y por lo mismo: el
+            público lo ve la mesa entera y el otro sólo yo, y sumarlos haría que el mismo
+            renglón dijera una cosa distinta en cada pantalla.
+
+            Para un mirón que no está sentado no hay color ni cifra, y entonces es «≡» a
+            secas, que es lo que dice el diseño: no se inventa un cero que no es de nadie.
+          */}
+          <button
+            type="button"
+            ref={laFichaDeMisPuntos}
+            className="riberas-cinta-ficha"
+            aria-expanded={cajonAbierto}
+            aria-controls={nombreDelCajon}
+            aria-label={
+              yoEnElMarcador === null
+                ? cajonAbierto
+                  ? CERRAR_EL_CAJON
+                  : ABRIR_EL_CAJON
+                : `Marcador: ${String(yoEnElMarcador.puntos)} ${yoEnElMarcador.puntos === 1 ? 'punto' : 'puntos'} a la vista${loOcultoDeLaFicha === null ? '' : `, y ${String(yoEnElMarcador.puntosConLoOculto ?? yoEnElMarcador.puntos)} contándote lo oculto`}. ${cajonAbierto ? CERRAR_EL_CAJON : ABRIR_EL_CAJON}`
+            }
+            onClick={() => {
+              if (cajonAbierto) cerrarElCajon();
+              else ponerCajonAbierto(true);
+            }}
+          >
+            {yoEnElMarcador === null ? (
+              <span aria-hidden="true">≡</span>
+            ) : (
+              <>
+                <span
+                  className="riberas-cinta-rail"
+                  style={{ background: yoEnElMarcador.color }}
+                  aria-hidden="true"
+                />
+                <span className="riberas-cinta-puntos" aria-hidden="true">
+                  {yoEnElMarcador.puntos}
+                  {loOcultoDeLaFicha === null ? null : (
+                    <span className="riberas-cinta-ocultos">+{loOcultoDeLaFicha}</span>
+                  )}
+                </span>
+              </>
+            )}
+          </button>
+        </div>
+
+        {/*
+          ═══ Y LA SEGUNDA TIRA: EL CARRIL DE LO QUE EL TABLERO NO ENSEÑA ═══
+
+          SÓLO CUANDO HAY ALGO QUE OFRECER. Una tira vacía de 44 puntos sería cromo pegado
+          encima del tablero en todos los turnos ajenos, y además le restaría banda al cartel
+          de los naipes sin que hubiera nada que leer en ella. `hayCarril` es la MISMA
+          condición que entra en `elCartelQueCabe`, leída una sola vez, para que el alto que
+          se pinta y el alto que se resta no puedan separarse.
+
+          LO QUE AQUÍ YA NO ESTÁ: el `<Formulario>` en flujo por debajo del lienzo. Ver la
+          cabecera de `ElCarril`, con los 4.284 puntos de botones que el estiaje ponía ahí.
+        */}
+        {hayCarril ? (
+          <ElCarril opciones={fuera} alElegir={mover} quieto={quieto} ancho={laCinta} glifos={glifos} />
+        ) : null}
+
+        {/*
+          ═══ Y COLGANDO DE LA CINTA, EL PREGÓN: LAS PROPUESTAS DE TRUEQUE ═══
+
+          Es el requisito de Miguel —«se tiene que mostrar en la pantalla las propuestas de
+          trueque por cada jugador con capacidad de aceptar o rechazar»— y NO es modal a
+          propósito: lo lee quien NO tiene el turno, mientras otro juega, así que tiene que
+          verse sin abrir nada y por debajo se sigue girando el tablero. Ver `ElPregon`.
+
+          Sólo existe cuando hay algo VIVO: con la lista de tratos llena de cerrados no se
+          pinta, y lo cerrado se lee entonces en el panel «Trueques» del cajón. El porqué —y
+          lo que costaría lo contrario: el cartel de los naipes apagado para siempre— está
+          entero en `elPregonEnTres`.
+        */}
+        {pregon === null ? null : (
+          <ElPregon
+            pregon={pregon}
+            suya={elPregonEnLaPantalla}
+            ancho={laCinta}
+            alto={altoDelPregon}
+            raiz={raizDeLaLetra}
+            conCarril={hayCarril}
+            abierta={tratoAbierto}
+            alAbrir={ponerTratoAbierto}
+            sePliega={pregonSePliega}
+            desplegado={pregonDesplegado}
+            alPlegar={ponerPregonDesplegado}
+          />
+        )}
+
+        {/*
+          ═══ EL CAJÓN: EL RAÍL ENTERO, DEL ANCHO DE LA CINTA Y COLGADO DE ELLA (§1.11) ═══
+
+          Dentro va lo que la Sala monta —el marcador, la ficha de la mesa con su código y
+          su reloj, los seis paneles que declara el juego con «Lo mío» el primero, las dos
+          salidas y la crónica—, sin reescribir una línea de su lógica: sólo cambia dónde
+          está. Ver `elRail`.
+
+          Mide LO QUE LA CINTA y cuelga hasta el canto de abajo, así que su aire a la carta
+          más cercana de cada mano es el MISMO que el de la cinta —las manos se extienden a
+          lo ancho igual arriba que abajo—. Lo que sí hay debajo de él es la barra, y por
+          eso es modal: con el cajón abierto no se construye.
+
+          EL VELO ES LA MITAD QUE SE OLVIDA. Sin él, un clic fuera del cajón llega al
+          tablero: se cierra el cajón Y se funda una choza donde estaba el dedo. El velo
+          está para que ese clic no sea nada más que cerrar. Va `aria-hidden` porque para un
+          lector el cajón ya es modal (`aria-modal`) y un `<div>` sin texto en medio sólo
+          sería ruido.
+
+          Y ARRANCA MÁS ABAJO CUANDO HAY CARRIL, que es lo único que la segunda tira le cambia:
+          cuelga del PIE de la cinta, y con carril la cinta mide dos tiras. La clase la pone
+          este marcado y el `top` sigue viviendo en la hoja, en `rem`, por lo mismo que la
+          primera vez: la cinta se pinta con el suelo de toque de la casa y con la preferencia
+          de letra del navegador eso deja de ser 44 puntos. Escritos los dos en `rem`, crecen
+          juntos y no hay dos números que cuadrar.
+        */}
+        {cajonAbierto ? (
+          <>
+            <div className={EL_VELO} onClick={cerrarElCajon} aria-hidden="true" />
+            <div
+              id={nombreDelCajon}
+              ref={elCajon}
+              className={hayCarril ? `${EL_CAJON} ${EL_CAJON}-bajo-el-carril` : EL_CAJON}
+              role="dialog"
+              aria-modal="true"
+              aria-label={EL_CARRIL_DE_LA_MESA}
+              tabIndex={-1}
+              style={elEstiloDelCajon(laCinta)}
+            >
+              {/*
+                ═══ LA LISTA LARGA, CON RÓTULO Y AYUDA, Y AQUÍ ES DONDE HAY ANCHO ═══
+
+                El carril de la cinta ofrece las mismas opciones en cuadrados de 44 puntos, que
+                es lo que cabe ahí arriba y lo que hace que un siete no pare la mesa. Pero un
+                cuadrado con un número dentro no dice a qué isla va el estiaje, y esa frase
+                tiene que poder LEERSE en algún sitio: es aquí, en un cajón que mide 16rem de
+                suelo y rueda por dentro. Cada opción se alcanza por los dos sitios, en el
+                mismo orden y con el mismo número de tecla.
+
+                VA LA PRIMERA, delante del marcador: el cajón se abre y se cierra, y el primer
+                renglón es el único que se lee sin desplazar. Con el estiaje por mover, lo que
+                hay que hacer es más urgente que cuántos puntos lleva cada cual.
+
+                Y `atajos={false}`: las teclas 1-9 las escucha el carril, que está montado
+                también con el cajón abierto. Con las dos copias escuchándolas, el «3» mandaría
+                el mismo movimiento dos veces y el segundo viajaría con la revisión vieja. Ver
+                `usarLosAtajos`.
+
+                LA CONDICIÓN ES LA QUE TENÍA EL FORMULARIO EN FLUJO, palabra por palabra: se
+                calla sólo si el tablero está enseñando algo y aquí no queda nada —con una
+                barra encendida, «no hay nada que puedas hacer» sería mentira—, y si el juego
+                no ofrece nada de nada sí se dice, porque entonces es verdad y es lo único que
+                explica por qué la barra está apagada.
+              */}
+              {hayCarril || opciones.length === 0 ? (
+                <Formulario
+                  opciones={fuera}
+                  alElegir={mover}
+                  quieto={quieto}
+                  titulo={TITULO_DE_LO_QUE_SE_HACE}
+                  atajos={false}
+                />
+              ) : null}
+              {elRail}
+            </div>
+          </>
+        ) : null}
+
         {conMundo ? (
           <>
             {/*
@@ -1976,37 +3363,473 @@ export function RiberasEnTres({ manifiesto, mesa, puesta, tablero, opciones }: L
             ))}
           </ul>
         ) : null}
+        {/*
+          ═══ EL MENÚ DE ELEGIR, MODAL Y DENTRO DEL RECUADRO ═══
+
+          Estaba EN FLUJO por debajo del lienzo, y con la página de pie eso deja de ser un
+          sitio: el recuadro vale la ventana entera menos la cabecera, así que «debajo» está
+          fuera de la pantalla. El menú de «a quién le robas» —o el de los quince pares del año
+          bueno— aparecía donde no se ve, y como mover el estiaje es obligatorio, la partida se
+          quedaba parada sin un error en ninguna parte. En la app su hermano (`HojaDeAQuien`) ya
+          era modal desde su primera versión.
+
+          Va DENTRO del recuadro, encima del lienzo y con el mismo velo y la misma trampa de
+          foco que el cajón (`usarLaTrampaDeFoco`). Y por eso mismo se pinta AQUÍ, hermano del
+          cajón y no del recuadro: los dos son cajas modales del mismo lienzo.
+        */}
+        {preguntando !== null ? (
+          <ElijeUna
+            titulo={preguntando.titulo}
+            opciones={preguntando.opciones}
+            quieto={quieto}
+            alElegir={(o) => {
+              cerrarElMenu();
+              mover({ tipo: o.tipo, carga: o.carga });
+            }}
+            alDejarlo={cerrarElMenu}
+          />
+        ) : null}
+        {/*
+          ═══ LA HOJA DE UNA PROPUESTA: DONDE SE CONFIRMA, Y ES `ElijeUna` ═══
+
+          Miguel: «la aceptación debe tener que confirmarse para que no se acepte por
+          equivocación». La forma de garantizarlo NO es un diálogo detrás del botón: es que en
+          la tira no haya botón. La tira entera abre esto, y aquí están «Aceptar» y
+          «Rechazar», cada uno con su renglón y su rótulo escrito. Dos toques, y el primero no
+          está encima del segundo.
+
+          Y ES `ElijeUna` Y NO UN QUINTO MODAL CASI IGUAL. Lo que la hoja necesita es
+          exactamente lo que ese componente ya hace: velo, `role="dialog"` con nombre, trampa
+          de foco escrita UNA vez, `Escape`, `Dejarlo` que nunca se apaga, y las opciones con
+          el rótulo y la ayuda que redactó el JUEGO —«Le das 1 limo y te da 1 junco»— sin
+          inventar aquí una palabra sobre la jugada. Escribir una hoja aparte habría sido la
+          quinta copia de la misma caja, y la que se rompe es la que nadie mira.
+
+          El TÍTULO es la frase entera del trato y la NOTA es su estado: los dos los redacta
+          `elPregonEnTres` en `shared/`, que es donde los va a leer también la app.
+
+          CON LA TIRA CERRADA —o con una mía— la lista de opciones sale VACÍA y la hoja es de
+          lectura: qué se ofreció, a quién y en qué acabó, con «Dejarlo» de única salida. Es
+          la misma hoja y no un componente nuevo, que es lo que dice el §3.2 del trueque.
+        */}
+        {laTiraAbierta === null ? null : (
+          <ElijeUna
+            titulo={laTiraAbierta.frase}
+            nota={laTiraAbierta.comoAnda}
+            opciones={[laTiraAbierta.aceptar, laTiraAbierta.rechazar].filter((o): o is Opcion => o !== null)}
+            quieto={quieto}
+            alElegir={(o) => {
+              cerrarLaHoja();
+              mover({ tipo: o.tipo, carga: o.carga });
+            }}
+            alDejarlo={cerrarLaHoja}
+          />
+        )}
       </div>
+    </div>
+  );
+}
 
-      {preguntando !== null ? (
-        <ElijeUna
-          titulo={preguntando.titulo}
-          opciones={preguntando.opciones}
-          quieto={quieto}
-          alElegir={(o) => {
-            ponerPreguntando(null);
-            mover({ tipo: o.tipo, carga: o.carga });
-          }}
-          alDejarlo={() => {
-            ponerPreguntando(null);
-          }}
-        />
-      ) : null}
+/**
+ * ═══ EL CARRIL DE LA CINTA: UN CUADRADO POR OPCIÓN, Y LA MESA NO SE PARA ═══
+ *
+ * Debajo del lienzo iba un `<Formulario>` EN FLUJO con lo que el tablero no enseña —tirar,
+ * pasar, aceptar, rechazar, empezar, tirar fichas, mover el estiaje—, y en la pantalla
+ * completa eso era el agujero que dejaba la mesa parada. LOS NÚMEROS, medidos y no supuestos:
+ *
+ *   · un `.opcion` de este cliente mide 238 puntos de ancho (`min-width: 14rem`) y 46,75 de
+ *     alto, porque lleva rótulo Y ayuda;
+ *   · un turno corriente trae UNA opción suelta —«Pasar el turno»— y el descarte trae CINCO,
+ *     una por clase de bien que quede en la mano;
+ *   · pero CON EL ESTIAJE POR MOVER el juego emite DIECIOCHO destinos siempre, y hasta
+ *     veintitrés cuando las islas tienen dos víctimas. Dieciocho botones de 238 son 4.284
+ *     puntos de lista debajo de un lienzo que se come la ventana entera. No es una lista
+ *     larga: es que mover la pieza es obligatorio y al botón no se llega.
+ *
+ * Y NINGÚN COMPROBADOR SE PONÍA ROJO, que es la mitad que hay que arreglar aparte: los que
+ * había miran la LISTA DE OPCIONES —que ninguna se pierda entre la barra, las manos y los
+ * botones— y esa cuenta seguía saliendo bien. Nadie miraba la PANTALLA. La comprobación que
+ * la mira está en `verify:escritorio`, y es hermana del bloque del mazo.
+ *
+ * ═══ EL GLIFO ERA EL NÚMERO DE ORDEN, Y ESA DECISIÓN QUEDA REVOCADA ═══
+ *
+ * Aquí ponía que el número de orden era «lo ÚNICO que distingue a los dieciocho» y que no
+ * decir a qué isla va era «una renuncia y no un descuido», porque el carril es la puerta
+ * rápida y el cajón es donde se lee. Jugando una partida entera contra el servidor, esa
+ * renuncia salió como esto: con un siete de verdad en una mesa de tres, el juego emitió
+ * VEINTE opciones y el carril las pintó como veinte cuadrados con «1», «2», … «20» dentro.
+ * Rodar funcionaba (`.riberas-carril` 313 × 46,8, `scrollWidth` 935); lo que no existía era
+ * QUÉ hace cada uno. Y los cuadrados 5 y 6 decían los dos «Mover el estiaje a la marisma …»
+ * y sólo se distinguían por la víctima, o sea que ni el cajón resolvía el empate de un
+ * vistazo.
+ *
+ * Y la premisa era falsa: lo que distingue a los dieciocho no es su orden en la lista, es
+ * SU ISLA — y la isla tiene un número que YA ESTÁ PINTADO en el tablero, en el disco del
+ * centro de cada comarca. `glifosDelCarril` lo saca de la vista (`shared/arcade/juegos/
+ * riberas-en-tres.ts`, con el porqué entero y lo que se descartó), y este mueble lo pinta:
+ *
+ *   · EL NÚMERO DE LA ISLA dentro del cuadrado, que es lo que hay que buscar en el delta.
+ *   · SU TERRENO como una barra de color al pie, porque el reparto lleva DOS de cada cifra
+ *     y en el carril puede haber dos onces — igual que en el tablero, donde lo que los
+ *     separa es de qué son. El color sale de `colorDeTerreno`, la misma tabla que pinta el
+ *     tablero plano y la que `verify:riberas` mide.
+ *   · LA VÍCTIMA como filo izquierdo, del color con el que esa persona se pinta en el
+ *     marcador. Es lo que separa los dos cuadrados gemelos de una isla con dos víctimas sin
+ *     escribir una letra más.
+ *
+ * LO QUE SE PIERDE, dicho: el número de orden ya no está a la vista, y ése era el atajo de
+ * teclado de las nueve primeras. Sigue anunciado en `aria-keyshortcuts` y sigue funcionando;
+ * lo que ya no hace es ocupar el único hueco que había para decir adónde va la pieza. En las
+ * listas cortas —tirar, pasar, aceptar, rechazar, descartar— no hay isla que nombrar, no hay
+ * glifo, y el ordinal se queda exactamente donde estaba.
+ *
+ * Y el rótulo y la ayuda siguen ENTEROS en el árbol —`aria-labelledby`, `aria-describedby` y
+ * `title`—: lo que se pinta es un resumen, no un recorte del nombre accesible.
+ *
+ * ═══ Y RUEDA A LO ANCHO, QUE ES LO QUE HACE QUE QUEPAN ═══
+ *
+ * El carril mide LO QUE LA CINTA —el mismo `anchoDeLaCinta`, porque a los lados siguen las
+ * dos manos y siguen siendo cartas que se arrastran— y lo que no cabe se rueda. En un lienzo
+ * de 288 se ven dos botones de los dieciocho y en un monitor trece (`cuantosSeVenEnElCarril`).
+ * `touch-action: auto` en la hoja NO es adorno: el recuadro lo tiene en `none` por el gesto
+ * del delta, y sin devolvérselo el carril no se puede rodar CON EL DEDO, que es tanto como no
+ * tenerlo.
+ */
+function ElCarril({
+  opciones,
+  alElegir,
+  quieto,
+  ancho,
+  glifos,
+}: {
+  opciones: readonly Opcion[];
+  alElegir: (movimiento: MovimientoDeclarado) => void;
+  quieto: boolean;
+  ancho: { ancho: number };
+  /**
+   * QUÉ DICE CADA CUADRADO, por `id` de opción. Viene montado de fuera y no se calcula aquí
+   * por lo mismo que la barra y las dos manos: la lectura de la vista vive en un solo sitio
+   * (`glifosDelCarril`) y este mueble sólo recoge. Una tabla vacía es «ninguna opción tiene
+   * glifo», que es lo que pasa en un turno corriente, y entonces se pinta el número de orden
+   * de siempre.
+   */
+  glifos: ReadonlyMap<string, GlifoDelCarril>;
+}): JSX.Element {
+  /*
+   * POR LA MISMA PUERTA QUE EL FORMULARIO, y no por un `map` escrito aquí:
+   * `loQueSePuedePintar` es la guarda que convierte lo que llegó POR EL CABLE en algo
+   * pintable —una opción sin `ayuda` es un `TypeError` al pintar, dos ids iguales
+   * desincronizan la lista de React, y un rótulo que falta deja un botón sin nombre
+   * accesible—. Copiarla aquí sería tener dos guardas, y la que se quedaría atrás es la de
+   * la pantalla que nadie mira.
+   */
+  const base = useId();
+  const pintables = useMemo(() => loQueSePuedePintar(opciones), [opciones]);
+  /*
+   * Y LAS TECLAS 1-9 SON DE ESTE MUEBLE. El carril está montado siempre que haya opciones
+   * sueltas —también con el cajón abierto, detrás de su velo—, así que el número que dispara
+   * una tecla es el mismo aquí y en la copia del cajón, que ofrece esta misma lista en este
+   * mismo orden y por eso declara `atajos={false}`. Ver `usarLosAtajos`.
+   */
+  usarLosAtajos(pintables, alElegir, quieto);
 
+  return (
+    <div
+      className="riberas-carril"
+      style={elEstiloDeLaCinta(ancho)}
+      role="group"
+      aria-label={TITULO_DE_LO_QUE_SE_HACE}
+    >
+      {pintables.map((o, i) => {
+        const conAtajo = i < CON_ATAJO;
+        const idRotulo = `${base}-rotulo-${String(i)}`;
+        const idAyuda = `${base}-ayuda-${String(i)}`;
+        /*
+         * `o.clave` ES el `id` de la opción siempre que el cable trajera uno y no estuviera
+         * repetido (`loQueSePuedePintar`), que es por donde `glifosDelCarril` indexa. Cuando
+         * no lo hay, la clave es un `sin-clave-N` que la tabla no contiene: no hay glifo y se
+         * cae al número de orden, que es lo que se pinta en las listas cortas.
+         */
+        const suGlifo = glifos.get(o.clave) ?? null;
+        return (
+          /*
+           * `aria-disabled` Y NO `disabled`, por lo mismo que en el formulario: un `<button>`
+           * al que se le pone `disabled` TENIENDO EL FOCO lo pierde, y el foco cae al `<body>`.
+           * Aquí eso es peor que allí, porque el carril está dentro del recuadro y volver
+           * cuesta tabular la cabecera entera de la Sala.
+           */
+          <button
+            key={o.clave}
+            type="button"
+            className={quieto ? 'riberas-carril-opcion riberas-carril-quieta' : 'riberas-carril-opcion'}
+            aria-disabled={quieto}
+            aria-labelledby={idRotulo}
+            aria-describedby={o.ayuda.length > 0 ? idAyuda : undefined}
+            aria-keyshortcuts={conAtajo && !quieto ? String(i + 1) : undefined}
+            title={o.ayuda.length > 0 ? `${o.rotulo}. ${o.ayuda}` : o.rotulo}
+            onClick={() => {
+              if (quieto) return;
+              alElegir(o.movimiento);
+            }}
+          >
+            {/*
+              EL FILO IZQUIERDO, DEL COLOR DE LA VÍCTIMA. Sólo cuando se le roba a alguien: es
+              lo único que separa los dos cuadrados de una isla con dos víctimas. Va
+              `aria-hidden` porque el nombre de quien pierde la ficha está en el rótulo entero
+              de aquí abajo, que es lo que se oye: un color no se lee en voz alta.
+            */}
+            {suGlifo?.rail == null ? null : (
+              <span
+                className="riberas-carril-rail"
+                style={{ background: suGlifo.rail }}
+                aria-hidden="true"
+              />
+            )}
+            <span className="riberas-carril-glifo" aria-hidden="true">
+              {suGlifo === null ? i + 1 : suGlifo.glifo}
+            </span>
+            {/*
+              LA BARRA DEL TERRENO AL PIE. El número de la isla no es único —el reparto lleva
+              dos de cada cifra— así que esto es lo que separa dos «11» distintos, con el mismo
+              color con el que esas dos islas se ven distintas en el tablero. `colorDeTerreno`
+              es la MISMA tabla que pinta el tablero plano, y la que `verify:riberas` mide
+              contra los seis colores de colono para que ninguna se coma una pieza.
+            */}
+            {suGlifo === null ? null : (
+              <span
+                className="riberas-carril-terreno"
+                style={{ background: colorDeTerreno(suGlifo.terreno) }}
+                aria-hidden="true"
+              />
+            )}
+            {/*
+              EL RÓTULO Y LA AYUDA, ENTEROS Y FUERA DE LA VISTA. Es la misma técnica que la
+              lista de las explicaciones de los naipes —`clip-path`, nunca `display: none`,
+              que los lectores saltan—: en 44 puntos no cabe «Mover el estiaje al cantil 10»,
+              pero un botón sin nombre accesible no se puede pulsar con lector de pantalla, y
+              dieciocho botones llamados «1»…«18» no son dieciocho movimientos distintos.
+            */}
+            <span className="riberas-carril-dicho" id={idRotulo}>
+              {o.rotulo}
+            </span>
+            {o.ayuda.length > 0 ? (
+              <span className="riberas-carril-dicho" id={idAyuda}>
+                {o.ayuda}
+              </span>
+            ) : null}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// El pregón: las propuestas de trueque, colgando de la cinta
+// ---------------------------------------------------------------------------
+
+/**
+ * ═══ EL PREGÓN, QUE ES LO QUE MIGUEL PIDIÓ Y LO QUE NO HABÍA ═══
+ *
+ * «Se tiene que mostrar en la pantalla las propuestas de trueque por cada jugador con
+ * capacidad de aceptar o rechazar, la aceptación debe tener que confirmarse para que no se
+ * acepte por equivocación.» Lo que había era un panel de TEXTO dentro del cajón —«t3: Ana da
+ * junco por limo a Bruno — propuesta»— sin nada que pulsar y detrás de un botón que hay que
+ * abrir, y unos botones sueltos llamados «Aceptar el trueque t3» que salían con los demás.
+ * Una propuesta caduca al acabar el turno de quien la hizo, así que una oferta que sólo se ve
+ * abriendo un cajón es una oferta que casi nadie contesta.
+ *
+ * ═══ NO ES MODAL, Y ÉSA ES LA DIFERENCIA CON EL CAJÓN ═══
+ *
+ * El cajón lo abre quien quiere mirar; el pregón lo lee quien NO tiene el turno mientras otro
+ * juega, así que tiene que estar a la vista SIN abrir nada y el tablero tiene que seguir
+ * girando por debajo. De ahí las tres cosas que no lleva: ni velo, ni trampa de foco, ni
+ * `role="dialog"`. Es una región con nombre, y las tiras están en el orden del tabulador
+ * como cualquier botón de la pantalla.
+ *
+ * ═══ LA TIRA NO LLEVA BOTÓN DE ACEPTAR, Y ESO ES LAS DOS MITADES DEL ENCARGO ═══
+ *
+ * La tira entera es un botón y lo único que hace es ABRIR la hoja; «Aceptar» y «Rechazar»
+ * están dentro. Es lo que Miguel pide —dos toques, y el primero no está encima del segundo—
+ * y además es lo que hace que la oferta quepa: medido en el diseño, con los dos botones de 44
+ * al lado a la oferta le quedan 77 puntos en el SE apaisado y 16 en 320×360, o sea CERO
+ * fichas, contra los 165 y 104 que quedan sin ellos.
+ *
+ * ═══ TRES BLOQUES, Y EL DE EN MEDIO ES EL QUE NADIE VEÍA ═══
+ *
+ *   · «Para contestar»: lo vivo que va dirigido a mí.
+ *   · «Tuyas»: lo vivo que YO ofrecí. Hoy el que propone no ve NADA de lo que propuso —ni si
+ *     sigue en pie, ni quién se lo apartó—, y ése era el segundo agujero.
+ *   · «Ya trocado»: lo cerrado, que es la otra mitad de la decisión 17. Quien vuelve al
+ *     tablero dos turnos después tiene que poder saber quién le dio qué a quién.
+ *
+ * Un bloque vacío NO se pinta: un rótulo de 44 puntos con nada debajo es cromo encima del
+ * tablero, y con el trueque de hoy uno de los dos primeros está vacío SIEMPRE —sólo propone
+ * quien tiene el turno—. Ver `elPregonEnTres`, que lo mide.
+ *
+ * ═══ Y RUEDA POR DENTRO, HASTA EL TECHO DEL ASA ═══
+ *
+ * Cuelga del pie de la cinta —una tira o dos, según haya carril— y se para donde se para el
+ * cartel de un naipe: en el techo del asa de la barra menos el mismo aire (`elAltoDelPregon`).
+ * Hasta el canto taparía las piezas de construir y el naipe del mazo, que es justo lo que un
+ * mueble NO modal no puede hacer. Lo que no cabe se rueda, y `touch-action: auto` en la hoja
+ * no es adorno: el recuadro lo tiene en `none` por el gesto del delta.
+ *
+ * ═══ Y SE PLIEGA CUANDO NO HAY NADA QUE CONTESTAR, QUE ES LO QUE SALIÓ JUGANDO ═══
+ *
+ * Es una caja OPACA, y en el turno de uno crece con las propuestas PROPIAS: medido en una
+ * partida de verdad, con ocho abiertas iba de y=159 a y≈540 de un recuadro de 857, o sea el
+ * 44 % de arriba del tablero, justo donde viven los anillos de fundar. No crece sin fin —el
+ * techo del asa lo para—, pero ese tope ya es media pantalla tapada mientras se decide dónde
+ * construir, y lo que tapa es lo que NO hay que contestar.
+ *
+ * Así que cuando `elPregonSePliega` —no queda nada dirigido a mí— el pregón se pinta como UNA
+ * tira que dice cuántas hay, y un toque lo despliega. Plegado ocupa `altoDelPregonPlegado`,
+ * 63,75 puntos, que en aquel recuadro son el 7,4 % en vez del 44 %. Con algo que contestar no
+ * se pliega NUNCA, porque entonces taparlo es su trabajo.
+ *
+ * La tira que resume es la MISMA tira de siempre —`.riberas-pregon-tira`, el suelo de toque,
+ * el raíl de color, los dos renglones y `elEstadoQueCabe` para el recorte— con un triángulo al
+ * canto, y no un mueble nuevo: dos formas de tira serían dos sitios donde se recorta distinto.
+ */
+function ElPregon({
+  pregon,
+  suya,
+  ancho,
+  alto,
+  raiz,
+  conCarril,
+  abierta,
+  alAbrir,
+  sePliega,
+  desplegado,
+  alPlegar,
+}: {
+  pregon: PregonEnTres<Opcion>;
+  suya: RefObject<HTMLDivElement | null>;
+  ancho: { ancho: number };
+  alto: number;
+  raiz: number;
+  conCarril: boolean;
+  abierta: string | null;
+  alAbrir: (id: string) => void;
+  sePliega: boolean;
+  desplegado: boolean;
+  alPlegar: (desplegado: boolean) => void;
+}): JSX.Element {
+  /*
+   * EL HUECO DE LETRAS DE UNA TIRA, medido con el ancho que la cinta tiene HOY y con la raíz
+   * de VERDAD del navegador. De aquí sale si en el renglón de estado cabe el nombre de quien
+   * contestó: en un lienzo de 288 no cabe, y entonces se recorta EL NOMBRE y nunca el estado.
+   */
+  const hueco = huecoDeLaTira(ancho.ancho);
+  const bloques: { rotulo: string; tiras: readonly TiraDelPregon<Opcion>[] }[] = [
+    { rotulo: PARA_CONTESTAR, tiras: pregon.paraContestar },
+    { rotulo: LAS_MIAS, tiras: pregon.mias },
+    { rotulo: LOS_CERRADOS, tiras: pregon.cerrados },
+  ];
+  const resumen = sePliega ? elResumenDelPregon(pregon) : null;
+  /* Y el de la tira que resume, que es el mismo menos el triángulo del pliegue. */
+  const huecoDelResumen = huecoDeLaTiraQueResume(ancho.ancho);
+  return (
+    <div
+      ref={suya}
+      className={conCarril ? `${EL_PREGON} ${EL_PREGON}-bajo-el-carril` : EL_PREGON}
+      style={elEstiloDelPregon(ancho, alto)}
+      role="region"
+      aria-label={EL_PREGON_DE_LA_MESA}
+    >
       {/*
-        Y debajo, lo que el tablero NO enseña ya: tirar, pasar, aceptar, rechazar,
-        empezar. Fundar y alzar los ofrece la barra con sus anillos; ofrecer un
-        trueque lo ofrece la mano; COMPRAR lo ofrece el cuarto hueco de la barra.
-        Cada movimiento se enseña exactamente una vez.
+        LA TIRA QUE RESUME, cuando no hay nada que contestar. Está puesta también con el
+        pregón desplegado —con el triángulo al revés y `aria-expanded` en cierto—: es la
+        única puerta de vuelta, y un mueble que sólo se sabe abrir es un mueble que tapa el
+        tablero hasta que cambia el turno.
 
-        Se calla SÓLO si el tablero está enseñando algo y aquí no queda nada: con
-        una barra encendida, «no hay nada que puedas hacer» sería mentira. Y si el
-        juego no ofrece nada de nada —le toca a otro— sí se dice, porque entonces es
-        verdad y es lo único que explica por qué la barra está apagada.
+        `aria-expanded` y no un rótulo que diga «abrir» o «cerrar»: es un botón que despliega
+        una región, y ésa es la palabra que un lector de pantalla ya sabe leer. Lo que se OYE
+        es la frase entera de `elResumenDelPregon`, que dice las dos cifras y qué hace el toque.
       */}
-      {fuera.length > 0 || opciones.length === 0 ? (
-        <Formulario opciones={fuera} alElegir={mover} quieto={quieto} titulo={TITULO_DE_LO_QUE_SE_HACE} />
-      ) : null}
+      {resumen === null ? null : (
+        <button
+          type="button"
+          className="riberas-pregon-tira riberas-pregon-resume"
+          aria-expanded={desplegado}
+          aria-label={resumen.seOye}
+          title={resumen.seOye}
+          onClick={() => {
+            alPlegar(!desplegado);
+          }}
+        >
+          <span
+            className="riberas-pregon-rail"
+            style={{ background: pregon.mias[0]?.color ?? 'transparent' }}
+            aria-hidden="true"
+          />
+          <span className="riberas-pregon-dicho" aria-hidden="true">
+            <span className="riberas-pregon-oferta">
+              {elEstadoQueCabe(
+                { comoAnda: resumen.dicho, comoAndaSinNombre: resumen.dichoCorto },
+                huecoDelResumen,
+                raiz,
+              )}
+            </span>
+            <span className="riberas-pregon-estado">
+              {elEstadoQueCabe(resumen, huecoDelResumen, raiz)}
+            </span>
+          </span>
+          <span className="riberas-pregon-pliegue" aria-hidden="true">
+            {desplegado ? '▴' : '▾'}
+          </span>
+        </button>
+      )}
+      {sePliega && !desplegado
+        ? null
+        : bloques.map((bloque) =>
+            bloque.tiras.length === 0 ? null : (
+              <div key={bloque.rotulo} className="riberas-pregon-bloque">
+                <h2 className="rotulo-de-panel">{bloque.rotulo}</h2>
+                {bloque.tiras.map((t) => {
+                  const seContesta = t.aceptar !== null || t.rechazar !== null;
+                  /*
+                   * EL NOMBRE ACCESIBLE ES LA FRASE ENTERA Y NO LO QUE SE PINTA. En la tira
+                   * caben «1 junco → 1 limo» y cuatro palabras de estado; lo que se oye es
+                   * quién, qué, en qué dirección y qué hace un toque. Las dos cajas que se
+                   * pintan van `aria-hidden` para que nada se diga dos veces, que es lo mismo
+                   * que hace la ficha de un colono en el marcador del cajón.
+                   */
+                  const seOye = `${t.frase}. ${t.comoAnda}. ${seContesta ? ABRIR_LA_HOJA : ABRIR_LA_HOJA_SIN_CONTESTAR}`;
+                  return (
+                    <button
+                      key={t.id}
+                      type="button"
+                      className="riberas-pregon-tira"
+                      /* El seudónimo, para que al cerrar la hoja el foco encuentre su tira. */
+                      data-trato={t.id}
+                      aria-haspopup="dialog"
+                      aria-expanded={abierta === t.id}
+                      aria-label={seOye}
+                      title={seOye}
+                      onClick={() => {
+                        alAbrir(t.id);
+                      }}
+                    >
+                      <span
+                        className="riberas-pregon-rail"
+                        style={{ background: t.color }}
+                        aria-hidden="true"
+                      />
+                      <span className="riberas-pregon-dicho" aria-hidden="true">
+                        <span className="riberas-pregon-oferta">
+                          {t.da} → {t.pide}
+                        </span>
+                        <span className="riberas-pregon-estado">{elEstadoQueCabe(t, hueco, raiz)}</span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            ),
+          )}
     </div>
   );
 }
@@ -2029,51 +3852,111 @@ export function RiberasEnTres({ manifiesto, mesa, puesta, tablero, opciones }: L
  * `Dejarlo` NO va deshabilitado con `quieto`: cerrar el menú no manda nada, y dejar sin
  * salida a quien lo abrió mientras una petición viaja es encerrarlo delante de una lista
  * de botones apagados.
+ *
+ * ═══ Y DESDE LA PANTALLA COMPLETA ES MODAL, PORQUE «DEBAJO» DEJÓ DE SER UN SITIO ═══
+ *
+ * Esto vivía EN FLUJO por debajo del lienzo, y funcionaba mientras el lienzo medía `62vh` y
+ * la página rodaba. Con la página de pie el recuadro vale la VENTANA ENTERA menos la
+ * cabecera: debajo no hay nada, porque debajo está fuera de la pantalla. O sea que el menú
+ * de «a quién le robas» —y el de los quince pares del año bueno, y el de comprar— se pintaba
+ * donde no se ve. Y como el estiaje es obligatorio, eso no es una molestia: es la partida
+ * parada, sin un error en ninguna consola. En la app su hermano `HojaDeAQuien` ya era modal.
+ *
+ * Ahora se pinta DENTRO del recuadro con las mismas cuatro mitades que el cajón, y ninguna
+ * sobra: el VELO, sin el cual un clic fuera cierra el menú Y funda una choza donde estaba el
+ * dedo; `role="dialog"` con `aria-modal` y NOMBRE —que es el título de la pregunta—, sin el
+ * cual un lector sigue leyendo el tablero de debajo; la TRAMPA DE FOCO, que es
+ * `usarLaTrampaDeFoco`, la misma del cajón y no una copia; y el foco DE VUELTA al cerrar,
+ * que lo hace `cerrarElMenu` porque adonde vuelve depende de quién abrió.
+ *
+ * `alDejarlo` hace de cerrar en los tres caminos —el botón, el velo y `Escape`—, y eso es a
+ * propósito: son la misma decisión dicha de tres maneras, y con tres funciones distintas la
+ * que se olvidaría de devolver el foco sería la que menos se prueba.
  */
 function ElijeUna({
   titulo,
+  nota,
   opciones,
   quieto,
   alElegir,
   alDejarlo,
 }: {
   titulo: string;
+  /**
+   * UN RENGLÓN EN TENUE BAJO EL TÍTULO, y hoy lo usa una sola pregunta: la hoja de una
+   * propuesta de trueque, donde dice en qué anda —«la aceptó Ana», «no tienes 1 limo»—.
+   *
+   * Va aquí y no en el título porque el título es además el NOMBRE del diálogo, y meterle
+   * el estado dentro haría que un lector anunciara «Ana te da 1 junco por 1 limo, la aceptó
+   * Ana, diálogo» al abrirlo. Y va opcional porque las otras tres preguntas —a quién le
+   * robas, qué dos bienes, comprar— no tienen estado ninguno que contar: un renglón vacío
+   * ahí sería una caja de más en un modal que ya va justo de alto.
+   */
+  nota?: string;
   opciones: readonly Opcion[];
   quieto: boolean;
   alElegir: (o: Opcion) => void;
   alDejarlo: () => void;
 }): JSX.Element {
+  const caja = useRef<HTMLDivElement | null>(null);
+  usarLaTrampaDeFoco(true, caja, alDejarlo);
   return (
-    <div className="formulario riberas-elige">
-      <h2 className="rotulo-de-panel">{titulo}</h2>
-      <ul className="opciones">
-        {opciones.map((o) => (
-          <li key={o.id}>
-            <button
-              type="button"
-              className="opcion"
-              disabled={quieto}
-              title={o.ayuda}
-              onClick={() => {
-                alElegir(o);
-              }}
-            >
+    <>
+      <div className={EL_VELO} onClick={alDejarlo} aria-hidden="true" />
+      <div
+        ref={caja}
+        className={`formulario ${EL_MENU}`}
+        role="dialog"
+        aria-modal="true"
+        aria-label={titulo}
+        tabIndex={-1}
+      >
+        <h2 className="rotulo-de-panel">{titulo}</h2>
+        {nota === undefined ? null : <p className="riberas-elige-nota">{nota}</p>}
+        <ul className="opciones">
+          {opciones.map((o) => (
+            <li key={o.id}>
+              {/*
+                ═══ `aria-disabled` Y NO `disabled`, Y DESDE QUE ESTO ES MODAL IMPORTA MÁS ═══
+
+                Un `<button>` al que se le pone `disabled` TENIENDO EL FOCO lo pierde, y el foco
+                cae al `<body>`. En una lista en flujo eso era molesto; dentro de un modal es
+                escaparse de la trampa: el foco sale de la caja, tabular desde ahí lleva a la
+                cabecera de la Sala y encima hay un diálogo opaco que ya no se puede cerrar con
+                el teclado. Es el mismo razonamiento que `formulario.tsx` escribió para su lista,
+                y aquí vale doble.
+
+                `aria-disabled` lo cuenta igual de bien a un lector de pantalla, conserva el foco
+                donde estaba, y quien ignora el clic es este `onClick`. La pinta de apagado la
+                pone `.opcion-quieta`, que existe para apagar SIN `disabled`.
+              */}
+              <button
+                type="button"
+                className={quieto ? 'opcion opcion-quieta' : 'opcion'}
+                aria-disabled={quieto}
+                title={o.ayuda}
+                onClick={() => {
+                  if (quieto) return;
+                  alElegir(o);
+                }}
+              >
+                <span className="opcion-texto">
+                  <span className="opcion-rotulo">{o.rotulo}</span>
+                  {o.ayuda.length > 0 ? <span className="opcion-ayuda">{o.ayuda}</span> : null}
+                </span>
+              </button>
+            </li>
+          ))}
+          <li>
+            <button type="button" className="opcion opcion-sobria" onClick={alDejarlo}>
               <span className="opcion-texto">
-                <span className="opcion-rotulo">{o.rotulo}</span>
-                {o.ayuda.length > 0 ? <span className="opcion-ayuda">{o.ayuda}</span> : null}
+                <span className="opcion-rotulo">Dejarlo</span>
               </span>
             </button>
           </li>
-        ))}
-        <li>
-          <button type="button" className="opcion opcion-sobria" onClick={alDejarlo}>
-            <span className="opcion-texto">
-              <span className="opcion-rotulo">Dejarlo</span>
-            </span>
-          </button>
-        </li>
-      </ul>
-    </div>
+        </ul>
+      </div>
+    </>
   );
 }
 
@@ -2120,53 +4003,214 @@ function ElijeUna({
  * vista no es de Riberas, y entonces el raíl no pinta nada — que es lo correcto: un
  * marcador vacío se lee como «vais todos a cero».
  */
+/** La mota del color del colono y el aire de la rejilla, en partes de la raíz (`estilo.css`). */
+const MOTA_DEL_COLONO = 0.7;
+const HUECO_DE_LA_REJILLA = 0.5;
+/** El cuerpo de `.letra-chica`, que es con lo que se pinta el renglón de debajo de la ficha. */
+const CUERPO_DE_LA_LETRA_CHICA = 0.9;
+
+/**
+ * LO QUE LE QUEDA AL RENGLÓN DE DEBAJO DE UNA FICHA, ya quitado el cromo de su renglón.
+ *
+ * La ficha vive en una rejilla de tres columnas —mota, ficha, puntos— y la del medio se lleva
+ * lo que sobra, así que el hueco es el ancho de la lista menos la mota, los dos huecos de la
+ * rejilla y la columna de los puntos. Los puntos se miden por sus CIFRAS y no por un ancho
+ * fijo: «12+3» es el doble de ancho que «4», y en una mesa de seis eso son varias letras.
+ *
+ * Con la lista sin medir —el primer render, y Node, donde no hay `ResizeObserver`— devuelve
+ * cero, y el renglón se pinta entero: es lo que había, y un hueco de cero puntos no puede
+ * leerse como «no cabe nada».
+ */
+export function huecoDelRenglonDelColono(
+  anchoDeLaLista: number,
+  cifrasDeLosPuntos: number,
+  raiz: number = RAIZ_DE_LA_CASA,
+): number {
+  if (anchoDeLaLista <= 0) return 0;
+  const cromo = (MOTA_DEL_COLONO + 2 * HUECO_DE_LA_REJILLA) * raiz + cifrasDeLosPuntos * raiz * ANCHO_SOBRE_EL_CUERPO;
+  return Math.max(0, anchoDeLaLista - cromo);
+}
+
+/** Las cifras que ocupa la columna de puntos de un colono, con el «+N» de lo oculto si lo hay. */
+export function cifrasDeLosPuntos(c: ColonoEnElMarcador): number {
+  const oculto = c.puntosConLoOculto !== null && c.puntosConLoOculto !== c.puntos;
+  return String(c.puntos).length + (oculto ? 1 + String(c.puntosConLoOculto - c.puntos).length : 0);
+}
+
+/** Lo construido, que es lo que el §1.11 subió al contrato: las chozas y las torres. */
+function loConstruido(c: ColonoEnElMarcador): string {
+  return `${String(c.chozas)} ${c.chozas === 1 ? 'choza' : 'chozas'} · ${String(c.torres)} ${c.torres === 1 ? 'torre' : 'torres'}`;
+}
+
+/**
+ * ═══ EL RENGLÓN DE DEBAJO, Y LO QUE SE SUELTA CUANDO NO CABE ES EL VADO ═══
+ *
+ * MEDIDO jugando, con la ventana en 852×922 y el cajón en 313 puntos: el renglón salía «vado 1
+ * de 5 · 2 chozas · 0…» y lo que se perdía era SIEMPRE la cifra del final, o sea las TORRES —
+ * justo el dato que la fase 0 subió al contrato del marcador—. Los puntos suspensivos de la
+ * hoja recortan por donde el texto acaba, y el texto acaba en las torres.
+ *
+ * Así que cuando no cabe entero se suelta el trozo del VADO y se quedan las chozas y las
+ * torres, y no al revés. No es una preferencia: el vado está ADEMÁS en su propio panel del
+ * cajón —el que declara el juego— y en la frase que se oye, mientras que las torres, con el
+ * marcador en el cajón, no están en ningún otro sitio de la pantalla.
+ *
+ * Y NO SE PARTE EN DOS LÍNEAS, que era la otra salida: la ficha vale `2.75rem` porque el §1.11
+ * pide que SEIS quepan en el cajón, y un tercer renglón la sube a más de sesenta puntos. Seis
+ * fichas de sesenta no caben, y entonces lo que se pierde no es una cifra: es un colono.
+ */
+export function elRenglonDelColonoQueCabe(
+  c: ColonoEnElMarcador,
+  marcador: MarcadorEnTres,
+  hueco: number,
+  raiz: number = RAIZ_DE_LA_CASA,
+): string {
+  const construido = loConstruido(c);
+  const entero = `${renglonDelVado(c, marcador)} · ${construido}`;
+  const anchoPorLetra = CUERPO_DE_LA_LETRA_CHICA * raiz * ANCHO_SOBRE_EL_CUERPO;
+  if (hueco <= 0 || anchoPorLetra <= 0) return entero;
+  return entero.length * anchoPorLetra <= hueco ? entero : construido;
+}
+
+/**
+ * LA FICHA DE UN COLONO, DICHA ENTERA, para quien no la ve.
+ *
+ * ═══ POR QUÉ HACE FALTA UNA FRASE Y NO VALE EL RENGLÓN QUE SE PINTA ═══
+ *
+ * Desde que el marcador vive en el cajón, cada colono cabe en 44 puntos: dos renglones y
+ * una cifra. Ahí no caben las cartas, las guardias, los dos premios ni los títulos —seis
+ * fichas de cuatro renglones no entran en un cajón, y ése es el motivo del §1.11 para que
+ * la ficha del cajón no sea la de antes—. Pero «no cabe en el renglón» no puede ser «no
+ * está en la partida»: quien navega con lector no tiene otra puerta a esos cuatro datos.
+ *
+ * Así que se dice todo aquí, en una frase con verbos, y las cajas que se pintan van con
+ * `aria-hidden` para que nada se oiga dos veces. El trozo del Vado Largo no se escribe:
+ * lo escribe `loQueSeOyeDelVado`, en `shared/`, que es la MISMA frase que lee la app —tres
+ * ramas, incluida la de llegar al mínimo y que el premio siga siendo de otro—.
+ */
+function loQueSeOyeDelColono(c: ColonoEnElMarcador, marcador: MarcadorEnTres): string {
+  const oculto =
+    c.puntosConLoOculto !== null && c.puntosConLoOculto !== c.puntos
+      ? `, y ${String(c.puntosConLoOculto)} contándote lo oculto`
+      : '';
+  const trozos = [
+    `${c.nombre}${c.soyYo ? ', tú' : ''}: ${String(c.puntos)} ${c.puntos === 1 ? 'pto' : 'ptos'} a la vista${oculto}.`,
+    `${String(c.chozas)} ${c.chozas === 1 ? 'choza' : 'chozas'} y ${String(c.torres)} ${c.torres === 1 ? 'torre' : 'torres'}.`,
+    `${String(c.cartas)} ${c.cartas === 1 ? 'carta' : 'cartas'} y ${String(c.guardias)} ${c.guardias === 1 ? 'guardia' : 'guardias'} ${c.guardias === 1 ? 'jugada' : 'jugadas'}.`,
+    `${loQueSeOyeDelVado(c, marcador)}.`,
+  ];
+  if (c.tieneLaMayorGuardia) trozos.push('La Mayor Guardia es suya.');
+  if (c.titulos.length > 0) trozos.push(`Títulos revelados: ${c.titulos.join(', ')}.`);
+  return trozos.join(' ');
+}
+
 export function MarcadorDeRiberas({ vista }: { vista: unknown }): JSX.Element | null {
+  /*
+   * ═══ LA LISTA SE MIDE, Y ES LA ÚNICA MANERA DE SABER SI EL RENGLÓN CABE ═══
+   *
+   * El marcador no sabe cuánto mide el cajón: lo monta la Sala y llega al lienzo dentro de
+   * `elRail`, ya compuesto. Y desde el §1.11 ese cajón vale lo que la cinta, que depende de la
+   * ventana: con 852×922 vale 313 puntos, y ahí el renglón de debajo de la ficha no cabe. Así
+   * que se mide LA LISTA, que es la caja de la que cuelgan las tres columnas, con el mismo
+   * `ResizeObserver` con el que este cliente mide el recuadro y por el mismo motivo: un umbral
+   * en puntos se equivoca en cuanto cambia la preferencia de tamaño de letra del navegador.
+   *
+   * Sin medida —el primer render, y Node— se pinta el renglón ENTERO, que es lo que había.
+   */
+  const [anchoDeLaLista, ponerAnchoDeLaLista] = useState(0);
+  const [raizDeLaLetra, ponerRaizDeLaLetra] = useState(RAIZ_DE_LA_CASA);
+  const elOjo = useRef<ResizeObserver | null>(null);
+  const medirLaLista = useCallback((lista: HTMLUListElement | null) => {
+    elOjo.current?.disconnect();
+    elOjo.current = null;
+    if (lista === null || typeof ResizeObserver === 'undefined') return;
+    const mide = (): void => {
+      ponerAnchoDeLaLista((antes) => (antes === lista.clientWidth ? antes : lista.clientWidth));
+      ponerRaizDeLaLetra((antes) => {
+        const ahora = raizDelNavegador();
+        return antes === ahora ? antes : ahora;
+      });
+    };
+    mide();
+    const ojo = new ResizeObserver(mide);
+    ojo.observe(lista);
+    if (typeof document !== 'undefined') ojo.observe(document.documentElement);
+    elOjo.current = ojo;
+  }, []);
+  useEffect(() => () => elOjo.current?.disconnect(), []);
   const marcador = marcadorEnTres(vista);
   if (marcador === null) return null;
   return (
     <section className="panel riberas-marcador">
       <h2 className="rotulo-de-panel">{TITULO_DEL_MARCADOR}</h2>
-      <ul className="renglones" role="list">
+      <ul className="renglones" role="list" ref={medirLaLista}>
         {marcador.colonos.map((c) => {
           const oculto = c.puntosConLoOculto !== null && c.puntosConLoOculto !== c.puntos;
           return (
             <li key={c.asiento} className={c.soyYo ? 'colono-del-marcador soy-yo' : 'colono-del-marcador'}>
               <span className="mota-de-color" style={{ background: c.color }} aria-hidden="true" />
-              <span className="nombre-del-colono">
-                {c.nombre}
-                {c.soyYo ? ' (tú)' : ''}
+              <span className="ficha-del-colono" aria-hidden="true">
+                <span className="nombre-del-colono">
+                  {c.nombre}
+                  {c.soyYo ? ' (tú)' : ''}
+                </span>
+                {/*
+                  EL SEGUNDO RENGLÓN DE LA FICHA: cuánto mide su cadena y cuánto ha
+                  construido, en ese orden y recortado con puntos suspensivos si no cabe
+                  (§1.11: lo que se recorta es este renglón, nunca el nombre).
+
+                  CUÁNTO MIDE LA CADENA VA SIEMPRE, y no sólo cuando ya ganó el premio. Es
+                  la línea que le habría contestado a Miguel: encadenó cinco veredas, no le
+                  salió el premio, y en toda la pantalla no había un número que dijera
+                  cuánto contaba el JUEGO —que no era lo que él contaba en el tablero,
+                  porque el vecino le cortaba el paso—. LA FRASE NO SE ESCRIBE AQUÍ: la
+                  escribe `renglonDelVado`, en `shared/`, y tiene TRES ramas y no dos.
+
+                  Y LAS CHOZAS Y LAS TORRES SON LAS DEL CONTRATO, contadas en
+                  `marcadorEnTres` desde las listas de vértices de la vista. Los puentes no
+                  se cuentan, como pidió Miguel.
+
+                  Y CUANDO NO CABE ENTERO SE SUELTA EL VADO Y NO LAS TORRES, que es lo que
+                  los puntos suspensivos se llevaban por delante con el cajón por debajo de
+                  350 puntos: ver `elRenglonDelColonoQueCabe`, que lo mide con la letra de
+                  verdad de este navegador.
+                */}
+                <span className="letra-chica lo-del-colono">
+                  {elRenglonDelColonoQueCabe(
+                    c,
+                    marcador,
+                    huecoDelRenglonDelColono(anchoDeLaLista, cifrasDeLosPuntos(c), raizDeLaLetra),
+                    raizDeLaLetra,
+                  )}
+                </span>
               </span>
-              <span className="puntos-del-colono">
-                {c.puntos} {c.puntos === 1 ? 'pto' : 'ptos'}
+              {/*
+                LOS PUNTOS A LA DERECHA, y el «+N» de lo oculto SÓLO EN EL MÍO y sólo cuando
+                es distinto. Es la cifra pública en grande y lo que sólo yo cuento en tenue
+                al lado: sumarlos en un número haría que el mismo renglón dijera una cosa
+                distinta en cada pantalla y nadie podría hablar del marcador en voz alta.
+                La frase entera —«y N contándote lo oculto»— va en lo que se oye.
+              */}
+              <span className="puntos-del-colono" aria-hidden="true">
+                {c.puntos}
                 {oculto ? (
-                  <span className="puntos-ocultos">
-                    {' '}
-                    y {c.puntosConLoOculto} contándote lo oculto
-                  </span>
+                  <span className="puntos-ocultos">+{(c.puntosConLoOculto ?? c.puntos) - c.puntos}</span>
                 ) : null}
               </span>
-              <span className="letra-chica lo-del-colono">
-                {c.cartas} {c.cartas === 1 ? 'carta' : 'cartas'} · {c.guardias}{' '}
-                {c.guardias === 1 ? 'guardia' : 'guardias'}
-                {/*
-                  CUÁNTO MIDE SU CADENA, SIEMPRE, Y NO SÓLO CUANDO YA GANÓ EL PREMIO.
-                  Es la línea que le habría contestado a Miguel: encadenó cinco veredas,
-                  no le salió el premio, y en toda la pantalla no había un número que
-                  dijera cuánto contaba el JUEGO —que no era lo que él contaba en el
-                  tablero, porque el vecino le cortaba el paso—.
+              {/*
+                ═══ Y LO QUE SE OYE ES LA FICHA ENTERA, NO EL RENGLÓN RECORTADO ═══
 
-                  LA FRASE NO SE ESCRIBE AQUÍ: la escribe `renglonDelVado`, en `shared/`,
-                  y tiene TRES ramas y no dos. La primera versión de este renglón decía
-                  «vado cinco de cinco» al segundo que llegaba a cinco —cadena de cinco, cero
-                  puntos de premio, porque el premio sólo se mueve a quien SUPERA— y eso
-                  se lee como «ya está». La app pinta y lee en voz alta la misma frase, y
-                  el cinco sigue siendo `vadoMinimo`: es `VADO_MINIMO`, la regla.
-                */}
-                {' · '}
-                {renglonDelVado(c, marcador)}
-                {c.tieneLaMayorGuardia ? ' · La Mayor Guardia' : ''}
-                {c.titulos.length > 0 ? ` · ${c.titulos.join(', ')}` : ''}
-              </span>
+                Un lector de pantalla no ve un renglón corto al lado de un nombre: lee una
+                fila detrás de otra, y «vado 5 · 3 chozas · 1 torre» son cinco datos sin un
+                solo verbo. La ficha de 44 puntos deja fuera de la VISTA las cartas, las
+                guardias, los dos premios y los títulos —no caben seis veces en un cajón—,
+                pero no los deja fuera de la partida: van todos aquí, en la misma frase que
+                lee la app, más las chozas y las torres (§1.11).
+
+                Va con `aria-hidden` en las tres cajas de arriba y el texto entero aquí, y
+                no al revés, para que no se oiga dos veces lo mismo.
+              */}
+              <span className="riberas-solo-apoyo">{loQueSeOyeDelColono(c, marcador)}</span>
             </li>
           );
         })}

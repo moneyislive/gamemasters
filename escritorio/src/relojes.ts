@@ -30,10 +30,24 @@
  *
  * O sea que cambiar los `Math.ceil` de abajo por `Math.floor` —que es exactamente
  * la regresión que la app ya pagó: «quedan 23 h» en una mesa de veinticuatro
- * horas recién abierta, y «2 días» que al bajar un minuto se lee «47 h»— deja
+ * horas recién abierta, y «2 días» que al bajar un minuto se lee «47 h»— dejaba
  * `npm run verificar` entero en verde. La app cubre eso con 30 comprobaciones en
  * `app/src/comprobadores/verificar-relojes.mjs`, unas 19 sobre los rótulos, y
  * dos de ellas son barridos que no dependen de acertar la frontera.
+ *
+ * ═══ ESA MITAD YA NO ESTÁ DESCUBIERTA, Y QUIÉN LA CUBRE ═══
+ *
+ * El día que el rótulo salió del cajón y se puso en la CINTA —porque una mesa
+ * jugó sola tres turnos por no decir cuánto quedaba— se escribió el bloque «El
+ * reloj de la cinta» de `verify:escritorio`, que barre mil doscientos instantes
+ * de todo el eje y afirma que el rótulo largo y el corto dicen la misma cifra,
+ * que las dos redondean hacia arriba, y que las dos ramas sin número —vencido y
+ * desconocido— no dicen lo mismo. Probado: con un `Math.floor` en el tramo de
+ * segundos, ese bloque se pone rojo por tres sitios.
+ *
+ * Lo que SIGUE descubierto es la otra mitad del párrafo de abajo: nadie lee aquí
+ * el `CONECTADO_MS` del servidor, así que la comprobación de la ventana de
+ * presencia sigue comparando contra una copia.
  *
  * Y la comprobación que sí existe aquí —`CICLO_MAXIMO_MS < VENTANA_DE_PRESENCIA`—
  * es cierta por álgebra y no por medida: `CICLO = APARCADA + (VENTANA − APARCADA
@@ -234,12 +248,125 @@ export const PLAZO_DESCONOCIDO = 'plazo desconocido';
  * tiene el agujero idéntico. Aquí se tapa; allí sigue abierto y es `app/`.)
  */
 export function cuantoQueda(ms: number): string {
-  if (!Number.isFinite(ms)) return PLAZO_DESCONOCIDO;
-  if (ms <= 0) return SE_ACABO_EL_TIEMPO;
-  if (ms < UN_MINUTO) return `quedan ${String(Math.ceil(ms / UN_SEGUNDO))} s`;
-  if (ms < UNA_HORA) return `quedan ${String(Math.ceil(ms / UN_MINUTO))} min`;
-  if (ms < DOS_DIAS) return `quedan ${String(Math.ceil(ms / UNA_HORA))} h`;
-  return `quedan ${String(Math.ceil(ms / UN_DIA))} días`;
+  const tramo = elTramoDelPlazo(ms);
+  if (tramo === null) return !Number.isFinite(ms) ? PLAZO_DESCONOCIDO : SE_ACABO_EL_TIEMPO;
+  return `quedan ${String(tramo.cifra)} ${tramo.largo}`;
+}
+
+/**
+ * EN QUÉ TRAMO CAE UN PLAZO: la cifra ya redondeada y cómo se llama su unidad de
+ * las dos maneras en que esta pantalla la escribe.
+ *
+ * ═══ POR QUÉ SE PARTE ASÍ, Y NO SON DOS FUNCIONES CON LAS MISMAS RAMAS ═══
+ *
+ * Porque la cuenta atrás se pinta hoy en DOS sitios —la frase larga del cajón y
+ * el reloj corto de la cinta— y los dos tienen que decir el MISMO número en el
+ * mismo instante. Escritos como dos cadenas de `if` paralelas, el día que alguien
+ * mueva una frontera —o cambie un `Math.ceil` por un `Math.floor`, que es la
+ * regresión que la app ya pagó— sólo la movería en uno de los dos, y la pantalla
+ * enseñaría «quedan 2 min» en el cajón y «1 min» en la cinta a la vez. Eso no se
+ * lee como un fallo del reloj: se lee como que el cajón y la cinta hablan de
+ * plazos distintos.
+ *
+ * Con el tramo en un solo sitio, las dos formas son la MISMA cuenta escrita con
+ * otro rótulo, y `verify:escritorio` puede afirmar que coinciden barriendo el eje
+ * en vez de creerse dos listas de casos.
+ *
+ * `null` es «no hay número que decir»: o el dato no es un número, o el plazo ya
+ * venció. Las dos son cosas distintas y quien llama las distingue mirando `ms`,
+ * porque las dos frases que salen de ahí también son distintas.
+ */
+interface ElTramoDelPlazo {
+  readonly cifra: number;
+  /** Como se dice en la frase entera: `s`, `min`, `h`, `días`. */
+  readonly largo: string;
+  /** Como cabe en el reloj de la cinta: `s`, `min`, `h`, `d`. */
+  readonly corto: string;
+}
+
+function elTramoDelPlazo(ms: number): ElTramoDelPlazo | null {
+  if (!Number.isFinite(ms) || ms <= 0) return null;
+  if (ms < UN_MINUTO) return { cifra: Math.ceil(ms / UN_SEGUNDO), largo: 's', corto: 's' };
+  if (ms < UNA_HORA) return { cifra: Math.ceil(ms / UN_MINUTO), largo: 'min', corto: 'min' };
+  if (ms < DOS_DIAS) return { cifra: Math.ceil(ms / UNA_HORA), largo: 'h', corto: 'h' };
+  return { cifra: Math.ceil(ms / UN_DIA), largo: 'días', corto: 'd' };
+}
+
+/**
+ * ═══ EL MISMO PLAZO, PERO CABIENDO EN LA LÍNEA DE ESTADO ═══
+ *
+ * Esto existe por lo que le pasó a un revisor jugando una partida entera: la cinta
+ * decía «Sacaste 6. Alza, truécalo o pasa.» y NO decía ni una vez cuánto quedaba de
+ * turno. El reloj vivía sólo dentro del cajón, o sea detrás de un toque. Con el
+ * plazo de serie —«Como venga», 120 s— la mesa jugó sola tres turnos: fundó una
+ * choza que él no puso, y le costó veinte minutos creer que no era el ratón.
+ *
+ * ═══ POR QUÉ CORTO, Y CUÁNTO CORTO ═══
+ *
+ * Porque el sitio es el que es. `escenas/cinta.ts` reparte el ancho de la cinta y
+ * todo lo que este reloj se lleve sale del trozo de la frase: con la letra de la
+ * casa (8,364 puntos por letra con raíz 17), «quedan 12 min» son trece caracteres y
+ * 108,7 puntos, que en el lienzo estrecho de 288 —donde la cinta entera mide 115,2—
+ * no es que aprieten: es que no existen. Sin el «quedan», lo más largo que puede
+ * escribirse aquí son SEIS caracteres —«12 min»— o sea 50,2 puntos, y lo típico son
+ * cuatro: «47 s».
+ *
+ * Se pierde la palabra «quedan» y no se pierde nada más: la frase entera sigue en el
+ * árbol, en el nombre accesible y en el `title`, igual que la frase de estado que
+ * tiene al lado. Y las dos salen del MISMO tramo, así que no pueden discrepar.
+ *
+ * ═══ LAS DOS RAMAS SIN NÚMERO NO DICEN LO MISMO, Y NO SE PUEDEN JUNTAR ═══
+ *
+ *   · Plazo vencido → «0 s». Es cierto y es un número: lo que hay que ver de un
+ *     vistazo es que el turno YA se está jugando solo, y en pantalla va en
+ *     `--alarma`. Poner ahí una raya diría «no sé», que es otra cosa.
+ *   · Dato roto (una fecha ISO por el cable, un `NaN`) → «?». No se afirma que
+ *     venció, que es exactamente lo contrario de lo que se sabe, y es la misma
+ *     decisión que `PLAZO_DESCONOCIDO` toma en la frase larga.
+ */
+export const SE_ACABO_EN_LA_CINTA = '0 s';
+export const PLAZO_DESCONOCIDO_EN_LA_CINTA = '?';
+
+export function cuantoQuedaEnLaCinta(ms: number): string {
+  const tramo = elTramoDelPlazo(ms);
+  if (tramo === null) return !Number.isFinite(ms) ? PLAZO_DESCONOCIDO_EN_LA_CINTA : SE_ACABO_EN_LA_CINTA;
+  return `${String(tramo.cifra)} ${tramo.corto}`;
+}
+
+/**
+ * CUÁNTAS LETRAS PUEDE LLEGAR A OCUPAR ESE RELOJ, para que quien reparte el ancho de
+ * la cinta pueda descontarlo ANTES de pintar.
+ *
+ * No es una constante escrita a ojo: es lo más largo que `cuantoQuedaEnLaCinta`
+ * puede devolver, y `verify:escritorio` lo barre por todo el eje del tiempo en vez
+ * de creerse este número. Seis caracteres, que es «12 min» —dos cifras de minutos
+ * con su unidad—; «59 s» son cuatro y «23 h» cuatro, y los días no pasan de tres
+ * («99 d» serían cuatro, y por encima de eso no hay plazo que ofrezca este
+ * producto).
+ *
+ * Va en LETRAS y no en puntos por lo mismo que `huecoMinimoDeLaFrase`: cuánto ocupa
+ * una letra depende del cuerpo con el que cada cliente pinta y, en el escritorio, de
+ * la preferencia de tamaño de letra del navegador. Quien pinta multiplica.
+ */
+export const LETRAS_DEL_RELOJ_DE_LA_CINTA = 6;
+
+/**
+ * ¿ESTE PLAZO APRIETA YA? Lo que decide si el reloj de la cinta se pinta en
+ * `--alarma` en vez de en la letra de al lado.
+ *
+ * El último minuto, y ni uno más. La hoja reserva `--alarma` para «lo que de verdad
+ * se acaba» (`estilo.css`), así que encenderla durante la hora entera de una mesa de
+ * una hora la gasta: un color de alarma que está puesto la mitad de la partida deja
+ * de significar nada, y entonces tampoco significa nada el minuto en que sí importa.
+ * Un minuto es además el tramo en el que el rótulo pasa a contar SEGUNDOS, o sea el
+ * único en el que la cifra se mueve mientras uno la mira.
+ *
+ * Un plazo vencido aprieta —es cuando la mesa ya está jugando sola— y un dato roto
+ * NO: no se sabe, y pintar de alarma lo que no se sabe es afirmarlo.
+ */
+export function elPlazoAprieta(ms: number): boolean {
+  if (!Number.isFinite(ms)) return false;
+  return ms < UN_MINUTO;
 }
 
 /**

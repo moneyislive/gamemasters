@@ -94,10 +94,13 @@
  */
 import type { ColorDeJugador, DeltaEn3D } from '../../../escenas/tipos';
 import type { DadosDeLaMesa } from '../../../escenas/dados';
+import { llaveDeHex } from '../../mecanicas/malla-hexagonal';
 import type { Hex, LlaveDeArista, LlaveDeVertice } from '../../mecanicas/malla-hexagonal';
+import type { PanelDeTablero } from '../../mecanicas/tablero-declarado';
 import type { AsientoId } from '../tipos';
 import {
   ACAPARAMIENTO,
+  ACEPTAR,
   ALZAR,
   ANO_BUENO,
   BIENES_DEL_ANO_BUENO,
@@ -107,10 +110,12 @@ import {
   FUNDAR,
   GUARDIA,
   GUARDIA_MINIMA,
+  MOVER_EL_ESTIAJE,
   OFRECER,
   PUNTOS_DE_LA_GUARDIA,
   PUNTOS_DEL_TITULO,
   PUNTOS_DEL_VADO,
+  RECHAZAR,
   REVELAR,
   seudonimoDeLaCarta,
   TIRAR,
@@ -134,9 +139,24 @@ interface ColonoEnLaVista {
   readonly asiento: AsientoId;
   readonly nombre: string;
   readonly color: string;
-  readonly chozas: readonly LlaveDeVertice[];
-  readonly torres: readonly LlaveDeVertice[];
-  readonly veredas: readonly LlaveDeArista[];
+  /*
+   * LAS PIEZAS PUESTAS VAN OPCIONALES, Y LO ERAN DESDE SIEMPRE SIN DECIRLO.
+   *
+   * Estaban declaradas obligatorias y no las leía NADIE de este fichero, así que la mentira
+   * no costaba nada: `esVistaQueSePinta` mira cuatro campos y ninguno es éste. El día que
+   * `marcadorEnTres` empezó a contarlas —para el §11— la vista mínima que este mismo
+   * repositorio ya usa como legítima (un colono con asiento, nombre y color, y nada más:
+   * ver la vacuna «una vista sin mazo» de `verify:riberas-en-tres`) reventó con «no se
+   * puede leer 'length' de undefined». O sea que el tipo prometía lo que la puerta no
+   * comprueba, que es exactamente lo que la cabecera de arriba dice que no se hace.
+   *
+   * Sin ellas se cuenta CERO, como se cuentan cero los puntos y cero las guardias de una
+   * vista que no los trae: es la misma convención de este fichero y por el mismo motivo —
+   * un marcador que se cae deja la mesa entera sin pintar por una cifra de adorno.
+   */
+  readonly chozas?: readonly LlaveDeVertice[];
+  readonly torres?: readonly LlaveDeVertice[];
+  readonly veredas?: readonly LlaveDeArista[];
   /*
    * LO DEL MAZO VA OPCIONAL, Y ESO NO ES DEJADEZ.
    *
@@ -207,6 +227,27 @@ interface VistaQueSePinta {
   readonly vado?: { readonly de?: AsientoId | null; readonly largo?: number };
   /** La Mayor Guardia: de quién es y con cuántas. Público entero. */
   readonly guardia?: { readonly de?: AsientoId | null; readonly cuantas?: number };
+  /**
+   * LOS TRUEQUES, Y VAN OPCIONALES POR LO MISMO QUE EL MAZO.
+   *
+   * `esVistaQueSePinta` mira cuatro campos y ninguno es éste: por esta puerta pasan
+   * vistas legítimas que no lo traen —la del banco de anillos, una partida guardada de
+   * antes de que el trueque existiera—, y exigirlo aquí dejaría de pintar el delta entero
+   * por no saber si alguien ofreció un junco. Sin la lista, el pregón sale `null`, que es
+   * «no hay nada que pregonar» y no un error.
+   *
+   * Son PÚBLICOS enteros —`da`, `pide`, `de`, `para` y `estado` viajan en la vista de
+   * todos, ver la cabecera de `Trato` en `riberas.ts`—, así que aquí no hay nada que tapar
+   * y por eso el pregón puede escribir la oferta ajena con todas sus letras.
+   */
+  readonly tratos?: readonly {
+    readonly id?: unknown;
+    readonly de?: unknown;
+    readonly para?: unknown;
+    readonly da?: unknown;
+    readonly pide?: unknown;
+    readonly estado?: unknown;
+  }[];
 }
 
 /** ¿Es esto una vista de Riberas con lo que hace falta para pintarla? */
@@ -1468,6 +1509,165 @@ export function opcionesFueraDeLaMesa<O extends OpcionQueLlega>(
 }
 
 // ---------------------------------------------------------------------------
+// EL CARRIL: qué dice cada cuadrado de 44 puntos
+// ---------------------------------------------------------------------------
+
+/** Lo que se pinta dentro de un cuadrado del carril, y con qué filo. */
+export interface GlifoDelCarril {
+  /**
+   * LO QUE VA DENTRO DEL CUADRADO. Una o dos letras: en 44 puntos no cabe más, y lo que
+   * hay que poner ahí es lo que ya está escrito EN EL TABLERO, para que el ojo lo case
+   * con lo que está mirando.
+   */
+  readonly glifo: string;
+  /**
+   * EL TERRENO DE ESA ISLA, con el nombre que le da el juego («marisma», «cantil»…).
+   *
+   * VIAJA EL NOMBRE Y NO UN COLOR, y es la misma frontera que separa este fichero de la
+   * escena en todo lo demás: de qué color se pinta una marisma lo decide `PALETA`
+   * (`escenas/paleta.ts`), que es donde `verify:riberas` ya mide que los seis terrenos se
+   * separan entre sí y no se comen las piezas de nadie. Mandar un `#rrggbb` desde aquí
+   * sería una SEGUNDA tabla de colores de terreno, y la que se quedaría atrás el día que
+   * alguien retoque un verde es justamente ésta.
+   *
+   * Hace falta porque el número no basta él solo: el reparto lleva DOS de cada cifra —
+   * `NUMEROS_DE_LAS_ISLAS` es `2,3,3,4,4,…,11,11,12`— así que en el carril puede haber dos
+   * cuadrados con un «11» dentro. En el tablero también hay dos onces, y lo que los
+   * distingue allí es de qué son: aquí, lo mismo.
+   */
+  readonly terreno: string;
+  /**
+   * EL FILO DEL CUADRADO, del color de a quién se le roba. `null` cuando no hay a quién.
+   * Es un `#rrggbb` porque sale de `colonos[i].color`, que es el mismo color con el que
+   * se pinta esa persona en el marcador y en el tablero plano.
+   */
+  readonly rail: string | null;
+}
+
+/**
+ * ═══ QUÉ HACE CADA CUADRADO DEL CARRIL, DICHO EN UNA O DOS LETRAS ═══
+ *
+ * ═══ EL FALLO, MEDIDO JUGANDO ═══
+ *
+ * Con un siete de verdad en una mesa de tres, el juego emitió VEINTE opciones de mover el
+ * estiaje —dieciocho islas más dos que sólo se distinguen por la víctima— y el carril las
+ * pintó como veinte cuadrados con «1», «2», … «20» dentro. Rodar funcionaba; lo que no
+ * existía era QUÉ hace cada uno. Y dos de ellos —el 5 y el 6— decían los dos «Mover el
+ * estiaje a la marisma …» y sólo se distinguían por a quién le robas, o sea que ni
+ * abriendo el cajón se elegía sin leer dos renglones enteros.
+ *
+ * ═══ LA SALIDA: EL GLIFO ES EL NÚMERO DE LA ISLA, PORQUE ESTÁ EN EL TABLERO ═══
+ *
+ * El «11» de «la marisma 11» es lo único de esa frase que ya está PINTADO en el delta, en
+ * el disco del centro de cada comarca. Con el número dentro del cuadrado, elegir destino
+ * deja de ser leer veinte rótulos y pasa a ser mirar el tablero y buscar ese número. Cabe:
+ * son dos cifras como mucho, y el cuadrado mide 46,75 puntos con la raíz de esta casa.
+ *
+ * Se descartaron las dos alternativas que se probaron antes:
+ *
+ *   · LA INICIAL DEL TERRENO («M» de marisma) — con diecinueve islas repartidas sobre seis
+ *     terrenos, las repeticiones son la norma y no la excepción: tres marismas distintas
+ *     dirían las tres «M», y encima el cantil y el carrizal comparten inicial. Es el fallo
+ *     de hoy escrito con otro alfabeto.
+ *   · UN NÚMERO DE ORDEN MÁS CORTO — es exactamente lo que hay, y lo que no dice nada.
+ *
+ * ═══ Y HASTA DÓNDE LLEGA, DICHO ANTES DE QUE LO DESCUBRA NADIE JUGANDO ═══
+ *
+ * El número NO es único: `NUMEROS_DE_LAS_ISLAS` reparte `2,3,3,4,4,5,5,6,6,8,8,9,9,10,10,
+ * 11,11,12`, o sea DOS de cada cifra salvo el dos y el doce. Así que en el carril puede
+ * haber dos cuadrados con un «11». Por eso viaja también el TERRENO, que es lo que los
+ * separa en el tablero: dos onces, uno sobre salina y otro sobre cantil, se ven distintos
+ * allí y se ven distintos aquí. Y queda una ambigüedad que este fichero no puede cerrar
+ * porque es del propio rótulo del juego: si las dos islas del mismo número son ADEMÁS del
+ * mismo terreno, ni «Mover el estiaje a la salina 11» las distingue —medido: esa frase sale
+ * dos veces en la partida de `verify:escritorio`—. Eso se arregla en el rótulo que emite
+ * `opcionesDelEstiaje`, no en el cuadrado que lo pinta.
+ *
+ * ═══ Y LA VÍCTIMA VA EN EL FILO, NO EN EL GLIFO ═══
+ *
+ * Porque no cabe dentro y porque no es la misma pregunta: primero se elige ADÓNDE, y sólo
+ * en las islas con dos víctimas hay una segunda. El filo del color de a quién le robas es lo
+ * que separa esos dos cuadrados gemelos sin escribir una letra más — y es el mismo color
+ * con el que esa persona se pinta en el marcador, no un código nuevo que haya que aprender.
+ * El filo NO es la única señal: el `aria-label` sigue llevando la frase entera con el nombre
+ * de la víctima dentro, que es lo que se oye y lo que se ve al posar el ratón.
+ *
+ * ═══ LO QUE NO SE TOCA: LO DEMÁS SIGUE CON SU NÚMERO DE ORDEN ═══
+ *
+ * Esta tabla sólo habla del estiaje. Tirar, pasar, empezar, aceptar y rechazar salen en
+ * listas de dos a cinco botones, donde el número de orden SÍ significa algo —es el atajo de
+ * teclado que el carril anuncia con `aria-keyshortcuts`— y donde no hay ninguna isla que
+ * nombrar. Quien pinta usa el glifo cuando lo hay y el ordinal cuando no.
+ *
+ * ═══ SE DEVUELVE UNA TABLA POR `id` Y NO UNA LISTA PARALELA ═══
+ *
+ * Por lo mismo que `Opcion.id` existe: una lista paralela obliga a quien pinta a mantener
+ * dos órdenes iguales, y el día que se filtre una opción antes de pintarla los glifos se
+ * corren un puesto — cada cuadrado diría el número de la isla del siguiente, sin que nada
+ * se caiga. Con la tabla por `id` eso es imposible por construcción.
+ */
+export function glifosDelCarril<O extends OpcionQueLlega>(
+  vista: unknown,
+  opciones: readonly O[],
+): ReadonlyMap<string, GlifoDelCarril> {
+  const tabla = new Map<string, GlifoDelCarril>();
+  if (!esVistaQueSePinta(vista)) return tabla;
+  /*
+   * Las islas se indexan UNA vez: con veinte opciones y diecinueve islas, buscarlas dentro
+   * del bucle son trescientas ochenta comparaciones por repintado, y esto se llama en cada
+   * render del delta.
+   */
+  const porLlave = new Map<string, { terreno: string; numero: number }>();
+  for (const isla of vista.islas) {
+    /*
+     * SE LEE LO QUE LLEGA POR EL CABLE, no lo que el tipo promete. `esVistaQueSePinta` mira
+     * CUATRO campos y ninguno es la forma de una isla —está dicho en su cabecera—, así que una
+     * isla sin `hex` reventaría aquí con «no se puede leer 'q' de undefined» y dejaría el delta
+     * ENTERO sin pintar por un cuadrado que no se iba a pintar. Es el mismo agujero que ya se
+     * pagó en `marcadorEnTres` el día que empezó a contar chozas. La isla mala se salta: su
+     * opción se queda sin glifo y cae al número de orden, que es la degradación de siempre.
+     */
+    const hex = isla.hex as { q?: unknown; r?: unknown } | undefined;
+    if (hex === undefined || typeof hex.q !== 'number' || typeof hex.r !== 'number') continue;
+    porLlave.set(llaveDeHex({ q: hex.q, r: hex.r }), {
+      terreno: typeof isla.terreno === 'string' ? isla.terreno : 'desconocido',
+      numero: typeof isla.numero === 'number' ? isla.numero : 0,
+    });
+  }
+  for (const o of opciones) {
+    if (o.tipo !== MOVER_EL_ESTIAJE) continue;
+    if (typeof o.carga !== 'object' || o.carga === null) continue;
+    const carga = o.carga as Record<string, unknown>;
+    const donde = carga['donde'];
+    if (typeof donde !== 'string') continue;
+    const isla = porLlave.get(donde);
+    if (isla === undefined) continue;
+    const a = carga['a'];
+    const rail = typeof a === 'string' ? (vista.colonos.find((c) => c.asiento === a)?.color ?? null) : null;
+    tabla.set(o.id, { glifo: glifoDeLaIsla(isla.terreno, isla.numero), terreno: isla.terreno, rail });
+  }
+  return tabla;
+}
+
+/**
+ * EL NÚMERO DE LA ISLA, Y LA ÚNICA QUE NO TIENE.
+ *
+ * La duna no rinde: su `numero` es cero y en el tablero NO lleva disco de cifra, así que
+ * poner un «0» en su cuadrado sería escribir en el carril un número que no está pintado en
+ * ninguna parte del delta. Se pone su inicial, y la colisión de iniciales que descarta esa
+ * solución para las demás aquí no puede darse: de las diecinueve islas de un reparto, la
+ * duna es EXACTAMENTE UNA (`RINDE` le da `null` a un solo terreno), así que en el carril hay
+ * como mucho un cuadrado con letra y dieciocho con cifra.
+ *
+ * Y sale del terreno que trae la vista y no de una tabla de nombres escrita aquí: un terreno
+ * que este cliente no conozca da su propia inicial en vez de un hueco.
+ */
+function glifoDeLaIsla(terreno: string, numero: number): string {
+  if (numero > 0) return String(numero);
+  return terreno.slice(0, 1).toUpperCase();
+}
+
+// ---------------------------------------------------------------------------
 // EL MARCADOR: lo que se ve de cada colono, y lo que sólo cuento yo
 // ---------------------------------------------------------------------------
 
@@ -1497,6 +1697,29 @@ export interface ColonoEnElMarcador {
   readonly guardias: number;
   /** Los títulos que ha revelado, con su nombre de Riberas: «El Faro»… */
   readonly titulos: readonly string[];
+  /**
+   * CUÁNTAS CHOZAS Y CUÁNTAS TORRES TIENE PUESTAS: las dos cifras que el §11 del diseño
+   * le pedía al marcador y que hasta hoy no salían de ninguna función.
+   *
+   * ═══ CONTAR AQUÍ NO ES ESCRIBIR UNA REGLA, Y LA DIFERENCIA ESTÁ EN QUÉ SE CUENTA ═══
+   *
+   * Las piezas están SOBRE EL TABLERO: quien mira la mesa las ve y las cuenta con el dedo,
+   * y `ColonoVisto` las trae enteras —`chozas` y `torres` son las mismas listas de vértices
+   * con las que se pinta el delta—. Un `length` de una lista pública es PROYECCIÓN: no hay
+   * aquí ningún tope de piezas, ningún coste y ninguna condición de victoria. El día que la
+   * pantalla quiera decir «te quedan dos chozas por poner», eso SÍ sería regla y tendría
+   * que llegar publicado por `proyectarRiberas`, igual que llegan `puntos` o `vado`.
+   *
+   * ═══ Y POR QUÉ `bienes` NO ESTÁ AL LADO ═══
+   *
+   * Porque Miguel lo quitó del encargo (DECISIÓN 17): los bienes de los DEMÁS no se
+   * enseñan. Subirlos «ya que estamos» metería en el marcador —que es lo que ve la mesa
+   * entera— la mano de cada uno, que es exactamente lo que esa decisión dice que no se
+   * pinta. Lo mío por clase lo enseña el panel «Lo mío», que sale de la vista de mi propio
+   * asiento y no de aquí.
+   */
+  readonly chozas: number;
+  readonly torres: number;
   readonly tieneElVado: boolean;
   readonly tieneLaMayorGuardia: boolean;
   /**
@@ -1568,6 +1791,13 @@ export function marcadorEnTres(vista: unknown): MarcadorEnTres | null {
         cartas: c.cartas ?? 0,
         guardias: c.guardias ?? 0,
         titulos: (c.titulos ?? []).map((t) => retratoDeLaCarta(t)?.nombre ?? t),
+        /*
+         * SE CUENTAN LAS LISTAS DE LA VISTA, no las de ningún estado: lo que llega por el
+         * cable es lo que hay sobre el tablero, y de ahí sale la cifra. Y no llega `bienes`
+         * ni por descuido: DECISIÓN 17.
+         */
+        chozas: c.chozas?.length ?? 0,
+        torres: c.torres?.length ?? 0,
         tieneElVado: delVado !== null && c.asiento === delVado,
         tieneLaMayorGuardia: deLaGuardia !== null && c.asiento === deLaGuardia,
         /* Su cadena más larga, tal como la cuenta el juego. Aquí no se cuenta nada. */
@@ -1653,4 +1883,488 @@ export function loQueSeOyeDelVado(colono: ColonoEnElMarcador, marcador: Marcador
     return `${llega} lo tiene ${estado.dueño.nombre} con ${String(estado.dueño.vado)}: hay que superarle`;
   }
   return `${llega} lo tiene ${estado.dueño.nombre}, que llegó antes: hay que superarle`;
+}
+
+// ---------------------------------------------------------------------------
+// Los paneles declarados, ordenados para el cajón
+// ---------------------------------------------------------------------------
+
+/**
+ * LOS SEIS PANELES QUE EL JUEGO DECLARA, PUESTOS EN EL ORDEN DEL CAJÓN Y SIN LOS BIENES
+ * AJENOS (decisión 17).
+ *
+ * ═══ POR QUÉ ESTOS PANELES SON EL DATO Y NO EL ADORNO ═══
+ *
+ * `panelesDe` (`riberas.ts`) declara «Lo mío», «Mis cartas», «La mesa», «El Vado Largo»,
+ * «La Mayor Guardia» y —cuando hay— «Trueques», y los pintan los dos clientes por igual.
+ * Un inventario de lo que vive FUERA del lienzo encontró que dos datos de la partida no
+ * existen en ningún otro sitio de esta pantalla: MIS BIENES POR CLASE —en la escena la
+ * mano son cartas sin número, así que «limo: 3» sólo se lee aquí— y LAS PROPUESTAS DE
+ * TRUEQUE, que el panel «Trueques» es lo único que enseña. O sea que llevar el delta a
+ * pantalla completa sin llevarse los paneles habría perdido las dos cosas.
+ *
+ * ═══ QUÉ HACE ESTA FUNCIÓN, QUE SON DOS COSAS Y NINGUNA ES UNA REGLA ═══
+ *
+ *   1. GARANTIZA QUE «Lo mío» VA EL PRIMERO. En el raíl el orden daba igual porque se
+ *      veían todos a la vez; en un cajón que se abre para mirar y se cierra para jugar, el
+ *      primer renglón es el que se lee sin desplazar, y lo que hay que mirar antes de
+ *      decidir una jugada es lo que uno tiene. Los demás se quedan en el orden que les dio
+ *      el juego: reordenarlos todos sería escribir aquí un criterio que allí no hay.
+ *
+ *      Y HOY ESTO NO CAMBIA NADA, que hay que decirlo: `panelesDe` ya lo declara el
+ *      primero. O sea que con los paneles de una partida de verdad este adelanto es un
+ *      no-op, y una comprobación que sólo mirase eso estaría en verde aunque la función no
+ *      reordenara. Por eso `verify:riberas-en-tres` la llama ADEMÁS con «Lo mío» enterrado
+ *      en medio: lo que se compra no es el orden de hoy, es que el día que el juego añada
+ *      un panel por encima el cajón siga abriéndose por lo que uno tiene.
+ *   2. QUITA LA CIFRA DE BIENES DEL PANEL «La mesa». Es la decisión 17 de Miguel, tomada
+ *      el 7 de septiembre de 2026: los bienes de los DEMÁS no se llevan a la pantalla
+ *      completa. El renglón de ese panel dice «Ana — 3 ptos, 5 bienes, 2 cartas, vereda
+ *      más larga 4»; se le quita el trozo de los bienes y se queda el resto, que es lo
+ *      único que ese panel añade a la ficha del marcador de arriba.
+ *
+ * Ninguna de las dos es una regla del juego: son dos decisiones sobre QUÉ SE ENSEÑA y
+ * dónde, tomadas sobre texto que el juego ya escribió. Aquí no se cuenta nada, no se
+ * consulta la vista y no se inventa una palabra: entra una lista de paneles y sale la
+ * misma lista con otro orden y un trozo menos.
+ *
+ * ═══ Y VIVE EN `shared/` Y NO EN LA PANTALLA, QUE ES LO QUE LA HACE MEDIBLE ═══
+ *
+ * Por lo mismo que `marcadorEnTres`: la va a llamar el escritorio hoy y la app en la fase
+ * 6, y una copia en cada cliente son dos criterios que divergen. Y sobre todo porque así
+ * `verify:riberas-en-tres` puede llamarla desde Node con los paneles de una partida de
+ * VERDAD y exigir las dos mitades: que la cifra desaparezca, y que estuviera antes. Lo
+ * segundo es lo que importa, porque esto se apoya en cómo `panelesDe` redacta el
+ * renglón: el día que lo reescriba, la comprobación se pone roja en vez de dejar el
+ * recorte sin recortar y a nadie enterado.
+ *
+ * NUNCA SE PIERDE UN PANEL. Si el juego renombra sus títulos, esto devuelve los mismos
+ * paneles en el mismo orden y sin tocar: se degrada a no hacer nada, que es lo correcto
+ * cuando la suposición de la que parte ha dejado de valer.
+ */
+export const PANEL_DE_LO_MIO = 'Lo mío';
+export const PANEL_DE_LA_MESA = 'La mesa';
+
+/**
+ * «, 5 bienes» dentro del renglón de un colono, con su coma de delante y sin la de
+ * detrás: así el renglón se cierra solo y no quedan dos comas seguidas ni un espacio
+ * suelto. `bien` en singular está en la alternativa porque el juego lo escribe así con
+ * uno solo, y ése es justo el caso que una expresión escrita de memoria se deja.
+ */
+const LOS_BIENES_DE_UN_COLONO = /, \d+ bien(?:es)?(?=,|$)/g;
+
+export function panelesEnTres(paneles: unknown): PanelDeTablero[] {
+  if (!Array.isArray(paneles)) return [];
+  const sanos = (paneles as unknown[]).filter(
+    (p): p is PanelDeTablero => typeof p === 'object' && p !== null,
+  );
+  const puestos = sanos.map((panel): PanelDeTablero => {
+    const lineas = Array.isArray(panel.lineas) ? panel.lineas : [];
+    if (panel.titulo !== PANEL_DE_LA_MESA) return { titulo: panel.titulo, lineas: [...lineas] };
+    return {
+      titulo: panel.titulo,
+      lineas: lineas.map((l) => (typeof l === 'string' ? l.replace(LOS_BIENES_DE_UN_COLONO, '') : l)),
+    };
+  });
+  const mio = puestos.filter((p) => p.titulo === PANEL_DE_LO_MIO);
+  return [...mio, ...puestos.filter((p) => p.titulo !== PANEL_DE_LO_MIO)];
+}
+
+// ---------------------------------------------------------------------------
+// EL PREGÓN: las propuestas de trueque, y lo que ya se trocó
+// ---------------------------------------------------------------------------
+
+/**
+ * ═══ QUÉ ES EL PREGÓN Y POR QUÉ NO PODÍA SEGUIR SIENDO UN PANEL ═══
+ *
+ * Miguel, palabra por palabra: «se tiene que mostrar en la pantalla las propuestas de
+ * trueque por cada jugador con capacidad de aceptar o rechazar, la aceptación debe tener
+ * que confirmarse para que no se acepte por equivocación». Y su decisión 17 parte los
+ * trueques en DOS MITADES: las propuestas VIVAS y los que YA se cerraron.
+ *
+ * Lo único que enseñaba hoy una propuesta era el panel «Trueques» que declara `panelesDe`:
+ * un renglón de texto por trato con su seudónimo delante («t3: Ana da junco por limo a
+ * Bruno — propuesta»). Eso vale para leer un historial y no vale para CONTESTAR —no hay
+ * dónde pulsar— y con el delta a pantalla completa ese panel vive dentro del cajón, o sea
+ * detrás de un botón que hay que abrir. Una propuesta caduca al acabar el turno de quien la
+ * hizo (`caducarLosAbiertos`), así que una oferta que sólo se ve abriendo un cajón es una
+ * oferta que casi nadie contesta.
+ *
+ * El pregón cuelga de la cinta, NO es modal —lo lee quien no tiene el turno, mientras otro
+ * juega— y sus tiras se pulsan.
+ *
+ * ═══ POR QUÉ ESTO VIVE EN `shared/` Y NO EN LA PANTALLA ═══
+ *
+ * Por lo mismo que `marcadorEnTres` y `panelesEnTres`: lo va a pintar el escritorio hoy y
+ * la app después, y dos lecturas de `v.tratos` son dos maneras de decir «la aceptó Ana» que
+ * divergen el día que alguien toque una. Y sobre todo porque así un comprobador de Node
+ * puede ejercitarlo con partidas de VERDAD, que es lo único que compra que las frases digan
+ * lo que de verdad pasó.
+ *
+ * ═══ AQUÍ NO SE DECIDE NINGUNA REGLA ═══
+ *
+ * Quién puede aceptar y quién rechazar lo dice el juego con su lista de opciones, y aquí se
+ * BUSCAN por el seudónimo del trato en vez de volver a mirar almacenes: es lo mismo que hace
+ * `mazoEnLaBarra` con COMPRAR y `dadosEnTres` con TIRAR. Que a una tira le falte el botón de
+ * aceptar significa exactamente «el juego no me lo ofrece» —no tengo lo que se me pide—, y
+ * eso se escribe en su renglón de estado en vez de inventarse aquí una segunda comprobación
+ * de las reglas.
+ */
+
+/** El estado vivo de `EstadoDelTrato`, tal como lo escribe `riberas.ts`. */
+const TRATO_VIVO = 'propuesta';
+
+/**
+ * LO QUE DE VERDAD SEA UNA LISTA DE BIENES, y nada más que eso. Los campos del trato llegan
+ * declarados como `unknown` a propósito —esta vista se declara por estructura y por aquí
+ * pasan partidas guardadas de cualquier época—, así que se criban antes de contarlos: una
+ * lista con un `null` dentro se pintaría «1 null por 1 limo» sin que nada fallara.
+ */
+function soloBienes(lo: unknown): string[] {
+  return Array.isArray(lo) ? (lo as unknown[]).filter((b): b is string => typeof b === 'string') : [];
+}
+
+/**
+ * «1 junco», «2 juncos y 1 limo». Con el trueque de hoy siempre es UN bien por lado
+ * (`BIENES_POR_LADO_DEL_TRUEQUE` vale 1), pero se cuenta y se agrupa igual: el día que la
+ * multiplicidad entre —es otro encargo: `docs/EL-TRUEQUE-DE-RIBERAS.md` §1.1— esta frase ya
+ * la sabe decir, y mientras tanto no se lee distinto.
+ */
+function enPalabras(bienes: readonly string[]): string {
+  if (bienes.length === 0) return 'nada';
+  const cuentas = new Map<string, number>();
+  for (const b of bienes) cuentas.set(b, (cuentas.get(b) ?? 0) + 1);
+  const trozos = [...cuentas].map(([bien, cuantos]) => `${String(cuantos)} ${bien}${cuantos === 1 ? '' : 's'}`);
+  if (trozos.length === 1) return trozos[0] as string;
+  return `${trozos.slice(0, -1).join(', ')} y ${trozos[trozos.length - 1] as string}`;
+}
+
+/** Una propuesta de trueque tal como se pinta en el pregón: una tira. */
+export interface TiraDelPregon<O extends OpcionQueLlega = OpcionQueLlega> {
+  /** El seudónimo del trato (`t3`). Es su identidad y su llave de lista. */
+  readonly id: string;
+  readonly de: AsientoId;
+  readonly para: AsientoId;
+  /** El color de quien la propone: el raíl de la tira, el mismo de sus piezas. */
+  readonly color: string;
+  /** Lo que entrega quien propone y lo que quiere a cambio, en palabras. */
+  readonly da: string;
+  readonly pide: string;
+  /** `propuesta` | `aceptada` | `rechazada` | `caducada`, tal cual del juego. */
+  readonly estado: string;
+  /**
+   * LA FRASE ENTERA, escrita desde donde mira quien la lee: «Ana te da 1 junco por 1 limo».
+   * Es el nombre accesible de la tira y el título de su hoja, así que dice quién, qué y en
+   * qué dirección — que es justo lo que un «t3: …» del panel no decía.
+   */
+  readonly frase: string;
+  /**
+   * EL RENGLÓN DE ESTADO, EN DOS VERSIONES, Y LAS DOS HACEN FALTA.
+   *
+   * `comoAnda` lleva el nombre («la aceptó Ana»); `comoAndaSinNombre` no («aceptada»). Cuál
+   * se pinta lo decide el ancho, y lo decide el CLIENTE porque sólo él sabe con qué letra
+   * pinta: en un lienzo de 288 puntos la tira deja 91,2, que son diez letras, y ahí «la
+   * aceptó Ana» no entra. LA REGLA, decidida y escrita: si algo no cabe se recorta EL
+   * NOMBRE, nunca el estado. Saber que te la aceptaron importa más que saber quién, y el
+   * quién sigue entero en la frase y en la hoja.
+   */
+  readonly comoAnda: string;
+  readonly comoAndaSinNombre: string;
+  /**
+   * LAS DOS OPCIONES DEL JUEGO, o `null` cuando no las ofrece. `aceptar` en `null` con
+   * `rechazar` puesto es un caso de verdad y no un hueco: el juego ofrece RECHAZAR siempre
+   * al destinatario y ACEPTAR sólo si tengo lo que se me pide.
+   */
+  readonly aceptar: O | null;
+  readonly rechazar: O | null;
+}
+
+/** Los tres bloques del pregón. Ver `elPregonEnTres`. */
+export interface PregonEnTres<O extends OpcionQueLlega = OpcionQueLlega> {
+  /** Las vivas que YO puedo contestar. */
+  readonly paraContestar: readonly TiraDelPregon<O>[];
+  /** Las vivas que YO he propuesto, con su estado. */
+  readonly mias: readonly TiraDelPregon<O>[];
+  /** Y lo que ya se cerró: aceptado, apartado o caducado. La otra mitad de la decisión 17. */
+  readonly cerrados: readonly TiraDelPregon<O>[];
+}
+
+/**
+ * EL PREGÓN DE ESTA VISTA, o `null` cuando no hay NADA VIVO que pregonar.
+ *
+ * ═══ EL `null` ES LA DECISIÓN, Y ES LA QUE PAGA EL CARTEL DE LOS NAIPES ═══
+ *
+ * Devuelve `null` —o sea: no hay pregón— cuando no queda ninguna propuesta viva, aunque
+ * `v.tratos` esté lleno de cerrados. Y eso NO es media decisión 17: es lo que la hace
+ * sostenible, y sale de una medida. Con la cinta a 88 y el cartel de los naipes puesto
+ * quedan 32 puntos en el SE apaisado, o sea CERO tiras, así que la regla que
+ * `docs/EL-TRUEQUE-DE-RIBERAS.md` §4.1 comparte con el otro documento es de EXCLUSIÓN: con
+ * el pregón pintado el cartel NO se pinta. Si el pregón existiera también con sólo tratos
+ * cerrados, el cartel se apagaría PARA SIEMPRE en cuanto se trocara una vez —`ultimos`
+ * guarda los ocho últimos y esa lista ya no se vacía en toda la partida— y encima ocho
+ * renglones de historia taparían el tablero sin que nadie los hubiera pedido.
+ *
+ * Lo cerrado NO se pierde por eso, y ahí está la otra mitad: cuando el pregón existe se lo
+ * lleva entero (`cerrados`) y `panelesFueraDelPregon` retira el panel «Trueques» del cajón
+ * para que no se diga dos veces; cuando no existe, el panel se queda donde estaba y quien
+ * vuelva al tablero dos turnos después sigue pudiendo saber quién le dio qué a quién. Es el
+ * mismo trato que `opcionesFueraDeLaBarra` le da al botón de comprar, y por lo mismo: la
+ * cosa desaparece de un sitio exactamente cuando aparece en el otro, porque las dos mitades
+ * miran EL MISMO dato y no dos banderas que se pueden separar.
+ *
+ * ═══ Y «PARA CONTESTAR» Y «TUYAS» NO SE DAN A LA VEZ, QUE ES UNA MEDIDA Y NO UN DISEÑO ═══
+ *
+ * Un trueque sólo se propone con el turno en la mano (`ofrecer` corta si no se ha tirado y
+ * `opcionesDeTurno` sólo lo emite dentro del turno) y caduca al pasarlo
+ * (`caducarLosAbiertos`, dentro de `siguienteTurno`). O sea que en cualquier instante el
+ * único que puede tener propuestas vivas es quien tiene el turno: o soy yo, y entonces todas
+ * las vivas son MÍAS, o es otro, y entonces ninguna lo es. Los dos bloques están escritos
+ * igual porque el día que el turno deje de ser la frontera —una propuesta que sobreviva al
+ * turno, una oferta a la mesa— van a hacer falta a la vez; hoy uno de los dos sale siempre
+ * vacío, y `verify:riberas-en-tres` lo dice con esas palabras para que no se lea como un
+ * bloque que no funciona.
+ */
+export function elPregonEnTres<O extends OpcionQueLlega>(
+  vista: unknown,
+  quien: AsientoId | null,
+  opciones: readonly O[],
+): PregonEnTres<O> | null {
+  if (!esVistaQueSePinta(vista) || quien === null) return null;
+  const tratos = vista.tratos;
+  if (!Array.isArray(tratos)) return null;
+
+  const nombreDe = (asiento: AsientoId): string =>
+    vista.colonos.find((c) => c.asiento === asiento)?.nombre ?? asiento;
+  const colorDe = (asiento: AsientoId): string =>
+    vista.colonos.find((c) => c.asiento === asiento)?.color ?? '';
+  const laOpcion = (tipo: string, id: string): O | null =>
+    opciones.find((o) => {
+      if (o.tipo !== tipo || typeof o.carga !== 'object' || o.carga === null) return false;
+      return (o.carga as Record<string, unknown>)['trato'] === id;
+    }) ?? null;
+
+  const paraContestar: TiraDelPregon<O>[] = [];
+  const mias: TiraDelPregon<O>[] = [];
+  const cerrados: TiraDelPregon<O>[] = [];
+
+  for (const crudo of tratos) {
+    if (typeof crudo !== 'object' || crudo === null) continue;
+    const id = crudo.id;
+    const de = crudo.de;
+    const para = crudo.para;
+    const estado = crudo.estado;
+    if (typeof id !== 'string' || typeof de !== 'string' || typeof para !== 'string') continue;
+    if (typeof estado !== 'string') continue;
+    const da = soloBienes(crudo.da);
+    const pide = soloBienes(crudo.pide);
+    const daDicho = enPalabras(da);
+    const pideDicho = enPalabras(pide);
+    const suNombre = nombreDe(de);
+    const elOtro = nombreDe(para);
+    const vivo = estado === TRATO_VIVO;
+    const comun = { id, de, para, color: colorDe(de), da: daDicho, pide: pideDicho, estado };
+
+    /*
+     * TRES REDACCIONES Y NO UNA CON UN «SI» DENTRO: la misma oferta se lee distinta según de
+     * qué lado de la mesa esté quien la mira, y ésa es justo la información que el panel de
+     * texto no daba. «Ana te da» dice que hay que contestar; «le ofreces a Bruno» dice que
+     * estás esperando; y el pasado dice que ya no hay nada que hacer.
+     */
+    if (vivo && para === quien) {
+      const aceptar = laOpcion(ACEPTAR, id);
+      paraContestar.push({
+        ...comun,
+        frase: `${suNombre} te da ${daDicho} por ${pideDicho}`,
+        /*
+         * SIN ACEPTAR, EL RENGLÓN DICE POR QUÉ. El juego le ofrece RECHAZAR siempre al
+         * destinatario y ACEPTAR sólo si tiene lo que se le pide (`opcionesDeTurno`). Una
+         * hoja con un solo botón y sin una palabra que lo explique se lee como una hoja rota.
+         */
+        comoAnda: aceptar === null ? `no tienes ${pideDicho}` : 'te toca contestar',
+        comoAndaSinNombre: aceptar === null ? 'no puedes pagarlo' : 'contesta',
+        aceptar,
+        rechazar: laOpcion(RECHAZAR, id),
+      });
+      continue;
+    }
+    if (vivo && de === quien) {
+      mias.push({
+        ...comun,
+        frase: `Le ofreces a ${elOtro} ${daDicho} por ${pideDicho}`,
+        comoAnda: `esperando a ${elOtro}`,
+        comoAndaSinNombre: 'esperando',
+        aceptar: null,
+        rechazar: null,
+      });
+      continue;
+    }
+    /*
+     * LO VIVO QUE NO ES MÍO NI PARA MÍ NO SE PINTA, y no es que se pierda: hoy no puede
+     * existir —sólo propone quien tiene el turno, y propone a UNO—, y el día que exista (una
+     * oferta a la mesa) su sitio es «Para contestar» con su propio botón, no un cuarto bloque
+     * de mirón. Se deja fuera a sabiendas en vez de colarlo entre los cerrados, que es donde
+     * diría que ya pasó algo que no ha pasado.
+     */
+    if (vivo) continue;
+    /*
+     * QUIÉN CONTESTÓ, Y SI FUI YO SE DICE EN SEGUNDA PERSONA. Escrito con el nombre a secas
+     * salía «la apartó Ana» en la pantalla de Ana, o sea la frase hablando de quien la lee en
+     * tercera persona: se lee como si hubiera otra Ana en la mesa. Esto se vio MIRANDO y no
+     * midiendo, y por eso queda escrito aquí.
+     */
+    const contesto = para === quien ? null : elOtro;
+    const cerrada =
+      estado === 'aceptada'
+        ? { con: contesto === null ? 'la aceptaste' : `la aceptó ${contesto}`, sin: 'aceptada' }
+        : estado === 'rechazada'
+          ? { con: contesto === null ? 'la apartaste' : `la apartó ${contesto}`, sin: 'apartada' }
+          : { con: 'caducó sin respuesta', sin: 'caducada' };
+    cerrados.push({
+      ...comun,
+      frase:
+        de === quien
+          ? `Le ofreciste a ${elOtro} ${daDicho} por ${pideDicho}`
+          : para === quien
+            ? `${suNombre} te ofreció ${daDicho} por ${pideDicho}`
+            : `${suNombre} le ofreció a ${elOtro} ${daDicho} por ${pideDicho}`,
+      comoAnda: cerrada.con,
+      comoAndaSinNombre: cerrada.sin,
+      aceptar: null,
+      rechazar: null,
+    });
+  }
+
+  if (paraContestar.length === 0 && mias.length === 0) return null;
+  /*
+   * LOS CERRADOS, DEL MÁS NUEVO AL MÁS VIEJO. `v.tratos` llega del más viejo al más nuevo
+   * —`ultimos` recorta por delante—, que es el orden de un registro; en una lista que se
+   * lee de un vistazo y que se desplaza hacia abajo, lo último que pasó es lo que se busca.
+   * Las VIVAS no se dan la vuelta: allí el orden es en el que llegaron, y contestar antes la
+   * primera que la segunda es lo justo.
+   */
+  return { paraContestar, mias, cerrados: [...cerrados].reverse() };
+}
+
+/**
+ * ═══ CUÁNDO EL PREGÓN SE PLIEGA, Y POR QUÉ NO ES «EN MI TURNO» AUNQUE HOY SEA LO MISMO ═══
+ *
+ * JUGANDO una partida entera salió esto: el pregón es una caja OPACA colgada de la cinta, y
+ * en MI turno crece con MIS propuestas vivas. Con ocho abiertas llegaba de y=159 a y≈540 de
+ * un recuadro de 857 —el 44 % de arriba del tablero—, que es exactamente donde viven los
+ * anillos de fundar. No crece sin fin, porque `elAltoDelPregon` lo para en el techo del asa;
+ * lo que pasa es que ESE tope, en mi turno, ya es media pantalla de tablero tapada justo
+ * mientras se decide dónde construir.
+ *
+ * Y lo que tapa es lo que NO hay que contestar. La regla, dicha por lo que significa y no por
+ * de quién es el turno: EL PREGÓN SE PLIEGA CUANDO NO HAY NADA QUE CONTESTAR. Si hay una
+ * propuesta esperando mi respuesta se ve entera y tapa lo que haga falta, porque para eso
+ * existe (§1.10 del trueque). Si no la hay —mis propias ofertas en pie y lo ya trocado—, se
+ * pliega a UNA tira y el tablero vuelve a estar entero; un toque en la tira lo despliega.
+ *
+ * HOY LAS DOS FRASES SON LA MISMA, y está escrito así a propósito: sólo propone quien tiene
+ * el turno, así que «nada que contestar» y «es mi turno» coinciden en cada instante (el mismo
+ * razonamiento que hay unas líneas más arriba, en `elPregonEnTres`). Escrita por lo que
+ * significa, el día que una oferta sobreviva al turno —o que se pueda ofrecer a la mesa— esto
+ * seguirá haciendo lo correcto sin que nadie se acuerde de venir a cambiarlo; escrita como
+ * «en mi turno», ese día empezaría a esconder propuestas que hay que contestar.
+ */
+export function elPregonSePliega(pregon: PregonEnTres<OpcionQueLlega> | null): boolean {
+  return pregon !== null && pregon.paraContestar.length === 0;
+}
+
+/** Lo que dice la tira única del pregón plegado. Ver `elResumenDelPregon`. */
+export interface ResumenDelPregon {
+  /** Las vivas que se están escondiendo. Nunca cero: sin ellas no habría pregón que plegar. */
+  readonly cuantas: number;
+  /** Y las cerradas que van debajo, que también se esconden. */
+  readonly cerradas: number;
+  /**
+   * EL RENGLÓN DE ARRIBA, EN DOS VERSIONES, y el de abajo igual: son los mismos dos campos
+   * que lleva una tira (`comoAnda`/`comoAndaSinNombre`) para que el cliente los mida con
+   * `elEstadoQueCabe`, que es la función que ya decide qué cabe con la letra de VERDAD del
+   * navegador. Un tercer camino de recorte sería un tercer sitio donde se recorta distinto.
+   */
+  readonly dicho: string;
+  readonly dichoCorto: string;
+  readonly comoAnda: string;
+  readonly comoAndaSinNombre: string;
+  /** La frase entera: el nombre accesible de la tira, y lo que hace el toque. */
+  readonly seOye: string;
+}
+
+/**
+ * LO QUE DICE EL PREGÓN PLEGADO. Una tira, con las cifras de lo que esconde.
+ *
+ * NO DICE «tócalo para verlas» en lo que se PINTA y sí en lo que se OYE: en el lienzo de 288
+ * la tira deja 81,2 puntos, que son nueve letras y media, y ahí una instrucción se come el
+ * dato. Lo que se pinta son las dos cifras —cuántas mías siguen en pie y cuántas ya se
+ * cerraron—, que es lo que se mira para decidir si merece la pena abrirlo; que se abre lo
+ * dicen el triángulo del canto y el `aria-expanded`, que es donde un lector lo busca.
+ *
+ * `null` cuando no hay pregón: no hay nada que resumir y no hay tira que pintar.
+ */
+export function elResumenDelPregon(pregon: PregonEnTres<OpcionQueLlega> | null): ResumenDelPregon | null {
+  if (pregon === null) return null;
+  const cuantas = pregon.mias.length;
+  const cerradas = pregon.cerrados.length;
+  const tuyas = cuantas === 1 ? '1 propuesta tuya' : `${String(cuantas)} propuestas tuyas`;
+  const tuyasCorto = cuantas === 1 ? '1 tuya' : `${String(cuantas)} tuyas`;
+  const trocadas = cerradas === 1 ? 'y 1 ya trocada' : `y ${String(cerradas)} ya trocadas`;
+  const trocadasCorto = cerradas === 1 ? 'y 1 cerrada' : `y ${String(cerradas)} cerradas`;
+  return {
+    cuantas,
+    cerradas,
+    dicho: tuyas,
+    dichoCorto: tuyasCorto,
+    comoAnda: cerradas === 0 ? 'esperando respuesta' : trocadas,
+    comoAndaSinNombre: cerradas === 0 ? 'esperando' : trocadasCorto,
+    seOye: `El pregón, plegado: ${tuyas} en pie${cerradas === 0 ? '' : ` ${trocadas}`}. Tócalo para verlas.`,
+  };
+}
+
+/**
+ * LAS OPCIONES QUE TAMPOCO PINTAN LOS BOTONES: se caen ACEPTAR y RECHAZAR, y sólo si el
+ * pregón está pintado.
+ *
+ * El mismo patrón que `opcionesFueraDeLaBarra` con el mazo y `opcionesFueraDeLaMesa` con los
+ * dados, y por el mismo par de fallos. Con pregón y botones a la vez, la misma pantalla
+ * ofrece contestar DOS VECES y se rompe la regla de la casa —cada movimiento se enseña
+ * exactamente una vez— que los comprobadores cuentan con los dedos. Y el fallo contrario es
+ * el mudo: donde NO hay pregón —un mirón, el respaldo del retablo, una pantalla que todavía
+ * no lo pinte— quitar los botones deja una propuesta que no se puede contestar en toda la
+ * tarde, sin un error en ninguna parte.
+ *
+ * Por eso recibe EL PREGÓN y no un interruptor: los botones desaparecen exactamente cuando
+ * las tiras existen, porque son el mismo dato. Y el pregón se compone ANTES, con las opciones
+ * ENTERAS: al revés se quedaría sin los dos botones que cuelga de cada tira.
+ */
+export function opcionesFueraDelPregon<O extends OpcionQueLlega>(
+  opciones: readonly O[],
+  pregon: PregonEnTres<O> | null,
+): O[] {
+  return pregon === null
+    ? [...opciones]
+    : opciones.filter((o) => o.tipo !== ACEPTAR && o.tipo !== RECHAZAR);
+}
+
+/** El panel de trueques que declara `panelesDe`, por su título. */
+export const PANEL_DE_TRUEQUES = 'Trueques';
+
+/**
+ * Y EL PANEL «Trueques» DEL CAJÓN SE RETIRA CUANDO EL PREGÓN LO HEREDA.
+ *
+ * Ese panel es un renglón de texto por trato —«t3: Ana da junco por limo a Bruno —
+ * propuesta»— y dice exactamente lo que el pregón pinta en tiras. Con los dos puestos, la
+ * misma pantalla cuenta lo mismo dos veces con dos redacciones distintas, y la que se
+ * quedaría atrás el día que una cambie es la que vive dentro de un cajón que hay que abrir.
+ *
+ * Se compone con `panelesEnTres` y el orden da igual: las dos son criba. Y recibe el pregón y
+ * no un `boolean` por lo mismo que la función de arriba: cuando no hay pregón el panel se
+ * QUEDA, porque entonces es el único sitio donde vive lo que ya se trocó.
+ */
+export function panelesFueraDelPregon(
+  paneles: readonly PanelDeTablero[],
+  pregon: PregonEnTres<OpcionQueLlega> | null,
+): PanelDeTablero[] {
+  return pregon === null ? [...paneles] : paneles.filter((p) => p.titulo !== PANEL_DE_TRUEQUES);
 }

@@ -2102,14 +2102,28 @@ code {
   display: flex;
   flex-direction: column;
   gap: 1rem;
-  margin-bottom: 1.5rem;
 }
 
+/*
+ * ═══ SIN SUELO DE ALTO, Y ES UN CAMBIO DE QUIÉN MANDA ═══
+ *
+ * Aquí ponía `min-height: 420px`, y ese número no era un mínimo de comodidad: era EL
+ * SUELO que hacía que este cliente no pudiera dar nunca un lienzo bajo. Con la página de
+ * pie manda la ventana, así que un monitor da 1.015 puntos de delta y una ventana de 420
+ * de alto da 355 —o 317 si la cabecera se parte en dos renglones—, y esos lienzos existen
+ * de verdad: son los que `verify:escritorio` mide ahora, y por los que la cuenta de frases
+ * del cartel tuvo que aprender dos formas nuevas.
+ *
+ * El `height: 62vh` SE QUEDA, y no es un resto: es la base de la que crece. Dentro de la
+ * cadena de abajo el lienzo es `flex: 1 1 auto`, o sea que `62vh` es su punto de partida y
+ * el reparto lo estira hasta la ventana o lo encoge por debajo; fuera de la cadena —un
+ * lienzo montado suelto, el respaldo que cae al retablo, un contenedor que no tiene alto
+ * que repartir— `62vh` sigue siendo lo que hay, y sin él ese lienzo saldría de cero.
+ */
 .riberas-lienzo {
   position: relative;
   width: 100%;
   height: 62vh;
-  min-height: 420px;
   background: var(--teja);
   border: 1px solid var(--filo);
   border-radius: var(--radio-ficha);
@@ -2132,6 +2146,198 @@ code {
 .riberas-lienzo-quieto canvas {
   cursor: progress;
 }
+
+/* --- La página de pie: el delta ocupa la ventana menos la cabecera ---------- */
+
+/*
+ * ═══ POR QUÉ HACÍAN FALTA SEIS ESLABONES Y NO CUATRO ═══
+ *
+ * Miguel pidió que la partida entrara en la pantalla. Un alto en `vh` sobre el recuadro no
+ * lo consigue: entre la ventana y el lienzo hay SEIS cajas, y cada una de las que no se
+ * toca sigue poniendo su cromo y su alto propio. Medidas con la raíz en 17, antes de esto:
+ *
+ *   · `main.dentro.mesa-puesta` .......... 102 pt de relleno vertical (2rem arriba, 4rem abajo)
+ *   · `section.el-mueble` con `<h1 class="titulo">` dentro .......... 58,64 pt
+ *   · `.riberas-en-tres` con su `margin-bottom: 1.5rem` .......... 25,5 pt
+ *   · y el aviso de la MESA, cuando lo hay .......... 65 a 146 pt más
+ *
+ * 292,4 pt de cromo sin el aviso. Un `62vh` de lienzo dentro de eso no llega a la ventana ni
+ * de lejos, y el resto se iba en blanco y en desplazamiento. Así que se pone de pie la
+ * CADENA ENTERA: cada eslabón reparte alto y ninguno se queda su trozo.
+ *
+ * ═══ POR QUÉ SE ENGANCHA A `:has(.riberas-lienzo)` Y NO A UNA CLASE PUESTA A MANO ═══
+ *
+ * Porque el que decide si hay delta no es la Sala: es el propio pintor, DENTRO del render.
+ * `RiberasEnTres` cae al retablo SVG si el `.glb` no llega, si el `Canvas` revienta al
+ * nacer o si la mesa no cabe en sus colores, y en ese caso no hay `.riberas-lienzo` en
+ * ninguna parte. Una clase puesta desde `sala.tsx` no se enteraría de ninguna de las tres:
+ * dejaría la página de pie, el título escondido y el retablo flotando en una ventana vacía.
+ * Con `:has` la cadena existe exactamente cuando existe el lienzo, y se deshace sola cuando
+ * el respaldo entra. Las demás pantallas de la Sala —el catálogo, el vestíbulo, las mesas
+ * de los otros arcades— no tienen lienzo y no se enteran de que esto está escrito.
+ *
+ * Y en un navegador sin `:has` no se rompe nada: el bloque entero no se aplica y queda la
+ * página de siempre, con su `62vh` y su desplazamiento.
+ *
+ * ═══ QUIÉN SE QUEDA CON EL DESPLAZAMIENTO ═══
+ *
+ * `.sala` pasa a medir la ventana exacta, así que la PÁGINA ya no rueda. Lo que rueda es
+ * `.mesa-puesta`, y sigue haciendo falta aunque el raíl ya no esté debajo.
+ *
+ * Hacía falta por el raíl: bajo 60rem se iba debajo del mueble y sin este desplazamiento
+ * quedaba inalcanzable. Eso ya no pasa —el raíl vive dentro del cajón—, y lo que queda
+ * debajo del lienzo, en flujo, es el `<Formulario>` de lo que el tablero no enseña: pasar,
+ * aceptar, rechazar, empezar. En un turno corriente son dos o tres botones; con el ESTIAJE
+ * por mover son DIECIOCHO, y hasta veintitrés contando a quién se le roba. Con
+ * `overflow: hidden` esos botones se quedarían fuera del recorte y sin manera de llegar a
+ * ellos: la mesa parada y ningún error en ninguna consola.
+ *
+ * O sea que esto se queda hasta que la cinta se lleve también los botones (fase 6 del
+ * diseño), y NO ANTES. Quien los mueva puede volver aquí y quitarlo.
+ */
+.sala:has(.riberas-lienzo) {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
+}
+
+/*
+ * El relleno vertical se va SÓLO en esta pantalla. En el catálogo y en el vestíbulo esos
+ * 2rem y 4rem son el aire de una página que se lee; aquí son 102 pt robados al tablero.
+ */
+.sala:has(.riberas-lienzo) > .mesa-puesta {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  /*
+   * `width: 100%` NO ES REDUNDANTE, y sin ella esto costaba 302 puntos de tablero MEDIDOS en
+   * un monitor de 1920. `.dentro` se centra con `margin: 0 auto`; en cuanto esta caja pasa a
+   * ser hija de un flex, esos márgenes automáticos del eje cruzado APAGAN el estirado, así
+   * que la caja se queda del tamaño de su contenido —mueble + raíl + relleno, 1.261— en vez
+   * de los 92rem del `max-width` (1.564). O sea que poner la página de pie, sin esta línea,
+   * habría ESTRECHADO el tablero justo en la pantalla donde más sitio hay. Con `width: 100%`
+   * vuelve a mandar el `max-width`, y el centrado sigue siendo el de siempre.
+   */
+  width: 100%;
+  padding-block: 0;
+  overflow: hidden auto;
+}
+
+/*
+ * La rejilla no es un eslabón de flex por dentro, así que reparte con `grid-template-rows`:
+ * una fila que se lleva lo que hay. `align-items: start` sigue valiendo —el mueble se estira
+ * aparte, con su `align-self`—.
+ *
+ * ═══ Y AHORA ES UNA SOLA COLUMNA, PORQUE EL RAÍL SE HA IDO DENTRO DEL LIENZO ═══
+ *
+ * La rejilla base es `minmax(0, 1fr) 22rem`: el tablero y el raíl. Desde que el raíl vive en
+ * el cajón de la cinta, en esta pantalla no hay segundo hijo, y una rejilla de dos columnas
+ * con un solo hijo deja las 22rem de la derecha VACÍAS — o sea 374 puntos de ventana en
+ * blanco justo en la pantalla que se puso de pie para no desperdiciar ninguno. Se declara la
+ * columna aquí, y sólo aquí: fuera de esta pantalla la rejilla sigue siendo la de siempre, y
+ * si el pintor cae al retablo el `:has` deja de casar y el raíl vuelve a su columna.
+ */
+.sala:has(.riberas-lienzo) .tablero-y-panel {
+  flex: 1;
+  min-height: 0;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.sala:has(.riberas-lienzo) .el-mueble {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/*
+ * EL TÍTULO SALE DEL FLUJO, NO DE LA PÁGINA. Son 58,64 pt que dicen el nombre del arcade
+ * al que se está jugando mientras se está mirando ese arcade, y el raíl ya lo nombra en la
+ * ficha de la mesa. Se queda en el árbol —es el `<h1>` del documento, y navegar por
+ * encabezados es como se recorre una página con lector de pantalla—, con la misma técnica
+ * que `.riberas-solo-apoyo`.
+ *
+ * Lo que NO se queda aquí es el destino del foco: eso se muda al recuadro del lienzo en
+ * `sala.tsx`, porque un aro de foco sobre un elemento invisible no lo ve nadie. El porqué
+ * entero está allí, junto al efecto que lo lleva.
+ */
+.sala:has(.riberas-lienzo) .el-mueble > .titulo {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/*
+ * ═══ AQUÍ HUBO UNA REGLA PARA EL RAÍL, Y YA NO HACE FALTA NINGUNA ═══
+ *
+ * Decía que el raíl se midiera contra su hueco y no contra la ventana (`max-height: 100%` en
+ * vez de `calc(100vh - 2rem)`), porque anclado a la ventana sobresalía justo lo que mide la
+ * cabecera y sus dos últimos botones —«Levantarse» y «Tirar la mesa»— se quedaban fuera.
+ *
+ * En esta pantalla ya no hay raíl que medir: se ha ido entero dentro del lienzo, al cajón que
+ * abre la ficha de mis puntos, y `sala.tsx` no pinta el `<aside>` mientras haya recuadro. La
+ * regla se borra en vez de quedarse de adorno; la de la hoja base sigue valiendo para el
+ * camino del respaldo, que es donde el raíl vuelve a existir.
+ */
+
+.sala:has(.riberas-lienzo) .riberas-en-tres {
+  flex: 1;
+  min-height: 0;
+}
+
+/*
+ * `flex: 1 1 auto` y no `flex: 1`: la base es el `62vh` de arriba, no cero. Con base cero
+ * un antepasado que no tenga alto que repartir —una rejilla de fila automática, un lienzo
+ * montado fuera de esta cadena— dejaría el recuadro en cero puntos y la mesa en negro, sin
+ * un error en ninguna consola. Con base `62vh` crece hasta la ventana donde hay reparto y
+ * se queda en `62vh` donde no lo hay.
+ */
+.sala:has(.riberas-lienzo) .riberas-lienzo {
+  flex: 1 1 auto;
+  /*
+   * ═══ EL SUELO VUELVE, PERO ES UNA REGLA Y NO UN NÚMERO: LA MITAD DEL MUEBLE ═══
+   *
+   * `min-height: 0` a secas costaba el tablero en las ventanas bajas, y está MEDIDO: en una
+   * de 568×320 el recuadro se quedaba en 47,6 puntos —una raya azul— porque el aviso del
+   * tablero y la lista de botones se llevaban el resto. Eso no es «la partida entra en la
+   * pantalla»: es que ya no hay partida.
+   *
+   * Los 420 píxeles de antes tampoco valen: eran un número fijo, y un suelo fijo es
+   * exactamente lo que impedía que mandara la ventana. Lo que vale es un REPARTO: el tablero
+   * no baja de la mitad del mueble, y lo que no quepa —el aviso, los botones— rueda dentro de
+   * la mesa, que para eso tiene su desplazamiento. En las ventanas con sitio no se nota
+   * siquiera: el recuadro crece muy por encima de la mitad y este suelo no ata nada.
+   *
+   * En porcentaje del mueble y no en `vh` porque lo que se reparte es EL MUEBLE: en dos
+   * columnas la cabecera ya se ha descontado, y un `vh` volvería a prometer alto que no
+   * existe. Si el porcentaje no se pudiera resolver —un antepasado sin alto definido— vale
+   * `auto`, o sea cero, y el reparto de arriba manda igual.
+   */
+  min-height: 50%;
+}
+
+/*
+ * ═══ Y AQUÍ HUBO UNA EXCEPCIÓN PARA LA VENTANA ESTRECHA, QUE TAMPOCO HACE FALTA ═══
+ *
+ * Decía que por debajo de 60rem la fila del mueble valiera la ventana entera y el raíl
+ * quedara debajo del pliegue, alcanzable rodando la mesa. Era lo mejor que se podía hacer
+ * mientras el raíl seguía siendo una caja de la página: entre 1.947 y 2.588 puntos de
+ * marcador, código, paneles, crónica y salidas que en una columna no caben en ninguna
+ * ventana.
+ *
+ * Con el raíl dentro del cajón esa excepción sobra: hay UNA columna en todos los anchos y la
+ * fila es siempre `minmax(0, 1fr)`, o sea el delta se queda la ventana entera menos la
+ * cabecera en cualquier forma de ventana, no sólo en las estrechas.
+ */
 
 /*
  * El telón: `--suelo` con el nombre del juego hasta que el modelo llega. Es el
@@ -2394,6 +2600,744 @@ code {
   box-shadow: none;
 }
 
+/* --- La cinta del tercio central y el cajón que cuelga de ella -------------- */
+
+/*
+ * ═══ LA CINTA: TRES COSAS EN UN RENGLÓN, DENTRO DEL LIENZO Y SIN QUITARLE ALTO ═══
+ *
+ * Aquí arriba vivían dos cajas EN FLUJO por encima del recuadro: el `<p class="aviso-del-
+ * tablero">` del juego (29 puntos más su hueco) y, debajo del lienzo, la lista de opciones
+ * sueltas. Las dos le comían alto al tablero en todas las ventanas, y en las bajas —una de
+ * 568×320 deja un mueble de 255 puntos— eso es la diferencia entre jugar y mirar una raya.
+ * El aviso se muda aquí dentro, encima del lienzo y no encima del recuadro: `position:
+ * absolute` no ocupa layout, así que el tablero no pierde ni un punto por tenerlo.
+ *
+ * ═══ EL ANCHO NO ESTÁ AQUÍ, Y ES LA MISMA DECISIÓN QUE LA DEL CARTEL ═══
+ *
+ * Lo pone `elEstiloDeLaCinta` en cada render con lo que dice `anchoDeLaCinta`
+ * (`escenas/cinta.ts`): el tercio central en apaisado y el 40 % de pie, porque a los lados
+ * están las dos manos y son cartas que se ARRASTRAN. Un porcentaje escrito aquí sería un
+ * segundo reparto, y el día que la franja de las cartas se ensanche la cinta se quedaría
+ * encima de la mano sin que nada se pusiera rojo. `verify:escena` mide esos dos números
+ * contra las dos manos abiertas en los dieciocho lienzos, con un suelo de 15 puntos de
+ * aire; lo que vive aquí es lo que no depende del lienzo.
+ *
+ * EL ALTO SÍ ESTÁ AQUÍ, y es el suelo de toque de la casa: `2.75rem`, los mismos que
+ * `.riberas-recoger` y que cualquier `.opcion`. `ALTO_DE_LA_CINTA` dice 44, que es ese
+ * mismo suelo en PUNTOS —es lo que `elCartelQueCabe` le resta a la banda del cartel y lo
+ * que miden los comprobadores en Node, donde no hay `rem`—. Con la raíz de esta casa
+ * (`106.25 %`) esto pinta 46,75 y aquella cuenta resta 44: los 2,75 de diferencia no le
+ * quitan nada al cartel, porque su caja es la MITAD de la banda libre y el resto es holgura
+ * por construcción. `verify:escritorio` afirma que los dos números dicen lo mismo.
+ *
+ * Redondeada sólo por abajo: está pegada al canto de arriba del recuadro y un redondeo
+ * arriba dejaría ver dos cuernos de tablero entre la cinta y el borde.
+ */
+.riberas-cinta {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  /*
+   * POR ENCIMA DEL LIENZO Y POR DEBAJO DEL VELO. Sin esto queda al mismo nivel que el
+   * `<canvas>` y gana el que se pinte después: el orden del árbol la dejaba encima hoy, pero
+   * eso es un accidente del JSX y no una decisión, y el día que alguien mueva un hermano la
+   * línea de estado desaparecería detrás del tablero sin que nada fallara.
+   */
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  /*
+   * ═══ NI HUECO ENTRE LOS TRES NI RELLENO A LOS LADOS, Y NO ES AUSTERIDAD ═══
+   *
+   * `loQueLlevaLaCinta` reparte el ancho en tres trozos —botón, frase, botón— y de ahí sale
+   * si el «‹» cabe y cuántas letras le quedan a la frase. Todo lo que esta regla añada a los
+   * lados sale del trozo de la frase SIN QUE LA CUENTA SE ENTERE. Estuvo escrito con
+   * `gap: 0.25rem` y `padding: 0 0.25rem`, y MEDIDO en 568×320 eso son 17 puntos de los 80
+   * que la frase tenía: la cuenta decía diez letras y en pantalla salían siete y medias. No
+   * se ve como un error: se ve como que el aviso se recorta antes de tiempo.
+   *
+   * Los botones traen su propio aire dentro de sus 44 puntos, que para eso son cuadrados de
+   * un suelo de toque y no del tamaño de su glifo.
+   */
+  gap: 0;
+  height: 2.75rem;
+  padding: 0;
+  background: var(--teja-alta);
+  border-radius: 0 0 var(--radio-mando) var(--radio-mando);
+  box-shadow:
+    0 0 0 1px var(--filo),
+    0 14px 30px -18px var(--sombra);
+}
+
+/*
+ * LOS DOS BOTONES DE LA CINTA: cuadrados del suelo de toque y SIN caja propia.
+ *
+ * No llevan fondo ni filo porque la cinta ya es la caja: tres recuadros dentro de un
+ * recuadro de 44 puntos de alto se leen como una barra de herramientas de 1998, y además
+ * no cabrían —a 288 de ancho la cinta entera son 115 puntos—. Lo que dice que se pueden
+ * tocar es lo mismo que en el resto de la Sala: el acento al pasar el ratón y el
+ * `:focus-visible` de la cabecera.
+ *
+ * `flex: 0 0 auto` en los dos: lo que se encoge es la frase, nunca un botón. Sin esto, en
+ * un lienzo estrecho el flex reparte la falta entre los tres y los botones bajan de los 44
+ * — o sea que el suelo de toque se pierde justo donde la pantalla es más pequeña, que es
+ * donde se juega con el dedo.
+ *
+ * ═══ Y MIDEN 2,75rem CLAVADOS, NO «AL MENOS» 2,75rem ═══
+ *
+ * Con `min-width` la ficha de mis puntos crecía con su contenido —el raíl de color, el hueco
+ * y la cifra—, y ese crecimiento salía del trozo de la frase sin que `loQueLlevaLaCinta` se
+ * enterara: la cuenta reparte el ancho en tres trozos de un tamaño que aquí tiene que ser
+ * verdad. Con `width` fijo la cifra de dos dígitos entra de sobra (raíl 4 + hueco 5 + dígitos
+ * 17 = 26 de los 46,75 que esto mide con la raíz de la casa) y `overflow: hidden` es la red
+ * por si algún día no entrara: antes recortar la cifra que descuadrar el reparto.
+ */
+.riberas-cinta-salir,
+.riberas-cinta-ficha {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  width: 2.75rem;
+  height: 2.75rem;
+  padding: 0;
+  overflow: hidden;
+  background: none;
+  color: var(--palabra);
+  border: 0;
+  border-radius: var(--radio-mando);
+  font: inherit;
+  font-size: 1.1rem;
+  font-weight: 600;
+  line-height: 1;
+  text-decoration: none;
+  cursor: pointer;
+  transition: color 0.12s;
+}
+
+.riberas-cinta-salir:hover,
+.riberas-cinta-ficha:hover {
+  color: var(--acento);
+}
+
+/*
+ * ═══ LA FRASE: LA ÚNICA LÍNEA DE ESTADO DE ESTA PANTALLA ═══
+ *
+ * Es `tablero.aviso` —de quién es el turno y en qué paso está—, y se recorta con puntos
+ * suspensivos en vez de partirse en dos renglones: la cinta ES la línea de sus botones y
+ * crecer a dos renglones la metería por dentro de la mano del mazo, que es de lo que va el
+ * ancho medido en `escenas/cinta.ts`.
+ *
+ * EL TEXTO NO SE PIERDE AL RECORTARSE: el `<p>` lleva la frase entera en el árbol, así que
+ * un lector la lee completa y el ratón la ve al posarse (`title`). Y `min-width: 0` no es
+ * adorno: un hijo de flex no baja de su ancho de contenido por omisión, así que sin esto la
+ * frase larga EMPUJA la cinta y se lleva por delante el ancho medido en vez de recortarse.
+ * Es el fallo clásico del `text-overflow` dentro de un flex, y no se ve como un texto que
+ * no cabe: se ve como una cinta que cambia de tamaño sola.
+ */
+.riberas-cinta-frase {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  text-align: center;
+  font-size: 0.82rem;
+  color: var(--palabra);
+}
+
+/*
+ * ═══ EL RELOJ DE LA CINTA: LO ÚNICO DE LOS CUATRO TROZOS QUE NO SE ENCOGE ═══
+ *
+ * Lo que evita está contado con números en `escenas/cinta.ts`: la línea de estado no decía
+ * NUNCA cuánto quedaba de turno —la cuenta atrás vivía sólo dentro del cajón, o sea detrás de
+ * un toque— y con el plazo de serie de 120 s la mesa jugó sola tres turnos y fundó una choza
+ * que nadie puso.
+ *
+ * `flex: 0 0 auto`, como los dos botones y por lo mismo pero al revés: los botones no se
+ * encogen para no perder el suelo de toque, y éste no se encoge porque un reloj recortado no
+ * es un plazo más corto, es otro número. Lo que se encoge sigue siendo la frase, que se corta
+ * con puntos suspensivos y sigue ENTERA en el árbol.
+ *
+ * EL ANCHO NO SE FIJA AQUÍ, y ésa es la diferencia con la ficha de mis puntos. La ficha mide
+ * `2.75rem` clavados porque su trozo es un cuadrado del suelo de toque; el reloj cambia de
+ * ancho con lo que dice —«4 s» y «12 min» no miden igual— y fijarlo al peor caso le quitaría
+ * a la frase esos puntos durante los cincuenta y nueve minutos en que sobran. Lo que
+ * `loQueLlevaLaCinta` descuenta SÍ es el peor caso (`huecoDelRelojDeLaCinta`), así que la
+ * cuenta se equivoca por el lado bueno: nunca promete a la frase más de lo que va a tener.
+ *
+ * `padding` en vez de un `gap` en la cinta: la cinta no tiene hueco entre trozos a propósito
+ * —todo lo que aquella regla añada sale del trozo de la frase SIN QUE LA CUENTA SE ENTERE, y
+ * ya costó 17 puntos de los 80 de una frase una vez—. Aquí el aire va donde
+ * `huecoDelRelojDeLaCinta` lo descuenta, que es dentro del reloj.
+ *
+ * `tabular-nums` porque es una cuenta atrás: con cifras de anchos distintos el rótulo baila
+ * cada segundo y arrastra con él la frase de al lado.
+ */
+.riberas-cinta-reloj {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 0 0.3rem 0 0.15rem;
+  overflow: hidden;
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--tenue);
+}
+
+/*
+ * EL ÚLTIMO MINUTO, EN `--alarma`. Esta hoja reserva ese color para «lo que de verdad se
+ * acaba», y esto es literalmente eso: pasado el plazo, la mesa juega sola. Se enciende en el
+ * último minuto y ni uno antes (`elPlazoAprieta`), porque un color de alarma encendido media
+ * partida deja de significar nada — y entonces tampoco significa nada el minuto en que sí.
+ *
+ * EL COLOR NO ES LA ÚNICA SEÑAL: el número sigue ahí y sigue bajando, y el nombre accesible
+ * dice la frase entera. Quien no distinga el naranja del gris tenue lee exactamente lo mismo.
+ */
+.riberas-cinta-reloj-aprieta {
+  color: var(--alarma);
+  font-weight: 600;
+}
+
+/*
+ * EL RAÍL DE COLOR DE LA FICHA: la misma mota que distingue a cada colono en el marcador,
+ * en barra porque aquí va al lado de una cifra y no delante de un nombre. Es lo que hace
+ * que mis puntos sean MÍOS de un vistazo. Va `aria-hidden`: el color se dice con palabras
+ * en el `aria-label` del botón.
+ */
+.riberas-cinta-rail {
+  width: 0.25rem;
+  height: 1.15rem;
+  border-radius: 2px;
+}
+
+/*
+ * ═══ LA CIFRA DE LA FICHA, Y POR QUÉ NO SE PINTA CON LA LETRA DE LA CINTA ═══
+ *
+ * En la ficha caben TRES cosas —el raíl de color, mi cifra pública y el «+N» de lo que sólo
+ * cuento yo— dentro de un cuadrado del suelo de toque, que con la raíz de esta casa son
+ * 46,75 puntos. Y ese cuadrado no puede crecer: su ancho es el que `loQueLlevaLaCinta` le
+ * resta al trozo de la frase, así que cada punto que se lleve la cifra es un punto menos de
+ * línea de estado.
+ *
+ * LA CUENTA, con lo peor que puede escribirse ahí —«12+5», dos dígitos públicos y uno
+ * oculto, que es una partida a punto de acabar— y el ancho de letra de la casa (0,6 del
+ * cuerpo, el mismo con el que se mide el cartel de los naipes):
+ *
+ *   raíl 4,25 + hueco 5,1 + «12» a 0,95rem (2 × 9,7 = 19,4) + «+5» a 13 px (2 × 7,8 = 15,6)
+ *   = 44,35 de los 46,75. Cabe con 2,4 de sobra.
+ *
+ * Con el `1.1rem` que la ficha hereda de la cinta, esos mismos «12» ocupan 22,4 y la suma se
+ * va a 47,35: se sale por 0,6 puntos. Por eso la cifra baja a `0.95rem` — no es un ajuste de
+ * gusto, es la diferencia entre que quepa y que no. `verify:escritorio` afirma la cuenta.
+ *
+ * `overflow: hidden` en la ficha es la red por si algún día no cupiera: antes recortar la
+ * cifra que descuadrar el reparto de la frase.
+ */
+.riberas-cinta-puntos {
+  display: inline-flex;
+  align-items: baseline;
+  font-size: 0.95rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+ * LO QUE SÓLO CUENTAS TÚ, en la letra chica y en `--tenue`, exactamente como en el marcador
+ * del cajón: se distingue de la cifra pública sin gritar, y que sean DOS números y no su
+ * suma es la información — el público lo ve la mesa entera y éste sólo lo ves tú.
+ */
+.riberas-cinta-ocultos {
+  font-size: var(--letra-minima);
+  font-weight: 400;
+  color: var(--tenue);
+}
+
+/*
+ * ═══ EL CARRIL: LA SEGUNDA TIRA DE LA CINTA, Y LO QUE EVITA ES UNA MESA PARADA ═══
+ *
+ * Debajo del lienzo iba un `<Formulario>` EN FLUJO con lo que el tablero no enseña. Con el
+ * estiaje por mover eso son DIECIOCHO botones de 238 puntos de ancho —y hasta veintitrés—,
+ * o sea 4.284 puntos de lista colgando de un recuadro que ya se come la ventana entera. Como
+ * mover la pieza es obligatorio, al botón no se llega y la partida se queda ahí. Los
+ * números y el reparto, en la cabecera de `ElCarril` (`riberas-en-tres.tsx`).
+ *
+ * Aquí van los tres hechos de pantalla:
+ *
+ *   · ARRANCA AL PIE DE LA CINTA Y MIDE OTRA TIRA IGUAL. Los dos altos en `rem` y el mismo
+ *     número, porque son el mismo suelo de toque: `altoDeLaCinta(true)` dice 88 en puntos y
+ *     es lo que `elCartelQueCabe` le resta a la banda del cartel de los naipes. Si estas dos
+ *     líneas dejan de sumar lo que aquella cuenta resta, el cartel crece hacia arriba y se
+ *     mete por debajo del vidrio sin que nada falle.
+ *   · EL ANCHO NO ESTÁ AQUÍ, igual que en la cinta y por lo mismo: lo pone
+ *     `elEstiloDeLaCinta` con el mismo `anchoDeLaCinta`, porque a los lados del carril
+ *     siguen estando las dos manos y siguen siendo cartas que se arrastran. Que las dos
+ *     tiras midan lo MISMO es lo que hace que el aire de quince puntos que `verify:escena`
+ *     mide contra las manos valga también para ésta.
+ *   · RUEDA A LO ANCHO, Y CON EL DEDO. `touch-action: auto` no es adorno: `.riberas-lienzo`
+ *     lleva `touch-action: none` por el gesto del delta y el carril lo heredaría, así que
+ *     con el dedo no se podría rodar —se verían dos destinos de dieciocho y no habría manera
+ *     de llegar a los otros dieciséis, sin un error en ninguna consola—. Y
+ *     `overscroll-behavior: contain` para que al llegar al final no se lo lleve la mesa.
+ *
+ * LA BARRA DE DESPLAZAMIENTO SE ESCONDE, Y HAY QUE DECIR LO QUE CUESTA: una barra pintada
+ * dentro de 44 puntos le come al botón justo el suelo de toque que el botón existe para
+ * tener. Lo que queda como señal de que hay más es que el último cuadrado se ve CORTADO por
+ * el canto —`anchoDeLaCinta` casi nunca es un múltiplo del botón—, y que con el tabulador el
+ * navegador los trae a la vista de uno en uno. Es menos señal de la que da una barra.
+ */
+.riberas-carril {
+  position: absolute;
+  top: 2.75rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  display: flex;
+  gap: 0;
+  height: 2.75rem;
+  padding: 0;
+  background: var(--teja-alta);
+  border-radius: 0 0 var(--radio-mando) var(--radio-mando);
+  box-shadow:
+    0 0 0 1px var(--filo),
+    0 14px 30px -18px var(--sombra);
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior: contain;
+  touch-action: auto;
+  scrollbar-width: none;
+}
+
+.riberas-carril::-webkit-scrollbar {
+  display: none;
+}
+
+/*
+ * CON EL CARRIL PUESTO, LA CINTA DEJA DE REDONDEARSE POR ABAJO. Las dos tiras son la misma
+ * caja de vidrio partida en dos renglones; con las cuatro esquinas redondeadas se leen como
+ * dos cajas apiladas y entre ellas asoman dos cuernos de tablero. La clase la pone el
+ * marcado y no un `:has`, para que un navegador sin `:has` no vea una cosa distinta.
+ */
+.riberas-cinta-con-carril {
+  border-radius: 0;
+}
+
+/*
+ * CADA OPCIÓN, UN CUADRADO DEL SUELO DE TOQUE. Sin caja propia, como los dos botones de la
+ * cinta y por lo mismo: la tira ya es la caja. `flex: 0 0 auto` para que el flex NO los
+ * encoja al no caber —encogerlos es perder el suelo de toque justo cuando hay dieciocho, que
+ * es cuando más falta hace—: lo que pasa cuando no caben es que el carril rueda.
+ *
+ * `font-variant-numeric: tabular-nums` porque lo que va dentro es una cifra —el número de la
+ * isla, o el de orden cuando no hay isla que nombrar— y con cifras de anchos distintos la
+ * fila de cuadrados se lee ondulada.
+ *
+ * `position: relative` porque el filo de la víctima y la barra del terreno se posan DENTRO
+ * del cuadrado: no pueden ser `border`, que le comería al glifo el sitio que tiene, ni pueden
+ * empujar en el flujo, que correría el número de su centro.
+ */
+.riberas-carril-opcion {
+  position: relative;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  padding: 0;
+  background: none;
+  color: var(--acento);
+  border: 0;
+  border-radius: var(--radio-mando);
+  font: inherit;
+  font-size: 0.95rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 0.12s;
+}
+
+.riberas-carril-opcion:hover {
+  color: var(--palabra);
+}
+
+/*
+ * ═══ EL GLIFO: EL NÚMERO DE LA ISLA, QUE ES LO QUE ESTÁ ESCRITO EN EL TABLERO ═══
+ *
+ * Va por encima de las dos marcas de color (`z-index`) y centrado en el cuadrado entero, no
+ * en lo que queda libre: la barra del terreno mide dos puntos y correr el número hacia arriba
+ * por ella dejaría la fila de cuadrados descuadrada según cada uno tenga isla o no.
+ */
+.riberas-carril-glifo {
+  position: relative;
+  z-index: 1;
+}
+
+/*
+ * EL FILO DE LA VÍCTIMA: a quién le robas, del color con el que esa persona se pinta en el
+ * marcador y en el tablero. Es lo ÚNICO que separa los dos cuadrados de una isla con dos
+ * víctimas —el juego emite una opción por víctima y las dos dicen «Mover el estiaje a la
+ * marisma 11»— y por eso vive pegado al canto y no dentro, donde competiría con la cifra.
+ *
+ * Tres puntos y no uno: un pelo de color al lado de un número no se ve en un carril que rueda.
+ * Y NO es la única señal: el nombre de quien pierde la ficha va entero en el `aria-label` y en
+ * el `title`, así que quien no distinga los colores lo lee igual.
+ */
+.riberas-carril-rail {
+  position: absolute;
+  top: 0.35rem;
+  bottom: 0.35rem;
+  left: 0.2rem;
+  width: 3px;
+  border-radius: 2px;
+}
+
+/*
+ * LA BARRA DEL TERRENO AL PIE: de qué es esa isla, con el color con el que se ve en el tablero
+ * plano (`colorDeTerreno`). Hace falta porque el número NO es único —el reparto lleva dos de
+ * cada cifra, así que puede haber dos cuadrados con un «11»— y en el tablero esos dos onces
+ * también se distinguen por lo que son y no por lo que dicen.
+ *
+ * Al pie y a lo ancho, que es donde una banda de color se lee sin robarle contraste a la cifra:
+ * `verify:riberas` mide que los seis terrenos se separan entre sí 25 unidades de CIE76, o sea
+ * que la banda es reconocible; el número, que es texto, conserva su contraste contra el fondo
+ * de la tira porque la banda no pasa por debajo de él.
+ */
+.riberas-carril-terreno {
+  position: absolute;
+  right: 0.35rem;
+  bottom: 0.3rem;
+  left: 0.35rem;
+  height: 3px;
+  border-radius: 2px;
+}
+
+/*
+ * APAGADO MIENTRAS HAY ALGO EN VUELO, y con `aria-disabled` y no `disabled` en el marcado:
+ * un botón al que se le pone `disabled` teniendo el foco lo suelta al `<body>`, y aquí
+ * volver cuesta tabular la cabecera entera de la Sala. `--tenue` sobre `--teja-alta` se lee
+ * y no tiene acento, que en esta Sala es lo que significa «esto se puede tocar».
+ */
+.riberas-carril-quieta {
+  color: var(--tenue);
+  cursor: default;
+}
+
+/*
+ * EL RÓTULO Y LA AYUDA DEL BOTÓN, FUERA DE LA VISTA Y DENTRO DEL ÁRBOL. Es la misma técnica
+ * que `.riberas-solo-apoyo` y por la misma razón: `display: none` se lo saltan los lectores,
+ * y un botón llamado «7» no es un movimiento que nadie pueda elegir a ciegas. En 44 puntos
+ * no cabe «Mover el estiaje al cantil 10»; en el árbol sí, y de ahí sale el nombre
+ * accesible y el `title` del ratón.
+ */
+.riberas-carril-dicho {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/*
+ * ═══ EL VELO: LA MITAD DEL MODAL QUE SE OLVIDA ═══
+ *
+ * Sin él, un clic fuera del cajón llega al tablero: se cierra el cajón Y se funda una choza
+ * donde estaba el dedo. Cubre el recuadro entero —`inset: 0` sobre `.riberas-lienzo`, que
+ * es `position: relative`— y su único trabajo es comerse ese clic.
+ *
+ * `touch-action: auto` porque el recuadro lo tiene en `none` para que el gesto del delta no
+ * se lo lleve el navegador; heredado aquí, un dedo sobre el velo no dispararía ni el `click`
+ * que lo cierra en algunos navegadores.
+ */
+.riberas-velo {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  background: var(--velo);
+  touch-action: auto;
+}
+
+/*
+ * ═══ EL CAJÓN: EL RAÍL ENTERO, DEL ANCHO DE LA CINTA Y COLGADO DE ELLA ═══
+ *
+ * Dentro va todo lo que no es el tablero —el marcador, el código de la mesa con su reloj,
+ * los seis paneles que declara el juego, las dos salidas y la crónica—, que con el delta a
+ * pantalla completa ya no tiene columna a la derecha donde vivir.
+ *
+ * MIDE LO QUE LA CINTA —lo pone `elEstiloDelCajon` con el mismo `anchoDeLaCinta`, por lo
+ * mismo que ella: un porcentaje escrito aquí sería un segundo reparto—, PERO CON UN SUELO,
+ * y ese suelo es una decisión que hay que contar entera.
+ *
+ * ═══ POR QUÉ EL SUELO, Y POR QUÉ NO ROMPE LA CUENTA DE LAS MANOS ═══
+ *
+ * MEDIDO en el navegador, con la ventana en 288×420 y los botones del turno debajo del
+ * lienzo: el recuadro se queda en 254×203 —o sea APAISADO, aunque la ventana sea de pie—, la
+ * cinta vale su tercio, 84 puntos, y un cajón de 84 puntos no es un marcador estrecho: es un
+ * panel donde se lee «EL MARCA…» y nada más. La partida entra en la pantalla y los datos no,
+ * que es justo lo contrario del encargo.
+ *
+ * Y el ancho de la cinta es el que es POR LAS DOS MANOS: son cartas que se arrastran y una
+ * caja opaca encima de ellas tapa una carta que hay que poder coger. Al cajón esa razón NO le
+ * aplica, y no por conveniencia: es MODAL. Con él abierto hay un velo por delante que se come
+ * los punteros, la rueda no llega a la cámara y no hay carta que arrastrar —eso es lo que
+ * significa modal—. Así que el cajón puede pasar por encima de las manos mientras está
+ * abierto, y se cierra dejándolas exactamente donde estaban.
+ *
+ * El suelo es `16rem`, que es lo que un `.panel` necesita para leerse con su relleno, topado
+ * por el ancho del propio recuadro menos el inset de los dos lados: así nunca se sale del
+ * lienzo. Donde la cinta ya es más ancha —de 852 de ventana para arriba— este suelo no ata
+ * nada y el cajón mide exactamente lo que ella.
+ *
+ * CUELGA HASTA EL CANTO MENOS EL INSET (`bottom: 0.75rem`, el mismo margen con el que este
+ * cliente pone su cromo sobre el lienzo) en vez de tener un alto propio: así el cajón es
+ * todo lo alto que el lienzo dé, en un monitor y en una ventana de 288×317, y lo que no
+ * quepa rueda POR DENTRO. Un alto en `vh` volvería a prometer alto que aquí no existe.
+ *
+ * `touch-action: auto` ES OBLIGATORIO Y NO SE VE FALLAR EN UN RATÓN. `.riberas-lienzo`
+ * lleva `touch-action: none` para que el navegador no se lleve el gesto de girar el delta;
+ * el cajón es descendiente suyo y lo heredaría, así que con el dedo NO SE PODRÍA DESPLAZAR:
+ * el marcador se vería y la crónica no, sin un error en ninguna consola y sin que nada se
+ * moviera en un monitor.
+ *
+ * `overscroll-behavior: contain` para que al llegar al final la rueda no se la lleve la
+ * mesa de detrás; el resto de esa cuenta —que la rueda dentro del cajón no acerque la
+ * cámara— lo hace el oyente de `riberas-en-tres.tsx`, que mira de quién es el suceso.
+ */
+.riberas-cajon {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  /*
+   * ARRANCA AL PIE DE LA CINTA, Y EN LA MISMA UNIDAD QUE ELLA. Este `top` estuvo escrito en
+   * el pintor como `44px` —el `ALTO_DE_LA_CINTA` que miden los comprobadores en Node—, y
+   * eran 2,75 puntos de menos: la cinta se pinta en `rem` y con la raíz de esta casa mide
+   * 46,75, así que el cajón se le metía por debajo. Escritos aquí los dos, en `rem`, crecen
+   * juntos con la preferencia de tamaño de letra del navegador y no hay nada que cuadrar.
+   */
+  top: 2.75rem;
+  bottom: 0.75rem;
+  /*
+   * EL SUELO DE ANCHO (ver arriba): lo que pide un panel para leerse, sin salirse nunca del
+   * recuadro. El `100%` es el del lienzo, que es su antepasado colocado, y el `1.5rem` son
+   * los dos insets del cromo de este cliente. Va aquí y no en el pintor porque depende del
+   * hueco, no del reparto: `anchoDeLaCinta` sigue siendo el único que dice cuánto se lleva
+   * la cinta, y esto sólo impide que el cajón baje de legible.
+   */
+  min-width: min(calc(100% - 1.5rem), 16rem);
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1rem;
+  background: var(--teja);
+  border-radius: var(--radio-ficha);
+  box-shadow:
+    0 0 0 1px var(--filo),
+    0 24px 50px -24px var(--sombra);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: auto;
+}
+
+/*
+ * Y CON CARRIL, EL CAJÓN ARRANCA UNA TIRA MÁS ABAJO.
+ *
+ * Cuelga del PIE de la cinta, y con carril la cinta son dos tiras. Sin esto se mete por
+ * debajo del carril, que es de vidrio: los dieciocho cuadrados se leerían a través del primer
+ * renglón de la lista, y el primer renglón de la lista es justamente el que se lee sin
+ * desplazar. Es el mismo fallo que ya tuvo el cajón con la cinta —entonces por 2,75 puntos—,
+ * y por eso se arregla igual: los dos altos en `rem`, aquí, uno el doble del otro, para que
+ * crezcan juntos con la preferencia de tamaño de letra del navegador.
+ */
+.riberas-cajon-bajo-el-carril {
+  top: 5.5rem;
+}
+
+/*
+ * ═══ EL PREGÓN: LAS PROPUESTAS DE TRUEQUE, COLGANDO DE LA CINTA Y SIN VELO ═══
+ *
+ * Cuelga del mismo sitio que el cajón y mide lo mismo que la cinta, pero NO es modal, y de
+ * ahí salen todas las diferencias de este bloque. El cajón lo abre quien quiere mirar; el
+ * pregón lo lee quien NO tiene el turno mientras otro juega, así que tiene que verse sin
+ * abrir nada y el tablero tiene que seguir girando por debajo (§1.10 del trueque).
+ *
+ *   · SIN VELO Y CON `z-index` DE CINTA (2, el del carril) y no de cajón (4): por debajo se
+ *     construye, se cogen cartas y se gira la cámara. Un velo aquí sería exactamente el
+ *     fallo que este mueble viene a arreglar.
+ *   · NO CUELGA HASTA EL CANTO. El `max-height` lo pone `elEstiloDelPregon` con lo que mide
+ *     `elAltoDelPregon`, que se para en el techo del asa de la barra menos el mismo aire con
+ *     que se para el cartel de un naipe. Hasta el canto taparía las tres piezas de construir
+ *     y el naipe del mazo, o sea cromo opaco encima de lo único que se pulsa para jugar.
+ *   · EL ANCHO TAMPOCO ESTÁ AQUÍ, igual que en la cinta y en el carril: lo pone
+ *     `elEstiloDelPregon` con el mismo `anchoDeLaCinta`, porque a los lados siguen estando
+ *     las dos manos y siguen siendo cartas que se arrastran. Y SIN el suelo de `16rem` que
+ *     sí tiene el cajón: aquel suelo es legítimo porque el cajón es modal —con él abierto
+ *     hay un velo que se come los punteros y no hay carta que arrastrar—, y aquí no lo hay.
+ *   · RUEDA POR DENTRO Y CON EL DEDO. `touch-action: auto` no es adorno: `.riberas-lienzo`
+ *     lleva `touch-action: none` por el gesto del delta y el pregón lo heredaría, así que
+ *     con el dedo no se podría llegar a la tercera propuesta. Y `overscroll-behavior:
+ *     contain` para que al llegar al final no se lo lleve la mesa.
+ *
+ * Redondeado sólo por abajo y sin sombra por arriba: es la misma caja de vidrio que la
+ * cinta, continuada hacia abajo. Con las esquinas de arriba redondeadas asomarían dos
+ * cuernos de tablero entre la cinta y él, que es el mismo motivo por el que la cinta pierde
+ * su redondeo cuando lleva carril.
+ */
+.riberas-pregon {
+  position: absolute;
+  top: 2.75rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.5rem 0;
+  background: var(--teja-alta);
+  border-radius: 0 0 var(--radio-mando) var(--radio-mando);
+  box-shadow:
+    0 0 0 1px var(--filo),
+    0 14px 30px -18px var(--sombra);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: auto;
+}
+
+/*
+ * Y CON CARRIL ARRANCA UNA TIRA MÁS ABAJO, por lo mismo que el cajón y con el mismo número
+ * escrito en la misma unidad: cuelga del PIE de la cinta, y con carril la cinta son dos
+ * tiras. En `rem` para que crezcan juntos con la preferencia de tamaño de letra.
+ */
+.riberas-pregon-bajo-el-carril {
+  top: 5.5rem;
+}
+
+/*
+ * Un bloque por mitad de la decisión 17 —lo vivo que me toca, lo vivo que ofrecí, lo ya
+ * cerrado—. El rótulo es el `.rotulo-de-panel` de la casa, así que no se viste aquí: sólo
+ * se le da el margen de los lados, que en el pregón lo pone cada tira y no la caja (las
+ * tiras se pintan de canto a canto al pasar el ratón).
+ */
+.riberas-pregon-bloque > .rotulo-de-panel {
+  margin: 0 12px 0.25rem;
+}
+
+/*
+ * ═══ LA TIRA: 44 PUNTOS, Y NI UN BOTÓN DENTRO ═══
+ *
+ * La tira ENTERA es el botón y lo único que hace es abrir la hoja donde se confirma. No es
+ * una preferencia: medido, con «Aceptar» y «Rechazar» al lado a la oferta le quedarían 77
+ * puntos en el SE apaisado y 16 en 320×360, o sea cero fichas. Y es lo que Miguel pidió: que
+ * aceptar cueste dos toques y que el primero no esté encima del segundo.
+ *
+ * `2.75rem` de alto, que es el suelo de toque de la casa y lo mismo que mide una tira de la
+ * cinta. Dentro caben dos renglones de `0.82rem` con interlineado 1,35 —19 puntos cada uno,
+ * 38 de los 46,75—, que es la cuenta del §3.2 del trueque hecha con la raíz de VERDAD de
+ * esta casa (17) y no con los 16 de un navegador de serie.
+ */
+.riberas-pregon-tira {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0 12px;
+  background: none;
+  color: var(--palabra);
+  border: 0;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.riberas-pregon-tira:hover {
+  background: var(--teja);
+}
+
+/*
+ * ═══ LA TIRA QUE RESUME, QUE ES EL PREGÓN PLEGADO ═══
+ *
+ * Es la MISMA tira —el suelo de toque, el raíl de color, los dos renglones y el mismo
+ * recorte— con dos diferencias, y las dos por lo que ES: la cabecera del mueble, no una
+ * propuesta. Va en la letra fuerte de la casa para que no se lea como una tira más de la
+ * lista, y con el pregón desplegado gana un filo por debajo, que es lo que separa una cabecera
+ * de lo que cuelga de ella.
+ *
+ * El aire de la hoja son los `0.5rem` de arriba y abajo de `.riberas-pregon`, y de ahí sale
+ * `altoDelPregonPlegado`: con la raíz de esta casa, 8,5 + 46,75 + 8,5 = 63,75 puntos. Ésa es
+ * la cifra que arregla el agujero —jugando, el pregón llegaba al 44 % de arriba del tablero en
+ * el turno de uno, con los anillos de fundar debajo— y se mide en el pintor, no aquí.
+ */
+.riberas-pregon-resume {
+  font-weight: 600;
+}
+
+.riberas-pregon-resume[aria-expanded='true'] {
+  border-bottom: 1px solid var(--filo);
+}
+
+/*
+ * EL TRIÁNGULO DEL PLIEGUE, con `flex: 0 0 auto` por lo mismo que el reloj de la cinta: de los
+ * trozos de la tira es el único que no se puede recortar. Doce puntos, que son los que
+ * `huecoDeLaTiraQueResume` le descuenta al texto; si crece aquí y no allí, la cuenta promete
+ * letras que en pantalla ya no están.
+ */
+.riberas-pregon-pliegue {
+  flex: 0 0 auto;
+  width: 12px;
+  text-align: center;
+  color: var(--tenue);
+}
+
+/* El raíl de color de quien propone: el mismo dato y el mismo ancho que en la cinta. */
+.riberas-pregon-rail {
+  flex: 0 0 auto;
+  width: 4px;
+  align-self: stretch;
+  margin: 0.4rem 0;
+  border-radius: 2px;
+}
+
+/*
+ * LOS DOS RENGLONES, Y `min-width: 0` NO ES ADORNO: sin él un hijo de flex no baja de su
+ * ancho de contenido, así que una oferta larga EMPUJARÍA la tira y se llevaría por delante
+ * el ancho medido de la cinta en vez de recortarse. No se ve como un texto que no cabe: se
+ * ve como un pregón que cambia de tamaño solo.
+ */
+.riberas-pregon-dicho {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.35;
+}
+
+.riberas-pregon-oferta,
+.riberas-pregon-estado {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 0.82rem;
+}
+
+/*
+ * EL RENGLÓN DE ESTADO VA EN TENUE Y NUNCA SE RECORTA POR EL LADO QUE IMPORTA: cuál de las
+ * dos redacciones se pinta —«la aceptó Ana» o «aceptada»— lo decide `elEstadoQueCabe` con la
+ * letra de verdad del navegador, y la regla es que se recorta EL NOMBRE y no el estado.
+ * Estos puntos suspensivos son la red de debajo, no el mecanismo.
+ */
+.riberas-pregon-estado {
+  color: var(--tenue);
+}
+
 /*
  * Por qué se está jugando sobre el SVG. Va ENCIMA del retablo y en gris, sin
  * `--alarma`: no se ha perdido nada, la mesa está entera; sólo falta el mundo.
@@ -2403,16 +3347,75 @@ code {
 }
 
 /*
- * EL MENÚ DE ELEGIR —a quién se le propone el trato, a quién le roba la guardia, qué dos
- * bienes coge el año bueno—: los botones de siempre, en columna y a lo ancho del mueble.
+ * ═══ EL MENÚ DE ELEGIR, QUE DESDE LA PANTALLA COMPLETA VIVE DENTRO DEL RECUADRO ═══
+ *
+ * —a quién se le propone el trato, a quién le roba la guardia, qué dos bienes coge el año
+ * bueno—. Estaba EN FLUJO por debajo del lienzo, y eso valía mientras el lienzo medía `62vh`
+ * y la página rodaba. Con la página de pie el recuadro vale la ventana entera menos la
+ * cabecera: DEBAJO NO HAY NADA, porque debajo está fuera de la pantalla. El menú se pintaba
+ * donde no se ve, y como mover el estiaje es obligatorio eso deja la partida parada sin un
+ * error en ninguna consola. En la app su hermano ya era una hoja modal.
+ *
+ * Ahora se coloca sobre el recuadro, centrado, con su velo detrás (el mismo `.riberas-velo`
+ * del cajón) y por encima de él en `z-index`: el cajón no puede estar abierto a la vez —al
+ * menú lo abre un naipe del tablero, que con el cajón abierto no recibe punteros—, pero si
+ * un día lo estuviera, la pregunta es lo último que se ha abierto y va delante.
+ *
+ * TOPADO POR EL RECUADRO Y DESPLAZABLE POR DENTRO: el menú del año bueno son QUINCE opciones
+ * de dos renglones cada una, y en un lienzo de 128 puntos de alto —el SE apaisado— eso no
+ * cabe de ninguna manera. Con `max-height` y `overflow-y: auto` se lee rodando; sin ellos,
+ * las opciones de abajo se salen del recuadro y vuelven a estar donde no se ve, que es el
+ * fallo que este bloque viene a arreglar.
+ *
+ * `touch-action: auto` por lo mismo que en el cajón y en el carril: el recuadro lo tiene en
+ * `none` por el gesto del delta y sus descendientes lo heredan.
  *
  * En columna y no en fila porque lo que se lee es el RÓTULO ENTERO, y los del año bueno
  * son quince y dicen dos bienes cada uno: en fila se cortan y hay que adivinar cuál es
  * cuál. Se llamaba `.riberas-a-quien` cuando la única pregunta era el trueque.
  */
+.riberas-elige {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 5;
+  width: min(calc(100% - 1.5rem), 22rem);
+  max-height: calc(100% - 1.5rem);
+  /*
+   * EL FONDO Y EL RELLENO SON SUYOS, Y NO DE `.formulario`. Aquella clase no pinta caja
+   * ninguna —sólo un `margin-top`— porque en flujo el fondo lo ponía la página; encima del
+   * tablero, sin fondo, los rótulos se leerían sobre el delta y no se leerían. Y el margen
+   * heredado se quita: con `position: absolute` y `transform`, 1,5rem de margen superior
+   * descentran la caja justo eso.
+   */
+  margin: 0;
+  padding: 1rem;
+  background: var(--teja);
+  border-radius: var(--radio-ficha);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: auto;
+  box-shadow:
+    0 0 0 1px var(--filo),
+    0 24px 50px -24px var(--sombra);
+}
+
 .riberas-elige .opciones {
   flex-direction: column;
   flex-wrap: nowrap;
+}
+
+/*
+ * EL RENGLÓN EN TENUE BAJO EL TÍTULO DE LA HOJA DE UNA PROPUESTA: en qué anda —«la aceptó
+ * Ana», «no tienes 1 limo»—. Va aparte del título y no dentro porque el título es además el
+ * NOMBRE del diálogo, y un lector anunciaría el estado al abrirlo como si fuera parte de la
+ * oferta. Sólo existe donde hay algo que contar: las otras tres preguntas no lo pasan.
+ */
+.riberas-elige-nota {
+  margin: -0.5rem 0 0.75rem;
+  color: var(--tenue);
+  font-size: 0.82rem;
 }
 
 /*
@@ -2457,9 +3460,49 @@ code {
   align-self: center;
 }
 
+/*
+ * ═══ LA FICHA DEL COLONO: DOS RENGLONES, Y EL QUE SE RECORTA ES EL DE ABAJO (§1.11) ═══
+ *
+ * Aquí no había regla ninguna, y el nombre y el renglón de debajo se leían PEGADOS: «Alguien
+ * (tú)vado 1 de 5 · 2» y el resto partido donde cayera. Antes no pasaba porque los dos eran
+ * hijos directos de la rejilla de tres columnas y `.lo-del-colono` se colaba a la fila de
+ * abajo con su `grid-column: 1 / -1`; al envolverlos en esta caja —para poder llevarse la
+ * ficha entera a `aria-hidden` y decir la frase completa una sola vez— dejaron de serlo, y
+ * dos `<span>` seguidos fluyen en el mismo renglón. Es un fallo que no rompe nada: sólo deja
+ * el marcador ilegible, y sólo se ve mirando.
+ *
+ * `min-width: 0` en la caja y en sus dos renglones: sin él un hijo de rejilla no baja de su
+ * ancho de contenido, así que el renglón largo ensancharía la columna del medio y la cifra de
+ * puntos se saldría del cajón en vez de recortarse.
+ *
+ * Los 2,75rem son el suelo de toque de la casa, que es lo que el §1.11 pide para la ficha:
+ * seis de ellas tienen que caber en el cajón sin que ninguna se lea apretada.
+ */
+.ficha-del-colono {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+  min-height: 2.75rem;
+}
+
 .nombre-del-colono {
   min-width: 0;
   font-weight: 600;
+}
+
+/*
+ * SE RECORTAN LOS DOS, y el que se queda corto es el de abajo porque el nombre casi nunca
+ * llega: quién es cada cual es lo que hace que el marcador sirva de algo, y «vado 1 de 5 · 2
+ * chozas…» sigue diciendo lo suyo a medias. Lo recortado no se pierde: la frase entera de cada
+ * colono va al lado, en la lista de apoyo, y es la que se lee en voz alta.
+ */
+.ficha-del-colono > .nombre-del-colono,
+.ficha-del-colono > .lo-del-colono {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 /* El renglón de quien mira, en la letra de la casa y con su nombre destacado. */

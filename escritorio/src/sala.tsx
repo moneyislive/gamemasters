@@ -38,9 +38,18 @@ import type { MovimientoDeclarado } from '../../shared/mecanicas/tablero-declara
 import { cuantoQueda } from './relojes';
 import { AccionesDelTablero, Paneles, Retablo } from './retablo';
 import { MarcadorDeRiberas, RiberasEnTres } from './riberas-en-tres';
+/* Los dos retoques de pantalla del §1.11 y de la decisión 17, medibles desde Node. */
+import { elPregonEnTres, panelesEnTres, panelesFueraDelPregon } from '../../shared/arcade/juegos/riberas-en-tres';
 
 /** La acera de este cliente dentro del servicio. Ver `vite.config.ts`. */
 export const BASE = '/sala';
+
+/**
+ * EL RÓTULO DE LA CRÓNICA, Y ESTÁ AQUÍ PARA QUE SE DIGA UNA VEZ: encabeza el panel y es el
+ * nombre accesible de la lista, y con las dos cadenas escritas aparte se separan el día que
+ * alguien cambie una. Por qué ya no dice «Lo que ha pasado», entero en `LaCronica`.
+ */
+export const AVISOS_DE_LA_MESA = 'Avisos de la mesa';
 
 export type Donde =
   | { que: 'catalogo'; silla: string }
@@ -455,12 +464,74 @@ function LaMesaPuesta({
    * nadie, porque quien lo tenía se acaba de desmontar; y sólo se hace en el
    * CAMBIO de fuera a dentro, para que un repintado del sondeo no vuelva a
    * mover el foco cada vez que otro juega.
+   *
+   * ═══ Y DESDE QUE LA PÁGINA SE PONE DE PIE, EL DESTINO SON DOS Y NO UNO ═══
+   *
+   * Con el delta a pantalla completa el `<h1>` sale del flujo (`estilo.css`, la
+   * sección «La página de pie»): sigue en el árbol para quien recorre la página
+   * por encabezados, pero no se ve. Un aro de foco sobre un elemento invisible no
+   * lo ve nadie, así que quien juega con teclado se quedaría sin saber dónde está
+   * el foco justo al sentarse — el mismo fallo mudo que este efecto existe para no
+   * tener, escrito en el arreglo del anterior.
+   *
+   * Así que el destino se pide POR ORDEN: el recuadro del lienzo si lo hay, y el
+   * título si no. Y «si no» no es un caso raro: `RiberasEnTres` decide DENTRO de
+   * su render si cae al retablo SVG —sin `.glb`, sin WebGL, con más colonos que
+   * colores—, y en ese camino no hay recuadro ninguno y el título vuelve a verse.
+   * Por eso el pintor AVISA de dónde ha quedado su recuadro y esta pantalla no se
+   * lo calcula: aquí arriba no se puede saber.
+   *
+   * El orden de React lo permite: las referencias de los hijos se enganchan en el
+   * commit, ANTES de que corra este efecto, así que cuando esto mira `elLienzo` ya
+   * está puesto o ya se sabe que no lo va a estar.
+   *
+   * ═══ Y EL RESCATE, QUE ES EL CAMINO QUE NADIE MIRA ═══
+   *
+   * El modelo del delta TARDA. Mientras carga ya hay recuadro —con su telón—, o
+   * sea que el foco aterriza ahí; y si el `.glb` acaba fallando, el recuadro se
+   * desmonta con el foco puesto y el navegador lo suelta al `<body>`. Medido en el
+   * banco con la ruta del modelo rota: el foco acababa en `BODY`, o sea otra vez
+   * tabulando desde la cabecera, que es el fallo que este efecto vino a arreglar.
+   *
+   * Por eso el aviso del pintor no se guarda a secas: al llegar `null` se mira si
+   * el recuadro que se va es el que TIENE el foco, y en ese caso se devuelve al
+   * título —que en el camino del retablo vuelve a estar a la vista—. Se comprueba
+   * `document.activeElement` ANTES de olvidar el recuadro, porque después ya no
+   * habría con qué comparar.
    */
   const tituloDeLaMesa = useRef<HTMLHeadingElement | null>(null);
+  const elLienzo = useRef<HTMLElement | null>(null);
+  /*
+   * ═══ Y EL MISMO AVISO DICE ADEMÁS DÓNDE VIVE EL RAÍL ═══
+   *
+   * Desde que el delta ocupa la pantalla entera, el raíl no está a la derecha del tablero:
+   * está DENTRO del lienzo, en el cajón que abre la ficha de mis puntos (§1.11). Pero eso
+   * sólo vale cuando hay lienzo, y quién lo decide es `RiberasEnTres` en mitad de su render
+   * —sin `.glb`, sin WebGL o con más colonos que colores cae al retablo SVG—, o sea que
+   * aquí arriba no se puede saber. Es exactamente el dato que este aviso ya traía para el
+   * foco, así que se aprovecha en vez de inventar un segundo camino.
+   *
+   * Y ES ESTADO Y NO UNA `ref`, al contrario que el destino del foco: de esto depende QUÉ
+   * SE PINTA —el `<aside>` o nada—, y una `ref` no repinta. El repintado de más es uno por
+   * mesa: el aviso llega al montar el recuadro y al soltarlo, no en cada jugada.
+   *
+   * Empieza en falso a propósito: mientras no conste que hay lienzo, el raíl se pinta donde
+   * siempre. Un raíl de más durante un fotograma es una columna que aparece; un raíl de
+   * menos es la crónica, el código de la mesa y las dos salidas que no están en ninguna
+   * parte.
+   */
+  const [conLienzo, ponerConLienzo] = useState(false);
+  const apuntarElLienzo = useCallback((recuadro: HTMLElement | null): void => {
+    const seLoLlevaPuesto =
+      recuadro === null && elLienzo.current !== null && document.activeElement === elLienzo.current;
+    elLienzo.current = recuadro;
+    ponerConLienzo(recuadro !== null);
+    if (seLoLlevaPuesto) tituloDeLaMesa.current?.focus();
+  }, []);
   const estabaDentro = useRef(false);
   const dentro = mesa.fase === 'dentro' && mesa.mesa !== null;
   useEffect(() => {
-    if (dentro && !estabaDentro.current) tituloDeLaMesa.current?.focus();
+    if (dentro && !estabaDentro.current) (elLienzo.current ?? tituloDeLaMesa.current)?.focus();
     estabaDentro.current = dentro;
   }, [dentro]);
 
@@ -514,6 +585,149 @@ function LaMesaPuesta({
    * nada que ofrecer ahora mismo, y `queSePinta` ya sabe decir las dos cosas.
    */
   const pintado = queSePinta(puesta.vista, puesta.opciones ?? []);
+  const esRiberas = manifiesto.id === RIBERAS;
+
+  /*
+   * ═══ SI EL PREGÓN VA A PINTARSE, EL PANEL «Trueques» NO ═══
+   *
+   * El pregón cuelga de la cinta y enseña las propuestas en tiras que se pulsan; el panel
+   * «Trueques» del cajón dice lo mismo en renglones de texto que no se pulsan. Con los dos
+   * puestos, la misma pantalla cuenta lo mismo dos veces con dos redacciones distintas, y la
+   * que se quedaría atrás el día que una cambie es la que vive dentro de un cajón que hay
+   * que abrir.
+   *
+   * SE PREGUNTA AQUÍ Y NO ABAJO PORQUE EL RAÍL SE MONTA AQUÍ, y la respuesta depende de
+   * `conLienzo`, que es lo único que sabe si hay cinta de la que colgar un pregón: por el
+   * camino del respaldo —cinco colonos, el `.glb` que no llega— no la hay, el panel es el
+   * ÚNICO sitio donde vive lo que ya se trocó, y ahí se queda.
+   *
+   * ES LA MISMA FUNCIÓN PURA QUE LLAMA EL PINTOR, con los mismos argumentos, y eso es lo
+   * contrario de dos criterios: no hay dos maneras de decidir si hay pregón, hay UNA escrita
+   * en `shared/` que se pregunta desde los dos sitios que necesitan la respuesta. Un
+   * `boolean` calculado a mano aquí sí habría sido un segundo criterio.
+   */
+  const elPregonSePinta =
+    conLienzo && esRiberas ? elPregonEnTres(puesta.vista, puesta.yo, puesta.opciones ?? []) : null;
+
+  /*
+   * ═══ EL RAÍL SE MONTA UNA VEZ Y VIVE EN DOS SITIOS ═══
+   *
+   * Aquí dentro está TODO lo que no es el tablero: el marcador, el código de la mesa con su
+   * reloj y quién está sentado, los paneles que declara el juego, las dos salidas y la
+   * crónica. Con el delta a pantalla completa eso no cabe al lado del tablero, así que se va
+   * al cajón que abre la cinta (§1.11); sin delta —el respaldo SVG— se queda en su `<aside>`
+   * de siempre, a la derecha.
+   *
+   * SE MONTA UNA SOLA VEZ, en un fragmento, y se le pasa entero a quien toque. Dos copias de
+   * estas cinco cosas serían dos raíles que divergen: el día que uno gane un dato, el otro
+   * —el que menos se mira— no lo tendría, y ese día nadie se enteraría.
+   *
+   * ═══ Y ÉSTE ES EL ORDEN DEL §1.11, QUE NO ERA EL DE ANTES ═══
+   *
+   * Antes iba la ficha de la mesa primero y las dos salidas al final, después de la crónica.
+   * Ahora manda el orden del cajón: lo que se mira ANTES de decidir una jugada arriba —el
+   * marcador con lo de cada cual, y luego el código y el reloj—, después los paneles, y al
+   * final las dos salidas y la crónica. En un cajón que se abre y se cierra, el primer
+   * renglón es el único que se lee sin desplazar; en el `<aside>` daba igual porque se veía
+   * todo a la vez, y por eso el cambio no le quita nada a la pantalla del respaldo.
+   */
+  const elRail = (
+    <>
+      {/*
+        ═══ EL MARCADOR DE RIBERAS, ANTES DE LOS PANELES QUE DECLARA EL JUEGO ═══
+
+        Se decide por QUIÉN es y no por si hay tablero en tres dimensiones: el marcador se
+        mira igual cuando la mesa cae al retablo SVG, y ahí es donde más falta hace, porque
+        el respaldo pinta los movimientos del mazo como botones sueltos y no dice de nadie
+        cuántos puntos lleva. Él mismo devuelve `null` si la vista no es de Riberas.
+
+        Va DELANTE de `Paneles` y no en su lugar: los paneles son texto que declara el juego
+        y que leen todos los clientes por igual —«Lo mío», «Mis cartas», los dos premios y
+        los trueques—, y quitarlos aquí dejaría a este cliente enseñando menos que el de al
+        lado. Lo que este marcador añade es lo que un renglón de texto no puede: el color de
+        cada colono, quién eres tú, y tus puntos ocultos marcados como tuyos.
+      */}
+      {pintado.que === 'tablero' && esRiberas ? <MarcadorDeRiberas vista={puesta.vista} /> : null}
+      <LaFicha mesa={puesta} silla={silla} />
+      {/*
+        ═══ LOS SEIS PANELES, CON «Lo mío» EL PRIMERO Y SIN LOS BIENES AJENOS ═══
+
+        `panelesEnTres` hace las dos cosas, y las dos son de pantalla y no del juego: pone
+        delante el panel donde están MIS BIENES POR CLASE —que en la escena son cartas sin
+        número, así que «limo: 3» no se lee en ningún otro sitio— y le quita al panel «La
+        mesa» la cifra de bienes de cada colono, que es la decisión 17 de Miguel. Vive en
+        `shared/` y no aquí para que `verify:riberas-en-tres` pueda medirla desde Node con
+        los paneles de una partida de verdad.
+
+        Sólo para Riberas: los títulos por los que busca son los que escribe `panelesDe` de
+        Riberas, y otro arcade con un panel llamado «La mesa» no tiene por qué querer nada
+        de esto.
+
+        Y SON SEIS O SON CINCO: `panelesFueraDelPregon` retira «Trueques» cuando el pregón lo
+        hereda, y sólo entonces. Las dos cribas se componen y el orden da igual, que las dos
+        son filtros. Ver `elPregonSePinta`, arriba.
+      */}
+      {pintado.que === 'tablero' ? (
+        <Paneles
+          tablero={pintado.tablero}
+          paneles={
+            esRiberas
+              ? panelesFueraDelPregon(panelesEnTres(pintado.tablero.paneles), elPregonSePinta)
+              : undefined
+          }
+        />
+      ) : null}
+      {/*
+        ═══ LAS DOS SALIDAS, Y SÓLO UNA SE DESTACA ═══
+
+        «Levantarse» pasa a secundario —texto y borde en acento, sin relleno—, que es la
+        primera vez que este cliente pinta un botón que se recorta de su fondo: el `.opcion`
+        de antes era `--teja-alta` sobre `--suelo`, o sea 1,15:1 contra el 3:1 que pide WCAG
+        1.4.11, y el borde de `--filo` compuesto encima, 1,23. En secundario el acento
+        recorta 5,01 violeta / 9,22 ámbar / 8,69 verde / 5,40 carmesí sobre el suelo, y son
+        las cifras de los CUATRO temas, no las del violeta.
+
+        «Tirar la mesa» se queda en `.opcion-sobria` A PROPÓSITO: es la única acción de esta
+        pantalla que se lleva por delante la partida de los demás, y destacarla sería
+        invitar a pulsarla. Si se destaca una, esa no.
+      */}
+      <button type="button" className="opcion opcion-secundaria" onClick={mesa.salir}>
+        <span className="opcion-texto">
+          <span className="opcion-rotulo">Levantarse de la mesa</span>
+          <span className="opcion-ayuda">Se olvida el asiento en este navegador.</span>
+        </span>
+      </button>
+      {/*
+        ═══ Y LA SALIDA DE VERDAD, QUE NO EXISTÍA ═══
+
+        «Levantarse» sólo olvida la llave AQUÍ: el asiento sigue en la mesa del servidor,
+        porque un asiento no se libera nunca. Con el plazo «Sin prisa» eso deja la mesa
+        congelada para todos —se reparte contando a quien se fue, no hay plazo que venza,
+        nadie puede jugar por él— y hasta hoy no había ninguna forma de salir de ahí.
+
+        Se pregunta antes de hacerlo porque afecta a los demás, y por eso el rótulo dice
+        «para todos»: es la diferencia entera con el de arriba.
+      */}
+      <button
+        type="button"
+        className="opcion opcion-sobria"
+        onClick={() => {
+          const seguro = globalThis.confirm(
+            '¿Tirar la mesa? Se acaba la partida para todos los que estén sentados.',
+          );
+          if (seguro) mesa.tirar();
+        }}
+      >
+        <span className="opcion-texto">
+          <span className="opcion-rotulo">Tirar la mesa</span>
+          <span className="opcion-ayuda">
+            Se acaba para todos. Para cuando alguien se ha ido y la partida no puede seguir.
+          </span>
+        </span>
+      </button>
+      <LaCronica mesa={mesa} />
+    </>
+  );
 
   return (
     <main className="dentro mesa-puesta">
@@ -549,6 +763,12 @@ function LaMesaPuesta({
              * raíl porque la vista sigue trayendo el tablero declarado. Y si el
              * mundo no arranca, o la mesa no cabe en sus colores, él mismo decide
              * caer al retablo de siempre. Los demás arcades no cambian ni un píxel.
+             *
+             * Y SE LE PASA EL RAÍL ENTERO, que es lo que va dentro del cajón de la
+             * cinta cuando hay lienzo. Se le pasa SIEMPRE, también cuando este
+             * pintor va a caer al retablo: no lo pinta en ese camino, y quien lo
+             * pinta entonces es el `<aside>` de abajo. La cuenta de quién de los
+             * dos lo enseña la lleva `conLienzo`, y la decide el propio pintor.
              */
             <RiberasEnTres
               manifiesto={manifiesto}
@@ -556,6 +776,9 @@ function LaMesaPuesta({
               puesta={puesta}
               tablero={pintado.tablero}
               opciones={pintado.opciones}
+              foco={apuntarElLienzo}
+              elRail={elRail}
+              laSalida={`${BASE}/${sufijoDeSilla(silla)}`}
             />
           ) : pintado.que === 'tablero' ? (
             <>
@@ -592,86 +815,29 @@ function LaMesaPuesta({
         </section>
 
         {/*
+          ═══ EL RAÍL, CUANDO NO SE LO HA LLEVADO EL CAJÓN ═══
+
+          Con delta el raíl vive dentro del lienzo, en el cajón que abre la ficha
+          de mis puntos; aquí se pinta cuando NO hay lienzo, que es el camino del
+          respaldo SVG —sin `.glb`, sin WebGL, o con más colonos que colores— y
+          también cualquier otro arcade, que no tiene cinta ninguna. Quien dice
+          cuál de los dos casos es no es esta pantalla: es el aviso del pintor.
+
+          Pintarlo en los dos sitios a la vez sería tener la crónica, el código de
+          la mesa y las dos salidas DOS veces en el árbol, con dos regiones vivas
+          diciendo lo mismo y dos botones de «Tirar la mesa».
+
           UN PUNTO DE REFERENCIA SIN NOMBRE NO SIRVE DE PUNTO DE REFERENCIA. Un
           `<aside>` es un `complementary` en la lista de regiones que ofrece un
           lector de pantalla, y sin nombre se anuncia «complementario» a secas:
           aquí dentro están el código de la mesa, quién está sentado, lo que ha
           pasado y las dos salidas, o sea todo lo que no es el tablero.
         */}
-        <aside className="rail" aria-label="El carril de la mesa">
-          <LaFicha mesa={puesta} silla={silla} />
-          {/*
-            ═══ EL MARCADOR DE RIBERAS, ANTES DE LOS PANELES QUE DECLARA EL JUEGO ═══
-
-            Se decide por QUIÉN es —el mismo identificador que arriba— y no por si hay
-            tablero en tres dimensiones: el marcador se mira igual cuando la mesa cae al
-            retablo SVG, y ahí es donde más falta hace, porque el respaldo pinta los
-            movimientos del mazo como botones sueltos y no dice de nadie cuántos puntos
-            lleva. Él mismo devuelve `null` si la vista no es de Riberas.
-
-            Va DELANTE de `Paneles` y no en su lugar: los paneles son texto que declara el
-            juego y que leen todos los clientes por igual —«Lo mío», «Mis cartas», los dos
-            premios—, y quitarlos aquí dejaría a este cliente enseñando menos que el de al
-            lado. Lo que este marcador añade es lo que un renglón de texto no puede: el
-            color de cada colono, quién eres tú, y tus puntos ocultos marcados como tuyos.
-          */}
-          {pintado.que === 'tablero' && manifiesto.id === RIBERAS ? (
-            <MarcadorDeRiberas vista={puesta.vista} />
-          ) : null}
-          {pintado.que === 'tablero' ? <Paneles tablero={pintado.tablero} /> : null}
-          <LaCronica mesa={mesa} />
-          {/*
-            ═══ LAS DOS SALIDAS, Y SÓLO UNA SE DESTACA ═══
-
-            «Levantarse» pasa a secundario —texto y borde en acento, sin
-            relleno—, que es la primera vez que este cliente pinta un botón que
-            se recorta de su fondo: el `.opcion` de antes era `--teja-alta` sobre
-            `--suelo`, o sea 1,15:1 contra el 3:1 que pide WCAG 1.4.11, y el
-            borde de `--filo` compuesto encima, 1,23. En secundario el acento
-            recorta 5,01 violeta / 9,22 ámbar / 8,69 verde / 5,40 carmesí sobre
-            el suelo, y son las cifras de los CUATRO temas, no las del violeta.
-
-            «Tirar la mesa» se queda en `.opcion-sobria` A PROPÓSITO: es la única
-            acción de esta pantalla que se lleva por delante la partida de los
-            demás, y destacarla sería invitar a pulsarla. Si se destaca una, esa
-            no.
-          */}
-          <button type="button" className="opcion opcion-secundaria" onClick={mesa.salir}>
-            <span className="opcion-texto">
-              <span className="opcion-rotulo">Levantarse de la mesa</span>
-              <span className="opcion-ayuda">Se olvida el asiento en este navegador.</span>
-            </span>
-          </button>
-          {/*
-            ═══ Y LA SALIDA DE VERDAD, QUE NO EXISTÍA ═══
-
-            «Levantarse» sólo olvida la llave AQUÍ: el asiento sigue en la mesa
-            del servidor, porque un asiento no se libera nunca. Con el plazo «Sin
-            prisa» eso deja la mesa congelada para todos —se reparte contando a
-            quien se fue, no hay plazo que venza, nadie puede jugar por él— y
-            hasta hoy no había ninguna forma de salir de ahí.
-
-            Se pregunta antes de hacerlo porque afecta a los demás, y por eso el
-            rótulo dice «para todos»: es la diferencia entera con el de arriba.
-          */}
-          <button
-            type="button"
-            className="opcion opcion-sobria"
-            onClick={() => {
-              const seguro = globalThis.confirm(
-                '¿Tirar la mesa? Se acaba la partida para todos los que estén sentados.',
-              );
-              if (seguro) mesa.tirar();
-            }}
-          >
-            <span className="opcion-texto">
-              <span className="opcion-rotulo">Tirar la mesa</span>
-              <span className="opcion-ayuda">
-                Se acaba para todos. Para cuando alguien se ha ido y la partida no puede seguir.
-              </span>
-            </span>
-          </button>
-        </aside>
+        {conLienzo ? null : (
+          <aside className="rail" aria-label="El carril de la mesa">
+            {elRail}
+          </aside>
+        )}
       </div>
     </main>
   );
@@ -1100,12 +1266,40 @@ function LaFicha({
   );
 }
 
-/** Lo que ha ido pasando, de lo más nuevo a lo más viejo. */
+/**
+ * LO QUE HA DICHO EL CANAL DE LA MESA, de lo más nuevo a lo más viejo.
+ *
+ * ═══ NO SE PINTABA NUNCA, Y LA DECISIÓN QUEDA TOMADA AQUÍ ═══
+ *
+ * Jugando una partida de Riberas de más de CUATROCIENTOS movimientos, el sondeo devolvió
+ * `avisos: []` de principio a fin: esto daba `null` toda la tarde y quedaba la duda de si
+ * estaba roto. NO LO ESTÁ, y la duda era del rótulo.
+ *
+ * Esto es el registro DEL CANAL de la mesa —lo que `anunciar` guarda con su revisión para que
+ * quien estuviera en segundo plano lo recupere al volver—, y no el relato de la partida. En
+ * todo el servidor hay DOS llamadas a `anunciar` para una mesa de arcade y las dos dicen lo
+ * mismo, «Se acabó la partida.»: el cierre a mano y el cierre solo al terminar el juego. O sea
+ * que el canal de una mesa dice UNA cosa y sólo al final, y `verify:mesa` lo mide jugando
+ * veinte movimientos contra un servidor de verdad y contando lo que ha salido por ahí.
+ *
+ * Y UN ARCADE NO VA A EMITIR UN AVISO POR JUGADA, que era la otra salida. Lo que hay que
+ * contar ya tiene un sitio y una redacción: la cinta dice lo que toca hacer, el pregón los
+ * trueques, los paneles del juego el estado. Un tercer relato de los mismos hechos dentro de
+ * un cajón es exactamente la duplicación que este cliente quita en todas partes
+ * —`opcionesFueraDelPregon`, `panelesFueraDelPregon`, `opcionesFueraDeLaBarra`—, y además
+ * `arcade/mesas.ts` no importa el canal a propósito.
+ *
+ * LO QUE SÍ CAMBIA ES EL RÓTULO. «Lo que ha pasado» promete el relato de la partida y lo que
+ * trae es el registro del canal; con esa promesa, la caja vacía se lee como un mueble roto.
+ * Se llama por lo que es. Y se QUEDA, porque ese único renglón no sobra: llega en el momento
+ * en el que el tablero solo no explica nada —una mesa que se para—, y mientras no llega esto
+ * devuelve `null` y no ocupa ni un punto del cajón.
+ */
 function LaCronica({ mesa }: { mesa: LaMesa }): JSX.Element | null {
   if (mesa.cronica.length === 0) return null;
   return (
     <section className="panel">
-      <h2 className="rotulo-de-panel">Lo que ha pasado</h2>
+      <h2 className="rotulo-de-panel">{AVISOS_DE_LA_MESA}</h2>
       {/*
         ═══ UNA REGIÓN QUE SE DESPLAZA Y QUE EL TECLADO NO ALCANZA ES CONTENIDO ESCONDIDO ═══
 
@@ -1115,12 +1309,16 @@ function LaCronica({ mesa }: { mesa: LaMesa }): JSX.Element | null {
         aviso de foco —`.cronica:focus-visible`— y dice que el `tabIndex` y el
         nombre los tiene que poner este fichero, porque un contenedor enfocable
         sin nombre se anuncia «grupo» y no dice qué es.
+
+        El tope de 40 y el desplazamiento se quedan aunque hoy el canal diga UNA cosa: son de
+        `mesa.ts`, valen para cualquier mesa —la campaña sí anuncia por su canal— y quitarlos
+        sería atar esta caja a la medida de hoy.
       */}
       <ul
         className="renglones cronica"
         tabIndex={0}
         role="group"
-        aria-label="Lo que ha pasado"
+        aria-label={AVISOS_DE_LA_MESA}
         aria-live="polite"
       >
         {mesa.cronica.map((a, i) => (

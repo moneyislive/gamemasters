@@ -59,6 +59,7 @@ import { useEffect, useState } from 'react';
 import type { CSSProperties } from 'react';
 import type {
   MovimientoDeclarado,
+  PanelDeTablero,
   PuntoDeTablero,
   TableroDeclarado,
 } from '../../shared/mecanicas/tablero-declarado';
@@ -758,12 +759,31 @@ function movimientoSano(x: unknown): MovimientoDeclarado | null {
  *
  * Y `role="list"`, porque `list-style: none` le quita a Safari + VoiceOver la
  * semántica de lista y aquí el número de renglones es el dato.
+ *
+ * ═══ Y SE PUEDE PINTAR OTRA LISTA QUE LA DEL TABLERO, PERO NADIE LO HACE POR SU CUENTA ═══
+ *
+ * `paneles` es opcional y por omisión son los del tablero, o sea que quien no diga nada
+ * pinta lo que el juego mandó, como hasta hoy. Existe porque la pantalla completa de
+ * Riberas pone «Lo mío» el primero y le quita al panel «La mesa» la cifra de bienes ajenos
+ * (decisión 17), y esas dos decisiones son de PANTALLA: viven en `panelesEnTres`, en
+ * `shared/`, donde un comprobador puede llamarlas desde Node.
+ *
+ * Lo que este componente NO hace, y por eso el criterio entra por la puerta en vez de
+ * escribirse aquí: decidir cuál de los paneles va primero. Aquí no se conoce ningún juego,
+ * y un `if (titulo === 'Lo mío')` en el mueble genérico sería Riberas escrito dentro del
+ * retablo que pinta a los otros tres arcades.
  */
-export function Paneles({ tablero }: { tablero: TableroDeclarado }): JSX.Element | null {
-  if (tablero.paneles.length === 0) return null;
+export function Paneles({
+  tablero,
+  paneles = tablero.paneles,
+}: {
+  tablero: TableroDeclarado;
+  paneles?: readonly PanelDeTablero[];
+}): JSX.Element | null {
+  if (paneles.length === 0) return null;
   return (
     <>
-      {tablero.paneles.map((panel, i) => {
+      {paneles.map((panel, i) => {
         const titulo = cadena(panel.titulo);
         /*
          * `panel.lineas.map` era la quinta lectura sin guardia de este fichero, y

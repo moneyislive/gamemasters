@@ -2489,6 +2489,34 @@ try {
       conRevDeAyer.datos.mesa.vista,
     );
 
+    /*
+     * ═══ Y LO QUE EL CANAL HA DICHO EN TODA LA PARTIDA. DECISIÓN, CON SU MEDIDA ═══
+     *
+     * El cliente de escritorio pinta una CRÓNICA con los avisos que trae el sondeo, y jugando
+     * una partida de más de cuatrocientos movimientos volvió `avisos: []` de principio a fin —
+     * o sea que la crónica no se pintó ni una vez y quedó la duda de si estaba rota.
+     *
+     * NO LO ESTÁ, Y ÉSTA ES LA MEDIDA. La crónica es el registro del CANAL de la mesa, no el
+     * del juego: aquí se llevan veinte movimientos y el canal ha dicho UNA sola cosa, y sólo al
+     * cerrarse. Y la decisión que va con ella, escrita también en `escritorio/src/sala.tsx`: un
+     * arcade NO va a emitir un aviso por jugada. Lo que hay que contar ya tiene un sitio y una
+     * redacción —la cinta dice lo que toca, el pregón los trueques, los paneles el estado—, y
+     * un tercer relato de los mismos hechos dentro de un cajón es la duplicación que este
+     * cliente quita en todas partes (`opcionesFueraDelPregon`, `panelesFueraDelPregon`).
+     *
+     * Y ESTO SE PONE ROJO EL DÍA QUE ALGUIEN CAMBIE DE OPINIÓN, que es para lo que está: si un
+     * arcade empieza a anunciar por jugada, aquí saldrán veinte avisos donde se compra uno, y
+     * quien lo haga tendrá que venir a redecidir lo del cajón en vez de encontrárselo hecho.
+     */
+    const loQueDijoElCanal = conRevDeAyer.datos.avisos;
+    comprobar(
+      'y el canal ha dicho UNA sola cosa en veinte movimientos —que se acabó la partida— y ni una por jugada: la crónica del cliente es el registro del CANAL y no el del juego, y por eso sale vacía toda la partida',
+      Array.isArray(loQueDijoElCanal) &&
+        loQueDijoElCanal.length === 1 &&
+        loQueDijoElCanal[0]?.clave === 'arcade:mesa-cerrada',
+      loQueDijoElCanal,
+    );
+
     const negativo = await pedir(`/arcade/mesas/${codigo}?desde=-99999`, { llave: gente[0]!.llave });
     comprobar('y una revisión imposible tampoco es un error', negativo.estado === 200);
 

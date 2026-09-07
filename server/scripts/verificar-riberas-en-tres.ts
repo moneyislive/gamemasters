@@ -59,6 +59,7 @@ import type { LlaveDeArista } from '../../shared/mecanicas/malla-hexagonal';
 import '../../shared/arcade/juegos';
 import {
   ACAPARAMIENTO,
+  ACEPTAR,
   ALZAR,
   ANO_BUENO,
   BIENES,
@@ -78,6 +79,7 @@ import {
   PUNTOS_DEL_TITULO,
   PUNTOS_DEL_VADO,
   PUNTOS_DE_LA_GUARDIA,
+  RECHAZAR,
   VEREDAS_DE_LA_CARTA,
   opcionesDeRiberas,
   MOVER_EL_ESTIAJE,
@@ -85,6 +87,7 @@ import {
   largoDelVado,
   loSecretoDeRiberas,
   proyectarRiberas,
+  tableroDeRiberas,
   recalcularElVado,
   recalcularLaGuardia,
   REVELAR,
@@ -109,6 +112,7 @@ import {
   colocandoEnTres,
   comprarEnTres,
   dadosEnTres,
+  elPregonEnTres,
   enCabeza,
   estadoDelVado,
   esVistaQueSePinta,
@@ -123,10 +127,16 @@ import {
   opcionesFueraDeLaBarra,
   opcionesFueraDeLaMano,
   opcionesFueraDeLaMesa,
+  opcionesFueraDelPregon,
   opcionesFueraDelTablero,
   paresDelAnoBueno,
   plural,
   premiosEnTres,
+  panelesEnTres,
+  panelesFueraDelPregon,
+  PANEL_DE_LA_MESA,
+  PANEL_DE_LO_MIO,
+  PANEL_DE_TRUEQUES,
   renglonDelVado,
   retratoDeLaCarta,
   revelarDe,
@@ -1207,6 +1217,86 @@ const CAMPO_DE_LA_BARRA = (45 * Math.PI) / 180;
     comprobar('y el renglón dice «empatado y sin dueño», no «vado 5 de 5»', deA === `vado ${String(VADO_MINIMO)}, empatado y sin dueño` && estadoDeA.clase === 'llega' && estadoDeA.dueño === null, deA);
     comprobar('y la frase que se oye dice que el premio queda sin dueño hasta que alguien supere', loQueSeOyeDelVado(aVacante, marcadorVacante).includes('sin dueño') && loQueSeOyeDelVado(aVacante, marcadorVacante).includes('supere'), loQueSeOyeDelVado(aVacante, marcadorVacante));
   }
+
+  /*
+   * ═══ 8 bis. CUÁNTAS CHOZAS Y CUÁNTAS TORRES, QUE ES LO QUE EL §11 PEDÍA Y NO ESTABA ═══
+   *
+   * El marcador sabía decir los puntos y no sabía decir de qué estaban hechos. Con las dos
+   * cifras, «7 puntos» pasa a ser «tres torres y una choza», que es una frase que se puede
+   * discutir mirando el tablero; sin ellas hay que contar las piezas a ojo en la escena, y
+   * en el respaldo SVG ni eso.
+   *
+   * ═══ LAS DOS COSAS QUE AQUÍ SE COMPRAN, Y SON DISTINTAS ═══
+   *
+   *   1. QUE LOS NÚMEROS SEAN LOS DE ESE COLONO. Se monta un reparto DESIGUAL a propósito
+   *      —A con dos chozas y tres torres, B con una y ninguna— porque el escenario de este
+   *      fichero le da a todo el mundo una choza y cero torres, y con eso `chozas` podría
+   *      salir de una constante, del índice del colono o de la lista del vecino y las tres
+   *      pasarían en verde.
+   *   2. QUE SALGAN DE LA VISTA Y NO DE UN CÁLCULO. Es la mitad que de verdad importa: la
+   *      cuenta se hace sobre `ColonoVisto.chozas`, o sea sobre lo que cruzó el cable. Se
+   *      compra tocando LA VISTA —no el estado— y exigiendo que el marcador siga. Una
+   *      implementación que recontara los vértices del tablero, o que se guardara la cifra
+   *      del render anterior, se pone roja aquí y sólo aquí.
+   */
+  const LA_ISLA_DE_LAS_PIEZAS = { q: 2, r: 0 };
+  const conObra = escenarioDeMazo({ bienes: [['limo'], ['junco'], []] });
+  const repartoDesigual: EstadoDeRiberas = {
+    ...conObra,
+    colonos: conObra.colonos.map((c, i) =>
+      i !== 0
+        ? c
+        : {
+            ...c,
+            chozas: [...c.chozas, verticeDeHex(LA_ISLA_DE_LAS_PIEZAS, 2)],
+            torres: [verticeDeHex(LA_ISLA_DE_LAS_PIEZAS, 0), verticeDeHex(LA_ISLA_DE_LAS_PIEZAS, 3), verticeDeHex(LA_ISLA_DE_LAS_PIEZAS, 4)],
+          },
+    ),
+  };
+  const laVistaDeLaObra = proyectarRiberas(repartoDesigual, 'A');
+  const conPiezas = marcadorEnTres(laVistaDeLaObra);
+  const aConObra = conPiezas?.colonos.find((c) => c.asiento === 'A');
+  const bSinObra = conPiezas?.colonos.find((c) => c.asiento === 'B');
+  comprobar(
+    'el marcador dice cuántas chozas y cuántas torres tiene cada colono, y no son el mismo número',
+    aConObra?.chozas === 2 && aConObra.torres === 3 && bSinObra?.chozas === 1 && bSinObra.torres === 0,
+    { a: { chozas: aConObra?.chozas, torres: aConObra?.torres }, b: { chozas: bSinObra?.chozas, torres: bSinObra?.torres } },
+  );
+  comprobar(
+    'y son las de ESE colono: las tres torres de A no aparecen en el renglón de B ni en el de C',
+    conPiezas?.colonos.filter((c) => c.torres > 0).length === 1 && conPiezas.colonos.reduce((suma, c) => suma + c.chozas, 0) === 4,
+    conPiezas?.colonos.map((c) => [c.asiento, c.chozas, c.torres]),
+  );
+  /*
+   * LA VACUNA: se le añade una choza A LA VISTA —al objeto que cruza el cable, no al
+   * estado— y el marcador tiene que decir tres. Si la cifra viniera de recontar el tablero
+   * o de cualquier otro sitio, aquí seguiría diciendo dos y nada más se pondría rojo.
+   */
+  const vistaTocada = {
+    ...(laVistaDeLaObra as unknown as { colonos: { asiento: string; chozas: unknown[] }[] }),
+    colonos: (laVistaDeLaObra as unknown as { colonos: { asiento: string; chozas: unknown[] }[] }).colonos.map((c) =>
+      c.asiento !== 'A' ? c : { ...c, chozas: [...c.chozas, verticeDeHex(LA_ISLA_DE_LAS_PIEZAS, 5)] },
+    ),
+  };
+  comprobar(
+    'y la cifra sale de la VISTA: una choza más en la vista es una choza más en el marcador',
+    marcadorEnTres(vistaTocada)?.colonos.find((c) => c.asiento === 'A')?.chozas === 3,
+    marcadorEnTres(vistaTocada)?.colonos.find((c) => c.asiento === 'A')?.chozas,
+  );
+  /*
+   * ═══ Y LO QUE EL MARCADOR NO PUEDE TRAER: LOS BIENES (DECISIÓN 17) ═══
+   *
+   * Miguel corrigió el encargo el 7 de septiembre: los bienes del RESTO no se enseñan. El
+   * marcador es lo que ve la mesa entera, así que un campo `bienes` aquí sería justo eso,
+   * y sería fácil de añadir «ya que estamos contando». Se compra por estructura —ningún
+   * colono del marcador tiene ese campo— y no por el texto de un renglón, porque lo que
+   * hay que impedir es que el dato LLEGUE a la pantalla, no que se pinte.
+   */
+  comprobar(
+    'ningún colono del marcador trae `bienes`: los bienes de los demás no se enseñan (decisión 17)',
+    conPiezas !== null && conPiezas.colonos.every((c) => !Object.prototype.hasOwnProperty.call(c, 'bienes') && !Object.prototype.hasOwnProperty.call(c, 'almacen')),
+    conPiezas?.colonos.map((c) => Object.keys(c)),
+  );
 }
 
 /* ═══ 9. LAS NUEVE CARAS SON LAS DE LA ESCENA, Y NI UNA MÁS ═══ */
@@ -2307,6 +2397,15 @@ const CAMPO_DE_LA_BARRA = (45 * Math.PI) / 180;
   comprobar('y su marcador sale con ceros y sin premios, que es la verdad', pobre?.mazo === 0 && pobre?.vado === null && pobre?.mayorGuardia === null, pobre);
   comprobar('con la cadena a cero, que es la verdad y no un hueco, y el mínimo de la regla igual', pobre?.colonos[0]?.vado === 0 && pobre?.vadoMinimo === VADO_MINIMO, { vado: pobre?.colonos[0]?.vado, minimo: pobre?.vadoMinimo });
   comprobar('con el colono que hay, sin cartas ni guardias ni títulos', pobre?.colonos.length === 1 && pobre?.colonos[0]?.cartas === 0 && pobre?.colonos[0]?.guardias === 0 && canonico(pobre?.colonos[0]?.titulos) === canonico([]));
+  /*
+   * Y SIN CHOZAS NI TORRES, QUE ES LO QUE ACABA DE ROMPER ESTA LÍNEA UNA VEZ.
+   *
+   * Este colono no trae las listas de piezas: es la vista mínima legítima —la del banco de
+   * anillos, la de una partida vieja—. `ColonoVisto` las declaraba OBLIGATORIAS y nadie las
+   * leía, así que la mentira era gratis; el primer `length` que se escribió encima dejó la
+   * mesa entera sin pintar. Cero, como los puntos y las guardias, y sin reventar.
+   */
+  comprobar('y sin chozas ni torres puestas: una vista que no trae las piezas cuenta cero, no revienta', pobre?.colonos[0]?.chozas === 0 && pobre?.colonos[0]?.torres === 0, { chozas: pobre?.colonos[0]?.chozas, torres: pobre?.colonos[0]?.torres });
   comprobar('y con mis puntos ocultos igualados a los públicos, no inventados', pobre?.colonos[0]?.puntosConLoOculto === 0 && pobre?.colonos[0]?.puntos === 0);
 
   /* Una carta con la forma rota se salta, como una ficha rota. */
@@ -2595,8 +2694,404 @@ const CAMPO_DE_LA_BARRA = (45 * Math.PI) / 180;
   comprobar('y lee `vista.turnosAbiertos` exactamente una vez, dentro de `dadosEnTres`, como sello', lecturas.length === 1 && /selloDeLaTirada\(vista\.turnosAbiertos \?\? 0, tirado\)/.test(codigo), lecturas.length);
 }
 
+/**
+ * ═══ LOS PANELES DEL CAJÓN: «Lo mío» DELANTE Y SIN LOS BIENES AJENOS (decisión 17) ═══
+ *
+ * `panelesEnTres` toma los paneles que el juego declara y hace DOS cosas de pantalla, no de
+ * regla: pone «Lo mío» el primero y le quita al panel «La mesa» la cifra de bienes de cada
+ * colono. Vive en `shared/` —y no en el cliente que la pinta— justamente para poder medirse
+ * aquí, desde Node, contra los paneles de una PARTIDA DE VERDAD.
+ *
+ * ═══ Y SE MIDEN LAS DOS MITADES, QUE ES LO QUE IMPORTA ═══
+ *
+ * Que la cifra desaparezca es la mitad fácil. La otra es que ESTUVIERA ANTES: este recorte se
+ * apoya en cómo `panelesDe` redacta el renglón del marcador («Ana — 3 ptos, 5 bienes, 2
+ * cartas, vereda más larga 4»), y el día que alguien reescriba esa frase el recorte dejaría de
+ * recortar sin que nada fallara — la decisión de Miguel se caería sola y en silencio, y en la
+ * pantalla completa volverían a salir los bienes de los demás. Comprobando que el original SÍ
+ * los traía, ese día esto se pone rojo.
+ *
+ * MIS bienes por clase no se tocan: son el panel «Lo mío», salen de mi propia vista y son el
+ * ÚNICO sitio de la pantalla donde se leen —en la escena la mano son cartas sin número—. Por
+ * eso ese panel además se adelanta: en un cajón que se abre para mirar y se cierra para jugar,
+ * el primer renglón es el único que se lee sin desplazar.
+ */
+{
+  /* Una partida de verdad, con bienes de sobra en tres manos distintas: si todos tuvieran cero, «0 bienes» y «sin bienes» no se distinguirían. */
+  const conBienes = escenarioDeMazo({
+    bienes: [
+      ['limo', 'junco', 'sal'],
+      ['piedra'],
+      ['grano', 'grano', 'limo', 'junco'],
+    ],
+    manos: [[{ carta: 'c1:guardia', comprada: 0 }], [], []],
+  });
+  const tableroDeVerdad = tableroDeRiberas(proyectarRiberas(conBienes, 'A'), 'A');
+  const antes = tableroDeVerdad.paneles;
+  comprobar(
+    'el juego declara sus paneles y entre ellos están «Lo mío» y «La mesa», o lo de abajo no mediría nada',
+    antes.length >= 5 && antes.some((p) => p.titulo === PANEL_DE_LO_MIO) && antes.some((p) => p.titulo === PANEL_DE_LA_MESA),
+    antes.map((p) => p.titulo),
+  );
+  const laMesaAntes = antes.find((p) => p.titulo === PANEL_DE_LA_MESA);
+  /*
+   * ═══ Y EL SUELO VA DELANTE DEL `every`, QUE NO ES UNA MANÍA ═══
+   *
+   * `[].every(...)` es CIERTO. Un panel «La mesa» que llegara sin renglones —el juego deja de
+   * declararlos, la proyección los pierde, alguien cambia el título— pasaría estas dos
+   * comprobaciones a la vez y con las MISMAS palabras: «los trae» y «ya no los trae». O sea que
+   * las dos mitades de la decisión 17 se comprarían por igual con el panel roto, que es el
+   * peor verde posible: el que dice que hay recorte donde no hay ni renglón.
+   *
+   * El suelo es UN RENGLÓN POR COLONO y se saca del escenario —`conBienes.colonos.length`— y no
+   * de un tres escrito a mano: el día que este bloque se monte con cuatro, un tres clavado se
+   * pondría rojo por la razón equivocada o, peor, seguiría comprando tres de cuatro.
+   */
+  const cuantosColonos = conBienes.colonos.length;
+  comprobar(
+    'y el renglón de cada colono en «La mesa» TRAE los bienes hoy: sin esta mitad, el día que el juego reescriba la frase el recorte dejaría de recortar y nadie se enteraría',
+    laMesaAntes !== undefined &&
+      laMesaAntes.lineas.length === cuantosColonos &&
+      laMesaAntes.lineas.every((l) => / \d+ bien(es)?,/.test(l)),
+    laMesaAntes?.lineas,
+  );
+
+  const despues = panelesEnTres(antes);
+  comprobar(
+    'no se pierde ni se inventa ningún panel: salen los mismos y con los mismos títulos',
+    despues.length === antes.length &&
+      canonico([...despues].map((p) => p.titulo).sort()) === canonico([...antes].map((p) => p.titulo).sort()),
+    despues.map((p) => p.titulo),
+  );
+  comprobar(
+    '«Lo mío» va el PRIMERO, que es el único renglón que se lee sin desplazar el cajón, y ahí están mis bienes por clase',
+    despues[0]?.titulo === PANEL_DE_LO_MIO && (despues[0]?.lineas ?? []).some((l) => /^limo: \d+$/.test(l)),
+    despues[0],
+  );
+  /*
+   * ═══ Y ESO HOY NO CAMBIA NADA, ASÍ QUE SE MIDE APARTE ═══
+   *
+   * `panelesDe` YA declara «Lo mío» el primero, o sea que con los paneles de una partida de
+   * verdad este adelanto es un no-op y la comprobación de arriba pasaría igual si la función
+   * no reordenara nada. Es un verde que no dice nada, y esto es la mitad que sí: se le da la
+   * lista con «Lo mío» enterrado en medio y se exige que salga delante. Lo que se compra no es
+   * el orden de hoy: es que el día que el juego añada un panel por encima —o los reordene— el
+   * cajón siga abriéndose por lo que uno TIENE, que es lo que se mira antes de decidir una
+   * jugada y lo único que en la escena no se puede contar, porque la mano son cartas sin
+   * número.
+   */
+  const revueltos = panelesEnTres([
+    { titulo: 'Mis cartas', lineas: ['Sin cartas.'] },
+    { titulo: PANEL_DE_LA_MESA, lineas: ['Ana — 3 ptos, 5 bienes, 2 cartas, vereda más larga 4'] },
+    { titulo: PANEL_DE_LO_MIO, lineas: ['limo: 3'] },
+    { titulo: 'El Vado Largo', lineas: ['Vacante.'] },
+  ]);
+  comprobar(
+    'y si el juego lo declarara enterrado en medio, saldría delante igual: hoy ya lo declara el primero, así que sin esta prueba el adelanto sería un no-op en verde',
+    canonico(revueltos.map((p) => p.titulo)) === canonico([PANEL_DE_LO_MIO, 'Mis cartas', PANEL_DE_LA_MESA, 'El Vado Largo']),
+    revueltos.map((p) => p.titulo),
+  );
+  comprobar(
+    'y los demás se quedan en el orden que les dio el juego: reordenarlos todos sería escribir aquí un criterio que allí no hay',
+    canonico(despues.slice(1).map((p) => p.titulo)) === canonico(antes.filter((p) => p.titulo !== PANEL_DE_LO_MIO).map((p) => p.titulo)),
+    despues.map((p) => p.titulo),
+  );
+  const laMesaDespues = despues.find((p) => p.titulo === PANEL_DE_LA_MESA);
+  comprobar(
+    'de «La mesa» desaparece la cifra de bienes de CADA colono (decisión 17: los bienes de los demás no se enseñan), y hay un renglón POR COLONO: sin ese suelo, un panel vacío compraría esto y su contrario',
+    laMesaDespues !== undefined &&
+      laMesaDespues.lineas.length === cuantosColonos &&
+      laMesaDespues.lineas.every((l) => !/bien(es)?/.test(l)),
+    laMesaDespues?.lineas,
+  );
+  comprobar(
+    'y no se lleva por delante el resto del renglón: siguen los puntos, las cartas y la vereda más larga, y no quedan dos comas seguidas ni una coma suelta al final',
+    laMesaDespues !== undefined &&
+      laMesaDespues.lineas.length === cuantosColonos &&
+      laMesaDespues.lineas.every((l) => / ptos?,/.test(l) && / cartas?,/.test(l) && /vereda más larga \d+$/.test(l)) &&
+      laMesaDespues.lineas.every((l) => !l.includes(',,') && !l.includes(' ,')),
+    laMesaDespues?.lineas,
+  );
+  /*
+   * Y MIS BIENES NO SE TOCAN. El recorte busca el renglón de un colono del marcador, no la
+   * palabra «bien»: si se llevara por delante «limo: 3» del panel «Lo mío», la decisión 17 —que
+   * habla de los bienes de LOS DEMÁS— se habría comido el único sitio donde se leen los míos.
+   */
+  const loMioDespues = despues.find((p) => p.titulo === PANEL_DE_LO_MIO);
+  const loMioAntes = antes.find((p) => p.titulo === PANEL_DE_LO_MIO);
+  comprobar(
+    'y MIS bienes por clase salen intactos: la decisión 17 habla de los de los demás, y éste es el único sitio de la pantalla donde se leen los míos',
+    loMioDespues !== undefined && loMioAntes !== undefined && canonico(loMioDespues.lineas) === canonico(loMioAntes.lineas),
+    loMioDespues?.lineas,
+  );
+  /*
+   * SINGULAR Y PLURAL, que es lo que una expresión escrita de memoria se deja: el juego escribe
+   * «1 bien» sin la ese, y ése es justo el colono cuyo renglón se quedaría con la cifra puesta.
+   */
+  comprobar(
+    'con UN solo bien el juego escribe «1 bien» sin la ese, y también desaparece: es el caso que una expresión escrita de memoria se deja',
+    (laMesaAntes?.lineas ?? []).some((l) => l.includes(' 1 bien,')) &&
+      (laMesaDespues?.lineas ?? []).every((l) => !l.includes(' 1 bien')),
+    { antes: laMesaAntes?.lineas, despues: laMesaDespues?.lineas },
+  );
+  /*
+   * ═══ Y SE DEGRADA A NO HACER NADA, QUE ES LO CORRECTO CUANDO LA SUPOSICIÓN CAE ═══
+   *
+   * Esto se apoya en dos títulos que escribe otro fichero. Si el juego los renombra, lo que
+   * tiene que pasar es que salgan los mismos paneles en el mismo orden y sin tocar —una
+   * pantalla con los paneles del juego— y no que se pierda uno o que reviente el cajón.
+   */
+  const conOtrosTitulos = panelesEnTres([
+    { titulo: 'Lo de uno', lineas: ['limo: 3'] },
+    { titulo: 'El corro', lineas: ['Ana — 3 ptos, 5 bienes, 2 cartas'] },
+  ]);
+  comprobar(
+    'con títulos que no reconoce no hace nada: los mismos paneles, en el mismo orden y sin recortar, en vez de perder uno',
+    canonico(conOtrosTitulos) === canonico([
+      { titulo: 'Lo de uno', lineas: ['limo: 3'] },
+      { titulo: 'El corro', lineas: ['Ana — 3 ptos, 5 bienes, 2 cartas'] },
+    ]),
+    conOtrosTitulos,
+  );
+  comprobar(
+    'y con basura por la puerta devuelve lista vacía en vez de romper el cajón entero: lo mismo que hace `marcadorEnTres` con una vista que no es suya',
+    panelesEnTres(null).length === 0 && panelesEnTres('paneles').length === 0 && panelesEnTres([null, 3]).length === 0,
+    panelesEnTres([null, 3]),
+  );
+}
+
+/**
+ * ═══ EL PREGÓN: LAS PROPUESTAS DE TRUEQUE, Y LO QUE YA SE TROCÓ (decisión 17) ═══
+ *
+ * Miguel: «se tiene que mostrar en la pantalla las propuestas de trueque por cada jugador con
+ * capacidad de aceptar o rechazar». Lo único que las enseñaba era un renglón de texto dentro
+ * del panel «Trueques» —«t3: Ana da junco por limo a Bruno — propuesta»— y unos botones
+ * sueltos llamados «Aceptar el trueque t3». `elPregonEnTres` lee `v.tratos` y saca las tiras
+ * que pinta la cinta, con la opción del juego colgada de cada una.
+ *
+ * ═══ TODO ESTO SE JUEGA, NO SE DECLARA ═══
+ *
+ * El trato se propone con un movimiento de verdad por el árbitro y se acepta con otro. Un
+ * estado con `tratos` escrito a mano probaría que la función sabe leer una lista; jugándolo se
+ * prueba lo que importa: que las opciones que el pregón cuelga de cada tira son EXACTAMENTE
+ * las que `opciones()` emitió, y que el ciclo de vida del trato —vivo, aceptado, y el pregón
+ * que desaparece— es el del reductor y no el que esta función se imagina.
+ */
+{
+  /** El nombre de un colono en una vista. La tira habla de personas, no de asientos. */
+  const nombreDe = (v: unknown, asiento: string): string =>
+    (v as { colonos: readonly { asiento: string; nombre: string }[] }).colonos.find((c) => c.asiento === asiento)?.nombre ?? asiento;
+  const estado = escenarioDeTrueque(['junco', 'limo'], ['sal', 'grano']);
+  const mesa = mesaSobre('RIB-3D-PR', estado, ['A', 'B']);
+  const ofrecer = opcionesEn(mesa, 'A').find((o) => o.id === 'ofrecer:B:junco:sal');
+  comprobar('el juego ofrece el trueque que este bloque va a jugar, o lo de abajo no mediría nada', ofrecer !== undefined, opcionesEn(mesa, 'A').filter((o) => o.tipo === OFRECER).map((o) => o.id));
+  const propuesto = mover(mesa, 'A', ofrecer as Opcion);
+  const vistaB = vistaEn(propuesto, 'B');
+  const opcionesB = opcionesEn(propuesto, 'B');
+  const pregonB = elPregonEnTres(vistaB, 'B', opcionesB);
+
+  comprobar('con una propuesta viva dirigida a mí, hay pregón', pregonB !== null);
+  comprobar(
+    'y trae UNA tira para contestar, ninguna mía y ninguna cerrada',
+    pregonB?.paraContestar.length === 1 && pregonB.mias.length === 0 && pregonB.cerrados.length === 0,
+    pregonB && { contestar: pregonB.paraContestar.length, mias: pregonB.mias.length, cerrados: pregonB.cerrados.length },
+  );
+  const suya = pregonB?.paraContestar[0];
+  /*
+   * LA FRASE SE ESCRIBE DESDE DONDE MIRA QUIEN LA LEE, y con la CIFRA delante. El panel decía
+   * «A da junco por sal a B», que es la mesa contada en tercera persona y con el seudónimo del
+   * trato de por medio; la tira dice qué me dan y qué me piden. Y dice «1 junco» y no «junco»
+   * porque el día que la multiplicidad entre —es otro encargo— la frase ya la sabe decir.
+   */
+  comprobar(
+    'la frase la escribe desde donde mira quien la lee, con la cifra delante y el nombre de quien propone',
+    suya?.frase === `${nombreDe(vistaB, 'A')} te da 1 junco por 1 sal`,
+    suya?.frase,
+  );
+  comprobar('y la oferta sale partida en dos, para las dos mitades de la tira', suya?.da === '1 junco' && suya.pide === '1 sal', suya && [suya.da, suya.pide]);
+  comprobar('con el color de quien propone, que es el raíl de la tira', suya?.color === (vistaB as { colonos: { asiento: string; color: string }[] }).colonos[0]?.color, suya?.color);
+  /*
+   * LAS DOS OPCIONES SON LAS DEL JUEGO, LAS MISMAS Y NO UNA COPIA. Aquí es donde esto se
+   * podría haber escrito mal sin que nada fallara: montando la carga a mano —`{ trato: id }`—
+   * la tira mandaría un movimiento que HOY coincide y que el día que el juego cambie de forma
+   * dejaría de coincidir, y lo que se vería es un botón que no hace nada.
+   */
+  const aceptarDelJuego = opcionesB.find((o) => o.tipo === ACEPTAR);
+  const rechazarDelJuego = opcionesB.find((o) => o.tipo === RECHAZAR);
+  comprobar(
+    'y cuelga las opciones DEL JUEGO, los mismos objetos y no una carga montada a mano',
+    suya !== undefined && aceptarDelJuego !== undefined && suya.aceptar === aceptarDelJuego && suya.rechazar === rechazarDelJuego,
+    { aceptar: suya?.aceptar?.id, rechazar: suya?.rechazar?.id },
+  );
+  comprobar('el renglón de estado dice que me toca, con nombre y sin él', suya?.comoAnda === 'te toca contestar' && suya.comoAndaSinNombre === 'contesta', suya && [suya.comoAnda, suya.comoAndaSinNombre]);
+
+  /*
+   * ═══ SIN CON QUÉ PAGAR NO HAY «Aceptar», Y EL RENGLÓN LO DICE ═══
+   *
+   * El juego ofrece RECHAZAR siempre al destinatario y ACEPTAR sólo si tiene lo que se le pide
+   * (`opcionesDeTurno`, y ése es el contraejemplo del «si y sólo si» del §5 bis: mi almacén sí
+   * está en mi vista, el suyo no). Aquí no se vuelve a mirar ningún almacén: se mira si la
+   * opción llegó. Una hoja con un solo botón y sin una palabra que lo explique se lee como una
+   * hoja rota, y por eso el renglón dice qué falta.
+   */
+  const sinGrano = mover(mesa, 'A', opcionesEn(mesa, 'A').find((o) => o.id === 'ofrecer:B:junco:piedra') as Opcion);
+  const pregonSinPagar = elPregonEnTres(vistaEn(sinGrano, 'B'), 'B', opcionesEn(sinGrano, 'B'));
+  const flaca = pregonSinPagar?.paraContestar[0];
+  comprobar(
+    'a quien no tiene con qué pagar el juego no le ofrece aceptar, y la tira lo dice en vez de enseñar un botón menos sin explicar por qué',
+    flaca !== undefined && flaca.aceptar === null && flaca.rechazar !== null && flaca.comoAnda === 'no tienes 1 piedra' && flaca.comoAndaSinNombre === 'no puedes pagarlo',
+    flaca && { aceptar: flaca.aceptar, comoAnda: flaca.comoAnda },
+  );
+
+  /*
+   * ═══ EL QUE PROPONE VE LO SUYO, QUE ES LO QUE NO VEÍA NADIE ═══
+   *
+   * Hoy quien ofrece un trueque no ve NADA de lo que ofreció: ni si sigue en pie, ni a quién
+   * se lo hizo, ni quién se lo apartó. El bloque «Tuyas» es esa mitad.
+   */
+  const pregonA = elPregonEnTres(vistaEn(propuesto, 'A'), 'A', opcionesEn(propuesto, 'A'));
+  const mia = pregonA?.mias[0];
+  comprobar(
+    'y el que propone ve lo suyo, con a quién se lo hizo y a qué está esperando',
+    pregonA !== null && pregonA.mias.length === 1 && pregonA.paraContestar.length === 0 &&
+      mia?.frase === `Le ofreces a ${nombreDe(vistaB, 'B')} 1 junco por 1 sal` &&
+      mia.comoAnda === `esperando a ${nombreDe(vistaB, 'B')}` && mia.comoAndaSinNombre === 'esperando',
+    mia && { frase: mia.frase, comoAnda: mia.comoAnda },
+  );
+  comprobar('y de lo suyo no cuelga ningún botón: contestar es del otro lado', mia?.aceptar === null && mia.rechazar === null);
+
+  /*
+   * ═══ Y LOS DOS BLOQUES VIVOS NO SE DAN A LA VEZ, QUE ES UNA MEDIDA Y NO UN DISEÑO ═══
+   *
+   * Un trueque sólo se propone con el turno en la mano y caduca al pasarlo
+   * (`caducarLosAbiertos`, dentro de `siguienteTurno`), así que en cualquier instante el único
+   * con propuestas vivas es quien tiene el turno: o son todas MÍAS o no lo es ninguna. Queda
+   * escrito para que «Tuyas» vacío en la pantalla de quien contesta no se lea como un bloque
+   * roto, y para que el día que el turno deje de ser la frontera —una oferta a la mesa— esto
+   * se ponga rojo y alguien vuelva a mirar los dos bloques.
+   */
+  comprobar(
+    'con el trueque de hoy los dos bloques vivos se excluyen: quien contesta no tiene ninguna suya y quien propone no tiene ninguna que contestar',
+    pregonB?.mias.length === 0 && pregonA?.paraContestar.length === 0,
+  );
+
+  /*
+   * ═══ AL ACEPTARLO EL PREGÓN DESAPARECE, Y ESO ES LA DECISIÓN DEL `null` ═══
+   *
+   * `elPregonEnTres` devuelve `null` cuando no queda nada VIVO, aunque `v.tratos` siga lleno.
+   * Es lo que hace sostenible la regla de exclusión con el cartel de los naipes: si el pregón
+   * existiera también con sólo cerrados, en cuanto se trocara una vez el cartel se apagaría
+   * para el resto de la partida —`ultimos` guarda los ocho últimos y esa lista ya no se vacía—
+   * y encima ocho renglones de historia taparían el tablero sin que nadie los pidiera.
+   */
+  const aceptado = mover(propuesto, 'B', aceptarDelJuego as Opcion);
+  const trasAceptar = elPregonEnTres(vistaEn(aceptado, 'A'), 'A', opcionesEn(aceptado, 'A'));
+  comprobar(
+    'aceptado el único trato vivo, el pregón entero desaparece aunque la lista de tratos siga llena: es lo que deja sitio al cartel de los naipes',
+    trasAceptar === null && (vistaEn(aceptado, 'A') as { tratos: unknown[] }).tratos.length === 1,
+  );
+
+  /*
+   * ═══ PERO LO CERRADO NO SE PIERDE: VA EN EL PREGÓN CUANDO EL PREGÓN EXISTE ═══
+   *
+   * La otra mitad de la decisión 17. Con el trato aceptado Y otro vivo encima, el bloque de
+   * cerrados dice quién le dio qué a quién, que es lo que necesita quien vuelve al tablero dos
+   * turnos después.
+   */
+  const yOtroVivo = mover(aceptado, 'A', opcionesEn(aceptado, 'A').find((o) => o.tipo === OFRECER) as Opcion);
+  const conHistoria = elPregonEnTres(vistaEn(yOtroVivo, 'A'), 'A', opcionesEn(yOtroVivo, 'A'));
+  const cerrada = conHistoria?.cerrados[0];
+  comprobar(
+    'con algo vivo encima, lo ya cerrado va en su bloque y dice quién lo aceptó',
+    conHistoria !== null && conHistoria.cerrados.length === 1 && cerrada?.estado === 'aceptada' &&
+      cerrada.comoAnda === `la aceptó ${nombreDe(vistaB, 'B')}` && cerrada.comoAndaSinNombre === 'aceptada',
+    cerrada && { estado: cerrada.estado, comoAnda: cerrada.comoAnda },
+  );
+  /*
+   * Y SI QUIEN CONTESTÓ FUI YO, SE DICE EN SEGUNDA PERSONA. Escrito con el nombre a secas
+   * salía «la aceptó Ana» en la pantalla de Ana: la frase hablando de quien la lee en tercera
+   * persona, que se lee como si hubiera otra Ana en la mesa. Se vio MIRANDO, no midiendo.
+   */
+  const desdeB = elPregonEnTres(vistaEn(yOtroVivo, 'B'), 'B', opcionesEn(yOtroVivo, 'B'));
+  comprobar(
+    'y en la pantalla de quien contestó se dice en segunda persona, no con su propio nombre',
+    desdeB?.cerrados[0]?.comoAnda === 'la aceptaste',
+    desdeB?.cerrados[0]?.comoAnda,
+  );
+
+  /*
+   * ═══ LOS DOS FILTROS, Y LOS DOS SE COMPRAN POR LAS DOS MITADES ═══
+   *
+   * Con pregón, ACEPTAR y RECHAZAR se caen de los botones: la regla de la casa es que cada
+   * movimiento se enseña exactamente una vez. Y SIN pregón se quedan, que es la mitad muda: un
+   * mirón, el respaldo del retablo o una pantalla que todavía no lo pinte se quedarían con una
+   * propuesta imposible de contestar en toda la tarde, sin un error en ninguna parte.
+   */
+  comprobar(
+    'con pregón puesto, aceptar y rechazar se caen de los botones: cada movimiento se enseña una sola vez',
+    opcionesFueraDelPregon(opcionesB, pregonB).every((o) => o.tipo !== ACEPTAR && o.tipo !== RECHAZAR),
+    opcionesFueraDelPregon(opcionesB, pregonB).map((o) => o.id),
+  );
+  comprobar(
+    'y sin pregón se QUEDAN, que es la mitad muda: donde nadie pinta tiras, quitarlas deja una propuesta que no se puede contestar y ni un error en ninguna parte',
+    opcionesFueraDelPregon(opcionesB, null).length === opcionesB.length,
+  );
+  comprobar(
+    'y no se lleva por delante nada más: lo que no es contestar sigue entero y en su orden',
+    canonico(opcionesFueraDelPregon(opcionesB, pregonB).map((o) => o.id)) ===
+      canonico(opcionesB.filter((o) => o.tipo !== ACEPTAR && o.tipo !== RECHAZAR).map((o) => o.id)),
+  );
+
+  /*
+   * Y EL PANEL «Trueques» SE RETIRA CUANDO EL PREGÓN LO HEREDA. Con los dos puestos la misma
+   * pantalla cuenta lo mismo dos veces, con dos redacciones distintas, y la que se quedaría
+   * atrás el día que una cambie es la que vive dentro de un cajón que hay que abrir.
+   */
+  const panelesConTrato = panelesEnTres(tableroDeRiberas(vistaB, 'B').paneles);
+  comprobar(
+    'el juego declara el panel «Trueques» en cuanto hay un trato, o lo de abajo no mediría nada',
+    panelesConTrato.some((p) => p.titulo === PANEL_DE_TRUEQUES),
+    panelesConTrato.map((p) => p.titulo),
+  );
+  comprobar(
+    'con pregón, el panel «Trueques» del cajón se retira: lo mismo dicho dos veces en la misma pantalla',
+    !panelesFueraDelPregon(panelesConTrato, pregonB).some((p) => p.titulo === PANEL_DE_TRUEQUES),
+    panelesFueraDelPregon(panelesConTrato, pregonB).map((p) => p.titulo),
+  );
+  comprobar(
+    'y sin pregón se queda, porque entonces es el ÚNICO sitio donde vive lo que ya se trocó: el respaldo del retablo no tiene cinta de la que colgar tiras',
+    canonico(panelesFueraDelPregon(panelesConTrato, null).map((p) => p.titulo)) === canonico(panelesConTrato.map((p) => p.titulo)),
+  );
+  comprobar(
+    'y no toca ningún otro panel: los demás salen los mismos y en el mismo orden',
+    canonico(panelesFueraDelPregon(panelesConTrato, pregonB).map((p) => p.titulo)) ===
+      canonico(panelesConTrato.filter((p) => p.titulo !== PANEL_DE_TRUEQUES).map((p) => p.titulo)),
+  );
+
+  /*
+   * ═══ Y LAS PUERTAS, QUE ES LO QUE HACE QUE ESTO NO TIRE UNA PANTALLA ENTERA ═══
+   *
+   * La misma convención que `marcadorEnTres` y `panelesEnTres`: con algo que no es una vista de
+   * Riberas, sin asiento, sin lista de tratos o con basura dentro, se devuelve `null` o se
+   * salta la entrada — nunca se revienta. Una vista sin `tratos` es legítima: la del banco de
+   * anillos no los trae, y una partida guardada de antes del trueque tampoco.
+   */
+  comprobar('un mirón no tiene pregón: no puede contestar nada ni ha propuesto nada', elPregonEnTres(vistaB, null, opcionesB) === null);
+  comprobar('una vista que no es de Riberas tampoco', elPregonEnTres({ desde: 'otro' }, 'B', opcionesB) === null && elPregonEnTres(null, 'B', opcionesB) === null);
+  const sinTratos = { ...(vistaB as Record<string, unknown>) };
+  delete sinTratos['tratos'];
+  comprobar('y una vista sin lista de tratos da `null` en vez de reventar la pantalla entera', elPregonEnTres(sinTratos, 'B', opcionesB) === null);
+  const conBasura = { ...(vistaB as Record<string, unknown>), tratos: [null, 3, { id: 7 }, { id: 't9', de: 'A', para: 'B', da: [null, 'junco'], pide: 'no', estado: 'propuesta' }] };
+  const pregonSucio = elPregonEnTres(conBasura, 'B', opcionesB);
+  comprobar(
+    'y con basura en la lista se saltan las entradas malas y se criban los bienes que no son bienes, en vez de pintar «1 null por 1 limo»',
+    pregonSucio?.paraContestar.length === 1 && pregonSucio.paraContestar[0]?.da === '1 junco' && pregonSucio.paraContestar[0]?.pide === 'nada',
+    pregonSucio?.paraContestar[0],
+  );
+}
+
 /* ═══ EL RECUENTO, PARA QUE NO SE VACÍE SIN QUE NADIE LO NOTE ═══ */
-const MINIMO = 355;
+const MINIMO = 390;
 if (hechas < MINIMO) {
   console.log(`✘ este comprobador debería hacer al menos ${MINIMO} comprobaciones y ha hecho ${hechas}: alguien ha borrado un bloque`);
   process.exit(2);

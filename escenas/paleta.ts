@@ -186,6 +186,113 @@ export function desplazamientoDeColor(color: string): { u: number; v: number } {
   return { u: (columna - CELDA_DEL_JUGADOR[0]) / COLUMNAS_DEL_ATLAS, v: 0 };
 }
 
+/**
+ * ═══ EL COLOR DE CADA JUGADOR EN PLANO, Y POR QUÉ HACÍA FALTA MEDIRLO ═══
+ *
+ * ═══ EL FALLO, QUE SALIÓ JUGANDO Y NO LEYENDO ═══
+ *
+ * Un revisor jugó una partida entera de Riberas en tres dimensiones y NO consiguió
+ * señalar ni una sola vez su propia choza. La captura del tablero recién repartido
+ * —cero piezas— y la del mismo tablero con SEIS chozas y SEIS veredas puestas son
+ * indistinguibles a la vista con el encuadre de «Ver el tablero entero».
+ *
+ * La causa está medida sobre `modelos/tablero.glb`, contando los vértices de cada
+ * pieza que caen en la fila 3 del atlas —la fila donde el pack pone los cuatro
+ * colores de jugador, uno por columna—:
+ *
+ *     casa (adorno)       384 vértices en la columna 1  → ROJO
+ *     iglesia, acena,     551, 496, 98, 473, 326        → AZUL
+ *     mina, concejo, vigía
+ *     taberna, herrería,  142, 187, 611                 → AMARILLO
+ *     taller
+ *     mercado, aserradero,112, 272, 160, 304            → VERDE
+ *     pozo, cuadras
+ *     ---------------------------------------------------------------
+ *     poblado (jugador)   288 vértices en la columna 0, desplazada por color
+ *     ciudad  (jugador)   837
+ *
+ * O sea que el tejado de una casa de adorno y el tejado del poblado de alguien no
+ * son colores PARECIDOS: son EL MISMO TÉXEL. La distancia entre ellos es cero, y
+ * `poblar.ts` reparte casas por todas las comarcas. La cabecera de
+ * `compilar-modelos.ts` dice que eso está resuelto «por TIPO, porque las piezas de
+ * jugador son casa y castillo y ningún edificio de adorno es una casa ni un
+ * castillo». No es cierto: el adorno `casa` es `building_home_B_red` y la pieza de
+ * jugador es `building_home_A_blue`. Son la misma clase de edificio, y uno de los
+ * dos lleva el rojo de un colono.
+ *
+ * ═══ LO QUE SE HACE CON ESTO, Y LO QUE NO ═══
+ *
+ * Recolorear el decorado exigiría recompilar el `.glb` y no arregla el caso de dos
+ * jugadores; lo que se hace es DARLE A LA PIEZA DE JUGADOR ALGO QUE EL DECORADO NO
+ * TIENE: un zócalo del color de su dueño, del tamaño de una marca de pantalla, que
+ * se ve desde el encuadre de tablero entero — donde un poblado ocupa el 1,27 % del alto
+ * de la pantalla, once píxeles en una ventana de novecientos, y encima con el tejado del
+ * mismo color que las casas de adorno que tiene alrededor. Lo pinta `delta.tsx` y necesita el color en
+ * hexadecimal, que es lo que hay aquí.
+ *
+ * ═══ Y POR QUÉ ESTOS SEIS DÍGITOS Y NO OTROS ═══
+ *
+ * Están MEDIDOS dentro del atlas, en las UV que de verdad usa la pieza del jugador:
+ * se toman los 288 vértices del `poblado` que caen en la celda del color, se les
+ * aplica `desplazamientoDeColor` y se promedia el color de la tabla del atlas en
+ * esos puntos. No son «un azul que pega». `verify:escena` vuelve a hacer esa medida
+ * sobre el `.glb` y el atlas de verdad y compara, así que el día que el pack cambie
+ * de paleta esto se pone rojo en vez de quedarse escrito — que es lo que le pasó a
+ * la frase de `compilar-modelos.ts` de aquí arriba.
+ *
+ * El zócalo NO se pinta con la textura por lo mismo que los caminos, y está dicho en
+ * `tipos.ts`: es geometría propia, no una pieza del pack a la que se le mueven las
+ * UV. Para geometría propia hace falta un color, y el color tiene que ser el mismo
+ * que lleva la pieza encima o el zócalo señalaría a otro.
+ */
+export const COLOR_LLANO_DEL_JUGADOR: Readonly<Record<string, string>> = {
+  blue: '#236dae',
+  red: '#c92630',
+  yellow: '#f8a34a',
+  green: '#007d52',
+};
+
+/**
+ * ═══ EL FILO DEL ZÓCALO, Y POR QUÉ EL ARO NO PUEDE SER SÓLO DE COLOR ═══
+ *
+ * Porque MEDIDO no se ve. El zócalo se posa sobre el suelo de su isla, y ese suelo sale
+ * del atlas: el verde de jugador es `#007d52` y la celda del bosque —que es la que
+ * pinta el carrizal de Riberas— es `#008454`. Son CUATRO unidades de CIE76, o sea el
+ * mismo color; el amarillo sobre la vega son 14,8, y el umbral con el que esta casa mide
+ * que una superficie no se come una pieza es 20. Un aro verde sobre un carrizal es un
+ * aro que no está, y el carrizal es uno de los seis terrenos: en un delta de diecinueve
+ * islas hay tres o cuatro.
+ *
+ * Retocar los cuatro colores de jugador para apartarlos de los seis terrenos no es una
+ * salida: son los colores QUE LLEVA LA PIEZA dentro del atlas, así que cambiarlos aquí
+ * haría que el aro señalara con un color distinto del tejado al que señala.
+ *
+ * La salida es la de siempre para un trazo sobre un fondo cualquiera: un FILO. Un aro
+ * casi negro un poco más grande, con el aro de color encima, y entonces lo que tiene que
+ * separarse del terreno es el filo —uno solo, y siempre el mismo— y no los cuatro
+ * colores. Es exactamente lo que el tablero plano ya hace con cada isla, y por eso el
+ * casi negro es el mismo: `#1d1f26`.
+ *
+ * NO SE IMPORTA DE `riberas.ts`, donde vive como `BORDE_DE_LA_ISLA`, y es a propósito:
+ * la escena no puede depender de una constante de un juego —pinta el delta de quien se lo
+ * mande— y el valor coincide porque los dos resuelven el mismo problema, no porque uno
+ * lea al otro. `verify:escena` mide que este filo se separa de los seis terrenos y de los
+ * cuatro colores de jugador, así que el día que dejaran de coincidir se vería aquí.
+ */
+export const FILO_DEL_ZOCALO = '#1d1f26';
+
+/**
+ * EL COLOR DE UN JUGADOR, con reserva para el que no se conozca.
+ *
+ * Un color que no esté en la tabla sale AZUL, exactamente como en
+ * `desplazamientoDeColor` y por lo mismo: un dato que llega de fuera no puede dejar
+ * una pieza sin zócalo — una pieza sin zócalo es una pieza que no se encuentra, que
+ * es el fallo que esto existe para tapar.
+ */
+export function colorLlanoDelJugador(color: string): string {
+  return COLOR_LLANO_DEL_JUGADOR[color] ?? (COLOR_LLANO_DEL_JUGADOR['blue'] as string);
+}
+
 /** Un terreno: cómo se pinta en plano y de qué celda del atlas sale su suelo. */
 export interface Terreno {
   /** El color para el tablero plano y para cuando no hay textura. */

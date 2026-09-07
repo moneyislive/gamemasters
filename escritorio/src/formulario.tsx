@@ -84,13 +84,32 @@ export interface LoQueSeOfrece {
   quieto: boolean;
   /** Si esto es el mueble entero o el panel de acciones de un tablero. */
   titulo?: string;
+  /**
+   * ═══ SI ESTA COPIA SE QUEDA LAS TECLAS 1-9, Y POR QUÉ HAY QUE PODER DECIR QUE NO ═══
+   *
+   * Los atajos se registran EN LA VENTANA, así que son de la pantalla y no de la caja: dos
+   * listas montadas a la vez con las mismas opciones dentro registran DOS oyentes y el «3»
+   * dispara el mismo movimiento dos veces. Los dos salen antes de que React vuelva a pintar
+   * —`quieto` es un estado, no un cerrojo—, así que el segundo viaja con la revisión vieja y
+   * la mesa contesta «ese movimiento no se ha podido hacer». Es exactamente la carrera que
+   * `e.repeat` evita para una tecla mantenida, por el otro extremo.
+   *
+   * Ese caso existe desde que el delta de Riberas pinta las opciones sueltas DOS veces: el
+   * carril de la cinta y la lista entera del cajón. Quien se queda con las teclas es el
+   * carril —está siempre, con el cajón abierto y cerrado—, y la copia del cajón declara
+   * `atajos={false}`. Así el número escrito en el botón del carril, el escrito en el botón
+   * del cajón y la tecla son el mismo número y significan lo mismo se mire donde se mire.
+   *
+   * Por omisión SÍ, que es lo que hace cualquier formulario que esté solo en su pantalla.
+   */
+  atajos?: boolean;
 }
 
 /** Hasta dónde llegan los atajos. Después del 9 no hay tecla que valga. */
-const CON_ATAJO = 9;
+export const CON_ATAJO = 9;
 
 /** Una opción ya comprobada: lo que de verdad se puede pintar y mandar. */
-interface OpcionPintable {
+export interface OpcionPintable {
   /** La clave de la lista de React. Estable si el servidor manda ids estables. */
   clave: string;
   /** El movimiento entero, tal como se manda. Aquí no se traduce nada. */
@@ -129,7 +148,7 @@ interface OpcionPintable {
  * Dos iguales desincronizan la lista de React sin decir nada. Se usa el id
  * mientras sea una cadena con contenido y no se haya visto ya; si no, el orden.
  */
-function loQueSePuedePintar(opciones: readonly OpcionQueLlega[]): OpcionPintable[] {
+export function loQueSePuedePintar(opciones: readonly OpcionQueLlega[]): OpcionPintable[] {
   /*
    * El array entra por el cable, así que se recorre como `unknown`: leerlo con el
    * tipo puesto es justamente lo que impedía escribir estas comprobaciones.
@@ -175,16 +194,28 @@ function loQueSePuedePintar(opciones: readonly OpcionQueLlega[]): OpcionPintable
   return pintables;
 }
 
-export function Formulario({ opciones, alElegir, quieto, titulo }: LoQueSeOfrece): JSX.Element {
-  /*
-   * Los `id` de los rótulos y las ayudas salen de `useId` y no de un contador
-   * propio porque este mueble se pinta DOS VECES en la misma pantalla —debajo del
-   * tablero va «Y además puedes»— y dos `aria-labelledby` apuntando al mismo id
-   * harían que la mitad de los botones se llamaran como los de arriba.
-   */
-  const base = useId();
-  const pintables = useMemo(() => loQueSePuedePintar(opciones), [opciones]);
-
+/**
+ * LAS TECLAS 1-9, REGISTRADAS EN LA VENTANA, para una lista de opciones ya pintable.
+ *
+ * ═══ POR QUÉ ES UN GANCHO Y NO EL CUERPO DE `Formulario` ═══
+ *
+ * Porque desde que el delta de Riberas tiene su carril en la cinta hay DOS muebles que
+ * ofrecen la misma lista con la misma numeración —el carril y la copia entera del cajón—, y
+ * el número escrito en el botón, el número escrito en el otro botón y la tecla tienen que
+ * ser el mismo número. Con el atajo copiado en el segundo mueble, ese número se separa el día
+ * que alguien toque uno de los dos; y con los dos registrados a la vez, el «3» manda el
+ * movimiento DOS VECES (ver `atajos` en `LoQueSeOfrece`). Escrito una vez, quien no quiere
+ * las teclas pasa `activos: false` y no hay dos cuentas que cuadrar.
+ *
+ * `activos` va aparte de `quieto` a propósito: `quieto` es «ahora mismo no, hay algo en
+ * vuelo» y se levanta solo; `activos` es «estas teclas no son de este mueble» y no cambia.
+ */
+export function usarLosAtajos(
+  pintables: readonly OpcionPintable[],
+  alElegir: (movimiento: MovimientoDeclarado) => void,
+  quieto: boolean,
+  activos = true,
+): void {
   /*
    * El atajo se registra en la ventana y no en un contenedor con `tabIndex`,
    * porque quien juega no tiene por qué haber hecho clic en ningún sitio antes
@@ -213,7 +244,7 @@ export function Formulario({ opciones, alElegir, quieto, titulo }: LoQueSeOfrece
    * que es exactamente lo que `quieto` existe para evitar.
    */
   useEffect(() => {
-    if (quieto) return;
+    if (quieto || !activos) return;
     const alPulsar = (e: KeyboardEvent): void => {
       if (e.metaKey || e.ctrlKey || e.altKey || e.repeat) return;
       const activo = document.activeElement;
@@ -242,7 +273,19 @@ export function Formulario({ opciones, alElegir, quieto, titulo }: LoQueSeOfrece
     return () => {
       window.removeEventListener('keydown', alPulsar);
     };
-  }, [pintables, alElegir, quieto]);
+  }, [pintables, alElegir, quieto, activos]);
+}
+
+export function Formulario({ opciones, alElegir, quieto, titulo, atajos = true }: LoQueSeOfrece): JSX.Element {
+  /*
+   * Los `id` de los rótulos y las ayudas salen de `useId` y no de un contador
+   * propio porque este mueble se pinta DOS VECES en la misma pantalla —debajo del
+   * tablero va «Y además puedes»— y dos `aria-labelledby` apuntando al mismo id
+   * harían que la mitad de los botones se llamaran como los de arriba.
+   */
+  const base = useId();
+  const pintables = useMemo(() => loQueSePuedePintar(opciones), [opciones]);
+  usarLosAtajos(pintables, alElegir, quieto, atajos);
 
   if (pintables.length === 0) {
     /*
@@ -272,7 +315,14 @@ export function Formulario({ opciones, alElegir, quieto, titulo }: LoQueSeOfrece
       */}
       <ul className="opciones" role="list">
         {pintables.map((o, i) => {
-          const conAtajo = i < CON_ATAJO;
+          /*
+           * Y CON LOS ATAJOS APAGADOS NO SE PINTA NINGUNO, que es la misma vara de siempre:
+           * un «3» dibujado al lado de un botón cuyo «3» lo escucha otro mueble declararía el
+           * mismo atajo en dos sitios a la vez. La tecla SIGUE funcionando —la escucha el
+           * carril de la cinta, que está montado también con el cajón abierto y ofrece esta
+           * misma lista en este mismo orden—; lo que no se hace es prometerla dos veces.
+           */
+          const conAtajo = atajos && i < CON_ATAJO;
           const idRotulo = `${base}-rotulo-${String(i)}`;
           const idAyuda = `${base}-ayuda-${String(i)}`;
           return (

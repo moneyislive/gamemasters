@@ -39,8 +39,12 @@ import type { Punto } from '../../shared/mecanicas/malla-hexagonal';
 import {
   colorDelBien,
   colorDeTerreno,
+  colorLlanoDelJugador,
   COLUMNA_DEL_COLOR,
+  FILO_DEL_ZOCALO,
   COLUMNAS_DEL_ATLAS,
+  desplazamientoDeColor,
+  esDelColorDelJugador,
   FILAS_DEL_ATLAS,
   PALETA,
   puntosDeLaCifra,
@@ -213,9 +217,28 @@ import {
   CONTORNOS_DE_LA_CIFRA,
   CONTORNOS_DEL_BIEN,
 } from '../iconos';
+import { altoDeLaCinta, ALTO_DE_LA_CINTA, anchoDeLaCinta, BOTON_DE_LA_CINTA, cuantosSeVenEnElCarril, loQueLlevaLaCinta } from '../cinta';
 import { selloDeLaTirada } from '../../shared/arcade/juegos/riberas-en-tres';
 import { MODELO, modeloDePieza } from '../modelos';
-import { ALTURA_DE_UNA_PERSONA, ESCALON, RADIO_DE_COMARCA, RADIO_DE_TESELA } from '../escala';
+import {
+  ALTURA_DE_UNA_PERSONA,
+  ESCALA_DEL_PACK,
+  ESCALON,
+  RADIO_DE_COMARCA,
+  RADIO_DE_TESELA,
+  SUELO_DEL_ZOCALO,
+  tallaDeUnaMarca,
+  TECHO_DEL_ZOCALO,
+  ZOCALO_EN_PANTALLA,
+} from '../escala';
+/*
+ * EL ATLAS SE LEE DE LA TABLA COMPILADA, que es la que la app sube a la GPU y la que
+ * `verify:atlas-del-tablero` compara píxel a píxel contra el PNG del pack. Abrir aquí el PNG
+ * otra vez sería un TERCER camino hasta el mismo color, y el que nadie compara con los otros
+ * dos es siempre el que miente.
+ */
+import { tablaDelAtlas } from '../texeles-del-atlas';
+import { ALTO_DEL_ATLAS, COLUMNAS_DE_LA_TABLA } from '../atlas-del-tablero';
 import { ORDEN_DE_LA_BARRA, ORDEN_DE_LAS_CARTAS } from '../capas';
 import { fallosDelOrden, ordenDeDibujoDeLaMesa } from './arbol-de-la-mesa';
 import { MAR_ADENTRO_DE_LOS_BARCOS, laMarinaDelMundo } from '../marina';
@@ -5695,6 +5718,691 @@ paso('Recoger la mesa: la bajada tapa el asa PROYECTADA en los quince lienzos, e
   );
 }
 
+// ---------------------------------------------------------------------------
+paso('La cinta del tercio central deja aire a las dos manos, la frase no se queda en tres letras, y su segunda tira mide otro suelo de toque');
+// ---------------------------------------------------------------------------
+
+/*
+ * ═══ POR QUÉ ESTE REPARTO SE MIDE AQUÍ Y NO EN CADA CLIENTE ═══
+ *
+ * `escenas/cinta.ts` dice cuánto ancho se lleva la cinta que va pegada al canto de arriba
+ * del lienzo —el aviso del turno y la puerta del cajón— y qué le cabe dentro. Lo van a
+ * pintar DOS pantallas: el escritorio hoy y la app después. Una copia del reparto en cada
+ * cliente son dos repartos que divergen el día que alguien toque uno, y el que diverge es
+ * el que nadie estaba mirando.
+ *
+ * Y LO QUE SE ROMPE EN SILENCIO ES ESTO: la cinta es una caja OPACA encima del lienzo, y a
+ * los dos lados del lienzo viven las dos manos de cartas — que no son adorno, son cartas
+ * que se ARRASTRAN. Una cinta un poco más ancha de la cuenta no da error, no rompe ninguna
+ * prueba y en una captura de un monitor no se ve: lo que hace es tapar el canto de la carta
+ * de arriba en los lienzos de pie, o sea que hay una carta que no se puede coger y nada lo
+ * dice. Aquí se mide contra las manos DE VERDAD —las que reparten `franjaDeLasCartas` y
+ * `huecosDeLaBaraja`— en los quince lienzos de la lista de arriba, con un suelo de aire.
+ *
+ * ═══ DE DÓNDE SALE EL SUELO DE QUINCE PUNTOS ═══
+ *
+ * De medir el peor caso y quedarse justo por debajo. En 390×845 —el lienzo entero de un
+ * móvil de pie, que es donde las manos suben hasta arriba— la cinta al 50 % del ancho SE
+ * METE 3,9 puntos por dentro de la franja de la mano del mazo, al 45 % deja 5,8 (que no es
+ * un margen: es un pelo) y al 40 % deja 15,6 y 26,5 a la mano de bienes. De ahí sale el
+ * `PARTE_DE_PIE = 0,40`, y de ahí sale este quince.
+ *
+ * ═══ Y CONTRA QUÉ SE MIDE CADA MANO, QUE NO ES LO MISMO EN LAS DOS ═══
+ *
+ *   · la del MAZO se mide contra su FRANJA (`franjaDeLasCartas`), que es el rectángulo
+ *     reservado para ella: dentro viven las cartas y también las casillas donde se sueltan
+ *     al arrastrarlas, y esas llegan al 93 % del ancho de la franja. Medir sólo las cartas
+ *     daría 33 puntos de más de holgura que no existen;
+ *   · la de BIENES no tiene franja declarada, así que se mide contra sus cartas ABIERTAS
+ *     —el imán a tope sobre la de más arriba, que es cuando más se meten hacia dentro—.
+ *     Quietas asoman menos, y medir quietas sería medir el caso fácil.
+ */
+{
+  const CAMPO_DE_LA_CINTA = (45 * Math.PI) / 180;
+  const MANO_DE_BIENES = Array.from({ length: 14 }, (_, i) => ({
+    id: `b${String(i)}`,
+    bien: ['limo', 'junco', 'sal', 'piedra', 'grano'][i % 5] as string,
+  }));
+  const SUELO_DE_AIRE = 15;
+
+  /*
+   * LOS DOS ALTOS DE LA CINTA SON EL SUELO DE TOQUE, Y SON EL MISMO A PROPÓSITO: la cinta ES
+   * la línea de sus botones. Escritos aparte se separan sin que nada se caiga —una cinta de
+   * cuarenta con botones de cuarenta y cuatro deja los botones asomando por los dos cantos—,
+   * y además el alto es lo que `elCartelQueCabe` le resta a la banda del cartel de los
+   * naipes: una cinta que crece sin que aquella cuenta se entere le mete el cartel debajo.
+   */
+  comprobar(
+    'el alto de la cinta y el lado de sus botones son el suelo de toque de la casa, los dos: 44 puntos',
+    ALTO_DE_LA_CINTA === SUELO_DEL_TOQUE && BOTON_DE_LA_CINTA === SUELO_DEL_TOQUE,
+    { cinta: ALTO_DE_LA_CINTA, boton: BOTON_DE_LA_CINTA, suelo: SUELO_DEL_TOQUE },
+  );
+
+  const aires: string[] = [];
+  const pisados: string[] = [];
+  for (const [nombre, anchoPt, altoPt] of LIENZOS) {
+    const prop = anchoPt / altoPt;
+    const suAncho = anchoDeLaCinta(anchoPt, altoPt);
+    const izquierdaDeLaCinta = (anchoPt - suAncho) / 2;
+    const derechaDeLaCinta = izquierdaDeLaCinta + suAncho;
+
+    const vistoEnLasCartas = loQueSeVeEnLasCartas(CAMPO_DE_LA_CINTA, prop);
+    const porPunto = altoPt / vistoEnLasCartas.alto;
+    const franja = franjaDeLasCartas(CAMPO_DE_LA_CINTA, prop);
+    const cantoDeLaFranja = (franja.derecha + vistoEnLasCartas.ancho / 2) * porPunto;
+
+    const vistoEnLaBaraja = loQueSeVeEnLaBaraja(CAMPO_DE_LA_CINTA, prop);
+    const porPuntoEnLaBaraja = altoPt / vistoEnLaBaraja.alto;
+    const quietas = huecosDeLaBaraja(MANO_DE_BIENES, CAMPO_DE_LA_CINTA, prop, null);
+    const laDeArriba = Math.max(...quietas.map((c) => c.hueco.y));
+    const abiertas = huecosDeLaBaraja(MANO_DE_BIENES, CAMPO_DE_LA_CINTA, prop, laDeArriba);
+    const cantoDeLosBienes = Math.min(
+      ...abiertas.map((c) => (c.hueco.x - c.hueco.ancho / 2 + vistoEnLaBaraja.ancho / 2) * porPuntoEnLaBaraja),
+    );
+
+    const alMazo = izquierdaDeLaCinta - cantoDeLaFranja;
+    const aLosBienes = cantoDeLosBienes - derechaDeLaCinta;
+    aires.push(`${nombre}: mazo ${alMazo.toFixed(1)} · bienes ${aLosBienes.toFixed(1)}`);
+    if (alMazo < SUELO_DE_AIRE) pisados.push(`${nombre}: la cinta deja ${alMazo.toFixed(1)} pt a la franja del mazo`);
+    if (aLosBienes < SUELO_DE_AIRE) pisados.push(`${nombre}: la cinta deja ${aLosBienes.toFixed(1)} pt a la mano de bienes`);
+  }
+
+  comprobar(
+    'la cinta deja al menos quince puntos de aire a la franja del mazo y a la mano de bienes abierta en los quince lienzos',
+    pisados.length === 0 && aires.length === LIENZOS.length,
+    pisados.length > 0 ? pisados.slice(0, 4) : aires.slice(0, 3),
+  );
+  /*
+   * Y EL PEOR CASO ES EL QUE DECIDIÓ EL 0,40, así que se nombra: si un día deja de ser el
+   * peor —porque las manos se aparten o porque entre un lienzo más de pie— esto se cae y
+   * quien lo mire tiene delante el número que hay que volver a mirar.
+   */
+  const elPeor = aires.find((l) => l.startsWith('móvil de pie, lienzo entero')) ?? '';
+  comprobar(
+    'y el más apretado de los quince es el móvil de pie con el lienzo entero (390×845), que es el que decidió el 40 %: 15,6 puntos a la franja del mazo y 26,5 a la de bienes',
+    /mazo 15\.[56]/.test(elPeor) && /bienes 26\.[45]/.test(elPeor),
+    elPeor,
+  );
+  /*
+   * ═══ ENSANCHARLA NO ARREGLA LA FRASE, Y ESO ES UNA MEDIDA Y NO UNA OPINIÓN ═══
+   *
+   * La cabecera de `loQueLlevaLaCinta` cuenta que a 288 puntos de lienzo la frase se queda
+   * en tres letras y que ensanchar la cinta no lo arregla, porque el techo antes de comerse
+   * los quince puntos de aire son 122,8 puntos. Ese número es el que sostiene la decisión de
+   * sacar el «‹» en vez de ensanchar, así que se mide en vez de creérselo.
+   */
+  {
+    const prop = 288 / 420;
+    const vistoEnLasCartas = loQueSeVeEnLasCartas(CAMPO_DE_LA_CINTA, prop);
+    const franja = franjaDeLasCartas(CAMPO_DE_LA_CINTA, prop);
+    const cantoDeLaFranja = ((franja.derecha + vistoEnLasCartas.ancho / 2) * 420) / vistoEnLasCartas.alto;
+    /* Centrada: lo que puede crecer por un lado lo pierde por el otro, así que el techo es simétrico. */
+    const techo = 2 * (288 / 2 - cantoDeLaFranja - SUELO_DE_AIRE);
+    comprobar(
+      'y el techo de la cinta a 288 de lienzo son 122,8 puntos: más allá se come los quince de aire, así que ensancharla NO es la salida y por eso el «‹» se va',
+      Math.abs(techo - 122.8) <= 0.6 && techo < 288 / 2,
+      techo.toFixed(1),
+    );
+  }
+
+  /*
+   * ═══ Y QUÉ LE CABE DENTRO: LAS TRES RAMAS DE `loQueLlevaLaCinta` ═══
+   *
+   * El hueco mínimo de la frase y el lado del botón entran POR LA PUERTA porque dependen de
+   * cómo pinte cada cliente (ver la cabecera del fichero). Aquí se prueba la función con los
+   * dos casos que separan sus ramas, y con los números del escritorio, que es el que la pinta
+   * hoy: raíz 17, ocho letras de 8,364 puntos (66,9) y botones de 46,75 —los 44 de aquí
+   * escritos `2.75rem`—.
+   */
+  {
+    const OCHO_LETRAS = 8 * 0.82 * 17 * 0.6;
+    const BOTON_PINTADO = (BOTON_DE_LA_CINTA * 17) / 16;
+    const estrecha = loQueLlevaLaCinta(288, 420, OCHO_LETRAS, BOTON_PINTADO);
+    const ancha = loQueLlevaLaCinta(1920, 1080, OCHO_LETRAS, BOTON_PINTADO);
+    comprobar(
+      'con la frase sin sitio para sus ocho letras, el que se va es el «‹» y no la frase: a 288 de lienzo la cinta vale 115,2 y le quedan 68,4 puntos, que son ocho letras justas',
+      !estrecha.salidaDentro &&
+        Math.abs(estrecha.ancho - 115.2) < 0.1 &&
+        estrecha.hueco >= OCHO_LETRAS &&
+        Math.abs(estrecha.hueco - 68.45) < 0.1,
+      estrecha,
+    );
+    comprobar(
+      'y donde hay sitio se queda dentro: en un monitor la cinta vale 640 y a la frase le quedan 546,5 puntos con los dos botones puestos',
+      ancha.salidaDentro && Math.abs(ancha.ancho - 640) < 0.1 && Math.abs(ancha.hueco - 546.5) < 0.1,
+      ancha,
+    );
+    /*
+     * EL LADO DEL BOTÓN CUENTA DE VERDAD, y esto es lo que compra que no se haya quedado en
+     * la constante: con los 44 de aquí, la misma cinta de 288 diría que a la frase le quedan
+     * 71,2 puntos, y en pantalla son 68,4. Son tres puntos, y con la preferencia de letra del
+     * navegador en grande dejan de ser tres.
+     */
+    const conElDeAqui = loQueLlevaLaCinta(288, 420, OCHO_LETRAS);
+    comprobar(
+      'y el lado del botón entra por la puerta: con los 44 de este fichero la cuenta da 71,2 puntos de frase donde el escritorio pinta 68,4',
+      Math.abs(conElDeAqui.hueco - 71.2) < 0.1 && conElDeAqui.hueco > estrecha.hueco,
+      { conElDeAqui: conElDeAqui.hueco, comoSePinta: estrecha.hueco },
+    );
+    /*
+     * Y CON EL LIENZO SIN MEDIR NO HAY CINTA: cero por cero es el primer render y también
+     * Node. Un ancho de cero no se ve como un error, se ve como que no hay cinta, y quien
+     * pinta ya sabe no pintarla. Un ancho negativo o infinito se vería como una raya.
+     */
+    comprobar(
+      'y con el lienzo sin medir todavía la cinta vale cero, que es «no hay cinta» y no una raya',
+      anchoDeLaCinta(0, 0) === 0 && anchoDeLaCinta(288, 0) === 0 && anchoDeLaCinta(-1, 420) === 0,
+      [anchoDeLaCinta(0, 0), anchoDeLaCinta(288, 0), anchoDeLaCinta(-1, 420)],
+    );
+    /*
+     * LA PROPORCIÓN DECIDE, NO UN UMBRAL DE ANCHO. «De pie» es que el lienzo sea más alto
+     * que ancho, que es exactamente cuando las manos suben hasta arriba. Con un umbral en
+     * puntos —«por debajo de 400 es de pie»— una tableta apaisada estrecha se mediría como
+     * un teléfono de pie y al revés, y la cinta saldría del tamaño equivocado sin que se
+     * cayera nada.
+     */
+    comprobar(
+      'y lo que decide el reparto es la PROPORCIÓN y no un umbral de ancho: 400×400 cuenta como apaisado (el tercio) y 400×401 como de pie (el 40 %)',
+      Math.abs(anchoDeLaCinta(400, 400) - 400 / 3) < 1e-9 && Math.abs(anchoDeLaCinta(400, 401) - 160) < 1e-9,
+      [anchoDeLaCinta(400, 400), anchoDeLaCinta(400, 401)],
+    );
+  }
+
+  /*
+   * ═══ LA SEGUNDA TIRA: EL CARRIL DE LOS BOTONES SUELTOS ═══
+   *
+   * Esta cabecera decía que la línea de los botones de `opcionesFueraDeLaMesa` «todavía no
+   * está escrita en ninguna pantalla». Ya lo está, y lo que la obligó se cuenta con un
+   * número: con el estiaje por mover el juego emite DIECIOCHO destinos y ninguno lo pinta el
+   * delta, así que los dieciocho salían como botones de 238 puntos DEBAJO del lienzo, o sea
+   * fuera de una pantalla que el delta se come entera. Y mover la pieza es obligatorio.
+   *
+   * LO QUE SE MIDE AQUÍ es lo que es de este fichero y no de una pantalla: que el alto de la
+   * cinta con carril sean DOS tiras del suelo de toque y no un número suelto —ese alto es lo
+   * que `elCartelQueCabe` le resta a la banda del cartel de los naipes, y una cinta que crece
+   * sin que aquella cuenta se entere le mete el cartel por debajo del vidrio—, y cuántos
+   * cuadrados se ven de una vez en cada lienzo, que es lo que dice si el carril rueda.
+   *
+   * Y EL CARRIL MIDE LO QUE LA CINTA, que no es una comodidad: a los lados siguen estando las
+   * dos manos y siguen siendo cartas que se arrastran. Midiendo lo mismo, el aire de quince
+   * puntos que se acaba de medir arriba vale para las dos tiras y no hay una segunda cuenta
+   * que llevar. Por eso aquí no hay un `anchoDelCarril`: sería justo el segundo reparto que
+   * este fichero existe para no tener.
+   */
+  {
+    const BOTON_PINTADO = (BOTON_DE_LA_CINTA * 17) / 16;
+    comprobar(
+      'el alto de la cinta son DOS tiras del suelo de toque cuando lleva carril y una cuando no: 88 y 44, que es lo que el cartel de los naipes resta a su banda',
+      altoDeLaCinta(false) === ALTO_DE_LA_CINTA &&
+        altoDeLaCinta(true) === 2 * ALTO_DE_LA_CINTA &&
+        altoDeLaCinta(true) === 88,
+      { sin: altoDeLaCinta(false), con: altoDeLaCinta(true) },
+    );
+    /*
+     * CUÁNTOS SE VEN DE UNA VEZ, en los dos extremos de la lista. En el lienzo más estrecho de
+     * este cliente —288 puntos, cinta de 115,2— se ven DOS de los dieciocho: el carril rueda
+     * casi siempre, y por eso la hoja del escritorio lleva `overflow-x` y `touch-action:
+     * auto`. En un monitor —cinta de 640— se ven trece, o sea que ahí rueda poco. Los dos
+     * números están escritos en la cabecera de `cuantosSeVenEnElCarril` para que el siguiente
+     * no tenga que medirlos, y por eso se miden aquí en vez de creérselos.
+     */
+    comprobar(
+      'y en el lienzo más estrecho de este cliente se ven DOS cuadrados de los dieciocho y en un monitor trece: es lo que dice que el carril rueda, y son los números que su cabecera escribe',
+      cuantosSeVenEnElCarril(anchoDeLaCinta(288, 420), BOTON_PINTADO) === 2 &&
+        cuantosSeVenEnElCarril(anchoDeLaCinta(1920, 1080), BOTON_PINTADO) === 13,
+      {
+        estrecho: cuantosSeVenEnElCarril(anchoDeLaCinta(288, 420), BOTON_PINTADO),
+        monitor: cuantosSeVenEnElCarril(anchoDeLaCinta(1920, 1080), BOTON_PINTADO),
+      },
+    );
+    /*
+     * Y EL LADO DEL BOTÓN ENTRA POR LA PUERTA, como en `loQueLlevaLaCinta` y por lo mismo: esta
+     * casa escribe los 44 como `2.75rem`, que con su raíz son 46,75. Con los 44 de este fichero
+     * la cuenta dice que en la cinta del monitor caben catorce, y en pantalla son trece: uno de
+     * más, que es el que se sale por el canto.
+     */
+    comprobar(
+      'y el lado del botón entra por la puerta: con los 44 de este fichero la cuenta dice catorce cuadrados en la cinta de un monitor donde el escritorio pinta trece',
+      cuantosSeVenEnElCarril(anchoDeLaCinta(1920, 1080)) === 14 &&
+        cuantosSeVenEnElCarril(anchoDeLaCinta(1920, 1080)) > cuantosSeVenEnElCarril(anchoDeLaCinta(1920, 1080), BOTON_PINTADO),
+      { conLosDeAqui: cuantosSeVenEnElCarril(anchoDeLaCinta(1920, 1080)), comoSePinta: cuantosSeVenEnElCarril(anchoDeLaCinta(1920, 1080), BOTON_PINTADO) },
+    );
+    /*
+     * Y CON EL LIENZO SIN MEDIR NO HAY CARRIL, por lo mismo que no hay cinta: cero por cero es
+     * el primer render y también Node. Cero cuadrados es «no hay carril»; una división por cero
+     * sería un `Infinity` que nadie ve como un error.
+     */
+    comprobar(
+      'y con el lienzo sin medir todavía no se ve ningún cuadrado, que es «no hay carril» y no un infinito',
+      cuantosSeVenEnElCarril(0) === 0 && cuantosSeVenEnElCarril(115.2, 0) === 0 && cuantosSeVenEnElCarril(-1) === 0,
+      [cuantosSeVenEnElCarril(0), cuantosSeVenEnElCarril(115.2, 0), cuantosSeVenEnElCarril(-1)],
+    );
+  }
+}
+
+/*
+ * ═══ LAS PIEZAS DE UN COLONO NO SE ENCUENTRAN EN EL TABLERO, Y ESO ES DEL JUEGO ═══
+ *
+ * Esto salió jugando una partida entera contra el servidor, no leyendo. El revisor NO
+ * consiguió señalar ni una sola vez su propia choza: la captura del tablero recién repartido
+ * —cero piezas— y la del mismo tablero con SEIS chozas y SEIS veredas puestas son
+ * indistinguibles a la vista con el encuadre de «Ver el tablero entero».
+ *
+ * Aquí se miden las DOS causas, porque son dos y sólo una es de color:
+ *
+ *   1. QUE LA PIEZA NO TIENE UN COLOR PROPIO. El pack pinta los tejados del decorado con LOS
+ *      MISMOS cuatro colores de jugador, y `poblar.ts` reparte casas por todas las comarcas.
+ *      La distancia entre el tejado de una casa de adorno y el tejado del poblado de alguien
+ *      no es «poca»: es CERO, porque es el mismo téxel del atlas.
+ *   2. QUE A LA DISTANCIA DE TABLERO NO SE VE NADA. Un poblado mide unas cinco unidades sobre
+ *      un mundo de doscientas de radio: pintado a su tamaño real, ocupa unos pocos píxeles.
+ *
+ * Y por eso el arreglo es un ZÓCALO —un aro del color del dueño, medido como una marca de
+ * pantalla— y no un retoque de paleta: el retoque no toca la segunda causa, y la segunda es la
+ * que hace que ni siquiera se pueda comparar el color.
+ */
+{
+  paso('La pieza de un colono se distingue del caserío: color propio medido, y tamaño de marca de pantalla');
+
+  /*
+   * LA DISTANCIA SE MIDE EN CIELAB, con la misma fórmula y el mismo umbral que usa
+   * `verify:riberas` para afirmar que ninguna isla se come una pieza. Se copia la aritmética
+   * —son doce líneas de conversión— y NO el veredicto: el umbral es el de allí (20 unidades de
+   * CIE76) y está razonado allí. En RGB esta medida no vale: `#3f6d5a` y `#6d8f3f` están a 68
+   * unidades y el ojo los ve casi iguales.
+   */
+  const aLab = (hex: string): [number, number, number] => {
+    const canal = (i: number): number => parseInt(hex.slice(1 + i * 2, 3 + i * 2), 16) / 255;
+    const lineal = (c: number): number => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+    const r = lineal(canal(0));
+    const v = lineal(canal(1));
+    const a = lineal(canal(2));
+    const x = (r * 0.4124 + v * 0.3576 + a * 0.1805) / 0.95047;
+    const y = r * 0.2126 + v * 0.7152 + a * 0.0722;
+    const z = (r * 0.0193 + v * 0.1192 + a * 0.9505) / 1.08883;
+    const f = (t: number): number => (t > 0.008856 ? Math.cbrt(t) : 7.787 * t + 16 / 116);
+    return [116 * f(y) - 16, 500 * (f(x) - f(y)), 200 * (f(y) - f(z))];
+  };
+  const distancia = (uno: string, otro: string): number => {
+    const a = aLab(uno);
+    const b = aLab(otro);
+    return Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+  };
+  /* El mismo 20 de `verify:riberas`: ver allí por qué no es 25. */
+  const CUANTO_SE_SEPARA_DE_UNA_PIEZA = 20;
+
+  // ── 1. En qué columna del atlas pinta cada modelo su color de jugador ──────
+
+  const glb = path.join(import.meta.dirname ?? __dirname, '..', 'modelos', 'tablero.glb');
+  const tablero = await new NodeIO().read(glb);
+  const nodos = tablero.getRoot().listNodes();
+  const primitivasDe = (n: Node): Primitive[] => {
+    const sacadas: Primitive[] = [];
+    const bajar = (x: Node): void => {
+      for (const p of x.getMesh()?.listPrimitives() ?? []) sacadas.push(p);
+      for (const h of x.listChildren()) bajar(h);
+    };
+    bajar(n);
+    return sacadas;
+  };
+  /** Las UV de un modelo que caen en la fila de los colores de jugador, por columna. */
+  const columnasDeColor = (nombre: string): Map<number, number> => {
+    const cuenta = new Map<number, number>();
+    const nodo = nodos.find((n) => n.getName() === nombre);
+    if (nodo === undefined) return cuenta;
+    for (const prim of primitivasDe(nodo)) {
+      const uv = prim.getAttribute('TEXCOORD_0');
+      if (uv === null) continue;
+      const st = [0, 0];
+      for (let i = 0; i < uv.getCount(); i++) {
+        uv.getElement(i, st);
+        if (Math.floor((st[1] as number) * FILAS_DEL_ATLAS) !== 3) continue;
+        const columna = Math.floor((st[0] as number) * COLUMNAS_DEL_ATLAS);
+        cuenta.set(columna, (cuenta.get(columna) ?? 0) + 1);
+      }
+    }
+    return cuenta;
+  };
+
+  /*
+   * LOS EDIFICIOS QUE `poblar.ts` REPARTE POR LAS COMARCAS. No se leen de aquella tabla porque
+   * está dentro de una constante privada; se nombran los que la lista `PUEBLO` y `OFICIO`
+   * ponen, que son éstos, y se afirma que todos existen en el `.glb` — un nombre mal escrito
+   * daría cero vértices y la comprobación de abajo pasaría por vacío.
+   */
+  const DEL_CASERIO = [
+    'casa',
+    'iglesia',
+    'taberna',
+    'mercado',
+    'molino',
+    'acena',
+    'aserradero',
+    'herreria',
+    'mina',
+    'pozo',
+    'atalaya',
+    'concejo',
+    'taller',
+    'cuadras',
+    'ermita',
+    'vigia',
+  ];
+  const COLUMNAS_DE_JUGADOR = new Set(Object.values(COLUMNA_DEL_COLOR));
+  const conColorDeJugador = DEL_CASERIO.map((nombre) => {
+    const cuenta = columnasDeColor(nombre);
+    const suyas = [...cuenta.entries()].filter(([columna]) => COLUMNAS_DE_JUGADOR.has(columna));
+    return { nombre, suyas };
+  });
+  comprobar(
+    'los dieciséis edificios del caserío están dentro del .glb, o lo de abajo mediría cero vértices y pasaría por vacío',
+    conColorDeJugador.every(({ nombre }) => nodos.some((n) => n.getName() === nombre)),
+    conColorDeJugador.filter(({ nombre }) => !nodos.some((n) => n.getName() === nombre)).map((c) => c.nombre),
+  );
+  /*
+   * ═══ EL HECHO QUE OBLIGA AL ZÓCALO, MEDIDO ═══
+   *
+   * Esto NO es una comprobación que haya que arreglar: es la medida que justifica el zócalo, y
+   * se afirma para que el día que alguien recoloree el decorado —y entonces el zócalo pudiera
+   * discutirse— este renglón se ponga rojo y le cuente por qué está ahí. La cabecera de
+   * `compilar-modelos.ts` dice que esto está resuelto «por TIPO, porque las piezas de jugador
+   * son casa y castillo y ningún edificio de adorno es una casa ni un castillo»: el adorno
+   * `casa` es `building_home_B_red` y la pieza es `building_home_A_blue`, o sea la misma clase
+   * de edificio, y uno de los dos lleva el rojo de un colono.
+   */
+  const tejadosDeColono = conColorDeJugador.filter(({ suyas }) => suyas.length > 0);
+  comprobar(
+    `los ${String(tejadosDeColono.length)} edificios del caserío pintan su tejado en la MISMA fila del atlas que las piezas de jugador: la distancia de color entre un tejado de adorno y el de un poblado es CERO, no «poca», y por eso el zócalo no es un adorno`,
+    tejadosDeColono.length === DEL_CASERIO.length,
+    tejadosDeColono.map(
+      ({ nombre, suyas }) => `${nombre}: ${suyas.map(([c, n]) => `columna ${String(c)} × ${String(n)}`).join(', ')}`,
+    ),
+  );
+
+  // ── 2. El color llano de cada jugador sale del atlas, no de un gusto ───────
+
+  /*
+   * SE VUELVE A MEDIR lo que `COLOR_LLANO_DEL_JUGADOR` declara: se toman los vértices del
+   * POBLADO que caen en la celda del color, se les aplica el desplazamiento de cada color —el
+   * mismo que aplica la escena al cargar— y se promedia el color del atlas ahí. Sin esto, esos
+   * cuatro hexadecimales serían cuatro colores «que pegan», y el día que el pack cambiara de
+   * paleta el zócalo señalaría con un color que ya no lleva ninguna pieza.
+   *
+   * El atlas se lee de la TABLA COMPILADA, que es la que la app sube a la GPU y la que
+   * `verify:atlas-del-tablero` compara píxel a píxel contra el PNG del pack: leer el PNG otra
+   * vez aquí sería un tercer camino que nadie compara con los otros dos.
+   */
+  const tabla = tablaDelAtlas();
+  const colorDelAtlas = (u: number, v: number): [number, number, number] => {
+    const columna = Math.min(COLUMNAS_DE_LA_TABLA - 1, Math.max(0, Math.floor(u * COLUMNAS_DE_LA_TABLA)));
+    /* Las filas de la tabla van de ARRIBA abajo, como el PNG y como las UV de glTF. */
+    const fila = Math.min(ALTO_DEL_ATLAS - 1, Math.max(0, Math.floor(v * ALTO_DEL_ATLAS)));
+    const i = (fila * COLUMNAS_DE_LA_TABLA + columna) * 3;
+    return [tabla[i] as number, tabla[i + 1] as number, tabla[i + 2] as number];
+  };
+  const enHexadecimal = (c: readonly number[]): string =>
+    `#${c.map((x) => Math.round(x).toString(16).padStart(2, '0')).join('')}`;
+  /*
+   * LA PIEZA BASE ES `poblado`, y el nombre sale de `PIEZAS_DE_COLOR` y no de una cadena
+   * escrita aquí: esa lista es la que dice qué mallas viven en el `.glb` en UN solo color y se
+   * tiñen moviendo las UV, que es exactamente la propiedad de la que depende esta medida.
+   */
+  const LA_PIEZA_BASE = PIEZAS_DE_COLOR[0];
+  comprobar(
+    'la pieza base de la que se mide el color es el poblado, la primera de las que vienen en un solo color',
+    LA_PIEZA_BASE === 'poblado' && nodos.some((n) => n.getName() === LA_PIEZA_BASE),
+    LA_PIEZA_BASE,
+  );
+  const medidoEnElPack = (color: string): string | null => {
+    const nodo = nodos.find((n) => n.getName() === LA_PIEZA_BASE);
+    if (nodo === undefined) return null;
+    const desplaza = desplazamientoDeColor(color);
+    const suma = [0, 0, 0];
+    let cuantos = 0;
+    for (const prim of primitivasDe(nodo)) {
+      const uv = prim.getAttribute('TEXCOORD_0');
+      if (uv === null) continue;
+      const st = [0, 0];
+      for (let i = 0; i < uv.getCount(); i++) {
+        uv.getElement(i, st);
+        const u = st[0] as number;
+        const v = st[1] as number;
+        if (!esDelColorDelJugador(u, v)) continue;
+        const rgb = colorDelAtlas(u + desplaza.u, v + desplaza.v);
+        suma[0] += rgb[0];
+        suma[1] += rgb[1];
+        suma[2] += rgb[2];
+        cuantos++;
+      }
+    }
+    if (cuantos === 0) return null;
+    return enHexadecimal(suma.map((x) => x / cuantos));
+  };
+
+  /*
+   * LA VARA es un paso de sRGB por canal, o sea unas dos unidades de CIE76: el promedio de un
+   * degradado vertical no tiene por qué caer en un byte exacto, y pedir igualdad exacta sería
+   * pedirle al comprobador que reprodujera el redondeo de quien escribió la constante. Dos
+   * unidades es «se nota si están pegados», o sea la vara más fina que tiene sentido aquí.
+   */
+  const UN_PASO_DE_SRGB = 2;
+  const desviados = COLORES_DE_JUGADOR.map((color) => {
+    const medido = medidoEnElPack(color);
+    const declarado = colorLlanoDelJugador(color);
+    return { color, medido, declarado, cuanto: medido === null ? null : distancia(medido, declarado) };
+  }).filter((d) => d.medido === null || (d.cuanto as number) > UN_PASO_DE_SRGB);
+  comprobar(
+    'los cuatro colores llanos de jugador son los que de verdad lleva la pieza dentro del atlas, medidos sobre el .glb: no son cuatro colores que peguen',
+    desviados.length === 0,
+    desviados,
+  );
+  /*
+   * LA VACUNA: el mismo camino con los colores CRUZADOS —el azul declarado contra el rojo
+   * medido— tiene que caer por los cuatro. Sin ella, «ninguno se desvía» seguiría siendo cierto
+   * si `medidoEnElPack` devolviera siempre lo mismo que la tabla, que es el fallo típico de una
+   * medida que se lee a sí misma.
+   */
+  const cruzados = COLORES_DE_JUGADOR.filter((color, i) => {
+    const otro = COLORES_DE_JUGADOR[(i + 1) % COLORES_DE_JUGADOR.length] as string;
+    const medido = medidoEnElPack(color);
+    return medido !== null && distancia(medido, colorLlanoDelJugador(otro)) <= UN_PASO_DE_SRGB;
+  });
+  comprobar(
+    'se ve fallar: cruzando cada color con el del siguiente, los cuatro se separan — la medida no se está leyendo a sí misma',
+    cruzados.length === 0,
+    cruzados,
+  );
+
+  // ── 3. Y el zócalo se ve sobre la isla en la que se posa ──────────────────
+
+  /*
+   * ═══ Y AQUÍ ES DONDE EL ARO DE COLOR SOLO NO VALÍA ═══
+   *
+   * El zócalo se posa sobre el suelo de su isla, y ese suelo sale del atlas. Medido con la
+   * misma fórmula de arriba: el verde de jugador (`#007d52`) y la celda del bosque —que es la
+   * que pinta el carrizal de Riberas— están a CUATRO unidades de CIE76, o sea que son el mismo
+   * color; el amarillo sobre la vega, a 14,8; y el umbral de esta casa para «no se come una
+   * pieza» es 20. Un aro verde sobre un carrizal es un aro que no está.
+   *
+   * Por eso el zócalo lleva FILO, y por eso lo que se mide aquí es el filo: es UNO solo y
+   * siempre el mismo, así que basta con que él se separe. Se mide contra el color del ATLAS de
+   * cada terreno —que es el suelo que de verdad hay debajo en tres dimensiones— y no contra el
+   * color plano del tablero SVG, que es otro dibujo.
+   */
+  const colorDelSuelo = (terreno: string): string => {
+    const celda = (PALETA[terreno] as { celda: readonly [number, number] }).celda;
+    return enHexadecimal(colorDelAtlas((celda[0] + 0.5) / COLUMNAS_DEL_ATLAS, (celda[1] + 0.5) / FILAS_DEL_ATLAS));
+  };
+  const seComenElFilo = Object.keys(PALETA)
+    .map((terreno) => ({ terreno, cuanto: distancia(FILO_DEL_ZOCALO, colorDelSuelo(terreno)) }))
+    .filter((x) => x.cuanto < CUANTO_SE_SEPARA_DE_UNA_PIEZA);
+  comprobar(
+    'ningún terreno se come el FILO del zócalo: el aro que existe para encontrar la pieza se ve sobre la isla donde se posa, sea del terreno que sea',
+    seComenElFilo.length === 0,
+    seComenElFilo.map((x) => `${x.terreno} ${colorDelSuelo(x.terreno)}: ${x.cuanto.toFixed(1)}`),
+  );
+  /*
+   * Y EL FILO SE SEPARA TAMBIÉN DE LOS CUATRO COLORES DE JUGADOR, o el aro de color quedaría
+   * ahogado dentro de su propio borde y las cuatro piezas se verían iguales entre sí — que es
+   * el mismo fallo, sólo que un paso más adentro.
+   */
+  const ahogados = COLORES_DE_JUGADOR.map((color) => ({
+    color,
+    cuanto: distancia(FILO_DEL_ZOCALO, colorLlanoDelJugador(color)),
+  })).filter((x) => x.cuanto < CUANTO_SE_SEPARA_DE_UNA_PIEZA);
+  comprobar(
+    'y el filo se separa de los cuatro colores de jugador: el aro de color no se ahoga dentro de su propio borde',
+    ahogados.length === 0,
+    ahogados,
+  );
+  /*
+   * LA VACUNA, con los números que se midieron: SIN filo, el aro de color solo se lo comen dos
+   * terrenos —el verde sobre el carrizal a 4,0 y el amarillo sobre la vega a 14,8—. Tiene que
+   * caer por los dos, o el filo estaría pintado por si acaso.
+   */
+  const sinFilo: string[] = [];
+  for (const color of COLORES_DE_JUGADOR) {
+    for (const terreno of Object.keys(PALETA)) {
+      const cuanto = distancia(colorLlanoDelJugador(color), colorDelSuelo(terreno));
+      if (cuanto < CUANTO_SE_SEPARA_DE_UNA_PIEZA) {
+        sinFilo.push(`${terreno} ${colorDelSuelo(terreno)} se comería el aro ${color}: ${cuanto.toFixed(1)}`);
+      }
+    }
+  }
+  comprobar(
+    `se ve fallar: sin filo, el aro de color solo desaparecería en ${String(sinFilo.length)} pares de color y terreno — de ahí que el zócalo lleve borde`,
+    sinFilo.length > 0,
+    sinFilo,
+  );
+
+  // ── 4. Y mide lo mismo en pantalla desde donde se mire ────────────────────
+
+  /*
+   * ═══ LA SEGUNDA CAUSA, QUE NINGÚN COLOR ARREGLA ═══
+   *
+   * La vista de tablero mira el delta desde lo alto. `encuadreDelDelta` pone la cámara a
+   * `mayor·1,25` de altura y `mayor·1,15` de fondo, con `mayor` el radio del mundo: se rehace
+   * esa cuenta aquí —sobre `mallaDeRadio(2)`, que es el delta de verdad— en vez de escribir el
+   * número, para que el día que el encuadre cambie esto lo siga midiendo.
+   *
+   * A esa distancia, una pieza del pack de cinco unidades ocupa una fracción de pantalla que se
+   * cuenta abajo, y por eso una partida entera de piezas puestas se ve igual que el tablero
+   * vacío. El zócalo no: su tamaño sale de `tallaDeUnaMarca`, que es la misma cuenta con la que
+   * la señal de un sitio libre se ve desde donde sea.
+   */
+  const radioDelMundo = DELTA.reduce((mayor, h) => {
+    const c = centroDeHex(h, RADIO_DE_COMARCA);
+    return Math.max(mayor, Math.hypot(c.x, c.y) + RADIO_DE_COMARCA);
+  }, RADIO_DE_COMARCA);
+  const desdeElAire = Math.hypot(radioDelMundo * 1.25, radioDelMundo * 1.15);
+  const CAMPO = (45 * Math.PI) / 180;
+  const altoQueSeVe = 2 * desdeElAire * Math.tan(CAMPO / 2);
+
+  /*
+   * LO QUE MIDE UNA PIEZA DE VERDAD: la caja del poblado del `.glb`, a la escala del pack. No
+   * se escribe «cinco unidades»: se mide el modelo.
+   */
+  const cajaDelPoblado = ((): number => {
+    const nodo = nodos.find((n) => n.getName() === LA_PIEZA_BASE);
+    if (nodo === undefined) return 0;
+    let ancho = 0;
+    const punto = [0, 0, 0];
+    for (const prim of primitivasDe(nodo)) {
+      const pos = prim.getAttribute('POSITION');
+      if (pos === null) continue;
+      for (let i = 0; i < pos.getCount(); i++) {
+        pos.getElement(i, punto);
+        ancho = Math.max(ancho, Math.hypot(punto[0] as number, punto[2] as number) * 2);
+      }
+    }
+    return ancho;
+  })();
+  const parteQueOcupaLaPieza = (cajaDelPoblado * ESCALA_DEL_PACK) / altoQueSeVe;
+  const EN_UNA_VENTANA_DE = 900;
+  comprobar(
+    `un poblado ocupa el ${(parteQueOcupaLaPieza * 100).toFixed(2)} % del alto desde la vista de tablero —${(parteQueOcupaLaPieza * EN_UNA_VENTANA_DE).toFixed(0)} píxeles en una ventana de ${String(EN_UNA_VENTANA_DE)}— y su tejado sale del mismo téxel que el de las casas de adorno que tiene alrededor: por eso el tablero repartido y el tablero con seis chozas salían iguales`,
+    cajaDelPoblado > 0 && parteQueOcupaLaPieza < ZOCALO_EN_PANTALLA,
+    {
+      cajaDelPack: Number(cajaDelPoblado.toFixed(3)),
+      enElMundo: Number((cajaDelPoblado * ESCALA_DEL_PACK).toFixed(1)),
+      desdeElAire: Number(desdeElAire.toFixed(1)),
+      altoQueSeVe: Number(altoQueSeVe.toFixed(1)),
+      parte: Number(parteQueOcupaLaPieza.toFixed(4)),
+      pixeles: Number((parteQueOcupaLaPieza * EN_UNA_VENTANA_DE).toFixed(1)),
+    },
+  );
+  /*
+   * Y EL ZÓCALO OCUPA LO QUE PROMETE, desde el aire y desde el suelo. Es lo que compra que no
+   * sea un objeto del mundo sino un cartel: la misma fracción de pantalla a cualquier
+   * distancia, salvo donde los topes muerden.
+   */
+  const talla = (lejos: number): number =>
+    tallaDeUnaMarca(lejos, CAMPO, ZOCALO_EN_PANTALLA, SUELO_DEL_ZOCALO, TECHO_DEL_ZOCALO);
+  const parteQueOcupa = (lejos: number): number =>
+    (talla(lejos) * RADIO_DE_TESELA) / (2 * lejos * Math.tan(CAMPO / 2));
+  comprobar(
+    `el zócalo ocupa el ${(parteQueOcupa(desdeElAire) * 100).toFixed(1)} % del alto desde la vista de tablero y lo mismo a media altura: mide igual en pantalla desde donde se mire`,
+    Math.abs(parteQueOcupa(desdeElAire) - ZOCALO_EN_PANTALLA) < 1e-9 &&
+      Math.abs(parteQueOcupa(desdeElAire / 2) - ZOCALO_EN_PANTALLA) < 1e-9,
+    { desdeElAire: parteQueOcupa(desdeElAire), aMediaAltura: parteQueOcupa(desdeElAire / 2) },
+  );
+  /*
+   * Y ES MÁS GRANDE QUE LA PIEZA desde el aire — que es la frase entera de este bloque: lo que
+   * se ve desde la vista de tablero es el zócalo, no el tejado.
+   */
+  /*
+   * ═══ Y ES MÁS GRANDE QUE LA PIEZA DESDE EL AIRE, QUE ES LA MITAD MENOS IMPORTANTE ═══
+   *
+   * Conviene decir en qué orden pesan las dos causas, porque el tamaño es la que se ve venir y
+   * NO es la que más manda. Una pieza de once píxeles no es invisible: lo que la hace
+   * indistinguible es que su tejado sale del mismo téxel que el de las casas de adorno que
+   * `poblar.ts` reparte alrededor —hasta cinco por comarca—, y once píxeles de casa roja entre
+   * casas rojas no son nada. El zócalo arregla eso porque el decorado NO tiene ninguno.
+   *
+   * Lo que el tamaño de marca añade es que ese aro se siga viendo igual desde el aire que de
+   * cerca: aquí se compra que desde la vista de tablero mida más que la pieza —1,7 veces— y
+   * que ese porcentaje no dependa de la distancia, que es lo que la comprobación de arriba ya
+   * ha afirmado.
+   */
+  comprobar(
+    `desde la vista de tablero el zócalo ocupa ${(parteQueOcupa(desdeElAire) / parteQueOcupaLaPieza).toFixed(1)} veces lo que la pieza entera, y a diferencia de ella no encoge al alejarse`,
+    parteQueOcupa(desdeElAire) > parteQueOcupaLaPieza,
+    { zocalo: parteQueOcupa(desdeElAire), pieza: parteQueOcupaLaPieza },
+  );
+  /*
+   * LA VACUNA DE LA CUENTA: sin la regla de marca de pantalla —o sea, con un aro del tamaño de
+   * una tesela, que es lo que se pintaría escribiendo un radio a mano— el zócalo ocuparía desde
+   * el aire lo mismo que la pieza, y no se vería tampoco. Es literalmente el fallo que ya se
+   * pagó con la primera versión de la señal de los sitios: se dibujaba, costaba sus llamadas, y
+   * la captura salía idéntica a la de antes.
+   */
+  const comoUnaTesela = RADIO_DE_TESELA / altoQueSeVe;
+  comprobar(
+    `se ve fallar: un aro del tamaño de una tesela ocuparía el ${(comoUnaTesela * 100).toFixed(2)} % del alto desde el aire —del orden de la propia pieza, que ocupa el ${(parteQueOcupaLaPieza * 100).toFixed(2)} %— y encogería con la distancia en vez de mantenerse`,
+    comoUnaTesela < ZOCALO_EN_PANTALLA && comoUnaTesela < parteQueOcupaLaPieza * 3,
+    { comoUnaTesela, laPieza: parteQueOcupaLaPieza, deMarca: ZOCALO_EN_PANTALLA },
+  );
+  /*
+   * Y LOS TOPES MUERDEN POR LOS DOS LADOS, que es la mitad que se olvida: pegada al suelo la
+   * cuenta pide un aro de una unidad —una china— y desde muy lejos uno que se come tres
+   * comarcas. Se comprueba que la función los respeta y que con datos imposibles devuelve el
+   * SUELO y no cero: un aro de tamaño cero desaparece sin que nada falle, que es el fallo que
+   * esta función existe para no tener.
+   */
+  comprobar(
+    'la talla de una marca respeta sus dos topes, y con datos imposibles devuelve el suelo y no cero',
+    talla(0.001) === SUELO_DEL_ZOCALO &&
+      talla(1e9) === TECHO_DEL_ZOCALO &&
+      tallaDeUnaMarca(Number.NaN, CAMPO, ZOCALO_EN_PANTALLA, SUELO_DEL_ZOCALO, TECHO_DEL_ZOCALO) === SUELO_DEL_ZOCALO &&
+      tallaDeUnaMarca(desdeElAire, 0, ZOCALO_EN_PANTALLA, SUELO_DEL_ZOCALO, TECHO_DEL_ZOCALO) === SUELO_DEL_ZOCALO,
+    {
+      pegadaAlSuelo: talla(0.001),
+      muyLejos: talla(1e9),
+      conBasura: tallaDeUnaMarca(Number.NaN, CAMPO, ZOCALO_EN_PANTALLA, SUELO_DEL_ZOCALO, TECHO_DEL_ZOCALO),
+    },
+  );
+}
+
 console.log('');
 if (fallos.length > 0) {
   console.log(`${fallos.length} de ${hechas} comprobaciones han fallado:\n`);
@@ -5713,7 +6421,7 @@ if (fallos.length > 0) {
  * a veintitrés: durante ese tiempo el guion podía morirse en la novena sin que nadie se
  * enterara. Un guardia desfasado no guarda nada.
  */
-const COMPROBACIONES_ESCRITAS = 352;
+const COMPROBACIONES_ESCRITAS = 378;
 if (hechas < COMPROBACIONES_ESCRITAS) {
   console.error(
     `Solo se han hecho ${hechas} de las ${COMPROBACIONES_ESCRITAS} comprobaciones que ` +

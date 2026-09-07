@@ -121,14 +121,21 @@ import {
   LAMINA,
   RADIO_DE_COMARCA,
   RADIO_DE_TESELA,
+  ALTO_DEL_ZOCALO,
+  SUELO_DEL_ZOCALO,
+  tallaDeUnaMarca,
+  TECHO_DEL_ZOCALO,
+  ZOCALO_EN_PANTALLA,
 } from './escala';
 import {
   CELDA_DE_LA_NIEVE,
   colorDelBien,
+  colorLlanoDelJugador,
   desplazamientoDeCelda,
   desplazamientoDeColor,
   esDeLaHierba,
   esDelColorDelJugador,
+  FILO_DEL_ZOCALO,
   puntosDeLaCifra,
   terrenoDe,
 } from './paleta';
@@ -994,8 +1001,15 @@ function Senal({
     const dz = camara.position.z - sitio.punto.y;
     const lejos = Math.sqrt(dx * dx + dy * dy + dz * dz);
     const campo = ((camara.isPerspectiveCamera ? camara.fov : 45) * Math.PI) / 180;
-    const quiere = (2 * lejos * Math.tan(campo / 2) * PARTE_DE_PANTALLA) / RADIO_DE_TESELA;
-    const talla = Math.min(Math.max(quiere, 0.7), 6) * (encima || elegida ? 1.25 : 1);
+    /*
+     * LA CUENTA VIVE EN `escala.ts`, y no por gusto de repartir: escrita aquí dentro no la
+     * puede medir nadie desde Node, y de esta cuenta depende que una marca se VEA desde la
+     * vista de tablero. Es la misma que usa el zócalo de los asentamientos, con otro suelo y
+     * otro techo, y que las dos sean la misma es lo que hace que no se separen.
+     */
+    const talla =
+      tallaDeUnaMarca(lejos, campo, PARTE_DE_PANTALLA, SUELO_DE_LA_SENAL, TECHO_DE_LA_SENAL) *
+      (encima || elegida ? 1.25 : 1);
 
     const a = anillo.current;
     if (a !== null) {
@@ -1132,6 +1146,14 @@ const ALTO_DEL_ANILLO = ALTURA_DE_UNA_PERSONA * 2.5;
 const LATIDO_DE_LA_SENAL = 0.18;
 /** Qué parte del alto de la pantalla ocupa una señal, mire desde donde mire la cámara. */
 const PARTE_DE_PANTALLA = 0.035;
+/**
+ * Y LOS DOS TOPES DE LA SEÑAL. Pegada al suelo la cuenta pide un anillo de una unidad, que es
+ * una china; desde muy lejos pediría uno que se come tres comarcas. Eran dos números sueltos
+ * dentro del `useFrame`; están aquí para poder nombrarlos y para que el zócalo pueda decir en
+ * qué se diferencia de ellos.
+ */
+const SUELO_DE_LA_SENAL = 0.7;
+const TECHO_DE_LA_SENAL = 6;
 
 /**
  * UNA PIEZA PUESTA EN SU HUECO DE LA BARRA.
@@ -3955,10 +3977,31 @@ function Asentamiento({
 
   const grupos = useRef<Array<THREE.Group | null>>([]);
   const nacido = useRef(-1);
+  const zocalo = useRef<THREE.Group>(null);
 
   useFrame((estado) => {
     if (nacido.current < 0) nacido.current = estado.clock.elapsedTime;
     const transcurrido = estado.clock.elapsedTime - nacido.current;
+    /*
+     * EL ZÓCALO SE MIDE COMO UNA MARCA DE PANTALLA, con la misma cuenta que la señal de los
+     * sitios libres (`tallaDeUnaMarca`, `escala.ts`) y por la misma razón: desde la vista de
+     * tablero —a 574,6 unidades del asentamiento, medidas sobre el encuadre de verdad en
+     * `verify:escena`— un poblado ocupa el 1,27 % del alto de la pantalla, o sea once píxeles
+     * en una ventana de novecientos, y un aro del tamaño del mundo mediría lo mismo. Ver la
+     * cabecera de `ZOCALO_EN_PANTALLA`.
+     */
+    const z = zocalo.current;
+    if (z !== null) {
+      const camara = estado.camera as THREE.PerspectiveCamera;
+      const dx = camara.position.x - punto.x;
+      const dy = camara.position.y - suelo;
+      const dz = camara.position.z - punto.y;
+      const lejos = Math.sqrt(dx * dx + dy * dy + dz * dz);
+      const campo = ((camara.isPerspectiveCamera ? camara.fov : 45) * Math.PI) / 180;
+      z.scale.setScalar(
+        tallaDeUnaMarca(lejos, campo, ZOCALO_EN_PANTALLA, SUELO_DEL_ZOCALO, TECHO_DEL_ZOCALO),
+      );
+    }
     for (let i = 0; i < partes.length; i++) {
       const g = grupos.current[i];
       const parte = partes[i];
@@ -3974,6 +4017,76 @@ function Asentamiento({
 
   return (
     <group position={alMundo(punto, suelo)}>
+      {/*
+        ═══ EL ZÓCALO: LO ÚNICO QUE EL DECORADO NO TIENE ═══
+
+        El fallo que tapa, medido jugando y no leyendo: en una partida entera nadie consiguió
+        señalar su propia choza. Con el encuadre de «Ver el tablero entero», el tablero recién
+        repartido y el mismo con SEIS chozas y SEIS veredas puestas salen indistinguibles.
+
+        Y no es que las piezas no se pinten: es que el tejado de una casa de adorno y el tejado
+        del poblado de alguien son EL MISMO TÉXEL del atlas —`poblar.ts` reparte casas de
+        tejado rojo, azul y amarillo por todas las comarcas, y ésos son tres de los cuatro
+        colores de jugador—. Los números están en `COLOR_LLANO_DEL_JUGADOR` (`paleta.ts`).
+        Buscar el color propio entre el caserío es buscar una casa roja entre casas rojas.
+
+        Así que la pieza de jugador gana algo que el decorado no puede tener: un aro del color
+        de su dueño, pegado al suelo, que MIDE LO MISMO EN PANTALLA desde donde se mire. Desde
+        el aire eso es lo que se ve; de cerca es un zócalo discreto alrededor del asentamiento.
+
+        ═══ SE PARECE A `Senal` Y NO ES `Senal`, Y LAS DIFERENCIAS SON LA MITAD DEL DISEÑO ═══
+
+          · NO LATE y no responde al ratón. La señal dice «aquí PUEDES construir» y por eso
+            respira; el zócalo dice «esto YA es de alguien». Un aro que late sobre algo
+            construido invita a pulsarlo, y ahí no hay nada que pulsar.
+          · NO RECIBE RAYOS, y va escrito aunque HOY no haga falta. Hoy no hace falta porque
+            r3f sólo mete en su lista de trazado las mallas que tienen manejadores, y éstas no
+            tienen ninguno; el día que alguien le cuelgue un `onPointerUp` —para señalar la
+            pieza, pongamos— este aro pasaría a ocupar desde el aire más que la propia comarca
+            y se comería los toques de lo que tiene debajo. `raycast={() => null}` es lo que de
+            verdad lo desactiva: con `raycast={null}` el motor revienta al primer rayo, y
+            `visible={false}` NO lo quita del trazado — las dos cosas están medidas sobre el
+            paquete instalado en la cabecera de `Senal`.
+          · VA MÁS BAJO Y MÁS PEQUEÑO. La señal flota dos personas y media para no perderse
+            entre el follaje; el zócalo se apoya casi en el suelo porque tiene una pieza encima
+            que lo levanta visualmente, y ocupa menos pantalla porque hay uno por asentamiento
+            y puede haber cuarenta — al tamaño de una señal, cuarenta aros serían el tablero.
+
+        `depthWrite={false}` y `DoubleSide` como el de la señal, y por lo mismo: que no tape lo
+        que tiene detrás y que no desaparezca visto a ras de suelo.
+      */}
+      <group ref={zocalo} position={[0, ALTO_DEL_ZOCALO, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        {/*
+          EL FILO, DEBAJO Y UN POCO MÁS GRANDE. Sin él el aro no se ve, y no es una
+          suposición: el verde de jugador y la celda del bosque —que es la que pinta el
+          carrizal— están a CUATRO unidades de CIE76, o sea que son el mismo color. Los
+          números y la decisión entera, en `FILO_DEL_ZOCALO` (`paleta.ts`).
+
+          Va un poco por debajo en la pila de dibujo (`renderOrder`) y no en altura: dos
+          planos separados en el eje vertical se cruzarían al mirar desde el ras del suelo, y
+          el filo asomaría por delante del color en unos ángulos y por detrás en otros.
+        */}
+        <mesh renderOrder={1} raycast={() => null}>
+          <ringGeometry args={[RADIO_DE_TESELA * 0.55, RADIO_DE_TESELA * 1.07, 28]} />
+          <meshBasicMaterial
+            color={FILO_DEL_ZOCALO}
+            transparent
+            opacity={0.75}
+            depthWrite={false}
+            side={THREE.DoubleSide}
+          />
+        </mesh>
+        <mesh renderOrder={2} raycast={() => null}>
+          <ringGeometry args={[RADIO_DE_TESELA * 0.62, RADIO_DE_TESELA, 28]} />
+          <meshBasicMaterial
+            color={colorLlanoDelJugador(pieza.color)}
+            transparent
+            opacity={0.9}
+            depthWrite={false}
+            side={THREE.DoubleSide}
+          />
+        </mesh>
+      </group>
       {partes.map((parte, i) => {
         const mallas = aplanados.get(parte.modelo);
         if (mallas === undefined) return null;
