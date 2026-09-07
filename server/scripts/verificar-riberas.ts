@@ -121,6 +121,7 @@ import {
   comoSiSiempreHubieraHabidoMazo,
   COMPRAR,
   COSTE_DE_LA_CARTA,
+  DESCARTAR,
   deQuienEsElPaso,
   DOS_VEREDAS,
   EMPEZAR_RIBERAS,
@@ -562,7 +563,7 @@ function tirarPor(donde: Mesa, quien: string): Mesa {
  * regla nueva tiene que hacer.
  */
 function tirarYResolverElEstiaje(donde: Mesa, quien: string): Mesa {
-  const tirada = tirarPor(donde, quien);
+  const tirada = vaciarLasManos(tirarPor(donde, quien));
   if (!estadoDe(tirada).estiajePorMover) return tirada;
   const destino = opcionesEn(tirada, quien).find((o) => o.tipo === MOVER_EL_ESTIAJE);
   /*
@@ -573,6 +574,43 @@ function tirarYResolverElEstiaje(donde: Mesa, quien: string): Mesa {
    */
   comprobar('con el estiaje por mover siempre hay un destino que ofrecer, o la mesa se para', destino !== undefined);
   return destino === undefined ? tirada : mover(tirada, quien, destino);
+}
+
+/**
+ * DESCARTA HASTA QUE LA MESA SALGA DE `'descartando'`. Devuelve la mesa lista para seguir.
+ *
+ * Hace la misma falta que `tirarYResolverElEstiaje` y por la misma razón, un escalón
+ * antes: desde la fase 2, un siete con manos llenas no deja mover la pieza hasta que se
+ * hayan tirado las fichas, así que un `find(MOVER_EL_ESTIAJE)` detrás de un `TIRAR` sale
+ * `undefined` en cuanto alguien pasa de siete fichas —que en este fichero, con las manos
+ * que se montan a mano para el mazo y para el trueque, es a menudo—.
+ *
+ * Le pregunta SIEMPRE a `turnoDe` y no a una lista suya: si `turnoDe` no apuntara al
+ * primero que debe, este bucle se quedaría sin jugada y se cortaría, que es exactamente
+ * la forma en que se rompería el bucle de `verify:mesa`.
+ */
+function vaciarLasManos(donde: Mesa): Mesa {
+  let mesa = donde;
+  for (let vueltas = 0; vueltas < 60 && estadoDe(mesa).momento === 'descartando'; vueltas++) {
+    const quien = (estadoDe(mesa).colonos[turnoDeLaMesa(mesa)] as Colono | undefined)?.asiento;
+    const tirar = quien === undefined ? undefined : opcionesEn(mesa, quien).find((o) => o.tipo === DESCARTAR);
+    if (quien === undefined || tirar === undefined) {
+      comprobar('en «descartando» siempre hay a quién preguntarle y qué tirar, o la mesa se para', false, {
+        quien,
+        descartes: estadoDe(mesa).descartes,
+      });
+      return mesa;
+    }
+    mesa = mover(mesa, quien, tirar);
+  }
+  return mesa;
+}
+
+/** El índice del colono a quien apunta `turnoDe` de la vista pública, o −1. */
+function turnoDeLaMesa(donde: Mesa): number {
+  const e = estadoDe(donde);
+  const turnoDe = proyectarRiberas(e, 'A').turnoDe;
+  return e.colonos.findIndex((c) => c.asiento === turnoDe);
 }
 
 /** Las llaves de todas las islas del delta, en el orden canónico de la malla. */
@@ -597,7 +635,16 @@ function semillaQueSaca(suma: number): number {
   throw new Error(`ninguna semilla de las veinte mil primeras saca ${String(suma)}`);
 }
 
-/** La mesa parada en el instante del siete, y a quién le tocaba. */
+/**
+ * LA MESA PARADA EN EL INSTANTE DEL SIETE, y a quién le tocaba.
+ *
+ * Son DOS mesas y no una desde la fase 2, y la diferencia es el orden en que se juega un
+ * siete: primero se tiran fichas y después se mueve la pieza. `alSacarlo` es el instante
+ * exacto de la tirada —que es lo que mira el bloque del descarte— y `mesa` es la misma
+ * partida con las manos ya vaciadas, que es donde de verdad se ofrecen los dieciocho
+ * destinos. Escribirlo con una sola dejaría este bloque mirando una mesa en
+ * `'descartando'` y afirmando cosas del estiaje sobre una lista vacía.
+ */
 const elSiete = (() => {
   let corriendo = mesaSobre('RIB-ESTIAJE', { ...estadoDe(mesa), tirado: false }, TRES);
   let tiradas = 0;
@@ -605,10 +652,12 @@ const elSiete = (() => {
     const quien = (estadoDe(corriendo).colonos[estadoDe(corriendo).turno] as Colono).asiento;
     corriendo = tirarPor(corriendo, quien);
     tiradas++;
-    if (estadoDe(corriendo).ultimaTirada === 7) return { mesa: corriendo, quien, tiradas };
+    if (estadoDe(corriendo).ultimaTirada === 7) {
+      return { mesa: vaciarLasManos(corriendo), alSacarlo: corriendo, quien, tiradas };
+    }
     corriendo = mover(corriendo, quien, opcionesEn(corriendo, quien).find((o) => o.tipo === PASAR) as Opcion);
   }
-  return { mesa: corriendo, quien: 'A', tiradas };
+  return { mesa: corriendo, alSacarlo: corriendo, quien: 'A', tiradas };
 })();
 
 {
@@ -1096,6 +1145,592 @@ const elSiete = (() => {
   const suyas = opcionesDeRiberas(vistaDeAyer, 'A');
   comprobar('una vista sin los campos del estiaje sigue ofreciendo el turno entero', suyas.length > 0, suyas.length);
   comprobar('y no ofrece ninguna opción de estiaje, que es lo correcto: ahí no había pieza', suyas.every((o) => o.tipo !== MOVER_EL_ESTIAJE));
+}
+
+// ---------------------------------------------------------------------------
+paso('EL DESCARTE: al sacar un siete se tira la mitad, y la tira quien NO tiene el turno');
+// ---------------------------------------------------------------------------
+
+/*
+ * ═══ ESTE BLOQUE TAMBIÉN SE JUEGA, Y CON EL SIETE QUE YA HABÍA ═══
+ *
+ * La mesa que lo sostiene es la misma de arriba, `elSiete.alSacarlo`: la partida llevada
+ * con el árbitro delante hasta el primer siete de verdad, mirada UNA TIRADA ANTES de que
+ * se muevan las manos. Y esa partida trae, sin que nadie la haya colocado, exactamente el
+ * reparto que hacía falta para mirar esta regla: quien tiró se queda con siete justas y no
+ * tira ninguna, y los que deben tirar son OTROS DOS que no tienen el turno.
+ *
+ * Lo único que se monta a mano es el filo de la regla —siete contra ocho— y el trato
+ * abierto, y las dos veces se dice aquí mismo por qué no se puede jugar: para pillar a
+ * alguien con ocho justas en un siete de verdad habría que jugar hasta que salga, que es
+ * un bucle que tarda lo que quiera.
+ */
+
+/** El aviso que la cinta le pinta a este asiento, que es lo que se lee de verdad. */
+function avisoPara(estado: EstadoDeRiberas, quien: string): string {
+  return tableroDeRiberas(proyectarRiberas(estado, quien), quien).aviso;
+}
+
+/** Qué bien es esta ficha, leído del propio identificador: `b17:junco` es junco. */
+function bienDe(ficha: Ficha): Bien {
+  return ficha.slice(ficha.indexOf(':') + 1) as Bien;
+}
+
+/** El número de serie de una ficha: `b17:junco` son diecisiete. */
+function serieDe(ficha: Ficha): number {
+  return Number(ficha.slice(1, ficha.indexOf(':')));
+}
+
+/** Cuántas fichas de este bien hay en este almacén. */
+function cuantasDe(almacen: readonly Ficha[], bien: string): number {
+  return almacen.filter((f) => f.endsWith(`:${bien}`)).length;
+}
+
+/** El almacén de este asiento. */
+function manoDe(estado: EstadoDeRiberas, quien: string): readonly Ficha[] {
+  return (estado.colonos.find((c) => c.asiento === quien) as Colono).almacen;
+}
+
+/** Lo que le falta por tirar a este asiento, o cero si no debe nada. */
+function faltanA(estado: EstadoDeRiberas, quien: string): number {
+  return estado.descartes.find((d) => d.de === quien)?.faltan ?? 0;
+}
+
+const alSacarlo = estadoDe(elSiete.alSacarlo);
+
+/* ── LA LISTA: QUIÉN DEBE Y CUÁNTAS ────────────────────────────────────── */
+
+{
+  const manos = alSacarlo.colonos.map((c) => c.almacen.length);
+  comprobar(
+    'el siete de verdad pilla a alguien con la mano llena, o lo de abajo mira el conjunto vacío',
+    alSacarlo.momento === 'descartando',
+    { momento: alSacarlo.momento, manos },
+  );
+  /*
+   * LA CUENTA SE CALCULA AQUÍ COMO REGLA Y NO SE COPIA COMO CASO: para cada colono, si
+   * tiene MÁS de siete, la mitad hacia abajo. Escribir «A tira seis» sería escribir lo
+   * que salió esta vez, y esta lista cambia con la semilla.
+   */
+  const comoTocaba = alSacarlo.colonos
+    .filter((c) => c.almacen.length > 7)
+    .map((c) => ({ de: c.asiento, faltan: Math.floor(c.almacen.length / 2) }));
+  comprobar(
+    'y la lista es exactamente quien pasa de siete, con la mitad redondeando hacia abajo',
+    canonico(alSacarlo.descartes) === canonico(comoTocaba),
+    { descartes: alSacarlo.descartes, manos },
+  );
+  comprobar(
+    'y va en el orden de `colonos`, que es de donde sale a quién se espera primero',
+    canonico(alSacarlo.descartes.map((d) => d.de)) ===
+      canonico(alSacarlo.colonos.filter((c) => c.almacen.length > 7).map((c) => c.asiento)),
+  );
+  comprobar(
+    'quien tiró tenía SIETE justas y no tira ninguna: la regla es MÁS de siete',
+    manoDe(alSacarlo, elSiete.quien).length === 7 && faltanA(alSacarlo, elSiete.quien) === 0,
+    { quien: elSiete.quien, mano: manoDe(alSacarlo, elSiete.quien).length },
+  );
+  comprobar(
+    'y no hay ninguna excepción para él: los que deben son los OTROS DOS, que no tienen el turno',
+    alSacarlo.descartes.length === 2 && alSacarlo.descartes.every((d) => d.de !== elSiete.quien),
+    alSacarlo.descartes,
+  );
+  comprobar(
+    'la bandera del estiaje se enciende igual: el descarte va DELANTE de mover, no en su lugar',
+    alSacarlo.estiajePorMover === true,
+  );
+  comprobar(
+    'y a nadie se le pide más de lo que tiene, o se quedaría sin qué tirar y la mesa parada',
+    alSacarlo.descartes.every((d) => manoDe(alSacarlo, d.de).length >= d.faltan),
+  );
+}
+
+/*
+ * ═══ EL FILO DE LA REGLA, MONTADO A MANO Y DICHO EN VOZ ALTA ═══
+ *
+ * Siete no descarta y ocho sí. Se fabrica la tirada —una semilla cuyas dos primeras
+ * suman siete, que es lo que ya hace el bloque del bloqueo— y se juega dos veces la misma
+ * mesa cambiando UNA ficha en la mano de quien tira. Jugarlo hasta que salga solo sería
+ * esperar a que una partida deje a alguien con ocho justas en el turno de un siete.
+ */
+{
+  const antesDeTirar: EstadoDeRiberas = {
+    ...alSacarlo,
+    momento: 'jugando',
+    tirado: false,
+    estiajePorMover: false,
+    descartes: [],
+    azar: sembrar(semillaQueSaca(7)),
+  };
+  const conLaManoDe = (cuantas: number): EstadoDeRiberas => ({
+    ...antesDeTirar,
+    colonos: antesDeTirar.colonos.map((c) =>
+      c.asiento === elSiete.quien
+        ? { ...c, almacen: [...c.almacen.slice(0, 7), ...(cuantas > 7 ? ['b900:limo'] : [])] }
+        : c,
+    ),
+  });
+  const conSiete = avanzarRiberas(conLaManoDe(7), { tipo: TIRAR, carga: {} }, ctxDe(elSiete.quien, TRES));
+  const conOcho = avanzarRiberas(conLaManoDe(8), { tipo: TIRAR, carga: {} }, ctxDe(elSiete.quien, TRES));
+  comprobar('la tirada fabricada saca un siete, o el filo no se mira', conSiete.ultimaTirada === 7 && conOcho.ultimaTirada === 7);
+  comprobar('con SIETE fichas no se tira ninguna', faltanA(conSiete, elSiete.quien) === 0, conSiete.descartes);
+  comprobar(
+    'y se ve fallar: con OCHO se tiran cuatro, que es la mitad hacia abajo',
+    faltanA(conOcho, elSiete.quien) === 4,
+    conOcho.descartes,
+  );
+}
+
+/*
+ * ═══ Y UN SIETE CON TODAS LAS MANOS CORTAS NO ABRE EL MOMENTO ═══
+ *
+ * Es la otra mitad de la regla y la que hace que un siete de la primera ronda siga
+ * costando exactamente lo que costaba: mover la pieza. Sin esto, `'descartando'` se
+ * abriría con la lista vacía y la mesa se quedaría esperando a nadie.
+ */
+{
+  const conLasManosCortas: EstadoDeRiberas = {
+    ...alSacarlo,
+    momento: 'jugando',
+    tirado: false,
+    estiajePorMover: false,
+    descartes: [],
+    azar: sembrar(semillaQueSaca(7)),
+    colonos: alSacarlo.colonos.map((c) => ({ ...c, almacen: c.almacen.slice(0, 3) })),
+  };
+  const tirado = avanzarRiberas(conLasManosCortas, { tipo: TIRAR, carga: {} }, ctxDe(elSiete.quien, TRES));
+  comprobar('con todas las manos cortas, el siete no abre el descarte', tirado.momento === 'jugando' && tirado.descartes.length === 0, {
+    momento: tirado.momento,
+    descartes: tirado.descartes,
+  });
+  comprobar('y se va derecho a mover la pieza, como antes de esta fase', tirado.estiajePorMover === true);
+  comprobar(
+    'y a quien tiró se le ofrecen los dieciocho destinos y nada más',
+    opcionesDeRiberas(proyectarRiberas(tirado, elSiete.quien), elSiete.quien).some((o) => o.tipo === MOVER_EL_ESTIAJE),
+  );
+}
+
+/* ── EL DESPACHO: LA RAMA NUEVA, Y LO QUE PASA SI SE ESCRIBE DONDE NO ES ── */
+
+/*
+ * LOS DOS QUE DEBEN, con nombre. Y con respaldo, que no es un adorno: si un día el siete
+ * dejara de abrir el descarte —quitando la línea que llena la lista, por ejemplo— todo
+ * este bloque tiene que ponerse ROJO y no caerse con «no se puede leer 'de' de undefined».
+ * Un guion que revienta cuenta peor que treinta líneas rojas con su nombre, y es
+ * exactamente el caso que la cabecera de `tirarYResolverElEstiaje` deja escrito.
+ */
+const debeElPrimero = alSacarlo.descartes[0]?.de ?? (TRES[0] as string);
+const debeElSegundo = alSacarlo.descartes[1]?.de ?? (TRES[0] as string);
+
+{
+  /*
+   * ═══ ÉSTA ES LA QUE CAZA EL FALLO DEL DESPACHO, Y NO SE PARECE A UN FALLO ═══
+   *
+   * Con el descarte escrito dentro de `opcionesDeTurno` —que es donde lo pusieron las dos
+   * primeras versiones del diseño— estas dos listas salen VACÍAS: a `opcionesDeTurno` no
+   * se llega en `'descartando'`, porque `opcionesDeRiberas` despacha por momento. Y una
+   * lista vacía no revienta nada: la mesa se queda parada en seco, con los dos clientes y
+   * el bucle del comprobador mirando una pantalla sin botones. Por eso lo primero que se
+   * afirma aquí es que hay algo, y para CADA UNO de los que deben.
+   */
+  for (const quien of [debeElPrimero, debeElSegundo]) {
+    const suyas = opcionesDeRiberas(proyectarRiberas(alSacarlo, quien), quien);
+    comprobar(`en «descartando», a ${quien} se le ofrece algo que hacer`, suyas.length > 0, suyas.length);
+    comprobar(
+      `y todo lo que se le ofrece a ${quien} es tirar una ficha`,
+      suyas.every((o) => o.tipo === DESCARTAR),
+      suyas.map((o) => o.tipo),
+    );
+    comprobar(
+      `a ${quien} no se le ofrecen más de cinco: una por clase de bien, y no un reparto de la mitad`,
+      suyas.length <= BIENES.length && new Set(suyas.map((o) => o.id)).size === suyas.length,
+      suyas.map((o) => o.id),
+    );
+    /*
+     * SE COMPARAN LOS `id` Y NO LAS CARGAS, y no es lo mismo: el `id` lleva el bien
+     * dentro —`descartar:limo`— porque son hasta cinco botones a la vez en la misma lista
+     * de `acciones` y un `id` repetido es uno que deja de poder pulsarse. Comparando los
+     * `id` se mira de una vez qué se ofrece y con qué nombre, y una opción de otra clase
+     * que se colara aquí se ve como lo que es en vez de reventar al canonizar una carga
+     * sin `bien` dentro.
+     */
+    comprobar(
+      `y son exactamente las clases que ${quien} tiene en la mano, con el bien en el \`id\``,
+      canonico(suyas.map((o) => o.id).sort()) ===
+        canonico(BIENES.filter((b) => cuantasDe(manoDe(alSacarlo, quien), b) > 0).map((b) => `descartar:${b}`).sort()),
+      suyas.map((o) => o.id),
+    );
+  }
+
+  comprobar(
+    'y a quien NO debe nada no se le ofrece nada, aunque sea suyo el turno',
+    opcionesDeRiberas(proyectarRiberas(alSacarlo, elSiete.quien), elSiete.quien).length === 0,
+    opcionesDeRiberas(proyectarRiberas(alSacarlo, elSiete.quien), elSiete.quien).map((o) => o.id),
+  );
+  comprobar(
+    'ni tirar, ni pasar, ni mover el estiaje: en «descartando» eso no existe para nadie',
+    TRES.every((q) =>
+      opcionesDeRiberas(proyectarRiberas(alSacarlo, q), q).every(
+        (o) => o.tipo !== TIRAR && o.tipo !== PASAR && o.tipo !== MOVER_EL_ESTIAJE,
+      ),
+    ),
+  );
+
+  /*
+   * ═══ Y `turnoDe` APUNTA AL PRIMERO QUE DEBE, QUE ES LA DECISIÓN 2 ═══
+   *
+   * De este campo cuelgan el reloj de pared de la mesa, el aviso al móvil, el tapete del
+   * tablero en tres dimensiones y el bucle del comprobador que juega partidas enteras.
+   * Con `turnoDe` en quien tiró, los cuatro esperarían a alguien que no tiene nada que
+   * hacer, y los dos últimos se pararían pidiéndole jugadas a quien no las tiene.
+   */
+  const vista = proyectarRiberas(alSacarlo, debeElSegundo);
+  comprobar('`turnoDe` apunta al PRIMERO que debe tirar, y no a quien tiró', vista.turnoDe === debeElPrimero, {
+    turnoDe: vista.turnoDe,
+    tiro: elSiete.quien,
+  });
+  comprobar('y el turno de verdad no se ha movido: sigue siendo de quien tiró', alSacarlo.turno === TRES.indexOf(elSiete.quien));
+  comprobar(
+    'y el segundo de la cola puede mover IGUAL, sin tener el turno: eso es lo que el momento añade',
+    opcionesDeRiberas(proyectarRiberas(alSacarlo, debeElSegundo), debeElSegundo).length > 0 &&
+      vista.turnoDe !== debeElSegundo,
+  );
+}
+
+/* ── EL AVISO: TRES RAMAS, Y LA PRIMERA MIRA `descartes` ────────────────── */
+
+{
+  const delPrimero = avisoPara(alSacarlo, debeElPrimero);
+  const delSegundo = avisoPara(alSacarlo, debeElSegundo);
+  const delQueTiro = avisoPara(alSacarlo, elSiete.quien);
+
+  comprobar('al primero de la cola se le dice cuántas tira, y no a quién se espera', delPrimero === `Tira ${faltanA(alSacarlo, debeElPrimero)} fichas.`, delPrimero);
+  /*
+   * ═══ ÉSTA ES LA VACUNA DEL §9.1, Y ES LA QUE SE CAÍA CON EL DISEÑO ANTERIOR ═══
+   *
+   * El segundo de la cola tiene sus cinco botones encendidos delante y `turnoDe` apunta a
+   * otro. Con el aviso elegido por `turnoDe` —que es como lo elige el resto de la
+   * función— leería «se espera a Ana, que tira 6 fichas» con sus propias opciones en la
+   * pantalla. Es el peor aviso posible: no dice que no puedas, dice que le toca a otro.
+   */
+  comprobar(
+    'y el SEGUNDO lee lo suyo y no «se espera a…», que es lo que pasaría eligiendo por `turnoDe`',
+    delSegundo === `Tira ${faltanA(alSacarlo, debeElSegundo)} fichas.` && !delSegundo.includes('espera'),
+    delSegundo,
+  );
+  comprobar(
+    'y quien no debe nada sí lee a quién se espera, con su nombre y su cuenta',
+    delQueTiro.startsWith('Se espera a ') && delQueTiro.includes(String(faltanA(alSacarlo, debeElPrimero))),
+    delQueTiro,
+  );
+  comprobar(
+    'y nadie lee el aviso del estiaje mientras se descarta, aunque la bandera esté encendida',
+    TRES.every((q) => !avisoPara(alSacarlo, q).includes('estiaje')),
+    TRES.map((q) => avisoPara(alSacarlo, q)),
+  );
+}
+
+/* ── EL RETABLO, QUE EN UNA MESA DE CINCO O SEIS ES LA ÚNICA PANTALLA ───── */
+
+{
+  const declarado = tableroDeRiberas(proyectarRiberas(alSacarlo, debeElPrimero), debeElPrimero);
+  const suyas = opcionesDeRiberas(proyectarRiberas(alSacarlo, debeElPrimero), debeElPrimero);
+  comprobar(
+    'el descarte baja a los BOTONES enteros: no tiene sitio en el mapa, como un trueque',
+    declarado.acciones.length === suyas.length && declarado.acciones.every((a) => a.toque.tipo === DESCARTAR),
+    declarado.acciones.map((a) => a.id),
+  );
+  comprobar('y cada botón dice qué se tira y cuántas quedan', declarado.acciones.every((a) => a.rotulo.length > 0 && a.ayuda.length > 0), declarado.acciones.map((a) => a.rotulo));
+  /*
+   * Y NADA DEL TABLERO SE TOCA MIENTRAS TANTO. Es la otra mitad de que el bucle de
+   * `verify:mesa` coja un descarte a la primera: si una isla siguiera tocable, un cliente
+   * tonto —o un comprobador— podría pulsarla y no pasaría nada.
+   */
+  comprobar(
+    'y ninguna isla, vereda ni vértice se puede tocar: en «descartando» sólo se tira',
+    declarado.caras.every((c) => c.toque === null) &&
+      declarado.lineas.every((l) => l.toque === null) &&
+      declarado.nudos.every((n) => n.toque === null),
+  );
+  comprobar('y la isla del estiaje sigue diciendo en su rótulo que está seca', (declarado.caras.find((c) => c.id === alSacarlo.estiaje) as { rotulo: string }).rotulo.endsWith(' · estiaje'));
+  comprobar('a quien no debe nada, el retablo no le enseña ni un botón', tableroDeRiberas(proyectarRiberas(alSacarlo, elSiete.quien), elSiete.quien).acciones.length === 0);
+}
+
+/* ── EN «DESCARTANDO» NO SE CONTESTA A TRUEQUES ─────────────────────────── */
+
+/*
+ * ═══ LA REGLA QUE NO CUESTA NINGUNA LÍNEA, Y POR ESO SE COMPRUEBA ═══
+ *
+ * Sale gratis de la forma del despacho: el bloque que contesta tratos vive dentro de
+ * `opcionesDeTurno`, adonde no se llega en `'descartando'`. Y por eso mismo es la que
+ * mañana alguien deshace sin darse cuenta, escribiendo el descarte «al lado de los
+ * trueques, que también se contestan sin turno».
+ *
+ * El porqué es de reglas y no de pantalla: `faltan` se congela en el instante del siete,
+ * así que dos colonos que se pasaran fichas de ida y vuelta salvarían la mitad de sus dos
+ * almacenes sin que ninguna cuenta cambiara. No es un caso raro: es la primera jugada que
+ * descubre cualquiera que juegue dos partidas.
+ */
+{
+  const loQuePide = bienDe(manoDe(alSacarlo, debeElPrimero)[0] as Ficha);
+  const trato = {
+    id: 't9',
+    de: elSiete.quien,
+    para: debeElPrimero,
+    da: ['sal'] as Bien[],
+    pide: [loQuePide],
+    estado: 'propuesta' as const,
+  };
+  const conElTrato: EstadoDeRiberas = { ...alSacarlo, tratos: [trato] };
+  const suyas = opcionesDeRiberas(proyectarRiberas(conElTrato, debeElPrimero), debeElPrimero);
+  comprobar(
+    'con un trato abierto y la partida descartando, no se ofrece ni aceptar ni rechazar',
+    suyas.every((o) => o.tipo !== ACEPTAR && o.tipo !== RECHAZAR),
+    suyas.map((o) => o.id),
+  );
+  comprobar('y sí se ofrece tirar fichas, que es lo que toca', suyas.some((o) => o.tipo === DESCARTAR));
+  /*
+   * LA VACUNA, y es la que le da valor a las dos de arriba: con la misma mesa y el mismo
+   * trato en `'jugando'`, aceptar TIENE que estar. Sin ella, un `opciones()` que devolviera
+   * lista vacía por cualquier motivo daría verde.
+   */
+  const enJugando: EstadoDeRiberas = { ...conElTrato, momento: 'jugando', descartes: [] };
+  const enPie = opcionesDeRiberas(proyectarRiberas(enJugando, debeElPrimero), debeElPrimero);
+  comprobar(
+    'se ve fallar: el mismo trato en «jugando» sí se puede aceptar',
+    enPie.some((o) => o.tipo === ACEPTAR),
+    enPie.map((o) => o.id),
+  );
+  comprobar(
+    'y contestarlo a mano mientras se descarta no cambia nada',
+    avanzarRiberas(conElTrato, { tipo: ACEPTAR, carga: { trato: 't9' } }, ctxDe(debeElPrimero, TRES)) === conElTrato,
+  );
+  /*
+   * Y EL TRATO NO CADUCA POR ESTO, que es la otra mitad de la decisión: caducarlo sería
+   * inventar una regla nueva y además castigaría al que ofreció por una tirada que no hizo
+   * él. Sigue abierto y se contesta al volver, y se comprueba dejando que venza el plazo,
+   * que es el camino que resuelve el descarte sin que nadie esté delante.
+   */
+  const trasElPlazo = avanzarRiberas(conElTrato, { tipo: 'arcade:tic', carga: {} }, { quien: null, azar: 0, tic: 1, asientos: TRES });
+  comprobar('el trato sigue abierto al salir del descarte: no lo caduca el momento', trasElPlazo.tratos[0]?.estado === 'propuesta', trasElPlazo.tratos);
+  comprobar(
+    'y entonces sí se puede contestar, que es lo que significa «se aplaza» y no «se pierde»',
+    opcionesDeRiberas(proyectarRiberas(trasElPlazo, debeElPrimero), debeElPrimero).some((o) => o.tipo === ACEPTAR),
+  );
+}
+
+/* ── TIRAR UNA FICHA: LA MÁS VIEJA DE SU CLASE, Y UNA SOLA ──────────────── */
+
+{
+  /* Se elige una clase de la que haya DOS o más, o «la más vieja» no distinguiría nada. */
+  const conVarias = BIENES.find((b) => cuantasDe(manoDe(alSacarlo, debeElPrimero), b) > 1) as Bien;
+  comprobar('el que descarta tiene dos fichas de alguna clase, o lo de abajo no mide nada', conVarias !== undefined, manoDe(alSacarlo, debeElPrimero));
+  const antes = manoDe(alSacarlo, debeElPrimero);
+  const laVieja = antes.filter((f) => bienDe(f) === conVarias).sort((a, b) => serieDe(a) - serieDe(b))[0] as Ficha;
+
+  const tirada = avanzarRiberas(alSacarlo, { tipo: DESCARTAR, carga: { bien: conVarias } }, ctxDe(debeElPrimero, TRES));
+  const despues = manoDe(tirada, debeElPrimero);
+  comprobar('tirar una ficha se lleva UNA y no la mitad de golpe', despues.length === antes.length - 1, {
+    antes: antes.length,
+    despues: despues.length,
+  });
+  comprobar('y se lleva la MÁS VIEJA de esa clase, que es el criterio de `cobrar`', !despues.includes(laVieja) && antes.includes(laVieja), laVieja);
+  comprobar('y le baja en uno lo que le falta', faltanA(tirada, debeElPrimero) === faltanA(alSacarlo, debeElPrimero) - 1);
+  comprobar('sin tocar la cuenta del otro que debe', faltanA(tirada, debeElSegundo) === faltanA(alSacarlo, debeElSegundo));
+  comprobar(
+    'y nadie más pierde ni gana una ficha: lo tirado no va a ningún sitio',
+    tirada.colonos.every((c) => c.asiento === debeElPrimero || c.almacen.length === manoDe(alSacarlo, c.asiento).length),
+  );
+  comprobar('y no se gasta una tirada de azar: tirar una ficha no sortea nada', tirada.azar.tiradas === alSacarlo.azar.tiradas);
+  comprobar('y sigue siendo el momento del descarte hasta que no falte ninguna', tirada.momento === 'descartando');
+
+  /* ── LO QUE EL REDUCTOR NO ACEPTA, AUNQUE SE MANDE A MANO ─────────────── */
+
+  const sinNinguna = BIENES.find((b) => cuantasDe(manoDe(alSacarlo, debeElPrimero), b) === 0);
+  if (sinNinguna !== undefined) {
+    comprobar(
+      'tirar un bien que no se tiene devuelve el mismo objeto',
+      avanzarRiberas(alSacarlo, { tipo: DESCARTAR, carga: { bien: sinNinguna } }, ctxDe(debeElPrimero, TRES)) === alSacarlo,
+    );
+  }
+  comprobar(
+    'y tirar por quien no debe nada, tampoco: la lista es la que autoriza, no el turno',
+    avanzarRiberas(alSacarlo, { tipo: DESCARTAR, carga: { bien: conVarias } }, ctxDe(elSiete.quien, TRES)) === alSacarlo,
+  );
+  comprobar(
+    'y en «jugando» no se tira nada: el momento es la mitad de la guarda',
+    avanzarRiberas({ ...alSacarlo, momento: 'jugando', descartes: [] }, { tipo: DESCARTAR, carga: { bien: conVarias } }, ctxDe(debeElPrimero, TRES)).momento === 'jugando',
+  );
+  comprobar(
+    'y mandar TIRAR mientras se descarta no cambia nada',
+    avanzarRiberas(alSacarlo, { tipo: TIRAR, carga: {} }, ctxDe(elSiete.quien, TRES)) === alSacarlo,
+  );
+  comprobar(
+    'ni PASAR: el turno de quien tiró no se cierra con fichas pendientes',
+    avanzarRiberas(alSacarlo, { tipo: PASAR, carga: {} }, ctxDe(elSiete.quien, TRES)) === alSacarlo,
+  );
+  comprobar(
+    'ni mover el estiaje: primero se tira, y después se mueve',
+    avanzarRiberas(
+      alSacarlo,
+      { tipo: MOVER_EL_ESTIAJE, carga: { donde: llavesDeLasIslas(alSacarlo).find((l) => l !== alSacarlo.estiaje) as string, a: null } },
+      ctxDe(elSiete.quien, TRES),
+    ) === alSacarlo,
+  );
+}
+
+/* ── HASTA EL FINAL: SE SALE POR DONDE SE ENTRÓ, CON EL ESTIAJE DELANTE ── */
+
+/*
+ * ═══ Y SE JUEGA A CIEGAS, LEYENDO `turnoDe` Y EL TABLERO. NADA MÁS ═══
+ *
+ * Es la comprobación que sostiene la decisión 2, y la que un estado montado a mano no
+ * puede dar: quien juega aquí no sabe quién debe descartar —lee `turnoDe`, como el reloj
+ * de la mesa, como el móvil y como el bucle de `verify:mesa`— y coge el primer toque que
+ * el retablo le ofrece. Si `turnoDe` apuntara a quien tiró, este bucle se quedaría sin
+ * jugada en la primera vuelta y se cortaría.
+ *
+ * El recuento va delante a propósito: sin él, «atraviesa el siete» sería verde también si
+ * no hubiera habido nada que tirar.
+ */
+{
+  const debidas = alSacarlo.descartes.reduce((suma, d) => suma + d.faltan, 0);
+  let corriendo = elSiete.alSacarlo;
+  let movimientos = 0;
+  const quienes: string[] = [];
+  let corte: string | null = null;
+
+  let trasElDescarte: EstadoDeRiberas | null = null;
+
+  while (movimientos < 40) {
+    const e = estadoDe(corriendo);
+    if (e.momento === 'jugando' && trasElDescarte === null) trasElDescarte = e;
+    if (e.momento === 'jugando' && !e.estiajePorMover) break;
+    const turnoDe = proyectarRiberas(e, 'A').turnoDe;
+    if (turnoDe === null) {
+      corte = 'no se espera a nadie y la mesa sigue parada';
+      break;
+    }
+    const declarado = tableroDeRiberas(proyectarRiberas(e, turnoDe), turnoDe);
+    const toque =
+      declarado.acciones[0]?.toque ?? (declarado.caras.find((c) => c.toque !== null)?.toque ?? null);
+    if (toque === null) {
+      corte = `el tablero de ${turnoDe} no ofrece nada en «${e.momento}»`;
+      break;
+    }
+    corriendo = jugar(corriendo, { quien: turnoDe, rev: corriendo.rev, movimiento: { tipo: toque.tipo, carga: toque.carga } });
+    quienes.push(turnoDe);
+    movimientos++;
+  }
+
+  const fin = estadoDe(corriendo);
+  comprobar('jugando a ciegas por `turnoDe`, el siete se atraviesa entero y la mesa no se para', corte === null, corte);
+  comprobar('y costó exactamente las fichas que se debían, más el movimiento de la pieza', movimientos === debidas + 1, {
+    movimientos,
+    debidas,
+  });
+  comprobar(
+    'y las tiraron los DOS que debían, cada uno las suyas, sin que ninguno tuviera el turno',
+    alSacarlo.descartes.every((d) => quienes.filter((q) => q === d.de).length === d.faltan),
+    quienes,
+  );
+  comprobar('al acabar se vuelve a jugar, y la lista queda vacía', fin.momento === 'jugando' && fin.descartes.length === 0, {
+    momento: fin.momento,
+    descartes: fin.descartes,
+  });
+  comprobar('el turno sigue siendo de quien tiró el siete, que no lo perdió en ningún momento', (fin.colonos[fin.turno] as Colono).asiento === elSiete.quien);
+  comprobar('la pieza acabó movida, que es lo que esperaba al otro lado del descarte', fin.estiajePorMover === false && fin.estiaje !== alSacarlo.estiaje);
+  /*
+   * Y LA CUENTA, QUE ES LA REGLA: quien tenía trece se queda con siete y quien tenía
+   * catorce, con siete. Se calcula desde las manos de antes y no se copia el número,
+   * porque el reparto cambia con la semilla.
+   *
+   * ═══ Y SE MIDE EN EL INSTANTE EN QUE SE ACABA EL DESCARTE, NO AL FINAL ═══
+   *
+   * Porque al otro lado está el estiaje, y el estiaje ROBA: escrita sobre el estado final,
+   * esta línea salía roja por catorce menos siete menos UNA MÁS, y lo que faltaba no lo
+   * había tirado nadie: se lo había llevado la pieza. Dos reglas seguidas sobre el mismo
+   * almacén se miden por separado o la primera acaba respondiendo por la segunda.
+   */
+  const trasTirar = trasElDescarte ?? fin;
+  comprobar('el descarte se acaba ANTES de mover la pieza, que es el orden de la regla', trasElDescarte !== null && trasTirar.estiajePorMover === true);
+  comprobar(
+    'y cada uno tiró exactamente la mitad de lo que tenía, redondeando hacia abajo',
+    alSacarlo.descartes.every(
+      (d) => manoDe(trasTirar, d.de).length === manoDe(alSacarlo, d.de).length - Math.floor(manoDe(alSacarlo, d.de).length / 2),
+    ),
+    alSacarlo.descartes.map((d) => ({ de: d.de, antes: manoDe(alSacarlo, d.de).length, despues: manoDe(trasTirar, d.de).length })),
+  );
+}
+
+/* ── EL RELOJ: TIRA POR TODOS LOS QUE FALTEN, Y DE UNA VEZ ──────────────── */
+
+{
+  const conElTic = avanzarRiberas(alSacarlo, { tipo: 'arcade:tic', carga: {} }, { quien: null, azar: 0, tic: 1, asientos: TRES });
+  comprobar('al vencer el plazo descartando, la mesa deja de estar parada', conElTic.momento === 'jugando' && conElTic.descartes.length === 0, {
+    momento: conElTic.momento,
+    descartes: conElTic.descartes,
+  });
+  /*
+   * POR TODOS Y NO POR EL PRIMERO, y esto es lo que se paga con una línea y se cobra en
+   * días: el plazo de pared se reprograma cada vez que cambia `turnoDe`, y `turnoDe`
+   * cambia cada vez que uno termina. De uno en uno, un siete con seis manos llenas serían
+   * seis plazos encadenados — y en La Larga, seis días.
+   */
+  comprobar(
+    'y ha tirado por TODOS los que faltaban, no sólo por el primero de la cola',
+    alSacarlo.descartes.every(
+      (d) => manoDe(conElTic, d.de).length === manoDe(alSacarlo, d.de).length - d.faltan,
+    ),
+    alSacarlo.descartes.map((d) => ({ de: d.de, antes: manoDe(alSacarlo, d.de).length, despues: manoDe(conElTic, d.de).length })),
+  );
+  /*
+   * LAS MÁS VIEJAS, que es lo que hace esto reejecutable: elegir al azar gastaría una
+   * tirada, y entonces dos ejecuciones del mismo diario con distinto número de plazos
+   * vencidos dejarían el acumulador en sitios distintos.
+   */
+  comprobar(
+    'y las que se ha llevado son las MÁS VIEJAS: lo que queda son los números altos',
+    alSacarlo.descartes.every((d) => {
+      const quedan = manoDe(conElTic, d.de).map(serieDe);
+      const tiradas = manoDe(alSacarlo, d.de).slice(0, d.faltan).map(serieDe);
+      return quedan.every((q) => tiradas.every((t) => t < q));
+    }),
+  );
+  comprobar('sin gastar una tirada de azar, o dos diarios con distintos plazos vencidos no cuadrarían', conElTic.azar.tiradas === alSacarlo.azar.tiradas, {
+    antes: alSacarlo.azar.tiradas,
+    ahora: conElTic.azar.tiradas,
+  });
+  comprobar('y no elige qué se salva: el plazo es un castigo, no una jugada', conElTic.colonos.every((c) => c.almacen.every((f) => manoDe(alSacarlo, c.asiento).includes(f))));
+  /*
+   * Y NO PASA EL TURNO DETRÁS, al revés que un plazo vencido en `'jugando'`: el turno de
+   * quien tiró el siete no ha llegado a empezar, y lo que le espera —mover la pieza— tiene
+   * su propio plazo, que es el que ya estaba escrito.
+   */
+  comprobar('y el turno no se pasa: sigue siendo de quien tiró, con la pieza por mover', conElTic.turno === alSacarlo.turno && conElTic.estiajePorMover === true);
+  const suyas = opcionesDeRiberas(proyectarRiberas(conElTic, elSiete.quien), elSiete.quien);
+  comprobar('y lo que se le ofrece ahora son los dieciocho destinos', new Set(suyas.filter((o) => o.tipo === MOVER_EL_ESTIAJE).map((o) => (o.carga as { donde: string }).donde)).size === 18);
+  /*
+   * Y EL SEGUNDO TIC MUEVE LA PIEZA, que es la mitad que ya estaba escrita: dos plazos
+   * vencidos seguidos resuelven un siete entero sin que nadie esté delante.
+   */
+  const segundoTic = avanzarRiberas(conElTic, { tipo: 'arcade:tic', carga: {} }, { quien: null, azar: 0, tic: 2, asientos: TRES });
+  comprobar('y un segundo plazo vencido mueve la pieza y cierra el turno, sin nadie delante', segundoTic.estiajePorMover === false && segundoTic.turno !== conElTic.turno);
+}
+
+/* ── UNA MESA GUARDADA ANTES DEL DESCARTE NO DEBE NINGUNA FICHA ─────────── */
+
+{
+  const deAyer = { ...alSacarlo, momento: 'jugando' } as Record<string, unknown>;
+  delete deAyer.descartes;
+  const rellenada = comoSiSiempreHubieraHabidoMazo(deAyer as unknown as EstadoDeRiberas);
+  comprobar('una mesa de ayer se reabre sin deberle fichas a nadie', canonico(rellenada.descartes) === canonico([]), rellenada.descartes);
+  const vistaDeAyer = { ...(proyectarRiberas(rellenada, elSiete.quien) as unknown as Record<string, unknown>) };
+  delete vistaDeAyer.descartes;
+  comprobar(
+    'y una vista sin el campo sigue ofreciendo el turno entero, sin apagar el juego',
+    opcionesDeRiberas(vistaDeAyer, elSiete.quien).length > 0,
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -2119,7 +2754,7 @@ const EL_TRIO = ['A', 'B', 'C'];
     'y si se manda igual, el reductor devuelve el mismo objeto',
     avanzarRiberas(
       estadoDe(partida),
-      { tipo: GUARDIA, carga: { carta: 'c1', a: 'B' } },
+      { tipo: GUARDIA, carga: { carta: 'c1' } },
       ctxDe('A', DOS_AQUI),
     ) === estadoDe(partida),
   );
@@ -2138,17 +2773,27 @@ const EL_TRIO = ['A', 'B', 'C'];
   const alTurnoSiguiente = opcionesEn(partida, 'A').filter((o) => o.tipo === GUARDIA);
   comprobar('y al turno siguiente sí se ofrece', alTurnoSiguiente.length > 0, opcionesEn(partida, 'A').map((o) => o.id).slice(0, 8));
   comprobar(
-    'y entra de verdad: la mano se queda sin ella y la guardia queda jugada',
+    'y entra de verdad: la mano se queda sin ella, la guardia cuenta y el estiaje queda por mover',
     (() => {
       const jugada = estadoDe(mover(partida, 'A', alTurnoSiguiente[0] as Opcion));
       const suyo = jugada.colonos[0] as Colono;
-      return suyo.mano.length === 0 && suyo.guardias === 1 && jugada.cartaJugada;
+      return suyo.mano.length === 0 && suyo.guardias === 1 && jugada.cartaJugada && jugada.estiajePorMover;
     })(),
   );
 }
 
 /* ── UNA CARTA POR TURNO ────────────────────────────────────────────────── */
 {
+  /*
+   * ═══ Y AQUÍ HAY QUE MOVER LA PIEZA EN MEDIO, O ESTO DEJA DE COMPROBAR NADA ═══
+   *
+   * Desde la fase 3 la guardia enciende `estiajePorMover`, y con la bandera encendida
+   * `opcionesDeTurno` corta y no ofrece NINGUNA carta. O sea que «la segunda ya no se
+   * ofrece» pasaría en verde aunque la regla de «una al turno» se hubiera borrado
+   * entera: quien la estaría tapando sería el corte del estiaje, que es otra regla. Se
+   * mueve la pieza primero —con eso la bandera se apaga y el turno vuelve a estar
+   * abierto— y sólo entonces se pregunta. Se vio pasar sin esto.
+   */
   const DOS_AQUI = ['A', 'B'];
   const conDos = escenarioDeMazo({
     bienes: [[], ['limo', 'junco']],
@@ -2156,54 +2801,148 @@ const EL_TRIO = ['A', 'B', 'C'];
   });
   const antes = ofrecidasA(conDos, 'A').filter((o) => o.tipo === GUARDIA);
   comprobar('con dos guardias de ayer en la mano, se ofrecen las dos', antes.length === 2 && new Set(antes.map((o) => o.id)).size === 2, antes.map((o) => o.id));
+  comprobar('una por carta, y sin víctima dentro del identificador', canonico(antes.map((o) => o.id).sort()) === canonico(['jugar-guardia:c1', 'jugar-guardia:c2']), antes.map((o) => o.id));
 
-  const primera = avanzarRiberas(conDos, { tipo: GUARDIA, carga: { carta: 'c1', a: 'B' } }, ctxDe('A', DOS_AQUI));
+  const primera = avanzarRiberas(conDos, { tipo: GUARDIA, carga: { carta: 'c1' } }, ctxDe('A', DOS_AQUI));
   comprobar('la primera entra', primera !== conDos && (primera.colonos[0] as Colono).guardias === 1);
-  comprobar('y la segunda ya no se ofrece: una carta por turno', ofrecidasA(primera, 'A').every((o) => o.tipo !== GUARDIA));
+  comprobar('y con el estiaje por mover no se ofrece ninguna carta: manda el corte, que es otra regla', ofrecidasA(primera, 'A').every((o) => o.tipo !== GUARDIA) && primera.estiajePorMover);
+
+  /* Y si no hubiera destino, esto se pone ROJO en vez de caerse: la mesa se para. */
+  const destinoDeLaSegunda = ofrecidasA(primera, 'A').find((o) => o.tipo === MOVER_EL_ESTIAJE);
+  comprobar('con la guardia jugada hay adónde mover la pieza', destinoDeLaSegunda !== undefined);
+  const movida =
+    destinoDeLaSegunda === undefined
+      ? primera
+      : avanzarRiberas(primera, { tipo: MOVER_EL_ESTIAJE, carga: destinoDeLaSegunda.carga }, ctxDe('A', DOS_AQUI));
+  comprobar('se puede mover la pieza y seguir el turno', movida !== primera && movida.estiajePorMover === false);
+  comprobar('y con la pieza ya movida la segunda SIGUE sin ofrecerse: una carta por turno', ofrecidasA(movida, 'A').every((o) => o.tipo !== GUARDIA), ofrecidasA(movida, 'A').map((o) => o.id).slice(0, 8));
   comprobar(
     'y mandarla devuelve el mismo objeto',
-    avanzarRiberas(primera, { tipo: GUARDIA, carga: { carta: 'c2', a: 'B' } }, ctxDe('A', DOS_AQUI)) === primera,
+    avanzarRiberas(movida, { tipo: GUARDIA, carga: { carta: 'c2' } }, ctxDe('A', DOS_AQUI)) === movida,
   );
-  comprobar('la carta que no se jugó sigue en la mano', (primera.colonos[0] as Colono).mano.length === 1);
+  comprobar('la carta que no se jugó sigue en la mano', (movida.colonos[0] as Colono).mano.length === 1);
+
+  /*
+   * LA VACUNA DE ESTE BLOQUE: con la pieza movida el turno está de verdad abierto, o
+   * sea que el «no se ofrece» de arriba es por la carta jugada y no porque no quede
+   * nada que hacer. Se pregunta por PASAR, que es lo que siempre está.
+   */
+  comprobar('y el turno sigue vivo: pasar se ofrece, así que arriba no callaba el corte', ofrecidasA(movida, 'A').some((o) => o.tipo === PASAR));
 }
 
-/* ── LA GUARDIA ROBA DE VERDAD ──────────────────────────────────────────── */
+/* ── LA GUARDIA MUEVE EL ESTIAJE, Y EL ROBO SALE DE LA ISLA ─────────────── */
 {
+  /*
+   * ═══ LA FASE 3, JUGADA ENTERA: LA CARTA YA NO ELIGE VÍCTIMA, ELIGE ISLA ═══
+   *
+   * Miguel: «puede usar esta carta para mover al ladrón de forma idéntica a si hubiera
+   * sacado un 7». Así que lo que hay que comprobar no es que la carta robe, sino que
+   * ENCIENDE la bandera y deja delante exactamente los mismos dieciocho destinos que un
+   * siete, con sus víctimas dentro. El robo lo comprueba el bloque del estiaje; aquí se
+   * compra que la carta llega hasta ahí y que quien roba es el sitio, no el naipe.
+   */
   const conVictima = escenarioDeMazo({
     bienes: [['limo'], ['sal', 'piedra', 'grano'], []],
     manos: [[{ carta: 'c1:guardia', comprada: 0 }], [], []],
   });
 
-  /* A quien no tiene nada no se le ofrece robar, y a quien tiene sí. */
   const contra = ofrecidasA(conVictima, 'A').filter((o) => o.tipo === GUARDIA);
-  comprobar('sólo se ofrece robar a quien tiene algo', contra.length === 1 && contra[0]?.id === 'jugar-guardia:c1:B', contra.map((o) => o.id));
-  comprobar(
-    'y robarle a quien no tiene nada devuelve el mismo objeto',
-    avanzarRiberas(conVictima, { tipo: GUARDIA, carga: { carta: 'c1', a: 'C' } }, ctxDe('A', EL_TRIO)) === conVictima,
-  );
+  comprobar('se ofrece UNA sola manera de jugar la guardia, sin víctima que elegir', contra.length === 1 && contra[0]?.id === 'jugar-guardia:c1', contra.map((o) => o.id));
+  comprobar('y su carga es sólo la carta: el campo `a` se cayó con la regla vieja', canonico((contra[0] as Opcion).carga) === canonico({ carta: 'c1' }), (contra[0] as Opcion).carga);
 
-  const robado = avanzarRiberas(conVictima, { tipo: GUARDIA, carga: (contra[0] as Opcion).carga }, ctxDe('A', EL_TRIO));
-  const ladron = robado.colonos[0] as Colono;
-  const victima = robado.colonos[1] as Colono;
-  const antesB = (conVictima.colonos[1] as Colono).almacen;
-  comprobar('el ladrón gana una ficha y la víctima pierde una', ladron.almacen.length === 2 && victima.almacen.length === 2, { ladron: ladron.almacen, victima: victima.almacen });
-  const laQueFalta = antesB.filter((f) => !victima.almacen.includes(f));
-  comprobar('falta exactamente una del almacén de la víctima', laQueFalta.length === 1, laQueFalta);
+  const jugada = avanzarRiberas(conVictima, { tipo: GUARDIA, carga: (contra[0] as Opcion).carga }, ctxDe('A', EL_TRIO));
+  const ladron = jugada.colonos[0] as Colono;
+  comprobar('la carta entra: sale de la mano, cuenta y gasta la jugada del turno', ladron.mano.length === 0 && ladron.guardias === 1 && jugada.cartaJugada, { mano: ladron.mano.length, guardias: ladron.guardias });
+  comprobar('y ENCIENDE el estiaje, que es lo que la fase 3 le añadió', jugada.estiajePorMover === true);
+  comprobar('todavía no ha robado nadie: el robo sale de la isla, y la isla no se ha elegido', canonico(ladron.almacen) === canonico((conVictima.colonos[0] as Colono).almacen), ladron.almacen);
+  comprobar('ni se ha tocado el azar: jugar la carta no sortea nada', canonico(jugada.azar) === canonico(conVictima.azar));
+  comprobar('y la pieza sigue donde estaba hasta que se elija destino', jugada.estiaje === conVictima.estiaje);
+
+  /*
+   * ═══ Y LO QUE MIGUEL DEJÓ DICHO APARTE: NO SE DESCARTA ═══
+   *
+   * «Esta regla de descarte sólo aplica al sacar un 7 con los dados, NO al usar una
+   * carta de caballero.» B tiene tres bienes aquí, así que se monta el filo aparte: una
+   * mano de NUEVE, que con un siete tiraría cuatro. Con la carta no tira ninguna.
+   */
+  const conManosLlenas = escenarioDeMazo({
+    bienes: [
+      ['limo'],
+      ['sal', 'sal', 'sal', 'piedra', 'piedra', 'piedra', 'grano', 'grano', 'junco'],
+      [],
+    ],
+    manos: [[{ carta: 'c1:guardia', comprada: 0 }], [], []],
+  });
+  comprobar('el escenario del descarte vale: B lleva nueve fichas, más de las que se aguantan', (conManosLlenas.colonos[1] as Colono).almacen.length === 9);
+  const sinDescarte = avanzarRiberas(conManosLlenas, { tipo: GUARDIA, carga: { carta: 'c1' } }, ctxDe('A', EL_TRIO));
+  comprobar('la guardia NO abre el descarte, por llenas que estén las manos', sinDescarte.momento === 'jugando' && sinDescarte.descartes.length === 0, { momento: sinDescarte.momento, descartes: sinDescarte.descartes });
+  comprobar('y nadie tira una sola ficha: eso lo cobra el siete y sólo el siete', (sinDescarte.colonos[1] as Colono).almacen.length === 9);
+
+  /*
+   * LOS DESTINOS QUE DEJA DELANTE SON LOS MISMOS DIECIOCHO DE UN SIETE, y ni uno de
+   * ellos es la isla donde la pieza está. Es la comprobación de «de forma idéntica»:
+   * si la carta encendiera otra cosa —o una bandera propia— esta lista saldría vacía.
+   */
+  const destinos = ofrecidasA(jugada, 'A').filter((o) => o.tipo === MOVER_EL_ESTIAJE);
+  const islasOfrecidas = new Set(destinos.map((o) => (o.carga as { donde: string }).donde));
+  comprobar('deja delante las DIECIOCHO islas que no son la suya, igual que un siete', islasOfrecidas.size === jugada.islas.length - 1 && !islasOfrecidas.has(jugada.estiaje ?? ''), { islas: islasOfrecidas.size, total: jugada.islas.length });
+  comprobar('y no se ofrece nada más que mover y revelar: manda el corte del estiaje', ofrecidasA(jugada, 'A').every((o) => o.tipo === MOVER_EL_ESTIAJE || o.tipo === REVELAR), [...new Set(ofrecidasA(jugada, 'A').map((o) => o.tipo))]);
+
+  /*
+   * ═══ Y AHORA SE MUEVE Y SE ROBA DE VERDAD, POR EL CAMINO DE LA CARTA ═══
+   *
+   * Se busca un destino que traiga víctima —lo trae `opcionesDelEstiaje` con `a` dentro—
+   * y se comprueba que la ficha viaja entera, con su número de serie. Es el mismo robo
+   * que el del siete, y ésa es justamente la afirmación: `elRobo` se llama una vez y
+   * desde un solo sitio.
+   */
+  const conRobo = destinos.find((o) => (o.carga as { a: string | null }).a !== null);
+  comprobar('alguno de los dieciocho destinos tiene a quién robarle, o lo de abajo no miraría el robo', conRobo !== undefined, destinos.length);
+  if (conRobo !== undefined) {
+    const aQuien = (conRobo.carga as { a: string }).a;
+    const victimaAntes = jugada.colonos.find((c) => c.asiento === aQuien) as Colono;
+    const robado = avanzarRiberas(jugada, { tipo: MOVER_EL_ESTIAJE, carga: conRobo.carga }, ctxDe('A', EL_TRIO));
+    const suyoDespues = robado.colonos[0] as Colono;
+    const victimaDespues = robado.colonos.find((c) => c.asiento === aQuien) as Colono;
+    comprobar('la pieza se planta en la isla elegida y la bandera se apaga', robado.estiaje === (conRobo.carga as { donde: string }).donde && robado.estiajePorMover === false);
+    comprobar('el ladrón gana una ficha y la víctima pierde una', suyoDespues.almacen.length === ladron.almacen.length + 1 && victimaDespues.almacen.length === victimaAntes.almacen.length - 1, { ladron: suyoDespues.almacen, victima: victimaDespues.almacen });
+    const laQueFalta = victimaAntes.almacen.filter((f) => !victimaDespues.almacen.includes(f));
+    comprobar('falta exactamente una del almacén de la víctima', laQueFalta.length === 1, laQueFalta);
+    comprobar(
+      'y esa MISMA ficha, con su número de serie, está ahora en el del ladrón',
+      suyoDespues.almacen.includes(laQueFalta[0] as Ficha),
+      { robada: laQueFalta[0], ladron: suyoDespues.almacen },
+    );
+    comprobar('y la guardia no se cuenta dos veces por mover', suyoDespues.guardias === 1);
+  }
+
+  /*
+   * ═══ CON EL ESTIAJE POR MOVER NO SE JUEGA OTRA GUARDIA ═══
+   *
+   * Las dos mitades, como siempre: el corte de `opcionesDeTurno` ya se comprobó arriba
+   * («no se ofrece nada más que mover y revelar»); ésta es la del reductor. Sin ella, un
+   * cliente viejo colapsaría dos activaciones en una —gastando carta, muesca y turno para
+   * mover UNA vez— y no se caería nada.
+   */
+  const conDosEnMano = escenarioDeMazo({
+    bienes: [['limo'], ['sal'], []],
+    manos: [[{ carta: 'c1:guardia', comprada: 0 }, { carta: 'c2:guardia', comprada: 0 }], [], []],
+  });
+  const conBandera = avanzarRiberas(conDosEnMano, { tipo: GUARDIA, carga: { carta: 'c1' } }, ctxDe('A', EL_TRIO));
+  comprobar('el escenario vale: la primera guardia entra y deja la bandera encendida', conBandera !== conDosEnMano && conBandera.estiajePorMover);
   comprobar(
-    'y esa MISMA ficha, con su número de serie, está ahora en el del ladrón',
-    ladron.almacen.includes(laQueFalta[0] as Ficha),
-    { robada: laQueFalta[0], ladron: ladron.almacen },
+    'y la segunda, mandada a mano con la pieza sin mover, devuelve EL MISMO objeto',
+    avanzarRiberas(conBandera, { tipo: GUARDIA, carga: { carta: 'c2' } }, ctxDe('A', EL_TRIO)) === conBandera,
   );
-  comprobar('nadie más pierde nada', (robado.colonos[2] as Colono).almacen.length === 0);
-  comprobar('y la guardia cuenta: jugada, y fuera de la mano', ladron.guardias === 1 && ladron.mano.length === 0);
 
   /*
    * ═══ LA VACUNA DEL AZAR: no es «la primera de la lista» ═══
    *
-   * Con cuatro fichas iguales de clase distinta y ocho semillas, si el robo cogiera
-   * siempre la primera del almacén saldría ocho veces la misma. Es la comprobación
-   * que separa «roba al azar» de «roba la más vieja», que es lo que sale solo al
-   * escribirlo y además filtraría el ORDEN del almacén ajeno, que no es público.
+   * Con cuatro fichas de clase distinta y ocho semillas, si el robo cogiera siempre la
+   * primera del almacén saldría ocho veces la misma. Es la comprobación que separa «roba
+   * al azar» de «roba la más vieja», que es lo que sale solo al escribirlo y además
+   * filtraría el ORDEN del almacén ajeno, que no es público. Se juega ahora por el camino
+   * de la carta: jugarla, y mover a la isla donde está B.
    */
   const robadas = new Set<string>();
   for (const semilla of [1, 2, 3, 4, 5, 6, 7, 8]) {
@@ -2212,11 +2951,168 @@ const EL_TRIO = ['A', 'B', 'C'];
       bienes: [[], ['limo', 'junco', 'sal', 'piedra']],
       manos: [[{ carta: 'c1:guardia', comprada: 0 }], []],
     });
-    const tras = avanzarRiberas(mesa4, { tipo: GUARDIA, carga: { carta: 'c1', a: 'B' } }, ctxDe('A', ['A', 'B']));
+    const conCarta = avanzarRiberas(mesa4, { tipo: GUARDIA, carga: { carta: 'c1' } }, ctxDe('A', ['A', 'B']));
+    const aB = ofrecidasA(conCarta, 'A').find((o) => (o.carga as { a?: string | null }).a === 'B');
+    if (aB === undefined) continue;
+    const tras = avanzarRiberas(conCarta, { tipo: MOVER_EL_ESTIAJE, carga: aB.carga }, ctxDe('A', ['A', 'B']));
     const suya = (tras.colonos[0] as Colono).almacen[0];
     if (suya !== undefined) robadas.add(suya.slice(suya.indexOf(':') + 1));
   }
   comprobar('con distintas semillas no roba siempre el mismo bien: es al azar', robadas.size > 1, [...robadas]);
+}
+
+/* ── LA GUARDIA SE JUEGA ANTES DE TIRAR (§3 y §3 bis del diseño) ────────── */
+{
+  /*
+   * ═══ ES LA MITAD DE LA PETICIÓN DE MIGUEL, Y LA QUE SE ROMPE EN SILENCIO ═══
+   *
+   * «INCLUSO ANTES DE LANZAR LOS DADOS.» Lo que hay que comprar aquí no es sólo que la
+   * carta se ofrezca sin haber tirado —eso lo daría por bueno cualquier sitio donde se
+   * escribiera—, sino DÓNDE queda el corte de `estiajePorMover` dentro de
+   * `opcionesDeTurno`. Puesto donde corta `veredasGratis` —después del bloque de tirar—
+   * la carta se juega, la bandera se enciende, y lo único que sale es «Tirar los dados»:
+   * los dieciocho destinos no aparecen NUNCA y la carta se convierte en una que mueve
+   * después de la cosecha, que es justo la cosecha que servía para evitar.
+   *
+   * Por eso las dos afirmaciones van juntas: que salen los dieciocho, Y QUE TIRAR NO
+   * ESTÁ. Sin la segunda, el corte en el sitio malo pasa en verde, porque el corte malo
+   * también devuelve una lista.
+   */
+  const antesDeTirar = escenarioDeMazo({
+    bienes: [['limo'], ['sal', 'piedra'], ['grano']],
+    manos: [[{ carta: 'c1:guardia', comprada: 0 }], [], []],
+    tirado: false,
+  });
+  const suyas = ofrecidasA(antesDeTirar, 'A');
+  comprobar('sin tirar, la guardia SÍ se ofrece: es la petición de Miguel', suyas.some((o) => o.tipo === GUARDIA), suyas.map((o) => o.id));
+  comprobar('y tirar se sigue ofreciendo mientras no se juegue: el escenario vale', suyas.some((o) => o.tipo === TIRAR));
+  comprobar('pero ninguna de las otras tres cartas, ni comprar: sus reductores exigen la tirada', suyas.every((o) => o.tipo !== ANO_BUENO && o.tipo !== ACAPARAMIENTO && o.tipo !== DOS_VEREDAS && o.tipo !== COMPRAR));
+
+  /*
+   * Y SI LA CARTA NO SE OFRECIERA, ESTO SE PONE ROJO Y NO SE CAE. Es justo la mitad que
+   * una vacuna quita —la de `opcionesDeTurno`—, y un guion que revienta con «no se puede
+   * leer 'carga' de undefined» cuenta peor lo que pasa que once líneas rojas con su
+   * nombre. Se manda la carga a mano, que es lo que mandaría un cliente viejo.
+   */
+  const laCarta = suyas.find((o) => o.tipo === GUARDIA);
+  const jugadaAntes = avanzarRiberas(antesDeTirar, { tipo: GUARDIA, carga: laCarta?.carga ?? { carta: 'c1' } }, ctxDe('A', EL_TRIO));
+  comprobar('el reductor la acepta sin haber tirado: el `!estado.tirado` se cayó de verdad', jugadaAntes !== antesDeTirar && jugadaAntes.estiajePorMover === true && jugadaAntes.tirado === false);
+
+  const despues = ofrecidasA(jugadaAntes, 'A');
+  const dieciocho = despues.filter((o) => o.tipo === MOVER_EL_ESTIAJE);
+  comprobar(
+    'y delante quedan los DIECIOCHO destinos, no «Tirar los dados»',
+    new Set(dieciocho.map((o) => (o.carga as { donde: string }).donde)).size === jugadaAntes.islas.length - 1,
+    { destinos: dieciocho.length, islas: jugadaAntes.islas.length },
+  );
+  comprobar(
+    'Y TIRAR NO ESTÁ, que es la mitad que caza el corte puesto en el sitio de `veredasGratis`',
+    despues.every((o) => o.tipo !== TIRAR),
+    despues.map((o) => o.tipo).filter((t) => t === TIRAR),
+  );
+  comprobar('ni pasar: mover es obligatorio también por este camino', despues.every((o) => o.tipo !== PASAR));
+  comprobar('y el reductor tampoco deja tirar con la pieza pendiente', avanzarRiberas(jugadaAntes, { tipo: TIRAR, carga: {} }, ctxDe('A', EL_TRIO)) === jugadaAntes);
+
+  /*
+   * EL AVISO NO PUEDE INVENTARSE UNA TIRADA. `ultimaTirada` no se borra al cambiar de
+   * turno, así que la frase de siempre —«Sacaste N: mueve el estiaje»— anunciaría aquí
+   * la tirada del turno anterior, y en la primera vuelta un «Sacaste 0». Ver `avisoDe`.
+   */
+  const aviso = avisoPara(jugadaAntes, 'A');
+  comprobar('el aviso dice que fue la carta y no una tirada que no ha pasado', aviso.includes('guardia') && !aviso.includes('Sacaste'), aviso);
+  comprobar('y a los demás se les dice de quién es el turno y qué está haciendo', avisoPara(jugadaAntes, 'B').includes('mueve el estiaje'), avisoPara(jugadaAntes, 'B'));
+  /*
+   * LA VACUNA DEL AVISO, y hace falta: sin ella, un aviso que dijera «mueve el estiaje» a
+   * secas pasaría igual. Se contrasta contra el MISMO aviso encendido por un siete, que sí
+   * tiene tirada que nombrar y sí la nombra.
+   */
+  const porUnSiete = avanzarRiberas({ ...antesDeTirar, azar: sembrar(semillaQueSaca(7)) }, { tipo: TIRAR, carga: {} }, ctxDe('A', EL_TRIO));
+  comprobar('y cuando lo enciende un siete de verdad, el aviso SÍ nombra la tirada', porUnSiete.ultimaTirada === 7 && avisoPara(porUnSiete, 'A').includes('Sacaste 7'), avisoPara(porUnSiete, 'A'));
+}
+
+/* ── §3 ter: EL TURNO QUE NADIE HABÍA DESCRITO ─────────────────────────── */
+{
+  /*
+   * ═══ DOS MOVIMIENTOS DEL ESTIAJE, DOS ROBOS Y UN DESCARTE EN EL MISMO TURNO ═══
+   *
+   * Juego la guardia sin haber tirado, muevo y robo; luego tiro y sale un SIETE; la
+   * bandera se enciende OTRA VEZ —la misma bandera, la segunda vez en el mismo turno— y
+   * esta vez además con descarte detrás. Es legal desde la fase 3 y no estaba descrito en
+   * ninguna parte hasta el §3 ter.
+   *
+   * Es donde una bandera booleana reutilizada se rompe, así que lo que se compra es
+   * exactamente eso: que el SEGUNDO robo funciona (`cartaJugada` no lo bloquea, porque el
+   * segundo movimiento no viene de una carta), que `guardias` sube UNA sola vez y que La
+   * Mayor Guardia se recalcula UNA sola vez.
+   *
+   * El siete NO se espera tirando: se fabrica con `semillaQueSaca(7)`, que es la
+   * herramienta que este fichero ya usa dos veces para el filo del descarte. Y se siembra
+   * JUSTO ANTES de tirar y no al montar el escenario, porque el primer robo gasta azar
+   * —`elRobo` sortea qué ficha— y con la semilla puesta al principio la tirada saldría
+   * cualquier cosa.
+   */
+  const arranque = escenarioDeMazo({
+    /* Manos gordas a propósito: el siete de abajo tiene que abrir el descarte. */
+    bienes: [
+      ['limo', 'limo', 'sal', 'sal', 'piedra', 'piedra', 'grano', 'grano'],
+      ['sal', 'piedra', 'grano', 'junco'],
+      ['limo', 'junco'],
+    ],
+    /* DOS guardias, y la segunda no es adorno: es lo que hace que la ultima comprobacion
+       del bloque muerda. Con una sola, «no queda ninguna guardia por jugar» sale verde
+       porque la mano está vacía, y seguiría verde con la regla de `cartaJugada` borrada. */
+    manos: [[{ carta: 'c1:guardia', comprada: 0 }, { carta: 'c9:guardia', comprada: 0 }], [], []],
+    guardias: [2, 0, 0],
+    tirado: false,
+  });
+  comprobar('el escenario vale: A no ha tirado, lleva dos guardias y ocho fichas', arranque.tirado === false && (arranque.colonos[0] as Colono).guardias === 2 && (arranque.colonos[0] as Colono).almacen.length === 8);
+
+  /* 1. Se juega la guardia ANTES de tirar. */
+  const conCarta = avanzarRiberas(arranque, { tipo: GUARDIA, carga: { carta: 'c1' } }, ctxDe('A', EL_TRIO));
+  comprobar('1. la guardia entra sin haber tirado, y con la tercera La Mayor Guardia pasa a ser suya', conCarta.estiajePorMover && (conCarta.colonos[0] as Colono).guardias === 3 && conCarta.guardia.de === 'A', conCarta.guardia);
+
+  /* 2. Primer movimiento y primer robo. */
+  const primerDestino = ofrecidasA(conCarta, 'A').find((o) => (o.carga as { a?: string | null }).a !== null);
+  comprobar('2. hay un destino con víctima para el primer robo', primerDestino !== undefined);
+  const trasElPrimero = primerDestino === undefined ? conCarta : avanzarRiberas(conCarta, { tipo: MOVER_EL_ESTIAJE, carga: primerDestino.carga }, ctxDe('A', EL_TRIO));
+  comprobar('y roba: el almacén de A crece una ficha', (trasElPrimero.colonos[0] as Colono).almacen.length === 9, (trasElPrimero.colonos[0] as Colono).almacen.length);
+  comprobar('y la bandera se apaga, con el turno todavía por tirar', trasElPrimero.estiajePorMover === false && trasElPrimero.tirado === false);
+
+  /* 3. Ahora sí se tira, y sale un siete. */
+  const trasTirar = avanzarRiberas({ ...trasElPrimero, azar: sembrar(semillaQueSaca(7)) }, { tipo: TIRAR, carga: {} }, ctxDe('A', EL_TRIO));
+  comprobar('3. se tira y sale un siete', trasTirar.ultimaTirada === 7, trasTirar.ultimaTirada);
+  comprobar('4. la MISMA bandera se enciende otra vez, y esta vez con descarte detrás', trasTirar.estiajePorMover === true && trasTirar.momento === 'descartando', { momento: trasTirar.momento, descartes: trasTirar.descartes });
+  comprobar('y quien tiró está en la cola con la mitad de sus nueve: la carta le llenó la mano y ahora la paga', trasTirar.descartes.some((d) => d.de === 'A' && d.faltan === 4), trasTirar.descartes);
+
+  /* 5. Se descarta entero, y se vuelve a mover. */
+  const yaDescartado = estadoDe(vaciarLasManos(mesaSobre('RIB-3TER', trasTirar, TRES)));
+  comprobar('5. el descarte se cierra y el turno sigue siendo de A con la pieza por mover', yaDescartado.momento === 'jugando' && yaDescartado.estiajePorMover === true && yaDescartado.turno === 0, { momento: yaDescartado.momento, turno: yaDescartado.turno });
+
+  const segundoDestino = ofrecidasA(yaDescartado, 'A').find((o) => (o.carga as { a?: string | null }).a !== null);
+  comprobar('hay un destino con víctima para el SEGUNDO robo del turno', segundoDestino !== undefined);
+  const alFinal = segundoDestino === undefined ? yaDescartado : avanzarRiberas(yaDescartado, { tipo: MOVER_EL_ESTIAJE, carga: segundoDestino.carga }, ctxDe('A', EL_TRIO));
+  const victima2 = (segundoDestino?.carga as { a: string } | undefined)?.a ?? '';
+  const antesDelSegundo = yaDescartado.colonos.find((c) => c.asiento === victima2) as Colono | undefined;
+  const despuesDelSegundo = alFinal.colonos.find((c) => c.asiento === victima2) as Colono | undefined;
+  comprobar(
+    'EL SEGUNDO ROBO FUNCIONA: `cartaJugada` no lo bloquea, porque este movimiento no viene de una carta',
+    alFinal !== yaDescartado &&
+      alFinal.cartaJugada === true &&
+      (despuesDelSegundo?.almacen.length ?? 0) === (antesDelSegundo?.almacen.length ?? 0) - 1,
+    { cartaJugada: alFinal.cartaJugada, antes: antesDelSegundo?.almacen.length, despues: despuesDelSegundo?.almacen.length },
+  );
+  comprobar('el estiaje ha cambiado de isla las DOS veces', trasElPrimero.estiaje !== arranque.estiaje && alFinal.estiaje !== trasElPrimero.estiaje, { antes: arranque.estiaje, primera: trasElPrimero.estiaje, segunda: alFinal.estiaje });
+  comprobar('`guardias` sube UNA sola vez en todo el turno: la carta se jugó una vez', (alFinal.colonos[0] as Colono).guardias === 3, (alFinal.colonos[0] as Colono).guardias);
+  comprobar('y La Mayor Guardia se queda en tres, o sea recalculada una sola vez', alFinal.guardia.de === 'A' && alFinal.guardia.cuantas === 3, alFinal.guardia);
+  comprobar('la bandera queda apagada al final: el turno no debe ningún movimiento', alFinal.estiajePorMover === false);
+  /* Le queda una guardia EN LA MANO y aun así no se le ofrece: eso es `cartaJugada`, y no
+     una mano vacía. Con una sola guardia en el escenario esta línea era un verde por
+     conjunto vacío y habría seguido verde con la regla borrada. */
+  comprobar(
+    'le queda una guardia en la mano y NO se le ofrece: dos en el mismo turno siguen sin poder',
+    (alFinal.colonos[0] as Colono).mano.length === 1 && ofrecidasA(alFinal, 'A').every((o) => o.tipo !== GUARDIA),
+    { enLaMano: (alFinal.colonos[0] as Colono).mano.map((c) => c.carta), cartaJugada: alFinal.cartaJugada },
+  );
 }
 
 /* ── EL ACAPARAMIENTO SE LLEVA TODOS LOS DE ESE BIEN, Y NINGUNO MÁS ─────── */
@@ -2398,7 +3294,17 @@ const EL_TRIO = ['A', 'B', 'C'];
     tirado: false,
   });
   comprobar('y antes de tirar los dados, también', ofrecidasA(sinTirar, 'A').some((o) => o.tipo === REVELAR));
-  comprobar('mientras que jugar una carta antes de tirar no se ofrece', ofrecidasA(sinTirar, 'A').every((o) => o.tipo !== GUARDIA && o.tipo !== COMPRAR));
+  /*
+   * Y AQUÍ LA LISTA SE ACORTÓ EN LA FASE 3, que es lo que hay que decir en voz alta: la
+   * guardia SÍ se juega antes de tirar desde que mueve el estiaje, así que nombrarla en
+   * esta línea la dejaría comprobando lo contrario de la regla. Lo que sigue sin poder
+   * jugarse antes de tirar son las OTRAS TRES cartas y comprar, y eso es lo que se pide.
+   * La guardia tiene su propio bloque, con la lista entera y con «TIRAR no está» dentro.
+   */
+  comprobar(
+    'mientras que las otras tres cartas y comprar siguen sin ofrecerse antes de tirar',
+    ofrecidasA(sinTirar, 'A').every((o) => o.tipo !== ANO_BUENO && o.tipo !== ACAPARAMIENTO && o.tipo !== DOS_VEREDAS && o.tipo !== COMPRAR),
+  );
 
   /*
    * LA VACUNA DEL «OCULTO NO SUMA»: si `puntosDe` contara la mano, los dos números
@@ -2458,7 +3364,7 @@ const EL_TRIO = ['A', 'B', 'C'];
     guardias: [2, 0, 0],
   });
   comprobar('con dos jugadas todavía no es de nadie', recalcularLaGuardia(aPuntoDeGanarlo).de === null);
-  const conLaTercera = avanzarRiberas(aPuntoDeGanarlo, { tipo: GUARDIA, carga: { carta: 'c1', a: 'B' } }, ctxDe('A', EL_TRIO));
+  const conLaTercera = avanzarRiberas(aPuntoDeGanarlo, { tipo: GUARDIA, carga: { carta: 'c1' } }, ctxDe('A', EL_TRIO));
   comprobar(
     'y al jugar la tercera el premio ya es suyo, sin que nadie lo pida',
     conLaTercera.guardia.de === 'A' && conLaTercera.guardia.cuantas === 3,
@@ -3878,8 +4784,14 @@ paso('Cada isla se ve del bien que da, y los dos tableros cuentan lo mismo');
  *
  * El numero va a mano y hay que subirlo al anadir comprobaciones. Ese es el precio, y es
  * barato al lado de un verde que no ha comprobado nada.
+ *
+ * Y SE MIDE, NO SE PONE AL RAS. Con todo verde este guion hace 541; el numero es 530
+ * porque hay bloques que se saltan cuando la regla esta rota, y si el guardia estuviera en
+ * 541 saltaria EL antes de que se vieran las lineas rojas —que es lo contrario de lo que
+ * hace falta para arreglar nada—. Medido con la vacuna que mas bloques apaga (la guardia
+ * que no enciende el estiaje): 536 comprobaciones y 19 rojas. Once de margen.
  */
-const COMPROBACIONES_ESCRITAS = 349;
+const COMPROBACIONES_ESCRITAS = 530;
 if (hechas < COMPROBACIONES_ESCRITAS) {
   console.error(
     `Solo se han hecho ${hechas} de las ${COMPROBACIONES_ESCRITAS} comprobaciones que ` +
@@ -3899,15 +4811,26 @@ if (fallos.length === 0) {
       '  juego deja construir y lo que el Vado cuenta dan el mismo número, que es la regla que faltaba\n' +
       '  y por la que Miguel puso cinco puentes seguidos sin premio y sin explicación.\n' +
       '  Y el mazo: veinticinco cartas barajadas una vez con la semilla de la mesa, una carta que no se\n' +
-      '  juega el turno que se compra, una por turno, la guardia que roba a ciegas, el acaparamiento que\n' +
-      '  se lleva todos los de un bien y ninguno más, las dos veredas que son dos, y un título que sólo\n' +
-      '  suma en público cuando se enseña — con La Mayor Guardia al tercero y sólo si se supera.\n' +
+      '  juega el turno que se compra, una por turno, el acaparamiento que se lleva todos los de un bien\n' +
+      '  y ninguno más, las dos veredas que son dos, y un título que sólo suma en público cuando se\n' +
+      '  enseña — con La Mayor Guardia al tercero y sólo si se supera.\n' +
+      '  Y LA GUARDIA MUEVE: enciende el estiaje igual que un siete —sin descarte, que ése lo cobra el\n' +
+      '  siete y sólo el siete—, se puede jugar ANTES de tirar y entonces lo que sale son los dieciocho\n' +
+      '  destinos y no «Tirar los dados», y el robo lo decide la isla y no el naipe. Con el turno que\n' +
+      '  nadie había descrito jugado entero: carta antes de tirar, mover y robar, un siete detrás, la\n' +
+      '  misma bandera otra vez con descarte, y un segundo robo — con una sola muesca al final.\n' +
       '  Y EL ESTIAJE: al sacar un siete hay que mover la pieza —a otra isla, y no se puede tirar ni\n' +
       '  pasar hasta hacerlo—, la isla donde se posa deja de rendir exactamente lo que rendía, se le\n' +
       '  roba una ficha entera con su número de serie a quien tenga algo puesto en ella, el reloj\n' +
       '  mueve por quien no está sin gastar azar, y una mesa de ayer se reabre con la pieza en la duna.\n' +
       '  Todo eso jugado hasta un siete de verdad y no montado a mano, que es lo único que se pone\n' +
       '  rojo el día que la línea que enciende la bandera desaparezca.\n' +
+      '  Y EL DESCARTE: ese mismo siete pilla a dos con la mano llena y les hace tirar la mitad ANTES\n' +
+      '  de que la pieza se mueva —el que tiró tenía siete justas y no tira ninguna—, se tira ficha a\n' +
+      '  ficha y siempre la más vieja de su clase, la tiran dos que NO tienen el turno, el reloj tira\n' +
+      '  por los dos de una vez cuando nadie está, y mientras dura no se contesta a un trueque aunque\n' +
+      '  siga abierto para después. Jugado a ciegas leyendo sólo `turnoDe`, que es la decisión de la\n' +
+      '  que cuelgan el reloj de la mesa, el aviso del móvil y los dos comprobadores que juegan solos.\n' +
       '  Y cada isla se ve del bien que da: el carrizal como el bosque porque su junco es la madera, la\n' +
       '  marisma como la colina porque su limo es el ladrillo — en el tablero plano, en el de tres\n' +
       '  dimensiones y en la carta, con los seis colores del plano separados lo bastante para no\n' +

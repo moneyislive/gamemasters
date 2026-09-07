@@ -682,6 +682,10 @@ const EXPLICACION_DEL_TITULO: ExplicacionDeLaCarta = {
 /**
  * ═══ LAS TRES PUERTAS DE UNA CARTA QUE SE JUEGA, Y LAS TRES ESTÁN DICHAS ═══
  *
+ * Nota de la fase 3: esta frase la comparten TRES de las cuatro, y no las cuatro. La
+ * guardia se salió con `USAS_DE_LA_GUARDIA`, que dice las mismas tres puertas con la
+ * primera del revés, porque a ella el juego ya no se la impone. Ver allí.
+ *
  * Las cuatro frases decían «Tras tirar, suéltala en JUGAR y di a quién», y eso nombra UNA
  * de las tres condiciones como si fuera la condición entera. `sePuedeJugarLaCarta` tiene
  * las otras dos escritas seguidas (`if (estado.cartaJugada) return false;` y
@@ -713,6 +717,39 @@ const EXPLICACION_DEL_TITULO: ExplicacionDeLaCarta = {
 const USAS_DE_LA_JUGADA = 'Tras tirar, suelta una al turno; la nueva no.';
 
 /**
+ * ═══ Y LA GUARDIA DICE LAS MISMAS TRES PUERTAS, CON LA PRIMERA DEL REVÉS ═══
+ *
+ * Miguel lo pidió por escrito y la fase 3 lo cumplió: la guardia «puede usarse durante
+ * su fase de juego, INCLUSO ANTES DE LANZAR LOS DADOS». O sea que de las tres
+ * condiciones de `sePuedeJugarLaCarta`, a esta carta el juego le impone dos y no tres:
+ * `jugarLaGuardia` ya no empieza por `!estado.tirado` y `opcionesDeTurno` la ofrece
+ * también por el camino de antes de tirar.
+ *
+ * Por eso NO puede seguir compartiendo `USAS_DE_LA_JUGADA`: aquella frase abre por
+ * «Tras tirar», que ahora sería mentira, y la vacuna de `verify:riberas-en-tres` está
+ * escrita justamente para que esa mentira no se pueda quedar — le pregunta al juego si
+ * ofrece la guardia antes de tirar y exige que la frase diga «Tras tirar» si y sólo si
+ * no la ofrece. Se puso roja al empujar la fase 3, que era su trabajo.
+ *
+ * Las otras dos puertas se dicen IGUAL Y CON LAS MISMAS PALABRAS —«una al turno» y «la
+ * nueva no»—, porque son las mismas y porque son las cadenas que esa vacuna busca. Y
+ * «suéltala» es el gesto, dicho sin nombrar mando ninguno, como en las otras cuatro.
+ *
+ * Medido contra el presupuesto de este cliente (§4 de `verify:riberas-en-tres`): 46
+ * caracteres, que es el tope exacto, y dos renglones del lienzo peor. No cabe una
+ * palabra más, y ésa es la razón de que no diga además lo que la carta hace: eso lo
+ * dicen las otras dos frases del mismo naipe.
+ */
+/*
+ * «Suéltala sin tirar» decía la regla del revés: se lee como la CONDICIÓN de alguien que
+ * sólo puede jugarla así, y lo que la guardia tiene es un PERMISO. Se sigue ofreciendo
+ * después de tirar —`opcionesDelMazo` la emite igual— y así es como se juega la mayoría de
+ * las veces; lo que la fase 3 le añadió es que TAMBIÉN vale antes. Las otras dos puertas
+ * siguen dichas: una carta al turno, y la comprada hoy no.
+ */
+const USAS_DE_LA_GUARDIA = 'Antes o tras tirar; una al turno, la nueva no.';
+
+/**
  * LAS NUEVE CLASES, CON SU CARA Y CON LO QUE SE EXPLICA DE ELLAS.
  *
  * ═══ AQUÍ HAY UNA PARÁFRASIS DE LAS REGLAS, Y HAY QUE DECIRLO ═══
@@ -730,9 +767,11 @@ const USAS_DE_LA_JUGADA = 'Tras tirar, suelta una al turno; la nueva no.';
  *     de nadie (ver la cabecera de `EXPLICACION_DEL_TITULO`);
  *   · y la VACUNA DE LA GUARDIA de `verify:riberas-en-tres` le PREGUNTA al juego, sobre
  *     una mesa de verdad, si ofrece jugar una guardia antes de tirar, y exige que la
- *     frase «cómo se usa» diga «Tras tirar» si y sólo si no la ofrece. El día que la fase
- *     3 de `docs/EL-LADRON-DE-RIBERAS.md` quite el `!estado.tirado` de `jugarLaGuardia`,
- *     esa comprobación se pone ROJA, y volverla verde es cambiar esta fila.
+ *     frase «cómo se usa» diga «Tras tirar» si y sólo si no la ofrece. La fase 3 de
+ *     `docs/EL-LADRON-DE-RIBERAS.md` quitó el `!estado.tirado` de `jugarLaGuardia` y esa
+ *     comprobación SE PUSO ROJA, que es exactamente lo que se le pedía; volverla verde
+ *     fue cambiar esta fila, y no al revés. La afirmación no se tocó: sigue siendo un «si
+ *     y sólo si», y hoy compra que la frase NO diga «Tras tirar».
  *
  * ═══ POR QUÉ ESTA TABLA ESTÁ AQUÍ Y NO EN `riberas.ts` ═══
  *
@@ -760,22 +799,31 @@ const RETRATO_DE_LA_CARTA: Readonly<Record<ClaseDeCarta, RetratoDeLaCarta>> = {
     dibujo: 'guardia',
     nombre: 'La Guardia',
     /*
-     * LA GUARDIA DE HOY, con la regla de hoy: roba sin mover nada, y sólo después de
-     * tirar. Lo segundo no lo decide esta tabla — lo decide `jugarLaGuardia`, que empieza
-     * con `if (yo < 0 || !estado.tirado)`, y `opcionesDeRiberas`, que antes de tirar se va
-     * por su `return` con TIRAR y revelar y nada más. El «Tras tirar» con que abre
-     * `USAS_DE_LA_JUGADA` es lo que la vacuna de `verify:riberas-en-tres` contrasta contra
-     * esa respuesta; las otras dos puertas que esa misma frase dice (una al turno y la
-     * nueva no) salen de `sePuedeJugarLaCarta`, y su cabecera está aquí al lado.
+     * LA GUARDIA CON EL ESTIAJE, que es la regla desde la fase 3: mueve la pieza y roba
+     * desde la isla donde la posa, y se puede jugar sin haber tirado.
      *
-     * Cuando entre el estiaje, las tres frases se SUSTITUYEN por las de la fase 5 de
-     * `docs/LAS-CARTAS-SE-EXPLICAN.md` («Mueves el estiaje y robas a quien tenga allí»),
-     * no se suman.
+     * Las tres frases SE SUSTITUYERON, no se sumaron, tal como el §7.6 de
+     * `docs/LAS-CARTAS-SE-EXPLICAN.md` dejó escrito que había que hacerlo. Las dos
+     * primeras son las de aquel documento; la tercera la decidió la vacuna, que es lo que
+     * allí se dijo también.
+     *
+     * ═══ QUÉ SE PERDIÓ AL CAMBIARLAS, Y POR QUÉ SE PIERDE A SABIENDAS ═══
+     *
+     * El «al azar» ya no se dice. La ficha se sigue robando al azar —`elRobo` sortea con
+     * `estado.azar` y su cabecera lo razona—, pero en 46 caracteres no caben las dos
+     * cosas y la que hay que decir es la que CAMBIA LA DECISIÓN: adónde mandas la pieza
+     * decide a quién le robas, y de eso no se enteraba nadie. El «a quien tenga allí» es
+     * además la condición dura que `opcionesDelEstiaje` aplica —choza o torre en esa
+     * isla— y la que hace que mover sea una jugada y no un trámite.
+     *
+     * Y lo que esta tabla NO dice, a propósito, porque no es de la carta: que un siete
+     * hace tirar la mitad de la mano y esta carta no. Es la regla del descarte y vive
+     * donde se aplica, en `tirarLosDados`.
      */
     explicacion: {
-      hace: 'Le quitas un bien al azar a quien elijas.',
-      consigues: 'Ese bien, y una muesca para La Mayor Guardia.',
-      usas: USAS_DE_LA_JUGADA,
+      hace: 'Mueves el estiaje y robas a quien tenga allí.',
+      consigues: 'Un bien suyo, y muesca para La Mayor Guardia.',
+      usas: USAS_DE_LA_GUARDIA,
     },
   },
   'ano-bueno': {
@@ -1136,10 +1184,6 @@ export interface JugadaDeCarta<O extends OpcionQueLlega = OpcionQueLlega> {
   readonly clase: ClaseDeJugada;
   /** El seudónimo de la carta que se juega. El mismo `id` que lleva el naipe. */
   readonly carta: string;
-  /** A quién se le roba. Sólo La Guardia; `null` en las demás. */
-  readonly a: AsientoId | null;
-  /** Cómo se llama ése, para poder preguntar por su nombre y no por su asiento. */
-  readonly nombre: string;
   /** Dos para El Año Bueno, uno para El Acaparamiento, ninguno para las demás. */
   readonly bienes: readonly string[];
   /** Lo que el juego escribe en el botón. Se usa tal cual: aquí no se redacta nada. */
@@ -1158,13 +1202,24 @@ function bienesDeLaCarga(carga: Record<string, unknown>): string[] {
 /**
  * TODAS LAS MANERAS DE JUGAR ESTA CARTA que el juego ofrece ahora mismo.
  *
- * Una sola para Las Dos Veredas, una por colono al que se pueda robar para La
- * Guardia, quince pares para El Año Bueno y cinco bienes para El Acaparamiento. La
- * lista sale vacía si la carta no se puede jugar, que es la misma respuesta que da
- * `sePuedeJugar` y sale de la misma sitio: no hay dos cuentas.
+ * Una sola para Las Dos Veredas Y PARA LA GUARDIA, quince pares para El Año Bueno y
+ * cinco bienes para El Acaparamiento. La lista sale vacía si la carta no se puede
+ * jugar, que es la misma respuesta que da `sePuedeJugar` y sale del mismo sitio: no
+ * hay dos cuentas.
  *
  * `carta` es el seudónimo, o sea el `id` del naipe que la escena acaba de soltar en
  * la casilla. La pantalla no tiene que traducir nada para preguntar.
+ *
+ * ═══ LA GUARDIA YA NO PREGUNTA A QUIÉN, Y ESTO NO TUVO QUE APRENDERLO ═══
+ *
+ * Hasta la fase 3 emitía una jugada por colono al que se pudiera robar, y esta función
+ * sacaba de la carga un campo `a` con el asiento y le buscaba el nombre para poder
+ * preguntar. Ahora la carta MUEVE EL ESTIAJE y a quién se le roba se decide después,
+ * eligiendo isla en el tablero, así que la guardia trae una sola jugada y
+ * `jugadaSinPreguntar` la manda derecha sin abrir menú. Los dos campos que servían para
+ * preguntar —`a` y `nombre`— se cayeron del tipo en vez de quedarse valiendo `null` y
+ * `''` para siempre: un campo que ya nadie llena es una respuesta falsa esperando a que
+ * alguien la lea. Con ellos se fue `aQuienSeLeRoba`, cuyo nombre habría pasado a mentir.
  */
 export function jugadasDeLaCarta<O extends OpcionQueLlega>(
   vista: unknown,
@@ -1177,37 +1232,15 @@ export function jugadasDeLaCarta<O extends OpcionQueLlega>(
     if (cartaDeLaCarga(o.carga) !== carta) continue;
     const clase = CLASE_DE_LA_JUGADA[o.tipo];
     if (clase === undefined) continue;
-    const carga = o.carga as Record<string, unknown>;
-    const cual = carga['a'];
-    const a = typeof cual === 'string' ? cual : null;
     lista.push({
       clase,
       carta,
-      a,
-      nombre: a === null ? '' : (vista.colonos.find((c) => c.asiento === a)?.nombre ?? a),
-      bienes: bienesDeLaCarga(carga),
+      bienes: bienesDeLaCarga(o.carga as Record<string, unknown>),
       rotulo: o.rotulo,
       opcion: o,
     });
   }
   return lista;
-}
-
-/**
- * A QUIÉN SE LE PUEDE ROBAR con esta guardia: exactamente los colonos que el juego
- * ofrece, ni uno más.
- *
- * Y son menos que «todos los demás», que es lo que una pantalla escribiría sola: a
- * quien no tiene ni un bien no se le roba, y eso lo decide `opcionesDelMazo` mirando
- * un número que sí es público. Escrita aquí, esa resta se olvidaría el día que
- * cambiara — y la mesa vería un botón para robarle a quien no tiene nada.
- */
-export function aQuienSeLeRoba<O extends OpcionQueLlega>(
-  vista: unknown,
-  opciones: readonly O[],
-  carta: string,
-): JugadaDeCarta<O>[] {
-  return jugadasDeLaCarta(vista, opciones, carta).filter((j) => j.clase === 'guardia');
 }
 
 /**
@@ -1244,10 +1277,11 @@ export function bienesQueSeAcaparan<O extends OpcionQueLlega>(
 /**
  * LA JUGADA QUE NO HAY QUE PREGUNTAR: la única que hay, o `null` si hay que elegir.
  *
- * Las Dos Veredas siempre cae aquí —no pide nada—, y La Guardia también cuando queda
- * un solo colono al que robar, que en una mesa de dos es siempre. Es el mismo trato
- * que `truequesPosibles` pide para las ofertas y está escrito allí: si sale una sola,
- * se manda sin preguntar; si salen varias, se pregunta.
+ * Las Dos Veredas siempre cae aquí —no pide nada— y La Guardia también desde la fase 3,
+ * por lo mismo: mueve el estiaje, y la isla se elige después sobre el tablero. Antes
+ * caía sólo cuando quedaba un colono al que robar. Es el mismo trato que
+ * `truequesPosibles` pide para las ofertas y está escrito allí: si sale una sola, se
+ * manda sin preguntar; si salen varias, se pregunta.
  *
  * Con cero devuelve `null` igual que con dos, y así tiene que ser: «no se puede» y
  * «hay que elegir» comparten respuesta porque en los dos casos la pantalla NO manda

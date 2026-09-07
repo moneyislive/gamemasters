@@ -616,9 +616,16 @@ export function elEstiloDelCartel(cartel: CartelAlPie | null): CSSProperties | u
  * `dosveredas` está en la tabla porque el tipo la exige entera, y no porque se espere ver
  * su menú: esa carta ofrece una sola jugada y se manda sin preguntar. Si algún día
  * ofreciera dos, saldría un menú con título en vez de un hueco.
+ *
+ * Y DESDE LA FASE 3 DEL ESTIAJE, `guardia` está aquí por lo mismo que `dosveredas`. Esa
+ * carta ya no elige víctima: mueve el estiaje, ofrece una sola jugada y se manda sin
+ * preguntar; a quién se le roba lo decide después la isla, sobre el tablero. Su renglón
+ * decía «A quién le quitas un bien», que era el título de un menú que ya no se abre y que,
+ * si se abriera, preguntaría otra cosa. Se corrige en vez de borrarse, porque el tipo exige
+ * las cuatro y un título mentiroso que nadie ve es de los que sobreviven a tres fases.
  */
 const LO_QUE_SE_PREGUNTA: Readonly<Record<ClaseDeJugada, string>> = {
-  guardia: 'A quién le quitas un bien',
+  guardia: 'Cómo la juegas',
   anobueno: 'Qué dos bienes coges',
   acaparamiento: 'Qué bien pides',
   dosveredas: 'Cómo la juegas',

@@ -995,9 +995,10 @@ function LaMesaEnTres({
   /**
    * SE HA SOLTADO UN NAIPE EN LA CASILLA DE JUGAR.
    *
-   * Si sólo hay una manera de jugarlo se manda sin preguntar —Las Dos Veredas
-   * siempre, y La Guardia en una mesa de dos, donde no hay a quién elegir—; si hay
-   * varias se abre la hoja. Es el mismo trato que la traducción pide para las ofertas
+   * Si sólo hay una manera de jugarlo se manda sin preguntar —Las Dos Veredas siempre, y
+   * La Guardia también desde que mueve el estiaje: la isla se elige después, sobre el
+   * tablero, así que la carta ya no pregunta a quién y no depende del tamaño de la mesa—;
+   * si hay varias se abre la hoja. Es el mismo trato que la traducción pide para las ofertas
    * y está escrito en `jugadaSinPreguntar`: con una sola, mandar; con varias,
    * preguntar; con ninguna, no mandar nada por nuestra cuenta.
    *

@@ -46,11 +46,13 @@
  *     serie por lo mismo que las fichas, y lo que se publica de ella es un seudónimo.
  *     Ver `Carta`, y el §5 bis.
  *
- * Y lo que la Guardia NO hace TODAVÍA: mover el estiaje. La pieza ya existe —la trajo
- * la fase 1 de `docs/EL-LADRON-DE-RIBERAS.md`, y quien la mueve hoy es el siete— así
- * que la frase que había aquí («este juego no tiene esa pieza») está revocada. Lo que
- * la carta hace hoy es robar, que es lo otro que hacía aquella carta; que además mueva
- * es la fase 3 de ese documento y no ha entrado. Está razonado en `jugarLaGuardia`.
+ * Y lo que la Guardia SÍ hace ya: MOVER EL ESTIAJE. La pieza la trajo la fase 1 de
+ * `docs/EL-LADRON-DE-RIBERAS.md` —y quien la movía era sólo el siete—; la fase 3 le da
+ * la segunda llave a esta carta, que enciende `estiajePorMover` y deja que el robo
+ * salga de la isla donde la pieza caiga, en vez de elegir víctima a pelo. Aquí ponía
+ * «este juego no tiene esa pieza», y luego «todavía no»: las dos frases están cumplidas
+ * y revocadas. Lo que la guardia NO trae es el descarte, que lo pone el siete y sólo el
+ * siete. Está razonado en `jugarLaGuardia`.
  *
  * ═══ LO QUE NO CUPO EN LA FASE 4, Y CUPO EN LA 5 ═══
  *
@@ -420,11 +422,29 @@ const NUMEROS_DE_LAS_ISLAS: readonly number[] = [
  * Medido antes de escribir esto: una docena de sietes por partida que no hacían
  * absolutamente nada.
  *
- * Lo que pasa hoy al sacar un siete: no rinde nadie, y quien tiró MUEVE EL ESTIAJE
- * a otra isla y le roba una ficha a quien tenga algo puesto en ella. El descarte
- * de la mitad de la mano es la fase 2 y todavía no está.
+ * Lo que pasa hoy al sacar un siete: no rinde nadie, TODO EL QUE TENGA LA MANO
+ * demasiado llena tira la mitad (`MANO_QUE_SE_AGUANTA`), y después quien tiró MUEVE
+ * EL ESTIAJE a otra isla y le roba una ficha a quien tenga algo puesto en ella.
  */
 const SUMA_DEL_ESTIAJE = 7;
+
+/**
+ * CUÁNTAS FICHAS SE AGUANTAN EN LA MANO SIN TIRAR NADA. Con MÁS de éstas, la mitad se va.
+ *
+ * ═══ VALE SIETE, Y NO ES `SUMA_DEL_ESTIAJE` ═══
+ *
+ * Los dos son siete y no son la misma cosa, y por eso son dos constantes: uno es una
+ * suma de dos dados y el otro un tamaño de mano. Escribir `almacen.length >
+ * SUMA_DEL_ESTIAJE` compila, dice lo mismo hoy y encadena dos reglas que nadie
+ * decidió encadenar: el día que alguien pruebe a activar el estiaje también con un
+ * ocho —o a apretar el descarte a partir de seis— tocaría una y cambiaría dos, sin que
+ * ningún comprobador tenga por qué enterarse.
+ *
+ * MÁS de siete y no siete o más: con siete justas no se tira nada, y con ocho se
+ * tiran cuatro. Ésa es la regla tal y como se juega, y la vacuna de `verify:riberas`
+ * la mira justo en ese filo, con un colono de siete y otro de ocho en la misma mesa.
+ */
+const MANO_QUE_SE_AGUANTA = 7;
 
 /**
  * EL FILO DE LA ISLA QUE EL ESTIAJE TIENE SECA. Sólo pintado, y ACOMPAÑA: no es lo que se ve.
@@ -726,7 +746,7 @@ export const BIENES_DEL_ANO_BUENO = 2;
  * Porque LA CARTA ENTERA ES SECRETA y el botón para jugarla no puede serlo: el
  * §5 bis prohíbe que un identificador de opción lleve dentro algo oculto, y
  * `verify:mesa` NO lo cazaría —busca la forma canónica, con comillas, y
- * `'jugar-guardia:c7:B'` no contiene `"c7:guardia"`—. Así que lo que se publica es
+ * `'jugar-guardia:c7'` no contiene `"c7:guardia"`—. Así que lo que se publica es
  * `c7` a secas, que no dice qué carta es, y el reductor lo resuelve contra la mano
  * de quien mueve, que es el único sitio donde ese seudónimo significa algo.
  *
@@ -822,11 +842,16 @@ export const PASAR = 'riberas:pasar';
  * que quien mueve puede cerrar la app, y obligaría a un tercer momento con su plazo
  * de pared para elegir entre tres.
  *
- * Y los nombres no son gusto: los dos campos YA TIENEN LECTOR ESCRITO en este
- * fichero. `donde` es el campo de sitio del `ALZAR` y lo lee `dondeDeLaCarga`; `a` es
- * el campo de víctima del `GUARDIA` y lo lee `campoDeTexto(carga, 'a')`. Llamarlos
- * `isla` o `victima` sería estrenar dos lectores de carga para decir lo que el
- * fichero ya sabe decir.
+ * Y los nombres no son gusto: los dos campos YA TENÍAN LECTOR ESCRITO en este fichero
+ * cuando se eligieron. `donde` es el campo de sitio del `ALZAR` y lo lee
+ * `dondeDeLaCarga`; `a` era el campo de víctima que el `GUARDIA` llevaba entonces y lo
+ * lee `campoDeTexto(carga, 'a')`. Llamarlos `isla` o `victima` habría sido estrenar dos
+ * lectores de carga para decir lo que el fichero ya sabía decir.
+ *
+ * Desde la fase 3 la guardia ya no lleva `a` —mueve la pieza y el robo sale de la isla,
+ * ver `jugarLaGuardia`—, así que este movimiento es HOY el único que usa ese campo. El
+ * nombre se queda: el lector es el mismo y renombrarlo ahora sólo cambiaría de sitio el
+ * trabajo de leer por qué se llama así.
  *
  * ═══ Y EL `id` LLEVA LA VÍCTIMA DENTRO, QUE NO ES ADORNO ═══
  *
@@ -837,6 +862,35 @@ export const PASAR = 'riberas:pasar';
  * dejaría de poder elegirse sin que nada se pusiera rojo.
  */
 export const MOVER_EL_ESTIAJE = 'riberas:estiaje';
+
+/**
+ * TIRA UNA FICHA DE LA MANO, DE UNA EN UNA. `carga: { bien }`.
+ *
+ * ═══ FICHA A FICHA, Y NO UNA LISTA CON LA MITAD DENTRO ═══
+ *
+ * Lo obvio sería un solo movimiento con las fichas que se tiran dentro de la carga, y
+ * sería un movimiento en vez de cuatro. No se hace, y la razón está medida: lo que
+ * `opciones()` tendría que emitir entonces son TODOS LOS REPARTOS legales de la mitad
+ * de una mano —24 de media y 713 en el peor caso—. Ficha a ficha son CINCO opciones
+ * como mucho pase lo que pase —una por clase de bien que quede en la mano— y esa cota
+ * no depende del tamaño de la mano, que es lo que la hace buena: en una mesa de seis
+ * con manos de veinte, la lista sigue siendo de cinco.
+ *
+ * Y el portillo del §5 bis sigue valiendo palabra por palabra: cada tirada es una
+ * opción de la lista, comparada en forma canónica, sin que nadie tenga que escribir un
+ * validador de repartos.
+ *
+ * El `bien` se lee con `bienDeLaCarga(carga, 'bien')`, que ya existe y que ya usa el
+ * acaparamiento; y el `id` lleva el bien dentro —`descartar:limo`— por lo mismo que el
+ * del estiaje lleva la víctima: son hasta cinco opciones a la vez en la misma lista de
+ * `acciones`, y un `id` repetido es una que deja de poder pulsarse.
+ *
+ * CUÁL de las fichas de esa clase se va no lo elige quien mueve: se va la más vieja,
+ * que es el criterio de `cobrar` y por su misma razón —dos ejecuciones del mismo
+ * diario tienen que dejar los mismos números de serie—. Por eso esto se cobra CON
+ * `cobrar` y no con un `filter` escrito otra vez.
+ */
+export const DESCARTAR = 'riberas:descartar';
 
 /*
  * ═══ LOS SEIS DEL MAZO, Y POR QUÉ SON SEIS TIPOS Y NO UNO ═══
@@ -888,6 +942,23 @@ export type MomentoDeRiberas =
   | 'colocando'
   /** Turnos normales: tirar, alzar, trocar, pasar. */
   | 'jugando'
+  /**
+   * SALIÓ UN SIETE Y HAY MANOS DEMASIADO LLENAS: se tira la mitad antes de mover.
+   *
+   * ═══ POR QUÉ UN MOMENTO Y NO UNA BANDERA COMO `estiajePorMover` ═══
+   *
+   * Porque durante éste puede mover GENTE QUE NO TIENE EL TURNO, y varios a la vez.
+   * Una bandera se mira dentro de `opcionesDeTurno`, que sólo se alcanza en
+   * `'jugando'` y que empieza descartando a quien no le toca; un momento tiene su
+   * propia rama en `opcionesDeRiberas` —la de `opcionesDeDescarte`, que NO mira
+   * `turnoDe` ni una vez— y con eso el descarte se ofrece a varios sin inventar
+   * ninguna forma de turno nueva. Ver `opcionesDeRiberas`.
+   *
+   * Va entre `'jugando'` y `'terminada'` porque es a `'jugando'` a donde vuelve: se
+   * sale de aquí en cuanto no le falte ninguna ficha a nadie, y lo que espera al otro
+   * lado es el estiaje por mover, que se encendió en la misma tirada.
+   */
+  | 'descartando'
   /** Alguien llegó a los puntos. Ya no entra ningún movimiento. */
   | 'terminada';
 
@@ -1011,6 +1082,23 @@ export interface Trato {
   /** Lo que quiere a cambio. */
   pide: Bien[];
   estado: EstadoDelTrato;
+}
+
+/**
+ * LO QUE LE QUEDA POR TIRAR A UNO, mientras dura `'descartando'`.
+ *
+ * Una lista de éstos y no un `Record<AsientoId, number>`, por lo mismo que `colonos`
+ * es una lista: de aquí sale el ORDEN en que se espera a la gente —`turnoDe` apunta
+ * al primero que aún deba— y el orden de las claves de un objeto es una cosa que
+ * nadie debería tener que jurar. Con una lista en el orden de `colonos`, «el primero»
+ * significa lo mismo aquí, en la vista y en la reejecución.
+ *
+ * `faltan` llega a cero y la entrada SE QUEDA: quien ya descartó sigue en la lista con
+ * su cero, que es lo que permite decir «éste ya está» sin mirar su almacén.
+ */
+export interface Descarte {
+  de: AsientoId;
+  faltan: number;
 }
 
 /** Quién tiene el Vado Largo y con qué longitud. `de: null` si está vacante. */
@@ -1170,12 +1258,35 @@ export interface EstadoDeRiberas {
    * porque el estiaje se mueve UNA vez por activación: un contador invitaría a un
    * `estiajePorMover: 2` el día que alguien quisiera una carta que mueve dos veces,
    * y esa carta no existe. Lo que sí puede pasar dos veces en un turno son dos
-   * activaciones de la misma bandera, no una bandera con valor dos.
+   * activaciones de la misma bandera, no una bandera con valor dos — y desde la fase 3
+   * ese turno EXISTE y está jugado en `verify:riberas`: guardia antes de tirar, mover y
+   * robar, y luego un siete que la vuelve a encender con descarte detrás (§3 ter).
    *
-   * La mitad que vive en el reductor es la guarda de `tirarLosDados`, y las dos van
-   * SIEMPRE en el mismo empujón por lo que dice la cabecera de `sePuedeJugarLaCarta`.
+   * La mitad que vive en el reductor son las guardas de `tirarLosDados` y de
+   * `jugarLaGuardia`, y van SIEMPRE en el mismo empujón que el corte de `opcionesDeTurno`
+   * por lo que dice la cabecera de `sePuedeJugarLaCarta`.
    */
   estiajePorMover: boolean;
+
+  /**
+   * QUIÉN DEBE TIRAR FICHAS Y CUÁNTAS LE FALTAN. Público entero. Ver `Descarte`.
+   *
+   * Vacío salvo en `'descartando'`, y en el orden de `colonos`, que es estable desde
+   * `repartirElDelta` y por tanto reejecutable. Se llena de una vez en `tirarLosDados`
+   * al sacar el siete y desde ahí sólo baja: `faltan` es la mitad de lo que se tenía
+   * EN EL INSTANTE DEL SIETE, congelado, y por eso no se recalcula al descartar.
+   *
+   * ═══ Y POR QUÉ VA ENTERO Y PÚBLICO EN LA VISTA ═══
+   *
+   * Porque cuántas fichas tiene cada cual ya es público —`ColonoVisto.bienes`, «se
+   * cuentan mirando su montón»— y `faltan` es la mitad de un número público. No hay
+   * nada aquí que no se pueda calcular mirando la mesa. Lo que NO es público es QUÉ
+   * tira cada uno, y no hace falta que lo sea: la ficha desaparece del estado y no
+   * aparece en ninguna vista, que es el caso más fácil de la regla de
+   * `loSecretoDeRiberas` —«en la vista de más de un asiento» se cumple de sobra con
+   * cero—. Es el mismo trato que recibe una carta jugada.
+   */
+  descartes: Descarte[];
 
   /** Los trueques, del más viejo al más nuevo. Ver `TRATOS_QUE_SE_RECUERDAN`. */
   tratos: Trato[];
@@ -1229,6 +1340,7 @@ export function partidaNueva(): EstadoDeRiberas {
     /* Sin delta no hay isla donde posarse: nace en la duna, en `repartirElDelta`. */
     estiaje: null,
     estiajePorMover: false,
+    descartes: [],
     tratos: [],
     siguienteFicha: 1,
     siguienteTrato: 1,
@@ -1301,7 +1413,13 @@ export function comoSiSiempreHubieraHabidoMazo(estado: EstadoDeRiberas): EstadoD
      * duna cada vez que se proyecta una mesa sin delta.
      */
     estado.estiaje === undefined ||
-    estado.estiajePorMover === undefined;
+    estado.estiajePorMover === undefined ||
+    /*
+     * Y `descartes` SÍ SE RELLENA VACÍO, al revés que el estiaje: una mesa escrita
+     * ayer no puede deber ninguna ficha, porque el momento en el que se deben no
+     * existía. La lista vacía es lo cierto y no un valor de conveniencia.
+     */
+    estado.descartes === undefined;
   const faltaEnAlguien = estado.colonos.some(
     (c) => c.mano === undefined || c.guardias === undefined || c.titulos === undefined,
   );
@@ -1312,6 +1430,7 @@ export function comoSiSiempreHubieraHabidoMazo(estado: EstadoDeRiberas): EstadoD
     mazo: estado.mazo ?? [],
     estiaje: estado.estiaje === undefined ? laDuna(estado.islas) : estado.estiaje,
     estiajePorMover: estado.estiajePorMover ?? false,
+    descartes: estado.descartes ?? [],
     turnosAbiertos: estado.turnosAbiertos ?? 0,
     cartaJugada: estado.cartaJugada ?? false,
     veredasGratis: estado.veredasGratis ?? 0,
@@ -1457,6 +1576,8 @@ export function avanzarRiberas(
       return contestar(actual, ctx, tratoDeLaCarga(movimiento.carga), false);
     case PASAR:
       return pasarTurno(actual, ctx);
+    case DESCARTAR:
+      return descartarUnaFicha(actual, ctx, bienDeLaCarga(movimiento.carga, 'bien'));
     case MOVER_EL_ESTIAJE:
       return moverElEstiaje(
         actual,
@@ -1466,13 +1587,9 @@ export function avanzarRiberas(
       );
     case COMPRAR:
       return comprarUnaCarta(actual, ctx);
+    /* Sin `a`: desde la fase 3 la guardia no elige víctima, mueve. Ver `jugarLaGuardia`. */
     case GUARDIA:
-      return jugarLaGuardia(
-        actual,
-        ctx,
-        campoDeTexto(movimiento.carga, 'carta'),
-        campoDeTexto(movimiento.carga, 'a'),
-      );
+      return jugarLaGuardia(actual, ctx, campoDeTexto(movimiento.carga, 'carta'));
     case ANO_BUENO:
       return jugarElAnoBueno(
         actual,
@@ -1748,6 +1865,7 @@ function repartirElDelta(
      */
     estiaje: laDuna(islas),
     estiajePorMover: false,
+    descartes: [],
     azar: mazoRevuelto.azar,
   };
 }
@@ -1785,10 +1903,43 @@ export function deQuienEsElPaso(paso: number, cuantos: number): number {
   return paso < cuantos ? paso : cuantos * 2 - 1 - paso;
 }
 
-/** A quién le toca AHORA, sea colocando o jugando. −1 si a nadie. */
+/**
+ * A quién le toca AHORA, sea colocando, jugando o descartando. −1 si a nadie.
+ *
+ * ═══ EN `'descartando'` APUNTA AL PRIMERO QUE DEBE, Y NO A QUIEN TIRÓ ═══
+ *
+ * Y eso no es cosmética. De este número cuelgan cuatro cosas que preguntan «a quién
+ * esperamos»: el reloj de pared de la mesa (`empiezaTurnoNuevo`), el aviso que se le
+ * manda al móvil de quien no está delante (`shared/mecanicas/turno-declarado.ts`), el
+ * tapete de «me toca» del tablero en tres dimensiones y el bucle del comprobador que
+ * juega partidas enteras. Con `turnoDe` en quien tiró, las dos primeras esperarían a
+ * alguien que no tiene nada que hacer, y las dos últimas se pararían en seco pidiéndole
+ * jugadas a quien no las tiene.
+ *
+ * El precio, dicho en voz alta porque no es gratis: durante el descarte pueden mover
+ * VARIOS, y `turnoDe` es un solo campo, así que deja de significar «el único que puede
+ * mover» y pasa a significar «el primero de los que pueden mover». Todo lo que lea este
+ * campo para decidir qué puedo hacer YO deja de valer, y por eso `opciones()` no lo mira
+ * en `'descartando'` —`opcionesDeDescarte` recorre `descartes`— y por eso la primera
+ * rama de `avisoDe` mira `descartes` y no esto.
+ *
+ * `estado.turno` NO se toca mientras tanto: quien tiró sigue teniendo el turno y lo
+ * recupera entero al volver a `'jugando'`, con el estiaje aún por mover.
+ */
 function turnoDe(estado: EstadoDeRiberas): number {
   if (estado.momento === 'colocando') return deQuienEsElPaso(estado.paso, estado.colonos.length);
+  if (estado.momento === 'descartando') return elPrimeroQueDebe(estado);
   if (estado.momento === 'jugando') return estado.turno;
+  return -1;
+}
+
+/** El índice del primero de `descartes` al que aún le falte alguna ficha, o −1. */
+function elPrimeroQueDebe(estado: EstadoDeRiberas): number {
+  for (const debe of estado.descartes) {
+    if (debe.faltan <= 0) continue;
+    const i = indiceDelAsiento(estado, debe.de);
+    if (i >= 0) return i;
+  }
   return -1;
 }
 
@@ -2151,9 +2302,49 @@ function tirarLosDados(estado: EstadoDeRiberas, ctx: ContextoMovimiento): Estado
    * en verde con un estiaje que no se activa jamás. Es el peor de los verdes,
    * porque parece hecho.
    */
-  if (suma === SUMA_DEL_ESTIAJE) return { ...conLaTirada, estiajePorMover: true };
+  /*
+   * ═══ Y LA SEGUNDA MITAD DE ESA LÍNEA: QUIÉN TIRA FICHAS ═══
+   *
+   * La bandera se enciende SIEMPRE, y el momento del descarte sólo si de verdad hay
+   * manos demasiado llenas. Ése es el orden que se juega —primero se tira la mitad, y
+   * después se mueve la pieza— y con la lista vacía el momento se salta entero, que
+   * es lo que hace que un siete en la primera ronda, con los almacenes casi vacíos,
+   * siga costando exactamente lo que costaba: mover.
+   *
+   * `descartes` se calcula CON LA MANO DE ESTE INSTANTE y se congela. Que no se
+   * recalcule al ir tirando no es un descuido: si `faltan` se recalculara sobre lo que
+   * queda, tirar bajaría el listón y una mano de diez se quedaría en siete tirando
+   * tres. Se tira la mitad de lo que había cuando salió el siete, y punto.
+   */
+  if (suma === SUMA_DEL_ESTIAJE) {
+    const conLaBandera: EstadoDeRiberas = { ...conLaTirada, estiajePorMover: true };
+    const descartes = losQueDebenTirar(estado);
+    if (descartes.length === 0) return conLaBandera;
+    return { ...conLaBandera, momento: 'descartando', descartes };
+  }
 
   return repartirLaCosecha(conLaTirada, suma);
+}
+
+/**
+ * QUIÉN TIENE LA MANO DEMASIADO LLENA, Y CUÁNTAS TIRA. En el orden de `colonos`.
+ *
+ * La mitad REDONDEANDO HACIA ABAJO, que es lo que dice la regla y lo que hace que con
+ * nueve se tiren cuatro y queden cinco. Y el que tiró está incluido como cualquiera:
+ * no hay ninguna excepción para él, y escribirla sería inventar una regla nueva.
+ *
+ * El orden es el de `colonos` —el mismo que ya hace reejecutable el reparto de la
+ * cosecha— porque de este orden sale a quién se espera primero (`turnoDe`), y una
+ * espera que dependiera del recorrido de un objeto sería una espera distinta en dos
+ * reejecuciones del mismo diario.
+ */
+function losQueDebenTirar(estado: EstadoDeRiberas): Descarte[] {
+  const debidos: Descarte[] = [];
+  for (const c of estado.colonos) {
+    if (c.almacen.length <= MANO_QUE_SE_AGUANTA) continue;
+    debidos.push({ de: c.asiento, faltan: Math.floor(c.almacen.length / 2) });
+  }
+  return debidos;
 }
 
 /**
@@ -2332,23 +2523,40 @@ function tienePiezaEn(quien: Colono, hex: Hex): boolean {
  * Esto vivía dentro de `jugarLaGuardia`, y en aquellas líneas convivían cinco cosas:
  * el sorteo, el traslado de la ficha, `sinLaCarta`, `guardias + 1` y `conLaGuardia`.
  * **Las tres últimas son de la CARTA y no del robo** —una guardia jugada sale de la
- * mano, cuenta para el premio y lo recalcula— así que se quedan allí, y aquí baja
- * sólo lo que las dos puertas hacen igual. Si bajaran, mover el estiaje gastaría
- * una carta que nadie jugó y subiría un premio que nadie ganó.
+ * mano, cuenta para el premio y lo recalcula— así que se quedaron allí, y aquí bajó
+ * sólo lo que las dos puertas hacían igual. Si hubieran bajado, mover el estiaje
+ * gastaría una carta que nadie jugó y subiría un premio que nadie ganó.
+ *
+ * ═══ Y HOY SÓLO QUEDA UNA PUERTA, QUE ES LO QUE HAY QUE SABER PARA TOCARLO ═══
+ *
+ * Desde la fase 3 la guardia NO llama aquí: enciende `estiajePorMover` y el robo llega
+ * después por `conElEstiajeEn`, que es el único que entra por esta puerta. El corte
+ * sigue valiendo la pena y no se deshace: `venceElPlazo` mueve por el ausente por ese
+ * mismo camino, y una función que se llama desde dos sitios es lo que hace que el robo
+ * esté escrito UNA vez. Lo que ya no hay que suponer es que la carta pase por aquí.
  *
  * ═══ QUIÉN COMPRUEBA QUÉ ═══
  *
  * Esto comprueba lo que es DEL ROBO: que la víctima existe, que no soy yo y que le
- * queda algo. Devuelve `null` y no un estado, para que cada quien decida qué
- * significa: para la guardia, `null` es un movimiento ilegal; para el estiaje, la
- * elección de «no robar» ni siquiera llega aquí, porque viaja como `a: null`. Lo que
- * NO comprueba es nada del sitio ni de la carta: que la víctima tenga pieza en la
- * isla lo mira quien mueve el estiaje, y que la carta se pueda jugar lo mira la
- * guardia. Cada regla, en la función que la tiene.
+ * queda algo. Devuelve `null` y no un estado, para que quien llame decida qué
+ * significa: la elección de «no robar» ni siquiera llega aquí, porque viaja como
+ * `a: null`, y con eso `conElEstiajeEn` se va antes. Lo que NO comprueba es nada del
+ * sitio: que la víctima tenga pieza en la isla lo mira quien mueve el estiaje. Cada
+ * regla, en la función que la tiene.
  *
- * Y por qué al azar del estado y no la primera de la lista, y por qué la ficha viaja
- * entera con su número de serie: está donde estaba, en la cabecera de
- * `jugarLaGuardia`, y sigue valiendo palabra por palabra para los dos caminos.
+ * ═══ AL AZAR DEL ESTADO, Y NO LA PRIMERA DE LA LISTA ═══
+ *
+ * Coger «la primera» sería determinista y también sería una fuga de reglas: el orden
+ * del almacén ajeno es el orden en que le fueron llegando las fichas, o sea información
+ * que quien roba no tiene y no debe tener. Con `estado.azar` se roba a ciegas, que es lo
+ * que dice la regla, y sigue siendo reejecutable — que es exactamente para lo que el
+ * azar vive dentro del estado.
+ *
+ * Y la ficha viaja ENTERA, con su número de serie, por lo mismo que en el trueque: un
+ * secreto que cambia de manos deja de aparecer en una vista y empieza a aparecer en la
+ * otra, que es justo lo que `verify:mesa` comprueba. Estos dos párrafos vivían en la
+ * cabecera de `jugarLaGuardia`, que era su primera puerta; se mudan aquí, que es donde
+ * está el código del que hablan.
  */
 function elRobo(
   estado: EstadoDeRiberas,
@@ -2369,6 +2577,105 @@ function elRobo(
     return c;
   });
   return { colonos, azar: tirada.azar };
+}
+
+// ---------------------------------------------------------------------------
+// EL DESCARTE: lo que cuesta un siete a quien guarda demasiado
+// ---------------------------------------------------------------------------
+
+/**
+ * TIRA UNA FICHA DE UN BIEN. Ver `DESCARTAR`.
+ *
+ * ═══ NO MIRA `turnoDe` NI UNA VEZ, Y ESO ES LA REGLA ENTERA ═══
+ *
+ * Lo que autoriza a mover aquí no es tener el turno: es estar en `descartes` con algo
+ * pendiente. Escribir `yo !== estado.turno` en esta función sería dejar el descarte en
+ * manos de uno solo por vez, o sea seis plazos de pared encadenados en una mesa de
+ * seis. Quien decide es la lista, y la lista se llenó de una vez en `tirarLosDados`.
+ *
+ * ═══ Y LA FICHA SE COBRA CON `cobrar`, QUE ES LO QUE HACE ESTO REEJECUTABLE ═══
+ *
+ * Quien mueve elige LA CLASE y no la ficha: dos fichas de junco son la misma cosa para
+ * el juego y NO lo son para el diario, porque llevan número de serie. `cobrar` se lleva
+ * siempre la de número más bajo —la más vieja— y así dos ejecuciones del mismo diario
+ * dejan los mismos almacenes. Escribir aquí un `filter` propio sería un segundo
+ * criterio que un día se separa del primero sin que nada se ponga rojo.
+ */
+function descartarUnaFicha(
+  estado: EstadoDeRiberas,
+  ctx: ContextoMovimiento,
+  bien: Bien | null,
+): EstadoDeRiberas {
+  if (estado.momento !== 'descartando' || bien === null) return estado;
+  const yo = indiceDelAsiento(estado, ctx.quien);
+  if (yo < 0) return estado;
+  const mio = estado.colonos[yo] as Colono;
+  const debe = estado.descartes.find((d) => d.de === mio.asiento);
+  if (debe === undefined || debe.faltan <= 0) return estado;
+
+  const quedan = cobrar(mio.almacen, [bien]);
+  if (quedan === null) return estado;
+
+  const colonos = estado.colonos.map((c, i) => (i === yo ? { ...c, almacen: quedan } : c));
+  const descartes = estado.descartes.map((d) =>
+    d.de === mio.asiento ? { de: d.de, faltan: d.faltan - 1 } : d,
+  );
+  return alSalirDelDescarte({ ...estado, colonos, descartes });
+}
+
+/**
+ * ¿SE ACABÓ EL DESCARTE? Entonces vuelve a `'jugando'`, con el estiaje aún por mover.
+ *
+ * La lista se VACÍA al salir en vez de quedarse con sus ceros dentro, y la razón es que
+ * `descartes` significa «lo que se debe ahora mismo»: una lista de ceros arrastrada
+ * durante el resto del turno haría que la primera rama de `avisoDe` y la de
+ * `opcionesDeDescarte` tuvieran que preguntar además por el momento, que es la clase de
+ * condición doble que un día se escribe en un sitio y se olvida en el otro.
+ *
+ * Y se vuelve a `'jugando'` y no a nada más: el siete encendió la bandera del estiaje en
+ * la misma tirada, así que lo que espera al otro lado son los dieciocho destinos, para
+ * quien tiró, que es quien nunca perdió el turno.
+ */
+function alSalirDelDescarte(estado: EstadoDeRiberas): EstadoDeRiberas {
+  if (estado.descartes.some((d) => d.faltan > 0)) return estado;
+  return { ...estado, momento: 'jugando', descartes: [] };
+}
+
+/**
+ * TIRA POR TODOS LOS QUE FALTEN, las fichas MÁS VIEJAS y sin gastar azar.
+ *
+ * ═══ POR TODOS Y NO POR UNO, Y ES LA DECISIÓN QUE MÁS SE NOTA EN UNA PARTIDA LARGA ═══
+ *
+ * El plazo de pared se reprograma cada vez que cambia `turnoDe` (`empiezaTurnoNuevo`), y
+ * durante el descarte `turnoDe` cambia cada vez que alguien termina. O sea que drenar de
+ * uno en uno cuesta UN PLAZO POR PERSONA: en La Larga, con `PLAZO_MAXIMO_S` de siete
+ * días, un siete con seis manos llenas serían seis días de espera por un momento que
+ * dura lo que se tarda en pulsar cuatro botones. Tirando por todos, la espera tiene tope
+ * y el tope es un plazo.
+ *
+ * ═══ LAS MÁS VIEJAS, Y NO AL AZAR ═══
+ *
+ * Por lo mismo que `colocarPorElAusente` coloca en el primer sitio legal del orden
+ * canónico: gastar una tirada de `estado.azar` en un vencimiento haría que dos
+ * ejecuciones del mismo diario con distinto número de plazos vencidos dejaran el
+ * acumulador en sitios distintos, y con eso `reejecutarEn` deja de valer. «La más vieja»
+ * es el criterio que ya usa `cobrar`, y aquí, sin clase que elegir, son sencillamente
+ * las primeras de la lista: el almacén se llena siempre por el final.
+ *
+ * No elige QUÉ se salva, y eso es lo que hace que el plazo sea un castigo y no una
+ * jugada: la mitad de la gracia de la regla es elegir, y quien no está no elige.
+ */
+function descartarPorLosAusentes(estado: EstadoDeRiberas): EstadoDeRiberas {
+  const colonos = estado.colonos.map((c) => {
+    const debe = estado.descartes.find((d) => d.de === c.asiento);
+    if (debe === undefined || debe.faltan <= 0) return c;
+    return { ...c, almacen: c.almacen.slice(debe.faltan) };
+  });
+  return alSalirDelDescarte({
+    ...estado,
+    colonos,
+    descartes: estado.descartes.map((d) => ({ de: d.de, faltan: 0 })),
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -2758,66 +3065,86 @@ function comprarUnaCarta(estado: EstadoDeRiberas, ctx: ContextoMovimiento): Esta
 }
 
 /**
- * JUEGA UNA GUARDIA: le quitas un bien AL AZAR a un colono que elijas.
+ * JUEGA UNA GUARDIA: enciende el estiaje. Mueves la pieza y robas desde donde caiga.
  *
- * ═══ ROBA, Y TODAVÍA NO MUEVE ═══
+ * ═══ MUEVE IGUAL QUE UN SIETE, Y ÉSA ES LA FASE 3 ═══
  *
- * Aquí ponía que en la familia de la que viene esta mecánica la carta mueve la pieza
- * de la desgracia, que RIBERAS NO TIENE ESA PIEZA y que por eso esta carta hace lo
- * OTRO que hacía aquélla, que es robar. **La premisa está revocada**: desde la fase 1
- * de `docs/EL-LADRON-DE-RIBERAS.md` el estiaje sí es una pieza que ocupa una isla y
- * la seca, y quien la mueve es el siete. Que además la mueva esta carta es la fase 3
- * de ese documento y no ha entrado, así que lo que hoy hace la guardia sigue siendo
- * robar y nada más — pero por una razón que ya no es «no hay pieza», sino «todavía
- * no».
+ * Aquí ponía que esta carta robaba «y todavía no movía», porque la pieza existía
+ * desde la fase 1 y sólo el siete la movía. **Eso ya no es verdad.** Miguel lo pidió
+ * por escrito y es el §3 del diseño: la guardia mueve el estiaje «de forma idéntica a
+ * si hubiera sacado un 7». Así que esta función NO roba: lo único que hace del robo es
+ * darle la llave, encendiendo `estiajePorMover`, y el robo lo resuelve
+ * `conElEstiajeEn` cuando quien juega elija a cuál de las dieciocho islas la manda.
  *
- * Lo que sí cambió aquí dentro es que EL ROBO YA NO SE ESCRIBE EN ESTA FUNCIÓN: vive
- * en `elRobo`, que es el mismo que usa el estiaje. Lo que se quedó es lo que es DE LA
- * CARTA y no del robo: que sale de la mano, que sube `guardias` y que recalcula el
- * premio.
+ * Lo que eso cambia y no se ve desde aquí: la víctima YA NO SE ELIGE A PELO. Antes
+ * valía cualquiera que tuviera algo; ahora tiene que tener choza o torre EN LA ISLA
+ * donde la pieza se posa, que es lo que hace que mover sea una decisión y no un
+ * trámite. Por eso el movimiento pierde su campo `a` y su carga se queda en
+ * `{ carta }`: ver `opcionesDeLaGuardia`.
  *
- * ═══ AL AZAR DEL ESTADO, Y NO LA PRIMERA DE LA LISTA ═══
+ * ═══ Y LO QUE NO TRAE: EL DESCARTE ═══
  *
- * Coger «la primera» sería determinista y también sería una fuga de reglas: el
- * orden del almacén ajeno es el orden en que le fueron llegando las fichas, o sea
- * información que quien roba no tiene y no debe tener. Con `estado.azar` la carta
- * roba a ciegas, que es lo que dice la regla, y sigue siendo reejecutable — que
- * es exactamente para lo que el azar vive dentro del estado.
+ * Miguel lo dejó dicho aparte y va escrito aquí porque es donde se cometería el error:
+ * «esta regla de descarte sólo aplica al sacar un 7 con los dados, NO al usar una carta
+ * de caballero». `'descartando'` lo abre `tirarLosDados` y sólo `tirarLosDados`; esta
+ * función no toca `momento` ni `descartes`. Mover sin pagar ese peaje es justamente lo
+ * que hace que valga la pena guardarse la carta.
  *
- * Y la ficha viaja ENTERA, con su número de serie, por lo mismo que en el trueque:
- * un secreto que cambia de manos deja de aparecer en una vista y empieza a
- * aparecer en la otra, que es justo lo que `verify:mesa` comprueba.
+ * ═══ SE PUEDE JUGAR ANTES DE TIRAR, Y ESO SON DOS LÍNEAS EN DOS SITIOS ═══
+ *
+ * Se cayó el `!estado.tirado` que abría esta función. La otra mitad está en
+ * `opcionesDeTurno`, que ahora ofrece la guardia también por el camino de antes de
+ * tirar. Las dos a la vez, por lo que dice la cabecera de `sePuedeJugarLaCarta`: sólo
+ * con ésta habría un reductor que acepta lo que ningún botón ofrece; sólo con aquélla,
+ * un botón encendido que no responde.
+ *
+ * Y entra una guarda que antes no hacía falta: CON EL ESTIAJE POR MOVER NO SE JUEGA UNA
+ * GUARDIA. No es celo: encender una bandera que ya está encendida gastaría la carta, la
+ * muesca y el turno para no mover ni una vez más de lo que ya se iba a mover — dos
+ * movimientos colapsados en uno, en silencio. Es la copia de reductor del corte que
+ * `opcionesDeTurno` hace por `estiajePorMover`.
+ *
+ * ESA GUARDA ESTÁ A LA SOMBRA DEL PORTILLO, Y ESTÁ MEDIDO: quitándola, `verify:riberas`
+ * se queda en VERDE ENTERO, porque el portillo del §5 bis rechaza el movimiento una capa
+ * antes —`opcionesDeTurno` no ofrece ninguna carta mientras la bandera esté encendida— y
+ * la mesa devuelve el mismo objeto por el otro camino. Se escribe igual, y es el mismo
+ * trato que recibe `sePuedeJugarLaCarta`, cuya cabecera lleva la doctrina entera: quien
+ * lea esta rama dentro de un año no debe tener que demostrar el teorema del portillo para
+ * saber que está a salvo, y una regla que sólo vive en `opciones()` se la salta cualquier
+ * camino que no pase por ahí. Lo que sí se ve fallar es la mitad que muerde: que la carta
+ * NO SE OFRECE con la pieza pendiente.
+ *
+ * ═══ LO QUE NO CAMBIA, Y HAY QUE DECIRLO PORQUE SE LEE COMO SI CAMBIARA ═══
+ *
+ * `GUARDIA_MINIMA`, `PUNTOS_DE_LA_GUARDIA` y La Mayor Guardia entera están igual: la
+ * carta sale de la mano, `guardias` sube UNO, `conLaGuardia` recalcula el premio y
+ * `puedeHaberGanado` mira si con ese punto se acabó. Que la carta haga otra cosa no le
+ * cambia el precio ni lo que cuenta. Y el premio se recalcula AQUÍ y en ningún otro
+ * sitio, que es lo mismo que ya valía antes: La Mayor Guardia sólo se mueve cuando
+ * alguien juega una guardia. El Vado Largo cuelga además de `fundar`, porque una choza
+ * ajena parte una cadena; una guardia ajena no le quita guardias a nadie.
  */
 function jugarLaGuardia(
   estado: EstadoDeRiberas,
   ctx: ContextoMovimiento,
   seudonimo: string | null,
-  aQuien: string | null,
 ): EstadoDeRiberas {
   const yo = elTurnoEsDe(estado, ctx);
-  if (yo < 0 || !estado.tirado) return estado;
+  if (yo < 0) return estado;
+  if (estado.estiajePorMover) return estado;
   const mio = estado.colonos[yo] as Colono;
 
   const enMano = laCartaDeLaMano(mio, seudonimo);
   if (enMano === null || claseDeLaCarta(enMano.carta) !== 'guardia') return estado;
   if (!sePuedeJugarLaCarta(estado, enMano)) return estado;
 
-  const robo = elRobo(estado, yo, indiceDelAsiento(estado, aQuien));
-  if (robo === null) return estado;
-
-  /* Y lo que es de la carta y no del robo: la carta sale de la mano y cuenta. */
-  const colonos = robo.colonos.map((c, i) =>
+  /* Lo que es de la carta: sale de la mano y cuenta para el premio. */
+  const colonos = estado.colonos.map((c, i) =>
     i !== yo ? c : { ...c, mano: sinLaCarta(c.mano, enMano.carta), guardias: c.guardias + 1 },
   );
 
-  /*
-   * EL PREMIO SE RECALCULA AQUÍ, y es el único sitio donde hace falta: La Mayor
-   * Guardia sólo se mueve cuando alguien juega una guardia. El Vado Largo cuelga
-   * además de `fundar`, porque una choza ajena parte una cadena; una guardia
-   * ajena no le quita guardias a nadie.
-   */
   return puedeHaberGanado(
-    conLaGuardia({ ...estado, colonos, azar: robo.azar, cartaJugada: true }),
+    conLaGuardia({ ...estado, colonos, cartaJugada: true, estiajePorMover: true }),
   );
 }
 
@@ -3063,11 +3390,19 @@ function siguienteTurno(estado: EstadoDeRiberas): EstadoDeRiberas {
  *     Y NO SE ROBA. Robar sí gasta azar —`elRobo` sortea qué ficha— y además elegiría
  *     víctima por quien no está: se mueve con `a: null`, que es «se mueve y no se
  *     roba», el caso que la propia regla ya tiene escrito para las islas vacías.
+ *   · DESCARTANDO — se tira por TODOS los que falten, las fichas más viejas, y la mesa
+ *     vuelve a mover el estiaje. Por todos y no por el primero, porque el plazo se
+ *     reprograma cada vez que cambia `turnoDe` y `turnoDe` cambia cada vez que uno
+ *     termina: de uno en uno, un siete con seis manos llenas cuesta seis plazos. Y NO
+ *     se pasa el turno detrás, al revés que en `'jugando'`: el turno de quien tiró no
+ *     ha llegado a empezar, y lo que le espera —mover la pieza— tiene su propio plazo,
+ *     que es el que ya está escrito arriba.
  *   · REUNIENDO o TERMINADA — no pasa nada y se devuelve EL MISMO objeto. Una
  *     mesa esperando al segundo puede estar días así, y cada lectura mete su tic.
  */
 function venceElPlazo(estado: EstadoDeRiberas): EstadoDeRiberas {
   if (estado.momento === 'colocando') return colocarPorElAusente(estado);
+  if (estado.momento === 'descartando') return descartarPorLosAusentes(estado);
   if (estado.momento !== 'jugando') return estado;
   if (estado.estiajePorMover) return siguienteTurno(moverPorElAusente(estado));
   return siguienteTurno(estado);
@@ -3545,6 +3880,16 @@ export interface VistaDeRiberas {
    */
   estiaje: LlaveDeHex | null;
   estiajePorMover: boolean;
+  /**
+   * QUIÉN DEBE TIRAR FICHAS Y CUÁNTAS LE FALTAN. Entero y público; ver `Descarte`.
+   *
+   * Entero y no «lo mío» porque de aquí sale la frase de la cinta de todos —«se espera a
+   * Bruno, que tira 4 fichas»— y porque no hay nada que tapar: `bienes` de cada colono ya
+   * es público y `faltan` es la mitad de ese número. Y va en la vista y no sólo en el
+   * estado porque `opciones()` recibe la vista y jamás el estado: sin este campo, la
+   * rama del descarte no tendría con qué decidir a quién le ofrece qué.
+   */
+  descartes: Descarte[];
   /** Los trueques. PÚBLICOS: una oferta se dice en voz alta. */
   tratos: Trato[];
   vado: Vado;
@@ -3645,6 +3990,7 @@ function loQueSeVe(
     ultimaTirada: estado.ultimaTirada,
     estiaje: estado.estiaje,
     estiajePorMover: estado.estiajePorMover,
+    descartes: estado.descartes.map((d) => ({ de: d.de, faltan: d.faltan })),
     tratos: estado.tratos.map((t) => ({ ...t, da: [...t.da], pide: [...t.pide] })),
     vado: { de: estado.vado.de, largo: estado.vado.largo },
     guardia: { de: estado.guardia.de, cuantas: estado.guardia.cuantas },
@@ -3796,6 +4142,30 @@ export function opcionesDeRiberas(vista: unknown, quien: QuienMira): readonly Op
 
   if (v.momento === 'reuniendo') return opcionesDeReunion();
   if (v.momento === 'colocando') return opcionesDeColocacion(v, quien);
+  /*
+   * ═══ EL DESCARTE VIVE AQUÍ, Y NO DENTRO DE `opcionesDeTurno` ═══
+   *
+   * Una rama hermana de las otras tres, y ni una línea del descarte allí abajo. La
+   * tentación es grande y está a un paso: contestar a un trueque también se ofrece a
+   * quien no tiene el turno, y vive dentro de `opcionesDeTurno`, delante del `if` del
+   * turno. Se parecen en lo que consiguen y no en cómo, y confundirlos no deja un
+   * descarte a medias: a `opcionesDeTurno` NO SE LLEGA en `'descartando'` —esta misma
+   * función despacha por momento, tres líneas más abajo—, así que un descarte escrito
+   * allí es código que no se ejecuta nunca y lo que queda es una mesa SIN NINGUNA
+   * OPCIÓN PARA NADIE, parada en seco, con los dos clientes y el bucle del comprobador
+   * mirando una lista vacía.
+   *
+   * Y de esta forma sale gratis la otra regla del momento: EN `'descartando'` NO SE
+   * CONTESTA A TRUEQUES. El bloque que los contesta vive dentro de `opcionesDeTurno`, o
+   * sea al otro lado de este despacho, y `opcionesDeDescarte` no lo repite. Que salga
+   * gratis es justo por lo que hay una comprobación escrita para ella en
+   * `verify:riberas`: una regla que hoy no cuesta ninguna línea es la que mañana
+   * alguien deshace sin darse cuenta. El porqué es de reglas y no de pantalla: `faltan`
+   * se congela en el instante del siete, así que dos colonos que se pasaran fichas de
+   * ida y vuelta salvarían la mitad de sus dos almacenes sin que ninguna cuenta
+   * cambiara. Y el trato no caduca por esto: sigue abierto y se contesta al volver.
+   */
+  if (v.momento === 'descartando') return opcionesDeDescarte(v, quien);
   if (v.momento === 'jugando') return opcionesDeTurno(v, quien);
   return [];
 }
@@ -3844,6 +4214,13 @@ function comoVista(vista: unknown): VistaSinTablero | null {
      */
     estiaje: typeof v.estiaje === 'string' ? v.estiaje : null,
     estiajePorMover: v.estiajePorMover === true,
+    /*
+     * Y `descartes` SE NORMALIZA IGUAL, por lo mismo: una vista de ayer no lo trae, y
+     * una lista vacía es exactamente «aquí nadie debe ninguna ficha», que es lo que
+     * había. Exigirlo en las guardas de arriba apagaría el juego entero por un campo
+     * que no tiene nada que ver con fundar ni con pasar.
+     */
+    descartes: Array.isArray(v.descartes) ? v.descartes : [],
     misCartas: Array.isArray(v.misCartas) ? v.misCartas : [],
     misPuntos: typeof v.misPuntos === 'number' ? v.misPuntos : 0,
     mazo: typeof v.mazo === 'number' ? v.mazo : 0,
@@ -3918,6 +4295,50 @@ function opcionesDeColocacion(v: VistaSinTablero, quien: AsientoId): readonly Op
   return opciones;
 }
 
+/**
+ * QUÉ PUEDE TIRAR ÉSTE: una opción por clase de bien que le quede. CINCO como mucho.
+ *
+ * ═══ NO MIRA `turnoDe`, Y ÉSA ES TODA LA DIFERENCIA CON SUS DOS HERMANAS ═══
+ *
+ * `opcionesDeColocacion` empieza con `if (v.turnoDe !== quien) return []` y
+ * `opcionesDeTurno` lo tiene en medio; ésta sencillamente no lo escribe. Con eso el
+ * descarte se ofrece a la vez a todos los que deben, sin inventar ninguna forma de
+ * turno nueva y sin que la mecánica común tenga que aprender un segundo campo. Quien
+ * autoriza es `descartes`: si no estoy en la lista, o ya no me falta ninguna, la lista
+ * sale vacía, que es lo correcto —quien ya descartó espera— y no un error.
+ *
+ * ═══ Y AQUÍ NO SE REPITE EL BLOQUE DE CONTESTAR TRUEQUES ═══
+ *
+ * A propósito: en `'descartando'` no se contesta a trueques (§2.2), y la forma en que
+ * eso se consigue es que el bloque que los contesta vive en `opcionesDeTurno`, adonde
+ * no se llega. Lo único que hay que no hacer aquí es volver a escribirlo.
+ *
+ * El rótulo dice el bien y la ayuda dice cuántas quedan por tirar, porque son cinco
+ * botones iguales salvo por una palabra y el número es la única forma de saber si hay
+ * que volver a pulsar. Y el recuento sale de `faltan`, que es lo que se debe AHORA:
+ * después de cada tirada, la lista se vuelve a pedir y el número ha bajado.
+ */
+function opcionesDeDescarte(v: VistaSinTablero, quien: AsientoId): readonly Opcion[] {
+  const debo = v.descartes.find((d) => d.de === quien);
+  if (debo === undefined || debo.faltan <= 0) return [];
+
+  const opciones: Opcion[] = [];
+  for (const bien of BIENES) {
+    if (!v.misFichas.some((f) => bienDeLaFicha(f) === bien)) continue;
+    opciones.push({
+      id: `descartar:${bien}`,
+      tipo: DESCARTAR,
+      carga: { bien },
+      rotulo: `Tirar un ${bien}`,
+      ayuda:
+        debo.faltan === 1
+          ? 'Es la última que te queda por tirar.'
+          : `Te quedan ${debo.faltan} por tirar. Se va la más vieja de esa clase.`,
+    });
+  }
+  return opciones;
+}
+
 /** El turno de verdad: tirar, alzar, trocar, contestar y pasar. */
 function opcionesDeTurno(v: VistaSinTablero, quien: AsientoId): readonly Opcion[] {
   const opciones: Opcion[] = [];
@@ -3963,14 +4384,14 @@ function opcionesDeTurno(v: VistaSinTablero, quien: AsientoId): readonly Opcion[
    *
    * O sea: justo después del `if` del turno y ANTES del bloque de tirar. El de
    * `veredasGratis` está DESPUÉS de ese bloque y ahí está bien, porque las veredas de
-   * la carta sólo pueden existir con la tirada hecha. El estiaje no: hoy lo enciende
-   * el siete —que ya ha tirado— pero la fase 3 lo va a encender también con una
-   * guardia jugada ANTES de tirar, y con el corte puesto donde el de `veredasGratis`
-   * lo único que saldría entonces es «Tirar los dados»: los dieciocho destinos no
-   * aparecerían nunca y el movimiento se aplazaría a después de la cosecha, que es
-   * justo la cosecha que esa carta sirve para evitar. La carta no se rompería con
-   * estrépito: se convertiría en una que mueve tarde, que es peor porque parece que
-   * funciona. Se escribe ya en su sitio para no tener que moverlo entonces.
+   * la carta sólo pueden existir con la tirada hecha. El estiaje no: lo enciende el
+   * siete —que ya ha tirado— Y TAMBIÉN una guardia jugada ANTES de tirar, que es lo que
+   * trajo la fase 3. La fase 1 dejó el corte aquí escribiendo esto en futuro; ahora es
+   * presente y se puede comprobar. Con el corte puesto donde el de `veredasGratis`, lo
+   * único que sale al jugar esa carta es «Tirar los dados»: los dieciocho destinos no
+   * aparecen nunca y el movimiento se aplaza a después de la cosecha, que es justo la
+   * cosecha que la carta sirve para evitar. La carta no se rompe con estrépito: se
+   * convierte en una que mueve tarde, que es peor porque parece que funciona.
    *
    * Y MIENTRAS CORTA NO SE OFRECE TIRAR, ni siquiera sin haber tirado. Es lo que hace
    * que este `return` sea correcto y no una trampa: si `tirar` se colara, la lista
@@ -3996,9 +4417,25 @@ function opcionesDeTurno(v: VistaSinTablero, quien: AsientoId): readonly Opcion[
         'tenga algo puesto en ella.',
     });
     /*
-     * REVELAR TAMBIÉN AQUÍ, ANTES DE TIRAR, y va después de `tirar` en la lista a
-     * propósito: quien recorre las opciones de arriba abajo —un comprobador, un
-     * cliente tonto— tiene que encontrarse primero lo que mueve la partida.
+     * ═══ Y LA GUARDIA, QUE ES LA OTRA MITAD DE LA PETICIÓN DE MIGUEL ═══
+     *
+     * «El jugador puede usar esta carta durante su fase de juego (INCLUSO ANTES DE
+     * LANZAR LOS DADOS)». Ésta es la copia sobre la vista de la línea que se cayó de
+     * `jugarLaGuardia`, y van las dos o ninguna: sin ésta habría un reductor que acepta
+     * lo que ningún botón ofrece, y la carta quedaría en una que en la pantalla sólo se
+     * puede jugar tarde — que es peor que rota, porque parece que funciona.
+     *
+     * Ninguna de las otras tres cartas sale por aquí, ni comprar: sus reductores
+     * empiezan por `!estado.tirado` y ofrecerlas sería encender botones que no responden.
+     *
+     * Va después de `tirar` por lo mismo que revelar, y antes que revelar por lo mismo
+     * que `tirar`: quien recorre la lista de arriba abajo se encuentra primero lo que
+     * mueve la partida, y jugar la guardia la mueve.
+     */
+    opciones.push(...opcionesDeLaGuardia(v));
+    /*
+     * REVELAR TAMBIÉN AQUÍ, ANTES DE TIRAR, y va al final de la lista a propósito, por
+     * lo que acaba de decirse: no es una jugada.
      *
      * Que se ofrezca antes de tirar no es un capricho: los puntos con los que se
      * gana son los públicos, así que quien tiene el octavo en un título tiene que
@@ -4143,8 +4580,12 @@ function opcionesDeTurno(v: VistaSinTablero, quien: AsientoId): readonly Opcion[
  *
  * Las tres condiciones de la víctima —que tenga choza o torre en uno de los seis
  * vértices, que no sea yo, y que le quede algo— son PÚBLICAS las tres, así que las
- * tres se comprueban aquí y ninguna necesita el «sólo si»: es la misma comprobación
- * que ya hace `opcionesDelMazo` para la guardia.
+ * tres se comprueban aquí y ninguna necesita el «sólo si».
+ *
+ * Y desde la fase 3 se comprueban aquí Y NADA MÁS QUE AQUÍ: la tercera («que le quede
+ * algo») vivía además en `opcionesDelMazo`, porque la guardia elegía víctima a pelo.
+ * Ahora la guardia mueve la pieza y entra por esta misma puerta, así que a quién se le
+ * puede robar se decide en un solo sitio, que es el que sabe en qué isla cae.
  *
  * Y si en una isla no hay a quién robar, la opción se emite igual con `a: null` —su
  * `id` acaba en `:nadie`—: se mueve y no se roba. Eso evita el peor fallo posible,
@@ -4294,15 +4735,61 @@ function opcionesDeRevelar(v: VistaSinTablero): Opcion[] {
 }
 
 /**
+ * JUGAR UNA GUARDIA: UNA opción por carta, sin víctima dentro.
+ *
+ * ═══ POR QUÉ ESTO ESTÁ FUERA DE `opcionesDelMazo`, QUE ES DONDE VIVÍA ═══
+ *
+ * Porque desde la fase 3 la guardia se puede jugar ANTES DE TIRAR y las otras tres
+ * cartas no —sus reductores empiezan por `!estado.tirado`, y comprar también—, así que
+ * `opcionesDeTurno` la necesita por dos caminos que se van cada uno por su `return`.
+ * Emitida una sola vez y desde aquí, las dos puertas ofrecen exactamente lo mismo; si se
+ * escribiera dos veces, un día una de las dos dejaría de aplicar una de las dos reglas.
+ *
+ * ═══ Y POR QUÉ YA NO HAY UNA OPCIÓN POR VÍCTIMA ═══
+ *
+ * Antes salía una por colono al que se pudiera robar, y el asiento viajaba en la carga.
+ * Ahora la carta MUEVE LA PIEZA (ver `jugarLaGuardia`) y a quién se le roba lo deciden
+ * los dieciocho destinos que `opcionesDelEstiaje` ofrece en el paso siguiente, donde la
+ * víctima tiene además que tener algo PUESTO en esa isla. O sea que la resta que aquí se
+ * hacía —«a quien no tiene ni un bien no se le roba»— no desaparece: se muda al sitio
+ * donde ahora se decide, y aquí sobraría porque desde aquí todavía no se sabe la isla.
+ *
+ * Lo que sí sigue vivo son LAS DOS REGLAS DE TODAS LAS CARTAS —una al turno, y nunca la
+ * comprada hoy—, escritas otra vez sobre la vista, que es donde muerden. Ver
+ * `sePuedeJugarLaCarta`.
+ *
+ * El `id` no lleva la víctima porque ya no hay ninguna; y una carta sólo puede jugarse
+ * una vez, así que el seudónimo basta para que sea único.
+ */
+function opcionesDeLaGuardia(v: VistaSinTablero): Opcion[] {
+  const opciones: Opcion[] = [];
+  if (v.cartaJugada) return opciones;
+  for (const enMano of v.misCartas) {
+    if (claseDeLaCarta(enMano.carta) !== 'guardia') continue;
+    if (enMano.comprada >= v.turnosAbiertos) continue;
+    const suyo = seudonimoDeLaCarta(enMano.carta);
+    opciones.push({
+      id: `jugar-guardia:${suyo}`,
+      tipo: GUARDIA,
+      carga: { carta: suyo },
+      rotulo: NOMBRE_DE_LA_CARTA['guardia'],
+      ayuda: 'Mueves el estiaje y le robas a quien tenga algo puesto ahí. Cuenta para La Mayor Guardia.',
+    });
+  }
+  return opciones;
+}
+
+/**
  * COMPRAR, Y JUGAR LO QUE SE PUEDA JUGAR.
  *
  * ═══ QUÉ SE COMPRUEBA AQUÍ Y QUÉ NO, QUE ES LA MITAD DEL §5 bis ═══
  *
  * Se comprueba todo lo que está EN MI VISTA: que me llegue el coste (mi almacén es
  * mío), que quede mazo (el número es público), que no haya jugado ya una carta
- * (público), que la carta no sea de este turno (el sello viaja en mi propia mano) y
- * —para la guardia— que a quien voy a robar le quede algo, porque cuántos bienes
- * tiene cada cual es público.
+ * (público) y que la carta no sea de este turno (el sello viaja en mi propia mano).
+ * Aquí había además una resta de la guardia —que a quien voy a robar le quede algo—;
+ * se fue con ella a `opcionesDelEstiaje`, que es donde desde la fase 3 se elige a quién
+ * se le roba. Ver `opcionesDeLaGuardia`.
  *
  * Y NO se comprueba lo que no puedo ver: al acaparar se ofrecen los cinco bienes
  * aunque nadie tenga ninguno. Filtrar por lo que los demás tienen sería publicar
@@ -4322,31 +4809,24 @@ function opcionesDelMazo(v: VistaSinTablero, mio: ColonoVisto): Opcion[] {
     });
   }
 
+  /*
+   * LA GUARDIA SE EMITE APARTE PORQUE SALE POR DOS PUERTAS. Aquí, con el turno hecho, y
+   * también por el camino de antes de tirar, que es lo único de este bloque que se puede
+   * jugar sin haber tirado. Escrita dentro del bucle habría que escribirla dos veces —o
+   * llamar a `opcionesDelMazo` entero desde allí, que ofrecería comprar y las otras tres
+   * cartas, que el reductor rechaza por su `!estado.tirado`—. Ver `opcionesDeLaGuardia`.
+   */
+  opciones.push(...opcionesDeLaGuardia(v));
+
   for (const enMano of v.misCartas) {
     const clase = claseDeLaCarta(enMano.carta);
-    if (clase === null || esTitulo(clase)) continue;
+    if (clase === null || esTitulo(clase) || clase === 'guardia') continue;
     /* Una por turno, y nunca la de hoy. Las dos reglas, mirando lo que veo yo. */
     if (v.cartaJugada) continue;
     if (enMano.comprada >= v.turnosAbiertos) continue;
 
     const suyo = seudonimoDeLaCarta(enMano.carta);
     const como = NOMBRE_DE_LA_CARTA[clase];
-
-    if (clase === 'guardia') {
-      for (const otro of v.colonos) {
-        if (otro.asiento === mio.asiento) continue;
-        /* A quien no tiene nada no se le roba: es público cuántos bienes tiene. */
-        if (otro.bienes === 0) continue;
-        opciones.push({
-          id: `jugar-guardia:${suyo}:${otro.asiento}`,
-          tipo: GUARDIA,
-          carga: { carta: suyo, a: otro.asiento },
-          rotulo: `${como}: robar a ${nombreEnLaVista(v, otro.asiento)}`,
-          ayuda: 'Le quitas un bien al azar. Cuenta para La Mayor Guardia.',
-        });
-      }
-      continue;
-    }
 
     if (clase === 'ano-bueno') {
       /*
@@ -4834,15 +5314,58 @@ function avisoDe(v: VistaSinTablero, quien: QuienMira): string {
     return suyo ? `Coloca ${que}.` : `${de} coloca ${que}.`;
   }
   /*
+   * ═══ LO QUE YO DEBO SE MIRA EN `descartes`, Y NO EN `turnoDe` ═══
+   *
+   * Ésta es la única rama del aviso que no elige con el campo del turno, y tiene que ir
+   * la primera de las tres. Durante el descarte `turnoDe` apunta al PRIMERO de la cola
+   * (ver `turnoDe`), así que el segundo que debe tirar leería «se espera a Bruno, que
+   * tira 4 fichas» con sus propios cinco botones encendidos delante. Es el peor aviso
+   * posible: no dice que no puedas, dice que le toca a otro.
+   *
+   * Y va antes que la rama del estiaje porque durante el descarte la bandera del estiaje
+   * YA está encendida —las dos las enciende la misma tirada—, así que escrita después
+   * esta rama no se leería nunca.
+   *
+   * Lo que esto arregla es la pantalla, y lo que NO arregla hay que decirlo en voz alta:
+   * `turnoDeLaVista` lee `turnoDe` y nada más, así que al segundo y siguientes de la cola
+   * NO les llega aviso al móvil hasta que `turnoDe` llegue a ellos. Se acepta a sabiendas:
+   * un segundo campo en la vista para «quién más puede mover» sería inventar en la
+   * mecánica común una forma de turno que hoy no tiene ningún juego. Lo que acota la
+   * espera es que el tic tira por todos.
+   */
+  const debo = v.descartes.find((d) => d.de === quien);
+  if (debo !== undefined && debo.faltan > 0) {
+    return debo.faltan === 1 ? 'Tira 1 ficha: sacaste un siete.' : `Tira ${debo.faltan} fichas.`;
+  }
+  if (v.momento === 'descartando') {
+    const cuantas = v.descartes.find((d) => d.faltan > 0)?.faltan ?? 0;
+    return `Se espera a ${de}, que tira ${cuantas} ${cuantas === 1 ? 'ficha' : 'fichas'}.`;
+  }
+  /*
    * EL ESTIAJE MANDA EN EL AVISO MIENTRAS ESTÉ POR MOVER, y va antes que la rama de
-   * tirar porque desde la fase 3 se podrá activar SIN haber tirado: escrito al revés,
-   * ese turno leería «está por tirar» mientras lo único que hay delante son los
-   * dieciocho destinos.
+   * tirar porque desde la fase 3 se activa SIN haber tirado: escrito al revés, ese turno
+   * leería «está por tirar» mientras lo único que hay delante son los dieciocho destinos.
+   *
+   * ═══ Y POR ESO EL AVISO NO PUEDE DECIR SIEMPRE «SACASTE N» ═══
+   *
+   * `ultimaTirada` NO se borra al empezar un turno —nadie la borra: sólo la escribe
+   * `tirarLosDados`—, así que con la bandera encendida por una guardia jugada antes de
+   * tirar, la frase de siempre anunciaba la tirada DEL TURNO ANTERIOR, y en la primera
+   * vuelta de la partida un «Sacaste 0». Un aviso que inventa una tirada es peor que uno
+   * escueto: manda mirar un número que no ha pasado.
+   *
+   * La causa no se guarda en el estado y no hace falta guardarla, porque se deduce: si no
+   * se ha tirado, sólo pudo encenderla la carta. Y si se ha tirado y la suma NO es siete,
+   * tampoco pudo ser el siete. Queda un solo caso ambiguo —siete tirado, movido, y una
+   * guardia jugada después en el mismo turno— y ahí la frase dice «sacaste siete», que
+   * es verdad y manda a la misma tarea. Un campo nuevo en el estado para afinar eso
+   * costaría una migración de `comoSiSiempreHubieraHabidoMazo` a cambio de una palabra.
    */
   if (v.estiajePorMover) {
-    return suyo
+    if (!suyo) return `Turno de ${de}, que mueve el estiaje.`;
+    return v.tirado && v.ultimaTirada === SUMA_DEL_ESTIAJE
       ? `Sacaste ${v.ultimaTirada}: mueve el estiaje.`
-      : `Turno de ${de}, que mueve el estiaje.`;
+      : 'Jugaste la guardia: mueve el estiaje.';
   }
   if (!v.tirado) return suyo ? 'Te toca: tira los dados.' : `Turno de ${de}: está por tirar.`;
   return suyo

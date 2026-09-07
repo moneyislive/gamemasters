@@ -405,6 +405,7 @@ const R = {
   fundar: 'riberas:fundar',
   alzar: 'riberas:alzar',
   tirar: 'riberas:tirar',
+  descartar: 'riberas:descartar',
   estiaje: 'riberas:estiaje',
   ofrecer: 'riberas:ofrecer',
   aceptar: 'riberas:aceptar',
@@ -452,6 +453,20 @@ const FAMILIAS: ReadonlyArray<{ nombre: string; es: (t: Toque) => boolean }> = [
    * pero va la primera porque es lo que más mueve la partida: un siete no se resuelve
    * hasta que alguien mueve la pieza.
    */
+  /*
+   * ═══ Y TIRAR FICHAS VA ANTES QUE MOVER LA PIEZA, PORQUE ES EL ORDEN DEL JUEGO ═══
+   *
+   * Desde la fase 2 de `docs/EL-LADRON-DE-RIBERAS.md`, un siete que pilla a alguien con
+   * más de siete fichas abre el momento `'descartando'`, y ahí lo ÚNICO que se ofrece —a
+   * quien deba, tenga el turno o no— es tirar una ficha. Sin esta familia, este bucle se
+   * queda sin jugada la primera vez que sale un siete con las manos llenas: medido antes
+   * de escribirla, las tres semillas se cortaron con «el tablero no ofrece nada en
+   * descartando» después de 8 sietes y sólo 5 movidas de estiaje.
+   *
+   * Va la primera porque es lo primero que hay que resolver: hasta que las manos no se
+   * vacían no hay pieza que mover, y hasta que la pieza no se mueve no hay turno.
+   */
+  { nombre: 'descartar', es: (t) => t.tipo === R.descartar },
   { nombre: 'estiaje', es: (t) => t.tipo === R.estiaje },
   /* Tirar primero: es lo único que hace correr el reloj del juego y traer cosecha. */
   { nombre: 'tirar', es: (t) => t.tipo === R.tirar },
@@ -780,12 +795,22 @@ paso('En proceso: tres partidas ENTERAS de Riberas, con su tablero dentro de la 
   let conFichas = 0;
 
   /*
-   * EL PRESUPUESTO DE VUELTAS. La partida más larga de las tres semillas de aquí
-   * abajo gasta 586, así que esto es holgura y no un corte disimulado: si un día
-   * una partida se lo comiera entero, la afirmación «las tres partidas TERMINAN»
-   * se pondría roja en vez de dejarla a medias en silencio.
+   * EL PRESUPUESTO DE VUELTAS. La partida más larga de las tres semillas de aquí abajo
+   * gasta 1.771, así que esto es holgura y no un corte disimulado: si un día una partida
+   * se lo comiera entero, la afirmación «las tres partidas TERMINAN» se pondría roja en
+   * vez de dejarla a medias en silencio.
+   *
+   * ═══ AQUÍ PONÍA 586 Y 1.500, Y EL DESCARTE SE LO COMIÓ ═══
+   *
+   * Medido con la fase 2 encima: la semilla 3 gasta 537 vueltas y la 77 gasta 691 —o sea
+   * casi lo mismo que antes—, pero la 20260901 pasa de 586 a 1.771 y se comía el tope
+   * entero, dejando esa partida sin ganador. Y la culpa NO es de las 249 vueltas que esa
+   * semilla se va en tirar fichas, que son el 14 %: es que tirar la mitad de la mano en
+   * 35 sietes retrasa las obras de todo el mundo, así que la partida entera se alarga.
+   * El número se sube a sabiendas y con la medida al lado, que es distinto de subirlo
+   * hasta que deje de estorbar.
    */
-  const TOPE_DE_VUELTAS = 1500;
+  const TOPE_DE_VUELTAS = 3000;
 
   interface Partida {
     mesa: Mesa;
@@ -1014,6 +1039,20 @@ paso('En proceso: tres partidas ENTERAS de Riberas, con su tablero dentro de la 
     tiradas: cuantas(total, 'tirar'),
   });
   comprobar('y salen SIETES, que es la tirada que no rinde a nadie', sietes >= 10, { sietes });
+  /*
+   * Y EL DESCARTE SE JUEGA DE VERDAD, que es lo que esta familia añade sobre el siete:
+   * un siete con todas las manos cortas no hace descartar a nadie, así que «salen
+   * sietes» seguiría verde con el momento `'descartando'` sin estrenar. Medido: 321
+   * fichas tiradas en las tres partidas, y el suelo es la mitad. Estas fichas las tiran
+   * en su mayoría colonos que NO tienen el turno —el bucle le pregunta a `turnoDe`, que
+   * durante el descarte apunta al primero que debe y no a quien tiró—, o sea que esta
+   * cuenta es además la única medida que este fichero tiene de que eso funciona.
+   */
+  comprobar(
+    'y se TIRAN FICHAS por sacarlos, que es lo que le cuesta un siete a quien guarda',
+    cuantas(total, 'descartar') >= 150,
+    { tiradas: cuantas(total, 'descartar') },
+  );
   comprobar('se compran cartas del mazo', cuantas(total, 'comprar') >= 8, {
     compras: cuantas(total, 'comprar'),
   });
@@ -2415,11 +2454,19 @@ try {
        * aquí: viaja dentro de `misFichas` del ladrón y desaparece de la del robado, que
        * es justo lo que la búsqueda de secretos de este fichero comprueba una revisión
        * sí y otra también.
+       *
+       * ═══ Y UNA TERCERA VEZ CON EL DESCARTE. UN CAMPO, Y TAMBIÉN PÚBLICO ═══
+       *
+       *   · `descartes` — quién debe tirar fichas y cuántas le faltan. Es público porque
+       *     se calcula con números que ya lo son: `colonos[].bienes` se cuenta mirando el
+       *     montón de cada cual, y `faltan` es su mitad congelada en el instante del
+       *     siete. Lo que NO viaja es QUÉ tira cada uno: la ficha desaparece del estado y
+       *     no aparece en la vista de nadie, que es el caso más fácil de la regla.
        */
       comprobar(
         'y la vista de Riberas manda exactamente estos campos',
         campos ===
-          'cartaJugada,colonos,desde,estiaje,estiajePorMover,faltaVereda,ganadores,guardia,islas,mazo,misCartas,misFichas,misPuntos,momento,paso,tablero,tirado,tratos,turnoDe,turnosAbiertos,ultimaChoza,ultimaTirada,vado,veredasGratis,yo',
+          'cartaJugada,colonos,descartes,desde,estiaje,estiajePorMover,faltaVereda,ganadores,guardia,islas,mazo,misCartas,misFichas,misPuntos,momento,paso,tablero,tirado,tratos,turnoDe,turnosAbiertos,ultimaChoza,ultimaTirada,vado,veredasGratis,yo',
         campos,
       );
     }

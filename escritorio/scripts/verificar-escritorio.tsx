@@ -1769,7 +1769,13 @@ function laProyeccionConMazo(
    * este fichero mira no es la regla —eso es `verify:riberas`— sino qué se OYE al
    * pintarlo.
    */
-  { empateDelVado = false, conElEstiajePorMover = false }: { empateDelVado?: boolean; conElEstiajePorMover?: boolean } = {},
+  /*
+   * `descartando`: además, la partida se queda en el momento del descarte, con NUEVE
+   * fichas en mi mano y cuatro por tirar. Es un estado que en la mesa se alcanza sacando
+   * un siete con la mano llena; aquí se declara, porque lo que este fichero mira no es la
+   * regla —eso es `verify:riberas`— sino que los botones lleguen a la pantalla.
+   */
+  { empateDelVado = false, conElEstiajePorMover = false, descartando = false }: { empateDelVado?: boolean; conElEstiajePorMover?: boolean; descartando?: boolean } = {},
 ): {
   vista: unknown;
   opciones: readonly Opcion[];
@@ -1839,9 +1845,27 @@ function laProyeccionConMazo(
       }
     : conDueno;
   const conElVado: EstadoDeRiberas = empateDelVado ? { ...yoTambienLlego, vado: recalcularElVado(yoTambienLlego) } : conDueno;
-  const estado: EstadoDeRiberas = conElEstiajePorMover
+  const conElEstiaje: EstadoDeRiberas = conElEstiajePorMover
     ? { ...conElVado, ultimaTirada: 7, estiajePorMover: true }
     : conElVado;
+  /*
+   * EL DESCARTE VA DESPUÉS DEL ESTIAJE Y NO EN SU LUGAR: al sacar un siete se encienden
+   * las dos cosas, y el orden en que se juegan es éste —primero se tiran las fichas y
+   * después se mueve la pieza—. Montarlo sin la bandera sería montar un estado que la
+   * regla no produce nunca.
+   */
+  const estado: EstadoDeRiberas = descartando
+    ? {
+        ...conElEstiaje,
+        momento: 'descartando',
+        ultimaTirada: 7,
+        estiajePorMover: true,
+        descartes: [{ de: asientos[0] as string, faltan: 4 }],
+        colonos: conElEstiaje.colonos.map((c, i) =>
+          i === 0 ? { ...c, almacen: [...c.almacen, ...fichasDe(['junco', 'limo', 'sal', 'piedra'])] } : c,
+        ),
+      }
+    : conElEstiaje;
   const vista = proyectar(RIBERAS, estado, 's1', sentados);
   return { vista, opciones: opcionesDeArcade(RIBERAS, vista, 's1'), sentados };
 }
@@ -1952,11 +1976,27 @@ function elMazoEnLaPantalla(): void {
     cartas.some((c) => c.sePuedeJugar || c.sePuedeRevelar) && cartas.some((c) => !c.sePuedeJugar && !c.sePuedeRevelar),
     cartas.map((c) => [c.id, c.sePuedeJugar, c.sePuedeRevelar]),
   );
+  /*
+   * ═══ QUIÉN ABRE EL MENÚ AHORA, QUE CAMBIÓ CON LA FASE 3 DEL ESTIAJE ═══
+   *
+   * Aquí el naipe que hacía preguntar era LA GUARDIA, porque ofrecía una jugada por
+   * víctima. Desde que mueve el estiaje trae UNA sola —la isla se elige después, sobre el
+   * tablero— así que se manda sin menú. El escenario necesita las dos cosas, y las dos se
+   * piden por su nombre: una carta que pregunte (El Acaparamiento, con sus cinco bienes) y
+   * la guardia, que ya no pregunta. Sin la primera, el menú de este paso no se abriría
+   * nunca y media pantalla no se recorrería.
+   */
+  const laQuePregunta = cartas.find((c) => c.familia === 'acaparamiento' && c.sePuedeJugar);
+  comprobar(
+    'hay una carta que ofrece MÁS DE UNA jugada: hay que preguntar, y el menú se abre',
+    laQuePregunta !== undefined && jugadasDeLaCarta(vista, opciones, laQuePregunta.id).length > 1,
+    laQuePregunta === undefined ? null : jugadasDeLaCarta(vista, opciones, laQuePregunta.id).map((j) => j.rotulo),
+  );
   const laGuardia = cartas.find((c) => c.familia === 'guardia' && c.sePuedeJugar);
   comprobar(
-    'la guardia de un turno anterior ofrece MÁS DE UNA víctima: hay que preguntar, y el menú se abre',
-    laGuardia !== undefined && jugadasDeLaCarta(vista, opciones, laGuardia.id).length > 1,
-    laGuardia === undefined ? null : jugadasDeLaCarta(vista, opciones, laGuardia.id).map((j) => j.a),
+    'y la guardia trae UNA sola: mueve el estiaje, y la isla se elige después en el tablero',
+    laGuardia !== undefined && jugadasDeLaCarta(vista, opciones, laGuardia.id).length === 1,
+    laGuardia === undefined ? null : jugadasDeLaCarta(vista, opciones, laGuardia.id).map((j) => j.rotulo),
   );
   const elTitulo = cartas.find((c) => c.sePuedeRevelar);
   comprobar('y el título se puede revelar, que es la otra casilla', elTitulo !== undefined && revelarDe(opciones, elTitulo.id) !== null);
@@ -2191,6 +2231,84 @@ function elMazoEnLaPantalla(): void {
       const todo = new Set([...enElDibujo, ...sueltas.map((o) => canonico({ tipo: o.tipo, carga: o.carga }))]);
       return cinco.opciones.every((o) => todo.has(canonico({ tipo: o.tipo, carga: o.carga })));
     })(),
+  );
+
+  /*
+   * ═══ Y EL DESCARTE, QUE EN ESTA MESA NO TIENE OTRA PANTALLA ═══
+   *
+   * Con cinco colonos el retablo es lo único que hay, así que un descarte que no saliera
+   * aquí no se podría hacer en toda la tarde: la mesa se quedaría esperando a alguien que
+   * ve la pantalla vacía. Y no es un caso raro —ocurre en cada siete que pilla a alguien
+   * con más de siete fichas—, pero es de los que nadie abre para mirar.
+   *
+   * Lo que se compra aquí es de ESTE cliente y no de la regla: que los cinco botones
+   * lleguen renderizados con su rótulo, que el aviso diga cuántas quedan, y que mientras
+   * dura no haya NADA tocable sobre el dibujo —que es lo que hace que el único camino sea
+   * el botón—.
+   */
+  paso('Y en esa misma mesa, el descarte de un siete se puede pulsar');
+
+  const tirando = laProyeccionConMazo(5, { descartando: true });
+  const tableroDelDescarte = tableroDeLaVista(tirando.vista);
+  comprobar('la mesa que descarta trae tablero declarado', tableroDelDescarte !== null);
+  if (tableroDelDescarte === null) return;
+  const aTirar = tirando.opciones.filter((o) => o.tipo === 'riberas:descartar');
+  comprobar('el juego ofrece tirar fichas, o esto no comprobaría nada', aTirar.length > 0, aTirar.map((o) => o.id));
+  comprobar(
+    'y mientras se descarta no hay NADA tocable sobre el dibujo: el botón es el único camino',
+    tableroDelDescarte.caras.every((c) => c.toque === null) &&
+      tableroDelDescarte.lineas.every((l) => l.toque === null) &&
+      tableroDelDescarte.nudos.every((n) => n.toque === null),
+  );
+
+  /*
+   * Y SALEN DEL TABLERO DECLARADO, no de la lista suelta que este cliente pinta además.
+   * La diferencia no se ve en pantalla y decide otra cosa: quien juega a ciegas —el bucle
+   * de `verify:mesa`, y mañana el jugador de la fase 5— lee las cuatro listas del tablero
+   * y nunca la lista de opciones. Un descarte que sólo saliera por la puerta del cliente
+   * se vería bien aquí y dejaría la mesa parada allí.
+   */
+  comprobar(
+    'y salen del TABLERO, que es lo único que lee quien juega a ciegas',
+    tableroDelDescarte.acciones.length === aTirar.length &&
+      tableroDelDescarte.acciones.every((a) => a.toque.tipo === 'riberas:descartar'),
+    tableroDelDescarte.acciones.map((a) => a.id),
+  );
+
+  const puestaDelDescarte = mesaPuestaDe(tirando.sentados, tirando.vista, tirando.opciones);
+  const htmlDelDescarte = renderToStaticMarkup(
+    <RiberasEnTres
+      manifiesto={riberas}
+      mesa={unaMesa('dentro', puestaDelDescarte)}
+      puesta={puestaDelDescarte}
+      tablero={tableroDelDescarte}
+      opciones={tirando.opciones}
+    />,
+  );
+  const textoDelDescarte = palabrasDe(htmlDelDescarte);
+  for (const o of aTirar) {
+    comprobar(`sobre el retablo, «${o.rotulo}» sale como botón y se puede pulsar`, textoDelDescarte.includes(o.rotulo), o.id);
+  }
+  comprobar('y el aviso dice cuántas quedan por tirar', textoDelDescarte.includes(tableroDelDescarte.aviso), tableroDelDescarte.aviso);
+  comprobar(
+    'y tampoco aquí se pierde ni una: entre el dibujo y los botones están todas',
+    (() => {
+      const sueltas = opcionesSueltas(tableroDelDescarte, tirando.opciones);
+      const enElDibujo = new Set<string>();
+      for (const a of tableroDelDescarte.acciones) enElDibujo.add(canonico({ tipo: a.toque.tipo, carga: a.toque.carga }));
+      const todo = new Set([...enElDibujo, ...sueltas.map((o) => canonico({ tipo: o.tipo, carga: o.carga }))]);
+      return tirando.opciones.every((o) => todo.has(canonico({ tipo: o.tipo, carga: o.carga })));
+    })(),
+  );
+  /*
+   * LA VACUNA: la misma mesa un instante antes —sin descartar— NO tiene esos rótulos.
+   * Sin ella, «sale como botón» se cumpliría igual si el retablo pintara siempre todo lo
+   * que le llega, que es lo que no se está comprobando.
+   */
+  comprobar(
+    'se ve fallar: en un turno normal esos botones no están',
+    aTirar.every((o) => !textoDeCinco.includes(o.rotulo)),
+    aTirar.map((o) => o.rotulo),
   );
 
   /*
@@ -3331,8 +3449,21 @@ console.log('');
  * guion que se cae a la mitad, termina con código cero y una lista corta de aciertos, y
  * eso se lee como verde. Con el número escrito, salir con menos es un fallo ruidoso. Va a
  * mano y se sube al añadir comprobaciones; un guardia desfasado no guarda nada.
+ *
+ * ═══ Y VA CON MARGEN, PORQUE AL RAS HACE LO CONTRARIO DE LO QUE QUIERE ═══
+ *
+ * Estuvo en 467 con el guion haciendo 467 exactos, y así la PRIMERA comprobación que
+ * dejara de correr —una sola línea dentro de un `if` que ya no entra— mataba el guion
+ * gritando «sólo se han hecho 466 de 467», en vez de enseñar las rojas con su nombre.
+ * Este guardia existe para cazar un guion que se cae A LA MITAD, que son decenas o
+ * cientos de comprobaciones, no una.
+ *
+ * El margen es 9, un 2 % medido y no elegido a ojo: hay 18 llamadas a `comprobar` dentro
+ * de un `if` o un `for` en este fichero, y las de los bucles se repiten por lienzo, así
+ * que una forma de ventana que deje de darse quita más de una. Es el mismo criterio con
+ * el que `verificar-riberas.ts` puso el suyo: medir el peor caso y dejar hueco debajo.
  */
-const COMPROBACIONES_ESCRITAS = 448;
+const COMPROBACIONES_ESCRITAS = 458;
 if (hechas < COMPROBACIONES_ESCRITAS) {
   console.error(
     `Solo se han hecho ${String(hechas)} de las ${String(COMPROBACIONES_ESCRITAS)} comprobaciones que ` +

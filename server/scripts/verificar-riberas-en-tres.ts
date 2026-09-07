@@ -67,6 +67,7 @@ import {
   claseDeLaCarta,
   CLASES_DE_CARTA,
   COMPRAR,
+  DESCARTAR,
   DOS_VEREDAS,
   EMPEZAR_RIBERAS,
   esTitulo,
@@ -100,7 +101,6 @@ import type {
   Opcion,
 } from '../../shared/arcade/juegos';
 import {
-  aQuienSeLeRoba,
   barraEnTres,
   bienesQueSeAcaparan,
   bienesQueSeCambianPor,
@@ -605,7 +605,6 @@ const CAMPO_DE_LA_BARRA = (45 * Math.PI) / 180;
     opcionesEn(partida, 'A').map((o) => o.id),
   );
   comprobar('así que no hay ninguna jugada que ofrecer para ella', jugadasDeLaCarta(vistaEn(partida, 'A'), opcionesEn(partida, 'A'), 'c1').length === 0);
-  comprobar('ni a quién robar', aQuienSeLeRoba(vistaEn(partida, 'A'), opcionesEn(partida, 'A'), 'c1').length === 0);
   comprobar('ni una jugada que mandar sin preguntar', jugadaSinPreguntar(vistaEn(partida, 'A'), opcionesEn(partida, 'A'), 'c1') === null);
   comprobar('ni nada que revelar: una guardia no es un título', revelarDe(opcionesEn(partida, 'A'), 'c1') === null);
 
@@ -631,21 +630,24 @@ const CAMPO_DE_LA_BARRA = (45 * Math.PI) / 180;
   comprobar('la escena deja de apagarla', yaNoApagada[0]?.apagada === false);
   comprobar('y le abre la casilla de jugar, y sólo ésa', canonico(puertasDeLaCarta(manana ?? null)) === canonico(['jugar']), puertasDeLaCarta(manana ?? null));
 
-  /* LOS DESTINATARIOS SON EXACTAMENTE LOS QUE EL JUEGO OFRECE. */
+  /*
+   * ═══ LA GUARDIA YA NO PREGUNTA A QUIÉN: DESDE LA FASE 3 SE MANDA DERECHA ═══
+   *
+   * Aquí se comprobaba que la lista de víctimas de la traducción era, una a una, la que el
+   * juego ofrecía. Esa lista ya no existe: la carta mueve el estiaje y a quién se le roba
+   * lo decide después la isla, sobre el tablero. Así que lo que se compra ahora es lo que
+   * la pantalla de verdad hace con ella — UNA jugada, y por tanto `jugadaSinPreguntar` la
+   * manda sin abrir menú, que es el mismo trato que Las Dos Veredas.
+   */
   const ofrecidas = opcionesA.filter((o) => o.tipo === GUARDIA);
-  const roban = aQuienSeLeRoba(vistaA, opcionesA, 'c1');
-  comprobar(
-    'a quien se le puede robar es, uno a uno, lo que el juego ofrece',
-    canonico(roban.map((j) => j.a).sort()) === canonico(ofrecidas.map((o) => (o.carga as { a: string }).a).sort()),
-    { traduccion: roban.map((j) => j.a), juego: ofrecidas.map((o) => (o.carga as { a: string }).a) },
-  );
-  comprobar('con dos en la mesa, sólo B, y con su nombre para preguntar', roban.length === 1 && roban[0]?.a === 'B' && (roban[0]?.nombre ?? '') !== '');
-  comprobar('la jugada dice de qué clase es, y coincide con la familia del naipe', roban[0]?.clase === 'guardia' && roban[0]?.clase === manana?.familia);
-  comprobar('una guardia no pide bienes', canonico(roban[0]?.bienes) === canonico([]));
+  const suyas = jugadasDeLaCarta(vistaA, opcionesA, 'c1');
+  comprobar('la guardia trae UNA sola manera de jugarse, y es la que el juego ofrece', suyas.length === 1 && ofrecidas.length === 1, { traduccion: suyas.length, juego: ofrecidas.length });
+  comprobar('la jugada dice de qué clase es, y coincide con la familia del naipe', suyas[0]?.clase === 'guardia' && suyas[0]?.clase === manana?.familia);
+  comprobar('una guardia no pide bienes', canonico(suyas[0]?.bienes) === canonico([]));
 
   /* SIENDO UNA SOLA, SE MANDA SIN PREGUNTAR. */
   const sola = jugadaSinPreguntar(vistaA, opcionesA, 'c1');
-  comprobar('con un solo destinatario no hay nada que preguntar', sola !== null && sola.a === 'B', sola?.a);
+  comprobar('no hay nada que preguntar: la isla se elige después, en el tablero', sola !== null && sola.clase === 'guardia', sola?.clase);
   comprobar(
     'y el movimiento que se manda es EL DE LA OPCIÓN, sin montar nada',
     sola !== null &&
@@ -657,38 +659,66 @@ const CAMPO_DE_LA_BARRA = (45 * Math.PI) / 180;
   const jugada = mover(partida, 'A', sola?.opcion as Opcion);
   comprobar('el árbitro lo acepta tal cual', jugada.rev === partida.rev + 1, { antes: partida.rev, despues: jugada.rev });
   comprobar(
-    'y roba de verdad: B pierde un bien y A suma una guardia',
-    (estadoDe(jugada).colonos[1]?.almacen.length ?? 0) === bienesDeBAntes - 1 && estadoDe(jugada).colonos[0]?.guardias === 1,
+    'y hace lo suyo: A suma una guardia y le queda el estiaje por mover',
+    estadoDe(jugada).colonos[0]?.guardias === 1 && estadoDe(jugada).estiajePorMover === true,
+    { guardias: estadoDe(jugada).colonos[0]?.guardias, estiaje: estadoDe(jugada).estiajePorMover },
   );
+  comprobar('sin robarle todavía a nadie: eso lo cobra la isla que se elija', (estadoDe(jugada).colonos[1]?.almacen.length ?? 0) === bienesDeBAntes);
   comprobar('la carta se va de la mano, y la mano de la escena se queda vacía', cartasEnTres(vistaEn(jugada, 'A'), opcionesEn(jugada, 'A')).length === 0);
+  /*
+   * Y LO QUE LA ESCENA TIENE QUE PINTAR DETRÁS: los destinos llegan al TABLERO, no a la
+   * mano. Es la puerta por la que la jugada se termina, y sin ella la carta se gastaría
+   * dejando la mesa mirando un naipe que ya no está.
+   */
+  /*
+   * Y LO QUE LA ESCENA TIENE QUE PINTAR DETRÁS: los dieciocho destinos, ENTEROS. Es la
+   * puerta por la que la jugada se termina, y sin ella la carta se gastaría dejando la
+   * mesa mirando un naipe que ya no está. Se pregunta al filtro de la escena, que es quien
+   * se lleva lo que no reconoce: si `opcionesFueraDelTablero` se comiera los destinos, la
+   * mesa en tres dimensiones se quedaría parada con la bandera encendida.
+   */
+  const trasLaCarta = opcionesEn(jugada, 'A');
+  const destinosDeLaCarta = trasLaCarta.filter((o) => o.tipo === MOVER_EL_ESTIAJE);
+  const destinosQueSobreviven = opcionesFueraDelTablero(trasLaCarta).filter((o) => o.tipo === MOVER_EL_ESTIAJE);
+  comprobar(
+    'y detrás de la carta llegan las dieciocho islas, y el filtro de la escena no se come ninguna',
+    destinosDeLaCarta.length >= 18 && destinosQueSobreviven.length === destinosDeLaCarta.length,
+    { destinos: destinosDeLaCarta.length, sobreviven: destinosQueSobreviven.length },
+  );
 }
 
-/* ═══ 5. LOS DESTINATARIOS SON LOS DEL JUEGO, TAMBIÉN CUANDO SON MENOS ═══ */
+/* ═══ 5. LA QUE PREGUNTA Y LA QUE NO, QUE SIGUEN SIENDO DOS CAMINOS ═══ */
 {
-  /* C no tiene ni un bien: a quien no tiene nada no se le roba, y eso es público. */
-  const estado = escenarioDeMazo({
-    bienes: [[], ['limo', 'junco'], []],
-    manos: [[{ carta: 'c1:guardia', comprada: 0 }], [], []],
-  });
-  const vista = proyectarRiberas(estado, 'A');
-  const opciones = opcionesDeRiberas(vista, 'A');
-  const roban = aQuienSeLeRoba(vista, opciones, 'c1');
-  comprobar('a C, que no tiene nada, no se le ofrece robar', roban.length === 1 && roban[0]?.a === 'B', roban.map((j) => j.a));
-  comprobar('y eso no lo decide esta traducción: es lo que el juego ofrece', roban.length === opciones.filter((o) => o.tipo === GUARDIA).length);
-
-  const conDos = escenarioDeMazo({
+  /*
+   * ═══ ESTE BLOQUE CAMBIÓ DE NAIPE, Y HAY QUE DECIR POR QUÉ ═══
+   *
+   * Preguntaba por las víctimas de una guardia, que era el caso de «salen varias, hay que
+   * elegir». Desde la fase 3 la guardia no tiene ninguna, así que el caso se pide donde
+   * sigue existiendo —El Acaparamiento, con sus cinco bienes— y la guardia se queda con
+   * la otra mitad: la de mandar sin preguntar, ahora en TODAS las mesas y no sólo en las
+   * de dos. Las dos ramas de `jugadaSinPreguntar` siguen recorridas, que era lo que este
+   * bloque compraba.
+   */
+  const conTresQueTienen = escenarioDeMazo({
     bienes: [[], ['limo'], ['grano']],
-    manos: [[{ carta: 'c1:guardia', comprada: 0 }], [], []],
+    manos: [[{ carta: 'c1:guardia', comprada: 0 }, { carta: 'c2:acaparamiento', comprada: 0 }], [], []],
   });
-  const vistaDos = proyectarRiberas(conDos, 'A');
-  const opcionesDos = opcionesDeRiberas(vistaDos, 'A');
-  const dosVictimas = aQuienSeLeRoba(vistaDos, opcionesDos, 'c1');
-  comprobar('con dos que tienen algo, salen los dos', canonico(dosVictimas.map((j) => j.a).sort()) === canonico(['B', 'C']), dosVictimas.map((j) => j.a));
-  comprobar('y entonces HAY que preguntar: no se manda nada solo', jugadaSinPreguntar(vistaDos, opcionesDos, 'c1') === null);
+  const vista = proyectarRiberas(conTresQueTienen, 'A');
+  const opciones = opcionesDeRiberas(vista, 'A');
+
+  const laGuardia = jugadasDeLaCarta(vista, opciones, 'c1');
+  comprobar('con DOS colonos con bienes, la guardia sigue trayendo una sola jugada: ya no cuenta víctimas', laGuardia.length === 1, laGuardia.map((j) => j.rotulo));
+  comprobar('y eso no lo decide esta traducción: es lo que el juego ofrece', laGuardia.length === opciones.filter((o) => o.tipo === GUARDIA).length);
+  comprobar('así que se manda sin preguntar, como Las Dos Veredas', jugadaSinPreguntar(vista, opciones, 'c1') !== null);
+  comprobar('y su carga es sólo la carta, sin asiento de nadie dentro', canonico(laGuardia[0]?.opcion.carga) === canonico({ carta: 'c1' }), laGuardia[0]?.opcion.carga);
+
+  const acaparar = bienesQueSeAcaparan(vista, opciones, 'c2');
+  comprobar('el acaparamiento sí trae varias —los cinco bienes—, que es el otro camino', acaparar.length === BIENES.length, acaparar.length);
+  comprobar('y entonces HAY que preguntar: no se manda nada solo', jugadaSinPreguntar(vista, opciones, 'c2') === null);
   comprobar(
-    'cada una trae la opción entera y el nombre del colono, no su asiento',
-    dosVictimas.every((j) => j.opcion.tipo === GUARDIA && j.nombre !== '' && canonico(j.opcion.carga) === canonico({ carta: 'c1', a: j.a })),
-    dosVictimas.map((j) => [j.nombre, j.opcion.carga]),
+    'cada una trae la opción entera del juego, no una montada aquí',
+    acaparar.every((j) => j.opcion.tipo === ACAPARAMIENTO && canonico(j.opcion.carga) === canonico({ carta: 'c2', bien: j.bienes[0] })),
+    acaparar.map((j) => j.opcion.carga),
   );
 }
 
@@ -806,7 +836,7 @@ const CAMPO_DE_LA_BARRA = (45 * Math.PI) / 180;
   /* LAS DOS VEREDAS: no pide nada, así que se manda sola. */
   const veredas = jugadaSinPreguntar(vista, opciones, 'c5');
   comprobar('Las Dos Veredas no preguntan nada: sale una sola jugada', veredas !== null && veredas.clase === 'dosveredas', veredas?.clase);
-  comprobar('sin destinatario y sin bienes', veredas?.a === null && canonico(veredas?.bienes) === canonico([]));
+  comprobar('sin bienes que pedir', canonico(veredas?.bienes) === canonico([]));
   comprobar('y con la carga del juego: sólo la carta', canonico(veredas?.opcion.carga) === canonico({ carta: 'c5' }));
 
   /* LA CLASE DE LA JUGADA Y LA FAMILIA DEL NAIPE SON LA MISMA PALABRA. */
@@ -1597,47 +1627,84 @@ const CAMPO_DE_LA_BARRA = (45 * Math.PI) / 180;
 
   /* ── 6. LA VACUNA DE LA GUARDIA: SE LE PREGUNTA AL JUEGO, Y NO A UN CALENDARIO ──
    *
-   * Es la comprobación más importante de este encargo, y está atada a una FASE y no a una
-   * fecha. Hoy una guardia sólo se puede jugar después de tirar —`jugarLaGuardia` empieza
-   * con `if (yo < 0 || !estado.tirado)`, y `opcionesDeRiberas` antes de tirar se va por su
-   * `return` con TIRAR y revelar y nada más—, así que su frase dice «Tras tirar».
+   * Es la comprobación más importante de este encargo, y está atada a una REGLA y no a una
+   * fecha. Cuando se escribió, una guardia sólo se podía jugar después de tirar y su frase
+   * decía «Tras tirar»; se dejó dicho que el día que la fase 3 quitara el `!estado.tirado`
+   * de `jugarLaGuardia` esto se pondría ROJO.
    *
-   * Con el estiaje, Miguel pidió por escrito que la guardia se pueda jugar «incluso antes
-   * de lanzar los dados». El día que la fase 3 de `docs/EL-LADRON-DE-RIBERAS.md` («La
-   * guardia mueve») quite ese `!estado.tirado`, esta comprobación se pone ROJA — y eso es
-   * lo que tiene que pasar. Ponerla verde otra vez es cambiar la fila de `RETRATO_DE_LA_CARTA`
-   * por las tres frases del estiaje. Sin ella, la regla cambiaría y el cartel seguiría
-   * explicando la de antes con toda la batería en verde, que es la clase de fallo que este
-   * repositorio tiene escrita como la peor. */
+   * ═══ Y ES LO QUE PASÓ. LA AFIRMACIÓN NO SE HA TOCADO ═══
+   *
+   * La fase 3 lo quitó, esto se puso rojo, y lo que se cambió fue la FILA de
+   * `RETRATO_DE_LA_CARTA` — que es lo que la vacuna existía para forzar. Hoy compra lo
+   * contrario que ayer con las mismas letras: el juego ofrece la guardia antes de tirar, y
+   * por tanto la frase NO puede empezar por «Tras tirar». Si alguien devolviera el
+   * `!estado.tirado` sin tocar el texto, esto se volvería a poner rojo por el otro lado.
+   *
+   * Sin ella, la regla habría cambiado y el cartel seguiría explicando la de antes con toda
+   * la batería en verde, que es la clase de fallo que este repositorio tiene escrita como
+   * la peor. */
   {
-    const conGuardiaVieja = escenarioDeMazo({
+    const conGuardia = escenarioDeMazo({
       bienes: [['limo'], ['junco'], ['sal']],
       manos: [[{ carta: 'c1:guardia', comprada: 0 }], [], []],
     });
-    const antesDeTirar: EstadoDeRiberas = { ...conGuardiaVieja, tirado: false };
+    const antesDeTirar: EstadoDeRiberas = { ...conGuardia, tirado: false };
     const guardiasAntes = opcionesEn(mesaSobre('RIB-3D-VAC-1', antesDeTirar, [...TRES]), 'A').filter((o) => o.tipo === GUARDIA);
-    const guardiasDespues = opcionesEn(mesaSobre('RIB-3D-VAC-2', conGuardiaVieja, [...TRES]), 'A').filter((o) => o.tipo === GUARDIA);
+    const guardiasDespues = opcionesEn(mesaSobre('RIB-3D-VAC-2', conGuardia, [...TRES]), 'A').filter((o) => o.tipo === GUARDIA);
 
-    /* EL ESCENARIO TIENE QUE VALER: con los dados ya tirados la guardia SÍ se ofrece. Sin
-     * esta línea, una guardia que no se ofreciera nunca —mano vacía, víctimas sin bienes,
-     * carta comprada hoy— dejaría la vacuna verde sin haber preguntado nada. */
+    /* EL ESCENARIO TIENE QUE VALER, y ahora por los DOS lados: con los dados tirados la
+     * guardia se ofrece, y sin tirar también. Sin la primera línea, una guardia que no se
+     * ofreciera nunca —mano vacía, carta comprada hoy— dejaría la vacuna verde sin haber
+     * preguntado nada; sin la segunda, el «si y sólo si» de abajo se cumpliría por la rama
+     * que ya no es la de la regla. */
     comprobar(
       'la guardia de la mano se ofrece DESPUÉS de tirar, o la vacuna de abajo no estaría preguntando por la regla',
       guardiasDespues.length > 0 && antesDeTirar.turno === 0 && antesDeTirar.tirado === false,
       { despues: guardiasDespues.length, turno: antesDeTirar.turno },
     );
+    comprobar(
+      'y ANTES de tirar también, que es lo que la fase 3 le añadió y lo que Miguel pidió por escrito',
+      guardiasAntes.length > 0,
+      { antes: guardiasAntes.length, ids: guardiasAntes.map((o) => o.id) },
+    );
 
     const laOfreceAntesDeTirar = guardiasAntes.length > 0;
     const suUsas = retratoDeLaCarta('guardia')?.explicacion.usas ?? '';
     comprobar(
-      'el texto de la guardia dice «Tras tirar» si y sólo si el juego no la ofrece antes de tirar: el día que la fase del estiaje le dé la vuelta, esto se pone rojo',
+      'el texto de la guardia dice «Tras tirar» si y sólo si el juego no la ofrece antes de tirar: la fase del estiaje le dio la vuelta y la frase la siguió',
       suUsas.startsWith('Tras tirar') === !laOfreceAntesDeTirar,
       { ofreceAntesDeTirar: laOfreceAntesDeTirar, usas: suUsas },
     );
     comprobar(
-      'y su «qué hace» cuenta la regla de hoy: roba, y no mueve nada por el tablero',
-      (retratoDeLaCarta('guardia')?.explicacion.hace ?? '').includes('quitas') && !canonico(retratoDeLaCarta('guardia')?.explicacion).includes('estiaje'),
+      'y su «qué hace» cuenta la regla de hoy: mueve el estiaje, y roba desde donde lo posa',
+      (retratoDeLaCarta('guardia')?.explicacion.hace ?? '').includes('estiaje') &&
+        (retratoDeLaCarta('guardia')?.explicacion.hace ?? '').includes('robas'),
       retratoDeLaCarta('guardia')?.explicacion,
+    );
+    /*
+     * Y LA OTRA MITAD DE ESO, QUE ES LA QUE SE OLVIDA: que ya NO dice la regla vieja. Una
+     * frase que sume la nueva sin quitar la de antes —«le quitas un bien a quien elijas, y
+     * mueves el estiaje»— pasaría la línea de arriba y estaría mintiendo en la mitad que
+     * más decide. `docs/LAS-CARTAS-SE-EXPLICAN.md` lo dejó escrito: SUSTITUYE, no suma.
+     */
+    comprobar(
+      'y ya no queda ni rastro de la regla vieja: la víctima no se elige, así que no se nombra',
+      !canonico(retratoDeLaCarta('guardia')?.explicacion).includes('elijas'),
+      retratoDeLaCarta('guardia')?.explicacion,
+    );
+    /*
+     * LA GUARDIA JUGADA ANTES DE TIRAR DEJA LOS DESTINOS DELANTE, PREGUNTADO AQUÍ TAMBIÉN.
+     * `verify:riberas` lo compra sobre el estado; esto lo compra donde el naipe se suelta,
+     * que es el otro sitio donde la carta se puede quedar sin salida.
+     */
+    const sinTirarAun = mesaSobre('RIB-3D-VAC-1B', antesDeTirar, [...TRES]);
+    /* Si no se ofreciera, esto se pone ROJO y no se cae con «no se puede leer 'tipo'». */
+    const trasJugarla = guardiasAntes[0] === undefined ? sinTirarAun : mover(sinTirarAun, 'A', guardiasAntes[0]);
+    const loQueQueda = opcionesEn(trasJugarla, 'A');
+    comprobar(
+      'jugada sin tirar, lo que queda delante son los destinos del estiaje y TIRAR no está',
+      loQueQueda.some((o) => o.tipo === MOVER_EL_ESTIAJE) && loQueQueda.every((o) => o.tipo !== TIRAR),
+      [...new Set(loQueQueda.map((o) => o.tipo))],
     );
 
     /*
@@ -2333,6 +2400,102 @@ const CAMPO_DE_LA_BARRA = (45 * Math.PI) / 180;
   );
 }
 
+/* ═══ 12 ter. EL DESCARTE DE UN SIETE: EN TRES DIMENSIONES SE TIRA POR LOS BOTONES ═══ */
+
+/*
+ * ═══ QUÉ COMPRA ESTE BLOQUE, Y POR QUÉ ES ESTA MESA Y NO LA DE CINCO ═══
+ *
+ * La fase 2 de `docs/EL-LADRON-DE-RIBERAS.md` mete un momento nuevo, `'descartando'`, en el
+ * que lo único que se puede hacer es tirar fichas —y lo hace hasta gente que no tiene el
+ * turno—. En el retablo eso son botones y ya está comprobado donde vive el retablo; aquí
+ * hay que comprobar lo otro: que en una mesa de hasta CUATRO colonos, que son las que se
+ * juegan en tres dimensiones, esos botones LLEGAN.
+ *
+ * Y hay motivo para dudarlo, que es lo que hace que este bloque no sea una formalidad: la
+ * escena filtra las opciones por cuatro puertas —el tablero, la mano, la barra y la mesa—
+ * y tres de ellas se apagan solas en este momento porque preguntan por `'jugando'`. Si una
+ * de esas puertas se llevara por delante lo que no reconoce, la mesa se quedaría PARADA:
+ * en `'descartando'` no hay ninguna otra opción para nadie, ni siquiera pasar. Y no se
+ * caería nada, que es la forma de fallo que este fichero persigue entero.
+ */
+{
+  const casiJugando = escenarioDeMazo({ bienes: [['limo'], ['limo'], []] });
+  /*
+   * NUEVE FICHAS PARA A Y CUATRO POR TIRAR: es lo que produce un siete con la mano llena,
+   * y se monta a mano porque llegar jugando exige que salga el siete justo cuando alguien
+   * pasa de siete fichas. La regla de quién debe y cuántas la comprueba `verify:riberas`
+   * jugando de verdad; aquí lo que se mira es qué hace la escena con ello.
+   */
+  const tirando: EstadoDeRiberas = {
+    ...casiJugando,
+    momento: 'descartando',
+    /*
+     * EL TURNO ES DE B Y QUIEN DEBE TIRAR ES A, que es el caso de verdad y no el cómodo:
+     * un siete lo saca uno y las manos llenas suelen ser de otros. Con `turno: 0` esta
+     * mesa saldría verde aunque `turnoDe` apuntara a quien tiró, que es justo la decisión
+     * que el tapete de abajo comprueba.
+     */
+    turno: 1,
+    ultimaTirada: 7,
+    estiajePorMover: true,
+    descartes: [{ de: 'A', faltan: 4 }],
+    colonos: casiJugando.colonos.map((c, i) =>
+      i === 0
+        ? { ...c, almacen: ['b900:limo', 'b901:limo', 'b902:junco', 'b903:sal', 'b904:sal', 'b905:piedra', 'b906:grano', 'b907:grano', 'b908:junco'] }
+        : c,
+    ),
+  };
+  const mesaDelDescarte = mesaSobre('RIB-3D-DESCARTE', tirando, TRES);
+  const vista = vistaEn(mesaDelDescarte, 'A');
+  const opciones = opcionesEn(mesaDelDescarte, 'A');
+  const aTirar = opciones.filter((o) => o.tipo === DESCARTAR);
+
+  comprobar('la vista del descarte se puede pintar: el momento nuevo no la vuelve ajena', esVistaQueSePinta(vista));
+  comprobar('el juego ofrece tirar fichas, y una por clase de bien: cinco como mucho', aTirar.length === 5, opciones.map((o) => o.id));
+  comprobar('y ninguna otra cosa: ni tirar, ni construir, ni pasar, ni revelar', opciones.length === aTirar.length, opciones.map((o) => o.tipo));
+  /*
+   * Y EL TAPETE DE «ME TOCA» SE ENCIENDE PARA QUIEN DEBE TIRAR, que es la mitad visible de
+   * la decisión de apuntar `turnoDe` al primero de la cola: `meToca` lee ese campo y nada
+   * más, así que con `turnoDe` en quien tiró el siete, quien tiene los botones delante
+   * vería la mesa de otro.
+   */
+  comprobar('y el tapete de «me toca» se enciende para quien debe tirar, aunque el turno sea de otro', meToca(vista) === true);
+  comprobar('y no para quien tiró el siete, que ahora mismo no tiene nada que hacer', (vista as { turnoDe?: unknown }).turnoDe === 'A' && tirando.turno === 1);
+
+  /*
+   * LOS TRES HUECOS DE LA ESCENA SE APAGAN, Y SE APAGAN CON `null` Y NO EN GRIS. Un hueco
+   * apagado promete que se encenderá al tocarlo; aquí no hay nada que encender, porque el
+   * juego no ofrece ni tirar ni comprar ni levantar mientras haya fichas que tirar.
+   */
+  comprobar('no hay dados mientras se descarta: no es que estén apagados, es que no hay jugada', dadosEnTres(vista, 'A', opciones) === null);
+  comprobar('ni hueco de mazo, por lo mismo', mazoEnLaBarra(vista, 'A', opciones) === null);
+  const obras = obrasPosibles(vista, 'A');
+  comprobar(
+    'y la barra de obra no ofrece nada, ni se inventa un sitio para una ficha que se tira',
+    obras.length === 3 && obras.every((o) => o.sitios.length === 0 && o.clase === null),
+    obras.map((o) => `${o.pieza}: ${String(o.sitios.length)}`),
+  );
+
+  /*
+   * Y LOS CINCO LLEGAN ENTEROS A LOS BOTONES, que es la reserva de este cliente para todo
+   * lo que la escena no sabe pintar. Es la misma afirmación que hace el 12 bis para los
+   * dieciocho destinos, y aquí vale más: aquello se podía mover luego, y esto no se puede
+   * aplazar —mientras haya fichas que tirar, la mesa entera espera—.
+   */
+  const fuera = opcionesFueraDeLaMesa(opcionesFueraDeLaBarra(opcionesFueraDeLaMano(opcionesFueraDelTablero(opciones)), null), null);
+  comprobar('y los cinco llegan enteros a los botones: la mesa en tres dimensiones no se queda parada', fuera.filter((o) => o.tipo === DESCARTAR).length === aTirar.length, {
+    botones: fuera.filter((o) => o.tipo === DESCARTAR).length,
+    ofrecidas: aTirar.length,
+  });
+  comprobar('cada uno con su rótulo, que dice qué se tira', aTirar.every((o) => o.rotulo.startsWith('Tirar un ')), aTirar[0]?.rotulo);
+  /*
+   * LA VACUNA: en un turno normal no hay ningún botón de tirar fichas. Sin ella, «los cinco
+   * llegan» sería verde igual con una escena que no filtrara nada nunca.
+   */
+  const deUnTurnoNormal = opcionesEn(mesaSobre('RIB-3D-DESCARTE-2', casiJugando, TRES), 'A');
+  comprobar('se ve fallar: en un turno normal no se ofrece tirar ni una ficha', deUnTurnoNormal.every((o) => o.tipo !== DESCARTAR), deUnTurnoNormal.length);
+}
+
 /* ═══ 13. LOS DADOS: TIRAR SE OFRECE UNA VEZ, EL SELLO ES EL TURNO, Y `comprada` SIGUE SIN ESCRIBIRSE ═══ */
 
 /*
@@ -2433,7 +2596,7 @@ const CAMPO_DE_LA_BARRA = (45 * Math.PI) / 180;
 }
 
 /* ═══ EL RECUENTO, PARA QUE NO SE VACÍE SIN QUE NADIE LO NOTE ═══ */
-const MINIMO = 330;
+const MINIMO = 355;
 if (hechas < MINIMO) {
   console.log(`✘ este comprobador debería hacer al menos ${MINIMO} comprobaciones y ha hecho ${hechas}: alguien ha borrado un bloque`);
   process.exit(2);
