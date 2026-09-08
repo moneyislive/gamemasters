@@ -207,6 +207,7 @@ import {
 } from '../../escenas/camara';
 /* La cinta se mide con la MISMA función que la app y que `verify:escena`: ver `escenas/cinta.ts`. */
 import { altoDeLaCinta, BOTON_DE_LA_CINTA, loQueLlevaLaCinta } from '../../escenas/cinta';
+import type { RelojDeLaMesa } from '../../escenas/reloj';
 import { Delta, encuadreDelDelta } from '../../escenas/delta';
 /*
  * DE QUÉ COLOR SE VE CADA TERRENO. La MISMA tabla que pinta el tablero plano y la que
@@ -258,6 +259,7 @@ import {
   revelarDe,
   seVeEnTres,
   tableroEnTres,
+  pasarEnTres,
   tirarEnTres,
   truequesPosibles,
   turnoEnTres,
@@ -2666,6 +2668,44 @@ export function RiberasEnTres({
     return mover({ tipo: tirar.tipo, carga: tirar.carga });
   }, [quieto, opciones, mover, soltarTodo]);
 
+  /*
+   * ═══ EL RELOJ DE ARENA: PASAR EL TURNO SIN ABRIR EL CAJÓN ═══
+   *
+   * Gemelo de `alPulsarLosDados` y por la misma puerta: `pasarEnTres` busca la opción en la lista
+   * que el juego ofrece, así que si el juego no deja pasar —porque falta colocar, porque hay que
+   * mover el estiaje, porque hay un descarte a medias— el reloj no manda nada y el portillo no
+   * tiene que rechazar nada.
+   */
+  const alPasarElTurno = useCallback((): void => {
+    if (quieto) return;
+    const pasar = pasarEnTres(opciones);
+    if (pasar === null) return;
+    soltarTodo();
+    void mover({ tipo: pasar.tipo, carga: pasar.carga });
+  }, [quieto, opciones, mover, soltarTodo]);
+
+  /*
+   * LO QUE EL RELOJ NECESITA SABER. No lleva «cuánto queda» calculado: lleva los dos instantes y
+   * la escena saca la fracción en su `useFrame`, que es donde ya se mira el tiempo. Con la
+   * fracción como prop, el delta entero se repintaría sesenta veces por segundo.
+   *
+   * `vuelta` es `turnosAbiertos` de la vista: sólo crece, es el mismo número en todos los
+   * aparatos, y por eso el reloj se voltea a la vez en las dos pantallas sin mandar nada.
+   */
+  const vueltaDelReloj =
+    typeof (vista as { turnosAbiertos?: unknown }).turnosAbiertos === 'number'
+      ? ((vista as { turnosAbiertos: number }).turnosAbiertos)
+      : 0;
+  const reloj = useMemo(
+    (): RelojDeLaMesa => ({
+      desde: puesta.turnoDesde,
+      venceEn: puesta.terminada ? null : puesta.venceEn,
+      disponible: !quieto && pasarEnTres(opciones) !== null,
+      vuelta: vueltaDelReloj,
+    }),
+    [puesta.turnoDesde, puesta.venceEn, puesta.terminada, quieto, opciones, vueltaDelReloj],
+  );
+
   const colocando = useMemo(
     () => (tomada === null ? null : colocandoEnTres(vista, yo, tomada)),
     [vista, yo, tomada],
@@ -3454,6 +3494,8 @@ export function RiberasEnTres({
                   turnoDe={turnoDe}
                   dados={dados}
                   onPulsarLosDados={alPulsarLosDados}
+                  reloj={reloj}
+                  onPasarElTurno={alPasarElTurno}
                   mesaRecogida={mesaRecogida}
                   mano={mano}
                   cogida={cogida}

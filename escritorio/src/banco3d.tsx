@@ -85,6 +85,11 @@ const COLOR_DEL_CIELO = '#9ec9e2';
  * Diecinueve comarcas —el delta de radio 2— con los terrenos y los números
  * repartidos a mano. No sale de `azar.ts` a propósito: ver la cabecera.
  */
+/** El plazo que el banco se inventa para poder ver caer la arena entera: veinte segundos. */
+const PLAZO_DEL_BANCO = 20_000;
+/** Lo que el banco finge que tarda el servidor en dar el turno siguiente. */
+const LO_QUE_TARDA_EL_SERVIDOR = 700;
+
 function deltaDePrueba(): DeltaEn3D {
   const hexes = mallaDeRadio(2);
   const terrenos = [
@@ -570,6 +575,25 @@ function Banco(): JSX.Element {
    * vuelta sola sólo se comprueba leyendo el código.
    */
   const [mesaRecogida, ponerMesaRecogida] = useState(false);
+
+  /*
+   * EL RELOJ DE ARENA. Aquí no hay servidor que reparta plazos, así que el banco se inventa uno
+   * corto —`PLAZO_DEL_BANCO`— para poder ver la arena caer entera sin esperar dos minutos, y
+   * «Nueva ronda» sube la vuelta, que es lo que dispara el giro. Es el mismo mando que «Ahora te
+   * toca»: hacer de flanco para poder mirar una animación que en la partida ocurre sola.
+   */
+  const [vueltaDelReloj, ponerVueltaDelReloj] = useState(1);
+  const [desdeDelReloj, ponerDesdeDelReloj] = useState(() => Date.now());
+  const [conPlazo, ponerConPlazo] = useState(true);
+  const reloj = useMemo(
+    () => ({
+      desde: desdeDelReloj,
+      venceEn: conPlazo ? desdeDelReloj + PLAZO_DEL_BANCO : null,
+      disponible: true,
+      vuelta: vueltaDelReloj,
+    }),
+    [desdeDelReloj, conPlazo, vueltaDelReloj],
+  );
   const simularLaTirada = useCallback(
     (): Promise<ResultadoDelToque> =>
       new Promise((resuelve) => {
@@ -842,6 +866,19 @@ function Banco(): JSX.Element {
               /* Los dados de mentira: ver `dadosDelBanco`. El asa manda al mismo simulador que el botón «Tirar». */
               dados={dadosDelBanco}
               onPulsarLosDados={simularLaTirada}
+              reloj={reloj}
+              onPasarElTurno={() => {
+                /*
+                 * La ronda nueva llega con RETARDO, como en la partida: allí el turno cambia
+                 * cuando el servidor contesta, no cuando se pulsa. Sin esperar aquí, el giro
+                 * pisaba al vaciado en el mismo fotograma y no se podía ver caer la arena de
+                 * golpe, que es la mitad de lo que este mando sirve para mirar.
+                 */
+                window.setTimeout(() => {
+                  ponerVueltaDelReloj((v) => v + 1);
+                  ponerDesdeDelReloj(Date.now());
+                }, LO_QUE_TARDA_EL_SERVIDOR);
+              }}
               /* La mesa recogida: ver los dos mandos de abajo. */
               mesaRecogida={mesaRecogida}
               mano={mano}

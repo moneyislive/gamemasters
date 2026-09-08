@@ -39,11 +39,25 @@
  *
  * El campo dice qué opacidad va en cada punto, pero si dos mallas cubren el mismo píxel la mezcla
  * se sigue aplicando dos veces por mucho que el número sea el correcto. Por eso los caminos se
- * RECORTAN: cada uno empieza y acaba en el borde del disco de su punta, y nunca entra dentro. En
- * un vértice sin asentamiento se planta una JUNTA —un disco del ancho del propio camino— para que
- * dos veredas que se encuentran allí se recorten contra ella en vez de pisarse entre sí.
+ * RECORTAN: cada uno empieza y acaba en el borde del disco de su punta, y nunca entra dentro.
  *
- * Resultado: las figuras se tocan y no se solapan nunca, y el campo las cose.
+ * ═══ Y EN UN VÉRTICE SIN CONSTRUCCIÓN NO HAY CÍRCULO, QUE ES UNA REGLA DE MIGUEL ═══
+ *
+ * Aquí hubo una JUNTA: un disco del ancho del propio camino, plantado en cada vértice por el que
+ * pasaba una vereda y que no tenía asentamiento, para que dos veredas que se encuentran allí se
+ * recortaran contra él en vez de pisarse. Funcionaba y se veía: Miguel lo miró en el tablero y
+ * dijo que un círculo donde no hay nada construido «puede dar a equívoco». Tiene razón — un bulto
+ * en el territorio significa una pieza, y ésa era la gramática entera del dibujo.
+ *
+ * Lo que la junta hacía lo hace ahora la PUNTA de una de las veredas. Un camino no es un
+ * rectángulo sino una cápsula, así que su punta YA es un semicírculo del ancho del camino: es
+ * exactamente la junta que se quita, pero perteneciendo a una vereda en vez de siendo una figura
+ * suelta. En cada vértice sin asentamiento manda UNA —la primera por orden de sus dos puntas, que
+ * es estable y da lo mismo en los tres aparatos—: ésa llega entera y las demás se recortan contra
+ * su punta.
+ *
+ * Resultado: las figuras se tocan y no se solapan nunca, el campo las cose, y donde no hay pieza
+ * no hay bulto.
  *
  * ═══ ESTO NO SABE DE `three` ═══
  *
@@ -52,7 +66,7 @@
  * un `useFrame` no se mide nada.
  */
 
-import { RADIO_DE_TESELA } from './escala';
+import { ALTURA_DE_UNA_PERSONA, RADIO_DE_TESELA } from './escala';
 
 /** Un punto del plano del tablero. `y` es la profundidad; la altura la pone el relieve. */
 export interface PuntoLlano {
@@ -88,11 +102,32 @@ export const MEDIO_ANCHO_DEL_CAMINO = 0.55;
  */
 export const DESVANECIDO = 0.42;
 
-/** La opacidad del territorio donde está entero. La de fuera sale del campo. */
-export const OPACIDAD_DEL_TERRITORIO = 0.85;
+/**
+ * ═══ LA OPACIDAD DEL TERRITORIO DONDE ESTÁ ENTERO. La de fuera sale del campo. ═══
+ *
+ * Estuvo en 0,85, que era el techo que dejaba la cuenta de la tinta cuando la marca era una
+ * insignia por pieza y había que compararla con el aro que sustituía. Miguel la miró en el
+ * tablero y pidió «el triple de transparencia para que también se siga apreciando el tablero»:
+ * de 0,85 a 0,28, o sea que lo que tapa pasa del 85 % al 28 % y por debajo se lee el terreno,
+ * el número de la comarca y el camino del pack.
+ *
+ * ═══ Y LO QUE ESO CUESTA, DICHO CON EL NÚMERO ═══
+ *
+ * Cuesta contraste contra el suelo, y ya iba justo: medidas en el lienzo con luz y tone mapping,
+ * a 0,85 había TRES combinaciones de color y terreno por debajo del umbral 20 de esta casa —el
+ * verde sobre el carrizal en 8,0, el amarillo sobre la vega en 5,7 y el azul sobre el agua del
+ * río en 7,3—, y ninguna de las tres se arregla con opacidad porque el verde de jugador (#007d52)
+ * y el carrizal (#008454) son literalmente el mismo color. A 0,28 caen más, y ahí está el cambio
+ * de trato: la marca deja de decir «de quién es esto» por su COLOR y pasa a decirlo por su FORMA
+ * —un trazo largo que recorre los caminos y se ensancha bajo los poblados— y por el caserío,
+ * que ya va teñido del color de su dueño. La forma aguanta el cambio: barriendo el delta con las
+ * marcas apagadas hay 91 manchas oscuras de más de 60 píxeles y sólo TRES son alargadas como una
+ * vereda.
+ */
+export const OPACIDAD_DEL_TERRITORIO = 0.22;
 
 /**
- * ═══ CUÁNTO SE LEVANTA LA MANCHA SOBRE LA TIERRA, Y POR QUÉ NO ES CERO ═══
+ * ═══ CUÁNTO SE LEVANTA LA MANCHA SOBRE LA TIERRA: LO JUSTO PARA NO PARPADEAR ═══
  *
  * Porque una pintura pegada al suelo la corta TODO lo que crece encima. En este delta el mundo
  * entero se dibuja con el mismo orden —711 mallas opacas en el cero, medido en la escena— así que
@@ -110,15 +145,22 @@ export const OPACIDAD_DEL_TERRITORIO = 0.85;
  *      9         4 racimos ·   863     8 racimos ·  1809
  *     12         4 racimos ·   861     6 racimos ·  1884
  *
- * El codo está en SEIS: de ahí para abajo la mancha se rompe en pedazos —que es justo lo contrario
- * de lo que Miguel pidió, que se lean como una sola área— y de ahí para arriba se gana poco y se
- * empieza a despegar del suelo en las cuestas. Con el techo sin profundidad en 865 y 1886, a seis
- * se recupera el 99 % del azul y el 89 % del rojo, y las casas siguen tapando lo que les toca.
+ * El codo de esa tabla está en SEIS, y AHÍ ESTUVO, Y ESTABA MAL. Miguel lo miró en el tablero:
+ * «las áreas no están en la base del tablero debajo de las construcciones, están por encima y no
+ * permiten que se vean las construcciones». Y tiene razón por aritmética: una casa del pack
+ * levanta 6,4 de mundo y un árbol 6,5, así que una lámina a SEIS no pasa por debajo de nada —
+ * pasa a la altura del tejado, y lo que la tabla contaba como «píxeles recuperados» eran en
+ * buena parte píxeles robados a las casas.
  *
- * Son 2,4 personas. La marca de antes flotaba a 2,5 por el mismo motivo y con otra medida: el
- * árbol del pack levanta 6,5 de mundo y la casa de paisaje 6,4.
+ * Así que vuelve a la BASE, que es donde tiene que estar una pintura en el suelo, y lo que se
+ * paga es lo que la tabla dice: la mancha se rompe donde hay maleza encima. Eso NO es un fallo
+ * —un árbol plantado sobre tu territorio tapa la pintura que hay debajo, igual que en el suelo—
+ * y es exactamente el trato que Miguel eligió al verlo.
+ *
+ * Media persona es lo que hace falta para no parpadear contra la tesela de debajo por el z-fight
+ * y nada más: es el mismo número con el que se posaba el zócalo, y por la misma razón.
  */
-export const ALTO_DE_LA_MANCHA = 6;
+export const ALTO_DE_LA_MANCHA = ALTURA_DE_UNA_PERSONA * 0.06;
 
 /** Un disco del territorio: un asentamiento, o la junta donde se encuentran dos veredas. */
 export interface DiscoDelTerritorio {
@@ -184,19 +226,13 @@ export function territorioDe(tiene: LoQueTiene): readonly FiguraDelTerritorio[] 
     radioEn.set(llaveDelPunto(a.punto), radio);
   }
   /*
-   * LAS JUNTAS. Un vértice por el que pasa una vereda y que no tiene asentamiento lleva un disco
-   * del ancho del propio camino: no se ve como un bulto —mide lo mismo que el trazo— y es lo que
-   * permite recortar contra él las dos veredas que se encuentran ahí en vez de dejarlas pisarse.
+   * SÓLO LOS ASENTAMIENTOS PONEN DISCO. Un vértice por el que pasa una vereda y donde no hay nada
+   * construido no lleva ninguno: un bulto en el territorio significa una pieza, y ésa es la
+   * gramática del dibujo. Que las veredas que se encuentran ahí no se pisen lo resuelve
+   * `piezasQueSePintan` con la punta de una de ellas.
    */
   const puntos = new Map<string, PuntoLlano>();
   for (const a of tiene.asentamientos) puntos.set(llaveDelPunto(a.punto), a.punto);
-  for (const v of tiene.veredas) {
-    for (const p of [v.a, v.b]) {
-      const llave = llaveDelPunto(p);
-      puntos.set(llave, p);
-      if (!radioEn.has(llave)) radioEn.set(llave, medioAncho);
-    }
-  }
 
   const figuras: FiguraDelTerritorio[] = [];
   for (const [llave, radio] of radioEn) {
@@ -227,17 +263,50 @@ export function piezasQueSePintan(
   figuras: readonly FiguraDelTerritorio[],
 ): readonly FiguraDelTerritorio[] {
   const discos = figuras.filter((f): f is DiscoDelTerritorio => f.que === 'disco');
+  const caminos = figuras.filter((f): f is CaminoDelTerritorio => f.que === 'camino');
   const radioEn = (p: PuntoLlano): number => {
     for (const d of discos) if (distancia(d.centro, p) < 1e-6) return d.radio;
     return 0;
+  };
+  /*
+   * QUIÉN MANDA EN UN VÉRTICE SIN DISCO: el primero de los caminos que lo tocan, por el orden
+   * estable de sus dos puntas. Ése llega entero y su punta redonda hace de junta; los demás se
+   * recortan contra ella. El orden no puede salir del orden en que llegan las veredas —eso
+   * cambiaría el dibujo según en qué turno se construyó cada una— así que sale de las
+   * coordenadas, que son las mismas en el servidor, en el escritorio y en el móvil.
+   */
+  const nombreDelCamino = (c: CaminoDelTerritorio): string =>
+    [llaveDelPunto(c.desde), llaveDelPunto(c.hasta)].sort().join('~');
+  const mandaEn = new Map<string, string>();
+  for (const c of [...caminos].sort((x, y) => (nombreDelCamino(x) < nombreDelCamino(y) ? -1 : 1))) {
+    for (const p of [c.desde, c.hasta]) {
+      const llave = llaveDelPunto(p);
+      if (radioEn(p) > 0) continue;
+      if (!mandaEn.has(llave)) mandaEn.set(llave, nombreDelCamino(c));
+    }
+  }
+  /** Cuánto se recorta este camino en esta punta suya. */
+  const recorteEn = (c: CaminoDelTerritorio, p: PuntoLlano): number => {
+    const radio = radioEn(p);
+    if (radio > 0) return radio + c.medioAncho;
+    /*
+     * Sin disco: el que manda llega entero y su punta hace de junta. Los demás se paran a DOS
+     * medios anchos, no a uno, y ese factor no es de adorno: la punta de un camino es un
+     * semicírculo de un medio ancho, así que un camino recortado a `d` sigue pintando hasta
+     * `d - medioAncho`. Para quedar TANGENTE a la punta del que manda —que es un disco de un
+     * medio ancho alrededor del vértice— hace falta `d - medioAncho >= medioAncho`. Con uno solo
+     * se pisaban: medido sobre un poblado con dos veredas encadenadas, 125 puntos de rejilla en
+     * dos figuras a la vez.
+     */
+    return mandaEn.get(llaveDelPunto(p)) === nombreDelCamino(c) ? 0 : c.medioAncho * 2;
   };
   const piezas: FiguraDelTerritorio[] = [...discos];
   for (const f of figuras) {
     if (f.que !== 'camino') continue;
     const largo = distancia(f.desde, f.hasta);
     if (largo <= 0) continue;
-    const ra = radioEn(f.desde) + f.medioAncho;
-    const rb = radioEn(f.hasta) + f.medioAncho;
+    const ra = recorteEn(f, f.desde);
+    const rb = recorteEn(f, f.hasta);
     /*
      * Un camino al que el recorte se le come el largo entero no se pinta, y con este tablero no
      * puede pasar —la arista mide doce teselas y el recorte más grande son cuatro—, pero se

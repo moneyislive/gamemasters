@@ -71,6 +71,9 @@ export function Mancha({
         opacity={OPACIDAD_DEL_TERRITORIO}
         depthWrite={false}
         side={THREE.DoubleSide}
+        polygonOffset
+        polygonOffsetFactor={-2}
+        polygonOffsetUnits={-2}
       />
     </mesh>
   );

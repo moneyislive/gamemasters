@@ -473,3 +473,54 @@ export function loQueSeVe(campo: number, proporcion: number): { alto: number; an
   const alto = 2 * DISTANCIA_DE_LA_BARRA * Math.tan(campo / 2);
   return { alto, ancho: alto * proporcion };
 }
+
+/**
+ * ═══ EL SITIO DEL RELOJ DE ARENA: SIMÉTRICO DE LOS DADOS, AL OTRO CANTO ═══
+ *
+ * Los dados cuelgan a la IZQUIERDA del primer hueco. El reloj cuelga a la DERECHA del último,
+ * con el mismo aire y el mismo alto, y por eso se lee como su pareja: los dos son cosas que se
+ * pulsan y que no son piezas que se cogen.
+ *
+ * Lo pidió Miguel y no es sólo simetría. Hoy, para pasar el turno hay que abrir el cajón de
+ * arriba, y sobre todo NADA avisa de que el plazo se acaba: el que trae el servidor de serie son
+ * dos minutos, y jugando una partida de prueba se me acabó mirando el tablero y el servidor
+ * colocó una choza por mí sin decir nada. Un reloj de arena que empieza a caer con la ronda
+ * enseña eso sin leer un número, y pulsarlo pasa el turno.
+ *
+ * ═══ POR QUÉ ES MÁS ESTRECHO QUE UN HUECO ═══
+ *
+ * Un reloj de arena es alto y estrecho —dos conos por su vértice— así que ocupar un cuadrado
+ * entero lo dejaría nadando en su hueco. Se le da 0,62 del lado, que es lo que mide el par de
+ * bulbos con su marco, y el alto entero del hueco. El asa que se pulsa SÍ es el rectángulo
+ * completo, como en los dados: lo que se toca no es el cristal.
+ */
+export const ANCHO_DEL_RELOJ = 0.62;
+
+/** El sitio del reloj, o `null` si no cabe sin salirse por el canto derecho. */
+export function sitioDelReloj(
+  piezas: readonly HuecoDeLaBarra[],
+  campo: number,
+  proporcion: number,
+): HuecoDeLosDados | null {
+  const ultimo = piezas[piezas.length - 1];
+  if (ultimo === undefined) return null;
+  const { ancho } = loQueSeVe(campo, proporcion);
+  const lado = ultimo.lado;
+  const izquierda = ultimo.x + lado / 2 + AIRE * lado;
+  const derecha = izquierda + ANCHO_DEL_RELOJ * lado;
+  /*
+   * El mismo aire hasta el canto que se le exige al asa de los dados por el suyo. Sin esta
+   * línea el reloj se sale de la pantalla en los lienzos estrechos y no lo ve nadie, que es el
+   * fallo silencioso de siempre: un botón que está pero no se puede tocar.
+   */
+  if (ancho / 2 - derecha < AIRE_HASTA_EL_CANTO * lado - 1e-9) return null;
+  return {
+    x: (izquierda + derecha) / 2,
+    y: ultimo.y,
+    z: ultimo.z,
+    ancho: ANCHO_DEL_RELOJ * lado,
+    alto: lado,
+    lado,
+    forma: 'colgado',
+  };
+}

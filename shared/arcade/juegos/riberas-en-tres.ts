@@ -120,6 +120,7 @@ import {
   RECHAZAR,
   REVELAR,
   seudonimoDeLaCarta,
+  PASAR,
   TIRAR,
   VADO_MINIMO,
   VEREDAS_DE_LA_CARTA,
@@ -1596,6 +1597,18 @@ export interface DadosEnTres extends DadosDeLaMesa {
  */
 export function tirarEnTres<O extends OpcionQueLlega>(opciones: readonly O[]): O | null {
   return opciones.find((o) => o.tipo === TIRAR) ?? null;
+}
+
+/**
+ * PASAR EL TURNO, si el juego lo ofrece.
+ *
+ * Es la gemela de `tirarEnTres` y existe por el mismo motivo: el reloj de arena de la barra es un
+ * botón de tres dimensiones y no puede recorrer la lista de opciones buscando una cadena. Que la
+ * busque aquí es lo que hace que el escritorio y la app pulsen LA MISMA opción, y lo que permite
+ * que un comprobador de Node afirme cuál es sin abrir un lienzo.
+ */
+export function pasarEnTres<O extends OpcionQueLlega>(opciones: readonly O[]): O | null {
+  return opciones.find((o) => o.tipo === PASAR) ?? null;
 }
 
 /**

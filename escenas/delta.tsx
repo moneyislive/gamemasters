@@ -128,6 +128,8 @@ import {
   techoDeLaMarca,
 } from './escala';
 import { Mancha } from './mancha';
+import type { RelojDeLaMesa } from './reloj';
+import { GIRO_DEL_RELOJ, RelojDeArena, VACIADO_DEL_RELOJ } from './reloj';
 import type { LoQueTiene } from './territorio';
 import { ALTO_DE_LA_MANCHA, mallaDelTerritorio, territorioDe } from './territorio';
 import { asientoDelDisco } from './zocalo';
@@ -173,6 +175,7 @@ import {
   ZOCALO,
   huecosDeLaBarra,
   huecosDeLaMesa,
+  sitioDelReloj,
 } from './barra';
 import {
   AMORTIGUACION_DE_LA_MESA,
@@ -1730,6 +1733,8 @@ function Barra({
   onTomar,
   onPulsarElMazo,
   onPulsarLosDados,
+  reloj,
+  onPasarElTurno,
 }: {
   piezas: readonly PiezaDeBarra[];
   mazo: MazoDeLaBarra | null;
@@ -1746,8 +1751,23 @@ function Barra({
   onTomar: (id: string) => void;
   onPulsarElMazo: () => void;
   onPulsarLosDados: () => Promise<ResultadoDelToque>;
+  /** El reloj de arena del canto derecho, o `null` si esta pantalla no lo pinta. */
+  reloj: RelojDeLaMesa | null;
+  onPasarElTurno: () => void;
 }): JSX.Element {
   const grupo = useRef<THREE.Group>(null);
+  const cuerpoDelReloj = useRef<THREE.Group>(null);
+  const arenaArriba = useRef<THREE.Group>(null);
+  const arenaAbajo = useRef<THREE.Group>(null);
+  const hiloDeArena = useRef<THREE.Mesh>(null);
+  const asaDelReloj = useRef<THREE.Mesh>(null);
+  /* La vuelta que el reloj tiene girada, y cuándo empezó el giro. `null` es «quieto». */
+  const girando = useRef<{ desde: number; vuelta: number } | null>(null);
+  const vueltaPintada = useRef<number | null>(null);
+  /* Cuándo se pulsó para pasar: a partir de ahí la arena se vacía de golpe. */
+  const vaciando = useRef<number | null>(null);
+  /* El toque deja aquí la señal; el `useFrame` le pone hora, que es quien tiene el reloj. */
+  const sePulso = useRef(false);
   const laQueBaja = useRef<THREE.Group>(null);
   /* Abajo del todo y apagada: apaga el grupo y desmonta los dados, ver la cabecera. */
   const [escondida, ponerEscondida] = useState(false);
@@ -1879,6 +1899,95 @@ function Barra({
     const { dados: sitio } = huecosDeLaMesa(cuantos, forma.campo, forma.proporcion, forma.alto);
     return sitio !== null && sitio.forma === 'colgado' ? sitio : null;
   }, [mesa, hayTapete, cuantos, forma]);
+
+  /*
+   * ═══ EL SITIO DEL RELOJ DE ARENA, AL CANTO DERECHO ═══
+   *
+   * Simétrico del asa de los dados, que cuelga del izquierdo. Sale de los huecos YA repartidos y
+   * no de un reparto propio: si se pidiera uno con un hueco más, las piezas se moverían al
+   * aparecer el reloj y la barra bailaría según de quién sea el turno.
+   */
+  const sitioDelRelojDeArena = useMemo(
+    () => (reloj === null ? null : sitioDelReloj(huecos, forma.campo, forma.proporcion)),
+    [reloj, huecos, forma],
+  );
+
+  /*
+   * ═══ LA ARENA, EL GIRO Y EL VACIADO DE GOLPE ═══
+   *
+   * Tres cosas en un solo `useFrame`, y ninguna pasa por el estado de React: la fracción que
+   * queda cambia con el reloj de pared y ponerla en un `useState` repintaría el delta entero
+   * sesenta veces por segundo.
+   *
+   *   · LA CAÍDA. `parte` va de cero a uno entre `desde` y `venceEn`. Sin plazo se queda en cero:
+   *     la arena se pinta llena y quieta, que es lo honrado —no hay nada que contar— y el reloj
+   *     sigue siendo el botón de pasar.
+   *   · EL GIRO. Al cambiar `vuelta` el cuerpo da media vuelta sobre su eje en `GIRO_DEL_RELOJ`
+   *     segundos. No es un adorno: es lo que dice «ha empezado una ronda» sin escribir una línea.
+   *   · EL VACIADO. Al pulsar, la arena que quede cae en `VACIADO_DEL_RELOJ` segundos en vez de
+   *     en lo que faltara. Miguel lo pidió con estas palabras: «la arena terminaría de bajar
+   *     acelerada casi de inmediato cuando el usuario pasara la ronda».
+   */
+  useFrame((estado) => {
+    const cuerpo = cuerpoDelReloj.current;
+    if (cuerpo === null || reloj === null) return;
+    const ahora = Date.now();
+
+    /* El giro: se arranca cuando la vuelta que llega no es la que está pintada. */
+    if (vueltaPintada.current !== reloj.vuelta) {
+      if (vueltaPintada.current !== null) {
+        girando.current = { desde: estado.clock.elapsedTime, vuelta: reloj.vuelta };
+      }
+      vueltaPintada.current = reloj.vuelta;
+      /*
+       * La ronda nueva llega con la arena llena, así que se olvidan las dos cosas del vaciado: el
+       * que estuviera corriendo Y la señal del toque que todavía no había arrancado. Sin la
+       * segunda línea, pulsar el reloj vaciaba de golpe la arena de la ronda SIGUIENTE —medido en
+       * el banco: dos segundos después de pulsar, el montón de arriba estaba en cero con veinte
+       * segundos de plazo por delante—, y el reloj dejaba de contar nada justo al empezar.
+       */
+      vaciando.current = null;
+      sePulso.current = false;
+    }
+    const giro = girando.current;
+    if (giro === null) {
+      cuerpo.rotation.z = 0;
+    } else {
+      const va = (estado.clock.elapsedTime - giro.desde) / GIRO_DEL_RELOJ;
+      if (va >= 1) {
+        cuerpo.rotation.z = 0;
+        girando.current = null;
+      } else {
+        /* Media vuelta y de vuelta: el reloj se voltea y se endereza, no se queda del revés. */
+        cuerpo.rotation.z = Math.sin(va * Math.PI) * Math.PI;
+      }
+    }
+
+    /* Cuánta arena ha caído: cero llena, uno vacía. */
+    let parte = 0;
+    if (reloj.venceEn !== null && reloj.venceEn > reloj.desde) {
+      parte = (ahora - reloj.desde) / (reloj.venceEn - reloj.desde);
+    }
+    /* El toque no tiene el reloj de la escena: deja la señal y aquí se le pone hora. */
+    if (sePulso.current && vaciando.current === null) {
+      vaciando.current = estado.clock.elapsedTime;
+      sePulso.current = false;
+    }
+    const seVacia = vaciando.current;
+    if (seVacia !== null) {
+      const va = (estado.clock.elapsedTime - seVacia) / VACIADO_DEL_RELOJ;
+      parte = Math.max(parte, Math.min(1, parte + (1 - parte) * va));
+    }
+    parte = Math.min(1, Math.max(0, parte));
+
+    const arriba = arenaArriba.current;
+    if (arriba !== null) arriba.scale.y = 1 - parte;
+    const abajo = arenaAbajo.current;
+    if (abajo !== null) abajo.scale.y = parte;
+    const hilo = hiloDeArena.current;
+    /* El hilo sólo cae mientras queda algo arriba y aún no ha llegado todo abajo. */
+    if (hilo !== null) hilo.visible = parte > 0.001 && parte < 0.999;
+  });
 
   /*
    * Una sombra de contacto por hueco, y las de los dos dados AÑADIDAS a la misma lista:
@@ -2055,6 +2164,30 @@ function Barra({
           modelo={aplanados.get(MODELO.dado)}
           onPulsar={onPulsarLosDados}
         />
+      )}
+      {/*
+        * EL RELOJ DE ARENA, al otro canto. Va dentro del mismo grupo que baja con la mesa
+        * recogida y por lo mismo que los dados: recogida la mesa no hay ronda que pasar.
+        */}
+      {reloj !== null && sitioDelRelojDeArena !== null && (
+        <group
+          position={[sitioDelRelojDeArena.x, sitioDelRelojDeArena.y, sitioDelRelojDeArena.z]}
+        >
+          <RelojDeArena
+            cuerpo={cuerpoDelReloj}
+            arenaArriba={arenaArriba}
+            arenaAbajo={arenaAbajo}
+            hilo={hiloDeArena}
+            asa={asaDelReloj}
+            lado={sitioDelRelojDeArena.alto}
+            ancho={sitioDelRelojDeArena.ancho}
+            encendido={reloj.disponible}
+            onPulsar={() => {
+              sePulso.current = true;
+              onPasarElTurno();
+            }}
+          />
+        </group>
       )}
       </>
       )}
@@ -3227,6 +3360,8 @@ export function Delta({
   turnoDe = null,
   dados = null,
   onPulsarLosDados,
+  reloj = null,
+  onPasarElTurno,
   mesaRecogida = false,
   mano = [],
   cogida = null,
@@ -3315,6 +3450,13 @@ export function Delta({
    * doble toque.
    */
   onPulsarLosDados?: () => Promise<ResultadoDelToque>;
+  /**
+   * EL RELOJ DE ARENA del canto derecho. `null` en las pantallas que no lo pintan —el banco de
+   * pruebas, el respaldo— y por defecto, para que una que no sepa de él siga compilando y
+   * pintando la barra como antes.
+   */
+  reloj?: RelojDeLaMesa | null;
+  onPasarElTurno?: () => void;
   /**
    * LA MESA RECOGIDA: el grupo de la barra baja bajo el canto y, al llegar, se apaga.
    *
@@ -4087,6 +4229,8 @@ export function Delta({
         */}
       {(barra.length > 0 || mazo !== null) && (
         <Barra
+          reloj={reloj}
+          onPasarElTurno={() => onPasarElTurno?.()}
           piezas={barra}
           mazo={mazo}
           aplanados={aplanados}
