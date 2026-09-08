@@ -75,6 +75,19 @@ export interface OpcionQueLlega {
   carga: unknown;
   rotulo: string;
   ayuda: string;
+  /**
+   * ESTO NO ES UN MOVIMIENTO: ES UNA DECLARACIÓN, Y NO SE PINTA.
+   *
+   * Ver `Opcion.declaracion` en `shared/arcade/opciones.ts`, que es donde está contado
+   * el caso entero. Aquí basta con lo que este mueble tiene que hacer: no pintarla. Un
+   * botón que manda una declaración recibe un motivo y no juega nada, o sea un botón
+   * encendido que no responde.
+   *
+   * Opcional, y se declara aquí en vez de importarse del contrato por lo mismo que los
+   * otros cinco campos: esto es lo que LLEGA por el cable, y lo que llega puede venir
+   * de un servidor de otra versión.
+   */
+  declaracion?: true;
 }
 
 export interface LoQueSeOfrece {
@@ -148,6 +161,26 @@ export interface OpcionPintable {
  * Dos iguales desincronizan la lista de React sin decir nada. Se usa el id
  * mientras sea una cadena con contenido y no se haya visto ya; si no, el orden.
  */
+/**
+ * ═══ ¿HAY ALGO QUE PINTAR? LA PREGUNTA QUE HAY QUE HACER ANTES DE PINTAR EL PANEL ═══
+ *
+ * Existe por un fallo MEDIDO en el banco, con cinco sentados y el turno en la mano. Las
+ * guardas que deciden si sale el panel de «Y además puedes» contaban `opciones.length`, o
+ * sea lo que LLEGA, mientras que quien decide qué se pinta es `loQueSePuedePintar`, que
+ * filtra las declaraciones. En cuanto la única suelta fue la puerta del trueque —que es lo
+ * normal en el turno de quien tiene bienes— el panel se pintaba con CERO pintables y
+ * `Formulario` caía en su rama de vacío: «Ahora mismo no hay nada que puedas hacer en esta
+ * mesa», escrito debajo de cuarenta y ocho botones de trueque y en tu propio turno.
+ *
+ * Se exporta y no se escribe en cada pantalla porque las guardas son DOS aquí y otras dos
+ * en la app, y una condición repetida cuatro veces es cuatro sitios donde se olvida la
+ * quinta. Y llama a `loQueSePuedePintar` en vez de repetir su filtro por la misma razón:
+ * el día que se pinte o se deje de pintar otra cosa, la pregunta cambia con ella sola.
+ */
+export function hayAlgoQuePintar(opciones: readonly OpcionQueLlega[]): boolean {
+  return loQueSePuedePintar(opciones).length > 0;
+}
+
 export function loQueSePuedePintar(opciones: readonly OpcionQueLlega[]): OpcionPintable[] {
   /*
    * El array entra por el cable, así que se recorre como `unknown`: leerlo con el
@@ -160,6 +193,25 @@ export function loQueSePuedePintar(opciones: readonly OpcionQueLlega[]): OpcionP
   crudas.forEach((cruda, i) => {
     if (typeof cruda !== 'object' || cruda === null) return;
     const o = cruda as Partial<OpcionQueLlega>;
+
+    /*
+     * ═══ UNA DECLARACIÓN NO SE PINTA, Y ES LA MITAD DE UNA DECISIÓN DE DOS ═══
+     *
+     * Ver `OpcionQueLlega.declaracion`. Va aquí, dentro de la función que ya decide
+     * qué se pinta y qué no, y no en el sitio donde se llama: es el único punto por el
+     * que pasan las dos listas que esta pantalla enseña —el mueble entero y el panel de
+     * «Y además puedes» que el retablo pinta debajo del tablero—.
+     *
+     * Y ese segundo es el que importa, porque es por donde la puerta llega de verdad:
+     * el juego la saca de las acciones del tablero, y entonces `opcionesSueltas` la
+     * cuenta como un movimiento que no se enseñó en ningún sitio y la manda aquí. Sin
+     * esta línea, sacarla del tablero sólo la baja una fila.
+     *
+     * Se compara con `=== true` y no por veracidad: el campo viene por el cable y por
+     * contrato sólo existe valiendo `true`, así que cualquier otra cosa es una opción
+     * normal y se pinta.
+     */
+    if (o.declaracion === true) return;
 
     const id = typeof o.id === 'string' && o.id.length > 0 ? o.id : '';
     const clave = id.length > 0 && !vistas.has(id) ? id : `sin-clave-${String(i)}`;

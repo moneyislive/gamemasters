@@ -585,7 +585,8 @@ export function ElTableroEnLinea(): JSX.Element {
         style={estilos.pieDeLaMesa}
         contentContainerStyle={{ paddingBottom: bordes.bottom }}
       >
-        {sueltas.length > 0 ? (
+        {/* Lo que decide es lo PINTABLE y no lo que llega: ver `hayAlgoQuePintar`. */}
+        {hayAlgoQuePintar(sueltas) ? (
           <LasOpciones opciones={sueltas} alTocar={mesa.mover} quieto={mesa.quieto} />
         ) : null}
         <LaCronica cronica={mesa.cronica} />
@@ -828,9 +829,23 @@ function LasOpciones({
   alTocar: (movimiento: MovimientoDeclarado) => void;
   quieto: boolean;
 }): JSX.Element {
+  /*
+   * ═══ LAS DECLARACIONES NO SE PINTAN, Y ES LO ÚNICO QUE ESTE MUEBLE MIRA ═══
+   *
+   * Ver `OpcionDeMesa.declaracion`. Una opción marcada no es un movimiento montado, así
+   * que el botón que la mandara recibiría un motivo y no jugaría nada: encendido y
+   * mudo. Es la única condición de todo este componente, y no lo hace menos genérico —no
+   * mira el `tipo`, ni el juego, ni la carga—: mira un campo del contrato de opciones,
+   * que es exactamente su trabajo.
+   *
+   * Y es la mitad de un par: la otra es que el juego no la baje a las acciones de su
+   * tablero. Sin ésta, sacarla de allí sólo la mueve a la lista de sueltas, que es este
+   * mismo componente unas líneas más abajo.
+   */
+  const pintables = loQueLasOpcionesPintan(opciones);
   return (
     <View style={estilos.opciones}>
-      {opciones.map((o) => (
+      {pintables.map((o) => (
         <Pressable
           key={o.id}
           style={[estilos.opcion, quieto ? estilos.opcionQuieta : null]}
@@ -1490,4 +1505,33 @@ const estilos = StyleSheet.create({
  * Nada de lo de arriba cambia: esta pantalla sigue siendo el mueble genérico, y
  * sigue sin saber a qué se juega.
  */
-export { BarraDeLaMesa, LineaDelTurno, LasOpciones, LaCronica, ElAviso, estilos as ESTILOS_DE_LA_MESA };
+/**
+ * ═══ QUÉ PINTA `LasOpciones`, Y ¿HAY ALGO QUE PINTAR? ═══
+ *
+ * Las declaraciones no se pintan (ver `LasOpciones`), así que la pregunta «¿pinto el
+ * cajón de opciones?» NO es `opciones.length > 0`: es ésta. Escrito de la otra manera, con
+ * la puerta del trueque como única suelta —lo normal en el turno de quien tiene bienes— se
+ * montaba un `<View>` con cero hijos y su relleno de 16 puntos arriba y abajo: treinta y
+ * dos puntos de hueco vacío en el pie de la pantalla más apretada de las cuatro. En el
+ * escritorio el mismo fallo escribía además «Ahora mismo no hay nada que puedas hacer».
+ *
+ * Las dos salen del MISMO filtro y no de dos condiciones parecidas, que es lo que hace que
+ * no se puedan separar el día que se filtre otra cosa.
+ */
+function loQueLasOpcionesPintan(opciones: readonly OpcionDeMesa[]): OpcionDeMesa[] {
+  return opciones.filter((o) => o.declaracion !== true);
+}
+
+function hayAlgoQuePintar(opciones: readonly OpcionDeMesa[]): boolean {
+  return loQueLasOpcionesPintan(opciones).length > 0;
+}
+
+export {
+  BarraDeLaMesa,
+  LineaDelTurno,
+  LasOpciones,
+  hayAlgoQuePintar,
+  LaCronica,
+  ElAviso,
+  estilos as ESTILOS_DE_LA_MESA,
+};

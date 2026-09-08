@@ -591,35 +591,88 @@ export const PUNTOS_PARA_GANAR = 8;
  */
 export const TOPE_DE_PIEZAS: Record<Pieza, number> = { vereda: 12, choza: 5, torre: 4 };
 
-/** Cuántos trueques se guardan en el estado. Los viejos se olvidan. */
+/**
+ * CUÁNTOS TRUEQUES SE GUARDAN EN EL ESTADO. Los viejos se olvidan, pero NO los vivos.
+ *
+ * Ocho, y quien recorta es `losQueSeRecuerdan`, que mira el estado de cada trato.
+ * El recorte ciego por el final —que es lo que había, y se llamaba `ultimos`— tiraba
+ * propuestas EN PIE cuando un turno cerraba muchas: reproducido con el reductor de
+ * verdad, quince movimientos dentro de un mismo turno y sin pasar nunca de cuatro
+ * vivas dejaban la lista en nueve, y la primera —que nadie había contestado— se caía
+ * sin caducar, sin rechazarse y sin aceptarse. Ver `losQueSeRecuerdan`.
+ *
+ * Y ocho basta por aritmética y no por costumbre: sólo propone quien tiene el turno,
+ * los trueques caducan al acabarlo, y `PROPUESTAS_VIVAS_A_LA_VEZ` tapa las vivas en
+ * cuatro. Cuatro vivas más cuatro cerradas caben aquí.
+ */
 const TRATOS_QUE_SE_RECUERDAN = 8;
 
 /**
- * CUÁNTOS BIENES VAN EN CADA LADO DE UN TRUEQUE: uno. Un trueque es UNO POR UNO.
+ * CUÁNTOS BIENES CABEN EN CADA LADO DE UN TRUEQUE: TRES.
  *
- * ═══ ESTA CONSTANTE VALÍA 3 Y ERA UNA MENTIRA DE TRES LÍNEAS ═══
+ * ═══ ESTO VALÍA UNO, Y LA DECISIÓN LA REVOCA MIGUEL DESPUÉS DE JUGAR ═══
  *
- * Decía «como mucho tres» y la validación de `bienesDeLaCarga` rechazaba las
- * listas de más de tres, así que quien la leyera creería que el juego admite
- * trueques de dos o tres bienes por lado y que esa comprobación estaba viva
- * protegiendo algo. Ninguna de las dos cosas era cierta: `opcionesDeTrueque` sólo
- * emite `da: [uno], pide: [uno]`, y el portillo del §5 bis rechaza todo lo que no
- * coincida EN FORMA CANÓNICA con una opción ofrecida. Un `da: [x, y]` no llegaba
- * nunca a `ofrecer`. Medido: devolvía el mismo objeto de estado y `tratos` no
- * crecía.
+ * Aquí ponía `BIENES_POR_LADO_DEL_TRUEQUE = 1` con veinte líneas defendiéndolo, y el
+ * DIAGNÓSTICO de aquellas líneas era correcto y se queda entero: la combinatoria
+ * completa —cualquier montón por cualquier montón— con topes de tres por lado y cinco
+ * rivales son 5.000 opciones y 1.141,9 kB de lista en CADA lectura de la mesa, contra
+ * las 54 opciones y 9,3 kB de la lista más larga que se ve hoy jugando. Eso no es una
+ * interfaz: es una lista que nadie lee, y encima viaja a seis aparatos por movimiento.
  *
- * O sea que «no hay trueques de 2×1» era una regla del juego tomada de rebote por
- * el portillo, sin estar escrita en ninguna parte. Ahora está escrita aquí y es
- * una decisión: uno por uno se lee de un vistazo en una lista de botones, y la
- * combinatoria completa —cualquier montón por cualquier montón— son miles de
- * opciones, que no es una interfaz sino una lista que nadie lee.
+ * Lo que estaba mal era la salida. De «la lista no puede ser la interfaz» se concluyó
+ * «los trueques son de uno por uno», cuando lo que se sigue es «la interfaz no puede
+ * ser la lista». Un colono con una piedra que necesita tres no está pidiendo nada raro:
+ * es la mitad de los trueques de este juego, y con uno por uno no se puede decir.
  *
- * Y la validación no sobra por ser el portillo quien ya lo rechaza. Es lo que dice
- * el comentario de `bienesDeLaCarga`: quien lea esto dentro de un año no debe
- * tener que demostrar el teorema del portillo para saber que `ofrecer` está a
- * salvo. Lo que no puede es afirmar una forma que el juego no admite.
+ * Así que la lista deja de enumerar la combinatoria y `opcionesDeTrueque` emite, al
+ * lado de las de uno por uno, UNA SOLA OPCIÓN DE PUERTA que declara lo que cabe. El
+ * portillo del §5 bis gana por eso una rama de FORMA, y quien la lea tiene que leer
+ * `cabeEnLaPuerta` entera antes de tocarla.
+ *
+ * ═══ Y POR QUÉ TRES Y NO CUATRO, QUE ES LO QUE CUESTA DINERO ═══
+ *
+ *  · LA TIRA DEL PREGÓN EN EL LIENZO MÁS PEQUEÑO CABE JUSTO. Una propuesta se lee
+ *    como fichas de bien con su cifra —una ficha por CLASE, no por unidad— y en el SE
+ *    apaisado (568×320) a la oferta le quedan 165 puntos, o sea SEIS fichas contando
+ *    la flecha del medio. Tres clases por lado son seis fichas. Con cuatro no cabe, y
+ *    lo que se recorta es la mitad derecha, que es justo lo que se pide.
+ *  · CUBRE LAS DOS MITADES DE LA PIEZA MÁS CARA. `COSTES.torre` son tres piedras y
+ *    dos granos: con tres por lado se puede pedir de una vez cualquiera de las dos
+ *    mitades de cualquier compra del juego.
+ *  · LAS MANOS REALES NO DAN PARA MÁS. En 15.834 turnos con turno y tirada hecha, la
+ *    mediana de CLASES distintas en la mano es 3 y el máximo 5.
+ *
+ * ═══ LO QUE CUESTA SUBIRLO NO ESTÁ EN LA LISTA: ESTÁ EN LA PUERTA ═══
+ *
+ * La lista no crece —la puerta declara `tope: 3` en cuatro caracteres— pero los
+ * movimientos que la puerta ADMITE sí: con tope 3, cinco clases y una mesa de cuatro
+ * son 55 multiconjuntos por lado, 1.170 pares con la regla de que ningún bien esté en
+ * los dos lados, y 4.680 OFRECER admitidos. Con tope 4 son 16.000, y en mesa de seis
+ * 24.000. De casi todos ellos —el 75,0 % de media, medido sobre 15.834 manos de
+ * verdad— el reductor devuelve un rechazo, porque la declaración NO lleva mi mano
+ * dentro y no puede: ver `cabeEnLaPuerta`. Subir esto es subir esos dos números.
  */
-const BIENES_POR_LADO_DEL_TRUEQUE = 1;
+export const TOPE_POR_LADO_DEL_TRUEQUE = 3;
+
+/**
+ * CUÁNTAS PROPUESTAS MÍAS PUEDEN ESTAR VIVAS A LA VEZ: CUATRO.
+ *
+ * Sale de dos sitios y los dos hacen falta:
+ *
+ *  · DE LA PANTALLA. Con la cinta de dos líneas puesta y sin cartel, en el SE apaisado
+ *    caben TRES tiras de pregón y en otros cuatro lienzos caben cuatro justas. Cuatro
+ *    es el número que se ve casi entero sin desplazar; más no se ve.
+ *  · DE LA MEMORIA. `TRATOS_QUE_SE_RECUERDAN` son ocho, y con cuatro vivas como tope
+ *    quedan cuatro huecos para las cerradas, así que `losQueSeRecuerdan` no tiene que
+ *    elegir NUNCA entre dos vivas. Sin este tope esa cuenta no se cierra: en un turno
+ *    se puede contestar muchas veces, y las contestadas de ESE turno también ocupan.
+ *
+ * Y es un tope FIJO y no uno que dependa de cuántos huecos queden. La otra salida
+ * —hacerlo dinámico— convierte una regla que el jugador VE, porque sale en
+ * `opciones()` y en el botón apagado del componedor, en una que cambia sola y que
+ * nadie puede contar mirando la mesa.
+ */
+export const PROPUESTAS_VIVAS_A_LA_VEZ = 4;
 
 // ---------------------------------------------------------------------------
 // EL MAZO: la segunda economía
@@ -1062,6 +1115,17 @@ export type EstadoDelTrato = 'propuesta' | 'aceptada' | 'rechazada' | 'caducada'
  * Lo que se ofrece y lo que se pide son PÚBLICOS: un trueque se dice en voz alta.
  * Lo que no es público es si quien lo propone tiene de verdad lo que promete, y
  * ahí está el contraejemplo del §5 bis. Ver `opcionesDeRiberas`.
+ *
+ * ═══ Y SE DICE A UNO O SE DICE A LA MESA, QUE SON DOS CAMPOS Y NO UNO ═══
+ *
+ * `para` admite `null`, que es la propuesta ABIERTA: la oye quien quiera y la coge
+ * el primero que conteste. El dirigido NO se va con eso, y no es nostalgia: es lo
+ * único que permite una oferta discreta al único que tiene piedra, y es lo que hace
+ * que las opciones de uno por uno sigan siendo movimientos MONTADOS con destinatario
+ * dentro. Quitarlo obligaría a que la lista de uno por uno fuera abierta, y entonces
+ * una mesa de seis vería seis veces cada oferta.
+ *
+ * Y un abierto no lo mata el primero que dice que no: por eso está `rechazada`.
  */
 export interface Trato {
   /**
@@ -1076,11 +1140,50 @@ export interface Trato {
    */
   id: string;
   de: AsientoId;
-  para: AsientoId;
-  /** Lo que entrega quien lo propone. */
+  /** A quién se le dice. `null` es a la mesa: puede contestarlo cualquiera. */
+  para: AsientoId | null;
+  /**
+   * Lo que entrega quien lo propone. De uno a `TOPE_POR_LADO_DEL_TRUEQUE` bienes, y
+   * SIEMPRE en el orden de `BIENES`: quien normaliza es `ofrecer`, y por qué está
+   * dicho allí. Aquí basta con saber que dos aparatos que compongan el mismo trueque
+   * tocando las fichas en distinto orden dejan EL MISMO `Trato` en la crónica.
+   */
   da: Bien[];
-  /** Lo que quiere a cambio. */
+  /** Lo que quiere a cambio. Mismo rango y mismo orden que `da`. */
   pide: Bien[];
+  /**
+   * QUIÉN HA APARTADO UNA PROPUESTA ABIERTA, y sólo tiene sentido en las abiertas.
+   *
+   * Un dirigido pasa a `'rechazada'` con el primero que dice que no, porque no hay
+   * más nadie a quien preguntarle. Un abierto sigue EN PIE mientras quede alguien que
+   * no lo haya apartado, y sólo cuando lo apartan todos los que podían contestarlo
+   * pasa a `'rechazada'`. Sin este campo, «no me interesa» de uno mataría la oferta
+   * para los otros cuatro, que es lo contrario de decirla en voz alta.
+   *
+   * Es público, como todo lo demás de un trato: sale en la vista de todos, y es lo
+   * que le permite a quien propuso ver quién la apartó en vez de verla desaparecer.
+   */
+  rechazada: AsientoId[];
+  /**
+   * QUIÉN LA CERRÓ ACEPTÁNDOLA, y sólo tiene sentido en las abiertas.
+   *
+   * En una dirigida quien contestó es `para`, así que este campo no añade nada: se sabe
+   * mirando el trato. En una ABIERTA la acepta cualquiera y no había dónde apuntarlo, y
+   * eso salía en pantalla como esto: a quien acababa de aceptarla se le decía en su
+   * PROPIA pantalla «se la llevó alguien», o sea que se le contaba en tercera persona
+   * una cosa que había hecho él, y se lee como si se le hubiera escapado. Las dirigidas
+   * ya resolvían el mismo problema en segunda persona («la aceptaste»); a las abiertas
+   * les faltaba el dato para poder hacerlo.
+   *
+   * `null` mientras está en pie, y `null` también en la que se apartó, en la que caducó
+   * y en la que se guardó antes de que este campo existiera: son los tres casos en los
+   * que nadie se la llevó, y la pantalla ya sabe decir «nadie» sin inventarse un nombre.
+   *
+   * Es público como todo lo demás de un trato —un trueque se cierra en voz alta— y por
+   * eso viaja en la vista de todos, que es lo que permite que quien lo propuso sepa a
+   * quién le dio la mercancía en vez de verla salir de su almacén sin destinatario.
+   */
+  acepto: AsientoId | null;
   estado: EstadoDelTrato;
 }
 
@@ -1423,7 +1526,18 @@ export function comoSiSiempreHubieraHabidoMazo(estado: EstadoDeRiberas): EstadoD
   const faltaEnAlguien = estado.colonos.some(
     (c) => c.mano === undefined || c.guardias === undefined || c.titulos === undefined,
   );
-  if (!faltaEnLaMesa && !faltaEnAlguien) return estado;
+  /*
+   * Y `rechazada` SE RELLENA VACÍA, igual que `descartes`: una mesa escrita ayer no
+   * puede tener a nadie apartado de una propuesta abierta, porque las abiertas no
+   * existían. La lista vacía es lo cierto y no un valor de conveniencia. Y hay que
+   * rellenarla, no leerla con `?? []` donde se use: quien lee un trato de ayer lo lee
+   * en `contestar`, en `opcionesDeTurno` y en el panel del tablero, y tres sitios
+   * donde acordarse son tres sitios donde olvidarse.
+   */
+  const faltaEnAlgunTrato = estado.tratos.some(
+    (t) => t.rechazada === undefined || t.acepto === undefined,
+  );
+  if (!faltaEnLaMesa && !faltaEnAlguien && !faltaEnAlgunTrato) return estado;
 
   return {
     ...estado,
@@ -1435,6 +1549,9 @@ export function comoSiSiempreHubieraHabidoMazo(estado: EstadoDeRiberas): EstadoD
     cartaJugada: estado.cartaJugada ?? false,
     veredasGratis: estado.veredasGratis ?? 0,
     guardia: estado.guardia ?? { de: null, cuantas: 0 },
+    tratos: faltaEnAlgunTrato
+      ? estado.tratos.map((t) => ({ ...t, rechazada: t.rechazada ?? [], acepto: t.acepto ?? null }))
+      : estado.tratos,
     colonos: faltaEnAlguien
       ? estado.colonos.map((c) => ({
           ...c,
@@ -1595,7 +1712,7 @@ export function avanzarRiberas(
         actual,
         ctx,
         campoDeTexto(movimiento.carga, 'carta'),
-        bienesDeLaCarga(movimiento.carga, 'bienes', BIENES_DEL_ANO_BUENO),
+        exactamenteBienes(movimiento.carga, 'bienes', BIENES_DEL_ANO_BUENO),
       );
     case ACAPARAMIENTO:
       return jugarElAcaparamiento(
@@ -1633,6 +1750,27 @@ export function avanzarRiberas(
  * traer cualquier cosa: `canonico` RECHAZA lo no serializable en vez de
  * tragárselo, y aquí ese rechazo significa exactamente «esto no es ninguna de
  * las opciones», que es la respuesta correcta.
+ *
+ * ═══ Y HAY UNA EXCEPCIÓN, QUE ES OFRECER, Y ES LA MITAD CARA DEL FICHERO ═══
+ *
+ * Un trueque puede llevar hasta `TOPE_POR_LADO_DEL_TRUEQUE` bienes por lado, y esa
+ * familia NO CABE en la lista: 5.000 opciones y 1.141,9 kB por lectura de la mesa en
+ * una mesa de seis (ver `TOPE_POR_LADO_DEL_TRUEQUE`). Así que `opcionesDeTrueque`
+ * emite una OPCIÓN DE PUERTA, marcada con `declaracion`, que dice lo que cabe, y un
+ * OFRECER que no coincida con nadie por igualdad canónica entra si CABE EN ELLA.
+ *
+ * EL ORDEN DE LAS DOS COSAS ES LA MITAD DE LA GARANTÍA Y NO SE PUEDE INVERTIR:
+ * primero se busca la puerta EN ESTA MISMA LISTA, y sólo si está se mira la forma.
+ * Es lo que hace que ofrecer siga exigiendo tener el turno, haber tirado y no deber
+ * ninguna vereda de la carta —tres cosas que la forma NO dice, y que las dice el
+ * hecho de que la puerta esté en la lista que `opcionesDeRiberas` acaba de componer
+ * para ESTE observador y ESTE estado—. Comprobar la forma antes de buscar la puerta
+ * es el fallo más fácil de escribir y el más difícil de ver.
+ *
+ * Y la rama es SÓLO para OFRECER. Aplicarla a todos los tipos es acabar con el
+ * portillo: fundar en cualquier vértice, alzar donde no pega. Las guardas de cada
+ * rama tapan casi todo, pero no todo — la cabecera de `pegaConLoSuyo` mide que sin
+ * el corte de la vista la vereda ENTRA, porque el portillo es justo quien pregunta.
  */
 function estaOfrecido(opciones: readonly Opcion[], movimiento: Movimiento): boolean {
   let firma = '';
@@ -1650,7 +1788,102 @@ function estaOfrecido(opciones: readonly Opcion[], movimiento: Movimiento): bool
     }
     if (suya === firma) return true;
   }
+  if (movimiento.tipo !== OFRECER) return false;
+  for (const o of opciones) {
+    if (o.declaracion !== true) continue;
+    return cabeEnLaPuerta(o.carga, movimiento.carga);
+  }
   return false;
+}
+
+/**
+ * ¿CABE ESTE TRUEQUE EN LO QUE LA PUERTA DECLARA? Tres reglas, y ninguna más.
+ *
+ *  1. `da` y `pide` son listas de bienes de `BIENES`, cada una con entre 1 y el
+ *     `tope` que la declaración trae.
+ *  2. NINGÚN BIEN ESTÁ EN LOS DOS LADOS. Dar limo por limo no es un trueque.
+ *  3. `para` está, y es `null` —si la declaración admite la mesa— o uno de los
+ *     asientos que la declaración nombra.
+ *
+ * ═══ LA REGLA 2 NO ES COSMÉTICA: ES LA MITAD DE LA FACTURA ═══
+ *
+ * Medido con tope 3 y cinco clases de bien: con ella, los pares admitidos son 1.170 y
+ * los OFRECER que la puerta deja pasar en una mesa de cuatro son 4.680. Sin ella,
+ * 3.025 y 12.100. Quien la quite «porque pedir dos piedras teniendo una es legítimo»
+ * —que lo es, y por eso el filtro de «no pedir lo que ya tengo» se quitó de
+ * `opcionesDeTrueque`— está confundiendo dos reglas distintas y multiplicando por 2,6
+ * lo que el reductor tiene que rechazar.
+ *
+ * ═══ LO QUE NO COMPRUEBA, A PROPÓSITO: SI TENGO LO QUE OFREZCO ═══
+ *
+ * Y es la decisión de seguridad de todo esto. LA DECLARACIÓN NO LLEVA MI MANO DENTRO.
+ * El motivo es medible: `verify:mesa` compone lo que se le manda a cada asiento como
+ * `{ vista, opciones }` y busca ahí dentro los valores canónicos de `loSecreto`, o
+ * sea `"b17:junco"` CON comillas. Una ficha metida en la declaración la cazaría; una
+ * CUENTA —«tengo cuatro limos»— no, porque no contiene esa cadena. Una declaración con
+ * cuentas sería una superficie nueva que el comprobador de secretos no vigila, y el
+ * día que alguien la compusiera con la mano de OTRO —por ejemplo para no ofrecer lo
+ * que el otro no puede pagar— la fuga sería invisible.
+ *
+ * El precio está medido y se paga: sobre 15.834 manos de verdad, el 75,0 % de los
+ * OFRECER que esta puerta admite mueren luego en `llegaPara` dentro de `ofrecer`. Por
+ * eso esa guarda dejó de ser muda.
+ *
+ * ═══ Y LA CARGA TIENE QUE TRAER ESOS TRES CAMPOS Y NINGUNO MÁS ═══
+ *
+ * Esta comprobación se escribió después, y la reprodujo un revisor jugando por el árbitro
+ * de verdad. Sin ella, aquí se validaban los tres campos que la puerta conoce y NO SE
+ * MIRABAN LOS DEMÁS: un OFRECER bien formado con ocho kilobytes de relleno pegados al lado
+ * pasaba el portillo entero —la ruta lo deja entrar, `TOPE_CARGA_BYTES` son 8.192— y se
+ * archivaba TAL CUAL en el diario de la mesa. Medido con dos asientos y un solo turno: 60
+ * propuestas seguidas hacían crecer el diario 491,4 kB, con el ESTADO quieto en 3.076
+ * bytes, y 60 fue donde el revisor paró el bucle. `TOPE_BYTES` (512 kB) mide el estado y no
+ * el diario, así que no lo tapa, y el descarte del movimiento que no cambia nada tampoco:
+ * un OFRECER sí cambia el estado.
+ *
+ * Es el mismo ataque que `server/src/arcade/mesas.ts` da por cerrado en su cabecera con
+ * estas palabras: «uno solo con 240 kB de carga dentro quedaba archivado tal cual durante
+ * treinta días». Lo reabría el «sólo si» aflojado a propósito de esta puerta, porque hasta
+ * ella toda carga tenía que COINCIDIR con una opción y ahí no cabe nada de más.
+ *
+ * ═══ Y CUESTA LO QUE MIDE EL MOVIMIENTO, NUNCA LO QUE MIDE LA LISTA ═══
+ *
+ * Esto corre DENTRO del tramo cronometrado, igual que el `canonico` de al lado. Todo
+ * lo que hay aquí está acotado por `tope`: `bienesDeLaCarga` descarta por longitud
+ * antes de recorrer nada, y la regla 2 compara dos listas de tres. Un
+ * `cabeEnLaPuerta` que recorriera algo cuyo tamaño elige quien llama reabre por la
+ * puerta de al lado el ataque que `TOPE_CARGA_BYTES` cerró, y al otro lado de eso
+ * está la cuarentena por arcade, que es permanente y no tiene puerta para levantarla.
+ *
+ * La cuenta de campos de aquí abajo es la única cosa que recorre algo del tamaño que
+ * elige quien llama, y por eso se dice: cuesta lo que la carga tenga de ANCHO, que la
+ * ruta ya acotó en 8 kB, y `canonico` —que corre en el mismo tramo, tres líneas más
+ * arriba— ya la recorre entera de todas formas. O sea que no añade ni un orden de
+ * magnitud a lo que ya se pagaba, y cierra el sobre.
+ */
+/** Los campos de la carga de un OFRECER: `para`, `da` y `pide`. Ni uno más. */
+const CAMPOS_DE_UN_TRUEQUE = 3;
+
+function cabeEnLaPuerta(declaracion: unknown, carga: unknown): boolean {
+  if (typeof declaracion !== 'object' || declaracion === null) return false;
+  const d = declaracion as { tope?: unknown; a?: unknown; mesa?: unknown };
+  if (typeof d.tope !== 'number' || !Array.isArray(d.a)) return false;
+
+  /* Los TRES campos de un trueque, y ninguno más. Ver la cabecera: cierra el sobre. */
+  if (typeof carga !== 'object' || carga === null) return false;
+  if (Object.keys(carga as Record<string, unknown>).length !== CAMPOS_DE_UN_TRUEQUE) return false;
+
+  const da = bienesDeLaCarga(carga, 'da', 1, d.tope);
+  const pide = bienesDeLaCarga(carga, 'pide', 1, d.tope);
+  if (da === null || pide === null) return false;
+  for (const uno of da) {
+    if (pide.includes(uno)) return false;
+  }
+
+  const para = destinoDeLaCarga(carga);
+  if (para === undefined) return false;
+  if (para === null) return d.mesa === true;
+  return (d.a as unknown[]).includes(para);
 }
 
 // ---------------------------------------------------------------------------
@@ -1684,6 +1917,27 @@ function tratoDeLaCarga(carga: unknown): string | null {
   return campoDeTexto(carga, 'trato');
 }
 
+/**
+ * A QUIÉN VA UN TRUEQUE: un asiento, `null` si es a la mesa, o `undefined` si ahí no
+ * venía un destino.
+ *
+ * ═══ TRES RESPUESTAS Y NO DOS, Y POR ESO NO VALE `campoDeTexto` ═══
+ *
+ * Desde que existen las propuestas abiertas, `null` es un destino LEGÍTIMO —«a la
+ * mesa»— y `campoDeTexto` devuelve `null` también cuando el campo no está o cuando
+ * trae un número. Con esa función, una carga SIN `para` y una carga con `para: null`
+ * serían el mismo movimiento para el reductor y dos movimientos distintos para
+ * `canonico`, o sea dos formas de escribir la misma propuesta abierta. Aquí se
+ * distinguen, y `cabeEnLaPuerta` exige que el campo esté.
+ */
+function destinoDeLaCarga(carga: unknown): AsientoId | null | undefined {
+  if (typeof carga !== 'object' || carga === null) return undefined;
+  if (!('para' in carga)) return undefined;
+  const posible = (carga as Record<string, unknown>).para;
+  if (posible === null) return null;
+  return typeof posible === 'string' ? posible : undefined;
+}
+
 function piezaDeLaCarga(carga: unknown): Pieza | null {
   const que = campoDeTexto(carga, 'que');
   if (que === 'vereda' || que === 'choza' || que === 'torre') return que;
@@ -1693,20 +1947,37 @@ function piezaDeLaCarga(carga: unknown): Pieza | null {
 /**
  * Lee una lista de bienes de la carga, o `null` si ahí no venía una.
  *
- * Exige EXACTAMENTE `cuantos`, y quien llama dice cuántos: `BIENES_POR_LADO_DEL_TRUEQUE`
- * para un lado de un trueque —hoy uno, y ver esa constante para por qué un trueque
- * de este juego es uno por uno— y `BIENES_DEL_ANO_BUENO` para la carta.
+ * Exige un RANGO, y quien llama dice cuál. Sus llamantes son `ofrecer` y `cabeEnLaPuerta`,
+ * para cada lado de un trueque, con `(1, tope)`; y `exactamenteBienes`, que es por donde
+ * pasa hoy `ANO_BUENO`. La carta ya NO escribe su rango aquí a mano: escribía la misma
+ * constante en los dos parámetros y de esos dos números sólo uno estaba comprado. El
+ * porqué entero, con la medida, está en la cabecera de `exactamenteBienes`.
+ *
+ * ═══ EXIGÍA UN NÚMERO EXACTO, Y LO QUE CAMBIA NO ES EL RANGO SINO LA FIRMA ═══
+ *
+ * Un lado de un trueque pasa a admitir de uno a tres bienes (ver
+ * `TOPE_POR_LADO_DEL_TRUEQUE`), así que hacía falta un mínimo y un máximo. Lo que
+ * hay que mirar es que NO HAY VALORES POR DEFECTO, y es deliberado: con
+ * `maximo = Infinity` por defecto, un llamante al que se le olvidara el cuarto
+ * argumento aceptaría cargas de cuarenta bienes y ningún comprobador tendría por
+ * qué enterarse. Sin defectos, quien se olvide NO COMPILA. Aflojar una regla en
+ * silencio es peor que romper el árbol.
  *
  * El número entra por parámetro y no se mira aquí dentro porque esta función no
  * sabe de qué regla la están llamando, y no debe: en el momento en que decidiera
  * ella el número, las dos reglas compartirían un valor que nadie pidió que fuera
  * el mismo.
  */
-function bienesDeLaCarga(carga: unknown, campo: string, cuantos: number): Bien[] | null {
+function bienesDeLaCarga(
+  carga: unknown,
+  campo: string,
+  minimo: number,
+  maximo: number,
+): Bien[] | null {
   if (typeof carga !== 'object' || carga === null) return null;
   const posible = (carga as Record<string, unknown>)[campo];
   if (!Array.isArray(posible)) return null;
-  if (posible.length !== cuantos) return null;
+  if (posible.length < minimo || posible.length > maximo) return null;
   const bienes: Bien[] = [];
   for (const uno of posible) {
     if (typeof uno !== 'string') return null;
@@ -1714,6 +1985,70 @@ function bienesDeLaCarga(carga: unknown, campo: string, cuantos: number): Bien[]
     bienes.push(uno as Bien);
   }
   return bienes;
+}
+
+/**
+ * EXACTAMENTE `cuantos` BIENES, y existe para que el rango de uno sea UN NÚMERO.
+ *
+ * Aquí ponía `bienesDeLaCarga(carga, 'bienes', BIENES_DEL_ANO_BUENO, BIENES_DEL_ANO_BUENO)`
+ * en el sitio de la llamada, o sea la misma constante escrita dos veces en dos parámetros
+ * distintos. Y lo que un revisor midió es que de esos dos números **sólo uno estaba
+ * comprado**: aflojar el máximo a nueve dejaba `verify:riberas` en EXIT=0 con todas sus
+ * comprobaciones verdes, y apretar el mínimo a uno sí mordía. El mínimo lo compra el camino
+ * feliz —con él roto la carta deja de funcionar y se cae medio fichero—; el máximo no lo
+ * compra nadie, porque el portillo compara por igualdad canónica y para una carga de tres
+ * bienes ANTES de llegar al reductor. O sea que ese cinturón se podía soltar en silencio.
+ *
+ * NO SE ARREGLA CON UNA COMPROBACIÓN, PORQUE NO HAY DESDE DÓNDE MIRARLO. La guarda vive
+ * dentro de `avanzarRiberas`, detrás del portillo, y por la única puerta que hay no llega
+ * nadie: no existe carga de tres bienes que `opciones()` ofrezca. Escribir un comprobador
+ * que «mande tres por el reductor» daría verde con el máximo puesto y verde sin él, que es
+ * la peor clase de verde.
+ *
+ * ═══ Y LA PRIMERA VERSIÓN DE ESTA FUNCIÓN NO LO CERRABA: LO MUDABA DE SITIO ═══
+ *
+ * Aquí ponía que quedaba arreglado «POR CONSTRUCCIÓN: con un solo número no hay un extremo
+ * que aflojar sin aflojar el otro». Eso era verdad en el sitio de la llamada y FALSO una
+ * línea más abajo, porque el cuerpo seguía siendo `bienesDeLaCarga(carga, campo, cuantos,
+ * cuantos)`, o sea los dos huecos de siempre. Dos revisores lo midieron por separado y con
+ * el mismo resultado: aflojando el máximo a nueve —o el mínimo a uno— `verify:riberas` sale
+ * en EXIT=0 con sus 657 comprobaciones verdes, exactamente igual que sin aflojarlo. O sea
+ * que el cinturón no se había comprado: se había mudado una línea hacia dentro, y la
+ * cabecera decía que estaba cerrado. En esta casa eso es peor que el agujero, porque es lo
+ * que hace que nadie vuelva a mirar.
+ *
+ * Ahora `cuantos` aparece UNA SOLA VEZ en todo el camino. El rango que se le pasa a
+ * `bienesDeLaCarga` deja de ser un cinturón: dice «cualquier largo», que es lo único que
+ * puede decir sin repetir el número, y el largo lo decide la línea de debajo.
+ *
+ * ═══ Y ESO ES TODO LO QUE SE GANA. LO MEDÍ ANTES DE ESCRIBIRLO ═══
+ *
+ * Porque la tentación era escribir aquí que con un solo número aflojarlo «lo ve el camino
+ * feliz al instante», y eso habría sido cometer otra vez el mismo fallo que estas líneas
+ * corrigen. Las cuatro medidas, sobre `verify:riberas` y con el código de salida delante:
+ *
+ *   · `bienes.length !== cuantos` → sin comprobar el largo:  EXIT=0, 657 verdes, 0 rojas
+ *   · `bienes.length !== cuantos` → `bienes.length < cuantos`: EXIT=0, 657 verdes, 0 rojas
+ *   · `cuantos` apretado a mano a uno:                        EXIT=1, el guion se cae
+ *
+ * O sea: APRETAR se caza —el camino feliz deja de funcionar—, pero AFLOJAR sigue sin verse
+ * desde fuera, igual que antes, y por el mismo motivo de siempre: por la única puerta que
+ * hay no llega una carga de tres bienes, porque el portillo la para antes. Lo que se ha
+ * ganado es que ya no hay DOS huecos de los que uno se pueda soltar mientras el otro sigue
+ * pareciendo correcto; lo que NO se ha ganado es un comprobador que lo vea caer.
+ *
+ * Cerrarlo de verdad pide partir `avanzarRiberas` en portillo y reductor y exportar el
+ * segundo, y eso abre una costura por la que se puede saltar el portillo: no se hace aquí
+ * y queda escrito para quien decida si ese precio compensa.
+ *
+ * Lo que sí se compra desde fuera es la otra mitad del par, y `verify:riberas` la compra:
+ * que NINGUNA opción de ANO_BUENO que se ofrezca lleve un número de bienes distinto de
+ * `BIENES_DEL_ANO_BUENO`. Ésa es la mitad que un dispositivo puede tocar.
+ */
+function exactamenteBienes(carga: unknown, campo: string, cuantos: number): Bien[] | null {
+  /* Sin rango aquí: el largo se mide abajo, y así el número no está escrito dos veces. */
+  const bienes = bienesDeLaCarga(carga, campo, 0, Number.POSITIVE_INFINITY);
+  return bienes === null || bienes.length !== cuantos ? null : bienes;
 }
 
 /** Un bien suelto de la carga, o `null` si ahí no venía uno de los cinco. */
@@ -2743,41 +3078,162 @@ function llegaPara(almacen: readonly Ficha[], precio: readonly Bien[]): boolean 
  * ofrece: mentir en la propuesta llenaría la mesa de ofertas imposibles. Lo que
  * NO se puede garantizar es que lo siga teniendo cuando el otro conteste —puede
  * gastarlo alzando— y de ahí sale el contraejemplo del §5 bis.
+ *
+ * ═══ Y DESDE LA PUERTA PARAMÉTRICA, AQUÍ LLEGA GENTE QUE ANTES NO LLEGABA ═══
+ *
+ * Mientras el portillo enumeraba trueques de uno por uno, casi todas las guardas de
+ * abajo eran texto muerto: lo que se ofrecía era exactamente lo que se podía hacer.
+ * Con la opción de puerta —ver `cabeEnLaPuerta`— el portillo valida la FORMA y no el
+ * contenido, así que dos de estas guardas pasan de inalcanzables a camino normal, y
+ * las dos HABLAN. Cuáles y por qué está en cada una.
+ *
+ * ═══ Y LOS DOS LADOS SE GUARDAN ORDENADOS POR `BIENES` ═══
+ *
+ * No es cosmética: es un fallo que este árbol ya aprendió en rojo. El portillo compara
+ * formas canónicas y una lista conserva su orden, así que mandar `['sal','limo']`
+ * cuando lo ofrecido era `['limo','sal']` lo rechaza —está escrito en el paso del año
+ * bueno de `verify:riberas`—. Con un bien por lado eso no se notaba. Con tres, un
+ * cliente que monte `da` en el orden en que el dedo tocó las fichas manda una lista
+ * que la puerta ACEPTA, porque cuenta multiconjuntos, y que se guardaría en el estado
+ * con ese orden: dos aparatos componiendo el mismo trueque dejarían dos `Trato`
+ * distintos en la crónica y en el rótulo. Se normaliza aquí, que es el único sitio por
+ * el que pasan los dos caminos —la lista de uno por uno y la puerta—.
  */
 function ofrecer(
   estado: EstadoDeRiberas,
   ctx: ContextoMovimiento,
   carga: unknown,
-): EstadoDeRiberas {
+): EstadoDeRiberas | Rechazo<EstadoDeRiberas> {
   if (estado.momento !== 'jugando') return estado;
   const yo = indiceDelAsiento(estado, ctx.quien);
   if (yo < 0 || yo !== estado.turno) return estado;
   if (!estado.tirado) return estado;
 
-  const para = campoDeTexto(carga, 'para');
-  const da = bienesDeLaCarga(carga, 'da', BIENES_POR_LADO_DEL_TRUEQUE);
-  const pide = bienesDeLaCarga(carga, 'pide', BIENES_POR_LADO_DEL_TRUEQUE);
-  if (para === null || da === null || pide === null) return estado;
+  const da = bienesDeLaCarga(carga, 'da', 1, TOPE_POR_LADO_DEL_TRUEQUE);
+  const pide = bienesDeLaCarga(carga, 'pide', 1, TOPE_POR_LADO_DEL_TRUEQUE);
+  /*
+   * ═══ ESTA GUARDA ERA MUDA Y AHORA HABLA, Y ES LO QUE SALVA LA PUERTA ═══
+   *
+   * Va la PRIMERA, antes que la del destino, y ése es todo el arreglo. La carga de la
+   * opción de puerta es `{ tope, a, mesa }`: no lleva `da`, no lleva `pide` y no lleva
+   * `para`. Mandada tal cual —y mandarla tal cual es LO QUE HACE la casa: un cliente
+   * tonto, un mueble genérico que pinta lo que hay en la lista, un jugador ciego que
+   * elige uniformemente de `opciones()`— coincide consigo misma en forma canónica, o
+   * sea que pasa el portillo ENTERO y cae aquí. Medido antes de escribir esto: `tratos`
+   * seguía en cero, el árbitro contestaba que sí, la revisión no subía y el motivo
+   * llegaba nulo. Un botón encendido que no hace nada y nadie que lo explique.
+   *
+   * El motivo no filtra: habla de la CARGA que acaba de mandar quien mueve, y de nada
+   * más. Con ella escrita, «ninguna opción devuelve el mismo estado sin motivo» se
+   * puede afirmar sin excepciones — y eso es lo que la afirma un comprobador entero.
+   *
+   * La marca `declaracion` de la opción es la otra mitad y no sustituye a ésta: la
+   * marca hace que no se pinte, y esto hace que si se manda, se conteste.
+   */
+  if (da === null || pide === null) {
+    return rechazar(estado, 'Eso no es un trueque: falta lo que das o lo que pides.');
+  }
 
-  const otro = indiceDelAsiento(estado, para);
-  if (otro < 0 || otro === yo) return estado;
+  /*
+   * EL DESTINO SE QUEDA MUDO, y aquí no llega nadie: los dos caminos del portillo lo
+   * exigen antes. La lista de uno por uno monta el asiento dentro de la carga, y
+   * `cabeEnLaPuerta` exige que el campo esté y que sea `null` o uno de los asientos
+   * que la declaración nombra. `undefined` es «ahí no venía un destino».
+   */
+  const para = destinoDeLaCarga(carga);
+  if (para === undefined) return estado;
+
+  /*
+   * `para === null` es la propuesta ABIERTA, dicha a la mesa, y no hay a quién buscar.
+   * Con destinatario sí, y las dos guardas siguen mudas por lo mismo de siempre.
+   */
+  if (para !== null) {
+    const otro = indiceDelAsiento(estado, para);
+    if (otro < 0 || otro === yo) return estado;
+  }
 
   const mio = estado.colonos[yo] as Colono;
-  if (!llegaPara(mio.almacen, da)) return estado;
+  /*
+   * ═══ Y ÉSTA ERA LA OTRA MUDA, Y AHORA ES EL CAMINO NORMAL ═══
+   *
+   * Con la enumeración de uno por uno, lo que el portillo ofrecía yo lo tenía, así que
+   * esto no se disparaba nunca. La puerta declara FORMA y no contenido —no puede
+   * declarar contenido: llevaría mi mano dentro, y el porqué está en `cabeEnLaPuerta`—
+   * así que ahora entra por aquí casi todo: medido sobre 15.834 manos de verdad, el
+   * 75,0 % de los OFRECER que la puerta admite no pasan de esta línea, con mediana del
+   * 76,6 %. Un rechazo silencioso en tres de cada cuatro intentos es la pantalla
+   * quieta que la regla del espejo no sabe explicar.
+   *
+   * Y el motivo no filtra: habla de MI almacén, que está en MI vista, y no nombra
+   * ningún bien ni a nadie. Es lo contrario del caso de `contestar`, donde el motivo
+   * callado habla del almacén del OTRO.
+   */
+  if (!llegaPara(mio.almacen, da)) {
+    return rechazar(estado, 'No tienes lo que estás ofreciendo.');
+  }
+
+  /*
+   * ═══ EL TOPE DE VIVAS SE CIERRA AQUÍ, Y NO EN `opciones()` ═══
+   *
+   * Y a esta guarda LLEGA GENTE, que es lo que la separa de las mudas de `contestar`.
+   * `opcionesDeTrueque` apaga con el tope puesto la lista de uno por uno —serían hasta
+   * veinte botones que el reductor rechazaría— pero DEJA la puerta, porque la puerta no
+   * es un botón sino la declaración de qué forma de trueque admite el juego, y esa
+   * forma no cambia porque yo tenga cuatro propuestas en la mesa. Ver allí. O sea que
+   * un trueque compuesto entra hasta aquí y aquí se para, igual que el 75 % que se para
+   * en `llegaPara`.
+   *
+   * Y habla porque puede: `v.tratos` va ENTERO en la vista de todos —quién propuso qué
+   * a quién y en qué estado— así que el motivo no dice nada que quien mueve no viera
+   * ya. Es lo contrario de las guardas de `contestar`, que callan porque hablar
+   * filtraría el almacén ajeno.
+   *
+   * Lo que compra es que la cuenta se cierre por ARITMÉTICA y no por costumbre: sólo
+   * propone quien tiene el turno y los trueques caducan al acabarlo, así que todas las
+   * vivas son de la misma persona y no pueden pasar de cuatro. Cuatro vivas más cuatro
+   * cerradas caben en `TRATOS_QUE_SE_RECUERDAN`, y por eso `losQueSeRecuerdan` no
+   * tiene que elegir nunca entre dos vivas.
+   */
+  const vivas = estado.tratos.filter((x) => x.estado === 'propuesta' && x.de === mio.asiento);
+  if (vivas.length >= PROPUESTAS_VIVAS_A_LA_VEZ) {
+    return rechazar(
+      estado,
+      `Ya tienes ${PROPUESTAS_VIVAS_A_LA_VEZ} propuestas en la mesa: espera a que se contesten o pasa el turno.`,
+    );
+  }
 
   const trato: Trato = {
     id: `t${estado.siguienteTrato}`,
     de: mio.asiento,
     para,
-    da,
-    pide,
+    da: enOrdenDeBienes(da),
+    pide: enOrdenDeBienes(pide),
+    rechazada: [],
+    acepto: null,
     estado: 'propuesta',
   };
   return {
     ...estado,
-    tratos: ultimos([...estado.tratos, trato]),
+    tratos: losQueSeRecuerdan([...estado.tratos, trato]),
     siguienteTrato: estado.siguienteTrato + 1,
   };
+}
+
+/**
+ * LOS MISMOS BIENES, EN EL ORDEN DE `BIENES`. Ver la cabecera de `ofrecer`.
+ *
+ * Se recorre `BIENES` y se cuenta, en vez de ordenar la lista con un comparador de
+ * índices: es la misma tabla pública que recorren `opcionesDeTrueque` y el panel, así
+ * que un bien que mañana entre o salga de `BIENES` cambia las tres a la vez.
+ */
+function enOrdenDeBienes(bienes: readonly Bien[]): Bien[] {
+  const puestos: Bien[] = [];
+  for (const bien of BIENES) {
+    for (const uno of bienes) {
+      if (uno === bien) puestos.push(bien);
+    }
+  }
+  return puestos;
 }
 
 /**
@@ -2794,39 +3250,65 @@ function ofrecer(
  * Así que la aceptación se ofrece y AQUÍ se vuelve a validar con todo lo que
  * hay. Son dos reglas distintas que parecían una, y ninguna de las dos sobra.
  *
- * ═══ Y CADA RECHAZO DICE POR QUÉ, QUE ES LA MITAD QUE FALTABA ═══
+ * ═══ ESTA PANTALLA ES LA QUE MÁS SE MUEVE POR DEBAJO, Y ESO NO HA CAMBIADO ═══
  *
- * Ésta es la pantalla donde más falta hace, y es por la forma del juego: aceptar
- * un trueque es lo ÚNICO que se hace sin tener el turno, o sea con la mesa
+ * Aceptar un trueque es lo ÚNICO que se hace sin tener el turno, o sea con la mesa
  * moviéndose por debajo mientras miras. Entre que se pinta el botón y se pulsa
  * pueden pasar cuatro cosas —que caduque el trueque, que lo acepten antes, que
  * el oferente gaste lo que prometía, que lo gastes tú— y las cuatro daban el
- * mismo silencio.
+ * mismo silencio. Tres de las cuatro las para el PORTILLO de `avanzarRiberas` una
+ * capa antes, con su motivo corto y ciego, porque de las tres se entera
+ * `opciones()` mirando la vista de quien pulsa.
  *
- * ═══ Y EL MOTIVO DEL CASO GORDO NO DICE POR QUÉ, A PROPÓSITO ═══
+ * ═══ Y LA CUARTA NO SE CONTESTA CON UNA FRASE: SE CONTESTA CERRANDO EL TRATO ═══
  *
- * Cuando el oferente ya gastó la mercancía, aquí se contesta «ese trueque ya no
- * está en pie» y NO «el oferente ya no tiene lo que prometía». La segunda es la
- * que sale sola al escribirla, y es una fuga.
+ * La cuarta —el oferente ya gastó la mercancía— es la única que llega hasta aquí, y
+ * durante una fase entera se contestó con `rechazar(estado, 'Ese trueque ya no está
+ * en pie.')`. La frase estaba bien pensada y era FALSA en el sitio donde se leía: el
+ * trato seguía en pie, con su botón, y volvía a ofrecerse indefinidamente. Lo que
+ * hace hoy está abajo, en la guarda, con el porqué de que no lleve motivo.
  *
- * La regla está en la cabecera de `aplicarConMotivo`, en `shared/arcade/motor.ts`,
- * y nombra este caso con estas palabras: un motivo NO PUEDE DECIR NADA QUE LA
- * PROYECCIÓN DE QUIEN MUEVE NO DIJERA YA. El almacén del oferente no está en la
- * vista de quien acepta —y no puede estarlo: taparlo es justo para lo que existe
- * el «sólo si»—, así que un motivo que hable de él lo saca por la puerta de
- * atrás, en un texto que ningún comprobador de secretos mira: `verify:mesa` busca
- * valores canónicos y un motivo es una frase.
- *
- * Se pensó el argumento contrario —que quien acepta podría deducirlo por
- * eliminación, viendo que a él no le falta nada— y no basta: la deducción es
- * suya, y confirmársela es darle certeza donde tenía sospecha. Además dejaría la
- * puerta abierta al siguiente que quiera «mejorar» el mensaje nombrando el bien.
+ * Lo que ese motivo defendía se queda escrito, porque la regla sigue viva para quien
+ * venga a «mejorar» esto: un motivo NO PUEDE DECIR NADA QUE LA PROYECCIÓN DE QUIEN
+ * MUEVE NO DIJERA YA —la regla está en la cabecera de `aplicarConMotivo`, en
+ * `shared/arcade/motor.ts`—, así que «el oferente ya no tiene lo que prometía» no se
+ * puede decir aquí ni aunque sea lo que sale solo al escribirlo: el almacén del
+ * oferente no está en la vista de quien acepta, y taparlo es justo para lo que existe
+ * el «sólo si». Se pensó el argumento contrario —que quien acepta podría deducirlo
+ * por eliminación, viendo que a él no le falta nada— y no basta: la deducción es
+ * suya, y confirmársela es darle certeza donde tenía sospecha.
  *
  * ═══ Y TODAS LAS DEMÁS GUARDAS SE QUEDAN MUDAS, QUE ES LO QUE COSTÓ VER ═══
  *
  * Se escribieron con motivo —«ese trueque ya no está en la mesa», «caducó al
  * pasar el turno», «no te lo han ofrecido a ti»— y hubo que quitarlos todos,
  * porque son TEXTO MUERTO: a esas guardas no llega nadie.
+ *
+ * ═══ Y AHORA SON MÁS, PORQUE UNA SE PARTIÓ EN TRES ═══
+ *
+ * Con las propuestas ABIERTAS —`para: null`, dichas a la mesa— la guarda de «esto no
+ * es para mí» ya no es una comparación: son tres condiciones distintas, y a las tres
+ * se les deja el `return` mudo por el mismo motivo de siempre.
+ *
+ *  · UN DIRIGIDO QUE NO ES PARA MÍ. Lo de antes, y sigue sin llegar nadie.
+ *  · UN ABIERTO QUE PROPUSE YO. `opcionesDeTurno` no me ofrece contestarme a mí
+ *    mismo, y el portillo rechaza lo que no se ofreció. Es la condición NUEVA que
+ *    antes no hacía falta: un dirigido nunca podía ser para su propio autor.
+ *  · UN ABIERTO QUE YA APARTÉ. Está en `rechazada`, y `opcionesDeTurno` tampoco lo
+ *    ofrece: apartar es definitivo para quien aparta.
+ *
+ * Y la de `estado !== 'propuesta'` SIGUE sin recibir a nadie, aunque con abiertos
+ * parezca que debería: dos personas pueden pulsar «Aceptar» sobre la misma propuesta,
+ * pero los movimientos de una mesa SE SERIALIZAN —la cabecera de `mesas.ts` lo dice
+ * con esas palabras— así que no hay dos aceptaciones a la vez: hay una primera y una
+ * segunda. La segunda llega por uno de dos caminos y los dos paran antes: con la
+ * revisión vieja la para el ÁRBITRO por rancia, y con la vista ya nueva
+ * `opcionesDeTurno` no le ofrece aceptar nada que no esté en `'propuesta'`, así que la
+ * para el PORTILLO con su motivo corto y ciego. Lo que se ha pensado y NO se hace es
+ * dar un motivo específico —«se lo llevó otro»—: para decirlo habría que seguir
+ * ofreciendo ACEPTAR sobre un trato ya cerrado, o sea pintar un botón que no hace
+ * nada, que es el fallo que la cabecera de los topes de `opcionesDeTurno` mide con
+ * 2.834 movimientos.
  *
  * El portillo de `avanzarRiberas` corre ANTES que esto y rechaza todo lo que
  * `opciones()` no ofreció. Y `opciones()` sólo ofrece aceptar un trueque que esté
@@ -2838,7 +3320,9 @@ function ofrecer(
  * Queda UNA sola guarda alcanzable, y no por casualidad: es la que `opciones()`
  * NO PUEDE comprobar, porque mira el almacén del oferente y ése no está en la
  * vista de quien acepta. Es el contraejemplo del «sólo si» y es justo la que
- * necesitaba explicarse.
+ * necesitaba explicarse. Y es además la única que NO devuelve el estado que
+ * recibió: las demás no tienen nada que arreglar, y ésta sí — el trato al que
+ * llega está muerto y hasta hoy nadie lo enterraba.
  *
  * `yo < 0` y `oferente < 0` son además cinturones para el compilador: el árbitro
  * ya comprobó que quien mueve está sentado, y un trueque guardado apunta a dos
@@ -2849,7 +3333,7 @@ function contestar(
   ctx: ContextoMovimiento,
   id: string | null,
   acepta: boolean,
-): EstadoDeRiberas | Rechazo<EstadoDeRiberas> {
+): EstadoDeRiberas {
   if (estado.momento !== 'jugando' || id === null) return estado;
   const yo = indiceDelAsiento(estado, ctx.quien);
   if (yo < 0) return estado;
@@ -2857,9 +3341,36 @@ function contestar(
   const trato = estado.tratos.find((t) => t.id === id);
   if (trato === undefined) return estado;
   if (trato.estado !== 'propuesta') return estado;
-  if (trato.para !== (estado.colonos[yo] as Colono).asiento) return estado;
+  const mia = (estado.colonos[yo] as Colono).asiento;
+  /* Las tres de arriba, en el mismo orden en que la cabecera las cuenta. */
+  if (trato.para !== null && trato.para !== mia) return estado;
+  if (trato.para === null && trato.de === mia) return estado;
+  if (trato.para === null && trato.rechazada.includes(mia)) return estado;
 
-  if (!acepta) return { ...estado, tratos: conElTrato(estado.tratos, id, 'rechazada') };
+  /*
+   * ═══ APARTAR UN ABIERTO NO LO MATA PARA LOS DEMÁS ═══
+   *
+   * Un dirigido pasa a `'rechazada'` con el primero, porque no queda nadie más a quien
+   * preguntarle. Un abierto se queda EN PIE mientras haya alguien que no lo haya
+   * apartado; cuando lo apartan todos los que podían contestarlo —o sea todos los
+   * sentados menos quien lo propuso— se cierra. Que «no me interesa» de uno matara la
+   * oferta para los otros cuatro sería lo contrario de decirla en voz alta.
+   */
+  if (!acepta) {
+    if (trato.para !== null) {
+      return { ...estado, tratos: conElTrato(estado.tratos, id, 'rechazada', null) };
+    }
+    const apartada = [...trato.rechazada, mia];
+    const quedanPorContestar = estado.colonos.length - 1 - apartada.length;
+    return {
+      ...estado,
+      tratos: estado.tratos.map((x) =>
+        x.id === id
+          ? { ...x, rechazada: apartada, estado: quedanPorContestar > 0 ? x.estado : 'rechazada' }
+          : x,
+      ),
+    };
+  }
 
   const oferente = indiceDelAsiento(estado, trato.de);
   if (oferente < 0) return estado;
@@ -2868,10 +3379,52 @@ function contestar(
    * LAS DOS MITADES, y la primera es la que `opciones()` no podía comprobar.
    */
   const suyo = cobrar((estado.colonos[oferente] as Colono).almacen, trato.da);
-  if (suyo === null) {
-    /* La redacción es la que el contrato deja escrita. Ver la cabecera. */
-    return rechazar(estado, 'Ese trueque ya no está en pie.');
-  }
+  /*
+   * ═══ Y AQUÍ NO SE RECHAZA: SE CIERRA EL TRATO, QUE ES LO QUE FALTABA ═══
+   *
+   * Esta guarda devolvía `rechazar(estado, 'Ese trueque ya no está en pie.')` y dejaba el
+   * trato EN PIE. O sea que la frase la desmentía la propia pantalla de quien la leía: el
+   * trato seguía en `'propuesta'`, seguía saliendo en «PARA CONTESTAR» con su botón, y
+   * seguía ocupando uno de los cuatro huecos vivos. Su «Aceptar» no podía funcionar NUNCA
+   * y el ciclo se repetía sin fin.
+   *
+   * REPRODUCIDO con el reductor de verdad, y en una sola mano: Ana con UNA sal propone dos
+   * trueques que la gastan —`sal->limo` y `sal->grano`, los dos a Bruno—, Bruno acepta el
+   * primero y Ana se queda sin sales. El segundo se le seguía ofreciendo a Bruno con su
+   * botón para el resto de la partida. Esto no lo inventó el trueque paramétrico: lo volvió
+   * FÁCIL, porque con hasta tres fichas por lado se pueden prometer doce teniendo cuatro.
+   *
+   * SE CIERRA COMO `'caducada'` Y NO COMO `'rechazada'`. Nadie lo ha rechazado —quien
+   * pulsó quería aceptarlo—, y `'rechazada'` haría que la pantalla de quien lo intentó
+   * dijera «la apartaste», que es falso. `'caducada'` es además el ÚNICO de los cuatro
+   * finales que no cuenta nada del almacén ajeno: es el mismo estado en el que acaban
+   * todas las propuestas vivas al pasar el turno, así que desde fuera este cierre es
+   * indistinguible del corriente y no confirma que al oferente le falte nada.
+   *
+   * ═══ Y POR ESO SE VA EL MOTIVO, QUE ES LA PARTE QUE HAY QUE MEDIR ANTES DE TOCARLA ═══
+   *
+   * Lo natural sería `rechazar({ ...estado, tratos: cerrado }, '…')` y quedarse con las dos
+   * cosas. NO FUNCIONA, y en el sitio donde no funciona no hay ningún comprobador mirando:
+   * `mesas.ts` hace `despues = rechazado ? antes : jugado.mesa`, o sea que EL ESTADO DE UN
+   * RECHAZO SE TIRA ENTERO —revisión, diario y estado— y lo dice con esas palabras en su
+   * cabecera. Un cierre montado dentro de un `Rechazo` saldría verde en cualquier
+   * comprobación en proceso, que llama al reductor directamente, y en el servidor de verdad
+   * el trato seguiría vivo: exactamente el fallo de hoy, con una comprobación verde encima.
+   *
+   * Y NO SE DEDUJO LEYENDO: se montó y se midió contra el servidor levantado, con la misma
+   * mano de dos asientos. Con el cierre dentro del `Rechazo`, la respuesta al segundo
+   * «Aceptar» traía `motivo: "Ese trueque ya no está en pie."`, la revisión NO subió (91 y
+   * 91), el trato seguía en `'propuesta'` y sus dos opciones —`aceptar:t2` y `rechazar:t2`—
+   * seguían en la lista. Con el cierre fuera del `Rechazo`, que es lo que hay abajo:
+   * `motivo: null`, la revisión sube (14 → 15), el trato queda en `'caducada'` y la lista de
+   * opciones se queda vacía.
+   *
+   * Así que el movimiento SÍ cambia el estado y no lleva motivo. Lo que quien lo intentó ve
+   * es lo que el juego ya sabe contar: la propuesta se cae de «PARA CONTESTAR» y aparece en
+   * «TRUEQUES CERRADOS» diciendo que caducó. Que un trueque muerto se vaya de la pantalla
+   * es más información que una frase debajo de un botón que sigue ahí.
+   */
+  if (suyo === null) return { ...estado, tratos: conElTrato(estado.tratos, id, 'caducada', null) };
   /*
    * Y ÉSTA SE QUEDA MUDA POR EL MISMO MOTIVO QUE LAS DE ARRIBA. Se le puso texto
    * y hubo que quitárselo: `opciones()` comprueba `llegaPara(v.misFichas, ...)`
@@ -2906,7 +3459,7 @@ function contestar(
     return c;
   });
 
-  return { ...estado, colonos, tratos: conElTrato(estado.tratos, id, 'aceptada') };
+  return { ...estado, colonos, tratos: conElTrato(estado.tratos, id, 'aceptada', mia) };
 }
 
 /** Qué fichas concretas se van a entregar por un precio. Mismo criterio que `cobrar`. */
@@ -2925,16 +3478,77 @@ function fichasPara(almacen: readonly Ficha[], precio: readonly Bien[]): Ficha[]
   return salen;
 }
 
-/** Cambia el estado de un trueque, dejando los demás como estaban. */
-function conElTrato(tratos: readonly Trato[], id: string, nuevo: EstadoDelTrato): Trato[] {
-  return tratos.map((t) => (t.id === id ? { ...t, estado: nuevo } : t));
+/**
+ * Cambia el estado de un trueque, dejando los demás como estaban, y apunta quién lo cerró.
+ *
+ * `acepto` NO LLEVA VALOR POR DEFECTO, por lo mismo que `bienesDeLaCarga` no lo lleva: con
+ * un `= null` en la firma, el día que alguien añada un cierre nuevo y se olvide del cuarto
+ * argumento el trato se cerraría diciendo que no lo aceptó nadie, y eso no lo pone rojo
+ * ningún comprobador — se lee en pantalla seis meses después como «se la llevó alguien».
+ * Sin defecto, quien se olvide NO COMPILA. Los tres cierres de hoy lo dicen a mano: `null`
+ * al apartar y al caducar, y el asiento de quien acepta al aceptar.
+ */
+function conElTrato(
+  tratos: readonly Trato[],
+  id: string,
+  nuevo: EstadoDelTrato,
+  acepto: AsientoId | null,
+): Trato[] {
+  return tratos.map((t) => (t.id === id ? { ...t, estado: nuevo, acepto } : t));
 }
 
-/** Sólo se recuerdan los últimos, para que el estado no crezca sin tope. */
-function ultimos(tratos: readonly Trato[]): Trato[] {
-  return tratos.length <= TRATOS_QUE_SE_RECUERDAN
-    ? [...tratos]
-    : tratos.slice(tratos.length - TRATOS_QUE_SE_RECUERDAN);
+/**
+ * LOS QUE SE RECUERDAN: todos los que están EN PIE, y de los cerrados los más nuevos.
+ *
+ * ═══ SE LLAMABA `ultimos` Y EL NOMBRE ERA EL FALLO ═══
+ *
+ * `ultimos` prometía un recorte por el final y lo hacía: `slice` de los ocho últimos,
+ * sin mirar el estado de ninguno. Con eso, una propuesta VIVA se podía caer de la
+ * lista, y caerse no es ninguno de los cuatro finales que este juego tiene escritos:
+ * ni caducó, ni se rechazó, ni se aceptó. Desaparecía de la vista de todos sin
+ * explicación, y quien la había propuesto no tenía dónde enterarse.
+ *
+ * REPRODUCIDO con el reductor de verdad, dentro de UN turno y sin pasar nunca de
+ * cuatro vivas. A tiene junco y limo, B tiene sal, y proponer no cuesta nada, así que
+ * A puede repetir la misma oferta:
+ *
+ *     t1 (nadie la contesta) · t2 t3 t4   -> cuatro vivas, el tope
+ *     rechazadas t2 t3 t4                 -> una viva
+ *     t5 t6 t7                            -> cuatro vivas otra vez
+ *     rechazadas t5 t6 t7                 -> una viva
+ *     t8                                  -> dos vivas
+ *     t9                                  -> la lista llega a nueve y el recorte muerde
+ *
+ * Quince movimientos en un turno. Al final el estado guardaba `t2`..`t9`, y `t1`, que
+ * seguía en `'propuesta'`, NO estaba. La cuenta que defendía el recorte ciego —«con
+ * cuatro vivas como máximo quedan cuatro huecos»— olvidaba que las CONTESTADAS de ese
+ * mismo turno también ocupan hueco, y en un turno se puede contestar muchas veces.
+ *
+ * ═══ LO QUE HACE, Y POR QUÉ ES ESTO Y NO UN TOPE DINÁMICO ═══
+ *
+ * Guarda todas las que están en `'propuesta'` y recorta sólo entre las cerradas, de la
+ * más vieja a la más nueva, hasta que la lista quepa en `TRATOS_QUE_SE_RECUERDAN`. La
+ * otra salida era que `PROPUESTAS_VIVAS_A_LA_VEZ` dependiera de cuántos huecos
+ * quedaran, y se descarta ahí: el tope de vivas es una regla que el jugador VE, y
+ * hacerla depender de cuántas contestadas lleve el turno la convierte en una que
+ * cambia sola y que nadie puede contar mirando la mesa.
+ *
+ * El orden de lo que queda es el de siempre —del más viejo al más nuevo— porque de ahí
+ * salen la crónica y el panel, y un orden que cambia según qué se recortó no se puede
+ * leer.
+ */
+function losQueSeRecuerdan(tratos: readonly Trato[]): Trato[] {
+  if (tratos.length <= TRATOS_QUE_SE_RECUERDAN) return [...tratos];
+  let porTirar = tratos.length - TRATOS_QUE_SE_RECUERDAN;
+  const quedan: Trato[] = [];
+  for (const trato of tratos) {
+    if (porTirar > 0 && trato.estado !== 'propuesta') {
+      porTirar--;
+      continue;
+    }
+    quedan.push(trato);
+  }
+  return quedan;
 }
 
 /**
@@ -4353,13 +4967,30 @@ function opcionesDeTurno(v: VistaSinTablero, quien: AsientoId): readonly Opcion[
    */
   for (const trato of v.tratos) {
     if (trato.estado !== 'propuesta') continue;
-    if (trato.para !== quien) continue;
+    /*
+     * ═══ QUIÉN PUEDE CONTESTAR: EL DESTINATARIO, O CUALQUIERA SI ES ABIERTA ═══
+     *
+     * Un dirigido lo contesta aquél a quien se le dijo, como siempre. Un abierto
+     * —`para: null`, dicho a la mesa— lo contesta cualquiera MENOS dos: quien lo
+     * propuso, porque nadie se contesta a sí mismo y con los dirigidos eso no hacía
+     * falta escribirlo; y quien ya lo apartó, porque apartar es definitivo para quien
+     * aparta aunque la propuesta siga en pie para los demás.
+     *
+     * Las tres condiciones son las mismas tres guardas mudas de `contestar`, y tienen
+     * que serlo: son las que hacen que a aquéllas no llegue nadie.
+     */
+    const puedoContestar =
+      trato.para === quien ||
+      (trato.para === null && trato.de !== quien && !trato.rechazada.includes(quien));
+    if (!puedoContestar) continue;
     opciones.push({
       id: `rechazar:${trato.id}`,
       tipo: RECHAZAR,
       carga: { trato: trato.id },
-      rotulo: `Rechazar el trueque ${trato.id}`,
-      ayuda: `${nombreEnLaVista(v, trato.de)} te ofrece ${listar(trato.da)} por ${listar(trato.pide)}.`,
+      rotulo: trato.para === null ? `No me interesa el trueque ${trato.id}` : `Rechazar el trueque ${trato.id}`,
+      ayuda:
+        `${nombreEnLaVista(v, trato.de)} ofrece ${listar(trato.da)} por ${listar(trato.pide)}.` +
+        (trato.para === null ? ' A la mesa: apartarlo no se lo quita a los demás.' : ''),
     });
     /*
      * SE OFRECE ACEPTAR SI YO TENGO LO QUE SE ME PIDE, y no se comprueba que el
@@ -5005,35 +5636,101 @@ function opcionesDelMazo(v: VistaSinTablero, mio: ColonoVisto): Opcion[] {
 }
 
 /**
- * LOS TRUEQUES QUE SE PUEDEN PROPONER.
+ * LOS TRUEQUES QUE SE PUEDEN PROPONER: LA LISTA DE UNO POR UNO, Y LA PUERTA.
  *
- * Uno por uno y sólo de lo que me sobra por lo que no tengo. Uno por uno es una
- * REGLA de este juego y está escrita en `BIENES_POR_LADO_DEL_TRUEQUE`, con el
- * porqué: la combinatoria completa —cualquier montón por cualquier montón— son
- * miles de opciones, y una lista de miles de botones no es una interfaz.
+ * ═══ AQUÍ SÍ HAY UN EJEMPLO DEL «SÓLO SI» DEL §5 bis, Y ES EL SEGUNDO ═══
  *
- * Aquí NO hay ningún ejemplo del «sólo si» del §5 bis, y esta línea llegó a decir
- * que sí lo había: decía que «el reductor acepta trueques más ricos que los que se
- * ofrecen aquí», describiendo un camino que con el portillo delante no puede
- * recorrer nadie. El «sólo si» de este juego está tres funciones más abajo, en
- * `contestar`, y es el de verdad: se ofrece ACEPTAR mirando sólo mi almacén, y el
- * reductor lo vuelve a validar mirando también el del oferente, que no está en mi
- * vista. Ése no se puede quitar sin filtrar la mano ajena.
+ * Esta cabecera decía lo contrario —«aquí NO hay ningún ejemplo»— y era verdad
+ * mientras esto enumeraba trueques de uno por uno: lo ofrecido era exactamente lo
+ * ejecutable. Ya no. La OPCIÓN DE PUERTA ofrece una FAMILIA mirando sólo la vista, y
+ * el reductor valida el miembro concreto mirando el estado: es un «sólo si» de los
+ * buenos, y el otro —el de `contestar`, que valida contra el almacén del oferente— no
+ * se mueve de donde está.
  *
- * Ojo, y es lo que hace que esta lista sea segura de publicar: se recorre
- * `BIENES` —la lista pública de clases— y NUNCA `misFichas`, así que ni un
- * identificador de los que salen de aquí lleva dentro una ficha.
+ * ═══ POR QUÉ SALEN LAS DOS COSAS Y NO SÓLO LA PUERTA ═══
+ *
+ * La lista de uno por uno no es un cinturón: es lo que paga la factura de la puerta.
+ * Sin ella, `opciones()` deja de llevar dentro un trueque que se pueda mandar TAL
+ * CUAL, y con eso se cae el principio de que todo lo que se propone es jugable desde
+ * la lista —y con él, un cliente que sólo pinta botones, la vacuna que demuestra que
+ * el portillo existe, y cualquiera que juegue a ciegas eligiendo de `opciones()`—. Lo
+ * que cuesta está medido: en mesa de seis con la mano repartida son 100 opciones y
+ * 17,6 kB, contra los 5.000 y 1.141,9 kB de enumerar la combinatoria. Y el portillo, a
+ * 100 opciones, cuesta 0,26 ms.
+ *
+ * ═══ Y AQUÍ SE QUITÓ EL FILTRO DE «NO PEDIR LO QUE YA TENGO» ═══
+ *
+ * Había un `if (llegaPara(v.misFichas, [quiero])) continue;` y lo revoca Miguel
+ * después de jugar una partida entera, con razón. La medida es dura: con la mano
+ * repartida en los cinco bienes —`[2,2,2,2,2]`, diez bienes— esta función devolvía
+ * CERO opciones. Ninguna. Justo el turno en el que uno quiere trocar, el que llega con
+ * la mano llena y le falta CANTIDAD y no clase, era el turno en el que el juego no
+ * ofrecía trocar nada. Sin el filtro devuelve veinte por rival.
+ *
+ * Lo que se perdió con él, dicho: evitaba ofertas absurdas. Con uno por uno, pedir un
+ * limo teniendo cuatro casi nunca es lo que se quiere. Con multiplicidad deja de ser
+ * absurdo —pedir dos piedras cuando tienes una es la mitad de los trueques de este
+ * juego— y en la lista de uno por uno se queda como ruido aceptado. Lo que cuesta en
+ * tamaño está medido: la media de OFRECER por turno pasa de 16,5 a 30,8 y el máximo
+ * de 18 a 60.
+ *
+ * Y lo que se llevó por delante: DOS comprobaciones de `verify:riberas` que eran la
+ * única vacuna del árbol que demostraba que el portillo existe, porque estaban
+ * escritas sobre la regla que se acaba de revocar. Se borraron en el mismo empujón que
+ * esta línea y entraron dos sustitutas en su sitio, apoyadas en el `continue` de aquí
+ * abajo —no se ofrece trocar con quien no tiene nada— que el reductor NO comprueba y
+ * que sigue siendo verdad con el filtro y sin él.
+ *
+ * Ojo, y es lo que hace que esta lista sea segura de publicar: se recorre `BIENES` —la
+ * lista pública de clases— y NUNCA `misFichas`, así que ni un identificador de los que
+ * salen de aquí lleva dentro una ficha. Y la puerta lleva menos todavía: un número y
+ * una lista de asientos, y el porqué de que no lleve mi mano está en `cabeEnLaPuerta`.
  */
 function opcionesDeTrueque(v: VistaSinTablero, mio: ColonoVisto): Opcion[] {
+  /*
+   * ═══ CON CUATRO VIVAS SE APAGA LA LISTA DE UNO POR UNO, Y LA PUERTA SE QUEDA ═══
+   *
+   * Y no es un matiz: son las dos mitades de una decisión.
+   *
+   * LA LISTA SE APAGA porque cada opción de uno por uno es un BOTÓN, y con el tope
+   * puesto `ofrecer` los rechazaría todos. Un botón encendido que no responde es el
+   * fallo que la cabecera de los topes de `opcionesDeTurno` mide con 2.834
+   * movimientos, y aquí serían hasta veinte de golpe.
+   *
+   * LA PUERTA SE QUEDA porque no es un botón: es la declaración de qué FORMA de
+   * trueque admite este juego, y esa forma no cambia porque yo tenga cuatro propuestas
+   * en la mesa. Es lo mismo que ya pasa con el 75,0 % de los movimientos que la puerta
+   * admite y el reductor rechaza (ver `cabeEnLaPuerta`): la puerta habla de forma, y
+   * quien decide con el estado delante es `ofrecer`. Y hace falta que se quede: la
+   * pantalla que la lee es la que pinta «Proponer un trueque», y ese botón con el tope
+   * puesto se APAGA con su porqué en vez de desaparecer —saber que existe una jugada
+   * que ahora no se puede hacer es información—. Si la puerta se fuera, el botón se
+   * iría con ella y el tope pasaría de regla explicada a botón que desaparece solo.
+   *
+   * Y por eso el tope está TAMBIÉN en `ofrecer`, que es adonde llega el trueque que la
+   * puerta dejó pasar. Ver allí: es esta guarda la que de verdad cierra la cuenta.
+   */
+  const mias = v.tratos.filter((x) => x.estado === 'propuesta' && x.de === mio.asiento);
+  const conElTopePuesto = mias.length >= PROPUESTAS_VIVAS_A_LA_VEZ;
+
   const opciones: Opcion[] = [];
+  const conBienes: AsientoId[] = [];
   for (const otro of v.colonos) {
     if (otro.asiento === mio.asiento) continue;
+    /*
+     * NO SE OFRECE TROCAR CON QUIEN NO TIENE NADA, y el reductor NO comprueba esto:
+     * `ofrecer` sólo mira que el destinatario exista y no sea yo. Es la diferencia
+     * entera entre un motor con portillo y uno sin él, y por eso hay dos
+     * comprobaciones escritas sobre ella. La puerta lo hereda gratis, porque su lista
+     * de destinos se construye con este mismo `continue`.
+     */
     if (otro.bienes === 0) continue;
+    conBienes.push(otro.asiento);
+    if (conElTopePuesto) continue;
     for (const doy of BIENES) {
       if (!llegaPara(v.misFichas, [doy])) continue;
       for (const quiero of BIENES) {
         if (doy === quiero) continue;
-        if (llegaPara(v.misFichas, [quiero])) continue;
         opciones.push({
           id: `ofrecer:${otro.asiento}:${doy}:${quiero}`,
           tipo: OFRECER,
@@ -5043,6 +5740,41 @@ function opcionesDeTrueque(v: VistaSinTablero, mio: ColonoVisto): Opcion[] {
         });
       }
     }
+  }
+
+  /*
+   * ═══ LA PUERTA: UNA DECLARACIÓN, Y NO UN MOVIMIENTO. NO SE MANDA ═══
+   *
+   * Lleva la marca `declaracion` del núcleo, que es la que dice en voz alta que esta
+   * carga NO es un movimiento montado: quien la pinte como un botón pinta un botón que
+   * no juega. Y quien la lea, la lee POR LA MARCA y nunca por su `id`.
+   *
+   * Sale sólo si hay a quién ofrecerle algo y si tengo algún bien: sin una de las dos
+   * cosas no hay ningún trueque que quepa, y una puerta que no admite nada es otro
+   * botón muerto. Y lo que declara son datos PÚBLICOS y nada más —un número y una
+   * lista de asientos— por lo que está escrito entero en `cabeEnLaPuerta`.
+   */
+  if (conBienes.length > 0 && v.misFichas.length > 0) {
+    opciones.push({
+      id: 'ofrecer:puerta',
+      tipo: OFRECER,
+      carga: { tope: TOPE_POR_LADO_DEL_TRUEQUE, a: conBienes, mesa: true },
+      declaracion: true,
+      rotulo: 'Proponer un trueque',
+      ayuda: conElTopePuesto
+        ? `Ya tienes ${PROPUESTAS_VIVAS_A_LA_VEZ} propuestas en la mesa: espera a que se ` +
+          'contesten o pasa el turno.'
+        : /*
+           * FICHAS Y NO CLASES, y la diferencia se nota justo con el ejemplo de Miguel.
+           * `cabeEnLaPuerta` acota la LONGITUD de cada lado, no cuántas clases distintas
+           * hay: tres piedras (una clase, tres fichas) es el máximo y entra;
+           * piedra+piedra+grano+sal (tres clases, CUATRO fichas) no entra. Aquí ponía
+           * «clases» y decía una regla distinta de la que el motor aplica, en la frase que
+           * la pantalla del componedor va a leer para explicársela a quien juega.
+           */
+          `Hasta ${TOPE_POR_LADO_DEL_TRUEQUE} fichas por lado, y pueden repetirse de la misma ` +
+          'clase. A la mesa o a uno. Caduca al acabar tu turno.',
+    });
   }
   return opciones;
 }
@@ -5263,12 +5995,38 @@ export function tableroDeRiberas(vista: unknown, quien: QuienMira): TableroDecla
 
   /*
    * LO QUE NO SE PUEDE TOCAR SOBRE EL TABLERO va como botón: empezar, tirar,
-   * pasar, y los trueques —proponerlos, aceptarlos y rechazarlos—. Un trueque no
-   * tiene sitio en el mapa, y forzarlo a tener uno sería inventar geometría para
-   * una regla que no la tiene.
+   * pasar, y los trueques —ACEPTARLOS y rechazarlos—. Un trueque no tiene sitio en
+   * el mapa, y forzarlo a tener uno sería inventar geometría para una regla que no
+   * la tiene.
+   *
+   * ═══ PROPONER YA NO VA COMO BOTÓN DE AQUÍ, Y SON TRES COSAS QUE SE SALTAN Y NO DOS ═══
+   *
+   * Se saltan FUNDAR y el ALZAR que ya tiene su sitio en el mapa, como siempre, y se
+   * salta además LA OPCIÓN MARCADA CON `declaracion`. Esa opción no es un movimiento
+   * montado: es la declaración de lo que el juego admitiría —ver `cabeEnLaPuerta`— y
+   * mandada tal cual no hace nada más que recibir un motivo. Bajarla a `acciones` la
+   * pinta como un botón cualquiera, encendido, en la ÚNICA pantalla que tiene una mesa
+   * de cinco o de seis colonos, porque con más de cuatro no hay tablero en tres
+   * dimensiones. Un botón encendido que no juega es el fallo que la cabecera de los
+   * topes de `opcionesDeTurno` mide con 2.834 movimientos.
+   *
+   * Y LA MARCA SE LEE AQUÍ PORQUE AQUÍ TODAVÍA ES UNA `Opcion`. Al mueble no le llega:
+   * `AccionDeTablero` tiene cinco campos y ninguno es éste, y no los gana —es el
+   * contrato del mueble GENÉRICO, el que comparten los arcades que esta casa no
+   * escribe, y meter ahí el mismo concepto sería tenerlo en dos tipos, o sea en dos
+   * sitios donde olvidarlo—. La marca se lee donde NACE la lista y no viaja.
+   *
+   * Y hay que decir lo que esto NO cierra, porque solo no cierra nada:
+   * `opcionesSueltas`, en `tablero-declarado.ts`, devuelve de `opciones()` lo que no
+   * esté recogido en un `toque` del tablero. Al sacar la puerta de aquí, su movimiento
+   * deja de estar recogido y esa función se la manda derecha al `Formulario` de «Y
+   * además puedes» que el retablo pinta debajo: el mismo botón muerto, una fila más
+   * abajo. Quien lo para ahí es el filtro por `declaracion` de ese mueble y el de
+   * `LasOpciones` de la app. Los tres entran juntos o no entra ninguno.
    */
   const acciones: AccionDeTablero[] = [];
   for (const o of opciones) {
+    if (o.declaracion === true) continue;
     if (o.tipo === FUNDAR || (o.tipo === ALZAR && o.id.indexOf(':') > 0)) continue;
     /*
      * DEL ESTIAJE SÓLO BAJAN AQUÍ LAS VÍCTIMAS DE MÁS, y son de cero a cinco.
@@ -5304,20 +6062,30 @@ export function tableroDeRiberas(vista: unknown, quien: QuienMira): TableroDecla
   };
 }
 
-/** Un tablero sin delta: sólo el aviso y los botones que haya. */
+/**
+ * Un tablero sin delta: sólo el aviso y los botones que haya.
+ *
+ * Con el MISMO filtro de la marca que `tableroDeRiberas`, y no porque haga falta hoy
+ * —sin islas repartidas no hay trueque que ofrecer, así que la puerta no llega aquí—
+ * sino para que no haya un camino que dependa de eso. Un filtro que está en uno de los
+ * dos sitios por los que sale la misma lista es un filtro que se cae solo el día que
+ * alguien ofrezca algo antes de repartir.
+ */
 function tableroVacio(aviso: string, opciones: readonly Opcion[] = []): TableroDeclarado {
   return {
     vista: { x: 0, y: 0, ancho: 100, alto: 100 },
     caras: [],
     lineas: [],
     nudos: [],
-    acciones: opciones.map((o) => ({
-      id: o.id,
-      rotulo: o.rotulo,
-      ayuda: o.ayuda,
-      disponible: true,
-      toque: { tipo: o.tipo, carga: o.carga },
-    })),
+    acciones: opciones
+      .filter((o) => o.declaracion !== true)
+      .map((o) => ({
+        id: o.id,
+        rotulo: o.rotulo,
+        ayuda: o.ayuda,
+        disponible: true,
+        toque: { tipo: o.tipo, carga: o.carga },
+      })),
     paneles: [],
     aviso,
   };
@@ -5370,7 +6138,8 @@ function panelesDe(v: VistaSinTablero): PanelDeTablero[] {
 
   const tratos = v.tratos.map(
     (t) =>
-      `${t.id}: ${nombreEnLaVista(v, t.de)} da ${listar(t.da)} por ${listar(t.pide)} a ${nombreEnLaVista(v, t.para)} — ${t.estado}`,
+      `${t.id}: ${nombreEnLaVista(v, t.de)} da ${listar(t.da)} por ${listar(t.pide)} ` +
+      `a ${t.para === null ? 'la mesa' : nombreEnLaVista(v, t.para)} — ${t.estado}`,
   );
 
   /*
@@ -5490,6 +6259,34 @@ function avisoDe(v: VistaSinTablero, quien: QuienMira): string {
       : 'Jugaste la guardia: mueve el estiaje.';
   }
   if (!v.tirado) return suyo ? 'Te toca: tira los dados.' : `Turno de ${de}: está por tirar.`;
+  /*
+   * ═══ Y CON EL TOPE DE VIVAS PUESTO, EL AVISO LO DICE. LO MIDIÓ UN REVISOR ═══
+   *
+   * A la cuarta propuesta viva, `opcionesDeTrueque` apaga la lista de uno por uno entera
+   * —hasta cuarenta botones— porque el reductor los rechazaría todos. Eso está bien, y era
+   * la mitad de la decisión; la otra mitad no estaba escrita en ninguna parte. Medido en el
+   * banco con cinco sentados y cuatro propuestas puestas: el tablero pasaba de cuarenta
+   * botones «Ofrecer …» a ninguno, el aviso seguía diciendo «Sacaste 8. Alza, truécalo o
+   * pasa» —o sea, truécalo— y la ÚNICA frase que explicaba el tope vivía en la `ayuda` de
+   * la opción de puerta, que las cuatro pantallas filtran por su marca antes de pintar. O
+   * sea: nadie la leía nunca, y lo que se veía era que los trueques se habían ido solos.
+   *
+   * Aquí no hace falta ninguna pantalla nueva: `aviso` viaja dentro de
+   * `TableroDeclarado` a las cuatro. Y no filtra nada: `v.tratos` entero está en la vista
+   * de todos, con su `de` y su `estado`, así que contar las mías es contar lo que ya se ve.
+   *
+   * El día que exista el componedor, su botón apagado dirá lo mismo con la `ayuda` de la
+   * puerta; hasta entonces, ésta es la única boca que tiene esta regla.
+   */
+  if (suyo) {
+    const mias = v.tratos.filter((x) => x.estado === 'propuesta' && x.de === quien).length;
+    if (mias >= PROPUESTAS_VIVAS_A_LA_VEZ) {
+      return (
+        `Tienes ${PROPUESTAS_VIVAS_A_LA_VEZ} propuestas en la mesa: ` +
+        'espera a que se contesten o pasa el turno.'
+      );
+    }
+  }
   return suyo
     ? `Sacaste ${v.ultimaTirada}. Alza, truécalo o pasa.`
     : `Turno de ${de}, que sacó ${v.ultimaTirada}.`;

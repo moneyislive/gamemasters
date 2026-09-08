@@ -137,6 +137,7 @@ import '../../../shared/arcade/juegos';
 import { opcionesSueltas, tableroDeLaVista } from '../../../shared/mecanicas/tablero-declarado';
 import {
   barraEnTres,
+  bienesEnPalabras,
   bienesQueSeCambianPor,
   colocandoEnTres,
   comprarEnTres,
@@ -156,6 +157,21 @@ import {
   opcionesFueraDelTablero,
   renglonDelVado,
   revelarDe,
+  ABRIR_LA_HOJA,
+  ABRIR_LA_HOJA_SIN_CONTESTAR,
+  accionesFueraDelPregon,
+  elComponedor,
+  EL_PREGON_DE_LA_MESA,
+  elPregonEnTres,
+  panelesFueraDelPregon,
+  LAS_MIAS,
+  LO_QUE_DOY,
+  LO_QUE_PIDO,
+  LOS_CERRADOS,
+  NADA_COMPUESTO,
+  opcionesFueraDelPregon,
+  PARA_CONTESTAR,
+  PROPONER,
   seVeEnTres,
   tableroEnTres,
   tirarEnTres,
@@ -168,10 +184,14 @@ import type {
   ColocandoEnTres,
   ColonoEnElMarcador,
   DadosEnTres,
+  ElComponedor,
   IdDeLaBarra,
   JugadaDeCarta,
+  LoQueSeCompone,
   MarcadorEnTres,
+  PregonEnTres,
   TableroEnTres,
+  TiraDelPregon,
   TruequePosible,
 } from '../../../shared/arcade/juegos/riberas-en-tres';
 /*
@@ -217,7 +237,7 @@ import type { MesaVista, OpcionDeMesa, ResultadoDelMovimiento } from './mesa';
  */
 const CAMPO_DE_LA_CAMARA = (45 * Math.PI) / 180;
 import { usarMiradorTactil } from './mirador-tactil';
-import { LETRA, RADIO, SALA } from './muebles';
+import { BOTON, LETRA, RADIO, SALA } from './muebles';
 import { Pantalla } from './piezas';
 import { PLAZOS } from './plazos';
 import { Retablo } from './retablo';
@@ -226,6 +246,7 @@ import {
   ElAviso,
   ESTILOS_DE_LA_MESA,
   LaCronica,
+  hayAlgoQuePintar,
   LasOpciones,
   LineaDelTurno,
 } from './tablero-en-linea';
@@ -739,6 +760,64 @@ function LaMesaEnTres({
   );
   const marcador = useMemo(() => marcadorEnTres(laVista), [laVista]);
   /*
+   * ═══ EL TRUEQUE DEL RETABLO: EL PREGÓN, LA HOJA Y LO QUE SE LLEVA MONTADO ═══
+   *
+   * Vive aquí y no dentro del respaldo porque son ganchos, y un gancho detrás de un `return`
+   * no se puede escribir. El PREGÓN recibe las opciones ENTERAS, antes de ningún filtro: al
+   * revés cada tira se quedaría sin los dos botones que cuelga, que son justo lo que hay que
+   * pulsar. Es el mismo orden que `mazoEnLaBarra` con el mazo.
+   *
+   * Y NADA DE ESTO ENTRA EN `soltarTodo`. Allí se suelta lo que se tiene EN LA MANO porque la
+   * mesa cambió debajo; una propuesta no se tiene en la mano, y el sondeo trae una revisión
+   * nueva cada vez que cualquiera juega: una hoja que se cerrara con cada jugada ajena sería
+   * imposible de leer justo en el turno de otro, que es cuando existe.
+   */
+  const pregon = useMemo(() => elPregonEnTres(laVista, yo, opciones), [laVista, yo, opciones]);
+  const [tratoAbierto, ponerTratoAbierto] = useState<string | null>(null);
+  /*
+   * SE GUARDA EL SEUDÓNIMO Y NO LA TIRA. La que se abrió puede dejar de ser la que era: una
+   * propuesta viva se acepta, se aparta o caduca al pasar el turno, y la vista sólo recuerda
+   * los últimos tratos. Guardando el objeto, la hoja se quedaría ofreciendo «Aceptar» sobre un
+   * trato que el juego ya no ofrece; buscándolo por seudónimo se vuelve lectura sola cuando el
+   * trato se cierra, y se cierra sola cuando desaparece.
+   */
+  const laTiraAbierta = useMemo((): TiraDelPregon<OpcionDeMesa> | null => {
+    if (tratoAbierto === null || pregon === null) return null;
+    return (
+      [...pregon.paraContestar, ...pregon.mias, ...pregon.cerrados].find((x) => x.id === tratoAbierto) ?? null
+    );
+  }, [tratoAbierto, pregon]);
+  useEffect(() => {
+    if (tratoAbierto !== null && laTiraAbierta === null) ponerTratoAbierto(null);
+  }, [tratoAbierto, laTiraAbierta]);
+  /*
+   * LO QUE SE LLEVA MONTADO EN EL COMPONEDOR, y es lo único que esta pantalla guarda de él:
+   * el tope, lo que tengo y cuándo se apaga «Proponer» los deriva `elComponedor` en `shared/`.
+   * Se suelta cuando la puerta se va —al pasar el turno el juego deja de declarar qué trueque
+   * admite—, o dos sales montadas seguirían ahí tres turnos después, sobre una mano que ya no
+   * las tiene.
+   */
+  const [loQueSeCompone, ponerLoQueSeCompone] = useState<LoQueSeCompone>(NADA_COMPUESTO);
+  const [componedorAbierto, ponerComponedorAbierto] = useState(false);
+  const componedor = useMemo(
+    () => elComponedor(laVista, yo, opciones, loQueSeCompone),
+    [laVista, yo, opciones, loQueSeCompone],
+  );
+  const hayPuerta = componedor !== null;
+  useEffect(() => {
+    if (hayPuerta) return;
+    ponerLoQueSeCompone(NADA_COMPUESTO);
+    ponerComponedorAbierto(false);
+  }, [hayPuerta]);
+  const proponerElTrueque = useCallback(
+    (movimiento: { tipo: string; carga: unknown }) => {
+      ponerLoQueSeCompone(NADA_COMPUESTO);
+      ponerComponedorAbierto(false);
+      mesa.mover(movimiento);
+    },
+    [mesa],
+  );
+  /*
    * EL TAPETE DEL TURNO: el color de quien juega, leído de la vista por `shared/`. Sin
    * esto la mesa salía sin tapete en la partida —la entrada de `<Delta>` es opcional y no
    * se caía nada— y con él sólo en el banco.
@@ -961,7 +1040,13 @@ function LaMesaEnTres({
         mesa.mover({ tipo: unico.opcion.tipo, carga: unico.opcion.carga });
         return;
       }
-      /* Riberas exige destinatario: con varios, se pregunta a quién. */
+      /*
+       * Con varios, se pregunta a quién. NO porque «Riberas exija destinatario» —dejó de ser
+       * verdad: `Trato.para` admite `null` y una oferta se puede decir a la mesa—, sino
+       * porque la lista de UNO POR UNO va siempre con asiento dentro, y este gesto sólo sabe
+       * elegir de esa lista. Decirlo a la mesa se hace en el componedor, que tiene su propio
+       * renglón de destino.
+       */
       ponerAQuien(posibles);
     },
     [mesa, cartaCogida, laVista, opciones],
@@ -1130,8 +1215,47 @@ function LaMesaEnTres({
    * lleva hooks, y así se puede llamar detrás de los `return` de abajo.
    */
   const respaldoSobreElRetablo = (nota: string): JSX.Element => {
-    const tablero = tableroDeLaVista(laVista);
-    const sueltas = tablero === null ? opciones : opcionesSueltas(tablero, opciones);
+    /*
+     * ═══ AQUÍ SE JUEGAN LAS MESAS DE CINCO Y DE SEIS, Y POR ESO EL TRUEQUE VIVE TAMBIÉN AQUÍ ═══
+     *
+     * Con más de cuatro colonos el atlas no tiene colores y esta rama deja de ser un respaldo:
+     * es la partida entera. Hasta esta fase, ahí las propuestas no se veían —el pregón cuelga
+     * de la cinta del delta— y aceptar era un botón suelto del retablo, a UN toque, o sea sin
+     * la confirmación que Miguel pidió; y no había manera de montar una oferta de varios
+     * bienes con el dedo.
+     *
+     * CONTESTAR SE VA DE LOS BOTONES POR LOS DOS CAMINOS por los que llega: de las acciones
+     * del tablero, que `Retablo` pinta a un toque, y de las opciones sueltas del pie. Los dos
+     * filtros reciben EL PREGÓN y no un interruptor, así que donde no hay tiras que pulsar
+     * —un mirón— los botones se quedan y la propuesta se puede contestar igual.
+     *
+     * ═══ Y EL PANEL «Trueques» SE VA CON ELLOS, QUE ES LA TERCERA COPIA ═══
+     *
+     * Aquí faltaba entero: `panelesFueraDelPregon` no se usaba ni una vez en todo el cliente,
+     * así que en esta pantalla —la de una mesa de CINCO o de SEIS, o sea la partida entera
+     * para ellas— el mismo trueque VIVO salía dos veces: como tira del pregón («1 piedra →
+     * 1 limo») y como renglón de texto del panel que `Retablo` pinta abajo («t1: Ana da
+     * piedra por limo a Bruno — propuesta»), con dos redacciones distintas. Es la regla de
+     * la casa que se rompe: cada movimiento se enseña exactamente una vez.
+     *
+     * Va sobre el MISMO `pregon` que decide si se pinta `ElPregonEnElRetablo` unas líneas
+     * más abajo, y no sobre un interruptor calculado aparte: son el mismo dato, así que el
+     * panel desaparece exactamente cuando las tiras aparecen. Con `pregon` en `null` —un
+     * mirón, o una mesa sin nada vivo que pregonar— el panel se queda, porque entonces es el
+     * único sitio donde vive lo que ya se trocó.
+     */
+    const tableroEntero = tableroDeLaVista(laVista);
+    const tablero =
+      tableroEntero === null
+        ? null
+        : {
+            ...accionesFueraDelPregon(tableroEntero, pregon),
+            paneles: panelesFueraDelPregon(tableroEntero.paneles, pregon),
+          };
+    const sueltas = opcionesFueraDelPregon(
+      tableroEntero === null ? opciones : opcionesSueltas(tableroEntero, opciones),
+      pregon,
+    );
     return (
       <View style={estilos.todo}>
         <BarraDeLaMesa
@@ -1160,17 +1284,58 @@ function LaMesaEnTres({
         <Text style={estilos.nota} accessibilityRole="alert" accessibilityLiveRegion="polite">
           {nota}
         </Text>
+        {/*
+          EL PREGÓN VA ANTES DEL TABLERO, y no es un gusto: la caja del retablo es `flex: 1` y
+          se come lo que queda de pantalla, así que lo que se ponga debajo empieza fuera del
+          canto en un teléfono. Lo que hay que contestar tiene que verse sin buscarlo.
+        */}
+        {pregon === null ? null : (
+          <ElPregonEnElRetablo pregon={pregon} abierta={tratoAbierto} alAbrir={ponerTratoAbierto} />
+        )}
         {tablero === null ? null : (
           <View style={estilos.cajaDelRetablo}>
             <Retablo tablero={tablero} alTocar={mesa.mover} quieto={mesa.quieto} />
           </View>
         )}
         <ScrollView style={estilos.pieDeLaMesa} contentContainerStyle={{ paddingBottom: abajo }}>
-          {sueltas.length > 0 ? (
+          {/*
+            EL COMPONEDOR VA DEBAJO, al revés que el pregón y por lo contrario: el pregón es de
+            quien NO tiene el turno y hay que verlo sin buscarlo; el componedor es de quien SÍ
+            lo tiene, que ya ha mirado el tablero, y sólo crece cuando se abre.
+          */}
+          {componedor === null ? null : (
+            <ElComponedorEnElRetablo
+              componedor={componedor}
+              ponerPuesto={ponerLoQueSeCompone}
+              quieto={mesa.quieto}
+              abierto={componedorAbierto}
+              alAbrir={ponerComponedorAbierto}
+              alProponer={proponerElTrueque}
+            />
+          )}
+          {/* Lo que decide es lo PINTABLE y no lo que llega: ver `hayAlgoQuePintar`. */}
+          {hayAlgoQuePintar(sueltas) ? (
             <LasOpciones opciones={sueltas} alTocar={mesa.mover} quieto={mesa.quieto} />
           ) : null}
           <LaCronica cronica={mesa.cronica} />
         </ScrollView>
+        {/*
+          LA HOJA, encima de todo y pegada abajo, que es donde están las otras tres de esta
+          pantalla. Aquí es donde se confirma: la tira abre, y la hoja acepta o rechaza.
+        */}
+        {laTiraAbierta === null ? null : (
+          <HojaDeLaPropuesta
+            tira={laTiraAbierta}
+            quieto={mesa.quieto}
+            alElegir={(o) => {
+              ponerTratoAbierto(null);
+              mesa.mover({ tipo: o.tipo, carga: o.carga });
+            }}
+            alDejarlo={() => {
+              ponerTratoAbierto(null);
+            }}
+          />
+        )}
       </View>
     );
   };
@@ -1584,16 +1749,336 @@ function Ojo({
 }
 
 // ---------------------------------------------------------------------------
+// El trueque en el retablo: el pregón, la hoja donde se confirma y el componedor
+// ---------------------------------------------------------------------------
+
+/**
+ * ═══ EL PREGÓN DEL RETABLO, Y VA ANTES QUE EL TABLERO ═══
+ *
+ * En una mesa de CINCO o de SEIS ésta no es una pantalla de respaldo: es la única que hay.
+ * `MANIFIESTO_RIBERAS.jugadores` admite hasta seis y el atlas trae CUATRO colores de
+ * jugador, así que con el quinto sentado se juega aquí la partida entera. Y hasta esta fase,
+ * en esas mesas, contestar un trueque era un botón suelto del retablo que se disparaba de un
+ * toque: la mesa de cinco se quedaba sin la confirmación que Miguel pidió.
+ *
+ * Va ARRIBA, entre la nota y el tablero, y no es un gusto: la caja del retablo es `flex: 1` y
+ * se come lo que queda de pantalla, así que lo que se ponga debajo empieza fuera del canto en
+ * un teléfono. El pregón es de quien NO tiene el turno y tiene que verse sin buscarlo.
+ *
+ * LAS TIRAS NO LLEVAN BOTÓN DENTRO: la tira ENTERA es el botón y lo único que hace es abrir
+ * la hoja. Es lo que Miguel pidió —que aceptar cueste dos toques y que el primero no esté
+ * encima del segundo— y es lo mismo que hace el hermano del escritorio.
+ *
+ * Y AQUÍ NO SE REDACTA NI UNA PALABRA sobre el trueque: la frase, el estado y los dos
+ * rótulos los escribe `elPregonEnTres` en `shared/`, que es donde los lee también el PC.
+ */
+function ElPregonEnElRetablo({
+  pregon,
+  abierta,
+  alAbrir,
+}: {
+  pregon: PregonEnTres<OpcionDeMesa>;
+  abierta: string | null;
+  alAbrir: (id: string) => void;
+}): JSX.Element {
+  const bloques: { rotulo: string; tiras: readonly TiraDelPregon<OpcionDeMesa>[] }[] = [
+    { rotulo: PARA_CONTESTAR, tiras: pregon.paraContestar },
+    { rotulo: LAS_MIAS, tiras: pregon.mias },
+    { rotulo: LOS_CERRADOS, tiras: pregon.cerrados },
+  ];
+  return (
+    <View style={estilos.pregon} accessibilityLabel={EL_PREGON_DE_LA_MESA}>
+      <Text style={estilos.pregonRotulo}>{EL_PREGON_DE_LA_MESA}</Text>
+      {bloques.map((bloque) =>
+        bloque.tiras.length === 0 ? null : (
+          <View key={bloque.rotulo} style={estilos.pregonBloque}>
+            <Text style={estilos.pregonBloqueRotulo}>{bloque.rotulo}</Text>
+            {bloque.tiras.map((t) => {
+              const seContesta = t.aceptar !== null || t.rechazar !== null;
+              return (
+                <Pressable
+                  key={t.id}
+                  style={estilos.pregonTira}
+                  onPress={() => {
+                    alAbrir(t.id);
+                  }}
+                  accessibilityRole="button"
+                  accessibilityState={{ expanded: abierta === t.id }}
+                  accessibilityLabel={`${t.frase}. ${t.comoAnda}. ${seContesta ? ABRIR_LA_HOJA : ABRIR_LA_HOJA_SIN_CONTESTAR}`}
+                >
+                  <View style={[estilos.pregonRail, { backgroundColor: t.color }]} />
+                  <View style={estilos.pregonDicho}>
+                    <Text style={estilos.pregonOferta} numberOfLines={1}>
+                      {`${t.da} → ${t.pide}`}
+                    </Text>
+                    <Text style={estilos.pregonEstado} numberOfLines={1}>
+                      {t.comoAnda}
+                    </Text>
+                  </View>
+                </Pressable>
+              );
+            })}
+          </View>
+        ),
+      )}
+    </View>
+  );
+}
+
+/**
+ * LA HOJA DE UNA PROPUESTA: DONDE SE CONFIRMA, Y ES LA MISMA HOJA QUE LAS OTRAS TRES.
+ *
+ * Mismo mueble que `HojaDeAQuien` y `HojaDeLaCarta` —teja pegada abajo, contorno blanco al
+ * 40 %, `accessibilityViewIsModal`, «Dejarlo» de salida— porque es la misma clase de cosa:
+ * una pregunta de un toque que no puede llevarse el tablero de delante.
+ *
+ * CON UNA TIRA CERRADA —o con una mía— la lista sale VACÍA y la hoja es de LECTURA: qué se
+ * ofreció, a quién y en qué acabó. Es la misma hoja y no un componente nuevo.
+ */
+function HojaDeLaPropuesta({
+  tira,
+  quieto,
+  alElegir,
+  alDejarlo,
+}: {
+  tira: TiraDelPregon<OpcionDeMesa>;
+  quieto: boolean;
+  alElegir: (o: OpcionDeMesa) => void;
+  alDejarlo: () => void;
+}): JSX.Element {
+  const cuales = [tira.aceptar, tira.rechazar].filter((o): o is OpcionDeMesa => o !== null);
+  return (
+    <View style={estilos.hoja} accessibilityViewIsModal>
+      <Text style={estilos.hojaRotulo}>{tira.frase}</Text>
+      <Text style={estilos.hojaTexto}>{tira.comoAnda}</Text>
+      {cuales.map((o) => (
+        <Pressable
+          key={o.id}
+          disabled={quieto}
+          style={estilos.hojaBoton}
+          onPress={() => {
+            alElegir(o);
+          }}
+          accessibilityRole="button"
+          accessibilityLabel={o.rotulo}
+          accessibilityHint={o.ayuda.length > 0 ? o.ayuda : undefined}
+          accessibilityState={{ disabled: quieto }}
+        >
+          <Text style={estilos.hojaBotonRotulo}>{o.rotulo}</Text>
+        </Pressable>
+      ))}
+      <Pressable
+        style={estilos.hojaDejarlo}
+        onPress={alDejarlo}
+        accessibilityRole="button"
+        accessibilityLabel="Dejarlo, sin contestar"
+      >
+        <Text style={estilos.hojaDejarloRotulo}>Dejarlo</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+/**
+ * ═══ EL COMPONEDOR: DONDE SE MONTA UNA OFERTA DE VARIOS BIENES CON EL DEDO ═══
+ *
+ * El juego NO enumera la combinatoria de un trueque con multiplicidad —con el tope de tres y
+ * cinco rivales son 5.000 opciones y 1.141,9 kB en cada lectura de la mesa—: declara la
+ * PUERTA, una opción marcada cuya carga dice qué forma admite el portillo. Esto es lo que la
+ * lee y compone el movimiento, y es la única manera de que un tres por dos se pueda hacer con
+ * el dedo.
+ *
+ * SU BOTÓN SALE DE `puertaDelTrueque` Y NO DE LAS ACCIONES DEL TABLERO. La declaración no
+ * llega ahí a propósito: `tableroDeRiberas` la deja fuera, porque un botón que la mandara tal
+ * cual recibiría «Eso no es un trueque» y no haría nada más.
+ *
+ * Y AQUÍ NO SE DECIDE NINGUNA REGLA: ni el tope por lado, ni cuántas fichas tengo, ni qué
+ * bien no puede estar en los dos lados, ni cuándo se apaga «Proponer». Todo eso lo dice
+ * `elComponedor` en `shared/`, que es donde lo lee también el escritorio; lo que un «+» hace
+ * al pulsarse es guardar el estado que ya viene dentro, y va apagado exactamente cuando ese
+ * estado es `null`. Dos aritméticas del tope serían dos, y la que se rompe es la de aquí.
+ */
+function ElComponedorEnElRetablo({
+  componedor,
+  ponerPuesto,
+  quieto,
+  abierto,
+  alAbrir,
+  alProponer,
+}: {
+  componedor: ElComponedor;
+  ponerPuesto: (lo: LoQueSeCompone) => void;
+  quieto: boolean;
+  abierto: boolean;
+  alAbrir: (abierto: boolean) => void;
+  alProponer: (movimiento: { tipo: string; carga: unknown }) => void;
+}): JSX.Element {
+  const noSePuede = quieto || componedor.movimiento === null;
+  return (
+    <View style={estilos.componedor}>
+      {/*
+        ═══ Y CON LAS CUATRO VIVAS PUESTAS, EL BOTÓN QUE ABRE SE APAGA Y LO DICE ═══
+
+        No es lo mismo que apagar «Proponer», que está dentro: con cuatro propuestas en la
+        mesa no hay NADA que montar hasta que se contesten o pase el turno, y para leer el
+        porqué habría que abrir una caja de ocho renglones. Lo dice el propio botón, con la
+        `ayuda` que escribe el juego —que ya cambia de texto con el tope puesto— y que aquí no
+        se reescribe.
+
+        `noCabenMas` lo cuenta `shared/` y no esta pantalla: es el mismo booleano con el que
+        el escritorio apaga el cuadrado de su cinta, y con la comparación escrita dos veces la
+        que se quedaría atrás es la de este aparato, que se abre menos para mirar.
+
+        Se apaga con COLOR y nunca con `opacity`, que apagaría también la letra: un rótulo en
+        tenue cae de 5,95 a 2,32:1 y `verify:gramatica` lo caza.
+      */}
+      <Pressable
+        style={[estilos.hojaBoton, componedor.noCabenMas && estilos.componedorApagado]}
+        onPress={() => {
+          if (componedor.noCabenMas) return;
+          alAbrir(!abierto);
+        }}
+        accessibilityRole="button"
+        accessibilityState={{ expanded: abierto, disabled: componedor.noCabenMas }}
+        accessibilityLabel={componedor.rotulo}
+        accessibilityHint={componedor.ayuda}
+      >
+        <Text style={estilos.hojaBotonRotulo}>{componedor.rotulo}</Text>
+      </Pressable>
+      {!abierto ? null : (
+        <View style={estilos.componedorDentro}>
+          {/*
+            EL CONMUTADOR. Con dos contadores por fila —lo que doy y lo que pido en el mismo
+            renglón— la fila mide 296 puntos y no cabe en el ancho de ningún teléfono; con el
+            conmutador mide 162 y cabe en los quince lienzos de la casa.
+          */}
+          <View style={estilos.componedorLados}>
+            {(
+              [
+                ['doy', LO_QUE_DOY, componedor.verLoQueDoy],
+                ['pido', LO_QUE_PIDO, componedor.verLoQuePido],
+              ] as const
+            ).map(([cual, rotulo, siguiente]) => (
+              <Pressable
+                key={cual}
+                style={[estilos.componedorMando, componedor.lado === cual && estilos.componedorElegido]}
+                onPress={() => {
+                  ponerPuesto(siguiente);
+                }}
+                accessibilityRole="button"
+                accessibilityState={{ selected: componedor.lado === cual }}
+                accessibilityLabel={rotulo}
+              >
+                <Text style={estilos.componedorMandoRotulo}>{rotulo}</Text>
+              </Pressable>
+            ))}
+          </View>
+          {componedor.renglones.map((r) => (
+            <View key={r.bien} style={estilos.componedorRenglon}>
+              <Text style={estilos.componedorBien} numberOfLines={1}>
+                {r.bien}
+              </Text>
+              <Pressable
+                disabled={r.menos === null || quieto}
+                style={[estilos.componedorMando, (r.menos === null || quieto) && estilos.componedorApagado]}
+                onPress={() => {
+                  if (r.menos !== null) ponerPuesto(r.menos);
+                }}
+                accessibilityRole="button"
+                accessibilityLabel={r.seOyeMenos}
+                accessibilityState={{ disabled: r.menos === null || quieto }}
+              >
+                <Text
+                  style={[estilos.componedorMandoRotulo, (r.menos === null || quieto) && estilos.componedorApagadoRotulo]}
+                >
+                  −
+                </Text>
+              </Pressable>
+              <Text style={estilos.componedorCifra} accessibilityLabel={r.seOye}>
+                {String(r.cuantas)}
+              </Text>
+              <Pressable
+                disabled={r.mas === null || quieto}
+                style={[estilos.componedorMando, (r.mas === null || quieto) && estilos.componedorApagado]}
+                onPress={() => {
+                  if (r.mas !== null) ponerPuesto(r.mas);
+                }}
+                accessibilityRole="button"
+                accessibilityLabel={r.seOyeMas}
+                accessibilityHint={r.porQueNoMas.length > 0 ? r.porQueNoMas : undefined}
+                accessibilityState={{ disabled: r.mas === null || quieto }}
+              >
+                <Text
+                  style={[estilos.componedorMandoRotulo, (r.mas === null || quieto) && estilos.componedorApagadoRotulo]}
+                >
+                  +
+                </Text>
+              </Pressable>
+              <Text style={estilos.componedorTengo}>{`tienes ${String(r.tengo)}`}</Text>
+            </View>
+          ))}
+          {/* A quién: «la mesa» primero, que es el destino que siempre cabe. */}
+          <View style={estilos.componedorLados}>
+            {componedor.destinos.map((d) => (
+              <Pressable
+                key={d.para ?? 'la-mesa'}
+                style={[estilos.componedorMando, d.elegido && estilos.componedorElegido]}
+                onPress={() => {
+                  ponerPuesto(d.elegir);
+                }}
+                accessibilityRole="button"
+                accessibilityState={{ selected: d.elegido }}
+                accessibilityLabel={d.nombre}
+              >
+                <Text style={estilos.componedorMandoRotulo}>{d.nombre}</Text>
+              </Pressable>
+            ))}
+          </View>
+          {/* Lo que se va a mandar, escrito antes de pulsar: cambia con cada toque. */}
+          <Text style={estilos.componedorResumen} accessibilityLiveRegion="polite">
+            {componedor.resumen}
+          </Text>
+          <Pressable
+            disabled={noSePuede}
+            style={[estilos.hojaBoton, noSePuede && estilos.componedorApagado]}
+            onPress={() => {
+              const movimiento = componedor.movimiento;
+              if (movimiento !== null) alProponer(movimiento);
+            }}
+            accessibilityRole="button"
+            accessibilityLabel={PROPONER}
+            accessibilityHint={componedor.porQueNo.length > 0 ? componedor.porQueNo : undefined}
+            accessibilityState={{ disabled: noSePuede }}
+          >
+            <Text style={[estilos.hojaBotonRotulo, noSePuede && estilos.componedorApagadoRotulo]}>{PROPONER}</Text>
+          </Pressable>
+          {componedor.porQueNo.length === 0 ? null : (
+            <Text style={estilos.componedorPorQue}>{componedor.porQueNo}</Text>
+          )}
+        </View>
+      )}
+    </View>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // La hoja de «¿a quién?»
 // ---------------------------------------------------------------------------
 
 /**
  * A QUIÉN SE LE PROPONE EL TRUEQUE, cuando el juego deja proponérselo a varios.
  *
- * Riberas exige destinatario, y la escena no sabe quién hay sentado: la carta se
- * suelta sobre un bien y aquí se pregunta el resto. Es una hoja pequeña encima del
- * lienzo y no una pantalla, porque la pregunta es de un toque y el tablero tiene
- * que seguir a la vista para acordarse de qué se estaba cambiando.
+ * La escena no sabe quién hay sentado: la carta se suelta sobre un bien y aquí se
+ * pregunta el resto. Es una hoja pequeña encima del lienzo y no una pantalla, porque la
+ * pregunta es de un toque y el tablero tiene que seguir a la vista para acordarse de qué
+ * se estaba cambiando.
+ *
+ * Aquí ponía «Riberas exige destinatario» y ya no lo exige: una propuesta se puede decir A
+ * LA MESA (`Trato.para` admite `null`), y el componedor de esta misma pantalla arranca
+ * justamente así —`NADA_COMPUESTO` lleva `para: null`—. Lo que sigue necesitando un
+ * asiento es la LISTA DE UNO POR UNO, que es de donde salen estos botones: cada una de sus
+ * opciones es un movimiento ya montado y dirigido, así que cuando el gesto cae sobre
+ * varias hay que preguntar cuál se manda.
  *
  * Los botones van con el contorno de mando de la Sala y sin acento: son la lista
  * de la gente, no la acción principal. «Dejarlo» es la salida, que hace falta
@@ -1613,7 +2098,7 @@ function HojaDeAQuien({
     <View style={estilos.hoja} accessibilityViewIsModal>
       <Text style={estilos.hojaRotulo}>¿A quién se lo propones?</Text>
       {primero !== undefined ? (
-        <Text style={estilos.hojaTexto}>{`Das ${primero.doy} y pides ${primero.quiero}.`}</Text>
+        <Text style={estilos.hojaTexto}>{`Das ${bienesEnPalabras(primero.doy)} y pides ${bienesEnPalabras(primero.quiero)}.`}</Text>
       ) : null}
       {posibles.map((t) => (
         <Pressable
@@ -2140,6 +2625,94 @@ const estilos = StyleSheet.create({
   hojaLista: { flexGrow: 0, flexShrink: 1, maxHeight: 220 },
   hojaListaDentro: { gap: 8 },
   hojaDejarlo: { minHeight: 44, justifyContent: 'center', alignItems: 'center' },
+  /*
+   * ═══ EL PREGÓN DEL RETABLO: LO MISMO QUE EN EL PC, CON LOS MUEBLES DE AQUÍ ═══
+   *
+   * Ni `flex`, ni alto, ni desplazamiento propio: va en la columna, encima de la caja del
+   * retablo, y mide lo que midan sus tiras. Un `flexGrow` aquí le quitaría alto al tablero,
+   * que es lo que se ha venido a mirar, y con cuatro propuestas vivas se lo quitaría todo.
+   */
+  pregon: { paddingHorizontal: 16, paddingTop: 10, gap: 6 },
+  pregonRotulo: { ...LETRA.rotuloChico, color: SALA.tenue, fontSize: 13 },
+  pregonBloque: { gap: 4 },
+  pregonBloqueRotulo: { ...LETRA.rotuloChico, color: SALA.tenue, fontSize: 13 },
+  /*
+   * LA TIRA: 44 de alto, el mínimo de dedo de la casa, y NI UN BOTÓN DENTRO. La tira entera
+   * es el botón y lo único que hace es abrir la hoja: es lo que Miguel pidió —que aceptar
+   * cueste dos toques— y es lo que hace que la oferta quepa en un teléfono.
+   */
+  pregonTira: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    minHeight: 44,
+    paddingHorizontal: 10,
+    borderRadius: RADIO.mando,
+    borderWidth: 1,
+    borderColor: SALA.filo,
+    backgroundColor: SALA.teja,
+  },
+  /* El raíl de color de quien propone: el mismo dato y el mismo ancho que en la ficha. */
+  pregonRail: { width: 4, alignSelf: 'stretch', marginVertical: 8, borderRadius: 2 },
+  /* `flex: 1` con `minWidth: 0` de hecho: sin él una oferta larga empuja la tira y no se recorta. */
+  pregonDicho: { flex: 1 },
+  pregonOferta: { ...LETRA.cuerpo, color: SALA.palabra, fontSize: 14 },
+  pregonEstado: { ...LETRA.cuerpo, color: SALA.tenue, fontSize: 13 },
+  /*
+   * ═══ EL COMPONEDOR ═══
+   *
+   * Va en el pie, que se desplaza: los ocho renglones son 374 puntos y en un teléfono no
+   * caben debajo del tablero sin rodar. El botón que lo abre es un `hojaBoton`, el mismo que
+   * la lista de una hoja, porque es la misma clase de cosa.
+   */
+  componedor: { paddingHorizontal: 16, paddingTop: 10, gap: 8 },
+  componedorDentro: { gap: 8 },
+  componedorLados: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  /*
+   * UN RENGLÓN POR BIEN: el nombre, «−», la cifra, «+» y cuántas tengo. En fila, con el
+   * nombre cediendo (`flex: 1`) y los dos mandos cuadrados de 44: es el único reparto en el
+   * que la fila mide 162 puntos y cabe en los quince lienzos de la casa.
+   */
+  componedorRenglon: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  componedorBien: { ...LETRA.cuerpo, color: SALA.palabra, fontSize: 14, flex: 1 },
+  componedorMando: {
+    minWidth: 44,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 10,
+    borderRadius: RADIO.mando,
+    borderWidth: 1,
+    borderColor: conAlfa(SALA.blanco, 0.4),
+    backgroundColor: SALA.tejaAlta,
+  },
+  componedorMandoRotulo: { ...LETRA.rotulo, textTransform: 'none', color: SALA.blanco, fontSize: 16 },
+  /*
+   * LO ELEGIDO SE VE POR EL CONTORNO Y NO POR EL FONDO DE ACENTO: en esta Sala el acento
+   * quiere decir «esto es lo que hay que tocar», y con cuatro botones de acento en la misma
+   * caja no se sabría cuál manda. `accessibilityState.selected` lo cuenta a un lector.
+   */
+  componedorElegido: { borderColor: SALA.acento, backgroundColor: SALA.teja },
+  /*
+   * APAGADO SE VE, NO DESAPARECE: saber que existe una jugada que ahora no se puede es
+   * información. Y se apaga con los colores de `BOTON.quieto` —los mismos con los que el
+   * retablo apaga sus acciones—, NUNCA con opacidad: la opacidad apaga también la letra, y
+   * un rótulo en tenue cae de 5,95 a 2,32:1, que ya no se lee. Es la regla de la gramática
+   * de esta casa y hay un comprobador que la persigue.
+   */
+  componedorApagado: { backgroundColor: BOTON.quieto.fondo, borderColor: BOTON.quieto.borde },
+  componedorApagadoRotulo: { color: BOTON.quieto.tinta },
+  componedorCifra: {
+    ...LETRA.dato,
+    fontVariant: [...LETRA.dato.fontVariant],
+    color: SALA.blanco,
+    fontSize: 18,
+    minWidth: 30,
+    textAlign: 'center',
+  },
+  componedorTengo: { ...LETRA.cuerpo, color: SALA.tenue, fontSize: 13 },
+  componedorResumen: { ...LETRA.cuerpo, color: SALA.palabra, fontSize: 14, lineHeight: 20 },
+  componedorPorQue: { ...LETRA.cuerpo, color: SALA.tenue, fontSize: 13, lineHeight: 18 },
   hojaDejarloRotulo: { ...LETRA.rotuloChico, color: SALA.tenue, fontSize: 13 },
   /*
    * ═══ LA CINTA DEL MARCADOR ═══

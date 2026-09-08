@@ -74,9 +74,9 @@ esto, con nombre y fichero:
 |---|---|---|
 | El código de la mesa, quién está sentado, salir, tirar la mesa | `LaFicha` y los dos botones del `<aside class="rail">` de `sala.tsx` (22 rem, `tablero-y-panel`) | `BarraDeLaMesa` de `tablero-en-linea.tsx`, con `paddingTop: arriba + 14` |
 | De quién es el turno | (dentro de `LaFicha`) | `LineaDelTurno` |
-| La frase del juego («Te toca: tira los dados.», «Turno de Ana: está por tirar.») | `<p class="aviso-del-tablero">` ENCIMA del recuadro del lienzo, en flujo —un párrafo con margen, `riberas-en-tres.tsx` 1253 y `estilo.css` 1603, no un vidrio sobre la escena—, texto de `avisoDe` en `riberas.ts` (4174–4193) | el mismo `aviso` dentro del retablo; en la rama del delta no se pinta hoy |
+| La frase del juego («Te toca: tira los dados.», «Turno de Ana: está por tirar.») | `<p class="aviso-del-tablero">` ENCIMA del recuadro del lienzo, en flujo —un párrafo con margen, `riberas-en-tres.tsx` y la regla `.aviso-del-tablero` de `estilo.css`, no un vidrio sobre la escena—, texto de `avisoDe` en `riberas.ts` | el mismo `aviso` dentro del retablo; en la rama del delta no se pinta hoy |
 | El marcador: puntos, cartas, guardias, el Vado con su largo, la Guardia, títulos, el mazo que queda | `MarcadorDeRiberas` en el raíl | `ElMarcador`, una cinta horizontal de `FichaDelColono` entre el aviso y el lienzo |
-| Tirar, pasar, aceptar, rechazar, contestar, empezar | `<Formulario>` bajo el lienzo, con `opcionesFueraDeLaMesa(opcionesFueraDeLaBarra(opcionesFueraDeLaMano(opcionesFueraDelTablero(o)), mazo), dados)` (`riberas-en-tres.tsx` 845 y 955; desde la fase 3 TIRAR se cae donde hay dados, §1.4) | `LasOpciones` en el `ScrollView` del pie, misma composición (`riberas-en-tres-escena.tsx` 752 y 779) |
+| Tirar, pasar, empezar — y NO aceptar ni rechazar, que se los lleva el pregón | `<Formulario>` bajo el lienzo, con `opcionesFueraDelPregon(opcionesFueraDeLaMesa(opcionesFueraDeLaBarra(opcionesFueraDeLaMano(opcionesFueraDelTablero(o)), mazo), dados), pregon)` en `riberas-en-tres.tsx` (desde la fase 3 TIRAR se cae donde hay dados, §1.4; y desde el trueque, contestar se cae donde hay pregón) | `LasOpciones` en el `ScrollView` del pie, misma composición, en `riberas-en-tres-escena.tsx` |
 | La crónica | `LaCronica` en el raíl | `LaCronica` en el pie |
 
 El lienzo del escritorio mide `62vh` con un mínimo de 420 px (`estilo.css`,
@@ -736,8 +736,17 @@ cada una suma de alto:
   172 en un Android de 360, 193 en un iPhone 14, 223 en un Pro Max, 253 en la tableta,
   552 en el monitor.
 - **Los botones sueltos.** Una línea más de 44 puntos, en el mismo tercio y sólo cuando
-  hay botones tras `opcionesFueraDeLaMesa` (pasar, aceptar, rechazar, contestar,
-  empezar), con el rótulo del juego tal cual, como `LasOpciones`. Suma **44**.
+  quedan botones al final de la cadena, que hoy acaba en `opcionesFueraDelPregon(...)` y
+  no en `opcionesFueraDeLaMesa`. **Aceptar y rechazar ya NO están ahí**: se los lleva el
+  pregón, y ponerlos además aquí sería ofrecer contestar dos veces en la misma pantalla
+  (§5 de `docs/EL-TRUEQUE-DE-RIBERAS.md`). Lo que queda son pasar, empezar y lo que el
+  tablero no sabe pintar. Medido en el navegador sobre una mesa de CINCO —la que cae al
+  retablo, o sea la única pantalla que esas mesas tienen—, enumerando el DOM: en la silla
+  de quien NO tiene el turno no queda **ningún** botón suelto (lo único que se pulsa son
+  las dos tiras del pregón y las dos salidas del raíl, «Levantarse de la mesa» y «Tirar la
+  mesa»); en la de quien SÍ lo tiene quedan «Pasar el turno» y «Proponer un trueque», más
+  la lista de uno por uno. Ni un aceptar ni un rechazar en ninguna de las dos. Con el
+  rótulo del juego tal cual, como `LasOpciones`. Suma **44**.
 
 La suma máxima es por tanto **88 puntos** (el marcador NO añade línea: va en el cajón,
 decisión 11). A 88 la cinta sigue sin tocar ninguna carta (las manos no se acercan al

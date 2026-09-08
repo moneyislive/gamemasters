@@ -3027,6 +3027,44 @@ code {
   color: var(--tenue);
   cursor: default;
 }
+/*
+ * ═══ EL CUADRADO DE LA PUERTA DEL TRUEQUE: EL ÚNICO QUE NO RUEDA ═══
+ *
+ * Los demás cuadrados de esta tira se van por el canto cuando el carril se llena —rueda a lo
+ * ancho, y eso es lo que hace que quepan—. Éste se queda pegado al canto izquierdo porque es
+ * el que abre el componedor, y el §3.2 del diseño le pide justamente eso: «el renglón puede
+ * quedar fuera del recorte del pregón; el botón no, porque está en la cinta».
+ *
+ * ═══ Y AQUÍ SE DEFENDÍA UN CASO QUE EL JUEGO NO PRODUCE, QUE ES PEOR QUE NO DEFENDER ═══
+ *
+ * Ponía: «con un siete de verdad en la mesa el carril lleva veinte destinos del estiaje, y
+ * sin esto proponer un trueque sería rodar veinte cuadrados hacia atrás». NO PUEDE PASAR, y
+ * está medido sobre el árbitro de verdad en ocho partidas: con `estiajePorMover` encendido,
+ * `opcionesDeTurno` sale por su `return` temprano —sólo los destinos y revelar— y NO emite
+ * la puerta del trueque, así que este cuadrado no está en pantalla mientras están los veinte.
+ * La puerta se declaró 31.898 veces, coexistió con `estiajePorMover` CERO veces, y las
+ * opciones sueltas que la acompañan fueron SIEMPRE `["pasar"]`.
+ *
+ * O sea que hoy el carril con la puerta puesta lleva DOS cuadrados y no rueda. El `sticky`
+ * se queda —no estorba, y el día que las sueltas crezcan hace lo que dice— pero la razón que
+ * lo justificaba era falsa, y una decisión defendida con un caso que no existe es la que
+ * nadie vuelve a mirar.
+ *
+ * `position: sticky` con `left: 0` dentro del propio desplazador, que es la única manera de
+ * quedarse quieto sin sacarlo de la tira: sacado, la tira dejaría de medir 44 puntos de una
+ * pieza y habría dos altos que cuadrar. Y con FONDO propio, que los demás cuadrados no
+ * llevan: sin él los que ruedan por debajo se leerían a través de la flecha.
+ *
+ * El filo de la derecha dice dónde acaba lo que está quieto y empieza lo que rueda. Es la
+ * misma raya que separa dos cuadrados cualesquiera, sólo que aquí no se mueve.
+ */
+.riberas-carril-puerta {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--teja-alta);
+  box-shadow: 1px 0 0 0 var(--filo);
+}
 
 /*
  * EL RÓTULO Y LA AYUDA DEL BOTÓN, FUERA DE LA VISTA Y DENTRO DEL ÁRBOL. Es la misma técnica
@@ -3417,6 +3455,238 @@ code {
   color: var(--tenue);
   font-size: 0.82rem;
 }
+
+/*
+ * ═══ EL PREGÓN DEL RETABLO: EL MISMO DATO, OTRA CAJA ═══
+ *
+ * En una mesa de cinco o de seis no hay lienzo, así que no hay cinta de la que colgar el
+ * pregón: aquí es un `.panel` en flujo, del ancho de la columna, y va ARRIBA —entre la letra
+ * chica y el tablero— porque debajo del SVG no se ve. Medido en los quince lienzos de la
+ * casa: en cuatro el tablero ya pasa del pliegue él solo, y sólo seis dejan debajo los
+ * 233,75 puntos que miden el rótulo y cuatro tiras.
+ *
+ * Ni `position`, ni `z-index`, ni `overflow`, ni ancho: aquí la página RUEDA y la rejilla de
+ * la Sala pone el ancho. Lo único que hace falta es el aire de debajo, para que la caja no
+ * salga pegada al tablero. La TIRA de dentro es la misma que en el lienzo
+ * (`.riberas-pregon-tira`), que es donde vive el recorte del renglón de estado.
+ */
+/*
+ * Las tiras se pintan de canto a canto de la caja —al pasar el ratón se ve el fondo entero,
+ * como en el lienzo—, así que el panel pierde su relleno lateral y se lo devuelve por dentro
+ * al rótulo. Cada tira lleva el suyo, que es el mismo `12px` de `MARGEN_DE_LA_TIRA`: el
+ * número con el que se mide cuántas letras caben en el renglón de estado.
+ */
+.riberas-pregon-en-el-retablo {
+  margin-bottom: 1rem;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.riberas-pregon-en-el-retablo > .rotulo-de-panel,
+.riberas-pregon-en-el-retablo .riberas-pregon-bloque > .rotulo-de-panel {
+  margin-left: 1.25rem;
+  margin-right: 1.25rem;
+}
+
+/*
+ * Y el rótulo de cada bloque, un escalón por debajo del de la caja: son tres montones de la
+ * misma cosa —lo que puedo contestar, lo mío y lo cerrado— y no tres paneles.
+ */
+.riberas-pregon-en-el-retablo .riberas-pregon-bloque {
+  margin-top: 0.75rem;
+}
+
+/*
+ * ═══ EL COMPONEDOR: LA ÚNICA MANERA DE MONTAR UN TRUEQUE DE VARIOS BIENES ═══
+ *
+ * Va DEBAJO del tablero y no arriba, al revés que el pregón, y por lo contrario: el pregón
+ * es de quien NO tiene el turno y hay que verlo sin buscarlo; el componedor es de quien SÍ
+ * lo tiene, que ya ha mirado el tablero, y sólo crece cuando se abre.
+ *
+ * A TODO EL ANCHO de la columna, que es lo que el renglón necesita: la ficha (44), el «−»
+ * (44), la cifra (30) y el «+» (44) son 162 puntos, y el ancho de la cinta se queda corto en
+ * los cuatro lienzos de pie de la casa (128, 144, 156 y 156). Aquí no hay cinta que medir.
+ */
+.riberas-componedor {
+  margin-top: 1rem;
+}
+
+.riberas-componedor-dentro {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+/*
+ * EL CONMUTADOR DE LADO Y LA FILA DE DESTINOS: los mismos botones de la casa, en fila y
+ * envolviendo. `min-width: 0` sobre los hijos porque un `.opcion` trae `min-width: 14rem` y
+ * dos de ésos no caben en una columna de 286 puntos: aquí son etiquetas cortas —«Doy»,
+ * «Pido», un nombre— y el suelo de ancho no compra nada.
+ */
+.riberas-componedor-lados {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.riberas-componedor-lados > .opcion {
+  min-width: 0;
+  flex: 1 1 auto;
+  justify-content: center;
+  text-align: center;
+}
+
+/*
+ * LO ELEGIDO SE VE, Y SE VE CON EL FILO Y NO CON EL FONDO DE ACENTO. La placa de acento es
+ * de UNA cosa por pantalla —aquí lo es «Proponer»— y con cuatro botones de acento en la
+ * misma caja no se sabría cuál manda. `aria-pressed` lo cuenta a un lector; esto lo cuenta
+ * al ojo, y las dos cosas están puestas.
+ */
+.riberas-elegida {
+  border-color: var(--acento);
+  color: var(--palabra);
+  box-shadow: inset 0 0 0 1px var(--acento);
+}
+
+/*
+ * UN RENGLÓN POR BIEN: el nombre, «−», la cifra, «+», y a la derecha en tenue cuántas tengo.
+ * En rejilla y no en `flex` para que las cifras de los cinco renglones queden en la misma
+ * columna: con `flex` cada una se coloca donde la deja el nombre de su bien, y una columna
+ * de números desalineados se lee dos veces.
+ */
+.riberas-componedor-renglon {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto auto auto;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.riberas-componedor-bien {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/*
+ * LOS DOS MANDOS SON CUADRADOS DEL SUELO DE TOQUE, y `min-width: 0` por lo mismo que arriba:
+ * un «+» de 238 puntos de ancho dejaría el renglón sin sitio para el nombre del bien.
+ */
+.riberas-componedor-mando {
+  min-width: 0;
+  width: 2.75rem;
+  padding: 0;
+  justify-content: center;
+  text-align: center;
+}
+
+/* La cifra, en la letra de dato para que las cinco ocupen lo mismo y no bailen al subir. */
+.riberas-componedor-cifra {
+  font-family: var(--letra-dato);
+  font-weight: 600;
+  min-width: 1.75rem;
+  text-align: center;
+}
+
+.riberas-componedor-tengo {
+  color: var(--tenue);
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+/* Lo que se va a mandar, escrito antes de pulsar. Es región viva: cambia con cada toque. */
+.riberas-componedor-resumen {
+  margin: 0;
+  color: var(--palabra);
+}
+
+/*
+ * ═══ LA HOJA FIJA: SOBRE LA VENTANA, PORQUE AQUÍ LA PÁGINA RUEDA ═══
+ *
+ * En el lienzo, el menú de elegir se coloca dentro del recuadro, que vale la ventana entera.
+ * En el retablo no hay recuadro y la página rueda: colocada sobre el flujo, la hoja de una
+ * propuesta se quedaría centrada en un documento de mil puntos, o sea fuera de la pantalla en
+ * cuanto alguien haya bajado a mirar el tablero. Con `fixed` se coloca donde está mirando
+ * quien acaba de tocar la tira, y el velo cubre la ventana y no un trozo de página.
+ *
+ * El tope de alto pasa a ser el de la VENTANA por lo mismo: `100%` de un antepasado que mide
+ * el documento entero no es un tope, es una promesa de que la hoja cabe siempre.
+ */
+.riberas-velo-fijo {
+  position: fixed;
+}
+
+.riberas-elige-fijo {
+  position: fixed;
+  max-height: calc(100vh - 1.5rem);
+}
+/*
+ * ═══ EL COMPONEDOR EN EL LIENZO: MODAL, A TODO EL ANCHO Y COLGADO DE LA CINTA ═══
+ *
+ * Es la hermana del cajón del marcador —mismo sitio, mismo fondo, mismo `z-index`, mismo
+ * velo detrás— y se distingue en dos cosas, las dos medidas:
+ *
+ *   · VA A TODO EL ANCHO Y NO A LO QUE MIDE LA CINTA. El renglón de un bien es la ficha
+ *     (44), el «−» (44), la cifra (30) y el «+» (44): 162 puntos, y el tercio central de la
+ *     cinta se queda corto en los lienzos de pie de esta casa (128, 144, 156 y 156). El
+ *     cajón puede medir lo que la cinta porque lo que lleva dentro son renglones de texto
+ *     que se parten; aquí lo que hay son cinco mandos en fila que no se parten. Y se puede
+ *     porque es MODAL: con el velo puesto no hay carta que arrastrar a los lados, que es
+ *     justo el motivo por el que la cinta mide un tercio.
+ *   · ARRANCA SIEMPRE BAJO EL CARRIL, y no a veces. El cuadrado que lo abre VIVE en el
+ *     carril, así que cuando esta caja existe la cinta mide dos tiras sin excepción: no hay
+ *     una clase `-bajo-el-carril` que poner porque no hay el otro caso. Escrito en `rem`
+ *     como la cinta, para que crezcan juntos con la preferencia de tamaño de letra.
+ *
+ * Y RUEDA POR DENTRO: ocho renglones del suelo de toque son 374 puntos con la raíz de esta
+ * casa, y en los lienzos bajos de la lista no caben. `touch-action: auto` no es adorno
+ * —`.riberas-lienzo` lleva `none` por el gesto del delta y esto lo heredaría—, y
+ * `overscroll-behavior: contain` para que al llegar al final no se lo lleve la mesa.
+ *
+ * El tope de alto se escribe con `max-height` y no con `bottom`, al revés que el cajón: el
+ * cajón es el raíl entero y siempre llena lo que hay; esto tiene el alto que tenga —dos
+ * renglones puestos o cinco— y estirarlo hasta el canto dejaría media caja de vidrio vacía
+ * encima de la barra de piezas.
+ */
+.riberas-componedor-hoja {
+  position: absolute;
+  top: 5.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  width: calc(100% - 1.5rem);
+  max-height: calc(100% - 6.25rem);
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem;
+  background: var(--teja);
+  border-radius: var(--radio-ficha);
+  box-shadow:
+    0 0 0 1px var(--filo),
+    0 24px 50px -24px var(--sombra);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: auto;
+}
+
+/*
+ * Y DENTRO DE ESTA CAJA LAS TRIPAS NO LLEVAN SU MARGEN DE ARRIBA: en el retablo ese margen
+ * las separa del botón que las abre, que está justo encima; aquí el botón está en la cinta y
+ * lo de encima es la regla del juego, que ya trae el aire de la caja (`gap`).
+ */
+.riberas-componedor-hoja .riberas-componedor-dentro {
+  margin-top: 0;
+}
+
+/*
+ * LA REGLA DEL JUEGO, EN TENUE Y SIN EL MARGEN NEGATIVO que `.riberas-elige-nota` lleva para
+ * pegarse al título de una hoja apretada. Aquí el aire lo pone el `gap` de la caja.
+ */
+.riberas-componedor-hoja .riberas-elige-nota {
+  margin: 0;
+}
+
 
 /*
  * ═══ EL MARCADOR DEL RAÍL ═══

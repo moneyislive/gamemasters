@@ -78,8 +78,68 @@ export interface Opcion {
   id: string;
   /** El tipo del movimiento que manda elegirla. */
   tipo: string;
-  /** Su carga, ya montada. `unknown` por lo mismo que `Movimiento.carga`. */
+  /**
+   * Su carga, ya montada. `unknown` por lo mismo que `Movimiento.carga`.
+   *
+   * SALVO cuando la opción trae `declaracion: true`, y entonces esto no es un
+   * movimiento montado sino lo que el juego admitiría. El caso entero está contado
+   * en la cabecera de `declaracion`, aquí abajo, y hoy hay UNO en todo el árbol.
+   */
   carga: unknown;
+  /**
+   * ESTO NO ES UN MOVIMIENTO: ES UNA DECLARACIÓN DE LO QUE EL JUEGO ADMITIRÍA.
+   *
+   * ═══ QUÉ SIGNIFICA, Y QUÉ HAY QUE HACER CON ELLA ═══
+   *
+   * NO LA MANDES. Léela para construir el movimiento que sí se manda. Una opción con
+   * esta marca lleva en `carga` los límites de una FAMILIA de movimientos —un tope,
+   * una lista de destinos— y no una carga que el reductor pueda ejecutar. Mandada tal
+   * cual, lo mejor que puede pasar es que el reductor conteste con un motivo.
+   *
+   * ═══ POR QUÉ EXISTE, QUE ES LO QUE JUSTIFICA ROMPER LA PROMESA DE `carga` ═══
+   *
+   * Un juego puede tener una familia de movimientos que NO CABE en una lista. El caso
+   * que la estrena es el trueque de Riberas: con topes de tres bienes por lado y cinco
+   * rivales, enumerar «cualquier montón por cualquier montón» son 5.000 opciones y
+   * 1.141,9 kB de lista, y esa lista viaja entera a cada aparato en CADA lectura de la
+   * mesa. Contra 54 opciones y 9,3 kB, que es la lista más larga que se ve hoy jugando.
+   * La lista no puede ser la interfaz; la declaración es lo que la sustituye, y quien
+   * valida el miembro concreto es el reductor mirando el estado.
+   *
+   * ═══ QUIÉN LA ESCRIBE Y QUIÉN LA LEE ═══
+   *
+   * La escribe el juego, en la opción de puerta, y hoy sólo lo hace Riberas.
+   *
+   * La leen, y son cuatro clases de lector:
+   *  1. LOS MUEBLES GENÉRICOS QUE PINTAN OPCIONES. Una opción con esta marca NO SE
+   *     PINTA como botón: pulsarla no jugaría nada.
+   *  2. LOS FILTROS DEL PROPIO JUEGO, para no depender de que cada mueble se acuerde.
+   *  3. QUIEN BUSCA LA PUERTA, que la encuentra POR LA MARCA y nunca por su `id`: un
+   *     convenio en el `id` lo conoce quien lo escribió y nadie más, y este tipo
+   *     existe justamente para los arcades que esta casa no escribe.
+   *  4. QUIEN JUEGA A CIEGAS eligiendo de `opciones()`, que la salta.
+   *
+   * ═══ QUIÉN NO LA LEE, A PROPÓSITO ═══
+   *
+   * El portillo que compara lo que se manda contra lo que se ofreció. Esa comparación
+   * mira `{ tipo, carga }` y nada más: la marca es de la PANTALLA y no de la
+   * legalidad, y meterla dentro cambiaría la firma de todas las opciones de todos los
+   * juegos por una que sólo usa uno.
+   *
+   * ═══ QUÉ SE ROMPE SI ALGUIEN LA IGNORA ═══
+   *
+   * Un botón encendido que no juega. Pulsado, manda la declaración, recibe un motivo y
+   * no pasa nada más. Es el mismo fallo que esta casa tiene medido en 2.834
+   * movimientos: una pieza encendida que no responde. Y un jugador ciego que la ignore
+   * gasta una de cada N elecciones en un movimiento que nunca avanza la partida.
+   *
+   * ═══ POR QUÉ OPCIONAL Y SÓLO `true` ═══
+   *
+   * Aditiva: una opción que no la trae se comporta exactamente como antes de que esto
+   * existiera, y los juegos que no la escriben no se enteran. Y sin `false` posible,
+   * porque un `declaracion: false` es una frase que alguien acaba leyendo al revés.
+   */
+  declaracion?: true;
   /**
    * Lo que se lee en el botón.
    *

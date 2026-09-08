@@ -207,6 +207,7 @@ export {
   PUNTOS_DEL_VADO,
   PUNTOS_DE_LA_GUARDIA,
   PUNTOS_PARA_GANAR,
+  PROPUESTAS_VIVAS_A_LA_VEZ,
   recalcularElVado,
   comoSiSiempreHubieraHabidoMazo,
   recalcularLaGuardia,
@@ -219,6 +220,7 @@ export {
   TIRAR,
   TITULOS,
   TOPE_DE_PIEZAS,
+  TOPE_POR_LADO_DEL_TRUEQUE,
   VADO_MINIMO,
   VEREDAS_DE_LA_CARTA,
 } from './riberas';

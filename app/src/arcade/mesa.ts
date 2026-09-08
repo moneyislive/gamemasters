@@ -131,6 +131,18 @@ export interface OpcionDeMesa {
   carga: unknown;
   rotulo: string;
   ayuda: string;
+  /**
+   * ESTO NO ES UN MOVIMIENTO: ES UNA DECLARACIÓN, Y `LasOpciones` NO LA PINTA.
+   *
+   * Ver `Opcion.declaracion` en `shared/arcade/opciones.ts`, que es donde está contado
+   * el caso entero: la opción lleva dentro los límites de una FAMILIA de movimientos
+   * —un tope, una lista de destinos— porque enumerar esa familia serían miles de
+   * botones y más de un mega de lista por cada lectura de la mesa. Mandada tal cual no
+   * juega nada: la pantalla que sepa leerla compone el movimiento y manda ése.
+   *
+   * Opcional, y por lo mismo que el resto de este tipo: esto es lo que la app RECIBE.
+   */
+  declaracion?: true;
 }
 
 /** En qué punto está esta pantalla. */

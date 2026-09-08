@@ -19,7 +19,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { MouseEvent as ClicDeReact } from 'react';
 import { Catalogo, usarElCatalogo } from './catalogo';
 import type { ElCatalogo } from './catalogo';
-import { Formulario } from './formulario';
+import { Formulario, hayAlgoQuePintar } from './formulario';
 import { haEmpezado } from './empezada';
 import { usarMesaDeArcade } from './mesa';
 import type { FaseDeLaMesa, LaMesa } from './mesa';
@@ -436,7 +436,23 @@ export function leerAforo(ficha: unknown): Aforo | null {
   return { minimo, maximo };
 }
 
-function LaMesaPuesta({
+/**
+ * LA MESA CON ALGUIEN DENTRO: el tablero, el raíl y las dos salidas.
+ *
+ * ═══ SE EXPORTA, Y ES POR UNA COSA QUE NO SE PODÍA MEDIR DE OTRA MANERA ═══
+ *
+ * Aquí dentro se decide si el panel «Trueques» del cajón se retira porque el pregón lo
+ * hereda, y esa decisión estuvo MAL una fase entera —con `conLienzo &&` puesto, en la única
+ * pantalla que tiene una mesa de cinco— sin que `verify:escritorio` se pusiera rojo. Lo
+ * único que había encima era una expresión regular sobre el fuente que exigía que la
+ * llamada EXISTIERA, y una regular no puede ver CON QUÉ se la llama: quitando la guarda
+ * salía igual de verde que dejándola.
+ *
+ * Exportado, el comprobador lo pinta con cinco asientos de verdad y cuenta los rótulos del
+ * árbol. No se exporta para «poder probar»: se exporta porque lo que hay que comprar es el
+ * HTML, y el HTML no sale de ninguna otra puerta.
+ */
+export function LaMesaPuesta({
   manifiesto,
   mesa,
   silla,
@@ -596,18 +612,34 @@ function LaMesaPuesta({
    * que se quedaría atrás el día que una cambie es la que vive dentro de un cajón que hay
    * que abrir.
    *
-   * SE PREGUNTA AQUÍ Y NO ABAJO PORQUE EL RAÍL SE MONTA AQUÍ, y la respuesta depende de
-   * `conLienzo`, que es lo único que sabe si hay cinta de la que colgar un pregón: por el
-   * camino del respaldo —cinco colonos, el `.glb` que no llega— no la hay, el panel es el
-   * ÚNICO sitio donde vive lo que ya se trocó, y ahí se queda.
+   * ═══ Y AQUÍ PONÍA `conLienzo &&`, QUE ES DE CUANDO EL RETABLO NO TENÍA PREGÓN ═══
+   *
+   * Decía que la respuesta «depende de `conLienzo`, que es lo único que sabe si hay cinta de
+   * la que colgar un pregón: por el camino del respaldo —cinco colonos, el `.glb` que no
+   * llega— no la hay, el panel es el ÚNICO sitio donde vive lo que ya se trocó». Dejó de ser
+   * verdad en la fase en la que el retablo estrenó pregón: `RiberasEnTres`, por el camino del
+   * respaldo, pinta `ElPregonDelRetablo` encima del `<Retablo>`. O sea que en la ÚNICA
+   * pantalla que existe para una mesa de CINCO o de SEIS —el atlas trae cuatro colores— el
+   * mismo trueque vivo salía DOS VECES: como tira del pregón («1 piedra → 1 limo») y como
+   * renglón del panel del cajón («t1: Ana da piedra por limo a Bruno — propuesta»), con dos
+   * redacciones distintas. Reproducido en el navegador con cinco asientos de verdad.
+   *
+   * Lo que decide es lo que decide el PINTOR, y el pintor pinta el pregón por los dos
+   * caminos —el delta y el respaldo— siempre que haya algo vivo que pregonar. Así que la
+   * condición correcta es la que ya está escrita en `shared/`: `elPregonEnTres` devuelve
+   * `null` cuando no hay nada vivo, y ese `null` es lo que deja el panel en su sitio. Con
+   * eso, mirón incluido, el panel sigue siendo el único sitio donde vive lo ya cerrado
+   * exactamente cuando no hay pregón que lo herede.
    *
    * ES LA MISMA FUNCIÓN PURA QUE LLAMA EL PINTOR, con los mismos argumentos, y eso es lo
    * contrario de dos criterios: no hay dos maneras de decidir si hay pregón, hay UNA escrita
    * en `shared/` que se pregunta desde los dos sitios que necesitan la respuesta. Un
-   * `boolean` calculado a mano aquí sí habría sido un segundo criterio.
+   * `boolean` calculado a mano aquí sí habría sido un segundo criterio — y `conLienzo` era
+   * justamente eso: un segundo criterio, y encima uno que ya no coincidía con el primero.
    */
-  const elPregonSePinta =
-    conLienzo && esRiberas ? elPregonEnTres(puesta.vista, puesta.yo, puesta.opciones ?? []) : null;
+  const elPregonSePinta = esRiberas
+    ? elPregonEnTres(puesta.vista, puesta.yo, puesta.opciones ?? [])
+    : null;
 
   /*
    * ═══ EL RAÍL SE MONTA UNA VEZ Y VIVE EN DOS SITIOS ═══
@@ -860,7 +892,8 @@ function FormularioSiHayAlgo({
   alElegir: (movimiento: MovimientoDeclarado) => void;
   quieto: boolean;
 }): JSX.Element | null {
-  if (opciones.length === 0) return null;
+  /* Lo que decide es lo PINTABLE y no lo que llega: ver `hayAlgoQuePintar`. */
+  if (!hayAlgoQuePintar(opciones)) return null;
   return (
     <Formulario
       opciones={opciones}

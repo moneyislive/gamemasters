@@ -162,7 +162,7 @@ import {
   TICS_PARA_COLOCARSE,
 } from '../../shared/arcade/juegos';
 import type { MesaEnCurso } from '../src/arcade/mesas';
-import { abrirMesa, avanzarElReloj, jugar } from '../src/arcade/arbitro';
+import { abrirMesa, avanzarElReloj, jugar, jugarConMotivo } from '../src/arcade/arbitro';
 import type { Mesa } from '../src/arcade/arbitro';
 
 const REPO = path.resolve(import.meta.dirname ?? __dirname, '..', '..');
@@ -399,6 +399,22 @@ function toquesDelTablero(vista: unknown): Toque[] {
  */
 const TOPE_DE_OFERTAS = 2;
 
+/**
+ * CADA CUÁNTAS VUELTAS SE BARRE LA LISTA ENTERA DE OPCIONES.
+ *
+ * La barrida aplica TODAS las opciones del que tiene el turno sobre una copia que se
+ * tira, para exigir que ninguna vuelva muda: o cambia el estado, o dice por qué no. Ver
+ * `Partida.mudas`.
+ *
+ * No se hace en cada vuelta porque cada aplicación vuelve a componer la lista entera
+ * dentro del portillo, y con listas de más de cincuenta opciones eso son cientos de
+ * miles de reducciones por partida. Con el paso puesto salen unas dos mil por tanda, que
+ * ya recorren la colocación, el turno con dados, el siete, el descarte y el final — y el
+ * recuento de barridas se afirma abajo, para que bajarlo hasta que deje de estorbar se
+ * ponga rojo en vez de dejar la afirmación vacía.
+ */
+const CADA_CUANTO_SE_BARRE = 17;
+
 /** Los movimientos de Riberas que este bucle nombra. Nada más que sus etiquetas. */
 const R = {
   empezar: 'riberas:empezar',
@@ -548,6 +564,127 @@ function hayTruequeAbierto(espectador: unknown): boolean {
   const tratos = (espectador as { tratos?: unknown }).tratos;
   if (!Array.isArray(tratos)) return false;
   return tratos.some((t) => (t as { estado?: unknown }).estado === 'propuesta');
+}
+
+/**
+ * ═══ Y LA PUERTA DEL TRUEQUE, QUE ES LA ÚNICA JUGADA QUE NO SE PUEDE PULSAR ═══
+ *
+ * Desde que un trueque puede llevar hasta tres bienes por lado, esa familia NO CABE en
+ * la lista de opciones: enumerarla son 5.000 opciones y 1,14 MB por cada lectura de la
+ * mesa. Así que el juego emite UNA opción marcada con `declaracion`, que no es un
+ * movimiento montado sino los límites de lo que admite —un tope, una lista de destinos y
+ * si vale decirlo a la mesa— y quien quiera trocar en gordo COMPONE el movimiento.
+ *
+ * Y por eso el bucle de aquí abajo no la alcanzaba: lee el TABLERO, y el juego saca la
+ * declaración de sus acciones justamente para que nadie la pulse. O sea que con la
+ * política de familias sola, este comprobador jugaría tres partidas enteras sin proponer
+ * NI UN trueque de más de un bien por lado — la mitad del encargo, sin estrenar, y las
+ * afirmaciones de abajo verdes igual. Es el mismo verde por conjunto vacío que este
+ * fichero ya tiene apuntado tres veces.
+ *
+ * Así que se lee de `opcionesDeArcade`, que es lo que la mesa mete en `VistaDeMesa` al
+ * lado de la vista y lo que de verdad baja por el cable: no es mirar la implementación,
+ * es leer el otro campo del mismo sobre. Y componer con `misFichas` es lo que hace la
+ * pantalla, porque mi propia mano SÍ está en mi vista.
+ */
+function laPuertaDelTrueque(vista: unknown, quien: QuienMira): { tope: number; a: string[]; mesa: boolean } | null {
+  for (const o of opcionesDeArcade(RIBERAS, vista, quien)) {
+    if (o.declaracion !== true) continue;
+    const c = o.carga as { tope?: unknown; a?: unknown; mesa?: unknown };
+    if (typeof c.tope !== 'number' || !Array.isArray(c.a)) return null;
+    return { tope: c.tope, a: c.a as string[], mesa: c.mesa === true };
+  }
+  return null;
+}
+
+/** Cuántas fichas de cada clase tengo, leyendo mi propia vista y de ahí nada más. */
+function loQueTengoPorClase(vista: unknown): Map<string, number> {
+  const cuenta = new Map<string, number>();
+  const mias = (vista as { misFichas?: unknown }).misFichas;
+  if (!Array.isArray(mias)) return cuenta;
+  for (const ficha of mias) {
+    if (typeof ficha !== 'string') continue;
+    const clase = ficha.slice(ficha.indexOf(':') + 1);
+    cuenta.set(clase, (cuenta.get(clase) ?? 0) + 1);
+  }
+  return cuenta;
+}
+
+/**
+ * COMPONE UN TRUEQUE GORDO con lo que la puerta declara y lo que tengo en la mano.
+ *
+ * Da DOS unidades de la clase de la que más tengo —o tres, si el tope y la mano dan— y
+ * pide DOS de una clase que no esté en el lado que doy. Que pida una clase que quizá YA
+ * TENGA es a propósito y es la otra mitad del encargo: pedir dos piedras cuando tienes
+ * una es la mitad de los trueques de este juego, y hasta ahora el juego no lo ofrecía.
+ *
+ * ═══ Y UNO DE CADA CUATRO ES UN FAROL, QUE ES LO QUE HACE HABLAR AL REDUCTOR ═══
+ *
+ * Compuesto sólo con lo que tengo, este bucle no ejercitaría NUNCA la guarda de
+ * `ofrecer` que comprueba que tengo lo que ofrezco —medido: 401 trueques gordos, CERO
+ * rechazados— y esa guarda es el camino normal de todo esto: la puerta declara FORMA y
+ * no contenido, porque declarar contenido sería llevar mi mano dentro de la declaración,
+ * y sobre 15.834 manos de verdad el 75,0 % de los trueques que la puerta admite mueren
+ * ahí. Un bucle que sólo propone lo que puede pagar deja sin recorrer tres cuartas partes
+ * de lo que la puerta deja pasar, y con ello la única comprobación de que ese rechazo
+ * DICE POR QUÉ en vez de callarse.
+ *
+ * Así que uno de cada cuatro ofrece una clase de la que no tengo NADA. La puerta lo deja
+ * pasar —cabe en la forma— y el reductor tiene que pararlo con motivo. Si algún día se
+ * calla, el recuento de `mudas` deja de estar vacío y lo dice con su revisión.
+ *
+ * Devuelve `null` cuando no hay con qué, que es lo correcto y no un error: con una sola
+ * ficha en la mano no hay trueque gordo que componer.
+ */
+function unTruequeGordo(
+  vista: unknown,
+  puerta: { tope: number; a: string[]; mesa: boolean },
+  azar: Azar,
+): { jugada: Toque | null; azar: Azar } {
+  const cuenta = loQueTengoPorClase(vista);
+  const tengo = [...cuenta].sort((uno, otro) => otro[1] - uno[1]);
+  const masTengo = tengo[0];
+  if (masTengo === undefined || masTengo[1] < 2 || puerta.tope < 2) return { jugada: null, azar };
+
+  /* EL FAROL: una clase de la que no tengo ninguna. Sólo si hay alguna así. */
+  const farol = enteroEntre(azar, 0, 3);
+  const sinNada = CLASES_DE_BIEN.filter((b) => (cuenta.get(b) ?? 0) === 0);
+  const doy = farol.valor === 0 && sinNada.length > 0 ? (sinNada[0] as string) : masTengo[0];
+  const cuantasDoy = Math.min(doy === masTengo[0] ? masTengo[1] : 2, puerta.tope);
+  const da = Array.from({ length: cuantasDoy }, () => doy);
+
+  const clases = CLASES_DE_BIEN.filter((b) => b !== doy);
+  const cual = enteroEntre(farol.azar, 0, clases.length - 1);
+  const pide = [clases[cual.valor] as string, clases[cual.valor] as string];
+
+  /* A la mesa o a uno de los que la puerta nombra, sorteado: hacen falta los dos. */
+  const aQuien = enteroEntre(cual.azar, 0, puerta.a.length);
+  const para = aQuien.valor === puerta.a.length && puerta.mesa ? null : (puerta.a[Math.min(aQuien.valor, puerta.a.length - 1)] as string);
+  return { jugada: { tipo: R.ofrecer, carga: { para, da, pide } }, azar: aQuien.azar };
+}
+
+/**
+ * LAS CINCO CLASES DE BIEN, escritas aquí y no importadas del juego.
+ *
+ * Es la misma doctrina que `R` de arriba: este bucle dirige la partida como la dirige un
+ * cliente, y un cliente que compone un trueque conoce los nombres de los bienes porque
+ * le llegan dentro de su propia mano. Importar la tabla del juego sería empezar a
+ * comprobar la implementación en vez de lo que viaja. Y si un día el juego cambiara sus
+ * bienes, lo que se cae es el recuento de trueques gordos de abajo, que es exactamente
+ * la señal que se quiere.
+ */
+const CLASES_DE_BIEN: readonly string[] = ['junco', 'limo', 'sal', 'piedra', 'grano'];
+
+/** ¿Lleva este trato más de un bien en algún lado? Se lee de la vista pública. */
+function esGordo(tratos: unknown, id: unknown): boolean {
+  if (!Array.isArray(tratos)) return false;
+  const trato = tratos.find((t) => (t as { id?: unknown }).id === id) as
+    | { da?: unknown; pide?: unknown }
+    | undefined;
+  if (trato === undefined) return false;
+  const da = Array.isArray(trato.da) ? trato.da.length : 0;
+  const pide = Array.isArray(trato.pide) ? trato.pide.length : 0;
+  return da > 1 || pide > 1;
 }
 
 /** Un contador de familias, que es lo que convierte «se juega» en un número. */
@@ -820,6 +957,31 @@ paso('En proceso: tres partidas ENTERAS de Riberas, con su tablero dentro de la 
     vueltas: number;
     /** Por qué se cortó antes de terminar, o `null` si acabó como debía. */
     corte: string | null;
+    /**
+     * LAS OPCIONES QUE SE DEVOLVIERON MUDAS, y tiene que quedar vacío.
+     *
+     * ═══ QUÉ AFIRMA ESTA LISTA, Y POR QUÉ NO SE PODÍA AFIRMAR ANTES ═══
+     *
+     * «Ninguna opción que el juego ofrezca devuelve el mismo objeto de estado sin decir
+     * por qué.» Es la afirmación entera de la regla del espejo: con el «sólo si», el
+     * rechazo silencioso es el camino normal, y una pantalla que sólo puede decir «la
+     * mesa está igual que estaba» no sirve para jugar. Hasta ahora este bucle sólo podía
+     * decirlo de lo que PULSABA, o sea de un camino por partida.
+     *
+     * Se barre la lista ENTERA del que tiene el turno cada `CADA_CUÁNTO_SE_BARRE`
+     * vueltas, se aplica cada opción sobre una copia que se tira, y se apunta la que
+     * vuelva con el mismo objeto de estado y sin motivo. La copia es de verdad: `jugar`
+     * no muta, devuelve una mesa nueva, así que barrer no toca la partida.
+     *
+     * Y esto es lo que ponía al descubierto la opción de puerta del trueque: mandada tal
+     * cual pasaba el portillo entero, caía en una guarda muda de `ofrecer` y devolvía el
+     * mismo objeto con el motivo nulo. Aquí sale por su nombre.
+     */
+    mudas: string[];
+    /** Trueques de más de un bien por lado propuestos, y aceptados. */
+    gordos: { propuestos: number; aceptados: number };
+    /** Cuántas opciones se probaron en las barridas. Cero sería una afirmación vacía. */
+    barridas: number;
   }
 
   /**
@@ -853,6 +1015,9 @@ paso('En proceso: tres partidas ENTERAS de Riberas, con su tablero dentro de la 
      */
     let faltaMirarLaTirada = false;
     let vueltas = 0;
+    const mudas: string[] = [];
+    const gordos = { propuestos: 0, aceptados: 0 };
+    let barridas = 0;
 
     for (; vueltas < TOPE_DE_VUELTAS; vueltas++) {
       const espectador = vistaDeAsiento(RIBERAS, mesa.estado, ESPECTADOR) as {
@@ -860,6 +1025,8 @@ paso('En proceso: tres partidas ENTERAS de Riberas, con su tablero dentro de la 
         momento?: unknown;
         turnosAbiertos?: unknown;
         ultimaTirada?: unknown;
+        /* Los tratos van en la vista de TODOS: un trueque se dice en voz alta. */
+        tratos?: unknown;
       };
       if (espectador.momento === 'terminada') break;
       if (faltaMirarLaTirada) {
@@ -892,31 +1059,93 @@ paso('En proceso: tres partidas ENTERAS de Riberas, con su tablero dentro de la 
           quien = asiento;
           jugada = respuesta.jugada;
           familia = respuesta.familia;
+          /*
+           * Y SI LO QUE SE ACEPTA ES UN TRUEQUE GORDO, SE APUNTA. Es la otra mitad del
+           * recuento: proponer trueques de tres por dos que nadie acepta nunca dejaría
+           * `contestar` sin recorrer con listas de más de un bien, que es justo donde
+           * cambian de mano varias fichas de golpe.
+           */
+          if (respuesta.familia === 'aceptar') {
+            const cual = (respuesta.jugada.carga as { trato?: unknown } | null)?.trato;
+            if (esGordo(espectador.tratos, cual)) gordos.aceptados++;
+          }
           break;
         }
       }
 
       if (jugada === null) {
         quien = (typeof espectador.turnoDe === 'string' ? espectador.turnoDe : TRES[0]) as AsientoId;
-        const elegida = laJugadaDelTablero(
-          vistaDeAsiento(RIBERAS, mesa.estado, quien),
-          azar,
-          ofertasDelTurno < TOPE_DE_OFERTAS,
-        );
+        const suVista = vistaDeAsiento(RIBERAS, mesa.estado, quien);
+        const elegida = laJugadaDelTablero(suVista, azar, ofertasDelTurno < TOPE_DE_OFERTAS);
         azar = elegida.azar;
         jugada = elegida.jugada;
         familia = elegida.familia;
-        if (familia === 'ofrecer') ofertasDelTurno++;
+        /*
+         * ═══ Y CUANDO TOCABA OFRECER, LA MITAD DE LAS VECES SE COMPONE UNO GORDO ═══
+         *
+         * La mitad y no siempre, porque hacen falta los dos caminos: el de uno por uno,
+         * que sale del tablero y es lo que un cliente tonto puede pulsar, y el compuesto,
+         * que es el único que ejercita la rama de FORMA del portillo y las guardas de
+         * `ofrecer` que dejaron de ser mudas. Sin esta rama, este bucle jugaría tres
+         * partidas enteras sin proponer NI UN trueque de más de un bien por lado, y el
+         * recuento de abajo lo diría con un cero.
+         */
+        if (familia === 'ofrecer') {
+          const dado = enteroEntre(azar, 0, 1);
+          azar = dado.azar;
+          const puerta = dado.valor === 0 ? laPuertaDelTrueque(suVista, quien) : null;
+          if (puerta !== null) {
+            const compuesto = unTruequeGordo(suVista, puerta, azar);
+            azar = compuesto.azar;
+            if (compuesto.jugada !== null) {
+              jugada = compuesto.jugada;
+              familia = 'ofrecer-gordo';
+            }
+          }
+        }
+        if (familia === 'ofrecer' || familia === 'ofrecer-gordo') ofertasDelTurno++;
       }
 
       if (jugada === null || quien === null) {
         corte = `el tablero de ${String(espectador.turnoDe)} no ofrece nada en «${String(espectador.momento)}»`;
         break;
       }
+      /*
+       * ═══ LA BARRIDA: NINGUNA OPCIÓN OFRECIDA VUELVE MUDA ═══
+       *
+       * Cada tantas vueltas se coge la lista ENTERA del que tiene el turno —la misma que
+       * viaja dentro de `VistaDeMesa.opciones`— y se aplica una a una sobre una copia que
+       * se tira. Lo que se compra es la afirmación que la regla del espejo necesita y que
+       * hasta ahora nadie hacía: si el juego lo ofreció y el reductor no lo ejecuta, TIENE
+       * que decir por qué. Un botón que no hace nada y nadie que lo explique es el fallo
+       * que esta casa mide en 2.834 movimientos.
+       *
+       * Cada tantas y no en cada vuelta porque una lista de trueques pasa de las cincuenta
+       * opciones y cada aplicación vuelve a componer la lista entera dentro del portillo:
+       * en cada vuelta serían del orden de trescientas mil reducciones por partida. Con el
+       * paso puesto son unas dos mil, que ya recorren la colocación, el turno con dados, el
+       * siete, el descarte y el final.
+       */
+      if (vueltas % CADA_CUANTO_SE_BARRE === 0 && typeof espectador.turnoDe === 'string') {
+        const suya = vistaDeAsiento(RIBERAS, mesa.estado, espectador.turnoDe as AsientoId);
+        for (const o of opcionesDeArcade(RIBERAS, suya, espectador.turnoDe as AsientoId)) {
+          const probada = jugarConMotivo(mesa, {
+            quien: espectador.turnoDe as AsientoId,
+            movimiento: { tipo: o.tipo, carga: o.carga },
+            rev: mesa.rev,
+          });
+          barridas++;
+          if (probada.mesa.estado !== mesa.estado) continue;
+          if (probada.motivo !== null && probada.motivo.length > 0) continue;
+          mudas.push(`${o.id} en la revisión ${String(mesa.rev)}`);
+        }
+      }
+
 
       const antes = mesa.estado;
       const revAntes = mesa.rev;
-      mesa = jugar(mesa, { quien, movimiento: jugada, rev: mesa.rev });
+      const jugado = jugarConMotivo(mesa, { quien, movimiento: jugada, rev: mesa.rev });
+      mesa = jugado.mesa;
       /*
        * ═══ UN BOTÓN MUDO ES UN FALLO, Y AQUÍ SE CAZA. MIRANDO EL ESTADO ═══
        *
@@ -931,23 +1160,46 @@ paso('En proceso: tres partidas ENTERAS de Riberas, con su tablero dentro de la 
        * llevaba de adorno desde que se escribió. La forma buena la dice el propio
        * árbitro en la cabecera de `Jugado.motivo`: comparar `mesa.estado` con el de
        * antes. Un rechazo devuelve EL MISMO OBJETO, así que basta la identidad.
+       *
+       * ═══ SALVO EL TRUEQUE COMPUESTO, QUE SE RECHAZA CON MOTIVO Y ES LO NORMAL ═══
+       *
+       * Un trueque compuesto no sale del tablero: sale de COMPONERLO con lo que la
+       * puerta declara, y la puerta declara FORMA y no contenido —no puede declarar
+       * contenido: llevaría mi mano dentro, y ahí está la decisión de seguridad de todo
+       * el trueque—. Medido sobre 15.834 manos de verdad, el 75,0 % de los que la puerta
+       * admite mueren luego en el reductor. Así que aquí no es un botón mudo: es el
+       * camino normal, y lo único que se le exige es que DIGA POR QUÉ. Si se calla, se
+       * apunta en `mudas` con el resto.
        */
       if (mesa.estado === antes) {
+        if (familia === 'ofrecer-gordo') {
+          if (jugado.motivo === null || jugado.motivo.length === 0) {
+            mudas.push(`un trueque compuesto se rechazó en silencio en la revisión ${String(revAntes)}`);
+          }
+          apuntar(cuenta, 'gordo-rechazado');
+          trasCadaMovimiento(mesa);
+          continue;
+        }
         corte = `botón mudo: ${jugada.tipo} de ${quien} no cambió nada en la revisión ${revAntes}`;
         break;
       }
+      if (familia === 'ofrecer-gordo') gordos.propuestos++;
       if (jugada.tipo === R.tirar) faltaMirarLaTirada = true;
       apuntar(cuenta, familia);
       trasCadaMovimiento(mesa);
     }
 
-    return { mesa, cuenta, sietes, vueltas, corte };
+    return { mesa, cuenta, sietes, vueltas, corte, mudas, gordos, barridas };
   };
 
   const total = new Map<string, number>();
   let sietes = 0;
   let terminadas = 0;
   const cortes: string[] = [];
+  const mudas: string[] = [];
+  let gordosPropuestos = 0;
+  let gordosAceptados = 0;
+  let barridas = 0;
   /* El diario de la primera semilla, para la comprobación de reejecución de abajo. */
   let elDiarioDeLaTres = '';
 
@@ -983,6 +1235,10 @@ paso('En proceso: tres partidas ENTERAS de Riberas, con su tablero dentro de la 
       total.set(familia, (total.get(familia) ?? 0) + veces);
     }
     sietes += partida.sietes;
+    mudas.push(...partida.mudas);
+    gordosPropuestos += partida.gordos.propuestos;
+    gordosAceptados += partida.gordos.aceptados;
+    barridas += partida.barridas;
     if (partida.corte !== null) cortes.push(`semilla ${semilla}: ${partida.corte}`);
 
     const fin = vistaDeAsiento(RIBERAS, partida.mesa.estado, ESPECTADOR) as {
@@ -1092,6 +1348,71 @@ paso('En proceso: tres partidas ENTERAS de Riberas, con su tablero dentro de la 
   console.log(`  ${revisiones} revisiones de Riberas examinadas, ${conFichas} con fichas repartidas`);
   console.log(
     `  tres partidas enteras: ${[...total].sort().map(([f, n]) => `${n} ${f}`).join(' · ')} · ${sietes} sietes`,
+  );
+
+  /*
+   * ═══ LA RED DE SEGURIDAD DEL TRUEQUE, Y ES LO QUE ESTE BUCLE COMPRA DE NUEVO ═══
+   *
+   * Son dos afirmaciones y ninguna se puede escribir sin haber jugado.
+   *
+   * LA PRIMERA: NINGUNA OPCIÓN OFRECIDA VUELVE MUDA. Se ha barrido la lista entera del
+   * que tenía el turno cada tantas vueltas, aplicando cada opción sobre una copia que se
+   * tira, y exigiendo que o cambie el estado o traiga un motivo. Es la afirmación que la
+   * regla del espejo necesita: con el «sólo si», el rechazo silencioso es el camino
+   * normal, y una pantalla que sólo sabe decir «la mesa está igual que estaba» no sirve
+   * para jugar. Con el trueque paramétrico esto dejó de ser teoría: la opción de puerta
+   * mandada tal cual pasaba el portillo ENTERO —coincide consigo misma en forma
+   * canónica— y caía en una guarda muda que devolvía el mismo objeto con el motivo nulo.
+   * Si alguien vuelve a callar esa guarda, esta lista deja de estar vacía y dice el `id`
+   * de la opción y la revisión en la que se calló.
+   */
+  comprobar('ninguna opción que Riberas ofrece devuelve el mismo estado sin decir por qué', mudas.length === 0, mudas.slice(0, 8));
+  comprobar(
+    'y se han barrido bastantes opciones como para que ese vacío signifique algo',
+    barridas > 1000,
+    { barridas },
+  );
+
+  /*
+   * LA SEGUNDA: SE HAN JUGADO TRUEQUES DE MÁS DE UN BIEN POR LADO. Es la mitad del
+   * encargo de Miguel, y sin este recuento entraría sin que nadie la jugara nunca: la
+   * política lee el TABLERO, y el juego saca la declaración de sus acciones justamente
+   * para que no se pueda pulsar, así que un bucle que sólo pulse jamás propondrá un
+   * trueque gordo. Cero aquí no significa «no hay fallos»: significa que la política no
+   * está comprando nada, y es el mismo verde por conjunto vacío que este fichero tiene
+   * apuntado tres veces.
+   *
+   * Y hacen falta LAS DOS CIFRAS. Proponerlos ejercita la rama de FORMA del portillo y
+   * las dos guardas de `ofrecer` que dejaron de ser mudas; ACEPTARLOS es lo único que
+   * recorre `contestar` con listas de más de un bien, que es donde varias fichas cambian
+   * de dueño de golpe, con sus números de serie, y donde una fuga tendría más por dónde
+   * salir. Los suelos son aproximadamente la mitad de lo medido.
+   */
+  comprobar(
+    'se proponen trueques de MÁS DE UN BIEN por lado, que es lo que la lista no puede enumerar',
+    gordosPropuestos >= 30,
+    { propuestos: gordosPropuestos, rechazados: cuantas(total, 'gordo-rechazado') },
+  );
+  /*
+   * Y ALGUNO SE RECHAZA, que es la otra cara: el farol de `unTruequeGordo` ofrece lo que
+   * no se tiene, la puerta lo deja pasar porque cabe en la FORMA, y el reductor tiene que
+   * pararlo. Sin este suelo, la guarda que dejó de ser muda —el camino por el que muere el
+   * 75 % de lo que la puerta admite— no se recorrería ni una vez, y `mudas` estaría vacío
+   * por no haber mirado.
+   */
+  comprobar(
+    'y algunos los rechaza el reductor, que es donde muere lo que la puerta deja pasar',
+    cuantas(total, 'gordo-rechazado') >= 20,
+    { rechazados: cuantas(total, 'gordo-rechazado') },
+  );
+  comprobar(
+    'y alguien los ACEPTA, que es lo único que recorre `contestar` con varias fichas de golpe',
+    gordosAceptados >= 8,
+    { aceptados: gordosAceptados },
+  );
+  console.log(
+    `  trueques de más de un bien por lado: ${gordosPropuestos} propuestos, ${gordosAceptados} aceptados, ` +
+      `${cuantas(total, 'gordo-rechazado')} rechazados por el reductor · ${barridas} opciones barridas`,
   );
 
   /*
@@ -4502,8 +4823,23 @@ if (fallos.length > 0) {
  * probada») y con cien de ochocientas un bloque entero podía caerse sin que nadie lo
  * viera: el número va escrito, como en los demás comprobadores, y se sube al añadir
  * comprobaciones. Medido dos veces seguidas antes de escribirlo.
+ *
+ * ═══ PERO ÉSTE NO CUENTA COMPROBACIONES ESCRITAS: CUENTA COMPROBACIONES QUE OCURREN ═══
+ *
+ * Y por eso es el ÚNICO de los cuatro guardias de la casa que no puede ir al ras. Aquí
+ * `trasCadaMovimiento` revisa POR MOVIMIENTO, y una partida dura lo que dura: cuando el
+ * trueque paramétrico entró, el número bajó de 3.885 a 3.560 —325 de golpe— sin que nadie
+ * borrara ni una comprobación, sólo porque con trueques de varios bienes las partidas se
+ * acortan. Puesto en 3.560 exactos, el siguiente retoque de Riberas que acorte una partida
+ * en un movimiento dispara EL GUARDIA en vez de la roja, y quien lo vea creerá que se ha
+ * borrado un bloque.
+ *
+ * Así que va con un suelo holgado y medido, no con el número de hoy: 3.200, o sea 360 por
+ * debajo de las 3.560 que se hacen ahora, que es algo más que el salto entero que costó
+ * meter el trueque. Sigue cazando lo que este guardia existe para cazar —un bloque que
+ * deja de correr, que son cientos— y deja de cazar el ruido de una partida más corta.
  */
-const COMPROBACIONES_ESCRITAS = 856;
+const COMPROBACIONES_ESCRITAS = 3200;
 if (hechas < COMPROBACIONES_ESCRITAS) {
   console.error(
     `Solo se han hecho ${hechas} de las ${COMPROBACIONES_ESCRITAS} comprobaciones que tiene escritas este guion. ` +

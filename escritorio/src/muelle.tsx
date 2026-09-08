@@ -595,10 +595,24 @@ function EnElMuelle({
    * ═══ `?? []`, LA MISMA GUARDA QUE EN `LaMesaPuesta` Y POR LO MISMO ═══
    *
    * `opciones` puede faltar con un servidor anterior. Y las opciones se pintan
-   * TODAS, no sólo la de empezar: esconder un movimiento legal es peor que
-   * enseñarlo en el sitio equivocado. La de empezar es la única con acento (§5).
+   * TODAS menos una clase, no sólo la de empezar: esconder un movimiento legal es
+   * peor que enseñarlo en el sitio equivocado. La de empezar es la única con
+   * acento (§5).
+   *
+   * ═══ Y LA CLASE QUE NO SE PINTA SON LAS DECLARACIONES ═══
+   *
+   * Ésta es la CUARTA lista de botones de opciones del árbol, y era la única que no lo
+   * filtraba. Una opción con `declaracion` no es un movimiento montado: su carga declara
+   * lo que el juego admitiría, y mandada tal cual recibe un motivo y no juega nada. Ver
+   * `Opcion.declaracion` en `shared/arcade/opciones.ts`.
+   *
+   * HOY NO SE LLEGA, y por eso se dice: al muelle sólo se entra con la mesa sin empezar, y
+   * la única que trae la marca —la puerta del trueque de Riberas— sale con el turno en la
+   * mano y la tirada hecha. O sea que esto no apaga ningún botón de hoy: cierra un agujero
+   * que hoy tapa una guarda de OTRO fichero, que es justo lo que las otras tres listas no
+   * hacen.
    */
-  const opciones = puesta.opciones ?? [];
+  const opciones = (puesta.opciones ?? []).filter((o) => o.declaracion !== true);
   const sentados = puesta.asientos.length;
 
   return (

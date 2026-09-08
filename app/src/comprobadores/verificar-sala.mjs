@@ -1219,13 +1219,171 @@ paso('El mazo de Riberas se juega desde la app, y en las DOS ramas');
     'el respaldo NO quita las opciones de la mano: ahí las cartas se juegan por botón',
     respaldo.length > 0 &&
       !/opcionesFueraDeLaMano/.test(respaldo) &&
-      /opcionesSueltas\(tablero, opciones\)/.test(respaldo),
+      /opcionesSueltas\(tableroEntero, opciones\)/.test(respaldo),
     'sobre el retablo no hay mano que pintar: quitarlas dejaría el móvil con cartas y sin jugarlas',
   );
   comprobar(
     'y el marcador se ve también ahí, que es la rama que hoy ve todo el móvil',
     /<ElMarcador marcador=\{marcador\} \/>/.test(respaldo),
     'un marcador que sólo saliera con el delta no lo vería nadie que juegue desde el teléfono',
+  );
+
+  /* ─── EL TRUEQUE EN EL RETABLO, que es la única pantalla de una mesa de cinco o de seis ─── */
+
+  /*
+   * ═══ POR QUÉ ESTO SE COMPRA AQUÍ Y CÓMO ═══
+   *
+   * `MANIFIESTO_RIBERAS.jugadores` admite hasta SEIS y el atlas trae CUATRO colores de
+   * jugador, así que con el quinto sentado el respaldo deja de ser un respaldo: es la partida
+   * entera, en el teléfono. Y hasta esta fase ahí las propuestas de trueque no se veían —el
+   * pregón cuelga de la cinta del delta— y aceptar era un botón suelto del retablo, a UN
+   * toque, o sea sin la confirmación que Miguel pidió.
+   *
+   * Se compra por EXPRESIÓN REGULAR sobre el fuente y no ejecutando, por lo mismo que el
+   * resto de este guion: detrás de esta pantalla hay React Native y no se puede montar en
+   * Node. Que React haga con esto lo que se espera lo compra `verify:escritorio` sobre el
+   * mueble hermano, renderizado de verdad; y que las cuentas del componedor sean las del
+   * motor lo compra `verify:riberas-en-tres` jugándolas por el árbitro. Lo que se compra
+   * aquí es que las dos plataformas hagan LO MISMO, que es la regla de esta casa.
+   */
+  comprobar(
+    'el pregón se pinta en el respaldo, que es donde se juegan las mesas de cinco y de seis',
+    /<ElPregonEnElRetablo pregon=\{pregon\} abierta=\{tratoAbierto\} alAbrir=\{ponerTratoAbierto\} \/>/.test(respaldo),
+    'sin él, en una mesa de cinco las propuestas de trueque no se ven en ninguna parte',
+  );
+  comprobar(
+    'y va ANTES del tablero: la caja del retablo se come lo que queda de pantalla, y lo que quede debajo empieza fuera del canto',
+    respaldo.indexOf('<ElPregonEnElRetablo') > 0 &&
+      respaldo.indexOf('<ElPregonEnElRetablo') < respaldo.indexOf('<Retablo'),
+    'lo que hay que contestar tiene que verse sin buscarlo',
+  );
+  comprobar(
+    'la tira ENTERA es el botón y no lleva ninguno dentro: aceptar cuesta dos toques y el primero no está encima del segundo',
+    /<Pressable[\s\S]{0,400}?style=\{estilos\.pregonTira\}/.test(escena) &&
+      !/estilos\.pregonTira[\s\S]{0,600}?<Pressable/.test(escena),
+    'un botón de aceptar dentro de la tira es exactamente lo que Miguel pidió que no pasara',
+  );
+  comprobar(
+    'y la hoja es donde se confirma, modal y con los rótulos que escribe el juego',
+    /<HojaDeLaPropuesta/.test(respaldo) &&
+      /accessibilityViewIsModal/.test(/function HojaDeLaPropuesta\(\{[\s\S]*?\n\}\r?\n/.exec(escena)?.[0] ?? ''),
+    'sin hoja, la tira no serviría para nada y aceptar seguiría siendo un toque',
+  );
+  /*
+   * CONTESTAR NO SALE ADEMÁS COMO BOTÓN, y aquí son DOS caminos y no uno: las acciones del
+   * tablero —que `Retablo` pinta a un toque— y las opciones sueltas del pie. Los dos filtros
+   * reciben EL PREGÓN y no un interruptor, para que donde no hay tiras que pulsar los botones
+   * se queden: sin eso, un mirón se quedaría mirando una propuesta que no puede contestar.
+   */
+  comprobar(
+    'contestar se va por los DOS caminos —las acciones del tablero y los botones del pie—, y los dos filtros reciben EL PREGÓN',
+    /\.\.\.accionesFueraDelPregon\(tableroEntero, pregon\),/.test(respaldo) &&
+      /opcionesFueraDelPregon\(\s*tableroEntero === null \? opciones : opcionesSueltas\(tableroEntero, opciones\),\s*pregon,\s*\)/.test(
+        respaldo,
+      ),
+    'con los dos puestos, la misma pantalla ofrecería contestar dos veces; con ninguno, ninguna',
+  );
+  /*
+   * ═══ Y EL PANEL «Trueques» TAMPOCO SE QUEDA, QUE ERA LA TERCERA COPIA Y FALTABA ENTERA ═══
+   *
+   * `panelesFueraDelPregon` no se usaba NI UNA VEZ en todo este cliente. Y el sitio donde
+   * faltaba no es un rincón: `Retablo` pinta `tablero.paneles` debajo del mapa, y ésta es la
+   * única pantalla que ve una mesa de CINCO o de SEIS, así que ahí el mismo trueque VIVO
+   * salía dos veces —tira del pregón arriba, renglón de texto abajo— con dos redacciones
+   * distintas. Es la regla de la casa: cada movimiento se enseña exactamente una vez.
+   *
+   * Se compra que el filtro reciba EL MISMO `pregon` que decide si se pinta la tira —no un
+   * interruptor calculado aparte— y que lo que llega a `<Retablo>` sea el tablero YA
+   * filtrado y no el entero, que es el único fallo silencioso posible aquí: filtrar a un
+   * lado y pintar del otro. La misma regla, ejecutada de verdad sobre el árbol pintado, la
+   * compra `verify:escritorio` en el mueble hermano, con cinco sentados.
+   */
+  comprobar(
+    'y el panel «Trueques» del retablo se retira con el MISMO pregón: en una mesa de cinco el trueque vivo no se cuenta dos veces',
+    /paneles: panelesFueraDelPregon\(tableroEntero\.paneles, pregon\),/.test(respaldo) &&
+      /import \{[\s\S]*?\bpanelesFueraDelPregon,/.test(escena),
+    'sin esto, la tira dice «1 piedra → 1 limo» y el panel de abajo «t1: Ana da piedra por limo a Bruno — propuesta»',
+  );
+  comprobar(
+    'y lo que llega al Retablo es el tablero YA filtrado, no el entero: filtrar a un lado y pintar del otro es el fallo mudo de esta clase',
+    /<Retablo tablero=\{tablero\}/.test(respaldo) && !/<Retablo tablero=\{tableroEntero\}/.test(respaldo),
+    'el filtro tiene que llegar a lo que se pinta',
+  );
+  comprobar(
+    'y el pregón se compone ANTES, con las opciones ENTERAS: al revés cada tira se quedaría sin los botones que cuelga',
+    /const pregon = useMemo\(\(\) => elPregonEnTres\(laVista, yo, opciones\), \[laVista, yo, opciones\]\);/.test(escena),
+    'es el mismo orden que el del mazo en la barra, y por el mismo motivo',
+  );
+  /*
+   * EL COMPONEDOR: la única manera de montar una oferta de varios bienes con el dedo. Su
+   * botón sale de la DECLARACIÓN —`elComponedor` la busca por la marca— y no de las acciones
+   * del tablero, donde la declaración no llega a propósito.
+   */
+  comprobar(
+    'el componedor se pinta en el respaldo, y sale de la declaración y no de la lista de acciones',
+    /<ElComponedorEnElRetablo/.test(respaldo) &&
+      /const componedor = useMemo\(\s*\(\) => elComponedor\(laVista, yo, opciones, loQueSeCompone\),/.test(escena),
+    'sin él, en una mesa de cinco un tres por dos sólo se podría hacer por el cable',
+  );
+  comprobar(
+    'y va DEBAJO del tablero: es de quien tiene el turno, que ya ha mirado el tablero, y sólo crece cuando se abre',
+    respaldo.indexOf('<ElComponedorEnElRetablo') > respaldo.indexOf('<Retablo'),
+    'arriba le quitaría al tablero el alto que el pregón sí se gana',
+  );
+  /*
+   * Y AQUÍ NO SE DECIDE NINGUNA REGLA. Ni el tope por lado, ni cuántas fichas tengo, ni qué
+   * bien no puede estar en los dos lados: lo que un «+» hace al pulsarse es guardar el estado
+   * que ya viene dentro (`r.mas`), y va apagado exactamente cuando ese estado es `null`. Se
+   * persigue la aritmética escrita a mano, que es la forma que tendría el fallo.
+   */
+  const elComponedorDeLaApp = /function ElComponedorEnElRetablo\(\{[\s\S]*?\n\}\r?\n/.exec(escena)?.[0] ?? '';
+  comprobar(
+    'el «+» y el «−» guardan el estado que trae el renglón y no suman ellos, ni saben el tope',
+    elComponedorDeLaApp.length > 0 &&
+      /ponerPuesto\(r\.mas\)/.test(elComponedorDeLaApp) &&
+      /ponerPuesto\(r\.menos\)/.test(elComponedorDeLaApp) &&
+      !/[+-]\s*1\b/.test(soloCodigo(elComponedorDeLaApp).join('\n')) &&
+      !/TOPE_POR_LADO/.test(elComponedorDeLaApp),
+    'dos clientes sumando el uno por su cuenta son dos aritméticas del tope, y la que se rompe es la del teléfono',
+  );
+  comprobar(
+    'y el botón de proponer va apagado cuando no hay movimiento que mandar, diciendo por qué con la frase que escribe el juego',
+    /const noSePuede = quieto \|\| componedor\.movimiento === null;/.test(elComponedorDeLaApp) &&
+      /accessibilityHint=\{componedor\.porQueNo\.length > 0 \? componedor\.porQueNo : undefined\}/.test(elComponedorDeLaApp) &&
+      /\{componedor\.porQueNo\}/.test(elComponedorDeLaApp),
+    'un botón apagado y mudo es el mismo fallo que uno encendido que no juega, con menos tinta',
+  );
+  comprobar(
+    'y ni una palabra del trueque redactada en esta pantalla: el rótulo, el resumen y los porqués salen de la traducción',
+    /\{componedor\.rotulo\}/.test(elComponedorDeLaApp) &&
+      /\{componedor\.resumen\}/.test(elComponedorDeLaApp) &&
+      /accessibilityLabel=\{r\.seOyeMas\}/.test(elComponedorDeLaApp) &&
+      !/fichas por lado/.test(elComponedorDeLaApp),
+    'lo que la app diga de la regla y lo que diga el PC tienen que ser la misma frase',
+  );
+
+  /*
+   * ═══ Y EL BOTÓN QUE ABRE SE APAGA CON LAS CUATRO VIVAS, IGUAL QUE EL DEL PC ═══
+   *
+   * No es lo mismo que apagar «Proponer», que está dentro: con cuatro propuestas en la mesa
+   * no hay nada que montar, y para leer el porqué habría que abrir una caja de ocho
+   * renglones. El §4.2 del diseño lo dice con estas palabras: «el mismo botón, con la misma
+   * ayuda y el mismo apagado por las cuatro vivas» en las dos pantallas.
+   *
+   * Y el booleano viene de `shared/` —`componedor.noCabenMas`— y no de una cuenta escrita
+   * aquí: con la comparación escrita dos veces, la que se queda atrás es la de este aparato.
+   * Se compra ADEMÁS que se apague con COLOR y no con `opacity`, que apagaría también la
+   * letra; eso ya lo caza `verify:gramatica`, y aquí se compra que el estilo que se pone sea
+   * el mismo con el que este fichero apaga «Proponer».
+   */
+  comprobar(
+    'y el botón que ABRE el componedor se apaga con las cuatro propuestas vivas, con la frase del juego y sin contar las vivas en esta pantalla',
+    /style=\{\[estilos\.hojaBoton, componedor\.noCabenMas && estilos\.componedorApagado\]\}/.test(elComponedorDeLaApp) &&
+      /if \(componedor\.noCabenMas\) return;/.test(elComponedorDeLaApp) &&
+      /accessibilityState=\{\{ expanded: abierto, disabled: componedor\.noCabenMas \}\}/.test(elComponedorDeLaApp) &&
+      /accessibilityHint=\{componedor\.ayuda\}/.test(elComponedorDeLaApp) &&
+      !/PROPUESTAS_VIVAS/.test(elComponedorDeLaApp),
+    'sin esto, con cuatro en la mesa el botón se abre, «Proponer» sale apagado dentro, y el porqué queda a ocho renglones de distancia',
   );
 
   /* ─── El marcador ─── */
@@ -1515,6 +1673,76 @@ paso('Recoger la mesa en la app: suelta lo cogido, devuelve tirar y comprar al p
 
 // ---------------------------------------------------------------------------
 
+paso('El mueble de opciones de la app no pinta una DECLARACIÓN como si fuera un botón');
+
+/*
+ * ═══ QUÉ SE COMPRA AQUÍ, Y QUÉ NO SE PUEDE COMPRAR ═══
+ *
+ * Desde el trueque de varios bienes, una opción puede traer la marca `declaracion` del
+ * contrato (`shared/arcade/opciones.ts`): quiere decir que su carga NO es un movimiento
+ * montado sino los límites de una FAMILIA de movimientos —un tope y una lista de
+ * destinos—, porque enumerar esa familia serían 5.000 opciones y 1,14 MB de lista por
+ * cada lectura de la mesa. Un mueble que la pinte enciende un botón que, pulsado, manda
+ * la declaración, recibe un motivo y no juega nada.
+ *
+ * Y aquí no se puede EJECUTAR `LasOpciones` como el escritorio ejecuta su `Formulario`:
+ * vive en `tablero-en-linea.tsx`, que trae React Native entero detrás, y este guion corre
+ * con `node` pelado y en segundos. Así que se lee el fichero, y se lee sabiendo lo que
+ * eso compra y lo que no: compra que el filtro esté escrito y que el `map` recorra la
+ * lista FILTRADA y no la de entrada, que es el único fallo silencioso posible aquí
+ * —filtrar a un lado y pintar del otro—. No compra que React haga con eso lo que se
+ * espera; eso lo compra la misma regla, ejecutada de verdad, en `verify:escritorio`,
+ * sobre el mueble hermano y con la misma marca.
+ */
+{
+  const enLinea = leer(path.join(SRC, 'arcade', 'tablero-en-linea.tsx'));
+  const laEscena = leer(path.join(SRC, 'arcade', 'riberas-en-tres-escena.tsx'));
+  const contrato = leer(path.join(SRC, 'arcade', 'mesa.ts'));
+  comprobar(
+    'lo que llega por el cable tiene sitio donde traer la marca',
+    /declaracion\?: true;/.test(contrato),
+  );
+  comprobar(
+    'el mueble filtra las declaraciones antes de pintar',
+    /function loQueLasOpcionesPintan\(opciones: readonly OpcionDeMesa\[\]\): OpcionDeMesa\[\] \{\s+return opciones\.filter\(\(o\) => o\.declaracion !== true\);/.test(enLinea) &&
+      /const pintables = loQueLasOpcionesPintan\(opciones\);/.test(enLinea),
+  );
+  /*
+   * ═══ Y LA GUARDA QUE DECIDE SI SE PINTA EL CAJÓN SALE DEL MISMO FILTRO ═══
+   *
+   * Ésta nace de un fallo medido y no de una precaución. La guarda era
+   * `sueltas.length > 0`, o sea que contaba lo que LLEGA mientras que quien decide qué se
+   * pinta es el filtro de arriba. Con la puerta del trueque como única suelta —lo normal en
+   * el turno de quien tiene bienes— se montaba un `<View>` con cero hijos y su relleno de 16
+   * puntos: treinta y dos puntos de hueco vacío en el pie de la pantalla más apretada de las
+   * cuatro. En el escritorio, el mismo fallo escribía además «Ahora mismo no hay nada que
+   * puedas hacer en esta mesa» debajo de cuarenta y ocho botones.
+   *
+   * Se compra que las DOS salgan del mismo `loQueLasOpcionesPintan`, que es lo que hace que
+   * no se puedan separar: una condición repetida es un sitio donde se olvida.
+   */
+  comprobar(
+    'y la guarda que decide si se pinta el cajón cuenta lo PINTABLE y no lo que llega',
+    /function hayAlgoQuePintar\(opciones: readonly OpcionDeMesa\[\]\): boolean \{\s+return loQueLasOpcionesPintan\(opciones\)\.length > 0;/.test(enLinea) &&
+      /\{hayAlgoQuePintar\(sueltas\) \? \(/.test(enLinea) &&
+      !/\{sueltas\.length > 0 \? \(/.test(enLinea),
+  );
+  comprobar(
+    'y la pantalla en tres dimensiones usa la MISMA, importada y no copiada',
+    /\{hayAlgoQuePintar\(sueltas\) \? \(/.test(laEscena) &&
+      !/\{sueltas\.length > 0 \? \(/.test(laEscena) &&
+      /\n  hayAlgoQuePintar,\n/.test(laEscena),
+  );
+  comprobar(
+    'y el `map` recorre la lista FILTRADA, no la de entrada',
+    /\{pintables\.map\(\(o\) => \(/.test(enLinea) && !/\{opciones\.map\(\(o\) => \(/.test(enLinea),
+  );
+  comprobar(
+    'y se compara con `=== true`, que es lo que el contrato promete y no la veracidad',
+    !/o\.declaracion \?/.test(enLinea) && !/!o\.declaracion\b/.test(enLinea),
+  );
+}
+
 /**
  * EL GUARDIA DE «NO SE HAN HECHO TODAS», el mismo que llevan el servidor y la escena.
  *
@@ -1524,7 +1752,13 @@ paso('Recoger la mesa en la app: suelta lo cogido, devuelve tirar y comprar al p
  * Con el número escrito, salir con menos es un fallo ruidoso. Va a mano y se sube al
  * añadir comprobaciones; un guardia desfasado no guarda nada.
  */
-const COMPROBACIONES_ESCRITAS = 162;
+/*
+ * Y VA CON MARGEN Y NO AL RAS: hoy se hacen 182 —el trueque del retablo trajo once, y el
+ * panel que se retira con el pregón, dos más— y el guardia está en 178. Al ras hace lo
+ * contrario de lo que quiere —una comprobación que se cae de su bloque dispara el guardia
+ * en vez de la roja, y con el guardia delante nadie ve el nombre de lo que se rompió.
+ */
+const COMPROBACIONES_ESCRITAS = 178;
 if (cuantas < COMPROBACIONES_ESCRITAS) {
   console.error(
     `Solo se han hecho ${cuantas} de las ${COMPROBACIONES_ESCRITAS} comprobaciones que ` +

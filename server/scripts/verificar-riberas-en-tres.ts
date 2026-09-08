@@ -76,6 +76,7 @@ import {
   GUARDIA,
   GUARDIA_MINIMA,
   OFRECER,
+  PROPUESTAS_VIVAS_A_LA_VEZ,
   PUNTOS_DEL_TITULO,
   PUNTOS_DEL_VADO,
   PUNTOS_DE_LA_GUARDIA,
@@ -93,6 +94,7 @@ import {
   REVELAR,
   RIBERAS,
   TIRAR,
+  TOPE_POR_LADO_DEL_TRUEQUE,
   VADO_MINIMO,
 } from '../../shared/arcade/juegos';
 import type {
@@ -112,6 +114,7 @@ import {
   colocandoEnTres,
   comprarEnTres,
   dadosEnTres,
+  elComponedor,
   elPregonEnTres,
   enCabeza,
   estadoDelVado,
@@ -124,13 +127,19 @@ import {
   marcadorEnTres,
   mazoEnLaBarra,
   meToca,
+  misPropuestasVivas,
+  NADA_COMPUESTO,
   opcionesFueraDeLaBarra,
   opcionesFueraDeLaMano,
   opcionesFueraDeLaMesa,
   opcionesFueraDelPregon,
   opcionesFueraDelTablero,
+  A_LA_MESA,
+  bienesEnPalabras,
   paresDelAnoBueno,
   plural,
+  PLURAL_DEL_BIEN,
+  puertaDelTrueque,
   premiosEnTres,
   panelesEnTres,
   panelesFueraDelPregon,
@@ -149,7 +158,13 @@ import {
   turnoEnTres,
   colorDePiezaDelColono,
 } from '../../shared/arcade/juegos/riberas-en-tres';
-import type { CartaDelMazoEnTres, ExplicacionDeLaCarta } from '../../shared/arcade/juegos/riberas-en-tres';
+import type {
+  CartaDelMazoEnTres,
+  ElComponedor,
+  ExplicacionDeLaCarta,
+  LoQueSeCompone,
+  RenglonDelComponedor,
+} from '../../shared/arcade/juegos/riberas-en-tres';
 /*
  * Y `obrasPosibles`, que es la que enciende las tres piezas de la barra de obra del
  * tablero de tres dimensiones. Se pide aquí, por su nombre entero, para poder afirmar qué
@@ -424,14 +439,30 @@ function escenarioDeTrueque(deA: readonly Bien[], deB: readonly Bien[]): EstadoD
     mano.map((c) => [c.id, c.bien]),
   );
 
-  /* Lo que se cambia por junco: lo que A no tiene ya. */
+  /*
+   * LO QUE SE CAMBIA POR JUNCO: LOS OTROS CUATRO BIENES, Y NO TRES.
+   *
+   * ═══ ESTAS DOS LÍNEAS DECÍAN LO CONTRARIO, Y LA REGLA ESTÁ REVOCADA ═══
+   *
+   * Decían «lo que A no tiene: sal, piedra y grano» y «nunca lo que ya se tiene»,
+   * porque `opcionesDeTrueque` saltaba con un `continue` todo bien del que ya se
+   * tuviera uno. Miguel lo revocó después de jugar una partida entera, y la medida le
+   * da la razón: con la mano repartida en las cinco clases, el juego no ofrecía NINGÚN
+   * trueque —cero— y ése es justamente el turno en que uno quiere trocar, el que llega
+   * con la mano llena y le falta CANTIDAD y no clase. Al quitar el filtro, estas dos se
+   * pusieron rojas y se reescriben en el mismo empujón, que es lo que hay que hacer con
+   * una comprobación que describe una regla que ya no existe: reescribirla, no borrarla.
+   *
+   * Lo que SÍ sigue siendo verdad, y es la línea de abajo, es que nadie propone el
+   * mismo bien por el mismo bien: eso no es un trueque, es devolverse la ficha.
+   */
   const porJunco = bienesQueSeCambianPor(vistaA, opcionesA, 'junco');
   comprobar(
-    'por junco se puede pedir lo que A no tiene: sal, piedra y grano',
-    porJunco.length === 3 && ['sal', 'piedra', 'grano'].every((b) => porJunco.includes(b)),
+    'por junco se pueden pedir los otros CUATRO, incluido el limo que A ya tiene',
+    porJunco.length === 4 && ['limo', 'sal', 'piedra', 'grano'].every((b) => porJunco.includes(b)),
     porJunco,
   );
-  comprobar('y nunca lo que ya se tiene', !porJunco.includes('junco') && !porJunco.includes('limo'));
+  comprobar('y nunca el mismo bien por el mismo bien', !porJunco.includes('junco'));
   comprobar('por un bien que no tengo no se cambia nada', bienesQueSeCambianPor(vistaA, opcionesA, 'grano').length === 0);
 
   /* A quién: con dos en la mesa, uno solo. */
@@ -3090,9 +3121,704 @@ const CAMPO_DE_LA_BARRA = (45 * Math.PI) / 180;
   );
 }
 
+/*
+ * ═══ 20. LA PUERTA Y LAS PROPUESTAS DICHAS A LA MESA ═══
+ *
+ * Este bloque compra las dos mitades de lo que el trueque paramétrico estrenó y que esta
+ * pantalla compartida no sabía leer:
+ *
+ *  · LA PUERTA. La combinatoria de un trueque con multiplicidad no cabe en una lista de
+ *    botones —5.000 opciones y 1.141,9 kB por lectura de una mesa de seis—, así que el
+ *    juego emite UNA opción marcada con `declaracion` cuya carga declara la forma que el
+ *    portillo admite. `puertaDelTrueque` la traduce, y la busca POR LA MARCA: la vacuna
+ *    escrita es cambiarle el `id` y exigir que siga encontrándola.
+ *
+ *  · LAS ABIERTAS. `elPregonEnTres` cortaba con `typeof para !== 'string'`, así que una
+ *    propuesta dicha a la mesa no tenía tira; y como el pregón SÍ existe si además hay una
+ *    dirigida viva, `opcionesFueraDelPregon` le quitaba a la pantalla los ACEPTAR y
+ *    RECHAZAR de TODO. Resultado medido antes de arreglarlo: dos movimientos legales que el
+ *    juego ofrecía y que no había dónde pulsar, y ni una palabra en pantalla. La
+ *    comprobación que lo compra no mira una tira: mira que NINGUNA opción de contestar que
+ *    el juego ofrece se quede sin sitio.
+ *
+ * TODO ESTO SE JUEGA POR EL ÁRBITRO. La propuesta abierta se manda como carga compuesta
+ * —hoy ninguna pantalla la compone todavía, eso es la fase del componedor— y entra por el
+ * portillo con la puerta delante, que es exactamente el camino que va a usar el
+ * componedor. Si el motor dejara de admitirla, este bloque entero se cae.
+ */
+{
+  const TRES_CON_BIENES = ['A', 'B', 'C'];
+  const estado = escenarioDeMazo({
+    bienes: [
+      ['sal', 'sal', 'sal', 'junco'],
+      ['grano', 'limo'],
+      ['limo', 'piedra'],
+    ],
+  });
+  const mesa = mesaSobre('RIB-3D-PUERTA', estado, TRES_CON_BIENES);
+  const opcionesA = opcionesEn(mesa, 'A');
+  /*
+   * ═══ LO QUE NO SE ENCUENTRA SE MANDA COMO ESTO, Y NO COMO `undefined` ═══
+   *
+   * Este bloque encadena movimientos: se propone, se aparta, se acepta. Escrito con
+   * `opciones.find(...) as Opcion`, el día que una de esas opciones deje de ofrecerse el
+   * guion REVIENTA en `mover` con «no se puede leer 'tipo' de undefined» y se lleva por
+   * delante los nombres de todas las rojas que ya había encontrado — que es exactamente lo
+   * que pasó la primera vez que se probó la vacuna del corte de las abiertas. Una
+   * comprobación que revienta no es una comprobación roja. Con esto, un movimiento que no
+   * existe se manda igual, el portillo lo rechaza por no estar ofrecido, el estado no
+   * cambia, y las comprobaciones de abajo se ponen rojas UNA A UNA con su nombre delante.
+   */
+  const NINGUNA: Opcion = { id: 'no-la-hay', tipo: 'no-la-hay', carga: {}, rotulo: '', ayuda: '' };
+  const nombreEn = (m: Mesa, asiento: string): string =>
+    (vistaEn(m, 'A') as { colonos: readonly { asiento: string; nombre: string }[] }).colonos.find((c) => c.asiento === asiento)?.nombre ?? asiento;
+
+  /* ── La puerta, y que se lee por la marca ── */
+  const puerta = puertaDelTrueque(opcionesA);
+  comprobar(
+    'con el turno y bienes en la mano, el juego declara una puerta de trueque',
+    puerta !== null,
+    opcionesA.filter((o) => o.tipo === OFRECER).map((o) => o.id),
+  );
+  comprobar(
+    'y declara el tope por lado que dice la constante del juego, que es lo que el componedor va a leer',
+    puerta?.tope === TOPE_POR_LADO_DEL_TRUEQUE,
+    puerta,
+  );
+  comprobar(
+    'y que se puede decir a la mesa, y a quién si no: los dos rivales, que tienen bienes',
+    puerta?.mesa === true && puerta.a.length === 2 && puerta.a.includes('B') && puerta.a.includes('C'),
+    puerta?.a,
+  );
+  comprobar(
+    'y trae las dos frases que el juego escribe, para que el botón no se las invente',
+    (puerta?.rotulo.length ?? 0) > 0 && (puerta?.ayuda.length ?? 0) > 0,
+    puerta && [puerta.rotulo, puerta.ayuda],
+  );
+  /*
+   * ═══ SE BUSCA POR LA MARCA, Y ÉSTA ES LA VACUNA ESCRITA ═══
+   *
+   * Se le cambia el `id` a la opción de puerta y `puertaDelTrueque` tiene que seguir
+   * encontrándola; se le quita la marca dejándole el `id` y tiene que dejar de
+   * encontrarla. Las dos juntas son las que dicen que quien manda aquí es `declaracion`,
+   * que es del contrato, y no un convenio en el `id` que sólo entendería este fichero.
+   */
+  const conOtroId = opcionesA.map((o) => (o.declaracion === true ? { ...o, id: 'lo-que-sea' } : o));
+  comprobar(
+    'y se la encuentra por la MARCA: cambiarle el `id` no la esconde',
+    canonico(puertaDelTrueque(conOtroId)) === canonico(puerta) && puerta !== null,
+    puertaDelTrueque(conOtroId),
+  );
+  const sinLaMarca = opcionesA.map((o) => {
+    if (o.declaracion !== true) return o;
+    const copia: Record<string, unknown> = { ...o };
+    delete copia['declaracion'];
+    return copia as unknown as Opcion;
+  });
+  comprobar(
+    'y sin la marca no se la encuentra, aunque el `id` siga siendo el mismo: manda `declaracion` y no el nombre',
+    puertaDelTrueque(sinLaMarca) === null,
+    sinLaMarca.filter((o) => o.tipo === OFRECER).map((o) => o.id),
+  );
+  comprobar(
+    'a quien no tiene el turno no se le declara ninguna puerta',
+    puertaDelTrueque(opcionesEn(mesa, 'B')) === null,
+  );
+  comprobar(
+    'y una carga que no tiene la forma de una declaración no se cuela por traer la marca',
+    puertaDelTrueque([
+      { id: 'x', tipo: OFRECER, carga: { tope: 'tres', a: [], mesa: true }, rotulo: '', ayuda: '', declaracion: true },
+    ]) === null,
+  );
+
+  /* ── Y la puerta no es un botón: los dos filtros se la llevan ── */
+  comprobar(
+    'la declaración no sale como botón del pie: `opcionesFueraDelTablero` se la lleva',
+    !opcionesFueraDelTablero(opcionesA).some((o) => o.declaracion === true),
+    opcionesFueraDelTablero(opcionesA).map((o) => o.id),
+  );
+  const losDados = dadosEnTres(vistaEn(mesa, 'A'), 'A', opcionesA);
+  comprobar(
+    'ni cuando la mesa filtra por los dados, con dados y sin ellos: un botón que no juega no se pinta en ninguno de los dos casos',
+    !opcionesFueraDeLaMesa(opcionesA, null).some((o) => o.declaracion === true) &&
+      !opcionesFueraDeLaMesa(opcionesA, losDados).some((o) => o.declaracion === true),
+    opcionesFueraDeLaMesa(opcionesA, null).map((o) => o.id),
+  );
+  comprobar(
+    'y sin dados no se lleva nada más que la declaración: lo demás sale entero y en su orden',
+    canonico(opcionesFueraDeLaMesa(opcionesA, null).map((o) => o.id)) ===
+      canonico(opcionesA.filter((o) => o.declaracion !== true).map((o) => o.id)),
+  );
+  comprobar(
+    'y la puerta tampoco es un trueque que el gesto de la mano pueda mandar: por cada bien que tengo salen los otros CUATRO y ni uno más',
+    ['sal', 'junco'].every((b) => bienesQueSeCambianPor(vistaEn(mesa, 'A'), opcionesA, b).length === 4),
+    ['sal', 'junco'].map((b) => [b, bienesQueSeCambianPor(vistaEn(mesa, 'A'), opcionesA, b)]),
+  );
+
+  /*
+   * ═══ UNA OFERTA DE VARIAS FICHAS NO ES UN GESTO DE LA MANO, Y ÉSTA ES LA QUE LO COMPRA ═══
+   *
+   * El gesto del tablero en tres dimensiones —coger una carta de bien y soltarla sobre otro—
+   * sólo sabe decir UNA ficha por lado: es una carta encima de un sitio. `truequeDeLaOpcion`
+   * leía `da[0]` y `pide[0]`, o sea que una opción de tres sales por un limo se le habría
+   * ofrecido al gesto como «sal por limo», y al soltar la carta habría mandado la carga
+   * ENTERA: el jugador ve irse una ficha y se le van tres. Hoy `opcionesDeTrueque` no emite
+   * ninguna de varias fichas —la combinatoria se declara en la puerta y no se enumera—, así
+   * que esto se compra con una opción montada a mano, que es la única manera de que la
+   * comprobación exista antes que el fallo y no después.
+   */
+  const gorda: Opcion = {
+    id: 'ofrecer:B:sal-sal-sal:limo',
+    tipo: OFRECER,
+    carga: { para: 'B', da: ['sal', 'sal', 'sal'], pide: ['limo'] },
+    rotulo: 'Ofrecer 3 sales por 1 limo',
+    ayuda: '',
+  };
+  comprobar(
+    'una oferta de TRES fichas por una no se le ofrece al gesto de la mano como si fuera de una por una',
+    bienesQueSeCambianPor(vistaEn(mesa, 'A'), [gorda], 'sal').length === 0,
+    bienesQueSeCambianPor(vistaEn(mesa, 'A'), [gorda], 'sal'),
+  );
+  comprobar(
+    'ni se puede mandar por él: soltar la carta de sal sobre el limo no manda una carga con tres sales dentro',
+    truequesPosibles(vistaEn(mesa, 'A'), [gorda], 'sal', 'limo').length === 0,
+    truequesPosibles(vistaEn(mesa, 'A'), [gorda], 'sal', 'limo').map((x) => x.opcion.id),
+  );
+  comprobar(
+    'y la de UNA por una sí, que es la mitad que no se puede perder al arreglar la otra: una por cada rival con bienes',
+    truequesPosibles(vistaEn(mesa, 'A'), opcionesA, 'sal', 'limo').length === 2,
+    truequesPosibles(vistaEn(mesa, 'A'), opcionesA, 'sal', 'limo').map((x) => x.opcion.id),
+  );
+
+  /* ── El plural, que es la primera frase que la multiplicidad dice en voz alta ── */
+  comprobar(
+    'la tabla de plurales cubre las cinco clases de `BIENES`: el día que entre una sexta, esto se pone rojo antes de que nadie lea su plural inventado',
+    BIENES.every((b) => typeof PLURAL_DEL_BIEN[b] === 'string'),
+    BIENES.filter((b) => typeof PLURAL_DEL_BIEN[b] !== 'string'),
+  );
+  comprobar(
+    'y tres sales se leen «3 sales» y NUNCA «3 sals», que es lo que salía de pegarle una `s` a la palabra',
+    bienesEnPalabras(['sal', 'sal', 'sal']) === '3 sales',
+    bienesEnPalabras(['sal', 'sal', 'sal']),
+  );
+  comprobar(
+    'y una oferta de dos clases se cuenta por clase y se junta con una «y»',
+    bienesEnPalabras(['sal', 'sal', 'junco']) === '2 sales y 1 junco',
+    bienesEnPalabras(['sal', 'sal', 'junco']),
+  );
+
+  /* ── La propuesta dicha A LA MESA, jugada por el árbitro ── */
+  const aLaMesa: Opcion = {
+    id: 'compuesta:a-la-mesa',
+    tipo: OFRECER,
+    carga: { para: null, da: ['sal', 'sal', 'sal'], pide: ['limo'] },
+    rotulo: '',
+    ayuda: '',
+  };
+  const abierta = mover(mesa, 'A', aLaMesa);
+  comprobar(
+    'el motor admite por el portillo un trueque de TRES por uno dicho a la mesa, o lo de abajo no mediría nada',
+    abierta.rev === mesa.rev + 1,
+    { antes: mesa.rev, despues: abierta.rev },
+  );
+  /* Y encima una dirigida, que es el caso que dejaba a la abierta sin botones. */
+  const dirigida = opcionesEn(abierta, 'A').find((o) => o.id === 'ofrecer:B:junco:grano');
+  comprobar(
+    'y el juego sigue ofreciendo la lista de uno por uno al lado de la puerta',
+    dirigida !== undefined,
+    opcionesEn(abierta, 'A').filter((o) => o.tipo === OFRECER).map((o) => o.id),
+  );
+  const dos = mover(abierta, 'A', dirigida ?? NINGUNA);
+
+  const opcionesB = opcionesEn(dos, 'B');
+  const pregonB = elPregonEnTres(vistaEn(dos, 'B'), 'B', opcionesB);
+  comprobar(
+    'B ve las DOS en su pregón: la dirigida y la que se dijo a la mesa',
+    pregonB?.paraContestar.length === 2,
+    pregonB?.paraContestar.map((x) => [x.id, x.frase]),
+  );
+  const suya = pregonB?.paraContestar.find((x) => x.para === null);
+  comprobar(
+    'la abierta se lee como lo que es —una oferta a la mesa— y no como si fuera para mí, con la cifra y el plural bien dichos',
+    suya?.frase === `${nombreEn(dos, 'A')} ofrece 3 sales por 1 limo, a la mesa`,
+    suya?.frase,
+  );
+  comprobar(
+    'y de ella cuelgan las DOS opciones del juego, los mismos objetos: sin esto la tira sería un botón que no hace nada',
+    suya !== undefined &&
+      suya.aceptar !== null &&
+      suya.rechazar !== null &&
+      suya.aceptar === opcionesB.find((o) => o.tipo === ACEPTAR && (o.carga as { trato?: unknown }).trato === suya.id) &&
+      suya.rechazar === opcionesB.find((o) => o.tipo === RECHAZAR && (o.carga as { trato?: unknown }).trato === suya.id),
+    { aceptar: suya?.aceptar?.id, rechazar: suya?.rechazar?.id },
+  );
+  /*
+   * ═══ Y ÉSTA ES LA QUE COMPRA EL FALLO ENTERO, Y NO MIRA NINGUNA TIRA ═══
+   *
+   * Con el pregón pintado, `opcionesFueraDelPregon` quita TODOS los ACEPTAR y RECHAZAR de
+   * los botones. Eso es correcto exactamente mientras el pregón los tenga todos colgados de
+   * alguna tira. Antes de arreglarlo no los tenía: la abierta se caía del pregón y sus dos
+   * botones se iban con los de la dirigida, y no quedaba un solo sitio donde contestarla.
+   * Así que lo que se afirma es la conservación: cada opción de contestar que el juego
+   * ofrece está en una tira, y no está además en los botones.
+   */
+  const deContestar = opcionesB.filter((o) => o.tipo === ACEPTAR || o.tipo === RECHAZAR);
+  const enLasTiras = new Set<string>();
+  for (const tira of [...(pregonB?.paraContestar ?? []), ...(pregonB?.mias ?? []), ...(pregonB?.cerrados ?? [])]) {
+    if (tira.aceptar !== null) enLasTiras.add(tira.aceptar.id);
+    if (tira.rechazar !== null) enLasTiras.add(tira.rechazar.id);
+  }
+  const enLosBotones = new Set(opcionesFueraDelPregon(opcionesB, pregonB).map((o) => o.id));
+  comprobar(
+    'con pregón puesto, NINGUNA opción de contestar se queda sin sitio donde pulsarse: las cuatro cuelgan de una tira',
+    deContestar.length === 4 && deContestar.every((o) => enLasTiras.has(o.id)),
+    { ofrece: deContestar.map((o) => o.id), enTiras: [...enLasTiras] },
+  );
+  comprobar(
+    'y ninguna se enseña dos veces: lo que está en una tira no está además en los botones',
+    deContestar.every((o) => !enLosBotones.has(o.id)),
+    [...enLosBotones],
+  );
+  /*
+   * ═══ EL PREGÓN SE COMPONE ANTES DEL FILTRO, Y AL REVÉS SE QUEDA SIN BOTONES ═══
+   *
+   * La misma vacuna que ya está escrita para `porTirar` y `opcionesFueraDeLaMesa` unas
+   * líneas más arriba, y por lo mismo: el orden de dos funciones que se componen es una
+   * decisión, no una casualidad, y escrita al revés no falla nada — sale una pantalla con
+   * las tiras puestas y sin nada que pulsar dentro.
+   */
+  const alReves = elPregonEnTres(vistaEn(dos, 'B'), 'B', opcionesFueraDelPregon(opcionesB, pregonB));
+  comprobar(
+    'y compuesto al revés —el pregón sobre las opciones YA filtradas— las tiras se quedan sin sus botones: por eso recibe las opciones enteras',
+    alReves !== null &&
+      alReves.paraContestar.length === 2 &&
+      alReves.paraContestar.every((x) => x.aceptar === null && x.rechazar === null),
+    alReves?.paraContestar.map((x) => [x.id, x.aceptar?.id ?? null, x.rechazar?.id ?? null]),
+  );
+
+  /* ── Apartar una abierta no la mata, y quien la propuso se entera ── */
+  const noMeInteresa = opcionesB.find((o) => o.tipo === RECHAZAR && (o.carga as { trato?: unknown }).trato === suya?.id);
+  comprobar(
+    'el juego rotula el rechazo de una abierta como «No me interesa», que no es lo mismo que rechazarla',
+    (noMeInteresa?.rotulo ?? '').startsWith('No me interesa'),
+    noMeInteresa?.rotulo,
+  );
+  const apartada = mover(dos, 'B', noMeInteresa ?? NINGUNA);
+
+  const pregonC = elPregonEnTres(vistaEn(apartada, 'C'), 'C', opcionesEn(apartada, 'C'));
+  comprobar(
+    'B la aparta y a C se le sigue ofreciendo: apartar una abierta no se la quita a los demás',
+    pregonC?.paraContestar.some((x) => x.id === suya?.id) === true,
+    pregonC?.paraContestar.map((x) => x.id),
+  );
+  const pregonBTras = elPregonEnTres(vistaEn(apartada, 'B'), 'B', opcionesEn(apartada, 'B'));
+  comprobar(
+    'y a B, que ya dijo que no, no se le pinta una tira sin botones: se le cae de «Para contestar» porque el juego ya no le ofrece nada de ella',
+    pregonBTras?.paraContestar.length === 1 && pregonBTras.paraContestar.every((x) => x.id !== suya?.id),
+    pregonBTras?.paraContestar.map((x) => x.id),
+  );
+  const pregonA = elPregonEnTres(vistaEn(apartada, 'A'), 'A', opcionesEn(apartada, 'A'));
+  const miAbierta = pregonA?.mias.find((x) => x.para === null);
+  comprobar(
+    'y quien la propuso la ve en «Tuyas» con la cuenta de los que ya dijeron que no, que es lo único que se lo dice',
+    miAbierta?.comoAnda === 'apartada ×1' && miAbierta.comoAndaSinNombre === 'apartada ×1',
+    miAbierta && [miAbierta.frase, miAbierta.comoAnda],
+  );
+  comprobar(
+    'y la suya se lee «Ofreces a la mesa», no «Le ofreces a la mesa»',
+    miAbierta?.frase === 'Ofreces a la mesa 3 sales por 1 limo',
+    miAbierta?.frase,
+  );
+  comprobar(
+    'mientras que la dirigida sigue diciendo a quién y sin ninguna cuenta detrás',
+    pregonA?.mias.find((x) => x.para === 'B')?.comoAnda === `esperando a ${nombreEn(apartada, 'B')}`,
+    pregonA?.mias.map((x) => [x.id, x.comoAnda]),
+  );
+
+  /* ── Y cerrada, se dice lo que se sabe y no lo que quedaría mejor ── */
+  const laCoge = opcionesEn(apartada, 'C').find((o) => o.tipo === ACEPTAR && (o.carga as { trato?: unknown }).trato === suya?.id);
+  const trocada = mover(apartada, 'C', laCoge ?? NINGUNA);
+  const pregonAFinal = elPregonEnTres(vistaEn(trocada, 'A'), 'A', opcionesEn(trocada, 'A'));
+  const cerrada = pregonAFinal?.cerrados.find((x) => x.id === suya?.id);
+  comprobar(
+    'aceptada por C, la abierta se cierra y baja al bloque de lo cerrado',
+    cerrada?.estado === 'aceptada',
+    pregonAFinal?.cerrados.map((x) => [x.id, x.estado]),
+  );
+  /*
+   * ═══ Y DE UNA ABIERTA YA SE DICE QUIÉN SE LA LLEVÓ, QUE ANTES NO ═══
+   *
+   * Aquí se compraba «se la llevó alguien», y con ella se compraba un fallo: esa misma
+   * frase le salía EN SU PROPIA PANTALLA a quien acababa de aceptarla, o sea que al que se
+   * la había llevado se le contaba en tercera persona algo que había hecho él, y se lee
+   * como si se le hubiera escapado. Las dirigidas ya lo resolvían en segunda persona; a las
+   * abiertas les faltaba el campo, y ahora lo tienen (`Trato.acepto`).
+   *
+   * Se compran las TRES pantallas, que es lo que hace que esto valga: la de quien la
+   * ofreció, la de quien la apartó y la de quien se la llevó. Con una sola, un cliente que
+   * dijera siempre el nombre —o siempre «la aceptaste»— pasaría igual.
+   */
+  comprobar(
+    'de una abierta ya se dice QUIÉN se la llevó, y en la pantalla del que la ofreció es su nombre',
+    cerrada?.comoAnda === `la aceptó ${nombreEn(trocada, 'C')}` && cerrada.comoAndaSinNombre === 'aceptada',
+    cerrada && [cerrada.comoAnda, cerrada.comoAndaSinNombre],
+  );
+  comprobar(
+    'y en la de quien la apartó, el mismo nombre: nadie lee «alguien» habiendo nombre',
+    elPregonEnTres(vistaEn(trocada, 'B'), 'B', opcionesEn(trocada, 'B'))?.cerrados.find(
+      (x) => x.id === suya?.id,
+    )?.comoAnda === `la aceptó ${nombreEn(trocada, 'C')}`,
+    elPregonEnTres(vistaEn(trocada, 'B'), 'B', opcionesEn(trocada, 'B'))?.cerrados.map((x) => [x.id, x.comoAnda]),
+  );
+  /*
+   * LA TERCERA PANTALLA VA POR UNA RAMA APARTE DE LA PARTIDA —B la acepta en vez de
+   * apartarla— y no es por comodidad: el pregón sólo existe mientras queda algo VIVO que
+   * pregonar, y a C, que acaba de llevarse la única oferta que podía contestar, no le queda
+   * ninguna, así que su pantalla no tiene pregón donde leer nada. B sí tiene la dirigida
+   * esperando, y por eso es el que puede enseñar su propio cerrado.
+   */
+  {
+    const laCogeB = opcionesB.find((o) => o.tipo === ACEPTAR && (o.carga as { trato?: unknown }).trato === suya?.id);
+    const trocadaB = mover(dos, 'B', laCogeB ?? NINGUNA);
+    const suyaEnB = elPregonEnTres(vistaEn(trocadaB, 'B'), 'B', opcionesEn(trocadaB, 'B'))?.cerrados.find(
+      (x) => x.id === suya?.id,
+    );
+    comprobar(
+      'y en la pantalla de quien se la llevó se dice en segunda persona, no «se la llevó alguien»',
+      suyaEnB?.comoAnda === 'la aceptaste' && suyaEnB.comoAndaSinNombre === 'aceptada',
+      suyaEnB && [suyaEnB.comoAnda, suyaEnB.comoAndaSinNombre],
+    );
+  }
+  comprobar(
+    'y las fichas cambiaron de mano de verdad: las tres sales de A pasaron a C',
+    (estadoDe(trocada).colonos[2]?.almacen ?? []).filter((f) => bienDeLaFicha(f) === 'sal').length === 3 &&
+      (estadoDe(trocada).colonos[0]?.almacen ?? []).filter((f) => bienDeLaFicha(f) === 'sal').length === 0,
+    estadoDe(trocada).colonos.map((c) => c.almacen.map((f) => bienDeLaFicha(f))),
+  );
+
+  /* ── Y los dos números que la pantalla no se inventa ── */
+  comprobar(
+    'el tope de propuestas vivas es el del juego y no un número escrito en la pantalla',
+    PROPUESTAS_VIVAS_A_LA_VEZ === 4,
+  );
+  comprobar(
+    'y el destino sin nombre se dice igual en toda la pantalla, por una constante y no por cinco cadenas sueltas',
+    A_LA_MESA === 'la mesa',
+  );
+}
+
+/*
+ * ═══ 21. EL COMPONEDOR: MONTAR UN TRUEQUE DE VARIOS BIENES CON EL DEDO ═══
+ *
+ * La fase 1 hizo que un tres por dos SE PUEDA hacer; la 2, que se lea y se conteste. Lo
+ * que faltaba era la única manera de MONTARLO: leer la puerta y componer la carga. Eso es
+ * `elComponedor`, y vive en `shared/` por lo mismo que el pregón — el escritorio y la app
+ * tendrían dos aritméticas del tope, y la que se rompe es la del aparato que nadie abre.
+ *
+ * LO QUE ESTE BLOQUE COMPRA, y son cuatro cosas que sin él sólo se pueden mirar a ojo:
+ *
+ *   · que el «+» se apague por las TRES razones distintas —el tope, lo que tengo, y el
+ *     bien que ya está en el otro lado— y que cada una lo diga con su porqué;
+ *   · que la carga que sale de aquí ENTRE por el portillo de verdad, jugada por el
+ *     árbitro: es la única prueba de que el componedor y `cabeEnLaPuerta` dicen lo mismo;
+ *   · que con las cuatro vivas puestas «Proponer» se apague con la frase que escribe EL
+ *     JUEGO, y no con una redactada en la pantalla;
+ *   · y que pedir un bien QUE YA TENGO se pueda componer, que es la mitad de lo que
+ *     Miguel pidió y lo que el filtro borrado hacía imposible.
+ */
+{
+  const TRES = ['A', 'B', 'C'];
+  const estado = escenarioDeMazo({
+    bienes: [
+      ['sal', 'sal', 'sal', 'junco'],
+      ['grano', 'limo', 'limo'],
+      ['limo', 'piedra'],
+    ],
+  });
+  const mesa = mesaSobre('RIB-3D-COMPONE', estado, TRES);
+  const vista = vistaEn(mesa, 'A');
+  const opcionesA = opcionesEn(mesa, 'A');
+  const compone = (puesto: LoQueSeCompone): ElComponedor | null => elComponedor(vista, 'A', opcionesA, puesto);
+  const renglon = (c: ElComponedor | null, bien: string): RenglonDelComponedor | undefined =>
+    c?.renglones.find((r) => r.bien === bien);
+
+  /* ── Lo que hay al abrirlo: los bienes que tengo, ninguno puesto, y nada que mandar ── */
+  const vacio = compone(NADA_COMPUESTO);
+  comprobar(
+    'con la puerta declarada hay componedor, y con ella el botón que lo abre',
+    vacio !== null && vacio.rotulo === puertaDelTrueque(opcionesA)?.rotulo,
+    vacio && [vacio.rotulo, vacio.tope],
+  );
+  comprobar(
+    'y su tope es el que declara la puerta, no un número escrito en la pantalla',
+    vacio?.tope === TOPE_POR_LADO_DEL_TRUEQUE,
+    vacio?.tope,
+  );
+  comprobar(
+    'a quien no tiene el turno no se le compone nada: sin puerta no hay componedor ni botón',
+    elComponedor(vistaEn(mesa, 'B'), 'B', opcionesEn(mesa, 'B'), NADA_COMPUESTO) === null,
+  );
+  comprobar(
+    'el lado de DAR sólo ofrece los bienes que tengo: no se puede ofrecer lo que no está en la mano',
+    canonico(vacio?.renglones.map((r) => r.bien)) === canonico(['junco', 'sal']),
+    vacio?.renglones.map((r) => [r.bien, r.tengo]),
+  );
+  comprobar(
+    'y dice cuántas tengo de cada una, que es lo que se lee a la derecha del renglón',
+    renglon(vacio, 'sal')?.tengo === 3 && renglon(vacio, 'junco')?.tengo === 1,
+    vacio?.renglones.map((r) => [r.bien, r.tengo]),
+  );
+  comprobar(
+    'sin nada puesto no hay movimiento que mandar, y se dice qué falta',
+    vacio?.movimiento === null && vacio.porQueNo === 'Pon lo que das y lo que pides.',
+    vacio?.porQueNo,
+  );
+  comprobar(
+    'y el «−» de un renglón vacío va apagado: no se puede quitar lo que no está',
+    vacio?.renglones.every((r) => r.menos === null) === true,
+    vacio?.renglones.map((r) => [r.bien, r.menos === null]),
+  );
+
+  /* ── EL LADO DE PEDIR: LOS CINCO, Y EL QUE YA TENGO ENTRE ELLOS ── */
+  const pidiendo = compone({ ...NADA_COMPUESTO, lado: 'pido' });
+  comprobar(
+    'el lado de PEDIR ofrece las cinco clases, incluidas las que ya tengo: pedir MÁS de lo que tienes es lo que Miguel pidió',
+    canonico(pidiendo?.renglones.map((r) => r.bien)) === canonico([...BIENES]),
+    pidiendo?.renglones.map((r) => [r.bien, r.tengo]),
+  );
+  comprobar(
+    'y el renglón de la sal, de la que ya tengo TRES, se puede subir igual: no es lo que tengo lo que acota este lado',
+    renglon(pidiendo, 'sal')?.tengo === 3 && renglon(pidiendo, 'sal')?.mas !== null,
+    renglon(pidiendo, 'sal'),
+  );
+
+  /* ── EL TOPE POR LADO, QUE ES EL DE LA PUERTA ── */
+  const tresSales = { ...NADA_COMPUESTO, doy: { sal: 3 } };
+  const conTresPuestas = compone(tresSales);
+  comprobar(
+    'con TRES fichas puestas en un lado, el «+» de todos los renglones se apaga',
+    conTresPuestas?.renglones.every((r) => r.mas === null) === true,
+    conTresPuestas?.renglones.map((r) => [r.bien, r.mas === null]),
+  );
+  comprobar(
+    'y lo dice con el número de la puerta, que es lo que se lee en la ayuda del botón apagado',
+    renglon(conTresPuestas, 'sal')?.porQueNoMas === 'Ya llevas 3 fichas de este lado, que es el máximo.',
+    renglon(conTresPuestas, 'sal')?.porQueNoMas,
+  );
+  comprobar(
+    'y el «−» de la sal sigue vivo, y baja de tres a dos sin tocar el otro lado',
+    canonico(renglon(conTresPuestas, 'sal')?.menos) === canonico({ ...NADA_COMPUESTO, doy: { sal: 2 } }),
+    renglon(conTresPuestas, 'sal')?.menos,
+  );
+
+  /* ── LO QUE TENGO ACOTA EL LADO DE DAR, Y SÓLO ÉSE ── */
+  const unJunco = compone({ ...NADA_COMPUESTO, doy: { junco: 1 } });
+  comprobar(
+    'el «+» del junco se apaga al llegar al ÚNICO que tengo, aunque el tope de tres esté lejos',
+    renglon(unJunco, 'junco')?.mas === null && renglon(unJunco, 'sal')?.mas !== null,
+    renglon(unJunco, 'junco'),
+  );
+  comprobar(
+    'y lo dice contando lo que hay, en palabras y con su plural: es la frase que explica por qué no se puede',
+    renglon(unJunco, 'junco')?.porQueNoMas === 'Sólo tienes 1 junco.',
+    renglon(unJunco, 'junco')?.porQueNoMas,
+  );
+
+  /* ── NINGÚN BIEN EN LOS DOS LADOS: LA REGLA 2 DE `cabeEnLaPuerta`, PINTADA ── */
+  const pidoSal = { ...NADA_COMPUESTO, pido: { sal: 1 } };
+  comprobar(
+    'con la sal PEDIDA, el lado de dar sigue enseñando su renglón pero con el «+» apagado, y DICE la regla',
+    renglon(compone({ ...pidoSal, lado: 'doy' }), 'sal')?.mas === null &&
+      renglon(compone({ ...pidoSal, lado: 'doy' }), 'sal')?.porQueNoMas ===
+        'Ya lo estás pidiendo: un bien no puede estar en los dos lados.',
+    renglon(compone({ ...pidoSal, lado: 'doy' }), 'sal'),
+  );
+  /*
+   * Y POR EL OTRO LADO EL RENGLÓN NO ESTÁ, que es la otra mitad de la misma regla. Se
+   * pintan distinto a propósito: quitar el renglón del lado de DAR le borraría de la
+   * pantalla una ficha que acaba de poner en el otro lado sin decirle que la regla existe;
+   * en el lado de PEDIR no hay nada puesto que borrar.
+   */
+  const doySal = compone({ ...NADA_COMPUESTO, lado: 'pido', doy: { sal: 1 } });
+  comprobar(
+    'y el lado de PEDIR no ofrece siquiera el renglón de lo que estoy dando: son cuatro y no cinco',
+    doySal?.renglones.length === 4 && !doySal.renglones.some((r) => r.bien === 'sal'),
+    doySal?.renglones.map((r) => r.bien),
+  );
+
+  /* ── EL CONMUTADOR NO PIERDE LO PUESTO ── */
+  const aMedias = { ...NADA_COMPUESTO, doy: { sal: 2 }, pido: { limo: 1 } };
+  comprobar(
+    'cambiar de lado no tira lo que ya está puesto en el otro: es un conmutador, no dos formularios',
+    canonico(compone(aMedias)?.verLoQuePido) === canonico({ ...aMedias, lado: 'pido' }) &&
+      canonico(compone({ ...aMedias, lado: 'pido' })?.verLoQueDoy) === canonico(aMedias),
+    compone(aMedias)?.verLoQuePido,
+  );
+
+  /* ── LOS DESTINOS SALEN DE LA PUERTA ── */
+  const conDestinos = compone(aMedias);
+  comprobar(
+    'los destinos son los que declara la puerta: la mesa primero y luego los rivales CON bienes',
+    canonico(conDestinos?.destinos.map((d) => d.para)) === canonico([null, 'B', 'C']),
+    conDestinos?.destinos.map((d) => [d.para, d.nombre]),
+  );
+  comprobar(
+    'y el elegido de salida es la mesa, que es el que siempre cabe',
+    conDestinos?.destinos.find((d) => d.elegido)?.para === null,
+    conDestinos?.destinos.map((d) => [d.nombre, d.elegido]),
+  );
+  comprobar(
+    'y elegir a uno deja lo compuesto donde estaba: sólo cambia a quién',
+    canonico(conDestinos?.destinos.find((d) => d.para === 'B')?.elegir) === canonico({ ...aMedias, para: 'B' }),
+    conDestinos?.destinos.find((d) => d.para === 'B')?.elegir,
+  );
+
+  /* ── CON UN LADO VACÍO NO HAY NADA QUE MANDAR, Y SE DICE CUÁL ── */
+  comprobar(
+    'con lo que doy puesto y lo que pido vacío, «Proponer» va apagado y dice qué falta',
+    compone({ ...NADA_COMPUESTO, doy: { sal: 1 } })?.porQueNo === 'Pon al menos una ficha en lo que pides.',
+    compone({ ...NADA_COMPUESTO, doy: { sal: 1 } })?.porQueNo,
+  );
+  comprobar(
+    'y al revés, lo mismo por el otro lado',
+    compone(pidoSal)?.porQueNo === 'Pon al menos una ficha en lo que das.',
+    compone(pidoSal)?.porQueNo,
+  );
+
+  /* ── Y EL MOVIMIENTO QUE SALE ENTRA POR EL PORTILLO DE VERDAD ── */
+  const tresPorDos: LoQueSeCompone = { lado: 'doy', doy: { sal: 3 }, pido: { limo: 2 }, para: null };
+  const listo = compone(tresPorDos);
+  comprobar(
+    'con los dos lados puestos hay movimiento que mandar y ningún porqué que dar',
+    listo?.movimiento !== null && listo?.porQueNo === '',
+    listo?.movimiento,
+  );
+  comprobar(
+    'y su carga son las fichas EXPANDIDAS y en el orden de `BIENES`, que es el que el reductor deja escrito',
+    canonico(listo?.movimiento?.carga) === canonico({ para: null, da: ['sal', 'sal', 'sal'], pide: ['limo', 'limo'] }),
+    listo?.movimiento?.carga,
+  );
+  comprobar(
+    'y se lee antes de pulsarlo, con los plurales del juego y el destino dentro',
+    listo?.resumen === 'Das 3 sales y pides 2 limos, a la mesa.',
+    listo?.resumen,
+  );
+  /*
+   * ═══ LA COMPROBACIÓN QUE COMPRA EL BLOQUE ENTERO ═══
+   *
+   * El movimiento compuesto se manda POR EL ÁRBITRO, con el portillo delante. Es la única
+   * prueba de que el componedor y `cabeEnLaPuerta` dicen lo mismo: si el componedor dejara
+   * montar un lado de cuatro, o un bien en los dos lados, o una carga con un campo de más,
+   * el portillo lo pararía aquí y el trato no existiría. Y es el camino de verdad: es lo
+   * que hace el botón «Proponer» de las dos pantallas.
+   */
+  const propuesto = mover(mesa, 'A', {
+    id: 'compuesto',
+    tipo: listo?.movimiento?.tipo ?? 'no-lo-hay',
+    carga: listo?.movimiento?.carga ?? {},
+    rotulo: '',
+    ayuda: '',
+  });
+  const trato = estadoDe(propuesto).tratos.find((t) => t.de === 'A');
+  comprobar(
+    'y MANDADO POR EL ÁRBITRO entra: el portillo lo deja pasar y la mesa guarda el trato de tres por dos',
+    trato !== undefined && canonico(trato.da) === canonico(['sal', 'sal', 'sal']) && canonico(trato.pide) === canonico(['limo', 'limo']),
+    estadoDe(propuesto).tratos,
+  );
+  comprobar(
+    'y entra como ABIERTA, dicha a la mesa, que es el destino por omisión del componedor',
+    trato?.para === null && trato.estado === 'propuesta',
+    trato && [trato.para, trato.estado],
+  );
+  comprobar(
+    'y lo que se compuso se puede contestar: a B, que tiene los dos limos, se le ofrece aceptarlo',
+    opcionesEn(propuesto, 'B').some((o) => o.tipo === ACEPTAR && (o.carga as { trato?: unknown }).trato === trato?.id),
+    opcionesEn(propuesto, 'B').filter((o) => o.tipo === ACEPTAR).map((o) => o.id),
+  );
+
+  /* ── PEDIR LO QUE YA TENGO, COMPUESTO Y JUGADO ── */
+  const masSal: LoQueSeCompone = { lado: 'doy', doy: { junco: 1 }, pido: { sal: 2 }, para: 'B' };
+  const pidoLoQueTengo = compone(masSal);
+  const mandado = mover(mesa, 'A', {
+    id: 'compuesto2',
+    tipo: pidoLoQueTengo?.movimiento?.tipo ?? 'no-lo-hay',
+    carga: pidoLoQueTengo?.movimiento?.carga ?? {},
+    rotulo: '',
+    ayuda: '',
+  });
+  comprobar(
+    'y se puede componer y MANDAR una oferta que pide DOS sales teniendo tres: es la queja de Miguel, montada con el dedo',
+    estadoDe(mandado).tratos.some((t) => canonico(t.pide) === canonico(['sal', 'sal']) && t.para === 'B'),
+    estadoDe(mandado).tratos,
+  );
+
+  /* ── LAS CUATRO VIVAS APAGAN «PROPONER», CON LA FRASE DEL JUEGO ── */
+  /*
+   * Se llega jugando: cuatro propuestas por el árbitro, ninguna contestada. Con la cuarta
+   * puesta, `opcionesDeTrueque` apaga la lista de uno por uno y DEJA la puerta, que es la
+   * decisión que hace que este botón se pueda pintar apagado con su porqué en vez de
+   * desaparecer. Montarlo a mano no compraría eso: compraría una cuenta.
+   */
+  let conCuatro = mesa;
+  for (const bien of ['sal', 'sal', 'sal', 'junco']) {
+    const cual = opcionesEn(conCuatro, 'A').find(
+      (o) => o.tipo === OFRECER && o.declaracion !== true && canonico((o.carga as { da?: unknown }).da) === canonico([bien]),
+    );
+    conCuatro = cual === undefined ? conCuatro : mover(conCuatro, 'A', cual);
+  }
+  const cuatroVivas = elComponedor(vistaEn(conCuatro, 'A'), 'A', opcionesEn(conCuatro, 'A'), tresPorDos);
+  comprobar(
+    'con CUATRO propuestas vivas se han puesto de verdad, jugadas por el árbitro',
+    misPropuestasVivas(vistaEn(conCuatro, 'A'), 'A') === PROPUESTAS_VIVAS_A_LA_VEZ,
+    estadoDe(conCuatro).tratos.map((t) => [t.id, t.estado]),
+  );
+  comprobar(
+    'y el componedor SIGUE existiendo —la puerta se queda—, pero sin movimiento que mandar',
+    cuatroVivas !== null && cuatroVivas.movimiento === null,
+    cuatroVivas?.movimiento,
+  );
+  comprobar(
+    'y el porqué es la AYUDA que escribe el juego en la puerta, no una frase redactada en la pantalla',
+    cuatroVivas?.porQueNo === puertaDelTrueque(opcionesEn(conCuatro, 'A'))?.ayuda &&
+      (cuatroVivas?.porQueNo.includes('4 propuestas') ?? false),
+    cuatroVivas?.porQueNo,
+  );
+  comprobar(
+    'y aun así el motor lo pararía: el componedor no está adivinando una regla que el reductor no tenga',
+    estadoDe(
+      mover(conCuatro, 'A', {
+        id: 'quinta',
+        tipo: OFRECER,
+        carga: { para: null, da: ['sal', 'sal', 'sal'], pide: ['limo', 'limo'] },
+        rotulo: '',
+        ayuda: '',
+      }),
+    ).tratos.filter((t) => t.estado === 'propuesta').length === PROPUESTAS_VIVAS_A_LA_VEZ,
+    estadoDe(conCuatro).tratos.length,
+  );
+
+  /* ── Y LO QUE NO ES UNA VISTA NO COMPONE NADA ── */
+  comprobar(
+    'una vista que no es de Riberas no compone nada, y un mirón tampoco',
+    elComponedor({ desde: 'otro' }, 'A', opcionesA, NADA_COMPUESTO) === null &&
+      elComponedor(vista, null, opcionesA, NADA_COMPUESTO)?.movimiento === null,
+  );
+}
+
 /* ═══ EL RECUENTO, PARA QUE NO SE VACÍE SIN QUE NADIE LO NOTE ═══ */
-const MINIMO = 390;
+/*
+ * VA CON MARGEN Y NO AL RAS. Hoy se hacen 475 —el componedor trajo 34, y las dos pantallas
+ * que dicen quién se llevó una abierta, dos más—; el guardia está en 463, doce por debajo,
+ * que es lo que cuesta el bloque más pequeño de este guion. Al ras hace lo CONTRARIO de lo
+ * que quiere: una comprobación que se cae de un `if` y deja de contarse dispara el guardia
+ * en vez de la roja, y con el guardia delante nadie ve el nombre de lo que se rompió.
+ *
+ * Y POR ESO LAS ROJAS SE IMPRIMEN ANTES DE IRSE. El orden estaba al revés y se llevaba por
+ * delante la lista entera de nombres justo el día que hiciera falta leerla.
+ */
+const MINIMO = 463;
 if (hechas < MINIMO) {
+  for (const f of fallos) console.log(`   · ${f}`);
   console.log(`✘ este comprobador debería hacer al menos ${MINIMO} comprobaciones y ha hecho ${hechas}: alguien ha borrado un bloque`);
   process.exit(2);
 }

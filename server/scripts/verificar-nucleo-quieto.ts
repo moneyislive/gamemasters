@@ -260,6 +260,51 @@
  * vista, el almacén recibe la silla entera, y un fichero al que se le quitó la
  * figura a mano se lee como una mesa de antes.
  *
+ * ════════════════════════════════════════════════════════════════════════════
+ * QUINTO SELLADO: UNA OPCIÓN PUEDE SER UNA DECLARACIÓN Y NO UN MOVIMIENTO
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Lo que lo motivó: Miguel jugó una partida entera de Riberas y pidió que un trueque
+ * pueda llevar VARIOS bienes por lado y VARIAS unidades de cada clase. Y ahí el
+ * contrato de `Opcion` se quedaba corto de una forma que no se arregla dentro del
+ * juego: `Opcion.carga` promete «el movimiento ya montado», y ES esa promesa la que
+ * mantiene MUDO al mueble genérico —la pantalla manda lo que la opción lleva dentro y
+ * no traduce nada—. Con multiplicidad, montar todos los movimientos posibles no cabe:
+ * medido con topes de tres bienes por lado y cinco rivales, son 5.000 opciones y
+ * 1.141,9 kB de lista en CADA lectura de la mesa, contra las 54 opciones y 9,3 kB de
+ * la lista más larga que se ve hoy jugando — y esa lista viaja entera a cada aparato
+ * en cada movimiento. La lista no puede ser la interfaz.
+ *
+ *  L · `shared/arcade/opciones.ts`: `declaracion?: true` en `Opcion`. UN CAMPO, y es
+ *      todo lo que se ha movido del contrato en este encargo. Dice que la carga de esa
+ *      opción no es un movimiento sino los LÍMITES de una familia de movimientos, y
+ *      que quien la lea componga el movimiento en vez de mandarla.
+ *      Aditivo y opcional: una opción que no lo trae se comporta exactamente como
+ *      antes de que esto existiera, y los otros tres arcades no se enteran —lo
+ *      comprueban `verify:nucleo` y `verify:arcade-pobre`, que siguen verdes sin
+ *      tocarlos—. Y sólo `true`, sin `false` posible, porque un `declaracion: false`
+ *      es una frase que alguien acaba leyendo al revés.
+ *
+ * POR QUÉ EN EL CONTRATO Y NO EN UN CONVENIO DEL `id` DEL JUEGO. Un `id` que empiece
+ * por `ofrecer:puerta` lo entiende quien lo escribió y nadie más, y la cabecera de
+ * `Opcion.id` ya dice que un id sale del vocabulario público y sirve para reconciliar
+ * por identidad, no para llevar significado que el lector tenga que saberse. Y este
+ * tipo existe justamente para los arcades que esta casa NO escribe: un convenio que
+ * hay que conocer no lo conoce quien llega mañana, y lo que se lleva por delante es
+ * concreto —un botón encendido que, pulsado, no juega nada—.
+ *
+ * LO QUE NO SE HA MOVIDO, y es la mitad de lo que este sello compra:
+ * `shared/mecanicas/canonico.ts` sigue byte a byte —la comparación por forma del
+ * portillo cuenta multiconjuntos y el orden canónico de los dos lados lo resuelve el
+ * reductor del juego—, `shared/mecanicas/tablero-declarado.ts` también —`AccionDeTablero`
+ * NO gana esta marca: sería el mismo concepto en dos tipos, o sea dos sitios donde
+ * olvidarlo, y la marca se lee donde NACE la lista de opciones y no viaja al mueble—,
+ * `shared/arcade/index.ts` no cambia, el núcleo sigue sin nombrar ningún juego, y el
+ * portillo del §5 bis —que es privado de Riberas— sigue sin saber que esta marca
+ * existe: la marca es de la PANTALLA y no de la legalidad, y meterla en la comparación
+ * canónica cambiaría la firma de todas las opciones de todos los juegos por una que
+ * usa uno.
+ *
  * ═══ Y `server/src/canal/` NO SE HA TOCADO, QUE ES UNA DECISIÓN Y NO UN OLVIDO ═══
  *
  * El §9 pone en la fase 5 «la segunda implementación de `canal/`» —un canal

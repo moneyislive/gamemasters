@@ -224,7 +224,17 @@ import {
   colocandoEnTres,
   comprarEnTres,
   dadosEnTres,
+  ABRIR_LA_HOJA,
+  ABRIR_LA_HOJA_SIN_CONTESTAR,
+  accionesFueraDelPregon,
+  EL_COMPONEDOR,
+  elComponedor,
+  EL_PREGON_DE_LA_MESA,
   elPregonEnTres,
+  LAS_MIAS,
+  LO_QUE_DOY,
+  LO_QUE_PIDO,
+  LOS_CERRADOS,
   elPregonSePliega,
   elResumenDelPregon,
   glifosDelCarril,
@@ -239,7 +249,10 @@ import {
   opcionesFueraDeLaBarra,
   opcionesFueraDeLaMano,
   opcionesFueraDeLaMesa,
+  NADA_COMPUESTO,
   opcionesFueraDelPregon,
+  PARA_CONTESTAR,
+  PROPONER,
   opcionesFueraDelTablero,
   renglonDelVado,
   revelarDe,
@@ -257,6 +270,8 @@ import type {
   ExplicacionDeLaCarta,
   GlifoDelCarril,
   IdDeLaBarra,
+  ElComponedor,
+  LoQueSeCompone,
   MarcadorEnTres,
   PregonEnTres,
   TableroEnTres,
@@ -269,7 +284,7 @@ import { franjaDeLasCartas, loQueSeVeEnLasCartas } from '../../escenas/cartas';
 import { huecosDeLaBaraja, loQueSeVeEnLaBaraja } from '../../escenas/baraja';
 import { semillaDelCodigo } from '../../shared/mecanicas/semilla';
 import type { MovimientoDeclarado, TableroDeclarado } from '../../shared/mecanicas/tablero-declarado';
-import { CON_ATAJO, Formulario, loQueSePuedePintar, usarLosAtajos } from './formulario';
+import { CON_ATAJO, Formulario, hayAlgoQuePintar, loQueSePuedePintar, usarLosAtajos } from './formulario';
 import type { LaMesa, MesaVista, ResultadoDelMovimiento } from './mesa';
 import type { ArcadeDelCatalogo } from './muebles';
 import { opcionesSueltas } from './plan';
@@ -350,20 +365,34 @@ const RECUADRO_DEL_LIENZO = 'riberas-lienzo';
  *   · en cualquier otro sitio del recuadro —el lienzo, el botón de volver, el de recoger,
  *     la cinta— se acerca, que es lo que hacía antes.
  *
- * LAS CUATRO SE NOMBRAN JUNTAS Y NO UNA A UNA, y eso es lo que evita el fallo de la fase: el
+ * LAS CINCO SE NOMBRAN JUNTAS Y NO UNA A UNA, y eso es lo que evita el fallo de la fase: el
  * carril nació con dieciocho botones y `overflow-x: auto`, y con la rueda mirándole sólo al
  * cajón, girarla encima del carril acercaba el delta y el carril no se movía —que es
  * exactamente lo que le pasó a la crónica cuando el cajón era el que faltaba—. El PREGÓN es
  * la cuarta y es la que más lo necesita: no es modal, así que se lee con el tablero vivo
  * debajo, y sin nombrarla aquí girar la rueda sobre una propuesta acercaría el delta.
+ *
+ * Y LA QUINTA ES EL COMPONEDOR DEL LIENZO, que es la que más alto tiene de todas: ocho
+ * renglones del suelo de toque son 374 puntos con la raíz de esta casa, y en el lienzo más
+ * bajo de la lista (288×317, menos la cabecera de la Sala) no caben ni cinco. O sea que ahí
+ * SIEMPRE hay que rodar por dentro, y sin nombrarla aquí girar la rueda sobre los cinco
+ * renglones acercaría el delta detrás del velo sin mover un renglón — que es exactamente lo
+ * que le pasó a la crónica y luego al carril.
  */
 const EL_CAJON = 'riberas-cajon';
 const EL_VELO = 'riberas-velo';
 const EL_CARRIL = 'riberas-carril';
 const EL_MENU = 'riberas-elige';
 const EL_PREGON = 'riberas-pregon';
+/**
+ * LA CAJA DEL COMPONEDOR EN EL LIENZO, que no es la misma clase que la sección del retablo
+ * (`.riberas-componedor`): allí es un panel en flujo dentro de una página que rueda, y aquí
+ * es una caja modal colocada sobre el recuadro y a todo su ancho. Lo que sí es lo mismo son
+ * las TRIPAS, y por eso las pinta un solo componente en los dos sitios.
+ */
+const EL_COMPONEDOR_EN_EL_LIENZO = 'riberas-componedor-hoja';
 /** Las que se desplazan por dentro: la rueda es suya y no de la cámara. */
-const SE_DESPLAZAN_SOLAS = [EL_CAJON, EL_CARRIL, EL_MENU, EL_PREGON];
+const SE_DESPLAZAN_SOLAS = [EL_CAJON, EL_CARRIL, EL_MENU, EL_PREGON, EL_COMPONEDOR_EN_EL_LIENZO];
 
 /**
  * EL CAMPO VERTICAL DE LA CÁMARA, en radianes: los 45° del `fov` del `Canvas` de abajo. La
@@ -1350,10 +1379,6 @@ const TITULO_DEL_MARCADOR = 'El marcador';
  * partida—. Los tres bloques son las dos mitades de la decisión 17 y la mitad de en medio
  * que el que propone no veía: lo vivo que me toca, lo vivo que ofrecí, y lo que ya se cerró.
  */
-export const EL_PREGON_DE_LA_MESA = 'Los trueques de la mesa';
-const PARA_CONTESTAR = 'Para contestar';
-const LAS_MIAS = 'Tuyas';
-const LOS_CERRADOS = 'Trueques cerrados';
 /**
  * LO QUE HACE UNA TIRA AL PULSARLA, y va en su nombre accesible porque LA TIRA NO LLEVA
  * BOTONES: es lo que Miguel pidió —«la aceptación debe tener que confirmarse para que no se
@@ -1361,8 +1386,13 @@ const LOS_CERRADOS = 'Trueques cerrados';
  * con los dos botones de 44 al lado, a la oferta le quedan 77 puntos en el SE apaisado y 16
  * en 320×360, o sea CERO fichas.
  */
-const ABRIR_LA_HOJA = 'Toca para contestar';
-const ABRIR_LA_HOJA_SIN_CONTESTAR = 'Toca para verlo entero';
+/*
+ * LAS PALABRAS DEL COMPONEDOR, y las cinco son de la PANTALLA y no del juego: son rótulos
+ * de mueble —qué lado se toca, a quién, y el botón de mandar—. Todo lo que habla del
+ * TRUEQUE —«Proponer un trueque», el tope, el porqué de un botón apagado— lo redacta
+ * Riberas en la puerta y llega dentro de `elComponedor`: aquí no se reescribe ni una.
+ */
+const QUE_LADO_SE_TOCA = 'Qué lado estás montando';
 
 // ---------------------------------------------------------------------------
 // El catálogo de modelos, una vez por pestaña
@@ -2259,6 +2289,77 @@ export function RiberasEnTres({
    * tres cribas y una de ellas podría llevárselos mañana.
    */
   const pregon = useMemo(() => elPregonEnTres(vista, yo, opciones), [vista, yo, opciones]);
+  /*
+   * ═══ LO QUE SE LLEVA MONTADO EN EL COMPONEDOR, Y ES LO ÚNICO QUE ESTA PANTALLA GUARDA ═══
+   *
+   * Ni el tope, ni cuántas fichas tengo, ni si el «+» se puede pulsar: eso lo deriva
+   * `elComponedor` de esto más la vista, en `shared/`, que es donde lo lee también la app.
+   * Aquí sólo vive dónde está mirando quien juega, como el cajón y como la mesa recogida.
+   *
+   * Y SE SUELTA SOLO CUANDO LA PUERTA SE VA. Al pasar el turno el juego deja de declarar
+   * qué trueque admite, así que no hay componedor que pintar; sin esto, dos sales montadas
+   * seguirían ahí tres turnos después, encima de una mano que ya no las tiene.
+   */
+  const [loQueSeCompone, ponerLoQueSeCompone] = useState<LoQueSeCompone>(NADA_COMPUESTO);
+  const [componedorAbierto, ponerComponedorAbierto] = useState(false);
+  /*
+   * ═══ EL CUADRADO DE LA CINTA QUE LO ABRE, Y ADONDE VUELVE EL FOCO AL CERRARLO ═══
+   *
+   * Una caja modal que se desmonta con el foco dentro lo suelta al `<body>`, y desde el
+   * `<body>` no hay manera de volver al lienzo sin tabular la cabecera entera de la Sala.
+   * El cajón vuelve a la ficha de los puntos y la hoja de una propuesta vuelve a su tira;
+   * esto vuelve al cuadrado del carril, que es lo que lo abrió y que sigue estando ahí
+   * también después de proponer —apagado, si con ésa se llegó a las cuatro vivas, y un
+   * botón `aria-disabled` sigue pudiendo tener el foco, que es justo por lo que se apaga
+   * así y no con `disabled`—.
+   */
+  const laPuertaDelTrueque = useRef<HTMLButtonElement | null>(null);
+  const componedor = useMemo(
+    () => elComponedor(vista, yo, opciones, loQueSeCompone),
+    [vista, yo, opciones, loQueSeCompone],
+  );
+  const hayPuerta = componedor !== null;
+  /*
+   * ═══ Y SI LA PUERTA SE VA CON EL COMPONEDOR ABIERTO, EL FOCO VUELVE AL RECUADRO ═══
+   *
+   * No es un caso raro: la puerta se va en cuanto pasa mi turno, o sea cada pocos segundos
+   * por el sondeo, y una caja modal que se desmonta con el foco dentro lo suelta al
+   * `<body>`. Desde ahí hay que tabular la cabecera entera de la Sala para volver al
+   * tablero. Es el mismo rescate que la hoja de una propuesta, escrito por el mismo motivo.
+   *
+   * Y EL FOCO SÓLO SE MUEVE SI ESTABA ABIERTO, que es la mitad que no se ve: esta condición
+   * es cierta en todos los turnos ajenos, así que llamar a `focus()` sin mirar le robaría el
+   * foco a quien estuviera leyendo la crónica del cajón cada vez que juega otro. Por eso
+   * `componedorAbierto` entra en la lista de dependencias en vez de leerse de una clausura
+   * vieja: la vuelta siguiente ya vale `false` y esto no hace nada.
+   */
+  useEffect(() => {
+    if (hayPuerta) return;
+    ponerLoQueSeCompone(NADA_COMPUESTO);
+    if (!componedorAbierto) return;
+    ponerComponedorAbierto(false);
+    elRecuadro.current?.focus();
+  }, [hayPuerta, componedorAbierto]);
+  /* Se manda lo que el componedor montó y se vacía: lo montado ya está en la mesa. */
+  const proponerElTrueque = useCallback(
+    (movimiento: { tipo: string; carga: unknown }) => {
+      ponerLoQueSeCompone(NADA_COMPUESTO);
+      ponerComponedorAbierto(false);
+      /*
+       * Y EL FOCO VUELVE AL CUADRADO, que es lo mismo que hace `cerrarElComponedor` y por
+       * el mismo motivo: proponer desmonta la caja con el foco puesto en «Proponer». En el
+       * retablo esto no hace falta —allí la sección se pliega y el botón que la abre sigue
+       * en el flujo, dos renglones más arriba—; en el lienzo no hay flujo al que volver.
+       */
+      laPuertaDelTrueque.current?.focus();
+      void mover(movimiento);
+    },
+    [mover],
+  );
+  const cerrarElComponedor = useCallback(() => {
+    ponerComponedorAbierto(false);
+    laPuertaDelTrueque.current?.focus();
+  }, []);
   const fuera = useMemo(
     () => opcionesFueraDelPregon(opcionesFueraDeLaMesa(fueraDeLaBarra, mesaRecogida ? null : dados), pregon),
     [fueraDeLaBarra, dados, mesaRecogida, pregon],
@@ -2280,12 +2381,22 @@ export function RiberasEnTres({
    * ═══ Y SI HAY CARRIL, QUE ES LO QUE LA CINTA MIDE DISTINTO ═══
    *
    * El carril de la cinta —la segunda tira de 44 puntos con un botón cuadrado por opción
-   * suelta— existe exactamente cuando `fuera` trae algo. No es un ajuste: es lo que decide si
+   * suelta— existe cuando `fuera` trae algo O cuando el juego declara la puerta del trueque,
+   * porque el cuadrado que abre el componedor vive ahí. No es un ajuste: es lo que decide si
    * la caja opaca de arriba mide 44 o 88, y de ahí sale la banda que le queda al cartel de los
    * naipes. Se lee una vez y lo miran los dos sitios —la cuenta del cartel y el marcado—, para
    * que no haya dos condiciones que puedan separarse.
+   *
+   * ═══ Y EL SEGUNDO SUMANDO CASI NUNCA CAMBIA NADA, QUE ES LO QUE HAY QUE DECIR ═══
+   *
+   * La puerta sólo sale en MI turno y con la tirada hecha, y en ese turno `fuera` ya trae
+   * «Pasar el turno», así que el carril ya existía. Está escrito de todas formas porque lo
+   * que no se puede es pintar una segunda tira sin que la cuenta del cartel se entere: el
+   * día que pasar deje de ser una opción suelta —o que el pregón se lleve la última—, el
+   * cuadrado se pintaría encima de una cinta medida como si midiera 44, y el cartel de un
+   * naipe se metería 46,75 puntos por debajo de él.
    */
-  const hayCarril = fuera.length > 0;
+  const hayCarril = fuera.length > 0 || componedor !== null;
 
   /*
    * ═══ QUÉ NAIPE SE ESTÁ EXPLICANDO, Y LA PRECEDENCIA EN UNA LÍNEA ═══
@@ -2600,7 +2711,15 @@ export function RiberasEnTres({
 
   /*
    * AL SOLTAR LA CARTA SOBRE UN BIEN: uno solo a quien proponérselo, se manda; varios,
-   * se pregunta. Riberas exige destinatario y este cliente no lo elige por nadie.
+   * se pregunta, y este cliente no elige por nadie.
+   *
+   * Aquí ponía «Riberas exige destinatario» y dejó de ser verdad: `Trato.para` admite
+   * `null` y una propuesta se puede decir A LA MESA. Lo que sigue necesitando asiento es
+   * la LISTA DE UNO POR UNO, que es de donde salen estas opciones: cada una es un
+   * movimiento ya montado y dirigido, así que cuando el gesto de la mano cae sobre varias
+   * hay que preguntar cuál se manda. Decirlo a la mesa se hace en el COMPONEDOR, que tiene
+   * su propio renglón de destino y arranca justo ahí (`NADA_COMPUESTO` lleva `para: null`).
+   *
    * Los nombres de la escena se traducen de vuelta a los de Riberas antes de preguntar
    * a las reglas, porque la carga habla en el idioma del juego.
    */
@@ -2822,15 +2941,77 @@ export function RiberasEnTres({
           ? 'La mesa trae tablero pero no un delta que pintar: se juega sobre el tablero dibujado.'
           : null;
   if (porQueElRetablo !== null || datos === null || encuadre === null) {
-    const sueltas = opcionesSueltas(tablero, opciones);
+    /*
+     * ═══ AQUÍ SE JUEGAN LAS MESAS DE CINCO Y DE SEIS, Y POR ESO EL TRUEQUE VIVE TAMBIÉN AQUÍ ═══
+     *
+     * `MANIFIESTO_RIBERAS.jugadores` admite hasta seis y el atlas del delta trae CUATRO
+     * colores, así que con el quinto sentado ésta no es una pantalla de respaldo: es la
+     * ÚNICA que hay, la partida entera. Hasta hoy, en esas mesas, contestar un trueque era
+     * un botón suelto de `AccionesDelTablero` que se disparaba de un toque —o sea que la
+     * mesa de cinco se quedaba sin la confirmación que Miguel pidió— y no había ninguna
+     * manera de montar una oferta de varios bienes.
+     *
+     * LAS TRES PIEZAS Y EL ORDEN EN QUE VAN, que es una medida y no un gusto:
+     *
+     *   · EL PREGÓN va ARRIBA, entre la letra chica y el `<Retablo>`. Debajo del tablero no
+     *     se ve: en cuatro de los quince lienzos de la casa el SVG ya pasa del pliegue él
+     *     solo, y sólo seis dejan debajo los 233,75 puntos que miden el rótulo y cuatro
+     *     tiras. Ver `ElPregonDelRetablo`.
+     *   · CONTESTAR SE VA DE LOS BOTONES, por los dos caminos por los que llega: de las
+     *     acciones del tablero (`accionesFueraDelPregon`) y de las opciones sueltas
+     *     (`opcionesFueraDelPregon`). Los dos filtros reciben EL PREGÓN y no un interruptor,
+     *     así que donde no hay pregón —un mirón— los botones se quedan y la propuesta se
+     *     puede contestar igual. Y el pregón se compone ANTES, con las opciones enteras.
+     *   · EL COMPONEDOR va DEBAJO del tablero, y ahí sí, porque no es urgente: se abre en mi
+     *     turno, cuando ya he mirado el tablero, y sólo entonces crece.
+     *
+     * Y LA HOJA ES `ElijeUna`, la misma de las otras cuatro preguntas, en su forma FIJA:
+     * aquí la página rueda y una caja colocada sobre el flujo se quedaría en mitad de un
+     * documento largo, que es donde no se ve. Ver `fijo` allí.
+     */
+    const sueltas = opcionesFueraDelPregon(opcionesSueltas(tablero, opciones), pregon);
+    const sinContestar = accionesFueraDelPregon(tablero, pregon);
     return (
       <>
         <p className="letra-chica riberas-sin-mundo">{porQueElRetablo}</p>
-        <Retablo tablero={tablero} alTocar={mover} quieto={quieto} />
-        <AccionesDelTablero tablero={tablero} alTocar={mover} quieto={quieto} />
-        {sueltas.length > 0 ? (
+        {pregon === null ? null : (
+          <ElPregonDelRetablo
+            pregon={pregon}
+            suya={elPregonEnLaPantalla}
+            abierta={tratoAbierto}
+            alAbrir={ponerTratoAbierto}
+          />
+        )}
+        <Retablo tablero={sinContestar} alTocar={mover} quieto={quieto} />
+        <AccionesDelTablero tablero={sinContestar} alTocar={mover} quieto={quieto} />
+        {componedor === null ? null : (
+          <ElComponedorDelRetablo
+            componedor={componedor}
+            ponerPuesto={ponerLoQueSeCompone}
+            quieto={quieto}
+            abierto={componedorAbierto}
+            alAbrir={ponerComponedorAbierto}
+            alProponer={proponerElTrueque}
+          />
+        )}
+        {/* Lo que decide es lo PINTABLE y no lo que llega: ver `hayAlgoQuePintar`. */}
+        {hayAlgoQuePintar(sueltas) ? (
           <Formulario opciones={sueltas} alElegir={mover} quieto={quieto} titulo="Y además puedes" />
         ) : null}
+        {laTiraAbierta === null ? null : (
+          <ElijeUna
+            fijo
+            titulo={laTiraAbierta.frase}
+            nota={laTiraAbierta.comoAnda}
+            opciones={[laTiraAbierta.aceptar, laTiraAbierta.rechazar].filter((o): o is Opcion => o !== null)}
+            quieto={quieto}
+            alElegir={(o) => {
+              cerrarLaHoja();
+              void mover({ tipo: o.tipo, carga: o.carga });
+            }}
+            alDejarlo={cerrarLaHoja}
+          />
+        )}
       </>
     );
   }
@@ -3045,7 +3226,35 @@ export function RiberasEnTres({
           cabecera de `ElCarril`, con los 4.284 puntos de botones que el estiaje ponía ahí.
         */}
         {hayCarril ? (
-          <ElCarril opciones={fuera} alElegir={mover} quieto={quieto} ancho={laCinta} glifos={glifos} />
+          <ElCarril
+            opciones={fuera}
+            alElegir={mover}
+            quieto={quieto}
+            ancho={laCinta}
+            glifos={glifos}
+            /*
+              EL CUADRADO QUE ABRE EL COMPONEDOR, y no es una opción de la lista: la puerta es
+              una DECLARACIÓN y mandarla tal cual no hace nada. El rótulo y la ayuda los
+              escribe el juego —esta pantalla no redacta una palabra de la regla—, y el
+              apagado sale de `componedor.noCabenMas`, que cuenta las vivas en `shared/` para
+              que el móvil apague el suyo con la misma aritmética.
+            */
+            puerta={
+              componedor === null
+                ? null
+                : {
+                    rotulo: componedor.rotulo,
+                    ayuda: componedor.ayuda,
+                    apagado: componedor.noCabenMas || quieto,
+                    abierto: componedorAbierto,
+                    suyo: laPuertaDelTrueque,
+                    alPulsar: () => {
+                      if (componedorAbierto) cerrarElComponedor();
+                      else ponerComponedorAbierto(true);
+                    },
+                  }
+            }
+          />
         ) : null}
 
         {/*
@@ -3077,6 +3286,37 @@ export function RiberasEnTres({
           />
         )}
 
+        {/*
+          ═══ EL COMPONEDOR: DONDE SE MONTA UN TRUEQUE DE VARIOS BIENES CON EL DEDO ═══
+
+          Es lo último que le faltaba a esta pantalla para que lo que Miguel pidió se pueda
+          HACER en ella. El motor admite un tres por dos desde la fase 1, el pregón lo lee
+          desde la fase 2 y el retablo lo monta desde la fase 3; aquí, en la pantalla de las
+          mesas de dos a cuatro —que es donde Miguel juega—, un trueque gordo sólo se podía
+          proponer desde la lista de uno por uno, o sea que no se podía.
+
+          MODAL, y el pregón que cuelga del mismo sitio no lo es: mientras se compone no se
+          puede tocar el tablero, porque un toque perdido funda una choza. Y a TODO EL ANCHO
+          del recuadro, que es lo único de este encargo que no se mide con `anchoDeLaCinta`:
+          el renglón de un bien mide 162 puntos y el tercio central se queda corto en los
+          lienzos de pie. Puede hacerlo porque es modal — con el velo puesto no hay carta que
+          arrastrar a los lados. Ver `ElComponedorEnElLienzo`.
+
+          Y NO PUEDE ESTAR ABIERTO A LA VEZ QUE EL CAJÓN, sin una línea que lo impida: al
+          cajón lo abre la ficha de los puntos y a esto el cuadrado del carril, y los dos
+          quedan debajo del velo del otro; con el teclado tampoco, porque la trampa de foco no
+          deja salir de la caja que está encima. Queda dicho para que nadie añada la línea que
+          no hace falta.
+        */}
+        {componedor === null || !componedorAbierto ? null : (
+          <ElComponedorEnElLienzo
+            componedor={componedor}
+            ponerPuesto={ponerLoQueSeCompone}
+            quieto={quieto}
+            alProponer={proponerElTrueque}
+            alDejarlo={cerrarElComponedor}
+          />
+        )}
         {/*
           ═══ EL CAJÓN: EL RAÍL ENTERO, DEL ANCHO DE LA CINTA Y COLGADO DE ELLA (§1.11) ═══
 
@@ -3501,11 +3741,43 @@ function ElCarril({
   quieto,
   ancho,
   glifos,
+  puerta,
 }: {
   opciones: readonly Opcion[];
   alElegir: (movimiento: MovimientoDeclarado) => void;
   quieto: boolean;
   ancho: { ancho: number };
+  /**
+   * ═══ LA PUERTA DEL TRUEQUE, QUE NO ES UNA OPCIÓN Y POR ESO ENTRA POR OTRO SITIO ═══
+   *
+   * Los demás cuadrados de esta tira mandan `o.movimiento` tal cual. Éste no manda nada:
+   * abre el componedor, porque lo que el juego declara ahí es la FORMA que admite y no un
+   * movimiento montado —mandada tal cual contesta «Eso no es un trueque»—. Por eso llega
+   * como un trato aparte y no dentro de `opciones`: meterla en la lista sería exactamente
+   * el botón muerto que la marca `declaracion` existe para matar.
+   *
+   * Y VA AQUÍ Y NO EN LA PRIMERA TIRA DE LA CINTA porque ahí no cabe: medido, en un lienzo
+   * de 288 la cinta son 115,2 puntos y ya se le cae uno de los tres trozos que lleva. Aquí
+   * mide el suelo de toque como los demás cuadrados, y se queda PEGADA al canto izquierdo
+   * (`position: sticky` en la hoja) mientras los otros ruedan por debajo: es lo que el §3.2
+   * del diseño pide del botón de la cinta —«el renglón puede quedar fuera del recorte del
+   * pregón; el botón no»— aplicado al eje en el que esta tira se recorta, que es el ancho.
+   *
+   * Y NO ES QUE HOY RUEDE NADA POR DEBAJO: medido sobre el árbitro en ocho partidas, la
+   * puerta y los veinte destinos del estiaje NO COEXISTEN NUNCA —`opcionesDeTurno` sale por
+   * su `return` temprano con `estiajePorMover` y no emite la puerta—, y las sueltas que la
+   * acompañan fueron siempre `["pasar"]`. El porqué entero, con las cifras, está en la
+   * cabecera de `.riberas-carril-puerta` en `estilo.css`.
+   */
+  puerta: {
+    readonly rotulo: string;
+    readonly ayuda: string;
+    /** Con las cuatro propuestas vivas puestas no hay nada que montar: se apaga y lo dice. */
+    readonly apagado: boolean;
+    readonly abierto: boolean;
+    readonly suyo: RefObject<HTMLButtonElement | null>;
+    readonly alPulsar: () => void;
+  } | null;
   /**
    * QUÉ DICE CADA CUADRADO, por `id` de opción. Viene montado de fuera y no se calcula aquí
    * por lo mismo que la barra y las dos manos: la lectura de la vista vive en un solo sitio
@@ -3540,6 +3812,39 @@ function ElCarril({
       role="group"
       aria-label={TITULO_DE_LO_QUE_SE_HACE}
     >
+      {puerta === null ? null : (
+        /*
+         * `aria-disabled` y nunca `disabled`, por lo mismo que los demás cuadrados de esta
+         * tira: se apaga en cuanto entra la cuarta propuesta viva, y eso puede pasar con el
+         * foco puesto encima. Con `disabled` el foco se caería al `<body>` en mitad de un
+         * turno y volver cuesta tabular la cabecera entera de la Sala.
+         *
+         * El glifo es la flecha de doble punta, que es lo que el cuadrado tiene sitio para
+         * decir; QUÉ hace y con qué regla está entero en el nombre accesible y en el
+         * `title`, escritos por el juego y no aquí.
+         */
+        <button
+          type="button"
+          ref={puerta.suyo}
+          className={
+            puerta.apagado
+              ? 'riberas-carril-opcion riberas-carril-puerta riberas-carril-quieta'
+              : 'riberas-carril-opcion riberas-carril-puerta'
+          }
+          aria-disabled={puerta.apagado}
+          aria-expanded={puerta.abierto}
+          aria-label={puerta.rotulo}
+          title={`${puerta.rotulo}. ${puerta.ayuda}`}
+          onClick={() => {
+            if (puerta.apagado) return;
+            puerta.alPulsar();
+          }}
+        >
+          <span className="riberas-carril-glifo" aria-hidden="true">
+            ⇄
+          </span>
+        </button>
+      )}
       {pintables.map((o, i) => {
         const conAtajo = i < CON_ATAJO;
         const idRotulo = `${base}-rotulo-${String(i)}`;
@@ -3692,6 +3997,511 @@ function ElCarril({
  * el raíl de color, los dos renglones y `elEstadoQueCabe` para el recorte— con un triángulo al
  * canto, y no un mueble nuevo: dos formas de tira serían dos sitios donde se recorta distinto.
  */
+/**
+ * UNA TIRA DEL PREGÓN, ESCRITA UNA VEZ PARA LAS DOS PANTALLAS QUE LA PINTAN.
+ *
+ * La pinta el pregón colgado de la cinta (`ElPregon`) y la pinta el pregón del retablo
+ * (`ElPregonDelRetablo`), que son dos cajas distintas —una encima del lienzo y a lo que mide
+ * la cinta, la otra un panel en flujo del ancho de la columna— con LA MISMA tira dentro. Dos
+ * copias serían dos sitios donde se recorta distinto, y el que se quedaría atrás es el del
+ * retablo, que es la pantalla que sólo se abre cuando hay cinco sentados.
+ *
+ * Lo único que cambia entre las dos es el HUECO, que en una sale del ancho de la cinta y en
+ * la otra del de la columna medida: por eso entra por parámetro y no se calcula aquí.
+ */
+function UnaTira({
+  t,
+  hueco,
+  raiz,
+  abierta,
+  alAbrir,
+}: {
+  t: TiraDelPregon<Opcion>;
+  hueco: number;
+  raiz: number;
+  abierta: string | null;
+  alAbrir: (id: string) => void;
+}): JSX.Element {
+  const seContesta = t.aceptar !== null || t.rechazar !== null;
+  /*
+   * EL NOMBRE ACCESIBLE ES LA FRASE ENTERA Y NO LO QUE SE PINTA. En la tira
+   * caben «1 junco → 1 limo» y cuatro palabras de estado; lo que se oye es
+   * quién, qué, en qué dirección y qué hace un toque. Las dos cajas que se
+   * pintan van `aria-hidden` para que nada se diga dos veces, que es lo mismo
+   * que hace la ficha de un colono en el marcador del cajón.
+   */
+  const seOye = `${t.frase}. ${t.comoAnda}. ${seContesta ? ABRIR_LA_HOJA : ABRIR_LA_HOJA_SIN_CONTESTAR}`;
+  return (
+    <button
+      type="button"
+      className="riberas-pregon-tira"
+      /* El seudónimo, para que al cerrar la hoja el foco encuentre su tira. */
+      data-trato={t.id}
+      aria-haspopup="dialog"
+      aria-expanded={abierta === t.id}
+      aria-label={seOye}
+      title={seOye}
+      onClick={() => {
+        alAbrir(t.id);
+      }}
+    >
+      <span className="riberas-pregon-rail" style={{ background: t.color }} aria-hidden="true" />
+      <span className="riberas-pregon-dicho" aria-hidden="true">
+        <span className="riberas-pregon-oferta">
+          {t.da} → {t.pide}
+        </span>
+        <span className="riberas-pregon-estado">{elEstadoQueCabe(t, hueco, raiz)}</span>
+      </span>
+    </button>
+  );
+}
+
+/**
+ * ═══ EL PREGÓN DEL RETABLO, Y VA ANTES QUE EL TABLERO ═══
+ *
+ * En una mesa de CINCO o de SEIS el retablo no es un respaldo: es la única pantalla que hay.
+ * `MANIFIESTO_RIBERAS.jugadores` admite hasta seis y el atlas del delta trae CUATRO colores,
+ * así que `bastanColores` manda aquí en cuanto se sienta el quinto, y con él se va la cinta
+ * de la que cuelga el pregón del 3D. Hasta hoy, en esas mesas, contestar un trueque era un
+ * botón suelto de `AccionesDelTablero` que se disparaba de un toque — o sea que la mesa de
+ * cinco se quedaba sin la confirmación que Miguel pidió.
+ *
+ * ═══ POR QUÉ ARRIBA, Y ESTO ES UNA MEDIDA Y NO UN GUSTO ═══
+ *
+ * Debajo del `<Retablo>` no se ve. El alto pintado del SVG es
+ * `min(max(408, 62 % del alto), ancho útil de la columna / 1,101)`, y con eso, medido en los
+ * quince lienzos de la casa, en CUATRO —568×320, 780×360, 667×375 y 844×390— el tablero ya
+ * pasa del pliegue él solo, y en un quinto (932×430) deja menos de medio renglón. Cinco
+ * renglones de 46,75 —el rótulo y cuatro tiras— son 233,75 puntos, y sólo SEIS de los quince
+ * dejan tanto sitio debajo. Un botón de aceptar al que hay que desplazarse después de pasar
+ * el tablero entero es un botón que en una partida real no se pulsa.
+ *
+ * Arriba, entre la letra chica del porqué y el tablero, se ve sin desplazar en los quince. Y
+ * aquí la página SÍ rueda, así que no hay recorte que decidir ni alto que calcular: lo que se
+ * decide es el ORDEN, y el orden es que el pregón va antes que el tablero.
+ *
+ * ═══ Y ES UN `<section class="panel">` Y NO LA CAJA DEL 3D ═══
+ *
+ * Aquella cuelga de la cinta con `position: absolute`, mide lo que la cinta y se para en el
+ * techo del asa de la barra; aquí no hay cinta, ni barra, ni lienzo, y la página rueda. Lo
+ * que SÍ se comparte es la tira, que es donde vive el recorte: ver `UnaTira`.
+ *
+ * ═══ LA LISTA SE MIDE, POR LO MISMO QUE LA DEL MARCADOR ═══
+ *
+ * De la anchura sale si en el renglón de estado cabe el nombre —«la aceptó Ana»— o sólo el
+ * estado —«aceptada»—, y la anchura aquí no la pone este mueble: la pone la rejilla de la
+ * Sala, que en 320×360 deja 286 puntos de columna y en un monitor 1.071. Un umbral escrito
+ * aquí se equivocaría en cuanto cambie la preferencia de tamaño de letra del navegador. Sin
+ * medida —el primer render, y Node— se pinta el renglón ENTERO, que es lo que había.
+ */
+function ElPregonDelRetablo({
+  pregon,
+  suya,
+  abierta,
+  alAbrir,
+}: {
+  pregon: PregonEnTres<Opcion>;
+  suya: RefObject<HTMLDivElement | null>;
+  abierta: string | null;
+  alAbrir: (id: string) => void;
+}): JSX.Element {
+  const [anchoDeLaLista, ponerAnchoDeLaLista] = useState(0);
+  const [raizDeLaLetra, ponerRaizDeLaLetra] = useState(RAIZ_DE_LA_CASA);
+  const elOjo = useRef<ResizeObserver | null>(null);
+  const medirLaLista = useCallback((lista: HTMLDivElement | null) => {
+    elOjo.current?.disconnect();
+    elOjo.current = null;
+    if (lista === null || typeof ResizeObserver === 'undefined') return;
+    const mide = (): void => {
+      ponerAnchoDeLaLista((antes) => (antes === lista.clientWidth ? antes : lista.clientWidth));
+      ponerRaizDeLaLetra((antes) => {
+        const ahora = raizDelNavegador();
+        return antes === ahora ? antes : ahora;
+      });
+    };
+    mide();
+    const ojo = new ResizeObserver(mide);
+    ojo.observe(lista);
+    if (typeof document !== 'undefined') ojo.observe(document.documentElement);
+    elOjo.current = ojo;
+  }, []);
+  useEffect(() => () => elOjo.current?.disconnect(), []);
+  /* Sin medir, el hueco es infinito y cabe el renglón entero: `elEstadoQueCabe` lo decide. */
+  const hueco = anchoDeLaLista === 0 ? Number.POSITIVE_INFINITY : huecoDeLaTira(anchoDeLaLista);
+  const bloques: { rotulo: string; tiras: readonly TiraDelPregon<Opcion>[] }[] = [
+    { rotulo: PARA_CONTESTAR, tiras: pregon.paraContestar },
+    { rotulo: LAS_MIAS, tiras: pregon.mias },
+    { rotulo: LOS_CERRADOS, tiras: pregon.cerrados },
+  ];
+  return (
+    <section className="panel riberas-pregon-en-el-retablo" aria-label={EL_PREGON_DE_LA_MESA}>
+      <h2 className="rotulo-de-panel">{EL_PREGON_DE_LA_MESA}</h2>
+      <div ref={suya}>
+        {bloques.map((bloque) =>
+          bloque.tiras.length === 0 ? null : (
+            <div key={bloque.rotulo} className="riberas-pregon-bloque" ref={medirLaLista}>
+              <h3 className="rotulo-de-panel">{bloque.rotulo}</h3>
+              {bloque.tiras.map((t) => (
+                <UnaTira key={t.id} t={t} hueco={hueco} raiz={raizDeLaLetra} abierta={abierta} alAbrir={alAbrir} />
+              ))}
+            </div>
+          ),
+        )}
+      </div>
+    </section>
+  );
+}
+
+/**
+ * ═══ EL COMPONEDOR: DONDE SE MONTA UNA OFERTA DE VARIOS BIENES CON EL DEDO ═══
+ *
+ * Es lo único que faltaba para que lo que Miguel pidió se pueda HACER. El motor admite un
+ * tres por dos desde la fase 1 y el pregón lo lee desde la fase 2, pero la lista de botones
+ * del juego sigue siendo de uno por uno a propósito: la combinatoria completa son 5.000
+ * opciones y 1.141,9 kB en CADA lectura de una mesa de seis, así que el juego no la enumera,
+ * declara la PUERTA. Esto es lo que la lee y compone la carga.
+ *
+ * ═══ Y SU BOTÓN SALE DE `puertaDelTrueque` Y NO DE `acciones` ═══
+ *
+ * La declaración NO llega a `AccionesDelTablero`: `tableroDeRiberas` la deja fuera con el
+ * mismo `continue` que ya salta FUNDAR, porque un botón que manda la declaración tal cual
+ * recibe «Eso no es un trueque» y no hace nada más. O sea que ahí no hay botón que pulsar, y
+ * el que abre esto lo pinta esta sección, que es de Riberas y sabe leer una declaración. Y se
+ * puede hacer porque el retablo de este juego NO es la rama genérica de la Sala: `sala.tsx`
+ * manda a Riberas a `RiberasEnTres` siempre, y es `RiberasEnTres` quien decide caer aquí.
+ *
+ * ═══ AQUÍ NO SE DECIDE NINGUNA REGLA, Y ESO ES LA MITAD DEL MUEBLE ═══
+ *
+ * Ni el tope por lado, ni cuántas fichas tengo, ni qué bien no puede estar en los dos lados,
+ * ni cuándo se apaga «Proponer»: todo eso lo dice `elComponedor` en `shared/`, que es donde lo
+ * lee también la app. Lo que un «+» hace al pulsarse es guardar el estado que ya viene dentro
+ * (`renglon.mas`), y va apagado exactamente cuando ese estado es `null`. Con dos clientes
+ * sumando el uno por su cuenta serían dos aritméticas del tope, y la que se rompe es la del
+ * aparato que nadie abre para mirar.
+ *
+ * ═══ `aria-disabled` Y NUNCA `disabled` NATIVO ═══
+ *
+ * Por lo mismo que el botón de tirar los dados y que la lista de `ElijeUna`: un `<button>` al
+ * que se le pone `disabled` TENIENDO EL FOCO lo pierde, y el foco cae al `<body>`. Aquí pasa
+ * en cada toque —se sube la tercera sal y el «+» de los cinco renglones se apaga de golpe—,
+ * así que con `disabled` el dedo funcionaría y el teclado se quedaría sin sitio donde estar.
+ *
+ * ═══ Y LAS TRIPAS SE PINTAN EN LAS DOS PANTALLAS DE ESTE CLIENTE, ASÍ QUE SON UN MUEBLE ═══
+ *
+ * En el retablo son una sección que se pliega dentro de una página que rueda; en el lienzo
+ * son una caja modal a todo el ancho colgada de la cinta. La CAJA es distinta y el contenido
+ * es el mismo: los cinco renglones, el conmutador, los destinos, el resumen vivo y
+ * «Proponer». Escritos dos veces serían dos sitios donde el día que el «+» cambie sólo
+ * cambiará uno, y el que se queda atrás es el que se mira menos.
+ */
+function LasTripasDelComponedor({
+  componedor,
+  ponerPuesto,
+  quieto,
+  alCerrar,
+  alProponer,
+}: {
+  componedor: ElComponedor;
+  ponerPuesto: (lo: LoQueSeCompone) => void;
+  quieto: boolean;
+  /** Cerrar la caja que lo lleva: en el retablo es plegar la sección, en el lienzo es irse. */
+  alCerrar: () => void;
+  alProponer: (movimiento: { tipo: string; carga: unknown }) => void;
+}): JSX.Element {
+  const noSePuede = quieto || componedor.movimiento === null;
+  return (
+    <div className="riberas-componedor-dentro">
+      {/*
+        EL CONMUTADOR, Y POR QUÉ HAY UNO. Con dos contadores por fila —lo que doy y lo
+        que pido en el mismo renglón— la fila mide 296 puntos y no cabe en el ancho de
+        ningún teléfono. Con el conmutador cada fila mide 162 y cabe en los quince.
+      */}
+      <div className="riberas-componedor-lados" role="group" aria-label={QUE_LADO_SE_TOCA}>
+        {([
+          ['doy', LO_QUE_DOY, componedor.verLoQueDoy],
+          ['pido', LO_QUE_PIDO, componedor.verLoQuePido],
+        ] as const).map(([cual, rotulo, estado]) => (
+          <button
+            key={cual}
+            type="button"
+            className={componedor.lado === cual ? 'opcion riberas-elegida' : 'opcion'}
+            aria-pressed={componedor.lado === cual}
+            onClick={() => {
+              ponerPuesto(estado);
+            }}
+          >
+            <span className="opcion-texto">
+              <span className="opcion-rotulo">{rotulo}</span>
+            </span>
+          </button>
+        ))}
+      </div>
+      <ul className="renglones" role="list">
+        {componedor.renglones.map((r) => (
+          <li key={r.bien} className="riberas-componedor-renglon">
+            <span className="riberas-componedor-bien" aria-hidden="true">
+              {r.bien}
+            </span>
+            <button
+              type="button"
+              className={r.menos === null ? 'opcion opcion-quieta riberas-componedor-mando' : 'opcion riberas-componedor-mando'}
+              aria-disabled={r.menos === null || quieto}
+              aria-label={r.seOyeMenos}
+              title={r.seOyeMenos}
+              onClick={() => {
+                if (r.menos === null || quieto) return;
+                ponerPuesto(r.menos);
+              }}
+            >
+              <span className="opcion-texto">
+                <span className="opcion-rotulo">−</span>
+              </span>
+            </button>
+            {/*
+              LA CIFRA ES LO QUE SE OYE DEL RENGLÓN ENTERO —«3 sales, y tienes 3»—, y la
+              redacta `shared/` para que la app diga exactamente lo mismo. Lo que se
+              PINTA es el número a secas, que es lo que cabe entre los dos mandos.
+            */}
+            <span className="riberas-componedor-cifra" aria-label={r.seOye}>
+              {r.cuantas}
+            </span>
+            <button
+              type="button"
+              className={r.mas === null ? 'opcion opcion-quieta riberas-componedor-mando' : 'opcion riberas-componedor-mando'}
+              aria-disabled={r.mas === null || quieto}
+              aria-label={r.seOyeMas}
+              title={r.seOyeMas}
+              onClick={() => {
+                if (r.mas === null || quieto) return;
+                ponerPuesto(r.mas);
+              }}
+            >
+              <span className="opcion-texto">
+                <span className="opcion-rotulo">+</span>
+              </span>
+            </button>
+            <span className="riberas-componedor-tengo" aria-hidden="true">
+              {`tienes ${String(r.tengo)}`}
+            </span>
+          </li>
+        ))}
+      </ul>
+      {/* A QUIÉN: «a la mesa» primero, que es el que siempre cabe, y luego los que tienen bienes. */}
+      <div className="riberas-componedor-lados" role="group" aria-label={A_QUIEN_SE_LO_PROPONES}>
+        {componedor.destinos.map((d) => (
+          <button
+            key={d.para ?? 'la-mesa'}
+            type="button"
+            className={d.elegido ? 'opcion riberas-elegida' : 'opcion'}
+            aria-pressed={d.elegido}
+            onClick={() => {
+              ponerPuesto(d.elegir);
+            }}
+          >
+            <span className="opcion-texto">
+              <span className="opcion-rotulo">{d.nombre}</span>
+            </span>
+          </button>
+        ))}
+      </div>
+      {/*
+        LO QUE SE VA A MANDAR, ESCRITO ANTES DE PULSAR. Es región viva porque cambia con
+        cada «+» y con cada «−», y quien juega con lector de pantalla no tiene otra
+        manera de saber qué lleva montado sin recorrer los cinco renglones otra vez.
+      */}
+      <p className="riberas-componedor-resumen" aria-live="polite">
+        {componedor.resumen}
+      </p>
+      <button
+        type="button"
+        className={noSePuede ? 'opcion opcion-quieta' : 'opcion opcion-primaria'}
+        aria-disabled={noSePuede}
+        title={componedor.porQueNo}
+        onClick={() => {
+          const movimiento = componedor.movimiento;
+          if (quieto || movimiento === null) return;
+          alCerrar();
+          alProponer(movimiento);
+        }}
+      >
+        <span className="opcion-texto">
+          <span className="opcion-rotulo">{PROPONER}</span>
+          {componedor.porQueNo.length > 0 ? (
+            <span className="opcion-ayuda">{componedor.porQueNo}</span>
+          ) : null}
+        </span>
+      </button>
+    </div>
+  );
+}
+
+/**
+ * ═══ EL COMPONEDOR DEL RETABLO: UNA SECCIÓN QUE SE PLIEGA, EN UNA PÁGINA QUE RUEDA ═══
+ *
+ * En la mesa de cinco o de seis no hay lienzo del que colgar nada, así que esto es un
+ * `.panel` en flujo con su rótulo, su botón de abrir y las tripas debajo. Va DEBAJO del
+ * tablero y no arriba, al revés que el pregón, y por lo contrario: el pregón es de quien NO
+ * tiene el turno y hay que verlo sin buscarlo; esto es de quien SÍ lo tiene, que ya ha
+ * mirado el tablero.
+ *
+ * ═══ Y EL BOTÓN QUE ABRE SE APAGA CON LAS CUATRO VIVAS, IGUAL QUE EL DE LA CINTA ═══
+ *
+ * Es el §4.2 del diseño a la letra —«el mismo botón, con la misma ayuda y el mismo apagado
+ * por las cuatro vivas, que el §3.2 pone en la cinta del 3D»— y hasta esta fase estaba a
+ * medias: el botón se abría, dentro «Proponer» salía apagado con su porqué, y para leer el
+ * porqué había que abrir una caja de ocho renglones. Ahora lo dice el propio botón, con la
+ * ayuda que escribe el juego (`componedor.ayuda` ya cambia de texto con el tope puesto), y
+ * lo dice sin abrir nada.
+ *
+ * `aria-disabled` y nunca `disabled` nativo, por lo mismo que los dos mandos de dentro.
+ */
+/*
+ * SE EXPORTA PARA PODER PINTARLO ABIERTO DESDE NODE. Abrirlo es pulsar, y en un guion no
+ * hay quien pulse: sin esto, de los ocho renglones no se mediría ni uno, y lo único que
+ * `verify:escritorio` podría comprobar del componedor sería que existe el botón que lo abre.
+ */
+export function ElComponedorDelRetablo({
+  componedor,
+  ponerPuesto,
+  quieto,
+  abierto,
+  alAbrir,
+  alProponer,
+}: {
+  componedor: ElComponedor;
+  ponerPuesto: (lo: LoQueSeCompone) => void;
+  quieto: boolean;
+  abierto: boolean;
+  alAbrir: (abierto: boolean) => void;
+  alProponer: (movimiento: { tipo: string; carga: unknown }) => void;
+}): JSX.Element {
+  return (
+    <section className="panel riberas-componedor">
+      <h2 className="rotulo-de-panel">{EL_COMPONEDOR}</h2>
+      {/*
+        EL BOTÓN QUE LO ABRE, con el rótulo y la ayuda que escribió EL JUEGO en la puerta.
+        Esta pantalla no redacta ni una palabra sobre el trueque: lo que dice de la regla
+        —«Hasta 3 fichas por lado, y pueden repetirse de la misma clase»— sale de ahí, y lo
+        que dice cuando ya no caben más —«Ya tienes 4 propuestas en la mesa»— también.
+      */}
+      <button
+        type="button"
+        className={componedor.noCabenMas ? 'opcion opcion-quieta' : 'opcion'}
+        aria-expanded={abierto}
+        aria-disabled={componedor.noCabenMas}
+        title={componedor.ayuda}
+        onClick={() => {
+          if (componedor.noCabenMas) return;
+          alAbrir(!abierto);
+        }}
+      >
+        <span className="opcion-texto">
+          <span className="opcion-rotulo">{componedor.rotulo}</span>
+          <span className="opcion-ayuda">{componedor.ayuda}</span>
+        </span>
+      </button>
+      {!abierto ? null : (
+        <LasTripasDelComponedor
+          componedor={componedor}
+          ponerPuesto={ponerPuesto}
+          quieto={quieto}
+          alCerrar={() => {
+            alAbrir(false);
+          }}
+          alProponer={alProponer}
+        />
+      )}
+    </section>
+  );
+}
+
+/**
+ * ═══ EL COMPONEDOR EN EL LIENZO: MODAL, A TODO EL ANCHO, Y RODANDO POR DENTRO ═══
+ *
+ * Las tripas son las MISMAS que en el retablo —el mismo mueble, no una copia—, y lo único
+ * que cambia es la caja. Tres decisiones, y ninguna es de gusto:
+ *
+ *   · ES MODAL, y el pregón que cuelga del mismo sitio no lo es. La diferencia es quién lo
+ *     usa y cuándo: el pregón lo lee quien NO tiene el turno y por debajo se sigue girando
+ *     el tablero; esto lo usa quien SÍ lo tiene, y mientras compone no puede tocar el
+ *     tablero, porque un toque perdido funda una choza donde estaba el dedo. Es el mismo
+ *     razonamiento del cajón del marcador, y por eso lleva sus mismas cuatro mitades: velo,
+ *     `role="dialog"` con nombre, la trampa de foco escrita UNA vez (`usarLaTrampaDeFoco`) y
+ *     el foco de vuelta al cuadrado que lo abrió.
+ *   · VA A TODO EL ANCHO DEL RECUADRO Y NO A LO QUE MIDE LA CINTA, que es lo único de este
+ *     encargo que no se mide con `anchoDeLaCinta`. El renglón de un bien es la ficha (44),
+ *     el «−» (44), la cifra (30) y el «+» (44), o sea 162 puntos, y el tercio central de la
+ *     cinta se queda corto en los lienzos de pie de esta casa. Puede hacerlo justamente
+ *     porque es modal: con el velo puesto no hay carta que arrastrar a los lados.
+ *   · RUEDA POR DENTRO. Ocho renglones del suelo de toque son 374 puntos con la raíz de esta
+ *     casa, y en los lienzos bajos de la lista no caben. Por eso está en
+ *     `SE_DESPLAZAN_SOLAS`: sin nombrarla ahí, la rueda del ratón sobre los cinco renglones
+ *     acercaría el delta detrás del velo sin mover un renglón.
+ *
+ * Y NO SE ESCRIBE UN QUINTO MODAL: lo que hace de caja es lo mismo que hace `ElijeUna` con
+ * su `fijo`, sólo que aquí el contenido no es una lista de opciones sino un mueble entero.
+ * Lo que sí se comparte de verdad —velo, diálogo, trampa— está escrito una sola vez.
+ */
+export function ElComponedorEnElLienzo({
+  componedor,
+  ponerPuesto,
+  quieto,
+  alProponer,
+  alDejarlo,
+}: {
+  componedor: ElComponedor;
+  ponerPuesto: (lo: LoQueSeCompone) => void;
+  quieto: boolean;
+  alProponer: (movimiento: { tipo: string; carga: unknown }) => void;
+  alDejarlo: () => void;
+}): JSX.Element {
+  const caja = useRef<HTMLDivElement | null>(null);
+  usarLaTrampaDeFoco(true, caja, alDejarlo);
+  return (
+    <>
+      <div className={EL_VELO} onClick={alDejarlo} aria-hidden="true" />
+      <div
+        ref={caja}
+        className={EL_COMPONEDOR_EN_EL_LIENZO}
+        role="dialog"
+        aria-modal="true"
+        aria-label={EL_COMPONEDOR}
+        tabIndex={-1}
+      >
+        <h2 className="rotulo-de-panel">{EL_COMPONEDOR}</h2>
+        {/*
+          LA REGLA DEL JUEGO, ARRIBA Y EN TENUE. En el retablo va dentro del botón que abre
+          la sección; aquí ese botón está en la cinta y mide 44 puntos, así que la frase
+          —«Hasta 3 fichas por lado, y pueden repetirse de la misma clase»— no cabe dentro y
+          se escribe aquí. Sigue siendo la que redacta el juego, palabra por palabra.
+        */}
+        <p className="riberas-elige-nota">{componedor.ayuda}</p>
+        <LasTripasDelComponedor
+          componedor={componedor}
+          ponerPuesto={ponerPuesto}
+          quieto={quieto}
+          alCerrar={alDejarlo}
+          alProponer={alProponer}
+        />
+        {/*
+          «DEJARLO», COMO EN LAS OTRAS CUATRO HOJAS. El velo y el `Escape` cierran igual, pero
+          los dos son puertas que hay que saberse: con el dedo, en un lienzo tapado por el
+          velo, un botón escrito es la única salida que se ve.
+        */}
+        <button
+          type="button"
+          className="opcion opcion-sobria"
+          onClick={alDejarlo}
+        >
+          <span className="opcion-texto">
+            <span className="opcion-rotulo">Dejarlo</span>
+          </span>
+        </button>
+      </div>
+    </>
+  );
+}
+
 function ElPregon({
   pregon,
   suya,
@@ -3788,45 +4598,9 @@ function ElPregon({
             bloque.tiras.length === 0 ? null : (
               <div key={bloque.rotulo} className="riberas-pregon-bloque">
                 <h2 className="rotulo-de-panel">{bloque.rotulo}</h2>
-                {bloque.tiras.map((t) => {
-                  const seContesta = t.aceptar !== null || t.rechazar !== null;
-                  /*
-                   * EL NOMBRE ACCESIBLE ES LA FRASE ENTERA Y NO LO QUE SE PINTA. En la tira
-                   * caben «1 junco → 1 limo» y cuatro palabras de estado; lo que se oye es
-                   * quién, qué, en qué dirección y qué hace un toque. Las dos cajas que se
-                   * pintan van `aria-hidden` para que nada se diga dos veces, que es lo mismo
-                   * que hace la ficha de un colono en el marcador del cajón.
-                   */
-                  const seOye = `${t.frase}. ${t.comoAnda}. ${seContesta ? ABRIR_LA_HOJA : ABRIR_LA_HOJA_SIN_CONTESTAR}`;
-                  return (
-                    <button
-                      key={t.id}
-                      type="button"
-                      className="riberas-pregon-tira"
-                      /* El seudónimo, para que al cerrar la hoja el foco encuentre su tira. */
-                      data-trato={t.id}
-                      aria-haspopup="dialog"
-                      aria-expanded={abierta === t.id}
-                      aria-label={seOye}
-                      title={seOye}
-                      onClick={() => {
-                        alAbrir(t.id);
-                      }}
-                    >
-                      <span
-                        className="riberas-pregon-rail"
-                        style={{ background: t.color }}
-                        aria-hidden="true"
-                      />
-                      <span className="riberas-pregon-dicho" aria-hidden="true">
-                        <span className="riberas-pregon-oferta">
-                          {t.da} → {t.pide}
-                        </span>
-                        <span className="riberas-pregon-estado">{elEstadoQueCabe(t, hueco, raiz)}</span>
-                      </span>
-                    </button>
-                  );
-                })}
+                {bloque.tiras.map((t) => (
+                  <UnaTira key={t.id} t={t} hueco={hueco} raiz={raiz} abierta={abierta} alAbrir={alAbrir} />
+                ))}
               </div>
             ),
           )}
@@ -3869,6 +4643,15 @@ function ElPregon({
  * `usarLaTrampaDeFoco`, la misma del cajón y no una copia; y el foco DE VUELTA al cerrar,
  * que lo hace `cerrarElMenu` porque adonde vuelve depende de quién abrió.
  *
+ * ═══ Y EN EL RETABLO NO HAY RECUADRO, ASÍ QUE HAY UNA SEGUNDA COLOCACIÓN ═══
+ *
+ * Todo lo de arriba vale para el lienzo, donde el recuadro es la ventana entera. En la mesa
+ * de cinco o de seis no hay lienzo y LA PÁGINA RUEDA: colocada sobre el flujo, la hoja de una
+ * propuesta se quedaría centrada en un documento de mil puntos, o sea fuera de la pantalla en
+ * cuanto alguien haya bajado a mirar el tablero. Eso es lo que hace `fijo`, que está contado
+ * entero en su propio comentario unas líneas más abajo; lo que NO cambia con él es nada de lo
+ * de arriba: el mismo velo, el mismo diálogo con nombre, la misma trampa y el mismo `Escape`.
+ *
  * `alDejarlo` hace de cerrar en los tres caminos —el botón, el velo y `Escape`—, y eso es a
  * propósito: son la misma decisión dicha de tres maneras, y con tres funciones distintas la
  * que se olvidaría de devolver el foco sería la que menos se prueba.
@@ -3878,6 +4661,7 @@ function ElijeUna({
   nota,
   opciones,
   quieto,
+  fijo = false,
   alElegir,
   alDejarlo,
 }: {
@@ -3895,6 +4679,21 @@ function ElijeUna({
   nota?: string;
   opciones: readonly Opcion[];
   quieto: boolean;
+  /**
+   * SOBRE LA VENTANA Y NO SOBRE EL RECUADRO, y hace falta porque hay DOS pantallas.
+   *
+   * En el lienzo, este menú se coloca dentro del recuadro (`position: absolute`) porque el
+   * recuadro vale la ventana entera y debajo de él no hay nada. En el RETABLO no hay
+   * recuadro y la página RUEDA: colocado sobre el flujo, la hoja de una propuesta se
+   * quedaría centrada en un documento de mil puntos, o sea fuera de la pantalla en cuanto
+   * alguien haya bajado a mirar el tablero. Con esto se coloca sobre la VENTANA, que es
+   * donde está mirando quien acaba de tocar la tira.
+   *
+   * Y es un parámetro y no un componente aparte por lo mismo que la nota: lo que cambia es
+   * DÓNDE se pinta, no qué es. Un quinto modal casi igual sería el sitio donde la trampa de
+   * foco y el `Escape` se quedan a medias.
+   */
+  fijo?: boolean;
   alElegir: (o: Opcion) => void;
   alDejarlo: () => void;
 }): JSX.Element {
@@ -3902,10 +4701,10 @@ function ElijeUna({
   usarLaTrampaDeFoco(true, caja, alDejarlo);
   return (
     <>
-      <div className={EL_VELO} onClick={alDejarlo} aria-hidden="true" />
+      <div className={fijo ? `${EL_VELO} ${EL_VELO}-fijo` : EL_VELO} onClick={alDejarlo} aria-hidden="true" />
       <div
         ref={caja}
-        className={`formulario ${EL_MENU}`}
+        className={fijo ? `formulario ${EL_MENU} ${EL_MENU}-fijo` : `formulario ${EL_MENU}`}
         role="dialog"
         aria-modal="true"
         aria-label={titulo}
