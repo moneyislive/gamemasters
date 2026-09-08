@@ -9080,15 +9080,15 @@ paso('El zócalo se compra de verdad: disco en la choza, raya en la vereda, cada
     );
   }
 
-  // ── Y `delta.tsx` LO MONTA EN LOS DOS SITIOS ─────────────────────────────
+  // ── Y `delta.tsx` MONTA LA MANCHA DE CADA COLONO ─────────────────────────────
 
   /*
-   * ═══ LO QUE EL ÁRBOL DE `Zocalo` NO PUEDE COMPRAR ═══
+   * ═══ LO QUE EL MÓDULO DEL TERRITORIO NO PUEDE COMPRAR ═══
    *
-   * Todo lo de arriba mide un aro perfecto. Un aro perfecto que nadie monta es exactamente el
-   * verde falso de antes con otro disfraz. Así que hace falta leer `delta.tsx` y afirmar que
-   * las dos piezas de jugador —la choza y la vereda— lo montan, y que las dos le ponen la
-   * talla.
+   * Todo lo de arriba mide una mancha perfecta. Una mancha perfecta que nadie monta es
+   * exactamente el verde falso de siempre con otro disfraz: este árbol ya lo ha pagado cuatro
+   * veces con la marca de jugador. Así que se lee `delta.tsx` y se afirma que la monta, que la
+   * monta UNA VEZ POR COLONO y no por pieza, y que las dos piezas ya NO llevan marca propia.
    *
    * Se lee por TEXTO, que es la técnica que este guion ya usa con los diez grupos de la mesa y
    * por la misma razón: dentro de un componente con `useFrame` no entra un guion de Node.
@@ -9097,538 +9097,97 @@ paso('El zócalo se compra de verdad: disco en la choza, raya en la vereda, cada
     path.join(import.meta.dirname ?? __dirname, '..', 'delta.tsx'),
     'utf8',
   );
+  const soloCodigoDelDelta = fuenteDelDelta
+    .split('\n')
+    .filter((l) => !/^\s*(\*|\/\/|\/\*|\{\/\*|\*\/)/.test(l))
+    .join('\n');
+
+  comprobar(
+    'el delta monta la mancha de cada colono, con su color y su malla',
+    /<Mancha\b/.test(soloCodigoDelDelta) &&
+      /color=\{color\}/.test(soloCodigoDelDelta) &&
+      /malla=\{malla\}/.test(soloCodigoDelDelta),
+    { hayMancha: /<Mancha\b/.test(soloCodigoDelDelta) },
+  );
+
   /*
-   * EL CUERPO DE UN COMPONENTE, de su firma a la siguiente declaración de primer nivel. No se
-   * cuentan llaves: dentro de un JSX hay llaves en los atributos, en los comentarios y en las
-   * plantillas, y contarlas es escribir medio analizador. Lo que sí hay es que en este fichero
-   * todas las declaraciones de primer nivel empiezan en la columna cero.
+   * ═══ UNA POR COLONO Y NO UNA POR PIEZA, QUE ES LA DIFERENCIA ENTERA ═══
+   *
+   * Si la mancha se montara dentro de `Asentamiento` o de `PuenteDeJugador` volveríamos al
+   * diseño de antes con otro nombre: cada pieza pintaría su trozo y donde dos se tocaran la
+   * mezcla alfa se aplicaría dos veces, que es la costura que Miguel pidió quitar. Se compra por
+   * los dos lados: que el `<Mancha>` NO esté dentro de esos dos cuerpos, y que se pinte
+   * recorriendo una lista agrupada por color.
    */
-  const cuerpoEn = (fuente: string, firma: string): string => {
-    const desde = fuente.indexOf(firma);
-    if (desde < 0) return '';
+  const cuerpoDe = (firma: string): string => {
+    const empieza = soloCodigoDelDelta.indexOf(firma);
+    if (empieza < 0) return '';
     const re = /^(?:function|const|export) /gm;
-    re.lastIndex = desde + firma.length;
-    const siguiente = re.exec(fuente);
-    return fuente.slice(desde, siguiente === null ? fuente.length : siguiente.index);
+    re.lastIndex = empieza + firma.length;
+    const siguiente = re.exec(soloCodigoDelDelta);
+    return soloCodigoDelDelta.slice(empieza, siguiente === null ? soloCodigoDelDelta.length : siguiente.index);
   };
-  /*
-   * Y SE PARTE EN DOS: el lector toma la fuente por la puerta para que las vacunas puedan
-   * pasarle una fuente ROTA a mano. Sin eso, una vacuna de un lector de texto sólo puede
-   * comprobar que el lector no devuelve el fichero entero — que es lo que había — y no que
-   * caza el fallo de verdad.
-   */
-  const cuerpoDe = (firma: string): string => cuerpoEn(fuenteDelDelta, firma);
-  /*
-   * Y SE MIRA EL CÓDIGO, NO LOS COMENTARIOS. Estas cabeceras citan `<Zocalo` y `tallaDelZocalo`
-   * por su nombre, así que sin quitar los comentarios esto sería verde leyendo prosa — que es
-   * el fallo que ya cazó `soloCodigo` en el bloque de la mesa recogida.
-   */
-  const soloElCodigo = (texto: string): string =>
-    texto.split('\n').filter((l) => !/^\s*(\*|\/\/|\/\*|\{\/\*|\*\/)/.test(l)).join('\n');
-  const LOS_QUE_LLEVAN_MARCA = ['function Asentamiento(', 'function PuenteDeJugador('];
-  const sinMarca: string[] = [];
-  const sinTalla: string[] = [];
-  for (const firma of LOS_QUE_LLEVAN_MARCA) {
-    const cuerpo = soloElCodigo(cuerpoDe(firma));
-    if (!/<Zocalo\b/.test(cuerpo) || !/\bcolor=\{/.test(cuerpo) || !/\bmarca=\{/.test(cuerpo)) sinMarca.push(firma);
-    if (!/tallaDelZocalo\(/.test(cuerpo) || !/scale\.setScalar\(/.test(cuerpo)) sinTalla.push(firma);
-  }
-  /*
-   * ═══ Y CADA UNA CON SU FORMA, QUE ES LO QUE LA MARCA DICE DE MÁS ═══
-   *
-   * `forma` tiene valor por defecto en ninguna parte: el que se olvide de ponerlo no compila. Lo
-   * que SÍ puede pasar es que las dos pidan la misma —dos `forma="disco"`— y entonces la vereda
-   * vuelve a estar marcada con un punto, que es exactamente lo que había antes y lo que se
-   * pidió cambiar. Eso no lo caza el compilador y no lo caza el árbol de `Zocalo`: hay que
-   * leerlo aquí.
-   *
-   * Y el GIRO de la vereda sale de `entero.giro` y no de una cuenta escrita a mano: rehacer ese
-   * `atan2` con el signo de la Y sin cambiar es lo que dejó los tramos del puente cruzados, y
-   * una raya cruzada mide cuatro píxeles de punta a punta.
-   */
-  const laFormaDe = (firma: string): string => {
-    const cuerpo = soloElCodigo(cuerpoDe(firma));
-    return (/forma="([a-z]+)"/.exec(cuerpo) ?? ['', ''])[1] as string;
-  };
+  const LOS_QUE_YA_NO_MARCAN = ['function Asentamiento(', 'function PuenteDeJugador('];
+  const queSiguenMarcando = LOS_QUE_YA_NO_MARCAN.filter((f) => /<(Mancha|Zocalo)\b/.test(cuerpoDe(f)));
   comprobar(
-    'el asentamiento se marca con un DISCO y la vereda con una RAYA: la marca dice también qué clase de cosa es, y una vereda marcada con un punto no dice hacia dónde va',
-    laFormaDe('function Asentamiento(') === 'disco' && laFormaDe('function PuenteDeJugador(') === 'raya',
-    { choza: laFormaDe('function Asentamiento('), vereda: laFormaDe('function PuenteDeJugador(') },
+    'y NINGUNA pieza monta marca propia: el territorio es de un colono y no de una choza',
+    queSiguenMarcando.length === 0 && LOS_QUE_YA_NO_MARCAN.every((f) => cuerpoDe(f).length > 200),
+    { queSiguenMarcando, miden: LOS_QUE_YA_NO_MARCAN.map((f) => cuerpoDe(f).length) },
   );
   comprobar(
-    'y el giro de la raya sale de `entero.giro`, que es la convención de los caminos, y no de un `atan2` rehecho a mano en `delta.tsx`',
-    /giro=\{entero\.giro\}/.test(soloElCodigo(cuerpoDe('function PuenteDeJugador('))) &&
-      !/Math\.atan2/.test(soloElCodigo(cuerpoDe('function PuenteDeJugador('))),
-    { cita: /giro=\{[^}]*\}/.exec(soloElCodigo(cuerpoDe('function PuenteDeJugador(')))?.[0] },
-  );
-  /*
-   * ═══ Y DÓNDE LO PLANTA, QUE ES LO QUE FALTABA Y ES LO MISMO QUE APAGARLO ═══
-   *
-   * Todo lo de arriba compra que el aro EXISTA, de quién es, cuánto mide y que nadie le puso
-   * `visible` en falso. Nada compraba el `donde=`. Medido: cambiando en `PuenteDeJugador` el
-   * `donde` por `entero.medio.y - 400`, la marca se hunde 400 unidades bajo la calzada y
-   * desaparece del tablero exactamente igual que si estuviera apagada — y las 403
-   * comprobaciones de este guion salían EN VERDE. Es el mismo fallo que este bloque entero
-   * existe para que no vuelva, un centímetro más allá.
-   *
-   * Se exige que cada una CITE las piezas de su sitio y no un literal cualquiera: la vereda
-   * cuelga de `entero.medio` —el punto de la polilínea de juntas a mitad de vano, que es lo que
-   * la pone a la cota de la calzada y no a la del suelo— y la choza va en el origen de su
-   * propio grupo. Las dos suben `ALTO_DEL_ZOCALO`, que es lo que las despega del suelo.
-   *
-   * No se comprueba la aritmética, que aquí no se puede ejecutar: se comprueba que los nombres
-   * que deciden la cota estén en la expresión. Un `- 400` escrito a mano ya no cuela, porque el
-   * `+ ALTO_DEL_ZOCALO` deja de estar.
-   */
-  /** La expresión que va en `donde=` dentro de un componente, sin comentarios. */
-  const dondeDe = (firma: string): string => {
-    const cuerpo = soloElCodigo(cuerpoDe(firma));
-    const desde = cuerpo.indexOf('donde={');
-    if (desde < 0) return '';
-    const cierra = cuerpo.indexOf('}', cuerpo.indexOf(']', desde));
-    return cierra < 0 ? '' : cuerpo.slice(desde, cierra + 1);
-  };
-  const dondeDelPuente = dondeDe('function PuenteDeJugador(');
-  const dondeDelAsentamiento = dondeDe('function Asentamiento(');
-  comprobar(
-    'la marca de la vereda se planta en el medio del vano y a la cota de la calzada, no en un punto escrito a mano',
-    /entero\.medio\.x/.test(dondeDelPuente) &&
-      /entero\.medio\.y \+ ALTO_DEL_ZOCALO/.test(dondeDelPuente) &&
-      /entero\.medio\.z/.test(dondeDelPuente),
-    { dondeDelPuente },
-  );
-  /*
-   * ═══ Y LA DE LA CHOZA YA NO VA A UN ALTO ESCRITO A MANO, Y ESO HAY QUE COMPRARLO ═══
-   *
-   * Aquí se exigía `donde={[0, ALTO_DEL_ZOCALO, 0]}` clavado, y media persona sobre el suelo
-   * del vértice no levanta a nadie por encima de la comarca de al lado: un escalón mide cuatro
-   * veces y media eso, y el trozo de disco que pisa la comarca vecina queda DENTRO de la
-   * ladera. Ahora la cota la decide `asientoDelDisco`, que mira el relieve de ese vértice.
-   *
-   * Y se compra la CADENA entera, no la grafía: que el `donde=` cite el nombre, que ese nombre
-   * salga de un `useMemo` con `asientoDelDisco(` dentro, y que a ése le entre el relieve de
-   * VERDAD —`relieve.alturaEn`— y no un llano supuesto. Con cualquiera de los tres eslabones
-   * rotos —un `asiento.alto` que no venga de ningún sitio, o un asiento calculado y no usado—
-   * esto cae, que es lo que `donde={[0, ALTO_DEL_ZOCALO, 0]}` no podía decir.
-   */
-  const elCuerpoDeLaChozaEnElJsx = soloElCodigo(cuerpoDe('function Asentamiento('));
-  const laCadenaDelAsiento =
-    /^donde=\{\[0, asiento\.alto, 0\]\}$/.test(dondeDelAsentamiento) &&
-    /const asiento = useMemo\(/.test(elCuerpoDeLaChozaEnElJsx) &&
-    /asientoDelDisco\(/.test(elCuerpoDeLaChozaEnElJsx) &&
-    /asientoDelDisco\(\s*\(x: number, y: number\) => relieve\.alturaEn/.test(elCuerpoDeLaChozaEnElJsx);
-  comprobar(
-    'y la de la choza va en el origen de su pieza y a la cota que el RELIEVE de su vértice deja: el «donde=» cita el asiento, el asiento sale de un `useMemo` con `asientoDelDisco`, y a ése le entra el relieve de verdad y no un llano supuesto',
-    laCadenaDelAsiento,
-    {
-      dondeDelAsentamiento,
-      citaElAsiento: /const asiento = useMemo\(/.test(elCuerpoDeLaChozaEnElJsx),
-      lLamaAlAsiento: /asientoDelDisco\(/.test(elCuerpoDeLaChozaEnElJsx),
-      leDaElRelieveDeVerdad: /asientoDelDisco\(\s*\(x: number, y: number\) => relieve\.alturaEn/.test(
-        elCuerpoDeLaChozaEnElJsx,
-      ),
-    },
-  );
-  /*
-   * LA VACUNA: con el asiento calculado pero NO usado —el `donde=` de vuelta al alto escrito a
-   * mano— la cadena se rompe. Es la mutación exacta que deja la marca donde estaba y con la
-   * comprobación de arriba en verde si sólo mirase la grafía.
-   */
-  const conElAltoAMano = fuenteDelDelta.replace(
-    'donde={[0, asiento.alto, 0]}',
-    'donde={[0, ALTO_DEL_ZOCALO, 0]}',
-  );
-  const dondeAMano = ((): string => {
-    const cuerpo = soloElCodigo(cuerpoEn(conElAltoAMano, 'function Asentamiento('));
-    const desde = cuerpo.indexOf('donde={');
-    const cierra = cuerpo.indexOf('}', cuerpo.indexOf(']', desde));
-    return desde < 0 || cierra < 0 ? '' : cuerpo.slice(desde, cierra + 1);
-  })();
-  comprobar(
-    'se ve fallar: devolviendo el «donde=» al alto escrito a mano —que compila y que deja el asiento calculado ahí al lado sin usar— la cadena se rompe',
-    conElAltoAMano !== fuenteDelDelta && !/^donde=\{\[0, asiento\.alto, 0\]\}$/.test(dondeAMano),
-    { dondeAMano },
-  );
-  comprobar(
-    'las dos piezas de jugador de `delta.tsx` montan el zócalo: la choza y la vereda, con su color y su referencia',
-    sinMarca.length === 0 && LOS_QUE_LLEVAN_MARCA.every((f) => cuerpoDe(f).length > 200),
-    { sinMarca, miden: LOS_QUE_LLEVAN_MARCA.map((f) => cuerpoDe(f).length) },
-  );
-  comprobar(
-    'y las dos le ponen la talla con `tallaDelZocalo`, que es la misma cuenta: ninguna la escribe a mano',
-    sinTalla.length === 0,
-    sinTalla,
-  );
-  /*
-   * ═══ Y EL «marca=» TIENE QUE CITAR LA REFERENCIA QUE SE ESCALA, QUE NO ES LO MISMO ═══
-   *
-   * Lo de arriba compra que en el texto de estos dos componentes haya un «marca={» y un
-   * «scale.setScalar(». Las dos cosas siguen siendo verdad con «marca={null}» escrito en el JSX
-   * de la choza: la prop es un «Ref<THREE.Group>» y «null» es un Ref legal, así que
-   * `verify:escena`, `verify:escritorio` y el typecheck salen los TRES en cero mientras la
-   * referencia que el `useFrame` escala no llega a ningún sitio.
-   *
-   * Y no es un fallo pequeño: sin referencia el grupo se queda a escala UNO, o sea del tamaño de
-   * una tesela del mundo — que es exactamente el fallo que este guion ya tiene vacunado unos
-   * bloques más arriba («un aro del tamaño de una tesela … encogería con la distancia»). El
-   * disco desaparecería de la vista de tablero igual que si estuviera apagado.
-   *
-   * Se lee la CADENA ENTERA, igual que se hizo con el `donde=`: el nombre que va en «marca={…}»
-   * tiene que ser el de un `useRef` de este mismo componente, y ese nombre tiene que ser el que
-   * se lee con «.current» para escalarlo. Tres eslabones, y romper cualquiera la parte.
-   */
-  const laCadenaDeLaMarca = (fuente: string, firma: string): string => {
-    const cuerpo = soloElCodigo(cuerpoEn(fuente, firma));
-    const nombre = (/marca=\{([A-Za-z_$][\w$]*)\}/.exec(cuerpo) ?? ['', ''])[1] ?? '';
-    if (nombre === '') return '';
-    if (!cuerpo.includes(`const ${nombre} = useRef<`)) return '';
-    const alias = (new RegExp(`const ([A-Za-z_$][A-Za-z0-9_$]*) = ${nombre}[.]current;`).exec(cuerpo) ?? [])[1];
-    if (alias === undefined) return '';
-    return cuerpo.includes(`${alias}.scale.setScalar(`) ? `${nombre} → ${alias}` : '';
-  };
-  const lasCadenas = LOS_QUE_LLEVAN_MARCA.map((f) => ({
-    componente: f,
-    cadena: laCadenaDeLaMarca(fuenteDelDelta, f),
-  }));
-  comprobar(
-    'y el «marca=» de cada una CITA la referencia que su propio «useFrame» escala: el nombre está en un «useRef» del componente, se lee con «.current» y es ése el que recibe el «scale.setScalar»',
-    lasCadenas.every((c) => c.cadena !== ''),
-    lasCadenas,
-  );
-  /*
-   * LA VACUNA, Y ES EL FALLO LITERAL: «marca={null}» en el zócalo de la choza. Se exige (a) que
-   * la cadena se rompa y (b) que TODO lo que se compraba antes siga diciendo que sí — que es lo
-   * que hay que enseñar, porque es justo lo que pasaba.
-   */
-  const conLaMarcaNula = fuenteDelDelta.replace(
-    'forma="disco" donde={[0, asiento.alto, 0]} marca={zocalo}',
-    'forma="disco" donde={[0, asiento.alto, 0]} marca={null}',
-  );
-  const laChozaSinReferencia = soloElCodigo(cuerpoEn(conLaMarcaNula, 'function Asentamiento('));
-  comprobar(
-    'se ve fallar: con «marca={null}» en el zócalo de la choza —que compila, porque un Ref admite null— la cadena se rompe, y las seis de antes siguen diciendo que sí',
-    conLaMarcaNula !== fuenteDelDelta &&
-      laCadenaDeLaMarca(conLaMarcaNula, 'function Asentamiento(') === '' &&
-      /<Zocalo\b/.test(laChozaSinReferencia) &&
-      /\bcolor=\{/.test(laChozaSinReferencia) &&
-      /\bmarca=\{/.test(laChozaSinReferencia) &&
-      /forma="disco"/.test(laChozaSinReferencia) &&
-      /donde=\{\[0, asiento\.alto, 0\]\}/.test(laChozaSinReferencia) &&
-      /tallaDelZocalo\(/.test(laChozaSinReferencia) &&
-      /scale\.setScalar\(/.test(laChozaSinReferencia),
-    {
-      cambio: conLaMarcaNula !== fuenteDelDelta,
-      cadenaRota: laCadenaDeLaMarca(conLaMarcaNula, 'function Asentamiento('),
-      laDeVerdad: laCadenaDeLaMarca(fuenteDelDelta, 'function Asentamiento('),
-    },
-  );
-  /*
-   * ═══ Y NADIE MIRABA EL JSX QUE ENVUELVE LA LLAMADA, QUE ES LA PUERTA DE AL LADO ═══
-   *
-   * Todo lo de arriba compra el árbol que DEVUELVE `Zocalo()` —que no tiene nodos apagados— y
-   * que el texto de estos dos componentes CITA `<Zocalo`, `color={`, `marca={`, `forma=` y
-   * `donde=`. Ninguna de las dos cosas mira lo que hay ALREDEDOR de la llamada.
-   *
-   * Y ahí está el mismo fallo que costó un encargo entero cerrar: envolver el `<Zocalo>` en un
-   * `<group visible={false}>` DENTRO de `delta.tsx` —que es literalmente lo que hizo el revisor
-   * que encontró el fallo original— deja `verify:escena`, `verify:escritorio` y los typechecks
-   * los TRES en cero, con el tablero de piezas puestas otra vez idéntico al vacío. La vacuna de
-   * abajo lo enseña: con la fuente rota, las cinco comprobaciones de arriba siguen diciendo que
-   * sí.
-   *
-   * La regla es sencilla y por eso se sostiene: en el código de estos dos componentes NO HAY
-   * NINGÚN `visible={`. La animación de la obra apaga sus grupos desde el `useFrame`
-   * (`g.visible = salido > 0.001`), que es una asignación y no una prop, así que la regla no
-   * la roza. Un `visible={` en el JSX de aquí sólo puede ser una cosa: alguien apagando algo.
-   */
-  const apagaDesdeFuera = (fuente: string, firma: string): string[] =>
-    soloElCodigo(cuerpoEn(fuente, firma))
-      .split('\n')
-      .filter((l) => /visible=\{/.test(l))
-      .map((l) => l.trim());
-  const apagados = LOS_QUE_LLEVAN_MARCA.flatMap((f) =>
-    apagaDesdeFuera(fuenteDelDelta, f).map((l) => `${f}: ${l}`),
-  );
-  comprobar(
-    'y nadie apaga la marca DESDE FUERA: en el JSX de la choza y el de la vereda no hay un solo «visible={», que es lo único que hace falta para que el zócalo desaparezca sin que ninguna de las otras comprobaciones se entere',
-    apagados.length === 0,
-    apagados,
-  );
-  /*
-   * LA VACUNA, Y ES EXACTAMENTE EL FALLO: se envuelve el `<Zocalo>` de la choza en un
-   * `<group visible={false}>` sobre una copia de la fuente y se exige (a) que el lector nuevo lo
-   * cace y (b) que TODO lo que se compraba antes siga diciendo que sí — que es la parte que
-   * duele y la razón de que esta comprobación exista.
-   */
-  const EL_ZOCALO_DE_LA_CHOZA =
-    '<Zocalo color={pieza.color} forma="disco" donde={[0, asiento.alto, 0]} marca={zocalo} />';
-  const fuenteApagada = fuenteDelDelta.replace(
-    EL_ZOCALO_DE_LA_CHOZA,
-    `<group visible={false}>${EL_ZOCALO_DE_LA_CHOZA}</group>`,
-  );
-  const rotaYLoDice = apagaDesdeFuera(fuenteApagada, 'function Asentamiento(').length > 0;
-  const laVieja = soloElCodigo(cuerpoEn(fuenteApagada, 'function Asentamiento('));
-  const laViejaSigueDiciendoQueSi =
-    /<Zocalo\b/.test(laVieja) &&
-    /\bcolor=\{/.test(laVieja) &&
-    /\bmarca=\{/.test(laVieja) &&
-    /forma="disco"/.test(laVieja) &&
-    /donde=\{\[0, asiento\.alto, 0\]\}/.test(laVieja) &&
-    /tallaDelZocalo\(/.test(laVieja);
-  comprobar(
-    'se ve fallar: envolviendo el «<Zocalo>» de la choza en un «<group visible={false}>» —lo que el revisor hizo— el lector nuevo lo caza, y todas las que había antes siguen diciendo que sí',
-    fuenteApagada !== fuenteDelDelta && rotaYLoDice && laViejaSigueDiciendoQueSi,
-    { cambio: fuenteApagada !== fuenteDelDelta, loCaza: rotaYLoDice, lasDeAntesSiguenEnVerde: laViejaSigueDiciendoQueSi },
-  );
-  /*
-   * ═══ Y LO QUE SE COMPRÓ AHÍ ARRIBA ES UNA GRAFÍA, NO LA PUERTA ═══
-   *
-   * La regla de «no hay ni un `visible={` en el JSX de estos dos componentes» caza la mutación
-   * histórica y sólo ésa. Probadas SIETE formas más de apagar la misma marca desde este mismo
-   * JSX, con `verify:escena`, `verify:escritorio` y el typecheck los tres en cero:
-   *
-   *   1. envolverlo en `<group scale={0}>`                      ← pasaba
-   *   2. envolverlo en `<group scale={[0, 0, 0]}>`              ← pasaba
-   *   3. envolverlo en `<group position={[0, -1000, 0]}>`       ← pasaba
-   *   4. escribirlo como `{false && <Zocalo … />}`              ← pasaba
-   *   5. `scale={0}` en el grupo RAÍZ de `Zocalo()`             ← pasaba
-   *   6. `scale={0}` en el grupo del GIRO, dentro de `Zocalo()` ← pasaba
-   *   7. las mallas de `Zocalo()` mudadas fuera del encuadre    ← pasaba
-   *
-   * Las tres últimas viven en `zocalo.tsx` y las caza ahora el juez del árbol, unos bloques más
-   * arriba, con sus tres vacunas. Las cuatro primeras viven aquí, en el JSX de `delta.tsx`, y
-   * ninguna regla de PALABRAS las puede cerrar todas: la lista de formas de apagar algo no
-   * tiene fin. Lo que sí tiene fin es la lista de sitios donde el `<Zocalo>` puede estar.
-   *
-   * ═══ ASÍ QUE SE COMPRA LA FORMA DEL ÁRBOL Y NO LAS PALABRAS ═══
-   *
-   * Que el `<Zocalo>` de cada componente cuelgue DIRECTAMENTE del elemento raíz de su `return`
-   * y de nada más. Cualquier envoltorio —lleve `visible`, `scale`, `position`, o lo que se
-   * invente el que venga— añade un eslabón al camino y se ve; y escribirlo dentro de una
-   * expresión `{…}`, que es lo que hace el `{false && …}`, lo saca del camino y también se ve.
-   *
-   * Y NO ROZA LA ANIMACIÓN DE LA OBRA, que es la trampa: `Asentamiento` apaga sus grupos con
-   * `g.visible = salido > 0.001` y los arranca con `scale={0}` en el JSX de las PARTES. Lo
-   * primero es una asignación, no una prop; lo segundo es un elemento que no envuelve al
-   * zócalo. Esto mira el CAMINO hasta el `<Zocalo>` y nada más, así que las dos cosas siguen
-   * siendo código legítimo.
-   *
-   * ═══ CÓMO SE LEE UN CAMINO DE JSX SIN ESCRIBIR UN ANALIZADOR ═══
-   *
-   * Se recorre desde el `return (` llevando la pila de etiquetas abiertas. Lo que va entre
-   * llaves se SALTA ENTERO —los atributos, los `.map(…)`, los condicionales—, y por eso un
-   * `<Zocalo>` metido dentro de una expresión no aparece: que no aparezca es la respuesta.
-   * Vale aquí porque en este fichero las llaves están equilibradas y ningún atributo lleva un
-   * `>` fuera de sus llaves; el día que eso cambie, esto dejará de encontrar el camino y lo
-   * dirá en rojo, que es el lado bueno por el que fallar.
-   *
-   * ═══ Y LO QUE SIGUE ABIERTO, ESCRITO PARA QUE EL SIGUIENTE NO LO DESCUBRA SOLO ═══
-   *
-   * Las siete de la lista quedan cerradas, y no de palabra: se han probado UNA A UNA sobre el
-   * árbol de verdad, las siete compilan con el typecheck en cero y las siete ponen este guion
-   * en rojo. Estas DOS no quedan cerradas, y no por descuido:
-   *
-   *   · `scale={0}` en el grupo RAÍZ de `Asentamiento` —el `<group position={alMundo(…)}>`—
-   *     apaga el zócalo Y la pieza entera, y no lo caza nadie. Se deja fuera a propósito: el
-   *     JSX de las PARTES arranca legítimamente con `scale={0}` —es la animación de la obra,
-   *     que las hace brotar—, así que una regla de «ningún `scale={0}` en este componente»
-   *     daría rojo con código bueno. Lo que lo hace menos grave es que se VE: lo que
-   *     desaparece es el asentamiento entero y no sólo su marca, o sea que no es el fallo
-   *     silencioso del que viene todo esto.
-   *   · escribir la talla como `z.scale.setScalar(tallaDelZocalo(…) * 0)`. La cadena de más
-   *     arriba compra que el `marca={}` cita el `useRef` que recibe el `scale.setScalar` y que
-   *     en el cuerpo aparece `tallaDelZocalo(`; no compra qué NÚMERO acaba entrando, porque de
-   *     dentro de un `useFrame` no se mide. Es la frontera de siempre, y el precio de tenerla.
-   */
-  const trasLaLlave = (texto: string, desde: number): number => {
-    let hondo = 0;
-    let i = desde;
-    while (i < texto.length) {
-      if (texto[i] === '{') hondo++;
-      else if (texto[i] === '}') {
-        hondo--;
-        if (hondo === 0) return i + 1;
-      }
-      i++;
-    }
-    return texto.length;
-  };
-  /** Las etiquetas abiertas en el punto donde aparece `<etiqueta`, o `null` si no cuelga del árbol. */
-  const caminoHasta = (cuerpo: string, etiqueta: string): string[] | null => {
-    const arranca = cuerpo.indexOf('return (');
-    if (arranca < 0) return null;
-    const pila: string[] = [];
-    let i = arranca + 'return ('.length;
-    while (i < cuerpo.length) {
-      if (cuerpo[i] === '{') {
-        i = trasLaLlave(cuerpo, i);
-        continue;
-      }
-      if (cuerpo[i] !== '<') {
-        i++;
-        continue;
-      }
-      const cierra = /^<\/([A-Za-z][\w.]*)\s*>/.exec(cuerpo.slice(i));
-      if (cierra !== null) {
-        pila.pop();
-        i += cierra[0].length;
-        if (pila.length === 0) return null;
-        continue;
-      }
-      const abre = /^<([A-Za-z][\w.]*)/.exec(cuerpo.slice(i));
-      if (abre === null) {
-        i++;
-        continue;
-      }
-      const nombre = abre[1] as string;
-      if (nombre === etiqueta) return [...pila];
-      let j = i + abre[0].length;
-      let suelta = false;
-      while (j < cuerpo.length) {
-        if (cuerpo[j] === '{') {
-          j = trasLaLlave(cuerpo, j);
-          continue;
-        }
-        if (cuerpo[j] === '>') {
-          suelta = cuerpo[j - 1] === '/';
-          j++;
-          break;
-        }
-        j++;
-      }
-      if (!suelta) pila.push(nombre);
-      i = j;
-    }
-    return null;
-  };
-  const caminoDelZocaloEn = (fuente: string, firma: string): string[] | null =>
-    caminoHasta(soloElCodigo(cuerpoEn(fuente, firma)), 'Zocalo');
-  const losCaminos = LOS_QUE_LLEVAN_MARCA.map((f) => ({
-    componente: f,
-    camino: caminoDelZocaloEn(fuenteDelDelta, f),
-  }));
-  comprobar(
-    'y el «<Zocalo>» de cada componente NO ESTÁ ENVUELTO EN NADA: su padre en el JSX es el elemento raíz del `return` y no un elemento intermedio, así que ningún envoltorio —con `visible`, con `scale`, con `position` o con lo que sea— lo puede apagar sin que esto se entere',
-    losCaminos.every((c) => c.camino !== null && c.camino.length === 1),
-    losCaminos,
-  );
-  /*
-   * LAS CUATRO VACUNAS, Y SON LAS CUATRO MUTACIONES DE LA LISTA DE ARRIBA. Se exige de cada
-   * una (a) que el lector nuevo la cace y (b) que la regla de la grafía —«no hay `visible={`»,
-   * que es lo único que había— siga diciendo que sí, que es la parte que enseña por qué hacía
-   * falta esto.
-   */
-  const conElZocaloAsi = (texto: string): string => fuenteDelDelta.replace(EL_ZOCALO_DE_LA_CHOZA, texto);
-  const LAS_SIETE_FORMAS = [
-    { como: 'envuelto en «<group scale={0}>»', fuente: conElZocaloAsi(`<group scale={0}>${EL_ZOCALO_DE_LA_CHOZA}</group>`) },
-    { como: 'envuelto en «<group scale={[0, 0, 0]}>»', fuente: conElZocaloAsi(`<group scale={[0, 0, 0]}>${EL_ZOCALO_DE_LA_CHOZA}</group>`) },
-    { como: 'envuelto en «<group position={[0, -1000, 0]}>», o sea hundido bajo tierra', fuente: conElZocaloAsi(`<group position={[0, -1000, 0]}>${EL_ZOCALO_DE_LA_CHOZA}</group>`) },
-    { como: 'escrito como «{false && <Zocalo … />}»', fuente: conElZocaloAsi(`{false && ${EL_ZOCALO_DE_LA_CHOZA}}`) },
-  ];
-  const noCazadas = LAS_SIETE_FORMAS.filter((m) => {
-    const camino = caminoDelZocaloEn(m.fuente, 'function Asentamiento(');
-    return m.fuente === fuenteDelDelta || (camino !== null && camino.length === 1);
-  });
-  const laGrafiaSigueEnVerde = LAS_SIETE_FORMAS.every(
-    (m) => apagaDesdeFuera(m.fuente, 'function Asentamiento(').length === 0,
-  );
-  comprobar(
-    `se ve fallar: las ${String(LAS_SIETE_FORMAS.length)} formas de apagar el zócalo desde el JSX de la choza que NO llevan un «visible=» —un cero en la escala, un envoltorio hundido, un condicional falso— las caza el camino, y la regla de la grafía que había antes las deja pasar las ${String(LAS_SIETE_FORMAS.length)}`,
-    noCazadas.length === 0 && laGrafiaSigueEnVerde,
-    {
-      noCazadas: noCazadas.map((m) => m.como),
-      laGrafiaLasDejaPasar: laGrafiaSigueEnVerde,
-      caminos: LAS_SIETE_FORMAS.map((m) => `${m.como}: ${JSON.stringify(caminoDelZocaloEn(m.fuente, 'function Asentamiento('))}`),
-    },
-  );
-  /*
-   * ═══ Y EL CASERÍO DE LA PROPIA PIEZA SE TIÑE, QUE ES DONDE SE PIDIÓ ═══
-   *
-   * «Que el poblado del jugador azul no tenga casas rojas y la del centro azul, sino que todas
-   * las casas fueran azules» — la frase del encargo. Se arregló el pueblo del PAISAJE
-   * (`plan.caserio` → `caserioTenido`), que es la mitad grande, y no se tocó la pieza: un
-   * poblado planta TRES `MODELO.casa` a 7,7-8,9 unidades del vértice DENTRO de sí mismo, y
-   * `delta.tsx` las pintaba con `aplanados.get(parte.modelo)` —el modelo CRUDO—.
-   *
-   * Medido en el banco con `readPixels`: en un radio de 18 píxeles alrededor de la choza AZUL
-   * había 416 píxeles rojos contra 26 azules. Más rojo que azul dentro del poblado del jugador
-   * azul. Cambiando sólo la geometría de esas cuatro partes y sin tocar nada más: 265 contra
-   * 108.
-   */
-  const cuerpoDelAsentamiento = soloElCodigo(cuerpoDe('function Asentamiento('));
-  const pideElTenido = (cuerpo: string): boolean =>
-    /EDIFICIOS_DEL_CASERIO\.has\(parte\.modelo\)/.test(cuerpo) &&
-    /tenido\.get\(/.test(cuerpo) &&
-    /pieza\.color/.test(cuerpo);
-  comprobar(
-    'la choza pide la geometría TEÑIDA para sus propias casas, la misma tabla con la que se repinta el pueblo del paisaje: sin esto el poblado de un jugador azul tiene tres casas rojas dentro',
-    pideElTenido(cuerpoDelAsentamiento),
-    { cita: /const mallas = [^;]*/.exec(cuerpoDelAsentamiento)?.[0]?.replace(/\s+/g, ' ').slice(0, 180) },
-  );
-  comprobar(
-    'se ve fallar: con la línea de antes —«aplanados.get(parte.modelo)» a secas— el mismo lector dice que la pieza no pide nada teñido',
-    !pideElTenido(
-      cuerpoDelAsentamiento.replace(
-        /const mallas = [\s\S]*?;\n/,
-        'const mallas = aplanados.get(parte.modelo);\n',
-      ),
+    'se ve fallar: montando la mancha dentro del `Asentamiento` se vuelve al diseño de una por pieza',
+    /<(Mancha|Zocalo)\b/.test(
+      cuerpoDe('function Asentamiento(') + '      <Mancha color={pieza.color} malla={malla} />',
     ),
-    {},
   );
+
   /*
-   * Y QUÉ SE TIÑE Y QUÉ NO, que es lo que el texto de arriba no puede decir: las casas y el
-   * pozo del caserío están en `EDIFICIOS_DEL_CASERIO` y se tiñen; la pieza CENTRAL y la BANDERA
-   * no, porque ésas ya vienen del `.glb` con el color en el nombre y se tiñen por su camino de
-   * siempre — pedirlas también por el otro las teñiría dos veces.
-   */
-  const partesDeUnPoblado = piezasDeAsentamiento('poblado', 'blue', LOS_VERTICES[0] as never);
-  const lasQueSeTinen = partesDeUnPoblado.filter((p) => EDIFICIOS_DEL_CASERIO.has(p.modelo));
-  const laCentral = modeloDePieza('poblado', 'blue');
-  const suBandera = modeloDeBandera('blue');
-  comprobar(
-    `de las ${String(partesDeUnPoblado.length)} partes de un poblado se tiñen por el camino del caserío ${String(lasQueSeTinen.length)} —las tres casas y el pozo—, y ni la pieza central ni la bandera: ésas llevan el color en el nombre y se teñirían dos veces`,
-    lasQueSeTinen.length >= 4 &&
-      lasQueSeTinen.filter((p) => p.modelo === MODELO.casa).length === 3 &&
-      !EDIFICIOS_DEL_CASERIO.has(laCentral) &&
-      !EDIFICIOS_DEL_CASERIO.has(suBandera) &&
-      partesDeUnPoblado.some((p) => p.modelo === laCentral) &&
-      partesDeUnPoblado.some((p) => p.modelo === suBandera),
-    {
-      seTinen: lasQueSeTinen.map((p) => p.modelo),
-      central: laCentral,
-      bandera: suBandera,
-    },
-  );
-  /*
-   * LA VACUNA DEL LECTOR: el mismo lector sobre componentes que NO llevan marca tiene que decir
-   * que no la llevan. Sin esta línea, un `cuerpoDe` que devolviera el fichero entero —o una
-   * cadena vacía— dejaría las dos de arriba en verde para siempre.
-   */
-  const noLlevanMarca = ['function Senal(', 'function LaComarcaSeca(', 'function Numero('];
-  comprobar(
-    'se ve fallar: el mismo lector dice que la señal, la tienda seca y el número de una isla NO montan zócalo — o estaría leyendo el fichero entero',
-    noLlevanMarca.every((f) => cuerpoDe(f).length > 100 && !/<Zocalo\b/.test(soloElCodigo(cuerpoDe(f)))),
-    noLlevanMarca.map((f) => `${f} mide ${String(cuerpoDe(f).length)}`),
-  );
-  /*
-   * ═══ Y LA TALLA DE LA VEREDA VA ANTES DEL CORTE DE LA OBRA ═══
+   * ═══ Y NO SE REESCALA CON LA RUEDA, QUE ES LO OTRO QUE SE PIDIÓ ═══
    *
-   * El `useFrame` del puente sale temprano cuando la obra ha terminado (`avance >= 1`), que es
-   * lo correcto: los tramos ya no se mueven. Poniendo la talla del aro DESPUÉS de esa línea, la
-   * marca se quedaría congelada al tamaño del fotograma en que se acabó de construir y a partir
-   * de ahí encogería con la distancia como cualquier objeto del mundo — o sea que la vereda
-   * volvería a desaparecer desde la vista de tablero, y sólo las YA construidas, que son todas
-   * menos la de este segundo.
+   * La marca de antes sacaba su tamaño de la distancia a la cámara y por eso encogía contra el
+   * terreno al acercarse: medido, de 9,28 de mundo a 800 de cámara a 3,48 a 300, o sea a un
+   * tercio, con tres comportamientos distintos según el zoom. Miguel lo vio jugando y lo llamó
+   * un error: «debe ser fija en el tablero, no un elemento independiente».
    *
-   * No lo caza ninguna aritmética y no se cae nada: se mide el ORDEN en el texto.
+   * Se compra por donde no se puede esquivar: el memo que compone las manchas NO puede depender
+   * de la cámara. Si alguien mete `estado.camera` ahí dentro, o vuelve a escalar la malla en un
+   * `useFrame`, esta línea se pone roja. Y `mallaDelTerritorio` no recibe ninguna cámara: eso lo
+   * garantiza su firma, que el typecheck ya vigila.
    */
-  const cuerpoDelPuente = soloElCodigo(cuerpoDe('function PuenteDeJugador('));
-  const dondeSeEscala = cuerpoDelPuente.indexOf('tallaDelZocalo(');
-  const dondeCortaLaObra = cuerpoDelPuente.indexOf('avance >= 1');
+  const memoDeLasManchas = cuerpoDe('  const manchas = useMemo(');
   comprobar(
-    'la talla del zócalo de la vereda se pone ANTES del corte de la obra: si no, la marca se congelaría al acabarse el puente y volvería a encoger con la distancia',
-    dondeSeEscala >= 0 && dondeCortaLaObra > dondeSeEscala,
-    { dondeSeEscala, dondeCortaLaObra },
+    'la mancha se compone SIN la cámara: su tamaño es del mundo y no de la pantalla',
+    memoDeLasManchas.length > 200 &&
+      !/camera|camara|cámara|tallaDe/.test(memoDeLasManchas) &&
+      /\[datos\.piezas, datos\.caminos, relieve\]/.test(memoDeLasManchas),
+    { mide: memoDeLasManchas.length },
+  );
+  comprobar(
+    'se ve fallar: metiéndole la cámara al memo de las manchas',
+    /camera/.test(memoDeLasManchas + 'const talla = estado.camera.position;'),
+  );
+
+  /*
+   * ═══ Y LA MANCHA NO SE APAGA DESDE FUERA ═══
+   *
+   * La lección que costó cuatro rondas: no vale prohibir la grafía con la que un revisor la
+   * apagó, porque la lista de formas de apagar algo no acaba nunca. Lo que se compra es que el
+   * `<Mancha>` cuelgue DIRECTAMENTE de donde se pinta y no de un envoltorio: cualquier `<group>`
+   * en medio —con `visible`, con `scale`, con lo que sea— añade un eslabón y se ve.
+   */
+  const dondeSePinta = soloCodigoDelDelta.indexOf('{manchas.map(');
+  const trozoDeLaMancha = dondeSePinta < 0 ? '' : soloCodigoDelDelta.slice(dondeSePinta, dondeSePinta + 220);
+  comprobar(
+    'la mancha se pinta directamente en el recorrido de los colonos, sin ningún envoltorio en medio',
+    dondeSePinta >= 0 &&
+      /\{manchas\.map\(\(\{ color, malla \}\) => \(\s*<Mancha /.test(trozoDeLaMancha),
+    { trozo: trozoDeLaMancha.slice(0, 120) },
+  );
+  comprobar(
+    'se ve fallar: envolviéndola en un grupo apagado',
+    !/\{manchas\.map\(\(\{ color, malla \}\) => \(\s*<Mancha /.test(
+      '{manchas.map(({ color, malla }) => (\n        <group visible={false}>\n          <Mancha ',
+    ),
   );
 }
 

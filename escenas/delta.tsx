@@ -127,7 +127,10 @@ import {
   tallaDeUnaMarca,
   techoDeLaMarca,
 } from './escala';
-import { asientoDelDisco, tallaDelZocalo, Zocalo } from './zocalo';
+import { Mancha } from './mancha';
+import type { LoQueTiene } from './territorio';
+import { ALTO_DE_LA_MANCHA, mallaDelTerritorio, territorioDe } from './territorio';
+import { asientoDelDisco } from './zocalo';
 import {
   CELDA_DE_LA_NIEVE,
   colorDelBien,
@@ -877,7 +880,6 @@ function PuenteDeJugador({
   aplanados: ReadonlyMap<string, Instanciable[]>;
 }): JSX.Element | null {
   const empezo = useRef<number | null>(null);
-  const zocalo = useRef<THREE.Group>(null);
   const [avance, ponerAvance] = useState(0);
 
   const [a, b] = useMemo(() => verticesDeArista(arista as LlaveDeArista), [arista]);
@@ -905,10 +907,6 @@ function PuenteDeJugador({
    * no tener. Es el mismo orden que en `Asentamiento`, y por lo mismo.
    */
   useFrame((estado) => {
-    const z = zocalo.current;
-    if (z !== null && entero !== null) {
-      z.scale.setScalar(tallaDelZocalo(estado.camera, [entero.medio.x, entero.medio.y, entero.medio.z]));
-    }
     if (entero === null || avance >= 1) return;
     if (empezo.current === null) empezo.current = estado.clock.elapsedTime;
     const va = (estado.clock.elapsedTime - empezo.current) / SEGUNDOS_DE_OBRA;
@@ -1014,13 +1012,7 @@ function PuenteDeJugador({
         * Y no lleva el `avance` de la obra: la marca dice de quién es la vereda, y eso no
         * cambia mientras se levanta.
         */}
-      <Zocalo
-        color={color}
-        forma="raya"
-        giro={entero.giro}
-        donde={[entero.medio.x, entero.medio.y + ALTO_DEL_ZOCALO, entero.medio.z]}
-        marca={zocalo}
-      />
+      {/* La marca de esta vereda ya no vive aquí: la pinta la mancha de su colono. */}
       {/*
         * LAS ASTAS. Geometría propia y no un modelo del pack, y no por capricho: ningún
         * mástil del pack mide tres personas y media, y estirar uno que mide dos tercios
@@ -3897,6 +3889,62 @@ export function Delta({
    * chozas que caben como mucho, o sea unas diez mil restas: se puede rehacer cada vez que
    * alguien construye, que es exactamente lo que el plan de al lado no podía.
    */
+  /**
+   * ═══ LA MANCHA DE CADA COLONO: UNA POR COLOR, NO UNA POR PIEZA ═══
+   *
+   * Es lo que sustituye al zócalo suelto que llevaba cada choza y cada vereda. Miguel lo pidió
+   * después de jugar con aquéllas: que no sean «áreas independientes que compiten» sino
+   * elementos que se unen, de modo que una vereda que sale de un poblado nazca de su círculo sin
+   * costura y una cadena de veredas se lea como un solo trazo. El porqué y la aritmética están
+   * en `territorio.ts`; aquí sólo se junta lo que cada colono tiene y se pide la malla.
+   *
+   * Y SE REHACE CUANDO SE CONSTRUYE, NO CUANDO SE MIRA. Las dependencias son las piezas, los
+   * caminos y el relieve —nunca la cámara—, que es lo que hace que la mancha se quede quieta en
+   * el tablero mientras se mueve la rueda. La de antes se reescalaba en cada fotograma y por eso
+   * encogía contra el terreno al acercarse; ésta es pintura sobre el suelo.
+   */
+  const manchas = useMemo(() => {
+    const suyo = new Map<string, { asentamientos: LoQueTiene['asentamientos'][number][]; veredas: LoQueTiene['veredas'][number][] }>();
+    const deColor = (color: string) => {
+      const ya = suyo.get(color);
+      if (ya !== undefined) return ya;
+      const nuevo = { asentamientos: [], veredas: [] };
+      suyo.set(color, nuevo);
+      return nuevo;
+    };
+    for (const pieza of datos.piezas) {
+      deColor(pieza.color).asentamientos.push({
+        punto: puntoDeVertice(pieza.vertice, RADIO_DE_COMARCA),
+        clase: pieza.clase === 'ciudad' ? 'ciudad' : 'poblado',
+      });
+    }
+    for (const camino of datos.caminos) {
+      const [a, b] = verticesDeArista(camino.arista as LlaveDeArista);
+      if (a === undefined || b === undefined) continue;
+      deColor(camino.color).veredas.push({
+        a: puntoDeVertice(a, RADIO_DE_COMARCA),
+        b: puntoDeVertice(b, RADIO_DE_COMARCA),
+      });
+    }
+    /*
+     * El orden es el de los colores y no el de construcción, y eso es una renuncia dicha: cuando
+     * dos colonos cruzan sus veredas se ve por encima la mancha del color que salga después en
+     * esta lista, no la del que construyó al final. Es sólo visual y no toca ninguna regla; lo
+     * que haría falta para lo segundo es un instante de construcción por pieza, que la vista no
+     * trae hoy.
+     */
+    return [...suyo.entries()]
+      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+      .map(([color, tiene]) => ({
+        color,
+        malla: mallaDelTerritorio(
+          territorioDe(tiene),
+          (p) => relieve.alturaEn(p),
+          ALTO_DE_LA_MANCHA,
+        ),
+      }));
+  }, [datos.piezas, datos.caminos, relieve]);
+
   const pueblos = useMemo(() => {
     const fundadas: Fundacion[] = datos.piezas.map((pieza) => ({
       vertice: pieza.vertice,
@@ -4118,6 +4166,17 @@ export function Delta({
       {seca === null ? null : <LaComarcaSeca mallas={aplanados.get(MODELO.tienda)} puesta={seca} />}
 
       {/*
+        * LAS MANCHAS DE LOS COLONOS, una por color y debajo de todo lo que se construye.
+        *
+        * Van aquí y no dentro de cada pieza porque un territorio es de un COLONO y no de una
+        * choza: es lo que permite que el disco de un poblado y el trazo de sus veredas salgan de
+        * la misma malla y se fundan sin costura.
+        */}
+      {manchas.map(({ color, malla }) => (
+        <Mancha key={`mancha:${color}`} color={color} malla={malla} />
+      ))}
+
+      {/*
         * LOS PUENTES DE LOS JUGADORES. Uno por arista construida.
         *
         * No se agrupan por color en una sola llamada de dibujo como se hacía con las
@@ -4196,7 +4255,6 @@ function Asentamiento({
 
   const grupos = useRef<Array<THREE.Group | null>>([]);
   const nacido = useRef(-1);
-  const zocalo = useRef<THREE.Group>(null);
 
   /*
    * ═══ DÓNDE SE APOYA EL DISCO, Y HASTA DÓNDE LE DEJA LLEGAR LA TIERRA ═══
@@ -4265,18 +4323,7 @@ function Asentamiento({
      * `techoDeLaMarca` reparte el techo con la misma proporción que la fracción, y `asiento`
      * lo baja con lo que la tierra de este vértice deja: las dos medidas están en `escala.ts`.
      */
-    const z = zocalo.current;
-    if (z !== null) {
-      z.scale.setScalar(
-        tallaDelZocalo(
-          estado.camera,
-          [punto.x, suelo, punto.y],
-          parteDeLaMarca(pieza.clase),
-          sueloDeLaMarca(pieza.clase),
-          techoDeLaMarca(pieza.clase),
-        ),
-      );
-    }
+
     for (let i = 0; i < partes.length; i++) {
       const g = grupos.current[i];
       const parte = partes[i];
@@ -4332,7 +4379,7 @@ function Asentamiento({
         arriba — que es lo que hacía desaparecer la marca según con qué comarca limitase el
         vértice. Sin cuesta alrededor, `asiento.alto` ES `ALTO_DEL_ZOCALO`.
       */}
-      <Zocalo color={pieza.color} forma="disco" donde={[0, asiento.alto, 0]} marca={zocalo} />
+      {/* La marca de esta pieza ya no vive aquí: la pinta la mancha de su colono. */}
       {partes.map((parte, i) => {
         /*
          * ═══ LAS CASAS DEL POBLADO SON DEL COLOR DE SU DUEÑO, Y NO LO ERAN ═══
