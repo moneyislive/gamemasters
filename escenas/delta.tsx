@@ -1954,12 +1954,26 @@ function Barra({
     clon.add(dentro);
     const mezclador = new THREE.AnimationMixer(dentro);
     for (const clip of modeloDelReloj.clips) mezclador.clipAction(clip).play();
-    /* Los dos montones: las mallas con morfología, que el compilador deja como «0» y «1». */
-    const montones: THREE.Mesh[] = [];
+    /*
+     * ═══ LOS DOS MONTONES, Y CUÁL ES CUÁL ═══
+     *
+     * Son las dos mallas con morfología —el compilador las deja como «0» y «1»— y hay que saber
+     * cuál va arriba, porque se mueven AL REVÉS la una de la otra. No se distinguen por el
+     * nombre: «0» y «1» los pone el exportador y el día que alguien recompile pueden salir
+     * cambiados, y el fallo sería un reloj que cuenta al revés sin que nada falle. Se distinguen
+     * midiendo dónde está cada una: la de arriba tiene el centro de su caja más alto.
+     */
+    const conAltura: { malla: THREE.Mesh; alturaDeSuCaja: number }[] = [];
     dentro.traverse((n) => {
       const m = n as THREE.Mesh;
-      if (m.isMesh && (m.morphTargetInfluences?.length ?? 0) > 0) montones.push(m);
+      if (!m.isMesh || (m.morphTargetInfluences?.length ?? 0) === 0) return;
+      m.geometry.computeBoundingBox();
+      const caja = m.geometry.boundingBox;
+      const centro = caja === null ? 0 : (caja.min.y + caja.max.y) / 2;
+      conAltura.push({ malla: m, alturaDeSuCaja: centro });
     });
+    conAltura.sort((a, b) => b.alturaDeSuCaja - a.alturaDeSuCaja);
+    const montones = conAltura.map((c, i) => ({ malla: c.malla, arriba: i === 0 }));
     return { clon, mezclador, montones };
   }, [modeloDelReloj]);
 
@@ -2054,9 +2068,21 @@ function Barra({
        * corriendo y sin fallar nada.
        */
       relojMontado.mezclador.update(salto);
+      /*
+       * ═══ LA MISMA ARENA: LO QUE BAJA DE UNO SUBE EN EL OTRO ═══
+       *
+       * Aquí los dos montones llevaban `parte`, y eso hacía tres cosas mal a la vez, las tres
+       * vistas en el tablero: el de abajo EMPEZABA con arena, se vaciaba en vez de crecer, y al
+       * empezar una ronda aparecía arena nueva arriba Y abajo. Un reloj de arena no fabrica
+       * arena: los dos montones son inversamente proporcionales y su suma es siempre uno.
+       *
+       * El peso cero de cada malla es su montón LLENO y el uno es vacío —así lo dejó quien
+       * modeló—, de modo que arriba va `parte` (empieza lleno y se vacía) y abajo va su
+       * complementario (empieza vacío y se llena).
+       */
       for (const monton of relojMontado.montones) {
-        const pesos = monton.morphTargetInfluences;
-        if (pesos !== undefined && pesos.length > 0) pesos[0] = parte;
+        const pesos = monton.malla.morphTargetInfluences;
+        if (pesos !== undefined && pesos.length > 0) pesos[0] = monton.arriba ? parte : 1 - parte;
       }
     }
 
