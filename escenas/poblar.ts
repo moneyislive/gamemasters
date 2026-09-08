@@ -253,6 +253,27 @@ const OFICIO: Readonly<Record<string, string>> = {
   salina: MODELO.mercado,
 };
 
+/**
+ * LOS EDIFICIOS QUE ESTE FICHERO PUEDE PLANTAR, y por qué se derivan y no se escriben.
+ *
+ * Son los de `PUEBLO` y los de `OFICIO`, unidos. CATORCE, no dieciséis: `acena` y `vigia`
+ * están en `MODELO` y dentro del `.glb`, pero no los planta nadie, y una lista escrita a
+ * mano los habría metido.
+ *
+ * Hacen falta fuera porque el caserío ya NO es sólo decorado: `caserio.ts` reparte estos
+ * edificios entre los colonos que hayan fundado cerca y `delta.tsx` les mueve las UV al
+ * color de su dueño. Escrita a mano, el día que alguien metiera un edificio nuevo en
+ * `PUEBLO` ese edificio se quedaría ROJO dentro del pueblo de un jugador azul — que es
+ * exactamente el fallo que esto viene a arreglar, reaparecido por la puerta de atrás.
+ * Derivada no puede pasar, y `verify:escena` comprueba además que los catorce pintan su
+ * color en UNA sola de las cuatro columnas de jugador del atlas: con dos, el traslado
+ * sería ambiguo.
+ */
+export const EDIFICIOS_DEL_CASERIO: ReadonlySet<string> = new Set([
+  ...PUEBLO,
+  ...Object.values(OFICIO),
+]);
+
 const SEIS = Math.PI / 3;
 
 /**

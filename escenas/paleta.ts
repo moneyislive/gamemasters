@@ -187,6 +187,59 @@ export function desplazamientoDeColor(color: string): { u: number; v: number } {
 }
 
 /**
+ * LAS CUATRO COLUMNAS DE LA FILA DEL COLOR QUE SON DE UN JUGADOR, y por qué no son ocho.
+ *
+ * La fila 3 del atlas tiene ocho manchas y sólo las cuatro primeras son los colores de
+ * jugador; de la 4 a la 7 hay otros tonos del pack, y los usan piezas de verdad. Medido
+ * sobre `tablero.glb`: la HERRERÍA pinta 187 vértices en la columna 2 —su color de
+ * jugador— y 41 en la 4; el TALLER, 611 en la 2 y 18 en la 4; la ERMITA, 120 en la 1 y 80
+ * en la 5; y el MUELLE reparte 44 en la 0 y 388 entre la 5, la 6 y la 7.
+ *
+ * O sea que «mover la fila 3 entera» habría repintado del color del dueño trozos que no
+ * son suyos, y en tres de los catorce edificios del caserío. Se deriva de
+ * `COLUMNA_DEL_COLOR` y no se escribe, para que añadir un quinto color no deje esta
+ * frontera atrás.
+ */
+export const COLUMNAS_DE_JUGADOR: ReadonlySet<number> = new Set(
+  Object.values(COLUMNA_DEL_COLOR),
+);
+
+/**
+ * ¿ES ESTA UV DE ALGUNO DE LOS CUATRO COLORES DE JUGADOR, VENGA DE DONDE VENGA?
+ *
+ * `esDelColorDelJugador` pregunta por la celda (0,3), que es de donde salen las piezas de
+ * jugador porque el pack las distribuye en azul. Ésta pregunta por las CUATRO, y hace
+ * falta desde que el caserío del paisaje también se recolorea: la casa de adorno pinta su
+ * tejado en la columna 1, la iglesia en la 0, la taberna en la 2 y el mercado en la 3, así
+ * que no hay una celda de origen única y la pregunta tiene que ser «¿esto lleva un color
+ * de colono?» y no «¿esto es azul?».
+ */
+export function esDeUnColorDeJugador(u: number, v: number): boolean {
+  const columna = Math.floor(u * COLUMNAS_DEL_ATLAS);
+  const fila = Math.floor(v * FILAS_DEL_ATLAS);
+  return fila === CELDA_DEL_JUGADOR[1] && COLUMNAS_DE_JUGADOR.has(columna);
+}
+
+/**
+ * LO QUE HAY QUE SUMARLE A ESTA UV PARA QUE PASE A SER DEL COLOR PEDIDO.
+ *
+ * Se calcula desde la columna en la que el vértice YA ESTÁ, y ésa es toda la diferencia
+ * con `desplazamientoDeColor`: aquélla vale para una lámina entera que se sabe que sale de
+ * la celda del jugador; ésta vale vértice a vértice, y por eso puede llevar al azul una
+ * casa que era roja y una iglesia que era azul sin saber de antemano de dónde viene cada
+ * una. Devuelve cero para un vértice que ya está en su sitio, que es lo que permite
+ * reconocer una variante que no mueve nada y ahorrarse el clon de su geometría.
+ *
+ * Un color desconocido no mueve nada y sale azul, igual que en `desplazamientoDeColor` y
+ * por lo mismo: un dato que llega de fuera no puede dejar la escena en negro.
+ */
+export function saltoAlColor(u: number, color: string): number {
+  const destino = COLUMNA_DEL_COLOR[color] ?? COLUMNA_DEL_COLOR['blue'] ?? 0;
+  const suya = Math.floor(u * COLUMNAS_DEL_ATLAS);
+  return (destino - suya) / COLUMNAS_DEL_ATLAS;
+}
+
+/**
  * ═══ EL COLOR DE CADA JUGADOR EN PLANO, Y POR QUÉ HACÍA FALTA MEDIRLO ═══
  *
  * ═══ EL FALLO, QUE SALIÓ JUGANDO Y NO LEYENDO ═══
@@ -220,15 +273,40 @@ export function desplazamientoDeColor(color: string): { u: number; v: number } {
  * jugador es `building_home_A_blue`. Son la misma clase de edificio, y uno de los
  * dos lleva el rojo de un colono.
  *
- * ═══ LO QUE SE HACE CON ESTO, Y LO QUE NO ═══
+ * ═══ LO QUE SE HACE CON ESTO — Y ESTO CAMBIÓ, Y LA CABECERA DECÍA LO CONTRARIO ═══
  *
- * Recolorear el decorado exigiría recompilar el `.glb` y no arregla el caso de dos
- * jugadores; lo que se hace es DARLE A LA PIEZA DE JUGADOR ALGO QUE EL DECORADO NO
- * TIENE: un zócalo del color de su dueño, del tamaño de una marca de pantalla, que
- * se ve desde el encuadre de tablero entero — donde un poblado ocupa el 1,27 % del alto
- * de la pantalla, once píxeles en una ventana de novecientos, y encima con el tejado del
- * mismo color que las casas de adorno que tiene alrededor. Lo pinta `delta.tsx` y necesita el color en
- * hexadecimal, que es lo que hay aquí.
+ * Aquí ponía que «recolorear el decorado exigiría recompilar el `.glb`», y de ahí salía
+ * que la única salida fuera darle a la pieza de jugador algo que el decorado no tuviera.
+ * Era falso, y lo falso era el «recompilar»: el color de un edificio son unas UV
+ * apuntando a una columna de la fila 3, y llevarlas a otra columna es lo mismo que ya se
+ * hacía para fabricar las piezas de los cuatro jugadores desde una sola. Recompilar haría
+ * falta para recolorear el decorado ENTERO y de forma FIJA, que es otra cosa y no es ésta:
+ * aquí el color depende de quién haya fundado al lado y cambia durante la partida.
+ *
+ * Así que ahora se hacen las DOS cosas, y cada una arregla una mitad distinta:
+ *
+ *   · EL CASERÍO TOMA EL COLOR DE SU DUEÑO. Los edificios del pueblo que caen dentro del
+ *     radio de una choza se repintan del color de quien la fundó, moviendo sus UV con
+ *     `saltoAlColor`. El reparto vive en `caserio.ts`. Medido sobre doce mundos con la
+ *     ocupación máxima —27 chozas—, cada colono se lleva 12,4 edificios de media, 11 de
+ *     mediana y 38 en el peor caso: eso es lo que hace que un pueblo diga de quién es desde
+ *     el aire, porque lo que se ve grande es el pueblo y no la pieza. Contado en el banco,
+ *     alrededor de la choza AZUL los píxeles rojos caen de 234 a 88.
+ *
+ *   · Y LA PIEZA SIGUE LLEVANDO SU ZÓCALO, que ha dejado de ser «lo único que el decorado
+ *     no tiene» y ha pasado a ser otra cosa: la señal fina que dice dónde está el VÉRTICE
+ *     EXACTO. Hace falta por dos motivos medidos. Uno, que 11 de 324 chozas no tienen NI UN
+ *     edificio dentro de su radio —el pueblo de su comarca cayó lejos—, y ésas se quedarían
+ *     otra vez sin nada. Y dos, que un pueblo repintado dice de quién es la COMARCA pero no
+ *     en cuál de sus tres esquinas está puesta la choza, que es lo que hay que saber para
+ *     jugar: un poblado ocupa el 1,27 % del alto de la pantalla, once píxeles en una ventana
+ *     de novecientos, y el edificio de adorno más cercano a un vértice está a 18,9 unidades
+ *     de mediana, o sea a tres teselas de allí.
+ *
+ * Y ES JUSTO ESO lo que permitió bajarle el volumen a la marca en la misma tanda: mientras
+ * era lo único que distinguía, tenía que gritar; ahora que el pueblo hace el trabajo grueso,
+ * puede ser un disco translúcido de 25 píxeles en vez de un aro opaco de 42. Lo pinta
+ * `delta.tsx` y necesita el color en hexadecimal, que es lo que hay aquí.
  *
  * ═══ Y POR QUÉ ESTOS SEIS DÍGITOS Y NO OTROS ═══
  *
@@ -253,25 +331,33 @@ export const COLOR_LLANO_DEL_JUGADOR: Readonly<Record<string, string>> = {
 };
 
 /**
- * ═══ EL FILO DEL ZÓCALO, Y POR QUÉ EL ARO NO PUEDE SER SÓLO DE COLOR ═══
+ * ═══ EL FILO DEL ZÓCALO, Y POR QUÉ LA MARCA NO PUEDE SER SÓLO DE COLOR ═══
  *
  * Porque MEDIDO no se ve. El zócalo se posa sobre el suelo de su isla, y ese suelo sale
  * del atlas: el verde de jugador es `#007d52` y la celda del bosque —que es la que
- * pinta el carrizal de Riberas— es `#008454`. Son CUATRO unidades de CIE76, o sea el
- * mismo color; el amarillo sobre la vega son 14,8, y el umbral con el que esta casa mide
- * que una superficie no se come una pieza es 20. Un aro verde sobre un carrizal es un
- * aro que no está, y el carrizal es uno de los seis terrenos: en un delta de diecinueve
- * islas hay tres o cuatro.
+ * pinta el carrizal de Riberas— es `#008454`. Son CUATRO unidades de CIE76 a pelo, y con
+ * el relleno a su opacidad de 0,55 se quedan en 2,3, o sea el mismo color; el amarillo
+ * sobre la vega en 8,1 y sobre la duna en 16,6, y el umbral con el que esta casa mide que
+ * una superficie no se come una pieza es 20. Un disco verde sobre un carrizal es un disco
+ * que no está, y el carrizal es uno de los seis terrenos: en un delta de diecinueve islas
+ * hay tres o cuatro.
  *
  * Retocar los cuatro colores de jugador para apartarlos de los seis terrenos no es una
  * salida: son los colores QUE LLEVA LA PIEZA dentro del atlas, así que cambiarlos aquí
- * haría que el aro señalara con un color distinto del tejado al que señala.
+ * haría que la marca señalara con un color distinto del tejado al que señala.
  *
- * La salida es la de siempre para un trazo sobre un fondo cualquiera: un FILO. Un aro
- * casi negro un poco más grande, con el aro de color encima, y entonces lo que tiene que
- * separarse del terreno es el filo —uno solo, y siempre el mismo— y no los cuatro
- * colores. Es exactamente lo que el tablero plano ya hace con cada isla, y por eso el
- * casi negro es el mismo: `#1d1f26`.
+ * Y LA MEZCLA ADITIVA TAMPOCO, que era la salida elegante y se descartó con número: una
+ * marca que suma luz en vez de sustituir color se separa del suelo 11,2 en el peor par
+ * —el rojo sobre la duna— y, peor todavía, sobre esa misma arena el verde y el amarillo se
+ * separan ENTRE SÍ 13,6, porque los cuatro se van al blanco a la vez. Una marca que sobre
+ * dos de los seis terrenos deja de decir de quién es no vale para lo único que hace.
+ *
+ * La salida es la de siempre para un trazo sobre un fondo cualquiera: un FILO. Casi negro,
+ * finísimo y pegado al borde de la forma —el contorno del disco, los dos flancos de la
+ * raya—, y entonces lo que tiene que separarse del terreno es el filo —uno solo, y siempre
+ * el mismo— y no los cuatro colores. Compuesto con su opacidad se separa de los seis
+ * terrenos por lo menos 35,6. Es exactamente lo que el tablero plano ya hace con cada isla,
+ * y por eso el casi negro es el mismo: `#1d1f26`.
  *
  * NO SE IMPORTA DE `riberas.ts`, donde vive como `BORDE_DE_LA_ISLA`, y es a propósito:
  * la escena no puede depender de una constante de un juego —pinta el delta de quien se lo

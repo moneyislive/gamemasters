@@ -92,7 +92,13 @@ import {
 } from '../shared/mecanicas/malla-hexagonal';
 import type { Hex, LlaveDeVertice, Punto } from '../shared/mecanicas/malla-hexagonal';
 import { puntoDeVertice, verticesDe } from '../shared/mecanicas/malla-hexagonal';
-import { ESCALON, RADIO_DE_COMARCA, RADIO_DE_TESELA, TESELAS_POR_RADIO } from './escala';
+import {
+  ESCALON,
+  RADIO_DE_COMARCA,
+  RADIO_DEL_RELLANO,
+  RADIO_DE_TESELA,
+  TESELAS_POR_RADIO,
+} from './escala';
 import { fraccion } from './revoltijo';
 import { deforma, fbm, fbmDeCresta } from './ruido';
 import { trazaLasAguas } from './aguas';
@@ -308,8 +314,13 @@ const ALCANCE_DEL_BIOMA = RADIO_DE_COMARCA * 0.78;
  */
 const DUREZA_DEL_MAXIMO = 4;
 
-/** El rellano que se aplana alrededor de cada vértice, para poder construir. */
-const RADIO_DE_RELLANO = RADIO_DE_TESELA * 2.6;
+/*
+ * EL RELLANO QUE SE APLANA ALREDEDOR DE CADA VÉRTICE, para poder construir, subió a
+ * `escala.ts` (`RADIO_DEL_RELLANO`). Aquí se escribía `RADIO_DE_TESELA * 2.6` a mano, y desde
+ * que la MARCA de un asentamiento se mide contra ese mismo rellano, el 2,6 estaba escrito en
+ * dos sitios: dos números iguales en dos ficheros discrepan al primer retoque.
+ */
+const RADIO_DE_RELLANO = RADIO_DEL_RELLANO;
 
 /** Qué parte de las teselas de una ladera se convierte en rampa. */
 const CUANTAS_RAMPAS = 0.5;

@@ -167,6 +167,18 @@ export interface Puente {
    * `puntoDeArista`— y `y` es la altura.
    */
   medio: { x: number; y: number; z: number };
+  /**
+   * HACIA DÓNDE MIRA LA VEREDA, en radianes y con la convención de los caminos: con giro cero,
+   * lo largo apunta a +X.
+   *
+   * Se devuelve aunque sea el mismo `giro` que ya llevan los tramos, y por dos razones. La
+   * primera: la marca del dueño es una RAYA a lo largo de la arista, y durante la obra `tramos`
+   * está vacío o a medias —`avance` los suelta de uno en uno—, así que quien la pintara leyendo
+   * el primer tramo la dejaría sin dirección hasta que el puente estuviera levantado. La
+   * segunda: recalcularla fuera es reescribir la convención, y ese `atan2` con el signo cambiado
+   * en la Y es exactamente la cuenta que ya salió mal una vez y dejó los puentes de través.
+   */
+  giro: number;
 }
 
 /**
@@ -336,5 +348,5 @@ export function puenteEntre(
     }
   }
 
-  return { tramos, estandartes, cotas: [cotaA, cotaB], medio };
+  return { tramos, estandartes, cotas: [cotaA, cotaB], medio, giro };
 }

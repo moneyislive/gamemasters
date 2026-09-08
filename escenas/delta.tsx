@@ -122,17 +122,20 @@ import {
   RADIO_DE_COMARCA,
   RADIO_DE_TESELA,
   ALTO_DEL_ZOCALO,
+  parteDeLaMarca,
+  sueloDeLaMarca,
   tallaDeUnaMarca,
+  techoDeLaMarca,
 } from './escala';
-import { tallaDelZocalo, Zocalo } from './zocalo';
+import { asientoDelDisco, tallaDelZocalo, Zocalo } from './zocalo';
 import {
   CELDA_DE_LA_NIEVE,
   colorDelBien,
   desplazamientoDeCelda,
-  desplazamientoDeColor,
   esDeLaHierba,
-  esDelColorDelJugador,
+  esDeUnColorDeJugador,
   puntosDeLaCifra,
+  saltoAlColor,
   terrenoDe,
 } from './paleta';
 import {
@@ -146,7 +149,9 @@ import {
 import { laMarinaDelMundo } from './marina';
 import type { CatalogoDeModelos } from './modelos';
 import { cuantoHaSalido, piezasDeAsentamiento } from './asentamiento';
-import { queVaEn } from './poblar';
+import { EDIFICIOS_DEL_CASERIO, queVaEn } from './poblar';
+import { duenoDelCaserio } from './caserio';
+import type { Fundacion } from './caserio';
 import { fraccion } from './revoltijo';
 import { crearRelieve, hexDePunto } from './relieve';
 import type { Relieve, Subtesela } from './relieve';
@@ -200,6 +205,7 @@ import {
   huecosDeLaBaraja,
   loQueSeVeEnLaBaraja,
 } from './baraja';
+import { ALTO_DEL_DIBUJO } from './baraja';
 import type { CartaEnLaMano, HuecoDeCarta } from './baraja';
 import {
   casillasDeLaMano,
@@ -427,6 +433,58 @@ function aplana(modelo: THREE.Object3D): Instanciable[] {
     salida.push({ geometria, material });
   });
   return salida;
+}
+
+/**
+ * LAS MISMAS MALLAS, PINTADAS DEL COLOR DE UN JUGADOR.
+ *
+ * ═══ UNA SOLA FUNCIÓN PARA LAS PIEZAS Y PARA EL CASERÍO, Y ESO ES LO NUEVO ═══
+ *
+ * Antes esto estaba escrito dentro de `aplanados` y sólo valía para las piezas de jugador,
+ * porque daba por hecho que el color venía de la celda (0,3) —el pack distribuye las piezas
+ * en azul—. Con el caserío repintado eso ya no sirve: la casa de adorno pinta su tejado en la
+ * columna 1, la iglesia en la 0, la taberna en la 2 y el mercado en la 3, así que no hay una
+ * columna de origen y el salto se calcula VÉRTICE A VÉRTICE desde donde ese vértice ya está.
+ * Ver `saltoAlColor` en `paleta.ts`.
+ *
+ * Y sólo se mueve lo que ES de un color de jugador. Un castillo tiene piedra, madera y tejado;
+ * la herrería pinta 41 vértices en la columna 4 y el muelle 388 entre la 5, la 6 y la 7, y ésos
+ * no son de nadie. Mover la lámina entera dejaría la pieza de un color plano — la misma
+ * corrección que hubo que hacer en los biomas con `esDeLaHierba`.
+ *
+ * ═══ LO QUE NO MUEVE NADA NO SE CLONA ═══
+ *
+ * Una iglesia azul pedida en azul, o una pieza de jugador pedida en el color en el que viene:
+ * el salto sale cero en todos sus vértices y se devuelve la geometría del catálogo tal cual.
+ * No es una micro-optimización, es lo que impide soltar (`dispose`) una geometría que en
+ * realidad es la del catálogo y que están usando otros veinte sitios — por eso los clones que
+ * SÍ se hacen se apuntan en `propias`, y sólo ésos se sueltan.
+ */
+function deOtroColor(
+  mallas: readonly Instanciable[],
+  color: string,
+  propias: THREE.BufferGeometry[],
+): Instanciable[] {
+  return mallas.map(({ geometria, material }) => {
+    const uv = geometria.getAttribute('uv') as THREE.BufferAttribute | undefined;
+    if (uv === undefined) return { geometria, material };
+    let mueve = false;
+    for (let i = 0; i < uv.count && !mueve; i++) {
+      const u = uv.getX(i);
+      if (esDeUnColorDeJugador(u, uv.getY(i)) && saltoAlColor(u, color) !== 0) mueve = true;
+    }
+    if (!mueve) return { geometria, material };
+    const suya = geometria.clone();
+    const suyaUv = suya.getAttribute('uv') as THREE.BufferAttribute;
+    for (let i = 0; i < suyaUv.count; i++) {
+      const u = suyaUv.getX(i);
+      if (!esDeUnColorDeJugador(u, suyaUv.getY(i))) continue;
+      suyaUv.setX(i, u + saltoAlColor(u, color));
+    }
+    suyaUv.needsUpdate = true;
+    propias.push(suya);
+    return { geometria: suya, material };
+  });
 }
 
 /** Una copia colocada: dónde, cómo girada y con qué escala en cada eje. */
@@ -841,7 +899,7 @@ function PuenteDeJugador({
    *
    * Y EL ZÓCALO SE ESCALA ANTES DEL CORTE DE LA OBRA, que no es un detalle de estilo. La
    * obra termina —`avance >= 1`— y a partir de ahí este `useFrame` no hacía nada; poniendo la
-   * talla del aro detrás de esa línea, la marca de la vereda se quedaría congelada al tamaño
+   * talla de la marca detrás de esa línea, la raya de la vereda se quedaría congelada al tamaño
    * que tuviera el fotograma en que se acabó de construir y encogería con la distancia como
    * cualquier objeto del mundo, que es exactamente el fallo que la talla de marca existe para
    * no tener. Es el mismo orden que en `Asentamiento`, y por lo mismo.
@@ -930,24 +988,38 @@ function PuenteDeJugador({
         * un sendero del terreno — y el VADO LARGO, que es uno de los dos títulos de la
         * partida, se juega contando cinco veredas seguidas.
         *
-        * Es EL MISMO `Zocalo` que llevan las chozas, con la misma cuenta de marca de
-        * pantalla, y eso es la decisión: dos marcas distintas para «esto es mío» obligan al
-        * ojo a aprender dos cosas, y coinciden hasta el primer retoque.
+        * Es EL MISMO `Zocalo` que llevan las chozas —el mismo material, la misma cuenta de
+        * marca de pantalla y el mismo contorno—, y eso es la decisión: dos marcas escritas en
+        * dos sitios coinciden hasta el primer retoque.
+        *
+        * ═══ PERO CON FORMA DE VEREDA, QUE ES UNA RAYA Y NO UN DISCO ═══
+        *
+        * Un asentamiento es un punto y una vereda es un TRAMO. Marcada con un disco, una
+        * vereda diría «aquí hay algo» y no «esto va de aquí a allá», que es la mitad de lo que
+        * un camino significa — y el VADO LARGO, uno de los dos títulos de la partida, se juega
+        * contando cinco veredas SEGUIDAS. Por eso la raya, y por eso `giro`.
+        *
+        * `giro` sale de `entero` y NO se recalcula aquí. Durante la obra `puesto.tramos` está
+        * a medias, así que sacarlo del primer tramo dejaría la raya sin dirección hasta que el
+        * puente estuviera levantado; y rehacer el `atan2` a mano es reescribir la convención
+        * de los caminos, que es la cuenta que ya dejó los puentes puestos de través.
         *
         * ═══ Y VA A LA ALTURA DE LA CALZADA, NO A LA DEL SUELO ═══
         *
         * `entero.medio` es el punto de la calzada a mitad de vano, interpolado sobre las
-        * juntas (`puente.ts`). Con la altura del terreno de debajo, el aro quedaría BAJO el
+        * juntas (`puente.ts`). Con la altura del terreno de debajo, la raya quedaría BAJO el
         * puente en las aristas donde la calzada salva un cerro —hasta ocho personas y media
-        * de roca en la peor de este delta— y desde el aire lo taparía el propio tablero.
+        * de roca en la peor de este delta— y desde el aire la taparía el propio tablero.
         *
         * Y no lleva el `avance` de la obra: la marca dice de quién es la vereda, y eso no
         * cambia mientras se levanta.
         */}
       <Zocalo
         color={color}
+        forma="raya"
+        giro={entero.giro}
         donde={[entero.medio.x, entero.medio.y + ALTO_DEL_ZOCALO, entero.medio.z]}
-        aro={zocalo}
+        marca={zocalo}
       />
       {/*
         * LAS ASTAS. Geometría propia y no un modelo del pack, y no por capricho: ningún
@@ -2461,12 +2533,15 @@ function Carta({
        * El bien, en la MITAD IZQUIERDA de la carta: es la que asoma cuando la mano esta
        * en reposo. Puesto en el centro, la pieza quedaria fuera de la pantalla justo
        * cuando hace falta para saber que carta es.
+       *
+       * Y lo GRANDE que se pinta lo dice `baraja.ts`, que es quien sabe cuanto asoma la
+       * carta: ver `ALTO_DEL_DIBUJO`.
        */}
       {icono !== null && (
         <mesh
           geometry={icono}
           position={[hueco.ancho * hueco.dibujo, hueco.alto * 0.04, 0.01]}
-          scale={hueco.alto * 0.4}
+          scale={hueco.alto * ALTO_DEL_DIBUJO}
           renderOrder={base + 2}
           raycast={() => null}
         >
@@ -3351,9 +3426,9 @@ export function Delta({
    * está evitando. El coste en memoria es el mismo que antes —cuatro geometrías vivas—
    * pero el fichero que se descarga y que entra en la historia de git lleva una.
    *
-   * Sólo se mueve lo que ES del color. Un castillo tiene piedra, madera y tejado, y
-   * mover la lámina entera lo dejaría de un color plano — la misma corrección que hubo
-   * que hacer en los biomas con `esDeLaHierba`, aquí desde el principio.
+   * El traslado en sí lo hace `deOtroColor`, que es la misma función con la que se repinta
+   * el caserío del paisaje: allí está escrito por qué sólo se mueve lo que ES de un color de
+   * jugador y por qué lo que no mueve nada no se clona.
    */
   const aplanados = useMemo(() => {
     const tabla = new Map<string, Instanciable[]>();
@@ -3362,26 +3437,17 @@ export function Delta({
       if (mallas.length > 0) tabla.set(nombre, mallas);
     }
 
+    /*
+     * Los clones que salen de aquí viven lo que viva el catálogo, así que su lista de
+     * `propias` no se guarda: nadie las suelta. Las del caserío SÍ, porque ésas dependen
+     * de quién esté jugando y se rehacen cuando entra un color nuevo — ver más abajo.
+     */
+    const deUsarYTirar: THREE.BufferGeometry[] = [];
     for (const pieza of PIEZAS_DE_COLOR) {
       const base = tabla.get(pieza);
       if (base === undefined) continue;
       for (const color of COLORES_DE_JUGADOR) {
-        const salto = desplazamientoDeColor(color);
-        tabla.set(
-          `${pieza}-${color}`,
-          base.map(({ geometria, material }) => {
-            if (salto.u === 0 && salto.v === 0) return { geometria, material };
-            const suya = geometria.clone();
-            const uv = suya.getAttribute('uv') as THREE.BufferAttribute | undefined;
-            if (uv === undefined) return { geometria: suya, material };
-            for (let i = 0; i < uv.count; i++) {
-              if (!esDelColorDelJugador(uv.getX(i), uv.getY(i))) continue;
-              uv.setXY(i, uv.getX(i) + salto.u, uv.getY(i) + salto.v);
-            }
-            uv.needsUpdate = true;
-            return { geometria: suya, material };
-          }),
-        );
+        tabla.set(`${pieza}-${color}`, deOtroColor(base, color, deUsarYTirar));
       }
     }
     return tabla;
@@ -3445,6 +3511,7 @@ export function Delta({
   const plan = useMemo(() => {
     const suelo = new Map<string, Puesta[]>();
     const cosas = new Map<string, Puesta[]>();
+    const caserio: Array<{ llave: string; modelo: string; puesta: Puesta }> = [];
     const plazas: Array<{ isla: IslaEn3D; centro: Punto; altura: number }> = [];
 
     for (const isla of datos.islas) {
@@ -3640,17 +3707,29 @@ export function Delta({
         if (senda !== undefined || enAgua || orilla !== null) continue;
 
         for (const puesto of queVaEn(t, isla.terreno)) {
-          empuja(
-            cosas,
-            `${llave}|${puesto.modelo}`,
-            comoElPack(
-              t.centro.x + puesto.donde.x,
-              t.altura,
-              t.centro.y + puesto.donde.y,
-              puesto.giro,
-              puesto.talla,
-            ),
+          const puesta = comoElPack(
+            t.centro.x + puesto.donde.x,
+            t.altura,
+            t.centro.y + puesto.donde.y,
+            puesto.giro,
+            puesto.talla,
           );
+          /*
+           * LOS EDIFICIOS DEL CASERÍO SE APARTAN AQUÍ, y esto es lo que evita rehacer el
+           * mundo entero cada vez que alguien construye.
+           *
+           * El color de un edificio de pueblo depende de quién haya fundado cerca, o sea
+           * de `datos.piezas`, que cambia varias veces por turno. Meterlos en `cosas` con
+           * el color ya puesto obligaría a que este plan —dos mil setecientas teselas y
+           * varios miles de cosas— dependiera de las piezas y se recalculara entero en
+           * cada choza. Se guardan sin dueño y los reparte un memo de al lado, que sólo
+           * recorre los 357 edificios de un mundo.
+           */
+          if (EDIFICIOS_DEL_CASERIO.has(puesto.modelo)) {
+            caserio.push({ llave, modelo: puesto.modelo, puesta });
+          } else {
+            empuja(cosas, `${llave}|${puesto.modelo}`, puesta);
+          }
         }
       }
 
@@ -3728,7 +3807,7 @@ export function Delta({
       );
     }
 
-    return { suelo, cosas, plazas };
+    return { suelo, cosas, caserio, plazas };
   }, [datos.islas, relieve, red]);
 
   /**
@@ -3804,6 +3883,83 @@ export function Delta({
       for (const material of suelos.propios) material.dispose();
     },
     [suelos],
+  );
+
+  /**
+   * ═══ EL CASERÍO DEL COLOR DE SU DUEÑO ═══
+   *
+   * Cada edificio de pueblo se lo lleva la choza más cercana que lo tenga dentro de
+   * `RADIO_DEL_CASERIO`, y quien no tiene ninguna se queda como estaba —rojo el adorno de
+   * casa, azul la iglesia, amarilla la taberna: el paisaje de siempre—. La regla vive en
+   * `caserio.ts`, que no importa `three` y por eso se puede medir desde Node.
+   *
+   * Este memo cuesta lo que cuesta recorrer los 357 edificios de un mundo contra las 27
+   * chozas que caben como mucho, o sea unas diez mil restas: se puede rehacer cada vez que
+   * alguien construye, que es exactamente lo que el plan de al lado no podía.
+   */
+  const pueblos = useMemo(() => {
+    const fundadas: Fundacion[] = datos.piezas.map((pieza) => ({
+      vertice: pieza.vertice,
+      color: pieza.color,
+      punto: puntoDeVertice(pieza.vertice, RADIO_DE_COMARCA),
+    }));
+    const grupos = new Map<string, Puesta[]>();
+    for (const edificio of plan.caserio) {
+      /*
+       * El sitio del edificio se lee de la PUESTA que ya se calculó, y no se guarda otra
+       * vez al hacer el plan: dos copias del mismo punto son dos copias que pueden
+       * discrepar, y ésta discreparía justo el día que alguien tocara cómo se posan las
+       * cosas sobre la tesela. La `y` del plano de la malla es la `z` del mundo.
+       */
+      const donde = { x: edificio.puesta.posicion.x, y: edificio.puesta.posicion.z };
+      const dueno = duenoDelCaserio(donde, fundadas);
+      const nombre = dueno === null ? edificio.modelo : `${edificio.modelo}-${dueno.color}`;
+      empuja(grupos, `${edificio.llave}|${nombre}`, edificio.puesta);
+    }
+    return grupos;
+  }, [plan.caserio, datos.piezas]);
+
+  /**
+   * LAS GEOMETRÍAS DEL CASERÍO TEÑIDO, una por edificio y color EN JUEGO.
+   *
+   * ═══ POR QUÉ NO SE FABRICAN LAS CUATRO SIEMPRE ═══
+   *
+   * Porque se pagan en memoria y el sitio donde duele es el móvil. Los catorce edificios
+   * que `poblar.ts` planta suman 48.690 vértices, y un clon lleva posición, normal y UV en
+   * `float32`: 32 bytes por vértice, o sea entre 1,06 y 1,19 MB por color —lo que varía es
+   * cuántos de los catorce ya estaban en esa columna y se devuelven sin clonar—. Con los
+   * cuatro son 4,46 MB de más SIEMPRE, incluso en un tablero donde nadie ha construido
+   * todavía. Con los colores que de verdad están jugando, una partida de dos paga la mitad
+   * y el tablero recién repartido no paga nada.
+   *
+   * La lista de colores se saca de las piezas ya puestas y se ORDENA, para que la
+   * identidad del memo no dependa de en qué orden construyó cada uno: sin ordenar, dos
+   * jugadores fundando en distinto orden rehacían las mismas geometrías desde cero.
+   */
+  const coloresEnJuego = useMemo(
+    () => [...new Set(datos.piezas.map((p) => p.color))].sort().join(','),
+    [datos.piezas],
+  );
+
+  const caserioTenido = useMemo(() => {
+    const tabla = new Map<string, Instanciable[]>();
+    /* Los clones son NUESTROS y hay que soltarlos cuando entra un color nuevo. */
+    const propias: THREE.BufferGeometry[] = [];
+    for (const color of coloresEnJuego === '' ? [] : coloresEnJuego.split(',')) {
+      for (const modelo of EDIFICIOS_DEL_CASERIO) {
+        const base = aplanados.get(modelo);
+        if (base === undefined) continue;
+        tabla.set(`${modelo}-${color}`, deOtroColor(base, color, propias));
+      }
+    }
+    return { tabla, propias };
+  }, [aplanados, coloresEnJuego]);
+
+  useEffect(
+    () => () => {
+      for (const geometria of caserioTenido.propias) geometria.dispose();
+    },
+    [caserioTenido],
   );
 
   /** La comarca seca: una tienda plantada en su plaza, para que se vea cuál no rinde. */
@@ -3925,6 +4081,19 @@ export function Delta({
         );
       })}
 
+      {/*
+        * EL CASERÍO, en grupos aparte de las demás cosas porque su nombre lleva el color de
+        * su dueño y ése cambia durante la partida. Un edificio sin dueño se busca por su
+        * nombre pelado en el catálogo de siempre — es el mismo pueblo de antes.
+        */}
+      {[...pueblos].map(([llave, puestas]) => {
+        const nombre = llave.slice(llave.indexOf('|') + 1);
+        const mallas = caserioTenido.tabla.get(nombre) ?? aplanados.get(nombre);
+        return mallas === undefined ? null : (
+          <Modelo key={`pueblo:${llave}`} mallas={mallas} puestas={puestas} />
+        );
+      })}
+
       {plan.plazas.map(({ isla, centro, altura }) =>
         isla.cifra === null ? null : (
           <Numero
@@ -3941,6 +4110,7 @@ export function Delta({
           key={`obra:${pieza.vertice}:${pieza.clase}:${pieza.color}`}
           pieza={pieza}
           aplanados={aplanados}
+          tenido={caserioTenido.tabla}
           relieve={relieve}
         />
       ))}
@@ -3999,10 +4169,22 @@ export function Delta({
 function Asentamiento({
   pieza,
   aplanados,
+  tenido,
   relieve,
 }: {
   pieza: PiezaEn3D;
   aplanados: ReadonlyMap<string, Instanciable[]>;
+  /**
+   * EL CATÁLOGO YA TEÑIDO, el mismo que usa el caserío del paisaje.
+   *
+   * ═══ POR QUÉ ESTO ENTRA POR LA PUERTA Y NO SE FABRICA AQUÍ ═══
+   *
+   * Porque un asentamiento no es dueño de sus geometrías: teñir es clonar el búfer de UV,
+   * y un clon por asentamiento serían veintisiete copias de la misma casa azul en una
+   * partida de cuatro. La tabla la fabrica `Delta` UNA vez por color en juego —donde ya
+   * se fabrica para el pueblo del paisaje— y la suelta cuando ese color deja de jugar.
+   */
+  tenido: ReadonlyMap<string, Instanciable[]>;
   relieve: Relieve;
 }): JSX.Element {
   const punto = puntoDeVertice(pieza.vertice, RADIO_DE_COMARCA);
@@ -4016,20 +4198,85 @@ function Asentamiento({
   const nacido = useRef(-1);
   const zocalo = useRef<THREE.Group>(null);
 
+  /*
+   * ═══ DÓNDE SE APOYA EL DISCO, Y HASTA DÓNDE LE DEJA LLEGAR LA TIERRA ═══
+   *
+   * Un vértice es la esquina donde se juntan TRES comarcas y casi nunca están a la misma cota.
+   * El disco es un plano HORIZONTAL a media persona sobre el suelo de su vértice y un escalón
+   * del mundo mide cuatro veces y media eso, así que basta con que la comarca de al lado esté
+   * UN escalón más arriba para que el trozo de disco que la pisa quede dentro de la ladera.
+   * Medido sobre los 54 vértices con doce relieves: a la talla del techo, 88 de las 648 tenían
+   * tierra por encima del plano de la marca, y en el peor la tierra subía 20,60 sobre él —3,77
+   * escalones—. En pantalla eso no es una marca torcida: es una marca que NO ESTÁ, y depende de
+   * con qué comarca limita el vértice.
+   *
+   * `asientoDelDisco` sube la marca hasta la tierra que pisa, un escalón como mucho. Recortar
+   * el disco para que no toque la ladera PARECE lo razonable y es lo contrario: lo que se quita
+   * estaba tapado —o sea que no pintaba— y lo que se quita de más sí pintaba. Medido en el
+   * banco sobre el peor vértice: recortado pinta 7 píxeles, entero y subido 127. La regla, las
+   * tres salidas que se probaron y los números están en `asientoDeLaMarca` (`escala.ts`).
+   *
+   * SE CALCULA UNA VEZ POR SITIO Y NO POR FOTOGRAMA: el relieve no cambia mientras hay una
+   * partida encima, y son 2.304 consultas al relieve. Del `useFrame` sale sólo la talla, que
+   * es lo único que depende de dónde esté la cámara.
+   */
+  const asiento = useMemo(
+    () =>
+      asientoDelDisco(
+        (x: number, y: number) => relieve.alturaEn({ x, y }),
+        punto.x,
+        punto.y,
+        suelo,
+        techoDeLaMarca(pieza.clase),
+      ),
+    [relieve, punto.x, punto.y, suelo, pieza.clase],
+  );
+
   useFrame((estado) => {
     if (nacido.current < 0) nacido.current = estado.clock.elapsedTime;
     const transcurrido = estado.clock.elapsedTime - nacido.current;
     /*
      * EL ZÓCALO SE MIDE COMO UNA MARCA DE PANTALLA, con la misma cuenta que la señal de los
      * sitios libres y por la misma razón: desde la vista de tablero —a 574,6 unidades del
-     * asentamiento, medidas sobre el encuadre de verdad en `verify:escena`— un poblado ocupa
-     * el 1,27 % del alto de la pantalla, o sea once píxeles en una ventana de novecientos, y
-     * un aro del tamaño del mundo mediría lo mismo. La cuenta es `tallaDelZocalo`
-     * (`zocalo.tsx`) y no está escrita aquí a propósito: de dentro de un `useFrame` no se
-     * mide, y la vereda hace exactamente lo mismo con ella.
+     * asentamiento, medidas sobre el encuadre de verdad en `verify:escena`— la casa del
+     * jugador ocupa el 1,27 % del alto de la pantalla, o sea once píxeles en una ventana de
+     * novecientos, y una marca del tamaño del mundo mediría lo mismo. La cuenta es
+     * `tallaDelZocalo` (`zocalo.tsx`) y no está escrita aquí a propósito: de dentro de un
+     * `useFrame` no se mide, y la vereda hace exactamente lo mismo con ella.
+     *
+     * Y LA FRACCIÓN LA DECIDE LA CLASE. Un poblado son casas sueltas y el disco se ve por los
+     * huecos; una CIUDAD es un recinto cerrado —la muralla llega a 12,43 del vértice— y el
+     * disco de una choza, que llega a 6,66, cabe debajo entero: medido en el banco, la torre
+     * pintaba VEINTINUEVE píxeles de marca contra los 191 y 238 de dos chozas del mismo
+     * fotograma. `parteDeLaMarca` está en `escala.ts`, con las dos medidas al lado.
+     *
+     * Y LA CIUDAD LLEVA ADEMÁS SU PROPIO SUELO, que no es lo mismo que su fracción: la
+     * fracción la mide contra la PANTALLA y la muralla es del MUNDO. Desde el encuadre de
+     * salida los vértices están entre 431,5 y 821,6 de la cámara, no todos a los 574,6 del
+     * centro, y en el más cercano el disco al 2,66 % se queda en 9,51 — debajo de la muralla
+     * otra vez. `sueloDeLaMarca` es el mínimo de mundo que lo impide, y está medido al lado
+     * de la fracción.
+     *
+     * Y EL TECHO TAMBIÉN LO DECIDE LA CLASE, y encima lo baja el relieve de ESTE sitio. El
+     * techo era un 3,5 escrito a mano para las tres marcas y se toca jugando: con la ventana a
+     * 826×833 —media pantalla de portátil— 38 de los 54 discos de ciudad se quedan clavados en
+     * él, y en un móvil en retrato los 126. En el techo la ciudad y el poblado medían LO MISMO,
+     * así que `parteDeLaMarca` no distinguía nada justo donde el tablero está más lejos.
+     * `techoDeLaMarca` reparte el techo con la misma proporción que la fracción, y `asiento`
+     * lo baja con lo que la tierra de este vértice deja: las dos medidas están en `escala.ts`.
      */
     const z = zocalo.current;
-    if (z !== null) z.scale.setScalar(tallaDelZocalo(estado.camera, [punto.x, suelo, punto.y]));
+    if (z !== null) {
+      z.scale.setScalar(
+        tallaDelZocalo(
+          estado.camera,
+          [punto.x, suelo, punto.y],
+          parteDeLaMarca(pieza.clase),
+          sueloDeLaMarca(pieza.clase),
+          techoDeLaMarca(pieza.clase),
+        ),
+      );
+    }
     for (let i = 0; i < partes.length; i++) {
       const g = grupos.current[i];
       const parte = partes[i];
@@ -4046,13 +4293,28 @@ function Asentamiento({
   return (
     <group position={alMundo(punto, suelo)}>
       {/*
-        ═══ EL ZÓCALO: LO ÚNICO QUE EL DECORADO NO TIENE ═══
+        ═══ EL ZÓCALO: EN CUÁL DE SUS TRES ESQUINAS ESTÁ PUESTA ESTA CHOZA ═══
 
-        El aro del color de su dueño, y la razón entera de que exista está en la cabecera de
-        `zocalo.tsx`: el tejado de una casa de adorno y el tejado del poblado de alguien son EL
-        MISMO TÉXEL del atlas, así que buscar el color propio entre el caserío es buscar una
-        casa roja entre casas rojas, y a la distancia de la vista de tablero una pieza mide
-        once píxeles.
+        El DISCO del color de su dueño bajo la pieza —relleno, translúcido y con un contorno
+        finísimo que es lo que lo hace visible sobre cualquier terreno—, y la razón entera de
+        que exista está en la cabecera de `zocalo.tsx`.
+
+        AQUÍ PONÍA «LO ÚNICO QUE EL DECORADO NO TIENE», Y YA NO ES VERDAD. Desde
+        `caserio.ts` el pueblo que rodea una choza se repinta del color de quien la fundó,
+        así que el decorado SÍ dice de quién es. Eso no deja al disco sin trabajo: le cambia
+        el trabajo, y el reparto es el que `zocalo.tsx` ya tiene escrito —la misma frase, en
+        el mismo sitio, para que las dos no se separen—.
+
+          · el PUEBLO dice DE QUIÉN ES LA COMARCA, que es lo que se ve de lejos: cada choza
+            se lleva 12,4 edificios de media y 38 en el peor caso, medidos sobre doce mundos
+            con la ocupación máxima.
+          · el DISCO dice EN CUÁL DE LAS TRES ESQUINAS de esa comarca está puesta, que es lo
+            que hay que saber para jugar y lo que ningún tejado puede decir: el edificio de
+            adorno más cercano a un vértice está a 18,9 unidades de mediana, o sea a tres
+            teselas de allí.
+
+        Y hay un caso en el que el disco es lo ÚNICO que hay: 11 de 324 chozas no tienen ni
+        un edificio dentro de su radio, porque el pueblo de su comarca cayó lejos.
 
         VIVE FUERA DE ESTE FICHERO, y eso es la mitad del arreglo. Aquí estuvo escrito a mano
         dentro del JSX, y por eso se le pudo apagar el grupo entero con `verify:escena` y
@@ -4060,12 +4322,39 @@ function Asentamiento({
         ningún comprobador de Node. `Zocalo` no usa ningún gancho, así que se puede llamar como
         una función y recorrer lo que devuelve — y eso es lo que `verify:escena` hace ahora.
 
-        Y lo monta también la VEREDA, en `PuenteDeJugador`, con la misma llamada: dos marcas
-        escritas en dos sitios coinciden hasta el primer retoque.
+        Y lo monta también la VEREDA, en `PuenteDeJugador`, con la misma llamada y otra
+        `forma`: dos marcas escritas en dos sitios coinciden hasta el primer retoque.
       */}
-      <Zocalo color={pieza.color} donde={[0, ALTO_DEL_ZOCALO, 0]} aro={zocalo} />
+      {/*
+        Y NO VA A `ALTO_DEL_ZOCALO` A SECAS: va a lo que `asientoDelDisco` diga. Media persona
+        sobre el suelo del vértice basta para no parpadear contra la tesela de debajo, y no
+        basta para asomar por encima de la comarca de al lado cuando ésa está un escalón más
+        arriba — que es lo que hacía desaparecer la marca según con qué comarca limitase el
+        vértice. Sin cuesta alrededor, `asiento.alto` ES `ALTO_DEL_ZOCALO`.
+      */}
+      <Zocalo color={pieza.color} forma="disco" donde={[0, asiento.alto, 0]} marca={zocalo} />
       {partes.map((parte, i) => {
-        const mallas = aplanados.get(parte.modelo);
+        /*
+         * ═══ LAS CASAS DEL POBLADO SON DEL COLOR DE SU DUEÑO, Y NO LO ERAN ═══
+         *
+         * Un poblado planta TRES `MODELO.casa` alrededor de la del jugador, y la casa de
+         * adorno del pack es la ROJA: medido en el banco, en un radio de 18 píxeles
+         * alrededor de la choza AZUL había 416 píxeles rojos contra 26 azules. O sea que
+         * el poblado del jugador azul tenía tres casas rojas y la del medio azul, que es
+         * la frase con la que llegó el encargo — y se arregló el pueblo del PAISAJE
+         * (`plan.caserio`) y no la pieza, que es donde se dijo.
+         *
+         * Se pide por el MISMO camino que el caserío del paisaje: la tabla teñida que
+         * `Delta` fabrica moviendo las UV una columna. No hay una segunda manera de teñir.
+         *
+         * Y sólo lo que está en `EDIFICIOS_DEL_CASERIO`: la pieza central
+         * (`poblado-blue`, `ciudad-blue`) y la bandera (`bandera-blue`) ya vienen del
+         * `.glb` con el color en el nombre y se tiñen por su camino de siempre —pedirlas
+         * también aquí las teñiría dos veces—, y las vallas y los árboles no son de nadie.
+         */
+        const mallas = EDIFICIOS_DEL_CASERIO.has(parte.modelo)
+          ? tenido.get(`${parte.modelo}-${pieza.color}`) ?? aplanados.get(parte.modelo)
+          : aplanados.get(parte.modelo);
         if (mallas === undefined) return null;
         return (
           <group

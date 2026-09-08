@@ -43,15 +43,22 @@ import {
   colorDeTerreno,
   colorLlanoDelJugador,
   COLUMNA_DEL_COLOR,
+  COLUMNAS_DE_JUGADOR,
   FILO_DEL_ZOCALO,
   COLUMNAS_DEL_ATLAS,
   desplazamientoDeColor,
   esDelColorDelJugador,
+  esDeUnColorDeJugador,
   FILAS_DEL_ATLAS,
   PALETA,
   puntosDeLaCifra,
+  saltoAlColor,
   TERRENO_DEL_BIEN,
 } from '../paleta';
+import { EDIFICIOS_DEL_CASERIO, queVaEn } from '../poblar';
+import { duenoDelCaserio, RADIO_DEL_CASERIO } from '../caserio';
+import type { Fundacion } from '../caserio';
+import { verticesVecinos } from '../../shared/mecanicas/malla-hexagonal';
 import {
   NOMBRE_QUE_SOBREVIVE,
   nombresEnElGlb,
@@ -183,11 +190,15 @@ import {
 } from '../mesa';
 import { semillaDelCodigo } from '../../shared/mecanicas/semilla';
 import {
+  ALTO_DEL_DIBUJO,
+  ANCHO_DE_LA_TIRA,
   areasDeTrueque,
+  DISTANCIA_DE_LA_BARAJA,
   enLaZonaDeLaMano,
   huecosDeLaBaraja,
   loQueSeVeEnLaBaraja,
   manoPorGrupos,
+  ORDEN_DE_LOS_BIENES,
 } from '../baraja';
 import {
   casillasDeLaMano,
@@ -222,20 +233,46 @@ import {
 } from '../iconos';
 import { altoDeLaCinta, ALTO_DE_LA_CINTA, anchoDeLaCinta, BOTON_DE_LA_CINTA, cuantosSeVenEnElCarril, loQueLlevaLaCinta } from '../cinta';
 import { selloDeLaTirada } from '../../shared/arcade/juegos/riberas-en-tres';
-import { MODELO, modeloDePieza } from '../modelos';
+import { BIENES } from '../../shared/arcade/juegos/riberas';
+import { MODELO, modeloDeBandera, modeloDePieza } from '../modelos';
 import {
   ALTO_DEL_ZOCALO,
+  ALTURA_DE_UNA_CASA,
   ALTURA_DE_UNA_PERSONA,
+  asientoDeLaMarca,
   ESCALA_DEL_PACK,
   ESCALON,
   RADIO_DE_COMARCA,
+  RADIO_DEL_RELLANO,
   RADIO_DE_TESELA,
+  SUBIDA_MAXIMA_DEL_ZOCALO,
   SUELO_DEL_ZOCALO,
+  SUELO_DEL_ZOCALO_DE_CIUDAD,
+  sueloDeLaMarca,
   tallaDeUnaMarca,
+  parteDeLaMarca,
   TECHO_DEL_ZOCALO,
+  TECHO_DEL_ZOCALO_DE_CIUDAD,
+  techoDeLaMarca,
+  ZOCALO_DE_CIUDAD_EN_PANTALLA,
   ZOCALO_EN_PANTALLA,
 } from '../escala';
-import { anillosDelZocalo, LADOS_DEL_ARO, tallaDelZocalo, Zocalo } from '../zocalo';
+import {
+  ANCHO_DE_LA_RAYA,
+  asientoDelDisco,
+  GRUESO_DEL_CONTORNO,
+  GRUESO_DEL_FLANCO,
+  LADOS_DEL_DISCO,
+  LARGO_DE_LA_RAYA,
+  loLejosQueLlegaLaMarca,
+  loQueOcupaElZocalo,
+  OPACIDAD_DEL_CONTORNO,
+  OPACIDAD_DEL_RELLENO,
+  piezasDelZocalo,
+  RADIO_DEL_DISCO,
+  tallaDelZocalo,
+  Zocalo,
+} from '../zocalo';
 /*
  * EL ATLAS SE LEE DE LA TABLA COMPILADA, que es la que la app sube a la GPU y la que
  * `verify:atlas-del-tablero` compara píxel a píxel contra el PNG del pack. Abrir aquí el PNG
@@ -1749,12 +1786,22 @@ paso('La mano se agrupa por bien, cabe, asoma y el imán reparte');
     ['monitor', 16 / 9],
     ['móvil de pie', 9 / 19.5],
   ];
-  const BIENES = ['madera', 'ladrillo', 'lana', 'grano', 'mineral'];
+  /*
+   * ═══ LOS BIENES SE PIDEN AL JUEGO, Y ANTES SE ESCRIBÍAN AQUÍ MAL ═══
+   *
+   * Esta lista decía `madera, ladrillo, lana, grano, mineral`, que son los del catán de
+   * caja. Riberas reparte `limo, junco, sal, piedra, grano` y los manda SIN TRADUCIR
+   * (cabecera de `riberas-en-3d.ts`), así que de los cinco que se medían aquí sólo
+   * `grano` llegaba a existir: las comprobaciones de la mano llevaban midiendo una mano
+   * que el juego no reparte nunca, que es la manera más silenciosa de estar en verde.
+   *
+   * Se importa del juego en vez de volver a escribirla para que no pueda volver a pasar.
+   */
   const manoDe = (cuantas: number): Array<{ id: string; bien: string }> =>
     Array.from({ length: cuantas }, (_, i) => ({
       id: `c${String(i)}`,
       /* A propósito desordenada: el reparto tiene que agruparla él. */
-      bien: BIENES[(i * 3 + (i % 2)) % BIENES.length] ?? 'madera',
+      bien: BIENES[(i * 3 + (i % 2)) % BIENES.length] ?? 'limo',
     }));
 
   const malas: string[] = [];
@@ -1777,6 +1824,184 @@ paso('La mano se agrupa por bien, cabe, asoma y el imán reparte');
     }
   }
   comprobar('la mano cabe y asoma con una carta y con veinte', malas.length === 0, malas.slice(0, 4));
+
+  /*
+   * ═══ EL ORDEN FIJO DE LA MANO TIENE QUE NOMBRAR LOS BIENES QUE LLEGAN ═══
+   *
+   * `ORDEN_DE_LOS_BIENES` promete en su cabecera que la mano se lee por la posición,
+   * «como se lee un teclado». Eso sólo es verdad si los bienes que llegan están EN la
+   * lista: los que no están caen todos al mismo sitio y desempatan por orden alfabético,
+   * que es un orden, pero no el del juego ni uno que nadie haya elegido.
+   *
+   * Medido con los cinco de Riberas: cuatro se caían fuera de la lista y la mano salía
+   * `grano` primero y luego `junco, limo, piedra, sal` por alfabeto.
+   */
+  comprobar(
+    'el orden fijo de la mano nombra los cinco bienes que Riberas reparte',
+    BIENES.every((b) => ORDEN_DE_LOS_BIENES.includes(b)),
+    { orden: ORDEN_DE_LOS_BIENES, fuera: BIENES.filter((b) => !ORDEN_DE_LOS_BIENES.includes(b)) },
+  );
+
+  /*
+   * ═══ Y EL DIBUJO DEL BIEN CABE EN LA TIRA QUE ASOMA ═══
+   *
+   * Es lo único que se ve de una carta en reposo, y si el dibujo no cabe en ella no se
+   * lee de qué bien es sin apuntarla, que es justo para lo que se subió `ASOMA_QUIETA`.
+   *
+   * El dibujo llega encajado por su lado MAYOR (`geometriaDeContornos`), así que un
+   * glifo más ancho que alto sale con ancho 1 y se come más tira que uno estrecho. Con
+   * el 0,4 que el pintor llevaba suelto, `junco`, `limo` y `piedra` medían 0,0994 en una
+   * tira de 0,0957: se salían 0,0019 por cada lado, o sea que el dibujo pisaba el filo
+   * del naipe por la izquierda y lo cortaba el borde del lienzo por la derecha.
+   */
+  const anchos = new Map<string, number>();
+  for (const bien of BIENES) {
+    const g = geometriaDeContornos(CONTORNOS_DEL_BIEN[bien] ?? []);
+    if (g === null) continue;
+    const caja = g.boundingBox;
+    if (caja !== null) anchos.set(bien, caja.max.x - caja.min.x);
+  }
+  const seSalen = [...anchos.entries()]
+    .filter(([, w]) => w * ALTO_DEL_DIBUJO > ANCHO_DE_LA_TIRA + 1e-9)
+    .map(
+      ([b, w]) =>
+        `${b}: dibujo ${(w * ALTO_DEL_DIBUJO).toFixed(4)} en tira ${ANCHO_DE_LA_TIRA.toFixed(4)}`,
+    );
+  comprobar(
+    'el dibujo de cada bien cabe DE PLANO en la tira que asoma en reposo: el ancho del glifo contra el ancho de la tira, sin giro y sin cámara. Es condición necesaria y no es la que decide — la que decide está justo debajo',
+    anchos.size === BIENES.length && seSalen.length === 0,
+    { medidos: anchos.size, seSalen },
+  );
+  /*
+   * ═══ Y CABE DE VERDAD: LAS CUATRO ESQUINAS, CON EL GIRO Y CON LA CÁMARA ═══
+   *
+   * La de arriba compara dos FRACCIONES PLANAS: el ancho del glifo contra el ancho de la tira.
+   * Es una condición necesaria y NO es la que decide, porque en pantalla el naipe no está ni de
+   * frente ni en el plano nominal de la baraja:
+   *
+   *   · va INCLINADO —`INCLINACION`, hasta 0,13 radianes de la primera carta a la última—, y
+   *     girar un rectángulo mete sus esquinas más allá de donde llegaban sus lados;
+   *   · y el dibujo va 0,01 POR DELANTE de la cara, o sea más cerca del ojo, donde el lienzo
+   *     mide menos. La mano vive a dos unidades de la cámara: un centésimo de acercamiento es
+   *     medio por ciento de lienzo, y la carta ya está pegada al borde derecho.
+   *
+   * Medido: con el 0,38 que había, la peor esquina caía FUERA del lienzo, y en una mano de cinco
+   * el dibujo quedaba dentro entre el 84 % y el 100 % según el naipe. Las dos comprobaciones de
+   * arriba —la plana y la de que la mano asoma— salían las dos en verde.
+   *
+   * Así que se proyectan las cuatro esquinas del rectángulo del dibujo: se le aplica el giro del
+   * naipe, se lleva al sitio del hueco y se divide por lo que el lienzo mide A ESA PROFUNDIDAD.
+   * Dentro es que las dos coordenadas quedan en [-1, 1].
+   */
+  const DONDE_VA_EL_DIBUJO = 'position={[hueco.ancho * hueco.dibujo, hueco.alto * 0.04, 0.01]}';
+  const fuenteDelNaipe = fs.readFileSync(
+    path.join(import.meta.dirname ?? __dirname, '..', 'delta.tsx'),
+    'utf8',
+  );
+  comprobar(
+    'el dibujo se planta en `delta.tsx` donde este guion lo proyecta: sube 0,04 del alto y va 0,01 por delante de la cara. Si alguien mueve esa línea, lo de abajo deja de medir la escena y hay que traerlo',
+    fuenteDelNaipe.includes(DONDE_VA_EL_DIBUJO),
+    { loQueBusca: DONDE_VA_EL_DIBUJO },
+  );
+  const SUBE_EL_DIBUJO = 0.04;
+  const DELANTE_DE_LA_CARA = 0.01;
+  const LAS_CUATRO_PROPORCIONES: Array<[string, number]> = [
+    ['16:9', 16 / 9],
+    ['1280x800', 1280 / 800],
+    ['852x922', 852 / 922],
+    ['9:19,5', 9 / 19.5],
+  ];
+  const cajaDelBien = new Map<string, { ancho: number; alto: number }>();
+  for (const bien of BIENES) {
+    const g = geometriaDeContornos(CONTORNOS_DEL_BIEN[bien] ?? []);
+    const caja = g?.boundingBox ?? null;
+    if (caja !== null) {
+      cajaDelBien.set(bien, { ancho: caja.max.x - caja.min.x, alto: caja.max.y - caja.min.y });
+    }
+  }
+  /** La esquina del dibujo que más se sale, en fracción de medio lienzo. Uno es el borde. */
+  const laPeorEsquina = (talla: number): number => {
+    let peor = 0;
+    for (const [, proporcion] of LAS_CUATRO_PROPORCIONES) {
+      for (let cuantas = 1; cuantas <= 20; cuantas++) {
+        for (const c of huecosDeLaBaraja(manoDe(cuantas), CAMPO, proporcion, null)) {
+          const caja = cajaDelBien.get(c.carta.bien);
+          if (caja === undefined) continue;
+          const h = c.hueco;
+          /* El lienzo A LA PROFUNDIDAD DEL DIBUJO, que es la de la carta menos su relieve. */
+          const hasta = -(h.z + DELANTE_DE_LA_CARA);
+          const medioAlto = hasta * Math.tan(CAMPO / 2);
+          const medioAncho = medioAlto * proporcion;
+          const cos = Math.cos(h.giro);
+          const sen = Math.sin(h.giro);
+          const centroX = h.ancho * h.dibujo;
+          const centroY = h.alto * SUBE_EL_DIBUJO;
+          const medioW = (caja.ancho * h.alto * talla) / 2;
+          const medioH = (caja.alto * h.alto * talla) / 2;
+          for (const sx of [-1, 1]) {
+            for (const sy of [-1, 1]) {
+              const lx = centroX + sx * medioW;
+              const ly = centroY + sy * medioH;
+              peor = Math.max(
+                peor,
+                Math.abs((h.x + lx * cos - ly * sen) / medioAncho),
+                Math.abs((h.y + lx * sen + ly * cos) / medioAlto),
+              );
+            }
+          }
+        }
+      }
+    }
+    return peor;
+  };
+  const LA_TALLA_DE_ANTES = 0.38;
+  comprobar(
+    `y las cuatro esquinas del dibujo caen DENTRO del lienzo con el giro y la cámara puestos: la peor de las ${String(LAS_CUATRO_PROPORCIONES.length)} proporciones y las manos de una a veinte cartas se queda en ${laPeorEsquina(ALTO_DEL_DIBUJO).toFixed(4)} del borde`,
+    cajaDelBien.size === BIENES.length && laPeorEsquina(ALTO_DEL_DIBUJO) <= 1,
+    { talla: ALTO_DEL_DIBUJO, peor: laPeorEsquina(ALTO_DEL_DIBUJO), medidos: cajaDelBien.size },
+  );
+  comprobar(
+    `se ve fallar: con el ${LA_TALLA_DE_ANTES.toFixed(2)} de antes —el que la comprobación plana daba por bueno— la peor esquina cae a ${laPeorEsquina(LA_TALLA_DE_ANTES).toFixed(4)}, o sea fuera del lienzo, y el glifo sale cortado por el canto derecho`,
+    laPeorEsquina(LA_TALLA_DE_ANTES) > 1 && laPeorEsquina(LA_TALLA_DE_ANTES + 0.02) > 1,
+    { conElDeAntes: laPeorEsquina(LA_TALLA_DE_ANTES), conElDeAhora: laPeorEsquina(ALTO_DEL_DIBUJO) },
+  );
+  /*
+   * ═══ Y LA TIRA QUE ASOMA ES LA QUE `ASOMA_QUIETA` PROMETE, TAMBIÉN EN LA ÚLTIMA CARTA ═══
+   *
+   * La mano se coloca en un plano a dos unidades del ojo, y cada carta va un pelo más cerca que
+   * la anterior para dejar la profundidad coherente. Ese pelo se sumaba POR CARTA, y en
+   * perspectiva eso empuja las últimas hacia fuera por el borde derecho: medido, lo que asomaba
+   * del vigésimo naipe caía al 42,9 % contra el 55,0 % del primero — una quinta parte de la tira
+   * perdida, y con ella el sitio del dibujo. Ahora la separación se reparte entre toda la mano
+   * (`SEPARACION_EN_PROFUNDIDAD`) y no crece con ella.
+   */
+  const loMenosQueAsoma = (porCarta: boolean): number => {
+    let menos = 1;
+    for (const [, proporcion] of LAS_CUATRO_PROPORCIONES) {
+      for (let cuantas = 1; cuantas <= 20; cuantas++) {
+        const puestas = huecosDeLaBaraja(manoDe(cuantas), CAMPO, proporcion, null);
+        for (let i = 0; i < puestas.length; i++) {
+          const h = (puestas[i] as (typeof puestas)[number]).hueco;
+          const hasta = porCarta ? DISTANCIA_DE_LA_BARAJA - i * 0.0015 : -h.z;
+          const medioAncho = hasta * Math.tan(CAMPO / 2) * proporcion;
+          const asoma = Math.min(1, (medioAncho - (h.x - h.ancho / 2)) / h.ancho);
+          menos = Math.min(menos, asoma / ((ANCHO_DE_LA_TIRA * h.alto) / h.ancho));
+        }
+      }
+    }
+    return menos;
+  };
+  comprobar(
+    `y de todas asoma la tira que ANCHO_DE_LA_TIRA promete: el peor naipe de las manos de una a veinte enseña el ${(loMenosQueAsoma(false) * 100).toFixed(1)} % de ella`,
+    loMenosQueAsoma(false) > 0.98,
+    { loMenos: loMenosQueAsoma(false) },
+  );
+  comprobar(
+    `se ve fallar: con el paso de profundidad sumado POR CARTA —como estaba— el peor naipe enseña el ${(loMenosQueAsoma(true) * 100).toFixed(1)} % de la tira, o sea que la carta veinte se va por el borde derecho`,
+    loMenosQueAsoma(true) < 0.85,
+    { conElPasoPorCarta: loMenosQueAsoma(true), repartido: loMenosQueAsoma(false) },
+  );
+
 
   /*
    * AGRUPADA POR BIEN, que es lo que la hace legible de un vistazo.
@@ -6105,15 +6330,21 @@ paso('La cinta del tercio central deja aire a las dos manos, la frase no se qued
     conColorDeJugador.filter(({ nombre }) => !nodos.some((n) => n.getName() === nombre)).map((c) => c.nombre),
   );
   /*
-   * ═══ EL HECHO QUE OBLIGA AL ZÓCALO, MEDIDO ═══
+   * ═══ EL HECHO QUE OBLIGA AL ZÓCALO, Y QUE AHORA ADEMÁS ES LA PALANCA ═══
    *
-   * Esto NO es una comprobación que haya que arreglar: es la medida que justifica el zócalo, y
-   * se afirma para que el día que alguien recoloree el decorado —y entonces el zócalo pudiera
-   * discutirse— este renglón se ponga rojo y le cuente por qué está ahí. La cabecera de
-   * `compilar-modelos.ts` dice que esto está resuelto «por TIPO, porque las piezas de jugador
-   * son casa y castillo y ningún edificio de adorno es una casa ni un castillo»: el adorno
-   * `casa` es `building_home_B_red` y la pieza es `building_home_A_blue`, o sea la misma clase
-   * de edificio, y uno de los dos lleva el rojo de un colono.
+   * Esto NO es una comprobación que haya que arreglar: es la medida de la que cuelgan las dos
+   * mitades del arreglo. La cabecera de `compilar-modelos.ts` dice que el choque de colores está
+   * resuelto «por TIPO, porque las piezas de jugador son casa y castillo y ningún edificio de
+   * adorno es una casa ni un castillo»: el adorno `casa` es `building_home_B_red` y la pieza es
+   * `building_home_A_blue`, o sea la misma clase de edificio, y uno de los dos lleva el rojo de
+   * un colono.
+   *
+   * Lo que ha cambiado es qué se hace con ello. Que el caserío pinte en la MISMA fila del atlas
+   * era el problema, y desde esta tanda es también la solución: por eso el pueblo que rodea una
+   * choza se puede llevar al color de su dueño moviendo la UV una columna, sin recompilar nada
+   * (ver `caserio.ts` y el bloque del caserío, más abajo). Y el zócalo sigue haciendo falta
+   * porque el pueblo dice de quién es la COMARCA y no en cuál de sus tres esquinas está puesta
+   * la choza — y porque hay chozas cuyo pueblo cae lejos y se quedan sin ninguna.
    */
   const tejadosDeColono = conColorDeJugador.filter(({ suyas }) => suyas.length > 0);
   comprobar(
@@ -6221,63 +6452,180 @@ paso('La cinta del tercio central deja aire a las dos manos, la frase no se qued
   // ── 3. Y el zócalo se ve sobre la isla en la que se posa ──────────────────
 
   /*
-   * ═══ Y AQUÍ ES DONDE EL ARO DE COLOR SOLO NO VALÍA ═══
+   * ═══ Y AQUÍ ES DONDE EL RELLENO DE COLOR SOLO NO VALE ═══
    *
-   * El zócalo se posa sobre el suelo de su isla, y ese suelo sale del atlas. Medido con la
-   * misma fórmula de arriba: el verde de jugador (`#007d52`) y la celda del bosque —que es la
-   * que pinta el carrizal de Riberas— están a CUATRO unidades de CIE76, o sea que son el mismo
-   * color; el amarillo sobre la vega, a 14,8; y el umbral de esta casa para «no se come una
-   * pieza» es 20. Un aro verde sobre un carrizal es un aro que no está.
+   * El zócalo se posa sobre el suelo de su isla, y ese suelo sale del atlas. Se mide contra el
+   * color del ATLAS de cada terreno —que es el suelo que de verdad hay debajo en tres
+   * dimensiones— y no contra el color plano del tablero SVG, que es otro dibujo.
    *
-   * Por eso el zócalo lleva FILO, y por eso lo que se mide aquí es el filo: es UNO solo y
-   * siempre el mismo, así que basta con que él se separe. Se mide contra el color del ATLAS de
-   * cada terreno —que es el suelo que de verdad hay debajo en tres dimensiones— y no contra el
-   * color plano del tablero SVG, que es otro dibujo.
+   * ═══ Y CON LA OPACIDAD DENTRO DE LA CUENTA, QUE ES LO QUE ANTES NO ESTABA ═══
+   *
+   * La versión del aro medía `FILO_DEL_ZOCALO` A PELO contra el terreno, y el filo se pinta al
+   * 0,75 de opacidad: la comprobación habría seguido en verde con un contorno a 0,1, que en
+   * pantalla no es un contorno. Ahora lo que se mide es el color COMPUESTO —lo que de verdad
+   * sale en el píxel— con la opacidad que el material lleva escrita, así que bajarla se ve aquí.
+   *
+   * (Se compone en el espacio en el que la GPU mezcla, que es el del framebuffer ya codificado:
+   * `fondo·(1−α) + tinta·α` sobre los bytes. Es un modelo, y por eso la medida de verdad se
+   * hace además contando píxeles sobre el lienzo; lo que esto compra es que el día que alguien
+   * suba una opacidad o cambie un color, el número cambie AQUÍ y no dentro de dos semanas.)
    */
   const colorDelSuelo = (terreno: string): string => {
     const celda = (PALETA[terreno] as { celda: readonly [number, number] }).celda;
     return enHexadecimal(colorDelAtlas((celda[0] + 0.5) / COLUMNAS_DEL_ATLAS, (celda[1] + 0.5) / FILAS_DEL_ATLAS));
   };
-  const seComenElFilo = Object.keys(PALETA)
-    .map((terreno) => ({ terreno, cuanto: distancia(FILO_DEL_ZOCALO, colorDelSuelo(terreno)) }))
-    .filter((x) => x.cuanto < CUANTO_SE_SEPARA_DE_UNA_PIEZA);
-  comprobar(
-    'ningún terreno se come el FILO del zócalo: el aro que existe para encontrar la pieza se ve sobre la isla donde se posa, sea del terreno que sea',
-    seComenElFilo.length === 0,
-    seComenElFilo.map((x) => `${x.terreno} ${colorDelSuelo(x.terreno)}: ${x.cuanto.toFixed(1)}`),
-  );
+  const enBytes = (hex: string): [number, number, number] => [
+    parseInt(hex.slice(1, 3), 16),
+    parseInt(hex.slice(3, 5), 16),
+    parseInt(hex.slice(5, 7), 16),
+  ];
+  /** Lo que sale en el píxel al pintar `tinta` con esa opacidad sobre `fondo`. */
+  const encima = (fondo: string, tinta: string, opacidad: number): string => {
+    const f = enBytes(fondo);
+    const t = enBytes(tinta);
+    return enHexadecimal([0, 1, 2].map((i) => (f[i] as number) * (1 - opacidad) + (t[i] as number) * opacidad));
+  };
+  /** Lo que saldría SUMANDO luz, que es lo que hace la mezcla aditiva. */
+  const sumando = (fondo: string, tinta: string, opacidad: number): string => {
+    const f = enBytes(fondo);
+    const t = enBytes(tinta);
+    return enHexadecimal([0, 1, 2].map((i) => Math.min(255, (f[i] as number) + (t[i] as number) * opacidad)));
+  };
   /*
-   * Y EL FILO SE SEPARA TAMBIÉN DE LOS CUATRO COLORES DE JUGADOR, o el aro de color quedaría
-   * ahogado dentro de su propio borde y las cuatro piezas se verían iguales entre sí — que es
-   * el mismo fallo, sólo que un paso más adentro.
+   * LOS SEIS TERRENOS SON SEIS COLORES, y no doce: los doce nombres de `PALETA` se reparten seis
+   * celdas del atlas —el carrizal pinta con la del bosque, la vega con la del campo—. Se mide
+   * sobre los colores distintos para que las veinticuatro parejas sean veinticuatro y no
+   * cuarenta y ocho con la mitad repetidas.
    */
-  const ahogados = COLORES_DE_JUGADOR.map((color) => ({
-    color,
-    cuanto: distancia(FILO_DEL_ZOCALO, colorLlanoDelJugador(color)),
+  const SUELOS = [...new Set(Object.keys(PALETA).map((t) => colorDelSuelo(t)))];
+  const comoSeLlama = (suelo: string): string =>
+    Object.keys(PALETA).filter((t) => colorDelSuelo(t) === suelo).join('/');
+  comprobar(
+    `los doce terrenos de la paleta pintan con ${String(SUELOS.length)} colores de suelo distintos: seis, que son los seis contra los que hay que medir`,
+    SUELOS.length === 6,
+    SUELOS.map((s) => `${comoSeLlama(s)} ${s}`),
+  );
+  const seComenElFilo = SUELOS.map((suelo) => ({
+    suelo: comoSeLlama(suelo),
+    cuanto: distancia(encima(suelo, FILO_DEL_ZOCALO, OPACIDAD_DEL_CONTORNO), suelo),
   })).filter((x) => x.cuanto < CUANTO_SE_SEPARA_DE_UNA_PIEZA);
   comprobar(
-    'y el filo se separa de los cuatro colores de jugador: el aro de color no se ahoga dentro de su propio borde',
-    ahogados.length === 0,
-    ahogados,
+    `ningún terreno se come el CONTORNO del zócalo con su opacidad de ${OPACIDAD_DEL_CONTORNO.toFixed(2)}: la marca que existe para encontrar la pieza se ve sobre la isla donde se posa, sea del terreno que sea`,
+    seComenElFilo.length === 0,
+    SUELOS.map(
+      (s) => `${comoSeLlama(s)}: ${distancia(encima(s, FILO_DEL_ZOCALO, OPACIDAD_DEL_CONTORNO), s).toFixed(1)}`,
+    ),
   );
   /*
-   * LA VACUNA, con los números que se midieron: SIN filo, el aro de color solo se lo comen dos
-   * terrenos —el verde sobre el carrizal a 4,0 y el amarillo sobre la vega a 14,8—. Tiene que
-   * caer por los dos, o el filo estaría pintado por si acaso.
+   * Y EL RELLENO SE SEPARA DE SU PROPIO CONTORNO, o el color quedaría ahogado dentro del borde
+   * y las cuatro piezas se verían iguales entre sí — que es el mismo fallo, un paso más adentro.
    */
-  const sinFilo: string[] = [];
-  for (const color of COLORES_DE_JUGADOR) {
-    for (const terreno of Object.keys(PALETA)) {
-      const cuanto = distancia(colorLlanoDelJugador(color), colorDelSuelo(terreno));
+  const ahogados: string[] = [];
+  for (const suelo of SUELOS) {
+    for (const color of COLORES_DE_JUGADOR) {
+      const cuanto = distancia(
+        encima(suelo, colorLlanoDelJugador(color), OPACIDAD_DEL_RELLENO),
+        encima(suelo, FILO_DEL_ZOCALO, OPACIDAD_DEL_CONTORNO),
+      );
       if (cuanto < CUANTO_SE_SEPARA_DE_UNA_PIEZA) {
-        sinFilo.push(`${terreno} ${colorDelSuelo(terreno)} se comería el aro ${color}: ${cuanto.toFixed(1)}`);
+        ahogados.push(`${color} sobre ${comoSeLlama(suelo)}: ${cuanto.toFixed(1)}`);
       }
     }
   }
   comprobar(
-    `se ve fallar: sin filo, el aro de color solo desaparecería en ${String(sinFilo.length)} pares de color y terreno — de ahí que el zócalo lleve borde`,
+    'y el relleno se separa de su propio contorno en las veinticuatro parejas: el color no se ahoga dentro del borde que lo hace visible',
+    ahogados.length === 0,
+    ahogados,
+  );
+  /*
+   * ═══ Y LO QUE EL CONTORNO NO HACE: DECIR DE QUIÉN ES ═══
+   *
+   * El contorno es UNO solo, así que no distingue a nadie. Lo que distingue es el relleno, y el
+   * relleno es translúcido: mezclado con el terreno, dos colores de jugador podrían acercarse.
+   * Se mide que NO, en las veinticuatro parejas de color y terreno tomadas de dos en dos.
+   */
+  const confundibles: string[] = [];
+  for (const suelo of SUELOS) {
+    const pintados = COLORES_DE_JUGADOR.map((c) => ({
+      c,
+      hex: encima(suelo, colorLlanoDelJugador(c), OPACIDAD_DEL_RELLENO),
+    }));
+    for (let i = 0; i < pintados.length; i++) {
+      for (let j = i + 1; j < pintados.length; j++) {
+        const cuanto = distancia((pintados[i] as { hex: string }).hex, (pintados[j] as { hex: string }).hex);
+        if (cuanto < CUANTO_SE_SEPARA_DE_UNA_PIEZA) {
+          confundibles.push(
+            `${(pintados[i] as { c: string }).c} contra ${(pintados[j] as { c: string }).c} sobre ${comoSeLlama(suelo)}: ${cuanto.toFixed(1)}`,
+          );
+        }
+      }
+    }
+  }
+  comprobar(
+    'los cuatro rellenos translúcidos se separan entre sí sobre los seis terrenos: la marca sigue diciendo DE QUIÉN es la pieza y no sólo que hay una',
+    confundibles.length === 0,
+    confundibles,
+  );
+  /*
+   * LA VACUNA, con los números que se midieron: SIN contorno, el relleno solo se lo comen tres
+   * pares —el verde sobre el carrizal a 2,3, el amarillo sobre la vega a 8,1 y sobre la duna a
+   * 16,6—. Tiene que caer por los tres, o el contorno estaría pintado por si acaso.
+   */
+  const sinFilo: string[] = [];
+  for (const color of COLORES_DE_JUGADOR) {
+    for (const suelo of SUELOS) {
+      const cuanto = distancia(encima(suelo, colorLlanoDelJugador(color), OPACIDAD_DEL_RELLENO), suelo);
+      if (cuanto < CUANTO_SE_SEPARA_DE_UNA_PIEZA) {
+        sinFilo.push(`${comoSeLlama(suelo)} ${suelo} se comería el relleno ${color}: ${cuanto.toFixed(1)}`);
+      }
+    }
+  }
+  comprobar(
+    `se ve fallar: sin contorno, el relleno translúcido desaparecería en ${String(sinFilo.length)} pares de color y terreno — de ahí que la marca lleve borde`,
     sinFilo.length > 0,
     sinFilo,
+  );
+  /*
+   * ═══ Y LA VACUNA DE LA SALIDA ELEGANTE QUE NO ERA, QUE ES LA QUE COSTÓ DECIDIR ═══
+   *
+   * La propuesta era MEZCLA ADITIVA: un disco que SUMA luz en vez de sustituir color se lee
+   * sobre cualquier terreno, y el problema del color desaparecería por construcción en vez de
+   * por un contorno. Medida, no vale, y falla por los DOS lados:
+   *
+   *   · contra el suelo, el peor par se queda en 11,2 (el rojo sobre la duna);
+   *   · y ENTRE SÍ —que es lo que de verdad la mata— el verde y el amarillo sobre esa misma
+   *     arena se separan 13,6, porque sumando luz sobre un terreno claro los cuatro colores se
+   *     van al blanco a la vez.
+   *
+   * Se deja escrito como comprobación y no como comentario para que el día que alguien vuelva a
+   * proponerlo —y se propone solo, porque es la idea bonita— el número esté aquí y no haya que
+   * volver a medirlo. Si algún día el atlas cambiara y la aditiva SÍ valiera, esto se pondría
+   * rojo y contaría por qué.
+   */
+  let peorAditivaContraElSuelo = Infinity;
+  let peorAditivaEntreSi = Infinity;
+  let elParDeLaAditiva = '';
+  for (const suelo of SUELOS) {
+    const sumados = COLORES_DE_JUGADOR.map((c) => ({
+      c,
+      hex: sumando(suelo, colorLlanoDelJugador(c), OPACIDAD_DEL_RELLENO),
+    }));
+    for (const p of sumados) peorAditivaContraElSuelo = Math.min(peorAditivaContraElSuelo, distancia(p.hex, suelo));
+    for (let i = 0; i < sumados.length; i++) {
+      for (let j = i + 1; j < sumados.length; j++) {
+        const cuanto = distancia((sumados[i] as { hex: string }).hex, (sumados[j] as { hex: string }).hex);
+        if (cuanto < peorAditivaEntreSi) {
+          peorAditivaEntreSi = cuanto;
+          elParDeLaAditiva = `${(sumados[i] as { c: string }).c}/${(sumados[j] as { c: string }).c} sobre ${comoSeLlama(suelo)}`;
+        }
+      }
+    }
+  }
+  comprobar(
+    `se ve fallar: con mezcla aditiva la marca se separaría del suelo sólo ${peorAditivaContraElSuelo.toFixed(1)} en el peor par, y DOS colores de jugador se separarían entre sí ${peorAditivaEntreSi.toFixed(1)} (${elParDeLaAditiva}) — sobre arena los cuatro se van al blanco a la vez, y una marca que no dice de quién es no vale para nada`,
+    peorAditivaContraElSuelo < CUANTO_SE_SEPARA_DE_UNA_PIEZA &&
+      peorAditivaEntreSi < CUANTO_SE_SEPARA_DE_UNA_PIEZA,
+    { contraElSuelo: peorAditivaContraElSuelo, entreSi: peorAditivaEntreSi, elPar: elParDeLaAditiva },
   );
 
   // ── 4. Y mide lo mismo en pantalla desde donde se mire ────────────────────
@@ -6324,6 +6672,172 @@ paso('La cinta del tercio central deja aire a las dos manos, la frase no se qued
   })();
   const parteQueOcupaLaPieza = (cajaDelPoblado * ESCALA_DEL_PACK) / altoQueSeVe;
   const EN_UNA_VENTANA_DE = 900;
+
+  /*
+   * ═══ Y UN POBLADO NO ES ESE NODO: ES TRECE GRUPOS ═══
+   *
+   * Lo de arriba mide `LA_PIEZA_BASE`, o sea el nodo `poblado` SUELTO del `.glb`. Eso es la
+   * casa del jugador y nada más, y con ella se escribió durante una tanda entera que la marca
+   * medía «2,2 veces la pieza». En el juego un poblado NO es ese modelo: `asentamiento.ts` lo
+   * rodea de tres casas, un pozo, cuatro vallas, dos árboles y una bandera —TRECE grupos— y una
+   * ciudad es un recinto amurallado de doce. Comparar la marca contra un nodo suelto era
+   * comparar contra algo que no se pinta nunca.
+   *
+   * Así que aquí se mide lo que de verdad hay en el vértice: se piden las piezas a
+   * `piezasDeAsentamiento` —la misma función que las coloca— y de cada una se toma su sitio
+   * más el radio de su modelo, a la escala del pack y con su talla. Se recorren los CINCUENTA Y
+   * CUATRO vértices del delta porque la forma del caserío sale del revoltijo de la llave: dos
+   * vértices dan dos pueblos distintos, y lo que hay que saber es el peor.
+   *
+   * Y SE MIDE CON EL GIRO PUESTO, que es la diferencia entre una cota y una medida. Sumar
+   * «lo que dista el sitio más el radio del modelo» es una cota superior que no depende del
+   * giro, y con ella la muralla de una ciudad sale a 16,83 cuando de verdad llega a 12,43 —un
+   * 35 % más—: un codo de muralla es largo y estrecho, y va puesto ATRAVESANDO su tesela, no
+   * apuntando hacia afuera. Con la cota, el disco que «asoma» tendría que ser la mitad de
+   * grande otra vez.
+   *
+   * (AQUÍ PONÍA 11,66 Y ERA FALSO. El 16,83 está bien; el otro no: la muralla llega a 12,43.
+   * 11,66 es un peldaño de la escalera de radios que la cabecera de `escala.ts` escribe —10,93
+   * → 40 px; 11,66 → 78; 12,39 → 123— y se coló en la frase que sostiene la decisión técnica.
+   * El argumento no se debilita, porque la cota sigue siendo un 35 % mayor que la medida; el
+   * número sí estaba mal. Los DOS se rehacen aquí abajo y salen en el mensaje de su
+   * comprobación, para que nadie tenga que fiarse de esta prosa.)
+   *
+   * El radio del modelo baja además por los hijos con su traslación y su escala. Sin eso, un
+   * modelo cuya malla cuelga de un nodo desplazado mediría desde el sitio equivocado.
+   */
+  const sinElColor = (nombre: string): string => {
+    for (const color of COLORES_DE_JUGADOR) if (nombre.endsWith(`-${color}`)) return nombre.slice(0, -color.length - 1);
+    return nombre;
+  };
+  const faltanDelPack: string[] = [];
+  const puntosEnElPack = (() => {
+    const cache = new Map<string, number[]>();
+    return (nombre: string): number[] => {
+      const guardado = cache.get(nombre);
+      if (guardado !== undefined) return guardado;
+      /*
+       * EL NOMBRE DE UNA PIEZA DE JUGADOR NO ES EL DE SU NODO. El `.glb` trae UNA torre y
+       * las cuatro salen de mover las UV (`PIEZAS_DE_COLOR`), así que `torre-blue` no existe
+       * dentro del fichero y buscarlo tal cual devuelve cero puntos — o sea una torre que no
+       * mide nada, que es exactamente la clase de cero que se lee como «vigilado».
+       */
+      const raiz = nodos.find((n) => n.getName() === sinElColor(nombre));
+      const puntos: number[] = [];
+      if (raiz === undefined) faltanDelPack.push(nombre);
+      if (raiz !== undefined) {
+        const bajar = (n: Node, tx: number, tz: number, s: number): void => {
+          const t = n.getTranslation();
+          const e = n.getScale();
+          const px = tx + (t[0] as number) * s;
+          const pz = tz + (t[2] as number) * s;
+          const ss = s * Math.max(Math.abs(e[0] as number), Math.abs(e[2] as number));
+          for (const prim of n.getMesh()?.listPrimitives() ?? []) {
+            const pos = prim.getAttribute('POSITION');
+            if (pos === null) continue;
+            const p = [0, 0, 0];
+            for (let i = 0; i < pos.getCount(); i++) {
+              pos.getElement(i, p);
+              puntos.push(px + (p[0] as number) * ss, pz + (p[2] as number) * ss);
+            }
+          }
+          for (const h of n.listChildren()) bajar(h, px, pz, ss);
+        };
+        bajar(raiz, 0, 0, 1);
+      }
+      cache.set(nombre, puntos);
+      return puntos;
+    };
+  })();
+  const TODOS_LOS_VERTICES = verticesDe(DELTA);
+  /** Hasta dónde llega, en unidades de mundo, lo que se planta en un vértice. */
+  const radioDeLoQueSePlanta = (
+    clase: 'poblado' | 'ciudad',
+    sirve: (modelo: string) => boolean = () => true,
+  ): number => {
+    let radio = 0;
+    for (const v of TODOS_LOS_VERTICES) {
+      for (const parte of piezasDeAsentamiento(clase, 'blue', v)) {
+        if (!sirve(parte.modelo)) continue;
+        const puntos = puntosEnElPack(parte.modelo);
+        const escala = ESCALA_DEL_PACK * parte.talla;
+        /* El mismo giro que `delta.tsx` le pone al grupo: `rotation={[0, parte.giro, 0]}`. */
+        const cos = Math.cos(parte.giro);
+        const sen = Math.sin(parte.giro);
+        for (let i = 0; i < puntos.length; i += 2) {
+          const x = puntos[i] as number;
+          const z = puntos[i + 1] as number;
+          radio = Math.max(
+            radio,
+            Math.hypot(
+              parte.donde.x + (x * cos + z * sen) * escala,
+              parte.donde.y + (-x * sen + z * cos) * escala,
+            ),
+          );
+        }
+      }
+    }
+    return radio;
+  };
+  const RADIO_DEL_CASERIO_DE_UNA_CHOZA = radioDeLoQueSePlanta('poblado');
+  const RADIO_DE_UNA_FORTALEZA = radioDeLoQueSePlanta('ciudad');
+  /*
+   * LO QUE TAPA EL DISCO DE UNA CIUDAD ES LA MURALLA, y no la torre más lejana: las torres son
+   * TRES y el disco asoma entre ellas; los seis codos de muralla dan la vuelta entera y no
+   * dejan ni un hueco. Por eso el radio contra el que hay que medir es el de los codos.
+   */
+  const esMuralla = (modelo: string): boolean =>
+    modelo === MODELO.muroEsquina || modelo === MODELO.muroEsquinaPuerta;
+  const RADIO_DEL_RECINTO = radioDeLoQueSePlanta('ciudad', esMuralla);
+  /*
+   * Y LA COTA SIN GIRO, rehecha aquí al lado para que la cabecera de arriba no cite un número
+   * que nadie recalcula. Es la misma suma que se descartó —«lo que dista el sitio más el radio
+   * del modelo»— y se guarda porque la diferencia entre las dos es el argumento entero: con la
+   * cota, el disco que «asoma» tendría que ser la mitad de grande otra vez.
+   */
+  const cotaSinGiro = (clase: 'poblado' | 'ciudad', sirve: (modelo: string) => boolean): number => {
+    let cota = 0;
+    for (const v of TODOS_LOS_VERTICES) {
+      for (const parte of piezasDeAsentamiento(clase, 'blue', v)) {
+        if (!sirve(parte.modelo)) continue;
+        const puntos = puntosEnElPack(parte.modelo);
+        const escala = ESCALA_DEL_PACK * parte.talla;
+        let delModelo = 0;
+        for (let i = 0; i < puntos.length; i += 2) {
+          delModelo = Math.max(delModelo, Math.hypot(puntos[i] as number, puntos[i + 1] as number) * escala);
+        }
+        cota = Math.max(cota, Math.hypot(parte.donde.x, parte.donde.y) + delModelo);
+      }
+    }
+    return cota;
+  };
+  const COTA_DEL_RECINTO = cotaSinGiro('ciudad', esMuralla);
+  comprobar(
+    `y la MEDIDA con el giro puesto no es la COTA sin él: sumando «sitio + radio del modelo» la muralla sale a ${COTA_DEL_RECINTO.toFixed(2)} y de verdad llega a ${RADIO_DEL_RECINTO.toFixed(2)}, un ${(((COTA_DEL_RECINTO - RADIO_DEL_RECINTO) / RADIO_DEL_RECINTO) * 100).toFixed(0)} % más — porque un codo de muralla es largo y estrecho y va ATRAVESANDO su tesela, no apuntando hacia afuera`,
+    COTA_DEL_RECINTO > RADIO_DEL_RECINTO * 1.2 && COTA_DEL_RECINTO < RADIO_DEL_RECINTO * 1.6,
+    {
+      cota: Number(COTA_DEL_RECINTO.toFixed(2)),
+      medida: Number(RADIO_DEL_RECINTO.toFixed(2)),
+      cuantoMas: Number((((COTA_DEL_RECINTO - RADIO_DEL_RECINTO) / RADIO_DEL_RECINTO) * 100).toFixed(1)),
+    },
+  );
+  const anchoEnPixeles = (radioDeMundo: number): number =>
+    ((2 * radioDeMundo) / altoQueSeVe) * EN_UNA_VENTANA_DE;
+  comprobar(
+    `y lo que se planta en un vértice mide mucho más que ese nodo: un poblado llega a ${RADIO_DEL_CASERIO_DE_UNA_CHOZA.toFixed(2)} del vértice —${anchoEnPixeles(RADIO_DEL_CASERIO_DE_UNA_CHOZA).toFixed(1)} píxeles de diámetro desde la vista de tablero— y una ciudad a ${RADIO_DE_UNA_FORTALEZA.toFixed(2)} (${anchoEnPixeles(RADIO_DE_UNA_FORTALEZA).toFixed(1)} píxeles), con la muralla cerrando a ${RADIO_DEL_RECINTO.toFixed(2)}`,
+    faltanDelPack.length === 0 &&
+      RADIO_DEL_CASERIO_DE_UNA_CHOZA > cajaDelPoblado * ESCALA_DEL_PACK * 2 &&
+      RADIO_DE_UNA_FORTALEZA > 0 &&
+      RADIO_DEL_RECINTO > 0 &&
+      RADIO_DEL_RECINTO < RADIO_DE_UNA_FORTALEZA,
+    {
+      poblado: Number(RADIO_DEL_CASERIO_DE_UNA_CHOZA.toFixed(2)),
+      ciudad: Number(RADIO_DE_UNA_FORTALEZA.toFixed(2)),
+      recinto: Number(RADIO_DEL_RECINTO.toFixed(2)),
+      elNodoSuelto: Number(((cajaDelPoblado * ESCALA_DEL_PACK) / 2).toFixed(2)),
+      faltanDelPack: [...new Set(faltanDelPack)],
+    },
+  );
   comprobar(
     `un poblado ocupa el ${(parteQueOcupaLaPieza * 100).toFixed(2)} % del alto desde la vista de tablero —${(parteQueOcupaLaPieza * EN_UNA_VENTANA_DE).toFixed(0)} píxeles en una ventana de ${String(EN_UNA_VENTANA_DE)}— y su tejado sale del mismo téxel que el de las casas de adorno que tiene alrededor: por eso el tablero repartido y el tablero con seis chozas salían iguales`,
     cajaDelPoblado > 0 && parteQueOcupaLaPieza < ZOCALO_EN_PANTALLA,
@@ -6352,11 +6866,7 @@ paso('La cinta del tercio central deja aire a las dos manos, la frase no se qued
     { desdeElAire: parteQueOcupa(desdeElAire), aMediaAltura: parteQueOcupa(desdeElAire / 2) },
   );
   /*
-   * Y ES MÁS GRANDE QUE LA PIEZA desde el aire — que es la frase entera de este bloque: lo que
-   * se ve desde la vista de tablero es el zócalo, no el tejado.
-   */
-  /*
-   * ═══ Y ES MÁS GRANDE QUE LA PIEZA DESDE EL AIRE, QUE ES LA MITAD MENOS IMPORTANTE ═══
+   * ═══ CUÁNTO MIDE LA MARCA CONTRA LO QUE MARCA, Y AQUÍ HABÍA UNA CIFRA FALSA ═══
    *
    * Conviene decir en qué orden pesan las dos causas, porque el tamaño es la que se ve venir y
    * NO es la que más manda. Una pieza de once píxeles no es invisible: lo que la hace
@@ -6364,15 +6874,878 @@ paso('La cinta del tercio central deja aire a las dos manos, la frase no se qued
    * `poblar.ts` reparte alrededor —hasta cinco por comarca—, y once píxeles de casa roja entre
    * casas rojas no son nada. El zócalo arregla eso porque el decorado NO tiene ninguno.
    *
-   * Lo que el tamaño de marca añade es que ese aro se siga viendo igual desde el aire que de
-   * cerca: aquí se compra que desde la vista de tablero mida más que la pieza —1,7 veces— y
-   * que ese porcentaje no dependa de la distancia, que es lo que la comprobación de arriba ya
-   * ha afirmado.
+   * Aquí ponía que el disco mide «2,2 veces la pieza», y era falso: comparaba contra
+   * `parteQueOcupaLaPieza`, o sea contra el nodo `poblado` SUELTO del `.glb`. Lo que se planta
+   * en un vértice mide cuatro veces más —se acaba de medir arriba—, así que la marca es MÁS
+   * PEQUEÑA que el asentamiento, no el doble de grande. Y tiene que serlo: un disco del tamaño
+   * del caserío, en los 54 vértices, es la alfombra que se mide más abajo.
+   *
+   * Lo que sí se sostiene, y es lo que el suelo de la talla compra, es que el disco pasa de la
+   * pieza CENTRAL —la casa del jugador, que es lo que hay EN el vértice— y por eso no se pierde
+   * antes que el tejado al que apunta.
+   */
+  const anchoDeLaMarca = (2 * loQueOcupaElZocalo('disco').fuera * ZOCALO_EN_PANTALLA) * EN_UNA_VENTANA_DE;
+  const anchoDeLaPieza = parteQueOcupaLaPieza * EN_UNA_VENTANA_DE;
+  const CUANTO_MAYOR_QUE_LA_PIEZA = 2;
+  comprobar(
+    `desde la vista de tablero el disco mide ${anchoDeLaMarca.toFixed(1)} píxeles de diámetro contra los ${anchoDeLaPieza.toFixed(1)} de la casa del jugador —${(anchoDeLaMarca / anchoDeLaPieza).toFixed(1)} veces— y a diferencia de ella no encoge al alejarse`,
+    anchoDeLaMarca > anchoDeLaPieza * CUANTO_MAYOR_QUE_LA_PIEZA,
+    { marca: anchoDeLaMarca, laCasaDelJugador: anchoDeLaPieza, veces: anchoDeLaMarca / anchoDeLaPieza },
+  );
+  /*
+   * Y LA CIFRA QUE LA CABECERA DECÍA AL REVÉS, escrita ahora con el número que sale: contra el
+   * ASENTAMIENTO ENTERO la marca es más pequeña, y por eso el disco de un poblado se ve por los
+   * huecos entre las casas y no por fuera de ellas.
+   */
+  const anchoDelCaserio = anchoEnPixeles(RADIO_DEL_CASERIO_DE_UNA_CHOZA);
+  comprobar(
+    `y contra el asentamiento ENTERO la marca es más pequeña, no más grande: ${anchoDeLaMarca.toFixed(1)} píxeles de disco contra ${anchoDelCaserio.toFixed(1)} de caserío, o sea ${(anchoDeLaMarca / anchoDelCaserio).toFixed(2)} veces la pieza`,
+    anchoDeLaMarca < anchoDelCaserio && anchoDeLaMarca / anchoDelCaserio > 0.25,
+    { marca: Number(anchoDeLaMarca.toFixed(1)), caserio: Number(anchoDelCaserio.toFixed(1)), veces: Number((anchoDeLaMarca / anchoDelCaserio).toFixed(2)) },
+  );
+  /*
+   * ═══ Y EL DISCO DE UNA CIUDAD TIENE QUE ASOMAR POR FUERA DE SU RECINTO ═══
+   *
+   * Éste es el fallo que un jugador nota antes que ningún otro, y no lo cazaba nada. Un poblado
+   * son casas sueltas con calles entre ellas y el disco se ve por los huecos; una CIUDAD es un
+   * recinto CERRADO —seis codos de muralla dando la vuelta entera, con el castillo dentro— y un
+   * disco que quepa debajo no se ve por ningún lado. Medido en el banco con `gl.render` +
+   * `readPixels`, comparando el mismo fotograma con la marca y con ella a opacidad cero: a la
+   * talla de la choza la torre pintaba VEINTINUEVE píxeles de marca —en dos manchas de veinte y
+   * nueve— contra los 191 y 238 de dos chozas del mismo fotograma.
+   *
+   * Aquí se compra la condición geométrica de la que eso cuelga: que el borde del disco pase
+   * del radio de la MURALLA desde la vista de tablero. La muralla y no la torre más lejana,
+   * porque las torres son tres y el disco asoma entre ellas; los codos no dejan ni un hueco.
+   */
+  /*
+   * El radio del disco en unidades de MUNDO: `tallaDeUnaMarca` devuelve
+   * `altoQueSeVe · parte / RADIO_DE_TESELA` y las piezas van en múltiplos de la tesela, así
+   * que la tesela se va y queda `altoQueSeVe · parte · fuera`. No se escribe el número: se
+   * rehace con el encuadre de verdad, que es el mismo con el que se mide todo este bloque.
+   */
+  /*
+   * ═══ Y SE MIDE EN LOS 54 VÉRTICES, NO EN EL CENTRO DEL TABLERO ═══
+   *
+   * Aquí se compraba la condición en un punto que no existe. `discoEnElMundo` colgaba de
+   * `altoQueSeVe`, que sale de `desdeElAire`: la distancia de la cámara al CENTRO del delta,
+   * 574,6. Pero `tallaDelZocalo` NO escala con esa distancia — escala con la distancia de la
+   * cámara A LA PIEZA, y ésa es distinta en cada vértice: desde el encuadre de salida los
+   * cincuenta y cuatro están entre 431,5 y 821,6, y en ninguno hay una ciudad a 574,6.
+   *
+   * Con la distancia del centro el disco de una ciudad salía a 12,66 y la muralla cierra a
+   * 12,43: el sí venía por dos décimas, y en el vértice MÁS CERCANO el mismo disco se quedaba
+   * en 9,51 — tapado entero por la muralla, que es literalmente el fallo que este bloque existe
+   * para cazar, en la mitad del tablero que está más cerca del ojo.
+   *
+   * Así que se recorren los vértices con SU distancia —la misma cámara de `three` que se monta
+   * abajo para el bloque del aire, y la misma llamada que hace el `useFrame`— y se exige la
+   * condición en el PEOR de ellos. Lo que el peor pide no lo puede dar una fracción de
+   * pantalla: para que el más cercano asomara haría falta el 3,48 %, más que la señal de un
+   * sitio libre. Lo da `sueloDeLaMarca`, que es un mínimo del MUNDO y está medido en
+   * `escala.ts` junto a la ventana de cuatro centésimas en la que cabe.
+   */
+  const ojoDelEncuadre = new THREE.PerspectiveCamera(45, 16 / 9, 1, 10000);
+  ojoDelEncuadre.position.set(0, radioDelMundo * 1.25, radioDelMundo * 1.15);
+  const sitiosDeChoza = TODOS_LOS_VERTICES.map((v) => {
+    const q = puntoDeVertice(v, RADIO_DE_COMARCA);
+    return { que: v, donde: [q.x, 0, q.y] as [number, number, number] };
+  });
+  const loLejosQueEsta = (donde: readonly [number, number, number]): number =>
+    Math.hypot(
+      ojoDelEncuadre.position.x - donde[0],
+      ojoDelEncuadre.position.y - donde[1],
+      ojoDelEncuadre.position.z - donde[2],
+    );
+  const discoEnElMundo = (
+    parte: number,
+    suelo: number,
+    techo: number,
+    donde: readonly [number, number, number],
+  ): number => loLejosQueLlegaLaMarca('disco', tallaDelZocalo(ojoDelEncuadre, donde, parte, suelo, techo));
+  const losDiscos = (
+    parte: number,
+    suelo: number,
+    techo: number,
+  ): Array<{ que: string; lejos: number; radio: number }> =>
+    sitiosDeChoza.map((s) => ({
+      que: s.que,
+      lejos: loLejosQueEsta(s.donde),
+      radio: discoEnElMundo(parte, suelo, techo, s.donde),
+    }));
+  const LOS_DE_CIUDAD = losDiscos(
+    ZOCALO_DE_CIUDAD_EN_PANTALLA,
+    sueloDeLaMarca('ciudad'),
+    techoDeLaMarca('ciudad'),
+  );
+  const LOS_DE_POBLADO = losDiscos(
+    ZOCALO_EN_PANTALLA,
+    sueloDeLaMarca('poblado'),
+    techoDeLaMarca('poblado'),
+  );
+  const elPeorDeLaCiudad = LOS_DE_CIUDAD.reduce((peor, d) => (d.radio < peor.radio ? d : peor));
+  const elMayorDePoblado = LOS_DE_POBLADO.reduce((mayor, d) => (d.radio > mayor.radio ? d : mayor));
+  const DISCO_DE_CIUDAD = elPeorDeLaCiudad.radio;
+  const DISCO_DE_POBLADO = elMayorDePoblado.radio;
+  comprobar(
+    `el disco de una CIUDAD asoma por fuera de su recinto EN LOS ${String(sitiosDeChoza.length)} VÉRTICES y no sólo desde el centro: en el peor —${elPeorDeLaCiudad.que}, a ${elPeorDeLaCiudad.lejos.toFixed(1)} de la cámara— llega a ${DISCO_DE_CIUDAD.toFixed(2)} contra los ${RADIO_DEL_RECINTO.toFixed(2)} que mide la muralla, y el mayor de los discos de poblado se queda en ${DISCO_DE_POBLADO.toFixed(2)} — que debajo de una ciudad es un disco que no está`,
+    LOS_DE_CIUDAD.every((d) => d.radio > RADIO_DEL_RECINTO) && DISCO_DE_CIUDAD > DISCO_DE_POBLADO,
+    {
+      elPeor: elPeorDeLaCiudad.que,
+      ciudad: Number(DISCO_DE_CIUDAD.toFixed(2)),
+      recinto: Number(RADIO_DEL_RECINTO.toFixed(2)),
+      poblado: Number(DISCO_DE_POBLADO.toFixed(2)),
+      elMasCerca: Number(Math.min(...LOS_DE_CIUDAD.map((d) => d.lejos)).toFixed(1)),
+      elMasLejos: Number(Math.max(...LOS_DE_CIUDAD.map((d) => d.lejos)).toFixed(1)),
+      alCentro: Number(desdeElAire.toFixed(1)),
+      parte: ZOCALO_DE_CIUDAD_EN_PANTALLA,
+      suelo: sueloDeLaMarca('ciudad'),
+    },
+  );
+  /*
+   * LA VACUNA DE LA DISTANCIA, Y ES EL FALLO QUE ESTABA ESCONDIDO: sólo con la fracción de
+   * pantalla —o sea con el suelo de siempre, que es lo que había— el disco del vértice más
+   * cercano se queda por DEBAJO de la muralla, y la cuenta vieja, hecha a la distancia del
+   * centro, daba el sí. Los dos números en el mismo mensaje, que es lo que enseña que el punto
+   * que se compraba no existía.
+   */
+  const SIN_EL_SUELO_DE_CIUDAD = losDiscos(
+    ZOCALO_DE_CIUDAD_EN_PANTALLA,
+    SUELO_DEL_ZOCALO,
+    techoDeLaMarca('ciudad'),
+  );
+  const elMasChicoSinSuelo = Math.min(...SIN_EL_SUELO_DE_CIUDAD.map((d) => d.radio));
+  const comoSeMediaAntes = altoQueSeVe * ZOCALO_DE_CIUDAD_EN_PANTALLA * loQueOcupaElZocalo('disco').fuera;
+  comprobar(
+    `se ve fallar: sólo con la fracción de pantalla, el disco del vértice más cercano se quedaría en ${elMasChicoSinSuelo.toFixed(2)} contra los ${RADIO_DEL_RECINTO.toFixed(2)} de la muralla —tapado entero—, y la cuenta vieja, hecha a la distancia del CENTRO del tablero, decía ${comoSeMediaAntes.toFixed(2)} y daba el sí`,
+    elMasChicoSinSuelo < RADIO_DEL_RECINTO &&
+      comoSeMediaAntes > RADIO_DEL_RECINTO &&
+      SIN_EL_SUELO_DE_CIUDAD.some((d) => d.radio < RADIO_DEL_RECINTO),
+    {
+      sinSuelo: Number(elMasChicoSinSuelo.toFixed(2)),
+      alCentro: Number(comoSeMediaAntes.toFixed(2)),
+      recinto: Number(RADIO_DEL_RECINTO.toFixed(2)),
+      cuantosVerticesTapados: SIN_EL_SUELO_DE_CIUDAD.filter((d) => d.radio < RADIO_DEL_RECINTO).length,
+    },
+  );
+  /*
+   * LA VACUNA DE LA CLASE, y es el fallo que había cuando las dos clases medían igual: con la
+   * talla de la choza el disco de una ciudad cabe debajo de la muralla con holgura EN LOS 54
+   * VÉRTICES, no sólo en el del medio. Es la medida que dice que el número nuevo no es un gusto.
    */
   comprobar(
-    `desde la vista de tablero el zócalo ocupa ${(parteQueOcupa(desdeElAire) / parteQueOcupaLaPieza).toFixed(1)} veces lo que la pieza entera, y a diferencia de ella no encoge al alejarse`,
-    parteQueOcupa(desdeElAire) > parteQueOcupaLaPieza,
-    { zocalo: parteQueOcupa(desdeElAire), pieza: parteQueOcupaLaPieza },
+    `se ve fallar: con la talla de una choza, el disco de una ciudad llegaría como mucho a ${DISCO_DE_POBLADO.toFixed(2)} en los ${String(sitiosDeChoza.length)} vértices y la muralla cierra a ${RADIO_DEL_RECINTO.toFixed(2)} — cabe debajo entero, que es por lo que pintaba 29 píxeles`,
+    LOS_DE_POBLADO.every((d) => d.radio < RADIO_DEL_RECINTO),
+    { poblado: Number(DISCO_DE_POBLADO.toFixed(2)), recinto: Number(RADIO_DEL_RECINTO.toFixed(2)) },
+  );
+  /*
+   * Y CADA CLASE PIDE LA SUYA. `parteDeLaMarca` es lo que `delta.tsx` llama desde su
+   * `useFrame`; si devolviera lo mismo para las dos, todo lo de arriba seguiría midiendo dos
+   * constantes que nadie usa.
+   */
+  comprobar(
+    'y `parteDeLaMarca` da una fracción distinta a cada clase: la ciudad la suya y el poblado la de siempre',
+    parteDeLaMarca('ciudad') === ZOCALO_DE_CIUDAD_EN_PANTALLA &&
+      parteDeLaMarca('poblado') === ZOCALO_EN_PANTALLA &&
+      ZOCALO_DE_CIUDAD_EN_PANTALLA > ZOCALO_EN_PANTALLA,
+    { ciudad: parteDeLaMarca('ciudad'), poblado: parteDeLaMarca('poblado') },
+  );
+  /*
+   * Y LO MISMO CON EL TOPE POR ABAJO, que es lo que la fracción sola no puede dar: la muralla
+   * es un objeto del MUNDO y no encoge cuando la cámara se acerca, así que la marca de una
+   * ciudad necesita un mínimo del mundo y no sólo una fracción de pantalla. Si `sueloDeLaMarca`
+   * devolviera lo mismo para las dos clases, el disco de una ciudad volvería a caber debajo de
+   * su recinto en la mitad del tablero más cercana al ojo.
+   */
+  comprobar(
+    `y \`sueloDeLaMarca\` da un tope por abajo distinto a cada clase: la ciudad no baja de ${(SUELO_DEL_ZOCALO_DE_CIUDAD * RADIO_DE_TESELA * loQueOcupaElZocalo('disco').fuera).toFixed(2)} de mundo —más que los ${RADIO_DEL_RECINTO.toFixed(2)} que tapa su muralla— y el poblado se queda con el de siempre`,
+    sueloDeLaMarca('ciudad') === SUELO_DEL_ZOCALO_DE_CIUDAD &&
+      sueloDeLaMarca('poblado') === SUELO_DEL_ZOCALO &&
+      SUELO_DEL_ZOCALO_DE_CIUDAD > SUELO_DEL_ZOCALO &&
+      SUELO_DEL_ZOCALO_DE_CIUDAD * RADIO_DE_TESELA * loQueOcupaElZocalo('disco').fuera > RADIO_DEL_RECINTO,
+    {
+      ciudad: sueloDeLaMarca('ciudad'),
+      poblado: sueloDeLaMarca('poblado'),
+      enElMundo: Number((SUELO_DEL_ZOCALO_DE_CIUDAD * RADIO_DE_TESELA).toFixed(2)),
+      recinto: Number(RADIO_DEL_RECINTO.toFixed(2)),
+    },
+  );
+
+  // ── EL TECHO, A LAS FORMAS DE VENTANA QUE UN CLIENTE PRODUCE DE VERDAD ────
+
+  /*
+   * ═══ EL TECHO SE MEDÍA A UN INFINITO TEÓRICO, Y SE TOCA JUGANDO ═══
+   *
+   * `TECHO_DEL_ZOCALO` valía 3,5 para las tres marcas y lo único que se compraba de él era que
+   * `tallaDeUnaMarca(1e9, …)` lo devuelve. Mil millones de unidades no es una distancia de este
+   * juego; las distancias de este juego las produce `ojoDelMirador` con la proporción de la
+   * VENTANA, porque `alejarseParaQueQuepa` retira la cámara en retrato para que el tablero
+   * quepa de lado a lado. Así que aquí se monta la cámara del cliente con formas de ventana de
+   * verdad y se mide en los 126 sitios lo que sale.
+   *
+   * Y a esas distancias el techo muerde: con media pantalla de portátil la cámara se va a
+   * 1.076 y con un móvil en retrato a 2.308, contra las 600 del monitor de referencia. En el
+   * techo pasan las tres cosas que un techo existe para no dejar pasar —la clase se pierde, la
+   * marca de un camino pasa del camino, y las marcas se comen unas a otras—, y las tres se
+   * compran aquí abajo con la vacuna que enseña el techo viejo cayéndose.
+   */
+  const LAS_FORMAS_DE_VENTANA = [
+    { como: 'media pantalla de portátil', ancho: 826, alto: 833 },
+    { como: 'portátil entero', ancho: 1477, alto: 833 },
+    { como: 'monitor de referencia', ancho: 1600, alto: 900 },
+    { como: 'móvil en retrato', ancho: 390, alto: 844 },
+    { como: 'el panel del navegador', ancho: 655, alto: 922 },
+    { como: 'tableta en retrato', ancho: 768, alto: 1024 },
+  ];
+  /*
+   * LA CÁMARA DE VERDAD, y no la que `encuadreDelDelta` deja en el primer fotograma: la escena
+   * monta `CamaraAerea`, que en cada fotograma pone el ojo con `ojoDelMirador` desde el mirador
+   * de salida y con la proporción del lienzo. Es la misma llamada, con el mismo alcance.
+   */
+  const laCamaraDeLaVentana = (ancho: number, alto: number): THREE.PerspectiveCamera => {
+    const proporcion = ancho / alto;
+    const ojo = new THREE.PerspectiveCamera(45, proporcion, 1, 10000);
+    const donde = ojoDelMirador(MIRADOR_DE_SALIDA, radioDelMundo, proporcion);
+    ojo.position.set(donde[0], donde[1], donde[2]);
+    ojo.updateMatrixWorld();
+    return ojo;
+  };
+  const LOS_SITIOS_DE_VEREDA = aristasDe(DELTA).map((a) => {
+    const q = puntoDeArista(a, RADIO_DE_COMARCA);
+    return { que: a, donde: [q.x, 0, q.y] as [number, number, number] };
+  });
+  const LARGO_DE_UNA_ARISTA = ((): number => {
+    const primera = aristasDe(DELTA)[0];
+    if (primera === undefined) return 0;
+    const [uno, otro] = verticesDeArista(primera);
+    if (uno === undefined || otro === undefined) return 0;
+    const a = puntoDeVertice(uno, RADIO_DE_COMARCA);
+    const b = puntoDeVertice(otro, RADIO_DE_COMARCA);
+    return Math.hypot(a.x - b.x, a.y - b.y);
+  })();
+  /** Lo que mide cada una de las 126 marcas a esta forma de ventana, con este techo. */
+  const lasMarcasDe = (
+    ojo: THREE.PerspectiveCamera,
+    techoDeCiudad: number,
+    techoDePoblado: number,
+    techoDeLaRaya: number,
+  ): {
+    ciudad: number[];
+    poblado: number[];
+    raya: number[];
+    largoDeLaRaya: number;
+    aire: number;
+    tinta: number;
+  } => {
+    const ciudad = sitiosDeChoza.map((s) =>
+      loLejosQueLlegaLaMarca(
+        'disco',
+        tallaDelZocalo(ojo, s.donde, ZOCALO_DE_CIUDAD_EN_PANTALLA, sueloDeLaMarca('ciudad'), techoDeCiudad),
+      ),
+    );
+    const poblado = sitiosDeChoza.map((s) =>
+      loLejosQueLlegaLaMarca(
+        'disco',
+        tallaDelZocalo(ojo, s.donde, ZOCALO_EN_PANTALLA, sueloDeLaMarca('poblado'), techoDePoblado),
+      ),
+    );
+    const tallaDeLaRaya = LOS_SITIOS_DE_VEREDA.map((s) =>
+      tallaDelZocalo(ojo, s.donde, ZOCALO_EN_PANTALLA, SUELO_DEL_ZOCALO, techoDeLaRaya),
+    );
+    const raya = tallaDeLaRaya.map((t) => loLejosQueLlegaLaMarca('raya', t));
+    /*
+     * EL AIRE, con el radio de CADA marca y no con el de la más ancha supuesta en las dos: el
+     * peor caso de talla es que los 54 vértices sean ciudades, que es lo que más ocupa.
+     */
+    let aire = Infinity;
+    for (let i = 0; i < sitiosDeChoza.length; i++) {
+      const uno = sitiosDeChoza[i] as (typeof sitiosDeChoza)[number];
+      for (let j = 0; j < LOS_SITIOS_DE_VEREDA.length; j++) {
+        const otro = LOS_SITIOS_DE_VEREDA[j] as (typeof LOS_SITIOS_DE_VEREDA)[number];
+        const cuanto = Math.hypot(uno.donde[0] - otro.donde[0], uno.donde[2] - otro.donde[2]);
+        aire = Math.min(aire, cuanto - (ciudad[i] as number) - (raya[j] as number));
+      }
+    }
+    const superficieDeEsteDelta =
+      DELTA.length * ((3 * Math.sqrt(3)) / 2) * RADIO_DE_COMARCA * RADIO_DE_COMARCA;
+    const tinta =
+      (ciudad.reduce((s, r) => s + loQueOcupaElZocalo('disco').tinta * r * r, 0) +
+        tallaDeLaRaya.reduce(
+          (s, t) => s + loQueOcupaElZocalo('raya').tinta * (t * RADIO_DE_TESELA) ** 2,
+          0,
+        )) /
+      superficieDeEsteDelta;
+    return {
+      ciudad,
+      poblado,
+      raya,
+      largoDeLaRaya: Math.max(...tallaDeLaRaya) * RADIO_DE_TESELA * LARGO_DE_LA_RAYA,
+      aire,
+      tinta,
+    };
+  };
+  const CON_EL_TECHO_NUEVO = LAS_FORMAS_DE_VENTANA.map((f) => {
+    const ojo = laCamaraDeLaVentana(f.ancho, f.alto);
+    return {
+      ...f,
+      lejos: Math.hypot(ojo.position.x, ojo.position.y, ojo.position.z),
+      /*
+       * El techo se le pide a `techoDeLaMarca`, que es lo que `delta.tsx` llama, y no a la
+       * constante: pidiéndoselo a la constante, una función que devolviera lo mismo para las dos
+       * clases dejaría esto en verde mientras la escena pinta las dos clases iguales.
+       */
+      medidas: lasMarcasDe(
+        ojo,
+        techoDeLaMarca('ciudad'),
+        techoDeLaMarca('poblado'),
+        TECHO_DEL_ZOCALO,
+      ),
+    };
+  });
+  const seLeVeLaClase = CON_EL_TECHO_NUEVO.every((f) =>
+    f.medidas.ciudad.every((r, i) => r > (f.medidas.poblado[i] as number) + 1e-9),
+  );
+  comprobar(
+    `en las ${String(LAS_FORMAS_DE_VENTANA.length)} formas de ventana que un cliente produce de verdad —de ${Math.min(...CON_EL_TECHO_NUEVO.map((f) => f.lejos)).toFixed(0)} a ${Math.max(...CON_EL_TECHO_NUEVO.map((f) => f.lejos)).toFixed(0)} de cámara— el disco de una CIUDAD mide siempre más que el de un poblado en los ${String(sitiosDeChoza.length)} vértices: el techo no borra la clase`,
+    seLeVeLaClase,
+    CON_EL_TECHO_NUEVO.map((f) => ({
+      como: f.como,
+      lejos: Number(f.lejos.toFixed(0)),
+      ciudad: `${Math.min(...f.medidas.ciudad).toFixed(2)}-${Math.max(...f.medidas.ciudad).toFixed(2)}`,
+      poblado: `${Math.min(...f.medidas.poblado).toFixed(2)}-${Math.max(...f.medidas.poblado).toFixed(2)}`,
+    })),
+  );
+  const elPeorAire = Math.min(...CON_EL_TECHO_NUEVO.map((f) => f.medidas.aire));
+  comprobar(
+    `y ninguna marca toca a otra en ninguna de ellas: el par más apretado —una choza y su propia vereda, a ${LARGO_DE_UNA_ARISTA === 0 ? '?' : (LARGO_DE_UNA_ARISTA / 2).toFixed(2)}— deja ${elPeorAire.toFixed(2)} de aire en el peor caso, con las 54 chozas puestas como CIUDADES`,
+    elPeorAire > 0,
+    CON_EL_TECHO_NUEVO.map((f) => ({
+      como: f.como,
+      aire: Number(f.medidas.aire.toFixed(2)),
+      tinta: Number((f.medidas.tinta * 100).toFixed(1)),
+    })),
+  );
+  const laRayaMasLarga = Math.max(...CON_EL_TECHO_NUEVO.map((f) => f.medidas.largoDeLaRaya));
+  comprobar(
+    `y la raya de una vereda no pasa del CAMINO que marca en ninguna de ellas: llega a ${laRayaMasLarga.toFixed(2)} de largo contra los ${LARGO_DE_UNA_ARISTA.toFixed(2)} de su arista, o sea ${((laRayaMasLarga / LARGO_DE_UNA_ARISTA) * 100).toFixed(0)} % del camino`,
+    LARGO_DE_UNA_ARISTA > 0 && laRayaMasLarga < LARGO_DE_UNA_ARISTA,
+    { laRayaMasLarga: Number(laRayaMasLarga.toFixed(2)), arista: Number(LARGO_DE_UNA_ARISTA.toFixed(2)) },
+  );
+  /*
+   * LA VACUNA DEL TECHO, Y ES EL FALLO ENTERO EN UN SOLO NÚMERO: con el 3,5 que había, y a las
+   * MISMAS formas de ventana, las tres cosas se rompen a la vez. No es un techo teórico que
+   * nadie alcanza: es un techo que se toca con la ventana a medio abrir.
+   */
+  const EL_TECHO_VIEJO = 3.5;
+  const CON_EL_TECHO_VIEJO = LAS_FORMAS_DE_VENTANA.map((f) => ({
+    ...f,
+    medidas: lasMarcasDe(
+      laCamaraDeLaVentana(f.ancho, f.alto),
+      EL_TECHO_VIEJO,
+      EL_TECHO_VIEJO,
+      EL_TECHO_VIEJO,
+    ),
+  }));
+  const clasesIguales = CON_EL_TECHO_VIEJO.map((f) => ({
+    como: f.como,
+    cuantas: f.medidas.ciudad.filter((r, i) => Math.abs(r - (f.medidas.poblado[i] as number)) < 1e-9).length,
+  }));
+  const laRayaViejaMasLarga = Math.max(...CON_EL_TECHO_VIEJO.map((f) => f.medidas.largoDeLaRaya));
+  const elAireViejo = Math.min(...CON_EL_TECHO_VIEJO.map((f) => f.medidas.aire));
+  comprobar(
+    `se ve fallar: con el techo de 3,5 que había, y a las mismas formas de ventana, la ciudad y el poblado miden LO MISMO en ${String(Math.max(...clasesIguales.map((c) => c.cuantas)))} de los ${String(sitiosDeChoza.length)} vértices —o sea que \`parteDeLaMarca\` no distingue nada—, la raya llega a ${laRayaViejaMasLarga.toFixed(2)} de largo contra los ${LARGO_DE_UNA_ARISTA.toFixed(2)} de su arista, y el par más apretado se SOLAPA ${(-elAireViejo).toFixed(2)}`,
+    clasesIguales.some((c) => c.cuantas === sitiosDeChoza.length) &&
+      laRayaViejaMasLarga > LARGO_DE_UNA_ARISTA &&
+      elAireViejo < 0,
+    {
+      clasesIguales,
+      laRayaViejaMasLarga: Number(laRayaViejaMasLarga.toFixed(2)),
+      arista: Number(LARGO_DE_UNA_ARISTA.toFixed(2)),
+      elAireViejo: Number(elAireViejo.toFixed(2)),
+    },
+  );
+  /*
+   * Y LAS DOS VENTANAS EN LAS QUE CABEN LOS DOS TECHOS, rehechas aquí para que la cabecera de
+   * `escala.ts` no cite números que nadie recalcula. Ver allí el porqué de cada límite.
+   */
+  const ojoDeReferencia = laCamaraDeLaVentana(1600, 900);
+  const loQuePideElEncuadre = (parte: number, donde: readonly [number, number, number]): number => {
+    const lejos = Math.hypot(
+      ojoDeReferencia.position.x - donde[0],
+      ojoDeReferencia.position.y - donde[1],
+      ojoDeReferencia.position.z - donde[2],
+    );
+    return (2 * lejos * Math.tan(((45 * Math.PI) / 180) / 2) * parte) / RADIO_DE_TESELA;
+  };
+  const PIDE_EL_MAS_LEJANO = Math.max(
+    ...[...sitiosDeChoza, ...LOS_SITIOS_DE_VEREDA].map((s) => loQuePideElEncuadre(ZOCALO_EN_PANTALLA, s.donde)),
+  );
+  const PIDE_EL_CENTRO = loQuePideElEncuadre(ZOCALO_DE_CIUDAD_EN_PANTALLA, [0, 0, 0]);
+  const elDiscoOcupa = loQueOcupaElZocalo('disco').fuera;
+  const laRayaOcupaFuera = loQueOcupaElZocalo('raya').fuera;
+  const TOPE_DE_PANTALLA_POR_SU_VECINA =
+    LARGO_DE_UNA_ARISTA / 2 / (RADIO_DE_TESELA * (elDiscoOcupa + laRayaOcupaFuera));
+  const TOPE_DE_CIUDAD_POR_EL_RELLANO = RADIO_DEL_RELLANO / (RADIO_DE_TESELA * elDiscoOcupa);
+  const TOPE_DE_CIUDAD_POR_SU_VECINA =
+    (LARGO_DE_UNA_ARISTA / 2 - TECHO_DEL_ZOCALO * RADIO_DE_TESELA * laRayaOcupaFuera) /
+    (RADIO_DE_TESELA * elDiscoOcupa);
+  comprobar(
+    `y los dos techos caen dentro de su ventana: el de pantalla vale ${String(TECHO_DEL_ZOCALO)} entre ${PIDE_EL_MAS_LEJANO.toFixed(3)} —lo que el encuadre de referencia pide en el sitio más lejano, por debajo de lo cual mordería donde se juega— y ${TOPE_DE_PANTALLA_POR_SU_VECINA.toFixed(3)}; el de la ciudad vale ${String(TECHO_DEL_ZOCALO_DE_CIUDAD)} entre ${PIDE_EL_CENTRO.toFixed(3)} —lo que pide en el centro— y ${Math.min(TOPE_DE_CIUDAD_POR_EL_RELLANO, TOPE_DE_CIUDAD_POR_SU_VECINA).toFixed(3)}`,
+    TECHO_DEL_ZOCALO > PIDE_EL_MAS_LEJANO &&
+      TECHO_DEL_ZOCALO < TOPE_DE_PANTALLA_POR_SU_VECINA &&
+      TECHO_DEL_ZOCALO_DE_CIUDAD > PIDE_EL_CENTRO &&
+      TECHO_DEL_ZOCALO_DE_CIUDAD < TOPE_DE_CIUDAD_POR_EL_RELLANO &&
+      TECHO_DEL_ZOCALO_DE_CIUDAD < TOPE_DE_CIUDAD_POR_SU_VECINA,
+    {
+      pantalla: TECHO_DEL_ZOCALO,
+      pideElMasLejano: Number(PIDE_EL_MAS_LEJANO.toFixed(3)),
+      porSuVecina: Number(TOPE_DE_PANTALLA_POR_SU_VECINA.toFixed(3)),
+      ciudad: TECHO_DEL_ZOCALO_DE_CIUDAD,
+      pideElCentro: Number(PIDE_EL_CENTRO.toFixed(3)),
+      porElRellano: Number(TOPE_DE_CIUDAD_POR_EL_RELLANO.toFixed(3)),
+      porSuVecinaLaCiudad: Number(TOPE_DE_CIUDAD_POR_SU_VECINA.toFixed(3)),
+    },
+  );
+  comprobar(
+    'y `techoDeLaMarca` da un tope por arriba distinto a cada clase: si diera el mismo, en el techo las dos medirían igual y la clase se perdería justo donde el tablero está más lejos',
+    techoDeLaMarca('ciudad') === TECHO_DEL_ZOCALO_DE_CIUDAD &&
+      techoDeLaMarca('poblado') === TECHO_DEL_ZOCALO &&
+      TECHO_DEL_ZOCALO_DE_CIUDAD > TECHO_DEL_ZOCALO,
+    { ciudad: techoDeLaMarca('ciudad'), poblado: techoDeLaMarca('poblado') },
+  );
+
+  // ── Y LA MARCA CONTRA EL RELIEVE: que no se la trague la comarca de al lado ──
+
+  /*
+   * ═══ NADIE MEDÍA LA MARCA CONTRA LA TIERRA, SÓLO CONTRA LA PIEZA ═══
+   *
+   * Todo lo de arriba compra que el disco asoma por fuera de su MURALLA. Un vértice es la
+   * esquina donde se juntan TRES comarcas y casi nunca están a la misma cota: el disco es un
+   * plano horizontal a `ALTO_DEL_ZOCALO` —1,27— sobre el suelo de su vértice, y un escalón mide
+   * 5,47. Basta con que la comarca de al lado esté un escalón más arriba para que el trozo de
+   * disco que la pisa quede DENTRO de la ladera, y eso no lo miraba nada.
+   *
+   * Se mide sobre los 54 vértices con doce relieves —la misma batería con la que se mide el
+   * suelo de los vértices y la calzada de los puentes— y con el disco a la talla de su techo,
+   * recorriendo su BORDE entero. Con el asiento puesto no queda ni uno tapado; la vacuna de
+   * abajo enseña lo que había.
+   */
+  {
+    /*
+     * DOS REPARTOS DE TERRENO, y no uno: el de este comprobador y el del BANCO. No son el mismo
+     * mundo y no se rompen por los mismos sitios — el del banco tiene vértices donde la comarca
+     * de al lado sube DOS escalones a seis unidades, y el de aquí no. Medir sólo con uno de los
+     * dos deja fuera el caso que decide el diseño, y de hecho lo dejó: el tope del recorte se
+     * escribió con el de aquí y el banco lo tumbó a la primera.
+     */
+    const LOS_REPARTOS: Array<{ como: string; terrenos: string[] }> = [
+      {
+        como: 'el del comprobador',
+        terrenos: [
+          'bosque', 'bosque', 'bosque', 'bosque', 'pradera', 'pradera', 'pradera', 'pradera',
+          'campo', 'campo', 'campo', 'campo', 'colina', 'colina', 'colina',
+          'montana', 'montana', 'montana', 'desierto',
+        ],
+      },
+      {
+        como: 'el del banco',
+        terrenos: [
+          'bosque', 'pradera', 'campo', 'colina', 'montana', 'bosque', 'pradera',
+          'campo', 'desierto', 'colina', 'montana', 'bosque', 'pradera', 'campo',
+          'colina', 'montana', 'bosque', 'pradera', 'campo',
+        ],
+      },
+    ];
+    const islasDelAsiento = DELTA.map((hex, i) => ({
+      hex,
+      terreno: (LOS_REPARTOS[0] as { terrenos: string[] }).terrenos[i % 19] ?? 'pradera',
+    }));
+    /*
+     * SE MIDE LO QUE SE VE DEL DISCO, y no si su borde toca. Un disco con la punta de un lado
+     * dentro de la ladera se sigue viendo entero por el otro; uno con el centro tapado no se ve
+     * aunque su borde esté limpio. Se muestrea por ANILLOS DE ÁREA IGUAL —la misma cuenta que
+     * `asientoDeLaMarca` usa para subirla— así que cada muestra pesa lo mismo y la fracción que
+     * sale es superficie de verdad.
+     */
+    const ANILLOS = 48;
+    const RADIOS = 48;
+    const loQueSeVeDelDisco = (
+      tierra: (x: number, y: number) => number,
+      centro: Punto,
+      cota: number,
+      radio: number,
+    ): number => {
+      let seVe = 0;
+      let cuantas = 0;
+      for (let k = 1; k <= ANILLOS; k++) {
+        const suRadio = radio * Math.sqrt(k / ANILLOS);
+        for (let a = 0; a < RADIOS; a++) {
+          const angulo = (2 * Math.PI * (a + (k % 2) * 0.5)) / RADIOS;
+          cuantas++;
+          if (tierra(centro.x + Math.cos(angulo) * suRadio, centro.y + Math.sin(angulo) * suRadio) < cota) {
+            seVe++;
+          }
+        }
+      }
+      return seVe / cuantas;
+    };
+    /**
+     * LO QUE EL RELIEVE LE HACE A LA MARCA DE ESTA CLASE, en los 54 vértices por doce relieves
+     * por los dos repartos. `antes` es con la marca clavada a media persona sobre el suelo del
+     * vértice —lo que había— y `ahora` con el asiento puesto.
+     */
+    const loQueElRelieveLeHace = (clase: 'poblado' | 'ciudad') => {
+      const radio = loLejosQueLlegaLaMarca('disco', techoDeLaMarca(clase));
+      let medidas = 0;
+      let tapadosAntes = 0;
+      let tapadosAhora = 0;
+      let elPeorAntes = 1;
+      let elPeorAhora = 1;
+      let quienPeorAhora = '';
+      let quienPeorAntes = '';
+      let laMayorSubida = 0;
+      let suben = 0;
+      for (const reparto of LOS_REPARTOS) {
+        const islas = DELTA.map((hex, i) => ({
+          hex,
+          terreno: reparto.terrenos[i % reparto.terrenos.length] ?? 'pradera',
+        }));
+        for (let semilla = 0; semilla < 12; semilla++) {
+          const suRelieve = crearRelieve(islas, semilla);
+          const tierra = (x: number, y: number): number => suRelieve.alturaEn({ x, y });
+          for (const v of TODOS_LOS_VERTICES) {
+            const q = puntoDeVertice(v, RADIO_DE_COMARCA);
+            const suelo = suRelieve.alturaEn(q);
+            const asiento = asientoDelDisco(tierra, q.x, q.y, suelo, techoDeLaMarca(clase));
+            medidas++;
+            if (asiento.alto > ALTO_DEL_ZOCALO + 1e-9) suben++;
+            laMayorSubida = Math.max(laMayorSubida, asiento.alto - ALTO_DEL_ZOCALO);
+            const antes = loQueSeVeDelDisco(tierra, q, suelo + ALTO_DEL_ZOCALO, radio);
+            const ahora = loQueSeVeDelDisco(tierra, q, suelo + asiento.alto, radio);
+            if (antes < 1 - 1e-9) tapadosAntes++;
+            if (ahora < 1 - 1e-9) tapadosAhora++;
+            if (antes < elPeorAntes) {
+              elPeorAntes = antes;
+              quienPeorAntes = `${v} con ${reparto.como} y la semilla ${String(semilla)}`;
+            }
+            if (ahora < elPeorAhora) {
+              elPeorAhora = ahora;
+              quienPeorAhora = `${v} con ${reparto.como} y la semilla ${String(semilla)}`;
+            }
+          }
+        }
+      }
+      return {
+        medidas, tapadosAntes, tapadosAhora, elPeorAntes, elPeorAhora,
+        quienPeorAntes, quienPeorAhora, laMayorSubida, suben, radio,
+      };
+    };
+    const EL_POBLADO = loQueElRelieveLeHace('poblado');
+    const LA_CIUDAD = loQueElRelieveLeHace('ciudad');
+    comprobar(
+      `hay relieve que medir: ${String(EL_POBLADO.medidas)} discos por clase —los ${String(TODOS_LOS_VERTICES.length)} vértices con doce relieves y con los dos repartos de terreno, el de aquí y el del banco`,
+      EL_POBLADO.medidas === TODOS_LOS_VERTICES.length * 12 * LOS_REPARTOS.length &&
+        LA_CIUDAD.medidas === EL_POBLADO.medidas,
+      { medidas: EL_POBLADO.medidas, repartos: LOS_REPARTOS.length },
+    );
+    comprobar(
+      `la marca se apoya en la tierra que pisa y no a media persona del vértice: sube en ${String(EL_POBLADO.suben + LA_CIUDAD.suben)} de las ${String(EL_POBLADO.medidas * 2)} y nunca más de un escalón —${LA_CIUDAD.laMayorSubida.toFixed(2)}, o sea ${(LA_CIUDAD.laMayorSubida / ESCALON).toFixed(2)}—, que es lo que sube el terreno de una terraza a la siguiente`,
+      LA_CIUDAD.laMayorSubida <= SUBIDA_MAXIMA_DEL_ZOCALO + 1e-9 &&
+        EL_POBLADO.laMayorSubida <= SUBIDA_MAXIMA_DEL_ZOCALO + 1e-9 &&
+        LA_CIUDAD.suben > 0 &&
+        EL_POBLADO.suben > 0,
+      {
+        subenPoblado: EL_POBLADO.suben,
+        subenCiudad: LA_CIUDAD.suben,
+        laMayorSubida: Number(LA_CIUDAD.laMayorSubida.toFixed(2)),
+        enEscalones: Number((LA_CIUDAD.laMayorSubida / ESCALON).toFixed(2)),
+      },
+    );
+    comprobar(
+      `y con eso ninguna marca se pierde en la ladera de al lado: del disco de un POBLADO se ve como poco el ${(EL_POBLADO.elPeorAhora * 100).toFixed(0)} % —tapado en ${String(EL_POBLADO.tapadosAhora)} de las ${String(EL_POBLADO.medidas)}— y del de una CIUDAD el ${(LA_CIUDAD.elPeorAhora * 100).toFixed(0)} % —tapado en ${String(LA_CIUDAD.tapadosAhora)}—`,
+      EL_POBLADO.elPeorAhora > 0.8 &&
+        LA_CIUDAD.elPeorAhora > 0.8 &&
+        EL_POBLADO.tapadosAhora < EL_POBLADO.medidas / 100 &&
+        LA_CIUDAD.tapadosAhora < LA_CIUDAD.medidas / 20,
+      {
+        poblado: { seVe: Number((EL_POBLADO.elPeorAhora * 100).toFixed(0)), tapados: EL_POBLADO.tapadosAhora, elPeor: EL_POBLADO.quienPeorAhora },
+        ciudad: { seVe: Number((LA_CIUDAD.elPeorAhora * 100).toFixed(0)), tapados: LA_CIUDAD.tapadosAhora, elPeor: LA_CIUDAD.quienPeorAhora },
+      },
+    );
+    comprobar(
+      `se ve fallar: con la marca clavada a media persona sobre el suelo de su vértice —lo que había—, del disco de una CIUDAD se ve el ${(LA_CIUDAD.elPeorAntes * 100).toFixed(0)} % en el peor —${LA_CIUDAD.quienPeorAntes}— y la tierra le pisa algo en ${String(LA_CIUDAD.tapadosAntes)} de las ${String(LA_CIUDAD.medidas)}, contra ${String(LA_CIUDAD.tapadosAhora)} con el asiento puesto`,
+      LA_CIUDAD.elPeorAntes < 0.5 &&
+        EL_POBLADO.elPeorAntes < 0.6 &&
+        LA_CIUDAD.tapadosAntes > LA_CIUDAD.tapadosAhora * 4 &&
+        EL_POBLADO.tapadosAntes > EL_POBLADO.tapadosAhora * 4,
+      {
+        ciudadAntes: Number((LA_CIUDAD.elPeorAntes * 100).toFixed(0)),
+        pobladoAntes: Number((EL_POBLADO.elPeorAntes * 100).toFixed(0)),
+        tapadosAntes: { poblado: EL_POBLADO.tapadosAntes, ciudad: LA_CIUDAD.tapadosAntes },
+        tapadosAhora: { poblado: EL_POBLADO.tapadosAhora, ciudad: LA_CIUDAD.tapadosAhora },
+      },
+    );
+    /*
+     * ═══ Y LA VACUNA QUE NO NECESITA UN MUNDO: UN VÉRTICE PEGADO A LA MONTAÑA ═══
+     *
+     * Un terreno escrito a mano, para que la regla se pueda leer sin generar nada: llano a la
+     * izquierda, y a partir de una raya vertical sube. Con UN escalón el asiento sube el escalón
+     * entero; con TRES no sube nada, porque subir tres es un halo de 8,6 personas y recortar el
+     * disco para no tocar la ladera sólo le quitaría píxeles del lado que sí se ve; y con la
+     * ladera de UNO y la montaña de TRES a la vez sube uno, que es la parte que enseña que se
+     * mira el disco ENTERO y no el primer sitio donde topa.
+     */
+    const RADIO_DE_PRUEBA = loLejosQueLlegaLaMarca('disco', techoDeLaMarca('ciudad'));
+    const LA_RAYA_DE_LA_MONTANA = RADIO_DE_PRUEBA * 0.7;
+    const laMontana = (cuantosEscalones: number) => (x: number): number =>
+      x >= LA_RAYA_DE_LA_MONTANA ? cuantosEscalones * ESCALON : 0;
+    const enLlano = asientoDeLaMarca(() => 0, 0, 0, 0, RADIO_DE_PRUEBA);
+    const conUnEscalon = asientoDeLaMarca((x) => laMontana(1)(x), 0, 0, 0, RADIO_DE_PRUEBA);
+    const conTresEscalones = asientoDeLaMarca((x) => laMontana(3)(x), 0, 0, 0, RADIO_DE_PRUEBA);
+    /* La ladera de UNO cerca y la montaña de TRES detrás, que es el caso del banco. */
+    const conLasDos = asientoDeLaMarca(
+      (x) => (x >= LA_RAYA_DE_LA_MONTANA ? 3 * ESCALON : x >= LA_RAYA_DE_LA_MONTANA / 2 ? ESCALON : 0),
+      0,
+      0,
+      0,
+      RADIO_DE_PRUEBA,
+    );
+    comprobar(
+      `y en llano el asiento no toca nada: se queda a ${enLlano.alto.toFixed(4)}, los ${ALTO_DEL_ZOCALO.toFixed(4)} de siempre`,
+      Math.abs(enLlano.alto - ALTO_DEL_ZOCALO) < 1e-9,
+      enLlano,
+    );
+    comprobar(
+      `con un vértice pegado a una comarca UN escalón más alta, el disco sube el escalón entero —a ${conUnEscalon.alto.toFixed(2)}— y no encoge: mide lo que medía y ahora se ve por encima de la ladera`,
+      Math.abs(conUnEscalon.alto - (ESCALON + ALTO_DEL_ZOCALO)) < 1e-9,
+      conUnEscalon,
+    );
+    comprobar(
+      `y con una MONTAÑA de tres escalones no se sube tres —eso sería un halo de ${((3 * ESCALON) / ALTURA_DE_UNA_PERSONA).toFixed(1)} personas, por encima del tejado que marca— sino que se queda a ${conTresEscalones.alto.toFixed(2)} y deja que la ladera le tape ese lado`,
+      Math.abs(conTresEscalones.alto - ALTO_DEL_ZOCALO) < 1e-9,
+      conTresEscalones,
+    );
+    comprobar(
+      `y con la ladera de UNO delante y la montaña de TRES detrás sube uno —a ${conLasDos.alto.toFixed(2)}— y no se para en lo primero que topa: se mira el disco entero, que es el caso que el banco enseña`,
+      Math.abs(conLasDos.alto - (ESCALON + ALTO_DEL_ZOCALO)) < 1e-9,
+      conLasDos,
+    );
+    comprobar(
+      `se ve fallar: con la marca clavada a \`ALTO_DEL_ZOCALO\` sobre ese mismo vértice, la comarca de un escalón le pasa ${(ESCALON - ALTO_DEL_ZOCALO).toFixed(2)} por encima —${((ESCALON - ALTO_DEL_ZOCALO) / ALTURA_DE_UNA_PERSONA).toFixed(1)} personas de roca— y se traga la mitad del disco`,
+      ESCALON > ALTO_DEL_ZOCALO * 2,
+      {
+        escalon: Number(ESCALON.toFixed(2)),
+        altoDelZocalo: Number(ALTO_DEL_ZOCALO.toFixed(2)),
+        cuantasVeces: Number((ESCALON / ALTO_DEL_ZOCALO).toFixed(1)),
+      },
+    );
+
+    /*
+     * ═══ Y LA RAYA DE UNA VEREDA TAMBIÉN SE MIDE CONTRA LA TIERRA ═══
+     *
+     * La raya cuelga de la CALZADA —del punto de la polilínea de juntas a mitad de vano—, y eso
+     * la salva de quedar enterrada bajo el cerro que el puente salva; ya hay una comprobación
+     * que lo compra. Lo que nadie miraba es que la raya es un TRAMO: es plana y está a la cota
+     * del MEDIO del vano, así que hacia sus puntas la tierra puede pasarle por encima cuando la
+     * arista cruza una vaguada y sube por los dos lados.
+     *
+     * Aquí no se puede hacer lo que se hace con el disco: subirla un escalón la despegaría de
+     * su propia calzada, y hay una comprobación —la del halo— que compra que no lo hace. Lo que
+     * sí la salva es el TECHO, que es la mitad de esta tanda: la raya pasó de 79,57 de largo
+     * —más que la arista que marca, 75,78— a 38,65.
+     *
+     * Se mide lo que eso compra sobre las 864 —las 72 aristas con doce relieves— y se exige lo
+     * que sí se puede exigir: que ninguna quede ENTERAMENTE bajo tierra, que es el fallo del
+     * que viene todo esto. Con el techo que había, la peor se quedaba entera debajo.
+     */
+    const laHuellaDeLaRaya = (
+      tierra: (x: number, y: number) => number,
+      medio: { x: number; y: number; z: number },
+      hacia: { x: number; y: number },
+      techo: number,
+    ): number => {
+      const largo = techo * RADIO_DE_TESELA * LARGO_DE_LA_RAYA;
+      const medioAncho = techo * RADIO_DE_TESELA * (ANCHO_DE_LA_RAYA / 2 + GRUESO_DEL_FLANCO);
+      const cota = medio.y + ALTO_DEL_ZOCALO;
+      for (let k = 1; k <= 96; k++) {
+        const cuanto = ((largo / 2) * k) / 96;
+        for (const signo of [-1, 1]) {
+          for (const lado of [-1, 0, 1]) {
+            const px = medio.x + hacia.x * cuanto * signo - hacia.y * lado * medioAncho;
+            const py = medio.z + hacia.y * cuanto * signo + hacia.x * lado * medioAncho;
+            if (tierra(px, py) >= cota) return (k - 1) / 96;
+          }
+        }
+      }
+      return 1;
+    };
+    const laRayaCon = (techo: number): { tapadas: number; medidas: number; laPeor: number } => {
+      let tapadas = 0;
+      let medidas = 0;
+      let laPeor = 1;
+      for (let semilla = 0; semilla < 12; semilla++) {
+        const suRelieve = crearRelieve(islasDelAsiento, semilla);
+        const tierra = (x: number, y: number): number => suRelieve.alturaEn({ x, y });
+        for (const arista of aristasDe(DELTA)) {
+          const [uno, otro] = verticesDeArista(arista);
+          if (uno === undefined || otro === undefined) continue;
+          const a = puntoDeVertice(uno, RADIO_DE_COMARCA);
+          const b = puntoDeVertice(otro, RADIO_DE_COMARCA);
+          const suLargo = Math.hypot(b.x - a.x, b.y - a.y);
+          const puente = puenteEntre(a, b, (q: Punto) => suRelieve.alturaEn(q));
+          const parte = laHuellaDeLaRaya(
+            tierra,
+            puente.medio,
+            { x: (b.x - a.x) / suLargo, y: (b.y - a.y) / suLargo },
+            techo,
+          );
+          medidas++;
+          if (parte < 1) tapadas++;
+          laPeor = Math.min(laPeor, parte);
+        }
+      }
+      return { tapadas, medidas, laPeor };
+    };
+    const LA_RAYA_AHORA = laRayaCon(TECHO_DEL_ZOCALO);
+    const LA_RAYA_ANTES = laRayaCon(3.5);
+    comprobar(
+      `y ninguna raya de vereda queda ENTERA bajo tierra en las ${String(LA_RAYA_AHORA.medidas)} medidas: la peor conserva el ${(LA_RAYA_AHORA.laPeor * 100).toFixed(0)} % de su largo, y sólo ${String(LA_RAYA_AHORA.tapadas)} tienen algo de su huella tapada — la raya cuelga de la calzada, así que lo que la puede tapar es la cuesta de sus propias puntas`,
+      LA_RAYA_AHORA.laPeor > 0 && LA_RAYA_AHORA.tapadas < LA_RAYA_AHORA.medidas / 100,
+      {
+        tapadas: LA_RAYA_AHORA.tapadas,
+        medidas: LA_RAYA_AHORA.medidas,
+        laPeor: Number((LA_RAYA_AHORA.laPeor * 100).toFixed(0)),
+        largo: Number((TECHO_DEL_ZOCALO * RADIO_DE_TESELA * LARGO_DE_LA_RAYA).toFixed(2)),
+      },
+    );
+    comprobar(
+      `se ve fallar: con el techo de 3,5 la raya medía ${(3.5 * RADIO_DE_TESELA * LARGO_DE_LA_RAYA).toFixed(2)} —más que los ${LARGO_DE_UNA_ARISTA.toFixed(2)} de la arista que marca— y la tierra le pasaba por encima en ${String(LA_RAYA_ANTES.tapadas)} de las ${String(LA_RAYA_ANTES.medidas)}, con la peor ENTERA debajo`,
+      LA_RAYA_ANTES.tapadas > LA_RAYA_AHORA.tapadas * 4 && LA_RAYA_ANTES.laPeor === 0,
+      {
+        tapadasAntes: LA_RAYA_ANTES.tapadas,
+        tapadasAhora: LA_RAYA_AHORA.tapadas,
+        laPeorAntes: Number((LA_RAYA_ANTES.laPeor * 100).toFixed(0)),
+        largoAntes: Number((3.5 * RADIO_DE_TESELA * LARGO_DE_LA_RAYA).toFixed(2)),
+      },
+    );
+  }
+  /*
+   * LA VACUNA DEL SUELO, que es la que no existía mientras la marca era grande: bajando la
+   * fracción de pantalla al 0,5 % el disco se quedaría en menos de lo que mide la pieza, y una
+   * marca más pequeña que lo que marca se pierde antes que ello.
+   */
+  const DEMASIADO_PEQUENA = 0.005;
+  const siFueraDiminuta = 2 * loQueOcupaElZocalo('disco').fuera * DEMASIADO_PEQUENA * EN_UNA_VENTANA_DE;
+  comprobar(
+    `se ve fallar: al ${(DEMASIADO_PEQUENA * 100).toFixed(1)} % del alto el disco mediría ${siFueraDiminuta.toFixed(1)} píxeles, MENOS que los ${anchoDeLaPieza.toFixed(1)} de la pieza que señala`,
+    siFueraDiminuta < anchoDeLaPieza,
+    { siFueraDiminuta, laPieza: anchoDeLaPieza },
+  );
+  /*
+   * ═══ Y EL TRAZO MÁS FINO TAMBIÉN SE MIDE EN PÍXELES, QUE ES LO QUE COSTÓ UNA VUELTA ═══
+   *
+   * El contorno es lo que hace que la marca se vea sobre cualquier terreno —el bloque de color
+   * de arriba lo mide y le sale 35,6 sobre el peor de los seis—, pero esa cuenta es de COLOR y
+   * no sabe cuántos píxeles se pintan de ese color. El contorno heredó el grueso del filo del
+   * aro, 0,09, y a la nueva fracción de pantalla eso son 1,1 píxeles: un trazo de un píxel es
+   * casi todo antialias, y contando píxeles en el lienzo sólo el 37 % de los del disco azul
+   * sobre la montaña pasaba del umbral, contra el 73-81 % de las otras tres marcas. A 0,19 el
+   * contorno mide 2,4 píxeles y ese disco sube al 49 %.
+   *
+   * Así que aquí se compra lo que aquella medida de color no ve: que ningún trazo de la marca
+   * baje de dos píxeles desde el encuadre de tablero.
+   */
+  const DOS_PIXELES = 2;
+  const enPixeles = (cuanto: number): number => cuanto * ZOCALO_EN_PANTALLA * EN_UNA_VENTANA_DE;
+  const trazos = [
+    { que: 'el contorno del disco', grueso: enPixeles(GRUESO_DEL_CONTORNO) },
+    { que: 'el flanco de la raya', grueso: enPixeles(GRUESO_DEL_FLANCO) },
+    { que: 'el relleno de la raya', grueso: enPixeles(ANCHO_DE_LA_RAYA) },
+  ];
+  comprobar(
+    `ningún trazo de la marca baja de ${String(DOS_PIXELES)} píxeles desde la vista de tablero: ${trazos.map((t) => `${t.que} ${t.grueso.toFixed(1)}`).join(', ')}`,
+    trazos.every((t) => t.grueso >= DOS_PIXELES),
+    trazos,
+  );
+  comprobar(
+    `se ve fallar: con el contorno al grueso que tenía el filo del aro —0,09— mediría ${enPixeles(0.09).toFixed(1)} píxeles, o sea casi todo antialias`,
+    enPixeles(0.09) < DOS_PIXELES,
+    { conElGruesoDelAro: enPixeles(0.09), elDeAhora: enPixeles(GRUESO_DEL_CONTORNO) },
+  );
+  /*
+   * ═══ Y LA RAYA DE UNA VEREDA PONE MENOS TINTA QUE EL DISCO — EN LA GEOMETRÍA ═══
+   *
+   * Se pidió que la vereda pesara menos que el asentamiento, y esto lo mide con número y no con
+   * un adjetivo, porque «menos llamativa» sin cifra vuelve a subir sola en el primer retoque.
+   *
+   * PERO AQUÍ PONÍA «la vereda pesa menos EN PANTALLA», Y ESO ES FALSO. Lo que esta cuenta mide
+   * es la tinta de la GEOMETRÍA de la marca: el área de sus mallas a la fracción de pantalla que
+   * le toca, como si nada la tapara. En pantalla la tapa su propia pieza, y no por igual:
+   *
+   *   · un ASENTAMIENTO se pone ENCIMA de su disco —trece grupos de casas, vallas y árboles
+   *     alrededor del vértice— y se come la mayor parte de él;
+   *   · una VEREDA es una calzada estrecha a lo largo de la arista y la raya asoma por los dos
+   *     costados, así que casi toda la que se pinta se ve.
+   *
+   * Medido en el banco (`banco3d.html`) con la cámara puesta en el encuadre de tablero —(0;
+   * 422,9; 389), a 574,6 del centro— y el lienzo a 1600×900, comparando el mismo fotograma con
+   * la marca y con su opacidad a cero y agrupando lo que cambia en manchas de cuatro
+   * conectividades: las cinco veredas del tablero pintan 269, 269, 279, 281 y 301 píxeles —279,8
+   * de media— y los dos poblados 117 y 177 —147,0—. O sea que EN PANTALLA la raya pesa el doble
+   * que el disco, justo al revés de lo que dice la tinta de aquí: el disco de un poblado enseña
+   * el 29 % de la tinta que tiene y la raya el 72 %.
+   *
+   * Y la CIUDAD, que es la que esta tanda agrandó para que asomara por fuera de la muralla:
+   * pinta 193 píxeles con la mancha mayor en 84, o sea que su recinto también se come lo suyo.
+   *
+   * Lo de abajo se queda porque es la cifra que gobierna lo que se DIBUJA —y es la que hay que
+   * mirar el día que alguien suba una talla—, pero dice lo que mide: tinta de geometría, no
+   * píxeles vistos. Los píxeles vistos no se pueden medir desde Node y por eso están arriba con
+   * el guion y el encuadre con el que salen.
+   */
+  const tintaEnPixeles = (forma: 'disco' | 'raya'): number =>
+    loQueOcupaElZocalo(forma).tinta * (ZOCALO_EN_PANTALLA * EN_UNA_VENTANA_DE) ** 2;
+  comprobar(
+    `la raya de una vereda pone ${tintaEnPixeles('raya').toFixed(0)} píxeles cuadrados de TINTA DE GEOMETRÍA y el disco de un asentamiento ${tintaEnPixeles('disco').toFixed(0)}: la marca de la vereda es la más floja de las dos, que es lo que se pidió. En píxeles VISTOS es al revés, y está medido en la cabecera de aquí arriba`,
+    tintaEnPixeles('raya') < tintaEnPixeles('disco') && tintaEnPixeles('raya') > 4 * anchoDeLaPieza,
+    { raya: tintaEnPixeles('raya'), disco: tintaEnPixeles('disco') },
+  );
+  /*
+   * Y LAS DOS PONEN MENOS TINTA QUE EL ARO QUE HABÍA ANTES, que es el encargo entero: bajarle el
+   * volumen a la marca SIN perder que se encuentre. El aro medía de 0,55 a 1,07 al 2,2 % del
+   * alto; se rehace esa cuenta aquí en vez de escribir el número.
+   */
+  const COMO_ERA_EL_ARO = { dentro: 0.55, fuera: 1.07, parte: 0.022 };
+  const tintaDelAro =
+    Math.PI *
+    (COMO_ERA_EL_ARO.fuera ** 2 - COMO_ERA_EL_ARO.dentro ** 2) *
+    (COMO_ERA_EL_ARO.parte * EN_UNA_VENTANA_DE) ** 2;
+  comprobar(
+    `y las dos pesan menos que el aro que había antes: el disco pone el ${((tintaEnPixeles('disco') / tintaDelAro) * 100).toFixed(0)} % de su tinta y la raya el ${((tintaEnPixeles('raya') / tintaDelAro) * 100).toFixed(0)} %, con ${(2 * COMO_ERA_EL_ARO.fuera * COMO_ERA_EL_ARO.parte * EN_UNA_VENTANA_DE).toFixed(1)} píxeles de ancho que tenía el aro contra los ${anchoDeLaMarca.toFixed(1)} del disco`,
+    tintaEnPixeles('disco') < tintaDelAro &&
+      tintaEnPixeles('raya') < tintaEnPixeles('disco') &&
+      anchoDeLaMarca < 2 * COMO_ERA_EL_ARO.fuera * COMO_ERA_EL_ARO.parte * EN_UNA_VENTANA_DE,
+    { disco: tintaEnPixeles('disco'), raya: tintaEnPixeles('raya'), elAro: tintaDelAro },
+  );
+  /*
+   * ═══ Y LA TERCERA PESA MÁS QUE EL ARO, QUE ES EL PRECIO Y NO SE ESCONDE ═══
+   *
+   * El disco de una CIUDAD es la única de las tres marcas que pone MÁS tinta que el aro que
+   * había antes, y no hay forma de que no sea así: un disco relleno del mismo radio que un
+   * anillo pone siempre más que él, y para asomar por fuera de la muralla hace falta ese radio.
+   * Se paga porque la alternativa está medida en el banco: 29 píxeles de marca en la torre,
+   * contra 191 y 238 en dos chozas del mismo fotograma.
+   *
+   * Se acota por arriba —menos del doble del aro— para que el número no suba solo en el primer
+   * retoque, y lo que de verdad lo sujeta es la medida de la alfombra de más abajo, que ya se
+   * hace con las 54 marcas siendo ciudades.
+   */
+  const tintaDeLaCiudad =
+    loQueOcupaElZocalo('disco').tinta * (ZOCALO_DE_CIUDAD_EN_PANTALLA * EN_UNA_VENTANA_DE) ** 2;
+  comprobar(
+    `y la tercera pesa más, dicho con número: el disco de una ciudad pone ${tintaDeLaCiudad.toFixed(0)} píxeles cuadrados, el ${((tintaDeLaCiudad / tintaDelAro) * 100).toFixed(0)} % del aro — es lo que cuesta que asome por fuera de un recinto cerrado`,
+    tintaDeLaCiudad > tintaDelAro && tintaDeLaCiudad < 2 * tintaDelAro,
+    { ciudad: tintaDeLaCiudad, elAro: tintaDelAro, deUnPoblado: tintaEnPixeles('disco') },
   );
   /*
    * LA VACUNA DE LA CUENTA: sin la regla de marca de pantalla —o sea, con un aro del tamaño de
@@ -6409,7 +7782,7 @@ paso('La cinta del tercio central deja aire a las dos manos, la frase no se qued
 }
 
 // ---------------------------------------------------------------------------
-paso('El zócalo se compra de verdad: existe, es de su dueño, tiene filo y se ve caer al apagarlo');
+paso('El zócalo se compra de verdad: disco en la choza, raya en la vereda, cada una de su dueño, con contorno y a lo largo de su arista');
 // ---------------------------------------------------------------------------
 
 /**
@@ -6475,46 +7848,156 @@ paso('El zócalo se compra de verdad: existe, es de su dueño, tiene filo y se v
    * así cada vacuna puede exigir que falte exactamente lo que se ha quitado. Un juez que
    * devolviera un booleano pasaría por verde con la mitad de las razones equivocadas.
    */
-  const queLeFaltaAlZocalo = (raiz: unknown, deQuien: string): string[] => {
+  /**
+   * `forma` entra en el juez porque las dos marcas NO son el mismo árbol: el disco son dos
+   * mallas —contorno y relleno— y la raya son tres —dos flancos y el relleno—. Un juez que se
+   * conformara con «hay mallas» diría que sí a una raya sin flancos, que es la marca de las
+   * veredas sin lo que la hace visible sobre el carrizal.
+   */
+  const queLeFaltaAlZocalo = (raiz: unknown, deQuien: string, forma: 'disco' | 'raya'): string[] => {
     const faltas: string[] = [];
     const arbol = todoElArbol(raiz);
     const apagados = arbol.filter((n) => n.props['visible'] === false);
     if (apagados.length > 0) faltas.push(`hay ${String(apagados.length)} nodos apagados con visible en falso`);
+    /*
+     * ═══ Y APAGAR NO ES SÓLO `visible`: UN `scale={0}` HACE EXACTAMENTE LO MISMO ═══
+     *
+     * Este juez recorría el árbol y compraba `visible`, las mallas, las geometrías, los
+     * colores, el `renderOrder`, el `depthWrite`, el `side`, el `transparent`, las opacidades
+     * y el `raycast`. NADIE MIRABA `scale`. Y un `scale={0}` en el grupo raíz que devuelve
+     * `Zocalo()` apaga las 126 marcas del tablero desde el fichero cuya premisa entera es
+     * «esto SÍ se puede medir desde Node»: probado sobre esta misma fuente, `verify:escena`,
+     * `verify:escritorio` y el typecheck salían los TRES en cero.
+     *
+     * Se mira TODO el árbol y no sólo la raíz, porque el grupo de dentro —el del giro— y las
+     * tres mallas apagan igual de bien. Se admite que la prop no esté, que es lo normal, y se
+     * admite el uno escrito de las dos formas que r3f acepta.
+     *
+     * Y LO MISMO CON EL SITIO, que es la puerta de al lado: una malla empujada a
+     * `[0, 0, -100000]` desaparece sin que ninguna otra comprobación se entere. Los únicos
+     * sitios legales son los que `piezasDelZocalo` declara —cero para el disco, `±aparte` para
+     * los dos flancos de la raya—, y el grupo RAÍZ queda fuera de esta regla porque su
+     * posición se la dice quien lo monta y se compra aparte, con el `donde=`.
+     */
+    const escalaRota = (valor: unknown): boolean => {
+      if (valor === undefined || valor === null) return false;
+      if (typeof valor === 'number') return valor !== 1;
+      if (Array.isArray(valor)) return valor.some((v) => v !== 1);
+      return true;
+    };
+    const encogidos = arbol.filter((n) => escalaRota(n.props['scale']));
+    if (encogidos.length > 0) {
+      faltas.push(
+        `hay ${String(encogidos.length)} nodos encogidos con un scale que no es uno: ${encogidos
+          .map((n) => JSON.stringify(n.props['scale']))
+          .join(', ')}`,
+      );
+    }
+    const sitiosLegales = piezasDelZocalo(forma, deQuien).map((p) =>
+      p.que === 'raya' ? RADIO_DE_TESELA * p.aparte : 0,
+    );
+    const mudados = arbol.slice(1).filter((n) => {
+      const donde = n.props['position'];
+      if (donde === undefined || donde === null) return false;
+      if (!Array.isArray(donde) || donde.length !== 3) return true;
+      return (
+        donde[0] !== 0 ||
+        donde[2] !== 0 ||
+        !sitiosLegales.some((y) => Math.abs(y - Number(donde[1])) < 1e-9)
+      );
+    });
+    if (mudados.length > 0) {
+      faltas.push(
+        `hay ${String(mudados.length)} piezas mudadas fuera de su sitio: ${mudados
+          .map((n) => JSON.stringify(n.props['position']))
+          .join(', ')}`,
+      );
+    }
     const mallas = deTipo(arbol, 'mesh');
-    if (mallas.length !== 2) faltas.push(`tiene ${String(mallas.length)} mallas y son dos: el filo y el color`);
-    const aros = deTipo(arbol, 'ringGeometry');
-    if (aros.length !== 2) faltas.push(`tiene ${String(aros.length)} aros y son dos`);
+    const CUANTAS = forma === 'disco' ? 2 : 3;
+    if (mallas.length !== CUANTAS) {
+      faltas.push(
+        `tiene ${String(mallas.length)} mallas y son ${String(CUANTAS)}: ${forma === 'disco' ? 'el contorno y el relleno' : 'los dos flancos y el relleno'}`,
+      );
+    }
+    /* Y CADA FORMA CON SU GEOMETRÍA. Un disco pintado con planos no es un disco. */
+    const cuantasDe = (que: string): number => deTipo(arbol, que).length;
+    if (forma === 'disco' && (cuantasDe('circleGeometry') !== 1 || cuantasDe('ringGeometry') !== 1)) {
+      faltas.push(
+        `el disco no está hecho de un círculo y un aro de contorno: ${String(cuantasDe('circleGeometry'))} círculos y ${String(cuantasDe('ringGeometry'))} aros`,
+      );
+    }
+    if (forma === 'raya' && cuantasDe('planeGeometry') !== 3) {
+      faltas.push(`la raya no está hecha de tres planos: ${String(cuantasDe('planeGeometry'))}`);
+    }
     const pinturas = deTipo(arbol, 'meshBasicMaterial');
     const colores = pinturas.map((n) => String(n.props['color']));
-    if (!colores.includes(FILO_DEL_ZOCALO)) faltas.push(`no lleva el filo ${FILO_DEL_ZOCALO}: ${colores.join(', ')}`);
+    if (!colores.includes(FILO_DEL_ZOCALO)) {
+      faltas.push(`no lleva el contorno ${FILO_DEL_ZOCALO}: ${colores.join(', ')}`);
+    }
     const suyo = colorLlanoDelJugador(deQuien);
     if (!colores.includes(suyo)) faltas.push(`no lleva el color de su dueño ${suyo}: ${colores.join(', ')}`);
-    /* El filo va por DEBAJO en la pila de dibujo y por FUERA en tamaño, o no es un filo. */
-    const conEsteColor = (color: string): { orden: number; fuera: number } | null => {
-      const malla = mallas.find((m) =>
-        deTipo(todoElArbol(m), 'meshBasicMaterial').some((q) => q.props['color'] === color),
-      );
-      if (malla === undefined) return null;
-      const aro = deTipo(todoElArbol(malla), 'ringGeometry')[0];
-      if (aro === undefined) return null;
-      return { orden: Number(malla.props['renderOrder']), fuera: (aro.props['args'] as number[])[1] ?? 0 };
-    };
-    const elFilo = conEsteColor(FILO_DEL_ZOCALO);
-    const elSuyo = conEsteColor(suyo);
-    if (elFilo === null || elSuyo === null) faltas.push('no se puede emparejar cada aro con su color');
-    else {
-      if (elFilo.orden >= elSuyo.orden) {
-        faltas.push(`el filo se pinta encima del color: ${String(elFilo.orden)} contra ${String(elSuyo.orden)}`);
+    /*
+     * EL CONTORNO VA POR DEBAJO EN LA PILA DE DIBUJO Y POR FUERA EN TAMAÑO, o no es un contorno.
+     * «Por fuera» se mide distinto en cada forma y es la misma idea: en el disco, el radio de
+     * fuera del aro pasa del radio del círculo; en la raya, el flanco se aparta del eje más de
+     * lo que el relleno es ancho por su mitad.
+     */
+    const laMalla = (color: string): NodoPintado | undefined =>
+      mallas.find((m) => deTipo(todoElArbol(m), 'meshBasicMaterial').some((q) => q.props['color'] === color));
+    const elFilo = laMalla(FILO_DEL_ZOCALO);
+    const elSuyo = laMalla(suyo);
+    if (elFilo === undefined || elSuyo === undefined) {
+      faltas.push('no se puede emparejar cada pieza con su color');
+    } else {
+      const ordenDelFilo = Number(elFilo.props['renderOrder']);
+      const ordenDelSuyo = Number(elSuyo.props['renderOrder']);
+      if (ordenDelFilo >= ordenDelSuyo) {
+        faltas.push(`el contorno se pinta encima del color: ${String(ordenDelFilo)} contra ${String(ordenDelSuyo)}`);
       }
-      if (elFilo.fuera <= elSuyo.fuera) {
-        faltas.push(`el filo no asoma por fuera: ${String(elFilo.fuera)} contra ${String(elSuyo.fuera)}`);
+      if (forma === 'disco') {
+        const aro = deTipo(todoElArbol(elFilo), 'ringGeometry')[0];
+        const circulo = deTipo(todoElArbol(elSuyo), 'circleGeometry')[0];
+        const fuera = aro === undefined ? 0 : (aro.props['args'] as number[])[1] ?? 0;
+        const radio = circulo === undefined ? Infinity : (circulo.props['args'] as number[])[0] ?? Infinity;
+        if (!(fuera > radio)) {
+          faltas.push(`el contorno no asoma por fuera del disco: ${String(fuera)} contra ${String(radio)}`);
+        }
+      } else {
+        const flancos = mallas.filter((m) =>
+          deTipo(todoElArbol(m), 'meshBasicMaterial').some((q) => q.props['color'] === FILO_DEL_ZOCALO),
+        );
+        const anchoDelRelleno = ((): number => {
+          const plano = deTipo(todoElArbol(elSuyo), 'planeGeometry')[0];
+          return plano === undefined ? Infinity : (plano.props['args'] as number[])[1] ?? Infinity;
+        })();
+        if (flancos.length !== 2) faltas.push(`la raya lleva ${String(flancos.length)} flancos y son dos`);
+        const lados = flancos.map((f) => ((f.props['position'] as number[] | undefined) ?? [0, 0, 0])[1] ?? 0);
+        if (!lados.some((y) => y > anchoDelRelleno / 2) || !lados.some((y) => y < -anchoDelRelleno / 2)) {
+          faltas.push(`los flancos no asoman por los dos lados de la raya: ${lados.join(', ')} contra ${String(anchoDelRelleno / 2)}`);
+        }
       }
     }
     /* Y las tres del material, que son las que hacen que se vea sobre lo que sea. */
     for (const pintura of pinturas) {
-      if (pintura.props['depthWrite'] !== false) faltas.push('un aro escribe profundidad y taparía lo de detrás');
-      if (pintura.props['side'] !== THREE.DoubleSide) faltas.push('un aro se pinta por una cara y desaparece a ras de suelo');
-      if (pintura.props['transparent'] !== true) faltas.push('un aro es opaco');
+      if (pintura.props['depthWrite'] !== false) faltas.push('una pieza escribe profundidad y taparía lo de detrás');
+      if (pintura.props['side'] !== THREE.DoubleSide) faltas.push('una pieza se pinta por una cara y desaparece a ras de suelo');
+      if (pintura.props['transparent'] !== true) faltas.push('una pieza es opaca');
+    }
+    /*
+     * Y LAS OPACIDADES SON LAS QUE SE MIDIERON. No es un detalle de estilo: el bloque de color
+     * de arriba afirma que el contorno se separa de los seis terrenos 35,6 y que los cuatro
+     * rellenos se separan entre sí 33,0, y las dos cifras están calculadas CON ESTAS opacidades.
+     * Cambiando una en el JSX, aquellas medidas seguirían saliendo y ya no hablarían de lo que
+     * se pinta.
+     */
+    for (const pintura of pinturas) {
+      const cual = pintura.props['color'] === FILO_DEL_ZOCALO ? OPACIDAD_DEL_CONTORNO : OPACIDAD_DEL_RELLENO;
+      if (pintura.props['opacity'] !== cual) {
+        faltas.push(
+          `una pieza se pinta con una opacidad de ${String(pintura.props['opacity'])} y las medidas de color están hechas al ${String(cual)}`,
+        );
+      }
     }
     /* Y NO COGE TOQUES. `raycast={() => null}`, que es lo único que de verdad lo desactiva. */
     for (const malla of mallas) {
@@ -6526,46 +8009,122 @@ paso('El zócalo se compra de verdad: existe, es de su dueño, tiene filo y se v
     return faltas;
   };
 
-  const elRojo = Zocalo({ color: 'red', donde: [0, ALTO_DEL_ZOCALO, 0], aro: null });
+  const elRojo = Zocalo({ color: 'red', donde: [0, ALTO_DEL_ZOCALO, 0], forma: 'disco', marca: null });
   comprobar(
-    'se monta un zócalo de verdad y no le falta nada: dos aros, el filo debajo y por fuera, el color de su dueño encima, transparentes, a dos caras y sin coger toques',
-    queLeFaltaAlZocalo(elRojo, 'red').length === 0,
-    queLeFaltaAlZocalo(elRojo, 'red'),
+    'se monta el disco de un asentamiento y no le falta nada: un círculo del color de su dueño con su contorno debajo y por fuera, los dos transparentes, a dos caras, a la opacidad que se midió y sin coger toques',
+    queLeFaltaAlZocalo(elRojo, 'red', 'disco').length === 0,
+    queLeFaltaAlZocalo(elRojo, 'red', 'disco'),
+  );
+  const laRaya = Zocalo({ color: 'red', donde: [0, ALTO_DEL_ZOCALO, 0], forma: 'raya', giro: 0.7, marca: null });
+  comprobar(
+    'y se monta la raya de una vereda y tampoco le falta nada: tres planos —el relleno y sus dos flancos, uno a cada lado— con las mismas reglas',
+    queLeFaltaAlZocalo(laRaya, 'red', 'raya').length === 0,
+    queLeFaltaAlZocalo(laRaya, 'red', 'raya'),
+  );
+  /*
+   * Y LAS DOS FORMAS SON DISTINTAS DE VERDAD. Sin esto, `forma` podría estar sin usar —un
+   * `Zocalo` que devolviera siempre el disco— y las dos comprobaciones de arriba seguirían en
+   * verde con las veredas marcadas con un punto, que es el fallo que la raya viene a arreglar.
+   */
+  comprobar(
+    'el disco y la raya son dos árboles distintos: la vereda no se marca con un punto',
+    deTipo(todoElArbol(elRojo), 'circleGeometry').length === 1 &&
+      deTipo(todoElArbol(laRaya), 'circleGeometry').length === 0 &&
+      deTipo(todoElArbol(laRaya), 'planeGeometry').length === 3 &&
+      deTipo(todoElArbol(elRojo), 'planeGeometry').length === 0,
+    {
+      disco: todoElArbol(elRojo).map((n) => String(n.type)).filter((t) => t.endsWith('Geometry')),
+      raya: todoElArbol(laRaya).map((n) => String(n.type)).filter((t) => t.endsWith('Geometry')),
+    },
+  );
+  /*
+   * ═══ Y LAS MEDIDAS DEL JSX SALEN DE LAS CONSTANTES, NO DE UN NÚMERO A MANO ═══
+   *
+   * Es la misma frontera de siempre: `piezasDelZocalo` es lo que se mide desde Node —con ella se
+   * compra que 126 marcas no tapan el delta y que ninguna toca a su vecina— y el JSX es lo que
+   * se pinta. Si el JSX escribiera sus propios radios, aquellas medidas hablarían de otra marca.
+   * Se comprueba que cada argumento de geometría es exactamente `RADIO_DE_TESELA` por lo que la
+   * pieza dice, que es lo único que ata las dos cosas.
+   */
+  const comoSeDibuja = (arbol: unknown, que: string): number[][] =>
+    deTipo(todoElArbol(arbol), que).map((n) => n.props['args'] as number[]);
+  const laDelDisco = comoSeDibuja(elRojo, 'circleGeometry')[0] ?? [];
+  const elContorno = comoSeDibuja(elRojo, 'ringGeometry')[0] ?? [];
+  const losPlanos = comoSeDibuja(laRaya, 'planeGeometry');
+  comprobar(
+    `las medidas del JSX salen de las constantes: el disco a ${String(RADIO_DEL_DISCO)} de radio con su contorno, y la raya de ${String(LARGO_DE_LA_RAYA)} por ${String(ANCHO_DE_LA_RAYA)} con flancos de ${String(GRUESO_DEL_FLANCO)}, todo en múltiplos de la tesela`,
+    laDelDisco[0] === RADIO_DE_TESELA * RADIO_DEL_DISCO &&
+      elContorno[0] === RADIO_DE_TESELA * RADIO_DEL_DISCO &&
+      elContorno[1] === RADIO_DE_TESELA * (RADIO_DEL_DISCO + GRUESO_DEL_CONTORNO) &&
+      losPlanos.length === 3 &&
+      losPlanos.every((p) => p[0] === RADIO_DE_TESELA * LARGO_DE_LA_RAYA) &&
+      losPlanos.filter((p) => p[1] === RADIO_DE_TESELA * ANCHO_DE_LA_RAYA).length === 1 &&
+      losPlanos.filter((p) => p[1] === RADIO_DE_TESELA * GRUESO_DEL_FLANCO).length === 2,
+    { laDelDisco, elContorno, losPlanos },
+  );
+  /*
+   * Y `piezasDelZocalo` DICE LO MISMO QUE EL JSX, que es la otra mitad del atado: la función es
+   * lo que se mide y el JSX es lo que se pinta, así que si una lista tres piezas y el otro
+   * dibuja dos, la medida de la alfombra habla de una marca que no existe.
+   */
+  comprobar(
+    'y `piezasDelZocalo` lista exactamente las piezas que el JSX dibuja, en las dos formas: lo que se mide y lo que se pinta son la misma marca',
+    piezasDelZocalo('disco', 'red').length === deTipo(todoElArbol(elRojo), 'mesh').length &&
+      piezasDelZocalo('raya', 'red').length === deTipo(todoElArbol(laRaya), 'mesh').length &&
+      piezasDelZocalo('disco', 'red').length === 2 &&
+      piezasDelZocalo('raya', 'red').length === 3,
+    {
+      dice: [piezasDelZocalo('disco', 'red').length, piezasDelZocalo('raya', 'red').length],
+      dibuja: [deTipo(todoElArbol(elRojo), 'mesh').length, deTipo(todoElArbol(laRaya), 'mesh').length],
+    },
   );
   /*
    * Y EL DE CADA COLONO ES EL SUYO. No es la misma comprobación con cuatro datos: lo que se
-   * compra aquí es que el aro NO ES SIEMPRE EL MISMO —cuatro zócalos idénticos señalarían las
+   * compra aquí es que la marca NO ES SIEMPRE LA MISMA —cuatro zócalos idénticos señalarían las
    * cuatro piezas con el mismo color, que es justo el fallo que el zócalo existe para tapar— y
-   * que un color que llegue de fuera no deje una pieza sin aro.
+   * que un color que llegue de fuera no deje una pieza sin marca.
    */
-  const suColor = (color: string): string[] =>
-    deTipo(todoElArbol(Zocalo({ color, donde: [0, ALTO_DEL_ZOCALO, 0], aro: null })), 'meshBasicMaterial')
-      .map((n) => String(n.props['color']))
-      .filter((c) => c !== FILO_DEL_ZOCALO);
+  const suColor = (color: string): string[] => [
+    ...new Set(
+      deTipo(
+        todoElArbol(Zocalo({ color, donde: [0, ALTO_DEL_ZOCALO, 0], forma: 'disco', marca: null })),
+        'meshBasicMaterial',
+      )
+        .map((n) => String(n.props['color']))
+        .filter((c) => c !== FILO_DEL_ZOCALO),
+    ),
+  ];
   const cuatroDistintos = new Set(COLORES_DE_JUGADOR.map((c) => suColor(c).join('')));
   comprobar(
-    'los cuatro colonos llevan cuatro aros distintos, cada uno con el color con el que se pinta su pieza',
+    'los cuatro colonos llevan cuatro marcas distintas, cada una con el color con el que se pinta su pieza',
     cuatroDistintos.size === COLORES_DE_JUGADOR.length &&
       COLORES_DE_JUGADOR.every((c) => suColor(c).length === 1 && suColor(c)[0] === colorLlanoDelJugador(c)),
     Object.fromEntries(COLORES_DE_JUGADOR.map((c) => [c, suColor(c)])),
   );
   comprobar(
-    'y un color que llega de fuera no deja la pieza sin aro: sale azul, como en `desplazamientoDeColor`',
+    'y un color que llega de fuera no deja la pieza sin marca: sale azul, como en `desplazamientoDeColor`',
     suColor('morado')[0] === colorLlanoDelJugador('blue'),
     suColor('morado'),
   );
   /*
-   * EL GRUPO VA TUMBADO Y DONDE LE DICEN. Sin el cuarto de vuelta el aro se pinta DE CANTO —un
-   * anillo de `three` nace en el plano XY, o sea vertical en este mundo— y desde el aire lo que
-   * se ve es una raya de un píxel o nada. Es un fallo que no lanza y que en pantalla se lee
-   * exactamente igual que si el zócalo no estuviera.
+   * ═══ LOS DOS GIROS, Y LOS DOS BORRAN LA MARCA SIN LANZAR NADA ═══
+   *
+   * EL DE FUERA la TUMBA sobre el suelo. Sin el cuarto de vuelta se pinta DE CANTO —un plano de
+   * `three` nace en el plano XY, o sea vertical en este mundo— y desde el aire lo que se ve es
+   * una raya de un píxel o nada, que en pantalla se lee exactamente igual que si el zócalo no
+   * estuviera.
+   *
+   * EL DE DENTRO la APUNTA a lo largo de la arista, y es el que decide si la raya de una vereda
+   * va A LO LARGO o DE TRAVÉS. De través mide cuatro píxeles de punta a punta: la marca que
+   * existe para que se cuenten cinco veredas seguidas sería un punto. Es exactamente el fallo
+   * que ya se pagó con los tramos del puente puestos cruzados.
    */
-  const grupoDelAro = todoElArbol(Zocalo({ color: 'blue', donde: [7, 3, 11], aro: null }))[0];
-  const giro = grupoDelAro?.props['rotation'] as number[] | undefined;
-  const plantado = grupoDelAro?.props['position'] as number[] | undefined;
+  const grupoDeFuera = todoElArbol(Zocalo({ color: 'blue', donde: [7, 3, 11], forma: 'disco', marca: null }))[0];
+  const giro = grupoDeFuera?.props['rotation'] as number[] | undefined;
+  const plantado = grupoDeFuera?.props['position'] as number[] | undefined;
   comprobar(
-    'el aro se tumba sobre el suelo —un cuarto de vuelta sobre X— y se planta donde le dicen',
-    grupoDelAro?.type === 'group' &&
+    'la marca se tumba sobre el suelo —un cuarto de vuelta sobre X— y se planta donde le dicen',
+    grupoDeFuera?.type === 'group' &&
       giro !== undefined &&
       Math.abs((giro[0] ?? 0) + Math.PI / 2) < 1e-12 &&
       giro[1] === 0 &&
@@ -6573,10 +8132,22 @@ paso('El zócalo se compra de verdad: existe, es de su dueño, tiene filo y se v
       plantado?.join(',') === '7,3,11',
     { giro, plantado },
   );
+  const conEsteGiro = (cuanto: number): number[] | undefined => {
+    const dentro = todoElArbol(
+      Zocalo({ color: 'blue', donde: [0, 0, 0], forma: 'raya', giro: cuanto, marca: null }),
+    ).filter((n) => n.type === 'group')[1];
+    return dentro?.props['rotation'] as number[] | undefined;
+  };
   comprobar(
-    `el aro se parte en ${String(LADOS_DEL_ARO)} trozos: a cuarenta y dos píxeles de diámetro eso son menos de cinco píxeles por lado, y el ojo lee un círculo`,
-    deTipo(todoElArbol(elRojo), 'ringGeometry').every((n) => (n.props['args'] as number[])[2] === LADOS_DEL_ARO) &&
-      LADOS_DEL_ARO >= 20,
+    'y la raya de una vereda se apunta a lo largo de la arista: el giro que le dan llega al grupo de dentro y gira sobre el eje del plano tumbado',
+    (conEsteGiro(0.7) ?? [])[2] === 0.7 && (conEsteGiro(-1.9) ?? [])[2] === -1.9 && (conEsteGiro(0.7) ?? [])[0] === 0,
+    { conSieteDecimas: conEsteGiro(0.7), conMenosDos: conEsteGiro(-1.9) },
+  );
+  comprobar(
+    `el disco se parte en ${String(LADOS_DEL_DISCO)} trozos: a ${(2 * loQueOcupaElZocalo('disco').fuera * ZOCALO_EN_PANTALLA * 900).toFixed(1)} píxeles de diámetro eso son ${((Math.PI * 2 * loQueOcupaElZocalo('disco').fuera * ZOCALO_EN_PANTALLA * 900) / LADOS_DEL_DISCO).toFixed(1)} píxeles por lado, y el ojo lee un círculo`,
+    deTipo(todoElArbol(elRojo), 'ringGeometry').every((n) => (n.props['args'] as number[])[2] === LADOS_DEL_DISCO) &&
+      deTipo(todoElArbol(elRojo), 'circleGeometry').every((n) => (n.props['args'] as number[])[1] === LADOS_DEL_DISCO) &&
+      LADOS_DEL_DISCO >= 20,
     deTipo(todoElArbol(elRojo), 'ringGeometry').map((n) => (n.props['args'] as number[])[2]),
   );
 
@@ -6599,23 +8170,44 @@ paso('El zócalo se compra de verdad: existe, es de su dueño, tiene filo y se v
   const apagado = conLaPropCambiada(elArbolDelRojo, 'visible', false);
   comprobar(
     'se ve fallar: con el grupo apagado —lo que el revisor hizo y las dos baterías dejaron pasar— el juez lo dice',
-    queLeFaltaAlZocalo(apagado, 'red').some((f) => f.includes('apagados')),
-    queLeFaltaAlZocalo(apagado, 'red'),
+    queLeFaltaAlZocalo(apagado, 'red', 'disco').some((f) => f.includes('apagados')),
+    queLeFaltaAlZocalo(apagado, 'red', 'disco'),
   );
-  const sinFilo = conLaPropCambiada(
-    elArbolDelRojo,
-    'children',
-    todoElArbol(elRojo).filter((n) => n.type === 'mesh' && n.props['renderOrder'] === 2)[0],
-  );
+  /** Un árbol con sólo las mallas que se piden, colgadas del grupo de fuera. */
+  const soloConEstasMallas = (arbol: unknown, sirve: (n: NodoPintado) => boolean): NodoPintado => ({
+    type: 'group',
+    props: {
+      ...(arbol as NodoPintado).props,
+      children: todoElArbol(arbol).filter((n) => n.type === 'mesh' && sirve(n)),
+    },
+  });
+  const esDelFilo = (n: NodoPintado): boolean =>
+    deTipo(todoElArbol(n), 'meshBasicMaterial').some((q) => q.props['color'] === FILO_DEL_ZOCALO);
+  const discoSinContorno = soloConEstasMallas(elRojo, (n) => !esDelFilo(n));
   comprobar(
-    'se ve fallar: sin el aro del filo, un zócalo verde sobre el carrizal sería un aro que no está',
-    queLeFaltaAlZocalo(sinFilo, 'red').some((f) => f.includes(FILO_DEL_ZOCALO)),
-    queLeFaltaAlZocalo(sinFilo, 'red'),
+    'se ve fallar: sin el contorno, un disco verde sobre el carrizal se quedaría a 2,3 de CIE76 del suelo, o sea sería un disco que no está',
+    queLeFaltaAlZocalo(discoSinContorno, 'red', 'disco').some((f) => f.includes(FILO_DEL_ZOCALO)),
+    queLeFaltaAlZocalo(discoSinContorno, 'red', 'disco'),
+  );
+  /*
+   * Y LA MISMA VACUNA EN LA RAYA, QUITÁNDOLE UN SOLO FLANCO. No es la de arriba con otra forma:
+   * una raya con un flanco sigue teniendo contorno del color correcto y sigue teniendo tres
+   * colores en el árbol — lo que pierde es el borde por UN lado, y por ese lado se funde con el
+   * terreno. Un juez que sólo contara colores diría que sí.
+   */
+  const rayaConUnFlanco = soloConEstasMallas(laRaya, (n) => {
+    const y = ((n.props['position'] as number[] | undefined) ?? [0, 0, 0])[1] ?? 0;
+    return y <= 0;
+  });
+  comprobar(
+    'se ve fallar: a la raya de una vereda se le quita UN flanco y el juez dice que el contorno ya no asoma por los dos lados',
+    queLeFaltaAlZocalo(rayaConUnFlanco, 'red', 'raya').some((f) => f.includes('los dos lados')),
+    queLeFaltaAlZocalo(rayaConUnFlanco, 'red', 'raya'),
   );
   comprobar(
     'se ve fallar: un zócalo del color de otro colono no señala a su dueño',
-    queLeFaltaAlZocalo(elRojo, 'green').some((f) => f.includes(colorLlanoDelJugador('green'))),
-    queLeFaltaAlZocalo(elRojo, 'green'),
+    queLeFaltaAlZocalo(elRojo, 'green', 'disco').some((f) => f.includes(colorLlanoDelJugador('green'))),
+    queLeFaltaAlZocalo(elRojo, 'green', 'disco'),
   );
   const cogiendoToques: NodoPintado = {
     type: 'group',
@@ -6627,9 +8219,77 @@ paso('El zócalo se compra de verdad: existe, es de su dueño, tiene filo y se v
     },
   };
   comprobar(
-    'se ve fallar: sin el `raycast` que devuelve null, el aro se comería desde el aire los toques de la comarca que tiene debajo',
-    queLeFaltaAlZocalo(cogiendoToques, 'red').some((f) => f.includes('toques')),
-    queLeFaltaAlZocalo(cogiendoToques, 'red'),
+    'se ve fallar: sin el `raycast` que devuelve null, la marca se comería desde el aire los toques de la comarca que tiene debajo',
+    queLeFaltaAlZocalo(cogiendoToques, 'red', 'disco').some((f) => f.includes('toques')),
+    queLeFaltaAlZocalo(cogiendoToques, 'red', 'disco'),
+  );
+  /*
+   * Y LA VACUNA DE LA OPACIDAD, que es la que la versión del aro no tenía: aflojando el relleno
+   * al 0,15 la marca sigue estando, sigue siendo del color de su dueño y sigue teniendo
+   * contorno — y en pantalla ya no se distingue de qué color es, porque todas las medidas del
+   * bloque de arriba están hechas al 0,55. El juez tiene que decirlo.
+   */
+  const aguado: NodoPintado = {
+    type: 'group',
+    props: {
+      ...elArbolDelRojo.props,
+      children: todoElArbol(elRojo)
+        .filter((n) => n.type === 'mesh')
+        .map((n) => ({
+          type: n.type,
+          props: {
+            ...n.props,
+            children: todoElArbol(n)
+              .filter((q) => q.type !== 'mesh')
+              .map((q) => (q.type === 'meshBasicMaterial' ? conLaPropCambiada(q, 'opacity', 0.15) : q)),
+          },
+        })),
+    },
+  };
+  comprobar(
+    'se ve fallar: con el relleno aflojado al 0,15 la marca sigue montada y el juez dice que ya no se pinta a la opacidad con la que se midió el color',
+    queLeFaltaAlZocalo(aguado, 'red', 'disco').some((f) => f.includes('opacidad')),
+    queLeFaltaAlZocalo(aguado, 'red', 'disco'),
+  );
+  /*
+   * ═══ LAS TRES VACUNAS DE LA PUERTA DE AL LADO: `scale` Y EL SITIO ═══
+   *
+   * Las de arriba compran que el juez caza lo que el revisor rompió. Éstas compran lo que el
+   * juez NO miraba y que apaga la marca igual de bien, desde este mismo fichero y sin tocar
+   * `visible`: un cero en la escala —en la raíz, en el grupo del giro o en las mallas— y una
+   * malla empujada fuera del encuadre. Las tres pasaban con `verify:escena` en verde.
+   */
+  const encogido = conLaPropCambiada(elArbolDelRojo, 'scale', 0);
+  comprobar(
+    'se ve fallar: con `scale={0}` en el grupo raíz de `Zocalo` —dentro de `zocalo.tsx`, o sea en el fichero que existe para poder medirse— el juez lo dice',
+    queLeFaltaAlZocalo(encogido, 'red', 'disco').some((f) => f.includes('encogidos')),
+    queLeFaltaAlZocalo(encogido, 'red', 'disco'),
+  );
+  const dentroEncogido: NodoPintado = {
+    type: elArbolDelRojo.type,
+    props: {
+      ...elArbolDelRojo.props,
+      children: conLaPropCambiada(elArbolDelRojo.props['children'] as NodoPintado, 'scale', [0, 0, 0]),
+    },
+  };
+  comprobar(
+    'se ve fallar: y con `scale={[0, 0, 0]}` en el grupo del GIRO —que no es la raíz y apaga lo mismo— también',
+    queLeFaltaAlZocalo(dentroEncogido, 'red', 'disco').some((f) => f.includes('encogidos')),
+    queLeFaltaAlZocalo(dentroEncogido, 'red', 'disco'),
+  );
+  const mudada: NodoPintado = {
+    type: 'group',
+    props: {
+      ...elArbolDelRojo.props,
+      children: todoElArbol(elRojo)
+        .filter((n) => n.type === 'mesh')
+        .map((n) => conLaPropCambiada(n, 'position', [0, 0, -100000])),
+    },
+  };
+  comprobar(
+    'se ve fallar: y con las mallas empujadas a cien mil unidades de su sitio la marca sigue montada, sigue siendo del color de su dueño y no está en ningún sitio — el juez lo dice',
+    queLeFaltaAlZocalo(mudada, 'red', 'disco').some((f) => f.includes('mudadas')),
+    queLeFaltaAlZocalo(mudada, 'red', 'disco'),
   );
 
   // ── LA TALLA: la misma marca de pantalla en los 126 sitios del delta ──────
@@ -6690,27 +8350,33 @@ paso('El zócalo se compra de verdad: existe, es de su dueño, tiene filo y se v
     desviados.slice(0, 3).map((s) => s.que),
   );
   /*
-   * LA VACUNA, y es la que sostiene la marca de pantalla entera: un aro del tamaño del mundo
+   * LA VACUNA, y es la que sostiene la marca de pantalla entera: una marca del tamaño del mundo
    * —que es lo que se pinta escribiendo un radio a mano— ocupa cosas distintas en el centro y
-   * en el borde, y todas por debajo de lo que hace falta para verlo. En pantalla eso se lee
-   * como que unas veredas se ven y otras no.
+   * en el borde. En pantalla eso se lee como que unas veredas se ven y otras no, y es
+   * exactamente lo que pasa: la del borde se queda por debajo de la fracción que hace falta.
+   *
+   * Con el aro esta vacuna exigía además que NINGUNA llegara a la fracción de marca. Con el
+   * disco ya no es cierto —al 1,4 % del alto, una marca de una tesela SÍ pasa de ese ancho en
+   * el sitio más cercano a la cámara— y decirlo seguiría siendo cómodo pero falso: lo que se
+   * exige ahora es lo que se mide, que la más lejana se quede corta y que las dos no midan lo
+   * mismo, que es la frase entera de la marca de pantalla.
    */
   const comoUnaTesela = sitiosDeMarca.map((s) => parteQueOcupaEn(s.donde, 1));
   const masChica = Math.min(...comoUnaTesela);
   const masGrande = Math.max(...comoUnaTesela);
   comprobar(
-    `se ve fallar: con un aro del tamaño del mundo, la marca del sitio más cercano ocuparía ${(masGrande / masChica).toFixed(2)} veces la del más lejano, y las dos por debajo del ${(ZOCALO_EN_PANTALLA * 100).toFixed(1)} % que hace falta`,
-    masGrande / masChica > 1.2 && masGrande < ZOCALO_EN_PANTALLA,
+    `se ve fallar: con una marca del tamaño del mundo, la del sitio más cercano ocuparía ${(masGrande / masChica).toFixed(2)} veces la del más lejano, y la del borde del delta se quedaría en el ${(masChica * 100).toFixed(2)} % del alto contra el ${(ZOCALO_EN_PANTALLA * 100).toFixed(1)} % que hace falta`,
+    masGrande / masChica > 1.2 && masChica < ZOCALO_EN_PANTALLA,
     { masChica, masGrande, deMarca: ZOCALO_EN_PANTALLA },
   );
   /*
-   * Y UNA CÁMARA QUE NO ES DE PERSPECTIVA NO DEJA EL ARO SIN TALLA. `tallaDeUnaMarca` con un
+   * Y UNA CÁMARA QUE NO ES DE PERSPECTIVA NO DEJA LA MARCA SIN TALLA. `tallaDeUnaMarca` con un
    * campo de cero devuelve el SUELO, que es una china; con el campo de reserva sale una marca.
    */
   const ortogonal = new THREE.OrthographicCamera(-100, 100, 100, -100, 1, 10000);
   ortogonal.position.copy(laCamara.position);
   comprobar(
-    'con una cámara ortográfica el aro sigue teniendo talla de marca y no se queda en el suelo de la cuenta',
+    'con una cámara ortográfica la marca sigue teniendo talla de marca y no se queda en el suelo de la cuenta',
     tallaDelZocalo(ortogonal, [0, 0, 0]) > SUELO_DEL_ZOCALO &&
       tallaDelZocalo(ortogonal, [0, 0, 0]) < TECHO_DEL_ZOCALO,
     tallaDelZocalo(ortogonal, [0, 0, 0]),
@@ -6733,54 +8399,96 @@ paso('El zócalo se compra de verdad: existe, es de su dueño, tiene filo y se v
    * menos chozas— y por tanto una cota de verdad.
    *
    * Y por los DOS lados, porque «alfombra» son dos cosas distintas:
-   *   · CUÁNTO TAPAN: la suma de los aros contra la superficie del delta.
+   *   · CUÁNTO TAPAN: la tinta de las 126 marcas contra la superficie del delta. Se cuenta la
+   *     TINTA y no el círculo que las contiene, porque ahora una de las dos formas es una raya
+   *     larga y fina: medirla por su círculo diría que tapa siete veces lo que tapa.
    *   · Y SI SE TOCAN: dos marcas pegadas dejan de leerse como dos. Las más juntas que puede
    *     haber son una choza y una de sus propias veredas —medio lado de comarca—, y eso es lo
-   *     que decide el tamaño máximo que la marca puede tener.
+   *     que decide el tamaño máximo que la marca puede tener. Aquí sí manda el círculo que la
+   *     contiene, porque una raya girada puede apuntar a cualquier lado.
    */
-  const anillos = anillosDelZocalo('red');
-  const elMasDeFuera = anillos.reduce((m, a) => Math.max(m, a.fuera), 0);
-  const elMasDeDentro = anillos.reduce((m, a) => Math.min(m, a.dentro), Infinity);
-  const laTalla = tallaDelZocalo(laCamara, [0, 0, 0]);
-  const radioDeFuera = laTalla * RADIO_DE_TESELA * elMasDeFuera;
-  const radioDeDentro = laTalla * RADIO_DE_TESELA * elMasDeDentro;
-  const puntosDeMarca = sitiosDeMarca.map((s) => ({ x: s.donde[0], y: s.donde[2] }));
+  /*
+   * ═══ Y AHORA LAS MARCAS NO MIDEN TODAS LO MISMO, ASÍ QUE EL PAR IMPORTA ═══
+   *
+   * Esto se medía tomando la marca MÁS ANCHA y suponiendo que las dos del par eran ella:
+   * `aire = masJuntas − 2·radioDeFuera`. Mientras había una sola talla eso era conservador y
+   * daba igual. Desde que el disco de una ciudad mide casi el doble que la raya de una vereda,
+   * suponerlo pide aire para una pareja que no existe —dos ciudades vecinas están a 75,8, no a
+   * 37,9— y deja sin medir la que sí existe.
+   *
+   * Así que se recorren los 126 sitios con SU radio cada uno y se busca el par que menos aire
+   * deja. El peor caso de talla es que los 54 vértices sean CIUDADES, que es lo que más ocupa
+   * —una partida de Riberas reparte cuatro ciudades por colono, así que no puede pasar—.
+   */
+  const elDisco = loQueOcupaElZocalo('disco');
+  const laRayaOcupa = loQueOcupaElZocalo('raya');
+  const enElMundoDeLaRaya = tallaDelZocalo(laCamara, [0, 0, 0]) * RADIO_DE_TESELA;
+  const enElMundoDeLaCiudad =
+    tallaDelZocalo(
+      laCamara,
+      [0, 0, 0],
+      ZOCALO_DE_CIUDAD_EN_PANTALLA,
+      sueloDeLaMarca('ciudad'),
+      techoDeLaMarca('ciudad'),
+    ) * RADIO_DE_TESELA;
+  const radioDeLaRaya = enElMundoDeLaRaya * laRayaOcupa.fuera;
+  const radioDelDisco = enElMundoDeLaCiudad * elDisco.fuera;
+  const radioDeFuera = Math.max(radioDelDisco, radioDeLaRaya);
+  const puntosDeMarca = sitiosDeMarca.map((s) => ({
+    x: s.donde[0],
+    y: s.donde[2],
+    radio: s.que.startsWith('choza') ? radioDelDisco : radioDeLaRaya,
+    que: s.que,
+  }));
   let masJuntas = Infinity;
+  let aire = Infinity;
+  let elParMasJunto = '';
   for (let i = 0; i < puntosDeMarca.length; i++) {
     for (let j = i + 1; j < puntosDeMarca.length; j++) {
-      const uno = puntosDeMarca[i] as Punto;
-      const otro = puntosDeMarca[j] as Punto;
-      masJuntas = Math.min(masJuntas, Math.hypot(uno.x - otro.x, uno.y - otro.y));
+      const uno = puntosDeMarca[i] as (typeof puntosDeMarca)[number];
+      const otro = puntosDeMarca[j] as (typeof puntosDeMarca)[number];
+      const cuanto = Math.hypot(uno.x - otro.x, uno.y - otro.y);
+      masJuntas = Math.min(masJuntas, cuanto);
+      const suAire = cuanto - uno.radio - otro.radio;
+      if (suAire < aire) {
+        aire = suAire;
+        elParMasJunto = `${uno.que} y ${otro.que}, a ${cuanto.toFixed(1)}`;
+      }
     }
   }
   const superficieDelDelta = DELTA.length * ((3 * Math.sqrt(3)) / 2) * RADIO_DE_COMARCA * RADIO_DE_COMARCA;
-  const cuantoTapanTodas = (fuera: number, dentro: number): number =>
-    (puntosDeMarca.length * Math.PI * (fuera * fuera - dentro * dentro)) / superficieDelDelta;
-  const tapan = cuantoTapanTodas(radioDeFuera, radioDeDentro);
-  const aire = masJuntas - 2 * radioDeFuera;
+  const cuantoTapanTodas = (deLaCiudad: number, deLaRaya: number): number =>
+    (LOS_VERTICES.length * elDisco.tinta * deLaCiudad * deLaCiudad +
+      LAS_ARISTAS.length * laRayaOcupa.tinta * deLaRaya * deLaRaya) /
+    superficieDelDelta;
+  const tapan = cuantoTapanTodas(enElMundoDeLaCiudad, enElMundoDeLaRaya);
   comprobar(
-    `con las ${String(puntosDeMarca.length)} marcas puestas a la vez, los aros tapan el ${(tapan * 100).toFixed(1)} % del delta: no es una alfombra`,
+    `con las ${String(puntosDeMarca.length)} marcas puestas a la vez —${String(LOS_VERTICES.length)} discos de CIUDAD, que es lo que más ocupa, y ${String(LAS_ARISTAS.length)} rayas— la tinta tapa el ${(tapan * 100).toFixed(1)} % del delta: no es una alfombra`,
     tapan < 0.15,
-    { tapan, superficieDelDelta, radioDeFuera },
+    { tapan, superficieDelDelta, radioDelDisco, radioDeLaRaya },
   );
   comprobar(
-    `y ninguna toca a otra: las dos más juntas —una choza y una de sus propias veredas— están a ${masJuntas.toFixed(1)} y los aros miden ${(2 * radioDeFuera).toFixed(1)} de ancho, o sea ${aire.toFixed(1)} de aire entre las dos`,
+    `y ninguna toca a otra: el par más apretado es ${elParMasJunto} y deja ${aire.toFixed(1)} de aire, más que los ${radioDeFuera.toFixed(1)} que mide de radio la más ancha de las dos`,
     aire > radioDeFuera,
-    { masJuntas, ancho: 2 * radioDeFuera, aire },
+    { masJuntas, aire, radioDeFuera, elPar: elParMasJunto },
   );
   /*
    * LA VACUNA: A LA TALLA DE LA SEÑAL DE UN SITIO LIBRE ESTO SÍ SERÍA UNA ALFOMBRA. Es la razón
-   * por la que `ZOCALO_EN_PANTALLA` vale 0,022 y no 0,035, y hasta hoy estaba escrita como un
-   * argumento y no como una medida.
+   * por la que `ZOCALO_EN_PANTALLA` vale 0,014 y no 0,035, y no es un argumento sino una medida.
+   *
+   * Y los dos números que salen de aquí son los que la cabecera de `escala.ts` decía mal: no
+   * es que el aire «baje a 1,6», es que se hace NEGATIVO —las dos marcas se solapan— y no es
+   * el 46 % del delta sino el 33,9 %. Los dos venían de la época del aro.
    */
   const COMO_UNA_SENAL = 0.035;
-  const tallaDeSenal = (laTalla * COMO_UNA_SENAL) / ZOCALO_EN_PANTALLA;
-  const fueraDeSenal = tallaDeSenal * RADIO_DE_TESELA * elMasDeFuera;
-  const tapanDeSenal = cuantoTapanTodas(fueraDeSenal, tallaDeSenal * RADIO_DE_TESELA * elMasDeDentro);
+  const deSenalEnElMundo = (enElMundoDeLaRaya * COMO_UNA_SENAL) / ZOCALO_EN_PANTALLA;
+  const tapanDeSenal = cuantoTapanTodas(deSenalEnElMundo, deSenalEnElMundo);
+  const aireDeSenal =
+    masJuntas - deSenalEnElMundo * elDisco.fuera - deSenalEnElMundo * laRayaOcupa.fuera;
   comprobar(
-    `se ve fallar: a la talla de la señal de un sitio libre las mismas marcas taparían el ${(tapanDeSenal * 100).toFixed(1)} % del delta, y el aire entre una choza y su vereda bajaría de ${aire.toFixed(1)} a ${(masJuntas - 2 * fueraDeSenal).toFixed(1)}`,
-    tapanDeSenal > 0.3 && tapanDeSenal > tapan * 2 && masJuntas - 2 * fueraDeSenal < radioDeFuera,
-    { tapanDeSenal, tapan, aireDeSenal: masJuntas - 2 * fueraDeSenal },
+    `se ve fallar: a la talla de la señal de un sitio libre las mismas marcas taparían el ${(tapanDeSenal * 100).toFixed(1)} % del delta, y el aire del par más apretado pasaría de ${aire.toFixed(1)} a ${aireDeSenal.toFixed(1)} — o sea que se solaparían`,
+    tapanDeSenal > 0.3 && tapanDeSenal > tapan * 2 && aireDeSenal < 0,
+    { tapanDeSenal, tapan, aireDeSenal },
   );
 
   // ── DÓNDE CAE LA MARCA DE UNA VEREDA: en la calzada, no bajo tierra ───────
@@ -6812,6 +8520,7 @@ paso('El zócalo se compra de verdad: existe, es de su dueño, tiene filo y se v
     const fueraDelMedio: string[] = [];
     const enterradas: string[] = [];
     const enterradasSiFueraLaRecta: string[] = [];
+    const torcidas: string[] = [];
     let loMasHondoDeLaRecta = 0;
     for (let semilla = 0; semilla < 12; semilla++) {
       const relieve = crearRelieve(islasDePrueba, semilla);
@@ -6828,6 +8537,24 @@ paso('El zócalo se compra de verdad: existe, es de su dueño, tiene filo y se v
           fueraDelMedio.push(
             `${arista}: la marca en ${puente.medio.x.toFixed(1)},${puente.medio.z.toFixed(1)} y el medio de la arista en ${enElMapa.x.toFixed(1)},${enElMapa.y.toFixed(1)}`,
           );
+        }
+        /*
+         * ═══ Y LA RAYA VA A LO LARGO DE LA ARISTA, QUE ES LA MITAD DE LO QUE MARCA ═══
+         *
+         * `puente.giro` es lo que `delta.tsx` le pasa al zócalo, y con la convención de los
+         * caminos —giro cero apunta a +X— eso tiene que dejar la raya PARALELA a la arista. Se
+         * comprueba comparando la dirección que el giro produce con la de la arista de verdad,
+         * en valor absoluto del coseno: una raya vale igual apuntando a un lado que al otro,
+         * pero de través vale cero. Un signo cambiado en la Y del `atan2` —que es la cuenta que
+         * ya dejó los puentes cruzados— da aquí un coseno que no es uno.
+         */
+        const largoDeLaArista = Math.hypot(b.x - a.x, b.y - a.y);
+        const cuadra =
+          Math.abs(
+            (Math.cos(puente.giro) * (b.x - a.x) - Math.sin(puente.giro) * (b.y - a.y)) / largoDeLaArista,
+          );
+        if (Math.abs(cuadra - 1) > 1e-9) {
+          torcidas.push(`${arista}: la raya se desvía de la arista, el coseno sale ${cuadra.toFixed(4)}`);
         }
         const tierra = suelo({ x: enElMapa.x, y: enElMapa.y });
         if (puente.medio.y + ALTO_DEL_ZOCALO <= tierra) {
@@ -6855,6 +8582,32 @@ paso('El zócalo se compra de verdad: existe, es de su dueño, tiene filo y se v
       fueraDelMedio.slice(0, 3),
     );
     comprobar(
+      `y la raya va A LO LARGO de la arista en las ${String(medidas)} medidas: una vereda marcada de través mide cuatro píxeles de punta a punta y deja de decir hacia dónde va`,
+      torcidas.length === 0,
+      torcidas.slice(0, 3),
+    );
+    /*
+     * LA VACUNA DEL GIRO: el mismo juez con el signo de la Y sin cambiar —que es el error que ya
+     * dejó los tramos del puente puestos cruzados— tiene que caer, y tiene que caer en CASI
+     * todas: las pocas aristas que sobreviven son las horizontales, donde el signo da igual.
+     */
+    const conElSignoAlReves: string[] = [];
+    for (const arista of LAS_ARISTAS) {
+      const [uno, otro] = verticesDeArista(arista);
+      if (uno === undefined || otro === undefined) continue;
+      const a = puntoDeVertice(uno, RADIO_DE_COMARCA);
+      const b = puntoDeVertice(otro, RADIO_DE_COMARCA);
+      const alReves = Math.atan2(b.y - a.y, b.x - a.x);
+      const largo = Math.hypot(b.x - a.x, b.y - a.y);
+      const cuadra = Math.abs((Math.cos(alReves) * (b.x - a.x) - Math.sin(alReves) * (b.y - a.y)) / largo);
+      if (Math.abs(cuadra - 1) > 1e-9) conElSignoAlReves.push(`${arista}: ${cuadra.toFixed(4)}`);
+    }
+    comprobar(
+      `se ve fallar: con el signo de la Y sin cambiar en el \`atan2\`, la raya se sale de la arista en ${String(conElSignoAlReves.length)} de las ${String(LAS_ARISTAS.length)} —todas menos las horizontales, donde el signo da igual—`,
+      conElSignoAlReves.length > LAS_ARISTAS.length / 2,
+      conElSignoAlReves.slice(0, 3),
+    );
+    comprobar(
       `y va a la altura de la CALZADA, así que no queda enterrada en ninguna de las ${String(medidas)} medidas`,
       enterradas.length === 0,
       enterradas.slice(0, 3),
@@ -6865,29 +8618,112 @@ paso('El zócalo se compra de verdad: existe, es de su dueño, tiene filo y se v
       enterradasSiFueraLaRecta.slice(0, 3),
     );
     /*
-     * Y NO SE VA POR ARRIBA. Una marca colgada muy por encima de la calzada dejaría de leerse
-     * como el suelo de la vereda y pasaría a ser un globo. El techo es lo que la propia calzada
-     * se permite sobre lo que salva: su aire, el grosor del camino y el alto del zócalo.
+     * ═══ Y NO SE VA POR ARRIBA — Y LO QUE HABÍA AQUÍ NO COMPRABA NADA ═══
+     *
+     * Una marca colgada muy por encima de la calzada deja de leerse como el suelo de la vereda
+     * y pasa a ser un globo. Hasta esta tanda el techo era
+     * `tierra + AIRE_BAJO_LA_CALZADA + SUPERFICIE_DEL_CAMINO + ALTO_DEL_ZOCALO` y la marca
+     * `puente.medio.y + ALTO_DEL_ZOCALO`: LA CONSTANTE QUE SE ESTABA JUZGANDO ESTABA EN LOS DOS
+     * LADOS y se cancelaba. Medido subiéndola a veinte personas de halo —50,86 de mundo, diez
+     * veces la choza—: `verify:escritorio` y el typecheck salían en cero y de este guion caía
+     * OTRA comprobación, no ésta. Un techo que sube con lo que se está midiendo no es un techo.
+     *
+     * Y EL TECHO NO PUEDE COLGAR DEL SUELO, que era la otra mitad del error. La marca no cuelga
+     * del suelo: cuelga de la CALZADA, y una calzada es un puente que pasa POR ENCIMA de lo que
+     * salva. Medido aquí mismo sobre las 864 aristas de los doce relieves, la calzada llega a ir
+     * casi doce unidades por encima de la tierra del punto medio —eso es un puente haciendo su
+     * trabajo, y el número lo dice la tercera comprobación de abajo—, así que un techo contado
+     * desde la tierra o es falso o hay que dejarlo en el único relieve que lo cumple, que es
+     * peor: con el relieve de la semilla 3, que es el que se medía, las 72 aristas dan el mismo
+     * número clavado.
+     *
+     * EL TECHO BUENO ES LO QUE MIDE LA PIEZA QUE PUEDE IR ENCIMA: si la marca sube más que la
+     * choza que marca, ha dejado de ser su suelo. Se mide del `.glb` —no se escribe— bajando
+     * por los hijos del nodo con su traslación y su escala, y con la talla más pequeña que
+     * `piezasDeAsentamiento` le da en los 54 vértices del delta.
      */
+    const modeloDeLaChoza = PIEZAS_DE_COLOR[0] as string;
+    const nodosDeLaChoza = (
+      await new NodeIO().read(
+        path.join(import.meta.dirname ?? __dirname, '..', 'modelos', 'tablero.glb'),
+      )
+    )
+      .getRoot()
+      .listNodes();
+    const raizDeLaChoza = nodosDeLaChoza.find((n) => n.getName() === modeloDeLaChoza);
+    let altoEnElPack = 0;
+    if (raizDeLaChoza !== undefined) {
+      const bajarPorLoAlto = (n: Node, ty: number, s: number): void => {
+        const t = n.getTranslation();
+        const e = n.getScale();
+        const py = ty + (t[1] as number) * s;
+        const ss = s * Math.abs(e[1] as number);
+        for (const prim of n.getMesh()?.listPrimitives() ?? []) {
+          const pos = prim.getAttribute('POSITION');
+          if (pos === null) continue;
+          const p = [0, 0, 0];
+          for (let i = 0; i < pos.getCount(); i++) {
+            pos.getElement(i, p);
+            altoEnElPack = Math.max(altoEnElPack, py + (p[1] as number) * ss);
+          }
+        }
+        for (const h of n.listChildren()) bajarPorLoAlto(h, py, ss);
+      };
+      bajarPorLoAlto(raizDeLaChoza, 0, 1);
+    }
+    let laTallaMasPequena = Infinity;
+    for (const v of LOS_VERTICES) {
+      for (const parte of piezasDeAsentamiento('poblado', 'blue', v)) {
+        if (parte.modelo !== modeloDePieza('poblado', 'blue')) continue;
+        laTallaMasPequena = Math.min(laTallaMasPequena, parte.talla);
+      }
+    }
+    const ALTO_DE_LA_CHOZA = altoEnElPack * ESCALA_DEL_PACK * laTallaMasPequena;
+    /* Y con el halo de la vacuna, que es la talla que hace falta para verlo caer. */
+    const UN_HALO_DE_VEINTE = ALTURA_DE_UNA_PERSONA * 20;
     const flotan: string[] = [];
-    const unRelieve = crearRelieve(islasDePrueba, 3);
-    for (const arista of LAS_ARISTAS) {
-      const [uno, otro] = verticesDeArista(arista);
-      if (uno === undefined || otro === undefined) continue;
-      const a = puntoDeVertice(uno, RADIO_DE_COMARCA);
-      const b = puntoDeVertice(otro, RADIO_DE_COMARCA);
-      const puente = puenteEntre(a, b, (q: Punto) => unRelieve.alturaEn(q));
-      const enElMapa = puntoDeArista(arista, RADIO_DE_COMARCA);
-      const tierra = unRelieve.alturaEn({ x: enElMapa.x, y: enElMapa.y });
-      const techo = tierra + AIRE_BAJO_LA_CALZADA + SUPERFICIE_DEL_CAMINO + ALTO_DEL_ZOCALO;
-      if (puente.medio.y + ALTO_DEL_ZOCALO > techo + 1e-6) {
-        flotan.push(`${arista}: la marca a ${(puente.medio.y + ALTO_DEL_ZOCALO).toFixed(1)} y el techo en ${techo.toFixed(1)}`);
+    const flotanConElHalo: string[] = [];
+    let aristasMedidas = 0;
+    let loQueSubeLaCalzada = 0;
+    for (let semilla = 0; semilla < 12; semilla++) {
+      const unRelieve = crearRelieve(islasDePrueba, semilla);
+      for (const arista of LAS_ARISTAS) {
+        const [uno, otro] = verticesDeArista(arista);
+        if (uno === undefined || otro === undefined) continue;
+        const a = puntoDeVertice(uno, RADIO_DE_COMARCA);
+        const b = puntoDeVertice(otro, RADIO_DE_COMARCA);
+        const puente = puenteEntre(a, b, (q: Punto) => unRelieve.alturaEn(q));
+        const enElMapa = puntoDeArista(arista, RADIO_DE_COMARCA);
+        const tierra = unRelieve.alturaEn({ x: enElMapa.x, y: enElMapa.y });
+        aristasMedidas++;
+        loQueSubeLaCalzada = Math.max(
+          loQueSubeLaCalzada,
+          puente.medio.y + SUPERFICIE_DEL_CAMINO - (tierra + AIRE_BAJO_LA_CALZADA),
+        );
+        const techo = puente.medio.y + ALTO_DE_LA_CHOZA;
+        if (puente.medio.y + ALTO_DEL_ZOCALO > techo + 1e-6) {
+          flotan.push(`${arista}: la marca a ${(puente.medio.y + ALTO_DEL_ZOCALO).toFixed(1)} y el techo en ${techo.toFixed(1)}`);
+        }
+        if (puente.medio.y + UN_HALO_DE_VEINTE > techo + 1e-6) flotanConElHalo.push(arista);
       }
     }
     comprobar(
-      'y tampoco flota: nunca sube más de lo que la propia calzada se permite sobre el suelo que salva',
-      flotan.length === 0,
-      flotan.slice(0, 3),
+      `y tampoco flota: la marca de la vereda cuelga de la calzada y sube ${ALTO_DEL_ZOCALO.toFixed(2)} sobre ella —media persona—, que es menos de lo que mide la choza que puede ir encima (${ALTO_DE_LA_CHOZA.toFixed(3)}, medida del .glb, y sale clavada la ALTURA_DE_UNA_CASA de escala.ts, que es de donde sale la escala del pack). Medido en las ${String(aristasMedidas)} aristas de doce relieves`,
+      ALTO_DE_LA_CHOZA > 0 &&
+        Math.abs(ALTO_DE_LA_CHOZA - ALTURA_DE_UNA_CASA) < 1e-3 &&
+        flotan.length === 0 &&
+        ALTO_DEL_ZOCALO < ALTO_DE_LA_CHOZA,
+      { ALTO_DEL_ZOCALO, ALTO_DE_LA_CHOZA, ALTURA_DE_UNA_CASA, flotan: flotan.slice(0, 3) },
+    );
+    comprobar(
+      `se ve fallar: con veinte personas de halo —${UN_HALO_DE_VEINTE.toFixed(1)} de mundo— la marca flota por encima de su propia choza en las ${String(flotanConElHalo.length)} de ${String(aristasMedidas)} medidas, que es lo que el techo de antes NO decía porque llevaba la misma constante en los dos lados`,
+      aristasMedidas > 0 && flotanConElHalo.length === aristasMedidas,
+      { deVeinte: UN_HALO_DE_VEINTE, techoDeLaChoza: ALTO_DE_LA_CHOZA, cuantas: flotanConElHalo.length },
+    );
+    comprobar(
+      `y por eso el techo no se cuenta desde el suelo: la calzada llega a ir ${loQueSubeLaCalzada.toFixed(2)} por encima de la tierra que salva —un puente haciendo su trabajo—, así que un techo colgado del suelo daría por «flotante» a la marca de un puente alto`,
+      loQueSubeLaCalzada > AIRE_BAJO_LA_CALZADA * 4,
+      { loQueSubeLaCalzada, elAire: AIRE_BAJO_LA_CALZADA },
     );
   }
 
@@ -6914,14 +8750,21 @@ paso('El zócalo se compra de verdad: existe, es de su dueño, tiene filo y se v
    * plantillas, y contarlas es escribir medio analizador. Lo que sí hay es que en este fichero
    * todas las declaraciones de primer nivel empiezan en la columna cero.
    */
-  const cuerpoDe = (firma: string): string => {
-    const desde = fuenteDelDelta.indexOf(firma);
+  const cuerpoEn = (fuente: string, firma: string): string => {
+    const desde = fuente.indexOf(firma);
     if (desde < 0) return '';
     const re = /^(?:function|const|export) /gm;
     re.lastIndex = desde + firma.length;
-    const siguiente = re.exec(fuenteDelDelta);
-    return fuenteDelDelta.slice(desde, siguiente === null ? fuenteDelDelta.length : siguiente.index);
+    const siguiente = re.exec(fuente);
+    return fuente.slice(desde, siguiente === null ? fuente.length : siguiente.index);
   };
+  /*
+   * Y SE PARTE EN DOS: el lector toma la fuente por la puerta para que las vacunas puedan
+   * pasarle una fuente ROTA a mano. Sin eso, una vacuna de un lector de texto sólo puede
+   * comprobar que el lector no devuelve el fichero entero — que es lo que había — y no que
+   * caza el fallo de verdad.
+   */
+  const cuerpoDe = (firma: string): string => cuerpoEn(fuenteDelDelta, firma);
   /*
    * Y SE MIRA EL CÓDIGO, NO LOS COMENTARIOS. Estas cabeceras citan `<Zocalo` y `tallaDelZocalo`
    * por su nombre, así que sin quitar los comentarios esto sería verde leyendo prosa — que es
@@ -6934,9 +8777,37 @@ paso('El zócalo se compra de verdad: existe, es de su dueño, tiene filo y se v
   const sinTalla: string[] = [];
   for (const firma of LOS_QUE_LLEVAN_MARCA) {
     const cuerpo = soloElCodigo(cuerpoDe(firma));
-    if (!/<Zocalo\b/.test(cuerpo) || !/\bcolor=\{/.test(cuerpo) || !/\baro=\{/.test(cuerpo)) sinMarca.push(firma);
+    if (!/<Zocalo\b/.test(cuerpo) || !/\bcolor=\{/.test(cuerpo) || !/\bmarca=\{/.test(cuerpo)) sinMarca.push(firma);
     if (!/tallaDelZocalo\(/.test(cuerpo) || !/scale\.setScalar\(/.test(cuerpo)) sinTalla.push(firma);
   }
+  /*
+   * ═══ Y CADA UNA CON SU FORMA, QUE ES LO QUE LA MARCA DICE DE MÁS ═══
+   *
+   * `forma` tiene valor por defecto en ninguna parte: el que se olvide de ponerlo no compila. Lo
+   * que SÍ puede pasar es que las dos pidan la misma —dos `forma="disco"`— y entonces la vereda
+   * vuelve a estar marcada con un punto, que es exactamente lo que había antes y lo que se
+   * pidió cambiar. Eso no lo caza el compilador y no lo caza el árbol de `Zocalo`: hay que
+   * leerlo aquí.
+   *
+   * Y el GIRO de la vereda sale de `entero.giro` y no de una cuenta escrita a mano: rehacer ese
+   * `atan2` con el signo de la Y sin cambiar es lo que dejó los tramos del puente cruzados, y
+   * una raya cruzada mide cuatro píxeles de punta a punta.
+   */
+  const laFormaDe = (firma: string): string => {
+    const cuerpo = soloElCodigo(cuerpoDe(firma));
+    return (/forma="([a-z]+)"/.exec(cuerpo) ?? ['', ''])[1] as string;
+  };
+  comprobar(
+    'el asentamiento se marca con un DISCO y la vereda con una RAYA: la marca dice también qué clase de cosa es, y una vereda marcada con un punto no dice hacia dónde va',
+    laFormaDe('function Asentamiento(') === 'disco' && laFormaDe('function PuenteDeJugador(') === 'raya',
+    { choza: laFormaDe('function Asentamiento('), vereda: laFormaDe('function PuenteDeJugador(') },
+  );
+  comprobar(
+    'y el giro de la raya sale de `entero.giro`, que es la convención de los caminos, y no de un `atan2` rehecho a mano en `delta.tsx`',
+    /giro=\{entero\.giro\}/.test(soloElCodigo(cuerpoDe('function PuenteDeJugador('))) &&
+      !/Math\.atan2/.test(soloElCodigo(cuerpoDe('function PuenteDeJugador('))),
+    { cita: /giro=\{[^}]*\}/.exec(soloElCodigo(cuerpoDe('function PuenteDeJugador(')))?.[0] },
+  );
   /*
    * ═══ Y DÓNDE LO PLANTA, QUE ES LO QUE FALTABA Y ES LO MISMO QUE APAGARLO ═══
    *
@@ -6973,10 +8844,57 @@ paso('El zócalo se compra de verdad: existe, es de su dueño, tiene filo y se v
       /entero\.medio\.z/.test(dondeDelPuente),
     { dondeDelPuente },
   );
+  /*
+   * ═══ Y LA DE LA CHOZA YA NO VA A UN ALTO ESCRITO A MANO, Y ESO HAY QUE COMPRARLO ═══
+   *
+   * Aquí se exigía `donde={[0, ALTO_DEL_ZOCALO, 0]}` clavado, y media persona sobre el suelo
+   * del vértice no levanta a nadie por encima de la comarca de al lado: un escalón mide cuatro
+   * veces y media eso, y el trozo de disco que pisa la comarca vecina queda DENTRO de la
+   * ladera. Ahora la cota la decide `asientoDelDisco`, que mira el relieve de ese vértice.
+   *
+   * Y se compra la CADENA entera, no la grafía: que el `donde=` cite el nombre, que ese nombre
+   * salga de un `useMemo` con `asientoDelDisco(` dentro, y que a ése le entre el relieve de
+   * VERDAD —`relieve.alturaEn`— y no un llano supuesto. Con cualquiera de los tres eslabones
+   * rotos —un `asiento.alto` que no venga de ningún sitio, o un asiento calculado y no usado—
+   * esto cae, que es lo que `donde={[0, ALTO_DEL_ZOCALO, 0]}` no podía decir.
+   */
+  const elCuerpoDeLaChozaEnElJsx = soloElCodigo(cuerpoDe('function Asentamiento('));
+  const laCadenaDelAsiento =
+    /^donde=\{\[0, asiento\.alto, 0\]\}$/.test(dondeDelAsentamiento) &&
+    /const asiento = useMemo\(/.test(elCuerpoDeLaChozaEnElJsx) &&
+    /asientoDelDisco\(/.test(elCuerpoDeLaChozaEnElJsx) &&
+    /asientoDelDisco\(\s*\(x: number, y: number\) => relieve\.alturaEn/.test(elCuerpoDeLaChozaEnElJsx);
   comprobar(
-    'y la de la choza va en el origen de su pieza, subida el mismo alto',
-    /^donde=\{\[0, ALTO_DEL_ZOCALO, 0\]\}$/.test(dondeDelAsentamiento),
-    { dondeDelAsentamiento },
+    'y la de la choza va en el origen de su pieza y a la cota que el RELIEVE de su vértice deja: el «donde=» cita el asiento, el asiento sale de un `useMemo` con `asientoDelDisco`, y a ése le entra el relieve de verdad y no un llano supuesto',
+    laCadenaDelAsiento,
+    {
+      dondeDelAsentamiento,
+      citaElAsiento: /const asiento = useMemo\(/.test(elCuerpoDeLaChozaEnElJsx),
+      lLamaAlAsiento: /asientoDelDisco\(/.test(elCuerpoDeLaChozaEnElJsx),
+      leDaElRelieveDeVerdad: /asientoDelDisco\(\s*\(x: number, y: number\) => relieve\.alturaEn/.test(
+        elCuerpoDeLaChozaEnElJsx,
+      ),
+    },
+  );
+  /*
+   * LA VACUNA: con el asiento calculado pero NO usado —el `donde=` de vuelta al alto escrito a
+   * mano— la cadena se rompe. Es la mutación exacta que deja la marca donde estaba y con la
+   * comprobación de arriba en verde si sólo mirase la grafía.
+   */
+  const conElAltoAMano = fuenteDelDelta.replace(
+    'donde={[0, asiento.alto, 0]}',
+    'donde={[0, ALTO_DEL_ZOCALO, 0]}',
+  );
+  const dondeAMano = ((): string => {
+    const cuerpo = soloElCodigo(cuerpoEn(conElAltoAMano, 'function Asentamiento('));
+    const desde = cuerpo.indexOf('donde={');
+    const cierra = cuerpo.indexOf('}', cuerpo.indexOf(']', desde));
+    return desde < 0 || cierra < 0 ? '' : cuerpo.slice(desde, cierra + 1);
+  })();
+  comprobar(
+    'se ve fallar: devolviendo el «donde=» al alto escrito a mano —que compila y que deja el asiento calculado ahí al lado sin usar— la cadena se rompe',
+    conElAltoAMano !== fuenteDelDelta && !/^donde=\{\[0, asiento\.alto, 0\]\}$/.test(dondeAMano),
+    { dondeAMano },
   );
   comprobar(
     'las dos piezas de jugador de `delta.tsx` montan el zócalo: la choza y la vereda, con su color y su referencia',
@@ -6987,6 +8905,346 @@ paso('El zócalo se compra de verdad: existe, es de su dueño, tiene filo y se v
     'y las dos le ponen la talla con `tallaDelZocalo`, que es la misma cuenta: ninguna la escribe a mano',
     sinTalla.length === 0,
     sinTalla,
+  );
+  /*
+   * ═══ Y EL «marca=» TIENE QUE CITAR LA REFERENCIA QUE SE ESCALA, QUE NO ES LO MISMO ═══
+   *
+   * Lo de arriba compra que en el texto de estos dos componentes haya un «marca={» y un
+   * «scale.setScalar(». Las dos cosas siguen siendo verdad con «marca={null}» escrito en el JSX
+   * de la choza: la prop es un «Ref<THREE.Group>» y «null» es un Ref legal, así que
+   * `verify:escena`, `verify:escritorio` y el typecheck salen los TRES en cero mientras la
+   * referencia que el `useFrame` escala no llega a ningún sitio.
+   *
+   * Y no es un fallo pequeño: sin referencia el grupo se queda a escala UNO, o sea del tamaño de
+   * una tesela del mundo — que es exactamente el fallo que este guion ya tiene vacunado unos
+   * bloques más arriba («un aro del tamaño de una tesela … encogería con la distancia»). El
+   * disco desaparecería de la vista de tablero igual que si estuviera apagado.
+   *
+   * Se lee la CADENA ENTERA, igual que se hizo con el `donde=`: el nombre que va en «marca={…}»
+   * tiene que ser el de un `useRef` de este mismo componente, y ese nombre tiene que ser el que
+   * se lee con «.current» para escalarlo. Tres eslabones, y romper cualquiera la parte.
+   */
+  const laCadenaDeLaMarca = (fuente: string, firma: string): string => {
+    const cuerpo = soloElCodigo(cuerpoEn(fuente, firma));
+    const nombre = (/marca=\{([A-Za-z_$][\w$]*)\}/.exec(cuerpo) ?? ['', ''])[1] ?? '';
+    if (nombre === '') return '';
+    if (!cuerpo.includes(`const ${nombre} = useRef<`)) return '';
+    const alias = (new RegExp(`const ([A-Za-z_$][A-Za-z0-9_$]*) = ${nombre}[.]current;`).exec(cuerpo) ?? [])[1];
+    if (alias === undefined) return '';
+    return cuerpo.includes(`${alias}.scale.setScalar(`) ? `${nombre} → ${alias}` : '';
+  };
+  const lasCadenas = LOS_QUE_LLEVAN_MARCA.map((f) => ({
+    componente: f,
+    cadena: laCadenaDeLaMarca(fuenteDelDelta, f),
+  }));
+  comprobar(
+    'y el «marca=» de cada una CITA la referencia que su propio «useFrame» escala: el nombre está en un «useRef» del componente, se lee con «.current» y es ése el que recibe el «scale.setScalar»',
+    lasCadenas.every((c) => c.cadena !== ''),
+    lasCadenas,
+  );
+  /*
+   * LA VACUNA, Y ES EL FALLO LITERAL: «marca={null}» en el zócalo de la choza. Se exige (a) que
+   * la cadena se rompa y (b) que TODO lo que se compraba antes siga diciendo que sí — que es lo
+   * que hay que enseñar, porque es justo lo que pasaba.
+   */
+  const conLaMarcaNula = fuenteDelDelta.replace(
+    'forma="disco" donde={[0, asiento.alto, 0]} marca={zocalo}',
+    'forma="disco" donde={[0, asiento.alto, 0]} marca={null}',
+  );
+  const laChozaSinReferencia = soloElCodigo(cuerpoEn(conLaMarcaNula, 'function Asentamiento('));
+  comprobar(
+    'se ve fallar: con «marca={null}» en el zócalo de la choza —que compila, porque un Ref admite null— la cadena se rompe, y las seis de antes siguen diciendo que sí',
+    conLaMarcaNula !== fuenteDelDelta &&
+      laCadenaDeLaMarca(conLaMarcaNula, 'function Asentamiento(') === '' &&
+      /<Zocalo\b/.test(laChozaSinReferencia) &&
+      /\bcolor=\{/.test(laChozaSinReferencia) &&
+      /\bmarca=\{/.test(laChozaSinReferencia) &&
+      /forma="disco"/.test(laChozaSinReferencia) &&
+      /donde=\{\[0, asiento\.alto, 0\]\}/.test(laChozaSinReferencia) &&
+      /tallaDelZocalo\(/.test(laChozaSinReferencia) &&
+      /scale\.setScalar\(/.test(laChozaSinReferencia),
+    {
+      cambio: conLaMarcaNula !== fuenteDelDelta,
+      cadenaRota: laCadenaDeLaMarca(conLaMarcaNula, 'function Asentamiento('),
+      laDeVerdad: laCadenaDeLaMarca(fuenteDelDelta, 'function Asentamiento('),
+    },
+  );
+  /*
+   * ═══ Y NADIE MIRABA EL JSX QUE ENVUELVE LA LLAMADA, QUE ES LA PUERTA DE AL LADO ═══
+   *
+   * Todo lo de arriba compra el árbol que DEVUELVE `Zocalo()` —que no tiene nodos apagados— y
+   * que el texto de estos dos componentes CITA `<Zocalo`, `color={`, `marca={`, `forma=` y
+   * `donde=`. Ninguna de las dos cosas mira lo que hay ALREDEDOR de la llamada.
+   *
+   * Y ahí está el mismo fallo que costó un encargo entero cerrar: envolver el `<Zocalo>` en un
+   * `<group visible={false}>` DENTRO de `delta.tsx` —que es literalmente lo que hizo el revisor
+   * que encontró el fallo original— deja `verify:escena`, `verify:escritorio` y los typechecks
+   * los TRES en cero, con el tablero de piezas puestas otra vez idéntico al vacío. La vacuna de
+   * abajo lo enseña: con la fuente rota, las cinco comprobaciones de arriba siguen diciendo que
+   * sí.
+   *
+   * La regla es sencilla y por eso se sostiene: en el código de estos dos componentes NO HAY
+   * NINGÚN `visible={`. La animación de la obra apaga sus grupos desde el `useFrame`
+   * (`g.visible = salido > 0.001`), que es una asignación y no una prop, así que la regla no
+   * la roza. Un `visible={` en el JSX de aquí sólo puede ser una cosa: alguien apagando algo.
+   */
+  const apagaDesdeFuera = (fuente: string, firma: string): string[] =>
+    soloElCodigo(cuerpoEn(fuente, firma))
+      .split('\n')
+      .filter((l) => /visible=\{/.test(l))
+      .map((l) => l.trim());
+  const apagados = LOS_QUE_LLEVAN_MARCA.flatMap((f) =>
+    apagaDesdeFuera(fuenteDelDelta, f).map((l) => `${f}: ${l}`),
+  );
+  comprobar(
+    'y nadie apaga la marca DESDE FUERA: en el JSX de la choza y el de la vereda no hay un solo «visible={», que es lo único que hace falta para que el zócalo desaparezca sin que ninguna de las otras comprobaciones se entere',
+    apagados.length === 0,
+    apagados,
+  );
+  /*
+   * LA VACUNA, Y ES EXACTAMENTE EL FALLO: se envuelve el `<Zocalo>` de la choza en un
+   * `<group visible={false}>` sobre una copia de la fuente y se exige (a) que el lector nuevo lo
+   * cace y (b) que TODO lo que se compraba antes siga diciendo que sí — que es la parte que
+   * duele y la razón de que esta comprobación exista.
+   */
+  const EL_ZOCALO_DE_LA_CHOZA =
+    '<Zocalo color={pieza.color} forma="disco" donde={[0, asiento.alto, 0]} marca={zocalo} />';
+  const fuenteApagada = fuenteDelDelta.replace(
+    EL_ZOCALO_DE_LA_CHOZA,
+    `<group visible={false}>${EL_ZOCALO_DE_LA_CHOZA}</group>`,
+  );
+  const rotaYLoDice = apagaDesdeFuera(fuenteApagada, 'function Asentamiento(').length > 0;
+  const laVieja = soloElCodigo(cuerpoEn(fuenteApagada, 'function Asentamiento('));
+  const laViejaSigueDiciendoQueSi =
+    /<Zocalo\b/.test(laVieja) &&
+    /\bcolor=\{/.test(laVieja) &&
+    /\bmarca=\{/.test(laVieja) &&
+    /forma="disco"/.test(laVieja) &&
+    /donde=\{\[0, asiento\.alto, 0\]\}/.test(laVieja) &&
+    /tallaDelZocalo\(/.test(laVieja);
+  comprobar(
+    'se ve fallar: envolviendo el «<Zocalo>» de la choza en un «<group visible={false}>» —lo que el revisor hizo— el lector nuevo lo caza, y todas las que había antes siguen diciendo que sí',
+    fuenteApagada !== fuenteDelDelta && rotaYLoDice && laViejaSigueDiciendoQueSi,
+    { cambio: fuenteApagada !== fuenteDelDelta, loCaza: rotaYLoDice, lasDeAntesSiguenEnVerde: laViejaSigueDiciendoQueSi },
+  );
+  /*
+   * ═══ Y LO QUE SE COMPRÓ AHÍ ARRIBA ES UNA GRAFÍA, NO LA PUERTA ═══
+   *
+   * La regla de «no hay ni un `visible={` en el JSX de estos dos componentes» caza la mutación
+   * histórica y sólo ésa. Probadas SIETE formas más de apagar la misma marca desde este mismo
+   * JSX, con `verify:escena`, `verify:escritorio` y el typecheck los tres en cero:
+   *
+   *   1. envolverlo en `<group scale={0}>`                      ← pasaba
+   *   2. envolverlo en `<group scale={[0, 0, 0]}>`              ← pasaba
+   *   3. envolverlo en `<group position={[0, -1000, 0]}>`       ← pasaba
+   *   4. escribirlo como `{false && <Zocalo … />}`              ← pasaba
+   *   5. `scale={0}` en el grupo RAÍZ de `Zocalo()`             ← pasaba
+   *   6. `scale={0}` en el grupo del GIRO, dentro de `Zocalo()` ← pasaba
+   *   7. las mallas de `Zocalo()` mudadas fuera del encuadre    ← pasaba
+   *
+   * Las tres últimas viven en `zocalo.tsx` y las caza ahora el juez del árbol, unos bloques más
+   * arriba, con sus tres vacunas. Las cuatro primeras viven aquí, en el JSX de `delta.tsx`, y
+   * ninguna regla de PALABRAS las puede cerrar todas: la lista de formas de apagar algo no
+   * tiene fin. Lo que sí tiene fin es la lista de sitios donde el `<Zocalo>` puede estar.
+   *
+   * ═══ ASÍ QUE SE COMPRA LA FORMA DEL ÁRBOL Y NO LAS PALABRAS ═══
+   *
+   * Que el `<Zocalo>` de cada componente cuelgue DIRECTAMENTE del elemento raíz de su `return`
+   * y de nada más. Cualquier envoltorio —lleve `visible`, `scale`, `position`, o lo que se
+   * invente el que venga— añade un eslabón al camino y se ve; y escribirlo dentro de una
+   * expresión `{…}`, que es lo que hace el `{false && …}`, lo saca del camino y también se ve.
+   *
+   * Y NO ROZA LA ANIMACIÓN DE LA OBRA, que es la trampa: `Asentamiento` apaga sus grupos con
+   * `g.visible = salido > 0.001` y los arranca con `scale={0}` en el JSX de las PARTES. Lo
+   * primero es una asignación, no una prop; lo segundo es un elemento que no envuelve al
+   * zócalo. Esto mira el CAMINO hasta el `<Zocalo>` y nada más, así que las dos cosas siguen
+   * siendo código legítimo.
+   *
+   * ═══ CÓMO SE LEE UN CAMINO DE JSX SIN ESCRIBIR UN ANALIZADOR ═══
+   *
+   * Se recorre desde el `return (` llevando la pila de etiquetas abiertas. Lo que va entre
+   * llaves se SALTA ENTERO —los atributos, los `.map(…)`, los condicionales—, y por eso un
+   * `<Zocalo>` metido dentro de una expresión no aparece: que no aparezca es la respuesta.
+   * Vale aquí porque en este fichero las llaves están equilibradas y ningún atributo lleva un
+   * `>` fuera de sus llaves; el día que eso cambie, esto dejará de encontrar el camino y lo
+   * dirá en rojo, que es el lado bueno por el que fallar.
+   *
+   * ═══ Y LO QUE SIGUE ABIERTO, ESCRITO PARA QUE EL SIGUIENTE NO LO DESCUBRA SOLO ═══
+   *
+   * Las siete de la lista quedan cerradas, y no de palabra: se han probado UNA A UNA sobre el
+   * árbol de verdad, las siete compilan con el typecheck en cero y las siete ponen este guion
+   * en rojo. Estas DOS no quedan cerradas, y no por descuido:
+   *
+   *   · `scale={0}` en el grupo RAÍZ de `Asentamiento` —el `<group position={alMundo(…)}>`—
+   *     apaga el zócalo Y la pieza entera, y no lo caza nadie. Se deja fuera a propósito: el
+   *     JSX de las PARTES arranca legítimamente con `scale={0}` —es la animación de la obra,
+   *     que las hace brotar—, así que una regla de «ningún `scale={0}` en este componente»
+   *     daría rojo con código bueno. Lo que lo hace menos grave es que se VE: lo que
+   *     desaparece es el asentamiento entero y no sólo su marca, o sea que no es el fallo
+   *     silencioso del que viene todo esto.
+   *   · escribir la talla como `z.scale.setScalar(tallaDelZocalo(…) * 0)`. La cadena de más
+   *     arriba compra que el `marca={}` cita el `useRef` que recibe el `scale.setScalar` y que
+   *     en el cuerpo aparece `tallaDelZocalo(`; no compra qué NÚMERO acaba entrando, porque de
+   *     dentro de un `useFrame` no se mide. Es la frontera de siempre, y el precio de tenerla.
+   */
+  const trasLaLlave = (texto: string, desde: number): number => {
+    let hondo = 0;
+    let i = desde;
+    while (i < texto.length) {
+      if (texto[i] === '{') hondo++;
+      else if (texto[i] === '}') {
+        hondo--;
+        if (hondo === 0) return i + 1;
+      }
+      i++;
+    }
+    return texto.length;
+  };
+  /** Las etiquetas abiertas en el punto donde aparece `<etiqueta`, o `null` si no cuelga del árbol. */
+  const caminoHasta = (cuerpo: string, etiqueta: string): string[] | null => {
+    const arranca = cuerpo.indexOf('return (');
+    if (arranca < 0) return null;
+    const pila: string[] = [];
+    let i = arranca + 'return ('.length;
+    while (i < cuerpo.length) {
+      if (cuerpo[i] === '{') {
+        i = trasLaLlave(cuerpo, i);
+        continue;
+      }
+      if (cuerpo[i] !== '<') {
+        i++;
+        continue;
+      }
+      const cierra = /^<\/([A-Za-z][\w.]*)\s*>/.exec(cuerpo.slice(i));
+      if (cierra !== null) {
+        pila.pop();
+        i += cierra[0].length;
+        if (pila.length === 0) return null;
+        continue;
+      }
+      const abre = /^<([A-Za-z][\w.]*)/.exec(cuerpo.slice(i));
+      if (abre === null) {
+        i++;
+        continue;
+      }
+      const nombre = abre[1] as string;
+      if (nombre === etiqueta) return [...pila];
+      let j = i + abre[0].length;
+      let suelta = false;
+      while (j < cuerpo.length) {
+        if (cuerpo[j] === '{') {
+          j = trasLaLlave(cuerpo, j);
+          continue;
+        }
+        if (cuerpo[j] === '>') {
+          suelta = cuerpo[j - 1] === '/';
+          j++;
+          break;
+        }
+        j++;
+      }
+      if (!suelta) pila.push(nombre);
+      i = j;
+    }
+    return null;
+  };
+  const caminoDelZocaloEn = (fuente: string, firma: string): string[] | null =>
+    caminoHasta(soloElCodigo(cuerpoEn(fuente, firma)), 'Zocalo');
+  const losCaminos = LOS_QUE_LLEVAN_MARCA.map((f) => ({
+    componente: f,
+    camino: caminoDelZocaloEn(fuenteDelDelta, f),
+  }));
+  comprobar(
+    'y el «<Zocalo>» de cada componente NO ESTÁ ENVUELTO EN NADA: su padre en el JSX es el elemento raíz del `return` y no un elemento intermedio, así que ningún envoltorio —con `visible`, con `scale`, con `position` o con lo que sea— lo puede apagar sin que esto se entere',
+    losCaminos.every((c) => c.camino !== null && c.camino.length === 1),
+    losCaminos,
+  );
+  /*
+   * LAS CUATRO VACUNAS, Y SON LAS CUATRO MUTACIONES DE LA LISTA DE ARRIBA. Se exige de cada
+   * una (a) que el lector nuevo la cace y (b) que la regla de la grafía —«no hay `visible={`»,
+   * que es lo único que había— siga diciendo que sí, que es la parte que enseña por qué hacía
+   * falta esto.
+   */
+  const conElZocaloAsi = (texto: string): string => fuenteDelDelta.replace(EL_ZOCALO_DE_LA_CHOZA, texto);
+  const LAS_SIETE_FORMAS = [
+    { como: 'envuelto en «<group scale={0}>»', fuente: conElZocaloAsi(`<group scale={0}>${EL_ZOCALO_DE_LA_CHOZA}</group>`) },
+    { como: 'envuelto en «<group scale={[0, 0, 0]}>»', fuente: conElZocaloAsi(`<group scale={[0, 0, 0]}>${EL_ZOCALO_DE_LA_CHOZA}</group>`) },
+    { como: 'envuelto en «<group position={[0, -1000, 0]}>», o sea hundido bajo tierra', fuente: conElZocaloAsi(`<group position={[0, -1000, 0]}>${EL_ZOCALO_DE_LA_CHOZA}</group>`) },
+    { como: 'escrito como «{false && <Zocalo … />}»', fuente: conElZocaloAsi(`{false && ${EL_ZOCALO_DE_LA_CHOZA}}`) },
+  ];
+  const noCazadas = LAS_SIETE_FORMAS.filter((m) => {
+    const camino = caminoDelZocaloEn(m.fuente, 'function Asentamiento(');
+    return m.fuente === fuenteDelDelta || (camino !== null && camino.length === 1);
+  });
+  const laGrafiaSigueEnVerde = LAS_SIETE_FORMAS.every(
+    (m) => apagaDesdeFuera(m.fuente, 'function Asentamiento(').length === 0,
+  );
+  comprobar(
+    `se ve fallar: las ${String(LAS_SIETE_FORMAS.length)} formas de apagar el zócalo desde el JSX de la choza que NO llevan un «visible=» —un cero en la escala, un envoltorio hundido, un condicional falso— las caza el camino, y la regla de la grafía que había antes las deja pasar las ${String(LAS_SIETE_FORMAS.length)}`,
+    noCazadas.length === 0 && laGrafiaSigueEnVerde,
+    {
+      noCazadas: noCazadas.map((m) => m.como),
+      laGrafiaLasDejaPasar: laGrafiaSigueEnVerde,
+      caminos: LAS_SIETE_FORMAS.map((m) => `${m.como}: ${JSON.stringify(caminoDelZocaloEn(m.fuente, 'function Asentamiento('))}`),
+    },
+  );
+  /*
+   * ═══ Y EL CASERÍO DE LA PROPIA PIEZA SE TIÑE, QUE ES DONDE SE PIDIÓ ═══
+   *
+   * «Que el poblado del jugador azul no tenga casas rojas y la del centro azul, sino que todas
+   * las casas fueran azules» — la frase del encargo. Se arregló el pueblo del PAISAJE
+   * (`plan.caserio` → `caserioTenido`), que es la mitad grande, y no se tocó la pieza: un
+   * poblado planta TRES `MODELO.casa` a 7,7-8,9 unidades del vértice DENTRO de sí mismo, y
+   * `delta.tsx` las pintaba con `aplanados.get(parte.modelo)` —el modelo CRUDO—.
+   *
+   * Medido en el banco con `readPixels`: en un radio de 18 píxeles alrededor de la choza AZUL
+   * había 416 píxeles rojos contra 26 azules. Más rojo que azul dentro del poblado del jugador
+   * azul. Cambiando sólo la geometría de esas cuatro partes y sin tocar nada más: 265 contra
+   * 108.
+   */
+  const cuerpoDelAsentamiento = soloElCodigo(cuerpoDe('function Asentamiento('));
+  const pideElTenido = (cuerpo: string): boolean =>
+    /EDIFICIOS_DEL_CASERIO\.has\(parte\.modelo\)/.test(cuerpo) &&
+    /tenido\.get\(/.test(cuerpo) &&
+    /pieza\.color/.test(cuerpo);
+  comprobar(
+    'la choza pide la geometría TEÑIDA para sus propias casas, la misma tabla con la que se repinta el pueblo del paisaje: sin esto el poblado de un jugador azul tiene tres casas rojas dentro',
+    pideElTenido(cuerpoDelAsentamiento),
+    { cita: /const mallas = [^;]*/.exec(cuerpoDelAsentamiento)?.[0]?.replace(/\s+/g, ' ').slice(0, 180) },
+  );
+  comprobar(
+    'se ve fallar: con la línea de antes —«aplanados.get(parte.modelo)» a secas— el mismo lector dice que la pieza no pide nada teñido',
+    !pideElTenido(
+      cuerpoDelAsentamiento.replace(
+        /const mallas = [\s\S]*?;\n/,
+        'const mallas = aplanados.get(parte.modelo);\n',
+      ),
+    ),
+    {},
+  );
+  /*
+   * Y QUÉ SE TIÑE Y QUÉ NO, que es lo que el texto de arriba no puede decir: las casas y el
+   * pozo del caserío están en `EDIFICIOS_DEL_CASERIO` y se tiñen; la pieza CENTRAL y la BANDERA
+   * no, porque ésas ya vienen del `.glb` con el color en el nombre y se tiñen por su camino de
+   * siempre — pedirlas también por el otro las teñiría dos veces.
+   */
+  const partesDeUnPoblado = piezasDeAsentamiento('poblado', 'blue', LOS_VERTICES[0] as never);
+  const lasQueSeTinen = partesDeUnPoblado.filter((p) => EDIFICIOS_DEL_CASERIO.has(p.modelo));
+  const laCentral = modeloDePieza('poblado', 'blue');
+  const suBandera = modeloDeBandera('blue');
+  comprobar(
+    `de las ${String(partesDeUnPoblado.length)} partes de un poblado se tiñen por el camino del caserío ${String(lasQueSeTinen.length)} —las tres casas y el pozo—, y ni la pieza central ni la bandera: ésas llevan el color en el nombre y se teñirían dos veces`,
+    lasQueSeTinen.length >= 4 &&
+      lasQueSeTinen.filter((p) => p.modelo === MODELO.casa).length === 3 &&
+      !EDIFICIOS_DEL_CASERIO.has(laCentral) &&
+      !EDIFICIOS_DEL_CASERIO.has(suBandera) &&
+      partesDeUnPoblado.some((p) => p.modelo === laCentral) &&
+      partesDeUnPoblado.some((p) => p.modelo === suBandera),
+    {
+      seTinen: lasQueSeTinen.map((p) => p.modelo),
+      central: laCentral,
+      bandera: suBandera,
+    },
   );
   /*
    * LA VACUNA DEL LECTOR: el mismo lector sobre componentes que NO llevan marca tiene que decir
@@ -7021,6 +9279,648 @@ paso('El zócalo se compra de verdad: existe, es de su dueño, tiene filo y se v
   );
 }
 
+// ---------------------------------------------------------------------------
+paso('El caserío toma el color de su dueño: qué casas son de quién, y que el traslado de UV mueve lo suyo y sólo lo suyo');
+// ---------------------------------------------------------------------------
+
+/**
+ * ═══ QUÉ FALLO VIGILA ESTE BLOQUE ═══
+ *
+ * El pueblo que `poblar.ts` reparte por las comarcas lleva puestos los cuatro colores de
+ * jugador: la casa de adorno es la ROJA del pack —mismo téxel que el tejado del poblado del
+ * colono rojo—, la iglesia la azul, la taberna la amarilla y el mercado la verde. Hasta esta
+ * tanda eso era decorado ciego, y quien fundaba en azul veía su choza en medio de un pueblo
+ * de casas rojas. Ahora el caserío que cae dentro del radio de una choza se repinta del color
+ * de su dueño moviendo las UV, igual que las piezas de jugador.
+ *
+ * Lo que se compra aquí son las tres cosas que no se ven en una captura:
+ *
+ *   1. QUE EL REPARTO ES EL MISMO EN LOS TRES APARATOS. Es una regla geométrica con un
+ *      desempate, y un desempate que dependiera del orden de la lista pintaría dos tableros
+ *      distintos con los mismos datos.
+ *   2. QUE EL TRASLADO MUEVE LO SUYO Y SÓLO LO SUYO. La fila 3 del atlas tiene ocho manchas y
+ *      sólo cuatro son de jugador: mover la fila entera repintaría los 41 vértices de la
+ *      herrería que están en la columna 4 y los 80 de la ermita que están en la 5.
+ *   3. QUE UN TABLERO SIN PIEZAS SIGUE SIENDO EL PAISAJE DE SIEMPRE. Si el reparto se colara
+ *      con la lista vacía, el mundo entero saldría de un color antes de empezar la partida.
+ */
+{
+  const nodosDelTablero = (
+    await new NodeIO().read(
+      path.join(import.meta.dirname ?? __dirname, '..', 'modelos', 'tablero.glb'),
+    )
+  )
+    .getRoot()
+    .listNodes();
+
+  const TERRENOS_DE_RIBERAS = ['carrizal', 'marisma', 'salina', 'vega', 'cantil', 'duna'];
+  const hexesDelDelta = mallaDeRadio(2);
+  const islasDelDelta = hexesDelDelta.map((hex, i) => ({
+    hex,
+    terreno: TERRENOS_DE_RIBERAS[i % TERRENOS_DE_RIBERAS.length] as string,
+  }));
+  const todosLosVerticesDelDelta = verticesDe(hexesDelDelta) as readonly string[];
+
+  // ── 1. El radio: es la apotema, y es la mitad de lo más cerca que caben dos chozas ──
+
+  /*
+   * NO SE COMPARA CONTRA UN NÚMERO ESCRITO. Se mide sobre la malla de verdad cuál es la menor
+   * distancia entre dos vértices donde se puede fundar a la vez —o sea, no vecinos— y se exige
+   * que el radio sea exactamente su mitad. Así, el día que cambie el radio de la comarca o la
+   * convención de la malla, esto se mueve solo o se cae; escrito como «65,6» se quedaría.
+   */
+  let masCercaLegal = Infinity;
+  let masCercaVecinos = Infinity;
+  for (const uno of todosLosVerticesDelDelta) {
+    const vecinos = new Set<string>(verticesVecinos(uno as never) as readonly string[]);
+    const a = puntoDeVertice(uno as never, RADIO_DE_COMARCA);
+    for (const otro of todosLosVerticesDelDelta) {
+      if (uno === otro) continue;
+      const b = puntoDeVertice(otro as never, RADIO_DE_COMARCA);
+      const d = Math.hypot(a.x - b.x, a.y - b.y);
+      if (vecinos.has(otro)) masCercaVecinos = Math.min(masCercaVecinos, d);
+      else masCercaLegal = Math.min(masCercaLegal, d);
+    }
+  }
+  comprobar(
+    `el radio del caserío (${RADIO_DEL_CASERIO.toFixed(2)}) es EXACTAMENTE la mitad de lo más cerca que caben dos chozas legales (${masCercaLegal.toFixed(2)}): con eso sus discos se tocan y no se solapan`,
+    Math.abs(RADIO_DEL_CASERIO * 2 - masCercaLegal) < 1e-6,
+    { RADIO_DEL_CASERIO, masCercaLegal, masCercaVecinos },
+  );
+  comprobar(
+    `y es la APOTEMA de la comarca (${((RADIO_DE_COMARCA * Math.sqrt(3)) / 2).toFixed(2)}), que es el mismo número por el otro lado de la misma malla`,
+    Math.abs(RADIO_DEL_CASERIO - (RADIO_DE_COMARCA * Math.sqrt(3)) / 2) < 1e-9,
+    RADIO_DEL_CASERIO,
+  );
+  /*
+   * LA VACUNA DEL RADIO: con el radio puesto a la distancia entre vértices VECINOS —que es lo
+   * que pediría quien quisiera un pueblo más grande sin mirar la malla— dos chozas legales sí
+   * se solapan, y entonces hay edificios a tiro de dos dueños. Se afirma que ese radio de
+   * mentira rompe la propiedad, no que la nuestra la cumple: sin esto, «no hay solapes» sería
+   * verde también con el radio a cero.
+   */
+  comprobar(
+    'se ve fallar: con el radio subido a la distancia entre vértices vecinos, dos chozas legales SÍ se solaparían',
+    masCercaVecinos * 2 > masCercaLegal,
+    { masCercaVecinos, masCercaLegal },
+  );
+
+  // ── 2. El reparto sobre mundos de verdad ──
+
+  /** Los edificios del caserío de un mundo, con su sitio en el plano de la malla. */
+  const caserioDelMundo = (semilla: number): Array<{ llave: string; modelo: string; donde: Punto }> => {
+    const relieve = crearRelieve(islasDelDelta, semilla);
+    const salida: Array<{ llave: string; modelo: string; donde: Punto }> = [];
+    for (const isla of islasDelDelta) {
+      for (const t of relieve.subteselasDe(isla.hex)) {
+        if (t.agua === CAUCE || t.agua === CUERPO) continue;
+        if (t.orilla !== 0) continue;
+        for (const puesto of queVaEn(t, isla.terreno)) {
+          if (!EDIFICIOS_DEL_CASERIO.has(puesto.modelo)) continue;
+          salida.push({
+            /* La MISMA llave con la que `delta.tsx` agrupa: la comarca. */
+            llave: `${String(isla.hex.q)},${String(isla.hex.r)}`,
+            modelo: puesto.modelo,
+            donde: { x: t.centro.x + puesto.donde.x, y: t.centro.y + puesto.donde.y },
+          });
+        }
+      }
+    }
+    return salida;
+  };
+
+  /*
+   * LA OCUPACIÓN MÁXIMA: todas las chozas que caben en el delta respetando la regla de
+   * distancia. Es el peor caso para el reparto —el que más disputas tendría y el que más
+   * geometrías teñidas fabrica— y por eso se mide con ése y no con dos colonos.
+   */
+  const laOcupacionMaxima: string[] = [];
+  for (const v of todosLosVerticesDelDelta) {
+    if ((verticesVecinos(v as never) as readonly string[]).some((n) => laOcupacionMaxima.includes(n))) continue;
+    laOcupacionMaxima.push(v);
+  }
+  const fundadasDelMaximo: Fundacion[] = laOcupacionMaxima.map((v, i) => ({
+    vertice: v,
+    color: COLORES_DE_JUGADOR[i % COLORES_DE_JUGADOR.length] as string,
+    punto: puntoDeVertice(v as never, RADIO_DE_COMARCA),
+  }));
+  comprobar(
+    `en el delta de radio 2 caben ${String(laOcupacionMaxima.length)} chozas legales, que es el peor caso con el que se mide todo lo de abajo`,
+    laOcupacionMaxima.length === 27,
+    laOcupacionMaxima.length,
+  );
+
+  const SEMILLAS_DEL_CASERIO = 12;
+  let edificiosMedidos = 0;
+  let repintados = 0;
+  let disputados = 0;
+  let disputadosConVecinos = 0;
+  let discrepanciasDeOrden = 0;
+  const porChozaYMundo = new Map<string, number>();
+  const alReves = [...fundadasDelMaximo].reverse();
+  /* Las chozas de doce vértices SEGUIDOS, o sea vecinos: lo que daría un juego sin regla de distancia. */
+  const pegadas: Fundacion[] = todosLosVerticesDelDelta.slice(0, 12).map((v, i) => ({
+    vertice: v,
+    color: COLORES_DE_JUGADOR[i % COLORES_DE_JUGADOR.length] as string,
+    punto: puntoDeVertice(v as never, RADIO_DE_COMARCA),
+  }));
+  for (let semilla = 0; semilla < SEMILLAS_DEL_CASERIO; semilla++) {
+    for (const v of laOcupacionMaxima) porChozaYMundo.set(`${String(semilla)}|${v}`, 0);
+    for (const edificio of caserioDelMundo(semilla)) {
+      edificiosMedidos++;
+      const dueno = duenoDelCaserio(edificio.donde, fundadasDelMaximo);
+      if (dueno !== null) {
+        repintados++;
+        const cual = `${String(semilla)}|${dueno.vertice}`;
+        porChozaYMundo.set(cual, (porChozaYMundo.get(cual) ?? 0) + 1);
+      }
+      /* ¿Está a tiro de dos? Eso es lo que el radio promete que no pasa. */
+      const aTiro = fundadasDelMaximo.filter(
+        (f) => Math.hypot(edificio.donde.x - f.punto.x, edificio.donde.y - f.punto.y) <= RADIO_DEL_CASERIO,
+      ).length;
+      if (aTiro > 1) disputados++;
+      const conVecinos = pegadas.filter(
+        (f) => Math.hypot(edificio.donde.x - f.punto.x, edificio.donde.y - f.punto.y) <= RADIO_DEL_CASERIO,
+      ).length;
+      if (conVecinos > 1) disputadosConVecinos++;
+      /* Y el mismo edificio con la lista al revés tiene que salir del mismo dueño. */
+      const otro = duenoDelCaserio(edificio.donde, alReves);
+      if ((dueno === null) !== (otro === null) || (dueno !== null && otro !== null && dueno.vertice !== otro.vertice)) {
+        discrepanciasDeOrden++;
+      }
+    }
+  }
+  comprobar(
+    `se han medido ${String(edificiosMedidos)} edificios de caserío en ${String(SEMILLAS_DEL_CASERIO)} mundos: si esto fuera cero, todo lo de abajo pasaría por vacío`,
+    edificiosMedidos > 3000,
+    edificiosMedidos,
+  );
+  comprobar(
+    `con la ocupación máxima NINGÚN edificio queda a tiro de dos chozas: ${String(disputados)} de ${String(edificiosMedidos)}`,
+    disputados === 0,
+    { disputados, edificiosMedidos },
+  );
+  /*
+   * LA VACUNA DEL SOLAPE: con las chozas puestas en vértices VECINOS —ilegal en Riberas, pero
+   * la escena pinta el delta que le manden— sí hay edificios a tiro de dos, y ahí es donde la
+   * regla de cercanía y su desempate hacen falta de verdad. Sin esta comprobación, «cero
+   * disputas» sería verde aunque `duenoDelCaserio` no supiera resolver ninguna.
+   */
+  comprobar(
+    `se ve fallar: con las chozas en vértices vecinos hay ${String(disputadosConVecinos)} edificios a tiro de dos, y ahí la regla de cercanía es la que decide`,
+    disputadosConVecinos > 0,
+    disputadosConVecinos,
+  );
+  comprobar(
+    `el reparto NO depende del orden de la lista: los ${String(edificiosMedidos)} edificios dan el mismo dueño con las fundaciones al derecho y al revés`,
+    discrepanciasDeOrden === 0,
+    discrepanciasDeOrden,
+  );
+
+  /*
+   * SE CUENTA POR MUNDO Y POR CHOZA, no sumando los doce mundos: sumados, la media saldría doce
+   * veces mayor y la comprobación de «ninguna se queda sin pueblo» daría cero siempre, porque
+   * basta con que UNO de los doce le diera casas. Lo que hay que saber es cuántas tiene una
+   * choza en UN tablero.
+   */
+  const cuantasPorChoza = [...porChozaYMundo.values()].sort((a, b) => a - b);
+  const mediaPorChoza = cuantasPorChoza.reduce((a, b) => a + b, 0) / cuantasPorChoza.length;
+  const sinNinguna = cuantasPorChoza.filter((n) => n === 0).length;
+  /*
+   * ═══ EL NÚMERO QUE DECIDIÓ EL RADIO, ESCRITO PARA QUE NO SE PUEDA BAJAR A CIEGAS ═══
+   *
+   * Con la mitad de la distancia entre vértices vecinos —37,9, el candidato cómodo— la media
+   * caía a 4,4 y 40 de 324 chozas se quedaban sin UNA sola casa de su color; contado en el
+   * banco, los píxeles rojos alrededor de la choza azul sólo bajaban un 43 % y quedaban dos
+   * tejados rojos pegados a la pieza. Con éste la media es 12,4 y bajan un 62 %. Se exige el
+   * rango, no el número exacto: lo que no puede pasar es que el pueblo de alguien sea una
+   * casa suelta.
+   */
+  comprobar(
+    `cada choza se lleva ${mediaPorChoza.toFixed(1)} edificios de media (mediana ${String(cuantasPorChoza[Math.floor(cuantasPorChoza.length / 2)])}, máximo ${String(cuantasPorChoza[cuantasPorChoza.length - 1])}) — un pueblo, no una casa suelta`,
+    mediaPorChoza >= 8 && mediaPorChoza <= 20,
+    { mediaPorChoza, sinNinguna, de: cuantasPorChoza.length },
+  );
+  comprobar(
+    `${String(sinNinguna)} de ${String(cuantasPorChoza.length)} chozas no se llevan ninguna —el pueblo de su comarca cae lejos— y ésas se quedan sólo con su zócalo: por eso el zócalo no sobra`,
+    sinNinguna > 0 && sinNinguna < cuantasPorChoza.length / 4,
+    { sinNinguna, de: cuantasPorChoza.length },
+  );
+  comprobar(
+    `se repintan ${String(repintados)} de ${String(edificiosMedidos)} edificios en el peor caso: ni ninguno ni todos`,
+    repintados > edificiosMedidos * 0.5 && repintados < edificiosMedidos,
+    { repintados, edificiosMedidos },
+  );
+  /*
+   * ═══ EL PRECIO EN GRUPOS DE DIBUJO, QUE ES LO QUE SE PAGA EN EL MÓVIL ═══
+   *
+   * `delta.tsx` agrupa el caserío por comarca y modelo —`${llave}|${modelo}`— y cada grupo se
+   * dibuja de una vez. Teñir mete el COLOR en esa llave, así que un pueblo con dos dueños
+   * distintos dentro de la misma comarca pasa a ser dos grupos donde había uno. Ése es todo el
+   * coste del arreglo, y hasta ahora no lo compraba nadie: en la cabecera de `caserio.ts` había
+   * un número escrito («129,5 pasan a 221») que era el PEOR de los doce mundos puesto donde se
+   * lee la media, y nadie lo iba a notar porque ninguna comprobación lo tocaba.
+   *
+   * Se rehace aquí con la misma llave que usa la escena, sobre los mismos doce mundos y con la
+   * ocupación máxima —27 chozas de cuatro colores, que es el peor caso—. Y se afirman las dos
+   * cosas que importan, porque cada una tapa un fallo distinto:
+   *
+   *   · que SUBE. Si no subiera, el color no estaría entrando en la llave y no se estaría
+   *     repintando nada — que es la clase de cero que se lee como vigilado.
+   *   · que NO se multiplica por los cuatro colores. Lo que lo impide es que la tabla teñida sea
+   *     una por COLOR y no una por choza: con un grupo por fundación —que es lo que sale de
+   *     teñir dentro de cada asentamiento— la cuenta se va a 228,2.
+   */
+  const laLlaveDeLaComarca = (semilla: number, porFundacion: boolean, quienes: Fundacion[]): number => {
+    const grupos = new Set<string>();
+    for (const edificio of caserioDelMundo(semilla)) {
+      const dueno = duenoDelCaserio(edificio.donde, quienes);
+      const nombre =
+        dueno === null
+          ? edificio.modelo
+          : `${edificio.modelo}-${porFundacion ? dueno.vertice : dueno.color}`;
+      grupos.add(`${edificio.llave}|${nombre}`);
+    }
+    return grupos.size;
+  };
+  let gruposSinPiezas = 0;
+  let gruposConCuatro = 0;
+  let gruposPorFundacion = 0;
+  let elPeorMundo = 0;
+  for (let semilla = 0; semilla < SEMILLAS_DEL_CASERIO; semilla++) {
+    gruposSinPiezas += laLlaveDeLaComarca(semilla, false, []);
+    const conCuatro = laLlaveDeLaComarca(semilla, false, fundadasDelMaximo);
+    gruposConCuatro += conCuatro;
+    elPeorMundo = Math.max(elPeorMundo, conCuatro);
+    gruposPorFundacion += laLlaveDeLaComarca(semilla, true, fundadasDelMaximo);
+  }
+  const mediaSinPiezas = gruposSinPiezas / SEMILLAS_DEL_CASERIO;
+  const mediaConCuatro = gruposConCuatro / SEMILLAS_DEL_CASERIO;
+  const mediaPorFundacion = gruposPorFundacion / SEMILLAS_DEL_CASERIO;
+  /** El mismo juez para los tres casos: sube, pero no se multiplica por los colores. */
+  const cabeElPrecio = (media: number): boolean =>
+    mediaSinPiezas > 0 && media > mediaSinPiezas * 1.2 && media < mediaSinPiezas * 1.7;
+  comprobar(
+    `el precio de teñir el caserío está acotado y medido: ${mediaSinPiezas.toFixed(1)} grupos de dibujo de media pasan a ${mediaConCuatro.toFixed(1)} con cuatro colores jugando —un ${(((mediaConCuatro / mediaSinPiezas) - 1) * 100).toFixed(0)} % más, y ${String(elPeorMundo)} en el peor de los ${String(SEMILLAS_DEL_CASERIO)} mundos—, no por cuatro`,
+    cabeElPrecio(mediaConCuatro),
+    { mediaSinPiezas, mediaConCuatro, elPeorMundo },
+  );
+  comprobar(
+    `se ve fallar por los dos lados, y con el mismo juez: sin el color en la llave la cuenta se queda en ${mediaSinPiezas.toFixed(1)} —no se estaría repintando nada— y con un grupo por FUNDACIÓN en vez de por color se va a ${mediaPorFundacion.toFixed(1)}; el juez rechaza las dos y sólo acepta la de verdad`,
+    !cabeElPrecio(mediaSinPiezas) && !cabeElPrecio(mediaPorFundacion) && cabeElPrecio(mediaConCuatro),
+    { mediaSinPiezas, mediaConCuatro, mediaPorFundacion, techo: mediaSinPiezas * 1.7 },
+  );
+
+
+  // ── 3. Sin piezas no se repinta nada, y fuera del radio tampoco ──
+
+  /*
+   * EL PAISAJE DE SIEMPRE. Es la mitad que se olvida: un tablero recién repartido —o el de un
+   * juego que no tenga piezas de color— tiene que salir exactamente igual que antes de esta
+   * tanda. Se comprueba sobre los edificios de verdad, no sobre uno inventado.
+   */
+  const conListaVacia = caserioDelMundo(3).filter((e) => duenoDelCaserio(e.donde, []) !== null);
+  comprobar(
+    'sin ninguna choza fundada NINGÚN edificio tiene dueño: el tablero sin piezas sigue teniendo su caserío rojo de siempre',
+    conListaVacia.length === 0,
+    conListaVacia.length,
+  );
+  const unaChoza: Fundacion[] = [{ vertice: 'v:a', color: 'blue', punto: { x: 0, y: 0 } }];
+  comprobar(
+    'un edificio justo fuera del radio no es de nadie, y justo dentro sí: el corte está donde dice',
+    duenoDelCaserio({ x: RADIO_DEL_CASERIO + 0.01, y: 0 }, unaChoza) === null &&
+      duenoDelCaserio({ x: RADIO_DEL_CASERIO - 0.01, y: 0 }, unaChoza) !== null,
+    RADIO_DEL_CASERIO,
+  );
+
+  // ── 4. El empate, que con las reglas de Riberas no pasa pero está escrito ──
+
+  /*
+   * DOS CHOZAS A LA MISMA DISTANCIA EXACTA. No se puede provocar con la malla —los discos de
+   * dos chozas legales se tocan y no se solapan— así que se provoca a mano, que es lo que hace
+   * falta para SABER qué hace la rama. Se pide las dos veces con la lista en orden distinto: si
+   * el desempate fuera «la primera que encuentre», estas dos llamadas darían dueños distintos y
+   * el mismo tablero se pintaría de dos maneras.
+   */
+  const empatadas: Fundacion[] = [
+    { vertice: 'v:zzz', color: 'red', punto: { x: -10, y: 0 } },
+    { vertice: 'v:aaa', color: 'blue', punto: { x: 10, y: 0 } },
+  ];
+  const enUnOrden = duenoDelCaserio({ x: 0, y: 0 }, empatadas);
+  const enElOtro = duenoDelCaserio({ x: 0, y: 0 }, [...empatadas].reverse());
+  comprobar(
+    'con dos chozas a la misma distancia exacta gana la de la llave menor, y da lo mismo en los dos órdenes de la lista',
+    enUnOrden !== null && enElOtro !== null && enUnOrden.vertice === 'v:aaa' && enElOtro.vertice === 'v:aaa',
+    { enUnOrden: enUnOrden?.vertice, enElOtro: enElOtro?.vertice },
+  );
+  /*
+   * Y LA VACUNA DEL DESEMPATE: movida una de las dos un pelo, gana la CERCANÍA y no la llave.
+   * Sin esto, un `duenoDelCaserio` que devolviera siempre la de llave menor —ignorando la
+   * distancia— pasaría la comprobación de arriba.
+   */
+  const casiEmpatadas: Fundacion[] = [
+    { vertice: 'v:zzz', color: 'red', punto: { x: -9, y: 0 } },
+    { vertice: 'v:aaa', color: 'blue', punto: { x: 10, y: 0 } },
+  ];
+  comprobar(
+    'se ve fallar: apartando una de las dos un pelo, gana la CERCANÍA y no la llave',
+    duenoDelCaserio({ x: 0, y: 0 }, casiEmpatadas)?.vertice === 'v:zzz',
+    duenoDelCaserio({ x: 0, y: 0 }, casiEmpatadas)?.vertice,
+  );
+
+  // ── 5. El traslado de UV: mueve lo suyo, y sólo lo suyo ──
+
+  /*
+   * ═══ LA LISTA DE EDIFICIOS SE DERIVA DE `poblar.ts` Y NO SE ESCRIBE ═══
+   *
+   * `EDIFICIOS_DEL_CASERIO` sale de `PUEBLO` y `OFICIO` unidos. Son CATORCE, y los dieciséis que
+   * el bloque de arriba mide contra el atlas incluyen dos que no planta nadie (`acena`, `vigia`).
+   * Escrita a mano, un edificio nuevo en `PUEBLO` se quedaría rojo dentro del pueblo de un
+   * jugador azul; derivada, entra solo.
+   */
+  comprobar(
+    `los edificios que se repintan salen de poblar.ts y son ${String(EDIFICIOS_DEL_CASERIO.size)}: la lista no está escrita a mano`,
+    EDIFICIOS_DEL_CASERIO.size === 14 &&
+      EDIFICIOS_DEL_CASERIO.has('casa') &&
+      EDIFICIOS_DEL_CASERIO.has('mercado') &&
+      !EDIFICIOS_DEL_CASERIO.has('acena'),
+    [...EDIFICIOS_DEL_CASERIO],
+  );
+  comprobar(
+    'todos ellos están dentro del .glb, o lo de abajo mediría cero vértices y pasaría por vacío',
+    [...EDIFICIOS_DEL_CASERIO].every((n) => nodosDelTablero.some((x) => x.getName() === n)),
+    [...EDIFICIOS_DEL_CASERIO].filter((n) => !nodosDelTablero.some((x) => x.getName() === n)),
+  );
+
+  /** Las UV de un modelo dentro del `.glb`, todas, sin filtrar. */
+  const uvDe = (nombre: string): Array<[number, number]> => {
+    const nodo = nodosDelTablero.find((n) => n.getName() === nombre);
+    const salida: Array<[number, number]> = [];
+    if (nodo === undefined) return salida;
+    const bajar = (x: Node): void => {
+      for (const prim of x.getMesh()?.listPrimitives() ?? []) {
+        const uv = prim.getAttribute('TEXCOORD_0');
+        if (uv === null) continue;
+        const st = [0, 0];
+        for (let i = 0; i < uv.getCount(); i++) {
+          uv.getElement(i, st);
+          salida.push([st[0] as number, st[1] as number]);
+        }
+      }
+      for (const h of x.listChildren()) bajar(h);
+    };
+    bajar(nodo);
+    return salida;
+  };
+
+  /*
+   * ═══ UNA SOLA COLUMNA DE JUGADOR POR EDIFICIO, QUE ES LO QUE HACE EL TRASLADO POSIBLE ═══
+   *
+   * El salto se calcula por vértice desde la columna en la que ese vértice está. Si un edificio
+   * pintara en DOS de las cuatro columnas de jugador —tejado rojo y puerta amarilla, pongamos—
+   * las dos irían a parar a la misma celda y el edificio saldría de un color plano. Medido: los
+   * catorce pintan en una sola. La herrería, el taller y la ermita tienen ADEMÁS vértices en las
+   * columnas 4 y 5 de esa misma fila, que no son de nadie y no se tocan — ver abajo.
+   */
+  const conDosColumnas = [...EDIFICIOS_DEL_CASERIO]
+    .map((nombre) => {
+      const cuantas = new Map<number, number>();
+      for (const [u, v] of uvDe(nombre)) {
+        if (Math.floor(v * FILAS_DEL_ATLAS) !== 3) continue;
+        const columna = Math.floor(u * COLUMNAS_DEL_ATLAS);
+        if (!COLUMNAS_DE_JUGADOR.has(columna)) continue;
+        cuantas.set(columna, (cuantas.get(columna) ?? 0) + 1);
+      }
+      return { nombre, suyas: [...cuantas.entries()] };
+    })
+    .filter(({ suyas }) => suyas.length !== 1);
+  comprobar(
+    'cada edificio del caserío pinta su color de jugador en UNA sola de las cuatro columnas: con dos, el traslado sería ambiguo y el edificio saldría de un color plano',
+    conDosColumnas.length === 0,
+    conDosColumnas.map(
+      (c) => `${c.nombre}: ${c.suyas.map(([col, n]) => `columna ${String(col)} × ${String(n)}`).join(', ')}`,
+    ),
+  );
+
+  /*
+   * ═══ Y EL TRASLADO, HECHO SOBRE LAS UV DE VERDAD ═══
+   *
+   * Se recorren los vértices de cada edificio dentro del `.glb`, se les aplica `saltoAlColor` y
+   * se comprueba que TODOS los que llevaban un color de jugador acaban en la columna del color
+   * pedido — y que ninguno de los otros se ha movido un solo téxel.
+   */
+  const malLlevados: string[] = [];
+  let verticesTrasladados = 0;
+  for (const nombre of EDIFICIOS_DEL_CASERIO) {
+    const suyas = uvDe(nombre);
+    for (const color of COLORES_DE_JUGADOR) {
+      const destino = COLUMNA_DEL_COLOR[color] as number;
+      for (const [u, v] of suyas) {
+        if (!esDeUnColorDeJugador(u, v)) continue;
+        verticesTrasladados++;
+        const llega = Math.floor((u + saltoAlColor(u, color)) * COLUMNAS_DEL_ATLAS);
+        if (llega !== destino) malLlevados.push(`${nombre}/${color}: llega a ${String(llega)}`);
+      }
+    }
+  }
+  comprobar(
+    `los ${String(verticesTrasladados)} vértices de color de los catorce edificios acaban EXACTAMENTE en la columna del color pedido, para los cuatro colores`,
+    verticesTrasladados > 0 && malLlevados.length === 0,
+    [...new Set(malLlevados)],
+  );
+
+  /*
+   * ═══ Y LO QUE SE QUEDA QUIETO, QUE ES LA MITAD QUE NO SE VE ═══
+   *
+   * La guarda del traslado es `esDeUnColorDeJugador`, así que lo que hay que medir es que esa
+   * guarda dice que NO a los vértices de la fila del color que están en las cuatro columnas de
+   * la derecha. Son pocos y son concretos —medidos sobre el `.glb`— y por eso se nombran uno a
+   * uno: si el pack los moviera de sitio, esto se pone rojo y le cuenta a quien lo lea que hay
+   * edificios con dos manchas en esa fila.
+   */
+  const LOS_QUE_NO_SON_DE_NADIE: ReadonlyArray<[string, number, number]> = [
+    ['herreria', 4, 41],
+    ['taller', 4, 18],
+    ['ermita', 5, 80],
+  ];
+  const quietosMalContados = LOS_QUE_NO_SON_DE_NADIE.filter(([nombre, columna, cuantos]) => {
+    const enEsaColumna = uvDe(nombre).filter(
+      ([u, v]) => Math.floor(v * FILAS_DEL_ATLAS) === 3 && Math.floor(u * COLUMNAS_DEL_ATLAS) === columna,
+    );
+    return enEsaColumna.length !== cuantos || enEsaColumna.some(([u, v]) => esDeUnColorDeJugador(u, v));
+  });
+  comprobar(
+    'ningún vértice que NO sea de un color de jugador entra en el traslado: los 41 de la herrería y los 18 del taller en la columna 4, y los 80 de la ermita en la 5, siguen ahí y la guarda dice que no a los tres',
+    quietosMalContados.length === 0,
+    quietosMalContados.map(([n]) => n),
+  );
+  /*
+   * LA VACUNA DEL TRASLADO: `esDeUnColorDeJugador` tiene que decir que NO a las cuatro columnas
+   * de la derecha de esa misma fila. Sin ella, «no se mueve lo que no es suyo» sería verde con
+   * una función que dijera que no a todo — y entonces tampoco se movería lo que sí es.
+   */
+  const laFilaDelColor = 3.5 / FILAS_DEL_ATLAS;
+  const columnasQueAcepta = [0, 1, 2, 3, 4, 5, 6, 7].filter((c) =>
+    esDeUnColorDeJugador((c + 0.5) / COLUMNAS_DEL_ATLAS, laFilaDelColor),
+  );
+  comprobar(
+    'se ve fallar: esDeUnColorDeJugador acepta las cuatro columnas de jugador de la fila 3 y rechaza las otras cuatro',
+    columnasQueAcepta.join(',') === '0,1,2,3',
+    columnasQueAcepta,
+  );
+  const otrasFilas = [0, 1, 2].filter((f) =>
+    esDeUnColorDeJugador(0.5 / COLUMNAS_DEL_ATLAS, (f + 0.5) / FILAS_DEL_ATLAS),
+  );
+  comprobar(
+    'y rechaza las otras tres filas del atlas, que son el suelo, las maderas y las piedras',
+    otrasFilas.length === 0,
+    otrasFilas,
+  );
+
+  /*
+   * ═══ EL OBJETIVO, MEDIDO: LA CASA DEL AZUL ACABA EN EL TÉXEL DEL POBLADO DEL AZUL ═══
+   *
+   * Es la frase con la que llegó el encargo, vuelta comprobación: después del traslado, el
+   * tejado de una casa del caserío de un colono y el tejado de su poblado son EL MISMO TÉXEL
+   * —distancia cero— y están a la distancia declarada de los otros tres colores.
+   */
+  const columnaTrasElSalto = (nombre: string, color: string): number | null => {
+    for (const [u, v] of uvDe(nombre)) {
+      if (!esDeUnColorDeJugador(u, v)) continue;
+      return Math.floor((u + saltoAlColor(u, color)) * COLUMNAS_DEL_ATLAS);
+    }
+    return null;
+  };
+  const desalineados = COLORES_DE_JUGADOR.filter(
+    (color) => columnaTrasElSalto('casa', color) !== columnaTrasElSalto('poblado', color),
+  );
+  comprobar(
+    'después del traslado, la casa del caserío de un colono apunta a la MISMA columna del atlas que su poblado: el tejado de su pueblo y el de su choza son el mismo téxel',
+    desalineados.length === 0 && columnaTrasElSalto('casa', 'blue') !== null,
+    desalineados,
+  );
+  const cruzadosDelCaserio = COLORES_DE_JUGADOR.filter(
+    (color, i) =>
+      columnaTrasElSalto('casa', color) ===
+      columnaTrasElSalto('poblado', COLORES_DE_JUGADOR[(i + 1) % COLORES_DE_JUGADOR.length] as string),
+  );
+  comprobar(
+    'se ve fallar: cruzando cada color con el del siguiente, los cuatro apuntan a columnas distintas — la medida no se está leyendo a sí misma',
+    cruzadosDelCaserio.length === 0,
+    cruzadosDelCaserio,
+  );
+
+  // ── 6. Lo que la escena hace con esto, leído del texto de `delta.tsx` ──
+
+  /*
+   * Por lo de siempre: dentro de un componente con `useMemo` y JSX no entra un guion de Node, y
+   * lo que hay que vigilar aquí es ESTRUCTURA — que el plan del mundo no dependa de las piezas,
+   * que las geometrías teñidas se fabriquen sólo para los colores en juego, y que se suelten.
+   */
+  const fuenteDelCaserio = fs.readFileSync(
+    path.join(import.meta.dirname ?? __dirname, '..', 'delta.tsx'),
+    'utf8',
+  );
+  const codigoDelCaserio = fuenteDelCaserio
+    .split('\n')
+    .filter((l) => !/^\s*(\*|\/\/|\/\*|\{\/\*|\*\/)/.test(l))
+    .join('\n');
+  const trozoDelCodigo = (desde: string, hasta: string): string => {
+    const a = codigoDelCaserio.indexOf(desde);
+    if (a < 0) return '';
+    const b = codigoDelCaserio.indexOf(hasta, a);
+    return codigoDelCaserio.slice(a, b < 0 ? codigoDelCaserio.length : b);
+  };
+  const elPlan = trozoDelCodigo('const plan = useMemo(', 'const suelos = useMemo(');
+  const elPueblo = trozoDelCodigo('const pueblos = useMemo(', 'const coloresEnJuego');
+  const elTenido = trozoDelCodigo('const caserioTenido = useMemo(', 'const seca = useMemo(');
+  /*
+   * SE PIDE LA LÍNEA ENTERA Y NO «que aparezca `EDIFICIOS_DEL_CASERIO`», y eso es una lección
+   * pagada: con el `test` flojo, anteponerle un `false &&` a la condición dejaba el caserío otra
+   * vez dentro de `cosas` —o sea sin color de dueño— y el comprobador seguía en verde, porque el
+   * nombre seguía escrito. Un `includes` sobre un nombre no distingue una rama viva de una
+   * muerta.
+   */
+  comprobar(
+    'el plan del mundo APARTA los edificios del caserío en vez de meterlos en `cosas`, y la rama está VIVA: si no, el color iría dentro del plan y las dos mil setecientas teselas se recalcularían con cada choza',
+    /\n\s*if \(EDIFICIOS_DEL_CASERIO\.has\(puesto\.modelo\)\) \{\n/.test(elPlan) &&
+      /\n\s*caserio\.push\(\{ llave, modelo: puesto\.modelo, puesta \}\);\n/.test(elPlan) &&
+      /\n\s*empuja\(cosas, `\$\{llave\}\|\$\{puesto\.modelo\}`, puesta\);\n/.test(elPlan),
+    elPlan.length,
+  );
+
+  /*
+   * ═══ Y EL TRASLADO SÓLO TOCA LO QUE ES DE UN COLOR, LEÍDO DEL CÓDIGO ═══
+   *
+   * `deOtroColor` es la única función de la escena que escribe UV de color, y lo hace dentro de
+   * un bucle sobre TODOS los vértices de la malla: lo único que separa «se repinta el tejado» de
+   * «se repinta el edificio entero de un color plano» es la guarda de una línea. Quitarla no
+   * rompe ninguna cuenta —`saltoAlColor` sigue devolviendo lo mismo— y no la caza ninguna otra
+   * comprobación de este guion, porque esa función vive en un fichero que importa `three`. Se
+   * mide el TEXTO: la escritura tiene que ir justo detrás de su guarda.
+   */
+  const elTinte = trozoDelCodigo('function deOtroColor(', '/** Una copia colocada');
+  comprobar(
+    'el traslado de color salta los vértices que no son de ningún jugador ANTES de escribirlos: sin esa guarda, el edificio entero saldría de un color plano y ninguna otra comprobación lo vería',
+    /if \(!esDeUnColorDeJugador\(u, suyaUv\.getY\(i\)\)\) continue;\n\s*suyaUv\.setX\(i, u \+ saltoAlColor\(u, color\)\);/.test(elTinte),
+    elTinte.length,
+  );
+  comprobar(
+    'y decide si hace falta clonar mirando esa misma guarda, no el nombre del color: por eso una iglesia azul pedida en azul es la geometría del catálogo y no un clon',
+    /esDeUnColorDeJugador\(u, uv\.getY\(i\)\) && saltoAlColor\(u, color\) !== 0/.test(elTinte),
+    elTinte.length,
+  );
+  comprobar(
+    'y el plan NO depende de las piezas: sus dependencias siguen siendo las islas, el relieve y la red de caminos',
+    elPlan.length > 0 && /\}, \[datos\.islas, relieve, red\]\);/.test(elPlan),
+    elPlan.slice(-160),
+  );
+  comprobar(
+    'el reparto vive en un memo aparte que SÍ depende de las piezas, y llama a `duenoDelCaserio` en vez de decidir por su cuenta',
+    /duenoDelCaserio\(/.test(elPueblo) && /\}, \[plan\.caserio, datos\.piezas\]\);/.test(elPueblo),
+    elPueblo.slice(-160),
+  );
+  comprobar(
+    'las geometrías teñidas se fabrican SÓLO para los colores en juego —fabricar los cuatro serían 4,46 MB de clones en un tablero donde nadie ha construido— y se apuntan para soltarlas',
+    elTenido.length > 0 && /coloresEnJuego/.test(elTenido) && /propias/.test(elTenido) && !/COLORES_DE_JUGADOR/.test(elTenido),
+    elTenido.length,
+  );
+  comprobar(
+    'y hay quien las suelte al cambiar de colores: un dispose colgado de `caserioTenido`',
+    /for \(const geometria of caserioTenido\.propias\) geometria\.dispose\(\);/.test(codigoDelCaserio),
+    /caserioTenido\.propias/.test(codigoDelCaserio),
+  );
+  comprobar(
+    'y lo que se pinta busca primero la variante teñida y cae en el catálogo de siempre para un edificio sin dueño',
+    /caserioTenido\.tabla\.get\(nombre\) \?\? aplanados\.get\(nombre\)/.test(codigoDelCaserio),
+    /caserioTenido\.tabla\.get/.test(codigoDelCaserio),
+  );
+
+  /*
+   * ═══ CUÁNTO SE CLONA DE VERDAD, Y POR QUÉ NO SE CLONA TODO ═══
+   *
+   * Un clon lleva posición, normal y UV en `float32`: 32 bytes por vértice. Los catorce
+   * edificios suman los vértices que se cuentan aquí, y lo que NO se clona es la variante que ya
+   * está en su sitio —la iglesia azul pedida en azul es la misma geometría del catálogo—. Se
+   * afirma el ahorro para que el día que alguien clone las cuatro siempre, el número cambie.
+   */
+  const verticesDeLosCatorce = [...EDIFICIOS_DEL_CASERIO].reduce((suma, n) => suma + uvDe(n).length, 0);
+  let seClonan = 0;
+  for (const color of COLORES_DE_JUGADOR) {
+    for (const nombre of EDIFICIOS_DEL_CASERIO) {
+      const suyas = uvDe(nombre);
+      if (suyas.some(([u, v]) => esDeUnColorDeJugador(u, v) && saltoAlColor(u, color) !== 0)) {
+        seClonan += suyas.length;
+      }
+    }
+  }
+  comprobar(
+    `los catorce edificios suman ${String(verticesDeLosCatorce)} vértices; con los cuatro colores jugando se clonan ${String(seClonan)} (${((seClonan * 32) / 1024 / 1024).toFixed(1)} MB) y NO los ${String(verticesDeLosCatorce * 4)} de clonarlos todos: la variante que ya está en su color es la misma geometría`,
+    seClonan > 0 && seClonan < verticesDeLosCatorce * COLORES_DE_JUGADOR.length,
+    { verticesDeLosCatorce, seClonan, ahorrado: verticesDeLosCatorce * COLORES_DE_JUGADOR.length - seClonan },
+  );
+}
+
 console.log('');
 if (fallos.length > 0) {
   console.log(`${fallos.length} de ${hechas} comprobaciones han fallado:\n`);
@@ -7038,8 +9938,30 @@ if (fallos.length > 0) {
  * El suelo estuvo en ocho mientras el guion tenía ocho, y se quedó ahí mientras crecía
  * a veintitrés: durante ese tiempo el guion podía morirse en la novena sin que nadie se
  * enterara. Un guardia desfasado no guarda nada.
+ *
+ * ═══ Y VOLVIÓ A DESFASARSE: 457 CONTRA 459 QUE SE HACÍAN ═══
+ *
+ * O sea que el guion podía morirse en la comprobación 457 —dos antes del final— y salir con
+ * cero. Se sube a lo que se hace HOY, y esta vez con la cuenta rehecha en vez de escrita a
+ * ojo: el guion tiene 451 llamadas a `comprobar` en el texto y ejecuta 481, porque treinta de
+ * ellas viven dentro de bucles sobre listas fijas —tres proporciones de pantalla, dos manos,
+ * las clases de pieza—. Corrido tres veces seguidas da 481 las tres.
+ *
+ * ═══ POR QUÉ EL NÚMERO VA AL RAS DE LA MEDIDA Y NO POR DEBAJO ═══
+ *
+ * Porque esto es un SUELO, y todo lo que se le reste es exactamente el tamaño del agujero:
+ * con el guardia en 470 y 481 hechas, el guion se puede morir once comprobaciones antes del
+ * final y salir en verde. La holgura no protege de nada aquí — protege al que añade una
+ * comprobación y se olvida de subir el número, y a ése no hay que protegerlo: si añade, la
+ * cuenta sube y el guardia sigue pasando igual. El único caso en el que el ras molesta es
+ * quitar una comprobación de verdad, y ahí bajar el número es parte de quitarla.
+ *
+ * Lo que sí hay que medir antes de ponerlo al ras es que la cuenta no BAILE entre corridas:
+ * si alguna comprobación viviera dentro de un `if` que depende del aparato, un guardia al ras
+ * sería un rojo aleatorio. Medido: no hay ninguna: las treinta que no son llamadas sueltas
+ * están en bucles sobre listas escritas en el propio guion.
  */
-const COMPROBACIONES_ESCRITAS = 403;
+const COMPROBACIONES_ESCRITAS = 481;
 if (hechas < COMPROBACIONES_ESCRITAS) {
   console.error(
     `Solo se han hecho ${hechas} de las ${COMPROBACIONES_ESCRITAS} comprobaciones que ` +

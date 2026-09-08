@@ -101,17 +101,31 @@ export interface CartaColocada {
  *
  * Siempre el mismo, tenga uno lo que tenga. Una mano ordenada por cómo fueron llegando
  * las cartas obliga a leerla entera cada vez; una ordenada siempre igual se lee por la
- * posición, como se lee un teclado. Es el orden en que el catán las nombra.
+ * posición, como se lee un teclado. Es el orden en que Riberas los nombra, que es el de
+ * `BIENES` en `shared/arcade/juegos/riberas.ts`.
+ *
+ * ═══ AQUÍ ESTABAN LOS CINCO DEL CATÁN DE CAJA, Y NO LLEGA NINGUNO ═══
+ *
+ * Ponía `madera, ladrillo, lana, grano, mineral`. Riberas reparte `limo, junco, sal,
+ * piedra, grano` y los manda SIN TRADUCIR (cabecera de `riberas-en-3d.ts`), así que
+ * cuatro de los cinco se caían fuera de la lista: `indexOf` devolvía -1, los cuatro
+ * empataban en el mismo sitio y acababan desempatando por orden alfabético. La mano
+ * salía `grano, junco, limo, piedra, sal`, que es fijo pero no es éste ni ninguno que
+ * nadie haya elegido, y la promesa de leerla por la posición estaba escrita sin cumplir.
+ *
+ * La lista se sigue escribiendo a mano en vez de importarla del juego, para no atar la
+ * escena a un catán concreto (ver `CartaEnLaMano`). Lo que ya no puede es desviarse
+ * callando: `verify:escena` la compara con la del juego, y con los cinco de verdad.
  *
  * Un bien que no esté en la lista va al final, en vez de desaparecer: la escena no es
  * quién para decidir que un bien de otro juego no existe.
  */
 export const ORDEN_DE_LOS_BIENES: readonly string[] = [
-  'madera',
-  'ladrillo',
-  'lana',
+  'limo',
+  'junco',
+  'sal',
+  'piedra',
   'grano',
-  'mineral',
 ];
 
 /** A qué distancia de la cámara vive la baraja. La misma que la barra, y por lo mismo. */
@@ -143,6 +157,75 @@ const ANCHO_SOBRE_ALTO = 0.7;
 const ASOMA_QUIETA = 0.55;
 /** Y cuánto asoma la carta a la que apunta el cursor, con el imán a tope. */
 const ASOMA_TIRADA = 1.02;
+
+/**
+ * LO ANCHA QUE ES LA TIRA QUE ASOMA EN REPOSO, en fracción del ALTO de la carta.
+ *
+ * No depende del tamaño de la pantalla: el reparto entero se hace en fracciones del alto
+ * que se ve, así que la tira mide lo mismo en un monitor y en un móvil de pie. Medido en
+ * cuatro proporciones (16:9, 1280x800, 852x922 y 9:19,5): 55,0 % del naipe en las cuatro.
+ */
+export const ANCHO_DE_LA_TIRA = ANCHO_SOBRE_ALTO * ASOMA_QUIETA;
+
+/**
+ * LO GRANDE QUE SE PINTA EL DIBUJO DEL BIEN, en fracción del alto de la carta.
+ *
+ * ═══ POR QUÉ EL NÚMERO ESTÁ AQUÍ Y NO DONDE SE PINTA ═══
+ *
+ * Porque lo que decide si el dibujo cabe es cuánto asoma la carta, y eso se sabe aquí.
+ * Mientras vivió suelto en el pintor no había forma de comprobarlo en Node, y no se
+ * comprobó: el dibujo llega de `formas.ts` encajado por su lado MAYOR en un cuadrado de
+ * lado uno, así que lo que mide de ancho lo decide el glifo. Los tres bienes anchos
+ * (`junco`, `limo` y `piedra`) salen con ancho normalizado 1,00; `grano` 0,96 y `sal`
+ * 0,84.
+ *
+ * ═══ POR QUÉ 0,27, Y POR QUÉ EL 0,38 QUE HABÍA NO CABÍA ═══
+ *
+ * Porque 0,38 se comparaba contra `ANCHO_DE_LA_TIRA` (0,385) y las dos son FRACCIONES
+ * PLANAS: dan por supuesto que el naipe está de frente y en el plano nominal de la baraja.
+ * En pantalla no es ni una cosa ni la otra. El naipe va INCLINADO —`INCLINACION`, hasta
+ * 0,13 radianes— y el dibujo va 0,01 POR DELANTE de la cara, o sea más cerca del ojo, donde
+ * el lienzo es más estrecho. Las dos cosas lo empujan hacia el borde por el que la carta ya
+ * está cortada.
+ *
+ * Medido proyectando las CUATRO ESQUINAS del rectángulo del dibujo con la cámara del
+ * encuadre, en las cuatro proporciones y con manos de una a veinte cartas: con 0,38 la peor
+ * esquina cae a 1,0183 del borde del lienzo, o sea un 1,8 % FUERA. En una mano de cinco el
+ * dibujo queda dentro sólo entre el 84 % y el 100 % según el naipe y la pantalla —el que
+ * peor sale es el más ancho de la mano de 16:9, con un 84 %—. Eso es un glifo cortado por el
+ * canto derecho, que es exactamente lo que se bajó el número para evitar.
+ *
+ * 0,27 deja la peor esquina en 0,9990. El techo exacto está en 0,2813 y 0,28 lo roza —0,9999,
+ * o sea a menos de un píxel del borde en un lienzo de mil seiscientos—, así que se toma el
+ * redondo de abajo y queda un 4 % de aire medido. Subirlo a 0,29 vuelve a sacarlo, y
+ * `verify:escena` lo dice con el número.
+ */
+export const ALTO_DEL_DIBUJO = 0.27;
+
+/**
+ * LO QUE LA MANO ENTERA SE SEPARA EN PROFUNDIDAD, de la primera carta a la última.
+ *
+ * ═══ ESTO ERA UN PASO POR CARTA, Y DECÍA DE SÍ MISMO QUE «NO DECIDE NADA» ═══
+ *
+ * Estaba escrito como `z: -DISTANCIA_DE_LA_BARAJA + i * 0,0015`, con un comentario que decía
+ * que el orden lo manda `orden` y que esto sólo deja la profundidad coherente. Lo primero es
+ * verdad; lo segundo NO: la mano vive a dos unidades del ojo y en PERSPECTIVA, así que
+ * acercar la carta diecinueve 0,0285 la agranda un 1,4 % y la empuja hacia fuera por el borde
+ * derecho — que es justo el borde por el que la mano ya asoma a medias, y por donde se pierde
+ * lo único que se ve de un naipe en reposo.
+ *
+ * Medido con la cámara del encuadre (45°, 16:9) sobre una mano de veinte: lo que asoma de
+ * cada naipe caía del 55,0 % en la primera al 42,9 % en la última. Una QUINTA PARTE de la
+ * tira que `ASOMA_QUIETA` promete, perdida por una constante decorativa que en su propio
+ * comentario decía no decidir nada. Con la separación repartida entre toda la mano, las
+ * veinte se quedan entre el 55,0 y el 54,4 %.
+ *
+ * Y lo que la constante quería sigue estando: veinte cartas siguen cada una un pelo por
+ * delante de la anterior, sólo que el pelo es el mismo para toda la mano y no crece con ella.
+ * `verify:escena` mide lo que asoma el peor naipe de manos de una a veinte y en las cuatro
+ * proporciones, y lo ve caer con el paso por carta.
+ */
+const SEPARACION_EN_PROFUNDIDAD = 0.0015;
 
 /**
  * EL ALCANCE DEL IMÁN, en fracción del alto de la pantalla.
@@ -306,11 +389,13 @@ export function huecosDeLaBaraja(
         dibujo: asoma / 2 - 0.5,
         y,
         /*
-         * Cada carta un pelo más cerca que la anterior. No decide nada por sí solo —el
-         * orden lo manda `orden`— pero deja la profundidad coherente por si algún día
-         * alguna capa vuelve a probarla.
+         * Cada carta un pelo más cerca que la anterior, y el pelo se reparte entre TODA la
+         * mano en vez de sumarse una vez por carta: ver `SEPARACION_EN_PROFUNDIDAD`. El orden
+         * lo sigue mandando `orden`; esto sólo deja la profundidad coherente.
          */
-        z: -DISTANCIA_DE_LA_BARAJA + i * 0.0015,
+        z:
+          -DISTANCIA_DE_LA_BARAJA +
+          (ordenada.length > 1 ? (i / (ordenada.length - 1)) * SEPARACION_EN_PROFUNDIDAD : 0),
         ancho: anchoDeCarta,
         alto: altoDeCarta,
         /* La inclinación va de `-INCLINACION` a `+INCLINACION` de arriba abajo. */
