@@ -258,21 +258,23 @@ import {
   ZOCALO_EN_PANTALLA,
 } from '../escala';
 import {
+  alfasDeLaPieza,
   ANCHO_DE_LA_RAYA,
   asientoDelDisco,
-  GRUESO_DEL_CONTORNO,
-  GRUESO_DEL_FLANCO,
+  DESVANECIDO_DE_LA_RAYA,
+  DESVANECIDO_DEL_DISCO,
   LADOS_DEL_DISCO,
   LARGO_DE_LA_RAYA,
   loLejosQueLlegaLaMarca,
   loQueOcupaElZocalo,
-  OPACIDAD_DEL_CONTORNO,
-  OPACIDAD_DEL_RELLENO,
+  OPACIDAD_DEL_ZOCALO,
   piezasDelZocalo,
-  RADIO_DEL_DISCO,
+  RADIO_DE_LA_MESETA,
   tallaDelZocalo,
+  TRAMOS_DE_LA_RAYA,
   Zocalo,
 } from '../zocalo';
+import type { PiezaDelZocalo } from '../zocalo';
 /*
  * EL ATLAS SE LEE DE LA TABLA COMPILADA, que es la que la app sube a la GPU y la que
  * `verify:atlas-del-tablero` compara píxel a píxel contra el PNG del pack. Abrir aquí el PNG
@@ -6505,54 +6507,93 @@ paso('La cinta del tercio central deja aire a las dos manos, la frase no se qued
     SUELOS.length === 6,
     SUELOS.map((s) => `${comoSeLlama(s)} ${s}`),
   );
-  const seComenElFilo = SUELOS.map((suelo) => ({
-    suelo: comoSeLlama(suelo),
-    cuanto: distancia(encima(suelo, FILO_DEL_ZOCALO, OPACIDAD_DEL_CONTORNO), suelo),
-  })).filter((x) => x.cuanto < CUANTO_SE_SEPARA_DE_UNA_PIEZA);
-  comprobar(
-    `ningún terreno se come el CONTORNO del zócalo con su opacidad de ${OPACIDAD_DEL_CONTORNO.toFixed(2)}: la marca que existe para encontrar la pieza se ve sobre la isla donde se posa, sea del terreno que sea`,
-    seComenElFilo.length === 0,
-    SUELOS.map(
-      (s) => `${comoSeLlama(s)}: ${distancia(encima(s, FILO_DEL_ZOCALO, OPACIDAD_DEL_CONTORNO), s).toFixed(1)}`,
-    ),
-  );
   /*
-   * Y EL RELLENO SE SEPARA DE SU PROPIO CONTORNO, o el color quedaría ahogado dentro del borde
-   * y las cuatro piezas se verían iguales entre sí — que es el mismo fallo, un paso más adentro.
-   */
-  const ahogados: string[] = [];
-  for (const suelo of SUELOS) {
-    for (const color of COLORES_DE_JUGADOR) {
-      const cuanto = distancia(
-        encima(suelo, colorLlanoDelJugador(color), OPACIDAD_DEL_RELLENO),
-        encima(suelo, FILO_DEL_ZOCALO, OPACIDAD_DEL_CONTORNO),
-      );
-      if (cuanto < CUANTO_SE_SEPARA_DE_UNA_PIEZA) {
-        ahogados.push(`${color} sobre ${comoSeLlama(suelo)}: ${cuanto.toFixed(1)}`);
-      }
-    }
-  }
-  comprobar(
-    'y el relleno se separa de su propio contorno en las veinticuatro parejas: el color no se ahoga dentro del borde que lo hace visible',
-    ahogados.length === 0,
-    ahogados,
-  );
-  /*
-   * ═══ Y LO QUE EL CONTORNO NO HACE: DECIR DE QUIÉN ES ═══
+   * ═══ LAS VEINTICUATRO PAREJAS, SIN CONTORNO Y CON EL DEGRADADO ═══
    *
-   * El contorno es UNO solo, así que no distingue a nadie. Lo que distingue es el relleno, y el
-   * relleno es translúcido: mezclado con el terreno, dos colores de jugador podrían acercarse.
-   * Se mide que NO, en las veinticuatro parejas de color y terreno tomadas de dos en dos.
+   * Aquí había DOS comprobaciones que ya no existen —«ningún terreno se come el CONTORNO» y «el
+   * relleno se separa de su propio contorno»— porque el contorno se ha quitado: se pidió, con
+   * la producción delante, que la marca terminara «difuminándose del mismo color del área hacia
+   * transparente hacia fuera, sin borde».
+   *
+   * Lo que las sustituye es LA MEDIDA QUE DE VERDAD IMPORTA, y que antes se hacía sólo como
+   * vacuna: las veinticuatro parejas de color de jugador y suelo, con la marca sola. Porque el
+   * contorno tenía un trabajo —hacer que la marca SE ENCUENTRE sobre cualquier terreno— y quien
+   * lo hereda es la opacidad del degradado, que por eso sube de 0,55 a 0,85 —el techo que la
+   * tinta permite sin que la marca pese más que la que llevaba contorno—.
+   */
+  const laMarcaSobre = (suelo: string, color: string, opacidad: number): number =>
+    distancia(encima(suelo, colorLlanoDelJugador(color), opacidad), suelo);
+  const lasVeinticuatro = (opacidad: number): Array<{ par: string; cuanto: number }> =>
+    COLORES_DE_JUGADOR.flatMap((color) =>
+      SUELOS.map((suelo) => ({
+        par: `${color} sobre ${comoSeLlama(suelo)}`,
+        cuanto: laMarcaSobre(suelo, color, opacidad),
+      })),
+    );
+  const seLaComen = lasVeinticuatro(OPACIDAD_DEL_ZOCALO).filter(
+    (x) => x.cuanto < CUANTO_SE_SEPARA_DE_UNA_PIEZA,
+  );
+  /*
+   * ═══ Y DOS DE LAS VEINTICUATRO NO SE SALVAN, Y SE DICEN CON SU NÚMERO EN VEZ DE ESCONDERSE ═══
+   *
+   * El verde de jugador es `#007d52` y el carrizal es `#008454`: SON EL MISMO COLOR. Ninguna
+   * cantidad de un color sobre sí mismo se ve, así que ni la opacidad entera salva esa pareja
+   * —se comprueba justo debajo— y lo mismo, más flojo, con el amarillo sobre la vega. Eso no lo
+   * arregla un degradado: lo arreglaría cambiar uno de los dos colores, y eso es una decisión de
+   * quien manda y no de quien mide.
+   *
+   * Se escriben AQUÍ, por nombre, y se exige que sean EXACTAMENTE ésas dos: si mañana cae una
+   * tercera —porque alguien toca el atlas o una opacidad— esto se pone rojo y lo cuenta, en vez
+   * de dejar que la lista crezca en silencio.
+   */
+  const LAS_QUE_NINGUNA_OPACIDAD_SALVA = ['green sobre bosque/carrizal', 'yellow sobre campo/vega'];
+  comprobar(
+    `de las veinticuatro parejas de color y terreno, la marca a ${OPACIDAD_DEL_ZOCALO.toFixed(2)} se separa del suelo más de ${String(CUANTO_SE_SEPARA_DE_UNA_PIEZA)} en ${String(24 - seLaComen.length)}, y las ${String(seLaComen.length)} que no son las dos en las que el color del jugador y el del terreno SON EL MISMO: ${seLaComen.map((x) => `${x.par} ${x.cuanto.toFixed(1)}`).join(', ')}`,
+    [...seLaComen.map((x) => x.par)].sort().join(' | ') ===
+      [...LAS_QUE_NINGUNA_OPACIDAD_SALVA].sort().join(' | '),
+    lasVeinticuatro(OPACIDAD_DEL_ZOCALO).map((x) => `${x.par}: ${x.cuanto.toFixed(1)}`),
+  );
+  const niOpacaDelTodo = lasVeinticuatro(1).filter((x) => x.cuanto < CUANTO_SE_SEPARA_DE_UNA_PIEZA);
+  comprobar(
+    `y no es que le falte opacidad: pintando la marca OPACA DEL TODO caen las mismas ${String(niOpacaDelTodo.length)} y con casi el mismo número (${niOpacaDelTodo.map((x) => `${x.par} ${x.cuanto.toFixed(1)}`).join(', ')}) — subir la opacidad no las salva, así que subirla más sólo pesaría`,
+    [...niOpacaDelTodo.map((x) => x.par)].sort().join(' | ') ===
+      [...seLaComen.map((x) => x.par)].sort().join(' | '),
+    niOpacaDelTodo,
+  );
+  /*
+   * LA VACUNA, Y ES LA QUE JUSTIFICA LA SUBIDA DE OPACIDAD: con el 0,55 que tenía el relleno
+   * cuando era la mitad de un dúo, cae UNA MÁS —el amarillo sobre la duna—. O sea que el paso a
+   * 0,85 no es un gusto: es la pareja que el degradado sí puede salvar en la tabla, y la única.
+   */
+  const COMO_ERA_EL_RELLENO = 0.55;
+  const alViejoRelleno = lasVeinticuatro(COMO_ERA_EL_RELLENO).filter(
+    (x) => x.cuanto < CUANTO_SE_SEPARA_DE_UNA_PIEZA,
+  );
+  const laQueSeSalva = alViejoRelleno.filter((x) => !seLaComen.some((y) => y.par === x.par));
+  comprobar(
+    `se ve fallar: a la opacidad que tenía el relleno con contorno —${COMO_ERA_EL_RELLENO.toFixed(2)}— caerían ${String(alViejoRelleno.length)} parejas y no ${String(seLaComen.length)}; la que la subida salva es ${laQueSeSalva.map((x) => `${x.par}, de ${x.cuanto.toFixed(1)} a ${lasVeinticuatro(OPACIDAD_DEL_ZOCALO).find((y) => y.par === x.par)?.cuanto.toFixed(1) ?? '?'}`).join(', ')}`,
+    alViejoRelleno.length === seLaComen.length + 1 && laQueSeSalva.length === 1,
+    { alViejoRelleno, ahora: seLaComen, laQueSeSalva },
+  );
+  /*
+   * ═══ Y LA OTRA MITAD DEL TRABAJO: DECIR DE QUIÉN ES ═══
+   *
+   * La marca es translúcida: mezclada con el terreno, dos colores de jugador podrían acercarse.
+   * Se mide que NO, en las veinticuatro parejas de color y terreno tomadas de dos en dos. Con el
+   * degradado esto puede EMPEORAR —el borde es más tenue—, así que se vuelve a medir con la
+   * opacidad de ahora y no se hereda el número de antes.
    */
   const confundibles: string[] = [];
+  let laPeorPareja = Infinity;
   for (const suelo of SUELOS) {
     const pintados = COLORES_DE_JUGADOR.map((c) => ({
       c,
-      hex: encima(suelo, colorLlanoDelJugador(c), OPACIDAD_DEL_RELLENO),
+      hex: encima(suelo, colorLlanoDelJugador(c), OPACIDAD_DEL_ZOCALO),
     }));
     for (let i = 0; i < pintados.length; i++) {
       for (let j = i + 1; j < pintados.length; j++) {
         const cuanto = distancia((pintados[i] as { hex: string }).hex, (pintados[j] as { hex: string }).hex);
+        laPeorPareja = Math.min(laPeorPareja, cuanto);
         if (cuanto < CUANTO_SE_SEPARA_DE_UNA_PIEZA) {
           confundibles.push(
             `${(pintados[i] as { c: string }).c} contra ${(pintados[j] as { c: string }).c} sobre ${comoSeLlama(suelo)}: ${cuanto.toFixed(1)}`,
@@ -6562,28 +6603,9 @@ paso('La cinta del tercio central deja aire a las dos manos, la frase no se qued
     }
   }
   comprobar(
-    'los cuatro rellenos translúcidos se separan entre sí sobre los seis terrenos: la marca sigue diciendo DE QUIÉN es la pieza y no sólo que hay una',
+    `las cuatro marcas translúcidas se separan entre sí sobre los seis terrenos —la peor pareja a ${laPeorPareja.toFixed(1)}—: la marca sigue diciendo DE QUIÉN es la pieza y no sólo que hay una`,
     confundibles.length === 0,
     confundibles,
-  );
-  /*
-   * LA VACUNA, con los números que se midieron: SIN contorno, el relleno solo se lo comen tres
-   * pares —el verde sobre el carrizal a 2,3, el amarillo sobre la vega a 8,1 y sobre la duna a
-   * 16,6—. Tiene que caer por los tres, o el contorno estaría pintado por si acaso.
-   */
-  const sinFilo: string[] = [];
-  for (const color of COLORES_DE_JUGADOR) {
-    for (const suelo of SUELOS) {
-      const cuanto = distancia(encima(suelo, colorLlanoDelJugador(color), OPACIDAD_DEL_RELLENO), suelo);
-      if (cuanto < CUANTO_SE_SEPARA_DE_UNA_PIEZA) {
-        sinFilo.push(`${comoSeLlama(suelo)} ${suelo} se comería el relleno ${color}: ${cuanto.toFixed(1)}`);
-      }
-    }
-  }
-  comprobar(
-    `se ve fallar: sin contorno, el relleno translúcido desaparecería en ${String(sinFilo.length)} pares de color y terreno — de ahí que la marca lleve borde`,
-    sinFilo.length > 0,
-    sinFilo,
   );
   /*
    * ═══ Y LA VACUNA DE LA SALIDA ELEGANTE QUE NO ERA, QUE ES LA QUE COSTÓ DECIDIR ═══
@@ -6608,7 +6630,7 @@ paso('La cinta del tercio central deja aire a las dos manos, la frase no se qued
   for (const suelo of SUELOS) {
     const sumados = COLORES_DE_JUGADOR.map((c) => ({
       c,
-      hex: sumando(suelo, colorLlanoDelJugador(c), OPACIDAD_DEL_RELLENO),
+      hex: sumando(suelo, colorLlanoDelJugador(c), OPACIDAD_DEL_ZOCALO),
     }));
     for (const p of sumados) peorAditivaContraElSuelo = Math.min(peorAditivaContraElSuelo, distancia(p.hex, suelo));
     for (let i = 0; i < sumados.length; i++) {
@@ -7169,9 +7191,9 @@ paso('La cinta del tercio central deja aire a las dos manos, la frase no se qued
     const superficieDeEsteDelta =
       DELTA.length * ((3 * Math.sqrt(3)) / 2) * RADIO_DE_COMARCA * RADIO_DE_COMARCA;
     const tinta =
-      (ciudad.reduce((s, r) => s + loQueOcupaElZocalo('disco').tinta * r * r, 0) +
+      (ciudad.reduce((s, r) => s + loQueOcupaElZocalo('disco').mancha * r * r, 0) +
         tallaDeLaRaya.reduce(
-          (s, t) => s + loQueOcupaElZocalo('raya').tinta * (t * RADIO_DE_TESELA) ** 2,
+          (s, t) => s + loQueOcupaElZocalo('raya').mancha * (t * RADIO_DE_TESELA) ** 2,
           0,
         )) /
       superficieDeEsteDelta;
@@ -7565,7 +7587,7 @@ paso('La cinta del tercio central deja aire a las dos manos, la frase no se qued
       techo: number,
     ): number => {
       const largo = techo * RADIO_DE_TESELA * LARGO_DE_LA_RAYA;
-      const medioAncho = techo * RADIO_DE_TESELA * (ANCHO_DE_LA_RAYA / 2 + GRUESO_DEL_FLANCO);
+      const medioAncho = techo * RADIO_DE_TESELA * (ANCHO_DE_LA_RAYA / 2 + DESVANECIDO_DE_LA_RAYA);
       const cota = medio.y + ALTO_DEL_ZOCALO;
       for (let k = 1; k <= 96; k++) {
         const cuanto = ((largo / 2) * k) / 96;
@@ -7642,35 +7664,50 @@ paso('La cinta del tercio central deja aire a las dos manos, la frase no se qued
     { siFueraDiminuta, laPieza: anchoDeLaPieza },
   );
   /*
-   * ═══ Y EL TRAZO MÁS FINO TAMBIÉN SE MIDE EN PÍXELES, QUE ES LO QUE COSTÓ UNA VUELTA ═══
+   * ═══ Y CADA TROZO DE LA MARCA SE MIDE EN PÍXELES, QUE ES LO QUE COSTÓ UNA VUELTA ═══
    *
-   * El contorno es lo que hace que la marca se vea sobre cualquier terreno —el bloque de color
-   * de arriba lo mide y le sale 35,6 sobre el peor de los seis—, pero esa cuenta es de COLOR y
-   * no sabe cuántos píxeles se pintan de ese color. El contorno heredó el grueso del filo del
-   * aro, 0,09, y a la nueva fracción de pantalla eso son 1,1 píxeles: un trazo de un píxel es
-   * casi todo antialias, y contando píxeles en el lienzo sólo el 37 % de los del disco azul
-   * sobre la montaña pasaba del umbral, contra el 73-81 % de las otras tres marcas. A 0,19 el
-   * contorno mide 2,4 píxeles y ese disco sube al 49 %.
+   * El bloque de color de arriba mide CIE76 y no sabe cuántos píxeles se pintan de ese color.
+   * El contorno que había heredó el grueso del filo del aro, 0,09, y a esta fracción de pantalla
+   * eso son 1,1 píxeles: un trazo de un píxel es casi todo antialias, y contando píxeles en el
+   * lienzo sólo el 37 % de los del disco azul sobre la montaña pasaba del umbral, contra el
+   * 73-81 % de las otras tres marcas.
    *
-   * Así que aquí se compra lo que aquella medida de color no ve: que ningún trazo de la marca
-   * baje de dos píxeles desde el encuadre de tablero.
+   * CON EL DEGRADADO LA REGLA NO CAMBIA, SÓLO A QUIÉN SE LE APLICA: lo que no puede bajar de dos
+   * píxeles ya no es un contorno sino la MESETA —el trozo a opacidad entera, que es lo que hace
+   * que la marca se vea— y la CAÍDA —la zona donde se apaga, que si mide un píxel no es un
+   * degradado sino un filo de antialias, o sea el borde que se ha quitado con otro color—. Y las
+   * PUNTAS de la raya entran en la lista porque también se apagan.
    */
   const DOS_PIXELES = 2;
   const enPixeles = (cuanto: number): number => cuanto * ZOCALO_EN_PANTALLA * EN_UNA_VENTANA_DE;
   const trazos = [
-    { que: 'el contorno del disco', grueso: enPixeles(GRUESO_DEL_CONTORNO) },
-    { que: 'el flanco de la raya', grueso: enPixeles(GRUESO_DEL_FLANCO) },
-    { que: 'el relleno de la raya', grueso: enPixeles(ANCHO_DE_LA_RAYA) },
+    { que: 'la meseta del disco (diámetro)', grueso: enPixeles(2 * RADIO_DE_LA_MESETA) },
+    { que: 'la caída del disco', grueso: enPixeles(DESVANECIDO_DEL_DISCO) },
+    { que: 'la banda de la raya', grueso: enPixeles(ANCHO_DE_LA_RAYA) },
+    { que: 'la caída de la raya', grueso: enPixeles(DESVANECIDO_DE_LA_RAYA) },
+    { que: 'la punta de la raya', grueso: enPixeles(LARGO_DE_LA_RAYA / TRAMOS_DE_LA_RAYA) },
   ];
   comprobar(
-    `ningún trazo de la marca baja de ${String(DOS_PIXELES)} píxeles desde la vista de tablero: ${trazos.map((t) => `${t.que} ${t.grueso.toFixed(1)}`).join(', ')}`,
+    `ningún trozo de la marca baja de ${String(DOS_PIXELES)} píxeles desde la vista de tablero: ${trazos.map((t) => `${t.que} ${t.grueso.toFixed(1)}`).join(', ')}`,
     trazos.every((t) => t.grueso >= DOS_PIXELES),
     trazos,
   );
   comprobar(
-    `se ve fallar: con el contorno al grueso que tenía el filo del aro —0,09— mediría ${enPixeles(0.09).toFixed(1)} píxeles, o sea casi todo antialias`,
+    `se ve fallar: con el contorno al grueso que tenía el filo del aro —0,09— mediría ${enPixeles(0.09).toFixed(1)} píxeles, o sea casi todo antialias — y ésa es la vara con la que la caída de ahora mide ${enPixeles(DESVANECIDO_DEL_DISCO).toFixed(1)}`,
     enPixeles(0.09) < DOS_PIXELES,
-    { conElGruesoDelAro: enPixeles(0.09), elDeAhora: enPixeles(GRUESO_DEL_CONTORNO) },
+    { conElGruesoDelAro: enPixeles(0.09), laCaidaDeAhora: enPixeles(DESVANECIDO_DEL_DISCO) },
+  );
+  /*
+   * Y LA VACUNA DE POR QUÉ LA RAYA NO SE DESVANECE LO MISMO QUE EL DISCO, que es la pregunta que
+   * la cabecera de `zocalo.tsx` contesta con este número: dándole a la raya la caída del disco
+   * —0,30 por lado sobre 0,68 de ancho total— la banda del eje se quedaría en un píxel.
+   */
+  const siLaRayaCayeraComoElDisco =
+    ANCHO_DE_LA_RAYA + 2 * DESVANECIDO_DE_LA_RAYA - 2 * DESVANECIDO_DEL_DISCO;
+  comprobar(
+    `se ve fallar: con la caída del disco —${DESVANECIDO_DEL_DISCO.toFixed(2)}— a los dos lados de la raya, su banda de eje se quedaría en ${enPixeles(siLaRayaCayeraComoElDisco).toFixed(1)} píxeles contra los ${enPixeles(ANCHO_DE_LA_RAYA).toFixed(1)} de ahora`,
+    enPixeles(siLaRayaCayeraComoElDisco) < DOS_PIXELES,
+    { siCayeraComoElDisco: enPixeles(siLaRayaCayeraComoElDisco), laDeAhora: enPixeles(ANCHO_DE_LA_RAYA) },
   );
   /*
    * ═══ Y LA RAYA DE UNA VEREDA PONE MENOS TINTA QUE EL DISCO — EN LA GEOMETRÍA ═══
@@ -7704,11 +7741,74 @@ paso('La cinta del tercio central deja aire a las dos manos, la frase no se qued
    * el guion y el encuadre con el que salen.
    */
   const tintaEnPixeles = (forma: 'disco' | 'raya'): number =>
-    loQueOcupaElZocalo(forma).tinta * (ZOCALO_EN_PANTALLA * EN_UNA_VENTANA_DE) ** 2;
+    loQueOcupaElZocalo(forma).mancha * (ZOCALO_EN_PANTALLA * EN_UNA_VENTANA_DE) ** 2;
   comprobar(
-    `la raya de una vereda pone ${tintaEnPixeles('raya').toFixed(0)} píxeles cuadrados de TINTA DE GEOMETRÍA y el disco de un asentamiento ${tintaEnPixeles('disco').toFixed(0)}: la marca de la vereda es la más floja de las dos, que es lo que se pidió. En píxeles VISTOS es al revés, y está medido en la cabecera de aquí arriba`,
+    `la raya de una vereda pone ${tintaEnPixeles('raya').toFixed(0)} píxeles cuadrados de MANCHA DE GEOMETRÍA y el disco de un asentamiento ${tintaEnPixeles('disco').toFixed(0)}: la marca de la vereda es la más floja de las dos, que es lo que se pidió. En píxeles VISTOS es al revés, y está medido en la cabecera de aquí arriba`,
     tintaEnPixeles('raya') < tintaEnPixeles('disco') && tintaEnPixeles('raya') > 4 * anchoDeLaPieza,
     { raya: tintaEnPixeles('raya'), disco: tintaEnPixeles('disco') },
+  );
+  /*
+   * ═══ Y AHORA HAY UNA SEGUNDA CIFRA, PORQUE UN DEGRADADO NO SE MIDE POR SU ÁREA ═══
+   *
+   * La de arriba es la MANCHA: el área de las mallas, sin mirar la opacidad. Con un relleno
+   * llano eso valía, porque el área y la pintura eran la misma cosa. Con un degradado NO: una
+   * falda que acaba en cero cubre suelo y casi no pinta, y contarla entera es exactamente la
+   * forma de que un degradado ancho parezca ligero.
+   *
+   * Así que se mide también la TINTA —la integral de la opacidad sobre la mancha— y se compara
+   * con la que ponía la marca CON CONTORNO, que es la pregunta que había encima de esta tanda:
+   * quitar el borde y difuminar no puede haber hecho la marca más pesada. La geometría de antes
+   * se escribe aquí como un dato y se rehace la cuenta, igual que se hace con el aro.
+   */
+  const COMO_ERA_CON_CONTORNO = {
+    radio: 0.81,
+    grueso: 0.19,
+    opRelleno: 0.55,
+    opContorno: 0.8,
+    ancho: 0.34,
+    flanco: 0.17,
+  };
+  const tintaDeAntes = {
+    disco:
+      Math.PI * COMO_ERA_CON_CONTORNO.radio ** 2 * COMO_ERA_CON_CONTORNO.opRelleno +
+      Math.PI *
+        ((COMO_ERA_CON_CONTORNO.radio + COMO_ERA_CON_CONTORNO.grueso) ** 2 -
+          COMO_ERA_CON_CONTORNO.radio ** 2) *
+        COMO_ERA_CON_CONTORNO.opContorno,
+    raya:
+      LARGO_DE_LA_RAYA * COMO_ERA_CON_CONTORNO.ancho * COMO_ERA_CON_CONTORNO.opRelleno +
+      2 * LARGO_DE_LA_RAYA * COMO_ERA_CON_CONTORNO.flanco * COMO_ERA_CON_CONTORNO.opContorno,
+  };
+  const tintaDeAhora = {
+    disco: loQueOcupaElZocalo('disco').tinta,
+    raya: loQueOcupaElZocalo('raya').tinta,
+  };
+  comprobar(
+    `y el degradado NO ha hecho la marca más pesada: la tinta —la integral de la opacidad, no el área— baja de ${tintaDeAntes.disco.toFixed(2)} a ${tintaDeAhora.disco.toFixed(2)} en el disco (${((tintaDeAhora.disco / tintaDeAntes.disco) * 100).toFixed(0)} %) y de ${tintaDeAntes.raya.toFixed(2)} a ${tintaDeAhora.raya.toFixed(2)} en la raya (${((tintaDeAhora.raya / tintaDeAntes.raya) * 100).toFixed(0)} %), con la MISMA mancha que antes`,
+    tintaDeAhora.disco < tintaDeAntes.disco &&
+      tintaDeAhora.raya < tintaDeAntes.raya &&
+      Math.abs(loQueOcupaElZocalo('disco').mancha - Math.PI * (COMO_ERA_CON_CONTORNO.radio + COMO_ERA_CON_CONTORNO.grueso) ** 2) < 1e-9 &&
+      Math.abs(loQueOcupaElZocalo('raya').mancha - LARGO_DE_LA_RAYA * (COMO_ERA_CON_CONTORNO.ancho + 2 * COMO_ERA_CON_CONTORNO.flanco)) < 1e-9,
+    { antes: tintaDeAntes, ahora: tintaDeAhora },
+  );
+  /*
+   * LA VACUNA DEL PERFIL, que es la que decide la meseta: con la caída en 0,20 —o sea con la
+   * meseta llegando a 0,80— la tinta del disco SUBIRÍA por encima de la que había con contorno.
+   * Es el número que descartó ese perfil, y está aquí para que nadie lo vuelva a proponer sin
+   * verlo. La integral es la misma que hace `loQueOcupaElZocalo`, rehecha con otra caída.
+   */
+  const tintaDeUnDiscoCon = (caida: number): number => {
+    const d = 1 - caida;
+    return (
+      OPACIDAD_DEL_ZOCALO * Math.PI * d * d +
+      OPACIDAD_DEL_ZOCALO * ((2 * Math.PI) / caida) * ((1 - d * d) / 2 - (1 - d * d * d) / 3)
+    );
+  };
+  comprobar(
+    `se ve fallar: con la caída en 0,20 en vez de en ${DESVANECIDO_DEL_DISCO.toFixed(2)} el disco pondría ${tintaDeUnDiscoCon(0.2).toFixed(2)} de tinta, MÁS que los ${tintaDeAntes.disco.toFixed(2)} que ponía con contorno — la caída no es un gusto, es lo que sujeta el peso`,
+    tintaDeUnDiscoCon(0.2) > tintaDeAntes.disco &&
+      Math.abs(tintaDeUnDiscoCon(DESVANECIDO_DEL_DISCO) - tintaDeAhora.disco) < 1e-9,
+    { con020: tintaDeUnDiscoCon(0.2), conLaDeAhora: tintaDeUnDiscoCon(DESVANECIDO_DEL_DISCO), antes: tintaDeAntes.disco },
   );
   /*
    * Y LAS DOS PONEN MENOS TINTA QUE EL ARO QUE HABÍA ANTES, que es el encargo entero: bajarle el
@@ -7741,7 +7841,7 @@ paso('La cinta del tercio central deja aire a las dos manos, la frase no se qued
    * hace con las 54 marcas siendo ciudades.
    */
   const tintaDeLaCiudad =
-    loQueOcupaElZocalo('disco').tinta * (ZOCALO_DE_CIUDAD_EN_PANTALLA * EN_UNA_VENTANA_DE) ** 2;
+    loQueOcupaElZocalo('disco').mancha * (ZOCALO_DE_CIUDAD_EN_PANTALLA * EN_UNA_VENTANA_DE) ** 2;
   comprobar(
     `y la tercera pesa más, dicho con número: el disco de una ciudad pone ${tintaDeLaCiudad.toFixed(0)} píxeles cuadrados, el ${((tintaDeLaCiudad / tintaDelAro) * 100).toFixed(0)} % del aro — es lo que cuesta que asome por fuera de un recinto cerrado`,
     tintaDeLaCiudad > tintaDelAro && tintaDeLaCiudad < 2 * tintaDelAro,
@@ -7782,7 +7882,7 @@ paso('La cinta del tercio central deja aire a las dos manos, la frase no se qued
 }
 
 // ---------------------------------------------------------------------------
-paso('El zócalo se compra de verdad: disco en la choza, raya en la vereda, cada una de su dueño, con contorno y a lo largo de su arista');
+paso('El zócalo se compra de verdad: disco en la choza, raya en la vereda, cada una de su dueño, apagándose hacia fuera y a lo largo de su arista');
 // ---------------------------------------------------------------------------
 
 /**
@@ -7810,10 +7910,16 @@ paso('El zócalo se compra de verdad: disco en la choza, raya en la vereda, cada
  * TEXTO en el último bloque, que es la técnica que este guion ya usa con los diez grupos de
  * la mesa.
  *
- * Cuatro cosas se compran del aro y las cuatro se pueden perder solas: QUE EXISTA, QUE LLEVE
- * EL COLOR DE SU DUEÑO, QUE TENGA FILO y QUE ESTÉ A LA TALLA DE UNA MARCA DE PANTALLA. Y las
- * cuatro llevan su vacuna: se le rompe a un árbol de mentira exactamente eso y el mismo juez
- * que dice que sí tiene que decir que no.
+ * Cuatro cosas se compran de la marca y las cuatro se pueden perder solas: QUE EXISTA, QUE
+ * LLEVE EL COLOR DE SU DUEÑO Y NINGÚN OTRO, QUE SE APAGUE HACIA FUERA HASTA SER TRANSPARENTE y
+ * QUE ESTÉ A LA TALLA DE UNA MARCA DE PANTALLA. Y las cuatro llevan su vacuna: se le rompe a un
+ * árbol de mentira exactamente eso y el mismo juez que dice que sí tiene que decir que no.
+ *
+ * LA TERCERA ES NUEVA Y SUSTITUYE A «QUE TENGA FILO», y no es un cambio de palabras: aquí se
+ * exigía que la marca llevara `FILO_DEL_ZOCALO` —el contorno casi negro— y ahora se exige que
+ * NO lo lleve, porque se pidió quitarlo. Lo que hacía el contorno —que la marca se encuentre
+ * sobre cualquier terreno— lo hace ahora la opacidad, que subió de 0,55 a 0,85, y eso se mide en
+ * el bloque de color de más arriba con las veinticuatro parejas de color y suelo.
  */
 {
   /** Un elemento de React, visto como lo que es: un objeto llano con `type` y `props`. */
@@ -7850,9 +7956,10 @@ paso('El zócalo se compra de verdad: disco en la choza, raya en la vereda, cada
    */
   /**
    * `forma` entra en el juez porque las dos marcas NO son el mismo árbol: el disco son dos
-   * mallas —contorno y relleno— y la raya son tres —dos flancos y el relleno—. Un juez que se
-   * conformara con «hay mallas» diría que sí a una raya sin flancos, que es la marca de las
-   * veredas sin lo que la hace visible sobre el carrizal.
+   * mallas —la meseta y su falda— y la raya son tres —la banda del eje y sus dos faldas—. Un
+   * juez que se conformara con «hay mallas» diría que sí a una raya sin faldas, que es la marca
+   * de las veredas cortada en seco, o sea con el borde que se acaba de quitar dibujado con su
+   * propio color.
    */
   const queLeFaltaAlZocalo = (raiz: unknown, deQuien: string, forma: 'disco' | 'raya'): string[] => {
     const faltas: string[] = [];
@@ -7914,17 +8021,18 @@ paso('El zócalo se compra de verdad: disco en la choza, raya en la vereda, cada
       );
     }
     const mallas = deTipo(arbol, 'mesh');
+    const piezas = piezasDelZocalo(forma, deQuien);
     const CUANTAS = forma === 'disco' ? 2 : 3;
     if (mallas.length !== CUANTAS) {
       faltas.push(
-        `tiene ${String(mallas.length)} mallas y son ${String(CUANTAS)}: ${forma === 'disco' ? 'el contorno y el relleno' : 'los dos flancos y el relleno'}`,
+        `tiene ${String(mallas.length)} mallas y son ${String(CUANTAS)}: ${forma === 'disco' ? 'la meseta y su falda' : 'la banda del eje y sus dos faldas'}`,
       );
     }
     /* Y CADA FORMA CON SU GEOMETRÍA. Un disco pintado con planos no es un disco. */
     const cuantasDe = (que: string): number => deTipo(arbol, que).length;
     if (forma === 'disco' && (cuantasDe('circleGeometry') !== 1 || cuantasDe('ringGeometry') !== 1)) {
       faltas.push(
-        `el disco no está hecho de un círculo y un aro de contorno: ${String(cuantasDe('circleGeometry'))} círculos y ${String(cuantasDe('ringGeometry'))} aros`,
+        `el disco no está hecho de un círculo de meseta y un aro de falda: ${String(cuantasDe('circleGeometry'))} círculos y ${String(cuantasDe('ringGeometry'))} aros`,
       );
     }
     if (forma === 'raya' && cuantasDe('planeGeometry') !== 3) {
@@ -7932,50 +8040,121 @@ paso('El zócalo se compra de verdad: disco en la choza, raya en la vereda, cada
     }
     const pinturas = deTipo(arbol, 'meshBasicMaterial');
     const colores = pinturas.map((n) => String(n.props['color']));
-    if (!colores.includes(FILO_DEL_ZOCALO)) {
-      faltas.push(`no lleva el contorno ${FILO_DEL_ZOCALO}: ${colores.join(', ')}`);
-    }
     const suyo = colorLlanoDelJugador(deQuien);
     if (!colores.includes(suyo)) faltas.push(`no lleva el color de su dueño ${suyo}: ${colores.join(', ')}`);
     /*
-     * EL CONTORNO VA POR DEBAJO EN LA PILA DE DIBUJO Y POR FUERA EN TAMAÑO, o no es un contorno.
-     * «Por fuera» se mide distinto en cada forma y es la misma idea: en el disco, el radio de
-     * fuera del aro pasa del radio del círculo; en la raya, el flanco se aparta del eje más de
-     * lo que el relleno es ancho por su mitad.
+     * ═══ Y NO LLEVA NINGÚN OTRO COLOR, QUE ES LO QUE SUSTITUYE A «TIENE CONTORNO» ═══
+     *
+     * Aquí se exigía que la marca LLEVARA `FILO_DEL_ZOCALO`. Ahora se exige lo contrario, y por
+     * la misma razón por la que se exigía aquello: lo que se pidió es que el borde negro
+     * desapareciera y que la marca se difuminara «del mismo color del área». Una marca con dos
+     * colores es una marca con contorno, se llame como se llame el segundo.
      */
-    const laMalla = (color: string): NodoPintado | undefined =>
-      mallas.find((m) => deTipo(todoElArbol(m), 'meshBasicMaterial').some((q) => q.props['color'] === color));
-    const elFilo = laMalla(FILO_DEL_ZOCALO);
-    const elSuyo = laMalla(suyo);
-    if (elFilo === undefined || elSuyo === undefined) {
-      faltas.push('no se puede emparejar cada pieza con su color');
-    } else {
-      const ordenDelFilo = Number(elFilo.props['renderOrder']);
-      const ordenDelSuyo = Number(elSuyo.props['renderOrder']);
-      if (ordenDelFilo >= ordenDelSuyo) {
-        faltas.push(`el contorno se pinta encima del color: ${String(ordenDelFilo)} contra ${String(ordenDelSuyo)}`);
+    const ajenos = [...new Set(colores.filter((c) => c !== suyo))];
+    if (ajenos.length > 0) {
+      faltas.push(
+        `la marca lleva ${String(ajenos.length)} color(es) que no son el de su dueño —o sea, ha vuelto el contorno—: ${ajenos.join(', ')}`,
+      );
+    }
+    /*
+     * ═══ EL DEGRADADO: QUE ESTÉ, QUE LLEVE ALFA, Y QUE SEA EL QUE SE MIDE ═══
+     *
+     * El perfil se pinta con COLORES POR VÉRTICE de cuatro componentes —`three` sólo enciende el
+     * alfa por vértice si `itemSize` es 4—, así que aquí se compran las tres cosas que pueden
+     * romperlo sin que nada más se entere: que el material los LEA (`vertexColors`), que el
+     * atributo tenga CUATRO componentes, y que los números sean EXACTAMENTE los que
+     * `alfasDeLaPieza` declara, vértice a vértice. Esa última es la que ata el JSX con lo que se
+     * mide: sin ella, el fichero podría pintar un degradado y la medida hablar de otro.
+     */
+    for (const pintura of pinturas) {
+      if (pintura.props['vertexColors'] !== true) {
+        faltas.push('una pieza no lee el color por vértice: sin `vertexColors` el degradado no se pinta y la marca se corta en seco');
       }
-      if (forma === 'disco') {
-        const aro = deTipo(todoElArbol(elFilo), 'ringGeometry')[0];
-        const circulo = deTipo(todoElArbol(elSuyo), 'circleGeometry')[0];
-        const fuera = aro === undefined ? 0 : (aro.props['args'] as number[])[1] ?? 0;
-        const radio = circulo === undefined ? Infinity : (circulo.props['args'] as number[])[0] ?? Infinity;
-        if (!(fuera > radio)) {
-          faltas.push(`el contorno no asoma por fuera del disco: ${String(fuera)} contra ${String(radio)}`);
-        }
-      } else {
-        const flancos = mallas.filter((m) =>
-          deTipo(todoElArbol(m), 'meshBasicMaterial').some((q) => q.props['color'] === FILO_DEL_ZOCALO),
+    }
+    const alfasDeLaMalla = (malla: NodoPintado): number[] | undefined => {
+      const deColor = deTipo(todoElArbol(malla), 'bufferAttribute').filter(
+        (n) => n.props['attach'] === 'attributes-color',
+      );
+      if (deColor.length !== 1) return undefined;
+      const args = (deColor[0] as NodoPintado).props['args'];
+      if (!Array.isArray(args) || args.length < 2 || args[1] !== 4) return undefined;
+      const crudo = args[0] as ArrayLike<number> | undefined;
+      if (crudo === undefined || typeof crudo.length !== 'number') return undefined;
+      const salida: number[] = [];
+      for (let i = 3; i < crudo.length; i += 4) salida.push(crudo[i] as number);
+      return salida;
+    };
+    const todosLosAlfas: number[] = [];
+    for (let i = 0; i < mallas.length; i++) {
+      const malla = mallas[i] as NodoPintado;
+      const suyos = alfasDeLaMalla(malla);
+      if (suyos === undefined) {
+        faltas.push('una malla no lleva un atributo `attributes-color` de cuatro componentes: sin él no hay alfa por vértice y el degradado no existe');
+        continue;
+      }
+      todosLosAlfas.push(...suyos);
+      const pieza = piezas[i];
+      if (pieza === undefined) continue;
+      const debidos = alfasDeLaPieza(pieza);
+      const cuadran =
+        debidos.length === (suyos.length * 4) &&
+        suyos.every((a, k) => (debidos[k * 4 + 3] as number) === a);
+      if (!cuadran) {
+        faltas.push(
+          `el degradado que se PINTA en la ${pieza.que} no es el que se MIDE en \`alfasDeLaPieza\`: ${String(suyos.length)} vértices contra ${String(debidos.length / 4)}`,
         );
-        const anchoDelRelleno = ((): number => {
-          const plano = deTipo(todoElArbol(elSuyo), 'planeGeometry')[0];
-          return plano === undefined ? Infinity : (plano.props['args'] as number[])[1] ?? Infinity;
-        })();
-        if (flancos.length !== 2) faltas.push(`la raya lleva ${String(flancos.length)} flancos y son dos`);
-        const lados = flancos.map((f) => ((f.props['position'] as number[] | undefined) ?? [0, 0, 0])[1] ?? 0);
-        if (!lados.some((y) => y > anchoDelRelleno / 2) || !lados.some((y) => y < -anchoDelRelleno / 2)) {
-          faltas.push(`los flancos no asoman por los dos lados de la raya: ${lados.join(', ')} contra ${String(anchoDelRelleno / 2)}`);
+      }
+    }
+    if (todosLosAlfas.length > 0 && !todosLosAlfas.some((a) => a === 0)) {
+      faltas.push('ningún vértice de la marca es transparente: el degradado no llega a cero, o sea que la marca se corta en seco por el borde');
+    }
+    if (todosLosAlfas.length > 0 && !todosLosAlfas.some((a) => a === 1)) {
+      faltas.push('ningún vértice de la marca es opaco: la marca no tiene meseta y se ve entera aguada');
+    }
+    /*
+     * LA FALDA VA POR DEBAJO EN LA PILA DE DIBUJO Y POR FUERA EN TAMAÑO, que es lo que la hace
+     * falda y no un parche encima. «Por fuera» se mide distinto en cada forma y es la misma
+     * idea: en el disco, el radio de fuera del aro pasa del radio del círculo; en la raya, la
+     * falda se aparta del eje más de lo que la banda es ancha por su mitad.
+     */
+    const laMallaDe = (que: string): NodoPintado | undefined => {
+      const donde = piezas.findIndex((p) => p.que === que);
+      return donde < 0 ? undefined : mallas[donde];
+    };
+    if (forma === 'disco') {
+      const laFalda = laMallaDe('falda');
+      const laMeseta = laMallaDe('meseta');
+      if (laFalda === undefined || laMeseta === undefined) {
+        faltas.push('al disco le falta la meseta o la falda que la apaga');
+      } else {
+        const ordenDeLaFalda = Number(laFalda.props['renderOrder']);
+        const ordenDeLaMeseta = Number(laMeseta.props['renderOrder']);
+        if (ordenDeLaFalda >= ordenDeLaMeseta) {
+          faltas.push(`la falda se pinta encima de la meseta: ${String(ordenDeLaFalda)} contra ${String(ordenDeLaMeseta)}`);
         }
+        const aro = deTipo(todoElArbol(laFalda), 'ringGeometry')[0];
+        const circulo = deTipo(todoElArbol(laMeseta), 'circleGeometry')[0];
+        const fuera = aro === undefined ? 0 : (aro.props['args'] as number[])[1] ?? 0;
+        const dentro = aro === undefined ? Infinity : (aro.props['args'] as number[])[0] ?? Infinity;
+        const radio = circulo === undefined ? Infinity : (circulo.props['args'] as number[])[0] ?? Infinity;
+        if (!(fuera > radio) || dentro !== radio) {
+          faltas.push(`la falda no arranca donde acaba la meseta y sale hacia fuera: ${String(dentro)}-${String(fuera)} contra ${String(radio)}`);
+        }
+      }
+    } else {
+      const laBanda = laMallaDe('raya');
+      const lasFaldas = mallas.filter((m, i) => (piezas[i] as { apaga?: number } | undefined)?.apaga !== 0);
+      const anchoDeLaBanda = ((): number => {
+        const suya = mallas[piezas.findIndex((p) => p.que === 'raya' && p.apaga === 0)];
+        const plano = suya === undefined ? undefined : deTipo(todoElArbol(suya), 'planeGeometry')[0];
+        return plano === undefined ? Infinity : (plano.props['args'] as number[])[1] ?? Infinity;
+      })();
+      if (laBanda === undefined || lasFaldas.length !== 2) {
+        faltas.push(`la raya lleva ${String(lasFaldas.length)} faldas y son dos, una a cada canto`);
+      }
+      const lados = lasFaldas.map((f) => ((f.props['position'] as number[] | undefined) ?? [0, 0, 0])[1] ?? 0);
+      if (!lados.some((y) => y > anchoDeLaBanda / 2) || !lados.some((y) => y < -anchoDeLaBanda / 2)) {
+        faltas.push(`las faldas no salen por los dos cantos de la raya: ${lados.join(', ')} contra ${String(anchoDeLaBanda / 2)}`);
       }
     }
     /* Y las tres del material, que son las que hacen que se vea sobre lo que sea. */
@@ -7985,17 +8164,16 @@ paso('El zócalo se compra de verdad: disco en la choza, raya en la vereda, cada
       if (pintura.props['transparent'] !== true) faltas.push('una pieza es opaca');
     }
     /*
-     * Y LAS OPACIDADES SON LAS QUE SE MIDIERON. No es un detalle de estilo: el bloque de color
-     * de arriba afirma que el contorno se separa de los seis terrenos 35,6 y que los cuatro
-     * rellenos se separan entre sí 33,0, y las dos cifras están calculadas CON ESTAS opacidades.
-     * Cambiando una en el JSX, aquellas medidas seguirían saliendo y ya no hablarían de lo que
-     * se pinta.
+     * Y LA OPACIDAD ES LA QUE SE MIDIÓ. No es un detalle de estilo: el bloque de color de arriba
+     * afirma que veintidós de las veinticuatro parejas de color y terreno se separan más de 20 y
+     * que las cuatro marcas se separan entre sí, y las dos cifras están calculadas CON ESTA
+     * opacidad. Cambiándola en el JSX, aquellas medidas seguirían saliendo y ya no hablarían de
+     * lo que se pinta.
      */
     for (const pintura of pinturas) {
-      const cual = pintura.props['color'] === FILO_DEL_ZOCALO ? OPACIDAD_DEL_CONTORNO : OPACIDAD_DEL_RELLENO;
-      if (pintura.props['opacity'] !== cual) {
+      if (pintura.props['opacity'] !== OPACIDAD_DEL_ZOCALO) {
         faltas.push(
-          `una pieza se pinta con una opacidad de ${String(pintura.props['opacity'])} y las medidas de color están hechas al ${String(cual)}`,
+          `una pieza se pinta con una opacidad de ${String(pintura.props['opacity'])} y las medidas de color están hechas al ${String(OPACIDAD_DEL_ZOCALO)}`,
         );
       }
     }
@@ -8011,15 +8189,92 @@ paso('El zócalo se compra de verdad: disco en la choza, raya en la vereda, cada
 
   const elRojo = Zocalo({ color: 'red', donde: [0, ALTO_DEL_ZOCALO, 0], forma: 'disco', marca: null });
   comprobar(
-    'se monta el disco de un asentamiento y no le falta nada: un círculo del color de su dueño con su contorno debajo y por fuera, los dos transparentes, a dos caras, a la opacidad que se midió y sin coger toques',
+    'se monta el disco de un asentamiento y no le falta nada: la meseta del color de su dueño y la falda que la apaga hasta transparente por fuera, sin ningún otro color, las dos transparentes, a dos caras, con el degradado que se mide, a la opacidad que se midió y sin coger toques',
     queLeFaltaAlZocalo(elRojo, 'red', 'disco').length === 0,
     queLeFaltaAlZocalo(elRojo, 'red', 'disco'),
   );
   const laRaya = Zocalo({ color: 'red', donde: [0, ALTO_DEL_ZOCALO, 0], forma: 'raya', giro: 0.7, marca: null });
   comprobar(
-    'y se monta la raya de una vereda y tampoco le falta nada: tres planos —el relleno y sus dos flancos, uno a cada lado— con las mismas reglas',
+    'y se monta la raya de una vereda y tampoco le falta nada: tres planos —la banda del eje y sus dos faldas, una a cada canto— con las mismas reglas',
     queLeFaltaAlZocalo(laRaya, 'red', 'raya').length === 0,
     queLeFaltaAlZocalo(laRaya, 'red', 'raya'),
+  );
+  /*
+   * ═══ Y EL PERFIL DEL DEGRADADO, VÉRTICE A VÉRTICE, QUE ES LO QUE SUSTITUYE AL CONTORNO ═══
+   *
+   * Lo de arriba compra que el JSX pinta lo que `alfasDeLaPieza` dice. Esto compra que lo que
+   * `alfasDeLaPieza` dice ES UN DEGRADADO y no cualquier lista de números: uno por dentro, cero
+   * en el borde, en el sitio exacto en que `three` pone cada vértice. Sin esto, las dos podrían
+   * estar de acuerdo en pintar un borde duro.
+   *
+   * El orden de los vértices no se supone: está escrito en la cabecera de `alfasDeLaPieza` y
+   * sale de las tres geometrías de `three` —el círculo, el aro y el plano—, y es lo que aquí se
+   * recorre.
+   */
+  const soloElAlfa = (pieza: PiezaDelZocalo): number[] => {
+    const crudo = alfasDeLaPieza(pieza);
+    const salida: number[] = [];
+    for (let i = 3; i < crudo.length; i += 4) salida.push(crudo[i] as number);
+    return salida;
+  };
+  const elRgbEsBlanco = [...piezasDelZocalo('disco', 'red'), ...piezasDelZocalo('raya', 'red')].every((p) => {
+    const crudo = alfasDeLaPieza(p);
+    for (let i = 0; i < crudo.length; i += 4) {
+      if (crudo[i] !== 1 || crudo[i + 1] !== 1 || crudo[i + 2] !== 1) return false;
+    }
+    return true;
+  });
+  const laFaldaDelDisco = soloElAlfa(
+    piezasDelZocalo('disco', 'red').find((p) => p.que === 'falda') as PiezaDelZocalo,
+  );
+  const laMesetaDelDisco = soloElAlfa(
+    piezasDelZocalo('disco', 'red').find((p) => p.que === 'meseta') as PiezaDelZocalo,
+  );
+  const porDentro = laFaldaDelDisco.slice(0, LADOS_DEL_DISCO + 1);
+  const porFuera = laFaldaDelDisco.slice(LADOS_DEL_DISCO + 1);
+  comprobar(
+    `el degradado del disco es un degradado: la meseta va entera a uno en sus ${String(laMesetaDelDisco.length)} vértices, y la falda entra a uno por sus ${String(porDentro.length)} vértices de dentro y sale a CERO por sus ${String(porFuera.length)} de fuera — que es lo que el contorno hacía con un filo casi negro`,
+    elRgbEsBlanco &&
+      laMesetaDelDisco.length === LADOS_DEL_DISCO + 2 &&
+      laMesetaDelDisco.every((a) => a === 1) &&
+      laFaldaDelDisco.length === 2 * (LADOS_DEL_DISCO + 1) &&
+      porDentro.every((a) => a === 1) &&
+      porFuera.every((a) => a === 0),
+    { meseta: laMesetaDelDisco.length, porDentro: porDentro.length, porFuera: porFuera.length },
+  );
+  /*
+   * Y EN LA RAYA HAY DOS BORDES Y NO UNO: los CANTOS largos y las PUNTAS. Las dos faldas apagan
+   * su canto de fuera, la banda del eje no apaga ninguno de los dos —porque sus cantos no son el
+   * borde de la marca: las faldas siguen hacia fuera—, y LAS TRES apagan las puntas, que es lo
+   * que hace que una vereda no tenga costura con el poblado del que sale.
+   */
+  const lasDeLaRaya = piezasDelZocalo('raya', 'red').map((p) => ({
+    apaga: (p as { apaga: number }).apaga,
+    alfa: soloElAlfa(p),
+  }));
+  const enFila = (alfa: number[], fila: number): number[] =>
+    alfa.slice(fila * (TRAMOS_DE_LA_RAYA + 1), (fila + 1) * (TRAMOS_DE_LA_RAYA + 1));
+  const laPuntaSeApaga = lasDeLaRaya.every((r) =>
+    [0, 1].every((f) => {
+      const su = enFila(r.alfa, f);
+      return su[0] === 0 && su[su.length - 1] === 0;
+    }),
+  );
+  const elCantoSeApaga = lasDeLaRaya.every((r) => {
+    const arriba = enFila(r.alfa, 0);
+    const abajo = enFila(r.alfa, 1);
+    if (r.apaga === 0) return arriba.filter((a) => a === 1).length === TRAMOS_DE_LA_RAYA - 1 && abajo.filter((a) => a === 1).length === TRAMOS_DE_LA_RAYA - 1;
+    const fuera = r.apaga === 1 ? arriba : abajo;
+    const dentro = r.apaga === 1 ? abajo : arriba;
+    return fuera.every((a) => a === 0) && dentro.filter((a) => a === 1).length === TRAMOS_DE_LA_RAYA - 1;
+  });
+  comprobar(
+    `y el de la raya se apaga por sus CUATRO bordes: las dos faldas dejan a cero su canto de fuera, la banda del eje no apaga ninguno de los dos —porque las faldas siguen— y las tres se apagan en las PUNTAS, un tramo de ${String(TRAMOS_DE_LA_RAYA)} a cada lado, que es lo que quita la costura con el poblado`,
+    lasDeLaRaya.length === 3 &&
+      lasDeLaRaya.every((r) => r.alfa.length === 2 * (TRAMOS_DE_LA_RAYA + 1)) &&
+      laPuntaSeApaga &&
+      elCantoSeApaga,
+    lasDeLaRaya.map((r) => ({ apaga: r.apaga, aCero: r.alfa.filter((a) => a === 0).length, aUno: r.alfa.filter((a) => a === 1).length })),
   );
   /*
    * Y LAS DOS FORMAS SON DISTINTAS DE VERDAD. Sin esto, `forma` podría estar sin usar —un
@@ -8049,18 +8304,19 @@ paso('El zócalo se compra de verdad: disco en la choza, raya en la vereda, cada
   const comoSeDibuja = (arbol: unknown, que: string): number[][] =>
     deTipo(todoElArbol(arbol), que).map((n) => n.props['args'] as number[]);
   const laDelDisco = comoSeDibuja(elRojo, 'circleGeometry')[0] ?? [];
-  const elContorno = comoSeDibuja(elRojo, 'ringGeometry')[0] ?? [];
+  const laFalda = comoSeDibuja(elRojo, 'ringGeometry')[0] ?? [];
   const losPlanos = comoSeDibuja(laRaya, 'planeGeometry');
   comprobar(
-    `las medidas del JSX salen de las constantes: el disco a ${String(RADIO_DEL_DISCO)} de radio con su contorno, y la raya de ${String(LARGO_DE_LA_RAYA)} por ${String(ANCHO_DE_LA_RAYA)} con flancos de ${String(GRUESO_DEL_FLANCO)}, todo en múltiplos de la tesela`,
-    laDelDisco[0] === RADIO_DE_TESELA * RADIO_DEL_DISCO &&
-      elContorno[0] === RADIO_DE_TESELA * RADIO_DEL_DISCO &&
-      elContorno[1] === RADIO_DE_TESELA * (RADIO_DEL_DISCO + GRUESO_DEL_CONTORNO) &&
+    `las medidas del JSX salen de las constantes: la meseta a ${String(RADIO_DE_LA_MESETA)} de radio con su falda de ${String(DESVANECIDO_DEL_DISCO)}, y la raya de ${String(LARGO_DE_LA_RAYA)} por ${String(ANCHO_DE_LA_RAYA)} con faldas de ${String(DESVANECIDO_DE_LA_RAYA)} y partida en ${String(TRAMOS_DE_LA_RAYA)} tramos, todo en múltiplos de la tesela`,
+    laDelDisco[0] === RADIO_DE_TESELA * RADIO_DE_LA_MESETA &&
+      laFalda[0] === RADIO_DE_TESELA * RADIO_DE_LA_MESETA &&
+      laFalda[1] === RADIO_DE_TESELA * (RADIO_DE_LA_MESETA + DESVANECIDO_DEL_DISCO) &&
       losPlanos.length === 3 &&
       losPlanos.every((p) => p[0] === RADIO_DE_TESELA * LARGO_DE_LA_RAYA) &&
+      losPlanos.every((p) => p[2] === TRAMOS_DE_LA_RAYA && p[3] === 1) &&
       losPlanos.filter((p) => p[1] === RADIO_DE_TESELA * ANCHO_DE_LA_RAYA).length === 1 &&
-      losPlanos.filter((p) => p[1] === RADIO_DE_TESELA * GRUESO_DEL_FLANCO).length === 2,
-    { laDelDisco, elContorno, losPlanos },
+      losPlanos.filter((p) => p[1] === RADIO_DE_TESELA * DESVANECIDO_DE_LA_RAYA).length === 2,
+    { laDelDisco, laFalda, losPlanos },
   );
   /*
    * Y `piezasDelZocalo` DICE LO MISMO QUE EL JSX, que es la otra mitad del atado: la función es
@@ -8089,9 +8345,7 @@ paso('El zócalo se compra de verdad: disco en la choza, raya en la vereda, cada
       deTipo(
         todoElArbol(Zocalo({ color, donde: [0, ALTO_DEL_ZOCALO, 0], forma: 'disco', marca: null })),
         'meshBasicMaterial',
-      )
-        .map((n) => String(n.props['color']))
-        .filter((c) => c !== FILO_DEL_ZOCALO),
+      ).map((n) => String(n.props['color'])),
     ),
   ];
   const cuatroDistintos = new Set(COLORES_DE_JUGADOR.map((c) => suColor(c).join('')));
@@ -8181,28 +8435,127 @@ paso('El zócalo se compra de verdad: disco en la choza, raya en la vereda, cada
       children: todoElArbol(arbol).filter((n) => n.type === 'mesh' && sirve(n)),
     },
   });
-  const esDelFilo = (n: NodoPintado): boolean =>
-    deTipo(todoElArbol(n), 'meshBasicMaterial').some((q) => q.props['color'] === FILO_DEL_ZOCALO);
-  const discoSinContorno = soloConEstasMallas(elRojo, (n) => !esDelFilo(n));
+  /*
+   * ═══ EL REESCRITOR: TOCARLE UNA PIEZA A UN ÁRBOL DE REACT SIN PERDER EL RESTO ═══
+   *
+   * Las vacunas del degradado no pueden usar `soloConEstasMallas` —que aplana el árbol— porque
+   * lo que hay que romper vive DENTRO de la malla: el atributo de color por vértice, que cuelga
+   * de la geometría. Así que se recorre el árbol entero rehaciendo los nodos, y se cambia el que
+   * la vacuna diga. Los hijos que no son nodos (los `false` que dejan los `&&` del JSX) se
+   * copian tal cual, que es lo que hace que la forma del árbol siga siendo la de verdad.
+   */
+  const rehaciendo = (x: unknown, toca: (n: NodoPintado) => NodoPintado | undefined): unknown => {
+    if (Array.isArray(x)) return x.map((h) => rehaciendo(h, toca));
+    if (!esNodo(x)) return x;
+    const cambiado = toca(x);
+    if (cambiado !== undefined) return cambiado;
+    return { type: x.type, props: { ...x.props, children: rehaciendo(x.props['children'], toca) } };
+  };
+  const discoSinFalda = soloConEstasMallas(elRojo, (n) => deTipo(todoElArbol(n), 'ringGeometry').length === 0);
   comprobar(
-    'se ve fallar: sin el contorno, un disco verde sobre el carrizal se quedaría a 2,3 de CIE76 del suelo, o sea sería un disco que no está',
-    queLeFaltaAlZocalo(discoSinContorno, 'red', 'disco').some((f) => f.includes(FILO_DEL_ZOCALO)),
-    queLeFaltaAlZocalo(discoSinContorno, 'red', 'disco'),
+    'se ve fallar: quitándole la FALDA al disco queda la meseta sola, o sea un disco que se corta en seco por el borde — que es exactamente el borde que se pidió quitar, dibujado ahora con el color del dueño. El juez dice que ningún vértice de la marca es transparente',
+    queLeFaltaAlZocalo(discoSinFalda, 'red', 'disco').some((f) => f.includes('transparente')),
+    queLeFaltaAlZocalo(discoSinFalda, 'red', 'disco'),
   );
   /*
-   * Y LA MISMA VACUNA EN LA RAYA, QUITÁNDOLE UN SOLO FLANCO. No es la de arriba con otra forma:
-   * una raya con un flanco sigue teniendo contorno del color correcto y sigue teniendo tres
-   * colores en el árbol — lo que pierde es el borde por UN lado, y por ese lado se funde con el
-   * terreno. Un juez que sólo contara colores diría que sí.
+   * Y LA MISMA VACUNA EN LA RAYA, QUITÁNDOLE UNA SOLA FALDA. No es la de arriba con otra forma:
+   * una raya con una falda sigue apagándose por un canto, sigue siendo del color de su dueño y
+   * sigue teniendo vértices transparentes — lo que pierde es el degradado por UN canto, y por
+   * ese canto se corta en seco. Un juez que sólo mirara «hay alfas a cero» diría que sí.
    */
-  const rayaConUnFlanco = soloConEstasMallas(laRaya, (n) => {
+  const rayaConUnaFalda = soloConEstasMallas(laRaya, (n) => {
     const y = ((n.props['position'] as number[] | undefined) ?? [0, 0, 0])[1] ?? 0;
     return y <= 0;
   });
   comprobar(
-    'se ve fallar: a la raya de una vereda se le quita UN flanco y el juez dice que el contorno ya no asoma por los dos lados',
-    queLeFaltaAlZocalo(rayaConUnFlanco, 'red', 'raya').some((f) => f.includes('los dos lados')),
-    queLeFaltaAlZocalo(rayaConUnFlanco, 'red', 'raya'),
+    'se ve fallar: a la raya de una vereda se le quita UNA falda y el juez dice que ya no se apaga por los dos cantos',
+    queLeFaltaAlZocalo(rayaConUnaFalda, 'red', 'raya').some((f) => f.includes('los dos cantos')),
+    queLeFaltaAlZocalo(rayaConUnaFalda, 'red', 'raya'),
+  );
+  /*
+   * ═══ Y LA VACUNA DEL ENCARGO ENTERO: QUE EL CONTORNO NO PUEDA VOLVER SIN QUE NADIE LO VEA ═══
+   *
+   * Aquí había una comprobación que EXIGÍA `FILO_DEL_ZOCALO` en la marca. Ahora se exige lo
+   * contrario, y esto es lo que compra que la exigencia tiene dientes: se le pinta a UNA de las
+   * dos mallas el filo casi negro de antes —que es literalmente lo que se pidió quitar— y el
+   * juez tiene que decirlo. Sin esto, «no lleva otro color» podría ser un juez que no mira.
+   */
+  const conElContornoDeVuelta = rehaciendo(elRojo, (n) =>
+    n.type === 'meshBasicMaterial' && n.props['color'] === colorLlanoDelJugador('red')
+      ? conLaPropCambiada(n, 'color', FILO_DEL_ZOCALO)
+      : undefined,
+  );
+  comprobar(
+    `se ve fallar: pintándole a la marca el contorno casi negro que se pidió quitar —${FILO_DEL_ZOCALO}— el juez dice que ha vuelto el contorno`,
+    queLeFaltaAlZocalo(conElContornoDeVuelta, 'red', 'disco').some((f) => f.includes('ha vuelto el contorno')),
+    queLeFaltaAlZocalo(conElContornoDeVuelta, 'red', 'disco'),
+  );
+  /*
+   * ═══ LAS TRES FORMAS DE APAGAR EL DEGRADADO SIN TOCAR NI UNA GEOMETRÍA ═══
+   *
+   * Son las que este cambio ABRE, y por eso llevan vacuna cada una. Las tres dejan la marca
+   * montada, del color de su dueño, con sus dos mallas y a su opacidad — y las tres la
+   * devuelven al borde duro que Miguel pidió quitar:
+   *
+   *   · quitarle `vertexColors` al material: `three` ignora el atributo y pinta la falda entera
+   *     a la opacidad de la meseta;
+   *   · dejar el atributo en TRES componentes: sin la cuarta no hay alfa por vértice —es
+   *     literalmente lo que enciende `USE_COLOR_ALPHA`— y pasa lo mismo;
+   *   · y escribir los alfas de la falda a uno, que es el borde duro dibujado a mano.
+   */
+  const sinLeerElColorPorVertice = rehaciendo(elRojo, (n) =>
+    n.type === 'meshBasicMaterial' ? conLaPropCambiada(n, 'vertexColors', false) : undefined,
+  );
+  comprobar(
+    'se ve fallar: sin `vertexColors` en el material, `three` ignora el alfa por vértice y la falda se pinta entera a la opacidad de la meseta — o sea, vuelve el borde duro. El juez lo dice',
+    queLeFaltaAlZocalo(sinLeerElColorPorVertice, 'red', 'disco').some((f) => f.includes('por vértice')),
+    queLeFaltaAlZocalo(sinLeerElColorPorVertice, 'red', 'disco'),
+  );
+  const conTresComponentes = rehaciendo(elRojo, (n) => {
+    if (n.type !== 'bufferAttribute') return undefined;
+    const args = n.props['args'] as [ArrayLike<number>, number];
+    return conLaPropCambiada(n, 'args', [args[0], 3]);
+  });
+  comprobar(
+    'se ve fallar: con el atributo de color en TRES componentes en vez de cuatro no hay alfa por vértice —es lo que `three` mira para encender `USE_COLOR_ALPHA`— y el degradado desaparece sin que nada más cambie. El juez lo dice',
+    queLeFaltaAlZocalo(conTresComponentes, 'red', 'disco').some((f) => f.includes('cuatro componentes')),
+    queLeFaltaAlZocalo(conTresComponentes, 'red', 'disco'),
+  );
+  const conLaFaldaLlena = rehaciendo(elRojo, (n) => {
+    if (n.type !== 'bufferAttribute') return undefined;
+    const args = n.props['args'] as [ArrayLike<number>, number];
+    const llena = new Float32Array(args[0].length).fill(1);
+    return conLaPropCambiada(n, 'args', [llena, args[1]]);
+  });
+  comprobar(
+    'se ve fallar: escribiendo los alfas de la falda a UNO —el borde duro dibujado a mano, con la geometría intacta— el juez dice que el degradado que se pinta no es el que se mide y que ningún vértice es transparente',
+    queLeFaltaAlZocalo(conLaFaldaLlena, 'red', 'disco').some((f) => f.includes('no es el que se MIDE')) &&
+      queLeFaltaAlZocalo(conLaFaldaLlena, 'red', 'disco').some((f) => f.includes('transparente')),
+    queLeFaltaAlZocalo(conLaFaldaLlena, 'red', 'disco'),
+  );
+  /*
+   * Y LA CUARTA, QUE ES LA DE LA COSTURA: dejar los alfas de las PUNTAS de la raya a uno. La
+   * marca sigue apagándose por los cantos —o sea que parece que el degradado está—, y la vereda
+   * vuelve a cortarse en seco justo donde entra en el poblado, que es la costura que el
+   * territorio continuo no puede tener.
+   */
+  const laRayaCortadaEnSeco = rehaciendo(laRaya, (n) => {
+    if (n.type !== 'bufferAttribute') return undefined;
+    const args = n.props['args'] as [ArrayLike<number>, number];
+    const sinPuntas = new Float32Array(args[0] as unknown as ArrayLike<number>);
+    const porFila = TRAMOS_DE_LA_RAYA + 1;
+    for (let fila = 0; fila <= 1; fila++) {
+      for (const columna of [0, TRAMOS_DE_LA_RAYA]) {
+        const v = fila * porFila + columna;
+        sinPuntas[v * 4 + 3] = sinPuntas[(fila * porFila + 1) * 4 + 3] as number;
+      }
+    }
+    return conLaPropCambiada(n, 'args', [sinPuntas, args[1]]);
+  });
+  comprobar(
+    'se ve fallar: dejando las PUNTAS de la raya sin apagar —la vereda cortada en seco justo donde entra en el poblado, que es la costura que el territorio no puede tener— el juez dice que el degradado que se pinta no es el que se mide',
+    queLeFaltaAlZocalo(laRayaCortadaEnSeco, 'red', 'raya').some((f) => f.includes('no es el que se MIDE')),
+    queLeFaltaAlZocalo(laRayaCortadaEnSeco, 'red', 'raya'),
   );
   comprobar(
     'se ve fallar: un zócalo del color de otro colono no señala a su dueño',
@@ -8224,10 +8577,10 @@ paso('El zócalo se compra de verdad: disco en la choza, raya en la vereda, cada
     queLeFaltaAlZocalo(cogiendoToques, 'red', 'disco'),
   );
   /*
-   * Y LA VACUNA DE LA OPACIDAD, que es la que la versión del aro no tenía: aflojando el relleno
-   * al 0,15 la marca sigue estando, sigue siendo del color de su dueño y sigue teniendo
-   * contorno — y en pantalla ya no se distingue de qué color es, porque todas las medidas del
-   * bloque de arriba están hechas al 0,55. El juez tiene que decirlo.
+   * Y LA VACUNA DE LA OPACIDAD, que es la que la versión del aro no tenía: aflojando la marca al
+   * 0,15 sigue estando, sigue siendo del color de su dueño y sigue difuminándose — y en pantalla
+   * ya no se distingue de qué color es, porque todas las medidas del bloque de arriba están
+   * hechas al 0,85. El juez tiene que decirlo.
    */
   const aguado: NodoPintado = {
     type: 'group',
@@ -8458,8 +8811,8 @@ paso('El zócalo se compra de verdad: disco en la choza, raya en la vereda, cada
   }
   const superficieDelDelta = DELTA.length * ((3 * Math.sqrt(3)) / 2) * RADIO_DE_COMARCA * RADIO_DE_COMARCA;
   const cuantoTapanTodas = (deLaCiudad: number, deLaRaya: number): number =>
-    (LOS_VERTICES.length * elDisco.tinta * deLaCiudad * deLaCiudad +
-      LAS_ARISTAS.length * laRayaOcupa.tinta * deLaRaya * deLaRaya) /
+    (LOS_VERTICES.length * elDisco.mancha * deLaCiudad * deLaCiudad +
+      LAS_ARISTAS.length * laRayaOcupa.mancha * deLaRaya * deLaRaya) /
     superficieDelDelta;
   const tapan = cuantoTapanTodas(enElMundoDeLaCiudad, enElMundoDeLaRaya);
   comprobar(
