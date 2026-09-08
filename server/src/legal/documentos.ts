@@ -1,5 +1,5 @@
 /**
- * Los tres documentos públicos, en un solo router.
+ * Los CUATRO documentos públicos, en un solo router.
  *
  * POR QUÉ AGRUPARLOS. Cada documento trae el suyo, así que montarlos habría
  * sido escribir tres líneas en `index.ts` en vez de una. La diferencia está en
@@ -26,6 +26,7 @@
  */
 import { crearRouter } from '../rutas';
 import avisoLegalRouter from './aviso-legal';
+import creditosRouter from './creditos';
 import privacidadRouter from './privacidad';
 import terminosRouter from './terminos';
 
@@ -34,5 +35,6 @@ const router = crearRouter();
 router.use(privacidadRouter);
 router.use(avisoLegalRouter);
 router.use(terminosRouter);
+router.use(creditosRouter);
 
 export default router;

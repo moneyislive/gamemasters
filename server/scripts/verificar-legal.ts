@@ -571,6 +571,46 @@ try {
       doc.ruta,
     );
   }
+
+  /*
+   * ═══ LA ATRIBUCIÓN QUE UNA LICENCIA EXIGE, Y POR QUÉ LA VIGILA UN COMPROBADOR ═══
+   *
+   * El reloj de arena de la mesa de Riberas lleva CC-BY-4.0: permite el uso comercial y a
+   * cambio OBLIGA a acreditar a su autor allá donde se comparta la obra. Todo lo demás de esta
+   * casa es CC0 y no obliga a nada, así que ésta es la única pieza de arte cuyo crédito no es
+   * cortesía sino condición de uso.
+   *
+   * Y un incumplimiento de licencia NO AVISA. No hay pantalla roja, no hay excepción, no hay
+   * un 500 en un registro: alguien mueve un fichero, el crédito se va, y el servidor sigue
+   * sirviendo el modelo tan tranquilo. Por eso se ata a lo que se puede medir: si el `.glb`
+   * está en el árbol, la página tiene que nombrar al autor y a la licencia. La condición va en
+   * ese orden —del modelo al crédito y no al revés— para que quitar el modelo no deje una
+   * comprobación roja pidiendo un crédito que ya no hace falta.
+   */
+  const EL_RELOJ = path.join(import.meta.dirname ?? __dirname, '..', '..', 'escenas', 'modelos', 'reloj.glb');
+  if (fs.existsSync(EL_RELOJ)) {
+    const creditos = await pedir(5897, '/creditos');
+    comprobar(
+      'los créditos se leen en abierto, sin entrar',
+      creditos.estado === 200,
+      `contestó ${String(creditos.estado)}`,
+    );
+    comprobar(
+      'y acreditan al autor del reloj de arena, que es lo que su licencia exige',
+      creditos.cuerpo.includes('arloopa'),
+      'la página no nombra a arloopa',
+    );
+    comprobar(
+      'y dicen bajo qué licencia se usa',
+      creditos.cuerpo.includes('CC-BY-4.0'),
+      'la página no nombra la licencia',
+    );
+    comprobar(
+      'y llevan la frase exacta que la licencia pide copiar',
+      creditos.cuerpo.includes('This work is based on &quot;Hourglass / Sand Clock&quot;'),
+      'falta el crédito literal',
+    );
+  }
 } catch (e) {
   fallos.push(`la prueba se cayó: ${e instanceof Error ? e.message : String(e)}`);
 } finally {
@@ -585,7 +625,7 @@ try {
 console.log('');
 for (const aviso of avisos) console.log(`   ⚠ ${aviso}`);
 if (fallos.length === 0) {
-  console.log(`✔ ${hechas} comprobaciones. Los tres documentos se leen en abierto y dicen la verdad.`);
+  console.log(`✔ ${hechas} comprobaciones. Los cuatro documentos se leen en abierto y dicen la verdad.`);
   process.exit(0);
 }
 console.log(`✘ ${fallos.length} de ${hechas} comprobaciones han fallado:\n`);

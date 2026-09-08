@@ -31,9 +31,15 @@ export const DOCUMENTOS = [
   { ruta: '/privacidad', titulo: 'Política de privacidad', corto: 'Privacidad' },
   { ruta: '/aviso-legal', titulo: 'Aviso legal', corto: 'Aviso legal' },
   { ruta: '/terminos', titulo: 'Términos de uso', corto: 'Términos de uso' },
+  /*
+   * El cuarto, y el único que no está aquí por una tienda ni por la LSSI: está porque una de
+   * las licencias del material de arte —CC-BY-4.0, la del reloj de arena— obliga a acreditar a
+   * su autor allá donde se comparta la obra, y donde se comparte es este servidor.
+   */
+  { ruta: '/creditos', titulo: 'Créditos del material de arte', corto: 'Créditos' },
 ] as const;
 
-/** La dirección de uno de los tres documentos. */
+/** La dirección de uno de los cuatro documentos. */
 export type RutaLegal = (typeof DOCUMENTOS)[number]['ruta'];
 
 /** Una sección con su encabezado. El cuerpo ya viene en HTML. */

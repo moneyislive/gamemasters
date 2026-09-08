@@ -47,3 +47,12 @@ data/mesas/
 #
 # `arte/README.md` dice de donde sale cada pack y como rehacer el GLB.
 arte/kaykit/
+
+# El reloj de arena de Sketchfab: 18 MB de los que solo salen 717 kB compilados. El
+# material bruto no entra, pero la LICENCIA si, y eso no es simetrico con KayKit a
+# proposito: aquel pack es CC0 y este es CC-BY-4.0, o sea que obliga a acreditar al
+# autor. Un `license.txt` que se pierde en un `git clean` es un incumplimiento que
+# nadie ve. Ver `arte/README.md` y `server/src/legal/creditos.ts`.
+arte/sketchfab/*/scene.gltf
+arte/sketchfab/*/scene.bin
+arte/sketchfab/*/textures/

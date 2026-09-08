@@ -82,6 +82,12 @@ export const VACIADO_DEL_RELOJ = 0.34;
  * INSTANTES y el reloj saca la fracción en su `useFrame`, que es donde ya se está mirando el
  * tiempo de todas formas.
  */
+/** El `.glb` del reloj tal como llega: su escena y los clips que trae dentro. */
+export interface RelojCargado {
+  readonly escena: THREE.Object3D;
+  readonly clips: readonly THREE.AnimationClip[];
+}
+
 export interface RelojDeLaMesa {
   /** Cuándo empezó el turno, en milisegundos de reloj de pared. */
   readonly desde: number;
@@ -113,6 +119,7 @@ export function RelojDeArena({
   lado,
   ancho,
   encendido,
+  modelo = null,
   onPulsar,
 }: {
   /** El grupo que GIRA al empezar la ronda. Lo mueve quien monta. */
@@ -137,6 +144,16 @@ export function RelojDeArena({
   ancho: number;
   /** Apagado cuando no se puede pasar el turno: se pinta más flojo y no coge el toque. */
   encendido: boolean;
+  /**
+   * EL MODELO DE VERDAD, ya clonado y con su mezclador puesto por quien monta, o `null`.
+   *
+   * `null` es el caso normal mientras `reloj.glb` viaja, y el caso PERMANENTE si no llega —un
+   * despliegue sin el fichero, un 404, un binario roto—. Entonces se pintan los conos de aquí
+   * abajo, que hacen exactamente lo mismo con veinte triángulos. Es el mismo trato que tienen los
+   * dados con su respaldo procedimental, y por la misma razón: un fichero de arte que no llega no
+   * puede dejar la mesa sin el botón de pasar el turno.
+   */
+  modelo?: THREE.Object3D | null;
   onPulsar: () => void;
 }): JSX.Element {
   const cintura = 0;
@@ -169,6 +186,10 @@ export function RelojDeArena({
       </mesh>
 
       <group ref={cuerpo}>
+        {/* Llega normalizado a una unidad de alto y centrado: sólo hay que darle su lado. */}
+        {modelo !== null && <primitive object={modelo} scale={lado} />}
+        {modelo !== null ? null : (
+        <>
         {/* Las dos tapas de madera y los tres postes que las unen. */}
         {[tapa, -tapa].map((y) => (
           <mesh key={`tapa:${String(y)}`} position={[0, y, 0]} raycast={() => null}>
@@ -242,6 +263,8 @@ export function RelojDeArena({
           <cylinderGeometry args={[RADIO_DEL_HILO * lado, RADIO_DEL_HILO * lado, altoDelBulbo, 5]} />
           <meshStandardMaterial color={COLOR_DE_LA_ARENA} roughness={1} />
         </mesh>
+        </>
+        )}
       </group>
     </group>
   );

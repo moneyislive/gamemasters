@@ -213,6 +213,21 @@ router.get('/arcade/modelos/dados.glb', (_req, res) => {
 });
 
 /**
+ * El reloj de arena de la barra: 717 kB con su clip dentro. Fichero APARTE por lo
+ * mismo que los dados —que no obligue a recargar el tablero y que su fallo no lo
+ * tumbe— y con una razon mas suya: es el unico modelo de este servidor que NO es de
+ * dominio publico. Lleva CC-BY-4.0 y obliga a acreditar a su autor, cosa que hace
+ * `/creditos`. Ver `escenas/scripts/compilar-reloj.ts`.
+ */
+router.get('/arcade/modelos/reloj.glb', (_req, res) => {
+  if (carpeta === undefined) {
+    faltaLaCarpeta(res);
+    return;
+  }
+  servir(res, carpeta, 'reloj.glb');
+});
+
+/**
  * Un aventurero, por nombre de fichero. La lista blanca va ANTES de mirar si
  * existe la carpeta, para que un nombre fuera de forma conteste siempre lo mismo
  * y no diga, según el despliegue, si hay carpeta o no.

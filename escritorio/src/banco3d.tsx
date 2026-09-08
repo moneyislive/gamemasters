@@ -27,6 +27,7 @@ import { createRoot } from 'react-dom/client';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import type { RelojCargado } from '../../escenas/reloj';
 import {
   aristaEntre,
   aristasDe,
@@ -74,6 +75,7 @@ import type { DadosDeLaMesa, ResultadoDelToque } from '../../escenas/dados';
 import tableroGlb from '../../escenas/modelos/tablero.glb?url';
 /* Los dados, en su fichero aparte: el banco los pide como la partida, a la vez y con su propia red. */
 import dadosGlb from '../../escenas/modelos/dados.glb?url';
+import relojGlb from '../../escenas/modelos/reloj.glb?url';
 import './estilo.css';
 
 /** El azul del cielo de mediodía, que es también el color al que se funde la niebla. */
@@ -582,6 +584,24 @@ function Banco(): JSX.Element {
    * «Nueva ronda» sube la vuelta, que es lo que dispara el giro. Es el mismo mando que «Ahora te
    * toca»: hacer de flanco para poder mirar una animación que en la partida ocurre sola.
    */
+  /* El modelo del reloj, para poder mirarlo aquí igual que se mira en la mesa. */
+  const [modeloDelReloj, ponerModeloDelReloj] = useState<RelojCargado | null>(null);
+  useEffect(() => {
+    let cancelado = false;
+    void fetch(relojGlb)
+      .then((r) => r.arrayBuffer())
+      .then((b) => new GLTFLoader().parseAsync(b, ''))
+      .then((gltf) => {
+        if (!cancelado) ponerModeloDelReloj({ escena: gltf.scene, clips: gltf.animations });
+      })
+      .catch((e: unknown) => {
+        console.warn('El reloj no ha llegado al banco:', e);
+      });
+    return () => {
+      cancelado = true;
+    };
+  }, []);
+
   const [vueltaDelReloj, ponerVueltaDelReloj] = useState(1);
   const [desdeDelReloj, ponerDesdeDelReloj] = useState(() => Date.now());
   const [conPlazo, ponerConPlazo] = useState(true);
@@ -867,6 +887,7 @@ function Banco(): JSX.Element {
               dados={dadosDelBanco}
               onPulsarLosDados={simularLaTirada}
               reloj={reloj}
+              modeloDelReloj={modeloDelReloj}
               onPasarElTurno={() => {
                 /*
                  * La ronda nueva llega con RETARDO, como en la partida: allí el turno cambia

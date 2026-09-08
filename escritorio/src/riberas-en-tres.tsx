@@ -207,7 +207,7 @@ import {
 } from '../../escenas/camara';
 /* La cinta se mide con la MISMA función que la app y que `verify:escena`: ver `escenas/cinta.ts`. */
 import { altoDeLaCinta, BOTON_DE_LA_CINTA, loQueLlevaLaCinta } from '../../escenas/cinta';
-import type { RelojDeLaMesa } from '../../escenas/reloj';
+import type { RelojCargado, RelojDeLaMesa } from '../../escenas/reloj';
 import { Delta, encuadreDelDelta } from '../../escenas/delta';
 /*
  * DE QUÉ COLOR SE VE CADA TERRENO. La MISMA tabla que pinta el tablero plano y la que
@@ -217,7 +217,7 @@ import { Delta, encuadreDelDelta } from '../../escenas/delta';
 import { colorDeTerreno } from '../../escenas/paleta';
 import { catalogoDeModelos, unirCatalogos } from '../../escenas/modelos';
 import type { CatalogoDeModelos } from '../../escenas/modelos';
-import { rutaDeLosDados, rutaDelTablero } from '../../escenas/ruta-de-modelos';
+import { rutaDeLosDados, rutaDelReloj, rutaDelTablero } from '../../escenas/ruta-de-modelos';
 import type { Opcion } from '../../shared/arcade';
 import {
   barraEnTres,
@@ -308,6 +308,7 @@ import { AccionesDelTablero, Retablo } from './retablo';
 const RUTA_DEL_TABLERO = rutaDelTablero();
 /** Y los dados, en su fichero de unos kB, por la misma puerta. Ver `rutaDeLosDados`. */
 const RUTA_DE_LOS_DADOS = rutaDeLosDados();
+const RUTA_DEL_RELOJ = rutaDelReloj();
 
 /** El azul del cielo de mediodía, que es también el color al que se funde la niebla. */
 const COLOR_DEL_CIELO = '#9ec9e2';
@@ -1407,8 +1408,8 @@ const QUE_LADO_SE_TOCA = 'Qué lado estás montando';
  * vuelve a bajar porque los dados no llegaran, y unos dados que fallaron se pueden
  * reintentar solos en el siguiente montaje.
  */
-function recordada(traer: () => Promise<CatalogoDeModelos>): () => Promise<CatalogoDeModelos> {
-  let enCamino: Promise<CatalogoDeModelos> | null = null;
+function recordada<T>(traer: () => Promise<T>): () => Promise<T> {
+  let enCamino: Promise<T> | null = null;
   return () => {
     if (enCamino !== null) return enCamino;
     const promesa = traer();
@@ -1434,6 +1435,23 @@ async function traerUnGlb(ruta: string): Promise<CatalogoDeModelos> {
   const gltf = await new GLTFLoader().parseAsync(bytes, '');
   return catalogoDeModelos(gltf.scene);
 }
+
+/**
+ * EL RELOJ DE ARENA, aparte de los otros dos y CON SUS CLIPS.
+ *
+ * No pasa por `traerUnGlb` porque aquél devuelve un catálogo —un mapa de nombre a nodo— y ahí los
+ * clips se pierden, que es justamente lo que este modelo trae y los otros no. Y va con su propia
+ * red por lo mismo que los dados: un `reloj.glb` que no llegue no puede tirar el tablero, y su
+ * fallo se convierte en «sin modelo», con lo que la escena pinta el reloj de conos del respaldo.
+ */
+async function traerElRelojConSuClip(): Promise<RelojCargado> {
+  const r = await fetch(RUTA_DEL_RELOJ);
+  if (!r.ok) throw new Error(`${RUTA_DEL_RELOJ} contestó ${String(r.status)}`);
+  const gltf = await new GLTFLoader().parseAsync(await r.arrayBuffer(), '');
+  return { escena: gltf.scene, clips: gltf.animations };
+}
+
+const traerElReloj = recordada(traerElRelojConSuClip);
 
 const traerElTablero = recordada(() => traerUnGlb(RUTA_DEL_TABLERO));
 const traerLosDados = recordada(() => traerUnGlb(RUTA_DE_LOS_DADOS));
@@ -2706,6 +2724,32 @@ export function RiberasEnTres({
     [puesta.turnoDesde, puesta.venceEn, puesta.terminada, quieto, opciones, vueltaDelReloj],
   );
 
+  /*
+   * EL MODELO DEL RELOJ, con su propia red y degradando a `null`.
+   *
+   * `null` mientras viaja y `null` para siempre si no llega, y en los dos casos la escena pinta
+   * el reloj de conos del respaldo: el botón de pasar el turno no puede depender de que un
+   * fichero de arte de 717 kB haya llegado. Se avisa por consola porque un respaldo mudo es un
+   * fallo que nadie ve — el mismo trato que los dados.
+   */
+  const [modeloDelReloj, ponerModeloDelReloj] = useState<RelojCargado | null>(null);
+  useEffect(() => {
+    let cancelado = false;
+    traerElReloj().then(
+      (cargado) => {
+        if (!cancelado) ponerModeloDelReloj(cargado);
+      },
+      (fallo: unknown) => {
+        console.warn(
+          `El reloj de arena no ha llegado (${loQueSeDiceDeUnFallo(fallo)}): se pinta el del respaldo.`,
+        );
+      },
+    );
+    return () => {
+      cancelado = true;
+    };
+  }, []);
+
   const colocando = useMemo(
     () => (tomada === null ? null : colocandoEnTres(vista, yo, tomada)),
     [vista, yo, tomada],
@@ -3495,6 +3539,7 @@ export function RiberasEnTres({
                   dados={dados}
                   onPulsarLosDados={alPulsarLosDados}
                   reloj={reloj}
+                  modeloDelReloj={modeloDelReloj}
                   onPasarElTurno={alPasarElTurno}
                   mesaRecogida={mesaRecogida}
                   mano={mano}

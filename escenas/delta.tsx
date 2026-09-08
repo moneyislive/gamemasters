@@ -78,6 +78,7 @@ import * as THREE from 'three';
  * con la lista vacía NO hace, porque el compilador lo elide; ver `jsx-de-three.d.ts`.
  */
 import { useFrame } from '@react-three/fiber';
+import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
 import type { ThreeEvent } from '@react-three/fiber';
 
 /**
@@ -128,7 +129,7 @@ import {
   techoDeLaMarca,
 } from './escala';
 import { Mancha } from './mancha';
-import type { RelojDeLaMesa } from './reloj';
+import type { RelojCargado, RelojDeLaMesa } from './reloj';
 import { GIRO_DEL_RELOJ, RelojDeArena, VACIADO_DEL_RELOJ } from './reloj';
 import type { LoQueTiene } from './territorio';
 import { ALTO_DE_LA_MANCHA, mallaDelTerritorio, territorioDe } from './territorio';
@@ -1734,6 +1735,7 @@ function Barra({
   onPulsarElMazo,
   onPulsarLosDados,
   reloj,
+  modeloDelReloj,
   onPasarElTurno,
 }: {
   piezas: readonly PiezaDeBarra[];
@@ -1753,6 +1755,8 @@ function Barra({
   onPulsarLosDados: () => Promise<ResultadoDelToque>;
   /** El reloj de arena del canto derecho, o `null` si esta pantalla no lo pinta. */
   reloj: RelojDeLaMesa | null;
+  /** El `.glb` del reloj con su clip, o `null` mientras viaja o si no llegó. */
+  modeloDelReloj: RelojCargado | null;
   onPasarElTurno: () => void;
 }): JSX.Element {
   const grupo = useRef<THREE.Group>(null);
@@ -1913,6 +1917,62 @@ function Barra({
   );
 
   /*
+   * ═══ EL MODELO DEL RELOJ, CLONADO, CON SU CLIP EN BUCLE Y SUS DOS MONTONES ═══
+   *
+   * Se CLONA porque el `.glb` cargado se comparte —la caché lo recuerda— y un mezclador escribe
+   * en los nodos: dos mesas del mismo navegador moverían la misma escena. Es lo mismo que hace
+   * el aventurero del muelle con su marioneta.
+   *
+   * El clip son cuatro segundos: cincuenta granos que caen (posición y escala) y DOS canales de
+   * morfología, que son los montones. Los granos van en bucle —un chorro no tiene principio— y
+   * los montones NO se dejan al clip: se sobreescriben cada fotograma con la fracción de turno,
+   * que es la única que sabe cuánto queda de verdad. Dejándolos correr, el reloj de arena y el
+   * reloj del turno dirían cosas distintas, y el que la gente se cree es el de arena.
+   */
+  const relojMontado = useMemo(() => {
+    if (modeloDelReloj === null) return null;
+    const dentro = SkeletonUtils.clone(modeloDelReloj.escena);
+    /*
+     * ═══ SE MIDE LA CAJA, NO SE SUPONE ═══
+     *
+     * El `.glb` trae su propia escala en la raíz —los modelos de Sketchfab salen casi siempre con
+     * una— y multiplicar la nuestra encima daba 0,0001 de escala de mundo: el reloj estaba en la
+     * escena, con sus mallas y su clip corriendo, y medía tres milésimas de unidad. No se veía y
+     * no fallaba nada, que es la peor forma de no estar.
+     *
+     * Así que se envuelve en un grupo que lo normaliza a UNA UNIDAD DE ALTO centrado en el
+     * origen, con la caja medida sobre el clon ya montado. Quien lo pinta sólo tiene que
+     * multiplicar por el lado de su hueco, y el día que alguien recompile el modelo con otra
+     * escala esto sigue saliendo bien sin tocar una línea.
+     */
+    const caja = new THREE.Box3().setFromObject(dentro);
+    const alto = Math.max(1e-6, caja.max.y - caja.min.y);
+    const centro = caja.getCenter(new THREE.Vector3());
+    dentro.position.set(-centro.x / alto, -centro.y / alto, -centro.z / alto);
+    dentro.scale.multiplyScalar(1 / alto);
+    const clon = new THREE.Group();
+    clon.add(dentro);
+    const mezclador = new THREE.AnimationMixer(dentro);
+    for (const clip of modeloDelReloj.clips) mezclador.clipAction(clip).play();
+    /* Los dos montones: las mallas con morfología, que el compilador deja como «0» y «1». */
+    const montones: THREE.Mesh[] = [];
+    dentro.traverse((n) => {
+      const m = n as THREE.Mesh;
+      if (m.isMesh && (m.morphTargetInfluences?.length ?? 0) > 0) montones.push(m);
+    });
+    return { clon, mezclador, montones };
+  }, [modeloDelReloj]);
+
+  useEffect(
+    () => () => {
+      if (relojMontado === null) return;
+      relojMontado.mezclador.stopAllAction();
+      relojMontado.mezclador.uncacheRoot(relojMontado.clon.children[0] ?? relojMontado.clon);
+    },
+    [relojMontado],
+  );
+
+  /*
    * ═══ LA ARENA, EL GIRO Y EL VACIADO DE GOLPE ═══
    *
    * Tres cosas en un solo `useFrame`, y ninguna pasa por el estado de React: la fracción que
@@ -1928,7 +1988,7 @@ function Barra({
    *     en lo que faltara. Miguel lo pidió con estas palabras: «la arena terminaría de bajar
    *     acelerada casi de inmediato cuando el usuario pasara la ronda».
    */
-  useFrame((estado) => {
+  useFrame((estado, salto) => {
     const cuerpo = cuerpoDelReloj.current;
     if (cuerpo === null || reloj === null) return;
     const ahora = Date.now();
@@ -1979,6 +2039,26 @@ function Barra({
       parte = Math.max(parte, Math.min(1, parte + (1 - parte) * va));
     }
     parte = Math.min(1, Math.max(0, parte));
+
+    /*
+     * El modelo: primero corre el clip —los granos— y DESPUÉS se pisan los dos montones con la
+     * fracción. El orden importa: al revés, el clip los volvería a escribir en el mismo
+     * fotograma y la arena contaría los cuatro segundos del clip en vez del plazo del turno.
+     */
+    if (relojMontado !== null) {
+      /*
+       * El `delta` que da `useFrame`, y NO `estado.clock.getDelta()`. El segundo parece lo
+       * natural y está mal: r3f ya lo consume una vez por fotograma en su propio bucle, así que
+       * volver a llamarlo devuelve lo que ha pasado desde ESA llamada, o sea casi cero. Medido en
+       * el banco: los granos avanzaban 0,002 unidades en dos segundos y medio, con el clip
+       * corriendo y sin fallar nada.
+       */
+      relojMontado.mezclador.update(salto);
+      for (const monton of relojMontado.montones) {
+        const pesos = monton.morphTargetInfluences;
+        if (pesos !== undefined && pesos.length > 0) pesos[0] = parte;
+      }
+    }
 
     const arriba = arenaArriba.current;
     if (arriba !== null) arriba.scale.y = 1 - parte;
@@ -2182,6 +2262,7 @@ function Barra({
             lado={sitioDelRelojDeArena.alto}
             ancho={sitioDelRelojDeArena.ancho}
             encendido={reloj.disponible}
+            modelo={relojMontado?.clon ?? null}
             onPulsar={() => {
               sePulso.current = true;
               onPasarElTurno();
@@ -3361,6 +3442,7 @@ export function Delta({
   dados = null,
   onPulsarLosDados,
   reloj = null,
+  modeloDelReloj = null,
   onPasarElTurno,
   mesaRecogida = false,
   mano = [],
@@ -3456,6 +3538,8 @@ export function Delta({
    * pintando la barra como antes.
    */
   reloj?: RelojDeLaMesa | null;
+  /** El `.glb` del reloj con su clip. Sin él se pintan los conos del respaldo. */
+  modeloDelReloj?: RelojCargado | null;
   onPasarElTurno?: () => void;
   /**
    * LA MESA RECOGIDA: el grupo de la barra baja bajo el canto y, al llegar, se apaga.
@@ -4230,6 +4314,7 @@ export function Delta({
       {(barra.length > 0 || mazo !== null) && (
         <Barra
           reloj={reloj}
+          modeloDelReloj={modeloDelReloj}
           onPasarElTurno={() => onPasarElTurno?.()}
           piezas={barra}
           mazo={mazo}

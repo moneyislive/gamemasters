@@ -18,6 +18,24 @@ obligatorio y se hace igual, que para eso está el `NOTICE`.
 | `arte/kaykit/adventurers/` | KayKit Adventurers 2.0 FREE | [itch.io](https://kaylousberg.itch.io/kaykit-adventurers) |
 | `arte/kaykit/resource-bits/` | KayKit Resource Bits 1.0 FREE | [itch.io](https://kaylousberg.itch.io/resource-bits) |
 | `arte/kaykit/board-game-bits/` | KayKit Board Game Bits 1.0 FREE | [itch.io](https://kaylousberg.itch.io/board-game-bits) |
+| `arte/sketchfab/reloj-de-arena/` | Hourglass / Sand Clock, de **arloopa** | [Sketchfab](https://sketchfab.com/3d-models/hourglass-sand-clock-86fb4b7dc8444a33b7bde4ad1adc535e) |
+
+## El reloj de arena NO es CC0, y eso cambia una obligación
+
+Los cinco packs de arriba son **CC0**: dominio público, citar no es obligatorio. El reloj de
+arena es **CC-BY-4.0**, o sea que permite el uso comercial **a cambio de acreditar al autor**,
+y la licencia dice dónde: «wherever you share it». Compartirlo es servirlo, así que el crédito
+vive en una página pública del servidor —`/creditos`, en `server/src/legal/creditos.ts`— y no
+sólo en este directorio. Un `license.txt` dentro de una carpeta que ni siquiera va a git no
+acredita a nadie.
+
+De ese pack sale un solo fichero: `escenas/modelos/reloj.glb`, con
+`escenas/scripts/compilar-reloj.ts`. Entran 18 MB y salen **717 kB**, y la mayor parte de lo
+que se va son texturas que a la talla a la que se pinta no distinguen un píxel: once PNG de
+hasta cuatro megas de color, rugosidad metálica y normales, para un objeto que vive en el
+estante de la barra a cuarenta y cuatro puntos de pantalla. Se hornean a color por vértice
+como todo lo demás; el cristal se queda transparente sin mapas. **El clip de animación se
+conserva** —es la razón de usar este modelo— y el compilador se niega a escribir si se pierde.
 
 De Board Game Bits sale una sola cosa: el D6 que son los dados de la mesa de Riberas
 (`docs/LA-MESA-DE-RIBERAS.md` §5.1), compilado a `escenas/modelos/dados.glb` con

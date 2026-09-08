@@ -32,3 +32,14 @@ export function rutaDelTablero(): string {
 export function rutaDeLosDados(): string {
   return `${RUTA_DE_MODELOS}/dados.glb`;
 }
+
+/**
+ * EL RELOJ DE ARENA DE LA BARRA: 717 kB con su clip de animación dentro.
+ *
+ * Fichero aparte por lo mismo que los dados —que no obligue a recargar el tablero y que su fallo
+ * no lo tumbe— y con una razón más suya: es el único modelo de esta casa que NO es de dominio
+ * público. Lleva CC-BY-4.0 y obliga a acreditar a su autor, cosa que hace la página `/creditos`.
+ */
+export function rutaDelReloj(): string {
+  return `${RUTA_DE_MODELOS}/reloj.glb`;
+}
