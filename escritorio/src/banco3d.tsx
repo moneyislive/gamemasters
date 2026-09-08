@@ -544,6 +544,16 @@ function Banco(): JSX.Element {
   const [trueque, ponerTrueque] = useState<string | null>(null);
 
   /*
+   * LA BOLSA DEL ESTIAJE DE MENTIRA, para mirarla sin sacar un siete.
+   *
+   * En la partida esto sale de `laBolsaDelDescarte` y no se alcanza sin una mano llena y un
+   * siete en los dados, que es media tarde de juego para ver una casilla. El mando de abajo
+   * la enciende con cuatro fichas por tirar y cada ficha que se suelta encima baja el
+   * contador, que es lo único que la escena hace con el número.
+   */
+  const [porLaBolsa, ponerPorLaBolsa] = useState(0);
+
+  /*
    * LOS DADOS DE MENTIRA, para mirarlos de cerca sin montar una partida.
    *
    * Tres mandos: «Me toca tirar» enciende `disponible` (vibran); «Tirar» hace de servidor
@@ -917,6 +927,12 @@ function Banco(): JSX.Element {
                 ponerTrueque(`${doy} por ${bien}`);
                 ponerCogida(null);
               }}
+              cuantasALaBolsa={porLaBolsa}
+              onTirarFicha={(bien) => {
+                ponerTrueque(`a la bolsa: ${bien}`);
+                ponerCogida(null);
+                ponerPorLaBolsa((n) => Math.max(0, n - 1));
+              }}
               tomada={tomada}
               onTomarDeLaBarra={(id) => {
                 /*
@@ -1063,6 +1079,16 @@ function Banco(): JSX.Element {
           style={{ ...BOTON, borderColor: COLOR_EN_PANTALLA[quienJuega] }}
         >
           Juega: {quienJuega}
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            ponerPorLaBolsa((n) => (n === 0 ? 4 : 0));
+            ponerCogida(null);
+          }}
+          style={{ ...BOTON, borderColor: porLaBolsa > 0 ? '#e7dcc0' : undefined }}
+        >
+          {porLaBolsa > 0 ? `A la bolsa: ${String(porLaBolsa)}` : 'Sale un siete'}
         </button>
         <button type="button" onClick={tender} style={BOTON}>
           Tender puente

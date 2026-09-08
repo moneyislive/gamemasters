@@ -107,6 +107,7 @@ import {
   BIENES_DEL_ANO_BUENO,
   claseDeLaCarta,
   COMPRAR,
+  DESCARTAR,
   DOS_VEREDAS,
   FUNDAR,
   GUARDIA,
@@ -199,6 +200,19 @@ interface VistaQueSePinta {
   readonly turnoDe: AsientoId | null;
   readonly yo: AsientoId | null;
   readonly misFichas?: readonly string[];
+  /**
+   * LO QUE CADA UNO DEBE TIRAR POR UN SIETE, y va opcional por lo mismo que el mazo.
+   *
+   * Es PÚBLICO entero y lo publica `proyectarRiberas`: el tamaño de la mano ya lo es —«los
+   * bienes se cuentan mirando su montón»— y `faltan` es la mitad de un número público, así
+   * que aquí no hay nada que tapar. Se lee para dos cosas y ninguna es una regla: cuántas
+   * fichas quedan por tirar (el contador de la casilla) y si hay que enseñar la bolsa en vez
+   * de las casillas de trueque.
+   *
+   * La entrada SE QUEDA con `faltan` en cero cuando alguien ya terminó —así lo deja
+   * `riberas.ts`—, o sea que «hay lista» no es «hay que tirar»: hay que mirar el número.
+   */
+  readonly descartes?: readonly { readonly de?: unknown; readonly faltan?: unknown }[];
   /**
    * MI MANO DEL MAZO, y de cada carta se lee UNA cosa: su identificador.
    *
@@ -1547,6 +1561,84 @@ export function opcionesFueraDeLaBarra<O extends OpcionQueLlega>(
   mazo: MazoEnLaBarraEnTres | null,
 ): O[] {
   return mazo === null ? [...opciones] : opciones.filter((o) => o.tipo !== COMPRAR);
+}
+
+// ---------------------------------------------------------------------------
+// LA BOLSA DEL DESCARTE: lo que se tira cuando sale un siete
+// ---------------------------------------------------------------------------
+
+/**
+ * LO QUE HAY QUE TIRAR AHORA MISMO, o `null` si no hay nada que tirar.
+ *
+ * ═══ QUÉ ES ESTO EN LA PANTALLA ═══
+ *
+ * Cuando sale un siete, quien tenga más de la mano que se aguanta tira la mitad. Eso se
+ * ofrecía como una fila de números en la barra de arriba —«2», «3», «4»…, un botón por bien,
+ * rotulados con la ficha y no con la cuenta—, y hay que abrir una pestaña para verlos. Ahora
+ * la mano de bienes retira sus casillas de trueque y deja una sola, la BOLSA DEL ESTIAJE, y
+ * se arrastra encima cada ficha que se quiera tirar: el mismo gesto que el trueque.
+ *
+ * ═══ POR QUÉ UN OBJETO Y NO UN NÚMERO SUELTO ═══
+ *
+ * Porque es el mismo dato que decide TRES cosas —que se pinte la bolsa, que no se pinten las
+ * casillas de trueque, y que el botón de la barra desaparezca— y las tres tienen que cambiar
+ * a la vez. Un `number` suelto se puede pasar a una y olvidar en otra; `opcionesFueraDeLaBolsa`
+ * recibe ESTO, igual que `opcionesFueraDeLaBarra` recibe el mazo y por la misma razón.
+ */
+export interface BolsaDelDescarte {
+  /** Cuántas fichas quedan por tirar. Uno o más: con cero no hay bolsa que pintar. */
+  readonly faltan: number;
+}
+
+/** ¿Le toca tirar fichas a este asiento, y cuántas le quedan? */
+export function laBolsaDelDescarte(vista: unknown, quien: AsientoId | null): BolsaDelDescarte | null {
+  if (!esVistaQueSePinta(vista) || quien === null) return null;
+  const lista = vista.descartes;
+  if (lista === undefined) return null;
+  const mio = lista.find((d) => d.de === quien);
+  if (mio === undefined || typeof mio.faltan !== 'number' || mio.faltan <= 0) return null;
+  return { faltan: mio.faltan };
+}
+
+/**
+ * EL MOVIMIENTO DE TIRAR UNA FICHA DE ESTE BIEN, tal como lo ofrece el juego, o `null`.
+ *
+ * Se busca por TIPO y por la carga, nunca por el `id`: es la misma regla que `tirarEnTres` y
+ * `pasarEnTres`, y la razón está escrita en la cabecera de `Opcion.id`. Y devuelve la opción
+ * ENTERA para mandarla tal cual, que es lo que el portillo exige (§5 bis, forma canónica):
+ * montar aquí un `{ tipo, carga }` parecido sería componer un movimiento distinto del que el
+ * juego ofreció.
+ *
+ * `null` es «este bien no se puede tirar ahora», y la casilla lo trata como el área de
+ * trueque trata a un bien que no está en su lista: no pasa nada. No hay que adivinar por qué
+ * —puede ser que no queda ninguna ficha de ese bien, o que ya no debe nada.
+ */
+export function tirarLaFichaEnTres<O extends OpcionQueLlega>(opciones: readonly O[], bien: string): O | null {
+  for (const o of opciones) {
+    if (o.tipo !== DESCARTAR) continue;
+    if (typeof o.carga !== 'object' || o.carga === null) continue;
+    if ((o.carga as Record<string, unknown>)['bien'] === bien) return o;
+  }
+  return null;
+}
+
+/**
+ * LAS OPCIONES QUE TAMPOCO PINTA LA BARRA DE ARRIBA: se caen las de tirar fichas, y sólo si
+ * la mano está pintando la bolsa.
+ *
+ * Es hermana de `opcionesFueraDeLaBarra` y evita el mismo par de fallos. El de aquí —dos
+ * sitios ofreciendo tirar la misma ficha— rompe la regla de la casa de que cada movimiento se
+ * enseña una vez. El contrario es peor porque es mudo: donde NO hay bolsa —el respaldo del
+ * móvil, una mesa que no pinta la mano— quitar los botones deja al jugador con un siete
+ * encima y sin manera de tirar nada, con la mesa esperándole. Por eso recibe LA BOLSA, el
+ * mismo objeto que se le pasa a `<Delta>`: los botones desaparecen exactamente cuando la
+ * casilla existe, porque son el mismo dato.
+ */
+export function opcionesFueraDeLaBolsa<O extends OpcionQueLlega>(
+  opciones: readonly O[],
+  bolsa: BolsaDelDescarte | null,
+): O[] {
+  return bolsa === null ? [...opciones] : opciones.filter((o) => o.tipo !== DESCARTAR);
 }
 
 // ---------------------------------------------------------------------------

@@ -221,6 +221,7 @@ export {
   TITULOS,
   TOPE_DE_PIEZAS,
   TOPE_POR_LADO_DEL_TRUEQUE,
+  UNA_FICHA_DE,
   VADO_MINIMO,
   VEREDAS_DE_LA_CARTA,
 } from './riberas';

@@ -242,12 +242,14 @@ import {
   jugadasDeLaCarta,
   laManoDeLaIzquierda,
   jugadaSinPreguntar,
+  laBolsaDelDescarte,
   loQueSeOyeDelVado,
   manoEnTres,
   marcadorEnTres,
   mazoEnLaBarra,
   meToca,
   opcionesFueraDeLaBarra,
+  opcionesFueraDeLaBolsa,
   opcionesFueraDeLaMano,
   opcionesFueraDeLaMesa,
   NADA_COMPUESTO,
@@ -261,6 +263,7 @@ import {
   tableroEnTres,
   pasarEnTres,
   tirarEnTres,
+  tirarLaFichaEnTres,
   truequesPosibles,
   turnoEnTres,
 } from '../../shared/arcade/juegos/riberas-en-tres';
@@ -1978,6 +1981,18 @@ export function RiberasEnTres({
   }, [vista]);
   const mano = useMemo(() => manoEnTres(vista), [vista]);
   /*
+   * LA BOLSA DEL ESTIAJE: lo que me queda por tirar de un siete, o nada.
+   *
+   * Va aquí arriba, antes que los botones, porque los botones dependen de ella: mientras la
+   * bolsa está en la mano, los de tirar fichas NO salen en el carril. Ver la criba de abajo.
+   *
+   * Y NO la apaga `quieto`, al revés que el mazo. Con una petición en vuelo la mano entera se
+   * apaga —eso ya lo hace la escena— pero la bolsa tiene que SEGUIR AHÍ: si desapareciera,
+   * los botones del carril volverían durante ese parpadeo y la misma pantalla ofrecería lo
+   * mismo dos veces, justo en el momento en que se está mandando una de las dos.
+   */
+  const bolsa = useMemo(() => laBolsaDelDescarte(vista, yo), [vista, yo]);
+  /*
    * EL CUARTO HUECO DE LA BARRA: el mazo. `quieto` lo apaga como a las tres piezas y por
    * lo mismo —con una petición en vuelo, el movimiento que se mandara ahora saldría con la
    * revisión vieja—. Apagado y NO quitado: la barra reparte centrado, y un hueco que va y
@@ -2035,9 +2050,25 @@ export function RiberasEnTres({
    * mismo botón que la recogió. Tirar y comprar son distintos porque son justo los dos que
    * podrían pillarme con la mesa recogida por mi propia mano.
    */
+  /*
+   * ═══ Y LA CUARTA CRIBA: TIRAR FICHAS TAMPOCO ES UN BOTÓN ═══
+   *
+   * Desde que la mano enseña la bolsa, cada ficha se tira arrastrándola encima. Si además
+   * siguieran los botones del carril —una fila de nombres de bien detrás de una pestaña que
+   * hay que abrir— la misma pantalla ofrecería lo mismo dos veces. Y como las otras tres,
+   * recibe EL DATO y no un interruptor: los botones se van exactamente cuando la casilla
+   * está, porque son el mismo `bolsa`.
+   *
+   * La bolsa NO baja con la mesa recogida, al revés que el mazo: no está sobre el tablero,
+   * está en la mano, y la mano se queda. Por eso aquí no hay `mesaRecogida ? null : ...`.
+   */
   const fueraDeLaBarra = useMemo(
-    () => opcionesFueraDeLaBarra(opcionesFueraDeLaMano(opcionesFueraDelTablero(opciones)), mesaRecogida ? null : mazo),
-    [opciones, mazo, mesaRecogida],
+    () =>
+      opcionesFueraDeLaBolsa(
+        opcionesFueraDeLaBarra(opcionesFueraDeLaMano(opcionesFueraDelTablero(opciones)), mesaRecogida ? null : mazo),
+        bolsa,
+      ),
+    [opciones, mazo, mesaRecogida, bolsa],
   );
   /*
    * LA MANO DE LA IZQUIERDA: mis premios y mis cartas del mazo, apagada entera mientras
@@ -2826,6 +2857,27 @@ export function RiberasEnTres({
     [quieto, cartaCogida, vista, opciones, mover],
   );
 
+  /*
+   * AL SOLTAR LA FICHA SOBRE LA BOLSA: se tira, y no se pregunta nada.
+   *
+   * No hay a quién elegir —al otro lado está el estiaje— así que esto es el gesto más corto
+   * de la mano: una opción, se manda. El movimiento sale ENTERO de la lista que el juego
+   * ofrece (`tirarLaFichaEnTres`) y no se monta aquí: el portillo lo exige en forma canónica
+   * (§5 bis), y un `{ tipo, carga }` parecido montado en el cliente es un movimiento distinto.
+   *
+   * Se suelta la carta cogida SIEMPRE, se haya podido tirar o no: la que se acaba de tirar ya
+   * no existe, y dejarla «cogida» por su identificador dejaría la mano señalando un hueco.
+   */
+  const alTirarFicha = useCallback(
+    (bienEnLaEscena: string) => {
+      ponerCogida(null);
+      if (quieto || bolsa === null) return;
+      const opcion = tirarLaFichaEnTres(opciones, bienEnLaEscena);
+      if (opcion !== null) mover({ tipo: opcion.tipo, carga: opcion.carga });
+    },
+    [quieto, bolsa, opciones, mover],
+  );
+
   // -------------------------------------------------------------------------
   // El mazo: coger, jugar y revelar
   // -------------------------------------------------------------------------
@@ -3547,6 +3599,8 @@ export function RiberasEnTres({
                   onCogerCarta={alCogerCarta}
                   seCambianPor={seCambianPor}
                   onProponerTrueque={alProponerTrueque}
+                  cuantasALaBolsa={bolsa?.faltan ?? 0}
+                  onTirarFicha={alTirarFicha}
                   cartasDelMazo={cartasDelMazo}
                   cartaDelMazoCogida={cartaDelMazo}
                   onCogerCartaDelMazo={alCogerCartaDelMazo}

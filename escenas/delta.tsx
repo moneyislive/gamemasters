@@ -211,6 +211,7 @@ import {
   enLaZonaDeLaMano,
   huecosDeLaBaraja,
   loQueSeVeEnLaBaraja,
+  sitioDeLaBolsa,
 } from './baraja';
 import { ALTO_DEL_DIBUJO } from './baraja';
 import type { CartaEnLaMano, HuecoDeCarta } from './baraja';
@@ -2872,8 +2873,164 @@ function AreaDeTrueque({
           renderOrder={ORDEN_DE_LAS_AREAS + 2}
           raycast={() => null}
         >
+          {/* `transparent` con opacidad uno: si no, el dibujo va a la cola opaca y la cara
+              translúcida de la casilla se pinta ENCIMA. Ver la casilla de la bolsa. */}
           <meshBasicMaterial
             color="#f7f1e2"
+            transparent
+            opacity={1}
+            toneMapped={false}
+            depthTest={false}
+            depthWrite={false}
+          />
+        </mesh>
+      )}
+    </group>
+  );
+}
+
+/**
+ * LA BOLSA DEL ESTIAJE: «suéltala aquí y se va».
+ *
+ * ═══ QUÉ SUSTITUYE ═══
+ *
+ * Cuando sale un siete y hay que tirar la mitad de la mano, esto se ofrecía como una fila de
+ * números en la barra de arriba: un botón por bien, detrás de una pestaña que hay que abrir,
+ * rotulados con la ficha y no con lo que queda por tirar. Ahora la mano retira sus casillas de
+ * trueque y deja ÉSTA sola, y se arrastra encima cada ficha. El gesto es el mismo que el del
+ * trueque, y a propósito: lo único que cambia es quién está al otro lado.
+ *
+ * ═══ LAS DOS DIFERENCIAS CON `AreaDeTrueque`, Y POR QUÉ ═══
+ *
+ *   · NO ESPERA A QUE HAYA UNA CARTA COGIDA. La de trueque aparece al arrastrar porque el
+ *     trueque es voluntario y hasta que no se coge una ficha no hay nada que ofrecer; el
+ *     descarte es OBLIGATORIO y la mesa está esperando, así que la casilla tiene que estar a
+ *     la vista ANTES de tocar nada — si no, no hay quien adivine qué hacer.
+ *   · LLEVA CONTADOR. Es el número que faltaba: cuántas fichas quedan por tirar. Se dibuja
+ *     con la misma tabla de cifras que la ficha de la comarca (`CONTORNOS_DE_LA_CIFRA`), que
+ *     por eso llega hasta treinta y no hasta doce. Por encima de la tabla la casilla se pinta
+ *     SIN cifra, con la bolsa sola: es lo honrado, y una mano de sesenta y una fichas no se ha
+ *     visto ni en el bucle que juega partidas enteras.
+ *
+ * El color va al revés que en el trueque —fondo claro y dibujo NEGRO— porque una casilla de
+ * trueque se pinta del color del bien que se pide y aquí no se pide nada: lo que hay al otro
+ * lado es el estiaje.
+ */
+function AreaDeDescarte({
+  hueco,
+  faltan,
+  onSoltar,
+}: {
+  hueco: HuecoDeCarta;
+  faltan: number;
+  onSoltar: () => void;
+}): JSX.Element {
+  const [encima, setEncima] = useState(false);
+  const geometria = useMemo(
+    () => formaDeCarta(hueco.ancho, hueco.alto),
+    [hueco.ancho, hueco.alto],
+  );
+  const bolsa = useMemo(() => geometriaDeContornos(CONTORNOS_DE_LA_CARTA['bolsa'] ?? []), []);
+  const cuenta = useMemo(
+    () => geometriaDeContornos(CONTORNOS_DE_LA_CIFRA[String(faltan)] ?? []),
+    [faltan],
+  );
+  /* Son nuestras y no del catálogo: se sueltan al desmontar. */
+  useEffect(() => () => bolsa?.dispose(), [bolsa]);
+  useEffect(() => () => cuenta?.dispose(), [cuenta]);
+
+  return (
+    <group
+      position={[hueco.x, hueco.y, hueco.z]}
+      scale={encima ? 1.1 : 1}
+      renderOrder={ORDEN_DE_LAS_AREAS}
+    >
+      <mesh
+        geometry={geometria}
+        renderOrder={ORDEN_DE_LAS_AREAS + 1}
+        onPointerOver={(e) => {
+          e.stopPropagation();
+          setEncima(true);
+        }}
+        onPointerOut={() => setEncima(false)}
+        onPointerUp={(e) => {
+          if (noEsElPrimario(e)) return;
+          e.stopPropagation();
+          onSoltar();
+        }}
+      >
+        <meshBasicMaterial
+          color="#e7dcc0"
+          transparent
+          opacity={encima ? 0.98 : 0.82}
+          toneMapped={false}
+          depthTest={false}
+          depthWrite={false}
+        />
+      </mesh>
+      {/* El borde, en verde cuando está señalada: el mismo idioma que el anillo. */}
+      <mesh
+        geometry={geometria}
+        position={[0, 0, -0.002]}
+        scale={1.06}
+        renderOrder={ORDEN_DE_LAS_AREAS}
+        raycast={() => null}
+      >
+        <meshBasicMaterial
+          color={encima ? COLOR_DE_LA_SENAL : '#0d1f1a'}
+          transparent
+          opacity={encima ? 1 : 0.7}
+          toneMapped={false}
+          depthTest={false}
+          depthWrite={false}
+        />
+      </mesh>
+      {bolsa !== null && (
+        <mesh
+          geometry={bolsa}
+          position={[-hueco.ancho * 0.24, 0, 0.01]}
+          scale={hueco.alto * 0.62}
+          renderOrder={ORDEN_DE_LAS_AREAS + 2}
+          raycast={() => null}
+        >
+          {/*
+            * `transparent` CON OPACIDAD UNO, y no es un adorno: sin él este material va a la
+            * cola OPACA, que se pinta ANTES que toda la transparente, y `renderOrder` sólo
+            * ordena DENTRO de cada cola. La cara de la casilla es translúcida, o sea que se
+            * pintaba encima del dibujo por muy alto que fuera su orden, y la bolsa salía
+            * lavada —negro al 18%— en vez de negra. Con esto los tres van a la misma cola y el
+            * orden vuelve a mandar.
+            */}
+          <meshBasicMaterial
+            color="#12100d"
+            transparent
+            opacity={1}
+            toneMapped={false}
+            depthTest={false}
+            depthWrite={false}
+          />
+        </mesh>
+      )}
+      {cuenta !== null && (
+        <mesh
+          geometry={cuenta}
+          position={[hueco.ancho * 0.26, 0, 0.01]}
+          scale={hueco.alto * 0.5}
+          renderOrder={ORDEN_DE_LAS_AREAS + 2}
+          raycast={() => null}
+        >
+          {/*
+            * `transparent` CON OPACIDAD UNO, y no es un adorno: sin él este material va a la
+            * cola OPACA, que se pinta ANTES que toda la transparente, y `renderOrder` sólo
+            * ordena DENTRO de cada cola. La cara de la casilla es translúcida, o sea que se
+            * pintaba encima del dibujo por muy alto que fuera su orden, y la bolsa salía
+            * lavada —negro al 18%— en vez de negra. Con esto los tres van a la misma cola y el
+            * orden vuelve a mandar.
+            */}
+          <meshBasicMaterial
+            color="#12100d"
+            transparent
+            opacity={1}
             toneMapped={false}
             depthTest={false}
             depthWrite={false}
@@ -2904,6 +3061,8 @@ function Baraja({
   onCoger,
   seCambianPor,
   onProponer,
+  cuantasALaBolsa,
+  onTirar,
 }: {
   mano: readonly CartaEnLaMano[];
   aplanados: Map<string, Instanciable[]>;
@@ -2911,6 +3070,8 @@ function Baraja({
   onCoger: (carta: CartaEnLaMano) => void;
   seCambianPor: readonly string[];
   onProponer: (bien: string) => void;
+  cuantasALaBolsa: number;
+  onTirar: (bien: string) => void;
 }): JSX.Element {
   const grupo = useRef<THREE.Group>(null);
   const [forma, setForma] = useState({ campo: (45 * Math.PI) / 180, proporcion: 16 / 9 });
@@ -2944,6 +3105,21 @@ function Baraja({
   );
 
   /*
+   * ═══ MIENTRAS HAYA QUE TIRAR FICHAS, LA MANO SÓLO OFRECE LA BOLSA ═══
+   *
+   * Las dos casillas no conviven, y no es por sitio: es que el descarte es OBLIGATORIO y el
+   * trueque no. Con las dos a la vista, soltar una ficha en la casilla de al lado sería
+   * proponer un trueque en mitad de un descarte —el juego lo rechazaría, pero eso el jugador
+   * lo descubre después—, y el que está esperando es todo el resto de la mesa.
+   *
+   * Y la bolsa NO espera a que haya una carta cogida, al revés que las de trueque: cuando se
+   * acaba de sacar un siete hay que ver qué se espera de uno antes de tocar nada.
+   */
+  const bolsa = useMemo(
+    () => (cuantasALaBolsa > 0 ? sitioDeLaBolsa(forma.campo, forma.proporcion) : null),
+    [cuantasALaBolsa, forma],
+  );
+  /*
    * Las areas solo se calculan cuando hay una carta cogida. Con la lista vacia no sale
    * ninguna, que es lo que tiene que pasar cuando el juego dice que no hay trueque
    * posible — y se ve, en vez de dejar al jugador arrastrando la carta sin sitio donde
@@ -2951,10 +3127,10 @@ function Baraja({
    */
   const areas = useMemo(
     () =>
-      cogida === null
+      cogida === null || cuantasALaBolsa > 0
         ? []
         : areasDeTrueque(seCambianPor.length, forma.campo, forma.proporcion),
-    [cogida, seCambianPor.length, forma],
+    [cogida, cuantasALaBolsa, seCambianPor.length, forma],
   );
 
   return (
@@ -2969,6 +3145,16 @@ function Baraja({
        * `capas.ts`).
        */}
       <pointLight position={[0.9, 0, -1.2]} intensity={2.6} distance={3} decay={1.4} />
+      {bolsa !== null && (
+        <AreaDeDescarte
+          hueco={bolsa}
+          faltan={cuantasALaBolsa}
+          onSoltar={() => {
+            const carta = mano.find((c) => c.id === cogida);
+            if (carta !== undefined) onTirar(carta.bien);
+          }}
+        />
+      )}
       {areas.map((hueco, i) => {
         const bien = seCambianPor[i];
         if (bien === undefined) return null;
@@ -3476,6 +3662,8 @@ export function Delta({
   onCogerCarta,
   seCambianPor = [],
   onProponerTrueque,
+  cuantasALaBolsa = 0,
+  onTirarFicha,
   cartasDelMazo = [],
   cartaDelMazoCogida = null,
   onCogerCartaDelMazo,
@@ -3610,6 +3798,16 @@ export function Delta({
   seCambianPor?: readonly string[];
   /** Aviso de que se ha soltado la carta cogida sobre el area de un bien. */
   onProponerTrueque?: (bien: string) => void;
+  /**
+   * CUÁNTAS FICHAS QUEDAN POR TIRAR por un siete. En cero no hay bolsa, que es lo normal.
+   *
+   * Llega resuelto, como todo lo demás: la escena no sabe qué es un siete ni cuánta mano se
+   * aguanta. Mientras sea mayor que cero la mano de bienes esconde sus casillas de trueque y
+   * enseña la bolsa, y el número es lo que pinta el contador.
+   */
+  cuantasALaBolsa?: number;
+  /** Aviso de que se ha soltado la carta cogida sobre la bolsa: tirar esa ficha. */
+  onTirarFicha?: (bien: string) => void;
   /**
    * LA MANO DE CARTAS DEL MAZO, para la franja de la izquierda. Vacía, no hay mano.
    *
@@ -4312,6 +4510,8 @@ export function Delta({
           onCoger={(c) => onCogerCarta?.(c)}
           seCambianPor={seCambianPor}
           onProponer={(b) => onProponerTrueque?.(b)}
+          cuantasALaBolsa={cuantasALaBolsa}
+          onTirar={(b) => onTirarFicha?.(b)}
         />
       )}
 

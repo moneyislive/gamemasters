@@ -451,3 +451,22 @@ export function areasDeTrueque(
   }
   return huecos;
 }
+
+/**
+ * EL SITIO DE LA BOLSA DEL DESCARTE, que es el de la casilla de trueque cuando hay una sola.
+ *
+ * ═══ POR QUÉ EL MISMO SITIO Y NO UNO SUYO ═══
+ *
+ * Porque el gesto es EL MISMO: se coge una ficha de la mano y se suelta en una casilla. Lo
+ * único que cambia es qué hay al otro lado —un vecino que te da algo, o el estiaje que se lo
+ * lleva—, y eso lo dice el dibujo de la casilla, no su posición. Una bolsa en otro rincón
+ * obligaría a aprender un segundo gesto para el mismo movimiento de la mano, y a aprenderlo
+ * justo en el peor momento: cuando acaba de salir un siete y hay prisa.
+ *
+ * Y sale de `areasDeTrueque` en vez de repetir su cuenta, para que el día que la mano se
+ * mueva se muevan las dos. `null` no puede pasar hoy —con `cuantas` en uno siempre devuelve
+ * una—, y se declara igual porque el que lo llama tiene que poder no pintar nada.
+ */
+export function sitioDeLaBolsa(campo: number, proporcion: number): HuecoDeCarta | null {
+  return areasDeTrueque(1, campo, proporcion)[0] ?? null;
+}

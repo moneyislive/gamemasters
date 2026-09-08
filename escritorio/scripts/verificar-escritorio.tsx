@@ -169,9 +169,12 @@ import {
   marcadorEnTres,
   mazoEnLaBarra,
   renglonDelVado,
+  laBolsaDelDescarte,
   opcionesFueraDeLaBarra,
+  opcionesFueraDeLaBolsa,
   opcionesFueraDeLaMano,
   opcionesFueraDelTablero,
+  tirarLaFichaEnTres,
   PIEZAS_DE_LA_BARRA,
   puertaDelTrueque,
   revelarDe,
@@ -3161,9 +3164,10 @@ function losDadosEnLaPantalla(): void {
     /if \(!haySitioParaLosDados\) return null;\s+const suyos = dadosEnTres\(vista, yo, opciones\);\s+return suyos === null \|\| !quieto \? suyos : \{ \.\.\.suyos, disponible: false \};/.test(codigo),
   );
   comprobar(
-    'TIRAR se cae de los botones con `opcionesFueraDeLaMesa` pasándole LOS DADOS (no un interruptor) y DESPUÉS de los tres filtros de siempre, y el pregón cierra la cadena con el cuarto',
+    'TIRAR se cae de los botones con `opcionesFueraDeLaMesa` pasándole LOS DADOS (no un interruptor) y DESPUÉS de la cadena de siempre, y el pregón la cierra',
     /opcionesFueraDelPregon\(opcionesFueraDeLaMesa\(fueraDeLaBarra, mesaRecogida \? null : dados\), pregon\)/.test(codigo.replace(/\s+/g, ' ')) &&
-      /const fueraDeLaBarra = useMemo\(\s+\(\) => opcionesFueraDeLaBarra\(opcionesFueraDeLaMano\(opcionesFueraDelTablero\(opciones\)\), mesaRecogida \? null : mazo\)/.test(codigo),
+      /const fueraDeLaBarra = useMemo\( \(\) => opcionesFueraDeLaBolsa\( opcionesFueraDeLaBarra\(opcionesFueraDeLaMano\(opcionesFueraDelTablero\(opciones\)\), mesaRecogida \? null : mazo\), bolsa, \), /.test(codigo.replace(/\s+/g, ' ')),
+    codigo.replace(/\s+/g, ' ').slice(codigo.replace(/\s+/g, ' ').indexOf('const fueraDeLaBarra'), codigo.replace(/\s+/g, ' ').indexOf('const fueraDeLaBarra') + 300),
   );
   comprobar(
     'la escena recibe `dados={dados}` y `onPulsarLosDados={alPulsarLosDados}`',
@@ -5444,14 +5448,60 @@ function laCintaYElCajon(): void {
               elRail={<p className="el-rail-de-prueba">el raíl</p>}
             />,
           );
+    /*
+     * ═══ Y EL DESCARTE YA NO ESTÁ EN EL CARRIL: ESTÁ EN LA MANO ═══
+     *
+     * Esto medía que los CINCO botones del descarte —uno por clase de bien— salieran en el
+     * carril, y era verdad: era la otra lista que un siete pone encima de la mesa. Se fueron
+     * a propósito. Un siete con la mano llena es el momento de más prisa de la partida y la
+     * respuesta estaba detrás de una pestaña, en una fila de nombres de bien que no dice
+     * cuántas fichas quedan por tirar. Ahora la mano de bienes retira sus casillas de trueque
+     * y deja la BOLSA DEL ESTIAJE, con su contador, y se arrastra cada ficha encima.
+     *
+     * Lo que se mide aquí es la mudanza ENTERA, porque media mudanza es una partida parada:
+     * que los botones se hayan ido del carril, que quien los quita sea la bolsa y no un
+     * interruptor, que sin bolsa NO se quite nada —el respaldo del móvil sigue teniéndolos, y
+     * es su única puerta—, que la escena reciba la cuenta y el aviso, y que el movimiento que
+     * se manda salga de la lista del juego y no montado aquí.
+     *
+     * El `<Canvas>` no pinta en Node —el lienzo mide cero—, así que la casilla en sí la mide
+     * `verify:escena`; esto mide las cuatro costuras que sí se ven desde fuera.
+     */
+    const laBolsa = laBolsaDelDescarte(conDescarte.vista, 's1');
+    const susDescartes = conDescarte.opciones.filter((o) => o.tipo === 'riberas:descartar');
     comprobar(
-      'y el descarte también cabe: sus CINCO botones —uno por clase de bien que quede en la mano— salen en el mismo carril, que es la otra lista que un siete pone encima de la mesa',
-      htmlDelDescarte.split('class="riberas-carril-opcion').length - 1 === 5 &&
-        conDescarte.opciones.filter((o) => o.tipo === 'riberas:descartar').length === 5,
+      'el juego sigue ofreciendo sus cinco descartes, y la bolsa dice cuántas fichas quedan por tirar',
+      susDescartes.length === 5 && laBolsa !== null && laBolsa.faltan > 0,
+      { descartes: susDescartes.length, bolsa: laBolsa },
+    );
+    comprobar(
+      'y NINGUNO sale ya en el carril: los tira `opcionesFueraDeLaBolsa`, que recibe la bolsa y no un interruptor',
+      htmlDelDescarte.split('class="riberas-carril-opcion').length - 1 === 0 &&
+        opcionesFueraDeLaBolsa(conDescarte.opciones, laBolsa).length ===
+          conDescarte.opciones.length - 5,
       {
         cuadrados: htmlDelDescarte.split('class="riberas-carril-opcion').length - 1,
-        descartes: conDescarte.opciones.filter((o) => o.tipo === 'riberas:descartar').length,
+        despues: opcionesFueraDeLaBolsa(conDescarte.opciones, laBolsa).length,
+        antes: conDescarte.opciones.length,
       },
+    );
+    comprobar(
+      'y SIN bolsa no se quita nada, que es lo que salva al respaldo del móvil: allí no hay mano que pinte la casilla y el botón es la única puerta',
+      opcionesFueraDeLaBolsa(conDescarte.opciones, null).length === conDescarte.opciones.length,
+      opcionesFueraDeLaBolsa(conDescarte.opciones, null).length,
+    );
+    comprobar(
+      'y cada una de las cinco fichas encuentra su movimiento por TIPO y carga, nunca por el `id`, y se manda entera',
+      ['limo', 'junco', 'sal', 'piedra', 'grano'].every((bien) => {
+        const suya = tirarLaFichaEnTres(conDescarte.opciones, bien);
+        return suya !== null && suya.tipo === 'riberas:descartar';
+      }) && tirarLaFichaEnTres(conDescarte.opciones, 'nada') === null,
+    );
+    const fuenteDelDescarte = readFileSync(new URL('../src/riberas-en-tres.tsx', import.meta.url), 'utf8');
+    comprobar(
+      'y la escena recibe la cuenta y el aviso: `cuantasALaBolsa` sale de la MISMA bolsa que quita los botones, y `onTirarFicha` manda la opción del juego por `mover`',
+      /<Delta[\s\S]*?cuantasALaBolsa=\{bolsa\?\.faltan \?\? 0\}\s+onTirarFicha=\{alTirarFicha\}/.test(fuenteDelDescarte) &&
+        /const opcion = tirarLaFichaEnTres\(opciones, bienEnLaEscena\);\s+if \(opcion !== null\) mover\(\{ tipo: opcion\.tipo, carga: opcion\.carga \}\);/.test(fuenteDelDescarte),
     );
   }
 
@@ -6282,11 +6332,17 @@ function elCarrilDiceAdondeVa(): void {
    * sigue con su número de orden — que ahí SÍ significa algo: es el atajo de teclado que el
    * carril anuncia. Sin esta línea, «los glifos ya no son 1,2,3…» podría estar pasando porque el
    * número de orden hubiera desaparecido de toda la pantalla.
+   *
+   * LA LISTA CORTA ERA LA DEL DESCARTE y ya no vale para lo segundo: desde que la bolsa está
+   * en la mano, el carril de un descarte está VACÍO, y un carril vacío no demuestra que el
+   * número de orden siga en pie —demuestra que no hay cuadrados—. Lo primero sí se sigue
+   * midiendo con ella, porque es sobre las OPCIONES y no sobre lo pintado: un descarte no
+   * nombra ninguna isla, tenga carril o no. Para lo segundo se pinta el turno corriente, que
+   * es la otra lista corta que hay y la que de verdad sale en el carril.
    */
   const {
     vista: turnoNormal,
     opciones: opcionesNormales,
-    sentados: losDelDescarte,
   } = laProyeccionConMazo(3, { descartando: true });
   const tableroNormal = tableroDeLaVista(turnoNormal);
   comprobar('la proyección del descarte trae tablero', tableroNormal !== null);
@@ -6297,25 +6353,37 @@ function elCarrilDiceAdondeVa(): void {
     sinIslas.size === 0,
     [...sinIslas.keys()],
   );
-  const puestaNormal = mesaPuestaDe(losDelDescarte, turnoNormal, opcionesNormales);
+  const corriente = laProyeccionConMazo(3);
+  const tableroCorriente = tableroDeLaVista(corriente.vista);
+  comprobar('la proyección del turno corriente trae tablero', tableroCorriente !== null);
+  if (tableroCorriente === null) return;
+  const puestaNormal = mesaPuestaDe(corriente.sentados, corriente.vista, corriente.opciones);
   const htmlNormal = renderToStaticMarkup(
     <RiberasEnTres
       manifiesto={riberas}
       mesa={unaMesa('dentro', puestaNormal)}
       puesta={puestaNormal}
-      tablero={tableroNormal}
-      opciones={opcionesNormales}
+      tablero={tableroCorriente}
+      opciones={corriente.opciones}
       laSalida="/sala/"
     />,
   );
+  /*
+   * Y LA PUERTA DEL TRUEQUE SE APARTA ANTES DE CONTAR. No es una opción del carril: es el
+   * botón que abre el componedor, va delante de todas y lleva su flecha de doble punta en vez
+   * de un número, porque no tiene atajo de teclado que anunciar. Contándola, el primer
+   * cuadrado sería «⇄» y no «1», y esto diría que el número de orden ha desaparecido cuando
+   * lo que hay es un botón más al lado.
+   */
+  const sinLaPuerta = htmlNormal.replace(/<button[^>]*riberas-carril-puerta[\s\S]*?<\/button>/, '');
   const cuadradosNormales = [
-    ...htmlNormal.matchAll(/<span class="riberas-carril-glifo"[^>]*>([^<]*)<\/span>/g),
+    ...sinLaPuerta.matchAll(/<span class="riberas-carril-glifo"[^>]*>([^<]*)<\/span>/g),
   ].map((m) => m[1] as string);
   comprobar(
     'y allí el cuadrado sigue llevando su número de orden, que es el atajo de teclado que el carril anuncia',
     cuadradosNormales.length > 0 &&
       cuadradosNormales.every((g, i) => g === String(i + 1)) &&
-      !htmlNormal.includes('riberas-carril-terreno'),
+      !sinLaPuerta.includes('riberas-carril-terreno'),
     cuadradosNormales,
   );
 }

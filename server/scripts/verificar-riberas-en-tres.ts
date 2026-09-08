@@ -95,6 +95,7 @@ import {
   RIBERAS,
   TIRAR,
   TOPE_POR_LADO_DEL_TRUEQUE,
+  UNA_FICHA_DE,
   VADO_MINIMO,
 } from '../../shared/arcade/juegos';
 import type {
@@ -2617,7 +2618,25 @@ const CAMPO_DE_LA_BARRA = (45 * Math.PI) / 180;
     botones: fuera.filter((o) => o.tipo === DESCARTAR).length,
     ofrecidas: aTirar.length,
   });
-  comprobar('cada uno con su rótulo, que dice qué se tira', aTirar.every((o) => o.rotulo.startsWith('Tirar un ')), aTirar[0]?.rotulo);
+  /*
+   * Y CADA UNO CON SU RÓTULO, QUE DICE QUÉ SE TIRA Y LO DICE BIEN ESCRITO.
+   *
+   * Esto pedía que empezaran por «Tirar un » y por eso pasaba en verde mientras la pantalla
+   * decía «Tirar un sal» y «Tirar un piedra»: dos de los cinco bienes son femeninos y el
+   * rótulo los escribía todos en masculino. Ahora se compara con `UNA_FICHA_DE`, que es de
+   * donde el juego saca la palabra, y se exige además que en la muestra haya alguno de los
+   * femeninos — sin eso, una tabla que volviera a decir «un» para los cinco pasaría por aquí
+   * sin que nadie se enterara.
+   */
+  comprobar(
+    'cada uno con su rótulo, que dice qué se tira y lo dice bien escrito: «una sal», no «un sal»',
+    aTirar.every((o) => {
+      const bien = (o.carga as { bien?: unknown }).bien;
+      if (typeof bien !== 'string' || !BIENES.includes(bien as Bien)) return false;
+      return o.rotulo === `Tirar ${UNA_FICHA_DE[bien as Bien]}`;
+    }) && aTirar.some((o) => o.rotulo.startsWith('Tirar una ')),
+    aTirar.map((o) => o.rotulo),
+  );
   /*
    * LA VACUNA: en un turno normal no hay ningún botón de tirar fichas. Sin ella, «los cinco
    * llegan» sería verde igual con una escena que no filtrara nada nunca.

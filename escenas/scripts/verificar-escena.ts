@@ -226,6 +226,7 @@ import {
 import {
   BIENES_CON_ICONO,
   CARTAS_CON_ICONO,
+  CIFRA_MAS_ALTA_CON_ICONO,
   CIFRAS_CON_ICONO,
   CONTORNOS_DE_LA_CARTA,
   CONTORNOS_DE_LA_CIFRA,
@@ -2889,11 +2890,40 @@ paso('La mano del mazo se agrupa por familias, cabe a la izquierda y no pisa a n
     cifrasMudas.length === 0,
     cifrasMudas,
   );
+  /*
+   * ═══ Y LA TABLA YA NO ES LA DE LAS FICHAS: EL CONTADOR DEL DESCARTE CUENTA POR ELLA ═══
+   *
+   * Esto decía «ni de más ni de menos», y comparaba la tabla con las once de un delta. Dejó
+   * de ser verdad el día que la CASILLA DEL DESCARTE puso un contador: lo que cuenta es
+   * `Math.floor(mano / 2)` y pasa por el 1 y por el 7, que no salen en ninguna comarca.
+   *
+   * Lo que se exige ahora es lo que la tabla promete: del UNO a su tope, SIN SALTOS. Sin el
+   * «sin saltos» esto sería una lista de longitud correcta con un agujero dentro, y el
+   * agujero no se vería: una cifra que falta no revienta, deja la casilla sin número.
+   */
+  const HASTA_DONDE_CUENTA = Array.from({ length: CIFRA_MAS_ALTA_CON_ICONO }, (_, i) => String(i + 1));
   comprobar(
-    'y no hay cifras de más ni de menos en la tabla: las que se dibujan son las que se juegan',
-    CIFRAS_CON_ICONO.length === CIFRAS_DE_UN_DELTA.length &&
-      CIFRAS_DE_UN_DELTA.every((c) => CIFRAS_CON_ICONO.includes(c)),
+    'la tabla de cifras va del uno a su tope sin saltos, que es lo que promete quien la lee',
+    CIFRAS_CON_ICONO.length === HASTA_DONDE_CUENTA.length &&
+      HASTA_DONDE_CUENTA.every((c) => CIFRAS_CON_ICONO.includes(c)),
+    { enLaTabla: CIFRAS_CON_ICONO.length, hastaElTope: HASTA_DONDE_CUENTA.length },
+  );
+  comprobar(
+    'y las once de un delta caen dentro: la ficha de la comarca sigue teniendo su cifra',
+    CIFRAS_DE_UN_DELTA.every((c) => CIFRAS_CON_ICONO.includes(c)),
     { enLaTabla: CIFRAS_CON_ICONO, enElJuego: CIFRAS_DE_UN_DELTA },
+  );
+  /*
+   * Y que el tope dé para una partida de verdad. `debidos` de `riberas.ts` reparte
+   * `Math.floor(almacen.length / 2)`, y el almacén NO tiene tope —no hay banco finito del
+   * que salgan las fichas—, así que ningún número es el último por regla. Treinta cubre una
+   * mano de sesenta y una fichas. Esto no comprueba una verdad matemática: fija el suelo por
+   * debajo del cual alguien habría recortado la tabla sin darse cuenta de para qué era.
+   */
+  comprobar(
+    'y llega hasta treinta, que es media mano de sesenta y una fichas',
+    CIFRA_MAS_ALTA_CON_ICONO >= 30,
+    CIFRA_MAS_ALTA_CON_ICONO,
   );
   comprobar(
     'y ninguna llave de cifra choca con una carta ni con un bien: son tres tablas y tres puertas',

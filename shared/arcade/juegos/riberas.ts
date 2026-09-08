@@ -215,6 +215,28 @@ export type Bien = 'limo' | 'junco' | 'sal' | 'piedra' | 'grano';
 /** Los cinco, en el orden en que se enseñan y en que se recorren. */
 export const BIENES: readonly Bien[] = ['limo', 'junco', 'sal', 'piedra', 'grano'];
 
+/**
+ * UNA FICHA DE CADA BIEN, escrita como se dice.
+ *
+ * Dos de los cinco son femeninos, y los rótulos del juego los escribían todos en masculino:
+ * «Tirar un sal», «Tirar un piedra». Se ve en la pantalla del descarte, que es cuando hay
+ * prisa y se lee de reojo. Está aquí y no en las pantallas porque el rótulo lo escribe el
+ * juego —es lo que dice `Opcion.rotulo`— y hay dos clientes: la palabra tiene que salir bien
+ * escrita una vez, no dos veces igual de mal.
+ *
+ * Es una tabla y no una regla —«las acabadas en A»— porque el género no se deduce del final
+ * de la palabra en castellano, y con cinco palabras que no van a cambiar una tabla no se
+ * equivoca nunca. El tipo `Record<Bien, string>` obliga a que el día que entre un sexto bien
+ * la casa no compile hasta que alguien diga cómo se dice.
+ */
+export const UNA_FICHA_DE: Readonly<Record<Bien, string>> = {
+  limo: 'un limo',
+  junco: 'un junco',
+  sal: 'una sal',
+  piedra: 'una piedra',
+  grano: 'un grano',
+};
+
 /** Lo que hay en cada isla. `duna` es la que no rinde nada. */
 export type Terreno = 'marisma' | 'carrizal' | 'salina' | 'cantil' | 'vega' | 'duna';
 
@@ -4943,7 +4965,7 @@ function opcionesDeDescarte(v: VistaSinTablero, quien: AsientoId): readonly Opci
       id: `descartar:${bien}`,
       tipo: DESCARTAR,
       carga: { bien },
-      rotulo: `Tirar un ${bien}`,
+      rotulo: `Tirar ${UNA_FICHA_DE[bien]}`,
       ayuda:
         debo.faltan === 1
           ? 'Es la última que te queda por tirar.'

@@ -1104,6 +1104,61 @@ const CARTAS: readonly Dibujo[] = [
       ];
     })(),
   },
+
+  /*
+   * ═══ Y EL DECIMOTERCERO, QUE TAMPOCO ES CARTA: LA BOLSA DEL ESTIAJE ═══
+   *
+   * `bolsa` no se pinta nunca en la mano de la izquierda ni en la barra. Es la cara de la
+   * CASILLA DEL DESCARTE: cuando sale un siete y hay que tirar la mitad de la mano, la mano
+   * de bienes retira sus casillas de trueque y deja ésta sola, y se arrastra encima cada
+   * ficha que se quiera tirar. Vive en este mapa por lo mismo que `comprarcarta`: quien
+   * pinta una casilla de la mano busca su dibujo en un solo sitio.
+   *
+   * ═══ POR QUÉ UN SACO Y NO UNA PAPELERA NI UNA CRUZ ═══
+   *
+   * Porque lo que pasa con esa ficha no es que se borre: es que se la lleva el estiaje. Una
+   * cruz diría «cancelar», que es justo lo contrario —el descarte es obligatorio y no se
+   * puede cancelar—, y una papelera diría «basura», que es vocabulario de aparato y no de
+   * mesa. Un saco atado por el cuello es lo que se lleva quien te roba, se lee sin una letra
+   * y en los cuatro idiomas.
+   *
+   * ═══ QUÉ SE VE, Y POR QUÉ ES UN SOLO CONTORNO ═══
+   *
+   * La panza, el cuello estrecho y los dos lazos del nudo, todo en UNA silueta que se
+   * recorre entera: sube por el cuello, se sale al lazo, vuelve, cruza por arriba y baja por
+   * el otro lado. Los lazos podrían haber sido dos contornos aparte, y no lo son a propósito:
+   * pegados al cuello se solaparían —y `toShapes` descarta en silencio lo que queda dentro de
+   * otra forma, que es la revisión de más abajo—, y separados dejarían una raya de aire de un
+   * píxel a tamaño de casilla. Recorridos de una vez no hay ni solape ni raya.
+   *
+   * Y NO HAY AGUJEROS, como en el mazo y por lo mismo: la silueta ya son tres bultos que no
+   * se parecen a ningún otro icono, y el detalle fino se pierde a ciento diez píxeles.
+   */
+  {
+    carta: 'bolsa',
+    que: 'Un saco atado por el cuello, con sus dos lazos: donde se tiran las fichas.',
+    contornos: (() => {
+      /* La panza: un círculo de 150 al que se le quita el casquete de arriba. */
+      const panza = arco(256, 320, 150, 160, 380, 24);
+      return [
+        macizo([
+          [330, 214], /* el hombro derecho */
+          [312, 176], /* el cuello, por debajo del nudo */
+          [404, 202], /* el lazo derecho, que sale y vuelve */
+          [400, 126],
+          [312, 140],
+          [306, 100], /* la boca del saco */
+          [206, 100],
+          [200, 140],
+          [112, 126], /* y el lazo izquierdo, en espejo */
+          [108, 202],
+          [200, 176],
+          [182, 214], /* el hombro izquierdo, y de ahí la panza */
+          ...panza,
+        ]),
+      ];
+    })(),
+  },
 ];
 
 /*
@@ -1352,11 +1407,31 @@ type Guarismo = (x: number, y: number, ancho: number, grosor: number) => number[
  */
 const GUARISMOS: Readonly<Record<string, Guarismo>> = {
   '0': (x, y, w, g) => anillo(x + w / 2, y + ALTO_DEL_GUARISMO / 2, w / 2, ALTO_DEL_GUARISMO / 2, g),
-  /* Con bandera y con pie, para que no sea un palo: encajado por el lado mayor, un palo
-     sale tan ancho como un ocho. */
+  /*
+   * Con bandera y con pie, para que no sea un palo: encajado por el lado mayor, un palo
+   * sale tan ancho como un ocho.
+   *
+   * Y EL PIE LEVANTA LAS PUNTAS, que es lo que le faltaba. Este guarismo no se había
+   * emitido nunca SOLO —en un delta el uno sólo sale dentro del 10, del 11 y del 12, y ahí
+   * la cifra entera trae también el otro guarismo—, y suelto no pasaba la revisión: dos
+   * cintas rectas dan seis triángulos y el trato de este fichero son ocho. El contador del
+   * descarte sí lo pide solo, porque baja hasta uno.
+   *
+   * Las puntas levantadas no son un truco para llegar a la cuenta: son el remate de un pie
+   * de imprenta, se ven también en el 10, el 11 y el 12 de las fichas, y ahí hacen lo mismo
+   * que aquí —que la raya de abajo se lea como el pie de un número y no como el suelo.
+   */
   '1': (x, y, w, g) => [
     trazo([[x + w * 0.22, y + g * 0.9], [x + w * 0.62, y + g / 2], [x + w * 0.62, y + ALTO_DEL_GUARISMO - g / 2]], g),
-    trazo([[x + w * 0.16, y + ALTO_DEL_GUARISMO - g / 2], [x + w * 0.96, y + ALTO_DEL_GUARISMO - g / 2]], g),
+    trazo(
+      [
+        [x + w * 0.16, y + ALTO_DEL_GUARISMO - g / 2 - 16],
+        [x + w * 0.26, y + ALTO_DEL_GUARISMO - g / 2],
+        [x + w * 0.86, y + ALTO_DEL_GUARISMO - g / 2],
+        [x + w * 0.96, y + ALTO_DEL_GUARISMO - g / 2 - 16],
+      ],
+      g,
+    ),
   ],
   /* El arco y la diagonal en un trazo y la base en otro: el codo de abajo a la izquierda es
      tan cerrado que el inglete disparaba una púa fuera del número. */
@@ -1378,8 +1453,16 @@ const GUARISMOS: Readonly<Record<string, Guarismo>> = {
     trazo([[x + w * 0.72, y + g / 2], [x + w * 0.72, y + ALTO_DEL_GUARISMO - g / 2]], g),
     trazo([[x + w * 0.5, y + ALTO_DEL_GUARISMO - g / 2], [x + w * 0.94, y + ALTO_DEL_GUARISMO - g / 2]], g),
   ],
+  /*
+   * LA PANZA SE MIDE POR LOS DOS LADOS DE LA CAJA, y no sólo por el alto. Medía
+   * `ALTO * 0.31` a secas, que en la caja ancha de un guarismo suelto (300) cabe y en la
+   * estrecha de una cifra de dos (214) NO: la panza se salía del lienzo por veintitrés
+   * unidades. No se había visto nunca porque en un delta no hay ningún número de dos cifras
+   * acabado en cinco —los suyos son 10, 11 y 12—, y el primero que lo pisó fue el contador
+   * del descarte al pasar por el quince.
+   */
   '5': (x, y, w, g) => {
-    const r = ALTO_DEL_GUARISMO * 0.31;
+    const r = Math.min(ALTO_DEL_GUARISMO * 0.31, w / 2 - g / 2);
     return [
       trazo([[x + w - g / 2, y + g / 2], [x + g / 2, y + g / 2], [x + g / 2, y + ALTO_DEL_GUARISMO * 0.46]], g),
       trazo([[x + g / 2, y + ALTO_DEL_GUARISMO * 0.46], ...arco(x + w / 2, y + ALTO_DEL_GUARISMO - r - g / 2, r, 100, -88, 12), [x + g / 2, y + ALTO_DEL_GUARISMO - g / 2]], g),
@@ -1395,6 +1478,36 @@ const GUARISMOS: Readonly<Record<string, Guarismo>> = {
       trazo([...arco(x + w * 0.5 + 20, y + w * 0.5 + 10, w * 0.5 - g / 2 + 10, 70, 178, 8), [x + g / 2 + 4, cy]], g),
     ];
   },
+  /*
+   * EL SIETE, QUE NO ESTABA. No sale en ninguna comarca de un delta —`NUMEROS_DE_LAS_ISLAS`
+   * lo salta, porque el siete es el del estiaje y no reparte—, así que estos diez guarismos
+   * eran nueve y nadie lo notaba: la única cifra que se pedía era la de una ficha. El
+   * contador del descarte cuenta de verdad y pasa por el siete.
+   *
+   * UNA SOLA CINTA, y no lleva travesaño. Llevaba uno —el siete europeo—, y `toShapes` lo
+   * DESCARTABA: su punto interior caía dentro de la diagonal, y un contorno que cruza otro
+   * sin cambiar el relleno se excluye por redundante (regla «nonzero»). No fallaba en
+   * pantalla, se veía un siete sin travesaño; lo cazó la revisión que cuenta los contornos
+   * aprovechados, que está aquí exactamente para eso.
+   *
+   * Sin travesaño no se confunde con el uno: el uno tiene una banderita y un pie, y éste
+   * tiene la barra de arriba entera y no tiene pie. Y la diagonal va quebrada en cuatro
+   * tramos, que además de dibujar mejor la panza del siete lo suben de seis triángulos a
+   * diez, por encima del trato de ocho.
+   */
+  '7': (x, y, w, g) => [
+    trazo(
+      [
+        [x + g / 2, y + g / 2],
+        [x + w - g / 2, y + g / 2],
+        [x + w * 0.7, y + ALTO_DEL_GUARISMO * 0.34],
+        [x + w * 0.55, y + ALTO_DEL_GUARISMO * 0.58],
+        [x + w * 0.42, y + ALTO_DEL_GUARISMO * 0.8],
+        [x + w * 0.32, y + ALTO_DEL_GUARISMO - g / 2],
+      ],
+      g,
+    ),
+  ],
   '8': (x, y, w, g) => {
     const ra = ALTO_DEL_GUARISMO * 0.24;
     const rb = ALTO_DEL_GUARISMO * 0.29;
@@ -1439,8 +1552,29 @@ function cifra(n: number): Dibujo {
   return { carta: texto, que: `La cifra ${texto}, como se lee en la ficha de la comarca.`, contornos };
 }
 
-/** Las once que salen en un delta: las de `NUMEROS_DE_LAS_ISLAS`, sin el siete. */
-const CIFRAS: readonly Dibujo[] = [2, 3, 4, 5, 6, 8, 9, 10, 11, 12].map(cifra);
+/**
+ * ═══ HASTA DÓNDE CUENTA EL CONTADOR DEL DESCARTE ═══
+ *
+ * Las cifras eran las once de un delta —las de `NUMEROS_DE_LAS_ISLAS`, sin el siete— porque
+ * el único sitio que pedía una era la ficha de la comarca. Ahora hay un segundo: el CONTADOR
+ * de la casilla del descarte, que dice cuántas fichas quedan por tirar y baja hasta UNO. El 1
+ * y el 7 no salen en ninguna comarca, y sin ellos el contador se quedaba mudo justo en la
+ * última, que es la que más importa.
+ *
+ * Y llega hasta treinta porque lo que cuenta es `Math.floor(mano / 2)` (ver `debidos` en
+ * `riberas.ts`) y LA MANO NO TIENE TOPE: no hay banco finito del que salgan las fichas, así
+ * que ningún número es el último por regla. Treinta cubre una mano de sesenta y una fichas,
+ * que no se ha visto ni en el bucle que juega partidas enteras. Lo que hay por encima no
+ * miente: la casilla se pinta sin cifra, y `verify:escena` afirma que el tope de la tabla y
+ * el tope que la escena admite son el mismo número.
+ */
+const HASTA_DONDE_CUENTA_EL_DESCARTE = 30;
+
+/** Del uno al treinta: las once de un delta caen dentro, y el resto es el contador. */
+const CIFRAS: readonly Dibujo[] = Array.from(
+  { length: HASTA_DONDE_CUENTA_EL_DESCARTE },
+  (_, i) => cifra(i + 1),
+);
 
 const revisiones = new Map<string, ReturnType<typeof revisa>>();
 for (const dibujo of [...CARTAS, SAL, ...CIFRAS]) {
@@ -1534,16 +1668,19 @@ ${cuerpo}
 export const BIENES_CON_ICONO: readonly string[] = Object.keys(CONTORNOS_DEL_BIEN);
 
 /**
- * LOS DIBUJOS DE LOS NAIPES DE RIBERAS: las nueve cartas del mazo y los DOS PREMIOS.
+ * LOS DIBUJOS DE LOS NAIPES DE RIBERAS: las nueve cartas del mazo, los DOS PREMIOS y las
+ * DOS CASILLAS que se pintan como un naipe sin serlo.
  *
  * Las nueve primeras llaves son las familias de \`docs/LAS-CARTAS-DE-RIBERAS.md\`: las
  * cuatro que se juegan y los cinco títulos, que valen un punto cada uno y sólo se
  * distinguen por el dibujo — de ahí que sean cinco y no uno repetido cinco veces.
  *
- * Las tres últimas NO son cartas del mazo, y no son lo mismo entre sí. \`vado\` y
+ * Las cuatro últimas NO son cartas del mazo, y no son lo mismo entre sí. \`vado\` y
  * \`mayorguardia\` son los PREMIOS, que no están en el mazo y no se compran: se pintan como
  * naipe en la misma mano. \`comprarcarta\` no se pinta en ninguna mano — es la cara del
- * cuarto hueco de la BARRA DE CONSTRUIR, el que se pulsa para comprar.
+ * cuarto hueco de la BARRA DE CONSTRUIR, el que se pulsa para comprar. Y \`bolsa\` es la cara
+ * de la CASILLA DEL DESCARTE, la que aparece sola en la mano de bienes cuando hay que tirar
+ * fichas por un siete.
  *
  * Las tres viven en el mismo mapa por lo mismo: quien pinta un naipe busca su dibujo en un
  * solo sitio, y una segunda tabla obligaría a la escena a saber de premios y de barras para
@@ -1560,7 +1697,11 @@ ${cuerpoDeLasCartas}
 export const CARTAS_CON_ICONO: readonly string[] = Object.keys(CONTORNOS_DE_LA_CARTA);
 
 /**
- * LAS CIFRAS DE LAS FICHAS, del 2 al 12 sin el 7, con la llave \`String(cifra)\`.
+ * LAS CIFRAS, del 1 al ${String(HASTA_DONDE_CUENTA_EL_DESCARTE)}, con la llave \`String(cifra)\`.
+ *
+ * Las once de un delta —del 2 al 12 sin el 7— son las de la FICHA DE LA COMARCA. Las demás
+ * están por el CONTADOR de la casilla del descarte, que baja hasta uno y arranca en la mitad
+ * de la mano, que no tiene tope.
  *
  * Están dibujadas en el compilador como las cartas, y por la misma razón que todo lo
  * demás de este fichero: no hay fuente ni lienzo del navegador en la app, así que un
@@ -1574,8 +1715,19 @@ export const CONTORNOS_DE_LA_CIFRA: Readonly<Record<string, readonly (readonly n
 ${cuerpoDeLasCifras}
 };
 
-/** Las cifras que tienen dibujo. Sirve para comprobar que están las once de un delta. */
+/** Las cifras que tienen dibujo: las once del delta y las que cuenta el descarte. */
 export const CIFRAS_CON_ICONO: readonly string[] = Object.keys(CONTORNOS_DE_LA_CIFRA);
+
+/**
+ * HASTA DÓNDE LLEGA LA TABLA. La tabla va del uno a este número, sin saltos.
+ *
+ * Lo lee el CONTADOR de la casilla del descarte, que es el único que puede pedir una cifra
+ * que no exista: lo que cuenta es la mitad de la mano, y una mano no tiene tope. Por encima
+ * de esto la casilla se pinta sin cifra —la bolsa sola—, que es honrado; lo que no puede
+ * hacer es pintar otro número. Sale de aquí y no de un \`Math.max\` en la escena porque un
+ * lector que se saca el tope de la tabla que está leyendo no puede afirmar nada sobre ella.
+ */
+export const CIFRA_MAS_ALTA_CON_ICONO = ${String(HASTA_DONDE_CUENTA_EL_DESCARTE)};
 `;
 
 fs.writeFileSync(DESTINO, salida, 'utf8');
