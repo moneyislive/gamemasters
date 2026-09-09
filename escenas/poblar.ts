@@ -35,6 +35,7 @@
  * denso y desordenado por poco dinero.
  */
 import type { Punto } from '../shared/mecanicas/malla-hexagonal';
+import { CAUCE, CUERPO, piezaDeOrilla } from './aguas';
 import { RADIO_DE_TESELA } from './escala';
 import { MODELO } from './nombres';
 import type { Subtesela } from './relieve';
@@ -83,6 +84,23 @@ const HABITABLE = 0.42;
  * más duele, que es el móvil. Se toca aquí y en ningún otro sitio.
  */
 const LO_EDIFICADO = 0.5;
+
+/**
+ * COMO MUCHO CUÁNTOS EDIFICIOS LEVANTA UNA COMARCA, y por qué ocho.
+ *
+ * `LO_EDIFICADO` baja la densidad pero no la acota. Medido sobre sesenta mundos con él a la
+ * mitad: una comarca levanta 20 edificios de mediana (p90 32, máximo 43) y un tablero 375
+ * (de 302 a 453). Miguel (9-sep-2026): «aunque el número de construcciones sea aleatorio y
+ * procedural, quiero poner un límite razonable porque he visto tableros con demasiadas».
+ *
+ * Con ocho por comarca el tablero se queda en 140 de mediana y 152 como mucho, y lo que se
+ * queda es el NÚCLEO del pueblo: `podaDelCaserio` conserva las teselas más habitables —las
+ * del centro del asentamiento— y las afueras vuelven a ser campo. Ocho es una aldea, cinco
+ * casas y algún edificio bueno, y no una urbanización. Es un techo y no una cuota: la comarca
+ * que levantaba tres sigue levantando tres. Se toca aquí y en ningún otro sitio, y
+ * `verify:escena` lo mide sobre mundos de verdad.
+ */
+export const TOPE_DE_EDIFICIOS_POR_COMARCA = 8;
 
 /** Lo que llena una tesela de campo, y lo que se le esparce por encima. */
 interface Campo {
@@ -260,14 +278,14 @@ const OFICIO: Readonly<Record<string, string>> = {
  * están en `MODELO` y dentro del `.glb`, pero no los planta nadie, y una lista escrita a
  * mano los habría metido.
  *
- * Hacen falta fuera porque el caserío ya NO es sólo decorado: `caserio.ts` reparte estos
- * edificios entre los colonos que hayan fundado cerca y `delta.tsx` les mueve las UV al
- * color de su dueño. Escrita a mano, el día que alguien metiera un edificio nuevo en
- * `PUEBLO` ese edificio se quedaría ROJO dentro del pueblo de un jugador azul — que es
- * exactamente el fallo que esto viene a arreglar, reaparecido por la puerta de atrás.
- * Derivada no puede pasar, y `verify:escena` comprueba además que los catorce pintan su
- * color en UNA sola de las cuatro columnas de jugador del atlas: con dos, el traslado
- * sería ambiguo.
+ * Hacen falta fuera porque el caserío ya NO es sólo decorado: `delta.tsx` les mueve las UV
+ * a un pardo del atlas (`COLUMNAS_DEL_CASERIO`), `podaDelCaserio` los cuenta contra el tope,
+ * y el asentamiento del jugador tiñe los suyos del color del dueño. Escrita a mano, el día
+ * que alguien metiera un edificio nuevo en `PUEBLO` ese edificio se quedaría ROJO en mitad
+ * del paisaje — que es exactamente el fallo que esto viene a arreglar, reaparecido por la
+ * puerta de atrás. Derivada no puede pasar, y `verify:escena` comprueba además que los
+ * catorce pintan su color en UNA sola de las cuatro columnas de jugador del atlas: con dos,
+ * el traslado sería ambiguo.
  */
 export const EDIFICIOS_DEL_CASERIO: ReadonlySet<string> = new Set([
   ...PUEBLO,
@@ -361,8 +379,13 @@ function dentroDeLaTesela(radio: number, u: number, v: number): Punto {
  * Devuelve la lista ya resuelta: modelo, sitio, giro y tamaño. Todo sale de las
  * coordenadas de la tesela, así que la misma tesela da siempre lo mismo y dos
  * clientes ven el mismo mundo sin hablar entre ellos. Ver `revoltijo.ts`.
+ *
+ * `sinPueblo` es lo único que llega de fuera: la poda de la comarca (`podaDelCaserio`) ha
+ * decidido que esta tesela, aunque sea habitable, no levanta edificio para no pasar del
+ * tope. Entonces se trata como campo —árboles, piedras— y no como un solar: la mesa no
+ * enseña dónde estuvo a punto de haber una casa.
  */
-export function queVaEn(tesela: Subtesela, terreno: string): Puesto[] {
+export function queVaEn(tesela: Subtesela, terreno: string, sinPueblo = false): Puesto[] {
   const { q, r } = tesela.sub;
 
   /*
@@ -440,7 +463,7 @@ export function queVaEn(tesela: Subtesela, terreno: string): Puesto[] {
    * Así los pueblos salen en las vegas y en los valles, cada comarca tiene el suyo
    * donde le toca —a veces dos, a veces ninguno— y dos partidas no se parecen.
    */
-  if (tesela.habitabilidad > HABITABLE) {
+  if (tesela.habitabilidad > HABITABLE && !sinPueblo) {
     return puebloEn(tesela, terreno);
   }
 
@@ -474,6 +497,43 @@ export function queVaEn(tesela: Subtesela, terreno: string): Puesto[] {
     });
   }
   return salida;
+}
+
+/**
+ * DÓNDE SE SIEMBRA: en tierra firme y fuera de la orilla.
+ *
+ * Es la misma pregunta que `delta.tsx` se hace antes de plantar nada —encima del agua y de
+ * una playa no crece nada— escrita UNA vez y compartida con la poda y con `verify:escena`:
+ * la poda tiene que contar sólo lo que de verdad se va a plantar, y con dos copias de la
+ * pregunta una comarca podría quedarse con menos del tope sin que nadie lo viera. Los
+ * caminos de los jugadores tampoco se siembran, pero eso lo sabe la escena y no esto.
+ */
+export function esTierraDeSiembra(tesela: Subtesela): boolean {
+  return tesela.agua !== CAUCE && tesela.agua !== CUERPO && piezaDeOrilla(tesela.orilla) === null;
+}
+
+/**
+ * QUÉ TESELAS SE QUEDAN SIN PUEBLO PARA QUE LA COMARCA NO PASE DEL TOPE.
+ *
+ * Se le pasan las teselas que la comarca va a sembrar de verdad y devuelve, de las que
+ * levantarían edificio, las que sobran: las MENOS habitables. Así la poda quita las afueras
+ * y deja el núcleo, que es lo que hace que un pueblo de ocho siga pareciendo un pueblo y no
+ * ocho casas sueltas. Con el tope o menos no toca nada: es un techo, no una cuota.
+ *
+ * Es determinista en los tres aparatos por lo mismo que todo el paisaje: la habitabilidad
+ * sale de `ruido.ts`, que es aritmética sin funciones trascendentes, y el empate lo rompe la
+ * coordenada de la tesela. Devuelve las propias teselas —identidad— y no llaves, para que
+ * quien llama pregunte con lo mismo que recorre.
+ */
+export function podaDelCaserio(teselas: readonly Subtesela[], terreno: string): ReadonlySet<Subtesela> {
+  const conEdificio = teselas.filter((t) =>
+    queVaEn(t, terreno).some((p) => EDIFICIOS_DEL_CASERIO.has(p.modelo)),
+  );
+  if (conEdificio.length <= TOPE_DE_EDIFICIOS_POR_COMARCA) return new Set();
+  const porPrioridad = [...conEdificio].sort(
+    (a, b) => b.habitabilidad - a.habitabilidad || a.sub.q - b.sub.q || a.sub.r - b.sub.r,
+  );
+  return new Set(porPrioridad.slice(TOPE_DE_EDIFICIOS_POR_COMARCA));
 }
 
 /**

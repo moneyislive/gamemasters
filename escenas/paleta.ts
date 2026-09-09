@@ -234,10 +234,60 @@ export function esDeUnColorDeJugador(u: number, v: number): boolean {
  * por lo mismo: un dato que llega de fuera no puede dejar la escena en negro.
  */
 export function saltoAlColor(u: number, color: string): number {
-  const destino = COLUMNA_DEL_COLOR[color] ?? COLUMNA_DEL_COLOR['blue'] ?? 0;
-  const suya = Math.floor(u * COLUMNAS_DEL_ATLAS);
-  return (destino - suya) / COLUMNAS_DEL_ATLAS;
+  return saltoALaColumna(u, columnaDelColor(color));
 }
+
+/** La columna de la fila del color en la que está un color de jugador; uno desconocido, el azul. */
+export function columnaDelColor(color: string): number {
+  return COLUMNA_DEL_COLOR[color] ?? COLUMNA_DEL_COLOR['blue'] ?? 0;
+}
+
+/**
+ * LO QUE HAY QUE SUMARLE A ESTA UV PARA QUE PASE A LA COLUMNA PEDIDA de la fila del color,
+ * venga de la columna que venga. Es `saltoAlColor` sin el nombre del color por medio, y
+ * hace falta desde que el caserío del paisaje se lleva a columnas que NO son de ningún
+ * jugador (`COLUMNAS_DEL_CASERIO`). Cero para un vértice que ya está donde se le pide.
+ */
+export function saltoALaColumna(u: number, columna: number): number {
+  const suya = Math.floor(u * COLUMNAS_DEL_ATLAS);
+  return (columna - suya) / COLUMNAS_DEL_ATLAS;
+}
+
+/**
+ * ═══ LAS TRES COLUMNAS DEL CASERÍO DEL PAISAJE: LOS PARDOS DE LA FILA DEL COLOR ═══
+ *
+ * ═══ EL FALLO, DICHO POR QUIEN JUGABA ═══
+ *
+ * Miguel (9-sep-2026): «las construcciones procedurales tienen los mismos colores que las
+ * de los jugadores y eso confunde bastante; me gustaría que el resto de las construcciones
+ * fueran de otro color: marrón claro, grisáceo, gama de marrones, pero sin ser el mismo
+ * que el marrón de madera». El pueblo del paisaje pintaba sus tejados en las cuatro
+ * columnas de jugador —la casa en el rojo, la iglesia en el azul…— y, teñido del color de
+ * quien fundaba al lado, seguía llevando un color de colono: el de otro, o el propio, que
+ * hace que un pueblo parezca una ciudad de alguien.
+ *
+ * ═══ LO QUE SE ELIGIÓ, MIDIENDO LAS TREINTA Y DOS CELDAS DEL ATLAS ═══
+ *
+ * Las tres columnas de la derecha de la MISMA fila del color, que es lo que permite llevar
+ * un tejado allí con el mismo salto horizontal con el que se tiñe una pieza. Medidas sobre
+ * la tabla compilada del atlas (media de la celda, franja clara, franja oscura), y sus
+ * distancias CIE76 al colono más cercano y a la madera de la celda (6,0), `#995841`:
+ *
+ *     (5,3)  #c5b197  (#decfbb → #ac9273)  L* 73   pardo claro     colono 46,5  madera 36,8
+ *     (6,3)  #978675  (#bbab9a → #736150)  L* 57   pardo grisáceo  colono 45,7  madera 27,7
+ *     (7,3)  #746459  (#998779 → #4f4138)  L* 44   pardo oscuro    colono 45,3  madera 25,7
+ *
+ * Es exactamente la gama que pidió —claro, grisáceo, oscuro— y ninguna es la madera: la
+ * madera es un rojizo saturado y éstas son pardos apagados. La cuarta columna de esa fila,
+ * la (4,3) `#f89946`, es el otro naranja del pack y está a 5,6 del amarillo: no vale, y
+ * `verify:escena` lo afirma para que nadie la meta «porque también es de la fila». Las
+ * distancias se vuelven a medir allí sobre la tabla de verdad; aquí están escritas para
+ * quien lea, no para que nadie se fíe de ellas.
+ *
+ * El tono se elige por COMARCA (`caserio.ts`), no por edificio: cada aldea de su piedra, y
+ * los grupos de dibujo —comarca × modelo— no se multiplican por tres.
+ */
+export const COLUMNAS_DEL_CASERIO: readonly number[] = [5, 6, 7];
 
 /**
  * ═══ EL COLOR DE CADA JUGADOR EN PLANO, Y POR QUÉ HACÍA FALTA MEDIRLO ═══
@@ -279,34 +329,33 @@ export function saltoAlColor(u: number, color: string): number {
  * que la única salida fuera darle a la pieza de jugador algo que el decorado no tuviera.
  * Era falso, y lo falso era el «recompilar»: el color de un edificio son unas UV
  * apuntando a una columna de la fila 3, y llevarlas a otra columna es lo mismo que ya se
- * hacía para fabricar las piezas de los cuatro jugadores desde una sola. Recompilar haría
- * falta para recolorear el decorado ENTERO y de forma FIJA, que es otra cosa y no es ésta:
- * aquí el color depende de quién haya fundado al lado y cambia durante la partida.
+ * hacía para fabricar las piezas de los cuatro jugadores desde una sola.
  *
- * Así que ahora se hacen las DOS cosas, y cada una arregla una mitad distinta:
+ * ═══ Y VOLVIÓ A CAMBIAR (9-sep-2026): EL PAISAJE YA NO LLEVA NINGÚN COLOR DE COLONO ═══
  *
- *   · EL CASERÍO TOMA EL COLOR DE SU DUEÑO. Los edificios del pueblo que caen dentro del
- *     radio de una choza se repintan del color de quien la fundó, moviendo sus UV con
- *     `saltoAlColor`. El reparto vive en `caserio.ts`. Medido sobre doce mundos con la
- *     ocupación máxima —27 chozas—, cada colono se lleva 12,4 edificios de media, 11 de
- *     mediana y 38 en el peor caso: eso es lo que hace que un pueblo diga de quién es desde
- *     el aire, porque lo que se ve grande es el pueblo y no la pieza. Contado en el banco,
- *     alrededor de la choza AZUL los píxeles rojos caen de 234 a 88.
+ * La primera salida fue teñir el pueblo del color de quien fundaba al lado (`caserio.ts`,
+ * con un radio y un desempate). Arreglaba lo que se pidió y dejaba en pie lo siguiente, que
+ * Miguel vio jugando: «las construcciones procedurales tienen los mismos colores que las de
+ * los jugadores y eso confunde bastante». Un pueblo rojo alrededor de una choza roja parece
+ * una ciudad del rojo, y un pueblo rojo lejos de todos parece de alguien. Así que ahora:
  *
- *   · Y LA PIEZA SIGUE LLEVANDO SU ZÓCALO, que ha dejado de ser «lo único que el decorado
- *     no tiene» y ha pasado a ser otra cosa: la señal fina que dice dónde está el VÉRTICE
- *     EXACTO. Hace falta por dos motivos medidos. Uno, que 11 de 324 chozas no tienen NI UN
- *     edificio dentro de su radio —el pueblo de su comarca cayó lejos—, y ésas se quedarían
- *     otra vez sin nada. Y dos, que un pueblo repintado dice de quién es la COMARCA pero no
- *     en cuál de sus tres esquinas está puesta la choza, que es lo que hay que saber para
- *     jugar: un poblado ocupa el 1,27 % del alto de la pantalla, once píxeles en una ventana
- *     de novecientos, y el edificio de adorno más cercano a un vértice está a 18,9 unidades
- *     de mediana, o sea a tres teselas de allí.
+ *   · EL CASERÍO DEL PAISAJE ES PARDO. Sus vértices de color de colono se llevan a una de
+ *     las tres columnas de la derecha de la misma fila —`COLUMNAS_DEL_CASERIO`, medidas
+ *     abajo—, un tono por comarca (`caserio.ts`). Ningún tejado del paisaje comparte téxel
+ *     con ninguna pieza: la distancia mínima a los cuatro colores es 45,3 CIE76, medida.
  *
- * Y ES JUSTO ESO lo que permitió bajarle el volumen a la marca en la misma tanda: mientras
- * era lo único que distinguía, tenía que gritar; ahora que el pueblo hace el trabajo grueso,
- * puede ser un disco translúcido de 25 píxeles en vez de un aro opaco de 42. Lo pinta
- * `delta.tsx` y necesita el color en hexadecimal, que es lo que hay aquí.
+ *   · EL ASENTAMIENTO DEL JUGADOR SÍ SE TIÑE. Las tres casas y el pozo que rodean su choza
+ *     (`asentamiento.ts`) salen del mismo catálogo y siguen yendo al color del dueño con
+ *     `saltoAlColor`, por lo mismo de siempre: un poblado azul con tres casas rojas fue la
+ *     frase con la que llegó el primer encargo.
+ *
+ *   · Y LA PIEZA SIGUE LLEVANDO SU ZÓCALO: la señal fina que dice dónde está el VÉRTICE
+ *     EXACTO. Un poblado ocupa el 1,27 % del alto de la pantalla, once píxeles en una
+ *     ventana de novecientos; sin la marca no se encuentra. La marca se bajó de volumen —un
+ *     disco translúcido de 25 píxeles en vez de un aro opaco de 42— cuando el pueblo teñido
+ *     hacía el trabajo grueso; ahora ese trabajo lo hacen las tres casas teñidas y la
+ *     bandera del asentamiento, y la marca sigue diciendo el vértice. Lo pinta `delta.tsx`
+ *     y necesita el color en hexadecimal, que es lo que hay aquí.
  *
  * ═══ Y POR QUÉ ESTOS SEIS DÍGITOS Y NO OTROS ═══
  *

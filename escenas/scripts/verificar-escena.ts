@@ -53,11 +53,19 @@ import {
   PALETA,
   puntosDeLaCifra,
   saltoAlColor,
+  saltoALaColumna,
+  COLUMNAS_DEL_CASERIO,
   TERRENO_DEL_BIEN,
 } from '../paleta';
-import { EDIFICIOS_DEL_CASERIO, queVaEn } from '../poblar';
-import { duenoDelCaserio, RADIO_DEL_CASERIO } from '../caserio';
-import type { Fundacion } from '../caserio';
+import {
+  EDIFICIOS_DEL_CASERIO,
+  esTierraDeSiembra,
+  podaDelCaserio,
+  queVaEn,
+  TOPE_DE_EDIFICIOS_POR_COMARCA,
+} from '../poblar';
+import { tonoDelCaserio } from '../caserio';
+import { EDIFICIOS_DEL_ASENTAMIENTO } from '../asentamiento';
 import { verticesVecinos } from '../../shared/mecanicas/malla-hexagonal';
 import {
   NOMBRE_QUE_SOBREVIVE,
@@ -9379,29 +9387,32 @@ paso('El zócalo se compra de verdad: disco en la choza, raya en la vereda, cada
 }
 
 // ---------------------------------------------------------------------------
-paso('El caserío toma el color de su dueño: qué casas son de quién, y que el traslado de UV mueve lo suyo y sólo lo suyo');
+paso('El caserío del paisaje es pardo y tiene tope: tres columnas del atlas lejos de los colores de colono, un tono por comarca, como mucho ocho edificios por comarca; y el asentamiento sigue tiñendo lo suyo');
 // ---------------------------------------------------------------------------
 
 /**
  * ═══ QUÉ FALLO VIGILA ESTE BLOQUE ═══
  *
- * El pueblo que `poblar.ts` reparte por las comarcas lleva puestos los cuatro colores de
- * jugador: la casa de adorno es la ROJA del pack —mismo téxel que el tejado del poblado del
- * colono rojo—, la iglesia la azul, la taberna la amarilla y el mercado la verde. Hasta esta
- * tanda eso era decorado ciego, y quien fundaba en azul veía su choza en medio de un pueblo
- * de casas rojas. Ahora el caserío que cae dentro del radio de una choza se repinta del color
- * de su dueño moviendo las UV, igual que las piezas de jugador.
+ * Dos cosas que Miguel vio jugando (9-sep-2026). Una: «las construcciones procedurales tienen
+ * los mismos colores que las de los jugadores y eso confunde bastante» — el pueblo del paisaje
+ * pintaba sus tejados en las cuatro columnas de colono del atlas y, teñido del color de quien
+ * fundaba al lado, seguía llevando un color de alguien. Dos: «he visto tableros con demasiadas
+ * construcciones» — medido, una comarca levantaba 20 edificios de mediana y un tablero 375.
  *
- * Lo que se compra aquí son las tres cosas que no se ven en una captura:
+ * Lo que se compra aquí son las cosas que no se ven en una captura:
  *
- *   1. QUE EL REPARTO ES EL MISMO EN LOS TRES APARATOS. Es una regla geométrica con un
- *      desempate, y un desempate que dependiera del orden de la lista pintaría dos tableros
- *      distintos con los mismos datos.
- *   2. QUE EL TRASLADO MUEVE LO SUYO Y SÓLO LO SUYO. La fila 3 del atlas tiene ocho manchas y
- *      sólo cuatro son de jugador: mover la fila entera repintaría los 41 vértices de la
- *      herrería que están en la columna 4 y los 80 de la ermita que están en la 5.
- *   3. QUE UN TABLERO SIN PIEZAS SIGUE SIENDO EL PAISAJE DE SIEMPRE. Si el reparto se colara
- *      con la lista vacía, el mundo entero saldría de un color antes de empezar la partida.
+ *   1. QUE LOS PARDOS SON PARDOS: medidos sobre la tabla del atlas, lejos de los cuatro colores
+ *      de colono y de la madera; y que la cuarta columna de esa fila, que «también es de la
+ *      fila», NO valdría.
+ *   2. QUE EL TRASLADO LLEVA LO SUYO Y SÓLO LO SUYO a las columnas pardas, sobre las UV de
+ *      verdad del .glb, y que después del traslado ningún vértice del paisaje sigue siendo de
+ *      un color de colono.
+ *   3. QUE EL ASENTAMIENTO SIGUE TIÑENDO LA CASA Y EL POZO del color del dueño, y sólo ésos.
+ *   4. QUE EL TONO ES UNO POR COMARCA, sale de la semilla y es el mismo en los tres aparatos.
+ *   5. QUE EL TOPE SE CUMPLE sobre mundos de verdad, que muerde —sin él la cuenta es la de
+ *      siempre—, y que lo que se poda son las afueras y no el núcleo.
+ *   6. Y QUE LA ESCENA HACE ESO, leído de delta.tsx: el plan no depende de las piezas, los
+ *      grupos del caserío tampoco, y las geometrías pardas se fabrican una vez y se sueltan.
  */
 {
   const nodosDelTablero = (
@@ -9418,327 +9429,107 @@ paso('El caserío toma el color de su dueño: qué casas son de quién, y que el
     hex,
     terreno: TERRENOS_DE_RIBERAS[i % TERRENOS_DE_RIBERAS.length] as string,
   }));
-  const todosLosVerticesDelDelta = verticesDe(hexesDelDelta) as readonly string[];
 
-  // ── 1. El radio: es la apotema, y es la mitad de lo más cerca que caben dos chozas ──
+  // ── 1. Los pardos, medidos contra el atlas ──
 
   /*
-   * NO SE COMPARA CONTRA UN NÚMERO ESCRITO. Se mide sobre la malla de verdad cuál es la menor
-   * distancia entre dos vértices donde se puede fundar a la vez —o sea, no vecinos— y se exige
-   * que el radio sea exactamente su mitad. Así, el día que cambie el radio de la comarca o la
-   * convención de la malla, esto se mueve solo o se cae; escrito como «65,6» se quedaría.
+   * SE MIDE SOBRE LA TABLA COMPILADA, que es la que sube a la GPU y la que
+   * verify:atlas-del-tablero compara píxel a píxel contra el PNG del pack: leer el PNG aquí
+   * sería un tercer camino que nadie compara con los otros dos. La distancia es CIE76, la
+   * misma vara con la que esta casa mide que un zócalo no se come contra su suelo.
    */
-  let masCercaLegal = Infinity;
-  let masCercaVecinos = Infinity;
-  for (const uno of todosLosVerticesDelDelta) {
-    const vecinos = new Set<string>(verticesVecinos(uno as never) as readonly string[]);
-    const a = puntoDeVertice(uno as never, RADIO_DE_COMARCA);
-    for (const otro of todosLosVerticesDelDelta) {
-      if (uno === otro) continue;
-      const b = puntoDeVertice(otro as never, RADIO_DE_COMARCA);
-      const d = Math.hypot(a.x - b.x, a.y - b.y);
-      if (vecinos.has(otro)) masCercaVecinos = Math.min(masCercaVecinos, d);
-      else masCercaLegal = Math.min(masCercaLegal, d);
+  const tablaDelPardo = tablaDelAtlas();
+  const altoDeCelda = ALTO_DEL_ATLAS / FILAS_DEL_ATLAS;
+  const mediaDeLaCelda = (columna: number, fila: number): [number, number, number] => {
+    const suma = [0, 0, 0];
+    for (let y = fila * altoDeCelda; y < (fila + 1) * altoDeCelda; y++) {
+      const i = (y * COLUMNAS_DE_LA_TABLA + columna) * 3;
+      suma[0] += tablaDelPardo[i] as number;
+      suma[1] += tablaDelPardo[i + 1] as number;
+      suma[2] += tablaDelPardo[i + 2] as number;
     }
-  }
-  comprobar(
-    `el radio del caserío (${RADIO_DEL_CASERIO.toFixed(2)}) es EXACTAMENTE la mitad de lo más cerca que caben dos chozas legales (${masCercaLegal.toFixed(2)}): con eso sus discos se tocan y no se solapan`,
-    Math.abs(RADIO_DEL_CASERIO * 2 - masCercaLegal) < 1e-6,
-    { RADIO_DEL_CASERIO, masCercaLegal, masCercaVecinos },
-  );
-  comprobar(
-    `y es la APOTEMA de la comarca (${((RADIO_DE_COMARCA * Math.sqrt(3)) / 2).toFixed(2)}), que es el mismo número por el otro lado de la misma malla`,
-    Math.abs(RADIO_DEL_CASERIO - (RADIO_DE_COMARCA * Math.sqrt(3)) / 2) < 1e-9,
-    RADIO_DEL_CASERIO,
-  );
-  /*
-   * LA VACUNA DEL RADIO: con el radio puesto a la distancia entre vértices VECINOS —que es lo
-   * que pediría quien quisiera un pueblo más grande sin mirar la malla— dos chozas legales sí
-   * se solapan, y entonces hay edificios a tiro de dos dueños. Se afirma que ese radio de
-   * mentira rompe la propiedad, no que la nuestra la cumple: sin esto, «no hay solapes» sería
-   * verde también con el radio a cero.
-   */
-  comprobar(
-    'se ve fallar: con el radio subido a la distancia entre vértices vecinos, dos chozas legales SÍ se solaparían',
-    masCercaVecinos * 2 > masCercaLegal,
-    { masCercaVecinos, masCercaLegal },
-  );
-
-  // ── 2. El reparto sobre mundos de verdad ──
-
-  /** Los edificios del caserío de un mundo, con su sitio en el plano de la malla. */
-  const caserioDelMundo = (semilla: number): Array<{ llave: string; modelo: string; donde: Punto }> => {
-    const relieve = crearRelieve(islasDelDelta, semilla);
-    const salida: Array<{ llave: string; modelo: string; donde: Punto }> = [];
-    for (const isla of islasDelDelta) {
-      for (const t of relieve.subteselasDe(isla.hex)) {
-        if (t.agua === CAUCE || t.agua === CUERPO) continue;
-        if (t.orilla !== 0) continue;
-        for (const puesto of queVaEn(t, isla.terreno)) {
-          if (!EDIFICIOS_DEL_CASERIO.has(puesto.modelo)) continue;
-          salida.push({
-            /* La MISMA llave con la que `delta.tsx` agrupa: la comarca. */
-            llave: `${String(isla.hex.q)},${String(isla.hex.r)}`,
-            modelo: puesto.modelo,
-            donde: { x: t.centro.x + puesto.donde.x, y: t.centro.y + puesto.donde.y },
-          });
-        }
-      }
-    }
-    return salida;
+    return [suma[0] / altoDeCelda, suma[1] / altoDeCelda, suma[2] / altoDeCelda] as [number, number, number];
   };
-
+  const aLab = (c: readonly number[]): [number, number, number] => {
+    const lineal = c.map((v) => {
+      const x = v / 255;
+      return x <= 0.04045 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4;
+    }) as [number, number, number];
+    const [r, g, b] = lineal;
+    const X = (r * 0.4124 + g * 0.3576 + b * 0.1805) / 0.95047;
+    const Y = r * 0.2126 + g * 0.7152 + b * 0.0722;
+    const Z = (r * 0.0193 + g * 0.1192 + b * 0.9505) / 1.08883;
+    const f = (x: number): number => (x > 0.008856 ? Math.cbrt(x) : 7.787 * x + 16 / 116);
+    return [116 * f(Y) - 16, 500 * (f(X) - f(Y)), 200 * (f(Y) - f(Z))];
+  };
+  const cie76 = (a: readonly number[], b: readonly number[]): number => {
+    const p = aLab(a);
+    const q = aLab(b);
+    return Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]);
+  };
+  const enHex = (c: readonly number[]): string =>
+    '#' + c.map((x) => Math.round(x).toString(16).padStart(2, '0')).join('');
+  const FILA_DEL_COLOR = 3;
+  const pardos = COLUMNAS_DEL_CASERIO.map((columna) => ({ columna, rgb: mediaDeLaCelda(columna, FILA_DEL_COLOR) }));
+  const colonos = COLORES_DE_JUGADOR.map((color) => ({
+    color,
+    rgb: mediaDeLaCelda(COLUMNA_DEL_COLOR[color] as number, FILA_DEL_COLOR),
+  }));
+  const madera = mediaDeLaCelda(6, 0);
+  const alColonoMasCercano = (rgb: readonly number[]): number => Math.min(...colonos.map((c) => cie76(rgb, c.rgb)));
   /*
-   * LA OCUPACIÓN MÁXIMA: todas las chozas que caben en el delta respetando la regla de
-   * distancia. Es el peor caso para el reparto —el que más disputas tendría y el que más
-   * geometrías teñidas fabrica— y por eso se mide con ése y no con dos colonos.
+   * LAS VARAS: cuarenta al colono y veinte a la madera. Medidos: 45,3 y 25,7 en el peor pardo.
+   * Cuarenta es el doble del umbral con el que esta casa dice que una superficie NO se come
+   * una pieza (20): no es «se distingue si te fijas», es «no se confunde». La madera no es un
+   * colono y no hay que apartarse tanto: lo que Miguel pidió es que no fuera EL MISMO marrón.
    */
-  const laOcupacionMaxima: string[] = [];
-  for (const v of todosLosVerticesDelDelta) {
-    if ((verticesVecinos(v as never) as readonly string[]).some((n) => laOcupacionMaxima.includes(n))) continue;
-    laOcupacionMaxima.push(v);
-  }
-  const fundadasDelMaximo: Fundacion[] = laOcupacionMaxima.map((v, i) => ({
-    vertice: v,
-    color: COLORES_DE_JUGADOR[i % COLORES_DE_JUGADOR.length] as string,
-    punto: puntoDeVertice(v as never, RADIO_DE_COMARCA),
+  const SEPARACION_DE_UN_COLONO = 40;
+  const SEPARACION_DE_LA_MADERA = 20;
+  comprobar(
+    `las columnas del caserío son tres, distintas, de la fila del color y ninguna de un colono: ${COLUMNAS_DEL_CASERIO.join(', ')}`,
+    COLUMNAS_DEL_CASERIO.length === 3 &&
+      new Set(COLUMNAS_DEL_CASERIO).size === 3 &&
+      COLUMNAS_DEL_CASERIO.every(
+        (c) => Number.isInteger(c) && c >= 0 && c < COLUMNAS_DEL_ATLAS && !COLUMNAS_DE_JUGADOR.has(c),
+      ),
+    [...COLUMNAS_DEL_CASERIO],
+  );
+  const lejos = pardos.map((p) => ({
+    columna: p.columna,
+    hex: enHex(p.rgb),
+    colono: alColonoMasCercano(p.rgb),
+    madera: cie76(p.rgb, madera),
   }));
   comprobar(
-    `en el delta de radio 2 caben ${String(laOcupacionMaxima.length)} chozas legales, que es el peor caso con el que se mide todo lo de abajo`,
-    laOcupacionMaxima.length === 27,
-    laOcupacionMaxima.length,
+    `cada pardo se separa del colono más cercano por lo menos ${String(SEPARACION_DE_UN_COLONO)} CIE76 y de la madera (6,0) por lo menos ${String(SEPARACION_DE_LA_MADERA)} — medido: ${lejos.map((p) => `${p.hex} colono ${p.colono.toFixed(1)} madera ${p.madera.toFixed(1)}`).join(', ')}: ni el mismo téxel ni uno parecido`,
+    lejos.every((p) => p.colono >= SEPARACION_DE_UN_COLONO && p.madera >= SEPARACION_DE_LA_MADERA),
+    lejos,
+  );
+  const elOtroNaranja = mediaDeLaCelda(4, FILA_DEL_COLOR);
+  comprobar(
+    `se ve fallar: la columna 4 de esa misma fila —el otro naranja del pack, ${enHex(elOtroNaranja)}— está a ${alColonoMasCercano(elOtroNaranja).toFixed(1)} del colono más cercano y el juez la rechaza: «también es de la fila» no basta`,
+    alColonoMasCercano(elOtroNaranja) < SEPARACION_DE_UN_COLONO,
+    alColonoMasCercano(elOtroNaranja),
+  );
+  const entrePardos = pardos.flatMap((a, i) => pardos.slice(i + 1).map((b) => cie76(a.rgb, b.rgb)));
+  comprobar(
+    `y los tres se distinguen entre sí —claro, grisáceo, oscuro—: ${Math.min(...entrePardos).toFixed(1)} CIE76 en el par más cercano, una gama y no un solo pardo`,
+    entrePardos.length === 3 && Math.min(...entrePardos) >= 10,
+    entrePardos,
   );
 
-  const SEMILLAS_DEL_CASERIO = 12;
-  let edificiosMedidos = 0;
-  let repintados = 0;
-  let disputados = 0;
-  let disputadosConVecinos = 0;
-  let discrepanciasDeOrden = 0;
-  const porChozaYMundo = new Map<string, number>();
-  const alReves = [...fundadasDelMaximo].reverse();
-  /* Las chozas de doce vértices SEGUIDOS, o sea vecinos: lo que daría un juego sin regla de distancia. */
-  const pegadas: Fundacion[] = todosLosVerticesDelDelta.slice(0, 12).map((v, i) => ({
-    vertice: v,
-    color: COLORES_DE_JUGADOR[i % COLORES_DE_JUGADOR.length] as string,
-    punto: puntoDeVertice(v as never, RADIO_DE_COMARCA),
-  }));
-  for (let semilla = 0; semilla < SEMILLAS_DEL_CASERIO; semilla++) {
-    for (const v of laOcupacionMaxima) porChozaYMundo.set(`${String(semilla)}|${v}`, 0);
-    for (const edificio of caserioDelMundo(semilla)) {
-      edificiosMedidos++;
-      const dueno = duenoDelCaserio(edificio.donde, fundadasDelMaximo);
-      if (dueno !== null) {
-        repintados++;
-        const cual = `${String(semilla)}|${dueno.vertice}`;
-        porChozaYMundo.set(cual, (porChozaYMundo.get(cual) ?? 0) + 1);
-      }
-      /* ¿Está a tiro de dos? Eso es lo que el radio promete que no pasa. */
-      const aTiro = fundadasDelMaximo.filter(
-        (f) => Math.hypot(edificio.donde.x - f.punto.x, edificio.donde.y - f.punto.y) <= RADIO_DEL_CASERIO,
-      ).length;
-      if (aTiro > 1) disputados++;
-      const conVecinos = pegadas.filter(
-        (f) => Math.hypot(edificio.donde.x - f.punto.x, edificio.donde.y - f.punto.y) <= RADIO_DEL_CASERIO,
-      ).length;
-      if (conVecinos > 1) disputadosConVecinos++;
-      /* Y el mismo edificio con la lista al revés tiene que salir del mismo dueño. */
-      const otro = duenoDelCaserio(edificio.donde, alReves);
-      if ((dueno === null) !== (otro === null) || (dueno !== null && otro !== null && dueno.vertice !== otro.vertice)) {
-        discrepanciasDeOrden++;
-      }
-    }
-  }
-  comprobar(
-    `se han medido ${String(edificiosMedidos)} edificios de caserío en ${String(SEMILLAS_DEL_CASERIO)} mundos: si esto fuera cero, todo lo de abajo pasaría por vacío`,
-    edificiosMedidos > 3000,
-    edificiosMedidos,
-  );
-  comprobar(
-    `con la ocupación máxima NINGÚN edificio queda a tiro de dos chozas: ${String(disputados)} de ${String(edificiosMedidos)}`,
-    disputados === 0,
-    { disputados, edificiosMedidos },
-  );
-  /*
-   * LA VACUNA DEL SOLAPE: con las chozas puestas en vértices VECINOS —ilegal en Riberas, pero
-   * la escena pinta el delta que le manden— sí hay edificios a tiro de dos, y ahí es donde la
-   * regla de cercanía y su desempate hacen falta de verdad. Sin esta comprobación, «cero
-   * disputas» sería verde aunque `duenoDelCaserio` no supiera resolver ninguna.
-   */
-  comprobar(
-    `se ve fallar: con las chozas en vértices vecinos hay ${String(disputadosConVecinos)} edificios a tiro de dos, y ahí la regla de cercanía es la que decide`,
-    disputadosConVecinos > 0,
-    disputadosConVecinos,
-  );
-  comprobar(
-    `el reparto NO depende del orden de la lista: los ${String(edificiosMedidos)} edificios dan el mismo dueño con las fundaciones al derecho y al revés`,
-    discrepanciasDeOrden === 0,
-    discrepanciasDeOrden,
-  );
+  // ── 2. El traslado sobre las UV de verdad ──
 
   /*
-   * SE CUENTA POR MUNDO Y POR CHOZA, no sumando los doce mundos: sumados, la media saldría doce
-   * veces mayor y la comprobación de «ninguna se queda sin pueblo» daría cero siempre, porque
-   * basta con que UNO de los doce le diera casas. Lo que hay que saber es cuántas tiene una
-   * choza en UN tablero.
-   */
-  const cuantasPorChoza = [...porChozaYMundo.values()].sort((a, b) => a - b);
-  const mediaPorChoza = cuantasPorChoza.reduce((a, b) => a + b, 0) / cuantasPorChoza.length;
-  const sinNinguna = cuantasPorChoza.filter((n) => n === 0).length;
-  /*
-   * ═══ EL NÚMERO QUE DECIDIÓ EL RADIO, ESCRITO PARA QUE NO SE PUEDA BAJAR A CIEGAS ═══
+   * ═══ LA LISTA DE EDIFICIOS SE DERIVA DE poblar.ts Y NO SE ESCRIBE ═══
    *
-   * Con la mitad de la distancia entre vértices vecinos —37,9, el candidato cómodo— la media
-   * caía a 4,4 y 40 de 324 chozas se quedaban sin UNA sola casa de su color; contado en el
-   * banco, los píxeles rojos alrededor de la choza azul sólo bajaban un 43 % y quedaban dos
-   * tejados rojos pegados a la pieza. Con éste la media es 12,4 y bajan un 62 %. Se exige el
-   * rango, no el número exacto: lo que no puede pasar es que el pueblo de alguien sea una
-   * casa suelta.
+   * EDIFICIOS_DEL_CASERIO sale de PUEBLO y OFICIO unidos. Son CATORCE, y los dieciséis que
+   * el bloque de arriba mide contra el atlas incluyen dos que no planta nadie (acena, vigia).
+   * Escrita a mano, un edificio nuevo en PUEBLO se quedaría rojo en mitad del paisaje;
+   * derivada, entra solo.
    */
   comprobar(
-    `cada choza se lleva ${mediaPorChoza.toFixed(1)} edificios de media (mediana ${String(cuantasPorChoza[Math.floor(cuantasPorChoza.length / 2)])}, máximo ${String(cuantasPorChoza[cuantasPorChoza.length - 1])}) — un pueblo, no una casa suelta`,
-    mediaPorChoza >= 8 && mediaPorChoza <= 20,
-    { mediaPorChoza, sinNinguna, de: cuantasPorChoza.length },
-  );
-  comprobar(
-    `${String(sinNinguna)} de ${String(cuantasPorChoza.length)} chozas no se llevan ninguna —el pueblo de su comarca cae lejos— y ésas se quedan sólo con su zócalo: por eso el zócalo no sobra`,
-    sinNinguna > 0 && sinNinguna < cuantasPorChoza.length / 4,
-    { sinNinguna, de: cuantasPorChoza.length },
-  );
-  comprobar(
-    `se repintan ${String(repintados)} de ${String(edificiosMedidos)} edificios en el peor caso: ni ninguno ni todos`,
-    repintados > edificiosMedidos * 0.5 && repintados < edificiosMedidos,
-    { repintados, edificiosMedidos },
-  );
-  /*
-   * ═══ EL PRECIO EN GRUPOS DE DIBUJO, QUE ES LO QUE SE PAGA EN EL MÓVIL ═══
-   *
-   * `delta.tsx` agrupa el caserío por comarca y modelo —`${llave}|${modelo}`— y cada grupo se
-   * dibuja de una vez. Teñir mete el COLOR en esa llave, así que un pueblo con dos dueños
-   * distintos dentro de la misma comarca pasa a ser dos grupos donde había uno. Ése es todo el
-   * coste del arreglo, y hasta ahora no lo compraba nadie: en la cabecera de `caserio.ts` había
-   * un número escrito («129,5 pasan a 221») que era el PEOR de los doce mundos puesto donde se
-   * lee la media, y nadie lo iba a notar porque ninguna comprobación lo tocaba.
-   *
-   * Se rehace aquí con la misma llave que usa la escena, sobre los mismos doce mundos y con la
-   * ocupación máxima —27 chozas de cuatro colores, que es el peor caso—. Y se afirman las dos
-   * cosas que importan, porque cada una tapa un fallo distinto:
-   *
-   *   · que SUBE. Si no subiera, el color no estaría entrando en la llave y no se estaría
-   *     repintando nada — que es la clase de cero que se lee como vigilado.
-   *   · que NO se multiplica por los cuatro colores. Lo que lo impide es que la tabla teñida sea
-   *     una por COLOR y no una por choza: con un grupo por fundación —que es lo que sale de
-   *     teñir dentro de cada asentamiento— la cuenta se va a 228,2.
-   */
-  const laLlaveDeLaComarca = (semilla: number, porFundacion: boolean, quienes: Fundacion[]): number => {
-    const grupos = new Set<string>();
-    for (const edificio of caserioDelMundo(semilla)) {
-      const dueno = duenoDelCaserio(edificio.donde, quienes);
-      const nombre =
-        dueno === null
-          ? edificio.modelo
-          : `${edificio.modelo}-${porFundacion ? dueno.vertice : dueno.color}`;
-      grupos.add(`${edificio.llave}|${nombre}`);
-    }
-    return grupos.size;
-  };
-  let gruposSinPiezas = 0;
-  let gruposConCuatro = 0;
-  let gruposPorFundacion = 0;
-  let elPeorMundo = 0;
-  for (let semilla = 0; semilla < SEMILLAS_DEL_CASERIO; semilla++) {
-    gruposSinPiezas += laLlaveDeLaComarca(semilla, false, []);
-    const conCuatro = laLlaveDeLaComarca(semilla, false, fundadasDelMaximo);
-    gruposConCuatro += conCuatro;
-    elPeorMundo = Math.max(elPeorMundo, conCuatro);
-    gruposPorFundacion += laLlaveDeLaComarca(semilla, true, fundadasDelMaximo);
-  }
-  const mediaSinPiezas = gruposSinPiezas / SEMILLAS_DEL_CASERIO;
-  const mediaConCuatro = gruposConCuatro / SEMILLAS_DEL_CASERIO;
-  const mediaPorFundacion = gruposPorFundacion / SEMILLAS_DEL_CASERIO;
-  /** El mismo juez para los tres casos: sube, pero no se multiplica por los colores. */
-  const cabeElPrecio = (media: number): boolean =>
-    mediaSinPiezas > 0 && media > mediaSinPiezas * 1.2 && media < mediaSinPiezas * 1.7;
-  comprobar(
-    `el precio de teñir el caserío está acotado y medido: ${mediaSinPiezas.toFixed(1)} grupos de dibujo de media pasan a ${mediaConCuatro.toFixed(1)} con cuatro colores jugando —un ${(((mediaConCuatro / mediaSinPiezas) - 1) * 100).toFixed(0)} % más, y ${String(elPeorMundo)} en el peor de los ${String(SEMILLAS_DEL_CASERIO)} mundos—, no por cuatro`,
-    cabeElPrecio(mediaConCuatro),
-    { mediaSinPiezas, mediaConCuatro, elPeorMundo },
-  );
-  comprobar(
-    `se ve fallar por los dos lados, y con el mismo juez: sin el color en la llave la cuenta se queda en ${mediaSinPiezas.toFixed(1)} —no se estaría repintando nada— y con un grupo por FUNDACIÓN en vez de por color se va a ${mediaPorFundacion.toFixed(1)}; el juez rechaza las dos y sólo acepta la de verdad`,
-    !cabeElPrecio(mediaSinPiezas) && !cabeElPrecio(mediaPorFundacion) && cabeElPrecio(mediaConCuatro),
-    { mediaSinPiezas, mediaConCuatro, mediaPorFundacion, techo: mediaSinPiezas * 1.7 },
-  );
-
-
-  // ── 3. Sin piezas no se repinta nada, y fuera del radio tampoco ──
-
-  /*
-   * EL PAISAJE DE SIEMPRE. Es la mitad que se olvida: un tablero recién repartido —o el de un
-   * juego que no tenga piezas de color— tiene que salir exactamente igual que antes de esta
-   * tanda. Se comprueba sobre los edificios de verdad, no sobre uno inventado.
-   */
-  const conListaVacia = caserioDelMundo(3).filter((e) => duenoDelCaserio(e.donde, []) !== null);
-  comprobar(
-    'sin ninguna choza fundada NINGÚN edificio tiene dueño: el tablero sin piezas sigue teniendo su caserío rojo de siempre',
-    conListaVacia.length === 0,
-    conListaVacia.length,
-  );
-  const unaChoza: Fundacion[] = [{ vertice: 'v:a', color: 'blue', punto: { x: 0, y: 0 } }];
-  comprobar(
-    'un edificio justo fuera del radio no es de nadie, y justo dentro sí: el corte está donde dice',
-    duenoDelCaserio({ x: RADIO_DEL_CASERIO + 0.01, y: 0 }, unaChoza) === null &&
-      duenoDelCaserio({ x: RADIO_DEL_CASERIO - 0.01, y: 0 }, unaChoza) !== null,
-    RADIO_DEL_CASERIO,
-  );
-
-  // ── 4. El empate, que con las reglas de Riberas no pasa pero está escrito ──
-
-  /*
-   * DOS CHOZAS A LA MISMA DISTANCIA EXACTA. No se puede provocar con la malla —los discos de
-   * dos chozas legales se tocan y no se solapan— así que se provoca a mano, que es lo que hace
-   * falta para SABER qué hace la rama. Se pide las dos veces con la lista en orden distinto: si
-   * el desempate fuera «la primera que encuentre», estas dos llamadas darían dueños distintos y
-   * el mismo tablero se pintaría de dos maneras.
-   */
-  const empatadas: Fundacion[] = [
-    { vertice: 'v:zzz', color: 'red', punto: { x: -10, y: 0 } },
-    { vertice: 'v:aaa', color: 'blue', punto: { x: 10, y: 0 } },
-  ];
-  const enUnOrden = duenoDelCaserio({ x: 0, y: 0 }, empatadas);
-  const enElOtro = duenoDelCaserio({ x: 0, y: 0 }, [...empatadas].reverse());
-  comprobar(
-    'con dos chozas a la misma distancia exacta gana la de la llave menor, y da lo mismo en los dos órdenes de la lista',
-    enUnOrden !== null && enElOtro !== null && enUnOrden.vertice === 'v:aaa' && enElOtro.vertice === 'v:aaa',
-    { enUnOrden: enUnOrden?.vertice, enElOtro: enElOtro?.vertice },
-  );
-  /*
-   * Y LA VACUNA DEL DESEMPATE: movida una de las dos un pelo, gana la CERCANÍA y no la llave.
-   * Sin esto, un `duenoDelCaserio` que devolviera siempre la de llave menor —ignorando la
-   * distancia— pasaría la comprobación de arriba.
-   */
-  const casiEmpatadas: Fundacion[] = [
-    { vertice: 'v:zzz', color: 'red', punto: { x: -9, y: 0 } },
-    { vertice: 'v:aaa', color: 'blue', punto: { x: 10, y: 0 } },
-  ];
-  comprobar(
-    'se ve fallar: apartando una de las dos un pelo, gana la CERCANÍA y no la llave',
-    duenoDelCaserio({ x: 0, y: 0 }, casiEmpatadas)?.vertice === 'v:zzz',
-    duenoDelCaserio({ x: 0, y: 0 }, casiEmpatadas)?.vertice,
-  );
-
-  // ── 5. El traslado de UV: mueve lo suyo, y sólo lo suyo ──
-
-  /*
-   * ═══ LA LISTA DE EDIFICIOS SE DERIVA DE `poblar.ts` Y NO SE ESCRIBE ═══
-   *
-   * `EDIFICIOS_DEL_CASERIO` sale de `PUEBLO` y `OFICIO` unidos. Son CATORCE, y los dieciséis que
-   * el bloque de arriba mide contra el atlas incluyen dos que no planta nadie (`acena`, `vigia`).
-   * Escrita a mano, un edificio nuevo en `PUEBLO` se quedaría rojo dentro del pueblo de un
-   * jugador azul; derivada, entra solo.
-   */
-  comprobar(
-    `los edificios que se repintan salen de poblar.ts y son ${String(EDIFICIOS_DEL_CASERIO.size)}: la lista no está escrita a mano`,
+    `los edificios que se llevan a pardo salen de poblar.ts y son ${String(EDIFICIOS_DEL_CASERIO.size)}: la lista no está escrita a mano`,
     EDIFICIOS_DEL_CASERIO.size === 14 &&
       EDIFICIOS_DEL_CASERIO.has('casa') &&
       EDIFICIOS_DEL_CASERIO.has('mercado') &&
@@ -9751,7 +9542,7 @@ paso('El caserío toma el color de su dueño: qué casas son de quién, y que el
     [...EDIFICIOS_DEL_CASERIO].filter((n) => !nodosDelTablero.some((x) => x.getName() === n)),
   );
 
-  /** Las UV de un modelo dentro del `.glb`, todas, sin filtrar. */
+  /** Las UV de un modelo dentro del .glb, todas, sin filtrar. */
   const uvDe = (nombre: string): Array<[number, number]> => {
     const nodo = nodosDelTablero.find((n) => n.getName() === nombre);
     const salida: Array<[number, number]> = [];
@@ -9773,10 +9564,10 @@ paso('El caserío toma el color de su dueño: qué casas son de quién, y que el
   };
 
   /*
-   * ═══ UNA SOLA COLUMNA DE JUGADOR POR EDIFICIO, QUE ES LO QUE HACE EL TRASLADO POSIBLE ═══
+   * ═══ UNA SOLA COLUMNA DE COLONO POR EDIFICIO, QUE ES LO QUE HACE EL TRASLADO POSIBLE ═══
    *
    * El salto se calcula por vértice desde la columna en la que ese vértice está. Si un edificio
-   * pintara en DOS de las cuatro columnas de jugador —tejado rojo y puerta amarilla, pongamos—
+   * pintara en DOS de las cuatro columnas de colono —tejado rojo y puerta amarilla, pongamos—
    * las dos irían a parar a la misma celda y el edificio saldría de un color plano. Medido: los
    * catorce pintan en una sola. La herrería, el taller y la ermita tienen ADEMÁS vértices en las
    * columnas 4 y 5 de esa misma fila, que no son de nadie y no se tocan — ver abajo.
@@ -9785,7 +9576,7 @@ paso('El caserío toma el color de su dueño: qué casas son de quién, y que el
     .map((nombre) => {
       const cuantas = new Map<number, number>();
       for (const [u, v] of uvDe(nombre)) {
-        if (Math.floor(v * FILAS_DEL_ATLAS) !== 3) continue;
+        if (Math.floor(v * FILAS_DEL_ATLAS) !== FILA_DEL_COLOR) continue;
         const columna = Math.floor(u * COLUMNAS_DEL_ATLAS);
         if (!COLUMNAS_DE_JUGADOR.has(columna)) continue;
         cuantas.set(columna, (cuantas.get(columna) ?? 0) + 1);
@@ -9794,7 +9585,7 @@ paso('El caserío toma el color de su dueño: qué casas son de quién, y que el
     })
     .filter(({ suyas }) => suyas.length !== 1);
   comprobar(
-    'cada edificio del caserío pinta su color de jugador en UNA sola de las cuatro columnas: con dos, el traslado sería ambiguo y el edificio saldría de un color plano',
+    'cada edificio del caserío pinta su color de colono en UNA sola de las cuatro columnas: con dos, el traslado sería ambiguo y el edificio saldría de un color plano',
     conDosColumnas.length === 0,
     conDosColumnas.map(
       (c) => `${c.nombre}: ${c.suyas.map(([col, n]) => `columna ${String(col)} × ${String(n)}`).join(', ')}`,
@@ -9802,38 +9593,43 @@ paso('El caserío toma el color de su dueño: qué casas son de quién, y que el
   );
 
   /*
-   * ═══ Y EL TRASLADO, HECHO SOBRE LAS UV DE VERDAD ═══
+   * ═══ EL TRASLADO A PARDO, HECHO SOBRE LAS UV DE VERDAD ═══
    *
-   * Se recorren los vértices de cada edificio dentro del `.glb`, se les aplica `saltoAlColor` y
-   * se comprueba que TODOS los que llevaban un color de jugador acaban en la columna del color
-   * pedido — y que ninguno de los otros se ha movido un solo téxel.
+   * Se recorren los vértices de cada edificio dentro del .glb, se les aplica saltoALaColumna
+   * y se comprueba que TODOS los que llevaban un color de colono acaban en la columna parda
+   * pedida, para las tres; y que ninguno de los otros se ha movido un solo téxel.
    */
   const malLlevados: string[] = [];
   let verticesTrasladados = 0;
   for (const nombre of EDIFICIOS_DEL_CASERIO) {
     const suyas = uvDe(nombre);
-    for (const color of COLORES_DE_JUGADOR) {
-      const destino = COLUMNA_DEL_COLOR[color] as number;
+    for (const columna of COLUMNAS_DEL_CASERIO) {
       for (const [u, v] of suyas) {
         if (!esDeUnColorDeJugador(u, v)) continue;
         verticesTrasladados++;
-        const llega = Math.floor((u + saltoAlColor(u, color)) * COLUMNAS_DEL_ATLAS);
-        if (llega !== destino) malLlevados.push(`${nombre}/${color}: llega a ${String(llega)}`);
+        const llega = Math.floor((u + saltoALaColumna(u, columna)) * COLUMNAS_DEL_ATLAS);
+        if (llega !== columna) malLlevados.push(`${nombre}/${String(columna)}: llega a ${String(llega)}`);
       }
     }
   }
   comprobar(
-    `los ${String(verticesTrasladados)} vértices de color de los catorce edificios acaban EXACTAMENTE en la columna del color pedido, para los cuatro colores`,
+    `los ${String(verticesTrasladados)} vértices de color de los catorce edificios acaban EXACTAMENTE en la columna parda pedida, para las tres columnas`,
     verticesTrasladados > 0 && malLlevados.length === 0,
     [...new Set(malLlevados)],
+  );
+  const laFilaDelColor = (FILA_DEL_COLOR + 0.5) / FILAS_DEL_ATLAS;
+  comprobar(
+    'y después del traslado ya no son de ningún colono: esDeUnColorDeJugador dice que no a las tres columnas pardas, así que pedir el pardo dos veces no mueve nada',
+    COLUMNAS_DEL_CASERIO.every((c) => !esDeUnColorDeJugador((c + 0.5) / COLUMNAS_DEL_ATLAS, laFilaDelColor)),
+    [...COLUMNAS_DEL_CASERIO],
   );
 
   /*
    * ═══ Y LO QUE SE QUEDA QUIETO, QUE ES LA MITAD QUE NO SE VE ═══
    *
-   * La guarda del traslado es `esDeUnColorDeJugador`, así que lo que hay que medir es que esa
+   * La guarda del traslado es esDeUnColorDeJugador, así que lo que hay que medir es que esa
    * guarda dice que NO a los vértices de la fila del color que están en las cuatro columnas de
-   * la derecha. Son pocos y son concretos —medidos sobre el `.glb`— y por eso se nombran uno a
+   * la derecha. Son pocos y son concretos —medidos sobre el .glb— y por eso se nombran uno a
    * uno: si el pack los moviera de sitio, esto se pone rojo y le cuenta a quien lo lea que hay
    * edificios con dos manchas en esa fila.
    */
@@ -9844,26 +9640,20 @@ paso('El caserío toma el color de su dueño: qué casas son de quién, y que el
   ];
   const quietosMalContados = LOS_QUE_NO_SON_DE_NADIE.filter(([nombre, columna, cuantos]) => {
     const enEsaColumna = uvDe(nombre).filter(
-      ([u, v]) => Math.floor(v * FILAS_DEL_ATLAS) === 3 && Math.floor(u * COLUMNAS_DEL_ATLAS) === columna,
+      ([u, v]) => Math.floor(v * FILAS_DEL_ATLAS) === FILA_DEL_COLOR && Math.floor(u * COLUMNAS_DEL_ATLAS) === columna,
     );
     return enEsaColumna.length !== cuantos || enEsaColumna.some(([u, v]) => esDeUnColorDeJugador(u, v));
   });
   comprobar(
-    'ningún vértice que NO sea de un color de jugador entra en el traslado: los 41 de la herrería y los 18 del taller en la columna 4, y los 80 de la ermita en la 5, siguen ahí y la guarda dice que no a los tres',
+    'ningún vértice que NO sea de un color de colono entra en el traslado: los 41 de la herrería y los 18 del taller en la columna 4, y los 80 de la ermita en la 5, siguen ahí y la guarda dice que no a los tres',
     quietosMalContados.length === 0,
     quietosMalContados.map(([n]) => n),
   );
-  /*
-   * LA VACUNA DEL TRASLADO: `esDeUnColorDeJugador` tiene que decir que NO a las cuatro columnas
-   * de la derecha de esa misma fila. Sin ella, «no se mueve lo que no es suyo» sería verde con
-   * una función que dijera que no a todo — y entonces tampoco se movería lo que sí es.
-   */
-  const laFilaDelColor = 3.5 / FILAS_DEL_ATLAS;
   const columnasQueAcepta = [0, 1, 2, 3, 4, 5, 6, 7].filter((c) =>
     esDeUnColorDeJugador((c + 0.5) / COLUMNAS_DEL_ATLAS, laFilaDelColor),
   );
   comprobar(
-    'se ve fallar: esDeUnColorDeJugador acepta las cuatro columnas de jugador de la fila 3 y rechaza las otras cuatro',
+    'se ve fallar: esDeUnColorDeJugador acepta las cuatro columnas de colono de la fila 3 y rechaza las otras cuatro',
     columnasQueAcepta.join(',') === '0,1,2,3',
     columnasQueAcepta,
   );
@@ -9876,12 +9666,20 @@ paso('El caserío toma el color de su dueño: qué casas son de quién, y que el
     otrasFilas,
   );
 
+  // ── 3. El asentamiento sigue tiñendo lo suyo ──
+
+  comprobar(
+    `los edificios del caserío que el asentamiento tiñe del color del dueño son ${[...EDIFICIOS_DEL_ASENTAMIENTO].join(' y ')}: derivados de asentamiento.ts, dentro del caserío, y dos`,
+    EDIFICIOS_DEL_ASENTAMIENTO.size === 2 &&
+      EDIFICIOS_DEL_ASENTAMIENTO.has('casa') &&
+      EDIFICIOS_DEL_ASENTAMIENTO.has('pozo') &&
+      [...EDIFICIOS_DEL_ASENTAMIENTO].every((m) => EDIFICIOS_DEL_CASERIO.has(m)),
+    [...EDIFICIOS_DEL_ASENTAMIENTO],
+  );
   /*
-   * ═══ EL OBJETIVO, MEDIDO: LA CASA DEL AZUL ACABA EN EL TÉXEL DEL POBLADO DEL AZUL ═══
-   *
-   * Es la frase con la que llegó el encargo, vuelta comprobación: después del traslado, el
-   * tejado de una casa del caserío de un colono y el tejado de su poblado son EL MISMO TÉXEL
-   * —distancia cero— y están a la distancia declarada de los otros tres colores.
+   * LA CASA DEL AZUL ACABA EN EL TÉXEL DEL POBLADO DEL AZUL: la frase con la que llegó el
+   * primer encargo, vuelta comprobación. Después del traslado, el tejado de una casa del
+   * asentamiento de un colono y el tejado de su poblado son EL MISMO TÉXEL.
    */
   const columnaTrasElSalto = (nombre: string, color: string): number | null => {
     for (const [u, v] of uvDe(nombre)) {
@@ -9894,7 +9692,7 @@ paso('El caserío toma el color de su dueño: qué casas son de quién, y que el
     (color) => columnaTrasElSalto('casa', color) !== columnaTrasElSalto('poblado', color),
   );
   comprobar(
-    'después del traslado, la casa del caserío de un colono apunta a la MISMA columna del atlas que su poblado: el tejado de su pueblo y el de su choza son el mismo téxel',
+    'después del traslado, la casa del asentamiento de un colono apunta a la MISMA columna del atlas que su poblado: el tejado de su casa y el de su choza son el mismo téxel',
     desalineados.length === 0 && columnaTrasElSalto('casa', 'blue') !== null,
     desalineados,
   );
@@ -9909,12 +9707,137 @@ paso('El caserío toma el color de su dueño: qué casas son de quién, y que el
     cruzadosDelCaserio,
   );
 
-  // ── 6. Lo que la escena hace con esto, leído del texto de `delta.tsx` ──
+  // ── 4. El tono por comarca, sobre mundos de verdad ──
+
+  const SEMILLAS_DEL_CASERIO = 12;
+  const tonosPorMundo = Array.from({ length: SEMILLAS_DEL_CASERIO }, (_, semilla) =>
+    islasDelDelta.map((isla) => tonoDelCaserio(isla.hex, semilla)),
+  );
+  const fueraDeLosPardos = tonosPorMundo.flat().filter((tono) => !COLUMNAS_DEL_CASERIO.includes(tono));
+  comprobar(
+    `el tono de cada comarca es una de las tres columnas pardas, en ${String(SEMILLAS_DEL_CASERIO)} mundos y ${String(islasDelDelta.length)} comarcas`,
+    fueraDeLosPardos.length === 0,
+    fueraDeLosPardos,
+  );
+  const deUnSoloPardo = tonosPorMundo.filter((tonos) => new Set(tonos).size < 2).length;
+  comprobar(
+    'en esos mundos salen los tres pardos, y ninguno es de un solo pardo: cada aldea de su piedra, y una gama',
+    new Set(tonosPorMundo.flat()).size === 3 && deUnSoloPardo === 0,
+    { distintos: [...new Set(tonosPorMundo.flat())], deUnSoloPardo },
+  );
+  const otraVez = islasDelDelta.map((isla) => tonoDelCaserio(isla.hex, 0));
+  const cambianConLaSemilla = islasDelDelta.filter((_, i) => tonosPorMundo[0]?.[i] !== tonosPorMundo[1]?.[i]).length;
+  comprobar(
+    `el reparto es determinista —el mismo mundo da lo mismo dos veces— y depende de la semilla: ${String(cambianConLaSemilla)} de ${String(islasDelDelta.length)} comarcas cambian de pardo entre la semilla 0 y la 1`,
+    otraVez.every((tono, i) => tono === tonosPorMundo[0]?.[i]) && cambianConLaSemilla > 0,
+    cambianConLaSemilla,
+  );
+
+  // ── 5. El tope, sobre mundos de verdad ──
 
   /*
-   * Por lo de siempre: dentro de un componente con `useMemo` y JSX no entra un guion de Node, y
+   * SE RECORRE COMO LO RECORRE LA ESCENA: las teselas de siembra son las de poblar.ts
+   * (esTierraDeSiembra), la poda se calcula sobre ésas, y se planta con queVaEn y su tercer
+   * argumento. Sin caminos, porque aquí no hay red; la escena además salta los suyos.
+   */
+  interface ComarcaMedida {
+    sinPoda: number;
+    conPoda: number;
+    podadas: number;
+    /** La habitabilidad más baja de lo que se queda con edificio, y la más alta de lo podado. */
+    quedaMinima: number;
+    podadaMaxima: number;
+  }
+  const medirElMundo = (semilla: number): ComarcaMedida[] => {
+    const relieve = crearRelieve(islasDelDelta, semilla);
+    return islasDelDelta.map((isla) => {
+      const teselas = relieve.subteselasDe(isla.hex).filter((t) => esTierraDeSiembra(t));
+      const podadas = podaDelCaserio(teselas, isla.terreno);
+      let sinPoda = 0;
+      let conPoda = 0;
+      let quedaMinima = Infinity;
+      let podadaMaxima = -Infinity;
+      for (const t of teselas) {
+        const levanta = queVaEn(t, isla.terreno).some((p) => EDIFICIOS_DEL_CASERIO.has(p.modelo));
+        if (!levanta) continue;
+        sinPoda++;
+        if (podadas.has(t)) {
+          podadaMaxima = Math.max(podadaMaxima, t.habitabilidad);
+          continue;
+        }
+        if (queVaEn(t, isla.terreno, podadas.has(t)).some((p) => EDIFICIOS_DEL_CASERIO.has(p.modelo))) {
+          conPoda++;
+          quedaMinima = Math.min(quedaMinima, t.habitabilidad);
+        }
+      }
+      return { sinPoda, conPoda, podadas: podadas.size, quedaMinima, podadaMaxima };
+    });
+  };
+  const comarcasMedidas = Array.from({ length: SEMILLAS_DEL_CASERIO }, (_, s) => medirElMundo(s));
+  const todas = comarcasMedidas.flat();
+  const porTableroSin = comarcasMedidas.map((m) => m.reduce((a, c) => a + c.sinPoda, 0));
+  const porTableroCon = comarcasMedidas.map((m) => m.reduce((a, c) => a + c.conPoda, 0));
+  const mediana = (xs: number[]): number => [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)] as number;
+  const media = (xs: number[]): number => xs.reduce((a, b) => a + b, 0) / xs.length;
+  const TOPE = TOPE_DE_EDIFICIOS_POR_COMARCA;
+  comprobar(
+    `sin tope una comarca levanta hasta ${String(Math.max(...todas.map((c) => c.sinPoda)))} edificios (mediana ${String(mediana(todas.map((c) => c.sinPoda)))}) y un tablero hasta ${String(Math.max(...porTableroSin))} (mediana ${String(mediana(porTableroSin))}): lo que Miguel vio, y lo que hace que el tope de ${String(TOPE)} muerda`,
+    Math.max(...todas.map((c) => c.sinPoda)) > TOPE * 2 && mediana(todas.map((c) => c.sinPoda)) > TOPE,
+    { maximo: Math.max(...todas.map((c) => c.sinPoda)), mediana: mediana(todas.map((c) => c.sinPoda)), TOPE },
+  );
+  comprobar(
+    `con el tope ninguna de las ${String(todas.length)} comarcas de ${String(SEMILLAS_DEL_CASERIO)} mundos pasa de ${String(TOPE)} edificios`,
+    todas.every((c) => c.conPoda <= TOPE),
+    todas.filter((c) => c.conPoda > TOPE).length,
+  );
+  const malPodadas = todas.filter((c) => (c.sinPoda > TOPE ? c.conPoda !== TOPE : c.conPoda !== c.sinPoda || c.podadas !== 0));
+  comprobar(
+    `y la poda quita LO JUSTO: la comarca que pasaba del tope se queda exactamente en ${String(TOPE)}, y la que no pasaba no se toca (${String(todas.filter((c) => c.sinPoda <= TOPE).length)} de ${String(todas.length)} no se tocan)`,
+    malPodadas.length === 0 && todas.some((c) => c.sinPoda <= TOPE) && todas.some((c) => c.sinPoda > TOPE),
+    malPodadas.slice(0, 5),
+  );
+  const conNucleoRoto = todas.filter((c) => c.podadas > 0 && c.quedaMinima < c.podadaMaxima);
+  comprobar(
+    `lo que se poda son las AFUERAS: en las ${String(todas.filter((c) => c.podadas > 0).length)} comarcas podadas, lo que se queda es por lo menos tan habitable como lo que se va`,
+    conNucleoRoto.length === 0,
+    conNucleoRoto.slice(0, 5),
+  );
+  comprobar(
+    `el tablero baja de ${media(porTableroSin).toFixed(0)} a ${media(porTableroCon).toFixed(0)} edificios de media: menos de la mitad, y sigue habiendo pueblos`,
+    media(porTableroCon) < media(porTableroSin) * 0.5 && media(porTableroCon) > TOPE * 6,
+    { sin: media(porTableroSin), con: media(porTableroCon) },
+  );
+  /*
+   * LA VACUNA DEL TERCER ARGUMENTO: queVaEn sin él planta el pueblo entero aunque la poda diga
+   * lo contrario. Si sinPueblo dejara de leerse, conPoda y sinPoda saldrían iguales en todas
+   * las comarcas y lo de arriba se caería; aquí se afirma sobre una tesela podada concreta,
+   * para que el fallo diga cuál.
+   */
+  const relieveDeMuestra = crearRelieve(islasDelDelta, 0);
+  const unaPodada = islasDelDelta
+    .map((isla) => {
+      const teselas = relieveDeMuestra.subteselasDe(isla.hex).filter((t) => esTierraDeSiembra(t));
+      const podadas = podaDelCaserio(teselas, isla.terreno);
+      const t = [...podadas][0];
+      return t === undefined ? null : { t, terreno: isla.terreno };
+    })
+    .find((x) => x !== null);
+  comprobar(
+    'se ve fallar: una tesela podada levanta su edificio con queVaEn(t, terreno) y no lo levanta con queVaEn(t, terreno, true) — el tercer argumento es lo que la poda tiene en la mano',
+    unaPodada !== null &&
+      unaPodada !== undefined &&
+      queVaEn(unaPodada.t, unaPodada.terreno).some((p) => EDIFICIOS_DEL_CASERIO.has(p.modelo)) &&
+      !queVaEn(unaPodada.t, unaPodada.terreno, true).some((p) => EDIFICIOS_DEL_CASERIO.has(p.modelo)),
+    unaPodada?.t.sub,
+  );
+
+  // ── 6. Lo que la escena hace con esto, leído del texto de delta.tsx ──
+
+  /*
+   * Por lo de siempre: dentro de un componente con useMemo y JSX no entra un guion de Node, y
    * lo que hay que vigilar aquí es ESTRUCTURA — que el plan del mundo no dependa de las piezas,
-   * que las geometrías teñidas se fabriquen sólo para los colores en juego, y que se suelten.
+   * que los grupos del caserío tampoco, que las geometrías pardas se fabriquen una vez y se
+   * suelten, y que la tabla teñida sea sólo del asentamiento.
    */
   const fuenteDelCaserio = fs.readFileSync(
     path.join(import.meta.dirname ?? __dirname, '..', 'delta.tsx'),
@@ -9932,42 +9855,28 @@ paso('El caserío toma el color de su dueño: qué casas son de quién, y que el
   };
   const elPlan = trozoDelCodigo('const plan = useMemo(', 'const suelos = useMemo(');
   const elPueblo = trozoDelCodigo('const pueblos = useMemo(', 'const coloresEnJuego');
-  const elTenido = trozoDelCodigo('const caserioTenido = useMemo(', 'const seca = useMemo(');
+  const elTenido = trozoDelCodigo('const caserioTenido = useMemo(', 'const caserioNeutro = useMemo(');
+  const elNeutro = trozoDelCodigo('const caserioNeutro = useMemo(', 'const seca = useMemo(');
+  const elTinte = trozoDelCodigo('function aLaColumna(', '/** Una copia colocada');
   /*
-   * SE PIDE LA LÍNEA ENTERA Y NO «que aparezca `EDIFICIOS_DEL_CASERIO`», y eso es una lección
-   * pagada: con el `test` flojo, anteponerle un `false &&` a la condición dejaba el caserío otra
-   * vez dentro de `cosas` —o sea sin color de dueño— y el comprobador seguía en verde, porque el
-   * nombre seguía escrito. Un `includes` sobre un nombre no distingue una rama viva de una
-   * muerta.
+   * SE PIDE LA LÍNEA ENTERA Y NO «que aparezca EDIFICIOS_DEL_CASERIO», y eso es una lección
+   * pagada: con el test flojo, anteponerle un false && a la condición dejaba el caserío otra
+   * vez dentro de cosas —o sea sin su pardo— y el comprobador seguía en verde, porque el
+   * nombre seguía escrito. Un includes sobre un nombre no distingue una rama viva de una muerta.
    */
   comprobar(
-    'el plan del mundo APARTA los edificios del caserío en vez de meterlos en `cosas`, y la rama está VIVA: si no, el color iría dentro del plan y las dos mil setecientas teselas se recalcularían con cada choza',
+    'el plan del mundo APARTA los edificios del caserío con su tono en vez de meterlos en cosas, y la rama está VIVA',
     /\n\s*if \(EDIFICIOS_DEL_CASERIO\.has\(puesto\.modelo\)\) \{\n/.test(elPlan) &&
-      /\n\s*caserio\.push\(\{ llave, modelo: puesto\.modelo, puesta \}\);\n/.test(elPlan) &&
+      /\n\s*caserio\.push\(\{ llave, modelo: puesto\.modelo, puesta, tono \}\);\n/.test(elPlan) &&
       /\n\s*empuja\(cosas, `\$\{llave\}\|\$\{puesto\.modelo\}`, puesta\);\n/.test(elPlan),
     elPlan.length,
   );
-
-  /*
-   * ═══ Y EL TRASLADO SÓLO TOCA LO QUE ES DE UN COLOR, LEÍDO DEL CÓDIGO ═══
-   *
-   * `deOtroColor` es la única función de la escena que escribe UV de color, y lo hace dentro de
-   * un bucle sobre TODOS los vértices de la malla: lo único que separa «se repinta el tejado» de
-   * «se repinta el edificio entero de un color plano» es la guarda de una línea. Quitarla no
-   * rompe ninguna cuenta —`saltoAlColor` sigue devolviendo lo mismo— y no la caza ninguna otra
-   * comprobación de este guion, porque esa función vive en un fichero que importa `three`. Se
-   * mide el TEXTO: la escritura tiene que ir justo detrás de su guarda.
-   */
-  const elTinte = trozoDelCodigo('function deOtroColor(', '/** Una copia colocada');
   comprobar(
-    'el traslado de color salta los vértices que no son de ningún jugador ANTES de escribirlos: sin esa guarda, el edificio entero saldría de un color plano y ninguna otra comprobación lo vería',
-    /if \(!esDeUnColorDeJugador\(u, suyaUv\.getY\(i\)\)\) continue;\n\s*suyaUv\.setX\(i, u \+ saltoAlColor\(u, color\)\);/.test(elTinte),
-    elTinte.length,
-  );
-  comprobar(
-    'y decide si hace falta clonar mirando esa misma guarda, no el nombre del color: por eso una iglesia azul pedida en azul es la geometría del catálogo y no un clon',
-    /esDeUnColorDeJugador\(u, uv\.getY\(i\)\) && saltoAlColor\(u, color\) !== 0/.test(elTinte),
-    elTinte.length,
+    'el plan decide la siembra UNA vez por tesela con la tierra de poblar.ts y los caminos de la red, poda y entona una vez por comarca, y planta con el tercer argumento de queVaEn: la poda no es un adorno',
+    /const sembrables = new Set\(\s*teselas\.filter\(\(t\) => esTierraDeSiembra\(t\) && red\.piezas\.get\(llaveDe\(t\.sub\)\) === undefined\),\s*\);\s*const podadas = podaDelCaserio\(\[\.\.\.sembrables\], isla\.terreno\);\s*const tono = tonoDelCaserio\(isla\.hex, semilla\);/.test(elPlan) &&
+      /\n\s*if \(!sembrables\.has\(t\)\) continue;\n/.test(elPlan) &&
+      /for \(const puesto of queVaEn\(t, isla\.terreno, podadas\.has\(t\)\)\) \{/.test(elPlan),
+    elPlan.length,
   );
   comprobar(
     'y el plan NO depende de las piezas: sus dependencias siguen siendo las islas, el relieve y la red de caminos',
@@ -9975,48 +9884,87 @@ paso('El caserío toma el color de su dueño: qué casas son de quién, y que el
     elPlan.slice(-160),
   );
   comprobar(
-    'el reparto vive en un memo aparte que SÍ depende de las piezas, y llama a `duenoDelCaserio` en vez de decidir por su cuenta',
-    /duenoDelCaserio\(/.test(elPueblo) && /\}, \[plan\.caserio, datos\.piezas\]\);/.test(elPueblo),
-    elPueblo.slice(-160),
+    'los grupos del caserío llevan el tono en el nombre y NO dependen de las piezas; y duenoDelCaserio ya no existe en la escena: el paisaje no lleva el color de nadie',
+    /`\$\{edificio\.llave\}\|\$\{edificio\.modelo\}-\$\{String\(edificio\.tono\)\}`/.test(elPueblo) &&
+      /\}, \[plan\.caserio\]\);/.test(elPueblo) &&
+      !/datos\.piezas/.test(elPueblo) &&
+      !/duenoDelCaserio/.test(codigoDelCaserio),
+    elPueblo.slice(-120),
   );
   comprobar(
-    'las geometrías teñidas se fabrican SÓLO para los colores en juego —fabricar los cuatro serían 4,46 MB de clones en un tablero donde nadie ha construido— y se apuntan para soltarlas',
-    elTenido.length > 0 && /coloresEnJuego/.test(elTenido) && /propias/.test(elTenido) && !/COLORES_DE_JUGADOR/.test(elTenido),
+    'la tabla teñida es SÓLO la del asentamiento —EDIFICIOS_DEL_ASENTAMIENTO, no los catorce— y sólo para los colores en juego, y se apunta para soltarla',
+    elTenido.length > 0 &&
+      /for \(const modelo of EDIFICIOS_DEL_ASENTAMIENTO\)/.test(elTenido) &&
+      /coloresEnJuego/.test(elTenido) &&
+      /propias/.test(elTenido) &&
+      !/EDIFICIOS_DEL_CASERIO/.test(elTenido),
     elTenido.length,
   );
   comprobar(
-    'y hay quien las suelte al cambiar de colores: un dispose colgado de `caserioTenido`',
-    /for \(const geometria of caserioTenido\.propias\) geometria\.dispose\(\);/.test(codigoDelCaserio),
-    /caserioTenido\.propias/.test(codigoDelCaserio),
+    'las geometrías pardas se fabrican UNA vez —para las tres columnas y los catorce edificios, sin mirar las piezas— y hay quien las suelte',
+    elNeutro.length > 0 &&
+      /for \(const columna of COLUMNAS_DEL_CASERIO\)/.test(elNeutro) &&
+      /for \(const modelo of EDIFICIOS_DEL_CASERIO\)/.test(elNeutro) &&
+      /aLaColumna\(base, columna, propias\)/.test(elNeutro) &&
+      /\}, \[aplanados\]\);/.test(elNeutro) &&
+      !/datos\.piezas|coloresEnJuego/.test(elNeutro) &&
+      /for \(const geometria of caserioNeutro\.propias\) geometria\.dispose\(\);/.test(codigoDelCaserio),
+    elNeutro.length,
+  );
+  /*
+   * ═══ Y EL TRASLADO SÓLO TOCA LO QUE ES DE UN COLOR, LEÍDO DEL CÓDIGO ═══
+   *
+   * aLaColumna es la única función de la escena que escribe UV de color, y lo hace dentro de
+   * un bucle sobre TODOS los vértices de la malla: lo único que separa «se repinta el tejado»
+   * de «se repinta el edificio entero de un color plano» es la guarda de una línea. Se mide el
+   * TEXTO: la escritura tiene que ir justo detrás de su guarda.
+   */
+  comprobar(
+    'el traslado salta los vértices que no son de ningún colono ANTES de escribirlos: sin esa guarda, el edificio entero saldría de un color plano y ninguna otra comprobación lo vería',
+    /if \(!esDeUnColorDeJugador\(u, suyaUv\.getY\(i\)\)\) continue;\n\s*suyaUv\.setX\(i, u \+ saltoALaColumna\(u, columna\)\);/.test(elTinte),
+    elTinte.length,
   );
   comprobar(
-    'y lo que se pinta busca primero la variante teñida y cae en el catálogo de siempre para un edificio sin dueño',
-    /caserioTenido\.tabla\.get\(nombre\) \?\? aplanados\.get\(nombre\)/.test(codigoDelCaserio),
-    /caserioTenido\.tabla\.get/.test(codigoDelCaserio),
+    'y decide si hace falta clonar mirando esa misma guarda: por eso una pieza pedida en su propio color es la geometría del catálogo y no un clon',
+    /esDeUnColorDeJugador\(u, uv\.getY\(i\)\) && saltoALaColumna\(u, columna\) !== 0/.test(elTinte),
+    elTinte.length,
+  );
+  comprobar(
+    'deOtroColor es aLaColumna con la columna del color, y lo que se pinta busca la variante parda para el paisaje y la teñida para el asentamiento: no hay dos maneras de teñir',
+    /return aLaColumna\(mallas, columnaDelColor\(color\), propias\);/.test(codigoDelCaserio) &&
+      /caserioNeutro\.tabla\.get\(nombre\) \?\? aplanados\.get\(nombre\)/.test(codigoDelCaserio) &&
+      /tenido\.get\(`\$\{parte\.modelo\}-\$\{pieza\.color\}`\) \?\? aplanados\.get\(parte\.modelo\)/.test(codigoDelCaserio),
+    /caserioNeutro\.tabla\.get/.test(codigoDelCaserio),
   );
 
+  // ── 7. Cuánto se clona, y que es lo que se dice ──
+
   /*
-   * ═══ CUÁNTO SE CLONA DE VERDAD, Y POR QUÉ NO SE CLONA TODO ═══
-   *
-   * Un clon lleva posición, normal y UV en `float32`: 32 bytes por vértice. Los catorce
-   * edificios suman los vértices que se cuentan aquí, y lo que NO se clona es la variante que ya
-   * está en su sitio —la iglesia azul pedida en azul es la misma geometría del catálogo—. Se
-   * afirma el ahorro para que el día que alguien clone las cuatro siempre, el número cambie.
+   * Un clon lleva posición, normal y UV en float32: 32 bytes por vértice. Ninguno de los
+   * catorce viene del pack en una columna parda, así que los tres pardos clonan los catorce
+   * enteros; el asentamiento clona la casa y el pozo por color en juego. Se afirma la cuenta
+   * para que el día que alguien meta un cuarto pardo o tiña los catorce otra vez, el número
+   * cambie aquí.
    */
   const verticesDeLosCatorce = [...EDIFICIOS_DEL_CASERIO].reduce((suma, n) => suma + uvDe(n).length, 0);
-  let seClonan = 0;
-  for (const color of COLORES_DE_JUGADOR) {
+  let seClonanPardos = 0;
+  for (const columna of COLUMNAS_DEL_CASERIO) {
     for (const nombre of EDIFICIOS_DEL_CASERIO) {
       const suyas = uvDe(nombre);
-      if (suyas.some(([u, v]) => esDeUnColorDeJugador(u, v) && saltoAlColor(u, color) !== 0)) {
-        seClonan += suyas.length;
+      if (suyas.some(([u, v]) => esDeUnColorDeJugador(u, v) && saltoALaColumna(u, columna) !== 0)) {
+        seClonanPardos += suyas.length;
       }
     }
   }
+  const delAsentamientoPorColor = [...EDIFICIOS_DEL_ASENTAMIENTO].reduce((suma, n) => suma + uvDe(n).length, 0);
+  const enMiB = (vertices: number): string => ((vertices * 32) / 1024 / 1024).toFixed(2);
   comprobar(
-    `los catorce edificios suman ${String(verticesDeLosCatorce)} vértices; con los cuatro colores jugando se clonan ${String(seClonan)} (${((seClonan * 32) / 1024 / 1024).toFixed(1)} MB) y NO los ${String(verticesDeLosCatorce * 4)} de clonarlos todos: la variante que ya está en su color es la misma geometría`,
-    seClonan > 0 && seClonan < verticesDeLosCatorce * COLORES_DE_JUGADOR.length,
-    { verticesDeLosCatorce, seClonan, ahorrado: verticesDeLosCatorce * COLORES_DE_JUGADOR.length - seClonan },
+    `los tres pardos clonan los catorce enteros: ${String(verticesDeLosCatorce)} vértices × 3 = ${enMiB(seClonanPardos)} MiB, una vez y para siempre; y el asentamiento paga ${String(delAsentamientoPorColor)} vértices (${((delAsentamientoPorColor * 32) / 1024).toFixed(0)} KiB) por color en juego, no los catorce`,
+    verticesDeLosCatorce > 0 &&
+      seClonanPardos === verticesDeLosCatorce * COLUMNAS_DEL_CASERIO.length &&
+      delAsentamientoPorColor > 0 &&
+      delAsentamientoPorColor < verticesDeLosCatorce / 4,
+    { verticesDeLosCatorce, seClonanPardos, delAsentamientoPorColor },
   );
 }
 
@@ -10060,7 +10008,7 @@ if (fallos.length > 0) {
  * sería un rojo aleatorio. Medido: no hay ninguna: las treinta que no son llamadas sueltas
  * están en bucles sobre listas escritas en el propio guion.
  */
-const COMPROBACIONES_ESCRITAS = 481;
+const COMPROBACIONES_ESCRITAS = 513;
 if (hechas < COMPROBACIONES_ESCRITAS) {
   console.error(
     `Solo se han hecho ${hechas} de las ${COMPROBACIONES_ESCRITAS} comprobaciones que ` +

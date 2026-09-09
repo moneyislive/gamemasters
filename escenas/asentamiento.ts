@@ -50,6 +50,7 @@ import { DIRECCIONES, centroDeHex, vecino } from '../shared/mecanicas/malla-hexa
 import type { LlaveDeVertice, Punto } from '../shared/mecanicas/malla-hexagonal';
 import { ESCALA_DEL_PACK, RADIO_DE_TESELA } from './escala';
 import { MODELO, modeloDeBandera, modeloDePieza, modeloDeTorre } from './nombres';
+import { EDIFICIOS_DEL_CASERIO } from './poblar';
 import { fraccion, revoltijo } from './revoltijo';
 import type { ClaseDePieza, ColorDeJugador } from './tipos';
 
@@ -433,3 +434,21 @@ export function cuantoHaSalido(pieza: PiezaDeAsentamiento, transcurrido: number)
   if (propio >= 1) return 1;
   return 1 - (1 - propio) ** 3;
 }
+
+/**
+ * LOS EDIFICIOS DEL CASERÍO QUE PLANTA UN ASENTAMIENTO, derivados y no escritos.
+ *
+ * Son los modelos de `caserio()` que están además en `EDIFICIOS_DEL_CASERIO`: la casa y el
+ * pozo. `delta.tsx` tiñe ÉSTOS del color del dueño —y sólo éstos— mientras el pueblo del
+ * paisaje va pardo (`COLUMNAS_DEL_CASERIO`). Escrita a mano, el día que el asentamiento
+ * plantara una taberna, esa taberna saldría del rojo del pack dentro del poblado de un
+ * jugador azul, que es la frase con la que llegó el primer encargo. Se deriva llamando a
+ * `caserio()` con una llave cualquiera: qué modelos planta no depende de la llave, sólo
+ * dónde van y cómo giran. Vive al final del fichero porque las constantes de arriba tienen
+ * que existir ya cuando se llama.
+ */
+export const EDIFICIOS_DEL_ASENTAMIENTO: ReadonlySet<string> = new Set(
+  caserio('blue', 'v:0,0:0')
+    .map((p) => p.modelo)
+    .filter((m) => EDIFICIOS_DEL_CASERIO.has(m)),
+);

@@ -139,9 +139,11 @@ import {
   colorDelBien,
   desplazamientoDeCelda,
   esDeLaHierba,
+  COLUMNAS_DEL_CASERIO,
+  columnaDelColor,
   esDeUnColorDeJugador,
   puntosDeLaCifra,
-  saltoAlColor,
+  saltoALaColumna,
   terrenoDe,
 } from './paleta';
 import {
@@ -154,10 +156,9 @@ import {
 } from './modelos';
 import { laMarinaDelMundo } from './marina';
 import type { CatalogoDeModelos } from './modelos';
-import { cuantoHaSalido, piezasDeAsentamiento } from './asentamiento';
-import { EDIFICIOS_DEL_CASERIO, queVaEn } from './poblar';
-import { duenoDelCaserio } from './caserio';
-import type { Fundacion } from './caserio';
+import { cuantoHaSalido, EDIFICIOS_DEL_ASENTAMIENTO, piezasDeAsentamiento } from './asentamiento';
+import { EDIFICIOS_DEL_CASERIO, esTierraDeSiembra, podaDelCaserio, queVaEn } from './poblar';
+import { tonoDelCaserio } from './caserio';
 import { fraccion } from './revoltijo';
 import { crearRelieve, hexDePunto } from './relieve';
 import type { Relieve, Subtesela } from './relieve';
@@ -477,7 +478,14 @@ function aplana(modelo: THREE.Object3D): Instanciable[] {
  * en azul—. Con el caserío repintado eso ya no sirve: la casa de adorno pinta su tejado en la
  * columna 1, la iglesia en la 0, la taberna en la 2 y el mercado en la 3, así que no hay una
  * columna de origen y el salto se calcula VÉRTICE A VÉRTICE desde donde ese vértice ya está.
- * Ver `saltoAlColor` en `paleta.ts`.
+ * Ver `saltoALaColumna` en `paleta.ts`.
+ *
+ * ═══ Y DESDE QUE EL PAISAJE ES PARDO, LA COLUMNA NO ES SIEMPRE LA DE UN COLOR ═══
+ *
+ * `deOtroColor` tiñe del color de un jugador —las piezas y las casas de su asentamiento— y
+ * `aLaColumna` es lo que hay debajo: llevar los vértices de color a UNA columna de la fila,
+ * sea la de un colono o una de las tres pardas del caserío (`COLUMNAS_DEL_CASERIO`). Una sola
+ * función escribe UV de color; no hay dos maneras de teñir.
  *
  * Y sólo se mueve lo que ES de un color de jugador. Un castillo tiene piedra, madera y tejado;
  * la herrería pinta 41 vértices en la columna 4 y el muelle 388 entre la 5, la 6 y la 7, y ésos
@@ -497,13 +505,21 @@ function deOtroColor(
   color: string,
   propias: THREE.BufferGeometry[],
 ): Instanciable[] {
+  return aLaColumna(mallas, columnaDelColor(color), propias);
+}
+
+function aLaColumna(
+  mallas: readonly Instanciable[],
+  columna: number,
+  propias: THREE.BufferGeometry[],
+): Instanciable[] {
   return mallas.map(({ geometria, material }) => {
     const uv = geometria.getAttribute('uv') as THREE.BufferAttribute | undefined;
     if (uv === undefined) return { geometria, material };
     let mueve = false;
     for (let i = 0; i < uv.count && !mueve; i++) {
       const u = uv.getX(i);
-      if (esDeUnColorDeJugador(u, uv.getY(i)) && saltoAlColor(u, color) !== 0) mueve = true;
+      if (esDeUnColorDeJugador(u, uv.getY(i)) && saltoALaColumna(u, columna) !== 0) mueve = true;
     }
     if (!mueve) return { geometria, material };
     const suya = geometria.clone();
@@ -511,7 +527,7 @@ function deOtroColor(
     for (let i = 0; i < suyaUv.count; i++) {
       const u = suyaUv.getX(i);
       if (!esDeUnColorDeJugador(u, suyaUv.getY(i))) continue;
-      suyaUv.setX(i, u + saltoAlColor(u, color));
+      suyaUv.setX(i, u + saltoALaColumna(u, columna));
     }
     suyaUv.needsUpdate = true;
     propias.push(suya);
@@ -4047,12 +4063,29 @@ export function Delta({
   const plan = useMemo(() => {
     const suelo = new Map<string, Puesta[]>();
     const cosas = new Map<string, Puesta[]>();
-    const caserio: Array<{ llave: string; modelo: string; puesta: Puesta }> = [];
+    const caserio: Array<{ llave: string; modelo: string; puesta: Puesta; tono: number }> = [];
     const plazas: Array<{ isla: IslaEn3D; centro: Punto; altura: number }> = [];
 
     for (const isla of datos.islas) {
       const llave = llaveDe(isla.hex);
       const teselas: Subtesela[] = relieve.subteselasDe(isla.hex);
+
+      /*
+       * DÓNDE SE SIEMBRA, decidido UNA vez por tesela y usado en dos sitios: la poda del
+       * pueblo, que tiene que contar sólo lo que de verdad se va a plantar, y el bucle de
+       * abajo, que salta lo que no se siembra. La tierra la dice `poblar.ts`; los caminos de
+       * los jugadores los sabe la escena, porque llegan con la red.
+       *
+       * Y EL PUEBLO DE ESTA COMARCA, ACOTADO Y DE UN SOLO PARDO: `podaDelCaserio` dice qué
+       * teselas se quedan sin edificio para no pasar del tope —las menos habitables, las
+       * afueras— y `tonoDelCaserio` de qué columna del atlas sale su piedra. Aquí no se
+       * decide nada; ver `poblar.ts` y `caserio.ts`.
+       */
+      const sembrables = new Set(
+        teselas.filter((t) => esTierraDeSiembra(t) && red.piezas.get(llaveDe(t.sub)) === undefined),
+      );
+      const podadas = podaDelCaserio([...sembrables], isla.terreno);
+      const tono = tonoDelCaserio(isla.hex, semilla);
 
       for (const t of teselas) {
         /*
@@ -4239,10 +4272,10 @@ export function Delta({
           }
         }
 
-        /* Encima del agua, de un camino y de una playa no crece nada. */
-        if (senda !== undefined || enAgua || orilla !== null) continue;
+        /* Encima del agua, de un camino y de una playa no crece nada: ver `sembrables`. */
+        if (!sembrables.has(t)) continue;
 
-        for (const puesto of queVaEn(t, isla.terreno)) {
+        for (const puesto of queVaEn(t, isla.terreno, podadas.has(t))) {
           const puesta = comoElPack(
             t.centro.x + puesto.donde.x,
             t.altura,
@@ -4251,18 +4284,14 @@ export function Delta({
             puesto.talla,
           );
           /*
-           * LOS EDIFICIOS DEL CASERÍO SE APARTAN AQUÍ, y esto es lo que evita rehacer el
-           * mundo entero cada vez que alguien construye.
-           *
-           * El color de un edificio de pueblo depende de quién haya fundado cerca, o sea
-           * de `datos.piezas`, que cambia varias veces por turno. Meterlos en `cosas` con
-           * el color ya puesto obligaría a que este plan —dos mil setecientas teselas y
-           * varios miles de cosas— dependiera de las piezas y se recalculara entero en
-           * cada choza. Se guardan sin dueño y los reparte un memo de al lado, que sólo
-           * recorre los 357 edificios de un mundo.
+           * LOS EDIFICIOS DEL CASERÍO SE APARTAN AQUÍ porque no se pintan con la geometría
+           * del catálogo: se pintan con su variante PARDA (`caserioNeutro`), una por tono, y
+           * el grupo lleva el tono en el nombre. Ya no dependen de las piezas —el pardo es
+           * fijo por comarca, y era el color del dueño lo que los ataba a `datos.piezas`—,
+           * así que el memo de al lado que los agrupa sólo recorre lo que hay aquí.
            */
           if (EDIFICIOS_DEL_CASERIO.has(puesto.modelo)) {
-            caserio.push({ llave, modelo: puesto.modelo, puesta });
+            caserio.push({ llave, modelo: puesto.modelo, puesta, tono });
           } else {
             empuja(cosas, `${llave}|${puesto.modelo}`, puesta);
           }
@@ -4489,40 +4518,35 @@ export function Delta({
       }));
   }, [datos.piezas, datos.caminos, relieve]);
 
+  /*
+   * LOS GRUPOS DEL CASERÍO: comarca × modelo × tono, y como el tono es uno por comarca son
+   * tantos como comarca × modelo. NO dependen de las piezas: un tablero con veinte chozas
+   * tiene el mismo pueblo que uno vacío, que es lo que pidió Miguel — el paisaje no lleva el
+   * color de nadie. Aquí estaba `duenoDelCaserio`, que teñía cada edificio del color de la
+   * choza más cercana; ver la cabecera de `caserio.ts` para por qué se quitó.
+   */
   const pueblos = useMemo(() => {
-    const fundadas: Fundacion[] = datos.piezas.map((pieza) => ({
-      vertice: pieza.vertice,
-      color: pieza.color,
-      punto: puntoDeVertice(pieza.vertice, RADIO_DE_COMARCA),
-    }));
     const grupos = new Map<string, Puesta[]>();
     for (const edificio of plan.caserio) {
-      /*
-       * El sitio del edificio se lee de la PUESTA que ya se calculó, y no se guarda otra
-       * vez al hacer el plan: dos copias del mismo punto son dos copias que pueden
-       * discrepar, y ésta discreparía justo el día que alguien tocara cómo se posan las
-       * cosas sobre la tesela. La `y` del plano de la malla es la `z` del mundo.
-       */
-      const donde = { x: edificio.puesta.posicion.x, y: edificio.puesta.posicion.z };
-      const dueno = duenoDelCaserio(donde, fundadas);
-      const nombre = dueno === null ? edificio.modelo : `${edificio.modelo}-${dueno.color}`;
-      empuja(grupos, `${edificio.llave}|${nombre}`, edificio.puesta);
+      empuja(grupos, `${edificio.llave}|${edificio.modelo}-${String(edificio.tono)}`, edificio.puesta);
     }
     return grupos;
-  }, [plan.caserio, datos.piezas]);
+  }, [plan.caserio]);
 
   /**
-   * LAS GEOMETRÍAS DEL CASERÍO TEÑIDO, una por edificio y color EN JUEGO.
+   * LAS GEOMETRÍAS TEÑIDAS DEL ASENTAMIENTO, una por edificio del asentamiento y color EN
+   * JUEGO: la casa y el pozo que rodean la choza de cada colono (`EDIFICIOS_DEL_ASENTAMIENTO`,
+   * derivado en `asentamiento.ts`). Hasta el 9-sep-2026 esta tabla teñía los CATORCE
+   * edificios del caserío, porque el pueblo del paisaje también se teñía del color del dueño;
+   * ahora el paisaje va pardo (`caserioNeutro`, abajo) y aquí queda sólo lo que es de alguien.
    *
    * ═══ POR QUÉ NO SE FABRICAN LAS CUATRO SIEMPRE ═══
    *
-   * Porque se pagan en memoria y el sitio donde duele es el móvil. Los catorce edificios
-   * que `poblar.ts` planta suman 48.690 vértices, y un clon lleva posición, normal y UV en
-   * `float32`: 32 bytes por vértice, o sea entre 1,06 y 1,19 MB por color —lo que varía es
-   * cuántos de los catorce ya estaban en esa columna y se devuelven sin clonar—. Con los
-   * cuatro son 4,46 MB de más SIEMPRE, incluso en un tablero donde nadie ha construido
-   * todavía. Con los colores que de verdad están jugando, una partida de dos paga la mitad
-   * y el tablero recién repartido no paga nada.
+   * Porque se pagan en memoria y el sitio donde duele es el móvil: un clon lleva posición,
+   * normal y UV en `float32`, 32 bytes por vértice, y la casa y el pozo suman 3.492 vértices,
+   * 109 KiB por color (medido sobre `tablero.glb`; lo recuenta `verify:escena`). Con los
+   * colores que de verdad están jugando, una partida de dos paga la mitad y el tablero recién
+   * repartido no paga nada.
    *
    * La lista de colores se saca de las piezas ya puestas y se ORDENA, para que la
    * identidad del memo no dependa de en qué orden construyó cada uno: sin ordenar, dos
@@ -4538,7 +4562,7 @@ export function Delta({
     /* Los clones son NUESTROS y hay que soltarlos cuando entra un color nuevo. */
     const propias: THREE.BufferGeometry[] = [];
     for (const color of coloresEnJuego === '' ? [] : coloresEnJuego.split(',')) {
-      for (const modelo of EDIFICIOS_DEL_CASERIO) {
+      for (const modelo of EDIFICIOS_DEL_ASENTAMIENTO) {
         const base = aplanados.get(modelo);
         if (base === undefined) continue;
         tabla.set(`${modelo}-${color}`, deOtroColor(base, color, propias));
@@ -4552,6 +4576,38 @@ export function Delta({
       for (const geometria of caserioTenido.propias) geometria.dispose();
     },
     [caserioTenido],
+  );
+
+  /**
+   * LAS GEOMETRÍAS PARDAS DEL CASERÍO DEL PAISAJE, una por edificio y por tono, fabricadas
+   * UNA vez: no dependen de las piezas ni de los colores en juego, porque el paisaje ya no
+   * lleva el color de nadie (Miguel, 9-sep-2026). Son los catorce edificios por las tres
+   * columnas pardas de `COLUMNAS_DEL_CASERIO`, y como ninguno de los catorce viene del pack
+   * en una columna parda, los tres tonos se clonan enteros: 48.690 vértices × 3 × 32 bytes,
+   * 4,46 MiB, medidos sobre `tablero.glb` y recontados por `verify:escena`, que afirma además
+   * que no se clona nada más. Es lo que cuesta que cada
+   * aldea salga de su piedra sin multiplicar los grupos de dibujo; un solo pardo costaría un
+   * tercio y llevar el salto de UV al sombreador con un atributo por copia costaría cero,
+   * pero toca el material de todo el catálogo y no se hace a ciegas.
+   */
+  const caserioNeutro = useMemo(() => {
+    const tabla = new Map<string, Instanciable[]>();
+    const propias: THREE.BufferGeometry[] = [];
+    for (const columna of COLUMNAS_DEL_CASERIO) {
+      for (const modelo of EDIFICIOS_DEL_CASERIO) {
+        const base = aplanados.get(modelo);
+        if (base === undefined) continue;
+        tabla.set(`${modelo}-${String(columna)}`, aLaColumna(base, columna, propias));
+      }
+    }
+    return { tabla, propias };
+  }, [aplanados]);
+
+  useEffect(
+    () => () => {
+      for (const geometria of caserioNeutro.propias) geometria.dispose();
+    },
+    [caserioNeutro],
   );
 
   /*
@@ -4705,13 +4761,13 @@ export function Delta({
       })}
 
       {/*
-        * EL CASERÍO, en grupos aparte de las demás cosas porque su nombre lleva el color de
-        * su dueño y ése cambia durante la partida. Un edificio sin dueño se busca por su
-        * nombre pelado en el catálogo de siempre — es el mismo pueblo de antes.
+        * EL CASERÍO, en grupos aparte de las demás cosas porque su nombre lleva el TONO pardo
+        * de su comarca y su geometría es la variante parda, no la del catálogo. Si un tono no
+        * tuviera variante —no pasa: se fabrican las tres— caería en el catálogo de siempre.
         */}
       {[...pueblos].map(([llave, puestas]) => {
         const nombre = llave.slice(llave.indexOf('|') + 1);
-        const mallas = caserioTenido.tabla.get(nombre) ?? aplanados.get(nombre);
+        const mallas = caserioNeutro.tabla.get(nombre) ?? aplanados.get(nombre);
         return mallas === undefined ? null : (
           <Modelo key={`pueblo:${llave}`} mallas={mallas} puestas={puestas} />
         );
