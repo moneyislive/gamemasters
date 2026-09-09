@@ -53,8 +53,8 @@ import {
   PALETA,
   puntosDeLaCifra,
   saltoAlColor,
-  saltoALaColumna,
-  COLUMNAS_DEL_CASERIO,
+  saltoALaCelda,
+  CELDAS_DEL_CASERIO,
   TERRENO_DEL_BIEN,
 } from '../paleta';
 import {
@@ -9387,32 +9387,35 @@ paso('El zócalo se compra de verdad: disco en la choza, raya en la vereda, cada
 }
 
 // ---------------------------------------------------------------------------
-paso('El caserío del paisaje es pardo y tiene tope: tres columnas del atlas lejos de los colores de colono, un tono por comarca, como mucho ocho edificios por comarca; y el asentamiento sigue tiñendo lo suyo');
+paso('El caserío del paisaje es gris, pardo o arena y tiene tope: seis celdas del atlas lejos de los colores de colono, un tono por comarca y clase de edificio, como mucho ocho edificios por comarca; y el asentamiento sigue tiñendo lo suyo');
 // ---------------------------------------------------------------------------
 
 /**
  * ═══ QUÉ FALLO VIGILA ESTE BLOQUE ═══
  *
- * Dos cosas que Miguel vio jugando (9-sep-2026). Una: «las construcciones procedurales tienen
+ * Tres cosas que Miguel vio jugando (9-sep-2026). Una: «las construcciones procedurales tienen
  * los mismos colores que las de los jugadores y eso confunde bastante» — el pueblo del paisaje
  * pintaba sus tejados en las cuatro columnas de colono del atlas y, teñido del color de quien
  * fundaba al lado, seguía llevando un color de alguien. Dos: «he visto tableros con demasiadas
  * construcciones» — medido, una comarca levantaba 20 edificios de mediana y un tablero 375.
+ * Tres, sobre la primera salida (tres pardos parecidos, uno por aldea): «me gustaría que se
+ * notara un poco de variedad en las gamas de color, aunque solo cambien entre grisáceo,
+ * marrones que no sean el de la madera e incluso amarillos apagados».
  *
  * Lo que se compra aquí son las cosas que no se ven en una captura:
  *
- *   1. QUE LOS PARDOS SON PARDOS: medidos sobre la tabla del atlas, lejos de los cuatro colores
- *      de colono y de la madera; y que la cuarta columna de esa fila, que «también es de la
- *      fila», NO valdría.
- *   2. QUE EL TRASLADO LLEVA LO SUYO Y SÓLO LO SUYO a las columnas pardas, sobre las UV de
- *      verdad del .glb, y que después del traslado ningún vértice del paisaje sigue siendo de
- *      un color de colono.
+ *   1. QUE LAS SEIS CELDAS SON LO QUE SE DICE: medidas sobre la tabla del atlas, lejos de los
+ *      cuatro colores de colono y de la madera, distintas entre sí, y una GAMA —del gris al
+ *      amarillo apagado, del claro al oscuro—; y que el dorado y el naranja del pack, que
+ *      también son «amarillos», NO valdrían.
+ *   2. QUE EL TRASLADO LLEVA LO SUYO Y SÓLO LO SUYO a esas celdas, columna Y fila, sobre las
+ *      UV de verdad del .glb, y que después ningún vértice del paisaje sigue siendo de colono.
  *   3. QUE EL ASENTAMIENTO SIGUE TIÑENDO LA CASA Y EL POZO del color del dueño, y sólo ésos.
- *   4. QUE EL TONO ES UNO POR COMARCA, sale de la semilla y es el mismo en los tres aparatos.
- *   5. QUE EL TOPE SE CUMPLE sobre mundos de verdad, que muerde —sin él la cuenta es la de
- *      siempre—, y que lo que se poda son las afueras y no el núcleo.
- *   6. Y QUE LA ESCENA HACE ESO, leído de delta.tsx: el plan no depende de las piezas, los
- *      grupos del caserío tampoco, y las geometrías pardas se fabrican una vez y se sueltan.
+ *   4. QUE EL TONO VA POR COMARCA Y MODELO: sale de la semilla, cambia con el modelo dentro de
+ *      una aldea —que es la variedad que se pidió— y es el mismo en los tres aparatos.
+ *   5. QUE EL TOPE SE CUMPLE sobre mundos de verdad, que muerde, y que se podan las afueras.
+ *   6. QUE LA ESCENA HACE ESO, leído de delta.tsx, y que sólo fabrica las parejas (modelo,
+ *      tono) que el mundo usa, y las suelta.
  */
 {
   const nodosDelTablero = (
@@ -9430,7 +9433,7 @@ paso('El caserío del paisaje es pardo y tiene tope: tres columnas del atlas lej
     terreno: TERRENOS_DE_RIBERAS[i % TERRENOS_DE_RIBERAS.length] as string,
   }));
 
-  // ── 1. Los pardos, medidos contra el atlas ──
+  // ── 1. Las seis celdas, medidas contra el atlas ──
 
   /*
    * SE MIDE SOBRE LA TABLA COMPILADA, que es la que sube a la GPU y la que
@@ -9438,15 +9441,15 @@ paso('El caserío del paisaje es pardo y tiene tope: tres columnas del atlas lej
    * sería un tercer camino que nadie compara con los otros dos. La distancia es CIE76, la
    * misma vara con la que esta casa mide que un zócalo no se come contra su suelo.
    */
-  const tablaDelPardo = tablaDelAtlas();
+  const tablaDelTono = tablaDelAtlas();
   const altoDeCelda = ALTO_DEL_ATLAS / FILAS_DEL_ATLAS;
   const mediaDeLaCelda = (columna: number, fila: number): [number, number, number] => {
     const suma = [0, 0, 0];
     for (let y = fila * altoDeCelda; y < (fila + 1) * altoDeCelda; y++) {
       const i = (y * COLUMNAS_DE_LA_TABLA + columna) * 3;
-      suma[0] += tablaDelPardo[i] as number;
-      suma[1] += tablaDelPardo[i + 1] as number;
-      suma[2] += tablaDelPardo[i + 2] as number;
+      suma[0] += tablaDelTono[i] as number;
+      suma[1] += tablaDelTono[i + 1] as number;
+      suma[2] += tablaDelTono[i + 2] as number;
     }
     return [suma[0] / altoDeCelda, suma[1] / altoDeCelda, suma[2] / altoDeCelda] as [number, number, number];
   };
@@ -9469,8 +9472,12 @@ paso('El caserío del paisaje es pardo y tiene tope: tres columnas del atlas lej
   };
   const enHex = (c: readonly number[]): string =>
     '#' + c.map((x) => Math.round(x).toString(16).padStart(2, '0')).join('');
+  const centroDeLaCelda = (celda: readonly [number, number]): [number, number] => [
+    (celda[0] + 0.5) / COLUMNAS_DEL_ATLAS,
+    (celda[1] + 0.5) / FILAS_DEL_ATLAS,
+  ];
   const FILA_DEL_COLOR = 3;
-  const pardos = COLUMNAS_DEL_CASERIO.map((columna) => ({ columna, rgb: mediaDeLaCelda(columna, FILA_DEL_COLOR) }));
+  const tonos = CELDAS_DEL_CASERIO.map((celda) => ({ celda, rgb: mediaDeLaCelda(celda[0], celda[1]) }));
   const colonos = COLORES_DE_JUGADOR.map((color) => ({
     color,
     rgb: mediaDeLaCelda(COLUMNA_DEL_COLOR[color] as number, FILA_DEL_COLOR),
@@ -9478,44 +9485,68 @@ paso('El caserío del paisaje es pardo y tiene tope: tres columnas del atlas lej
   const madera = mediaDeLaCelda(6, 0);
   const alColonoMasCercano = (rgb: readonly number[]): number => Math.min(...colonos.map((c) => cie76(rgb, c.rgb)));
   /*
-   * LAS VARAS: cuarenta al colono y veinte a la madera. Medidos: 45,3 y 25,7 en el peor pardo.
-   * Cuarenta es el doble del umbral con el que esta casa dice que una superficie NO se come
-   * una pieza (20): no es «se distingue si te fijas», es «no se confunde». La madera no es un
-   * colono y no hay que apartarse tanto: lo que Miguel pidió es que no fuera EL MISMO marrón.
+   * LAS VARAS: veinticinco al colono y veinte a la madera. Veinte es el umbral con el que esta
+   * casa dice que una superficie NO se come una pieza; el colono pide algo más porque lo que
+   * hay que impedir no es «se pierde» sino «se confunde». La arena marca la vara (29,8 del
+   * amarillo): es el amarillo APAGADO que Miguel pidió que cupiera; el dorado, a 14,7, ya es un
+   * amarillo, y se rechaza abajo.
    */
-  const SEPARACION_DE_UN_COLONO = 40;
+  const SEPARACION_DE_UN_COLONO = 25;
   const SEPARACION_DE_LA_MADERA = 20;
+  const llaveDeCelda = (celda: readonly [number, number]): string => `${String(celda[0])},${String(celda[1])}`;
   comprobar(
-    `las columnas del caserío son tres, distintas, de la fila del color y ninguna de un colono: ${COLUMNAS_DEL_CASERIO.join(', ')}`,
-    COLUMNAS_DEL_CASERIO.length === 3 &&
-      new Set(COLUMNAS_DEL_CASERIO).size === 3 &&
-      COLUMNAS_DEL_CASERIO.every(
-        (c) => Number.isInteger(c) && c >= 0 && c < COLUMNAS_DEL_ATLAS && !COLUMNAS_DE_JUGADOR.has(c),
+    `las celdas del caserío son seis, distintas, dentro del atlas y ninguna de un colono: ${CELDAS_DEL_CASERIO.map(llaveDeCelda).join(' · ')}`,
+    CELDAS_DEL_CASERIO.length === 6 &&
+      new Set(CELDAS_DEL_CASERIO.map(llaveDeCelda)).size === 6 &&
+      CELDAS_DEL_CASERIO.every(
+        (celda) =>
+          Number.isInteger(celda[0]) &&
+          Number.isInteger(celda[1]) &&
+          celda[0] >= 0 &&
+          celda[0] < COLUMNAS_DEL_ATLAS &&
+          celda[1] >= 0 &&
+          celda[1] < FILAS_DEL_ATLAS &&
+          !esDeUnColorDeJugador(...centroDeLaCelda(celda)),
       ),
-    [...COLUMNAS_DEL_CASERIO],
+    CELDAS_DEL_CASERIO.map(llaveDeCelda),
   );
-  const lejos = pardos.map((p) => ({
-    columna: p.columna,
+  const lejos = tonos.map((p) => ({
+    celda: llaveDeCelda(p.celda),
     hex: enHex(p.rgb),
     colono: alColonoMasCercano(p.rgb),
     madera: cie76(p.rgb, madera),
   }));
   comprobar(
-    `cada pardo se separa del colono más cercano por lo menos ${String(SEPARACION_DE_UN_COLONO)} CIE76 y de la madera (6,0) por lo menos ${String(SEPARACION_DE_LA_MADERA)} — medido: ${lejos.map((p) => `${p.hex} colono ${p.colono.toFixed(1)} madera ${p.madera.toFixed(1)}`).join(', ')}: ni el mismo téxel ni uno parecido`,
+    `cada celda se separa del colono más cercano por lo menos ${String(SEPARACION_DE_UN_COLONO)} CIE76 y de la madera (6,0) por lo menos ${String(SEPARACION_DE_LA_MADERA)} — medido: ${lejos.map((p) => `${p.hex} colono ${p.colono.toFixed(1)} madera ${p.madera.toFixed(1)}`).join(', ')}: ni el mismo téxel ni uno parecido`,
     lejos.every((p) => p.colono >= SEPARACION_DE_UN_COLONO && p.madera >= SEPARACION_DE_LA_MADERA),
     lejos,
   );
-  const elOtroNaranja = mediaDeLaCelda(4, FILA_DEL_COLOR);
+  const elDorado = mediaDeLaCelda(3, 1);
+  const elOtroNaranja = mediaDeLaCelda(4, 3);
   comprobar(
-    `se ve fallar: la columna 4 de esa misma fila —el otro naranja del pack, ${enHex(elOtroNaranja)}— está a ${alColonoMasCercano(elOtroNaranja).toFixed(1)} del colono más cercano y el juez la rechaza: «también es de la fila» no basta`,
-    alColonoMasCercano(elOtroNaranja) < SEPARACION_DE_UN_COLONO,
-    alColonoMasCercano(elOtroNaranja),
+    `se ve fallar: el dorado del pack (3,1) ${enHex(elDorado)} está a ${alColonoMasCercano(elDorado).toFixed(1)} del amarillo y el otro naranja (4,3) ${enHex(elOtroNaranja)} a ${alColonoMasCercano(elOtroNaranja).toFixed(1)}: los dos son «amarillos» y el juez los rechaza; apagado quiere decir a más de ${String(SEPARACION_DE_UN_COLONO)}`,
+    alColonoMasCercano(elDorado) < SEPARACION_DE_UN_COLONO && alColonoMasCercano(elOtroNaranja) < SEPARACION_DE_UN_COLONO,
+    { dorado: alColonoMasCercano(elDorado), naranja: alColonoMasCercano(elOtroNaranja) },
   );
-  const entrePardos = pardos.flatMap((a, i) => pardos.slice(i + 1).map((b) => cie76(a.rgb, b.rgb)));
+  const entreTonos = tonos.flatMap((a, i) => tonos.slice(i + 1).map((b) => cie76(a.rgb, b.rgb)));
   comprobar(
-    `y los tres se distinguen entre sí —claro, grisáceo, oscuro—: ${Math.min(...entrePardos).toFixed(1)} CIE76 en el par más cercano, una gama y no un solo pardo`,
-    entrePardos.length === 3 && Math.min(...entrePardos) >= 10,
-    entrePardos,
+    `y las seis se distinguen entre sí: ${Math.min(...entreTonos).toFixed(1)} CIE76 en el par más cercano, o no serían seis tonos sino tres repetidos`,
+    entreTonos.length === 15 && Math.min(...entreTonos) >= 10,
+    entreTonos.map((d) => d.toFixed(1)),
+  );
+  /*
+   * LA GAMA, medida en Lab: b* es el eje azul–amarillo, así que un gris está cerca de cero y
+   * un amarillo apagado bien por encima; L* es la claridad. Que las seis vayan del gris al
+   * amarillo y del claro al oscuro es lo que Miguel pidió vuelto número, y lo que un «tres
+   * pardos parecidos» no cumpliría.
+   */
+  const labs = tonos.map((p) => aLab(p.rgb));
+  const abanicoDeAmarillo = Math.max(...labs.map((l) => l[2])) - Math.min(...labs.map((l) => l[2]));
+  const abanicoDeClaridad = Math.max(...labs.map((l) => l[0])) - Math.min(...labs.map((l) => l[0]));
+  comprobar(
+    `y son una gama y no un solo pardo: del gris (b* ${Math.min(...labs.map((l) => l[2])).toFixed(0)}) al amarillo apagado (b* ${Math.max(...labs.map((l) => l[2])).toFixed(0)}), y del oscuro (L* ${Math.min(...labs.map((l) => l[0])).toFixed(0)}) al claro (L* ${Math.max(...labs.map((l) => l[0])).toFixed(0)})`,
+    abanicoDeAmarillo >= 25 && abanicoDeClaridad >= 30 && Math.min(...labs.map((l) => l[2])) < 5,
+    { abanicoDeAmarillo, abanicoDeClaridad },
   );
 
   // ── 2. El traslado sobre las UV de verdad ──
@@ -9529,7 +9560,7 @@ paso('El caserío del paisaje es pardo y tiene tope: tres columnas del atlas lej
    * derivada, entra solo.
    */
   comprobar(
-    `los edificios que se llevan a pardo salen de poblar.ts y son ${String(EDIFICIOS_DEL_CASERIO.size)}: la lista no está escrita a mano`,
+    `los edificios que cambian de tono salen de poblar.ts y son ${String(EDIFICIOS_DEL_CASERIO.size)}: la lista no está escrita a mano`,
     EDIFICIOS_DEL_CASERIO.size === 14 &&
       EDIFICIOS_DEL_CASERIO.has('casa') &&
       EDIFICIOS_DEL_CASERIO.has('mercado') &&
@@ -9566,7 +9597,7 @@ paso('El caserío del paisaje es pardo y tiene tope: tres columnas del atlas lej
   /*
    * ═══ UNA SOLA COLUMNA DE COLONO POR EDIFICIO, QUE ES LO QUE HACE EL TRASLADO POSIBLE ═══
    *
-   * El salto se calcula por vértice desde la columna en la que ese vértice está. Si un edificio
+   * El salto se calcula por vértice desde la celda en la que ese vértice está. Si un edificio
    * pintara en DOS de las cuatro columnas de colono —tejado rojo y puerta amarilla, pongamos—
    * las dos irían a parar a la misma celda y el edificio saldría de un color plano. Medido: los
    * catorce pintan en una sola. La herrería, el taller y la ermita tienen ADEMÁS vértices en las
@@ -9593,35 +9624,48 @@ paso('El caserío del paisaje es pardo y tiene tope: tres columnas del atlas lej
   );
 
   /*
-   * ═══ EL TRASLADO A PARDO, HECHO SOBRE LAS UV DE VERDAD ═══
+   * ═══ EL TRASLADO A CADA CELDA, HECHO SOBRE LAS UV DE VERDAD ═══
    *
-   * Se recorren los vértices de cada edificio dentro del .glb, se les aplica saltoALaColumna
-   * y se comprueba que TODOS los que llevaban un color de colono acaban en la columna parda
-   * pedida, para las tres; y que ninguno de los otros se ha movido un solo téxel.
+   * Se recorren los vértices de cada edificio dentro del .glb, se les aplica saltoALaCelda y
+   * se comprueba que TODOS los que llevaban un color de colono acaban en la celda pedida —en
+   * su columna Y en su fila, que ahora las hay de tres filas— para las seis; y que ninguno de
+   * los otros se ha movido un solo téxel.
    */
   const malLlevados: string[] = [];
   let verticesTrasladados = 0;
   for (const nombre of EDIFICIOS_DEL_CASERIO) {
     const suyas = uvDe(nombre);
-    for (const columna of COLUMNAS_DEL_CASERIO) {
+    for (const celda of CELDAS_DEL_CASERIO) {
       for (const [u, v] of suyas) {
         if (!esDeUnColorDeJugador(u, v)) continue;
         verticesTrasladados++;
-        const llega = Math.floor((u + saltoALaColumna(u, columna)) * COLUMNAS_DEL_ATLAS);
-        if (llega !== columna) malLlevados.push(`${nombre}/${String(columna)}: llega a ${String(llega)}`);
+        const salto = saltoALaCelda(u, v, celda);
+        const llegaColumna = Math.floor((u + salto.u) * COLUMNAS_DEL_ATLAS);
+        const llegaFila = Math.floor((v + salto.v) * FILAS_DEL_ATLAS);
+        if (llegaColumna !== celda[0] || llegaFila !== celda[1]) {
+          malLlevados.push(`${nombre}/${llaveDeCelda(celda)}: llega a ${String(llegaColumna)},${String(llegaFila)}`);
+        }
       }
     }
   }
   comprobar(
-    `los ${String(verticesTrasladados)} vértices de color de los catorce edificios acaban EXACTAMENTE en la columna parda pedida, para las tres columnas`,
+    `los ${String(verticesTrasladados)} vértices de color de los catorce edificios acaban EXACTAMENTE en la celda pedida —columna y fila— para las seis celdas`,
     verticesTrasladados > 0 && malLlevados.length === 0,
-    [...new Set(malLlevados)],
+    [...new Set(malLlevados)].slice(0, 8),
   );
   const laFilaDelColor = (FILA_DEL_COLOR + 0.5) / FILAS_DEL_ATLAS;
+  /*
+   * LA VACUNA DE LA FILA: la vieja saltoALaColumna movía sólo u, y con celdas de otras filas
+   * eso deja el tejado en la columna buena de la fila EQUIVOCADA: la (2,3) es el amarillo. Se
+   * afirma que un salto sin la fila no llega, para que nadie lo «simplifique».
+   */
+  const unaDeOtraFila = CELDAS_DEL_CASERIO.find((celda) => celda[1] !== FILA_DEL_COLOR);
   comprobar(
-    'y después del traslado ya no son de ningún colono: esDeUnColorDeJugador dice que no a las tres columnas pardas, así que pedir el pardo dos veces no mueve nada',
-    COLUMNAS_DEL_CASERIO.every((c) => !esDeUnColorDeJugador((c + 0.5) / COLUMNAS_DEL_ATLAS, laFilaDelColor)),
-    [...COLUMNAS_DEL_CASERIO],
+    'se ve fallar: hay celdas del caserío fuera de la fila del color, y un salto que sólo moviera la columna las dejaría en la fila del colono',
+    unaDeOtraFila !== undefined &&
+      Math.floor((laFilaDelColor + saltoALaCelda(0.5 / COLUMNAS_DEL_ATLAS, laFilaDelColor, unaDeOtraFila).v) * FILAS_DEL_ATLAS) === unaDeOtraFila[1] &&
+      Math.floor(laFilaDelColor * FILAS_DEL_ATLAS) !== unaDeOtraFila[1],
+    unaDeOtraFila,
   );
 
   /*
@@ -9661,7 +9705,7 @@ paso('El caserío del paisaje es pardo y tiene tope: tres columnas del atlas lej
     esDeUnColorDeJugador(0.5 / COLUMNAS_DEL_ATLAS, (f + 0.5) / FILAS_DEL_ATLAS),
   );
   comprobar(
-    'y rechaza las otras tres filas del atlas, que son el suelo, las maderas y las piedras',
+    'y rechaza las otras tres filas del atlas, que son el suelo, las maderas y las piedras: por eso pedir el tono dos veces no mueve nada',
     otrasFilas.length === 0,
     otrasFilas,
   );
@@ -9707,39 +9751,19 @@ paso('El caserío del paisaje es pardo y tiene tope: tres columnas del atlas lej
     cruzadosDelCaserio,
   );
 
-  // ── 4. El tono por comarca, sobre mundos de verdad ──
-
-  const SEMILLAS_DEL_CASERIO = 12;
-  const tonosPorMundo = Array.from({ length: SEMILLAS_DEL_CASERIO }, (_, semilla) =>
-    islasDelDelta.map((isla) => tonoDelCaserio(isla.hex, semilla)),
-  );
-  const fueraDeLosPardos = tonosPorMundo.flat().filter((tono) => !COLUMNAS_DEL_CASERIO.includes(tono));
-  comprobar(
-    `el tono de cada comarca es una de las tres columnas pardas, en ${String(SEMILLAS_DEL_CASERIO)} mundos y ${String(islasDelDelta.length)} comarcas`,
-    fueraDeLosPardos.length === 0,
-    fueraDeLosPardos,
-  );
-  const deUnSoloPardo = tonosPorMundo.filter((tonos) => new Set(tonos).size < 2).length;
-  comprobar(
-    'en esos mundos salen los tres pardos, y ninguno es de un solo pardo: cada aldea de su piedra, y una gama',
-    new Set(tonosPorMundo.flat()).size === 3 && deUnSoloPardo === 0,
-    { distintos: [...new Set(tonosPorMundo.flat())], deUnSoloPardo },
-  );
-  const otraVez = islasDelDelta.map((isla) => tonoDelCaserio(isla.hex, 0));
-  const cambianConLaSemilla = islasDelDelta.filter((_, i) => tonosPorMundo[0]?.[i] !== tonosPorMundo[1]?.[i]).length;
-  comprobar(
-    `el reparto es determinista —el mismo mundo da lo mismo dos veces— y depende de la semilla: ${String(cambianConLaSemilla)} de ${String(islasDelDelta.length)} comarcas cambian de pardo entre la semilla 0 y la 1`,
-    otraVez.every((tono, i) => tono === tonosPorMundo[0]?.[i]) && cambianConLaSemilla > 0,
-    cambianConLaSemilla,
-  );
-
-  // ── 5. El tope, sobre mundos de verdad ──
+  // ── 4. El tono por comarca y modelo, y el tope, sobre mundos de verdad ──
 
   /*
    * SE RECORRE COMO LO RECORRE LA ESCENA: las teselas de siembra son las de poblar.ts
-   * (esTierraDeSiembra), la poda se calcula sobre ésas, y se planta con queVaEn y su tercer
-   * argumento. Sin caminos, porque aquí no hay red; la escena además salta los suyos.
+   * (esTierraDeSiembra), la poda se calcula sobre ésas, se planta con queVaEn y su tercer
+   * argumento, y cada edificio pide su tono a tonoDelCaserio con su comarca y su modelo. Sin
+   * caminos, porque aquí no hay red; la escena además salta los suyos.
    */
+  interface EdificioMedido {
+    comarca: string;
+    modelo: string;
+    tono: number;
+  }
   interface ComarcaMedida {
     sinPoda: number;
     conPoda: number;
@@ -9747,16 +9771,19 @@ paso('El caserío del paisaje es pardo y tiene tope: tres columnas del atlas lej
     /** La habitabilidad más baja de lo que se queda con edificio, y la más alta de lo podado. */
     quedaMinima: number;
     podadaMaxima: number;
+    edificios: EdificioMedido[];
   }
   const medirElMundo = (semilla: number): ComarcaMedida[] => {
     const relieve = crearRelieve(islasDelDelta, semilla);
     return islasDelDelta.map((isla) => {
       const teselas = relieve.subteselasDe(isla.hex).filter((t) => esTierraDeSiembra(t));
       const podadas = podaDelCaserio(teselas, isla.terreno);
+      const comarca = `${String(isla.hex.q)},${String(isla.hex.r)}`;
       let sinPoda = 0;
       let conPoda = 0;
       let quedaMinima = Infinity;
       let podadaMaxima = -Infinity;
+      const edificios: EdificioMedido[] = [];
       for (const t of teselas) {
         const levanta = queVaEn(t, isla.terreno).some((p) => EDIFICIOS_DEL_CASERIO.has(p.modelo));
         if (!levanta) continue;
@@ -9765,18 +9792,64 @@ paso('El caserío del paisaje es pardo y tiene tope: tres columnas del atlas lej
           podadaMaxima = Math.max(podadaMaxima, t.habitabilidad);
           continue;
         }
-        if (queVaEn(t, isla.terreno, podadas.has(t)).some((p) => EDIFICIOS_DEL_CASERIO.has(p.modelo))) {
+        for (const p of queVaEn(t, isla.terreno, podadas.has(t))) {
+          if (!EDIFICIOS_DEL_CASERIO.has(p.modelo)) continue;
           conPoda++;
           quedaMinima = Math.min(quedaMinima, t.habitabilidad);
+          edificios.push({ comarca, modelo: p.modelo, tono: tonoDelCaserio(isla.hex, p.modelo, semilla) });
         }
       }
-      return { sinPoda, conPoda, podadas: podadas.size, quedaMinima, podadaMaxima };
+      return { sinPoda, conPoda, podadas: podadas.size, quedaMinima, podadaMaxima, edificios };
     });
   };
-  const comarcasMedidas = Array.from({ length: SEMILLAS_DEL_CASERIO }, (_, s) => medirElMundo(s));
-  const todas = comarcasMedidas.flat();
-  const porTableroSin = comarcasMedidas.map((m) => m.reduce((a, c) => a + c.sinPoda, 0));
-  const porTableroCon = comarcasMedidas.map((m) => m.reduce((a, c) => a + c.conPoda, 0));
+  const SEMILLAS_DEL_CASERIO = 12;
+  const mundos = Array.from({ length: SEMILLAS_DEL_CASERIO }, (_, s) => medirElMundo(s));
+  const todas = mundos.flat();
+  const edificiosMedidos = todas.flatMap((c) => c.edificios);
+  const fueraDeLosTonos = edificiosMedidos.filter((e) => !Number.isInteger(e.tono) || e.tono < 0 || e.tono >= CELDAS_DEL_CASERIO.length);
+  comprobar(
+    `el tono de cada uno de los ${String(edificiosMedidos.length)} edificios de ${String(SEMILLAS_DEL_CASERIO)} mundos es una de las seis celdas`,
+    edificiosMedidos.length > 0 && fueraDeLosTonos.length === 0,
+    fueraDeLosTonos.slice(0, 5),
+  );
+  const tonosPorMundo = mundos.map((m) => new Set(m.flatMap((c) => c.edificios.map((e) => e.tono))).size);
+  comprobar(
+    `en cada mundo salen por lo menos cuatro de los seis tonos (${tonosPorMundo.join(', ')}) y entre los doce salen los seis: una gama, no un pardo`,
+    tonosPorMundo.every((n) => n >= 4) && new Set(edificiosMedidos.map((e) => e.tono)).size === CELDAS_DEL_CASERIO.length,
+    tonosPorMundo,
+  );
+  const conVariedadDentro = todas.filter((c) => new Set(c.edificios.map((e) => e.tono)).size >= 2).length;
+  const conEdificios = todas.filter((c) => c.edificios.length >= 2).length;
+  comprobar(
+    `y la variedad se ve DENTRO de la aldea: ${String(conVariedadDentro)} de las ${String(conEdificios)} comarcas con dos edificios o más tienen dos tonos o más, porque el tono va con el modelo y no sólo con la comarca`,
+    conEdificios > 0 && conVariedadDentro > conEdificios / 2,
+    { conVariedadDentro, conEdificios },
+  );
+  const mismoModeloMismoTono = todas.every((c) => {
+    const porModelo = new Map<string, number>();
+    return c.edificios.every((e) => {
+      const visto = porModelo.get(e.modelo);
+      porModelo.set(e.modelo, e.tono);
+      return visto === undefined || visto === e.tono;
+    });
+  });
+  comprobar(
+    'pero dentro de una aldea todas las casas son de la misma cantera: el mismo modelo en la misma comarca lleva siempre el mismo tono, que es lo que mantiene los grupos de dibujo en comarca × modelo',
+    mismoModeloMismoTono,
+    mismoModeloMismoTono,
+  );
+  const otraVez = mundos[0]?.every((c) => c.edificios.every((e) => e.tono === tonoDelCaserio({ q: Number(e.comarca.split(',')[0]), r: Number(e.comarca.split(',')[1]) }, e.modelo, 0))) ?? false;
+  const cambianConLaSemilla = islasDelDelta.filter(
+    (isla) => tonoDelCaserio(isla.hex, 'casa', 0) !== tonoDelCaserio(isla.hex, 'casa', 1),
+  ).length;
+  comprobar(
+    `el reparto es determinista —el mismo mundo da lo mismo dos veces— y depende de la semilla: ${String(cambianConLaSemilla)} de ${String(islasDelDelta.length)} comarcas cambian el tono de sus casas entre la semilla 0 y la 1`,
+    otraVez && cambianConLaSemilla > 0,
+    cambianConLaSemilla,
+  );
+
+  const porTableroSin = mundos.map((m) => m.reduce((a, c) => a + c.sinPoda, 0));
+  const porTableroCon = mundos.map((m) => m.reduce((a, c) => a + c.conPoda, 0));
   const mediana = (xs: number[]): number => [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)] as number;
   const media = (xs: number[]): number => xs.reduce((a, b) => a + b, 0) / xs.length;
   const TOPE = TOPE_DE_EDIFICIOS_POR_COMARCA;
@@ -9831,13 +9904,13 @@ paso('El caserío del paisaje es pardo y tiene tope: tres columnas del atlas lej
     unaPodada?.t.sub,
   );
 
-  // ── 6. Lo que la escena hace con esto, leído del texto de delta.tsx ──
+  // ── 5. Lo que la escena hace con esto, leído del texto de delta.tsx ──
 
   /*
    * Por lo de siempre: dentro de un componente con useMemo y JSX no entra un guion de Node, y
    * lo que hay que vigilar aquí es ESTRUCTURA — que el plan del mundo no dependa de las piezas,
-   * que los grupos del caserío tampoco, que las geometrías pardas se fabriquen una vez y se
-   * suelten, y que la tabla teñida sea sólo del asentamiento.
+   * que los grupos del caserío tampoco, que las geometrías de tono se fabriquen sólo para las
+   * parejas del plan y se suelten, y que la tabla teñida sea sólo del asentamiento.
    */
   const fuenteDelCaserio = fs.readFileSync(
     path.join(import.meta.dirname ?? __dirname, '..', 'delta.tsx'),
@@ -9857,23 +9930,23 @@ paso('El caserío del paisaje es pardo y tiene tope: tres columnas del atlas lej
   const elPueblo = trozoDelCodigo('const pueblos = useMemo(', 'const coloresEnJuego');
   const elTenido = trozoDelCodigo('const caserioTenido = useMemo(', 'const caserioNeutro = useMemo(');
   const elNeutro = trozoDelCodigo('const caserioNeutro = useMemo(', 'const seca = useMemo(');
-  const elTinte = trozoDelCodigo('function aLaColumna(', '/** Una copia colocada');
+  const elTinte = trozoDelCodigo('function aLaCelda(', '/** Una copia colocada');
   /*
    * SE PIDE LA LÍNEA ENTERA Y NO «que aparezca EDIFICIOS_DEL_CASERIO», y eso es una lección
    * pagada: con el test flojo, anteponerle un false && a la condición dejaba el caserío otra
-   * vez dentro de cosas —o sea sin su pardo— y el comprobador seguía en verde, porque el
+   * vez dentro de cosas —o sea sin su tono— y el comprobador seguía en verde, porque el
    * nombre seguía escrito. Un includes sobre un nombre no distingue una rama viva de una muerta.
    */
   comprobar(
-    'el plan del mundo APARTA los edificios del caserío con su tono en vez de meterlos en cosas, y la rama está VIVA',
+    'el plan del mundo APARTA los edificios del caserío con el tono de su comarca y modelo en vez de meterlos en cosas, y la rama está VIVA',
     /\n\s*if \(EDIFICIOS_DEL_CASERIO\.has\(puesto\.modelo\)\) \{\n/.test(elPlan) &&
-      /\n\s*caserio\.push\(\{ llave, modelo: puesto\.modelo, puesta, tono \}\);\n/.test(elPlan) &&
+      /\n\s*caserio\.push\(\{ llave, modelo: puesto\.modelo, puesta, tono: tonoDelCaserio\(isla\.hex, puesto\.modelo, semilla\) \}\);\n/.test(elPlan) &&
       /\n\s*empuja\(cosas, `\$\{llave\}\|\$\{puesto\.modelo\}`, puesta\);\n/.test(elPlan),
     elPlan.length,
   );
   comprobar(
-    'el plan decide la siembra UNA vez por tesela con la tierra de poblar.ts y los caminos de la red, poda y entona una vez por comarca, y planta con el tercer argumento de queVaEn: la poda no es un adorno',
-    /const sembrables = new Set\(\s*teselas\.filter\(\(t\) => esTierraDeSiembra\(t\) && red\.piezas\.get\(llaveDe\(t\.sub\)\) === undefined\),\s*\);\s*const podadas = podaDelCaserio\(\[\.\.\.sembrables\], isla\.terreno\);\s*const tono = tonoDelCaserio\(isla\.hex, semilla\);/.test(elPlan) &&
+    'el plan decide la siembra UNA vez por tesela con la tierra de poblar.ts y los caminos de la red, poda una vez por comarca, y planta con el tercer argumento de queVaEn: la poda no es un adorno',
+    /const sembrables = new Set\(\s*teselas\.filter\(\(t\) => esTierraDeSiembra\(t\) && red\.piezas\.get\(llaveDe\(t\.sub\)\) === undefined\),\s*\);\s*const podadas = podaDelCaserio\(\[\.\.\.sembrables\], isla\.terreno\);/.test(elPlan) &&
       /\n\s*if \(!sembrables\.has\(t\)\) continue;\n/.test(elPlan) &&
       /for \(const puesto of queVaEn\(t, isla\.terreno, podadas\.has\(t\)\)\) \{/.test(elPlan),
     elPlan.length,
@@ -9901,70 +9974,78 @@ paso('El caserío del paisaje es pardo y tiene tope: tres columnas del atlas lej
     elTenido.length,
   );
   comprobar(
-    'las geometrías pardas se fabrican UNA vez —para las tres columnas y los catorce edificios, sin mirar las piezas— y hay quien las suelte',
+    'las geometrías de tono se fabrican SÓLO para las parejas (modelo, tono) del plan —no las 84—, sin mirar las piezas, y hay quien las suelte',
     elNeutro.length > 0 &&
-      /for \(const columna of COLUMNAS_DEL_CASERIO\)/.test(elNeutro) &&
-      /for \(const modelo of EDIFICIOS_DEL_CASERIO\)/.test(elNeutro) &&
-      /aLaColumna\(base, columna, propias\)/.test(elNeutro) &&
-      /\}, \[aplanados\]\);/.test(elNeutro) &&
-      !/datos\.piezas|coloresEnJuego/.test(elNeutro) &&
+      /for \(const edificio of plan\.caserio\)/.test(elNeutro) &&
+      /if \(tabla\.has\(nombre\)\) continue;/.test(elNeutro) &&
+      /const celda = CELDAS_DEL_CASERIO\[edificio\.tono\];/.test(elNeutro) &&
+      /aLaCelda\(base, celda, propias\)/.test(elNeutro) &&
+      /\}, \[aplanados, plan\.caserio\]\);/.test(elNeutro) &&
+      !/datos\.piezas|coloresEnJuego|for \(const celda of CELDAS_DEL_CASERIO\)/.test(elNeutro) &&
       /for \(const geometria of caserioNeutro\.propias\) geometria\.dispose\(\);/.test(codigoDelCaserio),
     elNeutro.length,
   );
   /*
    * ═══ Y EL TRASLADO SÓLO TOCA LO QUE ES DE UN COLOR, LEÍDO DEL CÓDIGO ═══
    *
-   * aLaColumna es la única función de la escena que escribe UV de color, y lo hace dentro de
-   * un bucle sobre TODOS los vértices de la malla: lo único que separa «se repinta el tejado»
-   * de «se repinta el edificio entero de un color plano» es la guarda de una línea. Se mide el
-   * TEXTO: la escritura tiene que ir justo detrás de su guarda.
+   * aLaCelda es la única función de la escena que escribe UV de color, y lo hace dentro de un
+   * bucle sobre TODOS los vértices de la malla: lo único que separa «se repinta el tejado» de
+   * «se repinta el edificio entero de un color plano» es la guarda de una línea. Se mide el
+   * TEXTO: la escritura tiene que ir justo detrás de su guarda, y escribir las DOS coordenadas.
    */
   comprobar(
-    'el traslado salta los vértices que no son de ningún colono ANTES de escribirlos: sin esa guarda, el edificio entero saldría de un color plano y ninguna otra comprobación lo vería',
-    /if \(!esDeUnColorDeJugador\(u, suyaUv\.getY\(i\)\)\) continue;\n\s*suyaUv\.setX\(i, u \+ saltoALaColumna\(u, columna\)\);/.test(elTinte),
+    'el traslado salta los vértices que no son de ningún colono ANTES de escribirlos, y escribe columna y fila: sin la guarda el edificio saldría de un color plano; sin la fila, en la fila del colono',
+    /if \(!esDeUnColorDeJugador\(u, v\)\) continue;\n\s*const salto = saltoALaCelda\(u, v, celda\);\n\s*suyaUv\.setXY\(i, u \+ salto\.u, v \+ salto\.v\);/.test(elTinte),
     elTinte.length,
   );
   comprobar(
-    'y decide si hace falta clonar mirando esa misma guarda: por eso una pieza pedida en su propio color es la geometría del catálogo y no un clon',
-    /esDeUnColorDeJugador\(u, uv\.getY\(i\)\) && saltoALaColumna\(u, columna\) !== 0/.test(elTinte),
+    'y decide si hace falta clonar mirando esa misma guarda y las dos coordenadas del salto: por eso una pieza pedida en su propia celda es la geometría del catálogo y no un clon',
+    /if \(!esDeUnColorDeJugador\(u, v\)\) continue;\n\s*const salto = saltoALaCelda\(u, v, celda\);\n\s*if \(salto\.u !== 0 \|\| salto\.v !== 0\) mueve = true;/.test(elTinte),
     elTinte.length,
   );
   comprobar(
-    'deOtroColor es aLaColumna con la columna del color, y lo que se pinta busca la variante parda para el paisaje y la teñida para el asentamiento: no hay dos maneras de teñir',
-    /return aLaColumna\(mallas, columnaDelColor\(color\), propias\);/.test(codigoDelCaserio) &&
+    'deOtroColor es aLaCelda con la celda del color, y lo que se pinta busca la variante de tono para el paisaje y la teñida para el asentamiento: no hay dos maneras de teñir',
+    /return aLaCelda\(mallas, \[columnaDelColor\(color\), CELDA_DEL_JUGADOR\[1\]\], propias\);/.test(codigoDelCaserio) &&
       /caserioNeutro\.tabla\.get\(nombre\) \?\? aplanados\.get\(nombre\)/.test(codigoDelCaserio) &&
       /tenido\.get\(`\$\{parte\.modelo\}-\$\{pieza\.color\}`\) \?\? aplanados\.get\(parte\.modelo\)/.test(codigoDelCaserio),
     /caserioNeutro\.tabla\.get/.test(codigoDelCaserio),
   );
 
-  // ── 7. Cuánto se clona, y que es lo que se dice ──
+  // ── 6. Cuánto se clona, medido sobre los mundos ──
 
   /*
    * Un clon lleva posición, normal y UV en float32: 32 bytes por vértice. Ninguno de los
-   * catorce viene del pack en una columna parda, así que los tres pardos clonan los catorce
-   * enteros; el asentamiento clona la casa y el pozo por color en juego. Se afirma la cuenta
-   * para que el día que alguien meta un cuarto pardo o tiña los catorce otra vez, el número
-   * cambie aquí.
+   * catorce viene del pack en una celda del caserío, así que cada pareja (modelo, tono) que el
+   * mundo usa clona su modelo entero; el asentamiento clona la casa y el pozo por color en
+   * juego. Se afirma la cuenta sobre los doce mundos para que el día que alguien fabrique las
+   * 84 parejas «por si acaso», o tiña los catorce otra vez, el número cambie aquí.
    */
-  const verticesDeLosCatorce = [...EDIFICIOS_DEL_CASERIO].reduce((suma, n) => suma + uvDe(n).length, 0);
-  let seClonanPardos = 0;
-  for (const columna of COLUMNAS_DEL_CASERIO) {
-    for (const nombre of EDIFICIOS_DEL_CASERIO) {
-      const suyas = uvDe(nombre);
-      if (suyas.some(([u, v]) => esDeUnColorDeJugador(u, v) && saltoALaColumna(u, columna) !== 0)) {
-        seClonanPardos += suyas.length;
-      }
-    }
-  }
-  const delAsentamientoPorColor = [...EDIFICIOS_DEL_ASENTAMIENTO].reduce((suma, n) => suma + uvDe(n).length, 0);
-  const enMiB = (vertices: number): string => ((vertices * 32) / 1024 / 1024).toFixed(2);
+  const verticesDe = new Map([...EDIFICIOS_DEL_CASERIO].map((n) => [n, uvDe(n).length] as const));
+  const parejasPorMundo = mundos.map((m) => new Set(m.flatMap((c) => c.edificios.map((e) => `${e.modelo}-${String(e.tono)}`))));
+  const bytesPorMundo = parejasPorMundo.map((parejas) =>
+    [...parejas].reduce((suma, pareja) => suma + (verticesDe.get(pareja.slice(0, pareja.lastIndexOf('-'))) ?? 0) * 32, 0),
+  );
+  const cuantasParejas = parejasPorMundo.map((p) => p.size);
+  const enMiB = (bytes: number): string => (bytes / 1024 / 1024).toFixed(2);
+  const seClonanTodas = [...EDIFICIOS_DEL_CASERIO].every((nombre) =>
+    CELDAS_DEL_CASERIO.every((celda) =>
+      uvDe(nombre).some(([u, v]) => {
+        if (!esDeUnColorDeJugador(u, v)) return false;
+        const salto = saltoALaCelda(u, v, celda);
+        return salto.u !== 0 || salto.v !== 0;
+      }),
+    ),
+  );
+  const delAsentamientoPorColor = [...EDIFICIOS_DEL_ASENTAMIENTO].reduce((suma, n) => suma + (verticesDe.get(n) ?? 0), 0);
   comprobar(
-    `los tres pardos clonan los catorce enteros: ${String(verticesDeLosCatorce)} vértices × 3 = ${enMiB(seClonanPardos)} MiB, una vez y para siempre; y el asentamiento paga ${String(delAsentamientoPorColor)} vértices (${((delAsentamientoPorColor * 32) / 1024).toFixed(0)} KiB) por color en juego, no los catorce`,
-    verticesDeLosCatorce > 0 &&
-      seClonanPardos === verticesDeLosCatorce * COLUMNAS_DEL_CASERIO.length &&
+    `un mundo usa ${media(cuantasParejas).toFixed(1)} parejas (modelo, tono) de media y ${String(Math.max(...cuantasParejas))} como mucho, de las ${String(EDIFICIOS_DEL_CASERIO.size * CELDAS_DEL_CASERIO.length)} posibles: ${enMiB(media(bytesPorMundo))} MiB de media y ${enMiB(Math.max(...bytesPorMundo))} como mucho, cada pareja su modelo entero; y el asentamiento paga ${String(delAsentamientoPorColor)} vértices (${((delAsentamientoPorColor * 32) / 1024).toFixed(0)} KiB) por color en juego`,
+    seClonanTodas &&
+      Math.max(...cuantasParejas) <= EDIFICIOS_DEL_CASERIO.size * CELDAS_DEL_CASERIO.length &&
+      media(cuantasParejas) < 60 &&
+      media(bytesPorMundo) < 6 * 1024 * 1024 &&
       delAsentamientoPorColor > 0 &&
-      delAsentamientoPorColor < verticesDeLosCatorce / 4,
-    { verticesDeLosCatorce, seClonanPardos, delAsentamientoPorColor },
+      delAsentamientoPorColor < 0.1 * [...verticesDe.values()].reduce((a, b) => a + b, 0),
+    { cuantasParejas, bytesPorMundo: bytesPorMundo.map(enMiB), delAsentamientoPorColor },
   );
 }
 
@@ -10008,7 +10089,7 @@ if (fallos.length > 0) {
  * sería un rojo aleatorio. Medido: no hay ninguna: las treinta que no son llamadas sueltas
  * están en bucles sobre listas escritas en el propio guion.
  */
-const COMPROBACIONES_ESCRITAS = 513;
+const COMPROBACIONES_ESCRITAS = 516;
 if (hechas < COMPROBACIONES_ESCRITAS) {
   console.error(
     `Solo se han hecho ${hechas} de las ${COMPROBACIONES_ESCRITAS} comprobaciones que ` +

@@ -139,13 +139,15 @@ import {
   colorDelBien,
   desplazamientoDeCelda,
   esDeLaHierba,
-  COLUMNAS_DEL_CASERIO,
+  CELDA_DEL_JUGADOR,
+  CELDAS_DEL_CASERIO,
   columnaDelColor,
   esDeUnColorDeJugador,
   puntosDeLaCifra,
-  saltoALaColumna,
+  saltoALaCelda,
   terrenoDe,
 } from './paleta';
+import type { CeldaDelAtlas } from './paleta';
 import {
   COLORES_DE_JUGADOR,
   MODELO,
@@ -478,14 +480,15 @@ function aplana(modelo: THREE.Object3D): Instanciable[] {
  * en azul—. Con el caserío repintado eso ya no sirve: la casa de adorno pinta su tejado en la
  * columna 1, la iglesia en la 0, la taberna en la 2 y el mercado en la 3, así que no hay una
  * columna de origen y el salto se calcula VÉRTICE A VÉRTICE desde donde ese vértice ya está.
- * Ver `saltoALaColumna` en `paleta.ts`.
+ * Ver `saltoALaCelda` en `paleta.ts`.
  *
- * ═══ Y DESDE QUE EL PAISAJE ES PARDO, LA COLUMNA NO ES SIEMPRE LA DE UN COLOR ═══
+ * ═══ Y DESDE QUE EL PAISAJE ES GRIS, PARDO O ARENA, LA CELDA NO ES SIEMPRE LA DE UN COLOR ═══
  *
  * `deOtroColor` tiñe del color de un jugador —las piezas y las casas de su asentamiento— y
- * `aLaColumna` es lo que hay debajo: llevar los vértices de color a UNA columna de la fila,
- * sea la de un colono o una de las tres pardas del caserío (`COLUMNAS_DEL_CASERIO`). Una sola
- * función escribe UV de color; no hay dos maneras de teñir.
+ * `aLaCelda` es lo que hay debajo: llevar los vértices de color a UNA celda del atlas, sea
+ * la de un colono en la fila del color o una de las seis del caserío (`CELDAS_DEL_CASERIO`),
+ * que están en cualquier fila. Una sola función escribe UV de color; no hay dos maneras de
+ * teñir.
  *
  * Y sólo se mueve lo que ES de un color de jugador. Un castillo tiene piedra, madera y tejado;
  * la herrería pinta 41 vértices en la columna 4 y el muelle 388 entre la 5, la 6 y la 7, y ésos
@@ -505,12 +508,12 @@ function deOtroColor(
   color: string,
   propias: THREE.BufferGeometry[],
 ): Instanciable[] {
-  return aLaColumna(mallas, columnaDelColor(color), propias);
+  return aLaCelda(mallas, [columnaDelColor(color), CELDA_DEL_JUGADOR[1]], propias);
 }
 
-function aLaColumna(
+function aLaCelda(
   mallas: readonly Instanciable[],
-  columna: number,
+  celda: CeldaDelAtlas,
   propias: THREE.BufferGeometry[],
 ): Instanciable[] {
   return mallas.map(({ geometria, material }) => {
@@ -519,15 +522,20 @@ function aLaColumna(
     let mueve = false;
     for (let i = 0; i < uv.count && !mueve; i++) {
       const u = uv.getX(i);
-      if (esDeUnColorDeJugador(u, uv.getY(i)) && saltoALaColumna(u, columna) !== 0) mueve = true;
+      const v = uv.getY(i);
+      if (!esDeUnColorDeJugador(u, v)) continue;
+      const salto = saltoALaCelda(u, v, celda);
+      if (salto.u !== 0 || salto.v !== 0) mueve = true;
     }
     if (!mueve) return { geometria, material };
     const suya = geometria.clone();
     const suyaUv = suya.getAttribute('uv') as THREE.BufferAttribute;
     for (let i = 0; i < suyaUv.count; i++) {
       const u = suyaUv.getX(i);
-      if (!esDeUnColorDeJugador(u, suyaUv.getY(i))) continue;
-      suyaUv.setX(i, u + saltoALaColumna(u, columna));
+      const v = suyaUv.getY(i);
+      if (!esDeUnColorDeJugador(u, v)) continue;
+      const salto = saltoALaCelda(u, v, celda);
+      suyaUv.setXY(i, u + salto.u, v + salto.v);
     }
     suyaUv.needsUpdate = true;
     propias.push(suya);
@@ -4076,16 +4084,15 @@ export function Delta({
        * abajo, que salta lo que no se siembra. La tierra la dice `poblar.ts`; los caminos de
        * los jugadores los sabe la escena, porque llegan con la red.
        *
-       * Y EL PUEBLO DE ESTA COMARCA, ACOTADO Y DE UN SOLO PARDO: `podaDelCaserio` dice qué
-       * teselas se quedan sin edificio para no pasar del tope —las menos habitables, las
-       * afueras— y `tonoDelCaserio` de qué columna del atlas sale su piedra. Aquí no se
-       * decide nada; ver `poblar.ts` y `caserio.ts`.
+       * Y EL PUEBLO DE ESTA COMARCA, ACOTADO: `podaDelCaserio` dice qué teselas se quedan
+       * sin edificio para no pasar del tope —las menos habitables, las afueras—. El tono de
+       * cada edificio se pide abajo, al plantarlo, porque va por comarca Y modelo
+       * (`tonoDelCaserio`). Aquí no se decide nada; ver `poblar.ts` y `caserio.ts`.
        */
       const sembrables = new Set(
         teselas.filter((t) => esTierraDeSiembra(t) && red.piezas.get(llaveDe(t.sub)) === undefined),
       );
       const podadas = podaDelCaserio([...sembrables], isla.terreno);
-      const tono = tonoDelCaserio(isla.hex, semilla);
 
       for (const t of teselas) {
         /*
@@ -4285,13 +4292,14 @@ export function Delta({
           );
           /*
            * LOS EDIFICIOS DEL CASERÍO SE APARTAN AQUÍ porque no se pintan con la geometría
-           * del catálogo: se pintan con su variante PARDA (`caserioNeutro`), una por tono, y
-           * el grupo lleva el tono en el nombre. Ya no dependen de las piezas —el pardo es
-           * fijo por comarca, y era el color del dueño lo que los ataba a `datos.piezas`—,
-           * así que el memo de al lado que los agrupa sólo recorre lo que hay aquí.
+           * del catálogo: se pintan con su variante de TONO (`caserioNeutro`), una por modelo
+           * y tono, y el grupo lleva el tono en el nombre. Ya no dependen de las piezas —el
+           * tono es fijo por comarca y modelo, y era el color del dueño lo que los ataba a
+           * `datos.piezas`—, así que el memo de al lado que los agrupa sólo recorre lo que
+           * hay aquí.
            */
           if (EDIFICIOS_DEL_CASERIO.has(puesto.modelo)) {
-            caserio.push({ llave, modelo: puesto.modelo, puesta, tono });
+            caserio.push({ llave, modelo: puesto.modelo, puesta, tono: tonoDelCaserio(isla.hex, puesto.modelo, semilla) });
           } else {
             empuja(cosas, `${llave}|${puesto.modelo}`, puesta);
           }
@@ -4519,8 +4527,8 @@ export function Delta({
   }, [datos.piezas, datos.caminos, relieve]);
 
   /*
-   * LOS GRUPOS DEL CASERÍO: comarca × modelo × tono, y como el tono es uno por comarca son
-   * tantos como comarca × modelo. NO dependen de las piezas: un tablero con veinte chozas
+   * LOS GRUPOS DEL CASERÍO: comarca × modelo × tono, y como el tono va con la comarca y el
+   * modelo son tantos como comarca × modelo. NO dependen de las piezas: un tablero con veinte chozas
    * tiene el mismo pueblo que uno vacío, que es lo que pidió Miguel — el paisaje no lleva el
    * color de nadie. Aquí estaba `duenoDelCaserio`, que teñía cada edificio del color de la
    * choza más cercana; ver la cabecera de `caserio.ts` para por qué se quitó.
@@ -4579,29 +4587,31 @@ export function Delta({
   );
 
   /**
-   * LAS GEOMETRÍAS PARDAS DEL CASERÍO DEL PAISAJE, una por edificio y por tono, fabricadas
-   * UNA vez: no dependen de las piezas ni de los colores en juego, porque el paisaje ya no
-   * lleva el color de nadie (Miguel, 9-sep-2026). Son los catorce edificios por las tres
-   * columnas pardas de `COLUMNAS_DEL_CASERIO`, y como ninguno de los catorce viene del pack
-   * en una columna parda, los tres tonos se clonan enteros: 48.690 vértices × 3 × 32 bytes,
-   * 4,46 MiB, medidos sobre `tablero.glb` y recontados por `verify:escena`, que afirma además
-   * que no se clona nada más. Es lo que cuesta que cada
-   * aldea salga de su piedra sin multiplicar los grupos de dibujo; un solo pardo costaría un
-   * tercio y llevar el salto de UV al sombreador con un atributo por copia costaría cero,
-   * pero toca el material de todo el catálogo y no se hace a ciegas.
+   * LAS GEOMETRÍAS DE TONO DEL CASERÍO DEL PAISAJE, una por modelo y tono, y SÓLO las que
+   * este mundo usa: no dependen de las piezas ni de los colores en juego, porque el paisaje
+   * ya no lleva el color de nadie (Miguel, 9-sep-2026); dependen del plan, porque con seis
+   * celdas y catorce edificios fabricar las 84 parejas costaría el doble de lo que se usa.
+   * Medido sobre doce mundos: 45,8 parejas de media y 53 como mucho —de las 84—, 4,72 MiB de
+   * media y 5,43 como mucho, y como
+   * ningún edificio viene del pack en una celda del caserío, cada pareja clona su modelo
+   * entero, 32 bytes por vértice. `verify:escena` lo recuenta y afirma que no se clona nada
+   * más. Es lo que cuesta que cada aldea salga de su cantera sin multiplicar los grupos de
+   * dibujo; llevar el salto de UV al sombreador con un atributo por copia costaría cero, pero
+   * toca el material de todo el catálogo y no se hace a ciegas.
    */
   const caserioNeutro = useMemo(() => {
     const tabla = new Map<string, Instanciable[]>();
     const propias: THREE.BufferGeometry[] = [];
-    for (const columna of COLUMNAS_DEL_CASERIO) {
-      for (const modelo of EDIFICIOS_DEL_CASERIO) {
-        const base = aplanados.get(modelo);
-        if (base === undefined) continue;
-        tabla.set(`${modelo}-${String(columna)}`, aLaColumna(base, columna, propias));
-      }
+    for (const edificio of plan.caserio) {
+      const nombre = `${edificio.modelo}-${String(edificio.tono)}`;
+      if (tabla.has(nombre)) continue;
+      const base = aplanados.get(edificio.modelo);
+      const celda = CELDAS_DEL_CASERIO[edificio.tono];
+      if (base === undefined || celda === undefined) continue;
+      tabla.set(nombre, aLaCelda(base, celda, propias));
     }
     return { tabla, propias };
-  }, [aplanados]);
+  }, [aplanados, plan.caserio]);
 
   useEffect(
     () => () => {
@@ -4761,9 +4771,9 @@ export function Delta({
       })}
 
       {/*
-        * EL CASERÍO, en grupos aparte de las demás cosas porque su nombre lleva el TONO pardo
-        * de su comarca y su geometría es la variante parda, no la del catálogo. Si un tono no
-        * tuviera variante —no pasa: se fabrican las tres— caería en el catálogo de siempre.
+        * EL CASERÍO, en grupos aparte de las demás cosas porque su nombre lleva el TONO de su
+        * comarca y modelo, y su geometría es la variante de ese tono, no la del catálogo. Si
+        * un tono no tuviera variante —no pasa: se fabrican las del plan— caería en el catálogo.
         */}
       {[...pueblos].map(([llave, puestas]) => {
         const nombre = llave.slice(llave.indexOf('|') + 1);
