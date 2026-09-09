@@ -663,7 +663,23 @@ export function LaMesaPuesta({
    * renglón es el único que se lee sin desplazar; en el `<aside>` daba igual porque se veía
    * todo a la vez, y por eso el cambio no le quita nada a la pantalla del respaldo.
    */
-  const elRail = (
+  /*
+   * ═══ Y DESDE QUE LA MESA ENTERA SE VE EN EL LIENZO, EL CAJÓN VA SIN LOS PANELES DEL JUEGO ═══
+   *
+   * Miguel, con la partida delante: «reducir al máximo el menú de la barra negra: no hace
+   * falta «Lo mío» —que además dice sal—, ni «Mis cartas», ni «La mesa», ni «El vado largo», ni
+   * «La mayor guardia»». Y no hace falta porque en el lienzo TODO ESO YA SE VE: los bienes son
+   * la mano de la derecha, las cartas la de la izquierda, los premios son naipes en esa misma
+   * mano, y lo de cada colono lo dice el marcador que va justo encima. Los paneles son el
+   * texto que el juego declara para quien NO tiene lienzo —el retablo de cinco, donde son la
+   * única manera de saber qué tienes—, y ahí se quedan enteros.
+   *
+   * Por eso el raíl se monta con una función y no como un fragmento: `railCon(true)` para el
+   * `<aside>` del respaldo, con los paneles, y `railCon(false)` para el cajón del lienzo, sin
+   * ellos. Todo lo demás —el marcador, la ficha con su código y su reloj, las dos salidas y
+   * la crónica— es el mismo JSX en los dos, escrito una vez.
+   */
+  const railCon = (conPaneles: boolean) => (
     <>
       {/*
         ═══ EL MARCADOR DE RIBERAS, ANTES DE LOS PANELES QUE DECLARA EL JUEGO ═══
@@ -699,7 +715,7 @@ export function LaMesaPuesta({
         hereda, y sólo entonces. Las dos cribas se componen y el orden da igual, que las dos
         son filtros. Ver `elPregonSePinta`, arriba.
       */}
-      {pintado.que === 'tablero' ? (
+      {conPaneles && pintado.que === 'tablero' ? (
         <Paneles
           tablero={pintado.tablero}
           paneles={
@@ -760,6 +776,8 @@ export function LaMesaPuesta({
       <LaCronica mesa={mesa} />
     </>
   );
+  const elRail = railCon(true);
+  const elRailDelCajon = railCon(false);
 
   return (
     <main className="dentro mesa-puesta">
@@ -809,7 +827,7 @@ export function LaMesaPuesta({
               tablero={pintado.tablero}
               opciones={pintado.opciones}
               foco={apuntarElLienzo}
-              elRail={elRail}
+              elRail={elRailDelCajon}
               laSalida={`${BASE}/${sufijoDeSilla(silla)}`}
             />
           ) : pintado.que === 'tablero' ? (

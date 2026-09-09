@@ -1835,6 +1835,33 @@ export function opcionesFueraDeLaMesa<O extends OpcionQueLlega>(
     : opciones.filter((o) => o.tipo !== TIRAR && o.declaracion !== true);
 }
 
+/**
+ * LAS OPCIONES QUE TAMPOCO PINTA EL RELOJ DE ARENA: se cae PASAR, y sólo si hay reloj.
+ *
+ * El mismo patrón que `opcionesFueraDeLaMesa` con los dados, y por el mismo par de fallos:
+ * con reloj y botón la pantalla ofrecería pasar dos veces —era el cuadrado «1» del carril,
+ * que Miguel pidió quitar—; sin reloj y sin botón, un lienzo donde el reloj no cabe —hoy los
+ * estrechos—, un mirón o el respaldo dejarían un turno que no se puede pasar más que
+ * esperando al plazo. Por eso recibe EL RELOJ, el mismo objeto que se le da a la escena, y
+ * `null` donde ella no lo pinta: el botón desaparece exactamente cuando el reloj existe.
+ */
+/**
+ * LO QUE ESTA CRIBA MIRA DEL RELOJ: que exista. Es la forma mínima de `RelojDeLaMesa`
+ * (`escenas/reloj.tsx`), escrita aquí como estructura y no importada: ese fichero es `.tsx` y
+ * el servidor compila esta traducción sin JSX, así que hasta un `import type` de allí lo rompe.
+ * Quien llame pasa el reloj entero, y le vale.
+ */
+export interface RelojQueSePinta {
+  readonly disponible: boolean;
+}
+
+export function opcionesFueraDelReloj<O extends OpcionQueLlega>(
+  opciones: readonly O[],
+  reloj: RelojQueSePinta | null,
+): O[] {
+  return reloj === null ? [...opciones] : opciones.filter((o) => o.tipo !== PASAR);
+}
+
 // ---------------------------------------------------------------------------
 // EL CARRIL: qué dice cada cuadrado de 44 puntos
 // ---------------------------------------------------------------------------

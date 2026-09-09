@@ -175,6 +175,7 @@ import {
   opcionesFueraDeLaBolsa,
   opcionesFueraDeLaMano,
   opcionesFueraDeLasIslas,
+  opcionesFueraDelReloj,
   opcionesFueraDelTablero,
   tirarLaFichaEnTres,
   PIEZAS_DE_LA_BARRA,
@@ -3213,7 +3214,30 @@ function losDadosEnLaPantalla(): void {
       !/dados\.disponible \? \(/.test(alrededorDelBoton) &&
       !/\sdisabled=/.test(alrededorDelBoton) &&
       /aria-disabled=\{!dados\.disponible\}/.test(alrededorDelBoton) &&
-      (codigo.match(/<button\s+type="button"\s+className="riberas-solo-apoyo"/g) ?? []).length === 1,
+      (codigo.match(/<button\s+type="button"\s+className="riberas-solo-apoyo"/g) ?? []).length === 2,
+  );
+  /*
+   * Y SON DOS BOTONES DESDE QUE EL RELOJ SE LLEVA PASAR: tirar y pasar, un movimiento cada uno.
+   * Miguel pidió quitar el cuadrado «1» del carril —el reloj de arena ya pasa el turno—, y sin
+   * este segundo botón un reloj que sólo se toca con el ratón dejaría el turno sin pasar para
+   * quien no ve el lienzo. Misma forma que el de tirar: se monta con `reloj !== null`, se apaga
+   * con `aria-disabled` y nunca con `disabled`.
+   */
+  comprobar(
+    'y desde que el reloj se lleva PASAR hay un segundo botón de apoyo, «Pasar el turno», con la misma forma que el de tirar: montado con `reloj !== null` y apagado con `aria-disabled`',
+    /\{reloj !== null \? \(\s+<button\s+type="button"\s+className="riberas-solo-apoyo"\s+aria-disabled=\{!reloj\.disponible\}\s+onClick=\{\(\) => \{\s+if \(reloj\.disponible\) alPasarElTurno\(\);\s+\}\}\s*>\s+Pasar el turno\s+<\/button>/.test(codigo),
+  );
+  const conPasar = laProyeccionConMazo(3);
+  const unReloj = { desde: 0, venceEn: null, disponible: true, vuelta: 1 };
+  comprobar(
+    'PASAR se cae de los botones con `opcionesFueraDelReloj` pasándole EL RELOJ (no un interruptor), y sin reloj se queda; y la pantalla compone esa criba la última y con el reloj en `null` mientras la mesa está recogida',
+    conPasar.opciones.some((o) => o.tipo === 'riberas:pasar') &&
+      opcionesFueraDelReloj(conPasar.opciones, unReloj).every((o) => o.tipo !== 'riberas:pasar') &&
+      opcionesFueraDelReloj(conPasar.opciones, null).length === conPasar.opciones.length &&
+      /const fuera = useMemo\( \(\) => opcionesFueraDelReloj\( opcionesFueraDelPregon\(opcionesFueraDeLaMesa\(fueraDeLaBarra, mesaRecogida \? null : dados\), pregon\), mesaRecogida \? null : reloj, \), /.test(codigo.replace(/\s+/g, ' ')) &&
+      /const haySitioParaElReloj = useMemo\(/.test(codigo) &&
+      /sitioDelReloj\(piezas, CAMPO_DE_LA_CAMARA, proporcion\) !== null/.test(codigo),
+    { ofrecePasar: conPasar.opciones.some((o) => o.tipo === 'riberas:pasar') },
   );
 }
 
@@ -3427,7 +3451,7 @@ function elCartelDeLaCarta(): void {
 
   comprobar(
     'el sitio del cartel se le pide a las tres manos de la escena: la franja de las cartas, la mano de bienes y el asa de la barra',
-    /import \{ ASA_DEL_HUECO, huecosDeLaMesa, loQueSeVe \} from '\.\.\/\.\.\/escenas\/barra';/.test(fuente) &&
+    /import \{ ASA_DEL_HUECO, huecosDeLaBarra, huecosDeLaMesa, loQueSeVe, sitioDelReloj \} from '\.\.\/\.\.\/escenas\/barra';/.test(fuente) &&
       /import \{ franjaDeLasCartas, loQueSeVeEnLasCartas \} from '\.\.\/\.\.\/escenas\/cartas';/.test(fuente) &&
       /import \{ huecosDeLaBaraja, loQueSeVeEnLaBaraja \} from '\.\.\/\.\.\/escenas\/baraja';/.test(fuente) &&
       /franjaDeLasCartas\(CAMPO_DE_LA_CAMARA, proporcion\)/.test(codigo) &&
@@ -4131,6 +4155,33 @@ function laPaginaDePie(): void {
    * los ojos, y por eso queda dicho aquí y no se promete de más.
    */
   const RAIZ = '.sala:has(.riberas-lienzo)';
+  /*
+   * ═══ Y LA VENTANA ES DEL TABLERO: SIN CABECERA, SIN MÁRGENES, SIN MARCO ═══
+   *
+   * Miguel, jugando en la web: «seguimos teniendo el marco en negro con la cabecera Sala de
+   * Arcade, todo eso no aporta nada». La cabecera se quita entera en esta pantalla, la página
+   * suelta su ancho de lectura y sus márgenes, y ni la rejilla ni el pintor ni el recuadro
+   * dejan aire o marco. Se leen las reglas de la hoja, bajo `:has`, para que el catálogo y
+   * el retablo sigan siendo una página.
+   */
+  comprobar(
+    'en la pantalla del lienzo la cabecera de la Sala no se pinta: `display: none` bajo `:has(.riberas-lienzo)`',
+    /display:\s*none/.test(reglaDe(`${RAIZ} > .cabecera`)),
+    reglaDe(`${RAIZ} > .cabecera`).replace(/\s+/g, ' '),
+  );
+  comprobar(
+    'y la página suelta el ancho de lectura y sus márgenes laterales: `max-width: none` y `padding-inline: 0`',
+    /max-width:\s*none/.test(reglaDe(`${RAIZ} > .mesa-puesta`)) && /padding-inline:\s*0/.test(reglaDe(`${RAIZ} > .mesa-puesta`)),
+    reglaDe(`${RAIZ} > .mesa-puesta`).replace(/\s+/g, ' '),
+  );
+  comprobar(
+    'y no queda aire ni marco entre la ventana y el lienzo: `gap: 0` en la rejilla y en el pintor, y el recuadro sin borde ni radio',
+    /gap:\s*0/.test(reglaDe(`${RAIZ} .tablero-y-panel`)) &&
+      /gap:\s*0/.test(reglaDe(`${RAIZ} .riberas-en-tres`)) &&
+      /border:\s*0/.test(reglaDe(`${RAIZ} .riberas-lienzo`)) &&
+      /border-radius:\s*0/.test(reglaDe(`${RAIZ} .riberas-lienzo`)),
+    { rejilla: reglaDe(`${RAIZ} .tablero-y-panel`).replace(/\s+/g, ' '), recuadro: reglaDe(`${RAIZ} .riberas-lienzo`).replace(/\s+/g, ' ') },
+  );
   const ESLABONES: Array<[string, string]> = [
     ['la ventana', RAIZ],
     ['la página', `${RAIZ} > .mesa-puesta`],
@@ -5073,9 +5124,9 @@ function laCintaYElCajon(): void {
    * lienzo.
    */
   comprobar(
-    'el raíl se monta una sola vez, en `elRail`, y se le pasa entero al pintor: dos copias serían dos crónicas y dos botones de «Tirar la mesa»',
-    /const elRail = \(\s*<>/.test(laSala) &&
-      /elRail=\{elRail\}/.test(laSala) &&
+    'el raíl se monta una sola vez, en `railCon`, y al pintor se le pasa el del cajón (sin los paneles del juego): dos copias escritas serían dos crónicas y dos botones de «Tirar la mesa»',
+    /const railCon = \(conPaneles: boolean\) => \(\s*<>/.test(laSala) &&
+      /elRail=\{elRailDelCajon\}/.test(laSala) &&
       (laSala.match(/<LaCronica/g) ?? []).length === 1,
     (laSala.match(/<LaCronica/g) ?? []).length,
   );
@@ -5133,11 +5184,27 @@ function laCintaYElCajon(): void {
    * abajo dos párrafos antes de que exista. Sin pelar, el orden salía cruzado y esto se ponía
    * rojo por documentar bien.
    */
-  const dentroDelRail = sinComentarios(/const elRail = \(([\s\S]*?)\n  \);/.exec(laSala)?.[1] ?? '');
-  const sitios = ['<MarcadorDeRiberas', '<LaFicha', '<Paneles', 'Levantarse de la mesa', 'Tirar la mesa', '<LaCronica'];
+  const dentroDelRail = sinComentarios(/const railCon = \(conPaneles: boolean\) => \(([\s\S]*?)\n  \);/.exec(laSala)?.[1] ?? '');
+  const sitios = ['<MarcadorDeRiberas', '<LaFicha', "{conPaneles && pintado.que === 'tablero' ? (", 'Levantarse de la mesa', 'Tirar la mesa', '<LaCronica'];
   const posiciones = sitios.map((s) => dentroDelRail.indexOf(s));
+  /*
+   * ═══ EL RAÍL SE MONTA CON `railCon(conPaneles)`, Y EL CAJÓN DEL LIENZO VA SIN LOS PANELES ═══
+   *
+   * Miguel pidió reducir al máximo el menú de la barra negra: «Lo mío», «Mis cartas», «La
+   * mesa», «El vado largo» y «La mayor guardia» sobran donde hay lienzo, porque el lienzo ya
+   * enseña todo eso. El `<aside>` del respaldo —el retablo de cinco, sin manos ni marcador en
+   * 3D— los conserva. Se compra que sean UNA función y dos llamadas, y que cada uno vaya a su
+   * sitio: los dos raíles no pueden divergir en nada que no sea los paneles.
+   */
   comprobar(
-    'y dentro va, en este orden: el marcador, la ficha de la mesa con su código y su reloj, los paneles del juego, las dos salidas y la crónica',
+    'el raíl se monta una vez, con `railCon(conPaneles)`: `elRail` con paneles para el aside del respaldo y `elRailDelCajon` sin ellos para el cajón del lienzo',
+    laSala.includes('const elRail = railCon(true);') &&
+      laSala.includes('const elRailDelCajon = railCon(false);') &&
+      /<RiberasEnTres[\s\S]*?elRail=\{elRailDelCajon\}/.test(laSala) &&
+      /<aside className="rail" aria-label="El carril de la mesa">\s+\{elRail\}/.test(laSala),
+  );
+  comprobar(
+    'y dentro va, en este orden: el marcador, la ficha de la mesa con su código y su reloj, los paneles del juego (sólo si se piden), las dos salidas y la crónica',
     posiciones.every((p) => p >= 0) && posiciones.every((p, i) => i === 0 || p > (posiciones[i - 1] as number)),
     Object.fromEntries(sitios.map((s, i) => [s, posiciones[i]])),
   );

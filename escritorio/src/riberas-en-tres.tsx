@@ -256,6 +256,7 @@ import {
   opcionesFueraDeLaMesa,
   NADA_COMPUESTO,
   opcionesFueraDelPregon,
+  opcionesFueraDelReloj,
   PARA_CONTESTAR,
   PROPONER,
   opcionesFueraDelTablero,
@@ -285,7 +286,7 @@ import type {
   TiraDelPregon,
 } from '../../shared/arcade/juegos/riberas-en-tres';
 /* El sitio de los dados se decide con la misma función que la escena: ver `haySitioParaLosDados`. */
-import { ASA_DEL_HUECO, huecosDeLaMesa, loQueSeVe } from '../../escenas/barra';
+import { ASA_DEL_HUECO, huecosDeLaBarra, huecosDeLaMesa, loQueSeVe, sitioDelReloj } from '../../escenas/barra';
 /* Y el del cartel, con las manos de verdad y no con números copiados: ver `elCartelQueCabe`. */
 import { franjaDeLasCartas, loQueSeVeEnLasCartas } from '../../escenas/cartas';
 import { huecosDeLaBaraja, loQueSeVeEnLaBaraja } from '../../escenas/baraja';
@@ -2433,9 +2434,64 @@ export function RiberasEnTres({
     ponerComponedorAbierto(false);
     laPuertaDelTrueque.current?.focus();
   }, []);
+  /*
+   * LO QUE EL RELOJ NECESITA SABER. No lleva «cuánto queda» calculado: lleva los dos instantes y
+   * la escena saca la fracción en su `useFrame`, que es donde ya se mira el tiempo. Con la
+   * fracción como prop, el delta entero se repintaría sesenta veces por segundo.
+   *
+   * `vuelta` es `turnosAbiertos` de la vista: sólo crece, es el mismo número en todos los
+   * aparatos, y por eso el reloj se voltea a la vez en las dos pantallas sin mandar nada.
+   *
+   * ═══ Y ES `null` DONDE NO CABE, COMO LOS DADOS Y POR LO MISMO ═══
+   *
+   * La escena sólo lo pinta si `sitioDelReloj` le encuentra sitio a la derecha de la barra, y
+   * en los lienzos estrechos no se lo encuentra. Si el objeto viajara igual, PASAR se caería de
+   * los botones (`opcionesFueraDelReloj`) sin que hubiera reloj que pulsar, y el turno sólo se
+   * pasaría esperando al plazo. Así que se pregunta ANTES, con las MISMAS funciones y el mismo
+   * reparto que la escena —las piezas de la mesa si hay dados, la barra a secas si no—, y
+   * donde no cabe el reloj no existe y el botón se queda. Va aquí arriba, antes que las cribas,
+   * porque las cribas dependen de él.
+   */
+  const vueltaDelReloj =
+    typeof (vista as { turnosAbiertos?: unknown }).turnosAbiertos === 'number'
+      ? ((vista as { turnosAbiertos: number }).turnosAbiertos)
+      : 0;
+  const haySitioParaElReloj = useMemo(() => {
+    if (lienzo.alto <= 0 || lienzo.ancho <= 0) return false;
+    const proporcion = lienzo.ancho / lienzo.alto;
+    const cuantos = barra.length + (mazo === null ? 0 : 1);
+    const piezas =
+      dados !== null
+        ? huecosDeLaMesa(cuantos, CAMPO_DE_LA_CAMARA, proporcion, lienzo.alto).piezas
+        : huecosDeLaBarra(cuantos, CAMPO_DE_LA_CAMARA, proporcion);
+    return sitioDelReloj(piezas, CAMPO_DE_LA_CAMARA, proporcion) !== null;
+  }, [lienzo, barra.length, mazo, dados]);
+  const reloj = useMemo(
+    (): RelojDeLaMesa | null =>
+      haySitioParaElReloj
+        ? {
+            desde: puesta.turnoDesde,
+            venceEn: puesta.terminada ? null : puesta.venceEn,
+            disponible: !quieto && pasarEnTres(opciones) !== null,
+            vuelta: vueltaDelReloj,
+          }
+        : null,
+    [haySitioParaElReloj, puesta.turnoDesde, puesta.venceEn, puesta.terminada, quieto, opciones, vueltaDelReloj],
+  );
+  /*
+   * ═══ Y LA SEXTA CRIBA: PASAR TAMPOCO ES UN BOTÓN MIENTRAS HAYA RELOJ ═══
+   *
+   * Era el cuadrado «1» del carril, y Miguel pidió quitarlo: el reloj de arena pasa el turno.
+   * Recibe el reloj —`null` con la mesa recogida, como los dados, porque baja con ella— y no
+   * un interruptor: el botón vuelve exactamente cuando el reloj no está.
+   */
   const fuera = useMemo(
-    () => opcionesFueraDelPregon(opcionesFueraDeLaMesa(fueraDeLaBarra, mesaRecogida ? null : dados), pregon),
-    [fueraDeLaBarra, dados, mesaRecogida, pregon],
+    () =>
+      opcionesFueraDelReloj(
+        opcionesFueraDelPregon(opcionesFueraDeLaMesa(fueraDeLaBarra, mesaRecogida ? null : dados), pregon),
+        mesaRecogida ? null : reloj,
+      ),
+    [fueraDeLaBarra, dados, mesaRecogida, pregon, reloj],
   );
   /*
    * ═══ QUÉ DICE CADA CUADRADO DEL CARRIL, Y POR QUÉ SE PREGUNTA SOBRE `fuera` ═══
@@ -2755,27 +2811,6 @@ export function RiberasEnTres({
     void mover({ tipo: pasar.tipo, carga: pasar.carga });
   }, [quieto, opciones, mover, soltarTodo]);
 
-  /*
-   * LO QUE EL RELOJ NECESITA SABER. No lleva «cuánto queda» calculado: lleva los dos instantes y
-   * la escena saca la fracción en su `useFrame`, que es donde ya se mira el tiempo. Con la
-   * fracción como prop, el delta entero se repintaría sesenta veces por segundo.
-   *
-   * `vuelta` es `turnosAbiertos` de la vista: sólo crece, es el mismo número en todos los
-   * aparatos, y por eso el reloj se voltea a la vez en las dos pantallas sin mandar nada.
-   */
-  const vueltaDelReloj =
-    typeof (vista as { turnosAbiertos?: unknown }).turnosAbiertos === 'number'
-      ? ((vista as { turnosAbiertos: number }).turnosAbiertos)
-      : 0;
-  const reloj = useMemo(
-    (): RelojDeLaMesa => ({
-      desde: puesta.turnoDesde,
-      venceEn: puesta.terminada ? null : puesta.venceEn,
-      disponible: !quieto && pasarEnTres(opciones) !== null,
-      vuelta: vueltaDelReloj,
-    }),
-    [puesta.turnoDesde, puesta.venceEn, puesta.terminada, quieto, opciones, vueltaDelReloj],
-  );
 
   /*
    * EL MODELO DEL RELOJ, con su propia red y degradando a `null`.
@@ -3604,6 +3639,23 @@ export function RiberasEnTres({
                 }}
               >
                 Tirar los dados
+              </button>
+            ) : null}
+            {/*
+              Y PASAR EL TURNO, por lo mismo y con la misma forma: desde que el reloj de arena
+              se lleva PASAR de la lista (`opcionesFueraDelReloj`), un reloj que sólo se puede
+              tocar con el ratón dejaría el turno sin pasar para quien no ve el lienzo.
+            */}
+            {reloj !== null ? (
+              <button
+                type="button"
+                className="riberas-solo-apoyo"
+                aria-disabled={!reloj.disponible}
+                onClick={() => {
+                  if (reloj.disponible) alPasarElTurno();
+                }}
+              >
+                Pasar el turno
               </button>
             ) : null}
             <LimiteDelMundo alFallar={alFallarElLienzo}>

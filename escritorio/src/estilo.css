@@ -2222,6 +2222,9 @@ code {
    */
   width: 100%;
   padding-block: 0;
+  /* Y el ancho de lectura y sus márgenes: ver «LA PARTIDA OCUPA LA VENTANA ENTERA», abajo. */
+  max-width: none;
+  padding-inline: 0;
   overflow: hidden auto;
 }
 
@@ -2244,6 +2247,7 @@ code {
   min-height: 0;
   grid-template-columns: minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr);
+  gap: 0;
 }
 
 .sala:has(.riberas-lienzo) .el-mueble {
@@ -2277,6 +2281,29 @@ code {
 }
 
 /*
+ * ═══ LA PARTIDA OCUPA LA VENTANA ENTERA: SIN CABECERA, SIN MÁRGENES, SIN MARCO ═══
+ *
+ * Miguel, jugando en la web: «cuando se abre la pantalla de Riberas después del lobby no se
+ * ve en pantalla completa: seguimos teniendo el marco en negro con la cabecera Sala de
+ * Arcade, todo eso no aporta nada». Tenía razón en las tres cosas que ese marco sumaba:
+ *
+ *   · LA CABECERA: el enlace de vuelta a la Sala y el nombre de la silla. La vuelta ya está
+ *     dentro del cajón («Levantarse de la mesa») y la silla en la ficha. Se quita ENTERA en
+ *     esta pantalla y sólo en ésta, con `display: none` y no con el truco de `clip`: no hay
+ *     nada ahí que un lector tenga que oír y no oiga dentro del cajón.
+ *   · LOS MÁRGENES LATERALES de `.dentro`: el `max-width` de 92rem y el relleno. Son el aire
+ *     de una página que se lee, y esto no se lee, se juega. Van en la regla de arriba.
+ *   · EL MARCO del recuadro —borde y radio— y el `gap` de la rejilla y del pintor. Van en
+ *     sus reglas.
+ *
+ * Sólo bajo `:has(.riberas-lienzo)`: el catálogo, el vestíbulo y el retablo de cinco siguen
+ * con su cabecera y su ancho de lectura, que ahí sí son de una página.
+ */
+.sala:has(.riberas-lienzo) > .cabecera {
+  display: none;
+}
+
+/*
  * ═══ AQUÍ HUBO UNA REGLA PARA EL RAÍL, Y YA NO HACE FALTA NINGUNA ═══
  *
  * Decía que el raíl se midiera contra su hueco y no contra la ventana (`max-height: 100%` en
@@ -2292,6 +2319,7 @@ code {
 .sala:has(.riberas-lienzo) .riberas-en-tres {
   flex: 1;
   min-height: 0;
+  gap: 0;
 }
 
 /*
@@ -2303,6 +2331,9 @@ code {
  */
 .sala:has(.riberas-lienzo) .riberas-lienzo {
   flex: 1 1 auto;
+  /* Sin borde ni radio: el recuadro ES la ventana. Ver «LA PARTIDA OCUPA LA VENTANA ENTERA». */
+  border: 0;
+  border-radius: 0;
   /*
    * ═══ EL SUELO VUELVE, PERO ES UNA REGLA Y NO UN NÚMERO: LA MITAD DEL MUEBLE ═══
    *
