@@ -59,6 +59,29 @@ export const CERCANIA_DE_SALIDA: Cercania = { factor: 1, centro: { x: 0, z: 0 } 
 export const MAS_CERCA = 0.16;
 export const MAS_LEJOS = 1.25;
 
+/**
+ * HASTA DÓNDE SE ACERCA Y HASTA DÓNDE SE ALEJA, como un par que viaja junto.
+ *
+ * ═══ POR QUÉ LOS TOPES SON UN PARÁMETRO Y NO SÓLO DOS CONSTANTES ═══
+ *
+ * Los dos números de arriba son los del DELTA: media comarca de cerca, un poco más
+ * que el encuadre de lejos. Otro tablero tiene otro tamaño y otro detalle, y quiere
+ * otros topes; pero la aritmética de acercarse —multiplicativa, acotada, con el
+ * centro aparte— es la misma. Copiar este fichero por un par de números sería tener
+ * dos zooms que se separan sin que nadie lo vea. Así que cada función que acota
+ * recibe sus límites por parámetro, y por defecto lleva los del delta: quien no
+ * dice nada sigue viendo exactamente lo de siempre, y `verify:escena` lo clava.
+ */
+export interface LimitesDeCercania {
+  /** El factor más pequeño: lo más cerca que se deja mirar. */
+  readonly masCerca: number;
+  /** El factor más grande: lo más lejos. */
+  readonly masLejos: number;
+}
+
+/** Los topes del delta, que son los de siempre. */
+export const LIMITES_DE_SALIDA: LimitesDeCercania = { masCerca: MAS_CERCA, masLejos: MAS_LEJOS };
+
 /** Lo que acerca UN paso de rueda o un pellizco corto. Multiplicativo: ver la cabecera. */
 export const PASO_DE_ACERCAMIENTO = 1.18;
 
@@ -70,29 +93,39 @@ export const PASO_DE_ACERCAMIENTO = 1.18;
  * casi ninguno a treinta, y el ojo acababa DENTRO de una colina, con el tablero visto
  * desde el interior de la roca. Se para en doce, que está por encima del tejado más
  * alto del pack (una atalaya) y deja pasar la vista rasante sin meterse en el suelo.
+ *
+ * Es el valor por defecto de `ojoYMira`: un tablero con tejados más altos pasa el suyo.
  */
 export const ALTURA_MINIMA_DEL_OJO = 12;
 
-/** Acota el factor a lo que se puede ver. Cualquier número raro cae en el encuadre entero. */
-export function factorValido(factor: number): number {
+/**
+ * Acota el factor a lo que se puede ver. Cualquier número raro cae en el encuadre
+ * entero. Los topes son los del delta si no se dicen otros.
+ */
+export function factorValido(factor: number, limites: LimitesDeCercania = LIMITES_DE_SALIDA): number {
   if (!Number.isFinite(factor)) return 1;
-  return Math.min(MAS_LEJOS, Math.max(MAS_CERCA, factor));
+  return Math.min(limites.masLejos, Math.max(limites.masCerca, factor));
 }
 
 /**
  * ACERCAR O ALEJAR unos cuantos pasos. Positivo acerca, negativo aleja; los pasos
  * pueden ser fraccionarios, que es lo que manda una rueda fina o un pellizco.
  */
-export function acercando(cercania: Cercania, pasos: number): Cercania {
+export function acercando(cercania: Cercania, pasos: number, limites: LimitesDeCercania = LIMITES_DE_SALIDA): Cercania {
   if (!Number.isFinite(pasos) || pasos === 0) return cercania;
-  const factor = factorValido(cercania.factor / Math.pow(PASO_DE_ACERCAMIENTO, pasos));
+  const factor = factorValido(cercania.factor / Math.pow(PASO_DE_ACERCAMIENTO, pasos), limites);
   return factor === cercania.factor ? cercania : { factor, centro: cercania.centro };
 }
 
 /** El acercamiento de un pellizco, que llega como una escala y no como pasos. */
-export function pellizcando(cercania: Cercania, alEmpezar: number, escala: number): Cercania {
+export function pellizcando(
+  cercania: Cercania,
+  alEmpezar: number,
+  escala: number,
+  limites: LimitesDeCercania = LIMITES_DE_SALIDA,
+): Cercania {
   if (!Number.isFinite(escala) || escala <= 0) return cercania;
-  const factor = factorValido(alEmpezar / escala);
+  const factor = factorValido(alEmpezar / escala, limites);
   return factor === cercania.factor ? cercania : { factor, centro: cercania.centro };
 }
 
@@ -185,14 +218,18 @@ export function estaComoAlPrincipio(cercania: Cercania): boolean {
  * los topes con una función de mentira. La distancia que se le pide ya lleva el
  * acercamiento; lo que devuelve se suma al punto de mira, porque acercarse a una
  * esquina es mover el ojo Y el objetivo, no sólo apuntar.
+ *
+ * `alturaMinima` es hasta dónde baja el ojo: la de siempre (`ALTURA_MINIMA_DEL_OJO`,
+ * la de los tejados del delta) si no se dice otra.
  */
 export function ojoYMira(
   cercania: Cercania,
   alcance: number,
   ojoAlrededor: (distancia: number) => readonly [number, number, number],
+  alturaMinima: number = ALTURA_MINIMA_DEL_OJO,
 ): { readonly ojo: readonly [number, number, number]; readonly mira: readonly [number, number, number] } {
   const [x, y, z] = ojoAlrededor(alcance * cercania.factor);
   const mira = [cercania.centro.x, 0, cercania.centro.z] as const;
-  const alto = Math.max(mira[1] + ALTURA_MINIMA_DEL_OJO, mira[1] + y);
+  const alto = Math.max(mira[1] + alturaMinima, mira[1] + y);
   return { ojo: [mira[0] + x, alto, mira[2] + z], mira };
 }

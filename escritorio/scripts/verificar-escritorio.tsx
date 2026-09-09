@@ -1219,10 +1219,19 @@ function elMuelle(): void {
     'y quien vuelve a una mesa que ya jugaba va directo al tablero, sin coreografía',
     !tocaElMuelle(true, 'dentro', true, orilla),
   );
+  /*
+   * QUIÉN TIENE MUELLE, POR LISTA CERRADA. Decía «Riberas y ningún otro» mientras Riberas
+   * fue el único; con el Burgo son dos, y se sigue escribiendo la lista entera en vez de
+   * «al menos uno»: dar un tema del muelle a un arcade es mandarlo a un lobby con seis
+   * amarres y una coreografía de zarpar, y eso tiene que pasar por aquí a sabiendas. Se
+   * exige contra los INSTALADOS: mientras `burgo` no esté dado de alta en
+   * `shared/arcade/juegos/index.ts`, esto está en rojo y dice cuál falta.
+   */
+  const CON_MUELLE = ['burgo', 'riberas'];
   comprobar(
-    'Riberas tiene muelle y el resto de los instalados no',
-    tieneMuelle('riberas') && arcadesInstalados().filter((m) => tieneMuelle(m.id)).length === 1,
-    arcadesInstalados().filter((m) => tieneMuelle(m.id)).map((m) => m.id),
+    `los arcades instalados con muelle son exactamente ${CON_MUELLE.join(' y ')}, y ninguno más`,
+    JSON.stringify(arcadesInstalados().filter((m) => tieneMuelle(m.id)).map((m) => m.id).sort()) === JSON.stringify(CON_MUELLE),
+    { conMuelle: arcadesInstalados().filter((m) => tieneMuelle(m.id)).map((m) => m.id), instalados: arcadesInstalados().map((m) => m.id) },
   );
 
   paso('El raíl del muelle existe entero sin el mundo, y en Node no se monta el Canvas');

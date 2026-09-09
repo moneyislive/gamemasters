@@ -43,3 +43,15 @@ export function rutaDeLosDados(): string {
 export function rutaDelReloj(): string {
   return `${RUTA_DE_MODELOS}/reloj.glb`;
 }
+
+/**
+ * LAS PIEZAS DEL BURGO: siete packs de KayKit en un solo fichero, con el color horneado y
+ * ya a escala del mundo (ver `escenas/burgo/piezas.ts`).
+ *
+ * Fichero aparte del embarcadero y del tablero por lo de siempre: que abrir un arcade no
+ * obligue a bajar el arte de otro, y que si este fichero no llega el Burgo caiga a su
+ * retablo SVG sin arrastrar a nadie. Las dos pantallas lo piden con su propia red.
+ */
+export function rutaDelBurgo(): string {
+  return `${RUTA_DE_MODELOS}/burgo.glb`;
+}

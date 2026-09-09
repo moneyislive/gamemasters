@@ -24,6 +24,18 @@
  * un juego —el juego cambia a su ritmo— y porque un lobby de otro arcade traerá
  * su paleta. `verify:embarcadero` contrasta esta copia contra el fichero de
  * Riberas para que no se separen sin que nadie lo vea.
+ *
+ * ═══ EL SEGUNDO TEMA: EL BURGO, CON EL MISMO EMBARCADERO ═══
+ *
+ * El Burgo (`shared/arcade/juegos/burgo.ts`) es el segundo arcade con muelle, y
+ * en su primera fase ES el mismo embarcadero —la cala, los barcos, el mar de hora
+ * azul— con otra voz y otros colores: este fichero parametriza SÓLO tres frases y
+ * la paleta, no el paisaje (`Embarcadero.tsx` monta la cala y `embarcadero.glb` en
+ * seco). La Plaza del Burgo, si llega, será una escena hermana que cumpla el mismo
+ * contrato, y entonces este tema dirá cuál de las dos se monta. Su paleta
+ * (`COLORES_DEL_BURGO`) es propia y distinta de la de Riberas a propósito: los
+ * barrios del Burgo se llaman por su color, y tres de los seis colonos de Riberas
+ * se confundirían con su acera. `verify:embarcadero` contrasta también ésta.
  */
 
 export interface TemaDelMuelle {
@@ -48,8 +60,18 @@ const RIBERAS: TemaDelMuelle = {
   colonos: ['#e0533d', '#3d8be0', '#e0b83d', '#4fbf7a', '#b06fd6', '#e08a3d'],
 };
 
+const BURGO: TemaDelMuelle = {
+  arcade: 'burgo',
+  lugar: 'A las puertas del Burgo',
+  espera: 'Las puertas se abren cuando estéis todos.',
+  zarpar: 'Se abre el Burgo',
+  /* El mismo orden que `COLORES_DEL_BURGO` en burgo.ts: marfil, azabache, violeta, turquesa, coral, lima. */
+  colonos: ['#f2e8cf', '#26262e', '#7d3fd6', '#2fe0d0', '#ff8f6b', '#c5e84a'],
+};
+
 const TEMAS: Readonly<Record<string, TemaDelMuelle>> = {
   [RIBERAS.arcade]: RIBERAS,
+  [BURGO.arcade]: BURGO,
 };
 
 /** ¿Tiene este arcade un muelle en tres dimensiones antes de la partida? */

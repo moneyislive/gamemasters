@@ -67,6 +67,38 @@
       ],
       "port": 5175,
       "url": "http://localhost:5175"
+    },
+    {
+      "name": "burgo-servidor",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": [
+        "/c",
+        "set PORT=5231&& npm run dev -w server"
+      ],
+      "port": 5231,
+      "autoPort": false
+    },
+    {
+      "name": "burgo-escritorio",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": [
+        "/c",
+        "set GM_API_URL=http://localhost:5231&& npm run dev -w escritorio -- --port 5232"
+      ],
+      "port": 5232,
+      "url": "http://localhost:5232",
+      "autoPort": false
+    },
+    {
+      "name": "burgo-movil",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": [
+        "/c",
+        "set EXPO_PUBLIC_API_URL=http://localhost:5231&& npm run web --prefix app -- --port 8091"
+      ],
+      "port": 8091,
+      "url": "http://localhost:8091",
+      "autoPort": false
     }
   ]
 }

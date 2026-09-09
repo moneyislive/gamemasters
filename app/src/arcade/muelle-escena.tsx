@@ -12,7 +12,8 @@
  *      `mesa.recuperando` existe: hasta que el bolsillo se ha mirado no se sabe.
  *   2. LA CALIDAD. `plena` en la web y en iOS; en Android empieza en `plena` y
  *      baja a `sobria` si el hilo de dibujo MIDE más de 22 ms por fotograma en
- *      los primeros 120. Medida y no adivinada: ver `juzgarCalidad`.
+ *      los primeros 120. Medida y no adivinada: ver `juzgarCalidad` en
+ *      `escenas/embarcadero/calidad.ts`.
  *   3. CUÁNDO SE CAMBIA DE PANTALLA. Cuando `haEmpezado` pasa a `true` EN LA
  *      VISTA —nunca al pulsar— se arranca la coreografía de zarpar, y se navega
  *      cuando la escena dice que terminó, cuando alguien toca la pantalla, o a
@@ -48,6 +49,12 @@ import type { ManifiestoDeArcade } from '../../../shared/arcade';
 /* Instala los arcades del binario, por si se llega aquí por enlace directo. Ver `pintar.tsx`. */
 import '../../../shared/arcade/juegos';
 import { Embarcadero } from '../../../escenas/embarcadero/Embarcadero';
+/*
+ * El juez de la calidad vivía aquí y se fue a `escenas/` el día que el Burgo lo quiso
+ * también en el escritorio, que no puede importar de `app/`. Ver su cabecera.
+ */
+import { juzgarCalidad } from '../../../escenas/embarcadero/calidad';
+import type { MuestraDelHilo } from '../../../escenas/embarcadero/calidad';
 import type { Calidad, MesaEnElMuelle, Ventana } from '../../../escenas/embarcadero/tipos';
 /*
  * Sólo la constante del mapeo tonal: el `Canvas` sigue entrando por `tres/Lienzo`,
@@ -80,46 +87,15 @@ const TOPE_DE_ZARPAR_MS = 3500;
 /** Lo que tarda el telón en fundirse cuando el mundo ya está, en ms. */
 const FUNDIDO_MS = 600;
 
-/**
+/*
  * ═══ LA CALIDAD SE MIDE, NO SE ADIVINA ═══
  *
  * `alMedir` llega una vez por segundo con el tiempo medio de fotograma de ese
- * segundo. No se mira el modelo del aparato ni la versión de Android: se mira
- * cuánto tarda ESTE aparato en pintar ESTA escena, que es lo único que dice si
- * va justo. El umbral es 22 ms —45 fotogramas por segundo— y la ventana son los
- * primeros 120 fotogramas, que es lo que el §10 fija como riesgo medido.
- *
- * Cada muestra cubre `1000 / ms` fotogramas aproximadamente, así que se suman
- * hasta pasar de 120 y se pondera cada muestra por los fotogramas que cubre. Una
- * muestra a cero —el andamio de la escena manda `ms: 0` mientras no mide— no
- * dice nada y se salta. Devuelve `null` mientras no hay fotogramas suficientes.
+ * segundo y el juez es `juzgarCalidad`, de `escenas/embarcadero/calidad.ts`: 22 ms
+ * sobre los primeros 120 fotogramas, medido en ESTE aparato con ESTA escena. Lo que
+ * este fichero decide es CUÁNDO se le pregunta —sólo en Android, y sólo hasta que
+ * haya veredicto—; la cuenta es de la escena y la comparten los dos clientes.
  */
-const UMBRAL_MS = 22;
-const FOTOGRAMAS_QUE_SE_MIRAN = 120;
-
-/** Una muestra de `alMedir`: la media de ms del último segundo y cuántos fotogramas cubre. */
-export interface MuestraDelHilo {
-  readonly ms: number;
-  readonly fotogramas: number;
-}
-
-export function juzgarCalidad(muestras: readonly MuestraDelHilo[]): Calidad | null {
-  let fotogramas = 0;
-  let tiempo = 0;
-  for (const m of muestras) {
-    if (!(m.ms > 0)) continue;
-    /*
-     * La escena dice cuántos fotogramas cubre cada media; si no lo dice —un
-     * andamio, una versión vieja— se estima desde los ms, que es lo que se hacía
-     * antes de que el contrato lo trajera.
-     */
-    const cubre = m.fotogramas > 0 ? m.fotogramas : 1000 / m.ms;
-    fotogramas += cubre;
-    tiempo += m.ms * cubre;
-  }
-  if (fotogramas < FOTOGRAMAS_QUE_SE_MIRAN) return null;
-  return tiempo / fotogramas > UMBRAL_MS ? 'sobria' : 'plena';
-}
 
 /** Pinta el Muelle del arcade que pida la ruta, o dice por qué no. */
 export default function EscenaDelMuelle(): JSX.Element {

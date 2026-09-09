@@ -33,18 +33,34 @@
  * azul del pack está medido en sRGB (`AZUL_DEL_PACK`) y se pasa a lineal por el
  * mismo camino antes de medirle la luminancia.
  *
- * ═══ LA CACHÉ ES POR (PIEZA, COLOR), Y SE SUELTA AL DESMONTAR ═══
+ * ═══ EL AZUL DE REFERENCIA ES DEL PACK, Y POR ESO ENTRA POR PARÁMETRO ═══
+ *
+ * La luminancia relativa se mide contra el azul MEDIO del pack del que salió la
+ * pieza, y cada pack tiene el suyo: el hexagonal pinta su celda azul en [37,125,188]
+ * (`AZUL_DEL_PACK`), y las fichas de Board Game Bits —las del Burgo— en [36,126,187]
+ * (`AZUL_DE_LAS_FICHAS` en `burgo/piezas.ts`). Son casi iguales y por eso da igual
+ * hoy; el día que se tiña una pieza de un pack con un azul de otro tono, medirla
+ * contra el azul equivocado le cambia el volumen a toda la pieza sin que nada
+ * proteste. Así que la referencia es un parámetro con el azul del hexagonal por
+ * defecto: el embarcadero no cambia ni un byte, y el Burgo pasa el suyo.
+ *
+ * ═══ LA CACHÉ ES POR (PIEZA, COLOR, REFERENCIA), Y SE SUELTA AL DESMONTAR ═══
  *
  * Seis asientos con seis colores son seis geometrías de barco, no treinta y seis
  * ni una por fotograma. Quien pide el mismo tinte para la misma pieza recibe el
- * mismo objeto, y puede instanciarlo o clonarlo barato. Las geometrías teñidas
- * son NUESTRAS (copias), y sin `dispose` se quedaban en la GPU al irse la escena:
- * `soltarTintes` las suelta pieza a pieza. `dispose` borra la copia de la GPU y
- * no los datos, así que si la escena vuelve a montarse con el mismo catálogo,
- * la caché sigue valiendo y three vuelve a subirlas sola.
+ * mismo objeto, y puede instanciarlo o clonarlo barato. La referencia va en la
+ * clave: la misma pieza teñida del mismo color contra dos azules son dos
+ * geometrías distintas, y devolver una por la otra sería el fallo mudo de arriba.
+ * Las geometrías teñidas son NUESTRAS (copias), y sin `dispose` se quedaban en la
+ * GPU al irse la escena: `soltarTintes` las suelta pieza a pieza. `dispose` borra
+ * la copia de la GPU y no los datos, así que si la escena vuelve a montarse con
+ * el mismo catálogo, la caché sigue valiendo y three vuelve a subirlas sola.
  */
 import * as THREE from 'three';
 import { ATRIBUTO_DE_TINTE_CARGADO, AZUL_DEL_PACK } from './piezas';
+
+/** Un azul de referencia: el color medio de la celda que se tiñe, en sRGB de 0 a 255. */
+export type AzulDeReferencia = readonly [number, number, number];
 
 const cache = new WeakMap<THREE.Object3D, Map<string, THREE.Object3D>>();
 const cacheDeGeometrias = new WeakMap<THREE.BufferGeometry, Map<string, THREE.BufferGeometry>>();
@@ -63,35 +79,56 @@ export function luminancia(r: number, g: number, b: number): number {
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 }
 
-/** El azul medio del pack, en lineal, y su luminancia: se calcula una vez. */
-const azulDelPack = new THREE.Color().setRGB(
-  AZUL_DEL_PACK[0] / 255,
-  AZUL_DEL_PACK[1] / 255,
-  AZUL_DEL_PACK[2] / 255,
-  THREE.SRGBColorSpace,
-);
-const LUMINANCIA_DEL_AZUL = Math.max(1e-4, luminancia(azulDelPack.r, azulDelPack.g, azulDelPack.b));
+/** La clave de caché de un tinte: el color del asiento y el azul contra el que se midió. */
+function claveDelTinte(hex: string, referencia: AzulDeReferencia): string {
+  return `${hex}|${String(referencia[0])},${String(referencia[1])},${String(referencia[2])}`;
+}
+
+/**
+ * La luminancia del azul de referencia, en lineal: se calcula una vez por azul y se
+ * recuerda, porque `tenirGeometria` la pide por vértice y son miles.
+ */
+const luminanciasDeReferencia = new Map<string, number>();
+function luminanciaDeReferencia(referencia: AzulDeReferencia): number {
+  const clave = claveDelTinte('', referencia);
+  const sabida = luminanciasDeReferencia.get(clave);
+  if (sabida !== undefined) return sabida;
+  const azul = new THREE.Color().setRGB(referencia[0] / 255, referencia[1] / 255, referencia[2] / 255, THREE.SRGBColorSpace);
+  const l = Math.max(1e-4, luminancia(azul.r, azul.g, azul.b));
+  luminanciasDeReferencia.set(clave, l);
+  return l;
+}
 
 const pinza = (x: number, a: number, b: number): number => Math.min(b, Math.max(a, x));
 
 /**
  * EL COLOR TEÑIDO DE UN VÉRTICE: el del asiento por la luminancia relativa del
- * horneado respecto del azul del pack, acotada. Expuesta para que el comprobador
- * pueda mirar la regla sin abrir una geometría.
+ * horneado respecto del azul de referencia, acotada. Expuesta para que el comprobador
+ * pueda mirar la regla sin abrir una geometría. Sin referencia, el azul del hexagonal.
  */
 export function colorTenido(
   horneado: readonly [number, number, number],
   asiento: readonly [number, number, number],
+  referencia: AzulDeReferencia = AZUL_DEL_PACK,
 ): [number, number, number] {
-  const relacion = pinza(luminancia(horneado[0], horneado[1], horneado[2]) / LUMINANCIA_DEL_AZUL, RELACION_MINIMA, RELACION_MAXIMA);
+  const relacion = pinza(
+    luminancia(horneado[0], horneado[1], horneado[2]) / luminanciaDeReferencia(referencia),
+    RELACION_MINIMA,
+    RELACION_MAXIMA,
+  );
   return [pinza(asiento[0] * relacion, 0, 1), pinza(asiento[1] * relacion, 0, 1), pinza(asiento[2] * relacion, 0, 1)];
 }
 
 /**
  * Una copia de la geometría con los vértices de tinte pintados. Si la geometría no
  * lleva máscara, se devuelve ella misma: no hay nada que teñir y clonar sería gastar.
+ * `referencia` es el azul medio del pack de la pieza (ver la cabecera).
  */
-export function tenirGeometria(geometria: THREE.BufferGeometry, hex: string): THREE.BufferGeometry {
+export function tenirGeometria(
+  geometria: THREE.BufferGeometry,
+  hex: string,
+  referencia: AzulDeReferencia = AZUL_DEL_PACK,
+): THREE.BufferGeometry {
   const mascara = geometria.getAttribute(ATRIBUTO_DE_TINTE_CARGADO);
   const color = geometria.getAttribute('color');
   if (mascara === undefined || color === undefined) return geometria;
@@ -101,7 +138,8 @@ export function tenirGeometria(geometria: THREE.BufferGeometry, hex: string): TH
     porColor = new Map();
     cacheDeGeometrias.set(geometria, porColor);
   }
-  const hecha = porColor.get(hex);
+  const clave = claveDelTinte(hex, referencia);
+  const hecha = porColor.get(clave);
   if (hecha !== undefined) return hecha;
 
   /* `clone()` a secas: los atributos ya no llegan entrelazados (ver `cargar.ts`). */
@@ -120,7 +158,7 @@ export function tenirGeometria(geometria: THREE.BufferGeometry, hex: string): TH
     const g = color.getY(i);
     const b = color.getZ(i);
     if ((mascara as THREE.BufferAttribute).getX(i) > 0.5) {
-      const t = colorTenido([r, g, b], asiento);
+      const t = colorTenido([r, g, b], asiento, referencia);
       nuevo[i * 3] = t[0];
       nuevo[i * 3 + 1] = t[1];
       nuevo[i * 3 + 2] = t[2];
@@ -131,30 +169,32 @@ export function tenirGeometria(geometria: THREE.BufferGeometry, hex: string): TH
     }
   }
   copia.setAttribute('color', new THREE.BufferAttribute(nuevo, 3));
-  porColor.set(hex, copia);
+  porColor.set(clave, copia);
   return copia;
 }
 
 /**
  * UNA PIEZA TEÑIDA: el nodo clonado con cada malla apuntando a su geometría
- * teñida. Los materiales se comparten con el original: no cambian.
+ * teñida. Los materiales se comparten con el original: no cambian. `referencia` es
+ * el azul medio del pack de la pieza (ver la cabecera); sin él, el del hexagonal.
  */
-export function tenir(pieza: THREE.Object3D, hex: string): THREE.Object3D {
+export function tenir(pieza: THREE.Object3D, hex: string, referencia: AzulDeReferencia = AZUL_DEL_PACK): THREE.Object3D {
   let porColor = cache.get(pieza);
   if (porColor === undefined) {
     porColor = new Map();
     cache.set(pieza, porColor);
   }
-  const hecha = porColor.get(hex);
+  const clave = claveDelTinte(hex, referencia);
+  const hecha = porColor.get(clave);
   if (hecha !== undefined) return hecha;
 
   const copia = pieza.clone(true);
   copia.traverse((n) => {
     const malla = n as THREE.Mesh;
     if (!malla.isMesh) return;
-    malla.geometry = tenirGeometria(malla.geometry, hex);
+    malla.geometry = tenirGeometria(malla.geometry, hex, referencia);
   });
-  porColor.set(hex, copia);
+  porColor.set(clave, copia);
   return copia;
 }
 

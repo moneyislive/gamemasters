@@ -88,6 +88,7 @@ import {
   comoAlPrincipio,
   estaComoAlPrincipio,
   factorValido,
+  LIMITES_DE_SALIDA,
   MAS_CERCA,
   MAS_LEJOS,
   ojoYMira,
@@ -4353,6 +4354,35 @@ paso('Un puente cubre su arista, salva lo que tiene debajo y encaja con el camin
   comprobar('acercar cero pasos tampoco', acercando(CERCANIA_DE_SALIDA, 0) === CERCANIA_DE_SALIDA);
   comprobar('y un factor imposible cae en el tablero entero', factorValido(Number.NaN) === 1 && factorValido(Number.POSITIVE_INFINITY) === 1);
 
+  /*
+   * LOS TOPES SON UN PARÁMETRO (decisión 14 del Burgo): otro tablero pasa los suyos y
+   * la aritmética es la misma. Lo que se compra aquí es que sin decir nada siga saliendo
+   * EXACTAMENTE lo del delta —los dos números de arriba— y que diciéndolo se obedezca.
+   */
+  const OTROS = { masCerca: 0.4, masLejos: 2 };
+  comprobar(
+    'los límites de salida son los dos topes del delta, y callar es lo mismo que pasarlos',
+    LIMITES_DE_SALIDA.masCerca === MAS_CERCA &&
+      LIMITES_DE_SALIDA.masLejos === MAS_LEJOS &&
+      factorValido(0.01) === factorValido(0.01, LIMITES_DE_SALIDA) &&
+      acercando(CERCANIA_DE_SALIDA, 100).factor === acercando(CERCANIA_DE_SALIDA, 100, LIMITES_DE_SALIDA).factor,
+  );
+  comprobar(
+    'con otros límites, el factor se acota a ésos y no a los del delta',
+    factorValido(0.01, OTROS) === OTROS.masCerca && factorValido(10, OTROS) === OTROS.masLejos && factorValido(1, OTROS) === 1,
+  );
+  comprobar(
+    'y acercar y pellizcar sin fin paran en los que se les dio',
+    acercando(CERCANIA_DE_SALIDA, 100, OTROS).factor === OTROS.masCerca &&
+      acercando(CERCANIA_DE_SALIDA, -100, OTROS).factor === OTROS.masLejos &&
+      pellizcando(CERCANIA_DE_SALIDA, 1, 100, OTROS).factor === OTROS.masCerca &&
+      pellizcando(CERCANIA_DE_SALIDA, 1, 0.01, OTROS).factor === OTROS.masLejos,
+  );
+  comprobar(
+    'se ve fallar: con los del delta esos mismos gestos NO paran en los otros topes',
+    acercando(CERCANIA_DE_SALIDA, 100).factor !== OTROS.masCerca && pellizcando(CERCANIA_DE_SALIDA, 1, 0.01).factor !== OTROS.masLejos,
+  );
+
   /* Mover la mirada: se arrastra el mundo, no la cámara. */
   const cerca = acercando(CERCANIA_DE_SALIDA, 6);
   const aLaDerecha = arrastrandoLaMirada(cerca, 200, 0, 0, ALCANCE, PANTALLA);
@@ -4408,6 +4438,16 @@ paso('Un puente cubre su arista, salva lo que tiene debajo y encaja con el camin
     'y por muy cerca y muy raso que se mire, el ojo no se mete dentro del mundo',
     rasante.ojo[1] >= ALTURA_MINIMA_DEL_OJO,
     rasante.ojo,
+  );
+  /* La altura mínima también es un parámetro: la de siempre si se calla, la que se diga si no. */
+  const MAS_ALTO = ALTURA_MINIMA_DEL_OJO * 3;
+  const rasanteAlto = ojoYMira({ factor: MAS_CERCA, centro: { x: 0, z: 0 } }, ALCANCE, (d) => [0, d * 0.001, d], MAS_ALTO);
+  comprobar(
+    'con otra altura mínima, el ojo se queda a ésa; y callarla es la de siempre',
+    rasanteAlto.ojo[1] === MAS_ALTO &&
+      rasante.ojo[1] === ALTURA_MINIMA_DEL_OJO &&
+      ojoYMira({ factor: MAS_CERCA, centro: { x: 0, z: 0 } }, ALCANCE, (d) => [0, d * 0.001, d], ALTURA_MINIMA_DEL_OJO).ojo[1] === rasante.ojo[1],
+    { rasante: rasante.ojo, alto: rasanteAlto.ojo },
   );
 }
 
@@ -10089,7 +10129,7 @@ if (fallos.length > 0) {
  * sería un rojo aleatorio. Medido: no hay ninguna: las treinta que no son llamadas sueltas
  * están en bucles sobre listas escritas en el propio guion.
  */
-const COMPROBACIONES_ESCRITAS = 516;
+const COMPROBACIONES_ESCRITAS = 521;
 if (hechas < COMPROBACIONES_ESCRITAS) {
   console.error(
     `Solo se han hecho ${hechas} de las ${COMPROBACIONES_ESCRITAS} comprobaciones que ` +

@@ -51,6 +51,15 @@
  * geometrías del barco, la bandera y el estandarte NO: son de la caché de
  * `tinte.ts` y las comparten los asientos del mismo color; las suelta la escena
  * entera al irse (`soltarTintes`).
+ *
+ * ═══ LA MARIONETA NO ES DE AQUÍ ═══
+ *
+ * Clonar la figura, montarle el mezclador, fundir de un clip al siguiente y
+ * soltar el esqueleto vivían aquí, privados, mientras el muelle fue el único sitio
+ * donde un aventurero se movía. Desde que el Burgo pone uno a andar por su anillo,
+ * eso es de `escenas/aventureros/marioneta.ts`: lo que este fichero sabe es DEL
+ * AMARRE —dónde está, hacia dónde mira, su barco y su bandera—, y la marioneta la
+ * importa como la importa el anillo.
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { JSX } from 'react';
@@ -58,10 +67,9 @@ import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { ESCALA_DEL_PACK, LAMINA } from '../escala';
 import { PIEZA } from './piezas';
-import { CLIP } from './figuras';
-import type { FiguraId, NombreDeClip } from './figuras';
-import { clonarAventurero, fundirClips } from './cargar';
+import type { FiguraId } from './figuras';
 import type { AventureroCargado, CatalogoDelEmbarcadero } from './cargar';
+import { desmontaMarioneta, giroCorto, montaMarioneta, reproduce } from '../aventureros/marioneta';
 import { tenir } from './tinte';
 import { amortiguado } from './camara';
 import {
@@ -105,7 +113,6 @@ export interface PropsDelAventurero {
 }
 
 const A_FLOTE = LAMINA + 0.06;
-const FUNDIDO = 0.22;
 /** El aventurero va sobre la cubierta del barco, que está a esta altura de la lámina. */
 const CUBIERTA = 1.1;
 /** Cuánto tarda en saludar al que llega cada asiento más que el anterior. */
@@ -113,69 +120,6 @@ const ESCALON_DEL_SALUDO = 0.15;
 
 const pinza = (x: number, a: number, b: number): number => Math.min(b, Math.max(a, x));
 const suaveFuera = (t: number): number => 1 - Math.pow(1 - pinza(t, 0, 1), 3);
-
-/** El giro más corto de `a` hacia `b`, en radianes. */
-function giroCorto(a: number, b: number): number {
-  let d = (b - a) % (Math.PI * 2);
-  if (d > Math.PI) d -= Math.PI * 2;
-  if (d < -Math.PI) d += Math.PI * 2;
-  return d;
-}
-
-/* ─────────────────────────────── La figura ─────────────────────────────── */
-
-interface Marioneta {
-  readonly raiz: THREE.Object3D;
-  readonly mezclador: THREE.AnimationMixer;
-  readonly acciones: ReadonlyMap<string, THREE.AnimationAction>;
-  actual: THREE.AnimationAction | null;
-  desdeActual: number;
-}
-
-function montaMarioneta(cargado: AventureroCargado, biblioteca: readonly THREE.AnimationClip[]): Marioneta | null {
-  const raiz = clonarAventurero(cargado);
-  const mezclador = new THREE.AnimationMixer(raiz);
-  const acciones = new Map<string, THREE.AnimationAction>();
-  for (const clip of fundirClips(cargado.clips, biblioteca)) {
-    if (clip.name === CLIP.tPose) continue;
-    acciones.set(clip.name, mezclador.clipAction(clip));
-  }
-  if (!acciones.has(CLIP.reposoA)) {
-    desmontaMarioneta({ raiz, mezclador, acciones, actual: null, desdeActual: -1 });
-    return null;
-  }
-  return { raiz, mezclador, acciones, actual: null, desdeActual: -1 };
-}
-
-function desmontaMarioneta(m: Marioneta): void {
-  m.mezclador.stopAllAction();
-  m.mezclador.uncacheRoot(m.raiz);
-  m.raiz.traverse((n) => {
-    const piel = n as THREE.SkinnedMesh;
-    if (piel.isSkinnedMesh) piel.skeleton.dispose();
-  });
-}
-
-/** Pone el clip que toca, fundiendo desde el anterior. Si el clip falta, `reposo-a`. */
-function reproduce(m: Marioneta, clip: NombreDeClip, bucle: boolean, desde: number, ahora: number): void {
-  const accion = m.acciones.get(clip) ?? m.acciones.get(CLIP.reposoA);
-  if (accion === undefined) return;
-  if (accion === m.actual && (bucle || Math.abs(m.desdeActual - desde) < 1e-3)) return;
-  accion.reset();
-  accion.setLoop(bucle ? THREE.LoopRepeat : THREE.LoopOnce, Infinity);
-  accion.clampWhenFinished = !bucle;
-  accion.enabled = true;
-  accion.setEffectiveTimeScale(1);
-  accion.setEffectiveWeight(1);
-  const duracion = Math.max(1e-3, accion.getClip().duration);
-  const transcurrido = Math.max(0, ahora - desde);
-  /* En bucle se entra en la vuelta que toca; de una vez, en su instante o clavado al final. */
-  accion.time = bucle ? transcurrido % duracion : Math.min(transcurrido, duracion - 0.001);
-  if (m.actual !== null && m.actual !== accion) accion.crossFadeFrom(m.actual, FUNDIDO, true);
-  accion.play();
-  m.actual = accion;
-  m.desdeActual = desde;
-}
 
 /* ──────────────────────────────── El amarre ──────────────────────────────── */
 

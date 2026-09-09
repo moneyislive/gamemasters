@@ -38,7 +38,9 @@
  *     es una mesa posible y el tope se exige con ella, no con la media. Se
  *     imprime la tabla para que quien ajuste sepa dónde pesa.
  *   · Que la PALETA de colonos de `tema.ts` es la de `riberas.ts`, leída como
- *     texto porque el juego no la exporta.
+ *     texto porque el juego no la exporta. Y que la del Burgo es la de
+ *     `burgo.ts` (`COLORES_DEL_BURGO`), leída igual: el segundo tema del muelle
+ *     no puede quedar sin vigilar sólo porque el primero lo esté.
  *
  * ═══ SIN `three`, A PROPÓSITO ═══
  *
@@ -106,6 +108,18 @@ const RAIZ = path.resolve(import.meta.dirname ?? __dirname, '..');
 const EMBARCADERO = path.join(RAIZ, 'modelos', 'embarcadero.glb');
 const AVENTUREROS = path.join(RAIZ, 'modelos', 'aventureros');
 const RIBERAS = path.resolve(RAIZ, '..', 'shared', 'arcade', 'juegos', 'riberas.ts');
+const BURGO = path.resolve(RAIZ, '..', 'shared', 'arcade', 'juegos', 'burgo.ts');
+
+/**
+ * La paleta de un juego, leída del FUENTE: `NOMBRE: readonly string[] = [ '#…', … ]`.
+ * Es la forma exacta que los dos juegos escriben para que esto la vea; otra forma
+ * —otro tipo, un `as const`— devuelve vacío y se ve como rojo, a propósito.
+ */
+function paletaDelFuente(fichero: string, nombre: string): string[] {
+  const texto = fs.existsSync(fichero) ? fs.readFileSync(fichero, 'utf8') : '';
+  const bloque = new RegExp(`${nombre}\\s*:\\s*readonly string\\[\\]\\s*=\\s*\\[([^\\]]*)\\]`).exec(texto);
+  return bloque === null ? [] : [...(bloque[1] ?? '').matchAll(/#[0-9a-fA-F]{6}/g)].map((m) => m[0].toLowerCase());
+}
 
 const ORILLAS: readonly string[] = [PIEZA.orillaA, PIEZA.orillaB, PIEZA.orillaC, PIEZA.orillaD, PIEZA.orillaE];
 const CODIGOS = ['ABCDE', 'QWERT', 'ZXCVB', 'MNBVC', 'HOLAA', 'RIBER', 'DELTA', 'MUELL'];
@@ -523,13 +537,44 @@ paso('La paleta de colonos de tema.ts es la de riberas.ts');
 // ---------------------------------------------------------------------------
 
 {
-  const texto = fs.existsSync(RIBERAS) ? fs.readFileSync(RIBERAS, 'utf8') : '';
-  const bloque = /COLORES_DE_COLONO\s*:\s*readonly string\[\]\s*=\s*\[([^\]]*)\]/.exec(texto);
-  const delJuego = bloque === null ? [] : [...(bloque[1] ?? '').matchAll(/#[0-9a-fA-F]{6}/g)].map((m) => m[0].toLowerCase());
+  const delJuego = paletaDelFuente(RIBERAS, 'COLORES_DE_COLONO');
   const tema = temaDelMuelle('riberas');
   comprobar('riberas.ts declara COLORES_DE_COLONO con seis #rrggbb', delJuego.length === 6, delJuego);
   comprobar('tema.ts tiene muelle para riberas con seis colores #rrggbb', tema !== undefined && tema.colonos.length === 6 && tema.colonos.every((c) => /^#[0-9a-f]{6}$/.test(c)), tema?.colonos);
   comprobar('y son los mismos seis, en el mismo orden', JSON.stringify(delJuego) === JSON.stringify(tema?.colonos.map((c) => c.toLowerCase())), { juego: delJuego, tema: tema?.colonos });
+}
+
+// ---------------------------------------------------------------------------
+paso('La paleta del Burgo de tema.ts es la de burgo.ts');
+// ---------------------------------------------------------------------------
+
+/*
+ * El segundo tema del muelle, vigilado igual que el primero. `burgo.ts` lo escribe el
+ * equipo de reglas; mientras no exista, la primera comprobación está en ROJO diciendo
+ * que falta el fichero —no en verde por «no hay nada que mirar»—, y se pone verde sola
+ * el día que exista con `COLORES_DEL_BURGO: readonly string[] = [...]` dentro.
+ */
+{
+  const existe = fs.existsSync(BURGO);
+  const delJuego = paletaDelFuente(BURGO, 'COLORES_DEL_BURGO');
+  const tema = temaDelMuelle('burgo');
+  comprobar(
+    'burgo.ts existe y declara COLORES_DEL_BURGO con seis #rrggbb',
+    existe && delJuego.length === 6,
+    existe ? delJuego : `falta el fichero ${path.relative(RAIZ, BURGO)}: se pondrá verde cuando exista`,
+  );
+  comprobar('tema.ts tiene muelle para el burgo con seis colores #rrggbb', tema !== undefined && tema.colonos.length === 6 && tema.colonos.every((c) => /^#[0-9a-f]{6}$/.test(c)), tema?.colonos);
+  comprobar('y son los mismos seis, en el mismo orden', JSON.stringify(delJuego) === JSON.stringify(tema?.colonos.map((c) => c.toLowerCase())), { juego: delJuego, tema: tema?.colonos });
+  const riberas = temaDelMuelle('riberas');
+  comprobar(
+    'y ninguno de los seis es de la paleta de Riberas: dos muelles con el mismo color para asientos distintos se confundirían',
+    tema !== undefined && riberas !== undefined && tema.colonos.every((c) => !riberas.colonos.includes(c)),
+    tema?.colonos.filter((c) => riberas?.colonos.includes(c)),
+  );
+  comprobar(
+    'se ve fallar: la regex no encuentra una paleta escrita de otra forma',
+    paletaDelFuente(RIBERAS, 'NO_EXISTE_ESTA_PALETA').length === 0 && paletaDelFuente(path.join(RAIZ, 'no-existe.ts'), 'COLORES_DE_COLONO').length === 0,
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -546,7 +591,7 @@ if (fallos.length > 0) {
  * cae a la mitad termina con código cero y una lista corta de aciertos, y eso se lee
  * como verde. El número va a mano y hay que subirlo al añadir comprobaciones.
  */
-const COMPROBACIONES_ESCRITAS = 72;
+const COMPROBACIONES_ESCRITAS = 77;
 if (hechas < COMPROBACIONES_ESCRITAS) {
   console.error(
     `Solo se han hecho ${String(hechas)} de las ${String(COMPROBACIONES_ESCRITAS)} comprobaciones que ` +

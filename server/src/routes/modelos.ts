@@ -3,8 +3,9 @@
  *
  * ═══ QUÉ ES ESTO Y QUÉ NO ES ═══
  *
- * Cuatro rutas que entregan ficheros `.glb` (el tablero, los dados y el
- * embarcadero de Riberas, y los aventureros del lobby) y nada más. El servidor NO
+ * Seis rutas que entregan ficheros `.glb` (el tablero, los dados y el
+ * embarcadero de Riberas, el reloj de la barra, las piezas del Burgo y los
+ * aventureros del lobby) y nada más. El servidor NO
  * SABE QUÉ HAY DENTRO: no importa `three`
  * (`server/` no lo tiene), no importa nada de `escenas/`, no abre el fichero para
  * mirarlo. Sirve bytes con el tipo correcto y una caché razonable, como sirve el
@@ -210,6 +211,22 @@ router.get('/arcade/modelos/dados.glb', (_req, res) => {
     return;
   }
   servir(res, carpeta, 'dados.glb');
+});
+
+/**
+ * Las piezas del Burgo: setenta y tantas de siete packs de KayKit, horneadas a color
+ * por vértice y ya a escala del mundo, en unos 2,8 MB. Fichero APARTE del embarcadero
+ * por lo mismo que los dados —que un arcade no obligue a bajar el arte de otro y que
+ * su fallo no lo tumbe— y ruta fija como las otras cuatro: lo que se puede pedir por
+ * HTTP es exactamente lo que se ha decidido servir. Ver `escenas/burgo/piezas.ts` para
+ * qué hay dentro y `escenas/scripts/compilar-burgo.ts` para cómo se rehace.
+ */
+router.get('/arcade/modelos/burgo.glb', (_req, res) => {
+  if (carpeta === undefined) {
+    faltaLaCarpeta(res);
+    return;
+  }
+  servir(res, carpeta, 'burgo.glb');
 });
 
 /**
