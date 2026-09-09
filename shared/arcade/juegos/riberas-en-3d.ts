@@ -45,7 +45,7 @@ import type { ColorDeJugador, DeltaEn3D } from '../../../escenas/tipos';
 import type { LlaveDeArista, LlaveDeHex, LlaveDeVertice } from '../../mecanicas/malla-hexagonal';
 import { claseDeLlave, hexDeLlave } from '../../mecanicas/malla-hexagonal';
 import type { Opcion } from '../opciones';
-import { ALZAR, bienDeLaFicha, FUNDAR, opcionesDeRiberas } from './riberas';
+import { ALZAR, bienDeLaFicha, FUNDAR, MOVER_EL_ESTIAJE, opcionesDeRiberas } from './riberas';
 
 /*
  * ═══ POR QUÉ ESTE FICHERO IMPORTA TIPOS DE `escenas/` Y NO AL REVÉS ═══
@@ -158,6 +158,61 @@ export function obraPosible(vista: unknown, quien: string, pieza: PiezaDeObra): 
 /** Todo lo que se puede levantar ahora, pieza por pieza. Para pintar la barra entera. */
 export function obrasPosibles(vista: unknown, quien: string): readonly ObraPosible[] {
   return PIEZAS_DE_OBRA.map((p) => obraPosible(vista, quien, p));
+}
+
+/**
+ * UNA ISLA A LA QUE PUEDE IR EL ESTIAJE, con TODAS las opciones que el juego ofrece para ella.
+ *
+ * Son varias cuando alrededor de la isla hay más de un colono con fichas: el juego emite una
+ * opción POR VÍCTIMA, y las dos sólo se distinguen por a quién se le roba. Por eso aquí no va
+ * un movimiento sino la lista entera: con una, quien pinta la manda; con varias, pregunta.
+ */
+export interface SitioDelEstiaje {
+  /** La llave de la comarca: `${q},${r}`, la MISMA de `llaveDeHex` y la de `escenas/sitios.ts`. */
+  llave: string;
+  opciones: readonly Opcion[];
+}
+
+/** Adónde puede ir el estiaje ahora mismo. `clase` va ESCRITA: ver `sitiosDelEstiaje`. */
+export interface DestinosDelEstiaje {
+  clase: 'comarca';
+  sitios: readonly SitioDelEstiaje[];
+}
+
+/**
+ * ADÓNDE PUEDE ESTE ASIENTO MOVER EL ESTIAJE, ahora mismo, o `null` si no le toca moverlo.
+ *
+ * ═══ HERMANA DE `obraPosible`, Y NO LA MISMA FUNCIÓN, A PROPÓSITO ═══
+ *
+ * `obraPosible` deduce la clase del sitio con `claseDeLlave`, que sólo conoce los prefijos
+ * `v:` y `a:` y devuelve `null` para una llave de comarca como `0,-2`. Esa deducción es una
+ * afirmación —«una lista con un vértice y una arista dentro es un fallo»— y aquí no hay nada
+ * que deducir: hay una sola pieza y su clase se conoce. Así que la clase va escrita, y a las
+ * comarcas NO se les da prefijo `c:`: eso cambiaría `sitios.ts` y todos los recuentos de
+ * `verify:escena` para arreglar un problema que no existe (`docs/EL-LADRON-DE-RIBERAS.md`,
+ * §9.1).
+ *
+ * ═══ Y LA ISLA DONDE YA ESTÁ NO SALE, PORQUE EL JUEGO NO LA OFRECE ═══
+ *
+ * `opcionesDelEstiaje` salta `v.estiaje`: la pieza tiene que moverse. Aquí no se vuelve a
+ * mirar, y es lo mismo de siempre —la escena no puede discrepar del juego porque no opina—;
+ * lo afirma `verify:riberas-en-tres`, que exige dieciocho islas y ninguna la seca.
+ */
+export function sitiosDelEstiaje(vista: unknown, quien: string): DestinosDelEstiaje | null {
+  const porIsla = new Map<string, Opcion[]>();
+  for (const opcion of opcionesDeRiberas(vista, quien)) {
+    if (opcion.tipo !== MOVER_EL_ESTIAJE) continue;
+    const donde = (opcion.carga as Record<string, unknown>)['donde'];
+    if (typeof donde !== 'string') continue;
+    const lista = porIsla.get(donde);
+    if (lista === undefined) porIsla.set(donde, [opcion]);
+    else lista.push(opcion);
+  }
+  if (porIsla.size === 0) return null;
+  return {
+    clase: 'comarca',
+    sitios: [...porIsla.entries()].map(([llave, opciones]) => ({ llave, opciones })),
+  };
 }
 
 /**

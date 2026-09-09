@@ -127,7 +127,8 @@ import {
   VEREDAS_DE_LA_CARTA,
 } from './riberas';
 import type { ClaseDeCarta } from './riberas';
-import { bastanColores, COLORES_EN_3D, deltaDeLaVista, manoDeLaVista, obraPosible } from './riberas-en-3d';
+import { bastanColores, COLORES_EN_3D, deltaDeLaVista, manoDeLaVista, obraPosible, sitiosDelEstiaje } from './riberas-en-3d';
+import type { Opcion } from '../opciones';
 import type { PiezaDeObra, SitioDeObra } from './riberas-en-3d';
 
 // ---------------------------------------------------------------------------
@@ -476,13 +477,32 @@ export function barraEnTres(vista: unknown, quien: AsientoId | null): PiezaDeLaB
  * hasta otra fase entera. Con `null` el botón de comprar vuelve al pie por
  * `opcionesFueraDeLaBarra`, y en esas fases no hay COMPRAR que devolver de todas formas.
  */
+/**
+ * ═══ LA MESA ESTÁ PUESTA JUGANDO Y TAMBIÉN DESCARTANDO ═══
+ *
+ * El descarte de un siete es un PARÉNTESIS dentro de la partida, no otra fase: el momento
+ * cambia a `descartando` mientras alguien tira fichas y vuelve a `jugando` en cuanto acaba.
+ * Los dados y el hueco del mazo se apagaban con `null` en ese paréntesis, y en la mesa se
+ * veía así: sale el siete y LOS DADOS DESAPARECEN —con el siete puesto, que es justo lo que
+ * explica por qué hay que tirar fichas—, y la barra pierde su cuarto hueco y recoloca las
+ * tres piezas; segundos después todo vuelve. Un hueco que se va y vuelve mueve el resto de
+ * sitio, y unos dados que se esfuman con el siete encima esconden la causa del descarte.
+ *
+ * Lo que sigue sin haber es JUGADA: `disponible` sale falso en los dos, que es lo que la
+ * escena sabe pintar como apagado. La colocación, la reunión y el final siguen sin dados y
+ * sin hueco, por lo que dice la cabecera de abajo.
+ */
+function laMesaEstaPuesta(momento: string): boolean {
+  return momento === 'jugando' || momento === 'descartando';
+}
+
 export function mazoEnLaBarra<O extends OpcionQueLlega>(
   vista: unknown,
   quien: AsientoId | null,
   opciones: readonly O[],
 ): MazoEnLaBarraEnTres | null {
   if (!esVistaQueSePinta(vista) || quien === null) return null;
-  if (vista.momento !== 'jugando') return null;
+  if (!laMesaEstaPuesta(vista.momento)) return null;
   if (colorDePiezaDelColono(indiceDelColono(vista, quien)) === null) return null;
   return { disponible: comprarEnTres(opciones) !== null };
 }
@@ -503,6 +523,55 @@ export function colocandoEnTres(vista: unknown, quien: AsientoId | null, id: IdD
     donde: obra.sitios.map((s) => s.llave),
     movimientos: new Map(obra.sitios.map((s) => [s.llave, s.movimiento] as const)),
   };
+}
+
+/**
+ * ADÓNDE PUEDE IR EL ESTIAJE, con la forma que la escena espera para pintar una señal por isla.
+ *
+ * `clase` y `donde` son un `Colocando` de `escenas/sitios.ts` —la tercera clase, `comarca`,
+ * que estaba declarada desde el primer día y no se había usado nunca— y `porIsla` es lo que
+ * hace falta al soltar: las opciones de esa isla, que son una, o una POR VÍCTIMA cuando hay
+ * dos colonos alrededor. Con una se manda; con varias se pregunta a quién.
+ */
+export interface EstiajeEnTres {
+  readonly clase: 'comarca';
+  readonly donde: readonly string[];
+  readonly porIsla: ReadonlyMap<string, readonly Opcion[]>;
+}
+
+/**
+ * EL ESTIAJE POR MOVER, traducido: dieciocho señales sobre el tablero en vez de dieciocho
+ * botones en la barra de arriba. `null` cuando no hay que moverlo, y también donde no hay
+ * tablero en tres —una mesa de más de cuatro colonos se juega sobre el retablo, que ofrece
+ * las islas por sí mismo—: ahí los botones se quedan, y `opcionesFueraDeLasIslas` los deja.
+ */
+export function estiajeEnTres(vista: unknown, quien: AsientoId | null): EstiajeEnTres | null {
+  if (!esVistaQueSePinta(vista) || quien === null || !bastanColores(vista)) return null;
+  const destinos = sitiosDelEstiaje(vista, quien);
+  if (destinos === null) return null;
+  return {
+    clase: 'comarca',
+    donde: destinos.sitios.map((s) => s.llave),
+    porIsla: new Map(destinos.sitios.map((s) => [s.llave, s.opciones] as const)),
+  };
+}
+
+/**
+ * LAS OPCIONES QUE TAMPOCO PINTA LA BARRA DE ARRIBA: se caen las de mover el estiaje, y sólo
+ * si el tablero está pintando sus señales.
+ *
+ * Hermana de `opcionesFueraDeLaBarra` y de `opcionesFueraDeLaBolsa`, por el mismo par de
+ * fallos: con señales y botones la pantalla ofrecería la misma isla dos veces; sin señales y
+ * sin botones —el retablo, la app, un lienzo que no las pinte— un siete dejaría la mesa
+ * parada con la pieza en la mano, y mover es OBLIGATORIO. Por eso recibe EL ESTIAJE, el mismo
+ * objeto que se le pasa a `<Delta>`, y no un interruptor: los botones se van exactamente
+ * cuando las señales existen, porque son el mismo dato.
+ */
+export function opcionesFueraDeLasIslas<O extends OpcionQueLlega>(
+  opciones: readonly O[],
+  estiaje: EstiajeEnTres | null,
+): O[] {
+  return estiaje === null ? [...opciones] : opciones.filter((o) => o.tipo !== MOVER_EL_ESTIAJE);
 }
 
 // ---------------------------------------------------------------------------
@@ -1707,7 +1776,8 @@ export function pasarEnTres<O extends OpcionQueLlega>(opciones: readonly O[]): O
  * ═══ `null` EN LOS MISMOS SITIOS QUE `mazoEnLaBarra`, Y POR LO MISMO ═══
  *
  * Un mirón, un asiento que no está en la mesa, una mesa de más de cuatro colonos (que se
- * juega sobre el retablo) y cualquier momento que no sea `jugando` no tienen dados; y
+ * juega sobre el retablo) y cualquier momento en que la mesa no esté puesta —ver
+ * `laMesaEstaPuesta`: jugando y descartando lo están; la colocación no— no tienen dados; y
  * donde no hay dados el botón TIRAR se QUEDA (`opcionesFueraDeLaMesa`), porque es lo único
  * que salva al respaldo y al mirón de una partida en la que nadie puede tirar. Un hueco
  * apagado prometería que un día se enciende; en la colocación no hay tirada que esperar.
@@ -1728,7 +1798,7 @@ export function dadosEnTres<O extends OpcionQueLlega>(
   opciones: readonly O[],
 ): DadosEnTres | null {
   if (!esVistaQueSePinta(vista) || quien === null) return null;
-  if (vista.momento !== 'jugando' || !bastanColores(vista)) return null;
+  if (!laMesaEstaPuesta(vista.momento) || !bastanColores(vista)) return null;
   if (colorDePiezaDelColono(indiceDelColono(vista, quien)) === null) return null;
   const porTirar = meToca(vista) && vista.yo === quien && opciones.some((o) => o.tipo === TIRAR);
   const tirado = vista.tirado ?? false;

@@ -169,10 +169,12 @@ import {
   marcadorEnTres,
   mazoEnLaBarra,
   renglonDelVado,
+  estiajeEnTres,
   laBolsaDelDescarte,
   opcionesFueraDeLaBarra,
   opcionesFueraDeLaBolsa,
   opcionesFueraDeLaMano,
+  opcionesFueraDeLasIslas,
   opcionesFueraDelTablero,
   tirarLaFichaEnTres,
   PIEZAS_DE_LA_BARRA,
@@ -3166,7 +3168,7 @@ function losDadosEnLaPantalla(): void {
   comprobar(
     'TIRAR se cae de los botones con `opcionesFueraDeLaMesa` pasándole LOS DADOS (no un interruptor) y DESPUÉS de la cadena de siempre, y el pregón la cierra',
     /opcionesFueraDelPregon\(opcionesFueraDeLaMesa\(fueraDeLaBarra, mesaRecogida \? null : dados\), pregon\)/.test(codigo.replace(/\s+/g, ' ')) &&
-      /const fueraDeLaBarra = useMemo\( \(\) => opcionesFueraDeLaBolsa\( opcionesFueraDeLaBarra\(opcionesFueraDeLaMano\(opcionesFueraDelTablero\(opciones\)\), mesaRecogida \? null : mazo\), bolsa, \), /.test(codigo.replace(/\s+/g, ' ')),
+      /const fueraDeLaBarra = useMemo\( \(\) => opcionesFueraDeLasIslas\( opcionesFueraDeLaBolsa\( opcionesFueraDeLaBarra\(opcionesFueraDeLaMano\(opcionesFueraDelTablero\(opciones\)\), mesaRecogida \? null : mazo\), bolsa, \), destinosDelEstiaje, \), /.test(codigo.replace(/\s+/g, ' ')),
     codigo.replace(/\s+/g, ' ').slice(codigo.replace(/\s+/g, ' ').indexOf('const fueraDeLaBarra'), codigo.replace(/\s+/g, ' ').indexOf('const fueraDeLaBarra') + 300),
   );
   comprobar(
@@ -5321,10 +5323,26 @@ function laCintaYElCajon(): void {
       />,
     );
     const cuadrados = htmlDelEstiaje.split('class="riberas-carril-opcion').length - 1;
+    /*
+     * ═══ YA NO SON VEINTE CUADRADOS: SON DIECIOCHO SEÑALES SOBRE EL TABLERO ═══
+     *
+     * Esto exigía un cuadrado por destino en el carril de la cinta, y era verdad y era el
+     * arreglo de la primera partida. Miguel jugó dos más y pidió lo otro: «en vez de elegir
+     * dónde ubicar el ladrón con una lista en la barra de arriba, aros como los verdes sobre el
+     * centro de las teselas». Es la fase 4 de `docs/EL-LADRON-DE-RIBERAS.md`: el tablero planta
+     * una señal negra por isla y la pieza se suelta encima como un poblado. El carril de esta
+     * mesa se queda VACÍO, y los veinte siguen alcanzándose: dieciocho islas, y las que tienen
+     * dos víctimas preguntan a quién en vez de elegir por nadie.
+     */
+    const enElTablero = estiajeEnTres(conEstiaje.vista, 's1');
+    const porIsla = enElTablero === null ? [] : [...enElTablero.porIsla.values()];
     comprobar(
-      'los VEINTE se alcanzan desde la pantalla completa: uno por cuadrado en el carril de la cinta, DENTRO del recuadro y no en una lista debajo del lienzo que en pantalla completa no existe',
-      cuadrados === destinos.length && htmlDelEstiaje.includes('class="riberas-carril"'),
-      { cuadrados, destinos: destinos.length },
+      'los VEINTE se alcanzan desde la pantalla completa: por las dieciocho señales del tablero, y el carril no pinta ninguno ni hay lista debajo del lienzo',
+      cuadrados === 0 &&
+        enElTablero !== null &&
+        enElTablero.donde.length === 18 &&
+        porIsla.reduce((n, l) => n + l.length, 0) === destinos.length,
+      { cuadrados, islas: enElTablero?.donde.length, destinos: destinos.length },
     );
     /*
      * Y NI UNO SOLO ES UN `.opcion` EN FLUJO. Es la mitad que se rompe sola si alguien
@@ -5343,14 +5361,12 @@ function laCintaYElCajon(): void {
      * sería accesible sólo para quien ve. El rótulo y la ayuda van en el árbol, recortados de
      * la vista con `clip-path` y nunca con `display: none`, que los lectores saltan.
      */
-    const dichos = palabrasDe(htmlDelEstiaje);
-    const mudos = destinos.filter((o) => !dichos.includes(o.rotulo) || !dichos.includes(o.ayuda));
+    const conDosVictimas = porIsla.filter((l) => l.length > 1);
     comprobar(
-      'y cada cuadrado dice adónde va: su rótulo y su ayuda enteros en el árbol, recortados de la vista y no escondidos con `display: none`, o veinte botones llamados «1»…«20» no serían veinte movimientos',
-      mudos.length === 0 &&
-        (htmlDelEstiaje.match(/aria-labelledby="/g) ?? []).length >= destinos.length &&
-        /clip-path:\s*inset\(50%\)/.test(reglaDe('.riberas-carril-dicho')),
-      mudos.slice(0, 3).map((o) => o.rotulo),
+      'y donde hay dos víctimas se pregunta leyendo: cada opción de esa isla dice en su ayuda a quién le robas, que es lo que `ElijeUna` pinta bajo el rótulo',
+      conDosVictimas.length > 0 &&
+        conDosVictimas.every((l) => l.every((o) => conEstiaje.sentados.some((s) => o.ayuda.includes(s.nombre)))),
+      conDosVictimas.map((l) => l.map((o) => o.ayuda)),
     );
     /*
      * Y EL CARRIL NO CABE, QUE ES EL PUNTO: veinte cuadrados del suelo de toque son 935
@@ -6164,6 +6180,30 @@ function elCarrilDiceAdondeVa(): void {
 
   // ── Y en la pantalla de verdad ───────────────────────────────────────────
 
+  /*
+   * ═══ EN LA PANTALLA DE VERDAD YA NO HAY CUADRADOS: HAY DIECIOCHO SEÑALES ═══
+   *
+   * Todo lo de arriba mide la TRADUCCIÓN del carril —`glifosDelCarril`— y sigue siendo verdad
+   * de ella. Lo que dejó de ser verdad es que se pinte: desde que el tablero de tres
+   * dimensiones planta una señal negra en el centro de cada isla adonde puede ir el estiaje,
+   * los veinte destinos se sueltan sobre el tablero como un poblado y el carril de esta mesa
+   * se queda VACÍO. Lo pidió Miguel jugando —«en vez de elegir dónde ubicar el ladrón con una
+   * lista en la barra de arriba, aros como los verdes sobre el centro de las teselas»— y es la
+   * fase 4 de `docs/EL-LADRON-DE-RIBERAS.md`.
+   *
+   * Aquí había un emparejado cuadrado a cuadrado por `title`; lo que se mide ahora es la
+   * mudanza ENTERA, porque media mudanza es una partida parada con la pieza en la mano: que
+   * el carril no pinte ninguno, que quien los quita sea el estiaje traducido y no un
+   * interruptor, que sin él NO se quite nada, que la escena reciba las dieciocho islas con
+   * sus opciones agrupadas, y que la isla con dos víctimas pregunte en vez de elegir por
+   * nadie.
+   *
+   * Y queda dicho en voz alta: los cuadrados con glifo, terreno y filo que el carril sabe
+   * pintar se han quedado SIN LECTOR en este cliente. `glifosDelCarril` sólo tendría trabajo
+   * en una pantalla que no componga `opcionesFueraDeLasIslas`, y hoy no la hay. Las
+   * comprobaciones de arriba siguen midiendo esa traducción mientras exista; quitarla entera
+   * —función, cuadrado, hoja de estilo y este paso— es una limpieza aparte.
+   */
   const puesta = mesaPuestaDe(sentados, vista, opciones);
   const html = renderToStaticMarkup(
     <RiberasEnTres
@@ -6175,87 +6215,43 @@ function elCarrilDiceAdondeVa(): void {
       laSalida="/sala/"
     />,
   );
-  /*
-   * ═══ SE LEE BOTÓN A BOTÓN, Y NO COMO UNA BOLSA DE GLIFOS ═══
-   *
-   * La primera versión de esto comparaba el CONJUNTO de glifos pintados contra el conjunto
-   * esperado, y pasaba en verde con el número de orden de antes puesto: con veinte destinos,
-   * los ordinales van del 1 al 20 y todos los números de isla —del 2 al 12— están dentro de
-   * ese rango, así que «cada glifo esperado aparece en la lista» era cierto sin que ni un solo
-   * cuadrado dijera lo suyo. Es exactamente el fallo que este bloque existe para cazar, y se
-   * coló en el propio comprobador.
-   *
-   * Así que se emparejan por el `title`, que el carril pinta con el rótulo Y la ayuda dentro y
-   * que por tanto identifica a cada opción —incluidas las dos gemelas, que comparten rótulo y
-   * se separan por la ayuda—, y se compara cuadrado por cuadrado.
-   */
-  const porTitulo = new Map<string, string>();
-  for (const m of html.matchAll(
-    /<button [^>]*class="riberas-carril-opcion[^"]*"[^>]*title="([^"]*)"[\s\S]*?<span class="riberas-carril-glifo"[^>]*>([^<]*)<\/span>/g,
-  )) {
-    porTitulo.set(m[1] as string, m[2] as string);
-  }
-  const escapa = (t: string): string => t.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  const malPintados = delEstiaje.filter((o) => {
-    const titulo = escapa(o.ayuda.length > 0 ? `${o.rotulo}. ${o.ayuda}` : o.rotulo);
-    return porTitulo.get(titulo) !== glifos.get(o.id)?.glifo;
-  });
+  const cuadradosDelEstiaje = html.split('class="riberas-carril-opcion').length - 1;
+  const traducido = estiajeEnTres(vista, 's1');
+  const opcionesPorIsla = traducido === null ? [] : [...traducido.porIsla.values()];
   comprobar(
-    `el carril pinta ${String(porTitulo.size)} cuadrados y CADA uno de los del estiaje lleva dentro el número de SU isla, emparejado por su rótulo y no por el conjunto`,
-    porTitulo.size >= delEstiaje.length && malPintados.length === 0,
-    malPintados.slice(0, 4).map((o) => {
-      const titulo = escapa(o.ayuda.length > 0 ? `${o.rotulo}. ${o.ayuda}` : o.rotulo);
-      return `«${o.rotulo}»: pinta «${porTitulo.get(titulo) ?? 'nada'}» y su isla es «${glifos.get(o.id)?.glifo ?? '?'}»`;
-    }),
-  );
-  /*
-   * EL FILO Y LA BARRA SE PINTAN DE VERDAD, y con un color de la mesa dentro del `style`. Sin
-   * esto, la tabla de arriba podría estar perfecta y la pantalla no enseñar ni una raya: es la
-   * diferencia entre comprobar la traducción y comprobar lo que se ve.
-   */
-  const filos = [...html.matchAll(/class="riberas-carril-rail" style="background:([^"]*)"/g)].map((m) =>
-    (m[1] as string).trim(),
+    'el carril no pinta ni un cuadrado con el estiaje por mover: los destinos se sueltan sobre el tablero',
+    cuadradosDelEstiaje === 0,
+    cuadradosDelEstiaje,
   );
   comprobar(
-    'y el filo de la víctima llega a la pantalla, con el color de la mesa dentro',
-    filos.length > 0 && filos.every((c) => coloresDeLaMesa.has(c)),
-    filos,
+    'y la escena recibe las dieciocho islas con sus opciones agrupadas: los veinte destinos, y alguna isla con dos víctimas',
+    traducido !== null &&
+      traducido.donde.length === 18 &&
+      opcionesPorIsla.reduce((n, l) => n + l.length, 0) === delEstiaje.length &&
+      opcionesPorIsla.some((l) => l.length > 1),
+    { islas: traducido?.donde.length, destinos: delEstiaje.length },
   );
   comprobar(
-    'y la barra del terreno también: una por cuadrado con isla, ni una más',
-    html.split('class="riberas-carril-terreno"').length - 1 === glifos.size,
-    { pintadas: html.split('class="riberas-carril-terreno"').length - 1, conIsla: glifos.size },
+    'quien quita los cuadrados es el estiaje traducido —el mismo dato que va a `<Delta>`—, y sin él no se quita ninguno',
+    opcionesFueraDeLasIslas(opciones, traducido).every((o) => o.tipo !== 'riberas:estiaje') &&
+      opcionesFueraDeLasIslas(opciones, null).length === opciones.length,
+    { con: opcionesFueraDeLasIslas(opciones, traducido).length, sin: opciones.length },
   );
-  /*
-   * ═══ Y EL NOMBRE ACCESIBLE SIGUE CONTANDO LA FRASE ENTERA ═══
-   *
-   * Lo que se pinta es un resumen, no un recorte del nombre. Un cuadrado que dijera «11» y se
-   * llamara «11» sería el mismo botón mudo de antes para quien usa lector de pantalla — y la
-   * víctima, que en pantalla es un color, ahí sólo existe en palabras.
-   */
-  const dichos = [...html.matchAll(/<span class="riberas-carril-dicho"[^>]*>([^<]*)<\/span>/g)].map(
-    (m) => m[1] as string,
-  );
-  const sinDecir = delEstiaje.filter((o) => !dichos.includes(o.rotulo) || !dichos.includes(o.ayuda));
+  const fuenteDelEstiaje = readFileSync(new URL('../src/riberas-en-tres.tsx', import.meta.url), 'utf8');
   comprobar(
-    'cada cuadrado sigue llevando su rótulo y su ayuda enteros en el árbol: lo pintado es un resumen, no un recorte del nombre',
-    sinDecir.length === 0,
-    sinDecir.slice(0, 3).map((o) => o.rotulo),
+    'y la escena recibe `destinosDelEstiaje` y `onMoverElEstiaje`; al soltar, una opción se manda entera y dos se preguntan con «A quién le robas»',
+    /<Delta[\s\S]*?destinosDelEstiaje=\{destinosDelEstiaje\}\s+onMoverElEstiaje=\{alMoverElEstiaje\}/.test(fuenteDelEstiaje) &&
+      /const suyas = destinosDelEstiaje\.porIsla\.get\(sitio\.llave\) \?\? \[\];[\s\S]*?mover\(\{ tipo: unica\.tipo, carga: unica\.carga \}\);[\s\S]*?ponerPreguntando\(\{ titulo: A_QUIEN_LE_ROBAS, opciones: suyas \}\)/.test(fuenteDelEstiaje) &&
+      /const A_QUIEN_LE_ROBAS = 'A quién le robas';/.test(fuenteDelEstiaje),
   );
   /*
-   * ═══ Y DOS CUADRADOS QUE APUNTAN A ISLAS DISTINTAS NO SE LLAMAN IGUAL ═══
+   * ═══ Y DOS DESTINOS QUE APUNTAN A ISLAS DISTINTAS NO SE LLAMAN IGUAL ═══
    *
-   * Éste es el que faltaba, y el fallo que lo trae se encontró jugando: en la primera partida
-   * de verdad, dos de los diecinueve destinos eran iguales en TODO lo que se ve —mismo glifo
-   * («10»), mismo terreno al pie, sin filo ninguno porque en ninguna de las dos había a quién
-   * robar— y encima con el MISMO RÓTULO, «Mover el estiaje al cantil 10». Se pulsaba uno de los
-   * dos a ciegas en una fase que es obligatoria.
-   *
-   * Se lee del HTML que sale y no de la lista de opciones, que es lo que separa esta línea de
-   * las de `verify:riberas`: allí se compra que el juego escriba nombres distintos, aquí que el
-   * carril los ENSEÑE — el `title` que sale al posar el ratón y el `riberas-carril-dicho` que es
-   * el nombre accesible del botón. Un rótulo perfecto que el carril recortara sería el mismo
-   * botón mudo de antes.
+   * Éste sigue valiendo con señales, y más: cuando una isla tiene dos víctimas, `ElijeUna`
+   * pinta sus dos opciones con el mismo rótulo —«Mover el estiaje al cantil 10»— y se separan
+   * por la ayuda. El fallo de la primera partida era el contrario, dos ISLAS con el mismo
+   * rótulo, y lo cierra `nombresDeLasIslas` en `riberas.ts` con el rumbo. Se compra aquí sobre
+   * la lista de opciones de esta mesa.
    */
   const islaDelTitulo = new Map<string, string>();
   const gemelosDeVerdad: string[] = [];
@@ -6267,26 +6263,12 @@ function elCarrilDiceAdondeVa(): void {
     islaDelTitulo.set(o.rotulo, donde);
   }
   comprobar(
-    'dos cuadrados que llevan a ISLAS DISTINTAS nunca se llaman igual: el rumbo separa a las dos que comparten terreno y cifra',
+    'dos destinos que llevan a ISLAS DISTINTAS nunca se llaman igual: el rumbo separa a las dos que comparten terreno y cifra',
     gemelosDeVerdad.length === 0,
     gemelosDeVerdad,
   );
-  /*
-   * Y QUE EL CARRIL LO ENSEÑE, no sólo que el juego lo escriba: los rumbos que el rótulo trae
-   * tienen que estar en el HTML, dentro del `title` de su botón y dentro del nombre accesible.
-   */
-  const conRumbo = delEstiaje.filter((o) => / del [a-z]+$/u.test(o.rotulo));
-  const noLlegan = conRumbo.filter((o) => {
-    const titulo = escapa(o.ayuda.length > 0 ? `${o.rotulo}. ${o.ayuda}` : o.rotulo);
-    return !porTitulo.has(titulo) || !dichos.includes(o.rotulo);
-  });
   comprobar(
-    `hay ${String(conRumbo.length)} destinos con rumbo en esta mesa y los ${String(conRumbo.length)} llegan enteros al carril: en su \`title\` y en su nombre accesible`,
-    conRumbo.length > 0 && noLlegan.length === 0,
-    noLlegan.slice(0, 3).map((o) => o.rotulo),
-  );
-  comprobar(
-    'y la víctima, que en pantalla es un color, se dice con su nombre en la ayuda: quien no vea colores lo lee igual',
+    'y la víctima, que en la señal no está, se dice con su nombre en la ayuda: es lo que se lee al preguntar a quién',
     delEstiaje
       .filter((o) => !o.id.endsWith(':nadie'))
       .every((o) => sentados.some((s) => o.ayuda.includes(s.nombre))),
@@ -6295,7 +6277,6 @@ function elCarrilDiceAdondeVa(): void {
       .slice(0, 3)
       .map((o) => o.ayuda),
   );
-
   /*
    * ═══ Y UNA ISLA ROTA POR EL CABLE NO SE LLEVA EL DELTA POR DELANTE ═══
    *

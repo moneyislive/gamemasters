@@ -2337,6 +2337,26 @@ dejaría el juego sin jugar en esas mesas.
    **Lo visible:** catorce cartas de veinticinco pasan a valer lo que valen.
 
 4. **El tablero en tres dimensiones. LA MITAD ENTRÓ EN LA FASE 1** (§9.1).
+   > **HECHO el 9 de septiembre de 2026, en `lobby-catan`, después de dos partidas más.** Lo que
+   > queda escrito debajo como pendiente ya está, con dos diferencias respecto a lo previsto,
+   > las dos pedidas jugando: (1) `sitiosDelEstiaje` (en `riberas-en-3d.ts`, como se dijo) no
+   > devuelve un movimiento por isla sino **la lista de opciones de cada isla** —una por
+   > víctima—, y `estiajeEnTres` la traduce a un `Colocando` de clase `comarca` más un mapa por
+   > isla; al soltar, una se manda y dos abren `ElijeUna` («A quién le robas»). La señal es la
+   > misma `Senal` de los sitios de obra y va en **negro** (`COLOR_DEL_ESTIAJE`), no en verde:
+   > secar no es construir. Los dieciocho botones del carril se van por `opcionesFueraDeLasIslas`,
+   > que recibe el estiaje traducido y no un interruptor, así que el retablo y la app los
+   > conservan. (2) La **duna** lleva por fin ficha: un posavasos **blanco** con el
+   > **siete y sus seis puntos**, igual que las demás y en su mismo sitio (`Numero` con
+   > `enBlanco`, `SIETE_DE_LA_DUNA` en `delta.tsx`). Es lo que Miguel echaba de menos —«el número
+   > 7 con el círculo blanco en la tesela del ladrón», la del ladrón es la duna donde empieza—;
+   > estuvo un rato puesto sobre la comarca del estiaje, viajando con la tienda, y lo corrigió
+   > jugando: «no en el desierto». El §7 de esta tabla, que decía «no se le pone número», se
+   > refería al número CON EL QUE RINDE la isla, que sigue sin ponerse. Y una tercera cosa que no era de esta
+   > fase pero se vio con ella: durante `descartando` los dados y el hueco del mazo **se
+   > quedan**, apagados —`laMesaEstaPuesta` en `riberas-en-tres.ts`—, porque salían con el
+   > siete puesto y desaparecían, y la barra recolocaba sus piezas por un paréntesis. De esta fase no
+   > queda nada pendiente.
    **Ya está:** el campo `seca` en `escenas/tipos.ts` (no `bloqueada`), `deltaDeLaVista`
    devolviéndolo, el componente `LaComarcaSeca` (no `Estiaje`) plantando la tienda sobre el
    relieve, y `banco3d.tsx` al día. **Se ve dónde está el estiaje.**

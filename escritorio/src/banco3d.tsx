@@ -517,9 +517,18 @@ function Banco(): JSX.Element {
    */
   const [obras, ponerObras] = useState<PiezaEn3D[]>(() => aperturaDePrueba().piezas);
   const [caminos, ponerCaminos] = useState<CaminoEn3D[]>(() => aperturaDePrueba().caminos);
+  /*
+   * EL ESTIAJE DE MENTIRA, para mirar las señales negras y el siete blanco sin sacar un siete.
+   *
+   * En la partida los destinos salen de `estiajeEnTres`; aquí son todas las islas menos la
+   * seca, que es lo que el juego ofrece. Al soltar sobre una, la tienda y el posavasos se van
+   * allí, que es lo único que la escena hace con el dato.
+   */
+  const [secaDelBanco, ponerSecaDelBanco] = useState<Hex | null>(null);
+  const [moviendoElEstiaje, ponerMoviendoElEstiaje] = useState(false);
   const conObras = useMemo(
-    () => ({ ...datos, piezas: obras, caminos }),
-    [datos, obras, caminos],
+    () => ({ ...datos, piezas: obras, caminos, seca: secaDelBanco ?? datos.seca }),
+    [datos, obras, caminos, secaDelBanco],
   );
 
   /*
@@ -552,6 +561,7 @@ function Banco(): JSX.Element {
    * contador, que es lo único que la escena hace con el número.
    */
   const [porLaBolsa, ponerPorLaBolsa] = useState(0);
+
 
   /*
    * LOS DADOS DE MENTIRA, para mirarlos de cerca sin montar una partida.
@@ -933,6 +943,24 @@ function Banco(): JSX.Element {
                 ponerCogida(null);
                 ponerPorLaBolsa((n) => Math.max(0, n - 1));
               }}
+              destinosDelEstiaje={
+                moviendoElEstiaje
+                  ? {
+                      clase: 'comarca',
+                      donde: datos.islas
+                        .map((i) => `${String(i.hex.q)},${String(i.hex.r)}`)
+                        .filter((llave) => {
+                          const s = conObras.seca;
+                          return s === null || llave !== `${String(s.q)},${String(s.r)}`;
+                        }),
+                    }
+                  : null
+              }
+              onMoverElEstiaje={(sitio) => {
+                const [q, r] = sitio.llave.split(',').map(Number);
+                if (q !== undefined && r !== undefined) ponerSecaDelBanco({ q, r });
+                ponerMoviendoElEstiaje(false);
+              }}
               tomada={tomada}
               onTomarDeLaBarra={(id) => {
                 /*
@@ -1089,6 +1117,13 @@ function Banco(): JSX.Element {
           style={{ ...BOTON, borderColor: porLaBolsa > 0 ? '#e7dcc0' : undefined }}
         >
           {porLaBolsa > 0 ? `A la bolsa: ${String(porLaBolsa)}` : 'Sale un siete'}
+        </button>
+        <button
+          type="button"
+          onClick={() => ponerMoviendoElEstiaje((m) => !m)}
+          style={{ ...BOTON, borderColor: moviendoElEstiaje ? '#15120e' : undefined }}
+        >
+          {moviendoElEstiaje ? 'Dejar el estiaje' : 'Mover el estiaje'}
         </button>
         <button type="button" onClick={tender} style={BOTON}>
           Tender puente

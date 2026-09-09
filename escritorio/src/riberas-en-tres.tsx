@@ -238,6 +238,7 @@ import {
   LOS_CERRADOS,
   elPregonSePliega,
   elResumenDelPregon,
+  estiajeEnTres,
   glifosDelCarril,
   jugadasDeLaCarta,
   laManoDeLaIzquierda,
@@ -251,6 +252,7 @@ import {
   opcionesFueraDeLaBarra,
   opcionesFueraDeLaBolsa,
   opcionesFueraDeLaMano,
+  opcionesFueraDeLasIslas,
   opcionesFueraDeLaMesa,
   NADA_COMPUESTO,
   opcionesFueraDelPregon,
@@ -1368,6 +1370,7 @@ const LO_QUE_SE_PREGUNTA: Readonly<Record<ClaseDeJugada, string>> = {
 
 /** El título del menú de siempre: a quién se le propone un trueque. */
 const A_QUIEN_SE_LO_PROPONES = 'A quién se lo propones';
+const A_QUIEN_LE_ROBAS = 'A quién le robas';
 
 /**
  * EL TÍTULO DEL MENÚ DE COMPRAR. Encabezado de la Sala, como los otros dos: lo que CUESTA
@@ -1993,6 +1996,14 @@ export function RiberasEnTres({
    */
   const bolsa = useMemo(() => laBolsaDelDescarte(vista, yo), [vista, yo]);
   /*
+   * ADÓNDE PUEDE IR EL ESTIAJE: dieciocho señales negras sobre el tablero, o nada.
+   *
+   * Va aquí arriba por lo mismo que la bolsa: los botones dependen de ello. Mientras el
+   * tablero pinte las señales, los dieciocho destinos NO salen en el carril; y como la bolsa,
+   * no lo apaga `quieto`, o los botones volverían durante el parpadeo de una petición.
+   */
+  const destinosDelEstiaje = useMemo(() => estiajeEnTres(vista, yo), [vista, yo]);
+  /*
    * EL CUARTO HUECO DE LA BARRA: el mazo. `quieto` lo apaga como a las tres piezas y por
    * lo mismo —con una petición en vuelo, el movimiento que se mandara ahora saldría con la
    * revisión vieja—. Apagado y NO quitado: la barra reparte centrado, y un hueco que va y
@@ -2062,13 +2073,24 @@ export function RiberasEnTres({
    * La bolsa NO baja con la mesa recogida, al revés que el mazo: no está sobre el tablero,
    * está en la mano, y la mano se queda. Por eso aquí no hay `mesaRecogida ? null : ...`.
    */
+  /*
+   * ═══ Y LA QUINTA: MOVER EL ESTIAJE TAMPOCO ES UN BOTÓN ═══
+   *
+   * Desde que el tablero pinta una señal negra por isla, la pieza se suelta encima como un
+   * poblado. Los dieciocho botones del carril —«Mover el estiaje al cantil 10», dos de ellos
+   * iguales— se van por la misma puerta que los demás: la criba recibe EL DATO que se le pasa
+   * a `<Delta>`, y donde no hay señales (el retablo, la app) los botones se quedan.
+   */
   const fueraDeLaBarra = useMemo(
     () =>
-      opcionesFueraDeLaBolsa(
-        opcionesFueraDeLaBarra(opcionesFueraDeLaMano(opcionesFueraDelTablero(opciones)), mesaRecogida ? null : mazo),
-        bolsa,
+      opcionesFueraDeLasIslas(
+        opcionesFueraDeLaBolsa(
+          opcionesFueraDeLaBarra(opcionesFueraDeLaMano(opcionesFueraDelTablero(opciones)), mesaRecogida ? null : mazo),
+          bolsa,
+        ),
+        destinosDelEstiaje,
       ),
-    [opciones, mazo, mesaRecogida, bolsa],
+    [opciones, mazo, mesaRecogida, bolsa, destinosDelEstiaje],
   );
   /*
    * LA MANO DE LA IZQUIERDA: mis premios y mis cartas del mazo, apagada entera mientras
@@ -2878,6 +2900,29 @@ export function RiberasEnTres({
     [quieto, bolsa, opciones, mover],
   );
 
+  /*
+   * AL SOLTAR EL ESTIAJE SOBRE UNA ISLA: una víctima o ninguna, se manda; dos, se pregunta.
+   *
+   * Es el mismo reparto que el trueque: el juego emite una opción POR VÍCTIMA cuando hay dos
+   * colonos con fichas alrededor de la isla, y las dos sólo se distinguen por a quién se le
+   * roba. Este cliente no elige por nadie: abre `ElijeUna` con las opciones de ESA isla, que
+   * llevan en la ayuda el nombre de cada uno, escrito por el juego. Con una sola —lo normal—
+   * se manda sin preguntar, que es lo que hace que mover cueste un toque.
+   */
+  const alMoverElEstiaje = useCallback(
+    (sitio: { llave: string }) => {
+      if (quieto || destinosDelEstiaje === null) return;
+      const suyas = destinosDelEstiaje.porIsla.get(sitio.llave) ?? [];
+      const unica = suyas[0];
+      if (unica !== undefined && suyas.length === 1) {
+        mover({ tipo: unica.tipo, carga: unica.carga });
+        return;
+      }
+      if (suyas.length > 1) ponerPreguntando({ titulo: A_QUIEN_LE_ROBAS, opciones: suyas });
+    },
+    [quieto, destinosDelEstiaje, mover],
+  );
+
   // -------------------------------------------------------------------------
   // El mazo: coger, jugar y revelar
   // -------------------------------------------------------------------------
@@ -3601,6 +3646,8 @@ export function RiberasEnTres({
                   onProponerTrueque={alProponerTrueque}
                   cuantasALaBolsa={bolsa?.faltan ?? 0}
                   onTirarFicha={alTirarFicha}
+                  destinosDelEstiaje={destinosDelEstiaje}
+                  onMoverElEstiaje={alMoverElEstiaje}
                   cartasDelMazo={cartasDelMazo}
                   cartaDelMazoCogida={cartaDelMazo}
                   onCogerCartaDelMazo={alCogerCartaDelMazo}

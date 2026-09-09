@@ -119,6 +119,7 @@ import {
   elPregonEnTres,
   enCabeza,
   estadoDelVado,
+  estiajeEnTres,
   esVistaQueSePinta,
   jugadaSinPreguntar,
   jugadasDeLaCarta,
@@ -133,6 +134,7 @@ import {
   opcionesFueraDeLaBarra,
   opcionesFueraDeLaMano,
   opcionesFueraDeLaMesa,
+  opcionesFueraDeLasIslas,
   opcionesFueraDelPregon,
   opcionesFueraDelTablero,
   A_LA_MESA,
@@ -171,7 +173,7 @@ import type {
  * tablero de tres dimensiones. Se pide aquí, por su nombre entero, para poder afirmar qué
  * hace —y qué NO hace— con el estiaje por mover. Ver el bloque 12 bis.
  */
-import { COLORES_EN_3D, obrasPosibles } from '../../shared/arcade/juegos/riberas-en-3d';
+import { COLORES_EN_3D, obrasPosibles, sitiosDelEstiaje } from '../../shared/arcade/juegos/riberas-en-3d';
 /*
  * LA ESCENA DE VERDAD, Y NO UNA COPIA DE SUS NÚMEROS.
  *
@@ -198,6 +200,11 @@ import type { CartaDelMazo } from '../../escenas/cartas';
  * día que la mano de bienes se mueva el presupuesto de las frases se mueva con ella.
  */
 import { huecosDeLaBaraja, loQueSeVeEnLaBaraja } from '../../escenas/baraja';
+/*
+ * Y LOS SITIOS DEL TABLERO, para afirmar que las llaves que la traducción da para el estiaje
+ * son las que la escena ya tiene para sus diecinueve comarcas — sin traducir nada por medio.
+ */
+import { sitiosDelTablero, sitiosPermitidos } from '../../escenas/sitios';
 /*
  * Y LA BARRA, por lo mismo: el cuarto hueco no se mide con un reparto escrito aquí sino con
  * el de verdad, y su dibujo se pide por el nombre que usa la escena y no por una cadena
@@ -2456,7 +2463,7 @@ const CAMPO_DE_LA_BARRA = (45 * Math.PI) / 180;
   comprobar('y sin opciones no hay nada que revelar ni que comprar', revelarDe([], 'c2') === null && comprarEnTres([]) === null);
 }
 
-/* ═══ 12 bis. EL ESTIAJE POR MOVER: EN TRES DIMENSIONES TODAVÍA NO SE DIBUJA, Y SE JUEGA IGUAL ═══ */
+/* ═══ 12 bis. EL ESTIAJE POR MOVER: SE SUELTA SOBRE EL TABLERO, Y LOS BOTONES SIGUEN DE RESERVA ═══ */
 
 /*
  * ═══ QUÉ COMPRA ESTE BLOQUE, Y POR QUÉ HACE FALTA AHORA Y NO EN LA FASE DEL DIBUJO ═══
@@ -2517,6 +2524,53 @@ const CAMPO_DE_LA_BARRA = (45 * Math.PI) / 180;
     destinos: destinos.length,
   });
   comprobar('cada uno con su rótulo, que es lo que dice a qué isla va', destinos.every((o) => o.rotulo.startsWith('Mover el estiaje')), destinos[0]?.rotulo);
+
+  /*
+   * ═══ Y DESDE LA FASE 4, LOS DIECIOCHO SE SUELTAN SOBRE EL TABLERO ═══
+   *
+   * `sitiosDelEstiaje` es la hermana de `obraPosible` que el diseño pedía (§9.1): la clase va
+   * ESCRITA —`comarca`, la tercera de `escenas/sitios.ts`, que no se había usado nunca— y las
+   * llaves son las de `llaveDeHex`, que son exactamente las de las comarcas de la escena. Se
+   * afirma con la escena de verdad: se piden los sitios del tablero de esta vista y se filtran
+   * con la traducción, y tienen que salir DIECIOCHO señales de comarca, ninguna la seca.
+   *
+   * Y la línea de arriba —«los dieciocho llegan enteros a los botones»— pasa a ser la vacuna
+   * que el diseño anunció: la cadena vieja de cribas no toca el estiaje, así que donde nadie
+   * componga `opcionesFueraDeLasIslas` (el retablo, la app) los botones se quedan. Lo que los
+   * quita es el estiaje traducido, el mismo objeto que va a `<Delta>`, y sin él no se quita
+   * nada.
+   */
+  const destinosEnTres = sitiosDelEstiaje(vista, 'A');
+  comprobar(
+    '`sitiosDelEstiaje` da la clase escrita y una entrada por isla: dieciocho, con sus opciones',
+    destinosEnTres !== null && destinosEnTres.clase === 'comarca' && destinosEnTres.sitios.length === 18 &&
+      destinosEnTres.sitios.every((s) => s.opciones.length >= 1 && s.opciones.every((o) => o.tipo === MOVER_EL_ESTIAJE)),
+    destinosEnTres?.sitios.length,
+  );
+  const traducido = estiajeEnTres(vista, 'A');
+  const laSeca = (vista as { estiaje?: unknown }).estiaje;
+  comprobar(
+    'y la traducción lleva las dieciocho llaves y ninguna es la de la comarca seca',
+    traducido !== null && traducido.donde.length === 18 && typeof laSeca === 'string' && !traducido.donde.includes(laSeca),
+    { islas: traducido?.donde.length, seca: laSeca },
+  );
+  const hexesDeLaVista = (vista as { islas: { hex: { q: number; r: number } }[] }).islas.map((i) => i.hex);
+  const senales = traducido === null ? [] : sitiosPermitidos(sitiosDelTablero(hexesDeLaVista, () => 0), traducido);
+  comprobar(
+    'y las llaves son las de la escena sin traducir: dieciocho señales de comarca de las diecinueve que hay',
+    senales.length === 18 && senales.every((s) => s.clase === 'comarca'),
+    senales.length,
+  );
+  comprobar(
+    'con el estiaje traducido, los dieciocho se caen de los botones: la criba recibe el dato y no un interruptor',
+    opcionesFueraDeLasIslas(opciones, traducido).every((o) => o.tipo !== MOVER_EL_ESTIAJE) &&
+      opcionesFueraDeLasIslas(opciones, traducido).length === opciones.length - destinos.length,
+    { antes: opciones.length, despues: opcionesFueraDeLasIslas(opciones, traducido).length },
+  );
+  comprobar(
+    'y sin él no se cae ninguno, que es lo que deja jugar al retablo y a la app',
+    opcionesFueraDeLasIslas(opciones, null).length === opciones.length,
+  );
   /*
    * LA VACUNA: los filtros de la escena se llevan lo que SÍ saben pintar. Con la misma
    * lista de opciones de un turno normal, `opcionesFueraDelTablero` quita las de sitio, y
@@ -2543,9 +2597,9 @@ const CAMPO_DE_LA_BARRA = (45 * Math.PI) / 180;
  * juegan en tres dimensiones, esos botones LLEGAN.
  *
  * Y hay motivo para dudarlo, que es lo que hace que este bloque no sea una formalidad: la
- * escena filtra las opciones por cuatro puertas —el tablero, la mano, la barra y la mesa—
- * y tres de ellas se apagan solas en este momento porque preguntan por `'jugando'`. Si una
- * de esas puertas se llevara por delante lo que no reconoce, la mesa se quedaría PARADA:
+ * escena filtra las opciones por varias puertas —el tablero, la mano, la barra, la mesa, la
+ * bolsa— y en este momento el juego no ofrece nada que no sea tirar fichas. Si una de esas
+ * puertas se llevara por delante lo que no reconoce, la mesa se quedaría PARADA:
  * en `'descartando'` no hay ninguna otra opción para nadie, ni siquiera pasar. Y no se
  * caería nada, que es la forma de fallo que este fichero persigue entero.
  */
@@ -2594,12 +2648,31 @@ const CAMPO_DE_LA_BARRA = (45 * Math.PI) / 180;
   comprobar('y no para quien tiró el siete, que ahora mismo no tiene nada que hacer', (vista as { turnoDe?: unknown }).turnoDe === 'A' && tirando.turno === 1);
 
   /*
-   * LOS TRES HUECOS DE LA ESCENA SE APAGAN, Y SE APAGAN CON `null` Y NO EN GRIS. Un hueco
-   * apagado promete que se encenderá al tocarlo; aquí no hay nada que encender, porque el
-   * juego no ofrece ni tirar ni comprar ni levantar mientras haya fichas que tirar.
+   * ═══ LOS DADOS Y EL MAZO SE QUEDAN, APAGADOS; SÓLO LA BARRA DE OBRA SE VACÍA ═══
+   *
+   * Aquí se exigía `null` para los tres —«un hueco apagado promete que se encenderá; aquí no
+   * hay nada que encender»— y era una regla escrita sin mirar la mesa. Mirada: sale el siete y
+   * LOS DADOS DESAPARECEN con el siete puesto, que es justo lo que explica por qué hay que tirar
+   * fichas; y la barra pierde el cuarto hueco, recoloca las tres piezas, y segundos después lo
+   * recupera y las vuelve a mover. Miguel lo vio jugando: «cuando sale un 7 los dados
+   * desaparecen de la mesa». El descarte es un paréntesis DENTRO de la partida, no otra fase
+   * (`laMesaEstaPuesta` en `riberas-en-tres.ts`), y la mesa no se recoge por un paréntesis.
+   *
+   * Lo que sí sigue siendo verdad es que no hay JUGADA en ninguno de los dos: `disponible`
+   * falso, que es lo que la escena pinta como apagado, y el siete a la vista.
    */
-  comprobar('no hay dados mientras se descarta: no es que estén apagados, es que no hay jugada', dadosEnTres(vista, 'A', opciones) === null);
-  comprobar('ni hueco de mazo, por lo mismo', mazoEnLaBarra(vista, 'A', opciones) === null);
+  const dadosDelDescarte = dadosEnTres(vista, 'A', opciones);
+  comprobar(
+    'los dados se quedan mientras se descarta, con el siete puesto y sin poderse tirar: la causa del descarte, a la vista',
+    dadosDelDescarte !== null && dadosDelDescarte.disponible === false && dadosDelDescarte.porTirar === false && dadosDelDescarte.ultimaTirada === 7,
+    dadosDelDescarte,
+  );
+  const mazoDelDescarte = mazoEnLaBarra(vista, 'A', opciones);
+  comprobar(
+    'y el hueco del mazo también, apagado: la barra no recoloca sus piezas por un paréntesis',
+    mazoDelDescarte !== null && mazoDelDescarte.disponible === false,
+    mazoDelDescarte,
+  );
   const obras = obrasPosibles(vista, 'A');
   comprobar(
     'y la barra de obra no ofrece nada, ni se inventa un sitio para una ficha que se tira',

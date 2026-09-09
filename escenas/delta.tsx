@@ -285,6 +285,13 @@ import { COLOR_DEL_NUMERO, COLOR_DEL_PUNTO } from './dados';
  * debajo — y va en material básico, sin luz, para que tampoco se apague en sombra.
  */
 const COLOR_DE_LA_SENAL = '#39ff14';
+/**
+ * LA SEÑAL DEL ESTIAJE ES NEGRA, y no verde, porque no dice lo mismo. El verde de arriba es
+ * «aquí puedes levantar algo»; esto es «aquí puedes secar una isla», que es lo contrario de
+ * construir. La misma forma —el anillo con el tamaño constante en pantalla, el latido, el
+ * agarre invisible— y el color del estiaje, que es el de la pieza que se va a soltar.
+ */
+const COLOR_DEL_ESTIAJE = '#15120e';
 
 /*
  * EL ORDEN DE DIBUJO DE LAS CAPAS QUE VAN PEGADAS A LA CÁMARA vive en `capas.ts`, sin
@@ -324,6 +331,24 @@ const POSAVASOS = (() => {
  */
 const COLOR_DE_LA_CIFRA_CALIENTE = '#a3262a';
 const CIFRAS_CALIENTES: readonly number[] = [6, 8];
+/**
+ * ═══ LA DUNA LLEVA UN SIETE, EN UN POSAVASOS BLANCO ═══
+ *
+ * La duna es la única isla que no rinde —`cifra: null`— y salía sin posavasos, sin cifra y sin
+ * puntos: un hexágono liso entre dieciocho con ficha. Miguel jugó tres partidas echándola de
+ * menos: «sigo sin ver el número 7 con el círculo blanco en la tesela del ladrón» —la del
+ * ladrón es la duna, donde empieza—, y cuando el siete se puso en otro sitio lo dijo más claro:
+ * «no en el desierto», «más abajo que el resto dentro del círculo blanco», «no aparecen los
+ * puntos de probabilidad». O sea: LA MISMA FICHA QUE LAS DEMÁS, con el siete y sus seis
+ * puntos, y en blanco para que la duna se encuentre de un vistazo.
+ *
+ * El siete no la hace rendir: `RINDE` le da `null` a la duna y `repartirLaCosecha` no la mira
+ * nunca. Es la cifra que le tocaría —la suma que no reparte— y la que dice de dónde sale el
+ * estiaje. El §7 de `docs/EL-LADRON-DE-RIBERAS.md` decía «no se le pone número» hablando del
+ * número CON EL QUE RINDE, y ése sigue sin ponerse.
+ */
+const COLOR_DEL_POSAVASOS_DE_LA_DUNA = '#f7f4ee';
+const SIETE_DE_LA_DUNA = 7;
 
 /**
  * DE DÓNDE SALE EL DIBUJO DE UNA CARTA DEL MAZO, Y POR QUÉ ESTA LÍNEA ESTÁ SUELTA.
@@ -633,10 +658,13 @@ function Numero({
   centro,
   altura,
   cifra,
+  enBlanco = false,
 }: {
   centro: Punto;
   altura: number;
   cifra: number;
+  /** El posavasos de la duna: blanco en vez de crema, y todo lo demás igual. Ver `SIETE_DE_LA_DUNA`. */
+  enBlanco?: boolean;
 }): JSX.Element {
   const puntos = puntosDeLaCifra(cifra);
   const disco = RADIO_DE_TESELA * 1.9;
@@ -648,7 +676,7 @@ function Numero({
     <group position={alMundo(centro, altura + 0.08)}>
       <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
         <circleGeometry args={[disco, 44]} />
-        <meshStandardMaterial color={COLOR_DEL_NUMERO} roughness={0.85} />
+        <meshStandardMaterial color={enBlanco ? COLOR_DEL_POSAVASOS_DE_LA_DUNA : COLOR_DEL_NUMERO} roughness={0.85} />
       </mesh>
       {guarismos !== null && (
         <mesh
@@ -3645,6 +3673,8 @@ export function Delta({
   semilla = 0,
   colocando = null,
   onElegirSitio,
+  destinosDelEstiaje = null,
+  onMoverElEstiaje,
   barra = [],
   tomada = null,
   onTomarDeLaBarra,
@@ -3682,6 +3712,15 @@ export function Delta({
   colocando?: Colocando | null;
   /** Aviso de que alguien ha pulsado un anillo. La escena no decide qué pasa después. */
   onElegirSitio?: (sitio: Sitio) => void;
+  /**
+   * ADÓNDE PUEDE IR EL ESTIAJE, o `null` si no hay que moverlo. Un `Colocando` de clase
+   * `comarca`: una señal NEGRA en el centro de cada isla de la lista. Las islas legales
+   * llegan de fuera, como los sitios de obra —la que ya está seca no viene, porque el juego
+   * no la ofrece—, y la escena no sabe por qué.
+   */
+  destinosDelEstiaje?: Colocando | null;
+  /** Aviso de que alguien ha soltado sobre la señal de una isla. La escena no sabe a quién se roba. */
+  onMoverElEstiaje?: (sitio: Sitio) => void;
   /**
    * Lo que se puede coger de la barra de abajo. Vacío o sin poner, no hay barra.
    *
@@ -4460,7 +4499,14 @@ export function Delta({
     [caserioTenido],
   );
 
-  /** La comarca seca: una tienda plantada en su plaza, para que se vea cuál no rinde. */
+  /*
+   * LA COMARCA SECA: una tienda plantada en su plaza, para que se vea cuál no rinde.
+   *
+   * Sobre la ficha de la isla, como se pone la pieza en el juego de mesa. Hubo aquí, un rato,
+   * un posavasos blanco con un siete que viajaba con la tienda; Miguel lo vio en una comarca de
+   * limo y dijo «no en el desierto»: el siete es de la DUNA y no de la pieza (ver
+   * `SIETE_DE_LA_DUNA`), y la pieza se marca sola.
+   */
   const seca = useMemo(() => {
     if (datos.seca === null) return null;
     const centro = centroDeHex(datos.seca, RADIO_DE_COMARCA);
@@ -4568,6 +4614,23 @@ export function Delta({
           />
         ))}
 
+      {/*
+       * LAS SEÑALES DEL ESTIAJE: la misma `Senal` de los sitios de obra, sobre el centro de
+       * cada isla adonde puede ir la pieza, y en negro. Con un siete son dieciocho —todas
+       * menos la seca— y sólo existen mientras haya que mover; se sueltan igual que un
+       * poblado: pulsando el anillo o arrastrando hasta él.
+       */}
+      {destinosDelEstiaje !== null &&
+        sitiosPermitidos(sitios, destinosDelEstiaje).map((sitio) => (
+          <Senal
+            key={`estiaje:${sitio.llave}`}
+            sitio={sitio}
+            color={COLOR_DEL_ESTIAJE}
+            elegida={false}
+            onElegir={(s) => onMoverElEstiaje?.(s)}
+          />
+        ))}
+
       {[...plan.suelo].map(([llave, puestas]) => {
         const partes = llave.split('|');
         const malla = suelos.tabla.get(`${String(partes[1])}|${String(partes[2])}`);
@@ -4597,16 +4660,19 @@ export function Delta({
         );
       })}
 
-      {plan.plazas.map(({ isla, centro, altura }) =>
-        isla.cifra === null ? null : (
-          <Numero
-            key={`num:${llaveDe(isla.hex)}`}
-            centro={centro}
-            altura={altura}
-            cifra={isla.cifra}
-          />
-        ),
-      )}
+      {/*
+       * TODAS LAS PLAZAS LLEVAN FICHA, la duna también: la suya es el siete en blanco. Antes
+       * `cifra === null` saltaba la isla y la dejaba lisa. Ver `SIETE_DE_LA_DUNA`.
+       */}
+      {plan.plazas.map(({ isla, centro, altura }) => (
+        <Numero
+          key={`num:${llaveDe(isla.hex)}`}
+          centro={centro}
+          altura={altura}
+          cifra={isla.cifra ?? SIETE_DE_LA_DUNA}
+          enBlanco={isla.cifra === null}
+        />
+      ))}
 
       {datos.piezas.map((pieza) => (
         <Asentamiento
