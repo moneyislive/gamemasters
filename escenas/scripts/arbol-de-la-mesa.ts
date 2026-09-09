@@ -214,8 +214,9 @@ export function arbolDeLaMesa(lienzo: LienzoDelModelo): { escena: THREE.Scene; c
   const barra = pegadoALaCamara('Barra', ORDEN_DE_LA_BARRA);
   /*
    * La rama CON dados de `Barra` (la llave `dados !== null`, §4.4): `.piezas` para las
-   * piezas y `.dados` para el asa, el tapete y los dos cubos, colgado o quinto. En los
-   * lienzos sin sitio (320×360, 360×490) `dados` es `null` y `.piezas` es `huecosDeLaBarra`.
+   * piezas y `.dados` para el asa, el tapete y los dos cubos, colgado o quinto. Desde que la
+   * mesa encoge en vez de esconder, los dados están en los quince lienzos y el reparto
+   * reserva el ala del reloj de arena (el árbol no lo levanta: no proyecta nada que asome).
    */
   const mesa = huecosDeLaMesa(4, campo, proporcion, lienzo.alto);
   const huecos = mesa.piezas;

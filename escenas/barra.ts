@@ -189,6 +189,7 @@ export function huecosDeLaBarra(
   cuantos: number,
   campo: number,
   proporcion: number,
+  conReloj = true,
 ): HuecoDeLaBarra[] {
   if (cuantos <= 0) return [];
 
@@ -202,7 +203,27 @@ export function huecosDeLaBarra(
    */
   const porElAlto = alto * PARTE_DEL_ALTO;
   const cabenEnElAncho = (ancho * ANCHO_MAXIMO) / (cuantos + (cuantos - 1) * AIRE);
-  const lado = Math.min(porElAlto, cabenEnElAncho);
+  /*
+   * ═══ Y EL RELOJ DE ARENA TIENE QUE CABER, ASÍ QUE TAMBIÉN RECORTA ═══
+   *
+   * El reloj cuelga a la derecha del último hueco: su aire, su ancho y el aire hasta el canto,
+   * `AIRE + ANCHO_DEL_RELOJ + AIRE_HASTA_EL_CANTO` = 1,36 lados más allá de la fila. Con el
+   * recorte del 70 % a secas, en los lienzos donde manda el ancho el margen de la derecha se
+   * quedaba en 0,15 del ancho y el reloj no cabía: `sitioDelReloj` devolvía `null` y la
+   * pantalla se quedaba SIN reloj, o sea sin ver cuánto turno queda ni con qué pasarlo. Miguel
+   * lo vio en una ventana estrecha: «es un elemento crítico del flujo, se tiene que ver
+   * siempre; es preferible disminuir de forma responsive el tamaño de los elementos de la
+   * mesa que dejar de mostrar algunos». La fila está centrada, así que el sitio que queda a
+   * cada lado es `ancho/2 − fila/2`, y en el derecho tiene que entrar el ala del reloj: de
+   * ahí el tercer tope. En un monitor manda el alto y este tope no ata nada; en un teléfono
+   * de pie encoge las piezas lo justo para que el reloj entre.
+   *
+   * `conReloj` es `false` donde no hay reloj que meter —la app no lo pinta todavía—, para no
+   * reservar sitio a nada. Por omisión es cierto porque el escritorio siempre lo pide.
+   */
+  const alaDelReloj = AIRE + ANCHO_DEL_RELOJ + AIRE_HASTA_EL_CANTO;
+  const conElReloj = conReloj ? ancho / (cuantos + (cuantos - 1) * AIRE + 2 * alaDelReloj) : Infinity;
+  const lado = Math.min(porElAlto, cabenEnElAncho, conElReloj);
 
   const paso = lado * (1 + AIRE);
   const primero = -((cuantos - 1) * paso) / 2;
@@ -314,8 +335,9 @@ export function huecosDeLaMesa(
   campo: number,
   proporcion: number,
   altoEnPuntos: number,
+  conReloj = true,
 ): { piezas: HuecoDeLaBarra[]; dados: HuecoDeLosDados | null } {
-  const piezas = huecosDeLaBarra(cuantos, campo, proporcion);
+  const piezas = huecosDeLaBarra(cuantos, campo, proporcion, conReloj);
   const primero = piezas[0];
   if (primero === undefined) return { piezas, dados: null };
 
@@ -343,33 +365,39 @@ export function huecosDeLaMesa(
   }
 
   /*
-   * 2. Quinto hueco, sólo si el reparto apretado sigue sobre el suelo de toque. El asa mide
-   *    lo que el par y crece hacia la izquierda desde el borde derecho del hueco de un lado,
-   *    para que el aire hasta la primera pieza siga siendo `AIRE`: ver la cabecera de
-   *    `HuecoDeLosDados`.
+   * 2. Quinto hueco, SIEMPRE que el colgado no quepa. El asa mide lo que el par y crece hacia
+   *    la izquierda desde el borde derecho del hueco de un lado, para que el aire hasta la
+   *    primera pieza siga siendo `AIRE`: ver la cabecera de `HuecoDeLosDados`.
+   *
+   * ═══ AQUÍ HABÍA UN TERCER PELDAÑO, «SIN DADOS», Y SE HA IDO ═══
+   *
+   * El quinto sólo entraba si su asa llegaba a los 44 puntos del suelo de toque; si no, la
+   * mesa se quedaba sin dados y TIRAR volvía a ser un botón del carril (320×360 y 360×490).
+   * Miguel pidió lo contrario, y para toda la mesa: «es preferible disminuir de forma
+   * responsive el tamaño de los elementos de la mesa que dejar de mostrar algunos». Así que
+   * los dados están siempre, y en los dos lienzos más pequeños de la lista el asa baja del
+   * suelo de toque: lo que se pierde es un poco de dedo, lo que se ganaba escondiéndolos era
+   * una mesa a la que le faltaba media. `verify:escena` mide cuánto baja y dónde, y exige
+   * que sólo baje donde ni el reparto más apretado llega a 44. El suelo sigue mandando en
+   * todo lo demás: `enPuntos` se queda porque el mínimo legible de los dados lo usa.
    */
-  const conUnoMas = huecosDeLaBarra(cuantos + 1, campo, proporcion);
-  const quinto = conUnoMas[0];
-  if (quinto !== undefined && enPuntos(quinto.lado) >= SUELO_DEL_TOQUE - 1e-9) {
-    const anchoDelQuinto = Math.max(quinto.lado, ANCHO_DEL_PAR_DE_DADOS * quinto.lado);
-    const derechaDelQuinto = quinto.x + quinto.lado / 2;
-    return {
-      piezas: conUnoMas.slice(1),
-      dados: {
-        x: derechaDelQuinto - anchoDelQuinto / 2,
-        y: quinto.y,
-        z: quinto.z,
-        ancho: anchoDelQuinto,
-        alto: quinto.lado,
-        lado: quinto.lado,
-        arista: aristaDelDado(quinto.lado, alto / altoEnPuntos),
-        forma: 'quinto',
-      },
-    };
-  }
-
-  /* 3. Sin dados: las piezas se quedan como estaban y el botón sigue fuera. */
-  return { piezas, dados: null };
+  const conUnoMas = huecosDeLaBarra(cuantos + 1, campo, proporcion, conReloj);
+  const quinto = conUnoMas[0] as HuecoDeLaBarra;
+  const anchoDelQuinto = Math.max(quinto.lado, ANCHO_DEL_PAR_DE_DADOS * quinto.lado);
+  const derechaDelQuinto = quinto.x + quinto.lado / 2;
+  return {
+    piezas: conUnoMas.slice(1),
+    dados: {
+      x: derechaDelQuinto - anchoDelQuinto / 2,
+      y: quinto.y,
+      z: quinto.z,
+      ancho: anchoDelQuinto,
+      alto: quinto.lado,
+      lado: quinto.lado,
+      arista: aristaDelDado(quinto.lado, alto / altoEnPuntos),
+      forma: 'quinto',
+    },
+  };
 }
 
 /**
@@ -524,8 +552,11 @@ export function sitioDelReloj(
   const derecha = izquierda + ANCHO_DEL_RELOJ * lado;
   /*
    * El mismo aire hasta el canto que se le exige al asa de los dados por el suyo. Sin esta
-   * línea el reloj se sale de la pantalla en los lienzos estrechos y no lo ve nadie, que es el
-   * fallo silencioso de siempre: un botón que está pero no se puede tocar.
+   * línea el reloj se saldría de la pantalla y no lo vería nadie, que es el fallo silencioso
+   * de siempre: un botón que está pero no se puede tocar. Desde que `huecosDeLaBarra` recorta
+   * el lado para que el reloj quepa, con unos huecos repartidos CON reloj esto no devuelve
+   * `null` nunca —lo afirma `verify:escena` en los quince lienzos—; se queda como red para
+   * quien reparta sin él y luego pida el reloj.
    */
   if (ancho / 2 - derecha < AIRE_HASTA_EL_CANTO * lado - 1e-9) return null;
   return {

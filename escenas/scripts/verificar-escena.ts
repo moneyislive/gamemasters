@@ -107,6 +107,7 @@ import {
   DISTANCIA_DE_LA_BARRA,
   GIRO_DE_LA_VITRINA,
   SUELO_DEL_TOQUE,
+  sitioDelReloj,
   ZOCALO,
   cotaDeLaTapa,
   dentroDelHueco,
@@ -2544,8 +2545,8 @@ paso('La mano del mazo se agrupa por familias, cabe a la izquierda y no pisa a n
     }
   }
   comprobar(
-    'la mano del mazo no invade la zona de la barra de construir, en los quince lienzos con su alto real —y entre los medidos hay lienzos con dados y sin ellos—',
-    pisanLaBarra.length === 0 && conDados.length > 0 && conDados.length < LIENZOS.length,
+    'la mano del mazo no invade la zona de la barra de construir, en los quince lienzos con su alto real —y todos llevan dados, desde que la mesa encoge en vez de esconder—',
+    pisanLaBarra.length === 0 && conDados.length === LIENZOS.length,
     { pisan: pisanLaBarra.slice(0, 2), conDados: conDados.length, lienzos: LIENZOS.length },
   );
 
@@ -3230,9 +3231,20 @@ paso('Los sitios se pueden contar y la barra cabe en cualquier pantalla');
       chicos.push(`${nombre}: ${enPuntos.toFixed(1)} puntos, y el suelo son ${String(SUELO_DEL_TOQUE)}`);
     }
   }
+  /*
+   * ═══ EL SUELO DE TOQUE SE PISA EN UN LIENZO, Y SE DICE CUÁL Y POR CUÁNTO ═══
+   *
+   * Desde que el reparto reserva el ala del reloj de arena para que quepa SIEMPRE, en
+   * 320×360 —el lienzo más estrecho de la lista, con la barra de cuatro— el asa se queda en
+   * 43,0 puntos: un punto bajo el suelo. Es lo que Miguel eligió, en voz alta: «es preferible
+   * disminuir el tamaño de los elementos de la mesa que dejar de mostrar algunos». Ahí no cabe
+   * de otra manera: sin reserva el asa daba 47,5 y el reloj no se veía. Se exige que sea ESE
+   * lienzo y sólo ése, y que la pérdida sea la medida, para que un recorte nuevo no se esconda
+   * detrás de una excepción ya concedida.
+   */
   comprobar(
-    'con cuatro huecos, el asa de cada uno sigue por encima de los 44 puntos de toque en todos los lienzos',
-    chicos.length === 0,
+    'con cuatro huecos, el asa de cada uno sigue por encima de los 44 puntos de toque en todos los lienzos salvo en 320×360, donde la reserva del reloj la deja en 43,0 y no cabe de otra manera',
+    chicos.length === 1 && (chicos[0] ?? '').startsWith('móvil estrecho, lienzo al mínimo: 43.0 puntos'),
     { medidos, chicos },
   );
   /*
@@ -3256,8 +3268,8 @@ paso('Los sitios se pueden contar y la barra cabe en cualquier pantalla');
     return ((huecosDeLaBarra(4, CAMPO, 320 / 360)[0]?.lado ?? 0) / visto.alto) * 360;
   })();
   comprobar(
-    'y en el lienzo peor tanto tres como cuatro huecos llegan al suelo: ahí ya manda el ancho y el cuarto cuesta, pero no cruza los 44',
-    conTres >= SUELO_DEL_TOQUE && conCuatro >= SUELO_DEL_TOQUE && conCuatro <= conTres,
+    'y en el lienzo peor con tres huecos se llega al suelo (50,4) y con cuatro se cruza por un punto (43,0): es lo que cuesta ahí la reserva del reloj, y es el único lienzo donde cuesta',
+    conTres >= SUELO_DEL_TOQUE && conCuatro < SUELO_DEL_TOQUE && conCuatro >= 43 && conCuatro <= conTres,
     { tres: Number(conTres.toFixed(1)), cuatro: Number(conCuatro.toFixed(1)), suelo: SUELO_DEL_TOQUE },
   );
 
@@ -3360,13 +3372,18 @@ paso('Los sitios se pueden contar y la barra cabe en cualquier pantalla');
    * exigen con una décima de margen: si la barra cambia, esto dice cuánto.
    */
   type Peldano = 'colgado' | 'quinto' | null;
+  /** Los dos lienzos donde la mesa entera no cabe a 44 por pieza, y a cuánto se queda. Medido. */
+  const BAJO_EL_SUELO: Record<string, number> = {
+    'móvil estrecho, lienzo al mínimo': 36.9,
+    'móvil pequeño': 41.5,
+  };
   const PELDANO_ESPERADO: Record<string, { forma: Peldano; asa?: number }> = {
-    'móvil estrecho, lienzo al mínimo': { forma: null, asa: 47.5 },
-    'móvil pequeño': { forma: null, asa: 53.4 },
-    'móvil corriente': { forma: 'quinto', asa: 45.8 },
-    'móvil de pie, lienzo entero': { forma: 'quinto', asa: 45.8 },
-    tableta: { forma: 'quinto', asa: 89.6 },
-    'tableta con el navegador de pie': { forma: 'quinto', asa: 90.2 },
+    'móvil estrecho, lienzo al mínimo': { forma: 'quinto', asa: 36.9 },
+    'móvil pequeño': { forma: 'quinto', asa: 41.5 },
+    'móvil corriente': { forma: 'quinto', asa: 44.9 },
+    'móvil de pie, lienzo entero': { forma: 'quinto', asa: 44.9 },
+    tableta: { forma: 'quinto', asa: 88.5 },
+    'tableta con el navegador de pie': { forma: 'quinto', asa: 88.5 },
     monitor: { forma: 'colgado' },
     'apaisado SE 1ª': { forma: 'colgado', asa: 44.8 },
     'apaisado SE 2ª/3ª': { forma: 'colgado' },
@@ -3401,8 +3418,19 @@ paso('Los sitios se pueden contar y la barra cabe en cualquier pantalla');
       malosDeLaMesa.push(`${nombre}: las piezas miden ${asa.toFixed(1)} y el diseño dice ${String(esperado.asa)}`);
     }
     if (mesa.piezas.length !== 4) malosDeLaMesa.push(`${nombre}: salen ${String(mesa.piezas.length)} piezas en vez de 4`);
+    /*
+     * BAJO EL SUELO DE TOQUE SÓLO DONDE NI EL REPARTO MÁS APRETADO LLEGA. Con toda la mesa a la
+     * vista —dados, cuatro piezas y el reloj— en 320×360 y en 360×490 no hay 44 puntos por
+     * pieza: se quedan en 36,9 y 41,5. Es la decisión de Miguel (encoger antes que esconder) y
+     * se concede POR NOMBRE y POR MEDIDA, no por regla: un lienzo más que baje, o uno de éstos
+     * que baje más, sale aquí.
+     */
+    const bajoElSuelo = BAJO_EL_SUELO[nombre];
     for (const p of mesa.piezas) {
-      if (enPuntos(p.lado) < SUELO_DEL_TOQUE - 1e-9) malosDeLaMesa.push(`${nombre}: una pieza baja a ${enPuntos(p.lado).toFixed(1)} puntos`);
+      const pt = enPuntos(p.lado);
+      if (pt < SUELO_DEL_TOQUE - 1e-9 && (bajoElSuelo === undefined || Math.abs(pt - bajoElSuelo) > 0.1)) {
+        malosDeLaMesa.push(`${nombre}: una pieza baja a ${pt.toFixed(1)} puntos`);
+      }
     }
     const deCuatro = huecosDeLaBarra(4, CAMPO, prop);
     const deCinco = huecosDeLaBarra(5, CAMPO, prop);
@@ -3415,12 +3443,14 @@ paso('Los sitios se pueden contar y la barra cabe en cualquier pantalla');
     }
     const dados = mesa.dados;
     if (dados === null) {
-      /* Sin dados porque el quinto no llegaba: que sea verdad, y no un atajo. */
-      const quinto = enPuntos(deCinco[0]?.lado ?? 0);
-      if (quinto >= SUELO_DEL_TOQUE) malosDeLaMesa.push(`${nombre}: no hay dados y sin embargo el quinto hueco mediría ${quinto.toFixed(1)}`);
+      malosDeLaMesa.push(`${nombre}: sin dados, y la mesa ya no esconde nada`);
       continue;
     }
-    if (enPuntos(dados.alto) < SUELO_DEL_TOQUE - 1e-9) malosDeLaMesa.push(`${nombre}: el asa de los dados mide ${enPuntos(dados.alto).toFixed(1)} puntos`);
+    if (enPuntos(dados.alto) < SUELO_DEL_TOQUE - 1e-9 && (bajoElSuelo === undefined || Math.abs(enPuntos(dados.alto) - bajoElSuelo) > 0.1)) {
+      malosDeLaMesa.push(`${nombre}: el asa de los dados mide ${enPuntos(dados.alto).toFixed(1)} puntos`);
+    }
+    /* Y EL RELOJ CABE, en los quince: es lo que la reserva del reparto promete. */
+    if (sitioDelReloj(mesa.piezas, CAMPO, prop) === null) malosDeLaMesa.push(`${nombre}: el reloj de arena no cabe`);
     const izquierdaDeLosDados = dados.x - dados.ancho / 2;
     const derechaDeLosDados = dados.x + dados.ancho / 2;
     if (izquierdaDeLosDados - -visto.ancho / 2 < 0.5 * dados.lado - 1e-9) {
@@ -3505,27 +3535,30 @@ paso('Los sitios se pueden contar y la barra cabe en cualquier pantalla');
     }
   }
   comprobar(
-    'los dados caen en el peldaño que dice el diseño en cada lienzo: colgados en los apaisados y el monitor, quinto hueco de pie en 390 y en las tabletas, y sin dados en 320×360 y 360×490',
+    'los dados están en los quince lienzos y caen en el peldaño medido: colgados en los apaisados y el monitor, quinto hueco de pie y en las tabletas; y el reloj cabe en todos, encogiendo las piezas sólo en 320×360 y 360×490',
     malosDeLaMesa.length === 0,
     { malosDeLaMesa, medidasDeLaMesa },
   );
   comprobar(
-    'el par cabe en el asa y en el tapete en los DOS peldaños, con su aire: como quinto el asa mide el par AL TOPE (1,12 lados, 51,3 pt en 390) y crece hacia la izquierda, con al menos 0,24 lados hasta la primera pieza —0,275 en 390, porque el dado se queda en el mínimo legible y no en el tope— y más de un lado hasta el canto',
+    'el par cabe en el asa y en el tapete en los DOS peldaños y en los QUINCE lienzos, con su aire: como quinto el asa mide el par AL TOPE (1,12 lados, 50,3 pt en 390) y crece hacia la izquierda, con al menos 0,24 lados hasta la primera pieza —0,265 en 390— y 1,24 lados hasta el canto, que es lo que deja la reserva del reloj',
     malosDelPar.length === 0 &&
-      parEnElAsa.length === LIENZOS.length - 2 &&
-      parEnElAsa.filter((m) => m.includes('quinto')).length === 4 &&
-      parEnElAsa.some((m) => m.startsWith('móvil corriente: quinto, asa de 1.12 lados (51.3 pt), par de 51.3 pt, aire hasta la primera pieza 0.275 lados (12.6 pt), hasta el canto 1.157 lados')),
+      parEnElAsa.length === LIENZOS.length &&
+      parEnElAsa.filter((m) => m.includes('quinto')).length === 6 &&
+      parEnElAsa.some((m) => m.startsWith('móvil corriente: quinto, asa de 1.12 lados (50.3 pt), par de 50.3 pt, aire hasta la primera pieza 0.265 lados (11.9 pt), hasta el canto 1.240 lados')),
     { malosDelPar, parEnElAsa },
   );
   comprobar(
-    'y en los cuatro lienzos de quinto el naipe del mazo —el último de huecosDeLaBarra(5)— queda libre de las cartas de bienes quietas, y no pisa la mano abierta donde con cuatro no la pisaba',
-    malosDelMazoDeCinco.length === 0 && medidasDelMazoDeCinco.length === 4,
+    'y en los seis lienzos de quinto el naipe del mazo —el último de huecosDeLaBarra(5)— queda libre de las cartas de bienes quietas, y no pisa la mano abierta donde con cuatro no la pisaba',
+    malosDelMazoDeCinco.length === 0 && medidasDelMazoDeCinco.length === 6,
     { malosDelMazoDeCinco, medidasDelMazoDeCinco },
   );
   comprobar(
-    'y en los dos lienzos sin dados las piezas no encogen: se quedan en los 47,5 y 53,4 puntos de siempre',
-    ['móvil estrecho, lienzo al mínimo', 'móvil pequeño'].every((n) => medidasDeLaMesa.some((m) => m.startsWith(`${n}: sin dados`))),
-    medidasDeLaMesa.filter((m) => m.includes('sin dados')),
+    'ya no hay ningún lienzo sin dados: en los dos más pequeños las piezas encogen a 36,9 y 41,5 puntos —bajo el suelo de toque, donde antes se escondían los dados a 47,5 y 53,4— y en todos los demás siguen sobre 44',
+    !medidasDeLaMesa.some((m) => m.includes('sin dados')) &&
+      medidasDeLaMesa.some((m) => m === 'móvil estrecho, lienzo al mínimo: quinto, piezas de 36.9 puntos') &&
+      medidasDeLaMesa.some((m) => m === 'móvil pequeño: quinto, piezas de 41.5 puntos') &&
+      medidasDeLaMesa.filter((m) => Number(/piezas de ([\d.]+) puntos/.exec(m)?.[1] ?? '0') < 44).length === 2,
+    medidasDeLaMesa.filter((m) => Number(/piezas de ([\d.]+) puntos/.exec(m)?.[1] ?? '0') < 44),
   );
   /*
    * Con el `cuantos` REAL de la colocación —tres, sin mazo— la misma regla vale, y las
@@ -3547,9 +3580,19 @@ paso('Los sitios se pueden contar y la barra cabe en cualquier pantalla');
    * puntos de alto se queda sin quinto hueco aunque su forma no haya cambiado. Si alguien
    * la reescribe mirando `proporcion >= 1`, esto se pone rojo.
    */
+  /*
+   * Aquí se afirmaba que 390×490 con la mitad de puntos SE QUEDABA SIN DADOS: el segundo
+   * peldaño miraba los puntos. Ya no hay umbral que mirar —encoger antes que esconder— y lo que
+   * se afirma es lo contrario: con la mitad de puntos los dados siguen, en el mismo peldaño, y
+   * miden la mitad. Si alguien vuelve a poner un umbral, esto lo ve.
+   */
   comprobar(
-    'el segundo peldaño mira los puntos y no la forma: 390×490 con la mitad de puntos ya no tiene dados',
-    huecosDeLaMesa(4, CAMPO, 390 / 490, 490).dados?.forma === 'quinto' && huecosDeLaMesa(4, CAMPO, 390 / 490, 245).dados === null,
+    'ya no hay umbral de puntos que quite los dados: 390×490 con la mitad de puntos sigue con su quinto hueco, la mitad de grande',
+    (() => {
+      const entero = huecosDeLaMesa(4, CAMPO, 390 / 490, 490).dados;
+      const mitad = huecosDeLaMesa(4, CAMPO, 390 / 490, 245).dados;
+      return entero?.forma === 'quinto' && mitad?.forma === 'quinto' && Math.abs(mitad.lado - entero.lado) < 1e-12;
+    })(),
   );
 
   /*
@@ -3583,9 +3626,9 @@ paso('Los sitios se pueden contar y la barra cabe en cualquier pantalla');
     'utf8',
   );
   comprobar(
-    'la barra pide UN reparto con las piezas y el mazo juntos, no dos pegados',
+    'la barra pide UN reparto con las piezas y el mazo juntos, no dos pegados, y le dice si hay reloj que reservar',
     /const cuantos = piezas\.length \+ \(mazo === null \? 0 : 1\);/.test(fuenteDeLaBarra) &&
-      /huecosDeLaBarra\(cuantos, forma\.campo, forma\.proporcion\)/.test(fuenteDeLaBarra),
+      /huecosDeLaBarra\(cuantos, forma\.campo, forma\.proporcion, conReloj\)/.test(fuenteDeLaBarra),
   );
   comprobar(
     'y el hueco del naipe es el ÚLTIMO de ese reparto, a la derecha de la vereda',
@@ -4868,25 +4911,44 @@ paso('Los dados se reparten por turno, ruedan hasta que el servidor contesta, y 
    * Antes ningún lienzo estaba en el mínimo (el SE daba 23,3): ahora el mínimo se PISA, y
    * por eso las dos comparaciones llevan tolerancia.
    */
+  /*
+   * ═══ Y DESDE QUE LA MESA ENCOGE EN VEZ DE ESCONDER, HAY DOS LIENZOS QUE NO LLEGAN ═══
+   *
+   * En 320×360 y 360×490 antes NO HABÍA DADOS; ahora los hay, del tamaño que la mesa entera
+   * les deja: el dado se queda en su tope (0,52 lados de una pieza de 36,9 / 41,5 puntos) y
+   * sale a 19,2 y 21,6 puntos, con el punto en 3,5 y 3,9. Es la única forma de que se vean, y
+   * es lo que se pidió. Se exige que sean ÉSOS DOS, con esas cifras, y ninguno más.
+   */
   comprobar(
-    'en ningún lienzo con sitio el dado baja de 22 puntos ni el punto de 4 (§1.15): en los teléfonos el dado se queda en el mínimo del punto, 22,2 y 4,0 —SE apaisado y 390 incluidos—, y en el monitor a 1080 mide el pedido, 55,0',
-    DADO_MINIMO === 22 && PUNTO_MINIMO === 4 && ilegibles.length === 0 &&
+    'en ningún lienzo el dado baja de 22 puntos ni el punto de 4 (§1.15) salvo en 320×360 y 360×490, donde antes no había dados y ahora los hay a 19,2 y 21,6 con el dado en su tope; en los demás teléfonos el dado se queda en 22,2 y 4,0, y en el monitor a 1080 mide el pedido, 55,0',
+    DADO_MINIMO === 22 && PUNTO_MINIMO === 4 &&
+      ilegibles.length === 2 &&
+      ilegibles.includes('móvil estrecho, lienzo al mínimo: dado 19.2 y punto 3.5') &&
+      ilegibles.includes('móvil pequeño: dado 21.6 y punto 3.9') &&
       legibles.some((l) => l.startsWith('apaisado SE 1ª: colgado, dado 22.2 pt, punto 4.0 pt')) &&
       legibles.some((l) => l.startsWith('móvil corriente: quinto, dado 22.2 pt, punto 4.0 pt')) &&
       legibles.some((l) => l.startsWith('apaisado monitor 1080: colgado, dado 55.0 pt, punto 9.9 pt')) &&
-      legibles.filter((l) => l.endsWith('sin dados')).length === 2,
-    ilegibles.length > 0 ? ilegibles : legibles,
+      legibles.filter((l) => l.endsWith('sin dados')).length === 0,
+    { ilegibles, legibles },
   );
   const enElUmbralApaisado = dadoEnPuntos(561, 316);
   const bajoElUmbralApaisado = dadoEnPuntos(557, 314);
-  const enElUmbralDePie = dadoEnPuntos(375, 845);
+  const enElUmbralDePie = dadoEnPuntos(382, 845);
+  const bajoElUmbralDePie = dadoEnPuntos(381, 845);
+  /*
+   * De pie el umbral de los 44 se ha movido de 375 a 382 de ancho: son los siete puntos que
+   * cuesta reservar el ala del reloj en la fila de cinco. Y por debajo YA NO desaparecen los
+   * dados —374×845 los tenía escondidos y ahora los tiene a 43,1—: el umbral dice dónde el asa
+   * cruza los 44, no dónde se quita nada. Apaisado no se mueve: ahí manda el alto.
+   */
   comprobar(
-    'los umbrales de la tabla: el asa colgada llega a 44 desde 315 puntos de alto (561×316 da 44,2 y 557×314 queda BAJO 44) y de pie el quinto llega desde 375 de ancho (375×845 da 44,0; 374×845 ya no tiene dados)',
+    'los umbrales de la tabla: el asa colgada llega a 44 desde 315 puntos de alto (561×316 da 44,2 y 557×314 queda BAJO 44) y de pie el quinto llega a 44 desde 382 de ancho (382×845 da 44,0; 381×845 queda bajo, y 374×845 sigue con sus dados a 43,1)',
     enElUmbralApaisado?.forma === 'colgado' && enElUmbralApaisado.asa >= 44 && enElUmbralApaisado.dado >= DADO_MINIMO &&
       bajoElUmbralApaisado?.forma === 'colgado' && bajoElUmbralApaisado.asa < 44 &&
       enElUmbralDePie?.forma === 'quinto' && enElUmbralDePie.asa >= 44 && enElUmbralDePie.dado >= DADO_MINIMO &&
-      dadoEnPuntos(374, 845) === null,
-    { apaisado: enElUmbralApaisado, bajo: bajoElUmbralApaisado, dePie: enElUmbralDePie },
+      bajoElUmbralDePie?.forma === 'quinto' && bajoElUmbralDePie.asa < 44 &&
+      dadoEnPuntos(374, 845)?.forma === 'quinto' && Math.abs((dadoEnPuntos(374, 845)?.asa ?? 0) - 43.1) < 0.1,
+    { apaisado: enElUmbralApaisado, bajo: bajoElUmbralApaisado, dePie: enElUmbralDePie, bajoDePie: bajoElUmbralDePie },
   );
 }
 
@@ -5378,10 +5440,11 @@ paso('La tapa de la mesa: a la cota del zócalo, con la veta del atlas, dentro d
    * piezas se moverían al empezar a jugar.
    */
   comprobar(
-    'la llave del reparto es dados !== null: con dados huecosDeLaMesa(cuantos, campo, proporcion, alto) y sus .piezas y .dados; sin dados sigue huecosDeLaBarra y el tapete sólo bajo el sitio COLGADO',
+    'la llave del reparto es dados !== null: con dados huecosDeLaMesa(cuantos, campo, proporcion, alto, conReloj) y sus .piezas y .dados; sin dados sigue huecosDeLaBarra, también con conReloj, y el tapete sólo bajo el sitio COLGADO',
     /const conDados = dados !== null;/.test(fuente) &&
-      /conDados \? huecosDeLaMesa\(cuantos, forma\.campo, forma\.proporcion, forma\.alto\) : null/.test(fuente) &&
-      /mesa === null \? huecosDeLaBarra\(cuantos, forma\.campo, forma\.proporcion\) : mesa\.piezas/.test(fuente) &&
+      /const conReloj = reloj !== null;/.test(fuente) &&
+      /conDados \? huecosDeLaMesa\(cuantos, forma\.campo, forma\.proporcion, forma\.alto, conReloj\) : null/.test(fuente) &&
+      /mesa === null \? huecosDeLaBarra\(cuantos, forma\.campo, forma\.proporcion, conReloj\) : mesa\.piezas/.test(fuente) &&
       /if \(mesa !== null\) return mesa\.dados;/.test(fuente) &&
       /sitio !== null && sitio\.forma === 'colgado' \? sitio : null/.test(fuente) &&
       /colorDelColono\(tapete\)/.test(fuente) &&
@@ -5778,18 +5841,19 @@ paso('Recoger la mesa: la bajada tapa el asa PROYECTADA en los quince lienzos, e
   /*
    * Y LA CUENTA PLANA SE QUEDABA CORTA, escrito al revés a propósito: si alguien vuelve a
    * `alto/2 + hueco.y + 0,5·lado` estas dos cifras se van a cero y esto se pone rojo. Medido:
-   * la proyectada baja entre 11,6 y 39,3 puntos más, y con la plana el asa se quedaba entre
-   * 10,8 y 36,6 puntos por encima del canto.
+   * la proyectada baja entre 9,6 y 39,3 puntos más, y con la plana el asa se quedaba entre
+   * 9,1 y 36,6 puntos por encima del canto. (Eran 11,6 y 10,8: el mínimo lo daba 320×360, y
+   * ahí la barra encogió al reservar el reloj —la mesa encoge en vez de esconder—.)
    */
   const menosQueGana = Math.min(...loQueGanaALaPlana);
   const masQueGana = Math.max(...loQueGanaALaPlana);
   const menosQueAsomaba = Math.min(...loQueAsomabaConLaPlana);
   const masQueAsomaba = Math.max(...loQueAsomabaConLaPlana);
   comprobar(
-    'la bajada proyectada baja de 11,6 a 39,3 puntos MÁS que la cuenta plana que había, y con la plana el techo del asa se quedaba de 10,8 a 36,6 puntos por encima del canto: el fallo era de verdad y no vuelve sin ponerse rojo',
-    Math.abs(menosQueGana - 11.63) <= 0.1 &&
+    'la bajada proyectada baja de 9,6 a 39,3 puntos MÁS que la cuenta plana que había, y con la plana el techo del asa se quedaba de 9,1 a 36,6 puntos por encima del canto: el fallo era de verdad y no vuelve sin ponerse rojo',
+    Math.abs(menosQueGana - 9.57) <= 0.1 &&
       Math.abs(masQueGana - 39.26) <= 0.1 &&
-      Math.abs(menosQueAsomaba - 10.85) <= 0.1 &&
+      Math.abs(menosQueAsomaba - 9.09) <= 0.1 &&
       Math.abs(masQueAsomaba - 36.6) <= 0.1,
     {
       gana: `${menosQueGana.toFixed(2)} a ${masQueGana.toFixed(2)} pt`,
@@ -5906,8 +5970,8 @@ paso('Recoger la mesa: la bajada tapa el asa PROYECTADA en los quince lienzos, e
     );
   })());
   comprobar(
-    'abajo NO cabe: con la silueta proyectada del asa, el cuadrado libre en el rincón de abajo a la izquierda de 320×360 es de 37,2 puntos con 4 de margen, por debajo del suelo de toque; con el rectángulo plano salían 44 y por eso el mando estuvo ahí comiéndose la esquina de la choza',
-    Math.abs(libreAbajo - 37.2) <= 0.2 &&
+    'abajo NO cabe: con la silueta proyectada del asa, el cuadrado libre en el rincón de abajo a la izquierda de 320×360 es de 37,6 puntos con 4 de margen (37,2 antes de que la mesa encogiera ahí para meter el reloj), por debajo del suelo de toque; con el rectángulo plano salían 44 y por eso el mando estuvo ahí comiéndose la esquina de la choza',
+    Math.abs(libreAbajo - 37.6) <= 0.2 &&
       libreAbajo < SUELO_DEL_TOQUE &&
       conLaPlana >= SUELO_DEL_TOQUE,
     { proyectada: libreAbajo.toFixed(1), plana: conLaPlana.toFixed(1), suelo: SUELO_DEL_TOQUE },

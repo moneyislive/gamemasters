@@ -2444,13 +2444,14 @@ export function RiberasEnTres({
    *
    * ═══ Y ES `null` DONDE NO CABE, COMO LOS DADOS Y POR LO MISMO ═══
    *
-   * La escena sólo lo pinta si `sitioDelReloj` le encuentra sitio a la derecha de la barra, y
-   * en los lienzos estrechos no se lo encuentra. Si el objeto viajara igual, PASAR se caería de
-   * los botones (`opcionesFueraDelReloj`) sin que hubiera reloj que pulsar, y el turno sólo se
-   * pasaría esperando al plazo. Así que se pregunta ANTES, con las MISMAS funciones y el mismo
-   * reparto que la escena —las piezas de la mesa si hay dados, la barra a secas si no—, y
-   * donde no cabe el reloj no existe y el botón se queda. Va aquí arriba, antes que las cribas,
-   * porque las cribas dependen de él.
+   * La escena sólo lo pinta si `sitioDelReloj` le encuentra sitio a la derecha de la barra. Si
+   * el objeto viajara sin preguntar, PASAR se caería de los botones (`opcionesFueraDelReloj`)
+   * sin que hubiera reloj que pulsar, y el turno sólo se pasaría esperando al plazo. Así que se
+   * pregunta ANTES, con las MISMAS funciones y el mismo reparto que la escena —las piezas de la
+   * mesa si hay dados, la barra a secas si no—. Desde que el reparto reserva el ala del reloj
+   * (`huecosDeLaBarra`, «la mesa encoge en vez de esconder») cabe en los quince lienzos y esto
+   * sólo es falso mientras el recuadro mide cero; se queda porque es lo que hace que las dos
+   * mitades no puedan separarse. Va aquí arriba, antes que las cribas, porque dependen de él.
    */
   const vueltaDelReloj =
     typeof (vista as { turnosAbiertos?: unknown }).turnosAbiertos === 'number'

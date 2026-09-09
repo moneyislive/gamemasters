@@ -585,6 +585,19 @@ dados o uno) está dentro de la decisión 3, y las otras seis son las decisiones
     triángulos del respaldo, que no cambian (los puntos son los mismos 21 por dado; los
     del D6 del pack son 662 por dado, medidos, §5.1).
 
+    > **9 de septiembre de 2026, segunda nota — la mesa encoge en vez de esconder.** Miguel,
+    > en una ventana estrecha: «no se muestra el reloj de arena porque no cabe; es un elemento
+    > crítico del flujo, se tiene que ver siempre; es preferible disminuir de forma responsive el
+    > tamaño de los elementos de la mesa que dejar de mostrar algunos». Desde entonces
+    > `huecosDeLaBarra` recorta el lado también para que quepa el ala del reloj (1,36 lados a
+    > la derecha de la fila) y `huecosDeLaMesa` ya no tiene tercer peldaño: colgado si cabe, y si
+    > no, quinto SIEMPRE, sin exigirle los 44. Medido en los quince lienzos con cuatro huecos: el
+    > reloj cabe en todos; las piezas siguen sobre 44 salvo en 320×360 (36,9) y 360×490 (41,5),
+    > donde antes no había dados y ahora los hay a 19,2 y 21,6 puntos, en su tope; 390×490 baja
+    > de 45,8 a 44,9; las tabletas de 89,6 a 88,5; apaisados y monitores no cambian. El umbral
+    > de los 44 de pie pasa de 375 a 382 de ancho. La tabla de arriba es la de antes de esta
+    > nota y queda como historia. Lo que sigue son las notas anteriores.
+
     > **9 de septiembre de 2026:** la arista baja de 0,52 a **0,364 lados** (un 30 % menos,
     > pedido jugando en un monitor: «haz los dados un poco más pequeños») y deja de ser un
     > número fijo. Es lo que se PIDE, y `aristaDelDado` (`escenas/dados.ts`) la sube hasta el

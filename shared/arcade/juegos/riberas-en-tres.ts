@@ -1840,8 +1840,8 @@ export function opcionesFueraDeLaMesa<O extends OpcionQueLlega>(
  *
  * El mismo patrón que `opcionesFueraDeLaMesa` con los dados, y por el mismo par de fallos:
  * con reloj y botón la pantalla ofrecería pasar dos veces —era el cuadrado «1» del carril,
- * que Miguel pidió quitar—; sin reloj y sin botón, un lienzo donde el reloj no cabe —hoy los
- * estrechos—, un mirón o el respaldo dejarían un turno que no se puede pasar más que
+ * que Miguel pidió quitar—; sin reloj y sin botón, un lienzo donde el reloj no cupiera, un
+ * mirón o el respaldo dejarían un turno que no se puede pasar más que
  * esperando al plazo. Por eso recibe EL RELOJ, el mismo objeto que se le da a la escena, y
  * `null` donde ella no lo pinta: el botón desaparece exactamente cuando el reloj existe.
  */

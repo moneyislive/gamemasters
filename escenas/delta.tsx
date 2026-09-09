@@ -1861,13 +1861,19 @@ function Barra({
    * el sello) no rehace el reparto: sólo importa si los hay.
    */
   const conDados = dados !== null;
+  /*
+   * Y SABIENDO SI HAY RELOJ: el reparto reserva a la derecha el ala del reloj de arena para que
+   * quepa SIEMPRE, encogiendo las piezas donde haga falta (ver `huecosDeLaBarra`). Donde no hay
+   * reloj —la app todavía no lo pinta— no se reserva nada.
+   */
+  const conReloj = reloj !== null;
   const mesa = useMemo(
-    () => (conDados ? huecosDeLaMesa(cuantos, forma.campo, forma.proporcion, forma.alto) : null),
-    [conDados, cuantos, forma],
+    () => (conDados ? huecosDeLaMesa(cuantos, forma.campo, forma.proporcion, forma.alto, conReloj) : null),
+    [conDados, cuantos, forma, conReloj],
   );
   const huecos = useMemo(
-    () => (mesa === null ? huecosDeLaBarra(cuantos, forma.campo, forma.proporcion) : mesa.piezas),
-    [mesa, cuantos, forma],
+    () => (mesa === null ? huecosDeLaBarra(cuantos, forma.campo, forma.proporcion, conReloj) : mesa.piezas),
+    [mesa, cuantos, forma, conReloj],
   );
   const huecoDelMazo = mazo === null ? undefined : huecos[piezas.length];
   const primero: HuecoDeLaBarra | undefined = huecos[0];
@@ -1934,9 +1940,9 @@ function Barra({
   const sitioDeLosDados = useMemo((): HuecoDeLosDados | null => {
     if (mesa !== null) return mesa.dados;
     if (!hayTapete) return null;
-    const { dados: sitio } = huecosDeLaMesa(cuantos, forma.campo, forma.proporcion, forma.alto);
+    const { dados: sitio } = huecosDeLaMesa(cuantos, forma.campo, forma.proporcion, forma.alto, conReloj);
     return sitio !== null && sitio.forma === 'colgado' ? sitio : null;
-  }, [mesa, hayTapete, cuantos, forma]);
+  }, [mesa, hayTapete, cuantos, forma, conReloj]);
 
   /*
    * ═══ EL SITIO DEL RELOJ DE ARENA, AL CANTO DERECHO ═══
