@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <!--
+      EL BANCO DE PRUEBAS DEL BURGO EN TRES DIMENSIONES.
+
+      Entrada APARTE de `index.html`, como `banco3d.html` y por lo mismo: la Sala
+      tiene su enrutador probado por `verify:escritorio`, y meter aquí una ruta
+      nueva para mirar una escena obligaría a tocarlo. Esto no es una pantalla del
+      producto: es el ÚNICO sitio donde se juzga que el Burgo SE VE (que un
+      edificio no tapa la calle, que el aventurero anda por la línea media, que
+      las banderas caen donde toca). Ningún comprobador lo dice; `verify:burgo-escena`
+      mide la aritmética y esto mira lo demás.
+
+      Se abre en http://localhost:5175/sala/banco-burgo.html (o el puerto que
+      tenga el Vite del escritorio). Mandos: ?jugadores=6&lleno=1&semilla=ABCDE
+    -->
+    <meta name="viewport" content="width=1024, initial-scale=1.0" />
+    <title>Banco de pruebas · el Burgo en 3D</title>
+    <meta name="theme-color" content="#06110f" />
+  </head>
+  <body>
+    <div id="raiz"></div>
+    <script type="module" src="/src/banco-burgo.tsx"></script>
+  </body>
+</html>
