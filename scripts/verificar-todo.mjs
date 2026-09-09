@@ -731,6 +731,25 @@ const BATERIA = [
     porque:
       'la cala que se genera con el código de la mesa es la misma para los seis aparatos, sus seis amarres caen sobre agua y no se solapan, la cámara deja al aventurero local entero y encima de la hoja del HUD en retrato, en tableta y en panorámico, la máquina de estados de los aventureros no se queda nunca en T-pose, y la paleta de colonos es la de Riberas',
   },
+  /*
+   * ═══ EL BURGO, Y POR QUÉ VA DETRÁS DEL EMBARCADERO ═══
+   *
+   * Es el mismo trato que `embarcadero · modelos` —un `.glb` horneado que el
+   * móvil abre sin textura— sobre otro fichero, `escenas/modelos/burgo.glb`, con
+   * dos cosas que sólo éste puede vigilar. Una: las piezas salen de SIETE packs
+   * de KayKit en cuatro unidades distintas, y la escala va HORNEADA en los
+   * vértices —al revés que el embarcadero, que la deja a la escena—, así que se
+   * mide pieza a pieza contra `escala.ts`: una silla del tamaño de una iglesia
+   * no da error, se ve. Y dos: que ningún fichero del Burgo nombra la marca de
+   * quien vende la mecánica, que es de dominio público.
+   */
+  {
+    nombre: 'burgo · modelos',
+    donde: 'escenas',
+    guion: 'verify:burgo-modelos',
+    porque:
+      '`burgo.glb` trae exactamente las piezas que `burgo/piezas.ts` declara, de siete packs, todas con el color horneado y ninguna con textura ni UV; las de asiento llevan su máscara de tinte —las fichas y el estandarte enteras, la casa grande, la posada y la bandera a medias—; la escala va horneada en los vértices y es la del mundo del Muelle, medida: la casa-ficha mide una persona, la casa grande dos, la tesela lo que la del tablero, la losa una casilla y el muro lo que la muralla, y el juez de tallas se ve caer con cajas sin escalar y con cajas escaladas dos veces; carga con el GLTFLoader de verdad sin atributos entrelazados; pesa menos del tope de la tabla; y ningún fichero del Burgo nombra una marca ajena',
+  },
   {
     nombre: 'escritorio honrado',
     donde: 'escritorio',

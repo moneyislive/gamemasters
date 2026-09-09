@@ -16,7 +16,9 @@
     "verify:embarcadero-modelos": "tsx scripts/verificar-embarcadero-modelos.ts",
     "verify:embarcadero": "tsx scripts/verificar-embarcadero.ts",
     "compilar:dados": "tsx scripts/compilar-dados.ts",
-    "verify:dados": "tsx scripts/verificar-dados.ts"
+    "verify:dados": "tsx scripts/verificar-dados.ts",
+    "compilar:burgo": "tsx scripts/compilar-burgo.ts",
+    "verify:burgo-modelos": "tsx scripts/verificar-burgo-modelos.ts"
   },
   "description": "Las escenas 3D que pintan los DOS clientes. Sin Canvas propio: lo monta quien la usa.",
   "peerDependencies": {
