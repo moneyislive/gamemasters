@@ -58,6 +58,15 @@ import {
 import type { EstadoDeRiberas } from './riberas';
 import { avanzarLaPeonza, MANIFIESTO_PEONZA } from './peonza';
 import type { EstadoDeLaPeonza } from './peonza';
+import {
+  avanzarElBurgo,
+  loSecretoDelBurgo,
+  MANIFIESTO_BURGO,
+  opcionesDelBurgo,
+  proyectarElBurgo,
+  seAcabo as seAcaboElBurgo,
+} from './burgo';
+import type { EstadoDelBurgo } from './burgo';
 import { laCifraDeElArcade } from './puntuaciones';
 
 export {
@@ -254,6 +263,81 @@ export type {
   VistaDeRiberas,
 } from './riberas';
 
+/*
+ * ═══ EL BURGO SALE CON APELLIDO DONDE CHOCA, Y ES EL SEXTO QUE LO PAGA ═══
+ *
+ * `EMPEZAR`, `PASAR`, `seAcabo` y `partidaNueva` ya los exportan La Frente, Riberas y
+ * La Ronda; `ACEPTAR`, `RECHAZAR`, `ALZAR` y `TIRAR` los exporta Riberas. Aquí llevan
+ * `_BURGO` / `DelBurgo`, igual que `EMPEZAR_RIBERAS` o `BARAJA_DE_LA_RONDA`, y por el
+ * mismo motivo: este fichero es la puerta común de los juegos y es donde los nombres
+ * se cruzan. Quien importe de `./burgo` directamente los tiene sin apellido.
+ */
+export {
+  A_ALMONEDA,
+  ACEPTAR as ACEPTAR_BURGO,
+  ALZAR as ALZAR_BURGO,
+  avanzarElBurgo,
+  BURGO,
+  COLORES_DEL_BURGO,
+  comoSiSiempreHubieraHabidoBurgo,
+  COMPRAR as COMPRAR_BURGO,
+  DESEMPENAR,
+  EMPENAR,
+  EMPEZAR as EMPEZAR_BURGO,
+  INDULTOS_QUE_EXISTEN,
+  LIBRE,
+  loSecretoDelBurgo,
+  MANIFIESTO_BURGO,
+  maravedies,
+  opcionesDelBurgo,
+  ordinal,
+  PAGAR_FIANZA,
+  partidaNueva as partidaNuevaDelBurgo,
+  PASAR as PASAR_BURGO,
+  PASAR_PUJA,
+  PASOS_DE_UN_PASEO,
+  PROPONER,
+  proyectarElBurgo,
+  PUJAR,
+  RECHAZAR as RECHAZAR_BURGO,
+  RENDIRSE,
+  RETIRAR,
+  RONDAS_DE_SORTEO,
+  seAcabo as seAcaboElBurgo,
+  tableroDelBurgo,
+  TIRAR as TIRAR_BURGO,
+  TOPE_DE_MRS_EN_UN_TRATO,
+  TOPE_DE_SUCESOS,
+  TOPE_DE_VUELTAS_MAXIMO,
+  TRATOS_ABIERTOS_POR_PROPONENTE,
+  USAR_INDULTO,
+  VENDER,
+} from './burgo';
+export type {
+  AlmonedaDelBurgo,
+  AlmonedaVista,
+  ApuroDelBurgo,
+  ApuroVisto,
+  CartaSalida,
+  DeudaDelBurgo,
+  EstadoDelBurgo,
+  JugadorDelBurgo,
+  JugadorVisto as JugadorVistoDelBurgo,
+  LadoDelTrato,
+  MomentoDelBurgo,
+  ParDeDados,
+  PasoDelTurno,
+  PasoDeVuelta,
+  PorqueDelDinero,
+  SucesoDelBurgo,
+  TituloDelBurgo,
+  TituloVisto,
+  TratoDelBurgo,
+  TratoVisto,
+  VistaDelBurgo,
+  VistaSinTablero,
+} from './burgo';
+
 /**
  * EL ALTA. Manifiesto, reductor, proyección y `loSecreto` por la misma puerta.
  *
@@ -417,4 +501,34 @@ instalarArcade<EstadoDeRiberas | undefined, unknown>({
 instalarArcade<EstadoDeLaPeonza | undefined>({
   manifiesto: MANIFIESTO_PEONZA,
   avanzar: avanzarLaPeonza,
+});
+
+/**
+ * «EL BURGO», el sexto: solares, rentas, almonedas, tratos y quiebra.
+ *
+ * ═══ ENTRA POR LA MISMA PUERTA QUE RIBERAS, CON LA MISMA ALTA ═══
+ *
+ * Es el juego con más fases de la Sala —almoneda con relevo, apuros en cola,
+ * quiebra que encola almonedas, un tic que liquida por el ausente— y su alta es
+ * literalmente la de Riberas: manifiesto, reductor, proyección, `loSecreto`,
+ * `opciones` y `seAcabo`. Ni un campo nuevo en el manifiesto ni un parámetro más.
+ *
+ * `secretos: true` obliga a las dos funciones que tapan: el azar sembrado y el
+ * orden de los dos mazos no salen de `loSecretoDelBurgo`, y sin ellas
+ * `exigirSecretosTapados()` no dejaría arrancar al servidor. `seAcabo` es
+ * obligatorio con sede servidor: sin él la mesa no se cerraría nunca.
+ *
+ * Los dos parámetros se escriben a mano por lo mismo que en Riberas: el estado
+ * porque la mesa nace `undefined` y las cuatro puertas lo usan en posiciones
+ * distintas, y la vista porque `opcionesDelBurgo` recibe `unknown` a propósito —lo
+ * que le llega en el móvil es lo que vino por la red— y dejarla inferir la ataría a
+ * la forma de la vista.
+ */
+instalarArcade<EstadoDelBurgo | undefined, unknown>({
+  manifiesto: MANIFIESTO_BURGO,
+  avanzar: avanzarElBurgo,
+  proyeccion: proyectarElBurgo,
+  loSecreto: loSecretoDelBurgo,
+  opciones: opcionesDelBurgo,
+  seAcabo: seAcaboElBurgo,
 });
