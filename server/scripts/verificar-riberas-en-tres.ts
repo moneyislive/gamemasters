@@ -115,12 +115,14 @@ import {
   colocandoEnTres,
   comprarEnTres,
   dadosEnTres,
+  eleccionDeBienes,
   elComponedor,
   elPregonEnTres,
   enCabeza,
   estadoDelVado,
   estiajeEnTres,
   esVistaQueSePinta,
+  jugadaConLosBienes,
   jugadaSinPreguntar,
   jugadasDeLaCarta,
   laBolsaDelDescarte,
@@ -875,6 +877,39 @@ const CAMPO_DE_LA_BARRA = (45 * Math.PI) / 180;
     pares[0]?.opcion.carga,
   );
   comprobar('con dos bienes que elegir, no se manda nada sin preguntar', jugadaSinPreguntar(vista, opciones, 'c3') === null);
+  /*
+   * ═══ Y LOS DOS BIENES SE ELIGEN EN LA MANO, UNO A UNO, Y NO EN UN MENÚ ═══
+   *
+   * `eleccionDeBienes` es lo que abre las cinco casillas en la mano del escritorio: dice
+   * cuántos bienes pide la carta y entre cuáles —sacado de las jugadas, no de una tabla— y
+   * `jugadaConLosBienes` devuelve, para lo elegido, la jugada ENTERA del juego, en cualquier
+   * orden de elección. Se mide con las quince del Año Bueno y con las cinco del Acaparamiento.
+   */
+  const eligeElAnoBueno = eleccionDeBienes(vista, opciones, 'c3');
+  comprobar(
+    'El Año Bueno se elige en la mano: dos bienes, entre los cinco, y la clase que es',
+    eligeElAnoBueno !== null && eligeElAnoBueno.cuantos === 2 && eligeElAnoBueno.clase === 'anobueno' && canonico(eligeElAnoBueno.bienes) === canonico([...BIENES]),
+    eligeElAnoBueno,
+  );
+  const salYJunco = jugadaConLosBienes(vista, opciones, 'c3', ['sal', 'junco']);
+  const juncoYSal = jugadaConLosBienes(vista, opciones, 'c3', ['junco', 'sal']);
+  const dosJuncos = jugadaConLosBienes(vista, opciones, 'c3', ['junco', 'junco']);
+  comprobar(
+    'y lo elegido en cualquier orden da la MISMA jugada del juego, con su carga tal como él la escribe; el doble también',
+    salYJunco !== null && juncoYSal !== null && salYJunco.opcion === juncoYSal.opcion &&
+      canonico(salYJunco.opcion.carga) === canonico({ carta: 'c3', bienes: [...salYJunco.bienes] }) &&
+      dosJuncos !== null && canonico(dosJuncos.bienes) === canonico(['junco', 'junco']) &&
+      jugadaConLosBienes(vista, opciones, 'c3', ['sal']) === null,
+    { salYJunco: salYJunco?.bienes, juncoYSal: juncoYSal?.bienes, dosJuncos: dosJuncos?.bienes },
+  );
+  const eligeElAcaparamiento = eleccionDeBienes(vista, opciones, 'c4');
+  comprobar(
+    'El Acaparamiento se elige igual, con un solo bien; y una carta de una sola jugada no es ninguna elección',
+    eligeElAcaparamiento !== null && eligeElAcaparamiento.cuantos === 1 && eligeElAcaparamiento.clase === 'acaparamiento' && eligeElAcaparamiento.bienes.length === 5 &&
+      jugadaConLosBienes(vista, opciones, 'c4', ['grano'])?.clase === 'acaparamiento' &&
+      mano.filter((c) => jugadaSinPreguntar(vista, opciones, c.id) !== null).every((c) => eleccionDeBienes(vista, opciones, c.id) === null),
+    eligeElAcaparamiento,
+  );
 
   /* EL ACAPARAMIENTO: los cinco bienes, tenga quien tenga. */
   const acapara = bienesQueSeAcaparan(vista, opciones, 'c4');

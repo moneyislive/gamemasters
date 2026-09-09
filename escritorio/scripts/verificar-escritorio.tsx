@@ -169,6 +169,7 @@ import {
   marcadorEnTres,
   mazoEnLaBarra,
   renglonDelVado,
+  eleccionDeBienes,
   estiajeEnTres,
   laBolsaDelDescarte,
   opcionesFueraDeLaBarra,
@@ -2358,9 +2359,30 @@ function elMazoEnLaPantalla(): void {
    */
   const laQuePregunta = cartas.find((c) => c.familia === 'acaparamiento' && c.sePuedeJugar);
   comprobar(
-    'hay una carta que ofrece MÁS DE UNA jugada: hay que preguntar, y el menú se abre',
+    'hay una carta que ofrece MÁS DE UNA jugada: hay que elegir',
     laQuePregunta !== undefined && jugadasDeLaCarta(vista, opciones, laQuePregunta.id).length > 1,
     laQuePregunta === undefined ? null : jugadasDeLaCarta(vista, opciones, laQuePregunta.id).map((j) => j.rotulo),
+  );
+  /*
+   * ═══ Y CUANDO LO QUE SE ELIGE SON BIENES, YA NO SE ABRE `ElijeUna`: SE ABREN LAS CASILLAS ═══
+   *
+   * Miguel pidió que El Acaparamiento y El Año Bueno se jugaran «mostrando las 5 celdas de
+   * recursos que se utilizan para trueque» y que lo elegido apareciera en la mano. La pantalla
+   * pregunta primero a `eleccionDeBienes` y sólo cae a `ElijeUna` cuando no son bienes lo que
+   * hay que elegir. Se compra sobre el código —el `<Canvas>` no pinta en Node— y sobre la
+   * traducción con la carta de esta mesa.
+   */
+  const laEleccion = laQuePregunta === undefined ? null : eleccionDeBienes(vista, opciones, laQuePregunta.id);
+  const fuenteDeLaEleccion = readFileSync(new URL('../src/riberas-en-tres.tsx', import.meta.url), 'utf8');
+  comprobar(
+    'y si lo que se elige son bienes se eligen en la mano: `alJugarCarta` pregunta a `eleccionDeBienes` antes que a `ElijeUna`, la escena recibe `bienesQueSeEligen` y `onElegirBien`, lo elegido entra en la `mano` que se le pasa, y `Escape` deshace la elección respetando la pila de trampas',
+    laEleccion !== null && laEleccion.cuantos === 1 && laEleccion.bienes.length === 5 &&
+      /const eleccion = eleccionDeBienes\(vista, opciones, carta\.id\);\s+if \(eleccion !== null\) \{\s+ponerCogida\(null\);\s+ponerEligiendo\(\{ eleccion, elegidos: \[\] \}\);\s+return;\s+\}\s+const todas = jugadasDeLaCarta/.test(fuenteDeLaEleccion) &&
+      /<Delta[\s\S]*?bienesQueSeEligen=\{eligiendo === null \? \[\] : eligiendo\.eleccion\.bienes\}\s+onElegirBien=\{alElegirBien\}/.test(fuenteDeLaEleccion) &&
+      /\.\.\.eligiendo\.elegidos\.map\(\(bien, i\) => \(\{ id: `elegido:\$\{String\(i\)\}:\$\{bien\}`, bien \}\)\)/.test(fuenteDeLaEleccion) &&
+      /const jugada = jugadaConLosBienes\(vista, opciones, eligiendo\.eleccion\.carta, elegidos\);\s+ponerEligiendo\(null\);\s+if \(jugada !== null\) mover\(\{ tipo: jugada\.opcion\.tipo, carga: jugada\.opcion\.carga \}\);/.test(fuenteDeLaEleccion) &&
+      /const estaEligiendo = eligiendo !== null;\s+useEffect\(\(\) => \{\s+if \(!estaEligiendo\) return;\s+const quien = \{\};\s+const desarmar = armarUnaTrampa\(quien\);\s+const alPulsar = \(tecla: KeyboardEvent\): void => \{\s+if \(tecla\.key === 'Escape' && mandaEstaTrampa\(quien\)\) ponerEligiendo\(null\);/.test(fuenteDeLaEleccion),
+    laEleccion,
   );
   const laGuardia = cartas.find((c) => c.familia === 'guardia' && c.sePuedeJugar);
   comprobar(

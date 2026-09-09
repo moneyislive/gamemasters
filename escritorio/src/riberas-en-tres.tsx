@@ -237,9 +237,11 @@ import {
   LO_QUE_PIDO,
   LOS_CERRADOS,
   elPregonSePliega,
+  eleccionDeBienes,
   elResumenDelPregon,
   estiajeEnTres,
   glifosDelCarril,
+  jugadaConLosBienes,
   jugadasDeLaCarta,
   laManoDeLaIzquierda,
   jugadaSinPreguntar,
@@ -275,6 +277,7 @@ import type {
   ClaseDeJugada,
   ColonoEnElMarcador,
   DadosEnTres,
+  EleccionDeBienes,
   ExplicacionDeLaCarta,
   GlifoDelCarril,
   IdDeLaBarra,
@@ -1983,7 +1986,37 @@ export function RiberasEnTres({
     islasVistas.current = { firma, islas };
     return { ...crudo, islas };
   }, [vista]);
-  const mano = useMemo(() => manoEnTres(vista), [vista]);
+  /*
+   * LO QUE SE ESTÁ ELIGIENDO PARA UNA CARTA: qué carta, entre qué bienes, cuántos, y los ya
+   * elegidos. Vive aquí como `cogida` y `preguntando`, y por lo mismo: es dónde está la
+   * persona, no estado del juego. Al juego sólo le llega la jugada entera cuando el último
+   * bien se ha elegido; hasta entonces no ha pasado nada. Ver `eleccionDeBienes`. Nace aquí,
+   * antes que `preguntando` y los demás, porque la `mano` de abajo lo lee.
+   */
+  const [eligiendo, ponerEligiendo] = useState<{ eleccion: EleccionDeBienes; elegidos: readonly string[] } | null>(null);
+  const manoDeVerdad = useMemo(() => manoEnTres(vista), [vista]);
+  /*
+   * ═══ LO ELEGIDO APARECE EN LA MANO ANTES DE QUE EL JUEGO CONTESTE ═══
+   *
+   * Es lo que Miguel pidió del gesto: «cuando el usuario seleccione uno a uno los recursos,
+   * aparezcan las cartas en su mano». Cada bien elegido entra en la mano como una carta más,
+   * con un identificador que no es ninguna ficha (`elegido:`), y la escena la pinta igual que
+   * a las demás. Cuando el último bien se elige y la jugada viaja, la mesa vuelve con las
+   * fichas de verdad y `soltarTodo` retira las provisionales: el reemplazo no se nota.
+   *
+   * No se pueden coger: `alCogerCarta` no coge nada mientras se elige, y con eso una carta
+   * provisional tampoco puede acabar en un trueque ni en la bolsa. Un toque en la mano al
+   * lado de las casillas NO deshace la elección a propósito: están pegadas, y un roce no
+   * debería costar volver a empezar. Se deshace con `Escape`, volviendo a coger el naipe
+   * (`alCogerCartaDelMazo`) o porque la mesa cambió debajo (`soltarTodo`).
+   */
+  const mano = useMemo(
+    () =>
+      eligiendo === null
+        ? manoDeVerdad
+        : [...manoDeVerdad, ...eligiendo.elegidos.map((bien, i) => ({ id: `elegido:${String(i)}:${bien}`, bien }))],
+    [manoDeVerdad, eligiendo],
+  );
   /*
    * LA BOLSA DEL ESTIAJE: lo que me queda por tirar de un siete, o nada.
    *
@@ -2175,6 +2208,7 @@ export function RiberasEnTres({
     ponerCogida(null);
     ponerCartaDelMazo(null);
     ponerPreguntando(null);
+    ponerEligiendo(null);
   }, []);
 
   /*
@@ -2873,13 +2907,13 @@ export function RiberasEnTres({
 
   const alCogerCarta = useCallback(
     (carta: { id: string }) => {
-      if (quieto) return;
+      if (quieto || eligiendo !== null) return;
       ponerTomada(null);
       ponerCartaDelMazo(null);
       ponerPreguntando(null);
       ponerCogida((antes) => (antes === carta.id ? null : carta.id));
     },
-    [quieto],
+    [quieto, eligiendo],
   );
 
   /*
@@ -2976,6 +3010,7 @@ export function RiberasEnTres({
       ponerTomada(null);
       ponerCogida(null);
       ponerPreguntando(null);
+      ponerEligiendo(null);
       ponerCartaDelMazo((antes) => (antes === carta.id ? null : carta.id));
     },
     [quieto],
@@ -3012,6 +3047,19 @@ export function RiberasEnTres({
         mover({ tipo: unica.opcion.tipo, carga: unica.opcion.carga });
         return;
       }
+      /*
+       * ═══ SI LO QUE HAY QUE ELEGIR SON BIENES, SE ELIGEN EN LA MANO Y NO EN UN MENÚ ═══
+       *
+       * El Acaparamiento (un bien) y El Año Bueno (dos): las casillas de la mano, una por
+       * bien, y lo elegido apareciendo en la mano. Es lo que pidió Miguel, y es el mismo gesto
+       * que el trueque y la bolsa. `ElijeUna` se queda para lo que no sean bienes.
+       */
+      const eleccion = eleccionDeBienes(vista, opciones, carta.id);
+      if (eleccion !== null) {
+        ponerCogida(null);
+        ponerEligiendo({ eleccion, elegidos: [] });
+        return;
+      }
       const todas = jugadasDeLaCarta(vista, opciones, carta.id);
       const primera = todas[0];
       if (primera === undefined) return;
@@ -3022,6 +3070,49 @@ export function RiberasEnTres({
     },
     [quieto, vista, opciones, mover],
   );
+
+  /*
+   * AL PULSAR LA CASILLA DE UN BIEN: se apunta, y con el último se manda la jugada ENTERA que
+   * el juego ofrece para esos bienes (`jugadaConLosBienes`), sin montar nada aquí. Si el juego
+   * no tuviera esa combinación —no pasa: ofrece las quince— no se manda nada y la elección se
+   * cierra, que es el mismo trato que la bolsa da a un bien que no se puede tirar.
+   */
+  const alElegirBien = useCallback(
+    (bien: string) => {
+      if (quieto || eligiendo === null) return;
+      const elegidos = [...eligiendo.elegidos, bien];
+      if (elegidos.length < eligiendo.eleccion.cuantos) {
+        ponerEligiendo({ eleccion: eligiendo.eleccion, elegidos });
+        return;
+      }
+      const jugada = jugadaConLosBienes(vista, opciones, eligiendo.eleccion.carta, elegidos);
+      ponerEligiendo(null);
+      if (jugada !== null) mover({ tipo: jugada.opcion.tipo, carga: jugada.opcion.carga });
+    },
+    [quieto, eligiendo, vista, opciones, mover],
+  );
+
+  /*
+   * `Escape` DESHACE LA ELECCIÓN, como cierra el menú y el cajón. Aquí no hay caja ni foco
+   * que atrapar —las casillas viven en el lienzo—, pero SÍ hay pila: si encima se abre el
+   * cajón, ese `Escape` es suyo. Por eso esto se apunta con `armarUnaTrampa` igual que las
+   * cajas y sólo actúa cuando `mandaEstaTrampa`. Se arma una vez por elección, no una vez
+   * por bien elegido: elegir no debe volver a subirla por encima de lo que se abrió después.
+   */
+  const estaEligiendo = eligiendo !== null;
+  useEffect(() => {
+    if (!estaEligiendo) return;
+    const quien = {};
+    const desarmar = armarUnaTrampa(quien);
+    const alPulsar = (tecla: KeyboardEvent): void => {
+      if (tecla.key === 'Escape' && mandaEstaTrampa(quien)) ponerEligiendo(null);
+    };
+    document.addEventListener('keydown', alPulsar);
+    return () => {
+      document.removeEventListener('keydown', alPulsar);
+      desarmar();
+    };
+  }, [estaEligiendo]);
 
   /**
    * SE HA PULSADO EL NAIPE DEL MAZO: se pregunta, SIEMPRE.
@@ -3701,6 +3792,8 @@ export function RiberasEnTres({
                   onTirarFicha={alTirarFicha}
                   destinosDelEstiaje={destinosDelEstiaje}
                   onMoverElEstiaje={alMoverElEstiaje}
+                  bienesQueSeEligen={eligiendo === null ? [] : eligiendo.eleccion.bienes}
+                  onElegirBien={alElegirBien}
                   cartasDelMazo={cartasDelMazo}
                   cartaDelMazoCogida={cartaDelMazo}
                   onCogerCartaDelMazo={alCogerCartaDelMazo}

@@ -561,6 +561,14 @@ function Banco(): JSX.Element {
    * contador, que es lo único que la escena hace con el número.
    */
   const [porLaBolsa, ponerPorLaBolsa] = useState(0);
+  /*
+   * CUÁNTOS BIENES QUEDAN POR ELEGIR para la carta de mentira («Jugar el Año Bueno»: dos), y
+   * cuántas cartas se han elegido en total, que sólo sirve para que cada una tenga su
+   * identificador. En la partida de verdad lo lleva `eligiendo` en `riberas-en-tres.tsx`, y
+   * lo elegido entra en la mano igual que aquí: una carta por bien pulsado.
+   */
+  const [porElegir, ponerPorElegir] = useState(0);
+  const [elegidas, ponerElegidas] = useState(0);
 
 
   /*
@@ -968,6 +976,13 @@ function Banco(): JSX.Element {
                 if (q !== undefined && r !== undefined) ponerSecaDelBanco({ q, r });
                 ponerMoviendoElEstiaje(false);
               }}
+              bienesQueSeEligen={porElegir > 0 ? ['limo', 'junco', 'sal', 'piedra', 'grano'] : []}
+              onElegirBien={(bien) => {
+                ponerTrueque(`elegido: ${bien}`);
+                ponerMano((m) => [...m, { id: `elegido:${String(elegidas)}:${bien}`, bien }]);
+                ponerElegidas((n) => n + 1);
+                ponerPorElegir((n) => Math.max(0, n - 1));
+              }}
               tomada={tomada}
               onTomarDeLaBarra={(id) => {
                 /*
@@ -1131,6 +1146,16 @@ function Banco(): JSX.Element {
           style={{ ...BOTON, borderColor: moviendoElEstiaje ? '#15120e' : undefined }}
         >
           {moviendoElEstiaje ? 'Dejar el estiaje' : 'Mover el estiaje'}
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            ponerPorElegir((n) => (n === 0 ? 2 : 0));
+            ponerCogida(null);
+          }}
+          style={{ ...BOTON, borderColor: porElegir > 0 ? '#e7dcc0' : undefined }}
+        >
+          {porElegir > 0 ? `Eligiendo: ${String(porElegir)}` : 'Jugar el Año Bueno'}
         </button>
         <button type="button" onClick={tender} style={BOTON}>
           Tender puente

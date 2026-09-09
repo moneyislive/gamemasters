@@ -137,6 +137,22 @@ antes de cada decisión.
 **Para revelar un título se arrastra a una casilla**, igual que un bien se arrastra
 al área de trueque. El gesto ya está aprendido; repetirlo cuesta cero.
 
+**Los bienes que pide una carta se eligen en la mano, no en un menú** (septiembre de
+2026). El Acaparamiento pide un bien y El Año Bueno dos, y en el escritorio abrían
+`ElijeUna` con cinco o quince renglones de texto. Miguel pidió que se eligieran
+«mostrando las 5 celdas de recursos que se utilizan para trueque» y que, según se
+elige, «aparezcan las cartas en su mano». Así queda: al jugar la carta salen las
+cinco casillas en el sitio de las de trueque —sin carta cogida, porque lo elegido
+ENTRA en la mano, no sale de ella—, cada casilla pulsada mete una carta provisional
+en la mano, y con el último bien viaja la jugada ENTERA que el juego ofrecía para
+esa combinación (`jugadaConLosBienes`, portillo §5 bis: no se monta nada en el
+cliente). Qué carta pide bienes y cuántos NO está en una tabla: lo dice
+`eleccionDeBienes` mirando las jugadas que el juego ofrece, así que si mañana una
+carta pide tres, se abren las casillas igual. `Escape`, volver a coger el naipe o
+que la mesa cambie debajo deshacen la elección; un roce en la mano de al lado no, a
+propósito. `ElijeUna` sigue para lo que no son bienes (a quién le robas, a quién se
+lo propones). La app del móvil no compone esto y conserva el menú.
+
 **El contador de puntos de cada colono se ve siempre**, y en el tuyo se distingue lo
 público de lo que sólo cuentas tú.
 

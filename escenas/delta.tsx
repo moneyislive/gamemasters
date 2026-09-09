@@ -3103,6 +3103,8 @@ function Baraja({
   onProponer,
   cuantasALaBolsa,
   onTirar,
+  bienesQueSeEligen,
+  onElegirBien,
 }: {
   mano: readonly CartaEnLaMano[];
   aplanados: Map<string, Instanciable[]>;
@@ -3112,6 +3114,8 @@ function Baraja({
   onProponer: (bien: string) => void;
   cuantasALaBolsa: number;
   onTirar: (bien: string) => void;
+  bienesQueSeEligen: readonly string[];
+  onElegirBien: (bien: string) => void;
 }): JSX.Element {
   const grupo = useRef<THREE.Group>(null);
   const [forma, setForma] = useState({ campo: (45 * Math.PI) / 180, proporcion: 16 / 9 });
@@ -3165,12 +3169,28 @@ function Baraja({
    * posible — y se ve, en vez de dejar al jugador arrastrando la carta sin sitio donde
    * soltarla.
    */
+  /*
+   * ═══ LAS CASILLAS DE ELEGIR UN BIEN: LAS MISMAS QUE LAS DEL TRUEQUE, Y EN SU SITIO ═══
+   *
+   * Cuando se juega una carta que pide bienes —El Acaparamiento uno, El Año Bueno dos— la
+   * mano ofrece una casilla por bien elegible, con la misma forma y en el mismo sitio que
+   * las de trueque, y se pulsa (o se suelta encima) para elegir. Como la bolsa, NO esperan a
+   * que haya una carta cogida: lo que se elige no sale de la mano, entra en ella. Y mientras
+   * se elige no hay casillas de trueque: las dos cosas se parecen demasiado para convivir.
+   */
+  const eleccion = useMemo(
+    () =>
+      bienesQueSeEligen.length > 0
+        ? areasDeTrueque(bienesQueSeEligen.length, forma.campo, forma.proporcion)
+        : [],
+    [bienesQueSeEligen.length, forma],
+  );
   const areas = useMemo(
     () =>
-      cogida === null || cuantasALaBolsa > 0
+      cogida === null || cuantasALaBolsa > 0 || bienesQueSeEligen.length > 0
         ? []
         : areasDeTrueque(seCambianPor.length, forma.campo, forma.proporcion),
-    [cogida, cuantasALaBolsa, seCambianPor.length, forma],
+    [cogida, cuantasALaBolsa, bienesQueSeEligen.length, seCambianPor.length, forma],
   );
 
   return (
@@ -3195,6 +3215,18 @@ function Baraja({
           }}
         />
       )}
+      {eleccion.map((hueco, i) => {
+        const bien = bienesQueSeEligen[i];
+        if (bien === undefined) return null;
+        return (
+          <AreaDeTrueque
+            key={`eleccion:${bien}`}
+            bien={bien}
+            hueco={hueco}
+            onSoltar={onElegirBien}
+          />
+        );
+      })}
       {areas.map((hueco, i) => {
         const bien = seCambianPor[i];
         if (bien === undefined) return null;
@@ -3706,6 +3738,8 @@ export function Delta({
   onProponerTrueque,
   cuantasALaBolsa = 0,
   onTirarFicha,
+  bienesQueSeEligen = [],
+  onElegirBien,
   cartasDelMazo = [],
   cartaDelMazoCogida = null,
   onCogerCartaDelMazo,
@@ -3859,6 +3893,15 @@ export function Delta({
   cuantasALaBolsa?: number;
   /** Aviso de que se ha soltado la carta cogida sobre la bolsa: tirar esa ficha. */
   onTirarFicha?: (bien: string) => void;
+  /**
+   * LOS BIENES ENTRE LOS QUE SE ESTÁ ELIGIENDO, o vacío. Una casilla por bien, en el sitio
+   * de las de trueque, mientras se juega una carta que pide bienes. Llega resuelto: la
+   * escena no sabe qué carta es ni cuántos faltan, y lo ya elegido lo enseña la propia
+   * `mano`, que quien monta el cliente completa con esas cartas.
+   */
+  bienesQueSeEligen?: readonly string[];
+  /** Aviso de que se ha pulsado la casilla de un bien. La escena no sabe qué pasa después. */
+  onElegirBien?: (bien: string) => void;
   /**
    * LA MANO DE CARTAS DEL MAZO, para la franja de la izquierda. Vacía, no hay mano.
    *
@@ -4570,6 +4613,8 @@ export function Delta({
           onProponer={(b) => onProponerTrueque?.(b)}
           cuantasALaBolsa={cuantasALaBolsa}
           onTirar={(b) => onTirarFicha?.(b)}
+          bienesQueSeEligen={bienesQueSeEligen}
+          onElegirBien={(b) => onElegirBien?.(b)}
         />
       )}
 

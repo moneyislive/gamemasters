@@ -1566,6 +1566,65 @@ export function jugadaSinPreguntar<O extends OpcionQueLlega>(
 }
 
 /**
+ * LA ELECCIÓN DE BIENES DE UNA CARTA, sobre las casillas de la mano y no en un menú.
+ *
+ * ═══ QUÉ SUSTITUYE ═══
+ *
+ * El Acaparamiento pide UN bien y El Año Bueno DOS, y las dos abrían `ElijeUna` con cinco o
+ * quince renglones de texto. Miguel: «me gustaría que se eligieran mostrando las 5 celdas de
+ * recursos que se utilizan para trueque y, cuando el usuario seleccione uno a uno los
+ * recursos, aparezcan las cartas en su mano». O sea, el mismo gesto que el trueque y que la
+ * bolsa: una casilla por bien, y la mano enseñando lo que ya se ha elegido.
+ *
+ * ═══ LO QUE SALE DE AQUÍ, Y LO QUE NO ═══
+ *
+ * `cuantos` y `bienes` salen de las JUGADAS que el juego ofrece —uno o dos bienes por carga,
+ * y los bienes que aparecen en ellas—, no de una tabla por clase: el día que el juego cambie
+ * lo que pide una carta, esto lo sigue sin tocarlo. `null` cuando la carta no es una
+ * elección de bienes: una sola jugada (se manda sin elegir, `jugadaSinPreguntar`), ninguna,
+ * o varias que no llevan bienes dentro.
+ *
+ * Lo que se manda al final NO se monta aquí: `jugadaConLosBienes` busca entre las jugadas
+ * del juego la que lleva exactamente los bienes elegidos, y devuelve su opción entera, que es
+ * lo que el portillo exige (§5 bis, forma canónica). Elegir «junco y sal» o «sal y junco» es
+ * la misma jugada, y el orden en que el juego la escribió es el que viaja.
+ */
+export interface EleccionDeBienes {
+  readonly carta: string;
+  readonly clase: ClaseDeJugada;
+  /** Cuántos bienes hay que elegir: uno para El Acaparamiento, dos para El Año Bueno. */
+  readonly cuantos: number;
+  /** Los bienes entre los que se elige, en el orden en que el juego los ofrece. */
+  readonly bienes: readonly string[];
+}
+
+export function eleccionDeBienes<O extends OpcionQueLlega>(
+  vista: unknown,
+  opciones: readonly O[],
+  carta: string,
+): EleccionDeBienes | null {
+  const jugadas = jugadasDeLaCarta(vista, opciones, carta);
+  const primera = jugadas[0];
+  if (primera === undefined || jugadas.length < 2) return null;
+  const cuantos = primera.bienes.length;
+  if (cuantos === 0 || jugadas.some((j) => j.bienes.length !== cuantos)) return null;
+  return { carta, clase: primera.clase, cuantos, bienes: [...new Set(jugadas.flatMap((j) => j.bienes))] };
+}
+
+/** La jugada cuyos bienes son EXACTAMENTE los elegidos, en cualquier orden; `null` si ninguna. */
+export function jugadaConLosBienes<O extends OpcionQueLlega>(
+  vista: unknown,
+  opciones: readonly O[],
+  carta: string,
+  elegidos: readonly string[],
+): JugadaDeCarta<O> | null {
+  /* Con comparador: sin él, el orden lo decide el motor (regla 10 de verify:pureza). */
+  const llave = (bienes: readonly string[]): string => [...bienes].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)).join('|');
+  const buscada = llave(elegidos);
+  return jugadasDeLaCarta(vista, opciones, carta).find((j) => llave(j.bienes) === buscada) ?? null;
+}
+
+/**
  * LA OPCIÓN DE REVELAR ESTE TÍTULO, o `null`.
  *
  * No hace falta la vista: revelar no pide destinatario ni bienes, así que la opción
